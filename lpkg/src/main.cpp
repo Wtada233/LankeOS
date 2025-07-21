@@ -271,7 +271,7 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
         return;
     }
 
-    // 复制文件
+    // 复制文件 - 修改部分开始
     std::cout << ">>> 正在复制文件到系统..." << std::endl;
     std::ifstream files_list(tmp_pkg_dir + "/files.txt");
     std::string src, dest;
@@ -285,15 +285,44 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
             exit_with_error("包中缺少文件: " + src);
         }
 
-        ensure_dir_exists(fs::path(dest_path).parent_path());
-        fs::copy(src_path, dest_path, fs::copy_options::overwrite_existing);
+        // 确保目标父目录存在
+        fs::path dest_parent = fs::path(dest_path).parent_path();
+        if (!dest_parent.empty()) {
+            ensure_dir_exists(dest_parent.string());
+        }
 
-        // 每50个文件输出一次进度
-        if (++file_count % 50 == 0) {
-            std::cout << ">>> 已复制 " << file_count << " 个文件" << std::endl;
+        try {
+            if (fs::is_directory(src_path)) {
+                // 递归复制目录
+                fs::copy(src_path, dest_path, 
+                    fs::copy_options::recursive | 
+                    fs::copy_options::overwrite_existing
+                );
+                // 计算目录中的文件数量用于进度显示
+                for (auto& p : fs::recursive_directory_iterator(src_path)) {
+                    if (fs::is_regular_file(p)) {
+                        file_count++;
+                    }
+                }
+            } else {
+                // 复制单个文件
+                fs::copy(src_path, dest_path, 
+                    fs::copy_options::overwrite_existing
+                );
+                file_count++;
+            }
+
+            // 每50个文件输出一次进度
+            if (file_count % 50 == 0) {
+                std::cout << ">>> 已复制 " << file_count << " 个文件" << std::endl;
+            }
+        } catch (const fs::filesystem_error& e) {
+            fs::remove_all(tmp_pkg_dir);
+            exit_with_error("复制失败: " + std::string(e.what()));
         }
     }
     std::cout << ">>> 文件复制完成，共复制 " << file_count << " 个文件" << std::endl;
+    // 修改部分结束
 
     // 保存文件列表
     std::ofstream pkg_files(FILES_DIR + pkg_name + ".txt");
