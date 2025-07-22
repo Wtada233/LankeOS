@@ -10,7 +10,8 @@ void print_usage(const char* prog_name) {
     << "  install <包名>[:版本]  安装指定包 (默认最新版)\n"
     << "  remove <包名>         移除指定包\n"
     << "  autoremove            自动移除不再需要的包\n"
-    << "  upgrade               升级所有可升级的包\n";
+    << "  upgrade               升级所有可升级的包\n"
+    << "  man <包名>            显示包的man page\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -19,10 +20,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    check_root();
-    init_filesystem();
-
     std::string command = argv[1];
+
+    if (command != "man") {
+        check_root();
+        init_filesystem();
+    }
 
     try {
         if (command == "install" && argc == 3) {
@@ -39,6 +42,8 @@ int main(int argc, char* argv[]) {
             autoremove();
         } else if (command == "upgrade" && argc == 2) {
             upgrade_packages();
+        } else if (command == "man" && argc == 3) {
+            show_man_page(argv[2]);
         } else {
             print_usage(argv[0]);
             return 1;
