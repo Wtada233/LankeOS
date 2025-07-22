@@ -316,3 +316,17 @@ void upgrade_packages() {
         log_info("已升级 " + std::to_string(upgraded_count) + " 个包。");
     }
 }
+
+void show_man_page(const std::string& pkg_name) {
+    std::string man_file_path = DOCS_DIR + pkg_name + ".man";
+    if (!fs::exists(man_file_path)) {
+        exit_with_error("没有找到 " + pkg_name + " 的man page");
+    }
+
+    std::ifstream man_file(man_file_path);
+    if (!man_file.is_open()) {
+        exit_with_error("无法打开man page: " + man_file_path);
+    }
+
+    std::cout << man_file.rdbuf();
+}
