@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <sys/utsname.h>
+#include <algorithm>
+#include <regex>
 
 namespace fs = std::filesystem;
 
@@ -188,6 +190,85 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
     return (r == ARCHIVE_EOF);
 }
 
+// 比较版本号
+bool version_compare(const std::string& v1, const std::string& v2) {
+    std::regex version_regex(R"((\d+)(?:\.(\d+))*(?:[\.\-]?([a-zA-Z]*)(\d*))?)");
+    std::smatch m1, m2;
+
+    if (!std::regex_match(v1, m1, version_regex) || !std::regex_match(v2, m2, version_regex)) {
+        return v1 < v2; // 如果不符合版本格式，按字符串比较
+    }
+
+    // 比较数字部分
+    for (size_t i = 1; i < m1.size() && i < m2.size(); ++i) {
+        if (m1[i].str().empty() && m2[i].str().empty()) continue;
+
+        if (m1[i].str().empty()) return true;
+        if (m2[i].str().empty()) return false;
+
+        if (i == 3) { // 字母部分
+            int cmp = m1[i].str().compare(m2[i].str());
+            if (cmp != 0) return cmp < 0;
+        } else { // 数字部分
+            int num1 = m1[i].str().empty() ? 0 : std::stoi(m1[i].str());
+            int num2 = m2[i].str().empty() ? 0 : std::stoi(m2[i].str());
+            if (num1 != num2) return num1 < num2;
+        }
+    }
+
+    return false;
+}
+
+// 获取最新版本
+std::string get_latest_version(const std::string& mirror_url, const std::string& arch, const std::string& pkg_name) {
+    std::string versions_url = mirror_url + arch + "/" + pkg_name + "/";
+    std::string tmp_file = TMP_DIR + "versions.html";
+
+    if (!download_file(versions_url, tmp_file)) {
+        exit_with_error("无法获取版本列表: " + versions_url);
+    }
+
+    // 解析HTML获取版本列表
+    std::ifstream file(tmp_file);
+    std::string line;
+    std::vector<std::string> versions;
+    std::regex version_link_regex(R"(<a href="([^"/]+)/">)");
+
+    while (std::getline(file, line)) {
+        std::smatch match;
+        if (std::regex_search(line, match, version_link_regex)) {
+            std::string version = match[1].str();
+            if (version != "..") {
+                versions.push_back(version);
+            }
+        }
+    }
+
+    fs::remove(tmp_file);
+
+    if (versions.empty()) {
+        exit_with_error("没有找到可用版本");
+    }
+
+    // 按版本号排序
+    std::sort(versions.begin(), versions.end(), [](const std::string& a, const std::string& b) {
+        return version_compare(a, b);
+    });
+
+    return versions.back();
+}
+
+// 获取当前安装的版本
+std::string get_installed_version(const std::string& pkg_name) {
+    auto pkgs = read_set_from_file(PKGS_FILE);
+    for (const auto& pkg : pkgs) {
+        if (pkg.find(pkg_name + ":") == 0) {
+            return pkg.substr(pkg_name.length() + 1);
+        }
+    }
+    return "";
+}
+
 // 执行安装一个包
 void install_package(const std::string& pkg_name, const std::string& version, bool explicit_install) {
     // 检查是否已安装
@@ -211,13 +292,20 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
     // 获取架构
     std::string arch = get_architecture();
 
+    // 如果是latest，获取最新版本
+    std::string actual_version = version;
+    if (version == "latest") {
+        actual_version = get_latest_version(mirror_url, arch, pkg_name);
+        std::cout << ">>> 最新版本为: " << actual_version << std::endl;
+    }
+
     // 准备临时目录
     std::string tmp_pkg_dir = TMP_DIR + pkg_name;
     fs::remove_all(tmp_pkg_dir);
     ensure_dir_exists(tmp_pkg_dir);
 
     // 下载包
-    std::string download_url = mirror_url + arch + "/" + pkg_name + "/" + version + "/app.tar.zst";
+    std::string download_url = mirror_url + arch + "/" + pkg_name + "/" + actual_version + "/app.tar.zst";
     std::string archive_path = tmp_pkg_dir + "/app.tar.zst";
 
     std::cout << ">>> 正在从 " << download_url << " 下载..." << std::endl;
@@ -294,9 +382,9 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
         try {
             if (fs::is_directory(src_path)) {
                 // 递归复制目录
-                fs::copy(src_path, dest_path, 
-                    fs::copy_options::recursive | 
-                    fs::copy_options::overwrite_existing
+                fs::copy(src_path, dest_path,
+                         fs::copy_options::recursive |
+                         fs::copy_options::overwrite_existing
                 );
                 // 计算目录中的文件数量用于进度显示
                 for (auto& p : fs::recursive_directory_iterator(src_path)) {
@@ -306,8 +394,8 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
                 }
             } else {
                 // 复制单个文件
-                fs::copy(src_path, dest_path, 
-                    fs::copy_options::overwrite_existing
+                fs::copy(src_path, dest_path,
+                         fs::copy_options::overwrite_existing
                 );
                 file_count++;
             }
@@ -344,7 +432,7 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
     fs::copy(tmp_pkg_dir + "/man.txt", DOCS_DIR + pkg_name + ".man", fs::copy_options::overwrite_existing);
 
     // 更新包列表
-    pkgs.insert(pkg_name + ":" + version);
+    pkgs.insert(pkg_name + ":" + actual_version);
     write_set_to_file(PKGS_FILE, pkgs);
 
     if (explicit_install) {
@@ -535,8 +623,65 @@ void autoremove() {
 
 // 升级所有包
 void upgrade_packages() {
-    // TODO: 实现包升级逻辑
-    std::cout << "升级功能尚未实现" << std::endl;
+    // 读取镜像配置
+    std::ifstream mirror_file(MIRROR_CONF);
+    std::string mirror_url;
+    if (!std::getline(mirror_file, mirror_url) || mirror_url.empty()) {
+        exit_with_error("无效的镜像配置");
+    }
+    if (mirror_url.back() != '/') mirror_url += '/';
+
+    // 获取架构
+    std::string arch = get_architecture();
+
+    // 获取已安装的包
+    auto pkgs = read_set_from_file(PKGS_FILE);
+    auto holdpkgs = read_set_from_file(HOLDPKGS_FILE);
+
+    std::cout << "正在检查可升级的包..." << std::endl;
+    int upgraded_count = 0;
+
+    for (const auto& pkg : pkgs) {
+        size_t pos = pkg.find(':');
+        if (pos == std::string::npos) continue;
+
+        std::string pkg_name = pkg.substr(0, pos);
+        std::string current_version = pkg.substr(pos + 1);
+
+        // 只升级手动安装的包
+        if (holdpkgs.find(pkg_name) == holdpkgs.end()) {
+            continue;
+        }
+
+        // 获取最新版本
+        std::string latest_version;
+        try {
+            latest_version = get_latest_version(mirror_url, arch, pkg_name);
+        } catch (...) {
+            std::cerr << "警告: 无法获取 " << pkg_name << " 的最新版本，跳过" << std::endl;
+            continue;
+        }
+
+        // 比较版本
+        if (version_compare(current_version, latest_version)) {
+            std::cout << "发现可升级包: " << pkg_name
+            << " (当前: " << current_version
+            << ", 最新: " << latest_version << ")" << std::endl;
+
+            // 先移除旧版本
+            remove_package(pkg_name);
+
+            // 安装新版本
+            install_package(pkg_name, latest_version, true);
+            upgraded_count++;
+        }
+    }
+
+    if (upgraded_count == 0) {
+        std::cout << "所有包都已是最新版本。" << std::endl;
+    } else {
+        std::cout << "已升级 " << upgraded_count << " 个包。" << std::endl;
+    }
 }
 
 int main(int argc, char* argv[]) {
