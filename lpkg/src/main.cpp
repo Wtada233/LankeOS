@@ -25,6 +25,8 @@ int main(int argc, char* argv[]) {
     if (command != "man") {
         check_root();
         init_filesystem();
+        create_lock();
+        atexit(remove_lock);
     }
 
     try {

@@ -1,9 +1,12 @@
 #include "utils.hpp"
+#include "config.hpp"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
 #include <cstdlib>
 #include <unistd.h>
+#include <sys/file.h>
+#include <cerrno>
 
 namespace fs = std::filesystem;
 
@@ -33,6 +36,32 @@ void exit_with_error(const std::string& msg) {
 void check_root() {
     if (geteuid() != 0) {
         exit_with_error("需要root权限运行");
+    }
+}
+
+static int lock_fd = -1;
+
+void create_lock() {
+    ensure_dir_exists(LOCK_DIR);
+    lock_fd = open(LOCK_FILE.c_str(), O_CREAT | O_RDWR, 0644);
+    if (lock_fd < 0) {
+        exit_with_error("无法创建或打开锁文件: " + LOCK_FILE);
+    }
+
+    if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
+        if (errno == EWOULDBLOCK) {
+            exit_with_error("lpkg数据库被另一进程锁定，请稍后重试。");
+        } else {
+            exit_with_error("无法锁定数据库。");
+        }
+    }
+}
+
+void remove_lock() {
+    if (lock_fd != -1) {
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        fs::remove(LOCK_FILE);
     }
 }
 
