@@ -15,6 +15,10 @@ void exit_with_error(const std::string& msg);
 // System checks
 void check_root();
 
+// Concurrency control
+void create_lock();
+void remove_lock();
+
 // Filesystem utilities
 void ensure_dir_exists(const std::string& path);
 void ensure_file_exists(const std::string& path);
