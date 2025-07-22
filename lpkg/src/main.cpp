@@ -14,8 +14,16 @@
 #include <sys/utsname.h>
 #include <algorithm>
 #include <regex>
+#include <set>
+#include <iomanip>
 
 namespace fs = std::filesystem;
+
+// 函数声明
+void remove_package(const std::string& pkg_name, bool force = false);
+bool is_manually_installed(const std::string& pkg_name);
+void install_package(const std::string& pkg_name, const std::string& version, bool explicit_install);
+
 
 // 全局常量
 const std::string CONFIG_DIR = "/etc/lpkg/";
@@ -27,9 +35,29 @@ const std::string MIRROR_CONF = CONFIG_DIR + "mirror.conf";
 const std::string DOCS_DIR = "/usr/share/lpkg/docs/";
 const std::string TMP_DIR = "/tmp/lpkg/";
 
+// 颜色代码
+const std::string COLOR_GREEN = "\033[1;32m";
+const std::string COLOR_WHITE = "\033[1;37m";
+const std::string COLOR_RED = "\033[1;31m";
+const std::string COLOR_RESET = "\033[0m";
+
+// 日志函数
+void log_info(const std::string& msg) {
+    std::cout << COLOR_GREEN << "==> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+}
+
+void log_sync(const std::string& msg) {
+    std::cout << COLOR_GREEN << ">>> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+}
+
+void log_error(const std::string& msg) {
+    std::cerr << COLOR_RED << "错误: " << COLOR_RESET << msg << std::endl;
+}
+
+
 // 错误处理
 void exit_with_error(const std::string& msg) {
-    std::cerr << "错误: " << msg << std::endl;
+    log_error(msg);
     exit(1);
 }
 
@@ -109,6 +137,33 @@ size_t write_data(void* ptr, size_t size, size_t nmemb, FILE* stream) {
     return fwrite(ptr, size, nmemb, stream);
 }
 
+// 下载进度条回调
+int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_off_t dlnow, [[maybe_unused]] curl_off_t ultotal, [[maybe_unused]] curl_off_t ulnow) {
+    if (dltotal <= 0) {
+        return 0;
+    }
+
+    double percentage = static_cast<double>(dlnow) / static_cast<double>(dltotal) * 100.0;
+    int bar_width = 50;
+    int pos = static_cast<int>(bar_width * percentage / 100.0);
+
+    std::cout << COLOR_GREEN << "==> " << COLOR_WHITE << "正在下载... [";
+    for (int i = 0; i < bar_width; ++i) {
+        if (i < pos) std::cout << "#";
+        else if (i == pos) std::cout << ">";
+        else std::cout << "-";
+    }
+    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%\r";
+    std::cout.flush();
+
+    if (dlnow == dltotal) {
+        std::cout << std::endl;
+    }
+
+    return 0;
+}
+
+
 // 下载文件
 bool download_file(const std::string& url, const std::string& output_path) {
     CURL* curl = curl_easy_init();
@@ -122,6 +177,8 @@ bool download_file(const std::string& url, const std::string& output_path) {
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_callback);
 
     CURLcode res = curl_easy_perform(curl);
     fclose(fp);
@@ -175,9 +232,8 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
         if (r < ARCHIVE_OK) break;
         archive_write_finish_entry(ext);
 
-        // 每100个文件输出一次进度
         if (++count % 100 == 0) {
-            std::cout << ">>> 正在解压文件: " << count << " 个已处理" << std::endl;
+            log_sync("正在解压文件: " + std::to_string(count) + " 个已处理");
         }
     }
 
@@ -186,37 +242,81 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
     archive_write_close(ext);
     archive_write_free(ext);
 
-    std::cout << ">>> 解压完成，共处理 " << count << " 个文件" << std::endl;
+    log_sync("解压完成，共处理 " + std::to_string(count) + " 个文件");
     return (r == ARCHIVE_EOF);
 }
 
 // 比较版本号
-bool version_compare(const std::string& v1, const std::string& v2) {
-    std::regex version_regex(R"((\d+)(?:\.(\d+))*(?:[\.\-]?([a-zA-Z]*)(\d*))?)");
-    std::smatch m1, m2;
-
-    if (!std::regex_match(v1, m1, version_regex) || !std::regex_match(v2, m2, version_regex)) {
-        return v1 < v2; // 如果不符合版本格式，按字符串比较
+bool version_compare(const std::string& v1_str, const std::string& v2_str) {
+    // Split into main version and pre-release part
+    std::string v1_main, v1_pre, v2_main, v2_pre;
+    size_t v1_hyphen = v1_str.find('-');
+    if (v1_hyphen != std::string::npos) {
+        v1_main = v1_str.substr(0, v1_hyphen);
+        v1_pre = v1_str.substr(v1_hyphen + 1);
+    } else {
+        v1_main = v1_str;
     }
 
-    // 比较数字部分
-    for (size_t i = 1; i < m1.size() && i < m2.size(); ++i) {
-        if (m1[i].str().empty() && m2[i].str().empty()) continue;
+    size_t v2_hyphen = v2_str.find('-');
+    if (v2_hyphen != std::string::npos) {
+        v2_main = v2_str.substr(0, v2_hyphen);
+        v2_pre = v2_str.substr(v2_hyphen + 1);
+    } else {
+        v2_main = v2_str;
+    }
 
-        if (m1[i].str().empty()) return true;
-        if (m2[i].str().empty()) return false;
+    // Compare main versions
+    std::regex re_dot("[.]");
+    std::vector<std::string> p1_main{std::sregex_token_iterator(v1_main.begin(), v1_main.end(), re_dot, -1), std::sregex_token_iterator()};
+    std::vector<std::string> p2_main{std::sregex_token_iterator(v2_main.begin(), v2_main.end(), re_dot, -1), std::sregex_token_iterator()};
+    
+    size_t main_len = std::max(p1_main.size(), p2_main.size());
+    for (size_t i = 0; i < main_len; ++i) {
+        int n1 = (i < p1_main.size() && !p1_main[i].empty()) ? std::stoi(p1_main[i]) : 0;
+        int n2 = (i < p2_main.size() && !p2_main[i].empty()) ? std::stoi(p2_main[i]) : 0;
+        if (n1 < n2) return true;
+        if (n1 > n2) return false;
+    }
 
-        if (i == 3) { // 字母部分
-            int cmp = m1[i].str().compare(m2[i].str());
-            if (cmp != 0) return cmp < 0;
-        } else { // 数字部分
-            int num1 = m1[i].str().empty() ? 0 : std::stoi(m1[i].str());
-            int num2 = m2[i].str().empty() ? 0 : std::stoi(m2[i].str());
-            if (num1 != num2) return num1 < num2;
+    // Main versions are equal, compare pre-release
+    if (v1_pre.empty() && !v2_pre.empty()) return false; // 1.0.0 > 1.0.0-alpha
+    if (!v1_pre.empty() && v2_pre.empty()) return true;  // 1.0.0-alpha < 1.0.0
+    if (v1_pre.empty() && v2_pre.empty()) return false; // equal
+
+    // Both have pre-release tags, compare them
+    std::regex re_pre("[.-]");
+    std::vector<std::string> p1_pre{std::sregex_token_iterator(v1_pre.begin(), v1_pre.end(), re_pre, -1), std::sregex_token_iterator()};
+    std::vector<std::string> p2_pre{std::sregex_token_iterator(v2_pre.begin(), v2_pre.end(), re_pre, -1), std::sregex_token_iterator()};
+
+    size_t pre_len = std::max(p1_pre.size(), p2_pre.size());
+    for (size_t i = 0; i < pre_len; ++i) {
+        if (i >= p1_pre.size()) return true; // 1.0.0-alpha < 1.0.0-alpha.1
+        if (i >= p2_pre.size()) return false;
+
+        const std::string& part1 = p1_pre[i];
+        const std::string& part2 = p2_pre[i];
+
+        bool is_num1 = !part1.empty() && std::all_of(part1.begin(), part1.end(), ::isdigit);
+        bool is_num2 = !part2.empty() && std::all_of(part2.begin(), part2.end(), ::isdigit);
+
+        if (is_num1 && is_num2) {
+            int n1 = std::stoi(part1);
+            int n2 = std::stoi(part2);
+            if (n1 < n2) return true;
+            if (n1 > n2) return false;
+        } else {
+            // numeric identifiers always have lower precedence than non-numeric identifiers.
+            if (is_num1 && !is_num2) return true;
+            if (!is_num1 && is_num2) return false;
+            
+            // both are strings
+            if (part1 < part2) return true;
+            if (part1 > part2) return false;
         }
     }
 
-    return false;
+    return false; // equal
 }
 
 // 获取最新版本
@@ -232,7 +332,7 @@ std::string get_latest_version(const std::string& mirror_url, const std::string&
     std::ifstream file(tmp_file);
     std::string line;
     std::vector<std::string> versions;
-    std::regex version_link_regex(R"(<a href="([^"/]+)/">)");
+    std::regex version_link_regex(R"(<a href="([^"]+)/">)");
 
     while (std::getline(file, line)) {
         std::smatch match;
@@ -279,7 +379,7 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
         }
     }
 
-    std::cout << ">>> 开始安装 " << pkg_name << " (版本: " << version << ")" << std::endl;
+    log_info("开始安装 " + pkg_name + " (版本: " + version + ")");
 
     // 读取镜像配置
     std::ifstream mirror_file(MIRROR_CONF);
@@ -296,7 +396,7 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
     std::string actual_version = version;
     if (version == "latest") {
         actual_version = get_latest_version(mirror_url, arch, pkg_name);
-        std::cout << ">>> 最新版本为: " << actual_version << std::endl;
+        log_info("最新版本为: " + actual_version);
     }
 
     // 准备临时目录
@@ -308,15 +408,14 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
     std::string download_url = mirror_url + arch + "/" + pkg_name + "/" + actual_version + "/app.tar.zst";
     std::string archive_path = tmp_pkg_dir + "/app.tar.zst";
 
-    std::cout << ">>> 正在从 " << download_url << " 下载..." << std::endl;
+    log_info("正在从 " + download_url + " 下载...");
     if (!download_file(download_url, archive_path)) {
         fs::remove_all(tmp_pkg_dir);
         exit_with_error("无法下载包: " + download_url);
     }
-    std::cout << ">>> 下载完成" << std::endl;
 
     // 解压包
-    std::cout << ">>> 正在解压到临时目录..." << std::endl;
+    log_info("正在解压到临时目录...");
     if (!extract_tar_zst(archive_path, tmp_pkg_dir)) {
         fs::remove_all(tmp_pkg_dir);
         exit_with_error("解压失败: " + archive_path);
@@ -332,20 +431,40 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
     }
 
     // 处理依赖
-    std::cout << ">>> 正在检查依赖..." << std::endl;
+    log_info("正在检查依赖...");
     std::ifstream deps_file(tmp_pkg_dir + "/deps.txt");
     std::string dep;
     while (std::getline(deps_file, dep)) {
-        if (!dep.empty()) {
-            std::cout << ">>> 发现依赖包: " << dep << "，开始安装..." << std::endl;
-            // 安装依赖包
+        if (dep.empty()) continue;
+
+        log_sync("发现依赖包: " + dep);
+        std::string installed_version = get_installed_version(dep);
+
+        if (installed_version.empty()) {
+            log_sync("依赖 " + dep + " 未安装，开始安装...");
             install_package(dep, "latest", false);
-            // 关键修复：更新本地包集合（确保包含新安装的依赖）
-            pkgs = read_set_from_file(PKGS_FILE);
+        } else {
+            std::string latest_version;
+            try {
+                latest_version = get_latest_version(mirror_url, arch, dep);
+            } catch (...) {
+                log_error("无法获取 " + dep + " 的最新版本，跳过更新检查");
+                continue;
+            }
+
+            if (version_compare(installed_version, latest_version)) {
+                log_sync("发现可升级依赖: " + dep + " (" + installed_version + " -> " + latest_version + ")");
+                bool is_held = is_manually_installed(dep);
+                remove_package(dep, true); // 强制移除以进行升级
+                install_package(dep, latest_version, is_held);
+            } else {
+                log_sync("依赖 " + dep + " 已是最新版本，跳过。");
+            }
         }
+        pkgs = read_set_from_file(PKGS_FILE); // 重新加载包列表
     }
 
-    // 修复：依赖安装后再次检查当前包（防止循环依赖安装）
+    // 修复：依赖安装后再次检查当前包
     bool already_installed = false;
     for (const auto& pkg : pkgs) {
         if (pkg.find(pkg_name + ":") == 0) {
@@ -355,12 +474,12 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
     }
     if (already_installed) {
         fs::remove_all(tmp_pkg_dir);
-        std::cout << "警告: 跳过安装，包已在依赖安装过程中安装: " << pkg_name << std::endl;
+        log_info("警告: 跳过安装，包已在依赖安装过程中安装: " + pkg_name);
         return;
     }
 
-    // 复制文件 - 修改部分开始
-    std::cout << ">>> 正在复制文件到系统..." << std::endl;
+    // 复制文件
+    log_info("正在复制文件到系统...");
     std::ifstream files_list(tmp_pkg_dir + "/files.txt");
     std::string src, dest;
     int file_count = 0;
@@ -373,7 +492,6 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
             exit_with_error("包中缺少文件: " + src);
         }
 
-        // 确保目标父目录存在
         fs::path dest_parent = fs::path(dest_path).parent_path();
         if (!dest_parent.empty()) {
             ensure_dir_exists(dest_parent.string());
@@ -381,36 +499,24 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
 
         try {
             if (fs::is_directory(src_path)) {
-                // 递归复制目录
-                fs::copy(src_path, dest_path,
-                         fs::copy_options::recursive |
-                         fs::copy_options::overwrite_existing
-                );
-                // 计算目录中的文件数量用于进度显示
+                fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
                 for (auto& p : fs::recursive_directory_iterator(src_path)) {
-                    if (fs::is_regular_file(p)) {
-                        file_count++;
-                    }
+                    if (fs::is_regular_file(p)) file_count++;
                 }
             } else {
-                // 复制单个文件
-                fs::copy(src_path, dest_path,
-                         fs::copy_options::overwrite_existing
-                );
+                fs::copy(src_path, dest_path, fs::copy_options::overwrite_existing);
                 file_count++;
             }
 
-            // 每50个文件输出一次进度
             if (file_count % 50 == 0) {
-                std::cout << ">>> 已复制 " << file_count << " 个文件" << std::endl;
+                log_sync("已复制 " + std::to_string(file_count) + " 个文件");
             }
         } catch (const fs::filesystem_error& e) {
             fs::remove_all(tmp_pkg_dir);
             exit_with_error("复制失败: " + std::string(e.what()));
         }
     }
-    std::cout << ">>> 文件复制完成，共复制 " << file_count << " 个文件" << std::endl;
-    // 修改部分结束
+    log_sync("文件复制完成，共复制 " + std::to_string(file_count) + " 个文件");
 
     // 保存文件列表
     std::ofstream pkg_files(FILES_DIR + pkg_name + ".txt");
@@ -444,43 +550,40 @@ void install_package(const std::string& pkg_name, const std::string& version, bo
     // 清理临时文件
     fs::remove_all(tmp_pkg_dir);
 
-    std::cout << "<<< " << pkg_name << " 已成功安装!" << std::endl;
+    log_info(pkg_name + " 已成功安装!");
 }
 
 // 执行卸载一个包
-void remove_package(const std::string& pkg_name) {
+void remove_package(const std::string& pkg_name, bool force) {
     // 检查是否被依赖
-    bool is_dependency = false;
-    std::string dependent_pkg;
-    for (const auto& dep_file : fs::directory_iterator(DEP_DIR)) {
-        // 跳过当前包自己的依赖文件
-        if (dep_file.path().filename() == pkg_name) {
-            continue;
-        }
+    if (!force) {
+        bool is_dependency = false;
+        std::string dependent_pkg;
+        for (const auto& dep_file : fs::directory_iterator(DEP_DIR)) {
+            std::string current_pkg_name = dep_file.path().stem().string();
+            if (current_pkg_name == pkg_name) continue;
 
-        std::ifstream file(dep_file.path());
-        std::string dep;
-        while (std::getline(file, dep)) {
-            if (dep == pkg_name) {
-                dependent_pkg = dep_file.path().filename().string();
-                is_dependency = true;
-                break;
+            std::ifstream file(dep_file.path());
+            std::string dep;
+            while (std::getline(file, dep)) {
+                if (dep == pkg_name) {
+                    dependent_pkg = current_pkg_name;
+                    is_dependency = true;
+                    break;
+                }
             }
+            if (is_dependency) break;
         }
-        if (is_dependency) break;
+
+        if (is_dependency) {
+            log_error("跳过删除，包 " + pkg_name + " 被 " + dependent_pkg + " 依赖");
+            return;
+        }
     }
 
-    if (is_dependency) {
-        std::cerr << "警告: 跳过删除，包 " << pkg_name
-        << " 被 " << dependent_pkg << " 依赖\n";
-        return;
-    }
-
-    // 读取当前包列表
     auto pkgs = read_set_from_file(PKGS_FILE);
     auto holdpkgs = read_set_from_file(HOLDPKGS_FILE);
 
-    // 查找要删除的包的确切记录
     std::string pkg_record;
     for (const auto& pkg : pkgs) {
         if (pkg.find(pkg_name + ":") == 0) {
@@ -490,54 +593,75 @@ void remove_package(const std::string& pkg_name) {
     }
 
     if (pkg_record.empty()) {
-        exit_with_error("找不到包记录: " + pkg_name);
+        log_info("包 " + pkg_name + " 未安装，无需移除。");
+        return;
     }
 
-    // 删除文件
-    std::cout << ">>> 正在移除文件..." << std::endl;
+    log_info("正在移除文件...");
     int removed_count = 0;
     std::string files_list_path = FILES_DIR + pkg_name + ".txt";
     if (fs::exists(files_list_path)) {
         std::ifstream files_list(files_list_path);
         std::string file_path;
+        std::vector<std::string> file_paths;
         while (std::getline(files_list, file_path)) {
-            if (fs::exists(file_path)) {
-                fs::remove(file_path);
-                removed_count++;
-                // 每50个文件输出一次进度
-                if (removed_count % 50 == 0) {
-                    std::cout << ">>> 已移除 " << removed_count << " 个文件" << std::endl;
-                }
-                // 尝试删除空目录
-                std::string dir_path = fs::path(file_path).parent_path().string();
-                while (dir_path != "/") {
-                    if (fs::exists(dir_path) && fs::is_empty(dir_path)) {
-                        fs::remove(dir_path);
-                        dir_path = fs::path(dir_path).parent_path().string();
-                    } else {
-                        break;
+            file_paths.push_back(file_path);
+        }
+        
+        // Sort paths to remove files before directories
+        std::sort(file_paths.rbegin(), file_paths.rend());
+
+        for (const auto& path : file_paths) {
+            if (fs::exists(path) || fs::is_symlink(path)) {
+                try {
+                    fs::remove(path);
+                    removed_count++;
+                    if (removed_count % 50 == 0) {
+                        log_sync("已移除 " + std::to_string(removed_count) + " 个文件");
                     }
+                } catch (const fs::filesystem_error& e) {
+                    // Ignore errors, especially for directories that are not empty
                 }
             }
         }
         fs::remove(files_list_path);
-        std::cout << ">>> 文件移除完成，共移除 " << removed_count << " 个文件" << std::endl;
+        log_sync("文件移除完成，共处理 " + std::to_string(removed_count) + " 个文件条目");
     }
 
-    // 删除依赖文件
-    fs::remove(DEP_DIR + pkg_name);
+    // Clean up empty parent directories
+    if (fs::exists(files_list_path)) {
+        std::ifstream files_list(files_list_path);
+        std::string file_path;
+        std::set<std::string> parent_dirs;
+        while (std::getline(files_list, file_path)) {
+            parent_dirs.insert(fs::path(file_path).parent_path().string());
+        }
 
-    // 删除man文档
+        std::vector<std::string> sorted_dirs(parent_dirs.begin(), parent_dirs.end());
+        std::sort(sorted_dirs.rbegin(), sorted_dirs.rend());
+
+        for(const auto& dir : sorted_dirs) {
+            if (dir != "/" && fs::exists(dir) && fs::is_empty(dir)) {
+                try {
+                    fs::remove(dir);
+                } catch (const fs::filesystem_error& e) {
+                    // ignore
+                }
+            }
+        }
+    }
+
+
+    fs::remove(DEP_DIR + pkg_name);
     fs::remove(DOCS_DIR + pkg_name + ".man");
 
-    // 更新包列表 - 只删除确切的包记录
     pkgs.erase(pkg_record);
     holdpkgs.erase(pkg_name);
 
     write_set_to_file(PKGS_FILE, pkgs);
     write_set_to_file(HOLDPKGS_FILE, holdpkgs);
 
-    std::cout << ">>> " << pkg_name << " 已成功移除" << std::endl;
+    log_info(pkg_name + " 已成功移除");
 }
 
 // 检查包是否是手动安装的
@@ -546,12 +670,11 @@ bool is_manually_installed(const std::string& pkg_name) {
     return holdpkgs.find(pkg_name) != holdpkgs.end();
 }
 
-// 获取所有必需的包（显式安装的包+被依赖的包）
+// 获取所有必需的包
 std::unordered_set<std::string> get_required_packages() {
     auto holdpkgs = read_set_from_file(HOLDPKGS_FILE);
     std::unordered_set<std::string> required_pkgs = holdpkgs;
 
-    // 添加所有被依赖的包
     for (const auto& dep_file : fs::directory_iterator(DEP_DIR)) {
         std::ifstream file(dep_file.path());
         std::string dep;
@@ -561,7 +684,6 @@ std::unordered_set<std::string> get_required_packages() {
             }
         }
     }
-
     return required_pkgs;
 }
 
@@ -570,9 +692,8 @@ void autoremove() {
     std::unordered_set<std::string> removed_pkgs;
     bool found_removable = true;
 
-    std::cout << "正在检查可自动移除的包..." << std::endl;
+    log_info("正在检查可自动移除的包...");
 
-    // 循环直到找不到可移除的包
     while (found_removable) {
         found_removable = false;
         auto pkgs_current = read_set_from_file(PKGS_FILE);
@@ -584,46 +705,31 @@ void autoremove() {
 
             std::string pkg_name = pkg.substr(0, pos);
 
-            // 跳过已删除的包
-            if (removed_pkgs.find(pkg_name) != removed_pkgs.end()) {
-                continue;
-            }
+            if (removed_pkgs.count(pkg_name)) continue;
+            if (is_manually_installed(pkg_name)) continue;
 
-            // 如果是手动安装的包，跳过
-            if (is_manually_installed(pkg_name)) {
-                continue;
-            }
-
-            // 检查是否被其他包依赖
-            bool is_required = (required_pkgs.find(pkg_name) != required_pkgs.end());
-
-            // 如果未被依赖，则安全删除
-            if (!is_required) {
-                std::cout << "发现可移除包: " << pkg_name
-                << " (手动安装: " << (is_manually_installed(pkg_name) ? "是" : "否")
-                << ", 被依赖: " << (is_required ? "是" : "否") << ")" << std::endl;
+            if (required_pkgs.find(pkg_name) == required_pkgs.end()) {
+                log_sync("发现可移除包: " + pkg_name);
                 remove_package(pkg_name);
                 removed_pkgs.insert(pkg_name);
                 found_removable = true;
-                break; // 重新开始循环
+                break;
             }
         }
     }
 
     if (removed_pkgs.empty()) {
-        std::cout << "没有找到可自动移除的包。" << std::endl;
+        log_info("没有找到可自动移除的包。");
     } else {
-        std::cout << "已自动移除 " << removed_pkgs.size() << " 个包。" << std::endl;
+        log_info("已自动移除 " + std::to_string(removed_pkgs.size()) + " 个包。");
     }
 
-    // 清理临时目录
     fs::remove_all(TMP_DIR);
     ensure_dir_exists(TMP_DIR);
 }
 
 // 升级所有包
 void upgrade_packages() {
-    // 读取镜像配置
     std::ifstream mirror_file(MIRROR_CONF);
     std::string mirror_url;
     if (!std::getline(mirror_file, mirror_url) || mirror_url.empty()) {
@@ -631,14 +737,10 @@ void upgrade_packages() {
     }
     if (mirror_url.back() != '/') mirror_url += '/';
 
-    // 获取架构
     std::string arch = get_architecture();
-
-    // 获取已安装的包
     auto pkgs = read_set_from_file(PKGS_FILE);
-    auto holdpkgs = read_set_from_file(HOLDPKGS_FILE);
 
-    std::cout << "正在检查可升级的包..." << std::endl;
+    log_info("正在检查可升级的包...");
     int upgraded_count = 0;
 
     for (const auto& pkg : pkgs) {
@@ -648,39 +750,27 @@ void upgrade_packages() {
         std::string pkg_name = pkg.substr(0, pos);
         std::string current_version = pkg.substr(pos + 1);
 
-        // 只升级手动安装的包
-        if (holdpkgs.find(pkg_name) == holdpkgs.end()) {
-            continue;
-        }
-
-        // 获取最新版本
         std::string latest_version;
         try {
             latest_version = get_latest_version(mirror_url, arch, pkg_name);
         } catch (...) {
-            std::cerr << "警告: 无法获取 " << pkg_name << " 的最新版本，跳过" << std::endl;
+            log_error("无法获取 " + pkg_name + " 的最新版本，跳过");
             continue;
         }
 
-        // 比较版本
         if (version_compare(current_version, latest_version)) {
-            std::cout << "发现可升级包: " << pkg_name
-            << " (当前: " << current_version
-            << ", 最新: " << latest_version << ")" << std::endl;
-
-            // 先移除旧版本
-            remove_package(pkg_name);
-
-            // 安装新版本
-            install_package(pkg_name, latest_version, true);
+            log_sync("发现可升级包: " + pkg_name + " (" + current_version + " -> " + latest_version + ")");
+            bool was_manually_installed = is_manually_installed(pkg_name);
+            remove_package(pkg_name, true);
+            install_package(pkg_name, latest_version, was_manually_installed);
             upgraded_count++;
         }
     }
 
     if (upgraded_count == 0) {
-        std::cout << "所有包都已是最新版本。" << std::endl;
+        log_info("所有包都已是最新版本。");
     } else {
-        std::cout << "已升级 " << upgraded_count << " 个包。" << std::endl;
+        log_info("已升级 " + std::to_string(upgraded_count) + " 个包。");
     }
 }
 
@@ -691,7 +781,7 @@ int main(int argc, char* argv[]) {
         << "  install <包名>[:版本] 安装指定包\n"
         << "  remove <包名>        移除指定包\n"
         << "  autoremove           自动移除不再需要的包\n"
-        << "  upgrade              升级所有包\n";
+        << "    upgrade              升级所有包\n";
         return 1;
     }
 
@@ -710,7 +800,7 @@ int main(int argc, char* argv[]) {
         }
     }
     else if (command == "remove" && argc == 3) {
-        remove_package(argv[2]);
+        remove_package(argv[2], false); // 默认非强制删除
     }
     else if (command == "autoremove") {
         autoremove();
@@ -719,7 +809,7 @@ int main(int argc, char* argv[]) {
         upgrade_packages();
     }
     else {
-        std::cerr << "无效命令或参数\n";
+        log_error("无效命令或参数");
         return 1;
     }
 
