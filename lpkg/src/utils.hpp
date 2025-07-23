@@ -16,9 +16,16 @@ void exit_with_error(const std::string& msg);
 // System checks
 void check_root();
 
-// Concurrency control
-void create_lock();
-void remove_lock();
+// Concurrency control (RAII lock)
+class DBLock {
+public:
+    DBLock();
+    ~DBLock();
+    DBLock(const DBLock&) = delete;
+    DBLock& operator=(const DBLock&) = delete;
+private:
+    int lock_fd = -1;
+};
 
 // Filesystem utilities
 void ensure_dir_exists(const std::string& path);

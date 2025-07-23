@@ -44,9 +44,7 @@ void check_root() {
     }
 }
 
-static int lock_fd = -1;
-
-void create_lock() {
+DBLock::DBLock() {
     ensure_dir_exists(LOCK_DIR);
     lock_fd = open(LOCK_FILE.c_str(), O_CREAT | O_RDWR, 0644);
     if (lock_fd < 0) {
@@ -62,7 +60,7 @@ void create_lock() {
     }
 }
 
-void remove_lock() {
+DBLock::~DBLock() {
     if (lock_fd != -1) {
         flock(lock_fd, LOCK_UN);
         close(lock_fd);

@@ -3,10 +3,14 @@
 #include <curl/curl.h>
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 
-// HTTP下载回调函数
-size_t write_data(void* ptr, size_t size, size_t nmemb, FILE* stream) {
-    return fwrite(ptr, size, nmemb, stream);
+// HTTP下载回调函数 (modern C++)
+size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
+    std::ostream* out = static_cast<std::ostream*>(stream);
+    size_t bytes = size * nmemb;
+    out->write(static_cast<char*>(ptr), bytes);
+    return out->good() ? bytes : 0;
 }
 
 // 下载进度条回调
@@ -23,14 +27,13 @@ int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_o
     const std::string COLOR_WHITE = "\033[1;37m";
     const std::string COLOR_RESET = "\033[0m";
 
-    std::cout << COLOR_GREEN << "==> " << COLOR_WHITE << "正在下载... [";
+    std::cout << "\r" << COLOR_GREEN << "==> " << COLOR_WHITE << "正在下载... [";
     for (int i = 0; i < bar_width; ++i) {
         if (i < pos) std::cout << "#";
         else if (i == pos) std::cout << ">";
         else std::cout << "-";
     }
-    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%\r";
-    std::cout.flush();
+    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%" << std::flush;
 
     if (dlnow == dltotal) {
         std::cout << std::endl;
@@ -43,22 +46,22 @@ bool download_file(const std::string& url, const std::string& output_path) {
     CURL* curl = curl_easy_init();
     if (!curl) return false;
 
-    FILE* fp = fopen(output_path.c_str(), "wb");
-    if (!fp) {
+    std::ofstream ofile(output_path, std::ios::binary);
+    if (!ofile) {
         curl_easy_cleanup(curl);
         return false;
     }
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data_cpp);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ofile);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_callback);
 
     CURLcode res = curl_easy_perform(curl);
-    fclose(fp);
+    ofile.close();
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
