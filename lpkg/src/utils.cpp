@@ -12,10 +12,10 @@ namespace fs = std::filesystem;
 
 // Color codes
 const std::string COLOR_GREEN = "\033[1;32m";
-const std::string COLOR_WHITE = "[1;37m";
-const std::string COLOR_YELLOW = "[1;33m";
-const std::string COLOR_RED = "[1;31m";
-const std::string COLOR_RESET = "[0m";
+const std::string COLOR_WHITE = "\033[1;37m";
+const std::string COLOR_YELLOW = "\033[1;33m";
+const std::string COLOR_RED = "\033[1;31m";
+const std::string COLOR_RESET = "\033[0m";
 
 void log_info(const std::string& msg) {
     std::cout << COLOR_GREEN << "==> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;

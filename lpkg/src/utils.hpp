@@ -4,6 +4,13 @@
 #include <string>
 #include <unordered_set>
 
+// Color codes
+extern const std::string COLOR_GREEN;
+extern const std::string COLOR_WHITE;
+extern const std::string COLOR_YELLOW;
+extern const std::string COLOR_RED;
+extern const std::string COLOR_RESET;
+
 // Log functions
 void log_info(const std::string& msg);
 void log_sync(const std::string& msg);
