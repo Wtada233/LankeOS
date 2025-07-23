@@ -7,6 +7,7 @@
 // Log functions
 void log_info(const std::string& msg);
 void log_sync(const std::string& msg);
+void log_warning(const std::string& msg);
 void log_error(const std::string& msg);
 
 // Error handling
