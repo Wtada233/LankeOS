@@ -35,10 +35,6 @@ int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_o
     }
     std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%" << COLOR_RESET << std::flush;
 
-    if (dlnow == dltotal) {
-        std::cout << std::endl;
-    }
-
     return 0;
 }
 
@@ -61,6 +57,7 @@ bool download_file(const std::string& url, const std::string& output_path) {
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_callback);
 
     CURLcode res = curl_easy_perform(curl);
+    std::cout << std::endl;
     ofile.close();
     curl_easy_cleanup(curl);
 
