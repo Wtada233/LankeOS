@@ -33,7 +33,7 @@ int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_o
         else if (i == pos) std::cout << ">";
         else std::cout << "-";
     }
-    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%" << std::flush;
+    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%" << COLOR_RESET << std::flush;
 
     if (dlnow == dltotal) {
         std::cout << std::endl;
