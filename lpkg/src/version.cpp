@@ -82,37 +82,21 @@ bool version_compare(const std::string& v1_str, const std::string& v2_str) {
 std::string get_latest_version(const std::string& pkg_name) {
     std::string mirror_url = get_mirror_url();
     std::string arch = get_architecture();
-    std::string versions_url = mirror_url + arch + "/" + pkg_name + "/";
-    std::string tmp_file = TMP_DIR + "versions.html";
+    std::string latest_txt_url = mirror_url + arch + "/" + pkg_name + "/latest.txt";
+    std::string tmp_file_path = TMP_DIR + pkg_name + "_latest.txt";
 
-    if (!download_file(versions_url, tmp_file)) {
-        exit_with_error("无法获取版本列表: " + versions_url);
+    if (!download_file(latest_txt_url, tmp_file_path)) {
+        exit_with_error("无法获取 latest.txt: " + latest_txt_url);
     }
 
-    std::ifstream file(tmp_file);
-    std::string line;
-    std::vector<std::string> versions;
-    std::regex version_link_regex(R"(<a href="([^"]+)/">)");
-
-    while (std::getline(file, line)) {
-        std::smatch match;
-        if (std::regex_search(line, match, version_link_regex)) {
-            std::string version = match[1].str();
-            if (version != "..") {
-                versions.push_back(version);
-            }
-        }
+    std::ifstream latest_file(tmp_file_path);
+    std::string latest_version;
+    if (!std::getline(latest_file, latest_version) || latest_version.empty()) {
+        fs::remove(tmp_file_path);
+        exit_with_error("无法从 latest.txt 读取版本信息或文件为空: " + latest_txt_url);
     }
 
-    fs::remove(tmp_file);
+    fs::remove(tmp_file_path);
 
-    if (versions.empty()) {
-        exit_with_error("没有找到可用版本");
-    }
-
-    std::sort(versions.begin(), versions.end(), [](const std::string& a, const std::string& b) {
-        return version_compare(a, b);
-    });
-
-    return versions.back();
+    return latest_version;
 }
