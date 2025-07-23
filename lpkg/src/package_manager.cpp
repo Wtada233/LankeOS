@@ -18,7 +18,7 @@ namespace fs = std::filesystem;
 // Forward declarations for internal functions
 std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
-void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install);
+void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path);
 
 // Implementation
 std::string get_installed_version(const std::string& pkg_name) {
@@ -37,16 +37,18 @@ bool is_manually_installed(const std::string& pkg_name) {
 }
 
 void install_package(const std::string& pkg_name, const std::string& version) {
-    do_install(pkg_name, version, true);
+    std::vector<std::string> install_path;
+    do_install(pkg_name, version, true, install_path);
 }
 
-void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install) {
+void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path) {
     if (!get_installed_version(pkg_name).empty()) {
         log_info("包 " + pkg_name + " 已安装，跳过。");
         return;
     }
 
     log_info("开始安装 " + pkg_name + " (版本: " + version + ")");
+    install_path.push_back(pkg_name);
 
     std::string mirror_url = get_mirror_url();
     std::string arch = get_architecture();
@@ -90,12 +92,17 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     while (std::getline(deps_file, dep)) {
         if (dep.empty()) continue;
 
+        if (std::find(install_path.begin(), install_path.end(), dep) != install_path.end()) {
+            log_warning("检测到循环依赖: " + pkg_name + " -> " + dep + "。忽略此依赖关系。");
+            continue;
+        }
+
         log_sync("发现依赖包: " + dep);
         std::string installed_version = get_installed_version(dep);
 
         if (installed_version.empty()) {
             log_sync("依赖 " + dep + " 未安装，开始安装...");
-            do_install(dep, "latest", false);
+            do_install(dep, "latest", false, install_path);
         } else {
             log_sync("依赖 " + dep + " 已安装，跳过。");
         }
@@ -104,6 +111,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     if (!get_installed_version(pkg_name).empty()) {
         fs::remove_all(tmp_pkg_dir);
         log_info("警告: 跳过安装，包已在依赖安装过程中安装: " + pkg_name);
+        install_path.pop_back();
         return;
     }
 
@@ -118,8 +126,8 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
         installed_files.push_back(dest_path);
 
         if (!fs::exists(src_path)) {
-            fs::remove_all(tmp_pkg_dir);
-            exit_with_error("包中缺少文件: " + src);
+            log_warning("包中缺少文件: " + src + "，跳过。");
+            continue;
         }
 
         fs::path dest_parent = fs::path(dest_path).parent_path();
@@ -131,8 +139,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
             fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
             file_count++;
         } catch (const fs::filesystem_error& e) {
-            fs::remove_all(tmp_pkg_dir);
-            exit_with_error("复制失败: " + std::string(e.what()));
+            log_warning("无法复制文件 " + src_path + " 到 " + dest_path + ": " + e.what());
         }
     }
     log_sync("文件复制完成，共复制 " + std::to_string(file_count) + " 个文件");
@@ -162,6 +169,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     }
 
     fs::remove_all(tmp_pkg_dir);
+    install_path.pop_back();
     log_info(pkg_name + " 已成功安装!");
 }
 
@@ -205,7 +213,9 @@ void remove_package(const std::string& pkg_name, bool force) {
                 try {
                     fs::remove(path);
                     removed_count++;
-                } catch (...) { /* Ignore errors */ }
+                } catch (const fs::filesystem_error& e) {
+                    log_warning("无法移除文件 " + path + ": " + e.what());
+                }
             }
         }
         log_sync("移除了 " + std::to_string(removed_count) + " 个文件");
@@ -305,7 +315,8 @@ void upgrade_packages() {
             log_sync("发现可升级包: " + pkg_name + " (" + current_version + " -> " + latest_version + ")");
             bool was_manually_installed = is_manually_installed(pkg_name);
             remove_package(pkg_name, true);
-            do_install(pkg_name, latest_version, was_manually_installed);
+            std::vector<std::string> install_path;
+            do_install(pkg_name, latest_version, was_manually_installed, install_path);
             upgraded_count++;
         }
     }
