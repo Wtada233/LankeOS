@@ -8,7 +8,7 @@ void print_usage(const char* prog_name) {
     std::cerr << "用法: " << prog_name << " <命令> [参数]\n"
     << "命令:\n"
     << "  install <包名>[:版本]  安装指定包 (默认最新版)\n"
-    << "  remove <包名>         移除指定包\n"
+    << "  remove <包名> [--force] 移除指定包 (使用 --force 强制移除)\n"
     << "  autoremove            自动移除不再需要的包\n"
     << "  upgrade               升级所有可升级的包\n"
     << "  man <包名>            显示包的man page\n";
@@ -38,8 +38,27 @@ int main(int argc, char* argv[]) {
             } else {
                 install_package(arg.substr(0, pos), arg.substr(pos + 1));
             }
-        } else if (command == "remove" && argc == 3) {
-            remove_package(argv[2]);
+        } else if (command == "remove" && (argc >= 3 && argc <= 4)) {
+            std::string pkg_name;
+            bool force = false;
+            for (int i = 2; i < argc; ++i) {
+                std::string arg(argv[i]);
+                if (arg == "--force") {
+                    force = true;
+                } else {
+                    if (!pkg_name.empty()) { // Already have a package name
+                        print_usage(argv[0]);
+                        return 1;
+                    }
+                    pkg_name = arg;
+                }
+            }
+
+            if (pkg_name.empty()) {
+                print_usage(argv[0]);
+                return 1;
+            }
+            remove_package(pkg_name, force);
         } else if (command == "autoremove" && argc == 2) {
             autoremove();
         } else if (command == "upgrade" && argc == 2) {
