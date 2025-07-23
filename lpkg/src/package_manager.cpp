@@ -247,46 +247,62 @@ void remove_package(const std::string& pkg_name, bool force) {
     log_info(pkg_name + " 已成功移除");
 }
 
-std::unordered_set<std::string> get_required_packages() {
-    auto holdpkgs = read_set_from_file(HOLDPKGS_FILE);
-    std::unordered_set<std::string> required_pkgs = holdpkgs;
+// Helper function for autoremove to perform a full dependency graph traversal
+std::unordered_set<std::string> get_all_required_packages() {
+    auto manually_installed = read_set_from_file(HOLDPKGS_FILE);
+    std::unordered_set<std::string> required;
+    std::vector<std::string> queue;
 
-    for (const auto& dep_file : fs::directory_iterator(DEP_DIR)) {
-        std::ifstream file(dep_file.path());
-        std::string dep;
-        while (std::getline(file, dep)) {
-            if (!dep.empty()) {
-                required_pkgs.insert(dep);
+    for (const auto& pkg : manually_installed) {
+        if (required.find(pkg) == required.end()) {
+            queue.push_back(pkg);
+            required.insert(pkg);
+        }
+    }
+
+    size_t head = 0;
+    while (head < queue.size()) {
+        std::string current_pkg = queue[head++];
+        std::string dep_file_path = DEP_DIR + current_pkg;
+
+        if (fs::exists(dep_file_path)) {
+            std::ifstream dep_file(dep_file_path);
+            std::string dep;
+            while (std::getline(dep_file, dep)) {
+                if (!dep.empty() && required.find(dep) == required.end()) {
+                    required.insert(dep);
+                    queue.push_back(dep);
+                }
             }
         }
     }
-    return required_pkgs;
+    return required;
 }
 
 void autoremove() {
     log_info("正在检查可自动移除的包...");
-    std::unordered_set<std::string> removed_pkgs;
-    bool changed = true;
-    while(changed) {
-        changed = false;
-        auto pkgs_current = read_set_from_file(PKGS_FILE);
-        auto required = get_required_packages();
-        for (const auto& pkg_rec : pkgs_current) {
-            std::string pkg_name = pkg_rec.substr(0, pkg_rec.find(':'));
-            if (!is_manually_installed(pkg_name) && !required.count(pkg_name)) {
-                remove_package(pkg_name, true);
-                removed_pkgs.insert(pkg_name);
-                changed = true;
-                break; 
-            }
+    
+    auto required_pkgs = get_all_required_packages();
+    auto all_pkgs_records = read_set_from_file(PKGS_FILE);
+    std::vector<std::string> packages_to_remove;
+
+    for (const auto& record : all_pkgs_records) {
+        std::string pkg_name = record.substr(0, record.find(':'));
+        if (required_pkgs.find(pkg_name) == required_pkgs.end()) {
+            packages_to_remove.push_back(pkg_name);
         }
     }
 
-    if (removed_pkgs.empty()) {
+    if (packages_to_remove.empty()) {
         log_info("没有找到可自动移除的包。");
     } else {
-        log_info("已自动移除 " + std::to_string(removed_pkgs.size()) + " 个包。");
+        for (const auto& pkg_name : packages_to_remove) {
+            // The 'force' flag is true because we've already determined it's safe to remove.
+            remove_package(pkg_name, true);
+        }
+        log_info("已自动移除 " + std::to_string(packages_to_remove.size()) + " 个包。");
     }
+
     fs::remove_all(TMP_DIR);
     ensure_dir_exists(TMP_DIR);
 }

@@ -3,15 +3,17 @@
 #include "package_manager.hpp"
 #include <iostream>
 #include <string>
+#include <vector>
+#include <memory>
 
 void print_usage(const char* prog_name) {
     std::cerr << "用法: " << prog_name << " <命令> [参数]\n"
-    << "命令:\n"
-    << "  install <包名>[:版本]  安装指定包 (默认最新版)\n"
-    << "  remove <包名> [--force] 移除指定包 (使用 --force 强制移除)\n"
-    << "  autoremove            自动移除不再需要的包\n"
-    << "  upgrade               升级所有可升级的包\n"
-    << "  man <包名>            显示包的man page\n";
+              << "命令:\n"
+              << "  install <包名>[:版本]  安装指定包 (默认最新版)\n"
+              << "  remove <包名> [--force] 移除指定包 (使用 --force 强制移除)\n"
+              << "  autoremove            自动移除不再需要的包\n"
+              << "  upgrade               升级所有可升级的包\n"
+              << "  man <包名>            显示包的man page\n";
 }
 
 int main(int argc, char* argv[]) {
@@ -20,37 +22,37 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    std::string command = argv[1];
+    const std::vector<std::string> args(argv + 1, argv + argc);
+    const std::string& command = args[0];
 
+    std::unique_ptr<DBLock> db_lock;
     if (command != "man") {
         check_root();
         init_filesystem();
-        create_lock();
-        atexit(remove_lock);
+        db_lock = std::make_unique<DBLock>();
     }
 
     try {
-        if (command == "install" && argc == 3) {
-            std::string arg = argv[2];
+        if (command == "install" && args.size() == 2) {
+            const std::string& arg = args[1];
             size_t pos = arg.find(':');
             if (pos == std::string::npos) {
                 install_package(arg, "latest");
             } else {
                 install_package(arg.substr(0, pos), arg.substr(pos + 1));
             }
-        } else if (command == "remove" && (argc >= 3 && argc <= 4)) {
+        } else if (command == "remove" && (args.size() >= 2 && args.size() <= 3)) {
             std::string pkg_name;
             bool force = false;
-            for (int i = 2; i < argc; ++i) {
-                std::string arg(argv[i]);
-                if (arg == "--force") {
+            for (size_t i = 1; i < args.size(); ++i) {
+                if (args[i] == "--force") {
                     force = true;
                 } else {
-                    if (!pkg_name.empty()) { // Already have a package name
+                    if (!pkg_name.empty()) {
                         print_usage(argv[0]);
                         return 1;
                     }
-                    pkg_name = arg;
+                    pkg_name = args[i];
                 }
             }
 
@@ -59,12 +61,12 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
             remove_package(pkg_name, force);
-        } else if (command == "autoremove" && argc == 2) {
+        } else if (command == "autoremove" && args.size() == 1) {
             autoremove();
-        } else if (command == "upgrade" && argc == 2) {
+        } else if (command == "upgrade" && args.size() == 1) {
             upgrade_packages();
-        } else if (command == "man" && argc == 3) {
-            show_man_page(argv[2]);
+        } else if (command == "man" && args.size() == 2) {
+            show_man_page(args[1]);
         } else {
             print_usage(argv[0]);
             return 1;
@@ -76,3 +78,4 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
