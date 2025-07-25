@@ -31,7 +31,7 @@ info.uninstall_complete=lpkg 已卸载
 info.extracting=正在解压文件: {} 个已处理
 info.extract_complete=解压完成，共处理 {} 个文件
 info.downloading=正在下载...
-info.https_fallback=HTTPS下载失败，尝试HTTP回退...
+
 info.package_already_installed=包 {} 已安装，跳过。
 info.installing_package=开始安装 {} (版本: {})
 info.latest_version=最新版本为: {}

@@ -31,7 +31,7 @@ info.uninstall_complete=lpkg has been uninstalled
 info.extracting=Extracting files: {} processed
 info.extract_complete=Extraction complete, {} files processed.
 info.downloading=Downloading...
-info.https_fallback=HTTPS download failed, trying HTTP fallback...
+
 info.package_already_installed=Package {} is already installed, skipping.
 info.installing_package=Starting to install {} (version: {})
 info.latest_version=Latest version is: {}

@@ -5,6 +5,7 @@
 #include "archive.hpp"
 #include "version.hpp"
 #include "localization.hpp"
+#include "exception.hpp"
 
 #include <iostream>
 #include <vector>
@@ -70,20 +71,20 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     log_info(string_format("info.downloading_from", download_url));
     if (!download_file(download_url, archive_path)) {
         fs::remove_all(tmp_pkg_dir);
-        exit_with_error(string_format("error.download_failed", download_url));
+        throw LpkgException(string_format("error.download_failed", download_url));
     }
 
     log_info(get_string("info.extracting_to_tmp"));
     if (!extract_tar_zst(archive_path, tmp_pkg_dir)) {
         fs::remove_all(tmp_pkg_dir);
-        exit_with_error(string_format("error.extract_failed", archive_path));
+        throw LpkgException(string_format("error.extract_failed", archive_path));
     }
 
     std::vector<std::string> required_files = {"man.txt", "deps.txt", "files.txt", "content/"};
     for (const auto& file : required_files) {
         if (!fs::exists(tmp_pkg_dir + "/" + file)) {
             fs::remove_all(tmp_pkg_dir);
-            exit_with_error(string_format("error.incomplete_package", file));
+            throw LpkgException(string_format("error.incomplete_package", file));
         }
     }
 
@@ -189,7 +190,7 @@ void remove_package(const std::string& pkg_name, bool force) {
             std::string dep;
             while (std::getline(file, dep)) {
                 if (dep == pkg_name) {
-                    exit_with_error(string_format("error.skip_remove_dependency", pkg_name, current_pkg_name));
+                    throw LpkgException(string_format("error.skip_remove_dependency", pkg_name, current_pkg_name));
                 }
             }
         }
@@ -348,12 +349,12 @@ void upgrade_packages() {
 void show_man_page(const std::string& pkg_name) {
     std::string man_file_path = DOCS_DIR + pkg_name + ".man";
     if (!fs::exists(man_file_path)) {
-        exit_with_error(string_format("error.no_man_page", pkg_name));
+        throw LpkgException(string_format("error.no_man_page", pkg_name));
     }
 
     std::ifstream man_file(man_file_path);
     if (!man_file.is_open()) {
-        exit_with_error(string_format("error.open_man_page_failed", man_file_path));
+        throw LpkgException(string_format("error.open_man_page_failed", man_file_path));
     }
 
     std::cout << man_file.rdbuf();

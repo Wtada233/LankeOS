@@ -1,6 +1,7 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include "exception.hpp"
 #include <string>
 #include <unordered_set>
 
@@ -16,9 +17,6 @@ void log_info(const std::string& msg);
 void log_sync(const std::string& msg);
 void log_warning(const std::string& msg);
 void log_error(const std::string& msg);
-
-// Error handling
-void exit_with_error(const std::string& msg);
 
 // System checks
 void check_root();
