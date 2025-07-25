@@ -7,10 +7,12 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <algorithm>
 
 void print_usage(const char* prog_name) {
     std::cerr << string_format("info.usage", prog_name) << "\n"
               << get_string("info.commands") << "\n"
+              << get_string("info.non_interactive_desc") << "\n"
               << get_string("info.install_desc") << "\n"
               << get_string("info.remove_desc") << "\n"
               << get_string("info.autoremove_desc") << "\n"
@@ -22,12 +24,38 @@ int main(int argc, char* argv[]) {
     try {
         init_localization();
 
-        if (argc < 2) {
+        std::vector<std::string> args;
+        for (int i = 1; i < argc; ++i) {
+            std::string arg = argv[i];
+            if (arg.rfind("--non-interactive", 0) == 0) {
+                if (arg == "--non-interactive") {
+                    set_non_interactive_mode(NonInteractiveMode::NO);
+                    continue;
+                }
+                size_t pos = arg.find('=');
+                if (pos != std::string::npos) {
+                    std::string value = arg.substr(pos + 1);
+                    if (value == "y" || value == "Y") {
+                        set_non_interactive_mode(NonInteractiveMode::YES);
+                    } else if (value == "n" || value == "N") {
+                        set_non_interactive_mode(NonInteractiveMode::NO);
+                    } else {
+                        log_error(get_string("error.invalid_non_interactive_value"));
+                        return 1;
+                    }
+                } else {
+                    set_non_interactive_mode(NonInteractiveMode::NO);
+                }
+            } else {
+                args.push_back(arg);
+            }
+        }
+
+        if (args.empty()) {
             print_usage(argv[0]);
             return 1;
         }
 
-        const std::vector<std::string> args(argv + 1, argv + argc);
         const std::string& command = args[0];
 
         std::unique_ptr<DBLock> db_lock;
@@ -39,12 +67,12 @@ int main(int argc, char* argv[]) {
 
         if (command == "install" && args.size() >= 2) {
             for (size_t i = 1; i < args.size(); ++i) {
-                const std::string& arg = args[i];
-                size_t pos = arg.find(':');
+                const std::string& pkg_arg = args[i];
+                size_t pos = pkg_arg.find(':');
                 if (pos == std::string::npos) {
-                    install_package(arg, "latest");
+                    install_package(pkg_arg, "latest");
                 } else {
-                    install_package(arg.substr(0, pos), arg.substr(pos + 1));
+                    install_package(pkg_arg.substr(0, pos), pkg_arg.substr(pos + 1));
                 }
             }
         } else if (command == "remove" && args.size() >= 2) {
@@ -85,4 +113,3 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-

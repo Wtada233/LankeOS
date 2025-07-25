@@ -18,6 +18,16 @@ void log_sync(const std::string& msg);
 void log_warning(const std::string& msg);
 void log_error(const std::string& msg);
 
+// Interactive mode control
+enum class NonInteractiveMode {
+    INTERACTIVE,
+    YES,
+    NO
+};
+
+void set_non_interactive_mode(NonInteractiveMode mode);
+NonInteractiveMode get_non_interactive_mode();
+
 bool user_confirms(const std::string& prompt);
 
 // System checks
