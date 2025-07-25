@@ -65,3 +65,5 @@ info.skipped_overwrite=Skipped overwriting: {}
 info.skipped_remove=Skipped removing: {}
 prompt.yes_no=(y/n)
 error.invalid_non_interactive_value=Invalid value for --non-interactive. Must be 'y' or 'n'.
+error.hash_mismatch=Hash mismatch for package: {}
+error.hash_download_failed=Failed to download hash file: {}

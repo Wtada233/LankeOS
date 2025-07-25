@@ -48,7 +48,7 @@ std::string get_latest_version(const std::string& pkg_name) {
     std::string latest_txt_url = mirror_url + arch + "/" + pkg_name + "/latest.txt";
     std::string tmp_file_path = TMP_DIR + pkg_name + "_latest.txt";
 
-    if (!download_file(latest_txt_url, tmp_file_path)) {
+    if (!download_file(latest_txt_url, tmp_file_path, false)) {
         throw LpkgException(string_format("error.download_latest_txt_failed", latest_txt_url));
     }
 

@@ -50,7 +50,7 @@ struct CurlDeleter {
 };
 using CurlHandle = std::unique_ptr<CURL, CurlDeleter>;
 
-bool download_file(const std::string& url, const std::string& output_path) {
+bool download_file(const std::string& url, const std::string& output_path, bool show_progress) {
     CurlHandle curl(curl_easy_init());
     if (!curl) {
         return false;
@@ -66,11 +66,18 @@ bool download_file(const std::string& url, const std::string& output_path) {
     curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &ofile);
     curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl.get(), CURLOPT_FAILONERROR, 1L);
-    curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
-    curl_easy_setopt(curl.get(), CURLOPT_XFERINFOFUNCTION, progress_callback);
+
+    if (show_progress) {
+        curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(curl.get(), CURLOPT_XFERINFOFUNCTION, progress_callback);
+    } else {
+        curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 1L);
+    }
 
     CURLcode res = curl_easy_perform(curl.get());
-    std::cout << std::endl;
+    if (show_progress) {
+        std::cout << std::endl;
+    }
     // ofile is closed by its destructor
     // curl handle is cleaned up by its destructor
 
