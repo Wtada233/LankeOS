@@ -9,8 +9,8 @@
 void print_usage(const char* prog_name) {
     std::cerr << "用法: " << prog_name << " <命令> [参数]\n"
               << "命令:\n"
-              << "  install <包名>[:版本]  安装指定包 (默认最新版)\n"
-              << "  remove <包名> [--force] 移除指定包 (使用 --force 强制移除)\n"
+              << "  install <包名>[:版本]...  安装一个或多个指定包 (默认最新版)\n"
+              << "  remove <包名>... [--force] 移除一个或多个指定包 (使用 --force 强制移除)\n"
               << "  autoremove            自动移除不再需要的包\n"
               << "  upgrade               升级所有可升级的包\n"
               << "  man <包名>            显示包的man page\n";
@@ -33,34 +33,34 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        if (command == "install" && args.size() == 2) {
-            const std::string& arg = args[1];
-            size_t pos = arg.find(':');
-            if (pos == std::string::npos) {
-                install_package(arg, "latest");
-            } else {
-                install_package(arg.substr(0, pos), arg.substr(pos + 1));
+        if (command == "install" && args.size() >= 2) {
+            for (size_t i = 1; i < args.size(); ++i) {
+                const std::string& arg = args[i];
+                size_t pos = arg.find(':');
+                if (pos == std::string::npos) {
+                    install_package(arg, "latest");
+                } else {
+                    install_package(arg.substr(0, pos), arg.substr(pos + 1));
+                }
             }
-        } else if (command == "remove" && (args.size() >= 2 && args.size() <= 3)) {
-            std::string pkg_name;
+        } else if (command == "remove" && args.size() >= 2) {
+            std::vector<std::string> pkg_names;
             bool force = false;
             for (size_t i = 1; i < args.size(); ++i) {
                 if (args[i] == "--force") {
                     force = true;
                 } else {
-                    if (!pkg_name.empty()) {
-                        print_usage(argv[0]);
-                        return 1;
-                    }
-                    pkg_name = args[i];
+                    pkg_names.push_back(args[i]);
                 }
             }
 
-            if (pkg_name.empty()) {
+            if (pkg_names.empty()) {
                 print_usage(argv[0]);
                 return 1;
             }
-            remove_package(pkg_name, force);
+            for (const auto& pkg_name : pkg_names) {
+                remove_package(pkg_name, force);
+            }
         } else if (command == "autoremove" && args.size() == 1) {
             autoremove();
         } else if (command == "upgrade" && args.size() == 1) {
