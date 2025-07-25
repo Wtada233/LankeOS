@@ -49,7 +49,7 @@ DBLock::DBLock() {
     ensure_dir_exists(LOCK_DIR);
     lock_fd = open(LOCK_FILE.c_str(), O_CREAT | O_RDWR, 0644);
     if (lock_fd < 0) {
-        exit_with_error(string_format("error.create_file_failed", LOCK_FILE.c_str()));
+        exit_with_error(string_format("error.create_file_failed", LOCK_FILE));
     }
 
     if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
@@ -72,10 +72,10 @@ DBLock::~DBLock() {
 void ensure_dir_exists(const std::string& path) {
     if (!fs::exists(path)) {
         if (!fs::create_directories(path)) {
-            exit_with_error(string_format("error.create_dir_failed", path.c_str()));
+            exit_with_error(string_format("error.create_dir_failed", path));
         }
     } else if (!fs::is_directory(path)) {
-        exit_with_error(string_format("error.path_not_dir", path.c_str()));
+        exit_with_error(string_format("error.path_not_dir", path));
     }
 }
 
@@ -83,7 +83,7 @@ void ensure_file_exists(const std::string& path) {
     if (!fs::exists(path)) {
         std::ofstream file(path);
         if (!file) {
-            exit_with_error(string_format("error.create_file_failed", path.c_str()));
+            exit_with_error(string_format("error.create_file_failed", path));
         }
     }
 }

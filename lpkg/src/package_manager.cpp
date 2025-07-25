@@ -44,11 +44,11 @@ void install_package(const std::string& pkg_name, const std::string& version) {
 
 void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path) {
     if (!get_installed_version(pkg_name).empty()) {
-        log_info(string_format("info.package_already_installed", pkg_name.c_str()));
+        log_info(string_format("info.package_already_installed", pkg_name));
         return;
     }
 
-    log_info(string_format("info.installing_package", pkg_name.c_str(), version.c_str()));
+    log_info(string_format("info.installing_package", pkg_name, version));
     install_path.push_back(pkg_name);
 
     std::string mirror_url = get_mirror_url();
@@ -57,7 +57,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     std::string actual_version = version;
     if (version == "latest") {
         actual_version = get_latest_version(pkg_name);
-        log_info(string_format("info.latest_version", actual_version.c_str()));
+        log_info(string_format("info.latest_version", actual_version));
     }
 
     std::string tmp_pkg_dir = TMP_DIR + pkg_name;
@@ -67,23 +67,23 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     std::string download_url = mirror_url + arch + "/" + pkg_name + "/" + actual_version + "/app.tar.zst";
     std::string archive_path = tmp_pkg_dir + "/app.tar.zst";
 
-    log_info(string_format("info.downloading_from", download_url.c_str()));
+    log_info(string_format("info.downloading_from", download_url));
     if (!download_file(download_url, archive_path)) {
         fs::remove_all(tmp_pkg_dir);
-        exit_with_error(string_format("error.download_failed", download_url.c_str()));
+        exit_with_error(string_format("error.download_failed", download_url));
     }
 
     log_info(get_string("info.extracting_to_tmp"));
     if (!extract_tar_zst(archive_path, tmp_pkg_dir)) {
         fs::remove_all(tmp_pkg_dir);
-        exit_with_error(string_format("error.extract_failed", archive_path.c_str()));
+        exit_with_error(string_format("error.extract_failed", archive_path));
     }
 
     std::vector<std::string> required_files = {"man.txt", "deps.txt", "files.txt", "content/"};
     for (const auto& file : required_files) {
         if (!fs::exists(tmp_pkg_dir + "/" + file)) {
             fs::remove_all(tmp_pkg_dir);
-            exit_with_error(string_format("error.incomplete_package", file.c_str()));
+            exit_with_error(string_format("error.incomplete_package", file));
         }
     }
 
@@ -94,24 +94,24 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
         if (dep.empty()) continue;
 
         if (std::find(install_path.begin(), install_path.end(), dep) != install_path.end()) {
-            log_warning(string_format("error.circular_dependency", pkg_name.c_str(), dep.c_str()));
+            log_warning(string_format("error.circular_dependency", pkg_name, dep));
             continue;
         }
 
-        log_sync(string_format("info.dep_found", dep.c_str()));
+        log_sync(string_format("info.dep_found", dep));
         std::string installed_version = get_installed_version(dep);
 
         if (installed_version.empty()) {
-            log_sync(string_format("info.dep_not_installed", dep.c_str()));
+            log_sync(string_format("info.dep_not_installed", dep));
             do_install(dep, "latest", false, install_path);
         } else {
-            log_sync(string_format("info.dep_already_installed", dep.c_str()));
+            log_sync(string_format("info.dep_already_installed", dep));
         }
     }
 
     if (!get_installed_version(pkg_name).empty()) {
         fs::remove_all(tmp_pkg_dir);
-        log_info(string_format("info.skip_already_installed", pkg_name.c_str()));
+        log_info(string_format("info.skip_already_installed", pkg_name));
         install_path.pop_back();
         return;
     }
@@ -127,7 +127,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
         installed_files.push_back(dest_path);
 
         if (!fs::exists(src_path)) {
-            log_warning(string_format("error.incomplete_package", src.c_str()));
+            log_warning(string_format("error.incomplete_package", src));
             continue;
         }
 
@@ -140,10 +140,10 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
             fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
             file_count++;
         } catch (const fs::filesystem_error& e) {
-            log_warning(string_format("error.copy_file_failed", src_path.c_str(), dest_path.c_str(), e.what()));
+            log_warning(string_format("error.copy_file_failed", src_path, dest_path, e.what()));
         }
     }
-    log_sync(string_format("info.copy_complete", std::to_string(file_count).c_str()));
+    log_sync(string_format("info.copy_complete", file_count));
 
     std::ofstream pkg_files(FILES_DIR + pkg_name + ".txt");
     for(const auto& file : installed_files) {
@@ -171,12 +171,12 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
 
     fs::remove_all(tmp_pkg_dir);
     install_path.pop_back();
-    log_info(string_format("info.package_installed_successfully", pkg_name.c_str()));
+    log_info(string_format("info.package_installed_successfully", pkg_name));
 }
 
 void remove_package(const std::string& pkg_name, bool force) {
     if (get_installed_version(pkg_name).empty()) {
-        log_info(string_format("info.package_not_installed", pkg_name.c_str()));
+        log_info(string_format("info.package_not_installed", pkg_name));
         return;
     }
 
@@ -189,13 +189,13 @@ void remove_package(const std::string& pkg_name, bool force) {
             std::string dep;
             while (std::getline(file, dep)) {
                 if (dep == pkg_name) {
-                    exit_with_error(string_format("error.skip_remove_dependency", pkg_name.c_str(), current_pkg_name.c_str()));
+                    exit_with_error(string_format("error.skip_remove_dependency", pkg_name, current_pkg_name));
                 }
             }
         }
     }
 
-    log_info(string_format("info.removing_package", pkg_name.c_str()));
+    log_info(string_format("info.removing_package", pkg_name));
 
     std::string files_list_path = FILES_DIR + pkg_name + ".txt";
     if (fs::exists(files_list_path)) {
@@ -215,11 +215,11 @@ void remove_package(const std::string& pkg_name, bool force) {
                     fs::remove(path);
                     removed_count++;
                 } catch (const fs::filesystem_error& e) {
-                    log_warning(string_format("error.remove_file_failed", path.c_str(), e.what()));
+                    log_warning(string_format("error.remove_file_failed", path, e.what()));
                 }
             }
         }
-        log_sync(string_format("info.files_removed", std::to_string(removed_count).c_str()));
+        log_sync(string_format("info.files_removed", removed_count));
         fs::remove(files_list_path);
     }
 
@@ -245,7 +245,7 @@ void remove_package(const std::string& pkg_name, bool force) {
         write_set_to_file(HOLDPKGS_FILE, holdpkgs);
     }
 
-    log_info(string_format("info.package_removed_successfully", pkg_name.c_str()));
+    log_info(string_format("info.package_removed_successfully", pkg_name));
 }
 
 // Helper function for autoremove to perform a full dependency graph traversal
@@ -301,7 +301,7 @@ void autoremove() {
             // The 'force' flag is true because we've already determined it's safe to remove.
             remove_package(pkg_name, true);
         }
-        log_info(string_format("info.autoremove_complete", std::to_string(packages_to_remove.size()).c_str()));
+        log_info(string_format("info.autoremove_complete", packages_to_remove.size()));
     }
 
     fs::remove_all(TMP_DIR);
@@ -324,12 +324,12 @@ void upgrade_packages() {
         try {
             latest_version = get_latest_version(pkg_name);
         } catch (...) {
-            log_error(string_format("error.get_latest_version_failed", pkg_name.c_str()));
+            log_error(string_format("error.get_latest_version_failed", pkg_name));
             continue;
         }
 
         if (version_compare(current_version, latest_version)) {
-            log_sync(string_format("info.upgradable_found", pkg_name.c_str(), current_version.c_str(), latest_version.c_str()));
+            log_sync(string_format("info.upgradable_found", pkg_name, current_version, latest_version));
             bool was_manually_installed = is_manually_installed(pkg_name);
             remove_package(pkg_name, true);
             std::vector<std::string> install_path;
@@ -341,19 +341,19 @@ void upgrade_packages() {
     if (upgraded_count == 0) {
         log_info(get_string("info.all_packages_latest"));
     } else {
-        log_info(string_format("info.upgraded_packages", std::to_string(upgraded_count).c_str()));
+        log_info(string_format("info.upgraded_packages", upgraded_count));
     }
 }
 
 void show_man_page(const std::string& pkg_name) {
     std::string man_file_path = DOCS_DIR + pkg_name + ".man";
     if (!fs::exists(man_file_path)) {
-        exit_with_error(string_format("error.no_man_page", pkg_name.c_str()));
+        exit_with_error(string_format("error.no_man_page", pkg_name));
     }
 
     std::ifstream man_file(man_file_path);
     if (!man_file.is_open()) {
-        exit_with_error(string_format("error.open_man_page_failed", man_file_path.c_str()));
+        exit_with_error(string_format("error.open_man_page_failed", man_file_path));
     }
 
     std::cout << man_file.rdbuf();
