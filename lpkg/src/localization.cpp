@@ -9,6 +9,7 @@
 
 namespace {
     std::unordered_map<std::string, std::string> translations;
+    std::unordered_map<std::string, std::string> missing_key_placeholders;
 }
 
 void load_strings(const std::string& lang) {
@@ -47,7 +48,9 @@ const std::string& get_string(const std::string& key) {
     if (it != translations.end()) {
         return it->second;
     }
-    // Return a default string to indicate a missing translation
-    static const std::string missing = "[MISSING_STRING: " + key + "]";
-    return missing;
+    auto missing_it = missing_key_placeholders.find(key);
+    if (missing_it == missing_key_placeholders.end()) {
+        missing_it = missing_key_placeholders.emplace(key, "[MISSING_STRING: " + key + "]").first;
+    }
+    return missing_it->second;
 }

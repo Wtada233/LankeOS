@@ -1,6 +1,6 @@
 # Makefile
-CC = g++
-CFLAGS = -std=c++20 -Wall -Wextra -O2
+CXX = g++
+CXXFLAGS = -std=c++20 -Wall -Wextra -O2
 LIBS = -lcurl -larchive -lfmt
 TARGET = lpkg
 SRC_DIR = src
@@ -18,11 +18,11 @@ OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 all: $(BUILD_DIR)/$(TARGET)
 
 $(BUILD_DIR)/$(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
 # Rule to compile .cpp files into .o files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)

@@ -17,6 +17,7 @@ error.read_latest_txt_failed=无法从 latest.txt 读取版本信息或文件为
 error.prefix=错误:
 info.usage=用法: {} <命令> [参数]
 info.commands=命令:
+info.non_interactive_desc=  --non-interactive[=y|n]  以非交互模式运行 ('y' 表示同意, 'n' 表示拒绝). 如果未提供值，则默认为 'n'。
 info.install_desc=  install <包名>[:版本]...  安装一个或多个指定包 (默认最新版)
 info.remove_desc=  remove <包名>... [--force] 移除一个或多个指定包 (使用 --force 强制移除)
 info.autoremove_desc=  autoremove            自动移除不再需要的包
@@ -62,3 +63,4 @@ warning.remove_shared_file=文件 {} 也被包 {} 使用。是否仍然移除？
 info.skipped_overwrite=已跳过覆盖: {}
 info.skipped_remove=已跳过移除: {}
 prompt.yes_no=(y/n)
+error.invalid_non_interactive_value=--non-interactive 的值无效。必须是 'y' 或 'n'。

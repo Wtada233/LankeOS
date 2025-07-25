@@ -17,6 +17,7 @@ error.read_latest_txt_failed=Failed to read version from latest.txt or file is e
 error.prefix=Error:
 info.usage=Usage: {} <command> [arguments]
 info.commands=Commands:
+info.non_interactive_desc=  --non-interactive[=y|n]  Run non-interactively ('y' to accept all, 'n' to deny all). Defaults to 'n' if no value is provided.
 info.install_desc=  install <package_name>[:version]...  Install one or more specified packages (latest by default).
 info.remove_desc=  remove <package_name>... [--force]      Remove one or more specified packages (use --force to force removal).
 info.autoremove_desc=  autoremove                          Automatically remove packages that are no longer needed.
@@ -62,3 +63,4 @@ warning.remove_shared_file=File {} is also used by package {}. Remove anyway?
 info.skipped_overwrite=Skipped overwriting: {}
 info.skipped_remove=Skipped removing: {}
 prompt.yes_no=(y/n)
+error.invalid_non_interactive_value=Invalid value for --non-interactive. Must be 'y' or 'n'.

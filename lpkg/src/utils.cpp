@@ -12,6 +12,10 @@
 
 namespace fs = std::filesystem;
 
+namespace {
+    NonInteractiveMode non_interactive_mode = NonInteractiveMode::INTERACTIVE;
+}
+
 // Color codes
 const std::string COLOR_GREEN = "\033[1;32m";
 const std::string COLOR_WHITE = "\033[1;37m";
@@ -35,11 +39,27 @@ void log_error(const std::string& msg) {
     std::cerr << COLOR_RED << get_string("error.prefix") << " " << COLOR_RESET << msg << std::endl;
 }
 
+void set_non_interactive_mode(NonInteractiveMode mode) {
+    non_interactive_mode = mode;
+}
+
+NonInteractiveMode get_non_interactive_mode() {
+    return non_interactive_mode;
+}
+
 bool user_confirms(const std::string& prompt) {
-    std::cout << prompt << " " << get_string("prompt.yes_no") << " ";
-    std::string response;
-    std::cin >> response;
-    return (response == "y" || response == "Y");
+    switch (get_non_interactive_mode()) {
+        case NonInteractiveMode::YES:
+            return true;
+        case NonInteractiveMode::NO:
+            return false;
+        case NonInteractiveMode::INTERACTIVE:
+        default:
+            std::cout << prompt << " " << get_string("prompt.yes_no") << " ";
+            std::string response;
+            std::cin >> response;
+            return (response == "y" || response == "Y");
+    }
 }
 
 void check_root() {
