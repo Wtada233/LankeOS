@@ -5,6 +5,7 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <memory>
 
 // HTTP download callback function (modern C++)
 size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
@@ -39,28 +40,39 @@ int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_o
     return 0;
 }
 
-bool download_file(const std::string& url, const std::string& output_path) {
-    CURL* curl = curl_easy_init();
-    if (!curl) return false;
+// Custom deleter for the CURL handle
+struct CurlDeleter {
+    void operator()(CURL* curl) const {
+        if (curl) {
+            curl_easy_cleanup(curl);
+        }
+    }
+};
+using CurlHandle = std::unique_ptr<CURL, CurlDeleter>;
 
-    std::ofstream ofile(output_path, std::ios::binary);
-    if (!ofile) {
-        curl_easy_cleanup(curl);
+bool download_file(const std::string& url, const std::string& output_path) {
+    CurlHandle curl(curl_easy_init());
+    if (!curl) {
         return false;
     }
 
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_data_cpp);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ofile);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progress_callback);
+    std::ofstream ofile(output_path, std::ios::binary);
+    if (!ofile) {
+        return false; // curl handle will be cleaned up automatically
+    }
 
-    CURLcode res = curl_easy_perform(curl);
+    curl_easy_setopt(curl.get(), CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, write_data_cpp);
+    curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &ofile);
+    curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl.get(), CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl.get(), CURLOPT_XFERINFOFUNCTION, progress_callback);
+
+    CURLcode res = curl_easy_perform(curl.get());
     std::cout << std::endl;
-    ofile.close();
-    curl_easy_cleanup(curl);
+    // ofile is closed by its destructor
+    // curl handle is cleaned up by its destructor
 
     return res == CURLE_OK;
 }
