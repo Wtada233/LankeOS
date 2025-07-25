@@ -1,5 +1,6 @@
 #include "archive.hpp"
 #include "utils.hpp"
+#include "localization.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 
@@ -20,7 +21,7 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
 
     struct archive_entry* entry;
     int r;
-    int count = 0;
+    long long count = 0;
     while ((r = archive_read_next_header(a, &entry)) == ARCHIVE_OK) {
         std::string path = output_dir + "/" + archive_entry_pathname(entry);
         archive_entry_set_pathname(entry, path.c_str());
@@ -42,7 +43,7 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
         archive_write_finish_entry(ext);
 
         if (++count % 100 == 0) {
-            log_sync("正在解压文件: " + std::to_string(count) + " 个已处理");
+            log_sync(string_format("info.extracting", std::to_string(count).c_str()));
         }
     }
 
@@ -51,6 +52,6 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
     archive_write_close(ext);
     archive_write_free(ext);
 
-    log_sync("解压完成，共处理 " + std::to_string(count) + " 个文件");
+    log_sync(string_format("info.extract_complete", std::to_string(count).c_str()));
     return (r == ARCHIVE_EOF);
 }

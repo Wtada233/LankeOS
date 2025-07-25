@@ -1,5 +1,6 @@
 #include "config.hpp"
 #include "utils.hpp"
+#include "localization.hpp"
 #include <sys/utsname.h>
 #include <filesystem>
 #include <fstream>
@@ -30,11 +31,11 @@ void init_filesystem() {
 std::string get_architecture() {
     struct utsname buf;
     if (uname(&buf) != 0) {
-        exit_with_error("无法获取系统架构");
+        exit_with_error(get_string("error.get_arch_failed"));
     }
     std::string arch(buf.machine);
     if (arch != "x86_64" && arch != "aarch64") {
-        exit_with_error("不支持的架构: " + arch);
+        exit_with_error(string_format("error.unsupported_arch", arch.c_str()));
     }
     return (arch == "x86_64") ? "amd64" : "arm64";
 }
@@ -43,7 +44,7 @@ std::string get_mirror_url() {
     std::ifstream mirror_file(MIRROR_CONF);
     std::string mirror_url;
     if (!std::getline(mirror_file, mirror_url) || mirror_url.empty()) {
-        exit_with_error("无效的镜像配置");
+        exit_with_error(get_string("error.invalid_mirror_config"));
     }
     if (mirror_url.back() != '/') mirror_url += '/';
     return mirror_url;

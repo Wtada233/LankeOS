@@ -4,6 +4,7 @@
 #include "downloader.hpp"
 #include "archive.hpp"
 #include "version.hpp"
+#include "localization.hpp"
 
 #include <iostream>
 #include <vector>
@@ -43,11 +44,11 @@ void install_package(const std::string& pkg_name, const std::string& version) {
 
 void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path) {
     if (!get_installed_version(pkg_name).empty()) {
-        log_info("包 " + pkg_name + " 已安装，跳过。");
+        log_info(string_format("info.package_already_installed", pkg_name.c_str()));
         return;
     }
 
-    log_info("开始安装 " + pkg_name + " (版本: " + version + ")");
+    log_info(string_format("info.installing_package", pkg_name.c_str(), version.c_str()));
     install_path.push_back(pkg_name);
 
     std::string mirror_url = get_mirror_url();
@@ -56,7 +57,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     std::string actual_version = version;
     if (version == "latest") {
         actual_version = get_latest_version(pkg_name);
-        log_info("最新版本为: " + actual_version);
+        log_info(string_format("info.latest_version", actual_version.c_str()));
     }
 
     std::string tmp_pkg_dir = TMP_DIR + pkg_name;
@@ -66,56 +67,56 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     std::string download_url = mirror_url + arch + "/" + pkg_name + "/" + actual_version + "/app.tar.zst";
     std::string archive_path = tmp_pkg_dir + "/app.tar.zst";
 
-    log_info("正在从 " + download_url + " 下载...");
+    log_info(string_format("info.downloading_from", download_url.c_str()));
     if (!download_file(download_url, archive_path)) {
         fs::remove_all(tmp_pkg_dir);
-        exit_with_error("无法下载包: " + download_url);
+        exit_with_error(string_format("error.download_failed", download_url.c_str()));
     }
 
-    log_info("正在解压到临时目录...");
+    log_info(get_string("info.extracting_to_tmp"));
     if (!extract_tar_zst(archive_path, tmp_pkg_dir)) {
         fs::remove_all(tmp_pkg_dir);
-        exit_with_error("解压失败: " + archive_path);
+        exit_with_error(string_format("error.extract_failed", archive_path.c_str()));
     }
 
     std::vector<std::string> required_files = {"man.txt", "deps.txt", "files.txt", "content/"};
     for (const auto& file : required_files) {
         if (!fs::exists(tmp_pkg_dir + "/" + file)) {
             fs::remove_all(tmp_pkg_dir);
-            exit_with_error("包不完整，缺少文件: " + file);
+            exit_with_error(string_format("error.incomplete_package", file.c_str()));
         }
     }
 
-    log_info("正在检查依赖...");
+    log_info(get_string("info.checking_deps"));
     std::ifstream deps_file(tmp_pkg_dir + "/deps.txt");
     std::string dep;
     while (std::getline(deps_file, dep)) {
         if (dep.empty()) continue;
 
         if (std::find(install_path.begin(), install_path.end(), dep) != install_path.end()) {
-            log_warning("检测到循环依赖: " + pkg_name + " -> " + dep + "。忽略此依赖关系。");
+            log_warning(string_format("error.circular_dependency", pkg_name.c_str(), dep.c_str()));
             continue;
         }
 
-        log_sync("发现依赖包: " + dep);
+        log_sync(string_format("info.dep_found", dep.c_str()));
         std::string installed_version = get_installed_version(dep);
 
         if (installed_version.empty()) {
-            log_sync("依赖 " + dep + " 未安装，开始安装...");
+            log_sync(string_format("info.dep_not_installed", dep.c_str()));
             do_install(dep, "latest", false, install_path);
         } else {
-            log_sync("依赖 " + dep + " 已安装，跳过。");
+            log_sync(string_format("info.dep_already_installed", dep.c_str()));
         }
     }
 
     if (!get_installed_version(pkg_name).empty()) {
         fs::remove_all(tmp_pkg_dir);
-        log_info("警告: 跳过安装，包已在依赖安装过程中安装: " + pkg_name);
+        log_info(string_format("info.skip_already_installed", pkg_name.c_str()));
         install_path.pop_back();
         return;
     }
 
-    log_info("正在复制文件到系统...");
+    log_info(get_string("info.copying_files"));
     std::ifstream files_list(tmp_pkg_dir + "/files.txt");
     std::string src, dest;
     int file_count = 0;
@@ -126,7 +127,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
         installed_files.push_back(dest_path);
 
         if (!fs::exists(src_path)) {
-            log_warning("包中缺少文件: " + src + "，跳过。");
+            log_warning(string_format("error.incomplete_package", src.c_str()));
             continue;
         }
 
@@ -139,10 +140,10 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
             fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
             file_count++;
         } catch (const fs::filesystem_error& e) {
-            log_warning("无法复制文件 " + src_path + " 到 " + dest_path + ": " + e.what());
+            log_warning(string_format("error.copy_file_failed", src_path.c_str(), dest_path.c_str(), e.what()));
         }
     }
-    log_sync("文件复制完成，共复制 " + std::to_string(file_count) + " 个文件");
+    log_sync(string_format("info.copy_complete", std::to_string(file_count).c_str()));
 
     std::ofstream pkg_files(FILES_DIR + pkg_name + ".txt");
     for(const auto& file : installed_files) {
@@ -170,12 +171,12 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
 
     fs::remove_all(tmp_pkg_dir);
     install_path.pop_back();
-    log_info(pkg_name + " 已成功安装!");
+    log_info(string_format("info.package_installed_successfully", pkg_name.c_str()));
 }
 
 void remove_package(const std::string& pkg_name, bool force) {
     if (get_installed_version(pkg_name).empty()) {
-        log_info("包 " + pkg_name + " 未安装，无需移除。");
+        log_info(string_format("info.package_not_installed", pkg_name.c_str()));
         return;
     }
 
@@ -188,13 +189,13 @@ void remove_package(const std::string& pkg_name, bool force) {
             std::string dep;
             while (std::getline(file, dep)) {
                 if (dep == pkg_name) {
-                    exit_with_error("跳过删除，包 " + pkg_name + " 被 " + current_pkg_name + " 依赖");
+                    exit_with_error(string_format("error.skip_remove_dependency", pkg_name.c_str(), current_pkg_name.c_str()));
                 }
             }
         }
     }
 
-    log_info("正在移除 " + pkg_name + "...");
+    log_info(string_format("info.removing_package", pkg_name.c_str()));
 
     std::string files_list_path = FILES_DIR + pkg_name + ".txt";
     if (fs::exists(files_list_path)) {
@@ -214,11 +215,11 @@ void remove_package(const std::string& pkg_name, bool force) {
                     fs::remove(path);
                     removed_count++;
                 } catch (const fs::filesystem_error& e) {
-                    log_warning("无法移除文件 " + path + ": " + e.what());
+                    log_warning(string_format("error.remove_file_failed", path.c_str(), e.what()));
                 }
             }
         }
-        log_sync("移除了 " + std::to_string(removed_count) + " 个文件");
+        log_sync(string_format("info.files_removed", std::to_string(removed_count).c_str()));
         fs::remove(files_list_path);
     }
 
@@ -244,7 +245,7 @@ void remove_package(const std::string& pkg_name, bool force) {
         write_set_to_file(HOLDPKGS_FILE, holdpkgs);
     }
 
-    log_info(pkg_name + " 已成功移除");
+    log_info(string_format("info.package_removed_successfully", pkg_name.c_str()));
 }
 
 // Helper function for autoremove to perform a full dependency graph traversal
@@ -280,7 +281,7 @@ std::unordered_set<std::string> get_all_required_packages() {
 }
 
 void autoremove() {
-    log_info("正在检查可自动移除的包...");
+    log_info(get_string("info.checking_autoremove"));
     
     auto required_pkgs = get_all_required_packages();
     auto all_pkgs_records = read_set_from_file(PKGS_FILE);
@@ -294,13 +295,13 @@ void autoremove() {
     }
 
     if (packages_to_remove.empty()) {
-        log_info("没有找到可自动移除的包。");
+        log_info(get_string("info.no_autoremove_packages"));
     } else {
         for (const auto& pkg_name : packages_to_remove) {
             // The 'force' flag is true because we've already determined it's safe to remove.
             remove_package(pkg_name, true);
         }
-        log_info("已自动移除 " + std::to_string(packages_to_remove.size()) + " 个包。");
+        log_info(string_format("info.autoremove_complete", std::to_string(packages_to_remove.size()).c_str()));
     }
 
     fs::remove_all(TMP_DIR);
@@ -308,7 +309,7 @@ void autoremove() {
 }
 
 void upgrade_packages() {
-    log_info("正在检查可升级的包...");
+    log_info(get_string("info.checking_upgradable"));
     auto pkgs = read_set_from_file(PKGS_FILE);
     int upgraded_count = 0;
 
@@ -323,12 +324,12 @@ void upgrade_packages() {
         try {
             latest_version = get_latest_version(pkg_name);
         } catch (...) {
-            log_error("无法获取 " + pkg_name + " 的最新版本，跳过");
+            log_error(string_format("error.get_latest_version_failed", pkg_name.c_str()));
             continue;
         }
 
         if (version_compare(current_version, latest_version)) {
-            log_sync("发现可升级包: " + pkg_name + " (" + current_version + " -> " + latest_version + ")");
+            log_sync(string_format("info.upgradable_found", pkg_name.c_str(), current_version.c_str(), latest_version.c_str()));
             bool was_manually_installed = is_manually_installed(pkg_name);
             remove_package(pkg_name, true);
             std::vector<std::string> install_path;
@@ -338,21 +339,21 @@ void upgrade_packages() {
     }
 
     if (upgraded_count == 0) {
-        log_info("所有包都已是最新版本。");
+        log_info(get_string("info.all_packages_latest"));
     } else {
-        log_info("已升级 " + std::to_string(upgraded_count) + " 个包。");
+        log_info(string_format("info.upgraded_packages", std::to_string(upgraded_count).c_str()));
     }
 }
 
 void show_man_page(const std::string& pkg_name) {
     std::string man_file_path = DOCS_DIR + pkg_name + ".man";
     if (!fs::exists(man_file_path)) {
-        exit_with_error("没有找到 " + pkg_name + " 的man page");
+        exit_with_error(string_format("error.no_man_page", pkg_name.c_str()));
     }
 
     std::ifstream man_file(man_file_path);
     if (!man_file.is_open()) {
-        exit_with_error("无法打开man page: " + man_file_path);
+        exit_with_error(string_format("error.open_man_page_failed", man_file_path.c_str()));
     }
 
     std::cout << man_file.rdbuf();

@@ -1,5 +1,6 @@
 #include "utils.hpp"
 #include "config.hpp"
+#include "localization.hpp"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -26,11 +27,11 @@ void log_sync(const std::string& msg) {
 }
 
 void log_warning(const std::string& msg) {
-    std::cout << COLOR_YELLOW << "警告: " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+    std::cout << COLOR_YELLOW << get_string("warning.prefix") << " " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
 }
 
 void log_error(const std::string& msg) {
-    std::cerr << COLOR_RED << "错误: " << COLOR_RESET << msg << std::endl;
+    std::cerr << COLOR_RED << get_string("error.prefix") << " " << COLOR_RESET << msg << std::endl;
 }
 
 void exit_with_error(const std::string& msg) {
@@ -40,7 +41,7 @@ void exit_with_error(const std::string& msg) {
 
 void check_root() {
     if (geteuid() != 0) {
-        exit_with_error("需要root权限运行");
+        exit_with_error(get_string("error.root_required"));
     }
 }
 
@@ -48,14 +49,14 @@ DBLock::DBLock() {
     ensure_dir_exists(LOCK_DIR);
     lock_fd = open(LOCK_FILE.c_str(), O_CREAT | O_RDWR, 0644);
     if (lock_fd < 0) {
-        exit_with_error("无法创建或打开锁文件: " + LOCK_FILE);
+        exit_with_error(string_format("error.create_file_failed", LOCK_FILE.c_str()));
     }
 
     if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
         if (errno == EWOULDBLOCK) {
-            exit_with_error("lpkg数据库被另一进程锁定，请稍后重试。");
+            exit_with_error(get_string("error.db_locked"));
         } else {
-            exit_with_error("无法锁定数据库。");
+            exit_with_error(get_string("error.db_lock_failed"));
         }
     }
 }
@@ -71,10 +72,10 @@ DBLock::~DBLock() {
 void ensure_dir_exists(const std::string& path) {
     if (!fs::exists(path)) {
         if (!fs::create_directories(path)) {
-            exit_with_error("无法创建目录: " + path);
+            exit_with_error(string_format("error.create_dir_failed", path.c_str()));
         }
     } else if (!fs::is_directory(path)) {
-        exit_with_error("路径不是目录: " + path);
+        exit_with_error(string_format("error.path_not_dir", path.c_str()));
     }
 }
 
@@ -82,7 +83,7 @@ void ensure_file_exists(const std::string& path) {
     if (!fs::exists(path)) {
         std::ofstream file(path);
         if (!file) {
-            exit_with_error("无法创建文件: " + path);
+            exit_with_error(string_format("error.create_file_failed", path.c_str()));
         }
     }
 }
