@@ -35,6 +35,13 @@ void log_error(const std::string& msg) {
     std::cerr << COLOR_RED << get_string("error.prefix") << " " << COLOR_RESET << msg << std::endl;
 }
 
+bool user_confirms(const std::string& prompt) {
+    std::cout << prompt << " " << get_string("prompt.yes_no") << " ";
+    std::string response;
+    std::cin >> response;
+    return (response == "y" || response == "Y");
+}
+
 void check_root() {
     if (geteuid() != 0) {
         throw LpkgException(get_string("error.root_required"));
