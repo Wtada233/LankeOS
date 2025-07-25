@@ -35,7 +35,7 @@ std::string get_architecture() {
     }
     std::string arch(buf.machine);
     if (arch != "x86_64" && arch != "aarch64") {
-        exit_with_error(string_format("error.unsupported_arch", arch.c_str()));
+        exit_with_error(string_format("error.unsupported_arch", arch));
     }
     return (arch == "x86_64") ? "amd64" : "arm64";
 }

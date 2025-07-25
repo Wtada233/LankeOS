@@ -1,7 +1,7 @@
 # Makefile
 CC = g++
-CFLAGS = -std=c++17 -Wall -Wextra -O2
-LIBS = -lcurl -larchive -lstdc++fs
+CFLAGS = -std=c++20 -Wall -Wextra -O2
+LIBS = -lcurl -larchive -lfmt
 TARGET = lpkg
 SRC_DIR = src
 CONF_DIR = conf

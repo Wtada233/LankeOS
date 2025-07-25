@@ -43,7 +43,7 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
         archive_write_finish_entry(ext);
 
         if (++count % 100 == 0) {
-            log_sync(string_format("info.extracting", std::to_string(count).c_str()));
+            log_sync(string_format("info.extracting", count));
         }
     }
 
@@ -52,6 +52,6 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
     archive_write_close(ext);
     archive_write_free(ext);
 
-    log_sync(string_format("info.extract_complete", std::to_string(count).c_str()));
+    log_sync(string_format("info.extract_complete", count));
     return (r == ARCHIVE_EOF);
 }
