@@ -95,7 +95,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
         if (dep.empty()) continue;
 
         if (std::find(install_path.begin(), install_path.end(), dep) != install_path.end()) {
-            log_warning(string_format("error.circular_dependency", pkg_name, dep));
+            log_warning(string_format("warning.circular_dependency", pkg_name, dep));
             continue;
         }
 
@@ -112,7 +112,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
 
     if (!get_installed_version(pkg_name).empty()) {
         fs::remove_all(tmp_pkg_dir);
-        log_info(string_format("info.skip_already_installed", pkg_name));
+        log_warning(string_format("warning.skip_already_installed", pkg_name));
         install_path.pop_back();
         return;
     }
@@ -133,43 +133,44 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
             continue;
         }
 
-        if (fs::exists(dest_path)) {
-            bool owned = false;
-            for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
-                if (entry.path().stem().string() == pkg_name) continue;
-                std::ifstream other_pkg_files(entry.path());
-                std::string line;
-                while (std::getline(other_pkg_files, line)) {
-                    if (line == dest_path) {
-                        log_warning(string_format("warning.overwrite_file", dest_path, entry.path().stem().string()));
-                        if (!user_confirms("")) {
-                            log_info(string_format("info.skipped_overwrite", dest_path));
-                            goto next_file;
+        [&]{
+            if (fs::exists(dest_path)) {
+                bool owned = false;
+                for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
+                    if (entry.path().stem().string() == pkg_name) continue;
+                    std::ifstream other_pkg_files(entry.path());
+                    std::string line;
+                    while (std::getline(other_pkg_files, line)) {
+                        if (line == dest_path) {
+                            log_warning(string_format("warning.overwrite_file", dest_path, entry.path().stem().string()));
+                            if (!user_confirms("")) {
+                                log_info(string_format("info.skipped_overwrite", dest_path));
+                                return;
+                            }
+                            owned = true;
+                            break;
                         }
-                        owned = true;
-                        break;
                     }
+                    if (owned) break;
                 }
-                if (owned) break;
             }
-        }
 
-        {
-            fs::path dest_parent = fs::path(dest_path).parent_path();
-            if (!dest_parent.empty()) {
-                ensure_dir_exists(dest_parent.string());
-                created_dirs.insert(dest_parent.string());
+            {
+                fs::path dest_parent = fs::path(dest_path).parent_path();
+                if (!dest_parent.empty()) {
+                    ensure_dir_exists(dest_parent.string());
+                    created_dirs.insert(dest_parent.string());
+                }
             }
-        }
 
-        try {
-            fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-            file_count++;
-            installed_files.push_back(dest_path);
-        } catch (const fs::filesystem_error& e) {
-            log_warning(string_format("error.copy_file_failed", src_path, dest_path, e.what()));
-        }
-        next_file:;
+            try {
+                fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+                file_count++;
+                installed_files.push_back(dest_path);
+            } catch (const fs::filesystem_error& e) {
+                log_warning(string_format("warning.copy_file_failed", src_path, dest_path, e.what()));
+            }
+        }();
     }
     log_sync(string_format("info.copy_complete", file_count));
 
@@ -186,9 +187,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     std::ofstream pkg_deps(DEP_DIR + pkg_name);
     deps_file.clear();
     deps_file.seekg(0);
-    while (std::getline(deps_file, dep)) {
-        if (!dep.empty()) pkg_deps << dep << "\n";
-    }
+    while (std::getline(deps_file, dep)) {        if (!dep.empty()) pkg_deps << dep << "\n";    }
 
     fs::copy(tmp_pkg_dir + "/man.txt", DOCS_DIR + pkg_name + ".man", fs::copy_options::overwrite_existing);
 
@@ -222,7 +221,8 @@ void remove_package(const std::string& pkg_name, bool force) {
             std::string dep;
             while (std::getline(file, dep)) {
                 if (dep == pkg_name) {
-                    throw LpkgException(string_format("error.skip_remove_dependency", pkg_name, current_pkg_name));
+                    log_info(string_format("info.skip_remove_dependency", pkg_name, current_pkg_name));
+                    return;
                 }
             }
         }
@@ -243,34 +243,35 @@ void remove_package(const std::string& pkg_name, bool force) {
 
         int removed_count = 0;
         for (const auto& path : file_paths) {
-            if (fs::exists(path) || fs::is_symlink(path)) {
-                bool is_shared = false;
-                for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
-                    if (entry.path().stem().string() == pkg_name || !entry.is_regular_file() || entry.path().extension() != ".txt") continue;
-                    std::ifstream other_pkg_files(entry.path());
-                    std::string line;
-                    while (std::getline(other_pkg_files, line)) {
-                        if (line == path) {
-                            log_warning(string_format("warning.remove_shared_file", path, entry.path().stem().string()));
-                            if (!user_confirms("")) {
-                                log_info(string_format("info.skipped_remove", path));
-                                goto next_file_remove;
+            [&]{
+                if (fs::exists(path) || fs::is_symlink(path)) {
+                    bool is_shared = false;
+                    for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
+                        if (entry.path().stem().string() == pkg_name || !entry.is_regular_file() || entry.path().extension() != ".txt") continue;
+                        std::ifstream other_pkg_files(entry.path());
+                        std::string line;
+                        while (std::getline(other_pkg_files, line)) {
+                            if (line == path) {
+                                log_warning(string_format("warning.remove_shared_file", path, entry.path().stem().string()));
+                                if (!user_confirms("")) {
+                                    log_info(string_format("info.skipped_remove", path));
+                                    return;
+                                }
+                                is_shared = true;
+                                break;
                             }
-                            is_shared = true;
-                            break;
                         }
+                        if (is_shared) break;
                     }
-                    if (is_shared) break;
-                }
 
-                try {
-                    fs::remove(path);
-                    removed_count++;
-                } catch (const fs::filesystem_error& e) {
-                    log_warning(string_format("error.remove_file_failed", path, e.what()));
+                    try {
+                        fs::remove(path);
+                        removed_count++;
+                    } catch (const fs::filesystem_error& e) {
+                        log_warning(string_format("warning.remove_file_failed", path, e.what()));
+                    }
                 }
-            }
-            next_file_remove:;
+            }();
         }
         log_sync(string_format("info.files_removed", removed_count));
         fs::remove(files_list_path);
@@ -398,7 +399,7 @@ void upgrade_packages() {
         try {
             latest_version = get_latest_version(pkg_name);
         } catch (...) {
-            log_error(string_format("error.get_latest_version_failed", pkg_name));
+            log_warning(string_format("warning.get_latest_version_failed", pkg_name));
             continue;
         }
 
