@@ -1,4 +1,5 @@
 #include "localization.hpp"
+#include "config.hpp"
 #include "utils.hpp"
 #include <iostream>
 #include <fstream>
@@ -8,7 +9,6 @@
 
 namespace {
     std::unordered_map<std::string, std::string> translations;
-    const std::string L10N_DIR = "/usr/share/lpkg/l10n/";
 }
 
 void load_strings(const std::string& lang) {

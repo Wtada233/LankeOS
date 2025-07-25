@@ -18,6 +18,8 @@ void log_sync(const std::string& msg);
 void log_warning(const std::string& msg);
 void log_error(const std::string& msg);
 
+bool user_confirms(const std::string& prompt);
+
 // System checks
 void check_root();
 

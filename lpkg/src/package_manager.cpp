@@ -122,33 +122,65 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     std::string src, dest;
     int file_count = 0;
     std::vector<std::string> installed_files;
+    std::set<std::string> created_dirs;
+
     while (files_list >> src >> dest) {
         std::string src_path = tmp_pkg_dir + "/content/" + src;
         std::string dest_path = dest + "/" + src;
-        installed_files.push_back(dest_path);
 
         if (!fs::exists(src_path)) {
             log_warning(string_format("error.incomplete_package", src));
             continue;
         }
 
-        fs::path dest_parent = fs::path(dest_path).parent_path();
-        if (!dest_parent.empty()) {
-            ensure_dir_exists(dest_parent.string());
+        if (fs::exists(dest_path)) {
+            bool owned = false;
+            for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
+                if (entry.path().stem().string() == pkg_name) continue;
+                std::ifstream other_pkg_files(entry.path());
+                std::string line;
+                while (std::getline(other_pkg_files, line)) {
+                    if (line == dest_path) {
+                        log_warning(string_format("warning.overwrite_file", dest_path, entry.path().stem().string()));
+                        if (!user_confirms("")) {
+                            log_info(string_format("info.skipped_overwrite", dest_path));
+                            goto next_file;
+                        }
+                        owned = true;
+                        break;
+                    }
+                }
+                if (owned) break;
+            }
+        }
+
+        {
+            fs::path dest_parent = fs::path(dest_path).parent_path();
+            if (!dest_parent.empty()) {
+                ensure_dir_exists(dest_parent.string());
+                created_dirs.insert(dest_parent.string());
+            }
         }
 
         try {
             fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
             file_count++;
+            installed_files.push_back(dest_path);
         } catch (const fs::filesystem_error& e) {
             log_warning(string_format("error.copy_file_failed", src_path, dest_path, e.what()));
         }
+        next_file:;
     }
     log_sync(string_format("info.copy_complete", file_count));
 
     std::ofstream pkg_files(FILES_DIR + pkg_name + ".txt");
     for(const auto& file : installed_files) {
         pkg_files << file << "\n";
+    }
+
+    std::ofstream dirs_file(FILES_DIR + pkg_name + ".dirs");
+    for (const auto& dir : created_dirs) {
+        dirs_file << dir << "\n";
     }
 
     std::ofstream pkg_deps(DEP_DIR + pkg_name);
@@ -212,6 +244,25 @@ void remove_package(const std::string& pkg_name, bool force) {
         int removed_count = 0;
         for (const auto& path : file_paths) {
             if (fs::exists(path) || fs::is_symlink(path)) {
+                bool is_shared = false;
+                for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
+                    if (entry.path().stem().string() == pkg_name || !entry.is_regular_file() || entry.path().extension() != ".txt") continue;
+                    std::ifstream other_pkg_files(entry.path());
+                    std::string line;
+                    while (std::getline(other_pkg_files, line)) {
+                        if (line == path) {
+                            log_warning(string_format("warning.remove_shared_file", path, entry.path().stem().string()));
+                            if (!user_confirms("")) {
+                                log_info(string_format("info.skipped_remove", path));
+                                goto next_file_remove;
+                            }
+                            is_shared = true;
+                            break;
+                        }
+                    }
+                    if (is_shared) break;
+                }
+
                 try {
                     fs::remove(path);
                     removed_count++;
@@ -219,9 +270,31 @@ void remove_package(const std::string& pkg_name, bool force) {
                     log_warning(string_format("error.remove_file_failed", path, e.what()));
                 }
             }
+            next_file_remove:;
         }
         log_sync(string_format("info.files_removed", removed_count));
         fs::remove(files_list_path);
+    }
+
+    std::string dirs_list_path = FILES_DIR + pkg_name + ".dirs";
+    if (fs::exists(dirs_list_path)) {
+        std::ifstream dirs_list(dirs_list_path);
+        std::string dir_path;
+        std::vector<std::string> dir_paths;
+        while (std::getline(dirs_list, dir_path)) {
+            dir_paths.push_back(dir_path);
+        }
+        std::sort(dir_paths.rbegin(), dir_paths.rend());
+        for (const auto& dir : dir_paths) {
+            if (fs::exists(dir) && fs::is_directory(dir) && fs::is_empty(dir)) {
+                try {
+                    fs::remove(dir);
+                } catch (const fs::filesystem_error& e) {
+                    // Ignore errors, maybe another package created it again
+                }
+            }
+        }
+        fs::remove(dirs_list_path);
     }
 
     fs::remove(DEP_DIR + pkg_name);
