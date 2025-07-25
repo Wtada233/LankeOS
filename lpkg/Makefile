@@ -1,7 +1,7 @@
 # Makefile
 CXX = g++
 CXXFLAGS = -std=c++20 -Wall -Wextra -O2
-LIBS = -lcurl -larchive -lfmt
+LIBS = -lcurl -larchive -lfmt -lcrypto
 TARGET = lpkg
 SRC_DIR = src
 CONF_DIR = conf

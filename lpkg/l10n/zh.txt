@@ -65,3 +65,5 @@ info.skipped_overwrite=已跳过覆盖: {}
 info.skipped_remove=已跳过移除: {}
 prompt.yes_no=(y/n)
 error.invalid_non_interactive_value=--non-interactive 的值无效。必须是 'y' 或 'n'。
+error.hash_mismatch=包的哈希值不匹配: {}
+error.hash_download_failed=无法下载哈希文件: {}
