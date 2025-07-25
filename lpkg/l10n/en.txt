@@ -14,6 +14,7 @@ error.no_man_page=No man page found for {}.
 error.open_man_page_failed=Failed to open man page: {}
 error.download_latest_txt_failed=Failed to download latest.txt: {}
 error.read_latest_txt_failed=Failed to read version from latest.txt or file is empty: {}
+error.invalid_version_format=Invalid version format: {}
 error.prefix=Error:
 info.usage=Usage: {} <command> [arguments]
 info.commands=Commands:
