@@ -5,6 +5,7 @@ LIBS = -lcurl -larchive -lstdc++fs
 TARGET = lpkg
 SRC_DIR = src
 CONF_DIR = conf
+L10N_DIR = l10n
 BUILD_DIR = build
 
 # Find all .cpp files in the source directory
@@ -32,6 +33,8 @@ clean:
 install: all
 	install -Dm755 $(BUILD_DIR)/$(TARGET) /usr/bin/$(TARGET)
 	install -Dm644 $(CONF_DIR)/mirror.conf /etc/lpkg/mirror.conf
+	install -d /usr/share/lpkg/l10n
+	install -m644 $(L10N_DIR)/*.txt /usr/share/lpkg/l10n/
 	@echo "安装完成"
 
 uninstall:

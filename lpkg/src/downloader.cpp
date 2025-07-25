@@ -1,11 +1,12 @@
 #include "downloader.hpp"
 #include "utils.hpp"
+#include "localization.hpp"
 #include <curl/curl.h>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 
-// HTTP下载回调函数 (modern C++)
+// HTTP download callback function (modern C++)
 size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
     std::ostream* out = static_cast<std::ostream*>(stream);
     size_t bytes = size * nmemb;
@@ -13,7 +14,7 @@ size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
     return out->good() ? bytes : 0;
 }
 
-// 下载进度条回调
+// Download progress bar callback
 int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_off_t dlnow, [[maybe_unused]] curl_off_t ultotal, [[maybe_unused]] curl_off_t ulnow) {
     if (dltotal <= 0) {
         return 0;
@@ -27,7 +28,7 @@ int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_o
     const std::string COLOR_WHITE = "\033[1;37m";
     const std::string COLOR_RESET = "\033[0m";
 
-    std::cout << "\r" << COLOR_GREEN << "==> " << COLOR_WHITE << "正在下载... [";
+    std::cout << "\r" << COLOR_GREEN << "==> " << COLOR_WHITE << get_string("info.downloading") << " [";
     for (int i = 0; i < bar_width; ++i) {
         if (i < pos) std::cout << "#";
         else if (i == pos) std::cout << ">";
@@ -62,9 +63,9 @@ bool download_file(const std::string& url, const std::string& output_path) {
     curl_easy_cleanup(curl);
 
     if (res != CURLE_OK) {
-        // 尝试HTTP回退
+        // Try HTTP fallback
         if (url.find("https://") == 0) {
-            log_sync("HTTPS下载失败，尝试HTTP回退...");
+            log_sync(get_string("info.https_fallback"));
             std::string http_url = "http://" + url.substr(8);
             return download_file(http_url, output_path);
         }

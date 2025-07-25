@@ -2,6 +2,7 @@
 #include "config.hpp"
 #include "utils.hpp"
 #include "downloader.hpp"
+#include "localization.hpp"
 #include <vector>
 #include <regex>
 #include <algorithm>
@@ -86,14 +87,14 @@ std::string get_latest_version(const std::string& pkg_name) {
     std::string tmp_file_path = TMP_DIR + pkg_name + "_latest.txt";
 
     if (!download_file(latest_txt_url, tmp_file_path)) {
-        exit_with_error("无法获取 latest.txt: " + latest_txt_url);
+        exit_with_error(string_format("error.download_latest_txt_failed", latest_txt_url.c_str()));
     }
 
     std::ifstream latest_file(tmp_file_path);
     std::string latest_version;
     if (!std::getline(latest_file, latest_version) || latest_version.empty()) {
         fs::remove(tmp_file_path);
-        exit_with_error("无法从 latest.txt 读取版本信息或文件为空: " + latest_txt_url);
+        exit_with_error(string_format("error.read_latest_txt_failed", latest_txt_url.c_str()));
     }
 
     fs::remove(tmp_file_path);

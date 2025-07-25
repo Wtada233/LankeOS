@@ -1,22 +1,25 @@
 #include "config.hpp"
 #include "utils.hpp"
 #include "package_manager.hpp"
+#include "localization.hpp"
 #include <iostream>
 #include <string>
 #include <vector>
 #include <memory>
 
 void print_usage(const char* prog_name) {
-    std::cerr << "用法: " << prog_name << " <命令> [参数]\n"
-              << "命令:\n"
-              << "  install <包名>[:版本]...  安装一个或多个指定包 (默认最新版)\n"
-              << "  remove <包名>... [--force] 移除一个或多个指定包 (使用 --force 强制移除)\n"
-              << "  autoremove            自动移除不再需要的包\n"
-              << "  upgrade               升级所有可升级的包\n"
-              << "  man <包名>            显示包的man page\n";
+    std::cerr << string_format("info.usage", prog_name) << "\n"
+              << get_string("info.commands") << "\n"
+              << get_string("info.install_desc") << "\n"
+              << get_string("info.remove_desc") << "\n"
+              << get_string("info.autoremove_desc") << "\n"
+              << get_string("info.upgrade_desc") << "\n"
+              << get_string("info.man_desc") << "\n";
 }
 
 int main(int argc, char* argv[]) {
+    init_localization();
+
     if (argc < 2) {
         print_usage(argv[0]);
         return 1;
