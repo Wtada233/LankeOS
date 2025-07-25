@@ -2,6 +2,7 @@
 #include "utils.hpp"
 #include "package_manager.hpp"
 #include "localization.hpp"
+#include "exception.hpp"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -18,24 +19,24 @@ void print_usage(const char* prog_name) {
 }
 
 int main(int argc, char* argv[]) {
-    init_localization();
-
-    if (argc < 2) {
-        print_usage(argv[0]);
-        return 1;
-    }
-
-    const std::vector<std::string> args(argv + 1, argv + argc);
-    const std::string& command = args[0];
-
-    std::unique_ptr<DBLock> db_lock;
-    if (command != "man") {
-        check_root();
-        init_filesystem();
-        db_lock = std::make_unique<DBLock>();
-    }
-
     try {
+        init_localization();
+
+        if (argc < 2) {
+            print_usage(argv[0]);
+            return 1;
+        }
+
+        const std::vector<std::string> args(argv + 1, argv + argc);
+        const std::string& command = args[0];
+
+        std::unique_ptr<DBLock> db_lock;
+        if (command != "man") {
+            check_root();
+            init_filesystem();
+            db_lock = std::make_unique<DBLock>();
+        }
+
         if (command == "install" && args.size() >= 2) {
             for (size_t i = 1; i < args.size(); ++i) {
                 const std::string& arg = args[i];
@@ -74,6 +75,9 @@ int main(int argc, char* argv[]) {
             print_usage(argv[0]);
             return 1;
         }
+    } catch (const LpkgException& e) {
+        log_error(e.what());
+        return 1;
     } catch (const std::exception& e) {
         log_error(e.what());
         return 1;

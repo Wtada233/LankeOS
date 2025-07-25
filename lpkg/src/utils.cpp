@@ -1,6 +1,7 @@
 #include "utils.hpp"
 #include "config.hpp"
 #include "localization.hpp"
+#include "exception.hpp"
 #include <iostream>
 #include <fstream>
 #include <filesystem>
@@ -34,14 +35,9 @@ void log_error(const std::string& msg) {
     std::cerr << COLOR_RED << get_string("error.prefix") << " " << COLOR_RESET << msg << std::endl;
 }
 
-void exit_with_error(const std::string& msg) {
-    log_error(msg);
-    exit(1);
-}
-
 void check_root() {
     if (geteuid() != 0) {
-        exit_with_error(get_string("error.root_required"));
+        throw LpkgException(get_string("error.root_required"));
     }
 }
 
@@ -49,14 +45,14 @@ DBLock::DBLock() {
     ensure_dir_exists(LOCK_DIR);
     lock_fd = open(LOCK_FILE.c_str(), O_CREAT | O_RDWR, 0644);
     if (lock_fd < 0) {
-        exit_with_error(string_format("error.create_file_failed", LOCK_FILE));
+        throw LpkgException(string_format("error.create_file_failed", LOCK_FILE));
     }
 
     if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
         if (errno == EWOULDBLOCK) {
-            exit_with_error(get_string("error.db_locked"));
+            throw LpkgException(get_string("error.db_locked"));
         } else {
-            exit_with_error(get_string("error.db_lock_failed"));
+            throw LpkgException(get_string("error.db_lock_failed"));
         }
     }
 }
@@ -65,17 +61,16 @@ DBLock::~DBLock() {
     if (lock_fd != -1) {
         flock(lock_fd, LOCK_UN);
         close(lock_fd);
-        fs::remove(LOCK_FILE);
     }
 }
 
 void ensure_dir_exists(const std::string& path) {
     if (!fs::exists(path)) {
         if (!fs::create_directories(path)) {
-            exit_with_error(string_format("error.create_dir_failed", path));
+            throw LpkgException(string_format("error.create_dir_failed", path));
         }
     } else if (!fs::is_directory(path)) {
-        exit_with_error(string_format("error.path_not_dir", path));
+        throw LpkgException(string_format("error.path_not_dir", path));
     }
 }
 
@@ -83,7 +78,7 @@ void ensure_file_exists(const std::string& path) {
     if (!fs::exists(path)) {
         std::ofstream file(path);
         if (!file) {
-            exit_with_error(string_format("error.create_file_failed", path));
+            throw LpkgException(string_format("error.create_file_failed", path));
         }
     }
 }

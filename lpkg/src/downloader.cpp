@@ -62,14 +62,5 @@ bool download_file(const std::string& url, const std::string& output_path) {
     ofile.close();
     curl_easy_cleanup(curl);
 
-    if (res != CURLE_OK) {
-        // Try HTTP fallback
-        if (url.find("https://") == 0) {
-            log_sync(get_string("info.https_fallback"));
-            std::string http_url = "http://" + url.substr(8);
-            return download_file(http_url, output_path);
-        }
-        return false;
-    }
-    return true;
+    return res == CURLE_OK;
 }
