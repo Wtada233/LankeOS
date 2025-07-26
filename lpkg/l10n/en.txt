@@ -67,3 +67,7 @@ prompt.yes_no=(y/n)
 error.invalid_non_interactive_value=Invalid value for --non-interactive. Must be 'y' or 'n'.
 error.hash_mismatch=Hash mismatch for package: {}
 error.hash_download_failed=Failed to download hash file: {}
+error.openssl_ctx_failed=Failed to create OpenSSL context
+error.openssl_init_failed=Failed to initialize OpenSSL digest
+error.openssl_update_failed=Failed to update OpenSSL digest
+error.openssl_final_failed=Failed to finalize OpenSSL digest

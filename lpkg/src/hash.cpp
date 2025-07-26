@@ -26,29 +26,29 @@ std::string calculate_sha256(const std::string& file_path) {
 
     EvpMdCtxPtr md_ctx(EVP_MD_CTX_new());
     if (!md_ctx) {
-        throw std::runtime_error("Failed to create EVP_MD_CTX");
+        throw LpkgException(get_string("error.openssl_ctx_failed"));
     }
 
     if (EVP_DigestInit_ex(md_ctx.get(), EVP_sha256(), NULL) != 1) {
-        throw std::runtime_error("Failed to initialize SHA256 digest");
+        throw LpkgException(get_string("error.openssl_init_failed"));
     }
 
     char buffer[8192];
     while (file.read(buffer, sizeof(buffer))) {
         if (EVP_DigestUpdate(md_ctx.get(), buffer, file.gcount()) != 1) {
-            throw std::runtime_error("Failed to update SHA256 digest");
+            throw LpkgException(get_string("error.openssl_update_failed"));
         }
     }
     if (file.gcount() > 0) { // Handle the last chunk
         if (EVP_DigestUpdate(md_ctx.get(), buffer, file.gcount()) != 1) {
-            throw std::runtime_error("Failed to update SHA256 digest");
+            throw LpkgException(get_string("error.openssl_update_failed"));
         }
     }
 
     unsigned char hash[EVP_MAX_MD_SIZE];
     unsigned int hash_len;
     if (EVP_DigestFinal_ex(md_ctx.get(), hash, &hash_len) != 1) {
-        throw std::runtime_error("Failed to finalize SHA256 digest");
+        throw LpkgException(get_string("error.openssl_final_failed"));
     }
 
     std::stringstream ss;
