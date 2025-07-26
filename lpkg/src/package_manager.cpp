@@ -75,6 +75,20 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
 
     int max_retries = 5;
     for (int i = 0; i < max_retries; ++i) {
+        if (download_file(hash_url, hash_path, false)) {
+            break;
+        }
+        fs::remove(hash_path);
+        if (i == max_retries - 1) {
+            throw LpkgException(string_format("error.hash_download_failed", hash_url));
+        }
+    }
+
+    std::ifstream hash_file(hash_path);
+    std::string expected_hash;
+    hash_file >> expected_hash;
+
+    for (int i = 0; i < max_retries; ++i) {
         if (!download_file(download_url, archive_path)) {
             fs::remove(archive_path);
             if (i == max_retries - 1) {
@@ -83,27 +97,12 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
             continue;
         }
 
-        if (!download_file(hash_url, hash_path, false)) {
-            fs::remove(hash_path);
-            if (i == max_retries - 1) {
-                throw LpkgException(string_format("error.hash_download_failed", hash_url));
-            }
-            continue;
-        }
-
-        std::ifstream hash_file(hash_path);
-        std::string expected_hash;
-        hash_file >> expected_hash;
-
         std::string actual_hash = calculate_sha256(archive_path);
-
         if (expected_hash == actual_hash) {
             break; // Success
         }
 
         fs::remove(archive_path);
-        fs::remove(hash_path);
-
         if (i < max_retries - 1) {
             log_warning(string_format("error.hash_mismatch", pkg_name));
         } else {
