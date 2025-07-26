@@ -73,3 +73,4 @@ error.openssl_ctx_failed=Failed to create OpenSSL context
 error.openssl_init_failed=Failed to initialize OpenSSL digest
 error.openssl_update_failed=Failed to update OpenSSL digest
 error.openssl_final_failed=Failed to finalize OpenSSL digest
+error.open_file_failed=Failed to open file: {}

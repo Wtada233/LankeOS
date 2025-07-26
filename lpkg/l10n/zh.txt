@@ -73,3 +73,4 @@ error.openssl_ctx_failed=无法创建 OpenSSL 上下文
 error.openssl_init_failed=无法初始化 OpenSSL 摘要
 error.openssl_update_failed=无法更新 OpenSSL 摘要
 error.openssl_final_failed=无法完成 OpenSSL 摘要
+error.open_file_failed=无法打开文件: {}

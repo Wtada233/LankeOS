@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <fstream>
 #include <memory>
+#include <unistd.h>
 
 // HTTP download callback function (modern C++)
 size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
@@ -17,7 +18,7 @@ size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
 
 // Download progress bar callback
 int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_off_t dlnow, [[maybe_unused]] curl_off_t ultotal, [[maybe_unused]] curl_off_t ulnow) {
-    if (dltotal <= 0) {
+    if (dltotal <= 0 || !isatty(fileno(stderr))) {
         return 0;
     }
 
@@ -29,13 +30,13 @@ int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_o
     const std::string COLOR_WHITE = "\033[1;37m";
     const std::string COLOR_RESET = "\033[0m";
 
-    std::cout << "\r" << COLOR_GREEN << "==> " << COLOR_WHITE << get_string("info.downloading") << " [";
+    std::cerr << "\r" << COLOR_GREEN << "==> " << COLOR_WHITE << get_string("info.downloading") << " [";
     for (int i = 0; i < bar_width; ++i) {
-        if (i < pos) std::cout << "#";
-        else if (i == pos) std::cout << ">";
-        else std::cout << "-";
+        if (i < pos) std::cerr << "#";
+        else if (i == pos) std::cerr << ">";
+        else std::cerr << "-";
     }
-    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%" << COLOR_RESET << std::flush;
+    std::cerr << "] " << std::fixed << std::setprecision(1) << percentage << "%" << COLOR_RESET << std::flush;
 
     return 0;
 }
@@ -76,7 +77,7 @@ bool download_file(const std::string& url, const std::string& output_path, bool 
 
     CURLcode res = curl_easy_perform(curl.get());
     if (show_progress) {
-        std::cout << std::endl;
+        std::cerr << std::endl;
     }
     // ofile is closed by its destructor
     // curl handle is cleaned up by its destructor
