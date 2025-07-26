@@ -3,60 +3,62 @@
 #include "package_manager.hpp"
 #include "localization.hpp"
 #include "exception.hpp"
+#include "cxxopts.hpp"
 #include <iostream>
 #include <string>
 #include <vector>
 #include <memory>
-#include <algorithm>
 
-void print_usage(const char* prog_name) {
-    std::cerr << string_format("info.usage", prog_name) << "\n"
-              << get_string("info.commands") << "\n"
-              << get_string("info.non_interactive_desc") << "\n"
-              << get_string("info.install_desc") << "\n"
-              << get_string("info.remove_desc") << "\n"
-              << get_string("info.autoremove_desc") << "\n"
-              << get_string("info.upgrade_desc") << "\n"
-              << get_string("info.man_desc") << "\n";
+void print_usage(const cxxopts::Options& options) {
+    std::cerr << options.help({""}) << std::endl;
+    std::cerr << std::endl << get_string("info.commands") << std::endl;
+    std::cerr << get_string("info.install_desc") << std::endl;
+    std::cerr << get_string("info.remove_desc") << std::endl;
+    std::cerr << get_string("info.autoremove_desc") << std::endl;
+    std::cerr << get_string("info.upgrade_desc") << std::endl;
+    std::cerr << get_string("info.man_desc") << std::endl;
 }
 
 int main(int argc, char* argv[]) {
     try {
         init_localization();
 
-        std::vector<std::string> args;
-        for (int i = 1; i < argc; ++i) {
-            std::string arg = argv[i];
-            if (arg.rfind("--non-interactive", 0) == 0) {
-                if (arg == "--non-interactive") {
-                    set_non_interactive_mode(NonInteractiveMode::NO);
-                    continue;
-                }
-                size_t pos = arg.find('=');
-                if (pos != std::string::npos) {
-                    std::string value = arg.substr(pos + 1);
-                    if (value == "y" || value == "Y") {
-                        set_non_interactive_mode(NonInteractiveMode::YES);
-                    } else if (value == "n" || value == "N") {
-                        set_non_interactive_mode(NonInteractiveMode::NO);
-                    } else {
-                        log_error(get_string("error.invalid_non_interactive_value"));
-                        return 1;
-                    }
-                } else {
-                    set_non_interactive_mode(NonInteractiveMode::NO);
-                }
+        cxxopts::Options options(argv[0], string_format("info.usage", argv[0]));
+
+        options.add_options()
+            ("h,help", get_string("info.help_desc"))
+            ("non-interactive", get_string("info.non_interactive_option_desc"), cxxopts::value<std::string>()->implicit_value("n"))
+            ("force", get_string("info.force_desc"), cxxopts::value<bool>()->default_value("false"))
+            ("command", "", cxxopts::value<std::string>())
+            ("packages", "", cxxopts::value<std::vector<std::string>>());
+
+        options.parse_positional({"command", "packages"});
+
+        auto result = options.parse(argc, argv);
+
+        if (result.count("help")) {
+            print_usage(options);
+            return 0;
+        }
+
+        if (result.count("non-interactive")) {
+            std::string value = result["non-interactive"].as<std::string>();
+            if (value == "y" || value == "Y") {
+                set_non_interactive_mode(NonInteractiveMode::YES);
+            } else if (value == "n" || value == "N") {
+                set_non_interactive_mode(NonInteractiveMode::NO);
             } else {
-                args.push_back(arg);
+                log_error(get_string("error.invalid_non_interactive_value"));
+                return 1;
             }
         }
 
-        if (args.empty()) {
-            print_usage(argv[0]);
+        if (!result.count("command")) {
+            print_usage(options);
             return 1;
         }
 
-        const std::string& command = args[0];
+        const std::string& command = result["command"].as<std::string>();
 
         std::unique_ptr<DBLock> db_lock;
         if (command != "man") {
@@ -65,9 +67,13 @@ int main(int argc, char* argv[]) {
             db_lock = std::make_unique<DBLock>();
         }
 
-        if (command == "install" && args.size() >= 2) {
-            for (size_t i = 1; i < args.size(); ++i) {
-                const std::string& pkg_arg = args[i];
+        if (command == "install") {
+            if (!result.count("packages")) {
+                print_usage(options);
+                return 1;
+            }
+            const auto& packages = result["packages"].as<std::vector<std::string>>();
+            for (const auto& pkg_arg : packages) {
                 size_t pos = pkg_arg.find(':');
                 if (pos == std::string::npos) {
                     install_package(pkg_arg, "latest");
@@ -75,34 +81,33 @@ int main(int argc, char* argv[]) {
                     install_package(pkg_arg.substr(0, pos), pkg_arg.substr(pos + 1));
                 }
             }
-        } else if (command == "remove" && args.size() >= 2) {
-            std::vector<std::string> pkg_names;
-            bool force = false;
-            for (size_t i = 1; i < args.size(); ++i) {
-                if (args[i] == "--force") {
-                    force = true;
-                } else {
-                    pkg_names.push_back(args[i]);
-                }
-            }
-
-            if (pkg_names.empty()) {
-                print_usage(argv[0]);
+        } else if (command == "remove") {
+            if (!result.count("packages")) {
+                print_usage(options);
                 return 1;
             }
+            const auto& pkg_names = result["packages"].as<std::vector<std::string>>();
+            bool force = result["force"].as<bool>();
             for (const auto& pkg_name : pkg_names) {
                 remove_package(pkg_name, force);
             }
-        } else if (command == "autoremove" && args.size() == 1) {
+        } else if (command == "autoremove") {
             autoremove();
-        } else if (command == "upgrade" && args.size() == 1) {
+        } else if (command == "upgrade") {
             upgrade_packages();
-        } else if (command == "man" && args.size() == 2) {
-            show_man_page(args[1]);
+        } else if (command == "man") {
+            if (!result.count("packages") || result["packages"].as<std::vector<std::string>>().size() != 1) {
+                print_usage(options);
+                return 1;
+            }
+            show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
         } else {
-            print_usage(argv[0]);
+            print_usage(options);
             return 1;
         }
+    } catch (const cxxopts::exceptions::exception& e) {
+        log_error(e.what());
+        return 1;
     } catch (const LpkgException& e) {
         log_error(e.what());
         return 1;
