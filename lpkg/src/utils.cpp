@@ -24,19 +24,35 @@ const std::string COLOR_RED = "\033[1;31m";
 const std::string COLOR_RESET = "\033[0m";
 
 void log_info(const std::string& msg) {
-    std::cout << COLOR_GREEN << "==> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+    if (isatty(fileno(stdout))) {
+        std::cout << COLOR_GREEN << "==> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+    } else {
+        std::cout << "==> " << msg << std::endl;
+    }
 }
 
 void log_sync(const std::string& msg) {
-    std::cout << COLOR_GREEN << ">>> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+    if (isatty(fileno(stdout))) {
+        std::cout << COLOR_GREEN << ">>> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+    } else {
+        std::cout << ">>> " << msg << std::endl;
+    }
 }
 
 void log_warning(const std::string& msg) {
-    std::cout << COLOR_YELLOW << get_string("warning.prefix") << " " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+    if (isatty(fileno(stderr))) {
+        std::cerr << COLOR_YELLOW << get_string("warning.prefix") << " " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+    } else {
+        std::cerr << get_string("warning.prefix") << " " << msg << std::endl;
+    }
 }
 
 void log_error(const std::string& msg) {
-    std::cerr << COLOR_RED << get_string("error.prefix") << " " << COLOR_RESET << msg << std::endl;
+    if (isatty(fileno(stderr))) {
+        std::cerr << COLOR_RED << get_string("error.prefix") << " " << COLOR_RESET << msg << std::endl;
+    } else {
+        std::cerr << get_string("error.prefix") << " " << msg << std::endl;
+    }
 }
 
 void set_non_interactive_mode(NonInteractiveMode mode) {
