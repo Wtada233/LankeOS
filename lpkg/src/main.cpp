@@ -10,8 +10,8 @@
 #include <memory>
 
 void print_usage(const cxxopts::Options& options) {
-    std::cerr << options.help({""}) << std::endl;
-    std::cerr << std::endl << get_string("info.commands") << std::endl;
+    std::cerr << options.help({""});
+    std::cerr << get_string("info.commands") << std::endl;
     std::cerr << get_string("info.install_desc") << std::endl;
     std::cerr << get_string("info.remove_desc") << std::endl;
     std::cerr << get_string("info.autoremove_desc") << std::endl;
