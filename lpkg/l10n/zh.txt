@@ -67,3 +67,7 @@ prompt.yes_no=(y/n)
 error.invalid_non_interactive_value=--non-interactive 的值无效。必须是 'y' 或 'n'。
 error.hash_mismatch=包的哈希值不匹配: {}
 error.hash_download_failed=无法下载哈希文件: {}
+error.openssl_ctx_failed=无法创建 OpenSSL 上下文
+error.openssl_init_failed=无法初始化 OpenSSL 摘要
+error.openssl_update_failed=无法更新 OpenSSL 摘要
+error.openssl_final_failed=无法完成 OpenSSL 摘要
