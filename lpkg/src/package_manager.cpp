@@ -15,6 +15,8 @@
 #include <unordered_set>
 #include <set>
 #include <algorithm>
+#include <map>
+#include <tuple>
 
 namespace fs = std::filesystem;
 
@@ -151,6 +153,37 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
         return;
     }
 
+    // Pre-install check for file conflicts
+    log_info(get_string("info.checking_for_file_conflicts"));
+    std::map<std::string, std::string> conflicts;
+    std::ifstream pre_check_files_list(tmp_pkg_dir + "/files.txt");
+    std::string src_check, dest_check;
+    while (pre_check_files_list >> src_check >> dest_check) {
+        std::string dest_path = dest_check + "/" + src_check;
+        if (fs::exists(dest_path)) {
+            for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
+                if (!entry.is_regular_file() || entry.path().extension() != ".txt") continue;
+                
+                std::string owner_pkg_name = entry.path().stem().string();
+                std::ifstream other_pkg_files(entry.path());
+                std::string line;
+                while (std::getline(other_pkg_files, line)) {
+                    if (line == dest_path) {
+                        conflicts[dest_path] = owner_pkg_name;
+                        goto next_file_check;
+                    }
+                }
+            }
+        }
+        next_file_check:;
+    }
+
+    if (!conflicts.empty()) {
+        std::string error_msg = get_string("error.file_conflict_header") + "\n";        for (const auto& conflict : conflicts) {            error_msg += "  " + string_format("error.file_conflict_entry", conflict.first, conflict.second) + "\n";        }        error_msg += get_string("error.installation_aborted");
+        fs::remove_all(tmp_pkg_dir);
+        throw LpkgException(error_msg);
+    }
+
     log_info(get_string("info.copying_files"));
     std::ifstream files_list(tmp_pkg_dir + "/files.txt");
     std::string src, dest;
@@ -167,44 +200,19 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
             continue;
         }
 
-        [&]{
-            if (fs::exists(dest_path)) {
-                bool owned = false;
-                for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
-                    if (entry.path().stem().string() == pkg_name) continue;
-                    std::ifstream other_pkg_files(entry.path());
-                    std::string line;
-                    while (std::getline(other_pkg_files, line)) {
-                        if (line == dest_path) {
-                            log_warning(string_format("warning.overwrite_file", dest_path, entry.path().stem().string()));
-                            if (!user_confirms("")) {
-                                log_info(string_format("info.skipped_overwrite", dest_path));
-                                return;
-                            }
-                            owned = true;
-                            break;
-                        }
-                    }
-                    if (owned) break;
-                }
-            }
+        fs::path dest_parent = fs::path(dest_path).parent_path();
+        if (!dest_parent.empty()) {
+            ensure_dir_exists(dest_parent.string());
+            created_dirs.insert(dest_parent.string());
+        }
 
-            {
-                fs::path dest_parent = fs::path(dest_path).parent_path();
-                if (!dest_parent.empty()) {
-                    ensure_dir_exists(dest_parent.string());
-                    created_dirs.insert(dest_parent.string());
-                }
-            }
-
-            try {
-                fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-                file_count++;
-                installed_files.push_back(dest_path);
-            } catch (const fs::filesystem_error& e) {
-                log_warning(string_format("warning.copy_file_failed", src_path, dest_path, e.what()));
-            }
-        }();
+        try {
+            fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+            file_count++;
+            installed_files.push_back(dest_path);
+        } catch (const fs::filesystem_error& e) {
+            throw LpkgException(string_format("error.copy_failed_rollback", src_path, dest_path, e.what()));
+        }
     }
     log_sync(string_format("info.copy_complete", file_count));
 
@@ -221,7 +229,11 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     std::ofstream pkg_deps(DEP_DIR + pkg_name);
     deps_file.clear();
     deps_file.seekg(0);
-    while (std::getline(deps_file, dep)) {        if (!dep.empty()) pkg_deps << dep << "\n";    }
+    while (std::getline(deps_file, dep)) {
+        if (!dep.empty()) {
+            pkg_deps << dep << "\n";
+        }
+    }
 
     fs::copy(tmp_pkg_dir + "/man.txt", DOCS_DIR + pkg_name + ".man", fs::copy_options::overwrite_existing);
 
@@ -304,46 +316,61 @@ void remove_package(const std::string& pkg_name, bool force) {
 
     std::string files_list_path = FILES_DIR + pkg_name + ".txt";
     if (fs::exists(files_list_path)) {
+        // Pre-remove check for shared files
+        log_info(get_string("info.checking_for_shared_files"));
+        std::map<std::string, std::vector<std::string>> shared_files;
+        std::ifstream files_to_check(files_list_path);
+        std::string file_to_check;
+        while (std::getline(files_to_check, file_to_check)) {
+            if (file_to_check.empty()) continue;
+            for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
+                std::string owner_pkg_name = entry.path().stem().string();
+                if (owner_pkg_name == pkg_name || !entry.is_regular_file() || entry.path().extension() != ".txt") continue;
+
+                std::ifstream other_pkg_files(entry.path());
+                std::string line;
+                while (std::getline(other_pkg_files, line)) {
+                    if (line == file_to_check) {
+                        shared_files[file_to_check].push_back(owner_pkg_name);
+                        break; 
+                    }
+                }
+            }
+        }
+
+        if (!shared_files.empty()) {
+            std::string error_msg = get_string("error.shared_file_header") + "\n";
+            for (const auto& [file, owners] : shared_files) {
+                std::string owners_str;
+                for(size_t i = 0; i < owners.size(); ++i) {
+                    owners_str += owners[i] + (i == owners.size() - 1 ? "" : ", ");
+                }
+                error_msg += "  " + string_format("error.shared_file_entry", file, owners_str) + "\n";
+            }
+            error_msg += get_string("error.removal_aborted");
+            throw LpkgException(error_msg);
+        }
+
+        // Passed the check, proceed with removal
         std::ifstream files_list(files_list_path);
         std::string file_path;
         std::vector<std::string> file_paths;
         while (std::getline(files_list, file_path)) {
-            file_paths.push_back(file_path);
+            if (!file_path.empty()) file_paths.push_back(file_path);
         }
         
         std::sort(file_paths.rbegin(), file_paths.rend());
 
         int removed_count = 0;
         for (const auto& path : file_paths) {
-            [&]{
-                if (fs::exists(path) || fs::is_symlink(path)) {
-                    bool is_shared = false;
-                    for (const auto& entry : fs::directory_iterator(FILES_DIR)) {
-                        if (entry.path().stem().string() == pkg_name || !entry.is_regular_file() || entry.path().extension() != ".txt") continue;
-                        std::ifstream other_pkg_files(entry.path());
-                        std::string line;
-                        while (std::getline(other_pkg_files, line)) {
-                            if (line == path) {
-                                log_warning(string_format("warning.remove_shared_file", path, entry.path().stem().string()));
-                                if (!user_confirms("")) {
-                                    log_info(string_format("info.skipped_remove", path));
-                                    return;
-                                }
-                                is_shared = true;
-                                break;
-                            }
-                        }
-                        if (is_shared) break;
-                    }
-
-                    try {
-                        fs::remove(path);
-                        removed_count++;
-                    } catch (const fs::filesystem_error& e) {
-                        log_warning(string_format("warning.remove_file_failed", path, e.what()));
-                    }
+            if (fs::exists(path) || fs::is_symlink(path)) {
+                try {
+                    fs::remove(path);
+                    removed_count++;
+                } catch (const fs::filesystem_error& e) {
+                    log_warning(string_format("warning.remove_file_failed", path, e.what()));
                 }
-            }();
+            }
         }
         log_sync(string_format("info.files_removed", removed_count));
         fs::remove(files_list_path);
@@ -355,7 +382,7 @@ void remove_package(const std::string& pkg_name, bool force) {
         std::string dir_path;
         std::vector<std::string> dir_paths;
         while (std::getline(dirs_list, dir_path)) {
-            dir_paths.push_back(dir_path);
+            if (!dir_path.empty()) dir_paths.push_back(dir_path);
         }
         std::sort(dir_paths.rbegin(), dir_paths.rend());
         for (const auto& dir : dir_paths) {
@@ -412,11 +439,16 @@ void autoremove() {
     if (packages_to_remove.empty()) {
         log_info(get_string("info.no_autoremove_packages"));
     } else {
+        log_info(string_format("info.autoremove_candidates", packages_to_remove.size()));
         for (const auto& pkg_name : packages_to_remove) {
-            // The 'force' flag is true because we've already determined it's safe to remove.
-            remove_package(pkg_name, true);
+            try {
+                // The 'force' flag is true for dependency checks, but shared file check is still active
+                remove_package(pkg_name, true);
+            } catch (const LpkgException& e) {
+                log_warning(string_format("warning.autoremove_skipped", pkg_name, e.what()));
+            }
         }
-        log_info(string_format("info.autoremove_complete", packages_to_remove.size()));
+        log_info(get_string("info.autoremove_complete"));
     }
 
     fs::remove_all(TMP_DIR);
@@ -427,6 +459,7 @@ void upgrade_packages() {
     log_info(get_string("info.checking_upgradable"));
     auto pkgs = read_set_from_file(PKGS_FILE);
     int upgraded_count = 0;
+    std::vector<std::tuple<std::string, std::string, std::string>> upgradable_pkgs;
 
     for (const auto& pkg : pkgs) {
         size_t pos = pkg.find(':');
@@ -445,17 +478,36 @@ void upgrade_packages() {
 
         if (version_compare(current_version, latest_version)) {
             log_sync(string_format("info.upgradable_found", pkg_name, current_version, latest_version));
-            bool was_manually_installed = is_manually_installed(pkg_name);
-            remove_package(pkg_name, true);
-            std::vector<std::string> install_path;
-            do_install(pkg_name, latest_version, was_manually_installed, install_path);
-            upgraded_count++;
+            upgradable_pkgs.emplace_back(pkg_name, current_version, latest_version);
         }
     }
 
-    if (upgraded_count == 0) {
+    if (upgradable_pkgs.empty()) {
         log_info(get_string("info.all_packages_latest"));
-    } else {
+        return;
+    }
+
+    for (const auto& [pkg_name, current_version, latest_version] : upgradable_pkgs) {
+        try {
+            log_info(string_format("info.upgrading_package", pkg_name, current_version, latest_version));
+            bool was_manually_installed = is_manually_installed(pkg_name);
+            
+            // Force removal for dependency checks, but shared file check will still prevent it if necessary
+            remove_package(pkg_name, true); 
+            
+            std::vector<std::string> install_path;
+            do_install(pkg_name, latest_version, was_manually_installed, install_path);
+            upgraded_count++;
+        } catch (const LpkgException& e) {
+            log_error(string_format("error.upgrade_failed", pkg_name, e.what()));
+            log_info(string_format("info.restoring_package", pkg_name, current_version));
+            // Attempt to restore the old package if upgrade fails
+            std::vector<std::string> install_path;
+            do_install(pkg_name, current_version, is_manually_installed(pkg_name), install_path);
+        }
+    }
+
+    if (upgraded_count > 0) {
         log_info(string_format("info.upgraded_packages", upgraded_count));
     }
 }
