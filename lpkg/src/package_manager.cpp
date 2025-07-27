@@ -18,10 +18,13 @@
 
 namespace fs = std::filesystem;
 
+namespace {
+
 // Forward declarations for internal functions
 std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
 void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path);
+std::unordered_set<std::string> get_all_required_packages();
 
 // Implementation
 std::string get_installed_version(const std::string& pkg_name) {
@@ -37,11 +40,6 @@ std::string get_installed_version(const std::string& pkg_name) {
 bool is_manually_installed(const std::string& pkg_name) {
     auto holdpkgs = read_set_from_file(HOLDPKGS_FILE);
     return holdpkgs.count(pkg_name) > 0;
-}
-
-void install_package(const std::string& pkg_name, const std::string& version) {
-    std::vector<std::string> install_path;
-    do_install(pkg_name, version, true, install_path);
 }
 
 void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path) {
@@ -242,6 +240,44 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
     log_info(string_format("info.package_installed_successfully", pkg_name));
 }
 
+std::unordered_set<std::string> get_all_required_packages() {
+    auto manually_installed = read_set_from_file(HOLDPKGS_FILE);
+    std::unordered_set<std::string> required;
+    std::vector<std::string> queue;
+
+    for (const auto& pkg : manually_installed) {
+        if (required.find(pkg) == required.end()) {
+            queue.push_back(pkg);
+            required.insert(pkg);
+        }
+    }
+
+    size_t head = 0;
+    while (head < queue.size()) {
+        std::string current_pkg = queue[head++];
+        std::string dep_file_path = DEP_DIR + current_pkg;
+
+        if (fs::exists(dep_file_path)) {
+            std::ifstream dep_file(dep_file_path);
+            std::string dep;
+            while (std::getline(dep_file, dep)) {
+                if (!dep.empty() && required.find(dep) == required.end()) {
+                    required.insert(dep);
+                    queue.push_back(dep);
+                }
+            }
+        }
+    }
+    return required;
+}
+
+}
+
+void install_package(const std::string& pkg_name, const std::string& version) {
+    std::vector<std::string> install_path;
+    do_install(pkg_name, version, true, install_path);
+}
+
 void remove_package(const std::string& pkg_name, bool force) {
     if (get_installed_version(pkg_name).empty()) {
         log_info(string_format("info.package_not_installed", pkg_name));
@@ -357,38 +393,6 @@ void remove_package(const std::string& pkg_name, bool force) {
     }
 
     log_info(string_format("info.package_removed_successfully", pkg_name));
-}
-
-// Helper function for autoremove to perform a full dependency graph traversal
-std::unordered_set<std::string> get_all_required_packages() {
-    auto manually_installed = read_set_from_file(HOLDPKGS_FILE);
-    std::unordered_set<std::string> required;
-    std::vector<std::string> queue;
-
-    for (const auto& pkg : manually_installed) {
-        if (required.find(pkg) == required.end()) {
-            queue.push_back(pkg);
-            required.insert(pkg);
-        }
-    }
-
-    size_t head = 0;
-    while (head < queue.size()) {
-        std::string current_pkg = queue[head++];
-        std::string dep_file_path = DEP_DIR + current_pkg;
-
-        if (fs::exists(dep_file_path)) {
-            std::ifstream dep_file(dep_file_path);
-            std::string dep;
-            while (std::getline(dep_file, dep)) {
-                if (!dep.empty() && required.find(dep) == required.end()) {
-                    required.insert(dep);
-                    queue.push_back(dep);
-                }
-            }
-        }
-    }
-    return required;
 }
 
 void autoremove() {

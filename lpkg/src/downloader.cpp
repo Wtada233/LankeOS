@@ -7,6 +7,7 @@
 #include <fstream>
 #include <memory>
 #include <unistd.h>
+#include <cstdio>
 
 // HTTP download callback function (modern C++)
 size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
@@ -18,7 +19,7 @@ size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
 
 // Download progress bar callback
 int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_off_t dlnow, [[maybe_unused]] curl_off_t ultotal, [[maybe_unused]] curl_off_t ulnow) {
-    if (dltotal <= 0 || !isatty(fileno(stderr))) {
+    if (dltotal <= 0 || !isatty(fileno(stdout))) {
         return 0;
     }
 

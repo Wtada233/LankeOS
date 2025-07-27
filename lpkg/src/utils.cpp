@@ -16,13 +16,6 @@ namespace {
     NonInteractiveMode non_interactive_mode = NonInteractiveMode::INTERACTIVE;
 }
 
-// Color codes
-const std::string COLOR_GREEN = "\033[1;32m";
-const std::string COLOR_WHITE = "\033[1;37m";
-const std::string COLOR_YELLOW = "\033[1;33m";
-const std::string COLOR_RED = "\033[1;31m";
-const std::string COLOR_RESET = "\033[0m";
-
 void log_info(const std::string& msg) {
     if (isatty(fileno(stdout))) {
         std::cout << COLOR_GREEN << "==> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;

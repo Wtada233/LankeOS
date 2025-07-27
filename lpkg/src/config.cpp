@@ -8,18 +8,6 @@
 
 namespace fs = std::filesystem;
 
-const std::string CONFIG_DIR = "/etc/lpkg/";
-const std::string DEP_DIR = CONFIG_DIR + "deps/";
-const std::string FILES_DIR = CONFIG_DIR + "files/";
-const std::string PKGS_FILE = CONFIG_DIR + "pkgs";
-const std::string HOLDPKGS_FILE = CONFIG_DIR + "holdpkgs";
-const std::string MIRROR_CONF = CONFIG_DIR + "mirror.conf";
-const std::string L10N_DIR = "/usr/share/lpkg/l10n/";
-const std::string DOCS_DIR = "/usr/share/lpkg/docs/";
-const std::string TMP_DIR = "/tmp/lpkg/";
-const std::string LOCK_DIR = "/var/lpkg/";
-const std::string LOCK_FILE = LOCK_DIR + "db.lck";
-
 void init_filesystem() {
     ensure_dir_exists(CONFIG_DIR);
     ensure_dir_exists(DEP_DIR);
