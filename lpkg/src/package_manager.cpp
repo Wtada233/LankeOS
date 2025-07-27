@@ -29,7 +29,6 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
 std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
 std::string find_file_owner(const fs::path& file_path, const std::string& current_pkg_name);
-void download_with_retries(const std::string& url, const fs::path& output_path, int max_retries, bool show_progress);
 
 // Helper Functions
 std::string get_installed_version(const std::string& pkg_name) {
@@ -63,22 +62,6 @@ std::string find_file_owner(const fs::path& file_path, const std::string& curren
         }
     }
     return "";
-}
-
-void download_with_retries(const std::string& url, const fs::path& output_path, int max_retries = 5, bool show_progress = true) {
-    for (int i = 0; i < max_retries; ++i) {
-        try {
-            download_file(url, output_path, show_progress);
-            return; // Success
-        } catch (const LpkgException& e) {
-            fs::remove(output_path); // Clean up failed download
-            if (i < max_retries - 1) {
-                log_warning(std::string(e.what()) + ". Retrying...");
-            } else {
-                throw; // Rethrow on last attempt
-            }
-        }
-    }
 }
 
 } // anonymous namespace

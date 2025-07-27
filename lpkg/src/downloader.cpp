@@ -66,10 +66,26 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
 
     CURLcode res = curl_easy_perform(curl.get());
     if (show_progress) {
-        std::cerr << std::endl;
+        std::cout << std::endl;
     }
 
     if (res != CURLE_OK) {
         throw LpkgException(string_format("error.download_failed", url));
+    }
+}
+
+void download_with_retries(const std::string& url, const fs::path& output_path, int max_retries, bool show_progress) {
+    for (int i = 0; i < max_retries; ++i) {
+        try {
+            download_file(url, output_path, show_progress);
+            return; // Success
+        } catch (const LpkgException& e) {
+            fs::remove(output_path); // Clean up failed download
+            if (i < max_retries - 1) {
+                log_warning(std::string(e.what()) + ". Retrying...");
+            } else {
+                throw; // Rethrow on last attempt
+            }
+        }
     }
 }
