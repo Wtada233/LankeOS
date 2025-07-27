@@ -15,6 +15,7 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <memory>
 #include <tuple>
 #include <unordered_set>
 #include <vector>
@@ -23,24 +24,14 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// Forward declarations for internal functions
+// Forward declarations
 void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path);
 std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
-std::unordered_set<std::string> get_all_required_packages();
 std::string find_file_owner(const fs::path& file_path, const std::string& current_pkg_name);
-void download_and_verify_package(const std::string& pkg_name, const std::string& version, const fs::path& tmp_pkg_dir, fs::path& out_archive_path, std::string& out_actual_version);
-void extract_and_validate_package(const std::string& pkg_name, const fs::path& archive_path, const fs::path& tmp_pkg_dir);
-void resolve_dependencies(const std::string& pkg_name, const fs::path& tmp_pkg_dir, std::vector<std::string>& install_path);
-void check_for_file_conflicts(const std::string& pkg_name, const fs::path& tmp_pkg_dir);
-void copy_package_files(const std::string& pkg_name, const fs::path& tmp_pkg_dir, std::vector<std::string>& out_installed_files, std::set<std::string>& out_created_dirs);
-void register_package(const std::string& pkg_name, const std::string& actual_version, bool explicit_install, const fs::path& tmp_pkg_dir, const std::vector<std::string>& installed_files, const std::set<std::string>& created_dirs);
+void download_with_retries(const std::string& url, const fs::path& output_path, int max_retries, bool show_progress);
 
-
-//
-// Core Helper Functions
-//
-
+// Helper Functions
 std::string get_installed_version(const std::string& pkg_name) {
     auto pkgs = read_set_from_file(PKGS_FILE);
     for (const auto& pkg : pkgs) {
@@ -90,24 +81,70 @@ void download_with_retries(const std::string& url, const fs::path& output_path, 
     }
 }
 
-//
-// Installation Step Functions
-//
+} // anonymous namespace
 
-void download_and_verify_package(const std::string& pkg_name, const std::string& version, const fs::path& tmp_pkg_dir, fs::path& out_archive_path, std::string& out_actual_version) {
+// --- InstallationTask Class Implementation ---
+
+InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path)
+    : pkg_name_(std::move(pkg_name)),
+      version_(std::move(version)),
+      explicit_install_(explicit_install),
+      install_path_(install_path),
+      tmp_pkg_dir_(fs::path(TMP_DIR) / pkg_name_) {}
+
+void InstallationTask::run() {
+    if (!get_installed_version(pkg_name_).empty()) {
+        log_info(string_format("info.package_already_installed", pkg_name_));
+        return;
+    }
+
+    log_info(string_format("info.installing_package", pkg_name_, version_));
+    install_path_.push_back(pkg_name_);
+
+    fs::remove_all(tmp_pkg_dir_);
+    ensure_dir_exists(tmp_pkg_dir_);
+
+    auto cleanup = [&](const void*) { fs::remove_all(tmp_pkg_dir_); };
+    std::unique_ptr<const void, decltype(cleanup)> tmp_dir_guard(tmp_pkg_dir_.c_str(), cleanup);
+
+    try {
+        download_and_verify_package();
+        extract_and_validate_package();
+        resolve_dependencies();
+
+        if (!get_installed_version(pkg_name_).empty()) {
+            log_warning(string_format("warning.skip_already_installed", pkg_name_));
+            install_path_.pop_back();
+            return;
+        }
+
+        check_for_file_conflicts();
+        copy_package_files();
+        register_package();
+
+    } catch (...) {
+        install_path_.pop_back();
+        throw;
+    }
+
+    install_path_.pop_back();
+    log_info(string_format("info.package_installed_successfully", pkg_name_));
+}
+
+void InstallationTask::download_and_verify_package() {
     std::string mirror_url = get_mirror_url();
     std::string arch = get_architecture();
 
-    out_actual_version = version;
-    if (version == "latest") {
-        out_actual_version = get_latest_version(pkg_name);
-        log_info(string_format("info.latest_version", out_actual_version));
+    actual_version_ = version_;
+    if (version_ == "latest") {
+        actual_version_ = get_latest_version(pkg_name_);
+        log_info(string_format("info.latest_version", actual_version_));
     }
 
-    const std::string download_url = mirror_url + arch + "/" + pkg_name + "/" + out_actual_version + "/app.tar.zst";
-    out_archive_path = tmp_pkg_dir / "app.tar.zst";
-    const std::string hash_url = mirror_url + arch + "/" + pkg_name + "/" + out_actual_version + "/hash.txt";
-    const fs::path hash_path = tmp_pkg_dir / "hash.txt";
+    const std::string download_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + "/app.tar.zst";
+    archive_path_ = tmp_pkg_dir_ / "app.tar.zst";
+    const std::string hash_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + "/hash.txt";
+    const fs::path hash_path = tmp_pkg_dir_ / "hash.txt";
 
     log_info(string_format("info.downloading_from", download_url));
 
@@ -119,57 +156,57 @@ void download_and_verify_package(const std::string& pkg_name, const std::string&
     }
     hash_file.close();
 
-    download_with_retries(download_url, out_archive_path, 5, true);
+    download_with_retries(download_url, archive_path_, 5, true);
 
-    std::string actual_hash = calculate_sha256(out_archive_path);
+    std::string actual_hash = calculate_sha256(archive_path_);
     if (expected_hash != actual_hash) {
-        throw LpkgException(string_format("error.hash_mismatch", pkg_name));
+        throw LpkgException(string_format("error.hash_mismatch", pkg_name_));
     }
 }
 
-void extract_and_validate_package([[maybe_unused]] const std::string& pkg_name, const fs::path& archive_path, const fs::path& tmp_pkg_dir) {
+void InstallationTask::extract_and_validate_package() {
     log_info(get_string("info.extracting_to_tmp"));
-    extract_tar_zst(archive_path, tmp_pkg_dir);
+    extract_tar_zst(archive_path_, tmp_pkg_dir_);
 
     std::vector<fs::path> required_files = {"man.txt", "deps.txt", "files.txt", "content/"};
     for (const auto& file : required_files) {
-        if (!fs::exists(tmp_pkg_dir / file)) {
-            throw LpkgException(string_format("error.incomplete_package", (tmp_pkg_dir / file).string()));
+        if (!fs::exists(tmp_pkg_dir_ / file)) {
+            throw LpkgException(string_format("error.incomplete_package", (tmp_pkg_dir_ / file).string()));
         }
     }
 }
 
-void resolve_dependencies(const std::string& pkg_name, const fs::path& tmp_pkg_dir, std::vector<std::string>& install_path) {
+void InstallationTask::resolve_dependencies() {
     log_info(get_string("info.checking_deps"));
-    std::ifstream deps_file(tmp_pkg_dir / "deps.txt");
+    std::ifstream deps_file(tmp_pkg_dir_ / "deps.txt");
     std::string dep;
     while (std::getline(deps_file, dep)) {
         if (dep.empty()) continue;
 
-        if (std::find(install_path.begin(), install_path.end(), dep) != install_path.end()) {
-            log_warning(string_format("warning.circular_dependency", pkg_name, dep));
+        if (std::find(install_path_.begin(), install_path_.end(), dep) != install_path_.end()) {
+            log_warning(string_format("warning.circular_dependency", pkg_name_, dep));
             continue;
         }
 
         log_info(string_format("info.dep_found", dep));
         if (get_installed_version(dep).empty()) {
             log_info(string_format("info.dep_not_installed", dep));
-            do_install(dep, "latest", false, install_path);
+            do_install(dep, "latest", false, install_path_);
         } else {
             log_info(string_format("info.dep_already_installed", dep));
         }
     }
 }
 
-void check_for_file_conflicts(const std::string& pkg_name, const fs::path& tmp_pkg_dir) {
+void InstallationTask::check_for_file_conflicts() {
     log_info(get_string("info.checking_for_file_conflicts"));
     std::map<std::string, std::string> conflicts;
-    std::ifstream files_list(tmp_pkg_dir / "files.txt");
+    std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
     std::string src, dest;
     while (files_list >> src >> dest) {
         fs::path dest_path = fs::path(dest) / src;
         if (fs::exists(dest_path)) {
-            std::string owner = find_file_owner(dest_path, pkg_name);
+            std::string owner = find_file_owner(dest_path, pkg_name_);
             if (!owner.empty()) {
                 conflicts[dest_path.string()] = owner;
             }
@@ -186,14 +223,16 @@ void check_for_file_conflicts(const std::string& pkg_name, const fs::path& tmp_p
     }
 }
 
-void copy_package_files([[maybe_unused]] const std::string& pkg_name, const fs::path& tmp_pkg_dir, std::vector<std::string>& out_installed_files, std::set<std::string>& out_created_dirs) {
+void InstallationTask::copy_package_files() {
     log_info(get_string("info.copying_files"));
-    std::ifstream files_list(tmp_pkg_dir / "files.txt");
+    std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
     std::string src, dest;
     int file_count = 0;
+    std::vector<std::string> installed_files;
+    std::set<std::string> created_dirs;
 
     while (files_list >> src >> dest) {
-        const fs::path src_path = tmp_pkg_dir / "content" / src;
+        const fs::path src_path = tmp_pkg_dir_ / "content" / src;
         const fs::path dest_path = fs::path(dest) / src;
 
         if (!fs::exists(src_path)) {
@@ -204,36 +243,34 @@ void copy_package_files([[maybe_unused]] const std::string& pkg_name, const fs::
         fs::path dest_parent = dest_path.parent_path();
         if (!dest_parent.empty()) {
             ensure_dir_exists(dest_parent);
-            out_created_dirs.insert(dest_parent.string());
+            created_dirs.insert(dest_parent.string());
         }
 
         try {
             fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
             file_count++;
-            out_installed_files.push_back(dest_path.string());
+            installed_files.push_back(dest_path.string());
         } catch (const fs::filesystem_error& e) {
             throw LpkgException(string_format("error.copy_failed_rollback", src_path.string(), dest_path.string(), e.what()));
         }
     }
     log_info(string_format("info.copy_complete", file_count));
-}
 
-void register_package(const std::string& pkg_name, const std::string& actual_version, bool explicit_install, const fs::path& tmp_pkg_dir, const std::vector<std::string>& installed_files, const std::set<std::string>& created_dirs) {
-    // Record installed files
-    std::ofstream pkg_files(FILES_DIR / (pkg_name + ".txt"));
+    // Now register the copied files
+    std::ofstream pkg_files(FILES_DIR / (pkg_name_ + ".txt"));
     for(const auto& file : installed_files) {
         pkg_files << file << "\n";
     }
-
-    // Record created directories
-    std::ofstream dirs_file(FILES_DIR / (pkg_name + ".dirs"));
+    std::ofstream dirs_file(FILES_DIR / (pkg_name_ + ".dirs"));
     for (const auto& dir : created_dirs) {
         dirs_file << dir << "\n";
     }
+}
 
+void InstallationTask::register_package() {
     // Record dependencies
-    std::ifstream deps_file_src(tmp_pkg_dir / "deps.txt");
-    std::ofstream pkg_deps_dest(DEP_DIR / pkg_name);
+    std::ifstream deps_file_src(tmp_pkg_dir_ / "deps.txt");
+    std::ofstream pkg_deps_dest(DEP_DIR / pkg_name_);
     std::string dep;
     while (std::getline(deps_file_src, dep)) {
         if (!dep.empty()) {
@@ -242,80 +279,28 @@ void register_package(const std::string& pkg_name, const std::string& actual_ver
     }
 
     // Copy man page
-    fs::copy(tmp_pkg_dir / "man.txt", DOCS_DIR / (pkg_name + ".man"), fs::copy_options::overwrite_existing);
+    fs::copy(tmp_pkg_dir_ / "man.txt", DOCS_DIR / (pkg_name_ + ".man"), fs::copy_options::overwrite_existing);
 
     // Add to main package list
     auto pkgs = read_set_from_file(PKGS_FILE);
-    pkgs.insert(pkg_name + ":" + actual_version);
+    pkgs.insert(pkg_name_ + ":" + actual_version_);
     write_set_to_file(PKGS_FILE, pkgs);
 
     // Add to manually installed list if needed
-    if (explicit_install) {
+    if (explicit_install_) {
         auto holdpkgs = read_set_from_file(HOLDPKGS_FILE);
-        holdpkgs.insert(pkg_name);
+        holdpkgs.insert(pkg_name_);
         write_set_to_file(HOLDPKGS_FILE, holdpkgs);
     }
 }
 
 
-//
-// Main Control Flow
-//
+// --- Public API Functions ---
 
+namespace {
 void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path) {
-    if (!get_installed_version(pkg_name).empty()) {
-        log_info(string_format("info.package_already_installed", pkg_name));
-        return;
-    }
-
-    log_info(string_format("info.installing_package", pkg_name, version));
-    install_path.push_back(pkg_name);
-
-    const fs::path tmp_pkg_dir = fs::path(TMP_DIR) / pkg_name;
-    fs::remove_all(tmp_pkg_dir);
-    ensure_dir_exists(tmp_pkg_dir);
-
-    // RAII cleanup for temp directory
-    auto cleanup = [&](const void*) { fs::remove_all(tmp_pkg_dir); };
-    std::unique_ptr<const void, decltype(cleanup)> tmp_dir_guard(tmp_pkg_dir.c_str(), cleanup);
-
-    try {
-        // Step 1: Download and Verify
-        fs::path archive_path;
-        std::string actual_version;
-        download_and_verify_package(pkg_name, version, tmp_pkg_dir, archive_path, actual_version);
-
-        // Step 2: Extract and Validate
-        extract_and_validate_package(pkg_name, archive_path, tmp_pkg_dir);
-
-        // Step 3: Resolve Dependencies
-        resolve_dependencies(pkg_name, tmp_pkg_dir, install_path);
-
-        // Re-check if installed during dependency resolution
-        if (!get_installed_version(pkg_name).empty()) {
-            log_warning(string_format("warning.skip_already_installed", pkg_name));
-            install_path.pop_back();
-            return;
-        }
-
-        // Step 4: Check for File Conflicts
-        check_for_file_conflicts(pkg_name, tmp_pkg_dir);
-
-        // Step 5: Copy Files
-        std::vector<std::string> installed_files;
-        std::set<std::string> created_dirs;
-        copy_package_files(pkg_name, tmp_pkg_dir, installed_files, created_dirs);
-
-        // Step 6: Register Package
-        register_package(pkg_name, actual_version, explicit_install, tmp_pkg_dir, installed_files, created_dirs);
-
-    } catch (...) {
-        install_path.pop_back();
-        throw; // Re-throw the exception after cleanup
-    }
-
-    install_path.pop_back();
-    log_info(string_format("info.package_installed_successfully", pkg_name));
+    InstallationTask task(pkg_name, version, explicit_install, install_path);
+    task.run();
 }
 
 std::unordered_set<std::string> get_all_required_packages() {
@@ -348,12 +333,7 @@ std::unordered_set<std::string> get_all_required_packages() {
     }
     return required;
 }
-
 } // anonymous namespace
-
-//
-// Public API Functions
-//
 
 void install_package(const std::string& pkg_name, const std::string& version) {
     std::vector<std::string> install_path;
