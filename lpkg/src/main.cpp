@@ -21,6 +21,14 @@ void print_usage(const cxxopts::Options& options) {
     std::cerr << get_string("info.man_desc") << std::endl;
 }
 
+void preinst_check(const cxxopts::ParseResult& result, const cxxopts::Options& options, size_t min, int max = -1) {
+    size_t count = result.count("packages") ? result["packages"].as<std::vector<std::string>>().size() : 0;
+    if (count < min || (max != -1 && count > (size_t)max)) {
+        print_usage(options);
+        exit(1);
+    }
+}
+
 int main(int argc, char* argv[]) {
     try {
         init_localization();
@@ -70,10 +78,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (command == "install") {
-            if (!result.count("packages")) {
-                print_usage(options);
-                return 1;
-            }
+            preinst_check(result, options, 1);
             const auto& packages = result["packages"].as<std::vector<std::string>>();
             for (const auto& pkg_arg : packages) {
                 size_t pos = pkg_arg.find(':');
@@ -84,24 +89,20 @@ int main(int argc, char* argv[]) {
                 }
             }
         } else if (command == "remove") {
-            if (!result.count("packages")) {
-                print_usage(options);
-                return 1;
-            }
+            preinst_check(result, options, 1);
             const auto& pkg_names = result["packages"].as<std::vector<std::string>>();
             bool force = result["force"].as<bool>();
             for (const auto& pkg_name : pkg_names) {
                 remove_package(pkg_name, force);
             }
         } else if (command == "autoremove") {
+            preinst_check(result, options, 0, 0);
             autoremove();
         } else if (command == "upgrade") {
+            preinst_check(result, options, 0, 0);
             upgrade_packages();
         } else if (command == "man") {
-            if (!result.count("packages") || result["packages"].as<std::vector<std::string>>().size() != 1) {
-                print_usage(options);
-                return 1;
-            }
+            preinst_check(result, options, 1, 1);
             show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
         } else {
             print_usage(options);
