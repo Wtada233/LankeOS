@@ -1,24 +1,25 @@
 #include "version.hpp"
+
 #include "config.hpp"
-#include "utils.hpp"
 #include "downloader.hpp"
-#include "localization.hpp"
 #include "exception.hpp"
-#include <vector>
-#include <regex>
+#include "localization.hpp"
+#include "utils.hpp"
+
 #include <algorithm>
-#include <fstream>
-#include <filesystem>
 #include <cctype>
+#include <filesystem>
+#include <fstream>
+#include <regex>
+#include <vector>
 
 namespace fs = std::filesystem;
 
 namespace {
 void validate_version_format(const std::string& version_str) {
-    for (char c : version_str) {
-        if (!std::isdigit(c) && c != '.') {
-            throw LpkgException(string_format("error.invalid_version_format", version_str));
-        }
+    static const std::regex version_regex(R"(^(\d+\.)*\d+$)");
+    if (!std::regex_match(version_str, version_regex)) {
+        throw LpkgException(string_format("error.invalid_version_format", version_str));
     }
 }
 }
@@ -46,11 +47,9 @@ std::string get_latest_version(const std::string& pkg_name) {
     std::string mirror_url = get_mirror_url();
     std::string arch = get_architecture();
     std::string latest_txt_url = mirror_url + arch + "/" + pkg_name + "/latest.txt";
-    std::string tmp_file_path = TMP_DIR + pkg_name + "_latest.txt";
+    fs::path tmp_file_path = fs::path(TMP_DIR) / (pkg_name + "_latest.txt");
 
-    if (!download_file(latest_txt_url, tmp_file_path, false)) {
-        throw LpkgException(string_format("error.download_latest_txt_failed", latest_txt_url));
-    }
+    download_file(latest_txt_url, tmp_file_path, false);
 
     std::ifstream latest_file(tmp_file_path);
     std::string latest_version;

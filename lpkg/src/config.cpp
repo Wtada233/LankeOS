@@ -1,8 +1,10 @@
 #include "config.hpp"
-#include "utils.hpp"
-#include "localization.hpp"
 #include "exception.hpp"
+#include "localization.hpp"
+#include "utils.hpp"
+
 #include <sys/utsname.h>
+
 #include <filesystem>
 #include <fstream>
 
@@ -37,6 +39,8 @@ std::string get_mirror_url() {
     if (!std::getline(mirror_file, mirror_url) || mirror_url.empty()) {
         throw LpkgException(get_string("error.invalid_mirror_config"));
     }
-    if (mirror_url.back() != '/') mirror_url += '/';
+    if (mirror_url.back() != '/') {
+        mirror_url += '/';
+    }
     return mirror_url;
 }

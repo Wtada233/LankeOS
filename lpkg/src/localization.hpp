@@ -1,5 +1,4 @@
-#ifndef LOCALIZATION_HPP
-#define LOCALIZATION_HPP
+#pragma once
 
 #include <string>
 #include <format>
@@ -18,5 +17,3 @@ std::string string_format(const std::string& key, Args&&... args) {
         return "Formatting error for key '" + key + "': " + e.what();
     }
 }
-
-#endif // LOCALIZATION_HPP

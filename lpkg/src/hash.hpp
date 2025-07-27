@@ -1,10 +1,10 @@
-#ifndef HASH_HPP
-#define HASH_HPP
+#pragma once
 
 #include <string>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 // Calculates the SHA256 hash of a file.
 // Throws LpkgException if the file cannot be opened.
-std::string calculate_sha256(const std::string& file_path);
-
-#endif // HASH_HPP
+std::string calculate_sha256(const fs::path& file_path);

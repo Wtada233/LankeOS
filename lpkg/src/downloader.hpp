@@ -1,8 +1,8 @@
-#ifndef DOWNLOADER_HPP
-#define DOWNLOADER_HPP
+#pragma once
 
 #include <string>
+#include <filesystem>
 
-bool download_file(const std::string& url, const std::string& output_path, bool show_progress = true);
+namespace fs = std::filesystem;
 
-#endif // DOWNLOADER_HPP
+void download_file(const std::string& url, const fs::path& output_path, bool show_progress = true);
