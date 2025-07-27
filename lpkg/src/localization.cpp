@@ -1,11 +1,12 @@
 #include "localization.hpp"
 #include "config.hpp"
 #include "utils.hpp"
-#include <iostream>
-#include <fstream>
-#include <unordered_map>
+
 #include <cstdlib>
+#include <fstream>
+#include <iostream>
 #include <string>
+#include <unordered_map>
 
 namespace {
     std::unordered_map<std::string, std::string> translations;
@@ -13,7 +14,7 @@ namespace {
 }
 
 void load_strings(const std::string& lang) {
-    std::string file_path = L10N_DIR + lang + ".txt";
+    auto file_path = L10N_DIR / (lang + ".txt");
     std::ifstream file(file_path);
     if (!file.is_open()) {
         if (lang != "en") { // Avoid infinite recursion

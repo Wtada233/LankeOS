@@ -1,5 +1,4 @@
-#ifndef PACKAGE_MANAGER_HPP
-#define PACKAGE_MANAGER_HPP
+#pragma once
 
 #include <string>
 
@@ -8,5 +7,3 @@ void remove_package(const std::string& pkg_name, bool force = false);
 void autoremove();
 void upgrade_packages();
 void show_man_page(const std::string& pkg_name);
-
-#endif // PACKAGE_MANAGER_HPP

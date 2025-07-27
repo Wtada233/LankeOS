@@ -1,13 +1,15 @@
 #include "config.hpp"
-#include "utils.hpp"
-#include "package_manager.hpp"
-#include "localization.hpp"
 #include "exception.hpp"
+#include "localization.hpp"
+#include "package_manager.hpp"
+#include "utils.hpp"
+
 #include "cxxopts.hpp"
+
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 
 void print_usage(const cxxopts::Options& options) {
     std::cerr << options.help({""});

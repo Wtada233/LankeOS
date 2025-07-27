@@ -1,51 +1,68 @@
 #include "utils.hpp"
+
 #include "config.hpp"
-#include "localization.hpp"
 #include "exception.hpp"
-#include <iostream>
-#include <fstream>
-#include <filesystem>
-#include <cstdlib>
-#include <unistd.h>
+#include "localization.hpp"
+
 #include <sys/file.h>
+#include <unistd.h>
+
 #include <cerrno>
+#include <cstdlib>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 
 namespace fs = std::filesystem;
 
 namespace {
     NonInteractiveMode non_interactive_mode = NonInteractiveMode::INTERACTIVE;
+
+    // Helper function to reduce code duplication in logging
+    void log_internal(const std::string& prefix, const std::string_view& color, const std::string& msg, std::ostream& stream) {
+        bool is_tty = false;
+        if (&stream == &std::cout) {
+            is_tty = isatty(STDOUT_FILENO);
+        } else if (&stream == &std::cerr) {
+            is_tty = isatty(STDERR_FILENO);
+        }
+
+        if (is_tty) {
+            stream << color << prefix << COLOR_WHITE << msg << COLOR_RESET << std::endl;
+        } else {
+            stream << prefix << msg << std::endl;
+        }
+    }
 }
 
 void log_info(const std::string& msg) {
-    if (isatty(fileno(stdout))) {
-        std::cout << COLOR_GREEN << "==> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
-    } else {
-        std::cout << "==> " << msg << std::endl;
-    }
+    log_internal("==> ", COLOR_GREEN, msg, std::cout);
 }
 
-void log_sync(const std::string& msg) {
-    if (isatty(fileno(stdout))) {
-        std::cout << COLOR_GREEN << ">>> " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
-    } else {
-        std::cout << ">>> " << msg << std::endl;
-    }
-}
+
 
 void log_warning(const std::string& msg) {
-    if (isatty(fileno(stderr))) {
-        std::cerr << COLOR_YELLOW << get_string("warning.prefix") << " " << COLOR_WHITE << msg << COLOR_RESET << std::endl;
-    } else {
-        std::cerr << get_string("warning.prefix") << " " << msg << std::endl;
-    }
+    log_internal(get_string("warning.prefix") + " ", COLOR_YELLOW, msg, std::cerr);
 }
 
 void log_error(const std::string& msg) {
-    if (isatty(fileno(stderr))) {
-        std::cerr << COLOR_RED << get_string("error.prefix") << " " << COLOR_RESET << msg << std::endl;
-    } else {
-        std::cerr << get_string("error.prefix") << " " << msg << std::endl;
+    log_internal(get_string("error.prefix") + " ", COLOR_RED, msg, std::cerr);
+}
+
+void log_progress(const std::string& msg, double percentage, int bar_width) {
+    if (!isatty(STDOUT_FILENO)) {
+        return;
     }
+
+    int pos = static_cast<int>(bar_width * percentage / 100.0);
+
+    std::cout << "\r" << COLOR_GREEN << "==> " << COLOR_WHITE << msg << " [";
+    for (int i = 0; i < bar_width; ++i) {
+        if (i < pos) std::cout << "#";
+        else if (i == pos) std::cout << ">";
+        else std::cout << "-";
+    }
+    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%" << COLOR_RESET << std::flush;
 }
 
 void set_non_interactive_mode(NonInteractiveMode mode) {
@@ -81,7 +98,7 @@ DBLock::DBLock() {
     ensure_dir_exists(LOCK_DIR);
     lock_fd = open(LOCK_FILE.c_str(), O_CREAT | O_RDWR, 0644);
     if (lock_fd < 0) {
-        throw LpkgException(string_format("error.create_file_failed", LOCK_FILE));
+        throw LpkgException(string_format("error.create_file_failed", LOCK_FILE.string()));
     }
 
     if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
@@ -100,26 +117,28 @@ DBLock::~DBLock() {
     }
 }
 
-void ensure_dir_exists(const std::string& path) {
+void ensure_dir_exists(const fs::path& path) {
     if (!fs::exists(path)) {
-        if (!fs::create_directories(path)) {
-            throw LpkgException(string_format("error.create_dir_failed", path));
+        std::error_code ec;
+        if (!fs::create_directories(path, ec)) {
+            throw LpkgException(string_format("error.create_dir_failed", path.string()));
         }
-    } else if (!fs::is_directory(path)) {
-        throw LpkgException(string_format("error.path_not_dir", path));
+    }
+    else if (!fs::is_directory(path)) {
+        throw LpkgException(string_format("error.path_not_dir", path.string()));
     }
 }
 
-void ensure_file_exists(const std::string& path) {
+void ensure_file_exists(const fs::path& path) {
     if (!fs::exists(path)) {
         std::ofstream file(path);
         if (!file) {
-            throw LpkgException(string_format("error.create_file_failed", path));
+            throw LpkgException(string_format("error.create_file_failed", path.string()));
         }
     }
 }
 
-std::unordered_set<std::string> read_set_from_file(const std::string& path) {
+std::unordered_set<std::string> read_set_from_file(const fs::path& path) {
     std::ifstream file(path);
     std::unordered_set<std::string> result;
     std::string line;
@@ -129,7 +148,7 @@ std::unordered_set<std::string> read_set_from_file(const std::string& path) {
     return result;
 }
 
-void write_set_to_file(const std::string& path, const std::unordered_set<std::string>& data) {
+void write_set_to_file(const fs::path& path, const std::unordered_set<std::string>& data) {
     std::ofstream file(path);
     for (const auto& item : data) {
         file << item << "\n";

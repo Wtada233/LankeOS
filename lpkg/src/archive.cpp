@@ -1,8 +1,11 @@
 #include "archive.hpp"
-#include "utils.hpp"
+#include "exception.hpp"
 #include "localization.hpp"
+#include "utils.hpp"
+
 #include <archive.h>
 #include <archive_entry.h>
+
 #include <memory>
 
 // Custom deleters for libarchive handles
@@ -27,7 +30,7 @@ struct ArchiveWriteDeleter {
 using ArchiveReadHandle = std::unique_ptr<struct archive, ArchiveReadDeleter>;
 using ArchiveWriteHandle = std::unique_ptr<struct archive, ArchiveWriteDeleter>;
 
-bool extract_tar_zst(const std::string& archive_path, const std::string& output_dir) {
+void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     ArchiveReadHandle a(archive_read_new());
     archive_read_support_filter_all(a.get());
     archive_read_support_format_all(a.get());
@@ -37,14 +40,14 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
     archive_write_disk_set_standard_lookup(ext.get());
 
     if (archive_read_open_filename(a.get(), archive_path.c_str(), 10240) != ARCHIVE_OK) {
-        return false; // Handles are cleaned up automatically
+        throw LpkgException(string_format("error.extract_failed", archive_path.string()));
     }
 
     struct archive_entry* entry;
     int r = ARCHIVE_OK;
     long long count = 0;
     while ((r = archive_read_next_header(a.get(), &entry)) == ARCHIVE_OK) {
-        std::string path = output_dir + "/" + archive_entry_pathname(entry);
+        fs::path path = output_dir / archive_entry_pathname(entry);
         archive_entry_set_pathname(entry, path.c_str());
         r = archive_write_header(ext.get(), entry);
         if (r < ARCHIVE_OK) {
@@ -65,13 +68,13 @@ bool extract_tar_zst(const std::string& archive_path, const std::string& output_
         archive_write_finish_entry(ext.get());
 
         if (++count % 100 == 0) {
-            log_sync(string_format("info.extracting", count));
+            log_info(string_format("info.extracting", count));
         }
     }
 
-    // Destructors of ArchiveReadHandle and ArchiveWriteHandle will automatically
-    // call archive_read_close/free and archive_write_close/free.
-
-    log_sync(string_format("info.extract_complete", count));
-    return (r == ARCHIVE_EOF);
+    log_info(string_format("info.extract_complete", count));
+    
+    if (r != ARCHIVE_EOF) {
+        throw LpkgException(string_format("error.extract_failed", archive_path.string()));
+    }
 }

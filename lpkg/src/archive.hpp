@@ -1,8 +1,8 @@
-#ifndef ARCHIVE_HPP
-#define ARCHIVE_HPP
+#pragma once
 
 #include <string>
+#include <filesystem>
 
-bool extract_tar_zst(const std::string& archive_path, const std::string& output_dir);
+namespace fs = std::filesystem;
 
-#endif // ARCHIVE_HPP
+void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir);

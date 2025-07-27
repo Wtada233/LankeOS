@@ -1,11 +1,13 @@
 #include "hash.hpp"
 #include "exception.hpp"
 #include "localization.hpp"
+
 #include <openssl/evp.h>
+
 #include <fstream>
-#include <sstream>
 #include <iomanip>
 #include <memory>
+#include <sstream>
 
 // Custom deleter for EVP_MD_CTX
 struct EvpMdCtxDeleter {
@@ -18,10 +20,10 @@ struct EvpMdCtxDeleter {
 
 using EvpMdCtxPtr = std::unique_ptr<EVP_MD_CTX, EvpMdCtxDeleter>;
 
-std::string calculate_sha256(const std::string& file_path) {
+std::string calculate_sha256(const fs::path& file_path) {
     std::ifstream file(file_path, std::ios::binary);
     if (!file) {
-        throw LpkgException(string_format("error.open_file_failed", file_path));
+        throw LpkgException(string_format("error.open_file_failed", file_path.string()));
     }
 
     EvpMdCtxPtr md_ctx(EVP_MD_CTX_new());

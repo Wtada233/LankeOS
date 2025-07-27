@@ -1,5 +1,4 @@
-#ifndef EXCEPTION_HPP
-#define EXCEPTION_HPP
+#pragma once
 
 #include <stdexcept>
 #include <string>
@@ -9,5 +8,3 @@ public:
     explicit LpkgException(const std::string& message)
         : std::runtime_error(message) {}
 };
-
-#endif // EXCEPTION_HPP
