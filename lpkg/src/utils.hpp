@@ -3,14 +3,15 @@
 
 #include "exception.hpp"
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 // Color codes
-extern const std::string COLOR_GREEN;
-extern const std::string COLOR_WHITE;
-extern const std::string COLOR_YELLOW;
-extern const std::string COLOR_RED;
-extern const std::string COLOR_RESET;
+inline constexpr std::string_view COLOR_GREEN = "\033[1;32m";
+inline constexpr std::string_view COLOR_WHITE = "\033[1;37m";
+inline constexpr std::string_view COLOR_YELLOW = "\033[1;33m";
+inline constexpr std::string_view COLOR_RED = "\033[1;31m";
+inline constexpr std::string_view COLOR_RESET = "\033[0m";
 
 // Log functions
 void log_info(const std::string& msg);
