@@ -21,11 +21,12 @@ void print_usage(const cxxopts::Options& options) {
     std::cerr << get_string("info.man_desc") << std::endl;
 }
 
-void preinst_check(const cxxopts::ParseResult& result, const cxxopts::Options& options, size_t min, int max = -1) {
+void pre_operation_check(const cxxopts::ParseResult& result, const cxxopts::Options& options, size_t min, int max = -1) {
+    log_info(get_string("info.pre_op_check"));
     size_t count = result.count("packages") ? result["packages"].as<std::vector<std::string>>().size() : 0;
     if (count < min || (max != -1 && count > (size_t)max)) {
         print_usage(options);
-        exit(1);
+        throw LpkgException("Invalid number of arguments.");
     }
 }
 
@@ -78,7 +79,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (command == "install") {
-            preinst_check(result, options, 1);
+            pre_operation_check(result, options, 1);
             const auto& packages = result["packages"].as<std::vector<std::string>>();
             for (const auto& pkg_arg : packages) {
                 size_t pos = pkg_arg.find(':');
@@ -88,21 +89,23 @@ int main(int argc, char* argv[]) {
                     install_package(pkg_arg.substr(0, pos), pkg_arg.substr(pos + 1));
                 }
             }
+            log_info(get_string("info.install_complete"));
         } else if (command == "remove") {
-            preinst_check(result, options, 1);
+            pre_operation_check(result, options, 1);
             const auto& pkg_names = result["packages"].as<std::vector<std::string>>();
             bool force = result["force"].as<bool>();
             for (const auto& pkg_name : pkg_names) {
                 remove_package(pkg_name, force);
             }
+            log_info(get_string("info.uninstall_complete"));
         } else if (command == "autoremove") {
-            preinst_check(result, options, 0, 0);
+            pre_operation_check(result, options, 0, 0);
             autoremove();
         } else if (command == "upgrade") {
-            preinst_check(result, options, 0, 0);
+            pre_operation_check(result, options, 0, 0);
             upgrade_packages();
         } else if (command == "man") {
-            preinst_check(result, options, 1, 1);
+            pre_operation_check(result, options, 1, 1);
             show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
         } else {
             print_usage(options);

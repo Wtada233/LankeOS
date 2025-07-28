@@ -14,7 +14,7 @@ namespace {
 }
 
 void load_strings(const std::string& lang) {
-    auto file_path = L10N_DIR / (lang + ".txt");
+    auto file_path = fs::path(LPKG_L10N_DIR) / (lang + ".txt");
     std::ifstream file(file_path);
     if (!file.is_open()) {
         if (lang != "en") { // Avoid infinite recursion

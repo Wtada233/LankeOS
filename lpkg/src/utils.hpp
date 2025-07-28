@@ -16,9 +16,9 @@ inline constexpr std::string_view COLOR_RED = "[1;31m";
 inline constexpr std::string_view COLOR_RESET = "[0m";
 
 // Log functions
-void log_info(const std::string& msg);
-void log_warning(const std::string& msg);
-void log_error(const std::string& msg);
+void log_info(std::string_view msg);
+void log_warning(std::string_view msg);
+void log_error(std::string_view msg);
 void log_progress(const std::string& msg, double percentage, int bar_width = 50);
 
 // Interactive mode control

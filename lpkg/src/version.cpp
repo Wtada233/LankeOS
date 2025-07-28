@@ -49,16 +49,19 @@ std::string get_latest_version(const std::string& pkg_name) {
     std::string latest_txt_url = mirror_url + arch + "/" + pkg_name + "/latest.txt";
     fs::path tmp_file_path = fs::path(TMP_DIR) / (pkg_name + "_latest.txt");
 
+    auto cleanup = [&](const void*) { fs::remove(tmp_file_path); };
+    std::unique_ptr<const void, decltype(cleanup)> tmp_file_guard(tmp_file_path.c_str(), cleanup);
+
     download_file(latest_txt_url, tmp_file_path, false);
 
     std::ifstream latest_file(tmp_file_path);
+    if (!latest_file.is_open()) {
+        throw LpkgException(string_format("error.open_file_failed", tmp_file_path.string()));
+    }
     std::string latest_version;
     if (!std::getline(latest_file, latest_version) || latest_version.empty()) {
-        fs::remove(tmp_file_path);
         throw LpkgException(string_format("error.read_latest_txt_failed", latest_txt_url));
     }
-
-    fs::remove(tmp_file_path);
 
     validate_version_format(latest_version);
 

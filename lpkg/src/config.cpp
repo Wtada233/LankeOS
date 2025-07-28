@@ -17,8 +17,10 @@ void init_filesystem() {
     ensure_dir_exists(L10N_DIR);
     ensure_dir_exists(DOCS_DIR);
     ensure_dir_exists(TMP_DIR);
+    ensure_dir_exists(LOCK_DIR);
     ensure_file_exists(PKGS_FILE);
     ensure_file_exists(HOLDPKGS_FILE);
+    ensure_file_exists(FILES_DB);
 }
 
 std::string get_architecture() {
@@ -35,6 +37,9 @@ std::string get_architecture() {
 
 std::string get_mirror_url() {
     std::ifstream mirror_file(MIRROR_CONF);
+    if (!mirror_file.is_open()) {
+        throw LpkgException(string_format("error.open_file_failed", MIRROR_CONF.string()));
+    }
     std::string mirror_url;
     if (!std::getline(mirror_file, mirror_url) || mirror_url.empty()) {
         throw LpkgException(get_string("error.invalid_mirror_config"));

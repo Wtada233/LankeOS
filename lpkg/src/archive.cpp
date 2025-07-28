@@ -40,15 +40,17 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     archive_write_disk_set_standard_lookup(ext.get());
 
     if (archive_read_open_filename(a.get(), archive_path.c_str(), 10240) != ARCHIVE_OK) {
-        throw LpkgException(string_format("error.extract_failed", archive_path.string()));
-    }
+            throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + archive_error_string(a.get()));
+        }
 
     struct archive_entry* entry;
     int r = ARCHIVE_OK;
     long long count = 0;
     while ((r = archive_read_next_header(a.get(), &entry)) == ARCHIVE_OK) {
-        fs::path path = output_dir / archive_entry_pathname(entry);
-        archive_entry_set_pathname(entry, path.c_str());
+        // Set the destination path for the entry
+        fs::path dest_path = output_dir / archive_entry_pathname(entry);
+        archive_entry_set_pathname(entry, dest_path.c_str());
+
         r = archive_write_header(ext.get(), entry);
         if (r < ARCHIVE_OK) {
             break;
@@ -75,6 +77,6 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     log_info(string_format("info.extract_complete", count));
     
     if (r != ARCHIVE_EOF) {
-        throw LpkgException(string_format("error.extract_failed", archive_path.string()));
+        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + archive_error_string(a.get()));
     }
 }
