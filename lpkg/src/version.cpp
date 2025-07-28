@@ -47,7 +47,7 @@ std::string get_latest_version(const std::string& pkg_name) {
     std::string mirror_url = get_mirror_url();
     std::string arch = get_architecture();
     std::string latest_txt_url = mirror_url + arch + "/" + pkg_name + "/latest.txt";
-    fs::path tmp_file_path = fs::path(TMP_DIR) / (pkg_name + "_latest.txt");
+    fs::path tmp_file_path = get_tmp_dir() / (pkg_name + "_latest.txt");
 
     auto cleanup = [&](const void*) { fs::remove(tmp_file_path); };
     std::unique_ptr<const void, decltype(cleanup)> tmp_file_guard(tmp_file_path.c_str(), cleanup);

@@ -4,11 +4,16 @@
 #include "utils.hpp"
 
 #include <sys/utsname.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
 
 namespace fs = std::filesystem;
+
+fs::path get_tmp_dir() {
+    return fs::path("/tmp") / ("lpkg_" + std::to_string(getpid()));
+}
 
 void init_filesystem() {
     ensure_dir_exists(CONFIG_DIR);
@@ -16,7 +21,7 @@ void init_filesystem() {
     ensure_dir_exists(FILES_DIR);
     ensure_dir_exists(L10N_DIR);
     ensure_dir_exists(DOCS_DIR);
-    ensure_dir_exists(TMP_DIR);
+    ensure_dir_exists(get_tmp_dir());
     ensure_dir_exists(LOCK_DIR);
     ensure_file_exists(PKGS_FILE);
     ensure_file_exists(HOLDPKGS_FILE);

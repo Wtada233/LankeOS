@@ -19,6 +19,7 @@
 #include <tuple>
 #include <unordered_set>
 #include <vector>
+#include <future>
 
 namespace fs = std::filesystem;
 
@@ -29,11 +30,13 @@ struct Cache {
     std::map<std::string, std::unordered_set<std::string>> file_db;
     std::unordered_set<std::string> pkgs;
     std::unordered_set<std::string> holdpkgs;
+    bool dirty = false;
 
     void load() {
         file_db = read_file_db_uncached();
         pkgs = read_set_from_file(PKGS_FILE);
         holdpkgs = read_set_from_file(HOLDPKGS_FILE);
+        dirty = false;
     }
 
     void write_pkgs() {
@@ -92,13 +95,12 @@ std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
 
 // --- Database Helper Functions ---
-std::map<std::string, std::unordered_set<std::string>> read_file_db() {
+std::map<std::string, std::unordered_set<std::string>>& read_file_db() {
     return get_cache().file_db;
 }
 
-void write_file_db(const std::map<std::string, std::unordered_set<std::string>>& db) {
-    get_cache().file_db = db;
-    get_cache().write_file_db();
+void mark_cache_dirty() {
+    get_cache().dirty = true;
 }
 
 // --- Other Helper Functions ---
@@ -124,7 +126,7 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version, bo
       version_(std::move(version)),
       explicit_install_(explicit_install),
       install_path_(install_path),
-      tmp_pkg_dir_(fs::path(TMP_DIR) / pkg_name_) {}
+      tmp_pkg_dir_(get_tmp_dir() / pkg_name_) {}
 
 void InstallationTask::run() {
     if (!get_installed_version(pkg_name_).empty()) {
@@ -237,7 +239,7 @@ void InstallationTask::check_for_file_conflicts() {
     std::map<std::string, std::string> conflicts;
     std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
     std::string src, dest;
-    auto db = read_file_db();
+    auto& db = read_file_db();
 
     while (files_list >> src >> dest) {
         fs::path dest_path = fs::path(dest) / src;
@@ -349,7 +351,7 @@ void InstallationTask::register_package() {
     }
 
     // Update file ownership database
-    auto db = read_file_db();
+    auto& db = read_file_db();
     std::ifstream files_list(FILES_DIR / (pkg_name_ + ".txt"));
     std::string file_path;
     while (std::getline(files_list, file_path)) {
@@ -357,19 +359,19 @@ void InstallationTask::register_package() {
             db[file_path].insert(pkg_name_);
         }
     }
-    write_file_db(db);
+    mark_cache_dirty();
 
     // Copy man page
     fs::copy(tmp_pkg_dir_ / "man.txt", DOCS_DIR / (pkg_name_ + ".man"), fs::copy_options::overwrite_existing);
 
     // Add to main package list
     get_cache().pkgs.insert(pkg_name_ + ":" + actual_version_);
-    get_cache().write_pkgs();
+    mark_cache_dirty();
 
     // Add to manually installed list if needed
     if (explicit_install_) {
         get_cache().holdpkgs.insert(pkg_name_);
-        get_cache().write_holdpkgs();
+        mark_cache_dirty();
     }
 }
 
@@ -451,7 +453,7 @@ void remove_package(const std::string& pkg_name, bool force) {
     if (fs::exists(files_list_path)) {
         
         std::map<std::string, std::vector<std::string>> shared_files;
-        auto db = get_cache().file_db;
+        auto& db = get_cache().file_db;
 
         std::ifstream files_to_check(files_list_path);
         if (!files_to_check.is_open()) {
@@ -522,7 +524,7 @@ void remove_package(const std::string& pkg_name, bool force) {
                 }
             }
         }
-        get_cache().write_file_db();
+        mark_cache_dirty();
     }
 
     const fs::path dirs_list_path = FILES_DIR / (pkg_name + ".dirs");
@@ -553,11 +555,11 @@ void remove_package(const std::string& pkg_name, bool force) {
     fs::remove(DOCS_DIR / (pkg_name + ".man"));
 
     get_cache().pkgs.erase(pkg_name + ":" + installed_version);
-    get_cache().write_pkgs();
+    mark_cache_dirty();
 
     if (get_cache().holdpkgs.contains(pkg_name)) {
         get_cache().holdpkgs.erase(pkg_name);
-        get_cache().write_holdpkgs();
+        mark_cache_dirty();
     }
 
     log_info(string_format("info.package_removed_successfully", pkg_name));
@@ -590,31 +592,45 @@ void autoremove() {
         log_info(string_format("info.autoremove_complete", packages_to_remove.size()));
     }
 
-    fs::remove_all(TMP_DIR);
-    ensure_dir_exists(TMP_DIR);
+    fs::remove_all(get_tmp_dir());
+    ensure_dir_exists(get_tmp_dir());
 }
 
 void upgrade_packages() {
     log_info(get_string("info.checking_upgradable"));
     int upgraded_count = 0;
     std::vector<std::tuple<std::string, std::string, std::string>> upgradable_pkgs;
+    std::vector<std::future<std::string>> futures;
 
-    for (const auto& pkg : get_cache().pkgs) {
-        size_t pos = pkg.find(':');
-        if (pos == std::string::npos) continue;
+    auto& pkgs = get_cache().pkgs;
+    for (const auto& pkg : pkgs) {
+        futures.push_back(std::async(std::launch::async, [pkg] {
+            size_t pos = pkg.find(':');
+            if (pos == std::string::npos) return std::string();
 
-        std::string pkg_name = pkg.substr(0, pos);
-        std::string current_version = pkg.substr(pos + 1);
+            std::string pkg_name = pkg.substr(0, pos);
+            std::string current_version = pkg.substr(pos + 1);
 
-        std::string latest_version;
-        try {
-            latest_version = get_latest_version(pkg_name);
-        } catch (...) {
-            log_warning(string_format("warning.get_latest_version_failed", pkg_name));
-            continue;
-        }
+            try {
+                std::string latest_version = get_latest_version(pkg_name);
+                if (version_compare(current_version, latest_version)) {
+                    return pkg_name + ":" + current_version + ":" + latest_version;
+                }
+            } catch (...) {
+                log_warning(string_format("warning.get_latest_version_failed", pkg_name));
+            }
+            return std::string();
+        }));
+    }
 
-        if (version_compare(current_version, latest_version)) {
+    for (auto& fut : futures) {
+        std::string result = fut.get();
+        if (!result.empty()) {
+            size_t pos1 = result.find(':');
+            size_t pos2 = result.rfind(':');
+            std::string pkg_name = result.substr(0, pos1);
+            std::string current_version = result.substr(pos1 + 1, pos2 - pos1 - 1);
+            std::string latest_version = result.substr(pos2 + 1);
             log_info(string_format("info.upgradable_found", pkg_name, current_version, latest_version));
             upgradable_pkgs.emplace_back(pkg_name, current_version, latest_version);
         }
@@ -664,4 +680,14 @@ void show_man_page(const std::string& pkg_name) {
     }
 
     std::cout << man_file.rdbuf();
+}
+
+void write_cache() {
+    auto& cache = get_cache();
+    if (cache.dirty) {
+        cache.write_file_db();
+        cache.write_pkgs();
+        cache.write_holdpkgs();
+        cache.dirty = false;
+    }
 }

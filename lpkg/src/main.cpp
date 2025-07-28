@@ -88,6 +88,7 @@ int main(int argc, char* argv[]) {
                 } else {
                     install_package(pkg_arg.substr(0, pos), pkg_arg.substr(pos + 1));
                 }
+                write_cache();
             }
             log_info(get_string("info.install_complete"));
         } else if (command == "remove") {
@@ -96,14 +97,17 @@ int main(int argc, char* argv[]) {
             bool force = result["force"].as<bool>();
             for (const auto& pkg_name : pkg_names) {
                 remove_package(pkg_name, force);
+                write_cache();
             }
             log_info(get_string("info.uninstall_complete"));
         } else if (command == "autoremove") {
             pre_operation_check(result, options, 0, 0);
             autoremove();
+            write_cache();
         } else if (command == "upgrade") {
             pre_operation_check(result, options, 0, 0);
             upgrade_packages();
+            write_cache();
         } else if (command == "man") {
             pre_operation_check(result, options, 1, 1);
             show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
@@ -111,6 +115,7 @@ int main(int argc, char* argv[]) {
             print_usage(options);
             return 1;
         }
+
     } catch (const cxxopts::exceptions::exception& e) {
         log_error(e.what());
         return 1;
@@ -121,6 +126,8 @@ int main(int argc, char* argv[]) {
         log_error(e.what());
         return 1;
     }
+
+    fs::remove_all(get_tmp_dir());
 
     return 0;
 }

@@ -33,7 +33,7 @@ inline const fs::path PKGS_FILE = CONFIG_DIR / "pkgs";
 inline const fs::path HOLDPKGS_FILE = CONFIG_DIR / "holdpkgs";
 inline const fs::path MIRROR_CONF = CONFIG_DIR / "mirror.conf";
 inline const fs::path FILES_DB = FILES_DIR / "files.db"; // Changed from main.db
-inline const fs::path TMP_DIR = "/tmp/lpkg/";
+fs::path get_tmp_dir();
 inline const fs::path LOCK_FILE = LOCK_DIR / "db.lck";
 
 // Functions
