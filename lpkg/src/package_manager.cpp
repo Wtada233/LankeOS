@@ -94,10 +94,7 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
 std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
 
-// --- Database Helper Functions ---
-std::map<std::string, std::unordered_set<std::string>>& read_file_db() {
-    return get_cache().file_db;
-}
+
 
 void mark_cache_dirty() {
     get_cache().dirty = true;
@@ -239,7 +236,7 @@ void InstallationTask::check_for_file_conflicts() {
     std::map<std::string, std::string> conflicts;
     std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
     std::string src, dest;
-    auto& db = read_file_db();
+    auto& db = get_cache().file_db;
 
     while (files_list >> src >> dest) {
         fs::path dest_path = fs::path(dest) / src;
@@ -351,7 +348,7 @@ void InstallationTask::register_package() {
     }
 
     // Update file ownership database
-    auto& db = read_file_db();
+    auto& db = get_cache().file_db;
     std::ifstream files_list(FILES_DIR / (pkg_name_ + ".txt"));
     std::string file_path;
     while (std::getline(files_list, file_path)) {
