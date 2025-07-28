@@ -6,6 +6,14 @@
 
 namespace fs = std::filesystem;
 
+#pragma once
+
+#include <string>
+#include <vector>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+
 class InstallationTask {
 public:
     InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path);
@@ -33,3 +41,4 @@ void remove_package(const std::string& pkg_name, bool force = false);
 void autoremove();
 void upgrade_packages();
 void show_man_page(const std::string& pkg_name);
+void write_cache();
