@@ -66,7 +66,9 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
 
     CURLcode res = curl_easy_perform(curl.get());
     if (show_progress) {
-        std::cout << std::endl;
+        if (isatty(STDOUT_FILENO)) {
+            std::cout << std::endl;
+        }
     }
 
     if (res != CURLE_OK) {

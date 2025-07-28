@@ -3,7 +3,6 @@
 #include "localization.hpp"
 #include "package_manager.hpp"
 #include "utils.hpp"
-
 #include "cxxopts.hpp"
 
 #include <iostream>

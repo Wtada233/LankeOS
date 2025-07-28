@@ -1,11 +1,11 @@
 # Makefile
-CXX = g++
-LIBS = -lcurl -larchive -lfmt -lcrypto
-TARGET = lpkg
-SRC_DIR = src
-BUILD_DIR = build
-CONF_SRC_DIR = conf
-L10N_SRC_DIR = l10n
+CXX ?= g++
+LIBS ?= -lcurl -larchive -lfmt -lcrypto
+TARGET ?= lpkg
+SRC_DIR ?= src
+BUILD_DIR ?= build
+CONF_SRC_DIR ?= conf
+L10N_SRC_DIR ?= l10n
 
 # --- Install Directories ---
 # Use `make PREFIX=/usr/local` to change the base directory
