@@ -70,7 +70,7 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
     }
 
     if (res != CURLE_OK) {
-        throw LpkgException(string_format("error.download_failed", url));
+        throw LpkgException(string_format("error.download_failed", url) + ": " + curl_easy_strerror(res));
     }
 }
 

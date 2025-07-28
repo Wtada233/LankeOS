@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <cstring>
 
 namespace fs = std::filesystem;
 
@@ -19,7 +20,7 @@ namespace {
     NonInteractiveMode non_interactive_mode = NonInteractiveMode::INTERACTIVE;
 
     // Helper function to reduce code duplication in logging
-    void log_internal(const std::string& prefix, const std::string_view& color, const std::string& msg, std::ostream& stream) {
+    void log_internal(std::string_view prefix, std::string_view color, std::string_view msg, std::ostream& stream) {
         bool is_tty = false;
         if (&stream == &std::cout) {
             is_tty = isatty(STDOUT_FILENO);
@@ -35,17 +36,15 @@ namespace {
     }
 }
 
-void log_info(const std::string& msg) {
+void log_info(std::string_view msg) {
     log_internal("==> ", COLOR_GREEN, msg, std::cout);
 }
 
-
-
-void log_warning(const std::string& msg) {
+void log_warning(std::string_view msg) {
     log_internal(get_string("warning.prefix") + " ", COLOR_YELLOW, msg, std::cerr);
 }
 
-void log_error(const std::string& msg) {
+void log_error(std::string_view msg) {
     log_internal(get_string("error.prefix") + " ", COLOR_RED, msg, std::cerr);
 }
 
@@ -112,8 +111,12 @@ DBLock::DBLock() {
 
 DBLock::~DBLock() {
     if (lock_fd != -1) {
-        flock(lock_fd, LOCK_UN);
-        close(lock_fd);
+        if (flock(lock_fd, LOCK_UN) < 0) {
+            log_warning(string_format("warning.remove_file_failed", LOCK_FILE.string(), strerror(errno)));
+        }
+        if (close(lock_fd) < 0) {
+            log_warning(string_format("warning.remove_file_failed", LOCK_FILE.string(), strerror(errno)));
+        }
     }
 }
 
@@ -121,7 +124,7 @@ void ensure_dir_exists(const fs::path& path) {
     if (!fs::exists(path)) {
         std::error_code ec;
         if (!fs::create_directories(path, ec)) {
-            throw LpkgException(string_format("error.create_dir_failed", path.string()));
+            throw LpkgException(string_format("error.create_dir_failed", path.string()) + ": " + ec.message());
         }
     }
     else if (!fs::is_directory(path)) {
@@ -133,13 +136,16 @@ void ensure_file_exists(const fs::path& path) {
     if (!fs::exists(path)) {
         std::ofstream file(path);
         if (!file) {
-            throw LpkgException(string_format("error.create_file_failed", path.string()));
+            throw LpkgException(string_format("error.create_file_failed", path.string()) + ": " + strerror(errno));
         }
     }
 }
 
 std::unordered_set<std::string> read_set_from_file(const fs::path& path) {
     std::ifstream file(path);
+    if (!file.is_open()) {
+        throw LpkgException(string_format("error.open_file_failed", path.string()));
+    }
     std::unordered_set<std::string> result;
     std::string line;
     while (std::getline(file, line)) {
@@ -150,6 +156,9 @@ std::unordered_set<std::string> read_set_from_file(const fs::path& path) {
 
 void write_set_to_file(const fs::path& path, const std::unordered_set<std::string>& data) {
     std::ofstream file(path);
+    if (!file.is_open()) {
+        throw LpkgException(string_format("error.create_file_failed", path.string()));
+    }
     for (const auto& item : data) {
         file << item << "\n";
     }

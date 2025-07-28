@@ -1,16 +1,30 @@
 # Makefile
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -I./third_party/include
 LIBS = -lcurl -larchive -lfmt -lcrypto
 TARGET = lpkg
 SRC_DIR = src
-CONF_DIR = conf
-L10N_DIR = l10n
 BUILD_DIR = build
+CONF_SRC_DIR = conf
+L10N_SRC_DIR = l10n
 
-# Find all .cpp files in the source directory
+# --- Install Directories ---
+# Use `make PREFIX=/usr/local` to change the base directory
+PREFIX ?= /usr
+SYSCONFDIR ?= /etc
+LOCALSTATEDIR ?= /var
+
+# These are the final destination directories
+INSTALL_BIN_DIR = $(DESTDIR)$(PREFIX)/bin
+INSTALL_CONF_DIR = $(DESTDIR)$(SYSCONFDIR)/lpkg
+INSTALL_SHARE_DIR = $(DESTDIR)$(PREFIX)/share/lpkg
+INSTALL_L10N_DIR = $(INSTALL_SHARE_DIR)/l10n
+INSTALL_DOCS_DIR = $(INSTALL_SHARE_DIR)/docs
+INSTALL_LOCK_DIR = $(DESTDIR)$(LOCALSTATEDIR)/lock/lpkg
+
+# Pass paths to C++ code
+CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -I./third_party/include
+
 SRCS = $(wildcard $(SRC_DIR)/*.cpp)
-# Generate object file names from source file names
 OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 
 .PHONY: all clean install uninstall
@@ -20,7 +34,6 @@ all: $(BUILD_DIR)/$(TARGET)
 $(BUILD_DIR)/$(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
-# Rule to compile .cpp files into .o files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
@@ -31,14 +44,15 @@ clean:
 	rm -rf $(BUILD_DIR)
 
 install: all
-	install -Dm755 $(BUILD_DIR)/$(TARGET) /usr/bin/$(TARGET)
-	install -Dm644 $(CONF_DIR)/mirror.conf /etc/lpkg/mirror.conf
-	install -d /usr/share/lpkg/l10n
-	install -m644 $(L10N_DIR)/*.txt /usr/share/lpkg/l10n/
-	@echo "安装完成"
+	install -Dm755 $(BUILD_DIR)/$(TARGET) $(INSTALL_BIN_DIR)/$(TARGET)
+	install -Dm644 $(CONF_SRC_DIR)/mirror.conf $(INSTALL_CONF_DIR)/mirror.conf
+	install -d $(INSTALL_L10N_DIR)
+	install -m644 $(L10N_SRC_DIR)/*.txt $(INSTALL_L10N_DIR)/
+	install -d $(INSTALL_LOCK_DIR)
+	install -d $(INSTALL_DOCS_DIR)
 
 uninstall:
-	rm -f /usr/bin/$(TARGET)
-	rm -rf /usr/share/lpkg
-	rm -rf /etc/lpkg
-	@echo "lpkg 已卸载"
+	rm -f $(INSTALL_BIN_DIR)/$(TARGET)
+	rm -rf $(INSTALL_SHARE_DIR)
+	rm -rf $(INSTALL_CONF_DIR)
+	rm -rf $(INSTALL_LOCK_DIR)

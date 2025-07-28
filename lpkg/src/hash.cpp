@@ -36,12 +36,7 @@ std::string calculate_sha256(const fs::path& file_path) {
     }
 
     char buffer[8192];
-    while (file.read(buffer, sizeof(buffer))) {
-        if (EVP_DigestUpdate(md_ctx.get(), buffer, file.gcount()) != 1) {
-            throw LpkgException(get_string("error.openssl_update_failed"));
-        }
-    }
-    if (file.gcount() > 0) { // Handle the last chunk
+    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
         if (EVP_DigestUpdate(md_ctx.get(), buffer, file.gcount()) != 1) {
             throw LpkgException(get_string("error.openssl_update_failed"));
         }
