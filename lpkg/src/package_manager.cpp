@@ -16,6 +16,7 @@
 #include <map>
 #include <set>
 #include <memory>
+#include <mutex>
 #include <tuple>
 #include <unordered_set>
 #include <vector>
@@ -31,6 +32,7 @@ struct Cache {
     std::unordered_set<std::string> pkgs;
     std::unordered_set<std::string> holdpkgs;
     bool dirty = false;
+    std::mutex mtx;
 
     void load() {
         file_db = read_file_db_uncached();
@@ -81,22 +83,18 @@ private:
 Cache& get_cache() {
     static Cache cache;
     static bool loaded = false;
-    static bool load_attempted = false;
-
-    if (!load_attempted) {
-        try {
-            cache.load();
-            loaded = true;
-        } catch (const LpkgException& e) {
-            log_error(string_format("error.lpkg_error", e.what()));
-        }
-        load_attempted = true;
-    }
 
     if (!loaded) {
-        // If loading failed, subsequent calls should not attempt to load again
-        // but should throw an exception if cache access is attempted.
-        throw LpkgException("Package cache is not loaded due to previous error.");
+        std::lock_guard<std::mutex> lock(cache.mtx);
+        if (!loaded) { // Double-check after acquiring the lock
+            try {
+                cache.load();
+                loaded = true;
+            } catch (const LpkgException& e) {
+                log_error(string_format("error.lpkg_error", e.what()));
+                throw;
+            }
+        }
     }
     return cache;
 }
@@ -107,15 +105,11 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
 std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
 
-
-
-void mark_cache_dirty() {
-    get_cache().dirty = true;
-}
-
 // --- Other Helper Functions ---
 std::string get_installed_version(const std::string& pkg_name) {
-    for (const auto& pkg : get_cache().pkgs) {
+    auto& cache = get_cache();
+    std::lock_guard<std::mutex> lock(cache.mtx);
+    for (const auto& pkg : cache.pkgs) {
         if (pkg.starts_with(pkg_name + ":")) {
             return pkg.substr(pkg_name.length() + 1);
         }
@@ -124,7 +118,9 @@ std::string get_installed_version(const std::string& pkg_name) {
 }
 
 bool is_manually_installed(const std::string& pkg_name) {
-    return get_cache().holdpkgs.contains(pkg_name);
+    auto& cache = get_cache();
+    std::lock_guard<std::mutex> lock(cache.mtx);
+    return cache.holdpkgs.contains(pkg_name);
 }
 
 } // anonymous namespace
@@ -280,7 +276,9 @@ void InstallationTask::check_for_file_conflicts() {
     std::map<std::string, std::string> conflicts;
     std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
     std::string src, dest;
-    auto& db = get_cache().file_db;
+    auto& cache = get_cache();
+    std::lock_guard<std::mutex> lock(cache.mtx);
+    auto& db = cache.file_db;
 
     while (files_list >> src >> dest) {
         fs::path dest_path = fs::path(dest) / src;
@@ -347,11 +345,16 @@ void InstallationTask::copy_package_files() {
         }
 
         fs::path current_dest_parent = dest_path.parent_path();
+        std::vector<fs::path> dirs_to_create;
         while (!current_dest_parent.empty() && !fs::exists(current_dest_parent)) {
-            created_dirs_for_rollback.insert(current_dest_parent);
+            dirs_to_create.push_back(current_dest_parent);
             current_dest_parent = current_dest_parent.parent_path();
         }
-        ensure_dir_exists(dest_path.parent_path());
+        std::reverse(dirs_to_create.begin(), dirs_to_create.end()); // Create from shallowest to deepest
+        for (const auto& dir : dirs_to_create) {
+            ensure_dir_exists(dir);
+            created_dirs_for_rollback.insert(dir);
+        }
 
         try {
             fs::copy(src_path, dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
@@ -391,8 +394,11 @@ void InstallationTask::register_package() {
         }
     }
 
+    auto& cache = get_cache();
+    std::lock_guard<std::mutex> lock(cache.mtx);
+
     // Update file ownership database
-    auto& db = get_cache().file_db;
+    auto& db = cache.file_db;
     std::ifstream files_list(FILES_DIR / (pkg_name_ + ".txt"));
     std::string file_path;
     while (std::getline(files_list, file_path)) {
@@ -400,23 +406,22 @@ void InstallationTask::register_package() {
             db[file_path].insert(pkg_name_);
         }
     }
-    mark_cache_dirty();
 
     // Copy man page
     fs::copy(tmp_pkg_dir_ / "man.txt", DOCS_DIR / (pkg_name_ + ".man"), fs::copy_options::overwrite_existing);
 
     // Add to main package list
-    get_cache().pkgs.insert(pkg_name_ + ":" + actual_version_);
+    cache.pkgs.insert(pkg_name_ + ":" + actual_version_);
     if (!old_version_to_replace_.empty()) {
-        get_cache().pkgs.erase(pkg_name_ + ":" + old_version_to_replace_);
+        cache.pkgs.erase(pkg_name_ + ":" + old_version_to_replace_);
     }
-    mark_cache_dirty();
 
     // Add to manually installed list if needed
     if (explicit_install_) {
-        get_cache().holdpkgs.insert(pkg_name_);
-        mark_cache_dirty();
+        cache.holdpkgs.insert(pkg_name_);
     }
+
+    cache.dirty = true;
 }
 
 
@@ -430,7 +435,9 @@ void do_install(const std::string& pkg_name, const std::string& version, bool ex
 }
 
 std::unordered_set<std::string> get_all_required_packages() {
-    auto manually_installed = get_cache().holdpkgs;
+    auto& cache = get_cache();
+    std::lock_guard<std::mutex> lock(cache.mtx);
+    auto manually_installed = cache.holdpkgs;
     std::unordered_set<std::string> required;
     std::vector<std::string> queue;
 
@@ -498,13 +505,13 @@ void remove_package(const std::string& pkg_name, bool force) {
     fs::remove(DEP_DIR / pkg_name);
     fs::remove(DOCS_DIR / (pkg_name + ".man"));
 
-    get_cache().pkgs.erase(pkg_name + ":" + installed_version);
-    mark_cache_dirty();
-
-    if (get_cache().holdpkgs.contains(pkg_name)) {
-        get_cache().holdpkgs.erase(pkg_name);
-        mark_cache_dirty();
+    auto& cache = get_cache();
+    std::lock_guard<std::mutex> lock(cache.mtx);
+    cache.pkgs.erase(pkg_name + ":" + installed_version);
+    if (cache.holdpkgs.contains(pkg_name)) {
+        cache.holdpkgs.erase(pkg_name);
     }
+    cache.dirty = true;
 
     log_info(string_format("info.package_removed_successfully", pkg_name));
 }
@@ -514,7 +521,9 @@ void remove_package_files(const std::string& pkg_name, bool force) {
     if (fs::exists(files_list_path)) {
         
         std::map<std::string, std::vector<std::string>> shared_files;
-        auto& db = get_cache().file_db;
+        auto& cache = get_cache();
+        std::unique_lock<std::mutex> lock(cache.mtx);
+        auto& db = cache.file_db;
 
         std::ifstream files_to_check(files_list_path);
         if (!files_to_check.is_open()) {
@@ -547,6 +556,8 @@ void remove_package_files(const std::string& pkg_name, bool force) {
             throw LpkgException(error_msg);
         }
 
+        lock.unlock(); // Unlock before performing file operations
+
         // No shared files, proceed with removal
         std::ifstream files_list(files_list_path);
         if (!files_list.is_open()) {
@@ -564,8 +575,18 @@ void remove_package_files(const std::string& pkg_name, bool force) {
         for (const auto& path : file_paths) {
             if (fs::exists(path) || fs::is_symlink(path)) {
                 try {
-                    fs::remove(path);
-                    removed_count++;
+                    // Check if the file is still owned by this package before removing
+                    lock.lock();
+                    auto it = db.find(path.string());
+                    bool can_remove = (it != db.end() && it->second.count(pkg_name));
+                    lock.unlock();
+
+                    if (can_remove) {
+                        fs::remove(path);
+                        removed_count++;
+                    } else {
+                        log_info(string_format("info.skipped_remove", path.string()));
+                    }
                 } catch (const fs::filesystem_error& e) {
                     log_warning(string_format("warning.remove_file_failed", path.string(), e.what()));
                 }
@@ -575,17 +596,17 @@ void remove_package_files(const std::string& pkg_name, bool force) {
         fs::remove(files_list_path);
 
         // Update file ownership database
-        auto& db_to_update = get_cache().file_db;
+        lock.lock();
         for (const auto& path : file_paths) {
-            auto it = db_to_update.find(path.string());
-            if (it != db_to_update.end()) {
+            auto it = db.find(path.string());
+            if (it != db.end()) {
                 it->second.erase(pkg_name);
                 if (it->second.empty()) {
-                    db_to_update.erase(it);
+                    db.erase(it);
                 }
             }
         }
-        mark_cache_dirty();
+        cache.dirty = true;
     }
 
     const fs::path dirs_list_path = FILES_DIR / (pkg_name + ".dirs");
@@ -620,12 +641,15 @@ void autoremove() {
     auto required_pkgs = get_all_required_packages();
     std::vector<std::string> packages_to_remove;
 
-    for (const auto& record : get_cache().pkgs) {
+    auto& cache = get_cache();
+    std::unique_lock<std::mutex> lock(cache.mtx);
+    for (const auto& record : cache.pkgs) {
         std::string pkg_name = record.substr(0, record.find(':'));
         if (!required_pkgs.contains(pkg_name)) {
             packages_to_remove.push_back(pkg_name);
         }
     }
+    lock.unlock();
 
     if (packages_to_remove.empty()) {
         log_info(get_string("info.no_autoremove_packages"));
@@ -651,13 +675,16 @@ void upgrade_packages() {
     std::vector<std::future<std::string>> futures;
     std::vector<std::pair<std::string, std::string>> installed_packages_info;
 
+    auto& cache = get_cache();
+    std::unique_lock<std::mutex> lock(cache.mtx);
     // Collect package info first to avoid race conditions with cache modifications
-    for (const auto& pkg_record : get_cache().pkgs) {
+    for (const auto& pkg_record : cache.pkgs) {
         size_t pos = pkg_record.find(':');
         if (pos != std::string::npos) {
             installed_packages_info.emplace_back(pkg_record.substr(0, pos), pkg_record.substr(pos + 1));
         }
     }
+    lock.unlock();
 
     for (const auto& pkg_info : installed_packages_info) {
         const std::string& pkg_name = pkg_info.first;
@@ -669,8 +696,8 @@ void upgrade_packages() {
                 if (version_compare(current_version, latest_version)) {
                     return pkg_name + ":" + current_version + ":" + latest_version;
                 }
-            } catch (...) {
-                log_warning(string_format("warning.get_latest_version_failed", pkg_name));
+            } catch (const std::exception& e) {
+                log_warning(string_format("warning.get_latest_version_failed", pkg_name, e.what()));
             }
             return std::string();
         }));
@@ -731,6 +758,7 @@ void show_man_page(const std::string& pkg_name) {
 
 void write_cache() {
     auto& cache = get_cache();
+    std::lock_guard<std::mutex> lock(cache.mtx);
     if (cache.dirty) {
         cache.write_file_db();
         cache.write_pkgs();

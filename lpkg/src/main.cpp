@@ -5,10 +5,22 @@
 #include "utils.hpp"
 #include "cxxopts.hpp"
 
+#include <curl/curl.h>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
+#include <functional>
+
+// RAII for curl global init/cleanup
+struct CurlGlobalInitializer {
+    CurlGlobalInitializer() {
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+    }
+    ~CurlGlobalInitializer() {
+        curl_global_cleanup();
+    }
+};
 
 void print_usage(const cxxopts::Options& options) {
     std::cerr << options.help({""});
@@ -22,16 +34,19 @@ void print_usage(const cxxopts::Options& options) {
 
 #include <optional>
 
-void pre_operation_check(const cxxopts::ParseResult& result, const cxxopts::Options& options, size_t min, std::optional<size_t> max = std::nullopt) {
+#include <functional>
+
+void pre_operation_check(const cxxopts::ParseResult& result, std::function<void()> print_usage_func, size_t min, std::optional<size_t> max = std::nullopt) {
     log_info(get_string("info.pre_op_check"));
     size_t count = result.count("packages") ? result["packages"].as<std::vector<std::string>>().size() : 0;
     if (count < min || (max.has_value() && count > max.value())) {
-        print_usage(options);
+        print_usage_func();
         throw LpkgException("Invalid number of arguments.");
     }
 }
 
 int main(int argc, char* argv[]) {
+    CurlGlobalInitializer curl_initializer;
     try {
         init_localization();
 
@@ -79,8 +94,10 @@ int main(int argc, char* argv[]) {
             db_lock = std::make_unique<DBLock>();
         }
 
+        auto usage_printer = [&]() { print_usage(options); };
+
         if (command == "install") {
-            pre_operation_check(result, options, 1);
+            pre_operation_check(result, usage_printer, 1);
             const auto& packages = result["packages"].as<std::vector<std::string>>();
             for (const auto& pkg_arg : packages) {
                 size_t pos = pkg_arg.find(':');
@@ -98,32 +115,27 @@ int main(int argc, char* argv[]) {
             }
             log_info(get_string("info.install_complete"));
         } else if (command == "remove") {
-            pre_operation_check(result, options, 1);
+            pre_operation_check(result, usage_printer, 1);
             const auto& pkg_names = result["packages"].as<std::vector<std::string>>();
             bool force = result["force"].as<bool>();
             for (const auto& pkg_name : pkg_names) {
                 remove_package(pkg_name, force);
-                // It is necessary to write to the cache after every single package operation.
-                // If we wait until the end of a multi-package operation (e.g., `install a b c`),
-                // and if package 'b' fails to install, the successful installation of package 'a'
-                // would not be recorded. This would leave the system in a corrupted state where
-                // files from 'a' exist on disk but the package database is unaware of them.
                 write_cache();
             }
             log_info(get_string("info.uninstall_complete"));
         } else if (command == "autoremove") {
-            pre_operation_check(result, options, 0, 0);
+            pre_operation_check(result, usage_printer, 0, 0);
             autoremove();
             write_cache();
         } else if (command == "upgrade") {
-            pre_operation_check(result, options, 0, 0);
+            pre_operation_check(result, usage_printer, 0, 0);
             upgrade_packages();
             write_cache();
         } else if (command == "man") {
-            pre_operation_check(result, options, 1, 1);
+            pre_operation_check(result, usage_printer, 1, 1);
             show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
         } else {
-            print_usage(options);
+            usage_printer();
             return 1;
         }
 

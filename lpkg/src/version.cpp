@@ -61,7 +61,7 @@ struct Version {
     }
 };
 
-int compare_pre_release_part(const std::vector<std::string>& p1, const std::vector<std::string>& p2) {
+int compare_pre_release_part(const std::vector<std::string>& p1, const std::vector<std::string>& p2, const std::string& v1_str, const std::string& v2_str) {
     size_t min_len = std::min(p1.size(), p2.size());
     for (size_t i = 0; i < min_len; ++i) {
         int res;
@@ -72,9 +72,13 @@ int compare_pre_release_part(const std::vector<std::string>& p1, const std::vect
         if (is_num1 && is_num2) {
             try {
                 n1 = std::stoi(p1[i]);
+            } catch (const std::exception& e) {
+                throw LpkgException(string_format("error.invalid_version_format", v1_str) + ": " + e.what());
+            }
+            try {
                 n2 = std::stoi(p2[i]);
             } catch (const std::exception& e) {
-                throw LpkgException(string_format("error.invalid_version_format", "") + ": " + e.what());
+                throw LpkgException(string_format("error.invalid_version_format", v2_str) + ": " + e.what());
             }
             if (n1 < n2) return -1;
             if (n1 > n2) return 1;
@@ -117,7 +121,7 @@ bool version_compare(const std::string& v1_str, const std::string& v2_str) {
         return false;
     }
     if (!v1.pre_release_part.empty() && !v2.pre_release_part.empty()) {
-        return compare_pre_release_part(v1.pre_release_part, v2.pre_release_part) < 0;
+        return compare_pre_release_part(v1.pre_release_part, v2.pre_release_part, v1_str, v2_str) < 0;
     }
 
     return false; // equal
@@ -129,13 +133,10 @@ std::string get_latest_version(const std::string& pkg_name) {
     std::string latest_txt_url = mirror_url + arch + "/" + pkg_name + "/latest.txt";
     fs::path tmp_file_path = get_tmp_dir() / (pkg_name + "_latest.txt");
 
-    auto cleanup = [&](const void*) { fs::remove(tmp_file_path); };
-    std::unique_ptr<const void, decltype(cleanup)> tmp_file_guard(tmp_file_path.c_str(), cleanup);
-
     try {
         download_file(latest_txt_url, tmp_file_path, false);
-    } catch (const LpkgException&) {
-        throw LpkgException(string_format("error.download_latest_txt_failed", latest_txt_url));
+    } catch (const LpkgException& e) {
+        throw LpkgException(string_format("error.download_latest_txt_failed", latest_txt_url) + ": " + e.what());
     }
 
     std::ifstream latest_file(tmp_file_path);
@@ -147,8 +148,12 @@ std::string get_latest_version(const std::string& pkg_name) {
         throw LpkgException(string_format("error.read_latest_txt_failed", latest_txt_url));
     }
 
+    // Trim trailing carriage return if present (from CRLF line endings)
+    if (!latest_version.empty() && latest_version.back() == '\r') {
+        latest_version.pop_back();
+    }
+
     validate_version_format(latest_version);
 
     return latest_version;
 }
-

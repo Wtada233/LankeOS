@@ -53,10 +53,10 @@ clean:
 install: all
 	install -Dm755 $(BUILD_DIR)/$(TARGET) $(INSTALL_BIN_DIR)/$(TARGET)
 	install -Dm644 $(CONF_SRC_DIR)/mirror.conf $(INSTALL_CONF_DIR)/mirror.conf
-	install -d $(INSTALL_L10N_DIR)
+	install -d -m755 $(INSTALL_L10N_DIR)
 	install -m644 $(L10N_SRC_DIR)/*.txt $(INSTALL_L10N_DIR)/
-	install -d $(INSTALL_LOCK_DIR)
-	install -d $(INSTALL_DOCS_DIR)
+	install -d -m777 $(INSTALL_LOCK_DIR)
+	install -d -m755 $(INSTALL_DOCS_DIR)
 
 uninstall:
 	rm -f $(INSTALL_BIN_DIR)/$(TARGET)
