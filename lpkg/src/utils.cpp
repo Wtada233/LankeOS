@@ -18,11 +18,15 @@
 
 namespace fs = std::filesystem;
 
+#include <mutex>
+
 namespace {
     NonInteractiveMode non_interactive_mode = NonInteractiveMode::INTERACTIVE;
+    std::mutex log_mutex;
 
     // Helper function to reduce code duplication in logging
     void log_internal(std::string_view prefix, std::string_view color, std::string_view msg, std::ostream& stream) {
+        std::lock_guard<std::mutex> lock(log_mutex);
         bool is_tty = false;
         if (&stream == &std::cout) {
             is_tty = isatty(STDOUT_FILENO);

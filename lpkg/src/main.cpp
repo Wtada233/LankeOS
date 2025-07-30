@@ -139,9 +139,12 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        fs::remove_all(get_tmp_dir());
+        fs::path current_tmp_dir = get_tmp_dir();
+        log_info(string_format("info.removing_tmp_dir", current_tmp_dir.string()));
+        fs::remove_all(current_tmp_dir);
+        log_info(string_format("info.tmp_dir_removed", current_tmp_dir.string()));
     } catch (const fs::filesystem_error& e) {
-        log_warning(string_format("warning.remove_file_failed", get_tmp_dir().string(), e.what()));
+        log_warning(string_format("warning.cleanup_tmp_failed", get_tmp_dir().string(), e.what()));
     }
 
     return 0;

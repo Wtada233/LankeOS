@@ -12,10 +12,15 @@ public:
     void run();
 
 private:
+    // Preparation phase
+    void prepare();
     void download_and_verify_package();
     void extract_and_validate_package();
     void resolve_dependencies();
     void check_for_file_conflicts();
+
+    // Commit phase
+    void commit();
     void copy_package_files();
     void register_package();
 

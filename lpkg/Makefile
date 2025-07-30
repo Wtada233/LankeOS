@@ -22,7 +22,11 @@ INSTALL_DOCS_DIR = $(INSTALL_SHARE_DIR)/docs
 INSTALL_LOCK_DIR = $(DESTDIR)$(LOCALSTATEDIR)/lock/lpkg
 
 # Pass paths to C++ code
-CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -I./third_party/include
+CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -I./third_party/include \
+           -DLPKG_CONF_DIR=\"$(INSTALL_CONF_DIR)\" \
+           -DLPKG_L10N_DIR=\"$(INSTALL_L10N_DIR)\" \
+           -DLPKG_DOCS_DIR=\"$(INSTALL_DOCS_DIR)\" \
+           -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\"
 
 SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))

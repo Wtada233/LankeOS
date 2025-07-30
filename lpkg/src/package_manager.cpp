@@ -146,24 +146,17 @@ void InstallationTask::run() {
         return;
     }
 
-    if (!current_installed_version.empty()) {
-        log_info(string_format("info.removing_old_version", current_installed_version, pkg_name_));
-        remove_package_files(pkg_name_, true); // Force remove old files
-    }
-
     log_info(string_format("info.installing_package", pkg_name_, version_));
     install_path_.push_back(pkg_name_);
 
     fs::remove_all(tmp_pkg_dir_);
     ensure_dir_exists(tmp_pkg_dir_);
 
-    auto cleanup = [&](const void*) { fs::remove_all(tmp_pkg_dir_); };
-    std::unique_ptr<const void, decltype(cleanup)> tmp_dir_guard(tmp_pkg_dir_.c_str(), cleanup);
+    auto cleanup_tmp = [&](const void*) { fs::remove_all(tmp_pkg_dir_); };
+    std::unique_ptr<const void, decltype(cleanup_tmp)> tmp_dir_guard(tmp_pkg_dir_.c_str(), cleanup_tmp);
 
     try {
-        download_and_verify_package();
-        extract_and_validate_package();
-        resolve_dependencies();
+        prepare(); // Phase 1: Prepare everything without modifying the system
 
         // Re-check if package was installed during dependency resolution
         if (!get_installed_version(pkg_name_).empty() && get_installed_version(pkg_name_) == actual_version_) {
@@ -172,10 +165,21 @@ void InstallationTask::run() {
             return;
         }
 
-        check_for_file_conflicts();
-        copy_package_files();
-        register_package();
+        commit(); // Phase 2: Apply changes to the system
 
+    } catch (const LpkgException& e) {
+        install_path_.pop_back();
+        // If an old version was being replaced, attempt to restore it
+        if (!old_version_to_replace_.empty()) {
+            log_info(string_format("info.restoring_package", pkg_name_, old_version_to_replace_));
+            try {
+                std::vector<std::string> restore_path; // Use a new path for restoration to avoid circularity
+                do_install(pkg_name_, old_version_to_replace_, explicit_install_, restore_path, "");
+            } catch (const LpkgException& e2) {
+                log_error(string_format("error.fatal_restore_failed", pkg_name_, e2.what()));
+            }
+        }
+        throw; // Re-throw the original exception
     } catch (...) {
         install_path_.pop_back();
         throw;
@@ -183,6 +187,23 @@ void InstallationTask::run() {
 
     install_path_.pop_back();
     log_info(string_format("info.package_installed_successfully", pkg_name_));
+}
+
+void InstallationTask::prepare() {
+    download_and_verify_package();
+    extract_and_validate_package();
+    resolve_dependencies();
+    check_for_file_conflicts();
+}
+
+void InstallationTask::commit() {
+    // If replacing an old version, remove its files now that the new package is ready
+    if (!old_version_to_replace_.empty()) {
+        log_info(string_format("info.removing_old_version", old_version_to_replace_, pkg_name_));
+        remove_package_files(pkg_name_, true); // Force remove old files
+    }
+    copy_package_files();
+    register_package();
 }
 
 void InstallationTask::download_and_verify_package() {
@@ -618,8 +639,7 @@ void autoremove() {
         log_info(string_format("info.autoremove_complete", packages_to_remove.size()));
     }
 
-    fs::remove_all(get_tmp_dir());
-    ensure_dir_exists(get_tmp_dir());
+    
 }
 
 void upgrade_packages() {
@@ -672,22 +692,14 @@ void upgrade_packages() {
             log_info(string_format("info.upgrading_package", pkg_name, current_version, latest_version));
             bool was_manually_installed = is_manually_installed(pkg_name);
 
-            // Temporarily remove old package's files to avoid conflicts
-            remove_package_files(pkg_name, true);
-
             std::vector<std::string> install_path;
+            // Pass current_version as old_version_to_replace_ to InstallationTask
             do_install(pkg_name, latest_version, was_manually_installed, install_path, current_version);
             upgraded_count++;
         } catch (const LpkgException& e) {
             log_error(string_format("error.upgrade_failed", pkg_name, e.what()));
-            log_info(string_format("info.restoring_package", pkg_name, current_version));
-            try {
-                // If upgrade fails, reinstall the original version
-                std::vector<std::string> install_path;
-                do_install(pkg_name, current_version, is_manually_installed(pkg_name), install_path, current_version);
-            } catch (const LpkgException& e2) {
-                log_error(string_format("error.fatal_restore_failed", pkg_name, e2.what()));
-            }
+            // The do_install function now handles rollback for failed installations/upgrades
+            // No need for explicit restore here unless the do_install itself fails fatally
         }
     }
 

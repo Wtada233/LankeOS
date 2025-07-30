@@ -27,7 +27,7 @@ void validate_version_format(const std::string& version_str) {
 
 struct Version {
     std::vector<int> main_part;
-    std::vector<std::string_view> pre_release_part;
+    std::vector<std::string> pre_release_part;
 
     Version(const std::string& version_str) {
         std::string_view v_sv(version_str);
@@ -41,7 +41,11 @@ struct Version {
         std::sregex_token_iterator it(main_str.begin(), main_str.end(), re_dot, -1);
         std::sregex_token_iterator end;
         for (; it != end; ++it) {
-            main_part.push_back(std::stoi(it->str()));
+            try {
+                main_part.push_back(std::stoi(it->str()));
+            } catch (const std::exception& e) {
+                throw LpkgException(string_format("error.invalid_version_format", version_str) + ": " + e.what());
+            }
         }
 
         if (pre_release_pos != std::string::npos) {
@@ -51,13 +55,13 @@ struct Version {
             std::sregex_token_iterator pre_it(pre_release_str.begin(), pre_release_str.end(), re_dot, -1);
             std::sregex_token_iterator pre_end;
             for (; pre_it != pre_end; ++pre_it) {
-                pre_release_part.push_back(std::string_view(pre_it->str()));
+                pre_release_part.push_back(pre_it->str()); // Store as std::string
             }
         }
     }
 };
 
-int compare_pre_release_part(const std::vector<std::string_view>& p1, const std::vector<std::string_view>& p2) {
+int compare_pre_release_part(const std::vector<std::string>& p1, const std::vector<std::string>& p2) {
     size_t min_len = std::min(p1.size(), p2.size());
     for (size_t i = 0; i < min_len; ++i) {
         int res;
@@ -66,8 +70,12 @@ int compare_pre_release_part(const std::vector<std::string_view>& p1, const std:
         bool is_num2 = !p2[i].empty() && std::all_of(p2[i].begin(), p2[i].end(), ::isdigit);
 
         if (is_num1 && is_num2) {
-            n1 = std::stoi(std::string(p1[i]));
-            n2 = std::stoi(std::string(p2[i]));
+            try {
+                n1 = std::stoi(p1[i]);
+                n2 = std::stoi(p2[i]);
+            } catch (const std::exception& e) {
+                throw LpkgException(string_format("error.invalid_version_format", "") + ": " + e.what());
+            }
             if (n1 < n2) return -1;
             if (n1 > n2) return 1;
         } else if (is_num1) {
