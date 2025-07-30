@@ -23,18 +23,28 @@ namespace fs = std::filesystem;
 namespace {
     NonInteractiveMode non_interactive_mode = NonInteractiveMode::INTERACTIVE;
     std::mutex log_mutex;
+    bool is_stdout_tty = false;
+    bool is_stderr_tty = false;
+    bool tty_check_performed = false;
 
     // Helper function to reduce code duplication in logging
     void log_internal(std::string_view prefix, std::string_view color, std::string_view msg, std::ostream& stream) {
         std::lock_guard<std::mutex> lock(log_mutex);
-        bool is_tty = false;
-        if (&stream == &std::cout) {
-            is_tty = isatty(STDOUT_FILENO);
-        } else if (&stream == &std::cerr) {
-            is_tty = isatty(STDERR_FILENO);
+
+        if (!tty_check_performed) {
+            is_stdout_tty = isatty(STDOUT_FILENO);
+            is_stderr_tty = isatty(STDERR_FILENO);
+            tty_check_performed = true;
         }
 
-        if (is_tty) {
+        bool current_stream_is_tty = false;
+        if (&stream == &std::cout) {
+            current_stream_is_tty = is_stdout_tty;
+        } else if (&stream == &std::cerr) {
+            current_stream_is_tty = is_stderr_tty;
+        }
+
+        if (current_stream_is_tty) {
             stream << color << prefix << COLOR_WHITE << msg << COLOR_RESET << std::endl;
         } else {
             stream << prefix << msg << std::endl;
@@ -55,7 +65,13 @@ void log_error(std::string_view msg) {
 }
 
 void log_progress(const std::string& msg, double percentage, int bar_width) {
-    if (!isatty(STDOUT_FILENO)) {
+    if (!tty_check_performed) {
+        is_stdout_tty = isatty(STDOUT_FILENO);
+        is_stderr_tty = isatty(STDERR_FILENO);
+        tty_check_performed = true;
+    }
+
+    if (!is_stdout_tty) {
         return;
     }
 
@@ -155,6 +171,9 @@ std::unordered_set<std::string> read_set_from_file(const fs::path& path) {
     std::unordered_set<std::string> result;
     std::string line;
     while (std::getline(file, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
         if (!line.empty()) result.insert(line);
     }
     return result;

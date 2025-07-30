@@ -19,8 +19,10 @@ namespace {
         ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
         if (count != -1) {
             return fs::path(result).parent_path();
+        } else {
+            log_warning("Could not determine executable path via /proc/self/exe. Falling back to current working directory. Localization might be incorrect if not run from install location.");
+            return fs::current_path(); // Fallback, though less reliable
         }
-        return fs::current_path(); // Fallback, though less reliable
     }
 }
 
