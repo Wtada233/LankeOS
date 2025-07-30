@@ -13,6 +13,8 @@
 #include <fstream>
 #include <iostream>
 #include <cstring>
+#include <chrono>
+#include <ctime>
 
 namespace fs = std::filesystem;
 
@@ -161,5 +163,31 @@ void write_set_to_file(const fs::path& path, const std::unordered_set<std::strin
     }
     for (const auto& item : data) {
         file << item << "\n";
+    }
+}
+
+void cleanup_tmp_dirs() {
+    const fs::path tmp_path = "/tmp";
+    const auto twenty_four_hours = std::chrono::hours(24);
+
+    if (!fs::exists(tmp_path) || !fs::is_directory(tmp_path)) {
+        return; // /tmp does not exist or is not a directory
+    }
+
+    for (const auto& entry : fs::directory_iterator(tmp_path)) {
+        if (entry.is_directory() && entry.path().filename().string().rfind("lpkg_", 0) == 0) {
+            try {
+                bool is_empty = fs::is_empty(entry.path());
+                auto ftime = fs::last_write_time(entry.path());
+                auto sctp = std::chrono::file_clock::to_sys(ftime);
+                auto now = std::chrono::system_clock::now();
+
+                if (is_empty || (now - sctp) > twenty_four_hours) {
+                    fs::remove_all(entry.path());
+                }
+            } catch (const fs::filesystem_error& e) {
+                log_warning(string_format("warning.cleanup_tmp_failed", entry.path().string(), e.what()));
+            }
+        }
     }
 }

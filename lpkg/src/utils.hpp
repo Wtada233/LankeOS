@@ -52,3 +52,4 @@ void ensure_dir_exists(const fs::path& path);
 void ensure_file_exists(const fs::path& path);
 std::unordered_set<std::string> read_set_from_file(const fs::path& path);
 void write_set_to_file(const fs::path& path, const std::unordered_set<std::string>& data);
+void cleanup_tmp_dirs();
