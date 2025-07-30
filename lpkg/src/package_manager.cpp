@@ -88,7 +88,7 @@ Cache& get_cache() {
             cache.load();
             loaded = true;
         } catch (const LpkgException& e) {
-            log_error(std::string("Failed to load package cache: ") + e.what());
+            log_error(string_format("error.lpkg_error", e.what()));
         }
         load_attempted = true;
     }
@@ -147,7 +147,7 @@ void InstallationTask::run() {
     }
 
     if (!current_installed_version.empty()) {
-        log_info("Removing old version " + current_installed_version + " of " + pkg_name_);
+        log_info(string_format("info.removing_old_version", current_installed_version, pkg_name_));
         remove_package_files(pkg_name_, true); // Force remove old files
     }
 
@@ -291,7 +291,7 @@ void InstallationTask::copy_package_files() {
     std::set<fs::path> created_dirs_for_rollback;
 
     auto rollback = [&](const void*) {
-        log_error("Rolling back installation of " + pkg_name_);
+        log_error(string_format("error.rollback_install", pkg_name_));
         for (const auto& file : installed_files) {
             try {
                 fs::remove(file);
@@ -686,7 +686,7 @@ void upgrade_packages() {
                 std::vector<std::string> install_path;
                 do_install(pkg_name, current_version, is_manually_installed(pkg_name), install_path, current_version);
             } catch (const LpkgException& e2) {
-                log_error("Fatal: Failed to restore package " + pkg_name + ": " + e2.what());
+                log_error(string_format("error.fatal_restore_failed", pkg_name, e2.what()));
             }
         }
     }
