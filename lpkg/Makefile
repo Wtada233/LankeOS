@@ -55,7 +55,7 @@ install: all
 	install -Dm644 $(CONF_SRC_DIR)/mirror.conf $(INSTALL_CONF_DIR)/mirror.conf
 	install -d -m755 $(INSTALL_L10N_DIR)
 	install -m644 $(L10N_SRC_DIR)/*.txt $(INSTALL_L10N_DIR)/
-	install -d -m777 $(INSTALL_LOCK_DIR)
+	install -d -m755 $(INSTALL_LOCK_DIR)
 	install -d -m755 $(INSTALL_DOCS_DIR)
 
 uninstall:
