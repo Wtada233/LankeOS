@@ -128,13 +128,13 @@ int main(int argc, char* argv[]) {
         }
 
     } catch (const cxxopts::exceptions::exception& e) {
-        log_error(e.what());
+        log_error(std::string("Command line parsing error: ") + e.what());
         return 1;
     } catch (const LpkgException& e) {
-        log_error(e.what());
+        log_error(std::string("Lpkg error: ") + e.what());
         return 1;
     } catch (const std::exception& e) {
-        log_error(e.what());
+        log_error(std::string("An unexpected error occurred: ") + e.what());
         return 1;
     }
 
