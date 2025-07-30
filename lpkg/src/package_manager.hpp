@@ -8,7 +8,7 @@ namespace fs = std::filesystem;
 
 class InstallationTask {
 public:
-    InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path);
+    InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path, std::string old_version_to_replace = "");
     void run();
 
 private:
@@ -26,6 +26,7 @@ private:
     fs::path tmp_pkg_dir_;
     std::string actual_version_;
     fs::path archive_path_;
+    std::string old_version_to_replace_;
 };
 
 void install_package(const std::string& pkg_name, const std::string& version);
@@ -34,3 +35,4 @@ void autoremove();
 void upgrade_packages();
 void show_man_page(const std::string& pkg_name);
 void write_cache();
+void remove_package_files(const std::string& pkg_name, bool force = false);

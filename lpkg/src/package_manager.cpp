@@ -81,16 +81,29 @@ private:
 Cache& get_cache() {
     static Cache cache;
     static bool loaded = false;
+    static bool load_attempted = false;
+
+    if (!load_attempted) {
+        try {
+            cache.load();
+            loaded = true;
+        } catch (const LpkgException& e) {
+            log_error(std::string("Failed to load package cache: ") + e.what());
+        }
+        load_attempted = true;
+    }
+
     if (!loaded) {
-        cache.load();
-        loaded = true;
+        // If loading failed, subsequent calls should not attempt to load again
+        // but should throw an exception if cache access is attempted.
+        throw LpkgException("Package cache is not loaded due to previous error.");
     }
     return cache;
 }
 
 
 // Forward declarations
-void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path);
+void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path, const std::string& old_version);
 std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
 
@@ -118,17 +131,24 @@ bool is_manually_installed(const std::string& pkg_name) {
 
 // --- InstallationTask Class Implementation ---
 
-InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path)
+InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path, std::string old_version_to_replace)
     : pkg_name_(std::move(pkg_name)),
       version_(std::move(version)),
       explicit_install_(explicit_install),
       install_path_(install_path),
-      tmp_pkg_dir_(get_tmp_dir() / pkg_name_) {}
+      tmp_pkg_dir_(get_tmp_dir() / pkg_name_),
+      old_version_to_replace_(std::move(old_version_to_replace)) {}
 
 void InstallationTask::run() {
-    if (!get_installed_version(pkg_name_).empty()) {
+    std::string current_installed_version = get_installed_version(pkg_name_);
+    if (!current_installed_version.empty() && current_installed_version == actual_version_) {
         log_info(string_format("info.package_already_installed", pkg_name_));
         return;
+    }
+
+    if (!current_installed_version.empty()) {
+        log_info("Removing old version " + current_installed_version + " of " + pkg_name_);
+        remove_package_files(pkg_name_, true); // Force remove old files
     }
 
     log_info(string_format("info.installing_package", pkg_name_, version_));
@@ -145,7 +165,8 @@ void InstallationTask::run() {
         extract_and_validate_package();
         resolve_dependencies();
 
-        if (!get_installed_version(pkg_name_).empty()) {
+        // Re-check if package was installed during dependency resolution
+        if (!get_installed_version(pkg_name_).empty() && get_installed_version(pkg_name_) == actual_version_) {
             log_warning(string_format("warning.skip_already_installed", pkg_name_));
             install_path_.pop_back();
             return;
@@ -224,7 +245,7 @@ void InstallationTask::resolve_dependencies() {
         log_info(string_format("info.dep_found", dep));
         if (get_installed_version(dep).empty()) {
             log_info(string_format("info.dep_not_installed", dep));
-            do_install(dep, "latest", false, install_path_);
+            do_install(dep, "latest", false, install_path_, "");
         } else {
             log_info(string_format("info.dep_already_installed", dep));
         }
@@ -363,6 +384,9 @@ void InstallationTask::register_package() {
 
     // Add to main package list
     get_cache().pkgs.insert(pkg_name_ + ":" + actual_version_);
+    if (!old_version_to_replace_.empty()) {
+        get_cache().pkgs.erase(pkg_name_ + ":" + old_version_to_replace_);
+    }
     mark_cache_dirty();
 
     // Add to manually installed list if needed
@@ -377,8 +401,8 @@ void InstallationTask::register_package() {
 
 namespace {
 
-void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path) {
-    InstallationTask task(pkg_name, version, explicit_install, install_path);
+void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path, const std::string& old_version = "") {
+    InstallationTask task(pkg_name, version, explicit_install, install_path, old_version);
     task.run();
 }
 
@@ -416,7 +440,7 @@ std::unordered_set<std::string> get_all_required_packages() {
 
 void install_package(const std::string& pkg_name, const std::string& version) {
     std::vector<std::string> install_path;
-    do_install(pkg_name, version, true, install_path);
+    do_install(pkg_name, version, true, install_path, "");
 }
 
 void remove_package(const std::string& pkg_name, bool force) {
@@ -446,6 +470,23 @@ void remove_package(const std::string& pkg_name, bool force) {
 
     log_info(string_format("info.removing_package", pkg_name));
 
+    remove_package_files(pkg_name, force);
+
+    fs::remove(DEP_DIR / pkg_name);
+    fs::remove(DOCS_DIR / (pkg_name + ".man"));
+
+    get_cache().pkgs.erase(pkg_name + ":" + installed_version);
+    mark_cache_dirty();
+
+    if (get_cache().holdpkgs.contains(pkg_name)) {
+        get_cache().holdpkgs.erase(pkg_name);
+        mark_cache_dirty();
+    }
+
+    log_info(string_format("info.package_removed_successfully", pkg_name));
+}
+
+void remove_package_files(const std::string& pkg_name, bool force) {
     const fs::path files_list_path = FILES_DIR / (pkg_name + ".txt");
     if (fs::exists(files_list_path)) {
         
@@ -470,7 +511,7 @@ void remove_package(const std::string& pkg_name, bool force) {
             }
         }
 
-        if (!shared_files.empty()) {
+        if (!shared_files.empty() && !force) { // Only abort if not forced
             std::string error_msg = get_string("error.shared_file_header") + "\n";
             for (const auto& [file, owners] : shared_files) {
                 std::string owners_str;
@@ -547,20 +588,8 @@ void remove_package(const std::string& pkg_name, bool force) {
         }
         fs::remove(dirs_list_path);
     }
-
-    fs::remove(DEP_DIR / pkg_name);
-    fs::remove(DOCS_DIR / (pkg_name + ".man"));
-
-    get_cache().pkgs.erase(pkg_name + ":" + installed_version);
-    mark_cache_dirty();
-
-    if (get_cache().holdpkgs.contains(pkg_name)) {
-        get_cache().holdpkgs.erase(pkg_name);
-        mark_cache_dirty();
-    }
-
-    log_info(string_format("info.package_removed_successfully", pkg_name));
 }
+
 
 void autoremove() {
     log_info(get_string("info.checking_autoremove"));
@@ -642,18 +671,20 @@ void upgrade_packages() {
         try {
             log_info(string_format("info.upgrading_package", pkg_name, current_version, latest_version));
             bool was_manually_installed = is_manually_installed(pkg_name);
-            
-            remove_package(pkg_name, true); 
-            
+
+            // Temporarily remove old package's files to avoid conflicts
+            remove_package_files(pkg_name, true);
+
             std::vector<std::string> install_path;
-            do_install(pkg_name, latest_version, was_manually_installed, install_path);
+            do_install(pkg_name, latest_version, was_manually_installed, install_path, current_version);
             upgraded_count++;
         } catch (const LpkgException& e) {
             log_error(string_format("error.upgrade_failed", pkg_name, e.what()));
             log_info(string_format("info.restoring_package", pkg_name, current_version));
             try {
+                // If upgrade fails, reinstall the original version
                 std::vector<std::string> install_path;
-                do_install(pkg_name, current_version, is_manually_installed(pkg_name), install_path);
+                do_install(pkg_name, current_version, is_manually_installed(pkg_name), install_path, current_version);
             } catch (const LpkgException& e2) {
                 log_error("Fatal: Failed to restore package " + pkg_name + ": " + e2.what());
             }

@@ -20,10 +20,12 @@ void print_usage(const cxxopts::Options& options) {
     std::cerr << get_string("info.man_desc") << std::endl;
 }
 
-void pre_operation_check(const cxxopts::ParseResult& result, const cxxopts::Options& options, size_t min, int max = -1) {
+#include <optional>
+
+void pre_operation_check(const cxxopts::ParseResult& result, const cxxopts::Options& options, size_t min, std::optional<size_t> max = std::nullopt) {
     log_info(get_string("info.pre_op_check"));
     size_t count = result.count("packages") ? result["packages"].as<std::vector<std::string>>().size() : 0;
-    if (count < min || (max != -1 && count > (size_t)max)) {
+    if (count < min || (max.has_value() && count > max.value())) {
         print_usage(options);
         throw LpkgException("Invalid number of arguments.");
     }
@@ -87,6 +89,11 @@ int main(int argc, char* argv[]) {
                 } else {
                     install_package(pkg_arg.substr(0, pos), pkg_arg.substr(pos + 1));
                 }
+                // It is necessary to write to the cache after every single package operation.
+                // If we wait until the end of a multi-package operation (e.g., `install a b c`),
+                // and if package 'b' fails to install, the successful installation of package 'a'
+                // would not be recorded. This would leave the system in a corrupted state where
+                // files from 'a' exist on disk but the package database is unaware of them.
                 write_cache();
             }
             log_info(get_string("info.install_complete"));
@@ -96,6 +103,11 @@ int main(int argc, char* argv[]) {
             bool force = result["force"].as<bool>();
             for (const auto& pkg_name : pkg_names) {
                 remove_package(pkg_name, force);
+                // It is necessary to write to the cache after every single package operation.
+                // If we wait until the end of a multi-package operation (e.g., `install a b c`),
+                // and if package 'b' fails to install, the successful installation of package 'a'
+                // would not be recorded. This would leave the system in a corrupted state where
+                // files from 'a' exist on disk but the package database is unaware of them.
                 write_cache();
             }
             log_info(get_string("info.uninstall_complete"));
@@ -126,7 +138,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    fs::remove_all(get_tmp_dir());
+    try {
+        fs::remove_all(get_tmp_dir());
+    } catch (const fs::filesystem_error& e) {
+        log_warning(string_format("warning.remove_file_failed", get_tmp_dir().string(), e.what()));
+    }
 
     return 0;
 }

@@ -12,32 +12,104 @@
 #include <fstream>
 #include <regex>
 #include <vector>
+#include <string_view>
 
 namespace fs = std::filesystem;
 
 namespace {
+static const std::regex version_regex(R"(^(\d+)(\.\d+)*(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$)");
+static const std::regex re_dot("[.]");
 void validate_version_format(const std::string& version_str) {
-    static const std::regex version_regex(R"(^(\d+\.)*\d+$)");
     if (!std::regex_match(version_str, version_regex)) {
         throw LpkgException(string_format("error.invalid_version_format", version_str));
     }
 }
+
+struct Version {
+    std::vector<int> main_part;
+    std::vector<std::string_view> pre_release_part;
+
+    Version(const std::string& version_str) {
+        std::string_view v_sv(version_str);
+        size_t pre_release_pos = v_sv.find('-');
+        size_t build_meta_pos = v_sv.find('+');
+
+        size_t main_end = std::min(pre_release_pos, build_meta_pos);
+        std::string_view main_sv = v_sv.substr(0, main_end);
+
+        std::string main_str(main_sv);
+        std::sregex_token_iterator it(main_str.begin(), main_str.end(), re_dot, -1);
+        std::sregex_token_iterator end;
+        for (; it != end; ++it) {
+            main_part.push_back(std::stoi(it->str()));
+        }
+
+        if (pre_release_pos != std::string::npos) {
+            size_t pre_release_end = (build_meta_pos > pre_release_pos) ? build_meta_pos : std::string::npos;
+            std::string_view pre_release_sv = v_sv.substr(pre_release_pos + 1, pre_release_end - (pre_release_pos + 1));
+            std::string pre_release_str(pre_release_sv);
+            std::sregex_token_iterator pre_it(pre_release_str.begin(), pre_release_str.end(), re_dot, -1);
+            std::sregex_token_iterator pre_end;
+            for (; pre_it != pre_end; ++pre_it) {
+                pre_release_part.push_back(std::string_view(pre_it->str()));
+            }
+        }
+    }
+};
+
+int compare_pre_release_part(const std::vector<std::string_view>& p1, const std::vector<std::string_view>& p2) {
+    size_t min_len = std::min(p1.size(), p2.size());
+    for (size_t i = 0; i < min_len; ++i) {
+        int res;
+        int n1, n2;
+        bool is_num1 = !p1[i].empty() && std::all_of(p1[i].begin(), p1[i].end(), ::isdigit);
+        bool is_num2 = !p2[i].empty() && std::all_of(p2[i].begin(), p2[i].end(), ::isdigit);
+
+        if (is_num1 && is_num2) {
+            n1 = std::stoi(std::string(p1[i]));
+            n2 = std::stoi(std::string(p2[i]));
+            if (n1 < n2) return -1;
+            if (n1 > n2) return 1;
+        } else if (is_num1) {
+            return -1; // Numeric identifiers have lower precedence than non-numeric identifiers.
+        } else if (is_num2) {
+            return 1;
+        } else {
+            res = p1[i].compare(p2[i]);
+            if (res != 0) return res < 0 ? -1 : 1;
+        }
+    }
+
+    if (p1.size() < p2.size()) return -1;
+    if (p1.size() > p2.size()) return 1;
+    return 0;
+}
+
 }
 
 bool version_compare(const std::string& v1_str, const std::string& v2_str) {
     validate_version_format(v1_str);
     validate_version_format(v2_str);
 
-    std::regex re_dot("[.]");
-    std::vector<std::string> p1_main{std::sregex_token_iterator(v1_str.begin(), v1_str.end(), re_dot, -1), std::sregex_token_iterator()};
-    std::vector<std::string> p2_main{std::sregex_token_iterator(v2_str.begin(), v2_str.end(), re_dot, -1), std::sregex_token_iterator()};
-    
-    size_t main_len = std::max(p1_main.size(), p2_main.size());
+    Version v1(v1_str);
+    Version v2(v2_str);
+
+    size_t main_len = std::max(v1.main_part.size(), v2.main_part.size());
     for (size_t i = 0; i < main_len; ++i) {
-        int n1 = (i < p1_main.size() && !p1_main[i].empty()) ? std::stoi(p1_main[i]) : 0;
-        int n2 = (i < p2_main.size() && !p2_main[i].empty()) ? std::stoi(p2_main[i]) : 0;
+        int n1 = (i < v1.main_part.size()) ? v1.main_part[i] : 0;
+        int n2 = (i < v2.main_part.size()) ? v2.main_part[i] : 0;
         if (n1 < n2) return true;
         if (n1 > n2) return false;
+    }
+
+    if (!v1.pre_release_part.empty() && v2.pre_release_part.empty()) {
+        return true; // A pre-release version has lower precedence than a normal version.
+    }
+    if (v1.pre_release_part.empty() && !v2.pre_release_part.empty()) {
+        return false;
+    }
+    if (!v1.pre_release_part.empty() && !v2.pre_release_part.empty()) {
+        return compare_pre_release_part(v1.pre_release_part, v2.pre_release_part) < 0;
     }
 
     return false; // equal
@@ -52,7 +124,11 @@ std::string get_latest_version(const std::string& pkg_name) {
     auto cleanup = [&](const void*) { fs::remove(tmp_file_path); };
     std::unique_ptr<const void, decltype(cleanup)> tmp_file_guard(tmp_file_path.c_str(), cleanup);
 
-    download_file(latest_txt_url, tmp_file_path, false);
+    try {
+        download_file(latest_txt_url, tmp_file_path, false);
+    } catch (const LpkgException&) {
+        throw LpkgException(string_format("error.download_latest_txt_failed", latest_txt_url));
+    }
 
     std::ifstream latest_file(tmp_file_path);
     if (!latest_file.is_open()) {
@@ -67,3 +143,4 @@ std::string get_latest_version(const std::string& pkg_name) {
 
     return latest_version;
 }
+
