@@ -152,8 +152,10 @@ void InstallationTask::run() {
     fs::remove_all(tmp_pkg_dir_);
     ensure_dir_exists(tmp_pkg_dir_);
 
-    auto cleanup_tmp = [&](const void*) { fs::remove_all(tmp_pkg_dir_); };
-    std::unique_ptr<const void, decltype(cleanup_tmp)> tmp_dir_guard(tmp_pkg_dir_.c_str(), cleanup_tmp);
+    auto cleanup_tmp = [&](const fs::path* dir_to_clean) {
+        fs::remove_all(*dir_to_clean);
+    };
+    std::unique_ptr<const fs::path, decltype(cleanup_tmp)> tmp_dir_guard(&tmp_pkg_dir_, cleanup_tmp);
 
     try {
         prepare(); // Phase 1: Prepare everything without modifying the system
@@ -647,16 +649,21 @@ void upgrade_packages() {
     int upgraded_count = 0;
     std::vector<std::tuple<std::string, std::string, std::string>> upgradable_pkgs;
     std::vector<std::future<std::string>> futures;
+    std::vector<std::pair<std::string, std::string>> installed_packages_info;
 
-    auto& pkgs = get_cache().pkgs;
-    for (const auto& pkg : pkgs) {
-        futures.push_back(std::async(std::launch::async, [pkg] {
-            size_t pos = pkg.find(':');
-            if (pos == std::string::npos) return std::string();
+    // Collect package info first to avoid race conditions with cache modifications
+    for (const auto& pkg_record : get_cache().pkgs) {
+        size_t pos = pkg_record.find(':');
+        if (pos != std::string::npos) {
+            installed_packages_info.emplace_back(pkg_record.substr(0, pos), pkg_record.substr(pos + 1));
+        }
+    }
 
-            std::string pkg_name = pkg.substr(0, pos);
-            std::string current_version = pkg.substr(pos + 1);
+    for (const auto& pkg_info : installed_packages_info) {
+        const std::string& pkg_name = pkg_info.first;
+        const std::string& current_version = pkg_info.second;
 
+        futures.push_back(std::async(std::launch::async, [pkg_name, current_version] {
             try {
                 std::string latest_version = get_latest_version(pkg_name);
                 if (version_compare(current_version, latest_version)) {
