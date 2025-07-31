@@ -164,16 +164,110 @@ lpkg/
 ```
 <mirror_url>/<arch>/<pkg_name>/<version>/
 ├── app.tar.zst   # 包内容，使用 zstd 压缩的 tar 包
-├── deps.txt      # 依赖列表，每行一个依赖包名
-├── files.txt     # 文件清单，格式为 "源路径 目标目录"
 ├── hash.txt      # app.tar.zst 的 SHA256 哈希值
-└── man.txt       # 包的手册页内容
 ```
 此外，还有一个 `latest.txt` 文件位于包的根目录，用于 `upgrade` 和 `install` 最新版：
 ```
 <mirror_url>/<arch>/<pkg_name>/latest.txt
 ```
 该文件只包含最新版本的版本号字符串。
+
+## 📦 打包指南
+
+本节将介绍如何为 `lpkg` 创建软件包。
+
+### 自动打包 (占位符)
+
+> ⚠️ **注意**: `lbp` (LankeOS Build & Pack) 工具目前正在开发中，尚未发布。一旦可用，它将成为创建和上传软件包的首选方式，能自动处理大部分打包流程。
+
+### 手动打包
+
+手动打包需要您手动创建包的元数据文件和压缩包。以下是详细步骤和规范。
+
+#### 1. 包源文件结构
+
+首先，准备一个用于打包的源目录，其结构如下：
+
+```
+my-package-1.0.0/
+├── content/          # 包含所有需要安装到系统的文件
+│   └── binary.bin    # 要打包的程序
+├── deps.txt          # 依赖项列表
+├── files.txt         # 文件清单
+└── man.txt           # man 手册页内容
+```
+
+-   **`content/`**: 这个目录是包的根。里面的文件和目录结构不代表它们在目标系统上的最终位置。最终的位置由files.txt指定。
+
+#### 2. 创建元数据文件
+
+##### `deps.txt`
+
+一个纯文本文件，每行列出一个依赖包的名称。如果您的包没有依赖项，这个文件可以为空。
+
+**示例:**
+```
+glibc
+openssl
+```
+
+##### `files.txt`
+
+这是包中最重要的元数据文件之一，它告诉 `lpkg` 如何安装 `content/` 目录中的文件。
+
+-   **格式**: `源路径 目标目录`
+-   **源路径**: 文件相对于 `content/` 目录的路径。
+-   **目标目录**: 文件在目标系统上安装的基准目录。最终安装路径将是 `目标目录` / `源路径`。
+
+**示例 `files.txt` (对应上面的 `content/` 结构):**
+```
+binary.bin /usr/bin/
+```
+-   `binary.bin /usr/bin/`: 将 `content/binary.bin` 安装到 `/usr/bin/binary.bin`。
+
+**注意**: 您必须列出 `content/` 目录中的 **每一个文件**。目录会自动创建，无需列出。
+
+##### `man.txt`
+
+纯文本文件，包含软件包的 `man` 手册页内容。用户可以通过 `lpkg man <包名>` 查看。
+
+#### 3. 创建包压缩文件
+
+##### `app.tar.zst`
+
+这是包的核心，包含了 `content/` 目录的所有内容。使用 `tar` 和 `zstd` 进行压缩。
+
+在您的包源目录上一级中运行以下命令：
+```bash
+tar -I zstd -cf app.tar.zst 包源目录/
+```
+#### 4. 生成哈希值
+
+##### `hash.txt`
+
+为了保证包的完整性，需要为 `app.tar.zst` 生成一个 SHA256 哈希值。
+
+在app.tar.zst所在的目录中运行：
+```bash
+sha256sum app.tar.zst | cut -d' ' -f1 > hash.txt
+```
+这会计算哈希值并将其保存到 `hash.txt` 文件中。
+
+#### 5. 上传到镜像
+
+完成以上步骤后，您的包最终目录中应该有以下文件：
+-   `app.tar.zst`
+-   `hash.txt`
+
+将这些文件上传到您的 `lpkg` 镜像服务器。路径结构应遵循：
+`<mirror_url>/<arch>/<pkg_name>/<version>/`
+
+例如: `http://my-mirror.com/repo/amd64/my-package/1.0.0/`
+
+最后，如果这是最新版本，不要忘记更新或创建 `latest.txt` 文件：
+`<mirror_url>/<arch>/<pkg_name>/latest.txt`
+
+该文件应只包含版本号字符串，例如 `1.0.0`。
 
 ## 🤝 贡献
 
