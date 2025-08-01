@@ -97,3 +97,6 @@ error.fatal_restore_failed=致命错误: 无法恢复包 {} : {}
 warning.cleanup_tmp_failed=无法清理临时目录 {} : {}
 info.removing_tmp_dir=正在移除临时目录: {}
 info.tmp_dir_removed=临时目录已移除: {}
+info.running_hook=正在运行钩子: {}
+warning.hook_failed_exec=钩子 {} 执行失败，退出代码 {}
+warning.hook_failed_setup=无法设置或运行钩子 {}: {}

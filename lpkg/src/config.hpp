@@ -25,6 +25,7 @@ inline const fs::path CONFIG_DIR = LPKG_CONF_DIR;
 inline const fs::path L10N_DIR = LPKG_L10N_DIR;
 inline const fs::path DOCS_DIR = LPKG_DOCS_DIR;
 inline const fs::path LOCK_DIR = LPKG_LOCK_DIR;
+inline const fs::path HOOKS_DIR = CONFIG_DIR / "hooks/";
 
 // Derived paths
 inline const fs::path DEP_DIR = CONFIG_DIR / "deps/";
