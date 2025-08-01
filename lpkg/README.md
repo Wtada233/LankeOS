@@ -47,7 +47,7 @@ sudo make install
 - 可执行文件: `/usr/bin/lpkg`
 - 配置文件: `/etc/lpkg/`
 - 共享文件 (语言、文档): `/usr/share/lpkg/`
-- 锁文件: `/var/lock/lpkg/`
+- 锁文件: `/var/lpkg/db.lck`
 
 你可以通过 `PREFIX` 变量来自定义安装基准目录：
 ```bash
@@ -90,7 +90,7 @@ lpkg [选项] <命令> [参数]
     lpkg upgrade
     ```
 
--   **`man <包名>`**: 显示一个软件包的 man page（手册页）。
+-   **`man <包名>`**: 显示一个软件包的 `man.txt` 内容。
     ```bash
     lpkg man a-package
     ```
@@ -98,7 +98,7 @@ lpkg [选项] <命令> [参数]
 #### 选项
 
 -   `-h, --help`: 显示帮助信息。
--   `--non-interactive [y/n]`: 以非交互模式运行。`y` 表示同意所有提示，`n` 表示拒绝所有提示。
+-   `--non-interactive [yes|no]`: 以非交互模式运行。如果只提供 `--non-interactive`，则默认为 `yes`。
 -   `--force`: 与 `remove` 命令一同使用，强制删除。
 
 ### 配置
@@ -131,6 +131,7 @@ lpkg/
 │   ├── version.hpp/cpp       # 版本号比较
 │   ├── localization.hpp/cpp  # 加载和管理本地化字符串
 │   ├── utils.hpp/cpp         # 工具函数 (日志、锁、权限检查)
+│   ├── exception.hpp       # 异常类定义
 │   └── ...
 └── third_party/          # 第三方库
     └── include/
@@ -156,7 +157,7 @@ lpkg/
 
 -   **`Archive`**: 使用 `libarchive` 来处理 `.tar.zst` 格式的压缩包解压。
 
--   **`DBLock`**: 一个基于 `flock` 的 RAII 锁。当 `PackageManager` 实例创建时，它会自动锁定数据库文件 (`/var/lock/lpkg/db.lck`)，并在实例销毁时自动解锁，确保了任何时候只有一个 `lpkg` 进程在修改系统状态。
+-   **`DBLock`**: 一个基于 `flock` 的 RAII 锁。当 `PackageManager` 实例创建时，它会自动锁定数据库文件 (`/var/lpkg/db.lck`)，并在实例销毁时自动解锁，确保了任何时候只有一个 `lpkg` 进程在修改系统状态。
 
 ### 软件包格式
 
@@ -190,14 +191,17 @@ lpkg/
 
 ```
 my-package-1.0.0/
-├── content/          # 包含所有需要安装到系统的文件
-│   └── binary.bin    # 要打包的程序
-├── deps.txt          # 依赖项列表
-├── files.txt         # 文件清单
-└── man.txt           # man 手册页内容
+├── content/
+│   └── binary.bin
+├── deps.txt
+├── files.txt
+├── man.txt
+└── hooks/
+    ├── postinst.sh
+    └── prerm.sh
 ```
 
--   **`content/`**: 这个目录是包的根。里面的文件和目录结构不代表它们在目标系统上的最终位置。最终的位置由files.txt指定。
+-   **`content/`**: 这个目录包含了包的所有文件。`files.txt` 中列出的源路径是相对于这个目录的。
 
 #### 2. 创建元数据文件
 
@@ -215,15 +219,17 @@ openssl
 
 这是包中最重要的元数据文件之一，它告诉 `lpkg` 如何安装 `content/` 目录中的文件。
 
--   **格式**: `源路径 目标目录`
--   **源路径**: 文件相对于 `content/` 目录的路径。
--   **目标目录**: 文件在目标系统上安装的基准目录。最终安装路径将是 `目标目录` / `源路径`。
+-   **格式**: `源文件 目标目录`
+-   **源文件**: 位于 `content/` 目录中的文件名。
+-   **目标目录**: 文件在目标系统上安装的**基准目录** (推荐以 `/` 结尾)。最终的安装路径是 `目标目录` + `源文件`。
 
-**示例 `files.txt` (对应上面的 `content/` 结构):**
+**示例 `files.txt`:**
 ```
 binary.bin /usr/bin/
+config.json /etc/my-app/
 ```
 -   `binary.bin /usr/bin/`: 将 `content/binary.bin` 安装到 `/usr/bin/binary.bin`。
+-   `config.json /etc/my-app/`: 将 `content/config.json` 安装到 `/etc/my-app/config.json`。
 
 **注意**: 您必须列出 `content/` 目录中的 **每一个文件**。目录会自动创建，无需列出。
 
@@ -240,36 +246,30 @@ binary.bin /usr/bin/
 
 如果这些脚本不存在，`lpkg` 会默认跳过。
 
-**示例结构:**
-```
-my-package-1.0.0/
-├── content/
-│   └── binary.bin
-├── deps.txt
-├── files.txt
-├── man.txt
-└── hooks/
-    ├── postinst.sh
-    └── prerm.sh
-```
-
 #### 3. 创建包压缩文件
 
 ##### `app.tar.zst`
 
-这是包的核心，包含了 `content` 所在目录的所有内容。使用 `tar` 和 `zstd` 进行压缩。''
+这是包的核心压缩文件。它应包含打包源目录（例如 `my-package-1.0.0/`）内 **所有** 的内容，包括：
+-   `content/` 目录
+-   `deps.txt`
+-   `files.txt`
+-   `man.txt`
+-   `hooks/` (如果存在)
 
-在您的包源目录上一级中运行以下命令：
+在您的包源目录中运行以下命令来创建它：
+
 ```bash
-tar -I zstd -cf app.tar.zst 包源目录/
+tar -I zstd -cf ../app.tar.zst ./
 ```
+
 #### 4. 生成哈希值
 
 ##### `hash.txt`
 
-为了保证包的完整性，需要为 `app.tar.zst` 生成一个 SHA256 哈希值。
+为了保证包的完整性，需要为 `app.tar.zst` 生成一个 SHA256 哈希值。`hash.txt` 文件 **不包含在** `app.tar.zst` 内，而是与 `app.tar.zst` 一起存放在镜像服务器的同一个目录中。
 
-在app.tar.zst所在的目录中运行：
+在 `app.tar.zst` 所在的目录中运行：
 ```bash
 sha256sum app.tar.zst | cut -d' ' -f1 > hash.txt
 ```
