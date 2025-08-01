@@ -23,6 +23,7 @@ private:
     void commit();
     void copy_package_files();
     void register_package();
+    void run_post_install_hook();
 
     std::string pkg_name_;
     std::string version_;

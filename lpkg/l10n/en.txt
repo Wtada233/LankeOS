@@ -97,3 +97,6 @@ error.fatal_restore_failed=Fatal: Failed to restore package {} : {}
 warning.cleanup_tmp_failed=Failed to clean up temporary directory {} : {}
 info.removing_tmp_dir=Removing temporary directory: {}
 info.tmp_dir_removed=Temporary directory removed: {}
+info.running_hook=Running hook: {}
+warning.hook_failed_exec=Hook {} execution failed with exit code {}
+warning.hook_failed_setup=Failed to set up or run hook {}: {}

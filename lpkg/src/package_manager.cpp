@@ -21,6 +21,7 @@
 #include <unordered_set>
 #include <vector>
 #include <future>
+#include <cstdlib>
 
 namespace fs = std::filesystem;
 
@@ -104,6 +105,7 @@ Cache& get_cache() {
 void do_install(const std::string& pkg_name, const std::string& version, bool explicit_install, std::vector<std::string>& install_path, const std::string& old_version);
 std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
+void run_hook(const std::string& pkg_name, const std::string& hook_name);
 
 // --- Other Helper Functions ---
 std::string get_installed_version(const std::string& pkg_name) {
@@ -202,6 +204,7 @@ void InstallationTask::commit() {
     }
     copy_package_files();
     register_package();
+    run_post_install_hook();
 }
 
 void InstallationTask::download_and_verify_package() {
@@ -424,6 +427,31 @@ void InstallationTask::register_package() {
     cache.dirty = true;
 }
 
+void InstallationTask::run_post_install_hook() {
+    fs::path hook_src_dir = tmp_pkg_dir_ / "hooks";
+    if (!fs::exists(hook_src_dir) || !fs::is_directory(hook_src_dir)) {
+        return; // No hooks directory, nothing to do.
+    }
+
+    fs::path pkg_hook_dest_dir = HOOKS_DIR / pkg_name_;
+    ensure_dir_exists(pkg_hook_dest_dir);
+
+    for (const auto& entry : fs::directory_iterator(hook_src_dir)) {
+        const auto& path = entry.path();
+        if (entry.is_regular_file()) {
+            fs::path dest_path = pkg_hook_dest_dir / path.filename();
+            try {
+                fs::copy(path, dest_path, fs::copy_options::overwrite_existing);
+                fs::permissions(dest_path, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec, fs::perm_options::add);
+            } catch (const fs::filesystem_error& e) {
+                log_warning(string_format("warning.hook_failed_setup", path.filename().string(), e.what()));
+            }
+        }
+    }
+
+    run_hook(pkg_name_, "postinst.sh");
+}
+
 
 // --- Public API Functions ---
 
@@ -466,6 +494,18 @@ std::unordered_set<std::string> get_all_required_packages() {
     }
     return required;
 }
+
+void run_hook(const std::string& pkg_name, const std::string& hook_name) {
+    fs::path hook_path = HOOKS_DIR / pkg_name / hook_name;
+    if (fs::exists(hook_path) && fs::is_regular_file(hook_path)) {
+        log_info(string_format("info.running_hook", hook_name));
+        int ret = std::system(hook_path.c_str());
+        if (ret != 0) {
+            log_warning(string_format("warning.hook_failed_exec", hook_name, std::to_string(ret)));
+        }
+    }
+}
+
 } // anonymous namespace
 
 void install_package(const std::string& pkg_name, const std::string& version) {
@@ -500,10 +540,13 @@ void remove_package(const std::string& pkg_name, bool force) {
 
     log_info(string_format("info.removing_package", pkg_name));
 
+    run_hook(pkg_name, "prerm.sh");
+
     remove_package_files(pkg_name, force);
 
     fs::remove(DEP_DIR / pkg_name);
     fs::remove(DOCS_DIR / (pkg_name + ".man"));
+    fs::remove_all(HOOKS_DIR / pkg_name);
 
     auto& cache = get_cache();
     std::lock_guard<std::mutex> lock(cache.mtx);
