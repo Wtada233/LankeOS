@@ -1,34 +1,18 @@
-name: Build Arch Linux Package for lpkg
+name: CI
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+    branches: main
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: archlinux/archlinux:latest # Use an Arch Linux container for makepkg
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v2
 
-    - name: Install build dependencies
-      run: |
-        pacman -Sy --noconfirm git base-devel gcc make libarchive curl openssl fmt
-
-    - name: Build lpkg
-      run: |
-        cd lpkg
-        makepkg -s --noconfirm
-
-    - name: Upload lpkg artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: lpkg.pkg.tar.zst
-        path: lpkg/*.pkg.tar.zst
+      - name: Validate package
+        uses: heyhusen/archlinux-package-action@v2
+        with:
+          path: lpkg
+          namcap: false
