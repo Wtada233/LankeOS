@@ -22,17 +22,13 @@ jobs:
       run: |
         pacman -Sy --noconfirm git base-devel gcc make libarchive curl openssl fmt
 
-    - name: List files in lpkg/src
-      run: |
-        ls -l lpkg/src
-
     - name: Build lpkg
       run: |
-        cd lpkg/src
-        make
+        cd lpkg
+        makepkg -s --noconfirm
 
     - name: Upload lpkg artifact
       uses: actions/upload-artifact@v4
       with:
-        name: lpkg
-        path: lpkg/src/build/lpkg
+        name: lpkg.pkg.tar.zst
+        path: lpkg/*.pkg.tar.zst
