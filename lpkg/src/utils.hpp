@@ -47,6 +47,17 @@ private:
     int lock_fd = -1;
 };
 
+// RAII for temporary directory
+class TmpDirManager {
+public:
+    TmpDirManager();
+    ~TmpDirManager();
+    TmpDirManager(const TmpDirManager&) = delete;
+    TmpDirManager& operator=(const TmpDirManager&) = delete;
+private:
+    fs::path tmp_dir_path_;
+};
+
 // Filesystem utilities
 void ensure_dir_exists(const fs::path& path);
 void ensure_file_exists(const fs::path& path);

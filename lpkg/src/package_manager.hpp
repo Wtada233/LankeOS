@@ -11,15 +11,12 @@ public:
     InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path, std::string old_version_to_replace = "");
     void run();
 
-private:
-    // Preparation phase
     void prepare();
     void download_and_verify_package();
     void extract_and_validate_package();
     void resolve_dependencies();
     void check_for_file_conflicts();
 
-    // Commit phase
     void commit();
     void copy_package_files();
     void register_package();
@@ -36,6 +33,7 @@ private:
 };
 
 void install_package(const std::string& pkg_name, const std::string& version);
+void install_packages(const std::vector<std::string>& pkg_args);
 void remove_package(const std::string& pkg_name, bool force = false);
 void autoremove();
 void upgrade_packages();

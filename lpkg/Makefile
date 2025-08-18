@@ -32,12 +32,17 @@ SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
 DEPS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.d,$(SRCS))
 
-.PHONY: all clean install uninstall
+.PHONY: all clean install uninstall static
 
 all: $(BUILD_DIR)/$(TARGET)
 
+static: $(BUILD_DIR)/$(TARGET)-static
+
 $(BUILD_DIR)/$(TARGET): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+
+$(BUILD_DIR)/$(TARGET)-static: $(OBJS)
+	$(CXX) $(CXXFLAGS) -static -o $@ $^ $(LIBS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
