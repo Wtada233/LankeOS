@@ -1,0 +1,21 @@
+# Maintainer: Wtada233 <your-email@example.com> # Placeholder, user can update
+pkgname=lpkg
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="LankeOS Package Manager"
+arch=('x86_64')
+url="https://github.com/Wtada233/LankeOS"
+license=('GPL-3.0-or-later')
+options=(!debug)
+depends=('glibc' 'libarchive' 'curl' 'openssl' 'fmt')
+makedepends=('gcc' 'make' 'libarchive' 'curl' 'openssl' 'fmt')
+source=() # No external source to fetch, we use the local directory
+sha256sums=() # No checksums needed for local source
+
+build() {
+  make
+}
+
+package() {
+  make install DESTDIR="$pkgdir"
+}
