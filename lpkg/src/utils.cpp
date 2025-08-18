@@ -142,6 +142,19 @@ DBLock::~DBLock() {
     }
 }
 
+TmpDirManager::TmpDirManager() : tmp_dir_path_(get_tmp_dir()) {
+    cleanup_tmp_dirs();
+    ensure_dir_exists(tmp_dir_path_);
+}
+
+TmpDirManager::~TmpDirManager() {
+    try {
+        fs::remove_all(tmp_dir_path_);
+    } catch (const fs::filesystem_error&) {
+        // Silent as requested
+    }
+}
+
 void ensure_dir_exists(const fs::path& path) {
     if (!fs::exists(path)) {
         std::error_code ec;
@@ -208,8 +221,8 @@ void cleanup_tmp_dirs() {
                 if (is_empty || (now - sctp) > twenty_four_hours) {
                     fs::remove_all(entry.path());
                 }
-            } catch (const fs::filesystem_error& e) {
-                log_warning(string_format("warning.cleanup_tmp_failed", entry.path().string(), e.what()));
+            } catch (const fs::filesystem_error&) {
+                // Silent as requested
             }
         }
     }

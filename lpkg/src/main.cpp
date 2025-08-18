@@ -99,20 +99,7 @@ int main(int argc, char* argv[]) {
         if (command == "install") {
             pre_operation_check(result, usage_printer, 1);
             const auto& packages = result["packages"].as<std::vector<std::string>>();
-            for (const auto& pkg_arg : packages) {
-                size_t pos = pkg_arg.find(':');
-                if (pos == std::string::npos) {
-                    install_package(pkg_arg, "latest");
-                } else {
-                    install_package(pkg_arg.substr(0, pos), pkg_arg.substr(pos + 1));
-                }
-                // It is necessary to write to the cache after every single package operation.
-                // If we wait until the end of a multi-package operation (e.g., `install a b c`),
-                // and if package 'b' fails to install, the successful installation of package 'a'
-                // would not be recorded. This would leave the system in a corrupted state where
-                // files from 'a' exist on disk but the package database is unaware of them.
-                write_cache();
-            }
+            install_packages(packages);
             log_info(get_string("info.install_complete"));
         } else if (command == "remove") {
             pre_operation_check(result, usage_printer, 1);
@@ -148,15 +135,6 @@ int main(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         log_error(string_format("error.unexpected_error", e.what()));
         return 1;
-    }
-
-    try {
-        fs::path current_tmp_dir = get_tmp_dir();
-        log_info(string_format("info.removing_tmp_dir", current_tmp_dir.string()));
-        fs::remove_all(current_tmp_dir);
-        log_info(string_format("info.tmp_dir_removed", current_tmp_dir.string()));
-    } catch (const fs::filesystem_error& e) {
-        log_warning(string_format("warning.cleanup_tmp_failed", get_tmp_dir().string(), e.what()));
     }
 
     return 0;

@@ -23,8 +23,6 @@ void init_filesystem() {
     ensure_dir_exists(L10N_DIR);
     ensure_dir_exists(DOCS_DIR);
     ensure_dir_exists(HOOKS_DIR);
-    cleanup_tmp_dirs();
-    ensure_dir_exists(get_tmp_dir());
     ensure_dir_exists(LOCK_DIR);
     ensure_file_exists(PKGS_FILE);
     ensure_file_exists(HOLDPKGS_FILE);
