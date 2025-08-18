@@ -22,13 +22,17 @@ jobs:
       run: |
         pacman -Sy --noconfirm git base-devel gcc make libarchive curl openssl fmt
 
-    - name: Build Arch Linux package
+    - name: List files in lpkg/src
       run: |
-        cd lpkg
-        makepkg -s --noconfirm # -s installs dependencies, --noconfirm avoids prompts
+        ls -l lpkg/src
 
-    - name: Upload package artifact
+    - name: Build lpkg
+      run: |
+        cd lpkg/src
+        make
+
+    - name: Upload lpkg artifact
       uses: actions/upload-artifact@v4
       with:
-        name: lpkg-arch-package
-        path: lpkg/*.pkg.tar.zst # Adjust if the package name is different
+        name: lpkg
+        path: lpkg/src/build/lpkg
