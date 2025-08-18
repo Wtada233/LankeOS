@@ -1,0 +1,38 @@
+name: Build Arch Linux Package
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'lpkg/**'
+  pull_request:
+    paths:
+      - 'lpkg/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 获取所有git历史记录以供 pkgver() 使用
+
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm --needed git base-devel
+
+      - name: Build the package
+        run: |
+          cd lpkg
+          makepkg -sf --noconfirm
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lpkg-arch-package
+          path: lpkg/*.pkg.tar.zst
