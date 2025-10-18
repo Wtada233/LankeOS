@@ -1,6 +1,5 @@
-# Maintainer: Wtada233 <your-email@example.com> # Placeholder, user can update
 pkgname=lpkg
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="LankeOS Package Manager"
 arch=('x86_64')
@@ -13,6 +12,7 @@ source=() # No external source to fetch, we use the local directory
 sha256sums=() # No checksums needed for local source
 
 build() {
+  make clean
   make
 }
 
