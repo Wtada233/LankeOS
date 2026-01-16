@@ -6,7 +6,7 @@
 
 class InstallationTask {
 public:
-    InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path, std::string old_version_to_replace = "", std::filesystem::path local_package_path = "");
+    InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path, std::string old_version_to_replace = "", std::filesystem::path local_package_path = "", std::string expected_hash = "");
     void run();
 
     void prepare();
@@ -29,6 +29,7 @@ public:
     std::filesystem::path archive_path_;
     std::string old_version_to_replace_;
     std::filesystem::path local_package_path_;
+    std::string expected_hash_;
 };
 
 void install_package(const std::string& pkg_name, const std::string& version);

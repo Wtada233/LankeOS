@@ -25,6 +25,7 @@ extern std::filesystem::path LOCK_FILE;
 // Functions
 void set_root_path(const std::string& root_path);
 void init_filesystem();
+void set_architecture(const std::string& arch); // Manually override architecture
 std::string get_architecture();
 std::string get_mirror_url();
 
