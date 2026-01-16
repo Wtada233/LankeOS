@@ -3,6 +3,7 @@
 #include "downloader.hpp"
 #include "utils.hpp"
 #include "exception.hpp"
+#include "localization.hpp" // Added include
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -27,7 +28,7 @@ void Repository::load_index() {
     }
 
     if (!std::filesystem::exists(index_path)) {
-        throw LpkgException("Repository index not found: " + index_path.string());
+        throw LpkgException(string_format("error.repo_index_not_found", index_path.string()));
     }
 
     std::ifstream file(index_path);

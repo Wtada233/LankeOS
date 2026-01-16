@@ -1,1 +1,3 @@
 build/
+run_tests
+*.o
