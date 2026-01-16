@@ -1,0 +1,4 @@
+Checks: '*,-fuchsia-*,-google-build-using-namespace,-cppcoreguidelines-pro-bounds-pointer-arithmetic,-cppcoreguidelines-avoid-c-arrays,-hicpp-no-array-decay,-modernize-use-trailing-return-type'
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+FormatStyle: file

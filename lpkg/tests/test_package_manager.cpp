@@ -158,3 +158,59 @@ TEST_F(PackageManagerTest, VirtualPackages) {
     fs::remove("consumer-1.0.tar.zst");
 }
 
+TEST_F(PackageManagerTest, VersionConstraints) {
+    // 1. Install lib v1.0
+    {
+        fs::path work_dir = "pkg_lib";
+        fs::create_directories(work_dir / "content");
+        std::ofstream deps(work_dir / "deps.txt"); deps.close();
+        std::ofstream files(work_dir / "files.txt"); files.close();
+        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
+        
+        std::string cmd = "tar --zstd -cf lib-1.0.tar.zst -C " + work_dir.string() + " .";
+        std::system(cmd.c_str());
+        fs::remove_all(work_dir);
+    }
+    install_packages({"lib-1.0.tar.zst"});
+
+    // 2. Try to install app requiring lib >= 2.0 (Should Fail)
+    {
+        fs::path work_dir = "pkg_app_bad";
+        fs::create_directories(work_dir / "content");
+        std::ofstream deps(work_dir / "deps.txt"); 
+        deps << "lib >= 2.0" << std::endl;
+        deps.close();
+        std::ofstream files(work_dir / "files.txt"); files.close();
+        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
+        
+        std::string cmd = "tar --zstd -cf app_bad-1.0.tar.zst -C " + work_dir.string() + " .";
+        std::system(cmd.c_str());
+        fs::remove_all(work_dir);
+    }
+    
+    EXPECT_THROW(install_packages({"app_bad-1.0.tar.zst"}), std::exception);
+
+    // 3. Try to install app requiring lib < 2.0 (Should Succeed)
+    {
+        fs::path work_dir = "pkg_app_good";
+        fs::create_directories(work_dir / "content");
+        std::ofstream deps(work_dir / "deps.txt"); 
+        deps << "lib < 2.0" << std::endl;
+        deps.close();
+        std::ofstream files(work_dir / "files.txt"); files.close();
+        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
+        
+        std::string cmd = "tar --zstd -cf app_good-1.0.tar.zst -C " + work_dir.string() + " .";
+        std::system(cmd.c_str());
+        fs::remove_all(work_dir);
+    }
+
+    EXPECT_NO_THROW(install_packages({"app_good-1.0.tar.zst"}));
+
+    // Cleanup
+    fs::remove("lib-1.0.tar.zst");
+    fs::remove("app_bad-1.0.tar.zst");
+    fs::remove("app_good-1.0.tar.zst");
+}
+
+

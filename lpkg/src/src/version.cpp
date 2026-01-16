@@ -127,6 +127,26 @@ bool version_compare(const std::string& v1_str, const std::string& v2_str) {
     return false; // equal
 }
 
+bool version_satisfies(const std::string& current_version, const std::string& op, const std::string& required_version) {
+    if (op == "=" || op == "==") {
+        return current_version == required_version;
+    }
+    if (op == "!=") {
+        return current_version != required_version;
+    }
+
+    bool less = version_compare(current_version, required_version);
+    bool greater = version_compare(required_version, current_version);
+    bool equal = !less && !greater;
+
+    if (op == "<") return less;
+    if (op == "<=") return less || equal;
+    if (op == ">") return greater;
+    if (op == ">=") return greater || equal;
+
+    throw LpkgException(string_format("error.invalid_version_format", op));
+}
+
 std::string get_latest_version(const std::string& pkg_name) {
     std::string mirror_url = get_mirror_url();
     std::string arch = get_architecture();

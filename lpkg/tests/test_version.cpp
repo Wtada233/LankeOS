@@ -24,3 +24,13 @@ TEST(UtilsTest, ParsePackageFilename) {
 
     EXPECT_THROW(parse_package_filename("invalid_filename.tar.gz"), std::exception);
 }
+
+TEST(VersionTest, Satisfaction) {
+    EXPECT_TRUE(version_satisfies("1.0", ">=", "1.0"));
+    EXPECT_TRUE(version_satisfies("2.0", ">=", "1.0"));
+    EXPECT_FALSE(version_satisfies("1.0", ">=", "2.0"));
+    EXPECT_TRUE(version_satisfies("1.0", "<", "2.0"));
+    EXPECT_FALSE(version_satisfies("2.0", "<", "1.0"));
+    EXPECT_TRUE(version_satisfies("1.0", "=", "1.0"));
+    EXPECT_FALSE(version_satisfies("1.0", "!=", "1.0"));
+}
