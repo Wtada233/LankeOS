@@ -217,13 +217,68 @@ void InstallationTask::prepare() {
 }
 
 void InstallationTask::commit() {
-    // If replacing an old version, remove its files now that the new package is ready
+    // Logic for safe upgrade:
+    // 1. Identify files from old version (if exists)
+    // 2. Copy new files (InstallationTask::copy_package_files handles backups of overwrites)
+    // 3. Register new package
+    // 4. Remove files that were in old version but NOT in new version
+    
+    std::unordered_set<std::string> old_files;
     if (!old_version_to_replace_.empty()) {
-        log_info(string_format("info.removing_old_version", old_version_to_replace_.c_str(), pkg_name_.c_str()));
-        remove_package_files(pkg_name_, true); // Force remove old files
+        fs::path old_files_list_path = FILES_DIR / (pkg_name_ + ".txt");
+        if (fs::exists(old_files_list_path)) {
+            std::ifstream f(old_files_list_path);
+            std::string line;
+            while (std::getline(f, line)) {
+                if (!line.empty()) old_files.insert(line);
+            }
+        }
     }
+
+    // This will overwrite files and create backups.
+    // If it fails, it rolls back (restores backups and deletes new files).
+    // Note: The old files list file (pkg.txt) will be overwritten here.
     copy_package_files();
+    
     register_package();
+    
+    // Prune obsolete files
+    if (!old_version_to_replace_.empty()) {
+        std::unordered_set<std::string> new_files;
+        fs::path new_files_list_path = FILES_DIR / (pkg_name_ + ".txt");
+        if (fs::exists(new_files_list_path)) {
+            std::ifstream f(new_files_list_path);
+            std::string line;
+            while (std::getline(f, line)) {
+                if (!line.empty()) new_files.insert(line);
+            }
+        }
+
+        for (const auto& old_file : old_files) {
+            if (new_files.find(old_file) == new_files.end()) {
+                // File was in old version but not in new version. Remove it.
+                // We should check if it's owned by another package? 
+                // remove_package_files logic does that.
+                // But here we are just pruning specific files.
+                // Let's assume strict ownership for now or check DB?
+                // The DB has already been updated in register_package()!
+                // So if we check DB for this file, it won't point to us anymore.
+                // If no one owns it, delete it.
+                
+                auto& cache = get_cache();
+                std::lock_guard<std::mutex> lock(cache.mtx);
+                auto& db = cache.file_db;
+                if (db.find(old_file) == db.end()) {
+                     fs::path physical_path = ROOT_DIR / old_file;
+                     if (fs::exists(physical_path)) {
+                         log_info("Removing obsolete file: " + old_file);
+                         fs::remove(physical_path);
+                     }
+                }
+            }
+        }
+    }
+
     run_post_install_hook();
 }
 
@@ -256,7 +311,7 @@ void InstallationTask::download_and_verify_package() {
     std::string expected_hash;
     if (!expected_hash_.empty()) {
         expected_hash = expected_hash_;
-        log_info("Verifying with provided hash.");
+        log_info(get_string("info.verifying_provided_hash"));
     } else {
         const std::string hash_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + "/hash.txt";
         const fs::path hash_path = tmp_pkg_dir_ / "hash.txt";
@@ -409,7 +464,7 @@ void InstallationTask::copy_package_files() {
             try {
                 fs::rename(backup.second, backup.first);
             } catch (const fs::filesystem_error& e) {
-                log_error("Failed to restore backup " + backup.second.string() + " to " + backup.first.string() + ": " + e.what());
+                log_error(string_format("error.restore_backup_failed", backup.second.string().c_str(), backup.first.string().c_str(), e.what()));
             }
         }
         // Cleanup remaining backups (if any restore failed, we might still have them, but we try to restore all)
@@ -660,16 +715,16 @@ void run_hook(const std::string& pkg_name, const std::string& hook_name) {
             // Need to fork to chroot safely
             pid_t pid = fork();
             if (pid == -1) {
-                log_warning("Failed to fork for hook execution: " + std::string(strerror(errno)));
+                log_warning(string_format("error.hook_fork_failed", std::string(strerror(errno))));
                 return;
             } else if (pid == 0) {
                 // Child
                 if (chroot(ROOT_DIR.c_str()) != 0) {
-                    std::cerr << "Failed to chroot to " << ROOT_DIR << ": " << strerror(errno) << std::endl;
+                    std::cerr << string_format("error.hook_chroot_failed", ROOT_DIR.string().c_str(), strerror(errno)) << std::endl;
                     _exit(1);
                 }
                 if (chdir("/") != 0) {
-                     std::cerr << "Failed to chdir to /: " << strerror(errno) << std::endl;
+                     std::cerr << string_format("error.hook_chdir_failed", strerror(errno)) << std::endl;
                      _exit(1);
                 }
                 // Hook path inside chroot (HOOKS_DIR is logical path relative to config, but config is rebased in set_root_path)
@@ -680,7 +735,7 @@ void run_hook(const std::string& pkg_name, const std::string& hook_name) {
                 std::string hook_cmd = "/" + hook_rel.string();
                 
                 execl("/bin/sh", "sh", "-c", hook_cmd.c_str(), (char*)NULL);
-                std::cerr << "Failed to exec hook: " << strerror(errno) << std::endl;
+                std::cerr << string_format("error.hook_exec_failed", strerror(errno)) << std::endl;
                 _exit(1);
             } else {
                 // Parent
@@ -905,7 +960,7 @@ void install_packages(const std::vector<std::string>& pkg_args) {
     try {
         repo.load_index();
     } catch (const std::exception& e) {
-        log_warning("Failed to load repository index: " + std::string(e.what()) + ". Remote resolution might fail.");
+        log_warning(string_format("warning.repo_index_load_failed", e.what()));
     }
 
     std::map<std::string, InstallPlan> plan;
@@ -925,10 +980,10 @@ void install_packages(const std::vector<std::string>& pkg_args) {
                      local_candidates[name_ver.first] = fs::absolute(p);
                      targets.emplace_back(name_ver.first, name_ver.second);
                  } catch (const std::exception& e) {
-                     log_error("Skipping invalid local package file: " + pkg_arg + " - " + e.what());
+                     log_error(string_format("warning.skip_invalid_local_pkg", pkg_arg.c_str(), e.what()));
                  }
             } else {
-                log_error("Local package file not found: " + pkg_arg);
+                log_error(string_format("error.local_pkg_not_found", pkg_arg.c_str()));
             }
         } else {
             // Regular package spec
