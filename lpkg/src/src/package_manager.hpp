@@ -4,11 +4,9 @@
 #include <vector>
 #include <filesystem>
 
-namespace fs = std::filesystem;
-
 class InstallationTask {
 public:
-    InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path, std::string old_version_to_replace = "");
+    InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path, std::string old_version_to_replace = "", std::filesystem::path local_package_path = "");
     void run();
 
     void prepare();
@@ -26,10 +24,11 @@ public:
     std::string version_;
     bool explicit_install_;
     std::vector<std::string>& install_path_;
-    fs::path tmp_pkg_dir_;
+    std::filesystem::path tmp_pkg_dir_;
     std::string actual_version_;
-    fs::path archive_path_;
+    std::filesystem::path archive_path_;
     std::string old_version_to_replace_;
+    std::filesystem::path local_package_path_;
 };
 
 void install_package(const std::string& pkg_name, const std::string& version);

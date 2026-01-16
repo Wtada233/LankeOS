@@ -6,8 +6,6 @@
 #include <unordered_set>
 #include <filesystem>
 
-namespace fs = std::filesystem;
-
 // Color codes
 inline constexpr std::string_view COLOR_GREEN = "[1;32m";
 inline constexpr std::string_view COLOR_WHITE = "[1;37m";
@@ -55,12 +53,15 @@ public:
     TmpDirManager(const TmpDirManager&) = delete;
     TmpDirManager& operator=(const TmpDirManager&) = delete;
 private:
-    fs::path tmp_dir_path_;
+    std::filesystem::path tmp_dir_path_;
 };
 
 // Filesystem utilities
-void ensure_dir_exists(const fs::path& path);
-void ensure_file_exists(const fs::path& path);
-std::unordered_set<std::string> read_set_from_file(const fs::path& path);
-void write_set_to_file(const fs::path& path, const std::unordered_set<std::string>& data);
+void ensure_dir_exists(const std::filesystem::path& path);
+void ensure_file_exists(const std::filesystem::path& path);
+std::unordered_set<std::string> read_set_from_file(const std::filesystem::path& path);
+void write_set_to_file(const std::filesystem::path& path, const std::unordered_set<std::string>& data);
 void cleanup_tmp_dirs();
+
+// Filename parsing
+std::pair<std::string, std::string> parse_package_filename(const std::string& filename);

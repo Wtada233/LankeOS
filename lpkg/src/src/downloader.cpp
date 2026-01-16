@@ -12,6 +12,8 @@
 #include <memory>
 #include <unistd.h>
 
+namespace fs = std::filesystem;
+
 // HTTP download callback function (modern C++)
 size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
     std::ostream* out = static_cast<std::ostream*>(stream);

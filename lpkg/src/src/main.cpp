@@ -56,6 +56,7 @@ int main(int argc, char* argv[]) {
             ("h,help", get_string("info.help_desc"))
             ("non-interactive", get_string("info.non_interactive_option_desc"), cxxopts::value<std::string>()->implicit_value("n"))
             ("force", get_string("info.force_desc"), cxxopts::value<bool>()->default_value("false"))
+            ("root", "Install root directory", cxxopts::value<std::string>())
             ("command", "", cxxopts::value<std::string>())
             ("packages", "", cxxopts::value<std::vector<std::string>>());
 
@@ -66,6 +67,10 @@ int main(int argc, char* argv[]) {
         if (result.count("help")) {
             print_usage(options);
             return 0;
+        }
+
+        if (result.count("root")) {
+            set_root_path(result["root"].as<std::string>());
         }
 
         if (result.count("non-interactive")) {

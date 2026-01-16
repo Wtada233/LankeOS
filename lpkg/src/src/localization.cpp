@@ -10,6 +10,8 @@
 #include <limits.h> // For PATH_MAX
 #include <unistd.h> // For readlink
 
+namespace fs = std::filesystem;
+
 namespace {
     std::unordered_map<std::string, std::string> translations;
     std::unordered_map<std::string, std::string> missing_key_placeholders;

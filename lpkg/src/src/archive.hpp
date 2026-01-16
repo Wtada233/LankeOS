@@ -3,6 +3,4 @@
 #include <string>
 #include <filesystem>
 
-namespace fs = std::filesystem;
-
-void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir);
+void extract_tar_zst(const std::filesystem::path& archive_path, const std::filesystem::path& output_dir);
