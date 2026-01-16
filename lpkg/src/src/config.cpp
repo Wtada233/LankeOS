@@ -78,7 +78,17 @@ void init_filesystem() {
     ensure_file_exists(PROVIDES_DB);
 }
 
+static std::string g_architecture_override;
+
+void set_architecture(const std::string& arch) {
+    g_architecture_override = arch;
+}
+
 std::string get_architecture() {
+    if (!g_architecture_override.empty()) {
+        return g_architecture_override;
+    }
+
     struct utsname buf;
     if (uname(&buf) != 0) {
         throw LpkgException(get_string("error.get_arch_failed"));

@@ -8,6 +8,7 @@
 #include "localization.hpp"
 #include "utils.hpp"
 #include "version.hpp"
+#include "repository.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -22,6 +23,8 @@
 #include <vector>
 #include <future>
 #include <cstdlib>
+#include <cstring>
+#include <cerrno>
 
 namespace fs = std::filesystem;
 
@@ -149,7 +152,7 @@ bool is_manually_installed(const std::string& pkg_name) {
 
 // --- InstallationTask Class Implementation ---
 
-InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path, std::string old_version_to_replace, fs::path local_package_path)
+InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::vector<std::string>& install_path, std::string old_version_to_replace, fs::path local_package_path, std::string expected_hash)
     : pkg_name_(std::move(pkg_name)),
       version_(std::move(version)),
       explicit_install_(explicit_install),
@@ -157,7 +160,8 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version, bo
       tmp_pkg_dir_(get_tmp_dir() / pkg_name_),
       actual_version_(version_), // Initialize actual_version_ with version_
       old_version_to_replace_(std::move(old_version_to_replace)),
-      local_package_path_(std::move(local_package_path)) {}
+      local_package_path_(std::move(local_package_path)),
+      expected_hash_(std::move(expected_hash)) {}
 
 void InstallationTask::run() {
     std::string current_installed_version = get_installed_version(pkg_name_);
@@ -248,20 +252,34 @@ void InstallationTask::download_and_verify_package() {
 
     const std::string download_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + "/app.tar.zst";
     archive_path_ = tmp_pkg_dir_ / "app.tar.zst";
-    const std::string hash_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + "/hash.txt";
-    const fs::path hash_path = tmp_pkg_dir_ / "hash.txt";
-
-    log_info(string_format("info.downloading_from", download_url.c_str()));
-
-    download_with_retries(hash_url, hash_path, 5, false);
-    std::ifstream hash_file(hash_path);
+    
     std::string expected_hash;
-    if (!(hash_file >> expected_hash)) {
-        throw LpkgException(string_format("error.hash_download_failed", hash_url.c_str()));
-    }
-    hash_file.close();
+    if (!expected_hash_.empty()) {
+        expected_hash = expected_hash_;
+        log_info("Verifying with provided hash.");
+    } else {
+        const std::string hash_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + "/hash.txt";
+        const fs::path hash_path = tmp_pkg_dir_ / "hash.txt";
+        log_info(string_format("info.downloading_from", download_url.c_str()));
 
-    download_with_retries(download_url, archive_path_, 5, true);
+        download_with_retries(hash_url, hash_path, 5, false);
+        std::ifstream hash_file(hash_path);
+        if (!(hash_file >> expected_hash)) {
+            throw LpkgException(string_format("error.hash_download_failed", hash_url.c_str()));
+        }
+        hash_file.close();
+    }
+
+    if (!fs::exists(archive_path_)) { // Check if already downloaded (by plan preparation maybe? No, plan doesn't download now)
+        // If expected_hash was provided, we might still need to download
+        if (expected_hash_.empty()) {
+             // If we just downloaded hash, we still need to download app.
+             // Wait, the original code downloaded hash then app.
+             // If expected_hash_ is provided, we skip hash download, but we MUST download app.
+        }
+        log_info(string_format("info.downloading_from", download_url.c_str()));
+        download_with_retries(download_url, archive_path_, 5, true);
+    }
 
     std::string actual_hash = calculate_sha256(archive_path_);
     if (expected_hash != actual_hash) {
@@ -299,9 +317,6 @@ void InstallationTask::resolve_dependencies() {
             has_constraint = true;
         }
         
-        // DEBUG LOGGING
-        std::cerr << "DEBUG: Checking dep " << dep_name << " constraint: " << (has_constraint ? (op + " " + req_ver) : "none") << std::endl;
-
         if (std::find(install_path_.begin(), install_path_.end(), dep_name) != install_path_.end()) {
             log_warning(string_format("warning.circular_dependency", pkg_name_.c_str(), dep_name.c_str()));
             continue;
@@ -325,10 +340,8 @@ void InstallationTask::resolve_dependencies() {
             }
         } else {
             log_info(string_format("info.dep_already_installed", dep_name.c_str()));
-            std::cerr << "DEBUG: Installed ver: " << installed_ver << " Constraint: " << has_constraint << std::endl;
             if (has_constraint && installed_ver != "virtual") {
                  bool sat = version_satisfies(installed_ver, op, req_ver);
-                 std::cerr << "DEBUG: Satisfies? " << sat << std::endl;
                  if (!sat) {
                      // TODO: Trigger upgrade if possible? For now, error out.
                      throw LpkgException("Installed dependency " + dep_name + " version " + installed_ver + " does not satisfy constraint " + op + " " + req_ver);
@@ -377,17 +390,32 @@ void InstallationTask::copy_package_files() {
     int file_count = 0;
     std::vector<fs::path> installed_files;
     std::set<fs::path> created_dirs_for_rollback;
+    std::vector<std::pair<fs::path, fs::path>> backups; // <installed_path, backup_path>
 
     auto rollback = [&](const void*) {
         log_error(string_format("error.rollback_install", pkg_name_.c_str()));
+        
+        // 1. Remove new files
         for (const auto& file : installed_files) {
             try {
-                fs::remove(file);
+                if (fs::exists(file)) fs::remove(file);
             } catch (const fs::filesystem_error& e) {
                 log_warning(string_format("warning.remove_file_failed", file.string().c_str(), e.what()));
             }
         }
-        // Attempt to remove created directories, from deepest to shallowest
+        
+        // 2. Restore backups
+        for (const auto& backup : backups) {
+            try {
+                fs::rename(backup.second, backup.first);
+            } catch (const fs::filesystem_error& e) {
+                log_error("Failed to restore backup " + backup.second.string() + " to " + backup.first.string() + ": " + e.what());
+            }
+        }
+        // Cleanup remaining backups (if any restore failed, we might still have them, but we try to restore all)
+        // Note: The loop above tries to restore. 
+
+        // 3. Remove created directories
         std::vector<fs::path> sorted_dirs(created_dirs_for_rollback.begin(), created_dirs_for_rollback.end());
         std::sort(sorted_dirs.rbegin(), sorted_dirs.rend());
         for (const auto& dir : sorted_dirs) {
@@ -400,7 +428,7 @@ void InstallationTask::copy_package_files() {
             }
         }
     };
-    std::unique_ptr<const void, decltype(rollback)> rollback_guard(nullptr, rollback);
+    std::unique_ptr<const void, decltype(rollback)> rollback_guard(this, rollback);
 
     while (files_list >> src >> dest) {
         const fs::path src_path = tmp_pkg_dir_ / "content" / src;
@@ -432,13 +460,39 @@ void InstallationTask::copy_package_files() {
         }
 
         try {
+            // Backup if exists
+            if (fs::exists(physical_dest_path) && !fs::is_directory(physical_dest_path)) {
+                fs::path backup_path = physical_dest_path;
+                backup_path += ".lpkg_bak";
+                fs::copy_file(physical_dest_path, backup_path, fs::copy_options::overwrite_existing); // copy first to be safe, or rename?
+                // Rename is atomic on same FS. Copy+Delete is safer if rename fails?
+                // Let's use rename if possible, but fallback to copy.
+                // Actually, standard upgrade safety usually involves: 
+                // 1. Write new file to .tmp
+                // 2. fsync
+                // 3. Rename old to .bak
+                // 4. Rename .tmp to new
+                // For now, simpler: Rename existing to .bak
+                fs::rename(physical_dest_path, backup_path);
+                backups.emplace_back(physical_dest_path, backup_path);
+            }
+            
             fs::copy(src_path, physical_dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing | fs::copy_options::copy_symlinks);
             file_count++;
-            installed_files.push_back(logical_dest_path); // Store logical path for DB
+            installed_files.push_back(physical_dest_path); // For rollback
+            // We need to keep track of logical paths for the database
         } catch (const fs::filesystem_error& e) {
             throw LpkgException(string_format("error.copy_failed_rollback", src_path.string().c_str(), physical_dest_path.string().c_str(), e.what()));
         }
     }
+    
+    // Success: Remove backups
+    for (const auto& backup : backups) {
+        std::error_code ec;
+        fs::remove(backup.second, ec);
+    }
+    rollback_guard.release(); // Cancel rollback
+
     log_info(string_format("info.copy_complete", file_count));
 
     // Now register the copied files for this package
@@ -446,9 +500,18 @@ void InstallationTask::copy_package_files() {
     if (!pkg_files.is_open()) {
         throw LpkgException(string_format("error.create_file_failed", (FILES_DIR / (pkg_name_ + ".txt")).string().c_str()));
     }
-    for(const auto& file : installed_files) {
-        pkg_files << file.string() << "\n";
+    
+    // Re-iterate to save logical paths, or we should have saved them.
+    // Iterating files_list again is safe since we just read it.
+    {
+        std::ifstream files_list_again(tmp_pkg_dir_ / "files.txt");
+        std::string s, d;
+        while (files_list_again >> s >> d) {
+             fs::path logical = fs::path(d) / s;
+             pkg_files << logical.string() << "\n";
+        }
     }
+
     std::ofstream dirs_file(FILES_DIR / (pkg_name_ + ".dirs"));
     if (!dirs_file.is_open()) {
         throw LpkgException(string_format("error.create_file_failed", (FILES_DIR / (pkg_name_ + ".dirs")).string().c_str()));
@@ -580,16 +643,63 @@ std::unordered_set<std::string> get_all_required_packages() {
     return required;
 }
 
+#include <sys/wait.h> // for waitpid
+
 void run_hook(const std::string& pkg_name, const std::string& hook_name) {
     fs::path hook_path = HOOKS_DIR / pkg_name / hook_name;
     if (fs::exists(hook_path) && fs::is_regular_file(hook_path)) {
         log_info(string_format("info.running_hook", hook_name.c_str()));
-        int ret = std::system(hook_path.c_str());
-        if (ret != 0) {
-            log_warning(string_format("warning.hook_failed_exec", hook_name.c_str(), std::to_string(ret)));
+
+        // Check if we need chroot
+        bool use_chroot = false;
+        if (ROOT_DIR != "/" && !ROOT_DIR.empty()) {
+            use_chroot = true;
+        }
+
+        if (use_chroot) {
+            // Need to fork to chroot safely
+            pid_t pid = fork();
+            if (pid == -1) {
+                log_warning("Failed to fork for hook execution: " + std::string(strerror(errno)));
+                return;
+            } else if (pid == 0) {
+                // Child
+                if (chroot(ROOT_DIR.c_str()) != 0) {
+                    std::cerr << "Failed to chroot to " << ROOT_DIR << ": " << strerror(errno) << std::endl;
+                    _exit(1);
+                }
+                if (chdir("/") != 0) {
+                     std::cerr << "Failed to chdir to /: " << strerror(errno) << std::endl;
+                     _exit(1);
+                }
+                // Hook path inside chroot (HOOKS_DIR is logical path relative to config, but config is rebased in set_root_path)
+                // Wait, HOOKS_DIR variable in config.cpp is absolute path including ROOT_DIR.
+                // We need the path relative to ROOT_DIR for execution inside chroot.
+                fs::path hook_rel = fs::relative(hook_path, ROOT_DIR);
+                // Prepend / to make it absolute in chroot
+                std::string hook_cmd = "/" + hook_rel.string();
+                
+                execl("/bin/sh", "sh", "-c", hook_cmd.c_str(), (char*)NULL);
+                std::cerr << "Failed to exec hook: " << strerror(errno) << std::endl;
+                _exit(1);
+            } else {
+                // Parent
+                int status;
+                waitpid(pid, &status, 0);
+                if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
+                     log_warning(string_format("warning.hook_failed_exec", hook_name.c_str(), std::to_string(WEXITSTATUS(status))));
+                }
+            }
+        } else {
+            // Normal execution
+            int ret = std::system(hook_path.c_str());
+            if (ret != 0) {
+                log_warning(string_format("warning.hook_failed_exec", hook_name.c_str(), std::to_string(ret)));
+            }
         }
     }
 }
+
 
 // --- New installation logic helpers ---
 
@@ -599,7 +709,9 @@ struct InstallPlan {
     std::string actual_version;
     bool is_explicit = false;
     fs::path tmp_dir;
-    fs::path local_path; // Added to plan
+    fs::path local_path;
+    std::string sha256;
+    std::vector<DependencyInfo> dependencies; // Pre-resolved dependencies from repo
 };
 
 void resolve_package_dependencies(
@@ -607,7 +719,8 @@ void resolve_package_dependencies(
     std::map<std::string, InstallPlan>& plan,
     std::vector<std::string>& install_order,
     std::set<std::string>& visited_stack,
-    const std::map<std::string, fs::path>& local_candidates) // Added param
+    const std::map<std::string, fs::path>& local_candidates,
+    Repository& repo) // Added repo param
 {
     if (visited_stack.count(pkg_name)) {
         log_warning(string_format("warning.circular_dependency", visited_stack.rbegin()->c_str(), pkg_name.c_str()));
@@ -624,42 +737,68 @@ void resolve_package_dependencies(
     // Check local candidates
     fs::path local_path;
     std::string latest_version;
+    std::vector<DependencyInfo> deps;
+    std::string pkg_hash;
+    
     auto it = local_candidates.find(pkg_name);
     if (it != local_candidates.end()) {
         local_path = it->second;
-        // If local, we can't easily check version without opening it.
-        // For now, assume local version satisfies requirement or is what the user wants.
-        // We extracted version from filename in install_packages, we should pass it here?
-        // Actually, if it's local, version_spec passed here might be "latest" or specific.
-        // The local candidate key is the name.
-        // We'll trust the local candidate is the right one.
-        // But wait, InstallPlan needs actual_version.
-        // We can parse it from filename again or pass it in local_candidates?
-        // local_candidates map: name -> path.
-        // We need to parse filename again to get version for the plan.
         auto name_ver = parse_package_filename(local_path.filename().string());
         latest_version = name_ver.second;
-    } else {
-        if (version_spec == "latest") {
-            try {
-                latest_version = get_latest_version(pkg_name);
-            } catch (const LpkgException& e) {
-                log_warning(string_format("warning.get_latest_version_failed", pkg_name.c_str(), e.what()));
-                return;
+        
+        // For local files, we MUST extract to find dependencies (no index)
+        // We create a temp task just to extract deps.txt
+        // Or we just extract deps.txt manually.
+        // Let's use InstallationTask but stop after extract.
+        std::vector<std::string> dummy;
+        InstallationTask task(pkg_name, latest_version, false, dummy, "", local_path);
+        // task.prepare() downloads and extracts. We only need extract.
+        // Local path logic in prepare() handles local file.
+        // But prepare() calls resolve_dependencies() which we are currently IN.
+        // So we should only call task.extract_and_validate_package().
+        // But constructor initializes tmp_pkg_dir.
+        task.download_and_verify_package(); // copies/verifies local file
+        task.extract_and_validate_package();
+        
+        // Read deps.txt
+        std::ifstream deps_file(task.tmp_pkg_dir_ / "deps.txt");
+        std::string line;
+        while (std::getline(deps_file, line)) {
+            if (line.empty()) continue;
+            if (line.back() == '\r') line.pop_back();
+            std::stringstream ss(line);
+            std::string dep_name, op, req_ver;
+            if (ss >> dep_name) {
+                DependencyInfo d;
+                d.name = dep_name;
+                if (ss >> op >> req_ver) {
+                    d.op = op;
+                    d.version_req = req_ver;
+                }
+                deps.push_back(d);
             }
-        } else {
-            latest_version = version_spec;
         }
+        
+    } else {
+        // Remote resolution using Repository
+        std::optional<PackageInfo> pkg_info;
+        if (version_spec == "latest") {
+            pkg_info = repo.find_package(pkg_name);
+        } else {
+            pkg_info = repo.find_package(pkg_name, version_spec);
+        }
+        
+        if (!pkg_info) {
+             log_warning("Package not found in repository: " + pkg_name);
+             return; // Or throw?
+        }
+        
+        latest_version = pkg_info->version;
+        pkg_hash = pkg_info->sha256;
+        deps = pkg_info->dependencies;
     }
 
     if (!installed_version.empty() && !version_compare(installed_version, latest_version)) {
-        // Even if installed, if explicit local file is provided, maybe force reinstall?
-        // Current logic: skip if up to date.
-        // If local file is provided, we usually intend to install IT.
-        // But if versions match, maybe skip.
-        // Let's stick to standard behavior: if installed version >= candidate, skip.
-        // Unless it's explicit? User might want to reinstall same version.
-        // For now, keep existing logic.
         return; 
     }
 
@@ -670,50 +809,31 @@ void resolve_package_dependencies(
     pkg_plan.version_spec = version_spec;
     pkg_plan.actual_version = latest_version;
     pkg_plan.is_explicit = is_explicit;
-    pkg_plan.tmp_dir = get_tmp_dir() / pkg_name;
+    pkg_plan.tmp_dir = get_tmp_dir() / pkg_name; // Note: this path might change if we don't download yet
     pkg_plan.local_path = local_path;
+    pkg_plan.sha256 = pkg_hash;
+    pkg_plan.dependencies = deps;
 
-    ensure_dir_exists(pkg_plan.tmp_dir);
-
-    InstallationTask task(pkg_name, latest_version, is_explicit, install_order, "", local_path);
-    task.download_and_verify_package();
-    task.extract_and_validate_package();
-
-    std::ifstream deps_file(pkg_plan.tmp_dir / "deps.txt");
-    std::string line;
-    while (std::getline(deps_file, line)) {
-        if (line.empty()) continue;
-        if (line.back() == '\r') line.pop_back();
-
-        std::stringstream ss(line);
-        std::string dep_name;
-        if (!(ss >> dep_name)) continue;
+    // Recursive resolution
+    for (const auto& dep : deps) {
+        // Check constraints
+        bool has_constraint = !dep.op.empty();
         
-        std::string op, req_ver;
-        bool has_constraint = false;
-        if (ss >> op >> req_ver) {
-            has_constraint = true;
-        }
-        
-        // Check if installed version satisfies constraint
         if (has_constraint) {
-                std::string installed_dep_ver = get_installed_version(dep_name);
-                // std::cout << "DEBUG: Checking " << dep_name << " installed=" << installed_dep_ver << " req=" << op << " " << req_ver << std::endl;
+                std::string installed_dep_ver = get_installed_version(dep.name);
                 if (!installed_dep_ver.empty() && installed_dep_ver != "virtual") {
-                    bool sat = version_satisfies(installed_dep_ver, op, req_ver);
-                    // std::cout << "DEBUG: Satisfied? " << sat << std::endl;
+                    bool sat = version_satisfies(installed_dep_ver, dep.op, dep.version_req);
                     if (!sat) {
-                        throw LpkgException("Installed dependency " + dep_name + " version " + installed_dep_ver + " does not satisfy constraint " + op + " " + req_ver);
+                        throw LpkgException("Installed dependency " + dep.name + " version " + installed_dep_ver + " does not satisfy constraint " + dep.op + " " + dep.version_req);
                     }
                 }
         }
 
-        resolve_package_dependencies(dep_name, "latest", false, plan, install_order, visited_stack, local_candidates);
+        resolve_package_dependencies(dep.name, "latest", false, plan, install_order, visited_stack, local_candidates, repo);
         
-        // Check if the candidate we just resolved (if not installed) satisfies constraint
-        if (has_constraint && plan.count(dep_name)) {
-                if (!version_satisfies(plan[dep_name].actual_version, op, req_ver)) {
-                    throw LpkgException("Candidate dependency " + dep_name + " version " + plan[dep_name].actual_version + " does not satisfy constraint " + op + " " + req_ver);
+        if (has_constraint && plan.count(dep.name)) {
+                if (!version_satisfies(plan[dep.name].actual_version, dep.op, dep.version_req)) {
+                    throw LpkgException("Candidate dependency " + dep.name + " version " + plan[dep.name].actual_version + " does not satisfy constraint " + dep.op + " " + dep.version_req);
                 }
         }
     }
@@ -725,10 +845,25 @@ void resolve_package_dependencies(
 
 void commit_package_installation(const InstallPlan& plan) {
     std::vector<std::string> dummy_path;
-    InstallationTask task(plan.name, plan.actual_version, plan.is_explicit, dummy_path, get_installed_version(plan.name), plan.local_path);
-    task.check_for_file_conflicts();
+    InstallationTask task(plan.name, plan.actual_version, plan.is_explicit, dummy_path, get_installed_version(plan.name), plan.local_path, plan.sha256);
+    
+    // Check if we need to download/prepare (if not local)
+    // resolve_package_dependencies didn't download if it was remote.
+    // So we need to call prepare() or parts of it.
+    // InstallationTask::run() calls prepare().
+    // prepare() downloads and extracts.
+    
+    task.prepare(); // This will download (using hash if provided) and extract.
+    // Note: resolve_dependencies() inside prepare() might re-check things, but since we already planned, maybe we should skip it?
+    // task.prepare() calls:
+    // download_and_verify_package(); -> uses hash
+    // extract_and_validate_package();
+    // resolve_dependencies(); -> checks deps.txt. Safe to run again, just verifies.
+    // check_for_file_conflicts();
+    
     task.commit();
 }
+
 
 void rollback_installed_package(const std::string& pkg_name, const std::string& version) {
     log_info(string_format("info.rolling_back", pkg_name.c_str()));
@@ -764,6 +899,14 @@ void install_packages(const std::vector<std::string>& pkg_args) {
 
     TmpDirManager tmp_manager;
     log_info(get_string("info.resolving_dependencies"));
+
+    // Initialize Repository
+    Repository repo;
+    try {
+        repo.load_index();
+    } catch (const std::exception& e) {
+        log_warning("Failed to load repository index: " + std::string(e.what()) + ". Remote resolution might fail.");
+    }
 
     std::map<std::string, InstallPlan> plan;
     std::vector<std::string> install_order;
@@ -802,8 +945,9 @@ void install_packages(const std::vector<std::string>& pkg_args) {
 
     for (const auto& target : targets) {
         std::set<std::string> visited_stack;
-        resolve_package_dependencies(target.first, target.second, true, plan, install_order, visited_stack, local_candidates);
+        resolve_package_dependencies(target.first, target.second, true, plan, install_order, visited_stack, local_candidates, repo);
     }
+
 
     if (plan.empty()) {
         log_info(get_string("info.all_packages_already_installed"));
@@ -1092,13 +1236,19 @@ void upgrade_packages() {
     log_info(get_string("info.checking_upgradable"));
     TmpDirManager tmp_manager;
     int upgraded_count = 0;
-    std::vector<std::tuple<std::string, std::string, std::string>> upgradable_pkgs;
-    std::vector<std::future<std::string>> futures;
-    std::vector<std::pair<std::string, std::string>> installed_packages_info;
+    std::vector<std::tuple<std::string, std::string, std::string>> upgradable_pkgs; // name, current, latest
 
+    // Initialize Repository
+    Repository repo;
+    try {
+        repo.load_index();
+    } catch (const std::exception& e) {
+        log_warning("Failed to load repository index: " + std::string(e.what()) + ". Upgrade check might require individual requests or fail.");
+    }
+
+    std::vector<std::pair<std::string, std::string>> installed_packages_info;
     auto& cache = get_cache();
     std::unique_lock<std::mutex> lock(cache.mtx);
-    // Collect package info first to avoid race conditions with cache modifications
     for (const auto& pkg_record : cache.pkgs) {
         size_t pos = pkg_record.find(':');
         if (pos != std::string::npos) {
@@ -1110,30 +1260,25 @@ void upgrade_packages() {
     for (const auto& pkg_info : installed_packages_info) {
         const std::string& pkg_name = pkg_info.first;
         const std::string& current_version = pkg_info.second;
-
-        futures.push_back(std::async(std::launch::async, [pkg_name, current_version] {
-            try {
-                std::string latest_version = get_latest_version(pkg_name);
-                if (version_compare(current_version, latest_version)) {
-                    return pkg_name + ":" + current_version + ":" + latest_version;
-                }
+        
+        std::string latest_version;
+        // Try repository first
+        auto pkg_opt = repo.find_package(pkg_name);
+        if (pkg_opt) {
+            latest_version = pkg_opt->version;
+        } else {
+            // Fallback to old method (slow)
+             try {
+                latest_version = get_latest_version(pkg_name);
             } catch (const std::exception& e) {
                 log_warning(string_format("warning.get_latest_version_failed", pkg_name.c_str(), e.what()));
+                continue;
             }
-            return std::string();
-        }));
-    }
+        }
 
-    for (auto& fut : futures) {
-        std::string result = fut.get();
-        if (!result.empty()) {
-            size_t pos1 = result.find(':');
-            size_t pos2 = result.rfind(':');
-            std::string pkg_name = result.substr(0, pos1);
-            std::string current_version = result.substr(pos1 + 1, pos2 - pos1 - 1);
-            std::string latest_version = result.substr(pos2 + 1);
-            log_info(string_format("info.upgradable_found", pkg_name.c_str(), current_version.c_str(), latest_version.c_str()));
-            upgradable_pkgs.emplace_back(pkg_name, current_version, latest_version);
+        if (version_compare(current_version, latest_version)) {
+             log_info(string_format("info.upgradable_found", pkg_name.c_str(), current_version.c_str(), latest_version.c_str()));
+             upgradable_pkgs.emplace_back(pkg_name, current_version, latest_version);
         }
     }
 
@@ -1147,15 +1292,25 @@ void upgrade_packages() {
             log_info(string_format("info.upgrading_package", pkg_name.c_str(), current_version.c_str(), latest_version.c_str()));
             bool was_manually_installed = is_manually_installed(pkg_name);
 
+            // Use resolve_package_dependencies logic (InstallPlan) instead of direct do_install 
+            // to ensure deps are updated/checked too.
+            // But for now, sticking to do_install but passing hash if known from repo?
+            // do_install calls InstallationTask.
+            // We can pass expected hash if we have it.
+            std::string expected_hash;
+            auto pkg_opt = repo.find_package(pkg_name);
+            if (pkg_opt && pkg_opt->version == latest_version) {
+                expected_hash = pkg_opt->sha256;
+            }
+
             std::vector<std::string> install_path;
-            // Pass current_version as old_version_to_replace_ to InstallationTask
-            do_install(pkg_name, latest_version, was_manually_installed, install_path, current_version);
+            InstallationTask task(pkg_name, latest_version, was_manually_installed, install_path, current_version, "", expected_hash);
+            task.run();
+            
             write_cache();
             upgraded_count++;
         } catch (const LpkgException& e) {
             log_error(string_format("error.upgrade_failed", pkg_name.c_str(), e.what()));
-            // The do_install function now handles rollback for failed installations/upgrades
-            // No need for explicit restore here unless the do_install itself fails fatally
         }
     }
 
