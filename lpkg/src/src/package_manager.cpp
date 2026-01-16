@@ -115,41 +115,6 @@ void run_hook(const std::string& pkg_name, const std::string& hook_name);
 
 // --- Helper Functions ---
 
-struct Dependency {
-    std::string name;
-    std::string op;
-    std::string version;
-    bool has_constraint = false;
-};
-
-std::vector<Dependency> parse_dependencies(const fs::path& deps_path) {
-    std::vector<Dependency> deps;
-    std::ifstream file(deps_path);
-    if (!file.is_open()) {
-        std::cerr << "DEBUG: Could not open deps file: " << deps_path << std::endl;
-        return deps;
-    }
-
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        if (line.back() == '\r') line.pop_back();
-
-        std::stringstream ss(line);
-        std::string name;
-        if (!(ss >> name)) continue;
-
-        Dependency dep;
-        dep.name = name;
-        if (ss >> dep.op >> dep.version) {
-            dep.has_constraint = true;
-        }
-        // std::cout << "DEBUG: Parsed dep: " << dep.name << " constraint=" << dep.has_constraint << std::endl;
-        deps.push_back(dep);
-    }
-    return deps;
-}
-
 // In get_cache, we might need a way to force reload for tests or ensure consistency
 void force_reload_cache() {
     auto& cache = get_cache();
