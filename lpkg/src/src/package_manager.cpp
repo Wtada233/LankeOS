@@ -113,6 +113,50 @@ std::string get_installed_version(const std::string& pkg_name);
 bool is_manually_installed(const std::string& pkg_name);
 void run_hook(const std::string& pkg_name, const std::string& hook_name);
 
+// --- Helper Functions ---
+
+struct Dependency {
+    std::string name;
+    std::string op;
+    std::string version;
+    bool has_constraint = false;
+};
+
+std::vector<Dependency> parse_dependencies(const fs::path& deps_path) {
+    std::vector<Dependency> deps;
+    std::ifstream file(deps_path);
+    if (!file.is_open()) {
+        std::cerr << "DEBUG: Could not open deps file: " << deps_path << std::endl;
+        return deps;
+    }
+
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        if (line.back() == '\r') line.pop_back();
+
+        std::stringstream ss(line);
+        std::string name;
+        if (!(ss >> name)) continue;
+
+        Dependency dep;
+        dep.name = name;
+        if (ss >> dep.op >> dep.version) {
+            dep.has_constraint = true;
+        }
+        // std::cout << "DEBUG: Parsed dep: " << dep.name << " constraint=" << dep.has_constraint << std::endl;
+        deps.push_back(dep);
+    }
+    return deps;
+}
+
+// In get_cache, we might need a way to force reload for tests or ensure consistency
+void force_reload_cache() {
+    auto& cache = get_cache();
+    std::lock_guard<std::mutex> lock(cache.mtx);
+    cache.load();
+}
+
 // --- Other Helper Functions ---
 std::string get_installed_version(const std::string& pkg_name) {
     auto& cache = get_cache();
@@ -125,8 +169,6 @@ std::string get_installed_version(const std::string& pkg_name) {
     }
     // Check virtual packages
     if (cache.providers.count(pkg_name)) {
-        // It is provided. Return a placeholder version or the version of the provider?
-        // For simple dependency satisfaction, returning "virtual" is enough to indicate it's present.
         return "virtual";
     }
     return "";
@@ -148,6 +190,7 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version, bo
       explicit_install_(explicit_install),
       install_path_(install_path),
       tmp_pkg_dir_(get_tmp_dir() / pkg_name_),
+      actual_version_(version_), // Initialize actual_version_ with version_
       old_version_to_replace_(std::move(old_version_to_replace)),
       local_package_path_(std::move(local_package_path)) {}
 
@@ -606,11 +649,6 @@ void resolve_package_dependencies(
         return;
     }
     
-    // DEBUG: PROVE WE ARE RUNNING NEW CODE
-    if (pkg_name == "app_bad") {
-         // std::cout << "DEBUG: resolving app_bad" << std::endl;
-    }
-    
     if (plan.count(pkg_name)) {
         if (is_explicit) plan.at(pkg_name).is_explicit = true;
         return;
@@ -695,8 +733,11 @@ void resolve_package_dependencies(
         // Check if installed version satisfies constraint
         if (has_constraint) {
                 std::string installed_dep_ver = get_installed_version(dep_name);
+                // std::cout << "DEBUG: Checking " << dep_name << " installed=" << installed_dep_ver << " req=" << op << " " << req_ver << std::endl;
                 if (!installed_dep_ver.empty() && installed_dep_ver != "virtual") {
-                    if (!version_satisfies(installed_dep_ver, op, req_ver)) {
+                    bool sat = version_satisfies(installed_dep_ver, op, req_ver);
+                    // std::cout << "DEBUG: Satisfied? " << sat << std::endl;
+                    if (!sat) {
                         throw LpkgException("Installed dependency " + dep_name + " version " + installed_dep_ver + " does not satisfy constraint " + op + " " + req_ver);
                     }
                 }
@@ -750,7 +791,12 @@ void install_package(const std::string& pkg_name, const std::string& version) {
     do_install(pkg_name, version, true, install_path, "");
 }
 
+// ...
+
 void install_packages(const std::vector<std::string>& pkg_args) {
+    // Force cache reload to handle consecutive calls in the same process (e.g. tests)
+    force_reload_cache();
+
     TmpDirManager tmp_manager;
     log_info(get_string("info.resolving_dependencies"));
 
