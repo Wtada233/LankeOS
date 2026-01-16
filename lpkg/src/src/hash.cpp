@@ -9,6 +9,8 @@
 #include <memory>
 #include <sstream>
 
+namespace fs = std::filesystem;
+
 // Custom deleter for EVP_MD_CTX
 struct EvpMdCtxDeleter {
     void operator()(EVP_MD_CTX* ctx) const {

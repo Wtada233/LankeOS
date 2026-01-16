@@ -8,6 +8,8 @@
 
 #include <memory>
 
+namespace fs = std::filesystem;
+
 // Custom deleters for libarchive handles
 struct ArchiveReadDeleter {
     void operator()(struct archive* a) const {
