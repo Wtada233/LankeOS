@@ -277,21 +277,55 @@ void InstallationTask::extract_and_validate_package() {
 void InstallationTask::resolve_dependencies() {
     log_info(get_string("info.checking_deps"));
     std::ifstream deps_file(tmp_pkg_dir_ / "deps.txt");
-    std::string dep;
-    while (std::getline(deps_file, dep)) {
-        if (dep.empty()) continue;
+    std::string line;
+    while (std::getline(deps_file, line)) {
+        if (line.empty()) continue;
 
-        if (std::find(install_path_.begin(), install_path_.end(), dep) != install_path_.end()) {
-            log_warning(string_format("warning.circular_dependency", pkg_name_.c_str(), dep.c_str()));
+        std::stringstream ss(line);
+        std::string dep_name, op, req_ver;
+        ss >> dep_name;
+        
+        // Check for version constraints
+        bool has_constraint = false;
+        if (ss >> op >> req_ver) {
+            has_constraint = true;
+        }
+        
+        // DEBUG LOGGING
+        std::cerr << "DEBUG: Checking dep " << dep_name << " constraint: " << (has_constraint ? (op + " " + req_ver) : "none") << std::endl;
+
+        if (std::find(install_path_.begin(), install_path_.end(), dep_name) != install_path_.end()) {
+            log_warning(string_format("warning.circular_dependency", pkg_name_.c_str(), dep_name.c_str()));
             continue;
         }
 
-        log_info(string_format("info.dep_found", dep.c_str()));
-        if (get_installed_version(dep).empty()) {
-            log_info(string_format("info.dep_not_installed", dep.c_str()));
-            do_install(dep, "latest", false, install_path_, "");
+        log_info(string_format("info.dep_found", dep_name.c_str()));
+        std::string installed_ver = get_installed_version(dep_name);
+        
+        if (installed_ver.empty()) {
+            log_info(string_format("info.dep_not_installed", dep_name.c_str()));
+            // TODO: If remote, we could try to find a version matching requirement.
+            // For now, install latest and check later (or here if we had metadata).
+            do_install(dep_name, "latest", false, install_path_, "");
+            
+            // Re-check after install
+            installed_ver = get_installed_version(dep_name);
+            if (has_constraint && !installed_ver.empty() && installed_ver != "virtual") {
+                 if (!version_satisfies(installed_ver, op, req_ver)) {
+                     throw LpkgException("Dependency " + dep_name + " installed version " + installed_ver + " does not satisfy constraint " + op + " " + req_ver);
+                 }
+            }
         } else {
-            log_info(string_format("info.dep_already_installed", dep.c_str()));
+            log_info(string_format("info.dep_already_installed", dep_name.c_str()));
+            std::cerr << "DEBUG: Installed ver: " << installed_ver << " Constraint: " << has_constraint << std::endl;
+            if (has_constraint && installed_ver != "virtual") {
+                 bool sat = version_satisfies(installed_ver, op, req_ver);
+                 std::cerr << "DEBUG: Satisfies? " << sat << std::endl;
+                 if (!sat) {
+                     // TODO: Trigger upgrade if possible? For now, error out.
+                     throw LpkgException("Installed dependency " + dep_name + " version " + installed_ver + " does not satisfy constraint " + op + " " + req_ver);
+                 }
+            }
         }
     }
 }
@@ -571,6 +605,12 @@ void resolve_package_dependencies(
         log_warning(string_format("warning.circular_dependency", visited_stack.rbegin()->c_str(), pkg_name.c_str()));
         return;
     }
+    
+    // DEBUG: PROVE WE ARE RUNNING NEW CODE
+    if (pkg_name == "app_bad") {
+         // std::cout << "DEBUG: resolving app_bad" << std::endl;
+    }
+    
     if (plan.count(pkg_name)) {
         if (is_explicit) plan.at(pkg_name).is_explicit = true;
         return;
@@ -637,10 +677,38 @@ void resolve_package_dependencies(
     task.extract_and_validate_package();
 
     std::ifstream deps_file(pkg_plan.tmp_dir / "deps.txt");
-    std::string dep;
-    while (std::getline(deps_file, dep)) {
-        if (!dep.empty()) {
-            resolve_package_dependencies(dep, "latest", false, plan, install_order, visited_stack, local_candidates);
+    std::string line;
+    while (std::getline(deps_file, line)) {
+        if (line.empty()) continue;
+        if (line.back() == '\r') line.pop_back();
+
+        std::stringstream ss(line);
+        std::string dep_name;
+        if (!(ss >> dep_name)) continue;
+        
+        std::string op, req_ver;
+        bool has_constraint = false;
+        if (ss >> op >> req_ver) {
+            has_constraint = true;
+        }
+        
+        // Check if installed version satisfies constraint
+        if (has_constraint) {
+                std::string installed_dep_ver = get_installed_version(dep_name);
+                if (!installed_dep_ver.empty() && installed_dep_ver != "virtual") {
+                    if (!version_satisfies(installed_dep_ver, op, req_ver)) {
+                        throw LpkgException("Installed dependency " + dep_name + " version " + installed_dep_ver + " does not satisfy constraint " + op + " " + req_ver);
+                    }
+                }
+        }
+
+        resolve_package_dependencies(dep_name, "latest", false, plan, install_order, visited_stack, local_candidates);
+        
+        // Check if the candidate we just resolved (if not installed) satisfies constraint
+        if (has_constraint && plan.count(dep_name)) {
+                if (!version_satisfies(plan[dep_name].actual_version, op, req_ver)) {
+                    throw LpkgException("Candidate dependency " + dep_name + " version " + plan[dep_name].actual_version + " does not satisfy constraint " + op + " " + req_ver);
+                }
         }
     }
 
