@@ -66,8 +66,8 @@ int compare_pre_release_part(const std::vector<std::string>& p1, const std::vect
     for (size_t i = 0; i < min_len; ++i) {
         int res;
         int n1, n2;
-        bool is_num1 = !p1[i].empty() && std::all_of(p1[i].begin(), p1[i].end(), ::isdigit);
-        bool is_num2 = !p2[i].empty() && std::all_of(p2[i].begin(), p2[i].end(), ::isdigit);
+        bool is_num1 = !p1[i].empty() && std::all_of(p1[i].begin(), p1[i].end(), [](unsigned char c) { return std::isdigit(c); });
+        bool is_num2 = !p2[i].empty() && std::all_of(p2[i].begin(), p2[i].end(), [](unsigned char c) { return std::isdigit(c); });
 
         if (is_num1 && is_num2) {
             try {

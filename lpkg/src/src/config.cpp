@@ -30,7 +30,7 @@ fs::path PROVIDES_DB = fs::path(LPKG_CONF_DIR) / "files" / "provides.db";
 fs::path LOCK_FILE = fs::path(LPKG_LOCK_DIR) / "db.lck";
 
 void set_root_path(const std::string& root_path) {
-    ROOT_DIR = fs::path(root_path);
+    ROOT_DIR = fs::path(root_path).lexically_normal();
     if (ROOT_DIR.empty()) ROOT_DIR = "/";
 
     // Re-base paths relative to the new root

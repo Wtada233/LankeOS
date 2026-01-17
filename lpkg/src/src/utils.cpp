@@ -67,14 +67,17 @@ void log_error(std::string_view msg) {
 }
 
 void log_progress(const std::string& msg, double percentage, int bar_width) {
-    if (!tty_check_performed) {
-        is_stdout_tty = isatty(STDOUT_FILENO);
-        is_stderr_tty = isatty(STDERR_FILENO);
-        tty_check_performed = true;
-    }
+    {
+        std::lock_guard<std::mutex> lock(log_mutex);
+        if (!tty_check_performed) {
+            is_stdout_tty = isatty(STDOUT_FILENO);
+            is_stderr_tty = isatty(STDERR_FILENO);
+            tty_check_performed = true;
+        }
 
-    if (!is_stdout_tty) {
-        return;
+        if (!is_stdout_tty) {
+            return;
+        }
     }
 
     int pos = static_cast<int>(bar_width * percentage / 100.0);

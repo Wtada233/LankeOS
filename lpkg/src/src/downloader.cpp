@@ -58,6 +58,9 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
     curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &ofile);
     curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl.get(), CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT, 10L); // 10 seconds to connect
+    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_LIMIT, 100L); // 100 bytes/sec
+    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_TIME, 30L); // for 30 seconds before timing out
 
     if (show_progress) {
         curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
