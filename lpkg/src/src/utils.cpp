@@ -24,6 +24,7 @@ namespace fs = std::filesystem;
 
 namespace {
     NonInteractiveMode non_interactive_mode = NonInteractiveMode::INTERACTIVE;
+    bool force_overwrite_mode = false;
     std::mutex log_mutex;
     bool is_stdout_tty = false;
     bool is_stderr_tty = false;
@@ -97,6 +98,14 @@ void set_non_interactive_mode(NonInteractiveMode mode) {
 
 NonInteractiveMode get_non_interactive_mode() {
     return non_interactive_mode;
+}
+
+void set_force_overwrite_mode(bool enable) {
+    force_overwrite_mode = enable;
+}
+
+bool get_force_overwrite_mode() {
+    return force_overwrite_mode;
 }
 
 bool user_confirms(const std::string& prompt) {

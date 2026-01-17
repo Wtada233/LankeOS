@@ -79,6 +79,10 @@ int main(int argc, char* argv[]) {
             set_architecture(result["arch"].as<std::string>());
         }
 
+        if (result.count("force-overwrite")) {
+            set_force_overwrite_mode(result["force-overwrite"].as<bool>());
+        }
+
         if (result.count("non-interactive")) {
             std::string value = result["non-interactive"].as<std::string>();
             if (value == "y" || value == "Y") {

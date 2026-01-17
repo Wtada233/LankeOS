@@ -460,7 +460,9 @@ void InstallationTask::check_for_file_conflicts() {
             if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
                 // 如果数据库没记录但物理文件存在，标记为 "unknown"
                 if (it == cache.file_db.end()) {
-                    conflicts[path_str] = "unknown (manual file)";
+                    if (!get_force_overwrite_mode()) {
+                        conflicts[path_str] = "unknown (manual file)";
+                    }
                 }
             }
         }

@@ -29,6 +29,9 @@ enum class NonInteractiveMode {
 void set_non_interactive_mode(NonInteractiveMode mode);
 NonInteractiveMode get_non_interactive_mode();
 
+void set_force_overwrite_mode(bool enable);
+bool get_force_overwrite_mode();
+
 bool user_confirms(const std::string& prompt);
 
 // System checks
