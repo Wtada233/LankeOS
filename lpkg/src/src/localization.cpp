@@ -18,11 +18,12 @@ namespace {
 
     fs::path get_executable_dir() {
         char result[PATH_MAX];
-        ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+        ssize_t count = readlink("/proc/self/exe", result, PATH_MAX - 1);
         if (count != -1) {
+            result[count] = '\0';
             return fs::path(result).parent_path();
         } else {
-            log_warning("Could not determine executable path via /proc/self/exe. Falling back to current working directory. Localization might be incorrect if not run from install location.");
+            log_warning(get_string("warning.exe_path_determination_failed"));
             return fs::current_path(); // Fallback, though less reliable
         }
     }
@@ -33,7 +34,7 @@ void load_strings(const std::string& lang, const fs::path& base_dir) {
     std::ifstream file(file_path);
     if (!file.is_open()) {
         if (lang != "en") { // Avoid infinite recursion
-            log_warning("Could not open localization file for " + lang + ", falling back to English.");
+            log_warning(string_format("warning.l10n_load_failed", lang.c_str()));
             load_strings("en", base_dir); // Try English with the same base_dir
         }
         return;

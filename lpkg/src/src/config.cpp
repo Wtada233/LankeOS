@@ -23,6 +23,7 @@ fs::path DEP_DIR = fs::path(LPKG_CONF_DIR) / "deps/";
 fs::path FILES_DIR = fs::path(LPKG_CONF_DIR) / "files/";
 fs::path PKGS_FILE = fs::path(LPKG_CONF_DIR) / "pkgs";
 fs::path HOLDPKGS_FILE = fs::path(LPKG_CONF_DIR) / "holdpkgs";
+fs::path ESSENTIAL_FILE = fs::path(LPKG_CONF_DIR) / "essential";
 fs::path MIRROR_CONF = fs::path(LPKG_CONF_DIR) / "mirror.conf";
 fs::path FILES_DB = fs::path(LPKG_CONF_DIR) / "files" / "files.db";
 fs::path PROVIDES_DB = fs::path(LPKG_CONF_DIR) / "files" / "provides.db";
@@ -53,6 +54,7 @@ void set_root_path(const std::string& root_path) {
     FILES_DIR = CONFIG_DIR / "files/";
     PKGS_FILE = CONFIG_DIR / "pkgs";
     HOLDPKGS_FILE = CONFIG_DIR / "holdpkgs";
+    ESSENTIAL_FILE = CONFIG_DIR / "essential";
     MIRROR_CONF = CONFIG_DIR / "mirror.conf";
     FILES_DB = FILES_DIR / "files.db";
     PROVIDES_DB = FILES_DIR / "provides.db";
@@ -74,6 +76,7 @@ void init_filesystem() {
     ensure_dir_exists(LOCK_DIR);
     ensure_file_exists(PKGS_FILE);
     ensure_file_exists(HOLDPKGS_FILE);
+    ensure_file_exists(ESSENTIAL_FILE);
     ensure_file_exists(FILES_DB);
     ensure_file_exists(PROVIDES_DB);
 }

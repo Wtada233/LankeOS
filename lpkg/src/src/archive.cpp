@@ -38,7 +38,15 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     archive_read_support_format_all(a.get());
 
     ArchiveWriteHandle ext(archive_write_disk_new());
-    archive_write_disk_set_options(ext.get(), ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_ACL | ARCHIVE_EXTRACT_FFLAGS);
+    archive_write_disk_set_options(ext.get(), 
+        ARCHIVE_EXTRACT_TIME | 
+        ARCHIVE_EXTRACT_PERM | 
+        ARCHIVE_EXTRACT_ACL | 
+        ARCHIVE_EXTRACT_FFLAGS | 
+        ARCHIVE_EXTRACT_SECURE_SYMLINKS | 
+        ARCHIVE_EXTRACT_SECURE_NODOTDOT | 
+        ARCHIVE_EXTRACT_UNLINK
+    );
     archive_write_disk_set_standard_lookup(ext.get());
 
     if (archive_read_open_filename(a.get(), archive_path.c_str(), 10240) != ARCHIVE_OK) {
@@ -95,4 +103,32 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     if (r != ARCHIVE_EOF) {
         throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + archive_error_string(a.get()));
     }
+}
+
+std::string extract_file_from_archive(const fs::path& archive_path, const std::string& internal_path) {
+    ArchiveReadHandle a(archive_read_new());
+    archive_read_support_filter_all(a.get());
+    archive_read_support_format_all(a.get());
+
+    if (archive_read_open_filename(a.get(), archive_path.c_str(), 10240) != ARCHIVE_OK) {
+        throw LpkgException(string_format("error.open_file_failed", archive_path.string()) + ": " + archive_error_string(a.get()));
+    }
+
+    struct archive_entry* entry;
+    while (archive_read_next_header(a.get(), &entry) == ARCHIVE_OK) {
+        std::string path = archive_entry_pathname(entry);
+        // Remove leading ./ if present
+        if (path.starts_with("./")) path = path.substr(2);
+
+        if (path == internal_path) {
+            size_t size = archive_entry_size(entry);
+            std::string content;
+            content.resize(size);
+            archive_read_data(a.get(), content.data(), size);
+            return content;
+        }
+        archive_read_data_skip(a.get());
+    }
+
+    return "";
 }
