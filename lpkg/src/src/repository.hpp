@@ -24,6 +24,7 @@ public:
     void load_index();
     std::optional<PackageInfo> find_package(const std::string& name);
     std::optional<PackageInfo> find_package(const std::string& name, const std::string& version); // exact match
+    std::optional<PackageInfo> find_best_matching_version(const std::string& name, const std::string& op, const std::string& version_req);
     std::optional<PackageInfo> find_provider(const std::string& capability);
 
 private:

@@ -11,6 +11,8 @@
 #include <algorithm>
 
 void Repository::load_index() {
+    packages_.clear();
+    providers_.clear();
     std::string mirror = get_mirror_url();
     std::string arch = get_architecture();
     
@@ -126,6 +128,19 @@ std::optional<PackageInfo> Repository::find_package(const std::string& name, con
     if (packages_.find(name) == packages_.end()) return std::nullopt;
     for (const auto& pkg : packages_[name]) {
         if (pkg.version == version) return pkg;
+    }
+    return std::nullopt;
+}
+
+std::optional<PackageInfo> Repository::find_best_matching_version(const std::string& name, const std::string& op, const std::string& version_req) {
+    auto it = packages_.find(name);
+    if (it == packages_.end() || it->second.empty()) return std::nullopt;
+
+    // Versions are already sorted in load_index, iterate from highest to lowest
+    for (auto rit = it->second.rbegin(); rit != it->second.rend(); ++rit) {
+        if (version_satisfies(rit->version, op, version_req)) {
+            return *rit;
+        }
     }
     return std::nullopt;
 }

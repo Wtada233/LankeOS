@@ -67,7 +67,7 @@ void init_localization() {
     } else if (fs::exists(src_l10n_dir) && fs::is_directory(src_l10n_dir)) {
         load_strings(lang, src_l10n_dir);
     } else {
-        load_strings(lang, LPKG_L10N_DIR); // Fallback to installed path
+        load_strings(lang, L10N_DIR); // Fallback to installed path
     }
 }
 

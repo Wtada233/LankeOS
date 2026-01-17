@@ -12,8 +12,7 @@ std::string string_format(const std::string& key, Args&&... args) {
     try {
         return std::vformat(get_string(key), std::make_format_args(args...));
     } catch (const std::format_error& e) {
-        // In case of a format error (e.g., mismatch between format string and arguments),
-        // return a descriptive error message. This is much safer than the C-style snprintf.
-        return string_format("error.formatting_error", key.c_str(), e.what());
+        // In case of a format error, return a descriptive error message without recursion.
+        return "Lpkg Formatting Error [key: " + key + "]: " + e.what();
     }
 }
