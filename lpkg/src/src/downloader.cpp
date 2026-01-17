@@ -86,7 +86,7 @@ void download_with_retries(const std::string& url, const fs::path& output_path, 
         } catch (const LpkgException& e) {
             fs::remove(output_path); // Clean up failed download
             if (i < max_retries - 1) {
-                log_warning(std::string(e.what()) + ". Retrying...");
+                log_warning(string_format("info.retrying", e.what()));
             } else {
                 throw; // Rethrow on last attempt
             }

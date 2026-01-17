@@ -24,7 +24,9 @@ public:
     void load_index();
     std::optional<PackageInfo> find_package(const std::string& name);
     std::optional<PackageInfo> find_package(const std::string& name, const std::string& version); // exact match
+    std::optional<PackageInfo> find_provider(const std::string& capability);
 
 private:
     std::unordered_map<std::string, std::vector<PackageInfo>> packages_; // name -> list of versions
+    std::unordered_map<std::string, std::vector<std::string>> providers_; // capability -> list of package names
 };

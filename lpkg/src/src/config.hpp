@@ -16,6 +16,7 @@ extern std::filesystem::path DEP_DIR;
 extern std::filesystem::path FILES_DIR;
 extern std::filesystem::path PKGS_FILE;
 extern std::filesystem::path HOLDPKGS_FILE;
+extern std::filesystem::path ESSENTIAL_FILE;
 extern std::filesystem::path MIRROR_CONF;
 extern std::filesystem::path FILES_DB;
 extern std::filesystem::path PROVIDES_DB;

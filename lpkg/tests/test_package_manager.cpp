@@ -231,10 +231,19 @@ TEST_F(PackageManagerTest, VersionConstraints) {
     }
     install_packages({"lib-1.0.tar.zst"});
     
-    // Verify lib is installed
-    // We don't have direct access to check "installed version" from public API easily in tests without linking everything.
-    // But we can check if file exists if we added one. 
-    // We didn't add files to lib pkg.
+    // Verify lib is installed by checking the pkgs file manually
+    {
+        std::ifstream pkgs_file(test_root / "etc" / "lpkg" / "pkgs");
+        std::string line;
+        bool found = false;
+        while (std::getline(pkgs_file, line)) {
+            if (line == "lib:1.0") {
+                found = true;
+                break;
+            }
+        }
+        ASSERT_TRUE(found) << "lib:1.0 was not found in pkgs file after installation";
+    }
     
     // 2. Try to install app requiring lib >= 2.0 (Should Fail)
     {
@@ -251,7 +260,7 @@ TEST_F(PackageManagerTest, VersionConstraints) {
         fs::remove_all(work_dir);
     }
     
-    EXPECT_THROW(install_packages({"app_bad-1.0.tar.zst"}), LpkgException); // Catch specific type
+    EXPECT_THROW(install_packages({"app_bad-1.0.tar.zst"}), LpkgException); 
 
     // 3. Try to install app requiring lib < 2.0 (Should Succeed)
     {

@@ -14,6 +14,6 @@ std::string string_format(const std::string& key, Args&&... args) {
     } catch (const std::format_error& e) {
         // In case of a format error (e.g., mismatch between format string and arguments),
         // return a descriptive error message. This is much safer than the C-style snprintf.
-        return "Formatting error for key '" + key + "': " + e.what();
+        return string_format("error.formatting_error", key.c_str(), e.what());
     }
 }

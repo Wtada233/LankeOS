@@ -5,6 +5,7 @@
 #include "localization.hpp"
 
 #include <sys/file.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -54,7 +55,7 @@ namespace {
 }
 
 void log_info(std::string_view msg) {
-    log_internal("==> ", COLOR_GREEN, msg, std::cout);
+    log_internal(get_string("info.log_prefix"), COLOR_GREEN, msg, std::cout);
 }
 
 void log_warning(std::string_view msg) {
@@ -124,7 +125,9 @@ DBLock::DBLock() {
     }
 
     if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
-        if (errno == EWOULDBLOCK) {
+        int err = errno;
+        close(lock_fd);
+        if (err == EWOULDBLOCK) {
             throw LpkgException(get_string("error.db_locked"));
         } else {
             throw LpkgException(get_string("error.db_lock_failed"));
@@ -134,12 +137,9 @@ DBLock::DBLock() {
 
 DBLock::~DBLock() {
     if (lock_fd != -1) {
-        if (flock(lock_fd, LOCK_UN) < 0) {
-            log_warning(string_format("warning.remove_file_failed", LOCK_FILE.string(), strerror(errno)));
-        }
-        if (close(lock_fd) < 0) {
-            log_warning(string_format("warning.remove_file_failed", LOCK_FILE.string(), strerror(errno)));
-        }
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        lock_fd = -1;
     }
 }
 
@@ -194,13 +194,17 @@ std::unordered_set<std::string> read_set_from_file(const fs::path& path) {
 }
 
 void write_set_to_file(const fs::path& path, const std::unordered_set<std::string>& data) {
-    std::ofstream file(path);
-    if (!file.is_open()) {
-        throw LpkgException(string_format("error.create_file_failed", path.string()));
+    fs::path tmp_path = path.string() + ".tmp";
+    {
+        std::ofstream file(tmp_path);
+        if (!file.is_open()) {
+            throw LpkgException(string_format("error.create_file_failed", tmp_path.string()));
+        }
+        for (const auto& item : data) {
+            file << item << "\n";
+        }
     }
-    for (const auto& item : data) {
-        file << item << "\n";
-    }
+    fs::rename(tmp_path, path);
 }
 
 void cleanup_tmp_dirs() {
@@ -208,12 +212,27 @@ void cleanup_tmp_dirs() {
     const auto twenty_four_hours = std::chrono::hours(24);
 
     if (!fs::exists(tmp_path) || !fs::is_directory(tmp_path)) {
-        return; // /tmp does not exist or is not a directory
+        return;
     }
 
+    uid_t current_uid = geteuid();
+
     for (const auto& entry : fs::directory_iterator(tmp_path)) {
-        if (entry.is_directory() && entry.path().filename().string().rfind("lpkg_", 0) == 0) {
-            try {
+        try {
+            // Use directory_entry::is_symlink() to avoid following symlinks to other places
+            if (fs::is_symlink(entry.path())) {
+                continue;
+            }
+
+            if (entry.is_directory() && entry.path().filename().string().starts_with("lpkg_")) {
+                // Security: Check owner of the directory
+                struct stat st;
+                if (lstat(entry.path().c_str(), &st) == 0) {
+                    if (st.st_uid != current_uid) {
+                        continue; // Not our directory
+                    }
+                }
+
                 bool is_empty = fs::is_empty(entry.path());
                 auto ftime = fs::last_write_time(entry.path());
                 auto sctp = std::chrono::file_clock::to_sys(ftime);
@@ -222,9 +241,9 @@ void cleanup_tmp_dirs() {
                 if (is_empty || (now - sctp) > twenty_four_hours) {
                     fs::remove_all(entry.path());
                 }
-            } catch (const fs::filesystem_error&) {
-                // Silent as requested
             }
+        } catch (const fs::filesystem_error&) {
+            // Silent as requested
         }
     }
 }
@@ -239,5 +258,5 @@ std::pair<std::string, std::string> parse_package_filename(const std::string& fi
     if (std::regex_match(filename, match, filename_regex)) {
         return {match[1], match[2]};
     }
-    throw LpkgException("Could not parse package name and version from filename: " + filename);
+    throw LpkgException(string_format("error.parse_pkg_filename_failed", filename.c_str()));
 }

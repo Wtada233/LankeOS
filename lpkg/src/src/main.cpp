@@ -41,7 +41,7 @@ void pre_operation_check(const cxxopts::ParseResult& result, std::function<void(
     size_t count = result.count("packages") ? result["packages"].as<std::vector<std::string>>().size() : 0;
     if (count < min || (max.has_value() && count > max.value())) {
         print_usage_func();
-        throw LpkgException("Invalid number of arguments.");
+        throw LpkgException(get_string("error.invalid_arg_count"));
     }
 }
 
@@ -56,8 +56,8 @@ int main(int argc, char* argv[]) {
             ("h,help", get_string("info.help_desc"))
             ("non-interactive", get_string("info.non_interactive_option_desc"), cxxopts::value<std::string>()->implicit_value("n"))
             ("force", get_string("info.force_desc"), cxxopts::value<bool>()->default_value("false"))
-            ("root", "Install root directory", cxxopts::value<std::string>())
-            ("arch", "Target architecture", cxxopts::value<std::string>())
+            ("root", get_string("help.root_dir"), cxxopts::value<std::string>())
+            ("arch", get_string("help.target_arch"), cxxopts::value<std::string>())
             ("command", "", cxxopts::value<std::string>())
             ("packages", "", cxxopts::value<std::vector<std::string>>());
 
