@@ -57,6 +57,8 @@ int main(int argc, char* argv[]) {
             ("non-interactive", get_string("info.non_interactive_option_desc"), cxxopts::value<std::string>()->implicit_value("n"))
             ("force", get_string("info.force_desc"), cxxopts::value<bool>()->default_value("false"))
             ("force-overwrite", "Overwrite untracked files", cxxopts::value<bool>()->default_value("false"))
+            ("no-hooks", "Do not run post-install or pre-remove hooks", cxxopts::value<bool>()->default_value("false"))
+            ("no-deps", "Do not resolve or install dependencies", cxxopts::value<bool>()->default_value("false"))
             ("root", get_string("help.root_dir"), cxxopts::value<std::string>())
             ("arch", get_string("help.target_arch"), cxxopts::value<std::string>())
             ("command", "", cxxopts::value<std::string>())
@@ -69,6 +71,14 @@ int main(int argc, char* argv[]) {
         if (result.count("help")) {
             print_usage(options);
             return 0;
+        }
+
+        if (result.count("no-hooks")) {
+            set_no_hooks_mode(result["no-hooks"].as<bool>());
+        }
+
+        if (result.count("no-deps")) {
+            set_no_deps_mode(result["no-deps"].as<bool>());
         }
 
         if (result.count("root")) {

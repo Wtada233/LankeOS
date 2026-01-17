@@ -16,13 +16,13 @@ void Repository::load_index() {
     std::string mirror = get_mirror_url();
     std::string arch = get_architecture();
     
-    // Support local file mirror (file://) for tests
-    bool is_local = mirror.find("file://") == 0;
+    // Support local file mirror (file:// or plain path) for tests/local repos
+    bool is_local = mirror.find("file://") == 0 || mirror.find("/") == 0;
     
     std::filesystem::path index_path;
     
     if (is_local) {
-        std::string path_str = mirror.substr(7);
+        std::string path_str = (mirror.find("file://") == 0) ? mirror.substr(7) : mirror;
         index_path = std::filesystem::path(path_str) / arch / "index.txt";
     } else {
         std::string url = mirror + arch + "/index.txt";

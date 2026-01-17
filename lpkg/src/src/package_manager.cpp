@@ -39,8 +39,11 @@ struct Cache {
     std::map<std::string, std::unordered_set<std::string>> providers; // 虚拟包名 -> {真实包名}
     std::map<std::string, std::string> installed_pkgs; // 包名 -> 已安装版本
     std::unordered_set<std::string> holdpkgs; // 手动安装的包列表
+    std::unordered_set<std::string> essentials; // 核心包列表
     std::map<std::string, std::unordered_set<std::string>> reverse_deps; // 依赖包 -> {依赖它的包}
     bool dirty = false;
+    bool reverse_deps_loaded = false;
+    bool essentials_loaded = false;
     std::mutex mtx;
 
     Cache() {
@@ -62,7 +65,15 @@ struct Cache {
         }
 
         holdpkgs = read_set_from_file(HOLDPKGS_FILE);
-        
+        reverse_deps.clear();
+        reverse_deps_loaded = false;
+        essentials.clear();
+        essentials_loaded = false;
+        dirty = false;
+    }
+
+    void ensure_reverse_deps() {
+        if (reverse_deps_loaded) return;
         reverse_deps.clear();
         if (fs::exists(DEP_DIR) && fs::is_directory(DEP_DIR)) {
              for (const auto& entry : fs::directory_iterator(DEP_DIR)) {
@@ -84,7 +95,15 @@ struct Cache {
                  }
              }
         }
-        dirty = false;
+        reverse_deps_loaded = true;
+    }
+
+    void ensure_essentials() {
+        if (essentials_loaded) return;
+        if (fs::exists(ESSENTIAL_FILE)) {
+            essentials = read_set_from_file(ESSENTIAL_FILE);
+        }
+        essentials_loaded = true;
     }
 
     void write_pkgs() { 
@@ -143,15 +162,10 @@ void force_reload_cache() {
 }
 
 bool is_essential_package(const std::string& pkg_name) {
-    static std::unordered_set<std::string> essentials;
-    static bool loaded = false;
-    if (!loaded) {
-        if (fs::exists(ESSENTIAL_FILE)) {
-            essentials = read_set_from_file(ESSENTIAL_FILE);
-        }
-        loaded = true;
-    }
-    return essentials.contains(pkg_name);
+    auto& cache = get_cache();
+    std::lock_guard<std::mutex> lock(cache.mtx);
+    cache.ensure_essentials();
+    return cache.essentials.contains(pkg_name);
 }
 
 // 获取已安装包的版本。如果未安装则返回空字符串。
@@ -217,11 +231,19 @@ private:
 };
 
 void run_hook(const std::string& pkg_name, const std::string& hook_name) {
+    if (get_no_hooks_mode()) return;
+
     fs::path hook_path = HOOKS_DIR / pkg_name / hook_name;
     if (fs::exists(hook_path) && fs::is_regular_file(hook_path)) {
         log_info(string_format("info.running_hook", hook_name.c_str()));
         bool use_chroot = (ROOT_DIR != "/" && !ROOT_DIR.empty());
         if (use_chroot) {
+            // Check if /bin/sh exists in the target root
+            if (!fs::exists(ROOT_DIR / "bin/sh")) {
+                log_warning(string_format("warning.hook_failed_setup", hook_name.c_str(), " /bin/sh not found in target root. Skipping."));
+                return;
+            }
+
             pid_t pid = fork();
             if (pid == -1) {
                 log_warning(string_format("error.hook_fork_failed", std::string(strerror(errno))));
@@ -512,6 +534,7 @@ void InstallationTask::register_package() {
     std::string d;
     auto& cache = get_cache();
     std::lock_guard<std::mutex> lock(cache.mtx);
+    cache.ensure_reverse_deps();
     
     // Clear old reverse deps if it's an upgrade
     if (!old_version_to_replace_.empty()) {
@@ -605,30 +628,36 @@ struct InstallPlan {
     std::vector<DependencyInfo> dependencies;
 };
 
-void resolve_package_dependencies(const std::string& pkg_name, const std::string& version_spec, bool is_explicit, std::map<std::string, InstallPlan>& plan,
-    std::vector<std::string>& install_order, std::set<std::string>& visited_stack, const std::map<std::string, fs::path>& local_candidates, Repository& repo) {
+struct ResolutionContext {
+    std::map<fs::path, std::vector<DependencyInfo>> local_deps_cache;
+    std::map<fs::path, std::string> local_version_cache;
+    Repository& repo;
+    const std::map<std::string, fs::path>& local_candidates;
+    std::map<std::string, InstallPlan>& plan;
+    std::vector<std::string>& install_order;
+};
+
+void resolve_package_dependencies(const std::string& pkg_name, const std::string& version_spec, bool is_explicit, 
+    ResolutionContext& ctx, std::set<std::string>& visited_stack) {
     if (visited_stack.count(pkg_name)) { 
         log_warning(string_format("warning.circular_dependency", pkg_name.c_str(), pkg_name.c_str())); 
         return; 
     }
     
-    if (plan.count(pkg_name)) { 
-        if (is_explicit) plan.at(pkg_name).is_explicit = true; 
+    if (ctx.plan.count(pkg_name)) { 
+        if (is_explicit) ctx.plan.at(pkg_name).is_explicit = true; 
         return; 
     }
 
     std::string installed_version = get_installed_version(pkg_name);
     fs::path local_path; std::string latest_version, pkg_hash; std::vector<DependencyInfo> deps;
-    
-    static std::map<fs::path, std::vector<DependencyInfo>> local_deps_cache;
-    static std::map<fs::path, std::string> local_version_cache;
 
-    auto it = local_candidates.find(pkg_name);
-    if (it != local_candidates.end()) {
+    auto it = ctx.local_candidates.find(pkg_name);
+    if (it != ctx.local_candidates.end()) {
         local_path = it->second;
-        if (local_version_cache.count(local_path)) {
-            latest_version = local_version_cache[local_path];
-            deps = local_deps_cache[local_path];
+        if (ctx.local_version_cache.count(local_path)) {
+            latest_version = ctx.local_version_cache[local_path];
+            deps = ctx.local_deps_cache[local_path];
         } else {
             latest_version = parse_package_filename(local_path.filename().string()).second;
             std::stringstream deps_ss(extract_file_from_archive(local_path, "deps.txt"));
@@ -639,13 +668,13 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
                 std::stringstream ss(line); std::string dn, op, rv;
                 if (ss >> dn) { DependencyInfo d; d.name = dn; if (ss >> op >> rv) { d.op = op; d.version_req = rv; } deps.push_back(d); }
             }
-            local_version_cache[local_path] = latest_version;
-            local_deps_cache[local_path] = deps;
+            ctx.local_version_cache[local_path] = latest_version;
+            ctx.local_deps_cache[local_path] = deps;
         }
     } else {
-        auto opt = repo.find_package(pkg_name); 
-        std::optional<PackageInfo> pkg_info = (version_spec == "latest") ? opt : repo.find_package(pkg_name, version_spec);
-        if (!pkg_info && version_spec == "latest") pkg_info = repo.find_provider(pkg_name);
+        auto opt = ctx.repo.find_package(pkg_name); 
+        std::optional<PackageInfo> pkg_info = (version_spec == "latest") ? opt : ctx.repo.find_package(pkg_name, version_spec);
+        if (!pkg_info && version_spec == "latest") pkg_info = ctx.repo.find_provider(pkg_name);
         
         if (!pkg_info) { 
             if (installed_version.empty()) log_warning(string_format("warning.package_not_in_repo", pkg_name.c_str())); 
@@ -653,7 +682,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         }
         
         if (pkg_info->name != pkg_name) { 
-            resolve_package_dependencies(pkg_info->name, pkg_info->version, is_explicit, plan, install_order, visited_stack, local_candidates, repo); 
+            resolve_package_dependencies(pkg_info->name, pkg_info->version, is_explicit, ctx, visited_stack); 
             return; 
         }
         latest_version = pkg_info->version; pkg_hash = pkg_info->sha256; deps = pkg_info->dependencies;
@@ -666,38 +695,40 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     visited_stack.insert(pkg_name);
     InstallPlan p; p.name = pkg_name; p.version_spec = version_spec; p.actual_version = latest_version; p.is_explicit = is_explicit; p.local_path = local_path; p.sha256 = pkg_hash; p.dependencies = deps;
     
-    for (const auto& dep : deps) {
-        std::string idv = get_installed_version(dep.name);
-        bool needs_resolution = false;
+    if (!get_no_deps_mode()) {
+        for (const auto& dep : deps) {
+            std::string idv = get_installed_version(dep.name);
+            bool needs_resolution = false;
 
-        if (idv.empty()) {
-            needs_resolution = true;
-        } else if (!dep.op.empty() && idv != "virtual" && !version_satisfies(idv, dep.op, dep.version_req)) {
-            // Check if already in plan (will be upgraded)
-            if (!plan.count(dep.name)) {
-                log_info(string_format("info.adding_upgrade_to_plan", dep.name.c_str(), dep.version_req.c_str()));
+            if (idv.empty()) {
                 needs_resolution = true;
+            } else if (!dep.op.empty() && idv != "virtual" && !version_satisfies(idv, dep.op, dep.version_req)) {
+                // Check if already in plan (will be upgraded)
+                if (!ctx.plan.count(dep.name)) {
+                    log_info(string_format("info.adding_upgrade_to_plan", dep.name.c_str(), dep.version_req.c_str()));
+                    needs_resolution = true;
+                }
             }
-        }
 
-        if (needs_resolution) {
-            std::string req_ver = "latest";
-            if (!dep.op.empty()) {
-                auto matching = repo.find_best_matching_version(dep.name, dep.op, dep.version_req);
-                if (matching) req_ver = matching->version;
+            if (needs_resolution) {
+                std::string req_ver = "latest";
+                if (!dep.op.empty()) {
+                    auto matching = ctx.repo.find_best_matching_version(dep.name, dep.op, dep.version_req);
+                    if (matching) req_ver = matching->version;
+                }
+                resolve_package_dependencies(dep.name, req_ver, false, ctx, visited_stack);
             }
-            resolve_package_dependencies(dep.name, req_ver, false, plan, install_order, visited_stack, local_candidates, repo);
+            
+            // Final sanity check for constraints
+            std::string candidate_version;
+            if (ctx.plan.count(dep.name)) candidate_version = ctx.plan[dep.name].actual_version;
+            else candidate_version = get_installed_version(dep.name);
+            
+            if (!dep.op.empty() && !candidate_version.empty() && candidate_version != "virtual" && !version_satisfies(candidate_version, dep.op, dep.version_req))
+                throw LpkgException(string_format("error.candidate_dep_version_mismatch", dep.name.c_str(), candidate_version.c_str(), dep.op.c_str(), dep.version_req.c_str()));
         }
-        
-        // Final sanity check for constraints
-        std::string candidate_version;
-        if (plan.count(dep.name)) candidate_version = plan[dep.name].actual_version;
-        else candidate_version = get_installed_version(dep.name);
-        
-        if (!dep.op.empty() && !candidate_version.empty() && candidate_version != "virtual" && !version_satisfies(candidate_version, dep.op, dep.version_req))
-            throw LpkgException(string_format("error.candidate_dep_version_mismatch", dep.name.c_str(), candidate_version.c_str(), dep.op.c_str(), dep.version_req.c_str()));
     }
-    plan[pkg_name] = p; install_order.push_back(pkg_name); visited_stack.erase(pkg_name);
+    ctx.plan[pkg_name] = p; ctx.install_order.push_back(pkg_name); visited_stack.erase(pkg_name);
 }
 
 // Check if upgrading or installing packages in the plan breaks existing system packages
@@ -812,7 +843,9 @@ void install_packages(const std::vector<std::string>& pkg_args) {
             targets.emplace_back(n, v);
         }
     }
-    for (const auto& t : targets) { std::set<std::string> vs; resolve_package_dependencies(t.first, t.second, true, plan, order, vs, locals, repo); }
+
+    ResolutionContext ctx{{}, {}, repo, locals, plan, order};
+    for (const auto& t : targets) { std::set<std::string> vs; resolve_package_dependencies(t.first, t.second, true, ctx, vs); }
     if (plan.empty()) { log_info(get_string("info.all_packages_already_installed")); return; }
 
     // Consistent check: verify if plan breaks other packages
@@ -860,6 +893,7 @@ void remove_package(const std::string& pkg_name, bool force) {
     if (!force) {
         if (is_essential_package(pkg_name)) { log_error(string_format("error.skip_remove_essential", pkg_name.c_str())); return; }
         auto& cache = get_cache(); std::lock_guard<std::mutex> lock(cache.mtx);
+        cache.ensure_reverse_deps();
         
         // Check direct dependencies
         auto it = cache.reverse_deps.find(pkg_name);
@@ -888,6 +922,7 @@ void remove_package(const std::string& pkg_name, bool force) {
     remove_package_files(pkg_name, force);
     {
         auto& cache = get_cache(); std::lock_guard<std::mutex> lock(cache.mtx);
+        cache.ensure_reverse_deps();
         fs::path p = DEP_DIR / pkg_name;
         if (fs::exists(p)) {
             std::ifstream f(p); std::string l;
