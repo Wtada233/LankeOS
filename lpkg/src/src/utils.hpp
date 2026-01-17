@@ -32,6 +32,12 @@ NonInteractiveMode get_non_interactive_mode();
 void set_force_overwrite_mode(bool enable);
 bool get_force_overwrite_mode();
 
+void set_no_hooks_mode(bool enable);
+bool get_no_hooks_mode();
+
+void set_no_deps_mode(bool enable);
+bool get_no_deps_mode();
+
 bool user_confirms(const std::string& prompt);
 
 // System checks

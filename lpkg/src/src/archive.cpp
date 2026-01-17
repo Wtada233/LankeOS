@@ -57,8 +57,11 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     int r = ARCHIVE_OK;
     long long count = 0;
     while ((r = archive_read_next_header(a.get(), &entry)) == ARCHIVE_OK) {
+        const char* current_path = archive_entry_pathname(entry);
+        if (!current_path) continue;
+
         // SECURITY: Path traversal vulnerability mitigation.
-        fs::path entry_path = archive_entry_pathname(entry);
+        fs::path entry_path = current_path;
 
         // Sanitize path: reject absolute paths or paths containing ".." components.
         if (entry_path.is_absolute()) {
