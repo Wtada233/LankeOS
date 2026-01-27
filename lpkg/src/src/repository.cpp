@@ -10,6 +10,9 @@
 #include <iostream>
 #include <algorithm>
 
+#include <ranges>
+#include <string_view>
+
 void Repository::load_index() {
     packages_.clear();
     providers_.clear();
@@ -47,72 +50,69 @@ void Repository::load_index() {
 
     std::ifstream file(index_path);
     std::string line;
-    static const std::vector<std::string> ops = {">=", "<=", "!=", "==", ">", "<", "="}; // Static to avoid recreation
+    static const std::vector<std::string> ops = {">=", "<=", "!=", "==", ">", "<", "="};
 
     while (std::getline(file, line)) {
         if (line.empty() || line[0] == '#') continue;
-        if (line.back() == '\r') line.pop_back(); // Handle CRLF
+        std::string_view sv = line;
+        if (sv.back() == '\r') sv.remove_suffix(1);
         
-        std::stringstream ss(line);
-        std::string segment;
-        std::vector<std::string> parts;
-        
-        while (std::getline(ss, segment, '|')) {
-            parts.push_back(segment);
-        }
-        if (!line.empty() && line.back() == '|') {
-            parts.push_back("");
-        }
+        auto parts = sv | std::views::split('|') | std::views::transform([](auto&& rng) {
+            return std::string_view(&*rng.begin(), std::ranges::distance(rng));
+        });
 
-        if (parts.size() < 3) {
-            continue; 
-        }
-
+        auto it = parts.begin();
+        if (it == parts.end()) continue;
         PackageInfo pkg;
-        pkg.name = parts[0];
-        pkg.version = parts[1];
-        pkg.sha256 = parts[2];
+        pkg.name = *it++;
+        if (it == parts.end()) continue;
+        pkg.version = *it++;
+        if (it == parts.end()) continue;
+        pkg.sha256 = *it++;
         
-        // Parse Deps: dep1>=1.0,dep2
-        if (parts.size() > 3 && !parts[3].empty()) {
-            std::stringstream deps_ss(parts[3]);
-            std::string dep_str;
-            while (std::getline(deps_ss, dep_str, ',')) {
-                DependencyInfo dep;
-                size_t op_pos = std::string::npos;
-                
-                for (const auto& op : ops) {
-                    op_pos = dep_str.find(op);
-                    if (op_pos != std::string::npos) {
-                        dep.name = dep_str.substr(0, op_pos);
-                        dep.op = op;
-                        dep.version_req = dep_str.substr(op_pos + op.length());
-                        break;
+        // Parse Deps
+        if (it != parts.end()) {
+            std::string_view deps_sv = *it++;
+            if (!deps_sv.empty()) {
+                auto deps_parts = deps_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
+                    return std::string_view(&*rng.begin(), std::ranges::distance(rng));
+                });
+                for (auto dep_str : deps_parts) {
+                    DependencyInfo dep;
+                    size_t op_pos = std::string_view::npos;
+                    for (const auto& op : ops) {
+                        if (op_pos = dep_str.find(op); op_pos != std::string_view::npos) {
+                            dep.name = dep_str.substr(0, op_pos);
+                            dep.op = op;
+                            dep.version_req = dep_str.substr(op_pos + op.length());
+                            break;
+                        }
                     }
+                    if (op_pos == std::string_view::npos) dep.name = dep_str;
+                    pkg.dependencies.push_back(dep);
                 }
-                if (op_pos == std::string::npos) {
-                    dep.name = dep_str;
-                }
-                pkg.dependencies.push_back(dep);
             }
         }
 
         // Parse Provides
-        if (parts.size() > 4 && !parts[4].empty()) {
-            std::stringstream prov_ss(parts[4]);
-            std::string prov;
-            while (std::getline(prov_ss, prov, ',')) {
-                pkg.provides.push_back(prov);
-                providers_[prov].push_back(pkg.name);
+        if (it != parts.end()) {
+            std::string_view prov_sv = *it++;
+            if (!prov_sv.empty()) {
+                auto prov_parts = prov_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
+                    return std::string_view(&*rng.begin(), std::ranges::distance(rng));
+                });
+                for (auto prov : prov_parts) {
+                    pkg.provides.emplace_back(prov);
+                    providers_[std::string(prov)].push_back(pkg.name);
+                }
             }
         }
 
         packages_[pkg.name].push_back(pkg);
     }
 
-    // 预先对所有包的版本进行排序，避免在查询时重复排序
-    for (auto& [name, versions] : packages_) {
-        std::sort(versions.begin(), versions.end(), [](const PackageInfo& a, const PackageInfo& b) {
+    for (auto& versions : packages_ | std::views::values) {
+        std::ranges::sort(versions, [](const PackageInfo& a, const PackageInfo& b) {
             return version_compare(a.version, b.version);
         });
     }
