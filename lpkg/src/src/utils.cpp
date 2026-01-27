@@ -27,6 +27,7 @@ namespace {
     bool force_overwrite_mode = false;
     bool no_hooks_mode = false;
     bool no_deps_mode = false;
+    bool testing_mode = false;
     std::mutex log_mutex;
     bool is_stdout_tty = false;
     bool is_stderr_tty = false;
@@ -124,6 +125,14 @@ void set_no_deps_mode(bool enable) {
 
 bool get_no_deps_mode() {
     return no_deps_mode;
+}
+
+void set_testing_mode(bool enable) {
+    testing_mode = enable;
+}
+
+bool get_testing_mode() {
+    return testing_mode;
 }
 
 bool user_confirms(const std::string& prompt) {
@@ -289,4 +298,18 @@ std::pair<std::string, std::string> parse_package_filename(const std::string& fi
         return {match[1], match[2]};
     }
     throw LpkgException(string_format("error.parse_pkg_filename_failed", filename.c_str()));
+}
+
+std::filesystem::path validate_path(const fs::path& path, const fs::path& root) {
+    if (path.is_absolute()) {
+         throw LpkgException("Security Violation: Path must be relative: " + path.string());
+    }
+
+    fs::path normalized = path.lexically_normal();
+    for (const auto& component : normalized) {
+        if (component == "..") {
+             throw LpkgException("Security Violation: Path traversal detected: " + path.string());
+        }
+    }
+    return root / normalized;
 }

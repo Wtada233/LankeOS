@@ -17,6 +17,7 @@ protected:
 
     void SetUp() override {
         set_non_interactive_mode(NonInteractiveMode::YES); // Default to auto-agree
+        set_testing_mode(true);
         init_localization();
         
         suite_work_dir = fs::absolute("tmp_conflict_test");

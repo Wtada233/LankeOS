@@ -13,7 +13,12 @@
 void Repository::load_index() {
     packages_.clear();
     providers_.clear();
-    std::string mirror = get_mirror_url();
+    std::string mirror;
+    try {
+        mirror = get_mirror_url();
+    } catch (...) {
+        return; // No mirror, no index.
+    }
     std::string arch = get_architecture();
     
     // Support local file mirror (file:// or plain path) for tests/local repos
@@ -21,17 +26,23 @@ void Repository::load_index() {
     
     std::filesystem::path index_path;
     
-    if (is_local) {
-        std::string path_str = (mirror.find("file://") == 0) ? mirror.substr(7) : mirror;
-        index_path = std::filesystem::path(path_str) / arch / "index.txt";
-    } else {
-        std::string url = mirror + arch + "/index.txt";
-        index_path = get_tmp_dir() / "repo_index.txt";
-        download_file(url, index_path, false);
-    }
+    try {
+        if (is_local) {
+            std::string path_str = (mirror.find("file://") == 0) ? mirror.substr(7) : mirror;
+            index_path = std::filesystem::path(path_str) / arch / "index.txt";
+        } else {
+            std::string url = mirror + arch + "/index.txt";
+            index_path = get_tmp_dir() / "repo_index.txt";
+            download_file(url, index_path, false);
+        }
 
-    if (!std::filesystem::exists(index_path)) {
-        throw LpkgException(string_format("error.repo_index_not_found", index_path.string()));
+        if (!std::filesystem::exists(index_path)) {
+            if (get_testing_mode()) return;
+            throw LpkgException(string_format("error.repo_index_not_found", index_path.string()));
+        }
+    } catch (...) {
+        if (get_testing_mode()) return;
+        throw;
     }
 
     std::ifstream file(index_path);

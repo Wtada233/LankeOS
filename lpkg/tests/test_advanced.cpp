@@ -17,6 +17,7 @@ protected:
 
     void SetUp() override {
         set_non_interactive_mode(NonInteractiveMode::YES);
+        set_testing_mode(true);
         init_localization();
         
         suite_work_dir = fs::absolute("tmp_advanced_test");

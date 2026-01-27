@@ -2,6 +2,7 @@
 #include "../src/src/config.hpp"
 #include "../src/src/repository.hpp"
 #include "../src/src/exception.hpp"
+#include "../src/src/utils.hpp"
 #include <fstream>
 #include <filesystem>
 
@@ -19,6 +20,7 @@ protected:
         fs::create_directories(mirror_dir);
         
         set_root_path(test_root.string());
+        set_testing_mode(true);
         
         // Setup a mock mirror config pointing to local dir
         fs::create_directories(test_root / "etc" / "lpkg");

@@ -38,6 +38,9 @@ bool get_no_hooks_mode();
 void set_no_deps_mode(bool enable);
 bool get_no_deps_mode();
 
+void set_testing_mode(bool enable);
+bool get_testing_mode();
+
 bool user_confirms(const std::string& prompt);
 
 // System checks
@@ -74,3 +77,6 @@ void cleanup_tmp_dirs();
 
 // Filename parsing
 std::pair<std::string, std::string> parse_package_filename(const std::string& filename);
+
+// Security
+std::filesystem::path validate_path(const std::filesystem::path& path, const std::filesystem::path& root);
