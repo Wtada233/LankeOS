@@ -51,6 +51,7 @@ int main(int argc, char* argv[]) {
         init_localization();
 
         cxxopts::Options options(argv[0], string_format("info.usage", argv[0]));
+        options.set_width(100);
 
         options.add_options()
             ("h,help", get_string("info.help_desc"))

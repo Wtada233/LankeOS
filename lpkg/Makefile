@@ -43,7 +43,6 @@ TEST_CXXFLAGS = -std=c++20 -Wall -Wextra -g -I$(MAIN_DIR)/third_party/include -I
 # Source files
 MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp)
 TEST_SRCS = $(wildcard $(TESTS_DIR)/*.cpp)
-# No changes needed here as wildcard picks it up, but ensure BUILD_DIR/tests matches
 
 # Object files
 MAIN_OBJS = $(patsubst $(APP_SRC_DIR)/%.cpp,$(BUILD_DIR)/main/%.o,$(MAIN_SRCS))
@@ -55,6 +54,14 @@ LPKG_OBJS = $(filter-out $(BUILD_DIR)/main/main.o, $(MAIN_OBJS))
 # Dependency files
 DEPS = $(MAIN_OBJS:.o=.d) $(TEST_OBJS:.o=.d)
 
+# Handle coverage mode flags internally to avoid shell quoting issues
+ifeq ($(COVERAGE_MODE),1)
+    CXXFLAGS += $(COVERAGE_FLAGS)
+    TEST_CXXFLAGS += $(COVERAGE_FLAGS)
+    LIBS += -lgcov
+    TEST_LIBS += -lgcov
+endif
+
 .PHONY: all clean install uninstall static test coverage
 
 all: $(BUILD_DIR)/$(TARGET)
@@ -62,21 +69,29 @@ all: $(BUILD_DIR)/$(TARGET)
 test: $(BUILD_DIR)/$(TEST_TARGET)
 	./$(BUILD_DIR)/$(TEST_TARGET)
 
-coverage: CXXFLAGS += $(COVERAGE_FLAGS)
-coverage: TEST_CXXFLAGS += $(COVERAGE_FLAGS)
-coverage: LIBS += -lgcov
-coverage: TEST_LIBS += -lgcov
-coverage: clean test
-	@mkdir -p $(BUILD_DIR)/coverage
+# Coverage target using a temporary directory to avoid polluting the main build
+coverage:
+	@echo "Starting coverage build in temporary directory..."
+	@rm -rf build_coverage coverage_report
+	@mkdir -p build_coverage
+	@$(MAKE) BUILD_DIR=build_coverage COVERAGE_MODE=1 build_coverage_internal
+	@mkdir -p coverage_report
 	@if command -v lcov > /dev/null; then \
-		lcov --rc geninfo_unexecuted_blocks=1 --capture --directory $(BUILD_DIR) --output-file $(BUILD_DIR)/coverage/coverage.info --ignore-errors mismatch,inconsistent,unused; \
-		lcov --ignore-errors mismatch,inconsistent,unused --remove $(BUILD_DIR)/coverage/coverage.info '/usr/*' '*/third_party/*' '*/tests/*' --output-file $(BUILD_DIR)/coverage/coverage_filtered.info; \
-		genhtml --ignore-errors mismatch,inconsistent --output-directory $(BUILD_DIR)/coverage/html $(BUILD_DIR)/coverage/coverage_filtered.info; \
-		echo "Coverage report generated at $(BUILD_DIR)/coverage/html/index.html"; \
+		lcov --rc geninfo_unexecuted_blocks=1 --capture --directory build_coverage --output-file build_coverage/coverage.info --ignore-errors mismatch,inconsistent,unused; \
+		lcov --ignore-errors mismatch,inconsistent,unused --remove build_coverage/coverage.info '/usr/*' '*/third_party/*' '*/tests/*' --output-file build_coverage/coverage_filtered.info; \
+		genhtml --ignore-errors mismatch,inconsistent --output-directory coverage_report build_coverage/coverage_filtered.info; \
+		echo "Coverage report generated at coverage_report/index.html"; \
 	else \
 		echo "lcov not found, using gcov summary:"; \
-		gcov -n $(filter-out $(APP_SRC_DIR)/main.cpp, $(MAIN_SRCS)) --object-directory $(BUILD_DIR)/main; \
+		gcov -n $(filter-out $(APP_SRC_DIR)/main.cpp, $(MAIN_SRCS)) --object-directory build_coverage/main; \
 	fi
+	@rm -rf build_coverage
+	@echo "------------------------------------------------------"
+	@echo "Coverage report is available in: coverage_report/index.html"
+	@echo "Temporary build files have been cleaned up."
+
+build_coverage_internal: $(BUILD_DIR)/$(TEST_TARGET)
+	./$(BUILD_DIR)/$(TEST_TARGET)
 
 $(BUILD_DIR)/$(TARGET): $(MAIN_OBJS)
 	@mkdir -p $(@D)
@@ -103,7 +118,7 @@ $(BUILD_DIR)/tests/%.o: $(TESTS_DIR)/%.cpp
 -include $(DEPS)
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(BUILD_DIR) build_coverage coverage_report
 
 install: all
 	install -Dm755 $(BUILD_DIR)/$(TARGET) $(INSTALL_BIN_DIR)/$(TARGET)
