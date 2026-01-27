@@ -13,29 +13,28 @@ namespace fs = std::filesystem;
 
 fs::path ROOT_DIR = "/";
 fs::path CONFIG_DIR = LPKG_CONF_DIR;
+fs::path STATE_DIR = "/var/lib/lpkg";
 fs::path L10N_DIR = LPKG_L10N_DIR;
 fs::path DOCS_DIR = LPKG_DOCS_DIR;
 fs::path LOCK_DIR = LPKG_LOCK_DIR;
 fs::path HOOKS_DIR = fs::path(LPKG_CONF_DIR) / "hooks/";
 
 // Derived paths
-fs::path DEP_DIR = fs::path(LPKG_CONF_DIR) / "deps/";
-fs::path FILES_DIR = fs::path(LPKG_CONF_DIR) / "files/";
-fs::path PKGS_FILE = fs::path(LPKG_CONF_DIR) / "pkgs";
-fs::path HOLDPKGS_FILE = fs::path(LPKG_CONF_DIR) / "holdpkgs";
+fs::path DEP_DIR = fs::path("/var/lib/lpkg") / "deps/";
+fs::path FILES_DIR = fs::path("/var/lib/lpkg") / "files/";
+fs::path PKGS_FILE = fs::path("/var/lib/lpkg") / "pkgs";
+fs::path HOLDPKGS_FILE = fs::path("/var/lib/lpkg") / "holdpkgs";
 fs::path ESSENTIAL_FILE = fs::path(LPKG_CONF_DIR) / "essential";
 fs::path MIRROR_CONF = fs::path(LPKG_CONF_DIR) / "mirror.conf";
-fs::path FILES_DB = fs::path(LPKG_CONF_DIR) / "files" / "files.db";
-fs::path PROVIDES_DB = fs::path(LPKG_CONF_DIR) / "files" / "provides.db";
+fs::path TRIGGERS_CONF = fs::path(LPKG_CONF_DIR) / "triggers.conf";
+fs::path FILES_DB = fs::path("/var/lib/lpkg") / "files.db";
+fs::path PROVIDES_DB = fs::path("/var/lib/lpkg") / "provides.db";
 fs::path LOCK_FILE = fs::path(LPKG_LOCK_DIR) / "db.lck";
 
 void set_root_path(const std::string& root_path) {
     ROOT_DIR = fs::path(root_path).lexically_normal();
     if (ROOT_DIR.empty()) ROOT_DIR = "/";
 
-    // Re-base paths relative to the new root
-    // Note: We strip the leading '/' from the default paths to append them correctly
-    
     auto rebase = [&](const std::string& default_path) {
         fs::path p(default_path);
         if (p.is_absolute()) {
@@ -45,19 +44,21 @@ void set_root_path(const std::string& root_path) {
     };
 
     CONFIG_DIR = rebase(LPKG_CONF_DIR);
+    STATE_DIR = rebase("/var/lib/lpkg");
     L10N_DIR = rebase(LPKG_L10N_DIR);
     DOCS_DIR = rebase(LPKG_DOCS_DIR);
     LOCK_DIR = rebase(LPKG_LOCK_DIR);
     
     HOOKS_DIR = CONFIG_DIR / "hooks/";
-    DEP_DIR = CONFIG_DIR / "deps/";
-    FILES_DIR = CONFIG_DIR / "files/";
-    PKGS_FILE = CONFIG_DIR / "pkgs";
-    HOLDPKGS_FILE = CONFIG_DIR / "holdpkgs";
+    DEP_DIR = STATE_DIR / "deps/";
+    FILES_DIR = STATE_DIR / "files/";
+    PKGS_FILE = STATE_DIR / "pkgs";
+    HOLDPKGS_FILE = STATE_DIR / "holdpkgs";
     ESSENTIAL_FILE = CONFIG_DIR / "essential";
     MIRROR_CONF = CONFIG_DIR / "mirror.conf";
-    FILES_DB = FILES_DIR / "files.db";
-    PROVIDES_DB = FILES_DIR / "provides.db";
+    TRIGGERS_CONF = CONFIG_DIR / "triggers.conf";
+    FILES_DB = STATE_DIR / "files.db";
+    PROVIDES_DB = STATE_DIR / "provides.db";
     LOCK_FILE = LOCK_DIR / "db.lck";
 }
 
@@ -68,6 +69,7 @@ fs::path get_tmp_dir() {
 
 void init_filesystem() {
     ensure_dir_exists(CONFIG_DIR);
+    ensure_dir_exists(STATE_DIR);
     ensure_dir_exists(DEP_DIR);
     ensure_dir_exists(FILES_DIR);
     ensure_dir_exists(L10N_DIR);

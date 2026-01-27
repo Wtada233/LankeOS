@@ -215,9 +215,10 @@ void InstallationTask::commit() {
             for (const auto& old_file : old_files) {
                 if (!new_files.contains(old_file)) {
                     auto& cache = Cache::instance();
-                    if (const auto* owners = cache.get_file_owners(old_file); owners && owners->contains(pkg_name_)) {
+                    auto owners = cache.get_file_owners(old_file);
+                    if (!owners.empty() && owners.contains(pkg_name_)) {
                         cache.remove_file_owner(old_file, pkg_name_);
-                        if (cache.get_file_owners(old_file) == nullptr) {
+                        if (cache.get_file_owners(old_file).empty()) {
                             fs::path physical_path = (fs::path(old_file).is_absolute()) ? ROOT_DIR / fs::path(old_file).relative_path() : ROOT_DIR / old_file;
                             if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
                                 log_info(string_format("info.removing_obsolete_file", old_file.c_str()));
@@ -293,10 +294,10 @@ void InstallationTask::check_for_file_conflicts() {
     while (files_list >> src >> dest) {
         fs::path logical_dest_path = fs::path(dest) / src;
         std::string path_str = logical_dest_path.string();
-        const auto* owners = cache.get_file_owners(path_str);
-        if (owners) {
+        auto owners = cache.get_file_owners(path_str);
+        if (!owners.empty()) {
             bool owned_by_others = false;
-            for (const auto& owner : *owners) {
+            for (const auto& owner : owners) {
                 if (owner != pkg_name_) {
                     conflicts[path_str] = owner;
                     owned_by_others = true;
@@ -308,7 +309,7 @@ void InstallationTask::check_for_file_conflicts() {
         if (old_version_to_replace_.empty()) {
             fs::path physical_path = (logical_dest_path.is_absolute()) ? ROOT_DIR / logical_dest_path.relative_path() : ROOT_DIR / logical_dest_path;
             if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
-                if (!owners) {
+                if (owners.empty()) {
                     if (!get_force_overwrite_mode()) {
                         conflicts[path_str] = "unknown (manual file)";
                     }
@@ -352,14 +353,10 @@ void InstallationTask::copy_package_files() {
             }
             fs::copy(src_path, final_dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing | fs::copy_options::copy_symlinks);
             installed_files_.push_back(final_dest_path);
-            std::string dest_str = physical_dest_path.string();
-            if (dest_str.find("/usr/share/icons") != std::string::npos) {
-                TriggerManager::instance().add("echo Trigger: gtk-update-icon-cache");
-            } else if (dest_str.find("/usr/share/glib-2.0/schemas") != std::string::npos) {
-                TriggerManager::instance().add("echo Trigger: glib-compile-schemas");
-            } else if (dest_str.find("/usr/lib/") != std::string::npos && physical_dest_path.extension() == ".so") {
-                 TriggerManager::instance().add("echo Trigger: ldconfig");
-            }
+            
+            // Trigger check for the newly installed file
+            TriggerManager::instance().check_file(logical_dest_path.string());
+
         } catch (const fs::filesystem_error& e) { throw LpkgException(string_format("error.copy_failed_rollback", src_path.string().c_str(), physical_dest_path.string().c_str(), e.what())); }
     }
     std::ofstream pkg_f(FILES_DIR / (pkg_name_ + ".txt"));
@@ -612,10 +609,13 @@ std::unordered_set<std::string> get_all_required_packages() {
                 std::string d_name(sv);
                 if (cache.is_installed(d_name)) {
                     if (!req.contains(d_name)) { req.insert(d_name); q.push_back(d_name); }
-                } else if (const auto* providers = cache.get_providers(d_name); providers) {
-                    for (const auto& provider : *providers) {
-                        if (cache.is_installed(provider) && !req.contains(provider)) {
-                            req.insert(provider); q.push_back(provider);
+                } else {
+                    auto providers = cache.get_providers(d_name);
+                    if (!providers.empty()) {
+                        for (const auto& provider : providers) {
+                            if (cache.is_installed(provider) && !req.contains(provider)) {
+                                req.insert(provider); q.push_back(provider);
+                            }
                         }
                     }
                 }
@@ -697,9 +697,9 @@ void remove_package(const std::string& pkg_name, bool force) {
     if (!force) {
         if (is_essential_package(pkg_name)) { log_error(string_format("error.skip_remove_essential", pkg_name.c_str())); return; }
         auto& cache = Cache::instance();
-        const auto* rdeps = cache.get_reverse_deps(pkg_name);
-        if (rdeps && !rdeps->empty()) {
-            std::string deps; for (const auto& d : *rdeps) deps += d + " ";
+        auto rdeps = cache.get_reverse_deps(pkg_name);
+        if (!rdeps.empty()) {
+            std::string deps; for (const auto& d : rdeps) deps += d + " ";
             log_info(string_format("info.skip_remove_dependency", pkg_name.c_str(), deps.c_str())); return;
         }
         const fs::path plist = FILES_DIR / (pkg_name + ".provides");
@@ -708,9 +708,9 @@ void remove_package(const std::string& pkg_name, bool force) {
             while (std::getline(f, cap)) {
                 if (cap.empty()) continue;
                 if (cap.back() == '\r') cap.pop_back();
-                const auto* cap_rdeps = cache.get_reverse_deps(cap);
-                if (cap_rdeps && !cap_rdeps->empty()) {
-                    std::string deps; for (const auto& d : *cap_rdeps) deps += d + " ";
+                auto cap_rdeps = cache.get_reverse_deps(cap);
+                if (!cap_rdeps.empty()) {
+                    std::string deps; for (const auto& d : cap_rdeps) deps += d + " ";
                     log_info(string_format("info.skip_remove_dependency", cap.c_str(), deps.c_str())); return;
                 }
             }
@@ -750,8 +750,9 @@ void remove_package_files(const std::string& pkg_name, bool force) {
         while (std::getline(f, l)) {
             if (l.empty()) continue;
             paths.emplace_back(l);
-            if (const auto* owners = cache.get_file_owners(l); owners) {
-                for (const auto& owner : *owners) if (owner != pkg_name) shared[l].push_back(owner);
+            auto owners = cache.get_file_owners(l);
+            if (!owners.empty()) {
+                for (const auto& owner : owners) if (owner != pkg_name) shared[l].push_back(owner);
             }
         }
         if (!shared.empty() && !force) {
@@ -769,8 +770,9 @@ void remove_package_files(const std::string& pkg_name, bool force) {
         for (const auto& p : paths) {
             fs::path phys = (p.is_absolute()) ? ROOT_DIR / p.relative_path() : ROOT_DIR / p;
             if (fs::exists(phys) || fs::is_symlink(phys)) {
-                if (const auto* owners = cache.get_file_owners(p.string()); owners && owners->contains(pkg_name)) {
-                    if (owners->size() == 1) {
+                auto owners = cache.get_file_owners(p.string());
+                if (!owners.empty() && owners.contains(pkg_name)) {
+                    if (owners.size() == 1) {
                         try { fs::remove(phys); } catch (...) {}
                         count++; 
                     } else {

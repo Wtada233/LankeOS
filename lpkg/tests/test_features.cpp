@@ -106,7 +106,10 @@ TEST_F(FeatureTest, TriggerActivation) {
     install_packages({pkg_path});
     std::string output = testing::internal::GetCapturedStdout();
 
-    EXPECT_TRUE(output.find("Trigger: ldconfig") != std::string::npos) << "Output was: " << output;
+    // Check for either English or Chinese trigger message
+    bool found = (output.find("Trigger: ldconfig") != std::string::npos) || 
+                 (output.find("触发器: ldconfig") != std::string::npos);
+    EXPECT_TRUE(found) << "Output was: " << output;
 }
 
 // 3. Bootstrap Test
@@ -125,8 +128,8 @@ TEST_F(FeatureTest, BootstrapInstallation) {
     install_packages({p1, p2});
 
     EXPECT_TRUE(fs::exists(bootstrap_root / "usr/bin/ls"));
-    EXPECT_TRUE(fs::exists(bootstrap_root / "etc/lpkg/files/coreutils.txt"));
-    EXPECT_TRUE(fs::exists(bootstrap_root / "etc/lpkg/pkgs"));
+    EXPECT_TRUE(fs::exists(bootstrap_root / "var/lib/lpkg/files/coreutils.txt"));
+    EXPECT_TRUE(fs::exists(PKGS_FILE));
     
     EXPECT_FALSE(fs::exists(test_root / "usr/bin/ls"));
 }

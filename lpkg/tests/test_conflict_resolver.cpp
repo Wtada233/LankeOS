@@ -77,7 +77,7 @@ TEST_F(ConflictResolverTest, AutoUpgradeToSatisfyDependency) {
 
     // 验证 libtest 是否变为了 2.0
     {
-        std::ifstream pkgs(test_root / "etc/lpkg/pkgs");
+        std::ifstream pkgs(PKGS_FILE);
         std::string line;
         bool found_v2 = false;
         while (std::getline(pkgs, line)) {
@@ -103,7 +103,7 @@ TEST_F(ConflictResolverTest, PromptToRemoveBrokenExistingPackage) {
 
     // 验证 oldapp 被删除了，而 newapp 和 libtest v2.0 在
     {
-        std::ifstream pkgs(test_root / "etc/lpkg/pkgs");
+        std::ifstream pkgs(PKGS_FILE);
         std::string line;
         bool found_old = false, found_new = false, found_lib2 = false;
         while (std::getline(pkgs, line)) {

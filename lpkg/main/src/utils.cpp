@@ -247,6 +247,15 @@ void write_set_to_file(const fs::path& path, const std::unordered_set<std::strin
 }
 
 void cleanup_tmp_dirs() {
+    static auto last_cleanup = std::chrono::system_clock::now();
+    auto now = std::chrono::system_clock::now();
+    
+    // Only cleanup once every hour in the same process
+    if (std::chrono::duration_cast<std::chrono::hours>(now - last_cleanup).count() < 1) {
+        return;
+    }
+    last_cleanup = now;
+
     const fs::path tmp_path = "/tmp";
     const auto twenty_four_hours = std::chrono::hours(24);
 
@@ -258,32 +267,26 @@ void cleanup_tmp_dirs() {
 
     for (const auto& entry : fs::directory_iterator(tmp_path)) {
         try {
-            // Use directory_entry::is_symlink() to avoid following symlinks to other places
             if (fs::is_symlink(entry.path())) {
                 continue;
             }
 
             if (entry.is_directory() && entry.path().filename().string().starts_with("lpkg_")) {
-                // Security: Check owner of the directory
                 struct stat st;
                 if (lstat(entry.path().c_str(), &st) == 0) {
                     if (st.st_uid != current_uid) {
-                        continue; // Not our directory
+                        continue;
                     }
                 }
 
-                bool is_empty = fs::is_empty(entry.path());
                 auto ftime = fs::last_write_time(entry.path());
                 auto sctp = std::chrono::file_clock::to_sys(ftime);
-                auto now = std::chrono::system_clock::now();
 
-                if (is_empty || (now - sctp) > twenty_four_hours) {
+                if ((now - sctp) > twenty_four_hours) {
                     fs::remove_all(entry.path());
                 }
             }
-        } catch (const fs::filesystem_error&) {
-            // Silent as requested
-        }
+        } catch (...) {}
     }
 }
 

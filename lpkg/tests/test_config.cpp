@@ -15,6 +15,7 @@ protected:
 TEST_F(ConfigTest, DefaultRoot) {
     EXPECT_EQ(ROOT_DIR, "/");
     EXPECT_EQ(CONFIG_DIR, "/etc/lpkg");
+    EXPECT_EQ(STATE_DIR, "/var/lib/lpkg");
 }
 
 TEST_F(ConfigTest, CustomRoot) {
@@ -23,7 +24,8 @@ TEST_F(ConfigTest, CustomRoot) {
     
     EXPECT_EQ(ROOT_DIR, fs::path(root));
     EXPECT_EQ(CONFIG_DIR, fs::path(root) / "etc/lpkg");
-    EXPECT_EQ(FILES_DB, fs::path(root) / "etc/lpkg/files/files.db");
+    EXPECT_EQ(STATE_DIR, fs::path(root) / "var/lib/lpkg");
+    EXPECT_EQ(FILES_DB, fs::path(root) / "var/lib/lpkg/files.db");
 }
 
 TEST_F(ConfigTest, CustomRootWithTrailingSlash) {
