@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
-#include "../src/src/config.hpp"
-#include "../src/src/repository.hpp"
-#include "../src/src/exception.hpp"
-#include "../src/src/utils.hpp"
+#include "../main/src/config.hpp"
+#include "../main/src/repository.hpp"
+#include "../main/src/exception.hpp"
+#include "../main/src/utils.hpp"
 #include <fstream>
 #include <filesystem>
 

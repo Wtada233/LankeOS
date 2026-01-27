@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
-#include "../src/src/package_manager.hpp"
-#include "../src/src/config.hpp"
-#include "../src/src/utils.hpp"
-#include "../src/src/localization.hpp"
+#include "../main/src/package_manager.hpp"
+#include "../main/src/config.hpp"
+#include "../main/src/utils.hpp"
+#include "../main/src/localization.hpp"
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>

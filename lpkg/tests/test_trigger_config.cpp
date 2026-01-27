@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../src/src/utils.hpp"
+#include "../main/src/utils.hpp"
 #include <filesystem>
 #include <fstream>
 #include <thread>
