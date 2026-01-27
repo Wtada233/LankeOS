@@ -70,10 +70,10 @@ void Cache::remove_file_owner(std::string_view path, std::string_view pkg) {
     }
 }
 
-const std::unordered_set<std::string>* Cache::get_file_owners(std::string_view path) {
+std::unordered_set<std::string> Cache::get_file_owners(std::string_view path) {
     std::lock_guard<std::mutex> lock(mtx);
     auto it = file_db.find(path);
-    return (it != file_db.end()) ? &it->second : nullptr;
+    return (it != file_db.end()) ? it->second : std::unordered_set<std::string>{};
 }
 
 void Cache::add_provider(std::string_view capability, std::string_view pkg) {
@@ -92,10 +92,10 @@ void Cache::remove_provider(std::string_view capability, std::string_view pkg) {
     }
 }
 
-const std::unordered_set<std::string>* Cache::get_providers(std::string_view capability) {
+std::unordered_set<std::string> Cache::get_providers(std::string_view capability) {
     std::lock_guard<std::mutex> lock(mtx);
     auto it = providers.find(capability);
-    return (it != providers.end()) ? &it->second : nullptr;
+    return (it != providers.end()) ? it->second : std::unordered_set<std::string>{};
 }
 
 void Cache::add_reverse_dep(std::string_view dep, std::string_view pkg) {
@@ -114,11 +114,11 @@ void Cache::remove_reverse_dep(std::string_view dep, std::string_view pkg) {
     }
 }
 
-const std::unordered_set<std::string>* Cache::get_reverse_deps(std::string_view name) {
+std::unordered_set<std::string> Cache::get_reverse_deps(std::string_view name) {
     std::lock_guard<std::mutex> lock(mtx);
     ensure_reverse_deps();
     auto it = reverse_deps.find(std::string(name));
-    return (it != reverse_deps.end()) ? &it->second : nullptr;
+    return (it != reverse_deps.end()) ? it->second : std::unordered_set<std::string>{};
 }
 
 void Cache::load() {

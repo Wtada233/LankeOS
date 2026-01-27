@@ -6,6 +6,7 @@
 // Global variables for paths (initially set to defaults, but can be modified)
 extern std::filesystem::path ROOT_DIR;
 extern std::filesystem::path CONFIG_DIR;
+extern std::filesystem::path STATE_DIR;
 extern std::filesystem::path L10N_DIR;
 extern std::filesystem::path DOCS_DIR;
 extern std::filesystem::path LOCK_DIR;
@@ -18,6 +19,7 @@ extern std::filesystem::path PKGS_FILE;
 extern std::filesystem::path HOLDPKGS_FILE;
 extern std::filesystem::path ESSENTIAL_FILE;
 extern std::filesystem::path MIRROR_CONF;
+extern std::filesystem::path TRIGGERS_CONF;
 extern std::filesystem::path FILES_DB;
 extern std::filesystem::path PROVIDES_DB;
 std::filesystem::path get_tmp_dir();

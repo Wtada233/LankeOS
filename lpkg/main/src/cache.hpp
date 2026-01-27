@@ -27,15 +27,15 @@ public:
     
     void add_file_owner(std::string_view path, std::string_view pkg);
     void remove_file_owner(std::string_view path, std::string_view pkg);
-    const std::unordered_set<std::string>* get_file_owners(std::string_view path);
+    std::unordered_set<std::string> get_file_owners(std::string_view path);
 
     void add_provider(std::string_view capability, std::string_view pkg);
     void remove_provider(std::string_view capability, std::string_view pkg);
-    const std::unordered_set<std::string>* get_providers(std::string_view capability);
+    std::unordered_set<std::string> get_providers(std::string_view capability);
 
     void add_reverse_dep(std::string_view dep, std::string_view pkg);
     void remove_reverse_dep(std::string_view dep, std::string_view pkg);
-    const std::unordered_set<std::string>* get_reverse_deps(std::string_view name);
+    std::unordered_set<std::string> get_reverse_deps(std::string_view name);
 
     void ensure_reverse_deps();
     void ensure_essentials();

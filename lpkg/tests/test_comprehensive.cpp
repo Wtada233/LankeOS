@@ -105,7 +105,7 @@ TEST_F(ComprehensiveTest, ExplicitVersionDowngrade) {
 
     // 检查版本是否回到了 1.0
     {
-        std::ifstream pkgs(test_root / "etc/lpkg/pkgs");
+        std::ifstream pkgs(PKGS_FILE);
         std::string line;
         bool found = false;
         while (std::getline(pkgs, line)) {

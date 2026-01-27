@@ -225,7 +225,7 @@ TEST_F(PackageManagerTest, VersionConstraints) {
     
     // Verify lib is installed by checking the pkgs file manually
     {
-        std::ifstream pkgs_file(test_root / "etc" / "lpkg" / "pkgs");
+        std::ifstream pkgs_file(PKGS_FILE);
         std::string line;
         bool found = false;
         while (std::getline(pkgs_file, line)) {
@@ -318,7 +318,7 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
 
     // 4. Verify both are installed
     {
-        std::ifstream pkgs_file(test_root / "etc" / "lpkg" / "pkgs");
+        std::ifstream pkgs_file(PKGS_FILE);
         std::string line;
         int count = 0;
         while (std::getline(pkgs_file, line)) {
@@ -333,7 +333,7 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
 
     // 6. Verify openssl is still there
     {
-        std::ifstream pkgs_file(test_root / "etc" / "lpkg" / "pkgs");
+        std::ifstream pkgs_file(PKGS_FILE);
         std::string line;
         bool found_openssl = false;
         while (std::getline(pkgs_file, line)) {
