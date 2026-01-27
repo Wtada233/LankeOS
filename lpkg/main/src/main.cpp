@@ -62,6 +62,7 @@ int main(int argc, char* argv[]) {
             ("testing", get_string("info.testing_desc"), cxxopts::value<bool>()->default_value("false"))
             ("root", get_string("help.root_dir"), cxxopts::value<std::string>())
             ("arch", get_string("help.target_arch"), cxxopts::value<std::string>())
+            ("hash", get_string("info.hash_desc"), cxxopts::value<std::string>())
             ("command", "", cxxopts::value<std::string>())
             ("packages", "", cxxopts::value<std::vector<std::string>>());
 
@@ -72,6 +73,11 @@ int main(int argc, char* argv[]) {
         if (result.count("help")) {
             print_usage(options);
             return 0;
+        }
+
+        std::string hash_file;
+        if (result.count("hash")) {
+            hash_file = result["hash"].as<std::string>();
         }
 
         if (result.count("no-hooks")) {
@@ -129,7 +135,7 @@ int main(int argc, char* argv[]) {
         if (command == "install") {
             pre_operation_check(result, usage_printer, 1);
             const auto& packages = result["packages"].as<std::vector<std::string>>();
-            install_packages(packages);
+            install_packages(packages, hash_file);
             log_info(get_string("info.install_complete"));
         } else if (command == "remove") {
             pre_operation_check(result, usage_printer, 1);
