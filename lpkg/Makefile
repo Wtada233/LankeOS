@@ -69,13 +69,13 @@ coverage: TEST_LIBS += -lgcov
 coverage: clean test
 	@mkdir -p $(BUILD_DIR)/coverage
 	@if command -v lcov > /dev/null; then \
-		lcov --capture --directory $(BUILD_DIR) --output-file $(BUILD_DIR)/coverage/coverage.info --ignore-errors mismatch; \
-		lcov --remove $(BUILD_DIR)/coverage/coverage.info '/usr/*' '*/third_party/*' '*/tests/*' --output-file $(BUILD_DIR)/coverage/coverage_filtered.info; \
-		genhtml $(BUILD_DIR)/coverage/coverage_filtered.info --output-directory $(BUILD_DIR)/coverage/html; \
+		lcov --rc geninfo_unexecuted_blocks=1 --capture --directory $(BUILD_DIR) --output-file $(BUILD_DIR)/coverage/coverage.info --ignore-errors mismatch,inconsistent,unused; \
+		lcov --ignore-errors mismatch,inconsistent,unused --remove $(BUILD_DIR)/coverage/coverage.info '/usr/*' '*/third_party/*' '*/tests/*' --output-file $(BUILD_DIR)/coverage/coverage_filtered.info; \
+		genhtml --ignore-errors mismatch,inconsistent --output-directory $(BUILD_DIR)/coverage/html $(BUILD_DIR)/coverage/coverage_filtered.info; \
 		echo "Coverage report generated at $(BUILD_DIR)/coverage/html/index.html"; \
 	else \
 		echo "lcov not found, using gcov summary:"; \
-		gcov -n $(MAIN_SRCS) --object-directory $(BUILD_DIR)/main; \
+		gcov -n $(filter-out $(APP_SRC_DIR)/main.cpp, $(MAIN_SRCS)) --object-directory $(BUILD_DIR)/main; \
 	fi
 
 $(BUILD_DIR)/$(TARGET): $(MAIN_OBJS)
