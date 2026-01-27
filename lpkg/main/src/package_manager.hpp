@@ -38,7 +38,7 @@ private:
 };
 
 void install_package(const std::string& pkg_name, const std::string& version);
-void install_packages(const std::vector<std::string>& pkg_args);
+void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file = "");
 void remove_package(const std::string& pkg_name, bool force = false);
 void autoremove();
 void upgrade_packages();

@@ -27,6 +27,7 @@ info.autoremove_desc=  autoremove               Remove unused packages.
 info.upgrade_desc=  upgrade                  Upgrade all packages.
 info.man_desc=  man <pkg>                  Show man page.
 info.help_desc=Print usage
+info.hash_desc=Path to a hash file for local installation verification
 info.force_desc=Force remove
 info.force_overwrite_desc=Overwrite untracked files
 info.no_hooks_desc=Do not run post-install or pre-remove hooks

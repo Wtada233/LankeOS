@@ -633,16 +633,28 @@ void install_package(const std::string& pkg_name, const std::string& version) {
     install_packages({arg});
 }
 
-void install_packages(const std::vector<std::string>& pkg_args) {
+void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file_path) {
     force_reload_cache(); TmpDirManager tmp; Repository repo;
     try { repo.load_index(); } catch (const std::exception& e) { log_warning(string_format("warning.repo_index_load_failed", e.what())); }
     std::map<std::string, InstallPlan> plan; std::vector<std::string> order; std::map<std::string, fs::path> locals;
     std::vector<std::pair<std::string, std::string>> targets;
+
+    std::string provided_hash;
+    if (!hash_file_path.empty()) {
+        if (!fs::exists(hash_file_path)) throw LpkgException(string_format("error.open_file_failed", hash_file_path.c_str()));
+        std::ifstream hf(hash_file_path);
+        if (!(hf >> provided_hash)) throw LpkgException("Failed to read hash from provided file.");
+    }
+
     for (const auto& arg : pkg_args) {
         fs::path p(arg);
         if (p.extension() == ".zst" || p.extension() == ".lpkg" || arg.find('/') != std::string::npos) {
             if (fs::exists(p)) { 
-                try { auto nv = parse_package_filename(p.filename().string()); locals[nv.first] = fs::absolute(p); targets.emplace_back(nv.first, nv.second); } 
+                try { 
+                    auto nv = parse_package_filename(p.filename().string()); 
+                    locals[nv.first] = fs::absolute(p); 
+                    targets.emplace_back(nv.first, nv.second); 
+                } 
                 catch (const std::exception& e) { log_error(string_format("warning.skip_invalid_local_pkg", arg.c_str(), e.what())); }
             } else log_error(string_format("error.local_pkg_not_found", arg.c_str()));
         } else {
@@ -651,8 +663,26 @@ void install_packages(const std::vector<std::string>& pkg_args) {
             targets.emplace_back(n, v);
         }
     }
+
+    if (!provided_hash.empty() && locals.empty()) {
+        throw LpkgException("--hash can only be used with local package installations.");
+    }
+
     ResolutionContext ctx{{}, {}, repo, locals, plan, order};
-    for (const auto& t : targets) { std::set<std::string> vs; resolve_package_dependencies(t.first, t.second, true, ctx, vs); }
+    for (const auto& t : targets) { 
+        std::set<std::string> vs; 
+        resolve_package_dependencies(t.first, t.second, true, ctx, vs); 
+    }
+
+    // Assign provided hash to the local packages in the plan
+    if (!provided_hash.empty()) {
+        for (auto& [name, p] : plan) {
+            if (!p.local_path.empty()) {
+                p.sha256 = provided_hash;
+            }
+        }
+    }
+
     if (plan.empty()) { log_info(get_string("info.all_packages_already_installed")); return; }
     std::set<std::string> broken = check_plan_consistency(plan);
     if (!broken.empty()) {

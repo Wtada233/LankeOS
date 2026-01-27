@@ -11,6 +11,9 @@ MAIN_DIR = main
 APP_SRC_DIR = $(MAIN_DIR)/src
 TESTS_DIR = tests
 
+# --- Coverage Flags ---
+COVERAGE_FLAGS = -fprofile-arcs -ftest-coverage
+
 # --- Install Directories (Matching original main/Makefile exactly) ---
 PREFIX ?= /usr
 SYSCONFDIR ?= /etc
@@ -40,6 +43,7 @@ TEST_CXXFLAGS = -std=c++20 -Wall -Wextra -g -I$(MAIN_DIR)/third_party/include -I
 # Source files
 MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp)
 TEST_SRCS = $(wildcard $(TESTS_DIR)/*.cpp)
+# No changes needed here as wildcard picks it up, but ensure BUILD_DIR/tests matches
 
 # Object files
 MAIN_OBJS = $(patsubst $(APP_SRC_DIR)/%.cpp,$(BUILD_DIR)/main/%.o,$(MAIN_SRCS))
@@ -51,12 +55,28 @@ LPKG_OBJS = $(filter-out $(BUILD_DIR)/main/main.o, $(MAIN_OBJS))
 # Dependency files
 DEPS = $(MAIN_OBJS:.o=.d) $(TEST_OBJS:.o=.d)
 
-.PHONY: all clean install uninstall static test
+.PHONY: all clean install uninstall static test coverage
 
 all: $(BUILD_DIR)/$(TARGET)
 
 test: $(BUILD_DIR)/$(TEST_TARGET)
 	./$(BUILD_DIR)/$(TEST_TARGET)
+
+coverage: CXXFLAGS += $(COVERAGE_FLAGS)
+coverage: TEST_CXXFLAGS += $(COVERAGE_FLAGS)
+coverage: LIBS += -lgcov
+coverage: TEST_LIBS += -lgcov
+coverage: clean test
+	@mkdir -p $(BUILD_DIR)/coverage
+	@if command -v lcov > /dev/null; then \
+		lcov --capture --directory $(BUILD_DIR) --output-file $(BUILD_DIR)/coverage/coverage.info --ignore-errors mismatch; \
+		lcov --remove $(BUILD_DIR)/coverage/coverage.info '/usr/*' '*/third_party/*' '*/tests/*' --output-file $(BUILD_DIR)/coverage/coverage_filtered.info; \
+		genhtml $(BUILD_DIR)/coverage/coverage_filtered.info --output-directory $(BUILD_DIR)/coverage/html; \
+		echo "Coverage report generated at $(BUILD_DIR)/coverage/html/index.html"; \
+	else \
+		echo "lcov not found, using gcov summary:"; \
+		gcov -n $(MAIN_SRCS) --object-directory $(BUILD_DIR)/main; \
+	fi
 
 $(BUILD_DIR)/$(TARGET): $(MAIN_OBJS)
 	@mkdir -p $(@D)
