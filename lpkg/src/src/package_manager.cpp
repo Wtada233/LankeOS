@@ -29,28 +29,54 @@
 #include <sys/mount.h> 
 #include <sys/wait.h> 
 #include <unistd.h> 
+#include <ranges>
+#include <concepts>
 
 namespace fs = std::filesystem;
 
 namespace {
 
 // Forward declarations for internal logic
-void run_hook(const std::string& pkg_name, const std::string& hook_name);
+void run_hook(std::string_view pkg_name, std::string_view hook_name);
 
 void force_reload_cache() {
     Cache::instance().load();
 }
 
-bool is_essential_package(const std::string& pkg_name) {
+bool is_essential_package(std::string_view pkg_name) {
     return Cache::instance().is_essential(pkg_name);
 }
 
-std::string get_installed_version(const std::string& pkg_name) {
+std::string get_installed_version(std::string_view pkg_name) {
     return Cache::instance().get_installed_version(pkg_name);
 }
 
-bool is_manually_installed(const std::string& pkg_name) {
+bool is_manually_installed(std::string_view pkg_name) {
     return Cache::instance().is_held(pkg_name);
+}
+
+// Modern helper for executing processes
+int execute_process(const std::vector<std::string>& args, bool use_chroot = false) {
+    pid_t pid = fork();
+    if (pid == -1) return -1;
+    if (pid == 0) {
+        if (use_chroot) {
+            if (unshare(CLONE_NEWNS) != 0) _exit(1);
+            mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL);
+            if (chroot(ROOT_DIR.c_str()) != 0) _exit(1);
+            if (chdir("/") != 0) _exit(1);
+        }
+        
+        std::vector<char*> c_args;
+        for (const auto& arg : args) c_args.push_back(const_cast<char*>(arg.c_str()));
+        c_args.push_back(nullptr);
+        
+        execv(c_args[0], c_args.data());
+        _exit(1);
+    }
+    int status;
+    waitpid(pid, &status, 0);
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 
 class ChrootMountGuard {
@@ -90,53 +116,28 @@ private:
     std::vector<fs::path> mounted_paths_;
 };
 
-void run_hook(const std::string& pkg_name, const std::string& hook_name) {
+void run_hook(std::string_view pkg_name, std::string_view hook_name) {
     if (get_no_hooks_mode()) return;
     fs::path hook_path = HOOKS_DIR / pkg_name / hook_name;
     if (fs::exists(hook_path) && fs::is_regular_file(hook_path)) {
-        log_info(string_format("info.running_hook", hook_name.c_str()));
+        log_info(string_format("info.running_hook", std::string(hook_name).c_str()));
         bool use_chroot = (ROOT_DIR != "/" && !ROOT_DIR.empty());
         if (use_chroot) {
             if (!fs::exists(ROOT_DIR / "bin/sh")) {
-                log_warning(string_format("warning.hook_failed_setup", hook_name.c_str(), " /bin/sh not found in target root. Skipping."));
+                log_warning(string_format("warning.hook_failed_setup", std::string(hook_name).c_str(), " /bin/sh not found in target root. Skipping."));
                 return;
             }
-            pid_t pid = fork();
-            if (pid == -1) {
-                log_warning(string_format("error.hook_fork_failed", std::string(strerror(errno)).c_str()));
-                return;
-            } else if (pid == 0) {
-                if (unshare(CLONE_NEWNS) != 0) _exit(1);
-                mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL);
-                {
-                    ChrootMountGuard mount_guard(ROOT_DIR);
-                    if (chroot(ROOT_DIR.c_str()) != 0) _exit(1);
-                    if (chdir("/") != 0) _exit(1);
-                    fs::path hook_rel = fs::relative(hook_path, ROOT_DIR);
-                    std::string hook_cmd = "/" + hook_rel.string();
-                    execl("/bin/sh", "sh", "-c", hook_cmd.c_str(), (char*)NULL);
-                    _exit(1);
-                }
-            } else {
-                int status;
-                waitpid(pid, &status, 0);
-                if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-                     log_warning(string_format("warning.hook_failed_exec", hook_name.c_str(), std::to_string(WEXITSTATUS(status)).c_str()));
-                }
+            ChrootMountGuard mount_guard(ROOT_DIR);
+            fs::path hook_rel = fs::relative(hook_path, ROOT_DIR);
+            std::string hook_cmd = "/" + hook_rel.string();
+            int ret = execute_process({"/bin/sh", "-c", hook_cmd}, true);
+            if (ret != 0) {
+                log_warning(string_format("warning.hook_failed_exec", std::string(hook_name).c_str(), std::to_string(ret).c_str()));
             }
         } else {
-            pid_t pid = fork();
-            if (pid == -1) {
-                log_warning(string_format("error.hook_fork_failed", std::string(strerror(errno)).c_str()));
-            } else if (pid == 0) {
-                execl("/bin/sh", "sh", "-c", hook_path.c_str(), (char*)NULL);
-                _exit(1);
-            } else {
-                int status;
-                waitpid(pid, &status, 0);
-                if (WIFEXITED(status) && WEXITSTATUS(status) != 0) {
-                    log_warning(string_format("warning.hook_failed_exec", hook_name.c_str(), std::to_string(WEXITSTATUS(status)).c_str()));
-                }
+            int ret = execute_process({"/bin/sh", "-c", hook_path.string()});
+            if (ret != 0) {
+                log_warning(string_format("warning.hook_failed_exec", std::string(hook_name).c_str(), std::to_string(ret).c_str()));
             }
         }
     }
@@ -178,12 +179,11 @@ void InstallationTask::rollback_files() {
     for (const auto& file : installed_files_) {
         try { if (fs::exists(file) || fs::is_symlink(file)) fs::remove(file); } catch (...) {}
     }
-    for (const auto& backup : backups_) {
-        try { if (fs::exists(backup.second)) fs::rename(backup.second, backup.first); } catch (...) {}
+    for (const auto& [physical, backup] : backups_) {
+        try { if (fs::exists(backup)) fs::rename(backup, physical); } catch (...) {}
     }
-    std::vector<fs::path> sorted_dirs(created_dirs_.begin(), created_dirs_.end());
-    std::sort(sorted_dirs.rbegin(), sorted_dirs.rend());
-    for (const auto& dir : sorted_dirs) {
+    
+    for (const auto& dir : created_dirs_ | std::views::reverse) {
         if (fs::exists(dir) && fs::is_directory(dir) && fs::is_empty(dir)) {
             try { fs::remove(dir); } catch (...) {}
         }
@@ -211,11 +211,11 @@ void InstallationTask::commit() {
                 std::string line;
                 while (std::getline(f, line)) if (!line.empty()) new_files.insert(line);
             }
+            
             for (const auto& old_file : old_files) {
                 if (!new_files.contains(old_file)) {
                     auto& cache = Cache::instance();
-                    const auto* owners = cache.get_file_owners(old_file);
-                    if (owners && owners->contains(pkg_name_)) {
+                    if (const auto* owners = cache.get_file_owners(old_file); owners && owners->contains(pkg_name_)) {
                         cache.remove_file_owner(old_file, pkg_name_);
                         if (cache.get_file_owners(old_file) == nullptr) {
                             fs::path physical_path = (fs::path(old_file).is_absolute()) ? ROOT_DIR / fs::path(old_file).relative_path() : ROOT_DIR / old_file;
@@ -227,13 +227,15 @@ void InstallationTask::commit() {
                     }
                 }
             }
+            
             fs::path old_dirs_list_path = FILES_DIR / (pkg_name_ + ".dirs");
             if (fs::exists(old_dirs_list_path)) {
                 std::ifstream f(old_dirs_list_path);
-                std::string line;
                 std::vector<fs::path> old_dirs;
-                while (std::getline(f, line)) if (!line.empty()) old_dirs.push_back(line);
-                std::sort(old_dirs.rbegin(), old_dirs.rend());
+                std::string line;
+                while (std::getline(f, line)) if (!line.empty()) old_dirs.emplace_back(line);
+                
+                std::ranges::sort(old_dirs, std::greater<>{});
                 for (const auto& d : old_dirs) {
                     fs::path physical_path = (d.is_absolute()) ? ROOT_DIR / d.relative_path() : ROOT_DIR / d;
                     if (fs::exists(physical_path) && fs::is_directory(physical_path) && fs::is_empty(physical_path)) {
@@ -243,7 +245,7 @@ void InstallationTask::commit() {
             }
         }
     } catch (...) { throw; }
-    for (const auto& backup : backups_) { fs::remove(backup.second); }
+    for (const auto& [physical, backup] : backups_) { try { fs::remove(backup); } catch (...) {} }
     backups_.clear();
     run_post_install_hook();
 }
@@ -325,8 +327,6 @@ void InstallationTask::copy_package_files() {
     log_info(get_string("info.copying_files"));
     std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
     std::string src, dest;
-    // No explicit lock needed here as we use thread-safe cache methods inside the loop if needed,
-    // but the loop itself uses cache.get_file_owners which is thread-safe.
     while (files_list >> src >> dest) {
         const fs::path src_path = tmp_pkg_dir_ / "content" / src;
         const fs::path logical_dest_path = fs::path(dest) / src;
@@ -335,8 +335,7 @@ void InstallationTask::copy_package_files() {
         fs::path parent = physical_dest_path.parent_path();
         std::vector<fs::path> to_create;
         while (!parent.empty() && parent != ROOT_DIR && !fs::exists(parent)) { to_create.push_back(parent); parent = parent.parent_path(); }
-        std::reverse(to_create.begin(), to_create.end());
-        for (const auto& d : to_create) { ensure_dir_exists(d); created_dirs_.insert(d); }
+        for (const auto& d : to_create | std::views::reverse) { ensure_dir_exists(d); created_dirs_.insert(d); }
         try {
             bool is_config = (src.size() >= 4 && src.substr(0, 4) == "etc/");
             fs::path final_dest_path = physical_dest_path;
@@ -381,9 +380,10 @@ void InstallationTask::register_package() {
             std::ifstream f(p); std::string l;
             while(std::getline(f, l)) {
                 if (!l.empty()) {
-                    if (l.back() == '\r') l.pop_back();
-                    std::stringstream ss(l); std::string dn; ss >> dn;
-                    if (!dn.empty()) cache.remove_reverse_dep(dn, pkg_name_);
+                    std::string_view sv = l;
+                    if (sv.back() == '\r') sv.remove_suffix(1);
+                    if (auto pos = sv.find_first_of(" \t<>="); pos != std::string_view::npos) sv = sv.substr(0, pos);
+                    if (!sv.empty()) cache.remove_reverse_dep(sv, pkg_name_);
                 }
             }
         }
@@ -402,10 +402,11 @@ void InstallationTask::register_package() {
     }
     while (std::getline(deps_in, d)) {
         if (!d.empty()) {
-            if (d.back() == '\r') d.pop_back();
-            deps_out << d << "\n";
-            std::stringstream ss(d); std::string dn; ss >> dn;
-            if (!dn.empty()) cache.add_reverse_dep(dn, pkg_name_);
+            std::string_view sv = d;
+            if (sv.back() == '\r') sv.remove_suffix(1);
+            deps_out << sv << "\n";
+            if (auto pos = sv.find_first_of(" \t<>="); pos != std::string_view::npos) sv = sv.substr(0, pos);
+            if (!sv.empty()) cache.add_reverse_dep(sv, pkg_name_);
         }
     }
     std::ifstream fl(FILES_DIR / (pkg_name_ + ".txt"));
@@ -482,8 +483,9 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
             std::string line;
             while (std::getline(deps_ss, line)) {
                 if (line.empty()) continue;
-                if (line.back() == '\r') line.pop_back();
-                std::stringstream ss(line); std::string dn, op, rv;
+                std::string_view sv = line;
+                if (sv.back() == '\r') sv.remove_suffix(1);
+                std::stringstream ss{std::string(sv)}; std::string dn, op, rv;
                 if (ss >> dn) { DependencyInfo d; d.name = dn; if (ss >> op >> rv) { d.op = op; d.version_req = rv; } deps.push_back(d); }
             }
             ctx.local_version_cache[local_path] = latest_version;
@@ -549,8 +551,9 @@ std::set<std::string> check_plan_consistency(const std::map<std::string, Install
             std::string line;
             while (std::getline(f, line)) {
                 if (line.empty()) continue;
-                if (line.back() == '\r') line.pop_back();
-                std::stringstream ss(line);
+                std::string_view sv = line;
+                if (sv.back() == '\r') sv.remove_suffix(1);
+                std::stringstream ss{std::string(sv)};
                 std::string dep_name, op, req_ver;
                 if (ss >> dep_name) {
                     if (plan.count(dep_name)) {
@@ -593,24 +596,26 @@ std::unordered_set<std::string> get_all_required_packages() {
     std::vector<std::string> q(req.begin(), req.end());
     size_t head = 0;
     while (head < q.size()) {
-        std::string curr = q[head++]; fs::path p = DEP_DIR / curr;
+        std::string curr = q[head++]; 
+        fs::path p = DEP_DIR / curr;
         if (fs::exists(p)) {
-            std::ifstream f(p); std::string d_line;
+            std::ifstream f(p);
+            std::string d_line;
             while (std::getline(f, d_line)) {
                 if (d_line.empty()) continue;
-                if (d_line.back() == '\r') d_line.pop_back();
-                std::stringstream ss(d_line); std::string d_name;
-                if (ss >> d_name) {
-                    if (cache.is_installed(d_name)) {
-                        if (!req.contains(d_name)) { req.insert(d_name); q.push_back(d_name); }
-                    } else {
-                        const auto* providers = cache.get_providers(d_name);
-                        if (providers) {
-                            for (const auto& provider : *providers) {
-                                if (cache.is_installed(provider) && !req.contains(provider)) {
-                                    req.insert(provider); q.push_back(provider);
-                                }
-                            }
+                std::string_view sv = d_line;
+                if (sv.back() == '\r') sv.remove_suffix(1);
+                if (auto space_pos = sv.find_first_of(" \t<>="); space_pos != std::string_view::npos) {
+                    sv = sv.substr(0, space_pos);
+                }
+                
+                std::string d_name(sv);
+                if (cache.is_installed(d_name)) {
+                    if (!req.contains(d_name)) { req.insert(d_name); q.push_back(d_name); }
+                } else if (const auto* providers = cache.get_providers(d_name); providers) {
+                    for (const auto& provider : *providers) {
+                        if (cache.is_installed(provider) && !req.contains(provider)) {
+                            req.insert(provider); q.push_back(provider);
                         }
                     }
                 }
@@ -720,8 +725,12 @@ void remove_package(const std::string& pkg_name, bool force) {
         if (fs::exists(p)) {
             std::ifstream f(p); std::string l;
             while(std::getline(f, l)) {
-                if (!l.empty()) { if (l.back() == '\r') l.pop_back(); std::stringstream ss(l); std::string dn; ss >> dn;
-                if (!dn.empty()) cache.remove_reverse_dep(dn, pkg_name); }
+                if (!l.empty()) { 
+                    std::string_view sv = l;
+                    if (sv.back() == '\r') sv.remove_suffix(1);
+                    if (auto pos = sv.find_first_of(" \t<>="); pos != std::string_view::npos) sv = sv.substr(0, pos);
+                    if (!sv.empty()) cache.remove_reverse_dep(sv, pkg_name); 
+                }
             }
         }
     }
@@ -735,34 +744,33 @@ void remove_package_files(const std::string& pkg_name, bool force) {
     if (fs::exists(list)) {
         std::map<std::string, std::vector<std::string>> shared;
         auto& cache = Cache::instance();
-        std::ifstream f(list); std::string l;
+        std::ifstream f(list);
+        std::string l;
+        std::vector<fs::path> paths;
         while (std::getline(f, l)) {
             if (l.empty()) continue;
-            const auto* owners = cache.get_file_owners(l);
-            if (owners) {
+            paths.emplace_back(l);
+            if (const auto* owners = cache.get_file_owners(l); owners) {
                 for (const auto& owner : *owners) if (owner != pkg_name) shared[l].push_back(owner);
             }
         }
         if (!shared.empty() && !force) {
             std::string msg = get_string("error.shared_file_header") + "\n";
             for (const auto& [file, owners] : shared) {
-                std::string os; for(size_t i=0; i<owners.size(); ++i) os += owners[i] + (i==owners.size()-1 ? "" : ", ");
+                std::string os; 
+                for(size_t i=0; i<owners.size(); ++i) os += owners[i] + (i==owners.size()-1 ? "" : ", ");
                 msg += "  " + string_format("error.shared_file_entry", file.c_str(), os.c_str()) + "\n";
             }
             throw LpkgException(msg + get_string("error.removal_aborted"));
         }
-        f.clear(); f.seekg(0);
-        std::vector<fs::path> paths; while (std::getline(f, l)) if (!l.empty()) paths.emplace_back(l);
-        std::sort(paths.rbegin(), paths.rend());
+        
+        std::ranges::sort(paths, std::greater<>{});
         int count = 0;
         for (const auto& p : paths) {
             fs::path phys = (p.is_absolute()) ? ROOT_DIR / p.relative_path() : ROOT_DIR / p;
             if (fs::exists(phys) || fs::is_symlink(phys)) {
-                const auto* owners = cache.get_file_owners(p.string());
-                bool owned_by_me = (owners && owners->contains(pkg_name));
-                bool owned_by_others = (owners && owners->size() > 1);
-                if (owned_by_me) {
-                    if (!owned_by_others) {
+                if (const auto* owners = cache.get_file_owners(p.string()); owners && owners->contains(pkg_name)) {
+                    if (owners->size() == 1) {
                         try { fs::remove(phys); } catch (...) {}
                         count++; 
                     } else {
@@ -771,26 +779,32 @@ void remove_package_files(const std::string& pkg_name, bool force) {
                 }
             }
         }
-        log_info(string_format("info.files_removed", count)); fs::remove(list);
+        log_info(string_format("info.files_removed", count)); 
+        fs::remove(list);
         for (const auto& p : paths) {
             cache.remove_file_owner(p.string(), pkg_name);
         }
     }
+    
     const fs::path dlist = FILES_DIR / (pkg_name + ".dirs");
     if (fs::exists(dlist)) {
-        std::ifstream f(dlist); std::string l; std::vector<fs::path> ps; 
+        std::ifstream f(dlist);
+        std::vector<fs::path> ps;
+        std::string l;
         while (std::getline(f, l)) if (!l.empty()) ps.emplace_back(l);
-        std::sort(ps.rbegin(), ps.rend());
+        std::ranges::sort(ps, std::greater<>{});
         for (const auto& d : ps) {
             fs::path phys = (d.is_absolute()) ? ROOT_DIR / d.relative_path() : ROOT_DIR / d;
             if (fs::exists(phys) && fs::is_directory(phys) && fs::is_empty(phys)) try { fs::remove(phys); } catch (...) {}
         }
         fs::remove(dlist);
     }
+    
     const fs::path plist = FILES_DIR / (pkg_name + ".provides");
     if (fs::exists(plist)) {
         auto& cache = Cache::instance();
-        std::ifstream f(plist); std::string c;
+        std::ifstream f(plist);
+        std::string c;
         while (std::getline(f, c)) if (!c.empty()) {
             cache.remove_provider(c, pkg_name);
         }
