@@ -61,21 +61,13 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
         if (!current_path) continue;
 
         // SECURITY: Path traversal vulnerability mitigation.
-        fs::path entry_path = current_path;
-
-        // Sanitize path: reject absolute paths or paths containing ".." components.
-        if (entry_path.is_absolute()) {
-            throw LpkgException(string_format("error.malicious_path_in_archive", entry_path.string()));
+        fs::path dest_path;
+        try {
+            dest_path = validate_path(current_path, output_dir);
+        } catch (const LpkgException& e) {
+             throw LpkgException(string_format("error.malicious_path_in_archive", current_path));
         }
 
-        fs::path normalized_entry_path = entry_path.lexically_normal();
-        for (const auto& component : normalized_entry_path) {
-            if (component == "..") {
-                throw LpkgException(string_format("error.malicious_path_in_archive", entry_path.string()));
-            }
-        }
-
-        fs::path dest_path = output_dir / normalized_entry_path;
         archive_entry_set_pathname(entry, dest_path.c_str());
 
         r = archive_write_header(ext.get(), entry);

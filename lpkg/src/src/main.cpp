@@ -59,6 +59,7 @@ int main(int argc, char* argv[]) {
             ("force-overwrite", "Overwrite untracked files", cxxopts::value<bool>()->default_value("false"))
             ("no-hooks", "Do not run post-install or pre-remove hooks", cxxopts::value<bool>()->default_value("false"))
             ("no-deps", "Do not resolve or install dependencies", cxxopts::value<bool>()->default_value("false"))
+            ("testing", "Enable testing mode", cxxopts::value<bool>()->default_value("false"))
             ("root", get_string("help.root_dir"), cxxopts::value<std::string>())
             ("arch", get_string("help.target_arch"), cxxopts::value<std::string>())
             ("command", "", cxxopts::value<std::string>())
@@ -79,6 +80,10 @@ int main(int argc, char* argv[]) {
 
         if (result.count("no-deps")) {
             set_no_deps_mode(result["no-deps"].as<bool>());
+        }
+
+        if (result.count("testing")) {
+            set_testing_mode(result["testing"].as<bool>());
         }
 
         if (result.count("root")) {

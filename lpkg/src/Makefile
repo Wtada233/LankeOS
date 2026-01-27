@@ -28,9 +28,10 @@ CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -I./third_party/include \
            -DLPKG_DOCS_DIR=\"$(INSTALL_DOCS_DIR)\" \
            -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\"
 
-SRCS = $(wildcard $(SRC_DIR)/*.cpp)
-OBJS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(SRCS))
-DEPS = $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.d,$(SRCS))
+SRCS = $(wildcard $(SRC_DIR)/*.cpp) $(wildcard src/*.cpp)
+OBJS = $(patsubst src/%.cpp,$(BUILD_DIR)/%.o,$(filter src/%.cpp,$(SRCS))) \
+       $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(filter $(SRC_DIR)/%.cpp,$(SRCS)))
+DEPS = $(OBJS:.o=.d)
 
 .PHONY: all clean install uninstall static
 
