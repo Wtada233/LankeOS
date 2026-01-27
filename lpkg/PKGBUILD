@@ -1,5 +1,5 @@
 pkgname=lpkg
-pkgver=0.1.1
+pkgver=1.0.0
 pkgrel=1
 pkgdesc="LankeOS Package Manager"
 arch=('x86_64')
