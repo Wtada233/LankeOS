@@ -7,6 +7,7 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #include <cerrno>
 #include <cstdlib>

@@ -60,10 +60,13 @@ void init_localization() {
 
     fs::path exec_dir = get_executable_dir();
     fs::path relative_l10n_dir = exec_dir / ".." / "l10n"; // Assuming l10n is one level up from build/
+    fs::path main_l10n_dir = exec_dir / ".." / "main" / "l10n"; // Support for main/l10n layout
     fs::path src_l10n_dir = exec_dir / ".." / "src" / "l10n"; // Support for tests directory (tests/../src/l10n)
 
     if (fs::exists(relative_l10n_dir) && fs::is_directory(relative_l10n_dir)) {
         load_strings(lang, relative_l10n_dir);
+    } else if (fs::exists(main_l10n_dir) && fs::is_directory(main_l10n_dir)) {
+        load_strings(lang, main_l10n_dir);
     } else if (fs::exists(src_l10n_dir) && fs::is_directory(src_l10n_dir)) {
         load_strings(lang, src_l10n_dir);
     } else {

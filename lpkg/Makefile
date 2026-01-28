@@ -1,7 +1,18 @@
 # Root Makefile for lpkg
 CXX ?= g++
-LIBS = -lcurl -larchive -lfmt -lcrypto
+
+# Use pkg-config to resolve dependencies
+# Removed libcares from explicit list as libcurl should bring it in if needed
+PKGS = libcurl libarchive libcrypto
+LIBS = $(shell pkg-config --libs $(PKGS))
 TEST_LIBS = $(LIBS) -lgtest -lgtest_main -lpthread
+
+# Override LIBS for static build
+ifeq ($(findstring static,$(MAKECMDGOALS)),static)
+    # Using --start-group/--end-group to handle complex static dependency chains
+    # We use pkg-config --static to get all transitive dependencies
+    LIBS = -Wl,--start-group $(shell pkg-config --libs --static $(PKGS)) -Wl,--end-group -static
+endif
 
 TARGET = lpkg
 TEST_TARGET = run_tests
@@ -14,7 +25,7 @@ TESTS_DIR = tests
 # --- Coverage Flags ---
 COVERAGE_FLAGS = -fprofile-arcs -ftest-coverage
 
-# --- Install Directories (Matching original main/Makefile exactly) ---
+# --- Install Directories ---
 PREFIX ?= /usr
 SYSCONFDIR ?= /etc
 LOCALSTATEDIR ?= /var
@@ -27,34 +38,28 @@ INSTALL_DOCS_DIR = $(INSTALL_SHARE_DIR)/docs
 INSTALL_LOCK_DIR = $(DESTDIR)$(LOCALSTATEDIR)/lpkg
 
 # Pass paths to C++ code
-# These macros must match the original Makefile's behavior.
 CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \
            -DLPKG_CONF_DIR=\"$(INSTALL_CONF_DIR)\" \
            -DLPKG_L10N_DIR=\"$(INSTALL_L10N_DIR)\" \
            -DLPKG_DOCS_DIR=\"$(INSTALL_DOCS_DIR)\" \
-           -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\"
+           -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\" \
+           -DFMT_HEADER_ONLY
 
 TEST_CXXFLAGS = -std=c++20 -Wall -Wextra -g -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \
            -DLPKG_CONF_DIR=\"$(INSTALL_CONF_DIR)\" \
            -DLPKG_L10N_DIR=\"$(INSTALL_L10N_DIR)\" \
            -DLPKG_DOCS_DIR=\"$(INSTALL_DOCS_DIR)\" \
-           -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\"
+           -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\" \
+           -DFMT_HEADER_ONLY
 
-# Source files
 MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp)
 TEST_SRCS = $(wildcard $(TESTS_DIR)/*.cpp)
-
-# Object files
 MAIN_OBJS = $(patsubst $(APP_SRC_DIR)/%.cpp,$(BUILD_DIR)/main/%.o,$(MAIN_SRCS))
 TEST_OBJS = $(patsubst $(TESTS_DIR)/%.cpp,$(BUILD_DIR)/tests/%.o,$(TEST_SRCS))
-
-# App objects excluding main.o for testing
 LPKG_OBJS = $(filter-out $(BUILD_DIR)/main/main.o, $(MAIN_OBJS))
-
-# Dependency files
 DEPS = $(MAIN_OBJS:.o=.d) $(TEST_OBJS:.o=.d)
 
-# Handle coverage mode flags internally to avoid shell quoting issues
+# Handle coverage mode flags internally
 ifeq ($(COVERAGE_MODE),1)
     CXXFLAGS += $(COVERAGE_FLAGS)
     TEST_CXXFLAGS += $(COVERAGE_FLAGS)
@@ -62,35 +67,24 @@ ifeq ($(COVERAGE_MODE),1)
     TEST_LIBS += -lgcov
 endif
 
-.PHONY: all clean install uninstall static test coverage
+.PHONY: all clean install uninstall static test
 
 all: $(BUILD_DIR)/$(TARGET)
 
-test: $(BUILD_DIR)/$(TEST_TARGET)
-	./$(BUILD_DIR)/$(TEST_TARGET)
-
-# Coverage target using a temporary directory to avoid polluting the main build
-coverage:
-	@echo "Starting coverage build in temporary directory..."
-	@rm -rf build_coverage coverage_report
-	@mkdir -p build_coverage
-	@$(MAKE) BUILD_DIR=build_coverage COVERAGE_MODE=1 build_coverage_internal
+test:
+	@echo "Starting comprehensive test suite with coverage..."
+	@rm -rf build_test coverage_report
+	@mkdir -p build_test
+	@$(MAKE) BUILD_DIR=build_test COVERAGE_MODE=1 build_test_internal
 	@mkdir -p coverage_report
-	@if command -v lcov > /dev/null; then \
-		lcov --rc geninfo_unexecuted_blocks=1 --capture --directory build_coverage --output-file build_coverage/coverage.info --ignore-errors mismatch,inconsistent,unused; \
-		lcov --ignore-errors mismatch,inconsistent,unused --remove build_coverage/coverage.info '/usr/*' '*/third_party/*' '*/tests/*' --output-file build_coverage/coverage_filtered.info; \
-		genhtml --ignore-errors mismatch,inconsistent --output-directory coverage_report build_coverage/coverage_filtered.info; \
-		echo "Coverage report generated at coverage_report/index.html"; \
-	else \
-		echo "lcov not found, using gcov summary:"; \
-		gcov -n $(filter-out $(APP_SRC_DIR)/main.cpp, $(MAIN_SRCS)) --object-directory build_coverage/main; \
-	fi
-	@rm -rf build_coverage
+	@lcov --rc geninfo_unexecuted_blocks=1 --capture --directory build_test --output-file build_test/coverage.info --ignore-errors mismatch,inconsistent,unused || true
+	@lcov --ignore-errors mismatch,inconsistent,unused --remove build_test/coverage.info '/usr/*' '*/third_party/*' '*/tests/*' --output-file build_test/coverage_filtered.info || true
+	@genhtml --ignore-errors mismatch,inconsistent --output-directory coverage_report build_test/coverage_filtered.info || true
+	@rm -rf build_test
 	@echo "------------------------------------------------------"
 	@echo "Coverage report is available in: coverage_report/index.html"
-	@echo "Temporary build files have been cleaned up."
 
-build_coverage_internal: $(BUILD_DIR)/$(TEST_TARGET)
+build_test_internal: $(BUILD_DIR)/$(TEST_TARGET)
 	./$(BUILD_DIR)/$(TEST_TARGET)
 
 $(BUILD_DIR)/$(TARGET): $(MAIN_OBJS)
