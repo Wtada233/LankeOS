@@ -4,6 +4,8 @@
 #include "package_manager.hpp"
 #include "utils.hpp"
 #include "cxxopts.hpp"
+#include "packer.hpp"
+#include "scanner.hpp"
 
 #include <curl/curl.h>
 #include <iostream>
@@ -30,6 +32,8 @@ void print_usage(const cxxopts::Options& options) {
     std::cerr << get_string("info.autoremove_desc") << std::endl;
     std::cerr << get_string("info.upgrade_desc") << std::endl;
     std::cerr << get_string("info.man_desc") << std::endl;
+    std::cerr << get_string("info.pack_desc") << std::endl;
+    std::cerr << get_string("info.scan_desc") << std::endl;
 }
 
 #include <optional>
@@ -55,6 +59,8 @@ int main(int argc, char* argv[]) {
 
         options.add_options()
             ("h,help", get_string("info.help_desc"))
+            ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
+            ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value("/tmp/lankepkg"))
             ("non-interactive", get_string("info.non_interactive_option_desc"), cxxopts::value<std::string>()->implicit_value("n"))
             ("force", get_string("info.force_desc"), cxxopts::value<bool>()->default_value("false"))
             ("force-overwrite", get_string("info.force_overwrite_desc"), cxxopts::value<bool>()->default_value("false"))
@@ -158,6 +164,38 @@ int main(int argc, char* argv[]) {
         } else if (command == "man") {
             pre_operation_check(result, usage_printer, 1, 1);
             show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
+        } else if (command == "pack") {
+            std::string output_file;
+            if (result.count("output")) {
+                 output_file = result["output"].as<std::string>();
+            } else {
+                 throw LpkgException(get_string("error.pack_no_output"));
+            }
+            std::string source_dir = result["source"].as<std::string>();
+            pack_package(output_file, source_dir);
+        } else if (command == "scan") {
+            check_root();
+            init_filesystem();
+            // If root is overridden via --root, main calls set_root_path.
+            // But if user wants to scan a SPECIFIC directory that is NOT the system root (e.g. testing),
+            // they can rely on the fact that scanner uses ROOT_DIR (which set_root_path sets).
+            // However, to be more explicit/flexible as per request "can modify scan dir", 
+            // if we want to scan a dir but keep DB from somewhere else, that's complex.
+            // Assuming "scan directory" means the target root we are operating on.
+            // So implicit use of ROOT_DIR via config.cpp is correct for LFS context.
+            // But to allow 'scan' to take an optional argument for directory?
+            // "give scan a scan directory, default root directory". 
+            // Let's check if user provided a package argument for scan?
+            // "scan <dir>" ?
+            // Let's support an optional positional argument for scan.
+            std::string scan_root;
+            if (result.count("packages")) {
+                auto pkgs = result["packages"].as<std::vector<std::string>>();
+                if (!pkgs.empty()) {
+                    scan_root = pkgs[0];
+                }
+            }
+            scan_orphans(scan_root);
         } else {
             usage_printer();
             return 1;

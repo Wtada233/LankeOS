@@ -1,0 +1,32 @@
+FROM alpine:3.19
+
+# 安装 3.19 稳定版的工具链和核心静态库
+# 3.19 应该包含 c-ares-static
+RUN apk add --no-cache \
+    build-base \
+    pkgconfig \
+    curl-dev \
+    curl-static \
+    libarchive-dev \
+    libarchive-static \
+    openssl-dev \
+    openssl-libs-static \
+    zlib-static \
+    zstd-static \
+    lz4-static \
+    bzip2-static \
+    xz-static \
+    brotli-static \
+    nghttp2-static \
+    libpsl-static \
+    libidn2-static \
+    libunistring-static \
+    c-ares-static \
+    acl-static \
+    expat-static \
+    fmt-dev
+
+WORKDIR /app
+
+# 编译前强制 clean
+CMD ["sh", "-c", "make clean && make static"]
