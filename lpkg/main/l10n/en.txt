@@ -166,6 +166,6 @@ cxxopts.default=default
 cxxopts.usage=Usage
 cxxopts.option_help=[OPTION...]
 cxxopts.arg=arg
-cxxopts.positional_help=positional parameters
+cxxopts.positional_help=
 error.pack_no_output=Please specify output file name with -o.
 error.some_failed=Some packages failed to install, but successfully installed packages were kept.
