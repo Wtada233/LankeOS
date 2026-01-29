@@ -166,6 +166,6 @@ cxxopts.default=默认
 cxxopts.usage=用法
 cxxopts.option_help=[选项...]
 cxxopts.arg=参数
-cxxopts.positional_help=位置参数
+cxxopts.positional_help=
 error.pack_no_output=请使用 -o 指定输出文件名。
 error.some_failed=部分软件包安装失败，但已成功安装的软件包已保留。
