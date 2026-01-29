@@ -54,6 +54,8 @@ void pack_package(const std::string& output_filename, const std::string& source_
 
     // 3. Robust Tar Packing
     fs::path abs_output = fs::absolute(output_filename);
+    ensure_dir_exists(abs_output.parent_path());
+    
     std::string tar_cmd = "tar -I zstd -cf " + abs_output.string() + 
                           " -C " + meta_dir.string() + " files.txt deps.txt man.txt hooks" +
                           " -C " + root_dir.parent_path().string() + " --transform='s|^root|content|' root";
