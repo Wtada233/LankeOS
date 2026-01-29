@@ -163,3 +163,4 @@ info.scan_desc=  scan                       扫描孤立文件。
 help.output_file=输出文件路径
 help.pack_source=打包的源目录 (默认: /tmp/lankepkg)
 error.pack_no_output=请使用 -o 指定输出文件名。
+error.some_failed=部分软件包安装失败，但已成功安装的软件包已保留。

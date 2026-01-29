@@ -735,7 +735,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     write_cache();
     TriggerManager::instance().run_all();
     if (any_failed) {
-        throw LpkgException("Some packages failed to install, but successfully installed packages were kept.");
+        throw LpkgException(get_string("error.some_failed"));
     }
     log_info(get_string("info.install_complete"));
 }

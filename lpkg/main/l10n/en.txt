@@ -163,3 +163,4 @@ info.scan_desc=  scan                       Scan for orphaned files.
 help.output_file=Output file path
 help.pack_source=Source directory for packing (default: /tmp/lankepkg)
 error.pack_no_output=Please specify output file name with -o.
+error.some_failed=Some packages failed to install, but successfully installed packages were kept.
