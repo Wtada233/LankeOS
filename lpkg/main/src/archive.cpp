@@ -47,11 +47,13 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
         ARCHIVE_EXTRACT_SECURE_NODOTDOT | 
         ARCHIVE_EXTRACT_UNLINK
     );
-    archive_write_disk_set_standard_lookup(ext.get());
+    // REMOVED: archive_write_disk_set_standard_lookup(ext.get());
+    // This function can cause segfaults in static binaries due to NSS issues in chroot.
 
     if (archive_read_open_filename(a.get(), archive_path.c_str(), 10240) != ARCHIVE_OK) {
-            throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + archive_error_string(a.get()));
-        }
+        const char* err = archive_error_string(a.get());
+        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Unknown error"));
+    }
 
     struct archive_entry* entry;
     int r = ARCHIVE_OK;
@@ -80,7 +82,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
         la_int64_t offset;
         while ((r = archive_read_data_block(a.get(), &buff, &size, &offset)) == ARCHIVE_OK) {
             if (archive_write_data_block(ext.get(), buff, size, offset) < ARCHIVE_OK) {
-                r = ARCHIVE_FATAL; // Ensure loop terminates
+                r = ARCHIVE_FATAL;
                 break;
             }
         }
@@ -95,8 +97,9 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
 
     log_info(string_format("info.extract_complete", count));
     
-    if (r != ARCHIVE_EOF) {
-        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + archive_error_string(a.get()));
+    if (r != ARCHIVE_EOF && r != ARCHIVE_OK) {
+        const char* err = archive_error_string(a.get());
+        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Unknown error"));
     }
 }
 
