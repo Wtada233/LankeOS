@@ -54,7 +54,8 @@ int main(int argc, char* argv[]) {
     try {
         init_localization();
 
-        cxxopts::Options options(argv[0], string_format("info.usage", argv[0]));
+        cxxopts::Options options(argv[0]);
+        options.custom_help(get_string("info.usage"));
         options.set_width(100);
 
         options.add_options()

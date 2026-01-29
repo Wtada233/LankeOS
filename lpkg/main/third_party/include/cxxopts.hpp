@@ -43,6 +43,7 @@ THE SOFTWARE.
 #include <vector>
 #include <algorithm>
 #include <locale>
+#include "localization.hpp"
 
 #ifdef CXXOPTS_NO_EXCEPTIONS
 #include <iostream>
@@ -1931,8 +1932,8 @@ class Options
   explicit Options(std::string program_name, std::string help_string = "")
   : m_program(std::move(program_name))
   , m_help_string(toLocalString(std::move(help_string)))
-  , m_custom_help("[OPTION...]")
-  , m_positional_help("positional parameters")
+  , m_custom_help(toLocalString(get_string("cxxopts.option_help")))
+  , m_positional_help(toLocalString(get_string("cxxopts.positional_help")))
   , m_show_positional(false)
   , m_allow_unrecognised(false)
   , m_width(76)
@@ -2157,7 +2158,7 @@ format_option
     result += " --" + toLocalString(l);
   }
 
-  auto arg = !o.arg_help.empty() ? toLocalString(o.arg_help) : "arg";
+  auto arg = !o.arg_help.empty() ? toLocalString(o.arg_help) : toLocalString(get_string("cxxopts.arg"));
 
   if (!o.is_boolean)
   {
@@ -2189,11 +2190,11 @@ format_description
   {
     if(!o.default_value.empty())
     {
-      desc += toLocalString(" (default: " + o.default_value + ")");
+      desc += toLocalString(" (" + get_string("cxxopts.default") + ": " + o.default_value + ")");
     }
     else
     {
-      desc += toLocalString(" (default: \"\")");
+      desc += toLocalString(" (" + get_string("cxxopts.default") + ": \"\")");
     }
   }
 
@@ -2882,7 +2883,7 @@ Options::help(const std::vector<std::string>& help_groups, bool print_usage) con
   String result = m_help_string;
   if(print_usage)
   {
-    result+= "\nUsage:\n  " + toLocalString(m_program);
+    result+= "\n" + toLocalString(get_string("cxxopts.usage")) + ":\n  " + toLocalString(m_program);
   }
 
   if (!m_custom_help.empty())
