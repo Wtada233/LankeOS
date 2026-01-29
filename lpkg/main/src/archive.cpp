@@ -58,7 +58,17 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     struct archive_entry* entry;
     int r = ARCHIVE_OK;
     long long count = 0;
-    while ((r = archive_read_next_header(a.get(), &entry)) == ARCHIVE_OK) {
+    while (true) {
+        r = archive_read_next_header(a.get(), &entry);
+        if (r == ARCHIVE_EOF) break;
+        if (r < ARCHIVE_OK) {
+            if (r < ARCHIVE_WARN) {
+                const char* err = archive_error_string(a.get());
+                throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Fatal read error"));
+            }
+            log_warning(archive_error_string(a.get()));
+        }
+
         const char* current_path = archive_entry_pathname(entry);
         if (!current_path) continue;
 
@@ -72,23 +82,62 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
 
         archive_entry_set_pathname(entry, dest_path.c_str());
 
-        r = archive_write_header(ext.get(), entry);
-        if (r < ARCHIVE_OK) {
-            break;
-        }
-
-        const void* buff;
-        size_t size;
-        la_int64_t offset;
-        while ((r = archive_read_data_block(a.get(), &buff, &size, &offset)) == ARCHIVE_OK) {
-            if (archive_write_data_block(ext.get(), buff, size, offset) < ARCHIVE_OK) {
-                r = ARCHIVE_FATAL;
-                break;
+        // Remap hardlink and symlink targets if they exist
+        const char* hardlink = archive_entry_hardlink(entry);
+        if (hardlink) {
+            try {
+                fs::path link_dest = validate_path(hardlink, output_dir);
+                archive_entry_set_hardlink(entry, link_dest.c_str());
+            } catch (...) {
+                archive_entry_set_hardlink(entry, nullptr); // Drop malicious/invalid links
             }
         }
 
-        if (r < ARCHIVE_OK) break;
-        archive_write_finish_entry(ext.get());
+        const char* symlink = archive_entry_symlink(entry);
+        if (symlink) {
+            try {
+                // For symlinks, we only remap if they are absolute. 
+                // Relative symlinks are usually package-internal and should be left alone
+                // unless they point outside via ../, which validate_path handles.
+                if (fs::path(symlink).is_absolute()) {
+                    fs::path link_dest = validate_path(symlink, output_dir);
+                    archive_entry_set_symlink(entry, link_dest.c_str());
+                }
+            } catch (...) {
+                archive_entry_set_symlink(entry, nullptr);
+            }
+        }
+
+        r = archive_write_header(ext.get(), entry);
+        if (r < ARCHIVE_OK) {
+            if (r < ARCHIVE_WARN) {
+                const char* err = archive_error_string(ext.get());
+                throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Fatal write error"));
+            }
+            log_warning(archive_error_string(ext.get()));
+        } else {
+            const void* buff;
+            size_t size;
+            la_int64_t offset;
+            while (true) {
+                r = archive_read_data_block(a.get(), &buff, &size, &offset);
+                if (r == ARCHIVE_EOF) break;
+                if (r < ARCHIVE_OK) {
+                    if (r < ARCHIVE_WARN) {
+                        const char* err = archive_error_string(a.get());
+                        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Data block read error"));
+                    }
+                    log_warning(archive_error_string(a.get()));
+                    break;
+                }
+                
+                if (archive_write_data_block(ext.get(), buff, size, offset) < ARCHIVE_OK) {
+                    const char* err = archive_error_string(ext.get());
+                    throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Data block write error"));
+                }
+            }
+            archive_write_finish_entry(ext.get());
+        }
 
         if (++count % 100 == 0) {
             log_info(string_format("info.extracting", count));
@@ -96,11 +145,6 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     }
 
     log_info(string_format("info.extract_complete", count));
-    
-    if (r != ARCHIVE_EOF && r != ARCHIVE_OK) {
-        const char* err = archive_error_string(a.get());
-        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Unknown error"));
-    }
 }
 
 std::string extract_file_from_archive(const fs::path& archive_path, const std::string& internal_path) {
