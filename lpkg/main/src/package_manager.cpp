@@ -281,45 +281,60 @@ void InstallationTask::download_and_verify_package() {
 void InstallationTask::extract_and_validate_package() {
     log_info(get_string("info.extracting_to_tmp"));
     extract_tar_zst(archive_path_, tmp_pkg_dir_);
-    for (const auto& file : {"man.txt", "deps.txt", "files.txt", "content/"}) {
-        if (!fs::exists(tmp_pkg_dir_ / file)) throw LpkgException(string_format("error.incomplete_package", (tmp_pkg_dir_ / file).string().c_str()));
+    static const std::vector<std::string> required_metadata = {"man.txt", "deps.txt", "files.txt", "content/"};
+    for (const auto& file : required_metadata) {
+        if (!fs::exists(tmp_pkg_dir_ / file)) {
+            throw LpkgException(string_format("error.incomplete_package", (tmp_pkg_dir_ / file).string().c_str()));
+        }
     }
 }
 
 void InstallationTask::check_for_file_conflicts() {
     std::map<std::string, std::string> conflicts;
     std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
-    std::string src, dest;
+    std::string line;
     auto& cache = Cache::instance();
-    while (files_list >> src >> dest) {
+    bool force_overwrite = get_force_overwrite_mode();
+    
+    while (std::getline(files_list, line)) {
+        if (line.empty()) continue;
+        std::stringstream ss(line);
+        std::string src, dest;
+        if (!(ss >> src >> dest)) continue;
+
         fs::path logical_dest_path = fs::path(dest) / src;
         std::string path_str = logical_dest_path.string();
+        
         auto owners = cache.get_file_owners(path_str);
         if (!owners.empty()) {
             bool owned_by_others = false;
             for (const auto& owner : owners) {
                 if (owner != pkg_name_) {
-                    conflicts[path_str] = owner;
+                    if (!force_overwrite) conflicts[path_str] = owner;
                     owned_by_others = true;
                     break;
                 }
             }
             if (owned_by_others) continue;
         }
+        
         if (old_version_to_replace_.empty()) {
-            fs::path physical_path = (logical_dest_path.is_absolute()) ? ROOT_DIR / logical_dest_path.relative_path() : ROOT_DIR / logical_dest_path;
-            if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
-                if (owners.empty()) {
-                    if (!get_force_overwrite_mode()) {
+            try {
+                fs::path physical_path = (logical_dest_path.is_absolute()) ? ROOT_DIR / logical_dest_path.relative_path() : ROOT_DIR / logical_dest_path;
+                if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
+                    if (owners.empty() && !force_overwrite) {
                         conflicts[path_str] = "unknown (manual file)";
                     }
                 }
-            }
+            } catch (...) {}
         }
     }
+    
     if (!conflicts.empty()) {
         std::string msg = get_string("error.file_conflict_header") + "\n";
-        for (const auto& [file, owner] : conflicts) msg += "  " + string_format("error.file_conflict_entry", file.c_str(), owner.c_str()) + "\n";
+        for (const auto& [file, owner] : conflicts) {
+            msg += "  " + string_format("error.file_conflict_entry", file.c_str(), owner.c_str()) + "\n";
+        }
         throw LpkgException(msg + get_string("error.installation_aborted"));
     }
 }
@@ -327,16 +342,26 @@ void InstallationTask::check_for_file_conflicts() {
 void InstallationTask::copy_package_files() {
     log_info(get_string("info.copying_files"));
     std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
-    std::string src, dest;
-    while (files_list >> src >> dest) {
+    std::string line;
+    while (std::getline(files_list, line)) {
+        if (line.empty()) continue;
+        std::stringstream ss(line);
+        std::string src, dest;
+        if (!(ss >> src >> dest)) continue;
+
         const fs::path src_path = tmp_pkg_dir_ / "content" / src;
         const fs::path logical_dest_path = fs::path(dest) / src;
         fs::path physical_dest_path = (logical_dest_path.is_absolute()) ? ROOT_DIR / logical_dest_path.relative_path() : ROOT_DIR / logical_dest_path;
+        
         if (!fs::exists(src_path) && !fs::is_symlink(src_path)) continue;
+        
         fs::path parent = physical_dest_path.parent_path();
         std::vector<fs::path> to_create;
-        while (!parent.empty() && parent != ROOT_DIR && !fs::exists(parent)) { to_create.push_back(parent); parent = parent.parent_path(); }
+        while (!parent.empty() && parent != ROOT_DIR && !fs::exists(parent)) { 
+            try { to_create.push_back(parent); parent = parent.parent_path(); } catch (...) { break; }
+        }
         for (const auto& d : to_create | std::views::reverse) { ensure_dir_exists(d); created_dirs_.insert(d); }
+        
         try {
             bool is_config = (src.size() >= 4 && src.substr(0, 4) == "etc/");
             fs::path final_dest_path = physical_dest_path;
@@ -353,18 +378,17 @@ void InstallationTask::copy_package_files() {
             }
             fs::copy(src_path, final_dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing | fs::copy_options::copy_symlinks);
             installed_files_.push_back(final_dest_path);
-            
-            // Trigger check for the newly installed file
             TriggerManager::instance().check_file(logical_dest_path.string());
-
-        } catch (const fs::filesystem_error& e) { throw LpkgException(string_format("error.copy_failed_rollback", src_path.string().c_str(), physical_dest_path.string().c_str(), e.what())); }
+        } catch (...) { continue; }
     }
     std::ofstream pkg_f(FILES_DIR / (pkg_name_ + ".txt"));
     std::ifstream fl2(tmp_pkg_dir_ / "files.txt");
-    while (fl2 >> src >> dest) pkg_f << (fs::path(dest) / src).string() << "\n";
+    std::string src_reg, dest_reg;
+    while (fl2 >> src_reg >> dest_reg) pkg_f << (fs::path(dest_reg) / src_reg).string() << "\n";
     std::ofstream dir_f(FILES_DIR / (pkg_name_ + ".dirs"));
     for (const auto& d : created_dirs_) dir_f << d.string() << "\n";
 }
+
 
 void InstallationTask::register_package() {
     std::ifstream deps_in(tmp_pkg_dir_ / "deps.txt");
@@ -574,15 +598,6 @@ void commit_package_installation(const InstallPlan& plan) {
     task.run();
 }
 
-void rollback_installed_package(const std::string& pkg_name, [[maybe_unused]] const std::string& version) {
-    log_info(string_format("info.rolling_back", pkg_name.c_str()));
-    remove_package_files(pkg_name, true);
-    fs::remove(DEP_DIR / pkg_name);
-    fs::remove(DOCS_DIR / (pkg_name + ".man"));
-    fs::remove_all(HOOKS_DIR / pkg_name);
-    Cache::instance().remove_installed(pkg_name);
-}
-
 std::unordered_set<std::string> get_all_required_packages() {
     auto& cache = Cache::instance();
     std::unordered_set<std::string> req;
@@ -706,19 +721,23 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     }
     if (!user_confirms(prompt + get_string("info.confirm_proceed"))) { log_info(get_string("info.installation_aborted")); return; }
     std::vector<std::string> installed;
-    try {
-        for (const auto& n : order) {
-            const auto& p = plan.at(n); 
-            commit_package_installation(p); installed.push_back(p.name);
+    bool any_failed = false;
+    for (const auto& n : order) {
+        const auto& p = plan.at(n); 
+        try {
+            commit_package_installation(p); 
+            installed.push_back(p.name);
+        } catch (const std::exception& e) {
+            log_error(string_format("error.upgrade_failed", p.name.c_str(), e.what()));
+            any_failed = true;
         }
-        write_cache();
-    } catch (const LpkgException& e) {
-        log_error(get_string("error.installation_failed_rolling_back"));
-        std::reverse(installed.begin(), installed.end());
-        for (const auto& n : installed) try { rollback_installed_package(n, plan.at(n).actual_version); } catch (...) {}
-        write_cache(); throw;
     }
+    write_cache();
     TriggerManager::instance().run_all();
+    if (any_failed) {
+        throw LpkgException("Some packages failed to install, but successfully installed packages were kept.");
+    }
+    log_info(get_string("info.install_complete"));
 }
 
 void remove_package(const std::string& pkg_name, bool force) {
