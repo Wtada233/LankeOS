@@ -21,19 +21,21 @@ void scan_orphans(const std::string& scan_root_override) {
     }
 
     std::vector<fs::path> scan_roots = {
-        actual_root / "bin",
-        actual_root / "sbin",
-        actual_root / "lib",
-        actual_root / "lib64",
         actual_root / "usr",
         actual_root / "etc",
-        actual_root / "opt"
+        actual_root / "opt",
+        actual_root / "var",
+        actual_root / "boot"
     };
 
     std::unordered_set<std::string> ignored_prefixes = {
         (actual_root / "usr/share/man").string(),
         (actual_root / "usr/share/doc").string(),
         (actual_root / "var/lib/lpkg").string(),
+        (actual_root / "var/cache/lpkg").string(),
+        (actual_root / "var/log").string(),
+        (actual_root / "var/tmp").string(),
+        (actual_root / "var/run").string(),
         (actual_root / "etc/lpkg").string(),
         (actual_root / "proc").string(),
         (actual_root / "sys").string(),
@@ -50,36 +52,36 @@ void scan_orphans(const std::string& scan_root_override) {
     for (const auto& root : scan_roots) {
         if (!fs::exists(root)) continue;
         
+        // Skip if root itself is a symlink (e.g., /bin -> /usr/bin)
+        if (fs::is_symlink(root)) continue;
+        
         for (const auto& entry : fs::recursive_directory_iterator(root, fs::directory_options::skip_permission_denied)) {
-            if (entry.is_symlink() || entry.is_regular_file()) {
-                scanned_count++;
-                std::string path = entry.path().string();
-                
-                bool ignored = false;
-                for (const auto& prefix : ignored_prefixes) {
-                    if (path.find(prefix) == 0) {
-                        ignored = true;
-                        break;
+            try {
+                if (entry.is_symlink() || entry.is_regular_file()) {
+                    scanned_count++;
+                    std::string path = entry.path().string();
+                    
+                    bool ignored = false;
+                    for (const auto& prefix : ignored_prefixes) {
+                        if (path.compare(0, prefix.size(), prefix) == 0) {
+                            ignored = true;
+                            break;
+                        }
+                    }
+                    if (ignored) continue;
+
+                    std::string key = path;
+                    if (actual_root != "/") {
+                         fs::path relative = fs::relative(entry.path(), actual_root);
+                         key = "/" + relative.string();
+                    }
+
+                    if (cache.get_file_owners(key).empty()) {
+                        std::cout << path << std::endl;
+                        orphan_count++;
                     }
                 }
-                if (ignored) continue;
-
-                std::string key = path;
-                // Normalize path to be relative to the logical root "/"
-                // If actual_root is different from /, we strip it to check against DB
-                // DB stores paths like "/usr/bin/ls"
-                if (actual_root != "/") {
-                     fs::path relative = fs::relative(entry.path(), actual_root);
-                     key = "/" + relative.string();
-                } else if (path.find("/") == 0) {
-                     // already absolute, key is path
-                }
-
-                if (cache.get_file_owners(key).empty()) {
-                    std::cout << path << std::endl;
-                    orphan_count++;
-                }
-            }
+            } catch (...) { continue; }
         }
     }
     log_info(string_format("info.scan_complete", orphan_count));
