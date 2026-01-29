@@ -29,6 +29,7 @@ void pack_package(const std::string& output_filename, const std::string& source_
     std::ofstream files_txt(meta_dir / "files.txt");
     log_info(get_string("info.pack_scanning"));
     for (const auto& entry : fs::recursive_directory_iterator(root_dir, fs::directory_options::none)) {
+        if (entry.is_directory()) continue; // 关键修复：跳过目录条目
         fs::path rel_path = fs::relative(entry.path(), root_dir);
         files_txt << rel_path.string() << " /" << std::endl;
     }
