@@ -24,8 +24,7 @@ void scan_orphans(const std::string& scan_root_override) {
         actual_root / "usr",
         actual_root / "etc",
         actual_root / "opt",
-        actual_root / "var",
-        actual_root / "boot"
+        actual_root / "var"
     };
 
     std::unordered_set<std::string> ignored_prefixes = {
@@ -45,7 +44,8 @@ void scan_orphans(const std::string& scan_root_override) {
         (actual_root / "tmp").string(),
         (actual_root / "lib").string(),
         (actual_root / "lib64").string(),
-        (actual_root / "sbin").string()
+        (actual_root / "sbin").string(),
+        (actual_root / "usr/lib/python3.13/site-packages").string(),
     };
 
     log_info(get_string("info.scan_start"));
