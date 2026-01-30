@@ -30,6 +30,7 @@ void scan_orphans(const std::string& scan_root_override) {
 
     std::unordered_set<std::string> ignored_prefixes = {
         (actual_root / "usr/share/man").string(),
+        (actual_root / "usr/sbin").string(),
         (actual_root / "usr/share/doc").string(),
         (actual_root / "var/lib/lpkg").string(),
         (actual_root / "var/cache/lpkg").string(),
@@ -41,7 +42,10 @@ void scan_orphans(const std::string& scan_root_override) {
         (actual_root / "sys").string(),
         (actual_root / "dev").string(),
         (actual_root / "run").string(),
-        (actual_root / "tmp").string()
+        (actual_root / "tmp").string(),
+        (actual_root / "lib").string(),
+        (actual_root / "lib64").string(),
+        (actual_root / "sbin").string()
     };
 
     log_info(get_string("info.scan_start"));
