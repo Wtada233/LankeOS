@@ -30,7 +30,9 @@ void pack_package(const std::string& output_filename, const std::string& source_
     log_info(get_string("info.pack_scanning"));
     for (const auto& entry : fs::recursive_directory_iterator(root_dir, fs::directory_options::none)) {
         if (entry.is_directory()) continue; // 关键修复：跳过目录条目
-        fs::path rel_path = fs::relative(entry.path(), root_dir);
+        // 核心修复：使用 lexically_relative 替代 fs::relative
+        // fs::relative 会解析软链接，导致记录错误；lexically_relative 仅处理路径字符串。
+        fs::path rel_path = entry.path().lexically_relative(root_dir);
         files_txt << rel_path.string() << " /" << std::endl;
     }
     files_txt.close();
