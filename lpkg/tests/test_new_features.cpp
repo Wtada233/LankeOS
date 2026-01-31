@@ -2,6 +2,7 @@
 #include "../main/src/package_manager.hpp"
 #include "../main/src/packer.hpp"
 #include "../main/src/hash.hpp"
+#include "../main/src/cache.hpp"
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
 #include "../main/src/localization.hpp"
@@ -76,11 +77,18 @@ protected:
         fs::remove_all(work_dir);
         return pkg_path;
     }
+
+    void TearDown() override {
+        set_root_path("/");
+        std::string unlock_cmd = "find " + suite_work_dir.string() + " -exec chattr -i {} + 2>/dev/null";
+        std::system(unlock_cmd.c_str());
+        fs::remove_all(suite_work_dir);
+    }
 };
 
 TEST_F(NewFeaturesTest, QueryFileAndPackage) {
     std::string pkg = create_pkg("query_test", "1.0", {{"usr/bin/query_target", "/"}});
-    install_packages({pkg});
+    install_packages({pkg}, "", false);
 
     // Test query file (absolute)
     testing::internal::CaptureStdout();
@@ -110,17 +118,17 @@ TEST_F(NewFeaturesTest, QueryFileAndPackage) {
 }
 
 TEST_F(NewFeaturesTest, ReinstallPackage) {
-    std::string pkg = create_pkg("reinstall_test", "1.0", {{"etc/reinstall.conf", "/"}});
+    std::string pkg = create_pkg("reinstall_test", "1.0", {{"usr/bin/reinstall_bin", "/"}});
     
     // Clear any previous attempts if necessary, but here we just install normally first
-    install_packages({pkg});
+    install_packages({pkg}, "", false);
 
-    fs::path conf = test_root / "etc/reinstall.conf";
-    EXPECT_TRUE(fs::exists(conf));
+    fs::path bin_path = test_root / "usr/bin/reinstall_bin";
+    EXPECT_TRUE(fs::exists(bin_path));
 
     // Modify the file to see if it gets restored
     {
-        std::ofstream f(conf);
+        std::ofstream f(bin_path);
         f << "modified";
     }
 
@@ -128,22 +136,54 @@ TEST_F(NewFeaturesTest, ReinstallPackage) {
     reinstall_package("reinstall_test");
 
     {
-        std::ifstream f(conf);
+        std::ifstream f(bin_path);
         std::string s;
         std::getline(f, s);
-        EXPECT_EQ(s, "content of etc/reinstall.conf");
+        EXPECT_EQ(s, "content of usr/bin/reinstall_bin");
     }
 
     // Additional Test: Reinstall via PATH
     {
-        std::ofstream f(conf);
+        std::ofstream f(bin_path);
         f << "modified again";
     }
     reinstall_package(pkg); // Use path instead of name
     {
-        std::ifstream f(conf);
+        std::ifstream f(bin_path);
         std::string s;
         std::getline(f, s);
-        EXPECT_EQ(s, "content of etc/reinstall.conf");
+        EXPECT_EQ(s, "content of usr/bin/reinstall_bin");
     }
+}
+
+TEST_F(NewFeaturesTest, ReinstallAtomicRollback) {
+    // 1. Install version 1 of a package
+    std::string pkg = create_pkg("rollback_test", "1.0", {{"usr/bin/app", "/"}});
+    install_packages({pkg}, "", false);
+    
+    fs::path app_path = test_root / "usr/bin/app";
+    ASSERT_TRUE(fs::exists(app_path));
+
+    // 2. Prepare a "broken" update or environment
+    // We will make the file immutable so the NEXT copy fails
+    std::string chattr_cmd = "chattr +i " + app_path.string();
+    std::system(chattr_cmd.c_str());
+
+    // 3. Attempt reinstall. It should fail during file copy.
+    // Because it's now an atomic transaction, it should NOT leave the package uninstalled.
+    EXPECT_THROW(reinstall_package(pkg), LpkgException);
+
+    // 4. Unlock for verification and cleanup
+    std::string unlock_cmd = "chattr -i " + app_path.string();
+    std::system(unlock_cmd.c_str());
+
+    // 5. VERIFY: The package should STILL be marked as installed
+    EXPECT_EQ(Cache::instance().get_installed_version("rollback_test"), "1.0");
+    
+    // 6. VERIFY: The file should still exist and contain original content
+    EXPECT_TRUE(fs::exists(app_path));
+    std::ifstream f(app_path);
+    std::string s;
+    std::getline(f, s);
+    EXPECT_EQ(s, "content of usr/bin/app");
 }

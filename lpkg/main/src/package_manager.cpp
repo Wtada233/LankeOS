@@ -145,14 +145,15 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
 
 } // anonymous namespace
 
-InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::string old_version_to_replace, fs::path local_package_path, std::string expected_hash)
+InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::string old_version_to_replace, fs::path local_package_path, std::string expected_hash, bool force_reinstall)
     : pkg_name_(std::move(pkg_name)), version_(std::move(version)), explicit_install_(explicit_install), 
       tmp_pkg_dir_(get_tmp_dir() / pkg_name_), actual_version_(version_), old_version_to_replace_(std::move(old_version_to_replace)),
-      local_package_path_(std::move(local_package_path)), expected_hash_(std::move(expected_hash)), has_config_conflicts_(false) {}
+      local_package_path_(std::move(local_package_path)), expected_hash_(std::move(expected_hash)), has_config_conflicts_(false),
+      force_reinstall_(force_reinstall) {}
 
 void InstallationTask::run() {
     std::string current_installed_version = get_installed_version(pkg_name_);
-    if (!current_installed_version.empty() && current_installed_version == actual_version_) {
+    if (!force_reinstall_ && !current_installed_version.empty() && current_installed_version == actual_version_) {
         log_info(string_format("info.package_already_installed", pkg_name_.c_str()));
         return;
     }
@@ -475,6 +476,7 @@ struct InstallPlan {
     bool is_explicit = false;
     fs::path local_path;
     std::vector<DependencyInfo> dependencies;
+    bool force_reinstall = false;
 };
 
 struct ResolutionContext {
@@ -484,6 +486,7 @@ struct ResolutionContext {
     const std::map<std::string, fs::path>& local_candidates;
     std::map<std::string, InstallPlan>& plan;
     std::vector<std::string>& install_order;
+    bool force_reinstall = false;
 };
 
 void resolve_package_dependencies(const std::string& pkg_name, const std::string& version_spec, bool is_explicit, 
@@ -532,10 +535,14 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         }
         latest_version = pkg_info->version; pkg_hash = pkg_info->sha256; deps = pkg_info->dependencies;
     }
-    if (!is_explicit && !installed_version.empty() && !version_compare(installed_version, latest_version)) return;
-    if (is_explicit && !installed_version.empty() && installed_version == latest_version) return;
+
+    if (!ctx.force_reinstall || !is_explicit) {
+        if (!is_explicit && !installed_version.empty() && !version_compare(installed_version, latest_version)) return;
+        if (is_explicit && !installed_version.empty() && installed_version == latest_version) return;
+    }
+
     visited_stack.insert(pkg_name);
-    InstallPlan p; p.name = pkg_name; p.version_spec = version_spec; p.actual_version = latest_version; p.is_explicit = is_explicit; p.local_path = local_path; p.sha256 = pkg_hash; p.dependencies = deps;
+    InstallPlan p; p.name = pkg_name; p.version_spec = version_spec; p.actual_version = latest_version; p.is_explicit = is_explicit; p.local_path = local_path; p.sha256 = pkg_hash; p.dependencies = deps; p.force_reinstall = (ctx.force_reinstall && is_explicit);
     if (!get_no_deps_mode()) {
         for (const auto& dep : deps) {
             std::string idv = get_installed_version(dep.name);
@@ -600,7 +607,7 @@ std::set<std::string> check_plan_consistency(const std::map<std::string, Install
 }
 
 void commit_package_installation(const InstallPlan& plan) {
-    InstallationTask task(plan.name, plan.actual_version, plan.is_explicit, get_installed_version(plan.name), plan.local_path, plan.sha256);
+    InstallationTask task(plan.name, plan.actual_version, plan.is_explicit, get_installed_version(plan.name), plan.local_path, plan.sha256, plan.force_reinstall);
     task.run();
 }
 
@@ -654,7 +661,7 @@ void install_package(const std::string& pkg_name, const std::string& version) {
     install_packages({arg});
 }
 
-void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file_path) {
+void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file_path, bool force_reinstall) {
     force_reload_cache(); TmpDirManager tmp; Repository repo;
     try { repo.load_index(); } catch (const std::exception& e) { log_warning(string_format("warning.repo_index_load_failed", e.what())); }
     std::map<std::string, InstallPlan> plan; std::vector<std::string> order; std::map<std::string, fs::path> locals;
@@ -689,7 +696,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
         throw LpkgException("--hash can only be used with local package installations.");
     }
 
-    ResolutionContext ctx{{}, {}, repo, locals, plan, order};
+    ResolutionContext ctx{{}, {}, repo, locals, plan, order, force_reinstall};
     for (const auto& t : targets) { 
         std::set<std::string> vs; 
         resolve_package_dependencies(t.first, t.second, true, ctx, vs); 
@@ -948,7 +955,7 @@ void upgrade_packages() {
         try {
             log_info(string_format("info.upgrading_package", n.c_str(), curr.c_str(), lat.c_str()));
             std::string hash; auto opt = repo.find_package(n); if (opt && opt->version == lat) hash = opt->sha256;
-            InstallationTask t(n, lat, is_manually_installed(n), curr, "", hash);
+            InstallationTask t(n, lat, is_manually_installed(n), curr, "", hash, false);
             t.run(); write_cache(); count++;
         } catch (const std::exception& e) { log_error(string_format("error.upgrade_failed", n.c_str(), e.what())); }
     }
@@ -964,27 +971,30 @@ void show_man_page(const std::string& pkg_name) {
 
 void reinstall_package(const std::string& arg) {
     std::string pkg_name = arg;
-    // If the argument is a path, we need to extract the package name
     if (arg.find('/') != std::string::npos || arg.ends_with(".lpkg") || arg.ends_with(".tar.zst")) {
         try {
             fs::path p(arg);
             pkg_name = parse_package_filename(p.filename().string()).first;
-        } catch (...) {
-            // If parsing fails, stick with the original argument
-        }
+        } catch (...) {}
     }
 
     std::string ver = get_installed_version(pkg_name);
-    if (!ver.empty()) {
-        log_info(string_format("info.reinstalling_package", pkg_name.c_str()));
-        // Force removal of the existing package files and registration
-        remove_package(pkg_name, true);
-        // We MUST write the cache here because install_packages will reload it from disk
-        write_cache();
+    if (ver.empty()) {
+        install_package(arg, "latest");
+        return;
     }
+
+    log_info(string_format("info.reinstalling_package", pkg_name.c_str()));
     
-    // Now perform a fresh installation of the original argument
-    install_packages({arg});
+    bool old_overwrite = get_force_overwrite_mode();
+    set_force_overwrite_mode(true); // Automatically force overwrite for reinstallation
+    try {
+        install_packages({arg}, "", true); 
+    } catch (...) {
+        set_force_overwrite_mode(old_overwrite);
+        throw;
+    }
+    set_force_overwrite_mode(old_overwrite);
 }
 
 void query_package(const std::string& pkg_name) {
