@@ -82,11 +82,25 @@ TEST_F(NewFeaturesTest, QueryFileAndPackage) {
     std::string pkg = create_pkg("query_test", "1.0", {{"usr/bin/query_target", "/"}});
     install_packages({pkg});
 
-    // Test query file
+    // Test query file (absolute)
     testing::internal::CaptureStdout();
     query_file("/usr/bin/query_target");
     std::string output = testing::internal::GetCapturedStdout();
     EXPECT_NE(output.find("query_test"), std::string::npos);
+
+    // Test query file (relative with smart resolution)
+    // We simulate being in /usr/bin and querying 'query_target'
+    fs::path old_cwd = fs::current_path();
+    fs::create_directories(test_root / "usr/bin");
+    fs::current_path(test_root / "usr/bin");
+    
+    testing::internal::CaptureStdout();
+    query_file("query_target");
+    output = testing::internal::GetCapturedStdout();
+    fs::current_path(old_cwd); // Restore CWD
+    
+    EXPECT_NE(output.find("query_test"), std::string::npos);
+    EXPECT_NE(output.find("/usr/bin/query_target"), std::string::npos);
 
     // Test query package
     testing::internal::CaptureStdout();

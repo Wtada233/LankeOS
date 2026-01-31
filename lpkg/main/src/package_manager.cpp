@@ -993,14 +993,32 @@ void query_package(const std::string& pkg_name) {
 
 void query_file(const std::string& filename) {
     auto& cache = Cache::instance();
-    auto owners = cache.get_file_owners(filename);
+    std::string target = filename;
+    
+    // 1. Try exact match as provided
+    auto owners = cache.get_file_owners(target);
+
+    // 2. Try resolving relative to current working directory and then relative to ROOT_DIR
     if (owners.empty()) {
-        // Try with absolute path if not found
-        fs::path p = filename;
-        if (!p.is_absolute()) {
-            p = "/" / p;
-            owners = cache.get_file_owners(p.string());
+        try {
+            fs::path abs_p = fs::absolute(filename);
+            // If the absolute path is inside our ROOT_DIR, resolve the logical path
+            if (abs_p.string().starts_with(ROOT_DIR.string())) {
+                std::string rel_to_root = fs::relative(abs_p, ROOT_DIR).string();
+                std::string logical_path = "/" + rel_to_root;
+                owners = cache.get_file_owners(logical_path);
+                if (!owners.empty()) target = logical_path;
+            }
+        } catch (...) {
+            // Ignore filesystem errors during resolution
         }
+    }
+
+    // 3. Fallback: original logic of prepending / if not absolute
+    if (owners.empty() && !fs::path(filename).is_absolute()) {
+        std::string fallback = (fs::path("/") / filename).string();
+        owners = cache.get_file_owners(fallback);
+        if (!owners.empty()) target = fallback;
     }
 
     if (owners.empty()) {
@@ -1010,7 +1028,7 @@ void query_file(const std::string& filename) {
         for (auto it = owners.begin(); it != owners.end(); ++it) {
             os += *it + (std::next(it) == owners.end() ? "" : ", ");
         }
-        log_info(string_format("info.file_owned_by", filename.c_str(), os.c_str()));
+        log_info(string_format("info.file_owned_by", target.c_str(), os.c_str()));
     }
 }
 
