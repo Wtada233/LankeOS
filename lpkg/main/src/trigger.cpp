@@ -42,7 +42,7 @@ void TriggerManager::load_config() {
                     try {
                         custom_triggers.push_back({std::regex(pattern), command, pattern});
                     } catch (const std::regex_error& e) {
-                        log_warning("Invalid regex in triggers.conf: " + pattern);
+                        log_warning(string_format("warning.invalid_trigger_regex", pattern.c_str()));
                     }
                 }
             }

@@ -58,7 +58,7 @@ protected:
         f_files.close();
 
         std::string pkg_path = (pkgs_dir / (name + "-" + version + ".tar.zst")).string();
-        std::string tar_cmd = "tar --zstd -cf " + pkg_path + " -C " + pkg_work_dir.string() + " . > /dev/null 2>&1";
+        std::string tar_cmd = "cd " + pkg_work_dir.string() + " && tar --zstd -cf " + pkg_path + " . > /dev/null 2>&1";
         if (system(tar_cmd.c_str()) != 0) throw std::runtime_error("Tar failed");
         
         fs::remove_all(pkg_work_dir);

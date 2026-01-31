@@ -69,6 +69,7 @@ warning.copy_file_failed=无法复制文件 {} 到 {}: {}
 warning.remove_file_failed=无法移除文件 {}: {}
 warning.get_latest_version_failed=无法获取 {} 的最新版本: {}，跳过
 warning.config_conflict=配置文件冲突: {}。将新版本安装为 {}
+warning.invalid_trigger_regex=triggers.conf 中的正则表达式无效: {}
 info.skipped_overwrite=已跳过覆盖: {}
 info.skipped_remove=已跳过移除: {}
 prompt.yes_no=(y/n)
