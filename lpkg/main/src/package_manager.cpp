@@ -962,16 +962,29 @@ void show_man_page(const std::string& pkg_name) {
     std::cout << f.rdbuf();
 }
 
-void reinstall_package(const std::string& pkg_name) {
-    std::string ver = get_installed_version(pkg_name);
-    if (ver.empty()) {
-        install_package(pkg_name, "latest");
-        return;
+void reinstall_package(const std::string& arg) {
+    std::string pkg_name = arg;
+    // If the argument is a path, we need to extract the package name
+    if (arg.find('/') != std::string::npos || arg.ends_with(".lpkg") || arg.ends_with(".tar.zst")) {
+        try {
+            fs::path p(arg);
+            pkg_name = parse_package_filename(p.filename().string()).first;
+        } catch (...) {
+            // If parsing fails, stick with the original argument
+        }
     }
-    log_info(string_format("info.reinstalling_package", pkg_name.c_str()));
-    remove_package(pkg_name, true);
-    write_cache();
-    install_package(pkg_name, ver);
+
+    std::string ver = get_installed_version(pkg_name);
+    if (!ver.empty()) {
+        log_info(string_format("info.reinstalling_package", pkg_name.c_str()));
+        // Force removal of the existing package files and registration
+        remove_package(pkg_name, true);
+        // We MUST write the cache here because install_packages will reload it from disk
+        write_cache();
+    }
+    
+    // Now perform a fresh installation of the original argument
+    install_packages({arg});
 }
 
 void query_package(const std::string& pkg_name) {

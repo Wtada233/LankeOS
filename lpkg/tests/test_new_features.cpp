@@ -133,4 +133,17 @@ TEST_F(NewFeaturesTest, ReinstallPackage) {
         std::getline(f, s);
         EXPECT_EQ(s, "content of etc/reinstall.conf");
     }
+
+    // Additional Test: Reinstall via PATH
+    {
+        std::ofstream f(conf);
+        f << "modified again";
+    }
+    reinstall_package(pkg); // Use path instead of name
+    {
+        std::ifstream f(conf);
+        std::string s;
+        std::getline(f, s);
+        EXPECT_EQ(s, "content of etc/reinstall.conf");
+    }
 }
