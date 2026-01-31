@@ -186,3 +186,6 @@ cxxopts.arg=arg
 cxxopts.positional_help=
 error.pack_no_output=Please specify output file name with -o.
 error.some_failed=Some packages failed to install, but successfully installed packages were kept.
+error.no_matching_version=No version of package {} matches constraint ({} {})
+error.package_not_in_repo=Package not found in repository: {}
+warning.invalid_trigger_regex=Invalid regex in triggers.conf: {}

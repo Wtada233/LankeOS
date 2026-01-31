@@ -95,7 +95,9 @@ TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
         sabotage.close();
         
         std::string chattr_cmd = "chattr +i " + (test_root / "usr/bin/file_blocked").string();
-        std::system(chattr_cmd.c_str());
+        if (std::system(chattr_cmd.c_str()) != 0) {
+            fs::permissions(test_root / "usr/bin/file_blocked", fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read);
+        }
     }
 
     // 3. Try install. Use --force-overwrite to pass the pre-check

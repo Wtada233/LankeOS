@@ -214,6 +214,7 @@ void InstallationTask::commit() {
             }
             
             for (const auto& old_file : old_files) {
+                if (old_file.find("/etc/") == 0) continue; // Protective rule
                 if (!new_files.contains(old_file)) {
                     auto& cache = Cache::instance();
                     auto owners = cache.get_file_owners(old_file);
@@ -524,7 +525,13 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     } else {
         auto opt = ctx.repo.find_package(pkg_name); 
         std::optional<PackageInfo> pkg_info = (version_spec == "latest") ? opt : ctx.repo.find_package(pkg_name, version_spec);
-        if (!pkg_info && version_spec == "latest") pkg_info = ctx.repo.find_provider(pkg_name);
+        
+        // VIRTUAL PROVIDER REDIRECTION
+        if (!pkg_info) {
+            auto prov = ctx.repo.find_provider(pkg_name);
+            if (prov) { resolve_package_dependencies(prov->name, prov->version, is_explicit, ctx, visited_stack); return; }
+        }
+
         if (!pkg_info) { 
             if (installed_version.empty()) log_warning(string_format("warning.package_not_in_repo", pkg_name.c_str())); 
             return; 
@@ -535,6 +542,8 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         }
         latest_version = pkg_info->version; pkg_hash = pkg_info->sha256; deps = pkg_info->dependencies;
     }
+
+    if (latest_version.empty()) latest_version = "0.0.0";
 
     if (!ctx.force_reinstall || !is_explicit) {
         if (!is_explicit && !installed_version.empty() && !version_compare(installed_version, latest_version)) return;

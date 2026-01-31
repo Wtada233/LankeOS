@@ -42,12 +42,13 @@ protected:
                         const std::vector<std::string>& deps = {},
                         const std::vector<std::string>& provides = {}) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name + "_" + ver);
+        fs::remove_all(work_dir);
         fs::create_directories(work_dir / "content");
         
         std::ofstream fl(work_dir / "files.txt");
         for (const auto& [src, dest] : files) {
             fs::path p = work_dir / "content" / src;
-            fs::create_directories(p.parent_path());
+            ensure_dir_exists(p.parent_path());
             std::ofstream f(p); f << "content of " << src; f.close();
             fl << src << " " << dest << "\n";
         }
@@ -67,7 +68,7 @@ protected:
 
         std::string pkg_name = name + "-" + ver + ".tar.zst";
         std::string pkg_path = (pkg_dir / pkg_name).string();
-        std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " . > /dev/null 2>&1";
+        std::string cmd = "cd " + work_dir.string() + " && tar --zstd -cf " + pkg_path + " . > /dev/null 2>&1";
         std::system(cmd.c_str());
         fs::remove_all(work_dir);
         return pkg_path;
