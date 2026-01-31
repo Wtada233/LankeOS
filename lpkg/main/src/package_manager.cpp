@@ -148,7 +148,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
 InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::string old_version_to_replace, fs::path local_package_path, std::string expected_hash)
     : pkg_name_(std::move(pkg_name)), version_(std::move(version)), explicit_install_(explicit_install), 
       tmp_pkg_dir_(get_tmp_dir() / pkg_name_), actual_version_(version_), old_version_to_replace_(std::move(old_version_to_replace)),
-      local_package_path_(std::move(local_package_path)), expected_hash_(std::move(expected_hash)) {}
+      local_package_path_(std::move(local_package_path)), expected_hash_(std::move(expected_hash)), has_config_conflicts_(false) {}
 
 void InstallationTask::run() {
     std::string current_installed_version = get_installed_version(pkg_name_);
@@ -368,6 +368,7 @@ void InstallationTask::copy_package_files() {
             if (is_config && fs::exists(physical_dest_path) && !fs::is_directory(physical_dest_path)) {
                 final_dest_path += ".lpkgnew";
                 log_warning(string_format("warning.config_conflict", physical_dest_path.c_str(), final_dest_path.c_str()));
+                has_config_conflicts_ = true;
             } else {
                  if (fs::exists(physical_dest_path) || fs::is_symlink(physical_dest_path)) {
                     if (!fs::is_directory(physical_dest_path)) {
@@ -379,7 +380,12 @@ void InstallationTask::copy_package_files() {
             fs::copy(src_path, final_dest_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing | fs::copy_options::copy_symlinks);
             installed_files_.push_back(final_dest_path);
             TriggerManager::instance().check_file(logical_dest_path.string());
-        } catch (...) { continue; }
+        } catch (const std::exception& e) {
+            throw LpkgException(string_format("error.copy_failed_rollback", src.c_str(), physical_dest_path.c_str(), e.what()));
+        }
+    }
+    if (has_config_conflicts_) {
+        log_warning(get_string("info.config_review_reminder"));
     }
     std::ofstream pkg_f(FILES_DIR / (pkg_name_ + ".txt"));
     std::ifstream fl2(tmp_pkg_dir_ / "files.txt");
@@ -714,6 +720,37 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
             return;
         }
     }
+    // Global conflict check within transaction
+    std::map<std::string, std::string> transaction_files;
+    for (const auto& n : order) {
+        const auto& p = plan.at(n);
+        // If it's a local package, we need to extract files.txt
+        std::string files_content;
+        if (!p.local_path.empty()) {
+            files_content = extract_file_from_archive(p.local_path, "files.txt");
+        } else {
+            // For remote packages, we'd need to download metadata. 
+            // For simplicity in this implementation, we focus on what's available.
+            // In a real PM, repo index should contain file lists.
+        }
+        
+        if (!files_content.empty()) {
+            std::stringstream ss(files_content);
+            std::string line;
+            while (std::getline(ss, line)) {
+                std::stringstream line_ss(line);
+                std::string src, dest;
+                if (line_ss >> src >> dest) {
+                    std::string full = (fs::path(dest) / src).string();
+                    if (transaction_files.contains(full)) {
+                        throw LpkgException("Transaction Conflict: File " + full + " is provided by both " + transaction_files[full] + " and " + p.name);
+                    }
+                    transaction_files[full] = p.name;
+                }
+            }
+        }
+    }
+
     std::string prompt;
     for (const auto& n : order) {
         const auto& p = plan.at(n);
@@ -730,13 +767,26 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
         } catch (const std::exception& e) {
             log_error(string_format("error.upgrade_failed", p.name.c_str(), e.what()));
             any_failed = true;
+            break; // Stop on first failure to allow rollback
         }
     }
-    write_cache();
-    TriggerManager::instance().run_all();
+
     if (any_failed) {
+        log_error(get_string("error.installation_failed_rolling_back"));
+        for (auto it = installed.rbegin(); it != installed.rend(); ++it) {
+            try {
+                log_info(string_format("info.rolling_back", it->c_str()));
+                remove_package(*it, true);
+            } catch (const std::exception& e) {
+                log_error(string_format("error.rollback_failed", it->c_str(), e.what()));
+            }
+        }
+        write_cache();
         throw LpkgException(get_string("error.some_failed"));
     }
+
+    write_cache();
+    TriggerManager::instance().run_all();
     log_info(get_string("info.install_complete"));
 }
 
@@ -910,6 +960,58 @@ void show_man_page(const std::string& pkg_name) {
     if (!fs::exists(p)) throw LpkgException(string_format("error.no_man_page", pkg_name.c_str()));
     std::ifstream f(p); if (!f.is_open()) throw LpkgException(string_format("error.open_man_page_failed", p.string().c_str()));
     std::cout << f.rdbuf();
+}
+
+void reinstall_package(const std::string& pkg_name) {
+    std::string ver = get_installed_version(pkg_name);
+    if (ver.empty()) {
+        install_package(pkg_name, "latest");
+        return;
+    }
+    log_info(string_format("info.reinstalling_package", pkg_name.c_str()));
+    remove_package(pkg_name, true);
+    write_cache();
+    install_package(pkg_name, ver);
+}
+
+void query_package(const std::string& pkg_name) {
+    std::string ver = get_installed_version(pkg_name);
+    if (ver.empty()) {
+        log_info(string_format("info.package_not_installed", pkg_name.c_str()));
+        return;
+    }
+    log_info(string_format("info.package_files", pkg_name.c_str()));
+    const fs::path list = FILES_DIR / (pkg_name + ".txt");
+    if (fs::exists(list)) {
+        std::ifstream f(list);
+        std::string l;
+        while (std::getline(f, l)) {
+            if (!l.empty()) std::cout << "  " << l << "\n";
+        }
+    }
+}
+
+void query_file(const std::string& filename) {
+    auto& cache = Cache::instance();
+    auto owners = cache.get_file_owners(filename);
+    if (owners.empty()) {
+        // Try with absolute path if not found
+        fs::path p = filename;
+        if (!p.is_absolute()) {
+            p = "/" / p;
+            owners = cache.get_file_owners(p.string());
+        }
+    }
+
+    if (owners.empty()) {
+        log_info(string_format("info.file_not_owned", filename.c_str()));
+    } else {
+        std::string os;
+        for (auto it = owners.begin(); it != owners.end(); ++it) {
+            os += *it + (std::next(it) == owners.end() ? "" : ", ");
+        }
+        log_info(string_format("info.file_owned_by", filename.c_str(), os.c_str()));
+    }
 }
 
 void write_cache() {

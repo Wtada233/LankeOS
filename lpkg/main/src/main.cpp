@@ -31,6 +31,8 @@ void print_usage(const cxxopts::Options& options) {
     std::cerr << get_string("info.remove_desc") << std::endl;
     std::cerr << get_string("info.autoremove_desc") << std::endl;
     std::cerr << get_string("info.upgrade_desc") << std::endl;
+    std::cerr << get_string("info.reinstall_desc") << std::endl;
+    std::cerr << get_string("info.query_desc") << std::endl;
     std::cerr << get_string("info.man_desc") << std::endl;
     std::cerr << get_string("info.pack_desc") << std::endl;
     std::cerr << get_string("info.scan_desc") << std::endl;
@@ -61,6 +63,7 @@ int main(int argc, char* argv[]) {
         options.add_options()
             ("h,help", get_string("info.help_desc"))
             ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
+            ("p,pkg-query", "Query by package name", cxxopts::value<bool>()->default_value("false"))
             ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value("/tmp/lankepkg"))
             ("non-interactive", get_string("info.non_interactive_option_desc"), cxxopts::value<std::string>()->implicit_value("n"))
             ("force", get_string("info.force_desc"), cxxopts::value<bool>()->default_value("false"))
@@ -162,6 +165,21 @@ int main(int argc, char* argv[]) {
             pre_operation_check(result, usage_printer, 0, 0);
             upgrade_packages();
             write_cache();
+        } else if (command == "reinstall") {
+            pre_operation_check(result, usage_printer, 1);
+            const auto& pkg_names = result["packages"].as<std::vector<std::string>>();
+            for (const auto& pkg_name : pkg_names) {
+                reinstall_package(pkg_name);
+            }
+            write_cache();
+        } else if (command == "query") {
+            pre_operation_check(result, usage_printer, 1, 1);
+            std::string target = result["packages"].as<std::vector<std::string>>()[0];
+            if (result.count("pkg-query")) {
+                query_package(target);
+            } else {
+                query_file(target);
+            }
         } else if (command == "man") {
             pre_operation_check(result, usage_printer, 1, 1);
             show_man_page(result["packages"].as<std::vector<std::string>>()[0]);

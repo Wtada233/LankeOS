@@ -19,6 +19,7 @@ public:
     std::string old_version_to_replace_;
     std::filesystem::path local_package_path_;
     std::string expected_hash_;
+    bool has_config_conflicts_ = false;
 
 private:
     void prepare();
@@ -42,6 +43,9 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 void remove_package(const std::string& pkg_name, bool force = false);
 void autoremove();
 void upgrade_packages();
+void reinstall_package(const std::string& pkg_name);
+void query_package(const std::string& pkg_name);
+void query_file(const std::string& filename);
 void show_man_page(const std::string& pkg_name);
 void write_cache();
 void remove_package_files(const std::string& pkg_name, bool force = false);
