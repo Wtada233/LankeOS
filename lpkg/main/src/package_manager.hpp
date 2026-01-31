@@ -7,7 +7,7 @@
 
 class InstallationTask {
 public:
-    InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::string old_version_to_replace = "", std::filesystem::path local_package_path = "", std::string expected_hash = "");
+    InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::string old_version_to_replace = "", std::filesystem::path local_package_path = "", std::string expected_hash = "", bool force_reinstall = false);
     void run();
 
     std::string pkg_name_;
@@ -20,6 +20,7 @@ public:
     std::filesystem::path local_package_path_;
     std::string expected_hash_;
     bool has_config_conflicts_ = false;
+    bool force_reinstall_ = false;
 
 private:
     void prepare();
@@ -39,7 +40,7 @@ private:
 };
 
 void install_package(const std::string& pkg_name, const std::string& version);
-void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file = "");
+void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file = "", bool force_reinstall = false);
 void remove_package(const std::string& pkg_name, bool force = false);
 void autoremove();
 void upgrade_packages();
