@@ -33,6 +33,9 @@ protected:
 
     void TearDown() override {
         set_root_path("/");
+        // Unlock any immutable files that might have been created during tests
+        std::string unlock_cmd = "find " + suite_work_dir.string() + " -exec chattr -i {} + 2>/dev/null";
+        std::system(unlock_cmd.c_str());
         fs::remove_all(suite_work_dir);
     }
     
@@ -62,77 +65,50 @@ protected:
 };
 
 TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
-    // 1. Install v1
-    std::string pkg1 = create_pkg("rollback_test", "1.0", "etc/config", "version1");
-    install_packages({pkg1});
-    
-    fs::path installed_conf = test_root / "etc/config";
-    EXPECT_TRUE(fs::exists(installed_conf));
+    // 1. Prepare a package with two files: file_ok and file_blocked
+    std::string pkg;
     {
-        std::ifstream f(installed_conf);
-        std::string s;
-        f >> s;
-        EXPECT_EQ(s, "version1");
-    }
-
-    // 2. Prepare v2 which writes to two files: etc/config (updated) and etc/newfile
-    std::string pkg2;
-    {
-        std::string pkg_v2_name = "rollback_test-2.0.tar.zst";
-        pkg2 = (pkg_dir / pkg_v2_name).string();
-        fs::path work_dir = suite_work_dir / "pkg_work_rollback_test_v2";
-        fs::create_directories(work_dir / "content" / "etc");
-        std::ofstream f1(work_dir / "content" / "etc" / "config"); f1 << "version2"; f1.close();
-        std::ofstream f2(work_dir / "content" / "etc" / "newfile"); f2 << "hello"; f2.close();
+        std::string pkg_name = "rollback_new-1.0.tar.zst";
+        pkg = (pkg_dir / pkg_name).string();
+        fs::path work_dir = suite_work_dir / "pkg_work_rollback_new";
+        fs::create_directories(work_dir / "content" / "usr" / "bin");
+        std::ofstream f1(work_dir / "content" / "usr" / "bin" / "file_ok"); f1 << "ok"; f1.close();
+        std::ofstream f2(work_dir / "content" / "usr" / "bin" / "file_blocked"); f2 << "blocked"; f2.close();
         
         std::ofstream files(work_dir / "files.txt");
-        files << "etc/config /\n";
-        files << "etc/newfile /\n"; // We will block this one
+        files << "usr/bin/file_ok /\n";
+        files << "usr/bin/file_blocked /\n";
         files.close();
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
         std::ofstream man(work_dir / "man.txt"); man.close();
         
-        std::string cmd = "tar --zstd -cf " + pkg2 + " -C " + work_dir.string() + " .";
+        std::string cmd = "tar --zstd -cf " + pkg + " -C " + work_dir.string() + " .";
         std::system(cmd.c_str());
         fs::remove_all(work_dir);
     }
 
-    // 3. Sabotage: Create the target file and make it immutable
+    // 2. Sabotage: Create file_blocked and lock it
     {
-        fs::create_directories(test_root / "etc");
-        std::ofstream sabotage(test_root / "etc" / "newfile");
-        sabotage << "sabotage";
+        fs::create_directories(test_root / "usr/bin");
+        std::ofstream sabotage(test_root / "usr/bin/file_blocked");
+        sabotage << "original";
         sabotage.close();
         
-        std::string chattr_cmd = "chattr +i " + (test_root / "etc" / "newfile").string();
-        int ret = std::system(chattr_cmd.c_str());
-        if (ret != 0) {
-            std::cerr << "[SKIPPED] chattr failed, skipping rollback failure test." << std::endl;
-            return;
-        }
+        std::string chattr_cmd = "chattr +i " + (test_root / "usr/bin/file_blocked").string();
+        std::system(chattr_cmd.c_str());
     }
 
-    // 4. Try install v2
-    EXPECT_THROW({
-        try {
-            install_packages({pkg2});
-        } catch (...) {
-            std::string chattr_cmd = "chattr -i " + (test_root / "etc" / "newfile").string();
-            std::system(chattr_cmd.c_str());
-            throw;
-        }
-    }, LpkgException);
+    // 3. Try install. Use --force-overwrite to pass the pre-check
+    set_force_overwrite_mode(true);
+    EXPECT_THROW(install_packages({pkg}), LpkgException);
 
-    std::string chattr_cmd = "chattr -i " + (test_root / "etc" / "newfile").string();
-    std::system(chattr_cmd.c_str());
-
-    // 5. Verify Rollback
+    // 4. Verify Rollback: file_ok should be GONE (cleaned up), file_blocked should be 'original'
+    EXPECT_FALSE(fs::exists(test_root / "usr/bin/file_ok"));
     {
-        std::ifstream f(installed_conf);
+        std::ifstream f(test_root / "usr/bin/file_blocked");
         std::string s; f >> s;
-        EXPECT_EQ(s, "version1");
+        EXPECT_EQ(s, "original");
     }
-    EXPECT_FALSE(fs::exists(installed_conf.string() + ".lpkg_bak"));
 }
 
 TEST_F(AdvancedPackageManagerTest, ChrootHook) {

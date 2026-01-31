@@ -132,6 +132,13 @@ error.installed_dep_version_mismatch=Installed dependency {} version {} does not
 info.verifying_provided_hash=Verifying with provided hash.
 info.log_prefix==> 
 info.removing_obsolete_file=Removing obsolete file: {}
+info.config_review_reminder=Some configuration files were installed as .lpkgnew. Please review them.
+info.query_desc=  query [-p] <file|pkg>      Query package or file owner.
+info.reinstall_desc=  reinstall <pkg>...         Reinstall package(s).
+info.file_owned_by=File {} is owned by: {}
+info.file_not_owned=File {} is not owned by any package.
+info.package_files=Files in package {}:
+info.reinstalling_package=Reinstalling package {}...
 info.installing_local_file=Installing from local file: {}
 error.parse_pkg_filename_failed=Could not parse package name and version from filename: {}
 warning.repo_index_load_failed_upgrade=Failed to load repository index: {}. Upgrade check might require individual requests or fail.

@@ -112,7 +112,7 @@ $(BUILD_DIR)/tests/%.o: $(TESTS_DIR)/%.cpp
 -include $(DEPS)
 
 clean:
-	rm -rf $(BUILD_DIR) build_coverage coverage_report
+	rm -rf $(BUILD_DIR) build_test coverage_report
 
 install: all
 	install -Dm755 $(BUILD_DIR)/$(TARGET) $(INSTALL_BIN_DIR)/$(TARGET)

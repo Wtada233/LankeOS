@@ -146,13 +146,13 @@ TEST_F(ComprehensiveTest, CircularDependencyResolution) {
 
 // 5. 事务内冲突测试 (两个新包冲突)
 TEST_F(ComprehensiveTest, InterTransactionConflict) {
-    std::string pA = create_pkg("conflictA", "1.0", {{"etc/shared.conf", "/"}});
-    std::string pB = create_pkg("conflictB", "1.0", {{"etc/shared.conf", "/"}});
+    std::string pA = create_pkg("conflictA", "1.0", {{"usr/bin/shared.bin", "/"}});
+    std::string pB = create_pkg("conflictB", "1.0", {{"usr/bin/shared.bin", "/"}});
 
     // 当同时安装两个包含相同文件的包时，第二个包应该报错
     // 注意：目前的实现是在 commit 阶段逐个执行，所以第一个成功，第二个抛出异常并触发回滚
     EXPECT_THROW(install_packages({pA, pB}), LpkgException);
     
     // 验证回滚：如果 conflictB 失败导致整体失败，conflictA 也应该被回滚
-    EXPECT_FALSE(fs::exists(test_root / "etc/shared.conf")) << "Transaction rollback failed after inter-package conflict!";
+    EXPECT_FALSE(fs::exists(test_root / "usr/bin/shared.bin")) << "Transaction rollback failed after inter-package conflict!";
 }
