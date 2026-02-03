@@ -124,7 +124,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
         bool use_chroot = (ROOT_DIR != "/" && !ROOT_DIR.empty());
         if (use_chroot) {
             if (!fs::exists(ROOT_DIR / "bin/sh")) {
-                log_warning(string_format("warning.hook_failed_setup", std::string(hook_name).c_str(), " /bin/sh not found in target root. Skipping."));
+                log_warning(string_format("warning.hook_failed_setup", std::string(hook_name).c_str(), get_string("error.sh_not_found")));
                 return;
             }
             ChrootMountGuard mount_guard(ROOT_DIR);
@@ -788,7 +788,12 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
                     
                     std::string full = (fs::path(dest) / src).string();
                     if (transaction_files.contains(full)) {
-                        throw LpkgException("Transaction Conflict: File " + full + " is provided by both " + transaction_files[full] + " and " + p.name);
+                        std::string msg = "Transaction Conflict: File " + full + " is provided by both " + transaction_files[full] + " and " + p.name;
+                        if (get_force_overwrite_mode()) {
+                            log_warning(msg + ". Overwriting due to --force-overwrite.");
+                        } else {
+                            throw LpkgException(msg);
+                        }
                     }
                     transaction_files[full] = p.name;
                 }
