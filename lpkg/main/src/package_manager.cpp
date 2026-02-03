@@ -300,9 +300,12 @@ void InstallationTask::check_for_file_conflicts() {
     
     while (std::getline(files_list, line)) {
         if (line.empty()) continue;
-        std::stringstream ss(line);
-        std::string src, dest;
-        if (!(ss >> src >> dest)) continue;
+        size_t tab_pos = line.find('\t');
+        if (tab_pos == std::string::npos) continue;
+        
+        std::string src = line.substr(0, tab_pos);
+        std::string dest = line.substr(tab_pos + 1);
+        if (!dest.empty() && dest.back() == '\r') dest.pop_back();
 
         fs::path logical_dest_path = fs::path(dest) / src;
         std::string path_str = logical_dest_path.string();
@@ -347,9 +350,12 @@ void InstallationTask::copy_package_files() {
     std::string line;
     while (std::getline(files_list, line)) {
         if (line.empty()) continue;
-        std::stringstream ss(line);
-        std::string src, dest;
-        if (!(ss >> src >> dest)) continue;
+        size_t tab_pos = line.find('\t');
+        if (tab_pos == std::string::npos) continue;
+
+        std::string src = line.substr(0, tab_pos);
+        std::string dest = line.substr(tab_pos + 1);
+        if (!dest.empty() && dest.back() == '\r') dest.pop_back();
 
         const fs::path src_path = tmp_pkg_dir_ / "content" / src;
         const fs::path logical_dest_path = fs::path(dest) / src;
@@ -391,8 +397,17 @@ void InstallationTask::copy_package_files() {
     }
     std::ofstream pkg_f(FILES_DIR / (pkg_name_ + ".txt"));
     std::ifstream fl2(tmp_pkg_dir_ / "files.txt");
-    std::string src_reg, dest_reg;
-    while (fl2 >> src_reg >> dest_reg) pkg_f << (fs::path(dest_reg) / src_reg).string() << "\n";
+    std::string fl2_line;
+    while (std::getline(fl2, fl2_line)) {
+        if (fl2_line.empty()) continue;
+        size_t tab_pos = fl2_line.find('\t');
+        if (tab_pos != std::string::npos) {
+            std::string src_reg = fl2_line.substr(0, tab_pos);
+            std::string dest_reg = fl2_line.substr(tab_pos + 1);
+            if (!dest_reg.empty() && dest_reg.back() == '\r') dest_reg.pop_back();
+            pkg_f << (fs::path(dest_reg) / src_reg).string() << "\n";
+        }
+    }
     std::ofstream dir_f(FILES_DIR / (pkg_name_ + ".dirs"));
     for (const auto& d : created_dirs_) dir_f << d.string() << "\n";
 }
@@ -754,9 +769,13 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
             std::stringstream ss(files_content);
             std::string line;
             while (std::getline(ss, line)) {
-                std::stringstream line_ss(line);
-                std::string src, dest;
-                if (line_ss >> src >> dest) {
+                if (line.empty()) continue;
+                size_t tab_pos = line.find('\t');
+                if (tab_pos != std::string::npos) {
+                    std::string src = line.substr(0, tab_pos);
+                    std::string dest = line.substr(tab_pos + 1);
+                    if (!dest.empty() && dest.back() == '\r') dest.pop_back();
+                    
                     std::string full = (fs::path(dest) / src).string();
                     if (transaction_files.contains(full)) {
                         throw LpkgException("Transaction Conflict: File " + full + " is provided by both " + transaction_files[full] + " and " + p.name);
