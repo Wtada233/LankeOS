@@ -52,7 +52,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
 
     if (archive_read_open_filename(a.get(), archive_path.c_str(), 10240) != ARCHIVE_OK) {
         const char* err = archive_error_string(a.get());
-        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Unknown error"));
+        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : get_string("error.unknown")));
     }
 
     struct archive_entry* entry;
@@ -64,7 +64,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
         if (r < ARCHIVE_OK) {
             if (r < ARCHIVE_WARN) {
                 const char* err = archive_error_string(a.get());
-                throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Fatal read error"));
+                throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : get_string("error.fatal_read")));
             }
             log_warning(archive_error_string(a.get()));
         }
@@ -112,7 +112,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
         if (r < ARCHIVE_OK) {
             if (r < ARCHIVE_WARN) {
                 const char* err = archive_error_string(ext.get());
-                throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Fatal write error"));
+                throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : get_string("error.fatal_write")));
             }
             log_warning(archive_error_string(ext.get()));
         } else {
@@ -125,7 +125,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
                 if (r < ARCHIVE_OK) {
                     if (r < ARCHIVE_WARN) {
                         const char* err = archive_error_string(a.get());
-                        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Data block read error"));
+                        throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : get_string("error.data_block_read")));
                     }
                     log_warning(archive_error_string(a.get()));
                     break;
@@ -133,7 +133,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
                 
                 if (archive_write_data_block(ext.get(), buff, size, offset) < ARCHIVE_OK) {
                     const char* err = archive_error_string(ext.get());
-                    throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : "Data block write error"));
+                    throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : get_string("error.data_block_write")));
                 }
             }
             archive_write_finish_entry(ext.get());

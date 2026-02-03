@@ -146,7 +146,8 @@ int main(int argc, char* argv[]) {
         if (command == "install") {
             pre_operation_check(result, usage_printer, 1);
             const auto& packages = result["packages"].as<std::vector<std::string>>();
-            install_packages(packages, hash_file);
+            bool force = result["force"].as<bool>();
+            install_packages(packages, hash_file, force);
             log_info(get_string("info.install_complete"));
         } else if (command == "remove") {
             pre_operation_check(result, usage_printer, 1);
