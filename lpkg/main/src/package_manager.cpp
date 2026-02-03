@@ -308,6 +308,11 @@ void InstallationTask::check_for_file_conflicts() {
         if (!dest.empty() && dest.back() == '\r') dest.pop_back();
 
         fs::path logical_dest_path = fs::path(dest) / src;
+        fs::path physical_dest_path = (logical_dest_path.is_absolute()) ? ROOT_DIR / logical_dest_path.relative_path() : ROOT_DIR / logical_dest_path;
+
+        // Skip conflict check if it's a directory
+        if (fs::is_directory(tmp_pkg_dir_ / "content" / src)) continue;
+
         std::string path_str = logical_dest_path.string();
         
         auto owners = cache.get_file_owners(path_str);
@@ -370,6 +375,11 @@ void InstallationTask::copy_package_files() {
         }
         for (const auto& d : to_create | std::views::reverse) { ensure_dir_exists(d); created_dirs_.insert(d); }
         
+        if (fs::is_directory(src_path)) {
+            ensure_dir_exists(physical_dest_path);
+            continue;
+        }
+
         try {
             bool is_config = (src.size() >= 4 && src.substr(0, 4) == "etc/");
             fs::path final_dest_path = physical_dest_path;
