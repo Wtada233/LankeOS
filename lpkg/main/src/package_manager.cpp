@@ -436,8 +436,13 @@ void InstallationTask::register_package() {
                 if (!l.empty()) {
                     std::string_view sv = l;
                     if (sv.back() == '\r') sv.remove_suffix(1);
-                    if (auto pos = sv.find_first_of(" \t<>="); pos != std::string_view::npos) sv = sv.substr(0, pos);
-                    if (!sv.empty()) cache.remove_reverse_dep(sv, pkg_name_);
+                    // Use standard dependency parsing: name [op version]
+                    std::string line_str(sv);
+                    std::stringstream ss(line_str);
+                    std::string dep_name;
+                    if (ss >> dep_name) {
+                        cache.remove_reverse_dep(dep_name, pkg_name_);
+                    }
                 }
             }
         }
@@ -877,8 +882,12 @@ void remove_package(const std::string& pkg_name, bool force) {
                 if (!l.empty()) { 
                     std::string_view sv = l;
                     if (sv.back() == '\r') sv.remove_suffix(1);
-                    if (auto pos = sv.find_first_of(" \t<>="); pos != std::string_view::npos) sv = sv.substr(0, pos);
-                    if (!sv.empty()) cache.remove_reverse_dep(sv, pkg_name); 
+                    std::string line_str(sv);
+                    std::stringstream ss(line_str);
+                    std::string dep_name;
+                    if (ss >> dep_name) {
+                        cache.remove_reverse_dep(dep_name, pkg_name);
+                    }
                 }
             }
         }

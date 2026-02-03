@@ -202,9 +202,16 @@ std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::read_
     std::map<std::string, std::unordered_set<std::string>, std::less<>> db;
     std::ifstream db_file(path);
     if (!db_file.is_open()) return db;
-    std::string key, value;
-    while (db_file >> key >> value) {
-        db[key].insert(value);
+    std::string line;
+    while (std::getline(db_file, line)) {
+        if (line.empty()) continue;
+        size_t tab_pos = line.find('\t');
+        if (tab_pos != std::string::npos) {
+            std::string key = line.substr(0, tab_pos);
+            std::string value = line.substr(tab_pos + 1);
+            if (!value.empty() && value.back() == '\r') value.pop_back();
+            db[key].insert(value);
+        }
     }
     return db;
 }
@@ -216,7 +223,7 @@ void Cache::write_db_uncached(const fs::path& path, const std::map<std::string, 
         if (!db_file.is_open()) throw LpkgException("Failed to create temporary database file");
         for (const auto& [key, values] : db) {
             for (const auto& value : values) {
-                db_file << key << " " << value << "\n";
+                db_file << key << "\t" << value << "\n";
             }
         }
     }
