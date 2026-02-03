@@ -91,7 +91,7 @@ void pack_package(const std::string& output_filename, const std::string& source_
             std::ofstream f(tmp_files_txt);
             for (const auto& entry : fs::recursive_directory_iterator(root_dir)) {
                 if (entry.is_directory()) continue;
-                f << entry.path().lexically_relative(root_dir).string() << " /\n";
+                f << entry.path().lexically_relative(root_dir).string() << "\t/\n";
             }
         }
         add_to_archive(a, tmp_files_txt, "files.txt");
