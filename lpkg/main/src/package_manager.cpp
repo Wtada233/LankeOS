@@ -385,6 +385,9 @@ void InstallationTask::copy_package_files() {
             fs::path final_dest_path = physical_dest_path;
             if (is_config && fs::exists(physical_dest_path) && !fs::is_directory(physical_dest_path)) {
                 final_dest_path += ".lpkgnew";
+                if (fs::exists(final_dest_path) || fs::is_symlink(final_dest_path)) {
+                    fs::remove(final_dest_path);
+                }
                 log_warning(string_format("warning.config_conflict", physical_dest_path.c_str(), final_dest_path.c_str()));
                 has_config_conflicts_ = true;
             } else {
