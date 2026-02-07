@@ -28,15 +28,15 @@ void scan_orphans(const std::string& scan_root_override) {
     };
 
     std::unordered_set<std::string> ignored_prefixes = {
-        (actual_root / "usr/share/man").string(),
+        (actual_root / "usr/man").string(),
         (actual_root / "usr/sbin").string(),
-        (actual_root / "usr/share/doc").string(),
+        (actual_root / "usr/lib64").string(),
+        (actual_root / "usr/share/lpkg").string(),
         (actual_root / "var/lib/lpkg").string(),
-        (actual_root / "var/cache/lpkg").string(),
+        (actual_root / "var/cache").string(),
         (actual_root / "var/log").string(),
         (actual_root / "var/tmp").string(),
         (actual_root / "var/run").string(),
-        (actual_root / "etc/lpkg").string(),
         (actual_root / "proc").string(),
         (actual_root / "sys").string(),
         (actual_root / "dev").string(),
@@ -45,7 +45,10 @@ void scan_orphans(const std::string& scan_root_override) {
         (actual_root / "lib").string(),
         (actual_root / "lib64").string(),
         (actual_root / "sbin").string(),
-        (actual_root / "usr/lib/python3.13/site-packages").string(),
+        (actual_root / "usr/lib/python").string(),
+        (actual_root / "etc/ssl/certs").string(),
+        (actual_root / "etc/pki").string(),
+        (actual_root / "etc/lpkg").string(),
     };
 
     log_info(get_string("info.scan_start"));
