@@ -83,6 +83,12 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
 
         archive_entry_set_pathname(entry, dest_path.c_str());
 
+        // FIX: Linux doesn't have lchmod. libarchive might try to use chmod on symlinks,
+        // which follows the link and corrupts the target file's permissions (e.g. sudo becomes 777).
+        if (archive_entry_filetype(entry) == AE_IFLNK) {
+            archive_entry_set_perm(entry, 0);
+        }
+
         // Remap hardlink and symlink targets if they exist
         const char* hardlink = archive_entry_hardlink(entry);
         if (hardlink) {

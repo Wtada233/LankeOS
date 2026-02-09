@@ -22,18 +22,18 @@ public:
     bool has_config_conflicts_ = false;
     bool force_reinstall_ = false;
 
-private:
+    // Temporarily public for testing
     void prepare();
     void download_and_verify_package();
     void extract_and_validate_package();
     void check_for_file_conflicts();
-
     void commit();
     void copy_package_files();
     void register_package();
     void run_post_install_hook();
     void rollback_files();
 
+private:
     std::vector<std::pair<std::filesystem::path, std::filesystem::path>> backups_;
     std::vector<std::filesystem::path> installed_files_;
     std::set<std::filesystem::path> created_dirs_;
