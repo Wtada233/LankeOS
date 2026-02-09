@@ -21,10 +21,16 @@ protected:
     void SetUp() override {
         set_non_interactive_mode(NonInteractiveMode::YES);
         set_testing_mode(true);
+        set_force_overwrite_mode(false);
+        set_no_hooks_mode(false);
+        set_no_deps_mode(false);
         init_localization();
         
         suite_work_dir = fs::absolute("tmp_new_features_test");
-        if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
+        if (fs::exists(suite_work_dir)) {
+            std::string clean_cmd = "sudo rm -rf " + suite_work_dir.string();
+            std::system(clean_cmd.c_str());
+        }
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
         
@@ -80,9 +86,8 @@ protected:
 
     void TearDown() override {
         set_root_path("/");
-        std::string unlock_cmd = "find " + suite_work_dir.string() + " -exec chattr -i {} + 2>/dev/null";
-        std::system(unlock_cmd.c_str());
-        fs::remove_all(suite_work_dir);
+        std::string clean_cmd = "sudo rm -rf " + suite_work_dir.string();
+        std::system(clean_cmd.c_str());
     }
 };
 
@@ -120,7 +125,6 @@ TEST_F(NewFeaturesTest, QueryFileAndPackage) {
 TEST_F(NewFeaturesTest, ReinstallPackage) {
     std::string pkg = create_pkg("reinstall_test", "1.0", {{"usr/bin/reinstall_bin", "/"}});
     
-    // Clear any previous attempts if necessary, but here we just install normally first
     install_packages({pkg}, "", false);
 
     fs::path bin_path = test_root / "usr/bin/reinstall_bin";
@@ -132,7 +136,7 @@ TEST_F(NewFeaturesTest, ReinstallPackage) {
         f << "modified";
     }
 
-    // Force reload cache/repo to ensure it sees the pkg in mirror
+    // Reinstall
     reinstall_package("reinstall_test");
 
     {
@@ -164,18 +168,15 @@ TEST_F(NewFeaturesTest, ReinstallAtomicRollback) {
     fs::path app_path = test_root / "usr/bin/app";
     ASSERT_TRUE(fs::exists(app_path));
 
-    // 2. Prepare a "broken" update or environment
-    // We will make the file immutable so the NEXT copy fails
-    std::string chattr_cmd = "chattr +i " + app_path.string();
-    std::system(chattr_cmd.c_str());
+    // 2. Sabotage: Make parent directory read-only to block overwrite
+    fs::path bin_dir = test_root / "usr" / "bin";
+    fs::permissions(bin_dir, fs::perms::owner_read | fs::perms::owner_exec);
 
     // 3. Attempt reinstall. It should fail during file copy.
-    // Because it's now an atomic transaction, it should NOT leave the package uninstalled.
     EXPECT_THROW(reinstall_package(pkg), LpkgException);
 
     // 4. Unlock for verification and cleanup
-    std::string unlock_cmd = "chattr -i " + app_path.string();
-    std::system(unlock_cmd.c_str());
+    fs::permissions(bin_dir, fs::perms::owner_all);
 
     // 5. VERIFY: The package should STILL be marked as installed
     EXPECT_EQ(Cache::instance().get_installed_version("rollback_test"), "1.0");

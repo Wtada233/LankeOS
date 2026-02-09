@@ -53,7 +53,7 @@ protected:
             ensure_dir_exists(full_path.parent_path());
             std::ofstream f(full_path);
             f << content;
-            f_files << path << " /\n"; 
+            f_files << path << "\t/\n"; 
         }
         f_files.close();
 

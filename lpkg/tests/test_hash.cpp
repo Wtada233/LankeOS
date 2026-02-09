@@ -49,7 +49,7 @@ protected:
         fs::create_directories(work_dir / "content");
         std::ofstream f(work_dir / "content/dummy"); f << "data"; f.close();
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream files(work_dir / "files.txt"); files << "dummy /\n"; files.close();
+        std::ofstream files(work_dir / "files.txt"); files << "dummy\t/\n"; files.close();
         std::ofstream ml(work_dir / "man.txt"); ml << "man\n"; ml.close();
 
         std::string pkg_filename = name + "-" + ver + ".tar.zst";

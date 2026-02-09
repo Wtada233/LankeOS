@@ -18,6 +18,9 @@ protected:
     void SetUp() override {
         set_non_interactive_mode(NonInteractiveMode::YES);
         set_testing_mode(true);
+        set_force_overwrite_mode(false);
+        set_no_hooks_mode(false);
+        set_no_deps_mode(false);
         init_localization();
         
         suite_work_dir = fs::absolute("tmp_comprehensive_test");
@@ -50,7 +53,7 @@ protected:
             fs::path p = work_dir / "content" / src;
             ensure_dir_exists(p.parent_path());
             std::ofstream f(p); f << "content of " << src; f.close();
-            fl << src << " " << dest << "\n";
+            fl << src << "\t" << dest << "\n";
         }
         fl.close();
 

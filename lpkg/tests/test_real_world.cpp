@@ -49,7 +49,7 @@ protected:
         
         {
             std::ofstream d(work_dir / "deps.txt");
-            for (auto const& dep : deps) d << dep.first << " " << dep.second << "\n";
+            for (auto const& dep : deps) d << dep.first << "\t" << dep.second << "\n";
         }
         
         {
@@ -66,7 +66,7 @@ protected:
                 out << "content of " << file.first;
                 out.close();
                 // CORRECT MAPPING: relative_path /
-                f << file.first << " /\n";
+                f << file.first << "\t/\n";
             }
         }
         
@@ -140,7 +140,7 @@ TEST_F(RealWorldScenarioTest, ReinstallFromNewSource) {
     }
     {
         std::ofstream f(work_dir / "files.txt");
-        f << "usr/bin/app /\n";
+        f << "usr/bin/app\t/\n";
     }
     std::ofstream(work_dir / "deps.txt").close();
     std::ofstream(work_dir / "provides.txt").close();

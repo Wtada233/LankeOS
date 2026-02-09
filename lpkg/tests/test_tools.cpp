@@ -100,7 +100,7 @@ TEST_F(ToolsTest, ScanOrphansLogic) {
     // 手动注入数据库记录 (模拟已安装包)
     {
         std::ofstream db(test_system_root / "var/lib/lpkg/files.db");
-        db << "/usr/bin/owned test-pkg" << std::endl;
+        db << "/usr/bin/owned\ttest-pkg" << std::endl;
     }
     Cache::instance().load(); // 强制重载数据库
 

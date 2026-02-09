@@ -50,7 +50,7 @@ protected:
         deps.close(); // No deps
         
         std::ofstream files(work_dir / "files.txt");
-        files << "usr/bin/hello /" << std::endl;
+        files << "usr/bin/hello\t/" << std::endl;
         files.close();
 
         std::ofstream man(work_dir / "man.txt");
