@@ -373,12 +373,22 @@ void InstallationTask::copy_package_files() {
                 }
             }
 
-            fs::copy(src_path, final_dest, fs::copy_options::recursive | fs::copy_options::overwrite_existing | fs::copy_options::copy_symlinks);
+            if (fs::is_symlink(src_path)) {
+                fs::path link_target = fs::read_symlink(src_path);
+                if (fs::exists(final_dest) || fs::is_symlink(final_dest)) fs::remove(final_dest);
+                fs::create_symlink(link_target, final_dest);
+            } else {
+                fs::copy(src_path, final_dest, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+            }
             
             struct stat st;
             if (lstat(src_path.c_str(), &st) == 0) {
                 (void)lchown(final_dest.c_str(), st.st_uid, st.st_gid);
-                (void)chmod(final_dest.c_str(), st.st_mode & 07777);
+                // Linux has no lchmod, calling chmod on a symlink will follow it.
+                // We must skip chmod for symlinks to prevent target corruption.
+                if (!S_ISLNK(st.st_mode)) {
+                    (void)chmod(final_dest.c_str(), st.st_mode & 07777);
+                }
             }
 
             installed_files_.push_back(final_dest);
