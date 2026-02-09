@@ -41,7 +41,7 @@ protected:
         fs::create_directories(work_dir / "content");
         std::ofstream f(work_dir / "content/file"); f << name; f.close();
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream files(work_dir / "files.txt"); files << "file /\n"; files.close();
+        std::ofstream files(work_dir / "files.txt"); files << "file\t/\n"; files.close();
         std::ofstream ml(work_dir / "man.txt"); ml << "man\n"; ml.close();
 
         std::string pkg_filename = name + "-1.0.tar.zst";

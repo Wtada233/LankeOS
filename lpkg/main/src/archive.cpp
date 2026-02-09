@@ -41,6 +41,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     archive_write_disk_set_options(ext.get(), 
         ARCHIVE_EXTRACT_TIME | 
         ARCHIVE_EXTRACT_PERM | 
+        ARCHIVE_EXTRACT_OWNER | 
         ARCHIVE_EXTRACT_ACL | 
         ARCHIVE_EXTRACT_FFLAGS | 
         ARCHIVE_EXTRACT_SECURE_SYMLINKS | 
