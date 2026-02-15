@@ -141,14 +141,14 @@ class RepoManager:
             self.upload_file(str(path), remote_pkg_path)
             
             # Upload hash.txt
-            with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8') as tmp:
                 tmp.write(sha256)
                 tmp_path = tmp.name
             self.upload_file(tmp_path, f"{prefix}{arch}/{name}/{version}/hash.txt")
             os.unlink(tmp_path)
 
             # Upload latest.txt
-            with tempfile.NamedTemporaryFile(mode='w', delete=False) as tmp:
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, encoding='utf-8') as tmp:
                 tmp.write(version)
                 tmp_path = tmp.name
             self.upload_file(tmp_path, f"{prefix}{arch}/{name}/latest.txt")
@@ -159,11 +159,79 @@ class RepoManager:
 
         # Save and upload index
         new_index_content = "\n".join(index_entries.values()) + "\n"
-        with open(index_local, 'w') as f:
+        with open(index_local, 'w', encoding='utf-8') as f:
             f.write(new_index_content)
         
         self.upload_file(index_local, f"{prefix}{arch}/index.txt")
         print("Done.")
+
+    def delete_package(self, name, version=None):
+        arch = self.config.get("architecture", "amd64")
+        prefix = self.config["storage"].get("path_prefix", "").strip('/')
+        if prefix: prefix += '/'
+        
+        index_local = self.download_index()
+        index_entries = self.parse_index(index_local)
+
+        if version:
+            print(f"Deleting {name} version {version}...")
+            remote_pkg_dir = f"{prefix}{arch}/{name}/{version}/"
+            self.delete_remote_dir(remote_pkg_dir)
+            # If this was the version in index, remove it from index
+            if name in index_entries:
+                entry_ver = index_entries[name].split('|')[1]
+                if entry_ver == version:
+                    del index_entries[name]
+                    print(f"Removed {name} from index (was version {version})")
+        else:
+            print(f"Deleting all versions of {name}...")
+            remote_pkg_root = f"{prefix}{arch}/{name}/"
+            self.delete_remote_dir(remote_pkg_root)
+            if name in index_entries:
+                del index_entries[name]
+                print(f"Removed {name} from index")
+
+        # Save and upload index
+        new_index_content = "\n".join(index_entries.values()) + "\n"
+        with open(index_local, 'w', encoding='utf-8') as f:
+            f.write(new_index_content)
+        self.upload_file(index_local, f"{prefix}{arch}/index.txt")
+        print("Done.")
+
+    def cleanup_repository(self):
+        """Removes all versions from storage that are NOT in the index.txt"""
+        print("Cleaning up historical packages...")
+        arch = self.config.get("architecture", "amd64")
+        prefix = self.config["storage"].get("path_prefix", "").strip('/')
+        if prefix: prefix += '/'
+        
+        index_local = self.download_index()
+        index_entries = self.parse_index(index_local)
+        
+        # Build map of name -> active_version
+        active_versions = {}
+        for name, line in index_entries.items():
+            active_versions[name] = line.split('|')[1]
+
+        # List all packages in storage
+        remote_base = f"{prefix}{arch}/"
+        all_pkgs = self.list_remote_dirs(remote_base)
+        
+        for pkg in all_pkgs:
+            if pkg not in active_versions:
+                print(f"Package {pkg} is not in index, deleting entire package directory...")
+                self.delete_remote_dir(f"{remote_base}{pkg}/")
+                continue
+            
+            # Check versions of this package
+            active_ver = active_versions[pkg]
+            all_vers = self.list_remote_dirs(f"{remote_base}{pkg}/")
+            for ver in all_vers:
+                if ver != active_ver:
+                    print(f"Deleting old version: {pkg} {ver}...")
+                    self.delete_remote_dir(f"{remote_base}{pkg}/{ver}/")
+        
+        print("Cleanup complete.")
 
     def upload_file(self, local_path, remote_path):
         st = self.config["storage"]
@@ -175,12 +243,57 @@ class RepoManager:
             print(f"Uploading via SCP: {remote_path}...")
             host = st["host"]
             user = st["user"]
-            remote_base = st["remote_path"].rstrip('/')
-            full_remote = f"{remote_base}/{remote_path}"
+            remote_base_path = st["remote_path"].rstrip('/')
+            full_remote = f"{remote_base_path}/{remote_path}"
             # Ensure remote directory exists
             remote_dir = os.path.dirname(full_remote)
             subprocess.run(["ssh", f"{user}@{host}", f"mkdir -p {remote_dir}"], check=True)
             subprocess.run(["scp", local_path, f"{user}@{host}:{full_remote}"], check=True)
+
+    def delete_remote_dir(self, remote_dir_prefix):
+        st = self.config["storage"]
+        if st["type"] == "s3":
+            client = self.get_storage()
+            # S3 delete objects with prefix
+            paginator = client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=st["bucket"], Prefix=remote_dir_prefix)
+            
+            for page in pages:
+                if 'Contents' in page:
+                    for obj in page['Contents']:
+                        print(f"  Deleting: {obj['Key']}")
+                        client.delete_object(Bucket=st["bucket"], Key=obj['Key'])
+        elif st["type"] == "scp":
+            host = st["host"]
+            user = st["user"]
+            remote_base = st["remote_path"].rstrip('/')
+            subprocess.run(["ssh", f"{user}@{host}", f"rm -rf {remote_base}/{remote_dir_prefix}"], check=True)
+
+    def list_remote_dirs(self, prefix):
+        st = self.config["storage"]
+        dirs = []
+        if st["type"] == "s3":
+            client = self.get_storage()
+            paginator = client.get_paginator('list_objects_v2')
+            # Use delimiter to get common prefixes (like directories)
+            pages = paginator.paginate(Bucket=st["bucket"], Prefix=prefix, Delimiter='/')
+            for page in pages:
+                if 'CommonPrefixes' in page:
+                    for cp in page['CommonPrefixes']:
+                        # cp['Prefix'] is like "prefix/pkg/" or "prefix/pkg/ver/"
+                        name = cp['Prefix'][len(prefix):].rstrip('/')
+                        if name:
+                            dirs.append(name)
+        elif st["type"] == "scp":
+            host = st["host"]
+            user = st["user"]
+            remote_base = st["remote_path"].rstrip('/')
+            full_path = f"{remote_base}/{prefix}"
+            result = subprocess.run(["ssh", f"{user}@{host}", f"ls -1F {full_path} 2>/dev/null | grep '/$' | sed 's|/||'"], 
+                                    capture_output=True, text=True)
+            if result.returncode == 0:
+                dirs = [d.strip() for d in result.stdout.split('\n') if d.strip()]
+        return dirs
 
     def download_index(self):
         st = self.config["storage"]
@@ -199,11 +312,11 @@ class RepoManager:
             elif st["type"] == "scp":
                 host = st["host"]
                 user = st["user"]
-                remote_base = st["remote_path"].rstrip('/')
-                subprocess.run(["scp", f"{user}@{host}:{remote_base}/{remote_path}", local_path], check=True)
+                remote_base_path = st["remote_path"].rstrip('/')
+                subprocess.run(["scp", f"{user}@{host}:{remote_base_path}/{remote_path}", local_path], check=True)
         except Exception:
             # If index doesn't exist, start with empty
-            with open(local_path, 'w') as f:
+            with open(local_path, 'w', encoding='utf-8') as f:
                 pass
         
         return local_path
@@ -211,7 +324,7 @@ class RepoManager:
     def parse_index(self, path):
         entries = {}
         if os.path.exists(path):
-            with open(path, 'r') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 for line in f:
                     line = line.strip()
                     if not line or line.startswith('#'): continue
@@ -227,6 +340,11 @@ def main():
     push_parser = subparsers.add_parser("push", help="Push packages to repository")
     push_parser.add_argument("patterns", nargs="+", help="File patterns/directories to push")
 
+    delete_parser = subparsers.add_parser("delete", help="Delete package or specific version from repository")
+    delete_parser.add_argument("package", help="Package name or name:version")
+
+    subparsers.add_parser("cleanup", help="Remove all historical versions not in index.txt")
+
     config_parser = subparsers.add_parser("config", help="View or modify config")
     config_parser.add_argument("--set", metavar="KEY=VALUE", nargs="+", help="Set config values (e.g. storage.access_key=XXX)")
     config_parser.add_argument("--show", action="store_true", help="Show current config (hides secrets by default)")
@@ -238,6 +356,14 @@ def main():
 
     if args.command == "push":
         mgr.push_packages(args.patterns)
+    elif args.command == "delete":
+        if ':' in args.package:
+            name, ver = args.package.split(':', 1)
+            mgr.delete_package(name, ver)
+        else:
+            mgr.delete_package(args.package)
+    elif args.command == "cleanup":
+        mgr.cleanup_repository()
     elif args.command == "config":
         if args.set:
             for item in args.set:
