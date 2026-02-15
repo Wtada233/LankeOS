@@ -106,6 +106,8 @@ void pack_package(const std::string& output_filename, const std::string& source_
             fs::remove(empty);
         }
 
+        if (fs::exists(base_dir / "provides.txt")) add_to_archive(a, base_dir / "provides.txt", "provides.txt");
+
         if (fs::exists(base_dir / "man.txt")) add_to_archive(a, base_dir / "man.txt", "man.txt");
         else {
             fs::path empty_man = get_tmp_dir() / "empty_man";

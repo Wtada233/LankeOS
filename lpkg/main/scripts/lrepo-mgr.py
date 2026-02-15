@@ -21,19 +21,22 @@ def extract_metadata(archive_path):
     deps = ""
     provides = ""
     try:
-        # Try to extract deps.txt
-        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, 'deps.txt', '-O'], 
+        # Try to extract deps.txt (using wildcard to handle potential ./ prefix)
+        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*deps.txt', '-O'], 
                                 capture_output=True, text=True)
         if result.returncode == 0:
             deps = result.stdout.strip().replace('\n', ',')
         
         # Try to extract provides.txt
-        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, 'provides.txt', '-O'], 
+        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*provides.txt', '-O'], 
                                 capture_output=True, text=True)
         if result.returncode == 0:
             provides = result.stdout.strip().replace('\n', ',')
+        
+        if not deps:
+            print(f"  Note: No dependencies found in {os.path.basename(archive_path)}")
     except Exception as e:
-        print(f"Warning: Failed to extract metadata: {e}")
+        print(f"  Warning: Failed to extract metadata from {archive_path}: {e}")
     
     return deps, provides
 
