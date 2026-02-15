@@ -94,7 +94,13 @@ class RepoManager:
                                   endpoint_url=st.get('endpoint'),
                                   aws_access_key_id=st.get('access_key'),
                                   aws_secret_access_key=st.get('secret_key'),
-                                  config=Config(s3={'addressing_style': 'virtual'}))
+                                  config=Config(
+                                      s3={'addressing_style': 'virtual'},
+                                      signature_version='s3v4',
+                                      # 禁用掉引起该问题的 checksum 计算
+                                      request_checksum_calculation='when_required',
+                                      response_checksum_validation='when_required'
+                                  ))
         return None
 
     def push_packages(self, patterns):
