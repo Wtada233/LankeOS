@@ -42,6 +42,23 @@ struct CurlDeleter {
 };
 using CurlHandle = std::unique_ptr<CURL, CurlDeleter>;
 
+// Function to find system CA certificate bundle
+const char* find_ca_bundle() {
+    static const char* const paths[] = {
+        "/etc/ssl/certs/ca-certificates.crt",     // Debian/Ubuntu/Arch/Alpine
+        "/etc/pki/tls/certs/ca-bundle.crt",       // RHEL/CentOS/Fedora
+        "/etc/ssl/ca-bundle.pem",                 // OpenSUSE
+        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // New Fedora/RHEL
+        "/etc/ssl/cert.pem"                       // Others
+    };
+    for (const char* path : paths) {
+        if (access(path, R_OK) == 0) {
+            return path;
+        }
+    }
+    return nullptr;
+}
+
 void download_file(const std::string& url, const fs::path& output_path, bool show_progress) {
     CurlHandle curl(curl_easy_init());
     if (!curl) {
@@ -58,6 +75,12 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
     curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &ofile);
     curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl.get(), CURLOPT_FAILONERROR, 1L);
+    
+    // Set CA bundle path if found
+    if (const char* ca_path = find_ca_bundle()) {
+        curl_easy_setopt(curl.get(), CURLOPT_CAINFO, ca_path);
+    }
+
     curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT, 10L); // 10 seconds to connect
     curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_LIMIT, 100L); // 100 bytes/sec
     curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_TIME, 30L); // for 30 seconds before timing out
