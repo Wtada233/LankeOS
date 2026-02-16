@@ -1,3 +1,4 @@
 build/
 run_tests
 *.o
+lrepo-mgr.json
