@@ -54,6 +54,7 @@ void Repository::load_index() {
 
     while (std::getline(file, line)) {
         if (line.empty() || line[0] == '#') continue;
+        
         std::string_view sv = line;
         if (sv.back() == '\r') sv.remove_suffix(1);
         
@@ -63,52 +64,72 @@ void Repository::load_index() {
 
         auto it = parts.begin();
         if (it == parts.end()) continue;
-        PackageInfo pkg;
-        pkg.name = *it++;
-        if (it == parts.end()) continue;
-        pkg.version = *it++;
-        if (it == parts.end()) continue;
-        pkg.sha256 = *it++;
+        std::string pkg_name(std::move(*it++));
         
-        // Parse Deps
-        if (it != parts.end()) {
-            std::string_view deps_sv = *it++;
-            if (!deps_sv.empty()) {
-                auto deps_parts = deps_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
-                    return std::string_view(&*rng.begin(), std::ranges::distance(rng));
-                });
-                for (auto dep_str : deps_parts) {
-                    DependencyInfo dep;
-                    size_t op_pos = std::string_view::npos;
-                    for (const auto& op : ops) {
-                        if (op_pos = dep_str.find(op); op_pos != std::string_view::npos) {
-                            dep.name = dep_str.substr(0, op_pos);
-                            dep.op = op;
-                            dep.version_req = dep_str.substr(op_pos + op.length());
-                            break;
-                        }
+        if (it == parts.end()) continue;
+        std::string_view versions_sv = *it++;
+        
+        std::string_view deps_sv;
+        if (it != parts.end()) deps_sv = *it++;
+        
+        std::string_view prov_sv;
+        if (it != parts.end()) prov_sv = *it++;
+
+        // Process dependencies once for all versions in this line
+        std::vector<DependencyInfo> common_deps;
+        if (!deps_sv.empty()) {
+            auto deps_parts = deps_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
+                return std::string_view(&*rng.begin(), std::ranges::distance(rng));
+            });
+            for (auto dep_str : deps_parts) {
+                DependencyInfo dep;
+                size_t op_pos = std::string_view::npos;
+                for (const auto& op : ops) {
+                    if (op_pos = dep_str.find(op); op_pos != std::string_view::npos) {
+                        dep.name = dep_str.substr(0, op_pos);
+                        dep.op = op;
+                        dep.version_req = dep_str.substr(op_pos + op.length());
+                        break;
                     }
-                    if (op_pos == std::string_view::npos) dep.name = dep_str;
-                    pkg.dependencies.push_back(dep);
                 }
+                if (op_pos == std::string_view::npos) dep.name = dep_str;
+                common_deps.push_back(dep);
             }
         }
 
-        // Parse Provides
-        if (it != parts.end()) {
-            std::string_view prov_sv = *it++;
-            if (!prov_sv.empty()) {
-                auto prov_parts = prov_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
-                    return std::string_view(&*rng.begin(), std::ranges::distance(rng));
-                });
-                for (auto prov : prov_parts) {
-                    pkg.provides.emplace_back(prov);
-                    providers_[std::string(prov)].push_back(pkg.name);
-                }
+        std::vector<std::string> common_provides;
+        if (!prov_sv.empty()) {
+            auto prov_parts = prov_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
+                return std::string_view(&*rng.begin(), std::ranges::distance(rng));
+            });
+            for (auto prov : prov_parts) {
+                common_provides.emplace_back(prov);
+                providers_[std::string(prov)].push_back(pkg_name);
             }
         }
 
-        packages_[pkg.name].push_back(pkg);
+        // Parse individual versions: v1:hash1,v2:hash2
+        auto ver_list = versions_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
+            return std::string_view(&*rng.begin(), std::ranges::distance(rng));
+        });
+
+        for (auto ver_hash : ver_list) {
+            auto vh_parts = ver_hash | std::views::split(':') | std::views::transform([](auto&& rng) {
+                return std::string_view(&*rng.begin(), std::ranges::distance(rng));
+            });
+            auto vh_it = vh_parts.begin();
+            if (vh_it == vh_parts.end()) continue;
+            
+            PackageInfo pkg;
+            pkg.name = pkg_name;
+            pkg.version = *vh_it++;
+            if (vh_it != vh_parts.end()) pkg.sha256 = *vh_it++;
+            
+            pkg.dependencies = common_deps;
+            pkg.provides = common_provides;
+            
+            packages_[pkg.name].push_back(std::move(pkg));
+        }
     }
 
     for (auto& versions : packages_ | std::views::values) {

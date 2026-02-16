@@ -146,34 +146,3 @@ bool version_satisfies(const std::string& current_version, const std::string& op
 
     throw LpkgException(string_format("error.invalid_version_format", op));
 }
-
-std::string get_latest_version(const std::string& pkg_name) {
-    std::string mirror_url = get_mirror_url();
-    std::string arch = get_architecture();
-    std::string latest_txt_url = mirror_url + arch + "/" + pkg_name + "/latest.txt";
-    fs::path tmp_file_path = get_tmp_dir() / (pkg_name + "_latest.txt");
-
-    try {
-        download_file(latest_txt_url, tmp_file_path, false);
-    } catch (const LpkgException& e) {
-        throw LpkgException(string_format("error.download_latest_txt_failed", latest_txt_url) + ": " + e.what());
-    }
-
-    std::ifstream latest_file(tmp_file_path);
-    if (!latest_file.is_open()) {
-        throw LpkgException(string_format("error.open_file_failed", tmp_file_path.string()));
-    }
-    std::string latest_version;
-    if (!std::getline(latest_file, latest_version) || latest_version.empty()) {
-        throw LpkgException(string_format("error.read_latest_txt_failed", latest_txt_url));
-    }
-
-    // Trim trailing carriage return if present (from CRLF line endings)
-    if (!latest_version.empty() && latest_version.back() == '\r') {
-        latest_version.pop_back();
-    }
-
-    validate_version_format(latest_version);
-
-    return latest_version;
-}

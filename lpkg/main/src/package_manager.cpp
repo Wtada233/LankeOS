@@ -248,22 +248,27 @@ void InstallationTask::download_and_verify_package() {
 
     const std::string mirror_url = get_mirror_url();
     const std::string arch = get_architecture();
-    if (version_ == "latest") actual_version_ = get_latest_version(pkg_name_);
     
-    const std::string download_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + "/app.tar.zst";
-    archive_path_ = tmp_pkg_dir_ / "app.tar.zst";
-    
-    std::string target_hash = expected_hash_;
-    if (target_hash.empty()) {
-        const std::string hash_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + "/hash.txt";
-        const fs::path hash_path = tmp_pkg_dir_ / "hash.txt";
-        download_with_retries(hash_url, hash_path, 5, false);
-        std::ifstream hf(hash_path);
-        if (!(hf >> target_hash)) throw LpkgException(string_format("error.hash_download_failed", hash_url));
+    // actual_version_ and expected_hash_ should have been resolved from Repository index in the plan phase
+    if (actual_version_.empty() || actual_version_ == "latest") {
+         // Fallback/safety: if plan didn't resolve version, try to use Repository directly
+         Repository repo;
+         repo.load_index();
+         auto info = repo.find_package(pkg_name_);
+         if (info) {
+             actual_version_ = info->version;
+             expected_hash_ = info->sha256;
+         } else {
+             throw LpkgException(string_format("warning.package_not_in_repo", pkg_name_));
+         }
     }
-
+    
+    // New URL format: mirror/arch/pkg/version.lpkg
+    const std::string download_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + ".lpkg";
+    archive_path_ = tmp_pkg_dir_ / (actual_version_ + ".lpkg");
+    
     if (!fs::exists(archive_path_)) download_with_retries(download_url, archive_path_, 5, true);
-    if (calculate_sha256(archive_path_) != target_hash) 
+    if (!expected_hash_.empty() && calculate_sha256(archive_path_) != expected_hash_) 
         throw LpkgException(string_format("error.hash_mismatch", pkg_name_));
 }
 
@@ -869,14 +874,15 @@ void upgrade_packages() {
     int count = 0;
     for (const auto& [n, curr] : installed) {
         auto opt = repo.find_package(n); 
-        std::string lat = opt ? opt->version : "";
-        if (lat.empty()) try { lat = get_latest_version(n); } catch (...) { continue; }
+        if (!opt) continue;
+        
+        std::string lat = opt->version;
         
         if (version_compare(curr, lat)) {
             log_info(string_format("info.upgradable_found", n, curr, lat));
             try {
                 log_info(string_format("info.upgrading_package", n, curr, lat));
-                const std::string hash = (opt && opt->version == lat) ? opt->sha256 : "";
+                const std::string hash = opt->sha256;
                 const bool held = Cache::instance().is_held(n);
                 InstallationTask t(n, lat, held, curr, "", hash, false);
                 t.run(); count++;
