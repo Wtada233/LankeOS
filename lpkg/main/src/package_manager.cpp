@@ -54,7 +54,6 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
             log_warning(string_format("warning.hook_failed_setup", std::string(hook_name), get_string("error.sh_not_found")));
             return;
         }
-        // Re-execute inside chroot via helper
         const fs::path hook_rel = fs::relative(hook_path, ROOT_DIR);
         args.push_back("/" + hook_rel.string());
     } else {
@@ -87,7 +86,6 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
     }
 }
 
-// Strictly parses Tab-separated line: key\tvalue
 std::optional<std::pair<std::string, std::string>> parse_tab_line(const std::string& line) {
     if (line.empty()) return std::nullopt;
     if (const auto pos = line.find('\t'); pos != std::string::npos) {
@@ -140,7 +138,6 @@ void InstallationTask::rollback_files() {
             std::error_code ec;
             fs::remove_all(file, ec);
             if (ec) {
-                // Brute force for root
                 std::string cmd = "sudo rm -rf \"" + file.string() + "\" 2>/dev/null";
                 (void)std::system(cmd.c_str());
             }
@@ -156,8 +153,6 @@ void InstallationTask::rollback_files() {
             }
         }
     }
-    
-    // Clean up empty dirs in reverse
     for (const auto& dir : created_dirs_ | std::views::reverse) {
         if (fs::exists(dir) && fs::is_directory(dir) && fs::is_empty(dir)) {
             std::error_code ec;
@@ -191,7 +186,7 @@ void InstallationTask::commit() {
             
             auto& cache = Cache::instance();
             for (const auto& old_file : old_files) {
-                if (old_file.starts_with("/etc/")) continue; // Protective rule
+                if (old_file.starts_with("/etc/")) continue;
                 if (!new_files.contains(old_file)) {
                     auto owners = cache.get_file_owners(old_file);
                     if (owners.contains(pkg_name_)) {
@@ -208,7 +203,6 @@ void InstallationTask::commit() {
                 }
             }
             
-            // Cleanup obsolete directories
             const fs::path old_dirs_list = FILES_DIR / (pkg_name_ + ".dirs");
             if (fs::exists(old_dirs_list)) {
                 std::ifstream df(old_dirs_list);
@@ -249,9 +243,7 @@ void InstallationTask::download_and_verify_package() {
     const std::string mirror_url = get_mirror_url();
     const std::string arch = get_architecture();
     
-    // actual_version_ and expected_hash_ should have been resolved from Repository index in the plan phase
     if (actual_version_.empty() || actual_version_ == "latest") {
-         // Fallback/safety: if plan didn't resolve version, try to use Repository directly
          Repository repo;
          repo.load_index();
          auto info = repo.find_package(pkg_name_);
@@ -263,7 +255,6 @@ void InstallationTask::download_and_verify_package() {
          }
     }
     
-    // New URL format: mirror/arch/pkg/version.lpkg
     const std::string download_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + ".lpkg";
     archive_path_ = tmp_pkg_dir_ / (actual_version_ + ".lpkg");
     
@@ -307,7 +298,6 @@ void InstallationTask::check_for_file_conflicts() {
             continue;
         }
         
-        // Manual file check
         if (old_version_to_replace_.empty()) {
             const fs::path phys = (logical_path.is_absolute()) ? ROOT_DIR / logical_path.relative_path() : ROOT_DIR / logical_path;
             if ((fs::exists(phys) || fs::is_symlink(phys)) && !force_overwrite) {
@@ -339,7 +329,6 @@ void InstallationTask::copy_package_files() {
         
         if (!fs::exists(src_path) && !fs::is_symlink(src_path)) continue;
         
-        // Create parent directories
         fs::path parent = physical_path.parent_path();
         std::vector<fs::path> to_create;
         while (!parent.empty() && parent != ROOT_DIR && !fs::exists(parent)) { 
@@ -387,10 +376,8 @@ void InstallationTask::copy_package_files() {
             }
             
             struct stat st;
-            if (lstat(src_path.c_str(), &st) == 0) {
+            if (lstat(final_dest.c_str(), &st) == 0) {
                 (void)lchown(final_dest.c_str(), st.st_uid, st.st_gid);
-                // Linux has no lchmod, calling chmod on a symlink will follow it.
-                // We must skip chmod for symlinks to prevent target corruption.
                 if (!S_ISLNK(st.st_mode)) {
                     (void)chmod(final_dest.c_str(), st.st_mode & 07777);
                 }
@@ -405,7 +392,6 @@ void InstallationTask::copy_package_files() {
     
     if (has_config_conflicts_) log_warning(get_string("info.config_review_reminder"));
 
-    // Update metadata files
     std::ofstream pkg_f(FILES_DIR / (pkg_name_ + ".txt"));
     std::ifstream fl2(tmp_pkg_dir_ / "files.txt");
     std::string fl2_line;
@@ -420,8 +406,6 @@ void InstallationTask::copy_package_files() {
 
 void InstallationTask::register_package() {
     auto& cache = Cache::instance();
-    
-    // Helper to cleanup old records if upgrading
     auto cleanup_old = [&](const fs::path& path, auto remover) {
         if (!old_version_to_replace_.empty() && fs::exists(path)) {
             std::ifstream f(path);
@@ -707,7 +691,6 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
         return;
     }
 
-    // Confirmation prompt
     std::string prompt;
     for (const auto& n : order) {
         const auto& p = plan.at(n);
@@ -747,7 +730,6 @@ void remove_package(const std::string& pkg_name, bool force) {
             std::string list; for (const auto& d : rdeps) list += d + " ";
             log_info(string_format("info.skip_remove_dependency", pkg_name, list)); return;
         }
-        // Check provides rdeps
         const fs::path plist = FILES_DIR / (pkg_name + ".provides");
         if (fs::exists(plist)) {
             std::ifstream f(plist); std::string cap;
@@ -764,7 +746,6 @@ void remove_package(const std::string& pkg_name, bool force) {
     run_hook(pkg_name, "prerm.sh");
     remove_package_files(pkg_name, force);
     
-    // Cleanup cache
     auto& cache = Cache::instance();
     const fs::path dep_file = DEP_DIR / pkg_name;
     if (fs::exists(dep_file)) {
@@ -823,7 +804,6 @@ void remove_package_files(const std::string& pkg_name, bool force) {
     log_info(string_format("info.files_removed", count)); 
     fs::remove(list);
 
-    // Cleanup dirs and provides
     if (const fs::path dlist = FILES_DIR / (pkg_name + ".dirs"); fs::exists(dlist)) {
         std::ifstream f(dlist); std::string l; std::vector<fs::path> ds;
         while (std::getline(f, l)) if (!l.empty()) ds.emplace_back(l);
@@ -862,8 +842,12 @@ void autoremove() {
 
 void upgrade_packages() {
     log_info(get_string("info.checking_upgradable")); 
+    TmpDirManager tmp;
     Repository repo;
-    try { repo.load_index(); } catch (...) {}
+    try { repo.load_index(); } catch (const std::exception& e) {
+        log_warning(string_format("warning.repo_index_load_failed", e.what()));
+        return;
+    }
     
     std::vector<std::pair<std::string, std::string>> installed;
     {
@@ -876,7 +860,7 @@ void upgrade_packages() {
         auto opt = repo.find_package(n); 
         if (!opt) continue;
         
-        std::string lat = opt->version;
+        const std::string& lat = opt->version;
         
         if (version_compare(curr, lat)) {
             log_info(string_format("info.upgradable_found", n, curr, lat));
@@ -903,7 +887,7 @@ void show_man_page(const std::string& pkg_name) {
 
 void reinstall_package(const std::string& arg) {
     std::string name = arg;
-    if (arg.find('/') != std::string::npos || arg.ends_with(".lpkg") || arg.ends_with(".tar.zst")) {
+    if (arg.find('/') != std::string::npos || arg.ends_with(".lpkg")) {
         try { name = parse_package_filename(fs::path(arg).filename().string()).first; } catch (...) {}
     }
 
