@@ -292,11 +292,10 @@ void cleanup_tmp_dirs() {
 }
 
 std::pair<std::string, std::string> parse_package_filename(const std::string& filename) {
-    // Regex to match "name-version.tar.zst" or "name-version.lpkg"
-    // Assuming version starts with a digit.
+    // Regex to match "name-version.lpkg"
     // Group 1: Name
     // Group 2: Version
-    static const std::regex filename_regex(R"(^(.+)-(\d+[0-9a-zA-Z\.\-\+]*)\.(?:tar\.zst|lpkg)$)");
+    static const std::regex filename_regex(R"(^(.+)-(\d+[0-9a-zA-Z\.\-\+]*)\.lpkg$)");
     std::smatch match;
     if (std::regex_match(filename, match, filename_regex)) {
         return {match[1], match[2]};

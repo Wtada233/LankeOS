@@ -4,12 +4,11 @@
 #include "utils.hpp"
 #include "exception.hpp"
 #include "localization.hpp"
-#include "version.hpp" // Added include for version comparison
+#include "version.hpp"
 #include <sstream>
 #include <fstream>
 #include <iostream>
 #include <algorithm>
-
 #include <ranges>
 #include <string_view>
 
@@ -17,16 +16,10 @@ void Repository::load_index() {
     packages_.clear();
     providers_.clear();
     std::string mirror;
-    try {
-        mirror = get_mirror_url();
-    } catch (...) {
-        return; // No mirror, no index.
-    }
+    try { mirror = get_mirror_url(); } catch (...) { return; }
     std::string arch = get_architecture();
     
-    // Support local file mirror (file:// or plain path) for tests/local repos
     bool is_local = mirror.find("file://") == 0 || mirror.find("/") == 0;
-    
     std::filesystem::path index_path;
     
     try {
@@ -38,96 +31,69 @@ void Repository::load_index() {
             index_path = get_tmp_dir() / "repo_index.txt";
             download_file(url, index_path, false);
         }
-
-        if (!std::filesystem::exists(index_path)) {
-            if (get_testing_mode()) return;
-            throw LpkgException(string_format("error.repo_index_not_found", index_path.string()));
-        }
-    } catch (...) {
-        if (get_testing_mode()) return;
-        throw;
-    }
+        if (!std::filesystem::exists(index_path)) return;
+    } catch (...) { return; }
 
     std::ifstream file(index_path);
     std::string line;
     static const std::vector<std::string> ops = {">=", "<=", "!=", "==", ">", "<", "="};
 
+    auto split = [](std::string_view s, char delim) {
+        std::vector<std::string_view> res;
+        size_t start = 0, end = 0;
+        while ((end = s.find(delim, start)) != std::string_view::npos) {
+            res.push_back(s.substr(start, end - start));
+            start = end + 1;
+        }
+        res.push_back(s.substr(start));
+        return res;
+    };
+
     while (std::getline(file, line)) {
         if (line.empty() || line[0] == '#') continue;
-        
         std::string_view sv = line;
-        if (sv.back() == '\r') sv.remove_suffix(1);
+        if (!sv.empty() && sv.back() == '\r') sv.remove_suffix(1);
         
-        auto parts = sv | std::views::split('|') | std::views::transform([](auto&& rng) {
-            return std::string_view(&*rng.begin(), std::ranges::distance(rng));
-        });
+        auto parts = split(sv, '|');
+        if (parts.size() < 2) continue;
 
-        auto it = parts.begin();
-        if (it == parts.end()) continue;
-        std::string pkg_name(std::move(*it++));
-        
-        if (it == parts.end()) continue;
-        std::string_view versions_sv = *it++;
-        
-        std::string_view deps_sv;
-        if (it != parts.end()) deps_sv = *it++;
-        
-        std::string_view prov_sv;
-        if (it != parts.end()) prov_sv = *it++;
+        std::string pkg_name(parts[0]);
+        std::string_view versions_sv = parts[1];
+        std::string_view deps_sv = (parts.size() > 2) ? parts[2] : "";
+        std::string_view prov_sv = (parts.size() > 3) ? parts[3] : "";
 
-        // Process dependencies once for all versions in this line
         std::vector<DependencyInfo> common_deps;
         if (!deps_sv.empty()) {
-            auto deps_parts = deps_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
-                return std::string_view(&*rng.begin(), std::ranges::distance(rng));
-            });
-            for (auto dep_str : deps_parts) {
+            for (auto dep_str : split(deps_sv, ',')) {
                 DependencyInfo dep;
                 size_t op_pos = std::string_view::npos;
                 for (const auto& op : ops) {
-                    if (op_pos = dep_str.find(op); op_pos != std::string_view::npos) {
-                        dep.name = dep_str.substr(0, op_pos);
+                    if ((op_pos = dep_str.find(op)) != std::string_view::npos) {
+                        dep.name = std::string(dep_str.substr(0, op_pos));
                         dep.op = op;
-                        dep.version_req = dep_str.substr(op_pos + op.length());
+                        dep.version_req = std::string(dep_str.substr(op_pos + op.length()));
                         break;
                     }
                 }
-                if (op_pos == std::string_view::npos) dep.name = dep_str;
-                common_deps.push_back(dep);
+                if (op_pos == std::string_view::npos) dep.name = std::string(dep_str);
+                common_deps.push_back(std::move(dep));
             }
         }
 
-        std::vector<std::string> common_provides;
         if (!prov_sv.empty()) {
-            auto prov_parts = prov_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
-                return std::string_view(&*rng.begin(), std::ranges::distance(rng));
-            });
-            for (auto prov : prov_parts) {
-                common_provides.emplace_back(prov);
+            for (auto prov : split(prov_sv, ',')) {
                 providers_[std::string(prov)].push_back(pkg_name);
             }
         }
 
-        // Parse individual versions: v1:hash1,v2:hash2
-        auto ver_list = versions_sv | std::views::split(',') | std::views::transform([](auto&& rng) {
-            return std::string_view(&*rng.begin(), std::ranges::distance(rng));
-        });
-
-        for (auto ver_hash : ver_list) {
-            auto vh_parts = ver_hash | std::views::split(':') | std::views::transform([](auto&& rng) {
-                return std::string_view(&*rng.begin(), std::ranges::distance(rng));
-            });
-            auto vh_it = vh_parts.begin();
-            if (vh_it == vh_parts.end()) continue;
-            
+        for (auto ver_hash : split(versions_sv, ',')) {
+            auto vh = split(ver_hash, ':');
+            if (vh.empty()) continue;
             PackageInfo pkg;
             pkg.name = pkg_name;
-            pkg.version = *vh_it++;
-            if (vh_it != vh_parts.end()) pkg.sha256 = *vh_it++;
-            
+            pkg.version = std::string(vh[0]);
+            if (vh.size() > 1) pkg.sha256 = std::string(vh[1]);
             pkg.dependencies = common_deps;
-            pkg.provides = common_provides;
-            
             packages_[pkg.name].push_back(std::move(pkg));
         }
     }
@@ -142,23 +108,19 @@ void Repository::load_index() {
 std::optional<PackageInfo> Repository::find_provider(const std::string& capability) {
     auto it = providers_.find(capability);
     if (it == providers_.end() || it->second.empty()) return std::nullopt;
-    
-    // For now, just return the first provider found. 
-    // In a more advanced manager, we might have a preference or scoring system.
     return find_package(it->second[0]);
 }
 
 std::optional<PackageInfo> Repository::find_package(const std::string& name) {
     auto it = packages_.find(name);
     if (it == packages_.end() || it->second.empty()) return std::nullopt;
-    
-    // 版本已在 load_index 中排序，直接返回最后一个（最新版）
     return it->second.back();
 }
 
 std::optional<PackageInfo> Repository::find_package(const std::string& name, const std::string& version) {
-    if (packages_.find(name) == packages_.end()) return std::nullopt;
-    for (const auto& pkg : packages_[name]) {
+    auto it = packages_.find(name);
+    if (it == packages_.end()) return std::nullopt;
+    for (const auto& pkg : it->second) {
         if (pkg.version == version) return pkg;
     }
     return std::nullopt;
@@ -167,8 +129,6 @@ std::optional<PackageInfo> Repository::find_package(const std::string& name, con
 std::optional<PackageInfo> Repository::find_best_matching_version(const std::string& name, const std::string& op, const std::string& version_req) {
     auto it = packages_.find(name);
     if (it == packages_.end() || it->second.empty()) return std::nullopt;
-
-    // Versions are already sorted in load_index, iterate from highest to lowest
     for (auto rit = it->second.rbegin(); rit != it->second.rend(); ++rit) {
         if (version_satisfies(rit->version, op, version_req)) {
             return *rit;
