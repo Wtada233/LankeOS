@@ -44,7 +44,7 @@ protected:
         std::ofstream files(work_dir / "files.txt"); files << "file\t/\n"; files.close();
         std::ofstream ml(work_dir / "man.txt"); ml << "man\n"; ml.close();
 
-        std::string pkg_filename = name + "-1.0.tar.zst";
+        std::string pkg_filename = name + "-1.0.lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
         std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " .";
         std::system(cmd.c_str());

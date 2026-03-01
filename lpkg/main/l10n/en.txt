@@ -208,3 +208,4 @@ error.package_not_in_repo=Package not found in repository: {}
 error.some_failed=Some packages failed to install, but successfully installed packages were kept.
 error.pack_no_output=Please specify output file name with -o.
 warning.invalid_trigger_regex=Invalid regex in triggers.conf: {}
+info.version=lpkg version {}

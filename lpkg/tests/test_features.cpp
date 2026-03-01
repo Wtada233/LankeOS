@@ -22,7 +22,7 @@ protected:
         
         // Mock configuration
         set_root_path(test_root.string());
-        set_architecture("amd64");
+        set_architecture("x86_64");
         set_non_interactive_mode(NonInteractiveMode::YES);
         set_testing_mode(true);
         init_filesystem();
@@ -37,7 +37,7 @@ protected:
         if (fs::exists(test_root)) fs::remove_all(test_root);
     }
 
-    // Helper to create a .tar.zst package
+    // Helper to create a .lpkg package
     std::string create_pkg(const std::string& name, const std::string& version, const std::vector<std::pair<std::string, std::string>>& files) {
         fs::path pkg_work_dir = pkgs_dir / (name + "_work");
         if (fs::exists(pkg_work_dir)) fs::remove_all(pkg_work_dir);
@@ -57,7 +57,7 @@ protected:
         }
         f_files.close();
 
-        std::string pkg_path = (pkgs_dir / (name + "-" + version + ".tar.zst")).string();
+        std::string pkg_path = (pkgs_dir / (name + "-" + version + ".lpkg")).string();
         std::string tar_cmd = "cd " + pkg_work_dir.string() + " && tar --zstd -cf " + pkg_path + " . > /dev/null 2>&1";
         if (system(tar_cmd.c_str()) != 0) throw std::runtime_error("Tar failed");
         

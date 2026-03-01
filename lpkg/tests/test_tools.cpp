@@ -28,7 +28,7 @@ protected:
         source_dir = suite_work_dir / "lankepkg";
         root_dir = source_dir / "root";
         hooks_dir = source_dir / "hooks";
-        output_pkg = suite_work_dir / "test.pkg.tar.zst";
+        output_pkg = suite_work_dir / "test.pkg.lpkg";
         test_system_root = suite_work_dir / "sysroot";
 
         fs::create_directories(root_dir / "usr/bin");

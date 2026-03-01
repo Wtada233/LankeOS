@@ -137,20 +137,12 @@ void InstallationTask::rollback_files() {
         if (fs::exists(file) || fs::is_symlink(file)) {
             std::error_code ec;
             fs::remove_all(file, ec);
-            if (ec) {
-                std::string cmd = "sudo rm -rf \"" + file.string() + "\" 2>/dev/null";
-                (void)std::system(cmd.c_str());
-            }
         }
     }
     for (const auto& [physical, backup] : backups_) {
         if (fs::exists(backup)) {
             std::error_code ec;
             fs::rename(backup, physical, ec);
-            if (ec) {
-                std::string cmd = "sudo mv \"" + backup.string() + "\" \"" + physical.string() + "\" 2>/dev/null";
-                (void)std::system(cmd.c_str());
-            }
         }
     }
     for (const auto& dir : created_dirs_ | std::views::reverse) {
@@ -376,8 +368,9 @@ void InstallationTask::copy_package_files() {
             }
             
             struct stat st;
-            if (lstat(final_dest.c_str(), &st) == 0) {
+            if (lstat(src_path.c_str(), &st) == 0) {
                 (void)lchown(final_dest.c_str(), st.st_uid, st.st_gid);
+                // Preserve SUID, SGID, and Sticky bits by using full st_mode & 07777
                 if (!S_ISLNK(st.st_mode)) {
                     (void)chmod(final_dest.c_str(), st.st_mode & 07777);
                 }

@@ -58,7 +58,7 @@ protected:
         man.close();
 
         // Pack it
-        std::string pkg_name = name + "-" + version + ".tar.zst";
+        std::string pkg_name = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
         std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " .";
         int ret = std::system(cmd.c_str());
@@ -110,7 +110,7 @@ TEST_F(PackageManagerTest, VirtualPackages) {
         std::ofstream files(work_dir / "files.txt"); files.close();
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
-        p_prov = (pkg_dir / "provider-1.0.tar.zst").string();
+        p_prov = (pkg_dir / "provider-1.0.lpkg").string();
         std::string cmd = "tar --zstd -cf " + p_prov + " -C " + work_dir.string() + " .";
         std::system(cmd.c_str());
         fs::remove_all(work_dir);
@@ -129,7 +129,7 @@ TEST_F(PackageManagerTest, VirtualPackages) {
         std::ofstream files(work_dir / "files.txt"); files.close();
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
-        p_cons = (pkg_dir / "consumer-1.0.tar.zst").string();
+        p_cons = (pkg_dir / "consumer-1.0.lpkg").string();
         std::string cmd = "tar --zstd -cf " + p_cons + " -C " + work_dir.string() + " .";
         std::system(cmd.c_str());
         fs::remove_all(work_dir);
@@ -196,7 +196,7 @@ TEST_F(PackageManagerTest, VirtualPackages) {
 // Why?
 // Cache didn't have "lib".
 // Why?
-// install_packages({"lib-1.0.tar.zst"}) was called just before.
+// install_packages({"lib-1.0.lpkg"}) was called just before.
 // It should have updated cache.
 
 // Let's verify if register_package was actually called for lib.
@@ -209,7 +209,7 @@ TEST_F(PackageManagerTest, VersionConstraints) {
     // 1. Install lib v1.0
     std::string p_lib1;
     {
-        std::string pkg_lib = "lib-1.0.tar.zst";
+        std::string pkg_lib = "lib-1.0.lpkg";
         p_lib1 = (pkg_dir / pkg_lib).string();
         fs::path work_dir = suite_work_dir / "pkg_lib";
         fs::create_directories(work_dir / "content");
@@ -240,7 +240,7 @@ TEST_F(PackageManagerTest, VersionConstraints) {
     // 2. Try to install app requiring lib >= 2.0 (Should Fail)
     std::string p_bad;
     {
-        std::string pkg_app_bad = "app_bad-1.0.tar.zst";
+        std::string pkg_app_bad = "app_bad-1.0.lpkg";
         p_bad = (pkg_dir / pkg_app_bad).string();
         fs::path work_dir = suite_work_dir / "pkg_app_bad";
         fs::create_directories(work_dir / "content");
@@ -260,7 +260,7 @@ TEST_F(PackageManagerTest, VersionConstraints) {
     // 3. Try to install app requiring lib < 2.0 (Should Succeed)
     std::string p_good;
     {
-        std::string pkg_app_good = "app_good-1.0.tar.zst";
+        std::string pkg_app_good = "app_good-1.0.lpkg";
         p_good = (pkg_dir / pkg_app_good).string();
         fs::path work_dir = suite_work_dir / "pkg_app_good";
         fs::create_directories(work_dir / "content");
@@ -282,7 +282,7 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
     // 1. Create provider package 'openssl' providing 'libssl'
     std::string p_ossl;
     {
-        std::string pkg_ossl = "openssl-1.0.tar.zst";
+        std::string pkg_ossl = "openssl-1.0.lpkg";
         p_ossl = (pkg_dir / pkg_ossl).string();
         fs::path work_dir = suite_work_dir / "pkg_openssl";
         fs::create_directories(work_dir / "content");
@@ -298,7 +298,7 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
     // 2. Create consumer package 'curl' depending on 'libssl'
     std::string p_curl;
     {
-        std::string pkg_curl = "curl-1.0.tar.zst";
+        std::string pkg_curl = "curl-1.0.lpkg";
         p_curl = (pkg_dir / pkg_curl).string();
         fs::path work_dir = suite_work_dir / "pkg_curl";
         fs::create_directories(work_dir / "content");

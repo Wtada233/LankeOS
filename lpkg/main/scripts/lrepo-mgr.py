@@ -69,7 +69,7 @@ class RepoManager:
                     "region": "ap-guangzhou",
                     "path_prefix": ""
                 },
-                "architecture": "amd64"
+                "architecture": "x86_64"
             }
             self.save_config()
             print(f"Created default config at {self.config_path}. Please edit it.")
@@ -110,7 +110,7 @@ class RepoManager:
             print("No files matched patterns.")
             return
 
-        arch = self.config.get("architecture", "amd64")
+        arch = self.config.get("architecture", "x86_64")
         prefix = self.config["storage"].get("path_prefix", "").strip('/')
         if prefix: prefix += '/'
 
@@ -149,7 +149,7 @@ class RepoManager:
         print("Done.")
 
     def delete_package(self, name, version=None):
-        arch = self.config.get("architecture", "amd64")
+        arch = self.config.get("architecture", "x86_64")
         prefix = self.config["storage"].get("path_prefix", "").strip('/')
         if prefix: prefix += '/'
         
@@ -180,7 +180,7 @@ class RepoManager:
     def cleanup_repository(self):
         """Removes all versions from storage that are NOT in the index.txt"""
         print("Cleaning up historical packages...")
-        arch = self.config.get("architecture", "amd64")
+        arch = self.config.get("architecture", "x86_64")
         prefix = self.config["storage"].get("path_prefix", "").strip('/')
         if prefix: prefix += '/'
         
@@ -321,7 +321,7 @@ class RepoManager:
 
     def download_index(self):
         st = self.config["storage"]
-        arch = self.config.get("architecture", "amd64")
+        arch = self.config.get("architecture", "x86_64")
         prefix = self.config["storage"].get("path_prefix", "").strip('/')
         if prefix: prefix += '/'
         remote_path = f"{prefix}{arch}/index.txt"

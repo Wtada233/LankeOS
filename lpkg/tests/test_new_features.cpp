@@ -38,15 +38,15 @@ protected:
         fs::create_directories(pkg_dir);
         
         set_root_path(test_root.string());
-        set_architecture("amd64");
+        set_architecture("x86_64");
         init_filesystem();
 
         // Setup mock mirror
         fs::path mirror_path = suite_work_dir / "mirror";
-        fs::create_directories(mirror_path / "amd64");
+        fs::create_directories(mirror_path / "x86_64");
         std::ofstream(test_root / "etc/lpkg/mirror.conf") << "file://" << mirror_path.string() << "/" << std::endl;
         // Create initial empty index
-        std::ofstream(mirror_path / "amd64" / "index.txt").close();
+        std::ofstream(mirror_path / "x86_64" / "index.txt").close();
     }
 
     std::string create_pkg(const std::string& name, const std::string& ver, 
@@ -63,22 +63,21 @@ protected:
         std::ofstream(work_dir / "man.txt") << "Manual for " << name << "\n";
         std::ofstream(work_dir / "deps.txt").close();
 
-        std::string pkg_filename = name + "-" + ver + ".tar.zst";
+        std::string pkg_filename = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
         pack_package(pkg_path, work_dir.string());
 
         // Also put it in the mirror
-        fs::path mirror_pkg_dir = suite_work_dir / "mirror" / "amd64" / name / ver;
+        fs::path mirror_pkg_dir = suite_work_dir / "mirror" / "x86_64" / name;
         fs::create_directories(mirror_pkg_dir);
-        fs::copy_file(pkg_path, mirror_pkg_dir / "app.tar.zst", fs::copy_options::overwrite_existing);
+        // New format: name/version.lpkg
+        fs::copy_file(pkg_path, mirror_pkg_dir / (ver + ".lpkg"), fs::copy_options::overwrite_existing);
         
         std::string hash = calculate_sha256(pkg_path);
-        std::ofstream(mirror_pkg_dir / "hash.txt") << hash;
-        std::ofstream(suite_work_dir / "mirror" / "amd64" / name / "latest.txt") << ver;
 
-        // Update index.txt
-        std::ofstream index(suite_work_dir / "mirror" / "amd64" / "index.txt", std::ios::app);
-        index << name << "|" << ver << "|" << hash << "||" << std::endl;
+        // Update index.txt with aggregated format: name|v:h|deps|provides
+        std::ofstream index(suite_work_dir / "mirror" / "x86_64" / "index.txt", std::ios::app);
+        index << name << "|" << ver << ":" << hash << "||" << std::endl;
         
         fs::remove_all(work_dir);
         return pkg_path;

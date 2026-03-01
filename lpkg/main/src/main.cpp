@@ -62,6 +62,7 @@ int main(int argc, char* argv[]) {
 
         options.add_options()
             ("h,help", get_string("info.help_desc"))
+            ("v,version", "Print version")
             ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
             ("p,pkg-query", get_string("help.pkg_query"), cxxopts::value<bool>()->default_value("false"))
             ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value("/tmp/lankepkg"))
@@ -83,6 +84,11 @@ int main(int argc, char* argv[]) {
 
         if (result.count("help")) {
             print_usage(options);
+            return 0;
+        }
+
+        if (result.count("version")) {
+            std::cout << string_format("info.version", LPKG_VERSION) << std::endl;
             return 0;
         }
 
