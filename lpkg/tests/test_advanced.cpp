@@ -56,7 +56,7 @@ protected:
         files.close();
         std::ofstream man(work_dir / "man.txt"); man.close();
 
-        std::string pkg_name = name + "-" + ver + ".tar.zst";
+        std::string pkg_name = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
         std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " .";
         std::system(cmd.c_str());
@@ -69,7 +69,7 @@ TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
     // 1. Prepare a package with two files: file_ok and file_blocked
     std::string pkg;
     {
-        std::string pkg_name = "rollback_new-1.0.tar.zst";
+        std::string pkg_name = "rollback_new-1.0.lpkg";
         pkg = (pkg_dir / pkg_name).string();
         fs::path work_dir = suite_work_dir / "pkg_work_rollback_new";
         fs::create_directories(work_dir / "content" / "usr" / "bin");

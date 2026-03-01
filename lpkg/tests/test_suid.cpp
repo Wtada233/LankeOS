@@ -74,7 +74,7 @@ protected:
         man.close();
 
         // Pack it using tar which should preserve permissions (-p)
-        std::string pkg_name = name + "-" + version + ".tar.zst";
+        std::string pkg_name = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
         std::string cmd = "tar --zstd -p -cf " + pkg_path + " -C " + work_dir.string() + " .";
         int ret = std::system(cmd.c_str());

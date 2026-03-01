@@ -11,7 +11,8 @@ namespace fs = std::filesystem;
 class SymlinkLogicTest : public ::testing::Test {
 protected:
     void Set_Up_Test_Env(const std::string& root_name) {
-        test_root = fs::current_path() / root_name;
+        // Use /tmp to avoid polluting project root
+        test_root = fs::temp_directory_path() / ("lpkg_test_" + root_name + "_" + std::to_string(getpid()));
         fs::remove_all(test_root);
         fs::create_directories(test_root);
         set_root_path(test_root.string());
@@ -29,6 +30,9 @@ protected:
 
     void TearDown() override {
         set_root_path("/");
+        if (!test_root.empty()) {
+            fs::remove_all(test_root);
+        }
     }
 
     fs::path test_root;

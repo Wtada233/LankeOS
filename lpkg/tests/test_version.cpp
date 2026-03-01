@@ -14,7 +14,7 @@ TEST(VersionTest, Comparisons) {
 }
 
 TEST(UtilsTest, ParsePackageFilename) {
-    auto p1 = parse_package_filename("glibc-2.38.tar.zst");
+    auto p1 = parse_package_filename("glibc-2.38.lpkg");
     EXPECT_EQ(p1.first, "glibc");
     EXPECT_EQ(p1.second, "2.38");
 

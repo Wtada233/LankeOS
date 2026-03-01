@@ -16,6 +16,7 @@ endif
 
 TARGET = lpkg
 TEST_TARGET = run_tests
+VERSION ?= 1.0.3
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -43,6 +44,7 @@ CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -I$(MAIN_DIR)/third_party/include -I$(AP
            -DLPKG_L10N_DIR=\"$(INSTALL_L10N_DIR)\" \
            -DLPKG_DOCS_DIR=\"$(INSTALL_DOCS_DIR)\" \
            -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\" \
+           -DLPKG_VERSION=\"$(VERSION)\" \
            -DFMT_HEADER_ONLY
 
 TEST_CXXFLAGS = -std=c++20 -Wall -Wextra -g -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \

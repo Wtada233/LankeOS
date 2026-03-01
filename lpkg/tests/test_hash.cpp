@@ -52,7 +52,7 @@ protected:
         std::ofstream files(work_dir / "files.txt"); files << "dummy\t/\n"; files.close();
         std::ofstream ml(work_dir / "man.txt"); ml << "man\n"; ml.close();
 
-        std::string pkg_filename = name + "-" + ver + ".tar.zst";
+        std::string pkg_filename = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
         std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " .";
         std::system(cmd.c_str());

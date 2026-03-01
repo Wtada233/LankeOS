@@ -69,7 +69,7 @@ protected:
 
         std::ofstream ml(work_dir / "man.txt"); ml << "man " << name; ml.close();
 
-        std::string pkg_name = name + "-" + ver + ".tar.zst";
+        std::string pkg_name = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
         std::string cmd = "cd " + work_dir.string() + " && tar --zstd -cf " + pkg_path + " . > /dev/null 2>&1";
         std::system(cmd.c_str());

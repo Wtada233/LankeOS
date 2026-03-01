@@ -98,11 +98,7 @@ std::string get_architecture() {
     if (uname(&buf) != 0) {
         throw LpkgException(get_string("error.get_arch_failed"));
     }
-    std::string arch(buf.machine);
-    if (arch != "x86_64" && arch != "aarch64") {
-        throw LpkgException(string_format("error.unsupported_arch", arch));
-    }
-    return (arch == "x86_64") ? "amd64" : "arm64";
+    return std::string(buf.machine);
 }
 
 std::string get_mirror_url() {
