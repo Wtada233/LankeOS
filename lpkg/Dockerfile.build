@@ -24,9 +24,10 @@ RUN apk add --no-cache \
     c-ares-static \
     acl-static \
     expat-static \
-    fmt-dev
+    fmt-dev \
+    upx
 
 WORKDIR /app
 
 # 编译前强制 clean
-CMD ["sh", "-c", "make clean && make static"]
+CMD ["sh", "-c", "make clean && make static && strip --strip-all build/lpkg-static && upx build/lpkg-static -9 -v"]
