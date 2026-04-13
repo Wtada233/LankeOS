@@ -4,6 +4,7 @@ CXX ?= g++
 # Use pkg-config to resolve dependencies
 # Removed libcares from explicit list as libcurl should bring it in if needed
 PKGS = libcurl libarchive libcrypto
+PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS))
 LIBS = $(shell pkg-config --libs $(PKGS))
 TEST_LIBS = $(LIBS) -lgtest -lgtest_main -lpthread
 
@@ -38,8 +39,9 @@ INSTALL_L10N_DIR = $(INSTALL_SHARE_DIR)/l10n
 INSTALL_DOCS_DIR = $(INSTALL_SHARE_DIR)/docs
 INSTALL_LOCK_DIR = $(DESTDIR)$(LOCALSTATEDIR)/lpkg
 
-# Pass paths to C++ code
-CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \
+# Common flags shared between production and test builds
+COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \
+           $(PKG_CFLAGS) \
            -DLPKG_CONF_DIR=\"$(INSTALL_CONF_DIR)\" \
            -DLPKG_L10N_DIR=\"$(INSTALL_L10N_DIR)\" \
            -DLPKG_DOCS_DIR=\"$(INSTALL_DOCS_DIR)\" \
@@ -47,12 +49,8 @@ CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -I$(MAIN_DIR)/third_party/include -I$(AP
            -DLPKG_VERSION=\"$(VERSION)\" \
            -DFMT_HEADER_ONLY
 
-TEST_CXXFLAGS = -std=c++20 -Wall -Wextra -g -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \
-           -DLPKG_CONF_DIR=\"$(INSTALL_CONF_DIR)\" \
-           -DLPKG_L10N_DIR=\"$(INSTALL_L10N_DIR)\" \
-           -DLPKG_DOCS_DIR=\"$(INSTALL_DOCS_DIR)\" \
-           -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\" \
-           -DFMT_HEADER_ONLY
+CXXFLAGS = $(COMMON_CXXFLAGS) -O2
+TEST_CXXFLAGS = $(COMMON_CXXFLAGS) -g
 
 MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp)
 TEST_SRCS = $(wildcard $(TESTS_DIR)/*.cpp)
@@ -69,7 +67,7 @@ ifeq ($(COVERAGE_MODE),1)
     TEST_LIBS += -lgcov
 endif
 
-.PHONY: all clean install uninstall static test
+.PHONY: all clean install uninstall static test build_test_internal
 
 all: $(BUILD_DIR)/$(TARGET)
 
