@@ -33,7 +33,6 @@ RUN make clean && make static \
     && strip --strip-all build/lpkg-static \
     && upx -9 build/lpkg-static
 
-# Stage 2: Minimal output image containing only the binary
-FROM scratch
-COPY --from=builder /app/build/lpkg-static /lpkg
-ENTRYPOINT ["/lpkg"]
+# Extract the binary with:
+#   docker build -t lpkg-builder -f Dockerfile.build .
+#   docker cp $(docker create lpkg-builder):/app/build/lpkg-static ./lpkg-static
