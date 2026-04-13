@@ -1,3 +1,5 @@
+[English](README.en.md) | 中文
+
 # lpkg - 一个简单的 C++ 包管理器
 
 `lpkg` 是一个为 LankeOS 设计的轻量级、高性能、基于命令行的包管理器。它使用 C++20 编写，旨在为 LFS (Linux From Scratch) 环境提供原子化、可追溯的软件包管理方案。
