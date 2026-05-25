@@ -3,7 +3,7 @@ CXX ?= g++
 
 # Use pkg-config to resolve dependencies
 # Removed libcares from explicit list as libcurl should bring it in if needed
-PKGS = libcurl libarchive libcrypto
+PKGS = libcurl libarchive libcrypto libelf
 LIBS = $(shell pkg-config --libs $(PKGS))
 TEST_LIBS = $(LIBS) -lgtest -lgtest_main -lpthread
 
@@ -13,6 +13,8 @@ ifeq ($(findstring static,$(MAKECMDGOALS)),static)
     # We use pkg-config --static to get all transitive dependencies
     LIBS = -Wl,--start-group $(shell pkg-config --libs --static $(PKGS)) -Wl,--end-group -static
 endif
+
+PKGS_LIST = $(PKGS)
 
 TARGET = lpkg
 TEST_TARGET = run_tests

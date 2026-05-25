@@ -25,6 +25,7 @@ RUN apk add --no-cache \
     acl-static \
     expat-static \
     fmt-dev \
+    elfutils-dev \
     upx
 
 WORKDIR /app
