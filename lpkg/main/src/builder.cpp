@@ -123,7 +123,7 @@ void run_build(const fs::path& build_dir) {
         log_info(string_format("info.executing_phase", phase_name));
         // We run a subshell that sources the build script and calls the function
         std::string cmd = env_setup + " . " + fs::absolute(script_path).string() + " && " + phase_name;
-        int ret = std::system(cmd.c_str());
+        int ret = run_shell(cmd);
         if (ret != 0) {
             throw LpkgException(string_format("error.build_phase_failed", phase_name, std::to_string(ret)));
         }
@@ -183,7 +183,7 @@ void run_build(const fs::path& build_dir) {
         // ldconfig
         if (fs::exists(staging_root / "usr" / "lib")) {
             log_info(get_string("info.executing_ldconfig"));
-            std::system(("ldconfig -n \"" + (staging_root / "usr" / "lib").string() + "\"").c_str());
+            run_shell("ldconfig -n \"" + (staging_root / "usr" / "lib").string() + "\"");
         }
 
         // Generate basic metadata if missing

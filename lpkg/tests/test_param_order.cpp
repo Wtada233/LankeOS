@@ -47,7 +47,7 @@ protected:
         std::string pkg_filename = name + "-1.0.lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
         std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
         return pkg_path;
     }
