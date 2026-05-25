@@ -74,9 +74,8 @@ void TriggerManager::run_all() {
     log_info(get_string("info.running_triggers"));
     for (const auto& cmd : pending_triggers) {
         log_info(string_format("info.trigger_exec", cmd.c_str()));
-        // Note: Using std::system for now, but in a real shell environment 
-        // we might want a safer exec-based approach.
-        if (int ret = std::system(cmd.c_str()); ret != 0) {
+        // Note: Using run_shell for a safer exec-based approach.
+        if (int ret = run_shell(cmd); ret != 0) {
             log_warning(string_format("warning.trigger_failed", std::to_string(ret).c_str()));
         }
     }

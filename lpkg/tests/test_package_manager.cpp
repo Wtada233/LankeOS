@@ -61,7 +61,7 @@ protected:
         std::string pkg_name = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
         std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " .";
-        int ret = std::system(cmd.c_str());
+        int ret = run_shell(cmd);
         if (ret != 0) throw std::runtime_error("tar failed");
         
         fs::remove_all(work_dir);
@@ -112,7 +112,7 @@ TEST_F(PackageManagerTest, VirtualPackages) {
         
         p_prov = (pkg_dir / "provider-1.0.lpkg").string();
         std::string cmd = "tar --zstd -cf " + p_prov + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
     }
     
@@ -131,7 +131,7 @@ TEST_F(PackageManagerTest, VirtualPackages) {
         
         p_cons = (pkg_dir / "consumer-1.0.lpkg").string();
         std::string cmd = "tar --zstd -cf " + p_cons + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
     }
 
@@ -218,7 +218,7 @@ TEST_F(PackageManagerTest, VersionConstraints) {
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
         std::string cmd = "tar --zstd -cf " + p_lib1 + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
     }
     install_packages({p_lib1});
@@ -251,7 +251,7 @@ TEST_F(PackageManagerTest, VersionConstraints) {
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
         std::string cmd = "tar --zstd -cf " + p_bad + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
     }
     
@@ -271,7 +271,7 @@ TEST_F(PackageManagerTest, VersionConstraints) {
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
         std::string cmd = "tar --zstd -cf " + p_good + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
     }
 
@@ -291,7 +291,7 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
         std::ofstream files(work_dir / "files.txt"); files.close();
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         std::string cmd = "tar --zstd -cf " + p_ossl + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
     }
 
@@ -306,7 +306,7 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
         std::ofstream files(work_dir / "files.txt"); files.close();
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         std::string cmd = "tar --zstd -cf " + p_curl + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
     }
 

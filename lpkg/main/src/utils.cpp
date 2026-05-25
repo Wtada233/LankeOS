@@ -17,9 +17,8 @@
 #include <cstring>
 #include <chrono>
 #include <ctime>
+#include <sys/wait.h>
 #include <regex>
-#include <libelf.h>
-#include <gelf.h>
 
 namespace fs = std::filesystem;
 
@@ -96,6 +95,28 @@ void log_progress(const std::string& msg, double percentage, int bar_width) {
         else std::cout << "-";
     }
     std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%" << COLOR_RESET << std::flush;
+}
+
+int run_command(const std::vector<std::string>& args) {
+    if (args.empty()) return -1;
+    pid_t pid = fork();
+    if (pid == -1) return -1;
+    if (pid == 0) {
+        std::vector<char*> c_args;
+        for (const auto& arg : args) {
+            c_args.push_back(const_cast<char*>(arg.c_str()));
+        }
+        c_args.push_back(nullptr);
+        execvp(c_args[0], c_args.data());
+        _exit(127);
+    }
+    int status;
+    if (waitpid(pid, &status, 0) == -1) return -1;
+    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
+int run_shell(const std::string& cmd) {
+    return run_command({"/bin/sh", "-c", cmd});
 }
 
 void set_non_interactive_mode(NonInteractiveMode mode) {
@@ -322,33 +343,32 @@ BinaryType get_binary_type(const fs::path& path) {
     int fd = open(path.c_str(), O_RDONLY);
     if (fd < 0) return BinaryType::UNKNOWN;
 
-    char magic[8];
-    ssize_t n = read(fd, magic, 8);
-    if (n < 4) {
+    unsigned char ident[16];
+    if (read(fd, ident, 16) != 16) {
         close(fd);
         return BinaryType::UNKNOWN;
     }
 
-    if (memcmp(magic, "\x7f" "ELF", 4) == 0) {
-        lseek(fd, 0, SEEK_SET);
-        elf_version(EV_CURRENT);
-        Elf* elf = elf_begin(fd, ELF_C_READ, nullptr);
-        if (!elf) {
+    if (memcmp(ident, "\x7f" "ELF", 4) == 0) {
+        uint16_t e_type;
+        if (read(fd, &e_type, 2) != 2) {
             close(fd);
             return BinaryType::UNKNOWN;
         }
-
-        GElf_Ehdr ehdr;
-        BinaryType type = BinaryType::UNKNOWN;
-        if (gelf_getehdr(elf, &ehdr) != nullptr) {
-            if (ehdr.e_type == ET_EXEC) type = BinaryType::ELF_EXECUTABLE;
-            else if (ehdr.e_type == ET_DYN) type = BinaryType::ELF_SHARED;
-        }
         
-        elf_end(elf);
+        // Handle endianness based on EI_DATA (ident[5])
+        // 1 = ELFDATA2LSB, 2 = ELFDATA2MSB
+        if (ident[5] == 2) { // MSB, swap for LSB host
+            e_type = (e_type >> 8) | (e_type << 8);
+        }
+
+        BinaryType type = BinaryType::UNKNOWN;
+        if (e_type == 2) type = BinaryType::ELF_EXECUTABLE;
+        else if (e_type == 3) type = BinaryType::ELF_SHARED;
+        
         close(fd);
         return type;
-    } else if (n >= 8 && memcmp(magic, "!<arch>\n", 8) == 0) {
+    } else if (memcmp(ident, "!<arch>\n", 8) == 0) {
         close(fd);
         return BinaryType::ELF_STATIC_LIB;
     }
@@ -359,56 +379,24 @@ BinaryType get_binary_type(const fs::path& path) {
 
 void strip_binary(const fs::path& path) {
     BinaryType type = get_binary_type(path);
-    if (type == BinaryType::UNKNOWN || type == BinaryType::ELF_STATIC_LIB) return;
+    if (type == BinaryType::UNKNOWN) return;
 
-    int fd = open(path.c_str(), O_RDWR);
-    if (fd < 0) return;
-
-    elf_version(EV_CURRENT);
-    Elf* elf = elf_begin(fd, ELF_C_RDWR, nullptr);
-    if (!elf) {
-        close(fd);
+    std::vector<std::string> args = {"strip"};
+    
+    if (type == BinaryType::ELF_SHARED) {
+        args.push_back("--strip-unneeded");
+    } else if (type == BinaryType::ELF_EXECUTABLE) {
+        args.push_back("--strip-all");
+    } else if (type == BinaryType::ELF_STATIC_LIB) {
+        args.push_back("--strip-debug");
+    } else {
         return;
     }
+    
+    args.push_back(path.string());
 
-    size_t shstrndx;
-    if (elf_getshdrstrndx(elf, &shstrndx) != 0) {
-        elf_end(elf);
-        close(fd);
-        return;
+    if (run_command(args) != 0) {
+        // We don't throw here to avoid failing the whole build for one bad file
+        log_warning("Failed to strip: " + path.string());
     }
-
-    Elf_Scn* scn = nullptr;
-    while ((scn = elf_nextscn(elf, scn)) != nullptr) {
-        GElf_Shdr shdr;
-        if (gelf_getshdr(scn, &shdr) == nullptr) continue;
-
-        const char* name = elf_strptr(elf, shstrndx, shdr.sh_name);
-        if (!name) continue;
-
-        std::string sname = name;
-        bool discard = false;
-
-        // Strip debug info and comments
-        if (sname.find(".debug") == 0 || sname == ".comment" || sname == ".note.GNU-stack") {
-            discard = true;
-        }
-
-        // For executables, we can strip symbol tables
-        if (type == BinaryType::ELF_EXECUTABLE && (sname == ".symtab" || sname == ".strtab")) {
-            discard = true;
-        }
-
-        if (discard) {
-            shdr.sh_type = SHT_NULL;
-            shdr.sh_size = 0;
-            shdr.sh_flags = 0;
-            gelf_update_shdr(scn, &shdr);
-        }
-    }
-
-    elf_flagelf(elf, ELF_C_SET, ELF_F_DIRTY);
-    elf_update(elf, ELF_C_WRITE);
-    elf_end(elf);
-    close(fd);
 }
