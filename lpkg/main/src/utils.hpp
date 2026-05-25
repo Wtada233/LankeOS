@@ -80,3 +80,15 @@ std::pair<std::string, std::string> parse_package_filename(const std::string& fi
 
 // Security
 std::filesystem::path validate_path(const std::filesystem::path& path, const std::filesystem::path& root);
+
+// Binary processing (ELF)
+enum class BinaryType {
+    UNKNOWN,
+    ELF_EXECUTABLE,
+    ELF_SHARED,
+    ELF_STATIC_LIB
+};
+
+BinaryType get_binary_type(const std::filesystem::path& path);
+void strip_binary(const std::filesystem::path& path);
+

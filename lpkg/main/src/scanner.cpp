@@ -91,5 +91,5 @@ void scan_orphans(const std::string& scan_root_override) {
             } catch (...) { continue; }
         }
     }
-    log_info(string_format("info.scan_complete", orphan_count));
+    log_info(string_format("info.scan_complete", scanned_count, orphan_count));
 }

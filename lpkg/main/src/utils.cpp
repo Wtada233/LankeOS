@@ -18,6 +18,8 @@
 #include <chrono>
 #include <ctime>
 #include <regex>
+#include <libelf.h>
+#include <gelf.h>
 
 namespace fs = std::filesystem;
 
@@ -315,4 +317,98 @@ std::filesystem::path validate_path(const fs::path& path, const fs::path& root) 
         }
     }
     return root / normalized;
+}
+BinaryType get_binary_type(const fs::path& path) {
+    int fd = open(path.c_str(), O_RDONLY);
+    if (fd < 0) return BinaryType::UNKNOWN;
+
+    char magic[8];
+    ssize_t n = read(fd, magic, 8);
+    if (n < 4) {
+        close(fd);
+        return BinaryType::UNKNOWN;
+    }
+
+    if (memcmp(magic, "\x7f" "ELF", 4) == 0) {
+        lseek(fd, 0, SEEK_SET);
+        elf_version(EV_CURRENT);
+        Elf* elf = elf_begin(fd, ELF_C_READ, nullptr);
+        if (!elf) {
+            close(fd);
+            return BinaryType::UNKNOWN;
+        }
+
+        GElf_Ehdr ehdr;
+        BinaryType type = BinaryType::UNKNOWN;
+        if (gelf_getehdr(elf, &ehdr) != nullptr) {
+            if (ehdr.e_type == ET_EXEC) type = BinaryType::ELF_EXECUTABLE;
+            else if (ehdr.e_type == ET_DYN) type = BinaryType::ELF_SHARED;
+        }
+        
+        elf_end(elf);
+        close(fd);
+        return type;
+    } else if (n >= 8 && memcmp(magic, "!<arch>\n", 8) == 0) {
+        close(fd);
+        return BinaryType::ELF_STATIC_LIB;
+    }
+
+    close(fd);
+    return BinaryType::UNKNOWN;
+}
+
+void strip_binary(const fs::path& path) {
+    BinaryType type = get_binary_type(path);
+    if (type == BinaryType::UNKNOWN || type == BinaryType::ELF_STATIC_LIB) return;
+
+    int fd = open(path.c_str(), O_RDWR);
+    if (fd < 0) return;
+
+    elf_version(EV_CURRENT);
+    Elf* elf = elf_begin(fd, ELF_C_RDWR, nullptr);
+    if (!elf) {
+        close(fd);
+        return;
+    }
+
+    size_t shstrndx;
+    if (elf_getshdrstrndx(elf, &shstrndx) != 0) {
+        elf_end(elf);
+        close(fd);
+        return;
+    }
+
+    Elf_Scn* scn = nullptr;
+    while ((scn = elf_nextscn(elf, scn)) != nullptr) {
+        GElf_Shdr shdr;
+        if (gelf_getshdr(scn, &shdr) == nullptr) continue;
+
+        const char* name = elf_strptr(elf, shstrndx, shdr.sh_name);
+        if (!name) continue;
+
+        std::string sname = name;
+        bool discard = false;
+
+        // Strip debug info and comments
+        if (sname.find(".debug") == 0 || sname == ".comment" || sname == ".note.GNU-stack") {
+            discard = true;
+        }
+
+        // For executables, we can strip symbol tables
+        if (type == BinaryType::ELF_EXECUTABLE && (sname == ".symtab" || sname == ".strtab")) {
+            discard = true;
+        }
+
+        if (discard) {
+            shdr.sh_type = SHT_NULL;
+            shdr.sh_size = 0;
+            shdr.sh_flags = 0;
+            gelf_update_shdr(scn, &shdr);
+        }
+    }
+
+    elf_flagelf(elf, ELF_C_SET, ELF_F_DIRTY);
+    elf_update(elf, ELF_C_WRITE);
+    elf_end(elf);
+    close(fd);
 }

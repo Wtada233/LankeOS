@@ -6,6 +6,7 @@
 #include "cxxopts.hpp"
 #include "packer.hpp"
 #include "scanner.hpp"
+#include "builder.hpp"
 
 #include <curl/curl.h>
 #include <iostream>
@@ -35,12 +36,15 @@ void print_usage(const cxxopts::Options& options) {
     std::cerr << get_string("info.query_desc") << std::endl;
     std::cerr << get_string("info.man_desc") << std::endl;
     std::cerr << get_string("info.pack_desc") << std::endl;
+    std::cerr << get_string("info.build_desc") << std::endl;
     std::cerr << get_string("info.scan_desc") << std::endl;
 }
 
 #include <optional>
 
 #include <functional>
+
+namespace fs = std::filesystem;
 
 void pre_operation_check(const cxxopts::ParseResult& result, std::function<void()> print_usage_func, size_t min, std::optional<size_t> max = std::nullopt) {
     log_info(get_string("info.pre_op_check"));
@@ -199,6 +203,15 @@ int main(int argc, char* argv[]) {
             }
             std::string source_dir = result["source"].as<std::string>();
             pack_package(output_file, source_dir);
+        } else if (command == "build") {
+            std::string build_dir = ".";
+            if (result.count("packages")) {
+                auto pkgs = result["packages"].as<std::vector<std::string>>();
+                if (!pkgs.empty()) {
+                    build_dir = pkgs[0];
+                }
+            }
+            run_build(fs::absolute(build_dir));
         } else if (command == "scan") {
             check_root();
             init_filesystem();
