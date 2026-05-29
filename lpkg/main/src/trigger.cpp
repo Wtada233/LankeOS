@@ -2,6 +2,7 @@
 #include "utils.hpp"
 #include "config.hpp"
 #include "localization.hpp"
+#include "lib_utils.hpp"
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
@@ -74,9 +75,16 @@ void TriggerManager::run_all() {
     log_info(get_string("info.running_triggers"));
     for (const auto& cmd : pending_triggers) {
         log_info(string_format("info.trigger_exec", cmd.c_str()));
-        // Note: Using run_shell for a safer exec-based approach.
-        if (int ret = run_shell(cmd); ret != 0) {
-            log_warning(string_format("warning.trigger_failed", std::to_string(ret).c_str()));
+        // Handle native triggers instead of calling external ldconfig
+        if (cmd == "ldconfig") {
+            // Apply SONAME symlinks to /usr/lib
+            log_info(get_string("info.generating_soname_links"));
+            apply_soname_links(ROOT_DIR / "usr/lib");
+        } else {
+            // Note: Using run_shell for a safer exec-based approach.
+            if (int ret = run_shell(cmd); ret != 0) {
+                log_warning(string_format("warning.trigger_failed", std::to_string(ret).c_str()));
+            }
         }
     }
     pending_triggers.clear();
