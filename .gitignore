@@ -1,4 +1,7 @@
+build_test/
 build/
+coverage_report/
+
 run_tests
 *.o
 lrepo-mgr.json
