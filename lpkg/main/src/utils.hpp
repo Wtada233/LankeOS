@@ -94,6 +94,5 @@ enum class BinaryType {
     ELF_STATIC_LIB
 };
 
-BinaryType get_binary_type(const std::filesystem::path& path);
 void strip_binary(const std::filesystem::path& path);
 

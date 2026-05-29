@@ -1,4 +1,5 @@
 #include "utils.hpp"
+#include "strip.hpp"
 
 #include "config.hpp"
 #include "exception.hpp"
@@ -339,64 +340,11 @@ std::filesystem::path validate_path(const fs::path& path, const fs::path& root) 
     }
     return root / normalized;
 }
-BinaryType get_binary_type(const fs::path& path) {
-    int fd = open(path.c_str(), O_RDONLY);
-    if (fd < 0) return BinaryType::UNKNOWN;
-
-    unsigned char ident[16];
-    if (read(fd, ident, 16) != 16) {
-        close(fd);
-        return BinaryType::UNKNOWN;
-    }
-
-    if (memcmp(ident, "\x7f" "ELF", 4) == 0) {
-        uint16_t e_type;
-        if (read(fd, &e_type, 2) != 2) {
-            close(fd);
-            return BinaryType::UNKNOWN;
-        }
-        
-        // Handle endianness based on EI_DATA (ident[5])
-        // 1 = ELFDATA2LSB, 2 = ELFDATA2MSB
-        if (ident[5] == 2) { // MSB, swap for LSB host
-            e_type = (e_type >> 8) | (e_type << 8);
-        }
-
-        BinaryType type = BinaryType::UNKNOWN;
-        if (e_type == 2) type = BinaryType::ELF_EXECUTABLE;
-        else if (e_type == 3) type = BinaryType::ELF_SHARED;
-        
-        close(fd);
-        return type;
-    } else if (memcmp(ident, "!<arch>\n", 8) == 0) {
-        close(fd);
-        return BinaryType::ELF_STATIC_LIB;
-    }
-
-    close(fd);
-    return BinaryType::UNKNOWN;
-}
-
 void strip_binary(const fs::path& path) {
-    BinaryType type = get_binary_type(path);
-    if (type == BinaryType::UNKNOWN) return;
-
-    std::vector<std::string> args = {"strip"};
-    
-    if (type == BinaryType::ELF_SHARED) {
-        args.push_back("--strip-unneeded");
-    } else if (type == BinaryType::ELF_EXECUTABLE) {
-        args.push_back("--strip-all");
-    } else if (type == BinaryType::ELF_STATIC_LIB) {
-        args.push_back("--strip-debug");
-    } else {
-        return;
-    }
-    
-    args.push_back(path.string());
-
-    if (run_command(args) != 0) {
-        // We don't throw here to avoid failing the whole build for one bad file
-        log_warning("Failed to strip: " + path.string());
+    std::string error_msg;
+    if (!strip_file(path, error_msg)) {
+        if (!error_msg.empty()) {
+            log_warning(string_format("warning.strip_failed", path.string(), error_msg));
+        }
     }
 }

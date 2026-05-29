@@ -105,7 +105,7 @@ void run_build(const fs::path& build_dir) {
     }
     if (dir_count == 1) {
         actual_work_dir = lone_dir;
-        log_info("Detected source tree: " + actual_work_dir.filename().string());
+        log_info(string_format("info.detected_source_tree", actual_work_dir.filename().string()));
     }
 
     // 5. Execution Environment
@@ -157,6 +157,16 @@ void run_build(const fs::path& build_dir) {
         normalize("lib64", "lib");
         normalize("sbin", "bin");
 
+        // Clean up libtool files
+        log_info(get_string("info.cleaning_libtool_files"));
+        std::error_code ec;
+        for (auto it = fs::recursive_directory_iterator(staging_root, ec); it != fs::recursive_directory_iterator(); it.increment(ec)) {
+            if (ec) break;
+            if (it->is_regular_file() && it->path().extension() == ".la") {
+                fs::remove(it->path(), ec);
+            }
+        }
+
         // Strip binaries
         if (!no_strip) {
             log_info(get_string("info.stripping_binaries"));
@@ -165,20 +175,25 @@ void run_build(const fs::path& build_dir) {
                 if (!fs::exists(p) || !fs::is_directory(p)) continue;
                 for (const auto& entry : fs::recursive_directory_iterator(p)) {
                     if (!entry.is_regular_file() || entry.is_symlink()) continue;
+                    
+                    // Only strip ELF files
+                    bool is_elf = false;
+                    std::ifstream f(entry.path(), std::ios::binary);
+                    if (f) {
+                        char magic[4];
+                        f.read(magic, 4);
+                        if (f.gcount() == 4 && magic[0] == 0x7f && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F') {
+                            is_elf = true;
+                        }
+                    }
+                    if (!is_elf) continue;
+                    
                     strip_binary(entry.path());
                 }
             }
         }
 
-        // Cleanup
-        std::error_code ec;
-        for (auto it = fs::recursive_directory_iterator(staging_root, ec); it != fs::recursive_directory_iterator(); it.increment(ec)) {
-            if (ec) break;
-            if (it->is_regular_file() && it->path().extension() == ".la") {
-                fs::remove(it->path(), ec);
-            }
-        }
-        fs::remove(staging_root / "usr/share/info/dir", ec);
+	fs::remove(staging_root / "usr/share/info/dir", ec);
 
         // ldconfig
         if (fs::exists(staging_root / "usr" / "lib")) {
