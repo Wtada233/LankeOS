@@ -1,3 +1,4 @@
+#include "lib_utils.hpp"
 #include "builder.hpp"
 #include "nlohmann/json.hpp"
 #include "utils.hpp"
@@ -195,10 +196,10 @@ void run_build(const fs::path& build_dir) {
 
 	fs::remove(staging_root / "usr/share/info/dir", ec);
 
-        // ldconfig
+        // Generate SONAME symlinks
         if (fs::exists(staging_root / "usr" / "lib")) {
-            log_info(get_string("info.executing_ldconfig"));
-            run_shell("ldconfig -n \"" + (staging_root / "usr" / "lib").string() + "\"");
+            log_info(get_string("info.generating_soname_links"));
+            apply_soname_links(staging_root / "usr" / "lib");
         }
 
         // Generate basic metadata if missing
