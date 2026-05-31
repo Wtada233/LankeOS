@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --without-bash-malloc --with-installed-readline --disable-static --disable-doc
+    make
+    make DESTDIR={STAGING_ROOT} install
+    ln -sf bash {STAGING_ROOT}/usr/bin/sh
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

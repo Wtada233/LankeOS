@@ -1,0 +1,24 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    ../configure --prefix=/usr --enable-shared --enable-threads=posix --enable-__cxa_atexit --enable-clocale=gnu --enable-languages=c,c++ --disable-multilib --disable-bootstrap --with-system-zlib
+    make
+    make DESTDIR={STAGING_ROOT} install
+    ln -sfv gcc {STAGING_ROOT}/usr/bin/cc
+    ln -sfv ../bin/cpp "{STAGING_ROOT}/usr/lib/cpp"
+    mkdir -pv "{STAGING_ROOT}/usr/lib/bfd-plugins"
+    ln -sfv ../../libexec/gcc/x86_64-pc-linux-gnu/15.2.0/liblto_plugin.so \
+           "{STAGING_ROOT}/usr/lib/bfd-plugins/liblto_plugin.so"
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

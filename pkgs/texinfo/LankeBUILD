@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --disable-static
+    make
+    make DESTDIR={STAGING_ROOT} install
+    ln -sfv texi2any {STAGING_ROOT}/usr/bin/makeinfo
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,7 @@
+{
+    "name": "dejagnu",
+    "version": "1.6.3",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/dejagnu/dejagnu-1.6.3.tar.gz"
+    ]
+}

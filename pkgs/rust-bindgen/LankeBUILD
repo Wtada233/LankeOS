@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    cargo build --release --bin bindgen
+    mkdir -p "{STAGING_ROOT}/usr/bin"
+    cp target/release/bindgen "{STAGING_ROOT}/usr/bin/"
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,43 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Ddefault-dnssec=no -Dfirstboot=false -Dman=false -Dpam=enabled -Dlogind=enabled -Dmode=release -Dwerror=disabled
+    ninja
+    DESTDIR={STAGING_ROOT} ninja install
+
+    # 添加系统管理链接
+    for tool in reboot halt poweroff shutdown telinit runlevel; do
+        ln -sfv systemctl {STAGING_ROOT}/usr/bin/$tool
+    done
+    ln -sfv resolvectl {STAGING_ROOT}/usr/bin/systemd-resolve
+    ln -sfv resolvectl {STAGING_ROOT}/usr/bin/resolvconf
+    ln -sfv ../lib/systemd/systemd {STAGING_ROOT}/usr/bin/init
+    ln -sfv systemd-run {STAGING_ROOT}/usr/bin/run0
+    ln -sfv systemd-sysext {STAGING_ROOT}/usr/bin/systemd-confext
+    ln -sfv systemd-mount {STAGING_ROOT}/usr/bin/systemd-umount
+    ln -sfv udevadm {STAGING_ROOT}/usr/bin/udevd
+
+    # 建立 LankeOS 默认预设策略：禁用自带网络管理，优先使用 NetworkManager
+    mkdir -pv {STAGING_ROOT}/usr/lib/systemd/system-preset
+    cat > {STAGING_ROOT}/usr/lib/systemd/system-preset/99-lankeos.preset << "EOF"
+disable systemd-networkd.service
+disable systemd-resolved.service
+enable NetworkManager.service
+enable sshd.service
+EOF
+
+    echo "systemd-machine-id-setup" >> "{STAGING_HOOKS}/postinst.sh"
+    echo "systemctl preset-all" >> "{STAGING_HOOKS}/postinst.sh"
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

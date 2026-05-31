@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    CC=gcc CFLAGS=\"$CFLAGS -std=gnu11\" ./configure --prefix=/usr -G -O3 -r
+    make
+    make DESTDIR={STAGING_ROOT} install
+    ln -sfv bc {STAGING_ROOT}/usr/bin/dc
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

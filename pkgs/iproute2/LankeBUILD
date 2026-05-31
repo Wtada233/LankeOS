@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    make NETNS_RUN_DIR=/run/netns
+    make SBINDIR=/usr/bin DESTDIR={STAGING_ROOT} install
+    ln -sfv lnstat {STAGING_ROOT}/usr/bin/ctstat
+    ln -sfv lnstat {STAGING_ROOT}/usr/bin/rtstat
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

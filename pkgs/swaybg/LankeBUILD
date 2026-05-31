@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    tar -xf swaybg-1.2.1.tar.gz
+    cd "swaybg-1.2.1"
+    meson setup build --prefix=/usr --buildtype=release
+    ninja -C build
+    DESTDIR=\{STAGING_ROOT} ninja -C build install
+}
+
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    # --enable-compat-symlinks 会自动创建 mkfs.vfat -> mkfs.fat 等链接
+    ./configure --prefix=/usr --enable-compat-symlinks --disable-static
+    make
+    make DESTDIR={STAGING_ROOT} install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

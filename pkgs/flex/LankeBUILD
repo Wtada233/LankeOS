@@ -1,0 +1,20 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --disable-static --disable-doc
+    make
+    make DESTDIR={STAGING_ROOT} install
+    ln -sfv flex {STAGING_ROOT}/usr/bin/lex
+    ln -sfv flex {STAGING_ROOT}/usr/bin/flex++
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

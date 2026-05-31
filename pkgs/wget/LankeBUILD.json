@@ -1,0 +1,7 @@
+{
+    "name": "wget",
+    "version": "1.25.0",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/wget/wget-1.25.0.tar.gz"
+    ]
+}

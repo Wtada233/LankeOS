@@ -1,0 +1,7 @@
+{
+    "name": "libdrm",
+    "version": "2.4.131",
+    "sources": [
+        "https://dri.freedesktop.org/libdrm/libdrm-2.4.131.tar.xz"
+    ]
+}

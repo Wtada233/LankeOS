@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    # 对齐 BLFS 推荐配置，包含 p11-kit 信任存储，并使用内置 unistring
+    ./configure --prefix=/usr --disable-static --with-default-trust-store-pkcs11=\"pkcs11:\" --with-included-unistring --disable-guile
+    make
+    make DESTDIR={STAGING_ROOT} install
+    # 显式创建用于编译链接的软链接，防止安装后丢失
+    ln -sfv libgnutls.so.30 {STAGING_ROOT}/usr/lib/libgnutls.so
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

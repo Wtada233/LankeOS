@@ -1,0 +1,7 @@
+{
+    "name": "make-ca",
+    "version": "1.16.1",
+    "sources": [
+        "https://github.com/lfs-book/make-ca/archive/refs/tags/v1.16.1.tar.gz"
+    ]
+}

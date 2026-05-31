@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    cmake .. -G Ninja -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_WSI_XCB_SUPPORT=OFF -DBUILD_WSI_XLIB_SUPPORT=OFF -DBUILD_WSI_WAYLAND_SUPPORT=ON
+    DESTDIR={STAGING_ROOT} ninja install
+    rm -rf {STAGING_ROOT}/usr/lib64/libvulkan.so.1
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

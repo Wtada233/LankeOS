@@ -1,0 +1,7 @@
+{
+    "name": "findutils",
+    "version": "4.10.0",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/findutils/findutils-4.10.0.tar.xz"
+    ]
+}

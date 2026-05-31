@@ -1,0 +1,25 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    sed -i 's/libsystemd_dep = dependency/systemd_dep = libsystemd_dep = dependency/' meson.build
+    mkdir build && cd build
+    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Dsession_tracking=logind -Dauthfw=shadow -Dintrospection=false -Dman=false
+    ninja
+    DESTDIR={STAGING_ROOT} ninja install
+    chmod 4755 {STAGING_ROOT}/usr/bin/pkexec
+    cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+getent group polkitd >/dev/null || groupadd -fg 27 polkitd
+getent passwd polkitd >/dev/null || useradd -c 'PolicyKit Daemon Owner' -d /etc/polkit-1 -u 27 -g polkitd -s /bin/false polkitd
+EOF
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

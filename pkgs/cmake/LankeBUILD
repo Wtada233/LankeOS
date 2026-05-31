@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir -p {STAGING_ROOT}/usr
+    cp -rv bin share {STAGING_ROOT}/usr/
+    cd ..
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

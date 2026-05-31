@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    meson setup build --prefix=/usr -Dudev=true
+    ninja -C build
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,7 @@
+{
+    "name": "libva",
+    "version": "2.23.0",
+    "sources": [
+        "https://github.com/intel/libva/releases/download/2.23.0/libva-2.23.0.tar.bz2"
+    ]
+}

@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --sysconfdir=/etc --with-openssl --with-xz --with-zstd --with-zlib --disable-static --disable-manpages
+    make
+    make DESTDIR={STAGING_ROOT} install
+    for target in depmod insmod lsmod modinfo modprobe rmmod; do
+      ln -sfv kmod {STAGING_ROOT}/usr/bin/$target
+    done
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

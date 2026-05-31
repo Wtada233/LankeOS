@@ -1,0 +1,7 @@
+{
+    "name": "gdbm",
+    "version": "1.26",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/gdbm/gdbm-1.26.tar.gz"
+    ]
+}

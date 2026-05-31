@@ -1,0 +1,7 @@
+{
+    "name": "automake",
+    "version": "1.18.1",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/automake/automake-1.18.1.tar.xz"
+    ]
+}
