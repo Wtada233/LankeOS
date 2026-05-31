@@ -1,18 +1,12 @@
 #pragma once
 
 #include "exception.hpp"
+#include "constants.hpp"
 #include <string>
 #include <string_view>
 #include <unordered_set>
 #include <filesystem>
 #include <vector>
-
-// Color codes
-inline constexpr std::string_view COLOR_GREEN = "\033[1;32m";
-inline constexpr std::string_view COLOR_WHITE = "\033[1;37m";
-inline constexpr std::string_view COLOR_YELLOW = "\033[1;33m";
-inline constexpr std::string_view COLOR_RED = "\033[1;31m";
-inline constexpr std::string_view COLOR_RESET = "\033[0m";
 
 // Log functions
 void log_info(std::string_view msg);
@@ -21,8 +15,8 @@ void log_error(std::string_view msg);
 void log_progress(const std::string& msg, double percentage, int bar_width = 50);
 
 // Process execution
-int run_command(const std::vector<std::string>& args);
-int run_shell(const std::string& cmd);
+int run_command(const std::vector<std::string>& args, const std::filesystem::path& work_dir = "");
+int run_shell(const std::string& cmd, const std::filesystem::path& work_dir = "");
 
 // Interactive mode control
 enum class NonInteractiveMode {
@@ -82,6 +76,9 @@ void cleanup_tmp_dirs();
 
 // Filename parsing
 std::pair<std::string, std::string> parse_package_filename(const std::string& filename);
+
+// String utilities
+void string_replace_all(std::string& str, const std::string& from, const std::string& to);
 
 // Security
 std::filesystem::path validate_path(const std::filesystem::path& path, const std::filesystem::path& root);

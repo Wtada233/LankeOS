@@ -213,7 +213,7 @@ info.packing_built_pkg=正在打包构建好的软件包...
 info.build_success=构建成功: {}
 error.build_phase_failed=构建阶段 '{}' 失败，退出代码 {}
 error.missing_lankebuild_json=在 {} 中未找到 LankeBUILD.json
-error.missing_lankebuild_sh=在 {} 中未找到 LankeBUILD.sh
+error.missing_lankebuild=在 {} 中未找到 LankeBUILD
 error.lankebuild_parse_failed=解析 LankeBUILD.json 失败: {}
 help.output_file=输出文件路径
 help.pack_source=打包的源目录
@@ -233,4 +233,8 @@ info.stripping_binaries=正在 Strip 二进制文件...
 info.cleaning_libtool_files=正在清理 libtool 档案...
 info.cleaning_up_build=正在清理构建目录...
 info.generating_soname_links=正在创建库软链接...
+man.name=名称
+man.version=版本
+man.build_date=构建日期
+man.line_format={}：{}
 
