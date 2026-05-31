@@ -1,0 +1,7 @@
+{
+    "name": "linux",
+    "version": "7.0",
+    "sources": [
+        "https://github.com/torvalds/linux/archive/refs/tags/v7.0.tar.gz"
+    ]
+}

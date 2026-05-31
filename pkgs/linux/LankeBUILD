@@ -1,0 +1,33 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # Apply custom configuration
+    cp {WORK_DIR}/../linux.cfg .config
+    make oldconfig
+
+    # Compile kernel and modules
+    make -j$(nproc)
+
+    # Install modules and headers
+    make INSTALL_MOD_PATH={STAGING_ROOT} modules_install
+    make headers_install ARCH=x86_64 INSTALL_HDR_PATH={STAGING_ROOT}/usr
+
+    # Install kernel image
+    mkdir -p {STAGING_ROOT}/mnt/base/boot
+    cp arch/x86/boot/bzImage {STAGING_ROOT}/mnt/base/boot/vmlinuz-lanke
+    cp System.map {STAGING_ROOT}/mnt/base/boot/System.map-lanke
+    cp .config {STAGING_ROOT}/mnt/base/boot/config-lanke
+
+    # Cleanup symlinks and strip modules
+    find {STAGING_ROOT}/usr/lib/modules -type l -name "build" -delete
+    find {STAGING_ROOT}/usr/lib/modules -type l -name "source" -delete
+    find {STAGING_ROOT}/usr/lib/modules -name "*.ko" -exec strip --strip-debug {} +
+}
+
+lankebuild_package() {
+    :
+}
