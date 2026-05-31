@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Dintrospection=disabled -Dtests=false
+    ninja
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

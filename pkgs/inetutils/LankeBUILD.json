@@ -1,0 +1,7 @@
+{
+    "name": "inetutils",
+    "version": "2.6",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/inetutils/inetutils-2.6.tar.xz"
+    ]
+}

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    patch -Np1 -i {SRC_DIR}/kbd-2.8.0-backspace-1.patch
+    sed -i '/RESIZECONS_PROGS=/s/yes/no/' configure
+    sed -i 's/resizecons.8 //' docs/man/man8/Makefile.in
+    ./configure --prefix=/usr --disable-static --disable-vlock
+    make
+    make DESTDIR={STAGING_ROOT} install
+    # 添加 psf 工具链接
+    for tool in psfaddtable psfgettable psfstriptable; do
+        ln -sfv psfxtable {STAGING_ROOT}/usr/bin/$tool
+    done
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

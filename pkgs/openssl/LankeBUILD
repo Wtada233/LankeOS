@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    # OpenSSL 不支持 no-static，手动安装后删除
+    ./config --prefix=/usr --openssldir=/etc/ssl --libdir=lib shared zlib-dynamic
+    make
+    make DESTDIR={STAGING_ROOT} install
+    # 手动清理静态库以减小体积
+    rm -f {STAGING_ROOT}/usr/lib/*.a
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

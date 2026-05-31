@@ -1,0 +1,11 @@
+#!/bin/bash
+lankebuild_prepare() { :; }
+lankebuild_build() {
+    mkdir build
+    cd build
+    meson setup --prefix=/usr ..
+    ninja
+    
+    DESTDIR={STAGING_ROOT} ninja install
+}
+lankebuild_package() { :; }

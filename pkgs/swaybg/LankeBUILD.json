@@ -1,0 +1,7 @@
+{
+    "name": "swaybg",
+    "version": "1.2.1",
+    "sources": [
+        "https://github.com/swaywm/swaybg/releases/download/v1.2.1/swaybg-1.2.1.tar.gz"
+    ]
+}

@@ -1,0 +1,7 @@
+{
+    "name": "texinfo",
+    "version": "7.2",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/texinfo/texinfo-7.2.tar.xz"
+    ]
+}

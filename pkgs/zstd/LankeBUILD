@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    make prefix=/usr
+    make prefix=/usr DESTDIR={STAGING_ROOT} install
+    # 添加兼容性链接
+    ln -sfv zstd {STAGING_ROOT}/usr/bin/zstdcat
+    ln -sfv zstd {STAGING_ROOT}/usr/bin/unzstd
+    ln -sfv zstd {STAGING_ROOT}/usr/bin/zstdmt
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

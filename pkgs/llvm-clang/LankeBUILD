@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    cmake -G Ninja ../llvm -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_PROJECTS='clang;lld' -DLLVM_ENABLE_RUNTIMES='compiler-rt;libcxx;libcxxabi;libunwind;libclc' -DLLVM_TARGETS_TO_BUILD='X86;AMDGPU;NVPTX;SPIRV' -DLLVM_LINK_LLVM_DYLIB=ON -DLLVM_INCLUDE_TESTS=OFF
+    ninja
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

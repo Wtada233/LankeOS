@@ -1,0 +1,7 @@
+{
+    "name": "grub",
+    "version": "2.12",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/grub/grub-2.12.tar.xz"
+    ]
+}

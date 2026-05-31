@@ -1,0 +1,7 @@
+{
+    "name": "grep",
+    "version": "3.12",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/grep/grep-3.12.tar.xz"
+    ]
+}

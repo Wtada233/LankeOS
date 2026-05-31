@@ -1,0 +1,7 @@
+{
+    "name": "spirv-llvm-translator",
+    "version": "21.1.4",
+    "sources": [
+        "https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v21.1.4.tar.gz"
+    ]
+}

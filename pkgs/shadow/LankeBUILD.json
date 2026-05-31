@@ -1,0 +1,7 @@
+{
+    "name": "shadow",
+    "version": "4.19.3",
+    "sources": [
+        "https://github.com/shadow-maint/shadow/releases/download/4.19.3/shadow-4.19.3.tar.xz"
+    ]
+}

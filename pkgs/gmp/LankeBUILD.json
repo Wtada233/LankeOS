@@ -1,0 +1,7 @@
+{
+    "name": "gmp",
+    "version": "6.3.0",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/gmp/gmp-6.3.0.tar.xz"
+    ]
+}

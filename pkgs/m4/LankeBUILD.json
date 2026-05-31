@@ -1,0 +1,7 @@
+{
+    "name": "m4",
+    "version": "1.4.20",
+    "sources": [
+        "https://mirrors.tuna.tsinghua.edu.cn/gnu/m4/m4-1.4.20.tar.xz"
+    ]
+}

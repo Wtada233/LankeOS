@@ -1,0 +1,13 @@
+#!/bin/bash
+lankebuild_prepare() { :; }
+lankebuild_build() {
+    # LSB-Tools 没有 configure 脚本，直接 make
+    make
+    make DESTDIR={STAGING_ROOT} install
+    
+    # 按照原逻辑创建符号链接
+    ln -sfv ../lib/lsb/install_initd {STAGING_ROOT}/usr/bin/install_initd
+    ln -sfv ../lib/lsb/remove_initd {STAGING_ROOT}/usr/bin/remove_initd
+    ln -sfv ../lib/lsb/lsbinstall {STAGING_ROOT}/usr/bin/lsbinstall
+}
+lankebuild_package() { :; }

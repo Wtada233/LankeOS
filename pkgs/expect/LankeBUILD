@@ -1,0 +1,20 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    patch -Np1 -i {SRC_DIR}/expect-5.45.4-gcc15-1.patch
+    ./configure --prefix=/usr --with-tcl=/usr/lib --enable-shared --disable-rpath --mandir=/usr/share/man --with-tclinclude=/usr/include --disable-static
+    make
+    make DESTDIR={STAGING_ROOT} install
+    ln -svf expect5.45.4/libexpect5.45.4.so {STAGING_ROOT}/usr/lib/
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    python3 setup.py build
+    python3 setup.py install --root={STAGING_ROOT}
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

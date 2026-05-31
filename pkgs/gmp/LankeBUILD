@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    sed -i '/long long t1;/,+1s/()/(...)/' configure
+    ./configure --prefix=/usr --enable-cxx --disable-static --disable-doc
+    make
+    make DESTDIR={STAGING_ROOT} install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}
