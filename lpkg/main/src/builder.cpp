@@ -16,11 +16,11 @@
 using json = nlohmann::json;
 
 void run_build(const fs::path& build_dir) {
-    fs::path json_path = build_dir / "LankeBUILD.json";
-    fs::path script_path = build_dir / "LankeBUILD.sh";
+    fs::path json_path = build_dir / constants::LANK_BUILD_JSON;
+    fs::path script_path = build_dir / constants::LANK_BUILD_SCRIPT;
 
     if (!fs::exists(json_path)) throw LpkgException(string_format("error.missing_lankebuild_json", build_dir.string()));
-    if (!fs::exists(script_path)) throw LpkgException(string_format("error.missing_lankebuild_sh", build_dir.string()));
+    if (!fs::exists(script_path)) throw LpkgException(string_format("error.missing_lankebuild", build_dir.string()));
 
     // 1. Parse Metadata
     log_info(get_string("info.parsing_lankebuild"));
@@ -40,9 +40,9 @@ void run_build(const fs::path& build_dir) {
     log_info(string_format("info.building_package", name, version));
 
     // 2. Prepare Directories
-    fs::path work_root = build_dir / "work";
-    fs::path staging_root = build_dir / "root";
-    fs::path staging_hooks = build_dir / "hooks";
+    fs::path work_root = build_dir / constants::DIR_WORK;
+    fs::path staging_root = build_dir / constants::DIR_ROOT;
+    fs::path staging_hooks = build_dir / constants::DIR_HOOKS;
 
     std::vector<fs::path> downloaded_files;
     bool created_man = false;
@@ -56,15 +56,15 @@ void run_build(const fs::path& build_dir) {
     ensure_dir_exists(staging_root);
     
     // Pre-create standard hierarchy
-    for (const auto& d : {"bin", "lib", "include", "share/man", "local/bin"}) {
-        ensure_dir_exists(staging_root / "usr" / d);
+    for (const auto& d : {constants::BIN, constants::LIB, constants::INCLUDE, constants::SHARE_MAN, constants::LOCAL_BIN}) {
+        ensure_dir_exists(staging_root / constants::USR / d);
     }
     ensure_dir_exists(staging_hooks);
     {
-        std::ofstream h(staging_hooks / "postinst.sh");
-        h << "#!/bin/sh\n";
+        std::ofstream h(staging_hooks / constants::POSTINST_SH);
+        h << "#!/bin/sh" << constants::NL;
     }
-    fs::permissions(staging_hooks / "postinst.sh", fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec, fs::perm_options::add);
+    fs::permissions(staging_hooks / constants::POSTINST_SH, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec, fs::perm_options::add);
 
     // 3. Download and Extract Sources
     for (const auto& url : sources) {
@@ -90,7 +90,6 @@ void run_build(const fs::path& build_dir) {
     }
 
     // 4. Source Tree Detection
-    // If work_root contains exactly one directory, we assume that's the source tree
     fs::path actual_work_dir = work_root;
     int dir_count = 0;
     fs::path lone_dir;
@@ -99,7 +98,6 @@ void run_build(const fs::path& build_dir) {
             lone_dir = entry.path();
             dir_count++;
         } else {
-            // If there's a file at root, it's not a single-dir archive
             dir_count = -1; 
             break;
         }
@@ -109,23 +107,40 @@ void run_build(const fs::path& build_dir) {
         log_info(string_format("info.detected_source_tree", actual_work_dir.filename().string()));
     }
 
-    // 5. Execution Environment
-    std::string env_setup = 
-        "export PKG_NAME=\"" + name + "\"\n" +
-        "export PKG_VER=\"" + version + "\"\n" +
-        "export WORK_DIR=\"" + fs::absolute(work_root).string() + "\"\n" +
-        "export SRC_DIR=\"" + fs::absolute(actual_work_dir).string() + "\"\n" +
-        "export STAGING_ROOT=\"" + fs::absolute(staging_root).string() + "\"\n" +
-        "export STAGING_HOOKS=\"" + fs::absolute(staging_hooks).string() + "\"\n" +
-        "export NO_STRIP=\"" + (no_strip ? "1" : "0") + "\"\n" +
-        "cd \"$SRC_DIR\" || exit 1\n";
+    // 5. Execution Environment (Template Substitution)
+    std::string script_content;
+    {
+        std::ifstream f(script_path);
+        script_content.assign((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    }
+
+    std::map<std::string, std::string> vars = {
+        {"{PKG_NAME}", name},
+        {"{PKG_VER}", version},
+        {"{WORK_DIR}", fs::absolute(work_root).string()},
+        {"{SRC_DIR}", fs::absolute(actual_work_dir).string()},
+        {"{STAGING_ROOT}", fs::absolute(staging_root).string()},
+        {"{STAGING_HOOKS}", fs::absolute(staging_hooks).string()},
+        {"{NO_STRIP}", (no_strip ? "1" : "0")}
+    };
+
+    for (const auto& [from, to] : vars) {
+        string_replace_all(script_content, from, to);
+    }
+
+    // We write the processed script to a temporary file to be sourced securely
+    fs::path processed_script = build_dir / constants::LANK_BUILD_PROCESSED;
+    {
+        std::ofstream f(processed_script);
+        f << script_content;
+    }
 
     auto execute_phase = [&](const std::string& phase_name) {
         log_info(string_format("info.executing_phase", phase_name));
-        // We run a subshell that sources the build script and calls the function
-        std::string cmd = env_setup + " . " + fs::absolute(script_path).string() + " && " + phase_name;
-        int ret = run_shell(cmd);
+        std::string cmd = ". " + fs::absolute(processed_script).string() + " && " + phase_name;
+        int ret = run_shell(cmd, actual_work_dir);
         if (ret != 0) {
+            fs::remove(processed_script);
             throw LpkgException(string_format("error.build_phase_failed", phase_name, std::to_string(ret)));
         }
     };
@@ -135,8 +150,10 @@ void run_build(const fs::path& build_dir) {
         execute_phase("lankebuild_build");
         execute_phase("lankebuild_package");
     } catch (...) {
+        fs::remove(processed_script);
         throw;
     }
+    fs::remove(processed_script);
 
     // 5. Post-Processing (Normalization, Strip, Cleanup)
     auto finalize_staging = [&]() {
@@ -145,8 +162,8 @@ void run_build(const fs::path& build_dir) {
         // Path Normalization
         log_info(get_string("info.path_normalization"));
         auto normalize = [&](const std::string& from, const std::string& to) {
-            fs::path from_p = staging_root / "usr" / from;
-            fs::path to_p = staging_root / "usr" / to;
+            fs::path from_p = staging_root / constants::USR / from;
+            fs::path to_p = staging_root / constants::USR / to;
             if (fs::exists(from_p) && fs::is_directory(from_p)) {
                 ensure_dir_exists(to_p);
                 for (const auto& entry : fs::directory_iterator(from_p)) {
@@ -155,15 +172,15 @@ void run_build(const fs::path& build_dir) {
                 fs::remove_all(from_p);
             }
         };
-        normalize("lib64", "lib");
-        normalize("sbin", "bin");
+        normalize(std::string(constants::LIB64), std::string(constants::LIB));
+        normalize(std::string(constants::SBIN), std::string(constants::BIN));
 
         // Clean up libtool files
         log_info(get_string("info.cleaning_libtool_files"));
         std::error_code ec;
         for (auto it = fs::recursive_directory_iterator(staging_root, ec); it != fs::recursive_directory_iterator(); it.increment(ec)) {
             if (ec) break;
-            if (it->is_regular_file() && it->path().extension() == ".la") {
+            if (it->is_regular_file() && it->path().extension() == constants::EXT_LA) {
                 fs::remove(it->path(), ec);
             }
         }
@@ -171,8 +188,8 @@ void run_build(const fs::path& build_dir) {
         // Strip binaries
         if (!no_strip) {
             log_info(get_string("info.stripping_binaries"));
-            for (const auto& sub : {"bin", "lib", "libexec"}) {
-                fs::path p = staging_root / "usr" / sub;
+            for (const auto& sub : {constants::BIN, constants::LIB, constants::LIBEXEC}) {
+                fs::path p = staging_root / constants::USR / sub;
                 if (!fs::exists(p) || !fs::is_directory(p)) continue;
                 for (const auto& entry : fs::recursive_directory_iterator(p)) {
                     if (!entry.is_regular_file() || entry.is_symlink()) continue;
@@ -197,26 +214,26 @@ void run_build(const fs::path& build_dir) {
 	fs::remove(staging_root / "usr/share/info/dir", ec);
 
         // Generate SONAME symlinks
-        if (fs::exists(staging_root / "usr" / "lib")) {
+        if (fs::exists(staging_root / constants::USR / constants::LIB)) {
             log_info(get_string("info.generating_soname_links"));
-            apply_soname_links(staging_root / "usr" / "lib");
+            apply_soname_links(staging_root / constants::USR / constants::LIB);
         }
 
         // Generate basic metadata if missing
-        if (!fs::exists(build_dir / "man.txt")) {
-            std::ofstream f(build_dir / "man.txt");
-            f << "Name: " << name << "\n"
-              << "Version: " << version << "\n"
-              << "BuildDate: " << []() {
+        if (!fs::exists(build_dir / constants::PKG_MAN_FILE)) {
+            std::ofstream f(build_dir / constants::PKG_MAN_FILE);
+            f << string_format("man.line_format", get_string("man.name"), name) << constants::NL
+              << string_format("man.line_format", get_string("man.version"), version) << constants::NL
+              << string_format("man.line_format", get_string("man.build_date"), []() {
                   char buf[16];
                   time_t now = time(nullptr);
                   strftime(buf, sizeof(buf), "%Y%m%d", localtime(&now));
                   return std::string(buf);
-              }() << "\n";
+              }()) << constants::NL;
             created_man = true;
         }
-        if (!fs::exists(build_dir / "deps.txt")) {
-            std::ofstream(build_dir / "deps.txt").close();
+        if (!fs::exists(build_dir / constants::PKG_DEPS_FILE)) {
+            std::ofstream(build_dir / constants::PKG_DEPS_FILE).close();
             created_deps = true;
         }
     };
@@ -225,7 +242,7 @@ void run_build(const fs::path& build_dir) {
 
     // 6. Pack the result
     log_info(get_string("info.packing_built_pkg"));
-    std::string output_filename = name + "-" + version + ".lpkg";
+    std::string output_filename = name + "-" + version + std::string(constants::EXT_LPKG);
     pack_package(output_filename, build_dir.string());
     
     log_info(string_format("info.build_success", output_filename));
@@ -236,8 +253,8 @@ void run_build(const fs::path& build_dir) {
     fs::remove_all(staging_root);
     fs::remove_all(staging_hooks);
 
-    if (created_man) fs::remove(build_dir / "man.txt");
-    if (created_deps) fs::remove(build_dir / "deps.txt");
+    if (created_man) fs::remove(build_dir / constants::PKG_MAN_FILE);
+    if (created_deps) fs::remove(build_dir / constants::PKG_DEPS_FILE);
     for (const auto& f : downloaded_files) {
         fs::remove(f);
     }

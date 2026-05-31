@@ -2,6 +2,7 @@
 #include "exception.hpp"
 #include "localization.hpp"
 #include "utils.hpp"
+#include "constants.hpp"
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -167,7 +168,7 @@ std::string extract_file_from_archive(const fs::path& archive_path, const std::s
     while (archive_read_next_header(a.get(), &entry) == ARCHIVE_OK) {
         std::string path = archive_entry_pathname(entry);
         // Remove leading ./ if present
-        if (path.starts_with("./")) path = path.substr(2);
+        if (path.starts_with(constants::CURRENT_DIR_PREFIX)) path = path.substr(constants::CURRENT_DIR_PREFIX.length());
 
         if (path == internal_path) {
             size_t size = archive_entry_size(entry);

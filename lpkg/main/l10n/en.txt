@@ -208,7 +208,7 @@ info.packing_built_pkg=Packing built package...
 info.build_success=Build successful: {}
 error.build_phase_failed=Build phase '{}' failed with exit code {}
 error.missing_lankebuild_json=Missing LankeBUILD.json in {}
-error.missing_lankebuild_sh=Missing LankeBUILD.sh in {}
+error.missing_lankebuild=Missing LankeBUILD in {}
 error.lankebuild_parse_failed=Failed to parse LankeBUILD.json: {}
 help.output_file=Output file path
 help.pack_source=Source directory for packing
@@ -233,4 +233,8 @@ info.stripping_binaries=Stripping binaries...
 info.cleaning_libtool_files=Cleaning up libtool files...
 info.cleaning_up_build=Cleaning up build directories...
 info.generating_soname_links=Generating SONAME symlinks...
+man.name=Name
+man.version=Version
+man.build_date=BuildDate
+man.line_format={}: {}
 

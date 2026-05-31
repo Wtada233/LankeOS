@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "builder.hpp"
 #include "utils.hpp"
+#include "archive.hpp"
 #include <filesystem>
 #include <fstream>
 
@@ -21,11 +22,11 @@ protected:
         json << "{\"name\": \"test-pkg\", \"version\": \"1.0.0\"}";
         json.close();
 
-        // Create dummy LankeBUILD.sh
-        std::ofstream sh(test_dir / "LankeBUILD.sh");
+        // Create dummy LankeBUILD with placeholder
+        std::ofstream sh(test_dir / "LankeBUILD");
         sh << "lankebuild_prepare() { :; }\n"
            << "lankebuild_build() { :; }\n"
-           << "lankebuild_package() { echo 'test' > $STAGING_ROOT/usr/bin/test_bin; }";
+           << "lankebuild_package() { echo \"{PKG_NAME}\" > \"{STAGING_ROOT}/usr/bin/test_bin\"; }";
         sh.close();
 
         // Create a dummy .la file for cleanup testing
@@ -58,4 +59,27 @@ TEST_F(BuilderTest, CleanupLibtoolFiles) {
 
     // Verify .la file is gone
     EXPECT_FALSE(fs::exists(staging_root / "usr/lib/test.la"));
+}
+
+TEST_F(BuilderTest, VariableSubstitutionWorks) {
+    std::string pkg_file = "test-pkg-1.0.0.lpkg";
+    fs::remove(pkg_file);
+    EXPECT_NO_THROW(run_build(test_dir));
+    ASSERT_TRUE(fs::exists(pkg_file));
+
+    // Extract to verify content
+    fs::path extract_dir = test_dir / "extract";
+    fs::create_directories(extract_dir);
+    
+    extract_tar_zst(pkg_file, extract_dir);
+
+    fs::path test_bin = extract_dir / "content/usr/bin/test_bin";
+    ASSERT_TRUE(fs::exists(test_bin)) << "test_bin not found in extracted package";
+
+    std::ifstream f(test_bin);
+    std::string content;
+    std::getline(f, content);
+    EXPECT_EQ(content, "test-pkg");
+
+    fs::remove(pkg_file);
 }

@@ -7,6 +7,7 @@
 #include "packer.hpp"
 #include "scanner.hpp"
 #include "builder.hpp"
+#include "constants.hpp"
 
 #include <curl/curl.h>
 #include <iostream>
@@ -69,7 +70,7 @@ int main(int argc, char* argv[]) {
             ("v,version", "Print version")
             ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
             ("p,pkg-query", get_string("help.pkg_query"), cxxopts::value<bool>()->default_value("false"))
-            ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value("/tmp/lankepkg"))
+            ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value(std::string(constants::DEFAULT_PACK_SOURCE)))
             ("non-interactive", get_string("info.non_interactive_option_desc"), cxxopts::value<std::string>()->implicit_value("n"))
             ("force", get_string("help.force"), cxxopts::value<bool>()->default_value("false"))
             ("force-overwrite", get_string("help.force_overwrite"), cxxopts::value<bool>()->default_value("false"))
@@ -145,7 +146,7 @@ int main(int argc, char* argv[]) {
         const std::string& command = result["command"].as<std::string>();
 
         std::unique_ptr<DBLock> db_lock;
-        if (command != "man") {
+        if (command != constants::CMD_MAN) {
             check_root();
             init_filesystem();
             db_lock = std::make_unique<DBLock>();
@@ -153,13 +154,13 @@ int main(int argc, char* argv[]) {
 
         auto usage_printer = [&]() { print_usage(options); };
 
-        if (command == "install") {
+        if (command == constants::CMD_INSTALL) {
             pre_operation_check(result, usage_printer, 1);
             const auto& packages = result["packages"].as<std::vector<std::string>>();
             bool force = result["force"].as<bool>();
             install_packages(packages, hash_file, force);
             log_info(get_string("info.install_complete"));
-        } else if (command == "remove") {
+        } else if (command == constants::CMD_REMOVE) {
             pre_operation_check(result, usage_printer, 1);
             const auto& pkg_names = result["packages"].as<std::vector<std::string>>();
             bool force = result["force"].as<bool>();
@@ -168,22 +169,22 @@ int main(int argc, char* argv[]) {
                 write_cache();
             }
             log_info(get_string("info.uninstall_complete"));
-        } else if (command == "autoremove") {
+        } else if (command == constants::CMD_AUTOREMOVE) {
             pre_operation_check(result, usage_printer, 0, 0);
             autoremove();
             write_cache();
-        } else if (command == "upgrade") {
+        } else if (command == constants::CMD_UPGRADE) {
             pre_operation_check(result, usage_printer, 0, 0);
             upgrade_packages();
             write_cache();
-        } else if (command == "reinstall") {
+        } else if (command == constants::CMD_REINSTALL) {
             pre_operation_check(result, usage_printer, 1);
             const auto& pkg_names = result["packages"].as<std::vector<std::string>>();
             for (const auto& pkg_name : pkg_names) {
                 reinstall_package(pkg_name);
             }
             write_cache();
-        } else if (command == "query") {
+        } else if (command == constants::CMD_QUERY) {
             pre_operation_check(result, usage_printer, 1, 1);
             std::string target = result["packages"].as<std::vector<std::string>>()[0];
             if (result.count("pkg-query")) {
@@ -191,10 +192,10 @@ int main(int argc, char* argv[]) {
             } else {
                 query_file(target);
             }
-        } else if (command == "man") {
+        } else if (command == constants::CMD_MAN) {
             pre_operation_check(result, usage_printer, 1, 1);
             show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
-        } else if (command == "pack") {
+        } else if (command == constants::CMD_PACK) {
             std::string output_file;
             if (result.count("output")) {
                  output_file = result["output"].as<std::string>();
@@ -203,7 +204,7 @@ int main(int argc, char* argv[]) {
             }
             std::string source_dir = result["source"].as<std::string>();
             pack_package(output_file, source_dir);
-        } else if (command == "build") {
+        } else if (command == constants::CMD_BUILD) {
             std::string build_dir = ".";
             if (result.count("packages")) {
                 auto pkgs = result["packages"].as<std::vector<std::string>>();
@@ -212,21 +213,9 @@ int main(int argc, char* argv[]) {
                 }
             }
             run_build(fs::absolute(build_dir));
-        } else if (command == "scan") {
+        } else if (command == constants::CMD_SCAN) {
             check_root();
             init_filesystem();
-            // If root is overridden via --root, main calls set_root_path.
-            // But if user wants to scan a SPECIFIC directory that is NOT the system root (e.g. testing),
-            // they can rely on the fact that scanner uses ROOT_DIR (which set_root_path sets).
-            // However, to be more explicit/flexible as per request "can modify scan dir", 
-            // if we want to scan a dir but keep DB from somewhere else, that's complex.
-            // Assuming "scan directory" means the target root we are operating on.
-            // So implicit use of ROOT_DIR via config.cpp is correct for LFS context.
-            // But to allow 'scan' to take an optional argument for directory?
-            // "give scan a scan directory, default root directory". 
-            // Let's check if user provided a package argument for scan?
-            // "scan <dir>" ?
-            // Let's support an optional positional argument for scan.
             std::string scan_root;
             if (result.count("packages")) {
                 auto pkgs = result["packages"].as<std::vector<std::string>>();
