@@ -10,7 +10,7 @@ lankebuild_build() {
     cd sway
     CURRENT_WORK_DIR="/root/sway"
     meson setup build --prefix=/usr --buildtype=release -Dsd-bus-provider=libsystemd -Dman-pages=disabled -Ddefault-wallpaper=false -Dwerror=false
-    ninja -C build
+    ninja -C build -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja -C build install
     
 }

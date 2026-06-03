@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     mkdir build && cd build
     meson setup .. --prefix=/usr --buildtype=release -Dsession-managers=[] -Draop=disabled -Dbluez5=disabled -Dman=disabled -Ddocs=disabled -Dtests=disabled -Dpipewire-v4l2=disabled -Dpipewire-jack=enabled -Dpipewire-alsa=enabled -Dspa-plugins=enabled -Dlibsystemd=enabled -Dlogind=enabled -Dsystemd-user-service=enabled -Dc_args=\"-Wno-error=unused-result\"
-    ninja
+    ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 }
 

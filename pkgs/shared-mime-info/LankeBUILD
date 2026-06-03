@@ -9,7 +9,7 @@ lankebuild_build() {
     mkdir build
     cd build
     meson setup --prefix=/usr --buildtype=release -D update-mimedb=true ..
-    ninja
+    ninja -j$(nproc)
     
     DESTDIR={STAGING_ROOT} ninja install
 }

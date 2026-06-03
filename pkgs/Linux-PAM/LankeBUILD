@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     mkdir build && cd build
     meson setup .. --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc --buildtype=release -Ddocs=disabled -Dsecuredir=/usr/lib/security -Dlogind=enabled -Dnis=disabled
-    ninja
+    ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 
     # 建立基础 PAM 配置文件
