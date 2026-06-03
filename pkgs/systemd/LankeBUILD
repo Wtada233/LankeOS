@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     mkdir build && cd build
     meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Ddefault-dnssec=no -Dfirstboot=false -Dman=false -Dpam=enabled -Dlogind=enabled -Dmode=release -Dwerror=disabled
-    ninja
+    ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 
     # 添加系统管理链接

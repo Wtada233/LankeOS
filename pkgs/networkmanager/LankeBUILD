@@ -10,7 +10,7 @@ lankebuild_build() {
     grep -rl '^#!.*python$' | xargs sed -i '1s/python/&3/'
     mkdir build && cd build
     meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Dpolkit=true -Dintrospection=false -Dnmtui=true -Dppp=false -Dlibaudit=no -Dselinux=false -Dcrypto=gnutls -Dmodem_manager=false -Dovs=false -Dnm_cloud_setup=false -Dqt=false -Dnbft=false -Dsession_tracking=systemd -Dlibpsl=false
-    ninja
+    ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
     # 创建官方推荐的基础配置
     mkdir -pv {STAGING_ROOT}/etc/NetworkManager/conf.d

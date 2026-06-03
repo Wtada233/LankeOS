@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     meson setup build --prefix=/usr --buildtype=release -Denable-x11=false
-    ninja -C build
+    ninja -C build -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja -C build install
 }
 

@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     # 注入编译配置，禁用 werror 避免某些警告导致中断
     meson setup build --prefix=/usr --buildtype=release -Dexamples=false -Dbackends=drm,libinput -Drenderers=gles2,vulkan -Dsession=enabled -Dxwayland=disabled -Dwerror=false
-    ninja -C build
+    ninja -C build -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja -C build install
 }
 
