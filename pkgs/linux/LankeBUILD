@@ -7,14 +7,14 @@ lankebuild_prepare() {
 lankebuild_build() {
     # Apply custom configuration
     cp {WORK_DIR}/../linux.cfg .config
-    make oldconfig
+    make oldconfig -j$(nproc)
 
     # Compile kernel and modules
     make -j$(nproc)
 
     # Install modules and headers
-    make INSTALL_MOD_PATH={STAGING_ROOT} modules_install
-    make headers_install ARCH=x86_64 INSTALL_HDR_PATH={STAGING_ROOT}/usr
+    make INSTALL_MOD_PATH={STAGING_ROOT} modules_install -j$(nproc)
+    make headers_install ARCH=x86_64 INSTALL_HDR_PATH={STAGING_ROOT}/usr -j$(nproc)
 
     # Install kernel image
     mkdir -p {STAGING_ROOT}/mnt/base/boot

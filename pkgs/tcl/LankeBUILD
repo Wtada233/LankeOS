@@ -9,7 +9,7 @@ lankebuild_build() {
     SRCDIR=$(pwd)
     cd unix
     ./configure --prefix=/usr --mandir=/usr/share/man --disable-static
-    make
+    make -j$(nproc)
     sed -e "s|$SRCDIR/unix|/usr/lib|"         -e "s|$SRCDIR|/usr/include|"          -i tclConfig.sh
 
     sed -e "s|$SRCDIR/unix/pkgs/tdbc1.1.12|/usr/lib/tdbc1.1.12|"         -e "s|$SRCDIR/pkgs/tdbc1.1.12/generic|/usr/include|"             -e "s|$SRCDIR/pkgs/tdbc1.1.12/library|/usr/lib/tcl8.6|"          -e "s|$SRCDIR/pkgs/tdbc1.1.12|/usr/include|"                     -i pkgs/tdbc1.1.12/tdbcConfig.sh

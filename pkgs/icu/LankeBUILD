@@ -11,7 +11,7 @@ lankebuild_build() {
       i?86) sed -e "s/U_PLATFORM_IS_LINUX_BASED/__X86_64__ \&\& &/"                 -i test/intltest/ustrtest.cpp ;;
     esac
     ./configure --prefix=/usr
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }
 

@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     mkdir build && cd build
     ../configure --prefix=/usr --enable-gold --enable-ld=default --enable-plugins --enable-shared --disable-werror --with-system-zlib --enable-64-bit-bfd --disable-static
-    make tooldir=/usr
+    make tooldir=/usr -j$(nproc)
     make tooldir=/usr DESTDIR={STAGING_ROOT} install
 }
 

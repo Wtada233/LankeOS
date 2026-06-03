@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     sed -i '/long long t1;/,+1s/()/(...)/' configure
     ./configure --prefix=/usr --enable-cxx --disable-static --disable-doc
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }
 

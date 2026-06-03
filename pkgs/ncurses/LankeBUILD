@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     ./configure --prefix=/usr --mandir=/usr/share/man --with-shared --without-debug --without-normal --with-cxx-shared --enable-pc-files --enable-widec --with-pkg-config-libdir=/usr/lib/pkgconfig
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     # LFS 兼容性链接
     for lib in ncurses form panel menu; do

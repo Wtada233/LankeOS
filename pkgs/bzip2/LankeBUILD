@@ -9,9 +9,9 @@ lankebuild_build() {
     patch -Np1 -i {SRC_DIR}/bzip2-1.0.8-install_docs-1.patch
     sed -i 's@\(ln -s -f \)\$(PREFIX)/bin/@\1@' Makefile
     sed -i 's@(PREFIX)/man@(PREFIX)/share/man@g' Makefile
-    make -f Makefile-libbz2_so
-    make clean
-    make
+    make -f Makefile-libbz2_so -j$(nproc)
+    make clean -j$(nproc)
+    make -j$(nproc)
     make PREFIX={STAGING_ROOT}/usr install
     cp -av libbz2.so.* {STAGING_ROOT}/usr/lib/
     ln -sv libbz2.so.1.0.8 {STAGING_ROOT}/usr/lib/libbz2.so

@@ -20,7 +20,7 @@ lankebuild_build() {
     # 3. 准备编译：使用 LFS 推荐的参数并显式激活 PAM
     ./configure --prefix=/usr --sysconfdir=/etc --disable-static --with-bcrypt --with-yescrypt --without-libbsd --with-libpam --with-group-name-max-length=32
 
-    make
+    make -j$(nproc)
 
     make exec_prefix=/usr pamddir= DESTDIR={STAGING_ROOT} install
     make -C man DESTDIR={STAGING_ROOT} install-man
