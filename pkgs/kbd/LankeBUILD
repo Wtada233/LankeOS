@@ -10,7 +10,7 @@ lankebuild_build() {
     sed -i '/RESIZECONS_PROGS=/s/yes/no/' configure
     sed -i 's/resizecons.8 //' docs/man/man8/Makefile.in
     ./configure --prefix=/usr --disable-static --disable-vlock
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     # 添加 psf 工具链接
     for tool in psfaddtable psfgettable psfstriptable; do

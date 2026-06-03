@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     ./gitcompile --prefix=/usr --disable-python --with-configdir=/usr/share/alsa --with-alsagconfdir=/etc/alsa/conf.d
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }
 

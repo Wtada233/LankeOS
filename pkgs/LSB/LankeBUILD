@@ -4,7 +4,7 @@ lankebuild_prepare() {
 }
 lankebuild_build() {
     # LSB-Tools 没有 configure 脚本，直接 make
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     
     # 按照原逻辑创建符号链接

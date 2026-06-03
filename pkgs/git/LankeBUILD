@@ -4,7 +4,7 @@ lankebuild_prepare() {
 }
 lankebuild_build() {
     ./configure --prefix=/usr --disable-static --with-curl --with-openssl --without-tcltk
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }
 lankebuild_package() {

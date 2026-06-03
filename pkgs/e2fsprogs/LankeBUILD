@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     mkdir build && cd build
     ../configure --prefix=/usr --sysconfdir=/etc --enable-elf-shlibs --disable-static --disable-libblkid --disable-libuuid --disable-fsck
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }
 

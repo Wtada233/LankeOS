@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     ./configure --bindir=/usr/bin --libdir=/usr/lib --runstatedir=/run --sbindir=/usr/bin --disable-chfn-chsh --disable-login --disable-nologin --disable-su --disable-setpriv --disable-runuser --disable-pylibmount --disable-liblastlog2 --without-python --without-systemd --disable-static --disable-doc ADJTIME_PATH=/var/lib/hwclock/adjtime
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     # 添加 Util-linux 兼容性链接
     for arch in x86_64 i386 linux32 linux64 uname26; do

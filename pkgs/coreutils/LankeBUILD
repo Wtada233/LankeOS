@@ -11,7 +11,7 @@ lankebuild_build() {
     autoreconf -fv
     automake -af
     FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix=/usr --disable-static --enable-no-install-program=kill,uptime
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }
 

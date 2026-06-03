@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     # --enable-compat-symlinks 会自动创建 mkfs.vfat -> mkfs.fat 等链接
     ./configure --prefix=/usr --enable-compat-symlinks --disable-static
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }
 

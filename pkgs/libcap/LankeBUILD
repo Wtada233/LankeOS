@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    make prefix=/usr lib=lib
+    make prefix=/usr lib=lib -j$(nproc)
     make prefix=/usr lib=lib DESTDIR={STAGING_ROOT} install
 }
 

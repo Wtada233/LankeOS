@@ -13,7 +13,7 @@ lankebuild_build() {
 
     # 仅构建 UEFI 版本，移除 Legacy BIOS 支持
     ./configure --prefix=/usr --sysconfdir=/etc --disable-werror --disable-efiemu --with-platform=efi --target=x86_64 --enable-grub-mkfont --disable-static
-    make
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 
     mkdir -pv {STAGING_ROOT}/usr/share/bash-completion/completions
