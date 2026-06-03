@@ -8,8 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     cd source
     case $(uname -m) in
-      i?86) sed -e "s/U_PLATFORM_IS_LINUX_BASED/__X86_64__ \&\& &/" \
-                -i test/intltest/ustrtest.cpp ;;
+      i?86) sed -e "s/U_PLATFORM_IS_LINUX_BASED/__X86_64__ \&\& &/"                 -i test/intltest/ustrtest.cpp ;;
     esac
     ./configure --prefix=/usr
     make

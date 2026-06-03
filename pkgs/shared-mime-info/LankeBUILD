@@ -1,5 +1,7 @@
 #!/bin/bash
-lankebuild_prepare() { :; }
+lankebuild_prepare() {
+    :
+}
 lankebuild_build() {
     # 如果有测试集需求，应在此预先提取 xdgmime 并编译
     # tar -xf ../xdgmime.tar.xz && make -C xdgmime
@@ -11,4 +13,6 @@ lankebuild_build() {
     
     DESTDIR={STAGING_ROOT} ninja install
 }
-lankebuild_package() { :; }
+lankebuild_package() {
+    :
+}

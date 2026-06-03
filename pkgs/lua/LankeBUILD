@@ -9,7 +9,7 @@ lankebuild_build() {
     make linux
     make INSTALL_TOP={STAGING_ROOT}/usr install
     mkdir -p '{STAGING_ROOT}/usr/lib/pkgconfig'
-    run_cmd "cat > '{STAGING_ROOT}/usr/lib/pkgconfig/lua.pc' << 'EOF'
+    cat > '{STAGING_ROOT}/usr/lib/pkgconfig/lua.pc' << 'EOF'
 V=5.5
 R=5.5.0
 prefix=/usr
@@ -26,7 +26,7 @@ Version: \$R
 Requires:
 Libs: -L\$libdir -llua -lm -ldl
 Cflags: -I\$includedir
-EOF"
+EOF
 }
 
 

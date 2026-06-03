@@ -1,5 +1,7 @@
 #!/bin/bash
-lankebuild_prepare() { :; }
+lankebuild_prepare() {
+    :
+}
 lankebuild_build() {
     # LSB-Tools 没有 configure 脚本，直接 make
     make
@@ -10,4 +12,6 @@ lankebuild_build() {
     ln -sfv ../lib/lsb/remove_initd {STAGING_ROOT}/usr/bin/remove_initd
     ln -sfv ../lib/lsb/lsbinstall {STAGING_ROOT}/usr/bin/lsbinstall
 }
-lankebuild_package() { :; }
+lankebuild_package() {
+    :
+}
