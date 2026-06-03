@@ -15,20 +15,10 @@ lankebuild_build() {
     find man -name Makefile.in -exec sed -i 's/passwd\.5 / /' {} \;
 
     # 2. 核心配置修改：在源码层级将默认加密设为 YESCRYPT
-    run_cmd "sed -e 's:#ENCRYPT_METHOD DES:ENCRYPT_METHOD YESCRYPT:' \
-                 -e 's:/var/spool/mail:/var/mail:'                \
-                 -e '/PATH=/{s@/sbin:@@;s@/bin:@@}'               \
-                 -i etc/login.defs"
+    sed -e 's:#ENCRYPT_METHOD DES:ENCRYPT_METHOD YESCRYPT:' -e 's:/var/spool/mail:/var/mail:' -e '/PATH=/{s@/sbin:@@;s@/bin:@@}' -i etc/login.defs
 
     # 3. 准备编译：使用 LFS 推荐的参数并显式激活 PAM
-    run_cmd "./configure --prefix=/usr \
-                         --sysconfdir=/etc  \
-                         --disable-static   \
-                         --with-bcrypt      \
-                         --with-yescrypt    \
-                         --without-libbsd   \
-                         --with-libpam      \
-                         --with-group-name-max-length=32"
+    ./configure --prefix=/usr --sysconfdir=/etc --disable-static --with-bcrypt --with-yescrypt --without-libbsd --with-libpam --with-group-name-max-length=32
 
     make
 

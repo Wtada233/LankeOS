@@ -1,5 +1,7 @@
 #!/bin/bash
-lankebuild_prepare() { :; }
+lankebuild_prepare() {
+    :
+}
 lankebuild_build() {
     mkdir build
     cd build
@@ -8,4 +10,6 @@ lankebuild_build() {
     
     DESTDIR={STAGING_ROOT} ninja install
 }
-lankebuild_package() { :; }
+lankebuild_package() {
+    :
+}

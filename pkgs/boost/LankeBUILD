@@ -9,15 +9,7 @@ lankebuild_build() {
     ./bootstrap.sh --prefix=/usr
 
     # 直接使用 sudo 写入 STAGING_ROOT
-    ./b2 install \
-        --prefix="{STAGING_ROOT}/usr" \
-        --includedir="{STAGING_ROOT}/usr/include" \
-        --libdir="{STAGING_ROOT}/usr/lib" \
-        threading=multi \
-        link=shared \
-        --layout=system \
-        variant=release \
-        -j$THREADS
+    ./b2 install         --prefix="{STAGING_ROOT}/usr"         --includedir="{STAGING_ROOT}/usr/include"         --libdir="{STAGING_ROOT}/usr/lib"         threading=multi         link=shared         --layout=system         variant=release         -j$THREADS
         
     # 修复硬编码 (Boost 特有修复)
     sudo find "{STAGING_ROOT}" -type f \( -name "*.cmake" -o -name "*.pc" \) -exec sed -i "s|{STAGING_ROOT}||g" {} +

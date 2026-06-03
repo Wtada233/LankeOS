@@ -1,5 +1,7 @@
 #!/bin/bash
-lankebuild_prepare() { :; }
+lankebuild_prepare() {
+    :
+}
 
 lankebuild_build() {
     mkdir -p {STAGING_ROOT}/usr/share/fonts/noto-cjk
@@ -18,4 +20,6 @@ EOF
     chmod +x {STAGING_ROOT}/hooks/postinst.sh
 }
 
-lankebuild_package() { :; }
+lankebuild_package() {
+    :
+}
