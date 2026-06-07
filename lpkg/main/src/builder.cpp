@@ -55,10 +55,20 @@ void run_build(const fs::path& build_dir) {
     ensure_dir_exists(work_root);
     ensure_dir_exists(staging_root);
     
-    // Pre-create standard hierarchy
+    // Path Normalization (UsrMerge)
+    log_info(get_string("info.path_normalization"));
     for (const auto& d : {constants::BIN, constants::LIB, constants::INCLUDE, constants::SHARE_MAN, constants::LOCAL_BIN}) {
         ensure_dir_exists(staging_root / constants::USR / d);
     }
+    // Top-level symlinks
+    fs::create_directory_symlink(constants::USR_BIN, staging_root / constants::BIN);
+    fs::create_directory_symlink(constants::USR_BIN, staging_root / constants::SBIN);
+    fs::create_directory_symlink(constants::USR_LIB, staging_root / constants::LIB);
+    fs::create_directory_symlink(constants::USR_LIB, staging_root / constants::LIB64);
+    // Internal USR symlinks
+    fs::create_directory_symlink(constants::BIN, staging_root / constants::USR_SBIN);
+    fs::create_directory_symlink(constants::LIB, staging_root / constants::USR_LIB64);
+
     ensure_dir_exists(staging_hooks);
     {
         std::ofstream h(staging_hooks / constants::POSTINST_SH);
@@ -159,22 +169,6 @@ void run_build(const fs::path& build_dir) {
     auto finalize_staging = [&]() {
         log_info(get_string("info.finalizing_staging"));
         
-        // Path Normalization
-        log_info(get_string("info.path_normalization"));
-        auto normalize = [&](const std::string& from, const std::string& to) {
-            fs::path from_p = staging_root / constants::USR / from;
-            fs::path to_p = staging_root / constants::USR / to;
-            if (fs::exists(from_p) && fs::is_directory(from_p)) {
-                ensure_dir_exists(to_p);
-                for (const auto& entry : fs::directory_iterator(from_p)) {
-                    fs::rename(entry.path(), to_p / entry.path().filename());
-                }
-                fs::remove_all(from_p);
-            }
-        };
-        normalize(std::string(constants::LIB64), std::string(constants::LIB));
-        normalize(std::string(constants::SBIN), std::string(constants::BIN));
-
         // Clean up libtool files
         log_info(get_string("info.cleaning_libtool_files"));
         std::error_code ec;
