@@ -35,8 +35,8 @@ enum class FileType {
 
 // Forward declarations for helper functions used in strip_file
 FileType identify_file_type(const fs::path& path);
-bool process_elf(const fs::path& path);
-bool process_archive(const fs::path& path);
+bool process_elf(const fs::path& path, std::string& error_msg);
+bool process_archive(const fs::path& path, std::string& error_msg);
 
 #include "localization.hpp"
 #include <iostream>
@@ -58,9 +58,9 @@ bool strip_file(const fs::path& path, std::string& error_msg) {
         case FileType::Executable:
         case FileType::SharedLibrary:
         case FileType::ObjectFile:
-            return process_elf(path);
+            return process_elf(path, error_msg);
         case FileType::StaticLibrary:
-            return process_archive(path);
+            return process_archive(path, error_msg);
         default:
             error_msg = get_string("error.strip_unknown_type");
             return false;
@@ -145,6 +145,12 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
 
     GElf_Ehdr ehdr;
     if (gelf_getehdr(in_elf, &ehdr) == nullptr) { elf_end(in_elf); return false; }
+
+    size_t shnum;
+    if (elf_getshdrnum(in_elf, &shnum) != 0 || shnum == 0 || ehdr.e_shoff == 0) {
+        elf_end(in_elf);
+        return false;
+    }
 
     size_t shstrndx;
     if (elf_getshdrstrndx(in_elf, &shstrndx) < 0) { elf_end(in_elf); return false; }
@@ -338,7 +344,7 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
     }
 }
 
-bool process_elf(const fs::path& path) {
+bool process_elf(const fs::path& path, std::string& error_msg) {
     std::ifstream is(path, std::ios::binary | std::ios::ate);
     if (!is) return false;
     std::streamsize size = is.tellg();
@@ -349,7 +355,6 @@ bool process_elf(const fs::path& path) {
     is.close();
 
     std::vector<uint8_t> output_buffer;
-    std::string error_msg;
     if (!strip_elf_data(buffer, output_buffer, error_msg)) return false;
 
     std::ofstream os(path, std::ios::binary | std::ios::trunc);
@@ -358,7 +363,7 @@ bool process_elf(const fs::path& path) {
     return true;
 }
 
-bool process_archive(const fs::path& path) {
+bool process_archive(const fs::path& path, [[maybe_unused]] std::string& error_msg) {
     struct archive* a = archive_read_new();
     archive_read_support_format_all(a);
     if (archive_read_open_filename(a, path.c_str(), 10240) != ARCHIVE_OK) {
