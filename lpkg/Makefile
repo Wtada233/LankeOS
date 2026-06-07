@@ -126,6 +126,16 @@ install: all
 	install -d -m755 $(INSTALL_LOCK_DIR)
 	install -d -m755 $(INSTALL_DOCS_DIR)
 
+
+static-install: static
+	install -Dm755 $(BUILD_DIR)/$(TARGET)-static $(INSTALL_BIN_DIR)/$(TARGET)
+	install -Dm644 $(MAIN_DIR)/conf/mirror.conf $(INSTALL_CONF_DIR)/mirror.conf
+	install -d -m755 $(INSTALL_L10N_DIR)
+	install -m644 $(MAIN_DIR)/l10n/*.txt $(INSTALL_L10N_DIR)/
+	install -d -m755 $(INSTALL_LOCK_DIR)
+	install -d -m755 $(INSTALL_DOCS_DIR)
+
+
 uninstall:
 	rm -f $(INSTALL_BIN_DIR)/$(TARGET)
 	rm -rf $(INSTALL_SHARE_DIR)
