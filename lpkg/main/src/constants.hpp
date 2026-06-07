@@ -37,6 +37,10 @@ namespace constants {
 
     // Common System Path Components
     inline constexpr std::string_view USR = "usr";
+    inline constexpr std::string_view USR_BIN = "usr/bin";
+    inline constexpr std::string_view USR_LIB = "usr/lib";
+    inline constexpr std::string_view USR_SBIN = "usr/sbin";
+    inline constexpr std::string_view USR_LIB64 = "usr/lib64";
     inline constexpr std::string_view BIN = "bin";
     inline constexpr std::string_view SBIN = "sbin";
     inline constexpr std::string_view LIB = "lib";
