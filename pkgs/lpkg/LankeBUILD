@@ -1,0 +1,13 @@
+#!/bin/bash
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    cd lpkg
+    docker build -t lpkg-builder -f Dockerfile.build .
+    docker run --rm -v $(pwd):/app lpkg-builder
+    make DESTDIR={STAGING_ROOT} static-install
+}
+lankebuild_package() {
+    :
+}
