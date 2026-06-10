@@ -2,6 +2,6 @@
     "name": "gperf",
     "version": "3.3",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/gperf/gperf-3.3.tar.gz"
+        "https://ftpmirror.gnu.org/gperf/gperf-3.3.tar.gz"
     ]
 }

@@ -2,6 +2,6 @@
     "name": "groff",
     "version": "1.23.0",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/groff/groff-1.23.0.tar.gz"
+        "https://ftpmirror.gnu.org/groff/groff-1.23.0.tar.gz"
     ]
 }

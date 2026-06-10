@@ -2,6 +2,6 @@
     "name": "bash",
     "version": "5.3",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/bash/bash-5.3.tar.gz"
+        "https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz"
     ]
 }

@@ -2,6 +2,6 @@
     "name": "libtool",
     "version": "2.5.4",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/libtool/libtool-2.5.4.tar.xz"
+        "https://ftpmirror.gnu.org/libtool/libtool-2.5.4.tar.xz"
     ]
 }

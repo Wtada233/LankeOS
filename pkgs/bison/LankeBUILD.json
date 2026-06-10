@@ -2,6 +2,6 @@
     "name": "bison",
     "version": "3.8.2",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/bison/bison-3.8.2.tar.xz"
+        "https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz"
     ]
 }

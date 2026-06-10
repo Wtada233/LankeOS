@@ -2,6 +2,6 @@
     "name": "diffutils",
     "version": "3.12",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/diffutils/diffutils-3.12.tar.xz"
+        "https://ftpmirror.gnu.org/diffutils/diffutils-3.12.tar.xz"
     ]
 }
