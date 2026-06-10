@@ -2,6 +2,6 @@
     "name": "gzip",
     "version": "1.14",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/gzip/gzip-1.14.tar.xz"
+        "https://ftpmirror.gnu.org/gzip/gzip-1.14.tar.xz"
     ]
 }

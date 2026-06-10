@@ -2,6 +2,6 @@
     "name": "mpfr",
     "version": "4.2.2",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/mpfr/mpfr-4.2.2.tar.xz"
+        "https://ftpmirror.gnu.org/mpfr/mpfr-4.2.2.tar.xz"
     ]
 }

@@ -2,6 +2,6 @@
     "name": "make",
     "version": "4.4.1",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/make/make-4.4.1.tar.gz"
+        "https://ftpmirror.gnu.org/make/make-4.4.1.tar.gz"
     ]
 }

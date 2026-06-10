@@ -2,6 +2,6 @@
     "name": "which",
     "version": "2.21",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/which/which-2.21.tar.gz"
+        "https://ftpmirror.gnu.org/which/which-2.21.tar.gz"
     ]
 }

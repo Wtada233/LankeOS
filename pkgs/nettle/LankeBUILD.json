@@ -2,6 +2,6 @@
     "name": "nettle",
     "version": "3.10.2",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/nettle/nettle-3.10.2.tar.gz"
+        "https://ftpmirror.gnu.org/nettle/nettle-3.10.2.tar.gz"
     ]
 }

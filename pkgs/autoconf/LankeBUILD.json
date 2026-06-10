@@ -2,6 +2,6 @@
     "name": "autoconf",
     "version": "2.72",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/autoconf/autoconf-2.72.tar.xz"
+        "https://ftpmirror.gnu.org/autoconf/autoconf-2.72.tar.xz"
     ]
 }

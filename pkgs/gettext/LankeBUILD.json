@@ -2,6 +2,6 @@
     "name": "gettext",
     "version": "0.26",
     "sources": [
-        "https://mirrors.tuna.tsinghua.edu.cn/gnu/gettext/gettext-0.26.tar.xz"
+        "https://ftpmirror.gnu.org/gettext/gettext-0.26.tar.xz"
     ]
 }
