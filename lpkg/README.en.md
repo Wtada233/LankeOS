@@ -10,7 +10,7 @@ English | [中文](README.md)
 -   **Smart version parsing**: Supports multi-segment revision numbers (e.g. `1.0.0.1`) with a rigorous comparison algorithm that correctly handles cases like `6.16.1 > 6.6.1`.
 -   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their hashes for a package, greatly reducing network requests.
 -   **Zero-redundancy storage**: Eliminates `latest.txt` and separate `hash.txt` files. Packages are stored in a flat `<name>/<version>.lpkg` layout.
--   **Automated operations**: Includes `lrepo-mgr.py` for one-click publishing to Tencent Cloud COS (S3) or SCP remote servers.
+-   **Automated operations**: Includes `lrepo-mgr.py` for seamless publishing to Tencent Cloud COS (S3) or SCP remote servers.
 -   **Highly compatible static builds**: Built-in automatic detection of system CA certificate paths ensures statically compiled binaries work across different Linux distributions.
 -   **Security**: Mandatory SHA256 hash verification, file conflict detection, and malicious path filtering.
 -   **System hooks and triggers**: Supports per-package `postinst`/`prerm` scripts and system-level triggers (e.g. `ldconfig`).
@@ -60,6 +60,7 @@ lpkg [options] <command> [arguments]
 -   **`query [-p] <package|filename>`**: Query which package owns a file, or list files in a package.
 -   **`scan [directory]`**: Scan for orphaned files not owned by any package.
 -   **`pack -o <output> --source <source-dir>`**: Build a `.lpkg` package from a directory.
+-   **`build [directory]`**: Automatically build and pack a package from a specific directory.
 
 ## Repository Management (Operations Guide)
 
