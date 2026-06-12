@@ -70,7 +70,7 @@ ifeq ($(COVERAGE_MODE),1)
     TEST_LIBS += -lgcov
 endif
 
-.PHONY: all clean install uninstall static test build_test_internal
+.PHONY: all clean install uninstall static test build_test_internal docker
 
 all: $(BUILD_DIR)/$(TARGET)
 
@@ -140,3 +140,20 @@ uninstall:
 	rm -rf $(INSTALL_SHARE_DIR)
 	rm -rf $(INSTALL_CONF_DIR)
 	rm -rf $(INSTALL_LOCK_DIR)
+
+DOCKER_ENV_CONTAINER = lpkg-builder
+
+docker:
+	@echo "Using persistent build-env container..."
+	@mkdir -p $(BUILD_DIR)
+	@if ! docker inspect $(DOCKER_ENV_CONTAINER) >/dev/null 2>&1; then \
+		echo "Initializing pure build environment, downloading packages..."; \
+		docker run --name $(DOCKER_ENV_CONTAINER) -d alpine:3.19 sleep infinity; \
+		docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx; \
+	fi
+	@echo "Syncing source code and compiling inside container..."
+	docker cp . $(DOCKER_ENV_CONTAINER):/app
+	docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make static -j$$(nproc) && strip --strip-all $(BUILD_DIR)/$(TARGET)-static && upx -9 $(BUILD_DIR)/$(TARGET)-static"
+	docker cp $(DOCKER_ENV_CONTAINER):/app/$(BUILD_DIR)/$(TARGET)-static $(BUILD_DIR)/$(TARGET)-static
+	@echo "--------------------------------------------------------"
+	@echo "Success! Pure static binary is ready at: $(BUILD_DIR)/$(TARGET)-static"
