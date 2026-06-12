@@ -35,6 +35,7 @@ void run_build(const fs::path& build_dir) {
     std::string name = meta.at("name").get<std::string>();
     std::string version = meta.at("version").get<std::string>();
     std::vector<std::string> sources = meta.value("sources", std::vector<std::string>{});
+    std::vector<std::string> work_sources = meta.value("work_sources", std::vector<std::string>{});
     bool no_strip = meta.value("no_strip", false);
 
     log_info(string_format("info.building_package", name, version));
@@ -77,7 +78,7 @@ void run_build(const fs::path& build_dir) {
     fs::permissions(staging_hooks / constants::POSTINST_SH, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec, fs::perm_options::add);
 
     // 3. Download and Extract Sources
-    for (const auto& url : sources) {
+    auto download_source = [&](const std::string& url) -> fs::path {
         fs::path filename = fs::path(url).filename();
         fs::path dest = build_dir / filename;
         if (!fs::exists(dest)) {
@@ -86,6 +87,12 @@ void run_build(const fs::path& build_dir) {
         } else {
             log_info(string_format("info.source_exists", filename.string()));
         }
+        return dest;
+    };
+
+    for (const auto& url : sources) {
+        fs::path dest = download_source(url);
+        fs::path filename = dest.filename();
 
         // Auto-extract archives to work_root
         std::string ext = dest.extension().string();
@@ -96,6 +103,22 @@ void run_build(const fs::path& build_dir) {
             } catch (const std::exception& e) {
                 log_warning(string_format("warning.auto_extract_failed", filename.string(), e.what()));
             }
+        }
+    }
+
+    for (const auto& url : work_sources) {
+        fs::path dest = download_source(url);
+        fs::path filename = dest.filename();
+        fs::path target_path = work_root / filename;
+
+        log_info(string_format("info.copying_to_workdir", filename.string()));
+        try {
+            if (fs::exists(target_path)) {
+                fs::remove(target_path);
+            }
+            fs::copy_file(dest, target_path, fs::copy_options::overwrite_existing);
+        } catch (const std::exception& e) {
+            throw LpkgException(string_format("error.copy_work_source_failed", filename.string(), std::string(e.what())));
         }
     }
 
