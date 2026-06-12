@@ -117,23 +117,23 @@ $(BUILD_DIR)/tests/%.o: $(TESTS_DIR)/%.cpp
 clean:
 	rm -rf $(BUILD_DIR) build_test coverage_report
 
-install: all
-	install -Dm755 $(BUILD_DIR)/$(TARGET) $(INSTALL_BIN_DIR)/$(TARGET)
+define do_install
+	install -Dm755 $(1) $(INSTALL_BIN_DIR)/$(TARGET)
 	install -Dm644 $(MAIN_DIR)/conf/mirror.conf $(INSTALL_CONF_DIR)/mirror.conf
 	install -d -m755 $(INSTALL_L10N_DIR)
 	install -m644 $(MAIN_DIR)/l10n/*.txt $(INSTALL_L10N_DIR)/
 	install -d -m755 $(INSTALL_LOCK_DIR)
 	install -d -m755 $(INSTALL_DOCS_DIR)
+endef
 
+install: all
+	$(call do_install,$(BUILD_DIR)/$(TARGET))
 
 static-install: static
-	install -Dm755 $(BUILD_DIR)/$(TARGET)-static $(INSTALL_BIN_DIR)/$(TARGET)
-	install -Dm644 $(MAIN_DIR)/conf/mirror.conf $(INSTALL_CONF_DIR)/mirror.conf
-	install -d -m755 $(INSTALL_L10N_DIR)
-	install -m644 $(MAIN_DIR)/l10n/*.txt $(INSTALL_L10N_DIR)/
-	install -d -m755 $(INSTALL_LOCK_DIR)
-	install -d -m755 $(INSTALL_DOCS_DIR)
+	$(call do_install,$(BUILD_DIR)/$(TARGET)-static)
 
+docker-install: docker
+	$(call do_install,$(BUILD_DIR)/$(TARGET)-docker)
 
 uninstall:
 	rm -f $(INSTALL_BIN_DIR)/$(TARGET)
@@ -154,6 +154,6 @@ docker:
 	@echo "Syncing source code and compiling inside container..."
 	docker cp . $(DOCKER_ENV_CONTAINER):/app
 	docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make static -j$$(nproc) && strip --strip-all $(BUILD_DIR)/$(TARGET)-static && upx -9 $(BUILD_DIR)/$(TARGET)-static"
-	docker cp $(DOCKER_ENV_CONTAINER):/app/$(BUILD_DIR)/$(TARGET)-static $(BUILD_DIR)/$(TARGET)-static
+	docker cp $(DOCKER_ENV_CONTAINER):/app/$(BUILD_DIR)/$(TARGET)-static $(BUILD_DIR)/$(TARGET)-docker
 	@echo "--------------------------------------------------------"
 	@echo "Success! Pure static binary is ready at: $(BUILD_DIR)/$(TARGET)-static"
