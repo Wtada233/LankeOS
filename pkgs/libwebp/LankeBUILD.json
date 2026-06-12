@@ -1,7 +1,8 @@
 {
-    "name": "libwebp",
-    "version": "1.5.0",
-    "sources": [
-        "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.5.0.tar.gz"
-    ]
+  "name": "libwebp",
+  "version": "1.5.0",
+  "sources": [
+    "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.5.0.tar.gz"
+  ],
+  "work_sources": []
 }

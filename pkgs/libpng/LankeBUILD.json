@@ -1,7 +1,8 @@
 {
-    "name": "libpng",
-    "version": "1.6.50",
-    "sources": [
-        "https://downloads.sourceforge.net/libpng/libpng-1.6.50.tar.xz"
-    ]
+  "name": "libpng",
+  "version": "1.6.50",
+  "sources": [
+    "https://downloads.sourceforge.net/libpng/libpng-1.6.50.tar.xz"
+  ],
+  "work_sources": []
 }

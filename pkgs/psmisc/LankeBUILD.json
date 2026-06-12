@@ -1,7 +1,8 @@
 {
-    "name": "psmisc",
-    "version": "23.7",
-    "sources": [
-        "https://sourceforge.net/projects/psmisc/files/psmisc/psmisc-23.7.tar.xz"
-    ]
+  "name": "psmisc",
+  "version": "23.7",
+  "sources": [
+    "https://sourceforge.net/projects/psmisc/files/psmisc/psmisc-23.7.tar.xz"
+  ],
+  "work_sources": []
 }

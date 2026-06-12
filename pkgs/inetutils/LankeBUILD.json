@@ -1,7 +1,8 @@
 {
-    "name": "inetutils",
-    "version": "2.6",
-    "sources": [
-        "https://ftpmirror.gnu.org/inetutils/inetutils-2.6.tar.xz"
-    ]
+  "name": "inetutils",
+  "version": "2.6",
+  "sources": [
+    "https://ftpmirror.gnu.org/inetutils/inetutils-2.6.tar.xz"
+  ],
+  "work_sources": []
 }

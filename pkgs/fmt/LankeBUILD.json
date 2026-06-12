@@ -1,7 +1,8 @@
 {
-    "name": "fmt",
-    "version": "11.0.2",
-    "sources": [
-        "https://github.com/fmtlib/fmt/archive/refs/tags/11.0.2.tar.gz"
-    ]
+  "name": "fmt",
+  "version": "11.0.2",
+  "sources": [
+    "https://github.com/fmtlib/fmt/archive/refs/tags/11.0.2.tar.gz"
+  ],
+  "work_sources": []
 }

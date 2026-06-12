@@ -1,7 +1,8 @@
 {
-    "name": "attr",
-    "version": "2.5.2",
-    "sources": [
-        "https://download-mirror.savannah.gnu.org/releases/attr/attr-2.5.2.tar.gz"
-    ]
+  "name": "attr",
+  "version": "2.5.2",
+  "sources": [
+    "https://download-mirror.savannah.gnu.org/releases/attr/attr-2.5.2.tar.gz"
+  ],
+  "work_sources": []
 }

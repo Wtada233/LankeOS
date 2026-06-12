@@ -1,7 +1,8 @@
 {
-    "name": "libpciaccess",
-    "version": "0.18.1",
-    "sources": [
-        "https://www.x.org/pub/individual/lib/libpciaccess-0.18.1.tar.xz"
-    ]
+  "name": "libpciaccess",
+  "version": "0.18.1",
+  "sources": [
+    "https://www.x.org/pub/individual/lib/libpciaccess-0.18.1.tar.xz"
+  ],
+  "work_sources": []
 }

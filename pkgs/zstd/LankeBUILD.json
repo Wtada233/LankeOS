@@ -1,7 +1,8 @@
 {
-    "name": "zstd",
-    "version": "1.5.7",
-    "sources": [
-        "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
-    ]
+  "name": "zstd",
+  "version": "1.5.7",
+  "sources": [
+    "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
+  ],
+  "work_sources": []
 }

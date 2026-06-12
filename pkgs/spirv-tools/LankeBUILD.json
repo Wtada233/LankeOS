@@ -1,7 +1,8 @@
 {
-    "name": "spirv-tools",
-    "version": "2026.1",
-    "sources": [
-        "https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/vulkan-sdk-1.4.341.0.tar.gz"
-    ]
+  "name": "spirv-tools",
+  "version": "2026.1",
+  "sources": [
+    "https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/vulkan-sdk-1.4.341.0.tar.gz"
+  ],
+  "work_sources": []
 }

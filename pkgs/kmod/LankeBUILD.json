@@ -1,7 +1,8 @@
 {
-    "name": "kmod",
-    "version": "34.2",
-    "sources": [
-        "https://www.kernel.org/pub/linux/utils/kernel/kmod/kmod-34.2.tar.xz"
-    ]
+  "name": "kmod",
+  "version": "34.2",
+  "sources": [
+    "https://www.kernel.org/pub/linux/utils/kernel/kmod/kmod-34.2.tar.xz"
+  ],
+  "work_sources": []
 }

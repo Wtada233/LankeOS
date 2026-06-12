@@ -1,7 +1,8 @@
 {
-    "name": "openssl",
-    "version": "3.5.2",
-    "sources": [
-        "https://github.com/openssl/openssl/releases/download/openssl-3.5.2/openssl-3.5.2.tar.gz"
-    ]
+  "name": "openssl",
+  "version": "3.5.2",
+  "sources": [
+    "https://github.com/openssl/openssl/releases/download/openssl-3.5.2/openssl-3.5.2.tar.gz"
+  ],
+  "work_sources": []
 }

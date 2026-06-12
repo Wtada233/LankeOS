@@ -1,8 +1,9 @@
 {
-    "name": "grub",
-    "version": "2.14",
-    "sources": [
-        "https://ftpmirror.gnu.org/gnu/grub/grub-2.14.tar.xz"
-    ],
-    "no_strip": true
+  "name": "grub",
+  "version": "2.14",
+  "sources": [
+    "https://ftpmirror.gnu.org/gnu/grub/grub-2.14.tar.xz"
+  ],
+  "no_strip": true,
+  "work_sources": []
 }

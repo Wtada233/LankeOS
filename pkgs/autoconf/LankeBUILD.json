@@ -1,7 +1,8 @@
 {
-    "name": "autoconf",
-    "version": "2.72",
-    "sources": [
-        "https://ftpmirror.gnu.org/autoconf/autoconf-2.72.tar.xz"
-    ]
+  "name": "autoconf",
+  "version": "2.72",
+  "sources": [
+    "https://ftpmirror.gnu.org/autoconf/autoconf-2.72.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,7 +1,8 @@
 {
-    "name": "less",
-    "version": "679",
-    "sources": [
-        "https://www.greenwoodsoftware.com/less/less-679.tar.gz"
-    ]
+  "name": "less",
+  "version": "679",
+  "sources": [
+    "https://www.greenwoodsoftware.com/less/less-679.tar.gz"
+  ],
+  "work_sources": []
 }

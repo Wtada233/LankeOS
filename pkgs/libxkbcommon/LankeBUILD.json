@@ -1,7 +1,8 @@
 {
-    "name": "libxkbcommon",
-    "version": "1.13.1",
-    "sources": [
-        "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz"
-    ]
+  "name": "libxkbcommon",
+  "version": "1.13.1",
+  "sources": [
+    "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz"
+  ],
+  "work_sources": []
 }

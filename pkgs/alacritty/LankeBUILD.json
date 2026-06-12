@@ -1,7 +1,8 @@
 {
-    "name": "alacritty",
-    "version": "0.16.1",
-    "sources": [
-        "https://github.com/alacritty/alacritty/archive/refs/tags/v0.16.1.tar.gz"
-    ]
+  "name": "alacritty",
+  "version": "0.16.1",
+  "sources": [
+    "https://github.com/alacritty/alacritty/archive/refs/tags/v0.16.1.tar.gz"
+  ],
+  "work_sources": []
 }

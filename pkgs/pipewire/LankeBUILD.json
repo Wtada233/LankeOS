@@ -1,7 +1,8 @@
 {
-    "name": "pipewire",
-    "version": "1.6.2",
-    "sources": [
-        "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.2/pipewire-1.6.2.tar.gz"
-    ]
+  "name": "pipewire",
+  "version": "1.6.2",
+  "sources": [
+    "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.2/pipewire-1.6.2.tar.gz"
+  ],
+  "work_sources": []
 }

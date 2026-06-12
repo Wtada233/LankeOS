@@ -1,7 +1,8 @@
 {
-    "name": "nettle",
-    "version": "3.10.2",
-    "sources": [
-        "https://ftpmirror.gnu.org/nettle/nettle-3.10.2.tar.gz"
-    ]
+  "name": "nettle",
+  "version": "3.10.2",
+  "sources": [
+    "https://ftpmirror.gnu.org/nettle/nettle-3.10.2.tar.gz"
+  ],
+  "work_sources": []
 }

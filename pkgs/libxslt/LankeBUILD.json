@@ -1,7 +1,8 @@
 {
-    "name": "libxslt",
-    "version": "1.1.39",
-    "sources": [
-        "https://download.gnome.org/sources/libxslt/1.1/libxslt-1.1.39.tar.xz"
-    ]
+  "name": "libxslt",
+  "version": "1.1.39",
+  "sources": [
+    "https://download.gnome.org/sources/libxslt/1.1/libxslt-1.1.39.tar.xz"
+  ],
+  "work_sources": []
 }

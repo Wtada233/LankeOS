@@ -1,7 +1,8 @@
 {
-    "name": "lua",
-    "version": "5.5.0",
-    "sources": [
-        "https://www.lua.org/ftp/lua-5.5.0.tar.gz"
-    ]
+  "name": "lua",
+  "version": "5.5.0",
+  "sources": [
+    "https://www.lua.org/ftp/lua-5.5.0.tar.gz"
+  ],
+  "work_sources": []
 }

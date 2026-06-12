@@ -1,7 +1,8 @@
 {
-    "name": "e2fsprogs",
-    "version": "1.47.3",
-    "sources": [
-        "https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v1.47.3/e2fsprogs-1.47.3.tar.gz"
-    ]
+  "name": "e2fsprogs",
+  "version": "1.47.3",
+  "sources": [
+    "https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v1.47.3/e2fsprogs-1.47.3.tar.gz"
+  ],
+  "work_sources": []
 }

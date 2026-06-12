@@ -1,7 +1,8 @@
 {
-    "name": "pkgconf",
-    "version": "2.5.1",
-    "sources": [
-        "https://distfiles.ariadne.space/pkgconf/pkgconf-2.5.1.tar.xz"
-    ]
+  "name": "pkgconf",
+  "version": "2.5.1",
+  "sources": [
+    "https://distfiles.ariadne.space/pkgconf/pkgconf-2.5.1.tar.xz"
+  ],
+  "work_sources": []
 }

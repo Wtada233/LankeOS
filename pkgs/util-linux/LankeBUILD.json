@@ -1,7 +1,8 @@
 {
-    "name": "util-linux",
-    "version": "2.41.1",
-    "sources": [
-        "https://www.kernel.org/pub/linux/utils/util-linux/v2.41/util-linux-2.41.1.tar.xz"
-    ]
+  "name": "util-linux",
+  "version": "2.41.1",
+  "sources": [
+    "https://www.kernel.org/pub/linux/utils/util-linux/v2.41/util-linux-2.41.1.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,7 +1,8 @@
 {
-    "name": "automake",
-    "version": "1.18.1",
-    "sources": [
-        "https://ftpmirror.gnu.org/automake/automake-1.18.1.tar.xz"
-    ]
+  "name": "automake",
+  "version": "1.18.1",
+  "sources": [
+    "https://ftpmirror.gnu.org/automake/automake-1.18.1.tar.xz"
+  ],
+  "work_sources": []
 }

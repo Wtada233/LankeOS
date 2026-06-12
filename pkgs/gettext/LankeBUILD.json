@@ -1,7 +1,8 @@
 {
-    "name": "gettext",
-    "version": "0.26",
-    "sources": [
-        "https://ftpmirror.gnu.org/gettext/gettext-0.26.tar.xz"
-    ]
+  "name": "gettext",
+  "version": "0.26",
+  "sources": [
+    "https://ftpmirror.gnu.org/gettext/gettext-0.26.tar.xz"
+  ],
+  "work_sources": []
 }

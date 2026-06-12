@@ -1,7 +1,8 @@
 {
-    "name": "procps-ng",
-    "version": "4.0.5",
-    "sources": [
-        "https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-4.0.5.tar.xz"
-    ]
+  "name": "procps-ng",
+  "version": "4.0.5",
+  "sources": [
+    "https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-4.0.5.tar.xz"
+  ],
+  "work_sources": []
 }

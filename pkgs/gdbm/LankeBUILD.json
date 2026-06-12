@@ -1,7 +1,8 @@
 {
-    "name": "gdbm",
-    "version": "1.26",
-    "sources": [
-        "https://ftpmirror.gnu.org/gdbm/gdbm-1.26.tar.gz"
-    ]
+  "name": "gdbm",
+  "version": "1.26",
+  "sources": [
+    "https://ftpmirror.gnu.org/gdbm/gdbm-1.26.tar.gz"
+  ],
+  "work_sources": []
 }
