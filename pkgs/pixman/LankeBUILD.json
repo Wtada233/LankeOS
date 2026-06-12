@@ -1,7 +1,8 @@
 {
-    "name": "pixman",
-    "version": "0.46.4",
-    "sources": [
-        "https://cairographics.org/releases/pixman-0.46.4.tar.gz"
-    ]
+  "name": "pixman",
+  "version": "0.46.4",
+  "sources": [
+    "https://cairographics.org/releases/pixman-0.46.4.tar.gz"
+  ],
+  "work_sources": []
 }

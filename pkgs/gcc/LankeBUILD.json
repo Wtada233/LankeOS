@@ -1,7 +1,8 @@
 {
-    "name": "gcc",
-    "version": "15.2.0",
-    "sources": [
-        "https://ftpmirror.gnu.org/gcc/gcc-15.2.0/gcc-15.2.0.tar.xz"
-    ]
+  "name": "gcc",
+  "version": "15.2.0",
+  "sources": [
+    "https://ftpmirror.gnu.org/gcc/gcc-15.2.0/gcc-15.2.0.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,7 +1,8 @@
 {
-    "name": "rust-bindgen",
-    "version": "0.72.1",
-    "sources": [
-        "https://github.com/rust-lang/rust-bindgen/archive/refs/tags/v0.72.1.tar.gz"
-    ]
+  "name": "rust-bindgen",
+  "version": "0.72.1",
+  "sources": [
+    "https://github.com/rust-lang/rust-bindgen/archive/refs/tags/v0.72.1.tar.gz"
+  ],
+  "work_sources": []
 }

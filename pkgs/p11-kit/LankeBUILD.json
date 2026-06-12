@@ -1,7 +1,8 @@
 {
-    "name": "p11-kit",
-    "version": "0.26.1",
-    "sources": [
-        "https://github.com/p11-glue/p11-kit/releases/download/0.26.1/p11-kit-0.26.1.tar.xz"
-    ]
+  "name": "p11-kit",
+  "version": "0.26.1",
+  "sources": [
+    "https://github.com/p11-glue/p11-kit/releases/download/0.26.1/p11-kit-0.26.1.tar.xz"
+  ],
+  "work_sources": []
 }

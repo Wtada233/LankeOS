@@ -1,7 +1,8 @@
 {
-    "name": "m4",
-    "version": "1.4.20",
-    "sources": [
-        "https://ftpmirror.gnu.org/m4/m4-1.4.20.tar.xz"
-    ]
+  "name": "m4",
+  "version": "1.4.20",
+  "sources": [
+    "https://ftpmirror.gnu.org/m4/m4-1.4.20.tar.xz"
+  ],
+  "work_sources": []
 }

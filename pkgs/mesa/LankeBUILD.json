@@ -1,7 +1,8 @@
 {
-    "name": "mesa",
-    "version": "25.3.4",
-    "sources": [
-        "https://archive.mesa3d.org/mesa-25.3.4.tar.xz"
-    ]
+  "name": "mesa",
+  "version": "25.3.4",
+  "sources": [
+    "https://archive.mesa3d.org/mesa-25.3.4.tar.xz"
+  ],
+  "work_sources": []
 }

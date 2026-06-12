@@ -1,7 +1,8 @@
 {
-    "name": "vulkan-headers",
-    "version": "1.4.341",
-    "sources": [
-        "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.341.0.tar.gz"
-    ]
+  "name": "vulkan-headers",
+  "version": "1.4.341",
+  "sources": [
+    "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.341.0.tar.gz"
+  ],
+  "work_sources": []
 }

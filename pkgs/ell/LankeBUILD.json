@@ -1,7 +1,8 @@
 {
-    "name": "ell",
-    "version": "0.81",
-    "sources": [
-        "https://mirrors.edge.kernel.org/pub/linux/libs/ell/ell-0.81.tar.xz"
-    ]
+  "name": "ell",
+  "version": "0.81",
+  "sources": [
+    "https://mirrors.edge.kernel.org/pub/linux/libs/ell/ell-0.81.tar.xz"
+  ],
+  "work_sources": []
 }

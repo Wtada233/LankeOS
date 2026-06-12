@@ -1,9 +1,11 @@
 {
-    "name": "glibc",
-    "version": "2.42",
-    "sources": [
-        "https://www.linuxfromscratch.org/patches/lfs/12.4/glibc-2.42-fhs-1.patch",
-        "https://ftpmirror.gnu.org/glibc/glibc-2.42.tar.xz",
-        "https://www.iana.org/time-zones/repository/releases/tzdata2025b.tar.gz"
-    ]
+  "name": "glibc",
+  "version": "2.42",
+  "sources": [
+    "https://ftpmirror.gnu.org/glibc/glibc-2.42.tar.xz"
+  ],
+  "work_sources": [
+    "https://www.linuxfromscratch.org/patches/lfs/12.4/glibc-2.42-fhs-1.patch",
+    "https://www.iana.org/time-zones/repository/releases/tzdata2025b.tar.gz"
+  ]
 }

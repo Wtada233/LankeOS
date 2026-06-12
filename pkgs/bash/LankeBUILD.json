@@ -1,7 +1,8 @@
 {
-    "name": "bash",
-    "version": "5.3",
-    "sources": [
-        "https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz"
-    ]
+  "name": "bash",
+  "version": "5.3",
+  "sources": [
+    "https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz"
+  ],
+  "work_sources": []
 }

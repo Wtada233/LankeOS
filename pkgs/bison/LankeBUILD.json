@@ -1,7 +1,8 @@
 {
-    "name": "bison",
-    "version": "3.8.2",
-    "sources": [
-        "https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz"
-    ]
+  "name": "bison",
+  "version": "3.8.2",
+  "sources": [
+    "https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz"
+  ],
+  "work_sources": []
 }

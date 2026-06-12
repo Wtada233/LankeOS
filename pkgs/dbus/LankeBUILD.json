@@ -1,7 +1,8 @@
 {
-    "name": "dbus",
-    "version": "1.16.2",
-    "sources": [
-        "https://dbus.freedesktop.org/releases/dbus/dbus-1.16.2.tar.xz"
-    ]
+  "name": "dbus",
+  "version": "1.16.2",
+  "sources": [
+    "https://dbus.freedesktop.org/releases/dbus/dbus-1.16.2.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,7 +1,8 @@
 {
-    "name": "rust",
-    "version": "1.93.0",
-    "sources": [
-        "https://static.rust-lang.org/dist/rustc-1.93.0-src.tar.xz"
-    ]
+  "name": "rust",
+  "version": "1.93.0",
+  "sources": [
+    "https://static.rust-lang.org/dist/rustc-1.93.0-src.tar.xz"
+  ],
+  "work_sources": []
 }

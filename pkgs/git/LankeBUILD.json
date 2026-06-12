@@ -1,7 +1,8 @@
 {
-    "name": "git",
-    "version": "2.48.0",
-    "sources": [
-        "https://www.kernel.org/pub/software/scm/git/git-2.48.0.tar.xz"
-    ]
+  "name": "git",
+  "version": "2.48.0",
+  "sources": [
+    "https://www.kernel.org/pub/software/scm/git/git-2.48.0.tar.xz"
+  ],
+  "work_sources": []
 }

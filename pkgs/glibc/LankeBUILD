@@ -6,9 +6,14 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    patch -Np1 -i {SRC_DIR}/glibc-2.42-fhs-1.patch
-    sed -e '/unistd.h/i #include <string.h>' -e '/libc_rwlock_init/c\\  __libc_rwlock_define_initialized (, reset_lock);\\  memcpy (&lock, &reset_lock, sizeof (lock));' -i stdlib/abort.c
-
+    for dir in */; do
+        if [ -d "$dir" ]; then
+            cd "$dir"
+            break
+        fi
+    done
+    patch -Np1 -i {WORK_DIR}/glibc-2.42-fhs-1.patch
+    sed -e '/unistd.h/i #include <string.h>' -e '/libc_rwlock_init/c\  __libc_rwlock_define_initialized (, reset_lock);\n  memcpy (&lock, &reset_lock, sizeof (lock));' -i stdlib/abort.c
     mkdir build && cd build
     echo 'rootsbindir=/usr/bin' > configparms
     CC=gcc CXX=g++ ../configure --prefix=/usr --disable-werror --enable-kernel=5.4 --enable-stack-protector=strong --disable-nscd libc_cv_slibdir=/usr/lib

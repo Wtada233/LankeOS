@@ -1,7 +1,8 @@
 {
-    "name": "fcitx5-chinese-addons",
-    "version": "5.1.8",
-    "sources": [
-        "https://github.com/fcitx/fcitx5-chinese-addons/archive/refs/tags/5.1.8.tar.gz"
-    ]
+  "name": "fcitx5-chinese-addons",
+  "version": "5.1.8",
+  "sources": [
+    "https://github.com/fcitx/fcitx5-chinese-addons/archive/refs/tags/5.1.8.tar.gz"
+  ],
+  "work_sources": []
 }

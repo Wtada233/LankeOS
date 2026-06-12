@@ -1,7 +1,8 @@
 {
-    "name": "gmp",
-    "version": "6.3.0",
-    "sources": [
-        "https://ftpmirror.gnu.org/gmp/gmp-6.3.0.tar.xz"
-    ]
+  "name": "gmp",
+  "version": "6.3.0",
+  "sources": [
+    "https://ftpmirror.gnu.org/gmp/gmp-6.3.0.tar.xz"
+  ],
+  "work_sources": []
 }

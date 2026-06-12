@@ -1,7 +1,8 @@
 {
-    "name": "gnutls",
-    "version": "3.8.11",
-    "sources": [
-        "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.11.tar.xz"
-    ]
+  "name": "gnutls",
+  "version": "3.8.11",
+  "sources": [
+    "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.11.tar.xz"
+  ],
+  "work_sources": []
 }

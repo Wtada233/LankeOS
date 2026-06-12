@@ -1,7 +1,8 @@
 {
-    "name": "cairo",
-    "version": "1.18.4",
-    "sources": [
-        "https://cairographics.org/releases/cairo-1.18.4.tar.xz"
-    ]
+  "name": "cairo",
+  "version": "1.18.4",
+  "sources": [
+    "https://cairographics.org/releases/cairo-1.18.4.tar.xz"
+  ],
+  "work_sources": []
 }

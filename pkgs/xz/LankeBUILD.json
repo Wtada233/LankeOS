@@ -1,7 +1,8 @@
 {
-    "name": "xz",
-    "version": "5.8.1",
-    "sources": [
-        "https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.xz"
-    ]
+  "name": "xz",
+  "version": "5.8.1",
+  "sources": [
+    "https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.xz"
+  ],
+  "work_sources": []
 }

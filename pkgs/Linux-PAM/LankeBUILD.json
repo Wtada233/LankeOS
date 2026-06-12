@@ -1,7 +1,8 @@
 {
-    "name": "Linux-Pam",
-    "version": "1.7.2",
-    "sources": [
-        "https://github.com/linux-pam/linux-pam/archive/refs/tags/v1.7.2.tar.gz"
-    ]
+  "name": "Linux-Pam",
+  "version": "1.7.2",
+  "sources": [
+    "https://github.com/linux-pam/linux-pam/archive/refs/tags/v1.7.2.tar.gz"
+  ],
+  "work_sources": []
 }

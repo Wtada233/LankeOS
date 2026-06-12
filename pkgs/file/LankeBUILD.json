@@ -1,7 +1,8 @@
 {
-    "name": "file",
-    "version": "5.46",
-    "sources": [
-        "https://astron.com/pub/file/file-5.46.tar.gz"
-    ]
+  "name": "file",
+  "version": "5.46",
+  "sources": [
+    "https://astron.com/pub/file/file-5.46.tar.gz"
+  ],
+  "work_sources": []
 }

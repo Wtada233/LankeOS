@@ -1,7 +1,8 @@
 {
-    "name": "libglvnd",
-    "version": "1.7.0",
-    "sources": [
-        "https://gitlab.freedesktop.org/glvnd/libglvnd/-/archive/v1.7.0/libglvnd-v1.7.0.tar.gz"
-    ]
+  "name": "libglvnd",
+  "version": "1.7.0",
+  "sources": [
+    "https://gitlab.freedesktop.org/glvnd/libglvnd/-/archive/v1.7.0/libglvnd-v1.7.0.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,7 +1,8 @@
 {
-    "name": "hwdata",
-    "version": "0.403",
-    "sources": [
-        "https://github.com/vcrhonek/hwdata/archive/refs/tags/v0.403.tar.gz"
-    ]
+  "name": "hwdata",
+  "version": "0.403",
+  "sources": [
+    "https://github.com/vcrhonek/hwdata/archive/refs/tags/v0.403.tar.gz"
+  ],
+  "work_sources": []
 }

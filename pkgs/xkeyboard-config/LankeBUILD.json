@@ -1,7 +1,8 @@
 {
-    "name": "xkeyboard-config",
-    "version": "2.45",
-    "sources": [
-        "https://www.x.org/pub/individual/data/xkeyboard-config/xkeyboard-config-2.45.tar.xz"
-    ]
+  "name": "xkeyboard-config",
+  "version": "2.45",
+  "sources": [
+    "https://www.x.org/pub/individual/data/xkeyboard-config/xkeyboard-config-2.45.tar.xz"
+  ],
+  "work_sources": []
 }

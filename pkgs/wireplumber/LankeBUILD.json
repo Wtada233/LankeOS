@@ -1,7 +1,8 @@
 {
-    "name": "wireplumber",
-    "version": "0.5.14",
-    "sources": [
-        "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.14/wireplumber-0.5.14.tar.gz"
-    ]
+  "name": "wireplumber",
+  "version": "0.5.14",
+  "sources": [
+    "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.14/wireplumber-0.5.14.tar.gz"
+  ],
+  "work_sources": []
 }

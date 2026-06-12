@@ -1,7 +1,8 @@
 {
-    "name": "libime",
-    "version": "1.10",
-    "sources": [
-        "https://github.com/fcitx/libime/archive/refs/tags/1.1.10.tar.gz"
-    ]
+  "name": "libime",
+  "version": "1.10",
+  "sources": [
+    "https://github.com/fcitx/libime/archive/refs/tags/1.1.10.tar.gz"
+  ],
+  "work_sources": []
 }

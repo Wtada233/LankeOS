@@ -1,5 +1,6 @@
 {
-    "name": "json-c",
-    "version": "0.18.99",
-    "sources": []
+  "name": "json-c",
+  "version": "0.18.99",
+  "sources": [],
+  "work_sources": []
 }

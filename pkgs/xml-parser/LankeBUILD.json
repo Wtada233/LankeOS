@@ -1,7 +1,8 @@
 {
-    "name": "xml-parser",
-    "version": "2.47",
-    "sources": [
-        "https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-2.47.tar.gz"
-    ]
+  "name": "xml-parser",
+  "version": "2.47",
+  "sources": [
+    "https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-2.47.tar.gz"
+  ],
+  "work_sources": []
 }

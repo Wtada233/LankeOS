@@ -1,7 +1,8 @@
 {
-    "name": "which",
-    "version": "2.21",
-    "sources": [
-        "https://ftpmirror.gnu.org/which/which-2.21.tar.gz"
-    ]
+  "name": "which",
+  "version": "2.21",
+  "sources": [
+    "https://ftpmirror.gnu.org/which/which-2.21.tar.gz"
+  ],
+  "work_sources": []
 }

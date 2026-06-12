@@ -1,7 +1,8 @@
 {
-    "name": "linux-firmware",
-    "version": "1.0.0",
-    "sources": [
-        "https://gitlab.com/kernel-firmware/linux-firmware/-/archive/main/linux-firmware-main.tar.gz"
-    ]
+  "name": "linux-firmware",
+  "version": "1.0.0",
+  "sources": [
+    "https://gitlab.com/kernel-firmware/linux-firmware/-/archive/main/linux-firmware-main.tar.gz"
+  ],
+  "work_sources": []
 }

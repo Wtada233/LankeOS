@@ -1,7 +1,8 @@
 {
-    "name": "grep",
-    "version": "3.12",
-    "sources": [
-        "https://ftpmirror.gnu.org/grep/grep-3.12.tar.xz"
-    ]
+  "name": "grep",
+  "version": "3.12",
+  "sources": [
+    "https://ftpmirror.gnu.org/grep/grep-3.12.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,7 +1,8 @@
 {
-    "name": "systemd",
-    "version": "257.8",
-    "sources": [
-        "https://github.com/systemd/systemd/archive/v257.8/systemd-257.8.tar.gz"
-    ]
+  "name": "systemd",
+  "version": "257.8",
+  "sources": [
+    "https://github.com/systemd/systemd/archive/v257.8/systemd-257.8.tar.gz"
+  ],
+  "work_sources": []
 }
