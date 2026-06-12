@@ -5,19 +5,19 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir -p {STAGING_ROOT}/usr/share/fonts/noto-cjk
-    mkdir -p {STAGING_ROOT}/hooks
+    # hooks dir created by builder
 
     cp NotoSansMonoCJK-Regular.ttc {STAGING_ROOT}/usr/share/fonts/noto-cjk/
     chmod 644 {STAGING_ROOT}/usr/share/fonts/noto-cjk/NotoSansMonoCJK-Regular.ttc
 
-    cat > {STAGING_ROOT}/hooks/postinst.sh <<EOF
+    cat > {STAGING_HOOKS}/postinst.sh <<EOF
 #!/bin/sh
 if command -v fc-cache >/dev/null 2>&1; then
     echo "=> 正在刷新系统字体缓存 (Mono)..."
     fc-cache -fv /usr/share/fonts/noto-cjk
 fi
 EOF
-    chmod +x {STAGING_ROOT}/hooks/postinst.sh
+    # chmod set by builder
 }
 
 lankebuild_package() {
