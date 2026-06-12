@@ -49,7 +49,8 @@ COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$
            -DLPKG_DOCS_DIR=\"$(INSTALL_DOCS_DIR)\" \
            -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\" \
            -DLPKG_VERSION=\"$(VERSION)\" \
-           -DFMT_HEADER_ONLY
+           -DFMT_HEADER_ONLY \
+           -Werror -Wall -Wextra
 
 CXXFLAGS = $(COMMON_CXXFLAGS) -O2
 TEST_CXXFLAGS = $(COMMON_CXXFLAGS) -g
