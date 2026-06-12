@@ -24,12 +24,13 @@ RUN apk add --no-cache \
     acl-static \
     expat-static \
     fmt-dev \
+    elfutils-dev \
     upx
 
 WORKDIR /app
 COPY . .
 
-RUN make clean && make static \
+RUN make clean && make static -j$(nproc) \
     && strip --strip-all build/lpkg-static \
     && upx -9 build/lpkg-static
 

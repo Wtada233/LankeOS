@@ -11,6 +11,7 @@
 #include "utils.hpp"
 #include "version.hpp"
 #include "repository.hpp"
+#include "constants.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -47,7 +48,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
     log_info(string_format("info.running_hook", std::string(hook_name)));
     
     const bool use_chroot = (ROOT_DIR != "/" && !ROOT_DIR.empty());
-    std::vector<std::string> args = {"/bin/sh", "-c"};
+    std::vector<std::string> args = {std::string(constants::BIN_SH), "-c"};
     
     if (use_chroot) {
         if (!fs::exists(ROOT_DIR / "bin/sh")) {
@@ -88,7 +89,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
 
 std::optional<std::pair<std::string, std::string>> parse_tab_line(const std::string& line) {
     if (line.empty()) return std::nullopt;
-    if (const auto pos = line.find('\t'); pos != std::string::npos) {
+    if (const auto pos = line.find(constants::TAB_CHAR); pos != std::string::npos) {
         std::string key = line.substr(0, pos);
         std::string val = line.substr(pos + 1);
         if (!val.empty() && val.back() == '\r') val.pop_back();
@@ -156,7 +157,7 @@ void InstallationTask::rollback_files() {
 void InstallationTask::commit() {
     std::unordered_set<std::string> old_files;
     if (!old_version_to_replace_.empty()) {
-        const fs::path old_files_list = FILES_DIR / (pkg_name_ + ".txt");
+        const fs::path old_files_list = FILES_DIR / (pkg_name_ + std::string(constants::SUFFIX_TXT));
         if (fs::exists(old_files_list)) {
             std::ifstream f(old_files_list);
             std::string line;
@@ -171,14 +172,14 @@ void InstallationTask::commit() {
         
         if (!old_files.empty()) {
             std::unordered_set<std::string> new_files;
-            const fs::path new_files_list = FILES_DIR / (pkg_name_ + ".txt");
+            const fs::path new_files_list = FILES_DIR / (pkg_name_ + std::string(constants::SUFFIX_TXT));
             std::ifstream f(new_files_list);
             std::string line;
             while (std::getline(f, line)) if (!line.empty()) new_files.insert(line);
             
             auto& cache = Cache::instance();
             for (const auto& old_file : old_files) {
-                if (old_file.starts_with("/etc/")) continue;
+                if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) continue;
                 if (!new_files.contains(old_file)) {
                     auto owners = cache.get_file_owners(old_file);
                     if (owners.contains(pkg_name_)) {
@@ -195,7 +196,7 @@ void InstallationTask::commit() {
                 }
             }
             
-            const fs::path old_dirs_list = FILES_DIR / (pkg_name_ + ".dirs");
+            const fs::path old_dirs_list = FILES_DIR / (pkg_name_ + std::string(constants::SUFFIX_DIRS));
             if (fs::exists(old_dirs_list)) {
                 std::ifstream df(old_dirs_list);
                 std::vector<fs::path> old_dirs;
@@ -235,7 +236,7 @@ void InstallationTask::download_and_verify_package() {
     const std::string mirror_url = get_mirror_url();
     const std::string arch = get_architecture();
     
-    if (actual_version_.empty() || actual_version_ == "latest") {
+    if (actual_version_.empty() || actual_version_ == constants::VER_LATEST) {
          Repository repo;
          repo.load_index();
          auto info = repo.find_package(pkg_name_);
@@ -247,8 +248,8 @@ void InstallationTask::download_and_verify_package() {
          }
     }
     
-    const std::string download_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + ".lpkg";
-    archive_path_ = tmp_pkg_dir_ / (actual_version_ + ".lpkg");
+    const std::string download_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ + std::string(constants::EXT_LPKG);
+    archive_path_ = tmp_pkg_dir_ / (actual_version_ + std::string(constants::EXT_LPKG));
     
     if (!fs::exists(archive_path_)) download_with_retries(download_url, archive_path_, 5, true);
     if (!expected_hash_.empty() && calculate_sha256(archive_path_) != expected_hash_) 
@@ -258,7 +259,7 @@ void InstallationTask::download_and_verify_package() {
 void InstallationTask::extract_and_validate_package() {
     log_info(get_string("info.extracting_to_tmp"));
     extract_tar_zst(archive_path_, tmp_pkg_dir_);
-    for (const auto& meta : {"man.txt", "deps.txt", "files.txt", "content/"}) {
+    for (const auto& meta : {constants::PKG_MAN_FILE, constants::PKG_DEPS_FILE, constants::PKG_FILES_FILE, constants::DIR_CONTENT}) {
         if (!fs::exists(tmp_pkg_dir_ / meta))
             throw LpkgException(string_format("error.incomplete_package", (tmp_pkg_dir_ / meta).string()));
     }
@@ -266,7 +267,7 @@ void InstallationTask::extract_and_validate_package() {
 
 void InstallationTask::check_for_file_conflicts() {
     std::map<std::string, std::string> conflicts;
-    std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
+    std::ifstream files_list(tmp_pkg_dir_ / constants::PKG_FILES_FILE);
     std::string line;
     auto& cache = Cache::instance();
     const bool force_overwrite = get_force_overwrite_mode();
@@ -278,7 +279,7 @@ void InstallationTask::check_for_file_conflicts() {
         const auto& [src, dest] = *res;
         const fs::path logical_path = fs::path(dest) / src;
         
-        if (fs::is_directory(tmp_pkg_dir_ / "content" / src)) continue;
+        if (fs::is_directory(tmp_pkg_dir_ / constants::DIR_CONTENT / src)) continue;
 
         const std::string path_str = logical_path.string();
         auto owners = cache.get_file_owners(path_str);
@@ -308,14 +309,14 @@ void InstallationTask::check_for_file_conflicts() {
 
 void InstallationTask::copy_package_files() {
     log_info(get_string("info.copying_files"));
-    std::ifstream files_list(tmp_pkg_dir_ / "files.txt");
+    std::ifstream files_list(tmp_pkg_dir_ / constants::PKG_FILES_FILE);
     std::string line;
     while (std::getline(files_list, line)) {
         auto res = parse_tab_line(line);
         if (!res) continue;
 
         const auto& [src, dest] = *res;
-        const fs::path src_path = tmp_pkg_dir_ / "content" / src;
+        const fs::path src_path = tmp_pkg_dir_ / constants::DIR_CONTENT / src;
         const fs::path logical_path = fs::path(dest) / src;
         const fs::path physical_path = (logical_path.is_absolute()) ? ROOT_DIR / logical_path.relative_path() : ROOT_DIR / logical_path;
         
@@ -343,17 +344,17 @@ void InstallationTask::copy_package_files() {
         }
 
         try {
-            const bool is_config = src.starts_with("etc/");
+            const bool is_config = src.starts_with(std::string(constants::DIR_ETC));
             fs::path final_dest = physical_path;
             
             if (is_config && fs::exists(physical_path) && !fs::is_directory(physical_path)) {
-                final_dest += ".lpkgnew";
+                final_dest += std::string(constants::SUFFIX_LPKG_NEW);
                 if (fs::exists(final_dest) || fs::is_symlink(final_dest)) fs::remove(final_dest);
                 log_warning(string_format("warning.config_conflict", physical_path.string(), final_dest.string()));
                 has_config_conflicts_ = true;
             } else if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
                 if (!fs::is_directory(physical_path)) {
-                    fs::path bak = physical_path; bak += ".lpkg_bak_" + pkg_name_; 
+                    fs::path bak = physical_path; bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_; 
                     fs::rename(physical_path, bak); 
                     backups_.emplace_back(physical_path, bak);
                 }
@@ -385,16 +386,16 @@ void InstallationTask::copy_package_files() {
     
     if (has_config_conflicts_) log_warning(get_string("info.config_review_reminder"));
 
-    std::ofstream pkg_f(FILES_DIR / (pkg_name_ + ".txt"));
-    std::ifstream fl2(tmp_pkg_dir_ / "files.txt");
+    std::ofstream pkg_f(FILES_DIR / (pkg_name_ + std::string(constants::SUFFIX_TXT)));
+    std::ifstream fl2(tmp_pkg_dir_ / constants::PKG_FILES_FILE);
     std::string fl2_line;
     while (std::getline(fl2, fl2_line)) {
         if (auto r = parse_tab_line(fl2_line)) {
-            pkg_f << (fs::path(r->second) / r->first).string() << "\n";
+            pkg_f << (fs::path(r->second) / r->first).string() << constants::NL;
         }
     }
-    std::ofstream dir_f(FILES_DIR / (pkg_name_ + ".dirs"));
-    for (const auto& d : created_dirs_) dir_f << d.string() << "\n";
+    std::ofstream dir_f(FILES_DIR / (pkg_name_ + std::string(constants::SUFFIX_DIRS)));
+    for (const auto& d : created_dirs_) dir_f << d.string() << constants::NL;
 }
 
 void InstallationTask::register_package() {
@@ -410,41 +411,41 @@ void InstallationTask::register_package() {
     cleanup_old(DEP_DIR / pkg_name_, [&](const std::string& l) {
         std::stringstream ss(l); std::string dn; if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name_);
     });
-    cleanup_old(FILES_DIR / (pkg_name_ + ".provides"), [&](const std::string& c) {
+    cleanup_old(FILES_DIR / (pkg_name_ + std::string(constants::SUFFIX_PROVIDES)), [&](const std::string& c) {
         cache.remove_provider(c, pkg_name_);
     });
 
-    std::ifstream deps_in(tmp_pkg_dir_ / "deps.txt");
+    std::ifstream deps_in(tmp_pkg_dir_ / constants::PKG_DEPS_FILE);
     std::ofstream deps_out(DEP_DIR / pkg_name_);
     std::string d;
     while (std::getline(deps_in, d)) {
         if (d.empty()) continue;
-        deps_out << d << "\n";
+        deps_out << d << constants::NL;
         std::string name = d;
         if (const auto pos = d.find_first_of(" \t<>="); pos != std::string::npos) name = d.substr(0, pos);
         cache.add_reverse_dep(name, pkg_name_);
     }
 
-    std::ifstream fl(FILES_DIR / (pkg_name_ + ".txt"));
+    std::ifstream fl(FILES_DIR / (pkg_name_ + std::string(constants::SUFFIX_TXT)));
     std::string fp;
     while (std::getline(fl, fp)) if (!fp.empty()) cache.add_file_owner(fp, pkg_name_);
     
-    fs::copy(tmp_pkg_dir_ / "man.txt", DOCS_DIR / (pkg_name_ + ".man"), fs::copy_options::overwrite_existing);
+    fs::copy(tmp_pkg_dir_ / constants::PKG_MAN_FILE, DOCS_DIR / (pkg_name_ + std::string(constants::SUFFIX_MAN)), fs::copy_options::overwrite_existing);
     
-    std::ifstream prov_in(tmp_pkg_dir_ / "provides.txt");
+    std::ifstream prov_in(tmp_pkg_dir_ / constants::PKG_PROVIDES_FILE);
     if (prov_in.is_open()) {
-        std::ofstream prov_out(FILES_DIR / (pkg_name_ + ".provides"));
+        std::ofstream prov_out(FILES_DIR / (pkg_name_ + std::string(constants::SUFFIX_PROVIDES)));
         std::string cap;
         while (std::getline(prov_in, cap)) if (!cap.empty()) { 
             cache.add_provider(cap, pkg_name_); 
-            prov_out << cap << "\n"; 
+            prov_out << cap << constants::NL; 
         }
     }
     cache.add_installed(pkg_name_, actual_version_, explicit_install_);
 }
 
 void InstallationTask::run_post_install_hook() {
-    const fs::path hook_src = tmp_pkg_dir_ / "hooks";
+    const fs::path hook_src = tmp_pkg_dir_ / constants::DIR_HOOKS;
     if (!fs::exists(hook_src) || !fs::is_directory(hook_src)) return;
     
     const fs::path dest_dir = HOOKS_DIR / pkg_name_;
@@ -456,7 +457,7 @@ void InstallationTask::run_post_install_hook() {
             fs::permissions(dest, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec, fs::perm_options::add);
         }
     }
-    run_hook(pkg_name_, "postinst.sh");
+    run_hook(pkg_name_, std::string(constants::POSTINST_SH));
 }
 
 namespace {
@@ -497,7 +498,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     if (auto it = ctx.local_candidates.find(pkg_name); it != ctx.local_candidates.end()) {
         local_path = it->second;
         latest_version = parse_package_filename(local_path.filename().string()).second;
-        std::stringstream ss(extract_file_from_archive(local_path, "deps.txt"));
+        std::stringstream ss(extract_file_from_archive(local_path, std::string(constants::PKG_DEPS_FILE)));
         std::string line;
         while (std::getline(ss, line)) {
             std::stringstream line_ss(line);
@@ -509,7 +510,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
             }
         }
     } else {
-        auto pkg_info = (version_spec == "latest") ? ctx.repo.find_package(pkg_name) : ctx.repo.find_package(pkg_name, version_spec);
+        auto pkg_info = (version_spec == constants::VER_LATEST) ? ctx.repo.find_package(pkg_name) : ctx.repo.find_package(pkg_name, version_spec);
         if (!pkg_info) {
             if (auto prov = ctx.repo.find_provider(pkg_name)) {
                 resolve_package_dependencies(prov->name, prov->version, is_explicit, ctx, visited_stack);
@@ -521,7 +522,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         latest_version = pkg_info->version; pkg_hash = pkg_info->sha256; deps = pkg_info->dependencies;
     }
 
-    if (latest_version.empty()) latest_version = "0.0.0";
+    if (latest_version.empty()) latest_version = constants::VER_DEFAULT;
 
     if (!ctx.force_reinstall || !is_explicit) {
         if (!is_explicit && !installed_version.empty() && !version_compare(installed_version, latest_version)) return;
@@ -546,7 +547,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
                 }
             }
             if (needs_resolution) {
-                std::string req_ver = "latest";
+                std::string req_ver = std::string(constants::VER_LATEST);
                 if (!dep.op.empty()) {
                     if (auto matching = ctx.repo.find_best_matching_version(dep.name, dep.op, dep.version_req))
                         req_ver = matching->version;
@@ -647,7 +648,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
     for (const auto& arg : pkg_args) {
         const fs::path p(arg);
-        if (p.extension() == ".zst" || p.extension() == ".lpkg" || arg.find('/') != std::string::npos) {
+        if (p.extension() == constants::EXT_ZST || p.extension() == constants::EXT_LPKG || arg.find('/') != std::string::npos) {
             if (fs::exists(p)) { 
                 try { 
                     auto [n, v] = parse_package_filename(p.filename().string()); 
@@ -656,7 +657,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
                 } catch (const std::exception& e) { log_error(string_format("warning.skip_invalid_local_pkg", arg, e.what())); }
             } else log_error(string_format("error.local_pkg_not_found", arg));
         } else {
-            std::string n = arg, v = "latest";
+            std::string n = arg, v = std::string(constants::VER_LATEST);
             if (const auto pos = arg.find(':'); pos != std::string::npos) { n = arg.substr(0, pos); v = arg.substr(pos+1); }
             targets.emplace_back(n, v);
         }
@@ -723,7 +724,7 @@ void remove_package(const std::string& pkg_name, bool force) {
             std::string list; for (const auto& d : rdeps) list += d + " ";
             log_info(string_format("info.skip_remove_dependency", pkg_name, list)); return;
         }
-        const fs::path plist = FILES_DIR / (pkg_name + ".provides");
+        const fs::path plist = FILES_DIR / (pkg_name + std::string(constants::SUFFIX_PROVIDES));
         if (fs::exists(plist)) {
             std::ifstream f(plist); std::string cap;
             while (std::getline(f, cap)) {
@@ -736,7 +737,7 @@ void remove_package(const std::string& pkg_name, bool force) {
     }
 
     log_info(string_format("info.removing_package", pkg_name));
-    run_hook(pkg_name, "prerm.sh");
+    run_hook(pkg_name, std::string(constants::PRERM_SH));
     remove_package_files(pkg_name, force);
     
     auto& cache = Cache::instance();
@@ -750,14 +751,14 @@ void remove_package(const std::string& pkg_name, bool force) {
     }
     
     fs::remove(dep_file); 
-    fs::remove(DOCS_DIR / (pkg_name + ".man")); 
+    fs::remove(DOCS_DIR / (pkg_name + std::string(constants::SUFFIX_MAN))); 
     fs::remove_all(HOOKS_DIR / pkg_name);
     cache.remove_installed(pkg_name);
     log_info(string_format("info.package_removed_successfully", pkg_name));
 }
 
 void remove_package_files(const std::string& pkg_name, bool force) {
-    const fs::path list = FILES_DIR / (pkg_name + ".txt");
+    const fs::path list = FILES_DIR / (pkg_name + std::string(constants::SUFFIX_TXT));
     if (!fs::exists(list)) return;
 
     auto& cache = Cache::instance();
@@ -774,10 +775,10 @@ void remove_package_files(const std::string& pkg_name, bool force) {
     }
 
     if (!shared.empty() && !force) {
-        std::string msg = get_string("error.shared_file_header") + "\n";
+        std::string msg = get_string("error.shared_file_header") + std::string(constants::NL);
         for (const auto& [file, owners] : shared) {
             std::string os; for (size_t i=0; i<owners.size(); ++i) os += owners[i] + (i==owners.size()-1 ? "" : ", ");
-            msg += "  " + string_format("error.shared_file_entry", file, os) + "\n";
+            msg += "  " + string_format("error.shared_file_entry", file, os) + std::string(constants::NL);
         }
         throw LpkgException(msg + get_string("error.removal_aborted"));
     }
@@ -797,7 +798,7 @@ void remove_package_files(const std::string& pkg_name, bool force) {
     log_info(string_format("info.files_removed", count)); 
     fs::remove(list);
 
-    if (const fs::path dlist = FILES_DIR / (pkg_name + ".dirs"); fs::exists(dlist)) {
+    if (const fs::path dlist = FILES_DIR / (pkg_name + std::string(constants::SUFFIX_DIRS)); fs::exists(dlist)) {
         std::ifstream f(dlist); std::string l; std::vector<fs::path> ds;
         while (std::getline(f, l)) if (!l.empty()) ds.emplace_back(l);
         std::ranges::sort(ds, std::greater<>{});
@@ -808,7 +809,7 @@ void remove_package_files(const std::string& pkg_name, bool force) {
         fs::remove(dlist);
     }
     
-    if (const fs::path plist = FILES_DIR / (pkg_name + ".provides"); fs::exists(plist)) {
+    if (const fs::path plist = FILES_DIR / (pkg_name + std::string(constants::SUFFIX_PROVIDES)); fs::exists(plist)) {
         std::ifstream f(plist); std::string c;
         while (std::getline(f, c)) if (!c.empty()) cache.remove_provider(c, pkg_name);
         fs::remove(plist);

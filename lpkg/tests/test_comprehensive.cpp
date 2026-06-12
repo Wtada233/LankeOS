@@ -72,7 +72,7 @@ protected:
         std::string pkg_name = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
         std::string cmd = "cd " + work_dir.string() + " && tar --zstd -cf " + pkg_path + " . > /dev/null 2>&1";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
         return pkg_path;
     }

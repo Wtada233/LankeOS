@@ -1,0 +1,7 @@
+{
+    "name": "libtool",
+    "version": "2.5.4",
+    "sources": [
+        "https://ftpmirror.gnu.org/libtool/libtool-2.5.4.tar.xz"
+    ]
+}

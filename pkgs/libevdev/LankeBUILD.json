@@ -1,0 +1,7 @@
+{
+    "name": "libevdev",
+    "version": "1.13.6",
+    "sources": [
+        "https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-1.13.6/libevdev-libevdev-1.13.6.tar.gz"
+    ]
+}

@@ -37,7 +37,7 @@ protected:
     void TearDown() override {
         set_root_path("/");
         std::string clean_cmd = "sudo rm -rf " + suite_work_dir.string();
-        std::system(clean_cmd.c_str());
+        run_shell(clean_cmd);
     }
     
     std::string create_pkg(const std::string& name, const std::string& ver, const std::string& content_file, const std::string& content) {
@@ -59,7 +59,7 @@ protected:
         std::string pkg_name = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
         std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
         return pkg_path;
     }
@@ -84,7 +84,7 @@ TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
         std::ofstream man(work_dir / "man.txt"); man.close();
         
         std::string cmd = "tar --zstd -cf " + pkg + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
     }
 
@@ -133,7 +133,7 @@ TEST_F(AdvancedPackageManagerTest, ChrootHook) {
         std::ofstream man(work_dir / "man.txt"); man.close();
         
         std::string cmd = "tar --zstd -cf " + pkg + " -C " + work_dir.string() + " .";
-        std::system(cmd.c_str());
+        run_shell(cmd);
         fs::remove_all(work_dir);
     }
 

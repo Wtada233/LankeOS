@@ -1,0 +1,31 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --mandir=/usr/share/man --with-shared --without-debug --without-normal --with-cxx-shared --enable-pc-files --enable-widec --with-pkg-config-libdir=/usr/lib/pkgconfig
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    # LFS 兼容性链接
+    for lib in ncurses form panel menu; do
+        ln -sfv lib$libw.so {STAGING_ROOT}/usr/lib/lib$lib.so
+        ln -sfv $libw.pc {STAGING_ROOT}/usr/lib/pkgconfig/$lib.pc
+    done
+    ln -sfv libncursesw.so {STAGING_ROOT}/usr/lib/libcurses.so
+    # 终端工具链接
+    ln -sfv tic {STAGING_ROOT}/usr/bin/infotocap
+    ln -sfv tic {STAGING_ROOT}/usr/bin/captoinfo
+    ln -sfv tset {STAGING_ROOT}/usr/bin/reset
+    # LLVM 经常会死磕 libtinfo，给它一个交待
+    ln -sfv libncursesw.so {STAGING_ROOT}/usr/lib/libtinfo.so
+    ln -sfv libncursesw.so.6 {STAGING_ROOT}/usr/lib/libtinfo.so.6
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

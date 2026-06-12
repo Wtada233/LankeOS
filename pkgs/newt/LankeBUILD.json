@@ -1,0 +1,7 @@
+{
+    "name": "newt",
+    "version": "0.52.24",
+    "sources": [
+        "https://releases.pagure.org/newt/newt-0.52.24.tar.gz"
+    ]
+}

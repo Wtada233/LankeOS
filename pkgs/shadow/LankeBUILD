@@ -1,0 +1,47 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+
+    # 1. 禁用 groups 程序及其手册页，避免与 Coreutils 冲突
+    sed -i 's/groups\$(EXEEXT) //' src/Makefile.in
+    find man -name Makefile.in -exec sed -i 's/groups\.1 / /' {} \;
+    # 避免安装 Man-pages 已经提供的重复手册页
+    find man -name Makefile.in -exec sed -i 's/getspnam\.3 / /' {} \;
+    find man -name Makefile.in -exec sed -i 's/passwd\.5 / /' {} \;
+
+    # 2. 核心配置修改：在源码层级将默认加密设为 YESCRYPT
+    sed -e 's:#ENCRYPT_METHOD DES:ENCRYPT_METHOD YESCRYPT:' -e 's:/var/spool/mail:/var/mail:' -e '/PATH=/{s@/sbin:@@;s@/bin:@@}' -i etc/login.defs
+
+    # 3. 准备编译：使用 LFS 推荐的参数并显式激活 PAM
+    ./configure --prefix=/usr --sysconfdir=/etc --disable-static --with-bcrypt --with-yescrypt --without-libbsd --with-libpam --with-group-name-max-length=32
+
+    make -j$(nproc)
+
+    make exec_prefix=/usr pamddir= DESTDIR={STAGING_ROOT} install
+    make -C man DESTDIR={STAGING_ROOT} install-man
+    # 关键：修复 passwd 的 SUID 权限，否则无法联动 PAM 改密
+    chmod -v 4711 {STAGING_ROOT}/usr/bin/passwd
+    # 添加 Shadow 链接
+    ln -sfv vipw {STAGING_ROOT}/usr/bin/vigr
+
+    # 5. 打包前的 Hook 逻辑
+    cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+export PATH={PATH}:/usr/sbin
+pwconv
+grpconv
+mkdir -p /etc/default
+useradd -D --gid 999
+EOF
+
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

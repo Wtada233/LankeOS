@@ -1,0 +1,7 @@
+{
+    "name": "openssh",
+    "version": "9.9",
+    "sources": [
+        "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-9.9p1.tar.gz"
+    ]
+}

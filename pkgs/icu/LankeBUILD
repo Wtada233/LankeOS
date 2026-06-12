@@ -1,0 +1,22 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    cd source
+    case $(uname -m) in
+      i?86) sed -e "s/U_PLATFORM_IS_LINUX_BASED/__X86_64__ \&\& &/"                 -i test/intltest/ustrtest.cpp ;;
+    esac
+    ./configure --prefix=/usr
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

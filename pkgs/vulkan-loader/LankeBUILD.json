@@ -1,0 +1,7 @@
+{
+    "name": "vulkan-loader",
+    "version": "1.4.341",
+    "sources": [
+        "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-1.4.341.0.tar.gz"
+    ]
+}

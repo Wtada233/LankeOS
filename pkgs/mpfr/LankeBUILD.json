@@ -1,0 +1,7 @@
+{
+    "name": "mpfr",
+    "version": "4.2.2",
+    "sources": [
+        "https://ftpmirror.gnu.org/mpfr/mpfr-4.2.2.tar.xz"
+    ]
+}

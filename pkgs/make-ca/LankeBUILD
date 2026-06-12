@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    make DESTDIR={STAGING_ROOT} install
+    echo "/usr/bin/make-ca -g" >> "{STAGING_HOOKS}/postinst.sh"
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

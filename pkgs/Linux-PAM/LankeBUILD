@@ -1,0 +1,34 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    meson setup .. --prefix=/usr --libdir=/usr/lib --sysconfdir=/etc --buildtype=release -Ddocs=disabled -Dsecuredir=/usr/lib/security -Dlogind=enabled -Dnis=disabled
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+
+    # 建立基础 PAM 配置文件
+    mkdir -pv {STAGING_ROOT}/etc/pam.d
+    cat > {STAGING_ROOT}/etc/pam.d/system-auth << "EOF"
+auth      required    pam_unix.so
+account   required    pam_unix.so
+session   required    pam_unix.so
+password  required    pam_unix.so
+EOF
+    cat > {STAGING_ROOT}/etc/pam.d/other << "EOF"
+auth      required    pam_deny.so
+account   required    pam_deny.so
+password  required    pam_deny.so
+session   required    pam_deny.so
+EOF
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,7 @@
+{
+    "name": "nano",
+    "version": "8.0",
+    "sources": [
+        "https://www.nano-editor.org/dist/v8/nano-8.0.tar.xz"
+    ]
+}

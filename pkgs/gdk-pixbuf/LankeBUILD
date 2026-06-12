@@ -1,0 +1,19 @@
+#!/bin/bash
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    mkdir build
+    cd build
+    meson setup ..                      --prefix=/usr                 --buildtype=release           -D others=enabled             --wrap-mode=nofallback
+    ninja -j$(nproc)
+    
+    DESTDIR={STAGING_ROOT} ninja install
+    
+    # Generate loader cache as per documentation for DESTDIR installation
+    # Running from within the staging directory to ensure correct pathing
+    {STAGING_ROOT}/usr/bin/gdk-pixbuf-query-loaders --update-cache
+}
+lankebuild_package() {
+    :
+}

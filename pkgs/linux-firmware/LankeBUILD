@@ -1,0 +1,40 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    mkdir -p {STAGING_ROOT}/usr/lib/firmware
+}
+
+lankebuild_build() {
+    # Extract source (assume SRC_DIR contains the tarball)
+    # The build system might have already extracted this, but
+    # to be safe, I'll extract it to a temp dir in the current workdir
+    mkdir -p source_extracted
+    tar -xf {SRC_DIR}/linux-firmware-main.tar.gz -C source_extracted --strip-components=1
+
+    # Whitelist logic
+    local source_dir="source_extracted"
+    local whitelist=(
+        "intel/iwlwifi-*" "intel/ibt-*"
+        "i915/adls_*" "i915/adlp_*" "i915/tgl_*" "i915/dg2_*" "i915/mtl_*"
+        "intel/sof/*" "intel/sof-tplg/*" "intel/avs/*"
+        "amdgpu/gc_11_*" "amdgpu/gc_10_*" "amdgpu/navi*"
+        "amdgpu/vcn_*" "amdgpu/psp_*" "amdgpu/dcn_*" "amdgpu/sdma_*"
+        "amd-ucode/*" "rtl_nic/rtl81*" "intel-ucode/*"
+    )
+
+    for pattern in "${whitelist[@]}"; do
+        find "$source_dir" -path "$source_dir/$pattern" | while read -r src_file; do
+            local rel_path="${src_file#$source_dir/}"
+            local target_dir=$(dirname "{STAGING_ROOT}/usr/lib/firmware/$rel_path")
+            mkdir -p "$target_dir"
+            cp -a "$src_file" "{STAGING_ROOT}/usr/lib/firmware/$rel_path"
+        done
+    done
+
+    # Copy licenses
+    cp "$source_dir"/WHENCE "$source_dir"/LICEN* "{STAGING_ROOT}/usr/lib/firmware/" 2>/dev/null
+}
+
+lankebuild_package() {
+    :
+}
