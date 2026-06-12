@@ -10,6 +10,8 @@ English | [中文](README.md)
 -   **Smart version parsing**: Supports multi-segment revision numbers (e.g. `1.0.0.1`) with a rigorous comparison algorithm that correctly handles cases like `6.16.1 > 6.6.1`.
 -   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their hashes for a package, greatly reducing network requests.
 -   **Zero-redundancy storage**: Eliminates `latest.txt` and separate `hash.txt` files. Packages are stored in a flat `<name>/<version>.lpkg` layout.
+-   **Embedded metadata**: Package name and version come from an internal `metadata.json` instead of fragile filename parsing.
+-   **No `files.txt`**: The `content/` directory layout maps directly to the root filesystem; `files.txt` for path mapping is eliminated.
 -   **Automated operations**: Includes `lrepo-mgr.py` for seamless publishing to Tencent Cloud COS (S3) or SCP remote servers.
 -   **Highly compatible static builds**: Built-in automatic detection of system CA certificate paths ensures statically compiled binaries work across different Linux distributions.
 -   **Security**: Mandatory SHA256 hash verification, file conflict detection, and malicious path filtering.
@@ -59,7 +61,7 @@ lpkg [options] <command> [arguments]
 -   **`remove <package> [--force]`**: Remove a package. Use `--force` to remove packages that others depend on.
 -   **`query [-p] <package|filename>`**: Query which package owns a file, or list files in a package.
 -   **`scan [directory]`**: Scan for orphaned files not owned by any package.
--   **`pack -o <output> --source <source-dir>`**: Build a `.lpkg` package from a directory.
+-   **`pack -o <output> --source <source-dir> [--pkg-name <name>] [--pkg-version <version>]`**: Build a `.lpkg` package from a directory. The name and version are embedded into `metadata.json`.
 -   **`build [directory]`**: Automatically build and pack a package from a specific directory.
 
 ## Repository Management (Operations Guide)
@@ -90,6 +92,30 @@ Remove all files from storage that are not listed in `index.txt`:
 ./main/scripts/lrepo-mgr.py cleanup
 ```
 
+## Package Format Specification
+
+Each `.lpkg` file is a tar.zst archive with the following structure:
+
+```text
+metadata.json         # Package metadata (name, version, file list)
+deps.txt              # Dependencies
+provides.txt          # Virtual provides (optional)
+man.txt               # Man page
+content/              # Files (maps directly to root directory)
+hooks/                # Hook scripts (optional)
+```
+
+### metadata.json Example
+```json
+{
+  "name": "bash",
+  "version": "5.2",
+  "files": ["usr/bin/bash", "usr/share/man/man1/bash.1"]
+}
+```
+
+The files under `content/` are extracted directly to the target root (`/`); no `files.txt` mapping is needed.
+
 ## Repository Specification
 
 ### Directory Structure
@@ -112,6 +138,7 @@ acl|2.3.1:sha...,2.3.2:sha...|attr,coreutils|libacl.so
 -   **`InstallationTask`**: Atomic transaction model with automatic rollback on failure.
 -   **`Downloader`**: Wraps `libcurl` with integrated multi-path certificate detection.
 -   **`Cache`**: Local state database stored at `/var/lib/lpkg/`.
+-   **`metadata.json`**: In-package embedded metadata (name, version, file list), eliminating fragile filename parsing and `files.txt` path mapping.
 
 ## Contributing
 

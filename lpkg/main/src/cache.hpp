@@ -40,6 +40,10 @@ public:
     void ensure_reverse_deps();
     void ensure_essentials();
 
+    // Reverse lookups: get all files owned by a package
+    std::unordered_set<std::string> get_package_files(std::string_view pkg);
+    std::unordered_set<std::string> get_package_provides(std::string_view pkg);
+
     // For iterations (locking should be handled carefully by callers)
     std::mutex& get_mutex() { return mtx; }
     const std::map<std::string, std::string, std::less<>>& get_all_installed() { return installed_pkgs; }

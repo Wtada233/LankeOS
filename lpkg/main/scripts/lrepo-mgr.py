@@ -40,17 +40,26 @@ def extract_metadata(archive_path):
     
     return deps, provides
 
-def parse_pkg_filename(filename):
-    # Matches name-version.lpkg
-    if not filename.endswith('.lpkg'):
-        return None, None
-    
-    base = filename.rsplit('.', 1)[0]
-    if '-' not in base:
-        return None, None
-    
-    name, version = base.rsplit('-', 1)
-    return name, version
+def read_metadata_from_archive(archive_path):
+    """Extracts metadata.json from the lpkg archive and returns name, version."""
+    try:
+        result = subprocess.run(
+            ['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*metadata.json', '-O'],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            meta = json.loads(result.stdout)
+            return meta.get('name', ''), meta.get('version', '')
+    except Exception as e:
+        print(f"  Warning: Failed to read metadata.json from {archive_path}: {e}")
+    # Fallback to filename parsing
+    base = os.path.basename(archive_path)
+    if base.endswith('.lpkg'):
+        base_noext = base.rsplit('.', 1)[0]
+        if '-' in base_noext:
+            name, version = base_noext.rsplit('-', 1)
+            return name, version
+    return None, None
 
 class RepoManager:
     def __init__(self, config_path):
@@ -121,9 +130,9 @@ class RepoManager:
             path = Path(f)
             if not path.is_file(): continue
             
-            name, version = parse_pkg_filename(path.name)
+            name, version = read_metadata_from_archive(str(path))
             if not name:
-                print(f"Skipping {path.name}: Invalid filename format (expected name-version.lpkg)")
+                print(f"Skipping {path.name}: Could not determine package name and version (missing metadata.json or invalid filename)")
                 continue
             
             print(f"Processing {name} {version}...")

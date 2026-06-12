@@ -14,7 +14,6 @@ extern std::filesystem::path HOOKS_DIR;
 
 // Derived paths
 extern std::filesystem::path DEP_DIR;
-extern std::filesystem::path FILES_DIR;
 extern std::filesystem::path PKGS_FILE;
 extern std::filesystem::path HOLDPKGS_FILE;
 extern std::filesystem::path ESSENTIAL_FILE;

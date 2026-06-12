@@ -121,6 +121,30 @@ std::unordered_set<std::string> Cache::get_reverse_deps(std::string_view name) {
     return (it != reverse_deps.end()) ? it->second : std::unordered_set<std::string>{};
 }
 
+std::unordered_set<std::string> Cache::get_package_files(std::string_view pkg) {
+    std::lock_guard<std::mutex> lock(mtx);
+    std::string pkg_str(pkg);
+    std::unordered_set<std::string> result;
+    for (const auto& [file, owners] : file_db) {
+        if (owners.contains(pkg_str)) {
+            result.insert(file);
+        }
+    }
+    return result;
+}
+
+std::unordered_set<std::string> Cache::get_package_provides(std::string_view pkg) {
+    std::lock_guard<std::mutex> lock(mtx);
+    std::string pkg_str(pkg);
+    std::unordered_set<std::string> result;
+    for (const auto& [cap, owners] : providers) {
+        if (owners.contains(pkg_str)) {
+            result.insert(cap);
+        }
+    }
+    return result;
+}
+
 void Cache::load() {
     std::lock_guard<std::mutex> lock(mtx);
     file_db = read_db_uncached(FILES_DB);

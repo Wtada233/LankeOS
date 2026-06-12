@@ -3,6 +3,7 @@ import subprocess
 import shutil
 import tempfile
 import re
+import json
 import argparse
 import concurrent.futures
 import sys
@@ -26,18 +27,29 @@ def is_elf(filepath):
     res = run_cmd(f"sudo head -c 4 '{filepath}' 2>/dev/null | hexdump -e '4/1 \"%02x\"'")
     return res.stdout.strip() == "7f454c46"
 
+def read_pkg_metadata(pkg_path):
+    """从 .lpkg 包中读取 metadata.json 获取包名"""
+    try:
+        result = subprocess.run(
+            ['tar', '--use-compress-program=zstd', '-xf', pkg_path, '--wildcards', '*metadata.json', '-O'],
+            capture_output=True, text=True
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            meta = json.loads(result.stdout)
+            return meta.get('name', '')
+    except Exception:
+        pass
+    # 回退到文件名解析
+    fname = os.path.basename(pkg_path).replace(".lpkg", "")
+    if "-" in fname:
+        return fname.rsplit("-", 1)[0]
+    return fname
+
 def process_phase1(lpkg_info):
     """Phase 1: 扫描包内容并建立提供者映射 (SONAME -> Package)"""
     lpkg, target_dir, extract_root = lpkg_info
     pkg_path = os.path.abspath(os.path.join(target_dir, lpkg))
-    # --- 修复：对齐包管理器解析逻辑 ---
-    # 去掉 .lpkg 后，从最后一个 '-' 处切割，取前半部分
-    raw_name = lpkg.replace(".lpkg", "")
-    if "-" in raw_name:
-        pkg_name = raw_name.rsplit("-", 1)[0]
-    else:
-        pkg_name = raw_name
-    # ----------------------------------
+    pkg_name = read_pkg_metadata(pkg_path)
     extract_dir = os.path.join(extract_root, lpkg)
     os.makedirs(extract_dir, exist_ok=True)
     
@@ -66,13 +78,7 @@ def process_phase2(lpkg_info, provider_map, working_dir):
     """Phase 2: 分析 NEEDED 链接并更新 deps.txt，最后重新打包"""
     lpkg, target_dir, extract_root = lpkg_info
     pkg_path = os.path.abspath(os.path.join(target_dir, lpkg))
-    # --- 修复：对齐包管理器解析逻辑 ---
-    raw_name = lpkg.replace(".lpkg", "")
-    if "-" in raw_name:
-        pkg_name = raw_name.rsplit("-", 1)[0]
-    else:
-        pkg_name = raw_name
-    # ----------------------------------
+    pkg_name = read_pkg_metadata(pkg_path)
     extract_dir = os.path.join(extract_root, lpkg)
     content_dir = os.path.join(extract_dir, "content")
     
