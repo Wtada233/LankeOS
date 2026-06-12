@@ -238,3 +238,4 @@ man.build_date=构建日期
 man.line_format={}：{}
 info.copying_to_workdir=正在复制 {} 到工作目录...
 error.copy_work_source_failed=复制 work_source 文件 {} 失败: {}
+help.version=打印版本

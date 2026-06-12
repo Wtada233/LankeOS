@@ -238,3 +238,4 @@ man.build_date=BuildDate
 man.line_format={}: {}
 info.copying_to_workdir=Copying {} to work directory...
 error.copy_work_source_failed=Failed to copy work_source file {}: {}
+help.version=Print version
