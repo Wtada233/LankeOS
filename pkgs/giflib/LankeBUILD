@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    sed -i '/$(MAKE) -C doc/d' Makefile
+    make -j$(nproc)
+    make PREFIX=/usr DESTDIR={STAGING_ROOT} install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

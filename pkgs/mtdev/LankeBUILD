@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr
+    make DESTDIR={STAGING_ROOT} install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

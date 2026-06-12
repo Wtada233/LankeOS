@@ -1,0 +1,7 @@
+{
+    "name": "tcl",
+    "version": "8.6.16",
+    "sources": [
+        "https://downloads.sourceforge.net/tcl/tcl8.6.16-src.tar.gz"
+    ]
+}

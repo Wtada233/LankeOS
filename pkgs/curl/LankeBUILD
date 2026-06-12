@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --with-openssl --without-libpsl --with-ca-bundle=/etc/pki/tls/certs/ca-bundle.crt --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

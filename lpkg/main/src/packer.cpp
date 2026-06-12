@@ -4,6 +4,7 @@
 #include "localization.hpp"
 #include "hash.hpp"
 #include "config.hpp"
+#include "constants.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>
@@ -66,8 +67,8 @@ namespace {
 
 void pack_package(const std::string& output_filename, const std::string& source_dir) {
     fs::path base_dir = source_dir;
-    fs::path root_dir = base_dir / "root";
-    fs::path hooks_dir = base_dir / "hooks";
+    fs::path root_dir = base_dir / constants::DIR_ROOT;
+    fs::path hooks_dir = base_dir / constants::DIR_HOOKS;
 
     if (!fs::exists(root_dir)) {
         throw LpkgException(get_string("error.pack_root_not_found") + ": " + root_dir.string());
@@ -85,45 +86,45 @@ void pack_package(const std::string& output_filename, const std::string& source_
         log_info(get_string("info.pack_scanning"));
         
         // 1. Generate and add files.txt
-        fs::path tmp_files_txt = get_tmp_dir() / "files.txt";
+        fs::path tmp_files_txt = get_tmp_dir() / constants::PKG_FILES_FILE;
         ensure_dir_exists(tmp_files_txt.parent_path());
         {
             std::ofstream f(tmp_files_txt);
             for (const auto& entry : fs::recursive_directory_iterator(root_dir)) {
                 if (entry.is_directory()) continue;
-                f << entry.path().lexically_relative(root_dir).string() << "\t/\n";
+                f << entry.path().lexically_relative(root_dir).string() << constants::TAB << "/" << constants::NL;
             }
         }
-        add_to_archive(a, tmp_files_txt, "files.txt");
+        add_to_archive(a, tmp_files_txt, std::string(constants::PKG_FILES_FILE));
         fs::remove(tmp_files_txt);
 
         // 2. Add metadata files
-        if (fs::exists(base_dir / "deps.txt")) add_to_archive(a, base_dir / "deps.txt", "deps.txt");
+        if (fs::exists(base_dir / constants::PKG_DEPS_FILE)) add_to_archive(a, base_dir / constants::PKG_DEPS_FILE, std::string(constants::PKG_DEPS_FILE));
         else {
             fs::path empty = get_tmp_dir() / "empty_deps";
             std::ofstream(empty).close();
-            add_to_archive(a, empty, "deps.txt");
+            add_to_archive(a, empty, std::string(constants::PKG_DEPS_FILE));
             fs::remove(empty);
         }
 
-        if (fs::exists(base_dir / "provides.txt")) add_to_archive(a, base_dir / "provides.txt", "provides.txt");
+        if (fs::exists(base_dir / constants::PKG_PROVIDES_FILE)) add_to_archive(a, base_dir / constants::PKG_PROVIDES_FILE, std::string(constants::PKG_PROVIDES_FILE));
 
-        if (fs::exists(base_dir / "man.txt")) add_to_archive(a, base_dir / "man.txt", "man.txt");
+        if (fs::exists(base_dir / constants::PKG_MAN_FILE)) add_to_archive(a, base_dir / constants::PKG_MAN_FILE, std::string(constants::PKG_MAN_FILE));
         else {
             fs::path empty_man = get_tmp_dir() / "empty_man";
             std::ofstream f(empty_man);
             f << "LankeOS Package" << std::endl;
             f.close();
-            add_to_archive(a, empty_man, "man.txt");
+            add_to_archive(a, empty_man, std::string(constants::PKG_MAN_FILE));
             fs::remove(empty_man);
         }
         
         if (fs::exists(hooks_dir)) {
-            add_dir_recursive(a, hooks_dir, "hooks");
+            add_dir_recursive(a, hooks_dir, std::string(constants::DIR_HOOKS));
         }
 
         // 3. Add content (root dir -> content/)
-        add_dir_recursive(a, root_dir, "content");
+        add_dir_recursive(a, root_dir, std::string(constants::DIR_CONTENT));
 
         archive_write_close(a);
         archive_write_free(a);

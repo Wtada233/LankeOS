@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    rm -v man3/crypt*
+    make MAKEFLAGS=-R prefix=/usr DESTDIR={STAGING_ROOT} install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

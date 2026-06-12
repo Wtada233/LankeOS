@@ -1,0 +1,7 @@
+{
+    "name": "sed",
+    "version": "4.9",
+    "sources": [
+        "https://ftpmirror.gnu.org/sed/sed-4.9.tar.xz"
+    ]
+}

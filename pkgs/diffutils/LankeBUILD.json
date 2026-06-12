@@ -1,0 +1,7 @@
+{
+    "name": "diffutils",
+    "version": "3.12",
+    "sources": [
+        "https://ftpmirror.gnu.org/diffutils/diffutils-3.12.tar.xz"
+    ]
+}

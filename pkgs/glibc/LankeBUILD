@@ -1,0 +1,64 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    patch -Np1 -i {SRC_DIR}/glibc-2.42-fhs-1.patch
+    sed -e '/unistd.h/i #include <string.h>' -e '/libc_rwlock_init/c\\  __libc_rwlock_define_initialized (, reset_lock);\\  memcpy (&lock, &reset_lock, sizeof (lock));' -i stdlib/abort.c
+
+    mkdir build && cd build
+    echo 'rootsbindir=/usr/bin' > configparms
+    CC=gcc CXX=g++ ../configure --prefix=/usr --disable-werror --enable-kernel=5.4 --enable-stack-protector=strong --disable-nscd libc_cv_slibdir=/usr/lib
+    CC=gcc CXX=g++ make
+
+    # 跳过过时的完整性检查（手册推荐）
+    sed '/test-installation/s@\$(PERL)@echo not running@' -i ../Makefile
+
+    make DESTDIR={STAGING_ROOT} install
+
+    # 修正 ldd 中的硬编码路径
+    sed '/RTLDLIST=/s@/usr@@g' -i {STAGING_ROOT}/usr/bin/ldd
+
+    # LFS Locales (受上面 SUPPORTED 文件控制，只安装中英文)
+    make DESTDIR={STAGING_ROOT} localedata/install-locales
+    # 添加 ld.so 兼容性链接 (Usr-Merge 规范)
+    ln -sfv ../lib/ld-linux-x86-64.so.2 {STAGING_ROOT}/usr/bin/ld.so
+
+    # Timezone data
+    tar -xf {SRC_DIR}/tzdata2025b.tar.gz
+    ZONEINFO={STAGING_ROOT}/usr/share/zoneinfo
+    mkdir -pv $ZONEINFO/{posix,right}
+    for tz in etcetera southamerica northamerica europe africa antarctica asia australasia backward; do
+        zic -L /dev/null -d $ZONEINFO $tz
+        zic -L /dev/null -d $ZONEINFO/posix $tz
+        zic -L leapseconds -d $ZONEINFO/right $tz
+    done
+    cp -v zone.tab zone1970.tab iso3166.tab $ZONEINFO
+    zic -d $ZONEINFO -p America/New_York
+    # Config files
+    cat > {STAGING_ROOT}/etc/nsswitch.conf << "EOF"
+passwd: files systemd
+group: files systemd
+shadow: files systemd
+hosts: mymachines resolve [!UNAVAIL=return] files myhostname dns
+networks: files
+protocols: files
+services: files
+ethers: files
+rpc: files
+EOF
+    cat > {STAGING_ROOT}/etc/ld.so.conf << "EOF"
+/usr/local/lib
+/opt/lib
+include /etc/ld.so.conf.d/*.conf
+EOF
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

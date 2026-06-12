@@ -5,6 +5,7 @@
 #include "exception.hpp"
 #include "localization.hpp"
 #include "version.hpp"
+#include "constants.hpp"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -19,16 +20,16 @@ void Repository::load_index() {
     try { mirror = get_mirror_url(); } catch (...) { return; }
     std::string arch = get_architecture();
     
-    bool is_local = mirror.find("file://") == 0 || mirror.find("/") == 0;
+    bool is_local = mirror.find(constants::PROTOCOL_FILE) == 0 || mirror.find("/") == 0;
     std::filesystem::path index_path;
     
     try {
         if (is_local) {
-            std::string path_str = (mirror.find("file://") == 0) ? mirror.substr(7) : mirror;
-            index_path = std::filesystem::path(path_str) / arch / "index.txt";
+            std::string path_str = (mirror.find(constants::PROTOCOL_FILE) == 0) ? mirror.substr(7) : mirror;
+            index_path = std::filesystem::path(path_str) / arch / constants::REPO_INDEX_FILE;
         } else {
-            std::string url = mirror + arch + "/index.txt";
-            index_path = get_tmp_dir() / "repo_index.txt";
+            std::string url = mirror + arch + "/" + std::string(constants::REPO_INDEX_FILE);
+            index_path = get_tmp_dir() / constants::REPO_INDEX_TMP;
             download_file(url, index_path, false);
         }
         if (!std::filesystem::exists(index_path)) return;
@@ -54,7 +55,7 @@ void Repository::load_index() {
         std::string_view sv = line;
         if (!sv.empty() && sv.back() == '\r') sv.remove_suffix(1);
         
-        auto parts = split(sv, '|');
+        auto parts = split(sv, constants::PIPE_CHAR);
         if (parts.size() < 2) continue;
 
         std::string pkg_name(parts[0]);
@@ -64,7 +65,7 @@ void Repository::load_index() {
 
         std::vector<DependencyInfo> common_deps;
         if (!deps_sv.empty()) {
-            for (auto dep_str : split(deps_sv, ',')) {
+            for (auto dep_str : split(deps_sv, constants::COMMA_CHAR)) {
                 DependencyInfo dep;
                 size_t op_pos = std::string_view::npos;
                 for (const auto& op : ops) {
@@ -81,13 +82,13 @@ void Repository::load_index() {
         }
 
         if (!prov_sv.empty()) {
-            for (auto prov : split(prov_sv, ',')) {
+            for (auto prov : split(prov_sv, constants::COMMA_CHAR)) {
                 providers_[std::string(prov)].push_back(pkg_name);
             }
         }
 
-        for (auto ver_hash : split(versions_sv, ',')) {
-            auto vh = split(ver_hash, ':');
+        for (auto ver_hash : split(versions_sv, constants::COMMA_CHAR)) {
+            auto vh = split(ver_hash, constants::COLON_CHAR);
             if (vh.empty()) continue;
             PackageInfo pkg;
             pkg.name = pkg_name;

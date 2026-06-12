@@ -1,0 +1,7 @@
+{
+    "name": "pango",
+    "version": "1.56.4",
+    "sources": [
+        "https://download.gnome.org/sources/pango/1.56/pango-1.56.4.tar.xz"
+    ]
+}

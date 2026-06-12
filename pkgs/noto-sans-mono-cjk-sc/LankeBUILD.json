@@ -1,0 +1,7 @@
+{
+    "name": "noto-sans-mono-cjk-sc",
+    "version": "2.004",
+    "sources": [
+        "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTC/NotoSansMonoCJK-Regular.ttc"
+    ]
+}

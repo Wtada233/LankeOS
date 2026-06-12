@@ -1,0 +1,7 @@
+{
+    "name": "ncurses",
+    "version": "6.5-20250809",
+    "sources": [
+        "https://invisible-mirror.net/archives/ncurses/current/ncurses-6.5-20250809.tgz"
+    ]
+}

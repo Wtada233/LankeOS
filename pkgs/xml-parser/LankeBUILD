@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    perl Makefile.PL
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

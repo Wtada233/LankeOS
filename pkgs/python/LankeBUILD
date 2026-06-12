@@ -1,0 +1,35 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --enable-shared --with-system-expat --with-system-ffi --enable-optimizations
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    # --- 新增：清理冗余文件 ---
+    # 1. 递归删除所有名为 __pycache__ 的目录
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+
+    # 2. 删除 Python 自带的测试模块 (非常大，约 100MB+)
+    if [ -d "{STAGING_ROOT}/usr/lib/python3.13/test" ]; then
+        rm -rf {STAGING_ROOT}/usr/lib/python3.13/test
+    fi
+    # -----------------------
+
+    # 添加 Python 兼容性链接
+    ln -sfv python3.13 {STAGING_ROOT}/usr/bin/python3
+    ln -sfv python3.13-config {STAGING_ROOT}/usr/bin/python3-config
+    ln -sfv pydoc3.13 {STAGING_ROOT}/usr/bin/pydoc3
+    ln -sfv idle3.13 {STAGING_ROOT}/usr/bin/idle3
+
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,7 @@
+{
+    "name": "seatd",
+    "version": "0.9.2",
+    "sources": [
+        "https://git.sr.ht/~kennylevinsen/seatd/archive/0.9.2.tar.gz"
+    ]
+}

@@ -1,0 +1,7 @@
+{
+    "name": "giflib",
+    "version": "5.2.2",
+    "sources": [
+        "https://downloads.sourceforge.net/giflib/giflib-5.2.2.tar.gz"
+    ]
+}

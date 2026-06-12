@@ -1,0 +1,18 @@
+#!/bin/bash
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    # 如果有测试集需求，应在此预先提取 xdgmime 并编译
+    # tar -xf ../xdgmime.tar.xz && make -C xdgmime
+    
+    mkdir build
+    cd build
+    meson setup --prefix=/usr --buildtype=release -D update-mimedb=true ..
+    ninja -j$(nproc)
+    
+    DESTDIR={STAGING_ROOT} ninja install
+}
+lankebuild_package() {
+    :
+}

@@ -1,0 +1,26 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    echo '#define SYS_VIMRC_FILE "/etc/vimrc"' >> src/feature.h
+    ./configure --prefix=/usr
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    ln -sf vim {STAGING_ROOT}/usr/bin/vi
+    ln -sfv vim {STAGING_ROOT}/usr/bin/vimdiff
+    ln -sfv vim {STAGING_ROOT}/usr/bin/view
+    ln -sfv vim {STAGING_ROOT}/usr/bin/rvim
+    ln -sfv vim {STAGING_ROOT}/usr/bin/rview
+    ln -sfv vim {STAGING_ROOT}/usr/bin/ex
+}
+
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

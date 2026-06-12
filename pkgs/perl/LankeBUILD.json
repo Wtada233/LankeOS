@@ -1,0 +1,7 @@
+{
+    "name": "perl",
+    "version": "5.42.0",
+    "sources": [
+        "https://www.cpan.org/src/5.0/perl-5.42.0.tar.xz"
+    ]
+}
