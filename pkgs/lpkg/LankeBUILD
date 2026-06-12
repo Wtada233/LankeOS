@@ -4,7 +4,6 @@ lankebuild_prepare() {
 }
 lankebuild_build() {
     cd lpkg
-    make docker
     make DESTDIR={STAGING_ROOT} docker-install
 }
 lankebuild_package() {
