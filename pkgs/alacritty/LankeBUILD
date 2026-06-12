@@ -33,7 +33,7 @@ lankebuild_build() {
     install -Dm644 extra/completions/alacritty.bash "{STAGING_ROOT}/usr/share/bash-completion/completions/alacritty"
 
     # 7. 注入 postinst.sh 
-    cat >> "{STAGING_ROOT}/hooks/postinst.sh" <<EOF
+    cat >> "{STAGING_HOOKS}/postinst.sh" <<EOF
 if command -v tic >/dev/null 2>&1; then
     echo "=> 正在注册 Alacritty Terminfo..."
     tic -xe alacritty,alacritty-direct /usr/share/terminfo/alacritty.info
