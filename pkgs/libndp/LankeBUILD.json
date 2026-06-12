@@ -1,0 +1,7 @@
+{
+    "name": "libndp",
+    "version": "1.9",
+    "sources": [
+        "http://libndp.org/files/libndp-1.9.tar.gz"
+    ]
+}

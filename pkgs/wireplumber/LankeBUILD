@@ -1,0 +1,20 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    meson setup .. --prefix=/usr --buildtype=release -Dintrospection=disabled -Ddoc=disabled -Dsystemd=enabled -Dsystemd-user-service=true -Dsystemd-system-service=false -Dsystem-lua=false
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+    # 清理冲突的静态库
+    rm -fv {STAGING_ROOT}/usr/lib/liblua.a
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

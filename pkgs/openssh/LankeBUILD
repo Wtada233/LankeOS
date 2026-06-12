@@ -1,0 +1,23 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --sysconfdir=/etc/ssh --with-privsep-path=/var/lib/sshd --without-pam --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+getent group sshd >/dev/null || groupadd -g 22 sshd
+getent passwd sshd >/dev/null || useradd -c 'sshd Privilege Separation' -d /var/lib/sshd -g sshd -s /bin/false -u 22 sshd
+systemctl enable sshd
+EOF
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

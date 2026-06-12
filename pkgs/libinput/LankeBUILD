@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    meson setup build --prefix=/usr -Ddebug-gui=false -Dlibwacom=false
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

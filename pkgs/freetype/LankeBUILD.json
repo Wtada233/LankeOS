@@ -1,0 +1,7 @@
+{
+    "name": "freetype",
+    "version": "2.13.3",
+    "sources": [
+        "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz"
+    ]
+}

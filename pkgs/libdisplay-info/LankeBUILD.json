@@ -1,0 +1,7 @@
+{
+    "name": "libdisplay-info",
+    "version": "0.3.0",
+    "sources": [
+        "https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/0.3.0/libdisplay-info-0.3.0.tar.gz"
+    ]
+}

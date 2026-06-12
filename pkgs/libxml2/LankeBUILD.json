@@ -1,0 +1,7 @@
+{
+    "name": "libxml2",
+    "version": "2.12.6",
+    "sources": [
+        "https://download.gnome.org/sources/libxml2/2.12/libxml2-2.12.6.tar.xz"
+    ]
+}

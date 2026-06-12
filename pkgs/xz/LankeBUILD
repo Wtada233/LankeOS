@@ -1,0 +1,32 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --disable-static --disable-doc
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    # 添加兼容性链接
+    for tool in xzcat unxz lzma unlzma lzcat; do
+        ln -sfv xz {STAGING_ROOT}/usr/bin/$tool
+    done
+    ln -sfv xzgrep {STAGING_ROOT}/usr/bin/lzgrep
+    ln -sfv xzgrep {STAGING_ROOT}/usr/bin/lzegrep
+    ln -sfv xzgrep {STAGING_ROOT}/usr/bin/lzfgrep
+    ln -sfv xzgrep {STAGING_ROOT}/usr/bin/xzegrep
+    ln -sfv xzgrep {STAGING_ROOT}/usr/bin/xzfgrep
+    ln -sfv xzdiff {STAGING_ROOT}/usr/bin/lzdiff
+    ln -sfv xzdiff {STAGING_ROOT}/usr/bin/lzcmp
+    ln -sfv xzdiff {STAGING_ROOT}/usr/bin/xzcmp
+    ln -sfv xzless {STAGING_ROOT}/usr/bin/lzless
+    ln -sfv xzmore {STAGING_ROOT}/usr/bin/lzmore
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

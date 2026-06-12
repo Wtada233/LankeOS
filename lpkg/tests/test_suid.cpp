@@ -35,7 +35,7 @@ protected:
     void TearDown() override {
         set_root_path("/"); // Reset
         std::string clean_cmd = "sudo rm -rf " + suite_work_dir.string();
-        std::system(clean_cmd.c_str());
+        run_shell(clean_cmd);
     }
 
     std::string create_suid_package(const std::string& name, const std::string& version) {
@@ -77,7 +77,7 @@ protected:
         std::string pkg_name = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
         std::string cmd = "tar --zstd -p -cf " + pkg_path + " -C " + work_dir.string() + " .";
-        int ret = std::system(cmd.c_str());
+        int ret = run_shell(cmd);
         if (ret != 0) throw std::runtime_error("tar failed");
         
         fs::remove_all(work_dir);

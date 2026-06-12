@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    python3 configure.py --bootstrap
+    install -vm755 ninja {STAGING_ROOT}/usr/bin/
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

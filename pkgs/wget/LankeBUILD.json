@@ -1,0 +1,7 @@
+{
+    "name": "wget",
+    "version": "1.25.0",
+    "sources": [
+        "https://ftpmirror.gnu.org/wget/wget-1.25.0.tar.gz"
+    ]
+}

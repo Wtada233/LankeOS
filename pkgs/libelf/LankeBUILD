@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --disable-static --disable-debuginfod --enable-libdebuginfod=dummy
+    make -C lib -j$(nproc)
+    make -C libelf -j$(nproc)
+    make -C libelf install DESTDIR={STAGING_ROOT}
+    mkdir -p {STAGING_ROOT}/usr/lib/pkgconfig
+    install -vm644 config/libelf.pc {STAGING_ROOT}/usr/lib/pkgconfig
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

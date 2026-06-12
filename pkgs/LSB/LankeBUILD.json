@@ -1,0 +1,7 @@
+{
+    "name": "LSB",
+    "version": "0.12",
+    "sources": [
+        "https://github.com/lfs-book/LSB-Tools/releases/download/v0.12/LSB-Tools-0.12.tar.gz"
+    ]
+}

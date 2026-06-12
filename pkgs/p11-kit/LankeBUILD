@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    rm -rf p11-build && mkdir p11-build && cd p11-build
+    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Dtrust_paths=/etc/pki/anchors -Dman=false -Dgtk_doc=false
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

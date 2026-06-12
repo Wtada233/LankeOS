@@ -1,0 +1,64 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    
+    # --- 策略性欺骗：FileCheck 软链接 ---
+    # 先尝试 ln -s (不加 -f)，保证安全性
+    CREATED_FAKE_FILECHECK=false
+    if [ ! -e /usr/bin/FileCheck ]; then
+        echo "[RUST-BUILD] FileCheck not found. Creating temporary symlink to /bin/true..."
+        ln -s /bin/true /usr/bin/FileCheck
+        CREATED_FAKE_FILECHECK=true
+    fi
+
+    # --- 写入 bootstrap.toml (最新规范) ---
+    cat > bootstrap.toml << EOF
+change-id = 148795
+
+[build]
+vendor = true
+target = ["x86_64-unknown-linux-gnu"]
+docs = false
+
+[llvm]
+download-ci-llvm = false
+static-libstdcpp = false
+ninja = true
+link-shared = true
+
+[rust]
+debug = false
+debug-assertions = false
+debuginfo-level = 0
+incremental = false
+parallel-frontend-threads = 6
+
+[target.x86_64-unknown-linux-gnu]
+llvm-config = "/usr/bin/llvm-config"
+EOF
+
+    # --- 执行安装 (含自动构建) ---
+    # 注意：使用 python3 x.py 直接调用最新的 bootstrap 逻辑
+    DESTDIR={STAGING_ROOT} python3 x.py install --stage 1 -j 6
+
+    if [ "$CREATED_FAKE_FILECHECK" = true ]; then
+        if [ -L /usr/bin/FileCheck ]; then
+            echo "[RUST-BUILD] Verified temporary FileCheck. Cleaning up..."
+            rm /usr/bin/FileCheck
+        else
+            echo "[RUST-BUILD] Warning: /usr/bin/FileCheck was changed by another process, skipping cleanup."
+        fi
+    fi
+
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

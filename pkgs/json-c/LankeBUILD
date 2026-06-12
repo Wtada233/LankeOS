@@ -1,0 +1,24 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    # 使用 GitHub 镜像下载
+    git clone https://github.com/json-c/json-c
+    CURRENT_WORK_DIR="/root/json-c"
+    cd json-c
+    mkdir build && cd build
+    # 核心：绕过 CMake 4.x 限制的策略设置
+    cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    make -j$THREADS
+    make DESTDIR={STAGING_ROOT} install
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

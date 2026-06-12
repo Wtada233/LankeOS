@@ -75,7 +75,7 @@ protected:
         std::string pkg_path = (repo_dir / (name + "-" + ver + ".lpkg")).string();
         // CORRECT PACKING: Files at root of archive
         std::string cmd = "cd " + work_dir.string() + " && tar -cf - . | zstd -o " + pkg_path;
-        std::system(cmd.c_str());
+        run_shell(cmd);
         return pkg_path;
     }
 };
@@ -147,7 +147,7 @@ TEST_F(RealWorldScenarioTest, ReinstallFromNewSource) {
     std::ofstream(work_dir / "man.txt") << "man";
     
     std::string pkg_v1_fixed = (test_root / "myapp-1.0-fixed.lpkg").string();
-    std::system(("cd " + work_dir.string() + " && tar -cf - . | zstd -o " + pkg_v1_fixed).c_str());
+    run_shell(("cd " + work_dir.string() + " && tar -cf - . | zstd -o " + pkg_v1_fixed));
 
     reinstall_package(pkg_v1_fixed);
     

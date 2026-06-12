@@ -1,0 +1,22 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared --wrap-mode=nofallback
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+    # 使 D-Bus 和 systemd 使用同一个 machine-id
+    mkdir -pv {STAGING_ROOT}/var/lib/dbus
+    ln -sfv /etc/machine-id {STAGING_ROOT}/var/lib/dbus/machine-id
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,8 @@
+{
+    "name": "kbd",
+    "version": "2.8.0",
+    "sources": [
+        "https://www.linuxfromscratch.org/patches/lfs/12.4/kbd-2.8.0-backspace-1.patch",
+        "https://www.kernel.org/pub/linux/utils/kbd/kbd-2.8.0.tar.xz"
+    ]
+}

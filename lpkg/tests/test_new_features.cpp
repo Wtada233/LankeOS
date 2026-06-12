@@ -29,7 +29,7 @@ protected:
         suite_work_dir = fs::absolute("tmp_new_features_test");
         if (fs::exists(suite_work_dir)) {
             std::string clean_cmd = "sudo rm -rf " + suite_work_dir.string();
-            std::system(clean_cmd.c_str());
+            run_shell(clean_cmd);
         }
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
@@ -86,7 +86,7 @@ protected:
     void TearDown() override {
         set_root_path("/");
         std::string clean_cmd = "sudo rm -rf " + suite_work_dir.string();
-        std::system(clean_cmd.c_str());
+        run_shell(clean_cmd);
     }
 };
 

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --disable-docs --enable-libxml2=no --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    cd ..
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}
