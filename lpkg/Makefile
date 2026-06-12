@@ -150,6 +150,9 @@ docker:
 		echo "Initializing pure build environment, downloading packages..."; \
 		docker run --name $(DOCKER_ENV_CONTAINER) -d alpine:3.19 sleep infinity; \
 		docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx; \
+	elif [ "$$(docker inspect -f '{{.State.Running}}' $(DOCKER_ENV_CONTAINER))" = "false" ]; then \
+		echo "Container exists but is stopped. Starting $(DOCKER_ENV_CONTAINER)..."; \
+		docker start $(DOCKER_ENV_CONTAINER) >/dev/null; \
 	fi
 	@echo "Syncing source code and compiling inside container..."
 	docker cp . $(DOCKER_ENV_CONTAINER):/app
