@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
 
         options.add_options()
             ("h,help", get_string("info.help_desc"))
-            ("v,version", "Print version")
+            ("v,version", get_string("help.version"))
             ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
             ("p,pkg-query", get_string("help.pkg_query"), cxxopts::value<bool>()->default_value("false"))
             ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value(std::string(constants::DEFAULT_PACK_SOURCE)))
