@@ -1,0 +1,7 @@
+{
+    "name": "libxcrypt",
+    "version": "4.4.38",
+    "sources": [
+        "https://github.com/besser82/libxcrypt/releases/download/v4.4.38/libxcrypt-4.4.38.tar.xz"
+    ]
+}

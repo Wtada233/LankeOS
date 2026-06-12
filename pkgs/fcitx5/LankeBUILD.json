@@ -1,0 +1,7 @@
+{
+    "name": "fcitx5",
+    "version": "5.1.12",
+    "sources": [
+        "https://github.com/fcitx/fcitx5/archive/refs/tags/5.1.12.tar.gz"
+    ]
+}

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    # 我们保留静态库支持，所以不加 --disable-static
+    ./configure --prefix=/usr --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    chmod -v 755 {STAGING_ROOT}/usr/lib/lib{hogweed,nettle}.so
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

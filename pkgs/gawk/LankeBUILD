@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    ln -sfv gawk {STAGING_ROOT}/usr/bin/awk
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

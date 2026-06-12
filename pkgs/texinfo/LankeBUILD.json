@@ -1,0 +1,7 @@
+{
+    "name": "texinfo",
+    "version": "7.2",
+    "sources": [
+        "https://ftpmirror.gnu.org/texinfo/texinfo-7.2.tar.xz"
+    ]
+}

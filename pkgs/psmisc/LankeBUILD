@@ -1,0 +1,20 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    # 添加 pstree.x11 链接
+    ln -sfv pstree {STAGING_ROOT}/usr/bin/pstree.x11
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

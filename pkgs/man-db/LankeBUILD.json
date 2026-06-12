@@ -1,0 +1,7 @@
+{
+    "name": "man-db",
+    "version": "2.13.1",
+    "sources": [
+        "https://download-mirror.savannah.gnu.org/releases/man-db/man-db-2.13.1.tar.xz"
+    ]
+}

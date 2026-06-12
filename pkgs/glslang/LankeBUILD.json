@@ -1,0 +1,7 @@
+{
+    "name": "glslang",
+    "version": "16.2.0",
+    "sources": [
+        "https://github.com/KhronosGroup/glslang/archive/refs/tags/16.2.0.tar.gz"
+    ]
+}

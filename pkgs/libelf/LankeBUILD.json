@@ -1,0 +1,7 @@
+{
+    "name": "libelf",
+    "version": "0.193",
+    "sources": [
+        "https://sourceware.org/ftp/elfutils/0.193/elfutils-0.193.tar.bz2"
+    ]
+}

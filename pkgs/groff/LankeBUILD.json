@@ -1,0 +1,7 @@
+{
+    "name": "groff",
+    "version": "1.23.0",
+    "sources": [
+        "https://ftpmirror.gnu.org/groff/groff-1.23.0.tar.gz"
+    ]
+}

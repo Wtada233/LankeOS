@@ -1,0 +1,7 @@
+{
+    "name": "llvm-clang",
+    "version": "21.1.7",
+    "sources": [
+        "https://github.com/llvm/llvm-project/releases/download/llvmorg-21.1.7/llvm-project-21.1.7.src.tar.xz"
+    ]
+}

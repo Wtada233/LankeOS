@@ -1,0 +1,20 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --sysconfdir=/etc --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    # 彻底清理可能泄露到 include 目录下的 .deps 文件夹
+    rm -rf {STAGING_ROOT}/usr/include/ell/.deps
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

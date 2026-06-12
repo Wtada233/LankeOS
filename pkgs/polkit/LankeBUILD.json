@@ -1,0 +1,7 @@
+{
+    "name": "polkit",
+    "version": "127",
+    "sources": [
+        "https://github.com/polkit-org/polkit/archive/127/polkit-127.tar.gz"
+    ]
+}

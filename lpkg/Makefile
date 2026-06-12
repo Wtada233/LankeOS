@@ -3,7 +3,7 @@ CXX ?= g++
 
 # Use pkg-config to resolve dependencies
 # Removed libcares from explicit list as libcurl should bring it in if needed
-PKGS = libcurl libarchive libcrypto
+PKGS = libcurl libarchive libcrypto libelf
 PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS))
 LIBS = $(shell pkg-config --libs $(PKGS))
 TEST_LIBS = $(LIBS) -lgtest -lgtest_main -lpthread
@@ -15,9 +15,11 @@ ifeq ($(findstring static,$(MAKECMDGOALS)),static)
     LIBS = -Wl,--start-group $(shell pkg-config --libs --static $(PKGS)) -Wl,--end-group -static
 endif
 
+PKGS_LIST = $(PKGS)
+
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 1.0.3
+VERSION ?= 1.2
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -121,6 +123,16 @@ install: all
 	install -m644 $(MAIN_DIR)/l10n/*.txt $(INSTALL_L10N_DIR)/
 	install -d -m755 $(INSTALL_LOCK_DIR)
 	install -d -m755 $(INSTALL_DOCS_DIR)
+
+
+static-install: static
+	install -Dm755 $(BUILD_DIR)/$(TARGET)-static $(INSTALL_BIN_DIR)/$(TARGET)
+	install -Dm644 $(MAIN_DIR)/conf/mirror.conf $(INSTALL_CONF_DIR)/mirror.conf
+	install -d -m755 $(INSTALL_L10N_DIR)
+	install -m644 $(MAIN_DIR)/l10n/*.txt $(INSTALL_L10N_DIR)/
+	install -d -m755 $(INSTALL_LOCK_DIR)
+	install -d -m755 $(INSTALL_DOCS_DIR)
+
 
 uninstall:
 	rm -f $(INSTALL_BIN_DIR)/$(TARGET)

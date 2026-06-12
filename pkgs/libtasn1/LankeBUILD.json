@@ -1,0 +1,7 @@
+{
+    "name": "libtasn1",
+    "version": "4.19.0",
+    "sources": [
+        "https://ftpmirror.gnu.org/libtasn1/libtasn1-4.19.0.tar.gz"
+    ]
+}
