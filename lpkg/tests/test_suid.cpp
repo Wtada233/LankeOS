@@ -3,12 +3,15 @@
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
 #include "../main/src/localization.hpp"
+#include "../main/src/constants.hpp"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
 #include <sys/stat.h>
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 class SUIDTest : public ::testing::Test {
 protected:
@@ -33,7 +36,7 @@ protected:
     }
 
     void TearDown() override {
-        set_root_path("/"); // Reset
+        set_root_path("/");
         std::string clean_cmd = "sudo rm -rf " + suite_work_dir.string();
         run_shell(clean_cmd);
     }
@@ -50,30 +53,29 @@ protected:
             bin.close();
         }
         
-        // Set SUID bit
         chmod(bin_path.c_str(), 04755);
         
-        // Verify bit is set in work_dir
         struct stat st;
         stat(bin_path.c_str(), &st);
         if (!(st.st_mode & S_ISUID)) {
             throw std::runtime_error("Failed to set SUID bit on dummy file");
         }
 
-        // Metadata
         std::ofstream deps(work_dir / "deps.txt");
         deps.close();
         
-        // IMPORTANT: Use TAB separator
-        std::ofstream files(work_dir / "files.txt");
-        files << "usr/bin/suid_bin\t/" << std::endl;
-        files.close();
+        json meta;
+        meta["name"] = name;
+        meta["version"] = version;
+        {
+            std::ofstream mf(work_dir / "metadata.json");
+            mf << meta.dump(2) << std::endl;
+        }
 
         std::ofstream man(work_dir / "man.txt");
         man << "Man page" << std::endl;
         man.close();
 
-        // Pack it using tar which should preserve permissions (-p)
         std::string pkg_name = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
         std::string cmd = "tar --zstd -p -cf " + pkg_path + " -C " + work_dir.string() + " .";

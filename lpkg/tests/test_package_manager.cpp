@@ -3,11 +3,14 @@
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
 #include "../main/src/localization.hpp"
+#include "../main/src/constants.hpp"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 class PackageManagerTest : public ::testing::Test {
 protected:
@@ -48,10 +51,15 @@ protected:
         // Metadata
         std::ofstream deps(work_dir / "deps.txt");
         deps.close(); // No deps
-        
-        std::ofstream files(work_dir / "files.txt");
-        files << "usr/bin/hello\t/" << std::endl;
-        files.close();
+
+        // metadata.json instead of files.txt
+        json meta;
+        meta["name"] = name;
+        meta["version"] = version;
+        {
+            std::ofstream f(work_dir / "metadata.json");
+            f << meta.dump(2) << std::endl;
+        }
 
         std::ofstream man(work_dir / "man.txt");
         man << "Man page for " << name << std::endl;
@@ -107,7 +115,8 @@ TEST_F(PackageManagerTest, VirtualPackages) {
         provides.close();
         
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream files(work_dir / "files.txt"); files.close();
+        json meta; meta["name"] = "provider"; meta["version"] = "1.0";
+        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
         p_prov = (pkg_dir / "provider-1.0.lpkg").string();
@@ -126,7 +135,8 @@ TEST_F(PackageManagerTest, VirtualPackages) {
         deps << "libssl" << std::endl;
         deps.close();
         
-        std::ofstream files(work_dir / "files.txt"); files.close();
+        json meta; meta["name"] = "consumer"; meta["version"] = "1.0";
+        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
         p_cons = (pkg_dir / "consumer-1.0.lpkg").string();
@@ -138,72 +148,8 @@ TEST_F(PackageManagerTest, VirtualPackages) {
     // Install provider
     install_packages({p_prov});
     
-    // Install consumer. It should check dependency "libssl". 
-    // Since "provider" is installed and provides "libssl", dependency check should pass
-    // without trying to install "libssl" from remote.
-    
-    // Note: If dependency resolution failed, it would try to fetch "libssl" and fail (or crash if no net).
-    // We are testing local install so it should succeed.
-    EXPECT_NO_THROW(install_packages({p_cons}));
+    install_packages({p_cons});
 }
-
-// Need access to internal force_reload_cache, but it's internal.
-// We can just rely on SetUp resetting paths.
-// But we need to ensure the Cache singleton is reset.
-// Since Cache is a static local in get_cache(), we can't easily reset it.
-// However, Cache::load() re-reads from files. 
-// If we can trigger load(), we are good.
-// In our modified code, resolve_dependencies() calls force_reload_cache() which calls load().
-// That might be enough.
-
-// Actually, the issue might be that get_installed_version returns empty because cache wasn't reloaded
-// after "lib" was installed.
-// In "install_packages", we call write_cache at end.
-// But do we ever call load()? Yes, get_cache calls load if !loaded.
-// But if loaded is true, it doesn't reload.
-// So subsequent install_packages calls reusing the same process (test suite) reuse the old cache 
-// which might not have the new package if we didn't update the in-memory cache structure properly.
-// Wait, register_package updates in-memory cache (cache.pkgs.insert).
-// So it should be fine.
-
-// Let's add a small sleep to ensure filesystem sync? Unlikely to be the issue.
-
-// Re-verify the test logic for VersionConstraints failure.
-// app_bad depends on lib >= 2.0.
-// lib 1.0 is installed.
-// resolve_package_dependencies for app_bad is called.
-// It iterates deps. Finds "lib".
-// get_installed_version("lib") returns "1.0".
-// has_constraint is true. op=">=", req="2.0".
-// version_satisfies("1.0", ">=", "2.0") -> false.
-// It SHOULD throw.
-
-// Why did "Actual: it throws nothing"?
-// It means resolve_package_dependencies completed.
-// Which means loop finished.
-// Which means either:
-// 1. getline failed / loop didn't run.
-// 2. ss >> dep_name failed.
-// 3. has_constraint was false.
-// 4. installed_dep_ver was empty (or "virtual").
-// 5. version_satisfies returned true.
-
-// We verified version_satisfies is correct in unit test.
-// We verified parsing seems correct in code review.
-// Most likely installed_dep_ver was empty.
-// Why?
-// Because get_installed_version returned empty.
-// Why?
-// Cache didn't have "lib".
-// Why?
-// install_packages({"lib-1.0.lpkg"}) was called just before.
-// It should have updated cache.
-
-// Let's verify if register_package was actually called for lib.
-// In test_package_manager.cpp, install_packages is called.
-// If it succeeded, it means commit -> register_package happened.
-
-// Let's modify the test to verify lib is installed before trying app_bad.
 
 TEST_F(PackageManagerTest, VersionConstraints) {
     // 1. Install lib v1.0
@@ -214,7 +160,8 @@ TEST_F(PackageManagerTest, VersionConstraints) {
         fs::path work_dir = suite_work_dir / "pkg_lib";
         fs::create_directories(work_dir / "content");
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream files(work_dir / "files.txt"); files.close();
+        json meta; meta["name"] = "lib"; meta["version"] = "1.0";
+        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
         std::string cmd = "tar --zstd -cf " + p_lib1 + " -C " + work_dir.string() + " .";
@@ -247,7 +194,8 @@ TEST_F(PackageManagerTest, VersionConstraints) {
         std::ofstream deps(work_dir / "deps.txt"); 
         deps << "lib >= 2.0" << std::endl;
         deps.close();
-        std::ofstream files(work_dir / "files.txt"); files.close();
+        json meta; meta["name"] = "app_bad"; meta["version"] = "1.0";
+        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
         std::string cmd = "tar --zstd -cf " + p_bad + " -C " + work_dir.string() + " .";
@@ -267,7 +215,8 @@ TEST_F(PackageManagerTest, VersionConstraints) {
         std::ofstream deps(work_dir / "deps.txt"); 
         deps << "lib < 2.0" << std::endl;
         deps.close();
-        std::ofstream files(work_dir / "files.txt"); files.close();
+        json meta; meta["name"] = "app_good"; meta["version"] = "1.0";
+        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         
         std::string cmd = "tar --zstd -cf " + p_good + " -C " + work_dir.string() + " .";
@@ -288,7 +237,8 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
         fs::create_directories(work_dir / "content");
         std::ofstream provides(work_dir / "provides.txt"); provides << "libssl" << std::endl; provides.close();
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream files(work_dir / "files.txt"); files.close();
+        json meta; meta["name"] = "openssl"; meta["version"] = "1.0";
+        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         std::string cmd = "tar --zstd -cf " + p_ossl + " -C " + work_dir.string() + " .";
         run_shell(cmd);
@@ -302,8 +252,9 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
         p_curl = (pkg_dir / pkg_curl).string();
         fs::path work_dir = suite_work_dir / "pkg_curl";
         fs::create_directories(work_dir / "content");
+        json meta; meta["name"] = "curl"; meta["version"] = "1.0";
         std::ofstream deps(work_dir / "deps.txt"); deps << "libssl" << std::endl; deps.close();
-        std::ofstream files(work_dir / "files.txt"); files.close();
+        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
         std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
         std::string cmd = "tar --zstd -cf " + p_curl + " -C " + work_dir.string() + " .";
         run_shell(cmd);
@@ -311,8 +262,6 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
     }
 
     // 3. Install curl (will pull openssl as a dependency)
-    // Note: Since we are installing from local files, we must install openssl first
-    // because our simple resolver doesn't auto-find local files not in its plan.
     install_packages({p_ossl});
     install_packages({p_curl});
 
@@ -327,7 +276,7 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
         ASSERT_EQ(count, 2);
     }
 
-    // 5. Run autoremove. openssl should NOT be removed because curl (a holdpkg) depends on libssl (provided by openssl).
+    // 5. Run autoremove
     autoremove();
     write_cache();
 
@@ -342,5 +291,3 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
         EXPECT_TRUE(found_openssl) << "openssl was incorrectly autoremoved!";
     }
 }
-
-

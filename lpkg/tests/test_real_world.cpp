@@ -3,10 +3,13 @@
 #include "cache.hpp"
 #include "config.hpp"
 #include "utils.hpp"
+#include "constants.hpp"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 class RealWorldScenarioTest : public ::testing::Test {
 protected:
@@ -20,13 +23,11 @@ protected:
         fs::create_directories(repo_dir);
         set_root_path(test_root.string() + "/root");
         
-        // Ensure standard lpkg directory structure
         fs::create_directories(ROOT_DIR / "var/lib/lpkg/deps");
         fs::create_directories(ROOT_DIR / "var/lib/lpkg/files");
         fs::create_directories(ROOT_DIR / "var/lib/lpkg/info");
         fs::create_directories(DOCS_DIR);
         
-        // Initialize empty database files
         std::ofstream(PKGS_FILE).close();
         std::ofstream(HOLDPKGS_FILE).close();
         std::ofstream(FILES_DB).close();
@@ -57,23 +58,24 @@ protected:
             for (auto const& prov : provides) p << prov << "\n";
         }
         
+        json meta;
+        meta["name"] = name;
+        meta["version"] = ver;
+        for (auto const& file : files) {
+            fs::path src = work_dir / "content" / file.first;
+            ensure_dir_exists(src.parent_path());
+            std::ofstream out(src);
+            out << "content of " << file.first;
+            out.close();
+        }
         {
-            std::ofstream f(work_dir / "files.txt");
-            for (auto const& file : files) {
-                fs::path src = work_dir / "content" / file.first;
-                ensure_dir_exists(src.parent_path());
-                std::ofstream out(src);
-                out << "content of " << file.first;
-                out.close();
-                // CORRECT MAPPING: relative_path /
-                f << file.first << "\t/\n";
-            }
+            std::ofstream mf(work_dir / "metadata.json");
+            mf << meta.dump(2) << std::endl;
         }
         
         std::ofstream(work_dir / "man.txt") << name << " man page";
         
         std::string pkg_path = (repo_dir / (name + "-" + ver + ".lpkg")).string();
-        // CORRECT PACKING: Files at root of archive
         std::string cmd = "cd " + work_dir.string() + " && tar -cf - . | zstd -o " + pkg_path;
         run_shell(cmd);
         return pkg_path;
@@ -138,9 +140,13 @@ TEST_F(RealWorldScenarioTest, ReinstallFromNewSource) {
         std::ofstream out(work_dir / "content/usr/bin/app");
         out << "new improved content";
     }
+    
+    json meta;
+    meta["name"] = "myapp";
+    meta["version"] = "1.0";
     {
-        std::ofstream f(work_dir / "files.txt");
-        f << "usr/bin/app\t/\n";
+        std::ofstream mf(work_dir / "metadata.json");
+        mf << meta.dump(2) << std::endl;
     }
     std::ofstream(work_dir / "deps.txt").close();
     std::ofstream(work_dir / "provides.txt").close();

@@ -234,10 +234,20 @@ void run_build(const fs::path& build_dir) {
 
     finalize_staging();
 
+    // 5.5. Generate metadata.json for the built package
+    {
+        json meta;
+        meta["name"] = name;
+        meta["version"] = version;
+
+        std::ofstream f(build_dir / constants::PKG_METADATA_FILE);
+        f << meta.dump(2) << std::endl;
+    }
+
     // 6. Pack the result
     log_info(get_string("info.packing_built_pkg"));
     std::string output_filename = name + "-" + version + std::string(constants::EXT_LPKG);
-    pack_package(output_filename, build_dir.string());
+    pack_package(output_filename, build_dir.string(), name, version);
     
     log_info(string_format("info.build_success", output_filename));
 
@@ -249,6 +259,7 @@ void run_build(const fs::path& build_dir) {
 
     if (created_man) fs::remove(build_dir / constants::PKG_MAN_FILE);
     if (created_deps) fs::remove(build_dir / constants::PKG_DEPS_FILE);
+    fs::remove(build_dir / constants::PKG_METADATA_FILE);
     for (const auto& f : downloaded_files) {
         fs::remove(f);
     }

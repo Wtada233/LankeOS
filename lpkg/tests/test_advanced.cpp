@@ -3,11 +3,14 @@
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
 #include "../main/src/localization.hpp"
+#include "../main/src/constants.hpp"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 class AdvancedPackageManagerTest : public ::testing::Test {
 protected:
@@ -50,10 +53,14 @@ protected:
         f << content;
         f.close();
         
+        json meta;
+        meta["name"] = name;
+        meta["version"] = ver;
+        {
+            std::ofstream mf(work_dir / "metadata.json");
+            mf << meta.dump(2) << std::endl;
+        }
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream files(work_dir / "files.txt");
-        files << content_file << "\t/\n";
-        files.close();
         std::ofstream man(work_dir / "man.txt"); man.close();
 
         std::string pkg_name = name + "-" + ver + ".lpkg";
@@ -66,7 +73,7 @@ protected:
 };
 
 TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
-    // 1. Prepare a package with two files: file_ok and file_blocked
+    // 1. Prepare a package with two files
     std::string pkg;
     {
         std::string pkg_name = "rollback_new-1.0.lpkg";
@@ -76,10 +83,13 @@ TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
         std::ofstream f1(work_dir / "content" / "usr" / "bin" / "file_ok"); f1 << "ok"; f1.close();
         std::ofstream f2(work_dir / "content" / "usr" / "bin" / "file_blocked"); f2 << "blocked"; f2.close();
         
-        std::ofstream files(work_dir / "files.txt");
-        files << "usr/bin/file_ok\t/\n";
-        files << "usr/bin/file_blocked\t/\n";
-        files.close();
+        json meta;
+        meta["name"] = "rollback_new";
+        meta["version"] = "1.0";
+        {
+            std::ofstream mf(work_dir / "metadata.json");
+            mf << meta.dump(2) << std::endl;
+        }
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
         std::ofstream man(work_dir / "man.txt"); man.close();
         
@@ -88,15 +98,12 @@ TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
         fs::remove_all(work_dir);
     }
 
-    // 2. Sabotage: Make the PARENT directory read-only to block ANY new file/overwrite
+    // 2. Sabotage: Make the PARENT directory read-only
     fs::path bin_dir = test_root / "usr" / "bin";
     fs::create_directories(bin_dir);
     
-    // 3. Try install. Use --force-overwrite to pass conflict check if any
     set_force_overwrite_mode(true);
     
-    // CRITICAL: Change permissions of parent directory to block writing
-    // We also put a file there to ensure it's not empty
     std::ofstream f_sabotage(bin_dir / "file_blocked");
     f_sabotage << "original";
     f_sabotage.close();
@@ -108,7 +115,7 @@ TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
     // Restore for cleanup
     fs::permissions(bin_dir, fs::perms::owner_all);
 
-    // 4. Verify Rollback: file_ok should be GONE (cleaned up)
+    // 3. Verify Rollback: file_ok should be GONE
     EXPECT_FALSE(fs::exists(test_root / "usr" / "bin" / "file_ok"));
 }
 
@@ -128,7 +135,13 @@ TEST_F(AdvancedPackageManagerTest, ChrootHook) {
         hook.close();
         fs::permissions(work_dir / "hooks" / "postinst.sh", fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec, fs::perm_options::add);
 
-        std::ofstream files(work_dir / "files.txt"); files << "dummy\t/\n"; files.close();
+        json meta;
+        meta["name"] = "hook_test";
+        meta["version"] = "1.0";
+        {
+            std::ofstream mf(work_dir / "metadata.json");
+            mf << meta.dump(2) << std::endl;
+        }
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
         std::ofstream man(work_dir / "man.txt"); man.close();
         

@@ -10,6 +10,8 @@
 -   **智能版本解析**：支持多位修订号（如 `1.0.0.1`），内置严谨的比较算法，确保 `6.16.1 > 6.6.1`。
 -   **聚合索引优化**：采用 `index.txt` 聚合格式，一行即可记录包的所有版本及其哈希，极大减少网络请求。
 -   **零冗余存储**：取消了 `latest.txt` 和单独的 `hash.txt`。软件包以 `包名/版本号.lpkg` 形式扁平化存储。
+-   **包内嵌元数据**：不再依赖文件名来识别包名和版本，改用 `metadata.json` 嵌入包内，消除文件名解析的脆弱性。
+-   **无 `files.txt`**：包的 `content/` 目录结构直接对应根目录文件布局，不再需要通过 `files.txt` 映射文件路径。
 -   **自动化运维**：提供 `lrepo-mgr.py` 工具，支持一键推送到腾讯云 COS (S3) 或 SCP 远程服务器。
 -   **高兼容性静态构建**：内置系统 CA 证书路径自动探测，确保静态编译版本在不同 Linux 发行版上都能正常联网。
 -   **安全性**：强制 SHA256 哈希校验、文件冲突检测、恶意路径过滤。
@@ -19,13 +21,13 @@
 
 ### 依赖
 
-编译 `lpkg` 需要以下库：
+编译 `lpkg` 需要以下库:
 - `libcurl`: 用于文件下载。
 - `libarchive`: 用于解压包文件。
 - `libcrypto` (OpenSSL): 用于计算哈希。
-- `libfmt`: 用于字符串格式化（Header-only）。
+- `libfmt`: 用于字符串格式化(Header-only)。
 
-在 Arch Linux 上安装：
+在 Arch Linux 上安装:
 ```bash
 sudo pacman -S curl libarchive openssl fmt
 ```
@@ -37,7 +39,7 @@ sudo pacman -S curl libarchive openssl fmt
     make && sudo make install
     ```
 2.  **静态编译 (推荐用于 LFS)**:
-    项目中包含 `Dockerfile.build`，可生成完全静态链接的二进制文件：
+    项目中包含 `Dockerfile.build`,可生成完全静态链接的二进制文件:
     ```bash
     sudo docker build -t lpkg-builder -f Dockerfile.build .
     sudo docker run -it --rm -v $(pwd):/app lpkg-builder
@@ -58,16 +60,16 @@ lpkg [选项] <命令> [参数]
 -   **`upgrade`**: 自动从索引中查找所有已安装包的更新。
 -   **`remove <包名> [--force]`**: 移除包。使用 `--force` 可强制删除被依赖的包。
 -   **`query [-p] <包名|文件名>`**: 查询文件归属或列出包内文件。
--   **`scan [目录]`**: 扫描系统中不属于任何包的“孤儿”文件。
--   **`pack -o <输出文件> --source <源目录>`**: 构建 `.lpkg` 格式的软件包。
--   **`build [目录]`**: 自动编译并打包软件包.
+-   **`scan [目录]`**: 扫描系统中不属于任何包的"孤儿"文件。
+-   **`pack -o <输出文件> --source <源目录> [--pkg-name <名称>] [--pkg-version <版本>]`**: 构建 `.lpkg` 格式的软件包，包名和版本会写入 `metadata.json`。
+-   **`build [目录]`**: 自动编译并打包软件包。
 
 ## 仓库管理 (运维指南)
 
 项目在 `main/scripts/lrepo-mgr.py` 提供了一个强大的运维脚本。
 
 ### 1. 配置仓库连接
-支持 S3 (腾讯云 COS, AWS) 或 SCP：
+支持 S3 (腾讯云 COS, AWS) 或 SCP:
 ```bash
 # 配置 S3/COS
 ./main/scripts/lrepo-mgr.py config --set \
@@ -79,16 +81,40 @@ lpkg [选项] <命令> [参数]
 ```
 
 ### 2. 发布软件包
-该命令会自动更新聚合索引并上传：
+该命令会自动更新聚合索引并上传:
 ```bash
 ./main/scripts/lrepo-mgr.py push ./pkgs/*.lpkg
 ```
 
 ### 3. 清理历史版本
-从存储端删除所有不在 `index.txt` 记录中的旧版本文件：
+从存储端删除所有不在 `index.txt` 记录中的旧版本文件:
 ```bash
 ./main/scripts/lrepo-mgr.py cleanup
 ```
+
+## 包格式规范
+
+每个 `.lpkg` 文件是一个 tar.zst 压缩包，包含以下内容：
+
+```text
+metadata.json         # 包元数据（名称、版本、文件列表）
+deps.txt              # 依赖关系
+provides.txt          # 虚拟提供（可选）
+man.txt               # 手册页
+content/              # 文件内容（直接对应根目录结构）
+hooks/                # 钩子脚本（可选）
+```
+
+### metadata.json 示例
+```json
+{
+  "name": "bash",
+  "version": "5.2",
+  "files": ["usr/bin/bash", "usr/share/man/man1/bash.1"]
+}
+```
+
+`content/` 目录下的文件布局直接对应目标根目录（`/`），无需 `files.txt` 做路径映射。
 
 ## 仓库规范
 
@@ -112,6 +138,7 @@ acl|2.3.1:sha...,2.3.2:sha...|attr,coreutils|libacl.so
 -   **`InstallationTask`**: 原子事务模型，支持失败自动回滚。
 -   **`Downloader`**: 封装了 `libcurl` 并集成了多路径证书探测逻辑。
 -   **`Cache`**: 本地状态数据库，存储于 `/var/lib/lpkg/`。
+-   **`metadata.json`**: 包内嵌元数据（名称、版本、文件列表），替代了基于文件名的解析和 `files.txt` 路径映射。
 
 ## 贡献
 

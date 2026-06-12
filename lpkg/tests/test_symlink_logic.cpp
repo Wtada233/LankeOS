@@ -2,11 +2,14 @@
 #include "package_manager.hpp"
 #include "config.hpp"
 #include "utils.hpp"
+#include "constants.hpp"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 #include <sys/stat.h>
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 class SymlinkLogicTest : public ::testing::Test {
 protected:
@@ -54,14 +57,19 @@ TEST_F(SymlinkLogicTest, PreventsSymlinkChmodFollow) {
     // 2. Prepare a mock extraction directory
     fs::path pkg_tmp_dir = get_tmp_dir() / "symlink_pkg";
     fs::remove_all(pkg_tmp_dir);
-    fs::create_directories(pkg_tmp_dir / "content");
+    // With content/ → / mapping, content/usr/bin/my_link installs to /usr/bin/my_link
+    fs::create_directories(pkg_tmp_dir / "content" / "usr" / "bin");
     
-    // Create symlink directly in content/ to match files.txt simple entry
-    fs::create_symlink("usr/bin/target_binary", pkg_tmp_dir / "content/my_link");
+    // Create symlink in content/usr/bin/ (relative to link's parent dir /usr/bin/)
+    fs::create_symlink("target_binary", pkg_tmp_dir / "content" / "usr" / "bin" / "my_link");
     
+    // Create metadata.json
+    json meta;
+    meta["name"] = "symlink_pkg";
+    meta["version"] = "1.0";
     {
-        std::ofstream f(pkg_tmp_dir / "files.txt");
-        f << "my_link\t/usr/bin/\n";
+        std::ofstream f(pkg_tmp_dir / "metadata.json");
+        f << meta.dump(2) << std::endl;
     }
 
     InstallationTask task("symlink_pkg", "1.0", true);
@@ -71,7 +79,7 @@ TEST_F(SymlinkLogicTest, PreventsSymlinkChmodFollow) {
 
     // 4. Verify the link was created at destination: /usr/bin/my_link
     fs::path link_phys = test_root / "usr/bin/my_link";
-    EXPECT_TRUE(fs::is_symlink(link_phys));
+    EXPECT_TRUE(fs::is_symlink(link_phys)) << "Symlink was not created at " << link_phys;
 
     // 5. Verify target remains untouched
     struct stat st_final;
@@ -93,7 +101,13 @@ TEST_F(SymlinkLogicTest, HandlesConfigSymlinkConflict) {
     fs::create_directories(pkg_tmp_dir / "content/etc");
     fs::create_symlink("/usr/lib/os-release", pkg_tmp_dir / "content/etc/os-release");
     
-    { std::ofstream f(pkg_tmp_dir / "files.txt"); f << "etc/os-release\t/\n"; }
+    json meta;
+    meta["name"] = "filesystem_pkg";
+    meta["version"] = "1.0";
+    {
+        std::ofstream f(pkg_tmp_dir / "metadata.json");
+        f << meta.dump(2) << std::endl;
+    }
 
     InstallationTask task("filesystem_pkg", "1.0", true);
     task.tmp_pkg_dir_ = pkg_tmp_dir;

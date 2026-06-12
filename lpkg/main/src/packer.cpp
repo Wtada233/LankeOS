@@ -5,6 +5,7 @@
 #include "hash.hpp"
 #include "config.hpp"
 #include "constants.hpp"
+#include "nlohmann/json.hpp"
 #include <archive.h>
 #include <archive_entry.h>
 #include <filesystem>
@@ -13,8 +14,11 @@
 #include <iostream>
 #include <algorithm>
 #include <climits>
+#include <sstream>
 
 namespace fs = std::filesystem;
+
+using json = nlohmann::json;
 
 namespace {
     void add_to_archive(struct archive* a, const fs::path& path, const std::string& entry_name) {
@@ -65,7 +69,8 @@ namespace {
     }
 }
 
-void pack_package(const std::string& output_filename, const std::string& source_dir) {
+void pack_package(const std::string& output_filename, const std::string& source_dir,
+                  const std::string& pkg_name, const std::string& pkg_version) {
     fs::path base_dir = source_dir;
     fs::path root_dir = base_dir / constants::DIR_ROOT;
     fs::path hooks_dir = base_dir / constants::DIR_HOOKS;
@@ -85,18 +90,19 @@ void pack_package(const std::string& output_filename, const std::string& source_
     try {
         log_info(get_string("info.pack_scanning"));
         
-        // 1. Generate and add files.txt
-        fs::path tmp_files_txt = get_tmp_dir() / constants::PKG_FILES_FILE;
-        ensure_dir_exists(tmp_files_txt.parent_path());
+        // 1. Generate and add metadata.json
+        fs::path tmp_meta = get_tmp_dir() / constants::PKG_METADATA_FILE;
+        ensure_dir_exists(tmp_meta.parent_path());
         {
-            std::ofstream f(tmp_files_txt);
-            for (const auto& entry : fs::recursive_directory_iterator(root_dir)) {
-                if (entry.is_directory()) continue;
-                f << entry.path().lexically_relative(root_dir).string() << constants::TAB << "/" << constants::NL;
-            }
+            json meta;
+            meta["name"] = pkg_name;
+            meta["version"] = pkg_version;
+
+            std::ofstream f(tmp_meta);
+            f << meta.dump(2) << std::endl;
         }
-        add_to_archive(a, tmp_files_txt, std::string(constants::PKG_FILES_FILE));
-        fs::remove(tmp_files_txt);
+        add_to_archive(a, tmp_meta, std::string(constants::PKG_METADATA_FILE));
+        fs::remove(tmp_meta);
 
         // 2. Add metadata files
         if (fs::exists(base_dir / constants::PKG_DEPS_FILE)) add_to_archive(a, base_dir / constants::PKG_DEPS_FILE, std::string(constants::PKG_DEPS_FILE));

@@ -4,10 +4,13 @@
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
 #include "../main/src/localization.hpp"
+#include "../main/src/constants.hpp"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 class HashTest : public ::testing::Test {
 protected:
@@ -49,7 +52,14 @@ protected:
         fs::create_directories(work_dir / "content");
         std::ofstream f(work_dir / "content/dummy"); f << "data"; f.close();
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream files(work_dir / "files.txt"); files << "dummy\t/\n"; files.close();
+        
+        json meta;
+        meta["name"] = name;
+        meta["version"] = ver;
+        {
+            std::ofstream mf(work_dir / "metadata.json");
+            mf << meta.dump(2) << std::endl;
+        }
         std::ofstream ml(work_dir / "man.txt"); ml << "man\n"; ml.close();
 
         std::string pkg_filename = name + "-" + ver + ".lpkg";
@@ -63,8 +73,6 @@ protected:
 
 TEST_F(HashTest, CalculateSHA256) {
     std::string path = create_dummy_file("test.txt", "hello world");
-    // echo -n "hello world" | sha256sum
-    // b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
     std::string hash = calculate_sha256(path);
     EXPECT_EQ(hash, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
 }

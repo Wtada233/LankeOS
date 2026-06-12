@@ -3,11 +3,14 @@
 #include "../main/src/package_manager.hpp"
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
+#include "../main/src/constants.hpp"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 #include <vector>
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 class ParamOrderTest : public ::testing::Test {
 protected:
@@ -41,7 +44,14 @@ protected:
         fs::create_directories(work_dir / "content");
         std::ofstream f(work_dir / "content/file"); f << name; f.close();
         std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream files(work_dir / "files.txt"); files << "file\t/\n"; files.close();
+        
+        json meta;
+        meta["name"] = name;
+        meta["version"] = "1.0";
+        {
+            std::ofstream mf(work_dir / "metadata.json");
+            mf << meta.dump(2) << std::endl;
+        }
         std::ofstream ml(work_dir / "man.txt"); ml << "man\n"; ml.close();
 
         std::string pkg_filename = name + "-1.0.lpkg";
@@ -59,14 +69,11 @@ TEST_F(ParamOrderTest, OrderVariation) {
     fs::path hash_file = suite_work_dir / "order.hash";
     std::ofstream hf(hash_file); hf << actual_hash; hf.close();
 
-    // 1. Install with hash provided
     EXPECT_NO_THROW(install_packages({pkg}, hash_file.string()));
     
-    // Clean up for next try
     remove_package("orderpkg", true);
     fs::remove(test_root / "file");
 
-    // 2. Install without hash provided
     EXPECT_NO_THROW(install_packages({pkg}, ""));
 }
 
@@ -76,6 +83,5 @@ TEST_F(ParamOrderTest, MultiplePackagesWithOneHash) {
     std::string hash_file = suite_work_dir / "multi.hash";
     std::ofstream hf(hash_file); hf << "invalid-hash"; hf.close();
 
-    // Should fail because hash mismatch for at least the first one
     EXPECT_THROW(install_packages({pkg1, pkg2}, hash_file), LpkgException);
 }

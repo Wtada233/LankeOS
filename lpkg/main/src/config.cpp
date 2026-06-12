@@ -21,7 +21,6 @@ fs::path HOOKS_DIR = fs::path(LPKG_CONF_DIR) / "hooks/";
 
 // Derived paths
 fs::path DEP_DIR = fs::path("/var/lib/lpkg") / "deps/";
-fs::path FILES_DIR = fs::path("/var/lib/lpkg") / "files/";
 fs::path PKGS_FILE = fs::path("/var/lib/lpkg") / "pkgs";
 fs::path HOLDPKGS_FILE = fs::path("/var/lib/lpkg") / "holdpkgs";
 fs::path ESSENTIAL_FILE = fs::path(LPKG_CONF_DIR) / "essential";
@@ -51,7 +50,6 @@ void set_root_path(const std::string& root_path) {
     
     HOOKS_DIR = CONFIG_DIR / "hooks/";
     DEP_DIR = STATE_DIR / "deps/";
-    FILES_DIR = STATE_DIR / "files/";
     PKGS_FILE = STATE_DIR / "pkgs";
     HOLDPKGS_FILE = STATE_DIR / "holdpkgs";
     ESSENTIAL_FILE = CONFIG_DIR / "essential";
@@ -71,7 +69,6 @@ void init_filesystem() {
     ensure_dir_exists(CONFIG_DIR);
     ensure_dir_exists(STATE_DIR);
     ensure_dir_exists(DEP_DIR);
-    ensure_dir_exists(FILES_DIR);
     ensure_dir_exists(L10N_DIR);
     ensure_dir_exists(DOCS_DIR);
     ensure_dir_exists(HOOKS_DIR);

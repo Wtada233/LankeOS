@@ -19,7 +19,7 @@ namespace constants {
     inline constexpr std::string_view PKG_MAN_FILE = "man.txt";
     inline constexpr std::string_view PKG_DEPS_FILE = "deps.txt";
     inline constexpr std::string_view PKG_PROVIDES_FILE = "provides.txt";
-    inline constexpr std::string_view PKG_FILES_FILE = "files.txt";
+    inline constexpr std::string_view PKG_METADATA_FILE = "metadata.json";
 
     // Repository and Index
     inline constexpr std::string_view REPO_INDEX_FILE = "index.txt";
@@ -64,9 +64,6 @@ namespace constants {
     inline constexpr std::string_view SUFFIX_LPKG_NEW = ".lpkgnew";
     inline constexpr std::string_view SUFFIX_LPKG_BAK = ".lpkg_bak_";
     inline constexpr std::string_view SUFFIX_MAN = ".man";
-    inline constexpr std::string_view SUFFIX_TXT = ".txt";
-    inline constexpr std::string_view SUFFIX_DIRS = ".dirs";
-    inline constexpr std::string_view SUFFIX_PROVIDES = ".provides";
 
     // CLI Commands
     inline constexpr std::string_view CMD_INSTALL = "install";

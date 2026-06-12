@@ -71,6 +71,8 @@ int main(int argc, char* argv[]) {
             ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
             ("p,pkg-query", get_string("help.pkg_query"), cxxopts::value<bool>()->default_value("false"))
             ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value(std::string(constants::DEFAULT_PACK_SOURCE)))
+            ("pkg-name", get_string("help.pkg_name"), cxxopts::value<std::string>()->default_value("package"))
+            ("pkg-version", get_string("help.pkg_version"), cxxopts::value<std::string>()->default_value("0.0.0"))
             ("non-interactive", get_string("info.non_interactive_option_desc"), cxxopts::value<std::string>()->implicit_value("n"))
             ("force", get_string("help.force"), cxxopts::value<bool>()->default_value("false"))
             ("force-overwrite", get_string("help.force_overwrite"), cxxopts::value<bool>()->default_value("false"))
@@ -203,7 +205,9 @@ int main(int argc, char* argv[]) {
                  throw LpkgException(get_string("error.pack_no_output"));
             }
             std::string source_dir = result["source"].as<std::string>();
-            pack_package(output_file, source_dir);
+            std::string pkg_name = result["pkg-name"].as<std::string>();
+            std::string pkg_version = result["pkg-version"].as<std::string>();
+            pack_package(output_file, source_dir, pkg_name, pkg_version);
         } else if (command == constants::CMD_BUILD) {
             std::string build_dir = ".";
             if (result.count("packages")) {

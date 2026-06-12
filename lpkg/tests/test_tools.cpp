@@ -7,11 +7,14 @@
 #include "../main/src/package_manager.hpp"
 #include "../main/src/archive.hpp"
 #include "../main/src/cache.hpp"
+#include "../main/src/constants.hpp"
+#include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 class ToolsTest : public ::testing::Test {
 protected:
@@ -46,7 +49,7 @@ protected:
 };
 
 TEST_F(ToolsTest, PackAndVerifyContent) {
-    // 1. 准备源文件
+    // 1. Prepare source files
     std::ofstream f(root_dir / "usr/bin/hello");
     f << "executable_content";
     f.close();
@@ -55,61 +58,57 @@ TEST_F(ToolsTest, PackAndVerifyContent) {
     h << "echo hook";
     h.close();
 
-    // 2. 执行打包
-    EXPECT_NO_THROW(pack_package(output_pkg.string(), source_dir.string()));
+    // 2. Execute pack with name/version
+    EXPECT_NO_THROW(pack_package(output_pkg.string(), source_dir.string(), "test-pkg", "1.0"));
     EXPECT_TRUE(fs::exists(output_pkg));
 
-    // 3. 解压并验证内容
+    // 3. Extract and verify content
     fs::path verify_dir = suite_work_dir / "verify_pack";
     fs::create_directories(verify_dir);
     
-    // 使用 lpkg 内部的解压函数进行验证
     extract_tar_zst(output_pkg, verify_dir);
 
-    // 检查核心文件结构
+    // Check core file structure (metadata.json replaces files.txt)
     EXPECT_TRUE(fs::exists(verify_dir / "content/usr/bin/hello"));
     EXPECT_TRUE(fs::exists(verify_dir / "hooks/postinst.sh"));
-    EXPECT_TRUE(fs::exists(verify_dir / "files.txt"));
+    EXPECT_TRUE(fs::exists(verify_dir / "metadata.json"));
     EXPECT_TRUE(fs::exists(verify_dir / "deps.txt"));
     EXPECT_TRUE(fs::exists(verify_dir / "man.txt"));
 
-    // 检查 files.txt 内容是否正确
-    std::ifstream files_txt(verify_dir / "files.txt");
-    std::string line;
-    bool found_bin = false;
-    while (std::getline(files_txt, line)) {
-        if (line.find("usr/bin/hello") != std::string::npos) {
-            found_bin = true;
-        }
+    // Verify metadata.json content
+    {
+        std::ifstream meta_f(verify_dir / "metadata.json");
+        json meta;
+        meta_f >> meta;
+        EXPECT_EQ(meta["name"], "test-pkg");
+        EXPECT_EQ(meta["version"], "1.0");
     }
-    EXPECT_TRUE(found_bin);
 }
 
 TEST_F(ToolsTest, ScanOrphansLogic) {
-    // 1. 创建孤儿文件 (Orphan)
+    // 1. Create orphan file
     fs::create_directories(test_system_root / "usr/bin");
     std::ofstream orphan(test_system_root / "usr/bin/orphan");
     orphan << "orphan";
     orphan.close();
 
-    // 2. 创建被拥有的文件 (Owned) 并注册到数据库
+    // 2. Create owned file and register to database
     std::ofstream owned(test_system_root / "usr/bin/owned");
     owned << "owned";
     owned.close();
     
-    // 手动注入数据库记录 (模拟已安装包)
     {
         std::ofstream db(test_system_root / "var/lib/lpkg/files.db");
         db << "/usr/bin/owned\ttest-pkg" << std::endl;
     }
-    Cache::instance().load(); // 强制重载数据库
+    Cache::instance().load();
 
-    // 3. 执行扫描并捕获输出
+    // 3. Run scan and capture output
     testing::internal::CaptureStdout();
     scan_orphans(test_system_root.string());
     std::string output = testing::internal::GetCapturedStdout();
 
-    // 4. 验证结果
-    EXPECT_NE(output.find("orphan"), std::string::npos) << "Should verify orphan file is detected";
+    // 4. Verify
+    EXPECT_NE(output.find("orphan"), std::string::npos) << "Should detect orphan file";
     EXPECT_EQ(output.find("owned"), std::string::npos) << "Should NOT report owned file as orphan";
 }
