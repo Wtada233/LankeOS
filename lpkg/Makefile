@@ -78,7 +78,7 @@ test:
 	@echo "Starting comprehensive test suite with coverage..."
 	@rm -rf build_test coverage_report
 	@mkdir -p build_test
-	@$(MAKE) -j$$(nproc) BUILD_DIR=build_test COVERAGE_MODE=1 build_test_internal
+	@$(MAKE) BUILD_DIR=build_test COVERAGE_MODE=1 build_test_internal
 	@mkdir -p coverage_report
 	@lcov --rc geninfo_unexecuted_blocks=1 --capture --directory build_test --output-file build_test/coverage.info --ignore-errors mismatch,inconsistent,unused || true
 	@lcov --ignore-errors mismatch,inconsistent,unused --remove build_test/coverage.info '/usr/*' '*/third_party/*' '*/tests/*' --output-file build_test/coverage_filtered.info || true
