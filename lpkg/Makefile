@@ -159,4 +159,4 @@ docker:
 	docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make static -j$$(nproc) && strip --strip-all $(BUILD_DIR)/$(TARGET)-static && upx -9 $(BUILD_DIR)/$(TARGET)-static"
 	docker cp $(DOCKER_ENV_CONTAINER):/app/$(BUILD_DIR)/$(TARGET)-static $(BUILD_DIR)/$(TARGET)-docker
 	@echo "--------------------------------------------------------"
-	@echo "Success! Pure static binary is ready at: $(BUILD_DIR)/$(TARGET)-static"
+	@echo "Success! Pure static binary is ready at: $(BUILD_DIR)/$(TARGET)-docker"
