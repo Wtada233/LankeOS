@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "../main/src/hash.hpp"
 #include "../main/src/package_manager.hpp"
+#include "../main/src/packer.hpp"
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
 #include "../main/src/constants.hpp"
@@ -42,8 +43,8 @@ protected:
 
     std::string create_pkg(const std::string& name) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
-        fs::create_directories(work_dir / "content");
-        std::ofstream f(work_dir / "content/file"); f << name; f.close();
+        fs::create_directories(work_dir / "root");
+        std::ofstream f(work_dir / "root/file"); f << name; f.close();
         
         std::string pkg_filename = name + "-1.0.lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();

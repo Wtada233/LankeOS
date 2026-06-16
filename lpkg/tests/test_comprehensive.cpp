@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "../main/src/package_manager.hpp"
+#include "../main/src/packer.hpp"
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
 #include "../main/src/localization.hpp"
@@ -48,29 +49,19 @@ protected:
                         const std::vector<std::string>& provides = {}) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name + "_" + ver);
         fs::remove_all(work_dir);
-        fs::create_directories(work_dir / "content");
+        fs::create_directories(work_dir / "root");
         
-        json meta;
-        meta[std::string(constants::J_NAME)] = name;
-        meta[std::string(constants::J_VERSION)] = ver;
-        meta[std::string(constants::J_DEPS)] = deps;
-        meta[std::string(constants::J_PROVIDES)] = provides;
-        meta[std::string(constants::J_MAN)] = "man " + name;
-
         for (const auto& [src, dest] : files) {
-            fs::path p = work_dir / "content" / src;
+            fs::path p = work_dir / "root" / src;
             ensure_dir_exists(p.parent_path());
             std::ofstream f(p); f << "content of " << src; f.close();
-        }
-        {
-            std::ofstream mf(work_dir / "metadata.json");
-            mf << meta.dump(2) << std::endl;
         }
 
         std::string pkg_name = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
-        std::string cmd = "cd " + work_dir.string() + " && tar --zstd -cf " + pkg_path + " . > /dev/null 2>&1";
-        run_shell(cmd);
+        
+        pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, "man " + name);
+        
         fs::remove_all(work_dir);
         return pkg_path;
     }

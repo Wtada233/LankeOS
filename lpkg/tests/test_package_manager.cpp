@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "../main/src/package_manager.hpp"
+#include "../main/src/packer.hpp"
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
 #include "../main/src/localization.hpp"
@@ -9,6 +10,7 @@
 #include <fstream>
 #include <cstdlib>
 #include "../main/src/packer.hpp"
+#include "../main/src/cache.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -25,6 +27,7 @@ protected:
         init_localization();
 
         suite_work_dir = fs::absolute("tmp_pm_test");
+        if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
         
@@ -33,6 +36,7 @@ protected:
         
         set_root_path(test_root.string());
         init_filesystem();
+        Cache::instance().load();
     }
 
     void TearDown() override {
@@ -42,11 +46,11 @@ protected:
 
     std::string create_dummy_package(const std::string& name, const std::string& version, const std::vector<std::string>& deps = {}, const std::vector<std::string>& provides = {}) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
-        fs::create_directories(work_dir / "content" / "usr" / "bin");
+        fs::create_directories(work_dir / "root" / "usr" / "bin");
         
-        // Create a dummy binary
-        std::ofstream bin(work_dir / "content" / "usr" / "bin" / "hello");
-        bin << "#!/bin/sh\necho Hello\n";
+        // Create a dummy binary unique to the package
+        std::ofstream bin(work_dir / "root" / "usr" / "bin" / name);
+        bin << "#!/bin/sh\necho Hello from " << name << "\n";
         bin.close();
         
         // Use pack_package to handle metadata consolidation
@@ -70,7 +74,7 @@ TEST_F(PackageManagerTest, InstallLocalPackage) {
     EXPECT_NO_THROW(install_packages(args));
 
     // Verify installation
-    fs::path installed_file = test_root / "usr" / "bin" / "hello";
+    fs::path installed_file = test_root / "usr" / "bin" / "testpkg";
     EXPECT_TRUE(fs::exists(installed_file));
     
     fs::path db_file = FILES_DB;
@@ -79,12 +83,13 @@ TEST_F(PackageManagerTest, InstallLocalPackage) {
 
 TEST_F(PackageManagerTest, SysrootIsolation) {
     // Ensure that files are NOT installed to real /usr/bin
-    std::string pkg_file = create_dummy_package("testpkg", "1.0");
+    std::string pkg_name = "sysroot_iso_testpkg";
+    std::string pkg_file = create_dummy_package(pkg_name, "1.0");
     std::vector<std::string> args = {pkg_file};
     install_packages(args);
 
-    EXPECT_FALSE(fs::exists("/usr/bin/hello")); 
-    EXPECT_TRUE(fs::exists(test_root / "usr/bin/hello"));
+    EXPECT_FALSE(fs::exists("/usr/bin/" + pkg_name)); 
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin" / pkg_name));
 }
 
 TEST_F(PackageManagerTest, VirtualPackages) {

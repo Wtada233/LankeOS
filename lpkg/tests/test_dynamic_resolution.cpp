@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "../main/src/package_manager.hpp"
 #include "../main/src/packer.hpp"
+#include "../main/src/hash.hpp"
 #include "../main/src/cache.hpp"
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
@@ -71,7 +72,13 @@ protected:
     void update_index(const std::vector<std::tuple<std::string, std::string, std::string, std::string>>& entries) {
         std::ofstream index(mirror_dir / "index.txt");
         for (const auto& [name, ver, deps, provides] : entries) {
-            index << name << "|" << ver << ":hash:" << deps << "|" << provides << "\n";
+            std::string pkg_filename = name + "-" + ver + ".lpkg";
+            std::string pkg_path = (pkg_dir / pkg_filename).string();
+            std::string hash = "unknown";
+            if (fs::exists(pkg_path)) {
+                hash = calculate_sha256(pkg_path);
+            }
+            index << name << "|" << ver << ":" << hash << ":" << deps << "|" << provides << "\n";
         }
     }
 };
@@ -115,7 +122,7 @@ TEST_F(DynamicResolutionTest, DynamicProviderChange) {
     update_index({
         {"app", "1.0", "virtual-pkg", ""},
         {"provA", "1.0", "", "virtual-pkg"},
-        {"provB", "1.0", "", ""}
+        {"provB", "1.0", "", "virtual-pkg"}
     });
 
     // 2. Install 'app'. 

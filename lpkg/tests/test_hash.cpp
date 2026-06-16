@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "../main/src/hash.hpp"
 #include "../main/src/package_manager.hpp"
+#include "../main/src/packer.hpp"
 #include "../main/src/config.hpp"
 #include "../main/src/utils.hpp"
 #include "../main/src/localization.hpp"

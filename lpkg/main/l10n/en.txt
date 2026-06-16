@@ -104,6 +104,7 @@ error.upgrade_failed=Failed to upgrade {}: {}
 info.restoring_package=Attempting to restore original version of {} ({})
 info.upgrading_package=Upgrading package {} from {} to {}
 error.copy_failed_rollback=Failed to copy file {} to {}: {}. Rolling back installation.
+info.resolving_metadata=Metadata changed for {}, re-resolving dependencies...
 info.pre_op_check=Performing pre-operation checks...
 error.cmd_parse_error=Command line parsing error: {}
 error.lpkg_error=Lpkg error: {}

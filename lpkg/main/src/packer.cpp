@@ -116,6 +116,8 @@ void pack_package(const std::string& output_filename, const std::string& source_
         }
 
         // 4. Add content (root dir -> content/)
+        // Always add the directory entry itself first
+        add_to_archive(a, root_dir, std::string(constants::DIR_CONTENT));
         add_dir_recursive(a, root_dir, std::string(constants::DIR_CONTENT));
 
         archive_write_close(a);

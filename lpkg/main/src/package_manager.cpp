@@ -283,7 +283,9 @@ void InstallationTask::check_for_file_conflicts() {
     const bool force_overwrite = get_force_overwrite_mode();
     
     for (const auto& f : files) {
-        const fs::path logical_path = fs::path("/") / f;
+        fs::path rel_f = f;
+        if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
+        const fs::path logical_path = fs::path("/") / rel_f;
         
         if (fs::is_directory(content_dir / f)) continue;
 
@@ -298,7 +300,7 @@ void InstallationTask::check_for_file_conflicts() {
         }
         
         if (old_version_to_replace_.empty()) {
-            const fs::path phys = ROOT_DIR / f;
+            const fs::path phys = ROOT_DIR / rel_f;
             if ((fs::exists(phys) || fs::is_symlink(phys)) && !force_overwrite) {
                 conflicts[path_str] = "unknown (manual file)";
             }
@@ -319,15 +321,19 @@ void InstallationTask::copy_package_files() {
     auto files = scan_content_files(content_dir);
     
     for (const auto& f : files) {
+        fs::path rel_f = f;
+        if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
+
         const fs::path src_path = content_dir / f;
-        const fs::path physical_path = ROOT_DIR / f;
+        const fs::path physical_path = ROOT_DIR / rel_f;
         
         if (!fs::exists(src_path) && !fs::is_symlink(src_path)) continue;
         
         fs::path parent = physical_path.parent_path();
         std::vector<fs::path> to_create;
-        while (!parent.empty() && parent != ROOT_DIR && !fs::exists(parent)) { 
+        while (!parent.empty() && !fs::exists(parent)) { 
             to_create.push_back(parent); 
+            if (parent == ROOT_DIR) break;
             parent = parent.parent_path(); 
         }
         for (const auto& d : to_create | std::views::reverse) { 
@@ -680,6 +686,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
             if (p.metadata_verified) continue;
 
             InstallationTask task(p.name, p.actual_version, p.is_explicit, Cache::instance().get_installed_version(p.name), p.local_path, p.sha256, p.force_reinstall);
+            ensure_dir_exists(task.tmp_pkg_dir_);
             task.download_and_verify_package();
             task.extract_and_validate_package();
             
@@ -704,7 +711,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
             }
 
             if (metadata_differs) {
-                log_info("Metadata changed for " + p.name + ", re-resolving...");
+                log_info(string_format("info.resolving_metadata", p.name));
                 repo.update_package_info(p.name, p.actual_version, actual_deps, task.provides_);
                 
                 // Keep track of the downloaded archive for this package to avoid re-downloading
