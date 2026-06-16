@@ -19,7 +19,7 @@ protected:
         
         // Create dummy LankeBUILD.json
         std::ofstream json(test_dir / "LankeBUILD.json");
-        json << "{\"name\": \"test-pkg\", \"version\": \"1.0.0\"}";
+        json << "{\"name\": \"test-pkg\", \"version\": \"1.0.0\", \"man\": \"Manual content\", \"deps\": [], \"provides\": []}";
         json.close();
 
         // Create dummy LankeBUILD with placeholder

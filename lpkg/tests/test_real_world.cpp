@@ -7,6 +7,7 @@
 #include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
+#include "../main/src/packer.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -46,38 +47,21 @@ protected:
                           std::vector<std::pair<std::string, std::string>> files = {}) {
         fs::path work_dir = test_root / ("work_" + name);
         fs::remove_all(work_dir);
-        fs::create_directories(work_dir / "content");
+        fs::create_directories(work_dir / "root");
         
-        {
-            std::ofstream d(work_dir / "deps.txt");
-            for (auto const& dep : deps) d << dep.first << "\t" << dep.second << "\n";
-        }
-        
-        {
-            std::ofstream p(work_dir / "provides.txt");
-            for (auto const& prov : provides) p << prov << "\n";
-        }
-        
-        json meta;
-        meta["name"] = name;
-        meta["version"] = ver;
+        std::vector<std::string> deps_list;
+        for (const auto& d : deps) deps_list.push_back(d.first + " " + d.second);
+
         for (auto const& file : files) {
-            fs::path src = work_dir / "content" / file.first;
+            fs::path src = work_dir / "root" / file.first;
             ensure_dir_exists(src.parent_path());
             std::ofstream out(src);
             out << "content of " << file.first;
             out.close();
         }
-        {
-            std::ofstream mf(work_dir / "metadata.json");
-            mf << meta.dump(2) << std::endl;
-        }
-        
-        std::ofstream(work_dir / "man.txt") << name << " man page";
         
         std::string pkg_path = (repo_dir / (name + "-" + ver + ".lpkg")).string();
-        std::string cmd = "cd " + work_dir.string() + " && tar -cf - . | zstd -o " + pkg_path;
-        run_shell(cmd);
+        pack_package(pkg_path, work_dir.string(), name, ver, deps_list, provides, name + " man page");
         return pkg_path;
     }
 };
@@ -135,25 +119,14 @@ TEST_F(RealWorldScenarioTest, ReinstallFromNewSource) {
     
     fs::path work_dir = test_root / "work_myapp_new";
     fs::remove_all(work_dir);
-    fs::create_directories(work_dir / "content/usr/bin");
+    fs::create_directories(work_dir / "root/usr/bin");
     {
-        std::ofstream out(work_dir / "content/usr/bin/app");
+        std::ofstream out(work_dir / "root/usr/bin/app");
         out << "new improved content";
     }
     
-    json meta;
-    meta["name"] = "myapp";
-    meta["version"] = "1.0";
-    {
-        std::ofstream mf(work_dir / "metadata.json");
-        mf << meta.dump(2) << std::endl;
-    }
-    std::ofstream(work_dir / "deps.txt").close();
-    std::ofstream(work_dir / "provides.txt").close();
-    std::ofstream(work_dir / "man.txt") << "man";
-    
     std::string pkg_v1_fixed = (test_root / "myapp-1.0-fixed.lpkg").string();
-    run_shell(("cd " + work_dir.string() + " && tar -cf - . | zstd -o " + pkg_v1_fixed));
+    pack_package(pkg_v1_fixed, work_dir.string(), "myapp", "1.0", {}, {}, "man");
 
     reinstall_package(pkg_v1_fixed);
     

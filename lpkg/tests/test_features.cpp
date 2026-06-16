@@ -44,13 +44,13 @@ protected:
         if (fs::exists(pkg_work_dir)) fs::remove_all(pkg_work_dir);
         fs::create_directories(pkg_work_dir / "content");
         
-        std::ofstream f_deps(pkg_work_dir / "deps.txt");
-        std::ofstream f_man(pkg_work_dir / "man.txt");
-        f_man << "Manual for " << name << "\n";
-
         json meta;
-        meta["name"] = name;
-        meta["version"] = version;
+        meta[std::string(constants::J_NAME)] = name;
+        meta[std::string(constants::J_VERSION)] = version;
+        meta[std::string(constants::J_DEPS)] = json::array();
+        meta[std::string(constants::J_PROVIDES)] = json::array();
+        meta[std::string(constants::J_MAN)] = "Manual for " + name;
+
         for (const auto& [path, content] : files) {
             fs::path full_path = pkg_work_dir / "content" / path;
             ensure_dir_exists(full_path.parent_path());

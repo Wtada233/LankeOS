@@ -32,11 +32,15 @@ void run_build(const fs::path& build_dir) {
         throw LpkgException(string_format("error.lankebuild_parse_failed", std::string(e.what())));
     }
 
-    std::string name = meta.at("name").get<std::string>();
-    std::string version = meta.at("version").get<std::string>();
-    std::vector<std::string> sources = meta.value("sources", std::vector<std::string>{});
-    std::vector<std::string> work_sources = meta.value("work_sources", std::vector<std::string>{});
-    bool no_strip = meta.value("no_strip", false);
+    std::string name = meta.at(std::string(constants::J_NAME)).get<std::string>();
+    std::string version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
+    std::vector<std::string> sources = meta.value(std::string(constants::J_SOURCES), std::vector<std::string>{});
+    std::vector<std::string> work_sources = meta.value(std::string(constants::J_WORK_SOURCES), std::vector<std::string>{});
+    bool no_strip = meta.value(std::string(constants::J_NO_STRIP), false);
+    
+    std::vector<std::string> deps = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
+    std::vector<std::string> provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+    std::string man_content = meta.value(std::string(constants::J_MAN), "");
 
     log_info(string_format("info.building_package", name, version));
 
@@ -46,8 +50,6 @@ void run_build(const fs::path& build_dir) {
     fs::path staging_hooks = build_dir / constants::DIR_HOOKS;
 
     std::vector<fs::path> downloaded_files;
-    bool created_man = false;
-    bool created_deps = false;
 
     fs::remove_all(work_root);
     fs::remove_all(staging_root);
@@ -235,42 +237,14 @@ void run_build(const fs::path& build_dir) {
             log_info(get_string("info.generating_soname_links"));
             apply_soname_links(staging_root / constants::USR / constants::LIB);
         }
-
-        // Generate basic metadata if missing
-        if (!fs::exists(build_dir / constants::PKG_MAN_FILE)) {
-            std::ofstream f(build_dir / constants::PKG_MAN_FILE);
-            f << string_format("man.line_format", get_string("man.name"), name) << constants::NL
-              << string_format("man.line_format", get_string("man.version"), version) << constants::NL
-              << string_format("man.line_format", get_string("man.build_date"), []() {
-                  char buf[16];
-                  time_t now = time(nullptr);
-                  strftime(buf, sizeof(buf), "%Y%m%d", localtime(&now));
-                  return std::string(buf);
-              }()) << constants::NL;
-            created_man = true;
-        }
-        if (!fs::exists(build_dir / constants::PKG_DEPS_FILE)) {
-            std::ofstream(build_dir / constants::PKG_DEPS_FILE).close();
-            created_deps = true;
-        }
     };
 
     finalize_staging();
 
-    // 5.5. Generate metadata.json for the built package
-    {
-        json meta;
-        meta["name"] = name;
-        meta["version"] = version;
-
-        std::ofstream f(build_dir / constants::PKG_METADATA_FILE);
-        f << meta.dump(2) << std::endl;
-    }
-
     // 6. Pack the result
     log_info(get_string("info.packing_built_pkg"));
     std::string output_filename = name + "-" + version + std::string(constants::EXT_LPKG);
-    pack_package(output_filename, build_dir.string(), name, version);
+    pack_package(output_filename, build_dir.string(), name, version, deps, provides, man_content);
     
     log_info(string_format("info.build_success", output_filename));
 
@@ -280,9 +254,6 @@ void run_build(const fs::path& build_dir) {
     fs::remove_all(staging_root);
     fs::remove_all(staging_hooks);
 
-    if (created_man) fs::remove(build_dir / constants::PKG_MAN_FILE);
-    if (created_deps) fs::remove(build_dir / constants::PKG_DEPS_FILE);
-    fs::remove(build_dir / constants::PKG_METADATA_FILE);
     for (const auto& f : downloaded_files) {
         fs::remove(f);
     }

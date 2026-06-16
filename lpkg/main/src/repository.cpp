@@ -59,11 +59,17 @@ void Repository::load_index() {
         if (parts.size() < 2) continue;
 
         std::string pkg_name(parts[0]);
-        std::string_view versions_sv = parts[1];
-        std::string_view deps_sv = (parts.size() > 2) ? parts[2] : "";
-        std::string_view prov_sv = (parts.size() > 3) ? parts[3] : "";
+        std::string_view version_info_sv = parts[1];
+        std::string_view prov_sv = (parts.size() > 2) ? parts[2] : "";
 
-        std::vector<DependencyInfo> common_deps;
+        auto vh_parts = split(version_info_sv, constants::COLON_CHAR);
+        if (vh_parts.empty()) continue;
+
+        std::string version(vh_parts[0]);
+        std::string hash = (vh_parts.size() > 1) ? std::string(vh_parts[1]) : "";
+        std::string_view deps_sv = (vh_parts.size() > 2) ? vh_parts[2] : "";
+
+        std::vector<DependencyInfo> deps;
         if (!deps_sv.empty()) {
             for (auto dep_str : split(deps_sv, constants::COMMA_CHAR)) {
                 DependencyInfo dep;
@@ -77,7 +83,7 @@ void Repository::load_index() {
                     }
                 }
                 if (op_pos == std::string_view::npos) dep.name = std::string(dep_str);
-                common_deps.push_back(std::move(dep));
+                deps.push_back(std::move(dep));
             }
         }
 
@@ -87,16 +93,17 @@ void Repository::load_index() {
             }
         }
 
-        for (auto ver_hash : split(versions_sv, constants::COMMA_CHAR)) {
-            auto vh = split(ver_hash, constants::COLON_CHAR);
-            if (vh.empty()) continue;
-            PackageInfo pkg;
-            pkg.name = pkg_name;
-            pkg.version = std::string(vh[0]);
-            if (vh.size() > 1) pkg.sha256 = std::string(vh[1]);
-            pkg.dependencies = common_deps;
-            packages_[pkg.name].push_back(std::move(pkg));
+        PackageInfo pkg;
+        pkg.name = pkg_name;
+        pkg.version = version;
+        pkg.sha256 = hash;
+        pkg.dependencies = std::move(deps);
+        if (!prov_sv.empty()) {
+             for (auto prov : split(prov_sv, constants::COMMA_CHAR)) {
+                 pkg.provides.push_back(std::string(prov));
+             }
         }
+        packages_[pkg.name].push_back(std::move(pkg));
     }
 
     for (auto& versions : packages_ | std::views::values) {
@@ -110,6 +117,42 @@ std::optional<PackageInfo> Repository::find_provider(const std::string& capabili
     auto it = providers_.find(capability);
     if (it == providers_.end() || it->second.empty()) return std::nullopt;
     return find_package(it->second[0]);
+}
+
+void Repository::update_package_info(const std::string& name, const std::string& version, const std::vector<DependencyInfo>& deps, const std::vector<std::string>& provides) {
+    auto& versions = packages_[name];
+    bool found = false;
+    for (auto& pkg : versions) {
+        if (pkg.version == version) {
+            pkg.dependencies = deps;
+            pkg.provides = provides;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        PackageInfo pkg;
+        pkg.name = name;
+        pkg.version = version;
+        pkg.dependencies = deps;
+        pkg.provides = provides;
+        versions.push_back(std::move(pkg));
+        std::ranges::sort(versions, [](const PackageInfo& a, const PackageInfo& b) {
+            return version_compare(a.version, b.version);
+        });
+    }
+
+    // Rebuild provider map (it's simpler and more robust as requested)
+    providers_.clear();
+    for (const auto& [pkg_name, pkg_versions] : packages_) {
+        for (const auto& pkg : pkg_versions) {
+            for (const auto& prov : pkg.provides) {
+                // If multiple packages provide the same thing, the first one indexed wins for now
+                // (Matches find_provider logic)
+                providers_[prov].push_back(pkg_name);
+            }
+        }
+    }
 }
 
 std::optional<PackageInfo> Repository::find_package(const std::string& name) {

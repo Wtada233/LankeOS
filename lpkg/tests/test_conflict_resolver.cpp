@@ -50,18 +50,15 @@ protected:
         }
         
         json meta;
-        meta["name"] = name;
-        meta["version"] = ver;
+        meta[std::string(constants::J_NAME)] = name;
+        meta[std::string(constants::J_VERSION)] = ver;
+        meta[std::string(constants::J_DEPS)] = deps;
+        meta[std::string(constants::J_PROVIDES)] = json::array();
+        meta[std::string(constants::J_MAN)] = "man " + name;
         {
             std::ofstream mf(work_dir / "metadata.json");
             mf << meta.dump(2) << std::endl;
         }
-
-        std::ofstream dl(work_dir / "deps.txt");
-        for (const auto& d : deps) dl << d << "\n";
-        dl.close();
-
-        std::ofstream ml(work_dir / "man.txt"); ml << "man " << name; ml.close();
 
         std::string pkg_name = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();

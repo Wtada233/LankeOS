@@ -21,6 +21,9 @@ public:
     std::string expected_hash_;
     bool has_config_conflicts_ = false;
     bool force_reinstall_ = false;
+    std::vector<std::string> deps_;
+    std::vector<std::string> provides_;
+    std::string man_content_;
 
     // Temporarily public for testing
     void prepare();

@@ -51,16 +51,17 @@ protected:
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
         fs::create_directories(work_dir / "content");
         std::ofstream f(work_dir / "content/dummy"); f << "data"; f.close();
-        std::ofstream deps(work_dir / "deps.txt"); deps.close();
         
         json meta;
-        meta["name"] = name;
-        meta["version"] = ver;
+        meta[std::string(constants::J_NAME)] = name;
+        meta[std::string(constants::J_VERSION)] = ver;
+        meta[std::string(constants::J_DEPS)] = json::array();
+        meta[std::string(constants::J_PROVIDES)] = json::array();
+        meta[std::string(constants::J_MAN)] = "man\n";
         {
             std::ofstream mf(work_dir / "metadata.json");
             mf << meta.dump(2) << std::endl;
         }
-        std::ofstream ml(work_dir / "man.txt"); ml << "man\n"; ml.close();
 
         std::string pkg_filename = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();

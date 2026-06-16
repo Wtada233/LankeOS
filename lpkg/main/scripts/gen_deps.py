@@ -93,18 +93,15 @@ def process_phase2(lpkg_info, provider_map, working_dir):
                     if dep_pkg != pkg_name:
                         needs.add(dep_pkg)
     
-    # 强制覆盖 deps.txt
-    deps_path = os.path.join(extract_dir, "deps.txt")
-    final_deps = sorted(list(needs))
-    
-    # 使用临时文件中转以处理权限问题
-    temp_deps = os.path.join(working_dir, f"deps_gen_{lpkg}.txt")
-    with open(temp_deps, "w") as f:
-        for d in final_deps:
-            f.write(d + "\n")
-    
-    run_cmd(f"sudo rm -f '{deps_path}'")
-    run_cmd(f"sudo cp '{temp_deps}' '{deps_path}'")
+    # Update metadata.json
+    meta_path = os.path.join(extract_dir, "metadata.json")
+    if os.path.exists(meta_path):
+        with open(meta_path, 'r') as f:
+            meta = json.load(f)
+        
+        meta['deps'] = sorted(list(needs))
+        with open(meta_path, 'w') as f:
+            json.dump(meta, f, indent=2)
     
     # 关键：重新打包前恢复 root 所有权，保持包内文件原始权限
     run_cmd(f"sudo chown -R root:root '{extract_dir}'")

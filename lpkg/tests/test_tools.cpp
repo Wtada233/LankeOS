@@ -72,16 +72,17 @@ TEST_F(ToolsTest, PackAndVerifyContent) {
     EXPECT_TRUE(fs::exists(verify_dir / "content/usr/bin/hello"));
     EXPECT_TRUE(fs::exists(verify_dir / "hooks/postinst.sh"));
     EXPECT_TRUE(fs::exists(verify_dir / "metadata.json"));
-    EXPECT_TRUE(fs::exists(verify_dir / "deps.txt"));
-    EXPECT_TRUE(fs::exists(verify_dir / "man.txt"));
 
     // Verify metadata.json content
     {
         std::ifstream meta_f(verify_dir / "metadata.json");
         json meta;
         meta_f >> meta;
-        EXPECT_EQ(meta["name"], "test-pkg");
-        EXPECT_EQ(meta["version"], "1.0");
+        EXPECT_EQ(meta[std::string(constants::J_NAME)], "test-pkg");
+        EXPECT_EQ(meta[std::string(constants::J_VERSION)], "1.0");
+        EXPECT_TRUE(meta.contains(std::string(constants::J_DEPS)));
+        EXPECT_TRUE(meta.contains(std::string(constants::J_PROVIDES)));
+        EXPECT_TRUE(meta.contains(std::string(constants::J_MAN)));
     }
 }
 

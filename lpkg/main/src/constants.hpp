@@ -10,15 +10,22 @@ namespace constants {
     inline constexpr char COMMA_CHAR = ',';
     inline constexpr char COLON_CHAR = ':';
 
+    // Package Metadata Keys (JSON)
+    inline constexpr std::string_view J_NAME = "name";
+    inline constexpr std::string_view J_VERSION = "version";
+    inline constexpr std::string_view J_MAN = "man";
+    inline constexpr std::string_view J_DEPS = "deps";
+    inline constexpr std::string_view J_PROVIDES = "provides";
+    inline constexpr std::string_view J_NO_STRIP = "no_strip";
+    inline constexpr std::string_view J_SOURCES = "sources";
+    inline constexpr std::string_view J_WORK_SOURCES = "work_sources";
+
     // Build Files and Scripts
     inline constexpr std::string_view LANK_BUILD_JSON = "LankeBUILD.json";
     inline constexpr std::string_view LANK_BUILD_SCRIPT = "LankeBUILD";
     inline constexpr std::string_view LANK_BUILD_PROCESSED = ".LankeBUILD_processed";
 
     // Package Metadata Filenames
-    inline constexpr std::string_view PKG_MAN_FILE = "man.txt";
-    inline constexpr std::string_view PKG_DEPS_FILE = "deps.txt";
-    inline constexpr std::string_view PKG_PROVIDES_FILE = "provides.txt";
     inline constexpr std::string_view PKG_METADATA_FILE = "metadata.json";
 
     // Repository and Index

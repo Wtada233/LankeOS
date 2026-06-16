@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
+#include "../main/src/packer.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -39,7 +40,7 @@ protected:
         fs::remove_all(suite_work_dir);
     }
 
-    std::string create_dummy_package(const std::string& name, const std::string& version) {
+    std::string create_dummy_package(const std::string& name, const std::string& version, const std::vector<std::string>& deps = {}, const std::vector<std::string>& provides = {}) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
         fs::create_directories(work_dir / "content" / "usr" / "bin");
         
@@ -48,29 +49,11 @@ protected:
         bin << "#!/bin/sh\necho Hello\n";
         bin.close();
         
-        // Metadata
-        std::ofstream deps(work_dir / "deps.txt");
-        deps.close(); // No deps
-
-        // metadata.json instead of files.txt
-        json meta;
-        meta["name"] = name;
-        meta["version"] = version;
-        {
-            std::ofstream f(work_dir / "metadata.json");
-            f << meta.dump(2) << std::endl;
-        }
-
-        std::ofstream man(work_dir / "man.txt");
-        man << "Man page for " << name << std::endl;
-        man.close();
-
-        // Pack it
+        // Use pack_package to handle metadata consolidation
         std::string pkg_name = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
-        std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " .";
-        int ret = run_shell(cmd);
-        if (ret != 0) throw std::runtime_error("tar failed");
+        
+        pack_package(pkg_path, work_dir.string(), name, version, deps, provides, "Man page for " + name);
         
         fs::remove_all(work_dir);
         return pkg_path;
@@ -106,44 +89,10 @@ TEST_F(PackageManagerTest, SysrootIsolation) {
 
 TEST_F(PackageManagerTest, VirtualPackages) {
     // 1. Create a "provider" package (e.g. openssl) that provides "libssl"
-    std::string p_prov;
-    {
-        fs::path work_dir = suite_work_dir / "pkg_provider";
-        fs::create_directories(work_dir / "content");
-        std::ofstream provides(work_dir / "provides.txt");
-        provides << "libssl" << std::endl;
-        provides.close();
-        
-        std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        json meta; meta["name"] = "provider"; meta["version"] = "1.0";
-        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
-        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
-        
-        p_prov = (pkg_dir / "provider-1.0.lpkg").string();
-        std::string cmd = "tar --zstd -cf " + p_prov + " -C " + work_dir.string() + " .";
-        run_shell(cmd);
-        fs::remove_all(work_dir);
-    }
+    std::string p_prov = create_dummy_package("provider", "1.0", {}, {"libssl"});
     
     // 2. Create a "consumer" package (e.g. curl) that depends on "libssl"
-    std::string p_cons;
-    {
-        fs::path work_dir = suite_work_dir / "pkg_consumer";
-        fs::create_directories(work_dir / "content");
-        
-        std::ofstream deps(work_dir / "deps.txt");
-        deps << "libssl" << std::endl;
-        deps.close();
-        
-        json meta; meta["name"] = "consumer"; meta["version"] = "1.0";
-        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
-        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
-        
-        p_cons = (pkg_dir / "consumer-1.0.lpkg").string();
-        std::string cmd = "tar --zstd -cf " + p_cons + " -C " + work_dir.string() + " .";
-        run_shell(cmd);
-        fs::remove_all(work_dir);
-    }
+    std::string p_cons = create_dummy_package("consumer", "1.0", {"libssl"});
 
     // Install provider
     install_packages({p_prov});
@@ -153,21 +102,7 @@ TEST_F(PackageManagerTest, VirtualPackages) {
 
 TEST_F(PackageManagerTest, VersionConstraints) {
     // 1. Install lib v1.0
-    std::string p_lib1;
-    {
-        std::string pkg_lib = "lib-1.0.lpkg";
-        p_lib1 = (pkg_dir / pkg_lib).string();
-        fs::path work_dir = suite_work_dir / "pkg_lib";
-        fs::create_directories(work_dir / "content");
-        std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        json meta; meta["name"] = "lib"; meta["version"] = "1.0";
-        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
-        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
-        
-        std::string cmd = "tar --zstd -cf " + p_lib1 + " -C " + work_dir.string() + " .";
-        run_shell(cmd);
-        fs::remove_all(work_dir);
-    }
+    std::string p_lib1 = create_dummy_package("lib", "1.0");
     install_packages({p_lib1});
     
     // Verify lib is installed by checking the pkgs file manually
@@ -185,81 +120,22 @@ TEST_F(PackageManagerTest, VersionConstraints) {
     }
     
     // 2. Try to install app requiring lib >= 2.0 (Should Fail)
-    std::string p_bad;
-    {
-        std::string pkg_app_bad = "app_bad-1.0.lpkg";
-        p_bad = (pkg_dir / pkg_app_bad).string();
-        fs::path work_dir = suite_work_dir / "pkg_app_bad";
-        fs::create_directories(work_dir / "content");
-        std::ofstream deps(work_dir / "deps.txt"); 
-        deps << "lib >= 2.0" << std::endl;
-        deps.close();
-        json meta; meta["name"] = "app_bad"; meta["version"] = "1.0";
-        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
-        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
-        
-        std::string cmd = "tar --zstd -cf " + p_bad + " -C " + work_dir.string() + " .";
-        run_shell(cmd);
-        fs::remove_all(work_dir);
-    }
+    std::string p_bad = create_dummy_package("app_bad", "1.0", {"lib >= 2.0"});
     
     EXPECT_THROW(install_packages({p_bad}), LpkgException); 
 
     // 3. Try to install app requiring lib < 2.0 (Should Succeed)
-    std::string p_good;
-    {
-        std::string pkg_app_good = "app_good-1.0.lpkg";
-        p_good = (pkg_dir / pkg_app_good).string();
-        fs::path work_dir = suite_work_dir / "pkg_app_good";
-        fs::create_directories(work_dir / "content");
-        std::ofstream deps(work_dir / "deps.txt"); 
-        deps << "lib < 2.0" << std::endl;
-        deps.close();
-        json meta; meta["name"] = "app_good"; meta["version"] = "1.0";
-        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
-        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
-        
-        std::string cmd = "tar --zstd -cf " + p_good + " -C " + work_dir.string() + " .";
-        run_shell(cmd);
-        fs::remove_all(work_dir);
-    }
+    std::string p_good = create_dummy_package("app_good", "1.0", {"lib < 2.0"});
 
     EXPECT_NO_THROW(install_packages({p_good}));
 }
 
 TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
     // 1. Create provider package 'openssl' providing 'libssl'
-    std::string p_ossl;
-    {
-        std::string pkg_ossl = "openssl-1.0.lpkg";
-        p_ossl = (pkg_dir / pkg_ossl).string();
-        fs::path work_dir = suite_work_dir / "pkg_openssl";
-        fs::create_directories(work_dir / "content");
-        std::ofstream provides(work_dir / "provides.txt"); provides << "libssl" << std::endl; provides.close();
-        std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        json meta; meta["name"] = "openssl"; meta["version"] = "1.0";
-        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
-        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
-        std::string cmd = "tar --zstd -cf " + p_ossl + " -C " + work_dir.string() + " .";
-        run_shell(cmd);
-        fs::remove_all(work_dir);
-    }
+    std::string p_ossl = create_dummy_package("openssl", "1.0", {}, {"libssl"});
 
     // 2. Create consumer package 'curl' depending on 'libssl'
-    std::string p_curl;
-    {
-        std::string pkg_curl = "curl-1.0.lpkg";
-        p_curl = (pkg_dir / pkg_curl).string();
-        fs::path work_dir = suite_work_dir / "pkg_curl";
-        fs::create_directories(work_dir / "content");
-        json meta; meta["name"] = "curl"; meta["version"] = "1.0";
-        std::ofstream deps(work_dir / "deps.txt"); deps << "libssl" << std::endl; deps.close();
-        std::ofstream(work_dir / "metadata.json") << meta.dump(2) << std::endl;
-        std::ofstream man(work_dir / "man.txt"); man << "man" << std::endl; man.close();
-        std::string cmd = "tar --zstd -cf " + p_curl + " -C " + work_dir.string() + " .";
-        run_shell(cmd);
-        fs::remove_all(work_dir);
-    }
+    std::string p_curl = create_dummy_package("curl", "1.0", {"libssl"});
 
     // 3. Install curl (will pull openssl as a dependency)
     install_packages({p_ossl});

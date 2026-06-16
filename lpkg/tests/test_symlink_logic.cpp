@@ -65,8 +65,11 @@ TEST_F(SymlinkLogicTest, PreventsSymlinkChmodFollow) {
     
     // Create metadata.json
     json meta;
-    meta["name"] = "symlink_pkg";
-    meta["version"] = "1.0";
+    meta[std::string(constants::J_NAME)] = "symlink_pkg";
+    meta[std::string(constants::J_VERSION)] = "1.0";
+    meta[std::string(constants::J_DEPS)] = json::array();
+    meta[std::string(constants::J_PROVIDES)] = json::array();
+    meta[std::string(constants::J_MAN)] = "";
     {
         std::ofstream f(pkg_tmp_dir / "metadata.json");
         f << meta.dump(2) << std::endl;
@@ -102,8 +105,11 @@ TEST_F(SymlinkLogicTest, HandlesConfigSymlinkConflict) {
     fs::create_symlink("/usr/lib/os-release", pkg_tmp_dir / "content/etc/os-release");
     
     json meta;
-    meta["name"] = "filesystem_pkg";
-    meta["version"] = "1.0";
+    meta[std::string(constants::J_NAME)] = "filesystem_pkg";
+    meta[std::string(constants::J_VERSION)] = "1.0";
+    meta[std::string(constants::J_DEPS)] = json::array();
+    meta[std::string(constants::J_PROVIDES)] = json::array();
+    meta[std::string(constants::J_MAN)] = "";
     {
         std::ofstream f(pkg_tmp_dir / "metadata.json");
         f << meta.dump(2) << std::endl;

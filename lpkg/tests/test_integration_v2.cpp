@@ -45,10 +45,10 @@ TEST_F(IntegrationV2Test, RepositoryIndexLoading) {
     fs::path arch_dir = mirror_dir / arch;
     fs::create_directories(arch_dir);
 
-    // Create a dummy index file in aggregated format: name|v1:h1,v2:h2|deps|provides
+    // Create a dummy index file in new format: name|v:h:deps|provides
     std::ofstream index(arch_dir / "index.txt");
-    index << "libfoo|1.0.0:hash123||\n";
-    index << "app|1.0.0:hash456|libfoo>=1.0.0|\n";
+    index << "libfoo|1.0.0:hash123:||\n";
+    index << "app|1.0.0:hash456:libfoo>=1.0.0||\n";
     index.close();
 
     // Configure mirror.conf to point to our local directory

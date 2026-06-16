@@ -60,24 +60,20 @@ protected:
             std::ofstream f(p); f << "content of " << src; f.close();
         }
 
-        std::ofstream(work_dir / "man.txt") << "Manual for " << name << "\n";
-        std::ofstream(work_dir / "deps.txt").close();
-
         std::string pkg_filename = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
-        pack_package(pkg_path, work_dir.string());
+        pack_package(pkg_path, work_dir.string(), name, ver);
 
         // Also put it in the mirror
         fs::path mirror_pkg_dir = suite_work_dir / "mirror" / "x86_64" / name;
         fs::create_directories(mirror_pkg_dir);
-        // New format: name/version.lpkg
         fs::copy_file(pkg_path, mirror_pkg_dir / (ver + ".lpkg"), fs::copy_options::overwrite_existing);
         
         std::string hash = calculate_sha256(pkg_path);
 
-        // Update index.txt with aggregated format: name|v:h|deps|provides
+        // Update index.txt with new format: name|v:h:deps|provides
         std::ofstream index(suite_work_dir / "mirror" / "x86_64" / "index.txt", std::ios::app);
-        index << name << "|" << ver << ":" << hash << "||" << std::endl;
+        index << name << "|" << ver << ":" << hash << ":|" << std::endl;
         
         fs::remove_all(work_dir);
         return pkg_path;

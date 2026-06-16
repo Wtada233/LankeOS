@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <vector>
+#include "../main/src/packer.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -43,21 +44,11 @@ protected:
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
         fs::create_directories(work_dir / "content");
         std::ofstream f(work_dir / "content/file"); f << name; f.close();
-        std::ofstream deps(work_dir / "deps.txt"); deps.close();
         
-        json meta;
-        meta["name"] = name;
-        meta["version"] = "1.0";
-        {
-            std::ofstream mf(work_dir / "metadata.json");
-            mf << meta.dump(2) << std::endl;
-        }
-        std::ofstream ml(work_dir / "man.txt"); ml << "man\n"; ml.close();
-
         std::string pkg_filename = name + "-1.0.lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
-        std::string cmd = "tar --zstd -cf " + pkg_path + " -C " + work_dir.string() + " .";
-        run_shell(cmd);
+        pack_package(pkg_path, work_dir.string(), name, "1.0");
+        
         fs::remove_all(work_dir);
         return pkg_path;
     }

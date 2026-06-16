@@ -54,14 +54,15 @@ protected:
         f.close();
         
         json meta;
-        meta["name"] = name;
-        meta["version"] = ver;
+        meta[std::string(constants::J_NAME)] = name;
+        meta[std::string(constants::J_VERSION)] = ver;
+        meta[std::string(constants::J_DEPS)] = json::array();
+        meta[std::string(constants::J_PROVIDES)] = json::array();
+        meta[std::string(constants::J_MAN)] = "";
         {
             std::ofstream mf(work_dir / "metadata.json");
             mf << meta.dump(2) << std::endl;
         }
-        std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream man(work_dir / "man.txt"); man.close();
 
         std::string pkg_name = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
@@ -84,14 +85,15 @@ TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
         std::ofstream f2(work_dir / "content" / "usr" / "bin" / "file_blocked"); f2 << "blocked"; f2.close();
         
         json meta;
-        meta["name"] = "rollback_new";
-        meta["version"] = "1.0";
+        meta[std::string(constants::J_NAME)] = "rollback_new";
+        meta[std::string(constants::J_VERSION)] = "1.0";
+        meta[std::string(constants::J_DEPS)] = json::array();
+        meta[std::string(constants::J_PROVIDES)] = json::array();
+        meta[std::string(constants::J_MAN)] = "";
         {
             std::ofstream mf(work_dir / "metadata.json");
             mf << meta.dump(2) << std::endl;
         }
-        std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream man(work_dir / "man.txt"); man.close();
         
         std::string cmd = "tar --zstd -cf " + pkg + " -C " + work_dir.string() + " .";
         run_shell(cmd);
@@ -136,14 +138,15 @@ TEST_F(AdvancedPackageManagerTest, ChrootHook) {
         fs::permissions(work_dir / "hooks" / "postinst.sh", fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec, fs::perm_options::add);
 
         json meta;
-        meta["name"] = "hook_test";
-        meta["version"] = "1.0";
+        meta[std::string(constants::J_NAME)] = "hook_test";
+        meta[std::string(constants::J_VERSION)] = "1.0";
+        meta[std::string(constants::J_DEPS)] = json::array();
+        meta[std::string(constants::J_PROVIDES)] = json::array();
+        meta[std::string(constants::J_MAN)] = "";
         {
             std::ofstream mf(work_dir / "metadata.json");
             mf << meta.dump(2) << std::endl;
         }
-        std::ofstream deps(work_dir / "deps.txt"); deps.close();
-        std::ofstream man(work_dir / "man.txt"); man.close();
         
         std::string cmd = "tar --zstd -cf " + pkg + " -C " + work_dir.string() + " .";
         run_shell(cmd);

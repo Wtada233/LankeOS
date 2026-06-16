@@ -22,6 +22,7 @@ struct PackageInfo {
 class Repository {
 public:
     void load_index();
+    void update_package_info(const std::string& name, const std::string& version, const std::vector<DependencyInfo>& deps, const std::vector<std::string>& provides);
     std::optional<PackageInfo> find_package(const std::string& name);
     std::optional<PackageInfo> find_package(const std::string& name, const std::string& version); // exact match
     std::optional<PackageInfo> find_best_matching_version(const std::string& name, const std::string& op, const std::string& version_req);

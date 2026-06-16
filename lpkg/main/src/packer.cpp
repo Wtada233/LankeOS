@@ -70,7 +70,10 @@ namespace {
 }
 
 void pack_package(const std::string& output_filename, const std::string& source_dir,
-                  const std::string& pkg_name, const std::string& pkg_version) {
+                  const std::string& pkg_name, const std::string& pkg_version,
+                  const std::vector<std::string>& deps,
+                  const std::vector<std::string>& provides,
+                  const std::string& man_content) {
     fs::path base_dir = source_dir;
     fs::path root_dir = base_dir / constants::DIR_ROOT;
     fs::path hooks_dir = base_dir / constants::DIR_HOOKS;
@@ -95,8 +98,11 @@ void pack_package(const std::string& output_filename, const std::string& source_
         ensure_dir_exists(tmp_meta.parent_path());
         {
             json meta;
-            meta["name"] = pkg_name;
-            meta["version"] = pkg_version;
+            meta[std::string(constants::J_NAME)] = pkg_name;
+            meta[std::string(constants::J_VERSION)] = pkg_version;
+            meta[std::string(constants::J_DEPS)] = deps;
+            meta[std::string(constants::J_PROVIDES)] = provides;
+            meta[std::string(constants::J_MAN)] = man_content;
 
             std::ofstream f(tmp_meta);
             f << meta.dump(2) << std::endl;
@@ -104,32 +110,12 @@ void pack_package(const std::string& output_filename, const std::string& source_
         add_to_archive(a, tmp_meta, std::string(constants::PKG_METADATA_FILE));
         fs::remove(tmp_meta);
 
-        // 2. Add metadata files
-        if (fs::exists(base_dir / constants::PKG_DEPS_FILE)) add_to_archive(a, base_dir / constants::PKG_DEPS_FILE, std::string(constants::PKG_DEPS_FILE));
-        else {
-            fs::path empty = get_tmp_dir() / "empty_deps";
-            std::ofstream(empty).close();
-            add_to_archive(a, empty, std::string(constants::PKG_DEPS_FILE));
-            fs::remove(empty);
-        }
-
-        if (fs::exists(base_dir / constants::PKG_PROVIDES_FILE)) add_to_archive(a, base_dir / constants::PKG_PROVIDES_FILE, std::string(constants::PKG_PROVIDES_FILE));
-
-        if (fs::exists(base_dir / constants::PKG_MAN_FILE)) add_to_archive(a, base_dir / constants::PKG_MAN_FILE, std::string(constants::PKG_MAN_FILE));
-        else {
-            fs::path empty_man = get_tmp_dir() / "empty_man";
-            std::ofstream f(empty_man);
-            f << "LankeOS Package" << std::endl;
-            f.close();
-            add_to_archive(a, empty_man, std::string(constants::PKG_MAN_FILE));
-            fs::remove(empty_man);
-        }
-        
+        // 3. Add hooks
         if (fs::exists(hooks_dir)) {
             add_dir_recursive(a, hooks_dir, std::string(constants::DIR_HOOKS));
         }
 
-        // 3. Add content (root dir -> content/)
+        // 4. Add content (root dir -> content/)
         add_dir_recursive(a, root_dir, std::string(constants::DIR_CONTENT));
 
         archive_write_close(a);

@@ -51,8 +51,12 @@ protected:
         fs::create_directories(work_dir / "content");
         
         json meta;
-        meta["name"] = name;
-        meta["version"] = ver;
+        meta[std::string(constants::J_NAME)] = name;
+        meta[std::string(constants::J_VERSION)] = ver;
+        meta[std::string(constants::J_DEPS)] = deps;
+        meta[std::string(constants::J_PROVIDES)] = provides;
+        meta[std::string(constants::J_MAN)] = "man " + name;
+
         for (const auto& [src, dest] : files) {
             fs::path p = work_dir / "content" / src;
             ensure_dir_exists(p.parent_path());
@@ -62,18 +66,6 @@ protected:
             std::ofstream mf(work_dir / "metadata.json");
             mf << meta.dump(2) << std::endl;
         }
-
-        std::ofstream dl(work_dir / "deps.txt");
-        for (const auto& d : deps) dl << d << "\n";
-        dl.close();
-
-        if (!provides.empty()) {
-            std::ofstream pl(work_dir / "provides.txt");
-            for (const auto& p : provides) pl << p << "\n";
-            pl.close();
-        }
-
-        std::ofstream ml(work_dir / "man.txt"); ml << "man " << name; ml.close();
 
         std::string pkg_name = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();

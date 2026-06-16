@@ -9,6 +9,7 @@
 #include <fstream>
 #include <cstdlib>
 #include <sys/stat.h>
+#include "../main/src/packer.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -61,26 +62,10 @@ protected:
             throw std::runtime_error("Failed to set SUID bit on dummy file");
         }
 
-        std::ofstream deps(work_dir / "deps.txt");
-        deps.close();
-        
-        json meta;
-        meta["name"] = name;
-        meta["version"] = version;
-        {
-            std::ofstream mf(work_dir / "metadata.json");
-            mf << meta.dump(2) << std::endl;
-        }
-
-        std::ofstream man(work_dir / "man.txt");
-        man << "Man page" << std::endl;
-        man.close();
-
         std::string pkg_name = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
-        std::string cmd = "tar --zstd -p -cf " + pkg_path + " -C " + work_dir.string() + " .";
-        int ret = run_shell(cmd);
-        if (ret != 0) throw std::runtime_error("tar failed");
+        
+        pack_package(pkg_path, work_dir.string(), name, version);
         
         fs::remove_all(work_dir);
         return pkg_path;

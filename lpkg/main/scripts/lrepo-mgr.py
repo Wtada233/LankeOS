@@ -17,24 +17,16 @@ def calculate_sha256(file_path):
     return sha256_hash.hexdigest()
 
 def extract_metadata(archive_path):
-    """Extracts deps.txt and provides.txt from the archive using tar command."""
+    """Extracts metadata from metadata.json inside the archive."""
     deps = ""
     provides = ""
     try:
-        # Try to extract deps.txt (using wildcard to handle potential ./ prefix)
-        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*deps.txt', '-O'], 
+        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*metadata.json', '-O'], 
                                 capture_output=True, text=True)
-        if result.returncode == 0:
-            deps = result.stdout.strip().replace('\n', ',')
-        
-        # Try to extract provides.txt
-        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*provides.txt', '-O'], 
-                                capture_output=True, text=True)
-        if result.returncode == 0:
-            provides = result.stdout.strip().replace('\n', ',')
-        
-        if not deps:
-            print(f"  Note: No dependencies found in {os.path.basename(archive_path)}")
+        if result.returncode == 0 and result.stdout.strip():
+            meta = json.loads(result.stdout)
+            deps = ",".join(meta.get('deps', []))
+            provides = ",".join(meta.get('provides', []))
     except Exception as e:
         print(f"  Warning: Failed to extract metadata from {archive_path}: {e}")
     
@@ -52,13 +44,6 @@ def read_metadata_from_archive(archive_path):
             return meta.get('name', ''), meta.get('version', '')
     except Exception as e:
         print(f"  Warning: Failed to read metadata.json from {archive_path}: {e}")
-    # Fallback to filename parsing
-    base = os.path.basename(archive_path)
-    if base.endswith('.lpkg'):
-        base_noext = base.rsplit('.', 1)[0]
-        if '-' in base_noext:
-            name, version = base_noext.rsplit('-', 1)
-            return name, version
     return None, None
 
 class RepoManager:
@@ -218,7 +203,7 @@ class RepoManager:
         print("Cleanup complete.")
 
     def parse_aggregated_index(self, path):
-        # Format: name|v1:h1,v2:h2|deps|provides
+        # Format: name|v:h:deps|provides
         data = {}
         if os.path.exists(path):
             with open(path, 'r', encoding='utf-8') as f:
@@ -228,25 +213,32 @@ class RepoManager:
                     parts = line.split('|')
                     if len(parts) < 2: continue
                     name = parts[0]
-                    versions_part = parts[1].split(',')
-                    deps = parts[2] if len(parts) > 2 else ""
-                    provides = parts[3] if len(parts) > 3 else ""
+                    v_info = parts[1].split(':')
+                    if len(v_info) < 2: continue
                     
-                    versions = {}
-                    for vh in versions_part:
-                        if ':' in vh:
-                            v, h = vh.split(':', 1)
-                            versions[v] = h
+                    version = v_info[0]
+                    hash_val = v_info[1]
+                    deps = v_info[2] if len(v_info) > 2 else ""
+                    provides = parts[2] if len(parts) > 2 else ""
                     
-                    data[name] = {"versions": versions, "deps": deps, "provides": provides}
+                    if name not in data:
+                        data[name] = {"versions": {}, "deps": "", "provides": ""}
+                    
+                    data[name]["versions"][version] = hash_val
+                    # Store per-version metadata in a way compatible with the rest of the script
+                    # Since the script expects shared metadata for aggregated view but we now have per-version,
+                    # we'll use a simple name:version key for metadata storage internally if needed,
+                    # but for 'push' we can just use the last processed one.
+                    data[name]["deps"] = deps
+                    data[name]["provides"] = provides
         return data
 
     def write_aggregated_index(self, path, data):
         with open(path, 'w', encoding='utf-8') as f:
             for name, info in data.items():
-                v_list = [f"{v}:{h}" for v, h in info["versions"].items()]
-                v_str = ",".join(v_list)
-                f.write(f"{name}|{v_str}|{info['deps']}|{info['provides']}\n")
+                for v, h in info["versions"].items():
+                    # In new format, each version is a line: name|v:h:deps|provides
+                    f.write(f"{name}|{v}:{h}:{info['deps']}|{info['provides']}\n")
 
     def upload_file(self, local_path, remote_path):
         st = self.config["storage"]

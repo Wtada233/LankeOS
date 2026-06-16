@@ -90,15 +90,22 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
     }
 }
 
-// Read metadata.json from the tmp package dir (name + version only)
-std::pair<std::string, std::string> read_package_metadata(const fs::path& tmp_pkg_dir) {
+// Read metadata.json from the tmp package dir (full metadata)
+void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::string& version, 
+                           std::vector<std::string>& deps, std::vector<std::string>& provides, 
+                           std::string& man) {
     fs::path meta_path = tmp_pkg_dir / constants::PKG_METADATA_FILE;
     json meta;
     {
         std::ifstream f(meta_path);
+        if (!f.is_open()) throw LpkgException(string_format("error.open_file_failed", meta_path.string()));
         f >> meta;
     }
-    return {meta.at("name").get<std::string>(), meta.at("version").get<std::string>()};
+    name = meta.at(std::string(constants::J_NAME)).get<std::string>();
+    version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
+    deps = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
+    provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+    man = meta.value(std::string(constants::J_MAN), "");
 }
 
 // Scan content/ directory to build file list (content/ maps directly to /)
@@ -255,13 +262,14 @@ void InstallationTask::extract_and_validate_package() {
     extract_tar_zst(archive_path_, tmp_pkg_dir_);
 
     // Validate required archive members
-    for (const auto& meta : {constants::PKG_METADATA_FILE, constants::PKG_DEPS_FILE, constants::PKG_MAN_FILE, constants::DIR_CONTENT}) {
+    for (const auto& meta : {constants::PKG_METADATA_FILE, constants::DIR_CONTENT}) {
         if (!fs::exists(tmp_pkg_dir_ / meta))
             throw LpkgException(string_format("error.incomplete_package", (tmp_pkg_dir_ / meta).string()));
     }
 
     // Read metadata.json and validate name/version match
-    auto [meta_name, meta_version] = read_package_metadata(tmp_pkg_dir_);
+    std::string meta_name, meta_version;
+    read_package_metadata(tmp_pkg_dir_, meta_name, meta_version, deps_, provides_, man_content_);
     if (meta_name != pkg_name_) {
         log_warning(string_format("warning.package_name_mismatch", pkg_name_, meta_name));
     }
@@ -400,16 +408,10 @@ void InstallationTask::register_package() {
         for (const auto& cap : cache.get_package_provides(pkg_name_)) {
             cache.remove_provider(cap, pkg_name_);
         }
-        // Old file owners are NOT removed here. commit() handles obsolete file
-        // cleanup by comparing old vs new file lists after register_package finishes.
-        // add_file_owner below will overwrite or keep existing entries as needed.
     }
 
-    std::ifstream deps_in(tmp_pkg_dir_ / constants::PKG_DEPS_FILE);
     std::ofstream deps_out(DEP_DIR / pkg_name_);
-    std::string d;
-    while (std::getline(deps_in, d)) {
-        if (d.empty()) continue;
+    for (const auto& d : deps_) {
         deps_out << d << constants::NL;
         std::string name = d;
         if (const auto pos = d.find_first_of(" \t<>="); pos != std::string::npos) name = d.substr(0, pos);
@@ -422,15 +424,14 @@ void InstallationTask::register_package() {
         cache.add_file_owner((fs::path("/") / f).string(), pkg_name_);
     }
     
-    fs::copy(tmp_pkg_dir_ / constants::PKG_MAN_FILE, DOCS_DIR / (pkg_name_ + std::string(constants::SUFFIX_MAN)), fs::copy_options::overwrite_existing);
+    if (!man_content_.empty()) {
+        std::ofstream man_out(DOCS_DIR / (pkg_name_ + std::string(constants::SUFFIX_MAN)));
+        man_out << man_content_;
+    }
     
-    // Register provides in Cache (no FILES_DIR .provides file)
-    std::ifstream prov_in(tmp_pkg_dir_ / constants::PKG_PROVIDES_FILE);
-    if (prov_in.is_open()) {
-        std::string cap;
-        while (std::getline(prov_in, cap)) if (!cap.empty()) { 
-            cache.add_provider(cap, pkg_name_); 
-        }
+    // Register provides from JSON
+    for (const auto& cap : provides_) {
+        cache.add_provider(cap, pkg_name_); 
     }
     cache.add_installed(pkg_name_, actual_version_, explicit_install_);
 }
@@ -458,7 +459,9 @@ struct InstallPlan {
     bool is_explicit = false;
     fs::path local_path;
     std::vector<DependencyInfo> dependencies;
+    std::vector<std::string> provides;
     bool force_reinstall = false;
+    bool metadata_verified = false;
 };
 
 struct ResolutionContext {
@@ -485,21 +488,26 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     fs::path local_path; 
     std::string latest_version, pkg_hash; 
     std::vector<DependencyInfo> deps;
+    std::vector<std::string> provides;
 
     if (auto it = ctx.local_candidates.find(pkg_name); it != ctx.local_candidates.end()) {
         local_path = it->second;
-        latest_version = parse_package_filename(local_path.filename().string()).second;
-        std::stringstream ss(extract_file_from_archive(local_path, std::string(constants::PKG_DEPS_FILE)));
-        std::string line;
-        while (std::getline(ss, line)) {
-            std::stringstream line_ss(line);
+        std::string m_json = extract_file_from_archive(local_path, std::string(constants::PKG_METADATA_FILE));
+        if (m_json.empty()) throw LpkgException("Local package missing metadata.json: " + local_path.string());
+        
+        json meta = json::parse(m_json);
+        latest_version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
+        
+        for (const auto& d_str : meta.value(std::string(constants::J_DEPS), std::vector<std::string>{})) {
+            std::stringstream ss(d_str);
             std::string dn, op, rv;
-            if (line_ss >> dn) {
+            if (ss >> dn) {
                 DependencyInfo d{.name = dn, .op = "", .version_req = ""};
-                if (line_ss >> op >> rv) { d.op = op; d.version_req = rv; }
+                if (ss >> op >> rv) { d.op = op; d.version_req = rv; }
                 deps.push_back(std::move(d));
             }
         }
+        provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
     } else {
         auto pkg_info = (version_spec == constants::VER_LATEST) ? ctx.repo.find_package(pkg_name) : ctx.repo.find_package(pkg_name, version_spec);
         if (!pkg_info) {
@@ -510,7 +518,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
             if (installed_version.empty()) log_warning(string_format("warning.package_not_in_repo", pkg_name));
             return;
         }
-        latest_version = pkg_info->version; pkg_hash = pkg_info->sha256; deps = pkg_info->dependencies;
+        latest_version = pkg_info->version; pkg_hash = pkg_info->sha256; deps = pkg_info->dependencies; provides = pkg_info->provides;
     }
 
     if (latest_version.empty()) latest_version = constants::VER_DEFAULT;
@@ -524,7 +532,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     InstallPlan p{
         .name = pkg_name, .actual_version = latest_version, .sha256 = pkg_hash,
         .is_explicit = is_explicit, .local_path = local_path, .dependencies = deps,
-        .force_reinstall = (ctx.force_reinstall && is_explicit)
+        .provides = provides, .force_reinstall = (ctx.force_reinstall && is_explicit)
     };
 
     if (!get_no_deps_mode()) {
@@ -660,6 +668,60 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     if (!provided_hash.empty()) {
         if (locals.empty()) throw LpkgException("--hash can only be used with local package installations.");
         for (auto& [n, p] : plan) if (!p.local_path.empty()) p.sha256 = provided_hash;
+    }
+
+    // Phase 2: Dynamic Metadata Verification
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        auto current_order = order;
+        for (const auto& name : current_order) {
+            auto& p = plan.at(name);
+            if (p.metadata_verified) continue;
+
+            InstallationTask task(p.name, p.actual_version, p.is_explicit, Cache::instance().get_installed_version(p.name), p.local_path, p.sha256, p.force_reinstall);
+            task.download_and_verify_package();
+            task.extract_and_validate_package();
+            
+            std::vector<DependencyInfo> actual_deps;
+            for (const auto& d_str : task.deps_) {
+                 std::stringstream ss(d_str);
+                 std::string dn, op, rv;
+                 if (ss >> dn) {
+                     DependencyInfo d{.name = dn, .op = "", .version_req = ""};
+                     if (ss >> op >> rv) { d.op = op; d.version_req = rv; }
+                     actual_deps.push_back(std::move(d));
+                 }
+            }
+
+            bool metadata_differs = (actual_deps.size() != p.dependencies.size()) || (task.provides_ != p.provides);
+            if (!metadata_differs) {
+                for (size_t i = 0; i < actual_deps.size(); ++i) {
+                    if (actual_deps[i].name != p.dependencies[i].name || actual_deps[i].op != p.dependencies[i].op || actual_deps[i].version_req != p.dependencies[i].version_req) {
+                        metadata_differs = true; break;
+                    }
+                }
+            }
+
+            if (metadata_differs) {
+                log_info("Metadata changed for " + p.name + ", re-resolving...");
+                repo.update_package_info(p.name, p.actual_version, actual_deps, task.provides_);
+                
+                // Keep track of the downloaded archive for this package to avoid re-downloading
+                locals[p.name] = task.archive_path_;
+
+                // Clear and re-resolve to be safe
+                plan.clear();
+                order.clear();
+                for (const auto& [n, v] : targets) {
+                    std::set<std::string> vs;
+                    resolve_package_dependencies(n, v, true, ctx, vs);
+                }
+                changed = true;
+                break; // Break current order loop and restart Phase 2 with new plan/order
+            }
+            p.metadata_verified = true;
+        }
     }
 
     if (plan.empty()) { log_info(get_string("info.all_packages_already_installed")); return; }
