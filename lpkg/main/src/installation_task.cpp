@@ -1,0 +1,453 @@
+#include "install_common.hpp"
+#include "archive.hpp"
+#include "cache.hpp"
+#include "trigger.hpp"
+#include "config.hpp"
+#include "downloader.hpp"
+#include "hash.hpp"
+#include "exception.hpp"
+#include "localization.hpp"
+#include "utils.hpp"
+#include "version.hpp"
+#include "constants.hpp"
+
+#include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <unordered_set>
+#include <vector>
+
+namespace fs = std::filesystem;
+using json = nlohmann::json;
+
+// ===== InstallationTask Implementation =====
+
+InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install,
+                                   std::string old_version_to_replace, fs::path local_package_path,
+                                   std::string expected_hash, bool force_reinstall)
+    : pkg_name_(std::move(pkg_name)), version_(std::move(version)),
+      explicit_install_(explicit_install),
+      tmp_pkg_dir_(get_tmp_dir() / pkg_name_),
+      actual_version_(version_),
+      old_version_to_replace_(std::move(old_version_to_replace)),
+      local_package_path_(std::move(local_package_path)),
+      expected_hash_(std::move(expected_hash)),
+      force_reinstall_(force_reinstall) {}
+
+void InstallationTask::run(InstallContext* ctx) {
+    const std::string current_installed_version = Cache::instance().get_installed_version(pkg_name_);
+    if (!force_reinstall_ && !current_installed_version.empty() && current_installed_version == actual_version_) {
+        log_info(string_format("info.package_already_installed", pkg_name_));
+        return;
+    }
+
+    log_info(string_format("info.installing_package", pkg_name_, version_));
+    ensure_dir_exists(tmp_pkg_dir_);
+
+    try {
+        prepare(ctx);
+        commit();
+    } catch (const std::exception& e) {
+        rollback_files();
+        throw;
+    }
+    log_info(string_format("info.package_installed_successfully", pkg_name_));
+}
+
+void InstallationTask::prepare(InstallContext* ctx) {
+    download_and_verify_package();
+    extract_and_validate_package();
+    if (ctx) {
+        ensure_dependencies_satisfied(*ctx);
+    }
+    check_for_file_conflicts();
+}
+
+void InstallationTask::rollback_files() {
+    log_error(string_format("error.rollback_install", pkg_name_));
+    for (const auto& file : installed_files_) {
+        if (fs::exists(file) || fs::is_symlink(file)) {
+            std::error_code ec;
+            fs::remove_all(file, ec);
+        }
+    }
+    for (const auto& [physical, backup] : backups_) {
+        if (fs::exists(backup)) {
+            std::error_code ec;
+            fs::rename(backup, physical, ec);
+        }
+    }
+    for (const auto& dir : created_dirs_ | std::views::reverse) {
+        if (fs::exists(dir) && fs::is_directory(dir) && fs::is_empty(dir)) {
+            std::error_code ec;
+            fs::remove(dir, ec);
+        }
+    }
+}
+
+void InstallationTask::commit() {
+    std::unordered_set<std::string> old_files;
+    if (!old_version_to_replace_.empty()) {
+        old_files = Cache::instance().get_package_files(pkg_name_);
+    }
+
+    copy_package_files();
+
+    try {
+        register_package();
+
+        if (!old_files.empty()) {
+            const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
+            auto new_files = detail::scan_content_files(content_dir);
+            std::unordered_set<std::string> new_set;
+            for (const auto& f : new_files) new_set.insert((fs::path("/") / f).string());
+
+            auto& cache = Cache::instance();
+            for (const auto& old_file : old_files) {
+                if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) continue;
+                if (!new_set.contains(old_file)) {
+                    auto owners = cache.get_file_owners(old_file);
+                    if (owners.contains(pkg_name_)) {
+                        cache.remove_file_owner(old_file, pkg_name_);
+                        if (cache.get_file_owners(old_file).empty()) {
+                            const fs::path phys = (fs::path(old_file).is_absolute())
+                                ? ROOT_DIR / fs::path(old_file).relative_path()
+                                : ROOT_DIR / old_file;
+                            if (fs::exists(phys) || fs::is_symlink(phys)) {
+                                log_info(string_format("info.removing_obsolete_file", old_file));
+                                fs::remove(phys);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } catch (...) { throw; }
+
+    for (const auto& [physical, backup] : backups_) {
+        std::error_code ec;
+        fs::remove(backup, ec);
+    }
+    backups_.clear();
+    run_post_install_hook();
+}
+
+void InstallationTask::download_and_verify_package() {
+    if (!local_package_path_.empty()) {
+        if (!fs::exists(local_package_path_))
+            throw LpkgException(string_format("error.local_pkg_not_found", local_package_path_.string()));
+        log_info(string_format("info.installing_local_file", local_package_path_.string()));
+        archive_path_ = local_package_path_;
+        if (!expected_hash_.empty() && calculate_sha256(archive_path_) != expected_hash_)
+            throw LpkgException(string_format("error.hash_mismatch", pkg_name_));
+        return;
+    }
+
+    const std::string mirror_url = get_mirror_url();
+    const std::string arch = get_architecture();
+
+    if (actual_version_.empty() || actual_version_ == constants::VER_LATEST) {
+        Repository repo;
+        repo.load_index();
+        auto info = repo.find_package(pkg_name_);
+        if (info) {
+            actual_version_ = info->version;
+            expected_hash_ = info->sha256;
+        } else {
+            throw LpkgException(string_format("warning.package_not_in_repo", pkg_name_));
+        }
+    }
+
+    const std::string download_url = mirror_url + arch + "/" + pkg_name_ + "/"
+                                     + actual_version_ + std::string(constants::EXT_LPKG);
+    archive_path_ = tmp_pkg_dir_ / (actual_version_ + std::string(constants::EXT_LPKG));
+
+    if (!fs::exists(archive_path_)) download_with_retries(download_url, archive_path_, 5, true);
+    if (!expected_hash_.empty() && calculate_sha256(archive_path_) != expected_hash_)
+        throw LpkgException(string_format("error.hash_mismatch", pkg_name_));
+}
+
+void InstallationTask::extract_and_validate_package() {
+    log_info(get_string("info.extracting_to_tmp"));
+    extract_tar_zst(archive_path_, tmp_pkg_dir_);
+
+    for (const auto& meta : {constants::PKG_METADATA_FILE, constants::DIR_CONTENT}) {
+        if (!fs::exists(tmp_pkg_dir_ / meta))
+            throw LpkgException(string_format("error.incomplete_package", (tmp_pkg_dir_ / meta).string()));
+    }
+
+    std::string meta_name, meta_version;
+    detail::read_package_metadata(tmp_pkg_dir_, meta_name, meta_version, deps_, provides_, man_content_);
+    if (meta_name != pkg_name_) {
+        log_warning(string_format("warning.package_name_mismatch", pkg_name_, meta_name));
+    }
+}
+
+void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
+    auto actual_deps = detail::parse_dep_strings(deps_);
+    if (actual_deps.empty()) return;
+
+    log_info(string_format("info.checking_deps"));
+    bool found_new = false;
+
+    for (const auto& dep : actual_deps) {
+        const std::string& dep_name = dep.name;
+        const std::string installed_ver = Cache::instance().get_installed_version(dep_name);
+
+        if (!installed_ver.empty()) {
+            if (dep.op.empty() || installed_ver == "virtual" || version_satisfies(installed_ver, dep.op, dep.version_req)) {
+                continue;
+            }
+        }
+
+        if (ctx.plan.contains(dep_name)) continue;
+
+        std::string req_ver = std::string(constants::VER_LATEST);
+        if (!dep.op.empty()) {
+            if (auto matching = ctx.repo.find_best_matching_version(dep_name, dep.op, dep.version_req))
+                req_ver = matching->version;
+        }
+
+        log_info(string_format("info.installing_discovered_dep", dep_name));
+
+        std::set<std::string> vs;
+        detail::resolve_package_dependencies(dep_name, req_ver, false, ctx, vs);
+
+        if (!ctx.plan.contains(dep_name)) {
+            auto providers = Cache::instance().get_providers(dep_name);
+            if (!providers.empty()) continue;
+
+            bool found_in_plan = false;
+            for (const auto& [pkg_name, pplan] : ctx.plan) {
+                for (const auto& prov : pplan.provides) {
+                    if (prov == dep_name || prov.find(dep_name) != std::string::npos) {
+                        found_in_plan = true;
+                        break;
+                    }
+                }
+                if (found_in_plan) break;
+            }
+
+            if (!found_in_plan) {
+                for (const auto& [tn, tv] : ctx.targets) {
+                    if (ctx.plan.contains(tn)) continue;
+                    if (auto it = ctx.local_candidates.find(tn); it != ctx.local_candidates.end()) {
+                        try {
+                            std::string m_json = extract_file_from_archive(it->second,
+                                std::string(constants::PKG_METADATA_FILE));
+                            if (!m_json.empty()) {
+                                json meta = json::parse(m_json);
+                                for (const auto& prov : meta.value(std::string(constants::J_PROVIDES),
+                                                                     std::vector<std::string>{})) {
+                                    if (prov == dep_name) { found_in_plan = true; break; }
+                                }
+                            }
+                        } catch (...) {}
+                    }
+                    if (found_in_plan) break;
+                }
+            }
+            if (found_in_plan) continue;
+
+            throw LpkgException(string_format("error.unresolvable_drift", pkg_name_,
+                                string_format("error.package_not_in_repo", dep_name)));
+        }
+        found_new = true;
+    }
+
+    if (found_new) {
+        if (auto broken = detail::check_plan_consistency(ctx.plan); !broken.empty()) {
+            throw LpkgException(string_format("error.unresolvable_drift", pkg_name_,
+                                "Dependency conflict detected in discovered dependencies"));
+        }
+    }
+}
+
+void InstallationTask::check_for_file_conflicts() {
+    std::map<std::string, std::string> conflicts;
+    const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
+    auto files = detail::scan_content_files(content_dir);
+    auto& cache = Cache::instance();
+    const bool force_overwrite = get_force_overwrite_mode();
+
+    for (const auto& f : files) {
+        fs::path rel_f = f;
+        if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
+        const fs::path logical_path = fs::path("/") / rel_f;
+        if (fs::is_directory(content_dir / f)) continue;
+
+        const std::string path_str = logical_path.string();
+        auto owners = cache.get_file_owners(path_str);
+
+        if (!owners.empty()) {
+            for (const auto& owner : owners) {
+                if (owner != pkg_name_ && !force_overwrite) conflicts[path_str] = owner;
+            }
+            continue;
+        }
+
+        if (old_version_to_replace_.empty()) {
+            const fs::path phys = ROOT_DIR / rel_f;
+            if ((fs::exists(phys) || fs::is_symlink(phys)) && !force_overwrite) {
+                conflicts[path_str] = "unknown (manual file)";
+            }
+        }
+    }
+
+    if (!conflicts.empty()) {
+        std::string msg = get_string("error.file_conflict_header") + "\n";
+        for (const auto& [file, owner] : conflicts)
+            msg += "  " + string_format("error.file_conflict_entry", file, owner) + "\n";
+        throw LpkgException(msg + get_string("error.installation_aborted"));
+    }
+}
+
+void InstallationTask::copy_package_files() {
+    log_info(get_string("info.copying_files"));
+    const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
+    auto files = detail::scan_content_files(content_dir);
+
+    for (const auto& f : files) {
+        fs::path rel_f = f;
+        if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
+        const fs::path src_path = content_dir / f;
+        const fs::path physical_path = ROOT_DIR / rel_f;
+
+        if (!fs::exists(src_path) && !fs::is_symlink(src_path)) continue;
+
+        fs::path parent = physical_path.parent_path();
+        std::vector<fs::path> to_create;
+        while (!parent.empty() && !fs::exists(parent)) {
+            to_create.push_back(parent);
+            if (parent == ROOT_DIR) break;
+            parent = parent.parent_path();
+        }
+        for (const auto& d : to_create | std::views::reverse) {
+            ensure_dir_exists(d);
+            created_dirs_.insert(d);
+        }
+
+        if (fs::is_directory(src_path)) {
+            ensure_dir_exists(physical_path);
+            struct stat st;
+            if (lstat(src_path.c_str(), &st) == 0) {
+                (void)lchown(physical_path.c_str(), st.st_uid, st.st_gid);
+                (void)chmod(physical_path.c_str(), st.st_mode & 07777);
+            }
+            continue;
+        }
+
+        try {
+            const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
+            fs::path final_dest = physical_path;
+
+            if (is_config && fs::exists(physical_path) && !fs::is_directory(physical_path)) {
+                final_dest += std::string(constants::SUFFIX_LPKG_NEW);
+                if (fs::exists(final_dest) || fs::is_symlink(final_dest)) fs::remove(final_dest);
+                log_warning(string_format("warning.config_conflict", physical_path.string(), final_dest.string()));
+                has_config_conflicts_ = true;
+            } else if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
+                if (!fs::is_directory(physical_path)) {
+                    fs::path bak = physical_path;
+                    bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
+                    fs::rename(physical_path, bak);
+                    backups_.emplace_back(physical_path, bak);
+                }
+            }
+
+            if (fs::is_symlink(src_path)) {
+                fs::path link_target = fs::read_symlink(src_path);
+                if (fs::exists(final_dest) || fs::is_symlink(final_dest)) fs::remove(final_dest);
+                fs::create_symlink(link_target, final_dest);
+            } else {
+                fs::copy(src_path, final_dest,
+                         fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+            }
+
+            struct stat st;
+            if (lstat(src_path.c_str(), &st) == 0) {
+                (void)lchown(final_dest.c_str(), st.st_uid, st.st_gid);
+                if (!S_ISLNK(st.st_mode)) {
+                    (void)chmod(final_dest.c_str(), st.st_mode & 07777);
+                }
+            }
+
+            installed_files_.push_back(final_dest);
+            TriggerManager::instance().check_file((fs::path("/") / f).string());
+        } catch (const std::exception& e) {
+            throw LpkgException(string_format("error.copy_failed_rollback", f, physical_path.string(), e.what()));
+        }
+    }
+
+    if (has_config_conflicts_) log_warning(get_string("info.config_review_reminder"));
+}
+
+void InstallationTask::register_package() {
+    auto& cache = Cache::instance();
+
+    if (!old_version_to_replace_.empty()) {
+        const fs::path old_dep_file = DEP_DIR / pkg_name_;
+        if (fs::exists(old_dep_file)) {
+            std::ifstream f(old_dep_file);
+            std::string line;
+            while (std::getline(f, line)) {
+                if (!line.empty()) {
+                    std::stringstream ss(line);
+                    std::string dn;
+                    if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name_);
+                }
+            }
+        }
+        for (const auto& cap : cache.get_package_provides(pkg_name_)) {
+            cache.remove_provider(cap, pkg_name_);
+        }
+    }
+
+    std::ofstream deps_out(DEP_DIR / pkg_name_);
+    for (const auto& d : deps_) {
+        deps_out << d << constants::NL;
+        std::string name = d;
+        if (const auto pos = d.find_first_of(" \t<>="); pos != std::string::npos) name = d.substr(0, pos);
+        cache.add_reverse_dep(name, pkg_name_);
+    }
+
+    const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
+    for (const auto& f : detail::scan_content_files(content_dir)) {
+        cache.add_file_owner((fs::path("/") / f).string(), pkg_name_);
+    }
+
+    if (!man_content_.empty()) {
+        std::ofstream man_out(DOCS_DIR / (pkg_name_ + std::string(constants::SUFFIX_MAN)));
+        man_out << man_content_;
+    }
+
+    for (const auto& cap : provides_) {
+        cache.add_provider(cap, pkg_name_);
+    }
+    cache.add_installed(pkg_name_, actual_version_, explicit_install_);
+}
+
+void InstallationTask::run_post_install_hook() {
+    const fs::path hook_src = tmp_pkg_dir_ / constants::DIR_HOOKS;
+    if (!fs::exists(hook_src) || !fs::is_directory(hook_src)) return;
+
+    const fs::path dest_dir = HOOKS_DIR / pkg_name_;
+    ensure_dir_exists(dest_dir);
+    for (const auto& entry : fs::directory_iterator(hook_src)) {
+        if (entry.is_regular_file()) {
+            const fs::path dest = dest_dir / entry.path().filename();
+            fs::copy(entry.path(), dest, fs::copy_options::overwrite_existing);
+            fs::permissions(dest, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
+                           fs::perm_options::add);
+        }
+    }
+    detail::run_hook(pkg_name_, std::string(constants::POSTINST_SH));
+}
+
+std::vector<DependencyInfo> InstallationTask::parse_deps() const {
+    return detail::parse_dep_strings(deps_);
+}
