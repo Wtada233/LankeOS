@@ -87,10 +87,10 @@ TEST_F(DynamicResolutionTest, DynamicDependencyChange) {
     // 1. Setup: Index says 'app' depends on 'libA'
     create_pkg("libA", "1.0");
     create_pkg("libB", "1.0");
-    
+
     // Package 'app' in mirror actually depends on 'libB'
     create_pkg("app", "1.0", {"libB"});
-    
+
     // But index incorrectly says it depends on 'libA'
     update_index({
         {"app", "1.0", "libA", ""},
@@ -109,27 +109,27 @@ TEST_F(DynamicResolutionTest, DynamicDependencyChange) {
 }
 
 TEST_F(DynamicResolutionTest, DynamicProviderChange) {
-    // 1. Setup: 
+    // 1. Setup:
     // Index says 'app' depends on 'virtual-pkg'
     // Index says 'provA' provides 'virtual-pkg'
     // Package 'app' actually provides nothing special.
     // Package 'provB' provides 'virtual-pkg'.
-    
+
     create_pkg("provA", "1.0", {}, {"other-pkg"}); // provA actually doesn't provide virtual-pkg
     create_pkg("provB", "1.0", {}, {"virtual-pkg"});
     create_pkg("app", "1.0", {"virtual-pkg"});
-    
+
     update_index({
         {"app", "1.0", "virtual-pkg", ""},
         {"provA", "1.0", "", "virtual-pkg"},
         {"provB", "1.0", "", "virtual-pkg"}
     });
 
-    // 2. Install 'app'. 
+    // 2. Install 'app'.
     // Initial resolution: app -> provA (because provA provides virtual-pkg in index)
     // After downloading provA, metadata says it provides 'other-pkg'.
     // System should re-resolve, find that virtual-pkg is missing, then find provB provides it.
-    
+
     EXPECT_NO_THROW(install_packages({"app"}));
 
     // 3. Verify
@@ -137,4 +137,73 @@ TEST_F(DynamicResolutionTest, DynamicProviderChange) {
     EXPECT_TRUE(Cache::instance().is_installed("app"));
     EXPECT_TRUE(Cache::instance().is_installed("provB"));
     EXPECT_FALSE(Cache::instance().is_installed("provA"));
+}
+
+// ====== TODO 4.1: Failure Scenario ======
+// Dep name change leads to unresolvable dependency
+TEST_F(DynamicResolutionTest, UnresolvableDriftFailure) {
+    // Index says 'app' depends on 'lib-old'.
+    // Real metadata.json says 'app' depends on 'lib-new'.
+    // 'lib-new' does NOT exist in the repository.
+    create_pkg("lib-old", "1.0");
+
+    // 'app' package: real metadata declares 'lib-new' dependency
+    create_pkg("app", "1.0", {"lib-new"});
+
+    // Index says it depends on 'lib-old' — only lib-old exists there
+    std::string hash = fs::exists(pkg_dir / "app-1.0.lpkg") ? calculate_sha256(pkg_dir / "app-1.0.lpkg") : "unknown";
+    std::string lib_hash = fs::exists(pkg_dir / "lib-old-1.0.lpkg") ? calculate_sha256(pkg_dir / "lib-old-1.0.lpkg") : "unknown";
+    {
+        std::ofstream index(mirror_dir / "index.txt");
+        index << "app|1.0:" << hash << ":lib-old|\n";
+        index << "lib-old|1.0:" << lib_hash << ":|\n";
+    }
+
+    // Installation should throw because lib-new cannot be resolved
+    EXPECT_THROW(install_packages({"app"}), LpkgException);
+}
+
+// ====== TODO 4.2: Discovery Scenario ======
+// Index says app has no deps, real metadata has lib-extra — system discovers and installs it
+TEST_F(DynamicResolutionTest, DiscoverNewDependency) {
+    // lib-extra exists in the repo
+    create_pkg("lib-extra", "1.0");
+    // app actually depends on lib-extra in its metadata
+    create_pkg("app", "1.0", {"lib-extra"});
+
+    // Index says app has NO deps
+    update_index({
+        {"app", "1.0", "", ""},
+        {"lib-extra", "1.0", "", ""}
+    });
+
+    // Install should succeed and discover lib-extra
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().is_installed("lib-extra"));
+}
+
+// ====== TODO 4.3: Atomic Rollback on Recursive Dep Failure ======
+// Recursive installation of discovered dep fails -> everything rolls back
+TEST_F(DynamicResolutionTest, AtomicRollbackOnFailedDep) {
+    // app depends on 'broken-dep' (in metadata), and that dep fails to download
+    // For this test, we create the package but DON'T put it in the mirror
+    create_pkg("app", "1.0", {"broken-dep"});
+
+    // Index says app has no deps
+    {
+        std::string hash = fs::exists(pkg_dir / "app-1.0.lpkg") ? calculate_sha256(pkg_dir / "app-1.0.lpkg") : "unknown";
+        std::ofstream index(mirror_dir / "index.txt");
+        index << "app|1.0:" << hash << ":|\n";
+        // broken-dep is NOT in the index — it will fail resolution
+    }
+
+    // Installation should throw because broken-dep doesn't exist
+    EXPECT_THROW(install_packages({"app"}), LpkgException);
+
+    // app should NOT be registered as installed
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("app"));
 }
