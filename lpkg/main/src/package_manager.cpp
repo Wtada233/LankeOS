@@ -105,8 +105,9 @@ void install_packages(const std::vector<std::string>& pkg_args,
             if (!p.local_path.empty()) p.sha256 = provided_hash;
     }
 
-    // Phase 2: Dynamic Metadata Verification
-    detail::verify_metadata_phase(ctx);
+    // Phase 2: Static consistency check (no download — pure dep-graph analysis)
+    // Dynamic metadata verification happens later, inside install_packages_internal,
+    // after the user has confirmed.
 
     if (plan.empty()) {
         log_info(get_string("info.all_packages_already_installed"));
@@ -159,9 +160,6 @@ void install_packages(const std::vector<std::string>& pkg_args,
 }
 
 void install_packages_internal(InstallContext& ctx) {
-    // Before installing, run metadata verification phase to download & check each package
-    detail::verify_metadata_phase(ctx);
-
     size_t i = 0;
     while (i < ctx.install_order.size()) {
         const std::string& n = ctx.install_order[i];
@@ -174,6 +172,58 @@ void install_packages_internal(InstallContext& ctx) {
         }
 
         const auto& p = ctx.plan.at(n);
+
+        // Inline metadata verification: download & check real metadata before install
+        if (!p.metadata_verified) {
+            InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
+                Cache::instance().get_installed_version(p.name),
+                p.local_path, p.sha256, p.force_reinstall);
+            ensure_dir_exists(check_task.tmp_pkg_dir_);
+            check_task.download_and_verify_package();
+            check_task.extract_and_validate_package();
+
+            auto actual_deps = detail::parse_dep_strings(check_task.deps_);
+
+            bool metadata_differs = (actual_deps.size() != p.dependencies.size())
+                || (check_task.provides_ != p.provides);
+            if (!metadata_differs) {
+                for (size_t di = 0; di < actual_deps.size(); ++di) {
+                    if (actual_deps[di].name != p.dependencies[di].name
+                        || actual_deps[di].op != p.dependencies[di].op
+                        || actual_deps[di].version_req != p.dependencies[di].version_req) {
+                        metadata_differs = true; break;
+                    }
+                }
+            }
+
+            if (metadata_differs) {
+                log_info(string_format("info.resolving_metadata", p.name));
+                ctx.repo.update_package_info(p.name, p.actual_version,
+                    actual_deps, check_task.provides_);
+                ctx.local_candidates[p.name] = check_task.archive_path_;
+
+                // Rollback any packages already installed in this transaction
+                for (const auto& done_name : ctx.successfully_installed | std::views::reverse) {
+                    try { remove_package(done_name, true); } catch (...) {}
+                }
+                ctx.successfully_installed.clear();
+
+                ctx.plan.clear();
+                ctx.install_order.clear();
+                for (const auto& [tn, tv] : ctx.targets) {
+                    std::set<std::string> vs;
+                    detail::resolve_package_dependencies(tn, tv, true, ctx, vs);
+                }
+                i = 0; // restart from beginning with new plan
+                continue;
+            }
+
+            // Save the downloaded archive path so the real task doesn't re-download
+            const_cast<InstallPlan&>(p).local_path = check_task.archive_path_;
+            const_cast<InstallPlan&>(p).metadata_verified = true;
+        }
+
+        // Now install
         InstallationTask task(p.name, p.actual_version, p.is_explicit,
                               Cache::instance().get_installed_version(p.name),
                               p.local_path, p.sha256, p.force_reinstall);
