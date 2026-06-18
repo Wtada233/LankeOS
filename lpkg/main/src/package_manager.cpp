@@ -140,7 +140,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
         return;
     }
 
-    // Phase 3: Actual installation with dependency re-verification
+    // Phase 3: Actual installation with inline metadata verification
     ctx.successfully_installed.clear();
     try {
         install_packages_internal(ctx);
@@ -159,6 +159,9 @@ void install_packages(const std::vector<std::string>& pkg_args,
 }
 
 void install_packages_internal(InstallContext& ctx) {
+    // Before installing, run metadata verification phase to download & check each package
+    detail::verify_metadata_phase(ctx);
+
     size_t i = 0;
     while (i < ctx.install_order.size()) {
         const std::string& n = ctx.install_order[i];
