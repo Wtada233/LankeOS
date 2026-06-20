@@ -8,23 +8,32 @@ import argparse
 import concurrent.futures
 import sys
 
+if os.geteuid() != 0:
+    cmd = ["sudo", sys.executable] + sys.argv
+    try:
+        subprocess.run(cmd, check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to re-execute with sudo: {e}", file=sys.stderr)
+        sys.exit(e.returncode)
+    sys.exit(0)
+
 def run_cmd(cmd):
     """执行 shell 命令并返回 CompletedProcess"""
     return subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
 def get_elf_needed(filepath):
     """获取 ELF 文件的 NEEDED 列表"""
-    res = run_cmd(f"sudo LC_ALL=C readelf -d '{filepath}' 2>/dev/null | grep '(NEEDED)'")
+    res = run_cmd(f"LC_ALL=C readelf -d '{filepath}' 2>/dev/null | grep '(NEEDED)'")
     return re.findall(r"\[(.*?)\]", res.stdout)
 
 def get_elf_soname(filepath):
     """获取 ELF 文件的 SONAME"""
-    res = run_cmd(f"sudo LC_ALL=C readelf -d '{filepath}' 2>/dev/null | grep '(SONAME)'")
+    res = run_cmd(f"LC_ALL=C readelf -d '{filepath}' 2>/dev/null | grep '(SONAME)'")
     return re.findall(r"\[(.*?)\]", res.stdout)
 
 def is_elf(filepath):
     """通过 Magic Number 检查文件是否为 ELF"""
-    res = run_cmd(f"sudo head -c 4 '{filepath}' 2>/dev/null | hexdump -e '4/1 \"%02x\"'")
+    res = run_cmd(f"head -c 4 '{filepath}' 2>/dev/null | hexdump -e '4/1 \"%02x\"'")
     return res.stdout.strip() == "7f454c46"
 
 def read_pkg_metadata(pkg_path):
@@ -54,13 +63,13 @@ def process_phase1(lpkg_info):
     os.makedirs(extract_dir, exist_ok=True)
     
     # 解压
-    run_cmd(f"sudo tar -I zstd -xf '{pkg_path}' -C '{extract_dir}'")
+    run_cmd(f"tar -I zstd -xf '{pkg_path}' -C '{extract_dir}'")
     
     content_dir = os.path.join(extract_dir, "content")
     local_providers = []
     
     # 查找所有 ELF 文件并记录 SONAME/文件名
-    res = run_cmd(f"sudo find '{content_dir}' -type f")
+    res = run_cmd(f"find '{content_dir}' -type f")
     for fpath in res.stdout.splitlines():
         if is_elf(fpath):
             # 记录内部 SONAME
@@ -83,7 +92,7 @@ def process_phase2(lpkg_info, provider_map, working_dir):
     content_dir = os.path.join(extract_dir, "content")
     
     needs = set()
-    res = run_cmd(f"sudo find '{content_dir}' -type f")
+    res = run_cmd(f"find '{content_dir}' -type f")
     for fpath in res.stdout.splitlines():
         if is_elf(fpath):
             needed = get_elf_needed(fpath)
@@ -103,14 +112,11 @@ def process_phase2(lpkg_info, provider_map, working_dir):
         with open(meta_path, 'w') as f:
             json.dump(meta, f, indent=2)
     
-    # 关键：重新打包前恢复 root 所有权，保持包内文件原始权限
-    run_cmd(f"sudo chown -R root:root '{extract_dir}'")
-    
     # 重新打包
     repack_path = pkg_path + ".repacked"
-    run_cmd(f"sudo tar -I zstd -cf '{repack_path}' -C '{extract_dir}' .")
-    run_cmd(f"sudo mv '{repack_path}' '{pkg_path}'")
-    return lpkg, final_deps
+    run_cmd(f"tar -I zstd -cf '{repack_path}' -C '{extract_dir}' .")
+    run_cmd(f"mv '{repack_path}' '{pkg_path}'")
+    return lpkg, sorted(list(needs))
 
 def main():
     parser = argparse.ArgumentParser(description="Auto-generate dependencies for .lpkg files based on ELF dynamic links.")
@@ -165,7 +171,7 @@ def main():
 
     # 清理
     print(f"[*] Cleaning up temporary files...")
-    run_cmd(f"sudo rm -rf '{working_dir}'")
+    run_cmd(f"rm -rf '{working_dir}'")
     print("[*] All tasks completed successfully!")
 
 if __name__ == "__main__":

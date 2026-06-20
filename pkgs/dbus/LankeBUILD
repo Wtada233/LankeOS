@@ -12,7 +12,7 @@ lankebuild_build() {
     DESTDIR={STAGING_ROOT} ninja install
     # 使 D-Bus 和 systemd 使用同一个 machine-id
     mkdir -pv {STAGING_ROOT}/var/lib/dbus
-    ln -sfv /etc/machine-id {STAGING_ROOT}/var/lib/dbus/machine-id
+    ln -sfv ../../../etc/machine-id {STAGING_ROOT}/var/lib/dbus/machine-id
 }
 
 
