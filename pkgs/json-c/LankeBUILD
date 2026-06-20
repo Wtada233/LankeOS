@@ -13,7 +13,7 @@ lankebuild_build() {
     mkdir build && cd build
     # 核心：绕过 CMake 4.x 限制的策略设置
     cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-    make -j$THREADS
+    make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }
 
