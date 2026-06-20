@@ -344,13 +344,13 @@ void string_replace_all(std::string& str, const std::string& from, const std::st
 
 std::filesystem::path validate_path(const fs::path& path, const fs::path& root) {
     if (path.is_absolute()) {
-         throw LpkgException("Security Violation: Path must be relative: " + path.string());
+         throw LpkgException(string_format("error.security_path_not_relative", path.string()));
     }
 
     fs::path normalized = path.lexically_normal();
     for (const auto& component : normalized) {
         if (component == "..") {
-             throw LpkgException("Security Violation: Path traversal detected: " + path.string());
+             throw LpkgException(string_format("error.security_path_traversal", path.string()));
         }
     }
     return root / normalized;

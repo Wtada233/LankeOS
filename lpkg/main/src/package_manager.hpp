@@ -33,15 +33,38 @@ struct InstallContext {
 
 class InstallationTask {
 public:
-    InstallationTask(std::string pkg_name, std::string version, bool explicit_install, std::string old_version_to_replace = "", std::filesystem::path local_package_path = "", std::string expected_hash = "", bool force_reinstall = false);
-    void run(InstallContext* ctx = nullptr);  // ctx for recursive dep discovery
+    InstallationTask(std::string pkg_name, std::string version, bool explicit_install,
+                     std::string old_version_to_replace = "",
+                     std::filesystem::path local_package_path = "",
+                     std::string expected_hash = "",
+                     bool force_reinstall = false);
+
+    // Main entry point; ctx for recursive dep discovery
+    void run(InstallContext* ctx = nullptr);
 
     // External callers (upgrade, etc.) still use the old interface
     void run_simple() { run(nullptr); }
 
+    // --- Public for metadata-verification mode ---
+    // Inline metadata verification: download + extract a package just to inspect
+    // its real metadata (deps, provides) before the actual installation task runs.
+    void download_and_verify_package();
+    void extract_and_validate_package();
+
+    // --- Public for testing ---
+    void copy_package_files();
+
+    // Accessors for metadata-verification callers
+    const std::vector<std::string>& deps() const { return deps_; }
+    const std::vector<std::string>& provides() const { return provides_; }
+    const std::filesystem::path& archive_path() const { return archive_path_; }
+    const std::filesystem::path& tmp_pkg_dir() const { return tmp_pkg_dir_; }
+    void set_tmp_dir(const std::filesystem::path& p) { tmp_pkg_dir_ = p; }
+
+private:
     std::string pkg_name_;
     std::string version_;
-    bool explicit_install_;
+    bool explicit_install_ = false;
     std::filesystem::path tmp_pkg_dir_;
     std::string actual_version_;
     std::filesystem::path archive_path_;
@@ -54,29 +77,22 @@ public:
     std::vector<std::string> provides_;
     std::string man_content_;
 
-    // Temporarily public for testing
-    void prepare(InstallContext* ctx = nullptr);
-    void download_and_verify_package();
-    void extract_and_validate_package();
-    void ensure_dependencies_satisfied(InstallContext& ctx);  // NEW: recursive dep discovery
-    void check_for_file_conflicts();
-    void commit();
-    void copy_package_files();
-    void register_package();
-    void run_post_install_hook();
-    void rollback_files();
-
-private:
     std::vector<std::pair<std::filesystem::path, std::filesystem::path>> backups_;
     std::vector<std::filesystem::path> installed_files_;
     std::set<std::filesystem::path> created_dirs_;
 
-    // Parse deps_ strings into DependencyInfo structs
+    void prepare(InstallContext* ctx = nullptr);
+    void ensure_dependencies_satisfied(InstallContext& ctx);
+    void check_for_file_conflicts();
+    void commit();
+    void register_package();
+    void run_post_install_hook();
+    void rollback_files();
+
     std::vector<DependencyInfo> parse_deps() const;
 };
 
 // Public API
-void install_package(const std::string& pkg_name, const std::string& version);
 void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file = "", bool force_reinstall = false);
 
 // Internal recursive engine

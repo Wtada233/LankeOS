@@ -43,7 +43,7 @@ namespace {
 
         if (archive_write_header(a, entry) != ARCHIVE_OK) {
             archive_entry_free(entry);
-            throw LpkgException("Archive write header failed: " + std::string(archive_error_string(a)));
+            throw LpkgException(string_format("error.archive_write_header_failed", archive_error_string(a)));
         }
 
         if (S_ISREG(st.st_mode)) {
@@ -52,7 +52,7 @@ namespace {
             while (f.read(buffer, sizeof(buffer)) || f.gcount() > 0) {
                 if (archive_write_data(a, buffer, f.gcount()) < 0) {
                     archive_entry_free(entry);
-                    throw LpkgException("Archive write data failed: " + std::string(archive_error_string(a)));
+                    throw LpkgException(string_format("error.archive_write_data_failed", archive_error_string(a)));
                 }
             }
         }
@@ -87,7 +87,7 @@ void pack_package(const std::string& output_filename, const std::string& source_
     archive_write_set_format_pax_restricted(a);
     
     if (archive_write_open_filename(a, output_filename.c_str()) != ARCHIVE_OK) {
-        throw LpkgException("Failed to open output archive: " + std::string(archive_error_string(a)));
+        throw LpkgException(string_format("error.archive_open_failed", archive_error_string(a)));
     }
 
     try {

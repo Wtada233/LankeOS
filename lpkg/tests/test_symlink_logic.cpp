@@ -76,8 +76,8 @@ TEST_F(SymlinkLogicTest, PreventsSymlinkChmodFollow) {
     }
 
     InstallationTask task("symlink_pkg", "1.0", true);
-    task.tmp_pkg_dir_ = pkg_tmp_dir;
-    
+    task.set_tmp_dir(pkg_tmp_dir);
+
     ASSERT_NO_THROW(task.copy_package_files());
 
     // 4. Verify the link was created at destination: /usr/bin/my_link
@@ -116,7 +116,7 @@ TEST_F(SymlinkLogicTest, HandlesConfigSymlinkConflict) {
     }
 
     InstallationTask task("filesystem_pkg", "1.0", true);
-    task.tmp_pkg_dir_ = pkg_tmp_dir;
+    task.set_tmp_dir(pkg_tmp_dir);
 
     // Trigger config conflict logic: existing file at etc/os-release.lpkgnew
     fs::path lpkgnew_path = test_root / "etc/os-release.lpkgnew";

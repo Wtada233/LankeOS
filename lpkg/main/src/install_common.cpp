@@ -119,7 +119,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     if (auto it = ctx.local_candidates.find(pkg_name); it != ctx.local_candidates.end()) {
         local_path = it->second;
         std::string m_json = extract_file_from_archive(local_path, std::string(constants::PKG_METADATA_FILE));
-        if (m_json.empty()) throw LpkgException("Local package missing metadata.json: " + local_path.string());
+        if (m_json.empty()) throw LpkgException(string_format("error.local_pkg_missing_metadata", local_path.string()));
 
         json meta = json::parse(m_json);
         latest_version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
@@ -249,54 +249,6 @@ std::unordered_set<std::string> get_all_required_packages() {
         }
     }
     return req;
-}
-
-bool verify_metadata_phase(InstallContext& ctx) {
-    bool changed = true;
-    while (changed) {
-        changed = false;
-        auto current_order = ctx.install_order;
-        for (const auto& name : current_order) {
-            auto& p = ctx.plan.at(name);
-            if (p.metadata_verified) continue;
-
-            InstallationTask task(p.name, p.actual_version, p.is_explicit,
-                Cache::instance().get_installed_version(p.name), p.local_path, p.sha256, p.force_reinstall);
-            ensure_dir_exists(task.tmp_pkg_dir_);
-            task.download_and_verify_package();
-            task.extract_and_validate_package();
-
-            auto actual_deps = parse_dep_strings(task.deps_);
-
-            bool metadata_differs = (actual_deps.size() != p.dependencies.size()) || (task.provides_ != p.provides);
-            if (!metadata_differs) {
-                for (size_t i = 0; i < actual_deps.size(); ++i) {
-                    if (actual_deps[i].name != p.dependencies[i].name ||
-                        actual_deps[i].op != p.dependencies[i].op ||
-                        actual_deps[i].version_req != p.dependencies[i].version_req) {
-                        metadata_differs = true;
-                        break;
-                    }
-                }
-            }
-
-            if (metadata_differs) {
-                log_info(string_format("info.resolving_metadata", p.name));
-                ctx.repo.update_package_info(p.name, p.actual_version, actual_deps, task.provides_);
-                ctx.local_candidates[p.name] = task.archive_path_;
-                ctx.plan.clear();
-                ctx.install_order.clear();
-                for (const auto& [n, v] : ctx.targets) {
-                    std::set<std::string> vs;
-                    resolve_package_dependencies(n, v, true, ctx, vs);
-                }
-                changed = true;
-                break;
-            }
-            p.metadata_verified = true;
-        }
-    }
-    return true;
 }
 
 } // namespace detail

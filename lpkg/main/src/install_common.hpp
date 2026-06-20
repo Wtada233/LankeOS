@@ -52,7 +52,4 @@ std::set<std::string> check_plan_consistency(const std::map<std::string, Install
 // BFS over the dependency graph starting from held packages
 std::unordered_set<std::string> get_all_required_packages();
 
-// Phase 2: download each pkg, verify real metadata matches index — re-resolve if drift
-bool verify_metadata_phase(InstallContext& ctx);
-
 } // namespace detail

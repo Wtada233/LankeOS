@@ -2,6 +2,7 @@
 #include "config.hpp"
 #include "utils.hpp"
 #include "exception.hpp"
+#include "localization.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -244,7 +245,7 @@ void Cache::write_db_uncached(const fs::path& path, const std::map<std::string, 
     fs::path tmp_path = path.string() + ".tmp";
     {
         std::ofstream db_file(tmp_path, std::ios::trunc);
-        if (!db_file.is_open()) throw LpkgException("Failed to create temporary database file");
+        if (!db_file.is_open()) throw LpkgException(get_string("error.create_tmp_db_failed"));
         for (const auto& [key, values] : db) {
             for (const auto& value : values) {
                 db_file << key << "\t" << value << "\n";

@@ -60,7 +60,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
     if (!hash_file_path.empty()) {
         std::ifstream hf(hash_file_path);
         if (!(hf >> provided_hash))
-            throw LpkgException("Failed to read hash from provided file.");
+            throw LpkgException(get_string("error.read_hash_failed"));
     }
 
     for (const auto& arg : pkg_args) {
@@ -100,7 +100,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
 
     if (!provided_hash.empty()) {
         if (locals.empty())
-            throw LpkgException("--hash can only be used with local package installations.");
+            throw LpkgException(get_string("error.hash_requires_local"));
         for (auto& [n, p] : plan)
             if (!p.local_path.empty()) p.sha256 = provided_hash;
     }
@@ -171,21 +171,21 @@ void install_packages_internal(InstallContext& ctx) {
             continue;
         }
 
-        const auto& p = ctx.plan.at(n);
+        auto& p = ctx.plan.at(n);
 
         // Inline metadata verification: download & check real metadata before install
         if (!p.metadata_verified) {
             InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
                 Cache::instance().get_installed_version(p.name),
                 p.local_path, p.sha256, p.force_reinstall);
-            ensure_dir_exists(check_task.tmp_pkg_dir_);
+            ensure_dir_exists(check_task.tmp_pkg_dir());
             check_task.download_and_verify_package();
             check_task.extract_and_validate_package();
 
-            auto actual_deps = detail::parse_dep_strings(check_task.deps_);
+            auto actual_deps = detail::parse_dep_strings(check_task.deps());
 
             bool metadata_differs = (actual_deps.size() != p.dependencies.size())
-                || (check_task.provides_ != p.provides);
+                || (check_task.provides() != p.provides);
             if (!metadata_differs) {
                 for (size_t di = 0; di < actual_deps.size(); ++di) {
                     if (actual_deps[di].name != p.dependencies[di].name
@@ -199,8 +199,8 @@ void install_packages_internal(InstallContext& ctx) {
             if (metadata_differs) {
                 log_info(string_format("info.resolving_metadata", p.name));
                 ctx.repo.update_package_info(p.name, p.actual_version,
-                    actual_deps, check_task.provides_);
-                ctx.local_candidates[p.name] = check_task.archive_path_;
+                    actual_deps, check_task.provides());
+                ctx.local_candidates[p.name] = check_task.archive_path();
 
                 // Rollback any packages already installed in this transaction
                 for (const auto& done_name : ctx.successfully_installed | std::views::reverse) {
@@ -219,8 +219,8 @@ void install_packages_internal(InstallContext& ctx) {
             }
 
             // Save the downloaded archive path so the real task doesn't re-download
-            const_cast<InstallPlan&>(p).local_path = check_task.archive_path_;
-            const_cast<InstallPlan&>(p).metadata_verified = true;
+            p.local_path = check_task.archive_path();
+            p.metadata_verified = true;
         }
 
         // Now install
