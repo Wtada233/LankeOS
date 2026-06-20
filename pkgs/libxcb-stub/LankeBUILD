@@ -20,15 +20,15 @@ lankebuild_build() {
     ln -s libxcb-util.so.0.0.0 "$LIB_DIR/libxcb-util.so"
 
     # 3. 伪造 pkg-config
-    cat > "$PC_DIR/xcb-util.pc" <<EOF
+    cat > "$PC_DIR/xcb-util.pc" <<'EOF'
 prefix=/usr
-libdir=\$prefix/lib
-includedir=\$prefix/include
+libdir=$prefix/lib
+includedir=$prefix/include
 Name: xcb-util
 Description: XCB stub for LankeOS
 Version: 1.0
-Libs: -L\$libdir -lxcb-util
-Cflags: -I\$includedir
+Libs: -L$libdir -lxcb-util
+Cflags: -I$includedir
 EOF
 }
 

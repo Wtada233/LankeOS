@@ -10,12 +10,12 @@ lankebuild_build() {
     cmake -D CMAKE_INSTALL_PREFIX=/usr -G Ninja .. 
     DESTDIR={STAGING_ROOT} ninja install
     mkdir -p "{STAGING_ROOT}/usr/share/pkgconfig"
-    cat > "{STAGING_ROOT}/usr/share/pkgconfig/SPIRV-Headers.pc" << EOF
+    cat > "{STAGING_ROOT}/usr/share/pkgconfig/SPIRV-Headers.pc" << 'EOF'
 prefix=/usr
-includedir=\$prefix/include
+includedir=$prefix/include
 Name: SPIRV-Headers
 Version: 1.4.341.0
-Cflags: -I\$includedir
+Cflags: -I$includedir
 EOF
 }
 

@@ -11,15 +11,15 @@ lankebuild_build() {
     cp -v src/duktape.h src/duk_config.h src/duk_util.h {STAGING_ROOT}/usr/include/
     cp -v libduktape.so.2.7.0 {STAGING_ROOT}/usr/lib/
     ln -sf libduktape.so.2.7.0 {STAGING_ROOT}/usr/lib/libduktape.so
-    cat > {STAGING_ROOT}/usr/lib/pkgconfig/duktape.pc << EOF
+    cat > {STAGING_ROOT}/usr/lib/pkgconfig/duktape.pc << 'EOF'
 prefix=/usr
-libdir=\$prefix/lib
-includedir=\$prefix/include
+libdir=$prefix/lib
+includedir=$prefix/include
 Name: duktape
 Description: Duktape engine
 Version: 2.7.0
-Libs: -L\$libdir -lduktape -lm
-Cflags: -I\$includedir
+Libs: -L$libdir -lduktape -lm
+Cflags: -I$includedir
 EOF
 }
 

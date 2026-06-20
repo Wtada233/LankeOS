@@ -13,19 +13,19 @@ lankebuild_build() {
 V=5.5
 R=5.5.0
 prefix=/usr
-INSTALL_BIN=\$prefix/bin
-INSTALL_INC=\$prefix/include
-INSTALL_LIB=\$prefix/lib
-exec_prefix=\$prefix
-libdir=\$exec_prefix/lib
-includedir=\$prefix/include
+INSTALL_BIN=$prefix/bin
+INSTALL_INC=$prefix/include
+INSTALL_LIB=$prefix/lib
+exec_prefix=$prefix
+libdir=$exec_prefix/lib
+includedir=$prefix/include
 
 Name: Lua
 Description: An Extensible Extension Language
-Version: \$R
+Version: $R
 Requires:
-Libs: -L\$libdir -llua -lm -ldl
-Cflags: -I\$includedir
+Libs: -L$libdir -llua -lm -ldl
+Cflags: -I$includedir
 EOF
 }
 
