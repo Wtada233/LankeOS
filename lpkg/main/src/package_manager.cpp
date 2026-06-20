@@ -180,12 +180,23 @@ void install_packages_internal(InstallContext& ctx) {
                 p.local_path, p.sha256, p.force_reinstall);
             ensure_dir_exists(check_task.tmp_pkg_dir());
             check_task.download_and_verify_package();
-            check_task.extract_and_validate_package();
 
-            auto actual_deps = detail::parse_dep_strings(check_task.deps());
+            // Read metadata.json directly from the archive without full extraction
+            std::string meta_json = extract_file_from_archive(
+                check_task.archive_path(), std::string(constants::PKG_METADATA_FILE));
+            if (meta_json.empty())
+                throw LpkgException(string_format("error.local_pkg_missing_metadata",
+                    check_task.archive_path().string()));
+
+            json meta = json::parse(meta_json);
+            std::vector<std::string> dep_strs = meta.value(
+                std::string(constants::J_DEPS), std::vector<std::string>{});
+            auto actual_deps = detail::parse_dep_strings(dep_strs);
+            std::vector<std::string> actual_provides = meta.value(
+                std::string(constants::J_PROVIDES), std::vector<std::string>{});
 
             bool metadata_differs = (actual_deps.size() != p.dependencies.size())
-                || (check_task.provides() != p.provides);
+                || (actual_provides != p.provides);
             if (!metadata_differs) {
                 for (size_t di = 0; di < actual_deps.size(); ++di) {
                     if (actual_deps[di].name != p.dependencies[di].name
@@ -199,7 +210,7 @@ void install_packages_internal(InstallContext& ctx) {
             if (metadata_differs) {
                 log_info(string_format("info.resolving_metadata", p.name));
                 ctx.repo.update_package_info(p.name, p.actual_version,
-                    actual_deps, check_task.provides());
+                    actual_deps, actual_provides);
                 ctx.local_candidates[p.name] = check_task.archive_path();
 
                 // Rollback any packages already installed in this transaction
