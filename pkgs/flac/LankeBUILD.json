@@ -1,0 +1,8 @@
+{
+  "name": "flac",
+  "version": "1.5.0",
+  "sources": [
+    "https://github.com/xiph/flac/releases/download/1.5.0/flac-1.5.0.tar.xz"
+  ],
+  "work_sources": []
+}
