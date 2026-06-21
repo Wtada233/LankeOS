@@ -33,7 +33,7 @@ lankebuild_build() {
     ln -sfv ../lib/ld-linux-x86-64.so.2 {STAGING_ROOT}/usr/bin/ld.so
 
     # Timezone data
-    tar -xf {SRC_DIR}/tzdata2025b.tar.gz
+    tar -xf {WORK_DIR}/tzdata2025b.tar.gz
     ZONEINFO={STAGING_ROOT}/usr/share/zoneinfo
     mkdir -pv $ZONEINFO/{posix,right}
     for tz in etcetera southamerica northamerica europe africa antarctica asia australasia backward; do
