@@ -1,0 +1,8 @@
+{
+  "name": "wpa_supplicant",
+  "version": "2.11",
+  "sources": [
+    "https://w1.fi/releases/wpa_supplicant-2.11.tar.gz"
+  ],
+  "work_sources": ["https://www.linuxfromscratch.org/patches/blfs/svn/wpa_supplicant-2.11-openssl_4_fixes-1.patch"]
+}
