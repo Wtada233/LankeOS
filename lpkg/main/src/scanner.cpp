@@ -15,7 +15,7 @@ void scan_orphans(const std::string& scan_root_override) {
     log_info(get_string("info.scan_loading_db"));
     Cache& cache = Cache::instance(); 
     
-    fs::path actual_root = ROOT_DIR;
+    fs::path actual_root = Config::instance().root_dir();
     if (!scan_root_override.empty()) {
         actual_root = scan_root_override;
     }

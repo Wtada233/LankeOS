@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config.hpp"   // NonInteractiveMode
 #include "exception.hpp"
 #include "constants.hpp"
 #include <string>
@@ -18,28 +19,7 @@ void log_progress(const std::string& msg, double percentage, int bar_width = 50)
 int run_command(const std::vector<std::string>& args, const std::filesystem::path& work_dir = "");
 int run_shell(const std::string& cmd, const std::filesystem::path& work_dir = "");
 
-// Interactive mode control
-enum class NonInteractiveMode {
-    INTERACTIVE,
-    YES,
-    NO
-};
-
-void set_non_interactive_mode(NonInteractiveMode mode);
-NonInteractiveMode get_non_interactive_mode();
-
-void set_force_overwrite_mode(bool enable);
-bool get_force_overwrite_mode();
-
-void set_no_hooks_mode(bool enable);
-bool get_no_hooks_mode();
-
-void set_no_deps_mode(bool enable);
-bool get_no_deps_mode();
-
-void set_testing_mode(bool enable);
-bool get_testing_mode();
-
+// User interaction (uses Config::instance().non_interactive_mode())
 bool user_confirms(const std::string& prompt);
 
 // System checks
@@ -92,4 +72,3 @@ enum class BinaryType {
 };
 
 void strip_binary(const std::filesystem::path& path);
-

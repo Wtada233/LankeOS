@@ -280,7 +280,7 @@ void remove_package(const std::string& pkg_name, bool force) {
     remove_package_files(pkg_name, force);
 
     auto& cache = Cache::instance();
-    const fs::path dep_file = DEP_DIR / pkg_name;
+    const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
     if (fs::exists(dep_file)) {
         std::ifstream f(dep_file);
         std::string l;
@@ -292,8 +292,8 @@ void remove_package(const std::string& pkg_name, bool force) {
     }
 
     fs::remove(dep_file);
-    fs::remove(DOCS_DIR / (pkg_name + std::string(constants::SUFFIX_MAN)));
-    fs::remove_all(HOOKS_DIR / pkg_name);
+    fs::remove(Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)));
+    fs::remove_all(Config::instance().hooks_dir() / pkg_name);
     cache.remove_installed(pkg_name);
     log_info(string_format("info.package_removed_successfully", pkg_name));
 }
@@ -333,8 +333,8 @@ void remove_package_files(const std::string& pkg_name, bool force) {
     int count = 0;
     for (const auto& p : paths) {
         const fs::path phys = p.is_absolute()
-            ? ROOT_DIR / fs::path(p).relative_path()
-            : ROOT_DIR / p;
+            ? Config::instance().root_dir() / fs::path(p).relative_path()
+            : Config::instance().root_dir() / p;
         if (fs::exists(phys) || fs::is_symlink(phys)) {
             fs::remove(phys);
             ++count;
@@ -419,7 +419,7 @@ void upgrade_packages() {
 }
 
 void show_man_page(const std::string& pkg_name) {
-    const fs::path p = DOCS_DIR / (pkg_name + ".man");
+    const fs::path p = Config::instance().docs_dir() / (pkg_name + ".man");
     if (!fs::exists(p))
         throw LpkgException(string_format("error.no_man_page", pkg_name));
     std::ifstream f(p);
@@ -441,15 +441,15 @@ void reinstall_package(const std::string& arg) {
     }
 
     log_info(string_format("info.reinstalling_package", name));
-    const bool old_ovr = get_force_overwrite_mode();
-    set_force_overwrite_mode(true);
+    const bool old_ovr = Config::instance().force_overwrite_mode();
+    Config::instance().set_force_overwrite_mode(true);
     try {
         install_packages({arg}, "", true);
     } catch (...) {
-        set_force_overwrite_mode(old_ovr);
+        Config::instance().set_force_overwrite_mode(old_ovr);
         throw;
     }
-    set_force_overwrite_mode(old_ovr);
+    Config::instance().set_force_overwrite_mode(old_ovr);
 }
 
 void query_package(const std::string& pkg_name) {
@@ -472,8 +472,8 @@ void query_file(const std::string& filename) {
     if (owners.empty()) {
         try {
             const fs::path abs_p = fs::absolute(filename);
-            if (abs_p.string().starts_with(ROOT_DIR.string())) {
-                const std::string logical = "/" + fs::relative(abs_p, ROOT_DIR).string();
+            if (abs_p.string().starts_with(Config::instance().root_dir().string())) {
+                const std::string logical = "/" + fs::relative(abs_p, Config::instance().root_dir()).string();
                 owners = cache.get_file_owners(logical);
                 if (!owners.empty()) target = logical;
             }

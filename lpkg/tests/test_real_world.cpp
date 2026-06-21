@@ -22,17 +22,17 @@ protected:
         repo_dir = test_root / "repo";
         fs::remove_all(test_root);
         fs::create_directories(repo_dir);
-        set_root_path(test_root.string() + "/root");
+        Config::instance().set_root_path(test_root.string() + "/root");
         
-        fs::create_directories(ROOT_DIR / "var/lib/lpkg/deps");
-        fs::create_directories(ROOT_DIR / "var/lib/lpkg/files");
-        fs::create_directories(ROOT_DIR / "var/lib/lpkg/info");
-        fs::create_directories(DOCS_DIR);
+        fs::create_directories(Config::instance().root_dir() / "var/lib/lpkg/deps");
+        fs::create_directories(Config::instance().root_dir() / "var/lib/lpkg/files");
+        fs::create_directories(Config::instance().root_dir() / "var/lib/lpkg/info");
+        fs::create_directories(Config::instance().docs_dir());
         
-        std::ofstream(PKGS_FILE).close();
-        std::ofstream(HOLDPKGS_FILE).close();
-        std::ofstream(FILES_DB).close();
-        std::ofstream(PROVIDES_DB).close();
+        std::ofstream(Config::instance().pkgs_file()).close();
+        std::ofstream(Config::instance().holdpkgs_file()).close();
+        std::ofstream(Config::instance().files_db()).close();
+        std::ofstream(Config::instance().provides_db()).close();
 
         Cache::instance().load();
     }
@@ -93,17 +93,17 @@ TEST_F(RealWorldScenarioTest, BlockRemovalOfProvider) {
 TEST_F(RealWorldScenarioTest, ManualFileClobbering) {
     std::string pkg = create_pkg("clobber", "1.0", {}, {}, {{"usr/bin/tool", "/"}});
     
-    fs::path target = ROOT_DIR / "usr/bin/tool";
+    fs::path target = Config::instance().root_dir() / "usr/bin/tool";
     ensure_dir_exists(target.parent_path());
     {
         std::ofstream f(target);
         f << "manual content";
     }
     
-    set_force_overwrite_mode(false);
+    Config::instance().set_force_overwrite_mode(false);
     EXPECT_THROW(install_packages({pkg}), LpkgException);
     
-    set_force_overwrite_mode(true);
+    Config::instance().set_force_overwrite_mode(true);
     install_packages({pkg});
     EXPECT_TRUE(Cache::instance().is_installed("clobber"));
     
@@ -130,7 +130,7 @@ TEST_F(RealWorldScenarioTest, ReinstallFromNewSource) {
 
     reinstall_package(pkg_v1_fixed);
     
-    std::ifstream f(ROOT_DIR / "usr/bin/app");
+    std::ifstream f(Config::instance().root_dir() / "usr/bin/app");
     std::string content;
     std::getline(f, content);
     EXPECT_EQ(content, "new improved content");

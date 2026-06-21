@@ -14,6 +14,7 @@
 #include <iostream>
 #include <algorithm>
 #include <climits>
+#include <array>
 #include <sstream>
 
 namespace fs = std::filesystem;
@@ -48,9 +49,9 @@ namespace {
 
         if (S_ISREG(st.st_mode)) {
             std::ifstream f(path, std::ios::binary);
-            char buffer[8192];
-            while (f.read(buffer, sizeof(buffer)) || f.gcount() > 0) {
-                if (archive_write_data(a, buffer, f.gcount()) < 0) {
+            std::array<char, 8192> buffer{};
+            while (f.read(buffer.data(), buffer.size()) || f.gcount() > 0) {
+                if (archive_write_data(a, buffer.data(), f.gcount()) < 0) {
                     archive_entry_free(entry);
                     throw LpkgException(string_format("error.archive_write_data_failed", archive_error_string(a)));
                 }
@@ -94,7 +95,7 @@ void pack_package(const std::string& output_filename, const std::string& source_
         log_info(get_string("info.pack_scanning"));
         
         // 1. Generate and add metadata.json
-        fs::path tmp_meta = get_tmp_dir() / constants::PKG_METADATA_FILE;
+        fs::path tmp_meta = Config::get_tmp_dir() / constants::PKG_METADATA_FILE;
         ensure_dir_exists(tmp_meta.parent_path());
         {
             json meta;
@@ -130,5 +131,5 @@ void pack_package(const std::string& output_filename, const std::string& source_
 
     std::string hash = calculate_sha256(output_filename);
     std::cout << get_string("info.pack_success") << " " << output_filename << std::endl;
-    std::cout << "SHA256: " << hash << std::endl;
+    std::cout << get_string("info.sha256_label") << hash << std::endl;
 }

@@ -46,8 +46,8 @@ TEST_F(L10nIntegrityTest, AllSourceKeysExistInTranslations) {
     
     // Explicitly add keys that might be missed by simple regex (e.g. multi-line or macros)
     std::vector<std::string> manual_keys = {
-        "info.non_interactive_option_desc", "help.output_file", "help.pack_source", 
-        "help.force", "help.force_overwrite", "help.no_hooks", "help.no_deps", 
+        "help.output_file", "help.pack_source",
+        "help.force", "help.force_overwrite", "help.no_hooks", "help.no_deps",
         "help.testing", "help.root_dir", "help.target_arch", "help.hash", "help.pkg_query",
         "cxxopts.default", "cxxopts.usage", "cxxopts.option_help", "cxxopts.arg", "cxxopts.positional_help"
     };

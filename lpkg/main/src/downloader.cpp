@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <array>
 #include <unistd.h>
 
 namespace fs = std::filesystem;
@@ -44,16 +45,16 @@ using CurlHandle = std::unique_ptr<CURL, CurlDeleter>;
 
 // Function to find system CA certificate bundle
 const char* find_ca_bundle() {
-    static const char* const paths[] = {
-        "/etc/ssl/certs/ca-certificates.crt",     // Debian/Ubuntu/Arch/Alpine
-        "/etc/pki/tls/certs/ca-bundle.crt",       // RHEL/CentOS/Fedora
-        "/etc/ssl/ca-bundle.pem",                 // OpenSUSE
-        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem", // New Fedora/RHEL
-        "/etc/ssl/cert.pem"                       // Others
+    static constexpr std::array paths = {
+        std::string_view{"/etc/ssl/certs/ca-certificates.crt"},     // Debian/Ubuntu/Arch/Alpine
+        std::string_view{"/etc/pki/tls/certs/ca-bundle.crt"},       // RHEL/CentOS/Fedora
+        std::string_view{"/etc/ssl/ca-bundle.pem"},                 // OpenSUSE
+        std::string_view{"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"}, // New Fedora/RHEL
+        std::string_view{"/etc/ssl/cert.pem"}                       // Others
     };
-    for (const char* path : paths) {
-        if (access(path, R_OK) == 0) {
-            return path;
+    for (auto path : paths) {
+        if (access(path.data(), R_OK) == 0) {
+            return path.data();
         }
     }
     return nullptr;

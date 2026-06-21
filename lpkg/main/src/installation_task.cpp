@@ -31,7 +31,7 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version, bo
                                    std::string expected_hash, bool force_reinstall)
     : pkg_name_(std::move(pkg_name)), version_(std::move(version)),
       explicit_install_(explicit_install),
-      tmp_pkg_dir_(get_tmp_dir() / pkg_name_),
+      tmp_pkg_dir_(Config::get_tmp_dir() / pkg_name_),
       actual_version_(version_),
       old_version_to_replace_(std::move(old_version_to_replace)),
       local_package_path_(std::move(local_package_path)),
@@ -115,8 +115,8 @@ void InstallationTask::commit() {
                         cache.remove_file_owner(old_file, pkg_name_);
                         if (cache.get_file_owners(old_file).empty()) {
                             const fs::path phys = (fs::path(old_file).is_absolute())
-                                ? ROOT_DIR / fs::path(old_file).relative_path()
-                                : ROOT_DIR / old_file;
+                                ? Config::instance().root_dir() / fs::path(old_file).relative_path()
+                                : Config::instance().root_dir() / old_file;
                             if (fs::exists(phys) || fs::is_symlink(phys)) {
                                 log_info(string_format("info.removing_obsolete_file", old_file));
                                 fs::remove(phys);
@@ -147,8 +147,8 @@ void InstallationTask::download_and_verify_package() {
         return;
     }
 
-    const std::string mirror_url = get_mirror_url();
-    const std::string arch = get_architecture();
+    const std::string mirror_url = Config::instance().get_mirror_url();
+    const std::string arch = Config::instance().get_architecture();
 
     if (actual_version_.empty() || actual_version_ == constants::VER_LATEST) {
         Repository repo;
@@ -272,7 +272,7 @@ void InstallationTask::check_for_file_conflicts() {
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
     auto files = detail::scan_content_files(content_dir);
     auto& cache = Cache::instance();
-    const bool force_overwrite = get_force_overwrite_mode();
+    // force_overwrite is read inline via Config::instance().force_overwrite_mode()
 
     for (const auto& f : files) {
         fs::path rel_f = f;
@@ -285,15 +285,15 @@ void InstallationTask::check_for_file_conflicts() {
 
         if (!owners.empty()) {
             for (const auto& owner : owners) {
-                if (owner != pkg_name_ && !force_overwrite) conflicts[path_str] = owner;
+                if (owner != pkg_name_ && !Config::instance().force_overwrite_mode()) conflicts[path_str] = owner;
             }
             continue;
         }
 
         if (old_version_to_replace_.empty()) {
-            const fs::path phys = ROOT_DIR / rel_f;
-            if ((fs::exists(phys) || fs::is_symlink(phys)) && !force_overwrite) {
-                conflicts[path_str] = "unknown (manual file)";
+            const fs::path phys = Config::instance().root_dir() / rel_f;
+            if ((fs::exists(phys) || fs::is_symlink(phys)) && !Config::instance().force_overwrite_mode()) {
+                conflicts[path_str] = get_string("error.unknown_manual_file");
             }
         }
     }
@@ -315,7 +315,7 @@ void InstallationTask::copy_package_files() {
         fs::path rel_f = f;
         if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
         const fs::path src_path = content_dir / f;
-        const fs::path physical_path = ROOT_DIR / rel_f;
+        const fs::path physical_path = Config::instance().root_dir() / rel_f;
 
         if (!fs::exists(src_path) && !fs::is_symlink(src_path)) continue;
 
@@ -323,7 +323,7 @@ void InstallationTask::copy_package_files() {
         std::vector<fs::path> to_create;
         while (!parent.empty() && !fs::exists(parent)) {
             to_create.push_back(parent);
-            if (parent == ROOT_DIR) break;
+            if (parent == Config::instance().root_dir()) break;
             parent = parent.parent_path();
         }
         for (const auto& d : to_create | std::views::reverse) {
@@ -390,7 +390,7 @@ void InstallationTask::register_package() {
     auto& cache = Cache::instance();
 
     if (!old_version_to_replace_.empty()) {
-        const fs::path old_dep_file = DEP_DIR / pkg_name_;
+        const fs::path old_dep_file = Config::instance().dep_dir() / pkg_name_;
         if (fs::exists(old_dep_file)) {
             std::ifstream f(old_dep_file);
             std::string line;
@@ -407,7 +407,7 @@ void InstallationTask::register_package() {
         }
     }
 
-    std::ofstream deps_out(DEP_DIR / pkg_name_);
+    std::ofstream deps_out(Config::instance().dep_dir() / pkg_name_);
     for (const auto& d : deps_) {
         deps_out << d << constants::NL;
         std::string name = d;
@@ -421,7 +421,7 @@ void InstallationTask::register_package() {
     }
 
     if (!man_content_.empty()) {
-        std::ofstream man_out(DOCS_DIR / (pkg_name_ + std::string(constants::SUFFIX_MAN)));
+        std::ofstream man_out(Config::instance().docs_dir() / (pkg_name_ + std::string(constants::SUFFIX_MAN)));
         man_out << man_content_;
     }
 
@@ -435,7 +435,7 @@ void InstallationTask::run_post_install_hook() {
     const fs::path hook_src = tmp_pkg_dir_ / constants::DIR_HOOKS;
     if (!fs::exists(hook_src) || !fs::is_directory(hook_src)) return;
 
-    const fs::path dest_dir = HOOKS_DIR / pkg_name_;
+    const fs::path dest_dir = Config::instance().hooks_dir() / pkg_name_;
     ensure_dir_exists(dest_dir);
     for (const auto& entry : fs::directory_iterator(hook_src)) {
         if (entry.is_regular_file()) {

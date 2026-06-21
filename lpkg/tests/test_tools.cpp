@@ -38,12 +38,12 @@ protected:
         fs::create_directories(hooks_dir);
         fs::create_directories(test_system_root / "var/lib/lpkg"); // DB dir
         
-        set_root_path(test_system_root.string());
-        init_filesystem();
+        Config::instance().set_root_path(test_system_root.string());
+        Config::instance().init_filesystem();
     }
 
     void TearDown() override {
-        set_root_path("/");
+        Config::instance().set_root_path("/");
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
     }
 };

@@ -7,7 +7,8 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
-#include <limits.h> // For PATH_MAX
+#include <array>
+#include <climits> // For PATH_MAX
 #include <unistd.h> // For readlink
 
 namespace fs = std::filesystem;
@@ -17,11 +18,11 @@ namespace {
     std::unordered_map<std::string, std::string> missing_key_placeholders;
 
     fs::path get_executable_dir() {
-        char result[PATH_MAX];
-        ssize_t count = readlink("/proc/self/exe", result, PATH_MAX - 1);
+        std::array<char, PATH_MAX> result{};
+        ssize_t count = readlink("/proc/self/exe", result.data(), result.size() - 1);
         if (count != -1) {
             result[count] = '\0';
-            return fs::path(result).parent_path();
+            return fs::path(result.data()).parent_path();
         } else {
             log_warning(get_string("warning.exe_path_determination_failed"));
             return fs::current_path(); // Fallback, though less reliable
@@ -70,7 +71,7 @@ void init_localization() {
     } else if (fs::exists(src_l10n_dir) && fs::is_directory(src_l10n_dir)) {
         load_strings(lang, src_l10n_dir);
     } else {
-        load_strings(lang, L10N_DIR); // Fallback to installed path
+        load_strings(lang, Config::instance().l10n_dir()); // Fallback to installed path
     }
 }
 

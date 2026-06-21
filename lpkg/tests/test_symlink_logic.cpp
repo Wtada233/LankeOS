@@ -18,8 +18,8 @@ protected:
         test_root = fs::temp_directory_path() / ("lpkg_test_" + root_name + "_" + std::to_string(getpid()));
         fs::remove_all(test_root);
         fs::create_directories(test_root);
-        set_root_path(test_root.string());
-        init_filesystem();
+        Config::instance().set_root_path(test_root.string());
+        Config::instance().init_filesystem();
         
         fs::create_directories(test_root / "etc/lpkg");
         {
@@ -27,12 +27,12 @@ protected:
             f << "http://localhost/lpkg/\n";
         }
 
-        set_testing_mode(true);
-        set_non_interactive_mode(NonInteractiveMode::YES);
+        Config::instance().set_testing_mode(true);
+        Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
     }
 
     void TearDown() override {
-        set_root_path("/");
+        Config::instance().set_root_path("/");
         if (!test_root.empty()) {
             fs::remove_all(test_root);
         }
@@ -55,7 +55,7 @@ TEST_F(SymlinkLogicTest, PreventsSymlinkChmodFollow) {
     ASSERT_TRUE(st_init.st_mode & S_ISUID);
 
     // 2. Prepare a mock extraction directory
-    fs::path pkg_tmp_dir = get_tmp_dir() / "symlink_pkg";
+    fs::path pkg_tmp_dir = Config::get_tmp_dir() / "symlink_pkg";
     fs::remove_all(pkg_tmp_dir);
     // With content/ → / mapping, content/usr/bin/my_link installs to /usr/bin/my_link
     fs::create_directories(pkg_tmp_dir / "content" / "usr" / "bin");
@@ -99,7 +99,7 @@ TEST_F(SymlinkLogicTest, HandlesConfigSymlinkConflict) {
     { std::ofstream f(conf_phys); f << "old release"; }
 
     // 2. Mock package with os-release as symlink
-    fs::path pkg_tmp_dir = get_tmp_dir() / "filesystem_pkg";
+    fs::path pkg_tmp_dir = Config::get_tmp_dir() / "filesystem_pkg";
     fs::remove_all(pkg_tmp_dir);
     fs::create_directories(pkg_tmp_dir / "content/etc");
     fs::create_symlink("/usr/lib/os-release", pkg_tmp_dir / "content/etc/os-release");

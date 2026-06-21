@@ -17,8 +17,8 @@ void Repository::load_index() {
     packages_.clear();
     providers_.clear();
     std::string mirror;
-    try { mirror = get_mirror_url(); } catch (...) { return; }
-    std::string arch = get_architecture();
+    try { mirror = Config::instance().get_mirror_url(); } catch (...) { return; }
+    std::string arch = Config::instance().get_architecture();
     
     bool is_local = mirror.find(constants::PROTOCOL_FILE) == 0 || mirror.find("/") == 0;
     std::filesystem::path index_path;
@@ -29,7 +29,7 @@ void Repository::load_index() {
             index_path = std::filesystem::path(path_str) / arch / constants::REPO_INDEX_FILE;
         } else {
             std::string url = mirror + arch + "/" + std::string(constants::REPO_INDEX_FILE);
-            index_path = get_tmp_dir() / constants::REPO_INDEX_TMP;
+            index_path = Config::get_tmp_dir() / constants::REPO_INDEX_TMP;
             download_file(url, index_path, false);
         }
         if (!std::filesystem::exists(index_path)) return;

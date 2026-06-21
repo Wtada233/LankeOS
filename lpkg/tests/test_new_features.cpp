@@ -19,11 +19,11 @@ protected:
     fs::path pkg_dir;
 
     void SetUp() override {
-        set_non_interactive_mode(NonInteractiveMode::YES);
-        set_testing_mode(true);
-        set_force_overwrite_mode(false);
-        set_no_hooks_mode(false);
-        set_no_deps_mode(false);
+        Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
+        Config::instance().set_testing_mode(true);
+        Config::instance().set_force_overwrite_mode(false);
+        Config::instance().set_no_hooks_mode(false);
+        Config::instance().set_no_deps_mode(false);
         init_localization();
         
         suite_work_dir = fs::absolute("tmp_new_features_test");
@@ -37,9 +37,9 @@ protected:
         fs::create_directories(test_root);
         fs::create_directories(pkg_dir);
         
-        set_root_path(test_root.string());
-        set_architecture("x86_64");
-        init_filesystem();
+        Config::instance().set_root_path(test_root.string());
+        Config::instance().set_architecture("x86_64");
+        Config::instance().init_filesystem();
 
         // Setup mock mirror
         fs::path mirror_path = suite_work_dir / "mirror";
@@ -80,7 +80,7 @@ protected:
     }
 
     void TearDown() override {
-        set_root_path("/");
+        Config::instance().set_root_path("/");
         std::string clean_cmd = "sudo rm -rf " + suite_work_dir.string();
         run_shell(clean_cmd);
     }

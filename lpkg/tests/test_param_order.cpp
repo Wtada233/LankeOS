@@ -21,8 +21,8 @@ protected:
     fs::path pkg_dir;
 
     void SetUp() override {
-        set_non_interactive_mode(NonInteractiveMode::YES);
-        set_testing_mode(true);
+        Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
+        Config::instance().set_testing_mode(true);
         
         suite_work_dir = fs::absolute("tmp_order_test");
         test_root = suite_work_dir / "root";
@@ -32,12 +32,12 @@ protected:
         fs::create_directories(test_root);
         fs::create_directories(pkg_dir);
         
-        set_root_path(test_root.string());
-        init_filesystem();
+        Config::instance().set_root_path(test_root.string());
+        Config::instance().init_filesystem();
     }
 
     void TearDown() override {
-        set_root_path("/");
+        Config::instance().set_root_path("/");
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
     }
 

@@ -22,8 +22,8 @@ protected:
     fs::path pkg_dir;
 
     void SetUp() override {
-        set_non_interactive_mode(NonInteractiveMode::YES);
-        set_testing_mode(true);
+        Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
+        Config::instance().set_testing_mode(true);
         init_localization();
 
         suite_work_dir = fs::absolute("tmp_pm_test");
@@ -34,13 +34,13 @@ protected:
         fs::create_directories(test_root);
         fs::create_directories(pkg_dir);
         
-        set_root_path(test_root.string());
-        init_filesystem();
+        Config::instance().set_root_path(test_root.string());
+        Config::instance().init_filesystem();
         Cache::instance().load();
     }
 
     void TearDown() override {
-        set_root_path("/"); // Reset
+        Config::instance().set_root_path("/"); // Reset
         fs::remove_all(suite_work_dir);
     }
 
@@ -77,7 +77,7 @@ TEST_F(PackageManagerTest, InstallLocalPackage) {
     fs::path installed_file = test_root / "usr" / "bin" / "testpkg";
     EXPECT_TRUE(fs::exists(installed_file));
     
-    fs::path db_file = FILES_DB;
+    fs::path db_file = Config::instance().files_db();
     EXPECT_TRUE(fs::exists(db_file));
 }
 
@@ -112,7 +112,7 @@ TEST_F(PackageManagerTest, VersionConstraints) {
     
     // Verify lib is installed by checking the pkgs file manually
     {
-        std::ifstream pkgs_file(PKGS_FILE);
+        std::ifstream pkgs_file(Config::instance().pkgs_file());
         std::string line;
         bool found = false;
         while (std::getline(pkgs_file, line)) {
@@ -148,7 +148,7 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
 
     // 4. Verify both are installed
     {
-        std::ifstream pkgs_file(PKGS_FILE);
+        std::ifstream pkgs_file(Config::instance().pkgs_file());
         std::string line;
         int count = 0;
         while (std::getline(pkgs_file, line)) {
@@ -163,7 +163,7 @@ TEST_F(PackageManagerTest, AutoremoveWithVirtualPackages) {
 
     // 6. Verify openssl is still there
     {
-        std::ifstream pkgs_file(PKGS_FILE);
+        std::ifstream pkgs_file(Config::instance().pkgs_file());
         std::string line;
         bool found_openssl = false;
         while (std::getline(pkgs_file, line)) {

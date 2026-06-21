@@ -17,12 +17,12 @@ protected:
         if (fs::exists(test_root)) fs::remove_all(test_root);
         fs::create_directories(test_root);
         
-        set_root_path(test_root.string());
-        init_filesystem();
+        Config::instance().set_root_path(test_root.string());
+        Config::instance().init_filesystem();
     }
 
     void TearDown() override {
-        set_root_path("/");
+        Config::instance().set_root_path("/");
         if (fs::exists(test_root)) fs::remove_all(test_root);
     }
 };

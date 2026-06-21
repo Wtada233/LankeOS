@@ -11,84 +11,103 @@
 
 namespace fs = std::filesystem;
 
-fs::path ROOT_DIR = "/";
-fs::path CONFIG_DIR = LPKG_CONF_DIR;
-fs::path STATE_DIR = "/var/lib/lpkg";
-fs::path L10N_DIR = LPKG_L10N_DIR;
-fs::path DOCS_DIR = LPKG_DOCS_DIR;
-fs::path LOCK_DIR = LPKG_LOCK_DIR;
-fs::path HOOKS_DIR = fs::path(LPKG_CONF_DIR) / "hooks/";
-
-// Derived paths
-fs::path DEP_DIR = fs::path("/var/lib/lpkg") / "deps/";
-fs::path PKGS_FILE = fs::path("/var/lib/lpkg") / "pkgs";
-fs::path HOLDPKGS_FILE = fs::path("/var/lib/lpkg") / "holdpkgs";
-fs::path ESSENTIAL_FILE = fs::path(LPKG_CONF_DIR) / "essential";
-fs::path MIRROR_CONF = fs::path(LPKG_CONF_DIR) / "mirror.conf";
-fs::path TRIGGERS_CONF = fs::path(LPKG_CONF_DIR) / "triggers.conf";
-fs::path FILES_DB = fs::path("/var/lib/lpkg") / "files.db";
-fs::path PROVIDES_DB = fs::path("/var/lib/lpkg") / "provides.db";
-fs::path LOCK_FILE = fs::path(LPKG_LOCK_DIR) / "db.lck";
-
-void set_root_path(const std::string& root_path) {
-    ROOT_DIR = fs::path(root_path).lexically_normal();
-    if (ROOT_DIR.empty()) ROOT_DIR = "/";
-
-    auto rebase = [&](const std::string& default_path) {
-        fs::path p(default_path);
-        if (p.is_absolute()) {
-            return ROOT_DIR / p.relative_path();
-        }
-        return ROOT_DIR / p;
-    };
-
-    CONFIG_DIR = rebase(LPKG_CONF_DIR);
-    STATE_DIR = rebase("/var/lib/lpkg");
-    L10N_DIR = rebase(LPKG_L10N_DIR);
-    DOCS_DIR = rebase(LPKG_DOCS_DIR);
-    LOCK_DIR = rebase(LPKG_LOCK_DIR);
-    
-    HOOKS_DIR = CONFIG_DIR / "hooks/";
-    DEP_DIR = STATE_DIR / "deps/";
-    PKGS_FILE = STATE_DIR / "pkgs";
-    HOLDPKGS_FILE = STATE_DIR / "holdpkgs";
-    ESSENTIAL_FILE = CONFIG_DIR / "essential";
-    MIRROR_CONF = CONFIG_DIR / "mirror.conf";
-    TRIGGERS_CONF = CONFIG_DIR / "triggers.conf";
-    FILES_DB = STATE_DIR / "files.db";
-    PROVIDES_DB = STATE_DIR / "provides.db";
-    LOCK_FILE = LOCK_DIR / "db.lck";
+// =====================================================================
+// Singleton
+// =====================================================================
+Config& Config::instance() {
+    static Config cfg;
+    return cfg;
 }
 
-fs::path get_tmp_dir() {
+// =====================================================================
+// Constructor — initialise paths from compile-time defines
+// =====================================================================
+Config::Config()
+    : root_dir_("/")
+    , config_dir_(fs::path{LPKG_CONF_DIR})
+    , state_dir_("/var/lib/lpkg")
+    , l10n_dir_(fs::path{LPKG_L10N_DIR})
+    , docs_dir_(fs::path{LPKG_DOCS_DIR})
+    , lock_dir_(fs::path{LPKG_LOCK_DIR})
+    , hooks_dir_(fs::path{LPKG_CONF_DIR} / "hooks/")
+
+    , dep_dir_(fs::path{"/var/lib/lpkg"} / "deps/")
+    , pkgs_file_(fs::path{"/var/lib/lpkg"} / "pkgs")
+    , holdpkgs_file_(fs::path{"/var/lib/lpkg"} / "holdpkgs")
+    , essential_file_(fs::path{LPKG_CONF_DIR} / "essential")
+    , mirror_conf_(fs::path{LPKG_CONF_DIR} / "mirror.conf")
+    , triggers_conf_(fs::path{LPKG_CONF_DIR} / "triggers.conf")
+    , files_db_(fs::path{"/var/lib/lpkg"} / "files.db")
+    , provides_db_(fs::path{"/var/lib/lpkg"} / "provides.db")
+    , lock_file_(fs::path{LPKG_LOCK_DIR} / "db.lck")
+{}
+
+// =====================================================================
+// Path helpers
+// =====================================================================
+void Config::rebase_paths() {
+    auto rebase = [&](const std::string& default_path) -> fs::path {
+        fs::path p(default_path);
+        if (p.is_absolute()) {
+            return root_dir_ / p.relative_path();
+        }
+        return root_dir_ / p;
+    };
+
+    config_dir_ = rebase(LPKG_CONF_DIR);
+    state_dir_  = rebase("/var/lib/lpkg");
+    l10n_dir_   = rebase(LPKG_L10N_DIR);
+    docs_dir_   = rebase(LPKG_DOCS_DIR);
+    lock_dir_   = rebase(LPKG_LOCK_DIR);
+
+    hooks_dir_        = config_dir_ / "hooks/";
+    dep_dir_          = state_dir_ / "deps/";
+    pkgs_file_        = state_dir_ / "pkgs";
+    holdpkgs_file_    = state_dir_ / "holdpkgs";
+    essential_file_   = config_dir_ / "essential";
+    mirror_conf_      = config_dir_ / "mirror.conf";
+    triggers_conf_    = config_dir_ / "triggers.conf";
+    files_db_         = state_dir_ / "files.db";
+    provides_db_      = state_dir_ / "provides.db";
+    lock_file_        = lock_dir_ / "db.lck";
+}
+
+void Config::set_root_path(const std::string& root_path) {
+    root_dir_ = fs::path(root_path).lexically_normal();
+    if (root_dir_.empty()) root_dir_ = "/";
+    rebase_paths();
+}
+
+fs::path Config::get_tmp_dir() {
     static const fs::path tmp_dir = fs::path("/tmp") / ("lpkg_" + std::to_string(getpid()));
     return tmp_dir;
 }
 
-void init_filesystem() {
-    ensure_dir_exists(CONFIG_DIR);
-    ensure_dir_exists(STATE_DIR);
-    ensure_dir_exists(DEP_DIR);
-    ensure_dir_exists(L10N_DIR);
-    ensure_dir_exists(DOCS_DIR);
-    ensure_dir_exists(HOOKS_DIR);
-    ensure_dir_exists(LOCK_DIR);
-    ensure_file_exists(PKGS_FILE);
-    ensure_file_exists(HOLDPKGS_FILE);
-    ensure_file_exists(ESSENTIAL_FILE);
-    ensure_file_exists(FILES_DB);
-    ensure_file_exists(PROVIDES_DB);
+void Config::init_filesystem() {
+    ensure_dir_exists(config_dir_);
+    ensure_dir_exists(state_dir_);
+    ensure_dir_exists(dep_dir_);
+    ensure_dir_exists(l10n_dir_);
+    ensure_dir_exists(docs_dir_);
+    ensure_dir_exists(hooks_dir_);
+    ensure_dir_exists(lock_dir_);
+    ensure_file_exists(pkgs_file_);
+    ensure_file_exists(holdpkgs_file_);
+    ensure_file_exists(essential_file_);
+    ensure_file_exists(files_db_);
+    ensure_file_exists(provides_db_);
 }
 
-static std::string g_architecture_override;
-
-void set_architecture(const std::string& arch) {
-    g_architecture_override = arch;
+// =====================================================================
+// Architecture
+// =====================================================================
+void Config::set_architecture(const std::string& arch) {
+    architecture_override_ = arch;
 }
 
-std::string get_architecture() {
-    if (!g_architecture_override.empty()) {
-        return g_architecture_override;
+std::string Config::get_architecture() {
+    if (!architecture_override_.empty()) {
+        return architecture_override_;
     }
 
     struct utsname buf;
@@ -98,10 +117,13 @@ std::string get_architecture() {
     return std::string(buf.machine);
 }
 
-std::string get_mirror_url() {
-    std::ifstream mirror_file(MIRROR_CONF);
+// =====================================================================
+// Mirror URL
+// =====================================================================
+std::string Config::get_mirror_url() {
+    std::ifstream mirror_file(mirror_conf_);
     if (!mirror_file.is_open()) {
-        throw LpkgException(string_format("error.open_file_failed", MIRROR_CONF.string()));
+        throw LpkgException(string_format("error.open_file_failed", mirror_conf_.string()));
     }
     std::string mirror_url;
     if (!std::getline(mirror_file, mirror_url) || mirror_url.empty()) {

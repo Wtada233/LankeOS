@@ -26,11 +26,6 @@ namespace fs = std::filesystem;
 #include <mutex>
 
 namespace {
-    NonInteractiveMode non_interactive_mode = NonInteractiveMode::INTERACTIVE;
-    bool force_overwrite_mode = false;
-    bool no_hooks_mode = false;
-    bool no_deps_mode = false;
-    bool testing_mode = false;
     std::mutex log_mutex;
     bool is_stdout_tty = false;
     bool is_stderr_tty = false;
@@ -126,48 +121,8 @@ int run_shell(const std::string& cmd, const fs::path& work_dir) {
     return run_command({std::string(constants::BIN_SH), "-c", cmd}, work_dir);
 }
 
-void set_non_interactive_mode(NonInteractiveMode mode) {
-    non_interactive_mode = mode;
-}
-
-NonInteractiveMode get_non_interactive_mode() {
-    return non_interactive_mode;
-}
-
-void set_force_overwrite_mode(bool enable) {
-    force_overwrite_mode = enable;
-}
-
-bool get_force_overwrite_mode() {
-    return force_overwrite_mode;
-}
-
-void set_no_hooks_mode(bool enable) {
-    no_hooks_mode = enable;
-}
-
-bool get_no_hooks_mode() {
-    return no_hooks_mode;
-}
-
-void set_no_deps_mode(bool enable) {
-    no_deps_mode = enable;
-}
-
-bool get_no_deps_mode() {
-    return no_deps_mode;
-}
-
-void set_testing_mode(bool enable) {
-    testing_mode = enable;
-}
-
-bool get_testing_mode() {
-    return testing_mode;
-}
-
 bool user_confirms(const std::string& prompt) {
-    switch (get_non_interactive_mode()) {
+    switch (Config::instance().non_interactive_mode()) {
         case NonInteractiveMode::YES:
             return true;
         case NonInteractiveMode::NO:
@@ -188,10 +143,10 @@ void check_root() {
 }
 
 DBLock::DBLock() {
-    ensure_dir_exists(LOCK_DIR);
-    lock_fd = open(LOCK_FILE.c_str(), O_CREAT | O_RDWR, 0644);
+    ensure_dir_exists(Config::instance().lock_dir());
+    lock_fd = open(Config::instance().lock_file().c_str(), O_CREAT | O_RDWR, 0644);
     if (lock_fd < 0) {
-        throw LpkgException(string_format("error.create_file_failed", LOCK_FILE.string()));
+        throw LpkgException(string_format("error.create_file_failed", Config::instance().lock_file().string()));
     }
 
     if (flock(lock_fd, LOCK_EX | LOCK_NB) < 0) {
@@ -213,7 +168,7 @@ DBLock::~DBLock() {
     }
 }
 
-TmpDirManager::TmpDirManager() : tmp_dir_path_(get_tmp_dir()) {
+TmpDirManager::TmpDirManager() : tmp_dir_path_(Config::get_tmp_dir()) {
     cleanup_tmp_dirs();
     ensure_dir_exists(tmp_dir_path_);
 }
@@ -280,7 +235,7 @@ void write_set_to_file(const fs::path& path, const std::unordered_set<std::strin
 void cleanup_tmp_dirs() {
     static auto last_cleanup = std::chrono::system_clock::now();
     auto now = std::chrono::system_clock::now();
-    
+
     // Only cleanup once every hour in the same process
     if (std::chrono::duration_cast<std::chrono::hours>(now - last_cleanup).count() < 1) {
         return;

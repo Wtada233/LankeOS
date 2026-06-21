@@ -11,22 +11,22 @@ using json = nlohmann::json;
 namespace detail {
 
 void run_hook(std::string_view pkg_name, std::string_view hook_name) {
-    if (get_no_hooks_mode()) return;
+    if (Config::instance().no_hooks_mode()) return;
 
-    const fs::path hook_path = HOOKS_DIR / pkg_name / hook_name;
+    const fs::path hook_path = Config::instance().hooks_dir() / pkg_name / hook_name;
     if (!fs::exists(hook_path) || !fs::is_regular_file(hook_path)) return;
 
     log_info(string_format("info.running_hook", std::string(hook_name)));
 
-    const bool use_chroot = (ROOT_DIR != "/" && !ROOT_DIR.empty());
+    const bool use_chroot = (Config::instance().root_dir() != "/" && Config::instance().root_dir().string() != "/");
     std::vector<std::string> args = {std::string(constants::BIN_SH), "-c"};
 
     if (use_chroot) {
-        if (!fs::exists(ROOT_DIR / "bin/sh")) {
+        if (!fs::exists(Config::instance().root_dir() / "bin/sh")) {
             log_warning(string_format("warning.hook_failed_setup", std::string(hook_name), get_string("error.sh_not_found")));
             return;
         }
-        const fs::path hook_rel = fs::relative(hook_path, ROOT_DIR);
+        const fs::path hook_rel = fs::relative(hook_path, Config::instance().root_dir());
         args.push_back("/" + hook_rel.string());
     } else {
         args.push_back(hook_path.string());
@@ -37,8 +37,8 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
     if (pid == 0) {
         if (use_chroot) {
             if (unshare(CLONE_NEWNS) != 0) _exit(1);
-            mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL);
-            if (chroot(ROOT_DIR.c_str()) != 0) _exit(1);
+            mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr);
+            if (chroot(Config::instance().root_dir().c_str()) != 0) _exit(1);
             if (chdir("/") != 0) _exit(1);
         }
 
@@ -165,7 +165,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         .provides = provides, .force_reinstall = (ctx.force_reinstall && is_explicit)
     };
 
-    if (!get_no_deps_mode()) {
+    if (!Config::instance().no_deps_mode()) {
         for (const auto& dep : deps) {
             const std::string idv = Cache::instance().get_installed_version(dep.name);
             bool needs_resolution = idv.empty();
@@ -201,7 +201,7 @@ std::set<std::string> check_plan_consistency(const std::map<std::string, Install
     std::lock_guard lock(cache.get_mutex());
     for (const auto& [pkg, ver] : cache.get_all_installed()) {
         if (plan.contains(pkg)) continue;
-        const fs::path dep_file = DEP_DIR / pkg;
+        const fs::path dep_file = Config::instance().dep_dir() / pkg;
         if (!fs::exists(dep_file)) continue;
         std::ifstream f(dep_file);
         std::string line;
@@ -231,7 +231,7 @@ std::unordered_set<std::string> get_all_required_packages() {
     size_t head = 0;
     while (head < q.size()) {
         const std::string curr = q[head++];
-        const fs::path p = DEP_DIR / curr;
+        const fs::path p = Config::instance().dep_dir() / curr;
         if (!fs::exists(p)) continue;
         std::ifstream f(p);
         std::string line;

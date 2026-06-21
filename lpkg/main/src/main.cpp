@@ -27,18 +27,19 @@ struct CurlGlobalInitializer {
 };
 
 void print_usage(const cxxopts::Options& options) {
-    std::cerr << options.help({""});
+    // Show all option groups (General, Install/Remove, Query, Pack, Other)
+    std::cerr << options.help();
     std::cerr << get_string("info.commands") << std::endl;
-    std::cerr << get_string("info.install_desc") << std::endl;
-    std::cerr << get_string("info.remove_desc") << std::endl;
+    std::cerr << get_string("info.install_desc")  << "  " << get_string("info.install_opts") << std::endl;
+    std::cerr << get_string("info.remove_desc")   << "  " << get_string("info.remove_opts") << std::endl;
     std::cerr << get_string("info.autoremove_desc") << std::endl;
-    std::cerr << get_string("info.upgrade_desc") << std::endl;
-    std::cerr << get_string("info.reinstall_desc") << std::endl;
-    std::cerr << get_string("info.query_desc") << std::endl;
-    std::cerr << get_string("info.man_desc") << std::endl;
-    std::cerr << get_string("info.pack_desc") << std::endl;
-    std::cerr << get_string("info.build_desc") << std::endl;
-    std::cerr << get_string("info.scan_desc") << std::endl;
+    std::cerr << get_string("info.upgrade_desc")  << "  " << get_string("info.upgrade_opts") << std::endl;
+    std::cerr << get_string("info.reinstall_desc") << "  " << get_string("info.reinstall_opts") << std::endl;
+    std::cerr << get_string("info.query_desc")    << "  " << get_string("info.query_opts") << std::endl;
+    std::cerr << get_string("info.man_desc")      << std::endl;
+    std::cerr << get_string("info.pack_desc")     << "  " << get_string("info.pack_opts") << std::endl;
+    std::cerr << get_string("info.build_desc")    << std::endl;
+    std::cerr << get_string("info.scan_desc")     << std::endl;
 }
 
 #include <optional>
@@ -65,25 +66,43 @@ int main(int argc, char* argv[]) {
         options.custom_help(get_string("info.usage"));
         options.set_width(100);
 
-        options.add_options()
+        // --- Option groups ---
+        options.add_options(get_string("help.group_general"))
             ("h,help", get_string("info.help_desc"))
             ("v,version", get_string("help.version"))
-            ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
-            ("p,pkg-query", get_string("help.pkg_query"), cxxopts::value<bool>()->default_value("false"))
-            ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value(std::string(constants::DEFAULT_PACK_SOURCE)))
-            ("pkg-name", get_string("help.pkg_name"), cxxopts::value<std::string>()->default_value("package"))
-            ("pkg-version", get_string("help.pkg_version"), cxxopts::value<std::string>()->default_value("0.0.0"))
-            ("non-interactive", get_string("info.non_interactive_option_desc"), cxxopts::value<std::string>()->implicit_value("n"))
+            ;
+
+        options.add_options(get_string("help.group_install"))
+            ("y,yes", get_string("help.yes_mode"), cxxopts::value<bool>()->default_value("false"))
+            ("n,no", get_string("help.no_mode"), cxxopts::value<bool>()->default_value("false"))
             ("force", get_string("help.force"), cxxopts::value<bool>()->default_value("false"))
             ("force-overwrite", get_string("help.force_overwrite"), cxxopts::value<bool>()->default_value("false"))
             ("no-hooks", get_string("help.no_hooks"), cxxopts::value<bool>()->default_value("false"))
             ("no-deps", get_string("help.no_deps"), cxxopts::value<bool>()->default_value("false"))
-            ("testing", get_string("help.testing"), cxxopts::value<bool>()->default_value("false"))
             ("root", get_string("help.root_dir"), cxxopts::value<std::string>())
             ("arch", get_string("help.target_arch"), cxxopts::value<std::string>())
             ("hash", get_string("help.hash"), cxxopts::value<std::string>())
+            ;
+
+        options.add_options(get_string("help.group_query"))
+            ("p,pkg-query", get_string("help.pkg_query"), cxxopts::value<bool>()->default_value("false"))
+            ;
+
+        options.add_options(get_string("help.group_pack"))
+            ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
+            ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value(std::string(constants::DEFAULT_PACK_SOURCE)))
+            ("pkg-name", get_string("help.pkg_name"), cxxopts::value<std::string>()->default_value("package"))
+            ("pkg-version", get_string("help.pkg_version"), cxxopts::value<std::string>()->default_value("0.0.0"))
+            ;
+
+        options.add_options(get_string("help.group_other"))
+            ("testing", get_string("help.testing"), cxxopts::value<bool>()->default_value("false"))
+            ;
+
+        options.add_options("")
             ("command", "", cxxopts::value<std::string>())
-            ("packages", "", cxxopts::value<std::vector<std::string>>());
+            ("packages", "", cxxopts::value<std::vector<std::string>>())
+            ;
 
         options.parse_positional({"command", "packages"});
 
@@ -105,39 +124,34 @@ int main(int argc, char* argv[]) {
         }
 
         if (result.count("no-hooks")) {
-            set_no_hooks_mode(result["no-hooks"].as<bool>());
+            Config::instance().set_no_hooks_mode(result["no-hooks"].as<bool>());
         }
 
         if (result.count("no-deps")) {
-            set_no_deps_mode(result["no-deps"].as<bool>());
+            Config::instance().set_no_deps_mode(result["no-deps"].as<bool>());
         }
 
         if (result.count("testing")) {
-            set_testing_mode(result["testing"].as<bool>());
+            Config::instance().set_testing_mode(result["testing"].as<bool>());
         }
 
         if (result.count("root")) {
-            set_root_path(result["root"].as<std::string>());
+            Config::instance().set_root_path(result["root"].as<std::string>());
         }
 
         if (result.count("arch")) {
-            set_architecture(result["arch"].as<std::string>());
+            Config::instance().set_architecture(result["arch"].as<std::string>());
         }
 
         if (result.count("force-overwrite")) {
-            set_force_overwrite_mode(result["force-overwrite"].as<bool>());
+            Config::instance().set_force_overwrite_mode(result["force-overwrite"].as<bool>());
         }
 
-        if (result.count("non-interactive")) {
-            std::string value = result["non-interactive"].as<std::string>();
-            if (value == "y" || value == "Y") {
-                set_non_interactive_mode(NonInteractiveMode::YES);
-            } else if (value == "n" || value == "N") {
-                set_non_interactive_mode(NonInteractiveMode::NO);
-            } else {
-                log_error(get_string("error.invalid_non_interactive_value"));
-                return 1;
-            }
+        if (result["yes"].as<bool>()) {
+            Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
+        }
+        if (result["no"].as<bool>()) {
+            Config::instance().set_non_interactive_mode(NonInteractiveMode::NO);
         }
 
         if (!result.count("command")) {
@@ -150,7 +164,7 @@ int main(int argc, char* argv[]) {
         std::unique_ptr<DBLock> db_lock;
         if (command != constants::CMD_MAN) {
             check_root();
-            init_filesystem();
+            Config::instance().init_filesystem();
             db_lock = std::make_unique<DBLock>();
         }
 
@@ -219,7 +233,7 @@ int main(int argc, char* argv[]) {
             run_build(fs::absolute(build_dir));
         } else if (command == constants::CMD_SCAN) {
             check_root();
-            init_filesystem();
+            Config::instance().init_filesystem();
             std::string scan_root;
             if (result.count("packages")) {
                 auto pkgs = result["packages"].as<std::vector<std::string>>();

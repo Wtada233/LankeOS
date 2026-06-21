@@ -29,8 +29,8 @@ void TriggerManager::load_config() {
     std::lock_guard<std::mutex> lock(mtx);
     if (config_loaded) return;
 
-    if (std::filesystem::exists(TRIGGERS_CONF)) {
-        std::ifstream file(TRIGGERS_CONF);
+    if (std::filesystem::exists(Config::instance().triggers_conf())) {
+        std::ifstream file(Config::instance().triggers_conf());
         std::string line;
         while (std::getline(file, line)) {
             if (line.empty() || line[0] == '#') continue;
@@ -79,7 +79,7 @@ void TriggerManager::run_all() {
         if (cmd == "ldconfig") {
             // Apply SONAME symlinks to /usr/lib
             log_info(get_string("info.generating_soname_links"));
-            apply_soname_links(ROOT_DIR / "usr/lib");
+            apply_soname_links(Config::instance().root_dir() / "usr/lib");
         } else {
             // Note: Using run_shell for a safer exec-based approach.
             if (int ret = run_shell(cmd); ret != 0) {

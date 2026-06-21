@@ -24,18 +24,18 @@ protected:
         if (fs::exists(test_root)) fs::remove_all(test_root);
         fs::create_directories(pkgs_dir);
         
-        set_root_path(test_root.string());
-        set_architecture("x86_64");
-        set_non_interactive_mode(NonInteractiveMode::YES);
-        set_testing_mode(true);
-        init_filesystem();
+        Config::instance().set_root_path(test_root.string());
+        Config::instance().set_architecture("x86_64");
+        Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
+        Config::instance().set_testing_mode(true);
+        Config::instance().init_filesystem();
         
         std::ofstream(test_root / "etc/lpkg/mirror.conf") << "file://" + pkgs_dir.string() + "/";
     }
 
     void TearDown() override {
-        set_root_path("/");
-        set_force_overwrite_mode(false);
+        Config::instance().set_root_path("/");
+        Config::instance().set_force_overwrite_mode(false);
         if (fs::exists(test_root)) fs::remove_all(test_root);
     }
 
@@ -72,7 +72,7 @@ protected:
 };
 
 TEST_F(FeatureTest, ConfigFileProtection) {
-    set_force_overwrite_mode(true);
+    Config::instance().set_force_overwrite_mode(true);
     fs::path etc_dir = test_root / "etc";
     fs::create_directories(etc_dir);
     fs::path config_file = etc_dir / "my.conf";
@@ -118,8 +118,8 @@ TEST_F(FeatureTest, BootstrapInstallation) {
     fs::path bootstrap_root = test_root / "mnt" / "bootstrap";
     fs::create_directories(bootstrap_root);
     
-    set_root_path(bootstrap_root.string());
-    init_filesystem();
+    Config::instance().set_root_path(bootstrap_root.string());
+    Config::instance().init_filesystem();
     
     std::string p1 = create_pkg("filesystem", "1.0", {{"usr/share/doc/dummy", ""}}); 
     std::string p2 = create_pkg("coreutils", "8.32", {{"usr/bin/ls", "elf_magic"}});
@@ -133,7 +133,7 @@ TEST_F(FeatureTest, BootstrapInstallation) {
     Cache::instance().load();
     EXPECT_TRUE(Cache::instance().is_installed("coreutils"));
     EXPECT_TRUE(Cache::instance().is_installed("filesystem"));
-    EXPECT_TRUE(fs::exists(PKGS_FILE));
+    EXPECT_TRUE(fs::exists(Config::instance().pkgs_file()));
     
     EXPECT_FALSE(fs::exists(test_root / "usr/bin/ls"));
 }

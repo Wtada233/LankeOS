@@ -148,10 +148,10 @@ std::unordered_set<std::string> Cache::get_package_provides(std::string_view pkg
 
 void Cache::load() {
     std::lock_guard<std::mutex> lock(mtx);
-    file_db = read_db_uncached(FILES_DB);
-    providers = read_db_uncached(PROVIDES_DB);
-    
-    auto pkg_set = read_set_from_file(PKGS_FILE);
+    file_db = read_db_uncached(Config::instance().files_db());
+    providers = read_db_uncached(Config::instance().provides_db());
+
+    auto pkg_set = read_set_from_file(Config::instance().pkgs_file());
     installed_pkgs.clear();
     for (const auto& line : pkg_set) {
         if (auto pos = line.find(':'); pos != std::string::npos) {
@@ -159,7 +159,7 @@ void Cache::load() {
         }
     }
 
-    holdpkgs = read_set_from_file(HOLDPKGS_FILE);
+    holdpkgs = read_set_from_file(Config::instance().holdpkgs_file());
     reverse_deps.clear();
     reverse_deps_loaded = false;
     essentials.clear();
@@ -170,8 +170,8 @@ void Cache::load() {
 void Cache::ensure_reverse_deps() {
     if (reverse_deps_loaded) return;
     reverse_deps.clear();
-    if (fs::exists(DEP_DIR) && fs::is_directory(DEP_DIR)) {
-        for (const auto& entry : fs::directory_iterator(DEP_DIR)) {
+    if (fs::exists(Config::instance().dep_dir()) && fs::is_directory(Config::instance().dep_dir())) {
+        for (const auto& entry : fs::directory_iterator(Config::instance().dep_dir())) {
             if (entry.is_regular_file()) {
                 std::string pkg_name = entry.path().filename().string();
                 std::ifstream f(entry.path());
@@ -195,8 +195,8 @@ void Cache::ensure_reverse_deps() {
 
 void Cache::ensure_essentials() {
     if (essentials_loaded) return;
-    if (fs::exists(ESSENTIAL_FILE)) {
-        essentials = read_set_from_file(ESSENTIAL_FILE);
+    if (fs::exists(Config::instance().essential_file())) {
+        essentials = read_set_from_file(Config::instance().essential_file());
     }
     essentials_loaded = true;
 }
@@ -216,12 +216,12 @@ void Cache::write_pkgs() {
     for (const auto& [name, ver] : installed_pkgs) {
         pkg_set.insert(name + ":" + ver);
     }
-    write_set_to_file(PKGS_FILE, pkg_set); 
+    write_set_to_file(Config::instance().pkgs_file(), pkg_set);
 }
 
-void Cache::write_holdpkgs() { write_set_to_file(HOLDPKGS_FILE, holdpkgs); }
-void Cache::write_file_db() { write_db_uncached(FILES_DB, file_db); }
-void Cache::write_providers() { write_db_uncached(PROVIDES_DB, providers); }
+void Cache::write_holdpkgs() { write_set_to_file(Config::instance().holdpkgs_file(), holdpkgs); }
+void Cache::write_file_db() { write_db_uncached(Config::instance().files_db(), file_db); }
+void Cache::write_providers() { write_db_uncached(Config::instance().provides_db(), providers); }
 
 std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::read_db_uncached(const fs::path& path) {
     std::map<std::string, std::unordered_set<std::string>, std::less<>> db;

@@ -17,11 +17,11 @@ protected:
         mirror_dir = suite_work_dir / "mirror";
         fs::create_directories(mirror_dir);
 
-        set_testing_mode(true);
+        Config::instance().set_testing_mode(true);
     }
 
     void TearDown() override {
-        set_root_path("/");
+        Config::instance().set_root_path("/");
         fs::remove_all(suite_work_dir);
     }
 
@@ -30,18 +30,18 @@ protected:
 };
 
 TEST_F(IntegrationV2Test, ArchitectureOverride) {
-    set_architecture("riscv64");
-    EXPECT_EQ(get_architecture(), "riscv64");
+    Config::instance().set_architecture("riscv64");
+    EXPECT_EQ(Config::instance().get_architecture(), "riscv64");
     
-    set_architecture("aarch64");
-    EXPECT_EQ(get_architecture(), "aarch64");
+    Config::instance().set_architecture("aarch64");
+    EXPECT_EQ(Config::instance().get_architecture(), "aarch64");
     
-    set_architecture(""); // Reset
-    EXPECT_NO_THROW(get_architecture());
+    Config::instance().set_architecture(""); // Reset
+    EXPECT_NO_THROW(Config::instance().get_architecture());
 }
 
 TEST_F(IntegrationV2Test, RepositoryIndexLoading) {
-    std::string arch = get_architecture();
+    std::string arch = Config::instance().get_architecture();
     fs::path arch_dir = mirror_dir / arch;
     fs::create_directories(arch_dir);
 
@@ -52,10 +52,10 @@ TEST_F(IntegrationV2Test, RepositoryIndexLoading) {
     index.close();
 
     // Configure mirror.conf to point to our local directory
-    set_root_path(suite_work_dir.string());
-    ensure_dir_exists(CONFIG_DIR);
+    Config::instance().set_root_path(suite_work_dir.string());
+    ensure_dir_exists(Config::instance().config_dir());
     {
-        std::ofstream f(MIRROR_CONF);
+        std::ofstream f(Config::instance().mirror_conf());
         f << "file://" << mirror_dir.string() << "/\n";
     }
 

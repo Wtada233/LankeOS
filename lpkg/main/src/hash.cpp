@@ -8,6 +8,8 @@
 #include <iomanip>
 #include <memory>
 #include <sstream>
+#include <vector>
+#include <array>
 
 namespace fs = std::filesystem;
 
@@ -33,20 +35,20 @@ std::string calculate_sha256(const fs::path& file_path) {
         throw LpkgException(get_string("error.openssl_ctx_failed"));
     }
 
-    if (EVP_DigestInit_ex(md_ctx.get(), EVP_sha256(), NULL) != 1) {
+    if (EVP_DigestInit_ex(md_ctx.get(), EVP_sha256(), nullptr) != 1) {
         throw LpkgException(get_string("error.openssl_init_failed"));
     }
 
-    char buffer[1024 * 1024];
-    while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
-        if (EVP_DigestUpdate(md_ctx.get(), buffer, file.gcount()) != 1) {
+    std::vector<char> buffer(1024 * 1024);
+    while (file.read(buffer.data(), buffer.size()) || file.gcount() > 0) {
+        if (EVP_DigestUpdate(md_ctx.get(), buffer.data(), file.gcount()) != 1) {
             throw LpkgException(get_string("error.openssl_update_failed"));
         }
     }
 
-    unsigned char hash[EVP_MAX_MD_SIZE];
+    std::array<unsigned char, EVP_MAX_MD_SIZE> hash{};
     unsigned int hash_len;
-    if (EVP_DigestFinal_ex(md_ctx.get(), hash, &hash_len) != 1) {
+    if (EVP_DigestFinal_ex(md_ctx.get(), hash.data(), &hash_len) != 1) {
         throw LpkgException(get_string("error.openssl_final_failed"));
     }
 
