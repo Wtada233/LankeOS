@@ -25,9 +25,9 @@ lankebuild_build() {
         done
     done
 
-    # 修复：确保目标目录存在，复制许可证并忽略可能的失败
-    mkdir -p "{STAGING_ROOT}/usr/lib/firmware"
     cp WHENCE LICEN* "{STAGING_ROOT}/usr/lib/firmware/" 2>/dev/null || true
+    cd "{STAGING_ROOT}/usr/lib/firmware/"
+    ln -sf intel/iwlwifi/iwlwifi-* .
 }
 
 lankebuild_package() {
