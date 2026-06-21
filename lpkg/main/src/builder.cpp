@@ -11,6 +11,7 @@
 #include <fstream>
 #include <array>
 #include <map>
+#include <ctime>
 
 namespace fs = std::filesystem;
 
@@ -169,6 +170,19 @@ void run_build(const fs::path& build_dir) {
     log_info(get_string("info.parsing_lankebuild"));
     auto cfg = parse_build_config(json_path);
     log_info(string_format("info.building_package", cfg.name, cfg.version));
+
+    // Auto-generate man page if not specified in LankeBUILD.json
+    if (cfg.man_content.empty()) {
+        std::time_t t = std::time(nullptr);
+        std::tm* tm = std::localtime(&t);
+        char date_buf[32];
+        std::strftime(date_buf, sizeof(date_buf), "%Y%m%d", tm);
+        cfg.man_content =
+            get_string("man.info_name") + ": " + cfg.name + "\n"
+            + get_string("man.info_version") + ": " + cfg.version + "\n"
+            + get_string("man.info_build_date") + ": " + date_buf + "\n";
+        log_info(string_format("info.auto_generated_man", cfg.name));
+    }
 
     // 2. Prepare directories
     fs::path work_root    = build_dir / constants::DIR_WORK;

@@ -199,3 +199,7 @@ error.archive_write_data_failed=Archive write data failed: {}
 error.archive_open_failed=Failed to open output archive: {}
 error.security_path_not_relative=Security Violation: Path must be relative: {}
 error.security_path_traversal=Security Violation: Path traversal detected: {}
+man.info_name=Name
+man.info_version=Version
+man.info_build_date=Build date
+info.auto_generated_man=No man page specified, auto-generated one for {}

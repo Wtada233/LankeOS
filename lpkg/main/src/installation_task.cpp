@@ -420,9 +420,13 @@ void InstallationTask::register_package() {
         cache.add_file_owner((fs::path("/") / f).string(), pkg_name_);
     }
 
+    const fs::path man_path = Config::instance().docs_dir() / (pkg_name_ + std::string(constants::SUFFIX_MAN));
     if (!man_content_.empty()) {
-        std::ofstream man_out(Config::instance().docs_dir() / (pkg_name_ + std::string(constants::SUFFIX_MAN)));
+        std::ofstream man_out(man_path);
         man_out << man_content_;
+    } else {
+        std::error_code ec;
+        fs::remove(man_path, ec);
     }
 
     for (const auto& cap : provides_) {

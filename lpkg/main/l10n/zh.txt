@@ -199,3 +199,7 @@ error.archive_write_data_failed=归档写入数据失败: {}
 error.archive_open_failed=无法打开输出归档文件: {}
 error.security_path_not_relative=安全违规: 路径必须是相对路径: {}
 error.security_path_traversal=安全违规: 检测到路径遍历: {}
+man.info_name=名称
+man.info_version=版本
+man.info_build_date=构建日期
+info.auto_generated_man=未指定 man 页，已为 {} 自动生成
