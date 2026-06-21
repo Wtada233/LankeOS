@@ -48,9 +48,9 @@ lankebuild_build() {
     # 编译
     make BINDIR=/usr/sbin LIBDIR=/usr/lib -j$(nproc)
 
-    # 安装二进制文件到目标根目录
     install -v -d {STAGING_ROOT}/usr/sbin
     install -v -m755 wpa_cli wpa_passphrase wpa_supplicant {STAGING_ROOT}/usr/sbin/
+    install -v -m644 systemd/*.service /usr/lib/systemd/system/
 
     # 安装手册页
     install -v -d {STAGING_ROOT}/usr/share/man/man5 {STAGING_ROOT}/usr/share/man/man8
