@@ -1,8 +1,8 @@
 {
   "name": "linux",
-  "version": "7.0.11",
+  "version": "7.1.1",
   "sources": [
-    "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.0.11.tar.xz"
+    "https://cdn.kernel.org/pub/linux/kernel/v7.x/linux-7.1.1.tar.xz"
   ],
   "no_strip": true,
   "work_sources": []
