@@ -6,7 +6,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     local whitelist=(
-        "intel/iwlwifi/*-cc-a0*" "intel/iwlwifi/*-Qu*" "intel/iwlwifi/*-ty-a0*" "intel/iwlwifi/*-bz-*" "intel/iwlwifi/*.pnvm"
+        "intel/iwlwifi/*-so-a0*" "intel/iwlwifi/*-cc-a0*" "intel/iwlwifi/*-Qu*" "intel/iwlwifi/*-ty-a0*" "intel/iwlwifi/*-bz-*" "intel/iwlwifi/*.pnvm"
         "intel/ibt*" "i915/adls_*" "i915/adlp_*" "i915/tgl_*" "i915/dg2_*" "i915/mtl_*"
         "intel/sof/*" "intel/sof-tplg/*" "intel/avs/*"
         "amdgpu/gc_11_*" "amdgpu/gc_10_*" "amdgpu/navi*"
