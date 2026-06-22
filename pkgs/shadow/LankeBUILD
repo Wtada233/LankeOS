@@ -31,7 +31,6 @@ lankebuild_build() {
 
     # 5. 打包前的 Hook 逻辑
     cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
-export PATH={PATH}:/usr/sbin
 pwconv
 grpconv
 mkdir -p /etc/default
