@@ -10,7 +10,7 @@
 -   **智能版本解析**：支持多位修订号（如 `1.0.0.1`），内置严谨的比较算法，确保 `6.16.1 > 6.6.1`。
 -   **聚合索引优化**：采用 `index.txt` 聚合格式，一行即可记录包的所有版本及其哈希，极大减少网络请求。
 -   **零冗余存储**：取消了 `latest.txt` 和单独的 `hash.txt`。软件包以 `包名/版本号.lpkg` 形式扁平化存储。
--   **包内嵌元数据**：不再依赖文件名来识别包名和版本，改用 `metadata.json` 嵌入包内，消除文件名解析的脆弱性。
+-   **包内嵌元数据**：不再依赖文件名来识别包名和版本，改用 `metadata.json` 嵌入包内，消除文件名解析的脆弱性。依赖、虚拟提供、手册页等元数据全部统一存储在 `metadata.json` 中，不再需要独立的描述文件。
 -   **无 `files.txt`**：包的 `content/` 目录结构直接对应根目录文件布局，不再需要通过 `files.txt` 映射文件路径。
 -   **自动化运维**：提供 `lrepo-mgr.py` 工具，支持一键推送到腾讯云 COS (S3) 或 SCP 远程服务器。
 -   **高兼容性静态构建**：内置系统 CA 证书路径自动探测，确保静态编译版本在不同 Linux 发行版上都能正常联网。
@@ -97,22 +97,31 @@ lpkg [选项] <命令> [参数]
 每个 `.lpkg` 文件是一个 tar.zst 压缩包，包含以下内容：
 
 ```text
-metadata.json         # 包元数据（名称、版本、文件列表）
-deps.txt              # 依赖关系
-provides.txt          # 虚拟提供（可选）
-man.txt               # 手册页
+metadata.json         # 包元数据（名称、版本、依赖、提供、手册页等）
 content/              # 文件内容（直接对应根目录结构）
 hooks/                # 钩子脚本（可选）
 ```
+
+所有元数据（依赖关系、虚拟提供、手册页）统一存储在 `metadata.json` 中，不再需要独立的 `deps.txt`、`provides.txt` 或 `man.txt` 文件。
 
 ### metadata.json 示例
 ```json
 {
   "name": "bash",
   "version": "5.2",
-  "files": ["usr/bin/bash", "usr/share/man/man1/bash.1"]
+  "deps": ["readline >= 8.0", "ncurses"],
+  "provides": ["libbash"],
+  "man": "bash(1) - GNU Bourne-Again SHell\n..."
 }
 ```
+
+| 字段 | 说明 |
+|------|------|
+| `name` | 包名 |
+| `version` | 版本号 |
+| `deps` | 依赖列表（可选），支持版本约束 |
+| `provides` | 虚拟提供列表（可选） |
+| `man` | 内联手册页内容（可选） |
 
 `content/` 目录下的文件布局直接对应目标根目录（`/`），无需 `files.txt` 做路径映射。
 
@@ -138,7 +147,7 @@ acl|2.3.1:sha...,2.3.2:sha...|attr,coreutils|libacl.so
 -   **`InstallationTask`**: 原子事务模型，支持失败自动回滚。
 -   **`Downloader`**: 封装了 `libcurl` 并集成了多路径证书探测逻辑。
 -   **`Cache`**: 本地状态数据库，存储于 `/var/lib/lpkg/`。
--   **`metadata.json`**: 包内嵌元数据（名称、版本、文件列表），替代了基于文件名的解析和 `files.txt` 路径映射。
+-   **`metadata.json`**: 包内嵌元数据（名称、版本、依赖、提供、手册页），替代了基于文件名的解析、`deps.txt`、`provides.txt`、`man.txt` 以及 `files.txt` 路径映射。
 
 ## 贡献
 

@@ -10,7 +10,7 @@ English | [中文](README.md)
 -   **Smart version parsing**: Supports multi-segment revision numbers (e.g. `1.0.0.1`) with a rigorous comparison algorithm that correctly handles cases like `6.16.1 > 6.6.1`.
 -   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their hashes for a package, greatly reducing network requests.
 -   **Zero-redundancy storage**: Eliminates `latest.txt` and separate `hash.txt` files. Packages are stored in a flat `<name>/<version>.lpkg` layout.
--   **Embedded metadata**: Package name and version come from an internal `metadata.json` instead of fragile filename parsing.
+-   **Embedded metadata**: Package name and version come from an internal `metadata.json` instead of fragile filename parsing. Dependencies, virtual provides, and man page content are all unified into `metadata.json`, eliminating standalone descriptor files.
 -   **No `files.txt`**: The `content/` directory layout maps directly to the root filesystem; `files.txt` for path mapping is eliminated.
 -   **Automated operations**: Includes `lrepo-mgr.py` for seamless publishing to Tencent Cloud COS (S3) or SCP remote servers.
 -   **Highly compatible static builds**: Built-in automatic detection of system CA certificate paths ensures statically compiled binaries work across different Linux distributions.
@@ -97,22 +97,31 @@ Remove all files from storage that are not listed in `index.txt`:
 Each `.lpkg` file is a tar.zst archive with the following structure:
 
 ```text
-metadata.json         # Package metadata (name, version, file list)
-deps.txt              # Dependencies
-provides.txt          # Virtual provides (optional)
-man.txt               # Man page
+metadata.json         # Package metadata (name, version, deps, provides, man page, etc.)
 content/              # Files (maps directly to root directory)
 hooks/                # Hook scripts (optional)
 ```
+
+All metadata (dependencies, virtual provides, man page) is stored exclusively in `metadata.json`. Standalone `deps.txt`, `provides.txt`, or `man.txt` files are no longer used.
 
 ### metadata.json Example
 ```json
 {
   "name": "bash",
   "version": "5.2",
-  "files": ["usr/bin/bash", "usr/share/man/man1/bash.1"]
+  "deps": ["readline >= 8.0", "ncurses"],
+  "provides": ["libbash"],
+  "man": "bash(1) - GNU Bourne-Again SHell\n..."
 }
 ```
+
+| Field | Description |
+|-------|-------------|
+| `name` | Package name |
+| `version` | Version string |
+| `deps` | Dependency list (optional), supports version constraints |
+| `provides` | Virtual provides list (optional) |
+| `man` | Inline man page content (optional) |
 
 The files under `content/` are extracted directly to the target root (`/`); no `files.txt` mapping is needed.
 
@@ -138,7 +147,7 @@ acl|2.3.1:sha...,2.3.2:sha...|attr,coreutils|libacl.so
 -   **`InstallationTask`**: Atomic transaction model with automatic rollback on failure.
 -   **`Downloader`**: Wraps `libcurl` with integrated multi-path certificate detection.
 -   **`Cache`**: Local state database stored at `/var/lib/lpkg/`.
--   **`metadata.json`**: In-package embedded metadata (name, version, file list), eliminating fragile filename parsing and `files.txt` path mapping.
+-   **`metadata.json`**: In-package embedded metadata (name, version, deps, provides, man page), eliminating fragile filename parsing, `deps.txt`, `provides.txt`, `man.txt`, and `files.txt` path mapping.
 
 ## Contributing
 
