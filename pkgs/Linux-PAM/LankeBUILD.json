@@ -1,5 +1,5 @@
 {
-  "name": "Linux-Pam",
+  "name": "Linux-PAM",
   "version": "1.7.2",
   "sources": [
     "https://github.com/linux-pam/linux-pam/archive/refs/tags/v1.7.2.tar.gz"
