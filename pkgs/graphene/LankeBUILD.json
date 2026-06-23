@@ -1,0 +1,8 @@
+{
+  "name": "graphene",
+  "version": "1.10.8",
+  "sources": [
+    "https://download.gnome.org/sources/graphene/1.10/graphene-1.10.8.tar.xz"
+  ],
+  "work_sources": []
+}

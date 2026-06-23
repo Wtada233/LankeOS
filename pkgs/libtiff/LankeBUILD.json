@@ -1,0 +1,8 @@
+{
+  "name": "libtiff",
+  "version": "4.7.0",
+  "sources": [
+    "https://download.osgeo.org/libtiff/tiff-4.7.0.tar.gz"
+  ],
+  "work_sources": []
+}
