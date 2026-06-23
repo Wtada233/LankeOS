@@ -130,12 +130,13 @@ class RepoManager:
             
             # Update index data
             if name not in index_data:
-                index_data[name] = {"versions": {}, "deps": deps, "provides": provides}
-            
-            index_data[name]["versions"][version] = sha256
-            # Metadata is shared across versions in this simplified aggregated format
-            if deps: index_data[name]["deps"] = deps
-            if provides: index_data[name]["provides"] = provides
+                index_data[name] = {"versions": {}}
+
+            index_data[name]["versions"][version] = {
+                "sha256": sha256,
+                "deps": deps,
+                "provides": provides
+            }
 
         # Save and upload aggregated index
         self.write_aggregated_index(index_local, index_data)
@@ -222,23 +223,21 @@ class RepoManager:
                     provides = parts[2] if len(parts) > 2 else ""
                     
                     if name not in data:
-                        data[name] = {"versions": {}, "deps": "", "provides": ""}
-                    
-                    data[name]["versions"][version] = hash_val
-                    # Store per-version metadata in a way compatible with the rest of the script
-                    # Since the script expects shared metadata for aggregated view but we now have per-version,
-                    # we'll use a simple name:version key for metadata storage internally if needed,
-                    # but for 'push' we can just use the last processed one.
-                    data[name]["deps"] = deps
-                    data[name]["provides"] = provides
+                        data[name] = {"versions": {}}
+
+                    data[name]["versions"][version] = {
+                        "sha256": hash_val,
+                        "deps": deps,
+                        "provides": provides
+                    }
         return data
 
     def write_aggregated_index(self, path, data):
         with open(path, 'w', encoding='utf-8') as f:
             for name, info in data.items():
-                for v, h in info["versions"].items():
+                for v, vinfo in info["versions"].items():
                     # In new format, each version is a line: name|v:h:deps|provides
-                    f.write(f"{name}|{v}:{h}:{info['deps']}|{info['provides']}\n")
+                    f.write(f"{name}|{v}:{vinfo['sha256']}:{vinfo['deps']}|{vinfo['provides']}\n")
 
     def upload_file(self, local_path, remote_path):
         st = self.config["storage"]
