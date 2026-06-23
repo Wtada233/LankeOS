@@ -1,0 +1,7 @@
+{
+  "name": "libyaml",
+  "version": "0.2.5",
+  "sources": ["https://github.com/yaml/libyaml/releases/download/0.2.5/yaml-0.2.5.tar.gz"],
+  "deps": [],
+  "no_strip": false
+}

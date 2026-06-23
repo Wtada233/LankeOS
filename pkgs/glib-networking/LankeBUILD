@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    mkdir -p build
+}
+
+lankebuild_build() {
+    echo "Configuring glib-networking-2.86.0..."
+    cd build
+    meson setup .. --prefix=/usr        \
+                   --buildtype=release  \
+                   -Dgnutls=enabled     \
+                   -Dlibproxy=disabled   \
+                   -Dgnome_proxy=disabled
+    echo "Building glib-networking-2.86.0..."
+    ninja -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging glib-networking-2.86.0..."
+    cd build
+    DESTDIR="{STAGING_ROOT}" ninja install
+    echo "Package staging complete."
+}

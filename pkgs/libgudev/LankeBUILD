@@ -6,19 +6,16 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    echo "Configuring libwebp-1.5.0..."
+    echo "Configuring libgudev-238..."
     cd build
-    cmake .. -G Ninja \
-        -DCMAKE_INSTALL_PREFIX=/usr \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_SHARED_LIBS=ON
-    echo "Building libwebp-1.5.0..."
+    meson setup .. --prefix=/usr --buildtype=release
+    echo "Building libgudev-238..."
     ninja -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging libwebp-1.5.0..."
+    echo "Packaging libgudev-238..."
     cd build
     DESTDIR="{STAGING_ROOT}" ninja install
     echo "Package staging complete."

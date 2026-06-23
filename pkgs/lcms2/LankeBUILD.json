@@ -1,0 +1,7 @@
+{
+  "name": "lcms2",
+  "version": "2.18",
+  "sources": ["https://downloads.sourceforge.net/lcms/lcms2-2.18.tar.gz"],
+  "deps": [],
+  "no_strip": false
+}

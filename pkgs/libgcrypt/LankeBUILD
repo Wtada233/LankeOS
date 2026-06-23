@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    echo "Preparing libgcrypt-1.11.0..."
+}
+
+lankebuild_build() {
+    echo "Configuring libgcrypt-1.11.0..."
+    ./configure --prefix=/usr --disable-static
+    echo "Building libgcrypt-1.11.0..."
+    make -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging libgcrypt-1.11.0..."
+    make DESTDIR="{STAGING_ROOT}" install
+    echo "Package staging complete."
+}

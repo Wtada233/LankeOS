@@ -1,0 +1,7 @@
+{
+  "name": "gst-plugins-base",
+  "version": "1.28.1",
+  "sources": ["https://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.28.1.tar.xz"],
+  "deps": [],
+  "no_strip": false
+}

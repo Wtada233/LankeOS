@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    echo "Preparing ruby-4.0.1..."
+}
+
+lankebuild_build() {
+    echo "Configuring ruby-4.0.1..."
+    ./configure --prefix=/usr          \
+                --enable-shared        \
+                --disable-install-doc  \
+                --docdir=/usr/share/doc/ruby-4.0.1
+    echo "Building ruby-4.0.1..."
+    make -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging ruby-4.0.1..."
+    make DESTDIR="{STAGING_ROOT}" install
+    echo "Package staging complete."
+}

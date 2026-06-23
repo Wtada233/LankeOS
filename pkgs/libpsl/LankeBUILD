@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    echo "Preparing libpsl-0.21.5..."
+}
+
+lankebuild_build() {
+    echo "Configuring libpsl-0.21.5..."
+    ./configure --prefix=/usr --disable-static
+    echo "Building libpsl-0.21.5..."
+    make -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging libpsl-0.21.5..."
+    make DESTDIR="{STAGING_ROOT}" install
+    echo "Package staging complete."
+}

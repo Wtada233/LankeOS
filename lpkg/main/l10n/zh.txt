@@ -127,7 +127,6 @@ info.file_not_owned=文件 {} 不属于任何已安装的包。
 info.package_files=软件包 {} 包含的文件:
 info.reinstalling_package=正在重新安装软件包 {}...
 info.installing_local_file=正在从本地文件安装: {}
-error.parse_pkg_filename_failed=无法从文件名解析包名和版本: {}
 error.invalid_arg_count=参数数量无效。
 error.dependency_conflict_title=检测到依赖冲突:
 error.conflict_breaks_existing=  将 '{}' 升级到 '{}' 将破坏现有软件包 '{}' (需要 '{} {}')。

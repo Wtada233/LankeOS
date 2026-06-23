@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    mkdir -p build
+}
+
+lankebuild_build() {
+    echo "Configuring libsecret-0.21.7..."
+    cd build
+    meson setup .. --prefix=/usr        \
+                   --buildtype=release  \
+                   -Dgtk_doc=false      \
+                   -Dmanpage=false      \
+                   -Dintrospection=false \
+                   -Dvapi=false          \
+                   -Dcrypto=gnutls
+    echo "Building libsecret-0.21.7..."
+    ninja -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging libsecret-0.21.7..."
+    cd build
+    DESTDIR="{STAGING_ROOT}" ninja install
+    echo "Package staging complete."
+}

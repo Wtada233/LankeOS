@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    mkdir -p build
+}
+
+lankebuild_build() {
+    echo "Configuring libsoup-3.6.6..."
+    cd build
+    meson setup .. --prefix=/usr        \
+                   --buildtype=release  \
+                   -Ddocs=disabled      \
+                   -Dtests=false        \
+                   -Dsysprof=disabled   \
+                   -Dbrotli=disabled
+    echo "Building libsoup-3.6.6..."
+    ninja -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging libsoup-3.6.6..."
+    cd build
+    DESTDIR="{STAGING_ROOT}" ninja install
+    echo "Package staging complete."
+}

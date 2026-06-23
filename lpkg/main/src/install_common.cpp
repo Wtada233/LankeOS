@@ -10,6 +10,15 @@ using json = nlohmann::json;
 
 namespace detail {
 
+json read_archive_metadata(const fs::path& archive_path) {
+    std::string meta_json = extract_file_from_archive(
+        archive_path, std::string(constants::PKG_METADATA_FILE));
+    if (meta_json.empty())
+        throw LpkgException(string_format("error.local_pkg_missing_metadata",
+            archive_path.string()));
+    return json::parse(meta_json);
+}
+
 void run_hook(std::string_view pkg_name, std::string_view hook_name) {
     if (Config::instance().no_hooks_mode()) return;
 
@@ -118,10 +127,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
 
     if (auto it = ctx.local_candidates.find(pkg_name); it != ctx.local_candidates.end()) {
         local_path = it->second;
-        std::string m_json = extract_file_from_archive(local_path, std::string(constants::PKG_METADATA_FILE));
-        if (m_json.empty()) throw LpkgException(string_format("error.local_pkg_missing_metadata", local_path.string()));
-
-        json meta = json::parse(m_json);
+        json meta = read_archive_metadata(local_path);
         latest_version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
 
         for (const auto& d_str : meta.value(std::string(constants::J_DEPS), std::vector<std::string>{})) {

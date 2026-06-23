@@ -19,8 +19,6 @@
 #include <chrono>
 #include <ctime>
 #include <sys/wait.h>
-#include <regex>
-
 namespace fs = std::filesystem;
 
 #include <mutex>
@@ -274,18 +272,6 @@ void cleanup_tmp_dirs() {
             }
         } catch (...) {}
     }
-}
-
-std::pair<std::string, std::string> parse_package_filename(const std::string& filename) {
-    // Regex to match "name-version.lpkg"
-    // Group 1: Name
-    // Group 2: Version
-    static const std::regex filename_regex(R"(^(.+)-(\d+[0-9a-zA-Z\.\-\+]*)\.lpkg$)");
-    std::smatch match;
-    if (std::regex_match(filename, match, filename_regex)) {
-        return {match[1], match[2]};
-    }
-    throw LpkgException(string_format("error.parse_pkg_filename_failed", filename.c_str()));
 }
 
 void string_replace_all(std::string& str, const std::string& from, const std::string& to) {

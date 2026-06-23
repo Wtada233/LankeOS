@@ -1,0 +1,7 @@
+{
+  "name": "libgudev",
+  "version": "238",
+  "sources": ["https://download.gnome.org/sources/libgudev/238/libgudev-238.tar.xz"],
+  "deps": [],
+  "no_strip": false
+}

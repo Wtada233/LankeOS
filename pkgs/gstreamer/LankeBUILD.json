@@ -1,0 +1,7 @@
+{
+  "name": "gstreamer",
+  "version": "1.28.1",
+  "sources": ["https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-1.28.1.tar.xz"],
+  "deps": [],
+  "no_strip": false
+}

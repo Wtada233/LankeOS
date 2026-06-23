@@ -124,7 +124,6 @@ info.file_not_owned=File {} is not owned by any package.
 info.package_files=Files in package {}:
 info.reinstalling_package=Reinstalling package {}...
 info.installing_local_file=Installing from local file: {}
-error.parse_pkg_filename_failed=Could not parse package name and version from filename: {}
 error.invalid_arg_count=Invalid number of arguments.
 error.dependency_conflict_title=Dependency conflict detected:
 error.conflict_breaks_existing=  Upgrading '{}' to '{}' will break existing package '{}' (requires '{} {}').

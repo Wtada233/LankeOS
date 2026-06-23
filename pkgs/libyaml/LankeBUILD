@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    echo "Configuring yaml-0.2.5..."
+    ./configure --prefix=/usr --disable-static
+    echo "Building yaml-0.2.5..."
+    make -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging yaml-0.2.5..."
+    make DESTDIR="{STAGING_ROOT}" install
+    echo "Package staging complete."
+}

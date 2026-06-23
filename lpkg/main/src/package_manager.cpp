@@ -70,7 +70,9 @@ void install_packages(const std::vector<std::string>& pkg_args,
             || arg.find('/') != std::string::npos) {
             if (fs::exists(p)) {
                 try {
-                    auto [n, v] = parse_package_filename(p.filename().string());
+                    json meta = detail::read_archive_metadata(fs::absolute(p));
+                    std::string n = meta.at(std::string(constants::J_NAME));
+                    std::string v = meta.at(std::string(constants::J_VERSION));
                     locals[n] = fs::absolute(p);
                     targets.emplace_back(n, v);
                 } catch (const std::exception& e) {
@@ -182,13 +184,7 @@ void install_packages_internal(InstallContext& ctx) {
             check_task.download_and_verify_package();
 
             // Read metadata.json directly from the archive without full extraction
-            std::string meta_json = extract_file_from_archive(
-                check_task.archive_path(), std::string(constants::PKG_METADATA_FILE));
-            if (meta_json.empty())
-                throw LpkgException(string_format("error.local_pkg_missing_metadata",
-                    check_task.archive_path().string()));
-
-            json meta = json::parse(meta_json);
+            json meta = detail::read_archive_metadata(check_task.archive_path());
             std::vector<std::string> dep_strs = meta.value(
                 std::string(constants::J_DEPS), std::vector<std::string>{});
             auto actual_deps = detail::parse_dep_strings(dep_strs);
@@ -431,8 +427,10 @@ void show_man_page(const std::string& pkg_name) {
 void reinstall_package(const std::string& arg) {
     std::string name = arg;
     if (arg.find('/') != std::string::npos || arg.ends_with(".lpkg")) {
-        try { name = parse_package_filename(fs::path(arg).filename().string()).first; }
-        catch (...) {}
+        try {
+            json meta = detail::read_archive_metadata(fs::absolute(arg));
+            name = meta.at(std::string(constants::J_NAME)).get<std::string>();
+        } catch (...) {}
     }
 
     if (Cache::instance().get_installed_version(name).empty()) {

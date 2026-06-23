@@ -1,0 +1,7 @@
+{
+  "name": "libsecret",
+  "version": "0.21.7",
+  "sources": ["https://download.gnome.org/sources/libsecret/0.21/libsecret-0.21.7.tar.xz"],
+  "deps": [],
+  "no_strip": false
+}

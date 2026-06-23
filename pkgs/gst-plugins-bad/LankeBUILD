@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    mkdir -p build
+}
+
+lankebuild_build() {
+    echo "Configuring gst-plugins-bad-1.28.1..."
+    cd build
+    meson setup .. --prefix=/usr        \
+                   --buildtype=release  \
+                   -Ddoc=disabled       \
+                   -Dintrospection=disabled \
+                   -Dnls=disabled       \
+                   -Dtests=disabled     \
+                   -Dexamples=disabled
+    echo "Building gst-plugins-bad-1.28.1..."
+    ninja -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging gst-plugins-bad-1.28.1..."
+    cd build
+    DESTDIR="{STAGING_ROOT}" ninja install
+    echo "Package staging complete."
+}

@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    mkdir -p build
+}
+
+lankebuild_build() {
+    echo "Configuring OpenJPEG-2.5.4..."
+    cd build
+    cmake -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX=/usr \
+          -DBUILD_STATIC_LIBS=OFF ..
+    echo "Building OpenJPEG-2.5.4..."
+    make -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging OpenJPEG-2.5.4..."
+    cd build
+    make DESTDIR="{STAGING_ROOT}" install
+    echo "Package staging complete."
+}

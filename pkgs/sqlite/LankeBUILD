@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    echo "Preparing sqlite-3.49.1..."
+}
+
+lankebuild_build() {
+    echo "Configuring sqlite-3.49.1..."
+    ./configure --prefix=/usr          \
+                --disable-static      \
+                --enable-threadsafe   \
+                CFLAGS="-O2 -DSQLITE_ENABLE_COLUMN_METADATA"
+    echo "Building sqlite-3.49.1..."
+    make -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging sqlite-3.49.1..."
+    make DESTDIR="{STAGING_ROOT}" install
+    echo "Package staging complete."
+}

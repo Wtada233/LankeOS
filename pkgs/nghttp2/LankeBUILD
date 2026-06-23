@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    echo "Preparing nghttp2-1.64.0..."
+}
+
+lankebuild_build() {
+    echo "Configuring nghttp2-1.64.0..."
+    ./configure --prefix=/usr --disable-static --enable-lib-only
+    echo "Building nghttp2-1.64.0..."
+    make -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging nghttp2-1.64.0..."
+    make DESTDIR="{STAGING_ROOT}" install
+    echo "Package staging complete."
+}

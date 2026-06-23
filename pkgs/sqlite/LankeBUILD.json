@@ -1,0 +1,7 @@
+{
+  "name": "sqlite",
+  "version": "3.49.1",
+  "sources": ["https://www.sqlite.org/2025/sqlite-autoconf-3490100.tar.gz"],
+  "deps": [],
+  "no_strip": false
+}

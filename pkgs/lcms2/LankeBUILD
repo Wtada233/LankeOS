@@ -1,0 +1,20 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    echo "Preparing Little CMS-2.18..."
+}
+
+lankebuild_build() {
+    echo "Configuring lcms2-2.18..."
+    ./configure --prefix=/usr --disable-static
+    echo "Building lcms2-2.18..."
+    make -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging lcms2-2.18..."
+    make DESTDIR="{STAGING_ROOT}" install
+    echo "Package staging complete."
+}

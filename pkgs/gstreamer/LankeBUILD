@@ -1,0 +1,30 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    mkdir -p build
+}
+
+lankebuild_build() {
+    echo "Configuring gstreamer-1.28.1..."
+    cd build
+    meson setup .. --prefix=/usr        \
+                   --buildtype=release  \
+                   -Ddoc=disabled       \
+                   -Dcheck=disabled     \
+                   -Dtests=disabled     \
+                   -Dexamples=disabled  \
+                   -Dintrospection=disabled \
+                   -Dnls=disabled       \
+                   -Dtools=disabled
+    echo "Building gstreamer-1.28.1..."
+    ninja -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging gstreamer-1.28.1..."
+    cd build
+    DESTDIR="{STAGING_ROOT}" ninja install
+    echo "Package staging complete."
+}

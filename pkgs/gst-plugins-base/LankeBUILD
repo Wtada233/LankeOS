@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+
+lankebuild_prepare() {
+    mkdir -p build
+}
+
+lankebuild_build() {
+    echo "Configuring gst-plugins-base-1.28.1..."
+    cd build
+    meson setup .. --prefix=/usr        \
+                   --buildtype=release  \
+                   -Ddoc=disabled       \
+                   -Dtests=disabled     \
+                   -Dintrospection=disabled \
+                   -Dnls=disabled
+    echo "Building gst-plugins-base-1.28.1..."
+    ninja -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging gst-plugins-base-1.28.1..."
+    cd build
+    DESTDIR="{STAGING_ROOT}" ninja install
+
+    # 清理误装的系统头文件（属于 libglvnd/mesa）
+    rm -rf "{STAGING_ROOT}/usr/include/GL" "{STAGING_ROOT}/usr/include/KHR" 2>/dev/null || true
+
+    echo "Package staging complete."
+}

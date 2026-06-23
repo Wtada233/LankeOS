@@ -54,9 +54,6 @@ std::unordered_set<std::string> read_set_from_file(const std::filesystem::path& 
 void write_set_to_file(const std::filesystem::path& path, const std::unordered_set<std::string>& data);
 void cleanup_tmp_dirs();
 
-// Filename parsing
-std::pair<std::string, std::string> parse_package_filename(const std::string& filename);
-
 // String utilities
 void string_replace_all(std::string& str, const std::string& from, const std::string& to);
 

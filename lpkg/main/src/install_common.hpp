@@ -30,6 +30,10 @@ namespace detail {
 // Run a hook script (postinst/prerm) inside chroot if needed
 void run_hook(std::string_view pkg_name, std::string_view hook_name);
 
+// Read metadata.json from an .lpkg archive (without extracting the whole package)
+// Returns parsed JSON. Throws LpkgException if missing or unreadable.
+nlohmann::json read_archive_metadata(const std::filesystem::path& archive_path);
+
 // Read metadata.json from an extracted package directory
 void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::string& version,
                            std::vector<std::string>& deps, std::vector<std::string>& provides,
