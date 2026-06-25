@@ -1,7 +1,6 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    # Prepare environment
     :
 }
 
@@ -13,25 +12,47 @@ lankebuild_build() {
         fi
     done
     patch -Np1 -i {WORK_DIR}/bzip2-1.0.8-install_docs-1.patch
-    sed -i 's@\(ln -s -f \)\$(PREFIX)/bin/@\1@' Makefile
-    sed -i 's@(PREFIX)/man@(PREFIX)/share/man@g' Makefile
-    make -f Makefile-libbz2_so -j$(nproc)
-    make clean -j$(nproc)
-    make -j$(nproc)
-    make PREFIX={STAGING_ROOT}/usr install
-    cp -av libbz2.so.* {STAGING_ROOT}/usr/lib/
-    ln -sv libbz2.so.1.0.8 {STAGING_ROOT}/usr/lib/libbz2.so
-    ln -sv libbz2.so.1.0.8 {STAGING_ROOT}/usr/lib/libbz2.so.1
-    cp -v bzip2-shared {STAGING_ROOT}/usr/bin/bzip2
-    # 添加兼容性链接
-    ln -sfv bzgrep {STAGING_ROOT}/usr/bin/bzegrep
-    ln -sfv bzgrep {STAGING_ROOT}/usr/bin/bzfgrep
-    ln -sfv bzdiff {STAGING_ROOT}/usr/bin/bzcmp
-    ln -sfv bzmore {STAGING_ROOT}/usr/bin/bzless
-}
 
+    cat > bzip2.pc <<EOF
+prefix=/usr
+exec_prefix=/usr
+bindir=\${exec_prefix}/bin
+libdir=\${exec_prefix}/lib
+includedir=\${prefix}/include
+
+Name: bzip2
+Description: A file compression library
+Version: 1.0.8
+Libs: -L\${libdir} -lbz2
+Cflags: -I\${includedir}
+EOF
+    make -f Makefile-libbz2_so -j$(nproc)
+    make bzip2 bzip2recover -j$(nproc)
+}
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    cd bzip2-1.0.8
+
+    install -dm755 {STAGING_ROOT}/usr/{bin,lib,include,share/man/man1}
+
+    install -m755 bzip2-shared {STAGING_ROOT}/usr/bin/bzip2
+    install -m755 bzip2recover bzdiff bzgrep bzmore {STAGING_ROOT}/usr/bin/
+    ln -sf bzip2 {STAGING_ROOT}/usr/bin/bunzip2
+    ln -sf bzip2 {STAGING_ROOT}/usr/bin/bzcat
+
+    cp -a libbz2.so* {STAGING_ROOT}/usr/lib/
+    ln -sf libbz2.so.1.0.8 {STAGING_ROOT}/usr/lib/libbz2.so.1
+    ln -sf libbz2.so.1 {STAGING_ROOT}/usr/lib/libbz2.so
+
+    install -m644 bzlib.h {STAGING_ROOT}/usr/include/
+
+    install -m644 bzip2.1 {STAGING_ROOT}/usr/share/man/man1/
+    ln -sf bzip2.1 {STAGING_ROOT}/usr/share/man/man1/bunzip2.1
+    ln -sf bzip2.1 {STAGING_ROOT}/usr/share/man/man1/bzcat.1
+    ln -sf bzip2.1 {STAGING_ROOT}/usr/share/man/man1/bzip2recover.1
+
+    install -Dm644 bzip2.pc {STAGING_ROOT}/usr/lib/pkgconfig/bzip2.pc
+
+    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/bzip2/LICENSE
 }
+

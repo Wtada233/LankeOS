@@ -8,6 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     make prefix=/usr -j$(nproc)
     make prefix=/usr DESTDIR={STAGING_ROOT} install
+    rm -f {STAGING_ROOT}/usr/lib/libzstd.a
     # 添加兼容性链接
     ln -sfv zstd {STAGING_ROOT}/usr/bin/zstdcat
     ln -sfv zstd {STAGING_ROOT}/usr/bin/unzstd

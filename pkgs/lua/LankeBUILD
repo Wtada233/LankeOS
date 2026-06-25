@@ -8,6 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     make linux -j$(nproc)
     make INSTALL_TOP={STAGING_ROOT}/usr install
+    rm -f {STAGING_ROOT}/usr/lib/liblua.a
     mkdir -p '{STAGING_ROOT}/usr/lib/pkgconfig'
     cat > '{STAGING_ROOT}/usr/lib/pkgconfig/lua.pc' << 'EOF'
 V=5.5
