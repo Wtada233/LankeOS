@@ -2,7 +2,7 @@
 
 lankebuild_prepare() {
     # Prepare environment
-    :
+    sed -i '/install -m.*STA/d' libcap/Makefile
 }
 
 lankebuild_build() {
