@@ -37,5 +37,5 @@ features:
   - title: 🖼️ GTK4 + WebKitGTK
     details: 完整 GTK4 图形栈，支持 WebKitGTK 浏览器引擎、GStreamer 多媒体框架。可运行现代 GTK4 图形应用。
   - title: 🔐 安全体系
-    details: Linux-PAM 认证模块、Polkit 授权框架、OpenSSL 加密库、SELinux 支持。完整的多用户安全模型。
+    details: Linux-PAM 认证模块、Polkit 授权框架、OpenSSL 加密库和GnuTLS支持。完整的多用户安全模型。
 ---
