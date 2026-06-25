@@ -67,7 +67,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/Wtada233/LankeOS/edit/main/docs/:path',
+      pattern: 'https://github.com/Wtada233/LankeOS/edit/main/site/docs/:path',
       text: '在 GitHub 上编辑此页',
     },
 
