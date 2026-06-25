@@ -5,3 +5,12 @@ coverage_report/
 run_tests
 *.o
 lrepo-mgr.json
+
+# 官网 (site/)
+site/node_modules/
+site/docs/.vitepress/dist/
+site/docs/.vitepress/cache/
+
+# 构建时自动生成的文件
+site/docs/releases.md
+site/docs/lpkg/index.md

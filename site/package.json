@@ -1,0 +1,18 @@
+{
+  "name": "lankeos-website",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm run clean:gen && pnpm run fetch-all && vitepress dev docs",
+    "build": "pnpm run clean:gen && pnpm run fetch-all && vitepress build docs && pnpm run clean:gen",
+    "preview": "vitepress preview docs",
+
+    "fetch-releases": "node scripts/fetch-releases.mjs",
+    "fetch-lpkg": "node scripts/fetch-lpkg-docs.mjs",
+    "fetch-all": "node scripts/fetch-releases.mjs && node scripts/fetch-lpkg-docs.mjs",
+    "clean:gen": "rm -f docs/releases.md docs/lpkg/index.md"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}
