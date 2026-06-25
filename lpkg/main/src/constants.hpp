@@ -9,6 +9,7 @@ namespace constants {
     inline constexpr char PIPE_CHAR = '|';
     inline constexpr char COMMA_CHAR = ',';
     inline constexpr char COLON_CHAR = ':';
+    inline constexpr char SEMICOLON_CHAR = ';';
 
     // Package Metadata Keys (JSON)
     inline constexpr std::string_view J_NAME = "name";

@@ -130,7 +130,7 @@ The files under `content/` are extracted directly to the target root (`/`); no `
 ### Directory Structure
 ```text
 /x86_64
-  ├── index.txt           # Core index: name|ver1:hash1,ver2:hash2|deps|provides
+  ├── index.txt           # Core index: name|ver1:hash1:dep1;ver2:hash2:dep2|provides
   └── bash/
       ├── 5.2.lpkg        # Actual tar.zst compressed package
       └── 5.3.lpkg
@@ -138,7 +138,7 @@ The files under `content/` are extracted directly to the target root (`/`); no `
 
 ### Index Line Example
 ```text
-acl|2.3.1:sha...,2.3.2:sha...|attr,coreutils|libacl.so
+acl|2.3.1:hash:attr,coreutils,glibc|libacl.so
 ```
 
 ## Source Architecture

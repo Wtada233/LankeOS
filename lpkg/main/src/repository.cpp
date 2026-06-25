@@ -59,51 +59,56 @@ void Repository::load_index() {
         if (parts.size() < 2) continue;
 
         std::string pkg_name(parts[0]);
-        std::string_view version_info_sv = parts[1];
+        std::string_view version_blocks_sv = parts[1];
         std::string_view prov_sv = (parts.size() > 2) ? parts[2] : "";
 
-        auto vh_parts = split(version_info_sv, constants::COLON_CHAR);
-        if (vh_parts.empty()) continue;
+        // Support aggregated format: ver1:hash1:deps;ver2:hash2:deps
+        for (auto version_info_sv : split(version_blocks_sv, constants::SEMICOLON_CHAR)) {
+            if (version_info_sv.empty()) continue;
 
-        std::string version(vh_parts[0]);
-        std::string hash = (vh_parts.size() > 1) ? std::string(vh_parts[1]) : "";
-        std::string_view deps_sv = (vh_parts.size() > 2) ? vh_parts[2] : "";
+            auto vh_parts = split(version_info_sv, constants::COLON_CHAR);
+            if (vh_parts.empty()) continue;
 
-        std::vector<DependencyInfo> deps;
-        if (!deps_sv.empty()) {
-            for (auto dep_str : split(deps_sv, constants::COMMA_CHAR)) {
-                DependencyInfo dep;
-                size_t op_pos = std::string_view::npos;
-                for (const auto& op : ops) {
-                    if ((op_pos = dep_str.find(op)) != std::string_view::npos) {
-                        dep.name = std::string(dep_str.substr(0, op_pos));
-                        dep.op = op;
-                        dep.version_req = std::string(dep_str.substr(op_pos + op.length()));
-                        break;
+            std::string version(vh_parts[0]);
+            std::string hash = (vh_parts.size() > 1) ? std::string(vh_parts[1]) : "";
+            std::string_view deps_sv = (vh_parts.size() > 2) ? vh_parts[2] : "";
+
+            std::vector<DependencyInfo> deps;
+            if (!deps_sv.empty()) {
+                for (auto dep_str : split(deps_sv, constants::COMMA_CHAR)) {
+                    DependencyInfo dep;
+                    size_t op_pos = std::string_view::npos;
+                    for (const auto& op : ops) {
+                        if ((op_pos = dep_str.find(op)) != std::string_view::npos) {
+                            dep.name = std::string(dep_str.substr(0, op_pos));
+                            dep.op = op;
+                            dep.version_req = std::string(dep_str.substr(op_pos + op.length()));
+                            break;
+                        }
                     }
+                    if (op_pos == std::string_view::npos) dep.name = std::string(dep_str);
+                    deps.push_back(std::move(dep));
                 }
-                if (op_pos == std::string_view::npos) dep.name = std::string(dep_str);
-                deps.push_back(std::move(dep));
             }
-        }
 
-        if (!prov_sv.empty()) {
-            for (auto prov : split(prov_sv, constants::COMMA_CHAR)) {
-                providers_[std::string(prov)].push_back(pkg_name);
+            if (!prov_sv.empty()) {
+                for (auto prov : split(prov_sv, constants::COMMA_CHAR)) {
+                    providers_[std::string(prov)].push_back(pkg_name);
+                }
             }
-        }
 
-        PackageInfo pkg;
-        pkg.name = pkg_name;
-        pkg.version = version;
-        pkg.sha256 = hash;
-        pkg.dependencies = std::move(deps);
-        if (!prov_sv.empty()) {
-             for (auto prov : split(prov_sv, constants::COMMA_CHAR)) {
-                 pkg.provides.push_back(std::string(prov));
-             }
+            PackageInfo pkg;
+            pkg.name = pkg_name;
+            pkg.version = version;
+            pkg.sha256 = hash;
+            pkg.dependencies = std::move(deps);
+            if (!prov_sv.empty()) {
+                 for (auto prov : split(prov_sv, constants::COMMA_CHAR)) {
+                     pkg.provides.push_back(std::string(prov));
+                 }
+            }
+            packages_[pkg.name].push_back(std::move(pkg));
         }
-        packages_[pkg.name].push_back(std::move(pkg));
     }
 
     for (auto& versions : packages_ | std::views::values) {

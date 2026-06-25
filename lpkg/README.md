@@ -130,7 +130,7 @@ hooks/                # 钩子脚本（可选）
 ### 目录结构
 ```text
 /x86_64
-  ├── index.txt           # 核心索引：包名|版本1:哈希1,版本2:哈希2|依赖|提供
+  ├── index.txt           # 核心索引：包名|版本1:哈希1:依赖1;版本2:哈希2:依赖2|提供
   └── bash/
       ├── 5.2.lpkg        # 实际的 tar.zst 压缩包
       └── 5.3.lpkg
@@ -138,7 +138,7 @@ hooks/                # 钩子脚本（可选）
 
 ### 索引行示例
 ```text
-acl|2.3.1:sha...,2.3.2:sha...|attr,coreutils|libacl.so
+acl|2.3.1:hash:attr,coreutils,glibc|libacl.so
 ```
 
 ## 源码架构
