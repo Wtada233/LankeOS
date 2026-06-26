@@ -69,7 +69,15 @@ void install_packages(const std::vector<std::string>& pkg_args,
             throw LpkgException(get_string("error.read_hash_failed"));
     }
 
-    // 解析安装参数：区分本地包文件（.zst/.lpkg/含路径）和包名:版本 格式
+    // ── 安装参数解析 ─────────────────────────────────────────────────────
+    // 支持三种参数格式：
+    //   1. 本地包文件：以 .zst / .lpkg 结尾，或包含 '/' 路径分隔符
+    //      → 从文件内 metadata.json 读取包名和版本
+    //   2. 远程仓库包名+版本：格式 包名:版本号  (如 bash:5.2)
+    //      → 从远程仓库下载匹配版本
+    //   3. 仅包名：不含 ':' 的纯字符串（如 vim）
+    //      → 从远程仓库获取最新版本
+    // 解析结果写入 targets 列表，后续由 resolve_package_dependencies 处理
     for (const auto& arg : pkg_args) {
         const fs::path p(arg);
         if (p.extension() == constants::EXT_ZST
@@ -114,8 +122,12 @@ void install_packages(const std::vector<std::string>& pkg_args,
             if (!p.local_path.empty()) p.sha256 = provided_hash;
     }
 
-    // 第二阶段：静态一致性检查（无需下载，纯依赖图分析）
-    // 动态元数据验证将在用户确认后、install_packages_internal 中进行
+    // ── 第二阶段：静态一致性检查 ────────────────────────────────────────
+    // 检查安装计划（即将安装的新版本）是否与已安装的其他包兼容。
+    // 例如：已安装的 libfoo 依赖 libbar >= 2.0，但计划将 libbar 降级到 1.x。
+    // 此阶段只做依赖图拓扑分析，无需下载包文件。
+    // 动态元数据验证（下载包后对比实际 metadata.json）将在用户确认后、
+    // install_packages_internal 中进行。
 
     if (plan.empty()) {
         log_info(get_string("info.all_packages_already_installed"));
@@ -134,7 +146,10 @@ void install_packages(const std::vector<std::string>& pkg_args,
         return;
     }
 
-    // 显示安装计划并请求用户确认
+    // ── 第三阶段：用户确认 ──────────────────────────────────────────────
+    // 向用户展示将要安装/升级的包列表（区分用户显式指定的和自动解析的依赖），
+    // 请求 y/n 确认。非交互模式 (-y/-n) 自动响应。
+
     std::string prompt;
     for (const auto& n : order) {
         const auto& p = plan.at(n);
@@ -149,7 +164,12 @@ void install_packages(const std::vector<std::string>& pkg_args,
         return;
     }
 
-    // 第三阶段：实际安装，过程中进行元数据验证
+    // ── 第四阶段：实际安装（含元数据验证和自动回滚） ──────────────────
+    // install_packages_internal 对每个包执行以下子流程：
+    //   1. 下载包 → 读取真实 metadata.json（验证仓库索引的 deps/provides）
+    //   2. 若元数据与索引不匹配 → 更新仓库信息 → 回滚已安装包 → 重解析依赖 → 从头重试
+    //   3. 匹配 → 执行 InstallationTask::run()（解压 → 依赖检查 → 冲突检测 → 写文件）
+    // 任何安装异常触发部分回滚：逆序移除已成功安装的包
     ctx.successfully_installed.clear();
     try {
         install_packages_internal(ctx);
@@ -187,7 +207,19 @@ void install_packages_internal(InstallContext& ctx) {
 
         auto& p = ctx.plan.at(n);
 
-        // 元数据验证：下载实际包并读取真实依赖信息
+        // ── 元数据验证 ──────────────────────────────────────────────────
+        // 仓库索引中的 deps/provides 可能过时或不完整，因此每个包在安装前
+        // 都需要下载并读取真实的 metadata.json 进行核对。
+        //
+        // 验证流程：
+        //   1. 下载实际包文件（或重用本地包路径）
+        //   2. 从 tar.zst 中提取 metadata.json（非完整解压，仅读元数据）
+        //   3. 对比实际依赖与仓库索引中的依赖列表
+        //   4. 若不一致 → 更新仓库信息 → 回滚当前事务 → 重新解析依赖 → 从头安装
+        //   5. 一致 → 保存已下载路径避免重复下载，继续安装
+        //
+        // 注意：已下载的归档路径会保存到 plan.local_path 中，这样后续
+        // InstallationTask 可以跳过 download_and_verify 直接使用本地文件。
         if (!p.metadata_verified) {
             InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
                 Cache::instance().get_installed_version(p.name),
@@ -367,7 +399,17 @@ void remove_package_files(const std::string& pkg_name, bool force) {
     }
 }
 
-/** 自动移除不再被任何包依赖的孤立包（用户显式标记的 held 包除外） */
+/**
+ * 自动移除不再被任何包依赖的孤立包
+ *
+ * 算法：
+ *   1. 从所有 held 包（用户显式标记的"根"包）出发，BFS 遍历依赖图，
+ *      收集所有"必需"包（held 包 + 它们的传递依赖）。
+ *   2. 已安装包中不在"必需"集合内的 → 视为孤立包，自动移除。
+ *
+ * 这样确保只保留用户需要的包及其传递依赖，其他自动安装的依赖可安全清理。
+ * 隐式安装的包（作为依赖被引入）若不被任何 held 包依赖，则会被清理。
+ */
 void autoremove() {
     log_info(get_string("info.checking_autoremove"));
     const auto req = detail::get_all_required_packages();
@@ -394,6 +436,13 @@ void autoremove() {
 /**
  * 升级所有已安装的包
  * 从仓库索引获取最新版本，与当前版本比较，对有更新的包执行升级安装
+ *
+ * 升级策略：
+ *   - 遍历所有已安装包，对每个包在仓库中查找最新版本
+ *   - 若最新版本 > 当前版本 → 创建 InstallationTask（传入旧版本号以触发文件清理）
+ *   - 跳过 held 包（锁定包不会被升级）
+ *   - 单个包升级失败不影响其他包（错误日志记录后继续）
+ *   - 使用版比较算法确保 6.16.1 > 6.6.1
  */
 void upgrade_packages() {
     log_info(get_string("info.checking_upgradable"));
@@ -406,6 +455,7 @@ void upgrade_packages() {
         return;
     }
 
+    // 在持有锁的情况下获取已安装包列表的快照（避免拷贝全量 map）
     std::vector<std::pair<std::string, std::string>> installed;
     {
         std::lock_guard lock(Cache::instance().get_mutex());
@@ -456,6 +506,13 @@ void show_man_page(const std::string& pkg_name) {
 /**
  * 重新安装一个包
  * 支持本地包文件路径或包名，强制覆盖模式以确保文件被替换
+ *
+ * 参数类型判断规则：
+ *   - 包含 '/' 或以 .lpkg 结尾 → 视为本地文件路径，从 metadata.json 读取包名
+ *   - 否则 → 视为已安装的包名
+ *
+ * 若包未安装则退化为 install 操作。安装期间强制开启 --force-overwrite
+ * 以确保旧文件被替换（而非产生 .lpkgnew 冲突）。
  */
 void reinstall_package(const std::string& arg) {
     std::string name = arg;

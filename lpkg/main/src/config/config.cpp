@@ -20,8 +20,12 @@ Config& Config::instance() {
 }
 
 /**
- * 构造函数：使用编译期宏定义初始化所有路径
- * 包括配置目录、状态目录、本地化目录等系统路径
+ * 构造函数：只初始化基础路径成员，派生路径通过 rebase_paths() 统一计算
+ *
+ * 设计说明：
+ *   hooks_dir_ / dep_dir_ / pkgs_file_ 等"派生路径"不应在本阶段硬编码赋值，
+ *   而是全部交由 rebase_paths() 根据基础路径统一推导，避免两处逻辑不一致。
+ *   当需要新增派生路径时，只需在 rebase_paths() 中添加，无需修改构造函数。
  */
 Config::Config()
     : root_dir_("/")
@@ -30,18 +34,9 @@ Config::Config()
     , l10n_dir_(fs::path{LPKG_L10N_DIR})
     , docs_dir_(fs::path{LPKG_DOCS_DIR})
     , lock_dir_(fs::path{LPKG_LOCK_DIR})
-    , hooks_dir_(fs::path{LPKG_CONF_DIR} / "hooks/")
-
-    , dep_dir_(fs::path{"/var/lib/lpkg"} / "deps/")
-    , pkgs_file_(fs::path{"/var/lib/lpkg"} / "pkgs")
-    , holdpkgs_file_(fs::path{"/var/lib/lpkg"} / "holdpkgs")
-    , essential_file_(fs::path{LPKG_CONF_DIR} / "essential")
-    , mirror_conf_(fs::path{LPKG_CONF_DIR} / "mirror.conf")
-    , triggers_conf_(fs::path{LPKG_CONF_DIR} / "triggers.conf")
-    , files_db_(fs::path{"/var/lib/lpkg"} / "files.db")
-    , provides_db_(fs::path{"/var/lib/lpkg"} / "provides.db")
-    , lock_file_(fs::path{LPKG_LOCK_DIR} / "db.lck")
-{}
+{
+    rebase_paths();  // 统一计算所有派生路径（hooks、dep、pkgs 等）
+}
 
 /**
  * 重新计算所有路径，将相对路径改为相对于 root_dir_ 的绝对路径

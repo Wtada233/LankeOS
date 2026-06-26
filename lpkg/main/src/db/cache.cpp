@@ -101,6 +101,16 @@ void Cache::remove_file_owner(std::string_view path, std::string_view pkg) {
 }
 
 /**
+ * 检查某文件是否由指定包所有
+ * 相比 get_file_owners() 返回整个集合，此方法仅做存在性检查，避免拷贝
+ */
+bool Cache::is_file_owned_by(std::string_view path, std::string_view pkg) {
+    std::lock_guard<std::mutex> lock(mtx);
+    auto it = file_db.find(path);
+    return it != file_db.end() && it->second.contains(std::string(pkg));
+}
+
+/**
  * 查询某文件由哪些包所有
  */
 std::unordered_set<std::string> Cache::get_file_owners(std::string_view path) {
@@ -138,6 +148,15 @@ std::unordered_set<std::string> Cache::get_providers(std::string_view capability
     std::lock_guard<std::mutex> lock(mtx);
     auto it = providers.find(capability);
     return (it != providers.end()) ? it->second : std::unordered_set<std::string>{};
+}
+
+/**
+ * 检查某能力是否由指定包提供（避免全量集合拷贝）
+ */
+bool Cache::is_provided_by(std::string_view capability, std::string_view pkg) {
+    std::lock_guard<std::mutex> lock(mtx);
+    auto it = providers.find(capability);
+    return it != providers.end() && it->second.contains(std::string(pkg));
 }
 
 /**

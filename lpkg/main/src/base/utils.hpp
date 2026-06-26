@@ -89,6 +89,23 @@ void cleanup_tmp_dirs();
 /** 替换字符串中的所有匹配子串 */
 void string_replace_all(std::string& str, const std::string& from, const std::string& to);
 
+/**
+ * 按分隔符切分 string_view，返回子串列表（零拷贝，仅分配 vector）
+ * @param s  输入的字符串视图
+ * @param d  分隔字符
+ * @return   切分后的子串列表
+ */
+inline std::vector<std::string_view> split_string_view(std::string_view s, char d) {
+    std::vector<std::string_view> r;
+    size_t start = 0, end;
+    while ((end = s.find(d, start)) != std::string_view::npos) {
+        r.push_back(s.substr(start, end - start));
+        start = end + 1;
+    }
+    r.push_back(s.substr(start));
+    return r;
+}
+
 // ============ 安全 ============
 
 /** 验证路径是否在指定根目录下，防止路径穿越攻击 */

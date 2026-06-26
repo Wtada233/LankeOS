@@ -312,15 +312,21 @@ void InstallationTask::check_for_file_conflicts() {
         if (fs::is_directory(content_dir / f)) continue;
 
         const std::string path_str = logical_path.string();
-        auto owners = cache.get_file_owners(path_str);
 
+        // 快速路径：文件已完全属于当前包 → 无冲突，跳过全量集合拷贝
+        if (cache.is_file_owned_by(path_str, pkg_name_)) continue;
+
+        // 检查是否被其他包占用
+        auto owners = cache.get_file_owners(path_str);
         if (!owners.empty()) {
-            for (const auto& owner : owners) {
-                if (owner != pkg_name_ && !Config::instance().force_overwrite_mode()) conflicts[path_str] = owner;
+            // 走到这里说明所有者不是当前包（快速路径已排除），直接报告冲突
+            if (!Config::instance().force_overwrite_mode()) {
+                conflicts[path_str] = *owners.begin();
             }
             continue;
         }
 
+        // 文件未被任何包管理，检查是否为磁盘上已存在的第三方手动安装文件
         if (old_version_to_replace_.empty()) {
             const fs::path phys = Config::instance().root_dir() / rel_f;
             if ((fs::exists(phys) || fs::is_symlink(phys)) && !Config::instance().force_overwrite_mode()) {
