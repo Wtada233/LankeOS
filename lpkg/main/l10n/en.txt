@@ -212,3 +212,6 @@ error.depend_unknown_subcmd=Unknown depend subcommand: {}. Use remove, abibreak,
 info.depend_remove_header=Dependency removal scan for '{}':
 info.depend_abibreak_header=ABI breakage scan for '{}':
 info.depend_install_header=Dependency install scan for '{}':
+warning.repo_mirror_config=Failed to read mirror configuration: {}
+warning.repo_index_missing=Repository index not found: {}
+warning.repo_index_download=Failed to download repository index: {}
