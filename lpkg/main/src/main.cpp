@@ -296,8 +296,10 @@ int main(int argc, char* argv[]) {
             db_lock = std::make_unique<DBLock>();
         }
 
+        // lambda 在 handle_command 栈帧内被立即消费，不跨函数逃逸，
+        // 但精确捕获 [&options] 比通配 [&] 更安全、更自文档化
         return handle_command(command, result, hash_file,
-                              [&]() { print_usage(options); });
+                              [&options]() { print_usage(options); });
 
     } catch (const cxxopts::exceptions::exception& e) {
         log_error(string_format("error.cmd_parse_error", e.what()));

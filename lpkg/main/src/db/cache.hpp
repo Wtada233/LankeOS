@@ -47,6 +47,8 @@ public:
     void remove_file_owner(std::string_view path, std::string_view pkg);
     /** 查询文件归属的包集合 */
     std::unordered_set<std::string> get_file_owners(std::string_view path);
+    /** 检查某文件是否由指定包所有（避免全量集合拷贝） */
+    bool is_file_owned_by(std::string_view path, std::string_view pkg);
 
     /** 添加 provider（能力名称 -> 包名） */
     void add_provider(std::string_view capability, std::string_view pkg);
@@ -54,6 +56,8 @@ public:
     void remove_provider(std::string_view capability, std::string_view pkg);
     /** 查询提供某能力的包集合 */
     std::unordered_set<std::string> get_providers(std::string_view capability);
+    /** 检查某能力是否由指定包提供（避免全量集合拷贝） */
+    bool is_provided_by(std::string_view capability, std::string_view pkg);
 
     /** 添加反向依赖记录 */
     void add_reverse_dep(std::string_view dep, std::string_view pkg);

@@ -35,6 +35,8 @@ std::string version_or_missing(const std::string& pkg) {
 /**
  * 从本地缓存收集传递反向依赖集 (BFS)
  * 从 root_pkg 出发，沿 reverse_deps 链遍历所有已安装的依赖者
+ * @param result  输出：收集到的受影响包集合
+ * @param visited 已访问节点集合，防止循环依赖和重复访问
  */
 void collect_transitive_rdeps(const std::string& root_pkg,
                               std::unordered_set<std::string>& result,
@@ -123,18 +125,6 @@ void resolve_transitive_deps(const std::string& pkg_name,
 
 namespace {
 
-/** 按分隔符切分 string_view，返回子串列表（不分配内存） */
-std::vector<std::string_view> sv_split(std::string_view s, char d) {
-    std::vector<std::string_view> r;
-    size_t start = 0, end;
-    while ((end = s.find(d, start)) != std::string_view::npos) {
-        r.push_back(s.substr(start, end - start));
-        start = end + 1;
-    }
-    r.push_back(s.substr(start));
-    return r;
-}
-
 /**
  * 从缓存的仓库索引文件构建反向依赖图
  * 只考虑每个包的最新版本，返回: 被依赖的包 -> {直接依赖它的包集合}
@@ -154,17 +144,17 @@ build_repo_revdep_map() {
     while (std::getline(f, line)) {
         if (line.empty() || line[0] == '#') continue;
         if (line.back() == '\r') line.pop_back();
-        auto parts = sv_split(line, constants::PIPE_CHAR);
+        auto parts = split_string_view(line, constants::PIPE_CHAR);
         if (parts.size() < 2) continue;
 
         std::string name(parts[0]);
-        auto blocks = sv_split(parts[1], constants::SEMICOLON_CHAR);
+        auto blocks = split_string_view(parts[1], constants::SEMICOLON_CHAR);
         if (blocks.empty()) continue;
         // 取最后一个版本块（最新版本）作为依赖分析的依据
-        auto vh = sv_split(blocks.back(), constants::COLON_CHAR);
+        auto vh = split_string_view(blocks.back(), constants::COLON_CHAR);
         if (vh.size() < 3) continue;
 
-        for (auto ds : sv_split(vh[2], constants::COMMA_CHAR)) {
+        for (auto ds : split_string_view(vh[2], constants::COMMA_CHAR)) {
             std::string_view dn = ds;
             for (const auto& op : ops) {
                 if (auto p = ds.find(op); p != std::string_view::npos) {
@@ -205,7 +195,9 @@ auto load_repo_revdep()
 
 /**
  * 递归构建"移除"依赖树（本地缓存路径）
- * 使用 affected 池标记尚未放入树的节点，避免重复
+ * @param affected 待处理节点池：函数从池中取出节点放入树中，
+ *                 确保每个受影响节点只在结果树中出现一次。
+ * @param show_all 为 true 时连带显示不受影响的共享依赖
  */
 void build_remove_tree_local(
     ScanNode& node,
@@ -255,7 +247,9 @@ void build_remove_tree_local(
 
 /**
  * 递归构建"移除"依赖树（仓库回退路径）
+ * 当目标包未在本地安装时，从仓库索引构建反向依赖图，
  * 结构与 build_remove_tree_local 类似，但数据来源是仓库索引
+ * @param affected 待处理节点池，用集合跟踪已处理的节点避免重复
  */
 void build_remove_tree_repo(
     ScanNode& node,
@@ -281,6 +275,7 @@ void build_remove_tree_repo(
 /**
  * 递归构建安装依赖树
  * 已安装的包标记为 KEEP（--all 才显示），需要安装的标记为 INSTALL
+ * @param seen 已展开节点池，防止循环依赖导致的无限递归
  */
 void build_install_tree(
     ScanNode* parent,

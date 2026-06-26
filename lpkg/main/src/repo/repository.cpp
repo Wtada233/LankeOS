@@ -58,23 +58,12 @@ void Repository::load_index() {
     std::string line;
     static const std::vector<std::string> ops = {">=", "<=", "!=", "==", ">", "<", "="};
 
-    auto split = [](std::string_view s, char delim) {
-        std::vector<std::string_view> res;
-        size_t start = 0, end = 0;
-        while ((end = s.find(delim, start)) != std::string_view::npos) {
-            res.push_back(s.substr(start, end - start));
-            start = end + 1;
-        }
-        res.push_back(s.substr(start));
-        return res;
-    };
-
     while (std::getline(file, line)) {
         if (line.empty() || line[0] == '#') continue;
         std::string_view sv = line;
         if (!sv.empty() && sv.back() == '\r') sv.remove_suffix(1);
 
-        auto parts = split(sv, constants::PIPE_CHAR);
+        auto parts = split_string_view(sv, constants::PIPE_CHAR);
         if (parts.size() < 2) continue;
 
         std::string pkg_name(parts[0]);
@@ -82,10 +71,10 @@ void Repository::load_index() {
         std::string_view prov_sv = (parts.size() > 2) ? parts[2] : "";
 
         // 一个包可能对应多个版本，用 ';' 分隔
-        for (auto version_info_sv : split(version_blocks_sv, constants::SEMICOLON_CHAR)) {
+        for (auto version_info_sv : split_string_view(version_blocks_sv, constants::SEMICOLON_CHAR)) {
             if (version_info_sv.empty()) continue;
 
-            auto vh_parts = split(version_info_sv, constants::COLON_CHAR);
+            auto vh_parts = split_string_view(version_info_sv, constants::COLON_CHAR);
             if (vh_parts.empty()) continue;
 
             std::string version(vh_parts[0]);
@@ -95,7 +84,7 @@ void Repository::load_index() {
             // 解析依赖字符串，提取包名和版本约束
             std::vector<DependencyInfo> deps;
             if (!deps_sv.empty()) {
-                for (auto dep_str : split(deps_sv, constants::COMMA_CHAR)) {
+                for (auto dep_str : split_string_view(deps_sv, constants::COMMA_CHAR)) {
                     DependencyInfo dep;
                     size_t op_pos = std::string_view::npos;
                     for (const auto& op : ops) {
@@ -113,7 +102,7 @@ void Repository::load_index() {
 
             // 记录虚拟包（provides）
             if (!prov_sv.empty()) {
-                for (auto prov : split(prov_sv, constants::COMMA_CHAR)) {
+                for (auto prov : split_string_view(prov_sv, constants::COMMA_CHAR)) {
                     providers_[std::string(prov)].push_back(pkg_name);
                 }
             }
@@ -124,7 +113,7 @@ void Repository::load_index() {
             pkg.sha256 = hash;
             pkg.dependencies = std::move(deps);
             if (!prov_sv.empty()) {
-                 for (auto prov : split(prov_sv, constants::COMMA_CHAR)) {
+                 for (auto prov : split_string_view(prov_sv, constants::COMMA_CHAR)) {
                      pkg.provides.push_back(std::string(prov));
                  }
             }
