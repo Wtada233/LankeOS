@@ -2,11 +2,11 @@
 #include "builder.hpp"
 #include "builder_config.hpp"
 #include "builder_executor.hpp"
-#include "core/utils.hpp"
-#include "core/exception.hpp"
+#include "base/utils.hpp"
+#include "base/exception.hpp"
 #include "packer.hpp"
-#include "core/localization.hpp"
-#include "core/constants.hpp"
+#include "i18n/localization.hpp"
+#include "base/constants.hpp"
 
 #include <fstream>
 #include <array>

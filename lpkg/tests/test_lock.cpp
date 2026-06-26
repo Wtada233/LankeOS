@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
-#include "../main/src/core/utils.hpp"
-#include "../main/src/core/config.hpp"
+#include "../main/src/base/utils.hpp"
+#include "../main/src/config/config.hpp"
 #include <filesystem>
 #include <thread>
 #include <vector>

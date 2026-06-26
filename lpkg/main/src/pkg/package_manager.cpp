@@ -3,17 +3,17 @@
 #include "install_common.hpp"
 
 #include "archive.hpp"
-#include "core/cache.hpp"
-#include "core/trigger.hpp"
-#include "core/config.hpp"
+#include "db/cache.hpp"
+#include "trigger/trigger.hpp"
+#include "config/config.hpp"
 #include "downloader.hpp"
-#include "core/exception.hpp"
-#include "core/hash.hpp"
-#include "core/localization.hpp"
-#include "core/utils.hpp"
-#include "core/version.hpp"
-#include "core/repository.hpp"
-#include "core/constants.hpp"
+#include "base/exception.hpp"
+#include "crypto/hash.hpp"
+#include "i18n/localization.hpp"
+#include "base/utils.hpp"
+#include "vercmp/version.hpp"
+#include "repo/repository.hpp"
+#include "base/constants.hpp"
 
 #include <algorithm>
 #include <filesystem>

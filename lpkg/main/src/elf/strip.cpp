@@ -38,7 +38,7 @@ FileType identify_file_type(const fs::path& path);
 bool process_elf(const fs::path& path, std::string& error_msg);
 bool process_archive(const fs::path& path, std::string& error_msg);
 
-#include "core/localization.hpp"
+#include "i18n/localization.hpp"
 #include <iostream>
 
 /**

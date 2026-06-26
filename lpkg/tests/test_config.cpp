@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../main/src/core/config.hpp"
+#include "../main/src/config/config.hpp"
 #include <filesystem>
 
 namespace fs = std::filesystem;
