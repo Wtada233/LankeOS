@@ -1,0 +1,63 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    rm -f llvm/cmake/modules/Findzstd.cmake
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+
+    local cmake_args=(
+        -G Ninja
+        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_INSTALL_PREFIX=/usr
+        -DLLVM_ENABLE_PROJECTS='clang;lld'
+        -DLLVM_TARGETS_TO_BUILD='X86;AMDGPU;NVPTX;SPIRV'
+        -DLLVM_BUILD_LLVM_DYLIB=ON
+        -DLLVM_LINK_LLVM_DYLIB=ON
+        -DLLVM_INCLUDE_TESTS=OFF
+        -DLLVM_INCLUDE_BENCHMARKS=OFF
+        -DLLVM_INSTALL_UTILS=ON
+        -DLLVM_ENABLE_RTTI=ON
+        -DLLVM_ENABLE_BINDINGS=OFF
+        -DLLVM_ENABLE_FFI=ON
+        -DLLVM_ENABLE_CURL=ON
+        -DCLANG_DEFAULT_PIE_ON_LINUX=ON
+        -DCLANG_LINK_CLANG_DYLIB=ON
+        -DENABLE_LINKER_BUILD_ID=ON
+    )
+
+    cmake ../llvm "${cmake_args[@]}"
+
+    # Determine distribution components (exclude static libs)
+    local components
+    components=$(ninja -t targets | grep -Po 'install-\K.*(?=-stripped:)' | while read -r target; do
+        case $target in
+            llvm-libraries|distribution|clang-libraries|lld-libraries)
+                continue ;;
+            LLVM|LLVMgold) ;;
+            LLVMDemangle|LLVMSupport|LLVMTableGen|LLVMDebuginfod) ;;
+            LLVMTestingAnnotations|LLVMTestingSupport) ;;
+            LLVM*) continue ;;
+            llvm-exegesis) continue ;;
+            clang|clangd|clang-*) ;;
+            clang*|findAllSymbols) continue ;;
+            lld|lld-*) ;;
+            lld*) continue ;;
+        esac
+        echo "$target"
+    done | paste -sd\;)
+
+    test -n "$components"
+    cmake_args+=("-DLLVM_DISTRIBUTION_COMPONENTS=$components")
+    cmake ../llvm "${cmake_args[@]}"
+
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install-distribution
+
+    install -Dm644 ../llvm/LICENSE.TXT {STAGING_ROOT}/usr/share/licenses/llvm/LICENSE
+}
+
+lankebuild_package() {
+    :
+}

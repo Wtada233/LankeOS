@@ -109,11 +109,9 @@ void finalize_staging(const fs::path& staging_root, bool no_strip) {
 
     if (!no_strip) {
         log_info(get_string("info.stripping_binaries"));
-        for (const auto& sub : {constants::BIN, constants::LIB,
-                                constants::LIBEXEC}) {
-            fs::path p = staging_root / constants::USR / sub;
-            if (!fs::exists(p) || !fs::is_directory(p)) continue;
-            for (const auto& entry : fs::recursive_directory_iterator(p)) {
+        fs::path usr_root = staging_root / constants::USR;
+        if (fs::exists(usr_root) && fs::is_directory(usr_root)) {
+            for (const auto& entry : fs::recursive_directory_iterator(usr_root)) {
                 if (!entry.is_regular_file() || entry.is_symlink()) continue;
 
                 // 仅对 ELF 文件进行 strip
