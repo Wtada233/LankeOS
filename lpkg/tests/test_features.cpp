@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
-#include "../main/src/package_manager.hpp"
-#include "../main/src/cache.hpp"
-#include "../main/src/utils.hpp"
-#include "../main/src/config.hpp"
-#include "../main/src/constants.hpp"
+#include "../main/src/ops/package_manager.hpp"
+#include "../main/src/core/cache.hpp"
+#include "../main/src/core/utils.hpp"
+#include "../main/src/core/config.hpp"
+#include "../main/src/core/constants.hpp"
 #include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>

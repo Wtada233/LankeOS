@@ -202,3 +202,13 @@ man.info_name=名称
 man.info_version=版本
 man.info_build_date=构建日期
 info.auto_generated_man=未指定 man 页，已为 {} 自动生成
+
+# depend command
+info.depend_desc=  depend <remove|abibreak|install> <包名>...  分析依赖树
+help.depend_all=显示依赖树中所有包，包括未改变的
+error.depend_need_subcmd=depend 命令需要子命令: remove、abibreak 或 install。
+error.depend_need_pkg=depend 至少需要一个包名。
+error.depend_unknown_subcmd=未知的 depend 子命令: {}。请使用 remove、abibreak 或 install。
+info.depend_remove_header=依赖移除扫描 '{}':
+info.depend_abibreak_header=ABI 断裂扫描 '{}':
+info.depend_install_header=依赖安装扫描 '{}':

@@ -42,7 +42,7 @@ INSTALL_DOCS_DIR = $(INSTALL_SHARE_DIR)/docs
 INSTALL_LOCK_DIR = $(DESTDIR)$(LOCALSTATEDIR)/lpkg
 
 # Common flags shared between production and test builds
-COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \
+COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) -I$(APP_SRC_DIR)/core -I$(APP_SRC_DIR)/ops \
            $(PKG_CFLAGS) \
            -DLPKG_CONF_DIR=\"$(INSTALL_CONF_DIR)\" \
            -DLPKG_L10N_DIR=\"$(INSTALL_L10N_DIR)\" \
@@ -55,7 +55,7 @@ COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$
 CXXFLAGS = $(COMMON_CXXFLAGS) -O2
 TEST_CXXFLAGS = $(COMMON_CXXFLAGS) -g
 
-MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp)
+MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp) $(wildcard $(APP_SRC_DIR)/core/*.cpp) $(wildcard $(APP_SRC_DIR)/ops/*.cpp)
 TEST_SRCS = $(wildcard $(TESTS_DIR)/*.cpp)
 MAIN_OBJS = $(patsubst $(APP_SRC_DIR)/%.cpp,$(BUILD_DIR)/main/%.o,$(MAIN_SRCS))
 TEST_OBJS = $(patsubst $(TESTS_DIR)/%.cpp,$(BUILD_DIR)/tests/%.o,$(TEST_SRCS))
@@ -155,6 +155,7 @@ docker:
 		docker start $(DOCKER_ENV_CONTAINER) >/dev/null; \
 	fi
 	@echo "Syncing source code and compiling inside container..."
+	docker exec $(DOCKER_ENV_CONTAINER) sh -c "rm -rf /app/* /app/.* 2>/dev/null; true"
 	docker cp . $(DOCKER_ENV_CONTAINER):/app
 	docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make static -j$$(nproc) && strip --strip-all $(BUILD_DIR)/$(TARGET)-static && upx -9 $(BUILD_DIR)/$(TARGET)-static"
 	docker cp $(DOCKER_ENV_CONTAINER):/app/$(BUILD_DIR)/$(TARGET)-static $(BUILD_DIR)/$(TARGET)-docker

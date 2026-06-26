@@ -1,10 +1,10 @@
 #include "packer.hpp"
-#include "utils.hpp"
-#include "exception.hpp"
-#include "localization.hpp"
-#include "hash.hpp"
-#include "config.hpp"
-#include "constants.hpp"
+#include "core/utils.hpp"
+#include "core/exception.hpp"
+#include "core/localization.hpp"
+#include "core/hash.hpp"
+#include "core/config.hpp"
+#include "core/constants.hpp"
 #include "nlohmann/json.hpp"
 #include <archive.h>
 #include <archive_entry.h>

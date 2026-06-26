@@ -1,13 +1,14 @@
-#include "config.hpp"
-#include "exception.hpp"
-#include "localization.hpp"
-#include "package_manager.hpp"
-#include "utils.hpp"
+#include "core/config.hpp"
+#include "core/exception.hpp"
+#include "core/localization.hpp"
+#include "ops/package_manager.hpp"
+#include "core/utils.hpp"
 #include "cxxopts.hpp"
-#include "packer.hpp"
-#include "scanner.hpp"
-#include "builder.hpp"
-#include "constants.hpp"
+#include "ops/packer.hpp"
+#include "ops/scanner.hpp"
+#include "ops/builder.hpp"
+#include "ops/depend_scanner.hpp"
+#include "core/constants.hpp"
 
 #include <curl/curl.h>
 #include <iostream>
@@ -39,6 +40,7 @@ void print_usage(const cxxopts::Options& options) {
     std::cerr << get_string("info.man_desc")      << std::endl;
     std::cerr << get_string("info.pack_desc")     << "  " << get_string("info.pack_opts") << std::endl;
     std::cerr << get_string("info.build_desc")    << std::endl;
+    std::cerr << get_string("info.depend_desc")   << std::endl;
     std::cerr << get_string("info.scan_desc")     << std::endl;
 }
 
@@ -97,6 +99,7 @@ int main(int argc, char* argv[]) {
 
         options.add_options(get_string("help.group_other"))
             ("testing", get_string("help.testing"), cxxopts::value<bool>()->default_value("false"))
+            ("all", get_string("help.depend_all"), cxxopts::value<bool>()->default_value("false"))
             ;
 
         options.add_options("")
@@ -231,6 +234,55 @@ int main(int argc, char* argv[]) {
                 }
             }
             run_build(fs::absolute(build_dir));
+        } else if (command == constants::CMD_DEPEND) {
+            const auto& args = result.count("packages")
+                ? result["packages"].as<std::vector<std::string>>()
+                : std::vector<std::string>{};
+            if (args.empty())
+                throw LpkgException(get_string("error.depend_need_subcmd"));
+
+            const std::string& subcmd = args[0];
+            bool show_all = result["all"].as<bool>();
+
+            if (subcmd == "remove") {
+                if (args.size() < 2)
+                    throw LpkgException(get_string("error.depend_need_pkg"));
+                for (size_t i = 1; i < args.size(); ++i) {
+                    auto root = depscan::scan_remove_tree(args[i], show_all);
+                    log_info(string_format("info.depend_remove_header", args[i]));
+                    depscan::print_tree(root);
+                    if (i + 1 < args.size()) std::cout << "\n";
+                }
+            } else if (subcmd == "abibreak") {
+                if (args.size() < 2)
+                    throw LpkgException(get_string("error.depend_need_pkg"));
+                for (size_t i = 1; i < args.size(); ++i) {
+                    auto root = depscan::scan_abibreak_tree(args[i], show_all);
+                    log_info(string_format("info.depend_abibreak_header", args[i]));
+                    depscan::print_tree(root);
+                    if (i + 1 < args.size()) std::cout << "\n";
+                }
+            } else if (subcmd == "install") {
+                if (args.size() < 2)
+                    throw LpkgException(get_string("error.depend_need_pkg"));
+                for (size_t i = 1; i < args.size(); ++i) {
+                    const fs::path p(args[i]);
+                    depscan::ScanNode root;
+                    if (p.extension() == constants::EXT_LPKG
+                        || p.extension() == constants::EXT_ZST) {
+                        root = depscan::scan_install_from_file(
+                            fs::absolute(p), show_all);
+                    } else {
+                        root = depscan::scan_install_tree(args[i], show_all);
+                    }
+                    log_info(string_format("info.depend_install_header", args[i]));
+                    depscan::print_tree(root);
+                    if (i + 1 < args.size()) std::cout << "\n";
+                }
+            } else {
+                throw LpkgException(string_format(
+                    "error.depend_unknown_subcmd", subcmd));
+            }
         } else if (command == constants::CMD_SCAN) {
             check_root();
             Config::instance().init_filesystem();

@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "../main/src/version.hpp"
+#include "../main/src/core/version.hpp"
 
 TEST(VersionTest, Comparisons) {
     EXPECT_TRUE(version_compare("1.0", "2.0"));

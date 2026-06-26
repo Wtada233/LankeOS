@@ -1,7 +1,7 @@
 #include "downloader.hpp"
-#include "exception.hpp"
-#include "localization.hpp"
-#include "utils.hpp"
+#include "core/exception.hpp"
+#include "core/localization.hpp"
+#include "core/utils.hpp"
 
 #include <curl/curl.h>
 

@@ -1,7 +1,7 @@
 #include "version.hpp"
 
 #include "config.hpp"
-#include "downloader.hpp"
+#include "ops/downloader.hpp"
 #include "exception.hpp"
 #include "localization.hpp"
 #include "utils.hpp"

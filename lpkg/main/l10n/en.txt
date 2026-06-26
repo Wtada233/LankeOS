@@ -202,3 +202,13 @@ man.info_name=Name
 man.info_version=Version
 man.info_build_date=Build date
 info.auto_generated_man=No man page specified, auto-generated one for {}
+
+# depend command
+info.depend_desc=  depend <remove|abibreak|install> <pkg>...  Analyze dependency trees
+help.depend_all=Show all packages in the dependency tree, including unchanged ones
+error.depend_need_subcmd=The depend command requires a subcommand: remove, abibreak, or install.
+error.depend_need_pkg=depend requires at least one package name.
+error.depend_unknown_subcmd=Unknown depend subcommand: {}. Use remove, abibreak, or install.
+info.depend_remove_header=Dependency removal scan for '{}':
+info.depend_abibreak_header=ABI breakage scan for '{}':
+info.depend_install_header=Dependency install scan for '{}':

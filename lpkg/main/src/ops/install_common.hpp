@@ -1,15 +1,15 @@
 #pragma once
 
 #include "package_manager.hpp"
-#include "repository.hpp"
+#include "core/repository.hpp"
 #include "archive.hpp"
-#include "constants.hpp"
-#include "config.hpp"
-#include "cache.hpp"
-#include "exception.hpp"
-#include "localization.hpp"
-#include "version.hpp"
-#include "utils.hpp"
+#include "core/constants.hpp"
+#include "core/config.hpp"
+#include "core/cache.hpp"
+#include "core/exception.hpp"
+#include "core/localization.hpp"
+#include "core/version.hpp"
+#include "core/utils.hpp"
 #include "nlohmann/json.hpp"
 
 #include <filesystem>

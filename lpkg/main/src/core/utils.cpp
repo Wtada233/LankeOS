@@ -1,5 +1,5 @@
 #include "utils.hpp"
-#include "strip.hpp"
+#include "ops/strip.hpp"
 
 #include "config.hpp"
 #include "exception.hpp"

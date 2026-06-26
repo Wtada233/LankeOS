@@ -6,7 +6,7 @@
 #include <map>
 #include <filesystem>
 
-#include "repository.hpp"
+#include "core/repository.hpp"
 
 // Install plan: a resolved package ready to be installed
 struct InstallPlan {

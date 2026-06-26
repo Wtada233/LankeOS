@@ -7,7 +7,7 @@
 #include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
-#include "../main/src/packer.hpp"
+#include "../main/src/ops/packer.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;

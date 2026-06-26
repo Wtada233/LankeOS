@@ -84,6 +84,7 @@ namespace constants {
     inline constexpr std::string_view CMD_PACK = "pack";
     inline constexpr std::string_view CMD_BUILD = "build";
     inline constexpr std::string_view CMD_SCAN = "scan";
+    inline constexpr std::string_view CMD_DEPEND = "depend";
 
     // Default Values
     inline constexpr std::string_view DEFAULT_PACK_SOURCE = "/tmp/lankepkg";

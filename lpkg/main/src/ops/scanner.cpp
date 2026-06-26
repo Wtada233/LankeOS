@@ -1,8 +1,8 @@
 #include "scanner.hpp"
-#include "cache.hpp"
-#include "config.hpp"
-#include "utils.hpp"
-#include "localization.hpp"
+#include "core/cache.hpp"
+#include "core/config.hpp"
+#include "core/utils.hpp"
+#include "core/localization.hpp"
 #include <filesystem>
 #include <iostream>
 #include <vector>
