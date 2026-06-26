@@ -24,7 +24,7 @@
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-// ===== InstallationTask Implementation =====
+// ===== InstallationTask 实现 =====
 
 InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install,
                                    std::string old_version_to_replace, fs::path local_package_path,
@@ -38,6 +38,10 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version, bo
       expected_hash_(std::move(expected_hash)),
       force_reinstall_(force_reinstall) {}
 
+/**
+ * 执行完整的安装流程：下载验证 -> 解压提取 -> 依赖检查 -> 文件冲突检测 -> 复制文件 -> 注册包 -> 运行钩子
+ * 安装过程中的任何异常都会触发回滚操作，清理已安装的文件
+ */
 void InstallationTask::run(InstallContext* ctx) {
     const std::string current_installed_version = Cache::instance().get_installed_version(pkg_name_);
     if (!force_reinstall_ && !current_installed_version.empty() && current_installed_version == actual_version_) {
@@ -58,6 +62,7 @@ void InstallationTask::run(InstallContext* ctx) {
     log_info(string_format("info.package_installed_successfully", pkg_name_));
 }
 
+/** 准备阶段：下载并验证包、解压、检查依赖和文件冲突 */
 void InstallationTask::prepare(InstallContext* ctx) {
     download_and_verify_package();
     extract_and_validate_package();
@@ -67,6 +72,10 @@ void InstallationTask::prepare(InstallContext* ctx) {
     check_for_file_conflicts();
 }
 
+/**
+ * 回滚机制：安装失败时清理已安装的文件
+ * 按逆序执行：删除已复制的新文件 -> 恢复备份的旧文件 -> 删除新建的空目录
+ */
 void InstallationTask::rollback_files() {
     log_error(string_format("error.rollback_install", pkg_name_));
     for (const auto& file : installed_files_) {
@@ -89,6 +98,9 @@ void InstallationTask::rollback_files() {
     }
 }
 
+/**
+ * 提交安装：复制文件 -> 注册包 -> 移除旧版本遗留的过时文件 -> 清理备份 -> 运行 post-install 钩子
+ */
 void InstallationTask::commit() {
     std::unordered_set<std::string> old_files;
     if (!old_version_to_replace_.empty()) {
@@ -100,6 +112,7 @@ void InstallationTask::commit() {
     try {
         register_package();
 
+        // 移除新版本中不再包含的旧文件（但不处理 /etc 下的配置文件）
         if (!old_files.empty()) {
             const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
             auto new_files = detail::scan_content_files(content_dir);
@@ -128,6 +141,7 @@ void InstallationTask::commit() {
         }
     } catch (...) { throw; }
 
+    // 清理备份文件
     for (const auto& [physical, backup] : backups_) {
         std::error_code ec;
         fs::remove(backup, ec);
@@ -136,6 +150,11 @@ void InstallationTask::commit() {
     run_post_install_hook();
 }
 
+/**
+ * 下载并验证包文件
+ * 如果是本地包文件，直接使用并校验 SHA256 哈希
+ * 如果是从仓库安装，从镜像 URL 下载并校验
+ */
 void InstallationTask::download_and_verify_package() {
     if (!local_package_path_.empty()) {
         if (!fs::exists(local_package_path_))
@@ -150,6 +169,7 @@ void InstallationTask::download_and_verify_package() {
     const std::string mirror_url = Config::instance().get_mirror_url();
     const std::string arch = Config::instance().get_architecture();
 
+    // 未指定版本时从仓库索引获取最新版本和哈希
     if (actual_version_.empty() || actual_version_ == constants::VER_LATEST) {
         Repository repo;
         repo.load_index();
@@ -171,6 +191,7 @@ void InstallationTask::download_and_verify_package() {
         throw LpkgException(string_format("error.hash_mismatch", pkg_name_));
 }
 
+/** 解压包文件到临时目录，验证包结构完整性（metadata + content 目录），读取元数据 */
 void InstallationTask::extract_and_validate_package() {
     log_info(get_string("info.extracting_to_tmp"));
     extract_tar_zst(archive_path_, tmp_pkg_dir_);
@@ -187,6 +208,11 @@ void InstallationTask::extract_and_validate_package() {
     }
 }
 
+/**
+ * 确保包的所有依赖已满足
+ * 对缺失的依赖进行递归解析，检查本地已安装包和仓库中的包
+ * 支持通过 providers 查找虚拟包提供者
+ */
 void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
     auto actual_deps = detail::parse_dep_strings(deps_);
     if (actual_deps.empty()) return;
@@ -217,6 +243,7 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
         std::set<std::string> vs;
         detail::resolve_package_dependencies(dep_name, req_ver, false, ctx, vs);
 
+        // 检查虚拟包提供者和 targets 中的候选包
         if (!ctx.plan.contains(dep_name)) {
             auto providers = Cache::instance().get_providers(dep_name);
             if (!providers.empty()) continue;
@@ -267,12 +294,16 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
     }
 }
 
+/**
+ * 检查包文件与已安装文件的冲突
+ * 检测未被任何包管理的文件（第三方手动安装）以及被其他包占用的文件
+ * 配置文件冲突会在复制阶段使用 .lpkg-new 后缀处理
+ */
 void InstallationTask::check_for_file_conflicts() {
     std::map<std::string, std::string> conflicts;
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
     auto files = detail::scan_content_files(content_dir);
     auto& cache = Cache::instance();
-    // force_overwrite is read inline via Config::instance().force_overwrite_mode()
 
     for (const auto& f : files) {
         fs::path rel_f = f;
@@ -306,6 +337,11 @@ void InstallationTask::check_for_file_conflicts() {
     }
 }
 
+/**
+ * 将包文件复制到系统根目录
+ * 处理配置文件冲突（使用 .lpkg-new 后缀）、替换已存在文件时创建备份、
+ * 保留文件权限和所有者信息
+ */
 void InstallationTask::copy_package_files() {
     log_info(get_string("info.copying_files"));
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
@@ -319,6 +355,7 @@ void InstallationTask::copy_package_files() {
 
         if (!fs::exists(src_path) && !fs::is_symlink(src_path)) continue;
 
+        // 递归创建父目录
         fs::path parent = physical_path.parent_path();
         std::vector<fs::path> to_create;
         while (!parent.empty() && !fs::exists(parent)) {
@@ -345,12 +382,14 @@ void InstallationTask::copy_package_files() {
             const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
             fs::path final_dest = physical_path;
 
+            // 配置文件冲突：使用 .lpkg-new 后缀
             if (is_config && fs::exists(physical_path) && !fs::is_directory(physical_path)) {
                 final_dest += std::string(constants::SUFFIX_LPKG_NEW);
                 if (fs::exists(final_dest) || fs::is_symlink(final_dest)) fs::remove(final_dest);
                 log_warning(string_format("warning.config_conflict", physical_path.string(), final_dest.string()));
                 has_config_conflicts_ = true;
             } else if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
+                // 替换已存在文件前先创建备份
                 if (!fs::is_directory(physical_path)) {
                     fs::path bak = physical_path;
                     bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
@@ -368,6 +407,7 @@ void InstallationTask::copy_package_files() {
                          fs::copy_options::recursive | fs::copy_options::overwrite_existing);
             }
 
+            // 保留原始文件权限和所有者
             struct stat st;
             if (lstat(src_path.c_str(), &st) == 0) {
                 (void)lchown(final_dest.c_str(), st.st_uid, st.st_gid);
@@ -386,9 +426,15 @@ void InstallationTask::copy_package_files() {
     if (has_config_conflicts_) log_warning(get_string("info.config_review_reminder"));
 }
 
+/**
+ * 在包管理数据库中注册已安装的包
+ * 记录包文件与所有者的映射、依赖关系、provides、man 页面和版本信息
+ * 处理包升级时的旧数据清理（移除旧的逆向依赖和 provides）
+ */
 void InstallationTask::register_package() {
     auto& cache = Cache::instance();
 
+    // 升级时清理旧的逆向依赖和 provides 记录
     if (!old_version_to_replace_.empty()) {
         const fs::path old_dep_file = Config::instance().dep_dir() / pkg_name_;
         if (fs::exists(old_dep_file)) {
@@ -435,6 +481,7 @@ void InstallationTask::register_package() {
     cache.add_installed(pkg_name_, actual_version_, explicit_install_);
 }
 
+/** 复制包的 hooks 目录到系统 hooks 目录，赋予执行权限，然后运行 post-install 钩子 */
 void InstallationTask::run_post_install_hook() {
     const fs::path hook_src = tmp_pkg_dir_ / constants::DIR_HOOKS;
     if (!fs::exists(hook_src) || !fs::is_directory(hook_src)) return;

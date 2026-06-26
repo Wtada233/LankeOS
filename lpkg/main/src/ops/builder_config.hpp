@@ -4,19 +4,24 @@
 #include <vector>
 #include <filesystem>
 
-// =====================================================================
-// BuildConfig — metadata extracted from LankeBUILD.json
-// =====================================================================
+/**
+ * @brief BuildConfig — 从 LankeBUILD.json 中提取的构建元数据
+ */
 struct BuildConfig {
-    std::string name;
-    std::string version;
-    std::vector<std::string> sources;
-    std::vector<std::string> work_sources;
-    bool no_strip = false;
-    std::vector<std::string> deps;
-    std::vector<std::string> provides;
-    std::string man_content;
+    std::string name;                     ///< 包名
+    std::string version;                  ///< 版本号
+    std::vector<std::string> sources;     ///< 源码包下载地址列表
+    std::vector<std::string> work_sources;///< 工作区源码路径列表
+    bool no_strip = false;                ///< 是否禁用 strip
+    std::vector<std::string> deps;        ///< 构建依赖
+    std::vector<std::string> provides;    ///< 提供的虚拟包
+    std::string man_content;              ///< 帮助文档内容
 };
 
-// Parse a LankeBUILD.json file.  Throws LpkgException on failure.
+/**
+ * @brief 解析 LankeBUILD.json 文件
+ * @param json_path JSON 文件路径
+ * @return 解析后的 BuildConfig 结构体
+ * @throws LpkgException 解析失败时抛出
+ */
 BuildConfig parse_build_config(const std::filesystem::path& json_path);

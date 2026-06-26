@@ -15,7 +15,7 @@
 
 namespace fs = std::filesystem;
 
-// HTTP download callback function (modern C++)
+/** HTTP 下载回调函数，将 curl 接收到的数据写入 ostream 输出流 */
 size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
     std::ostream* out = static_cast<std::ostream*>(stream);
     size_t bytes = size * nmemb;
@@ -23,7 +23,7 @@ size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream) {
     return out->good() ? bytes : 0;
 }
 
-// Download progress bar callback
+/** 下载进度回调函数，计算并显示下载百分比进度 */
 int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_off_t dlnow, [[maybe_unused]] curl_off_t ultotal, [[maybe_unused]] curl_off_t ulnow) {
     if (dltotal <= 0) {
         return 0;
@@ -33,7 +33,7 @@ int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_o
     return 0;
 }
 
-// Custom deleter for the CURL handle
+/** CURL 句柄的自定义删除器，用于智能指针自动清理 */
 struct CurlDeleter {
     void operator()(CURL* curl) const {
         if (curl) {
@@ -43,7 +43,7 @@ struct CurlDeleter {
 };
 using CurlHandle = std::unique_ptr<CURL, CurlDeleter>;
 
-// Function to find system CA certificate bundle
+/** 查找系统 CA 证书包路径，依次检测常见发行版的证书文件位置 */
 const char* find_ca_bundle() {
     static constexpr std::array paths = {
         std::string_view{"/etc/ssl/certs/ca-certificates.crt"},     // Debian/Ubuntu/Arch/Alpine
@@ -60,6 +60,7 @@ const char* find_ca_bundle() {
     return nullptr;
 }
 
+/** 下载单个文件，支持进度条显示和 CA 证书验证，失败时抛出异常 */
 void download_file(const std::string& url, const fs::path& output_path, bool show_progress) {
     CurlHandle curl(curl_easy_init());
     if (!curl) {
@@ -76,15 +77,15 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
     curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &ofile);
     curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl.get(), CURLOPT_FAILONERROR, 1L);
-    
-    // Set CA bundle path if found
+
+    // 如果找到 CA 证书包则设置
     if (const char* ca_path = find_ca_bundle()) {
         curl_easy_setopt(curl.get(), CURLOPT_CAINFO, ca_path);
     }
 
-    curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT, 10L); // 10 seconds to connect
-    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_LIMIT, 100L); // 100 bytes/sec
-    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_TIME, 30L); // for 30 seconds before timing out
+    curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT, 10L); // 连接超时 10 秒
+    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_LIMIT, 100L); // 最低速度限制 100 字节/秒
+    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_TIME, 30L); // 持续低于最低速度 30 秒则超时
 
     if (show_progress) {
         curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
@@ -105,17 +106,18 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
     }
 }
 
+/** 带重试机制的下载函数，最多重试 max_retries 次，每次失败后清理临时文件 */
 void download_with_retries(const std::string& url, const fs::path& output_path, int max_retries, bool show_progress) {
     for (int i = 0; i < max_retries; ++i) {
         try {
             download_file(url, output_path, show_progress);
-            return; // Success
+            return;
         } catch (const LpkgException& e) {
-            fs::remove(output_path); // Clean up failed download
+            fs::remove(output_path); // 清理失败的下载文件
             if (i < max_retries - 1) {
                 log_warning(string_format("info.retrying", e.what()));
             } else {
-                throw; // Rethrow on last attempt
+                throw; // 最后一次重试失败，向上抛出异常
             }
         }
     }

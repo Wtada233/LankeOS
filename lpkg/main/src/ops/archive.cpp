@@ -11,7 +11,7 @@
 
 namespace fs = std::filesystem;
 
-// Custom deleters for libarchive handles
+/** libarchive 读取句柄的自定义删除器 */
 struct ArchiveReadDeleter {
     void operator()(struct archive* a) const {
         if (a) {
@@ -21,6 +21,7 @@ struct ArchiveReadDeleter {
     }
 };
 
+/** libarchive 写入句柄的自定义删除器 */
 struct ArchiveWriteDeleter {
     void operator()(struct archive* a) const {
         if (a) {
@@ -33,24 +34,29 @@ struct ArchiveWriteDeleter {
 using ArchiveReadHandle = std::unique_ptr<struct archive, ArchiveReadDeleter>;
 using ArchiveWriteHandle = std::unique_ptr<struct archive, ArchiveWriteDeleter>;
 
+/**
+ * 解压 tar.zst 归档文件到目标目录
+ * 包含安全检查：路径穿越防护、符号链接权限修复、硬链接/软链接目标重映射
+ * 每解压 100 个文件输出一次进度
+ */
 void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     ArchiveReadHandle a(archive_read_new());
     archive_read_support_filter_all(a.get());
     archive_read_support_format_all(a.get());
 
     ArchiveWriteHandle ext(archive_write_disk_new());
-    archive_write_disk_set_options(ext.get(), 
-        ARCHIVE_EXTRACT_TIME | 
-        ARCHIVE_EXTRACT_PERM | 
-        ARCHIVE_EXTRACT_OWNER | 
-        ARCHIVE_EXTRACT_ACL | 
-        ARCHIVE_EXTRACT_FFLAGS | 
-        ARCHIVE_EXTRACT_SECURE_SYMLINKS | 
-        ARCHIVE_EXTRACT_SECURE_NODOTDOT | 
+    archive_write_disk_set_options(ext.get(),
+        ARCHIVE_EXTRACT_TIME |
+        ARCHIVE_EXTRACT_PERM |
+        ARCHIVE_EXTRACT_OWNER |
+        ARCHIVE_EXTRACT_ACL |
+        ARCHIVE_EXTRACT_FFLAGS |
+        ARCHIVE_EXTRACT_SECURE_SYMLINKS |
+        ARCHIVE_EXTRACT_SECURE_NODOTDOT |
         ARCHIVE_EXTRACT_UNLINK
     );
-    // REMOVED: archive_write_disk_set_standard_lookup(ext.get());
-    // This function can cause segfaults in static binaries due to NSS issues in chroot.
+    // 已移除：archive_write_disk_set_standard_lookup(ext.get());
+    // 该函数在静态链接的 chroot 环境下因 NSS 问题可能导致段错误
 
     if (archive_read_open_filename(a.get(), archive_path.c_str(), 10240) != ARCHIVE_OK) {
         const char* err = archive_error_string(a.get());
@@ -74,7 +80,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
         const char* current_path = archive_entry_pathname(entry);
         if (!current_path) continue;
 
-        // SECURITY: Path traversal vulnerability mitigation.
+        // 安全防护：路径穿越攻击防护，校验路径是否合法
         fs::path dest_path;
         try {
             dest_path = validate_path(current_path, output_dir);
@@ -84,29 +90,29 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
 
         archive_entry_set_pathname(entry, dest_path.c_str());
 
-        // FIX: Linux doesn't have lchmod. libarchive might try to use chmod on symlinks,
-        // which follows the link and corrupts the target file's permissions (e.g. sudo becomes 777).
+        // 修复：Linux 没有 lchmod，libarchive 可能会对符号链接使用 chmod，
+        // 这会导致跟随链接并破坏目标文件的权限（例如 sudo 变为 777）
         if (archive_entry_filetype(entry) == AE_IFLNK) {
             archive_entry_set_perm(entry, 0);
         }
 
-        // Remap hardlink and symlink targets if they exist
+        // 重映射硬链接和符号链接目标路径
         const char* hardlink = archive_entry_hardlink(entry);
         if (hardlink) {
             try {
                 fs::path link_dest = validate_path(hardlink, output_dir);
                 archive_entry_set_hardlink(entry, link_dest.c_str());
             } catch (...) {
-                archive_entry_set_hardlink(entry, nullptr); // Drop malicious/invalid links
+                archive_entry_set_hardlink(entry, nullptr); // 丢弃恶意或无效的链接
             }
         }
 
         const char* symlink = archive_entry_symlink(entry);
         if (symlink) {
             try {
-                // For symlinks, we only remap if they are absolute. 
-                // Relative symlinks are usually package-internal and should be left alone
-                // unless they point outside via ../, which validate_path handles.
+                // 对于符号链接，仅当目标为绝对路径时进行重映射。
+                // 相对路径的符号链接通常是包内部引用，不应修改，
+                // 除非它们通过 ../ 指向外部（validate_path 会处理此情况）
                 if (fs::path(symlink).is_absolute()) {
                     fs::path link_dest = validate_path(symlink, output_dir);
                     archive_entry_set_symlink(entry, link_dest.c_str());
@@ -138,7 +144,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
                     log_warning(archive_error_string(a.get()));
                     break;
                 }
-                
+
                 if (archive_write_data_block(ext.get(), buff, size, offset) < ARCHIVE_OK) {
                     const char* err = archive_error_string(ext.get());
                     throw LpkgException(string_format("error.extract_failed", archive_path.string()) + ": " + (err ? err : get_string("error.data_block_write")));
@@ -155,6 +161,10 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
     log_info(string_format("info.extract_complete", count));
 }
 
+/**
+ * 从归档文件中提取指定路径的内部文件内容并返回字符串
+ * 自动去除路径前缀 "./"，当文件不存在时返回空字符串
+ */
 std::string extract_file_from_archive(const fs::path& archive_path, const std::string& internal_path) {
     ArchiveReadHandle a(archive_read_new());
     archive_read_support_filter_all(a.get());
@@ -167,7 +177,7 @@ std::string extract_file_from_archive(const fs::path& archive_path, const std::s
     struct archive_entry* entry;
     while (archive_read_next_header(a.get(), &entry) == ARCHIVE_OK) {
         std::string path = archive_entry_pathname(entry);
-        // Remove leading ./ if present
+        // 去除开头的 ./ 前缀
         if (path.starts_with(constants::CURRENT_DIR_PREFIX)) path = path.substr(constants::CURRENT_DIR_PREFIX.length());
 
         if (path == internal_path) {

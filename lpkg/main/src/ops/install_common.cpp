@@ -10,6 +10,7 @@ using json = nlohmann::json;
 
 namespace detail {
 
+/** 从 lpkg 归档文件中读取 metadata.json 并解析为 JSON 对象 */
 json read_archive_metadata(const fs::path& archive_path) {
     std::string meta_json = extract_file_from_archive(
         archive_path, std::string(constants::PKG_METADATA_FILE));
@@ -19,6 +20,10 @@ json read_archive_metadata(const fs::path& archive_path) {
     return json::parse(meta_json);
 }
 
+/**
+ * 执行包的钩子脚本（如 post-install、pre-remove）
+ * 支持 chroot 环境下运行，使用 mount namespace 隔离
+ */
 void run_hook(std::string_view pkg_name, std::string_view hook_name) {
     if (Config::instance().no_hooks_mode()) return;
 
@@ -45,6 +50,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
     if (pid == -1) return;
     if (pid == 0) {
         if (use_chroot) {
+            // 创建独立的 mount namespace，避免影响主机挂载
             if (unshare(CLONE_NEWNS) != 0) _exit(1);
             mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr);
             if (chroot(Config::instance().root_dir().c_str()) != 0) _exit(1);
@@ -67,6 +73,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
     }
 }
 
+/** 从已解压的包目录读取 metadata.json，提取包名、版本、依赖等信息 */
 void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::string& version,
                            std::vector<std::string>& deps, std::vector<std::string>& provides,
                            std::string& man) {
@@ -84,6 +91,7 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
     man = meta.value(std::string(constants::J_MAN), "");
 }
 
+/** 扫描包内容目录，返回所有文件（非目录）的相对路径列表 */
 std::vector<std::string> scan_content_files(const fs::path& content_dir) {
     std::vector<std::string> files;
     for (const auto& entry : fs::recursive_directory_iterator(content_dir)) {
@@ -93,6 +101,7 @@ std::vector<std::string> scan_content_files(const fs::path& content_dir) {
     return files;
 }
 
+/** 解析依赖字符串列表为 DependencyInfo 结构体，提取包名、运算符和版本要求 */
 std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& dep_strs) {
     std::vector<DependencyInfo> deps;
     for (const auto& d_str : dep_strs) {
@@ -107,6 +116,11 @@ std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& de
     return deps;
 }
 
+/**
+ * 递归解析包依赖关系，构建安装计划
+ * 支持版本约束、虚拟包提供、循环依赖检测
+ * 检查本地缓存、本地包文件和远程仓库中的包信息
+ */
 void resolve_package_dependencies(const std::string& pkg_name, const std::string& version_spec,
                                   bool is_explicit, InstallContext& ctx,
                                   std::set<std::string>& visited_stack) {
@@ -125,6 +139,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     std::vector<DependencyInfo> deps;
     std::vector<std::string> provides;
 
+    // 优先检查本地包文件候选
     if (auto it = ctx.local_candidates.find(pkg_name); it != ctx.local_candidates.end()) {
         local_path = it->second;
         json meta = read_archive_metadata(local_path);
@@ -141,9 +156,11 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         }
         provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
     } else {
+        // 从远程仓库查找
         auto pkg_info = (version_spec == constants::VER_LATEST) ? ctx.repo.find_package(pkg_name)
                          : ctx.repo.find_package(pkg_name, version_spec);
         if (!pkg_info) {
+            // 检查是否有其他包提供此虚拟包名
             if (auto prov = ctx.repo.find_provider(pkg_name)) {
                 resolve_package_dependencies(prov->name, prov->version, is_explicit, ctx, visited_stack);
                 return;
@@ -159,6 +176,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
 
     if (latest_version.empty()) latest_version = std::string(constants::VER_DEFAULT);
 
+    // 检查是否需要安装/升级（非强制重装时跳过已安装的包）
     if (!ctx.force_reinstall || !is_explicit) {
         if (!is_explicit && !installed_version.empty() && !version_compare(installed_version, latest_version)) return;
         if (is_explicit && !installed_version.empty() && installed_version == latest_version) return;
@@ -171,6 +189,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         .provides = provides, .force_reinstall = (ctx.force_reinstall && is_explicit)
     };
 
+    // 递归解析子依赖
     if (!Config::instance().no_deps_mode()) {
         for (const auto& dep : deps) {
             const std::string idv = Cache::instance().get_installed_version(dep.name);
@@ -190,6 +209,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
                 resolve_package_dependencies(dep.name, req_ver, false, ctx, visited_stack);
             }
 
+            // 验证候选版本满足依赖版本约束
             std::string cand_v = ctx.plan.contains(dep.name) ? ctx.plan[dep.name].actual_version
                                 : Cache::instance().get_installed_version(dep.name);
             if (!dep.op.empty() && !cand_v.empty() && cand_v != "virtual" && !version_satisfies(cand_v, dep.op, dep.version_req))
@@ -201,6 +221,11 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     visited_stack.erase(pkg_name);
 }
 
+/**
+ * 检查安装计划与已安装包的兼容性
+ * 检测是否有已安装的包依赖于即将被升级/替换的包版本，且新版本不满足其版本约束
+ * 返回被破坏的包名集合
+ */
 std::set<std::string> check_plan_consistency(const std::map<std::string, InstallPlan>& plan) {
     std::set<std::string> broken;
     auto& cache = Cache::instance();
@@ -226,6 +251,10 @@ std::set<std::string> check_plan_consistency(const std::map<std::string, Install
     return broken;
 }
 
+/**
+ * 获取所有必需包的集合（被明确标记为 held 的包及其传递依赖）
+ * 用于 autoremove 判断哪些包可以安全移除
+ */
 std::unordered_set<std::string> get_all_required_packages() {
     auto& cache = Cache::instance();
     std::unordered_set<std::string> req;

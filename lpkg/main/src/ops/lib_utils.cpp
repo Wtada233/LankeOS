@@ -8,6 +8,11 @@
 
 namespace fs = std::filesystem;
 
+/**
+ * 从 ELF 共享库文件中读取 DT_SONAME 字段
+ * 遍历 .dynamic 节区查找 DT_SONAME 条目，返回其字符串值
+ * 如果文件不是 ELF 格式或没有 SONAME，返回空字符串
+ */
 std::string get_elf_soname(const fs::path& path) {
     int fd = open(path.c_str(), O_RDONLY);
     if (fd < 0) return "";
@@ -20,7 +25,7 @@ std::string get_elf_soname(const fs::path& path) {
     while ((scn = elf_nextscn(elf, scn)) != nullptr) {
         GElf_Shdr shdr;
         if (gelf_getshdr(scn, &shdr) == nullptr) continue;
-        
+
         if (shdr.sh_type == SHT_DYNAMIC) {
             Elf_Data* data = elf_getdata(scn, nullptr);
             if (data) {
@@ -43,6 +48,10 @@ std::string get_elf_soname(const fs::path& path) {
     return soname;
 }
 
+/**
+ * 扫描指定库目录中的 ELF 共享库文件，为每个文件创建 SONAME 符号链接
+ * 仅当目标链接不存在时才创建，避免覆盖用户已存在的文件
+ */
 void apply_soname_links(const fs::path& lib_dir) {
     if (!fs::exists(lib_dir) || !fs::is_directory(lib_dir)) return;
 
@@ -52,12 +61,12 @@ void apply_soname_links(const fs::path& lib_dir) {
         std::string soname = get_elf_soname(entry.path());
         if (!soname.empty()) {
             fs::path link_path = lib_dir / soname;
-            // Create symlink only if it doesn't exist to avoid conflict with existing proper files
+            // 仅在链接不存在时创建，避免与已存在的文件冲突
             if (!fs::exists(link_path) && !fs::is_symlink(link_path)) {
                 try {
                     fs::create_symlink(entry.path().filename(), link_path);
                 } catch (...) {
-                    // Ignore errors during symlink creation
+                    // 忽略符号链接创建过程中的错误
                 }
             }
         }
