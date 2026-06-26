@@ -2,6 +2,7 @@
 
 #include <string>
 #include <filesystem>
+#include <mutex>
 
 /**
  * 非交互模式枚举
@@ -69,27 +70,27 @@ public:
     /** 获取非交互模式设置 */
     NonInteractiveMode non_interactive_mode() const noexcept { return non_interactive_mode_; }
     /** 设置非交互模式 */
-    void set_non_interactive_mode(NonInteractiveMode m) noexcept { non_interactive_mode_ = m; }
+    void set_non_interactive_mode(NonInteractiveMode m) noexcept;
 
     /** 是否强制覆盖文件 */
     bool force_overwrite_mode() const noexcept { return force_overwrite_mode_; }
     /** 设置强制覆盖模式 */
-    void set_force_overwrite_mode(bool v) noexcept { force_overwrite_mode_ = v; }
+    void set_force_overwrite_mode(bool v) noexcept;
 
     /** 是否禁用钩子 */
     bool no_hooks_mode() const noexcept { return no_hooks_mode_; }
     /** 设置禁用钩子模式 */
-    void set_no_hooks_mode(bool v) noexcept { no_hooks_mode_ = v; }
+    void set_no_hooks_mode(bool v) noexcept;
 
     /** 是否跳过依赖处理 */
     bool no_deps_mode() const noexcept { return no_deps_mode_; }
     /** 设置跳过依赖模式 */
-    void set_no_deps_mode(bool v) noexcept { no_deps_mode_ = v; }
+    void set_no_deps_mode(bool v) noexcept;
 
     /** 是否测试模式（用于构建测试） */
     bool testing_mode() const noexcept { return testing_mode_; }
     /** 设置测试模式 */
-    void set_testing_mode(bool v) noexcept { testing_mode_ = v; }
+    void set_testing_mode(bool v) noexcept;
 
     // --- 操作方法 ---------------------------------------------------------
 
@@ -144,4 +145,6 @@ private:
 
     /** 重新计算所有派生路径 */
     void rebase_paths();
+
+    mutable std::mutex config_mutex_;
 };

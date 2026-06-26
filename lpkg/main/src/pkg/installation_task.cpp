@@ -109,7 +109,7 @@ void InstallationTask::commit() {
 
     copy_package_files();
 
-    try {
+    {
         register_package();
 
         // 移除新版本中不再包含的旧文件（但不处理 /etc 下的配置文件）
@@ -139,7 +139,7 @@ void InstallationTask::commit() {
                 }
             }
         }
-    } catch (...) { throw; }
+    }
 
     // 清理备份文件
     for (const auto& [physical, backup] : backups_) {

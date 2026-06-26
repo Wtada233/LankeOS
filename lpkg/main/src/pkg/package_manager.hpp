@@ -4,6 +4,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <unordered_set>
 #include <filesystem>
 
 #include "repo/repository.hpp"
@@ -29,6 +30,7 @@ struct InstallContext {
     bool force_reinstall;
     bool top_level;                                            ///< 是否为顶级调用（非递归子调用）
     std::vector<std::string> successfully_installed;           ///< 当前事务中已成功安装的包
+    std::unordered_set<std::string> installed_set{};           ///< 与 successfully_installed 同步，用于 O(1) 成员检查
 };
 
 class InstallationTask {

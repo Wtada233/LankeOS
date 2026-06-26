@@ -234,7 +234,6 @@ int main(int argc, char* argv[]) {
 
         // --- 其他选项 ---
         options.add_options(get_string("help.group_other"))
-            ("testing", get_string("help.testing"), cxxopts::value<bool>()->default_value("false"))
             ("all", get_string("help.depend_all"), cxxopts::value<bool>()->default_value("false"))
             ;
 
@@ -266,8 +265,6 @@ int main(int argc, char* argv[]) {
             Config::instance().set_no_hooks_mode(result["no-hooks"].as<bool>());
         if (result.count("no-deps"))
             Config::instance().set_no_deps_mode(result["no-deps"].as<bool>());
-        if (result.count("testing"))
-            Config::instance().set_testing_mode(result["testing"].as<bool>());
         if (result.count("root"))
             Config::instance().set_root_path(result["root"].as<std::string>());
         if (result.count("arch"))

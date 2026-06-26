@@ -171,6 +171,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
     //   3. 匹配 → 执行 InstallationTask::run()（解压 → 依赖检查 → 冲突检测 → 写文件）
     // 任何安装异常触发部分回滚：逆序移除已成功安装的包
     ctx.successfully_installed.clear();
+    ctx.installed_set.clear();
     try {
         install_packages_internal(ctx);
     } catch (const std::exception& e) {
@@ -199,9 +200,7 @@ void install_packages_internal(InstallContext& ctx) {
         const std::string& n = ctx.install_order[i];
         ++i;
 
-        if (std::find(ctx.successfully_installed.begin(),
-                      ctx.successfully_installed.end(), n)
-            != ctx.successfully_installed.end()) {
+        if (ctx.installed_set.contains(n)) {
             continue;
         }
 
@@ -259,6 +258,7 @@ void install_packages_internal(InstallContext& ctx) {
                     try { remove_package(done_name, true); } catch (...) {}
                 }
                 ctx.successfully_installed.clear();
+                ctx.installed_set.clear();
 
                 ctx.plan.clear();
                 ctx.install_order.clear();
@@ -282,6 +282,7 @@ void install_packages_internal(InstallContext& ctx) {
         try {
             task.run(&ctx);
             ctx.successfully_installed.push_back(p.name);
+            ctx.installed_set.insert(p.name);
         } catch (const std::exception& e) {
             throw;
         }
