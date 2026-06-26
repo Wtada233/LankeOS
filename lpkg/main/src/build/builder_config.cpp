@@ -1,7 +1,7 @@
 #include "builder_config.hpp"
-#include "core/constants.hpp"
-#include "core/exception.hpp"
-#include "core/localization.hpp"
+#include "base/constants.hpp"
+#include "base/exception.hpp"
+#include "i18n/localization.hpp"
 #include "nlohmann/json.hpp"
 
 #include <fstream>

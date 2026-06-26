@@ -6,7 +6,7 @@
 #include <map>
 #include <filesystem>
 
-#include "core/repository.hpp"
+#include "repo/repository.hpp"
 
 /// 安装计划：已解析完毕、待安装的包
 struct InstallPlan {

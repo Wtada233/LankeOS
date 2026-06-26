@@ -42,7 +42,12 @@ INSTALL_DOCS_DIR = $(INSTALL_SHARE_DIR)/docs
 INSTALL_LOCK_DIR = $(DESTDIR)$(LOCALSTATEDIR)/lpkg
 
 # Common flags shared between production and test builds
-COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) -I$(APP_SRC_DIR)/core -I$(APP_SRC_DIR)/ops \
+COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \
+	-I$(APP_SRC_DIR)/base -I$(APP_SRC_DIR)/vercmp -I$(APP_SRC_DIR)/crypto \
+	-I$(APP_SRC_DIR)/config -I$(APP_SRC_DIR)/i18n -I$(APP_SRC_DIR)/db \
+	-I$(APP_SRC_DIR)/repo -I$(APP_SRC_DIR)/trigger \
+	-I$(APP_SRC_DIR)/pkg -I$(APP_SRC_DIR)/archive -I$(APP_SRC_DIR)/build \
+	-I$(APP_SRC_DIR)/elf -I$(APP_SRC_DIR)/scan \
            $(PKG_CFLAGS) \
            -DLPKG_CONF_DIR=\"$(INSTALL_CONF_DIR)\" \
            -DLPKG_L10N_DIR=\"$(INSTALL_L10N_DIR)\" \
@@ -55,7 +60,14 @@ COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$
 CXXFLAGS = $(COMMON_CXXFLAGS) -O2
 TEST_CXXFLAGS = $(COMMON_CXXFLAGS) -g
 
-MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp) $(wildcard $(APP_SRC_DIR)/core/*.cpp) $(wildcard $(APP_SRC_DIR)/ops/*.cpp)
+MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp) \
+	$(wildcard $(APP_SRC_DIR)/base/*.cpp) $(wildcard $(APP_SRC_DIR)/vercmp/*.cpp) \
+	$(wildcard $(APP_SRC_DIR)/crypto/*.cpp) $(wildcard $(APP_SRC_DIR)/config/*.cpp) \
+	$(wildcard $(APP_SRC_DIR)/i18n/*.cpp) $(wildcard $(APP_SRC_DIR)/db/*.cpp) \
+	$(wildcard $(APP_SRC_DIR)/repo/*.cpp) $(wildcard $(APP_SRC_DIR)/trigger/*.cpp) \
+	$(wildcard $(APP_SRC_DIR)/pkg/*.cpp) $(wildcard $(APP_SRC_DIR)/archive/*.cpp) \
+	$(wildcard $(APP_SRC_DIR)/build/*.cpp) $(wildcard $(APP_SRC_DIR)/elf/*.cpp) \
+	$(wildcard $(APP_SRC_DIR)/scan/*.cpp)
 TEST_SRCS = $(wildcard $(TESTS_DIR)/*.cpp)
 MAIN_OBJS = $(patsubst $(APP_SRC_DIR)/%.cpp,$(BUILD_DIR)/main/%.o,$(MAIN_SRCS))
 TEST_OBJS = $(patsubst $(TESTS_DIR)/%.cpp,$(BUILD_DIR)/tests/%.o,$(TEST_SRCS))

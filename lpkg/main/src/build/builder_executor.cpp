@@ -1,10 +1,10 @@
 #include "builder_executor.hpp"
 #include "downloader.hpp"
 #include "archive.hpp"
-#include "core/exception.hpp"
-#include "core/localization.hpp"
-#include "core/utils.hpp"
-#include "core/constants.hpp"
+#include "base/exception.hpp"
+#include "i18n/localization.hpp"
+#include "base/utils.hpp"
+#include "base/constants.hpp"
 
 #include <fstream>
 #include <array>

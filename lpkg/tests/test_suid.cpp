@@ -1,16 +1,16 @@
 #include <gtest/gtest.h>
-#include "../main/src/ops/package_manager.hpp"
-#include "../main/src/ops/packer.hpp"
-#include "../main/src/core/config.hpp"
-#include "../main/src/core/utils.hpp"
-#include "../main/src/core/localization.hpp"
-#include "../main/src/core/constants.hpp"
+#include "../main/src/pkg/package_manager.hpp"
+#include "../main/src/archive/packer.hpp"
+#include "../main/src/config/config.hpp"
+#include "../main/src/base/utils.hpp"
+#include "../main/src/i18n/localization.hpp"
+#include "../main/src/base/constants.hpp"
 #include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
 #include <sys/stat.h>
-#include "../main/src/ops/packer.hpp"
+#include "../main/src/archive/packer.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;

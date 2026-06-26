@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
-#include "../main/src/ops/depend_scanner.hpp"
-#include "../main/src/core/config.hpp"
-#include "../main/src/core/cache.hpp"
-#include "../main/src/core/localization.hpp"
+#include "../main/src/pkg/depend_scanner.hpp"
+#include "../main/src/config/config.hpp"
+#include "../main/src/db/cache.hpp"
+#include "../main/src/i18n/localization.hpp"
 
 #include <filesystem>
 #include <fstream>
