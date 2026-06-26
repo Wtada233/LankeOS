@@ -59,6 +59,13 @@ EOF
 
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    # 删除不必要的文件减小包体积
+    rm -rf {STAGING_ROOT}/usr/local/lib/rustlib/rustc-src
+    rm -rf {STAGING_ROOT}/usr/local/lib/rustlib/src
+    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/uninstall.sh
+    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/install.log
+    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/components
+    rm -rf {STAGING_ROOT}/usr/local/lib/rustlib/etc
+    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/rust-installer-version
+    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/manifest-*
 }

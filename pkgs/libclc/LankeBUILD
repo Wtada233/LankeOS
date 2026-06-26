@@ -1,0 +1,22 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    mkdir -p build-libclc
+}
+
+lankebuild_build() {
+    cd build-libclc
+
+    cmake -G Ninja ../libclc \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr
+
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+
+    install -Dm644 ../libclc/LICENSE.TXT {STAGING_ROOT}/usr/share/licenses/libclc/LICENSE
+}
+
+lankebuild_package() {
+    :
+}
