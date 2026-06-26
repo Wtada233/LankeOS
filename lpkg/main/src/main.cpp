@@ -59,6 +59,115 @@ void pre_operation_check(const cxxopts::ParseResult& result, std::function<void(
     }
 }
 
+// ── Command dispatch: called after options are parsed and config is ready ──
+static int handle_command(const std::string& command,
+                          const cxxopts::ParseResult& result,
+                          const std::string& hash_file,
+                          std::function<void()> usage)
+{
+    if (command == constants::CMD_INSTALL) {
+        pre_operation_check(result, usage, 1);
+        install_packages(result["packages"].as<std::vector<std::string>>(),
+                         hash_file, result["force"].as<bool>());
+        log_info(get_string("info.install_complete"));
+    } else if (command == constants::CMD_REMOVE) {
+        pre_operation_check(result, usage, 1);
+        for (const auto& pkg : result["packages"].as<std::vector<std::string>>()) {
+            remove_package(pkg, result["force"].as<bool>());
+            write_cache();
+        }
+        log_info(get_string("info.uninstall_complete"));
+    } else if (command == constants::CMD_AUTOREMOVE) {
+        pre_operation_check(result, usage, 0, 0);
+        autoremove();
+        write_cache();
+    } else if (command == constants::CMD_UPGRADE) {
+        pre_operation_check(result, usage, 0, 0);
+        upgrade_packages();
+        write_cache();
+    } else if (command == constants::CMD_REINSTALL) {
+        pre_operation_check(result, usage, 1);
+        for (const auto& pkg : result["packages"].as<std::vector<std::string>>())
+            reinstall_package(pkg);
+        write_cache();
+    } else if (command == constants::CMD_QUERY) {
+        pre_operation_check(result, usage, 1, 1);
+        std::string t = result["packages"].as<std::vector<std::string>>()[0];
+        if (result.count("pkg-query")) query_package(t);
+        else query_file(t);
+    } else if (command == constants::CMD_MAN) {
+        pre_operation_check(result, usage, 1, 1);
+        show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
+    } else if (command == constants::CMD_PACK) {
+        if (!result.count("output"))
+            throw LpkgException(get_string("error.pack_no_output"));
+        pack_package(result["output"].as<std::string>(),
+                     result["source"].as<std::string>(),
+                     result["pkg-name"].as<std::string>(),
+                     result["pkg-version"].as<std::string>());
+    } else if (command == constants::CMD_BUILD) {
+        std::string dir = ".";
+        if (result.count("packages"))
+            if (auto v = result["packages"].as<std::vector<std::string>>(); !v.empty())
+                dir = v[0];
+        run_build(fs::absolute(dir));
+    } else if (command == constants::CMD_DEPEND) {
+        auto args = result.count("packages")
+            ? result["packages"].as<std::vector<std::string>>()
+            : std::vector<std::string>{};
+        if (args.empty())
+            throw LpkgException(get_string("error.depend_need_subcmd"));
+
+        const std::string& sub = args[0];
+        bool all = result["all"].as<bool>();
+
+        auto check_pkg = [&]{
+            if (args.size() < 2) throw LpkgException(get_string("error.depend_need_pkg"));
+        };
+
+        if (sub == "remove") {
+            check_pkg();
+            for (size_t i = 1; i < args.size(); ++i) {
+                auto root = depscan::scan_remove_tree(args[i], all);
+                log_info(string_format("info.depend_remove_header", args[i]));
+                depscan::print_tree(root);
+                if (i + 1 < args.size()) std::cout << "\n";
+            }
+        } else if (sub == "abibreak") {
+            check_pkg();
+            for (size_t i = 1; i < args.size(); ++i) {
+                auto root = depscan::scan_abibreak_tree(args[i], all);
+                log_info(string_format("info.depend_abibreak_header", args[i]));
+                depscan::print_tree(root);
+                if (i + 1 < args.size()) std::cout << "\n";
+            }
+        } else if (sub == "install") {
+            check_pkg();
+            for (size_t i = 1; i < args.size(); ++i) {
+                fs::path p(args[i]);
+                auto root = (p.extension() == constants::EXT_LPKG || p.extension() == constants::EXT_ZST)
+                    ? depscan::scan_install_from_file(fs::absolute(p), all)
+                    : depscan::scan_install_tree(args[i], all);
+                log_info(string_format("info.depend_install_header", args[i]));
+                depscan::print_tree(root);
+                if (i + 1 < args.size()) std::cout << "\n";
+            }
+        } else {
+            throw LpkgException(string_format("error.depend_unknown_subcmd", sub));
+        }
+    } else if (command == constants::CMD_SCAN) {
+        std::string r;
+        if (result.count("packages"))
+            if (auto v = result["packages"].as<std::vector<std::string>>(); !v.empty())
+                r = v[0];
+        scan_orphans(r);
+    } else {
+        usage();
+        return 1;
+    }
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     CurlGlobalInitializer curl_initializer;
     try {
@@ -172,132 +281,8 @@ int main(int argc, char* argv[]) {
         }
 
         auto usage_printer = [&]() { print_usage(options); };
-
-        if (command == constants::CMD_INSTALL) {
-            pre_operation_check(result, usage_printer, 1);
-            const auto& packages = result["packages"].as<std::vector<std::string>>();
-            bool force = result["force"].as<bool>();
-            install_packages(packages, hash_file, force);
-            log_info(get_string("info.install_complete"));
-        } else if (command == constants::CMD_REMOVE) {
-            pre_operation_check(result, usage_printer, 1);
-            const auto& pkg_names = result["packages"].as<std::vector<std::string>>();
-            bool force = result["force"].as<bool>();
-            for (const auto& pkg_name : pkg_names) {
-                remove_package(pkg_name, force);
-                write_cache();
-            }
-            log_info(get_string("info.uninstall_complete"));
-        } else if (command == constants::CMD_AUTOREMOVE) {
-            pre_operation_check(result, usage_printer, 0, 0);
-            autoremove();
-            write_cache();
-        } else if (command == constants::CMD_UPGRADE) {
-            pre_operation_check(result, usage_printer, 0, 0);
-            upgrade_packages();
-            write_cache();
-        } else if (command == constants::CMD_REINSTALL) {
-            pre_operation_check(result, usage_printer, 1);
-            const auto& pkg_names = result["packages"].as<std::vector<std::string>>();
-            for (const auto& pkg_name : pkg_names) {
-                reinstall_package(pkg_name);
-            }
-            write_cache();
-        } else if (command == constants::CMD_QUERY) {
-            pre_operation_check(result, usage_printer, 1, 1);
-            std::string target = result["packages"].as<std::vector<std::string>>()[0];
-            if (result.count("pkg-query")) {
-                query_package(target);
-            } else {
-                query_file(target);
-            }
-        } else if (command == constants::CMD_MAN) {
-            pre_operation_check(result, usage_printer, 1, 1);
-            show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
-        } else if (command == constants::CMD_PACK) {
-            std::string output_file;
-            if (result.count("output")) {
-                 output_file = result["output"].as<std::string>();
-            } else {
-                 throw LpkgException(get_string("error.pack_no_output"));
-            }
-            std::string source_dir = result["source"].as<std::string>();
-            std::string pkg_name = result["pkg-name"].as<std::string>();
-            std::string pkg_version = result["pkg-version"].as<std::string>();
-            pack_package(output_file, source_dir, pkg_name, pkg_version);
-        } else if (command == constants::CMD_BUILD) {
-            std::string build_dir = ".";
-            if (result.count("packages")) {
-                auto pkgs = result["packages"].as<std::vector<std::string>>();
-                if (!pkgs.empty()) {
-                    build_dir = pkgs[0];
-                }
-            }
-            run_build(fs::absolute(build_dir));
-        } else if (command == constants::CMD_DEPEND) {
-            const auto& args = result.count("packages")
-                ? result["packages"].as<std::vector<std::string>>()
-                : std::vector<std::string>{};
-            if (args.empty())
-                throw LpkgException(get_string("error.depend_need_subcmd"));
-
-            const std::string& subcmd = args[0];
-            bool show_all = result["all"].as<bool>();
-
-            if (subcmd == "remove") {
-                if (args.size() < 2)
-                    throw LpkgException(get_string("error.depend_need_pkg"));
-                for (size_t i = 1; i < args.size(); ++i) {
-                    auto root = depscan::scan_remove_tree(args[i], show_all);
-                    log_info(string_format("info.depend_remove_header", args[i]));
-                    depscan::print_tree(root);
-                    if (i + 1 < args.size()) std::cout << "\n";
-                }
-            } else if (subcmd == "abibreak") {
-                if (args.size() < 2)
-                    throw LpkgException(get_string("error.depend_need_pkg"));
-                for (size_t i = 1; i < args.size(); ++i) {
-                    auto root = depscan::scan_abibreak_tree(args[i], show_all);
-                    log_info(string_format("info.depend_abibreak_header", args[i]));
-                    depscan::print_tree(root);
-                    if (i + 1 < args.size()) std::cout << "\n";
-                }
-            } else if (subcmd == "install") {
-                if (args.size() < 2)
-                    throw LpkgException(get_string("error.depend_need_pkg"));
-                for (size_t i = 1; i < args.size(); ++i) {
-                    const fs::path p(args[i]);
-                    depscan::ScanNode root;
-                    if (p.extension() == constants::EXT_LPKG
-                        || p.extension() == constants::EXT_ZST) {
-                        root = depscan::scan_install_from_file(
-                            fs::absolute(p), show_all);
-                    } else {
-                        root = depscan::scan_install_tree(args[i], show_all);
-                    }
-                    log_info(string_format("info.depend_install_header", args[i]));
-                    depscan::print_tree(root);
-                    if (i + 1 < args.size()) std::cout << "\n";
-                }
-            } else {
-                throw LpkgException(string_format(
-                    "error.depend_unknown_subcmd", subcmd));
-            }
-        } else if (command == constants::CMD_SCAN) {
-            check_root();
-            Config::instance().init_filesystem();
-            std::string scan_root;
-            if (result.count("packages")) {
-                auto pkgs = result["packages"].as<std::vector<std::string>>();
-                if (!pkgs.empty()) {
-                    scan_root = pkgs[0];
-                }
-            }
-            scan_orphans(scan_root);
-        } else {
-            usage_printer();
-            return 1;
-        }
+        int rc = handle_command(command, result, hash_file, usage_printer);
+        if (rc != 0) return rc;
 
     } catch (const cxxopts::exceptions::exception& e) {
         log_error(string_format("error.cmd_parse_error", e.what()));
