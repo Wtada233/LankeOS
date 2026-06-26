@@ -46,9 +46,11 @@ std::vector<std::string> scan_content_files(const fs::path& content_dir);
 std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& dep_strs);
 
 /// 解析一个包及其传递依赖，将其加入共享安装计划
+/// depth 用于限制递归深度，防止栈溢出（默认 64）
 void resolve_package_dependencies(const std::string& pkg_name, const std::string& version_spec,
                                   bool is_explicit, InstallContext& ctx,
-                                  std::set<std::string>& visited_stack);
+                                  std::set<std::string>& visited_stack,
+                                  int depth = 0);
 
 /// 检查计划中的包升级是否会破坏已安装的包
 std::set<std::string> check_plan_consistency(const std::map<std::string, InstallPlan>& plan);

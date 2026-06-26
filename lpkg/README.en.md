@@ -9,9 +9,8 @@ English | [中文](README.md)
 -   **Full lifecycle management**: Install, uninstall, upgrade, and reinstall packages.
 -   **Smart version parsing**: Supports multi-segment revision numbers (e.g. `1.0.0.1`) with a rigorous comparison algorithm that correctly handles cases like `6.16.1 > 6.6.1`.
 -   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their hashes for a package, greatly reducing network requests.
--   **Zero-redundancy storage**: Eliminates `latest.txt` and separate `hash.txt` files. Packages are stored in a flat `<name>/<version>.lpkg` layout.
--   **Embedded metadata**: Package name and version come from an internal `metadata.json` instead of fragile filename parsing. Dependencies, virtual provides, and man page content are all unified into `metadata.json`, eliminating standalone descriptor files.
--   **No `files.txt`**: The `content/` directory layout maps directly to the root filesystem; `files.txt` for path mapping is eliminated.
+-   **Embedded metadata**: All metadata (name, version, dependencies, virtual provides, man page) is stored in a `metadata.json` inside each package.
+-   **Layout-as-content**: The `content/` directory layout maps directly to the root filesystem.
 -   **Automated operations**: Includes `lrepo-mgr.py` for seamless publishing to Tencent Cloud COS (S3) or SCP remote servers.
 -   **Highly compatible static builds**: Built-in automatic detection of system CA certificate paths ensures statically compiled binaries work across different Linux distributions.
 -   **Security**: Mandatory SHA256 hash verification, file conflict detection, and malicious path filtering.
@@ -81,7 +80,7 @@ Supports S3 (Tencent Cloud COS, AWS) or SCP:
 ```
 
 ### 2. Publish Packages
-This command automatically extracts dependency information, updates the aggregated index, and uploads:
+This command automatically updates the aggregated index and uploads:
 ```bash
 ./main/scripts/lrepo-mgr.py push ./pkgs/*.lpkg
 ```
@@ -102,8 +101,6 @@ content/              # Files (maps directly to root directory)
 hooks/                # Hook scripts (optional)
 ```
 
-All metadata (dependencies, virtual provides, man page) is stored exclusively in `metadata.json`. Standalone `deps.txt`, `provides.txt`, or `man.txt` files are no longer used.
-
 ### metadata.json Example
 ```json
 {
@@ -123,7 +120,7 @@ All metadata (dependencies, virtual provides, man page) is stored exclusively in
 | `provides` | Virtual provides list (optional) |
 | `man` | Inline man page content (optional) |
 
-The files under `content/` are extracted directly to the target root (`/`); no `files.txt` mapping is needed.
+The files under `content/` are extracted directly to the target root (`/`).
 
 ## Repository Specification
 
@@ -147,7 +144,7 @@ acl|2.3.1:hash:attr,coreutils,glibc|libacl.so
 -   **`InstallationTask`**: Atomic transaction model with automatic rollback on failure.
 -   **`Downloader`**: Wraps `libcurl` with integrated multi-path certificate detection.
 -   **`Cache`**: Local state database stored at `/var/lib/lpkg/`.
--   **`metadata.json`**: In-package embedded metadata (name, version, deps, provides, man page), eliminating fragile filename parsing, `deps.txt`, `provides.txt`, `man.txt`, and `files.txt` path mapping.
+-   **`metadata.json`**: In-package embedded metadata (name, version, deps, provides, man page).
 
 ## Contributing
 

@@ -1,4 +1,5 @@
 #include "install_common.hpp"
+#include "base/exception.hpp"
 
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -120,10 +121,15 @@ std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& de
  * 递归解析包依赖关系，构建安装计划
  * 支持版本约束、虚拟包提供、循环依赖检测
  * 检查本地缓存、本地包文件和远程仓库中的包信息
+ * depth 最大 64 层，超过则抛出异常防止栈溢出
  */
 void resolve_package_dependencies(const std::string& pkg_name, const std::string& version_spec,
                                   bool is_explicit, InstallContext& ctx,
-                                  std::set<std::string>& visited_stack) {
+                                  std::set<std::string>& visited_stack, int depth) {
+    constexpr int MAX_DEPTH = 64;
+    if (depth > MAX_DEPTH)
+        throw LpkgException(string_format("error.dependency_depth_exceeded", pkg_name, MAX_DEPTH));
+
     if (visited_stack.contains(pkg_name)) {
         log_warning(string_format("warning.circular_dependency", pkg_name, pkg_name));
         return;
@@ -145,15 +151,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         json meta = read_archive_metadata(local_path);
         latest_version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
 
-        for (const auto& d_str : meta.value(std::string(constants::J_DEPS), std::vector<std::string>{})) {
-            std::stringstream ss(d_str);
-            std::string dn, op, rv;
-            if (ss >> dn) {
-                DependencyInfo d{.name = dn, .op = "", .version_req = ""};
-                if (ss >> op >> rv) { d.op = op; d.version_req = rv; }
-                deps.push_back(std::move(d));
-            }
-        }
+        deps = parse_dep_strings(meta.value(std::string(constants::J_DEPS), std::vector<std::string>{}));
         provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
     } else {
         // 从远程仓库查找
@@ -162,10 +160,13 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         if (!pkg_info) {
             // 检查是否有其他包提供此虚拟包名
             if (auto prov = ctx.repo.find_provider(pkg_name)) {
-                resolve_package_dependencies(prov->name, prov->version, is_explicit, ctx, visited_stack);
+                resolve_package_dependencies(prov->name, prov->version, is_explicit, ctx, visited_stack, depth + 1);
                 return;
             }
-            if (installed_version.empty()) log_warning(string_format("warning.package_not_in_repo", pkg_name));
+            // 包在仓库中不存在 → 跳过，安装阶段会通过 ensure_dependencies_satisfied
+            // 检查 ctx.plan 中的提供者和已安装包
+            if (installed_version.empty())
+                log_warning(string_format("warning.package_not_in_repo", pkg_name));
             return;
         }
         latest_version = pkg_info->version;
@@ -206,7 +207,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
                     if (auto matching = ctx.repo.find_best_matching_version(dep.name, dep.op, dep.version_req))
                         req_ver = matching->version;
                 }
-                resolve_package_dependencies(dep.name, req_ver, false, ctx, visited_stack);
+                resolve_package_dependencies(dep.name, req_ver, false, ctx, visited_stack, depth + 1);
             }
 
             // 验证候选版本满足依赖版本约束

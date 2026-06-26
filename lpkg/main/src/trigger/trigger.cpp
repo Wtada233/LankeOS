@@ -94,18 +94,24 @@ void TriggerManager::add(const std::string& cmd) {
 /**
  * 执行所有待处理的触发器命令
  * 特殊处理 ldconfig 命令：直接调用内部 SONAME 链接生成，而非执行外部程序
+ * 在测试模式（testing mode）下跳过所有系统级触发器执行
  */
 void TriggerManager::run_all() {
     std::lock_guard<std::mutex> lock(mtx);
     if (pending_triggers.empty()) return;
 
     log_info(get_string("info.running_triggers"));
+
     for (const auto& cmd : pending_triggers) {
         log_info(string_format("info.trigger_exec", cmd.c_str()));
+
         // 内部处理 ldconfig，避免调用外部程序
         if (cmd == "ldconfig") {
             log_info(get_string("info.generating_soname_links"));
             apply_soname_links(Config::instance().root_dir() / "usr/lib");
+        } else if (Config::instance().testing_mode()) {
+            // 测试模式下跳过外部命令（systemctl daemon-reload 等），避免 polkit 弹窗
+            log_info(string_format("info.testing_skip_trigger", cmd.c_str()));
         } else {
             // 使用 run_shell 执行，基于 exec 的更安全方案
             if (int ret = run_shell(cmd); ret != 0) {

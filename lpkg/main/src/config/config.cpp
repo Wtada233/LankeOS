@@ -73,6 +73,7 @@ void Config::rebase_paths() {
  * 设置软件包安装根目录，并重新计算所有派生路径
  */
 void Config::set_root_path(const std::string& root_path) {
+    std::lock_guard<std::mutex> lock(config_mutex_);
     root_dir_ = fs::path(root_path).lexically_normal();
     if (root_dir_.empty()) root_dir_ = "/";
     rebase_paths();
@@ -84,6 +85,31 @@ void Config::set_root_path(const std::string& root_path) {
 fs::path Config::get_tmp_dir() {
     static const fs::path tmp_dir = fs::path("/tmp") / ("lpkg_" + std::to_string(getpid()));
     return tmp_dir;
+}
+
+void Config::set_non_interactive_mode(NonInteractiveMode m) noexcept {
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    non_interactive_mode_ = m;
+}
+
+void Config::set_force_overwrite_mode(bool v) noexcept {
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    force_overwrite_mode_ = v;
+}
+
+void Config::set_no_hooks_mode(bool v) noexcept {
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    no_hooks_mode_ = v;
+}
+
+void Config::set_no_deps_mode(bool v) noexcept {
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    no_deps_mode_ = v;
+}
+
+void Config::set_testing_mode(bool v) noexcept {
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    testing_mode_ = v;
 }
 
 /**
@@ -109,14 +135,17 @@ void Config::init_filesystem() {
  * 覆盖系统的架构检测结果，强制使用指定架构
  */
 void Config::set_architecture(const std::string& arch) {
+    std::lock_guard<std::mutex> lock(config_mutex_);
     architecture_override_ = arch;
 }
+
 
 /**
  * 获取当前系统的 CPU 架构
  * 如果未设置架构覆盖，通过 uname 系统调用获取
  */
 std::string Config::get_architecture() {
+    std::lock_guard<std::mutex> lock(config_mutex_);
     if (!architecture_override_.empty()) {
         return architecture_override_;
     }

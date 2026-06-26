@@ -48,7 +48,7 @@ TEST_F(L10nIntegrityTest, AllSourceKeysExistInTranslations) {
     std::vector<std::string> manual_keys = {
         "help.output_file", "help.pack_source",
         "help.force", "help.force_overwrite", "help.no_hooks", "help.no_deps",
-        "help.testing", "help.root_dir", "help.target_arch", "help.hash", "help.pkg_query",
+        "help.root_dir", "help.target_arch", "help.hash", "help.pkg_query",
         "cxxopts.default", "cxxopts.usage", "cxxopts.option_help", "cxxopts.arg", "cxxopts.positional_help"
     };
     for(const auto& k : manual_keys) source_keys.insert(k);

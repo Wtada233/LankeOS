@@ -29,6 +29,15 @@ namespace {
     bool is_stderr_tty = false;
     bool tty_check_performed = false;
 
+    /** 执行一次 tty 检测，缓存结果供后续使用（线程安全） */
+    void ensure_tty_check() {
+        if (!tty_check_performed) {
+            is_stdout_tty = isatty(STDOUT_FILENO);
+            is_stderr_tty = isatty(STDERR_FILENO);
+            tty_check_performed = true;
+        }
+    }
+
     /**
      * 日志输出内部辅助函数
      * 支持终端彩色输出（tty 检测），非 tty 时仅输出纯文本
@@ -36,11 +45,7 @@ namespace {
     void log_internal(std::string_view prefix, std::string_view color, std::string_view msg, std::ostream& stream) {
         std::lock_guard<std::mutex> lock(log_mutex);
 
-        if (!tty_check_performed) {
-            is_stdout_tty = isatty(STDOUT_FILENO);
-            is_stderr_tty = isatty(STDERR_FILENO);
-            tty_check_performed = true;
-        }
+        ensure_tty_check();
 
         bool current_stream_is_tty = false;
         if (&stream == &std::cout) {
@@ -85,12 +90,7 @@ void log_error(std::string_view msg) {
 void log_progress(const std::string& msg, double percentage, int bar_width) {
     {
         std::lock_guard<std::mutex> lock(log_mutex);
-        if (!tty_check_performed) {
-            is_stdout_tty = isatty(STDOUT_FILENO);
-            is_stderr_tty = isatty(STDERR_FILENO);
-            tty_check_performed = true;
-        }
-
+        ensure_tty_check();
         if (!is_stdout_tty) {
             return;
         }
@@ -293,6 +293,8 @@ void write_set_to_file(const fs::path& path, const std::unordered_set<std::strin
  */
 void cleanup_tmp_dirs() {
     static auto last_cleanup = std::chrono::system_clock::now();
+    static std::mutex cleanup_mutex;
+    std::lock_guard<std::mutex> cleanup_lock(cleanup_mutex);
     auto now = std::chrono::system_clock::now();
 
     // 同一进程内每小时最多清理一次
