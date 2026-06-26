@@ -21,23 +21,28 @@ using json = nlohmann::json;
 namespace depscan {
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Internal helpers
+//  内部工具函数
 // ═══════════════════════════════════════════════════════════════════════════
 
 namespace {
 
+/** 获取包版本号，未安装时返回 "(not installed)" */
 std::string version_or_missing(const std::string& pkg) {
     auto ver = Cache::instance().get_installed_version(pkg);
     return ver.empty() ? "(not installed)" : ver;
 }
 
-// ── Reverse-dependency BFS (transitive closure, local cache) ──────────────
+/**
+ * 从本地缓存收集传递反向依赖集 (BFS)
+ * 从 root_pkg 出发，沿 reverse_deps 链遍历所有已安装的依赖者
+ */
 void collect_transitive_rdeps(const std::string& root_pkg,
                               std::unordered_set<std::string>& result,
                               std::unordered_set<std::string>& visited)
 {
     if (!visited.insert(root_pkg).second) return;
     auto rdeps = Cache::instance().get_reverse_deps(root_pkg);
+    // 同时检查虚拟包（provides）的反向依赖
     for (const auto& cap : Cache::instance().get_package_provides(root_pkg)) {
         auto cap_rdeps = Cache::instance().get_reverse_deps(cap);
         rdeps.insert(cap_rdeps.begin(), cap_rdeps.end());
@@ -49,7 +54,10 @@ void collect_transitive_rdeps(const std::string& root_pkg,
     }
 }
 
-// ── Forward-dependency resolution (for install scan) ──────────────────────
+/**
+ * 前向依赖解析（用于 install 扫描）
+ * 记录每个解析到的包及其是否已安装
+ */
 struct ResolvedDep {
     std::string name;
     std::string version;
@@ -58,6 +66,10 @@ struct ResolvedDep {
 };
 using DepMap = std::unordered_map<std::string, ResolvedDep>;
 
+/**
+ * 递归解析传递依赖，将结果写入 plan
+ * 已安装的包直接记录并跳过展开，未安装的从仓库解析
+ */
 void resolve_transitive_deps(const std::string& pkg_name,
                              const std::string& version_spec,
                              DepMap& plan,
@@ -106,11 +118,12 @@ void resolve_transitive_deps(const std::string& pkg_name,
 } // anonymous namespace
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Repository reverse-dependency helpers
+//  仓库反向依赖图构建（当目标包未安装时回退到仓库索引）
 // ═══════════════════════════════════════════════════════════════════════════
 
 namespace {
 
+/** 按分隔符切分 string_view，返回子串列表（不分配内存） */
 std::vector<std::string_view> sv_split(std::string_view s, char d) {
     std::vector<std::string_view> r;
     size_t start = 0, end;
@@ -122,7 +135,10 @@ std::vector<std::string_view> sv_split(std::string_view s, char d) {
     return r;
 }
 
-// Build a reverse-dep map from the cached repo index.
+/**
+ * 从缓存的仓库索引文件构建反向依赖图
+ * 只考虑每个包的最新版本，返回: 被依赖的包 -> {直接依赖它的包集合}
+ */
 std::unordered_map<std::string, std::unordered_set<std::string>>
 build_repo_revdep_map() {
     std::unordered_map<std::string, std::unordered_set<std::string>> rev;
@@ -144,6 +160,7 @@ build_repo_revdep_map() {
         std::string name(parts[0]);
         auto blocks = sv_split(parts[1], constants::SEMICOLON_CHAR);
         if (blocks.empty()) continue;
+        // 取最后一个版本块（最新版本）作为依赖分析的依据
         auto vh = sv_split(blocks.back(), constants::COLON_CHAR);
         if (vh.size() < 3) continue;
 
@@ -160,6 +177,7 @@ build_repo_revdep_map() {
     return rev;
 }
 
+/** 在仓库反向依赖图上做传递 BFS，收集所有间接依赖者 */
 void repo_transitive_rdeps(
     const std::string& pkg,
     const std::unordered_map<std::string, std::unordered_set<std::string>>& rev,
@@ -175,7 +193,7 @@ void repo_transitive_rdeps(
     }
 }
 
-// ── Load repository and build revdep map; returns empty map on failure ────
+/** 加载仓库并构建反向依赖图；失败时返回空 map */
 auto load_repo_revdep()
     -> std::unordered_map<std::string, std::unordered_set<std::string>>
 {
@@ -185,7 +203,10 @@ auto load_repo_revdep()
     return build_repo_revdep_map();
 }
 
-// ── Recursive tree builder for local-cache remove scan ────────────────────
+/**
+ * 递归构建"移除"依赖树（本地缓存路径）
+ * 使用 affected 池标记尚未放入树的节点，避免重复
+ */
 void build_remove_tree_local(
     ScanNode& node,
     const std::string& node_name,
@@ -210,6 +231,7 @@ void build_remove_tree_local(
 
         build_remove_tree_local(child, rdep, affected, show_all);
 
+        // --all 模式下附带显示共享依赖（这些依赖不会被移除）
         if (show_all) {
             fs::path df = Config::instance().dep_dir() / rdep;
             if (fs::exists(df)) {
@@ -231,7 +253,10 @@ void build_remove_tree_local(
     }
 }
 
-// ── Recursive tree builder for repo-fallback remove scan ──────────────────
+/**
+ * 递归构建"移除"依赖树（仓库回退路径）
+ * 结构与 build_remove_tree_local 类似，但数据来源是仓库索引
+ */
 void build_remove_tree_repo(
     ScanNode& node,
     const std::string& node_name,
@@ -253,7 +278,10 @@ void build_remove_tree_repo(
     }
 }
 
-// ── Recursive tree builder for install scan ───────────────────────────────
+/**
+ * 递归构建安装依赖树
+ * 已安装的包标记为 KEEP（--all 才显示），需要安装的标记为 INSTALL
+ */
 void build_install_tree(
     ScanNode* parent,
     const std::string& parent_name,
@@ -266,7 +294,7 @@ void build_install_tree(
     if (pit == plan.end()) return;
 
     for (const auto& dep : pit->second.deps) {
-        // Resolve virtual provider
+        // 处理虚拟包（依赖的包名可能是 capabilities）
         std::string real = dep.name;
         auto dver = Cache::instance().get_installed_version(dep.name);
         if (dver.empty() && !plan.contains(dep.name)) {
@@ -296,13 +324,14 @@ void build_install_tree(
 } // anonymous namespace
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  scan_remove_tree
+//  scan_remove_tree — 移除依赖扫描
+//  若包未安装则回退到仓库分析，否则从本地缓存构建反向依赖树
 // ═══════════════════════════════════════════════════════════════════════════
 
 ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all) {
     auto& cache = Cache::instance();
 
-    // Not installed → fall back to repository index
+    // 未安装 → 从仓库索引查找谁依赖它
     if (cache.get_installed_version(pkg_name).empty()) {
         auto rev = load_repo_revdep();
         if (rev.find(pkg_name) == rev.end()) {
@@ -325,7 +354,7 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all) {
         return root;
     }
 
-    // Installed locally → use cache
+    // 已安装 → 从本地缓存构建
     std::unordered_set<std::string> affected, visited;
     collect_transitive_rdeps(pkg_name, affected, visited);
     affected.insert(pkg_name);
@@ -339,13 +368,14 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  scan_abibreak_tree
+//  scan_abibreak_tree — ABI 断裂扫描
+//  只有直接依赖需要重构建，间接依赖被中间层的抽象接口屏蔽
 // ═══════════════════════════════════════════════════════════════════════════
 
 ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all) {
     auto& cache = Cache::instance();
 
-    // Not installed → fall back to repository index
+    // 未安装 → 从仓库查找直接依赖者
     if (cache.get_installed_version(pkg_name).empty()) {
         auto rev = load_repo_revdep();
         ScanNode root;
@@ -362,6 +392,7 @@ ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all) {
                 child.status = ScanStatus::REBUILD;
                 child.reason = "direct dependency of " + pkg_name + " (repo)";
 
+                // --all 模式下显示间接依赖（标记为不变）
                 if (show_all) {
                     auto git = rev.find(dep);
                     if (git != rev.end()) {
@@ -381,7 +412,7 @@ ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all) {
         return root;
     }
 
-    // Installed locally → use cache
+    // 已安装 → 从本地缓存找直接反向依赖
     ScanNode root;
     root.name = pkg_name; root.version = version_or_missing(pkg_name);
     root.status = ScanStatus::ABI_CHANGED;
@@ -420,7 +451,8 @@ ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  scan_install_tree
+//  scan_install_tree — 安装依赖扫描
+//  显示安装某包需要新增安装的传递依赖（已安装的标记为 KEEP）
 // ═══════════════════════════════════════════════════════════════════════════
 
 ScanNode scan_install_tree(const std::string& pkg_name, bool show_all) {
@@ -433,6 +465,7 @@ ScanNode scan_install_tree(const std::string& pkg_name, bool show_all) {
 
     std::string target_name = pkg_name;
     std::string target_ver(constants::VER_LATEST);
+    // 支持 "包名:版本号" 格式
     if (auto pos = pkg_name.find(':'); pos != std::string_view::npos) {
         target_name = pkg_name.substr(0, pos);
         target_ver = pkg_name.substr(pos + 1);
@@ -462,6 +495,7 @@ ScanNode scan_install_tree(const std::string& pkg_name, bool show_all) {
     return root;
 }
 
+/** 从本地 .lpkg 文件扫描安装依赖（直接读取文件内 metadata.json） */
 ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all) {
     json meta;
     try {
@@ -484,7 +518,7 @@ ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all) {
     root.status = not_installed ? ScanStatus::INSTALL : ScanStatus::KEEP;
     root.reason = not_installed ? "target package (local)" : "already installed (local)";
 
-    // Resolve transitive deps from repo
+    // 解析传递依赖仓库
     ensure_dir_exists(Config::get_tmp_dir());
     Repository repo;
     try { repo.load_index(); } catch (...) {}
@@ -536,9 +570,10 @@ ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Display helpers
+//  显示辅助函数
 // ═══════════════════════════════════════════════════════════════════════════
 
+/** 返回状态对应的文字标签 */
 std::string_view status_label(ScanStatus s) {
     switch (s) {
         case ScanStatus::REMOVED:     return "WILL BE REMOVED";
@@ -552,6 +587,7 @@ std::string_view status_label(ScanStatus s) {
 
 namespace {
 
+/** 返回状态对应的 ANSI 颜色码 */
 std::string_view status_color(ScanStatus s) {
     switch (s) {
         case ScanStatus::REMOVED:     return constants::COLOR_RED;
@@ -563,6 +599,7 @@ std::string_view status_color(ScanStatus s) {
     return constants::COLOR_RESET;
 }
 
+/** 递归打印子树（使用 unicode 框线字符） */
 void print_subtree(const ScanNode& node, const std::string& prefix) {
     for (size_t i = 0; i < node.children.size(); ++i) {
         const auto& child = node.children[i];
@@ -581,6 +618,7 @@ void print_subtree(const ScanNode& node, const std::string& prefix) {
 
 } // anonymous namespace
 
+/** 打印整棵依赖树（彩色 + unicode 框线） */
 void print_tree(const ScanNode& node) {
     std::cout << status_color(node.status)
               << node.name << " (" << node.version << ") "

@@ -17,7 +17,7 @@
 #include <vector>
 #include <functional>
 
-// RAII for curl global init/cleanup
+/** RAII：curl 全局初始化/清理 */
 struct CurlGlobalInitializer {
     CurlGlobalInitializer() {
         curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -27,8 +27,8 @@ struct CurlGlobalInitializer {
     }
 };
 
+/** 打印帮助信息 */
 void print_usage(const cxxopts::Options& options) {
-    // Show all option groups (General, Install/Remove, Query, Pack, Other)
     std::cerr << options.help();
     std::cerr << get_string("info.commands") << std::endl;
     std::cerr << get_string("info.install_desc")  << "  " << get_string("info.install_opts") << std::endl;
@@ -45,21 +45,29 @@ void print_usage(const cxxopts::Options& options) {
 }
 
 #include <optional>
-
 #include <functional>
 
 namespace fs = std::filesystem;
 
-void pre_operation_check(const cxxopts::ParseResult& result, std::function<void()> print_usage_func, size_t min, std::optional<size_t> max = std::nullopt) {
+/** 检查命令行参数数量是否合法 */
+void pre_operation_check(const cxxopts::ParseResult& result,
+                         std::function<void()> print_usage_func,
+                         size_t min, std::optional<size_t> max = std::nullopt)
+{
     log_info(get_string("info.pre_op_check"));
-    size_t count = result.count("packages") ? result["packages"].as<std::vector<std::string>>().size() : 0;
+    size_t count = result.count("packages")
+        ? result["packages"].as<std::vector<std::string>>().size() : 0;
     if (count < min || (max.has_value() && count > max.value())) {
         print_usage_func();
         throw LpkgException(get_string("error.invalid_arg_count"));
     }
 }
 
-// ── Command dispatch: called after options are parsed and config is ready ──
+/**
+ * 命令分发函数
+ * 解析出的命令字符串与常量表匹配后执行对应操作。
+ * 所有命令的数据库初始化（root check、filesystem、锁）已在 main() 中完成。
+ */
 static int handle_command(const std::string& command,
                           const cxxopts::ParseResult& result,
                           const std::string& hash_file,
@@ -70,6 +78,7 @@ static int handle_command(const std::string& command,
         install_packages(result["packages"].as<std::vector<std::string>>(),
                          hash_file, result["force"].as<bool>());
         log_info(get_string("info.install_complete"));
+
     } else if (command == constants::CMD_REMOVE) {
         pre_operation_check(result, usage, 1);
         for (const auto& pkg : result["packages"].as<std::vector<std::string>>()) {
@@ -77,27 +86,33 @@ static int handle_command(const std::string& command,
             write_cache();
         }
         log_info(get_string("info.uninstall_complete"));
+
     } else if (command == constants::CMD_AUTOREMOVE) {
         pre_operation_check(result, usage, 0, 0);
         autoremove();
         write_cache();
+
     } else if (command == constants::CMD_UPGRADE) {
         pre_operation_check(result, usage, 0, 0);
         upgrade_packages();
         write_cache();
+
     } else if (command == constants::CMD_REINSTALL) {
         pre_operation_check(result, usage, 1);
         for (const auto& pkg : result["packages"].as<std::vector<std::string>>())
             reinstall_package(pkg);
         write_cache();
+
     } else if (command == constants::CMD_QUERY) {
         pre_operation_check(result, usage, 1, 1);
         std::string t = result["packages"].as<std::vector<std::string>>()[0];
         if (result.count("pkg-query")) query_package(t);
         else query_file(t);
+
     } else if (command == constants::CMD_MAN) {
         pre_operation_check(result, usage, 1, 1);
         show_man_page(result["packages"].as<std::vector<std::string>>()[0]);
+
     } else if (command == constants::CMD_PACK) {
         if (!result.count("output"))
             throw LpkgException(get_string("error.pack_no_output"));
@@ -105,13 +120,16 @@ static int handle_command(const std::string& command,
                      result["source"].as<std::string>(),
                      result["pkg-name"].as<std::string>(),
                      result["pkg-version"].as<std::string>());
+
     } else if (command == constants::CMD_BUILD) {
         std::string dir = ".";
         if (result.count("packages"))
             if (auto v = result["packages"].as<std::vector<std::string>>(); !v.empty())
                 dir = v[0];
         run_build(fs::absolute(dir));
+
     } else if (command == constants::CMD_DEPEND) {
+        /** depend 命令：分析依赖关系，支持 remove/abibreak/install 三个子命令 */
         auto args = result.count("packages")
             ? result["packages"].as<std::vector<std::string>>()
             : std::vector<std::string>{};
@@ -122,7 +140,8 @@ static int handle_command(const std::string& command,
         bool all = result["all"].as<bool>();
 
         auto check_pkg = [&]{
-            if (args.size() < 2) throw LpkgException(get_string("error.depend_need_pkg"));
+            if (args.size() < 2)
+                throw LpkgException(get_string("error.depend_need_pkg"));
         };
 
         if (sub == "remove") {
@@ -145,7 +164,8 @@ static int handle_command(const std::string& command,
             check_pkg();
             for (size_t i = 1; i < args.size(); ++i) {
                 fs::path p(args[i]);
-                auto root = (p.extension() == constants::EXT_LPKG || p.extension() == constants::EXT_ZST)
+                auto root = (p.extension() == constants::EXT_LPKG
+                            || p.extension() == constants::EXT_ZST)
                     ? depscan::scan_install_from_file(fs::absolute(p), all)
                     : depscan::scan_install_tree(args[i], all);
                 log_info(string_format("info.depend_install_header", args[i]));
@@ -153,14 +173,17 @@ static int handle_command(const std::string& command,
                 if (i + 1 < args.size()) std::cout << "\n";
             }
         } else {
-            throw LpkgException(string_format("error.depend_unknown_subcmd", sub));
+            throw LpkgException(string_format(
+                "error.depend_unknown_subcmd", sub));
         }
+
     } else if (command == constants::CMD_SCAN) {
         std::string r;
         if (result.count("packages"))
             if (auto v = result["packages"].as<std::vector<std::string>>(); !v.empty())
                 r = v[0];
         scan_orphans(r);
+
     } else {
         usage();
         return 1;
@@ -177,12 +200,13 @@ int main(int argc, char* argv[]) {
         options.custom_help(get_string("info.usage"));
         options.set_width(100);
 
-        // --- Option groups ---
+        // --- 通用选项 ---
         options.add_options(get_string("help.group_general"))
             ("h,help", get_string("info.help_desc"))
             ("v,version", get_string("help.version"))
             ;
 
+        // --- 安装/移除选项 ---
         options.add_options(get_string("help.group_install"))
             ("y,yes", get_string("help.yes_mode"), cxxopts::value<bool>()->default_value("false"))
             ("n,no", get_string("help.no_mode"), cxxopts::value<bool>()->default_value("false"))
@@ -195,10 +219,12 @@ int main(int argc, char* argv[]) {
             ("hash", get_string("help.hash"), cxxopts::value<std::string>())
             ;
 
+        // --- 查询选项 ---
         options.add_options(get_string("help.group_query"))
             ("p,pkg-query", get_string("help.pkg_query"), cxxopts::value<bool>()->default_value("false"))
             ;
 
+        // --- 打包选项 ---
         options.add_options(get_string("help.group_pack"))
             ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
             ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value(std::string(constants::DEFAULT_PACK_SOURCE)))
@@ -206,11 +232,13 @@ int main(int argc, char* argv[]) {
             ("pkg-version", get_string("help.pkg_version"), cxxopts::value<std::string>()->default_value("0.0.0"))
             ;
 
+        // --- 其他选项 ---
         options.add_options(get_string("help.group_other"))
             ("testing", get_string("help.testing"), cxxopts::value<bool>()->default_value("false"))
             ("all", get_string("help.depend_all"), cxxopts::value<bool>()->default_value("false"))
             ;
 
+        // 位置参数
         options.add_options("")
             ("command", "", cxxopts::value<std::string>())
             ("packages", "", cxxopts::value<std::vector<std::string>>())
@@ -230,42 +258,29 @@ int main(int argc, char* argv[]) {
             return 0;
         }
 
+        // 全局选项
         std::string hash_file;
-        if (result.count("hash")) {
-            hash_file = result["hash"].as<std::string>();
-        }
+        if (result.count("hash")) hash_file = result["hash"].as<std::string>();
 
-        if (result.count("no-hooks")) {
+        if (result.count("no-hooks"))
             Config::instance().set_no_hooks_mode(result["no-hooks"].as<bool>());
-        }
-
-        if (result.count("no-deps")) {
+        if (result.count("no-deps"))
             Config::instance().set_no_deps_mode(result["no-deps"].as<bool>());
-        }
-
-        if (result.count("testing")) {
+        if (result.count("testing"))
             Config::instance().set_testing_mode(result["testing"].as<bool>());
-        }
-
-        if (result.count("root")) {
+        if (result.count("root"))
             Config::instance().set_root_path(result["root"].as<std::string>());
-        }
-
-        if (result.count("arch")) {
+        if (result.count("arch"))
             Config::instance().set_architecture(result["arch"].as<std::string>());
-        }
-
-        if (result.count("force-overwrite")) {
+        if (result.count("force-overwrite"))
             Config::instance().set_force_overwrite_mode(result["force-overwrite"].as<bool>());
-        }
 
-        if (result["yes"].as<bool>()) {
+        if (result["yes"].as<bool>())
             Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
-        }
-        if (result["no"].as<bool>()) {
+        if (result["no"].as<bool>())
             Config::instance().set_non_interactive_mode(NonInteractiveMode::NO);
-        }
 
+        // 必须有命令
         if (!result.count("command")) {
             print_usage(options);
             return 1;
@@ -273,6 +288,7 @@ int main(int argc, char* argv[]) {
 
         const std::string& command = result["command"].as<std::string>();
 
+        // 除了 man 命令外都需要 root 权限 + 数据库初始化
         std::unique_ptr<DBLock> db_lock;
         if (command != constants::CMD_MAN) {
             check_root();
@@ -280,9 +296,8 @@ int main(int argc, char* argv[]) {
             db_lock = std::make_unique<DBLock>();
         }
 
-        auto usage_printer = [&]() { print_usage(options); };
-        int rc = handle_command(command, result, hash_file, usage_printer);
-        if (rc != 0) return rc;
+        return handle_command(command, result, hash_file,
+                              [&]() { print_usage(options); });
 
     } catch (const cxxopts::exceptions::exception& e) {
         log_error(string_format("error.cmd_parse_error", e.what()));
@@ -294,6 +309,4 @@ int main(int argc, char* argv[]) {
         log_error(string_format("error.unexpected_error", e.what()));
         return 1;
     }
-
-    return 0;
 }
