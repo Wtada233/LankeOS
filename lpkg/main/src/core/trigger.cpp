@@ -8,6 +8,9 @@
 #include <sstream>
 #include <iostream>
 
+/**
+ * 获取 TriggerManager 单例实例
+ */
 TriggerManager& TriggerManager::instance() {
     static TriggerManager inst;
     return inst;
@@ -17,14 +20,27 @@ TriggerManager::TriggerManager() {
     add_default_triggers();
 }
 
+/**
+ * 添加默认的内置触发器规则
+ * 为标准 LFS/Systemd 环境提供以下默认触发操作：
+ * - 共享库更新后运行 ldconfig
+ * - systemd 服务文件更新后重载守护进程
+ * - 图标更新后刷新图标缓存
+ * - GSettings 模式更新后编译模式文件
+ */
 void TriggerManager::add_default_triggers() {
-    // Built-in defaults for a standard LFS/Systemd environment
+    // LFS/Systemd 环境的默认触发器
     custom_triggers.push_back({std::regex(R"(^/usr/lib/.*\.so.*)"), "ldconfig", R"(^/usr/lib/.*\.so.*)"});
     custom_triggers.push_back({std::regex(R"(^/usr/lib/systemd/system/.*\.service$)"), "systemctl daemon-reload", R"(^/usr/lib/systemd/system/.*\.service$)"});
     custom_triggers.push_back({std::regex(R"(^/usr/share/icons/.*)"), "gtk-update-icon-cache -f -t /usr/share/icons/hicolor", R"(^/usr/share/icons/.*)"});
     custom_triggers.push_back({std::regex(R"(^/usr/share/glib-2.0/schemas/.*\.xml$)"), "glib-compile-schemas /usr/share/glib-2.0/schemas", R"(^/usr/share/glib-2.0/schemas/.*\.xml$)"});
 }
 
+/**
+ * 从配置文件加载自定义触发器规则
+ * 配置文件每行格式：正则表达式 命令
+ * 以 # 开头的行和空行将被跳过
+ */
 void TriggerManager::load_config() {
     std::lock_guard<std::mutex> lock(mtx);
     if (config_loaded) return;
@@ -34,7 +50,7 @@ void TriggerManager::load_config() {
         std::string line;
         while (std::getline(file, line)) {
             if (line.empty() || line[0] == '#') continue;
-            
+
             std::istringstream iss(line);
             std::string pattern, command;
             if (iss >> pattern) {
@@ -52,6 +68,10 @@ void TriggerManager::load_config() {
     config_loaded = true;
 }
 
+/**
+ * 检查指定路径是否匹配任意触发器规则
+ * 如果匹配，将对应的命令加入待执行集合
+ */
 void TriggerManager::check_file(const std::string& path) {
     if (!config_loaded) load_config();
     
@@ -63,25 +83,31 @@ void TriggerManager::check_file(const std::string& path) {
     }
 }
 
+/**
+ * 手动添加一个待执行的触发器命令
+ */
 void TriggerManager::add(const std::string& cmd) {
     std::lock_guard<std::mutex> lock(mtx);
     pending_triggers.insert(cmd);
 }
 
+/**
+ * 执行所有待处理的触发器命令
+ * 特殊处理 ldconfig 命令：直接调用内部 SONAME 链接生成，而非执行外部程序
+ */
 void TriggerManager::run_all() {
     std::lock_guard<std::mutex> lock(mtx);
     if (pending_triggers.empty()) return;
-    
+
     log_info(get_string("info.running_triggers"));
     for (const auto& cmd : pending_triggers) {
         log_info(string_format("info.trigger_exec", cmd.c_str()));
-        // Handle native triggers instead of calling external ldconfig
+        // 内部处理 ldconfig，避免调用外部程序
         if (cmd == "ldconfig") {
-            // Apply SONAME symlinks to /usr/lib
             log_info(get_string("info.generating_soname_links"));
             apply_soname_links(Config::instance().root_dir() / "usr/lib");
         } else {
-            // Note: Using run_shell for a safer exec-based approach.
+            // 使用 run_shell 执行，基于 exec 的更安全方案
             if (int ret = run_shell(cmd); ret != 0) {
                 log_warning(string_format("warning.trigger_failed", std::to_string(ret).c_str()));
             }

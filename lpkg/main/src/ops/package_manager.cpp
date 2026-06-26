@@ -34,13 +34,19 @@
 namespace fs = std::filesystem;
 
 // =====================================================================
-// Public API
+// 公开 API
 // =====================================================================
 
+/** 将缓存数据写回磁盘 */
 void write_cache() {
     Cache::instance().write();
 }
 
+/**
+ * 安装包的主入口
+ * 流程：解析参数 -> 初始化仓库和缓存 -> 解析依赖 -> 静态一致性检查 ->
+ * 用户确认 -> 实际安装（含元数据验证）-> 回滚处理 -> 触发运行
+ */
 void install_packages(const std::vector<std::string>& pkg_args,
                       const std::string& hash_file_path, bool force_reinstall) {
     Cache::instance().load();
@@ -63,6 +69,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
             throw LpkgException(get_string("error.read_hash_failed"));
     }
 
+    // 解析安装参数：区分本地包文件（.zst/.lpkg/含路径）和包名:版本 格式
     for (const auto& arg : pkg_args) {
         const fs::path p(arg);
         if (p.extension() == constants::EXT_ZST
@@ -94,7 +101,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
     InstallContext ctx{repo, plan, order, locals, targets,
                        force_reinstall, /*top_level=*/true, {}};
 
-    // Phase 1: Initial dependency resolution
+    // 第一阶段：初始依赖解析
     for (const auto& [n, v] : targets) {
         std::set<std::string> vs;
         detail::resolve_package_dependencies(n, v, true, ctx, vs);
@@ -107,9 +114,8 @@ void install_packages(const std::vector<std::string>& pkg_args,
             if (!p.local_path.empty()) p.sha256 = provided_hash;
     }
 
-    // Phase 2: Static consistency check (no download — pure dep-graph analysis)
-    // Dynamic metadata verification happens later, inside install_packages_internal,
-    // after the user has confirmed.
+    // 第二阶段：静态一致性检查（无需下载，纯依赖图分析）
+    // 动态元数据验证将在用户确认后、install_packages_internal 中进行
 
     if (plan.empty()) {
         log_info(get_string("info.all_packages_already_installed"));
@@ -128,7 +134,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
         return;
     }
 
-    // Show plan and ask for confirmation
+    // 显示安装计划并请求用户确认
     std::string prompt;
     for (const auto& n : order) {
         const auto& p = plan.at(n);
@@ -143,7 +149,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
         return;
     }
 
-    // Phase 3: Actual installation with inline metadata verification
+    // 第三阶段：实际安装，过程中进行元数据验证
     ctx.successfully_installed.clear();
     try {
         install_packages_internal(ctx);
@@ -161,6 +167,12 @@ void install_packages(const std::vector<std::string>& pkg_args,
     log_info(get_string("info.install_complete"));
 }
 
+/**
+ * 内部安装循环：按安装顺序逐个安装包
+ * 每个包在安装前会进行元数据验证（下载并读取实际 metadata.json），
+ * 若元数据与仓库索引不匹配，则更新计划并重新解析依赖后从头开始安装。
+ * 这是确保依赖一致性的关键机制。
+ */
 void install_packages_internal(InstallContext& ctx) {
     size_t i = 0;
     while (i < ctx.install_order.size()) {
@@ -175,7 +187,7 @@ void install_packages_internal(InstallContext& ctx) {
 
         auto& p = ctx.plan.at(n);
 
-        // Inline metadata verification: download & check real metadata before install
+        // 元数据验证：下载实际包并读取真实依赖信息
         if (!p.metadata_verified) {
             InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
                 Cache::instance().get_installed_version(p.name),
@@ -183,7 +195,7 @@ void install_packages_internal(InstallContext& ctx) {
             ensure_dir_exists(check_task.tmp_pkg_dir());
             check_task.download_and_verify_package();
 
-            // Read metadata.json directly from the archive without full extraction
+            // 直接从归档读取 metadata.json，无需完整解压
             json meta = detail::read_archive_metadata(check_task.archive_path());
             std::vector<std::string> dep_strs = meta.value(
                 std::string(constants::J_DEPS), std::vector<std::string>{});
@@ -204,12 +216,13 @@ void install_packages_internal(InstallContext& ctx) {
             }
 
             if (metadata_differs) {
+                // 元数据不匹配时：回滚已安装的包，更新仓库信息，重新解析依赖
                 log_info(string_format("info.resolving_metadata", p.name));
                 ctx.repo.update_package_info(p.name, p.actual_version,
                     actual_deps, actual_provides);
                 ctx.local_candidates[p.name] = check_task.archive_path();
 
-                // Rollback any packages already installed in this transaction
+                // 回滚当前事务中已安装的包
                 for (const auto& done_name : ctx.successfully_installed | std::views::reverse) {
                     try { remove_package(done_name, true); } catch (...) {}
                 }
@@ -221,16 +234,16 @@ void install_packages_internal(InstallContext& ctx) {
                     std::set<std::string> vs;
                     detail::resolve_package_dependencies(tn, tv, true, ctx, vs);
                 }
-                i = 0; // restart from beginning with new plan
+                i = 0; // 从头开始重新安装
                 continue;
             }
 
-            // Save the downloaded archive path so the real task doesn't re-download
+            // 保存已下载的归档路径，避免后续任务重复下载
             p.local_path = check_task.archive_path();
             p.metadata_verified = true;
         }
 
-        // Now install
+        // 执行实际安装
         InstallationTask task(p.name, p.actual_version, p.is_explicit,
                               Cache::instance().get_installed_version(p.name),
                               p.local_path, p.sha256, p.force_reinstall);
@@ -243,6 +256,11 @@ void install_packages_internal(InstallContext& ctx) {
     }
 }
 
+/**
+ * 移除已安装的包
+ * 检查是否为 essential 包、是否有其他包依赖它、是否有包依赖其提供的虚拟包名
+ * force 模式下跳过所有安全检查
+ */
 void remove_package(const std::string& pkg_name, bool force) {
     const std::string ver = Cache::instance().get_installed_version(pkg_name);
     if (ver.empty()) {
@@ -275,6 +293,7 @@ void remove_package(const std::string& pkg_name, bool force) {
     detail::run_hook(pkg_name, std::string(constants::PRERM_SH));
     remove_package_files(pkg_name, force);
 
+    // 清理依赖、文档和钩子文件，删除逆向依赖记录
     auto& cache = Cache::instance();
     const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
     if (fs::exists(dep_file)) {
@@ -294,6 +313,10 @@ void remove_package(const std::string& pkg_name, bool force) {
     log_info(string_format("info.package_removed_successfully", pkg_name));
 }
 
+/**
+ * 删除包的所有文件
+ * 非 force 模式会检查是否有其他包共享这些文件，若有则拒绝删除
+ */
 void remove_package_files(const std::string& pkg_name, bool force) {
     auto& cache = Cache::instance();
     auto owned_files = cache.get_package_files(pkg_name);
@@ -344,6 +367,7 @@ void remove_package_files(const std::string& pkg_name, bool force) {
     }
 }
 
+/** 自动移除不再被任何包依赖的孤立包（用户显式标记的 held 包除外） */
 void autoremove() {
     log_info(get_string("info.checking_autoremove"));
     const auto req = detail::get_all_required_packages();
@@ -367,6 +391,10 @@ void autoremove() {
     }
 }
 
+/**
+ * 升级所有已安装的包
+ * 从仓库索引获取最新版本，与当前版本比较，对有更新的包执行升级安装
+ */
 void upgrade_packages() {
     log_info(get_string("info.checking_upgradable"));
     TmpDirManager tmp;
@@ -414,6 +442,7 @@ void upgrade_packages() {
     Cache::instance().write();
 }
 
+/** 显示包的 man 页面内容 */
 void show_man_page(const std::string& pkg_name) {
     const fs::path p = Config::instance().docs_dir() / (pkg_name + ".man");
     if (!fs::exists(p))
@@ -424,6 +453,10 @@ void show_man_page(const std::string& pkg_name) {
     std::cout << f.rdbuf();
 }
 
+/**
+ * 重新安装一个包
+ * 支持本地包文件路径或包名，强制覆盖模式以确保文件被替换
+ */
 void reinstall_package(const std::string& arg) {
     std::string name = arg;
     if (arg.find('/') != std::string::npos || arg.ends_with(".lpkg")) {
@@ -450,6 +483,7 @@ void reinstall_package(const std::string& arg) {
     Config::instance().set_force_overwrite_mode(old_ovr);
 }
 
+/** 查询指定包安装的所有文件列表 */
 void query_package(const std::string& pkg_name) {
     if (Cache::instance().get_installed_version(pkg_name).empty()) {
         log_info(string_format("info.package_not_installed", pkg_name));
@@ -462,11 +496,13 @@ void query_package(const std::string& pkg_name) {
     }
 }
 
+/** 查询指定文件属于哪个包 */
 void query_file(const std::string& filename) {
     auto& cache = Cache::instance();
     std::string target = filename;
     auto owners = cache.get_file_owners(target);
 
+    // 尝试使用绝对路径解析
     if (owners.empty()) {
         try {
             const fs::path abs_p = fs::absolute(filename);
@@ -478,6 +514,7 @@ void query_file(const std::string& filename) {
         } catch (...) {}
     }
 
+    // 尝试添加 / 前缀作为绝对路径
     if (owners.empty() && !fs::path(filename).is_absolute()) {
         const std::string fallback = (fs::path("/") / filename).string();
         owners = cache.get_file_owners(fallback);

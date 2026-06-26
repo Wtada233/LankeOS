@@ -9,6 +9,7 @@
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
+/** 解析 LankeBUILD.json 构建配置文件，返回 BuildConfig 结构体 */
 BuildConfig parse_build_config(const fs::path& json_path) {
     json meta;
     try {

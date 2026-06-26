@@ -13,7 +13,7 @@
 
 namespace fs = std::filesystem;
 
-// Custom deleter for EVP_MD_CTX
+// EVP_MD_CTX 的自定义删除器
 struct EvpMdCtxDeleter {
     void operator()(EVP_MD_CTX* ctx) const {
         if (ctx) {
@@ -24,6 +24,13 @@ struct EvpMdCtxDeleter {
 
 using EvpMdCtxPtr = std::unique_ptr<EVP_MD_CTX, EvpMdCtxDeleter>;
 
+/**
+ * 计算文件的 SHA-256 哈希值
+ * 使用 OpenSSL EVP 接口进行哈希计算，支持大文件流式读取
+ * @param file_path 目标文件路径
+ * @return 小写十六进制字符串表示的 SHA-256 哈希值
+ * @throws LpkgException 文件无法打开或哈希计算失败时抛出
+ */
 std::string calculate_sha256(const fs::path& file_path) {
     std::ifstream file(file_path, std::ios::binary);
     if (!file) {

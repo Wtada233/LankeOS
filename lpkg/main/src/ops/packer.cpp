@@ -22,10 +22,11 @@ namespace fs = std::filesystem;
 using json = nlohmann::json;
 
 namespace {
+    /** 将磁盘上的单个文件或目录添加到归档中，保留文件元数据和符号链接信息 */
     void add_to_archive(struct archive* a, const fs::path& path, const std::string& entry_name) {
         struct archive_entry* entry = archive_entry_new();
         archive_entry_set_pathname(entry, entry_name.c_str());
-        
+
         struct stat st;
         if (lstat(path.c_str(), &st) != 0) {
             archive_entry_free(entry);
@@ -57,10 +58,11 @@ namespace {
                 }
             }
         }
-        
+
         archive_entry_free(entry);
     }
 
+    /** 递归遍历目录并将所有文件和子目录添加到归档中 */
     void add_dir_recursive(struct archive* a, const fs::path& dir, const std::string& archive_prefix) {
         for (const auto& entry : fs::recursive_directory_iterator(dir)) {
             fs::path rel = entry.path().lexically_relative(dir);
@@ -70,6 +72,14 @@ namespace {
     }
 }
 
+/**
+ * 打包完整的 lpkg 包文件
+ * 步骤包括：
+ *   1. 生成 metadata.json（包含名称、版本、依赖、提供和 man 信息）
+ *   2. 添加 hooks 目录
+ *   3. 添加内容文件（root 目录映射为 content/）
+ * 最后计算并输出 SHA256 哈希值
+ */
 void pack_package(const std::string& output_filename, const std::string& source_dir,
                   const std::string& pkg_name, const std::string& pkg_version,
                   const std::vector<std::string>& deps,
@@ -86,15 +96,15 @@ void pack_package(const std::string& output_filename, const std::string& source_
     struct archive* a = archive_write_new();
     archive_write_add_filter_zstd(a);
     archive_write_set_format_pax_restricted(a);
-    
+
     if (archive_write_open_filename(a, output_filename.c_str()) != ARCHIVE_OK) {
         throw LpkgException(string_format("error.archive_open_failed", archive_error_string(a)));
     }
 
     try {
         log_info(get_string("info.pack_scanning"));
-        
-        // 1. Generate and add metadata.json
+
+        // 1. 生成并添加 metadata.json
         fs::path tmp_meta = Config::get_tmp_dir() / constants::PKG_METADATA_FILE;
         ensure_dir_exists(tmp_meta.parent_path());
         {
@@ -111,13 +121,13 @@ void pack_package(const std::string& output_filename, const std::string& source_
         add_to_archive(a, tmp_meta, std::string(constants::PKG_METADATA_FILE));
         fs::remove(tmp_meta);
 
-        // 3. Add hooks
+        // 2. 添加 hooks 目录
         if (fs::exists(hooks_dir)) {
             add_dir_recursive(a, hooks_dir, std::string(constants::DIR_HOOKS));
         }
 
-        // 4. Add content (root dir -> content/)
-        // Always add the directory entry itself first
+        // 3. 添加内容文件（root 目录 -> content/）
+        // 先添加目录条目本身
         add_to_archive(a, root_dir, std::string(constants::DIR_CONTENT));
         add_dir_recursive(a, root_dir, std::string(constants::DIR_CONTENT));
 

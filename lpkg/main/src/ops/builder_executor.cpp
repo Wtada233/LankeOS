@@ -11,7 +11,11 @@
 
 namespace fs = std::filesystem;
 
-// =====================================================================
+/**
+ * 下载并准备构建所需的源码
+ * 将 sources 中的归档文件自动解压到工作目录，
+ * 将 work_sources 中的文件直接复制到工作目录
+ */
 std::vector<fs::path>
 download_and_prepare_sources(const std::vector<std::string>& sources,
                              const std::vector<std::string>& work_sources,
@@ -69,7 +73,11 @@ download_and_prepare_sources(const std::vector<std::string>& sources,
     return downloaded_files;
 }
 
-// =====================================================================
+/**
+ * 检测工作目录中的源码树结构
+ * 如果工作目录中只有一个子目录，则返回该子目录作为源码根目录（常见的 tarball 解压后单目录结构）
+ * 否则返回工作目录本身
+ */
 fs::path detect_source_tree(const fs::path& work_root) {
     if (!fs::exists(work_root) || !fs::is_directory(work_root)) {
         return work_root;
@@ -83,7 +91,7 @@ fs::path detect_source_tree(const fs::path& work_root) {
             lone_dir = entry.path();
             ++dir_count;
         } else {
-            // File at top-level means no single tree
+            // 顶层有文件说明不是单目录结构
             return work_root;
         }
     }
@@ -96,7 +104,10 @@ fs::path detect_source_tree(const fs::path& work_root) {
     return work_root;
 }
 
-// =====================================================================
+/**
+ * 读取构建脚本内容，并进行变量替换
+ * 将脚本中的 {PKG_NAME}、{SRC_DIR} 等占位符替换为实际值
+ */
 std::string process_build_script(const fs::path& script_path,
                                  const std::map<std::string, std::string>& vars) {
     std::string content;
@@ -111,7 +122,11 @@ std::string process_build_script(const fs::path& script_path,
     return content;
 }
 
-// =====================================================================
+/**
+ * 执行构建阶段的 shell 脚本
+ * source 处理后的构建脚本，然后调用指定的 phase_name 函数
+ * 构建失败时清理临时脚本并抛出异常
+ */
 void execute_build_phase(const std::string& phase_name,
                          const fs::path& work_dir,
                          const fs::path& processed_script_path) {

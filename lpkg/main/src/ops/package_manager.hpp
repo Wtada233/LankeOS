@@ -8,18 +8,18 @@
 
 #include "core/repository.hpp"
 
-// Install plan: a resolved package ready to be installed
+/// 安装计划：已解析完毕、待安装的包
 struct InstallPlan {
     std::string name, actual_version, sha256;
-    bool is_explicit = false;
+    bool is_explicit = false;                                  ///< 用户显式指定安装
     std::filesystem::path local_path;
     std::vector<DependencyInfo> dependencies;
     std::vector<std::string> provides;
-    bool force_reinstall = false;
-    bool metadata_verified = false;
+    bool force_reinstall = false;                              ///< 强制重新安装
+    bool metadata_verified = false;                            ///< 是否已验证元数据
 };
 
-// Shared context for recursive installation transactions
+/// 递归安装事务的共享上下文
 struct InstallContext {
     Repository& repo;
     std::map<std::string, InstallPlan>& plan;
@@ -27,8 +27,8 @@ struct InstallContext {
     std::map<std::string, std::filesystem::path>& local_candidates;
     std::vector<std::pair<std::string, std::string>>& targets;
     bool force_reinstall;
-    bool top_level;                     // false for recursive sub-calls
-    std::vector<std::string> successfully_installed;  // within current transaction
+    bool top_level;                                            ///< 是否为顶级调用（非递归子调用）
+    std::vector<std::string> successfully_installed;           ///< 当前事务中已成功安装的包
 };
 
 class InstallationTask {
@@ -39,22 +39,21 @@ public:
                      std::string expected_hash = "",
                      bool force_reinstall = false);
 
-    // Main entry point; ctx for recursive dep discovery
+    /// 主入口：执行安装任务，ctx 用于递归依赖发现
     void run(InstallContext* ctx = nullptr);
 
-    // External callers (upgrade, etc.) still use the old interface
+    /// 外部调用者（upgrade 等）仍使用旧接口
     void run_simple() { run(nullptr); }
 
-    // --- Public for metadata-verification mode ---
-    // Inline metadata verification: download + extract a package just to inspect
-    // its real metadata (deps, provides) before the actual installation task runs.
+    // --- 元数据验证模式（公开） ---
+    /// 下载并解压包仅用于检查真实元数据（deps、provides），在实际安装前执行
     void download_and_verify_package();
     void extract_and_validate_package();
 
-    // --- Public for testing ---
+    // --- 测试用（公开） ---
     void copy_package_files();
 
-    // Accessors for metadata-verification callers
+    // 元数据验证调用者的访问器
     const std::vector<std::string>& deps() const { return deps_; }
     const std::vector<std::string>& provides() const { return provides_; }
     const std::filesystem::path& archive_path() const { return archive_path_; }
@@ -92,10 +91,10 @@ private:
     std::vector<DependencyInfo> parse_deps() const;
 };
 
-// Public API
+/// 公共 API：安装包
 void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file = "", bool force_reinstall = false);
 
-// Internal recursive engine
+/// 内部递归引擎
 void install_packages_internal(InstallContext& ctx);
 
 void remove_package(const std::string& pkg_name, bool force = false);

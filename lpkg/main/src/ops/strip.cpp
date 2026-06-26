@@ -33,7 +33,7 @@ enum class FileType {
     ObjectFile
 };
 
-// Forward declarations for helper functions used in strip_file
+// strip_file 中使用的辅助函数的前向声明
 FileType identify_file_type(const fs::path& path);
 bool process_elf(const fs::path& path, std::string& error_msg);
 bool process_archive(const fs::path& path, std::string& error_msg);
@@ -41,6 +41,10 @@ bool process_archive(const fs::path& path, std::string& error_msg);
 #include "core/localization.hpp"
 #include <iostream>
 
+/**
+ * 对指定文件执行 strip 操作，去除调试信息和符号表
+ * 根据文件类型（ELF 可执行文件、共享库、目标文件、静态库）分发到对应的处理函数
+ */
 bool strip_file(const fs::path& path, std::string& error_msg) {
     if (!fs::exists(path)) {
         error_msg = string_format("error.strip_file_not_exist", path.string());
@@ -67,9 +71,11 @@ bool strip_file(const fs::path& path, std::string& error_msg) {
     }
 }
 
-
-
-// ... (Rest of the functions from strip_tool.cpp as is)
+/**
+ * 识别文件类型：通过 libelf 读取 ELF 头信息，区分可执行文件、共享库、
+ * 目标文件、静态库（ar 归档）等类型。
+ * 对于 ET_DYN 类型，通过检查 PT_INTERP 和 DT_SONAME 来区分可执行文件和共享库
+ */
 FileType identify_file_type(const fs::path& path) {
     int fd = open(path.c_str(), O_RDONLY);
     if (fd < 0) return FileType::Unknown;
@@ -93,6 +99,8 @@ FileType identify_file_type(const fs::path& path) {
     } else if (ehdr.e_type == ET_REL) {
         type = FileType::ObjectFile;
     } else if (ehdr.e_type == ET_DYN) {
+        // 区分 PIE 可执行文件和共享库：
+        // 有 PT_INTERP 且无 DT_SONAME 的视为可执行文件
         size_t phnum;
         bool has_pt_interp = false;
         if (elf_getphdrnum(elf, &phnum) == 0) {
@@ -106,7 +114,7 @@ FileType identify_file_type(const fs::path& path) {
                 }
             }
         }
-        
+
         bool has_soname = false;
         Elf_Scn* scn = nullptr;
         while ((scn = elf_nextscn(elf, scn)) != nullptr) {
@@ -137,6 +145,16 @@ FileType identify_file_type(const fs::path& path) {
     return type;
 }
 
+/**
+ * 对 ELF 二进制数据进行 strip 操作
+ *
+ * 对于可重定位文件（ET_REL）：通过 libelf API 创建新文件，只保留非调试节区，
+ * 同时更新节区索引映射（包括 SHT_SYMTAB 中的符号索引）
+ *
+ * 对于可执行文件和共享库（非 ET_REL）：手动重建 ELF 布局，
+ * 仅保留 SHF_ALLOC 节区以及必要的 .shstrtab 和字符串表，
+ * 丢弃 .symtab、.strtab、.comment 和 .debug* 节区
+ */
 bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>& output_data, [[maybe_unused]] std::string& error_msg) {
     if (elf_version(EV_CURRENT) == EV_NONE) return false;
 
@@ -158,6 +176,7 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
     int elf_class = gelf_getclass(in_elf);
 
     if (ehdr.e_type == ET_REL) {
+        // 处理可重定位文件（.o）：使用 libelf API 重建
         int out_fd = memfd_create("strip_out", 0);
         if (out_fd < 0) { elf_end(in_elf); return false; }
         Elf* out_elf = elf_begin(out_fd, ELF_C_WRITE, nullptr);
@@ -177,20 +196,22 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
             GElf_Shdr shdr; gelf_getshdr(scn, &shdr);
             const char* name_ptr = elf_strptr(in_elf, shstrndx, shdr.sh_name);
             std::string name = name_ptr ? name_ptr : "";
-            
+
             bool keep = true;
+            // 过滤掉调试信息和注释节区
             if (name.starts_with(".debug") || name.starts_with(".rela.debug") || name.starts_with(".rel.debug") || name == ".comment") keep = false;
-            
-            if (keep) { 
-                to_keep.push_back({scn, shdr, name, old_idx}); 
-                idx_map[old_idx] = new_idx++; 
+
+            if (keep) {
+                to_keep.push_back({scn, shdr, name, old_idx});
+                idx_map[old_idx] = new_idx++;
             }
         }
 
         for (auto& info : to_keep) {
             Elf_Scn* new_scn = elf_newscn(out_elf);
             GElf_Shdr new_shdr = info.shdr;
-            
+
+            // 重映射节区链接索引
             if (idx_map.count(new_shdr.sh_link)) new_shdr.sh_link = idx_map[new_shdr.sh_link];
             else if (new_shdr.sh_link != 0) new_shdr.sh_link = SHN_UNDEF;
 
@@ -198,12 +219,13 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
                 if (idx_map.count(new_shdr.sh_info)) new_shdr.sh_info = idx_map[new_shdr.sh_info];
                 else new_shdr.sh_info = 0;
             }
-            
+
             gelf_update_shdr(new_scn, &new_shdr);
             Elf_Data* in_data = elf_getdata(info.old_scn, nullptr);
             Elf_Data* out_data = elf_newdata(new_scn);
             if (in_data) {
                 *out_data = *in_data;
+                // 更新符号表中的节区索引
                 if (new_shdr.sh_type == SHT_SYMTAB) {
                     size_t sym_count = out_data->d_size / gelf_fsize(out_elf, ELF_T_SYM, 1, EV_CURRENT);
                     for (size_t i = 0; i < sym_count; ++i) {
@@ -217,20 +239,21 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
                 }
             }
         }
-        
+
         if (idx_map.count(shstrndx)) ehdr.e_shstrndx = idx_map[shstrndx];
         else ehdr.e_shstrndx = SHN_UNDEF;
 
         gelf_update_ehdr(out_elf, &ehdr);
         elf_update(out_elf, ELF_C_WRITE);
-        
+
         off_t size = lseek(out_fd, 0, SEEK_END);
-        output_data.resize(size); lseek(out_fd, 0, SEEK_SET); 
+        output_data.resize(size); lseek(out_fd, 0, SEEK_SET);
         [[maybe_unused]] ssize_t bytes_read = read(out_fd, output_data.data(), size);
-        
+
         elf_end(out_elf); close(out_fd); elf_end(in_elf);
         return true;
     } else {
+        // 处理可执行文件和共享库：手动重建 ELF 布局
         struct KeptSection {
             GElf_Shdr shdr;
             size_t old_index;
@@ -238,8 +261,8 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
         };
 
         std::vector<KeptSection> kept_sections;
-        std::map<size_t, size_t> el_idx_map; 
-        
+        std::map<size_t, size_t> el_idx_map;
+
         kept_sections.push_back({ {}, 0, 0 });
         el_idx_map[0] = 0; el_idx_map[SHN_ABS] = SHN_ABS; el_idx_map[SHN_COMMON] = SHN_COMMON; el_idx_map[SHN_UNDEF] = SHN_UNDEF;
 
@@ -252,24 +275,27 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
             GElf_Shdr shdr; gelf_getshdr(scn, &shdr);
             const char* name_ptr = elf_strptr(in_elf, shstrndx, shdr.sh_name);
             std::string name = name_ptr ? name_ptr : "";
-            
+
             bool keep = true;
+            // 保留 SHF_ALLOC 节区（运行时需要的节区）
             if (!(shdr.sh_flags & SHF_ALLOC)) {
                 if (name != ".shstrtab" && shdr.sh_type != SHT_STRTAB) keep = false;
             }
+            // 丢弃符号表、字符串表、注释和调试信息
             if (name == ".symtab" || name == ".strtab" || name == ".comment" || name.starts_with(".debug")) keep = false;
-            
+
             if (keep) {
                 kept_sections.push_back({ shdr, old_idx, current_new_idx });
                 el_idx_map[old_idx] = current_new_idx;
                 current_new_idx++;
-                
+
                 if ((shdr.sh_flags & SHF_ALLOC) && shdr.sh_type != SHT_NOBITS) {
                     max_alloc_end = std::max(max_alloc_end, shdr.sh_offset + shdr.sh_size);
                 }
             }
         }
 
+        // 对非 SHF_ALLOC 节区重新排列，紧跟在已分配数据之后
         uint64_t current_offset = (max_alloc_end + 15) & ~15;
         for (size_t i = 1; i < kept_sections.size(); ++i) {
             auto& ks = kept_sections[i];
@@ -277,13 +303,13 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
                 ks.shdr.sh_offset = current_offset;
                 current_offset += ks.shdr.sh_size;
             }
-            
+
             if (el_idx_map.count(ks.shdr.sh_link)) {
                 ks.shdr.sh_link = el_idx_map[ks.shdr.sh_link];
             } else if (ks.shdr.sh_link != 0) {
                 ks.shdr.sh_link = SHN_UNDEF;
             }
-            
+
             if (ks.shdr.sh_type == SHT_REL || ks.shdr.sh_type == SHT_RELA || (ks.shdr.sh_flags & SHF_INFO_LINK)) {
                 if (el_idx_map.count(ks.shdr.sh_info)) {
                     ks.shdr.sh_info = el_idx_map[ks.shdr.sh_info];
@@ -301,7 +327,7 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
         else ehdr.e_shstrndx = SHN_UNDEF;
 
         output_data.resize(ehdr.e_shoff + ehdr.e_shnum * shentsize);
-        
+
         for (size_t i = 1; i < kept_sections.size(); ++i) {
             const auto& ks = kept_sections[i];
             Elf_Scn* old_scn = elf_getscn(in_elf, ks.old_index);
@@ -312,11 +338,13 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
                 }
             }
         }
-        
+
+        // 复制 ELF 头和程序头到输出缓冲区
         size_t headers_size = ehdr.e_phoff + ehdr.e_phnum * ((elf_class == ELFCLASS64) ? sizeof(Elf64_Phdr) : sizeof(Elf32_Phdr));
         headers_size = std::max(headers_size, (size_t)ehdr.e_ehsize);
         std::memcpy(output_data.data(), input_data.data(), headers_size);
 
+        // 写入更新后的 ELF 头（节区表偏移、数量和字符串表索引）
         if (elf_class == ELFCLASS64) {
             Elf64_Ehdr* out = reinterpret_cast<Elf64_Ehdr*>(output_data.data());
             out->e_shoff = ehdr.e_shoff; out->e_shnum = ehdr.e_shnum; out->e_shstrndx = ehdr.e_shstrndx;
@@ -324,7 +352,8 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
             Elf32_Ehdr* out = reinterpret_cast<Elf32_Ehdr*>(output_data.data());
             out->e_shoff = ehdr.e_shoff; out->e_shnum = ehdr.e_shnum; out->e_shstrndx = ehdr.e_shstrndx;
         }
-        
+
+        // 写入更新后的节区表
         for (size_t i = 0; i < kept_sections.size(); ++i) {
             if (elf_class == ELFCLASS64) {
                 Elf64_Shdr* out = reinterpret_cast<Elf64_Shdr*>(output_data.data() + ehdr.e_shoff + i * shentsize);
@@ -344,6 +373,7 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
     }
 }
 
+/** 读取 ELF 文件内容，调用 strip_elf_data 处理后写回原文件 */
 bool process_elf(const fs::path& path, std::string& error_msg) {
     std::ifstream is(path, std::ios::binary | std::ios::ate);
     if (!is) return false;
@@ -363,6 +393,10 @@ bool process_elf(const fs::path& path, std::string& error_msg) {
     return true;
 }
 
+/**
+ * 处理静态库（ar 归档文件）：遍历其中的 .o 文件，对每个进行 ELF strip，
+ * 重新打包为新的归档文件
+ */
 bool process_archive(const fs::path& path, [[maybe_unused]] std::string& error_msg) {
     struct archive* a = archive_read_new();
     archive_read_support_format_all(a);
@@ -373,7 +407,7 @@ bool process_archive(const fs::path& path, [[maybe_unused]] std::string& error_m
 
     struct archive* out = archive_write_new();
     archive_write_set_format_ar_svr4(out);
-    
+
     fs::path temp_path = path.string() + ".tmp";
     if (archive_write_open_filename(out, temp_path.c_str()) != ARCHIVE_OK) {
         archive_read_free(a);
@@ -386,9 +420,10 @@ bool process_archive(const fs::path& path, [[maybe_unused]] std::string& error_m
         const char* name = archive_entry_pathname(entry);
         size_t size = archive_entry_size(entry);
         std::vector<uint8_t> data(size);
-        
+
         archive_read_data(a, data.data(), size);
 
+        // 对 .o 目标文件进行 strip 处理
         if (std::string_view(name).ends_with(".o")) {
             std::vector<uint8_t> stripped_data;
             std::string error_msg;
@@ -399,7 +434,7 @@ bool process_archive(const fs::path& path, [[maybe_unused]] std::string& error_m
                 continue;
             }
         }
-        
+
         archive_write_header(out, entry);
         archive_write_data(out, data.data(), size);
     }

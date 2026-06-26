@@ -11,17 +11,18 @@
 
 namespace fs = std::filesystem;
 
-// =====================================================================
-// Singleton
-// =====================================================================
+/**
+ * 获取 Config 单例实例
+ */
 Config& Config::instance() {
     static Config cfg;
     return cfg;
 }
 
-// =====================================================================
-// Constructor — initialise paths from compile-time defines
-// =====================================================================
+/**
+ * 构造函数：使用编译期宏定义初始化所有路径
+ * 包括配置目录、状态目录、本地化目录等系统路径
+ */
 Config::Config()
     : root_dir_("/")
     , config_dir_(fs::path{LPKG_CONF_DIR})
@@ -42,9 +43,10 @@ Config::Config()
     , lock_file_(fs::path{LPKG_LOCK_DIR} / "db.lck")
 {}
 
-// =====================================================================
-// Path helpers
-// =====================================================================
+/**
+ * 重新计算所有路径，将相对路径改为相对于 root_dir_ 的绝对路径
+ * 在设置了新的根目录后调用此方法
+ */
 void Config::rebase_paths() {
     auto rebase = [&](const std::string& default_path) -> fs::path {
         fs::path p(default_path);
@@ -72,17 +74,27 @@ void Config::rebase_paths() {
     lock_file_        = lock_dir_ / "db.lck";
 }
 
+/**
+ * 设置软件包安装根目录，并重新计算所有派生路径
+ */
 void Config::set_root_path(const std::string& root_path) {
     root_dir_ = fs::path(root_path).lexically_normal();
     if (root_dir_.empty()) root_dir_ = "/";
     rebase_paths();
 }
 
+/**
+ * 获取当前进程的临时目录，路径为 /tmp/lpkg_<PID>
+ */
 fs::path Config::get_tmp_dir() {
     static const fs::path tmp_dir = fs::path("/tmp") / ("lpkg_" + std::to_string(getpid()));
     return tmp_dir;
 }
 
+/**
+ * 初始化配置所需的文件系统结构
+ * 创建所有必要的目录和空文件（如包数据库、锁定文件等）
+ */
 void Config::init_filesystem() {
     ensure_dir_exists(config_dir_);
     ensure_dir_exists(state_dir_);
@@ -98,13 +110,17 @@ void Config::init_filesystem() {
     ensure_file_exists(provides_db_);
 }
 
-// =====================================================================
-// Architecture
-// =====================================================================
+/**
+ * 覆盖系统的架构检测结果，强制使用指定架构
+ */
 void Config::set_architecture(const std::string& arch) {
     architecture_override_ = arch;
 }
 
+/**
+ * 获取当前系统的 CPU 架构
+ * 如果未设置架构覆盖，通过 uname 系统调用获取
+ */
 std::string Config::get_architecture() {
     if (!architecture_override_.empty()) {
         return architecture_override_;
@@ -117,9 +133,10 @@ std::string Config::get_architecture() {
     return std::string(buf.machine);
 }
 
-// =====================================================================
-// Mirror URL
-// =====================================================================
+/**
+ * 从镜像配置文件中读取镜像源 URL
+ * 确保 URL 末尾包含斜杠
+ */
 std::string Config::get_mirror_url() {
     std::ifstream mirror_file(mirror_conf_);
     if (!mirror_file.is_open()) {

@@ -5,7 +5,7 @@
 namespace fs = std::filesystem;
 
 /**
- * Executes the LankeBUILD process for a directory.
- * @param build_dir The directory containing LankeBUILD.json and LankeBUILD.sh
+ * @brief 执行指定目录的 LankeBUILD 构建流程
+ * @param build_dir 包含 LankeBUILD.json 和 LankeBUILD.sh 的目录
  */
 void run_build(const fs::path& build_dir);

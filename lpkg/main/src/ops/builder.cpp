@@ -16,12 +16,16 @@
 namespace fs = std::filesystem;
 
 // =====================================================================
-// Internal helpers
+// 内部辅助函数
 // =====================================================================
 
 namespace {
 
-// Prepare staging directory layout (UsrMerge symlinks, hooks placeholder).
+/**
+ * 设置构建目录结构
+ * 创建工作目录、staging 目录和 hooks 目录，初始化 UsrMerge 符号链接
+ * 创建默认的 post-install 脚本占位符
+ */
 fs::path setup_build_directories(const fs::path& build_dir) {
     fs::path work_root     = build_dir / constants::DIR_WORK;
     fs::path staging_root  = build_dir / constants::DIR_ROOT;
@@ -34,7 +38,7 @@ fs::path setup_build_directories(const fs::path& build_dir) {
     ensure_dir_exists(work_root);
     ensure_dir_exists(staging_root);
 
-    // Path Normalization (UsrMerge)
+    // 路径规范化（UsrMerge 合并）
     log_info(get_string("info.path_normalization"));
     for (const auto& d : {constants::BIN, constants::LIB,
                           constants::INCLUDE, constants::SHARE_MAN,
@@ -67,7 +71,7 @@ fs::path setup_build_directories(const fs::path& build_dir) {
     return staging_hooks;
 }
 
-// Build the template-substitution map.
+/** 构建模板变量映射表，将占位符替换为实际的路径和配置值 */
 std::map<std::string, std::string>
 build_variable_map(const BuildConfig& cfg,
                    const fs::path& work_root,
@@ -85,7 +89,10 @@ build_variable_map(const BuildConfig& cfg,
     };
 }
 
-// Post-processing: libtool cleanup, ELF strip, SONAME symlinks.
+/**
+ * 构建后处理：清理 libtool 文件、对 ELF 二进制文件进行 strip、
+ * 生成 SONAME 符号链接
+ */
 void finalize_staging(const fs::path& staging_root, bool no_strip) {
     log_info(get_string("info.finalizing_staging"));
 
@@ -109,7 +116,7 @@ void finalize_staging(const fs::path& staging_root, bool no_strip) {
             for (const auto& entry : fs::recursive_directory_iterator(p)) {
                 if (!entry.is_regular_file() || entry.is_symlink()) continue;
 
-                // Only strip ELF files
+                // 仅对 ELF 文件进行 strip
                 bool is_elf = false;
                 std::ifstream f(entry.path(), std::ios::binary);
                 if (f) {
@@ -136,6 +143,7 @@ void finalize_staging(const fs::path& staging_root, bool no_strip) {
     }
 }
 
+/** 清理构建过程中产生的临时文件和工作目录 */
 void cleanup_build([[maybe_unused]] const fs::path& build_dir,
                    const fs::path& work_root,
                    const fs::path& staging_root,
@@ -153,10 +161,22 @@ void cleanup_build([[maybe_unused]] const fs::path& build_dir,
 } // anonymous namespace
 
 // =====================================================================
-// Public API
+// 公开 API
 // =====================================================================
+
+/**
+ * 执行完整的包构建流程：
+ * 1. 解析 LankeBUILD.json 配置
+ * 2. 准备构建目录结构和 UsrMerge 符号链接
+ * 3. 下载并解压源码
+ * 4. 检测源码树结构
+ * 5. 处理构建脚本并执行各构建阶段（prepare/build/package）
+ * 6. 后处理：strip、清理 libtool 文件、生成 SONAME 链接
+ * 7. 打包为 .lpkg 文件
+ * 8. 清理临时文件
+ */
 void run_build(const fs::path& build_dir) {
-    // 1. Parse metadata
+    // 1. 解析元数据
     fs::path json_path   = build_dir / constants::LANK_BUILD_JSON;
     fs::path script_path = build_dir / constants::LANK_BUILD_SCRIPT;
 
@@ -171,7 +191,7 @@ void run_build(const fs::path& build_dir) {
     auto cfg = parse_build_config(json_path);
     log_info(string_format("info.building_package", cfg.name, cfg.version));
 
-    // Auto-generate man page if not specified in LankeBUILD.json
+    // 如果 LankeBUILD.json 中未指定 man 页面内容，则自动生成
     if (cfg.man_content.empty()) {
         std::time_t t = std::time(nullptr);
         std::tm* tm = std::localtime(&t);
@@ -184,19 +204,19 @@ void run_build(const fs::path& build_dir) {
         log_info(string_format("info.auto_generated_man", cfg.name));
     }
 
-    // 2. Prepare directories
+    // 2. 准备目录
     fs::path work_root    = build_dir / constants::DIR_WORK;
     fs::path staging_root = build_dir / constants::DIR_ROOT;
     auto staging_hooks    = setup_build_directories(build_dir);
 
-    // 3. Download and extract sources
+    // 3. 下载并解压源码
     auto downloaded = download_and_prepare_sources(
         cfg.sources, cfg.work_sources, build_dir, work_root);
 
-    // 4. Detect source tree
+    // 4. 检测源码树
     auto actual_work_dir = detect_source_tree(work_root);
 
-    // 5. Process script and execute build phases
+    // 5. 处理脚本并执行构建阶段
     auto vars = build_variable_map(cfg, work_root, actual_work_dir,
                                     staging_root, staging_hooks);
     fs::path processed_script = build_dir / constants::LANK_BUILD_PROCESSED;
@@ -219,10 +239,10 @@ void run_build(const fs::path& build_dir) {
     }
     fs::remove(processed_script);
 
-    // 6. Post-process
+    // 6. 后处理
     finalize_staging(staging_root, cfg.no_strip);
 
-    // 7. Pack
+    // 7. 打包
     log_info(get_string("info.packing_built_pkg"));
     std::string output_filename =
         cfg.name + "-" + cfg.version + std::string(constants::EXT_LPKG);
@@ -230,7 +250,7 @@ void run_build(const fs::path& build_dir) {
                  cfg.deps, cfg.provides, cfg.man_content);
     log_info(string_format("info.build_success", output_filename));
 
-    // 8. Cleanup
+    // 8. 清理
     cleanup_build(build_dir, work_root, staging_root,
                   staging_hooks, downloaded);
 }
