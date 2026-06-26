@@ -1,11 +1,11 @@
 #include "repository.hpp"
-#include "config.hpp"
+#include "core/config.hpp"
 #include "ops/downloader.hpp"
-#include "utils.hpp"
-#include "exception.hpp"
-#include "localization.hpp"
-#include "version.hpp"
-#include "constants.hpp"
+#include "core/utils.hpp"
+#include "core/exception.hpp"
+#include "core/localization.hpp"
+#include "core/version.hpp"
+#include "core/constants.hpp"
 #include <sstream>
 #include <fstream>
 #include <iostream>
@@ -13,9 +13,17 @@
 #include <ranges>
 #include <string_view>
 
+/**
+ * 加载仓库索引文件
+ * 支持远程（http/https）和本地（file://）两种方式。
+ * 远程索引会被下载到临时目录后解析。
+ * 所有异常会被捕获并输出警告，不会影响程序运行。
+ */
 void Repository::load_index() {
     packages_.clear();
     providers_.clear();
+
+    // 读取镜像地址（可能为本地路径或 http URL）
     std::string mirror;
     try { mirror = Config::instance().get_mirror_url(); }
     catch (const std::exception& e) {
@@ -45,6 +53,7 @@ void Repository::load_index() {
         return;
     }
 
+    // 逐个解析索引行，格式: 包名|版本:哈希:依赖;版本2:哈希2:依赖2|提供者
     std::ifstream file(index_path);
     std::string line;
     static const std::vector<std::string> ops = {">=", "<=", "!=", "==", ">", "<", "="};
@@ -64,7 +73,7 @@ void Repository::load_index() {
         if (line.empty() || line[0] == '#') continue;
         std::string_view sv = line;
         if (!sv.empty() && sv.back() == '\r') sv.remove_suffix(1);
-        
+
         auto parts = split(sv, constants::PIPE_CHAR);
         if (parts.size() < 2) continue;
 
@@ -72,7 +81,7 @@ void Repository::load_index() {
         std::string_view version_blocks_sv = parts[1];
         std::string_view prov_sv = (parts.size() > 2) ? parts[2] : "";
 
-        // Support aggregated format: ver1:hash1:deps;ver2:hash2:deps
+        // 一个包可能对应多个版本，用 ';' 分隔
         for (auto version_info_sv : split(version_blocks_sv, constants::SEMICOLON_CHAR)) {
             if (version_info_sv.empty()) continue;
 
@@ -83,6 +92,7 @@ void Repository::load_index() {
             std::string hash = (vh_parts.size() > 1) ? std::string(vh_parts[1]) : "";
             std::string_view deps_sv = (vh_parts.size() > 2) ? vh_parts[2] : "";
 
+            // 解析依赖字符串，提取包名和版本约束
             std::vector<DependencyInfo> deps;
             if (!deps_sv.empty()) {
                 for (auto dep_str : split(deps_sv, constants::COMMA_CHAR)) {
@@ -101,6 +111,7 @@ void Repository::load_index() {
                 }
             }
 
+            // 记录虚拟包（provides）
             if (!prov_sv.empty()) {
                 for (auto prov : split(prov_sv, constants::COMMA_CHAR)) {
                     providers_[std::string(prov)].push_back(pkg_name);
@@ -121,6 +132,7 @@ void Repository::load_index() {
         }
     }
 
+    // 每个包的版本列表按版本号升序排列（最后一个就是最新版）
     for (auto& versions : packages_ | std::views::values) {
         std::ranges::sort(versions, [](const PackageInfo& a, const PackageInfo& b) {
             return version_compare(a.version, b.version);
@@ -128,12 +140,14 @@ void Repository::load_index() {
     }
 }
 
+/** 根据 capability 查找提供该能力的第一个包 */
 std::optional<PackageInfo> Repository::find_provider(const std::string& capability) {
     auto it = providers_.find(capability);
     if (it == providers_.end() || it->second.empty()) return std::nullopt;
     return find_package(it->second[0]);
 }
 
+/** 更新（或新增）某包某版本的元数据 */
 void Repository::update_package_info(const std::string& name, const std::string& version, const std::vector<DependencyInfo>& deps, const std::vector<std::string>& provides) {
     auto& versions = packages_[name];
     bool found = false;
@@ -157,25 +171,25 @@ void Repository::update_package_info(const std::string& name, const std::string&
         });
     }
 
-    // Rebuild provider map (it's simpler and more robust as requested)
+    // 重建 providers 映射（简单粗暴但可靠）
     providers_.clear();
     for (const auto& [pkg_name, pkg_versions] : packages_) {
         for (const auto& pkg : pkg_versions) {
             for (const auto& prov : pkg.provides) {
-                // If multiple packages provide the same thing, the first one indexed wins for now
-                // (Matches find_provider logic)
                 providers_[prov].push_back(pkg_name);
             }
         }
     }
 }
 
+/** 按包名查找最新版本 */
 std::optional<PackageInfo> Repository::find_package(const std::string& name) {
     auto it = packages_.find(name);
     if (it == packages_.end() || it->second.empty()) return std::nullopt;
     return it->second.back();
 }
 
+/** 按包名+版本精确查找 */
 std::optional<PackageInfo> Repository::find_package(const std::string& name, const std::string& version) {
     auto it = packages_.find(name);
     if (it == packages_.end()) return std::nullopt;
@@ -185,6 +199,7 @@ std::optional<PackageInfo> Repository::find_package(const std::string& name, con
     return std::nullopt;
 }
 
+/** 按版本约束查找最匹配的版本（从高到低遍历，返回第一个满足条件的） */
 std::optional<PackageInfo> Repository::find_best_matching_version(const std::string& name, const std::string& op, const std::string& version_req) {
     auto it = packages_.find(name);
     if (it == packages_.end() || it->second.empty()) return std::nullopt;
