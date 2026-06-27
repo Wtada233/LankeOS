@@ -14,6 +14,7 @@ lankebuild_build() {
 
 lankebuild_package() {
     # Installation handled by builder
+    mkdir -p "{STAGING_ROOT}/etc/profile.d"
     cat > "{STAGING_ROOT}/etc/profile.d/fcitx5.sh" << 'EOF'
 #!/bin/bash
 # start of fcitx5
