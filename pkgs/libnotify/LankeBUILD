@@ -1,0 +1,26 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # 创建构建目录并配置
+    mkdir -p build
+    cd build
+    meson setup --prefix=/usr            \
+                --buildtype=release      \
+                -D tests=false           \
+                -D man=false             \
+                -D gtk_doc=false         \
+                -D docbook_docs=disabled \
+                -D introspection=auto    \
+                ../
+    cd ..
+}
+
+lankebuild_build() {
+    cd build
+    meson compile -j $(nproc)
+    DESTDIR="{STAGING_ROOT}" meson install
+}
+
+lankebuild_package() {
+    :
+}

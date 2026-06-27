@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    ./configure --prefix=/usr          \
+            --shared-nghttp2       \
+            --shared-openssl       \
+            --shared-zlib          \
+            --with-intl=system-icu
+}
+
+lankebuild_build() {
+    make -j$(nproc)    
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

@@ -1,37 +1,80 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    cd "lua-{PKG_VER}"
+    # 将版本号赋给 shell 变量，以便后续处理
+    VERSION="{PKG_VER}"
+    MAJOR="${VERSION%.*}"          # 取主版本号，如 5.5
+
+    # 打补丁（补丁文件在构建目录中，即上一级）
+    patch -p1 -i ../liblua.so.patch
+    patch -p1 -i ../paths.patch
+
+    # 复制一份源码用于 lua++（C++ 版）
+    cp -r . "../lua++-{PKG_VER}"
+
+    # 生成 pkg-config 文件（使用模板，替换 %VER% 和 %REL%）
+    sed "s/%VER%/${MAJOR}/g; s/%REL%/${VERSION}/g" ../lua.pc > lua.pc
+    sed "s/%VER%/${MAJOR}/g; s/%REL%/${VERSION}/g; s/-llua/-llua++/g" ../lua.pc > "../lua++-${VERSION}/lua++.pc"
 }
 
 lankebuild_build() {
-    make linux -j$(nproc)
-    make INSTALL_TOP={STAGING_ROOT}/usr install
-    rm -f {STAGING_ROOT}/usr/lib/liblua.a
-    mkdir -p '{STAGING_ROOT}/usr/lib/pkgconfig'
-    cat > '{STAGING_ROOT}/usr/lib/pkgconfig/lua.pc' << 'EOF'
-V=5.5
-R=5.5.0
-prefix=/usr
-INSTALL_BIN=$prefix/bin
-INSTALL_INC=$prefix/include
-INSTALL_LIB=$prefix/lib
-exec_prefix=$prefix
-libdir=$exec_prefix/lib
-includedir=$prefix/include
+    cd "lua-{PKG_VER}"
+    # 编译 lua（C 版本）
+    make MYCFLAGS="$CFLAGS -fPIC" MYLDFLAGS="$LDFLAGS" linux -j$(nproc)
 
-Name: Lua
-Description: An Extensible Extension Language
-Version: $R
-Requires:
-Libs: -L$libdir -llua -lm -ldl
-Cflags: -I$includedir
-EOF
+    # 编译 lua++（C++ 版本）
+    cd "../lua++-{PKG_VER}"
+    make MYCFLAGS="$CXXFLAGS -fPIC" MYLDFLAGS="$LDFLAGS" CC=g++ LUA_A=liblua++.a LUA_SO=liblua++.so linux -j$(nproc)
+    cd ..
 }
 
-
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    cd "lua-{PKG_VER}"
+    VERSION="{PKG_VER}"
+    MAJOR="${VERSION%.*}"
+
+    # ---------- 安装 lua ----------
+    make TO_LIB="liblua.so liblua.so.${MAJOR} liblua.so.${VERSION}" \
+         INSTALL_DATA='cp -d' \
+         INSTALL_TOP="{STAGING_ROOT}/usr" \
+         INSTALL_MAN="{STAGING_ROOT}/usr/share/man/man1" \
+         install
+
+    # 创建兼容符号链接
+    ln -sf /usr/bin/lua "{STAGING_ROOT}/usr/bin/lua${MAJOR}"
+    ln -sf /usr/bin/luac "{STAGING_ROOT}/usr/bin/luac${MAJOR}"
+    ln -sf /usr/lib/liblua.so.${VERSION} "{STAGING_ROOT}/usr/lib/liblua${MAJOR}.so"
+
+    # 安装 pkg-config 文件（去掉点号作为 pkgconfig 名称，如 lua55）
+    PKGCONFIG_NAME="lua${MAJOR//./}"
+    install -Dm644 lua.pc "{STAGING_ROOT}/usr/lib/pkgconfig/${PKGCONFIG_NAME}.pc"
+    ln -sf "${PKGCONFIG_NAME}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua.pc"
+    ln -sf "${PKGCONFIG_NAME}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua${VERSION}.pc"
+    ln -sf "${PKGCONFIG_NAME}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua-${VERSION}.pc"
+
+    # 安装文档和许可证
+    install -d "{STAGING_ROOT}/usr/share/doc/{PKG_NAME}"
+    install -m644 doc/*.{png,css,html} "{STAGING_ROOT}/usr/share/doc/{PKG_NAME}/"
+    install -Dm644 ../license-from-upstream "{STAGING_ROOT}/usr/share/licenses/{PKG_NAME}/LICENSE"
+
+    # ---------- 安装 lua++ ----------
+    cd "../lua++-{PKG_VER}"
+    make TO_LIB="liblua++.so liblua++.so.${MAJOR} liblua++.so.${VERSION}" \
+         INSTALL_BIN=null \
+         INSTALL_INC=null \
+         INSTALL_MAN=../null \
+         INSTALL_DATA='cp -d' \
+         INSTALL_TOP="{STAGING_ROOT}/usr" \
+         install
+
+    ln -sf /usr/lib/liblua++.so.${VERSION} "{STAGING_ROOT}/usr/lib/liblua++${MAJOR}.so"
+
+    PKGCONFIG_NAME_CXX="lua++${MAJOR//./}"
+    install -Dm644 lua++.pc "{STAGING_ROOT}/usr/lib/pkgconfig/${PKGCONFIG_NAME_CXX}.pc"
+    ln -sf "${PKGCONFIG_NAME_CXX}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua++.pc"
+    ln -sf "${PKGCONFIG_NAME_CXX}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua++${VERSION}.pc"
+    ln -sf "${PKGCONFIG_NAME_CXX}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua++-${VERSION}.pc"
+
+    cd ..
 }

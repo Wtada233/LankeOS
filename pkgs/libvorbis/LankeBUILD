@@ -1,0 +1,16 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    ./configure --prefix=/usr \
+                --enable-shared \
+                --disable-static
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

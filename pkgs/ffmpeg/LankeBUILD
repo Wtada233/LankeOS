@@ -1,0 +1,23 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # BLFS 推荐配置，启用 GPL 和必要的编码器
+    ./configure --prefix=/usr            \
+                --enable-gpl             \
+                --enable-version3        \
+                --enable-libmp3lame      \
+                --enable-libvorbis       \
+                --enable-libx264         \
+                --enable-libx265         \
+                --enable-shared          \
+                --disable-static
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

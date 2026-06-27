@@ -1,0 +1,13 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    make -f unix/Makefile generic CC="gcc -std=gnu89"
+}
+
+lankebuild_package() {
+    make prefix=/usr MANDIR=/usr/share/man/man1 -f unix/Makefile install
+}

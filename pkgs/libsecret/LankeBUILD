@@ -12,8 +12,8 @@ lankebuild_build() {
                    --buildtype=release  \
                    -Dgtk_doc=false      \
                    -Dmanpage=false      \
-                   -Dintrospection=false \
-                   -Dvapi=false          \
+                   -Dintrospection=true \
+                   -Dvapi=false         \
                    -Dcrypto=gnutls
     echo "Building libsecret-0.21.7..."
     ninja -j$(nproc)

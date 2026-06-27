@@ -11,10 +11,9 @@ lankebuild_build() {
     meson setup .. --prefix=/usr        \
                    --buildtype=release  \
                    -Ddoc=disabled       \
-                   -Dcheck=disabled     \
                    -Dtests=disabled     \
                    -Dexamples=disabled  \
-                   -Dintrospection=disabled \
+                   -Dintrospection=enabled \
                    -Dnls=disabled       \
                    -Dtools=disabled
     echo "Building gstreamer-1.28.1..."
