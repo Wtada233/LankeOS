@@ -8,10 +8,23 @@ lankebuild_prepare() {
 lankebuild_build() {
     sed -i 's/libsystemd_dep = dependency/systemd_dep = libsystemd_dep = dependency/' meson.build
     mkdir build && cd build
-    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Dsession_tracking=logind -Dauthfw=shadow -Dintrospection=true -Dman=false
+    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Dsession_tracking=logind -Dauthfw=pam -Dintrospection=true -Dman=false
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
     chmod 4755 {STAGING_ROOT}/usr/bin/pkexec
+    chmod 4755 {STAGING_ROOT}/usr/lib/polkit-1/polkit-agent-helper-1
+
+    # 安装 PAM 配置文件 (pkexec 和 polkit-1 共用)
+    install -Dm644 /dev/stdin {STAGING_ROOT}/etc/pam.d/polkit-1 << 'PAM_EOF'
+# Polkit authentication: system-auth stack
+auth            include         system-auth
+account         include         system-auth
+password        include         system-auth
+session         include         system-auth
+PAM_EOF
+    # pkexec 也用同一份
+    ln -sf polkit-1 {STAGING_ROOT}/etc/pam.d/polkit-pkexec
+
     cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
 getent group polkitd >/dev/null || groupadd -fg 27 polkitd
 getent passwd polkitd >/dev/null || useradd -c 'PolicyKit Daemon Owner' -d /etc/polkit-1 -u 27 -g polkitd -s /bin/false polkitd
