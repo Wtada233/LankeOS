@@ -1,0 +1,11 @@
+NAME="LankeOS"
+PRETTY_NAME="LankeOS"
+ID=lanke
+BUILD_ID=rolling
+ANSI_COLOR="38;2;23;147;209"
+HOME_URL="https://github.com/Wtada233/LankeOS"
+DOCUMENTATION_URL="https://github.com/Wtada233/LankeOS/blob/main/README.md"
+SUPPORT_URL="https://github.com/Wtada233/LankeOS"
+BUG_REPORT_URL="https://github.com/Wtada233/LankeOS/issues"
+PRIVACY_POLICY_URL="Nothing Here"
+LOGO=lankeos-logo

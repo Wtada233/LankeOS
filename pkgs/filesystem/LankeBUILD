@@ -1,0 +1,14 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    rm -rf "{STAGING_ROOT}"
+    cp -a "{SRC_DIR}/../src" "{STAGING_ROOT}"
+}
+
+lankebuild_package() {
+    :
+}

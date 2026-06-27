@@ -22,5 +22,10 @@ lankebuild_build() {
 
 lankebuild_package() {
     # Installation handled by builder
-    :
+        cat > "{STAGING_ROOT}/etc/profile.d/fcitx5-gtk.sh" << 'EOF'
+#!/bin/bash
+# start of fcitx5-gtk
+export GTK_IM_MODULE=fcitx
+# end of fcitx5-gtk
+EOF
 }
