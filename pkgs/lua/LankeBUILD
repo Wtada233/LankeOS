@@ -42,9 +42,9 @@ lankebuild_package() {
          install
 
     # 创建兼容符号链接
-    ln -sf /usr/bin/lua "{STAGING_ROOT}/usr/bin/lua${MAJOR}"
-    ln -sf /usr/bin/luac "{STAGING_ROOT}/usr/bin/luac${MAJOR}"
-    ln -sf /usr/lib/liblua.so.${VERSION} "{STAGING_ROOT}/usr/lib/liblua${MAJOR}.so"
+    ln -sf lua "{STAGING_ROOT}/usr/bin/lua${MAJOR}"
+    ln -sf luac "{STAGING_ROOT}/usr/bin/luac${MAJOR}"
+    ln -sf liblua.so.${VERSION} "{STAGING_ROOT}/usr/lib/liblua${MAJOR}.so"
 
     # 安装 pkg-config 文件（去掉点号作为 pkgconfig 名称，如 lua55）
     PKGCONFIG_NAME="lua${MAJOR//./}"
@@ -68,7 +68,7 @@ lankebuild_package() {
          INSTALL_TOP="{STAGING_ROOT}/usr" \
          install
 
-    ln -sf /usr/lib/liblua++.so.${VERSION} "{STAGING_ROOT}/usr/lib/liblua++${MAJOR}.so"
+    ln -sf liblua++.so.${VERSION} "{STAGING_ROOT}/usr/lib/liblua++${MAJOR}.so"
 
     PKGCONFIG_NAME_CXX="lua++${MAJOR//./}"
     install -Dm644 lua++.pc "{STAGING_ROOT}/usr/lib/pkgconfig/${PKGCONFIG_NAME_CXX}.pc"
