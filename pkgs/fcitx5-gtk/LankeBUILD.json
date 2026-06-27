@@ -1,0 +1,8 @@
+{
+  "name": "fcitx5-gtk",
+  "version": "5.1.7",
+  "sources": [
+    "https://github.com/fcitx/fcitx5-gtk/archive/refs/tags/5.1.7.tar.gz"
+  ],
+  "work_sources": []
+}
