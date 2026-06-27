@@ -1,0 +1,11 @@
+# useradd defaults file
+GROUP=999
+GROUPS=netdev
+HOME=/home
+INACTIVE=-1
+EXPIRE=
+SHELL=/bin/bash
+SKEL=/etc/skel
+USRSKEL=/usr/etc/skel
+CREATE_MAIL_SPOOL=yes
+LOG_INIT=yes

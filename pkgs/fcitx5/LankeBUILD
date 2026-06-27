@@ -14,5 +14,11 @@ lankebuild_build() {
 
 lankebuild_package() {
     # Installation handled by builder
-    :
+    cat > "{STAGING_ROOT}/etc/profile.d/fcitx5.sh" << 'EOF'
+#!/bin/bash
+# start of fcitx5
+export XMODIFIERS=@im=fcitx
+export IMSETTINGS_MODULE=fcitx
+# end of fcitx5
+EOF
 }

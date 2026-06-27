@@ -1,0 +1,3 @@
+# LankeOS Logout Script
+
+clear
