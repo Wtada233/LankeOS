@@ -11,7 +11,7 @@ lankebuild_build() {
     meson setup .. --prefix=/usr        \
                    --buildtype=release  \
                    -Ddoc=disabled       \
-                   -Dintrospection=disabled \
+                   -Dintrospection=enabled \
                    -Dnls=disabled       \
                    -Dtests=disabled     \
                    -Dexamples=disabled

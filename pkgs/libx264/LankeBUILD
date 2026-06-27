@@ -1,0 +1,16 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # 使用自定义配置，启用共享库
+    ./configure --prefix=/usr \
+                --enable-shared
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

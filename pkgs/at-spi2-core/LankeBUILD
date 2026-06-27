@@ -1,0 +1,23 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    mkdir -p build
+    cd build
+    meson setup .. \
+        --prefix=/usr \
+        --buildtype=release \
+        -D introspection=enabled \
+        -D docs=false
+    cd ..
+}
+
+lankebuild_build() {
+    cd build
+    ninja -j$(nproc)
+    DESTDIR="{STAGING_ROOT}" ninja install
+    cd ..
+}
+
+lankebuild_package() {
+    :
+}

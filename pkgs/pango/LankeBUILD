@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    meson setup --prefix=/usr --buildtype=release --wrap-mode=nofallback -Dintrospection=disabled ..
+    meson setup --prefix=/usr --buildtype=release --wrap-mode=nofallback -Dintrospection=enabled ..
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 }

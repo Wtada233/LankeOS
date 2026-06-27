@@ -1,0 +1,14 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # 无需配置
+    :
+}
+
+lankebuild_build() {
+    cargo build --release
+}
+
+lankebuild_package() {
+    install -Dm755 target/release/cbindgen "{STAGING_ROOT}/usr/bin/cbindgen"
+}

@@ -1,5 +1,5 @@
 {
-  "name": "networkmanager",
+  "name": "NetworkManager",
   "version": "1.54.0",
   "sources": [
     "https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/releases/1.54.0/downloads/NetworkManager-1.54.0.tar.xz"

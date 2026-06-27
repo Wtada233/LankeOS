@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Firefox 152 构建脚本
+# 通过 --disable-libnotify 跳过 libnotify 依赖
+
+lankebuild_prepare() {
+    # ------------------------------------------------------------
+    # 1. 创建 mozconfig (核心构建配置)
+    # ------------------------------------------------------------
+    cat > mozconfig << "EOF"
+# ---------- 安装前缀 ----------
+ac_add_options --prefix=/usr
+
+# ---------- 标准配置选项 ----------
+ac_add_options --enable-application=browser
+ac_add_options --disable-crashreporter
+ac_add_options --disable-updater
+ac_add_options --disable-tests
+ac_add_options --enable-rust-simd
+ac_add_options --enable-system-ffi
+ac_add_options --enable-system-pixman
+ac_add_options --with-system-jpeg
+ac_add_options --with-system-zlib
+ac_add_options --enable-audio-backends=alsa
+ac_add_options --enable-default-toolkit=cairo-gtk3-wayland-only
+
+# ---------- 使用系统库 (若未装则自动回退到内部副本) ----------
+ac_add_options --with-system-webp
+
+# ---------- 禁用 wasm 沙盒库 (加速构建) ----------
+ac_add_options --without-wasm-sandboxed-libraries
+
+# ---------- 地理定位 (禁用 WiFi 扫描) ----------
+ac_add_options --disable-necko-wifi
+
+# ---------- Wayland 兼容 (修正启动类名) ----------
+MOZ_APP_REMOTINGNAME=firefox
+
+# ---------- 构建输出目录 ----------
+mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/firefox-build-dir
+EOF
+
+    # 关闭遥测
+    unset MOZ_TELEMETRY_REPORTING
+
+    # 设置 mach 环境变量 (避免下载 Python 包)
+    export MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE=none
+    export MOZBUILD_STATE_PATH="${PWD}/mozbuild"
+
+    # 若在 chroot 中，确保 /dev/shm 已挂载 (否则 Python 多进程会失败)
+    # mountpoint -q /dev/shm || mount -t tmpfs devshm /dev/shm
+}
+
+lankebuild_build() {
+    # 再次设置环境变量 (因为函数可能独立执行)
+    export MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE=none
+    export MOZBUILD_STATE_PATH="${PWD}/mozbuild"
+    ./mach python -m pip install taskcluster
+    ./mach build -j$(( $(nproc) - 4 ))
+
+    # 安装到临时根目录 (LankeBUILD 会替换 {STAGING_ROOT})
+    DESTDIR="{STAGING_ROOT}" ./mach install
+
+    # 清理环境变量
+    unset MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE
+    unset MOZBUILD_STATE_PATH
+}
+
+lankebuild_package() {
+    # 创建 .desktop 文件和图标 (BLFS 推荐)
+    mkdir -p "{STAGING_ROOT}/usr/share/applications"
+    mkdir -p "{STAGING_ROOT}/usr/share/pixmaps"
+
+    cat > "{STAGING_ROOT}/usr/share/applications/firefox.desktop" << "EOF"
+[Desktop Entry]
+Encoding=UTF-8
+Name=Firefox Web Browser
+Comment=Browse the World Wide Web
+GenericName=Web Browser
+Exec=firefox %u
+Terminal=false
+Type=Application
+Icon=firefox
+Categories=GNOME;GTK;Network;WebBrowser;
+MimeType=text/xml;text/mml;text/html;application/xhtml+xml;application/vnd.mozilla.xul+xml;x-scheme-handler/http;x-scheme-handler/https
+StartupNotify=true
+StartupWMClass=firefox
+EOF
+
+    # 图标链接 (注意：实际图标在安装后的 /usr/lib/firefox/ 下)
+    ln -sfv /usr/lib/firefox/browser/chrome/icons/default/default128.png \
+            "{STAGING_ROOT}/usr/share/pixmaps/firefox.png"
+    ln -sfv ../lib/firefox/firefox "{STAGING_ROOT}/usr/bin/firefox"
+}
+

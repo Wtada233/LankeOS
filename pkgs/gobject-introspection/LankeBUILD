@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Lpkg 已将源码解压到 work/ 下
+    :
+}
+
+lankebuild_build() {
+    mkdir -p build && cd build
+    meson setup .. \
+        --prefix=/usr \
+        --buildtype=release \
+        -Dcairo=disabled
+    ninja -j$(nproc)
+    DESTDIR="{STAGING_ROOT}" ninja install
+}
+
+lankebuild_package() {
+    # 所有安装已在 build 阶段完成
+    :
+}

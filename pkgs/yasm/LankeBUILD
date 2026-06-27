@@ -1,0 +1,14 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    CFLAGS="-std=gnu99" ./configure --prefix=/usr
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

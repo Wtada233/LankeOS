@@ -1,0 +1,44 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # GTK3 从 3.24.36 开始使用 Meson 构建[reference:2]
+    # 创建独立的构建目录
+    mkdir -p build
+    cd build
+
+    # 配置 Meson 构建
+    # --prefix=/usr: 安装到 /usr
+    # --buildtype=release: 发布版本优化
+    # -D man=true: 生成手册页（需要 docbook-xsl 和 libxslt）[reference:3][reference:4]
+    # -D broadway_backend=true: 启用 Broadway 后端（HTML5 显示支持）[reference:5][reference:6]
+    meson setup .. \
+        --prefix=/usr \
+        --buildtype=release \
+        -D man=true \
+        -D broadway_backend=true \
+        -D x11_backend=false \
+        -D wayland_backend=true \
+        -D man=false
+
+    cd ..
+}
+
+lankebuild_build() {
+    cd build
+    # 编译
+    ninja
+    cd ..
+}
+
+lankebuild_package() {
+    cd build
+    # 安装到暂存目录
+    DESTDIR="{STAGING_ROOT}" ninja install
+    cd ..
+
+    # 安装运行时必需的主题图标（如果未作为独立包安装）
+    # adwaita-icon-theme 是 GTK3 运行时默认需要的[reference:7][reference:8]
+    # 如果你的系统没有单独打包 adwaita-icon-theme，GTK3 会在运行时 fallback
+    # 到 hicolor-icon-theme[reference:9][reference:10]
+    # 建议单独打包 adwaita-icon-theme 以获得完整 GTK 外观
+}

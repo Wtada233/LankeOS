@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     sed -i 's/libsystemd_dep = dependency/systemd_dep = libsystemd_dep = dependency/' meson.build
     mkdir build && cd build
-    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Dsession_tracking=logind -Dauthfw=shadow -Dintrospection=false -Dman=false
+    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Dsession_tracking=logind -Dauthfw=shadow -Dintrospection=true -Dman=false
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
     chmod 4755 {STAGING_ROOT}/usr/bin/pkexec

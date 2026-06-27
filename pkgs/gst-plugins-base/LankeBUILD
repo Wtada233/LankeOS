@@ -12,7 +12,7 @@ lankebuild_build() {
                    --buildtype=release  \
                    -Ddoc=disabled       \
                    -Dtests=disabled     \
-                   -Dintrospection=disabled \
+                   -Dintrospection=enabled \
                    -Dnls=disabled
     echo "Building gst-plugins-base-1.28.1..."
     ninja -j$(nproc)

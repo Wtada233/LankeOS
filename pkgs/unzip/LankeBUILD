@@ -1,0 +1,42 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # 删除冲突的 gmtime/localtime 声明
+    sed -i '/struct tm \*gmtime/d' unix/unxcfg.h
+    sed -i '/struct tm \*localtime/d' unix/unxcfg.h
+}
+
+lankebuild_build() {
+    # 1. 构建主程序 unzip（使用 linux_noasm 目标）
+    make -f unix/Makefile linux_noasm CC="gcc -std=gnu89"
+    
+    # 2. 单独构建 zipinfo（它没有被 linux_noasm 包含）
+    make -f unix/Makefile zipinfo CC="gcc -std=gnu89"
+}
+
+lankebuild_package() {
+    # 安装主程序
+    if [ -f unzip ]; then
+        install -Dm755 unzip "{STAGING_ROOT}/usr/bin/unzip"
+    fi
+    
+    # 安装 zipinfo（如果存在）
+    if [ -f zipinfo ]; then
+        install -Dm755 zipinfo "{STAGING_ROOT}/usr/bin/zipinfo"
+    else
+        echo "⚠️  zipinfo not built, skipping"
+    fi
+    
+    # 安装手册页（检查实际路径）
+    if [ -f unix/unzip.1 ]; then
+        install -Dm644 unix/unzip.1 "{STAGING_ROOT}/usr/share/man/man1/unzip.1"
+    else
+        echo "⚠️  unzip.1 not found, skipping"
+    fi
+    
+    if [ -f unix/zipinfo.1 ]; then
+        install -Dm644 unix/zipinfo.1 "{STAGING_ROOT}/usr/share/man/man1/zipinfo.1"
+    else
+        echo "⚠️  zipinfo.1 not found, skipping"
+    fi
+}
