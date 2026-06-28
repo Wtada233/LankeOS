@@ -9,5 +9,5 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    make prefix=/usr MANDIR=/usr/share/man/man1 -f unix/Makefile install
+    make prefix={STAGING_ROOT}/usr MANDIR={STAGING_ROOT}/usr/share/man/man1 -f unix/Makefile install
 }
