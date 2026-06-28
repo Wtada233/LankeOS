@@ -277,6 +277,12 @@ class RepoManager:
             remote_dir = os.path.dirname(full_remote)
             subprocess.run(["ssh", f"{user}@{host}", f"mkdir -p {remote_dir}"], check=True)
             subprocess.run(["scp", local_path, f"{user}@{host}:{full_remote}"], check=True)
+        elif st["type"] == "local":
+            dest = os.path.join(st["path"], remote_path)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            import shutil
+            shutil.copy2(local_path, dest)
+            print(f"  Copied to {dest}")
 
     def delete_remote_file(self, remote_path):
         st = self.config["storage"]
@@ -288,6 +294,9 @@ class RepoManager:
             user = st["user"]
             remote_base = st["remote_path"].rstrip('/')
             subprocess.run(["ssh", f"{user}@{host}", f"rm -f {remote_base}/{remote_path}"], check=True)
+        elif st["type"] == "local":
+            target = os.path.join(st["path"], remote_path)
+            if os.path.exists(target): os.remove(target)
 
     def delete_remote_dir(self, remote_dir_prefix):
         st = self.config["storage"]
@@ -304,6 +313,9 @@ class RepoManager:
             user = st["user"]
             remote_base = st["remote_path"].rstrip('/')
             subprocess.run(["ssh", f"{user}@{host}", f"rm -rf {remote_base}/{remote_dir_prefix}"], check=True)
+        elif st["type"] == "local":
+            target = os.path.join(st["path"], remote_dir_prefix)
+            if os.path.exists(target): import shutil; shutil.rmtree(target)
 
     def list_remote_dirs(self, prefix):
         st = self.config["storage"]
@@ -326,6 +338,12 @@ class RepoManager:
                                     capture_output=True, text=True)
             if result.returncode == 0:
                 dirs = [d.strip() for d in result.stdout.split('\n') if d.strip()]
+        elif st["type"] == "local":
+            base = os.path.join(st["path"], prefix)
+            if os.path.isdir(base):
+                for entry in sorted(os.listdir(base)):
+                    if os.path.isdir(os.path.join(base, entry)):
+                        dirs.append(entry)
         return dirs
 
     def list_remote_files(self, prefix):
@@ -340,6 +358,13 @@ class RepoManager:
                     for obj in page['Contents']:
                         name = obj['Key'][len(prefix):]
                         if name: files.append(name)
+        elif st["type"] == "local":
+            base = os.path.join(st["path"], prefix)
+            if os.path.isdir(base):
+                for entry in sorted(os.listdir(base)):
+                    full = os.path.join(base, entry)
+                    if os.path.isfile(full):
+                        files.append(entry)
         return files
 
     def download_index(self):
@@ -359,13 +384,31 @@ class RepoManager:
                 user = st["user"]
                 remote_base_path = st["remote_path"].rstrip('/')
                 subprocess.run(["scp", f"{user}@{host}:{remote_base_path}/{remote_path}", local_path], check=True)
+            elif st["type"] == "local":
+                src = os.path.join(st["path"], remote_path)
+                if os.path.exists(src):
+                    import shutil
+                    shutil.copy2(src, local_path)
         except Exception:
             with open(local_path, 'w', encoding='utf-8') as f: pass
         return local_path
 
+def init_local_repo(path, arch="x86_64"):
+    """Initialize a local repo at the given path with the given architecture."""
+    data_dir = os.path.join(path, arch)
+    os.makedirs(data_dir, exist_ok=True)
+    index_path = os.path.join(data_dir, "index.txt")
+    if not os.path.exists(index_path):
+        with open(index_path, 'w', encoding='utf-8') as f:
+            f.write("# LankeOS local repo index\n")
+    print(f"Initialized local repo at {data_dir}")
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description="LankeOS Repository Manager")
     parser.add_argument("-c", "--config", default="lrepo-mgr.json", help="Path to config file")
+    parser.add_argument("--path", metavar="DIR", help="Local repo directory (enables local mode, overrides config storage)")
     subparsers = parser.add_subparsers(dest="command")
     push_parser = subparsers.add_parser("push", help="Push packages to repository")
     push_parser.add_argument("patterns", nargs="+", help="File patterns/directories to push")
@@ -378,6 +421,9 @@ def main():
     config_parser.add_argument("--show-secrets", action="store_true", help="Show current config with secrets")
     args = parser.parse_args()
     mgr = RepoManager(args.config)
+    if args.path:
+        mgr.config["storage"] = {"type": "local", "path": os.path.abspath(args.path)}
+        init_local_repo(os.path.abspath(args.path), mgr.config.get("architecture", "x86_64"))
     if args.command == "push": mgr.push_packages(args.patterns)
     elif args.command == "delete":
         if ':' in args.package:
