@@ -48,6 +48,8 @@ public:
 
     /** 依赖信息目录 */
     const std::filesystem::path& dep_dir()         const noexcept { return dep_dir_; }
+    /** needed_so（DT_NEEDED SONAME 列表）目录 */
+    const std::filesystem::path& needed_so_dir()   const noexcept { return needed_so_dir_; }
     /** 已安装包列表文件 */
     const std::filesystem::path& pkgs_file()       const noexcept { return pkgs_file_; }
     /** 锁定包列表文件 */
@@ -124,6 +126,7 @@ private:
 
     // 派生路径（由 rebase_paths() 重新计算）
     std::filesystem::path dep_dir_;            // 依赖信息目录
+    std::filesystem::path needed_so_dir_;      // needed_so SONAME 列表目录
     std::filesystem::path pkgs_file_;          // 已安装包列表文件
     std::filesystem::path holdpkgs_file_;      // 锁定包列表文件
     std::filesystem::path essential_file_;     // 核心包列表文件

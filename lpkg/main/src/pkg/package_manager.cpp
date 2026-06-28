@@ -385,6 +385,7 @@ void remove_package(const std::string& pkg_name, bool force) {
     }
 
     fs::remove(dep_file);
+    fs::remove(Config::instance().needed_so_dir() / pkg_name);
     fs::remove(Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)));
     fs::remove_all(Config::instance().hooks_dir() / pkg_name);
     cache.remove_installed(pkg_name);

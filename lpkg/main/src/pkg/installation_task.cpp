@@ -504,14 +504,38 @@ void InstallationTask::register_package() {
         for (const auto& cap : cache.get_package_provides(pkg_name_)) {
             cache.remove_provider(cap, pkg_name_);
         }
+        // 清理旧的 needed_so 文件（升级后重新写入）
+        fs::remove(Config::instance().needed_so_dir() / pkg_name_);
     }
 
+    // 写 deps（包名级别的依赖）— 合并两个来源：
+    // 1. metadata.json 中的 deps 字段（显式声明的包依赖）
+    // 2. needed_so 解析得到的提供者包（SONAME→提供者包映射）
+    //
+    // 这样 autoremove / remove 的逆向依赖检查能同时覆盖两类依赖。
     std::ofstream deps_out(Config::instance().dep_dir() / pkg_name_);
     for (const auto& d : deps_) {
         deps_out << d << constants::NL;
         std::string name = d;
         if (const auto pos = d.find_first_of(" \t<>="); pos != std::string::npos) name = d.substr(0, pos);
         cache.add_reverse_dep(name, pkg_name_);
+    }
+
+    // 将 needed_so 也写入 deps 文件（解析 SONAME→包名后合并入同一个系统）
+    for (const auto& soname : needed_so_) {
+        auto providers = cache.get_providers(soname);
+        for (const auto& prov_pkg : providers) {
+            if (prov_pkg != pkg_name_ && cache.is_installed(prov_pkg)) {
+                deps_out << prov_pkg << constants::NL;
+                cache.add_reverse_dep(prov_pkg, pkg_name_);
+            }
+        }
+    }
+
+    // 写 needed_so 原始 SONAME 列表（保留原始真相供审计和重校验）
+    std::ofstream nso_out(Config::instance().needed_so_dir() / pkg_name_);
+    for (const auto& sn : needed_so_) {
+        nso_out << sn << constants::NL;
     }
 
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;

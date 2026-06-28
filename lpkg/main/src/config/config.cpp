@@ -59,6 +59,7 @@ void Config::rebase_paths() {
 
     hooks_dir_        = config_dir_ / "hooks/";
     dep_dir_          = state_dir_ / "deps/";
+    needed_so_dir_    = state_dir_ / "needed_so/";
     pkgs_file_        = state_dir_ / "pkgs";
     holdpkgs_file_    = state_dir_ / "holdpkgs";
     essential_file_   = config_dir_ / "essential";
@@ -120,6 +121,7 @@ void Config::init_filesystem() {
     ensure_dir_exists(config_dir_);
     ensure_dir_exists(state_dir_);
     ensure_dir_exists(dep_dir_);
+    ensure_dir_exists(needed_so_dir_);
     ensure_dir_exists(l10n_dir_);
     ensure_dir_exists(docs_dir_);
     ensure_dir_exists(hooks_dir_);
