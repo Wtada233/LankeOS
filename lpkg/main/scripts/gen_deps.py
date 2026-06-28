@@ -338,8 +338,12 @@ def scan_package(lpkg, target_dir, extract_root):
                         'pkg_version': pkg_version,
                     })
 
-                # .so 文件名作为回退提供者（捕获没有 SONAME 的库）
+                # .so 文件名作为回退提供者（捕获没有 SONAME 的库）。
+                # 同时写入 provides_so 以存入 metadata.json 的 provides 字段，
+                # 确保 index 的 provides 段包含此 SONAME，否则没有 SONAME 的库
+                #（如 libtcl8.6.so）在 provides 中会缺失，导致其他包无法解析。
                 if '.so' in fname:
+                    provides_so.append(fname)
                     providers.append({
                         'key': fname,
                         'pkg': pkg_name,
