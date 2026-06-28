@@ -115,6 +115,7 @@ warning.skip_invalid_local_pkg=Skipping invalid local package file: {} - {}
 error.local_pkg_not_found=Local package file not found: {}
 error.candidate_dep_version_mismatch=Candidate dependency {} version {} does not satisfy constraint {} {}
 error.unresolvable_drift=Unresolvable metadata drift for package '{}': {}
+error.unresolved_soname=Required SONAME '{}' has no provider in repository or install plan
 info.installing_discovered_dep=Discovered missing dependency '{}', adding to install queue...
 info.log_prefix==> 
 info.removing_obsolete_file=Removing obsolete file: {}

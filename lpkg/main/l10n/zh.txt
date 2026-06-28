@@ -118,6 +118,7 @@ warning.skip_invalid_local_pkg=跳过无效的本地包文件: {} - {}
 error.local_pkg_not_found=找不到本地包文件: {}
 error.candidate_dep_version_mismatch=候选依赖 {} 版本 {} 不满足约束 {} {}
 error.unresolvable_drift=无法解决的元数据漂移，包 '{}': {}
+error.unresolved_soname=所需的 SONAME '{}' 在仓库和安装计划中均无提供者
 info.installing_discovered_dep=发现缺失的依赖 '{}'，正在加入安装队列...
 info.log_prefix==> 
 info.removing_obsolete_file=正在移除过时文件: {}

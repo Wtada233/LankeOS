@@ -77,6 +77,7 @@ private:
     bool force_reinstall_ = false;
     std::vector<std::string> deps_;
     std::vector<std::string> provides_;
+    std::vector<std::string> needed_so_;
     std::string man_content_;
 
     std::vector<std::pair<std::filesystem::path, std::filesystem::path>> backups_;

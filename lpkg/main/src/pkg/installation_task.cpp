@@ -203,6 +203,14 @@ void InstallationTask::extract_and_validate_package() {
 
     std::string meta_name, meta_version;
     detail::read_package_metadata(tmp_pkg_dir_, meta_name, meta_version, deps_, provides_, man_content_);
+    // 额外读取 needed_so（read_package_metadata 尚未覆盖此字段）
+    {
+        std::ifstream f(tmp_pkg_dir_ / std::string(constants::PKG_METADATA_FILE));
+        if (f.is_open()) {
+            json m; f >> m;
+            needed_so_ = m.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+        }
+    }
     if (meta_name != pkg_name_) {
         log_warning(string_format("warning.package_name_mismatch", pkg_name_, meta_name));
     }
@@ -290,6 +298,45 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
         if (auto broken = detail::check_plan_consistency(ctx.plan); !broken.empty()) {
             throw LpkgException(string_format("error.unresolvable_drift", pkg_name_,
                                 "Dependency conflict detected in discovered dependencies"));
+        }
+    }
+
+    // --- needed_so 完整性校验 ---
+    // 每个声明的 SONAME 必须在 repo 或当前 plan 中有提供者，
+    // 否则是"唯一真相"断裂（index 缺失 provides 或 build 时 provider_map 不完整）。
+    if (!needed_so_.empty()) {
+        for (const auto& soname : needed_so_) {
+            bool provided = false;
+
+            // 1) 检查 repo index 中的提供者
+            if (!provided && ctx.repo.find_provider(soname))
+                provided = true;
+
+            // 2) 检查当前 plan 中是否有包提供此 SONAME
+            if (!provided) {
+                for (const auto& [pn, plan] : ctx.plan) {
+                    for (const auto& prov : plan.provides) {
+                        if (prov == soname) { provided = true; break; }
+                    }
+                    if (provided) break;
+                }
+            }
+
+            // 3) 检查已安装包缓存
+            if (!provided) {
+                auto providers = Cache::instance().get_providers(soname);
+                for (const auto& p : providers) {
+                    if (Cache::instance().is_installed(p)) {
+                        // 检查此包是否在 plan 中被升级/移除
+                        if (!ctx.plan.contains(p)) { provided = true; break; }
+                    }
+                }
+            }
+
+            if (!provided) {
+                throw LpkgException(string_format("error.unresolvable_drift", pkg_name_,
+                    string_format("error.unresolved_soname", soname)));
+            }
         }
     }
 }
