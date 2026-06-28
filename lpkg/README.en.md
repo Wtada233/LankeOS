@@ -10,7 +10,7 @@ English | [中文](README.md)
 -   **needed_so verification**: Automatically validates every ELF DT_NEEDED SONAME against the repository before installation. Rejects packages with unresolvable SONAMEs, preventing the "empty provides still installs" class of bugs.
 -   **SIGINT graceful shutdown**: Pacman-style two-stage protection — first Ctrl+C waits for the current operation to finish and rolls back, second Ctrl+C force terminates.
 -   **Smart version parsing**: Supports multi-segment revision numbers (e.g. `1.0.0.1`) with a rigorous comparison algorithm that correctly handles cases like `6.16.1 > 6.6.1`. Supports compound range constraints (e.g. `>= 2.0.0 < 3.0.0`).
--   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions, hashes, provides, and needed_so (4th section) for a package.
+-   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their respective hashes, deps, provides, and needed_so.
 -   **Embedded metadata**: All metadata (name, version, dependencies, needed_so, virtual provides, man page) is stored in a `metadata.json` inside each package.
 -   **Auto dependency generation**: Includes `gen_deps.py` that scans ELF files to auto-generate both `needed_so` (DT_NEEDED SONAME list) and `deps` (provider package names), eliminating manual version constraint maintenance.
 -   **Layout-as-content**: The `content/` directory layout maps directly to the root filesystem.
