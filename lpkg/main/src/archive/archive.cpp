@@ -102,7 +102,8 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
             try {
                 fs::path link_dest = validate_path(hardlink, output_dir);
                 archive_entry_set_hardlink(entry, link_dest.c_str());
-            } catch (...) {
+            } catch (const std::exception& e) {
+                log_warning(string_format("warning.archive_invalid_hardlink", std::string(e.what())));
                 archive_entry_set_hardlink(entry, nullptr); // 丢弃恶意或无效的链接
             }
         }
@@ -117,7 +118,8 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
                     fs::path link_dest = validate_path(symlink, output_dir);
                     archive_entry_set_symlink(entry, link_dest.c_str());
                 }
-            } catch (...) {
+            } catch (const std::exception& e) {
+                log_warning(string_format("warning.archive_invalid_symlink", std::string(e.what())));
                 archive_entry_set_symlink(entry, nullptr);
             }
         }

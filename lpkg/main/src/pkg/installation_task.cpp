@@ -281,7 +281,9 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
                                     if (prov == dep_name) { found_in_plan = true; break; }
                                 }
                             }
-                        } catch (...) {}
+                        } catch (const std::exception& e) {
+                            log_warning(string_format("warning.dep_scan_metadata_parse_failed", tn, e.what()));
+                        }
                     }
                     if (found_in_plan) break;
                 }

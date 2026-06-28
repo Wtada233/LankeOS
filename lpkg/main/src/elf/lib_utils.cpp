@@ -1,10 +1,11 @@
 #include "lib_utils.hpp"
+#include "base/utils.hpp"
+#include "i18n/localization.hpp"
 #include <libelf.h>
 #include <gelf.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <filesystem>
-#include <iostream>
 
 namespace fs = std::filesystem;
 
@@ -65,8 +66,9 @@ void apply_soname_links(const fs::path& lib_dir) {
             if (!fs::exists(link_path) && !fs::is_symlink(link_path)) {
                 try {
                     fs::create_symlink(entry.path().filename(), link_path);
-                } catch (...) {
-                    // 忽略符号链接创建过程中的错误
+                } catch (const std::exception& e) {
+                    log_warning(string_format("warning.soname_link_failed",
+                        entry.path().filename().string(), link_path.string(), e.what()));
                 }
             }
         }

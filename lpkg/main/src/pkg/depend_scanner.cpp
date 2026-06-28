@@ -189,7 +189,9 @@ auto load_repo_revdep()
 {
     ensure_dir_exists(Config::get_tmp_dir());
     Repository repo;
-    try { repo.load_index(); } catch (...) {}
+    try { repo.load_index(); } catch (const std::exception& e) {
+        log_warning(string_format("warning.repo_index_load_failed", e.what()));
+    }
     return build_repo_revdep_map();
 }
 
@@ -516,7 +518,9 @@ ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all) {
     // 解析传递依赖仓库
     ensure_dir_exists(Config::get_tmp_dir());
     Repository repo;
-    try { repo.load_index(); } catch (...) {}
+    try { repo.load_index(); } catch (const std::exception& e) {
+        log_warning(string_format("warning.repo_index_load_failed", e.what()));
+    }
 
     DepMap plan;
     std::set<std::string> visited;

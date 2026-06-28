@@ -93,7 +93,10 @@ void scan_orphans(const std::string& scan_root_override) {
                         orphan_count++;
                     }
                 }
-            } catch (...) { continue; }
+            } catch (const std::exception& e) {
+                log_warning(string_format("warning.scan_file_error", entry.path().string(), e.what()));
+                continue;
+            }
         }
     }
     log_info(string_format("info.scan_complete", scanned_count, orphan_count));

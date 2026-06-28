@@ -250,7 +250,9 @@ void install_packages(const std::vector<std::string>& pkg_args,
     } catch (const std::exception& e) {
         log_error(get_string("error.installation_failed_rolling_back"));
         for (const auto& name : ctx.successfully_installed | std::views::reverse) {
-            try { remove_package(name, true); } catch (...) {}
+            try { remove_package(name, true); } catch (const std::exception& e) {
+                log_warning(string_format("warning.rollback_remove_failed", name, e.what()));
+            }
         }
         Cache::instance().write();
         throw;
@@ -336,7 +338,9 @@ void install_packages_internal(InstallContext& ctx) {
 
                 // 回滚当前事务中已安装的包
                 for (const auto& done_name : ctx.successfully_installed | std::views::reverse) {
-                    try { remove_package(done_name, true); } catch (...) {}
+                    try { remove_package(done_name, true); } catch (const std::exception& e) {
+                        log_warning(string_format("warning.rollback_remove_failed", done_name, e.what()));
+                    }
                 }
                 ctx.successfully_installed.clear();
                 ctx.installed_set.clear();
@@ -511,7 +515,9 @@ void autoremove() {
     } else {
         log_info(string_format("info.autoremove_candidates", to_rem.size()));
         for (const auto& n : to_rem) {
-            try { remove_package(n, true); } catch (...) {}
+            try { remove_package(n, true); } catch (const std::exception& e) {
+                log_warning(string_format("warning.autoremove_remove_failed", n, e.what()));
+            }
         }
         log_info(string_format("info.autoremove_complete", to_rem.size()));
     }
@@ -604,7 +610,9 @@ void reinstall_package(const std::string& arg) {
         try {
             json meta = detail::read_archive_metadata(fs::absolute(arg));
             name = meta.at(std::string(constants::J_NAME)).get<std::string>();
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            log_warning(string_format("warning.reinstall_metadata_read_failed", arg, e.what()));
+        }
     }
 
     if (Cache::instance().get_installed_version(name).empty()) {
@@ -652,7 +660,9 @@ void query_file(const std::string& filename) {
                 owners = cache.get_file_owners(logical);
                 if (!owners.empty()) target = logical;
             }
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            log_warning(string_format("warning.query_path_resolve_failed", filename) + ": " + e.what());
+        }
     }
 
     // 尝试添加 / 前缀作为绝对路径

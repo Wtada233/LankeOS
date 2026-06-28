@@ -9,9 +9,30 @@
 #include <filesystem>
 #include <fstream>
 #include <cstdlib>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+
+// Helper: make a directory read-only (uses chattr when root, permissions otherwise)
+static void make_dir_readonly(const fs::path& dir) {
+    if (geteuid() == 0) {
+        if (run_shell("chattr +i " + dir.string()) != 0) {
+            throw std::runtime_error("Failed to chattr +i " + dir.string());
+        }
+    } else {
+        fs::permissions(dir, fs::perms::owner_read | fs::perms::owner_exec);
+    }
+}
+
+// Helper: restore directory writability
+static void make_dir_writable(const fs::path& dir) {
+    if (geteuid() == 0) {
+        run_shell("chattr -i " + dir.string());
+    } else {
+        fs::permissions(dir, fs::perms::owner_all);
+    }
+}
 
 class AdvancedPackageManagerTest : public ::testing::Test {
 protected:
@@ -89,12 +110,12 @@ TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
     f_sabotage << "original";
     f_sabotage.close();
 
-    fs::permissions(bin_dir, fs::perms::owner_read | fs::perms::owner_exec);
+    make_dir_readonly(bin_dir);
 
     EXPECT_THROW(install_packages({pkg}), LpkgException);
 
     // Restore for cleanup
-    fs::permissions(bin_dir, fs::perms::owner_all);
+    make_dir_writable(bin_dir);
 
     // 3. Verify Rollback: file_ok should be GONE
     EXPECT_FALSE(fs::exists(test_root / "usr" / "bin" / "file_ok"));

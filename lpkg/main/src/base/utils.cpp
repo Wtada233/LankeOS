@@ -333,7 +333,9 @@ void cleanup_tmp_dirs() {
                     fs::remove_all(entry.path());
                 }
             }
-        } catch (...) {}
+        } catch (const std::exception& e) {
+            log_warning(string_format("warning.cleanup_old_tmp_failed", entry.path().string()) + ": " + e.what());
+        }
     }
 }
 
