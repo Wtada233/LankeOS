@@ -207,7 +207,8 @@ class RepoManager:
         print("Cleanup complete.")
 
     def parse_aggregated_index(self, path):
-        # Format: name|ver1:hash1:deps1;ver2:hash2:deps2|provides|needed_so
+        # 新版格式: name|ver:hash:deps:provides:needed_so;ver2:...|
+        # 旧版格式: name|ver:hash:deps;ver2:...|provides|needed_so
         data = {}
         if os.path.exists(path):
             with open(path, 'r', encoding='utf-8') as f:
@@ -217,10 +218,11 @@ class RepoManager:
                     parts = line.split('|')
                     if len(parts) < 2: continue
                     name = parts[0]
-                    provides = parts[2] if len(parts) > 2 else ""
-                    needed_so = parts[3] if len(parts) > 3 else ""
 
-                    # Each version block: ver:hash:deps, separated by ';'
+                    # 旧版 fallback: provides/needed_so 来自 pipe 段
+                    pipe_provides = parts[2] if len(parts) > 2 else ""
+                    pipe_needed_so = parts[3] if len(parts) > 3 else ""
+
                     for v_block in parts[1].split(';'):
                         v_info = v_block.split(':')
                         if len(v_info) < 2: continue
@@ -228,6 +230,14 @@ class RepoManager:
                         version = v_info[0]
                         hash_val = v_info[1]
                         deps = v_info[2] if len(v_info) > 2 else ""
+
+                        # 新版格式：provides/needed_so 在版本块内（第 4、5 字段）
+                        if len(v_info) >= 4:
+                            provides = v_info[3]
+                            needed_so = v_info[4] if len(v_info) > 4 else ""
+                        else:
+                            provides = pipe_provides
+                            needed_so = pipe_needed_so
 
                         if name not in data:
                             data[name] = {"versions": {}}
@@ -241,26 +251,15 @@ class RepoManager:
         return data
 
     def write_aggregated_index(self, path, data):
+        # 新版格式: name|ver:hash:deps:provides:needed_so;ver2:...|
         with open(path, 'w', encoding='utf-8') as f:
             for name, info in data.items():
                 blocks = []
-                all_provides = set()
-                all_needed = set()
                 for v, vinfo in info["versions"].items():
-                    blocks.append(f"{v}:{vinfo['sha256']}:{vinfo['deps']}")
-                    if vinfo.get('provides'):
-                        for p in vinfo['provides'].split(','):
-                            p = p.strip()
-                            if p:
-                                all_provides.add(p)
-                    if vinfo.get('needed_so'):
-                        for n in vinfo['needed_so'].split(','):
-                            n = n.strip()
-                            if n:
-                                all_needed.add(n)
-                provides_str = ','.join(sorted(all_provides))
-                needed_str = ','.join(sorted(all_needed))
-                f.write(f"{name}|{';'.join(blocks)}|{provides_str}|{needed_str}\n")
+                    provides = vinfo.get('provides', '')
+                    needed_so = vinfo.get('needed_so', '')
+                    blocks.append(f"{v}:{vinfo['sha256']}:{vinfo['deps']}:{provides}:{needed_so}")
+                f.write(f"{name}|{';'.join(blocks)}|\n")
 
     def upload_file(self, local_path, remote_path):
         st = self.config["storage"]
