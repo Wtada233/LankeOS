@@ -146,7 +146,50 @@ void install_packages(const std::vector<std::string>& pkg_args,
         return;
     }
 
-    // ── 第三阶段：用户确认 ──────────────────────────────────────────────
+    // ── 第三阶段：needed_so 完整性校验 ──────────────────────────────────
+    // 在展示安装计划给用户之前，验证每个包声明的 SONAME 依赖
+    // 在 repo / plan / 已安装缓存中有提供者。这是"唯一真相"的强制校验。
+    {
+        bool all_so_ok = true;
+        std::string so_errors;
+        for (const auto& [pname, pplan] : plan) {
+            for (const auto& soname : pplan.needed_so) {
+                bool provided = false;
+
+                if (repo.find_provider(soname))
+                    provided = true;
+
+                if (!provided) {
+                    for (const auto& [pn2, pp2] : plan) {
+                        for (const auto& prov : pp2.provides) {
+                            if (prov == soname) { provided = true; break; }
+                        }
+                        if (provided) break;
+                    }
+                }
+
+                if (!provided) {
+                    auto providers = Cache::instance().get_providers(soname);
+                    for (const auto& p : providers) {
+                        if (Cache::instance().is_installed(p) && !plan.contains(p)) {
+                            provided = true; break;
+                        }
+                    }
+                }
+
+                if (!provided) {
+                    all_so_ok = false;
+                    so_errors += "  " + string_format("error.unresolved_soname", soname) + "\n";
+                }
+            }
+        }
+        if (!all_so_ok) {
+            log_error(so_errors);
+            throw LpkgException(string_format("error.dependency_conflict_title") + "\n" + so_errors);
+        }
+    }
+
+    // ── 第四阶段：用户确认 ──────────────────────────────────────────────
     // 向用户展示将要安装/升级的包列表（区分用户显式指定的和自动解析的依赖），
     // 请求 y/n 确认。非交互模式 (-y/-n) 自动响应。
 
@@ -164,7 +207,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
         return;
     }
 
-    // ── 第四阶段：实际安装（含元数据验证和自动回滚） ──────────────────
+    // ── 第五阶段：实际安装（含元数据验证和自动回滚） ──────────────────
     // install_packages_internal 对每个包执行以下子流程：
     //   1. 下载包 → 读取真实 metadata.json（验证仓库索引的 deps/provides）
     //   2. 若元数据与索引不匹配 → 更新仓库信息 → 回滚已安装包 → 重解析依赖 → 从头重试
