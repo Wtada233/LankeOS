@@ -218,3 +218,4 @@ warning.repo_mirror_config=Failed to read mirror configuration: {}
 warning.repo_index_missing=Repository index not found: {}
 warning.repo_index_download=Failed to download repository index: {}
 error.dependency_depth_exceeded=Dependency depth exceeded for {} (max {}). Possible circular dependency.
+warning.needed_so_dropped_in_upgrade={} upgraded to {} no longer provides {}, breaking installed {}

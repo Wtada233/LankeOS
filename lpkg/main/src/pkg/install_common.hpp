@@ -55,6 +55,11 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
 /// 检查计划中的包升级是否会破坏已安装的包
 std::set<std::string> check_plan_consistency(const std::map<std::string, InstallPlan>& plan);
 
+/// 检查计划升级是否会破坏已安装包的 needed_so
+/// 例如：libM-1.0（提供 libM.so.1）被升级到 libM-2.0（不再提供 libM.so.1）
+/// 而已安装的 app 需要 libM.so.1 → app 被标记为 broken
+std::set<std::string> check_needed_so_consistency(const std::map<std::string, InstallPlan>& plan);
+
 /// 从已持有的包开始 BFS 遍历依赖图，获取所有必需的包
 std::unordered_set<std::string> get_all_required_packages();
 

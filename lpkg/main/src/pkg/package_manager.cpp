@@ -147,9 +147,32 @@ void install_packages(const std::vector<std::string>& pkg_args,
         return;
     }
 
+    // ── 第二·五阶段：needed_so 升级一致性检查 ──────────────────────────
+    // 检查计划升级是否会破坏已安装包的 needed_so（例如 libM-1.0 提供
+    // libM.so.1，app 需要它；计划升级 libM 到 2.0 后不再提供 libM.so.1）。
+    if (auto nso_broken = detail::check_needed_so_consistency(plan);
+        !nso_broken.empty()) {
+        log_error(get_string("error.dependency_conflict_title"));
+        std::string nso_msg;
+        for (const auto& pkg : nso_broken)
+            nso_msg += "  " + pkg + "\n";
+        log_error(nso_msg);
+        if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
+            for (const auto& pkg : nso_broken) remove_package(pkg, true);
+            Cache::instance().write();
+            install_packages(pkg_args, hash_file_path, force_reinstall);
+            return;
+        }
+        log_info(get_string("info.installation_aborted"));
+        return;
+    }
+
     // ── 第三阶段：needed_so 完整性校验 ──────────────────────────────────
-    // 在展示安装计划给用户之前，验证每个包声明的 SONAME 依赖
-    // 在 repo / plan / 已安装缓存中有提供者。这是"唯一真相"的强制校验。
+    // 验证每个包声明的 SONAME 在 plan / 已安装缓存 / repo 中有提供者。
+    // 检查顺序：plan（版本精准）→ 缓存 → repo（版本精准）。
+    // 注意：repo.find_provider 返回最新版本，若最新版本不提供该 SONAME
+    // （如 lib-2.0 不再提供 lib.so.1），则不走 repo 回退，
+    // 避免了"包级通过、版本级缺口"。
     {
         bool all_so_ok = true;
         std::string so_errors;
@@ -157,23 +180,29 @@ void install_packages(const std::vector<std::string>& pkg_args,
             for (const auto& soname : pplan.needed_so) {
                 bool provided = false;
 
-                if (repo.find_provider(soname))
-                    provided = true;
-
-                if (!provided) {
-                    for (const auto& [pn2, pp2] : plan) {
-                        for (const auto& prov : pp2.provides) {
-                            if (prov == soname) { provided = true; break; }
-                        }
-                        if (provided) break;
+                // 1) 检查当前 plan 中是否有包提供此 SONAME（版本精准）
+                for (const auto& [pn2, pp2] : plan) {
+                    for (const auto& prov : pp2.provides) {
+                        if (prov == soname) { provided = true; break; }
                     }
+                    if (provided) break;
                 }
 
+                // 2) 检查已安装缓存
                 if (!provided) {
                     auto providers = Cache::instance().get_providers(soname);
                     for (const auto& p : providers) {
                         if (Cache::instance().is_installed(p) && !plan.contains(p)) {
                             provided = true; break;
+                        }
+                    }
+                }
+
+                // 3) repo 级别回退——验证返回的版本确实提供此 SONAME
+                if (!provided) {
+                    if (auto prov_pkg = repo.find_provider(soname)) {
+                        for (const auto& prov : prov_pkg->provides) {
+                            if (prov == soname) { provided = true; break; }
                         }
                     }
                 }

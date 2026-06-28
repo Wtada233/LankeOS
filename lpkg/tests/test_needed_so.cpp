@@ -523,3 +523,395 @@ TEST_F(NeededSoTest, AutoremoveKeepsNeededSoDep) {
     EXPECT_TRUE(Cache::instance().is_installed("libX"));
     EXPECT_TRUE(Cache::instance().is_installed("app"));
 }
+
+
+// =========================================================================
+// 多版本决策测试套件
+//
+// 测试仓库中存在某个包的多个版本且各版本提供不同的 SONAME 集时，
+// 系统的版本选择与 needed_so 校验如何协同工作。
+//
+// 覆盖场景：
+//   - 多版本中最新版提供所需 SONAME（happy path）
+//   - 版本约束锁定到提供所需 SONAME 的中间版本
+//   - 版本约束强制升级到提供所需 SONAME 的版本
+//   - 版本区间 + SONAME 共同约束版本选择
+//   - 多个依赖分别按 SONAME 选择正确版本
+//   - 传递依赖的 SONAME 传播到版本选择
+//   - 版本约束排除提供 SONAME 的版本 → 拒绝（版本级校验修复）
+//   - 同一 SONAME 多包提供时的正确选择
+//   - 升级 SONAME 变更 → 依赖者被自动移除（升级一致性检查）
+//   - 已安装版本不提供 SONAME → 拒绝
+//   - autoremove 保护 needed_so 提供者
+//   - 本地包 + 多版本仓库的 needed_so 校验
+// =========================================================================
+
+// -----------------------------------------------------------------------
+// 1. 多版本仓库，最新版提供所需 SONAME
+//    libA-1.0 → libA.so.1，libA-2.0 → libA.so.2
+//    app 需要 libA.so.2 → 系统选择 libA-2.0（最新版），校验通过
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, MultiVersionLatestProvidesSoname) {
+    create_pkg("libA", "1.0", {}, {"libA.so.1"});
+    create_pkg("libA", "2.0", {}, {"libA.so.2"});
+    create_pkg("app", "1.0", {"libA"}, {}, {"libA.so.2"});
+    update_index({
+        {"app", "1.0", "libA", "", "libA.so.2"},
+        {"libA", "1.0", "", "libA.so.1", ""},
+        {"libA", "2.0", "", "libA.so.2", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().is_installed("libA"));
+    EXPECT_EQ(Cache::instance().get_installed_version("libA"), "2.0");
+}
+
+
+// -----------------------------------------------------------------------
+// 2. 版本约束锁定到提供所需 SONAME 的中间版本
+//    libB-1.0 → libB.so.1
+//    libB-2.0 → libB.so.1, libB.so.2
+//    libB-3.0 → libB.so.3
+//    app 依赖 libB >= 2.0 < 3.0，需要 libB.so.1
+//    → 应选择 libB-2.0（满足约束且提供 libB.so.1）
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, MultiVersionConstraintPicksVersionProvidingSoname) {
+    create_pkg("libB", "1.0", {}, {"libB.so.1"});
+    create_pkg("libB", "2.0", {}, {"libB.so.1", "libB.so.2"});
+    create_pkg("libB", "3.0", {}, {"libB.so.3"});
+    create_pkg("app", "1.0", {"libB >= 2.0 < 3.0"}, {}, {"libB.so.1"});
+    update_index({
+        {"app", "1.0", "libB >= 2.0 < 3.0", "", "libB.so.1"},
+        {"libB", "1.0", "", "libB.so.1", ""},
+        {"libB", "2.0", "", "libB.so.1,libB.so.2", ""},
+        {"libB", "3.0", "", "libB.so.3", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().is_installed("libB"));
+    EXPECT_EQ(Cache::instance().get_installed_version("libB"), "2.0");
+}
+
+
+// -----------------------------------------------------------------------
+// 3. 版本约束强制升级到提供所需 SONAME 的版本
+//    libC-1.0 已安装（提供 libC.so.1），libC-2.0 在仓库（提供 libC.so.2）
+//    app 依赖 libC >= 2.0（排除已安装的 1.0），需要 libC.so.2
+//    → 系统将 libC 从 1.0 升级到 2.0，以满足版本约束和 SONAME
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, VersionConstraintForcesUpgradeForSoname) {
+    create_pkg("libC", "1.0", {}, {"libC.so.1"});
+    update_index({{"libC", "1.0", "", "libC.so.1", ""}});
+    ASSERT_NO_THROW(install_packages({"libC"}));
+    Cache::instance().load();
+    ASSERT_EQ(Cache::instance().get_installed_version("libC"), "1.0");
+
+    create_pkg("libC", "2.0", {}, {"libC.so.2"});
+    create_pkg("app", "1.0", {"libC >= 2.0"}, {}, {"libC.so.2"});
+    update_index({
+        {"app", "1.0", "libC >= 2.0", "", "libC.so.2"},
+        {"libC", "1.0", "", "libC.so.1", ""},
+        {"libC", "2.0", "", "libC.so.2", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().is_installed("libC"));
+    EXPECT_EQ(Cache::instance().get_installed_version("libC"), "2.0");
+}
+
+
+// -----------------------------------------------------------------------
+// 4. 版本区间约束 + SONAME 共同约束版本选择
+//    libD-2.5 → libD.so.2
+//    libD-2.6 → libD.so.3
+//    libD-3.0 → libD.so.4
+//    app 依赖 libD >= 2.0 < 3.0，需要 libD.so.3
+//    → 应选择 libD-2.6（区间内且提供 libD.so.3）
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, VersionRangeAndSonameCombineCorrectly) {
+    create_pkg("libD", "2.5", {}, {"libD.so.2"});
+    create_pkg("libD", "2.6", {}, {"libD.so.3"});
+    create_pkg("libD", "3.0", {}, {"libD.so.4"});
+    create_pkg("app", "1.0", {"libD >= 2.0 < 3.0"}, {}, {"libD.so.3"});
+    update_index({
+        {"app", "1.0", "libD >= 2.0 < 3.0", "", "libD.so.3"},
+        {"libD", "2.5", "", "libD.so.2", ""},
+        {"libD", "2.6", "", "libD.so.3", ""},
+        {"libD", "3.0", "", "libD.so.4", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_EQ(Cache::instance().get_installed_version("libD"), "2.6");
+}
+
+
+// -----------------------------------------------------------------------
+// 5. 多个依赖分别根据 SONAME + 约束选择正确版本
+//    libE-1.0 → libE.so.1，libE-2.0 → libE.so.2
+//    libF-1.0 → libF.so.1，libF-2.0 → libF.so.2
+//    app 需要 libE.so.2 和 libF.so.1
+//    → libE 选 2.0（最新），libF 通过约束 >=1.0 <2.0 锁定到 1.0
+//    → 二者均提供所需 SONAME
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, MultipleDepsEachSelectCorrectVersionForSoname) {
+    create_pkg("libE", "1.0", {}, {"libE.so.1"});
+    create_pkg("libE", "2.0", {}, {"libE.so.2"});
+    create_pkg("libF", "1.0", {}, {"libF.so.1"});
+    create_pkg("libF", "2.0", {}, {"libF.so.2"});
+    create_pkg("app", "1.0", {"libE", "libF >= 1.0 < 2.0"}, {},
+               {"libE.so.2", "libF.so.1"});
+    update_index({
+        {"app", "1.0", "libE,libF >= 1.0 < 2.0", "", "libE.so.2,libF.so.1"},
+        {"libE", "1.0", "", "libE.so.1", ""},
+        {"libE", "2.0", "", "libE.so.2", ""},
+        {"libF", "1.0", "", "libF.so.1", ""},
+        {"libF", "2.0", "", "libF.so.2", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_EQ(Cache::instance().get_installed_version("libE"), "2.0");
+    EXPECT_EQ(Cache::instance().get_installed_version("libF"), "1.0");
+}
+
+
+// -----------------------------------------------------------------------
+// 6. 传递依赖的 SONAME 影响传递依赖的版本选择
+//    app → libG → libH
+//    libG-2.0 需要 libH.so.2
+//    libH-1.0 → libH.so.1，libH-2.0 → libH.so.2
+//    → libH 被选择为 2.0（最新版提供 libH.so.2）
+//      以满足 libG 的 needed_so 校验
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, TransitiveDepSonameDrivesVersionSelection) {
+    create_pkg("libH", "1.0", {}, {"libH.so.1"});
+    create_pkg("libH", "2.0", {}, {"libH.so.2"});
+    create_pkg("libG", "2.0", {"libH"}, {}, {"libH.so.2"});
+    create_pkg("app", "1.0", {"libG"});
+    update_index({
+        {"app", "1.0", "libG", "", ""},
+        {"libG", "2.0", "libH", "", "libH.so.2"},
+        {"libH", "1.0", "", "libH.so.1", ""},
+        {"libH", "2.0", "", "libH.so.2", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().is_installed("libG"));
+    EXPECT_TRUE(Cache::instance().is_installed("libH"));
+    EXPECT_EQ(Cache::instance().get_installed_version("libH"), "2.0");
+}
+
+
+// -----------------------------------------------------------------------
+// 7. 版本约束排除提供所需 SONAME 的版本 → 拒绝（版本级校验修复）
+//    libR-1.0 → libR.so.1，libR-2.0 → libR.so.2（不再提供 libR.so.1）
+//    app 依赖 libR >= 2.0（排除 1.0），但需要 libR.so.1
+//    → 版本选择器选 libR-2.0（唯一满足约束的版本）
+//    → 版本级 needed_so 检查发现 libR-2.0.provides 不包含 libR.so.1
+//    → 拒绝安装（不再走包级回退）
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, VersionConstraintExcludesSonameProvider) {
+    create_pkg("libR", "1.0", {}, {"libR.so.1"});
+    create_pkg("libR", "2.0", {}, {"libR.so.2"});
+    create_pkg("app", "1.0", {"libR >= 2.0"}, {}, {"libR.so.1"});
+    update_index({
+        {"app", "1.0", "libR >= 2.0", "", "libR.so.1"},
+        {"libR", "1.0", "", "libR.so.1", ""},
+        {"libR", "2.0", "", "libR.so.2", ""},
+    });
+
+    EXPECT_THROW(install_packages({"app"}), LpkgException);
+}
+
+
+// -----------------------------------------------------------------------
+// 8. 同一 SONAME 由多个包的不同版本提供 → 选择正确的提供者
+//    libJ 和 libK 都提供 "crypto-core"
+//    app 显式依赖 libJ，需要 "crypto-core"
+//    → 应选择 libJ（app 声明的依赖），而非 libK
+//    （验证 needed_so 的提供者查找不会"跨包抢用"）
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, SonameFromMultipleProvidersChoosesCorrectPackage) {
+    create_pkg("libJ", "1.0", {}, {"crypto-core", "libJ.so.1"});
+    create_pkg("libK", "1.0", {}, {"crypto-core", "libK.so.1"});
+    create_pkg("app", "1.0", {"libJ"}, {}, {"crypto-core"});
+    update_index({
+        {"app", "1.0", "libJ", "", "crypto-core"},
+        {"libJ", "1.0", "", "crypto-core,libJ.so.1", ""},
+        {"libK", "1.0", "", "crypto-core,libK.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().is_installed("libJ"));
+    EXPECT_FALSE(Cache::instance().is_installed("libK"));
+}
+
+
+// -----------------------------------------------------------------------
+// 9. 升级 SONAME 变更 → 依赖者被自动移除（升级一致性检查）
+//    libM-1.0 已安装（提供 libM.so.1）
+//    app 已安装（需要 libM.so.1）
+//    libM-2.0 在仓库（提供 libM.so.2，不再提供 libM.so.1）
+//    升级 libM 时，一致性检查发现 app 会被破坏
+//    在非交互模式下自动移除 app
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, SonameChangeInUpgradeBreaksDependents) {
+    create_pkg("libM", "1.0", {}, {"libM.so.1"});
+    update_index({{"libM", "1.0", "", "libM.so.1", ""}});
+    ASSERT_NO_THROW(install_packages({"libM"}));
+    Cache::instance().load();
+    ASSERT_EQ(Cache::instance().get_installed_version("libM"), "1.0");
+
+    create_pkg("app", "1.0", {"libM"}, {}, {"libM.so.1"});
+    update_index({
+        {"app", "1.0", "libM", "", "libM.so.1"},
+        {"libM", "1.0", "", "libM.so.1", ""},
+    });
+    ASSERT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("app"));
+
+    // 确认 app 的 needed_so 文件记录了 libM.so.1
+    {
+        fs::path nso_file = Config::instance().needed_so_dir() / "app";
+        std::ifstream f(nso_file);
+        bool found = false;
+        for (std::string l; std::getline(f, l); )
+            if (l == "libM.so.1") found = true;
+        ASSERT_TRUE(found) << "app's needed_so should contain libM.so.1";
+    }
+
+    // 加入 libM-2.0 并升级 libM
+    create_pkg("libM", "2.0", {}, {"libM.so.2"});
+    update_index({
+        {"libM", "1.0", "", "libM.so.1", ""},
+        {"libM", "2.0", "", "libM.so.2", ""},
+        {"app", "1.0", "libM", "", "libM.so.1"},
+    });
+
+    // 一致性检查检测到升级会破坏 app → NonInteractive YES 自动移除 app
+    EXPECT_NO_THROW(install_packages({"libM"}));
+
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version("libM"), "2.0");
+    // app 被一致性检查自动移除（libM.so.1 不再提供）
+    EXPECT_FALSE(Cache::instance().is_installed("app"));
+}
+
+
+// -----------------------------------------------------------------------
+// 10. 已安装的库版本不提供所需 SONAME → 拒绝（版本级校验修复）
+//     libN-2.0 已安装（提供 libN.so.2，仓库中最新版）
+//     libN-1.0 在仓库中（提供 libN.so.1）
+//     app 无显式 deps，仅 needed_so = libN.so.1
+//     → 版本级检查发现 libN-2.0.provides 不含 libN.so.1
+//     → 拒绝安装（不再靠旧版在仓库中的存在而放行）
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, InstalledVersionLacksSonameButPackageLevelCheckPasses) {
+    create_pkg("libN", "1.0", {}, {"libN.so.1"});
+    create_pkg("libN", "2.0", {}, {"libN.so.2"});
+    update_index({
+        {"libN", "1.0", "", "libN.so.1", ""},
+        {"libN", "2.0", "", "libN.so.2", ""},
+    });
+    ASSERT_NO_THROW(install_packages({"libN"}));
+    Cache::instance().load();
+    ASSERT_EQ(Cache::instance().get_installed_version("libN"), "2.0");
+
+    // app 无 deps，仅 needed_so 引用 libN.so.1
+    // 版本级检查会拒绝，因为 libN-2.0 不提供 libN.so.1
+    create_pkg("app", "1.0", {}, {}, {"libN.so.1"});
+    update_index({
+        {"app", "1.0", "", "", "libN.so.1"},
+        {"libN", "1.0", "", "libN.so.1", ""},
+        {"libN", "2.0", "", "libN.so.2", ""},
+    });
+
+    EXPECT_THROW(install_packages({"app"}), LpkgException);
+}
+
+
+// -----------------------------------------------------------------------
+// 11. autoremove 保护 needed_so 提供者
+//     libO-1.0 已安装（提供 libO.so.1）
+//     app 已安装（依赖 libO，需要 libO.so.1）
+//     autoremove 不应移除 libO（app 通过 deps 依赖它）
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, MultiVersionAutoremovePreservesSonameProvider) {
+    create_pkg("libO", "1.0", {}, {"libO.so.1"});
+    update_index({{"libO", "1.0", "", "libO.so.1", ""}});
+    ASSERT_NO_THROW(install_packages({"libO"}));
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("libO"));
+
+    create_pkg("app", "1.0", {"libO"}, {}, {"libO.so.1"});
+    update_index({
+        {"app", "1.0", "libO", "", "libO.so.1"},
+        {"libO", "1.0", "", "libO.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("app"));
+    ASSERT_TRUE(Cache::instance().is_installed("libO"));
+
+    // autoremove 不应移除 libO（app 通过 deps 依赖它）
+    EXPECT_NO_THROW(autoremove());
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("libO"));
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+}
+
+
+// -----------------------------------------------------------------------
+// 12. 本地包 + 多版本仓库的 needed_so 校验
+//     libP-1.0 → libP.so.1，libP-2.0 → libP.so.2
+//     本地安装 app.lpkg（需要 libP.so.2，依赖 libP）
+//     → 系统应从仓库安装 libP-2.0（最新版提供 libP.so.2）
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, LocalPackageMultiVersionSonameResolution) {
+    create_pkg("libP", "1.0", {}, {"libP.so.1"});
+    create_pkg("libP", "2.0", {}, {"libP.so.2"});
+    update_index({
+        {"libP", "1.0", "", "libP.so.1", ""},
+        {"libP", "2.0", "", "libP.so.2", ""},
+    });
+
+    // 创建本地 app.lpkg（元数据中依赖 libP，需要 libP.so.2）
+    fs::path work_dir = suite_work_dir / "local_app_work";
+    fs::create_directories(work_dir / "root" / "usr" / "bin");
+    std::ofstream(work_dir / "root" / "usr" / "bin" / "local-app").close();
+    std::string local_pkg = (pkg_dir / "local-app-1.0.lpkg").string();
+    pack_package(local_pkg, work_dir.string(), "local-app", "1.0",
+                 {"libP"}, {}, "", {"libP.so.2"});
+    fs::remove_all(work_dir);
+
+    ASSERT_TRUE(fs::exists(local_pkg));
+
+    EXPECT_NO_THROW(install_packages({local_pkg}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("local-app"));
+    EXPECT_TRUE(Cache::instance().is_installed("libP"));
+    EXPECT_EQ(Cache::instance().get_installed_version("libP"), "2.0");
+}

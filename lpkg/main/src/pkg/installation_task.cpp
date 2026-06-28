@@ -302,33 +302,35 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
     }
 
     // --- needed_so 完整性校验 ---
-    // 每个声明的 SONAME 必须在 repo 或当前 plan 中有提供者，
-    // 否则是"唯一真相"断裂（index 缺失 provides 或 build 时 provider_map 不完整）。
+    // 每个声明的 SONAME 必须在 plan / 已安装缓存 / repo 中有提供者，
+    // 否则是"唯一真相"断裂。采用版本级校验顺序避免包级缺口。
     if (!needed_so_.empty()) {
         for (const auto& soname : needed_so_) {
             bool provided = false;
 
-            // 1) 检查 repo index 中的提供者
-            if (!provided && ctx.repo.find_provider(soname))
-                provided = true;
-
-            // 2) 检查当前 plan 中是否有包提供此 SONAME
-            if (!provided) {
-                for (const auto& [pn, plan] : ctx.plan) {
-                    for (const auto& prov : plan.provides) {
-                        if (prov == soname) { provided = true; break; }
-                    }
-                    if (provided) break;
+            // 1) 检查当前 plan 中是否有包提供此 SONAME（版本精准）
+            for (const auto& [pn, plan_pkg] : ctx.plan) {
+                for (const auto& prov : plan_pkg.provides) {
+                    if (prov == soname) { provided = true; break; }
                 }
+                if (provided) break;
             }
 
-            // 3) 检查已安装包缓存
+            // 2) 检查已安装包缓存
             if (!provided) {
                 auto providers = Cache::instance().get_providers(soname);
                 for (const auto& p : providers) {
                     if (Cache::instance().is_installed(p)) {
-                        // 检查此包是否在 plan 中被升级/移除
                         if (!ctx.plan.contains(p)) { provided = true; break; }
+                    }
+                }
+            }
+
+            // 3) 检查 repo index——验证返回的版本确实提供此 SONAME
+            if (!provided) {
+                if (auto prov_pkg = ctx.repo.find_provider(soname)) {
+                    for (const auto& prov : prov_pkg->provides) {
+                        if (prov == soname) { provided = true; break; }
                     }
                 }
             }

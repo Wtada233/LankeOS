@@ -300,6 +300,54 @@ std::set<std::string> check_plan_consistency(const std::map<std::string, Install
 }
 
 /**
+ * 检查计划升级是否会破坏已安装包的 needed_so
+ * 当计划升级/替换某个包时，遍历已安装包的 needed_so 文件，
+ * 若某个 SONAME 由被升级包提供但新版不再提供，则将该已安装包
+ * 标记为 broken。
+ */
+std::set<std::string> check_needed_so_consistency(
+    const std::map<std::string, InstallPlan>& plan)
+{
+    std::set<std::string> broken;
+    auto& cache = Cache::instance();
+    auto& config = Config::instance();
+    const fs::path nso_dir = config.needed_so_dir();
+
+    for (const auto& [pkg, ver] : cache.get_all_installed()) {
+        if (plan.contains(pkg)) continue;
+
+        const fs::path nso_file = nso_dir / pkg;
+        if (!fs::exists(nso_file)) continue;
+
+        std::ifstream f(nso_file);
+        std::string soname;
+        while (std::getline(f, soname)) {
+            if (soname.empty()) continue;
+
+            // 查找此 SONAME 的已安装提供者
+            auto providers = cache.get_providers(soname);
+            for (const auto& prov_pkg : providers) {
+                // 若提供者在 plan 中（正在被升级），验证新版仍提供此 SONAME
+                if (!plan.contains(prov_pkg)) continue;
+
+                const auto& plan_entry = plan.at(prov_pkg);
+                bool still_provides = false;
+                for (const auto& prov : plan_entry.provides) {
+                    if (prov == soname) { still_provides = true; break; }
+                }
+                if (!still_provides) {
+                    log_warning(string_format(
+                        "warning.needed_so_dropped_in_upgrade",
+                        prov_pkg, plan_entry.actual_version, soname, pkg));
+                    broken.insert(pkg);
+                }
+            }
+        }
+    }
+    return broken;
+}
+
+/**
  * 获取所有必需包的集合（被明确标记为 held 的包及其传递依赖）
  * 用于 autoremove 判断哪些包可以安全移除
  */

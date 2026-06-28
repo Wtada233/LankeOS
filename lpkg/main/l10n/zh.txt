@@ -218,3 +218,4 @@ warning.repo_mirror_config=无法读取镜像配置: {}
 warning.repo_index_missing=未找到仓库索引: {}
 warning.repo_index_download=下载仓库索引失败: {}
 error.dependency_depth_exceeded=依赖深度超过限制: {} (最大 {}). 可能存在循环依赖。
+warning.needed_so_dropped_in_upgrade={} 升级为 {} 后不再提供 {}，破坏已安装的 {}
