@@ -391,10 +391,11 @@ void remove_package(const std::string& pkg_name, bool force) {
         }
     }
 
-    fs::remove(dep_file);
-    fs::remove(Config::instance().needed_so_dir() / pkg_name);
-    fs::remove(Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)));
-    fs::remove_all(Config::instance().hooks_dir() / pkg_name);
+    std::error_code ec;
+    fs::remove(dep_file, ec);
+    fs::remove(Config::instance().needed_so_dir() / pkg_name, ec);
+    fs::remove(Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), ec);
+    fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
     cache.remove_installed(pkg_name);
     log_info(string_format("info.package_removed_successfully", pkg_name));
 }

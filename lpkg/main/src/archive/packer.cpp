@@ -121,7 +121,8 @@ void pack_package(const std::string& output_filename, const std::string& source_
             f << meta.dump(2) << std::endl;
         }
         add_to_archive(a, tmp_meta, std::string(constants::PKG_METADATA_FILE));
-        fs::remove(tmp_meta);
+        std::error_code ec;
+        fs::remove(tmp_meta, ec);
 
         // 2. 添加 hooks 目录
         if (fs::exists(hooks_dir)) {
