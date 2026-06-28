@@ -7,11 +7,14 @@
 ## 功能特性
 
 -   **全生命周期管理**：安装、卸载、升级、重装软件包。
--   **智能版本解析**：支持多位修订号（如 `1.0.0.1`），内置严谨的比较算法，确保 `6.16.1 > 6.6.1`。
--   **聚合索引**：采用 `index.txt` 聚合格式，一行即可记录包的所有版本及其哈希，极大减少网络请求。
--   **包内嵌元数据**：采用 `metadata.json` 嵌入包内，统一存储名称、版本、依赖、虚拟提供、手册页等元数据。
+-   **needed_so 依赖校验**：安装前自动验证每个 ELF DT_NEEDED 声明的 SONAME 在仓库中有对应的提供者包，无提供者则拒绝安装，杜绝"空 provides 还能装"的漏洞。
+-   **SIGINT 优雅退出**：类 pacman 双段式防护——首次 Ctrl+C 等待当前操作完成后回滚退出，再次 Ctrl+C 强制终止，防止事务中断导致系统不一致。
+-   **智能版本解析**：支持多位修订号（如 `1.0.0.1`），内置严谨的比较算法，确保 `6.16.1 > 6.6.1`。支持复合区间约束（如 `>= 2.0.0 < 3.0.0`）。
+-   **聚合索引**：采用 `index.txt` 聚合格式，一行即可记录包的所有版本及其哈希。支持第 4 段 `needed_so`，提供完整的 SONAME→包名 映射。
+-   **包内嵌元数据**：采用 `metadata.json` 嵌入包内，统一存储名称、版本、依赖、needed_so、虚拟提供、手册页等元数据。
+-   **自动依赖推导**：提供 `gen_deps.py` 工具，基于 ELF 文件扫描自动生成 `needed_so`（DT_NEEDED SONAME 列表）和 `deps`（提供者包名），无需手动维护版本约束。
 -   **内容即文件布局**：包的 `content/` 目录结构直接对应根目录文件布局。
--   **自动化运维**：提供 `lrepo-mgr.py` 工具，支持一键推送到腾讯云 COS (S3) 或 SCP 远程服务器。
+-   **自动化运维**：提供 `lrepo-mgr.py` 工具，支持一键推送到腾讯云 COS (S3) 或 SCP 远程服务器。新增 `--path` 参数支持本地文件系统仓库，便于离线测试。
 -   **高兼容性静态构建**：内置系统 CA 证书路径自动探测，确保静态编译版本在不同 Linux 发行版上都能正常联网。
 -   **安全性**：强制 SHA256 哈希校验、文件冲突检测、恶意路径过滤。
 -   **系统钩子与触发器**：支持包级 `postinst/prerm` 脚本及系统级触发器（如 `ldconfig`）。
@@ -85,7 +88,16 @@ lpkg [选项] <命令> [参数]
 ./main/scripts/lrepo-mgr.py push ./pkgs/*.lpkg
 ```
 
-### 3. 清理历史版本
+### 3. 本地仓库（离线测试）
+```bash
+# 初始化本地 repo 并推送包
+./main/scripts/lrepo-mgr.py --path /tmp/repo push ./pkgs/*.lpkg
+
+# 查看生成的索引
+cat /tmp/repo/x86_64/index.txt
+```
+
+### 4. 清理历史版本
 从存储端删除所有不在 `index.txt` 记录中的旧版本文件:
 ```bash
 ./main/scripts/lrepo-mgr.py cleanup
@@ -104,11 +116,12 @@ hooks/                # 钩子脚本（可选）
 ### metadata.json 示例
 ```json
 {
-  "name": "bash",
-  "version": "5.2",
-  "deps": ["readline >= 8.0", "ncurses"],
-  "provides": ["libbash"],
-  "man": "bash(1) - GNU Bourne-Again SHell\n..."
+  "name": "curl",
+  "version": "8.11.1",
+  "deps": ["glibc", "openssl", "zlib", "zstd", "bash"],
+  "provides": ["libcurl.so.4"],
+  "needed_so": ["libc.so.6", "libssl.so.3", "libcrypto.so.3", "libz.so.1", "libzstd.so.1"],
+  "man": "curl(1) - transfer a URL\n..."
 }
 ```
 
@@ -116,8 +129,9 @@ hooks/                # 钩子脚本（可选）
 |------|------|
 | `name` | 包名 |
 | `version` | 版本号 |
-| `deps` | 依赖列表（可选），支持版本约束 |
-| `provides` | 虚拟提供列表（可选） |
+| `deps` | 依赖包名列表（无版本约束，由 gen_deps 自动解析 needed_so 生成） |
+| `provides` | 本包提供的 SONAME 及虚拟能力列表 |
+| `needed_so` | 本包 ELF 文件声明的 DT_NEEDED SONAME 列表（运行时依赖的原始真相） |
 | `man` | 内联手册页内容（可选） |
 
 `content/` 目录下的文件布局直接对应目标根目录（`/`）。
@@ -127,15 +141,16 @@ hooks/                # 钩子脚本（可选）
 ### 目录结构
 ```text
 /x86_64
-  ├── index.txt           # 核心索引：包名|版本1:哈希1:依赖1;版本2:哈希2:依赖2|提供
+  ├── index.txt           # 核心索引：包名|版本:哈希:依赖|提供|needed_so
   └── bash/
-      ├── 5.2.lpkg        # 实际的 tar.zst 压缩包
-      └── 5.3.lpkg
+      ├── 5.3.lpkg        # 实际的 tar.zst 压缩包
+      └── 5.4.lpkg
 ```
 
 ### 索引行示例
 ```text
-acl|2.3.1:hash:attr,coreutils,glibc|libacl.so
+# 第 4 段 needed_so：包内 ELF 的 DT_NEEDED SONAME 列表
+curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash|libcurl.so.4|libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1
 ```
 
 ## 源码架构
