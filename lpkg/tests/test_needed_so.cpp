@@ -95,7 +95,7 @@ protected:
                 hash = calculate_sha256(pkg_path);
             }
             index << name << "|" << ver << ":" << hash << ":" << deps
-                  << "|" << provides << "|" << needed_so << "\n";
+                  << ":" << provides << ":" << needed_so << "\n";
         }
     }
 };

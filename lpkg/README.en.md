@@ -141,7 +141,7 @@ The files under `content/` are extracted directly to the target root (`/`).
 ### Directory Structure
 ```text
 /x86_64
-  ├── index.txt           # Core index: name|version:hash:deps|provides|needed_so
+  ├── index.txt           # Core index: name|ver:hash:deps:provides:needed_so;...|
   └── bash/
       ├── 5.3.lpkg        # Actual tar.zst compressed package
       └── 5.4.lpkg
@@ -149,8 +149,8 @@ The files under `content/` are extracted directly to the target root (`/`).
 
 ### Index Line Example
 ```text
-# 4th section needed_so: DT_NEEDED SONAME list from the package's ELF files
-curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash|libcurl.so.4|libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1
+# provides/needed_so are per-version (inside the version block, fields 4 and 5)
+curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash:libcurl.so.4:libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1|
 ```
 
 ## Source Architecture

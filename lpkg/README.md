@@ -141,7 +141,7 @@ hooks/                # 钩子脚本（可选）
 ### 目录结构
 ```text
 /x86_64
-  ├── index.txt           # 核心索引：包名|版本:哈希:依赖|提供|needed_so
+  ├── index.txt           # 核心索引：包名|版本:哈希:依赖:提供:needed_so;...|
   └── bash/
       ├── 5.3.lpkg        # 实际的 tar.zst 压缩包
       └── 5.4.lpkg
@@ -149,8 +149,8 @@ hooks/                # 钩子脚本（可选）
 
 ### 索引行示例
 ```text
-# 第 4 段 needed_so：包内 ELF 的 DT_NEEDED SONAME 列表
-curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash|libcurl.so.4|libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1
+# provides/needed_so 在版本块内（第 4、5 字段），每个版本独立
+curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash:libcurl.so.4:libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1|
 ```
 
 ## 源码架构

@@ -207,8 +207,7 @@ class RepoManager:
         print("Cleanup complete.")
 
     def parse_aggregated_index(self, path):
-        # 新版格式: name|ver:hash:deps:provides:needed_so;ver2:...|
-        # 旧版格式: name|ver:hash:deps;ver2:...|provides|needed_so
+        # 格式: name|ver:hash:deps:provides:needed_so;ver2:...|
         data = {}
         if os.path.exists(path):
             with open(path, 'r', encoding='utf-8') as f:
@@ -219,10 +218,6 @@ class RepoManager:
                     if len(parts) < 2: continue
                     name = parts[0]
 
-                    # 旧版 fallback: provides/needed_so 来自 pipe 段
-                    pipe_provides = parts[2] if len(parts) > 2 else ""
-                    pipe_needed_so = parts[3] if len(parts) > 3 else ""
-
                     for v_block in parts[1].split(';'):
                         v_info = v_block.split(':')
                         if len(v_info) < 2: continue
@@ -230,14 +225,9 @@ class RepoManager:
                         version = v_info[0]
                         hash_val = v_info[1]
                         deps = v_info[2] if len(v_info) > 2 else ""
-
-                        # 新版格式：provides/needed_so 在版本块内（第 4、5 字段）
-                        if len(v_info) >= 4:
-                            provides = v_info[3]
-                            needed_so = v_info[4] if len(v_info) > 4 else ""
-                        else:
-                            provides = pipe_provides
-                            needed_so = pipe_needed_so
+                        # provides/needed_so 在版本块内（第 4、5 字段）
+                        provides = v_info[3] if len(v_info) > 3 else ""
+                        needed_so = v_info[4] if len(v_info) > 4 else ""
 
                         if name not in data:
                             data[name] = {"versions": {}}

@@ -78,7 +78,7 @@ protected:
             if (fs::exists(pkg_path)) {
                 hash = calculate_sha256(pkg_path);
             }
-            index << name << "|" << ver << ":" << hash << ":" << deps << "|" << provides << "\n";
+            index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":|\n";
         }
     }
 };

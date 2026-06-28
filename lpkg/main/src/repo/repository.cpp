@@ -63,17 +63,14 @@ void Repository::load_index() {
         std::string_view sv = line;
         if (!sv.empty() && sv.back() == '\r') sv.remove_suffix(1);
 
-        // 格式（新）: 包名|版本:哈希:依赖:提供者:needed_so;版本2:...|
-        // 格式（旧）: 包名|版本:哈希:依赖;版本2:哈希2:依赖2|提供者|needed_so
+        // 格式: 包名|版本:哈希:依赖:提供者:needed_so;版本2:...|
         auto parts = split_string_view(sv, constants::PIPE_CHAR);
         if (parts.size() < 2) continue;
 
         std::string pkg_name(parts[0]);
         std::string_view version_blocks_sv = parts[1];
 
-        // 旧格式兼容：provides/needed_so 在 pipe 段中（版本无关）
-        std::string_view pipe_prov_sv = (parts.size() > 2) ? parts[2] : "";
-        std::string_view pipe_needed_so_sv = (parts.size() > 3) ? parts[3] : "";
+        // 旧格式兼容（已移除）：provides/needed_so 在版本块内
 
         // 一个包可能对应多个版本，用 ';' 分隔
         for (auto version_info_sv : split_string_view(version_blocks_sv, constants::SEMICOLON_CHAR)) {
@@ -86,13 +83,9 @@ void Repository::load_index() {
             std::string hash = (vh_parts.size() > 1) ? std::string(vh_parts[1]) : "";
             std::string_view deps_sv = (vh_parts.size() > 2) ? vh_parts[2] : "";
 
-            // 新版格式：provides/needed_so 在版本块内（第 4、5 字段）
-            // 字段数 >= 4 则采用版本级 provides，否则回退到包级 pipe 段
-            bool is_new_format = (vh_parts.size() >= 4);
-            std::string_view ver_prov_sv = is_new_format ? vh_parts[3] : pipe_prov_sv;
-            std::string_view ver_needed_so_sv = is_new_format
-                ? ((vh_parts.size() > 4) ? vh_parts[4] : std::string_view{})
-                : pipe_needed_so_sv;
+            // provides/needed_so 在版本块内（第 4、5 字段），每个版本独立
+            std::string_view ver_prov_sv = (vh_parts.size() > 3) ? vh_parts[3] : std::string_view{};
+            std::string_view ver_needed_so_sv = (vh_parts.size() > 4) ? vh_parts[4] : std::string_view{};
 
             // 解析依赖字符串，提取包名和版本约束
             // 格式: "glibc >= 2.0.0 < 3.0.0, zlib >= 1.0.0"
