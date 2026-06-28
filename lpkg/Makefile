@@ -19,7 +19,7 @@ PKGS_LIST = $(PKGS)
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 3.1.0
+VERSION ?= 3.1.1
 
 BUILD_DIR = build
 MAIN_DIR = main
