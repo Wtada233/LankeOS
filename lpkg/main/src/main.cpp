@@ -16,6 +16,9 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <csignal>
+#include <atomic>
+#include <thread>
 
 /** RAII：curl 全局初始化/清理 */
 struct CurlGlobalInitializer {
@@ -25,6 +28,36 @@ struct CurlGlobalInitializer {
     ~CurlGlobalInitializer() {
         curl_global_cleanup();
     }
+};
+
+// ── SIGINT 双段式防护 ──────────────────────────────────────────────────
+// 与 pacman 行为一致：
+//   第 1 次 Ctrl+C → 设 graceful 标志，当前操作完成后退出
+//   第 2 次 Ctrl+C（2 秒内）→ 立即终止
+std::atomic<bool> sigint_graceful{false};
+static std::atomic<bool> sigint_force{false};
+
+extern "C" void sigint_handler(int) {
+    if (sigint_graceful.exchange(true)) {
+        static const char msg[] = "\nSIGINT: force abort (system may be inconsistent)\n";
+        write(STDERR_FILENO, msg, sizeof(msg) - 1);
+        _Exit(130);
+    }
+    static const char msg[] = "\nSIGINT: graceful shutdown after current operation...\n";
+    write(STDERR_FILENO, msg, sizeof(msg) - 1);
+    // 恢复默认行为，第二次 Ctrl+C 直接杀死
+    std::signal(SIGINT, SIG_DFL);
+    // 2 秒后超时强制退出（防止事务挂起）
+    std::thread([]{
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+        if (sigint_graceful.load()) _Exit(130);
+    }).detach();
+}
+
+/** RAII：安装/移除等事务中安装 SIGINT 防护 */
+struct SigIntGuard {
+    SigIntGuard() { sigint_graceful.store(false); std::signal(SIGINT, sigint_handler); }
+    ~SigIntGuard() { std::signal(SIGINT, SIG_DFL); }
 };
 
 /** 打印帮助信息 */
@@ -291,6 +324,15 @@ int main(int argc, char* argv[]) {
             check_root();
             Config::instance().init_filesystem();
             db_lock = std::make_unique<DBLock>();
+        }
+
+        // 安装/移除/升级等写操作启用 SIGINT 防护
+        // 首次 Ctrl+C 设 graceful 标志，第 2 次强制终止
+        std::optional<SigIntGuard> sig_guard;
+        if (command == constants::CMD_INSTALL || command == constants::CMD_REMOVE
+            || command == constants::CMD_AUTOREMOVE || command == constants::CMD_UPGRADE
+            || command == constants::CMD_REINSTALL) {
+            sig_guard.emplace();
         }
 
         // lambda 在 handle_command 栈帧内被立即消费，不跨函数逃逸，

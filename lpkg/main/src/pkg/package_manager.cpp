@@ -16,6 +16,7 @@
 #include "base/constants.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -237,9 +238,15 @@ void install_packages(const std::vector<std::string>& pkg_args,
  * 若元数据与仓库索引不匹配，则更新计划并重新解析依赖后从头开始安装。
  * 这是确保依赖一致性的关键机制。
  */
+/** 在 main.cpp 中声明，由 SIGINT 信号处理函数设置 */
+extern std::atomic<bool> sigint_graceful;
+
 void install_packages_internal(InstallContext& ctx) {
     size_t i = 0;
     while (i < ctx.install_order.size()) {
+        if (sigint_graceful.load())
+            throw LpkgException(get_string("info.sigint_aborted"));
+
         const std::string& n = ctx.install_order[i];
         ++i;
 

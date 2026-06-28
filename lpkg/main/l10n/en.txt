@@ -48,6 +48,7 @@ info.scan_desc=  scan                       Scan for orphaned files
 info.help_desc=Print this help
 info.package_list_item={} {}
 info.package_list_item_dep=[{}] {}
+info.sigint_aborted=Installation aborted by user (SIGINT).
 info.install_complete=Installation complete.
 info.uninstall_complete=Uninstallation complete.
 info.extracting=Extracting files: {} processed

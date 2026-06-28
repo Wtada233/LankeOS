@@ -48,6 +48,7 @@ info.scan_desc=  scan                       扫描孤立文件
 info.help_desc=打印本帮助
 info.package_list_item={} {}
 info.package_list_item_dep=[{}] {}
+info.sigint_aborted=用户中断 (SIGINT)，安装已中止。
 info.install_complete=安装完成。
 info.uninstall_complete=卸载完成。
 info.extracting=正在解压文件: {} 个已处理
