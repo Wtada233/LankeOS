@@ -225,7 +225,7 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
         const std::string installed_ver = Cache::instance().get_installed_version(dep_name);
 
         if (!installed_ver.empty()) {
-            if (dep.op.empty() || installed_ver == "virtual" || version_satisfies(installed_ver, dep.op, dep.version_req)) {
+            if (dep.constraints.empty() || installed_ver == "virtual" || version_satisfies_all(installed_ver, dep.constraints)) {
                 continue;
             }
         }
@@ -233,8 +233,8 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
         if (ctx.plan.contains(dep_name)) continue;
 
         std::string req_ver = std::string(constants::VER_LATEST);
-        if (!dep.op.empty()) {
-            if (auto matching = ctx.repo.find_best_matching_version(dep_name, dep.op, dep.version_req))
+        if (!dep.constraints.empty()) {
+            if (auto matching = ctx.repo.find_best_matching_version(dep_name, dep.constraints))
                 req_ver = matching->version;
         }
 

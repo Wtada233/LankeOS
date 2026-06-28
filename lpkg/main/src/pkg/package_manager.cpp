@@ -239,8 +239,7 @@ void install_packages_internal(InstallContext& ctx) {
             if (!metadata_differs) {
                 for (size_t di = 0; di < actual_deps.size(); ++di) {
                     if (actual_deps[di].name != p.dependencies[di].name
-                        || actual_deps[di].op != p.dependencies[di].op
-                        || actual_deps[di].version_req != p.dependencies[di].version_req) {
+                        || actual_deps[di].constraints != p.dependencies[di].constraints) {
                         metadata_differs = true; break;
                     }
                 }

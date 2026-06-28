@@ -107,8 +107,8 @@ void resolve_transitive_deps(const std::string& pkg_name,
     for (const auto& dep : pkg_info->dependencies) {
         if (!Config::instance().no_deps_mode()) {
             std::string dv(constants::VER_LATEST);
-            if (!dep.op.empty()) {
-                if (auto m = repo.find_best_matching_version(dep.name, dep.op, dep.version_req))
+            if (!dep.constraints.empty()) {
+                if (auto m = repo.find_best_matching_version(dep.name, dep.constraints))
                     dv = m->version;
             }
             resolve_transitive_deps(dep.name, dv, plan, visited, repo);
@@ -522,8 +522,8 @@ ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all) {
     std::set<std::string> visited;
     for (const auto& dep : deps) {
         std::string dv(constants::VER_LATEST);
-        if (!dep.op.empty()) {
-            if (auto m = repo.find_best_matching_version(dep.name, dep.op, dep.version_req))
+        if (!dep.constraints.empty()) {
+            if (auto m = repo.find_best_matching_version(dep.name, dep.constraints))
                 dv = m->version;
         }
         resolve_transitive_deps(dep.name, dv, plan, visited, repo);

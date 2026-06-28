@@ -4,33 +4,26 @@ gen_deps.py — Auto-generate dependencies for .lpkg packages.
 
 === 设计原则 ===
 
-本工具直接替换（而非合并）metadata.json 中的 deps 字段。
+本工具直接替换（而非合并）metadata.json 中的 deps 和 needed_so 字段。
 原因是：它探测的是运行时真实依赖（ELF DT_NEEDED + 脚本解释器），
 扫描结果就是运行时依赖的唯一真相（source of truth）。
-任何不在探测结果中的旧 dep 要么是过时的手工元数据、
-要么是肉眼维护遗漏的条目——直接覆盖消除了这些噪音。
-如果需要保留额外的元数据依赖，请在运行本工具后手动添加。
+
+=== 输出字段 ===
+
+  needed_so: ["libc.so.6", "libz.so.1", ...]
+    原始探测结果：当前包所有 ELF 文件的 DT_NEEDED 条目。
+    SONAME 编码了 ABI 版本，因此不需要额外的版本约束。
+
+  deps: ["glibc", "zlib", ...]
+    needed_so 经 provider_map 解析得到的包名列表（无版本约束）。
+    SONAME 即版本契约——ABI 不兼容则 SONAME 变化，自动产生新的 NEEDED。
 
 === 功能 ===
   • ELF 动态链接分析（pyelftools 优先，回退 readelf）
-  • 主版本约束推导（glibc 2.42 → ">= 2.0.0"）
+  • SONAME 收集（needed_so）与提供者解析（deps）
   • 脚本解释器探测（shebang + file(1) 补充）
   • 流水线架构：一次解包，同时扫描 SONAME + NEEDED
   • 并行流水线 + dry-run 模式
-
-=== 版本约束说明 ===
-
-依赖的版本约束提取自**提供者包的版本号**（metadata.json 中的 version
-字段的第一个数字段），而非 SONAME 的 ABI 编号。例如：
-  glibc 2.42 提供 libc.so.6  → 依赖写为 "glibc >= 2.0.0"
-  gcc 16.1.0 提供 libstdc++.so.6 → 依赖写为 "gcc >= 16.0.0"
-
-SONAME 的编号（libc.so.6 中的 6）是 ABI 兼容性标记，与包的发行版本
-是两套独立的编号体系——将二者混用会导致荒谬的约束（如 "glibc >= 6.0.0"）。
-
-约束格式 ">= X.0.0" 不是严格区间（会允许 X+1.0.0），但结合 SONAME
-的 ABI 隔离在实践中是安全的：如果主版本升级到 X+1，SONAME 会变为
-libfoo.so.X+1，产生不同的 NEEDED 条目。
 """
 
 import os
@@ -283,7 +276,7 @@ def scan_package(lpkg, target_dir, extract_root):
 
     返回：
       lpkg, pkg_name, pkg_version,
-      providers: list of {key, pkg, major}
+      providers: list of {key, pkg, pkg_version}
       needs: set of DT_NEEDED 字符串
       script_deps: set of 包名
       extract_dir
@@ -400,21 +393,17 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False):
     if not pkg_name:
         return lpkg, [], 'no_pkg_name'
 
-    deps = {}  # 包名 → 约束字符串（或 None）
+    deps = {}  # 包名（无版本约束）
+    needed_so = []  # 收集的 SONAME 列表
 
-    # --- 1) 解析 ELF DT_NEEDED → 提供者包 ---
+    # --- 1) 收集 needed_so + 解析 ELF DT_NEEDED → 提供者包 ---
+    # SONAME 本身编码了 ABI 版本（libc.so.6 中的 6），
+    # 因此 deps 中不包含版本约束。
     for soname in sorted(needs):
         provider = provider_map.get(soname)
         if provider and provider['pkg'] and provider['pkg'] != pkg_name:
-            # 版本约束来自提供者包的 version（而非 SONAME）：
-            # SONAME 的 ABI 编号与包版本是完全独立的体系。
-            # glibc 2.42 → libc.so.6 → 锁 >= 2.0.0，不是 >= 6.0.0
-            pkg_ver = provider.get('pkg_version')
-            major = extract_package_major(pkg_ver) if pkg_ver else None
-            if major:
-                deps[provider['pkg']] = f">= {major}.0.0"
-            else:
-                deps.setdefault(provider['pkg'])
+            deps.setdefault(provider['pkg'])
+            needed_so.append(soname)
 
     # --- 2) 解析脚本解释器 → 包 ---
     for dep_pkg in sorted(script_deps):
@@ -422,10 +411,8 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False):
             deps[dep_pkg] = None
 
     # --- 3) 格式化依赖列表 ---
-    dep_entries = sorted(
-        f"{pkg} {constraint}" if constraint else pkg
-        for pkg, constraint in deps.items()
-    )
+    dep_entries = sorted(deps.keys())
+    needed_so_entries = sorted(needed_so)
 
     # --- 4) 读取当前 metadata（从已解压目录，不再重新从 tar 读） ---
     meta_path = os.path.join(extract_dir, 'metadata.json')
@@ -434,15 +421,17 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False):
         return lpkg, dep_entries, 'no_metadata'
 
     old_deps = sorted(meta.get('deps', []))
-    if old_deps == dep_entries:
+    old_needed = sorted(meta.get('needed_so', []))
+    if old_deps == dep_entries and old_needed == needed_so_entries:
         return lpkg, dep_entries, 'unchanged'
 
     if dry_run:
         return lpkg, dep_entries, 'would_update'
 
-    # --- 5) 直接替换 deps（不合并）---
+    # --- 5) 直接替换 deps + needed_so（不合并）---
     # 设计决定：扫描结果是运行时依赖的唯一真相，见模块 docstring。
     meta['deps'] = dep_entries
+    meta['needed_so'] = needed_so_entries
     with open(meta_path, 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 

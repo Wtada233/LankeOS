@@ -96,8 +96,9 @@ TEST_F(AggregatedIndexTest, MultipleVersionsOneLine) {
     ASSERT_TRUE(pkg.has_value());
     ASSERT_EQ(pkg->dependencies.size(), 1);
     EXPECT_EQ(pkg->dependencies[0].name, "glibc");
-    EXPECT_EQ(pkg->dependencies[0].op, ">=");
-    EXPECT_EQ(pkg->dependencies[0].version_req, "2.35");
+    ASSERT_EQ(pkg->dependencies[0].constraints.size(), 1);
+    EXPECT_EQ(pkg->dependencies[0].constraints[0].op, ">=");
+    EXPECT_EQ(pkg->dependencies[0].constraints[0].version, "2.35");
 
     pkg = repo.find_package("libfoo");
     ASSERT_TRUE(pkg.has_value());

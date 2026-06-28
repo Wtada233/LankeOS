@@ -82,20 +82,70 @@ void Repository::load_index() {
             std::string_view deps_sv = (vh_parts.size() > 2) ? vh_parts[2] : "";
 
             // 解析依赖字符串，提取包名和版本约束
+            // 格式: "glibc >= 2.0.0 < 3.0.0, zlib >= 1.0.0"
+            // 先按逗号切割出每个依赖项，再在一个项内解析所有 (op, version) 对
             std::vector<DependencyInfo> deps;
             if (!deps_sv.empty()) {
                 for (auto dep_str : split_string_view(deps_sv, constants::COMMA_CHAR)) {
                     DependencyInfo dep;
-                    size_t op_pos = std::string_view::npos;
+                    std::string d(dep_str);
+
+                    // 找到第一个操作符，分割包名和约束序列
+                    size_t op_pos = std::string::npos;
                     for (const auto& op : ops) {
-                        if ((op_pos = dep_str.find(op)) != std::string_view::npos) {
-                            dep.name = std::string(dep_str.substr(0, op_pos));
-                            dep.op = op;
-                            dep.version_req = std::string(dep_str.substr(op_pos + op.length()));
+                        if ((op_pos = d.find(op)) != std::string::npos) {
+                            // 包名：第一个操作符之前的部分，去掉尾部空格
+                            std::string name = d.substr(0, op_pos);
+                            while (!name.empty() && name.back() == ' ')
+                                name.pop_back();
+                            dep.name = name;
+
+                            // 约束序列：第一个操作符及其之后的部分
+                            // 如 ">= 2.0.0 < 3.0.0"，从中提取一个或多个 (op, version) 对
+                            std::string remaining = d.substr(op_pos);
+                            size_t pos = 0;
+                            while (pos < remaining.size()) {
+                                // 跳过空格
+                                while (pos < remaining.size() && remaining[pos] == ' ')
+                                    ++pos;
+                                if (pos >= remaining.size()) break;
+
+                                // 提取当前操作符
+                                std::string cur_op;
+                                for (const auto& o : ops) {
+                                    if (remaining.substr(pos, o.size()) == o) {
+                                        cur_op = o;
+                                        pos += o.size();
+                                        break;
+                                    }
+                                }
+                                if (cur_op.empty()) break;
+
+                                // 跳过操作符后的空格
+                                while (pos < remaining.size() && remaining[pos] == ' ')
+                                    ++pos;
+
+                                // 提取版本号：到下一个操作符或字符串结尾
+                                size_t ver_end = remaining.size();
+                                for (const auto& o : ops) {
+                                    size_t np = remaining.find(o, pos);
+                                    if (np < ver_end && np >= pos)
+                                        ver_end = np;
+                                }
+
+                                std::string ver_str = remaining.substr(pos, ver_end - pos);
+                                while (!ver_str.empty() && ver_str.back() == ' ')
+                                    ver_str.pop_back();
+
+                                dep.constraints.push_back({cur_op, ver_str});
+                                pos = ver_end;
+                            }
                             break;
                         }
                     }
-                    if (op_pos == std::string_view::npos) dep.name = std::string(dep_str);
+                    if (op_pos == std::string::npos) {
+                        dep.name = std::string(dep_str);
+                    }
                     deps.push_back(std::move(dep));
                 }
             }
@@ -188,7 +238,19 @@ std::optional<PackageInfo> Repository::find_package(const std::string& name, con
     return std::nullopt;
 }
 
-/** 按版本约束查找最匹配的版本（从高到低遍历，返回第一个满足条件的） */
+/** 按复合版本约束查找最匹配的版本（从高到低遍历，返回第一个满足全部约束的） */
+std::optional<PackageInfo> Repository::find_best_matching_version(const std::string& name, const std::vector<Constraint>& constraints) {
+    auto it = packages_.find(name);
+    if (it == packages_.end() || it->second.empty()) return std::nullopt;
+    for (auto rit = it->second.rbegin(); rit != it->second.rend(); ++rit) {
+        if (version_satisfies_all(rit->version, constraints)) {
+            return *rit;
+        }
+    }
+    return std::nullopt;
+}
+
+/** 按单一版本约束查找最匹配的版本（从高到低遍历，返回第一个满足条件的） */
 std::optional<PackageInfo> Repository::find_best_matching_version(const std::string& name, const std::string& op, const std::string& version_req) {
     auto it = packages_.find(name);
     if (it == packages_.end() || it->second.empty()) return std::nullopt;

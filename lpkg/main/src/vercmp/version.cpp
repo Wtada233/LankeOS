@@ -167,3 +167,17 @@ bool version_satisfies(const std::string& current_version, const std::string& op
 
     throw LpkgException(string_format("error.invalid_version_format", op));
 }
+
+/**
+ * 检查版本号是否满足所有指定的复合版本约束
+ * 支持将多个约束用 AND 组合（如 >= 2.0.0 且 < 3.0.0）
+ * 传入空约束列表时始终返回 true
+ */
+bool version_satisfies_all(const std::string& current_version, const std::vector<Constraint>& constraints) {
+    for (const auto& c : constraints) {
+        if (!version_satisfies(current_version, c.op, c.version)) {
+            return false;
+        }
+    }
+    return true;
+}

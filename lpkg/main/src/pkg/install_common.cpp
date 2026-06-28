@@ -102,17 +102,60 @@ std::vector<std::string> scan_content_files(const fs::path& content_dir) {
     return files;
 }
 
-/** 解析依赖字符串列表为 DependencyInfo 结构体，提取包名、运算符和版本要求 */
+/** 解析依赖字符串列表为 DependencyInfo 结构体，支持复合约束 */
 std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& dep_strs) {
     std::vector<DependencyInfo> deps;
+    static const std::vector<std::string> ops = {">=", "<=", "!=", "==", ">", "<", "="};
     for (const auto& d_str : dep_strs) {
-        std::stringstream ss(d_str);
-        std::string dn, op, rv;
-        if (ss >> dn) {
-            DependencyInfo d{.name = dn, .op = "", .version_req = ""};
-            if (ss >> op >> rv) { d.op = op; d.version_req = rv; }
-            deps.push_back(std::move(d));
+        DependencyInfo dep;
+        const std::string& d = d_str;
+
+        // 找到第一个操作符，分割包名和约束序列
+        size_t op_pos = std::string::npos;
+        for (const auto& op : ops) {
+            if ((op_pos = d.find(op)) != std::string::npos) {
+                std::string name = d.substr(0, op_pos);
+                while (!name.empty() && name.back() == ' ') name.pop_back();
+                dep.name = name;
+
+                // 解析后续所有 (op, version) 对
+                std::string remaining = d.substr(op_pos);
+                size_t pos = 0;
+                while (pos < remaining.size()) {
+                    while (pos < remaining.size() && remaining[pos] == ' ') ++pos;
+                    if (pos >= remaining.size()) break;
+
+                    std::string cur_op;
+                    for (const auto& o : ops) {
+                        if (remaining.substr(pos, o.size()) == o) {
+                            cur_op = o;
+                            pos += o.size();
+                            break;
+                        }
+                    }
+                    if (cur_op.empty()) break;
+
+                    while (pos < remaining.size() && remaining[pos] == ' ') ++pos;
+
+                    size_t ver_end = remaining.size();
+                    for (const auto& o : ops) {
+                        size_t np = remaining.find(o, pos);
+                        if (np < ver_end) ver_end = np;
+                    }
+
+                    std::string ver_str = remaining.substr(pos, ver_end - pos);
+                    while (!ver_str.empty() && ver_str.back() == ' ') ver_str.pop_back();
+
+                    dep.constraints.push_back({cur_op, ver_str});
+                    pos = ver_end;
+                }
+                break;
+            }
         }
+        if (op_pos == std::string::npos) {
+            dep.name = d_str;
+        }
+        deps.push_back(std::move(dep));
     }
     return deps;
 }
@@ -195,16 +238,17 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         for (const auto& dep : deps) {
             const std::string idv = Cache::instance().get_installed_version(dep.name);
             bool needs_resolution = idv.empty();
-            if (!needs_resolution && !dep.op.empty() && idv != "virtual" && !version_satisfies(idv, dep.op, dep.version_req)) {
+            if (!needs_resolution && !dep.constraints.empty() && idv != "virtual"
+                && !version_satisfies_all(idv, dep.constraints)) {
                 if (!ctx.plan.contains(dep.name)) {
-                    log_info(string_format("info.adding_upgrade_to_plan", dep.name, dep.version_req));
+                    log_info(string_format("info.adding_upgrade_to_plan", dep.name));
                     needs_resolution = true;
                 }
             }
             if (needs_resolution) {
                 std::string req_ver = std::string(constants::VER_LATEST);
-                if (!dep.op.empty()) {
-                    if (auto matching = ctx.repo.find_best_matching_version(dep.name, dep.op, dep.version_req))
+                if (!dep.constraints.empty()) {
+                    if (auto matching = ctx.repo.find_best_matching_version(dep.name, dep.constraints))
                         req_ver = matching->version;
                 }
                 resolve_package_dependencies(dep.name, req_ver, false, ctx, visited_stack, depth + 1);
@@ -213,8 +257,9 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
             // 验证候选版本满足依赖版本约束
             std::string cand_v = ctx.plan.contains(dep.name) ? ctx.plan[dep.name].actual_version
                                 : Cache::instance().get_installed_version(dep.name);
-            if (!dep.op.empty() && !cand_v.empty() && cand_v != "virtual" && !version_satisfies(cand_v, dep.op, dep.version_req))
-                throw LpkgException(string_format("error.candidate_dep_version_mismatch", dep.name, cand_v, dep.op, dep.version_req));
+            if (!dep.constraints.empty() && !cand_v.empty() && cand_v != "virtual"
+                && !version_satisfies_all(cand_v, dep.constraints))
+                throw LpkgException(string_format("error.candidate_dep_version_mismatch", dep.name, cand_v));
         }
     }
     ctx.plan[pkg_name] = std::move(p);
@@ -238,14 +283,13 @@ std::set<std::string> check_plan_consistency(const std::map<std::string, Install
         std::ifstream f(dep_file);
         std::string line;
         while (std::getline(f, line)) {
-            std::stringstream ss(line);
-            std::string dep_name, op, req_v;
-            if (ss >> dep_name && plan.contains(dep_name)) {
-                const std::string& new_v = plan.at(dep_name).actual_version;
-                if (ss >> op >> req_v && !version_satisfies(new_v, op, req_v)) {
-                    log_error(string_format("error.conflict_breaks_existing", dep_name, new_v, pkg, op, req_v));
-                    broken.insert(pkg);
-                }
+            auto parsed = parse_dep_strings({line});
+            if (parsed.empty() || !plan.contains(parsed[0].name)) continue;
+            const auto& dep = parsed[0];
+            const std::string& new_v = plan.at(dep.name).actual_version;
+            if (!dep.constraints.empty() && !version_satisfies_all(new_v, dep.constraints)) {
+                log_error(string_format("error.conflict_breaks_existing", dep.name, new_v, pkg));
+                broken.insert(pkg);
             }
         }
     }

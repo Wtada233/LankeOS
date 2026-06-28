@@ -72,6 +72,7 @@ TEST_F(IntegrationV2Test, RepositoryIndexLoading) {
     EXPECT_EQ(pkg_app->version, "1.0.0");
     ASSERT_EQ(pkg_app->dependencies.size(), 1);
     EXPECT_EQ(pkg_app->dependencies[0].name, "libfoo");
-    EXPECT_EQ(pkg_app->dependencies[0].version_req, "1.0.0");
-    EXPECT_EQ(pkg_app->dependencies[0].op, ">=");
+    ASSERT_EQ(pkg_app->dependencies[0].constraints.size(), 1);
+    EXPECT_EQ(pkg_app->dependencies[0].constraints[0].op, ">=");
+    EXPECT_EQ(pkg_app->dependencies[0].constraints[0].version, "1.0.0");
 }
