@@ -233,9 +233,12 @@ void install_packages_internal(InstallContext& ctx) {
             auto actual_deps = detail::parse_dep_strings(dep_strs);
             std::vector<std::string> actual_provides = meta.value(
                 std::string(constants::J_PROVIDES), std::vector<std::string>{});
+            std::vector<std::string> actual_needed_so = meta.value(
+                std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
 
             bool metadata_differs = (actual_deps.size() != p.dependencies.size())
-                || (actual_provides != p.provides);
+                || (actual_provides != p.provides)
+                || (actual_needed_so != p.needed_so);
             if (!metadata_differs) {
                 for (size_t di = 0; di < actual_deps.size(); ++di) {
                     if (actual_deps[di].name != p.dependencies[di].name
@@ -249,7 +252,7 @@ void install_packages_internal(InstallContext& ctx) {
                 // 元数据不匹配时：回滚已安装的包，更新仓库信息，重新解析依赖
                 log_info(string_format("info.resolving_metadata", p.name));
                 ctx.repo.update_package_info(p.name, p.actual_version,
-                    actual_deps, actual_provides);
+                    actual_deps, actual_provides, actual_needed_so);
                 ctx.local_candidates[p.name] = check_task.archive_path();
 
                 // 回滚当前事务中已安装的包

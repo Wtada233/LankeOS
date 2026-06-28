@@ -16,6 +16,7 @@ struct InstallPlan {
     std::filesystem::path local_path;
     std::vector<DependencyInfo> dependencies;
     std::vector<std::string> provides;
+    std::vector<std::string> needed_so;
     bool force_reinstall = false;                              ///< 强制重新安装
     bool metadata_verified = false;                            ///< 是否已验证元数据
 };

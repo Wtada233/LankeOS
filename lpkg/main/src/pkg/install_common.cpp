@@ -187,6 +187,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     std::string latest_version, pkg_hash;
     std::vector<DependencyInfo> deps;
     std::vector<std::string> provides;
+    std::vector<std::string> needed_so;
 
     // 优先检查本地包文件候选
     if (auto it = ctx.local_candidates.find(pkg_name); it != ctx.local_candidates.end()) {
@@ -196,6 +197,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
 
         deps = parse_dep_strings(meta.value(std::string(constants::J_DEPS), std::vector<std::string>{}));
         provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+        needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
     } else {
         // 从远程仓库查找
         auto pkg_info = (version_spec == constants::VER_LATEST) ? ctx.repo.find_package(pkg_name)
@@ -216,6 +218,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
         pkg_hash = pkg_info->sha256;
         deps = pkg_info->dependencies;
         provides = pkg_info->provides;
+        needed_so = pkg_info->needed_so;
     }
 
     if (latest_version.empty()) latest_version = std::string(constants::VER_DEFAULT);
@@ -230,7 +233,7 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
     InstallPlan p{
         .name = pkg_name, .actual_version = latest_version, .sha256 = pkg_hash,
         .is_explicit = is_explicit, .local_path = local_path, .dependencies = deps,
-        .provides = provides, .force_reinstall = (ctx.force_reinstall && is_explicit)
+        .provides = provides, .needed_so = needed_so, .force_reinstall = (ctx.force_reinstall && is_explicit)
     };
 
     // 递归解析子依赖

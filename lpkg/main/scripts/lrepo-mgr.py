@@ -20,17 +20,19 @@ def extract_metadata(archive_path):
     """Extracts metadata from metadata.json inside the archive."""
     deps = ""
     provides = ""
+    needed_so = ""
     try:
-        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*metadata.json', '-O'], 
+        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*metadata.json', '-O'],
                                 capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
             meta = json.loads(result.stdout)
             deps = ",".join(meta.get('deps', []))
             provides = ",".join(meta.get('provides', []))
+            needed_so = ",".join(meta.get('needed_so', []))
     except Exception as e:
         print(f"  Warning: Failed to extract metadata from {archive_path}: {e}")
-    
-    return deps, provides
+
+    return deps, provides, needed_so
 
 def read_metadata_from_archive(archive_path):
     """Extracts metadata.json from the lpkg archive and returns name, version."""
@@ -122,12 +124,12 @@ class RepoManager:
             
             print(f"Processing {name} {version}...")
             sha256 = calculate_sha256(f)
-            deps, provides = extract_metadata(f)
-            
+            deps, provides, needed_so = extract_metadata(f)
+
             # Upload package as name/version.lpkg
             remote_pkg_path = f"{prefix}{arch}/{name}/{version}.lpkg"
             self.upload_file(str(path), remote_pkg_path)
-            
+
             # Update index data
             if name not in index_data:
                 index_data[name] = {"versions": {}}
@@ -135,7 +137,8 @@ class RepoManager:
             index_data[name]["versions"][version] = {
                 "sha256": sha256,
                 "deps": deps,
-                "provides": provides
+                "provides": provides,
+                "needed_so": needed_so,
             }
 
         # Save and upload aggregated index
@@ -204,7 +207,7 @@ class RepoManager:
         print("Cleanup complete.")
 
     def parse_aggregated_index(self, path):
-        # Format: name|ver1:hash1:deps1;ver2:hash2:deps2|provides
+        # Format: name|ver1:hash1:deps1;ver2:hash2:deps2|provides|needed_so
         data = {}
         if os.path.exists(path):
             with open(path, 'r', encoding='utf-8') as f:
@@ -215,6 +218,7 @@ class RepoManager:
                     if len(parts) < 2: continue
                     name = parts[0]
                     provides = parts[2] if len(parts) > 2 else ""
+                    needed_so = parts[3] if len(parts) > 3 else ""
 
                     # Each version block: ver:hash:deps, separated by ';'
                     for v_block in parts[1].split(';'):
@@ -231,7 +235,8 @@ class RepoManager:
                         data[name]["versions"][version] = {
                             "sha256": hash_val,
                             "deps": deps,
-                            "provides": provides
+                            "provides": provides,
+                            "needed_so": needed_so,
                         }
         return data
 
@@ -240,15 +245,22 @@ class RepoManager:
             for name, info in data.items():
                 blocks = []
                 all_provides = set()
+                all_needed = set()
                 for v, vinfo in info["versions"].items():
                     blocks.append(f"{v}:{vinfo['sha256']}:{vinfo['deps']}")
-                    if vinfo['provides']:
+                    if vinfo.get('provides'):
                         for p in vinfo['provides'].split(','):
                             p = p.strip()
                             if p:
                                 all_provides.add(p)
+                    if vinfo.get('needed_so'):
+                        for n in vinfo['needed_so'].split(','):
+                            n = n.strip()
+                            if n:
+                                all_needed.add(n)
                 provides_str = ','.join(sorted(all_provides))
-                f.write(f"{name}|{';'.join(blocks)}|{provides_str}\n")
+                needed_str = ','.join(sorted(all_needed))
+                f.write(f"{name}|{';'.join(blocks)}|{provides_str}|{needed_str}\n")
 
     def upload_file(self, local_path, remote_path):
         st = self.config["storage"]

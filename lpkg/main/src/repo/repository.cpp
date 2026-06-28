@@ -63,12 +63,14 @@ void Repository::load_index() {
         std::string_view sv = line;
         if (!sv.empty() && sv.back() == '\r') sv.remove_suffix(1);
 
+        // 格式: 包名|版本:哈希:依赖;版本2:哈希2:依赖2|提供者|needed_so
         auto parts = split_string_view(sv, constants::PIPE_CHAR);
         if (parts.size() < 2) continue;
 
         std::string pkg_name(parts[0]);
         std::string_view version_blocks_sv = parts[1];
         std::string_view prov_sv = (parts.size() > 2) ? parts[2] : "";
+        std::string_view needed_so_sv = (parts.size() > 3) ? parts[3] : "";
 
         // 一个包可能对应多个版本，用 ';' 分隔
         for (auto version_info_sv : split_string_view(version_blocks_sv, constants::SEMICOLON_CHAR)) {
@@ -167,6 +169,11 @@ void Repository::load_index() {
                      pkg.provides.push_back(std::string(prov));
                  }
             }
+            if (!needed_so_sv.empty()) {
+                 for (auto needed : split_string_view(needed_so_sv, constants::COMMA_CHAR)) {
+                     pkg.needed_so.push_back(std::string(needed));
+                 }
+            }
             packages_[pkg.name].push_back(std::move(pkg));
         }
     }
@@ -187,13 +194,14 @@ std::optional<PackageInfo> Repository::find_provider(const std::string& capabili
 }
 
 /** 更新（或新增）某包某版本的元数据 */
-void Repository::update_package_info(const std::string& name, const std::string& version, const std::vector<DependencyInfo>& deps, const std::vector<std::string>& provides) {
+void Repository::update_package_info(const std::string& name, const std::string& version, const std::vector<DependencyInfo>& deps, const std::vector<std::string>& provides, const std::vector<std::string>& needed_so) {
     auto& versions = packages_[name];
     bool found = false;
     for (auto& pkg : versions) {
         if (pkg.version == version) {
             pkg.dependencies = deps;
             pkg.provides = provides;
+            pkg.needed_so = needed_so;
             found = true;
             break;
         }
@@ -204,6 +212,7 @@ void Repository::update_package_info(const std::string& name, const std::string&
         pkg.version = version;
         pkg.dependencies = deps;
         pkg.provides = provides;
+        pkg.needed_so = needed_so;
         versions.push_back(std::move(pkg));
         std::ranges::sort(versions, [](const PackageInfo& a, const PackageInfo& b) {
             return version_compare(a.version, b.version);

@@ -27,7 +27,8 @@ struct PackageInfo {
     std::string version;                      // 版本号
     std::string sha256;                       // 包文件 SHA256 校验值
     std::vector<DependencyInfo> dependencies;  // 依赖列表
-    std::vector<std::string> provides;         // 提供的能力列表
+    std::vector<std::string> provides;         // 提供的能力列表（含 SONAME、虚拟包等）
+    std::vector<std::string> needed_so;        // 包声明的 DT_NEEDED SONAME 列表
 };
 
 /**
@@ -40,7 +41,7 @@ public:
     /** 加载并解析仓库索引文件 */
     void load_index();
     /** 更新或添加包信息到索引 */
-    void update_package_info(const std::string& name, const std::string& version, const std::vector<DependencyInfo>& deps, const std::vector<std::string>& provides);
+    void update_package_info(const std::string& name, const std::string& version, const std::vector<DependencyInfo>& deps, const std::vector<std::string>& provides, const std::vector<std::string>& needed_so = {});
     /** 查找包（不指定版本时返回最新版本） */
     std::optional<PackageInfo> find_package(const std::string& name);
     /** 精确查找指定版本的包 */

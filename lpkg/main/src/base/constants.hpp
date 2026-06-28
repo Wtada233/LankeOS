@@ -21,6 +21,7 @@ namespace constants {
     inline constexpr std::string_view J_MAN = "man";
     inline constexpr std::string_view J_DEPS = "deps";
     inline constexpr std::string_view J_PROVIDES = "provides";
+    inline constexpr std::string_view J_NEEDED_SO = "needed_so";
     inline constexpr std::string_view J_NO_STRIP = "no_strip";
     inline constexpr std::string_view J_SOURCES = "sources";
     inline constexpr std::string_view J_WORK_SOURCES = "work_sources";

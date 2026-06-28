@@ -314,6 +314,7 @@ def scan_package(lpkg, target_dir, extract_root):
         }
 
     providers = []
+    provides_so = []  # 本包提供的 SONAME 列表
     needs = set()
     script_deps = set()
 
@@ -328,8 +329,9 @@ def scan_package(lpkg, target_dir, extract_root):
                 # 每个 ELF 文件只解析一次 .dynamic
                 sonames, needed = parse_elf_dynamic(fpath)
 
-                # 记录 SONAME 提供者
+                # 记录本包提供的 SONAME（写入 metadata.provides，供 index 建立 SONAME→包名 映射）
                 for sn in sonames:
+                    provides_so.append(sn)
                     providers.append({
                         'key': sn,
                         'pkg': pkg_name,
@@ -363,6 +365,7 @@ def scan_package(lpkg, target_dir, extract_root):
         'pkg_name': pkg_name,
         'pkg_version': pkg_version,
         'providers': providers,
+        'provides_so': provides_so,
         'needs': needs,
         'script_deps': script_deps,
         'extract_dir': extract_dir,
@@ -386,6 +389,7 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False):
     """
     lpkg = scan_result['lpkg']
     pkg_name = scan_result['pkg_name']
+    provides_so = scan_result.get('provides_so', [])
     needs = scan_result['needs']
     script_deps = scan_result['script_deps']
     extract_dir = scan_result['extract_dir']
@@ -420,18 +424,24 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False):
     if not meta:
         return lpkg, dep_entries, 'no_metadata'
 
+    # 合并 provides：保留现有的虚拟包提供者，追加 SONAME 提供者
+    old_provides = set(meta.get('provides', []))
+    new_provides = sorted(old_provides | set(provides_so))
+
     old_deps = sorted(meta.get('deps', []))
     old_needed = sorted(meta.get('needed_so', []))
-    if old_deps == dep_entries and old_needed == needed_so_entries:
+    if old_deps == dep_entries and old_needed == needed_so_entries and old_provides == set(new_provides):
         return lpkg, dep_entries, 'unchanged'
 
     if dry_run:
         return lpkg, dep_entries, 'would_update'
 
-    # --- 5) 直接替换 deps + needed_so（不合并）---
+    # --- 5) 直接替换 deps + needed_so + provides（不合并）---
     # 设计决定：扫描结果是运行时依赖的唯一真相，见模块 docstring。
+    # provides 合并保留虚拟包条目，因为那是手写元数据
     meta['deps'] = dep_entries
     meta['needed_so'] = needed_so_entries
+    meta['provides'] = new_provides
     with open(meta_path, 'w', encoding='utf-8') as f:
         json.dump(meta, f, indent=2, ensure_ascii=False)
 
