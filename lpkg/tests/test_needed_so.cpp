@@ -349,3 +349,177 @@ TEST_F(NeededSoTest, InstalledPackageBypassesEmptyIndexProvides) {
     Cache::instance().load();
     EXPECT_TRUE(Cache::instance().is_installed("app"));
 }
+
+
+// -----------------------------------------------------------------------
+// 13. needed_so 本地文件持久化
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, NeededSoFilePersisted) {
+    create_pkg("libP", "1.0", {}, {"libP.so.1", "libQ.so.1"});
+    create_pkg("app", "1.0", {"libP"}, {},
+               {"libP.so.1", "libQ.so.1"});
+    update_index({
+        {"app", "1.0", "libP", "", "libP.so.1,libQ.so.1"},
+        {"libP", "1.0", "", "libP.so.1,libQ.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+
+    fs::path nso_file = Config::instance().needed_so_dir() / "app";
+    EXPECT_TRUE(fs::exists(nso_file));
+
+    std::ifstream f(nso_file);
+    std::set<std::string> lines;
+    std::string line;
+    while (std::getline(f, line)) {
+        if (!line.empty()) lines.insert(line);
+    }
+    EXPECT_TRUE(lines.contains("libP.so.1"));
+    EXPECT_TRUE(lines.contains("libQ.so.1"));
+    EXPECT_EQ(lines.size(), 2);
+}
+
+
+// -----------------------------------------------------------------------
+// 14. needed_so 解析结果写入 deps 文件
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, ProviderNameInDepsFile) {
+    create_pkg("libR", "1.0", {}, {"libR.so.1"});
+    create_pkg("app", "1.0", {"libR"}, {}, {"libR.so.1"});
+    update_index({
+        {"app", "1.0", "libR", "", "libR.so.1"},
+        {"libR", "1.0", "", "libR.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+
+    fs::path dep_file = Config::instance().dep_dir() / "app";
+    EXPECT_TRUE(fs::exists(dep_file));
+    std::ifstream f(dep_file);
+    bool found_libR = false;
+    std::string line;
+    while (std::getline(f, line)) {
+        if (line == "libR") found_libR = true;
+    }
+    EXPECT_TRUE(found_libR);
+    EXPECT_TRUE(Cache::instance().get_reverse_deps("libR").contains("app"));
+}
+
+
+// -----------------------------------------------------------------------
+// 15. needed_so 产生的逆向依赖阻止非 force 移除
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, ReverseDepBlocksRemoval) {
+    create_pkg("libS", "1.0", {}, {"libS.so.1"});
+    create_pkg("app", "1.0", {}, {}, {"libS.so.1"});
+    update_index({
+        {"app", "1.0", "", "", "libS.so.1"},
+        {"libS", "1.0", "", "libS.so.1", ""},
+    });
+
+    // 分步安装：先装提供者使缓存有 provides，再装依赖者触发 needed_so 解析
+    EXPECT_NO_THROW(install_packages({"libS"}));
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("libS"));
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().get_reverse_deps("libS").contains("app"));
+
+    // 非 force 移除被 needed_so 逆向依赖阻止（检查内存缓存，remove_package 不写磁盘）
+    remove_package("libS", /*force=*/false);
+    EXPECT_TRUE(Cache::instance().is_installed("libS"));
+}
+
+
+// -----------------------------------------------------------------------
+// 16. force 模式下绕过 needed_so 逆向依赖保护
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, ForceRemoveBypassesReverseDep) {
+    create_pkg("libT", "1.0", {}, {"libT.so.1"});
+    create_pkg("app", "1.0", {}, {}, {"libT.so.1"});
+    update_index({
+        {"app", "1.0", "", "", "libT.so.1"},
+        {"libT", "1.0", "", "libT.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"libT"}));
+    Cache::instance().load();
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().get_reverse_deps("libT").contains("app"));
+
+    // force 移除成功（检查内存缓存，remove_package 不写磁盘）
+    remove_package("libT", /*force=*/true);
+    EXPECT_FALSE(Cache::instance().is_installed("libT"));
+}
+
+
+// -----------------------------------------------------------------------
+// 17. 多个 needed_so 各自产生逆向依赖
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, MultipleNeededSoMultipleReverseDeps) {
+    create_pkg("libU", "1.0", {}, {"libU.so.1"});
+    create_pkg("libV", "1.0", {}, {"libV.so.2"});
+    create_pkg("app", "1.0", {}, {},
+               {"libU.so.1", "libV.so.2"});
+    update_index({
+        {"app", "1.0", "", "", "libU.so.1,libV.so.2"},
+        {"libU", "1.0", "", "libU.so.1", ""},
+        {"libV", "1.0", "", "libV.so.2", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"libU", "libV"}));
+    Cache::instance().load();
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().get_reverse_deps("libU").contains("app"));
+    EXPECT_TRUE(Cache::instance().get_reverse_deps("libV").contains("app"));
+}
+
+
+// -----------------------------------------------------------------------
+// 18. needed_so 不产生自引用
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, SelfNeededSoNoSelfReverseDep) {
+    create_pkg("libW", "1.0", {}, {"libW.so.1"}, {"libW.so.1"});
+    create_pkg("app", "1.0", {"libW"}, {}, {"libW.so.1"});
+    update_index({
+        {"app", "1.0", "libW", "", "libW.so.1"},
+        {"libW", "1.0", "", "libW.so.1", "libW.so.1"},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app", "libW"}));
+    Cache::instance().load();
+
+    auto rdeps = Cache::instance().get_reverse_deps("libW");
+    EXPECT_FALSE(rdeps.contains("libW"));   // 不自引用
+    EXPECT_TRUE(rdeps.contains("app"));     // app 依赖 libW
+}
+
+
+// -----------------------------------------------------------------------
+// 19. autoremove 不移除被 needed_so 依赖的包
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, AutoremoveKeepsNeededSoDep) {
+    create_pkg("libX", "1.0", {}, {"libX.so.1"});
+    create_pkg("app", "1.0", {"libX"}, {}, {"libX.so.1"});
+    update_index({
+        {"app", "1.0", "libX", "", "libX.so.1"},
+        {"libX", "1.0", "", "libX.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("libX"));
+
+    EXPECT_NO_THROW(autoremove());
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("libX"));
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+}
