@@ -1,0 +1,9 @@
+{
+  "name": "golang",
+  "version": "1.23.4",
+  "sources": [
+    "https://go.dev/dl/go1.23.4.linux-amd64.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": false
+}

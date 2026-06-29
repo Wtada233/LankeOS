@@ -1,0 +1,16 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    ./configure
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    make DESTDIR={STAGING_ROOT} install
+}

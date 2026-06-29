@@ -1,0 +1,23 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # GCC 16: gcc -E 不因 Syntax error 报错，跳过 sanity check
+    sed -i '/if \$ac_preproc_ok/i\
+ac_preproc_ok=:' {SRC_DIR}/configure.sh
+}
+
+lankebuild_build() {
+    ./configure \
+      --prefix=/usr \
+      --enable-ipv6 \
+      --disable-debug \
+      --disable-xxhash \
+      --with-included-popt=no \
+      --with-included-zlib=no
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

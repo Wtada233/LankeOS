@@ -1,0 +1,25 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    cmake -B build \
+        -G 'Unix Makefiles' \
+        -DCMAKE_INSTALL_PREFIX:PATH='/usr' \
+        -DCMAKE_INSTALL_LIBDIR:PATH='lib' \
+        -DCMAKE_POLICY_VERSION_MINIMUM:STRING='3.5.0' \
+        -DGEN8=OFF \
+        -DGEN9=OFF \
+        -DGEN11=OFF \
+        -DMEDIA_BUILD_FATAL_WARNINGS:BOOL='OFF'
+}
+
+lankebuild_build() {
+    cmake --build build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+

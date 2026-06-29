@@ -1,0 +1,26 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    export GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct
+    export GONOSUMCHECK=*
+    export GONOSUMDB=*
+    export PATH=/usr/lib/go/bin:$PATH
+    export CGO_ENABLED=0
+}
+
+lankebuild_build() {
+    cd {SRC_DIR}
+    
+    # 下载 Go 依赖
+    go mod download
+    
+    # 编译，开启 gvisor TUN 支持
+    go build -tags "with_gvisor" -trimpath \
+      -buildvcs=false \
+      -ldflags '-X "github.com/metacubex/mihomo/constant.Version=v{PKG_VER}" -X "github.com/metacubex/mihomo/constant.BuildTime=2026-06-29" -w -s -buildid=' \
+      -o {STAGING_ROOT}/usr/bin/mihomo .
+}
+
+lankebuild_package() {
+    :
+}

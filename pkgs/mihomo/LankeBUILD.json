@@ -1,0 +1,9 @@
+{
+  "name": "mihomo",
+  "version": "1.19.27",
+  "sources": [
+    "https://github.com/MetaCubeX/mihomo/archive/refs/tags/v1.19.27.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": false
+}

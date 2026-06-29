@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    cmake -B build \
+        -G 'Unix Makefiles' \
+        -DCMAKE_BUILD_TYPE='Release' \
+        -DCMAKE_INSTALL_PREFIX='/usr'
+}
+
+lankebuild_build() {
+    cmake --build build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    # Installation handled by builder
+    DESTDIR={STAGING_ROOT} cmake --install build
+}

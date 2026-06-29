@@ -1,0 +1,8 @@
+{
+  "name": "intel-gmmlib",
+  "version": "22.10.0",
+  "sources": [
+    "https://github.com/intel/gmmlib/archive/refs/tags/intel-gmmlib-22.10.0.tar.gz"
+  ],
+  "work_sources": []
+}
