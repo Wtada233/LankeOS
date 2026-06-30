@@ -428,13 +428,23 @@ void InstallationTask::copy_package_files() {
         if (fs::is_symlink(src_path)) {
             // 符号链接（包括指向目录的）必须在此处理，不能走目录或普通文件分支
             fs::path link_target = fs::read_symlink(src_path);
-            if (fs::exists(physical_path) || fs::is_symlink(physical_path)) fs::remove(physical_path);
-            fs::create_symlink(link_target, physical_path);
+            fs::path dest = physical_path;
+
+            // 配置文件冲突：保留原文件，将符号链接安装到 .lpkgnew
+            const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
+            if (is_config && fs::exists(physical_path) && !fs::is_directory(physical_path)) {
+                dest += std::string(constants::SUFFIX_LPKG_NEW);
+                log_warning(string_format("warning.config_conflict", physical_path.string(), dest.string()));
+                has_config_conflicts_ = true;
+            }
+
+            if (fs::exists(dest) || fs::is_symlink(dest)) fs::remove(dest);
+            fs::create_symlink(link_target, dest);
             struct stat st;
             if (lstat(src_path.c_str(), &st) == 0) {
-                (void)lchown(physical_path.c_str(), st.st_uid, st.st_gid);
+                (void)lchown(dest.c_str(), st.st_uid, st.st_gid);
             }
-            installed_files_.push_back(physical_path);
+            installed_files_.push_back(dest);
             TriggerManager::instance().check_file((fs::path("/") / f).string());
             continue;
         }
