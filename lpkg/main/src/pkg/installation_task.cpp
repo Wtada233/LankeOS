@@ -425,6 +425,20 @@ void InstallationTask::copy_package_files() {
             created_dirs_.insert(d);
         }
 
+        if (fs::is_symlink(src_path)) {
+            // 符号链接（包括指向目录的）必须在此处理，不能走目录或普通文件分支
+            fs::path link_target = fs::read_symlink(src_path);
+            if (fs::exists(physical_path) || fs::is_symlink(physical_path)) fs::remove(physical_path);
+            fs::create_symlink(link_target, physical_path);
+            struct stat st;
+            if (lstat(src_path.c_str(), &st) == 0) {
+                (void)lchown(physical_path.c_str(), st.st_uid, st.st_gid);
+            }
+            installed_files_.push_back(physical_path);
+            TriggerManager::instance().check_file((fs::path("/") / f).string());
+            continue;
+        }
+
         if (fs::is_directory(src_path)) {
             ensure_dir_exists(physical_path);
             struct stat st;
@@ -455,14 +469,8 @@ void InstallationTask::copy_package_files() {
                 }
             }
 
-            if (fs::is_symlink(src_path)) {
-                fs::path link_target = fs::read_symlink(src_path);
-                if (fs::exists(final_dest) || fs::is_symlink(final_dest)) fs::remove(final_dest);
-                fs::create_symlink(link_target, final_dest);
-            } else {
-                fs::copy(src_path, final_dest,
-                         fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-            }
+            fs::copy(src_path, final_dest,
+                     fs::copy_options::recursive | fs::copy_options::overwrite_existing);
 
             // 保留原始文件权限和所有者
             struct stat st;

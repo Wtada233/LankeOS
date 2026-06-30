@@ -96,7 +96,7 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
 std::vector<std::string> scan_content_files(const fs::path& content_dir) {
     std::vector<std::string> files;
     for (const auto& entry : fs::recursive_directory_iterator(content_dir)) {
-        if (entry.is_directory()) continue;
+        if (!entry.is_symlink() && entry.is_directory()) continue;
         files.push_back(entry.path().lexically_relative(content_dir).string());
     }
     return files;
