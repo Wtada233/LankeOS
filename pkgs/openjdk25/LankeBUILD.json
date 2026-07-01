@@ -1,6 +1,6 @@
 {
     "name": "openjdk25",
-    "version": "25.0.4.u6",
+    "version": "25.0.4",
     "sources": [
         "https://github.com/openjdk/jdk25u/archive/refs/tags/jdk-25.0.4+6.tar.gz"
     ],
