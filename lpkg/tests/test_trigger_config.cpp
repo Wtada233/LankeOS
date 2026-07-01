@@ -26,18 +26,6 @@ protected:
     }
 };
 
-TEST_F(TriggerAndConfigTest, ValidatePath) {
-    fs::path root = test_root / "root";
-    fs::create_directories(root);
-
-    EXPECT_NO_THROW(validate_path("usr/bin/ls", root));
-    EXPECT_NO_THROW(validate_path("etc/config", root));
-
-    EXPECT_THROW(validate_path("/etc/passwd", root), LpkgException);
-    EXPECT_THROW(validate_path("../outside", root), LpkgException);
-    EXPECT_THROW(validate_path("a/../../outside", root), LpkgException);
-}
-
 // ===== TriggerManager 测试 =====
 
 class TriggerManagerTest : public ::testing::Test {

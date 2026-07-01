@@ -330,8 +330,8 @@ void Cache::write_file_db() { write_db_uncached(Config::instance().files_db(), f
 void Cache::write_providers() { write_db_uncached(Config::instance().provides_db(), providers); }
 
 /**
- * 从磁盘读取键-多值数据库（制表符分隔）
- * 格式：key\tvalue，相同 key 的多行合并为集合
+ * 从磁盘读取键-多值数据库（制表符分隔，值以逗号分隔）
+ * 格式：key\tval1,val2,val3
  */
 std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::read_db_uncached(const fs::path& path) {
     std::map<std::string, std::unordered_set<std::string>, std::less<>> db;
@@ -343,9 +343,14 @@ std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::read_
         size_t tab_pos = line.find('\t');
         if (tab_pos != std::string::npos) {
             std::string key = line.substr(0, tab_pos);
-            std::string value = line.substr(tab_pos + 1);
-            if (!value.empty() && value.back() == '\r') value.pop_back();
-            db[key].insert(value);
+            std::string values = line.substr(tab_pos + 1);
+            if (!values.empty() && values.back() == '\r') values.pop_back();
+            size_t start = 0, end;
+            while ((end = values.find(',', start)) != std::string::npos) {
+                if (end > start) db[key].insert(values.substr(start, end - start));
+                start = end + 1;
+            }
+            if (start < values.size()) db[key].insert(values.substr(start));
         }
     }
     return db;
@@ -353,6 +358,7 @@ std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::read_
 
 /**
  * 将键-多值数据库写入磁盘（原子写入：先写临时文件再重命名）
+ * 格式：key\tval1,val2,val3 —— 一行一条记录，值以逗号分隔
  */
 void Cache::write_db_uncached(const fs::path& path, const std::map<std::string, std::unordered_set<std::string>, std::less<>>& db) {
     fs::path tmp_path = path.string() + ".tmp";
@@ -360,9 +366,12 @@ void Cache::write_db_uncached(const fs::path& path, const std::map<std::string, 
         std::ofstream db_file(tmp_path, std::ios::trunc);
         if (!db_file.is_open()) throw LpkgException(get_string("error.create_tmp_db_failed"));
         for (const auto& [key, values] : db) {
-            for (const auto& value : values) {
-                db_file << key << "\t" << value << "\n";
+            std::string joined;
+            for (const auto& v : values) {
+                if (!joined.empty()) joined += ',';
+                joined += v;
             }
+            db_file << key << "\t" << joined << "\n";
         }
     }
     fs::rename(tmp_path, path);

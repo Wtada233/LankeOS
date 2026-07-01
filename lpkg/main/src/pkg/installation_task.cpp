@@ -360,9 +360,10 @@ void InstallationTask::check_for_file_conflicts() {
         fs::path rel_f = f;
         if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
         const fs::path logical_path = fs::path("/") / rel_f;
-        if (fs::is_directory(content_dir / f)) continue;
-
         const std::string path_str = logical_path.string();
+
+        // 目录条目（末尾 /）支持多包共同持有，不视为冲突
+        if (path_str.ends_with('/')) continue;
 
         // 快速路径：文件已完全属于当前包 → 无冲突，跳过全量集合拷贝
         if (cache.is_file_owned_by(path_str, pkg_name_)) continue;
@@ -370,9 +371,14 @@ void InstallationTask::check_for_file_conflicts() {
         // 检查是否被其他包占用
         auto owners = cache.get_file_owners(path_str);
         if (!owners.empty()) {
-            // 走到这里说明所有者不是当前包（快速路径已排除），直接报告冲突
             if (!Config::instance().force_overwrite_mode()) {
+                // 正常模式：报告冲突
                 conflicts[path_str] = *owners.begin();
+            } else {
+                // --force-overwrite：转移所有权给新包（移除旧持有者）
+                for (const auto& owner : owners) {
+                    cache.remove_file_owner(path_str, owner);
+                }
             }
             continue;
         }

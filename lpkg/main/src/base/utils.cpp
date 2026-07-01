@@ -352,23 +352,6 @@ void string_replace_all(std::string& str, const std::string& from, const std::st
 }
 
 /**
- * 校验并安全拼接路径
- * 拒绝绝对路径和包含 .. 的路径穿越，防止目录遍历攻击
- */
-std::filesystem::path validate_path(const fs::path& path, const fs::path& root) {
-    if (path.is_absolute()) {
-         throw LpkgException(string_format("error.security_path_not_relative", path.string()));
-    }
-
-    fs::path normalized = path.lexically_normal();
-    for (const auto& component : normalized) {
-        if (component == "..") {
-             throw LpkgException(string_format("error.security_path_traversal", path.string()));
-        }
-    }
-    return root / normalized;
-}
-/**
  * 对二进制文件执行 strip 操作
  * 失败时仅记录警告而不中断流程
  */

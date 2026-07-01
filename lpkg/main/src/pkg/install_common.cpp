@@ -92,14 +92,38 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
     man = meta.value(std::string(constants::J_MAN), "");
 }
 
-/** 扫描包内容目录，返回所有文件（非目录）的相对路径列表 */
+/**
+ * 扫描包内容目录，返回所有可注册路径的相对路径列表。
+ *
+ * 实现 pacman 风格：目录以斜杠结尾（如 "usr/bin/"），普通文件不带斜杠。
+ * 目录支持多包共同持有，在移除时计数归零才删除。
+ *
+ * 包含：
+ *  - 普通文件 → "usr/bin/bash"
+ *  - 符号链接（含指向目录的，如 jvm/conf → /etc/java）→ "jvm/conf"
+ *  - 普通目录 → "usr/bin/", "usr/"
+ *
+ * 不包含：
+ *  - content/ 目录本身
+ *
+ * 这样做的原因：
+ *   builder.cpp 清理 USR-Merge 符号链后，包内的目录就是包的真实内容。
+ *   目录共享（如多包共享 /usr/bin/）通过引用计数管理，在最后持有者
+ *   移除时删除目录。
+ */
 std::vector<std::string> scan_content_files(const fs::path& content_dir) {
-    std::vector<std::string> files;
+    std::vector<std::string> entries;
     for (const auto& entry : fs::recursive_directory_iterator(content_dir)) {
-        if (!entry.is_symlink() && entry.is_directory()) continue;
-        files.push_back(entry.path().lexically_relative(content_dir).string());
+        std::string rel = entry.path().lexically_relative(content_dir).string();
+        if (entry.is_directory() && !entry.is_symlink()) {
+            // 目录 → 末尾加 /，和普通文件区分
+            entries.push_back(rel + "/");
+        } else {
+            // 文件或符号链接 → 原样保留
+            entries.push_back(rel);
+        }
     }
-    return files;
+    return entries;
 }
 
 /** 解析依赖字符串列表为 DependencyInfo 结构体，支持复合约束 */

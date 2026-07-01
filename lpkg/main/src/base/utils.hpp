@@ -106,11 +106,6 @@ inline std::vector<std::string_view> split_string_view(std::string_view s, char 
     return r;
 }
 
-// ============ 安全 ============
-
-/** 验证路径是否在指定根目录下，防止路径穿越攻击 */
-std::filesystem::path validate_path(const std::filesystem::path& path, const std::filesystem::path& root);
-
 // ============ 二进制文件处理(ELF) ============
 
 /** ELF 文件类型枚举 */

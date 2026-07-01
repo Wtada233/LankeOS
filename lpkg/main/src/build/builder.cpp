@@ -240,6 +240,25 @@ void run_build(const fs::path& build_dir) {
     // 6. 后处理
     finalize_staging(staging_root, cfg.no_strip);
 
+    // 6.5. 移除 USR-Merge 兼容符号链接（它们是构建阶段的辅助设施，不应打包入包）。
+    //       Builder 在 setup_build_directories() 中创建这些链接使构建脚本能够
+    //       向 bin/、lib/ 等路径安装文件（实际写入 usr/bin/、usr/lib/）。
+    //       现在打包前清理它们，避免每个包都声称"拥有"这些系统级符号链接，
+    //       从而导致卸载时因"文件被其他包共享"而拒绝移除。
+    for (const auto& link : {
+        staging_root / constants::BIN,
+        staging_root / constants::SBIN,
+        staging_root / constants::LIB,
+        staging_root / constants::LIB64,
+        staging_root / constants::USR_SBIN,
+        staging_root / constants::USR_LIB64
+    }) {
+        std::error_code ec;
+        if (fs::is_symlink(link, ec) || (!ec && fs::exists(link))) {
+            fs::remove(link, ec);
+        }
+    }
+
     // 7. 打包
     log_info(get_string("info.packing_built_pkg"));
     std::string output_filename =

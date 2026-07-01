@@ -434,53 +434,86 @@ void remove_package(const std::string& pkg_name, bool force) {
 }
 
 /**
- * 删除包的所有文件
- * 非 force 模式会检查是否有其他包共享这些文件，若有则拒绝删除
+ * 删除包的所有文件。
+ *
+ * pacman 风格：目录（路径末尾含 /）支持多包共同持有，不计入文件共享检查；
+ * 普通文件不允许共享（除非 --force）。目录在最后持有者释放时被删除，
+ * 并级联清理空父目录。
  */
 void remove_package_files(const std::string& pkg_name, bool force) {
     auto& cache = Cache::instance();
-    auto owned_files = cache.get_package_files(pkg_name);
-    if (owned_files.empty()) return;
+    auto owned_entries = cache.get_package_files(pkg_name);
+    if (owned_entries.empty()) return;
 
+    // ── 阶段 1：共享文件检查（仅检查普通文件，不检查目录） ──────────
     if (!force) {
-        std::vector<std::string> shared;
-        for (const auto& f : owned_files) {
-            auto owners = cache.get_file_owners(f);
+        std::vector<std::pair<std::string, std::string>> shared;
+        for (const auto& entry : owned_entries) {
+            if (entry.ends_with('/')) continue; // 目录允许多包持有
+            auto owners = cache.get_file_owners(entry);
+            std::string others;
             for (const auto& owner : owners) {
                 if (owner != pkg_name) {
-                    shared.push_back(f);
-                    break;
+                    if (!others.empty()) others += ", ";
+                    others += owner;
                 }
             }
+            if (!others.empty()) shared.emplace_back(entry, others);
         }
         if (!shared.empty()) {
             std::string msg = get_string("error.shared_file_header")
                             + std::string(constants::NL);
-            for (const auto& file : shared) {
+            for (const auto& [file, owners] : shared) {
                 msg += "  "
-                    + string_format("error.shared_file_entry", file, "other packages")
+                    + string_format("error.shared_file_entry", file, owners)
                     + std::string(constants::NL);
             }
             throw LpkgException(msg + get_string("error.removal_aborted"));
         }
     }
 
+    // ── 阶段 2：按逆字典序排序 → 子条目先于父条目 ────────────────
     std::vector<fs::path> paths;
-    for (const auto& f : owned_files) paths.emplace_back(f);
+    for (const auto& e : owned_entries) paths.emplace_back(e);
     std::ranges::sort(paths, std::greater<>{});
 
-    int count = 0;
+    int file_count = 0;
+    int dir_count = 0;
     for (const auto& p : paths) {
+        std::string path_str = p.string();
         const fs::path phys = p.is_absolute()
             ? Config::instance().root_dir() / fs::path(p).relative_path()
             : Config::instance().root_dir() / p;
-        if (fs::exists(phys) || fs::is_symlink(phys)) {
-            fs::remove(phys);
-            ++count;
+
+        if (path_str.ends_with('/')) {
+            // ── 目录：释放持有 → 无持有则清理 ──────────────────
+            cache.remove_file_owner(path_str, pkg_name);
+            if (cache.get_file_owners(path_str).empty()) {
+                std::error_code ec;
+                if (fs::is_directory(phys, ec) && !ec) {
+                    fs::remove(phys, ec); // 仅在目录为空时成功
+                    if (!ec) {
+                        ++dir_count;
+                    }
+                }
+            }
+        } else {
+            // ── 普通文件：从磁盘删除 + 移除所有权 ──────────────
+            if (fs::exists(phys) || fs::is_symlink(phys)) {
+                std::error_code ec;
+                fs::remove(phys, ec);
+                if (!ec) ++file_count;
+            }
+            cache.remove_file_owner(path_str, pkg_name);
         }
-        cache.remove_file_owner(p.string(), pkg_name);
     }
-    log_info(string_format("info.files_removed", count));
+
+    if (file_count > 0 || dir_count > 0) {
+        log_info(string_format("info.files_removed", file_count + dir_count));
+    }
+    if (dir_count > 0) {
+        log_info(string_format("info.dirs_removed", dir_count));
+    }
 
     for (const auto& cap : cache.get_package_provides(pkg_name)) {
         cache.remove_provider(cap, pkg_name);

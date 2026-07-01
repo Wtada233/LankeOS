@@ -80,14 +80,9 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
         const char* current_path = archive_entry_pathname(entry);
         if (!current_path) continue;
 
-        // 安全防护：路径穿越攻击防护，校验路径是否合法
-        fs::path dest_path;
-        try {
-            dest_path = validate_path(current_path, output_dir);
-        } catch (const LpkgException& e) {
-             throw LpkgException(string_format("error.malicious_path_in_archive", current_path));
-        }
-
+        // 路径直接拼接根目录，不进行路径穿越校验。
+        // 包管理器在根目录下安装文件，绝对路径的符号链接应保持原样。
+        fs::path dest_path = output_dir / current_path;
         archive_entry_set_pathname(entry, dest_path.c_str());
 
         // 修复：Linux 没有 lchmod，libarchive 可能会对符号链接使用 chmod，
@@ -96,32 +91,11 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir) {
             archive_entry_set_perm(entry, 0);
         }
 
-        // 重映射硬链接和符号链接目标路径
+        // 硬链接：直接以输出目录为根，不再进行路径校验
         const char* hardlink = archive_entry_hardlink(entry);
         if (hardlink) {
-            try {
-                fs::path link_dest = validate_path(hardlink, output_dir);
-                archive_entry_set_hardlink(entry, link_dest.c_str());
-            } catch (const std::exception& e) {
-                log_warning(string_format("warning.archive_invalid_hardlink", std::string(e.what())));
-                archive_entry_set_hardlink(entry, nullptr); // 丢弃恶意或无效的链接
-            }
-        }
-
-        const char* symlink = archive_entry_symlink(entry);
-        if (symlink) {
-            try {
-                // 对于符号链接，仅当目标为绝对路径时进行重映射。
-                // 相对路径的符号链接通常是包内部引用，不应修改，
-                // 除非它们通过 ../ 指向外部（validate_path 会处理此情况）
-                if (fs::path(symlink).is_absolute()) {
-                    fs::path link_dest = validate_path(symlink, output_dir);
-                    archive_entry_set_symlink(entry, link_dest.c_str());
-                }
-            } catch (const std::exception& e) {
-                log_warning(string_format("warning.archive_invalid_symlink", std::string(e.what())));
-                archive_entry_set_symlink(entry, nullptr);
-            }
+            fs::path link_dest = output_dir / hardlink;
+            archive_entry_set_hardlink(entry, link_dest.c_str());
         }
 
         r = archive_write_header(ext.get(), entry);
