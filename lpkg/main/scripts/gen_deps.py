@@ -12,16 +12,15 @@ gen_deps.py — Auto-generate dependencies for .lpkg packages.
 
   needed_so: ["libc.so.6", "libz.so.1", ...]
     原始探测结果：当前包所有 ELF 文件的 DT_NEEDED 条目。
-    SONAME 编码了 ABI 版本，因此不需要额外的版本约束。
 
   deps: ["glibc", "zlib", ...]
     needed_so 经 provider_map 解析得到的包名列表（无版本约束）。
-    SONAME 即版本契约——ABI 不兼容则 SONAME 变化，自动产生新的 NEEDED。
+    然后由 deprules/ 中的规则插件补充（脚本解释器、xwayland 注入等）。
 
 === 功能 ===
   • ELF 动态链接分析（pyelftools 优先，回退 readelf）
   • SONAME 收集（needed_so）与提供者解析（deps）
-  • 脚本解释器探测（shebang + file(1) 补充）
+  • 可扩展规则系统（deprules/ 目录下的 .py 文件自动加载）
   • 流水线架构：一次解包，同时扫描 SONAME + NEEDED
   • 并行流水线 + dry-run 模式
 """
@@ -32,22 +31,15 @@ import json
 import re
 import argparse
 import shutil
-import stat
 import tempfile
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+# 规则系统
+from deprules import discover_rules
+
 # ---------------------------------------------------------------------------
 # 权限自提升
-# ---------------------------------------------------------------------------
-# 本脚本必须以 root 运行，原因有二：
-#   1. SUID 文件读取：dbus-daemon-launch-helper 等 SUID 二进制的权限为
-#      --s--x--x（仅执行，无读权限），非 root 无法打开读取其 ELF 头。
-#   2. 所有者保真：解压后直接 repack 时，如果以非 root 运行，包内所有
-#      文件的所有者会被污染为普通用户的 UID（而非原始的 root:root）。
-#      此处自动通过 sudo 重新执行，并将子进程的退出码透传给调用方。
-#
-# 环境变量 LPKG_DEP_GEN_NO_SUDO=1 可跳过此提权，用于无 sudo 环境。
 # ---------------------------------------------------------------------------
 
 _ORIGINAL_ARGV = sys.argv.copy()
@@ -72,50 +64,6 @@ try:
     HAVE_PYELFFTOOLS = True
 except ImportError:
     HAVE_PYELFFTOOLS = False
-
-# ---------------------------------------------------------------------------
-# 解释器映射表
-# ---------------------------------------------------------------------------
-
-# shebang 解释器 → 包名
-SCRIPT_MAP = {
-    'bash':     'bash',
-    'sh':       'bash',
-    'dash':     'bash',
-    'ksh':      'bash',
-    'zsh':      'bash',
-    'perl':     'perl',
-    'python':   'python',
-    'python3':  'python',
-    'ruby':     'ruby',
-    'lua':      'lua',
-    'luajit':   'lua',
-    'gawk':     'gawk',
-    'awk':      'gawk',
-    'node':     'nodejs',
-    'nodejs':   'nodejs',
-    'wish':     'tcl',
-    'tclsh':    'tcl',
-    'expect':   'expect',
-}
-
-# file(1) 输出模式 → 包名（用于无 shebang 的脚本/模块）
-FILE_PATTERNS = [
-    (re.compile(r'Perl\s*module|Perl5?\s*script', re.I),     'perl'),
-    (re.compile(r'Python\s*script', re.I),                    'python'),
-    (re.compile(r'Bourne-Again\s+shell\s+script', re.I),      'bash'),
-    (re.compile(r'POSIX?\s+shell\s+script', re.I),            'bash'),
-    (re.compile(r'Ruby\s*script', re.I),                      'ruby'),
-    (re.compile(r'Lua\s*script', re.I),                       'lua'),
-    (re.compile(r'awk\s*script', re.I),                       'gawk'),
-    (re.compile(r'Tcl\s*script', re.I),                       'tcl'),
-]
-
-# 只有命中这些扩展名的文件才值得跑 file(1)（性能考量）
-SCRIPT_EXTENSIONS = frozenset({
-    '.pm', '.pl', '.py', '.rb', '.lua', '.tcl', '.sh', '.bash',
-    '.cgi', '.fcgi', '.al', '.awk',
-})
 
 # ---------------------------------------------------------------------------
 # 基础工具函数
@@ -155,7 +103,6 @@ def parse_elf_dynamic(path):
         except Exception:
             return [], []
 
-    # Fallback: 子进程 readelf
     try:
         res = subprocess.run(
             ['readelf', '-d', path],
@@ -177,19 +124,7 @@ def parse_elf_dynamic(path):
 
 
 def extract_package_major(version_str):
-    """
-    从包版本号中提取主版本号（第一个数字段）。
-
-    约束来自提供者包的 version（而非 SONAME），因为 SONAME
-    的 ABI 版本与包的发行版本是完全独立的两个编号体系：
-      glibc 2.42 提供 libc.so.6  → 锁 >= 2.0.0，不是 >= 6.0.0
-      gcc 16.1.0 提供 libstdc++.so.6 → 锁 >= 16.0.0，不是 >= 6.0.0
-
-    '2.42'      → '2'
-    '16.1.0'    → '16'
-    '127'       → '127'
-    '' | None   → None
-    """
+    """从包版本号中提取主版本号（第一个数字段）。"""
     if not version_str:
         return None
     m = re.match(r'(\d+)', version_str)
@@ -206,80 +141,20 @@ def read_metadata(path):
 
 
 # ---------------------------------------------------------------------------
-# 脚本解释器探测
-# ---------------------------------------------------------------------------
-
-
-def detect_interpreter_shebang(path):
-    """读取 #! 行识别脚本解释器。零子进程开销。"""
-    try:
-        with open(path, 'rb') as f:
-            header = f.read(256)
-        first_line = header.split(b'\n')[0].decode('utf-8', 'ignore').strip()
-        if first_line.startswith('#!'):
-            parts = first_line[2:].split()
-            if parts:
-                interp = os.path.basename(parts[0])
-                # 处理 /usr/bin/env python3
-                if interp == 'env' and len(parts) > 1:
-                    interp = parts[1]
-                return SCRIPT_MAP.get(interp)
-    except (OSError, UnicodeDecodeError):
-        pass
-    return None
-
-
-def detect_interpreter_file(path):
-    """调用 file(1) 识别脚本类型，仅用于无 shebang 的脚本/模块文件。"""
-    try:
-        res = subprocess.run(
-            ['file', '-b', path],
-            capture_output=True, text=True, timeout=5,
-        )
-        output = res.stdout.strip()
-        for pattern, pkg in FILE_PATTERNS:
-            if pattern.search(output):
-                return pkg
-    except (subprocess.TimeoutExpired, OSError):
-        pass
-    return None
-
-
-def should_file_detect(path):
-    """
-    判断一个文件是否值得跑 file(1)。
-    仅对可执行文件或已知脚本扩展名触发，避免不必要的子进程开销。
-    """
-    ext = os.path.splitext(path)[1].lower()
-    if ext in SCRIPT_EXTENSIONS:
-        return True
-    try:
-        st = os.lstat(path)
-        return bool(st.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
-    except OSError:
-        return False
-
-
-# ---------------------------------------------------------------------------
 # Phase 1：并行解包 + 扫描
 # ---------------------------------------------------------------------------
 
 
 def scan_package(lpkg, target_dir, extract_root):
     """
-    Phase 1 工作单元。
-
-    一次解包，一次性扫描所有文件：
+    Phase 1 工作单元。一次解包，一次性扫描所有文件：
       • ELF SONAME（提供者）+ DT_NEEDED（依赖）
       • .so 文件名回退提供者
-      • 脚本解释器依赖（shebang + file(1) 补充）
+      • 脚本解释器原始数据（由 deprules/shebang.py 解析映射）
 
     返回：
       lpkg, pkg_name, pkg_version,
-      providers: list of {key, pkg, pkg_version}
-      needs: set of DT_NEEDED 字符串
-      script_deps: set of 包名
-      extract_dir
+      providers, provides_so, needs, script_deps, extract_dir
     """
     pkg_path = os.path.abspath(os.path.join(target_dir, lpkg))
     pkg_name = ''
@@ -287,7 +162,6 @@ def scan_package(lpkg, target_dir, extract_root):
     extract_dir = os.path.join(extract_root, lpkg)
     os.makedirs(extract_dir, exist_ok=True)
 
-    # 解包
     ret = subprocess.run(
         ['tar', '-I', 'zstd', '-xf', pkg_path, '-C', extract_dir],
         capture_output=True,
@@ -299,7 +173,6 @@ def scan_package(lpkg, target_dir, extract_root):
             'extract_dir': extract_dir,
         }
 
-    # 从已解压目录读取 metadata（不再重新 tar 读取）
     meta = read_metadata(os.path.join(extract_dir, 'metadata.json'))
     if meta:
         pkg_name = meta.get('name', '') or ''
@@ -314,22 +187,19 @@ def scan_package(lpkg, target_dir, extract_root):
         }
 
     providers = []
-    provides_so = []  # 本包提供的 SONAME 列表
+    provides_so = []
     needs = set()
     script_deps = set()
 
-    # 一次 os.walk 遍历
     for root, dirs, files in os.walk(content_dir):
         for fname in files:
             fpath = os.path.join(root, fname)
             if os.path.islink(fpath):
-                continue  # 符号链接跳过，避免重复计数
+                continue
 
             if is_elf(fpath):
-                # 每个 ELF 文件只解析一次 .dynamic
                 sonames, needed = parse_elf_dynamic(fpath)
 
-                # 记录本包提供的 SONAME（写入 metadata.provides，供 index 建立 SONAME→包名 映射）
                 for sn in sonames:
                     provides_so.append(sn)
                     providers.append({
@@ -338,10 +208,6 @@ def scan_package(lpkg, target_dir, extract_root):
                         'pkg_version': pkg_version,
                     })
 
-                # .so 文件名作为回退提供者（捕获没有 SONAME 的库）。
-                # 同时写入 provides_so 以存入 metadata.json 的 provides 字段，
-                # 确保 index 的 provides 段包含此 SONAME，否则没有 SONAME 的库
-                #（如 libtcl8.6.so）在 provides 中会缺失，导致其他包无法解析。
                 if '.so' in fname:
                     provides_so.append(fname)
                     providers.append({
@@ -350,19 +216,26 @@ def scan_package(lpkg, target_dir, extract_root):
                         'pkg_version': pkg_version,
                     })
 
-                # 收集 DT_NEEDED
                 for n in needed:
                     needs.add(n)
 
             else:
-                # --- 脚本解释器探测 ---
-                interp = detect_interpreter_shebang(fpath)
+                # 脚本解释器探测（原始数据，由 deprules/shebang.py 解析映射）
+                interp = None
+                try:
+                    with open(fpath, 'rb') as f:
+                        header = f.read(256)
+                    first_line = header.split(b'\n')[0].decode('utf-8', 'ignore').strip()
+                    if first_line.startswith('#!'):
+                        parts = first_line[2:].split()
+                        if parts:
+                            interp = os.path.basename(parts[0])
+                            if interp == 'env' and len(parts) > 1:
+                                interp = next((p for p in parts[1:] if not p.startswith('-')), parts[1])
+                except (OSError, UnicodeDecodeError):
+                    pass
                 if interp:
                     script_deps.add(interp)
-                elif should_file_detect(fpath):
-                    interp = detect_interpreter_file(fpath)
-                    if interp:
-                        script_deps.add(interp)
 
     return {
         'lpkg': lpkg,
@@ -381,54 +254,54 @@ def scan_package(lpkg, target_dir, extract_root):
 # ---------------------------------------------------------------------------
 
 
-def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False):
+def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rules=None, rule_context=None):
     """
     Phase 2 工作单元。
 
-    将包的 DT_NEEDED + 脚本依赖解析到全局 provider_map，
-    更新 metadata.json（直接替换 deps），
-    若有变化则重新打包 .lpkg。
-
-    返回 (lpkg_name, deps_list, status_string)。
+    将包的 DT_NEEDED 解析到全局 provider_map，
+    然后执行 deprules/ 中的规则插件（脚本解释器、xwayland 注入等），
+    更新 metadata.json，若有变化则重新打包 .lpkg。
     """
     lpkg = scan_result['lpkg']
     pkg_name = scan_result['pkg_name']
     provides_so = scan_result.get('provides_so', [])
     needs = scan_result['needs']
-    script_deps = scan_result['script_deps']
     extract_dir = scan_result['extract_dir']
 
     if not pkg_name:
         return lpkg, [], 'no_pkg_name'
 
-    deps = {}  # 包名（无版本约束）
-    needed_so = []  # 收集的 SONAME 列表
+    deps = {}
+    needed_so = []
 
-    # --- 1) 收集 needed_so + 解析 ELF DT_NEEDED → 提供者包 ---
-    # SONAME 本身编码了 ABI 版本（libc.so.6 中的 6），
-    # 因此 deps 中不包含版本约束。
+    # --- 1) SONAME 解析 ---
     for soname in sorted(needs):
         provider = provider_map.get(soname)
         if provider and provider['pkg'] and provider['pkg'] != pkg_name:
             deps.setdefault(provider['pkg'])
             needed_so.append(soname)
 
-    # --- 2) 解析脚本解释器 → 包 ---
-    for dep_pkg in sorted(script_deps):
-        if dep_pkg != pkg_name and dep_pkg not in deps:
-            deps[dep_pkg] = None
+    # --- 2) 执行规则插件 ---
+    if rules:
+        ctx = dict(rule_context or {})
+        ctx['pkg_name'] = pkg_name
+        ctx['pkg_version'] = scan_result.get('pkg_version', '')
+        for rule_name, rule_desc, rule_fn in rules:
+            try:
+                rule_fn(scan_result, deps, needed_so, provider_map, ctx)
+            except Exception as e:
+                print(f'      [!] 规则 {rule_name} 失败 ({pkg_name}): {e}', file=sys.stderr)
 
-    # --- 3) 格式化依赖列表 ---
+    # --- 3) 格式化 ---
     dep_entries = sorted(deps.keys())
     needed_so_entries = sorted(needed_so)
 
-    # --- 4) 读取当前 metadata（从已解压目录，不再重新从 tar 读） ---
+    # --- 4) 读取 + 比较 ---
     meta_path = os.path.join(extract_dir, 'metadata.json')
     meta = read_metadata(meta_path)
     if not meta:
         return lpkg, dep_entries, 'no_metadata'
 
-    # 合并 provides：保留现有的虚拟包提供者，追加 SONAME 提供者
     old_provides = set(meta.get('provides', []))
     new_provides = sorted(old_provides | set(provides_so))
 
@@ -440,9 +313,7 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False):
     if dry_run:
         return lpkg, dep_entries, 'would_update'
 
-    # --- 5) 直接替换 deps + needed_so + provides（不合并）---
-    # 设计决定：扫描结果是运行时依赖的唯一真相，见模块 docstring。
-    # provides 合并保留虚拟包条目，因为那是手写元数据
+    # --- 5) 写入 ---
     meta['deps'] = dep_entries
     meta['needed_so'] = needed_so_entries
     meta['provides'] = new_provides
@@ -474,8 +345,7 @@ def main():
         description='Auto-generate dependencies for .lpkg packages based on '
                     'ELF dynamic links and script interpreters.',
     )
-    parser.add_argument('directory',
-                        help='Directory containing .lpkg files')
+    parser.add_argument('directory', help='Directory containing .lpkg files')
     parser.add_argument('-j', '--jobs', type=int,
                         default=os.cpu_count() or 4,
                         help='Parallel workers (default: number of CPUs)')
@@ -483,6 +353,8 @@ def main():
                         help='Show what would change without modifying files')
     parser.add_argument('--no-file-detection', action='store_true',
                         help='Skip file(1) based script detection')
+    parser.add_argument('--rules-dir', type=str, default=None,
+                        help='Path to deprules/ directory (default: <script_dir>/deprules)')
 
     args = parser.parse_args()
     target_dir = os.path.abspath(args.directory)
@@ -508,6 +380,22 @@ def main():
           f'file(1): {"off" if args.no_file_detection else "on"}')
 
     # ==================================================================
+    # 加载规则插件
+    # ==================================================================
+    rules_dir = args.rules_dir or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'deprules')
+    rules = []
+    if os.path.isdir(rules_dir):
+        print(f'[*] Loading rules from: {rules_dir}')
+        rules = discover_rules(rules_dir)
+        if rules:
+            print(f'[*] Rules loaded: {len(rules)}')
+        else:
+            print('[*] No rules found, running in SONAME-only mode')
+    else:
+        print(f'[*] Rules directory not found: {rules_dir}')
+    print()
+
+    # ==================================================================
     # Phase 1: 并行解包 + 扫描
     # ==================================================================
     print('[*] Phase 1: Scanning packages...')
@@ -524,8 +412,6 @@ def main():
                 print(f'   Scan: {i}/{len(lpkg_files)}')
 
     # 构建全局提供者映射
-    # first-wins 策略：第一个注册某 SONAME/.so 文件名的包被视为权威提供者。
-    # 在 LFS 中每个 .so 属于独立的包，因此在实践中这个启发式是安全的。
     provider_map = {}
     for result in all_results:
         for prov in result['providers']:
@@ -547,9 +433,16 @@ def main():
         'no_metadata': 0, 'no_pkg_name': 0, 'repack_failed': 0,
     }
 
+    rule_context = {
+        'dry_run': args.dry_run,
+        'no_file_detection': args.no_file_detection,
+        'rules_dir': rules_dir,
+    }
+
     with ThreadPoolExecutor(max_workers=args.jobs) as ex:
         futures = {
-            ex.submit(resolve_and_update, r, provider_map, target_dir, args.dry_run): r
+            ex.submit(resolve_and_update, r, provider_map, target_dir,
+                       args.dry_run, rules, rule_context): r
             for r in all_results
         }
         for i, future in enumerate(as_completed(futures), 1):
@@ -581,11 +474,8 @@ def main():
                 print(f'   Progress: {i}/{len(lpkg_files)}')
 
     # 清理
-    if not args.dry_run:
-        print('[*] Cleaning up temporary files...')
-        shutil.rmtree(working_dir, ignore_errors=True)
-    else:
-        print(f'[*] Temporary files kept at: {working_dir}')
+    print('[*] Cleaning up temporary files...')
+    shutil.rmtree(working_dir, ignore_errors=True)
 
     # 汇总
     print()
