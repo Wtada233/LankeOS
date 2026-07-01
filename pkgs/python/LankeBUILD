@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --enable-shared --with-system-expat --with-system-ffi --enable-optimizations --enable-loadable-sqlite-extensions
+    ./configure --prefix=/usr --enable-shared --with-system-expat --with-system-ffi --enable-optimizations --enable-loadable-sqlite-extensions --without-static-libpython
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 
