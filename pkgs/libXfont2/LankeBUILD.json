@@ -1,0 +1,9 @@
+{
+    "name": "libXfont2",
+    "version": "2.0.7",
+    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libXfont2-2.0.7.tar.xz"],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

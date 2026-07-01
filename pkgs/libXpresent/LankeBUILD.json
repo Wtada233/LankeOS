@@ -1,0 +1,9 @@
+{
+    "name": "libXpresent",
+    "version": "1.0.1",
+    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libXpresent-1.0.1.tar.xz"],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

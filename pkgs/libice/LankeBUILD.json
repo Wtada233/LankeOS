@@ -1,0 +1,11 @@
+{
+    "name": "libice",
+    "version": "1.1.2",
+    "sources": [
+        "https://www.x.org/releases/individual/lib/libICE-1.1.2.tar.xz"
+    ],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

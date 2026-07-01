@@ -1,0 +1,56 @@
+lankebuild_prepare() {
+    # Download bootstrap JDK (don't pollute source tree detection)
+    BOOT_JDK_DIR="/tmp/openjdk25-boot-jdk"
+    if [ ! -d "$BOOT_JDK_DIR" ]; then
+        wget -q "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.2%2B10/OpenJDK25U-jdk_x64_linux_hotspot_25.0.2_10.tar.gz" -O /tmp/boot-jdk.tar.gz
+        mkdir -p "$BOOT_JDK_DIR"
+        tar -xzf /tmp/boot-jdk.tar.gz -C "$BOOT_JDK_DIR" --strip-components=1
+        rm -f /tmp/boot-jdk.tar.gz
+    fi
+
+    bash configure \
+        --with-boot-jdk="$BOOT_JDK_DIR" \
+        --with-stdc++lib=dynamic \
+        --with-jvm-features="zgc,shenandoahgc" \
+        --with-native-debug-symbols=internal \
+        --enable-unlimited-crypto \
+        --disable-warnings-as-errors \
+        --with-libjpeg=bundled \
+        --with-giflib=bundled \
+        --with-libpng=bundled \
+        --with-lcms=bundled \
+        --with-zlib=bundled \
+        --with-harfbuzz=bundled \
+        --with-vendor-name="LankeOS" \
+        --enable-linkable-runtime
+}
+lankebuild_build() {
+    make images
+}
+lankebuild_package() {
+    mkdir -p "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk"
+    cp -a "build/linux-x86_64-server-release/images/jdk"/bin "build/linux-x86_64-server-release/images/jdk"/lib "build/linux-x86_64-server-release/images/jdk"/include \
+          "build/linux-x86_64-server-release/images/jdk"/release \
+          "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/"
+
+    mkdir -p "{STAGING_ROOT}/etc/java-25-openjdk"
+    cp -r "build/linux-x86_64-server-release/images/jdk"/conf/* "{STAGING_ROOT}/etc/java-25-openjdk/"
+    rm -rf "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/conf"
+    ln -sfv ../../../../etc/java-25-openjdk "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/conf"
+
+    mkdir -p "{STAGING_ROOT}/usr/share/licenses/openjdk25"
+    cp -r "build/linux-x86_64-server-release/images/jdk"/legal/* "{STAGING_ROOT}/usr/share/licenses/openjdk25/"
+    rm -rf "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/legal"
+    ln -sfv ../../../share/licenses/openjdk25 "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/legal"
+
+    for f in "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/bin/"*; do
+        name=$(basename "$f")
+        man="build/linux-x86_64-server-release/images/jdk/../jdk/man/man1/${name}.1"
+        if [ -f "$man" ]; then
+            mkdir -p "{STAGING_ROOT}/usr/share/man/man1"
+            cp "$man" "{STAGING_ROOT}/usr/share/man/man1/${name}-openjdk25.0"
+        fi
+    done
+    rm -rf "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/man"
+    ln -sfv ../../../share/man "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/man"
+}

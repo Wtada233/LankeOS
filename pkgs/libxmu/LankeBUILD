@@ -1,0 +1,26 @@
+lankebuild_prepare() {
+    cd "{SRC_DIR}"
+
+    # 生成 configure（如果需要）
+    if [ ! -f ./configure ]; then
+        ./autogen.sh || true
+        autoreconf -fi
+    fi
+
+    ./configure \
+        --prefix=/usr \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --disable-static
+}
+
+lankebuild_build() {
+    cd "{SRC_DIR}"
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    cd "{SRC_DIR}"
+    make DESTDIR="{STAGING_ROOT}" install
+}
+

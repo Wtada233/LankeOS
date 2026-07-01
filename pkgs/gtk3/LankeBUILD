@@ -16,7 +16,7 @@ lankebuild_prepare() {
         --buildtype=release \
         -D man=true \
         -D broadway_backend=true \
-        -D x11_backend=false \
+        -D x11_backend=true \
         -D wayland_backend=true \
         -D man=false
 

@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    cd "{SRC_DIR}"
+    ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+        --disable-static
+}
+lankebuild_build() {
+    cd "{SRC_DIR}"
+    make -j$(nproc)
+}
+lankebuild_package() {
+    cd "{SRC_DIR}"
+    make DESTDIR="{STAGING_ROOT}" install
+}

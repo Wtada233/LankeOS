@@ -1,0 +1,10 @@
+lankebuild_prepare() {
+    ./autogen.sh
+    ./configure --prefix=/usr
+}
+lankebuild_build() {
+    make -j$(nproc)
+}
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+}

@@ -1,0 +1,9 @@
+{
+    "name": "util-macros",
+    "version": "1.20.2",
+    "sources": ["https://gitlab.freedesktop.org/xorg/util/macros/-/archive/util-macros-1.20.2/macros-util-macros-1.20.2.tar.gz"],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

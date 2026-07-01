@@ -1,0 +1,9 @@
+lankebuild_prepare() {
+    ./configure
+}
+lankebuild_build() {
+    make -j$(nproc)
+}
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+}

@@ -1,0 +1,9 @@
+{
+    "name": "libXres",
+    "version": "1.2.2",
+    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libXres-1.2.2.tar.xz"],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

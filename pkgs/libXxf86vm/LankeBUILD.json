@@ -1,0 +1,9 @@
+{
+    "name": "libXxf86vm",
+    "version": "1.1.5",
+    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libXxf86vm-1.1.5.tar.xz"],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

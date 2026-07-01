@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    meson setup build --prefix=/usr -Dxcb=disabled -Dxlib=disabled
+    meson setup build --prefix=/usr -Dxcb=enabled -Dxlib=enabled
     DESTDIR={STAGING_ROOT} ninja -C build install
 }
 

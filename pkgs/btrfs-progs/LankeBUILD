@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    ./autogen.sh 2>&1 | tail -3
+}
+
+lankebuild_build() {
+    export CPP="gcc -E"
+    ./configure \
+      --prefix=/usr \
+      --disable-documentation \
+      --disable-python \
+      --disable-lzo \
+      --enable-zstd
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

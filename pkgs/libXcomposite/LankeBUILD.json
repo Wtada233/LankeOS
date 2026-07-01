@@ -1,0 +1,9 @@
+{
+    "name": "libXcomposite",
+    "version": "0.4.6",
+    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libXcomposite-0.4.6.tar.xz"],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

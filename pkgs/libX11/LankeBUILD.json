@@ -1,0 +1,9 @@
+{
+    "name": "libX11",
+    "version": "1.8.10",
+    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libX11-1.8.10.tar.xz"],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

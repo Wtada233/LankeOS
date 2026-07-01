@@ -1,0 +1,9 @@
+{
+    "name": "libxshmfence",
+    "version": "1.3.2",
+    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libxshmfence-1.3.2.tar.xz"],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

@@ -1,22 +1,18 @@
-#!/bin/bash
-
 lankebuild_prepare() {
-    # Prepare environment
-    :
-}
-
-lankebuild_build() {
+    cd "{WORK_DIR}"
     git clone https://github.com/swaywm/sway
-    cd sway
-    CURRENT_WORK_DIR="/root/sway"
-    meson setup build --prefix=/usr --buildtype=release -Dsd-bus-provider=libsystemd -Dman-pages=disabled -Ddefault-wallpaper=false -Dwerror=false
-    ninja -C build -j$(nproc)
-    DESTDIR={STAGING_ROOT} ninja -C build install
-    
+    cd sway && git checkout 845cdb19
 }
-
-
+lankebuild_build() {
+    cd "{WORK_DIR}/sway"
+    meson setup build --prefix=/usr --default-library=shared --buildtype=release \
+        -Dsd-bus-provider=libsystemd \
+        -Dman-pages=disabled \
+        -Ddefault-wallpaper=false \
+        -Dwerror=false
+    ninja -C build -j$(nproc)
+}
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    cd "{WORK_DIR}/sway"
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
 }

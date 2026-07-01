@@ -1,0 +1,11 @@
+{
+    "name": "openjdk25",
+    "version": "25.0.4.u6",
+    "sources": [
+        "https://github.com/openjdk/jdk25u/archive/refs/tags/jdk-25.0.4+6.tar.gz"
+    ],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}
