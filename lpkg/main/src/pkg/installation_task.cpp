@@ -556,9 +556,9 @@ void InstallationTask::register_package() {
     // 2. needed_so 解析得到的提供者包（SONAME→提供者包映射）
     //
     // 这样 autoremove / remove 的逆向依赖检查能同时覆盖两类依赖。
-    std::ofstream deps_out(Config::instance().dep_dir() / pkg_name_);
+    std::unordered_set<std::string> dep_entries;
     for (const auto& d : deps_) {
-        deps_out << d << constants::NL;
+        dep_entries.insert(d);
         std::string name = d;
         if (const auto pos = d.find_first_of(" \t<>="); pos != std::string::npos) name = d.substr(0, pos);
         cache.add_reverse_dep(name, pkg_name_);
@@ -569,10 +569,18 @@ void InstallationTask::register_package() {
         auto providers = cache.get_providers(soname);
         for (const auto& prov_pkg : providers) {
             if (prov_pkg != pkg_name_ && cache.is_installed(prov_pkg)) {
-                deps_out << prov_pkg << constants::NL;
+                dep_entries.insert(prov_pkg);
                 cache.add_reverse_dep(prov_pkg, pkg_name_);
             }
         }
+    }
+
+    // 从 set 写出（已去重），排序以保证每次生成的文件顺序一致
+    std::vector<std::string> sorted_deps(dep_entries.begin(), dep_entries.end());
+    std::sort(sorted_deps.begin(), sorted_deps.end());
+    std::ofstream deps_out(Config::instance().dep_dir() / pkg_name_);
+    for (const auto& entry : sorted_deps) {
+        deps_out << entry << constants::NL;
     }
 
     // 写 needed_so 原始 SONAME 列表（保留原始真相供审计和重校验）
