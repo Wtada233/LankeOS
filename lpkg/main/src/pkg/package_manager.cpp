@@ -110,61 +110,66 @@ void install_packages(const std::vector<std::string>& pkg_args,
     InstallContext ctx{repo, plan, order, locals, targets,
                        force_reinstall, /*top_level=*/true, {}};
 
-    // 第一阶段：初始依赖解析
-    for (const auto& [n, v] : targets) {
-        std::set<std::string> vs;
-        detail::resolve_package_dependencies(n, v, true, ctx, vs);
-    }
+    // 一致性重试循环。每次迭代至少移除一个冲突包，系统包集单调递减
+    // → 必然终止，无需固定重试上限（原递归设计也无上限，仅受栈深度限制）。
+    // 每次重试时清除当前 plan 并重新解析，反映移除后的最新依赖状态。
+    while (true) {
+        plan.clear();
+        order.clear();
+        ctx.plan = plan;
+        ctx.install_order = order;
+        ctx.successfully_installed.clear();
+        ctx.installed_set.clear();
 
-    if (!provided_hash.empty()) {
-        if (locals.empty())
-            throw LpkgException(get_string("error.hash_requires_local"));
-        for (auto& [n, p] : plan)
-            if (!p.local_path.empty()) p.sha256 = provided_hash;
-    }
+        // 第一阶段：依赖解析
+        for (const auto& [n, v] : targets) {
+            std::set<std::string> vs;
+            detail::resolve_package_dependencies(n, v, true, ctx, vs);
+        }
 
-    // ── 第二阶段：静态一致性检查 ────────────────────────────────────────
-    // 检查安装计划（即将安装的新版本）是否与已安装的其他包兼容。
-    // 例如：已安装的 libfoo 依赖 libbar >= 2.0，但计划将 libbar 降级到 1.x。
-    // 此阶段只做依赖图拓扑分析，无需下载包文件。
-    // 动态元数据验证（下载包后对比实际 metadata.json）将在用户确认后、
-    // install_packages_internal 中进行。
+        if (!provided_hash.empty()) {
+            if (locals.empty())
+                throw LpkgException(get_string("error.hash_requires_local"));
+            for (auto& [n, p] : plan)
+                if (!p.local_path.empty()) p.sha256 = provided_hash;
+        }
 
-    if (plan.empty()) {
-        log_info(get_string("info.all_packages_already_installed"));
-        return;
-    }
-
-    if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
-        log_error(get_string("error.dependency_conflict_title"));
-        if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
-            for (const auto& pkg : broken) remove_package(pkg, true);
-            Cache::instance().write();
-            install_packages(pkg_args, hash_file_path, force_reinstall);
+        if (plan.empty()) {
+            log_info(get_string("info.all_packages_already_installed"));
             return;
         }
-        log_info(get_string("info.installation_aborted"));
-        return;
-    }
 
-    // ── 第二·五阶段：needed_so 升级一致性检查 ──────────────────────────
-    // 检查计划升级是否会破坏已安装包的 needed_so（例如 libM-1.0 提供
-    // libM.so.1，app 需要它；计划升级 libM 到 2.0 后不再提供 libM.so.1）。
-    if (auto nso_broken = detail::check_needed_so_consistency(plan);
-        !nso_broken.empty()) {
-        log_error(get_string("error.dependency_conflict_title"));
-        std::string nso_msg;
-        for (const auto& pkg : nso_broken)
-            nso_msg += "  " + pkg + "\n";
-        log_error(nso_msg);
-        if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
-            for (const auto& pkg : nso_broken) remove_package(pkg, true);
-            Cache::instance().write();
-            install_packages(pkg_args, hash_file_path, force_reinstall);
+        // ── 第二阶段：静态一致性检查 ──────────────────────────────────
+        if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
+            log_error(get_string("error.dependency_conflict_title"));
+            if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
+                for (const auto& pkg : broken) remove_package(pkg, true);
+                Cache::instance().write();
+                continue;  // 重新解析
+            }
+            log_info(get_string("info.installation_aborted"));
             return;
         }
-        log_info(get_string("info.installation_aborted"));
-        return;
+
+        // ── 第二·五阶段：needed_so 升级一致性检查 ────────────────────
+        if (auto nso_broken = detail::check_needed_so_consistency(plan);
+            !nso_broken.empty()) {
+            log_error(get_string("error.dependency_conflict_title"));
+            std::string nso_msg;
+            for (const auto& pkg : nso_broken)
+                nso_msg += "  " + pkg + "\n";
+            log_error(nso_msg);
+            if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
+                for (const auto& pkg : nso_broken) remove_package(pkg, true);
+                Cache::instance().write();
+                continue;  // 重新解析
+            }
+            log_info(get_string("info.installation_aborted"));
+            return;
+        }
+
+        // 全部检查通过
+        break;
     }
 
     // ── 第三阶段：needed_so 完整性校验 ──────────────────────────────────

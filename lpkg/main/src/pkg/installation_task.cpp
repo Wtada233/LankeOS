@@ -456,11 +456,26 @@ void InstallationTask::copy_package_files() {
         }
 
         if (fs::is_directory(src_path)) {
+            bool existed = fs::exists(physical_path);
             ensure_dir_exists(physical_path);
             struct stat st;
             if (lstat(src_path.c_str(), &st) == 0) {
                 (void)lchown(physical_path.c_str(), st.st_uid, st.st_gid);
-                (void)chmod(physical_path.c_str(), st.st_mode & 07777);
+                mode_t pkg_mode = st.st_mode & 07777;
+                if (existed) {
+                    struct stat dst_st;
+                    if (lstat(physical_path.c_str(), &dst_st) == 0) {
+                        mode_t cur_mode = dst_st.st_mode & 07777;
+                        if (cur_mode != pkg_mode) {
+                            log_warning(string_format(
+                                "warning.dir_perm_mismatch",
+                                physical_path.string(),
+                                static_cast<int>(cur_mode),
+                                static_cast<int>(pkg_mode)));
+                        }
+                    }
+                }
+                (void)chmod(physical_path.c_str(), pkg_mode);
             }
             continue;
         }

@@ -159,7 +159,10 @@ void Repository::load_index() {
             // 记录提供者（provides）— 版本级优先，回退到包级
             if (!ver_prov_sv.empty()) {
                 for (auto prov : split_string_view(ver_prov_sv, constants::COMMA_CHAR)) {
-                    providers_[std::string(prov)].push_back(pkg_name);
+                    auto& pv = providers_[std::string(prov)];
+                    if (pv.empty() || pv.back() != pkg_name) {
+                        pv.push_back(pkg_name);
+                    }
                 }
             }
 
@@ -223,12 +226,30 @@ void Repository::update_package_info(const std::string& name, const std::string&
         });
     }
 
-    // 重建 providers 映射（简单粗暴但可靠）
-    providers_.clear();
+    // 增量更新 providers 映射：只移除旧版本中不再提供的条目，添加新版本
+    // 遍历所有版本的 provides，删除该包名下所有旧记录后重新插入
+    for (auto it = providers_.begin(); it != providers_.end(); ) {
+        auto& vec = it->second;
+        for (auto vit = vec.begin(); vit != vec.end(); ) {
+            if (*vit == name) {
+                vit = vec.erase(vit);
+            } else {
+                ++vit;
+            }
+        }
+        if (vec.empty()) {
+            it = providers_.erase(it);
+        } else {
+            ++it;
+        }
+    }
     for (const auto& [pkg_name, pkg_versions] : packages_) {
         for (const auto& pkg : pkg_versions) {
             for (const auto& prov : pkg.provides) {
-                providers_[prov].push_back(pkg_name);
+                auto& pv = providers_[prov];
+                if (pv.empty() || pv.back() != pkg_name) {
+                    pv.push_back(pkg_name);
+                }
             }
         }
     }

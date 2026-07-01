@@ -79,6 +79,7 @@ error.strip_libelf_mismatch=Libelf version mismatch
 error.strip_unknown_type=Unknown or unsupported file type
 warning.strip_failed=Failed to strip file {}: {}
 warning.config_conflict=Configuration file conflict: {}. Installing new version as {}
+warning.dir_perm_mismatch=Directory {} permissions differ: current {}, package wants {} — corrected
 prompt.yes_no=(y/n)
 error.hash_mismatch=Hash mismatch for package: {}
 error.openssl_ctx_failed=Failed to create OpenSSL context

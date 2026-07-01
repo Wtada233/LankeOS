@@ -79,6 +79,7 @@ error.strip_libelf_mismatch=Libelf 版本不匹配
 error.strip_unknown_type=未知或不支持的文件类型
 warning.strip_failed=无法 strip 文件 {}: {}
 warning.config_conflict=配置文件冲突: {}。将新版本安装为 {}
+warning.dir_perm_mismatch=目录 {} 权限不一致：当前 {}, 包要求 {} — 已修正
 warning.invalid_trigger_regex=triggers.conf 中的正则表达式无效: {}
 prompt.yes_no=(y/n)
 error.hash_mismatch=包的哈希值不匹配: {}
