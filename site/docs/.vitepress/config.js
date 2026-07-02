@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitepress'
 
 // ─── SEO 基础配置 ─────────────────────────────────────────────
-const siteURL = 'https://lankerepo.wtada233.top'
+const siteURL = 'https://lankeos.wtada233.top'
 const siteTitle = 'LankeOS'
 const siteDescription = 'A Linux From Scratch distribution built from the ground up — 从零构建的 Linux 发行版'
 const siteImage = `${siteURL}/screenshots/desktop.png`

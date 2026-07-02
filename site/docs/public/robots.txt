@@ -3,4 +3,4 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://lankerepo.wtada233.top/sitemap.xml
+Sitemap: https://lankeos.wtada233.top/sitemap.xml
