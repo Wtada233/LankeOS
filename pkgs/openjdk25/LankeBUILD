@@ -27,6 +27,7 @@ lankebuild_prepare() {
 }
 lankebuild_build() {
     make images
+    find "build/linux-x86_64-server-release/images/jdk" -iname '*.so' -exec chmod +x {} \;
 }
 lankebuild_package() {
     mkdir -p "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk"
