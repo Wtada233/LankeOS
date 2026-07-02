@@ -7,5 +7,5 @@
     "work_sources": [],
     "deps": [],
     "provides": [],
-    "no_strip": false
+    "no_strip": true
 }

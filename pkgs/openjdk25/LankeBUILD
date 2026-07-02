@@ -12,15 +12,15 @@ lankebuild_prepare() {
         --with-boot-jdk="$BOOT_JDK_DIR" \
         --with-stdc++lib=dynamic \
         --with-jvm-features="zgc,shenandoahgc" \
-        --with-native-debug-symbols=internal \
+        --with-native-debug-symbols=none \
         --enable-unlimited-crypto \
         --disable-warnings-as-errors \
-        --with-libjpeg=bundled \
-        --with-giflib=bundled \
-        --with-libpng=bundled \
-        --with-lcms=bundled \
-        --with-zlib=bundled \
-        --with-harfbuzz=bundled \
+        --with-libjpeg=dynamic \
+        --with-giflib=dynamic \
+        --with-libpng=dynamic \
+        --with-lcms=dynamic \
+        --with-zlib=dynamic \
+        --with-harfbuzz=dynamic \
         --with-vendor-name="LankeOS" \
         --enable-linkable-runtime
 }
