@@ -23,7 +23,8 @@ lankebuild_prepare() {
         --with-harfbuzz=system \
         --with-freetype=system \
         --with-vendor-name="LankeOS" \
-        --enable-linkable-runtime
+        --enable-linkable-runtime \
+        --with-extra-ldflags="-Wl,-s"
 }
 lankebuild_build() {
     make images
