@@ -29,6 +29,10 @@ export default defineConfig({
       content: 'LankeOS, Linux, LFS, Linux From Scratch, 发行版, 操作系统, lpkg, Sway, Wayland, C++20, 包管理器',
     }],
     ['meta', { name: 'author', content: 'Wtada233' }],
+
+    // ---------- 无障碍 ----------
+    ['script', {}, `document.addEventListener('DOMContentLoaded',()=>{document.querySelector('.VPHome')?.setAttribute('role','main')})`],
+    ['style', {}, `.VPButton.brand{background-color:#1f6fbe!important} .dark .VPButton.brand{background-color:#3b8bdb!important}`],
     ['meta', { name: 'robots', content: 'index, follow' }],
 
     // ---------- Open Graph ----------
