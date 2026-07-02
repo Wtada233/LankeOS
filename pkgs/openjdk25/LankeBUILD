@@ -21,6 +21,7 @@ lankebuild_prepare() {
         --with-lcms=system \
         --with-zlib=system \
         --with-harfbuzz=system \
+        --with-freetype=system \
         --with-vendor-name="LankeOS" \
         --enable-linkable-runtime
 }
