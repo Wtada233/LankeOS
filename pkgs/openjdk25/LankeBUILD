@@ -15,12 +15,12 @@ lankebuild_prepare() {
         --with-native-debug-symbols=none \
         --enable-unlimited-crypto \
         --disable-warnings-as-errors \
-        --with-libjpeg=dynamic \
-        --with-giflib=dynamic \
-        --with-libpng=dynamic \
-        --with-lcms=dynamic \
-        --with-zlib=dynamic \
-        --with-harfbuzz=dynamic \
+        --with-libjpeg=system \
+        --with-giflib=system \
+        --with-libpng=system \
+        --with-lcms=system \
+        --with-zlib=system \
+        --with-harfbuzz=system \
         --with-vendor-name="LankeOS" \
         --enable-linkable-runtime
 }
