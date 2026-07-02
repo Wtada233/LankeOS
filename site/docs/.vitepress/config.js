@@ -4,7 +4,7 @@ import { defineConfig } from 'vitepress'
 const siteURL = 'https://lankeos.wtada233.top'
 const siteTitle = 'LankeOS'
 const siteDescription = 'A Linux From Scratch distribution built from the ground up — 从零构建的 Linux 发行版'
-const siteImage = `${siteURL}/screenshots/desktop.png`
+const siteImage = `${siteURL}/assets/preview.webp`
 
 export default defineConfig({
   /* ─── 站点元信息 ───────────────────────────────────── */

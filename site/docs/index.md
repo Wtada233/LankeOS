@@ -6,8 +6,8 @@ hero:
   text: 从零构建的 Linux 发行版
   tagline: 基于 Linux From Scratch，配备自研 C++20 包管理器 lpkg，Sway on Wayland 桌面，从内核到浏览器全部亲手构建。
   image:
-    src: /screenshots/desktop.png
-    alt: LankeOS 桌面截图
+    src: /assets/preview.webp
+    alt: LankeOS 桌面截图 — Sway 平铺窗口管理器上运行的完整桌面环境
   actions:
     - theme: brand
       text: 下载 LankeOS
