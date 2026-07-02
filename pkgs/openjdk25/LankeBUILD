@@ -52,5 +52,6 @@ lankebuild_package() {
         fi
     done
     rm -rf "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/man"
+    rm -rf "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/lib/src.zip"
     ln -sfv ../../../share/man "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/man"
 }
