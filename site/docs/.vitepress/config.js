@@ -32,7 +32,7 @@ export default defineConfig({
 
     // ---------- 无障碍 ----------
     ['script', {}, `document.addEventListener('DOMContentLoaded',()=>{document.querySelector('.VPHome')?.setAttribute('role','main')})`],
-    ['style', {}, `.VPButton.brand{background-color:#1f6fbe!important} .dark .VPButton.brand{background-color:#3b8bdb!important}`],
+    ['style', {}, `.VPButton.brand{background-color:#1557a0!important} .dark .VPButton.brand{background-color:#1a5a9e!important}`],
     ['meta', { name: 'robots', content: 'index, follow' }],
 
     // ---------- Open Graph ----------
