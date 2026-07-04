@@ -1,0 +1,9 @@
+{
+  "name": "linux-firmware-full",
+  "version": "20260622",
+  "sources": [
+    "https://gitlab.com/kernel-firmware/linux-firmware/-/archive/20260622/linux-firmware-20260622.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": true
+}
