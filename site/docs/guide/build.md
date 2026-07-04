@@ -50,7 +50,7 @@ sudo lpkg build files/LankeOS/pkgs/bash
 # 构建 coreutils
 sudo lpkg build files/LankeOS/pkgs/coreutils
 
-# 构建整个系统需要按依赖顺序构建所有 189 个软件包
+# 构建整个系统需要按依赖顺序构建所有软件包
 ```
 
 ## 构建系统架构
