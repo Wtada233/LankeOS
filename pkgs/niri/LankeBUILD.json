@@ -1,0 +1,10 @@
+{
+  "name": "niri",
+  "version": "26.04",
+  "sources": [
+    "https://github.com/niri-wm/niri/archive/refs/tags/v26.04.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "provides": []
+}

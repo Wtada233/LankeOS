@@ -1,0 +1,63 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    cd "{SRC_DIR}"
+
+    # 下载所有依赖（锁定版本）
+    cargo fetch --locked --target "$(rustc --print host-tuple)"
+}
+
+lankebuild_build() {
+    cd "{SRC_DIR}"
+
+    # 嵌入构建标识（用于 niri --version）
+    export NIRI_BUILD_COMMIT="{PKG_VER}"
+
+    # 添加 LTO 兼容标志
+    export CFLAGS="${CFLAGS} -ffat-lto-objects"
+
+    # 编译 niri（含默认特性：wayland + x11 后端等）
+    cargo build --frozen --release --features default
+
+    # 生成 Shell 自动补全
+    for shell in bash fish zsh; do
+        cargo run --frozen --release --bin niri -- \
+            completions "$shell" > "$shell-completions"
+    done
+}
+
+lankebuild_package() {
+    cd "{SRC_DIR}"
+
+    # 主程序与会话脚本
+    install -vDm 755 target/release/niri "{STAGING_ROOT}/usr/bin/niri"
+    install -vDm 755 resources/niri-session "{STAGING_ROOT}/usr/bin/niri-session"
+
+    # systemd 用户单元
+    install -vDm 644 resources/niri.service \
+        "{STAGING_ROOT}/usr/lib/systemd/user/niri.service"
+    install -vDm 644 resources/niri-shutdown.target \
+        "{STAGING_ROOT}/usr/lib/systemd/user/niri-shutdown.target"
+
+    # Wayland 会话入口
+    install -vDm 644 resources/niri.desktop \
+        "{STAGING_ROOT}/usr/share/wayland-sessions/niri.desktop"
+
+    # XDG Desktop Portal 配置
+    install -vDm 644 resources/niri-portals.conf \
+        "{STAGING_ROOT}/usr/share/xdg-desktop-portal/niri-portals.conf"
+
+    # 文档
+    install -vDm 644 resources/default-config.kdl \
+        "{STAGING_ROOT}/usr/share/doc/niri/default-config.kdl"
+    install -vDm 644 README.md \
+        "{STAGING_ROOT}/usr/share/doc/niri/README.md"
+
+    # Shell 补全
+    install -vDm 644 bash-completions \
+        "{STAGING_ROOT}/usr/share/bash-completion/completions/niri"
+    install -vDm 644 fish-completions \
+        "{STAGING_ROOT}/usr/share/fish/vendor_completions.d/niri.fish"
+    install -vDm 644 zsh-completions \
+        "{STAGING_ROOT}/usr/share/zsh/site-functions/_niri"
+}

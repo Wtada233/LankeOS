@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    cd "{SRC_DIR}"
+
+    # 下载所有依赖（锁定版本）
+    cargo fetch --locked --target "$(rustc --print host-tuple)"
+}
+
+lankebuild_build() {
+    cd "{SRC_DIR}"
+
+    cargo build --frozen --release --features systemd
+}
+
+lankebuild_package() {
+    cd "{SRC_DIR}"
+    install -vDm 755 target/release/xwayland-satellite -t "{STAGING_ROOT}/usr/bin/"
+    install -vDm 644 resources/xwayland-satellite.service -t "{STAGING_ROOT}/usr/lib/systemd/user/"
+    install -vDm 644 LICENSE -t "{STAGING_ROOT}/usr/share/licenses/{STAGING_ROOT}/"
+}

@@ -1,0 +1,9 @@
+{
+    "name": "xcb-util-cursor",
+    "version": "0.1.6",
+    "sources": ["https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-cursor-0.1.6.tar.xz"],
+    "work_sources": [],
+    "deps": [],
+    "provides": [],
+    "no_strip": false
+}

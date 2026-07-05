@@ -1,0 +1,10 @@
+{
+  "name": "xwayland-satellite",
+  "version": "0.8.1",
+  "sources": [
+    "https://github.com/Supreeeme/xwayland-satellite/archive/refs/tags/v0.8.1.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "provides": []
+}

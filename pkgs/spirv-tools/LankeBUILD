@@ -12,9 +12,11 @@ lankebuild_build() {
           -D BUILD_SHARED_LIBS=ON \
           -D SPIRV_TOOLS_BUILD_STATIC=OFF \
           -D SPIRV-Headers_SOURCE_DIR=/usr \
+          -D CMAKE_INSTALL_SYSCONFDIR=/etc \
+          -D CMAKE_SKIP_INSTALL_RPATH=ON \
           -G Ninja ..
-    ninja
-    DESTDIR={STAGING_ROOT} ninja install
+    cmake --build . -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install .
 }
 
 lankebuild_package() {
