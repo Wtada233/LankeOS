@@ -33,7 +33,8 @@ lankebuild_package() {
     mkdir -p {STAGING_HOOKS}
     cat >> {STAGING_HOOKS}/postinst.sh << 'HOOKEOF'
 for kv in /usr/lib/modules/*/; do
-    [ -d "$kv" ] && depmod "${kv%/}"
+    kv="${kv%/}"
+    [ -d "$kv" ] && depmod "${kv##*/}"
 done
 HOOKEOF
 }
