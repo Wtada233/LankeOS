@@ -1,33 +1,498 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    mkdir -p {STAGING_ROOT}/usr/lib/firmware
+    :
 }
 
 lankebuild_build() {
-    local whitelist=(
-        "intel/iwlwifi/*-so-a0*" "intel/iwlwifi/*-cc-a0*" "intel/iwlwifi/*-Qu*" "intel/iwlwifi/*-ty-a0*" "intel/iwlwifi/*-bz-*" "intel/iwlwifi/*.pnvm"
-        "intel/ibt*" "i915/adls_*" "i915/adlp_*" "i915/tgl_*" "i915/dg2_*" "i915/mtl_*"
-        "intel/sof/*" "intel/sof-tplg/*" "intel/avs/*"
-        "amdgpu/gc_11_*" "amdgpu/gc_10_*" "amdgpu/navi*"
-        "amdgpu/vcn_*" "amdgpu/psp_*" "amdgpu/dcn_*" "amdgpu/sdma_*"
-        "amd-ucode/*" "rtl_nic/rtl81*" "intel-ucode/*"
-    )
+    # Step 1: Install ALL firmware via upstream make install
+    make -C "{SRC_DIR}"                                         \
+        DESTDIR="{STAGING_ROOT}"                                \
+        FIRMWAREDIR="/usr/lib/firmware"                         \
+        install                                                 \
+        NUM_JOBS=$(nproc)
 
-    for pattern in "${whitelist[@]}"; do
-        # 修复：匹配 ./ 开头的路径
-        find . -path "./$pattern" | while read -r src_file; do
-            # 修复：直接去掉开头的 "./"
-            local rel_path="${src_file#./}"
-            local target_dir=$(dirname "{STAGING_ROOT}/usr/lib/firmware/$rel_path")
-            mkdir -p "$target_dir"
-            cp -a "$src_file" "{STAGING_ROOT}/usr/lib/firmware/$rel_path"
-        done
+    # Step 2: Delete firmware for kernel-disabled drivers (blacklist)
+    cd "{STAGING_ROOT}/usr/lib/firmware"
+    xargs -r rm -rf <<'BLACKLIST'
+3com/
+HP/
+LENOVO/
+Lontium/
+adaptec/
+advansys/
+aeonsemi/
+airoha/
+amd/
+amdnpu/
+amdtee/
+amlogic/
+amphion/
+ar3k/
+arm/
+ath10k/
+ath6k/
+ath9k_htc/
+atmel/
+atusb/
+av7110/
+bnx2/
+bnx2x/
+cadence/
+cavium/
+cirrus/
+cis/
+cnm/
+cpia2/
+cxgb3/
+cxgb4/
+dabusb/
+dell/
+dpaa2/
+dsp56k/
+edgeport/
+emi26/
+ene-ub6250/
+go7007/
+imx/
+inside-secure/
+isci/
+ixp4xx/
+kaweth/
+keyspan/
+keyspan_pda/
+libertas/
+liquidio/
+matrox/
+mellanox/
+meson/
+microchip/
+moxa/
+mrvl/
+mwl8k/
+mwlwifi/
+netronome/
+nxp/
+ositech/
+powervr/
+qca/
+qcom/
+qed/
+qlogic/
+r128/
+radeon/
+realtek/
+rockchip/
+rsi/
+sb16/
+sdca/
+slicoss/
+sxg/
+tehuti/
+ti/
+ti-connectivity/
+ti-keystone/
+ueagle-atm/
+vxge/
+wfx/
+yamaha/
+amdgpu/isp_4_1_1.bin
+brcm/BCM-0bb4-0306.hcd
+brcm/bcm43xx-0.fw
+brcm/bcm43xx_hdr-0.fw
+intel/avs/apl/dsp_basefw.bin
+intel/avs/cnl/dsp_basefw.bin
+intel/avs/da7219-tplg.bin
+intel/avs/dmic-tplg.bin
+intel/avs/hda-808628xx-3ep-tplg.bin
+intel/avs/hda-generic-1ep-tplg.bin
+intel/avs/max98357a-tplg.bin
+intel/avs/max98373-tplg.bin
+intel/avs/max98927-tplg.bin
+intel/avs/nau8825-tplg.bin
+intel/avs/rt274-tplg.bin
+intel/avs/rt286-tplg.bin
+intel/avs/rt298-tplg.bin
+intel/avs/rt5514-tplg.bin
+intel/avs/rt5640-tplg.bin
+intel/avs/rt5663-tplg.bin
+intel/avs/skl/dsp_basefw.bin
+intel/avs/skl/dsp_mod_7CAD0808-AB10-CD23-EF45-12AB34CD56EF.bin
+intel/avs/ssm4567-tplg.bin
+intel/catpt/bdw/dsp_basefw.bin
+intel/dsp_fw_bxtn_v2219.bin
+intel/dsp_fw_bxtn_v3366.bin
+intel/dsp_fw_cnl_v1191.bin
+intel/dsp_fw_cnl_v1858.bin
+intel/dsp_fw_glk_v1814.bin
+intel/dsp_fw_glk_v2768.bin
+intel/dsp_fw_glk_v2880.bin
+intel/dsp_fw_glk_v3366.bin
+intel/dsp_fw_kbl_v1037.bin
+intel/dsp_fw_kbl_v2042.bin
+intel/dsp_fw_kbl_v2630.bin
+intel/dsp_fw_kbl_v3266.bin
+intel/dsp_fw_kbl_v3402.bin
+intel/dsp_fw_kbl_v3420.bin
+intel/dsp_fw_kbl_v701.bin
+intel/dsp_fw_release_v3402.bin
+intel/dsp_fw_release_v969.bin
+intel/fw_sst_0f28.bin
+intel/fw_sst_0f28.bin-48kHz_i2s_master
+intel/fw_sst_0f28_ssp0.bin
+intel/fw_sst_22a8.bin
+intel/ipu/ipu6_fw.bin
+intel/ipu/ipu6ep_fw.bin
+intel/ipu/ipu6epadln_fw.bin
+intel/ipu/ipu6epmtl_fw.bin
+intel/ipu/ipu6se_fw.bin
+intel/ipu/ipu7_fw.bin
+intel/ipu/ipu7ptl_fw.bin
+intel/ipu/irci_irci_ecr-master_20161208_0213_20170112_1500.bin
+intel/ipu/shisp_2400b0_v21.bin
+intel/ipu/shisp_2401a0_v21.bin
+intel/ish/ish_lnlm.bin
+intel/ish/ish_ptl.bin
+intel/ish/ish_wcl.bin
+intel/qat/qat_402xx.bin
+intel/qat/qat_402xx_mmp.bin
+intel/qat/qat_420xx.bin
+intel/qat/qat_420xx_mmp.bin
+intel/qat/qat_4xxx.bin
+intel/qat/qat_4xxx_mmp.bin
+intel/qat/qat_895xcc.bin
+intel/qat/qat_895xcc_mmp.bin
+intel/qat/qat_c3xxx.bin
+intel/qat/qat_c3xxx_mmp.bin
+intel/qat/qat_c62x.bin
+intel/qat/qat_c62x_mmp.bin
+intel/vpu/vpu_37xx_v1.bin
+intel/vpu/vpu_40xx_v1.bin
+intel/vpu/vpu_50xx_v1.bin
+intel/vsc/ivsc_fw.bin
+intel/vsc/ivsc_pkg_hi556_0.bin
+intel/vsc/ivsc_pkg_himx11b1_0.bin
+intel/vsc/ivsc_pkg_himx2170_0.bin
+intel/vsc/ivsc_pkg_himx2172_0.bin
+intel/vsc/ivsc_pkg_int3537_0.bin
+intel/vsc/ivsc_pkg_ovti01a0_0.bin
+intel/vsc/ivsc_pkg_ovti01af_0.bin
+intel/vsc/ivsc_pkg_ovti01as_0.bin
+intel/vsc/ivsc_pkg_ovti02c1_0.bin
+intel/vsc/ivsc_pkg_ovti02e1_0.bin
+intel/vsc/ivsc_pkg_ovti2740_0.bin
+intel/vsc/ivsc_pkg_ovti5678_0.bin
+intel/vsc/ivsc_pkg_ovti9734_0.bin
+intel/vsc/ivsc_pkg_ovti9738_0.bin
+intel/vsc/ivsc_skucfg_hi556_0_1.bin
+intel/vsc/ivsc_skucfg_himx11b1_0_1.bin
+intel/vsc/ivsc_skucfg_himx2170_0_1.bin
+intel/vsc/ivsc_skucfg_himx2172_0_1.bin
+intel/vsc/ivsc_skucfg_int3537_0_1.bin
+intel/vsc/ivsc_skucfg_ovti01a0_0_1.bin
+intel/vsc/ivsc_skucfg_ovti01af_0_1.bin
+intel/vsc/ivsc_skucfg_ovti01as_0_1.bin
+intel/vsc/ivsc_skucfg_ovti02c1_0_1.bin
+intel/vsc/ivsc_skucfg_ovti02e1_0_1.bin
+intel/vsc/ivsc_skucfg_ovti2740_0_1.bin
+intel/vsc/ivsc_skucfg_ovti5678_0_1.bin
+intel/vsc/ivsc_skucfg_ovti9734_0_1.bin
+intel/vsc/ivsc_skucfg_ovti9738_0_1.bin
+mediatek/BT_RAM_CODE_MT7902_1_1_hdr.bin
+mediatek/BT_RAM_CODE_MT7922_1_1_hdr.bin
+mediatek/BT_RAM_CODE_MT7961_1a_2_hdr.bin
+mediatek/WIFI_MT7902_patch_mcu_1_1_hdr.bin
+mediatek/WIFI_MT7922_patch_mcu_1_1_hdr.bin
+mediatek/WIFI_MT7961_patch_mcu_1a_2_hdr.bin
+mediatek/WIFI_RAM_CODE_MT7902_1.bin
+mediatek/WIFI_RAM_CODE_MT7922_1.bin
+mediatek/WIFI_RAM_CODE_MT7961_1a.bin
+mediatek/mt7610e.bin
+mediatek/mt7610u.bin
+mediatek/mt7622_n9.bin
+mediatek/mt7622_rom_patch.bin
+mediatek/mt7650e.bin
+mediatek/mt7662.bin
+mediatek/mt7662_rom_patch.bin
+mediatek/mt7662u.bin
+mediatek/mt7662u_rom_patch.bin
+mediatek/mt7663_n9_rebb.bin
+mediatek/mt7663_n9_v3.bin
+mediatek/mt7663pr2h.bin
+mediatek/mt7663pr2h_rebb.bin
+mediatek/mt7915_eeprom.bin
+mediatek/mt7915_eeprom_dbdc.bin
+mediatek/mt7915_rom_patch.bin
+mediatek/mt7915_wa.bin
+mediatek/mt7915_wm.bin
+mediatek/mt7916_eeprom.bin
+mediatek/mt7916_rom_patch.bin
+mediatek/mt7916_wa.bin
+mediatek/mt7916_wm.bin
+mediatek/mt7925/BT_RAM_CODE_MT7925_1_1_hdr.bin
+mediatek/mt7925/WIFI_MT7925_PATCH_MCU_1_1_hdr.bin
+mediatek/mt7925/WIFI_RAM_CODE_MT7925_1_1.bin
+mediatek/mt7927/WIFI_MT6639_PATCH_MCU_2_1_hdr.bin
+mediatek/mt7927/WIFI_RAM_CODE_MT6639_2_1.bin
+mediatek/mt7981_eeprom_mt7976_dbdc.bin
+mediatek/mt7981_rom_patch.bin
+mediatek/mt7981_wa.bin
+mediatek/mt7981_wm.bin
+mediatek/mt7981_wo.bin
+mediatek/mt7986_eeprom_mt7975_dual.bin
+mediatek/mt7986_eeprom_mt7976.bin
+mediatek/mt7986_eeprom_mt7976_dbdc.bin
+mediatek/mt7986_eeprom_mt7976_dual.bin
+mediatek/mt7986_rom_patch.bin
+mediatek/mt7986_rom_patch_mt7975.bin
+mediatek/mt7986_wa.bin
+mediatek/mt7986_wm.bin
+mediatek/mt7986_wm_mt7975.bin
+mediatek/mt7986_wo_0.bin
+mediatek/mt7986_wo_1.bin
+mediatek/mt7987/i2p5ge-phy-DSPBitTb.bin
+mediatek/mt7987/i2p5ge-phy-pmb.bin
+mediatek/mt7988/i2p5ge-phy-pmb.bin
+mediatek/mt7988/mt7988_wo_0.bin
+mediatek/mt7988/mt7988_wo_1.bin
+mediatek/mt7996/mt7990_eeprom.bin
+mediatek/mt7996/mt7990_eeprom_2i5i.bin
+mediatek/mt7996/mt7990_rom_patch.bin
+mediatek/mt7996/mt7990_wm.bin
+mediatek/mt7996/mt7990_wm_tm.bin
+mediatek/mt7996/mt7992_dsp.bin
+mediatek/mt7996/mt7992_dsp_23.bin
+mediatek/mt7996/mt7992_eeprom.bin
+mediatek/mt7996/mt7992_eeprom_23.bin
+mediatek/mt7996/mt7992_eeprom_23_2i5i.bin
+mediatek/mt7996/mt7992_eeprom_2i5e.bin
+mediatek/mt7996/mt7992_eeprom_2i5i.bin
+mediatek/mt7996/mt7992_rom_patch.bin
+mediatek/mt7996/mt7992_rom_patch_23.bin
+mediatek/mt7996/mt7992_wa.bin
+mediatek/mt7996/mt7992_wa_23.bin
+mediatek/mt7996/mt7992_wm.bin
+mediatek/mt7996/mt7992_wm_23.bin
+mediatek/mt7996/mt7992_wm_tm.bin
+mediatek/mt7996/mt7992_wm_tm_23.bin
+mediatek/mt7996/mt7996_dsp.bin
+mediatek/mt7996/mt7996_eeprom.bin
+mediatek/mt7996/mt7996_eeprom_233.bin
+mediatek/mt7996/mt7996_eeprom_233_2i5i6i.bin
+mediatek/mt7996/mt7996_eeprom_2i5i6i.bin
+mediatek/mt7996/mt7996_rom_patch.bin
+mediatek/mt7996/mt7996_rom_patch_233.bin
+mediatek/mt7996/mt7996_wa.bin
+mediatek/mt7996/mt7996_wa_233.bin
+mediatek/mt7996/mt7996_wm.bin
+mediatek/mt7996/mt7996_wm_233.bin
+mediatek/mt7996/mt7996_wm_tm.bin
+mediatek/mt7996/mt7996_wm_tm_233.bin
+mediatek/mt8173/vpu_d.bin
+mediatek/mt8173/vpu_p.bin
+mediatek/mt8183/scp.img
+mediatek/mt8186/scp.img
+mediatek/mt8188/scp_c0.img
+mediatek/mt8189/scp.img
+mediatek/mt8192/scp.img
+mediatek/mt8195/scp.img
+mediatek/mt8196/vcp.img
+mediatek/sof-tplg/sof-mt8186.tplg
+mediatek/sof-tplg/sof-mt8188.tplg
+mediatek/sof-tplg/sof-mt8195-mt6359-max98390-rt5682.tplg
+mediatek/sof-tplg/sof-mt8195-mt6359-rt1019-rt5682.tplg
+mediatek/sof-tplg/sof-mt8195.tplg
+mediatek/sof/sof-mt8186.ldc
+mediatek/sof/sof-mt8186.ri
+mediatek/sof/sof-mt8188.ldc
+mediatek/sof/sof-mt8188.ri
+mediatek/sof/sof-mt8195.ldc
+mediatek/sof/sof-mt8195.ri
+nvidia/tegra124/vic03_ucode.bin
+nvidia/tegra124/xusb.bin
+nvidia/tegra186/vic04_ucode.bin
+nvidia/tegra186/xusb.bin
+nvidia/tegra194/vic.bin
+nvidia/tegra194/xusb.bin
+nvidia/tegra210/vic04_ucode.bin
+nvidia/tegra210/xusb.bin
+rtl_nic/rtl8153a-2.fw
+rtl_nic/rtl8153a-3.fw
+rtl_nic/rtl8153a-4.fw
+rtl_nic/rtl8153b-2.fw
+rtl_nic/rtl8153c-1.fw
+rtl_nic/rtl8156a-2.fw
+rtl_nic/rtl8156b-2.fw
+rtlwifi/rtl8188efw.bin
+rtlwifi/rtl8192cfw.bin
+rtlwifi/rtl8192cfwU.bin
+rtlwifi/rtl8192cfwU_B.bin
+rtlwifi/rtl8192cufw.bin
+rtlwifi/rtl8192cufw_A.bin
+rtlwifi/rtl8192cufw_B.bin
+rtlwifi/rtl8192cufw_TMSC.bin
+rtlwifi/rtl8192defw.bin
+rtlwifi/rtl8192dufw.bin
+rtlwifi/rtl8192sefw.bin
+rtlwifi/rtl8712u.bin
+rtlwifi/rtl8723befw.bin
+rtlwifi/rtl8723befw_36.bin
+rtlwifi/rtl8723bs_bt.bin
+rtlwifi/rtl8723defw.bin
+rtlwifi/rtl8723fw.bin
+rtlwifi/rtl8723fw_B.bin
+rtlwifi/rtl8812aefw.bin
+rtlwifi/rtl8812aefw_wowlan.bin
+rtlwifi/rtl8821aefw.bin
+rtlwifi/rtl8821aefw_29.bin
+rtlwifi/rtl8821aefw_wowlan.bin
+rtlwifi/rtl8822befw.bin
+agere_ap_fw.bin
+agere_sta_fw.bin
+ar5523.bin
+ar7010.fw
+ar7010_1_1.fw
+ar9170-1.fw
+ar9170-2.fw
+ar9271.fw
+as102_data1_st.hex
+as102_data2_st.hex
+ath3k-1.fw
+bmi260-init-data.fw
+carl9170-1.fw
+cbfw-3.2.5.1.bin
+cmmb_vega_12mhz.inp
+cmmb_venice_12mhz.inp
+cs42l43.bin
+ct2fw-3.2.5.1.bin
+ctefx.bin
+ctfw-3.2.5.1.bin
+ctspeq.bin
+dvb-fe-xc4000-1.4.1.fw
+dvb-fe-xc5000-1.6.114.fw
+dvb-fe-xc5000c-4.1.30.7.fw
+dvb-usb-dib0700-1.20.fw
+dvb-usb-it9135-01.fw
+dvb-usb-it9135-02.fw
+dvb-usb-terratec-h5-drxk.fw
+dvb_nova_12mhz.inp
+dvb_nova_12mhz_b0.inp
+f2255usb.bin
+hfi1_dc8051.fw
+hfi1_fabric.fw
+hfi1_pcie.fw
+hfi1_sbus.fw
+htc_7010.fw
+htc_9271.fw
+isdbt_nova_12mhz.inp
+isdbt_nova_12mhz_b0.inp
+isdbt_rio.inp
+lbtf_usb.bin
+mts_cdma.fw
+mts_edge.fw
+mts_gsm.fw
+myri10ge_eth_big_z8e.dat
+myri10ge_eth_z8e.dat
+myri10ge_ethp_big_z8e.dat
+myri10ge_ethp_z8e.dat
+myri10ge_rss_eth_big_z8e.dat
+myri10ge_rss_eth_z8e.dat
+myri10ge_rss_ethp_big_z8e.dat
+myri10ge_rss_ethp_z8e.dat
+phanfw.bin
+ql2100_fw.bin
+ql2200_fw.bin
+ql2300_fw.bin
+ql2322_fw.bin
+ql2400_fw.bin
+ql2500_fw.bin
+r8a779x_usb3_v1.dlmem
+r8a779x_usb3_v2.dlmem
+r8a779x_usb3_v3.dlmem
+rcar_gen4_pcie.bin
+rp2.fw
+rsi_91x.fw
+rt2561.bin
+rt2561s.bin
+rt2661.bin
+rt2860.bin
+rt2870.bin
+rt3071.bin
+rt3290.bin
+rt73.bin
+s5p-mfc-v12.fw
+s5p-mfc-v6-v2.fw
+s5p-mfc-v6.fw
+s5p-mfc-v7.fw
+s5p-mfc-v8.fw
+s5p-mfc.fw
+sdd_sagrad_1091_1098.bin
+sms1xxx-hcw-55xxx-dvbt-02.fw
+sms1xxx-hcw-55xxx-isdbt-02.fw
+sms1xxx-nova-a-dvbt-01.fw
+sms1xxx-nova-b-dvbt-01.fw
+sms1xxx-stellar-dvbt-01.fw
+tdmb_nova_12mhz.inp
+ti_3410.fw
+ti_5052.fw
+tlg2300_firmware.bin
+tsse_firmware.bin
+usbdux_firmware.bin
+usbduxfast_firmware.bin
+usbduxsigma_firmware.bin
+v4l-cx231xx-avcore-01.fw
+v4l-cx23418-apu.fw
+v4l-cx23418-cpu.fw
+v4l-cx23418-dig.fw
+v4l-cx23885-avcore-01.fw
+v4l-cx25840.fw
+vntwusb.fw
+whiteheat.fw
+whiteheat_loader.fw
+wil6210.brd
+wil6210.fw
+wsm_22.bin
+BLACKLIST
+
+    # Step 3: Clean broken symlinks
+    find . -xtype l -delete
+    cd - >/dev/null || true
+
+    # Step 4: Install licenses
+    mkdir -p "{STAGING_ROOT}/usr/share/licenses/{PKG_NAME}"
+    cp "{SRC_DIR}/WHENCE"                                   \
+        "{STAGING_ROOT}/usr/share/licenses/{PKG_NAME}/"      \
+        2>/dev/null || true
+    cp -r "{SRC_DIR}/LICENSES/"*                             \
+        "{STAGING_ROOT}/usr/share/licenses/{PKG_NAME}/"      \
+        2>/dev/null || true
+
+    # Step 5: Remove licenses for deleted firmware.
+    # Keeps licenses whose firmware directory exists.
+    # Also keeps standard OSI licenses and well-known firmware licenses
+    # that don't have a 1:1 firmware directory mapping.
+    fwdir="{STAGING_ROOT}/usr/lib/firmware"
+    licdir="{STAGING_ROOT}/usr/share/licenses/{PKG_NAME}"
+    for f in "$licdir"/{LICEN*,NOTICE*}; do
+        [ -f "$f" ] || continue
+        base=$(basename "$f")
+        # Strip LICEN[CS]E. or NOTICE. prefix
+        dirname="${base#LICENCE.}"
+        dirname="${dirname#LICENSE.}"
+        dirname="${dirname#NOTICE.}"
+        # Always keep: standard OSI licenses, WHENCE, no-prefix files
+        case "$dirname" in
+            "$base"|GPL-*|MIT|Apache-*|WHENCE|BSDL-*) continue ;;
+        esac
+        # Keep well-known firmware licenses even without matching dir:
+        # iwlwifi (in intel/iwlwifi/), bcm43xx (in brcm/ or cypress/),
+        # ibt/ibt_firmware (in intel/), atheros/atmar8k (in ath*/ or ar3k/)
+        case "$dirname" in
+            iwlwifi_firmware|broadcom_bcm43xx|ibt_firmware) continue ;;
+            atmar8k|ar3k|Qualcomm*) continue ;;
+        esac
+        [ -d "$fwdir/$dirname" ] || rm -rf "$f"
     done
-
-    cp WHENCE LICEN* "{STAGING_ROOT}/usr/lib/firmware/" 2>/dev/null || true
-    cd "{STAGING_ROOT}/usr/lib/firmware/"
-    ln -sf intel/iwlwifi/iwlwifi-* .
 }
 
 lankebuild_package() {
