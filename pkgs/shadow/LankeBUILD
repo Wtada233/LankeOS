@@ -29,6 +29,7 @@ lankebuild_build() {
     # 添加 Shadow 链接
     ln -sfv vipw {STAGING_ROOT}/usr/bin/vigr
 
+    mkdir -p "{STAGING_ROOT}/etc/pam.d/"
     # 5. 打包前的 Hook 逻辑
     cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
 pwconv
@@ -37,10 +38,40 @@ mkdir -p /etc/default
 useradd -D --gid 999
 EOF
 
-    cat > "{STAGING_ROOT}/etc/pamd.d/chsh" << 'EOF'
+    cat > "{STAGING_ROOT}/etc/pam.d/chsh" << 'EOF'
+#%PAM-1.0
+auth            sufficient      pam_rootok.so
+auth            required        pam_unix.so
+account         required        pam_unix.so
+session         required        pam_unix.so
+password        required        pam_permit.so
+EOF
+
+    cat > "{STAGING_ROOT}/etc/pam.d/chfn" << 'EOF'
+#%PAM-1.0
+auth            sufficient      pam_rootok.so
+auth            required        pam_unix.so
+account         required        pam_unix.so
+session         required        pam_unix.so
+password        required        pam_permit.so
+EOF
+
+    cat > "{STAGING_ROOT}/etc/pam.d/su" << 'EOF'
+#%PAM-1.0
+auth            sufficient      pam_rootok.so
+# Uncomment the following line to implicitly trust users in the "wheel" group.
+#auth           sufficient      pam_wheel.so trust use_uid
+# Uncomment the following line to require a user to be in the "wheel" group.
+#auth           required        pam_wheel.so use_uid
+auth            required        pam_unix.so
+account         required        pam_unix.so
+session	       required        pam_unix.so
+password        include         system-auth
+EOF
+
+    cat > "{STAGING_ROOT}/etc/pam.d/newusers" << 'EOF'
 #%PAM-1.0
 auth		sufficient	pam_rootok.so
-auth		required	pam_unix.so
 account		required	pam_permit.so
 password	include		system-auth
 EOF
