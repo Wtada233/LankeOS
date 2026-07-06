@@ -121,7 +121,12 @@ void InstallationTask::commit() {
 
             auto& cache = Cache::instance();
             for (const auto& old_file : old_files) {
-                if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) continue;
+                if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) {
+                    // 配置文件：只清理所有权记录，不删除物理文件（保护用户配置）
+                    if (!new_set.contains(old_file))
+                        cache.remove_file_owner(old_file, pkg_name_);
+                    continue;
+                }
                 if (!new_set.contains(old_file)) {
                     auto owners = cache.get_file_owners(old_file);
                     if (owners.contains(pkg_name_)) {
