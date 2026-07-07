@@ -1,0 +1,26 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    if [ ! -d "libplacebo" ]; then
+        git clone --recursive --depth=1 -b v7.360.1 \
+            https://github.com/haasn/libplacebo.git
+    fi
+    cd libplacebo
+    git submodule update --init --recursive
+}
+
+lankebuild_build() {
+    cd libplacebo
+    meson setup build \
+        --prefix=/usr \
+        --buildtype=release \
+        -Ddefault_library=shared \
+        -Dtests=false \
+        -Ddemos=false
+    ninja -C build
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    :
+}

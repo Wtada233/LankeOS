@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Fetch all Go module dependencies
+    go mod download
+}
+
+lankebuild_build() {
+    # go-musicfox uses Makefile wrapping go build
+    export CGO_ENABLED=1
+    export CGO_CFLAGS="-I/usr/include"
+    make -j$(nproc) build
+    install -vDm 755 bin/musicfox {STAGING_ROOT}/usr/bin/musicfox
+}
+
+lankebuild_package() {
+    :
+}

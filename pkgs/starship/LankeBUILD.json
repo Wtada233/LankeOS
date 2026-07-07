@@ -1,0 +1,7 @@
+{
+  "name": "starship",
+  "version": "1.26.0",
+  "sources": [
+    "https://github.com/starship/starship/archive/refs/tags/v1.26.0.tar.gz"
+  ]
+}

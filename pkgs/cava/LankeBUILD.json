@@ -1,0 +1,7 @@
+{
+  "name": "cava",
+  "version": "1.0.0",
+  "sources": [
+    "https://github.com/karlstav/cava/archive/refs/tags/1.0.0.tar.gz"
+  ]
+}

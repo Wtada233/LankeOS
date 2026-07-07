@@ -1,0 +1,7 @@
+{
+  "name": "musicfox",
+  "version": "4.8.5",
+  "sources": [
+    "https://github.com/go-musicfox/go-musicfox/archive/refs/tags/v4.8.5.tar.gz"
+  ]
+}

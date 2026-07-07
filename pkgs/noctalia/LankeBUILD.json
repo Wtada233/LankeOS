@@ -1,0 +1,7 @@
+{
+  "name": "noctalia",
+  "version": "5.0.0-beta1",
+  "sources": [
+    "https://github.com/noctalia-dev/noctalia/releases/download/v5.0.0-beta1/noctalia-latest.tar.gz"
+  ]
+}

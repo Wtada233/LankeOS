@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix=/usr \
+        --buildtype=release \
+        -Ddefault_library=shared \
+        -Dpython=disabled \
+        -Dvalgrind=disabled \
+        -Dtests=false
+    ninja -C build
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    :
+}

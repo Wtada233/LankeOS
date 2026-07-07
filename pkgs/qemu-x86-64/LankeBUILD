@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure \
+        --prefix=/usr \
+        --localstatedir=/var \
+        --target-list=x86_64-softmmu \
+        --audio-drv-list=alsa,pipewire
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}
