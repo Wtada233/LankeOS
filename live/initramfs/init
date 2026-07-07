@@ -1,0 +1,388 @@
+#!/bin/sh
+export PATH=/usr/bin:/usr/sbin:/bin:/sbin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+echo "Welcome to LankeOS GNU/Linux (Kernel $(uname -r))"
+###############################################################################
+# 全局变量
+###############################################################################
+LABEL_BASE="LANKE_BASE"
+LABEL_DATA="LANKE_DATA"
+TORAM=0
+LIVE=0
+mkdir -p /mnt
+###############################################################################
+# 参数检测
+###############################################################################
+has_cmdline_arg()
+{
+    for arg in $(cat /proc/cmdline); do
+        [ "$arg" = "$1" ] && return 0
+    done
+    return 1
+}
+###############################################################################
+# 查找并挂载启动介质
+###############################################################################
+mount_boot_medium()
+{
+    echo "Scanning for boot medium with label: $LABEL_BASE..."
+    mkdir -p /mnt/medium
+    for i in 1 2 3 4 5; do
+        DEV_NODE=$(findfs LABEL="$LABEL_BASE" 2>/dev/null)
+        if [ -n "$DEV_NODE" ]; then
+            echo "Found medium: $DEV_NODE"
+            mount -t auto "$DEV_NODE" /mnt/medium 2>/dev/null
+            if [ -f "/mnt/medium/live/rootfs.sfs" ]; then
+                return 0
+            fi
+            echo "rootfs.sfs not found"
+            umount /mnt/medium 2>/dev/null
+        fi
+        echo "Waiting device ($i/5)"
+        sleep 1
+    done
+    echo "ERROR: Cannot find LankeOS medium"
+    exec sh
+}
+###############################################################################
+# toram逻辑
+###############################################################################
+setup_toram()
+{
+    if ! has_cmdline_arg "toram"; then
+        return
+    fi
+    TORAM=1
+    echo "Toram detected."
+    mkdir -p /mnt/ram_medium
+    mount -t tmpfs \
+        -o size=90% \
+        tmpfs \
+        /mnt/ram_medium
+    mkdir -p /mnt/ram_medium/live
+    mkdir -p /mnt/ram_medium/boot
+    echo "Copying medium into RAM..."
+    cp -a /mnt/medium/* /mnt/ram_medium/
+    echo "Switching medium to RAM..."
+    umount /mnt/medium
+    mount --move \
+        /mnt/ram_medium \
+        /mnt/medium
+    rm -rf /mnt/ram_medium
+    echo "Running from RAM."
+}
+###############################################################################
+# Live环境升级提示
+###############################################################################
+inject_update_notice()
+{
+    TARGET="/newroot/home/LankeOS/.bashrc"
+    mkdir -p /newroot/home/LankeOS
+    if [ ! -f "$TARGET" ]; then
+        touch "$TARGET"
+    fi
+    cat >> "$TARGET" <<'EBASH'
+if [ -f /.updated ]; then
+cat <<'EOF'
+================================================================
+ LankeOS system update detected.
+ The current system image version is different from the previous
+ persistent installation.
+ The system is running in LIVE upgrade mode.
+ You can:
+ 1. Remove:
+       LANKE_DATA/upper/etc/lanke-release-curr
+    Then reboot to accept the new base system.
+ 2. Reset your modifications under /usr if required.
+ 3. Keep your personal data under /home.
+ A future upgrade mechanism can migrate system files while
+ preserving user data.
+================================================================
+EOF
+fi
+EBASH
+}
+###############################################################################
+# Live模式
+###############################################################################
+setup_live()
+{
+    LIVE=1
+    echo "Entering Live mode."
+    mkdir -p /mnt/tmp
+    mkdir -p /newroot
+    mount \
+        -t tmpfs \
+        -o mode=0755 \
+        tmpfs \
+        /mnt/tmp
+    mkdir -p /mnt/tmp/upper
+    mkdir -p /mnt/tmp/work
+    mount \
+        -t overlay \
+        overlay \
+        -o lowerdir=/mnt/rootfs,upperdir=/mnt/tmp/upper,workdir=/mnt/tmp/work \
+        /newroot
+    if [ "$UPDATED_MODE" = "1" ]; then
+        echo "Creating update marker."
+        touch /newroot/.updated
+        mkdir -p /newroot/mnt/data
+        echo "Binding old LANKE_DATA into live environment."
+        mount --move \
+            /mnt/data \
+            /newroot/mnt/data
+    fi
+    ###########################################################################
+    # Live环境补丁
+    ###########################################################################
+    echo "Applying Live patches..."
+    if [ -f "/newroot/etc/shadow" ]; then
+        sed -i \
+        's/^root:[^:]*:/root::/' \
+        /newroot/etc/shadow
+        sed -i \
+        's/^LankeOS:[^:]*:/LankeOS::/' \
+        /newroot/etc/shadow
+    fi
+    for tty_dir in \
+        "getty@tty1.service.d" \
+        "serial-getty@ttyS0.service.d"
+    do
+        mkdir -p \
+        "/newroot/etc/systemd/system/$tty_dir"
+        cat > \
+        "/newroot/etc/systemd/system/$tty_dir/autologin.conf" \
+        <<'EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin LankeOS --noclear %I $TERM
+EOF
+    done
+    if [ "$UPDATED_MODE" = "1" ]; then
+        inject_update_notice
+    fi
+}
+###############################################################################
+# 查找启动介质
+###############################################################################
+mount_boot_medium
+###############################################################################
+# 挂载 squashfs
+###############################################################################
+mkdir -p /mnt/rootfs
+mount \
+    -t squashfs \
+    -o loop \
+    /mnt/medium/live/rootfs.sfs \
+    /mnt/rootfs
+###############################################################################
+# 检查启动参数
+###############################################################################
+if has_cmdline_arg "live"; then
+    LIVE=1
+fi
+###############################################################################
+# toram处理
+###############################################################################
+setup_toram
+###############################################################################
+# LANKE_DATA版本检测
+###############################################################################
+UPDATED_MODE=0
+DATA_DEV=""
+if [ "$LIVE" -eq 0 ]; then
+    echo "Persistent mode: checking LANKE_DATA..."
+    DATA_DEV=$(findfs LABEL="$LABEL_DATA" 2>/dev/null)
+    if [ -n "$DATA_DEV" ]; then
+        echo "Found data partition: $DATA_DEV"
+        mkdir -p /mnt/data
+        mount \
+            "$DATA_DEV" \
+            /mnt/data
+        #######################################################################
+        # erase参数
+        #######################################################################
+        if has_cmdline_arg "erase"; then
+            echo "Erase requested."
+            find /mnt/data \
+                -mindepth 1 \
+                -delete
+        fi
+        #######################################################################
+        # 版本检查
+        #######################################################################
+        mkdir -p /mnt/data/upper/etc
+        IMAGE_RELEASE="/mnt/rootfs/etc/lanke-release"
+        CURR_RELEASE="/mnt/data/upper/etc/lanke-release-curr"
+        if [ -f "$IMAGE_RELEASE" ]; then
+            if [ ! -f "$CURR_RELEASE" ]; then
+                echo "No release record."
+                cp \
+                    "$IMAGE_RELEASE" \
+                    "$CURR_RELEASE"
+            else
+                echo "Checking release version..."
+                if diff \
+                    "$IMAGE_RELEASE" \
+                    "$CURR_RELEASE" \
+                    >/dev/null 2>&1
+                then
+                    echo "Release matches."
+                else
+                    echo "Release mismatch detected."
+                    UPDATED_MODE=1
+                    LIVE=1
+                fi
+            fi
+        fi
+    else
+        echo "LANKE_DATA not found."
+        LIVE=1
+    fi
+fi
+###############################################################################
+# 根据最终状态进入live或者persistent
+###############################################################################
+if [ "$LIVE" -eq 1 ]; then
+    setup_live
+else
+    echo "Starting persistent overlay."
+    mkdir -p /mnt/data/upper
+    mkdir -p /mnt/data/work
+    mount \
+        -t overlay \
+        overlay \
+        -o lowerdir=/mnt/rootfs,upperdir=/mnt/data/upper,workdir=/mnt/data/work \
+        /newroot
+fi
+###############################################################################
+# 注入安装器
+###############################################################################
+if [ "$LIVE" -eq 1 ]; then
+mkdir -p /newroot/usr/bin
+    cat > /newroot/usr/bin/lanke_install << 'EINST'
+#!/bin/bash
+set -e
+[ "$EUID" -ne 0 ] && { echo "Error: Please run as root"; exit 1; }
+echo "=== LankeOS Installer (Fixed Partitioning) ==="
+DISKS=$(lsblk -dno NAME,SIZE,MODEL | grep -v "loop")
+echo "Available disks:"
+echo "$DISKS"
+read -p "Enter target disk (e.g., sda): " TARGET_DISK
+TARGET_DEV="/dev/$TARGET_DISK"
+[ -b "$TARGET_DEV" ] || { echo "Error: $TARGET_DEV not found"; exit 1; }
+read -p "WARNING: Data on $TARGET_DEV will be wiped. Continue? (y/N): " CONFIRM
+[[ "$CONFIRM" =~ ^[yY]$ ]] || exit 1
+echo "Partitioning with sfdisk..."
+wipefs -a "$TARGET_DEV"
+# P1: 8G (EFI + BASE), P2: Remainder (DATA)
+sfdisk "$TARGET_DEV" << EOF
+label: gpt
+size=4G, type=C12A7328-F81F-11D2-BA4B-00A0C93EC93B, name="LANKE_BASE"
+type=0FC63DAF-8483-4772-8E79-3D69D8477DE4, name="LANKE_DATA"
+EOF
+PART_PREFIX=""
+[[ "$TARGET_DEV" =~ [0-9]$ ]] && PART_PREFIX="p"
+echo "Formatting partitions..."
+mkfs.fat -F32 -n LANKE_BASE "${TARGET_DEV}${PART_PREFIX}1"
+mkfs.ext4 -F -L LANKE_DATA "${TARGET_DEV}${PART_PREFIX}2"
+echo "Copying LiveCD data to LANKE_BASE..."
+mkdir -p /mnt/inst_base
+mount "${TARGET_DEV}${PART_PREFIX}1" /mnt/inst_base
+cp -a /mnt/lanke_live/* /mnt/inst_base/
+echo "Configuring GRUB..."
+cat > /mnt/inst_base/boot/grub/grub.cfg << 'EGRUBCFG'
+# ---------------------------------------------------------
+# LankeOS LiveCD GRUB Configuration
+# ---------------------------------------------------------
+insmod part_gpt
+insmod part_msdos
+insmod fat
+insmod iso9660
+insmod ext2
+insmod all_video
+insmod video_bochs
+insmod video_cirrus
+insmod gfxterm
+terminal_input console
+terminal_output console
+set timeout=10
+set default=0
+set menu_color_normal=white/black
+set menu_color_highlight=black/light-gray
+# ---------------------------------------------------------
+# 引导条目
+# ---------------------------------------------------------
+menuentry "LankeOS" --class lankeos --class gnu-linux {
+    echo "Loading LankeOS Kernel..."
+    linux /boot/vmlinuz-lanke rw loglevel=3 console=ttyS0 console=tty1   
+    echo "Loading LankeOS Initramfs..."
+    initrd /boot/initrd.img
+}
+menuentry "Reboot System" {
+    reboot
+}
+menuentry "Power Off" {
+    halt
+}
+EGRUBCFG
+# 清理
+umount /mnt/inst_base
+echo "LankeOS Installed Successfully! Default User: LankeOS. Default Password: LankeOS"
+EINST
+chmod +x /newroot/usr/bin/lanke_install
+fi
+###############################################################################
+# 修复systemd服务
+###############################################################################
+mkdir -p /newroot/etc/systemd/system
+ln -sf \
+    /dev/null \
+    /newroot/etc/systemd/system/ldconfig.service
+sync
+###############################################################################
+# 移动必要挂载点
+###############################################################################
+mkdir -p /newroot/dev
+mkdir -p /newroot/proc
+mkdir -p /newroot/sys
+mkdir -p /newroot/run
+mount --move \
+    /dev \
+    /newroot/dev
+mount --move \
+    /proc \
+    /newroot/proc
+mount --move \
+    /sys \
+    /newroot/sys
+###############################################################################
+# 保留启动介质
+###############################################################################
+if [ "$TORAM" -eq 0 ]; then
+    if [ "$LIVE" -eq 1 ]; then
+        mkdir -p /newroot/mnt/lanke_live
+        mount --move \
+            /mnt/medium \
+            /newroot/mnt/lanke_live
+    else
+        mkdir -p /newroot/mnt/base
+        mount --move \
+            /mnt/medium \
+            /newroot/mnt/base
+    fi
+fi
+###############################################################################
+# switch_root
+###############################################################################
+TARGET_INIT="/sbin/init"
+if [ ! -x "/newroot$TARGET_INIT" ]; then
+    TARGET_INIT="/usr/bin/init"
+fi
+echo "Transitioning to LankeOS..."
+exec switch_root \
+    -c /dev/console \
+    /newroot \
+    "$TARGET_INIT"
