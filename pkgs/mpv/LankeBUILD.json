@@ -1,0 +1,7 @@
+{
+  "name": "mpv",
+  "version": "0.41.0",
+  "sources": [
+    "https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz"
+  ]
+}

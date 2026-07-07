@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # noctalia v5: meson build system
+    meson setup build \
+        --prefix=/usr \
+        --buildtype=release \
+        -Ddefault_library=shared
+    ninja -C build
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    :
+}

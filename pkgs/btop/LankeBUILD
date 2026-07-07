@@ -1,0 +1,22 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # btop v1.4.x: uses raw Makefile, C++23 required (GCC 14+)
+    make -j$(nproc) \
+        CXX=g++ \
+        STATIC=false \
+        STRIP=true \
+        GPU_SUPPORT=true \
+        ADDFLAGS="-DNDEBUG"
+    make install \
+        PREFIX=/usr \
+        DESTDIR={STAGING_ROOT}
+}
+
+lankebuild_package() {
+    :
+}

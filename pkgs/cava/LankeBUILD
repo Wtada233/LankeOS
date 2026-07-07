@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # cava uses autotools, need to generate configure first
+    autoreconf -fi
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr \
+        --enable-shared \
+        --disable-static \
+        --enable-alsa \
+        --enable-pipewire \
+        --enable-ncurses
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

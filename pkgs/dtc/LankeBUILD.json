@@ -1,0 +1,7 @@
+{
+  "name": "dtc",
+  "version": "1.8.1",
+  "sources": [
+    "https://git.kernel.org/pub/scm/utils/dtc/dtc.git/snapshot/dtc-1.8.1.tar.gz"
+  ]
+}

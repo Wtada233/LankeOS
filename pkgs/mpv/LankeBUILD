@@ -1,0 +1,30 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix=/usr \
+        --buildtype=release \
+        -Ddefault_library=shared \
+        -Dlibmpv=true \
+        -Dlua=disabled \
+        -Djpeg=enabled \
+        -Dx11=enabled \
+        -Dwayland=enabled \
+        -Ddrm=enabled \
+        -Dgbm=enabled \
+        -Dvulkan=enabled \
+        -Dvaapi=enabled \
+        -Dvdpau=disabled \
+        -Dtests=false \
+        -Dmanpage-build=disabled
+    ninja -C build
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    :
+}

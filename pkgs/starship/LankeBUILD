@@ -1,0 +1,14 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    cargo build --release --locked
+    install -vDm 755 target/release/starship {STAGING_ROOT}/usr/bin/starship
+}
+
+lankebuild_package() {
+    :
+}

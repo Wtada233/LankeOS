@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    cmake -G Ninja .. \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBUILD_STATIC_LIBS=OFF \
+        -DCMAKE_BUILD_TYPE=Release
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    :
+}

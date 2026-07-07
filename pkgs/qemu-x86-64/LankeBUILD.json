@@ -1,0 +1,7 @@
+{
+  "name": "qemu-x86-64",
+  "version": "9.2.3",
+  "sources": [
+    "https://download.qemu.org/qemu-9.2.3.tar.xz"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "name": "fish",
+  "version": "4.8.0",
+  "sources": [
+    "https://github.com/fish-shell/fish-shell/releases/download/4.8.0/fish-4.8.0.tar.xz"
+  ]
+}
