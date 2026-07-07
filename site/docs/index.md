@@ -20,7 +20,7 @@ hero:
       link: https://github.com/Wtada233/LankeOS
 
 features:
-  - title: ⚡ 急速启动
+  - title: ⚡ 极速启动
     details: 在 0.12 中，精心优化的 initramfs 从按下电源键到桌面就绪仅需约 4 秒。通过屏蔽 ldconfig.service 等非关键启动项实现极速启动。
   - title: 🖥️ 纯 Wayland 桌面
     details: 基于 Sway 平铺式窗口管理器 + Mesa 图形栈，无 X11 包袱。完整 GPU 硬件加速，流畅的 Wayland 原生体验。
