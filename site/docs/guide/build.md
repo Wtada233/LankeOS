@@ -112,7 +112,7 @@ lankebuild_package() {
 4. 执行 lankebuild_prepare()
 5. 执行 lankebuild_build()   → 安装到 STAGING_ROOT
 6. 执行 lankebuild_package()
-7. 后处理：ELP 剥离、SONAME 链接、移除 .la 文件
+7. 后处理：ELF 剥离、SONAME 链接、移除 .la 文件
 8. 打包为 .lpkg（tar.zst + metadata.json）
 ```
 
