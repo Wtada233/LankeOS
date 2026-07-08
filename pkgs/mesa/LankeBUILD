@@ -4,7 +4,7 @@ lankebuild_prepare() {
         -Db_ndebug=true \
         -Damdgpu-virtio=true \
         -Dandroid-libbacktrace=disabled \
-        -Dgallium-drivers=iris,nouveau,radeonsi,llvmpipe,zink \
+        -Dgallium-drivers=iris,nouveau,radeonsi,llvmpipe,zink,virgl \
         -Dgallium-extra-hud=true \
         -Dgallium-mediafoundation=disabled \
         -Dgallium-rusticl=true \
