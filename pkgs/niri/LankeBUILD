@@ -1,14 +1,15 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    cd "{SRC_DIR}"
+    cd $(ls -d */ | head -1)
 
     # 下载所有依赖（锁定版本）
     cargo fetch --locked --target "$(rustc --print host-tuple)"
+    patch -p1 < {WORK_DIR}/allow-software-rendering.patch
 }
 
 lankebuild_build() {
-    cd "{SRC_DIR}"
+    cd $(ls -d */ | head -1)
 
     # 嵌入构建标识（用于 niri --version）
     export NIRI_BUILD_COMMIT="{PKG_VER}"
@@ -27,7 +28,7 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    cd "{SRC_DIR}"
+    cd $(ls -d */ | head -1)
 
     # 主程序与会话脚本
     install -vDm 755 target/release/niri "{STAGING_ROOT}/usr/bin/niri"
