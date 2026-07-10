@@ -1,8 +1,46 @@
 diff --git a/src/backend/tty.rs b/src/backend/tty.rs
-index 5c8c5b13..91b0eb28 100644
+index 5368c7ec..3f4c2835 100644
 --- a/src/backend/tty.rs
 +++ b/src/backend/tty.rs
-@@ -786,17 +786,18 @@ impl Tty {
+@@ -27,7 +27,8 @@ use smithay::backend::drm::{
+     DrmDevice, DrmDeviceFd, DrmEvent, DrmEventMetadata, DrmEventTime, DrmNode, NodeType, VrrSupport,
+ };
+ use smithay::backend::egl::context::ContextPriority;
+-use smithay::backend::egl::{EGLDevice, EGLDisplay};
++use smithay::backend::egl::native::EGLSurfacelessDisplay;
++use smithay::backend::egl::{EGLContext, EGLDevice, EGLDisplay};
+ use smithay::backend::libinput::{LibinputInputBackend, LibinputSessionInterface};
+ use smithay::backend::renderer::gles::GlesRenderer;
+ use smithay::backend::renderer::multigpu::gbm::GbmGlesBackend;
+@@ -66,7 +67,7 @@ use crate::backend::OutputId;
+ use crate::frame_clock::FrameClock;
+ use crate::niri::{Niri, RedrawState, State};
+ use crate::render_helpers::debug::draw_damage;
+-use crate::render_helpers::renderer::AsGlesRenderer;
++use crate::render_helpers::renderer::{AsGlesRenderer, NiriRenderer};
+ use crate::render_helpers::{resources, shaders, RenderCtx, RenderTarget};
+ use crate::utils::{get_monotonic_time, is_laptop_panel, logical_output, PanelOrientation};
+ 
+@@ -100,6 +101,10 @@ pub struct Tty {
+     // Whether the debug tinting is enabled.
+     debug_tint: bool,
+     ipc_outputs: Arc<Mutex<IpcOutputMap>>,
++
++    /// Software fallback renderer, initialized when hardware EGL/GLES is unavailable.
++    /// Uses a surfaceless EGL context (e.g. llvmpipe/softpipe) backed by the hardware GBM device.
++    software_renderer: Option<GlesRenderer>,
+ }
+ 
+ pub type TtyRenderer<'render> = MultiRenderer<
+@@ -506,6 +511,7 @@ impl Tty {
+             update_output_config_on_resume: false,
+             debug_tint: false,
+             ipc_outputs: Arc::new(Mutex::new(HashMap::new())),
++            software_renderer: None,
+         })
+     }
+ 
+@@ -777,23 +783,24 @@ impl Tty {
              GbmDevice::new(device_fd)
          }?;
  
@@ -26,3 +64,446 @@ index 5c8c5b13..91b0eb28 100644
  
              let render_node = egl_device
                  .try_get_render_node()
+                 .ok()
+                 .flatten()
+-                .unwrap_or(node);
++                .unwrap_or(self.primary_render_node);
+             self.gpu_manager
+                 .as_mut()
+                 .add_node(render_node, gbm.clone())
+@@ -808,8 +815,16 @@ impl Tty {
+                 Some(render_node)
+             }
+             Err(err) => {
+-                debug!("failed to initialize renderer, falling back to primary gpu: {err:?}");
+-                None
++                debug!("failed to initialize renderer, trying software fallback: {err:?}");
++
++                // If the hardware GPU does not support GLES, fall back to a software renderer
++                // (EGLSurfacelessDisplay, e.g. llvmpipe/softpipe).
++                if let Err(sw_err) = self.try_software_renderer(niri) {
++                    warn!("software renderer also failed: {sw_err:?}");
++                    None
++                } else {
++                    Some(self.primary_render_node)
++                }
+             }
+         };
+ 
+@@ -817,69 +832,112 @@ impl Tty {
+             let render_node = self.primary_render_node;
+             debug!("initializing the primary renderer");
+ 
+-            let mut renderer = self
+-                .gpu_manager
+-                .single_renderer(&render_node)
+-                .context("error creating renderer")?;
+-
+-            if let Err(err) = renderer.bind_wl_display(&niri.display_handle) {
+-                // wl_drm is on its way out so this is expected on most modern distros.
+-                trace!("error binding legacy EGL to wl_display: {err}");
+-            } else {
+-                debug!("bound legacy EGL to wl_display");
+-            }
++            // Try hardware GLES first.  On GPUs whose DRM/GBM nodes exist but don't
++            // support GLES (e.g. virtio-gpu without VirGL), this will fail and we fall
++            // back to software rendering (llvmpipe/softpipe).
++            let mut is_software = self.software_renderer.is_some();
++            if !is_software {
++                match self.gpu_manager.single_renderer(&render_node) {
++                    Ok(mut renderer) => {
++                        if let Err(err) = renderer.bind_wl_display(&niri.display_handle) {
++                            trace!("error binding legacy EGL to wl_display: {err}");
++                        } else {
++                            debug!("bound legacy EGL to wl_display");
++                        }
+ 
+-            let gles_renderer = renderer.as_gles_renderer();
+-            resources::init(gles_renderer);
+-            shaders::init(gles_renderer);
++                        let gles_renderer = renderer.as_gles_renderer();
++                        resources::init(gles_renderer);
++                        shaders::init(gles_renderer);
+ 
+-            let config = self.config.borrow();
+-            if let Some(src) = config.animations.window_resize.custom_shader.as_deref() {
+-                shaders::set_custom_resize_program(gles_renderer, Some(src));
+-            }
+-            if let Some(src) = config.animations.window_close.custom_shader.as_deref() {
+-                shaders::set_custom_close_program(gles_renderer, Some(src));
+-            }
+-            if let Some(src) = config.animations.window_open.custom_shader.as_deref() {
+-                shaders::set_custom_open_program(gles_renderer, Some(src));
+-            }
+-            drop(config);
+-
+-            niri.update_shaders();
+-
+-            // Create the dmabuf global.
+-            let primary_formats = renderer.dmabuf_formats();
+-            let default_feedback =
+-                DmabufFeedbackBuilder::new(render_node.dev_id(), primary_formats.clone())
+-                    .build()
+-                    .context("error building default dmabuf feedback")?;
+-            let dmabuf_global = niri
+-                .dmabuf_state
+-                .create_global_with_default_feedback::<State>(
+-                    &niri.display_handle,
+-                    &default_feedback,
+-                );
+-            assert!(self.dmabuf_global.replace(dmabuf_global).is_none());
+-
+-            // Update the dmabuf feedbacks for all surfaces.
+-            for (node, device) in self.devices.iter_mut() {
+-                for surface in device.surfaces.values_mut() {
+-                    match surface_dmabuf_feedback(
+-                        &surface.compositor,
+-                        primary_formats.clone(),
+-                        self.primary_render_node,
+-                        device.render_node,
+-                        *node,
+-                    ) {
+-                        Ok(feedback) => {
+-                            surface.dmabuf_feedback = Some(feedback);
++                        let config = self.config.borrow();
++                        if let Some(src) = config.animations.window_resize.custom_shader.as_deref() {
++                            shaders::set_custom_resize_program(gles_renderer, Some(src));
+                         }
+-                        Err(err) => {
+-                            warn!("error building dmabuf feedback: {err:?}");
++                        if let Some(src) = config.animations.window_close.custom_shader.as_deref() {
++                            shaders::set_custom_close_program(gles_renderer, Some(src));
++                        }
++                        if let Some(src) = config.animations.window_open.custom_shader.as_deref() {
++                            shaders::set_custom_open_program(gles_renderer, Some(src));
++                        }
++                        drop(config);
++
++                        niri.update_shaders();
++
++                        // Create the dmabuf global.
++                        let primary_formats = renderer.dmabuf_formats();
++                        let default_feedback =
++                            DmabufFeedbackBuilder::new(render_node.dev_id(), primary_formats.clone())
++                                .build()
++                                .context("error building default dmabuf feedback")?;
++                        let dmabuf_global = niri
++                            .dmabuf_state
++                            .create_global_with_default_feedback::<State>(
++                                &niri.display_handle,
++                                &default_feedback,
++                            );
++                        assert!(self.dmabuf_global.replace(dmabuf_global).is_none());
++
++                        // Update the dmabuf feedbacks for all surfaces.
++                        for (node, device) in self.devices.iter_mut() {
++                            for surface in device.surfaces.values_mut() {
++                                match surface_dmabuf_feedback(
++                                    &surface.compositor,
++                                    primary_formats.clone(),
++                                    self.primary_render_node,
++                                    device.render_node,
++                                    *node,
++                                ) {
++                                    Ok(feedback) => {
++                                        surface.dmabuf_feedback = Some(feedback);
++                                    }
++                                    Err(err) => {
++                                        warn!("error building dmabuf feedback: {err:?}");
++                                    }
++                                }
++                            }
++                        }
++                    }
++                    Err(err) => {
++                        debug!("hardware renderer cannot create GLES context ({err:?})");
++                        if let Err(sw_err) = self.try_software_renderer(niri) {
++                            warn!("software renderer also failed: {sw_err:?}");
++                        } else {
++                            is_software = true;
+                         }
+                     }
+                 }
+             }
++
++            if is_software {
++                let Some(sw_renderer) = &mut self.software_renderer else {
++                    return Ok(());
++                };
++
++                if let Err(err) = sw_renderer.bind_wl_display(&niri.display_handle) {
++                    trace!("error binding legacy EGL to wl_display: {err}");
++                } else {
++                    debug!("bound legacy EGL to wl_display");
++                }
++
++                let gles_renderer = sw_renderer.as_gles_renderer();
++                resources::init(gles_renderer);
++                shaders::init(gles_renderer);
++
++                let config = self.config.borrow();
++                if let Some(src) = config.animations.window_resize.custom_shader.as_deref() {
++                    shaders::set_custom_resize_program(gles_renderer, Some(src));
++                }
++                if let Some(src) = config.animations.window_close.custom_shader.as_deref() {
++                    shaders::set_custom_close_program(gles_renderer, Some(src));
++                }
++                if let Some(src) = config.animations.window_open.custom_shader.as_deref() {
++                    shaders::set_custom_open_program(gles_renderer, Some(src));
++                }
++                drop(config);
++
++                niri.update_shaders();
++                warn!("using software rendering (llvmpipe/softpipe); dmabuf may be limited");
++            }
+         }
+ 
+         let allocator_gbm = if render_node.is_some() {
+@@ -1833,57 +1891,68 @@ impl Tty {
+         &mut self,
+         f: impl FnOnce(&mut GlesRenderer) -> T,
+     ) -> Option<T> {
+-        let mut renderer = self
++        // Fast path: hardware renderer.
++        if let Ok(mut renderer) = self
+             .gpu_manager
+             .single_renderer(&self.primary_render_node)
+-            .ok()?;
+-        Some(f(renderer.as_gles_renderer()))
+-    }
++        {
++            return Some(f(renderer.as_gles_renderer()));
++        }
+ 
+-    pub fn render(
+-        &mut self,
+-        niri: &mut Niri,
+-        output: &Output,
+-        target_presentation_time: Duration,
+-    ) -> RenderResult {
+-        let span = tracy_client::span!("Tty::render");
++        // Fallback: software renderer.
++        self.software_renderer.as_mut().map(f)
++    }
+ 
+-        let mut rv = RenderResult::Skipped;
++    fn try_software_renderer(&mut self, niri: &mut Niri) -> anyhow::Result<()> {
++        let _span = tracy_client::span!("Tty::try_software_renderer");
+ 
+-        let tty_state: &TtyOutputState = output.user_data().get().unwrap();
+-        let Some(device) = self.devices.get_mut(&tty_state.node) else {
+-            error!("missing output device");
+-            return rv;
++        let display = unsafe {
++            EGLDisplay::new(EGLSurfacelessDisplay)
++                .context("failed to create software EGL display (EGLSurfacelessDisplay)")?
+         };
+-
+-        let Some(surface) = device.surfaces.get_mut(&tty_state.crtc) else {
+-            error!("missing surface");
+-            return rv;
++        let context = EGLContext::new(&display)
++            .map_err(|_| anyhow!("failed to create EGL context for software renderer"))?;
++        let mut renderer = unsafe {
++            GlesRenderer::new(context)
++                .map_err(|_| anyhow!("failed to create GlesRenderer for software renderer"))?
+         };
+ 
+-        span.emit_text(&surface.name.connector);
++        resources::init(&mut renderer);
++        shaders::init(&mut renderer);
+ 
+-        if !device.drm.is_active() {
+-            // This branch hits any time we try to render while the user had switched to a
+-            // different VT, so don't print anything here.
+-            return rv;
++        // Try binding the legacy wl_drm display; it may or may not work.
++        if let Err(err) = renderer.bind_wl_display(&niri.display_handle) {
++            // wl_drm is on its way out, so this error is expected.
++            trace!("error binding software EGL to wl_display: {err}");
++        } else {
++            debug!("bound software EGL to wl_display");
+         }
+ 
+-        let mut renderer = match self.gpu_manager.renderer(
+-            &self.primary_render_node,
+-            &device.render_node.unwrap_or(self.primary_render_node),
+-            surface.compositor.format(),
+-        ) {
+-            Ok(renderer) => renderer,
+-            Err(err) => {
+-                warn!("error creating renderer for primary GPU: {err:?}");
+-                return rv;
+-            }
+-        };
++        self.software_renderer = Some(renderer);
++        Ok(())
++    }
++
++    /// Generic rendering loop shared by the hardware (`MultiRenderer`) and
++    /// software (`GlesRenderer`) paths.
++    #[allow(clippy::too_many_arguments)]
++    fn render_with_renderer<R>(
++        renderer: &mut R,
++        niri: &mut Niri,
++        output: &Output,
++        surface: &mut Surface,
++        config: &Config,
++        target_presentation_time: Duration,
++    ) -> RenderResult
++    where
++        R: NiriRenderer,
++        crate::niri::OutputRenderElements<R>: smithay::backend::renderer::element::RenderElement<R>,
++    {
++        let _span = tracy_client::span!("Tty::render_frame");
++        let mut rv = RenderResult::Skipped;
+ 
+         // Render the elements.
+         let ctx = RenderCtx {
+-            renderer: &mut renderer,
++            renderer,
+             target: RenderTarget::Output,
+             xray: None,
+         };
+@@ -1898,7 +1967,7 @@ impl Tty {
+         // Overlay planes are disabled by default as they cause weird performance issues on my
+         // system.
+         let flags = {
+-            let debug = &self.config.borrow().debug;
++            let debug = &config.debug;
+ 
+             let primary_scanout_flag = if debug.restrict_primary_scanout_to_matching_format {
+                 FrameFlags::ALLOW_PRIMARY_PLANE_SCANOUT
+@@ -1929,14 +1998,10 @@ impl Tty {
+ 
+         // Hand them over to the DRM.
+         let drm_compositor = &mut surface.compositor;
+-        match drm_compositor.render_frame::<_, _>(&mut renderer, &elements, [0.; 4], flags) {
++        match drm_compositor.render_frame::<_, _>(&mut *renderer, &elements, [0.; 4], flags) {
+             Ok(res) => {
+                 let needs_sync = res.needs_sync()
+-                    || self
+-                        .config
+-                        .borrow()
+-                        .debug
+-                        .wait_for_frame_completion_before_queueing;
++                    || config.debug.wait_for_frame_completion_before_queueing;
+                 if needs_sync {
+                     if let PrimaryPlaneElement::Swapchain(element) = res.primary_element {
+                         let _span = tracy_client::span!("wait for completion");
+@@ -2003,6 +2068,74 @@ impl Tty {
+         rv
+     }
+ 
++    pub fn render(
++        &mut self,
++        niri: &mut Niri,
++        output: &Output,
++        target_presentation_time: Duration,
++    ) -> RenderResult {
++        let span = tracy_client::span!("Tty::render");
++
++        let tty_state: &TtyOutputState = output.user_data().get().unwrap();
++        let Some(device) = self.devices.get_mut(&tty_state.node) else {
++            error!("missing output device");
++            return RenderResult::Skipped;
++        };
++
++        let Some(surface) = device.surfaces.get_mut(&tty_state.crtc) else {
++            error!("missing surface");
++            return RenderResult::Skipped;
++        };
++
++        span.emit_text(&surface.name.connector);
++
++        if !device.drm.is_active() {
++            // This branch hits any time we try to render while the user had switched to a
++            // different VT, so don't print anything here.
++            return RenderResult::Skipped;
++        }
++
++        // Try hardware renderer first – fast path for real GPUs.
++        match self.gpu_manager.renderer(
++            &self.primary_render_node,
++            &device.render_node.unwrap_or(self.primary_render_node),
++            surface.compositor.format(),
++        ) {
++            Ok(mut renderer) => {
++                let config = self.config.borrow();
++                return Self::render_with_renderer(
++                    &mut renderer,
++                    niri,
++                    output,
++                    surface,
++                    &config,
++                    target_presentation_time,
++                );
++            }
++            Err(err) => {
++                trace!("hardware renderer unavailable, trying software fallback: {err:?}");
++            }
++        }
++
++        // Software fallback — the software renderer should have been set up in
++        // device_added() when the hardware EGL/GLES init succeeded but the
++        // actual GLES context creation failed.
++        let Some(sw_renderer) = &mut self.software_renderer else {
++            error!("no renderer available; try running with Mesa's software rasterizer installed");
++            return RenderResult::Skipped;
++        };
++
++        let config = self.config.borrow();
++        Self::render_with_renderer(
++            sw_renderer,
++            niri,
++            output,
++            surface,
++            &config,
++            target_presentation_time,
++        )
++    }
++
+     pub fn change_vt(&mut self, vt: i32) {
+         if let Err(err) = self.session.change_vt(vt) {
+             warn!("error changing VT: {err}");
+@@ -2031,23 +2164,25 @@ impl Tty {
+     }
+ 
+     pub fn import_dmabuf(&mut self, dmabuf: &Dmabuf) -> bool {
+-        let mut renderer = match self.gpu_manager.single_renderer(&self.primary_render_node) {
+-            Ok(renderer) => renderer,
+-            Err(err) => {
+-                debug!("error creating renderer for primary GPU: {err:?}");
+-                return false;
++        // Fast path: hardware renderer.
++        if let Ok(mut renderer) = self.gpu_manager.single_renderer(&self.primary_render_node) {
++            match renderer.import_dmabuf(dmabuf, None) {
++                Ok(_texture) => {
++                    dmabuf.set_node(Some(self.primary_render_node));
++                    return true;
++                }
++                Err(err) => {
++                    debug!("error importing dmabuf: {err:?}");
++                    return false;
++                }
+             }
+-        };
++        }
+ 
+-        match renderer.import_dmabuf(dmabuf, None) {
+-            Ok(_texture) => {
+-                dmabuf.set_node(Some(self.primary_render_node));
+-                true
+-            }
+-            Err(err) => {
+-                debug!("error importing dmabuf: {err:?}");
+-                false
+-            }
++        // Fallback: software renderer (may or may not support dma-buf import).
++        if let Some(sw) = &mut self.software_renderer {
++            sw.import_dmabuf(dmabuf, None).is_ok()
++        } else {
++            false
+         }
+     }
+ 
