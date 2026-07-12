@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
 #include <sys/mount.h>
-#include "../main/src/pkg/package_manager.hpp"
-#include "../main/src/archive/packer.hpp"
-#include "../main/src/config/config.hpp"
-#include "../main/src/base/utils.hpp"
-#include "../main/src/i18n/localization.hpp"
-#include "../main/src/base/constants.hpp"
+#include "../../main/src/pkg/package_manager.hpp"
+#include "../../main/src/archive/packer.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/base/utils.hpp"
+#include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/base/constants.hpp"
 #include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>

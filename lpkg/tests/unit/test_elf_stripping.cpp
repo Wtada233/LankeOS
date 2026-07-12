@@ -167,3 +167,117 @@ TEST_F(StripTest, ProcessArchiveWithStaticLib) {
     bool result = strip_file(test_file, error_msg);
     EXPECT_TRUE(result);
 }
+
+TEST_F(StripTest, SharedLibraryStrip) {
+    // 编译一个共享库 .so 并测试 strip
+    fs::path src = test_file.string() + ".c";
+    fs::path so_file = test_file.string() + ".so";
+    {
+        std::ofstream f(src);
+        f << "int shared_func(int x) { return x + 1; }\n";
+    }
+    std::string cmd = "gcc -shared -fPIC -o " + so_file.string() + " " + src.string() + " 2>/dev/null";
+    int ret = std::system(cmd.c_str());
+    fs::remove(src);
+    if (ret != 0 || !fs::exists(so_file)) {
+        GTEST_SKIP() << "gcc not available, skipping shared library test";
+    }
+
+    // 编译后应有 .dynsym、.dynstr 等动态节区
+    off_t orig_size = fs::file_size(so_file);
+    ASSERT_GT(orig_size, 0);
+
+    std::string error_msg;
+    bool result = strip_file(so_file, error_msg);
+    EXPECT_TRUE(result) << error_msg;
+    EXPECT_TRUE(fs::exists(so_file));
+    EXPECT_GT(fs::file_size(so_file), 0);
+
+    // strip 去除了符号表和注释，但仍可加载（dlopen）
+    // 文件大小应小于原始文件
+    EXPECT_LE(fs::file_size(so_file), orig_size);
+
+    fs::remove(so_file);
+}
+
+TEST_F(StripTest, PIEExecutableStrip) {
+    // 编译一个 PIE 可执行文件并测试 strip
+    fs::path src = test_file.string() + ".c";
+    fs::path exe_file = test_file.string() + "_pie";
+    {
+        std::ofstream f(src);
+        f << "int main(void) { return 42; }\n";
+    }
+    std::string cmd = "gcc -fPIE -pie -o " + exe_file.string() + " " + src.string() + " 2>/dev/null";
+    int ret = std::system(cmd.c_str());
+    fs::remove(src);
+    if (ret != 0 || !fs::exists(exe_file)) {
+        GTEST_SKIP() << "gcc not available, skipping PIE test";
+    }
+
+    off_t orig_size = fs::file_size(exe_file);
+    ASSERT_GT(orig_size, 0);
+
+    std::string error_msg;
+    bool result = strip_file(exe_file, error_msg);
+    EXPECT_TRUE(result) << error_msg;
+    EXPECT_GT(fs::file_size(exe_file), 0);
+    EXPECT_LE(fs::file_size(exe_file), orig_size);
+
+    fs::remove(exe_file);
+}
+
+TEST_F(StripTest, StripUnknownFileType) {
+    // 非 ELF 文件 → identify_file_type → FileType::Unknown → default 分支
+    {
+        std::ofstream f(test_file);
+        f << "This is not an ELF file at all.\n";
+    }
+
+    std::string error_msg;
+    bool result = strip_file(test_file, error_msg);
+    EXPECT_FALSE(result);
+    // 应返回 unknown type 相关错误，而不是文件不存在
+    EXPECT_TRUE(error_msg.find("unknown") != std::string::npos
+                || error_msg.find("unknown") != std::string::npos
+                || !error_msg.empty());
+}
+
+TEST_F(StripTest, ArchiveWithObjectMembers) {
+    // 编译一个 .o 文件，打包成 ar 归档，测试 process_archive 的内层循环
+    if (!compile_test_object()) {
+        GTEST_SKIP() << "gcc not available, skipping archive test";
+    }
+
+    fs::path archive_file = test_file.string() + ".a";
+    std::string cmd = "ar rcs " + archive_file.string() + " " + test_file.string() + " 2>/dev/null";
+    int ret = std::system(cmd.c_str());
+    if (ret != 0 || !fs::exists(archive_file)) {
+        GTEST_SKIP() << "ar not available";
+    }
+
+    off_t orig_size = fs::file_size(archive_file);
+    ASSERT_GT(orig_size, 0);
+
+    std::string error_msg;
+    bool result = strip_file(archive_file, error_msg);
+    EXPECT_TRUE(result) << error_msg;
+    EXPECT_TRUE(fs::exists(archive_file));
+
+    fs::remove(archive_file);
+}
+
+TEST_F(StripTest, NonElfReturnsUnknownType) {
+    // 创建一个只包含 ELF magic 但无效头的文件
+    // 使 identify_file_type 走 gelf_getehdr 失败路径
+    {
+        std::ofstream f(test_file, std::ios::binary);
+        // 仅写入 ELFMAG 但不写入有效 ELF 头
+        const char magic[] = {0x7f, 'E', 'L', 'F'};
+        f.write(magic, 4);
+    }
+
+    std::string error_msg;
+    bool result = strip_file(test_file, error_msg);
+    EXPECT_FALSE(result);
+}

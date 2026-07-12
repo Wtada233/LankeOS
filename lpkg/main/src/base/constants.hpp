@@ -18,6 +18,7 @@ namespace constants {
     // 包元数据 JSON 键名
     inline constexpr std::string_view J_NAME = "name";
     inline constexpr std::string_view J_VERSION = "version";
+    inline constexpr std::string_view J_RELEASE = "release";
     inline constexpr std::string_view J_MAN = "man";
     inline constexpr std::string_view J_DEPS = "deps";
     inline constexpr std::string_view J_PROVIDES = "provides";
