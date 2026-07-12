@@ -4,6 +4,7 @@
 #include <vector>
 #include <set>
 #include <map>
+#include <functional>
 #include <unordered_set>
 #include <filesystem>
 
@@ -80,23 +81,34 @@ private:
     std::vector<std::string> needed_so_;
     std::string man_content_;
 
-    std::vector<std::pair<std::filesystem::path, std::filesystem::path>> backups_;
-    std::vector<std::filesystem::path> installed_files_;
-    std::set<std::filesystem::path> created_dirs_;
-
     void prepare(InstallContext* ctx = nullptr);
     void ensure_dependencies_satisfied(InstallContext& ctx);
     void check_for_file_conflicts();
-    void commit();
+    void backup_existing_files();
+    void rollback();
+    void cleanup_backups();
+    void commit_without_file_ops();
     void register_package();
     void run_post_install_hook();
-    void rollback_files();
+
+public:
+    // 测试钩子（非生产用途）：在 copy_package_files 每个文件复制前调用
+    std::function<void()> on_before_file_copy;
+
+private:
 
     std::vector<DependencyInfo> parse_deps() const;
+
+    // 事务状态
+    std::vector<std::pair<std::filesystem::path, std::filesystem::path>> backups_;
+    std::vector<std::filesystem::path> new_files_;
 };
 
 /// 公共 API：安装包
 void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file = "", bool force_reinstall = false);
+
+/// 从事务日志和残留备份中恢复中断的事务
+void recover_packages();
 
 /// 内部递归引擎
 void install_packages_internal(InstallContext& ctx);

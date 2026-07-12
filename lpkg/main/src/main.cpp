@@ -41,20 +41,12 @@ std::atomic<bool> sigint_graceful{false};
 static std::atomic<bool> sigint_force{false};
 
 extern "C" void sigint_handler(int) {
-    if (sigint_graceful.exchange(true)) {
-        static const char msg[] = "\nSIGINT: force abort (system may be inconsistent)\n";
-        write(STDERR_FILENO, msg, sizeof(msg) - 1);
-        _Exit(130);
-    }
+    // 第一次 Ctrl+C 设置优雅退出标志，后续忽略
+    // 不设超时，不回退到 SIG_DFL，不 _Exit ——
+    // 必须确保当前事务（含回滚）完整执行完毕，不留下半残系统。
+    sigint_graceful.store(true);
     static const char msg[] = "\nSIGINT: graceful shutdown after current operation...\n";
     write(STDERR_FILENO, msg, sizeof(msg) - 1);
-    // 恢复默认行为，第二次 Ctrl+C 直接杀死
-    std::signal(SIGINT, SIG_DFL);
-    // 2 秒后超时强制退出（防止事务挂起）
-    std::thread([]{
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-        if (sigint_graceful.load()) _Exit(130);
-    }).detach();
 }
 
 /** RAII：安装/移除等事务中安装 SIGINT 防护 */
@@ -227,6 +219,9 @@ static int handle_command(const std::string& command,
             if (auto v = result["packages"].as<std::vector<std::string>>(); !v.empty())
                 r = v[0];
         scan_orphans(r);
+
+    } else if (command == constants::CMD_REC) {
+        recover_packages();
 
     } else {
         usage();

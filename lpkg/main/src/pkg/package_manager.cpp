@@ -247,21 +247,11 @@ void install_packages(const std::vector<std::string>& pkg_args,
     //   1. 下载包 → 读取真实 metadata.json（验证仓库索引的 deps/provides）
     //   2. 若元数据与索引不匹配 → 更新仓库信息 → 回滚已安装包 → 重解析依赖 → 从头重试
     //   3. 匹配 → 执行 InstallationTask::run()（解压 → 依赖检查 → 冲突检测 → 写文件）
-    // 任何安装异常触发部分回滚：逆序移除已成功安装的包
+    // 安装循环。无原子回滚——如果安装中断，部分文件可能已复制到系统但缓存未更新。
+    // 重新运行 lpkg install 即可恢复（重复安装会跳过已成功完成的部分）。
     ctx.successfully_installed.clear();
     ctx.installed_set.clear();
-    try {
-        install_packages_internal(ctx);
-    } catch (const std::exception& e) {
-        log_error(get_string("error.installation_failed_rolling_back"));
-        for (const auto& name : ctx.successfully_installed | std::views::reverse) {
-            try { remove_package(name, true); } catch (const std::exception& e) {
-                log_warning(string_format("warning.rollback_remove_failed", name, e.what()));
-            }
-        }
-        Cache::instance().write();
-        throw;
-    }
+    install_packages_internal(ctx);
 
     Cache::instance().write();
     TriggerManager::instance().run_all();
@@ -335,20 +325,11 @@ void install_packages_internal(InstallContext& ctx) {
             }
 
             if (metadata_differs) {
-                // 元数据不匹配时：回滚已安装的包，更新仓库信息，重新解析依赖
+                // 元数据不匹配时：更新仓库信息，重新解析依赖
                 log_info(string_format("info.resolving_metadata", p.name));
                 ctx.repo.update_package_info(p.name, p.actual_version,
                     actual_deps, actual_provides, actual_needed_so);
                 ctx.local_candidates[p.name] = check_task.archive_path();
-
-                // 回滚当前事务中已安装的包
-                for (const auto& done_name : ctx.successfully_installed | std::views::reverse) {
-                    try { remove_package(done_name, true); } catch (const std::exception& e) {
-                        log_warning(string_format("warning.rollback_remove_failed", done_name, e.what()));
-                    }
-                }
-                ctx.successfully_installed.clear();
-                ctx.installed_set.clear();
 
                 ctx.plan.clear();
                 ctx.install_order.clear();
