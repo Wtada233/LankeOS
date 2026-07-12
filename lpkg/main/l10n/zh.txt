@@ -224,3 +224,11 @@ warning.reinstall_metadata_read_failed=从 {} 读取元数据失败: {}
 warning.query_path_resolve_failed=查询路径解析失败: {}
 warning.dep_scan_metadata_parse_failed=解析 {} 的元数据失败: {}
 warning.scan_file_error=扫描期间访问 {} 出错: {}
+warning.recover_pending_txn=检测到未完成的事务: {}（使用 'lpkg rec' 恢复）
+warning.recover_rename_failed=恢复备份 {} → {} 失败: {}
+
+info.recover_start=正在从中断的事务中恢复...
+info.recover_restored=已恢复 {} → {}
+info.recover_removed_stale_bak=已删除残留备份: {}
+info.recover_cleaned_tmp=已删除临时文件: {}
+info.recover_done=恢复完成。{} 个文件已恢复，{} 个临时文件已清理。

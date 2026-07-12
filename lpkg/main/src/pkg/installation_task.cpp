@@ -10,8 +10,10 @@
 #include "base/utils.hpp"
 #include "vercmp/version.hpp"
 #include "base/constants.hpp"
+#include "transaction_log.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -39,8 +41,12 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version, bo
       force_reinstall_(force_reinstall) {}
 
 /**
- * 执行完整的安装流程：下载验证 -> 解压提取 -> 依赖检查 -> 文件冲突检测 -> 复制文件 -> 注册包 -> 运行钩子
- * 安装过程中的任何异常都会触发回滚操作，清理已安装的文件
+ * 执行原子化安装流程：
+ *   预检 → 备份 → 复制 → 注册（最后一步）→ 清理备份
+ *
+ * 事务保证：复制中任意文件失败 → 全量回滚到安装前状态。
+ * 冲突保证：不加 --force-overwrite 不覆盖任何已存在文件（不论是否被包管理）。
+ * 回滚保证：回滚恢复所有 .lpkgbak 备份 + 删除本次新建的文件。
  */
 void InstallationTask::run(InstallContext* ctx) {
     const std::string current_installed_version = Cache::instance().get_installed_version(pkg_name_);
@@ -52,13 +58,30 @@ void InstallationTask::run(InstallContext* ctx) {
     log_info(string_format("info.installing_package", pkg_name_, version_));
     ensure_dir_exists(tmp_pkg_dir_);
 
+    // 第一阶段：预检——不碰文件，只做检查
+    prepare(ctx);
+
+    // 第二阶段：备份 + 复制——任一失败则全量回滚
+    TransactionLog log;
+    log.begin(pkg_name_, actual_version_);
     try {
-        prepare(ctx);
-        commit();
-    } catch (const std::exception& e) {
-        rollback_files();
+        backup_existing_files();
+        copy_package_files();
+    } catch (...) {
+        log.rollback(pkg_name_, actual_version_);
+        rollback();
+        log.end(pkg_name_, actual_version_);
         throw;
     }
+
+    // 第四阶段：注册——数据库修改是最后一步
+    commit_without_file_ops();
+    log.commit(pkg_name_, actual_version_);
+
+    // 清理备份
+    cleanup_backups();
+    log.end(pkg_name_, actual_version_);
+
     log_info(string_format("info.package_installed_successfully", pkg_name_));
 }
 
@@ -73,81 +96,49 @@ void InstallationTask::prepare(InstallContext* ctx) {
 }
 
 /**
- * 回滚机制：安装失败时清理已安装的文件
- * 按逆序执行：删除已复制的新文件 -> 恢复备份的旧文件 -> 删除新建的空目录
+ * 提交安装（无文件操作部分）：注册包 -> 移除旧版废弃文件 -> 运行 post-install 钩子
  */
-void InstallationTask::rollback_files() {
-    log_error(string_format("error.rollback_install", pkg_name_));
-    for (const auto& file : installed_files_) {
-        if (fs::exists(file) || fs::is_symlink(file)) {
-            std::error_code ec;
-            fs::remove_all(file, ec);
-        }
-    }
-    for (const auto& [physical, backup] : backups_) {
-        if (fs::exists(backup)) {
-            std::error_code ec;
-            fs::rename(backup, physical, ec);
-        }
-    }
-    for (const auto& dir : created_dirs_ | std::views::reverse) {
-        if (fs::exists(dir) && fs::is_directory(dir) && fs::is_empty(dir)) {
-            std::error_code ec;
-            fs::remove(dir, ec);
-        }
-    }
-}
-
-/**
- * 提交安装：复制文件 -> 注册包 -> 移除旧版本遗留的过时文件 -> 清理备份 -> 运行 post-install 钩子
- */
-void InstallationTask::commit() {
+void InstallationTask::commit_without_file_ops() {
     std::unordered_set<std::string> old_files;
     if (!old_version_to_replace_.empty()) {
         old_files = Cache::instance().get_package_files(pkg_name_);
     }
 
-    copy_package_files();
+    register_package();
 
-    {
-        register_package();
+    // 移除新版本中不再包含的旧文件（但不处理 /etc 下的配置文件）
+    if (!old_files.empty()) {
+        const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
+        auto new_files = detail::scan_content_files(content_dir);
+        std::unordered_set<std::string> new_set;
+        for (const auto& f : new_files) new_set.insert((fs::path("/") / f).string());
 
-        // 移除新版本中不再包含的旧文件（但不处理 /etc 下的配置文件）
-        if (!old_files.empty()) {
-            const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
-            auto new_files = detail::scan_content_files(content_dir);
-            std::unordered_set<std::string> new_set;
-            for (const auto& f : new_files) new_set.insert((fs::path("/") / f).string());
-
-            auto& cache = Cache::instance();
-            for (const auto& old_file : old_files) {
-                if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) {
-                    // 配置文件：只清理所有权记录，不删除物理文件（保护用户配置）
-                    if (!new_set.contains(old_file))
-                        cache.remove_file_owner(old_file, pkg_name_);
-                    continue;
-                }
-                if (!new_set.contains(old_file)) {
-                    auto owners = cache.get_file_owners(old_file);
-                    if (owners.contains(pkg_name_)) {
-                        cache.remove_file_owner(old_file, pkg_name_);
-                        if (cache.get_file_owners(old_file).empty()) {
-                            const fs::path phys = (fs::path(old_file).is_absolute())
-                                ? Config::instance().root_dir() / fs::path(old_file).relative_path()
-                                : Config::instance().root_dir() / old_file;
-                            if (fs::exists(phys) || fs::is_symlink(phys)) {
-                                if (fs::is_directory(phys)) {
-                                    // 目录：仅当为空时才删除，否则可能包含新包的文件
-                                    std::error_code ec;
-                                    if (fs::is_empty(phys, ec)) {
-                                        log_info(string_format("info.removing_obsolete_file", old_file));
-                                        fs::remove(phys, ec);
-                                    }
-                                    continue;
+        auto& cache = Cache::instance();
+        for (const auto& old_file : old_files) {
+            if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) {
+                if (!new_set.contains(old_file))
+                    cache.remove_file_owner(old_file, pkg_name_);
+                continue;
+            }
+            if (!new_set.contains(old_file)) {
+                auto owners = cache.get_file_owners(old_file);
+                if (owners.contains(pkg_name_)) {
+                    cache.remove_file_owner(old_file, pkg_name_);
+                    if (cache.get_file_owners(old_file).empty()) {
+                        const fs::path phys = (fs::path(old_file).is_absolute())
+                            ? Config::instance().root_dir() / fs::path(old_file).relative_path()
+                            : Config::instance().root_dir() / old_file;
+                        if (fs::exists(phys) || fs::is_symlink(phys)) {
+                            if (fs::is_directory(phys)) {
+                                std::error_code ec;
+                                if (fs::is_empty(phys, ec)) {
+                                    log_info(string_format("info.removing_obsolete_file", old_file));
+                                    fs::remove(phys, ec);
                                 }
-                                log_info(string_format("info.removing_obsolete_file", old_file));
-                                fs::remove(phys);
+                                continue;
                             }
+                            log_info(string_format("info.removing_obsolete_file", old_file));
+                            fs::remove(phys);
                         }
                     }
                 }
@@ -155,13 +146,90 @@ void InstallationTask::commit() {
         }
     }
 
-    // 清理备份文件
-    for (const auto& [physical, backup] : backups_) {
+    run_post_install_hook();
+}
+
+/** 备份所有将被覆盖的文件为 .lpkgbak */
+void InstallationTask::backup_existing_files() {
+    const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
+    auto files = detail::scan_content_files(content_dir);
+
+    for (const auto& f : files) {
+        // SIGINT 时立即中止，避免备份后 rollback 恢复
+        extern std::atomic<bool> sigint_graceful;
+        if (sigint_graceful.load())
+            throw LpkgException(get_string("info.sigint_aborted"));
+
+        fs::path rel_f = f;
+        if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
+        const fs::path physical_path = Config::instance().root_dir() / rel_f;
+        const fs::path phys_dir = physical_path.parent_path();
+
+        // 确保目标父目录存在
+        std::error_code ec;
+        fs::create_directories(phys_dir, ec);
+
+        // 配置文件跳过备份（复制阶段使用 .lpkg-new 后缀处理）
+        const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
+        if (is_config) continue;
+
+        if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
+            if (!fs::is_directory(physical_path)) {
+                // 只有普通文件和符号链接需要备份（目录被多包共享，不备份）
+                fs::path bak = physical_path;
+                bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
+                fs::rename(physical_path, bak);
+                backups_.emplace_back(physical_path, bak);
+                // 写事务日志
+                TransactionLog::log_raw("BACKUP " + physical_path.string() + " → " + bak.string());
+            }
+        } else {
+            // 记录新文件（不存在于磁盘上），回滚时需要删除
+            new_files_.push_back(physical_path);
+            TransactionLog::log_raw("NEW " + physical_path.string());
+        }
+    }
+}
+
+/** 全量回滚：恢复备份 + 删除新文件 + 清理临时文件 */
+void InstallationTask::rollback() {
+    log_error(string_format("error.rollback_install", pkg_name_));
+
+    // 清理可能残留的 .lpkgtmp 临时文件（来自原子写入）
+    std::error_code ec_tmp;
+    for (auto& entry : fs::recursive_directory_iterator(Config::instance().root_dir() / "usr", ec_tmp)) {
+        if (entry.path().extension() == ".lpkgtmp")
+            fs::remove(entry.path(), ec_tmp);
+    }
+
+    // 删除新创建的文件
+    for (const auto& f : new_files_ | std::views::reverse) {
+        if (fs::exists(f) || fs::is_symlink(f)) {
+            std::error_code ec;
+            fs::remove(f, ec);
+            TransactionLog::log_raw("ROLLBACK_DEL " + f.string());
+        }
+    }
+    new_files_.clear();
+
+    // 恢复备份（用 fs::is_symlink 处理悬空软链接——备份阶段目标文件被重命名后原软链接变成悬空）
+    for (const auto& [original, backup] : backups_ | std::views::reverse) {
+        if (fs::exists(backup) || fs::is_symlink(backup)) {
+            fs::rename(backup, original);
+            TransactionLog::log_raw("RESTORE " + backup.string() + " → " + original.string());
+        }
+    }
+    backups_.clear();
+}
+
+/** 安装成功后清理备份文件 */
+void InstallationTask::cleanup_backups() {
+    for (const auto& [original, backup] : backups_) {
         std::error_code ec;
         fs::remove(backup, ec);
     }
     backups_.clear();
-    run_post_install_hook();
+    new_files_.clear();
 }
 
 /**
@@ -228,6 +296,7 @@ void InstallationTask::extract_and_validate_package() {
  * 支持通过 providers 查找虚拟包提供者
  */
 void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx) {
+    if (Config::instance().no_deps_mode()) return;
     auto actual_deps = detail::parse_dep_strings(deps_);
     if (actual_deps.empty()) return;
 
@@ -417,6 +486,14 @@ void InstallationTask::copy_package_files() {
     auto files = detail::scan_content_files(content_dir);
 
     for (const auto& f : files) {
+        // 测试钩子：在复制前调用（用于精确触发中断场景）
+        if (on_before_file_copy) on_before_file_copy();
+
+        // SIGINT 时立即中止复制，避免文件处于不一致状态
+        extern std::atomic<bool> sigint_graceful;
+        if (sigint_graceful.load())
+            throw LpkgException(get_string("info.sigint_aborted"));
+
         fs::path rel_f = f;
         if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
         const fs::path src_path = content_dir / f;
@@ -434,7 +511,6 @@ void InstallationTask::copy_package_files() {
         }
         for (const auto& d : to_create | std::views::reverse) {
             ensure_dir_exists(d);
-            created_dirs_.insert(d);
         }
 
         if (fs::is_symlink(src_path)) {
@@ -456,7 +532,6 @@ void InstallationTask::copy_package_files() {
             if (lstat(src_path.c_str(), &st) == 0) {
                 (void)lchown(dest.c_str(), st.st_uid, st.st_gid);
             }
-            installed_files_.push_back(dest);
             TriggerManager::instance().check_file((fs::path("/") / f).string());
             continue;
         }
@@ -496,29 +571,29 @@ void InstallationTask::copy_package_files() {
                 if (fs::exists(final_dest) || fs::is_symlink(final_dest)) fs::remove(final_dest);
                 log_warning(string_format("warning.config_conflict", physical_path.string(), final_dest.string()));
                 has_config_conflicts_ = true;
-            } else if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
-                // 替换已存在文件前先创建备份
-                if (!fs::is_directory(physical_path)) {
-                    fs::path bak = physical_path;
-                    bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
-                    fs::rename(physical_path, bak);
-                    backups_.emplace_back(physical_path, bak);
+                // 配置文件的 .lpkg-new 不需要原子写入，因为不会覆盖现有文件
+                fs::copy(src_path, final_dest,
+                         fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+            } else {
+                // 原子写入：先复制到临时路径，再 rename 到最终位置
+                // rename 在同文件系统内是原子的，避免出现中间态文件
+                fs::path tmp_path = final_dest;
+                tmp_path += ".lpkgtmp";
+                fs::copy(src_path, tmp_path,
+                         fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+
+                // 保留原始文件权限和所有者（在 tmp 文件上操作）
+                struct stat st;
+                if (lstat(src_path.c_str(), &st) == 0) {
+                    (void)lchown(tmp_path.c_str(), st.st_uid, st.st_gid);
+                    if (!S_ISLNK(st.st_mode)) {
+                        (void)chmod(tmp_path.c_str(), st.st_mode & 07777);
+                    }
                 }
+                fs::rename(tmp_path, final_dest);
+                TransactionLog::log_raw("COPY " + tmp_path.string() + " → " + final_dest.string());
             }
 
-            fs::copy(src_path, final_dest,
-                     fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-
-            // 保留原始文件权限和所有者
-            struct stat st;
-            if (lstat(src_path.c_str(), &st) == 0) {
-                (void)lchown(final_dest.c_str(), st.st_uid, st.st_gid);
-                if (!S_ISLNK(st.st_mode)) {
-                    (void)chmod(final_dest.c_str(), st.st_mode & 07777);
-                }
-            }
-
-            installed_files_.push_back(final_dest);
             TriggerManager::instance().check_file((fs::path("/") / f).string());
         } catch (const std::exception& e) {
             throw LpkgException(string_format("error.copy_failed_rollback", f, physical_path.string(), e.what()));

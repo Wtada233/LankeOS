@@ -224,3 +224,11 @@ warning.reinstall_metadata_read_failed=Failed to read metadata from {}: {}
 warning.query_path_resolve_failed=Failed to resolve path for query: {}
 warning.dep_scan_metadata_parse_failed=Failed to parse metadata for {}: {}
 warning.scan_file_error=Error accessing {} during scan: {}
+warning.recover_pending_txn=Incomplete transaction detected: {} (use 'lpkg rec' to recover)
+warning.recover_rename_failed=Failed to restore {} → {}: {}
+
+info.recover_start=Recovering from interrupted transaction...
+info.recover_restored=Restored {} → {}
+info.recover_removed_stale_bak=Removed stale backup: {}
+info.recover_cleaned_tmp=Removed temporary file: {}
+info.recover_done=Recovery complete. {} files restored, {} temp files cleaned.

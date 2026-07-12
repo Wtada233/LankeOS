@@ -61,9 +61,10 @@ if os.geteuid() != 0 and not os.environ.get('LPKG_DEP_GEN_NO_SUDO'):
 try:
     from elftools.elf.elffile import ELFFile
     from elftools.elf.dynamic import DynamicSection
-    HAVE_PYELFFTOOLS = True
 except ImportError:
-    HAVE_PYELFFTOOLS = False
+    print("[!] 错误: 需要 pyelftools 但未安装。", file=sys.stderr)
+    print("    请运行: pip install pyelftools", file=sys.stderr)
+    sys.exit(1)
 
 # ---------------------------------------------------------------------------
 # 基础工具函数
@@ -83,44 +84,24 @@ def parse_elf_dynamic(path):
     """
     解析 ELF .dynamic 段，一次性返回 (sonames, needed)。
 
-    优先使用 pyelftools（无子进程）；回退到 readelf 子进程。
+    使用 pyelftools 解析，无子进程开销。
     """
     sonames = []
     needed = []
 
-    if HAVE_PYELFFTOOLS:
-        try:
-            with open(path, 'rb') as f:
-                elf = ELFFile(f)
-                for sec in elf.iter_sections():
-                    if isinstance(sec, DynamicSection):
-                        for tag in sec.iter_tags():
-                            if tag.entry.d_tag == 'DT_NEEDED':
-                                needed.append(tag.needed)
-                            elif tag.entry.d_tag == 'DT_SONAME':
-                                sonames.append(tag.soname)
-            return sonames, needed
-        except Exception:
-            return [], []
-
     try:
-        res = subprocess.run(
-            ['readelf', '-d', path],
-            capture_output=True, text=True, timeout=10,
-        )
-        if res.returncode != 0:
-            return [], []
-        for line in res.stdout.splitlines():
-            m = re.search(r'\(NEEDED\)\s+\[(.*?)\]', line)
-            if m:
-                needed.append(m.group(1))
-            m = re.search(r'\(SONAME\)\s+\[(.*?)\]', line)
-            if m:
-                sonames.append(m.group(1))
-    except (subprocess.TimeoutExpired, OSError):
-        pass
-
-    return sonames, needed
+        with open(path, 'rb') as f:
+            elf = ELFFile(f)
+            for sec in elf.iter_sections():
+                if isinstance(sec, DynamicSection):
+                    for tag in sec.iter_tags():
+                        if tag.entry.d_tag == 'DT_NEEDED':
+                            needed.append(tag.needed)
+                        elif tag.entry.d_tag == 'DT_SONAME':
+                            sonames.append(tag.soname)
+        return sonames, needed
+    except Exception:
+        return [], []
 
 
 def extract_package_major(version_str):
@@ -376,7 +357,6 @@ def main():
     if args.dry_run:
         print('[*] DRY RUN — no files will be modified')
     print(f'[*] Workers: {args.jobs}  '
-          f'pyelftools: {"yes" if HAVE_PYELFFTOOLS else "no (fallback readelf)"}  '
           f'file(1): {"off" if args.no_file_detection else "on"}')
 
     # ==================================================================
