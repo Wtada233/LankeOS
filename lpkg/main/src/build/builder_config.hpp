@@ -15,6 +15,7 @@ struct BuildConfig {
     bool no_strip = false;                ///< 是否禁用 strip
     std::vector<std::string> deps;        ///< 构建依赖
     std::vector<std::string> provides;    ///< 提供的虚拟包
+    std::vector<std::string> needed_so;   ///< 运行时 SO 依赖
     std::string man_content;              ///< 帮助文档内容
 };
 

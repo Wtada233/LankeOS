@@ -37,6 +37,7 @@ nlohmann::json read_archive_metadata(const std::filesystem::path& archive_path);
 /// 从已解压的包目录中读取 metadata.json
 void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::string& version,
                            std::vector<std::string>& deps, std::vector<std::string>& provides,
+                           std::vector<std::string>& needed_so,
                            std::string& man);
 
 /// 扫描 content/ 目录，返回相对路径列表

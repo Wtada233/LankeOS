@@ -47,13 +47,13 @@ protected:
                           std::vector<std::pair<std::string, std::string>> files = {}) {
         fs::path work_dir = test_root / ("work_" + name);
         fs::remove_all(work_dir);
-        fs::create_directories(work_dir / "root");
+        fs::create_directories(work_dir / "content");
         
         std::vector<std::string> deps_list;
         for (const auto& d : deps) deps_list.push_back(d.first + " " + d.second);
 
         for (auto const& file : files) {
-            fs::path src = work_dir / "root" / file.first;
+            fs::path src = work_dir / "content" / file.first;
             ensure_dir_exists(src.parent_path());
             std::ofstream out(src);
             out << "content of " << file.first;
@@ -119,9 +119,9 @@ TEST_F(RealWorldScenarioTest, ReinstallFromNewSource) {
     
     fs::path work_dir = test_root / "work_myapp_new";
     fs::remove_all(work_dir);
-    fs::create_directories(work_dir / "root/usr/bin");
+    fs::create_directories(work_dir / "content/usr/bin");
     {
-        std::ofstream out(work_dir / "root/usr/bin/app");
+        std::ofstream out(work_dir / "content/usr/bin/app");
         out << "new improved content";
     }
     

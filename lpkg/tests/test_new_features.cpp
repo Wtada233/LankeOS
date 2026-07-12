@@ -54,10 +54,10 @@ protected:
     std::string create_pkg(const std::string& name, const std::string& ver, 
                         const std::vector<std::pair<std::string, std::string>>& files) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name + "_" + ver);
-        fs::create_directories(work_dir / "root");
+        fs::create_directories(work_dir / "content");
         
         for (const auto& [src, dest] : files) {
-            fs::path p = work_dir / "root" / src;
+            fs::path p = work_dir / "content" / src;
             fs::create_directories(p.parent_path());
             std::ofstream f(p); f << "content of " << src; f.close();
         }

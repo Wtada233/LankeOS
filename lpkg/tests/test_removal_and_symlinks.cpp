@@ -84,17 +84,17 @@ protected:
     {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
         fs::remove_all(work_dir);
-        fs::create_directories(work_dir / "root");
+        fs::create_directories(work_dir / "content");
 
         for (const auto& [path, data] : content_map) {
-            fs::path full = work_dir / "root" / path;
+            fs::path full = work_dir / "content" / path;
             ensure_dir_exists(full.parent_path());
             std::ofstream f(full);
             f << data;
         }
 
         for (const auto& [src, target] : dir_symlinks) {
-            fs::path link_path = work_dir / "root" / src;
+            fs::path link_path = work_dir / "content" / src;
             ensure_dir_exists(link_path.parent_path());
             if (fs::exists(link_path)) fs::remove_all(link_path);
             fs::create_directory_symlink(target, link_path);
@@ -660,9 +660,9 @@ TEST_F(RemovalSymlinkTest, PackerIncludesDirectorySymlinks) {
     // builder's job. Verify that raw pack_package includes them.
     fs::path work_dir = suite_work_dir / "packer_test_raw";
     fs::remove_all(work_dir);
-    fs::create_directories(work_dir / "root" / "usr" / "bin");
-    std::ofstream(work_dir / "root" / "usr" / "bin" / "real_bin") << "content";
-    fs::create_directory_symlink("usr/bin", work_dir / "root" / "bin");
+    fs::create_directories(work_dir / "content" / "usr" / "bin");
+    std::ofstream(work_dir / "content" / "usr" / "bin" / "real_bin") << "content";
+    fs::create_directory_symlink("usr/bin", work_dir / "content" / "bin");
 
     std::string pkg_path = (pkg_dir / "packer-test.lpkg").string();
     pack_package(pkg_path, work_dir.string(), "packer-test", "1.0");
@@ -683,9 +683,9 @@ TEST_F(RemovalSymlinkTest, PackerIncludesDirectorySymlinks) {
 TEST_F(RemovalSymlinkTest, PackerIncludesSymlinksToRegularFiles) {
     fs::path work_dir = suite_work_dir / "packer_sym_test";
     fs::remove_all(work_dir);
-    fs::create_directories(work_dir / "root" / "usr" / "lib");
-    std::ofstream(work_dir / "root" / "usr" / "lib" / "libfoo.so.1") << "elf";
-    fs::create_symlink("libfoo.so.1", work_dir / "root" / "usr" / "lib" / "libfoo.so");
+    fs::create_directories(work_dir / "content" / "usr" / "lib");
+    std::ofstream(work_dir / "content" / "usr" / "lib" / "libfoo.so.1") << "elf";
+    fs::create_symlink("libfoo.so.1", work_dir / "content" / "usr" / "lib" / "libfoo.so");
 
     std::string pkg_path = (pkg_dir / "packer-sym-test.lpkg").string();
     pack_package(pkg_path, work_dir.string(), "packer-sym-test", "1.0");
@@ -706,13 +706,13 @@ TEST_F(RemovalSymlinkTest, PackedWithCleanupHasNoDirSymlinks) {
     // Simulate what the builder does: create dir symlinks, then clean them up.
     fs::path work_dir = suite_work_dir / "packer_clean_test";
     fs::remove_all(work_dir);
-    fs::create_directories(work_dir / "root" / "usr" / "bin");
-    std::ofstream(work_dir / "root" / "usr" / "bin" / "real_bin") << "content";
-    fs::create_directory_symlink("usr/bin", work_dir / "root" / "bin");
+    fs::create_directories(work_dir / "content" / "usr" / "bin");
+    std::ofstream(work_dir / "content" / "usr" / "bin" / "real_bin") << "content";
+    fs::create_directory_symlink("usr/bin", work_dir / "content" / "bin");
 
     // Clean up the dir symlink (as builder does before packing)
     std::error_code ec;
-    fs::remove(work_dir / "root" / "bin", ec);
+    fs::remove(work_dir / "content" / "bin", ec);
 
     std::string pkg_path = (pkg_dir / "packer-clean-test.lpkg").string();
     pack_package(pkg_path, work_dir.string(), "packer-clean-test", "1.0");
@@ -813,9 +813,9 @@ TEST_F(RemovalSymlinkTest, DependTreeRemoval) {
 TEST_F(RemovalSymlinkTest, SymlinkToFileIsRegistered) {
     fs::path work_dir = suite_work_dir / "lib_sym_work";
     fs::remove_all(work_dir);
-    fs::create_directories(work_dir / "root" / "usr" / "lib");
-    std::ofstream(work_dir / "root" / "usr" / "lib" / "libbar.so.1") << "elf";
-    fs::create_symlink("libbar.so.1", work_dir / "root" / "usr" / "lib" / "libbar.so");
+    fs::create_directories(work_dir / "content" / "usr" / "lib");
+    std::ofstream(work_dir / "content" / "usr" / "lib" / "libbar.so.1") << "elf";
+    fs::create_symlink("libbar.so.1", work_dir / "content" / "usr" / "lib" / "libbar.so");
 
     std::string pkg_path = (pkg_dir / "lib-sym-pkg.lpkg").string();
     pack_package(pkg_path, work_dir.string(), "lib-sym-pkg", "1.0");
@@ -982,11 +982,11 @@ TEST_F(RemovalSymlinkTest, DirPermWarningOnMismatch) {
     // Create a package with a directory having specific permissions
     fs::path work_dir = suite_work_dir / "dirperm_pkg_work";
     fs::remove_all(work_dir);
-    fs::create_directories(work_dir / "root" / "usr" / "lib" / "testapp");
-    std::ofstream(work_dir / "root" / "usr" / "lib" / "testapp" / "data") << "content";
+    fs::create_directories(work_dir / "content" / "usr" / "lib" / "testapp");
+    std::ofstream(work_dir / "content" / "usr" / "lib" / "testapp" / "data") << "content";
 
     // Set the directory to 0700
-    fs::permissions(work_dir / "root" / "usr" / "lib" / "testapp",
+    fs::permissions(work_dir / "content" / "usr" / "lib" / "testapp",
         fs::perms::owner_all);
 
     std::string pkg_path = (pkg_dir / "dirperm-test.lpkg").string();
@@ -1015,10 +1015,10 @@ TEST_F(RemovalSymlinkTest, NoDirPermWarningWhenMatch) {
     // Same dir permission in package and on disk → no warning
     fs::path work_dir = suite_work_dir / "dirperm_ok_pkg_work";
     fs::remove_all(work_dir);
-    fs::create_directories(work_dir / "root" / "usr" / "lib" / "testapp2");
-    std::ofstream(work_dir / "root" / "usr" / "lib" / "testapp2" / "data") << "content";
+    fs::create_directories(work_dir / "content" / "usr" / "lib" / "testapp2");
+    std::ofstream(work_dir / "content" / "usr" / "lib" / "testapp2" / "data") << "content";
 
-    fs::permissions(work_dir / "root" / "usr" / "lib" / "testapp2",
+    fs::permissions(work_dir / "content" / "usr" / "lib" / "testapp2",
         fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec |
         fs::perms::others_read | fs::perms::others_exec);
 

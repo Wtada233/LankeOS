@@ -10,13 +10,13 @@ namespace fs = std::filesystem;
 class BuilderTest : public ::testing::Test {
 protected:
     fs::path test_dir = fs::current_path() / "test_build_dir";
-    fs::path staging_root = test_dir / "root";
+    fs::path staging_root = test_dir / "content";
 
     void SetUp() override {
         fs::remove_all(test_dir);
-        fs::create_directories(test_dir / "root/usr/bin");
-        fs::create_directories(test_dir / "root/usr/lib");
-        
+        fs::create_directories(test_dir / "content/usr/bin");
+        fs::create_directories(test_dir / "content/usr/lib");
+
         // Create dummy LankeBUILD.json
         std::ofstream json(test_dir / "LankeBUILD.json");
         json << "{\"name\": \"test-pkg\", \"version\": \"1.0.0\", \"man\": \"Manual content\", \"deps\": [], \"provides\": []}";
@@ -30,7 +30,7 @@ protected:
         sh.close();
 
         // Create a dummy .la file for cleanup testing
-        std::ofstream la(test_dir / "root/usr/lib/test.la");
+        std::ofstream la(test_dir / "content/usr/lib/test.la");
         la << "dummy libtool file";
         la.close();
     }

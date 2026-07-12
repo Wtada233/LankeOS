@@ -44,7 +44,6 @@ namespace constants {
 
     // 内部目录名
     inline constexpr std::string_view DIR_WORK = "work";
-    inline constexpr std::string_view DIR_ROOT = "root";
     inline constexpr std::string_view DIR_HOOKS = "hooks";
     inline constexpr std::string_view DIR_CONTENT = "content";
 

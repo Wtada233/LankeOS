@@ -63,7 +63,7 @@ lpkg [options] <command> [arguments]
 -   **`remove <package> [--force]`**: Remove a package. Use `--force` to remove packages that others depend on.
 -   **`query [-p] <package|filename>`**: Query which package owns a file, or list files in a package.
 -   **`scan [directory]`**: Scan for orphaned files not owned by any package.
--   **`pack -o <output> --source <source-dir> [--pkg-name <name>] [--pkg-version <version>]`**: Build a `.lpkg` package from a directory. The name and version are embedded into `metadata.json`.
+-   **`pack -o <output> -d <directory>`**: Build a `.lpkg` package from a directory. Reads package metadata from `<directory>/metadata.json`.
 -   **`build [directory]`**: Automatically build and pack a package from a specific directory.
 
 ## Repository Management (Operations Guide)

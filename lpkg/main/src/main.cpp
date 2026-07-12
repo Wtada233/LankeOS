@@ -9,9 +9,11 @@
 #include "build/builder.hpp"
 #include "pkg/depend_scanner.hpp"
 #include "base/constants.hpp"
+#include "nlohmann/json.hpp"
 
 #include <curl/curl.h>
 #include <iostream>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -81,6 +83,7 @@ void print_usage(const cxxopts::Options& options) {
 #include <functional>
 
 namespace fs = std::filesystem;
+using json = nlohmann::json;
 
 /** 检查命令行参数数量是否合法 */
 void pre_operation_check(const cxxopts::ParseResult& result,
@@ -149,10 +152,28 @@ static int handle_command(const std::string& command,
     } else if (command == constants::CMD_PACK) {
         if (!result.count("output"))
             throw LpkgException(get_string("error.pack_no_output"));
+
+        // 从源目录读取 metadata.json
+        std::string source_dir = result["directory"].as<std::string>();
+        fs::path meta_path = fs::path(source_dir) / constants::PKG_METADATA_FILE;
+        json meta;
+        {
+            std::ifstream f(meta_path);
+            if (!f.is_open())
+                throw LpkgException(string_format("error.open_file_failed", meta_path.string()));
+            f >> meta;
+        }
+
+        std::string pkg_name  = meta.at(std::string(constants::J_NAME)).get<std::string>();
+        std::string pkg_ver   = meta.at(std::string(constants::J_VERSION)).get<std::string>();
+        auto deps      = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
+        auto provides  = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+        auto needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+        std::string man = meta.value(std::string(constants::J_MAN), "");
+
         pack_package(result["output"].as<std::string>(),
-                     result["source"].as<std::string>(),
-                     result["pkg-name"].as<std::string>(),
-                     result["pkg-version"].as<std::string>());
+                     source_dir, pkg_name, pkg_ver,
+                     deps, provides, man, needed_so);
 
     } else if (command == constants::CMD_BUILD) {
         std::string dir = ".";
@@ -260,9 +281,7 @@ int main(int argc, char* argv[]) {
         // --- 打包选项 ---
         options.add_options(get_string("help.group_pack"))
             ("o,output", get_string("help.output_file"), cxxopts::value<std::string>())
-            ("source", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value(std::string(constants::DEFAULT_PACK_SOURCE)))
-            ("pkg-name", get_string("help.pkg_name"), cxxopts::value<std::string>()->default_value("package"))
-            ("pkg-version", get_string("help.pkg_version"), cxxopts::value<std::string>()->default_value("0.0.0"))
+            ("d,directory", get_string("help.pack_source"), cxxopts::value<std::string>()->default_value(std::string(constants::DEFAULT_PACK_SOURCE)))
             ;
 
         // --- 其他选项 ---

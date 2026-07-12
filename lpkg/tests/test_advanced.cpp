@@ -48,8 +48,8 @@ protected:
     
     std::string create_pkg(const std::string& name, const std::string& ver, const std::string& content_file, const std::string& content) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
-        fs::create_directories(work_dir / "root");
-        fs::path dest = work_dir / "root" / content_file;
+        fs::create_directories(work_dir / "content");
+        fs::path dest = work_dir / "content" / content_file;
         fs::create_directories(dest.parent_path());
         
         std::ofstream f(dest);
@@ -73,9 +73,9 @@ TEST_F(AdvancedPackageManagerTest, RollbackOnCopyFailure) {
         std::string pkg_name = "rollback_new-1.0.lpkg";
         pkg = (pkg_dir / pkg_name).string();
         fs::path work_dir = suite_work_dir / "pkg_work_rollback_new";
-        fs::create_directories(work_dir / "root" / "usr" / "bin");
-        std::ofstream f1(work_dir / "root" / "usr" / "bin" / "file_ok"); f1 << "ok"; f1.close();
-        std::ofstream f2(work_dir / "root" / "usr" / "bin" / "file_blocked"); f2 << "blocked"; f2.close();
+        fs::create_directories(work_dir / "content" / "usr" / "bin");
+        std::ofstream f1(work_dir / "content" / "usr" / "bin" / "file_ok"); f1 << "ok"; f1.close();
+        std::ofstream f2(work_dir / "content" / "usr" / "bin" / "file_blocked"); f2 << "blocked"; f2.close();
         
         pack_package(pkg, work_dir.string(), "rollback_new", "1.0");
         fs::remove_all(work_dir);
@@ -107,8 +107,8 @@ TEST_F(AdvancedPackageManagerTest, ChrootHook) {
     // Add hook to the package (Re-creating with hook)
     {
         fs::path work_dir = suite_work_dir / "pkg_work_hook_test_with_hook";
-        fs::create_directories(work_dir / "root");
-        std::ofstream f(work_dir / "root" / "dummy"); f << "d"; f.close();
+        fs::create_directories(work_dir / "content");
+        std::ofstream f(work_dir / "content" / "dummy"); f << "d"; f.close();
         
         fs::create_directories(work_dir / "hooks");
         std::ofstream hook(work_dir / "hooks" / "postinst.sh");

@@ -207,15 +207,7 @@ void InstallationTask::extract_and_validate_package() {
     }
 
     std::string meta_name, meta_version;
-    detail::read_package_metadata(tmp_pkg_dir_, meta_name, meta_version, deps_, provides_, man_content_);
-    // 额外读取 needed_so（read_package_metadata 尚未覆盖此字段）
-    {
-        std::ifstream f(tmp_pkg_dir_ / std::string(constants::PKG_METADATA_FILE));
-        if (f.is_open()) {
-            json m; f >> m;
-            needed_so_ = m.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
-        }
-    }
+    detail::read_package_metadata(tmp_pkg_dir_, meta_name, meta_version, deps_, provides_, needed_so_, man_content_);
     if (meta_name != pkg_name_) {
         log_warning(string_format("warning.package_name_mismatch", pkg_name_, meta_name));
     }
