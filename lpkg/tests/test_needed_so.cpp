@@ -67,8 +67,8 @@ protected:
                            const std::vector<std::string>& provides = {},
                            const std::vector<std::string>& needed_so = {}) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
-        fs::create_directories(work_dir / "root" / "usr" / "bin");
-        std::ofstream(work_dir / "root" / "usr" / "bin" / name).close();
+        fs::create_directories(work_dir / "content" / "usr" / "bin");
+        std::ofstream(work_dir / "content" / "usr" / "bin" / name).close();
 
         std::string pkg_filename = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
@@ -899,8 +899,8 @@ TEST_F(NeededSoTest, LocalPackageMultiVersionSonameResolution) {
 
     // 创建本地 app.lpkg（元数据中依赖 libP，需要 libP.so.2）
     fs::path work_dir = suite_work_dir / "local_app_work";
-    fs::create_directories(work_dir / "root" / "usr" / "bin");
-    std::ofstream(work_dir / "root" / "usr" / "bin" / "local-app").close();
+    fs::create_directories(work_dir / "content" / "usr" / "bin");
+    std::ofstream(work_dir / "content" / "usr" / "bin" / "local-app").close();
     std::string local_pkg = (pkg_dir / "local-app-1.0.lpkg").string();
     pack_package(local_pkg, work_dir.string(), "local-app", "1.0",
                  {"libP"}, {}, "", {"libP.so.2"});

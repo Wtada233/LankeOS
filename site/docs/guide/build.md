@@ -28,13 +28,12 @@ cd LankeOS
 lpkg 是整个构建流程的核心工具。推荐使用静态编译：
 
 ```bash
-cd files/LankeOS/lpkg
+cd lpkg
 
-# 静态编译（Docker 方式）
-make docker
+# 静态链接（要求docker）
 sudo make docker-install
 
-# 或直接动态编译
+# 或直接默认
 make
 sudo make install
 ```
@@ -45,10 +44,10 @@ sudo make install
 
 ```bash
 # 构建 bash
-sudo lpkg build files/LankeOS/pkgs/bash
+sudo lpkg build pkgs/bash
 
 # 构建 coreutils
-sudo lpkg build files/LankeOS/pkgs/coreutils
+sudo lpkg build pkgs/coreutils
 
 # 构建整个系统需要按依赖顺序构建所有软件包
 ```
@@ -86,11 +85,13 @@ pkgs/<package>/
 
 ```bash
 lankebuild_prepare() {
+    cd pkg-dir
     # 补丁、配置生成
-    patch -Np1 -i {WORK_DIR}/fix.patch
+    patch -p1 < "{WORK_DIR}/fix.patch"
 }
 
 lankebuild_build() {
+    cd pkg-dir
     # 配置、编译、安装到 {STAGING_ROOT}
     ./configure --prefix=/usr
     make -j$(nproc)
@@ -120,7 +121,7 @@ lankebuild_package() {
 
 完整构建通常需要以下步骤：
 
-1. **构建 lpkg**（已完成）
+1. **构建 lpkg**（已完成）并使用构建好的lpkg运行pkgs/lpkg的build，然后使用lpkg install --force-overwrite替换lpkg，实现自举
 2. **构建基础工具链** — glibc、gcc、binutils、coreutils 等
 3. **构建系统基础设施** — systemd、dbus、util-linux、PAM 等
 4. **构建网络栈** — NetworkManager、wpa_supplicant、openssh、curl
@@ -136,20 +137,20 @@ lankebuild_package() {
 
 ```bash
 # 1. 重置系统状态（清除机器 ID、日志、临时文件等）
-sudo bash files/live/reinit.sh
+sudo bash live/reinit.sh
 
 # 2. 打包 ISO（需 root 权限）
-sudo bash files/live/pack.sh
+sudo bash live/pack.sh
 ```
 
-生成的 ISO 文件位于 `files/live/ISO/../lankeos-live.iso`。
+生成的 ISO 文件位于 `live/lankeos-live.iso`。
 
 ## 依赖生成
 
 使用 `gen_deps.py` 自动分析并补充软件包依赖：
 
 ```bash
-python3 files/LankeOS/lpkg/main/scripts/gen_deps.py /path/to/packages
+python3 lpkg/main/scripts/gen_deps.py /path/to/packages
 ```
 
 该脚本通过分析 ELF 文件的 NEEDED 和 SONAME，自动更新每个包的 `metadata.json` 中的依赖列表。

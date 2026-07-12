@@ -87,11 +87,11 @@ void pack_package(const std::string& output_filename, const std::string& source_
                   const std::string& man_content,
                   const std::vector<std::string>& needed_so) {
     fs::path base_dir = source_dir;
-    fs::path root_dir = base_dir / constants::DIR_ROOT;
+    fs::path root_dir = base_dir / constants::DIR_CONTENT;
     fs::path hooks_dir = base_dir / constants::DIR_HOOKS;
 
     if (!fs::exists(root_dir)) {
-        throw LpkgException(get_string("error.pack_root_not_found") + ": " + root_dir.string());
+        throw LpkgException(get_string("error.pack_root_not_found") + " " + root_dir.string());
     }
 
     struct archive* a = archive_write_new();

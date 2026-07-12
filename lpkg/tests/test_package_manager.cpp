@@ -46,10 +46,10 @@ protected:
 
     std::string create_dummy_package(const std::string& name, const std::string& version, const std::vector<std::string>& deps = {}, const std::vector<std::string>& provides = {}) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
-        fs::create_directories(work_dir / "root" / "usr" / "bin");
+        fs::create_directories(work_dir / "content" / "usr" / "bin");
         
         // Create a dummy binary unique to the package
-        std::ofstream bin(work_dir / "root" / "usr" / "bin" / name);
+        std::ofstream bin(work_dir / "content" / "usr" / "bin" / name);
         bin << "#!/bin/sh\necho Hello from " << name << "\n";
         bin.close();
         

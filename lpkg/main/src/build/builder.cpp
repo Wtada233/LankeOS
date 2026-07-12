@@ -28,7 +28,7 @@ namespace {
  */
 fs::path setup_build_directories(const fs::path& build_dir) {
     fs::path work_root     = build_dir / constants::DIR_WORK;
-    fs::path staging_root  = build_dir / constants::DIR_ROOT;
+    fs::path staging_root  = build_dir / constants::DIR_CONTENT;
     fs::path staging_hooks = build_dir / constants::DIR_HOOKS;
 
     fs::remove_all(work_root);
@@ -204,7 +204,7 @@ void run_build(const fs::path& build_dir) {
 
     // 2. 准备目录
     fs::path work_root    = build_dir / constants::DIR_WORK;
-    fs::path staging_root = build_dir / constants::DIR_ROOT;
+    fs::path staging_root = build_dir / constants::DIR_CONTENT;
     auto staging_hooks    = setup_build_directories(build_dir);
 
     // 3. 下载并解压源码
@@ -264,7 +264,7 @@ void run_build(const fs::path& build_dir) {
     std::string output_filename =
         cfg.name + "-" + cfg.version + std::string(constants::EXT_LPKG);
     pack_package(output_filename, build_dir.string(), cfg.name, cfg.version,
-                 cfg.deps, cfg.provides, cfg.man_content);
+                 cfg.deps, cfg.provides, cfg.man_content, cfg.needed_so);
     log_info(string_format("info.build_success", output_filename));
 
     // 8. 清理

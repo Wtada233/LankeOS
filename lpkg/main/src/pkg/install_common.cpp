@@ -77,6 +77,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name) {
 /** 从已解压的包目录读取 metadata.json，提取包名、版本、依赖等信息 */
 void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::string& version,
                            std::vector<std::string>& deps, std::vector<std::string>& provides,
+                           std::vector<std::string>& needed_so,
                            std::string& man) {
     fs::path meta_path = tmp_pkg_dir / constants::PKG_METADATA_FILE;
     json meta;
@@ -89,6 +90,7 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
     version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
     deps = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
     provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+    needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
     man = meta.value(std::string(constants::J_MAN), "");
 }
 

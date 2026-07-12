@@ -49,10 +49,10 @@ protected:
                         const std::vector<std::string>& provides = {}) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name + "_" + ver);
         fs::remove_all(work_dir);
-        fs::create_directories(work_dir / "root");
+        fs::create_directories(work_dir / "content");
         
         for (const auto& [src, dest] : files) {
-            fs::path p = work_dir / "root" / src;
+            fs::path p = work_dir / "content" / src;
             ensure_dir_exists(p.parent_path());
             std::ofstream f(p); f << "content of " << src; f.close();
         }

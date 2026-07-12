@@ -29,7 +29,7 @@ protected:
         init_localization();
         suite_work_dir = fs::absolute("tmp_tools_test");
         source_dir = suite_work_dir / "lankepkg";
-        root_dir = source_dir / "root";
+        root_dir = source_dir / "content";
         hooks_dir = source_dir / "hooks";
         output_pkg = suite_work_dir / "test.pkg.lpkg";
         test_system_root = suite_work_dir / "sysroot";

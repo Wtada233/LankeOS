@@ -68,8 +68,8 @@ protected:
     std::string create_pkg(const std::string& name, const std::string& ver,
                            const std::vector<std::string>& deps = {}) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
-        fs::create_directories(work_dir / "root" / "usr" / "bin");
-        std::ofstream(work_dir / "root" / "usr" / "bin" / name).close();
+        fs::create_directories(work_dir / "content" / "usr" / "bin");
+        std::ofstream(work_dir / "content" / "usr" / "bin" / name).close();
 
         std::string pkg_filename = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();

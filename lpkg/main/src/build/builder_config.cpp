@@ -27,6 +27,7 @@ BuildConfig parse_build_config(const fs::path& json_path) {
     cfg.no_strip    = meta.value(std::string(constants::J_NO_STRIP), false);
     cfg.deps        = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
     cfg.provides    = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+    cfg.needed_so   = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
     cfg.man_content = meta.value(std::string(constants::J_MAN), "");
     return cfg;
 }

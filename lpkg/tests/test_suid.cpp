@@ -45,9 +45,9 @@ protected:
 
     std::string create_suid_package(const std::string& name, const std::string& version) {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
-        fs::create_directories(work_dir / "root" / "usr" / "bin");
+        fs::create_directories(work_dir / "content" / "usr" / "bin");
         
-        fs::path bin_path = work_dir / "root" / "usr" / "bin" / "suid_bin";
+        fs::path bin_path = work_dir / "content" / "usr" / "bin" / "suid_bin";
         {
             std::ofstream bin(bin_path);
             bin << "#!/bin/sh\n"
