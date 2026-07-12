@@ -103,7 +103,7 @@ lpkg query /usr/bin/bash
 sudo lpkg scan
 ```
 
-详细用法请参考 [lpkg 使用指南](/lpkg/usage)。
+详细用法请参考 [lpkg 使用指南](/lpkg/)。
 
 ## 下一步
 

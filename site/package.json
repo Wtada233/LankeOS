@@ -10,7 +10,7 @@
     "fetch-releases": "node scripts/fetch-releases.mjs",
     "fetch-lpkg": "node scripts/fetch-lpkg-docs.mjs",
     "fetch-all": "node scripts/fetch-releases.mjs && node scripts/fetch-lpkg-docs.mjs",
-    "clean:gen": "rm -f docs/releases.md docs/lpkg/index.md"
+    "clean:gen": "rm -f docs/releases.md docs/lpkg/index.md docs/en/releases.md docs/en/lpkg/index.md"
   },
   "devDependencies": {
     "vitepress": "^1.6.4"

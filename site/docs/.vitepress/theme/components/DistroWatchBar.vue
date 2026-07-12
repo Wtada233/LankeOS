@@ -7,11 +7,24 @@
       class="distrowatch-link"
     >
       <span class="dw-star">&#9733;</span>
-      <span class="dw-text">点击链接为 LankeOS 加入 DistroWatch 投一票！</span>
+      <span class="dw-text">{{ text }}</span>
       <span class="dw-arrow">&rarr;</span>
     </a>
   </div>
 </template>
+
+<script setup>
+import { computed } from 'vue'
+import { useData } from 'vitepress'
+
+const { lang } = useData()
+
+const text = computed(() =>
+  lang.value === 'en'
+    ? 'Click to vote for LankeOS on DistroWatch!'
+    : '点击链接为 LankeOS 加入 DistroWatch 投一票！'
+)
+</script>
 
 <style>
 /* 为固定底栏留出空间 */
