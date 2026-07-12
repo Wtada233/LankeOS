@@ -17,25 +17,94 @@
 namespace fs = std::filesystem;
 
 namespace {
-static const std::regex version_regex(R"(^(\d+)(\.\d+)*(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$)");
+
+/// 点分隔符正则，用于 split
 static const std::regex re_dot("[.]");
-/**
- * 校验版本号字符串是否符合语义化版本规范
- * 格式要求: 主版本号.次版本号.修订号（可选预发布和构建元数据）
- */
-void validate_version_format(const std::string& version_str) {
-    if (!std::regex_match(version_str, version_regex)) {
-        throw LpkgException(string_format("error.invalid_version_format", version_str));
+
+/** 安全地将字符串转为 int，失败时抛出 LpkgException */
+int parse_int(const std::string& s, const std::string& ctx) {
+    try {
+        return std::stoi(s);
+    } catch (const std::exception& e) {
+        throw LpkgException(string_format("error.invalid_version_format", ctx) + ": " + e.what());
     }
+}
+
+/**
+ * 逐字符校验版本号格式
+ *
+ * 格式: 主版本号[补丁后缀][-预发布][+发行修订号]
+ * 主版本号 : (\d+)(\.\d+)*
+ * 补丁后缀 : [a-zA-Z]\d*           (可选)
+ * 预发布   : -[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*  (可选)
+ * 修订号   : \+[0-9A-Za-z]+(\.[0-9A-Za-z]+)*   (可选，不含连字符)
+ */
+void validate_version_format(const std::string& v) {
+    if (v.empty())
+        throw LpkgException(string_format("error.invalid_version_format", v));
+
+    auto is_digit = [](unsigned char c) { return std::isdigit(c); };
+    auto is_letter = [](unsigned char c) { return std::isalpha(c); };
+    auto is_alnum = [](unsigned char c) { return std::isalnum(c); };
+    auto is_pre_char = [&](unsigned char c) { return is_alnum(c) || c == '-'; };
+    auto fail = [&]{ throw LpkgException(string_format("error.invalid_version_format", v)); };
+
+    size_t i = 0;
+
+    // --- 1. 主版本号: (\d+)(\.\d+)* ---
+    if (!is_digit(v[i])) fail();
+    while (i < v.size() && is_digit(v[i])) i++;
+    while (i < v.size() && v[i] == '.') {
+        i++; // consume '.'
+        if (i >= v.size() || !is_digit(v[i])) fail();
+        while (i < v.size() && is_digit(v[i])) i++;
+    }
+
+    // --- 2. 补丁后缀: [a-zA-Z]\d* (可选) ---
+    if (i < v.size() && is_letter(v[i])) {
+        i++; // consume letter
+        while (i < v.size() && is_digit(v[i])) i++;
+    }
+
+    // --- 3. 预发布: -[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)* (可选) ---
+    if (i < v.size() && v[i] == '-') {
+        i++; // consume '-'
+        if (i >= v.size() || !is_pre_char(v[i])) fail();
+        while (i < v.size() && is_pre_char(v[i])) i++;
+        while (i < v.size() && v[i] == '.') {
+            i++; // consume '.'
+            if (i >= v.size() || !is_pre_char(v[i])) fail();
+            while (i < v.size() && is_pre_char(v[i])) i++;
+        }
+    }
+
+    // --- 4. 发行修订号: +[0-9A-Za-z]+(\.[0-9A-Za-z]+)* (可选，不含连字符) ---
+    if (i < v.size() && v[i] == '+') {
+        i++; // consume '+'
+        if (i >= v.size() || !is_alnum(v[i])) fail();
+        while (i < v.size() && is_alnum(v[i])) i++;
+        while (i < v.size() && v[i] == '.') {
+            i++; // consume '.'
+            if (i >= v.size() || !is_alnum(v[i])) fail();
+            while (i < v.size() && is_alnum(v[i])) i++;
+        }
+    }
+
+    // 必须完整消耗整个字符串
+    if (i != v.size()) fail();
 }
 
 struct Version {
     std::vector<int> main_part;
-    std::vector<std::string> pre_release_part;
+    std::string patch_suffix;                    // pN 补丁后缀，如 "p2"、"p"，空串表示无
+    std::vector<std::string> release_part;       // + 发行修订号，如 ["2"]、"["2", "1"]
+    std::vector<std::string> pre_release_part;   // - 预发布，如 ["rc", "1"]（不变）
 
     /**
-     * 解析版本号字符串，分离主版本号部分和预发布部分
-     * 主版本号以点分隔的数字序列，预发布部分以点分隔的字母数字序列
+     * 解析版本号字符串，分离各组成部分
+     * 格式: 主版本号[补丁后缀][-预发布][+发行修订号]
+     * 主版本号以点分隔的数字序列，允许末尾单字母+数字补丁后缀
+     * +后缀为发行修订号（优先级高于正式版），-后缀为预发布（优先级低于正式版）
      */
     Version(const std::string& version_str) {
         std::string_view v_sv(version_str);
@@ -45,17 +114,28 @@ struct Version {
         size_t main_end = std::min(pre_release_pos, build_meta_pos);
         std::string_view main_sv = v_sv.substr(0, main_end);
 
+        // 解析主版本号（数字段），最后一个段可能携带补丁后缀
         std::string main_str(main_sv);
         std::sregex_token_iterator it(main_str.begin(), main_str.end(), re_dot, -1);
         std::sregex_token_iterator end;
         for (; it != end; ++it) {
-            try {
-                main_part.push_back(std::stoi(it->str()));
-            } catch (const std::exception& e) {
-                throw LpkgException(string_format("error.invalid_version_format", version_str) + ": " + e.what());
+            std::string seg = it->str();
+            auto next = it;
+            ++next;
+            if (next == end) {
+                // 最后一个段：检查是否有补丁后缀（如 "17p2" → 17 + "p2"）
+                size_t pos = 0;
+                int num = std::stoi(seg, &pos);
+                main_part.push_back(num);
+                if (pos < seg.length()) {
+                    patch_suffix = seg.substr(pos);
+                }
+            } else {
+                main_part.push_back(parse_int(seg, version_str));
             }
         }
 
+        // 解析预发布部分（-后缀）
         if (pre_release_pos != std::string::npos) {
             size_t pre_release_end = (build_meta_pos > pre_release_pos) ? build_meta_pos : std::string::npos;
             std::string_view pre_release_sv = v_sv.substr(pre_release_pos + 1, pre_release_end - (pre_release_pos + 1));
@@ -64,6 +144,18 @@ struct Version {
             std::sregex_token_iterator pre_end;
             for (; pre_it != pre_end; ++pre_it) {
                 pre_release_part.push_back(pre_it->str());
+            }
+        }
+
+        // 解析发行修订号（+后缀）
+        if (build_meta_pos != std::string::npos) {
+            size_t release_end = (pre_release_pos > build_meta_pos) ? pre_release_pos : std::string::npos;
+            std::string_view release_sv = v_sv.substr(build_meta_pos + 1, release_end - (build_meta_pos + 1));
+            std::string release_str(release_sv);
+            std::sregex_token_iterator rel_it(release_str.begin(), release_str.end(), re_dot, -1);
+            std::sregex_token_iterator rel_end;
+            for (; rel_it != rel_end; ++rel_it) {
+                release_part.push_back(rel_it->str());
             }
         }
     }
@@ -83,16 +175,8 @@ int compare_pre_release_part(const std::vector<std::string>& p1, const std::vect
         bool is_num2 = !p2[i].empty() && std::all_of(p2[i].begin(), p2[i].end(), [](unsigned char c) { return std::isdigit(c); });
 
         if (is_num1 && is_num2) {
-            try {
-                n1 = std::stoi(p1[i]);
-            } catch (const std::exception& e) {
-                throw LpkgException(string_format("error.invalid_version_format", v1_str) + ": " + e.what());
-            }
-            try {
-                n2 = std::stoi(p2[i]);
-            } catch (const std::exception& e) {
-                throw LpkgException(string_format("error.invalid_version_format", v2_str) + ": " + e.what());
-            }
+            n1 = parse_int(p1[i], v1_str);
+            n2 = parse_int(p2[i], v2_str);
             if (n1 < n2) return -1;
             if (n1 > n2) return 1;
         } else if (is_num1) {
@@ -114,7 +198,11 @@ int compare_pre_release_part(const std::vector<std::string>& p1, const std::vect
 
 /**
  * 比较两个语义化版本号：v1 < v2 返回 true，否则返回 false
- * 先比较主版本号（数字逐段比较），再考虑预发布版本前缀
+ * 比较优先级（主版本号相等时）：
+ *   1. 补丁后缀 pN（最大）
+ *   2. 发行修订号 +N
+ *   3. 基础版本（无后缀）
+ *   4. 预发布 -X（最小）
  */
 bool version_compare(const std::string& v1_str, const std::string& v2_str) {
     validate_version_format(v1_str);
@@ -123,6 +211,7 @@ bool version_compare(const std::string& v1_str, const std::string& v2_str) {
     Version v1(v1_str);
     Version v2(v2_str);
 
+    // 1. 主版本号逐段比较（数字，缺失补 0）
     size_t main_len = std::max(v1.main_part.size(), v2.main_part.size());
     for (size_t i = 0; i < main_len; ++i) {
         int n1 = (i < v1.main_part.size()) ? v1.main_part[i] : 0;
@@ -131,12 +220,40 @@ bool version_compare(const std::string& v1_str, const std::string& v2_str) {
         if (n1 > n2) return false;
     }
 
-    if (!v1.pre_release_part.empty() && v2.pre_release_part.empty()) {
-        return true; // 有预发布版本的版本号优先级低于正式版本
+    // 2. 补丁后缀比较（pN）— 优先级最高
+    if (!v1.patch_suffix.empty() && v2.patch_suffix.empty())
+        return false;  // v1 > v2
+    if (v1.patch_suffix.empty() && !v2.patch_suffix.empty())
+        return true;   // v1 < v2
+    if (!v1.patch_suffix.empty() && !v2.patch_suffix.empty()) {
+        char letter1 = v1.patch_suffix[0];
+        char letter2 = v2.patch_suffix[0];
+        if (letter1 != letter2)
+            return letter1 < letter2;
+        // 字母相同，比较尾部数字
+        int num1 = 0, num2 = 0;
+        if (v1.patch_suffix.size() > 1)
+            num1 = parse_int(v1.patch_suffix.substr(1), v1_str);
+        if (v2.patch_suffix.size() > 1)
+            num2 = parse_int(v2.patch_suffix.substr(1), v2_str);
+        if (num1 != num2)
+            return num1 < num2;
     }
-    if (v1.pre_release_part.empty() && !v2.pre_release_part.empty()) {
-        return false;
+
+    // 3. 发行修订号比较（+）— 高于基础版和预发布
+    bool v1_rel = !v1.release_part.empty();
+    bool v2_rel = !v2.release_part.empty();
+    if (v1_rel && !v2_rel) return false;  // v1 > v2
+    if (!v1_rel && v2_rel) return true;   // v1 < v2
+    if (v1_rel && v2_rel) {
+        return compare_pre_release_part(v1.release_part, v2.release_part, v1_str, v2_str) < 0;
     }
+
+    // 4. 预发布比较（-）— 低于基础版（原语义）
+    if (!v1.pre_release_part.empty() && v2.pre_release_part.empty())
+        return true;   // v1 < v2
+    if (v1.pre_release_part.empty() && !v2.pre_release_part.empty())
+        return false;  // v1 > v2
     if (!v1.pre_release_part.empty() && !v2.pre_release_part.empty()) {
         return compare_pre_release_part(v1.pre_release_part, v2.pre_release_part, v1_str, v2_str) < 0;
     }

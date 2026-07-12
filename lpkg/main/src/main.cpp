@@ -8,6 +8,7 @@
 #include "scan/scanner.hpp"
 #include "build/builder.hpp"
 #include "pkg/depend_scanner.hpp"
+#include "pkg/install_common.hpp"
 #include "base/constants.hpp"
 #include "nlohmann/json.hpp"
 
@@ -156,20 +157,9 @@ static int handle_command(const std::string& command,
         // 从源目录读取 metadata.json
         std::string source_dir = result["directory"].as<std::string>();
         fs::path meta_path = fs::path(source_dir) / constants::PKG_METADATA_FILE;
-        json meta;
-        {
-            std::ifstream f(meta_path);
-            if (!f.is_open())
-                throw LpkgException(string_format("error.open_file_failed", meta_path.string()));
-            f >> meta;
-        }
-
-        std::string pkg_name  = meta.at(std::string(constants::J_NAME)).get<std::string>();
-        std::string pkg_ver   = meta.at(std::string(constants::J_VERSION)).get<std::string>();
-        auto deps      = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
-        auto provides  = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
-        auto needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
-        std::string man = meta.value(std::string(constants::J_MAN), "");
+        std::string pkg_name, pkg_ver, man;
+        std::vector<std::string> deps, provides, needed_so;
+        detail::read_package_metadata(source_dir, pkg_name, pkg_ver, deps, provides, needed_so, man);
 
         pack_package(result["output"].as<std::string>(),
                      source_dir, pkg_name, pkg_ver,

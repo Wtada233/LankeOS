@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
-#include "../main/src/repo/repository.hpp"
-#include "../main/src/config/config.hpp"
-#include "../main/src/i18n/localization.hpp"
-#include "../main/src/base/constants.hpp"
+#include "../../main/src/repo/repository.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/base/constants.hpp"
 #include <filesystem>
 #include <fstream>
 

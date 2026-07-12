@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
-#include "../main/src/pkg/depend_scanner.hpp"
-#include "../main/src/config/config.hpp"
-#include "../main/src/db/cache.hpp"
-#include "../main/src/i18n/localization.hpp"
+#include "../../main/src/pkg/depend_scanner.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/db/cache.hpp"
+#include "../../main/src/i18n/localization.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -301,4 +301,17 @@ TEST_F(DependScannerTest, StatusLabels) {
     EXPECT_EQ(depscan::status_label(depscan::ScanStatus::INSTALL), "WILL BE INSTALLED");
     EXPECT_EQ(depscan::status_label(depscan::ScanStatus::ABI_CHANGED), "ABI CHANGED");
     EXPECT_EQ(depscan::status_label(depscan::ScanStatus::KEEP), "UNCHANGED");
+}
+
+TEST_F(DependScannerTest, AbibreakNoDeps) {
+    add_pkg("standalone", "1.0");
+    auto tree = depscan::scan_abibreak_tree("standalone");
+    EXPECT_EQ(tree.children.size(), 0u);
+}
+
+TEST_F(DependScannerTest, PrintTreeNoCrash) {
+    depscan::ScanNode root;
+    root.name = "test";
+    root.status = depscan::ScanStatus::KEEP;
+    EXPECT_NO_THROW(depscan::print_tree(root));
 }

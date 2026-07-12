@@ -19,7 +19,7 @@ PKGS_LIST = $(PKGS)
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 3.6.0
+VERSION ?= 4.0.0
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -68,7 +68,7 @@ MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp) \
 	$(wildcard $(APP_SRC_DIR)/pkg/*.cpp) $(wildcard $(APP_SRC_DIR)/archive/*.cpp) \
 	$(wildcard $(APP_SRC_DIR)/build/*.cpp) $(wildcard $(APP_SRC_DIR)/elf/*.cpp) \
 	$(wildcard $(APP_SRC_DIR)/scan/*.cpp)
-TEST_SRCS = $(wildcard $(TESTS_DIR)/*.cpp)
+TEST_SRCS = $(TESTS_DIR)/main.cpp $(wildcard $(TESTS_DIR)/unit/*.cpp) $(wildcard $(TESTS_DIR)/integration/*.cpp)
 MAIN_OBJS = $(patsubst $(APP_SRC_DIR)/%.cpp,$(BUILD_DIR)/main/%.o,$(MAIN_SRCS))
 TEST_OBJS = $(patsubst $(TESTS_DIR)/%.cpp,$(BUILD_DIR)/tests/%.o,$(TEST_SRCS))
 LPKG_OBJS = $(filter-out $(BUILD_DIR)/main/main.o, $(MAIN_OBJS))

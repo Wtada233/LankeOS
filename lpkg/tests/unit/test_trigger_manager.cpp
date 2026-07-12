@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
-#include "../main/src/base/utils.hpp"
-#include "../main/src/trigger/trigger.hpp"
-#include "../main/src/config/config.hpp"
-#include "../main/src/base/constants.hpp"
-#include "../main/src/i18n/localization.hpp"
+#include "../../main/src/base/utils.hpp"
+#include "../../main/src/trigger/trigger.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/base/constants.hpp"
+#include "../../main/src/i18n/localization.hpp"
 #include <filesystem>
 #include <fstream>
 #include <thread>
@@ -92,11 +92,34 @@ TEST_F(TriggerManagerTest, MultipleAddsDeduplicate) {
 
 TEST_F(TriggerManagerTest, CheckFileMultipleTimesDeduplicates) {
     auto& tm = TriggerManager::instance();
+    tm.check_file("/usr/lib/libtest.so.1");
+    tm.check_file("/usr/lib/libtest.so.1");
+    tm.check_file("/usr/lib/libtest.so.1");
+    EXPECT_NO_THROW(tm.run_all());
+}
 
-    // 多次检查同一触发条件应只添加一次
-    tm.check_file("/usr/lib/libtest.so.1");
-    tm.check_file("/usr/lib/libtest.so.1");
-    tm.check_file("/usr/lib/libtest.so.1");
+TEST_F(TriggerManagerTest, AddDirectly) {
+    auto& tm = TriggerManager::instance();
+    EXPECT_NO_THROW(tm.add("custom command"));
+    EXPECT_NO_THROW(tm.run_all());
+}
 
+TEST_F(TriggerManagerTest, AddAndRunMultipleCommands) {
+    auto& tm = TriggerManager::instance();
+    tm.add("cmd1");
+    tm.add("cmd2");
+    EXPECT_NO_THROW(tm.run_all());
+    EXPECT_NO_THROW(tm.run_all());
+}
+
+TEST_F(TriggerManagerTest, IconTriggersMatch) {
+    auto& tm = TriggerManager::instance();
+    EXPECT_NO_THROW(tm.check_file("/usr/share/icons/hicolor/48x48/apps/foo.png"));
+    EXPECT_NO_THROW(tm.run_all());
+}
+
+TEST_F(TriggerManagerTest, GsettingsTriggerMatch) {
+    auto& tm = TriggerManager::instance();
+    EXPECT_NO_THROW(tm.check_file("/usr/share/glib-2.0/schemas/org.foo.bar.xml"));
     EXPECT_NO_THROW(tm.run_all());
 }

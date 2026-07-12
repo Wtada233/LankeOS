@@ -14,16 +14,16 @@
  */
 
 #include <gtest/gtest.h>
-#include "../main/src/pkg/package_manager.hpp"
-#include "../main/src/pkg/install_common.hpp"
-#include "../main/src/archive/packer.hpp"
-#include "../main/src/archive/archive.hpp"
-#include "../main/src/config/config.hpp"
-#include "../main/src/base/utils.hpp"
-#include "../main/src/i18n/localization.hpp"
-#include "../main/src/base/constants.hpp"
-#include "../main/src/db/cache.hpp"
-#include "../main/src/repo/repository.hpp"
+#include "../../main/src/pkg/package_manager.hpp"
+#include "../../main/src/pkg/install_common.hpp"
+#include "../../main/src/archive/packer.hpp"
+#include "../../main/src/archive/archive.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/base/utils.hpp"
+#include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/base/constants.hpp"
+#include "../../main/src/db/cache.hpp"
+#include "../../main/src/repo/repository.hpp"
 #include "nlohmann/json.hpp"
 
 #include <filesystem>

@@ -333,29 +333,24 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
     std::memcpy(output_data.data(), input_data.data(), std::min(headers_size, input_data.size()));
 
     // 写入更新后的 ELF 头（节区表偏移、数量和字符串表索引）
-    if (elf_class == ELFCLASS64) {
-        Elf64_Ehdr* out = reinterpret_cast<Elf64_Ehdr*>(output_data.data());
+    auto write_ehdr = [&]<typename Hdr>() {
+        Hdr* out = reinterpret_cast<Hdr*>(output_data.data());
         out->e_shoff = updated_ehdr.e_shoff; out->e_shnum = updated_ehdr.e_shnum; out->e_shstrndx = updated_ehdr.e_shstrndx;
-    } else {
-        Elf32_Ehdr* out = reinterpret_cast<Elf32_Ehdr*>(output_data.data());
-        out->e_shoff = updated_ehdr.e_shoff; out->e_shnum = updated_ehdr.e_shnum; out->e_shstrndx = updated_ehdr.e_shstrndx;
-    }
+    };
+    if (elf_class == ELFCLASS64) write_ehdr.operator()<Elf64_Ehdr>();
+    else write_ehdr.operator()<Elf32_Ehdr>();
 
     // 写入更新后的节区表
+    auto write_shdr = [&]<typename Shdr>(size_t i) {
+        Shdr* out = reinterpret_cast<Shdr*>(output_data.data() + updated_ehdr.e_shoff + i * shentsize);
+        out->sh_name = kept_sections[i].shdr.sh_name; out->sh_type = kept_sections[i].shdr.sh_type; out->sh_flags = kept_sections[i].shdr.sh_flags;
+        out->sh_addr = kept_sections[i].shdr.sh_addr; out->sh_offset = kept_sections[i].shdr.sh_offset; out->sh_size = kept_sections[i].shdr.sh_size;
+        out->sh_link = kept_sections[i].shdr.sh_link; out->sh_info = kept_sections[i].shdr.sh_info; out->sh_addralign = kept_sections[i].shdr.sh_addralign;
+        out->sh_entsize = kept_sections[i].shdr.sh_entsize;
+    };
     for (size_t i = 0; i < kept_sections.size(); ++i) {
-        if (elf_class == ELFCLASS64) {
-            Elf64_Shdr* out = reinterpret_cast<Elf64_Shdr*>(output_data.data() + updated_ehdr.e_shoff + i * shentsize);
-            out->sh_name = kept_sections[i].shdr.sh_name; out->sh_type = kept_sections[i].shdr.sh_type; out->sh_flags = kept_sections[i].shdr.sh_flags;
-            out->sh_addr = kept_sections[i].shdr.sh_addr; out->sh_offset = kept_sections[i].shdr.sh_offset; out->sh_size = kept_sections[i].shdr.sh_size;
-            out->sh_link = kept_sections[i].shdr.sh_link; out->sh_info = kept_sections[i].shdr.sh_info; out->sh_addralign = kept_sections[i].shdr.sh_addralign;
-            out->sh_entsize = kept_sections[i].shdr.sh_entsize;
-        } else {
-            Elf32_Shdr* out = reinterpret_cast<Elf32_Shdr*>(output_data.data() + updated_ehdr.e_shoff + i * shentsize);
-            out->sh_name = kept_sections[i].shdr.sh_name; out->sh_type = kept_sections[i].shdr.sh_type; out->sh_flags = kept_sections[i].shdr.sh_flags;
-            out->sh_addr = kept_sections[i].shdr.sh_addr; out->sh_offset = kept_sections[i].shdr.sh_offset; out->sh_size = kept_sections[i].shdr.sh_size;
-            out->sh_link = kept_sections[i].shdr.sh_link; out->sh_info = kept_sections[i].shdr.sh_info; out->sh_addralign = kept_sections[i].shdr.sh_addralign;
-            out->sh_entsize = kept_sections[i].shdr.sh_entsize;
-        }
+        if (elf_class == ELFCLASS64) write_shdr.operator()<Elf64_Shdr>(i);
+        else write_shdr.operator()<Elf32_Shdr>(i);
     }
     return true;
 }

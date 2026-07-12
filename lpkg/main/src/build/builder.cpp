@@ -77,10 +77,11 @@ build_variable_map(const BuildConfig& cfg,
                    const fs::path& work_root,
                    const fs::path& actual_work_dir,
                    const fs::path& staging_root,
-                   const fs::path& staging_hooks) {
+                   const fs::path& staging_hooks,
+                   const std::string& effective_version) {
     return {
         {"{PKG_NAME}",      cfg.name},
-        {"{PKG_VER}",       cfg.version},
+        {"{PKG_VER}",       effective_version},
         {"{WORK_DIR}",       fs::absolute(work_root).string()},
         {"{SRC_DIR}",        fs::absolute(actual_work_dir).string()},
         {"{STAGING_ROOT}",   fs::absolute(staging_root).string()},
@@ -187,7 +188,13 @@ void run_build(const fs::path& build_dir) {
 
     log_info(get_string("info.parsing_lankebuild"));
     auto cfg = parse_build_config(json_path);
-    log_info(string_format("info.building_package", cfg.name, cfg.version));
+
+    // 计算有效版本号：如有 release 修订号，附加到版本号后
+    std::string effective_version = cfg.version;
+    if (cfg.release > 0) {
+        effective_version = cfg.version + "+" + std::to_string(cfg.release);
+    }
+    log_info(string_format("info.building_package", cfg.name, effective_version));
 
     // 如果 LankeBUILD.json 中未指定 man 页面内容，则自动生成
     if (cfg.man_content.empty()) {
@@ -197,7 +204,7 @@ void run_build(const fs::path& build_dir) {
         std::strftime(date_buf, sizeof(date_buf), "%Y%m%d", tm);
         cfg.man_content =
             get_string("man.info_name") + ": " + cfg.name + "\n"
-            + get_string("man.info_version") + ": " + cfg.version + "\n"
+            + get_string("man.info_version") + ": " + effective_version + "\n"
             + get_string("man.info_build_date") + ": " + date_buf + "\n";
         log_info(string_format("info.auto_generated_man", cfg.name));
     }
@@ -216,7 +223,7 @@ void run_build(const fs::path& build_dir) {
 
     // 5. 处理脚本并执行构建阶段
     auto vars = build_variable_map(cfg, work_root, actual_work_dir,
-                                    staging_root, staging_hooks);
+                                    staging_root, staging_hooks, effective_version);
     fs::path processed_script = build_dir / constants::LANK_BUILD_PROCESSED;
     {
         std::string content = process_build_script(script_path, vars);
@@ -262,8 +269,8 @@ void run_build(const fs::path& build_dir) {
     // 7. 打包
     log_info(get_string("info.packing_built_pkg"));
     std::string output_filename =
-        cfg.name + "-" + cfg.version + std::string(constants::EXT_LPKG);
-    pack_package(output_filename, build_dir.string(), cfg.name, cfg.version,
+        cfg.name + "-" + effective_version + std::string(constants::EXT_LPKG);
+    pack_package(output_filename, build_dir.string(), cfg.name, effective_version,
                  cfg.deps, cfg.provides, cfg.man_content, cfg.needed_so);
     log_info(string_format("info.build_success", output_filename));
 

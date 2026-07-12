@@ -1,15 +1,15 @@
 #include <gtest/gtest.h>
-#include "../main/src/crypto/hash.hpp"
-#include "../main/src/pkg/package_manager.hpp"
-#include "../main/src/archive/packer.hpp"
-#include "../main/src/config/config.hpp"
-#include "../main/src/base/utils.hpp"
-#include "../main/src/base/constants.hpp"
+#include "../../main/src/crypto/hash.hpp"
+#include "../../main/src/pkg/package_manager.hpp"
+#include "../../main/src/archive/packer.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/base/utils.hpp"
+#include "../../main/src/base/constants.hpp"
 #include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
 #include <vector>
-#include "../main/src/archive/packer.hpp"
+#include "../../main/src/archive/packer.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
