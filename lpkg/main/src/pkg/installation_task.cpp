@@ -136,6 +136,15 @@ void InstallationTask::commit() {
                                 ? Config::instance().root_dir() / fs::path(old_file).relative_path()
                                 : Config::instance().root_dir() / old_file;
                             if (fs::exists(phys) || fs::is_symlink(phys)) {
+                                if (fs::is_directory(phys)) {
+                                    // 目录：仅当为空时才删除，否则可能包含新包的文件
+                                    std::error_code ec;
+                                    if (fs::is_empty(phys, ec)) {
+                                        log_info(string_format("info.removing_obsolete_file", old_file));
+                                        fs::remove(phys, ec);
+                                    }
+                                    continue;
+                                }
                                 log_info(string_format("info.removing_obsolete_file", old_file));
                                 fs::remove(phys);
                             }
