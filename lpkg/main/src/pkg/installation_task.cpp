@@ -6,6 +6,7 @@
 #include "downloader.hpp"
 #include "crypto/hash.hpp"
 #include "base/exception.hpp"
+#include "base/testing_breakpoints.hpp"
 #include "i18n/localization.hpp"
 #include "base/utils.hpp"
 #include "vercmp/version.hpp"
@@ -62,11 +63,20 @@ void InstallationTask::run(InstallContext* ctx) {
     // 第一阶段：预检——不碰文件，只做检查
     prepare(ctx);
 
+    // 测试断点：提取完成后、备份开始前
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_before_backup);
+
     // 第二阶段：备份 + 复制——任一失败则全量回滚
     TransactionLog log;
     log.begin(pkg_name_, actual_version_);
     try {
         backup_existing_files();
+
+        // 测试断点：备份完成后、复制开始前
+        if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_after_backup);
+
         copy_package_files();
     } catch (...) {
         log.rollback(pkg_name_, actual_version_);
@@ -75,11 +85,19 @@ void InstallationTask::run(InstallContext* ctx) {
         throw;
     }
 
+    // 测试断点：文件复制完成后、提交前
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_before_commit);
+
     // 第四阶段：注册——数据库修改是最后一步
     // Cache::write()（磁盘落盘）由外层 install_packages() 统一完成，
     // 以保证失败时全部回滚，而非部分包持久化。
     commit_without_file_ops();
     log.commit(pkg_name_, actual_version_);
+
+    // 测试断点：已提交
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_after_commit);
 
     // 清理备份
     cleanup_backups();
@@ -540,6 +558,10 @@ void InstallationTask::copy_package_files() {
     for (const auto& f : files) {
         // 测试钩子：在复制前调用（用于精确触发中断场景）
         if (on_before_file_copy) on_before_file_copy();
+
+        // 测试断点：每个文件复制前检查（用于细粒度控制）
+        if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_during_file_copy);
 
         // SIGINT 时立即中止复制，避免文件处于不一致状态
         extern std::atomic<bool> sigint_graceful;
