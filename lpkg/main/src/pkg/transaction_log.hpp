@@ -39,6 +39,22 @@ public:
     /** 检查是否有未完成事务，返回未提交的包名（空串表示无） */
     static std::string check_pending();
 
+    /**
+     * 压缩日志：删除所有已完结事务的记录，保留未完成事务。
+     *
+     * 调用时机：每项新事务开始时（install/remove/upgrade 之前）。
+     * 已完结事务的判断规则：
+     *   - INSTALL:  BEGIN → COMMIT + END 或 ROLLBACK + END
+     *   - REMOVE:   RM_BEGIN → RM_COMMIT + RM_END
+     *   - BATCH:    BEGIN_PKGS → COMMIT_PKGS（内部所有子事务自动完结）
+     * 未完结的事务及其之前的所有行均保留，以确保恢复状态机能够正确定位回滚起点。
+     * 若日志中无任何未完结事务，则完全清空日志文件。
+     *
+     * 安全性：使用 .tmp + rename 替换，替换过程中断电不会损坏原文件。
+     *         不删除未完成事务的任一行，确保 rec 恢复所需上下文完整。
+     */
+    static void trim_completed();
+
     /** 直接写入一行日志（不加时间戳，用于在无 TransactionLog 实例处写日志） */
     static void log_raw(const std::string& line);
 
