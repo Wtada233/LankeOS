@@ -482,6 +482,7 @@ void remove_package(const std::string& pkg_name, bool force) {
         if (e.ends_with('/'))
             dir_paths.emplace_back(fs::path(e));
     std::ranges::sort(dir_paths, std::greater<>{});
+    int dir_count = 0;
     for (const auto& p : dir_paths) {
         cache.remove_file_owner(p.string(), pkg_name);
         if (!cache.get_file_owners(p.string()).empty()) continue;
@@ -493,10 +494,12 @@ void remove_package(const std::string& pkg_name, bool force) {
             fs::remove(phys, ec2);
             if (!ec2) {
                 TransactionLog::log_raw("RM_DIR " + phys.string());
-                log_info(string_format("info.dirs_removed", 1));
+                ++dir_count;
             }
         }
     }
+    if (dir_count > 0)
+        log_info(string_format("info.dirs_removed", dir_count));
 
     // 2c：清理依赖、文档和钩子文件
     const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
