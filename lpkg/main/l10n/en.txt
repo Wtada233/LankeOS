@@ -232,6 +232,7 @@ warning.dep_scan_metadata_parse_failed=Failed to parse metadata for {}: {}
 warning.scan_file_error=Error accessing {} during scan: {}
 warning.recover_pending_txn=Incomplete transaction detected: {} (use 'lpkg rec' to recover)
 warning.recover_rename_failed=Failed to restore {} → {}: {}
+warning.recover_dir_not_empty=Directory {} is not empty after rolling back file entries — left in place for manual inspection
 
 info.recover_start=Recovering from interrupted transaction...
 info.recover_restored=Restored {} → {}

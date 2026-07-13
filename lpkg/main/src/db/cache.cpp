@@ -3,8 +3,11 @@
 #include "utils.hpp"
 #include "exception.hpp"
 #include "localization.hpp"
+#include "transaction_log.hpp"
 #include <fstream>
 #include <sstream>
+#include <unistd.h>
+#include <fcntl.h>
 
 namespace fs = std::filesystem;
 
@@ -291,43 +294,180 @@ void Cache::ensure_essentials() {
 }
 
 /**
- * 如果缓存数据有变动，将所有数据写回磁盘
+ * 如果缓存数据有变动，将所有数据写回磁盘。
+ *
+ * WAL 保护：每个 DB 文件写入前先写 DB/DBNEW 日志，
+ * 将原文件 rename 到 .lpkg_db_bak，再写 .tmp + fsync + rename，
+ * 确保断电时旧内容在 .lpkg_db_bak 中安全保留。
+ * 配合 COMMIT/ROLLBACK 使用，见 recover.cpp 的恢复逻辑。
+ *
+ * @param wal_tag   WAL 事务标签（如包名），用于 .lpkg_db_bak 后缀
  */
-void Cache::write() {
+void Cache::write(const std::string& wal_tag) {
     if (dirty) {
-        write_file_db();
-        write_providers();
-        write_pkgs();
-        write_holdpkgs();
+        write_file_db(wal_tag);
+        write_providers(wal_tag);
+        write_pkgs(wal_tag);
+        write_holdpkgs(wal_tag);
         dirty = false;
     }
 }
 
+/** 保留原无参 write 以兼容不涉及 WAL 的调用 */
+void Cache::write() { write(""); }
+
 /**
  * 将已安装包列表写入磁盘，格式为 包名:版本号
  */
-void Cache::write_pkgs() {
+void Cache::write_pkgs(const std::string& wal_tag) {
     std::unordered_set<std::string> pkg_set;
     for (const auto& [name, ver] : installed_pkgs) {
         pkg_set.insert(name + ":" + ver);
     }
-    write_set_to_file(Config::instance().pkgs_file(), pkg_set);
+    if (wal_tag.empty()) {
+        write_set_to_file(Config::instance().pkgs_file(), pkg_set);
+    } else {
+        write_set_file(Config::instance().pkgs_file(), pkg_set, wal_tag);
+    }
 }
+void Cache::write_pkgs() { write_pkgs(""); }
 
 /**
  * 将锁定包列表写入磁盘
  */
-void Cache::write_holdpkgs() { write_set_to_file(Config::instance().holdpkgs_file(), holdpkgs); }
+void Cache::write_holdpkgs(const std::string& wal_tag) {
+    if (wal_tag.empty())
+        write_set_to_file(Config::instance().holdpkgs_file(), holdpkgs);
+    else
+        write_set_file(Config::instance().holdpkgs_file(), holdpkgs, wal_tag);
+}
+void Cache::write_holdpkgs() { write_holdpkgs(""); }
 
 /**
  * 将文件归属数据库写入磁盘
  */
-void Cache::write_file_db() { write_db_uncached(Config::instance().files_db(), file_db); }
+void Cache::write_file_db(const std::string& wal_tag) {
+    if (wal_tag.empty())
+        write_db_uncached(Config::instance().files_db(), file_db);
+    else
+        write_db_file(Config::instance().files_db(), file_db, wal_tag);
+}
+void Cache::write_file_db() { write_file_db(""); }
 
 /**
  * 将提供者数据库写入磁盘
  */
-void Cache::write_providers() { write_db_uncached(Config::instance().provides_db(), providers); }
+void Cache::write_providers(const std::string& wal_tag) {
+    if (wal_tag.empty())
+        write_db_uncached(Config::instance().provides_db(), providers);
+    else
+        write_db_file(Config::instance().provides_db(), providers, wal_tag);
+}
+void Cache::write_providers() { write_providers(""); }
+
+// ── 文件系统辅助：带 fsync 的原子写入 ──────────────────────────────
+
+namespace {
+
+/** 将内容写出到临时路径、fsync、再 rename 到目标路径。
+ *  rename 在同文件系统内是原子的，fsync 保证 .tmp 内容在断电前完整落盘。 */
+void atomic_write_with_fsync(const fs::path& dst, const fs::path& tmp) {
+    int fd = ::open(tmp.c_str(), O_WRONLY);
+    if (fd >= 0) {
+        ::fsync(fd);
+        ::close(fd);
+    }
+    fs::rename(tmp, dst);
+}
+
+}
+
+// ── WAL 保护的 DB 文件写入 ─────────────────────────────────────────
+
+void Cache::write_db_file(const fs::path& path,
+                           const std::map<std::string, std::unordered_set<std::string>, std::less<>>& db,
+                           const std::string& wal_tag)
+{
+    const fs::path bak = path.string() + ".lpkg_db_bak_" + wal_tag;
+    const fs::path tmp = path.string() + ".tmp";
+
+    // 1) WAL 记录意图
+    TransactionLog::log_raw("DB " + path.string() + " " + wal_tag);
+
+    // 2) 备份原文件（若存在）
+    if (fs::exists(path)) {
+        std::error_code ec;
+        fs::rename(path, bak, ec);
+    }
+
+    // 3) 写出新内容
+    {
+        std::ofstream f(tmp, std::ios::trunc);
+        if (!f.is_open())
+            throw LpkgException(string_format("error.create_tmp_db_failed"));
+        for (const auto& [key, values] : db) {
+            std::string joined;
+            for (const auto& v : values) {
+                if (!joined.empty()) joined += ',';
+                joined += v;
+            }
+            f << key << "\t" << joined << "\n";
+        }
+    }
+
+    // 4) fsync + rename（原子替换）
+    atomic_write_with_fsync(path, tmp);
+}
+
+void Cache::write_set_file(const fs::path& path,
+                            const std::unordered_set<std::string>& data,
+                            const std::string& wal_tag)
+{
+    const fs::path bak = path.string() + ".lpkg_db_bak_" + wal_tag;
+    const fs::path tmp = path.string() + ".tmp";
+
+    TransactionLog::log_raw("DB " + path.string() + " " + wal_tag);
+
+    if (fs::exists(path)) {
+        std::error_code ec;
+        fs::rename(path, bak, ec);
+    }
+
+    {
+        std::ofstream f(tmp, std::ios::trunc);
+        if (!f.is_open())
+            throw LpkgException(string_format("error.create_file_failed", tmp.string()));
+        for (const auto& item : data)
+            f << item << "\n";
+    }
+
+    atomic_write_with_fsync(path, tmp);
+}
+
+void Cache::remove_db_file(const fs::path& path, const std::string& wal_tag) {
+    if (!fs::exists(path)) return;
+
+    const fs::path bak = path.string() + ".lpkg_db_bak_" + wal_tag;
+    TransactionLog::log_raw("DBRM " + path.string() + " " + wal_tag);
+
+    std::error_code ec;
+    fs::rename(path, bak, ec);
+}
+
+/** 扫描 state_dir 下所有 *.lpkg_db_bak 文件并删除。
+ *  事务提交后调用，清理已不再需要的备份。 */
+void Cache::cleanup_db_backups() {
+    const fs::path state_dir = Config::instance().state_dir();
+    if (!fs::exists(state_dir) || !fs::is_directory(state_dir)) return;
+
+    std::error_code ec;
+    for (const auto& entry : fs::directory_iterator(state_dir, ec)) {
+        if (entry.path().extension() == ".lpkg_db_bak"
+            || entry.path().filename().string().find(".lpkg_db_bak") != std::string::npos) {
+            fs::remove(entry.path(), ec);
+        }
+    }
+}
 
 /**
  * 从磁盘读取键-多值数据库（制表符分隔，值以逗号分隔）
