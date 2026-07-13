@@ -127,6 +127,71 @@ static void rollback_committed_packages(std::vector<std::string>& installed) {
     installed.clear();
 }
 
+/**
+ * 在统一批次事务中执行一组安装/升级操作。
+ *
+ * 事务协议：
+ *   正向：BEGIN_PKGS → body() → Cache::write(wal_tag) → COMMIT_PKGS
+ *   异常：body() 抛异常 → rollback_committed_packages → COMMIT_PKGS → rethrow
+ *
+ * 测试断点（由 body 外的框架层管理）：
+ *   break_after_begin_pkgs   — BEGIN_PKGS 刚写入后
+ *   break_before_db_write    — 所有包操作完成、Cache::write 前
+ *   break_before_commit_pkgs — Cache::write 后、COMMIT_PKGS 前
+ *
+ * 与 install_packages_internal / upgrade_packages 的内层 catch 协作：
+ *   内层 catch 已做文件级回滚并清空 success 列表 → 外层调用是空循环 → 幂等。
+ *   外层 breakpoint 触发时 install 已成功返回（success 未清空）→ 外层完成回滚。
+ *
+ * @param success  跟踪已成功操作的包名列表（用于回滚），异常时被清空
+ * @param wal_tag  Cache::write 的 WAL 标签（如 "pkgs"、"upgrade"）
+ * @param total    本次事务涉及的包数量
+ * @param body     实际安装/升级操作的回调
+ */
+static void with_batch_transaction(
+    std::vector<std::string>& success,
+    const std::string& wal_tag,
+    size_t total,
+    const std::function<void()>& body)
+{
+    TransactionLog::log_raw("BEGIN_PKGS " + std::to_string(total));
+
+    try {
+        // 测试断点：BEGIN_PKGS 后立即检查（必须在 try 内，确保 catch 补 COMMIT_PKGS）
+        if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_after_begin_pkgs);
+
+        body();
+
+        // 测试断点：所有包操作完成、DB 写入前
+        if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_before_db_write);
+
+        // 先落盘数据库（WAL 保护），再写 COMMIT_PKGS。
+        // 若 crash 在 Cache::write 与 COMMIT_PKGS 之间，
+        // 恢复时因无 COMMIT_PKGS 而回滚整个事务（含 DB 备份）。
+        Cache::instance().write(wal_tag);
+
+        // 测试断点：DB 写入后、COMMIT_PKGS 前
+        if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_before_commit_pkgs);
+
+        TransactionLog::log_raw("COMMIT_PKGS");
+    } catch (...) {
+        // 回滚同一批次中所有已成功安装的包。
+        // 内层 catch（如 install_packages_internal）已清空 success 时：
+        //   空循环直接返回，幂等安全。
+        // 外层 breakpoint 触发时（如 break_before_db_write）：
+        //   install 已完成，success 非空 → 全量回滚。
+        rollback_committed_packages(success);
+
+        // 补写 COMMIT_PKGS 标记批次完结。文件级清理已由内层 ROLLBACK+END
+        // 完成或本层 rollback_installed_package 完成。批次关闭后 rec 跳过。
+        TransactionLog::log_raw("COMMIT_PKGS");
+        throw;
+    }
+}
+
 // =====================================================================
 // 公开 API
 // =====================================================================
@@ -271,56 +336,8 @@ void install_packages(const std::vector<std::string>& pkg_args,
     }
 
     // ── 第三阶段：needed_so 完整性校验 ──────────────────────────────────
-    // 验证每个包声明的 SONAME 在 plan / 已安装缓存 / repo 中有提供者。
-    // 检查顺序：plan（版本精准）→ 缓存 → repo（版本精准）。
-    // 注意：repo.find_provider 返回最新版本，若最新版本不提供该 SONAME
-    // （如 lib-2.0 不再提供 lib.so.1），则不走 repo 回退，
-    // 避免了"包级通过、版本级缺口"。
-    {
-        bool all_so_ok = true;
-        std::string so_errors;
-        for (const auto& [pname, pplan] : plan) {
-            for (const auto& soname : pplan.needed_so) {
-                bool provided = false;
-
-                // 1) 检查当前 plan 中是否有包提供此 SONAME（版本精准）
-                for (const auto& [pn2, pp2] : plan) {
-                    for (const auto& prov : pp2.provides) {
-                        if (prov == soname) { provided = true; break; }
-                    }
-                    if (provided) break;
-                }
-
-                // 2) 检查已安装缓存
-                if (!provided) {
-                    auto providers = Cache::instance().get_providers(soname);
-                    for (const auto& p : providers) {
-                        if (Cache::instance().is_installed(p) && !plan.contains(p)) {
-                            provided = true; break;
-                        }
-                    }
-                }
-
-                // 3) repo 级别回退——验证返回的版本确实提供此 SONAME
-                if (!provided) {
-                    if (auto prov_pkg = repo.find_provider(soname)) {
-                        for (const auto& prov : prov_pkg->provides) {
-                            if (prov == soname) { provided = true; break; }
-                        }
-                    }
-                }
-
-                if (!provided) {
-                    all_so_ok = false;
-                    so_errors += "  " + string_format("error.unresolved_soname", soname) + "\n";
-                }
-            }
-        }
-        if (!all_so_ok) {
-            log_error(so_errors);
-            throw LpkgException(string_format("error.dependency_conflict_title") + "\n" + so_errors);
-        }
-    }
+    // 委托给共享函数，install 和 upgrade 使用相同的 3-tier 逻辑
+    detail::check_forward_soname_integrity(plan, repo);
 
     // ── 第四阶段：用户确认 ──────────────────────────────────────────────
     // 向用户展示将要安装/升级的包列表（区分用户显式指定的和自动解析的依赖），
@@ -345,7 +362,7 @@ void install_packages(const std::vector<std::string>& pkg_args,
     //   1. 下载包 → 读取真实 metadata.json（验证仓库索引的 deps/provides）
     //   2. 若元数据与索引不匹配 → 更新仓库信息 → 回滚已安装包 → 重解析依赖 → 从头重试
     //   3. 匹配 → 执行 InstallationTask::run()（解压 → 依赖检查 → 冲突检测 → 写文件）
-    // 安装循环。加入批量事务支持：跨包回滚。
+    // 跨包的事务回滚交由 with_batch_transaction 统一管理。
     ctx.successfully_installed.clear();
     ctx.installed_set.clear();
 
@@ -354,43 +371,9 @@ void install_packages(const std::vector<std::string>& pkg_args,
     // 保证只要 COMMIT_PKGS 未写入，恢复机制就能完整回滚（含 DB）。
     // 单包走批量路径后，Cache::write("pkgs") 走 WAL 保护路径，
     // .lpkg_db_bak 在恢复时可还原 DB 至安装前状态。
-    TransactionLog::log_raw("BEGIN_PKGS " + std::to_string(ctx.install_order.size()));
-
-    // 测试断点：BEGIN_PKGS 已写、开始安装前
-    if (Config::instance().testing_mode())
-        testing::check_and_break(testing::break_after_begin_pkgs);
-
-    try {
-        install_packages_internal(ctx);
-
-        // 测试断点：所有包安装完、DB 写入前
-        if (Config::instance().testing_mode())
-            testing::check_and_break(testing::break_before_db_write);
-
-        // 先落盘数据库（WAL 保护），再写 COMMIT_PKGS
-        // 若 crash 在 Cache::write 与 COMMIT_PKGS 之间，
-        // 恢复时因无 COMMIT_PKGS 而回滚整个事务（含 DB 备份）
-        Cache::instance().write("pkgs");
-
-        // 测试断点：DB 写入后、COMMIT_PKGS 前
-        if (Config::instance().testing_mode())
-            testing::check_and_break(testing::break_before_commit_pkgs);
-
-        TransactionLog::log_raw("COMMIT_PKGS");
-    } catch (...) {
-        // 回滚同一批次中所有已成功安装的包（例如 break_before_db_write
-        // 等外层测试断点触发时 install_packages_internal 已正常返回，
-        // 其成功安装的包未经过内层 catch 的回滚）。
-        // install_packages_internal 内层 catch 同样调用了此函数，
-        // 此处对已空列表再次调用是安全的（空循环直接返回）。
-        rollback_committed_packages(ctx.successfully_installed);
-
-        // 补写 COMMIT_PKGS 标记批次完结。内层已通过 ROLLBACK+END 或
-        // remove_package 完成文件级清理，系统已干净。批次关闭后 rec 跳过。
-        // rec 是紧急工具（断电/段错误/OOM），不应依赖它处理正常中断。
-        TransactionLog::log_raw("COMMIT_PKGS");
-        throw;
-    }
+    with_batch_transaction(ctx.successfully_installed, "pkgs",
+        ctx.install_order.size(),
+        [&ctx]() { install_packages_internal(ctx); });
 
     // 测试断点：COMMIT_PKGS 后
     if (Config::instance().testing_mode())
@@ -876,7 +859,8 @@ void autoremove() {
  *   - 使用版比较算法确保 6.16.1 > 6.6.1
  */
 void upgrade_packages() {
-    TransactionLog::trim_completed();  // 新事务开始前压缩已完结日志
+    extern std::atomic<bool> sigint_graceful;
+    TransactionLog::trim_completed();
     log_info(get_string("info.checking_upgradable"));
     TmpDirManager tmp;
     Repository repo;
@@ -887,7 +871,7 @@ void upgrade_packages() {
         return;
     }
 
-    // 在持有锁的情况下获取已安装包列表的快照（避免拷贝全量 map）
+    // ── 快照已安装包列表 ─────────────────────────────────────────────────
     std::vector<std::pair<std::string, std::string>> installed;
     {
         std::lock_guard lock(Cache::instance().get_mutex());
@@ -896,32 +880,108 @@ void upgrade_packages() {
         }
     }
 
-    int count = 0;
+    // ── 构建升级计划（同时检查 sigint） ──────────────────────────────────
+    struct UpgradeEntry {
+        std::string name;
+        std::string old_ver;
+        std::string new_ver;
+        std::string hash;
+        bool held;
+    };
+    std::vector<UpgradeEntry> plan;
+    std::map<std::string, InstallPlan> consistency_plan;
     for (const auto& [n, curr] : installed) {
+        if (sigint_graceful.load()) {
+            log_info(get_string("info.sigint_aborted"));
+            return;
+        }
         auto opt = repo.find_package(n);
         if (!opt) continue;
-        const std::string& lat = opt->version;
+        if (!version_compare(curr, opt->version)) continue;
+        const bool held = Cache::instance().is_held(n);
+        plan.push_back({n, curr, opt->version, opt->sha256, held});
 
-        if (version_compare(curr, lat)) {
-            log_info(string_format("info.upgradable_found", n, curr, lat));
-            try {
-                log_info(string_format("info.upgrading_package", n, curr, lat));
-                const std::string hash = opt->sha256;
-                const bool held = Cache::instance().is_held(n);
-                InstallationTask t(n, lat, held, curr, "", hash, false);
-                t.run();
-                ++count;
-            } catch (const std::exception& e) {
-                log_error(string_format("error.upgrade_failed", n, e.what()));
-            }
-        }
+        // 构建一致性检查用的 InstallPlan（复用 repo 中已解析的元数据）
+        InstallPlan ip;
+        ip.name = n;
+        ip.actual_version = opt->version;
+        ip.dependencies = opt->dependencies;
+        ip.provides = opt->provides;
+        ip.needed_so = opt->needed_so;
+        ip.is_explicit = held;
+        consistency_plan[n] = std::move(ip);
     }
 
-    if (count > 0)
-        log_info(string_format("info.upgraded_packages", count));
-    else
+    if (plan.empty()) {
         log_info(get_string("info.all_packages_latest"));
-    Cache::instance().write("upgrade");  // 使用 WAL 保护路径
+        return;
+    }
+
+    // ── 一致性检查（与 install 同款：正向 SONAME + 反向版本约束 + 反向 SONAME） ──
+    detail::check_forward_soname_integrity(consistency_plan, repo);
+
+    if (auto broken = detail::check_plan_consistency(consistency_plan); !broken.empty()) {
+        log_error(get_string("error.dependency_conflict_title"));
+        std::string msg;
+        for (const auto& p : broken) msg += "  " + p + "\n";
+        log_error(msg);
+        throw LpkgException(msg);
+    }
+
+    if (auto nso_broken = detail::check_needed_so_consistency(consistency_plan);
+        !nso_broken.empty()) {
+        log_error(get_string("error.dependency_conflict_title"));
+        std::string msg;
+        for (const auto& p : nso_broken) msg += "  " + p + "\n";
+        log_error(msg);
+        throw LpkgException(msg);
+    }
+
+    // ── 用户确认 ─────────────────────────────────────────────────────────
+    std::string prompt;
+    for (const auto& e : plan) {
+        prompt += "  " + e.name + " " + e.old_ver + " → " + e.new_ver + "\n";
+    }
+    if (!user_confirms(prompt + get_string("info.confirm_proceed"))) {
+        log_info(get_string("info.installation_aborted"));
+        return;
+    }
+
+    // ── 执行升级（统一批次事务） ─────────────────────────────────────────
+    // 使用与 install_packages 相同的事务协议。任一包升级失败（含 sigint）
+    // 都会触发 rollback_committed_packages 将本批次中已经升级成功的包
+    // 全部降级，保证系统状态一致。
+    std::vector<std::string> success;
+    with_batch_transaction(success, "upgrade", plan.size(), [&]() {
+        for (const auto& e : plan) {
+            if (sigint_graceful.load())
+                throw LpkgException(get_string("info.sigint_aborted"));
+
+            // 测试断点：每个包安装前/后（与 install_packages_internal 一致）
+            if (Config::instance().testing_mode())
+                testing::check_and_break(testing::break_before_each_pkg_install);
+
+            log_info(string_format("info.upgrading_package",
+                     e.name, e.old_ver, e.new_ver));
+            InstallationTask t(e.name, e.new_ver, e.held,
+                               e.old_ver, "", e.hash, false);
+            t.run();
+            success.push_back(e.name);
+
+            if (Config::instance().testing_mode())
+                testing::check_and_break(testing::break_after_each_pkg_install);
+        }
+    });
+
+    // 测试断点：事务提交后
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_after_commit_pkgs);
+
+    if (!success.empty()) {
+        log_info(string_format("info.upgraded_packages", success.size()));
+    } else {
+        log_info(get_string("info.all_packages_latest"));
+    }
     Cache::instance().cleanup_db_backups();
 }
 

@@ -37,8 +37,6 @@ public:
 
 private:
     TriggerManager();
-    /** 注册默认的内置触发器 */
-    void add_default_triggers();
 
     std::set<std::string> pending_triggers;       // 待执行的命令集合（自动去重）
     std::vector<CustomTrigger> custom_triggers;    // 用户自定义触发器列表

@@ -64,4 +64,14 @@ std::set<std::string> check_needed_so_consistency(const std::map<std::string, In
 /// 从已持有的包开始 BFS 遍历依赖图，获取所有必需的包
 std::unordered_set<std::string> get_all_required_packages();
 
+/// 向前 needed_so 完整性校验。
+/// 验证每个包声明的 SONAME 在 plan（版本精准）/ 已安装缓存 / repo（版本精准）
+/// 中有提供者，不存在则抛出 LpkgException。
+/// 与 check_needed_so_consistency（检查升级会破坏已安装包）成对使用：
+///   一个管"新包依赖的 ABI 能否解析"（向前），
+///   一个管"升级后旧依赖者的 ABI 是否断裂"（向后）。
+void check_forward_soname_integrity(
+    const std::map<std::string, InstallPlan>& plan,
+    Repository& repo);
+
 } // namespace detail
