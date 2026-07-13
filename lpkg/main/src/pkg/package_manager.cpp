@@ -208,6 +208,7 @@ void write_cache() {
  */
 void install_packages(const std::vector<std::string>& pkg_args,
                       const std::string& hash_file_path, bool force_reinstall) {
+    recover_packages();                // 自动恢复之前可能中断的事务
     TransactionLog::trim_completed();  // 新事务开始前压缩已完结日志
     Cache::instance().load();
     TmpDirManager tmp;
@@ -503,8 +504,10 @@ void install_packages_internal(InstallContext& ctx) {
  * force 模式下跳过所有安全检查
  */
 void remove_package(const std::string& pkg_name, bool force, bool wrap_in_txn) {
-    if (wrap_in_txn)
+    if (wrap_in_txn) {
+        recover_packages();                // 自动恢复之前可能中断的事务
         TransactionLog::trim_completed();
+    }
     const std::string ver = Cache::instance().get_installed_version(pkg_name);
     if (ver.empty()) {
         log_info(string_format("info.package_not_installed", pkg_name));
@@ -860,6 +863,7 @@ void autoremove() {
  */
 void upgrade_packages() {
     extern std::atomic<bool> sigint_graceful;
+    recover_packages();                // 自动恢复之前可能中断的事务
     TransactionLog::trim_completed();
     log_info(get_string("info.checking_upgradable"));
     TmpDirManager tmp;
@@ -1221,6 +1225,7 @@ void remove_package_recursive(const std::string& pkg_name) {
     }
 
     // ── 4. 原子移除（包裹在统一事务中） ──────────────────────────────
+    recover_packages();                // 自动恢复之前可能中断的事务
     TransactionLog::trim_completed();
     TransactionLog::log_raw("BEGIN_PKGS " + std::to_string(to_remove.size()));
 

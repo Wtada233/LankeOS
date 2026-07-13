@@ -713,3 +713,116 @@ TEST_F(AtomicRollbackTest, SuccessKeepsDirectories) {
     EXPECT_TRUE(fs::exists(test_root / "usr/share/keep-dir/data"));
     EXPECT_TRUE(fs::exists(test_root / "usr/share/keep-dir/"));
 }
+
+
+// ══════════════════════════════════════════════════════════════════════
+// 自动恢复测试（auto-recover before write operations）
+//
+// 验证所有写操作（install/remove）在开始新事务前自动调用
+// recover_packages()，确保 WAL 中的未完成事务先被回滚，再执行
+// 新操作，避免新旧事务混淆。
+//
+// 回归场景：进程断电后未调用 lpkg rec，直接执行新命令。
+// ══════════════════════════════════════════════════════════════════════
+
+// ── 32. 脏 WAL 在 install 前被自动恢复 ──
+TEST_F(AtomicRollbackTest, AutoRecoverDirtyWalBeforeInstall) {
+    // ── 1. 准备一个要通过 install 安装的包 ──
+    make_pkg("install-me", "1.0", {"usr/bin/target_bin"});
+
+    fs::path mirror = setup_local_mirror();
+    add_to_mirror("install-me", "1.0");
+    { std::ofstream idx(mirror / "index.txt");
+      idx << "install-me|1.0:::|\n"; }
+
+    // ── 2. 制造 WAL 脏状态（模拟断电未完成的事务） ──
+    // 场景：先前有一个操作: BEGIN_PKGS 写完、BACKUP 写完、
+    //      原始文件已删（备份到 .lpkg_bak），但 ROLLBACK/COMMIT 未写。
+    fs::path orphan_orig = test_root / "usr/bin/orphan_bin";
+    fs::create_directories(orphan_orig.parent_path());
+    { std::ofstream of(orphan_orig); of << "orphan content"; }
+    fs::path orphan_bak(orphan_orig.string() + ".lpkg_bak_crashed");
+    fs::rename(orphan_orig, orphan_bak);
+
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+    TransactionLog::log_raw("BEGIN crashed-pkg 1.0");
+    TransactionLog::log_raw("BACKUP " + orphan_orig.string()
+                            + " → " + orphan_bak.string());
+    // ← 模拟断电，无 ROLLBACK/END/COMMIT_PKGS
+
+    // ── 3. 执行新安装（应触发自动恢复后再安装） ──
+    EXPECT_NO_THROW(install_packages({"install-me:1.0"}));
+
+    // ── 4. 验证自动恢复生效：孤儿文件被恢复 ──
+    EXPECT_TRUE(fs::exists(orphan_orig))
+        << "auto-recover should restore orphan file";
+    { std::ifstream f(orphan_orig);
+      std::string content; std::getline(f, content);
+      EXPECT_EQ(content, "orphan content"); }
+
+    // ── 5. 验证新安装成功 ──
+    Cache::instance().write();
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("install-me"));
+}
+
+// ── 33. 脏 WAL 在 remove 前被自动恢复 ──
+TEST_F(AtomicRollbackTest, AutoRecoverDirtyWalBeforeRemove) {
+    // ── 1. 制造 WAL 脏状态 ──
+    fs::path orphan_orig = test_root / "usr/bin/survivor_bin";
+    fs::create_directories(orphan_orig.parent_path());
+    { std::ofstream of(orphan_orig); of << "must survive"; }
+    fs::path orphan_bak(orphan_orig.string() + ".lpkg_bak_ghost");
+    fs::rename(orphan_orig, orphan_bak);
+
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+    TransactionLog::log_raw("BEGIN ghost-pkg 1.0");
+    TransactionLog::log_raw("BACKUP " + orphan_orig.string()
+                            + " → " + orphan_bak.string());
+    // ← 模拟断电
+
+    // ── 2. 对不存在的包执行 remove（应触发自动恢复，然后因包未安装返回） ──
+    remove_package("certainly-not-installed", false);
+
+    // ── 3. 验证自动恢复 ──
+    EXPECT_TRUE(fs::exists(orphan_orig))
+        << "auto-recover should restore orphan before remove";
+    { std::ifstream f(orphan_orig);
+      std::string content; std::getline(f, content);
+      EXPECT_EQ(content, "must survive"); }
+
+    // ── 4. 验证 WAL 干净 ──
+    EXPECT_TRUE(TransactionLog::check_pending().empty());
+}
+
+// ── 34. 脏 WAL + 部分写入日志行不干扰自动恢复 ──
+TEST_F(AtomicRollbackTest, AutoRecoverPartialWriteLogLine) {
+    // ── 1. 孤儿文件 + 合法 WAL 行 + 末尾部分行（模拟断电时 write 中断） ──
+    fs::path orig = test_root / "usr/lib/partial.so";
+    fs::create_directories(orig.parent_path());
+    { std::ofstream of(orig); of << "partial data"; }
+    fs::path bak(orig.string() + ".lpkg_bak_partial-pkg");
+    fs::rename(orig, bak);
+
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+    TransactionLog::log_raw("BEGIN partial-pkg 1.0");
+    TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
+    // 追加一个部分写入行（无换行，格式不完整）
+    {
+        std::ofstream f(Config::instance().lock_dir() / "transaction.log",
+                        std::ios::app);
+        f << "[2026-07-13 10:00:00] BACKUP /usr/lib/partial";
+        // 没有换行 — 模拟部分写入
+    }
+
+    // ── 2. 执行 remove，触发自动恢复 ──
+    remove_package("non-existent-pkg", false);
+
+    // ── 3. 验证有效 BACKUP 被恢复、部分行被安全忽略 ──
+    EXPECT_TRUE(fs::exists(orig));
+    { std::ifstream f(orig);
+      std::string content; std::getline(f, content);
+      EXPECT_EQ(content, "partial data"); }
+
+    EXPECT_TRUE(TransactionLog::check_pending().empty());
+}
