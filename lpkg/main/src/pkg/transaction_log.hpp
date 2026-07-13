@@ -42,6 +42,9 @@ public:
     /** 直接写入一行日志（不加时间戳，用于在无 TransactionLog 实例处写日志） */
     static void log_raw(const std::string& line);
 
+    /** 写入一行日志但不 fsync（用于非关键路径，如回滚过程中的追加日志） */
+    static void log_raw_no_fsync(const std::string& line);
+
 private:
     int log_fd_ = -1;
     bool opened_ok_ = false;

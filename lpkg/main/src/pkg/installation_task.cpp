@@ -178,10 +178,10 @@ void InstallationTask::backup_existing_files() {
                 // 只有普通文件和符号链接需要备份（目录被多包共享，不备份）
                 fs::path bak = physical_path;
                 bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
+                // WAL 顺序：先写日志（确保崩溃后可恢复），再执行操作
+                TransactionLog::log_raw("BACKUP " + physical_path.string() + " → " + bak.string());
                 fs::rename(physical_path, bak);
                 backups_.emplace_back(physical_path, bak);
-                // 写事务日志
-                TransactionLog::log_raw("BACKUP " + physical_path.string() + " → " + bak.string());
             }
         } else {
             // 记录新文件（不存在于磁盘上），回滚时需要删除
@@ -577,6 +577,7 @@ void InstallationTask::copy_package_files() {
             } else {
                 // 原子写入：先复制到临时路径，再 rename 到最终位置
                 // rename 在同文件系统内是原子的，避免出现中间态文件
+                // WAL 顺序：先写 COPY 日志（确保崩溃后可恢复），再 rename
                 fs::path tmp_path = final_dest;
                 tmp_path += ".lpkgtmp";
                 fs::copy(src_path, tmp_path,
@@ -590,8 +591,8 @@ void InstallationTask::copy_package_files() {
                         (void)chmod(tmp_path.c_str(), st.st_mode & 07777);
                     }
                 }
-                fs::rename(tmp_path, final_dest);
                 TransactionLog::log_raw("COPY " + tmp_path.string() + " → " + final_dest.string());
+                fs::rename(tmp_path, final_dest);
             }
 
             TriggerManager::instance().check_file((fs::path("/") / f).string());
