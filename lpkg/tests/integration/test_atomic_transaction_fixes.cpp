@@ -137,7 +137,8 @@ TEST_F(AtomicTransactionFixesTest, CopyLogWrittenBeforeRename) {
     // 先写 COPY 日志（模拟新顺序：日志先于 rename）
     fs::path dst = test_root / "usr/bin/copy_tool";
     fs::path tmp_path = dst; tmp_path += ".lpkgtmp";
-    TransactionLog::log_raw("BEGIN " + std::string("copy-order") + " 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN " + std::string("copy-order") + " 1.0");
     TransactionLog::log_raw("COPY " + tmp_path.string() + " → " + dst.string());
     // 注意：没有执行 rename(tmp_path, dst)，模拟日志写完但 rename 前崩溃
 
@@ -179,7 +180,8 @@ TEST_F(AtomicTransactionFixesTest, RecoverFromBackupLogBeforeRename) {
     fs::path bak = orig; bak += ".lpkg_bak_recover-pkg";
 
     // 先写日志（固定顺序后），不执行 rename
-    TransactionLog::log_raw("BEGIN recover-pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN recover-pkg 1.0");
     TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
 
     // 文件还在原位
@@ -203,7 +205,8 @@ TEST_F(AtomicTransactionFixesTest, RecoverFromCopyLogBeforeRename) {
     fs::path tmp_src = dst; tmp_src += ".lpkgtmp";
     { std::ofstream f(tmp_src); f << "new content"; }
 
-    TransactionLog::log_raw("BEGIN copy-recover 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN copy-recover 1.0");
     TransactionLog::log_raw("COPY " + tmp_src.string() + " → " + dst.string());
 
     // 目标文件不存在，.lpkgtmp 存在
@@ -295,7 +298,8 @@ TEST_F(AtomicTransactionFixesTest, RemoveCrashRecoveryRestoresFiles) {
     fs::path bak = orig; bak += ".lpkg_bak_crash-rm";
     ASSERT_TRUE(fs::exists(orig));
 
-    TransactionLog::log_raw("RM_BEGIN crash-rm 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN crash-rm 1.0");
     TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
     fs::rename(orig, bak);  // 模拟 "移除"（rename to .bak）
     ASSERT_FALSE(fs::exists(orig));
@@ -352,7 +356,8 @@ TEST_F(AtomicTransactionFixesTest, BatchCrashRollsBackAll) {
     {
         fs::path f1 = test_root / "usr/bin/batch1_file";
         fs::path bak1 = f1; bak1 += ".lpkg_bak_batch-roll1";
-        TransactionLog::log_raw("BEGIN batch-roll1 1.0");
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN batch-roll1 1.0");
         TransactionLog::log_raw("BACKUP " + f1.string() + " → " + bak1.string());
         fs::rename(f1, bak1);
         { std::ofstream of(f1); of << "pkg:usr/bin/batch1_file"; }
@@ -365,7 +370,8 @@ TEST_F(AtomicTransactionFixesTest, BatchCrashRollsBackAll) {
     {
         fs::path f2 = test_root / "usr/bin/batch2_file";
         fs::path bak2 = f2; bak2 += ".lpkg_bak_batch-roll2";
-        TransactionLog::log_raw("BEGIN batch-roll2 1.0");
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN batch-roll2 1.0");
         TransactionLog::log_raw("BACKUP " + f2.string() + " → " + bak2.string());
         fs::rename(f2, bak2);
         { std::ofstream of(f2); of << "pkg:usr/bin/batch2_file"; }
@@ -448,7 +454,8 @@ TEST_F(AtomicTransactionFixesTest, RecoverSkipsCompletedRemove) {
     fs::create_directories(orig.parent_path());
     { std::ofstream f(orig); f << "data"; }
 
-    TransactionLog::log_raw("RM_BEGIN done-pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN done-pkg 1.0");
     TransactionLog::log_raw("BACKUP " + orig.string() + " → " + orig.string() + ".lpkg_bak_done-pkg");
     TransactionLog::log_raw("RM_COMMIT done-pkg 1.0");
 
@@ -468,7 +475,8 @@ TEST_F(AtomicTransactionFixesTest, RecoverRollsBackUncommittedRemove) {
 
     fs::path bak = orig; bak += ".lpkg_bak_pending-pkg";
 
-    TransactionLog::log_raw("RM_BEGIN pending-pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN pending-pkg 1.0");
     TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
     fs::rename(orig, bak);
 
@@ -500,15 +508,18 @@ TEST_F(AtomicTransactionFixesTest, BatchAndRemoveLogSeparation) {
     // 写一个 BEGIN_PKGS + COMMIT_PKGS，然后一个 RM_BEGIN + RM_COMMIT
     // 验证 rec 不会混淆两者
     TransactionLog::log_raw("BEGIN_PKGS 2");
-    TransactionLog::log_raw("BEGIN pkg1 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg1 1.0");
     TransactionLog::log_raw("COMMIT pkg1 1.0");
     TransactionLog::log_raw("END pkg1 1.0");
-    TransactionLog::log_raw("BEGIN pkg2 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg2 1.0");
     TransactionLog::log_raw("COMMIT pkg2 1.0");
     TransactionLog::log_raw("END pkg2 1.0");
     TransactionLog::log_raw("COMMIT_PKGS");
 
-    TransactionLog::log_raw("RM_BEGIN remove-pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN remove-pkg 1.0");
     TransactionLog::log_raw("BACKUP /dummy → /dummy.lpkg_bak_remove-pkg");
     TransactionLog::log_raw("RM_COMMIT remove-pkg 1.0");
     TransactionLog::log_raw("RM_END remove-pkg 1.0");
@@ -542,14 +553,16 @@ TEST_F(AtomicTransactionFixesTest, BatchWithoutCommitRollsBackAll) {
 
     TransactionLog::log_raw("BEGIN_PKGS 2");
     // pkg1 已安装（自己的 COMMIT 已写）
-    TransactionLog::log_raw("BEGIN pkg1 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg1 1.0");
     TransactionLog::log_raw("BACKUP " + f1.string() + " → " + (f1.string() + ".lpkg_bak_pkg1"));
     fs::rename(f1, f1.string() + ".lpkg_bak_pkg1");
     { std::ofstream of(f1); of << "new1"; }
     TransactionLog::log_raw("COMMIT pkg1 1.0");
     TransactionLog::log_raw("END pkg1 1.0");
     // pkg2 未完成（无 COMMIT）
-    TransactionLog::log_raw("BEGIN pkg2 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg2 1.0");
     TransactionLog::log_raw("BACKUP " + f2.string() + " → " + (f2.string() + ".lpkg_bak_pkg2"));
     fs::rename(f2, f2.string() + ".lpkg_bak_pkg2");
     { std::ofstream of(f2); of << "new2"; }
@@ -582,7 +595,8 @@ TEST_F(AtomicTransactionFixesTest, RemoveBeginNoCommitRecRestores) {
 
     fs::path bak = orig; bak += ".lpkg_bak_partial-rm";
 
-    TransactionLog::log_raw("RM_BEGIN partial-rm 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN partial-rm 1.0");
     TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
     fs::rename(orig, bak);
     // 没有 RM_COMMIT
@@ -602,10 +616,12 @@ TEST_F(AtomicTransactionFixesTest, RemoveBeginNoCommitRecRestores) {
 // ═══════════════════════════════════════════════════════════════════════
 
 TEST_F(AtomicTransactionFixesTest, LastUncommittedOnly) {
-    TransactionLog::log_raw("BEGIN done1 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN done1 1.0");
     TransactionLog::log_raw("COMMIT done1 1.0");
     TransactionLog::log_raw("END done1 1.0");
-    TransactionLog::log_raw("RM_BEGIN done2 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN done2 1.0");
     TransactionLog::log_raw("RM_COMMIT done2 1.0");
     TransactionLog::log_raw("RM_END done2 1.0");
     TransactionLog::log_raw("BEGIN_PKGS 1");
@@ -742,15 +758,18 @@ TEST_F(AtomicTransactionFixesTest, MixedTxnsOnlyLastUncommitted) {
     { std::ofstream f(orig_b); f << "b_data"; }
 
     // 完整的事务
-    TransactionLog::log_raw("BEGIN pkgA 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkgA 1.0");
     TransactionLog::log_raw("COMMIT pkgA 1.0");
     TransactionLog::log_raw("END pkgA 1.0");
-    TransactionLog::log_raw("RM_BEGIN pkgB 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN pkgB 1.0");
     TransactionLog::log_raw("RM_COMMIT pkgB 1.0");
     TransactionLog::log_raw("RM_END pkgB 1.0");
 
     // 未提交的移除
-    TransactionLog::log_raw("RM_BEGIN pkgC 2.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN pkgC 2.0");
     TransactionLog::log_raw("BACKUP " + orig_a.string() + " → " + (orig_a.string() + ".lpkg_bak_pkgC"));
     fs::rename(orig_a, orig_a.string() + ".lpkg_bak_pkgC");
     // 没有 RM_COMMIT
@@ -768,11 +787,13 @@ TEST_F(AtomicTransactionFixesTest, MixedTxnsOnlyLastUncommitted) {
 TEST_F(AtomicTransactionFixesTest, BatchContainsRemove) {
     // 在批量事务内部包含移除操作（例如升级场景）
     TransactionLog::log_raw("BEGIN_PKGS 2");
-    TransactionLog::log_raw("RM_BEGIN old-pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN old-pkg 1.0");
     TransactionLog::log_raw("BACKUP /dummy → /dummy.lpkg_bak_old-pkg");
     TransactionLog::log_raw("RM_COMMIT old-pkg 1.0");
     TransactionLog::log_raw("RM_END old-pkg 1.0");
-    TransactionLog::log_raw("BEGIN new-pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN new-pkg 1.0");
     TransactionLog::log_raw("COMMIT new-pkg 1.0");
     TransactionLog::log_raw("END new-pkg 1.0");
     // 没有 COMMIT_PKGS → 完整批量未提交
@@ -846,7 +867,8 @@ TEST_F(AtomicTransactionFixesTest, UpgradeRemoveOldRecRestores) {
     ASSERT_TRUE(fs::exists(bak));
 
     // WAL：BEGIN + REMOVE_OLD，没有 COMMIT（模拟崩溃）
-    TransactionLog::log_raw("BEGIN upgrade-pkg 2.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN upgrade-pkg 2.0");
     TransactionLog::log_raw("REMOVE_OLD " + obsolete_path.string() + " → " + bak.string());
 
     // rec 应恢复

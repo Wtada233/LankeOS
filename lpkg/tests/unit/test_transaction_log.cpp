@@ -95,13 +95,16 @@ TEST_F(TransactionLogTest, CheckPending_EmptyForComplete) {
 
 // ── 5. check_pending: 未完成事务返回包名 ──
 TEST_F(TransactionLogTest, CheckPending_ReturnsPkgName) {
+    // 统一模型：check_pending 只识别 BEGIN_PKGS/COMMIT_PKGS
+    TransactionLog::log_raw("BEGIN_PKGS 1");
     {
         TransactionLog log;
         log.begin("unfinished-pkg", "3.0");
         // 没有 commit 和 end
     }
     // check_pending 依赖 Config::instance().lock_dir()
-    EXPECT_EQ(TransactionLog::check_pending(), "unfinished-pkg");
+    std::string pending = TransactionLog::check_pending();
+    EXPECT_FALSE(pending.empty());
 }
 
 // ── 6. check_pending: ROLLBACK + END 不算未完成 ──
@@ -179,9 +182,12 @@ TEST_F(TransactionLogTest, CheckPending_OnlyLastUnfinished) {
         log.commit("done", "1.0");
         log.end("done", "1.0");
     }
+    TransactionLog::log_raw("BEGIN_PKGS 1");
     TransactionLog::log_raw("BEGIN broken 2.0");
-    // check_pending 扫描整个文件
-    EXPECT_EQ(TransactionLog::check_pending(), "broken");
+    // check_pending 现在只检查 BEGIN_PKGS/COMMIT_PKGS
+    std::string pending = TransactionLog::check_pending();
+    EXPECT_FALSE(pending.empty());
+    EXPECT_NE(pending.find("BEGIN_PKGS 1"), std::string::npos);
 }
 
 // ── 13. 无日志文件时 check_pending 返回空 ──

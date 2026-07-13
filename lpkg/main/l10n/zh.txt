@@ -125,7 +125,7 @@ error.unresolvable_drift=无法解决的元数据漂移，包 '{}': {}
 error.unresolved_soname=所需的 SONAME '{}' 在仓库和安装计划中均无提供者
 info.installing_discovered_dep=发现缺失的依赖 '{}'，正在加入安装队列...
 info.log_prefix==> 
-info.upgrade_old_files_check=正在升级: {} → {}, 发现 {} 个旧文件待处理
+info.upgrade_old_files_check=正在替换: {} → {}, {} 个旧文件待处理
 info.rollback_debug_files=回滚: new_files_ 共 {} 条
 info.rollback_debug_dirs=回滚: {} 个目录待删除
 info.rollback_debug_dirpath=  将删除目录: {}
@@ -150,6 +150,7 @@ help.output_file=输出文件路径
 help.pack_source=打包的源目录
 help.force=即使被其他包依赖也强制删除
 help.force_overwrite=覆盖未跟踪的文件
+help.recursive=递归移除包及其所有依赖者
 help.no_hooks=不运行安装后或移除前钩子
 help.no_deps=不解析或安装依赖
 help.hash=用于本地安装验证的哈希文件路径
@@ -232,6 +233,7 @@ warning.dep_scan_metadata_parse_failed=解析 {} 的元数据失败: {}
 warning.scan_file_error=扫描期间访问 {} 出错: {}
 warning.recover_pending_txn=检测到未完成的事务: {}（使用 'lpkg rec' 恢复）
 warning.recover_rename_failed=恢复备份 {} → {} 失败: {}
+warning.recover_skip_copy=未找到 {} 的备份文件，跳过删除以防止数据丢失。
 warning.recover_dir_not_empty=目录 {} 回滚文件条目后仍非空 — 已保留以待人工检查
 
 info.recover_start=正在从中断的事务中恢复...
@@ -242,3 +244,14 @@ info.recover_no_log=未找到事务日志，无需恢复。
 info.recover_no_pending=无未完成的事务。
 info.recover_rollback_txn=正在回滚未完成的事务: {}
 info.recover_done=恢复完成。{} 个文件已恢复，{} 个临时文件已清理。
+
+info.recursive_remove_start=正在构建 {} 的递归依赖树...
+info.recursive_remove_header=将要移除的包：
+info.recursive_remove_item=  - {}
+info.recursive_removing=正在移除 {}...
+info.recursive_remove_done=递归移除完成。
+info.recursive_nothing_to_remove=没有可移除的受影响包。
+info.recursive_protected_header=跳过受保护的包（核心/锁定）：
+info.recursive_confirm_prompt=警告 {}/3 — 输入验证码 [{}] 确认递归移除：
+
+info.recursive_confirm_failed=验证码错误，递归移除已中止。

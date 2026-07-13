@@ -143,7 +143,8 @@ TEST_F(LogTrimIntegrationTest, CrashWithoutRollbackThenTrimPreservesLog) {
 
     // 模拟：备份完成但 crash，未写 ROLLBACK/END
     fs::remove(log_path);
-    TransactionLog::log_raw("BEGIN t03 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN t03 1.0");
     {
         fs::path f = test_root / "usr/bin/t03";
         fs::path bak = f; bak += ".lpkg_bak_t03";
@@ -179,7 +180,8 @@ TEST_F(LogTrimIntegrationTest, BatchCrashTrimPreservesFullBatch) {
     // 手动模拟批量事务：pkg-a 完成，pkg-b 未完成，无 COMMIT_PKGS
     fs::remove(log_path);
     TransactionLog::log_raw("BEGIN_PKGS 2");
-    TransactionLog::log_raw("BEGIN t04a 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN t04a 1.0");
     {
         fs::path f = test_root / "usr/bin/t04a";
         fs::path b = f; b += ".lpkg_bak_t04a";
@@ -189,7 +191,8 @@ TEST_F(LogTrimIntegrationTest, BatchCrashTrimPreservesFullBatch) {
         TransactionLog::log_raw("COMMIT t04a 1.0");
         TransactionLog::log_raw("END t04a 1.0");
     }
-    TransactionLog::log_raw("BEGIN t04b 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN t04b 1.0");
     {
         fs::path f = test_root / "usr/bin/t04b";
         fs::path b = f; b += ".lpkg_bak_t04b";
@@ -230,7 +233,8 @@ TEST_F(LogTrimIntegrationTest, TrimAfterRecoveryIsClean) {
     fs::remove(log_path);
 
     // 模拟移除中断（写一半没电了）
-    TransactionLog::log_raw("RM_BEGIN t05 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN t05 1.0");
     fs::path f = test_root / "usr/bin/t05";
     fs::path bak = f; bak += ".lpkg_bak_t05";
     TransactionLog::log_raw("BACKUP " + f.string() + " → " + bak.string());

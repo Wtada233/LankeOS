@@ -109,9 +109,16 @@ static int handle_command(const std::string& command,
 
     } else if (command == constants::CMD_REMOVE) {
         pre_operation_check(result, usage, 1);
-        for (const auto& pkg : result["packages"].as<std::vector<std::string>>()) {
-            remove_package(pkg, result["force"].as<bool>());
-            write_cache();
+        if (result["recursive"].as<bool>()) {
+            for (const auto& pkg : result["packages"].as<std::vector<std::string>>()) {
+                remove_package_recursive(pkg);
+                write_cache();
+            }
+        } else {
+            for (const auto& pkg : result["packages"].as<std::vector<std::string>>()) {
+                remove_package(pkg, result["force"].as<bool>());
+                write_cache();
+            }
         }
         log_info(get_string("info.uninstall_complete"));
 
@@ -252,6 +259,7 @@ int main(int argc, char* argv[]) {
             ("force-overwrite", get_string("help.force_overwrite"), cxxopts::value<bool>()->default_value("false"))
             ("no-hooks", get_string("help.no_hooks"), cxxopts::value<bool>()->default_value("false"))
             ("no-deps", get_string("help.no_deps"), cxxopts::value<bool>()->default_value("false"))
+            ("r,recursive", get_string("help.recursive"), cxxopts::value<bool>()->default_value("false"))
             ("root", get_string("help.root_dir"), cxxopts::value<std::string>())
             ("arch", get_string("help.target_arch"), cxxopts::value<std::string>())
             ("hash", get_string("help.hash"), cxxopts::value<std::string>())

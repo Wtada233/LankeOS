@@ -100,10 +100,32 @@ std::pair<int, int> reverse_execute(const std::vector<WALOp>& ops,
         } else if (op.type == "COPY") {
             // COPY <src> → <dst>
             // 反向：删除 dst（已复制过去的目标），清理 src（.lpkgtmp 临时文件）
+            //
+            // 安全检查：如果 dst 文件存在，检查正向顺序中是否有对应的 BACKUP 操作
+            // 将同一路径备份到 .lpkg_bak。如果有且备份文件已不存在，说明此 COPY
+            // 已被回滚过——dst 是 BACKUP 恢复回来的文件而非新写入的文件，不能删除。
             bool removed = false;
             if (fs::exists(op.arg2) || fs::is_symlink(op.arg2)) {
-                fs::remove(op.arg2, ec);
-                if (!ec) { cleaned++; removed = true; }
+                bool skip_remove = false;
+                // 在反向遍历时，正向顺序中在 COPY 之前的 ops 位于 [0, i-1]。
+                // BACKUP 在正向顺序中在 COPY 之前（先备份再复制），
+                // 所以匹配的 BACKUP 需要在 [0, i-1] 中查找。
+                for (int j = 0; j < i; ++j) {
+                    if (ops[j].type == "BACKUP" && ops[j].arg1 == op.arg2) {
+                        if (!fs::exists(ops[j].arg2)) {
+                            // 备份文件已不存在（已被 BACKUP 恢复消费），
+                            // 说明此 COPY 反向已被执行过——跳过
+                            log_warning(string_format(
+                                "warning.recover_skip_copy", op.arg2));
+                            skip_remove = true;
+                        }
+                        break;
+                    }
+                }
+                if (!skip_remove) {
+                    fs::remove(op.arg2, ec);
+                    if (!ec) { cleaned++; removed = true; }
+                }
             }
             if (fs::exists(op.arg1)) {
                 fs::remove(op.arg1, ec);

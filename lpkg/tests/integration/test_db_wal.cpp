@@ -73,7 +73,8 @@ TEST_F(DbWalTest, DbModifyRollbackRestoresFile) {
     ASSERT_EQ(read_pkgs(), std::vector<std::string>({"old-pkg:1.0"}));
 
     fs::path bak = db_bak(pkgs_path, "new-pkg");
-    raw_log("BEGIN new-pkg 2.0");
+    raw_log("BEGIN_PKGS 1");
+raw_log("BEGIN new-pkg 2.0");
     fs::rename(pkgs_path, bak);
     write_pkgs({"old-pkg:1.0", "new-pkg:2.0"});
     raw_log("DB " + pkgs_path.string() + " new-pkg");
@@ -97,7 +98,8 @@ TEST_F(DbWalTest, DbNewRollbackDeletesFile) {
     fs::path new_db = Config::instance().state_dir() / "test_new.db";
     ASSERT_FALSE(fs::exists(new_db));
 
-    raw_log("BEGIN newdb-pkg 1.0");
+    raw_log("BEGIN_PKGS 1");
+raw_log("BEGIN newdb-pkg 1.0");
     { std::ofstream f(new_db); f << "new data"; }
     raw_log("DBNEW " + new_db.string() + " newdb-pkg");
     // 没有 COMMIT
@@ -111,11 +113,13 @@ TEST_F(DbWalTest, DbNewWithCommitPreservesFile) {
     fs::path new_db = Config::instance().state_dir() / "test_new_commit.db";
     ASSERT_FALSE(fs::exists(new_db));
 
-    raw_log("BEGIN newdb-pkg 1.0");
+    raw_log("BEGIN_PKGS 1");
+raw_log("BEGIN newdb-pkg 1.0");
     { std::ofstream f(new_db); f << "new data"; }
     raw_log("DBNEW " + new_db.string() + " newdb-pkg");
     raw_log("COMMIT newdb-pkg 1.0");
     raw_log("END newdb-pkg 1.0");
+    raw_log("COMMIT_PKGS");
 
     recover_packages();
 
@@ -132,7 +136,8 @@ TEST_F(DbWalTest, DbNewWithCommitPreservesFile) {
 TEST_F(DbWalTest, DbRmRollbackRestoresFile) {
     fs::path bak = db_bak(pkgs_path, "rm-pkg");
 
-    raw_log("BEGIN rm-pkg 1.0");
+    raw_log("BEGIN_PKGS 1");
+raw_log("BEGIN rm-pkg 1.0");
     fs::rename(pkgs_path, bak);
     raw_log("DBRM " + pkgs_path.string() + " rm-pkg");
     // 没有 COMMIT
@@ -157,7 +162,8 @@ TEST_F(DbWalTest, FullCommitPreservesDbAndFileState) {
     fs::path test_file = test_root / "usr/bin/commit_test";
     fs::create_directories(test_file.parent_path());
 
-    raw_log("BEGIN commit-pkg 1.0");
+    raw_log("BEGIN_PKGS 1");
+raw_log("BEGIN commit-pkg 1.0");
     raw_log("NEW " + test_file.string());
     { std::ofstream f(test_file); f << "new file"; }
 
@@ -167,6 +173,7 @@ TEST_F(DbWalTest, FullCommitPreservesDbAndFileState) {
 
     raw_log("COMMIT commit-pkg 1.0");
     raw_log("END commit-pkg 1.0");
+    raw_log("COMMIT_PKGS");
 
     recover_packages();
 
@@ -186,7 +193,8 @@ TEST_F(DbWalTest, NoCommitRollsBackBothFilesAndDb) {
     fs::path test_file = test_root / "usr/bin/roll_test";
     fs::create_directories(test_file.parent_path());
 
-    raw_log("BEGIN roll-pkg 1.0");
+    raw_log("BEGIN_PKGS 1");
+raw_log("BEGIN roll-pkg 1.0");
     raw_log("NEW " + test_file.string());
     { std::ofstream f(test_file); f << "orphan"; }
 
@@ -287,7 +295,8 @@ TEST_F(DbWalTest, BatchThreePackagesSameDbReturnsToOriginal) {
 // ═════════════════════════════════════════════════════════════════════════
 
 TEST_F(DbWalTest, DbEntryNoBakDoesNothing) {
-    raw_log("BEGIN ghost 1.0");
+    raw_log("BEGIN_PKGS 1");
+raw_log("BEGIN ghost 1.0");
     // WAL 条目已写但 .bak 从未创建（crash 在 rename 之前）
     raw_log("DB " + pkgs_path.string() + " ghost");
     // 没有 COMMIT
@@ -309,7 +318,8 @@ TEST_F(DbWalTest, MultipleDbFilesRollback) {
     fs::create_directories(test_file.parent_path());
     Config::instance().init_filesystem();
 
-    raw_log("BEGIN multi-pkg 1.0");
+    raw_log("BEGIN_PKGS 1");
+raw_log("BEGIN multi-pkg 1.0");
     raw_log("NEW " + test_file.string());
     { std::ofstream f(test_file); f << "multi test"; }
 
@@ -343,7 +353,8 @@ TEST_F(DbWalTest, RemoveTransactionRollbackDb) {
 
     fs::path bak = db_bak(pkgs_path, "remove-me");
 
-    raw_log("RM_BEGIN remove-me 1.0");
+    raw_log("BEGIN_PKGS 1");
+raw_log("RM_BEGIN remove-me 1.0");
     fs::rename(pkgs_path, bak);
     write_pkgs({"old-pkg:1.0"});
     raw_log("DBRM " + pkgs_path.string() + " remove-me");
