@@ -268,11 +268,13 @@ TEST_F(StressRecoveryTest, CrashBeforeCommitPkgs) {
     EXPECT_ANY_THROW(install_packages({lib_pkg_path}));
     sigint_graceful.store(false);
 
-    // DB 在磁盘上（WAL 保护），但 COMMIT_PKGS 未写 → rec 应回滚 DB
+    // 外层 catch 中的 rollback_committed_packages() 会移除已安装的包，
+    // 保证批次原子性，然后补写 COMMIT_PKGS 关闭批次。
     recover_packages();
 
     Cache::instance().load();
-    EXPECT_FALSE(db_installed("libbase")) << "DB rolled back via .lpkg_db_bak";
+    EXPECT_FALSE(db_installed("libbase")) << "batch rolled back, atomicity preserved";
+    EXPECT_FALSE(file_exists("usr/bin/libbase")) << "files removed by rollback";
     Config::instance().set_force_overwrite_mode(false);
 }
 
@@ -285,7 +287,7 @@ TEST_F(StressRecoveryTest, CrashAfterFirstPkgInBatch) {
     EXPECT_ANY_THROW(install_packages({lib_pkg_path}));
     sigint_graceful.store(false);
 
-    // 批量未提交的单个包 → rec 回滚
+    // fix: 已有包成功安装 → 不写 COMMIT_PKGS → rec 统一回滚
     recover_packages();
 
     Cache::instance().load();

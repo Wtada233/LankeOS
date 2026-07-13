@@ -37,6 +37,96 @@
 
 namespace fs = std::filesystem;
 
+// ── 事务回滚：撤销一个已成功安装的包 ────────────────────────────────
+// 这是 register_package + copy_package_files 的逆操作。
+// 与 remove_package 的语义区别：
+//   remove_package → 用户主动删除（写 RM_BEGIN/BACKUP/RM_COMMIT，运行 prerm 钩子）
+//   rollback       → 事务回滚（直接删文件，不运行钩子，写 ROLLBACK WAL 行）
+// 审计视角：WAL 中 ROLLBACK + END 标记明确表示"因事务失败而回滚"。
+static void rollback_installed_package(const std::string& pkg_name) {
+    auto& cache = Cache::instance();
+    const std::string ver = cache.get_installed_version(pkg_name);
+    if (ver.empty()) return;
+
+    log_info(string_format("info.batch_rollback_pkg", pkg_name));
+
+    // 1. 清理文件归属 → 删除文件
+    // get_package_files 返回 /usr/bin/... 格式的绝对路径，需用
+    // .relative_path() 与 root_dir 正确拼接（否则 fs::path 忽略 root_dir）。
+    auto owned_files = cache.get_package_files(pkg_name);
+    for (const auto& f : owned_files) {
+        if (f.ends_with('/')) continue;
+        const fs::path phys = Config::instance().root_dir() / fs::path(f).relative_path();
+        std::error_code ec;
+        if (fs::exists(phys) || fs::is_symlink(phys))
+            fs::remove(phys, ec);
+        cache.remove_file_owner(f, pkg_name);
+    }
+
+    // 2. 清理目录（仅最后持有者时删除）
+    for (const auto& f : owned_files) {
+        if (!f.ends_with('/')) continue;
+        cache.remove_file_owner(f, pkg_name);
+        if (cache.get_file_owners(f).empty()) {
+            const fs::path phys = Config::instance().root_dir() / fs::path(f).relative_path();
+            std::error_code ec;
+            if (fs::exists(phys) && fs::is_directory(phys) && fs::is_empty(phys))
+                fs::remove(phys, ec);
+        }
+    }
+
+    // 3. 撤销依赖关系
+    std::error_code ec;
+    const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
+    if (fs::exists(dep_file)) {
+        std::ifstream f(dep_file);
+        std::string line;
+        while (std::getline(f, line)) {
+            std::stringstream ss(line);
+            std::string dn;
+            if (ss >> dn)
+                cache.remove_reverse_dep(dn, pkg_name);
+        }
+    }
+    fs::remove(dep_file, ec);
+
+    // 4. 撤销 needed_so
+    fs::remove(Config::instance().needed_so_dir() / pkg_name, ec);
+
+    // 5. 撤销 man page
+    fs::remove(Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), ec);
+
+    // 6. 撤销 hooks
+    fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
+
+    // 7. 撤销 providers
+    for (const auto& cap : cache.get_package_provides(pkg_name))
+        cache.remove_provider(cap, pkg_name);
+
+    // 8. 撤销注册
+    cache.remove_installed(pkg_name);
+
+    // 9. 将内存缓存的变更落盘（WAL 保护），写入 DB/DBNEW 日志，
+    //    配合外层 COMMIT_PKGS 构成完整的事务记录。
+    cache.write(pkg_name);
+
+    // 10. WAL：ROLLBACK + END 明确标记"事务回滚"
+    TransactionLog::log_raw("ROLLBACK " + pkg_name + " " + ver);
+    TransactionLog::log_raw("END " + pkg_name + " " + ver);
+}
+
+// ── 批量回滚：撤销同一批次中所有已成功安装的包 ────────────────────
+static void rollback_committed_packages(std::vector<std::string>& installed) {
+    for (auto it = installed.rbegin(); it != installed.rend(); ++it) {
+        try {
+            rollback_installed_package(*it);
+        } catch (const std::exception& e) {
+            log_warning(string_format("warning.batch_rollback_failed", *it, e.what()));
+        }
+    }
+    installed.clear();
+}
+
 // =====================================================================
 // 公开 API
 // =====================================================================
@@ -270,22 +360,37 @@ void install_packages(const std::vector<std::string>& pkg_args,
     if (Config::instance().testing_mode())
         testing::check_and_break(testing::break_after_begin_pkgs);
 
-    install_packages_internal(ctx);
+    try {
+        install_packages_internal(ctx);
 
-    // 测试断点：所有包安装完、DB 写入前
-    if (Config::instance().testing_mode())
-        testing::check_and_break(testing::break_before_db_write);
+        // 测试断点：所有包安装完、DB 写入前
+        if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_before_db_write);
 
-    // 先落盘数据库（WAL 保护），再写 COMMIT_PKGS
-    // 若 crash 在 Cache::write 与 COMMIT_PKGS 之间，
-    // 恢复时因无 COMMIT_PKGS 而回滚整个事务（含 DB 备份）
-    Cache::instance().write("pkgs");
+        // 先落盘数据库（WAL 保护），再写 COMMIT_PKGS
+        // 若 crash 在 Cache::write 与 COMMIT_PKGS 之间，
+        // 恢复时因无 COMMIT_PKGS 而回滚整个事务（含 DB 备份）
+        Cache::instance().write("pkgs");
 
-    // 测试断点：DB 写入后、COMMIT_PKGS 前
-    if (Config::instance().testing_mode())
-        testing::check_and_break(testing::break_before_commit_pkgs);
+        // 测试断点：DB 写入后、COMMIT_PKGS 前
+        if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_before_commit_pkgs);
 
-    TransactionLog::log_raw("COMMIT_PKGS");
+        TransactionLog::log_raw("COMMIT_PKGS");
+    } catch (...) {
+        // 回滚同一批次中所有已成功安装的包（例如 break_before_db_write
+        // 等外层测试断点触发时 install_packages_internal 已正常返回，
+        // 其成功安装的包未经过内层 catch 的回滚）。
+        // install_packages_internal 内层 catch 同样调用了此函数，
+        // 此处对已空列表再次调用是安全的（空循环直接返回）。
+        rollback_committed_packages(ctx.successfully_installed);
+
+        // 补写 COMMIT_PKGS 标记批次完结。内层已通过 ROLLBACK+END 或
+        // remove_package 完成文件级清理，系统已干净。批次关闭后 rec 跳过。
+        // rec 是紧急工具（断电/段错误/OOM），不应依赖它处理正常中断。
+        TransactionLog::log_raw("COMMIT_PKGS");
+        throw;
+    }
 
     // 测试断点：COMMIT_PKGS 后
     if (Config::instance().testing_mode())
@@ -396,7 +501,10 @@ void install_packages_internal(InstallContext& ctx) {
             task.run(&ctx);
             ctx.successfully_installed.push_back(p.name);
             ctx.installed_set.insert(p.name);
-        } catch (const std::exception& e) {
+        } catch (...) {
+            // 当前包已由 InstallationTask::run() 的 catch 完成文件级回滚。
+            // 同一批次中已成功安装的前序包也需全部撤销，以保证批次原子性。
+            rollback_committed_packages(ctx.successfully_installed);
             throw;
         }
 

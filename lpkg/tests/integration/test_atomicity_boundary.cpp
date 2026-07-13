@@ -5,6 +5,7 @@
 #include "../../main/src/config/config.hpp"
 #include "../../main/src/base/utils.hpp"
 #include "../../main/src/base/constants.hpp"
+#include "../../main/src/base/testing_breakpoints.hpp"
 #include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/install_common.hpp"
 #include "../../main/src/archive/packer.hpp"
@@ -2048,4 +2049,137 @@ TransactionLog::log_raw("BEGIN lpkg 5.0.1");
     recover_packages();
     EXPECT_TRUE(fs::exists(test_root / "usr/bin/lpkg"));
     EXPECT_EQ(file_content("usr/bin/lpkg"), content_after_first_rec);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// 分组 G：回归测试 — BEGIN_PKGS 被 ROLLBACK+END 闭合后批次完结标记
+// ═══════════════════════════════════════════════════════════════════════
+
+// G01: install_packages 在 SIGINT 回滚后补写 COMMIT_PKGS
+TEST_F(AtomicityBoundaryTest, RollbackWritesCommitPkgs) {
+    std::string pkg = make_pkg("g01", "1.0", {"usr/bin/g01_tool"});
+
+    Config::instance().set_force_overwrite_mode(true);
+    InstallationTask task("g01", "1.0", true, "", pkg);
+    task.on_before_file_copy = [&]{ sigint_graceful.store(true); };
+    EXPECT_ANY_THROW(task.run_simple());
+    Config::instance().set_force_overwrite_mode(false);
+
+    // 内层 ROLLBACK 已写，但现在还没 COMMIT_PKGS
+    ASSERT_TRUE(log_has("ROLLBACK g01 1.0"));
+    ASSERT_TRUE(log_has("END g01 1.0"));
+
+    // 模拟 install_packages 的异常捕获：补写 COMMIT_PKGS
+    TransactionLog::log_raw("COMMIT_PKGS");
+
+    EXPECT_TRUE(log_has("COMMIT_PKGS")) << "COMMIT_PKGS written after rollback";
+    // 确认 ROLLBACK → END → COMMIT_PKGS 的顺序
+    EXPECT_LT(read_log().find("ROLLBACK"), read_log().find("COMMIT_PKGS"));
+    EXPECT_LT(read_log().find("END"), read_log().find("COMMIT_PKGS"));
+}
+
+// G02: 通过 testing breakpoint 触发 install_packages 内部异常，
+//     验证 fix 后 COMMIT_PKGS 被补写，后续安装不被 rec 破坏
+TEST_F(AtomicityBoundaryTest, InstallCrashThenReinstallRecIsSafe) {
+    std::string pkg_a = make_pkg("g02a", "1.0", {"usr/bin/g02a_tool"});
+    std::string pkg_b = make_pkg("g02b", "1.0", {"usr/bin/g02b_tool"});
+
+    // ── 第一步：通过 break_during_file_copy 模拟 SIGINT ──
+    Config::instance().set_testing_mode(true);
+    testing::break_during_file_copy.store(true);
+    EXPECT_ANY_THROW(install_packages({pkg_a}));
+    Config::instance().set_testing_mode(false);
+    testing::reset_all();
+    sigint_graceful.store(false);
+
+    // 验证 COMMIT_PKGS 已被补写（fix 的关键）
+    EXPECT_TRUE(log_has("COMMIT_PKGS")) << "fix: COMMIT_PKGS written after rollback";
+
+    // ── 第二步：正常安装另一个包 ──
+    EXPECT_NO_THROW(install_packages({pkg_b}));
+    Cache::instance().write("g02b");
+    Cache::instance().load();
+
+    ASSERT_TRUE(Cache::instance().is_installed("g02b"))
+        << "second install succeeded before rec";
+
+    // ── 第三步：rec 不应破坏 g02b ──
+    recover_packages();
+    Cache::instance().load();
+
+    EXPECT_TRUE(Cache::instance().is_installed("g02b"))
+        << "pkg-b survives recovery after fix";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/g02b_tool"))
+        << "pkg-b files survive recovery after fix";
+    EXPECT_FALSE(Cache::instance().is_installed("g02a"))
+        << "g02a was never committed (rolled back)";
+}
+
+// G03: 批量安装中途崩溃 → COMMIT_PKGS 补写 → 下一批不受影响
+TEST_F(AtomicityBoundaryTest, BatchCrashThenSecondBatchRecIsSafe) {
+    std::string pkg_a = make_pkg("g03a", "1.0", {"usr/bin/g03a"});
+    std::string pkg_b = make_pkg("g03b", "1.0", {"usr/bin/g03b"});
+
+    // ── 第一步：pkg-a 安装时 crash ──
+    Config::instance().set_testing_mode(true);
+    testing::break_during_file_copy.store(true);
+    EXPECT_ANY_THROW(install_packages({pkg_a}));
+    Config::instance().set_testing_mode(false);
+    testing::reset_all();
+    sigint_graceful.store(false);
+
+    EXPECT_TRUE(log_has("COMMIT_PKGS"))
+        << "batch 1 closed with COMMIT_PKGS";
+
+    // ── 第二步：安装 pkg-b（成功）─ 触发 trim_completed ──
+    //    如果 COMMIT_PKGS 缺失，trim 会保留第一批的 ops
+    //    导致第二批的日志混在第一批之后，rec 会误处理
+    EXPECT_NO_THROW(install_packages({pkg_b}));
+    Cache::instance().write("g03b");
+    Cache::instance().load();
+
+    ASSERT_TRUE(fs::exists(test_root / "usr/bin/g03b"));
+    ASSERT_TRUE(Cache::instance().is_installed("g03b"));
+
+    // ── 第三步：rec ──
+    recover_packages();
+    Cache::instance().load();
+
+    EXPECT_TRUE(Cache::instance().is_installed("g03b"))
+        << "pkg-b survives rec after batch crash + fix";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/g03b"));
+    EXPECT_FALSE(Cache::instance().is_installed("g03a"));
+}
+
+// G04: 大包（多文件）安装中 SIGINT → COMMIT_PKGS 补写 → rec 幂等
+TEST_F(AtomicityBoundaryTest, LargePkgSigintThenCommitPkgs) {
+    // 模拟 Java 大小的包：多文件
+    std::vector<std::string> many_files;
+    for (int i = 0; i < 50; ++i)
+        many_files.push_back("usr/lib/g04/lib" + std::to_string(i) + ".so");
+    std::string pkg = make_pkg("g04", "1.0", many_files);
+
+    // 预创建一些文件（模拟升级场景）
+    for (int i = 0; i < 50; ++i)
+        create_file("usr/lib/g04/lib" + std::to_string(i) + ".so", "old_v" + std::to_string(i));
+
+    Config::instance().set_force_overwrite_mode(true);
+    InstallationTask task("g04", "1.0", true, "", pkg);
+    task.on_before_file_copy = [&]{ sigint_graceful.store(true); };
+    EXPECT_ANY_THROW(task.run_simple());
+    Config::instance().set_force_overwrite_mode(false);
+
+    // 补写 COMMIT_PKGS（模拟 fix 的行为）
+    TransactionLog::log_raw("COMMIT_PKGS");
+
+    // 验证所有文件恢复
+    for (int i = 0; i < 50; ++i)
+        EXPECT_EQ(file_content("usr/lib/g04/lib" + std::to_string(i) + ".so"),
+                  "old_v" + std::to_string(i));
+
+    // rec 幂等
+    recover_packages();
+    for (int i = 0; i < 50; ++i)
+        EXPECT_TRUE(fs::exists(test_root / ("usr/lib/g04/lib" + std::to_string(i) + ".so")));
 }
