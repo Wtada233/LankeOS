@@ -16,8 +16,6 @@
 #include <fstream>
 #include <iostream>
 #include <cstring>
-#include <chrono>
-#include <ctime>
 #include <sys/wait.h>
 namespace fs = std::filesystem;
 
@@ -288,51 +286,33 @@ void write_set_to_file(const fs::path& path, const std::unordered_set<std::strin
 }
 
 /**
- * 清理超过 24 小时的 lpkg_* 临时目录
- * 同进程内每小时最多执行一次清理
+ * 清理孤儿 lpkg_* 临时目录。
+ *
+ * 仅基于 PID 存活性检查：lpkg_<PID> 目录若所属进程已死则安全删除。
+ *    kill(pid, 0) 是内核级 O(1) 操作——遍历整个 /tmp 的开销也远小于一次 stat，
+ *    因此不需要时间回退策略或速率限制。
  */
 void cleanup_tmp_dirs() {
-    static auto last_cleanup = std::chrono::system_clock::now();
-    static std::mutex cleanup_mutex;
-    std::lock_guard<std::mutex> cleanup_lock(cleanup_mutex);
-    auto now = std::chrono::system_clock::now();
-
-    // 同一进程内每小时最多清理一次
-    if (std::chrono::duration_cast<std::chrono::hours>(now - last_cleanup).count() < 1) {
-        return;
-    }
-    last_cleanup = now;
-
     const fs::path tmp_path = "/tmp";
-    const auto twenty_four_hours = std::chrono::hours(24);
-
-    if (!fs::exists(tmp_path) || !fs::is_directory(tmp_path)) {
-        return;
-    }
-
-    uid_t current_uid = geteuid();
+    if (!fs::exists(tmp_path) || !fs::is_directory(tmp_path)) return;
 
     for (const auto& entry : fs::directory_iterator(tmp_path)) {
         try {
-            if (fs::is_symlink(entry.path())) {
-                continue;
+            if (fs::is_symlink(entry.path()) || !entry.is_directory()) continue;
+            const std::string dirname = entry.path().filename().string();
+            if (!dirname.starts_with("lpkg_")) continue;
+
+            const auto pid_str = dirname.substr(5);
+            if (pid_str.empty()) continue;
+
+            int pid = std::stoi(pid_str);
+            if (pid <= 0 || pid == getpid()) continue;
+
+            if (::kill(pid, 0) != 0 && errno == ESRCH) {
+                fs::remove_all(entry.path());
             }
-
-            if (entry.is_directory() && entry.path().filename().string().starts_with("lpkg_")) {
-                struct stat st;
-                if (lstat(entry.path().c_str(), &st) == 0) {
-                    if (st.st_uid != current_uid) {
-                        continue;
-                    }
-                }
-
-                auto ftime = fs::last_write_time(entry.path());
-                auto sctp = std::chrono::file_clock::to_sys(ftime);
-
-                if ((now - sctp) > twenty_four_hours) {
-                    fs::remove_all(entry.path());
-                }
-            }
+        } catch (const std::invalid_argument&) {
+            // 非 PID 命名的 lpkg_* 目录——忽略，不删除
         } catch (const std::exception& e) {
             log_warning(string_format("warning.cleanup_old_tmp_failed", entry.path().string()) + ": " + e.what());
         }
