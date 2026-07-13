@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <random>
 
 namespace fs = std::filesystem;
 
@@ -84,7 +85,14 @@ void Config::set_root_path(const std::string& root_path) {
  * 获取当前进程的临时目录，路径为 /tmp/lpkg_<PID>
  */
 fs::path Config::get_tmp_dir() {
-    static const fs::path tmp_dir = fs::path("/tmp") / ("lpkg_" + std::to_string(getpid()));
+    static const fs::path tmp_dir = []() {
+        // 使用 PID + 随机后缀降低 PID 复用冲突概率。
+        // cleanup_tmp_dirs 通过 lpkg_ 前缀识别并 kill(pid,0) 检查存活性，
+        // 随机后缀不会影响清理逻辑（stoi 在首个非数字处停止）。
+        std::random_device rd;
+        return fs::path("/tmp") / ("lpkg_" + std::to_string(getpid())
+                                   + "_" + std::to_string(rd() % 10000));
+    }();
     return tmp_dir;
 }
 

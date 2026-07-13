@@ -235,30 +235,49 @@ upgrade_packages()
 ├── 快照已安装包列表：
 │   installed = [(name, version), ...]
 │
-├── for each (n, curr) in installed:
+├── 构建升级计划：
+│   for each (n, curr) in installed:
+│   │   ├── ⑂ sigint_graceful? → return           ← 同 install 的 SIGINT 检查
+│   │   ├── repo.find_package(n)
+│   │   │   ┌─ 不存在? → continue
+│   │   │   └─ 存在 → version_compare(curr, lat)?
+│   │   │       ┌─ 无需升级? → continue
+│   │   │       └─ 需要升级 → plan.push(n, lat, held, curr, hash)
+│   │   └── 下一个包
 │   │
-│   ├── repo.find_package(n)
-│   │   ┌─ 不存在? → continue
-│   │   └─ 存在 → version_compare(curr, lat)?
-│   │       ┌─ 无需升级? → continue
-│   │       └─ 需要升级 →                           │
-│   │                                               │
-│   │   InstallationTask t(n, lat, held,            │
-│   │                     curr, "", hash, false)     │
-│   │   t.run()    ← 复用安装流程（含内层 BEGIN/COMMIT/END）│
-│   │   ┌─ 异常? ─→ log_error → continue           │
-│   │   └─ 成功 → count++                          │
-│   │                                               │
-│   └── 下一个包                                   │
-│                                                   │
-├── Cache::instance().write("upgrade")     ← DB 落盘
-├── cleanup_db_backups()
+│   ├── plan 为空? → "全部最新"，return
+│   │
+│   ├── 用户确认（与 install 同款 prompt）
+│   │   ┌─ 拒绝? → return
+│   │   └─ 接受 → 继续
+│   │
+│   ├── with_batch_transaction(success, "upgrade", N)  ← 共享事务层
+│   │   ├── (BEGIN_PKGS <N>)
+│   │   │
+│   │   ├── try:
+│   │   │   for each e in plan:
+│   │   │   │   ├── ⑂ sigint_graceful? → throw      ← 逐包检查
+│   │   │   │   ├── InstallationTask::run()
+│   │   │   │   │   ← 复用安装流（含内层 BEGIN/COMMIT/END）
+│   │   │   │   └── success.push_back(e.name)
+│   │   │   │
+│   │   ├── Cache::instance().write("upgrade")
+│   │   ├── (COMMIT_PKGS)
+│   │   │
+│   │   └── catch(...):
+│   │       ├── rollback_committed_packages(success)  ← 已升包全部降级
+│   │       └── (COMMIT_PKGS) → throw
+│   │
+│   └── cleanup_db_backups()
 │
-└── → "升级完成"
+└── → "N 个包已升级"
 
-注意：upgrade 不使用 BEGIN_PKGS/COMMIT_PKGS 包裹。
-      每个 InstallationTask 自包含内层 BEGIN/COMMIT/END。
-      各包独立升级，一个失败不影响其他包。
+══════════════════════════════════════════════════════
+  v5.1 变更：upgrade 现在使用与 install 相同的统一
+  事务协议（BEGIN_PKGS / COMMIT_PKGS）。任一包升
+  级失败（含 sigint）→ 已升级包全部降级，系统保持
+  一致。不再有"各包独立升级"的行为。
+══════════════════════════════════════════════════════
 ```
 
 ---
@@ -438,7 +457,7 @@ recover_packages()          "lpkg rec"
 
 | 行前缀 | 所属组件 | 含义 |
 |--------|---------|------|
-| `BEGIN_PKGS <N>` | install / rec-remove | 批次事务开始，N=包数 |
+| `BEGIN_PKGS <N>` | install / upgrade / rec-remove | 批次事务开始，N=包数 |
 | `COMMIT_PKGS` | install / rec-remove | 批次事务完结 |
 | `BEGIN <pkg> <ver>` | InstallationTask | 单包安装开始 |
 | `COMMIT <pkg> <ver>` | InstallationTask | 单包安装提交（注册完成） |

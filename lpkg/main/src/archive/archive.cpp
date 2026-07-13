@@ -160,7 +160,12 @@ std::string extract_file_from_archive(const fs::path& archive_path, const std::s
             size_t size = archive_entry_size(entry);
             std::string content;
             content.resize(size);
-            archive_read_data(a.get(), content.data(), size);
+            ssize_t bytes_read = archive_read_data(a.get(), content.data(), size);
+            // archive_read_data 可能返回少于 size 的字节（截断/损坏归档）
+            if (bytes_read >= 0 && static_cast<size_t>(bytes_read) < size)
+                content.resize(static_cast<size_t>(bytes_read));
+            else if (bytes_read < 0)
+                content.clear();
             return content;
         }
         archive_read_data_skip(a.get());

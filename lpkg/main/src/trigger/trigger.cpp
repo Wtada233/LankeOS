@@ -17,27 +17,12 @@ TriggerManager& TriggerManager::instance() {
 }
 
 TriggerManager::TriggerManager() {
-    add_default_triggers();
+    // 默认触发器由 /etc/lpkg/triggers.conf 提供，不再硬编码
 }
 
 /**
- * 添加默认的内置触发器规则
- * 为标准 LFS/Systemd 环境提供以下默认触发操作：
- * - 共享库更新后运行 ldconfig
- * - systemd 服务文件更新后重载守护进程
- * - 图标更新后刷新图标缓存
- * - GSettings 模式更新后编译模式文件
- */
-void TriggerManager::add_default_triggers() {
-    // LFS/Systemd 环境的默认触发器
-    custom_triggers.push_back({std::regex(R"(^/usr/lib/.*\.so.*)"), "ldconfig", R"(^/usr/lib/.*\.so.*)"});
-    custom_triggers.push_back({std::regex(R"(^/usr/lib/systemd/system/.*\.service$)"), "systemctl daemon-reload", R"(^/usr/lib/systemd/system/.*\.service$)"});
-    custom_triggers.push_back({std::regex(R"(^/usr/share/icons/.*)"), "gtk-update-icon-cache -f -t /usr/share/icons/hicolor", R"(^/usr/share/icons/.*)"});
-    custom_triggers.push_back({std::regex(R"(^/usr/share/glib-2.0/schemas/.*\.xml$)"), "glib-compile-schemas /usr/share/glib-2.0/schemas", R"(^/usr/share/glib-2.0/schemas/.*\.xml$)"});
-}
-
-/**
- * 从配置文件加载自定义触发器规则
+ * 从配置文件加载自定义触发器规则。
+ * 若配置文件不存在，自动写入默认规则（使配置完全文件驱动，无硬编码）。
  * 配置文件每行格式：正则表达式 命令
  * 以 # 开头的行和空行将被跳过
  */
@@ -45,7 +30,34 @@ void TriggerManager::load_config() {
     std::lock_guard<std::mutex> lock(mtx);
     if (config_loaded) return;
 
-    if (std::filesystem::exists(Config::instance().triggers_conf())) {
+    auto conf_path = Config::instance().triggers_conf();
+
+    // 首次访问时创建默认配置（只触发一次，用户后续可编辑）
+    if (!std::filesystem::exists(conf_path)) {
+        std::error_code ec;
+        std::filesystem::create_directories(conf_path.parent_path(), ec);
+        std::ofstream def(conf_path);
+        if (def) {
+            def << R"(# Default triggers for LFS/Systemd
+# Format: <regex_pattern>	<command>
+# Lines starting with # are ignored.
+
+# Shared library update -> regenerate ldconfig links
+^/usr/lib/.*\.so.*	ldconfig
+
+# Systemd service unit change -> reload daemon
+^/usr/lib/systemd/system/.*\.service$	systemctl daemon-reload
+
+# Icon theme change -> update icon cache
+^/usr/share/icons/.*	gtk-update-icon-cache -f -t /usr/share/icons/hicolor
+
+# GSettings schema change -> recompile
+^/usr/share/glib-2.0/schemas/.*\.xml$	glib-compile-schemas /usr/share/glib-2.0/schemas
+)";
+        }
+    }
+
+    if (!std::filesystem::exists(conf_path)) return;
         std::ifstream file(Config::instance().triggers_conf());
         std::string line;
         while (std::getline(file, line)) {
@@ -64,7 +76,6 @@ void TriggerManager::load_config() {
                 }
             }
         }
-    }
     config_loaded = true;
 }
 

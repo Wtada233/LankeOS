@@ -1,5 +1,7 @@
 #include "install_common.hpp"
 #include "base/exception.hpp"
+#include "base/utils.hpp"
+#include "i18n/localization.hpp"
 
 #include <sys/mount.h>
 #include <sys/stat.h>
@@ -233,7 +235,9 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
                                 : Cache::instance().get_installed_version(dep.name);
             if (!dep.constraints.empty() && !cand_v.empty() && cand_v != "virtual"
                 && !version_satisfies_all(cand_v, dep.constraints))
-                throw LpkgException(string_format("error.candidate_dep_version_mismatch", dep.name, cand_v));
+                throw LpkgException(string_format("error.candidate_dep_version_mismatch",
+                    dep.name, cand_v,
+                    dep.constraints[0].op, dep.constraints[0].version));
         }
     }
     ctx.plan[pkg_name] = std::move(p);
@@ -352,6 +356,67 @@ std::unordered_set<std::string> get_all_required_packages() {
         }
     }
     return req;
+}
+
+/**
+ * 向前 needed_so 完整性校验。
+ *
+ * 对计划中的每个包，检查其每个 SONAME 的提供链：
+ *   plan（版本精准）→ 已安装缓存 → repo（版本精准）
+ *
+ * 版本精准的含义：
+ *   - plan 中同时升级的包以新版本计算 provides
+ *   - 缓存中的包以当前安装版本计算
+ *   - repo 中只取实际提供该 SONAME 的版本（find_provider 返回的版本必须提供该 SONAME）
+ */
+void check_forward_soname_integrity(
+    const std::map<std::string, InstallPlan>& plan,
+    Repository& repo)
+{
+    bool all_ok = true;
+    std::string errors;
+    for (const auto& [pname, pplan] : plan) {
+        if (pplan.needed_so.empty()) continue;
+        for (const auto& soname : pplan.needed_so) {
+            bool provided = false;
+
+            // 1) plan — 同批次升级的包以新版本 provides 为准
+            for (const auto& [pn2, pp2] : plan) {
+                for (const auto& prov : pp2.provides) {
+                    if (prov == soname) { provided = true; break; }
+                }
+                if (provided) break;
+            }
+
+            // 2) 已安装缓存
+            if (!provided) {
+                auto providers = Cache::instance().get_providers(soname);
+                for (const auto& p : providers) {
+                    if (Cache::instance().is_installed(p) && !plan.contains(p)) {
+                        provided = true; break;
+                    }
+                }
+            }
+
+            // 3) repo — 必须确认返回的版本确实提供此 SONAME
+            if (!provided) {
+                if (auto prov_pkg = repo.find_provider(soname)) {
+                    for (const auto& prov : prov_pkg->provides) {
+                        if (prov == soname) { provided = true; break; }
+                    }
+                }
+            }
+
+            if (!provided) {
+                all_ok = false;
+                errors += "  " + string_format("error.unresolved_soname", soname) + "\n";
+            }
+        }
+    }
+    if (!all_ok) {
+        log_error(errors);
+        throw LpkgException(errors);
+    }
 }
 
 } // namespace detail

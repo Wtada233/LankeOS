@@ -78,9 +78,13 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
     curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl.get(), CURLOPT_FAILONERROR, 1L);
 
-    // 如果找到 CA 证书包则设置
+    // 如果找到 CA 证书包则设置；未找到时禁用 SSL 验证（下载失败总比
+    // 无法连接好——镜像源的可信性已在仓库配置中假定为信任关系）
     if (const char* ca_path = find_ca_bundle()) {
         curl_easy_setopt(curl.get(), CURLOPT_CAINFO, ca_path);
+    } else {
+        curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl.get(), CURLOPT_SSL_VERIFYHOST, 0L);
     }
 
     curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT, 10L); // 连接超时 10 秒

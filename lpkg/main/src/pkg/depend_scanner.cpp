@@ -132,7 +132,22 @@ namespace {
 std::unordered_map<std::string, std::unordered_set<std::string>>
 build_repo_revdep_map() {
     std::unordered_map<std::string, std::unordered_set<std::string>> rev;
+
+    // 优先读取远程缓存索引（下载到临时目录的）
     fs::path idx = Config::get_tmp_dir() / constants::REPO_INDEX_TMP;
+    if (!fs::exists(idx)) {
+        // 回退到本地镜像的索引文件
+        try {
+            std::string mirror_url = Config::instance().get_mirror_url();
+            std::string arch = Config::instance().get_architecture();
+            std::string path_str = mirror_url;
+            if (path_str.find(constants::PROTOCOL_FILE) == 0)
+                path_str = path_str.substr(7);
+            idx = fs::path(path_str) / arch / std::string(constants::REPO_INDEX_FILE);
+        } catch (...) {
+            return rev;
+        }
+    }
     if (!fs::exists(idx)) return rev;
 
     std::ifstream f(idx);
