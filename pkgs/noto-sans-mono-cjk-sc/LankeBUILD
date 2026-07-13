@@ -7,8 +7,8 @@ lankebuild_build() {
     mkdir -p {STAGING_ROOT}/usr/share/fonts/noto-cjk
     # hooks dir created by builder
 
-    cp NotoSansMonoCJK-Regular.ttc {STAGING_ROOT}/usr/share/fonts/noto-cjk/
-    chmod 644 {STAGING_ROOT}/usr/share/fonts/noto-cjk/NotoSansMonoCJK-Regular.ttc
+    cp NotoSansMonoCJKsc-Regular.otf {STAGING_ROOT}/usr/share/fonts/noto-cjk/
+    chmod 644 {STAGING_ROOT}/usr/share/fonts/noto-cjk/NotoSansMonoCJKsc-Regular.otf
 
     cat > {STAGING_HOOKS}/postinst.sh <<EOF
 #!/bin/sh

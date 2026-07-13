@@ -1,0 +1,7 @@
+{
+    "name": "parallel",
+    "version": "20250522",
+    "sources": [
+        "https://ftpmirror.gnu.org/gnu/parallel/parallel-20250522.tar.bz2"
+    ]
+}
