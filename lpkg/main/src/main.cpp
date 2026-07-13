@@ -34,9 +34,7 @@ struct CurlGlobalInitializer {
 };
 
 // ── SIGINT 双段式防护 ──────────────────────────────────────────────────
-// 与 pacman 行为一致：
 //   第 1 次 Ctrl+C → 设 graceful 标志，当前操作完成后退出
-//   第 2 次 Ctrl+C（2 秒内）→ 立即终止
 std::atomic<bool> sigint_graceful{false};
 static std::atomic<bool> sigint_force{false};
 
