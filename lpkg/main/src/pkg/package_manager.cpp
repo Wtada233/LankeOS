@@ -252,25 +252,20 @@ void install_packages(const std::vector<std::string>& pkg_args,
     ctx.successfully_installed.clear();
     ctx.installed_set.clear();
 
-    // 批量事务：若安装不止一个包，用 BEGIN_PKGS / COMMIT_PKGS 包裹，
-    // 保证任一包安装失败时整个批量回滚，而非部分提交。
-    const bool is_batch = (ctx.install_order.size() > 1);
-    if (is_batch)
-        TransactionLog::log_raw("BEGIN_PKGS " + std::to_string(ctx.install_order.size()));
+    // ── 统一 WAL 事务协议 ──────────────────────────────────────────────
+    // 无论单包还是批量安装，都用 BEGIN_PKGS / COMMIT_PKGS 包裹，
+    // 保证只要 COMMIT_PKGS 未写入，恢复机制就能完整回滚（含 DB）。
+    // 单包走批量路径后，Cache::write("pkgs") 走 WAL 保护路径，
+    // .lpkg_db_bak 在恢复时可还原 DB 至安装前状态。
+    TransactionLog::log_raw("BEGIN_PKGS " + std::to_string(ctx.install_order.size()));
 
     install_packages_internal(ctx);
 
-    if (is_batch) {
-        // 批量事务：先落盘数据库（WAL 保护），再写 COMMIT_PKGS
-        // 这样如果 crash 在 Cache::write 与 COMMIT_PKGS 之间，
-        // 恢复时会因为没有 COMMIT_PKGS 而回滚整个批量（含 DB 备份）
-        Cache::instance().write("pkgs");
-        TransactionLog::log_raw("COMMIT_PKGS");
-    } else {
-        // 单包/非批量：Cache::write 在事务外执行（无 WAL 保护），
-        // 但保证了原子性——要么全部安装成功落盘，要么异常无任何持久化
-        Cache::instance().write();
-    }
+    // 先落盘数据库（WAL 保护），再写 COMMIT_PKGS
+    // 若 crash 在 Cache::write 与 COMMIT_PKGS 之间，
+    // 恢复时因无 COMMIT_PKGS 而回滚整个事务（含 DB 备份）
+    Cache::instance().write("pkgs");
+    TransactionLog::log_raw("COMMIT_PKGS");
 
     Cache::instance().cleanup_db_backups();
     TriggerManager::instance().run_all();
@@ -476,41 +471,64 @@ void remove_package(const std::string& pkg_name, bool force) {
     if (file_count > 0)
         log_info(string_format("info.files_removed", file_count));
 
-    // ── 阶段 2：清理 .bak → 删目录（RM_DIR） → 清理 deps → RM_COMMIT ──
+    // ── 阶段 2：从磁盘移除文件（rm）→ 清 .bak（仅清理目录内的）→ 删目录（RM_DIR） ──
     remove_package_files(pkg_name, force);
 
-    // 2a：清理 .lpkg_bak（目录现在为空，可删除）
+    // ── 阶段 3：释放目录所有权 → 删目录（含 .lpkg_bak 清扫） → WAL 记录 ─────────
+    // 设计说明：
+    //   .lpkg_bak 备份文件的清理必须在 RM_COMMIT 之后（保证能回滚），
+    //   但 .lpkg_bak 若留在目标目录内会阻塞 fs::remove(dir)。
+    //   因此这里分两步：
+    //     (a) 目录删除前：只清理目标目录内属于本包的 .lpkg_bak（记录在 WAL）
+    //     (b) 目录删除后：在 RM_COMMIT 之后才清理全部 .lpkg_bak
+    //   这样既保证 RM_DIR 能成功，又保证回滚时非目录内的备份文件还在。
+    //
+    // 为什么需要 RM_BAK_CLN WAL 记录：
+    //   若 crash 在 RM_DIR 之后 / RM_COMMIT 之前，恢复时 BACKUP 条目
+    //   的 .bak 可能已被 (a) 清除。Recovery 看到 RM_BAK_CLN 就知道
+    //   该 .bak 是"为清空目录而提前删除的"，而不是"意外丢失"。
+    //   此时文件内容在 RM_DIR 重建的目录中不可恢复，但系统一致性保持。
     std::error_code ec;
-    for (const auto& [orig, bak] : backups) {
-        fs::remove(bak, ec);
-    }
 
-    // 2b：目录所有权释放 + fs::remove + RM_DIR WAL
+    // 3a：收集需释放的目录列表
     std::vector<fs::path> dir_paths;
     for (const auto& e : owned_entries)
         if (e.ends_with('/'))
             dir_paths.emplace_back(fs::path(e));
     std::ranges::sort(dir_paths, std::greater<>{});
+
+    // 3b：为每个目录释放所有权 → 清扫 .lpkg_bak → 删除目录
     int dir_count = 0;
     for (const auto& p : dir_paths) {
         cache.remove_file_owner(p.string(), pkg_name);
         if (!cache.get_file_owners(p.string()).empty()) continue;
+
         const fs::path phys = p.is_absolute()
             ? Config::instance().root_dir() / p.relative_path()
             : Config::instance().root_dir() / p;
-        if (fs::exists(phys) && fs::is_directory(phys)) {
-            std::error_code ec2;
-            fs::remove(phys, ec2);
-            if (!ec2) {
-                TransactionLog::log_raw("RM_DIR " + phys.string());
-                ++dir_count;
+        if (!fs::exists(phys) || !fs::is_directory(phys)) continue;
+
+        // 在尝试删除目录前，先清扫内部本包的 .lpkg_bak 文件
+        // （这些文件是阶段 1 的备份 rename 遗留在目录内的）
+        const std::string bak_suffix = std::string(constants::SUFFIX_LPKG_BAK) + pkg_name;
+        for (auto& entry : fs::recursive_directory_iterator(phys, ec)) {
+            if (entry.path().filename().string().ends_with(bak_suffix)) {
+                TransactionLog::log_raw("RM_BAK_CLN " + entry.path().string());
+                fs::remove(entry.path(), ec);
             }
+        }
+
+        std::error_code ec2;
+        fs::remove(phys, ec2);
+        if (!ec2) {
+            TransactionLog::log_raw("RM_DIR " + phys.string());
+            ++dir_count;
         }
     }
     if (dir_count > 0)
         log_info(string_format("info.dirs_removed", dir_count));
 
-    // 2c：清理依赖、文档和钩子文件
+    // ── 阶段 4：清理依赖、文档和钩子文件 ─────────────────────────────
     const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
     if (fs::exists(dep_file)) {
         std::ifstream f(dep_file);
@@ -527,11 +545,19 @@ void remove_package(const std::string& pkg_name, bool force) {
     fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
     cache.remove_installed(pkg_name);
 
-    // 数据库落盘（WAL 保护），必须在 RM_COMMIT 之前
+    // ── 阶段 5：数据库落盘（WAL 保护）─ 必须在 RM_COMMIT 之前 ───────
     Cache::instance().write(pkg_name);
 
-    // 2d：RM_COMMIT — 事务完成
+    // ── 阶段 6：RM_COMMIT — 事务完成 ────────────────────────────────
     TransactionLog::log_raw("RM_COMMIT " + pkg_name + " " + ver);
+
+    // ── 阶段 7：安全清理全部 .lpkg_bak（事务已提交，无需回滚） ────
+    // 注意：阶段 3b 已清扫目录内的 .lpkg_bak（写入 RM_BAK_CLN），
+    // 此处清扫剩余的（父目录未被删除的）。
+    for (const auto& [orig, bak] : backups) {
+        fs::remove(bak, ec);
+    }
+
     TransactionLog::log_raw("RM_END " + pkg_name + " " + ver);
     Cache::instance().cleanup_db_backups();
     log_info(string_format("info.package_removed_successfully", pkg_name));

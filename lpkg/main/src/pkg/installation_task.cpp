@@ -183,11 +183,27 @@ void InstallationTask::backup_existing_files() {
         std::error_code ec;
         if (f.ends_with('/')) {
             // 目录条目：先检查存在性再确保父目录存在
-            if (!fs::exists(physical_path)) {
+            bool is_new_dir = !fs::exists(physical_path);
+            if (is_new_dir) {
                 new_dirs_.push_back(physical_path);
                 TransactionLog::log_raw("NEW_DIR " + physical_path.string());
             }
             fs::create_directories(phys_dir, ec);
+            // 若是新目录，从包源读取权限并立即设置
+            // 确保即使在 backup 后 copy 前回滚，目录也被创建为正确的权限，
+            // 从而在 rollback::new_dirs_ 清理时不留异常权限的残留。
+            if (is_new_dir) {
+                // 创建目录本身（phys_dir 只是父目录）
+                fs::create_directories(physical_path, ec);
+                std::string dir_rel = f;
+                if (dir_rel.ends_with('/')) dir_rel.pop_back();
+                const fs::path src_dir = content_dir / dir_rel;
+                struct stat st;
+                if (lstat(src_dir.c_str(), &st) == 0) {
+                    (void)lchown(physical_path.c_str(), st.st_uid, st.st_gid);
+                    (void)chmod(physical_path.c_str(), st.st_mode & 07777);
+                }
+            }
             continue;
         }
 

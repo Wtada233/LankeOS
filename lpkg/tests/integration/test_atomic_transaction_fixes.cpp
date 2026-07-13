@@ -389,9 +389,9 @@ TEST_F(AtomicTransactionFixesTest, BatchCrashRollsBackAll) {
     }
 }
 
-TEST_F(AtomicTransactionFixesTest, SinglePackageNoBatchPkgs) {
-    // 单个包安装不应添加 BEGIN_PKGS/COMMIT_PKGS
-    // 不预创建文件以避免文件冲突
+TEST_F(AtomicTransactionFixesTest, SinglePackageNowUsesBatchPkgs) {
+    // 单个包现在也使用 WAL 保护的批量协议（BEGIN_PKGS/COMMIT_PKGS）
+    // 确保 DB 写入在事务边界内，断电后 rec 能回滚
     std::string pkg_path = make_pkg("single-pkg", "1.0", {"usr/bin/single_pkg"});
 
     fs::path mirror = setup_local_mirror();
@@ -400,8 +400,9 @@ TEST_F(AtomicTransactionFixesTest, SinglePackageNoBatchPkgs) {
 
     install_packages({"single-pkg"});
 
-    EXPECT_FALSE(log_contains("BEGIN_PKGS")) << "single package should not have BEGIN_PKGS";
-    EXPECT_FALSE(log_contains("COMMIT_PKGS")) << "single package should not have COMMIT_PKGS";
+    // 现在单个包也有 WAL 保护了
+    EXPECT_TRUE(log_contains("BEGIN_PKGS 1")) << "single package should now use BEGIN_PKGS";
+    EXPECT_TRUE(log_contains("COMMIT_PKGS")) << "single package should now have COMMIT_PKGS";
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -432,8 +433,8 @@ TEST_F(AtomicTransactionFixesTest, BatchWithDepsWrapsInPkgs) {
 
     install_packages({"dep-main"});
 
-    // 应为批量事务（依赖 + 主包 = 至少 2 个）
-    EXPECT_TRUE(log_contains("BEGIN_PKGS")) << "install with deps should use batch wrapping";
+    // 所有安装都使用 WAL 保护（含 BEGIN_PKGS / COMMIT_PKGS）
+    EXPECT_TRUE(log_contains("BEGIN_PKGS")) << "every install uses BEGIN_PKGS";
     EXPECT_TRUE(log_contains("COMMIT_PKGS")) << "COMMIT_PKGS should be present";
 }
 

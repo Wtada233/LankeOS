@@ -186,6 +186,7 @@ void recover_packages() {
                 op.starts_with("END ") ||
                 op.starts_with("RM_BEGIN ") || op.starts_with("RM_COMMIT ") ||
                 op.starts_with("RM_END ") ||
+                op.starts_with("RM_BAK_CLN ") ||
                 op.starts_with("COMMIT_PKGS"))
                 continue;
 
@@ -327,18 +328,28 @@ void recover_packages() {
             } else if (op.starts_with("RM_DIR ")) {
                 // RM_DIR <path> — 回滚时重建目录，使 BACKUP rename 能成功
                 std::string dirpath = op.substr(6);
-                fs::create_directories(dirpath, ec);
-                if (!ec) {
+                std::error_code ec_create;
+                fs::create_directories(dirpath, ec_create);
+                if (!ec_create) {
                     log_info(string_format("info.recover_restored", "(dir)", dirpath));
                     restored++;
                 }
             } else if (op.starts_with("NEW_DIR ")) {
                 // NEW_DIR <path> — 新建目录。反向顺序中内部文件已在之前被
                 // 个体条目（NEW/COPY/BACKUP）清理，此时目录应为空。
-                // 空才删（fs::remove = rmdir），非空则警告用户而不强制铲除，
-                // 避免 WAL 中 NEW/COPY 条目的记录与文件系统状态不一致。
+                // 空才删（fs::remove = rmdir），非空则检查是否只剩 .lpkg_bak
+                // 残留（因备份文件的 .bak 被恢复时反转 rename 后已经消失，
+                // 但 RM_BAK_CLN 清理的 .bak 不会还原），清扫后若变空则删。
                 std::string path = op.substr(8);
                 if (fs::exists(path) && fs::is_directory(path) && !fs::is_symlink(path)) {
+                    // 清扫目录内的 .lpkg_bak 残留（可能来自恢复过程中未还原的备份）
+                    std::error_code ec_scan;
+                    for (auto& entry : fs::recursive_directory_iterator(path, ec_scan)) {
+                        const std::string fname = entry.path().filename().string();
+                        if (fname.find(".lpkg_bak_") != std::string::npos) {
+                            fs::remove(entry.path(), ec_scan);
+                        }
+                    }
                     std::error_code ec_empty;
                     if (fs::is_empty(path, ec_empty) && !ec_empty) {
                         if (fs::remove(path, ec) && !ec) {
@@ -350,6 +361,12 @@ void recover_packages() {
                         log_warning(string_format("warning.recover_dir_not_empty", path));
                     }
                 }
+            } else if (op.starts_with("RM_BAK_CLN ")) {
+                // RM_BAK_CLN <path> — 反向操作：不复位（.bak 已被删），
+                // 仅在 WAL 中标记。跳过即可。该条目的存在只是为了让
+                // 恢复过程知道这个 .bak 的消失是"主动清扫"而非"意外丢失"。
+                // 实际文件已在 RM_DIR 阶段重建目录时体现。
+                continue;
             } else if (op.starts_with("NEW ")) {
                 // NEW <path>
                 std::string path = op.substr(4);
