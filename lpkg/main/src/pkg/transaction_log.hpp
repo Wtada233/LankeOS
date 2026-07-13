@@ -4,18 +4,20 @@
 #include <string_view>
 #include <filesystem>
 #include <fstream>
-#include <mutex>
 
 namespace fs = std::filesystem;
 
 /**
  * WAL 风格的事务日志。记录每个文件操作的意图和结果。
- * 日志写入 Config::instance().log_dir() / "transaction.log"
+ * 日志写入 Config::instance().lock_dir() / "transaction.log"
+ *
+ * 每行使用单次 write() 写入，在 O_APPEND 模式下 < 4096 字节即为原子写入。
+ * 断电不会损坏已有行——最多丢失最后一行（部分写入行不合法，在恢复时被忽略）。
  *
  * 格式：每行一个操作
  *   BEGIN <pkg> <version>         事务开始
- *   BACKUP <src> <dst>            备份文件 → .lpkgbak
- *   COPY <src> <dst>              复制文件（.lpkgtmp → rename）
+ *   BACKUP <src> → <dst>          备份文件 → .lpkgbak
+ *   COPY <src> → <dst>            复制文件（.lpkgtmp → rename）
  *   NEW <path>                    新文件（回滚时需删除）
  *   COMMIT <pkg> <version>        事务提交（包注册完成）
  *   ROLLBACK <pkg> <version>      事务回滚
@@ -41,8 +43,8 @@ public:
     static void log_raw(const std::string& line);
 
 private:
-    std::ofstream log_;
-    std::mutex mtx_;
+    int log_fd_ = -1;
+    bool opened_ok_ = false;
     fs::path log_path_;
 
     void write(const std::string& line);
