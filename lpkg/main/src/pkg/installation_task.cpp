@@ -210,12 +210,33 @@ void InstallationTask::rollback() {
             fs::remove(entry.path(), ec_tmp);
     }
 
-    // 删除新创建的文件
-    for (const auto& f : new_files_ | std::views::reverse) {
-        if (fs::exists(f) || fs::is_symlink(f)) {
+    // ── 分层删除：先删文件，再坍缩式删目录 ──────────────────────────
+    // 第一层：删除所有文件（目录跳过）
+    std::vector<fs::path> dirs;
+    for (const auto& f : new_files_) {
+        if (!fs::exists(f) && !fs::is_symlink(f)) continue;
+        if (fs::is_directory(f) && !fs::is_symlink(f)) {
+            dirs.push_back(f);
+        } else {
             std::error_code ec;
             fs::remove(f, ec);
             TransactionLog::log_raw("ROLLBACK_DEL " + f.string());
+        }
+    }
+    // 第二层：按深度从最深到最浅排序目录，逐层 fs::remove
+    //   （目录此时应已清空，无需 remove_all）
+    std::ranges::sort(dirs, std::greater<>{}, [](const fs::path& p) {
+        return std::distance(p.begin(), p.end());
+    });
+    for (const auto& d : dirs) {
+        if (fs::exists(d)) {
+            std::error_code ec;
+            fs::remove(d, ec);  // 空目录，remove 即可
+            if (ec) {
+                // 非空 → 用 remove_all 兜底（不该走到这里）
+                fs::remove_all(d, ec);
+            }
+            TransactionLog::log_raw("ROLLBACK_DEL " + d.string());
         }
     }
     new_files_.clear();
