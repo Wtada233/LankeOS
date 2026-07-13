@@ -260,10 +260,19 @@ void install_packages(const std::vector<std::string>& pkg_args,
 
     install_packages_internal(ctx);
 
-    if (is_batch)
+    if (is_batch) {
+        // 批量事务：先落盘数据库（WAL 保护），再写 COMMIT_PKGS
+        // 这样如果 crash 在 Cache::write 与 COMMIT_PKGS 之间，
+        // 恢复时会因为没有 COMMIT_PKGS 而回滚整个批量（含 DB 备份）
+        Cache::instance().write("pkgs");
         TransactionLog::log_raw("COMMIT_PKGS");
+    } else {
+        // 单包/非批量：Cache::write 在事务外执行（无 WAL 保护），
+        // 但保证了原子性——要么全部安装成功落盘，要么异常无任何持久化
+        Cache::instance().write();
+    }
 
-    Cache::instance().write();
+    Cache::instance().cleanup_db_backups();
     TriggerManager::instance().run_all();
     log_info(get_string("info.install_complete"));
 }
@@ -518,9 +527,13 @@ void remove_package(const std::string& pkg_name, bool force) {
     fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
     cache.remove_installed(pkg_name);
 
+    // 数据库落盘（WAL 保护），必须在 RM_COMMIT 之前
+    Cache::instance().write(pkg_name);
+
     // 2d：RM_COMMIT — 事务完成
     TransactionLog::log_raw("RM_COMMIT " + pkg_name + " " + ver);
     TransactionLog::log_raw("RM_END " + pkg_name + " " + ver);
+    Cache::instance().cleanup_db_backups();
     log_info(string_format("info.package_removed_successfully", pkg_name));
 }
 
@@ -691,6 +704,7 @@ void upgrade_packages() {
     else
         log_info(get_string("info.all_packages_latest"));
     Cache::instance().write();
+    Cache::instance().cleanup_db_backups();
 }
 
 /** 显示包的 man 页面内容 */

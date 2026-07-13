@@ -76,6 +76,8 @@ void InstallationTask::run(InstallContext* ctx) {
     }
 
     // 第四阶段：注册——数据库修改是最后一步
+    // Cache::write()（磁盘落盘）由外层 install_packages() 统一完成，
+    // 以保证失败时全部回滚，而非部分包持久化。
     commit_without_file_ops();
     log.commit(pkg_name_, actual_version_);
 
