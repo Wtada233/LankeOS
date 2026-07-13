@@ -50,7 +50,8 @@ protected:
     /// 创建一个包含指定文件的包
     std::string make_pkg(const std::string& name, const std::string& ver,
                          const std::vector<std::string>& files) {
-        fs::path pkg_work = suite_work_dir / ("_pkg_" + name);
+        fs::path pkg_work = suite_work_dir / ("_pkg_" + name + "_" + ver);
+        fs::remove_all(pkg_work);
         for (const auto& f : files) {
             fs::path fp = pkg_work / "content" / f;
             fs::create_directories(fp.parent_path());
@@ -65,7 +66,8 @@ protected:
     std::string make_pkg_with_deps(const std::string& name, const std::string& ver,
                                    const std::vector<std::string>& files,
                                    const std::vector<std::string>& deps) {
-        fs::path pkg_work = suite_work_dir / ("_pkg_" + name);
+        fs::path pkg_work = suite_work_dir / ("_pkg_" + name + "_" + ver);
+        fs::remove_all(pkg_work);
         for (const auto& f : files) {
             fs::path fp = pkg_work / "content" / f;
             fs::create_directories(fp.parent_path());
@@ -778,4 +780,155 @@ TEST_F(AtomicTransactionFixesTest, BatchContainsRemove) {
     EXPECT_NO_THROW(recover_packages());
     // 批量没有文件操作，只是验证不崩溃
     SUCCEED() << "batch with nested remove handled without crash";
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 28-31: 升级时废弃文件 REMOVE_OLD WAL 日志
+// ═══════════════════════════════════════════════════════════════════════
+
+TEST_F(AtomicTransactionFixesTest, UpgradeWritesRemoveOldForObsoleteFiles) {
+    // 验证升级时被移除的旧版本文件写入了 REMOVE_OLD WAL 日志
+    std::string pkg_v1 = make_pkg("upgrade-obsolete", "1.0",
+        {"usr/bin/file_a", "usr/lib/file_b.so"});
+    std::string pkg_v2 = make_pkg("upgrade-obsolete", "2.0",
+        {"usr/bin/file_a"}); // file_b 被移除
+
+    // 安装 v1
+    Config::instance().set_force_overwrite_mode(true);
+    install_packages({pkg_v1});
+    Cache::instance().write();
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/file_a"));
+    EXPECT_TRUE(fs::exists(test_root / "usr/lib/file_b.so"));
+
+    // 清除 v1 安装产生的日志，只保留升级日志
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+
+    // 安装 v2（升级，会移除 file_b）
+    install_packages({pkg_v2});
+    Cache::instance().write();
+
+    // WAL 应包含 REMOVE_OLD 条目
+    EXPECT_TRUE(log_contains("REMOVE_OLD")) << "upgrade should log REMOVE_OLD for obsolete files";
+    // file_b 应已被删除（升级成功，废弃文件清理）
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/file_a"));
+    EXPECT_FALSE(fs::exists(test_root / "usr/lib/file_b.so"))
+        << "obsolete file should be removed after upgrade";
+
+    // 不应有残留 .lpkgbak 文件
+    bool bak_found = false;
+    for (auto& e : fs::recursive_directory_iterator(test_root)) {
+        if (e.path().filename().string().find(".lpkg_bak_") != std::string::npos) {
+            bak_found = true; break;
+        }
+    }
+    EXPECT_FALSE(bak_found) << "no .lpkgbak files should remain after successful upgrade";
+
+    Config::instance().set_force_overwrite_mode(false);
+}
+
+TEST_F(AtomicTransactionFixesTest, UpgradeRemoveOldRecRestores) {
+    // 模拟升级中崩溃（BEGIN + REMOVE_OLD 已写，无 COMMIT）
+    // rec 应能恢复被移除的废弃文件
+    create_file("usr/lib/old_lib.so", "old version lib");
+    create_file("usr/bin/kept_tool", "kept tool");
+
+    fs::path obsolete_path = test_root / "usr/lib/old_lib.so";
+    fs::path kept_path = test_root / "usr/bin/kept_tool";
+    ASSERT_TRUE(fs::exists(obsolete_path));
+    ASSERT_TRUE(fs::exists(kept_path));
+
+    // 模拟 REMOVE_OLD：文件已被 rename 到 .lpkgbak（fix 后的行为）
+    fs::path bak = obsolete_path;
+    bak += ".lpkg_bak_upgrade-pkg";
+    fs::rename(obsolete_path, bak);
+    ASSERT_FALSE(fs::exists(obsolete_path));
+    ASSERT_TRUE(fs::exists(bak));
+
+    // WAL：BEGIN + REMOVE_OLD，没有 COMMIT（模拟崩溃）
+    TransactionLog::log_raw("BEGIN upgrade-pkg 2.0");
+    TransactionLog::log_raw("REMOVE_OLD " + obsolete_path.string() + " → " + bak.string());
+
+    // rec 应恢复
+    recover_packages();
+
+    EXPECT_TRUE(fs::exists(obsolete_path))
+        << "recover should restore the obsolete file via REMOVE_OLD entry";
+    EXPECT_FALSE(fs::exists(bak))
+        << ".lpkgbak should be consumed by recover";
+    EXPECT_TRUE(fs::exists(kept_path))
+        << "unrelated files should be untouched";
+}
+
+TEST_F(AtomicTransactionFixesTest, UpgradeLogShowsRemoveOldAndBackupOrder) {
+    // 验证升级时同一事务中 BACKUP（覆盖前备份）和 REMOVE_OLD（废弃删除）的次序
+    create_file("usr/bin/overwritten_bin", "old content");
+    create_file("usr/lib/obsolete.so", "removed lib");
+
+    std::string pkg_v1 = make_pkg("order-test", "1.0",
+        {"usr/bin/overwritten_bin", "usr/lib/obsolete.so"});
+    std::string pkg_v2 = make_pkg("order-test", "2.0",
+        {"usr/bin/overwritten_bin"}); // obsolete.so 被移除
+
+    Config::instance().set_force_overwrite_mode(true);
+    install_packages({pkg_v1});
+    Cache::instance().write();
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+
+    install_packages({pkg_v2});
+    Cache::instance().write();
+
+    // BACKUP 出现在 copy_package_files 阶段，REMOVE_OLD 在 commit_without_file_ops
+    // 但二者都在同一事务 BEGIN…COMMIT 内
+    EXPECT_TRUE(log_contains("BACKUP"))
+        << "overwritten files should produce BACKUP entries";
+    EXPECT_TRUE(log_contains("REMOVE_OLD"))
+        << "obsolete files should produce REMOVE_OLD entries";
+    EXPECT_TRUE(log_contains("COMMIT order-test 2.0"))
+        << "upgrade should commit successfully";
+
+    Config::instance().set_force_overwrite_mode(false);
+}
+
+TEST_F(AtomicTransactionFixesTest, UpgradeRemoveOldMultipleObsoleteFiles) {
+    // 验证多个废弃文件都被正确记录 REMOVE_OLD
+    std::vector<std::string> v1_files = {
+        "usr/bin/tool_a", "usr/bin/tool_b", "usr/bin/tool_c",
+        "usr/lib/lib_x.so", "usr/lib/lib_y.so"
+    };
+    std::vector<std::string> v2_files = {
+        "usr/bin/tool_a", "usr/lib/lib_x.so" // 其余 3 个被移除
+    };
+
+    std::string pkg_v1 = make_pkg("multi-obsolete", "1.0", v1_files);
+    std::string pkg_v2 = make_pkg("multi-obsolete", "2.0", v2_files);
+
+    Config::instance().set_force_overwrite_mode(true);
+    install_packages({pkg_v1});
+    Cache::instance().write();
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+
+    install_packages({pkg_v2});
+    Cache::instance().write();
+
+    // 统计 REMOVE_OLD 行数
+    auto log_content = read_log();
+    int remove_old_count = 0;
+    std::istringstream ss(log_content);
+    std::string line;
+    while (std::getline(ss, line))
+        if (line.find("REMOVE_OLD") != std::string::npos) remove_old_count++;
+
+    // 应有 3 个 REMOVE_OLD（tool_b, tool_c, lib_y）
+    EXPECT_EQ(remove_old_count, 3)
+        << "each obsolete file should have its own REMOVE_OLD entry";
+
+    // 验证被移除的文件都不存在了
+    EXPECT_FALSE(fs::exists(test_root / "usr/bin/tool_b"));
+    EXPECT_FALSE(fs::exists(test_root / "usr/bin/tool_c"));
+    EXPECT_FALSE(fs::exists(test_root / "usr/lib/lib_y.so"));
+    // 保留的文件依然存在
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/tool_a"));
+    EXPECT_TRUE(fs::exists(test_root / "usr/lib/lib_x.so"));
+
+    Config::instance().set_force_overwrite_mode(false);
 }

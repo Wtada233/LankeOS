@@ -102,6 +102,8 @@ void InstallationTask::commit_without_file_ops() {
     std::unordered_set<std::string> old_files;
     if (!old_version_to_replace_.empty()) {
         old_files = Cache::instance().get_package_files(pkg_name_);
+        log_info(string_format("info.upgrade_old_files_check",
+                               old_version_to_replace_, actual_version_, old_files.size()));
     }
 
     register_package();
@@ -137,8 +139,14 @@ void InstallationTask::commit_without_file_ops() {
                                 }
                                 continue;
                             }
+                            // ★ WAL 保护：REMOVE_OLD 明确记录"旧版本废弃文件被移除"
+                            //   与 BACKUP（覆盖前临时备份）语义分离，确保 lpkg rec 能恢复
                             log_info(string_format("info.removing_obsolete_file", old_file));
-                            fs::remove(phys);
+                            fs::path bak = phys;
+                            bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
+                            TransactionLog::log_raw("REMOVE_OLD " + phys.string() + " → " + bak.string());
+                            fs::rename(phys, bak);
+                            backups_.emplace_back(phys, bak);
                         }
                     }
                 }
