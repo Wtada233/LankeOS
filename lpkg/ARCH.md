@@ -594,3 +594,56 @@ COMMIT_PKGS
 - **I-AUDIT-2**: WAL 中 `RM_BEGIN`/`RM_COMMIT` 行含义 = "用户主动删除了包"。
 - **I-AUDIT-3**: 一个包的 WAL 生命周期是唯一的：要么 `BEGIN → COMMIT/ROLLBACK → END`，要么 `RM_BEGIN → RM_COMMIT → RM_END`。不会混合出现两种模式。
 - **I-AUDIT-4**: `REMOVE_OLD`（升级时旧文件清理）与 `BACKUP`（覆盖前备份）语义分离，可区分。
+
+---
+
+## 10. 自动恢复（Auto-Recovery）
+
+### 10.1 动机
+
+WAL 中残留未完成事务时启动新操作会导致日志状态机混乱：
+
+```
+旧事务：BEGIN_PKGS 1 → BACKUP /usr/bin/foo → 进程断电死亡（无 COMMIT_PKGS）
+新事务：lpkg install bar → trim_completed() 保留旧事务 → 追加 BEGIN_PKGS 1 ...
+```
+
+`recover_packages()` 读到两个 `BEGIN_PKGS` 会把第一段未提交事务加入 `uncommitted_txns`
+然后 `reverse_execute`——但新操作对文件系统的修改可能已被反向执行错误撤销。
+
+### 10.2 自动恢复机制
+
+**所有写操作在开始新事务前自动调用 `recover_packages()`**，确保 WAL 始终是干净的再开始新事务。
+
+触发点（`package_manager.cpp`）：
+
+| 操作 | 入口函数 | 恢复时机 |
+|------|---------|---------|
+| `install` | `install_packages()` | `trim_completed()` 前 |
+| `remove` | `remove_package(wrap_in_txn=true)` | `trim_completed()` 前 |
+| `upgrade` | `upgrade_packages()` | `trim_completed()` 前 |
+| `remove -r` | `remove_package_recursive()` | `trim_completed()` 前 |
+| `reinstall` | `reinstall_package()` → 调 `install_packages()` | 同上 |
+| `autoremove` | 调 `remove_package()` | 同上 |
+
+### 10.3 流程
+
+```
+lpkg install pkgA       lpkg remove pkgB       lpkg upgrade
+     │                       │                      │
+     ├── recover_packages()  ← 先处理 WAL 残留      │
+     │   ├─ reverse_execute  (恢复文件 + DB)         │
+     │   └─ COMMIT_PKGS      (标记事务完结)           │
+     │                                                │
+     ├── trim_completed()    ← 所有事务已完结 → 清空  │
+     ├── ... (正常流程)                                │
+     └── BEGIN_PKGS → ... → COMMIT_PKGS               │
+         在干净的 WAL 上开始新事务                      │
+```
+
+### 10.4 不变量
+
+- **I-AUTO-1**: 任何写操作前 WAL 中无未完成事务（由 `recover_packages` 保证）。
+- **I-AUTO-2**: `recover_packages` 在同一操作中被多次调用 → 幂等（第二次看到 `COMMIT_PKGS` → 无操作）。
+- **I-AUTO-3**: 自动恢复不替代 `lpkg rec`——手动调用 `rec` 始终可用，但日常不需要。
+- **I-AUTO-4**: 自动恢复产生的 `COMMIT_PKGS` 可被 `trim_completed` 正常压缩。 
