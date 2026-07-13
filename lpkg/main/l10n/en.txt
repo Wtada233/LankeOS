@@ -122,7 +122,7 @@ error.unresolvable_drift=Unresolvable metadata drift for package '{}': {}
 error.unresolved_soname=Required SONAME '{}' has no provider in repository or install plan
 info.installing_discovered_dep=Discovered missing dependency '{}', adding to install queue...
 info.log_prefix==> 
-info.upgrade_old_files_check=Upgrading: {} → {}, found {} old files to verify
+info.upgrade_old_files_check=Replacing: {} → {}, {} old files to check
 info.rollback_debug_files=Rollback: {} entries in new_files_
 info.rollback_debug_dirs=Rollback: {} directories to remove
 info.rollback_debug_dirpath=  will remove dir: {}
@@ -147,6 +147,7 @@ help.output_file=Output file path
 help.pack_source=Source directory for packing
 help.force=Force remove even if needed by others
 help.force_overwrite=Overwrite untracked files
+help.recursive=Recursively remove package and all packages that depend on it
 help.no_hooks=Do not run post-install or pre-remove hooks
 help.no_deps=Do not resolve or install dependencies
 help.hash=Path to a hash file for local installation verification
@@ -232,6 +233,7 @@ warning.dep_scan_metadata_parse_failed=Failed to parse metadata for {}: {}
 warning.scan_file_error=Error accessing {} during scan: {}
 warning.recover_pending_txn=Incomplete transaction detected: {} (use 'lpkg rec' to recover)
 warning.recover_rename_failed=Failed to restore {} → {}: {}
+warning.recover_skip_copy=Backup file for {} not found, skipping removal to prevent data loss.
 warning.recover_dir_not_empty=Directory {} is not empty after rolling back file entries — left in place for manual inspection
 
 info.recover_start=Recovering from interrupted transaction...
@@ -242,3 +244,14 @@ info.recover_no_log=No transaction log found, nothing to recover.
 info.recover_no_pending=No pending transactions.
 info.recover_rollback_txn=Rolling back uncommitted transaction: {}
 info.recover_done=Recovery complete. {} files restored, {} temp files cleaned.
+
+info.recursive_remove_start=Building recursive dependency tree for {}...
+info.recursive_remove_header=Packages to be removed:
+info.recursive_remove_item=  - {}
+info.recursive_removing=Removing {}...
+info.recursive_remove_done=Recursive remove complete.
+info.recursive_nothing_to_remove=No removable packages affected.
+info.recursive_protected_header=Skipping protected packages (essential/held):
+info.recursive_confirm_prompt=Warning {}/3 — enter code [{}] to confirm recursive removal:
+
+info.recursive_confirm_failed=Incorrect code, recursive remove aborted.

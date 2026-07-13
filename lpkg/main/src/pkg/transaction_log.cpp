@@ -98,25 +98,21 @@ std::string TransactionLog::check_pending() {
     std::ifstream f(log_path);
     if (!f.is_open()) return "";
 
+    // 统一事务模型：只检查 BEGIN_PKGS / COMMIT_PKGS
     std::string line, last_begin, last_commit;
     while (std::getline(f, line)) {
-        if (line.find("BEGIN ") != std::string::npos)
+        // 用 find 而不是 starts_with，因为行含时间戳前缀
+        if (line.find("BEGIN_PKGS ") != std::string::npos)
             last_begin = line;
-        if (line.find("COMMIT ") != std::string::npos)
+        if (line.find("COMMIT_PKGS") != std::string::npos)
             last_commit = line;
-        if (line.find("END ") != std::string::npos) {
-            last_begin.clear();
-            last_commit.clear();
-        }
     }
 
     if (!last_begin.empty() && last_begin != last_commit) {
-        size_t pos = last_begin.find("BEGIN ");
-        if (pos != std::string::npos) {
-            auto rest = last_begin.substr(pos + 6);
-            pos = rest.find(' ');
-            if (pos != std::string::npos)
-                return rest.substr(0, pos);
+        // 从时间戳后的内容提取包数量（仅作显示用）
+        auto ts_end = last_begin.find(']');
+        if (ts_end != std::string::npos) {
+            return last_begin.substr(ts_end + 2);
         }
     }
     return "";
@@ -124,20 +120,12 @@ std::string TransactionLog::check_pending() {
 
 // ── 事务压缩 ─────────────────────────────────────────────────────────
 //
-// 用状态机逐行扫描日志，定位第一条未完结事务的起始行偏移。
-// 只有"已完结"且不属于任何未完结批量事务的条目才被安全删除。
+// 统一状态机：只识别 BEGIN_PKGS 和 COMMIT_PKGS，无 INSTALL/REMOVE/BATCH
+// 模式之分。BEGIN_PKGS 进入活跃事务，COMMIT_PKGS 退出。
+// 其余所有行（BEGIN、END、COMMIT、ROLLBACK、RM_BEGIN、RM_COMMIT、
+// RM_END 等）在活跃事务中被静默忽略（不改变状态）。
 //
-// 状态定义（复用 recover.cpp 的分类逻辑）：
-//   NONE    → 无活跃事务，遇到 BEGIN/RM_BEGIN/BEGIN_PKGS 时转入对应状态
-//   INSTALL → 单包安装中，遇到 COMMIT+END 或 ROLLBACK+END 回到 NONE
-//   REMOVE  → 移除中，   遇到 RM_COMMIT+RM_END 回到 NONE
-//   BATCH   → 批量安装中，遇到 COMMIT_PKGS 回到 NONE（内部子事务不退出 BATCH）
-//
-// 注意：批量事务内单个包的 COMMIT/END 不清除起始偏移——只有最外层的
-//        COMMIT_PKGS 可以。这是最关键的边界。
-//
-// 实现方式：读取所有行入内存 → 解析状态机 → 找到 trim 点 → 写出后缀。
-// 日志文件通常很小（< 1MB），因此全量读取不是问题。
+// 匹配 trim_completed，与 recover_packages 的状态机逻辑保持一致。
 
 void TransactionLog::trim_completed() {
     const fs::path log_path = Config::instance().lock_dir() / "transaction.log";
@@ -156,17 +144,15 @@ void TransactionLog::trim_completed() {
 
     if (lines.empty()) return;
 
-    // ── 状态机扫描 ─────────────────────────────────────────────────────
-    // 事务类型（与 recover.cpp 保持一致）
-    enum class TxnType { NONE, INSTALL, REMOVE, BATCH };
-    TxnType txn_type = TxnType::NONE;
-
+    // ── 统一状态机扫描 ─────────────────────────────────────────────────
+    // 只关心 BEGIN_PKGS 和 COMMIT_PKGS，其余行不影响状态。
     // trim_line_idx: 第一条未完结事务的行号索引
-    //   NONE 状态下 = -1（无事可 trim）
-    //   非 NONE = 当前未完结事务的起始行
-    int trim_line_idx = -1;  // -1 = 无未完结事务
+    //   -1 = 无未完结事务（可全量压缩）
+    //    0 = 从第一行开始就是未完结事务（不可压缩）
+    //   >0 = 从该行开始保留
+    int depth = 0;
+    int trim_line_idx = -1;
 
-    // 辅助：去掉时间戳前缀 "[YYYY-MM-DD HH:MM:SS] "
     auto strip_ts = [](std::string_view sv) -> std::string_view {
         auto ts_end = sv.find(']');
         if (ts_end == std::string_view::npos) return sv;
@@ -179,72 +165,28 @@ void TransactionLog::trim_completed() {
         if (content.empty()) continue;
 
         if (content.starts_with("BEGIN_PKGS ")) {
-            if (txn_type != TxnType::BATCH) {
-                if (txn_type == TxnType::NONE) {
-                    trim_line_idx = i;  // 记录批量事务起点
-                }
-                txn_type = TxnType::BATCH;
+            if (depth == 0) {
+                trim_line_idx = i;  // 记录未完结事务起点
             }
+            depth++;
         } else if (content.starts_with("COMMIT_PKGS")) {
-            if (txn_type == TxnType::BATCH) {
-                txn_type = TxnType::NONE;
-                trim_line_idx = -1;     // 批次完成，清除偏移
+            depth--;
+            if (depth == 0) {
+                trim_line_idx = -1;  // 事务完结
             }
-        } else if (content.starts_with("RM_BEGIN ")) {
-            if (txn_type == TxnType::NONE) {
-                trim_line_idx = i;
-                txn_type = TxnType::REMOVE;
-            }
-        } else if (content.starts_with("RM_COMMIT ") || content.starts_with("RM_END ")) {
-            if (txn_type == TxnType::REMOVE) {
-                txn_type = TxnType::NONE;
-                trim_line_idx = -1;
-            }
-            // BATCH 状态下不清除
-        } else if (content.starts_with("BEGIN ")) {
-            if (txn_type == TxnType::NONE) {
-                trim_line_idx = i;
-                txn_type = TxnType::INSTALL;
-            }
-        } else if (content.starts_with("COMMIT ")) {
-            if (txn_type == TxnType::INSTALL) {
-                // 不立即清除：INSTALL 还要看后续 END 才完结
-            }
-            // BATCH 下不清除
-        } else if (content.starts_with("ROLLBACK ")) {
-            // ROLLBACK（总是来自恢复流程）终结任意类型的事务
-            // 恢复流程在 rec 任何事务后写 ROLLBACK+END 标记事务已完结
-            if (txn_type != TxnType::NONE) {
-                txn_type = TxnType::NONE;
-                trim_line_idx = -1;
-            }
-        } else if (content.starts_with("END ")) {
-            if (txn_type == TxnType::INSTALL) {
-                txn_type = TxnType::NONE;
-                trim_line_idx = -1;
-            }
-            // 若已经是 NONE（因 ROLLBACK 先行清除），END 不再重复操作
-            // BATCH 下不清除
         }
+        // 其余所有行（BEGIN、END、COMMIT、ROLLBACK、RM_BEGIN 等）不影响状态
     }
 
     // ── 执行压缩 ───────────────────────────────────────────────────────
-    // trim_line_idx:
-    //   -1 → 无未完结事务，全量清空
-    //    0 → 第一条就是未完结事务，什么都不要删
-    //   >0 → 从第 trim_line_idx 行开始保留
-
     if (trim_line_idx < 0) {
-        // 全部已完结 → 清空
         std::ofstream clear_out(log_path, std::ios::trunc);
         return;
     }
     if (trim_line_idx == 0) {
-        // 未完结事务从开头开始 → 不动
         return;
     }
 
-    // 写出 trim_line_idx 及之后的行到 .tmp，rename 覆盖
     const fs::path tmp_path = log_path.string() + ".trim_tmp";
     {
         std::ofstream f_out(tmp_path);

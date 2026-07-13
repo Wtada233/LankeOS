@@ -31,6 +31,7 @@
 
 #include <sys/mount.h>
 #include <sys/wait.h>
+#include <random>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -410,8 +411,9 @@ void install_packages_internal(InstallContext& ctx) {
  * 检查是否为 essential 包、是否有其他包依赖它、是否有包依赖其提供的虚拟包名
  * force 模式下跳过所有安全检查
  */
-void remove_package(const std::string& pkg_name, bool force) {
-    TransactionLog::trim_completed();  // 新事务开始前压缩已完结日志
+void remove_package(const std::string& pkg_name, bool force, bool wrap_in_txn) {
+    if (wrap_in_txn)
+        TransactionLog::trim_completed();
     const std::string ver = Cache::instance().get_installed_version(pkg_name);
     if (ver.empty()) {
         log_info(string_format("info.package_not_installed", pkg_name));
@@ -445,7 +447,9 @@ void remove_package(const std::string& pkg_name, bool force) {
 
     log_info(string_format("info.removing_package", pkg_name));
 
-    // ── WAL：RM_BEGIN（原子移除事务开始） ──────────────────────────────
+    // ── WAL：统一事务开始（移除也走 BEGIN_PKGS / COMMIT_PKGS 模型） ──
+    if (wrap_in_txn)
+        TransactionLog::log_raw("BEGIN_PKGS 1");
     TransactionLog::log_raw("RM_BEGIN " + pkg_name + " " + ver);
 
     // 测试断点：RM_BEGIN 后、备份前
@@ -628,6 +632,12 @@ void remove_package(const std::string& pkg_name, bool force) {
 
     TransactionLog::log_raw("RM_END " + pkg_name + " " + ver);
     Cache::instance().cleanup_db_backups();
+
+    // 统一事务完结（仅在独立移除时包裹；递归移除由外层包裹）
+    if (wrap_in_txn) {
+        TransactionLog::log_raw("COMMIT_PKGS");
+        Cache::instance().cleanup_db_backups();
+    }
 
     // 测试断点：移除完全完成后
     if (Config::instance().testing_mode())
@@ -906,4 +916,161 @@ void query_file(const std::string& filename) {
         }
         log_info(string_format("info.file_owned_by", target, os));
     }
+}
+
+// =====================================================================
+// 递归移除
+// =====================================================================
+
+namespace {
+
+/** 生成 N 位随机大写字母数字验证码 */
+std::string generate_code(size_t len = 6) {
+    static const char chars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    std::random_device rd;
+    std::string code;
+    for (size_t i = 0; i < len; ++i)
+        code += chars[rd() % (sizeof(chars) - 1)];
+    return code;
+}
+
+/** 获取某包及其传递反向依赖的集合 */
+std::unordered_set<std::string> collect_recursive_remove_set(
+    const std::string& pkg_name)
+{
+    std::unordered_set<std::string> result;
+    std::unordered_set<std::string> visited;
+    std::vector<std::string> queue = {pkg_name};
+
+    while (!queue.empty()) {
+        auto current = std::move(queue.back());
+        queue.pop_back();
+        if (!visited.insert(current).second) continue;
+        result.insert(current);
+
+        // 本包的反向依赖
+        auto rdeps = Cache::instance().get_reverse_deps(current);
+        // 本包提供的虚拟包的反向依赖
+        for (const auto& cap : Cache::instance().get_package_provides(current)) {
+            auto cap_rdeps = Cache::instance().get_reverse_deps(cap);
+            rdeps.insert(cap_rdeps.begin(), cap_rdeps.end());
+        }
+        for (const auto& rdep : rdeps) {
+            if (rdep != current && !visited.contains(rdep))
+                queue.push_back(rdep);
+        }
+    }
+    return result;
+}
+
+} // anonymous namespace
+
+// main.cpp 中定义的 SIGINT 标志
+extern std::atomic<bool> sigint_graceful;
+
+/**
+ * 递归移除包及其所有受影响的依赖者。
+ *
+ * 流程：
+ *   1. 收集所有受影响的包（传递反向依赖）
+ *   2. 排除 essential / held 包并显示列表
+ *   3. 3 轮验证码确认（非交互模式跳过）
+ *   4. 按叶子优先的顺序逐个移除（force 模式）
+ *   5. 整体包裹在 BEGIN_PKGS / COMMIT_PKGS 中保证原子性
+ */
+void remove_package_recursive(const std::string& pkg_name) {
+    if (sigint_graceful.load())
+        throw LpkgException(get_string("info.sigint_aborted"));
+    Cache::instance().load();
+    log_info(string_format("info.recursive_remove_start", pkg_name));
+
+    const std::string ver = Cache::instance().get_installed_version(pkg_name);
+    if (ver.empty()) {
+        log_info(string_format("info.package_not_installed", pkg_name));
+        return;
+    }
+
+    // ── 1. 收集影响集合 ─────────────────────────────────────────────────
+    auto affected = collect_recursive_remove_set(pkg_name);
+    if (affected.empty()) return;
+
+    // ── 2. 排除受保护的包，显示列表 ────────────────────────────────────
+    // 跳过 essential 包（由 remove_package 内部保护），不跳 held 包——
+    // held 是 autoremove 概念（标记显式安装的包根），不应用于阻止递归移除。
+    // 用户如要保护包请使用 essential 机制。
+    std::vector<std::string> to_remove;
+    std::vector<std::string> essential_pkgs;
+    for (const auto& p : affected) {
+        if (Cache::instance().is_essential(p)) {
+            essential_pkgs.push_back(p);
+            continue;
+        }
+        to_remove.push_back(p);
+    }
+
+    if (to_remove.empty()) {
+        log_info(get_string("info.recursive_nothing_to_remove"));
+        return;
+    }
+
+    if (!essential_pkgs.empty()) {
+        std::string msg = get_string("info.recursive_protected_header") + "\n";
+        for (const auto& p : essential_pkgs)
+            msg += "  " + p + "\n";
+        log_warning(msg);
+    }
+
+    // 显示要移除的包
+    log_info(get_string("info.recursive_remove_header"));
+    for (const auto& p : to_remove)
+        log_info(string_format("info.recursive_remove_item", p));
+
+    // 按反向依赖数量升序排列（叶子先删）
+    std::ranges::sort(to_remove, [](const std::string& a, const std::string& b) {
+        return Cache::instance().get_reverse_deps(a).size()
+             < Cache::instance().get_reverse_deps(b).size();
+    });
+
+    // ── 3. 3 轮验证码确认 ──────────────────────────────────────────────
+    bool confirmed = true;
+    if (Config::instance().non_interactive_mode() == NonInteractiveMode::INTERACTIVE) {
+        for (int i = 0; i < 3; ++i) {
+            std::string code = generate_code();
+            log_info(string_format("info.recursive_confirm_prompt",
+                                    std::to_string(i + 1), code));
+            std::string input;
+            std::cin >> input;
+            if (input != code) {
+                log_info(get_string("info.recursive_confirm_failed"));
+                confirmed = false;
+                break;
+            }
+        }
+    }
+    if (!confirmed) {
+        log_info(get_string("info.installation_aborted"));
+        return;
+    }
+
+    // ── 4. 原子移除（包裹在统一事务中） ──────────────────────────────
+    TransactionLog::trim_completed();
+    TransactionLog::log_raw("BEGIN_PKGS " + std::to_string(to_remove.size()));
+
+    try {
+        for (const auto& p : to_remove) {
+            log_info(string_format("info.recursive_removing", p));
+            // wrap_in_txn=false — 递归移除自行管理外层事务包裹
+            remove_package(p, true, false);
+        }
+    } catch (...) {
+        // rec 会通过 reverse_execute 回滚
+        throw;
+    }
+
+    // 统一外层事务提交
+    Cache::instance().write("recursive-remove");
+    TransactionLog::log_raw("COMMIT_PKGS");
+    Cache::instance().cleanup_db_backups();
+
+    log_info(get_string("info.recursive_remove_done"));
 }

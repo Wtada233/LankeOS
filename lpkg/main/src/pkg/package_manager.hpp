@@ -114,7 +114,7 @@ void recover_packages();
 /// 内部递归引擎
 void install_packages_internal(InstallContext& ctx);
 
-void remove_package(const std::string& pkg_name, bool force = false);
+void remove_package(const std::string& pkg_name, bool force = false, bool wrap_in_txn = true);
 void autoremove();
 void upgrade_packages();
 void reinstall_package(const std::string& pkg_name);
@@ -123,3 +123,4 @@ void query_file(const std::string& filename);
 void show_man_page(const std::string& pkg_name);
 void write_cache();
 void remove_package_files(const std::string& pkg_name, bool force = false);
+void remove_package_recursive(const std::string& pkg_name);

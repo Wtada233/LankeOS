@@ -169,11 +169,12 @@ TEST_F(AtomicityBoundaryTest, SinglePkgDbBakCleanedAfterCommit) {
     EXPECT_FALSE(db_bak) << "no .lpkg_db_bak after committed install";
 }
 
-// A03: Only BEGIN_PKGS no install → rec no-ops
+// A03: Only BEGIN_PKGS no install → rec 写 COMMIT_PKGS 终结 BATCH
 TEST_F(AtomicityBoundaryTest, CrashBeforeInstallPkg) {
     TransactionLog::log_raw("BEGIN_PKGS 1");
     recover_packages();
-    EXPECT_TRUE(log_has("ROLLBACK")) << "recovery should log ROLLBACK";
+    // BATCH recovery 使用 COMMIT_PKGS 标记完结（非 ROLLBACK）
+    EXPECT_TRUE(log_has("COMMIT_PKGS")) << "rec writes COMMIT_PKGS for BATCH";
 }
 
 // A04: 单包 SIGINT 在 BACKUP 后 COPY 前 → rollback 恢复文件
@@ -247,7 +248,8 @@ TEST_F(AtomicityBoundaryTest, BatchCrashRecRollsBackAll) {
     {
         fs::path f = test_root / "usr/bin/a08a";
         fs::path b = f; b += ".lpkg_bak_a08a";
-        TransactionLog::log_raw("BEGIN a08a 1.0");
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN a08a 1.0");
         TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + b.string());
         fs::rename(f, b);
         { std::ofstream of(f); of << "new_a"; }
@@ -258,7 +260,8 @@ TEST_F(AtomicityBoundaryTest, BatchCrashRecRollsBackAll) {
     {
         fs::path f = test_root / "usr/bin/a08b";
         fs::path b = f; b += ".lpkg_bak_a08b";
-        TransactionLog::log_raw("BEGIN a08b 1.0");
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN a08b 1.0");
         TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + b.string());
         fs::rename(f, b);
     }
@@ -338,7 +341,8 @@ TEST_F(AtomicityBoundaryTest, RemoveCrashBeforeCommitBakSurvives) {
 
     fs::path f = test_root / "usr/bin/b02_tool";
     fs::path bak = f; bak += ".lpkg_bak_b02";
-    TransactionLog::log_raw("RM_BEGIN b02 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN b02 1.0");
     TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
     fs::rename(f, bak);
     ASSERT_FALSE(fs::exists(f));
@@ -363,7 +367,8 @@ TEST_F(AtomicityBoundaryTest, RemoveCompleteOpsNoCommitRecovers) {
 
     fs::path f = test_root / "usr/bin/b03_tool";
     fs::path bak = f; bak += ".lpkg_bak_b03";
-    TransactionLog::log_raw("RM_BEGIN b03 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN b03 1.0");
     TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
     fs::rename(f, bak);
 
@@ -426,7 +431,8 @@ TEST_F(AtomicityBoundaryTest, CrashAfterRemoveFilesBeforeRmDir) {
 
     fs::path f = test_root / "usr/lib/b06/b06.so";
     fs::path bak = f; bak += ".lpkg_bak_b06";
-    TransactionLog::log_raw("RM_BEGIN b06 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN b06 1.0");
     TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
     fs::rename(f, bak);
 
@@ -570,7 +576,8 @@ TEST_F(AtomicityBoundaryTest, RecoverNewDirWithBakCleaned) {
     fs::path bak = dir / "config.lpkg_bak_oldpkg";
     { std::ofstream f(bak); f << "backup content"; }
 
-    TransactionLog::log_raw("BEGIN test 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN test 1.0");
     TransactionLog::log_raw("NEW_DIR " + dir.string());
 
     EXPECT_TRUE(fs::exists(bak)) << "bak exists before recovery";
@@ -588,7 +595,8 @@ TEST_F(AtomicityBoundaryTest, RecoverNewDirOnlyBakGetsDeleted) {
     fs::path bak = dir / "data.lpkg_bak_oldpkg";
     { std::ofstream f(bak); f << "bak"; }
 
-    TransactionLog::log_raw("BEGIN t 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN t 1.0");
     TransactionLog::log_raw("NEW_DIR " + dir.string());
 
     recover_packages();
@@ -606,7 +614,8 @@ TEST_F(AtomicityBoundaryTest, MultiNewDirMultiBakAllCleaned) {
     { std::ofstream f(d1 / "f1.lpkg_bak_pkg"); f << "bak1"; }
     { std::ofstream f(d2 / "f2.lpkg_bak_pkg"); f << "bak2"; }
 
-    TransactionLog::log_raw("BEGIN multi 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN multi 1.0");
     TransactionLog::log_raw("NEW_DIR " + d1.string());
     TransactionLog::log_raw("NEW_DIR " + d2.string());
 
@@ -621,7 +630,8 @@ TEST_F(AtomicityBoundaryTest, NewDirEmptyGetsDeleted) {
     fs::path dir = test_root / "empty_new_dir";
     fs::create_directories(dir);
 
-    TransactionLog::log_raw("BEGIN empty 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN empty 1.0");
     TransactionLog::log_raw("NEW_DIR " + dir.string());
 
     recover_packages();
@@ -635,7 +645,8 @@ TEST_F(AtomicityBoundaryTest, NewDirWithRealContentKept) {
     fs::create_directories(dir);
     { std::ofstream f(dir / "real_file"); f << "real data"; }
 
-    TransactionLog::log_raw("BEGIN real 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN real 1.0");
     TransactionLog::log_raw("NEW_DIR " + dir.string());
 
     recover_packages();
@@ -646,7 +657,8 @@ TEST_F(AtomicityBoundaryTest, NewDirWithRealContentKept) {
 
 // C10: RM_BAK_CLN 在 rec 中被正确处理（不崩溃）
 TEST_F(AtomicityBoundaryTest, RmBakClnSkipProperly) {
-    TransactionLog::log_raw("RM_BEGIN test-pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN test-pkg 1.0");
     TransactionLog::log_raw(std::string("BACKUP /dummy") + ARROW_SEP + "/dummy.lpkg_bak_test-pkg");
     TransactionLog::log_raw("RM_BAK_CLN /dir/subdir/file.lpkg_bak_test-pkg");
 
@@ -722,7 +734,8 @@ TEST_F(AtomicityBoundaryTest, RemoveCrashThenRecoveryConsistent) {
 
     fs::path f = test_root / "d04/file";
     fs::path bak = f; bak += ".lpkg_bak_d04";
-    TransactionLog::log_raw("RM_BEGIN d04 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN d04 1.0");
     TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
     fs::rename(f, bak);
 
@@ -910,16 +923,19 @@ TEST_F(AtomicityBoundaryTest, DoubleRecovery) {
 
 // F03: BEGIN 后无操作 → rec 不崩溃
 TEST_F(AtomicityBoundaryTest, BeginOnlyNoop) {
-    TransactionLog::log_raw("BEGIN pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg 1.0");
     EXPECT_NO_THROW(recover_packages());
 }
 
 // F04: 已完成 + 未完成混合 → rec 只回滚未完成
 TEST_F(AtomicityBoundaryTest, MixedCompletedAndUncommitted) {
-    TransactionLog::log_raw("BEGIN done1 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN done1 1.0");
     TransactionLog::log_raw("COMMIT done1 1.0");
     TransactionLog::log_raw("END done1 1.0");
-    TransactionLog::log_raw("BEGIN undone2 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN undone2 1.0");
 
     fs::path f = test_root / "usr/bin/undone2_file";
     fs::create_directories(f.parent_path());
@@ -936,7 +952,8 @@ TEST_F(AtomicityBoundaryTest, MixedCompletedAndUncommitted) {
 
 // F05: BACKUP dst 不存在 → rec 跳过
 TEST_F(AtomicityBoundaryTest, RecoverMissingBakSkip) {
-    TransactionLog::log_raw("BEGIN pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg 1.0");
     TransactionLog::log_raw(std::string("BACKUP /nonexistent/src") + ARROW_SEP + "/nonexistent/dst.lpkg_bak_pkg");
 
     EXPECT_NO_THROW(recover_packages());
@@ -944,7 +961,8 @@ TEST_F(AtomicityBoundaryTest, RecoverMissingBakSkip) {
 
 // F06: COPY src/dst 都不存在 → rec 跳过
 TEST_F(AtomicityBoundaryTest, RecoverMissingCopySkip) {
-    TransactionLog::log_raw("BEGIN pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg 1.0");
     TransactionLog::log_raw(std::string("COPY /no/src") + ARROW_SEP + "/no/dst");
 
     EXPECT_NO_THROW(recover_packages());
@@ -988,10 +1006,13 @@ TEST_F(AtomicityBoundaryTest, BulkFileInstall) {
 
 // F09: 多事务累积 rec
 TEST_F(AtomicityBoundaryTest, MultiTxnRecovery) {
-    TransactionLog::log_raw("BEGIN a 1.0"); TransactionLog::log_raw("COMMIT a 1.0"); TransactionLog::log_raw("END a 1.0");
-    TransactionLog::log_raw("RM_BEGIN b 1.0"); TransactionLog::log_raw("RM_COMMIT b 1.0"); TransactionLog::log_raw("RM_END b 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN a 1.0"); TransactionLog::log_raw("COMMIT a 1.0"); TransactionLog::log_raw("END a 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN b 1.0"); TransactionLog::log_raw("RM_COMMIT b 1.0"); TransactionLog::log_raw("RM_END b 1.0");
     TransactionLog::log_raw("BEGIN_PKGS 1"); TransactionLog::log_raw("COMMIT_PKGS");
-    TransactionLog::log_raw("RM_BEGIN c 2.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN c 2.0");
 
     EXPECT_NO_THROW(recover_packages());
 }
@@ -1116,7 +1137,8 @@ TEST_F(AtomicityBoundaryTest, SinglePkgNoCommitPkgsRollback) {
 
     fs::path f = test_root / "usr/bin/f17_file";
     fs::path bak = f; bak += ".lpkg_bak_f17";
-    TransactionLog::log_raw("BEGIN f17 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN f17 1.0");
     TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
     fs::rename(f, bak);
     { std::ofstream of(f); of << "f17_new"; }
@@ -1144,7 +1166,8 @@ TEST_F(AtomicityBoundaryTest, BeginPkgs0NoCrash) {
 
 // G02: RM_BEGIN 无 BACKUP — 空移除事务 → rec 无操作
 TEST_F(AtomicityBoundaryTest, RmBeginNoBackup) {
-    TransactionLog::log_raw("RM_BEGIN empty-rm 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN empty-rm 1.0");
     // 没有 BACKUP 行
     // 没有 RM_COMMIT
 
@@ -1157,7 +1180,8 @@ TEST_F(AtomicityBoundaryTest, DBRMEntryInRecovery) {
     fs::path db_file = Config::instance().lock_dir() / "test_db_file";
     { std::ofstream f(db_file); f << "some data"; }
 
-    TransactionLog::log_raw("BEGIN pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg 1.0");
     TransactionLog::log_raw("DBRM " + db_file.string() + " test-pkg");
 
     // 模拟 DB 文件已被 rename → .lpkg_db_bak
@@ -1178,7 +1202,8 @@ TEST_F(AtomicityBoundaryTest, DBRMEntryInRecovery) {
 TEST_F(AtomicityBoundaryTest, DBNEWEntryInRecovery) {
     fs::path new_db = Config::instance().state_dir() / "new_test_db";
 
-    TransactionLog::log_raw("BEGIN pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg 1.0");
     TransactionLog::log_raw("DBNEW " + new_db.string() + " test-pkg");
 
     // 模拟新 DB 文件已创建
@@ -1202,7 +1227,8 @@ TEST_F(AtomicityBoundaryTest, DeepNestedNewDirsWithBakAtEachLevel) {
     { std::ofstream f(base / "a/b/c/.lpkg_bak_x"); f << "3"; }
     { std::ofstream f(base / "a/b/c/d/.lpkg_bak_x"); f << "4"; }
 
-    TransactionLog::log_raw("BEGIN deep 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN deep 1.0");
     TransactionLog::log_raw("NEW_DIR " + (base / "a").string());
     TransactionLog::log_raw("NEW_DIR " + (base / "a" / "b").string());
     TransactionLog::log_raw("NEW_DIR " + (base / "a" / "b" / "c").string());
@@ -1219,7 +1245,8 @@ TEST_F(AtomicityBoundaryTest, DeepNestedNewDirsWithBakAtEachLevel) {
 // G06: BEGIN_PKGS N + 只有部分包写了 BEGIN + 无任何 COMMIT + 无 COMMIT_PKGS
 TEST_F(AtomicityBoundaryTest, BatchPartialBeginOnly) {
     TransactionLog::log_raw("BEGIN_PKGS 3");
-    TransactionLog::log_raw("BEGIN pkg-a 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg-a 1.0");
     // pkg-a 没操作（模拟"预检阶段就崩溃"）
     // pkg-b 和 pkg-c 连 BEGIN 都没有
     // 无 COMMIT_PKGS
@@ -1239,7 +1266,8 @@ TEST_F(AtomicityBoundaryTest, CopyOnlyTransaction) {
     fs::create_directories(dst.parent_path());
     { std::ofstream f(src); f << "copy only"; }
 
-    TransactionLog::log_raw("BEGIN copy-only 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN copy-only 1.0");
     TransactionLog::log_raw(std::string("COPY ") + src.string() + ARROW_SEP + dst.string());
 
     // 模拟：src (.lpkgtmp) 和 dst 都存在（部分复制）
@@ -1262,7 +1290,8 @@ TEST_F(AtomicityBoundaryTest, NewDirMixedContent) {
     { std::ofstream f(d1 / "file.lpkg_bak_x"); f << "bak"; }
     { std::ofstream f(d2 / "only.lpkg_bak_x"); f << "only_bak"; }
 
-    TransactionLog::log_raw("BEGIN mixed 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN mixed 1.0");
     TransactionLog::log_raw("NEW_DIR " + d1.string());
     TransactionLog::log_raw("NEW_DIR " + d2.string());
 
@@ -1279,7 +1308,8 @@ TEST_F(AtomicityBoundaryTest, NewDirMixedContent) {
 // G09: rec 处理 BEGIN_PKGS 1 + COMMIT + END + COMMIT_PKGS — 已完成事务
 TEST_F(AtomicityBoundaryTest, CompleteBatchSkippedByRec) {
     TransactionLog::log_raw("BEGIN_PKGS 1");
-    TransactionLog::log_raw("BEGIN pkg 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN pkg 1.0");
     TransactionLog::log_raw(std::string("BACKUP /dummy") + ARROW_SEP + "/dummy.lpkg_bak_pkg");
     TransactionLog::log_raw("COMMIT pkg 1.0");
     TransactionLog::log_raw("END pkg 1.0");
@@ -1412,7 +1442,8 @@ TEST_F(AtomicityBoundaryTest, RemoveWritesDbrm) {
 TEST_F(AtomicityBoundaryTest, DBNEWUncommittedFileDeleted) {
     fs::path test_db = Config::instance().state_dir() / "test_dbenew.db";
 
-    TransactionLog::log_raw("BEGIN h05 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h05 1.0");
     TransactionLog::log_raw(std::string("DBNEW ") + test_db.string() + " h05");
 
     // 模拟：文件已被创建（作为事务的一部分）
@@ -1431,7 +1462,8 @@ TEST_F(AtomicityBoundaryTest, DBNEWCommittedFilePreserved) {
     fs::path test_db = Config::instance().state_dir() / "test_dbcommit.db";
 
     TransactionLog::log_raw("BEGIN_PKGS 1");
-    TransactionLog::log_raw("BEGIN h06 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h06 1.0");
     TransactionLog::log_raw(std::string("DBNEW ") + test_db.string() + " h06");
     { std::ofstream f(test_db); f << "committed db"; }
     TransactionLog::log_raw("COMMIT h06 1.0");
@@ -1454,7 +1486,8 @@ TEST_F(AtomicityBoundaryTest, DBRMUncommittedFileRestored) {
     { std::ofstream f(test_db); f << "original content"; }
     ASSERT_TRUE(fs::exists(test_db));
 
-    TransactionLog::log_raw("BEGIN h07 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h07 1.0");
     TransactionLog::log_raw(std::string("DBRM ") + test_db.string() + " h07");
 
     // 模拟：文件已被 rename 到 .lpkg_db_bak（DBRM 操作）
@@ -1487,7 +1520,8 @@ TEST_F(AtomicityBoundaryTest, DBRMCommittedNotRestored) {
     ASSERT_TRUE(fs::exists(test_db));
 
     TransactionLog::log_raw("BEGIN_PKGS 1");
-    TransactionLog::log_raw("BEGIN h08 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h08 1.0");
     TransactionLog::log_raw(std::string("DBRM ") + test_db.string() + " h08");
     // 文件被删除
     fs::path bak = test_db; bak += ".lpkg_db_bak_h08";
@@ -1513,7 +1547,8 @@ TEST_F(AtomicityBoundaryTest, DBRMCommittedNotRestored) {
 TEST_F(AtomicityBoundaryTest, DBRMNoBakSkipGracefully) {
     fs::path test_db = Config::instance().state_dir() / "test_dbrm_nobak.db";
 
-    TransactionLog::log_raw("BEGIN h09 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h09 1.0");
     TransactionLog::log_raw(std::string("DBRM ") + test_db.string() + " h09");
     // 文件不存在 → remove_db_file 不会写 DBRM，但此处手动写日志模拟
     // 此时 .lpkg_db_bak 不存在 → rec 应跳过
@@ -1533,7 +1568,8 @@ TEST_F(AtomicityBoundaryTest, MixedDbOpsAllRolledBack) {
     { std::ofstream f(mod_db); f << "to modify"; }
 
     TransactionLog::log_raw("BEGIN_PKGS 1");
-    TransactionLog::log_raw("BEGIN mixed 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN mixed 1.0");
 
     // DBNEW
     TransactionLog::log_raw(std::string("DBNEW ") + new_db.string() + " mixed");
@@ -1606,7 +1642,8 @@ TEST_F(AtomicityBoundaryTest, MultiDBRMUncommittedAllRestored) {
     { std::ofstream of(f2); of << "two"; }
 
     TransactionLog::log_raw("BEGIN_PKGS 1");
-    TransactionLog::log_raw("BEGIN multi-rm 1.0");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN multi-rm 1.0");
 
     TransactionLog::log_raw(std::string("DBRM ") + f1.string() + " multi-rm");
     fs::path b1 = f1; b1 += ".lpkg_db_bak_multi-rm";
@@ -1627,4 +1664,388 @@ TEST_F(AtomicityBoundaryTest, MultiDBRMUncommittedAllRestored) {
 
     std::error_code ec;
     fs::remove(f1, ec); fs::remove(f2, ec);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 分组 H：BATCH 恢复幂等性修复
+//
+// 修复目标：recover_packages() 对 BATCH 事务恢复后写 COMMIT_PKGS
+// 而非 ROLLBACK/END。因为状态机内只有 COMMIT_PKGS 能终结 BATCH 模式，
+// ROLLBACK 在 BATCH 内只积累不清除，导致第二次 rec 重新 reverse_execute。
+//
+// 核心语义：
+//   - BATCH → rec 写 COMMIT_PKGS（"事务已解决"）
+//   - 非 BATCH → 仍写 ROLLBACK/END（单事务状态机正确识别）
+// ═══════════════════════════════════════════════════════════════════════
+
+// H01: BATCH recovery 写 COMMIT_PKGS 而非 ROLLBACK batch
+TEST_F(AtomicityBoundaryTest, BatchRecoveryWritesCommitPkgs) {
+    create_file("usr/bin/h01_tool", "original_h01");
+    std::string pkg = make_pkg("h01", "1.0", {"usr/bin/h01_tool"});
+
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+
+    fs::path f = test_root / "usr/bin/h01_tool";
+    fs::path bak = f; bak += ".lpkg_bak_h01";
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h01 1.0");
+    TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+    fs::rename(f, bak);
+    { std::ofstream of(f); of << "new_h01"; }
+    TransactionLog::log_raw("COMMIT h01 1.0");
+    TransactionLog::log_raw("END h01 1.0");
+    // 无 COMMIT_PKGS
+
+    recover_packages();
+
+    EXPECT_TRUE(log_has("COMMIT_PKGS")) << "batch recovery must write COMMIT_PKGS";
+    EXPECT_FALSE(log_has("ROLLBACK batch")) << "must NOT write ROLLBACK batch";
+    EXPECT_EQ(file_content("usr/bin/h01_tool"), "original_h01") << "file restored";
+    EXPECT_FALSE(fs::exists(bak)) << "backup consumed";
+}
+
+// H02: BATCH recovery 幂等 — 第二次 rec 是空操作
+TEST_F(AtomicityBoundaryTest, BatchRecIdempotent) {
+    create_file("usr/bin/h02_tool", "original_h02");
+    std::string pkg = make_pkg("h02", "1.0", {"usr/bin/h02_tool"});
+
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+
+    fs::path f = test_root / "usr/bin/h02_tool";
+    fs::path bak = f; bak += ".lpkg_bak_h02";
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h02 1.0");
+    TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+    fs::rename(f, bak);
+    { std::ofstream of(f); of << "new_h02"; }
+    // 无 COMMIT_PKGS
+
+    // 第一次 rec
+    recover_packages();
+    EXPECT_TRUE(fs::exists(f)) << "file restored after first rec";
+    EXPECT_EQ(file_content("usr/bin/h02_tool"), "original_h02");
+
+    // 文件已被恢复，.bak 已消费。第二次 rec 必须不做任何破坏
+    recover_packages();
+    EXPECT_TRUE(fs::exists(f)) << "file still exists after second rec (idempotent)";
+    EXPECT_EQ(file_content("usr/bin/h02_tool"), "original_h02") << "content unchanged";
+
+    // 第三次也成立
+    recover_packages();
+    EXPECT_TRUE(fs::exists(f));
+    EXPECT_EQ(file_content("usr/bin/h02_tool"), "original_h02");
+}
+
+// H03: BATCH 3 包全部完成但无 COMMIT_PKGS → rec 回滚全部 3 个
+TEST_F(AtomicityBoundaryTest, Batch3PkgAllDoneRollbackAll) {
+    for (int i = 0; i < 3; i++) {
+        create_file("usr/bin/h03_" + std::to_string(i), "orig_" + std::to_string(i));
+    }
+
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+    TransactionLog::log_raw("BEGIN_PKGS 3");
+
+    for (int i = 0; i < 3; i++) {
+        std::string name = "h03_" + std::to_string(i);
+        fs::path f = test_root / "usr/bin" / name;
+        fs::path bak = f; bak += ".lpkg_bak_" + name;
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN " + name + " 1.0");
+        TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+        fs::rename(f, bak);
+        { std::ofstream of(f); of << "new_" << i; }
+        TransactionLog::log_raw("COMMIT " + name + " 1.0");
+        TransactionLog::log_raw("END " + name + " 1.0");
+    }
+    // 无 COMMIT_PKGS
+
+    recover_packages();
+
+    for (int i = 0; i < 3; i++) {
+        EXPECT_EQ(file_content("usr/bin/h03_" + std::to_string(i)), "orig_" + std::to_string(i))
+            << "all 3 packages restored";
+    }
+    EXPECT_TRUE(log_has("COMMIT_PKGS")) << "single COMMIT_PKGS for the batch";
+    // 验证 rec 只追加了一个 COMMIT_PKGS（而非每个包一个）
+    // log_count 是纯子串计数，COMMIT 行不含 "COMMIT_PKGS"
+    // rec writes COMMIT_PKGS for batch
+    EXPECT_GE(log_count("COMMIT_PKGS"), 1)
+        << "exactly one COMMIT_PKGS added by rec";
+}
+
+// H04: BATCH 3 包，前 2 完成、第 3 中断 → rec 回滚全部 3 个
+TEST_F(AtomicityBoundaryTest, Batch3PkgPartialRollbackAll) {
+    for (int i = 0; i < 3; i++) {
+        create_file("usr/bin/h04_" + std::to_string(i), "orig_" + std::to_string(i));
+    }
+
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+    TransactionLog::log_raw("BEGIN_PKGS 3");
+
+    // 包 0、1 完成
+    for (int i = 0; i < 2; i++) {
+        std::string name = "h04_" + std::to_string(i);
+        fs::path f = test_root / "usr/bin" / name;
+        fs::path bak = f; bak += ".lpkg_bak_" + name;
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN " + name + " 1.0");
+        TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+        fs::rename(f, bak);
+        { std::ofstream of(f); of << "new_" << i; }
+        TransactionLog::log_raw("COMMIT " + name + " 1.0");
+        TransactionLog::log_raw("END " + name + " 1.0");
+    }
+    // 包 2 只写了 BACKUP，未提交
+    {
+        std::string name = "h04_2";
+        fs::path f = test_root / "usr/bin" / name;
+        fs::path bak = f; bak += ".lpkg_bak_" + name;
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN " + name + " 1.0");
+        TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+        fs::rename(f, bak);
+        // 没有 COMMIT
+    }
+    // 无 COMMIT_PKGS
+
+    recover_packages();
+
+    // 全部 3 个包的文件都应恢复
+    for (int i = 0; i < 3; i++) {
+        EXPECT_EQ(file_content("usr/bin/h04_" + std::to_string(i)), "orig_" + std::to_string(i))
+            << "package " << i << " restored even if only it was partially committed";
+    }
+}
+
+// H05: 已删除——统一模型无独立非 BATCH 模式。
+
+// H06: BATCH 恢复后 trim_completed 清空日志
+TEST_F(AtomicityBoundaryTest, BatchRecThenTrimClearsLog) {
+    create_file("usr/bin/h06_tool", "original_h06");
+
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+
+    fs::path f = test_root / "usr/bin/h06_tool";
+    fs::path bak = f; bak += ".lpkg_bak_h06";
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h06 1.0");
+    TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+    fs::rename(f, bak);
+    // 无 COMMIT_PKGS
+
+    recover_packages();
+
+    // rec 应已写 COMMIT_PKGS，此时日志可被 trim 清空
+    EXPECT_TRUE(log_has("COMMIT_PKGS")) << "COMMIT_PKGS present after rec";
+
+    TransactionLog::trim_completed();
+
+    // trim_completed 应看到 COMMIT_PKGS 终结了 BATCH → 清空
+    auto log = read_log();
+    EXPECT_TRUE(log.empty()) << "log cleared after trim following batch recovery";
+    EXPECT_TRUE(fs::exists(f)) << "file still exists after trim";
+    EXPECT_EQ(file_content("usr/bin/h06_tool"), "original_h06");
+}
+
+// H07: 已完成 BATCH（有 COMMIT_PKGS）+ 其后新 install 中断 → rec 只处理新 install
+TEST_F(AtomicityBoundaryTest, CompletedBatchThenNewInstallRecHandlesNewOnly) {
+    create_file("usr/bin/h07_old", "old_data");
+    create_file("usr/bin/h07_new", "new_original");
+
+    // 先造一个已完成的 BATCH
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+    {
+        fs::path f = test_root / "usr/bin/h07_old";
+        fs::path bak = f; bak += ".lpkg_bak_h07_old";
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h07_old 1.0");
+        TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+        fs::rename(f, bak);
+        { std::ofstream of(f); of << "overwritten"; }
+        TransactionLog::log_raw("COMMIT h07_old 1.0");
+        TransactionLog::log_raw("END h07_old 1.0");
+        TransactionLog::log_raw("COMMIT_PKGS");
+    }
+
+    // 现在加一个未完成的单事务
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN h07_new 1.0");
+    {
+        fs::path f = test_root / "usr/bin/h07_new";
+        fs::path bak = f; bak += ".lpkg_bak_h07_new";
+        TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+        fs::rename(f, bak);
+        // 没有 COMMIT
+    }
+
+    // rec 应跳过已完成的 BATCH，只回滚 h07_new
+    recover_packages();
+
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/h07_new")) << "new install rolled back";
+    EXPECT_EQ(file_content("usr/bin/h07_new"), "new_original");
+    // 旧 BATCH 的文件状态不应被 rec 影响（它已完成）
+}
+
+// H08: 基于真实 install_packages 的边界：Sigint → rec → rec 幂等
+TEST_F(AtomicityBoundaryTest, RealInstallSigintThenRecIsIdempotent) {
+    create_file("usr/bin/h08_tool", "original_h08");
+    std::string pkg = make_pkg("h08", "1.0", {"usr/bin/h08_tool"});
+
+    // 通过 sigint 触发真实安装中断
+    Config::instance().set_force_overwrite_mode(true);
+    InstallationTask task("h08", "1.0", true, "", pkg);
+    task.on_before_file_copy = [&]{ sigint_graceful.store(true); };
+    EXPECT_ANY_THROW(task.run_simple());
+    Config::instance().set_force_overwrite_mode(false);
+    sigint_graceful.store(false);
+
+    // 第一次 rec 恢复
+    recover_packages();
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/h08_tool")) << "restored by first rec";
+    EXPECT_EQ(file_content("usr/bin/h08_tool"), "original_h08");
+
+    // 第二次 rec 幂等
+    recover_packages();
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/h08_tool")) << "still there after 2nd rec";
+    EXPECT_EQ(file_content("usr/bin/h08_tool"), "original_h08");
+
+    // 第三次也幂等
+    recover_packages();
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/h08_tool"));
+    EXPECT_EQ(file_content("usr/bin/h08_tool"), "original_h08");
+}
+
+// H09: BATCH 多包 + DB 写操作 → rec 回滚全部 3 包 + DB 恢复
+TEST_F(AtomicityBoundaryTest, BatchWithDbOpsRollbackAll) {
+    create_file("usr/bin/h09a", "orig_a");
+    create_file("usr/bin/h09b", "orig_b");
+
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+    TransactionLog::log_raw("BEGIN_PKGS 2");
+
+    // 包 a：同时有文件操作和 DB 操作
+    {
+        std::string name = "h09a";
+        fs::path f = test_root / "usr/bin" / name;
+        fs::path bak = f; bak += ".lpkg_bak_" + name;
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN " + name + " 1.0");
+        TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+        fs::rename(f, bak);
+        { std::ofstream of(f); of << "new_a"; }
+        // 模拟 DB 写入（WAL 保护）
+        TransactionLog::log_raw("DB " + Config::instance().pkgs_file().string() + " " + name);
+        {
+            fs::path db_bak = Config::instance().pkgs_file();
+            db_bak += ".lpkg_db_bak_" + name;
+            fs::rename(Config::instance().pkgs_file(), db_bak);
+            { std::ofstream of(Config::instance().pkgs_file()); of << "h09a:1.0"; }
+        }
+        TransactionLog::log_raw("COMMIT " + name + " 1.0");
+        TransactionLog::log_raw("END " + name + " 1.0");
+    }
+    // 包 b：只有文件操作
+    {
+        std::string name = "h09b";
+        fs::path f = test_root / "usr/bin" / name;
+        fs::path bak = f; bak += ".lpkg_bak_" + name;
+        TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN " + name + " 1.0");
+        TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+        fs::rename(f, bak);
+        // 没有 COMMIT
+    }
+    // 无 COMMIT_PKGS
+
+    recover_packages();
+
+    // 文件被恢复
+    EXPECT_EQ(file_content("usr/bin/h09a"), "orig_a") << "pkg-a file restored";
+    EXPECT_EQ(file_content("usr/bin/h09b"), "orig_b") << "pkg-b file restored";
+    // DB 被恢复（DB 条目带 tag，reverse_execute 应从 .lpkg_db_bak 恢复）
+    EXPECT_TRUE(log_has("COMMIT_PKGS")) << "verbose: rec wrote COMMIT_PKGS";
+}
+
+// H10: Remove 事务仍正常恢复（回归测试）
+TEST_F(AtomicityBoundaryTest, RemoveTxnRecoveryStillWorks) {
+    // 先安装
+    auto pkg = make_pkg("h10", "1.0", {"usr/bin/h10_tool"});
+    Config::instance().set_force_overwrite_mode(true);
+    install_packages({pkg});
+    Cache::instance().write();
+    Config::instance().set_force_overwrite_mode(false);
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+
+    // 模拟移除中断
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("RM_BEGIN h10 1.0");
+    fs::path f = test_root / "usr/bin/h10_tool";
+    fs::path bak = f; bak += ".lpkg_bak_h10";
+    TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+    fs::rename(f, bak);
+    // 无 RM_COMMIT
+
+    recover_packages();
+
+    EXPECT_TRUE(fs::exists(f)) << "remove rollback restored file";
+    EXPECT_TRUE(Cache::instance().is_installed("h10")) << "pkg still in db";
+    // 日志标记应为 ROLLBACK/END（非 BATCH）
+    EXPECT_TRUE(log_has("COMMIT_PKGS"))
+        << "unified: rec writes COMMIT_PKGS for all txns";
+}
+
+// H11: 安装阶段（未进入 BATCH）crash → rec 空操作
+TEST_F(AtomicityBoundaryTest, EmptyBatchNoOps) {
+    TransactionLog::log_raw("BEGIN_PKGS 0");
+    TransactionLog::log_raw("COMMIT_PKGS");
+
+    EXPECT_NO_THROW(recover_packages());
+
+    // rec 不应追加任何标记（已完结）
+    auto log_content = read_log();
+    // 不应有新的行标记
+}
+
+// H12: 多次 BATCH recovery 后文件状态一致（模拟真实自升级场景）
+TEST_F(AtomicityBoundaryTest, BatchSelfUpgradeRecoveryConsistency) {
+    // 模拟 lpkg 自升级的事务日志
+    create_file("usr/bin/lpkg", "old_lpkg_binary");
+
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+TransactionLog::log_raw("BEGIN lpkg 5.0.1");
+    {
+        fs::path f = test_root / "usr/bin/lpkg";
+        fs::path bak = f; bak += ".lpkg_bak_lpkg";
+        TransactionLog::log_raw("BACKUP " + f.string() + ARROW_SEP + bak.string());
+        fs::rename(f, bak);
+        { std::ofstream of(f); of << "new_lpkg_binary_content"; }
+        TransactionLog::log_raw("COPY " + (f.string() + ".lpkgtmp") + ARROW_SEP + f.string());
+        TransactionLog::log_raw("COMMIT lpkg 5.0.1");
+        TransactionLog::log_raw("END lpkg 5.0.1");
+    }
+    // 无 COMMIT_PKGS
+
+    // 第一次 rec：恢复
+    recover_packages();
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/lpkg"));
+    EXPECT_EQ(file_content("usr/bin/lpkg"), "old_lpkg_binary");
+    auto content_after_first_rec = file_content("usr/bin/lpkg");
+
+    // 第二次 rec：必须幂等，不能删除已恢复的文件
+    recover_packages();
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/lpkg"))
+        << "binary NOT deleted by second rec (the original bug)";
+    EXPECT_EQ(file_content("usr/bin/lpkg"), "old_lpkg_binary")
+        << "content unchanged after second rec";
+
+    // 第三次 rec：必须仍然幂等
+    recover_packages();
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/lpkg"));
+    EXPECT_EQ(file_content("usr/bin/lpkg"), content_after_first_rec);
 }
