@@ -448,6 +448,9 @@ void InstallationTask::check_for_file_conflicts() {
         // 目录条目（末尾 /）支持多包共同持有，不视为冲突
         if (path_str.ends_with('/')) continue;
 
+        // /etc 下的文件在复制阶段用 .lpkgnew 处理，不视为冲突
+        if (f.starts_with(std::string(constants::DIR_ETC))) continue;
+
         // 快速路径：文件已完全属于当前包 → 无冲突，跳过全量集合拷贝
         if (cache.is_file_owned_by(path_str, pkg_name_)) continue;
 
