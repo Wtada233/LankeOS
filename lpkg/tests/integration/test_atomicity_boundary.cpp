@@ -1324,3 +1324,307 @@ TEST_F(AtomicityBoundaryTest, DeepDirPermOnRollback) {
     // 全部被删
     EXPECT_FALSE(fs::exists(test_root / "a/"));
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// 分组 H：DBNEW / DBRM WAL 代码路径
+// ═══════════════════════════════════════════════════════════════════════
+
+// H01: write_db_file 在新文件上写 DBNEW
+TEST_F(AtomicityBoundaryTest, DbNewLogsDBNEW) {
+    // files.db 由 init_filesystem 创建，删除它以触发 DBNEW 路径
+    fs::path files_db = Config::instance().files_db();
+    ASSERT_TRUE(fs::exists(files_db));
+    std::error_code ec;
+    fs::remove(files_db, ec);
+    ASSERT_FALSE(fs::exists(files_db)) << "removed files.db to test DBNEW";
+
+    // write 时 write_db_file 会检测文件不存在 → 写 DBNEW 而非 DB
+    Cache::instance().add_file_owner("/dummy_path", "test-pkg");
+    Cache::instance().write("h01");
+
+    EXPECT_TRUE(log_has("DBNEW " + files_db.string()))
+        << "write_db_file on missing file logs DBNEW";
+
+    // 重新加载缓存，恢复 files.db
+    Cache::instance().load();
+    Cache::instance().write();
+}
+
+// H02: write_set_file 在新 set 文件上写 DBNEW
+TEST_F(AtomicityBoundaryTest, SetNewLogsDBNEW) {
+    // 删除 pkgs 文件使其不存在，然后触发 write_set_file
+    fs::path pkgs = Config::instance().pkgs_file();
+    ASSERT_TRUE(fs::exists(pkgs));
+    fs::remove(pkgs);
+    ASSERT_FALSE(fs::exists(pkgs));
+
+    // add_installed -> dirty -> write("h02") -> write_pkgs("h02") -> write_set_file
+    Cache::instance().add_installed("test-set-pkg", "1.0");
+    Cache::instance().write("h02");
+
+    EXPECT_TRUE(log_has("DBNEW " + pkgs.string())) << "write_set_file for new file logs DBNEW";
+
+    // 恢复 pkgs 文件
+    Cache::instance().load();
+    Cache::instance().write();
+}
+
+// H03: write_db_file 在已有文件上写 DB（非 DBNEW）
+TEST_F(AtomicityBoundaryTest, ExistingFileLogsDB) {
+    // 已有文件肯定存在（init_filesystem 已创建）
+    fs::path files_db = Config::instance().files_db();
+    ASSERT_TRUE(fs::exists(files_db));
+
+    // 产生脏数据后 write
+    Cache::instance().add_file_owner("/h03_file", "h03-pkg");
+    Cache::instance().write("h03");
+
+    // 应该写 DB，不是 DBNEW
+    EXPECT_TRUE(log_has("DB " + files_db.string() + " h03")) << "existing file logs DB";
+}
+
+// H04: remove_package 在有 dep 文件时写 DBRM
+TEST_F(AtomicityBoundaryTest, RemoveWritesDbrm) {
+    std::string pkg = make_pkg("h04", "1.0", {"usr/bin/h04_tool"});
+
+    Config::instance().set_force_overwrite_mode(true);
+    install_packages({pkg});
+    Cache::instance().write();
+    fs::remove(Config::instance().lock_dir() / "transaction.log");
+    Config::instance().set_force_overwrite_mode(false);
+
+    // 验证 dep 文件存在
+    fs::path dep = Config::instance().dep_dir() / "h04";
+    EXPECT_TRUE(fs::exists(dep)) << "dep file should exist after install";
+
+    remove_package("h04", false);
+    write_cache();
+
+    // 日志应有 DBRM 条目
+    EXPECT_TRUE(log_has("DBRM " + dep.string() + " h04"))
+        << "remove_package logs DBRM for dep file";
+
+    // dep 文件已被移除
+    EXPECT_FALSE(fs::exists(dep)) << "dep file removed after remove_package";
+}
+
+// H05: rec with DBNEW uncommitted → file deleted
+TEST_F(AtomicityBoundaryTest, DBNEWUncommittedFileDeleted) {
+    fs::path test_db = Config::instance().state_dir() / "test_dbenew.db";
+
+    TransactionLog::log_raw("BEGIN h05 1.0");
+    TransactionLog::log_raw(std::string("DBNEW ") + test_db.string() + " h05");
+
+    // 模拟：文件已被创建（作为事务的一部分）
+    { std::ofstream f(test_db); f << "new db content"; }
+    ASSERT_TRUE(fs::exists(test_db));
+
+    EXPECT_NO_THROW(recover_packages());
+
+    // DBNEW 未提交 → 文件被删除
+    EXPECT_FALSE(fs::exists(test_db))
+        << "DBNEW uncommitted: file deleted by recovery";
+}
+
+// H06: rec with DBNEW committed → file preserved
+TEST_F(AtomicityBoundaryTest, DBNEWCommittedFilePreserved) {
+    fs::path test_db = Config::instance().state_dir() / "test_dbcommit.db";
+
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+    TransactionLog::log_raw("BEGIN h06 1.0");
+    TransactionLog::log_raw(std::string("DBNEW ") + test_db.string() + " h06");
+    { std::ofstream f(test_db); f << "committed db"; }
+    TransactionLog::log_raw("COMMIT h06 1.0");
+    TransactionLog::log_raw("END h06 1.0");
+    TransactionLog::log_raw("COMMIT_PKGS");
+
+    ASSERT_TRUE(fs::exists(test_db));
+
+    EXPECT_NO_THROW(recover_packages());
+
+    // DBNEW 已提交 → 文件保留
+    EXPECT_TRUE(fs::exists(test_db))
+        << "DBNEW committed: file preserved after recovery";
+    std::error_code ec; fs::remove(test_db, ec);
+}
+
+// H07: rec with DBRM uncommitted → file restored from .lpkg_db_bak
+TEST_F(AtomicityBoundaryTest, DBRMUncommittedFileRestored) {
+    fs::path test_db = Config::instance().state_dir() / "test_dbrm.db";
+    { std::ofstream f(test_db); f << "original content"; }
+    ASSERT_TRUE(fs::exists(test_db));
+
+    TransactionLog::log_raw("BEGIN h07 1.0");
+    TransactionLog::log_raw(std::string("DBRM ") + test_db.string() + " h07");
+
+    // 模拟：文件已被 rename 到 .lpkg_db_bak（DBRM 操作）
+    fs::path bak = test_db; bak += ".lpkg_db_bak_h07";
+    ASSERT_TRUE(fs::exists(test_db));
+    fs::rename(test_db, bak);
+    ASSERT_FALSE(fs::exists(test_db));
+    ASSERT_TRUE(fs::exists(bak));
+
+    EXPECT_NO_THROW(recover_packages());
+
+    // DBRM 未提交 → 从 .lpkg_db_bak 恢复
+    EXPECT_TRUE(fs::exists(test_db))
+        << "DBRM uncommitted: file restored from .lpkg_db_bak";
+    EXPECT_FALSE(fs::exists(bak))
+        << ".lpkg_db_bak consumed by recovery";
+    EXPECT_EQ(file_content("state_dir_relative/test_dbrm.db"), "")
+        << "content restored - checking existence";
+    // Verify content
+    std::ifstream f(test_db);
+    std::string c; std::getline(f, c);
+    EXPECT_EQ(c, "original content");
+    std::error_code ec; fs::remove(test_db, ec);
+}
+
+// H08: rec with DBRM committed → file stays restored (committed removal)
+TEST_F(AtomicityBoundaryTest, DBRMCommittedNotRestored) {
+    fs::path test_db = Config::instance().state_dir() / "test_dbrm_done.db";
+    { std::ofstream f(test_db); f << "to be removed"; }
+    ASSERT_TRUE(fs::exists(test_db));
+
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+    TransactionLog::log_raw("BEGIN h08 1.0");
+    TransactionLog::log_raw(std::string("DBRM ") + test_db.string() + " h08");
+    // 文件被删除
+    fs::path bak = test_db; bak += ".lpkg_db_bak_h08";
+    fs::rename(test_db, bak);
+    TransactionLog::log_raw("COMMIT h08 1.0");
+    TransactionLog::log_raw("END h08 1.0");
+    TransactionLog::log_raw("COMMIT_PKGS");
+
+    // 清理 .lpkg_db_bak（提交后应清理）
+    Cache::instance().cleanup_db_backups();
+
+    ASSERT_FALSE(fs::exists(test_db));
+    ASSERT_FALSE(fs::exists(bak)) << ".lpkg_db_bak should be cleaned after commit";
+
+    EXPECT_NO_THROW(recover_packages());
+
+    // DBRM 已提交 → 不恢复
+    EXPECT_FALSE(fs::exists(test_db))
+        << "DBRM committed: file stays deleted after recovery";
+}
+
+// H09: rec with DBRM but no .lpkg_db_bak (skip gracefully)
+TEST_F(AtomicityBoundaryTest, DBRMNoBakSkipGracefully) {
+    fs::path test_db = Config::instance().state_dir() / "test_dbrm_nobak.db";
+
+    TransactionLog::log_raw("BEGIN h09 1.0");
+    TransactionLog::log_raw(std::string("DBRM ") + test_db.string() + " h09");
+    // 文件不存在 → remove_db_file 不会写 DBRM，但此处手动写日志模拟
+    // 此时 .lpkg_db_bak 不存在 → rec 应跳过
+
+    EXPECT_NO_THROW(recover_packages());
+    SUCCEED() << "DBRM without .lpkg_db_bak handled gracefully";
+}
+
+// H10: Mixed DBNEW + DBRM + DB in one uncommitted txn → all rolled back
+TEST_F(AtomicityBoundaryTest, MixedDbOpsAllRolledBack) {
+    fs::path new_db = Config::instance().state_dir() / "mixed_new.db";
+    fs::path del_db = Config::instance().state_dir() / "mixed_del.db";
+    fs::path mod_db = Config::instance().state_dir() / "mixed_mod.db";
+
+    // 准备数据：del 和 mod 文件存在
+    { std::ofstream f(del_db); f << "to delete"; }
+    { std::ofstream f(mod_db); f << "to modify"; }
+
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+    TransactionLog::log_raw("BEGIN mixed 1.0");
+
+    // DBNEW
+    TransactionLog::log_raw(std::string("DBNEW ") + new_db.string() + " mixed");
+    { std::ofstream f(new_db); f << "new"; }
+
+    // DBRM
+    TransactionLog::log_raw(std::string("DBRM ") + del_db.string() + " mixed");
+    fs::path del_bak = del_db; del_bak += ".lpkg_db_bak_mixed";
+    fs::rename(del_db, del_bak);
+
+    // DB
+    TransactionLog::log_raw(std::string("DB ") + mod_db.string() + " mixed");
+    fs::path mod_bak = mod_db; mod_bak += ".lpkg_db_bak_mixed";
+    fs::rename(mod_db, mod_bak);
+
+    // 无 COMMIT
+
+    EXPECT_NO_THROW(recover_packages());
+
+    // DBNEW rolled back: file deleted
+    EXPECT_FALSE(fs::exists(new_db)) << "DBNEW rolled back: new file deleted";
+    // DBRM rolled back: file restored
+    EXPECT_TRUE(fs::exists(del_db)) << "DBRM rolled back: file restored";
+    EXPECT_FALSE(fs::exists(del_bak)) << "DBRM bak consumed";
+    // DB rolled back: original restored
+    EXPECT_TRUE(fs::exists(mod_db)) << "DB rolled back: file restored";
+    {
+        std::ifstream f(mod_db);
+        std::string c; std::getline(f, c);
+        EXPECT_EQ(c, "to modify") << "DB rolled back: original content";
+    }
+
+    std::error_code ec;
+    fs::remove(new_db, ec); fs::remove(del_db, ec);
+    fs::remove(mod_db, ec); fs::remove(del_bak, ec); fs::remove(mod_bak, ec);
+}
+
+// H11: DBNEW with committed batch → all preserved
+TEST_F(AtomicityBoundaryTest, DBNEWCommittedBatchPreserved) {
+    fs::path db1 = Config::instance().state_dir() / "batch_new_1.db";
+    fs::path db2 = Config::instance().state_dir() / "batch_new_2.db";
+
+    TransactionLog::log_raw("BEGIN_PKGS 2");
+    TransactionLog::log_raw("BEGIN pkg-a 1.0");
+    TransactionLog::log_raw(std::string("DBNEW ") + db1.string() + " pkg-a");
+    { std::ofstream f(db1); f << "a"; }
+    TransactionLog::log_raw("COMMIT pkg-a 1.0");
+    TransactionLog::log_raw("END pkg-a 1.0");
+    TransactionLog::log_raw("BEGIN pkg-b 1.0");
+    TransactionLog::log_raw(std::string("DBNEW ") + db2.string() + " pkg-b");
+    { std::ofstream f(db2); f << "b"; }
+    TransactionLog::log_raw("COMMIT pkg-b 1.0");
+    TransactionLog::log_raw("END pkg-b 1.0");
+    TransactionLog::log_raw("COMMIT_PKGS");
+
+    recover_packages();
+
+    EXPECT_TRUE(fs::exists(db1)) << "batch DBNEW committed: preserved";
+    EXPECT_TRUE(fs::exists(db2)) << "batch DBNEW committed: preserved";
+
+    std::error_code ec;
+    fs::remove(db1, ec); fs::remove(db2, ec);
+}
+
+// H12: Multiple DBRM in one uncommitted txn → all restored
+TEST_F(AtomicityBoundaryTest, MultiDBRMUncommittedAllRestored) {
+    fs::path f1 = Config::instance().state_dir() / "multi_dbrm_1.db";
+    fs::path f2 = Config::instance().state_dir() / "multi_dbrm_2.db";
+    { std::ofstream of(f1); of << "one"; }
+    { std::ofstream of(f2); of << "two"; }
+
+    TransactionLog::log_raw("BEGIN_PKGS 1");
+    TransactionLog::log_raw("BEGIN multi-rm 1.0");
+
+    TransactionLog::log_raw(std::string("DBRM ") + f1.string() + " multi-rm");
+    fs::path b1 = f1; b1 += ".lpkg_db_bak_multi-rm";
+    fs::rename(f1, b1);
+
+    TransactionLog::log_raw(std::string("DBRM ") + f2.string() + " multi-rm");
+    fs::path b2 = f2; b2 += ".lpkg_db_bak_multi-rm";
+    fs::rename(f2, b2);
+
+    // 无 COMMIT
+
+    recover_packages();
+
+    EXPECT_TRUE(fs::exists(f1)) << "multi-DBRM: f1 restored";
+    EXPECT_TRUE(fs::exists(f2)) << "multi-DBRM: f2 restored";
+    EXPECT_FALSE(fs::exists(b1)) << "b1 consumed";
+    EXPECT_FALSE(fs::exists(b2)) << "b2 consumed";
+
+    std::error_code ec;
+    fs::remove(f1, ec); fs::remove(f2, ec);
+}

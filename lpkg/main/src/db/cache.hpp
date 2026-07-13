@@ -92,6 +92,9 @@ public:
     /** 清理 state 目录下残留的 .lpkg_db_bak 文件（事务提交后调用） */
     void cleanup_db_backups();
 
+    /** 删除 DB 文件并用 WAL 保护：备份到 .lpkg_db_bak_<tag> 后记录 DBRM */
+    void remove_db_file(const std::filesystem::path& path, const std::string& wal_tag);
+
 private:
     Cache();
 
@@ -139,6 +142,4 @@ private:
     void write_set_file(const std::filesystem::path& path,
                         const std::unordered_set<std::string>& data,
                         const std::string& wal_tag);
-    /** 删除 DB 文件并用 WAL 保护：备份后记录 DBRM */
-    void remove_db_file(const std::filesystem::path& path, const std::string& wal_tag);
 };
