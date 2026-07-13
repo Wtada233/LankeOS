@@ -125,6 +125,7 @@ error.unresolvable_drift=无法解决的元数据漂移，包 '{}': {}
 error.unresolved_soname=所需的 SONAME '{}' 在仓库和安装计划中均无提供者
 info.installing_discovered_dep=发现缺失的依赖 '{}'，正在加入安装队列...
 info.log_prefix==> 
+info.upgrade_old_files_check=正在升级: {} → {}, 发现 {} 个旧文件待处理
 info.removing_obsolete_file=正在移除过时文件: {}
 info.config_review_reminder=部分配置文件已安装为 .lpkgnew。请检查它们。
 info.file_owned_by=文件 {} 属于: {}

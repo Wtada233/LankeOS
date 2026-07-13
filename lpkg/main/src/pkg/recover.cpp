@@ -207,6 +207,25 @@ void recover_packages() {
                                                   dst, src, ec.message()));
                     }
                 }
+            } else if (op.starts_with("REMOVE_OLD ")) {
+                // REMOVE_OLD <src> → <dst>
+                // 恢复旧版本升级时被移除的废弃文件
+                auto arrow_pos = op.find(ARROW_SEP, 11);
+                if (arrow_pos == std::string::npos) continue;
+
+                std::string src = op.substr(11, arrow_pos - 11);
+                std::string dst = op.substr(arrow_pos + ARROW_SEP_LEN);
+
+                if (fs::exists(dst) || fs::is_symlink(dst)) {
+                    fs::rename(dst, src, ec);
+                    if (!ec) {
+                        log_info(string_format("info.recover_restored", dst, src));
+                        restored++;
+                    } else {
+                        log_warning(string_format("warning.recover_rename_failed",
+                                                  dst, src, ec.message()));
+                    }
+                }
             } else if (op.starts_with("COPY ")) {
                 // COPY <src> → <dst>
                 auto arrow_pos = op.find(ARROW_SEP, 5);
