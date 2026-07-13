@@ -2,17 +2,24 @@
 #include "config/config.hpp"
 #include <ctime>
 #include <sstream>
+#include <unistd.h>
+#include <fcntl.h>
 
 TransactionLog::TransactionLog() {
     log_path_ = Config::instance().lock_dir() / "transaction.log";
     std::error_code ec;
     fs::create_directories(log_path_.parent_path(), ec);
-    log_.open(log_path_, std::ios::app);
+    // O_APPEND 模式下 write() < PIPE_BUF (4096) 保证原子写入
+    int fd = ::open(log_path_.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+    if (fd >= 0) {
+        log_fd_ = fd;
+        opened_ok_ = true;
+    }
 }
 
 TransactionLog::~TransactionLog() {
-    if (log_.is_open())
-        log_.close();
+    if (log_fd_ >= 0)
+        ::close(log_fd_);
 }
 
 std::string TransactionLog::timestamp() {
@@ -25,9 +32,10 @@ std::string TransactionLog::timestamp() {
 }
 
 void TransactionLog::write(const std::string& line) {
-    std::lock_guard<std::mutex> lock(mtx_);
-    if (log_.is_open())
-        log_ << "[" << timestamp() << "] " << line << std::endl;
+    if (!opened_ok_) return;
+    std::string entry = "[" + timestamp() + "] " + line + "\n";
+    // 单次 write() 调用，在 O_APPEND 模式下 < 4096 字节时为原子写入
+    ::write(log_fd_, entry.data(), entry.size());
 }
 
 void TransactionLog::begin(const std::string& pkg, const std::string& version) {
@@ -62,9 +70,11 @@ void TransactionLog::log_raw(const std::string& line) {
     fs::path p = Config::instance().lock_dir() / "transaction.log";
     std::error_code ec;
     fs::create_directories(p.parent_path(), ec);
-    std::ofstream f(p, std::ios::app);
-    if (f.is_open())
-        f << "[" << timestamp() << "] " << line << std::endl;
+    int fd = ::open(p.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+    if (fd < 0) return;
+    std::string entry = "[" + timestamp() + "] " + line + "\n";
+    ::write(fd, entry.data(), entry.size());
+    ::close(fd);
 }
 
 std::string TransactionLog::check_pending() {
@@ -85,7 +95,6 @@ std::string TransactionLog::check_pending() {
     }
 
     if (!last_begin.empty() && last_begin != last_commit) {
-        // 有 BEGIN 没有对应的 COMMIT/END → 未完成事务
         size_t pos = last_begin.find("BEGIN ");
         if (pos != std::string::npos) {
             auto rest = last_begin.substr(pos + 6);
