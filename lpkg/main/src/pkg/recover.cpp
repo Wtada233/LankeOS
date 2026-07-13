@@ -250,6 +250,14 @@ void recover_packages() {
                             log_info(string_format("info.recover_cleaned_tmp", src));
                     }
                 }
+            } else if (op.starts_with("RM_DIR ")) {
+                // RM_DIR <path> — 回滚时重建目录，使 BACKUP rename 能成功
+                std::string dirpath = op.substr(6);
+                fs::create_directories(dirpath, ec);
+                if (!ec) {
+                    log_info(string_format("info.recover_restored", "(dir)", dirpath));
+                    restored++;
+                }
             } else if (op.starts_with("NEW ")) {
                 // NEW <path>
                 std::string path = op.substr(4);

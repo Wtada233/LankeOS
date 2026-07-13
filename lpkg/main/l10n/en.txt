@@ -123,6 +123,9 @@ error.unresolved_soname=Required SONAME '{}' has no provider in repository or in
 info.installing_discovered_dep=Discovered missing dependency '{}', adding to install queue...
 info.log_prefix==> 
 info.upgrade_old_files_check=Upgrading: {} → {}, found {} old files to verify
+info.rollback_debug_files=Rollback: {} entries in new_files_
+info.rollback_debug_dirs=Rollback: {} directories to remove
+info.rollback_debug_dirpath=  will remove dir: {}
 info.removing_obsolete_file=Removing obsolete file: {}
 info.config_review_reminder=Some configuration files were installed as .lpkgnew. Please review them.
 info.file_owned_by=File {} is owned by: {}

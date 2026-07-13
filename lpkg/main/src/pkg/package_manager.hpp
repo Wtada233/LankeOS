@@ -102,6 +102,7 @@ private:
     // 事务状态
     std::vector<std::pair<std::filesystem::path, std::filesystem::path>> backups_;
     std::vector<std::filesystem::path> new_files_;
+    std::vector<std::filesystem::path> new_dirs_;    // 新创建的目录（不含已存在的）
 };
 
 /// 公共 API：安装包
