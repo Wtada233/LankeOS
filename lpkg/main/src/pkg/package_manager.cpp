@@ -6,6 +6,7 @@
 #include "db/cache.hpp"
 #include "trigger/trigger.hpp"
 #include "config/config.hpp"
+#include "base/testing_breakpoints.hpp"
 #include "downloader.hpp"
 #include "base/exception.hpp"
 #include "crypto/hash.hpp"
@@ -58,6 +59,10 @@ void install_packages(const std::vector<std::string>& pkg_args,
     catch (const std::exception& e) {
         log_warning(string_format("warning.repo_index_load_failed", e.what()));
     }
+
+    // 测试断点：安装开始前（可用于模拟安装前崩溃）
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_before_install);
 
     std::map<std::string, InstallPlan> plan;
     std::vector<std::string> order;
@@ -259,13 +264,30 @@ void install_packages(const std::vector<std::string>& pkg_args,
     // .lpkg_db_bak 在恢复时可还原 DB 至安装前状态。
     TransactionLog::log_raw("BEGIN_PKGS " + std::to_string(ctx.install_order.size()));
 
+    // 测试断点：BEGIN_PKGS 已写、开始安装前
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_after_begin_pkgs);
+
     install_packages_internal(ctx);
+
+    // 测试断点：所有包安装完、DB 写入前
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_before_db_write);
 
     // 先落盘数据库（WAL 保护），再写 COMMIT_PKGS
     // 若 crash 在 Cache::write 与 COMMIT_PKGS 之间，
     // 恢复时因无 COMMIT_PKGS 而回滚整个事务（含 DB 备份）
     Cache::instance().write("pkgs");
+
+    // 测试断点：DB 写入后、COMMIT_PKGS 前
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_before_commit_pkgs);
+
     TransactionLog::log_raw("COMMIT_PKGS");
+
+    // 测试断点：COMMIT_PKGS 后
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_after_commit_pkgs);
 
     Cache::instance().cleanup_db_backups();
     TriggerManager::instance().run_all();
@@ -295,6 +317,10 @@ void install_packages_internal(InstallContext& ctx) {
         }
 
         auto& p = ctx.plan.at(n);
+
+        // 测试断点：每个包安装前
+        if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_before_each_pkg_install);
 
         // ── 元数据验证 ──────────────────────────────────────────────────
         // 仓库索引中的 deps/provides 可能过时或不完整，因此每个包在安装前
@@ -371,6 +397,10 @@ void install_packages_internal(InstallContext& ctx) {
         } catch (const std::exception& e) {
             throw;
         }
+
+        // 测试断点：每个包安装后
+        if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_after_each_pkg_install);
     }
 }
 
@@ -407,10 +437,18 @@ void remove_package(const std::string& pkg_name, bool force) {
         }
     }
 
+    // 测试断点：移除开始前（安全检查已通过、RM_BEGIN 尚未写）
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_before_remove);
+
     log_info(string_format("info.removing_package", pkg_name));
 
     // ── WAL：RM_BEGIN（原子移除事务开始） ──────────────────────────────
     TransactionLog::log_raw("RM_BEGIN " + pkg_name + " " + ver);
+
+    // 测试断点：RM_BEGIN 后、备份前
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_after_rm_begin);
 
     detail::run_hook(pkg_name, std::string(constants::PRERM_SH));
 
@@ -464,12 +502,20 @@ void remove_package(const std::string& pkg_name, bool force) {
                 fs::rename(phys, bak);
                 backups.emplace_back(phys, bak);
                 ++file_count;
+
+                // 测试断点：每个文件备份时检查（模拟逐文件中断）
+                if (Config::instance().testing_mode())
+                    testing::check_and_break(testing::break_during_rm_backup);
             }
         }
     }
 
     if (file_count > 0)
         log_info(string_format("info.files_removed", file_count));
+
+    // 测试断点：备份完成后
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_after_rm_backup);
 
     // ── 阶段 2：从磁盘移除文件（rm）→ 清 .bak（仅清理目录内的）→ 删目录（RM_DIR） ──
     remove_package_files(pkg_name, force);
@@ -496,6 +542,10 @@ void remove_package(const std::string& pkg_name, bool force) {
         if (e.ends_with('/'))
             dir_paths.emplace_back(fs::path(e));
     std::ranges::sort(dir_paths, std::greater<>{});
+
+    // 测试断点：RM_DIR 前
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_before_rm_dir);
 
     // 3b：为每个目录释放所有权 → 清扫 .lpkg_bak → 删除目录
     int dir_count = 0;
@@ -528,6 +578,10 @@ void remove_package(const std::string& pkg_name, bool force) {
     if (dir_count > 0)
         log_info(string_format("info.dirs_removed", dir_count));
 
+    // 测试断点：RM_DIR 完成后
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_after_rm_dir);
+
     // ── 阶段 4：清理依赖、文档和钩子文件 ─────────────────────────────
     const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
     if (fs::exists(dep_file)) {
@@ -549,8 +603,16 @@ void remove_package(const std::string& pkg_name, bool force) {
     fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
     cache.remove_installed(pkg_name);
 
+    // 测试断点：RM DB 写入前
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_before_rm_db_write);
+
     // ── 阶段 5：数据库落盘（WAL 保护）─ 必须在 RM_COMMIT 之前 ───────
     Cache::instance().write(pkg_name);
+
+    // 测试断点：RM COMMIT 前
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_before_rm_commit);
 
     // ── 阶段 6：RM_COMMIT — 事务完成 ────────────────────────────────
     TransactionLog::log_raw("RM_COMMIT " + pkg_name + " " + ver);
@@ -564,6 +626,11 @@ void remove_package(const std::string& pkg_name, bool force) {
 
     TransactionLog::log_raw("RM_END " + pkg_name + " " + ver);
     Cache::instance().cleanup_db_backups();
+
+    // 测试断点：移除完全完成后
+    if (Config::instance().testing_mode())
+        testing::check_and_break(testing::break_after_rm_cleanup);
+
     log_info(string_format("info.package_removed_successfully", pkg_name));
 }
 
