@@ -362,6 +362,7 @@ void atomic_write_with_fsync(const fs::path& dst, const fs::path& tmp) {
         ::close(fd);
     }
     fs::rename(tmp, dst);
+    fsync_parent_dir(dst);
 }
 
 }
@@ -389,6 +390,7 @@ void Cache::write_db_file(const fs::path& path,
     if (!is_new) {
         std::error_code ec;
         fs::rename(path, bak, ec);
+        if (!ec) fsync_parent_dir(bak);
     }
 
     // 3) 写出新内容
@@ -427,6 +429,7 @@ void Cache::write_set_file(const fs::path& path,
     if (!is_new) {
         std::error_code ec;
         fs::rename(path, bak, ec);
+        if (!ec) fsync_parent_dir(bak);
     }
 
     {
@@ -448,6 +451,7 @@ void Cache::remove_db_file(const fs::path& path, const std::string& wal_tag) {
 
     std::error_code ec;
     fs::rename(path, bak, ec);
+    if (!ec) fsync_parent_dir(bak);
 }
 
 /** 扫描 state_dir 下所有 *.lpkg_db_bak 文件并删除。

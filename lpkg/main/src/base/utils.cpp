@@ -287,6 +287,28 @@ void write_set_to_file(const fs::path& path, const std::unordered_set<std::strin
     int fd = ::open(tmp_path.c_str(), O_WRONLY);
     if (fd >= 0) { ::fsync(fd); ::close(fd); }
     fs::rename(tmp_path, path);
+    fsync_parent_dir(path);
+}
+
+/**
+ * fsync 目录条目。
+ * open + fsync + close 确保目录元数据（包括其中的 dentry）落盘。
+ */
+static void fsync_dir_internal(const fs::path& dir) {
+    int dir_fd = ::open(dir.c_str(), O_RDONLY | O_DIRECTORY);
+    if (dir_fd >= 0) {
+        ::fsync(dir_fd);
+        ::close(dir_fd);
+    }
+}
+
+void fsync_parent_dir(const fs::path& child_path) {
+    fs::path parent = child_path.parent_path();
+    if (parent.empty()) return;
+    std::error_code ec;
+    if (fs::exists(parent, ec)) {
+        fsync_dir_internal(parent);
+    }
 }
 
 /**

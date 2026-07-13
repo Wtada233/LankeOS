@@ -12,6 +12,7 @@
 #include "vercmp/version.hpp"
 #include "base/constants.hpp"
 #include "transaction_log.hpp"
+#include "wal_op.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -167,6 +168,7 @@ void InstallationTask::commit_without_file_ops() {
                             bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
                             TransactionLog::log_raw("REMOVE_OLD " + phys.string() + " → " + bak.string());
                             fs::rename(phys, bak);
+                            fsync_parent_dir(bak);
                             backups_.emplace_back(phys, bak);
                         }
                     }
@@ -233,6 +235,7 @@ void InstallationTask::backup_existing_files() {
                 bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
                 TransactionLog::log_raw("BACKUP " + physical_path.string() + " → " + bak.string());
                 fs::rename(physical_path, bak);
+                fsync_parent_dir(bak);
                 backups_.emplace_back(physical_path, bak);
             }
         } else {
@@ -248,42 +251,37 @@ void InstallationTask::rollback() {
 
     // 清理可能残留的 .lpkgtmp 临时文件（来自原子写入）
     std::error_code ec_tmp;
-    for (auto& entry : fs::recursive_directory_iterator(Config::instance().root_dir() / "usr", ec_tmp)) {
+    for (auto& entry : fs::recursive_directory_iterator(
+             Config::instance().root_dir() / "usr", ec_tmp)) {
         if (entry.path().extension() == ".lpkgtmp")
             fs::remove(entry.path(), ec_tmp);
     }
 
-    // ── 分层回滚：先删文件 → 恢复备份 → 删新目录 ────────────────
-    std::error_code ec;
-    // 第一层：删除新文件（来自备份阶段记录的 new_files_）
-    for (const auto& f : new_files_) {
-        if (fs::exists(f) || fs::is_symlink(f)) {
-            fs::remove(f, ec);
-            TransactionLog::log_raw("ROLLBACK_DEL " + f.string());
-        }
+    // 从内存向量构建 WALOp 列表，交由共享的 reverse_execute() 统一执行。
+    // 构建顺序很重要（reverse_execute 反向处理）：
+    //   NEW_DIR 最先构建（反向时最后处理，确保文件已从目录中清除）
+    //   BACKUP 中间构建（反向时中间恢复）
+    //   NEW 最后构建（反向时最先处理，确保目录在新文件被删后检查）
+    std::vector<wal::WALOp> ops;
+
+    // new_dirs_ → NEW_DIR，放在最前（反向时最后执行）
+    for (const auto& d : new_dirs_)
+        ops.push_back({"NEW_DIR", d.string(), ""});
+
+    // backups_ → BACKUP，反向时中间处理：rename .bak → 原位
+    for (const auto& [original, backup] : backups_)
+        ops.push_back({"BACKUP", original.string(), backup.string()});
+
+    // new_files_ → NEW，放在最后（反向时最先执行：先删新文件）
+    for (const auto& f : new_files_)
+        ops.push_back({"NEW", f.string(), ""});
+
+    auto [restored, cleaned] = wal::reverse_execute(ops, Config::instance().root_dir());
+    if (restored > 0 || cleaned > 0) {
+        log_info(string_format("info.recover_done", restored, cleaned));
     }
-    // 第二层：恢复备份（在删除目录之前，.bak 不阻塞目录清理）
-    for (const auto& [original, backup] : backups_ | std::views::reverse) {
-        if (fs::exists(backup) || fs::is_symlink(backup)) {
-            fs::rename(backup, original);
-            TransactionLog::log_raw("RESTORE " + backup.string() + " → " + original.string());
-        }
-    }
+
     backups_.clear();
-    // 第三层：从备份阶段记录的 new_dirs_ 按深度排序，逐层移除
-    //   只有本包首次创建的目录在此列表中（已存在目录不跟踪）
-    std::ranges::sort(new_dirs_, std::greater<>{}, [](const fs::path& p) {
-        return std::distance(p.begin(), p.end());
-    });
-    for (const auto& d : new_dirs_) {
-        if (fs::exists(d)) {
-            fs::remove(d, ec);
-            if (ec) {
-                fs::remove_all(d, ec);
-            }
-            TransactionLog::log_raw("ROLLBACK_DEL " + d.string());
-        }
-    }
     new_files_.clear();
     new_dirs_.clear();
 }
@@ -667,6 +665,7 @@ void InstallationTask::copy_package_files() {
                 }
                 TransactionLog::log_raw("COPY " + tmp_path.string() + " → " + final_dest.string());
                 fs::rename(tmp_path, final_dest);
+                fsync_parent_dir(final_dest);
             }
 
             TriggerManager::instance().check_file((fs::path("/") / f).string());

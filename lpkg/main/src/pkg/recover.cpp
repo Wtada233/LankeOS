@@ -5,6 +5,7 @@
 #include "i18n/localization.hpp"
 #include "base/utils.hpp"
 #include "base/constants.hpp"
+#include "wal_op.hpp"
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -13,11 +14,6 @@
 #include "base/exception.hpp"
 
 namespace fs = std::filesystem;
-
-// WAL 日志中使用的箭头分隔符（UTF-8 编码，与 transaction_log.cpp 保持一致）
-// " \xe2\x86\x92 " = space + U+2192 + space = 5 字节
-static constexpr std::string_view ARROW_SEP = " \xe2\x86\x92 ";
-static constexpr size_t ARROW_SEP_LEN = 5;
 
 // 事务类型
 enum class TxnType { NONE, INSTALL, REMOVE, BATCH };
@@ -55,10 +51,8 @@ static std::string extract_pkg_name(const std::string& first_op) {
  *
  * 完全基于 WAL 日志恢复，不扫描文件系统。
  *
- * 回滚逻辑：
- *   - BACKUP <src> → <dst>：将备份文件 <dst> 重命名回 <src>（恢复旧文件）
- *   - COPY <src> → <dst>：删除已复制到 <dst> 的文件，清理 <src> 临时文件
- *   - NEW <path>：删除新创建的文件
+ * 逆向执行委托给 wal::reverse_execute()，与 InstallationTask::rollback()
+ * 共享同一套撤销逻辑。
  */
 void recover_packages() {
     log_info(get_string("info.recover_start"));
@@ -167,7 +161,7 @@ void recover_packages() {
         return;
     }
 
-    // ── 回滚每个未完成事务 ──────────────────────────────────────────────
+    // ── 回滚每个未完成事务（委托给 wal::reverse_execute） ─────────────
     for (const auto& txn_ops : uncommitted_txns) {
         std::string pkg_name;
         if (!txn_ops.empty())
@@ -176,209 +170,17 @@ void recover_packages() {
         log_info(string_format("info.recover_rollback_txn",
                                 pkg_name.empty() ? "unknown" : pkg_name));
 
-        // 反向回滚（后执行的操作先撤销）
-        for (int i = static_cast<int>(txn_ops.size()) - 1; i >= 0; --i) {
-            const std::string& op = txn_ops[i];
-
-            // 跳过非操作行
-            if (op.starts_with("BEGIN ") || op.starts_with("BEGIN_PKGS ") ||
-                op.starts_with("COMMIT ") || op.starts_with("ROLLBACK ") ||
-                op.starts_with("END ") ||
-                op.starts_with("RM_BEGIN ") || op.starts_with("RM_COMMIT ") ||
-                op.starts_with("RM_END ") ||
-                op.starts_with("RM_BAK_CLN ") ||
-                op.starts_with("COMMIT_PKGS"))
-                continue;
-
-            std::error_code ec;
-
-            if (op.starts_with("BACKUP ")) {
-                // BACKUP <src> → <dst>
-                // 恢复备份：dst → src
-                auto arrow_pos = op.find(ARROW_SEP, 7);
-                if (arrow_pos == std::string::npos) continue;
-
-                std::string src = op.substr(7, arrow_pos - 7);
-                std::string dst = op.substr(arrow_pos + ARROW_SEP_LEN);
-
-                if (fs::exists(dst) || fs::is_symlink(dst)) {
-                    fs::rename(dst, src, ec);
-                    if (!ec) {
-                        log_info(string_format("info.recover_restored", dst, src));
-                        restored++;
-                    } else {
-                        log_warning(string_format("warning.recover_rename_failed",
-                                                  dst, src, ec.message()));
-                    }
-                }
-            } else if (op.starts_with("REMOVE_OLD ")) {
-                // REMOVE_OLD <src> → <dst>
-                // 恢复旧版本升级时被移除的废弃文件
-                auto arrow_pos = op.find(ARROW_SEP, 11);
-                if (arrow_pos == std::string::npos) continue;
-
-                std::string src = op.substr(11, arrow_pos - 11);
-                std::string dst = op.substr(arrow_pos + ARROW_SEP_LEN);
-
-                if (fs::exists(dst) || fs::is_symlink(dst)) {
-                    fs::rename(dst, src, ec);
-                    if (!ec) {
-                        log_info(string_format("info.recover_restored", dst, src));
-                        restored++;
-                    } else {
-                        log_warning(string_format("warning.recover_rename_failed",
-                                                  dst, src, ec.message()));
-                    }
-                }
-            } else if (op.starts_with("COPY ")) {
-                // COPY <src> → <dst>
-                auto arrow_pos = op.find(ARROW_SEP, 5);
-                if (arrow_pos == std::string::npos) continue;
-
-                std::string src = op.substr(5, arrow_pos - 5);
-                std::string dst = op.substr(arrow_pos + ARROW_SEP_LEN);
-
-                bool removed = false;
-                if (fs::exists(dst) || fs::is_symlink(dst)) {
-                    fs::remove(dst, ec);
-                    if (!ec) {
-                        cleaned++;
-                        removed = true;
-                    }
-                }
-                if (fs::exists(src)) {
-                    fs::remove(src, ec);
-                    if (!ec) {
-                        cleaned++;
-                        if (!removed)
-                            log_info(string_format("info.recover_cleaned_tmp", src));
-                    }
-                }
-            // ── DB 文件 WAL 回滚 ────────────────────────────────────────
-            // 这三种条目使用相同的 .lpkg_db_bak 机制：
-            //   DB /path tag    — 修改已有 DB 文件（备份 → 写 → 替换）
-            //   DBNEW /path tag — 新建 DB 文件（不存在则创建）
-            //   DBRM /path tag  — 删除 DB 文件（备份后删除）
-            // 恢复只在 .lpkg_db_bak 存在时进行（文件系统状态指示操作已发生）。
-            // 若 .bak 不存在，说明 crash 发生在 DB_WAL 条目写入后但实际操作前，
-            // 此时文件系统未变，无需恢复——WAL 条目仅标记意图，无副效应。
-            //
-            // 注意：这三种条目均不会匹配到 "DB " 前缀
-            // （DBRM/DBNEW 分别以 "DBRM " / "DBNEW " 开头），依赖检查顺序正确。
-            // ─────────────────────────────────────────────────────────────────
-
-            } else if (op.starts_with("DBRM ")) {
-                // DBRM /path tag — 文件曾存在，被备份到 .lpkg_db_bak_<tag> 后删除
-                // 格式："DBRM /var/lib/lpkg/pkgs pkg1"
-                {
-                    std::string rest = op.substr(5);  // 去掉 "DBRM "
-                    auto sp = rest.find(' ');
-                    if (sp != std::string::npos) {
-                        std::string dbpath = rest.substr(0, sp);
-                        std::string tag = rest.substr(sp + 1);
-                        fs::path bak = dbpath + ".lpkg_db_bak_" + tag;
-                        if (fs::exists(bak)) {
-                            fs::rename(bak, dbpath, ec);
-                            if (!ec) {
-                                log_info(string_format("info.recover_restored", dbpath, "(db_bak)"));
-                                restored++;
-                            } else {
-                                log_warning(string_format("warning.recover_rename_failed", bak.string(), dbpath, ec.message()));
-                            }
-                        }
-                    }
-                }
-            } else if (op.starts_with("DBNEW ")) {
-                // DBNEW /path tag — 新建数据库文件，未提交则删除
-                {
-                    std::string rest = op.substr(6);  // 去掉 "DBNEW "
-                    auto sp = rest.find(' ');
-                    if (sp != std::string::npos) {
-                        std::string dbpath = rest.substr(0, sp);
-                        if (fs::exists(dbpath) || fs::is_symlink(dbpath)) {
-                            fs::remove(dbpath, ec);
-                            if (!ec) {
-                                log_info(string_format("info.recover_cleaned_tmp", dbpath));
-                                cleaned++;
-                            }
-                        }
-                    }
-                }
-            } else if (op.starts_with("DB ")) {
-                // DB /path tag — 修改已有 DB 文件。恢复 .lpkg_db_bak_<tag> 到原位。
-                {
-                    std::string rest = op.substr(3);  // 去掉 "DB "
-                    auto sp = rest.find(' ');
-                    if (sp != std::string::npos) {
-                        std::string dbpath = rest.substr(0, sp);
-                        std::string tag = rest.substr(sp + 1);
-                        fs::path bak = dbpath + ".lpkg_db_bak_" + tag;
-                        if (fs::exists(bak)) {
-                            fs::rename(bak, dbpath, ec);
-                            if (!ec) {
-                                log_info(string_format("info.recover_restored", dbpath, "(db_bak)"));
-                                restored++;
-                            } else {
-                                log_warning(string_format("warning.recover_rename_failed", bak.string(), dbpath, ec.message()));
-                            }
-                        }
-                    }
-                }
-
-            } else if (op.starts_with("RM_DIR ")) {
-                // RM_DIR <path> — 回滚时重建目录，使 BACKUP rename 能成功
-                std::string dirpath = op.substr(6);
-                std::error_code ec_create;
-                fs::create_directories(dirpath, ec_create);
-                if (!ec_create) {
-                    log_info(string_format("info.recover_restored", "(dir)", dirpath));
-                    restored++;
-                }
-            } else if (op.starts_with("NEW_DIR ")) {
-                // NEW_DIR <path> — 新建目录。反向顺序中内部文件已在之前被
-                // 个体条目（NEW/COPY/BACKUP）清理，此时目录应为空。
-                // 空才删（fs::remove = rmdir），非空则检查是否只剩 .lpkg_bak
-                // 残留（因备份文件的 .bak 被恢复时反转 rename 后已经消失，
-                // 但 RM_BAK_CLN 清理的 .bak 不会还原），清扫后若变空则删。
-                std::string path = op.substr(8);
-                if (fs::exists(path) && fs::is_directory(path) && !fs::is_symlink(path)) {
-                    // 清扫目录内的 .lpkg_bak 残留（可能来自恢复过程中未还原的备份）
-                    std::error_code ec_scan;
-                    for (auto& entry : fs::recursive_directory_iterator(path, ec_scan)) {
-                        const std::string fname = entry.path().filename().string();
-                        if (fname.find(".lpkg_bak_") != std::string::npos) {
-                            fs::remove(entry.path(), ec_scan);
-                        }
-                    }
-                    std::error_code ec_empty;
-                    if (fs::is_empty(path, ec_empty) && !ec_empty) {
-                        if (fs::remove(path, ec) && !ec) {
-                            TransactionLog::log_raw_no_fsync("ROLLBACK_DEL " + path);
-                            log_info(string_format("info.recover_cleaned_tmp", path));
-                            cleaned++;
-                        }
-                    } else if (!ec_empty && !fs::is_empty(path, ec_empty)) {
-                        log_warning(string_format("warning.recover_dir_not_empty", path));
-                    }
-                }
-            } else if (op.starts_with("RM_BAK_CLN ")) {
-                // RM_BAK_CLN <path> — 反向操作：不复位（.bak 已被删），
-                // 仅在 WAL 中标记。跳过即可。该条目的存在只是为了让
-                // 恢复过程知道这个 .bak 的消失是"主动清扫"而非"意外丢失"。
-                // 实际文件已在 RM_DIR 阶段重建目录时体现。
-                continue;
-            } else if (op.starts_with("NEW ")) {
-                // NEW <path>
-                std::string path = op.substr(4);
-                if (fs::exists(path) || fs::is_symlink(path)) {
-                    fs::remove(path, ec);
-                    if (!ec) {
-                        log_info(string_format("info.recover_cleaned_tmp", path));
-                        cleaned++;
-                    }
-                }
-            }
+        // 将原始日志行解析为 WALOp 列表（parse_op 会跳过格式不匹配的行）
+        std::vector<wal::WALOp> ops;
+        for (const auto& line : txn_ops) {
+            if (auto parsed = wal::parse_op(line))
+                ops.push_back(std::move(*parsed));
         }
+
+        // 核心：共享的逆向执行
+        auto [r, c] = wal::reverse_execute(ops, Config::instance().root_dir());
+        restored += r;
+        cleaned += c;
 
         // 标记事务已回滚
         if (!pkg_name.empty()) {
