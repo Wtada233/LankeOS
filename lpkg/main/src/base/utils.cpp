@@ -281,7 +281,11 @@ void write_set_to_file(const fs::path& path, const std::unordered_set<std::strin
         for (const auto& item : data) {
             file << item << "\n";
         }
+        file.flush();
     }
+    // fsync 确保 .tmp 内容在断电前完整落盘，然后 rename 原子替换
+    int fd = ::open(tmp_path.c_str(), O_WRONLY);
+    if (fd >= 0) { ::fsync(fd); ::close(fd); }
     fs::rename(tmp_path, path);
 }
 

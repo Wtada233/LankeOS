@@ -52,6 +52,7 @@ void write_cache() {
  */
 void install_packages(const std::vector<std::string>& pkg_args,
                       const std::string& hash_file_path, bool force_reinstall) {
+    TransactionLog::trim_completed();  // 新事务开始前压缩已完结日志
     Cache::instance().load();
     TmpDirManager tmp;
     Repository repo;
@@ -410,6 +411,7 @@ void install_packages_internal(InstallContext& ctx) {
  * force 模式下跳过所有安全检查
  */
 void remove_package(const std::string& pkg_name, bool force) {
+    TransactionLog::trim_completed();  // 新事务开始前压缩已完结日志
     const std::string ver = Cache::instance().get_installed_version(pkg_name);
     if (ver.empty()) {
         log_info(string_format("info.package_not_installed", pkg_name));
@@ -756,6 +758,7 @@ void autoremove() {
  *   - 使用版比较算法确保 6.16.1 > 6.6.1
  */
 void upgrade_packages() {
+    TransactionLog::trim_completed();  // 新事务开始前压缩已完结日志
     log_info(get_string("info.checking_upgradable"));
     TmpDirManager tmp;
     Repository repo;
@@ -800,7 +803,7 @@ void upgrade_packages() {
         log_info(string_format("info.upgraded_packages", count));
     else
         log_info(get_string("info.all_packages_latest"));
-    Cache::instance().write();
+    Cache::instance().write("upgrade");  // 使用 WAL 保护路径
     Cache::instance().cleanup_db_backups();
 }
 

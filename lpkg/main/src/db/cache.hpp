@@ -118,20 +118,14 @@ private:
 
     /** 从文件读取多值数据库（不经过缓存） */
     std::map<std::string, std::unordered_set<std::string>, std::less<>> read_db_uncached(const std::filesystem::path& path);
-    /** 将多值数据库写入文件（不经过缓存） */
-    void write_db_uncached(const std::filesystem::path& path, const std::map<std::string, std::unordered_set<std::string>, std::less<>>& db);
 
-    /** 写入已安装包列表 */
-    void write_pkgs();
+    /** 写入已安装包列表（始终 WAL 保护） */
     void write_pkgs(const std::string& wal_tag);
-    /** 写入锁定包列表 */
-    void write_holdpkgs();
+    /** 写入锁定包列表（始终 WAL 保护） */
     void write_holdpkgs(const std::string& wal_tag);
-    /** 写入文件归属数据库 */
-    void write_file_db();
+    /** 写入文件归属数据库（始终 WAL 保护） */
     void write_file_db(const std::string& wal_tag);
-    /** 写入 providers 数据库 */
-    void write_providers();
+    /** 写入 providers 数据库（始终 WAL 保护） */
     void write_providers(const std::string& wal_tag);
 
     /** WAL 保护的 DB 文件写入：备份 → write+fsync → rename，记录 DB/DBNEW 日志 */

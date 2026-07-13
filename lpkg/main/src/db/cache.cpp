@@ -313,57 +313,41 @@ void Cache::write(const std::string& wal_tag) {
     }
 }
 
-/** 保留原无参 write 以兼容不涉及 WAL 的调用 */
-void Cache::write() { write(""); }
+/** 保留原无参 write 以兼容不涉及 WAL 的调用——现已全面启用 WAL 保护 */
+void Cache::write() { write("sync"); }
 
 /**
  * 将已安装包列表写入磁盘，格式为 包名:版本号
+ * 始终走 WAL 保护路径（write_set_file），生成 DB/DBNEW 日志 + .lpkg_db_bak
  */
 void Cache::write_pkgs(const std::string& wal_tag) {
     std::unordered_set<std::string> pkg_set;
     for (const auto& [name, ver] : installed_pkgs) {
         pkg_set.insert(name + ":" + ver);
     }
-    if (wal_tag.empty()) {
-        write_set_to_file(Config::instance().pkgs_file(), pkg_set);
-    } else {
-        write_set_file(Config::instance().pkgs_file(), pkg_set, wal_tag);
-    }
+    write_set_file(Config::instance().pkgs_file(), pkg_set, wal_tag);
 }
-void Cache::write_pkgs() { write_pkgs(""); }
 
 /**
- * 将锁定包列表写入磁盘
+ * 将锁定包列表写入磁盘，始终 WAL 保护
  */
 void Cache::write_holdpkgs(const std::string& wal_tag) {
-    if (wal_tag.empty())
-        write_set_to_file(Config::instance().holdpkgs_file(), holdpkgs);
-    else
-        write_set_file(Config::instance().holdpkgs_file(), holdpkgs, wal_tag);
+    write_set_file(Config::instance().holdpkgs_file(), holdpkgs, wal_tag);
 }
-void Cache::write_holdpkgs() { write_holdpkgs(""); }
 
 /**
- * 将文件归属数据库写入磁盘
+ * 将文件归属数据库写入磁盘，始终 WAL 保护
  */
 void Cache::write_file_db(const std::string& wal_tag) {
-    if (wal_tag.empty())
-        write_db_uncached(Config::instance().files_db(), file_db);
-    else
-        write_db_file(Config::instance().files_db(), file_db, wal_tag);
+    write_db_file(Config::instance().files_db(), file_db, wal_tag);
 }
-void Cache::write_file_db() { write_file_db(""); }
 
 /**
- * 将提供者数据库写入磁盘
+ * 将提供者数据库写入磁盘，始终 WAL 保护
  */
 void Cache::write_providers(const std::string& wal_tag) {
-    if (wal_tag.empty())
-        write_db_uncached(Config::instance().provides_db(), providers);
-    else
-        write_db_file(Config::instance().provides_db(), providers, wal_tag);
+    write_db_file(Config::instance().provides_db(), providers, wal_tag);
 }
-void Cache::write_providers() { write_providers(""); }
 
 // ── 文件系统辅助：带 fsync 的原子写入 ──────────────────────────────
 
@@ -508,25 +492,4 @@ std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::read_
         }
     }
     return db;
-}
-
-/**
- * 将键-多值数据库写入磁盘（原子写入：先写临时文件再重命名）
- * 格式：key\tval1,val2,val3 —— 一行一条记录，值以逗号分隔
- */
-void Cache::write_db_uncached(const fs::path& path, const std::map<std::string, std::unordered_set<std::string>, std::less<>>& db) {
-    fs::path tmp_path = path.string() + ".tmp";
-    {
-        std::ofstream db_file(tmp_path, std::ios::trunc);
-        if (!db_file.is_open()) throw LpkgException(get_string("error.create_tmp_db_failed"));
-        for (const auto& [key, values] : db) {
-            std::string joined;
-            for (const auto& v : values) {
-                if (!joined.empty()) joined += ',';
-                joined += v;
-            }
-            db_file << key << "\t" << joined << "\n";
-        }
-    }
-    fs::rename(tmp_path, path);
 }
