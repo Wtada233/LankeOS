@@ -84,6 +84,15 @@ void write_set_to_file(const std::filesystem::path& path, const std::unordered_s
 /** 清理所有临时目录 */
 void cleanup_tmp_dirs();
 
+/**
+ * fsync 目标文件所在父目录，确保 rename 后的 dentry 落盘。
+ *
+ * rename(2) 在同文件系统内是原子的，但如果父目录的 dentry 未落盘，
+ * 断电后目录可能指向旧路径，rename 的"原子性"在磁盘上不会体现。
+ * 在所有 fs::rename / rename(2) 之后调用此函数以消除此盲点。
+ */
+void fsync_parent_dir(const std::filesystem::path& child_path);
+
 // ============ 字符串工具 ============
 
 /** 替换字符串中的所有匹配子串 */
