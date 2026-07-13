@@ -539,9 +539,13 @@ void remove_package(const std::string& pkg_name, bool force) {
             if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name);
         }
     }
-    fs::remove(dep_file, ec);
-    fs::remove(Config::instance().needed_so_dir() / pkg_name, ec);
-    fs::remove(Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), ec);
+    // 使用 WAL 保护的 DB 删除：rename 到 .lpkg_db_bak + DBRM 日志，
+    // 确保若事务未提交（crash 后 RM_COMMIT 未写），rec 能恢复这些文件。
+    // dep 和 needed_so 文件位于 state_dir 子目录中，cleanup_db_backups()
+    // 使用 recursive_directory_iterator 可清扫其 .lpkg_db_bak 残留。
+    Cache::instance().remove_db_file(dep_file, pkg_name);
+    Cache::instance().remove_db_file(Config::instance().needed_so_dir() / pkg_name, pkg_name);
+    Cache::instance().remove_db_file(Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), pkg_name);
     fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
     cache.remove_installed(pkg_name);
 

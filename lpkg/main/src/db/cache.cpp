@@ -392,10 +392,17 @@ void Cache::write_db_file(const fs::path& path,
     const fs::path tmp = path.string() + ".tmp";
 
     // 1) WAL 记录意图
-    TransactionLog::log_raw("DB " + path.string() + " " + wal_tag);
+    //    DBNEW：文件尚不存在（新创建的数据库文件）
+    //    DB：   文件已存在（修改已有数据库文件）
+    const bool is_new = !fs::exists(path);
+    if (is_new) {
+        TransactionLog::log_raw("DBNEW " + path.string() + " " + wal_tag);
+    } else {
+        TransactionLog::log_raw("DB " + path.string() + " " + wal_tag);
+    }
 
     // 2) 备份原文件（若存在）
-    if (fs::exists(path)) {
+    if (!is_new) {
         std::error_code ec;
         fs::rename(path, bak, ec);
     }
@@ -426,9 +433,14 @@ void Cache::write_set_file(const fs::path& path,
     const fs::path bak = path.string() + ".lpkg_db_bak_" + wal_tag;
     const fs::path tmp = path.string() + ".tmp";
 
-    TransactionLog::log_raw("DB " + path.string() + " " + wal_tag);
+    const bool is_new = !fs::exists(path);
+    if (is_new) {
+        TransactionLog::log_raw("DBNEW " + path.string() + " " + wal_tag);
+    } else {
+        TransactionLog::log_raw("DB " + path.string() + " " + wal_tag);
+    }
 
-    if (fs::exists(path)) {
+    if (!is_new) {
         std::error_code ec;
         fs::rename(path, bak, ec);
     }
@@ -455,13 +467,15 @@ void Cache::remove_db_file(const fs::path& path, const std::string& wal_tag) {
 }
 
 /** 扫描 state_dir 下所有 *.lpkg_db_bak 文件并删除。
- *  事务提交后调用，清理已不再需要的备份。 */
+ *  事务提交后调用，清理已不再需要的备份。
+ *  使用 recursive_directory_iterator 确保子目录（deps/、needed_so/）
+ *  中的 .lpkg_db_bak 也能被清理。 */
 void Cache::cleanup_db_backups() {
     const fs::path state_dir = Config::instance().state_dir();
     if (!fs::exists(state_dir) || !fs::is_directory(state_dir)) return;
 
     std::error_code ec;
-    for (const auto& entry : fs::directory_iterator(state_dir, ec)) {
+    for (const auto& entry : fs::recursive_directory_iterator(state_dir, ec)) {
         if (entry.path().extension() == ".lpkg_db_bak"
             || entry.path().filename().string().find(".lpkg_db_bak") != std::string::npos) {
             fs::remove(entry.path(), ec);
