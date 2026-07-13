@@ -14,6 +14,7 @@
 #include "vercmp/version.hpp"
 #include "repo/repository.hpp"
 #include "base/constants.hpp"
+#include "transaction_log.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -247,11 +248,20 @@ void install_packages(const std::vector<std::string>& pkg_args,
     //   1. 下载包 → 读取真实 metadata.json（验证仓库索引的 deps/provides）
     //   2. 若元数据与索引不匹配 → 更新仓库信息 → 回滚已安装包 → 重解析依赖 → 从头重试
     //   3. 匹配 → 执行 InstallationTask::run()（解压 → 依赖检查 → 冲突检测 → 写文件）
-    // 安装循环。无原子回滚——如果安装中断，部分文件可能已复制到系统但缓存未更新。
-    // 重新运行 lpkg install 即可恢复（重复安装会跳过已成功完成的部分）。
+    // 安装循环。加入批量事务支持：跨包回滚。
     ctx.successfully_installed.clear();
     ctx.installed_set.clear();
+
+    // 批量事务：若安装不止一个包，用 BEGIN_PKGS / COMMIT_PKGS 包裹，
+    // 保证任一包安装失败时整个批量回滚，而非部分提交。
+    const bool is_batch = (ctx.install_order.size() > 1);
+    if (is_batch)
+        TransactionLog::log_raw("BEGIN_PKGS " + std::to_string(ctx.install_order.size()));
+
     install_packages_internal(ctx);
+
+    if (is_batch)
+        TransactionLog::log_raw("COMMIT_PKGS");
 
     Cache::instance().write();
     TriggerManager::instance().run_all();
@@ -394,11 +404,74 @@ void remove_package(const std::string& pkg_name, bool force) {
     }
 
     log_info(string_format("info.removing_package", pkg_name));
+
+    // ── WAL：RM_BEGIN（原子移除事务开始） ──────────────────────────────
+    TransactionLog::log_raw("RM_BEGIN " + pkg_name + " " + ver);
+
     detail::run_hook(pkg_name, std::string(constants::PRERM_SH));
+
+    auto& cache = Cache::instance();
+    auto owned_entries = cache.get_package_files(pkg_name);
+
+    // ── 共享文件检查（修改文件前执行，防止备份后才发现冲突） ──────────
+    if (!force && !owned_entries.empty()) {
+        std::vector<std::pair<std::string, std::string>> shared;
+        for (const auto& entry : owned_entries) {
+            if (entry.ends_with('/')) continue;
+            auto owners = cache.get_file_owners(entry);
+            std::string others;
+            for (const auto& owner : owners) {
+                if (owner != pkg_name) {
+                    if (!others.empty()) others += ", ";
+                    others += owner;
+                }
+            }
+            if (!others.empty()) shared.emplace_back(entry, others);
+        }
+        if (!shared.empty()) {
+            std::string msg = get_string("error.shared_file_header") + "\n";
+            for (const auto& [file, owners] : shared)
+                msg += "  " + string_format("error.shared_file_entry", file, owners) + "\n";
+            throw LpkgException(msg + get_string("error.removal_aborted"));
+        }
+    }
+
+    // ── 备份阶段：将每个包文件 rename 到 .lpkg_bak（WAL 先写后操作） ───
+    std::vector<std::pair<fs::path, fs::path>> backups;
+    int file_count = 0;
+
+    if (!owned_entries.empty()) {
+        std::vector<fs::path> paths;
+        for (const auto& e : owned_entries) paths.emplace_back(e);
+        std::ranges::sort(paths, std::greater<>{});
+
+        for (const auto& p : paths) {
+            std::string path_str = p.string();
+            if (path_str.ends_with('/')) continue;
+            const fs::path phys = p.is_absolute()
+                ? Config::instance().root_dir() / fs::path(p).relative_path()
+                : Config::instance().root_dir() / p;
+
+            if (fs::exists(phys) || fs::is_symlink(phys)) {
+                fs::path bak = phys;
+                bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name;
+                // WAL 顺序：先写 BACKUP 日志，再 rename
+                TransactionLog::log_raw("BACKUP " + phys.string() + " → " + bak.string());
+                fs::rename(phys, bak);
+                backups.emplace_back(phys, bak);
+                ++file_count;
+            }
+        }
+    }
+
+    if (file_count > 0)
+        log_info(string_format("info.files_removed", file_count));
+
+    // remove_package_files 对已移至 .bak 的普通文件是 no-op，
+    // 但仍会处理目录释放和缓存清理
     remove_package_files(pkg_name, force);
 
-    // 清理依赖、文档和钩子文件，删除逆向依赖记录
-    auto& cache = Cache::instance();
+    // ── 清理依赖、文档和钩子文件 ──────────────────────────────────────
     const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
     if (fs::exists(dep_file)) {
         std::ifstream f(dep_file);
@@ -416,6 +489,16 @@ void remove_package(const std::string& pkg_name, bool force) {
     fs::remove(Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), ec);
     fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
     cache.remove_installed(pkg_name);
+
+    // ── WAL：RM_COMMIT（移除提交，此后可安全清理 .lpkg_bak） ──────────
+    TransactionLog::log_raw("RM_COMMIT " + pkg_name + " " + ver);
+
+    // 清理 .lpkg_bak 文件
+    for (const auto& [orig, bak] : backups) {
+        fs::remove(bak, ec);
+    }
+
+    TransactionLog::log_raw("RM_END " + pkg_name + " " + ver);
     log_info(string_format("info.package_removed_successfully", pkg_name));
 }
 

@@ -4,6 +4,7 @@
 #include <sstream>
 #include <unistd.h>
 #include <fcntl.h>
+#include <errno.h>
 
 TransactionLog::TransactionLog() {
     log_path_ = Config::instance().lock_dir() / "transaction.log";
@@ -36,6 +37,8 @@ void TransactionLog::write(const std::string& line) {
     std::string entry = "[" + timestamp() + "] " + line + "\n";
     // 单次 write() 调用，在 O_APPEND 模式下 < 4096 字节时为原子写入
     ::write(log_fd_, entry.data(), entry.size());
+    // 立即 fsync 确保日志落盘（在断电场景下不会丢失已写入的行）
+    ::fsync(log_fd_);
 }
 
 void TransactionLog::begin(const std::string& pkg, const std::string& version) {
@@ -67,6 +70,18 @@ void TransactionLog::end(const std::string& pkg, const std::string& version) {
 }
 
 void TransactionLog::log_raw(const std::string& line) {
+    fs::path p = Config::instance().lock_dir() / "transaction.log";
+    std::error_code ec;
+    fs::create_directories(p.parent_path(), ec);
+    int fd = ::open(p.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0644);
+    if (fd < 0) return;
+    std::string entry = "[" + timestamp() + "] " + line + "\n";
+    ::write(fd, entry.data(), entry.size());
+    ::fsync(fd);
+    ::close(fd);
+}
+
+void TransactionLog::log_raw_no_fsync(const std::string& line) {
     fs::path p = Config::instance().lock_dir() / "transaction.log";
     std::error_code ec;
     fs::create_directories(p.parent_path(), ec);

@@ -422,7 +422,7 @@ TEST_F(AtomicRollbackTest, LogHasBackupAndRestore) {
 // lpkg rec 恢复测试
 // ══════════════════════════════════════════════════════════════════════
 
-// ── 18. rec 恢复孤儿 .lpkgbak ──
+// ── 18. rec 恢复孤儿 .lpkgbak（基于 WAL） ──
 TEST_F(AtomicRollbackTest, RecoverRestoresOrphanedBak) {
     // 模拟一个孤儿备份文件（原文件不在了）
     fs::path orig = test_root / "usr" / "bin" / "lost_binary";
@@ -438,6 +438,10 @@ TEST_F(AtomicRollbackTest, RecoverRestoresOrphanedBak) {
     ASSERT_FALSE(fs::exists(orig));
     ASSERT_TRUE(fs::exists(bak));
 
+    // 使用 WAL 记录事务（BEGIN + BACKUP，未 COMMIT）
+    TransactionLog::log_raw("BEGIN mypkg 1.0");
+    TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
+
     // rec 应恢复
     recover_packages();
 
@@ -449,20 +453,30 @@ TEST_F(AtomicRollbackTest, RecoverRestoresOrphanedBak) {
     EXPECT_FALSE(fs::exists(bak));
 }
 
-// ── 19. rec 清理 .lpkgtmp ──
+// ── 19. rec 清理 .lpkgtmp（基于 WAL） ──
 TEST_F(AtomicRollbackTest, RecoverCleansOrphanedTmp) {
+    // WAL 记录：COPY 操作，但未 COMMIT
     fs::path tmp_file = test_root / "tmp" / "stray.lpkgtmp";
+    fs::path dst_file = test_root / "usr" / "bin" / "orphan_bin";
     fs::create_directories(tmp_file.parent_path());
+    fs::create_directories(dst_file.parent_path());
     { std::ofstream f(tmp_file); f << "garbage"; }
+    { std::ofstream f(dst_file); f << "partial"; }
+
+    TransactionLog::log_raw("BEGIN stray-pkg 1.0");
+    TransactionLog::log_raw("COPY " + tmp_file.string() + " → " + dst_file.string());
 
     recover_packages();
 
+    // COPY 的目标文件和 .lpkgtmp 源文件都应被清理
     EXPECT_FALSE(fs::exists(tmp_file)) << "recover should clean .lpkgtmp";
+    EXPECT_FALSE(fs::exists(dst_file)) << "recover should remove COPY destination";
 }
 
-// ── 20. rec 恢复多个孤儿备份 ──
+// ── 20. rec 恢复多个孤儿备份（基于 WAL） ──
 TEST_F(AtomicRollbackTest, RecoverMultipleOrphans) {
     std::vector<std::string> files = {"usr/lib/a.so", "usr/lib/b.so", "usr/bin/tool"};
+    TransactionLog::log_raw("BEGIN mypkg 1.0");
     for (const auto& f : files) {
         auto orig = test_root / f;
         fs::create_directories(orig.parent_path());
@@ -470,6 +484,8 @@ TEST_F(AtomicRollbackTest, RecoverMultipleOrphans) {
 
         auto bak = fs::path(orig).concat(".lpkg_bak_mypkg");
         fs::rename(orig, bak);
+
+        TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
     }
 
     recover_packages();
@@ -508,7 +524,7 @@ TEST_F(AtomicRollbackTest, SpaceInFilename_RollbackWorks) {
     EXPECT_EQ(content, "spacey lib");
 }
 
-// ── 25. 文件名含空格 → rec 恢复 ──
+// ── 25. 文件名含空格 → rec 恢复（基于 WAL） ──
 TEST_F(AtomicRollbackTest, SpaceInFilename_RecRestores) {
     fs::path orig = test_root / "usr" / "share" / "my data file.txt";
     fs::create_directories(orig.parent_path());
@@ -516,6 +532,9 @@ TEST_F(AtomicRollbackTest, SpaceInFilename_RecRestores) {
 
     fs::path bak = fs::path(orig).concat(".lpkg_bak_pkg");
     fs::rename(orig, bak);
+
+    TransactionLog::log_raw("BEGIN pkg 1.0");
+    TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
 
     recover_packages();
 
@@ -529,18 +548,20 @@ TEST_F(AtomicRollbackTest, SpaceInFilename_RecRestores) {
 // 断电模拟
 // ══════════════════════════════════════════════════════════════════════
 
-// ── 26. 断电恢复：只有 BEGIN 没有其他日志 → rec 恢复孤儿 .lpkgbak ──
+// ── 26. 断电恢复：BEGIN + BACKUP 在日志中，没有 COMMIT → rec 恢复孤儿 .lpkgbak ──
 TEST_F(AtomicRollbackTest, PowerLoss_BeginOnly_RecRestores) {
-    // 模拟断电场景：只有 BEGIN 在日志中，然后进程崩溃
-    TransactionLog::log_raw("BEGIN crashed-pkg 1.0");
-    // 孤儿 .lpkgbak（备份已完成但 COPY 未开始就断电）
+    // 模拟断电场景：BEGIN + BACKUP 在日志中，但 COPY 未开始就断电
     fs::path orig = test_root / "usr" / "bin" / "powerlost";
     fs::create_directories(orig.parent_path());
     { std::ofstream f(orig); f << "precious data"; }
     fs::path bak = fs::path(orig).concat(".lpkg_bak_crashed-pkg");
     fs::rename(orig, bak);
 
-    // rec 应恢复（扫描 .lpkgbak，不依赖日志）
+    // WAL 记录了事务开始和备份
+    TransactionLog::log_raw("BEGIN crashed-pkg 1.0");
+    TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
+
+    // rec 基于 WAL 恢复
     recover_packages();
 
     EXPECT_TRUE(fs::exists(orig));
@@ -551,19 +572,6 @@ TEST_F(AtomicRollbackTest, PowerLoss_BeginOnly_RecRestores) {
 
 // ── 27. 断电 recovery：部分写入日志行不破坏恢复 ──
 TEST_F(AtomicRollbackTest, PowerLoss_PartialLine_RecStillWorks) {
-    // 模拟日志文件末尾有部分写入行（断电导致 write() 未完成）
-    {
-        TransactionLog log;
-        log.begin("partial-pkg", "1.0");
-        log.backup("/usr/lib/ok.so", "/usr/lib/ok.so.lpkg_bak_partial-pkg");
-    }
-    // 追加一个部分行（模拟断电中断 write）
-    {
-        std::ofstream f(Config::instance().lock_dir() / "transaction.log", std::ios::app);
-        f << "[2026-07-13 10:00:00] BACKUP /usr/lib/partial";
-        // 没有换行 — 模拟部分写入
-    }
-
     // 创建孤儿 .lpkgbak（模拟部分完成的备份）
     fs::path orig = test_root / "usr" / "lib" / "ok.so";
     fs::create_directories(orig.parent_path());
@@ -571,7 +579,20 @@ TEST_F(AtomicRollbackTest, PowerLoss_PartialLine_RecStillWorks) {
     fs::path bak = fs::path(orig).concat(".lpkg_bak_partial-pkg");
     fs::rename(orig, bak);
 
-    // rec 应仍能恢复 ok.so（文件扫描不依赖日志完整性）
+    // WAL 日志：有效的 BACKUP 行 + 末尾部分写入行
+    {
+        TransactionLog log;
+        log.begin("partial-pkg", "1.0");
+        log.backup(orig.string(), bak.string());
+    }
+    // 追加一个部分行（模拟断电中断 write — 没有换行，没有 → dst）
+    {
+        std::ofstream f(Config::instance().lock_dir() / "transaction.log", std::ios::app);
+        f << "[2026-07-13 10:00:00] BACKUP /usr/lib/partial";
+        // 没有换行 — 模拟部分写入
+    }
+
+    // rec 基于 WAL 恢复（部分行被安全忽略，有效 BACKUP 被处理）
     recover_packages();
 
     EXPECT_TRUE(fs::exists(orig));
@@ -588,7 +609,7 @@ TEST_F(AtomicRollbackTest, PowerLoss_CheckPendingDetects) {
     EXPECT_EQ(pending, "lost-pkg") << "check_pending should detect the incomplete transaction";
 }
 
-// ── 22. rec 恢复时原文件已存在 → 覆盖恢复（.bak 是正确版本） ──
+// ── 22. rec 恢复时原文件已存在 → 覆盖恢复（基于 WAL，.bak 是正确版本） ──
 TEST_F(AtomicRollbackTest, RecoverOverwritesExisting) {
     fs::path orig = test_root / "usr" / "bin" / "tool";
     fs::create_directories(orig.parent_path());
@@ -598,6 +619,10 @@ TEST_F(AtomicRollbackTest, RecoverOverwritesExisting) {
     fs::path bak = fs::path(orig).concat(".lpkg_bak_mypkg");
     { std::ofstream f(bak); f << "correct version from backup"; }
 
+    // WAL 记录事务，未 COMMIT
+    TransactionLog::log_raw("BEGIN mypkg 1.0");
+    TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
+
     recover_packages();
 
     // .lpkgbak 应覆盖原文件
@@ -606,7 +631,7 @@ TEST_F(AtomicRollbackTest, RecoverOverwritesExisting) {
     EXPECT_EQ(content, "correct version from backup");
 }
 
-// ── 23. rec 扫描完整 /usr 树 ──
+// ── 23. rec 基于 WAL 恢复深层嵌套备份 ──
 TEST_F(AtomicRollbackTest, RecoverDeeplyNestedBak) {
     fs::path orig = test_root / "usr" / "share" / "deep" / "nested" / "file.dat";
     fs::create_directories(orig.parent_path());
@@ -614,6 +639,9 @@ TEST_F(AtomicRollbackTest, RecoverDeeplyNestedBak) {
 
     fs::path bak = fs::path(orig).concat(".lpkg_bak_pkg");
     fs::rename(orig, bak);
+
+    TransactionLog::log_raw("BEGIN pkg 1.0");
+    TransactionLog::log_raw("BACKUP " + orig.string() + " → " + bak.string());
 
     recover_packages();
 
