@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <ranges>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -173,26 +174,32 @@ void InstallationTask::backup_existing_files() {
         const fs::path physical_path = Config::instance().root_dir() / rel_f;
         const fs::path phys_dir = physical_path.parent_path();
 
-        // 确保目标父目录存在
-        std::error_code ec;
-        fs::create_directories(phys_dir, ec);
-
         // 配置文件跳过备份（复制阶段使用 .lpkg-new 后缀处理）
         const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
         if (is_config) continue;
 
+        std::error_code ec;
+        if (f.ends_with('/')) {
+            // 目录条目：先检查存在性再确保父目录存在
+            if (!fs::exists(physical_path)) {
+                new_dirs_.push_back(physical_path);
+                TransactionLog::log_raw("NEW_DIR " + physical_path.string());
+            }
+            fs::create_directories(phys_dir, ec);
+            continue;
+        }
+
+        // 文件条目：确保父目录存在后检查/备份/记录
+        fs::create_directories(phys_dir, ec);
         if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
             if (!fs::is_directory(physical_path)) {
-                // 只有普通文件和符号链接需要备份（目录被多包共享，不备份）
                 fs::path bak = physical_path;
                 bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
-                // WAL 顺序：先写日志（确保崩溃后可恢复），再执行操作
                 TransactionLog::log_raw("BACKUP " + physical_path.string() + " → " + bak.string());
                 fs::rename(physical_path, bak);
                 backups_.emplace_back(physical_path, bak);
             }
         } else {
-            // 记录新文件（不存在于磁盘上），回滚时需要删除
             new_files_.push_back(physical_path);
             TransactionLog::log_raw("NEW " + physical_path.string());
         }
@@ -210,38 +217,16 @@ void InstallationTask::rollback() {
             fs::remove(entry.path(), ec_tmp);
     }
 
-    // ── 分层删除：先删文件，再坍缩式删目录 ──────────────────────────
-    // 第一层：删除所有文件（目录跳过）
-    std::vector<fs::path> dirs;
+    // ── 分层回滚：先删文件 → 恢复备份 → 删新目录 ────────────────
+    std::error_code ec;
+    // 第一层：删除新文件（来自备份阶段记录的 new_files_）
     for (const auto& f : new_files_) {
-        if (!fs::exists(f) && !fs::is_symlink(f)) continue;
-        if (fs::is_directory(f) && !fs::is_symlink(f)) {
-            dirs.push_back(f);
-        } else {
-            std::error_code ec;
+        if (fs::exists(f) || fs::is_symlink(f)) {
             fs::remove(f, ec);
             TransactionLog::log_raw("ROLLBACK_DEL " + f.string());
         }
     }
-    // 第二层：按深度从最深到最浅排序目录，逐层 fs::remove
-    //   （目录此时应已清空，无需 remove_all）
-    std::ranges::sort(dirs, std::greater<>{}, [](const fs::path& p) {
-        return std::distance(p.begin(), p.end());
-    });
-    for (const auto& d : dirs) {
-        if (fs::exists(d)) {
-            std::error_code ec;
-            fs::remove(d, ec);  // 空目录，remove 即可
-            if (ec) {
-                // 非空 → 用 remove_all 兜底（不该走到这里）
-                fs::remove_all(d, ec);
-            }
-            TransactionLog::log_raw("ROLLBACK_DEL " + d.string());
-        }
-    }
-    new_files_.clear();
-
-    // 恢复备份（用 fs::is_symlink 处理悬空软链接——备份阶段目标文件被重命名后原软链接变成悬空）
+    // 第二层：恢复备份（在删除目录之前，.bak 不阻塞目录清理）
     for (const auto& [original, backup] : backups_ | std::views::reverse) {
         if (fs::exists(backup) || fs::is_symlink(backup)) {
             fs::rename(backup, original);
@@ -249,6 +234,22 @@ void InstallationTask::rollback() {
         }
     }
     backups_.clear();
+    // 第三层：从备份阶段记录的 new_dirs_ 按深度排序，逐层移除
+    //   只有本包首次创建的目录在此列表中（已存在目录不跟踪）
+    std::ranges::sort(new_dirs_, std::greater<>{}, [](const fs::path& p) {
+        return std::distance(p.begin(), p.end());
+    });
+    for (const auto& d : new_dirs_) {
+        if (fs::exists(d)) {
+            fs::remove(d, ec);
+            if (ec) {
+                fs::remove_all(d, ec);
+            }
+            TransactionLog::log_raw("ROLLBACK_DEL " + d.string());
+        }
+    }
+    new_files_.clear();
+    new_dirs_.clear();
 }
 
 /** 安装成功后清理备份文件 */
@@ -259,6 +260,7 @@ void InstallationTask::cleanup_backups() {
     }
     backups_.clear();
     new_files_.clear();
+    new_dirs_.clear();
 }
 
 /**

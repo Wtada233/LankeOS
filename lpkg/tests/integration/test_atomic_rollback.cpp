@@ -650,3 +650,57 @@ TEST_F(AtomicRollbackTest, RecoverDeeplyNestedBak) {
     std::string content; std::getline(f, content);
     EXPECT_EQ(content, "deep data");
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// 目录回滚测试
+// ══════════════════════════════════════════════════════════════════════
+
+// ── 29. SIGINT 后所有新目录被 rollback 清理 ──
+TEST_F(AtomicRollbackTest, RollbackRemovesNewDirectories) {
+    std::string pkg_path = make_pkg("dir-pkg", "1.0", {"a/b/c/file"});
+
+    Config::instance().set_force_overwrite_mode(true);
+    InstallationTask task("dir-pkg", "1.0", true, "", pkg_path);
+    task.on_before_file_copy = [&]{ sigint_graceful.store(true); };
+    EXPECT_ANY_THROW(task.run_simple());
+    Config::instance().set_force_overwrite_mode(false);
+
+    EXPECT_FALSE(fs::exists(test_root / "a/b/c/file")) << "deepest file removed";
+    EXPECT_FALSE(fs::exists(test_root / "a/b/c/"))     << "c/ removed";
+    EXPECT_FALSE(fs::exists(test_root / "a/b/"))       << "b/ removed";
+    EXPECT_FALSE(fs::exists(test_root / "a/"))         << "a/ removed";
+    EXPECT_FALSE(Cache::instance().is_installed("dir-pkg"));
+}
+
+// ── 30. 文件在目录之前被 SIGINT 中断 → 空目录也被清理 ──
+TEST_F(AtomicRollbackTest, RollbackRemovesDirectoryWhenFileNotYetCopied) {
+    std::string pkg_path = make_pkg("two-dir", "1.0",
+        {"dir1/file1", "dir2/file2"});
+
+    Config::instance().set_force_overwrite_mode(true);
+    InstallationTask task("two-dir", "1.0", true, "", pkg_path);
+    static int hook_count = 0; hook_count = 0;
+    task.on_before_file_copy = [&]{
+        if (++hook_count >= 3) sigint_graceful.store(true);
+    };
+    EXPECT_ANY_THROW(task.run_simple());
+    Config::instance().set_force_overwrite_mode(false);
+
+    EXPECT_FALSE(fs::exists(test_root / "dir1/file1"));
+    EXPECT_FALSE(fs::exists(test_root / "dir2/file2"));
+    EXPECT_FALSE(fs::exists(test_root / "dir1/"));
+    EXPECT_FALSE(fs::exists(test_root / "dir2/"));
+}
+
+// ── 31. 成功安装后新目录正常保留 ──
+TEST_F(AtomicRollbackTest, SuccessKeepsDirectories) {
+    std::string pkg_path = make_pkg("keep-dir", "1.0", {"usr/share/keep-dir/data"});
+
+    Config::instance().set_force_overwrite_mode(true);
+    InstallationTask task("keep-dir", "1.0", true, "", pkg_path);
+    EXPECT_NO_THROW(task.run_simple());
+    Config::instance().set_force_overwrite_mode(false);
+
+    EXPECT_TRUE(fs::exists(test_root / "usr/share/keep-dir/data"));
+    EXPECT_TRUE(fs::exists(test_root / "usr/share/keep-dir/"));
+}

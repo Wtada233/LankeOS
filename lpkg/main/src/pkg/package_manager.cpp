@@ -467,11 +467,38 @@ void remove_package(const std::string& pkg_name, bool force) {
     if (file_count > 0)
         log_info(string_format("info.files_removed", file_count));
 
-    // remove_package_files 对已移至 .bak 的普通文件是 no-op，
-    // 但仍会处理目录释放和缓存清理
+    // ── 阶段 2：清理 .bak → 删目录（RM_DIR） → 清理 deps → RM_COMMIT ──
     remove_package_files(pkg_name, force);
 
-    // ── 清理依赖、文档和钩子文件 ──────────────────────────────────────
+    // 2a：清理 .lpkg_bak（目录现在为空，可删除）
+    std::error_code ec;
+    for (const auto& [orig, bak] : backups) {
+        fs::remove(bak, ec);
+    }
+
+    // 2b：目录所有权释放 + fs::remove + RM_DIR WAL
+    std::vector<fs::path> dir_paths;
+    for (const auto& e : owned_entries)
+        if (e.ends_with('/'))
+            dir_paths.emplace_back(fs::path(e));
+    std::ranges::sort(dir_paths, std::greater<>{});
+    for (const auto& p : dir_paths) {
+        cache.remove_file_owner(p.string(), pkg_name);
+        if (!cache.get_file_owners(p.string()).empty()) continue;
+        const fs::path phys = p.is_absolute()
+            ? Config::instance().root_dir() / p.relative_path()
+            : Config::instance().root_dir() / p;
+        if (fs::exists(phys) && fs::is_directory(phys)) {
+            std::error_code ec2;
+            fs::remove(phys, ec2);
+            if (!ec2) {
+                TransactionLog::log_raw("RM_DIR " + phys.string());
+                log_info(string_format("info.dirs_removed", 1));
+            }
+        }
+    }
+
+    // 2c：清理依赖、文档和钩子文件
     const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
     if (fs::exists(dep_file)) {
         std::ifstream f(dep_file);
@@ -482,22 +509,14 @@ void remove_package(const std::string& pkg_name, bool force) {
             if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name);
         }
     }
-
-    std::error_code ec;
     fs::remove(dep_file, ec);
     fs::remove(Config::instance().needed_so_dir() / pkg_name, ec);
     fs::remove(Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), ec);
     fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
     cache.remove_installed(pkg_name);
 
-    // ── WAL：RM_COMMIT（移除提交，此后可安全清理 .lpkg_bak） ──────────
+    // 2d：RM_COMMIT — 事务完成
     TransactionLog::log_raw("RM_COMMIT " + pkg_name + " " + ver);
-
-    // 清理 .lpkg_bak 文件
-    for (const auto& [orig, bak] : backups) {
-        fs::remove(bak, ec);
-    }
-
     TransactionLog::log_raw("RM_END " + pkg_name + " " + ver);
     log_info(string_format("info.package_removed_successfully", pkg_name));
 }
@@ -547,7 +566,6 @@ void remove_package_files(const std::string& pkg_name, bool force) {
     std::ranges::sort(paths, std::greater<>{});
 
     int file_count = 0;
-    int dir_count = 0;
     for (const auto& p : paths) {
         std::string path_str = p.string();
         const fs::path phys = p.is_absolute()
@@ -555,17 +573,9 @@ void remove_package_files(const std::string& pkg_name, bool force) {
             : Config::instance().root_dir() / p;
 
         if (path_str.ends_with('/')) {
-            // ── 目录：释放持有 → 无持有则清理 ──────────────────
-            cache.remove_file_owner(path_str, pkg_name);
-            if (cache.get_file_owners(path_str).empty()) {
-                std::error_code ec;
-                if (fs::is_directory(phys, ec) && !ec) {
-                    fs::remove(phys, ec); // 仅在目录为空时成功
-                    if (!ec) {
-                        ++dir_count;
-                    }
-                }
-            }
+            // 目录：完全跳过——所有权释放和 fs::remove 由 remove_package()
+            // 在 RM_DIR 阶段统一处理（此时 .bak 已清理，目录为空）
+            continue;
         } else {
             // ── 普通文件：从磁盘删除 + 移除所有权 ──────────────
             if (fs::exists(phys) || fs::is_symlink(phys)) {
@@ -577,11 +587,8 @@ void remove_package_files(const std::string& pkg_name, bool force) {
         }
     }
 
-    if (file_count > 0 || dir_count > 0) {
-        log_info(string_format("info.files_removed", file_count + dir_count));
-    }
-    if (dir_count > 0) {
-        log_info(string_format("info.dirs_removed", dir_count));
+    if (file_count > 0) {
+        log_info(string_format("info.files_removed", file_count));
     }
 
     for (const auto& cap : cache.get_package_provides(pkg_name)) {
