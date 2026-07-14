@@ -164,8 +164,8 @@ static bool is_batch_start_milestone(const WALOp &op) {
 /// 向 WAL 日志追加一行（不使用 fsync——审计行在上下文中已由外部 fsync）
 static void wal_append_raw(const std::string &line) {
   std::string path = wal_log_path();
-  int fd = ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC,
-                  0644);
+  int fd =
+      ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
     return;
   std::string l = line + "\n";
@@ -176,7 +176,7 @@ static void wal_append_raw(const std::string &line) {
 
 /// 获取 .lpkg_db_bak 备份文件的路径
 static std::string db_bak_path(const std::string &db_path,
-                                const std::string &milestone) {
+                               const std::string &milestone) {
   return db_path + ".lpkg_db_bak_before:" + milestone;
 }
 
@@ -198,8 +198,8 @@ static bool safe_remove(const fs::path &p) {
 }
 
 RollbackStats reverse_execute(const std::vector<WALOp> &ops,
-                               const std::string &milestone_target,
-                               bool write_audit) {
+                              const std::string &milestone_target,
+                              bool write_audit) {
   RollbackStats stats;
 
   // 逆序遍历

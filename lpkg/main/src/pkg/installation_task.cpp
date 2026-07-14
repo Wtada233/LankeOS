@@ -15,12 +15,12 @@
 
 #include <algorithm>
 #include <atomic>
+#include <fcntl.h>
 #include <filesystem>
 #include <fstream>
 #include <ranges>
 #include <sstream>
 #include <string>
-#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <unordered_set>
@@ -226,8 +226,8 @@ void InstallationTask::backup_existing_files() {
         fs::path bak = physical_path;
         bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
         // write-ahead: 先写 WAL 再 rename
-        wal::log_wal_line("BACKUP " + physical_path.string() + " \xe2\x86\x92 " +
-                          bak.string());
+        wal::log_wal_line("BACKUP " + physical_path.string() +
+                          " \xe2\x86\x92 " + bak.string());
         fs::rename(physical_path, bak);
         fsync_parent_dir(bak);
         backups_.emplace_back(physical_path, bak);
@@ -586,7 +586,6 @@ void InstallationTask::copy_package_files() {
   for (const auto &f : files) {
     if (on_before_file_copy)
       on_before_file_copy();
-
 
     extern std::atomic<bool> sigint_graceful;
     if (sigint_graceful.load())
