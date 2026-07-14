@@ -72,10 +72,10 @@ TEST_F(ActiveRollbackTest, AfterCommitBreakpointRollsBackWholeBatch) {
   EXPECT_FALSE(fs::exists(test_root / "usr/bin/bp_A2"));
   EXPECT_FALSE(fs::exists(test_root / "usr/bin/bp_B2"));
 
-  // WAL 应有 COMMIT_PKGS（回滚完结标记）
+  // 回滚后 WAL 应被 trim（COMMIT_PKGS + trim_completed）
   std::ifstream f(wal::wal_log_path());
   std::string c((std::istreambuf_iterator<char>(f)), {});
-  EXPECT_NE(c.find("COMMIT_PKGS"), std::string::npos);
+  EXPECT_EQ(c.find("BEGIN_PKGS"), std::string::npos);
 }
 
 // ============================================================================
@@ -203,12 +203,11 @@ TEST_F(ActiveRollbackTest, RollbackWritesRollbackAndCommitPkgs) {
   std::string p = create_pkg("bp_wal_x", "1.0");
   EXPECT_THROW(install_packages({p}), LpkgException);
 
+  // 回滚后 batch_rollback 写 COMMIT_PKGS → catch 块 trim_completed → WAL 清空
   std::ifstream f(wal::wal_log_path());
   std::string c((std::istreambuf_iterator<char>(f)), {});
-  EXPECT_NE(c.find("ROLLBACK"), std::string::npos)
-      << "WAL must contain ROLLBACK marker";
-  EXPECT_NE(c.find("COMMIT_PKGS"), std::string::npos)
-      << "WAL must be closed with COMMIT_PKGS";
+  EXPECT_EQ(c.find("BEGIN_PKGS"), std::string::npos)
+      << "WAL should be trimmed after completed rollback";
 }
 
 // ============================================================================
@@ -263,10 +262,10 @@ TEST_F(ActiveRollbackTest, RecursiveRemoveSIGINTMidwayRestoresAll) {
         << n << " binary should be restored from .lpkg_bak";
   }
 
-  // WAL 应有 COMMIT_PKGS
+  // 回滚后 WAL 应被 trim
   std::ifstream f(wal::wal_log_path());
   std::string c((std::istreambuf_iterator<char>(f)), {});
-  EXPECT_NE(c.find("COMMIT_PKGS"), std::string::npos);
+  EXPECT_EQ(c.find("BEGIN_PKGS"), std::string::npos);
 
   // 不应有 .lpkg_bak 残留
   std::error_code ec_bak;
@@ -278,4 +277,51 @@ TEST_F(ActiveRollbackTest, RecursiveRemoveSIGINTMidwayRestoresAll) {
   }
 }
 
-// RecoveryAfterRollbackAllowsNormalReRemoval: 回滚后可重新正常移除（需要完整 remove -r 流程修复后启用）
+// ============================================================================
+// 回归测试：dangling symlink 的 .lpkg_bak 恢复
+// fs::exists() 对断开的软链接返回 false，reverse_execute 必须
+// 也用 fs::is_symlink() 检测
+// ============================================================================
+
+TEST_F(ActiveRollbackTest, DanglingSymlinkBakIsRestored) {
+  // 先通过正常 install 创建包（包含 real lib + symlink）
+  fs::path work = suite_work_dir / "_pkg_symtest2";
+  fs::create_directories(work / "content" / "usr" / "lib");
+  std::ofstream(work / "content" / "usr" / "lib" / "libreal2.so.1.0.0") << "real lib\n";
+  fs::create_symlink("libreal2.so.1.0.0", work / "content" / "usr" / "lib" / "libreal2.so.1");
+
+  std::string p_path = (pkg_dir / "symtest2-1.0.lpkg").string();
+  pack_package(p_path, work.string(), "symtest2", "1.0");
+  install_packages({p_path});
+
+  fs::path real = test_root / "usr/lib/libreal2.so.1.0.0";
+  fs::path sym = test_root / "usr/lib/libreal2.so.1";
+  EXPECT_TRUE(fs::exists(real));
+  EXPECT_TRUE(fs::is_symlink(sym));
+
+  // 模拟 remove 中途崩溃：BACKUP rename 完成, RM_COMMIT 未写
+  fs::path real_bak = real.string() + std::string(constants::SUFFIX_LPKG_BAK) + "symtest2";
+  fs::path sym_bak = sym.string() + std::string(constants::SUFFIX_LPKG_BAK) + "symtest2";
+  fs::rename(real, real_bak);
+  fs::rename(sym, sym_bak);
+
+  // sym_bak 现在是 dangling symlink（real 被 rename 了，target 不存在）
+  EXPECT_TRUE(fs::is_symlink(sym_bak));
+  EXPECT_FALSE(fs::exists(sym_bak)) << "dangling symlink: exists() returns false";
+
+  {
+    std::ofstream w(wal::wal_log_path());
+    w << "BEGIN_PKGS 1\n"
+      << "RM_BEGIN symtest2 1.0\n"
+      << "BACKUP " << sym.string() << " \xe2\x86\x92 " << sym_bak.string() << "\n"
+      << "BACKUP " << real.string() << " \xe2\x86\x92 " << real_bak.string() << "\n";
+  }
+
+  recover_packages();
+
+  // 关键断言：dangling symlink 也应被恢复
+  EXPECT_TRUE(fs::exists(real)) << "real file restored";
+  EXPECT_FALSE(fs::exists(real_bak)) << "real bak consumed";
+  EXPECT_TRUE(fs::is_symlink(sym)) << "symlink restored (was dangling)";
+  EXPECT_FALSE(fs::exists(sym_bak)) << "symlink bak consumed";
+}

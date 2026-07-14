@@ -226,7 +226,8 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
       fs::path bak_path = op.arg2;
       fs::path orig_path = op.arg1;
 
-      if (fs::exists(bak_path)) {
+      // fs::exists 对 dangling symlink 返回 false，必须用 is_symlink 补检
+      if (fs::exists(bak_path) || fs::is_symlink(bak_path)) {
         safe_rename(bak_path, orig_path);
         stats.files_restored++;
 
@@ -242,7 +243,7 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
     // ── COPY ─────────────────────────────────────────────────────────
     case WALOpType::COPY: {
       // arg2 = dst（目标文件路径）
-      // 逆向：删除目标文件
+      // 逆向：删除目标文件（含 dangling symlink）
       fs::path dst = op.arg2;
       if (fs::exists(dst) || fs::is_symlink(dst)) {
         safe_remove(dst);
@@ -257,7 +258,7 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
 
     // ── NEW ──────────────────────────────────────────────────────────
     case WALOpType::NEW: {
-      // arg1 = 文件路径
+      // arg1 = 文件路径（含 dangling symlink）
       fs::path p = op.arg1;
       if (fs::exists(p) || fs::is_symlink(p)) {
         safe_remove(p);
