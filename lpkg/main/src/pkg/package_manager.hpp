@@ -58,6 +58,9 @@ public:
   // --- 测试用（公开） ---
   void copy_package_files();
   void rollback_files(); ///< 包级文件回滚（含 RESTORE_* WAL 审计）
+  /// 获取备份列表（供批次成功后清理 .lpkg_bak）
+  const std::vector<std::pair<std::filesystem::path, std::filesystem::path>> &
+  get_backups() const { return backups_; }
 
   // 元数据验证调用者的访问器
   const std::vector<std::string> &deps() const { return deps_; }

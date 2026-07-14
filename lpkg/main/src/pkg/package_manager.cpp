@@ -190,6 +190,7 @@ void install_packages(const std::vector<std::string> &pkg_args,
   ctx.installed_set.clear();
 
   // 执行安装（WAL 2.0 批量事务）
+  std::vector<std::pair<fs::path, fs::path>> all_backups;
   run_batch_transaction(order.size(), [&](wal::WalWriter & /*batch_writer*/,
                                           std::vector<std::string> &success) {
     auto &cache = Cache::instance();
@@ -263,11 +264,21 @@ void install_packages(const std::vector<std::string> &pkg_args,
                             p.local_path, p.sha256, p.force_reinstall);
       task.run(&ctx);
 
+      // 收集 .lpkg_bak 路径供批次成功后统一清理（升级/重装时产生）
+      for (const auto &b : task.get_backups())
+        all_backups.emplace_back(b);
+
       cache.write(p.name + ":installed");
       success.push_back(p.name);
       ctx.installed_set.insert(p.name);
     }
   });
+
+  // 清理批次产生的 .lpkg_bak 文件
+  for (const auto &[orig, bak] : all_backups) {
+    std::error_code ec;
+    fs::remove(bak, ec);
+  }
 
   trim_completed();
   cleanup_db_backups();
@@ -714,6 +725,7 @@ void upgrade_packages() {
   }
 
   // 执行升级（WAL 2.0 批量事务）
+  std::vector<std::pair<fs::path, fs::path>> upgrade_backups;
   run_batch_transaction(plan.size(), [&](wal::WalWriter & /*w*/,
                                          std::vector<std::string> &success) {
     auto &cache = Cache::instance();
@@ -729,10 +741,18 @@ void upgrade_packages() {
                          false);
       t.run();
 
+      for (const auto &b : t.get_backups())
+        upgrade_backups.emplace_back(b);
+
       cache.write(e.name + ":installed");
       success.push_back(e.name);
     }
   });
+
+  for (const auto &[orig, bak] : upgrade_backups) {
+    std::error_code ec;
+    fs::remove(bak, ec);
+  }
 
   trim_completed();
   cleanup_db_backups();
@@ -960,12 +980,91 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
     return;
   }
 
-  for (const auto &p : to_remove) {
-    log_info(string_format("info.recursive_removing", p));
-    remove_package(p, true, false);
-  }
+  // WAL 2.0: 整批原子移除
+  run_batch_transaction(
+      to_remove.size(), [&](wal::WalWriter & /*w*/,
+                            std::vector<std::string> &success) {
+        auto &cache = Cache::instance();
+        cache.write(":batch-start");
 
-  Cache::instance().write("recursive-remove");
+        for (const auto &p : to_remove) {
+          log_info(string_format("info.recursive_removing", p));
+
+          std::string ver = cache.get_installed_version(p);
+          detail::run_hook(p, std::string(constants::PRERM_SH));
+          wal::log_wal_line("RM_BEGIN " + p + " " + ver);
+
+          auto owned = cache.get_package_files(p);
+          std::vector<std::pair<fs::path, fs::path>> backups;
+
+          for (const auto &e : owned) {
+            if (e.ends_with('/')) continue;
+            const fs::path phys =
+                fs::path(e).is_absolute()
+                    ? Config::instance().root_dir() / fs::path(e).relative_path()
+                    : Config::instance().root_dir() / e;
+            if (fs::exists(phys) || fs::is_symlink(phys)) {
+              fs::path bak = phys;
+              bak += std::string(constants::SUFFIX_LPKG_BAK) + p;
+              wal::log_wal_line("BACKUP " + phys.string() +
+                                " \xe2\x86\x92 " + bak.string());
+              fs::rename(phys, bak);
+              fsync_parent_dir(bak);
+              backups.emplace_back(phys, bak);
+            }
+          }
+
+          remove_package_files(p, true);
+
+          // 目录元数据
+          for (const auto &e : owned) {
+            if (!e.ends_with('/')) continue;
+            const fs::path phys =
+                fs::path(e).is_absolute()
+                    ? Config::instance().root_dir() / fs::path(e).relative_path()
+                    : Config::instance().root_dir() / e;
+            if (fs::exists(phys) && fs::is_directory(phys)) {
+              struct stat st;
+              if (stat(phys.c_str(), &st) == 0) {
+                char mb[16], ub[16], gb[16];
+                snprintf(mb, sizeof(mb), "%o", st.st_mode & 07777);
+                snprintf(ub, sizeof(ub), "%u", st.st_uid);
+                snprintf(gb, sizeof(gb), "%u", st.st_gid);
+                wal::log_wal_line("RM_DIR " + phys.string() + " " +
+                                  std::string(mb) + " " + std::string(ub) +
+                                  " " + std::string(gb));
+              }
+            }
+            cache.remove_file_owner(e, p);
+          }
+
+          wal::log_wal_line("RM_COMMIT " + p + " " + ver);
+          cache.remove_installed(p);
+
+          // 后提交清理
+          std::error_code ec;
+          for (const auto &[orig, bak] : backups)
+            fs::remove(bak, ec);
+          for (const auto &e : owned)
+            if (e.ends_with('/')) {
+              const fs::path phys =
+                  fs::path(e).is_absolute()
+                      ? Config::instance().root_dir() /
+                            fs::path(e).relative_path()
+                      : Config::instance().root_dir() / e;
+              if (fs::exists(phys) && fs::is_directory(phys)) {
+                if (fs::is_empty(phys, ec)) fs::remove(phys, ec);
+              }
+            }
+
+          wal::log_wal_line("RM_END " + p + " " + ver);
+          cache.write(p + ":removed");
+          success.push_back(p);
+        }
+      });
+
+  trim_completed();
+  cleanup_db_backups();
 
   log_info(get_string("info.recursive_remove_done"));
 }
