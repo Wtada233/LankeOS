@@ -133,6 +133,16 @@ static void rollback_installed_package(const std::string &pkg_name) {
   TransactionLog::log_raw("END " + pkg_name + " " + ver);
 }
 
+// 递归移除中延迟清理的 .lpkg_bak 文件（在批次提交后才实际删除）
+static std::vector<std::pair<fs::path, fs::path>> deferred_remove_baks;
+static void clean_deferred_remove_baks() {
+  for (const auto &[orig, bak] : deferred_remove_baks) {
+    std::error_code ec;
+    fs::remove(bak, ec);
+  }
+  deferred_remove_baks.clear();
+}
+
 // ── 从 WAL 恢复 force_overwrite 剥夺的所有权 ──────────────────────
 // force_overwrite 在 check_for_file_conflicts 中写 OWNER_OVERRIDE WAL 记录，
 // 记录被剥夺所有权的旧包名。批次回滚时，先恢复这些所有权，
@@ -625,212 +635,231 @@ void remove_package(const std::string &pkg_name, bool force, bool wrap_in_txn) {
 
   detail::run_hook(pkg_name, std::string(constants::PRERM_SH));
 
-  auto &cache = Cache::instance();
-  auto owned_entries = cache.get_package_files(pkg_name);
-
-  // ── 共享文件检查（修改文件前执行，防止备份后才发现冲突） ──────────
-  if (!force && !owned_entries.empty()) {
-    std::vector<std::pair<std::string, std::string>> shared;
-    for (const auto &entry : owned_entries) {
-      if (entry.ends_with('/'))
-        continue;
-      auto owners = cache.get_file_owners(entry);
-      std::string others;
-      for (const auto &owner : owners) {
-        if (owner != pkg_name) {
-          if (!others.empty())
-            others += ", ";
-          others += owner;
-        }
-      }
-      if (!others.empty())
-        shared.emplace_back(entry, others);
-    }
-    if (!shared.empty()) {
-      std::string msg = get_string("error.shared_file_header") + "\n";
-      for (const auto &[file, owners] : shared)
-        msg += "  " + string_format("error.shared_file_entry", file, owners) +
-               "\n";
-      throw LpkgException(msg + get_string("error.removal_aborted"));
-    }
-  }
-
-  // ── 备份阶段：将每个包文件 rename 到 .lpkg_bak（WAL 先写后操作） ───
+  // backups/ec 在 try 外部声明，Phase 7 也需访问
   std::vector<std::pair<fs::path, fs::path>> backups;
-  int file_count = 0;
-
-  if (!owned_entries.empty()) {
-    std::vector<fs::path> paths;
-    for (const auto &e : owned_entries)
-      paths.emplace_back(e);
-    std::ranges::sort(paths, std::greater<>{});
-
-    for (const auto &p : paths) {
-      std::string path_str = p.string();
-      if (path_str.ends_with('/'))
-        continue;
-      const fs::path phys = p.is_absolute() ? Config::instance().root_dir() /
-                                                  fs::path(p).relative_path()
-                                            : Config::instance().root_dir() / p;
-
-      // SIGINT 检查：逐文件检查，防止备份到一半被中断时留下不一致状态
-      if (sigint_graceful.load())
-        throw LpkgException(get_string("info.sigint_aborted"));
-
-      if (fs::exists(phys) || fs::is_symlink(phys)) {
-        fs::path bak = phys;
-        bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name;
-        // WAL 顺序：先写 BACKUP 日志，再 rename
-        TransactionLog::log_raw("BACKUP " + phys.string() + " → " +
-                                bak.string());
-        fs::rename(phys, bak);
-        backups.emplace_back(phys, bak);
-        ++file_count;
-
-        // 测试断点：每个文件备份时检查（模拟逐文件中断）
-        if (Config::instance().testing_mode())
-          testing::check_and_break(testing::break_during_rm_backup);
-      }
-    }
-  }
-
-  if (file_count > 0)
-    log_info(string_format("info.files_removed", file_count));
-
-  // 测试断点：备份完成后
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_after_rm_backup);
-
-  // SIGINT 检查：所有文件已备份到 .lpkg_bak，此时中断可完整恢复
-  if (sigint_graceful.load())
-    throw LpkgException(get_string("info.sigint_aborted"));
-
-  // ── 阶段 2：从磁盘移除文件（rm）→ 清 .bak（仅清理目录内的）→
-  // 删目录（RM_DIR） ──
-  remove_package_files(pkg_name, force);
-
-  // SIGINT 检查：文件已处理完成, .lpkg_bak 尚未清理，中断后仍可完整恢复
-  if (sigint_graceful.load())
-    throw LpkgException(get_string("info.sigint_aborted"));
-
-  // ── 阶段 3：释放目录所有权 → 删目录（含 .lpkg_bak 清扫） → WAL 记录
-  // ───────── 设计说明：
-  //   .lpkg_bak 备份文件的清理必须在 RM_COMMIT 之后（保证能回滚），
-  //   但 .lpkg_bak 若留在目标目录内会阻塞 fs::remove(dir)。
-  //   因此这里分两步：
-  //     (a) 目录删除前：只清理目标目录内属于本包的 .lpkg_bak（记录在 WAL）
-  //     (b) 目录删除后：在 RM_COMMIT 之后才清理全部 .lpkg_bak
-  //   这样既保证 RM_DIR 能成功，又保证回滚时非目录内的备份文件还在。
-  //
-  // 为什么需要 RM_BAK_CLN WAL 记录：
-  //   若 crash 在 RM_DIR 之后 / RM_COMMIT 之前，恢复时 BACKUP 条目
-  //   的 .bak 可能已被 (a) 清除。Recovery 看到 RM_BAK_CLN 就知道
-  //   该 .bak 是"为清空目录而提前删除的"，而不是"意外丢失"。
-  //   此时文件内容在 RM_DIR 重建的目录中不可恢复，但系统一致性保持。
   std::error_code ec;
 
-  // 3a：收集需释放的目录列表
-  std::vector<fs::path> dir_paths;
-  for (const auto &e : owned_entries)
-    if (e.ends_with('/'))
-      dir_paths.emplace_back(fs::path(e));
-  std::ranges::sort(dir_paths, std::greater<>{});
+  try {
 
-  // 测试断点：RM_DIR 前
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_before_rm_dir);
+    auto &cache = Cache::instance();
+    auto owned_entries = cache.get_package_files(pkg_name);
 
-  // 3b：为每个目录释放所有权 → 清扫 .lpkg_bak → 删除目录
-  int dir_count = 0;
-  for (const auto &p : dir_paths) {
-    cache.remove_file_owner(p.string(), pkg_name);
-    if (!cache.get_file_owners(p.string()).empty())
-      continue;
-
-    const fs::path phys =
-        p.is_absolute() ? Config::instance().root_dir() / p.relative_path()
-                        : Config::instance().root_dir() / p;
-    if (!fs::exists(phys) || !fs::is_directory(phys))
-      continue;
-
-    // 在尝试删除目录前，先清扫内部本包的 .lpkg_bak 文件
-    // （这些文件是阶段 1 的备份 rename 遗留在目录内的）
-    const std::string bak_suffix =
-        std::string(constants::SUFFIX_LPKG_BAK) + pkg_name;
-    for (auto &entry : fs::recursive_directory_iterator(phys, ec)) {
-      if (entry.path().filename().string().ends_with(bak_suffix)) {
-        TransactionLog::log_raw("RM_BAK_CLN " + entry.path().string());
-        fs::remove(entry.path(), ec);
+    // ── 共享文件检查（修改文件前执行，防止备份后才发现冲突） ──────────
+    if (!force && !owned_entries.empty()) {
+      std::vector<std::pair<std::string, std::string>> shared;
+      for (const auto &entry : owned_entries) {
+        if (entry.ends_with('/'))
+          continue;
+        auto owners = cache.get_file_owners(entry);
+        std::string others;
+        for (const auto &owner : owners) {
+          if (owner != pkg_name) {
+            if (!others.empty())
+              others += ", ";
+            others += owner;
+          }
+        }
+        if (!others.empty())
+          shared.emplace_back(entry, others);
+      }
+      if (!shared.empty()) {
+        std::string msg = get_string("error.shared_file_header") + "\n";
+        for (const auto &[file, owners] : shared)
+          msg += "  " + string_format("error.shared_file_entry", file, owners) +
+                 "\n";
+        throw LpkgException(msg + get_string("error.removal_aborted"));
       }
     }
 
-    std::error_code ec2;
-    fs::remove(phys, ec2);
-    if (!ec2) {
-      TransactionLog::log_raw("RM_DIR " + phys.string());
-      ++dir_count;
+    // ── 备份阶段：将每个包文件 rename 到 .lpkg_bak（WAL 先写后操作） ───
+    int file_count = 0;
+
+    if (!owned_entries.empty()) {
+      std::vector<fs::path> paths;
+      for (const auto &e : owned_entries)
+        paths.emplace_back(e);
+      std::ranges::sort(paths, std::greater<>{});
+
+      for (const auto &p : paths) {
+        std::string path_str = p.string();
+        if (path_str.ends_with('/'))
+          continue;
+        const fs::path phys =
+            p.is_absolute()
+                ? Config::instance().root_dir() / fs::path(p).relative_path()
+                : Config::instance().root_dir() / p;
+
+        // SIGINT 检查：逐文件检查，防止备份到一半被中断时留下不一致状态
+        if (sigint_graceful.load())
+          throw LpkgException(get_string("info.sigint_aborted"));
+
+        if (fs::exists(phys) || fs::is_symlink(phys)) {
+          fs::path bak = phys;
+          bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name;
+          // WAL 顺序：先写 BACKUP 日志，再 rename
+          TransactionLog::log_raw("BACKUP " + phys.string() + " → " +
+                                  bak.string());
+          fs::rename(phys, bak);
+          backups.emplace_back(phys, bak);
+          ++file_count;
+
+          // 测试断点：每个文件备份时检查（模拟逐文件中断）
+          if (Config::instance().testing_mode())
+            testing::check_and_break(testing::break_during_rm_backup);
+        }
+      }
     }
-  }
-  if (dir_count > 0)
-    log_info(string_format("info.dirs_removed", dir_count));
 
-  // 测试断点：RM_DIR 完成后
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_after_rm_dir);
+    if (file_count > 0)
+      log_info(string_format("info.files_removed", file_count));
 
-  // ── 阶段 4：清理依赖、文档和钩子文件 ─────────────────────────────
-  const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
-  if (fs::exists(dep_file)) {
-    std::ifstream f(dep_file);
-    std::string l;
-    while (std::getline(f, l)) {
-      std::stringstream ss(l);
-      std::string dn;
-      if (ss >> dn)
-        cache.remove_reverse_dep(dn, pkg_name);
+    // 测试断点：备份完成后
+    if (Config::instance().testing_mode())
+      testing::check_and_break(testing::break_after_rm_backup);
+
+    // SIGINT 检查：所有文件已备份到 .lpkg_bak，此时中断可完整恢复
+    if (sigint_graceful.load())
+      throw LpkgException(get_string("info.sigint_aborted"));
+
+    // ── 阶段 2：从磁盘移除文件（rm）→ 清 .bak（仅清理目录内的）→
+    // 删目录（RM_DIR） ──
+    remove_package_files(pkg_name, force);
+
+    // SIGINT 检查：文件已处理完成, .lpkg_bak 尚未清理，中断后仍可完整恢复
+    if (sigint_graceful.load())
+      throw LpkgException(get_string("info.sigint_aborted"));
+
+    // ── 阶段 3：释放目录所有权 → 删目录（含 .lpkg_bak 清扫） → WAL 记录
+    // ───────── 设计说明：
+    //   .lpkg_bak 备份文件的清理必须在 RM_COMMIT 之后（保证能回滚），
+    //   但 .lpkg_bak 若留在目标目录内会阻塞 fs::remove(dir)。
+    //   因此这里分两步：
+    //     (a) 目录删除前：只清理目标目录内属于本包的 .lpkg_bak（记录在 WAL）
+    //     (b) 目录删除后：在 RM_COMMIT 之后才清理全部 .lpkg_bak
+    //   这样既保证 RM_DIR 能成功，又保证回滚时非目录内的备份文件还在。
+    //
+    // 为什么需要 RM_BAK_CLN WAL 记录：
+    //   若 crash 在 RM_DIR 之后 / RM_COMMIT 之前，恢复时 BACKUP 条目
+    //   的 .bak 可能已被 (a) 清除。Recovery 看到 RM_BAK_CLN 就知道
+    //   该 .bak 是"为清空目录而提前删除的"，而不是"意外丢失"。
+    //   此时文件内容在 RM_DIR 重建的目录中不可恢复，但系统一致性保持。
+    std::error_code ec;
+
+    // 3a：收集需释放的目录列表
+    std::vector<fs::path> dir_paths;
+    for (const auto &e : owned_entries)
+      if (e.ends_with('/'))
+        dir_paths.emplace_back(fs::path(e));
+    std::ranges::sort(dir_paths, std::greater<>{});
+
+    // 测试断点：RM_DIR 前
+    if (Config::instance().testing_mode())
+      testing::check_and_break(testing::break_before_rm_dir);
+
+    // 3b：为每个目录释放所有权 → 清扫 .lpkg_bak → 删除目录
+    int dir_count = 0;
+    for (const auto &p : dir_paths) {
+      cache.remove_file_owner(p.string(), pkg_name);
+      if (!cache.get_file_owners(p.string()).empty())
+        continue;
+
+      const fs::path phys =
+          p.is_absolute() ? Config::instance().root_dir() / p.relative_path()
+                          : Config::instance().root_dir() / p;
+      if (!fs::exists(phys) || !fs::is_directory(phys))
+        continue;
+
+      // 在尝试删除目录前，先清扫内部本包的 .lpkg_bak 文件
+      // （这些文件是阶段 1 的备份 rename 遗留在目录内的）
+      const std::string bak_suffix =
+          std::string(constants::SUFFIX_LPKG_BAK) + pkg_name;
+      for (auto &entry : fs::recursive_directory_iterator(phys, ec)) {
+        if (entry.path().filename().string().ends_with(bak_suffix)) {
+          TransactionLog::log_raw("RM_BAK_CLN " + entry.path().string());
+          fs::remove(entry.path(), ec);
+        }
+      }
+
+      std::error_code ec2;
+      fs::remove(phys, ec2);
+      if (!ec2) {
+        TransactionLog::log_raw("RM_DIR " + phys.string());
+        ++dir_count;
+      }
     }
+    if (dir_count > 0)
+      log_info(string_format("info.dirs_removed", dir_count));
+
+    // 测试断点：RM_DIR 完成后
+    if (Config::instance().testing_mode())
+      testing::check_and_break(testing::break_after_rm_dir);
+
+    // ── 阶段 4：清理依赖、文档和钩子文件 ─────────────────────────────
+    const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
+    if (fs::exists(dep_file)) {
+      std::ifstream f(dep_file);
+      std::string l;
+      while (std::getline(f, l)) {
+        std::stringstream ss(l);
+        std::string dn;
+        if (ss >> dn)
+          cache.remove_reverse_dep(dn, pkg_name);
+      }
+    }
+    // 使用 WAL 保护的 DB 删除：rename 到 .lpkg_db_bak + DBRM 日志，
+    // 确保若事务未提交（crash 后 RM_COMMIT 未写），rec 能恢复这些文件。
+    // dep 和 needed_so 文件位于 state_dir 子目录中，cleanup_db_backups()
+    // 使用 recursive_directory_iterator 可清扫其 .lpkg_db_bak 残留。
+    Cache::instance().remove_db_file(dep_file, pkg_name);
+    Cache::instance().remove_db_file(
+        Config::instance().needed_so_dir() / pkg_name, pkg_name);
+    Cache::instance().remove_db_file(
+        Config::instance().docs_dir() /
+            (pkg_name + std::string(constants::SUFFIX_MAN)),
+        pkg_name);
+    fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
+    cache.remove_installed(pkg_name);
+
+    // 测试断点：RM DB 写入前
+    if (Config::instance().testing_mode())
+      testing::check_and_break(testing::break_before_rm_db_write);
+
+    // SIGINT 检查：DB 落盘前中断，.lpkg_db_bak 可回滚，.lpkg_bak 可恢复
+    if (sigint_graceful.load())
+      throw LpkgException(get_string("info.sigint_aborted"));
+
+    // ── 阶段 5：数据库落盘（WAL 保护）─ 必须在 RM_COMMIT 之前 ───────
+    Cache::instance().write(pkg_name);
+
+    // 测试断点：RM COMMIT 前
+    if (Config::instance().testing_mode())
+      testing::check_and_break(testing::break_before_rm_commit);
+
+    // SIGINT 检查：RM_COMMIT 前中断可确保 .lpkg_bak 全部存在，可完全恢复
+    if (sigint_graceful.load())
+      throw LpkgException(get_string("info.sigint_aborted"));
+
+    // ── 阶段 6：RM_COMMIT — 事务完成 ────────────────────────────────
+    TransactionLog::log_raw("RM_COMMIT " + pkg_name + " " + ver);
+
+  } catch (...) {
+    // 回滚：恢复 .lpkg_bak + .lpkg_db_bak（reverse_execute 处理全部操作类型）
+    // 然后写 COMMIT_PKGS 关闭批次。对后续 auto-recover 幂等。
+    recover_packages();
+    throw;
   }
-  // 使用 WAL 保护的 DB 删除：rename 到 .lpkg_db_bak + DBRM 日志，
-  // 确保若事务未提交（crash 后 RM_COMMIT 未写），rec 能恢复这些文件。
-  // dep 和 needed_so 文件位于 state_dir 子目录中，cleanup_db_backups()
-  // 使用 recursive_directory_iterator 可清扫其 .lpkg_db_bak 残留。
-  Cache::instance().remove_db_file(dep_file, pkg_name);
-  Cache::instance().remove_db_file(
-      Config::instance().needed_so_dir() / pkg_name, pkg_name);
-  Cache::instance().remove_db_file(
-      Config::instance().docs_dir() /
-          (pkg_name + std::string(constants::SUFFIX_MAN)),
-      pkg_name);
-  fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
-  cache.remove_installed(pkg_name);
-
-  // 测试断点：RM DB 写入前
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_before_rm_db_write);
-
-  // SIGINT 检查：DB 落盘前中断，.lpkg_db_bak 可回滚，.lpkg_bak 可恢复
-  if (sigint_graceful.load())
-    throw LpkgException(get_string("info.sigint_aborted"));
-
-  // ── 阶段 5：数据库落盘（WAL 保护）─ 必须在 RM_COMMIT 之前 ───────
-  Cache::instance().write(pkg_name);
-
-  // 测试断点：RM COMMIT 前
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_before_rm_commit);
-
-  // SIGINT 检查：RM_COMMIT 前中断可确保 .lpkg_bak 全部存在，可完全恢复
-  if (sigint_graceful.load())
-    throw LpkgException(get_string("info.sigint_aborted"));
-
-  // ── 阶段 6：RM_COMMIT — 事务完成 ────────────────────────────────
-  TransactionLog::log_raw("RM_COMMIT " + pkg_name + " " + ver);
 
   // ── 阶段 7：安全清理全部 .lpkg_bak（事务已提交，无需回滚） ────
   // 注意：阶段 3b 已清扫目录内的 .lpkg_bak（写入 RM_BAK_CLN），
   // 此处清扫剩余的（父目录未被删除的）。
-  for (const auto &[orig, bak] : backups) {
-    fs::remove(bak, ec);
+  // 当 wrap_in_txn=false（在递归移除内层）时，延迟删除以保证批次可回滚。
+  if (wrap_in_txn) {
+    for (const auto &[orig, bak] : backups) {
+      fs::remove(bak, ec);
+    }
+  } else {
+    deferred_remove_baks.insert(deferred_remove_baks.end(), backups.begin(),
+                                backups.end());
   }
 
   TransactionLog::log_raw("RM_END " + pkg_name + " " + ver);
@@ -1380,13 +1409,16 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
     }
   } catch (...) {
     // 立即回滚整个批次：恢复所有已移除包的文件和数据库状态
+    // reverse_execute 会消费 .lpkg_bak 文件（重命名回原位），清空延迟列表
     recover_packages();
+    deferred_remove_baks.clear();
     throw;
   }
 
-  // 统一外层事务提交
+  // 统一外层事务提交：批次成功，清理延迟的 .lpkg_bak
   Cache::instance().write("recursive-remove");
   TransactionLog::log_raw("COMMIT_PKGS");
+  clean_deferred_remove_baks();
   Cache::instance().cleanup_db_backups();
 
   log_info(get_string("info.recursive_remove_done"));

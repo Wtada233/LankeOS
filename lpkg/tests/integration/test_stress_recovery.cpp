@@ -598,3 +598,104 @@ TEST_F(StressRecoveryTest, RecursiveRemoveSigintFileConsistency) {
   EXPECT_TRUE(db_installed("pkgA"));
   EXPECT_TRUE(db_installed("pkgB"));
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// 架构约束回归测试
+//
+// 验证 I-ARCH-4（catch 回滚）、I-ARCH-5（rec 是 no-op）、
+// I-ARCH-8（DB 恢复）、幂等性
+// ═══════════════════════════════════════════════════════════════════════
+
+// S26: remove Ctrl+C → catch 回滚 → rec 是 no-op（I-ARCH-5）
+TEST_F(StressRecoveryTest, RecoverIsNoopAfterCatchRollback) {
+  Config::instance().set_testing_mode(false);
+  EXPECT_NO_THROW(install_packages({lib_pkg_path}));
+  Cache::instance().load();
+
+  // 用 sigint_graceful 模拟 Ctrl+C → catch 回滚
+  sigint_graceful.store(true);
+  EXPECT_ANY_THROW(remove_package("libbase", false));
+  sigint_graceful.store(false);
+
+  // catch 已调用 recover_packages() → 包应恢复
+  Cache::instance().load();
+  ASSERT_TRUE(db_installed("libbase"));
+
+  // 再次运行 rec → 不应改变任何状态
+  recover_packages();
+  Cache::instance().load();
+  EXPECT_TRUE(db_installed("libbase")) << "second rec must not remove package";
+  EXPECT_TRUE(file_exists("usr/bin/libbase")) << "second rec must not delete file";
+}
+
+// S27: remove Ctrl+C → DB 和文件一致（I-ARCH-8）
+TEST_F(StressRecoveryTest, CatchRollbackRestoresDbAndFiles) {
+  Config::instance().set_testing_mode(false);
+  Config::instance().set_force_overwrite_mode(true);
+  EXPECT_NO_THROW(install_packages({lib_pkg_path}));
+  EXPECT_NO_THROW(install_packages({tool_pkg_path}));
+  Config::instance().set_force_overwrite_mode(false);
+  Cache::instance().load();
+
+  // 用 break_before_rm_commit 在 DB 落盘后、RM_COMMIT 前中断
+  // → catch 应恢复 DB（.lpkg_db_bak）和文件（.lpkg_bak）
+  Config::instance().set_testing_mode(true);
+  testing::break_before_rm_commit.store(true);
+  EXPECT_ANY_THROW(remove_package("tool", false));
+  testing::break_before_rm_commit.store(false);
+  Config::instance().set_testing_mode(false);
+  sigint_graceful.store(false);
+
+  // DB 恢复：tool 应再次出现在已安装列表中
+  //（rollback_installed_package 等价路径由 recover_packages 触发）
+  Cache::instance().load();
+  EXPECT_TRUE(db_installed("tool"))
+      << "tool should be restored in DB after catch rollback";
+  EXPECT_TRUE(db_installed("libbase"))
+      << "libbase should remain installed";
+  // 文件恢复
+  EXPECT_TRUE(file_exists("usr/bin/tool"))
+      << "tool's file should be restored from .lpkg_bak";
+}
+
+// S28: catch 回滚幂等（重复调用不破坏状态）
+TEST_F(StressRecoveryTest, CatchRollbackIdempotent) {
+  Config::instance().set_testing_mode(false);
+  EXPECT_NO_THROW(install_packages({lib_pkg_path}));
+  Cache::instance().load();
+
+  // 第一次 SIGINT → catch 回滚
+  sigint_graceful.store(true);
+  EXPECT_ANY_THROW(remove_package("libbase", false));
+  sigint_graceful.store(false);
+
+  // 第二次相同操作 → 应从干净 WAL 开始，包已安装，又被回滚
+  sigint_graceful.store(true);
+  EXPECT_ANY_THROW(remove_package("libbase", false));
+  sigint_graceful.store(false);
+
+  Cache::instance().load();
+  EXPECT_TRUE(db_installed("libbase"))
+      << "idempotent: libbase should still be installed after double rollback";
+  EXPECT_TRUE(file_exists("usr/bin/libbase"))
+      << "idempotent: libbase's file should still exist";
+}
+
+// S29: remove 正常完成（无中断）→ 包已移除，rec 无操作
+TEST_F(StressRecoveryTest, RemoveSuccessThenRecIsNoop) {
+  Config::instance().set_testing_mode(false);
+  Config::instance().set_force_overwrite_mode(true);
+  EXPECT_NO_THROW(install_packages({lib_pkg_path}));
+  Config::instance().set_force_overwrite_mode(false);
+  Cache::instance().load();
+
+  // 正常移除（无中断）
+  remove_package("libbase", false);
+  Cache::instance().load();
+  EXPECT_FALSE(db_installed("libbase"));
+
+  // rec 不应恢复已移除的包
+  recover_packages();
+  Cache::instance().load();
+  EXPECT_FALSE(db_installed("libbase")) << "rec must not resurrect removed package";
+}
