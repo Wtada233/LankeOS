@@ -1,7 +1,6 @@
 #include "archive.hpp"
 #include "base/constants.hpp"
 #include "base/exception.hpp"
-#include "base/testing_breakpoints.hpp"
 #include "base/utils.hpp"
 #include "config/config.hpp"
 #include "crypto/hash.hpp"
@@ -9,10 +8,8 @@
 #include "downloader.hpp"
 #include "i18n/localization.hpp"
 #include "install_common.hpp"
-#include "transaction_log.hpp"
 #include "trigger/trigger.hpp"
 #include "vercmp/version.hpp"
-#include "wal_op.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -47,12 +44,11 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version,
       force_reinstall_(force_reinstall) {}
 
 /**
- * 执行原子化安装流程：
- *   预检 → 备份 → 复制 → 注册（最后一步）→ 清理备份
+ * 执行安装流程：
+ *   预检 → 备份 → 复制 → 注册 → 清理备份
  *
- * 事务保证：复制中任意文件失败 → 全量回滚到安装前状态。
- * 冲突保证：不加 --force-overwrite 不覆盖任何已存在文件（不论是否被包管理）。
- * 回滚保证：回滚恢复所有 .lpkgbak 备份 + 删除本次新建的文件。
+ * 注意：本版本不提供原子事务保护。安装失败时，已复制的文件可能残留。
+ * 原子事务和回滚将在新的 WAL 2.0 架构中重新实现。
  */
 void InstallationTask::run(InstallContext *ctx) {
   const std::string current_installed_version =
@@ -69,45 +65,19 @@ void InstallationTask::run(InstallContext *ctx) {
   // 第一阶段：预检——不碰文件，只做检查
   prepare(ctx);
 
-  // 测试断点：提取完成后、备份开始前
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_before_backup);
+  // 第二阶段：备份 + 复制
+  backup_existing_files();
+  copy_package_files();
 
-  // 第二阶段：备份 + 复制——任一失败则全量回滚
-  TransactionLog log;
-  log.begin(pkg_name_, actual_version_);
-  try {
-    backup_existing_files();
-
-    // 测试断点：备份完成后、复制开始前
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_after_backup);
-
-    copy_package_files();
-  } catch (...) {
-    log.rollback(pkg_name_, actual_version_);
-    rollback();
-    log.end(pkg_name_, actual_version_);
-    throw;
-  }
-
-  // 测试断点：文件复制完成后、提交前
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_before_commit);
-
-  // 第四阶段：注册——数据库修改是最后一步
-  // Cache::write()（磁盘落盘）由外层 install_packages() 统一完成，
-  // 以保证失败时全部回滚，而非部分包持久化。
+  // 第三阶段：注册——数据库修改
   commit_without_file_ops();
-  log.commit(pkg_name_, actual_version_);
 
   // 测试断点：已提交
   if (Config::instance().testing_mode())
     testing::check_and_break(testing::break_after_commit);
 
-  // 清理备份
+  // 清理备份文件
   cleanup_backups();
-  log.end(pkg_name_, actual_version_);
 
   log_info(string_format("info.package_installed_successfully", pkg_name_));
 }
@@ -137,7 +107,7 @@ void InstallationTask::commit_without_file_ops() {
 
   register_package();
 
-  // 移除新版本中不再包含的旧文件（但不处理 /etc 下的配置文件）
+  // 移除新版本中不再包含的旧文件
   if (!old_files.empty()) {
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
     auto new_files = detail::scan_content_files(content_dir);
@@ -172,13 +142,9 @@ void InstallationTask::commit_without_file_ops() {
                 }
                 continue;
               }
-              // ★ WAL 保护：REMOVE_OLD 明确记录"旧版本废弃文件被移除"
-              //   与 BACKUP（覆盖前临时备份）语义分离，确保 lpkg rec 能恢复
               log_info(string_format("info.removing_obsolete_file", old_file));
               fs::path bak = phys;
               bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
-              TransactionLog::log_raw("REMOVE_OLD " + phys.string() + " → " +
-                                      bak.string());
               fs::rename(phys, bak);
               fsync_parent_dir(bak);
               backups_.emplace_back(phys, bak);
@@ -198,7 +164,6 @@ void InstallationTask::backup_existing_files() {
   auto files = detail::scan_content_files(content_dir);
 
   for (const auto &f : files) {
-    // SIGINT 时立即中止，避免备份后 rollback 恢复
     extern std::atomic<bool> sigint_graceful;
     if (sigint_graceful.load())
       throw LpkgException(get_string("info.sigint_aborted"));
@@ -209,25 +174,18 @@ void InstallationTask::backup_existing_files() {
     const fs::path physical_path = Config::instance().root_dir() / rel_f;
     const fs::path phys_dir = physical_path.parent_path();
 
-    // 配置文件跳过备份（复制阶段使用 .lpkg-new 后缀处理）
     const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
     if (is_config)
       continue;
 
     std::error_code ec;
     if (f.ends_with('/')) {
-      // 目录条目：先检查存在性再确保父目录存在
       bool is_new_dir = !fs::exists(physical_path);
       if (is_new_dir) {
         new_dirs_.push_back(physical_path);
-        TransactionLog::log_raw("NEW_DIR " + physical_path.string());
       }
       fs::create_directories(phys_dir, ec);
-      // 若是新目录，从包源读取权限并立即设置
-      // 确保即使在 backup 后 copy 前回滚，目录也被创建为正确的权限，
-      // 从而在 rollback::new_dirs_ 清理时不留异常权限的残留。
       if (is_new_dir) {
-        // 创建目录本身（phys_dir 只是父目录）
         fs::create_directories(physical_path, ec);
         std::string dir_rel = f;
         if (dir_rel.ends_with('/'))
@@ -242,95 +200,26 @@ void InstallationTask::backup_existing_files() {
       continue;
     }
 
-    // 文件条目：确保父目录存在后检查/备份/记录
     fs::create_directories(phys_dir, ec);
     if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
       if (!fs::is_directory(physical_path)) {
         fs::path bak = physical_path;
         bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
-        TransactionLog::log_raw("BACKUP " + physical_path.string() + " → " +
-                                bak.string());
         fs::rename(physical_path, bak);
         fsync_parent_dir(bak);
         backups_.emplace_back(physical_path, bak);
       }
     } else {
       new_files_.push_back(physical_path);
-      TransactionLog::log_raw("NEW " + physical_path.string());
     }
   }
 }
 
-/** 全量回滚：恢复备份 + 删除新文件 + 清理临时文件 */
-void InstallationTask::rollback() {
-  log_error(string_format("error.rollback_install", pkg_name_));
-
-  // 清理可能残留的 .lpkgtmp 临时文件（来自原子写入）
-  std::error_code ec_tmp;
-  for (auto &entry : fs::recursive_directory_iterator(
-           Config::instance().root_dir() / "usr", ec_tmp)) {
-    if (entry.path().extension() == ".lpkgtmp")
-      fs::remove(entry.path(), ec_tmp);
-  }
-
-  // 从内存向量构建 WALOp 列表，交由共享的 reverse_execute() 统一执行。
-  // 构建顺序很重要（reverse_execute 反向处理）：
-  //   NEW_DIR 最先构建（反向时最后处理，确保文件已从目录中清除）
-  //   BACKUP 中间构建（反向时中间恢复）
-  //   NEW 最后构建（反向时最先处理，确保目录在新文件被删后检查）
-  std::vector<wal::WALOp> ops;
-
-  // new_dirs_ → NEW_DIR，放在最前（反向时最后执行）
-  for (const auto &d : new_dirs_)
-    ops.push_back({"NEW_DIR", d.string(), ""});
-
-  // backups_ → BACKUP，反向时中间处理：rename .bak → 原位
-  for (const auto &[original, backup] : backups_)
-    ops.push_back({"BACKUP", original.string(), backup.string()});
-
-  // new_files_ → NEW，放在最后（反向时最先执行：先删新文件）
-  for (const auto &f : new_files_)
-    ops.push_back({"NEW", f.string(), ""});
-
-  auto [restored, cleaned] =
-      wal::reverse_execute(ops, Config::instance().root_dir());
-  if (restored > 0 || cleaned > 0) {
-    log_info(string_format("info.recover_done", restored, cleaned));
-  }
-
-  backups_.clear();
-  new_files_.clear();
-  new_dirs_.clear();
-}
-
-// 静态成员定义
-std::vector<std::pair<fs::path, fs::path>> InstallationTask::deferred_cleanups_;
-
-void InstallationTask::process_deferred_cleanups() {
-  for (const auto &[orig, bak] : deferred_cleanups_) {
+/** 清理备份文件 */
+void InstallationTask::cleanup_backups() {
+  for (const auto &[orig, bak] : backups_) {
     std::error_code ec;
     fs::remove(bak, ec);
-  }
-  deferred_cleanups_.clear();
-}
-
-void InstallationTask::discard_deferred_cleanups() {
-  deferred_cleanups_.clear();
-}
-
-/** 清理备份文件 — 批次模式下延迟删除，独立模式下立即删除 */
-void InstallationTask::cleanup_backups() {
-  if (batch_mode_) {
-    // 批次模式：延迟到 COMMIT_PKGS 后由 process_deferred_cleanups() 统一删除。
-    // 这样确保批次中任一新包失败时，前序包的 .lpkg_bak 仍可用于回滚恢复旧文件。
-    deferred_cleanups_.insert(deferred_cleanups_.end(), backups_.begin(),
-                              backups_.end());
-  } else {
-    // 独立模式（如测试中直接调用 run_simple）：立即删除
-    for (const auto &[orig, bak] : backups_) {
-      std::error_code ec;
-      fs::remove(bak, ec);
-    }
   }
   backups_.clear();
   new_files_.clear();
@@ -359,7 +248,6 @@ void InstallationTask::download_and_verify_package() {
   const std::string mirror_url = Config::instance().get_mirror_url();
   const std::string arch = Config::instance().get_architecture();
 
-  // 未指定版本时从仓库索引获取最新版本和哈希
   if (actual_version_.empty() || actual_version_ == constants::VER_LATEST) {
     Repository repo;
     repo.load_index();
@@ -386,8 +274,7 @@ void InstallationTask::download_and_verify_package() {
     throw LpkgException(string_format("error.hash_mismatch", pkg_name_));
 }
 
-/** 解压包文件到临时目录，验证包结构完整性（metadata + content
- * 目录），读取元数据 */
+/** 解压包文件到临时目录，验证包结构完整性 */
 void InstallationTask::extract_and_validate_package() {
   log_info(get_string("info.extracting_to_tmp"));
   extract_tar_zst(archive_path_, tmp_pkg_dir_);
@@ -408,11 +295,6 @@ void InstallationTask::extract_and_validate_package() {
   }
 }
 
-/**
- * 确保包的所有依赖已满足
- * 对缺失的依赖进行递归解析，检查本地已安装包和仓库中的包
- * 支持通过 providers 查找虚拟包提供者
- */
 void InstallationTask::ensure_dependencies_satisfied(InstallContext &ctx) {
   if (Config::instance().no_deps_mode())
     return;
@@ -450,7 +332,6 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext &ctx) {
     std::set<std::string> vs;
     detail::resolve_package_dependencies(dep_name, req_ver, false, ctx, vs);
 
-    // 检查虚拟包提供者和 targets 中的候选包
     if (!ctx.plan.contains(dep_name)) {
       auto providers = Cache::instance().get_providers(dep_name);
       if (!providers.empty())
@@ -516,14 +397,10 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext &ctx) {
     }
   }
 
-  // --- needed_so 完整性校验 ---
-  // 每个声明的 SONAME 必须在 plan / 已安装缓存 / repo 中有提供者，
-  // 否则是"唯一真相"断裂。采用版本级校验顺序避免包级缺口。
   if (!needed_so_.empty()) {
     for (const auto &soname : needed_so_) {
       bool provided = false;
 
-      // 1) 检查当前 plan 中是否有包提供此 SONAME（版本精准）
       for (const auto &[pn, plan_pkg] : ctx.plan) {
         for (const auto &prov : plan_pkg.provides) {
           if (prov == soname) {
@@ -535,7 +412,6 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext &ctx) {
           break;
       }
 
-      // 2) 检查已安装包缓存
       if (!provided) {
         auto providers = Cache::instance().get_providers(soname);
         for (const auto &p : providers) {
@@ -548,7 +424,6 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext &ctx) {
         }
       }
 
-      // 3) 检查 repo index——验证返回的版本确实提供此 SONAME
       if (!provided) {
         if (auto prov_pkg = ctx.repo.find_provider(soname)) {
           for (const auto &prov : prov_pkg->provides) {
@@ -569,11 +444,6 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext &ctx) {
   }
 }
 
-/**
- * 检查包文件与已安装文件的冲突
- * 检测未被任何包管理的文件（第三方手动安装）以及被其他包占用的文件
- * 配置文件冲突会在复制阶段使用 .lpkg-new 后缀处理
- */
 void InstallationTask::check_for_file_conflicts() {
   std::map<std::string, std::string> conflicts;
   const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
@@ -587,36 +457,27 @@ void InstallationTask::check_for_file_conflicts() {
     const fs::path logical_path = fs::path("/") / rel_f;
     const std::string path_str = logical_path.string();
 
-    // 目录条目（末尾 /）支持多包共同持有，不视为冲突
     if (path_str.ends_with('/'))
       continue;
 
-    // /etc 下的文件在复制阶段用 .lpkgnew 处理，不视为冲突
     if (f.starts_with(std::string(constants::DIR_ETC)))
       continue;
 
-    // 快速路径：文件已完全属于当前包 → 无冲突，跳过全量集合拷贝
     if (cache.is_file_owned_by(path_str, pkg_name_))
       continue;
 
-    // 检查是否被其他包占用
     auto owners = cache.get_file_owners(path_str);
     if (!owners.empty()) {
       if (!Config::instance().force_overwrite_mode()) {
-        // 正常模式：报告冲突
         conflicts[path_str] = *owners.begin();
       } else {
-        // --force-overwrite：剥夺旧包所有权，但先写 OWNER_OVERRIDE WAL。
-        // 这样批次回滚时能通过 WAL 恢复旧所有权，确保 get_package_files 正确。
         for (const auto &owner : owners) {
-          TransactionLog::log_raw("OWNER_OVERRIDE " + path_str + " " + owner);
           cache.remove_file_owner(path_str, owner);
         }
       }
       continue;
     }
 
-    // 文件未被任何包管理，检查是否为磁盘上已存在的第三方手动安装文件
     if (old_version_to_replace_.empty()) {
       const fs::path phys = Config::instance().root_dir() / rel_f;
       if ((fs::exists(phys) || fs::is_symlink(phys)) &&
@@ -635,26 +496,18 @@ void InstallationTask::check_for_file_conflicts() {
   }
 }
 
-/**
- * 将包文件复制到系统根目录
- * 处理配置文件冲突（使用 .lpkg-new 后缀）、替换已存在文件时创建备份、
- * 保留文件权限和所有者信息
- */
 void InstallationTask::copy_package_files() {
   log_info(get_string("info.copying_files"));
   const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
   auto files = detail::scan_content_files(content_dir);
 
   for (const auto &f : files) {
-    // 测试钩子：在复制前调用（用于精确触发中断场景）
     if (on_before_file_copy)
       on_before_file_copy();
 
-    // 测试断点：每个文件复制前检查（用于细粒度控制）
     if (Config::instance().testing_mode())
       testing::check_and_break(testing::break_during_file_copy);
 
-    // SIGINT 时立即中止复制，避免文件处于不一致状态
     extern std::atomic<bool> sigint_graceful;
     if (sigint_graceful.load())
       throw LpkgException(get_string("info.sigint_aborted"));
@@ -668,7 +521,6 @@ void InstallationTask::copy_package_files() {
     if (!fs::exists(src_path) && !fs::is_symlink(src_path))
       continue;
 
-    // 递归创建父目录
     fs::path parent = physical_path.parent_path();
     std::vector<fs::path> to_create;
     while (!parent.empty() && !fs::exists(parent)) {
@@ -682,11 +534,9 @@ void InstallationTask::copy_package_files() {
     }
 
     if (fs::is_symlink(src_path)) {
-      // 符号链接（包括指向目录的）必须在此处理，不能走目录或普通文件分支
       fs::path link_target = fs::read_symlink(src_path);
       fs::path dest = physical_path;
 
-      // 配置文件冲突：保留原文件，将符号链接安装到 .lpkgnew
       const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
       if (is_config && fs::exists(physical_path) &&
           !fs::is_directory(physical_path)) {
@@ -734,7 +584,6 @@ void InstallationTask::copy_package_files() {
       const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
       fs::path final_dest = physical_path;
 
-      // 配置文件冲突：使用 .lpkg-new 后缀
       if (is_config && fs::exists(physical_path) &&
           !fs::is_directory(physical_path)) {
         final_dest += std::string(constants::SUFFIX_LPKG_NEW);
@@ -743,21 +592,16 @@ void InstallationTask::copy_package_files() {
         log_warning(string_format("warning.config_conflict",
                                   physical_path.string(), final_dest.string()));
         has_config_conflicts_ = true;
-        // 配置文件的 .lpkg-new 不需要原子写入，因为不会覆盖现有文件
         fs::copy(src_path, final_dest,
                  fs::copy_options::recursive |
                      fs::copy_options::overwrite_existing);
       } else {
-        // 原子写入：先复制到临时路径，再 rename 到最终位置
-        // rename 在同文件系统内是原子的，避免出现中间态文件
-        // WAL 顺序：先写 COPY 日志（确保崩溃后可恢复），再 rename
         fs::path tmp_path = final_dest;
         tmp_path += ".lpkgtmp";
         fs::copy(src_path, tmp_path,
                  fs::copy_options::recursive |
                      fs::copy_options::overwrite_existing);
 
-        // 保留原始文件权限和所有者（在 tmp 文件上操作）
         struct stat st;
         if (lstat(src_path.c_str(), &st) == 0) {
           (void)lchown(tmp_path.c_str(), st.st_uid, st.st_gid);
@@ -765,8 +609,6 @@ void InstallationTask::copy_package_files() {
             (void)chmod(tmp_path.c_str(), st.st_mode & 07777);
           }
         }
-        TransactionLog::log_raw("COPY " + tmp_path.string() + " → " +
-                                final_dest.string());
         fs::rename(tmp_path, final_dest);
         fsync_parent_dir(final_dest);
       }
@@ -782,15 +624,9 @@ void InstallationTask::copy_package_files() {
     log_warning(get_string("info.config_review_reminder"));
 }
 
-/**
- * 在包管理数据库中注册已安装的包
- * 记录包文件与所有者的映射、依赖关系、provides、man 页面和版本信息
- * 处理包升级时的旧数据清理（移除旧的逆向依赖和 provides）
- */
 void InstallationTask::register_package() {
   auto &cache = Cache::instance();
 
-  // 升级时清理旧的逆向依赖和 provides 记录
   if (!old_version_to_replace_.empty()) {
     const fs::path old_dep_file = Config::instance().dep_dir() / pkg_name_;
     if (fs::exists(old_dep_file)) {
@@ -808,15 +644,9 @@ void InstallationTask::register_package() {
     for (const auto &cap : cache.get_package_provides(pkg_name_)) {
       cache.remove_provider(cap, pkg_name_);
     }
-    // 清理旧的 needed_so 文件（升级后重新写入）
     fs::remove(Config::instance().needed_so_dir() / pkg_name_);
   }
 
-  // 写 deps（包名级别的依赖）— 合并两个来源：
-  // 1. metadata.json 中的 deps 字段（显式声明的包依赖）
-  // 2. needed_so 解析得到的提供者包（SONAME→提供者包映射）
-  //
-  // 这样 autoremove / remove 的逆向依赖检查能同时覆盖两类依赖。
   std::unordered_set<std::string> dep_entries;
   for (const auto &d : deps_) {
     dep_entries.insert(d);
@@ -826,7 +656,6 @@ void InstallationTask::register_package() {
     cache.add_reverse_dep(name, pkg_name_);
   }
 
-  // 将 needed_so 也写入 deps 文件（解析 SONAME→包名后合并入同一个系统）
   for (const auto &soname : needed_so_) {
     auto providers = cache.get_providers(soname);
     for (const auto &prov_pkg : providers) {
@@ -837,7 +666,6 @@ void InstallationTask::register_package() {
     }
   }
 
-  // 从 set 写出（已去重），排序以保证每次生成的文件顺序一致
   std::vector<std::string> sorted_deps(dep_entries.begin(), dep_entries.end());
   std::sort(sorted_deps.begin(), sorted_deps.end());
   std::ofstream deps_out(Config::instance().dep_dir() / pkg_name_);
@@ -845,7 +673,6 @@ void InstallationTask::register_package() {
     deps_out << entry << constants::NL;
   }
 
-  // 写 needed_so 原始 SONAME 列表（保留原始真相供审计和重校验）
   std::ofstream nso_out(Config::instance().needed_so_dir() / pkg_name_);
   for (const auto &sn : needed_so_) {
     nso_out << sn << constants::NL;
@@ -872,8 +699,6 @@ void InstallationTask::register_package() {
   cache.add_installed(pkg_name_, actual_version_, explicit_install_);
 }
 
-/** 复制包的 hooks 目录到系统 hooks 目录，赋予执行权限，然后运行 post-install
- * 钩子 */
 void InstallationTask::run_post_install_hook() {
   const fs::path hook_src = tmp_pkg_dir_ / constants::DIR_HOOKS;
   if (!fs::exists(hook_src) || !fs::is_directory(hook_src))

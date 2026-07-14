@@ -22,9 +22,9 @@ public:
 
   /** 从磁盘加载所有缓存数据 */
   void load();
-  /** 将所有脏数据写入磁盘（无 WAL 保护，兼容非事务场景） */
+  /** 将所有脏数据写入磁盘 */
   void write();
-  /** 将所有脏数据写入磁盘，带 WAL 保护（wal_tag 如包名） */
+  /** 将所有脏数据写入磁盘（兼容旧接口，wal_tag 已无意义） */
   void write(const std::string &wal_tag);
 
   // ===== 包状态查询 =====
@@ -50,7 +50,7 @@ public:
   void remove_file_owner(std::string_view path, std::string_view pkg);
   /** 查询文件归属的包集合 */
   std::unordered_set<std::string> get_file_owners(std::string_view path);
-  /** 检查某文件是否由指定包所有（避免全量集合拷贝） */
+  /** 检查某文件是否由指定包所有 */
   bool is_file_owned_by(std::string_view path, std::string_view pkg);
 
   /** 添加 provider（能力名称 -> 包名） */
@@ -59,7 +59,7 @@ public:
   void remove_provider(std::string_view capability, std::string_view pkg);
   /** 查询提供某能力的包集合 */
   std::unordered_set<std::string> get_providers(std::string_view capability);
-  /** 检查某能力是否由指定包提供（避免全量集合拷贝） */
+  /** 检查某能力是否由指定包提供 */
   bool is_provided_by(std::string_view capability, std::string_view pkg);
 
   /** 添加反向依赖记录 */
@@ -92,12 +92,8 @@ public:
   /** 获取所有锁定包名集合 */
   const std::unordered_set<std::string> &get_all_held() { return holdpkgs; }
 
-  /** 清理 state 目录下残留的 .lpkg_db_bak 文件（事务提交后调用） */
+  /** 清理 state 目录下残留的 .lpkg_db_bak 文件 */
   void cleanup_db_backups();
-
-  /** 删除 DB 文件并用 WAL 保护：备份到 .lpkg_db_bak_<tag> 后记录 DBRM */
-  void remove_db_file(const std::filesystem::path &path,
-                      const std::string &wal_tag);
 
 private:
   Cache();
@@ -125,23 +121,21 @@ private:
   std::map<std::string, std::unordered_set<std::string>, std::less<>>
   read_db_uncached(const std::filesystem::path &path);
 
-  /** 写入已安装包列表（始终 WAL 保护） */
-  void write_pkgs(const std::string &wal_tag);
-  /** 写入锁定包列表（始终 WAL 保护） */
-  void write_holdpkgs(const std::string &wal_tag);
-  /** 写入文件归属数据库（始终 WAL 保护） */
-  void write_file_db(const std::string &wal_tag);
-  /** 写入 providers 数据库（始终 WAL 保护） */
-  void write_providers(const std::string &wal_tag);
+  /** 直接写入已安装包列表 */
+  void write_pkgs();
+  /** 直接写入锁定包列表 */
+  void write_holdpkgs();
+  /** 直接写入文件归属数据库 */
+  void write_file_db();
+  /** 直接写入 providers 数据库 */
+  void write_providers();
 
-  /** WAL 保护的 DB 文件写入：备份 → write+fsync → rename，记录 DB/DBNEW 日志 */
-  void write_db_file(
+  /** 直接写入 DB 文件（.tmp + fsync + rename） */
+  void write_db_file_direct(
       const std::filesystem::path &path,
       const std::map<std::string, std::unordered_set<std::string>, std::less<>>
-          &db,
-      const std::string &wal_tag);
-  /** WAL 保护的 set 文件写入（pkgs/holdpkgs），同上 */
-  void write_set_file(const std::filesystem::path &path,
-                      const std::unordered_set<std::string> &data,
-                      const std::string &wal_tag);
+          &db);
+  /** 直接写入 set 文件（.tmp + fsync + rename） */
+  void write_set_file_direct(const std::filesystem::path &path,
+                             const std::unordered_set<std::string> &data);
 };
