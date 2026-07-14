@@ -92,10 +92,6 @@ public:
   /** 获取所有锁定包名集合 */
   const std::unordered_set<std::string> &get_all_held() { return holdpkgs; }
 
-  /** 清理 state 目录下残留的 .lpkg_db_bak 文件 */
-  void cleanup_db_backups();
-
-private:
   Cache();
 
   // 文件归属数据库（路径 -> 包名集合）

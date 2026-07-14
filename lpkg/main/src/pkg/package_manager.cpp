@@ -476,7 +476,6 @@ void remove_package(const std::string &pkg_name, bool force, bool) {
     fs::remove(bak, ec);
   }
 
-  Cache::instance().cleanup_db_backups();
 
 
   log_info(string_format("info.package_removed_successfully", pkg_name));
@@ -699,7 +698,6 @@ void upgrade_packages() {
 
 
   log_info(string_format("info.upgraded_packages", plan.size()));
-  Cache::instance().cleanup_db_backups();
 }
 
 /** 显示包的 man 页面内容 */
@@ -930,7 +928,6 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
   }
 
   Cache::instance().write("recursive-remove");
-  Cache::instance().cleanup_db_backups();
 
   log_info(get_string("info.recursive_remove_done"));
 }
