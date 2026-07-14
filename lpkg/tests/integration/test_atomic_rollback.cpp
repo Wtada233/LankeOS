@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sys/stat.h>
+#include "../../main/src/base/testing_breakpoints.hpp"
 
 namespace fs = std::filesystem;
 
@@ -825,4 +826,384 @@ TEST_F(AtomicRollbackTest, AutoRecoverPartialWriteLogLine) {
       EXPECT_EQ(content, "partial data"); }
 
     EXPECT_TRUE(TransactionLog::check_pending().empty());
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 批量回滚测试（batch rollback atomicity）
+//
+// 验证批次事务中后继包失败时，所有前序成功包被完整回滚：
+//   - 旧文件从 .lpkg_bak 恢复（关键修复：cleanup_backups 延迟删除）
+//   - 新文件被正确删除
+//   - 全部包而非仅部分包被回滚
+//   - .lpkg_bak 在成功批次提交后才被清理，无泄漏
+// ══════════════════════════════════════════════════════════════════════
+
+// ── 35. 批次 [A, B] 中 B 失败 → A 覆盖的旧文件从 .bak 恢复 ──
+TEST_F(AtomicRollbackTest, BatchRollbackRestoresOldFiles) {
+    // 1) 安装 base-pkg，拥有 /usr/lib/libbase.so.1
+    make_pkg("base-pkg", "1.0", {"usr/lib/libbase.so.1"});
+    fs::path mirror = setup_local_mirror();
+    add_to_mirror("base-pkg", "1.0");
+    { std::ofstream idx(mirror / "index.txt"); idx << "base-pkg|1.0:::|\n"; }
+
+    // base-pkg 正常安装（无文件冲突）
+    install_packages({"base-pkg:1.0"});
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("base-pkg"));
+
+    // 2) 构造 pkgA（覆盖 base 文件）和 pkgB（损坏的归档）
+    fs::remove_all(mirror);  // 清空镜像镜像文件但保留 mirror.conf 指向
+
+    // pkgA：包含相同的 libbase.so.1
+    { auto pw = suite_work_dir / "_pkgA";
+      fs::create_directories(pw / "content" / "usr/lib");
+      { std::ofstream f(pw / "content/usr/lib/libbase.so.1"); f << "pkgA version"; }
+      pack_package((pkg_dir / "pkgA-1.0.lpkg").string(),
+                   pw.string(), "pkgA", "1.0", {}, {}, ""); }
+
+    // pkgB：损坏的归档（非有效 tar.zst）
+    { std::ofstream f(pkg_dir / "pkgB-1.0.lpkg", std::ios::binary);
+      f << "NOT A VALID TAR.ZST ARCHIVE"; }
+
+    // 重新初始化镜像目录并添加包
+    mirror = suite_work_dir / "mirror" / "x86_64";
+    fs::create_directories(mirror);
+    fs::create_directories(mirror / "pkgA");
+    fs::copy(pkg_dir / "pkgA-1.0.lpkg", mirror / "pkgA" / "1.0.lpkg");
+    fs::create_directories(mirror / "pkgB");
+    fs::copy(pkg_dir / "pkgB-1.0.lpkg", mirror / "pkgB" / "1.0.lpkg");
+    { std::ofstream idx(mirror / "index.txt");
+      idx << "base-pkg|1.0:::|\npkgA|1.0:::|\npkgB|1.0:::|\n"; }
+
+    // 3) 批次安装 [A, B]→B 损坏→失败→A 应被回滚
+    Config::instance().set_force_overwrite_mode(true);
+    EXPECT_THROW(install_packages({"pkgA:1.0", "pkgB:1.0"}), LpkgException);
+    Config::instance().set_force_overwrite_mode(false);
+
+    // 4) 验证 base-pkg 的旧文件从 .bak 恢复（内容 = base-pkg 安装时的内容）
+    Cache::instance().load();
+    { std::ifstream f(test_root / "usr/lib/libbase.so.1");
+      std::string content; std::getline(f, content);
+      EXPECT_EQ(content, "pkg:usr/lib/libbase.so.1")
+          << "rollback should restore base-pkg's file from .lpkg_bak"; }
+    EXPECT_FALSE(Cache::instance().is_installed("pkgA"))
+        << "pkgA should be uninstalled after batch rollback";
+}
+
+// ── 36. 批次 [A, B] 中 B 失败 → A 的新文件被删除 ──
+TEST_F(AtomicRollbackTest, BatchRollbackRemovesNewFiles) {
+    // 1) pkgA 安装新文件（无预存旧版本，所以不产生 .bak）
+    make_pkg("pkgA", "1.0", {"usr/share/pkgA/new_file.txt"});
+    make_pkg("pkgB", "1.0", {"usr/share/pkgB/dummy.txt"});
+
+    fs::path mirror = setup_local_mirror();
+    add_to_mirror("pkgA", "1.0");
+    // pkgB：损坏
+    { std::ofstream f(pkg_dir / "pkgB-1.0.lpkg", std::ios::binary);
+      f << "BROKEN"; }
+    add_to_mirror("pkgB", "1.0");
+    { std::ofstream idx(mirror / "index.txt");
+      idx << "pkgA|1.0:::|\npkgB|1.0:::|\n"; }
+
+    // 2) 批次安装 [A, B]
+    Config::instance().set_force_overwrite_mode(true);
+    EXPECT_THROW(install_packages({"pkgA:1.0", "pkgB:1.0"}), LpkgException);
+    Config::instance().set_force_overwrite_mode(false);
+
+    // 3) 验证 A 的新文件被删除（无 .bak 所以走 fs::remove）
+    EXPECT_FALSE(fs::exists(test_root / "usr/share/pkgA/new_file.txt"))
+        << "pkgA's new file should be deleted during rollback";
+    EXPECT_FALSE(Cache::instance().is_installed("pkgA"));
+}
+
+// ── 37. 批次 [A, B, C] 中 C 失败 → A、B 全部回滚 ──
+TEST_F(AtomicRollbackTest, BatchRollbackMultiplePackages) {
+    // 1) 安装 base-pkg 拥有共享文件
+    make_pkg("base", "1.0", {"usr/lib/libshared.so"});
+    fs::path mirror = setup_local_mirror();
+    add_to_mirror("base", "1.0");
+    { std::ofstream idx(mirror / "index.txt"); idx << "base|1.0:::|\n"; }
+    install_packages({"base:1.0"});
+    Cache::instance().load();
+
+    // 2) pkgA、pkgB 覆盖共享文件，pkgC 损坏
+    fs::remove_all(mirror);
+    for (auto& p : {"pkgA", "pkgB"}) {
+        auto pw = suite_work_dir / ("_" + std::string(p));
+        fs::create_directories(pw / "content" / "usr/lib");
+        { std::ofstream f(pw / "content/usr/lib/libshared.so"); f << p << " version"; }
+        pack_package((pkg_dir / (std::string(p) + "-1.0.lpkg")).string(),
+                     pw.string(), p, "1.0", {}, {}, ""); }
+    { std::ofstream f(pkg_dir / "pkgC-1.0.lpkg", std::ios::binary); f << "BROKEN"; }
+
+    mirror = suite_work_dir / "mirror" / "x86_64";
+    fs::create_directories(mirror);
+    for (auto& p : {"pkgA", "pkgB", "pkgC"}) {
+        fs::create_directories(mirror / p);
+        fs::copy(pkg_dir / (std::string(p) + "-1.0.lpkg"), mirror / p / "1.0.lpkg"); }
+    { std::ofstream idx(mirror / "index.txt");
+      idx << "base|1.0:::|\npkgA|1.0:::|\npkgB|1.0:::|\npkgC|1.0:::|\n"; }
+
+    // 3) 批次 [A, B, C]，C 损坏→失败→A、B 回滚
+    Config::instance().set_force_overwrite_mode(true);
+    EXPECT_THROW(install_packages({"pkgA:1.0", "pkgB:1.0", "pkgC:1.0"}), LpkgException);
+    Config::instance().set_force_overwrite_mode(false);
+
+    // 4) 验证所有回滚
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("pkgA"))
+        << "all packages in failed batch should be rolled back";
+    EXPECT_FALSE(Cache::instance().is_installed("pkgB"));
+    { std::ifstream f(test_root / "usr/lib/libshared.so");
+      std::string content; std::getline(f, content);
+      EXPECT_EQ(content, "pkg:usr/lib/libshared.so")
+          << "old file restored after rollback"; }
+}
+
+// ── 38. 成功批次提交后无 .lpkg_bak 泄漏 ──
+TEST_F(AtomicRollbackTest, DeferredBaksCleanedAfterSuccess) {
+    // 批次 [pkgA, pkgB] 全部成功 → 无 .lpkg_bak 残留
+    make_pkg("pkgA", "1.0", {"usr/bin/a_file"});
+    make_pkg("pkgB", "1.0", {"usr/bin/b_file"});
+    fs::path mirror = setup_local_mirror();
+    add_to_mirror("pkgA", "1.0");
+    add_to_mirror("pkgB", "1.0");
+    { std::ofstream idx(mirror / "index.txt");
+      idx << "pkgA|1.0:::|\npkgB|1.0:::|\n"; }
+
+    EXPECT_NO_THROW(install_packages({"pkgA:1.0", "pkgB:1.0"}));
+
+    // 验证无 .lpkg_bak 残留（批次成功且 COMMIT_PKGS 已写 → 已清理）
+    bool bak_found = false;
+    for (auto& e : fs::recursive_directory_iterator(test_root)) {
+        if (e.path().filename().string().find(".lpkg_bak_") != std::string::npos) {
+            bak_found = true; break;
+        }
+    }
+    EXPECT_FALSE(bak_found) << ".lpkg_bak should be cleaned after successful batch";
+    EXPECT_TRUE(Cache::instance().is_installed("pkgA"));
+    EXPECT_TRUE(Cache::instance().is_installed("pkgB"));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// SIGINT 期间 remove 测试
+//
+// 验证 remove 操作中各阶段的 SIGINT 能被正确捕获，系统回到一致状态。
+// ══════════════════════════════════════════════════════════════════════
+
+// ── 39. SIGINT 在 remove 备份前 → 安全中止，包完好 ──
+TEST_F(AtomicRollbackTest, SigintRemoveAbortsBeforeBackup) {
+    // 安装一个包
+    std::string pkg_path = make_pkg("remove-me", "1.0", {"usr/bin/remove_me"});
+    fs::path mirror = setup_local_mirror();
+    add_to_mirror("remove-me", "1.0");
+    { std::ofstream idx(mirror / "index.txt"); idx << "remove-me|1.0:::|\n"; }
+    install_packages({"remove-me:1.0"});
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("remove-me"));
+
+    // SIGINT 在 remove 调用前设置
+    sigint_graceful.store(true);
+    EXPECT_THROW(remove_package("remove-me", false), LpkgException);
+    sigint_graceful.store(false);
+
+    // 包应完整：文件存在 + DB 有记录
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/remove_me"))
+        << "file should survive after SIGINT-aborted remove";
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("remove-me"))
+        << "package should survive after SIGINT-aborted remove";
+}
+
+// ── 40. SIGINT 在 remove 备份阶段 → 已备份文件从 .bak 恢复 ──
+TEST_F(AtomicRollbackTest, SigintRemoveDuringBackupRecovers) {
+    // 含 3 个文件的包
+    std::string pkg_path = make_pkg("multi-file", "1.0",
+        {"usr/bin/a", "usr/bin/b", "usr/bin/c"});
+    fs::path mirror = setup_local_mirror();
+    add_to_mirror("multi-file", "1.0");
+    { std::ofstream idx(mirror / "index.txt"); idx << "multi-file|1.0:::|\n"; }
+    install_packages({"multi-file:1.0"});
+    Cache::instance().load();
+
+    // 用 break_during_rm_backup 触发备份阶段的 SIGINT
+    // check_and_break 会设 sigint_graceful=true 后抛异常，
+    // 模拟用户在备份循环中途按 Ctrl+C
+    testing::break_during_rm_backup.store(true);
+    EXPECT_ANY_THROW(remove_package("multi-file", false));
+    testing::break_during_rm_backup.store(false);
+    sigint_graceful.store(false);
+
+    // 恢复已备份的文件
+    recover_packages();
+
+    // 所有文件应恢复
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/a"));
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/b"));
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/c"));
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("multi-file"));
+}
+
+// ── 41. SIGINT 中止 remove → 下一个操作自动恢复 ──
+TEST_F(AtomicRollbackTest, SigintRemoveThenNextOpAutoRecovers) {
+    // 安装包
+    std::string pkg_path = make_pkg("resilient", "1.0", {"usr/bin/resilient"});
+    fs::path mirror = setup_local_mirror();
+    add_to_mirror("resilient", "1.0");
+    { std::ofstream idx(mirror / "index.txt");
+      idx << "resilient|1.0:::|\n"; }
+    install_packages({"resilient:1.0"});
+
+    // SIGINT 中断 remove → WAL 有未完成事务
+    sigint_graceful.store(true);
+    EXPECT_THROW(remove_package("resilient", false), LpkgException);
+    sigint_graceful.store(false);
+
+    // 下一个 install 操作应触发 auto-recover，恢复被中断的 remove
+    make_pkg("new-pkg", "1.0", {"usr/bin/new_file"});
+    add_to_mirror("new-pkg", "1.0");
+    { std::ofstream idx(mirror / "index.txt");
+      idx << "resilient|1.0:::|\nnew-pkg|1.0:::|\n"; }
+    install_packages({"new-pkg:1.0"});
+
+    // resilient 包的文件应被 auto-recover 恢复，且新包安装成功
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/resilient"))
+        << "auto-recover should restore file from SIGINT-aborted remove";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/new_file"))
+        << "new package should be installed after auto-recover";
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 链式综合测试（multi-operation chain）
+//
+// 模拟真实用户操作序列：安装 → force_overwrite → 中断移除 →
+// 恢复 → 重装 → 批量回滚 → 最终一致性校验。
+//
+// 验证经过多次操作后 DB、WAL 和文件系统状态一致。
+// ══════════════════════════════════════════════════════════════════════
+
+// ── 42. 链式操作：安装 → force_overwrite → SIGINT + rec → 重装 → 批量回滚 ──
+TEST_F(AtomicRollbackTest, ChainedOperationsConsistency) {
+    // ════════════════════════════════════════════════════════════════════
+    // 步骤 1：安装 base-pkg（拥有 /usr/lib/libcore.so）
+    // ════════════════════════════════════════════════════════════════════
+    make_pkg("base", "1.0", {"usr/lib/libcore.so"});
+    fs::path mirror = setup_local_mirror();
+    add_to_mirror("base", "1.0");
+    { std::ofstream idx(mirror / "index.txt"); idx << "base|1.0:::|\n"; }
+    install_packages({"base:1.0"});
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("base"));
+
+    // ════════════════════════════════════════════════════════════════════
+    // 步骤 2：pkgA force_overwrite → 写 OWNER_OVERRIDE WAL → 提交成功
+    // ════════════════════════════════════════════════════════════════════
+    fs::remove_all(mirror);
+    { auto pw = suite_work_dir / "_pkgA";
+      fs::create_directories(pw / "content" / "usr/lib");
+      { std::ofstream f(pw / "content/usr/lib/libcore.so"); f << "pkgA"; }
+      pack_package((pkg_dir / "pkgA-1.0.lpkg").string(),
+                   pw.string(), "pkgA", "1.0", {}, {}, ""); }
+    // pkgB 正常（用于后面的批量测试）
+    make_pkg("pkgB", "1.0", {"usr/bin/pkgb"});
+    make_pkg("pkgC", "1.0", {"usr/bin/pkgc"});
+    mirror = suite_work_dir / "mirror" / "x86_64";
+    fs::create_directories(mirror);
+    for (auto& p : {"pkgA", "pkgB", "pkgC"}) {
+        fs::create_directories(mirror / p);
+        fs::copy(pkg_dir / (std::string(p) + "-1.0.lpkg"), mirror / p / "1.0.lpkg");
+    }
+    { std::ofstream idx(mirror / "index.txt");
+      idx << "base|1.0:::|\npkgA|1.0:::|\npkgB|1.0:::|\npkgC|1.0:::|\n"; }
+
+    Config::instance().set_force_overwrite_mode(true);
+    EXPECT_NO_THROW(install_packages({"pkgA:1.0"}));
+    Config::instance().set_force_overwrite_mode(false);
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("pkgA"));
+
+    // 验证 WAL 有 OWNER_OVERRIDE 记录
+    {
+        std::ifstream log(Config::instance().lock_dir() / "transaction.log");
+        std::string log_content((std::istreambuf_iterator<char>(log)), {});
+        EXPECT_NE(log_content.find("OWNER_OVERRIDE"), std::string::npos)
+            << "force_overwrite should write OWNER_OVERRIDE to WAL";
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // 步骤 3：SIGINT 中断移除 pkgA → 验证已备份文件 → rec 恢复
+    // ════════════════════════════════════════════════════════════════════
+    testing::break_during_rm_backup.store(true);
+    EXPECT_ANY_THROW(remove_package("pkgA", false));
+    testing::break_during_rm_backup.store(false);
+    sigint_graceful.store(false);
+
+    // 验证：部分已备份文件 → rec 恢复
+    recover_packages();
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("pkgA"))
+        << "pkgA restored by rec after SIGINT-aborted remove";
+    EXPECT_TRUE(fs::exists(test_root / "usr/lib/libcore.so"))
+        << "libcore.so restored from .lpkg_bak";
+
+    // ════════════════════════════════════════════════════════════════════
+    // 步骤 4：正常移除 pkgA（成功）→ 验证 base 文件恢复
+    // ════════════════════════════════════════════════════════════════════
+    Config::instance().set_force_overwrite_mode(true);
+    EXPECT_NO_THROW(remove_package("pkgA", true));
+    Config::instance().set_force_overwrite_mode(false);
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("pkgA"));
+    // 跨批次 force_remove 不自动恢复旧文件（该特性为未来扩展）。
+    // base 安装状态不受影响。
+    EXPECT_TRUE(Cache::instance().is_installed("base"));
+
+    // ════════════════════════════════════════════════════════════════════
+    // 步骤 5：重装 pkgA + pkgB（成功批次）
+    // ════════════════════════════════════════════════════════════════════
+    Config::instance().set_force_overwrite_mode(true);
+    EXPECT_NO_THROW(install_packages({"pkgA:1.0", "pkgB:1.0"}));
+    Config::instance().set_force_overwrite_mode(false);
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("pkgA"));
+    EXPECT_TRUE(Cache::instance().is_installed("pkgB"));
+
+    // ════════════════════════════════════════════════════════════════════
+    // 步骤 6：批量安装 [pkgC, 损坏包] → 回滚 pkgC
+    // ════════════════════════════════════════════════════════════════════
+    { std::ofstream f(pkg_dir / "BROKEN-1.0.lpkg", std::ios::binary);
+      f << "BROKEN"; }
+    fs::create_directories(mirror / "BROKEN");
+    fs::copy(pkg_dir / "BROKEN-1.0.lpkg", mirror / "BROKEN" / "1.0.lpkg");
+    { std::ofstream idx(mirror / "index.txt");
+      idx << "base|1.0:::|\npkgA|1.0:::|\npkgB|1.0:::|\npkgC|1.0:::|\nBROKEN|1.0:::|\n"; }
+
+    Config::instance().set_force_overwrite_mode(true);
+    EXPECT_THROW(install_packages({"pkgC:1.0", "BROKEN:1.0"}), LpkgException);
+    Config::instance().set_force_overwrite_mode(false);
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("pkgC"))
+        << "pkgC should be rolled back after BROKEN failed";
+    EXPECT_FALSE(fs::exists(test_root / "usr/bin/pkgc"))
+        << "pkgC's file should be removed during rollback";
+
+    // ════════════════════════════════════════════════════════════════════
+    // 最终校验：所有之前安装的包状态正确
+    // ════════════════════════════════════════════════════════════════════
+    EXPECT_TRUE(Cache::instance().is_installed("base"));
+    EXPECT_TRUE(Cache::instance().is_installed("pkgA"));
+    EXPECT_TRUE(Cache::instance().is_installed("pkgB"));
+
+    // WAL 应干净（无未完成事务）
+    EXPECT_TRUE(TransactionLog::check_pending().empty());
+
+    // 无 .lpkg_bak 泄漏
+    bool bak_found = false;
+    for (auto& e : fs::recursive_directory_iterator(test_root)) {
+        if (e.path().filename().string().find(".lpkg_bak_") != std::string::npos) {
+            bak_found = true; break;
+        }
+    }
+    EXPECT_FALSE(bak_found) << "no .lpkg_bak leak after chained operations";
 }

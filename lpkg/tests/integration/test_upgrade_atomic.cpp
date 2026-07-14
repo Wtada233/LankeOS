@@ -584,8 +584,8 @@ TEST_F(UpgradeAtomicTest, C04_WalShowsRollbackAfterCommitPhase) {
     // 升级已 commit（register_package），然后被 rollback → ROLLBACK 在 WAL
     EXPECT_TRUE(log_has("ROLLBACK c04 2.0"));
     EXPECT_TRUE(log_has("COMMIT_PKGS"));
-    // rollback_installed_package 删除了文件 → 文件不存在
-    EXPECT_FALSE(fs::exists(test_root / "usr/share/c04/data.txt"));
+    // rollback 从 .lpkg_bak 恢复了旧版文件（v5.2：延迟删除 → 可还原）
+    EXPECT_TRUE(fs::exists(test_root / "usr/share/c04/data.txt"));
 }
 
 TEST_F(UpgradeAtomicTest, C05_UpgradeDoesNotAffectUnrelatedPackages) {
