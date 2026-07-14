@@ -327,21 +327,6 @@ void Cache::write_set_file_direct(
   atomic_write_with_fsync(path, tmp);
 }
 
-/** 扫描 state_dir 下所有 *.lpkg_db_bak 文件并删除 */
-void Cache::cleanup_db_backups() {
-  const fs::path state_dir = Config::instance().state_dir();
-  if (!fs::exists(state_dir) || !fs::is_directory(state_dir))
-    return;
-
-  std::error_code ec;
-  for (const auto &entry : fs::recursive_directory_iterator(state_dir, ec)) {
-    if (entry.path().extension() == ".lpkg_db_bak" ||
-        entry.path().filename().string().find(".lpkg_db_bak") !=
-            std::string::npos) {
-      fs::remove(entry.path(), ec);
-    }
-  }
-}
 
 std::map<std::string, std::unordered_set<std::string>, std::less<>>
 Cache::read_db_uncached(const fs::path &path) {
