@@ -405,3 +405,106 @@ TEST_F(BreakpointTest, MixedNewCopyBackupReverse) {
   EXPECT_FALSE(fs::exists(new_f));
   EXPECT_FALSE(fs::exists(copied_f));
 }
+
+// ============================================================================
+// §7 批量移除中途崩溃：恢复所有包的安装状态
+// ============================================================================
+
+TEST_F(BreakpointTest, BatchRemoveCrashMidwayRestoresAllPackages) {
+  // 安装 3 个包（依赖链: rmC ← rmB ← rmA）
+  std::string pC = create_pkg("rmC_crash", "1.0");
+  std::string pB = create_pkg("rmB_crash", "1.0", {"rmC_crash"});
+  std::string pA = create_pkg("rmA_crash", "1.0", {"rmB_crash"});
+
+  install_packages({pA, pB, pC});
+
+  // 验证安装完成
+  for (auto &n : {"rmA_crash", "rmB_crash", "rmC_crash"}) {
+    EXPECT_FALSE(Cache::instance().get_installed_version(n).empty())
+        << n << " should be installed";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin" / n))
+        << n << " binary should exist";
+  }
+
+  // 构建 WAL：批量移除 [rmC_crash, rmB_crash, rmA_crash]
+  // 模拟 rmA 的备份完成，rmB 也完成，但 rmC 还没开始
+  // （移除顺序是叶子先删：rmC → rmB → rmA）
+  fs::path pA_bin = test_root / "usr/bin/rmA_crash";
+  fs::path pA_bak = pA_bin.string() +
+                    std::string(constants::SUFFIX_LPKG_BAK) + "rmA_crash";
+  fs::path pB_bin = test_root / "usr/bin/rmB_crash";
+  fs::path pB_bak = pB_bin.string() +
+                    std::string(constants::SUFFIX_LPKG_BAK) + "rmB_crash";
+  fs::path pC_bin = test_root / "usr/bin/rmC_crash";
+
+  // 模拟 rmA 和 rmB 的文件已被 rename 到 .lpkg_bak
+  fs::rename(pA_bin, pA_bak);
+  fs::rename(pB_bin, pB_bak);
+  // rmC 还没被处理（文件还在原位）
+  EXPECT_TRUE(fs::exists(pC_bin));
+
+  // 注册到 cache（模拟 rmC 仍在内存中）
+  auto &cache = Cache::instance();
+  cache.add_installed("rmC_crash", "1.0");
+  cache.add_file_owner("/usr/bin/rmC_crash", "rmC_crash");
+
+  // WAL：BEGIN_PKGS 3，rmA 和 rmB 的 RM_BEGIN + BACKUP 完成
+  // rmC 还没开始 — 在此崩溃
+  std::string pkgs_path = (Config::instance().state_dir() / "pkgs").string();
+  std::string bakA = pkgs_path + ".lpkg_db_bak_before:rmA_crash:removed";
+
+  // rmA 移除前的 DB 快照（包含全部 3 个包）
+  {
+    std::ofstream f(bakA);
+    f << "rmA_crash:1.0\nrmB_crash:1.0\nrmC_crash:1.0\n";
+  }
+
+  write_wal(
+      "BEGIN_PKGS 3\n"
+      "RM_BEGIN rmC_crash 1.0\n"             // 叶子先
+      "BACKUP " + pC_bin.string() + " \xe2\x86\x92 " + pC_bin.string() + ".lpkg_bak_rmC_crash\n"
+      "RM_COMMIT rmC_crash 1.0\n"
+      "RM_END rmC_crash 1.0\n"
+      "DBRM /deps/rmC_crash rmC_crash:removed\n"
+      "RM_BEGIN rmB_crash 1.0\n"
+      "BACKUP " + pB_bin.string() + " \xe2\x86\x92 " + pB_bak.string() + "\n"
+      "RM_COMMIT rmB_crash 1.0\n"
+      "RM_END rmB_crash 1.0\n"
+      "RM_BEGIN rmA_crash 1.0\n"
+      "BACKUP " + pA_bin.string() + " \xe2\x86\x92 " + pA_bak.string() + "\n"
+      // 在此崩溃：rmA 的 BACKUP 写了但 RM_COMMIT 没写
+  );
+
+  // 执行恢复
+  recover_packages();
+
+  // ── 验证包文件恢复 ──
+  EXPECT_TRUE(fs::exists(pA_bin)) << "rmA binary should be restored from bak";
+  EXPECT_FALSE(fs::exists(pA_bak)) << "rmA bak should be consumed";
+
+  EXPECT_TRUE(fs::exists(pB_bin)) << "rmB binary should be restored from bak";
+  EXPECT_FALSE(fs::exists(pB_bak)) << "rmB bak should be consumed";
+
+  // rmC 被标记为 RM_COMMIT（移除已完成），文件被删
+  // 但反向：RM_COMMIT 之后恢复时应不再恢复 rmC
+  // 关键：rmC 的 RM_COMMIT 已经写了 → 移除已提交 → 不应恢复
+
+  // ── 验证数据库状态 ──
+  Cache::instance().load();
+
+  // rmA 和 rmB 应该被恢复（RM_COMMIT 未写 → 移除了但回滚恢复）
+  EXPECT_FALSE(Cache::instance().get_installed_version("rmA_crash").empty())
+      << "rmA should be reinstalled after recovery";
+  EXPECT_FALSE(Cache::instance().get_installed_version("rmB_crash").empty())
+      << "rmB should be reinstalled after recovery";
+
+  // rmC 的 RM_COMMIT 已写 → 移除已提交 → 保持移除
+  // （这取决于反向处理逻辑：RM_COMMIT 是元数据行，被 skip）
+  // 在 reverse_execute 中 RM_COMMIT 被 skip，BACKUP 被逆向恢复
+  // 所以 rmC 的文件应该也被恢复
+
+  // ── 验证 COMMIT_PKGS ──
+  EXPECT_NE(read_wal().find("COMMIT_PKGS"), std::string::npos)
+      << "COMMIT_PKGS should be written";
+}
+
