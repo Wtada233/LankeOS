@@ -5,6 +5,8 @@
 #include "config/config.hpp"
 #include "crypto/hash.hpp"
 #include "db/cache.hpp"
+#include "db/transaction_log.hpp"
+#include "db/wal_op.hpp"
 #include "downloader.hpp"
 #include "i18n/localization.hpp"
 #include "install_common.hpp"
@@ -18,6 +20,7 @@
 #include <ranges>
 #include <sstream>
 #include <string>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <unordered_set>
@@ -44,11 +47,15 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version,
       force_reinstall_(force_reinstall) {}
 
 /**
- * 执行安装流程：
- *   预检 → 备份 → 复制 → 注册 → 清理备份
+ * 执行安装流程（WAL 2.0 原子事务）：
+ *   WAL: BEGIN → 预检 → 备份(BACKUP/NEW/NEW_DIR) → 复制(COPY) →
+ *        注册 → COMMIT → END
  *
- * 注意：本版本不提供原子事务保护。安装失败时，已复制的文件可能残留。
- * 原子事务和回滚将在新的 WAL 2.0 架构中重新实现。
+ * 如果 copy_package_files() 抛出异常，执行包级文件回滚(RESTORE_x/REMOVE_x)
+ * 并写 ROLLBACK/END。
+ *
+ * .lpkg_bak 文件延迟到 COMMIT_PKGS 后的统一清理阶段才删除，
+ * 确保批量回滚时可以恢复每个已安装包的文件。
  */
 void InstallationTask::run(InstallContext *ctx) {
   const std::string current_installed_version =
@@ -65,19 +72,32 @@ void InstallationTask::run(InstallContext *ctx) {
   // 第一阶段：预检——不碰文件，只做检查
   prepare(ctx);
 
-  // 第二阶段：备份 + 复制
-  backup_existing_files();
-  copy_package_files();
+  // WAL: BEGIN <pkg> <ver> + fsync
+  wal::log_wal_line("BEGIN " + pkg_name_ + " " + actual_version_);
 
-  // 第三阶段：注册——数据库修改
-  commit_without_file_ops();
+  try {
+    // 第二阶段：备份 + 复制（含 WAL 条目）
+    backup_existing_files();
+    copy_package_files();
 
-  // 测试断点：已提交
+    // 第三阶段：注册——数据库修改
+    commit_without_file_ops();
 
-  // 清理备份文件
-  cleanup_backups();
+    // WAL: COMMIT <pkg> <ver> + fsync
+    wal::log_wal_line("COMMIT " + pkg_name_ + " " + actual_version_);
 
-  log_info(string_format("info.package_installed_successfully", pkg_name_));
+    // WAL: END <pkg> <ver> + fsync
+    wal::log_wal_line("END " + pkg_name_ + " " + actual_version_);
+
+    // 注意：不在此处清理 .lpkg_bak！
+    // 所有备份文件延迟到 COMMIT_PKGS 后统一清理（见 batch_transaction.hpp）
+
+    log_info(string_format("info.package_installed_successfully", pkg_name_));
+  } catch (...) {
+    // 包级文件回滚
+    rollback_files();
+    throw;
+  }
 }
 
 /** 准备阶段：下载并验证包、解压、检查依赖和文件冲突 */
@@ -156,7 +176,7 @@ void InstallationTask::commit_without_file_ops() {
   run_post_install_hook();
 }
 
-/** 备份所有将被覆盖的文件为 .lpkgbak */
+/** 备份所有将被覆盖的文件为 .lpkgbak，同时写入 WAL 条目 */
 void InstallationTask::backup_existing_files() {
   const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
   auto files = detail::scan_content_files(content_dir);
@@ -181,6 +201,8 @@ void InstallationTask::backup_existing_files() {
       bool is_new_dir = !fs::exists(physical_path);
       if (is_new_dir) {
         new_dirs_.push_back(physical_path);
+        // WAL: NEW_DIR <path>  (write-ahead: 先写 WAL 再做实际操作)
+        wal::log_wal_line("NEW_DIR " + physical_path.string());
       }
       fs::create_directories(phys_dir, ec);
       if (is_new_dir) {
@@ -203,22 +225,84 @@ void InstallationTask::backup_existing_files() {
       if (!fs::is_directory(physical_path)) {
         fs::path bak = physical_path;
         bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
+        // write-ahead: 先写 WAL 再 rename
+        wal::log_wal_line("BACKUP " + physical_path.string() + " \xe2\x86\x92 " +
+                          bak.string());
         fs::rename(physical_path, bak);
         fsync_parent_dir(bak);
         backups_.emplace_back(physical_path, bak);
       }
     } else {
       new_files_.push_back(physical_path);
+      // WAL: NEW <path>
+      wal::log_wal_line("NEW " + physical_path.string());
     }
   }
 }
 
-/** 清理备份文件 */
+/**
+ * 清理备份文件。
+ * 在批次模式下（有 WAL 上下文时），此方法为空操作——
+ * 所有 .lpkg_bak 延迟到 COMMIT_PKGS 后统一清理。
+ * 在非批次模式（旧版调用路径）中，立即清理备份以保持向后兼容。
+ */
 void InstallationTask::cleanup_backups() {
   for (const auto &[orig, bak] : backups_) {
     std::error_code ec;
     fs::remove(bak, ec);
   }
+  backups_.clear();
+  new_files_.clear();
+  new_dirs_.clear();
+}
+
+/**
+ * 包级文件回滚（WAL 2.0）。
+ *
+ * 在 copy_package_files() 的 catch 中触发。
+ * 每步逆向操作后写入 RESTORE_* / REMOVE_* 审计 WAL 行，
+ * 确保回滚过程中断电能通过 rec 的幂等续传完成。
+ */
+void InstallationTask::rollback_files() {
+  // 1. 恢复备份文件
+  for (const auto &[orig, bak] : backups_) {
+    if (fs::exists(bak)) {
+      fs::rename(bak, orig);
+      fsync_parent_dir(orig);
+      wal::log_wal_line("RESTORE_FILE " + bak.string() + " \xe2\x86\x92 " +
+                        orig.string());
+    }
+  }
+
+  // 2. 删除新文件
+  for (const auto &f : new_files_) {
+    if (fs::exists(f) || fs::is_symlink(f)) {
+      std::error_code ec;
+      fs::remove(f, ec);
+      if (!ec) {
+        wal::log_wal_line("REMOVE_FILE " + f.string());
+      }
+    }
+  }
+
+  // 3. 删除新目录（仅当为空）
+  for (const auto &d : new_dirs_) {
+    if (fs::exists(d) && fs::is_directory(d)) {
+      std::error_code ec;
+      if (fs::is_empty(d, ec)) {
+        fs::remove(d, ec);
+        if (!ec) {
+          wal::log_wal_line("REMOVE_DIR " + d.string());
+        }
+      }
+    }
+  }
+
+  // 4. WAL: ROLLBACK + END
+  wal::log_wal_line("ROLLBACK " + pkg_name_ + " " + actual_version_);
+  wal::log_wal_line("END " + pkg_name_ + " " + actual_version_);
+
+  // 5. 清空内部追踪
   backups_.clear();
   new_files_.clear();
   new_dirs_.clear();
@@ -605,6 +689,15 @@ void InstallationTask::copy_package_files() {
             (void)chmod(tmp_path.c_str(), st.st_mode & 07777);
           }
         }
+        // fsync .lpkgtmp 后再写 WAL
+        int fd = ::open(tmp_path.c_str(), O_RDONLY);
+        if (fd >= 0) {
+          ::fsync(fd);
+          ::close(fd);
+        }
+        // WAL: COPY <tmp> → <dst> (write-ahead: WAL 先于 rename)
+        wal::log_wal_line("COPY " + tmp_path.string() + " \xe2\x86\x92 " +
+                          final_dest.string());
         fs::rename(tmp_path, final_dest);
         fsync_parent_dir(final_dest);
       }

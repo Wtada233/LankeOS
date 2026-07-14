@@ -126,6 +126,9 @@ public:
   /** 直接写入 providers 数据库 */
   void write_providers();
 
+  /** 从 installed_pkgs 构建 set 格式数据 */
+  std::unordered_set<std::string> build_pkgs_set() const;
+
   /** 直接写入 DB 文件（.tmp + fsync + rename） */
   void write_db_file_direct(
       const std::filesystem::path &path,
@@ -134,4 +137,40 @@ public:
   /** 直接写入 set 文件（.tmp + fsync + rename） */
   void write_set_file_direct(const std::filesystem::path &path,
                              const std::unordered_set<std::string> &data);
+
+  // ── WAL 保护的写入 ────────────────────────────────────────────────
+
+  /**
+   * write-ahead DB 写入：WAL → fsync → 备份旧文件 → fsync → 写 .tmp →
+   * fsync → rename → fsync 父目录
+   *
+   * @param db_path     DB 文件路径
+   * @param db          要写入的 DB 内容
+   * @param milestone   里程碑标签（如 "glibc:installed"）
+   * @param wal_op_type WAL 操作类型（DB / DBNEW / DBRM）
+   */
+  void write_db_file_wal(
+      const std::filesystem::path &db_path,
+      const std::map<std::string, std::unordered_set<std::string>, std::less<>>
+          &db,
+      const std::string &milestone, const std::string &wal_op_type = "DB");
+
+  /**
+   * write-ahead set 写入：与 write_db_file_wal 相同序列
+   */
+  void write_set_file_wal(const std::filesystem::path &path,
+                          const std::unordered_set<std::string> &data,
+                          const std::string &milestone,
+                          const std::string &wal_op_type = "DB");
 };
+
+// ── WAL 恢复与清理（全局函数） ──────────────────────────────────────
+
+/// 从未完成的 WAL 事务中恢复（仅用于崩溃恢复）
+void recover_packages();
+
+/// 清理已提交批次的 WAL 日志行
+void trim_completed();
+
+/// 清理孤立的 .lpkg_db_bak_before:* 备份文件
+void cleanup_db_backups();

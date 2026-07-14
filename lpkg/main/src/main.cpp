@@ -5,6 +5,7 @@
 #include "build/builder.hpp"
 #include "config/config.hpp"
 #include "cxxopts.hpp"
+#include "db/cache.hpp"
 #include "i18n/localization.hpp"
 #include "nlohmann/json.hpp"
 #include "pkg/depend_scanner.hpp"
@@ -74,6 +75,7 @@ void print_usage(const cxxopts::Options &options) {
   std::cerr << get_string("info.build_desc") << std::endl;
   std::cerr << get_string("info.depend_desc") << std::endl;
   std::cerr << get_string("info.scan_desc") << std::endl;
+  std::cerr << get_string("info.rec_desc") << std::endl;
 }
 
 #include <functional>
@@ -238,6 +240,13 @@ static int handle_command(const std::string &command,
         r = v[0];
     scan_orphans(r);
 
+  } else if (command == constants::CMD_REC) {
+    log_info(get_string("info.rec_recovering"));
+    recover_packages();
+    trim_completed();
+    cleanup_db_backups();
+    log_info(get_string("info.rec_complete"));
+
   } else {
     usage();
     return 1;
@@ -351,6 +360,9 @@ int main(int argc, char *argv[]) {
       check_root();
       Config::instance().init_filesystem();
       db_lock = std::make_unique<DBLock>();
+      // WAL 2.0: 先从未完成事务中恢复，再清理已完成批次
+      recover_packages();
+      trim_completed();
     }
 
     // 安装/移除/升级等写操作启用 SIGINT 防护

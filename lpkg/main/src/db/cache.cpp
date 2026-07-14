@@ -2,7 +2,9 @@
 #include "config.hpp"
 #include "exception.hpp"
 #include "localization.hpp"
+#include "transaction_log.hpp"
 #include "utils.hpp"
+#include "wal_op.hpp"
 #include <fcntl.h>
 #include <fstream>
 #include <sstream>
@@ -245,9 +247,27 @@ void Cache::write() {
   }
 }
 
-void Cache::write(const std::string & /*wal_tag*/) {
-  // wal_tag 保留作接口兼容，写入逻辑与无参 write() 相同
-  write();
+void Cache::write(const std::string &milestone) {
+  // WAL 2.0: 对所有 DB 文件使用 write-ahead 顺序写入
+  //   WAL DB <path> <milestone> → fsync → 备份 → fsync →
+  //   .tmp → fsync → rename → fsync parent
+  // 反向回滚时从 .lpkg_db_bak_before:<milestone> 恢复
+
+  auto &config = Config::instance();
+  auto pkgs_data = build_pkgs_set();
+  write_set_file_wal(config.pkgs_file(), pkgs_data, milestone, "DB");
+  write_db_file_wal(config.files_db(), file_db, milestone, "DB");
+  write_db_file_wal(config.provides_db(), providers, milestone, "DB");
+  write_set_file_wal(config.holdpkgs_file(), holdpkgs, milestone, "DB");
+  dirty = false;
+}
+
+// build_pkgs_set: 将 installed_pkgs map 转换为 set<string> 格式
+std::unordered_set<std::string> Cache::build_pkgs_set() const {
+  std::unordered_set<std::string> result;
+  for (const auto &[name, ver] : installed_pkgs)
+    result.insert(name + ":" + ver);
+  return result;
 }
 
 void Cache::write_pkgs() {
@@ -327,6 +347,94 @@ void Cache::write_set_file_direct(
   atomic_write_with_fsync(path, tmp);
 }
 
+
+// ============================================================================
+// WAL 保护的写入方法（write-ahead 顺序）
+// ============================================================================
+
+void Cache::write_db_file_wal(
+    const fs::path &db_path,
+    const std::map<std::string, std::unordered_set<std::string>, std::less<>>
+        &db,
+    const std::string &milestone, const std::string &wal_op_type) {
+  /*
+   * 顺序（I-FSYNC-2）：
+   *   WAL: <wal_op_type> <path> <milestone>
+   *   fsync WAL
+   *   备份：rename old → .lpkg_db_bak_before:<milestone>
+   *   fsync 备份父目录
+   *   写 .tmp
+   *   fsync .tmp
+   *   rename .tmp → <path>
+   *   fsync <path> 父目录
+   */
+
+  const bool is_new = !fs::exists(db_path);
+
+  // 1. WAL 行
+  wal::log_wal_line(wal_op_type + " " + db_path.string() + " " + milestone);
+
+  // 2. 备份旧文件（仅当文件已存在时）
+  std::string bak_path = db_path.string() + ".lpkg_db_bak_before:" + milestone;
+  if (!is_new) {
+    fs::rename(db_path, bak_path);
+    fsync_parent_dir(bak_path);
+  }
+
+  // 3. 写 .tmp
+  const fs::path tmp = db_path.string() + ".tmp";
+  {
+    std::ofstream f(tmp, std::ios::trunc);
+    if (!f.is_open())
+      throw LpkgException(string_format("error.create_tmp_db_failed"));
+    for (const auto &[key, values] : db) {
+      std::string joined;
+      for (const auto &v : values) {
+        if (!joined.empty())
+          joined += ',';
+        joined += v;
+      }
+      f << key << "\t" << joined << "\n";
+    }
+  }
+
+  // 4. fsync .tmp
+  atomic_write_with_fsync(db_path, tmp);
+}
+
+void Cache::write_set_file_wal(
+    const fs::path &path, const std::unordered_set<std::string> &data,
+    const std::string &milestone, const std::string &wal_op_type) {
+  /*
+   * 与 write_db_file_wal 相同序列
+   */
+
+  const bool is_new = !fs::exists(path);
+
+  // 1. WAL 行
+  wal::log_wal_line(wal_op_type + " " + path.string() + " " + milestone);
+
+  // 2. 备份旧文件
+  std::string bak_path = path.string() + ".lpkg_db_bak_before:" + milestone;
+  if (!is_new) {
+    fs::rename(path, bak_path);
+    fsync_parent_dir(bak_path);
+  }
+
+  // 3. 写 .tmp
+  const fs::path tmp = path.string() + ".tmp";
+  {
+    std::ofstream f(tmp, std::ios::trunc);
+    if (!f.is_open())
+      throw LpkgException(
+          string_format("error.create_file_failed", tmp.string()));
+    for (const auto &item : data)
+      f << item << "\n";
+  }
+
+  // 4. fsync .tmp + rename + fsync parent
+  atomic_write_with_fsync(path, tmp);
+}
 
 std::map<std::string, std::unordered_set<std::string>, std::less<>>
 Cache::read_db_uncached(const fs::path &path) {
