@@ -1315,7 +1315,7 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
   std::vector<std::string> to_remove;
   std::vector<std::string> essential_pkgs;
   for (const auto &p : affected) {
-    if (Cache::instance().is_essential(p)) {
+    if (!force && Cache::instance().is_essential(p)) {
       essential_pkgs.push_back(p);
       continue;
     }
