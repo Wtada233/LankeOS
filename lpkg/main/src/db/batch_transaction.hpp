@@ -70,9 +70,14 @@ std::vector<std::string> run_batch_transaction(size_t total, OpT &&op) {
   } catch (const LpkgException &) {
     // 批次回滚
     wal::batch_rollback(successfully_installed);
+    // 回滚完成（COMMIT_PKGS 已写），清理 DB 备份
+    cleanup_db_backups();
+    trim_completed();
     throw;
   } catch (const std::exception &) {
     wal::batch_rollback(successfully_installed);
+    cleanup_db_backups();
+    trim_completed();
     throw;
   }
 }
