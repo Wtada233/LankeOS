@@ -461,3 +461,140 @@ TEST_F(StressRecoveryTest, FullRemoveThenRecovery) {
     Cache::instance().load();
     EXPECT_FALSE(db_installed("libbase")) << "still gone after rec";
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// 递归移除 + SIGINT 回滚测试
+//
+// 验证 remove_package_recursive 的正确行为：
+//   - essential 源头包 → 整个操作中止，不移除任何包
+//   - SIGINT 中途中断 → 全部已移除包恢复
+// ═══════════════════════════════════════════════════════════════════════
+
+// S21: 对 essential 包执行 remove -r → 操作被拒绝，所有包完好
+TEST_F(StressRecoveryTest, RecursiveRemoveEssentialAborts) {
+  // 标记 libbase 为 essential
+  {
+    std::ofstream f(Config::instance().essential_file());
+    f << "libbase\n";
+  }
+  // 安装 libbase + tool（tool 依赖 libbase）
+  Config::instance().set_testing_mode(false);
+  EXPECT_NO_THROW(install_packages({lib_pkg_path}));
+  EXPECT_NO_THROW(install_packages({tool_pkg_path}));
+  Cache::instance().load();
+
+  // 尝试递归移除 essential 的源头包 → 应拒绝
+  remove_package_recursive("libbase");
+
+  // libbase 和 tool 都应保留
+  Cache::instance().load();
+  EXPECT_TRUE(db_installed("libbase")) << "essential pkg should not be removed";
+  EXPECT_TRUE(db_installed("tool")) << "dependent pkg should not be removed either";
+  EXPECT_TRUE(file_exists("usr/bin/libbase"));
+  EXPECT_TRUE(file_exists("usr/bin/tool"));
+}
+
+// S22: 正常 remove -r（无中断）→ 全部移除成功
+TEST_F(StressRecoveryTest, RecursiveRemoveSuccess) {
+  Config::instance().set_testing_mode(false);
+  EXPECT_NO_THROW(install_packages({lib_pkg_path}));
+  EXPECT_NO_THROW(install_packages({tool_pkg_path}));
+  Cache::instance().load();
+
+  remove_package_recursive("libbase");
+
+  Cache::instance().load();
+  EXPECT_FALSE(db_installed("libbase"));
+  EXPECT_FALSE(db_installed("tool"));
+}
+
+// S23: SIGINT 在 remove 备份阶段 → 文件从 .lpkg_bak 恢复
+TEST_F(StressRecoveryTest, SigintRemoveRollsBack) {
+  // 安装一个包
+  Config::instance().set_testing_mode(false);
+  Config::instance().set_force_overwrite_mode(true);
+  EXPECT_NO_THROW(install_packages({lib_pkg_path}));
+  Config::instance().set_force_overwrite_mode(false);
+  Cache::instance().load();
+
+  // 模拟 SIGINT: 在 remove 的备份循环中设置 sigint_graceful
+  // 使用 testing breakpoint 触发（它会设 sigint_graceful=true 后抛异常）
+  Config::instance().set_testing_mode(true);
+  testing::break_during_rm_backup.store(true);
+  EXPECT_ANY_THROW(remove_package("libbase", false));
+  testing::break_during_rm_backup.store(false);
+  Config::instance().set_testing_mode(false);
+  sigint_graceful.store(false);
+
+  // 手动 rec 恢复（模拟下一次写操作前的 auto-recover）
+  recover_packages();
+  Cache::instance().load();
+  EXPECT_TRUE(db_installed("libbase"))
+      << "libbase should be restored after SIGINT + recover";
+  EXPECT_TRUE(file_exists("usr/bin/libbase"))
+      << "libbase's files should be restored from .lpkg_bak";
+}
+
+// S24: SIGINT 在 remove -r 中途 → 全部包恢复
+TEST_F(StressRecoveryTest, RecursiveRemoveSigintRollsBackAll) {
+  // 安装一个三层依赖链: leaf → mid → root (root 是源头)
+  // root 被移除时, mid 和 leaf 也被移除
+  std::string root_pkg = create_pkg("root", "1.0");
+  std::string mid_pkg = create_pkg("mid", "1.0", {"root"});
+  std::string leaf_pkg = create_pkg("leaf", "1.0", {"mid"});
+
+  Config::instance().set_testing_mode(false);
+  EXPECT_NO_THROW(install_packages({root_pkg}));
+  EXPECT_NO_THROW(install_packages({mid_pkg}));
+  EXPECT_NO_THROW(install_packages({leaf_pkg}));
+  Cache::instance().load();
+  ASSERT_TRUE(db_installed("root"));
+  ASSERT_TRUE(db_installed("mid"));
+  ASSERT_TRUE(db_installed("leaf"));
+
+  // 设置 testing breakpoint: 在备份阶段模拟中断
+  // 这个 breakpoint 会在 remove_package("root") 的备份循环中触发
+  Config::instance().set_testing_mode(true);
+  testing::break_during_rm_backup.store(true);
+  EXPECT_ANY_THROW(remove_package_recursive("root"));
+  testing::break_during_rm_backup.store(false);
+  Config::instance().set_testing_mode(false);
+  sigint_graceful.store(false);
+
+  // remove_package_recursive 的 catch 调用了 recover_packages()
+  // 应恢复所有包
+  Cache::instance().load();
+  EXPECT_TRUE(db_installed("root"))
+      << "root restored after SIGINT + rollback";
+  EXPECT_TRUE(db_installed("mid"))
+      << "mid restored after SIGINT + rollback";
+  EXPECT_TRUE(db_installed("leaf"))
+      << "leaf restored after SIGINT + rollback";
+  EXPECT_TRUE(file_exists("usr/bin/root"))
+      << "root's file restored";
+}
+
+// S25: SIGINT 在 remove -r 中途 → 文件系统一致性校验
+TEST_F(StressRecoveryTest, RecursiveRemoveSigintFileConsistency) {
+  // 创建两个独立的包（无依赖关系）
+  std::string pkgA = create_pkg("pkgA", "1.0");
+  std::string pkgB = create_pkg("pkgB", "1.0");
+
+  Config::instance().set_testing_mode(false);
+  EXPECT_NO_THROW(install_packages({pkgA}));
+  EXPECT_NO_THROW(install_packages({pkgB}));
+  Cache::instance().load();
+
+  // remove -r pkgA（只有一个包受影响）
+  Config::instance().set_testing_mode(true);
+  testing::break_before_remove.store(true);
+  EXPECT_ANY_THROW(remove_package_recursive("pkgA"));
+  testing::break_before_remove.store(false);
+  Config::instance().set_testing_mode(false);
+  sigint_graceful.store(false);
+
+  // 不应有任何变化（break_before_remove 在文件操作前触发）
+  Cache::instance().load();
+  EXPECT_TRUE(db_installed("pkgA"));
+  EXPECT_TRUE(db_installed("pkgB"));
+}
