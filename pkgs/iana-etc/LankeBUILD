@@ -6,6 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    mkdir -p {STAGING_ROOT}/etc
     cp services protocols {STAGING_ROOT}/etc/
 }
 
