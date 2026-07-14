@@ -130,6 +130,7 @@ info.upgrade_old_files_check=正在替换: {} → {}, {} 个旧文件待处理
 info.rollback_debug_files=回滚: new_files_ 共 {} 条
 info.rollback_debug_dirs=回滚: {} 个目录待删除
 info.rollback_debug_dirpath=  将删除目录: {}
+info.rollback_restore=已从备份恢复旧文件: {} ← {}
 info.removing_obsolete_file=正在移除过时文件: {}
 info.config_review_reminder=部分配置文件已安装为 .lpkgnew。请检查它们。
 info.file_owned_by=文件 {} 属于: {}

@@ -127,6 +127,7 @@ info.upgrade_old_files_check=Replacing: {} → {}, {} old files to check
 info.rollback_debug_files=Rollback: {} entries in new_files_
 info.rollback_debug_dirs=Rollback: {} directories to remove
 info.rollback_debug_dirpath=  will remove dir: {}
+info.rollback_restore=Restored old file from backup: {} ← {}
 info.removing_obsolete_file=Removing obsolete file: {}
 info.config_review_reminder=Some configuration files were installed as .lpkgnew. Please review them.
 info.file_owned_by=File {} is owned by: {}

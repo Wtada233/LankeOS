@@ -1,10 +1,10 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <optional>
 #include <filesystem>
+#include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -26,15 +26,15 @@ namespace wal {
 
 /// WAL 操作记录
 struct WALOp {
-    std::string type;   ///< 操作类型：BACKUP, COPY, NEW, NEW_DIR, REMOVE_OLD,
-                        ///< RM_DIR, RM_BAK_CLN, DB, DBNEW, DBRM
-    std::string arg1;   ///< 第一参数（src / path / dbpath）
-    std::string arg2;   ///< 第二参数（dst / tag），单参数操作为空
+  std::string type; ///< 操作类型：BACKUP, COPY, NEW, NEW_DIR, REMOVE_OLD,
+                    ///< RM_DIR, RM_BAK_CLN, DB, DBNEW, DBRM
+  std::string arg1; ///< 第一参数（src / path / dbpath）
+  std::string arg2; ///< 第二参数（dst / tag），单参数操作为空
 };
 
 /// 从 WAL 日志行（已去掉时间戳前缀）解析一条操作。
 /// 格式不合法时返回 std::nullopt。
-std::optional<WALOp> parse_op(const std::string& line);
+std::optional<WALOp> parse_op(const std::string &line);
 
 /**
  * 逆向执行一组 WAL 操作。
@@ -51,7 +51,7 @@ std::optional<WALOp> parse_op(const std::string& line);
  * @param root  系统根目录（用于路径查找，当前未使用，保留接口一致性）
  * @return      (restored_count, cleaned_count)
  */
-std::pair<int, int> reverse_execute(const std::vector<WALOp>& ops,
-                                    const fs::path& root);
+std::pair<int, int> reverse_execute(const std::vector<WALOp> &ops,
+                                    const fs::path &root);
 
 } // namespace wal

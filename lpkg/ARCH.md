@@ -150,7 +150,7 @@ install_packages(pkg_args, hash_file, force)
 │   │   │        │   run_post_install_hook()                       │
 │   │   │        │                                                 │
 │   │   │        ├── (COMMIT <pkg> <ver>)                         │
-│   │   │        ├── cleanup_backups()   ← 删 .lpkg_bak           │
+│   │   │        ├── cleanup_backups()   ← v5.2：延迟到批次提交后   │
 │   │   │        ├── (END <pkg> <ver>)                             │
 │   │   │        └── → 返回 ✓                                      │
 │   │   │                                                          │
@@ -185,8 +185,12 @@ install_packages(pkg_args, hash_file, force)
         （一个包安装失败，内层 catch 已写 ROLLBACK + END）
 
   → install_packages_internal 的 catch：
-      rollback_committed_packages() 撤销 successfully_installed 中所有前序包
-      （写 ROLLBACK + END + cache.write）
+      rollback_committed_packages() 撤销前序包
+        ├── restore_owner_overrides()       ← v5.2：从 WAL 恢复 force_overwrite 剥夺的所有权
+        └── rollback_installed_package():
+              ├── 检查 .lpkg_bak 是否存在   ← v5.2：延迟删除，.bak 仍在
+              │   └─ 存在 → 恢复旧文件内容  ← v5.2 新行为
+              └─ 清除包注册
   → 异常传播到 install_packages 的 catch：
       rollback_committed_packages() → 列表已空 → 无操作
       COMMIT_PKGS 关闭批次
@@ -196,7 +200,7 @@ install_packages(pkg_args, hash_file, force)
         （如 break_before_db_write、break_before_commit_pkgs 测试断点）
 
   → install_packages 的 catch：
-      rollback_committed_packages() 撤销 successfully_installed 中所有已安装包
+      rollback_committed_packages() 撤销所有已安装包（同上：恢复 .bak + 清除注册）
       COMMIT_PKGS 关闭批次
   → throw
 ```
@@ -306,15 +310,21 @@ remove_package(pkg_name, force, wrap_in_txn)
 │
 ├── 备份阶段：逐文件
 │   for each owned_file（逆字典序）:
+│     ⑂ SIGINT 检查                 ← v5.2：逐文件安全中断点
 │     (BACKUP <phys> → <phys>.lpkg_bak_<pkg>)
 │     fs::rename(phys, phys.lpkg_bak_<pkg>)
 │
+│  ⑂ SIGINT 检查                   ← v5.2：所有文件已备份，可完整恢复
+│
 ├── remove_package_files(pkg_name, force)   ← 阶段 2
+│   ⑂ SIGINT 检查（逐文件操作前）   ← v5.2
 │   ├── 共享文件检查（再次）
 │   ├── 逆字典序遍历：
 │   │   ├── 目录? → 跳过
 │   │   └── 文件? → fs::remove + remove_file_owner + remove_providers
 │   └── [In file owner map from cache]
+│
+│  ⑂ SIGINT 检查                   ← v5.2
 │
 ├── 目录处理：释放所有权 → 清扫 .lpkg_bak → rmdir（阶段 3）
 │   for each dir（逆字典序）:
@@ -331,7 +341,11 @@ remove_package(pkg_name, force, wrap_in_txn)
 │   fs::remove_all(hooks_dir/pkg)
 │   cache.remove_installed(pkg)
 │
+│  ⑂ SIGINT 检查                   ← v5.2：DB 落盘前中断，.lpkg_db_bak 可回滚
+│
 ├── Cache::instance().write(pkg_name)    ← DB 落盘（WAL 保护）
+│
+│  ⑂ SIGINT 检查                   ← v5.2：RM_COMMIT 前最后中断点
 │
 ├── (RM_COMMIT <pkg> <ver>)              ← 阶段 6
 ├── 清除全部 .lpkg_bak
@@ -348,7 +362,8 @@ remove_package(pkg_name, force, wrap_in_txn)
 | 维度 | `remove_package` | `rollback_installed_package` |
 |------|------------------|------------------------------|
 | WAL 前缀 | `RM_BEGIN` | `ROLLBACK` |
-| 备份 | `.lpkg_bak` 备份原文件再删 | 直接删除 |
+| 文件处理 | `.lpkg_bak` 备份原文件再删，提交后清 .bak | v5.2：从 `.lpkg_bak` 恢复旧文件（若存在），否则删新文件 |
+| 文件恢复能力 | RM_COMMIT 前可恢复（.bak 存在） | ✅ 完整恢复到安装前内容（.bak 在延迟删除列表中） |
 | prerm 钩子 | 运行 | 不运行 |
 | 共享文件检查 | 阻止删除 | 不检查 |
 | 逆向依赖检查 | 阻止删除 | 不检查 |
@@ -477,6 +492,8 @@ recover_packages()          "lpkg rec"
 | `DBNEW <path> <tag>` | Cache | DB 文件新建 |
 | `DBRM <path> <tag>` | Cache | DB 文件删除 |
 | `RESTORE <bak> → <orig>` | rec | 恢复操作（rec 追加） |
+| `OWNER_OVERRIDE <path> <old_owner>` | install（v5.2） | `--force-overwrite` 剥夺旧包所有权时记录，回滚时恢复 |
+| `RESTORE_FILE <bak> → <orig>` | rollback（v5.2） | `rollback_installed_package` 从 `.lpkg_bak` 恢复旧文件 |
 
 ### 8.2 WAL 示例
 
