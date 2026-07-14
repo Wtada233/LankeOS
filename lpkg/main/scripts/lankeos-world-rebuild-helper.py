@@ -279,6 +279,12 @@ def build_loop(order, cycles, args):
             print(f"  [!] 目录不存在，跳过: {pkg_dir}")
             continue
 
+        # 自动检测：如果目录中已有 .lpkg 文件，说明已构建过，直接跳过
+        existing_lpkg = glob.glob(os.path.join(pkg_dir, "*.lpkg"))
+        if existing_lpkg:
+            print(f"  [✓] 已存在 .lpkg 文件，跳过 rebuild: {os.path.basename(existing_lpkg[0])}")
+            continue
+
         # 验证目录中含有 LankeBUILD 和 LankeBUILD.json
         build_script = os.path.join(pkg_dir, "LankeBUILD")
         build_json = os.path.join(pkg_dir, "LankeBUILD.json")
