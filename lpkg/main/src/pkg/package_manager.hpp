@@ -138,4 +138,4 @@ void query_file(const std::string &filename);
 void show_man_page(const std::string &pkg_name);
 void write_cache();
 void remove_package_files(const std::string &pkg_name, bool force = false);
-void remove_package_recursive(const std::string &pkg_name);
+void remove_package_recursive(const std::string &pkg_name, bool force = false);

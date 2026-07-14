@@ -118,7 +118,7 @@ static int handle_command(const std::string &command,
     if (result["recursive"].as<bool>()) {
       for (const auto &pkg :
            result["packages"].as<std::vector<std::string>>()) {
-        remove_package_recursive(pkg);
+        remove_package_recursive(pkg, result["force"].as<bool>());
         write_cache();
       }
     } else {
