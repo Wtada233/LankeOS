@@ -73,8 +73,6 @@ void InstallationTask::run(InstallContext *ctx) {
   commit_without_file_ops();
 
   // 测试断点：已提交
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_after_commit);
 
   // 清理备份文件
   cleanup_backups();
@@ -505,8 +503,6 @@ void InstallationTask::copy_package_files() {
     if (on_before_file_copy)
       on_before_file_copy();
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_during_file_copy);
 
     extern std::atomic<bool> sigint_graceful;
     if (sigint_graceful.load())

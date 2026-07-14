@@ -5,7 +5,6 @@
 #include "archive.hpp"
 #include "base/constants.hpp"
 #include "base/exception.hpp"
-#include "base/testing_breakpoints.hpp"
 #include "base/utils.hpp"
 #include "config/config.hpp"
 #include "crypto/hash.hpp"
@@ -59,8 +58,6 @@ void install_packages(const std::vector<std::string> &pkg_args,
     log_warning(string_format("warning.repo_index_load_failed", e.what()));
   }
 
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_before_install);
 
   std::map<std::string, InstallPlan> plan;
   std::vector<std::string> order;
@@ -191,8 +188,6 @@ void install_packages(const std::vector<std::string> &pkg_args,
   install_packages_internal(ctx);
   Cache::instance().write();
 
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_after_commit_pkgs);
 
   TriggerManager::instance().run_all();
   log_info(get_string("info.install_complete"));
@@ -216,8 +211,6 @@ void install_packages_internal(InstallContext &ctx) {
 
     auto &p = ctx.plan.at(n);
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_before_each_pkg_install);
 
     if (!p.metadata_verified) {
       InstallationTask check_task(
@@ -276,8 +269,6 @@ void install_packages_internal(InstallContext &ctx) {
     ctx.successfully_installed.push_back(p.name);
     ctx.installed_set.insert(p.name);
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_after_each_pkg_install);
   }
 }
 
@@ -319,8 +310,6 @@ void remove_package(const std::string &pkg_name, bool force, bool) {
     }
   }
 
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_before_remove);
 
   log_info(string_format("info.removing_package", pkg_name));
 
@@ -391,8 +380,6 @@ void remove_package(const std::string &pkg_name, bool force, bool) {
           backups.emplace_back(phys, bak);
           ++file_count;
 
-          if (Config::instance().testing_mode())
-            testing::check_and_break(testing::break_during_rm_backup);
         }
       }
     }
@@ -400,8 +387,6 @@ void remove_package(const std::string &pkg_name, bool force, bool) {
     if (file_count > 0)
       log_info(string_format("info.files_removed", file_count));
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_after_rm_backup);
 
     if (sigint_graceful.load())
       throw LpkgException(get_string("info.sigint_aborted"));
@@ -419,8 +404,6 @@ void remove_package(const std::string &pkg_name, bool force, bool) {
         dir_paths.emplace_back(fs::path(e));
     std::ranges::sort(dir_paths, std::greater<>{});
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_before_rm_dir);
 
     int dir_count = 0;
     for (const auto &p : dir_paths) {
@@ -451,8 +434,6 @@ void remove_package(const std::string &pkg_name, bool force, bool) {
     if (dir_count > 0)
       log_info(string_format("info.dirs_removed", dir_count));
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_after_rm_dir);
 
     // 清理依赖、文档和钩子文件
     const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
@@ -474,8 +455,6 @@ void remove_package(const std::string &pkg_name, bool force, bool) {
     fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
     cache.remove_installed(pkg_name);
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_before_rm_db_write);
 
     if (sigint_graceful.load())
       throw LpkgException(get_string("info.sigint_aborted"));
@@ -483,8 +462,6 @@ void remove_package(const std::string &pkg_name, bool force, bool) {
     // 数据库落盘
     Cache::instance().write(pkg_name);
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_before_rm_commit);
 
     if (sigint_graceful.load())
       throw LpkgException(get_string("info.sigint_aborted"));
@@ -501,8 +478,6 @@ void remove_package(const std::string &pkg_name, bool force, bool) {
 
   Cache::instance().cleanup_db_backups();
 
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_after_rm_cleanup);
 
   log_info(string_format("info.package_removed_successfully", pkg_name));
 }
@@ -711,8 +686,6 @@ void upgrade_packages() {
     if (sigint_graceful.load())
       throw LpkgException(get_string("info.sigint_aborted"));
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_before_each_pkg_install);
 
     log_info(string_format("info.upgrading_package", e.name, e.old_ver,
                            e.new_ver));
@@ -720,14 +693,10 @@ void upgrade_packages() {
                        false);
     t.run();
 
-    if (Config::instance().testing_mode())
-      testing::check_and_break(testing::break_after_each_pkg_install);
   }
 
   Cache::instance().write();
 
-  if (Config::instance().testing_mode())
-    testing::check_and_break(testing::break_after_commit_pkgs);
 
   log_info(string_format("info.upgraded_packages", plan.size()));
   Cache::instance().cleanup_db_backups();
