@@ -5,6 +5,7 @@
 #include "config/config.hpp"
 #include "crypto/hash.hpp"
 #include "db/cache.hpp"
+#include "db/test_breakpoints.hpp"
 #include "db/transaction_log.hpp"
 #include "db/wal_op.hpp"
 #include "downloader.hpp"
@@ -75,6 +76,9 @@ void InstallationTask::run(InstallContext *ctx) {
   // WAL: BEGIN <pkg> <ver> + fsync
   wal::log_wal_line("BEGIN " + pkg_name_ + " " + actual_version_);
 
+  // 断点：begin 之后，可用于模拟安装刚开始就崩溃
+  BreakpointManager::instance().hit("install_after_begin_" + pkg_name_);
+
   try {
     // 第二阶段：备份 + 复制（含 WAL 条目）
     backup_existing_files();
@@ -85,6 +89,8 @@ void InstallationTask::run(InstallContext *ctx) {
 
     // WAL: COMMIT <pkg> <ver> + fsync
     wal::log_wal_line("COMMIT " + pkg_name_ + " " + actual_version_);
+    // 断点：COMMIT 之后、END 之前（模拟批量事务中某包成功后崩溃）
+    BreakpointManager::instance().hit("after_commit_" + pkg_name_);
 
     // WAL: END <pkg> <ver> + fsync
     wal::log_wal_line("END " + pkg_name_ + " " + actual_version_);
@@ -228,6 +234,7 @@ void InstallationTask::backup_existing_files() {
         // write-ahead: 先写 WAL 再 rename
         wal::log_wal_line("BACKUP " + physical_path.string() +
                           " \xe2\x86\x92 " + bak.string());
+        BreakpointManager::instance().hit("backup_after_wal_" + pkg_name_);
         fs::rename(physical_path, bak);
         fsync_parent_dir(bak);
         backups_.emplace_back(physical_path, bak);
@@ -697,6 +704,7 @@ void InstallationTask::copy_package_files() {
         // WAL: COPY <tmp> → <dst> (write-ahead: WAL 先于 rename)
         wal::log_wal_line("COPY " + tmp_path.string() + " \xe2\x86\x92 " +
                           final_dest.string());
+        BreakpointManager::instance().hit("copy_after_wal_" + pkg_name_);
         fs::rename(tmp_path, final_dest);
         fsync_parent_dir(final_dest);
       }
