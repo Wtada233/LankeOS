@@ -214,12 +214,12 @@ void cleanup_db_backups() {
     return;
 
   std::error_code ec;
-  for (const auto &entry : fs::directory_iterator(state_dir, ec)) {
+  // 递归扫描：DBRM 创建的备份在 deps/、needed_so/ 等子目录中
+  for (const auto &entry : fs::recursive_directory_iterator(state_dir, ec)) {
     if (ec)
       break;
 
     const std::string fname = entry.path().filename().string();
-    // 匹配 .lpkg_db_bak_before:* 模式
     if (fname.find(".lpkg_db_bak_before:") != std::string::npos) {
       fs::remove(entry.path(), ec);
     }
