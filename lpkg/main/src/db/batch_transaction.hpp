@@ -80,18 +80,19 @@ std::vector<std::string> run_batch_transaction(size_t total, OpT &&op) {
  * 便捷包装：对已构建的 target 列表执行单一类型的包操作
  *
  * @param targets         要处理的目标列表
- * @param per_pkg_fn      每个包的处理函数 (ctx, pkg_name, pkg_version, wal_writer)
+ * @param per_pkg_fn      每个包的处理函数 (ctx, pkg_name, pkg_version,
+ * wal_writer)
  * @param install_order   安装顺序（依赖拓扑序）
  * @param get_plan_fn     获取包的 InstallPlan 的函数
  * @return                成功处理的包名列表
  */
 template <typename PlanMap, typename PerPkgFn>
 std::vector<std::string>
-run_ordered_batch(const std::vector<std::string> &install_order,
-                  PlanMap &plan, PerPkgFn &&per_pkg_fn) {
+run_ordered_batch(const std::vector<std::string> &install_order, PlanMap &plan,
+                  PerPkgFn &&per_pkg_fn) {
   return run_batch_transaction(
-      install_order.size(), [&](wal::WalWriter &w,
-                                std::vector<std::string> &success) {
+      install_order.size(),
+      [&](wal::WalWriter &w, std::vector<std::string> &success) {
         auto &cache = Cache::instance();
 
         for (const auto &name : install_order) {

@@ -38,50 +38,50 @@ struct DbMilestone {
 
 enum class WALOpType {
   // 批次边界
-  BEGIN_PKGS,    // BEGIN_PKGS <N>
-  COMMIT_PKGS,   // COMMIT_PKGS
+  BEGIN_PKGS,  // BEGIN_PKGS <N>
+  COMMIT_PKGS, // COMMIT_PKGS
 
   // 安装操作
-  BEGIN,         // BEGIN <pkg> <ver>
-  COMMIT,        // COMMIT <pkg> <ver>
-  ROLLBACK,      // ROLLBACK <pkg> <ver>
-  END,           // END <pkg> <ver>
+  BEGIN,    // BEGIN <pkg> <ver>
+  COMMIT,   // COMMIT <pkg> <ver>
+  ROLLBACK, // ROLLBACK <pkg> <ver>
+  END,      // END <pkg> <ver>
 
   // 文件操作
-  BACKUP,        // BACKUP <src> → <dst>
-  NEW,           // NEW <path>
-  NEW_DIR,       // NEW_DIR <path>
-  COPY,          // COPY <src> → <dst>
-  REMOVE_OLD,    // REMOVE_OLD <src> → <dst>
+  BACKUP,     // BACKUP <src> → <dst>
+  NEW,        // NEW <path>
+  NEW_DIR,    // NEW_DIR <path>
+  COPY,       // COPY <src> → <dst>
+  REMOVE_OLD, // REMOVE_OLD <src> → <dst>
 
   // 移除操作
-  RM_BEGIN,      // RM_BEGIN <pkg> <ver>
-  RM_COMMIT,     // RM_COMMIT <pkg> <ver>
-  RM_END,        // RM_END <pkg> <ver>
-  RM_DIR,        // RM_DIR <path> <mode> <uid> <gid>
+  RM_BEGIN,  // RM_BEGIN <pkg> <ver>
+  RM_COMMIT, // RM_COMMIT <pkg> <ver>
+  RM_END,    // RM_END <pkg> <ver>
+  RM_DIR,    // RM_DIR <path> <mode> <uid> <gid>
 
   // DB 操作
-  DB,            // DB <path> <milestone>
-  DBNEW,         // DBNEW <path> <milestone>
-  DBRM,          // DBRM <path> <milestone>
+  DB,    // DB <path> <milestone>
+  DBNEW, // DBNEW <path> <milestone>
+  DBRM,  // DBRM <path> <milestone>
 
   // 回滚审计
-  RESTORE_FILE,  // RESTORE_FILE <bak> → <orig>
-  RESTORE_DB,    // RESTORE_DB <bak> → <db>
-  RESTORE_DIR,   // RESTORE_DIR <path>
-  REMOVE_FILE,   // REMOVE_FILE <path>
-  REMOVE_DIR,    // REMOVE_DIR <path>
+  RESTORE_FILE, // RESTORE_FILE <bak> → <orig>
+  RESTORE_DB,   // RESTORE_DB <bak> → <db>
+  RESTORE_DIR,  // RESTORE_DIR <path>
+  REMOVE_FILE,  // REMOVE_FILE <path>
+  REMOVE_DIR,   // REMOVE_DIR <path>
 };
 
 struct WALOp {
   WALOpType type;
-  std::string raw;   // 原始行文本（调试用）
-  std::string arg1;  // 参数1
-  std::string arg2;  // 参数2
-  std::string arg3;  // 参数3
-  std::string arg4;  // 参数4（RM_DIR: gid，split_line 顺序分配）
-  std::string arg5;  // 参数5（预留）
-  std::string arg6;  // 参数6（预留）
+  std::string raw;  // 原始行文本（调试用）
+  std::string arg1; // 参数1
+  std::string arg2; // 参数2
+  std::string arg3; // 参数3
+  std::string arg4; // 参数4（RM_DIR: gid，split_line 顺序分配）
+  std::string arg5; // 参数5（预留）
+  std::string arg6; // 参数6（预留）
 
   bool is_metadata() const {
     return type == WALOpType::ROLLBACK || type == WALOpType::END ||
@@ -137,13 +137,14 @@ struct RollbackStats {
  * 跳过 RESTORE_x/REMOVE_x/元数据行和 :batch-start DB 条目。
  *
  * @param ops              待逆向执行的操作（正向顺序）
- * @param milestone_target 目标里程碑（":batch-start"），达到后停止回滚。空=全部逆序
+ * @param milestone_target
+ * 目标里程碑（":batch-start"），达到后停止回滚。空=全部逆序
  * @param write_audit      是否写 RESTORE WAL 审计行
  * @return RollbackStats
  */
 RollbackStats reverse_execute(const std::vector<WALOp> &ops,
-                               const std::string &milestone_target = "",
-                               bool write_audit = true);
+                              const std::string &milestone_target = "",
+                              bool write_audit = true);
 
 // ============================================================================
 // 批次操作提取

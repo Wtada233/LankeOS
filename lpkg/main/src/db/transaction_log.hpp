@@ -23,8 +23,7 @@ public:
 
   WalWriter(const WalWriter &) = delete;
   WalWriter &operator=(const WalWriter &) = delete;
-  WalWriter(WalWriter &&other) noexcept
-      : fd_(other.fd_), lines_(other.lines_) {
+  WalWriter(WalWriter &&other) noexcept : fd_(other.fd_), lines_(other.lines_) {
     other.fd_ = -1;
     other.lines_ = 0;
   }

@@ -330,9 +330,8 @@ void Cache::write_db_file_direct(
   atomic_write_with_fsync(path, tmp);
 }
 
-void Cache::write_set_file_direct(
-    const fs::path &path,
-    const std::unordered_set<std::string> &data) {
+void Cache::write_set_file_direct(const fs::path &path,
+                                  const std::unordered_set<std::string> &data) {
   const fs::path tmp = path.string() + ".tmp";
 
   {
@@ -346,7 +345,6 @@ void Cache::write_set_file_direct(
 
   atomic_write_with_fsync(path, tmp);
 }
-
 
 // ============================================================================
 // WAL 保护的写入方法（write-ahead 顺序）
@@ -402,9 +400,10 @@ void Cache::write_db_file_wal(
   atomic_write_with_fsync(db_path, tmp);
 }
 
-void Cache::write_set_file_wal(
-    const fs::path &path, const std::unordered_set<std::string> &data,
-    const std::string &milestone, const std::string &wal_op_type) {
+void Cache::write_set_file_wal(const fs::path &path,
+                               const std::unordered_set<std::string> &data,
+                               const std::string &milestone,
+                               const std::string &wal_op_type) {
   /*
    * 与 write_db_file_wal 相同序列
    */
