@@ -348,6 +348,30 @@ TEST_F(WalEdgeCaseTest, BatchRollbackEmptySuccessList) {
   // WAL 应保留，不写 COMMIT_PKGS
 }
 
+// ── cleanup_db_backups 递归清理子目录 ────────────────────────────
+
+TEST_F(WalEdgeCaseTest, CleanupDbBackupsRecursive) {
+  auto dir = Config::instance().state_dir();
+
+  // 顶层备份
+  auto top_bak = dir / "pkgs.lpkg_db_bak_before:top:installed";
+  // 子目录备份（regression: 之前只扫描顶层，遗漏了这些）
+  auto deps_bak = dir / "deps/pkg.lpkg_db_bak_before:pkg:removed";
+  auto nso_bak = dir / "needed_so/pkg.lpkg_db_bak_before:pkg:removed";
+
+  fs::create_directories(dir / "deps");
+  fs::create_directories(dir / "needed_so");
+  std::ofstream(top_bak) << "top\n";
+  std::ofstream(deps_bak) << "deps\n";
+  std::ofstream(nso_bak) << "nso\n";
+
+  cleanup_db_backups();
+
+  EXPECT_FALSE(fs::exists(top_bak));
+  EXPECT_FALSE(fs::exists(deps_bak));
+  EXPECT_FALSE(fs::exists(nso_bak));
+}
+
 // ── extract_current_batch_ops 在纯已完成 WAL 时返回空 ─────────────
 
 TEST_F(WalEdgeCaseTest, ExtractReturnsEmptyOnAllCommitted) {
