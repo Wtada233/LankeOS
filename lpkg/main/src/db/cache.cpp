@@ -2,7 +2,6 @@
 #include "config.hpp"
 #include "exception.hpp"
 #include "localization.hpp"
-#include "transaction_log.hpp"
 #include "utils.hpp"
 #include <fcntl.h>
 #include <fstream>
@@ -11,9 +10,6 @@
 
 namespace fs = std::filesystem;
 
-/**
- * 获取 Cache 单例实例
- */
 Cache &Cache::instance() {
   static Cache instance;
   return instance;
@@ -21,18 +17,11 @@ Cache &Cache::instance() {
 
 Cache::Cache() { load(); }
 
-/**
- * 检查包是否已安装
- */
 bool Cache::is_installed(std::string_view name) {
   std::lock_guard<std::mutex> lock(mtx);
   return installed_pkgs.contains(name);
 }
 
-/**
- * 获取已安装包的版本号
- * 如果是虚拟包（提供者），返回 "virtual"；未安装返回空字符串
- */
 std::string Cache::get_installed_version(std::string_view name) {
   std::lock_guard<std::mutex> lock(mtx);
   auto it = installed_pkgs.find(name);
@@ -43,27 +32,17 @@ std::string Cache::get_installed_version(std::string_view name) {
   return "";
 }
 
-/**
- * 检查包是否被标记为 essential（系统必需）
- */
 bool Cache::is_essential(std::string_view name) {
   std::lock_guard<std::mutex> lock(mtx);
   ensure_essentials();
   return essentials.contains(std::string(name));
 }
 
-/**
- * 检查包是否被锁定，禁止更新或删除
- */
 bool Cache::is_held(std::string_view name) {
   std::lock_guard<std::mutex> lock(mtx);
   return holdpkgs.contains(std::string(name));
 }
 
-/**
- * 将包标记为已安装并记录版本号
- * @param hold 是否同时将其加入锁定列表
- */
 void Cache::add_installed(std::string_view name, std::string_view ver,
                           bool hold) {
   std::lock_guard<std::mutex> lock(mtx);
@@ -73,9 +52,6 @@ void Cache::add_installed(std::string_view name, std::string_view ver,
   dirty = true;
 }
 
-/**
- * 从已安装列表中移除包，同时清理对应的锁定状态
- */
 void Cache::remove_installed(std::string_view name) {
   std::lock_guard<std::mutex> lock(mtx);
   installed_pkgs.erase(std::string(name));
@@ -83,18 +59,12 @@ void Cache::remove_installed(std::string_view name) {
   dirty = true;
 }
 
-/**
- * 记录文件由哪个包所有（文件归属关系）
- */
 void Cache::add_file_owner(std::string_view path, std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
   file_db[std::string(path)].insert(std::string(pkg));
   dirty = true;
 }
 
-/**
- * 移除文件与包的所有权关联，若文件无其他所有者则清理条目
- */
 void Cache::remove_file_owner(std::string_view path, std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
   auto it = file_db.find(path);
@@ -106,37 +76,24 @@ void Cache::remove_file_owner(std::string_view path, std::string_view pkg) {
   }
 }
 
-/**
- * 检查某文件是否由指定包所有
- * 相比 get_file_owners() 返回整个集合，此方法仅做存在性检查，避免拷贝
- */
 bool Cache::is_file_owned_by(std::string_view path, std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
   auto it = file_db.find(path);
   return it != file_db.end() && it->second.contains(std::string(pkg));
 }
 
-/**
- * 查询某文件由哪些包所有
- */
 std::unordered_set<std::string> Cache::get_file_owners(std::string_view path) {
   std::lock_guard<std::mutex> lock(mtx);
   auto it = file_db.find(path);
   return (it != file_db.end()) ? it->second : std::unordered_set<std::string>{};
 }
 
-/**
- * 注册某个功能/虚拟包由哪个包提供
- */
 void Cache::add_provider(std::string_view capability, std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
   providers[std::string(capability)].insert(std::string(pkg));
   dirty = true;
 }
 
-/**
- * 移除某个功能/虚拟包的提供者记录
- */
 void Cache::remove_provider(std::string_view capability, std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
   auto it = providers.find(capability);
@@ -148,9 +105,6 @@ void Cache::remove_provider(std::string_view capability, std::string_view pkg) {
   }
 }
 
-/**
- * 查询提供指定功能/虚拟包的所有包
- */
 std::unordered_set<std::string>
 Cache::get_providers(std::string_view capability) {
   std::lock_guard<std::mutex> lock(mtx);
@@ -159,27 +113,18 @@ Cache::get_providers(std::string_view capability) {
                                  : std::unordered_set<std::string>{};
 }
 
-/**
- * 检查某能力是否由指定包提供（避免全量集合拷贝）
- */
 bool Cache::is_provided_by(std::string_view capability, std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
   auto it = providers.find(capability);
   return it != providers.end() && it->second.contains(std::string(pkg));
 }
 
-/**
- * 注册某包被另一个包所依赖（反向依赖关系）
- */
 void Cache::add_reverse_dep(std::string_view dep, std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
   ensure_reverse_deps();
   reverse_deps[std::string(dep)].insert(std::string(pkg));
 }
 
-/**
- * 移除反向依赖记录
- */
 void Cache::remove_reverse_dep(std::string_view dep, std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
   ensure_reverse_deps();
@@ -191,9 +136,6 @@ void Cache::remove_reverse_dep(std::string_view dep, std::string_view pkg) {
   }
 }
 
-/**
- * 查询依赖指定包的所有包（反向依赖）
- */
 std::unordered_set<std::string> Cache::get_reverse_deps(std::string_view name) {
   std::lock_guard<std::mutex> lock(mtx);
   ensure_reverse_deps();
@@ -202,10 +144,6 @@ std::unordered_set<std::string> Cache::get_reverse_deps(std::string_view name) {
                                     : std::unordered_set<std::string>{};
 }
 
-/**
- * 查询某包安装的所有文件列表
- * 遍历文件数据库，筛选出属于该包的文件
- */
 std::unordered_set<std::string> Cache::get_package_files(std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
   std::string pkg_str(pkg);
@@ -218,9 +156,6 @@ std::unordered_set<std::string> Cache::get_package_files(std::string_view pkg) {
   return result;
 }
 
-/**
- * 查询某包提供的所有功能/虚拟包列表
- */
 std::unordered_set<std::string>
 Cache::get_package_provides(std::string_view pkg) {
   std::lock_guard<std::mutex> lock(mtx);
@@ -234,11 +169,6 @@ Cache::get_package_provides(std::string_view pkg) {
   return result;
 }
 
-/**
- * 从磁盘加载所有缓存数据
- * 包括文件数据库、提供者数据库、已安装包列表、锁定包列表等
- * 反向依赖和 essential 列表初始化为未加载状态，按需读取
- */
 void Cache::load() {
   std::lock_guard<std::mutex> lock(mtx);
   file_db = read_db_uncached(Config::instance().files_db());
@@ -260,10 +190,6 @@ void Cache::load() {
   dirty = false;
 }
 
-/**
- * 按需加载反向依赖信息
- * 读取 dep_dir/ 目录下每个包的反向依赖文件（每行一个依赖项）
- */
 void Cache::ensure_reverse_deps() {
   if (reverse_deps_loaded)
     return;
@@ -296,10 +222,6 @@ void Cache::ensure_reverse_deps() {
   reverse_deps_loaded = true;
 }
 
-/**
- * 按需加载 essential 包列表
- * 从配置文件读取系统必需包的集合
- */
 void Cache::ensure_essentials() {
   if (essentials_loaded)
     return;
@@ -309,68 +231,49 @@ void Cache::ensure_essentials() {
   essentials_loaded = true;
 }
 
-/**
- * 如果缓存数据有变动，将所有数据写回磁盘。
- *
- * WAL 保护：每个 DB 文件写入前先写 DB/DBNEW 日志，
- * 将原文件 rename 到 .lpkg_db_bak，再写 .tmp + fsync + rename，
- * 确保断电时旧内容在 .lpkg_db_bak 中安全保留。
- * 配合 COMMIT/ROLLBACK 使用，见 recover.cpp 的恢复逻辑。
- *
- * @param wal_tag   WAL 事务标签（如包名），用于 .lpkg_db_bak 后缀
- */
-void Cache::write(const std::string &wal_tag) {
+// ── 直接写入（无 WAL 保护） ────────────────────────────────────────
+// 注意：本版本不提供 WAL 保护的原子写入。数据库文件直接覆写。
+// WAL 保护的写入将在新的事务架构中重新实现。
+
+void Cache::write() {
   if (dirty) {
-    write_file_db(wal_tag);
-    write_providers(wal_tag);
-    write_pkgs(wal_tag);
-    write_holdpkgs(wal_tag);
+    write_file_db();
+    write_providers();
+    write_pkgs();
+    write_holdpkgs();
     dirty = false;
   }
 }
 
-/** 保留原无参 write 以兼容不涉及 WAL 的调用——现已全面启用 WAL 保护 */
-void Cache::write() { write("sync"); }
+void Cache::write(const std::string & /*wal_tag*/) {
+  // wal_tag 保留作接口兼容，写入逻辑与无参 write() 相同
+  write();
+}
 
-/**
- * 将已安装包列表写入磁盘，格式为 包名:版本号
- * 始终走 WAL 保护路径（write_set_file），生成 DB/DBNEW 日志 + .lpkg_db_bak
- */
-void Cache::write_pkgs(const std::string &wal_tag) {
+void Cache::write_pkgs() {
   std::unordered_set<std::string> pkg_set;
   for (const auto &[name, ver] : installed_pkgs) {
     pkg_set.insert(name + ":" + ver);
   }
-  write_set_file(Config::instance().pkgs_file(), pkg_set, wal_tag);
+  write_set_file_direct(Config::instance().pkgs_file(), pkg_set);
 }
 
-/**
- * 将锁定包列表写入磁盘，始终 WAL 保护
- */
-void Cache::write_holdpkgs(const std::string &wal_tag) {
-  write_set_file(Config::instance().holdpkgs_file(), holdpkgs, wal_tag);
+void Cache::write_holdpkgs() {
+  write_set_file_direct(Config::instance().holdpkgs_file(), holdpkgs);
 }
 
-/**
- * 将文件归属数据库写入磁盘，始终 WAL 保护
- */
-void Cache::write_file_db(const std::string &wal_tag) {
-  write_db_file(Config::instance().files_db(), file_db, wal_tag);
+void Cache::write_file_db() {
+  write_db_file_direct(Config::instance().files_db(), file_db);
 }
 
-/**
- * 将提供者数据库写入磁盘，始终 WAL 保护
- */
-void Cache::write_providers(const std::string &wal_tag) {
-  write_db_file(Config::instance().provides_db(), providers, wal_tag);
+void Cache::write_providers() {
+  write_db_file_direct(Config::instance().provides_db(), providers);
 }
 
-// ── 文件系统辅助：带 fsync 的原子写入 ──────────────────────────────
+// ── 文件系统辅助 ───────────────────────────────────────────────────
 
 namespace {
 
-/** 将内容写出到临时路径、fsync、再 rename 到目标路径。
- *  rename 在同文件系统内是原子的，fsync 保证 .tmp 内容在断电前完整落盘。 */
 void atomic_write_with_fsync(const fs::path &dst, const fs::path &tmp) {
   int fd = ::open(tmp.c_str(), O_WRONLY);
   if (fd >= 0) {
@@ -383,35 +286,12 @@ void atomic_write_with_fsync(const fs::path &dst, const fs::path &tmp) {
 
 } // namespace
 
-// ── WAL 保护的 DB 文件写入 ─────────────────────────────────────────
-
-void Cache::write_db_file(
+void Cache::write_db_file_direct(
     const fs::path &path,
     const std::map<std::string, std::unordered_set<std::string>, std::less<>>
-        &db,
-    const std::string &wal_tag) {
-  const fs::path bak = path.string() + ".lpkg_db_bak_" + wal_tag;
+        &db) {
   const fs::path tmp = path.string() + ".tmp";
 
-  // 1) WAL 记录意图
-  //    DBNEW：文件尚不存在（新创建的数据库文件）
-  //    DB：   文件已存在（修改已有数据库文件）
-  const bool is_new = !fs::exists(path);
-  if (is_new) {
-    TransactionLog::log_raw("DBNEW " + path.string() + " " + wal_tag);
-  } else {
-    TransactionLog::log_raw("DB " + path.string() + " " + wal_tag);
-  }
-
-  // 2) 备份原文件（若存在）
-  if (!is_new) {
-    std::error_code ec;
-    fs::rename(path, bak, ec);
-    if (!ec)
-      fsync_parent_dir(bak);
-  }
-
-  // 3) 写出新内容
   {
     std::ofstream f(tmp, std::ios::trunc);
     if (!f.is_open())
@@ -427,29 +307,13 @@ void Cache::write_db_file(
     }
   }
 
-  // 4) fsync + rename（原子替换）
   atomic_write_with_fsync(path, tmp);
 }
 
-void Cache::write_set_file(const fs::path &path,
-                           const std::unordered_set<std::string> &data,
-                           const std::string &wal_tag) {
-  const fs::path bak = path.string() + ".lpkg_db_bak_" + wal_tag;
+void Cache::write_set_file_direct(
+    const fs::path &path,
+    const std::unordered_set<std::string> &data) {
   const fs::path tmp = path.string() + ".tmp";
-
-  const bool is_new = !fs::exists(path);
-  if (is_new) {
-    TransactionLog::log_raw("DBNEW " + path.string() + " " + wal_tag);
-  } else {
-    TransactionLog::log_raw("DB " + path.string() + " " + wal_tag);
-  }
-
-  if (!is_new) {
-    std::error_code ec;
-    fs::rename(path, bak, ec);
-    if (!ec)
-      fsync_parent_dir(bak);
-  }
 
   {
     std::ofstream f(tmp, std::ios::trunc);
@@ -463,23 +327,7 @@ void Cache::write_set_file(const fs::path &path,
   atomic_write_with_fsync(path, tmp);
 }
 
-void Cache::remove_db_file(const fs::path &path, const std::string &wal_tag) {
-  if (!fs::exists(path))
-    return;
-
-  const fs::path bak = path.string() + ".lpkg_db_bak_" + wal_tag;
-  TransactionLog::log_raw("DBRM " + path.string() + " " + wal_tag);
-
-  std::error_code ec;
-  fs::rename(path, bak, ec);
-  if (!ec)
-    fsync_parent_dir(bak);
-}
-
-/** 扫描 state_dir 下所有 *.lpkg_db_bak 文件并删除。
- *  事务提交后调用，清理已不再需要的备份。
- *  使用 recursive_directory_iterator 确保子目录（deps/、needed_so/）
- *  中的 .lpkg_db_bak 也能被清理。 */
+/** 扫描 state_dir 下所有 *.lpkg_db_bak 文件并删除 */
 void Cache::cleanup_db_backups() {
   const fs::path state_dir = Config::instance().state_dir();
   if (!fs::exists(state_dir) || !fs::is_directory(state_dir))
@@ -495,10 +343,6 @@ void Cache::cleanup_db_backups() {
   }
 }
 
-/**
- * 从磁盘读取键-多值数据库（制表符分隔，值以逗号分隔）
- * 格式：key\tval1,val2,val3
- */
 std::map<std::string, std::unordered_set<std::string>, std::less<>>
 Cache::read_db_uncached(const fs::path &path) {
   std::map<std::string, std::unordered_set<std::string>, std::less<>> db;

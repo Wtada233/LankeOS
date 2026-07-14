@@ -48,11 +48,10 @@ public:
   /// 主入口：执行安装任务，ctx 用于递归依赖发现
   void run(InstallContext *ctx = nullptr);
 
-  /// 外部调用者（upgrade 等）仍使用旧接口
+  /// 外部调用者仍使用旧接口
   void run_simple() { run(nullptr); }
 
   // --- 元数据验证模式（公开） ---
-  /// 下载并解压包仅用于检查真实元数据（deps、provides），在实际安装前执行
   void download_and_verify_package();
   void extract_and_validate_package();
 
@@ -78,7 +77,6 @@ private:
   std::string expected_hash_;
   bool has_config_conflicts_ = false;
   bool force_reinstall_ = false;
-  bool batch_mode_ = false; ///< 是否在批次事务中运行（延迟 .bak 删除）
   std::vector<std::string> deps_;
   std::vector<std::string> provides_;
   std::vector<std::string> needed_so_;
@@ -88,7 +86,6 @@ private:
   void ensure_dependencies_satisfied(InstallContext &ctx);
   void check_for_file_conflicts();
   void backup_existing_files();
-  void rollback();
   void cleanup_backups();
   void commit_without_file_ops();
   void register_package();
@@ -97,33 +94,20 @@ private:
 public:
   // 测试钩子（非生产用途）：在 copy_package_files 每个文件复制前调用
   std::function<void()> on_before_file_copy;
-  /// 设置批次模式：在批次事务中延迟 .lpkg_bak 删除到 COMMIT_PKGS 后
-  void set_batch_mode(bool b) { batch_mode_ = b; }
-
-  /// 延迟清理列表：批次提交后才真正删除备份文件，确保回滚时可恢复旧版本
-  static std::vector<std::pair<std::filesystem::path, std::filesystem::path>>
-      deferred_cleanups_;
-  /// 处理所有延迟清理（在 COMMIT_PKGS 后调用）
-  static void process_deferred_cleanups();
-  /// 丢弃延迟清理列表（回滚时调用，.bak 已被 restore 消费或不再需要）
-  static void discard_deferred_cleanups();
 
 private:
   std::vector<DependencyInfo> parse_deps() const;
 
-  // 事务状态
+  // 事务状态（仅供文件级备份/清理使用，不含事务保护语义）
   std::vector<std::pair<std::filesystem::path, std::filesystem::path>> backups_;
   std::vector<std::filesystem::path> new_files_;
-  std::vector<std::filesystem::path> new_dirs_; // 新创建的目录（不含已存在的）
+  std::vector<std::filesystem::path> new_dirs_;
 };
 
 /// 公共 API：安装包
 void install_packages(const std::vector<std::string> &pkg_args,
                       const std::string &hash_file = "",
                       bool force_reinstall = false);
-
-/// 从事务日志和残留备份中恢复中断的事务
-void recover_packages();
 
 /// 内部递归引擎
 void install_packages_internal(InstallContext &ctx);

@@ -74,8 +74,6 @@ void print_usage(const cxxopts::Options &options) {
   std::cerr << get_string("info.build_desc") << std::endl;
   std::cerr << get_string("info.depend_desc") << std::endl;
   std::cerr << get_string("info.scan_desc") << std::endl;
-  std::cerr << get_string("info.rec_desc") << "  "
-            << get_string("info.rec_opts") << std::endl;
 }
 
 #include <functional>
@@ -239,9 +237,6 @@ static int handle_command(const std::string &command,
           !v.empty())
         r = v[0];
     scan_orphans(r);
-
-  } else if (command == constants::CMD_REC) {
-    recover_packages();
 
   } else {
     usage();
