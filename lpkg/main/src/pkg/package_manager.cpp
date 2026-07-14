@@ -1287,7 +1287,7 @@ extern std::atomic<bool> sigint_graceful;
  *   4. 按叶子优先的顺序逐个移除（force 模式）
  *   5. 整体包裹在 BEGIN_PKGS / COMMIT_PKGS 中保证原子性
  */
-void remove_package_recursive(const std::string &pkg_name) {
+void remove_package_recursive(const std::string &pkg_name, bool force) {
   if (sigint_graceful.load())
     throw LpkgException(get_string("info.sigint_aborted"));
   Cache::instance().load();
@@ -1307,7 +1307,7 @@ void remove_package_recursive(const std::string &pkg_name) {
   // ── 2. 排除受保护的包 ────────────────────────────────────────────
   // 如果源头包（pkg_name）本身是 essential，则整个操作无意义——删依赖者
   // 但保留源头包，系统处于破损状态。直接中止。
-  if (Cache::instance().is_essential(pkg_name)) {
+  if (!force && Cache::instance().is_essential(pkg_name)) {
     log_error(string_format("error.skip_remove_essential", pkg_name));
     return;
   }
