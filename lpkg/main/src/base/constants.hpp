@@ -91,6 +91,7 @@ inline constexpr std::string_view CMD_PACK = "pack";
 inline constexpr std::string_view CMD_BUILD = "build";
 inline constexpr std::string_view CMD_SCAN = "scan";
 inline constexpr std::string_view CMD_DEPEND = "depend";
+inline constexpr std::string_view CMD_REC = "rec";
 
 // 默认值
 inline constexpr std::string_view DEFAULT_PACK_SOURCE = "/tmp/lankepkg";

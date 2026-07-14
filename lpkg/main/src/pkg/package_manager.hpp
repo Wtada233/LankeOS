@@ -57,6 +57,7 @@ public:
 
   // --- 测试用（公开） ---
   void copy_package_files();
+  void rollback_files(); ///< 包级文件回滚（含 RESTORE_* WAL 审计）
 
   // 元数据验证调用者的访问器
   const std::vector<std::string> &deps() const { return deps_; }
@@ -108,9 +109,6 @@ private:
 void install_packages(const std::vector<std::string> &pkg_args,
                       const std::string &hash_file = "",
                       bool force_reinstall = false);
-
-/// 内部递归引擎
-void install_packages_internal(InstallContext &ctx);
 
 void remove_package(const std::string &pkg_name, bool force = false,
                     bool wrap_in_txn = true);
