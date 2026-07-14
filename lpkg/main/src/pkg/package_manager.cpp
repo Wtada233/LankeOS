@@ -1304,10 +1304,14 @@ void remove_package_recursive(const std::string &pkg_name) {
   if (affected.empty())
     return;
 
-  // ── 2. 排除受保护的包，显示列表 ────────────────────────────────────
-  // 跳过 essential 包（由 remove_package 内部保护），不跳 held 包——
-  // held 是 autoremove 概念（标记显式安装的包根），不应用于阻止递归移除。
-  // 用户如要保护包请使用 essential 机制。
+  // ── 2. 排除受保护的包 ────────────────────────────────────────────
+  // 如果源头包（pkg_name）本身是 essential，则整个操作无意义——删依赖者
+  // 但保留源头包，系统处于破损状态。直接中止。
+  if (Cache::instance().is_essential(pkg_name)) {
+    log_error(string_format("error.skip_remove_essential", pkg_name));
+    return;
+  }
+
   std::vector<std::string> to_remove;
   std::vector<std::string> essential_pkgs;
   for (const auto &p : affected) {
@@ -1375,7 +1379,8 @@ void remove_package_recursive(const std::string &pkg_name) {
       remove_package(p, true, false);
     }
   } catch (...) {
-    // rec 会通过 reverse_execute 回滚
+    // 立即回滚整个批次：恢复所有已移除包的文件和数据库状态
+    recover_packages();
     throw;
   }
 
