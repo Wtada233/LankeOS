@@ -1,11 +1,48 @@
 # lpkg 原子事务架构
 
-## 图例
+## 0. 架构约束（Architecture Invariants）
+
+以下约束是 lpkg 事务系统的根本前提，所有功能实现必须遵守。
+
+### 0.1 批次模型
+
+- **I-ARCH-1**: 所有写操作（install / remove / upgrade / reinstall / autoremove）均为批次事务，
+  即使只有一个包也走 `BEGIN_PKGS 1 → ... → COMMIT_PKGS`。不存在"独立包事务"。
+- **I-ARCH-2**: 批次内每个包安装/移除完成后：`.lpkg_bak` 保留，`.lpkgtmp` 已清，
+  内存 COMMIT 已写，DB 已落盘（带 WAL 保护的 `.lpkg_db_bak`）。
+- **I-ARCH-3**: 批次提交前（`COMMIT_PKGS` 未写），整个批次视为未完成，可整体回滚。
+
+### 0.2 回滚约束
+
+- **I-ARCH-4**: 回滚由 try-catch 驱动。任何正常中断（Ctrl+C、安装依赖失败、
+  文件冲突、磁盘满等抛异常的场景）走 catch → `recover_packages()` → 恢复文件/DB/目录
+  → 写 `COMMIT_PKGS` 关闭批次。安装侧 `InstallationTask::run()` 的 catch 和移除侧
+  `remove_package()` 的 catch 对称。
+- **I-ARCH-5**: `lpkg rec` 只用于进程在 catch 前已死亡的场景（断电、段错误、OOM killer）。
+  正常 Ctrl+C 后运行 `rec` 应无操作（批次已被 catch 的 `COMMIT_PKGS` 关闭）。
+
+### 0.3 WAL 语义
+
+- **I-ARCH-6**: WAL（`transaction.log`）是修复日志，不是备份。批次成功提交后，
+  `trim_completed` 删除该批次的全部日志行。OWNER_OVERRIDE 只在该批次内存活。
+- **I-ARCH-7**: 批次成功后所有权/DB 状态转接给新包，旧版本的 `.lpkg_db_bak` 和
+  `.lpkg_bak` 不再需要。跨批次不保留"旧版本撤回"能力。
+
+### 0.4 DB 恢复语义
+
+- **I-ARCH-8**: 每个 DB 文件写入（`Cache::write_db_file` / `write_set_file`）先写
+  `DB`/`DBNEW` WAL 行，再 rename 原文件到 `.lpkg_db_bak_<tag>`，再原子写入新内容。
+  `reverse_execute` 通过 `.lpkg_db_bak` 恢复 DB 到写入前的状态。
+- **I-ARCH-9**: 回滚时恢复顺序：逆序处理 WAL 操作行。`BACKUP` → 恢复旧文件，
+  `DB`/`DBRM` → 恢复 `.lpkg_db_bak`，`RM_DIR` → 重建目录。DB 恢复到批次开始前的状态。
+
+### 0.5 图例
 
 ```
 ──→  正常流程     ~~→  异常/回滚
 [方框] = 阶段     <菱形> = 判断
 (圆角) = WAL 日志行写入
+⑂ = SIGINT 检查点（v5.2+）
 ```
 
 ---
