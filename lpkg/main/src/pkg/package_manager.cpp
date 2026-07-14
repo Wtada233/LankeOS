@@ -10,6 +10,7 @@
 #include "crypto/hash.hpp"
 #include "db/batch_transaction.hpp"
 #include "db/cache.hpp"
+#include "db/test_breakpoints.hpp"
 #include "db/transaction_log.hpp"
 #include "db/wal_op.hpp"
 #include "downloader.hpp"
@@ -402,6 +403,7 @@ void remove_package(const std::string &pkg_name, bool force,
           bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name;
           wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " +
                             bak.string());
+          BreakpointManager::instance().hit("rm_backup_after_wal_" + pkg_name);
           fs::rename(phys, bak);
           fsync_parent_dir(bak);
           backups.emplace_back(phys, bak);
@@ -415,6 +417,9 @@ void remove_package(const std::string &pkg_name, bool force,
 
     if (sigint_graceful.load())
       throw LpkgException(get_string("info.sigint_aborted"));
+
+    // 断点：移除的 BACKUP 阶段完成后、文件删除前
+    BreakpointManager::instance().hit("rm_before_file_removal_" + pkg_name);
 
     remove_package_files(pkg_name, force);
 

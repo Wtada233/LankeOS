@@ -4,6 +4,7 @@
 #include "../config/config.hpp"
 #include "../i18n/localization.hpp"
 #include "cache.hpp"
+#include "test_breakpoints.hpp"
 #include "transaction_log.hpp"
 #include "wal_op.hpp"
 
