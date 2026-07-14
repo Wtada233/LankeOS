@@ -227,3 +227,55 @@ TEST_F(ActiveRollbackTest, MultipleBreakpointsOnlyFirstHits) {
 
   EXPECT_EQ(hit_count, 1);
 }
+
+// ============================================================================
+// remove -r 中途 SIGINT：已移除的包全部恢复（文件+DB）
+// ============================================================================
+
+TEST_F(ActiveRollbackTest, RecursiveRemoveSIGINTMidwayRestoresAll) {
+  // 构建依赖链: leaf ← mid ← root
+  std::string pLeaf = create_pkg("rr_leaf", "1.0");
+  std::string pMid = create_pkg("rr_mid", "1.0", {"rr_leaf"});
+  std::string pRoot = create_pkg("rr_root", "1.0", {"rr_mid"});
+
+  install_packages({pRoot, pMid, pLeaf});
+
+  // 确认全部安装
+  for (auto &n : {"rr_root", "rr_mid", "rr_leaf"}) {
+    EXPECT_FALSE(Cache::instance().get_installed_version(n).empty());
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin" / n));
+  }
+
+  // 断点：在 rr_root 的 BACKUP WAL 写入后抛异常
+  // （root 是叶子插入顺序的最后，但 remove 顺序的中间）
+  BreakpointManager::instance().set("rm_backup_after_wal_rr_root",
+      [] { throw LpkgException("injected SIGINT during recursive remove"); });
+
+  // 模拟递归移除 rr_leaf（所有 3 个都在受影响集中）
+  EXPECT_THROW(remove_package_recursive("rr_leaf", true), LpkgException);
+
+  // 回滚后全部 3 个包应恢复
+  Cache::instance().load();
+  for (auto &n : {"rr_root", "rr_mid", "rr_leaf"}) {
+    EXPECT_FALSE(Cache::instance().get_installed_version(n).empty())
+        << n << " should be reinstalled after rollback";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin" / n))
+        << n << " binary should be restored from .lpkg_bak";
+  }
+
+  // WAL 应有 COMMIT_PKGS
+  std::ifstream f(wal::wal_log_path());
+  std::string c((std::istreambuf_iterator<char>(f)), {});
+  EXPECT_NE(c.find("COMMIT_PKGS"), std::string::npos);
+
+  // 不应有 .lpkg_bak 残留
+  std::error_code ec_bak;
+  for (const auto &e : fs::recursive_directory_iterator(
+           test_root / "usr", ec_bak)) {
+    EXPECT_EQ(e.path().filename().string().find(".lpkg_bak_"),
+              std::string::npos)
+        << "no .lpkg_bak should remain: " << e.path();
+  }
+}
+
+// RecoveryAfterRollbackAllowsNormalReRemoval: 回滚后可重新正常移除（需要完整 remove -r 流程修复后启用）

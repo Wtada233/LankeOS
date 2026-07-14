@@ -986,6 +986,10 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
   }
 
   // WAL 2.0: 整批原子移除
+  // I-BAK-1: .lpkg_bak 和目录清理延迟到 COMMIT_PKGS 后，确保回滚可恢复
+  std::vector<std::pair<fs::path, fs::path>> all_backups;
+  std::vector<fs::path> all_empty_dirs;
+
   run_batch_transaction(
       to_remove.size(), [&](wal::WalWriter & /*w*/,
                             std::vector<std::string> &success) {
@@ -994,6 +998,9 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
 
         for (const auto &p : to_remove) {
           log_info(string_format("info.recursive_removing", p));
+
+          if (sigint_graceful.load())
+            throw LpkgException(get_string("info.sigint_aborted"));
 
           std::string ver = cache.get_installed_version(p);
           detail::run_hook(p, std::string(constants::PRERM_SH));
@@ -1013,6 +1020,7 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
               bak += std::string(constants::SUFFIX_LPKG_BAK) + p;
               wal::log_wal_line("BACKUP " + phys.string() +
                                 " \xe2\x86\x92 " + bak.string());
+              BreakpointManager::instance().hit("rm_backup_after_wal_" + p);
               fs::rename(phys, bak);
               fsync_parent_dir(bak);
               backups.emplace_back(phys, bak);
@@ -1021,7 +1029,7 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
 
           remove_package_files(p, true);
 
-          // 目录元数据
+          // 目录元数据（回滚时重建用）
           for (const auto &e : owned) {
             if (!e.ends_with('/')) continue;
             const fs::path phys =
@@ -1038,6 +1046,9 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
                 wal::log_wal_line("RM_DIR " + phys.string() + " " +
                                   std::string(mb) + " " + std::string(ub) +
                                   " " + std::string(gb));
+                // 仅空目录放入待清理列表
+                std::error_code ec;
+                if (fs::is_empty(phys, ec)) all_empty_dirs.push_back(phys);
               }
             }
             cache.remove_file_owner(e, p);
@@ -1046,27 +1057,25 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
           wal::log_wal_line("RM_COMMIT " + p + " " + ver);
           cache.remove_installed(p);
 
-          // 后提交清理
-          std::error_code ec;
-          for (const auto &[orig, bak] : backups)
-            fs::remove(bak, ec);
-          for (const auto &e : owned)
-            if (e.ends_with('/')) {
-              const fs::path phys =
-                  fs::path(e).is_absolute()
-                      ? Config::instance().root_dir() /
-                            fs::path(e).relative_path()
-                      : Config::instance().root_dir() / e;
-              if (fs::exists(phys) && fs::is_directory(phys)) {
-                if (fs::is_empty(phys, ec)) fs::remove(phys, ec);
-              }
-            }
+          // I-BAK-1: 不在此处清理 .lpkg_bak！
+          // 收集到外部列表，COMMIT_PKGS 后统一清理
+          for (const auto &b : backups)
+            all_backups.emplace_back(b);
 
           wal::log_wal_line("RM_END " + p + " " + ver);
           cache.write(p + ":removed");
           success.push_back(p);
         }
       });
+
+  // COMMIT_PKGS 成功后的统一清理阶段
+  std::error_code ec;
+  for (const auto &[orig, bak] : all_backups)
+    fs::remove(bak, ec);
+  for (const auto &d : all_empty_dirs) {
+    if (fs::exists(d) && fs::is_directory(d) && fs::is_empty(d, ec))
+      fs::remove(d, ec);
+  }
 
   trim_completed();
   cleanup_db_backups();
