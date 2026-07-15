@@ -2,7 +2,7 @@
   "name": "acl",
   "version": "2.3.2",
   "sources": [
-    "https://mirrors.slackware.com/slackware/slackware-current/source/a/acl/acl-2.3.2.tar.xz"
+    "https://master.dl.sourceforge.net/project/linux4m/50.0/addons/acl/src/acl-2.3.2.tar.xz"
   ],
   "work_sources": []
 }
