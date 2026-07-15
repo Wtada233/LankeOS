@@ -147,9 +147,16 @@ def resolve_needed_so(packages, provides):
 # 拓扑排序（自底向上）
 # ---------------------------------------------------------------------------
 
+def _sorted(iterable):
+    """稳定性排序辅助：按小写字母序，保证每次运行结果一致。"""
+    return sorted(iterable, key=str.lower)
+
+
 def topo_sort(resolved):
     """
-    Kahn 算法拓扑排序 + 循环检测。
+    Kahn 算法拓扑排序 + 循环检测（确定性版本）。
+
+    所有集合迭代均经过排序，确保同一层级内的包顺序完全可复现。
     返回:
       - order: 自底向上的有序列表（依赖者靠后）
       - cycles: { pkg → [dep] } 被切断的循环依赖边（仅切实际构成循环的边）
@@ -170,83 +177,91 @@ def topo_sort(resolved):
         for dep in deps:
             rev[dep].add(pkg)
 
-    # 入度 = 本包依赖数；队列从无依赖的包开始
+    # 入度 = 本包依赖数；队列从无依赖的包开始（字母序稳定）
     in_deg = {n: len(graph[n]) for n in all_nodes}
-    queue = collections.deque(n for n in all_nodes if in_deg[n] == 0)
+    queue = collections.deque(_sorted(n for n in all_nodes if in_deg[n] == 0))
     order = []
     cycles = collections.defaultdict(list)
 
     while queue:
         node = queue.popleft()
         order.append(node)
+        # 收集本轮所有就绪的 depender，排序后入队
+        ready = []
         for depender in rev.get(node, set()):
             in_deg[depender] -= 1
             if in_deg[depender] == 0:
-                queue.append(depender)
+                ready.append(depender)
+        queue.extend(_sorted(ready))
 
-    # --- 循环检测：在剩余子图中 DFS 找实际环路 ---
+    # --- 循环检测：在剩余子图中用三色 DFS 找任意后向边 ---
     remaining = {n for n in all_nodes if in_deg.get(n, 0) > 0}
 
-    def find_cycle(start, subgraph):
-        """从 start 出发 DFS，找到一条回到 start 的路径"""
-        visited = set()
-        path = []
+    def find_any_cycle(subgraph):
+        """在子图中找任意后向边。返回 (src, dst) 表示待切断的边，无环返回 None。
+        使用迭代式三色 DFS（白=未访问，灰=栈中，黑=已完成），完全确定性。"""
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color = {n: WHITE for n in subgraph}
 
-        def dfs(u):
-            if u in visited:
-                return False
-            visited.add(u)
-            for v in subgraph.get(u, set()):
-                if v == start:
-                    path.append((u, v))
-                    return True
-                if dfs(v):
-                    path.append((u, v))
-                    return True
-            return False
+        for root in _sorted(subgraph.keys()):
+            if color[root] != WHITE:
+                continue
+            # 用显式栈做 DFS，栈元素为 (node, iterator over sorted neighbors)
+            stack = [(root, iter(_sorted(subgraph.get(root, set()))))]
+            color[root] = GRAY
+            while stack:
+                u, neighbors = stack[-1]
+                v = next(neighbors, None)
+                if v is None:
+                    color[u] = BLACK
+                    stack.pop()
+                    continue
+                if v not in color:      # v 不在 subgraph 中
+                    continue
+                cv = color[v]
+                if cv == GRAY:
+                    # 后向边 u → v：u 和 v 同在一个 DFS 栈帧中，构成环路
+                    return (u, v)
+                if cv == WHITE:
+                    color[v] = GRAY
+                    stack.append((v, iter(_sorted(subgraph.get(v, set())))))
 
-        if dfs(start):
-            return path[::-1]  # 正向路径
-        return []
+        return None  # 子图无环
 
-    # 反复处理剩余节点，每次切一条环边
+    # 反复：找环 → 切边 → 重新 Kahn，直到剩余图为 DAG
     max_iter = len(all_nodes)  # 安全上限
     for _ in range(max_iter):
         if not remaining:
             break
-        node = next(iter(remaining))
+
         subgraph = {n: (graph[n] & remaining) for n in remaining}
-        cycle_path = find_cycle(node, subgraph)
-        if not cycle_path:
-            # 不在环中 —— 直接入队
-            in_deg[node] = 0
-            queue.append(node)
-            while queue:
-                n = queue.popleft()
-                if n in remaining:
-                    remaining.remove(n)
-                    order.append(n)
-                    for depender in rev.get(n, set()):
-                        if depender in remaining:
-                            in_deg[depender] -= 1
-                            if in_deg[depender] == 0:
-                                queue.append(depender)
-            continue
-        # 切最后一条边 (from → to)
-        src, dst = cycle_path[-1]
+        edge = find_any_cycle(subgraph)
+
+        if edge is None:
+            # 子图已是 DAG，所有剩余节点按拓扑序直接处理
+            for n in _sorted(remaining):
+                order.append(n)
+            break
+
+        src, dst = edge
         cycles[src].append(dst)
+        # 从图中永久移除此边，防止同一环边被重复切割导致 in_deg 过度递减
+        graph[src].discard(dst)
         in_deg[src] -= 1
+        # 切断边后可能释放节点，重新 Kahn 推进
         if in_deg[src] == 0:
             queue.append(src)
             while queue:
                 n = queue.popleft()
                 remaining.discard(n)
                 order.append(n)
+                ready = []
                 for depender in rev.get(n, set()):
                     if depender in remaining:
                         in_deg[depender] -= 1
                         if in_deg[depender] == 0:
-                            queue.append(depender)
+                            ready.append(depender)
+                queue.extend(_sorted(ready))
 
     return order, cycles
 
