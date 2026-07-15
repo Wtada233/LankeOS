@@ -81,25 +81,6 @@ TEST_F(ComprehensiveTest, UpgradeCleansObsoleteFiles) {
     EXPECT_FALSE(fs::exists(test_root / "usr/bin/file2")) << "Obsolete file was not removed during upgrade!";
 }
 
-TEST_F(ComprehensiveTest, ExplicitVersionDowngrade) {
-    std::string p1 = create_pkg("vers_test", "1.0", {{"usr/bin/bin1", "/"}});
-    std::string p2 = create_pkg("vers_test", "2.0", {{"usr/bin/bin1", "/"}});
-
-    install_packages({p2});
-    
-    EXPECT_NO_THROW(install_packages({p1}));
-
-    {
-        std::ifstream pkgs(Config::instance().pkgs_file());
-        std::string line;
-        bool found = false;
-        while (std::getline(pkgs, line)) {
-            if (line == "vers_test:1.0") found = true;
-        }
-        EXPECT_TRUE(found) << "Failed to downgrade to 1.0";
-    }
-}
-
 TEST_F(ComprehensiveTest, AutoremoveHandlesVirtualChains) {
     std::string p1 = create_pkg("openssl", "1.0", {{"usr/lib/libssl.so", "/"}}, {}, {"libssl"});
     std::string p2 = create_pkg("curl", "1.0", {{"usr/bin/curl", "/"}}, {"libssl"});

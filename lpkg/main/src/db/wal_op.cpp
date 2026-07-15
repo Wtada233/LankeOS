@@ -44,8 +44,11 @@ static constexpr std::pair<std::string_view, WALOpType> TYPE_MAP[] = {
     {"RESTORE_FILE", WALOpType::RESTORE_FILE},
     {"RESTORE_DB", WALOpType::RESTORE_DB},
     {"RESTORE_DIR", WALOpType::RESTORE_DIR},
-    {"REMOVE_FILE", WALOpType::REMOVE_FILE},
-    {"REMOVE_DIR", WALOpType::REMOVE_DIR},
+    {"RESTORE_FILE_RM", WALOpType::RESTORE_FILE_RM},
+    {"RESTORE_DIR_RM", WALOpType::RESTORE_DIR_RM},
+    {"RESTORE_DB_RM", WALOpType::RESTORE_DB_RM},
+    {"REMOVE_FILE", WALOpType::REMOVE_FILE},   // 旧名称，向后兼容解析
+    {"REMOVE_DIR", WALOpType::REMOVE_DIR},     // 旧名称，向后兼容解析
 };
 
 std::string_view walop_type_name(WALOpType t) {
@@ -250,7 +253,8 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
         stats.files_cleaned++;
 
         if (write_audit) {
-          wal_append_raw("REMOVE_FILE " + op.arg2);
+          // 逆操作: 删除被 COPY 的目标文件（无备份可恢复）
+          wal_append_raw("RESTORE_FILE_RM " + op.arg2);
         }
       }
       break;
@@ -265,7 +269,8 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
         stats.files_cleaned++;
 
         if (write_audit) {
-          wal_append_raw("REMOVE_FILE " + op.arg1);
+          // 逆操作: 删除安装时新建的文件（无备份可恢复）
+          wal_append_raw("RESTORE_FILE_RM " + op.arg1);
         }
       }
       break;
@@ -280,7 +285,8 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
         if (fs::is_empty(p, ec)) {
           fs::remove(p, ec);
           if (!ec && write_audit) {
-            wal_append_raw("REMOVE_DIR " + op.arg1);
+            // 逆操作: 删除安装时新建的空目录（无备份可恢复）
+            wal_append_raw("RESTORE_DIR_RM " + op.arg1);
           }
         }
       }
@@ -340,16 +346,17 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
         stats.db_restored++;
 
         if (write_audit) {
+          // DBNEW 有备份 → 恢复备份（与 DB 逆操作相同）
           wal_append_raw("RESTORE_DB " + bak + " \xe2\x86\x92 " + op.arg1);
         }
       } else {
-        // 无备份 → 文件是新建的 → 删除
+        // 无备份 → DB 文件是全新创建的 → 删除以恢复安装前状态
         if (fs::exists(op.arg1)) {
           safe_remove(op.arg1);
           stats.files_cleaned++;
 
           if (write_audit) {
-            wal_append_raw("REMOVE_FILE " + op.arg1);
+            wal_append_raw("RESTORE_DB_RM " + op.arg1);
           }
         }
       }

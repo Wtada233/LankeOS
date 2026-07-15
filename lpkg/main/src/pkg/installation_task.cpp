@@ -287,7 +287,8 @@ void InstallationTask::rollback_files() {
       std::error_code ec;
       fs::remove(f, ec);
       if (!ec) {
-        wal::log_wal_line("REMOVE_FILE " + f.string());
+        // 逆操作: 删除安装时新建的文件（无备份可恢复）
+        wal::log_wal_line("RESTORE_FILE_RM " + f.string());
       }
     }
   }
@@ -299,7 +300,8 @@ void InstallationTask::rollback_files() {
       if (fs::is_empty(d, ec)) {
         fs::remove(d, ec);
         if (!ec) {
-          wal::log_wal_line("REMOVE_DIR " + d.string());
+          // 逆操作: 删除安装时新建的空目录（无备份可恢复）
+          wal::log_wal_line("RESTORE_DIR_RM " + d.string());
         }
       }
     }

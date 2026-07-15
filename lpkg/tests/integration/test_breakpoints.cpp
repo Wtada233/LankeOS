@@ -341,6 +341,82 @@ TEST_F(BreakpointTest, WalEdgeCasesNoCrash) {
   EXPECT_NO_THROW(recover_packages());
 }
 
+// §10: 二次回滚 — DBNEW 无备份的 RESTORE_DB_RM 审计行崩溃恢复
+// 锚定：DBNEW rollback 写 RESTORE_DB_RM（而非 REMOVE_FILE 或 RESTORE_DB），
+//       若 rollback 在写此行后崩溃，recover 应跳过已删除的文件（幂等）
+TEST_F(BreakpointTest, SecondaryRollbackAfterRestoreDbRm) {
+  auto dir = Config::instance().state_dir();
+  auto nf = (dir / "sec_dbnew").string();
+  std::string pkgs = (dir / "pkgs_sec_dbnew").string();
+  std::string bak_db = pkgs + ".lpkg_db_bak_before:A:installed";
+
+  // 模拟场景: 批次安装 A(DB更新) + B(新建DB)，B失败后 batch_rollback
+  // rollback 执行了 RESTORE_DB(A的DB备份恢复) 和 RESTORE_DB_RM(删除B新建的DB)
+  // 但 RESTORE_DB_RM 写入后、COMMIT_PKGS 前崩溃
+  fs::create_directories(dir);
+  std::ofstream(bak_db) << "pre_state\n";
+  std::ofstream(nf) << "new_db_content\n";
+
+  write_wal("BEGIN_PKGS 2\n"
+            "BEGIN A 1.0\nCOMMIT A 1.0\nEND A 1.0\n"
+            "DB " + pkgs + " A:installed\n"
+            "BEGIN B 1.0\nROLLBACK B 1.0\nEND B 1.0\n"
+            "DBNEW " + nf + " B:installed\n"
+            "RESTORE_DB " + bak_db + " \xe2\x86\x92 " + pkgs + "\n"
+            "RESTORE_DB_RM " + nf + "\n");
+
+  // RESTORE_DB 已完成：bak 已被消费
+  fs::rename(bak_db, pkgs);
+  // RESTORE_DB_RM 已完成：nf 已被删除
+  fs::remove(nf);
+
+  recover_packages();
+  // RESTORE_DB_RM 行被 skip_in_reverse 跳过 → 幂等
+  EXPECT_FALSE(fs::exists(nf)) << "New DB should stay deleted after recovery";
+  EXPECT_TRUE(fs::exists(pkgs)) << "Restored DB should still exist";
+  EXPECT_NE(read_wal().find("COMMIT_PKGS"), std::string::npos);
+}
+
+// §10: 二次回滚 — RESTORE_FILE_RM 崩溃恢复（COPY/NEW 逆操作审计行）
+// 锚定：rollback 写 RESTORE_FILE_RM 后崩溃，recover 应跳过已完成的行
+// 注意：RESTORE_FILE 恢复了 a_orig（bak→orig），但 recover 的 COPY 逆向会再次删除 a_orig
+//       这是预期行为 —— 批次被回滚意味着安装的文件应当不存在
+TEST_F(BreakpointTest, SecondaryRollbackAfterRestoreFileRm) {
+  fs::path a_orig = test_root / "usr/bin/sec_frm_a";
+  fs::path a_bak = a_orig.string() + std::string(constants::SUFFIX_LPKG_BAK) + "A";
+  fs::path b_new = test_root / "usr/bin/sec_frm_b";
+
+  fs::create_directories(a_orig.parent_path());
+  std::ofstream(a_bak) << "old A\n";
+  std::ofstream(b_new) << "new B\n";
+
+  write_wal("BEGIN_PKGS 2\n"
+            "BEGIN A 1.0\n"
+            "BACKUP " + a_orig.string() + " \xe2\x86\x92 " + a_bak.string() + "\n"
+            "COPY /tmp/a \xe2\x86\x92 " + a_orig.string() + "\n"
+            "COMMIT A 1.0\nEND A 1.0\n"
+            "BEGIN B 1.0\n"
+            "NEW " + b_new.string() + "\n"
+            "COPY /tmp/b \xe2\x86\x92 " + b_new.string() + "\n"
+            "ROLLBACK B 1.0\nEND B 1.0\n"
+            "RESTORE_FILE " + a_bak.string() + " \xe2\x86\x92 " + a_orig.string() + "\n"
+            "RESTORE_FILE_RM " + b_new.string() + "\n");
+
+  // 模拟 rollback 已部分执行：
+  // RESTORE_FILE 已消费备份（a 已恢复）
+  fs::rename(a_bak, a_orig);
+  // RESTORE_FILE_RM 已删除 b
+  fs::remove(b_new);
+
+  recover_packages();
+  // b 已被 RESTORE_FILE_RM 删除，COPY 逆向也无影响 → 保持删除
+  EXPECT_FALSE(fs::exists(b_new)) << "File deleted by RESTORE_FILE_RM should stay deleted";
+  // a 被 RESTORE_FILE 恢复后又会被 COPY 逆向删除 → 最终不存在（批次回滚完成）
+  EXPECT_FALSE(fs::exists(a_orig)) << "File restored by RESTORE_FILE is re-deleted by COPY reverse during recover";
+  EXPECT_FALSE(fs::exists(a_bak)) << "Backup should be consumed";
+  EXPECT_NE(read_wal().find("COMMIT_PKGS"), std::string::npos);
+}
+
 // DBNEW/DBNEW+备份/DBRM 恢复
 TEST_F(BreakpointTest, DbNewRmRecovery) {
   auto dir = Config::instance().state_dir();

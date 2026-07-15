@@ -369,8 +369,11 @@ void Cache::write_db_file_wal(
 
   const bool is_new = !fs::exists(db_path);
 
-  // 1. WAL 行
-  wal::log_wal_line(wal_op_type + " " + db_path.string() + " " + milestone);
+  // 1. WAL 行 — 新建文件使用 DBNEW（确保回滚时删除），已存在文件使用调用者指定的类型
+  const auto effective_op_type =
+      (is_new && wal_op_type == "DB") ? std::string("DBNEW") : wal_op_type;
+  wal::log_wal_line(effective_op_type + " " + db_path.string() + " " +
+                    milestone);
 
   // 2. 备份旧文件（仅当文件已存在时）
   std::string bak_path = db_path.string() + ".lpkg_db_bak_before:" + milestone;
@@ -410,8 +413,10 @@ void Cache::write_set_file_wal(const fs::path &path,
 
   const bool is_new = !fs::exists(path);
 
-  // 1. WAL 行
-  wal::log_wal_line(wal_op_type + " " + path.string() + " " + milestone);
+  // 1. WAL 行 — 新建文件使用 DBNEW（确保回滚时删除），已存在文件使用调用者指定的类型
+  const auto effective_op_type =
+      (is_new && wal_op_type == "DB") ? std::string("DBNEW") : wal_op_type;
+  wal::log_wal_line(effective_op_type + " " + path.string() + " " + milestone);
 
   // 2. 备份旧文件
   std::string bak_path = path.string() + ".lpkg_db_bak_before:" + milestone;

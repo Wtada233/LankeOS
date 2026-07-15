@@ -65,12 +65,18 @@ enum class WALOpType {
   DBNEW, // DBNEW <path> <milestone>
   DBRM,  // DBRM <path> <milestone>
 
-  // 回滚审计
+  // 回滚审计 — 描述实际文件动作，而非正向操作名
+  // 恢复备份: rename .bak → 原位
   RESTORE_FILE, // RESTORE_FILE <bak> → <orig>
   RESTORE_DB,   // RESTORE_DB <bak> → <db>
   RESTORE_DIR,  // RESTORE_DIR <path>
-  REMOVE_FILE,  // REMOVE_FILE <path>
-  REMOVE_DIR,   // REMOVE_DIR <path>
+  // 删除操作: 无备份可恢复，直接删除以回退到安装前状态
+  RESTORE_FILE_RM, // RESTORE_FILE_RM <path>   (COPY/NEW 逆操作)
+  RESTORE_DIR_RM,  // RESTORE_DIR_RM <path>    (NEW_DIR 逆操作)
+  RESTORE_DB_RM,   // RESTORE_DB_RM <path>     (DBNEW 无备份 逆操作)
+  // 旧名称 — 仅用于解析旧 WAL 文件，不再写入
+  REMOVE_FILE,  // 已废弃 → RESTORE_FILE_RM
+  REMOVE_DIR,   // 已废弃 → RESTORE_DIR_RM
 };
 
 struct WALOp {
@@ -93,8 +99,10 @@ struct WALOp {
 
   bool is_restore_audit() const {
     return type == WALOpType::RESTORE_FILE || type == WALOpType::RESTORE_DB ||
-           type == WALOpType::RESTORE_DIR || type == WALOpType::REMOVE_FILE ||
-           type == WALOpType::REMOVE_DIR;
+           type == WALOpType::RESTORE_DIR || type == WALOpType::RESTORE_FILE_RM ||
+           type == WALOpType::RESTORE_DIR_RM || type == WALOpType::RESTORE_DB_RM ||
+           type == WALOpType::REMOVE_FILE ||   // 旧名称兼容
+           type == WALOpType::REMOVE_DIR;      // 旧名称兼容
   }
 
   /// reverse_execute 需要跳过的行

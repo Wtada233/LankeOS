@@ -57,8 +57,11 @@ TEST_F(WalEdgeCaseTest, AllOpTypesParseRoundtrip) {
     {"RESTORE_FILE /bak \xe2\x86\x92 /orig", wal::WALOpType::RESTORE_FILE},
     {"RESTORE_DB /bak \xe2\x86\x92 /db", wal::WALOpType::RESTORE_DB},
     {"RESTORE_DIR /dir", wal::WALOpType::RESTORE_DIR},
-    {"REMOVE_FILE /f", wal::WALOpType::REMOVE_FILE},
-    {"REMOVE_DIR /d", wal::WALOpType::REMOVE_DIR},
+    {"REMOVE_FILE /f", wal::WALOpType::REMOVE_FILE},     // 旧名称
+    {"REMOVE_DIR /d", wal::WALOpType::REMOVE_DIR},       // 旧名称
+    {"RESTORE_FILE_RM /f", wal::WALOpType::RESTORE_FILE_RM},
+    {"RESTORE_DIR_RM /d", wal::WALOpType::RESTORE_DIR_RM},
+    {"RESTORE_DB_RM /db", wal::WALOpType::RESTORE_DB_RM},
   };
   for (auto &c : cases) {
     auto op = wal::parse_op(c.line);
@@ -303,8 +306,11 @@ TEST_F(WalEdgeCaseTest, AllSkipInReverseTypes) {
   EXPECT_TRUE(wal::parse_op("RESTORE_FILE a \xe2\x86\x92 b").skip_in_reverse());
   EXPECT_TRUE(wal::parse_op("RESTORE_DB a \xe2\x86\x92 b").skip_in_reverse());
   EXPECT_TRUE(wal::parse_op("RESTORE_DIR /d").skip_in_reverse());
-  EXPECT_TRUE(wal::parse_op("REMOVE_FILE /f").skip_in_reverse());
-  EXPECT_TRUE(wal::parse_op("REMOVE_DIR /d").skip_in_reverse());
+  EXPECT_TRUE(wal::parse_op("REMOVE_FILE /f").skip_in_reverse());       // 旧名称
+  EXPECT_TRUE(wal::parse_op("REMOVE_DIR /d").skip_in_reverse());        // 旧名称
+  EXPECT_TRUE(wal::parse_op("RESTORE_FILE_RM /f").skip_in_reverse());
+  EXPECT_TRUE(wal::parse_op("RESTORE_DIR_RM /d").skip_in_reverse());
+  EXPECT_TRUE(wal::parse_op("RESTORE_DB_RM /db").skip_in_reverse());
 
   EXPECT_FALSE(wal::parse_op("BACKUP a \xe2\x86\x92 b").skip_in_reverse());
   EXPECT_FALSE(wal::parse_op("NEW /f").skip_in_reverse());
