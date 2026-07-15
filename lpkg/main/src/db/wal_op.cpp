@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -164,16 +165,27 @@ static bool is_batch_start_milestone(const WALOp &op) {
 // reverse_execute — 逆向执行引擎
 // ============================================================================
 
-/// 向 WAL 日志追加一行（不使用 fsync——审计行在上下文中已由外部 fsync）
+/// 向 WAL 日志追加一行并 fsync（用于回滚审计行和批次标记）
+/// 失败时抛 LpkgException——WAL 不可写意味着系统状态无法保证
 static void wal_append_raw(const std::string &line) {
   std::string path = wal_log_path();
   int fd =
       ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
-    return;
+    throw LpkgException(string_format("error.wal_open_failed", path));
+
   std::string l = line + "\n";
-  ::write(fd, l.data(), l.size());
-  ::fsync(fd);
+  ssize_t written = ::write(fd, l.data(), l.size());
+  if (written < 0 || static_cast<size_t>(written) != l.size()) {
+    ::close(fd);
+    throw LpkgException(string_format("error.wal_write_failed", path));
+  }
+
+  if (::fsync(fd) != 0) {
+    ::close(fd);
+    throw LpkgException(string_format("error.wal_fsync_failed", path));
+  }
+
   ::close(fd);
 }
 
@@ -443,7 +455,7 @@ std::vector<WALOp> extract_current_batch_ops(const std::string &wal_path) {
 }
 
 std::vector<std::vector<WALOp>>
-extract_all_uncommitted_batches(const std::string &wal_path) {
+extract_last_uncommitted_batch(const std::string &wal_path) {
   std::vector<std::vector<WALOp>> result;
   std::ifstream file(wal_path);
   if (!file.is_open())
@@ -521,8 +533,15 @@ void batch_rollback(const std::vector<std::string> &successfully_installed) {
   cache.write(":batch-start");
 
   // 5. 对每个已成功（已回滚）包写 ROLLBACK + END
+  //    版本号从 WAL 的 BEGIN 行提取——load() 后的 Cache 对全新安装的包返回空版本
+  std::map<std::string, std::string> pkg_versions;
+  for (const auto &op : ops) {
+    if (op.type == WALOpType::BEGIN)
+      pkg_versions[op.arg1] = op.arg2;
+  }
   for (const auto &pkg : successfully_installed) {
-    std::string ver = Cache::instance().get_installed_version(pkg);
+    auto it = pkg_versions.find(pkg);
+    std::string ver = (it != pkg_versions.end()) ? it->second : std::string{};
     wal_append_raw("ROLLBACK " + pkg + " " + ver);
     wal_append_raw("END " + pkg + " " + ver);
   }

@@ -60,7 +60,7 @@ void recover_packages() {
   };
 
   std::vector<BatchInfo> uncommitted_batches;
-  bool in_txn = false;
+  int depth = 0;
   size_t batch_start = 0;
 
   for (size_t i = 0; i < lines.size(); ++i) {
@@ -69,20 +69,16 @@ void recover_packages() {
       continue;
 
     if (op.type == wal::WALOpType::BEGIN_PKGS) {
-      if (!in_txn) {
+      if (depth == 0)
         batch_start = i;
-        in_txn = true;
-      }
-      // 嵌套 BEGIN_PKGS（不应发生，但健壮处理）：记录新的起点
+      ++depth;
     } else if (op.type == wal::WALOpType::COMMIT_PKGS) {
-      if (in_txn) {
-        in_txn = false;
-        // 批次已完成，不加入未提交列表
-      }
+      if (depth > 0)
+        --depth;
     }
   }
 
-  if (in_txn) {
+  if (depth > 0) {
     uncommitted_batches.push_back({batch_start, lines.size()});
   }
 

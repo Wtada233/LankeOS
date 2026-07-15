@@ -195,7 +195,6 @@ void install_packages(const std::vector<std::string> &pkg_args,
   run_batch_transaction(order.size(), [&](wal::WalWriter & /*batch_writer*/,
                                           std::vector<std::string> &success) {
     auto &cache = Cache::instance();
-    cache.write(":batch-start");
 
     size_t i = 0;
     while (i < order.size()) {
@@ -335,7 +334,6 @@ void remove_package(const std::string &pkg_name, bool force,
   run_batch_transaction(1, [&](wal::WalWriter & /*w*/,
                                std::vector<std::string> &success) {
     auto &cache = Cache::instance();
-    cache.write(":batch-start");
 
     if (sigint_graceful.load())
       throw LpkgException(get_string("info.sigint_aborted"));
@@ -521,7 +519,6 @@ void remove_package(const std::string &pkg_name, bool force,
     // WAL: RM_END
     wal::log_wal_line("RM_END " + pkg_name + " " + ver);
 
-    cache.write(pkg_name + ":removed");
     success.push_back(pkg_name);
   });
 
@@ -734,7 +731,6 @@ void upgrade_packages() {
   run_batch_transaction(plan.size(), [&](wal::WalWriter & /*w*/,
                                          std::vector<std::string> &success) {
     auto &cache = Cache::instance();
-    cache.write(":batch-start");
 
     for (const auto &e : plan) {
       if (sigint_graceful.load())
@@ -994,7 +990,6 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
       to_remove.size(), [&](wal::WalWriter & /*w*/,
                             std::vector<std::string> &success) {
         auto &cache = Cache::instance();
-        cache.write(":batch-start");
 
         for (const auto &p : to_remove) {
           log_info(string_format("info.recursive_removing", p));
