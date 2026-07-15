@@ -234,7 +234,7 @@ void resolve_package_dependencies(const std::string &pkg_name,
         !version_compare(installed_version, latest_version))
       return;
     if (is_explicit && !installed_version.empty() &&
-        installed_version == latest_version)
+        !version_compare(installed_version, latest_version))
       return;
   }
 

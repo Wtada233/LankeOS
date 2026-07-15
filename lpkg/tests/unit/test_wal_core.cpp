@@ -262,6 +262,7 @@ TEST_F(WalCoreTest, ParseOpRestoreDir) {
 }
 
 TEST_F(WalCoreTest, ParseOpRemoveFile) {
+  // 旧名称 — 向后兼容解析旧 WAL 文件
   auto op = wal::parse_op("REMOVE_FILE /usr/bin/newtool");
   EXPECT_EQ(op.type, wal::WALOpType::REMOVE_FILE);
   EXPECT_EQ(op.arg1, "/usr/bin/newtool");
@@ -270,6 +271,25 @@ TEST_F(WalCoreTest, ParseOpRemoveFile) {
 TEST_F(WalCoreTest, ParseOpRemoveDir) {
   auto op = wal::parse_op("REMOVE_DIR /usr/share/newpkg");
   EXPECT_EQ(op.type, wal::WALOpType::REMOVE_DIR);
+}
+
+// 新名称 — RESTORE 统一前缀
+TEST_F(WalCoreTest, ParseOpRestoreFileRm) {
+  auto op = wal::parse_op("RESTORE_FILE_RM /usr/bin/newtool");
+  EXPECT_EQ(op.type, wal::WALOpType::RESTORE_FILE_RM);
+  EXPECT_EQ(op.arg1, "/usr/bin/newtool");
+}
+
+TEST_F(WalCoreTest, ParseOpRestoreDirRm) {
+  auto op = wal::parse_op("RESTORE_DIR_RM /usr/share/newpkg");
+  EXPECT_EQ(op.type, wal::WALOpType::RESTORE_DIR_RM);
+  EXPECT_EQ(op.arg1, "/usr/share/newpkg");
+}
+
+TEST_F(WalCoreTest, ParseOpRestoreDbRm) {
+  auto op = wal::parse_op("RESTORE_DB_RM /var/lib/lpkg/pkgs");
+  EXPECT_EQ(op.type, wal::WALOpType::RESTORE_DB_RM);
+  EXPECT_EQ(op.arg1, "/var/lib/lpkg/pkgs");
 }
 
 TEST_F(WalCoreTest, ParseOpInvalidLine) {
@@ -308,8 +328,11 @@ TEST_F(WalCoreTest, IsRestoreAudit) {
   EXPECT_TRUE(wal::parse_op("RESTORE_FILE a → b").is_restore_audit());
   EXPECT_TRUE(wal::parse_op("RESTORE_DB a → b").is_restore_audit());
   EXPECT_TRUE(wal::parse_op("RESTORE_DIR /path").is_restore_audit());
-  EXPECT_TRUE(wal::parse_op("REMOVE_FILE /path").is_restore_audit());
-  EXPECT_TRUE(wal::parse_op("REMOVE_DIR /path").is_restore_audit());
+  EXPECT_TRUE(wal::parse_op("REMOVE_FILE /path").is_restore_audit());  // 旧名称
+  EXPECT_TRUE(wal::parse_op("REMOVE_DIR /path").is_restore_audit());   // 旧名称
+  EXPECT_TRUE(wal::parse_op("RESTORE_FILE_RM /path").is_restore_audit());
+  EXPECT_TRUE(wal::parse_op("RESTORE_DIR_RM /path").is_restore_audit());
+  EXPECT_TRUE(wal::parse_op("RESTORE_DB_RM /path").is_restore_audit());
 
   EXPECT_FALSE(wal::parse_op("BACKUP a → b").is_restore_audit());
 }
@@ -318,7 +341,11 @@ TEST_F(WalCoreTest, SkipInReverse) {
   // 元数据和 RESTORE 审计行在 reverse_execute 中跳过
   EXPECT_TRUE(wal::parse_op("BEGIN pkg 1.0").skip_in_reverse());
   EXPECT_TRUE(wal::parse_op("RESTORE_FILE a → b").skip_in_reverse());
-  EXPECT_TRUE(wal::parse_op("REMOVE_FILE /path").skip_in_reverse());
+  EXPECT_TRUE(wal::parse_op("REMOVE_FILE /path").skip_in_reverse());    // 旧名称
+  EXPECT_TRUE(wal::parse_op("REMOVE_DIR /path").skip_in_reverse());     // 旧名称
+  EXPECT_TRUE(wal::parse_op("RESTORE_FILE_RM /path").skip_in_reverse());
+  EXPECT_TRUE(wal::parse_op("RESTORE_DIR_RM /path").skip_in_reverse());
+  EXPECT_TRUE(wal::parse_op("RESTORE_DB_RM /path").skip_in_reverse());
   EXPECT_TRUE(wal::parse_op("BEGIN_PKGS 1").skip_in_reverse());
 
   // 正向操作行不跳过
@@ -583,6 +610,53 @@ TEST_F(WalCoreTest, ReverseExecuteDbRmWithBackup) {
   wal::reverse_execute(ops, "", false);
   EXPECT_FALSE(fs::exists(bak_path));
   EXPECT_EQ(read_file("var/lib/lpkg/deps_vim"), "glibc\nopenssl\n");
+}
+
+// ============================================================================
+// reverse_execute 测试 — 审计 WAL 行命名（锚定意图，防止误改）
+// ============================================================================
+
+// 锚定：DBNEW 无备份的逆操作是删除文件，审计名 RESTORE_DB_RM（描述实际动作）
+// 不是 RESTORE_DB（那是 restore from backup），也不是 REMOVE_FILE（旧名称）
+TEST_F(WalCoreTest, ReverseExecuteAuditNamingDbNewNoBackup) {
+  fs::path db_path = Config::instance().state_dir() / "audit_db_new";
+  {
+    std::ofstream f(db_path);
+    f << "new db content\n";
+  }
+
+  std::vector<wal::WALOp> ops;
+  auto op = wal::parse_op("DBNEW /var/lib/lpkg/audit_db_new testpkg:installed");
+  op.arg1 = db_path.string();
+  op.arg2 = "testpkg:installed";
+  ops.push_back(op);
+
+  wal::reverse_execute(ops, "", true); // write_audit = true
+
+  std::string wal_content = read_wal();
+  EXPECT_NE(wal_content.find("RESTORE_DB_RM " + db_path.string()),
+            std::string::npos)
+      << "DBNEW without backup MUST emit RESTORE_DB_RM, not RESTORE_DB or REMOVE_FILE";
+  EXPECT_FALSE(fs::exists(db_path));
+}
+
+// 锚定：COPY/NEW 逆操作是删除文件，审计名 RESTORE_FILE_RM
+TEST_F(WalCoreTest, ReverseExecuteAuditNamingCopyReverse) {
+  fs::path fpath = test_root / "usr/bin/copied_file";
+  create_file("usr/bin/copied_file");
+
+  std::vector<wal::WALOp> ops;
+  auto op = wal::parse_op("COPY /tmp/src → /usr/bin/copied_file");
+  op.arg2 = fpath.string();
+  ops.push_back(op);
+
+  wal::reverse_execute(ops, "", true);
+
+  std::string wal_content = read_wal();
+  EXPECT_NE(wal_content.find("RESTORE_FILE_RM " + fpath.string()),
+            std::string::npos)
+      << "COPY reverse MUST emit RESTORE_FILE_RM";
+  EXPECT_FALSE(fs::exists(fpath));
 }
 
 // ============================================================================
