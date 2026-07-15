@@ -30,7 +30,7 @@ WalWriter::WalWriter() {
 
   fd_ = ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
   if (fd_ < 0)
-    throw LpkgException(string_format("error.create_file_failed", path));
+    throw LpkgException(string_format("error.wal_open_failed", path));
 }
 
 WalWriter::~WalWriter() {
@@ -41,15 +41,15 @@ WalWriter::~WalWriter() {
 
 void WalWriter::log(std::string_view line) {
   if (fd_ < 0)
-    throw LpkgException("WalWriter: file not open");
+    throw LpkgException(string_format("error.wal_open_failed", wal_log_path()));
 
   std::string l = std::string(line) + "\n";
   ssize_t written = ::write(fd_, l.data(), l.size());
   if (written < 0 || static_cast<size_t>(written) != l.size())
-    throw LpkgException("WalWriter: write failed");
+    throw LpkgException(string_format("error.wal_write_failed", wal_log_path()));
 
   if (::fsync(fd_) != 0)
-    throw LpkgException("WalWriter: fsync failed");
+    throw LpkgException(string_format("error.wal_fsync_failed", wal_log_path()));
 
   ++lines_;
 }
@@ -83,11 +83,20 @@ void log_wal_line(std::string_view line) {
   int fd =
       ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
   if (fd < 0)
-    return;
+    throw LpkgException(string_format("error.wal_open_failed", path));
 
   std::string l = std::string(line) + "\n";
-  ::write(fd, l.data(), l.size());
-  ::fsync(fd);
+  ssize_t written = ::write(fd, l.data(), l.size());
+  if (written < 0 || static_cast<size_t>(written) != l.size()) {
+    ::close(fd);
+    throw LpkgException(string_format("error.wal_write_failed", path));
+  }
+
+  if (::fsync(fd) != 0) {
+    ::close(fd);
+    throw LpkgException(string_format("error.wal_fsync_failed", path));
+  }
+
   ::close(fd);
 }
 

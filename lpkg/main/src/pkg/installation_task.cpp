@@ -169,6 +169,9 @@ void InstallationTask::commit_without_file_ops() {
               log_info(string_format("info.removing_obsolete_file", old_file));
               fs::path bak = phys;
               bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
+              // write-ahead: WAL 先于 rename（ARCH.md §3.2）
+              wal::log_wal_line("REMOVE_OLD " + phys.string() +
+                                " \xe2\x86\x92 " + bak.string());
               fs::rename(phys, bak);
               fsync_parent_dir(bak);
               backups_.emplace_back(phys, bak);

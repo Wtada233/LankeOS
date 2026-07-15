@@ -161,10 +161,10 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
 /// 从 WAL 日志文件提取当前（最后一个未完成的）批次的操作行列表
 std::vector<WALOp> extract_current_batch_ops(const std::string &wal_path);
 
-/// 从 WAL 日志文件中提取所有未完成批次的列表
-/// 返回每批的操作行（从最后一个 BEGIN_PKGS 到文件末尾）
+/// 从 WAL 日志文件中提取最后一个未完成批次的列表
+/// 注意：架构保证最多存在一个未完成批次，因此最多返回一个批次
 std::vector<std::vector<WALOp>>
-extract_all_uncommitted_batches(const std::string &wal_path);
+extract_last_uncommitted_batch(const std::string &wal_path);
 
 // ============================================================================
 // 批次回滚
