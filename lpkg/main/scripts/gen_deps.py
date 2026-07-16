@@ -175,7 +175,19 @@ def scan_package(lpkg, target_dir, extract_root):
     for root, dirs, files in os.walk(content_dir):
         for fname in files:
             fpath = os.path.join(root, fname)
+
             if os.path.islink(fpath):
+                target = os.readlink(fpath)
+                if not os.path.isabs(target):
+                    target = os.path.join(os.path.dirname(fpath), target)
+                real_target = os.path.realpath(target)   # 或者用 os.path.abspath + 循环，但 realpath 递归解析
+                if os.path.isfile(real_target) and is_elf(real_target):
+                    provides_so.append(fname)
+                    providers.append({
+                        'key': fname,
+                        'pkg': pkg_name,
+                        'pkg_version': pkg_version,
+                    })
                 continue
 
             if is_elf(fpath):
@@ -198,6 +210,8 @@ def scan_package(lpkg, target_dir, extract_root):
                     })
 
                 for n in needed:
+                    if '/' in n:
+                        n = os.path.basename(n)
                     needs.add(n)
 
             else:
@@ -253,14 +267,13 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rul
         return lpkg, [], 'no_pkg_name'
 
     deps = {}
-    needed_so = []
+    needed_so = sorted(needs)          # ① 直接使用全部 DT_NEEDED
 
-    # --- 1) SONAME 解析 ---
-    for soname in sorted(needs):
+    for soname in needed_so:           # ② 遍历已排序列表
         provider = provider_map.get(soname)
         if provider and provider['pkg'] and provider['pkg'] != pkg_name:
             deps.setdefault(provider['pkg'])
-            needed_so.append(soname)
+            # ③ 删除 needed_so.append(soname)
 
     # --- 2) 执行规则插件 ---
     if rules:
