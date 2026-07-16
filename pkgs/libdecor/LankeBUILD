@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    mkdir -p build && cd build
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -D gtk=enabled -D demo=false --buildtype=release
+}
+lankebuild_build() {
+    cd "{SRC_DIR}"
+    ninja -C build
+}
+lankebuild_package() {
+    cd "{SRC_DIR}"
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}
