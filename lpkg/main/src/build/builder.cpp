@@ -91,6 +91,7 @@ build_variable_map(const BuildConfig &cfg, const fs::path &work_root,
       {"{MANDIR}", "/usr/share/man"},
       {"{LOCALSTATEDIR}", "/var"},
       {"{DATADIR}", "/usr/share"},
+      {"{SYSCONFDIR}", "/etc"},
       {"{ORIG_PKG_VER}", cfg.version},
       {"{NO_STRIP}", cfg.no_strip ? "1" : "0"},
   };
