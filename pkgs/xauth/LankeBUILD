@@ -1,5 +1,5 @@
 lankebuild_prepare() {
-    ./configure
+    ./configure --prefix={PREFIX}
 }
 lankebuild_build() {
     make -j$(nproc)
