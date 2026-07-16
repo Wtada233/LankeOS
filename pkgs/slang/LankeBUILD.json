@@ -4,5 +4,6 @@
   "sources": [
     "https://www.jedsoft.org/releases/slang/slang-2.3.3.tar.bz2"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

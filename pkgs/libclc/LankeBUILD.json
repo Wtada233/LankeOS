@@ -7,5 +7,6 @@
   "work_sources": [],
   "deps": [],
   "no_strip": true,
-  "provides": []
+  "provides": [],
+  "release": 2
 }

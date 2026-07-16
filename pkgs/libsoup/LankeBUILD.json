@@ -1,7 +1,10 @@
 {
   "name": "libsoup",
   "version": "3.6.6",
-  "sources": ["https://download.gnome.org/sources/libsoup/3.6/libsoup-3.6.6.tar.xz"],
+  "sources": [
+    "https://download.gnome.org/sources/libsoup/3.6/libsoup-3.6.6.tar.xz"
+  ],
   "deps": [],
-  "no_strip": false
+  "no_strip": false,
+  "release": 2
 }

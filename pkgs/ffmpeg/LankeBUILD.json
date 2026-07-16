@@ -4,5 +4,6 @@
   "sources": [
     "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://download.gnome.org/sources/gobject-introspection/1.84/gobject-introspection-1.84.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

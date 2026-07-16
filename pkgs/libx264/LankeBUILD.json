@@ -4,5 +4,6 @@
   "sources": [
     "https://anduin.linuxfromscratch.org/BLFS/x264/x264-20250815.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

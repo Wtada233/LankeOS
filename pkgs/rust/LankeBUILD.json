@@ -9,5 +9,6 @@
     "file://./0002-bootstrap-Change-bash-completion-dir.patch",
     "file://./0004-compiler-Change-LLVM-targets.patch",
     "file://./0005-compiler-Use-ld.lld-by-default.patch"
-  ]
+  ],
+  "release": 2
 }

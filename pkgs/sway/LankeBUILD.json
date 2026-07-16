@@ -1,6 +1,7 @@
 {
-    "name": "sway",
-    "version": "1.12",
-    "sources": [],
-    "work_sources": []
+  "name": "sway",
+  "version": "1.12",
+  "sources": [],
+  "work_sources": [],
+  "release": 2
 }

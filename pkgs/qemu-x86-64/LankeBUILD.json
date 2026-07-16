@@ -3,5 +3,6 @@
   "version": "9.2.3",
   "sources": [
     "https://download.qemu.org/qemu-9.2.3.tar.xz"
-  ]
+  ],
+  "release": 2
 }

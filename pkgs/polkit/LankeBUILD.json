@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/polkit-org/polkit/archive/127/polkit-127.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://releases.pagure.org/newt/newt-0.52.24.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

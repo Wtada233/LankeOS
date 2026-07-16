@@ -4,5 +4,6 @@
   "sources": [
     "https://cairographics.org/releases/cairo-1.18.4.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

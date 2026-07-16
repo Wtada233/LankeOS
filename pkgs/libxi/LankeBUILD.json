@@ -1,9 +1,12 @@
 {
-    "name": "libXi",
-    "version": "1.8.2",
-    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libXi-1.8.2.tar.xz"],
-    "work_sources": [],
-    "deps": [],
-    "provides": [],
-    "no_strip": false
+  "name": "libXi",
+  "version": "1.8.2",
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXi-1.8.2.tar.xz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "provides": [],
+  "no_strip": false,
+  "release": 2
 }

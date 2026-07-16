@@ -4,5 +4,6 @@
   "sources": [
     "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-9.9p1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://gitlab.freedesktop.org/libinput/libinput/-/archive/1.30.901/libinput-1.30.901.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

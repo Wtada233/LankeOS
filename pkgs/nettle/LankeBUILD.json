@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/nettle/nettle-3.10.2.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

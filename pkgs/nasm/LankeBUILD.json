@@ -4,5 +4,6 @@
   "sources": [
     "https://www.nasm.us/pub/nasm/releasebuilds/3.01/nasm-3.01.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

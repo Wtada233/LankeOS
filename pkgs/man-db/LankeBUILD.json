@@ -4,5 +4,6 @@
   "sources": [
     "https://download-mirror.savannah.gnu.org/releases/man-db/man-db-2.13.1.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

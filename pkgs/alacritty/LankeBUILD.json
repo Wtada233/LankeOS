@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/alacritty/alacritty/archive/refs/tags/v0.16.1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

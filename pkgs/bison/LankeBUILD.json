@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

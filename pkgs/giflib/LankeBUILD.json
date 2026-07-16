@@ -4,5 +4,6 @@
   "sources": [
     "https://downloads.sourceforge.net/giflib/giflib-5.2.2.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

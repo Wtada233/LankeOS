@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/findutils/findutils-4.10.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/KhronosGroup/glslang/archive/refs/tags/16.2.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

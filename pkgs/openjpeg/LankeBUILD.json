@@ -1,7 +1,10 @@
 {
   "name": "openjpeg",
   "version": "2.5.4",
-  "sources": ["https://github.com/uclouvain/openjpeg/archive/v2.5.4/openjpeg-2.5.4.tar.gz"],
+  "sources": [
+    "https://github.com/uclouvain/openjpeg/archive/v2.5.4/openjpeg-2.5.4.tar.gz"
+  ],
   "deps": [],
-  "no_strip": false
+  "no_strip": false,
+  "release": 2
 }

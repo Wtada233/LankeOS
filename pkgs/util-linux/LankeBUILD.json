@@ -4,5 +4,6 @@
   "sources": [
     "https://www.kernel.org/pub/linux/utils/util-linux/v2.41/util-linux-2.41.1.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.16.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

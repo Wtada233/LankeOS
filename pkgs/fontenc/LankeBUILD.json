@@ -1,9 +1,12 @@
 {
-    "name": "fontenc",
-    "version": "1.1.8",
-    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libfontenc-1.1.8.tar.xz"],
-    "work_sources": [],
-    "deps": [],
-    "provides": [],
-    "no_strip": false
+  "name": "fontenc",
+  "version": "1.1.8",
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libfontenc-1.1.8.tar.xz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "provides": [],
+  "no_strip": false,
+  "release": 2
 }

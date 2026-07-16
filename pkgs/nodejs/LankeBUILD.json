@@ -4,5 +4,6 @@
   "sources": [
     "https://nodejs.org/dist/v26.2.0/node-v26.2.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

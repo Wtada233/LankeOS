@@ -1,7 +1,10 @@
 {
   "name": "libgudev",
   "version": "238",
-  "sources": ["https://download.gnome.org/sources/libgudev/238/libgudev-238.tar.xz"],
+  "sources": [
+    "https://download.gnome.org/sources/libgudev/238/libgudev-238.tar.xz"
+  ],
   "deps": [],
-  "no_strip": false
+  "no_strip": false,
+  "release": 2
 }

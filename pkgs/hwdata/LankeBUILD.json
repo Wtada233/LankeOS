@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/vcrhonek/hwdata/archive/refs/tags/v0.403.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

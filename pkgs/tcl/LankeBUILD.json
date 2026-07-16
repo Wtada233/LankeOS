@@ -4,5 +4,6 @@
   "sources": [
     "https://downloads.sourceforge.net/tcl/tcl8.6.16-src.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

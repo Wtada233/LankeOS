@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/ninja-build/ninja/archive/v1.13.1/ninja-1.13.1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

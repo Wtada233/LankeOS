@@ -4,5 +4,6 @@
   "sources": [
     "https://downloads.sourceforge.net/libpng/libpng-1.6.50.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

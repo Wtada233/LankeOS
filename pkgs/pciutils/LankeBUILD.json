@@ -4,5 +4,6 @@
   "sources": [
     "https://mj.ucw.cz/download/linux/pci/pciutils-3.15.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://sourceware.org/pub/binutils/releases/binutils-2.45.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v22.1.2.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

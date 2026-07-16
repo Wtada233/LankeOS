@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-x86_64.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

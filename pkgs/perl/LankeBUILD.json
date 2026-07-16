@@ -4,5 +4,6 @@
   "sources": [
     "https://www.cpan.org/src/5.0/perl-5.42.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

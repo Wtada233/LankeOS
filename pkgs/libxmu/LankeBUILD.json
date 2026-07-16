@@ -1,11 +1,12 @@
 {
-    "name": "libxmu",
-    "version": "1.2.1",
-    "sources": [
-        "https://www.x.org/releases/individual/lib/libXmu-1.2.1.tar.xz"
-    ],
-    "work_sources": [],
-    "deps": [],
-    "provides": [],
-    "no_strip": false
+  "name": "libxmu",
+  "version": "1.2.1",
+  "sources": [
+    "https://www.x.org/releases/individual/lib/libXmu-1.2.1.tar.xz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "provides": [],
+  "no_strip": false,
+  "release": 2
 }

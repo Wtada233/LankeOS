@@ -4,5 +4,6 @@
   "sources": [
     "https://download.savannah.gnu.org/releases/libpipeline/libpipeline-1.5.8.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -6,5 +6,6 @@
   ],
   "work_sources": [
     "https://www.linuxfromscratch.org/patches/lfs/12.4/expect-5.45.4-gcc15-1.patch"
-  ]
+  ],
+  "release": 2
 }

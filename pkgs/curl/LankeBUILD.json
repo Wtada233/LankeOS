@@ -4,5 +4,6 @@
   "sources": [
     "https://curl.se/download/curl-8.11.1.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

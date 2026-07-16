@@ -1,9 +1,12 @@
 {
-    "name": "libXrender",
-    "version": "0.9.11",
-    "sources": ["https://xorg.freedesktop.org/archive/individual/lib/libXrender-0.9.11.tar.xz"],
-    "work_sources": [],
-    "deps": [],
-    "provides": [],
-    "no_strip": false
+  "name": "libXrender",
+  "version": "0.9.11",
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXrender-0.9.11.tar.xz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "provides": [],
+  "no_strip": false,
+  "release": 2
 }

@@ -3,5 +3,6 @@
   "version": "2.004",
   "work_sources": [
     "https://github.com/notofonts/noto-cjk/raw/refs/heads/main/Sans/Mono/NotoSansMonoCJKsc-Regular.otf"
-  ]
+  ],
+  "release": 2
 }

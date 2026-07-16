@@ -4,5 +4,6 @@
   "sources": [
     "https://master.dl.sourceforge.net/project/linux4m/50.0/addons/acl/src/acl-2.3.2.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

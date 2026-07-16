@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/gzip/gzip-1.14.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }
