@@ -1,25 +1,23 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    # 进入解压后的源码目录
+    cd rustc-1.96.0-src || exit 1
+
+    # 应用所有补丁（来自 work_sources）
+    for patch in ../*.patch; do
+        if [ -f "$patch" ]; then
+            echo "Applying patch: $patch"
+            patch -Np1 < "$patch"
+        fi
+    done
 }
 
 lankebuild_build() {
-    
-    # --- 策略性欺骗：FileCheck 软链接 ---
-    # 先尝试 ln -s (不加 -f)，保证安全性
-    CREATED_FAKE_FILECHECK=false
-    if [ ! -e /usr/bin/FileCheck ]; then
-        echo "[RUST-BUILD] FileCheck not found. Creating temporary symlink to /bin/true..."
-        ln -s /bin/true /usr/bin/FileCheck
-        CREATED_FAKE_FILECHECK=true
-    fi
+    cd rustc-1.96.0-src || exit 1
 
-    # --- 写入 bootstrap.toml (最新规范) ---
+    # 生成 bootstrap.toml（适配 LankeOS x86_64）
     cat > bootstrap.toml << EOF
-change-id = 148795
-
 [build]
 vendor = true
 target = ["x86_64-unknown-linux-gnu"]
@@ -36,36 +34,26 @@ debug = false
 debug-assertions = false
 debuginfo-level = 0
 incremental = false
-parallel-frontend-threads = 6
+parallel-frontend-threads = $(nproc)
 
 [target.x86_64-unknown-linux-gnu]
 llvm-config = "/usr/bin/llvm-config"
+
+[install]
+prefix = "/usr"
 EOF
 
-    # --- 执行安装 (含自动构建) ---
-    # 注意：使用 python3 x.py 直接调用最新的 bootstrap 逻辑
-    DESTDIR={STAGING_ROOT} python3 x.py install --stage 1 -j 6
-
-    if [ "$CREATED_FAKE_FILECHECK" = true ]; then
-        if [ -L /usr/bin/FileCheck ]; then
-            echo "[RUST-BUILD] Verified temporary FileCheck. Cleaning up..."
-            rm /usr/bin/FileCheck
-        else
-            echo "[RUST-BUILD] Warning: /usr/bin/FileCheck was changed by another process, skipping cleanup."
-        fi
-    fi
-
+    DESTDIR="{STAGING_ROOT}" python3 x.py install -j "$(nproc)"
 }
 
-
 lankebuild_package() {
-    # 删除不必要的文件减小包体积
-    rm -rf {STAGING_ROOT}/usr/local/lib/rustlib/rustc-src
-    rm -rf {STAGING_ROOT}/usr/local/lib/rustlib/src
-    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/uninstall.sh
-    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/install.log
-    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/components
-    rm -rf {STAGING_ROOT}/usr/local/lib/rustlib/etc
-    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/rust-installer-version
-    rm -f  {STAGING_ROOT}/usr/local/lib/rustlib/manifest-*
+    # 删除 rust-src 及其他无用文件（减小包体积）
+    rm -rf "{STAGING_ROOT}/usr/lib/rustlib/rustc-src"
+    rm -rf "{STAGING_ROOT}/usr/lib/rustlib/src"
+    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/uninstall.sh"
+    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/install.log"
+    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/components"
+    rm -rf "{STAGING_ROOT}/usr/lib/rustlib/etc"
+    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/rust-installer-version"
+    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/manifest-*"
 }
