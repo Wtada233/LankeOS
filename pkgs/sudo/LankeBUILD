@@ -14,5 +14,21 @@ lankebuild_build() {
 
 lankebuild_package() {
     # Installation handled by builder
-    :
+    cat > "{STAGING_ROOT}{SYSCONFDIR}/pam.d/sudo" << 'EOF'
+#%PAM-1.0
+
+# 认证阶段
+auth        required    pam_env.so
+auth        sufficient  pam_rootok.so
+auth        required    pam_unix.so
+
+# 账户管理阶段
+account     required    pam_unix.so
+
+# 会话管理阶段
+session     required    pam_unix.so
+session     optional    pam_keyinit.so revoke
+session     required    pam_limits.so
+session     optional    pam_loginuid.so
+EOF
 }

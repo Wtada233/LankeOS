@@ -1,6 +1,6 @@
 {
   "name": "sudo",
-  "version": "1.9.17",
+  "version": "1.9.17p2",
   "sources": [
     "https://www.sudo.ws/dist/sudo-1.9.17p2.tar.gz"
   ],
