@@ -4,5 +4,6 @@
   "sources": [
     "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/archive/1.47/wayland-protocols-1.47.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

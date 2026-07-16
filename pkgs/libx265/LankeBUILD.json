@@ -4,5 +4,6 @@
   "sources": [
     "https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

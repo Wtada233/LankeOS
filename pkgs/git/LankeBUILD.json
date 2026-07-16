@@ -4,5 +4,6 @@
   "sources": [
     "https://www.kernel.org/pub/software/scm/git/git-2.48.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

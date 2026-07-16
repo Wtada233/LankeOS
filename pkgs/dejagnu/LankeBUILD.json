@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/dejagnu/dejagnu-1.6.3.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

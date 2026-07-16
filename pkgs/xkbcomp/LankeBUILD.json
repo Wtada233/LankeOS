@@ -1,9 +1,12 @@
 {
-    "name": "xkbcomp",
-    "version": "1.4.7",
-    "sources": ["https://xorg.freedesktop.org/archive/individual/app/xkbcomp-1.4.7.tar.xz"],
-    "work_sources": [],
-    "deps": [],
-    "provides": [],
-    "no_strip": false
+  "name": "xkbcomp",
+  "version": "1.4.7",
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/app/xkbcomp-1.4.7.tar.xz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "provides": [],
+  "no_strip": false,
+  "release": 2
 }

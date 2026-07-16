@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://archive.mozilla.org/pub/firefox/releases/152.0/source/firefox-152.0.source.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

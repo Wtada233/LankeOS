@@ -1,8 +1,9 @@
 {
-    "name": "doxygen",
-    "version": "1.17.0",
-    "sources": [
-        "https://doxygen.nl/files/doxygen-1.17.0.src.tar.gz"
-    ],
-    "work_sources": []
+  "name": "doxygen",
+  "version": "1.17.0",
+  "sources": [
+    "https://doxygen.nl/files/doxygen-1.17.0.src.tar.gz"
+  ],
+  "work_sources": [],
+  "release": 2
 }

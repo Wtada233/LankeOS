@@ -4,5 +4,6 @@
   "sources": [
     "https://www.nano-editor.org/dist/v8/nano-8.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

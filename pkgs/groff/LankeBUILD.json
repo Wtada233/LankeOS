@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/groff/groff-1.23.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

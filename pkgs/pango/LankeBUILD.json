@@ -4,5 +4,6 @@
   "sources": [
     "https://download.gnome.org/sources/pango/1.56/pango-1.56.4.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

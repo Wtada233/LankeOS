@@ -4,5 +4,6 @@
   "sources": [
     "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.11.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

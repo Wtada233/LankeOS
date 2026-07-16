@@ -4,5 +4,6 @@
   "sources": [
     "https://downloads.sourceforge.net/project/infozip/Zip%203.x%20%28latest%29/3.0/zip30.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

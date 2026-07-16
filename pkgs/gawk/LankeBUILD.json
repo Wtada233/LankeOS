@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/gawk/gawk-5.3.2.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

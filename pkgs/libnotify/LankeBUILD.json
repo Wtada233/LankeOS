@@ -4,5 +4,6 @@
   "sources": [
     "https://download.gnome.org/sources/libnotify/0.8/libnotify-0.8.8.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

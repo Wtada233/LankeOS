@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/libtool/libtool-2.5.4.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

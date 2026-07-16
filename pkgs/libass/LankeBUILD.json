@@ -3,5 +3,6 @@
   "version": "0.17.5",
   "sources": [
     "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz"
-  ]
+  ],
+  "release": 2
 }

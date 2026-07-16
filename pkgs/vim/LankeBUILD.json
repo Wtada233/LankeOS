@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/vim/vim/archive/v9.1.1629/vim-9.1.1629.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

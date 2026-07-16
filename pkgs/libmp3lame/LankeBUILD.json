@@ -4,5 +4,6 @@
   "sources": [
     "https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

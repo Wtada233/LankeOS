@@ -4,5 +4,6 @@
   "sources": [
     "https://dbus.freedesktop.org/releases/dbus/dbus-1.16.2.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

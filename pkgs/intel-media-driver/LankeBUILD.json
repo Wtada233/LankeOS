@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/intel/media-driver/archive/refs/tags/intel-media-26.1.5.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

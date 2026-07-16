@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/besser82/libxcrypt/releases/download/v4.4.38/libxcrypt-4.4.38.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

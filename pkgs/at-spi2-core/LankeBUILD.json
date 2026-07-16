@@ -4,5 +4,6 @@
   "sources": [
     "https://download.gnome.org/sources/at-spi2-core/2.56/at-spi2-core-2.56.4.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

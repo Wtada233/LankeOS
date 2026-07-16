@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/harfbuzz/harfbuzz/releases/download/11.4.1/harfbuzz-11.4.1.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

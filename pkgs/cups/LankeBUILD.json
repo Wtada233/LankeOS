@@ -1,11 +1,12 @@
 {
-    "name": "cups",
-    "version": "2.4.19",
-    "sources": [
-        "https://github.com/OpenPrinting/cups/releases/download/v2.4.19/cups-2.4.19-source.tar.gz"
-    ],
-    "work_sources": [],
-    "deps": [],
-    "provides": [],
-    "no_strip": false
+  "name": "cups",
+  "version": "2.4.19",
+  "sources": [
+    "https://github.com/OpenPrinting/cups/releases/download/v2.4.19/cups-2.4.19-source.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "provides": [],
+  "no_strip": false,
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://mirrors.edge.kernel.org/pub/linux/libs/ell/ell-0.81.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

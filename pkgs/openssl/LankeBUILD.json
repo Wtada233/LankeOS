@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/openssl/openssl/releases/download/openssl-3.5.2/openssl-3.5.2.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

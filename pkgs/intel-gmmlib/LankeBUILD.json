@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/intel/gmmlib/archive/refs/tags/intel-gmmlib-22.10.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

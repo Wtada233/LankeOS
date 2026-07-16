@@ -2,5 +2,6 @@
   "name": "libime",
   "version": "1.1.10",
   "sources": [],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

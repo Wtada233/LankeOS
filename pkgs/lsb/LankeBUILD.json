@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/lfs-book/LSB-Tools/releases/download/v0.12/LSB-Tools-0.12.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

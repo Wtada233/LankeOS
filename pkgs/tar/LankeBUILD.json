@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/tar/tar-1.35.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

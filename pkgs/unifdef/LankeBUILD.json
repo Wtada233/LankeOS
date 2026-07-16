@@ -1,6 +1,9 @@
 {
   "name": "unifdef",
   "version": "2.12",
-  "sources": ["https://dotat.at/prog/unifdef/unifdef-2.12.tar.gz"],
-  "no_strip": false
+  "sources": [
+    "https://dotat.at/prog/unifdef/unifdef-2.12.tar.gz"
+  ],
+  "no_strip": false,
+  "release": 2
 }

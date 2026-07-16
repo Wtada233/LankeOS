@@ -1,7 +1,10 @@
 {
   "name": "libgpg-error",
   "version": "1.54",
-  "sources": ["https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.54.tar.bz2"],
+  "sources": [
+    "https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.54.tar.bz2"
+  ],
   "deps": [],
-  "no_strip": false
+  "no_strip": false,
+  "release": 2
 }

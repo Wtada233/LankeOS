@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTC/NotoSansCJK-Regular.ttc"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

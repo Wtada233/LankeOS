@@ -4,5 +4,6 @@
   "sources": [
     "http://libndp.org/files/libndp-1.9.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

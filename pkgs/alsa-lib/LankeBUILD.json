@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/alsa-project/alsa-lib/archive/refs/tags/v1.2.15.3.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

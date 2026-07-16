@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/swaywm/swaybg/releases/download/v1.2.1/swaybg-1.2.1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://ftpmirror.gnu.org/libtasn1/libtasn1-4.19.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

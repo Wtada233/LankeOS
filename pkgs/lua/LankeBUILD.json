@@ -9,5 +9,6 @@
     "file://./paths.patch",
     "file://./lua.pc",
     "file://./license-from-upstream"
-  ]
+  ],
+  "release": 2
 }

@@ -6,5 +6,6 @@
   ],
   "work_sources": [
     "https://www.linuxfromscratch.org/patches/lfs/12.4/kbd-2.8.0-backspace-1.patch"
-  ]
+  ],
+  "release": 2
 }

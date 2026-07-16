@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/rust-lang/rust-bindgen/archive/refs/tags/v0.72.1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

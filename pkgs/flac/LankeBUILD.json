@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/xiph/flac/releases/download/1.5.0/flac-1.5.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

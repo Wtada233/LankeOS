@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/shadow-maint/shadow/releases/download/4.19.3/shadow-4.19.3.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

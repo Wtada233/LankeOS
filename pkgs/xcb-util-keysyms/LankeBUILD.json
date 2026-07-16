@@ -1,9 +1,12 @@
 {
-    "name": "xcb-util-keysyms",
-    "version": "0.4.1",
-    "sources": ["https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-keysyms-0.4.1.tar.xz"],
-    "work_sources": [],
-    "deps": [],
-    "provides": [],
-    "no_strip": false
+  "name": "xcb-util-keysyms",
+  "version": "0.4.1",
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-keysyms-0.4.1.tar.xz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "provides": [],
+  "no_strip": false,
+  "release": 2
 }

@@ -4,5 +4,6 @@
   "sources": [
     "https://duktape.org/duktape-2.7.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

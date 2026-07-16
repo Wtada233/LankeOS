@@ -4,5 +4,6 @@
   "sources": [
     "https://download.gnome.org/sources/gtk/3.24/gtk-3.24.52.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

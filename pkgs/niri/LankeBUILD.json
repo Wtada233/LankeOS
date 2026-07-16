@@ -4,7 +4,10 @@
   "sources": [
     "https://github.com/niri-wm/niri/archive/refs/tags/v26.04.tar.gz"
   ],
-  "work_sources": ["file://./allow-software-rendering.patch"],
+  "work_sources": [
+    "file://./allow-software-rendering.patch"
+  ],
   "deps": [],
-  "provides": []
+  "provides": [],
+  "release": 2
 }

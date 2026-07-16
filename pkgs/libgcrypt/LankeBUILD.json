@@ -1,7 +1,10 @@
 {
   "name": "libgcrypt",
   "version": "1.11.0",
-  "sources": ["https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.11.0.tar.bz2"],
+  "sources": [
+    "https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.11.0.tar.bz2"
+  ],
   "deps": [],
-  "no_strip": false
+  "no_strip": false,
+  "release": 2
 }

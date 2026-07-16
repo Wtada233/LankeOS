@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/systemd/systemd/archive/v261/systemd-261.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

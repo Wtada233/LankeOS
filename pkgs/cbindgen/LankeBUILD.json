@@ -4,5 +4,6 @@
   "sources": [
     "https://github.com/eqrion/cbindgen/archive/refs/tags/v0.29.4.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }
