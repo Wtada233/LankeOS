@@ -4,5 +4,10 @@
   "sources": [
     "https://static.rust-lang.org/dist/rustc-1.96.0-src.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [
+    "file://./0001-bootstrap-Change-libexec-dir.patch",
+    "file://./0002-bootstrap-Change-bash-completion-dir.patch",
+    "file://./0004-compiler-Change-LLVM-targets.patch",
+    "file://./0005-compiler-Use-ld.lld-by-default.patch"
+  ]
 }
