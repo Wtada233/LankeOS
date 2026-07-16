@@ -273,7 +273,11 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rul
         provider = provider_map.get(soname)
         if provider and provider['pkg'] and provider['pkg'] != pkg_name:
             deps.setdefault(provider['pkg'])
-            # ③ 删除 needed_so.append(soname)
+
+    # ③ 过滤掉包自身提供的 needed_so（如 python 的 libpython3.13.so.1.0）
+    needed_so = [n for n in needed_so
+                 if not (n in provider_map
+                         and provider_map[n]['pkg'] == pkg_name)]
 
     # --- 2) 执行规则插件 ---
     if rules:
