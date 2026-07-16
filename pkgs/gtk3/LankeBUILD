@@ -7,12 +7,12 @@ lankebuild_prepare() {
     cd build
 
     # 配置 Meson 构建
-    # --prefix=/usr: 安装到 /usr
+    # --prefix={PREFIX}: 安装到 /usr
     # --buildtype=release: 发布版本优化
     # -D man=true: 生成手册页（需要 docbook-xsl 和 libxslt）[reference:3][reference:4]
     # -D broadway_backend=true: 启用 Broadway 后端（HTML5 显示支持）[reference:5][reference:6]
     meson setup .. \
-        --prefix=/usr \
+        --prefix={PREFIX} \
         --buildtype=release \
         -D man=true \
         -D broadway_backend=true \

@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     echo "Configuring libgpg-error-1.54..."
-    ./configure --prefix=/usr
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
     echo "Building libgpg-error-1.54..."
     make -j$(nproc)
     echo "Build complete."

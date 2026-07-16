@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --disable-static --enable-hashes=strong,glibc --enable-obsolete-api=no
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --enable-hashes=strong,glibc --enable-obsolete-api=no
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --sysconfdir=/etc/ssh --with-privsep-path=/var/lib/sshd --without-pam --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}/ssh --with-privsep-path=/var/lib/sshd --without-pam --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'

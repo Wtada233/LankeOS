@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --with-openssl --without-libpsl --with-ca-bundle=/etc/pki/tls/certs/ca-bundle.crt --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --with-openssl --without-libpsl --with-ca-bundle=/etc/pki/tls/certs/ca-bundle.crt --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

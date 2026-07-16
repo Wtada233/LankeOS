@@ -3,10 +3,10 @@ lankebuild_prepare() {
     :
 }
 lankebuild_build() {
-    ./configure --prefix=/usr --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
-    rm -f {STAGING_ROOT}/usr/lib/libnewt.a
+    rm -f {STAGING_ROOT}{LIBDIR}/libnewt.a
 }
 lankebuild_package() {
     :

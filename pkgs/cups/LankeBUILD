@@ -1,8 +1,8 @@
 lankebuild_prepare() {
     ./configure \
-        --prefix=/usr \
-        --sysconfdir=/etc \
-        --localstatedir=/var \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --localstatedir={LOCALSTATEDIR} \
         --disable-static
 }
 

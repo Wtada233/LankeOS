@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    meson setup .. --prefix=/usr --buildtype=release -Dsession-managers=[] -Draop=disabled -Dbluez5=disabled -Dman=disabled -Ddocs=disabled -Dtests=disabled -Dpipewire-v4l2=disabled -Dpipewire-jack=enabled -Dpipewire-alsa=enabled -Dspa-plugins=enabled -Dlibsystemd=enabled -Dlogind=enabled -Dsystemd-user-service=enabled -Dc_args="-Wno-error=unused-result"
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Dsession-managers=[] -Draop=disabled -Dbluez5=disabled -Dman=disabled -Ddocs=disabled -Dtests=disabled -Dpipewire-v4l2=disabled -Dpipewire-jack=enabled -Dpipewire-alsa=enabled -Dspa-plugins=enabled -Dlibsystemd=enabled -Dlogind=enabled -Dsystemd-user-service=enabled -Dc_args="-Wno-error=unused-result"
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 
@@ -15,7 +15,7 @@ lankebuild_build() {
     # 但 ALSA 库实际读取 /etc/alsa/conf.d/（见 /usr/share/alsa/alsa.conf 的 hooks 路径）
     # 建立符号链接使其生效
     mkdir -p {STAGING_ROOT}/etc/alsa/conf.d
-    for f in {STAGING_ROOT}/usr/share/alsa/alsa.conf.d/*.conf; do
+    for f in {STAGING_ROOT}{DATADIR}/alsa/alsa.conf.d/*.conf; do
         ln -sf "../../../usr/share/alsa/alsa.conf.d/$(basename "$f")" \
                "{STAGING_ROOT}/etc/alsa/conf.d/$(basename "$f")"
     done

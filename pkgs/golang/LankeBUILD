@@ -6,13 +6,13 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     # Go 预编译二进制包，{SRC_DIR} 就是解压后的 go/ 目录
-    mkdir -p {STAGING_ROOT}/usr/lib
-    cp -a {SRC_DIR} {STAGING_ROOT}/usr/lib/go
+    mkdir -p {STAGING_ROOT}{LIBDIR}
+    cp -a {SRC_DIR} {STAGING_ROOT}{LIBDIR}/go
 
     # 创建符号链接
-    mkdir -p {STAGING_ROOT}/usr/bin
+    mkdir -p {STAGING_ROOT}{BINDIR}
     for bin in go gofmt; do
-        ln -sf ../lib/go/bin/$bin {STAGING_ROOT}/usr/bin/$bin
+        ln -sf ../lib/go/bin/$bin {STAGING_ROOT}{BINDIR}/$bin
     done
 }
 

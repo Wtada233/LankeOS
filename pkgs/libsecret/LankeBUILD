@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     echo "Configuring libsecret-0.21.7..."
     cd build
-    meson setup .. --prefix=/usr        \
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR}        \
                    --buildtype=release  \
                    -Dgtk_doc=false      \
                    -Dmanpage=false      \

@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --disable-thorough-tests --docdir=/usr/share/doc/flac-1.5.0
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-thorough-tests --docdir={DATADIR}/doc/flac-1.5.0
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

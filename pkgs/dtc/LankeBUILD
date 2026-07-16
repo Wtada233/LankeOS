@@ -6,7 +6,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     meson setup build \
-        --prefix=/usr \
+        --prefix={PREFIX} \
         --buildtype=release \
         -Ddefault_library=shared \
         -Dpython=disabled \

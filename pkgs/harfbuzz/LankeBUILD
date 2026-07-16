@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    meson setup .. --prefix=/usr --buildtype=release -Dgraphite2=disabled
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Dgraphite2=disabled
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 }

@@ -9,7 +9,8 @@ lankebuild_build() {
     echo "Configuring libwebp-1.5.0..."
     cd build
     cmake .. -G Ninja \
-        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=ON
     echo "Building libwebp-1.5.0..."

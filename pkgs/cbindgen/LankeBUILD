@@ -10,5 +10,5 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    install -Dm755 target/release/cbindgen "{STAGING_ROOT}/usr/bin/cbindgen"
+    install -Dm755 target/release/cbindgen "{STAGING_ROOT}{BINDIR}/cbindgen"
 }

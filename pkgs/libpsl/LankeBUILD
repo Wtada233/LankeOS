@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     echo "Configuring libpsl-0.21.5..."
-    ./configure --prefix=/usr --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
     echo "Building libpsl-0.21.5..."
     make -j$(nproc)
     echo "Build complete."

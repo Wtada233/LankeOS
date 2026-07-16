@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    meson setup build --prefix=/usr -Ddebug-gui=false -Dlibwacom=false
+    meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -Ddebug-gui=false -Dlibwacom=false
     DESTDIR={STAGING_ROOT} ninja -C build install
 }
 

@@ -3,7 +3,7 @@ lankebuild_prepare() {
     :
 }
 lankebuild_build() {
-    ./configure --prefix=/usr --disable-static --with-curl --with-openssl --without-tcltk
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --with-curl --with-openssl --without-tcltk
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

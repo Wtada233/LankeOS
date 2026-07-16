@@ -4,6 +4,5 @@
   "sources": [
     "https://github.com/google/shaderc/archive/v2026.2/shaderc-2026.2.tar.gz"
   ],
-  "work_sources": [],
-  "release": 2
+  "work_sources": []
 }

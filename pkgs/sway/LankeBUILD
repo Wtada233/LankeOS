@@ -5,7 +5,7 @@ lankebuild_prepare() {
 }
 lankebuild_build() {
     cd "{WORK_DIR}/sway"
-    meson setup build --prefix=/usr --default-library=shared --buildtype=release \
+    meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --default-library=shared --buildtype=release \
         -Dsd-bus-provider=libsystemd \
         -Dman-pages=disabled \
         -Ddefault-wallpaper=false \

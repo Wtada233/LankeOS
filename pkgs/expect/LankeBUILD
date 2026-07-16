@@ -13,10 +13,10 @@ lankebuild_build() {
         fi
     done
     patch -Np1 -i {WORK_DIR}/expect-5.45.4-gcc15-1.patch
-    ./configure --prefix=/usr --with-tcl=/usr/lib --enable-shared --disable-rpath --mandir=/usr/share/man --with-tclinclude=/usr/include --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --with-tcl={LIBDIR} --enable-shared --disable-rpath --mandir={MANDIR} --with-tclinclude={INCLUDEDIR} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
-    ln -svf expect5.45.4/libexpect5.45.4.so {STAGING_ROOT}/usr/lib/
+    ln -svf expect5.45.4/libexpect5.45.4.so {STAGING_ROOT}{LIBDIR}/
 }
 
 

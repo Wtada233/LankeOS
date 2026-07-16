@@ -9,7 +9,7 @@ lankebuild_prepare() {
     # ------------------------------------------------------------
     cat > mozconfig << "EOF"
 # ---------- 安装前缀 ----------
-ac_add_options --prefix=/usr
+ac_add_options --prefix={PREFIX}
 
 # ---------- 标准配置选项 ----------
 ac_add_options --enable-application=browser
@@ -68,10 +68,10 @@ lankebuild_build() {
 
 lankebuild_package() {
     # 创建 .desktop 文件和图标 (BLFS 推荐)
-    mkdir -p "{STAGING_ROOT}/usr/share/applications"
-    mkdir -p "{STAGING_ROOT}/usr/share/pixmaps"
+    mkdir -p "{STAGING_ROOT}{DATADIR}/applications"
+    mkdir -p "{STAGING_ROOT}{DATADIR}/pixmaps"
 
-    cat > "{STAGING_ROOT}/usr/share/applications/firefox.desktop" << "EOF"
+    cat > "{STAGING_ROOT}{DATADIR}/applications/firefox.desktop" << "EOF"
 [Desktop Entry]
 Encoding=UTF-8
 Name=Firefox Web Browser
@@ -87,9 +87,9 @@ StartupNotify=true
 StartupWMClass=firefox
 EOF
 
-    # 图标链接 (注意：实际图标在安装后的 /usr/lib/firefox/ 下)
-    ln -sfv /usr/lib/firefox/browser/chrome/icons/default/default128.png \
-            "{STAGING_ROOT}/usr/share/pixmaps/firefox.png"
-    ln -sfv ../lib/firefox/firefox "{STAGING_ROOT}/usr/bin/firefox"
+    # 图标链接 (注意：实际图标在安装后的 {LIBDIR}/firefox/ 下)
+    ln -sfv {LIBDIR}/firefox/browser/chrome/icons/default/default128.png \
+            "{STAGING_ROOT}{DATADIR}/pixmaps/firefox.png"
+    ln -sfv ../lib/firefox/firefox "{STAGING_ROOT}{BINDIR}/firefox"
 }
 

@@ -6,9 +6,19 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    mkdir build && cd build
-    cmake -G Ninja .. -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DENABLE_TEST=OFF -DCMAKE_CXX_FLAGS='-w'
-    DESTDIR={STAGING_ROOT} ninja install
+    git clone --depth 1 --branch 1.1.10 https://github.com/fcitx/libime
+    cd libime
+    git submodule update --init --recursive
+
+    cmake -G Ninja -B build \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DENABLE_TEST=OFF \
+        -DCMAKE_CXX_FLAGS='-w'
+
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja -C build install
 }
 
 

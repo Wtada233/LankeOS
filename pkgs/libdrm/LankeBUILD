@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    meson setup build --prefix=/usr -Dudev=true
+    meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -Dudev=true
     ninja -C build -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja -C build install
 }

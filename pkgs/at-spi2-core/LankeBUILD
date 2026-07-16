@@ -4,7 +4,7 @@ lankebuild_prepare() {
     mkdir -p build
     cd build
     meson setup .. \
-        --prefix=/usr \
+        --prefix={PREFIX} \
         --buildtype=release \
         -D introspection=enabled \
         -D docs=false

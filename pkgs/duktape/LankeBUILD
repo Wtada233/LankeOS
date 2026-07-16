@@ -9,8 +9,8 @@ lankebuild_build() {
     sed -i 's/-Os/-O2/' Makefile.sharedlibrary
     make -f Makefile.sharedlibrary INSTALL_PREFIX=/usr -j$(nproc)
     make -f Makefile.sharedlibrary INSTALL_PREFIX=/usr install
-    mkdir -p {STAGING_ROOT}/usr/lib/pkgconfig
-    cat > {STAGING_ROOT}/usr/lib/pkgconfig/duktape.pc << 'EOF'
+    mkdir -p {STAGING_ROOT}{LIBDIR}/pkgconfig
+    cat > {STAGING_ROOT}{LIBDIR}/pkgconfig/duktape.pc << 'EOF'
 prefix=/usr
 libdir=$prefix/lib
 includedir=$prefix/include

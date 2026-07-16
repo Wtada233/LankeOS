@@ -7,7 +7,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     export CPP="gcc -E"
     ./configure \
-      --prefix=/usr \
+      --prefix={PREFIX} \
       --disable-documentation \
       --disable-python \
       --disable-lzo \

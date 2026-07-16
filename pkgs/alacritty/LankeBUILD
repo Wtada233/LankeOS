@@ -11,35 +11,35 @@ lankebuild_build() {
     cargo build --release --no-default-features --features wayland
 
     # 2. 安装二进制文件
-    install -Dm755 target/release/alacritty "{STAGING_ROOT}/usr/bin/alacritty"
+    install -Dm755 target/release/alacritty "{STAGING_ROOT}{BINDIR}/alacritty"
 
     # 3. 安装桌面集成与图标
-    install -Dm644 extra/linux/Alacritty.desktop "{STAGING_ROOT}/usr/share/applications/Alacritty.desktop"
-    install -Dm644 extra/logo/alacritty-term.svg "{STAGING_ROOT}/usr/share/pixmaps/Alacritty.svg"
+    install -Dm644 extra/linux/Alacritty.desktop "{STAGING_ROOT}{DATADIR}/applications/Alacritty.desktop"
+    install -Dm644 extra/logo/alacritty-term.svg "{STAGING_ROOT}{DATADIR}/pixmaps/Alacritty.svg"
 
     # 4. 安装 Terminfo (放到 /usr/share/terminfo 等待 postinst 编译)
-    install -Dm644 extra/alacritty.info "{STAGING_ROOT}/usr/share/terminfo/alacritty.info"
+    install -Dm644 extra/alacritty.info "{STAGING_ROOT}{DATADIR}/terminfo/alacritty.info"
 
     # 5. 安装 Man Pages (如果你的系统有 scdoc 和 gzip)
     # 如果没有 scdoc 也可以跳过，但建议加上以增加系统完成度
     if command -v scdoc >/dev/null 2>&1; then
-        mkdir -p "{STAGING_ROOT}/usr/share/man/man1"
-        mkdir -p "{STAGING_ROOT}/usr/share/man/man5"
-        scdoc < extra/man/alacritty.1.scd | gzip -c > "{STAGING_ROOT}/usr/share/man/man1/alacritty.1.gz"
-        scdoc < extra/man/alacritty.5.scd | gzip -c > "{STAGING_ROOT}/usr/share/man/man5/alacritty.5.gz"
+        mkdir -p "{STAGING_ROOT}{MANDIR}/man1"
+        mkdir -p "{STAGING_ROOT}{MANDIR}/man5"
+        scdoc < extra/man/alacritty.1.scd | gzip -c > "{STAGING_ROOT}{MANDIR}/man1/alacritty.1.gz"
+        scdoc < extra/man/alacritty.5.scd | gzip -c > "{STAGING_ROOT}{MANDIR}/man5/alacritty.5.gz"
     fi
 
     # 6. 安装 Bash 补全脚本
-    install -Dm644 extra/completions/alacritty.bash "{STAGING_ROOT}/usr/share/bash-completion/completions/alacritty"
+    install -Dm644 extra/completions/alacritty.bash "{STAGING_ROOT}{DATADIR}/bash-completion/completions/alacritty"
 
     # 7. 注入 postinst.sh 
     cat >> "{STAGING_HOOKS}/postinst.sh" <<EOF
 if command -v tic >/dev/null 2>&1; then
     echo "=> 正在注册 Alacritty Terminfo..."
-    tic -xe alacritty,alacritty-direct /usr/share/terminfo/alacritty.info
+    tic -xe alacritty,alacritty-direct {DATADIR}/terminfo/alacritty.info
 fi
 if command -v update-desktop-database >/dev/null 2>&1; then
-    update-desktop-database /usr/share/applications
+    update-desktop-database {DATADIR}/applications
 fi
 EOF
 }

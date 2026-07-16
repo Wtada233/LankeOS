@@ -6,11 +6,11 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --sysconfdir=/etc --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     # 彻底清理可能泄露到 include 目录下的 .deps 文件夹
-    rm -rf {STAGING_ROOT}/usr/include/ell/.deps
+    rm -rf {STAGING_ROOT}{INCLUDEDIR}/ell/.deps
 }
 
 

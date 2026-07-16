@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    cmake .. -G Ninja -DCMAKE_INSTALL_PREFIX=/usr
+    cmake .. -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} -G Ninja -DCMAKE_INSTALL_PREFIX={PREFIX}
     DESTDIR={STAGING_ROOT} ninja install
 }
 

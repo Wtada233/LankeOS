@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     echo "Configuring glib-networking-2.86.0..."
     cd build
-    meson setup .. --prefix=/usr        \
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR}        \
                    --buildtype=release  \
                    -Dgnutls=enabled     \
                    -Dlibproxy=disabled   \

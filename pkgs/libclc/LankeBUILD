@@ -9,12 +9,12 @@ lankebuild_build() {
 
     cmake -G Ninja ../libclc \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr
+        -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR}
 
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 
-    install -Dm644 ../libclc/LICENSE.TXT {STAGING_ROOT}/usr/share/licenses/libclc/LICENSE
+    install -Dm644 ../libclc/LICENSE.TXT {STAGING_ROOT}{DATADIR}/licenses/libclc/LICENSE
 }
 
 lankebuild_package() {

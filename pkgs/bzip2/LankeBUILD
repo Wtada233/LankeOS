@@ -33,26 +33,26 @@ EOF
 lankebuild_package() {
     cd bzip2-1.0.8
 
-    install -dm755 {STAGING_ROOT}/usr/{bin,lib,include,share/man/man1}
+    install -dm755 {STAGING_ROOT}{BINDIR} {STAGING_ROOT}{LIBDIR} {STAGING_ROOT}{INCLUDEDIR} {STAGING_ROOT}{MANDIR}/man1
 
-    install -m755 bzip2-shared {STAGING_ROOT}/usr/bin/bzip2
-    install -m755 bzip2recover bzdiff bzgrep bzmore {STAGING_ROOT}/usr/bin/
-    ln -sf bzip2 {STAGING_ROOT}/usr/bin/bunzip2
-    ln -sf bzip2 {STAGING_ROOT}/usr/bin/bzcat
+    install -m755 bzip2-shared {STAGING_ROOT}{BINDIR}/bzip2
+    install -m755 bzip2recover bzdiff bzgrep bzmore {STAGING_ROOT}{BINDIR}/
+    ln -sf bzip2 {STAGING_ROOT}{BINDIR}/bunzip2
+    ln -sf bzip2 {STAGING_ROOT}{BINDIR}/bzcat
 
-    cp -a libbz2.so* {STAGING_ROOT}/usr/lib/
-    ln -sf libbz2.so.1.0.8 {STAGING_ROOT}/usr/lib/libbz2.so.1
-    ln -sf libbz2.so.1 {STAGING_ROOT}/usr/lib/libbz2.so
+    cp -a libbz2.so* {STAGING_ROOT}{LIBDIR}/
+    ln -sf libbz2.so.1.0.8 {STAGING_ROOT}{LIBDIR}/libbz2.so.1
+    ln -sf libbz2.so.1 {STAGING_ROOT}{LIBDIR}/libbz2.so
 
-    install -m644 bzlib.h {STAGING_ROOT}/usr/include/
+    install -m644 bzlib.h {STAGING_ROOT}{INCLUDEDIR}/
 
-    install -m644 bzip2.1 {STAGING_ROOT}/usr/share/man/man1/
-    ln -sf bzip2.1 {STAGING_ROOT}/usr/share/man/man1/bunzip2.1
-    ln -sf bzip2.1 {STAGING_ROOT}/usr/share/man/man1/bzcat.1
-    ln -sf bzip2.1 {STAGING_ROOT}/usr/share/man/man1/bzip2recover.1
+    install -m644 bzip2.1 {STAGING_ROOT}{MANDIR}/man1/
+    ln -sf bzip2.1 {STAGING_ROOT}{MANDIR}/man1/bunzip2.1
+    ln -sf bzip2.1 {STAGING_ROOT}{MANDIR}/man1/bzcat.1
+    ln -sf bzip2.1 {STAGING_ROOT}{MANDIR}/man1/bzip2recover.1
 
-    install -Dm644 bzip2.pc {STAGING_ROOT}/usr/lib/pkgconfig/bzip2.pc
+    install -Dm644 bzip2.pc {STAGING_ROOT}{LIBDIR}/pkgconfig/bzip2.pc
 
-    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/bzip2/LICENSE
+    install -Dm644 LICENSE {STAGING_ROOT}{DATADIR}/licenses/bzip2/LICENSE
 }
 

@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    sh Configure -des -Dprefix=/usr -Dvendorprefix=/usr -Dprivlib=/usr/lib/perl5/5.42/core_perl -Darchlib=/usr/lib/perl5/5.42/core_perl -Dsitelib=/usr/lib/perl5/5.42/site_perl -Dsitearch=/usr/lib/perl5/5.42/site_perl -Dvendorlib=/usr/lib/perl5/5.42/vendor_perl -Dvendorarch=/usr/lib/perl5/5.42/vendor_perl
+    sh Configure -des -Dprefix={PREFIX} -Dvendorprefix={PREFIX} -Dprivlib={LIBDIR}/perl5/5.42/core_perl -Darchlib={LIBDIR}/perl5/5.42/core_perl -Dsitelib={LIBDIR}/perl5/5.42/site_perl -Dsitearch={LIBDIR}/perl5/5.42/site_perl -Dvendorlib={LIBDIR}/perl5/5.42/vendor_perl -Dvendorarch={LIBDIR}/perl5/5.42/vendor_perl
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

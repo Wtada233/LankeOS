@@ -7,9 +7,9 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     make NETNS_RUN_DIR=/run/netns -j$(nproc)
-    make SBINDIR=/usr/bin DESTDIR={STAGING_ROOT} install
-    ln -sfv lnstat {STAGING_ROOT}/usr/bin/ctstat
-    ln -sfv lnstat {STAGING_ROOT}/usr/bin/rtstat
+    make SBINDIR={SBINDIR} DESTDIR={STAGING_ROOT} install
+    ln -sfv lnstat {STAGING_ROOT}{BINDIR}/ctstat
+    ln -sfv lnstat {STAGING_ROOT}{BINDIR}/rtstat
 }
 
 

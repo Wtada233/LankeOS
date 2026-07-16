@@ -6,22 +6,22 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --mandir=/usr/share/man --with-shared --without-debug --without-normal --with-cxx-shared --enable-pc-files --enable-widec --with-pkg-config-libdir=/usr/lib/pkgconfig
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --mandir={MANDIR} --with-shared --without-debug --without-normal --with-cxx-shared --enable-pc-files --enable-widec --with-pkg-config-libdir={LIBDIR}/pkgconfig
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     # LFS 兼容性链接
     for lib in ncurses form panel menu; do
-        ln -sfv lib$libw.so {STAGING_ROOT}/usr/lib/lib$lib.so
-        ln -sfv $libw.pc {STAGING_ROOT}/usr/lib/pkgconfig/$lib.pc
+        ln -sfv lib$libw.so {STAGING_ROOT}{LIBDIR}/lib$lib.so
+        ln -sfv $libw.pc {STAGING_ROOT}{LIBDIR}/pkgconfig/$lib.pc
     done
-    ln -sfv libncursesw.so {STAGING_ROOT}/usr/lib/libcurses.so
+    ln -sfv libncursesw.so {STAGING_ROOT}{LIBDIR}/libcurses.so
     # 终端工具链接
-    ln -sfv tic {STAGING_ROOT}/usr/bin/infotocap
-    ln -sfv tic {STAGING_ROOT}/usr/bin/captoinfo
-    ln -sfv tset {STAGING_ROOT}/usr/bin/reset
+    ln -sfv tic {STAGING_ROOT}{BINDIR}/infotocap
+    ln -sfv tic {STAGING_ROOT}{BINDIR}/captoinfo
+    ln -sfv tset {STAGING_ROOT}{BINDIR}/reset
     # LLVM 经常会死磕 libtinfo，给它一个交待
-    ln -sfv libncursesw.so {STAGING_ROOT}/usr/lib/libtinfo.so
-    ln -sfv libncursesw.so.6 {STAGING_ROOT}/usr/lib/libtinfo.so.6
+    ln -sfv libncursesw.so {STAGING_ROOT}{LIBDIR}/libtinfo.so
+    ln -sfv libncursesw.so.6 {STAGING_ROOT}{LIBDIR}/libtinfo.so.6
 }
 
 

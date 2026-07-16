@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --disable-static --without-python
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --without-python
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

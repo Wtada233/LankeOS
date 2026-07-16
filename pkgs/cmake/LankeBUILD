@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    mkdir -p {STAGING_ROOT}/usr
+    mkdir -p {STAGING_ROOT}{PREFIX}
     cp -rv bin share {STAGING_ROOT}/usr/
     cd ..
 }

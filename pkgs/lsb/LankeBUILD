@@ -8,9 +8,9 @@ lankebuild_build() {
     make DESTDIR={STAGING_ROOT} install
     
     # 按照原逻辑创建符号链接
-    ln -sfv ../lib/lsb/install_initd {STAGING_ROOT}/usr/bin/install_initd
-    ln -sfv ../lib/lsb/remove_initd {STAGING_ROOT}/usr/bin/remove_initd
-    ln -sfv ../lib/lsb/lsbinstall {STAGING_ROOT}/usr/bin/lsbinstall
+    ln -sfv ../lib/lsb/install_initd {STAGING_ROOT}{BINDIR}/install_initd
+    ln -sfv ../lib/lsb/remove_initd {STAGING_ROOT}{BINDIR}/remove_initd
+    ln -sfv ../lib/lsb/lsbinstall {STAGING_ROOT}{BINDIR}/lsbinstall
 }
 lankebuild_package() {
     :

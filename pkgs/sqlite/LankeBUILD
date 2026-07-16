@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     echo "Configuring sqlite-3.49.1..."
-    ./configure --prefix=/usr          \
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}          \
                 --disable-static      \
                 --enable-threadsafe   \
                 CFLAGS="-O2 -DSQLITE_ENABLE_COLUMN_METADATA"

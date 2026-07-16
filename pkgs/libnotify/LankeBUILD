@@ -4,7 +4,7 @@ lankebuild_prepare() {
     # 创建构建目录并配置
     mkdir -p build
     cd build
-    meson setup --prefix=/usr            \
+    meson setup --prefix={PREFIX} --sysconfdir={SYSCONFDIR}            \
                 --buildtype=release      \
                 -D tests=false           \
                 -D man=false             \

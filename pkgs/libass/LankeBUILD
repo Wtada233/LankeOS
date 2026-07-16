@@ -5,7 +5,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr \
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
         --enable-shared \
         --disable-static
     make -j$(nproc)

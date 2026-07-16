@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     echo "Configuring libgudev-238..."
     cd build
-    meson setup .. --prefix=/usr --buildtype=release
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release
     echo "Building libgudev-238..."
     ninja -j$(nproc)
     echo "Build complete."

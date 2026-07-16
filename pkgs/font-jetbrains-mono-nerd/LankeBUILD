@@ -5,15 +5,15 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    mkdir -p {STAGING_ROOT}/usr/share/fonts/TTF
-    cp -v *.ttf {STAGING_ROOT}/usr/share/fonts/TTF/
-    chmod 644 {STAGING_ROOT}/usr/share/fonts/TTF/*.ttf
+    mkdir -p {STAGING_ROOT}{DATADIR}/fonts/TTF
+    cp -v *.ttf {STAGING_ROOT}{DATADIR}/fonts/TTF/
+    chmod 644 {STAGING_ROOT}{DATADIR}/fonts/TTF/*.ttf
 
     cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
 #!/bin/sh
 if command -v fc-cache >/dev/null 2>&1; then
     echo "=> 刷新字体缓存..."
-    fc-cache -fv /usr/share/fonts/TTF
+    fc-cache -fv {DATADIR}/fonts/TTF
 fi
 EOF
 }

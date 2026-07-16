@@ -3,7 +3,8 @@
 lankebuild_prepare() {
     sed -r '/cmake_policy.*(0025|0054)/d' -i source/CMakeLists.txt
     # 使用自定义配置，启用共享库
-    mkdir bld && cd bld && cmake -D CMAKE_INSTALL_PREFIX=/usr        \
+    mkdir bld && cd bld && cmake -D CMAKE_INSTALL_PREFIX={PREFIX}        \
+    -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
       -D GIT_ARCHETYPE=1                  \
       -D CMAKE_POLICY_VERSION_MINIMUM=3.5 \
       -W no-dev                           \
@@ -18,5 +19,5 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    rm -vf {STAGING_ROOT}/usr/lib/libx265.a
+    rm -vf {STAGING_ROOT}{LIBDIR}/libx265.a
 }

@@ -31,34 +31,34 @@ lankebuild_package() {
     cd $(ls -d */ | head -1)
 
     # 主程序与会话脚本
-    install -vDm 755 target/release/niri "{STAGING_ROOT}/usr/bin/niri"
-    install -vDm 755 resources/niri-session "{STAGING_ROOT}/usr/bin/niri-session"
+    install -vDm 755 target/release/niri "{STAGING_ROOT}{BINDIR}/niri"
+    install -vDm 755 resources/niri-session "{STAGING_ROOT}{BINDIR}/niri-session"
 
     # systemd 用户单元
     install -vDm 644 resources/niri.service \
-        "{STAGING_ROOT}/usr/lib/systemd/user/niri.service"
+        "{STAGING_ROOT}{LIBDIR}/systemd/user/niri.service"
     install -vDm 644 resources/niri-shutdown.target \
-        "{STAGING_ROOT}/usr/lib/systemd/user/niri-shutdown.target"
+        "{STAGING_ROOT}{LIBDIR}/systemd/user/niri-shutdown.target"
 
     # Wayland 会话入口
     install -vDm 644 resources/niri.desktop \
-        "{STAGING_ROOT}/usr/share/wayland-sessions/niri.desktop"
+        "{STAGING_ROOT}{DATADIR}/wayland-sessions/niri.desktop"
 
     # XDG Desktop Portal 配置
     install -vDm 644 resources/niri-portals.conf \
-        "{STAGING_ROOT}/usr/share/xdg-desktop-portal/niri-portals.conf"
+        "{STAGING_ROOT}{DATADIR}/xdg-desktop-portal/niri-portals.conf"
 
     # 文档
     install -vDm 644 resources/default-config.kdl \
-        "{STAGING_ROOT}/usr/share/doc/niri/default-config.kdl"
+        "{STAGING_ROOT}{DATADIR}/doc/niri/default-config.kdl"
     install -vDm 644 README.md \
-        "{STAGING_ROOT}/usr/share/doc/niri/README.md"
+        "{STAGING_ROOT}{DATADIR}/doc/niri/README.md"
 
     # Shell 补全
     install -vDm 644 bash-completions \
-        "{STAGING_ROOT}/usr/share/bash-completion/completions/niri"
+        "{STAGING_ROOT}{DATADIR}/bash-completion/completions/niri"
     install -vDm 644 fish-completions \
-        "{STAGING_ROOT}/usr/share/fish/vendor_completions.d/niri.fish"
+        "{STAGING_ROOT}{DATADIR}/fish/vendor_completions.d/niri.fish"
     install -vDm 644 zsh-completions \
-        "{STAGING_ROOT}/usr/share/zsh/site-functions/_niri"
+        "{STAGING_ROOT}{DATADIR}/zsh/site-functions/_niri"
 }

@@ -20,10 +20,11 @@ lankebuild_build() {
     cd build
 
     cmake -D CMAKE_BUILD_TYPE=Release         \
-          -D CMAKE_INSTALL_PREFIX=/usr        \
+          -D CMAKE_INSTALL_PREFIX={PREFIX}        \
+          -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
           -D CMAKE_SKIP_INSTALL_RPATH=ON      \
           -D PORT=GTK                         \
-          -D LIB_INSTALL_DIR=/usr/lib         \
+          -D LIB_INSTALL_DIR={LIBDIR}         \
           -D USE_LIBBACKTRACE=OFF             \
           -D USE_LIBHYPHEN=OFF                \
           -D ENABLE_GAMEPAD=OFF               \
@@ -67,12 +68,12 @@ lankebuild_package() {
     cd build
     DESTDIR="{STAGING_ROOT}" ninja install
 
-    for dir in "{STAGING_ROOT}/usr/libexec"/webkit*/; do
+    for dir in "{STAGING_ROOT}{LIBDIR}exec"/webkit*/; do
         [ -d "$dir" ] || continue
         [ -f "${dir}MiniBrowser" ] || continue
-        mkdir -p "{STAGING_ROOT}/usr/bin"
+        mkdir -p "{STAGING_ROOT}{BINDIR}"
         ln -sf "../libexec/$(basename "${dir%/}")/MiniBrowser" \
-            "{STAGING_ROOT}/usr/bin/MiniBrowser"
+            "{STAGING_ROOT}{BINDIR}/MiniBrowser"
         break
     done
     echo "Package staging complete."

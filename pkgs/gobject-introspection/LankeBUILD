@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     mkdir -p build && cd build
     meson setup .. \
-        --prefix=/usr \
+        --prefix={PREFIX} \
         --buildtype=release \
         -Dcairo=disabled
     ninja -j$(nproc)

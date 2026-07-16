@@ -4,7 +4,8 @@ lankebuild_prepare() {
     # Prepare environment
     cmake -B build \
         -G 'Unix Makefiles' \
-        -DCMAKE_INSTALL_PREFIX:PATH='/usr' \
+        -DCMAKE_INSTALL_PREFIX:PATH={PREFIX} \
+        -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
         -DCMAKE_INSTALL_LIBDIR:PATH='lib' \
         -DCMAKE_POLICY_VERSION_MINIMUM:STRING='3.5.0' \
         -DGEN8=OFF \

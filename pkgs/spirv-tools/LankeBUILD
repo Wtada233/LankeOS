@@ -6,13 +6,13 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    cmake -D CMAKE_INSTALL_PREFIX=/usr \
+    cmake -D CMAKE_INSTALL_PREFIX={PREFIX} \
           -D CMAKE_BUILD_TYPE=Release \
           -D SPIRV_WERROR=OFF \
           -D BUILD_SHARED_LIBS=ON \
           -D SPIRV_TOOLS_BUILD_STATIC=OFF \
           -D SPIRV-Headers_SOURCE_DIR=/usr \
-          -D CMAKE_INSTALL_SYSCONFDIR=/etc \
+          -D CMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
           -D CMAKE_SKIP_INSTALL_RPATH=ON \
           -G Ninja ..
     cmake --build . -j$(nproc)

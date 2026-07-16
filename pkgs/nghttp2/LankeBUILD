@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     echo "Configuring nghttp2-1.64.0..."
-    ./configure --prefix=/usr --disable-static --enable-lib-only
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --enable-lib-only
     echo "Building nghttp2-1.64.0..."
     make -j$(nproc)
     echo "Build complete."

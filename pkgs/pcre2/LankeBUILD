@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --enable-pcre2-16 --enable-pcre2-32 --enable-jit --enable-unicode --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --enable-pcre2-16 --enable-pcre2-32 --enable-jit --enable-unicode --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }
