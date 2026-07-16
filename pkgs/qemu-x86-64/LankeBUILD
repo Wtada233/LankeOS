@@ -6,8 +6,8 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     ./configure \
-        --prefix=/usr \
-        --localstatedir=/var \
+        --prefix={PREFIX} \
+        --localstatedir={LOCALSTATEDIR} \
         --target-list=x86_64-softmmu \
         --audio-drv-list=alsa,pipewire
     make -j$(nproc)

@@ -7,8 +7,8 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     cargo build --release --bin bindgen
-    mkdir -p "{STAGING_ROOT}/usr/bin"
-    cp target/release/bindgen "{STAGING_ROOT}/usr/bin/"
+    mkdir -p "{STAGING_ROOT}{BINDIR}"
+    cp target/release/bindgen "{STAGING_ROOT}{BINDIR}/"
 }
 
 

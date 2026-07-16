@@ -7,15 +7,15 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     echo '#define SYS_VIMRC_FILE "/etc/vimrc"' >> src/feature.h
-    ./configure --prefix=/usr
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
-    ln -sf vim {STAGING_ROOT}/usr/bin/vi
-    ln -sfv vim {STAGING_ROOT}/usr/bin/vimdiff
-    ln -sfv vim {STAGING_ROOT}/usr/bin/view
-    ln -sfv vim {STAGING_ROOT}/usr/bin/rvim
-    ln -sfv vim {STAGING_ROOT}/usr/bin/rview
-    ln -sfv vim {STAGING_ROOT}/usr/bin/ex
+    ln -sf vim {STAGING_ROOT}{BINDIR}/vi
+    ln -sfv vim {STAGING_ROOT}{BINDIR}/vimdiff
+    ln -sfv vim {STAGING_ROOT}{BINDIR}/view
+    ln -sfv vim {STAGING_ROOT}{BINDIR}/rvim
+    ln -sfv vim {STAGING_ROOT}{BINDIR}/rview
+    ln -sfv vim {STAGING_ROOT}{BINDIR}/ex
 }
 
 

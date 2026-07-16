@@ -1,7 +1,7 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    CFLAGS="-std=gnu99" ./configure --prefix=/usr
+    CFLAGS="-std=gnu99" ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
 }
 
 lankebuild_build() {

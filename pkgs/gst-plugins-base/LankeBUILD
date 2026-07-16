@@ -8,7 +8,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     echo "Configuring gst-plugins-base-1.28.1..."
     cd build
-    meson setup .. --prefix=/usr        \
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR}        \
                    --buildtype=release  \
                    -Ddoc=disabled       \
                    -Dtests=disabled     \
@@ -25,7 +25,7 @@ lankebuild_package() {
     DESTDIR="{STAGING_ROOT}" ninja install
 
     # 清理误装的系统头文件（属于 libglvnd/mesa）
-    rm -rf "{STAGING_ROOT}/usr/include/GL" "{STAGING_ROOT}/usr/include/KHR" 2>/dev/null || true
+    rm -rf "{STAGING_ROOT}{INCLUDEDIR}/GL" "{STAGING_ROOT}{INCLUDEDIR}/KHR" 2>/dev/null || true
 
     echo "Package staging complete."
 }

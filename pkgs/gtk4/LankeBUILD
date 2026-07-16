@@ -6,7 +6,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    meson setup .. --prefix=/usr --buildtype=release       --wrap-mode=nofallback       -Dx11-backend=true       -Dwayland-backend=true       -Dvulkan=enabled       -Dbuild-demos=true       -Dbuild-tests=false       -Dbuild-examples=false       -Dbuild-testsuite=false       -Ddocumentation=false       -Dman-pages=false       -Dmedia-gstreamer=enabled       -Dcloudproviders=disabled       -Dintrospection=enabled       -Dtracker=disabled       -Dcolord=disabled       -Dsysprof=disabled       -Dprint-cups=enabled       -Dprint-cpdb=disabled
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release       --wrap-mode=nofallback       -Dx11-backend=true       -Dwayland-backend=true       -Dvulkan=enabled       -Dbuild-demos=true       -Dbuild-tests=false       -Dbuild-examples=false       -Dbuild-testsuite=false       -Ddocumentation=false       -Dman-pages=false       -Dmedia-gstreamer=enabled       -Dcloudproviders=disabled       -Dintrospection=enabled       -Dtracker=disabled       -Dcolord=disabled       -Dsysprof=disabled       -Dprint-cups=enabled       -Dprint-cpdb=disabled
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 }

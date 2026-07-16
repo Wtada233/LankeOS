@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     echo "Configuring yaml-0.2.5..."
-    ./configure --prefix=/usr --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
     echo "Building yaml-0.2.5..."
     make -j$(nproc)
     echo "Build complete."

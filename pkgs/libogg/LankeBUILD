@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --disable-static --docdir=/usr/share/doc/libogg-1.3.6
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --docdir={DATADIR}/doc/libogg-1.3.6
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

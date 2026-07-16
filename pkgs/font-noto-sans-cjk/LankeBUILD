@@ -4,17 +4,17 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    mkdir -p {STAGING_ROOT}/usr/share/fonts/noto-cjk
+    mkdir -p {STAGING_ROOT}{DATADIR}/fonts/noto-cjk
     # hooks dir created by builder
 
-    cp NotoSansCJK-Regular.ttc {STAGING_ROOT}/usr/share/fonts/noto-cjk/
-    chmod 644 {STAGING_ROOT}/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc
+    cp NotoSansCJK-Regular.ttc {STAGING_ROOT}{DATADIR}/fonts/noto-cjk/
+    chmod 644 {STAGING_ROOT}{DATADIR}/fonts/noto-cjk/NotoSansCJK-Regular.ttc
 
     cat > {STAGING_HOOKS}/postinst.sh <<EOF
 #!/bin/sh
 if command -v fc-cache >/dev/null 2>&1; then
     echo "=> 正在刷新系统字体缓存..."
-    fc-cache -fv /usr/share/fonts/noto-cjk
+    fc-cache -fv {DATADIR}/fonts/noto-cjk
 fi
 EOF
     # chmod set by builder

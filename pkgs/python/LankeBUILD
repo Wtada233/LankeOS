@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --enable-shared --with-system-expat --with-system-ffi --enable-optimizations --enable-loadable-sqlite-extensions --without-static-libpython
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --enable-shared --with-system-expat --with-system-ffi --enable-optimizations --enable-loadable-sqlite-extensions --without-static-libpython
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 
@@ -15,16 +15,16 @@ lankebuild_build() {
     find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
 
     # 2. 删除 Python 自带的测试模块 (非常大，约 100MB+)
-    if [ -d "{STAGING_ROOT}/usr/lib/python3.13/test" ]; then
-        rm -rf {STAGING_ROOT}/usr/lib/python3.13/test
+    if [ -d "{STAGING_ROOT}{LIBDIR}/python3.13/test" ]; then
+        rm -rf {STAGING_ROOT}{LIBDIR}/python3.13/test
     fi
     # -----------------------
 
     # 添加 Python 兼容性链接
-    ln -sfv python3.13 {STAGING_ROOT}/usr/bin/python3
-    ln -sfv python3.13-config {STAGING_ROOT}/usr/bin/python3-config
-    ln -sfv pydoc3.13 {STAGING_ROOT}/usr/bin/pydoc3
-    ln -sfv idle3.13 {STAGING_ROOT}/usr/bin/idle3
+    ln -sfv python3.13 {STAGING_ROOT}{BINDIR}/python3
+    ln -sfv python3.13-config {STAGING_ROOT}{BINDIR}/python3-config
+    ln -sfv pydoc3.13 {STAGING_ROOT}{BINDIR}/pydoc3
+    ln -sfv idle3.13 {STAGING_ROOT}{BINDIR}/idle3
 
 }
 

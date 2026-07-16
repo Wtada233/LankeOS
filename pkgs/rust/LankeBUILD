@@ -37,7 +37,7 @@ incremental = false
 parallel-frontend-threads = $(nproc)
 
 [target.x86_64-unknown-linux-gnu]
-llvm-config = "/usr/bin/llvm-config"
+llvm-config = "{BINDIR}/llvm-config"
 
 [install]
 prefix = "/usr"
@@ -48,12 +48,12 @@ EOF
 
 lankebuild_package() {
     # 删除 rust-src 及其他无用文件（减小包体积）
-    rm -rf "{STAGING_ROOT}/usr/lib/rustlib/rustc-src"
-    rm -rf "{STAGING_ROOT}/usr/lib/rustlib/src"
-    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/uninstall.sh"
-    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/install.log"
-    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/components"
-    rm -rf "{STAGING_ROOT}/usr/lib/rustlib/etc"
-    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/rust-installer-version"
-    rm -f  "{STAGING_ROOT}/usr/lib/rustlib/manifest-*"
+    rm -rf "{STAGING_ROOT}{LIBDIR}/rustlib/rustc-src"
+    rm -rf "{STAGING_ROOT}{LIBDIR}/rustlib/src"
+    rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/uninstall.sh"
+    rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/install.log"
+    rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/components"
+    rm -rf "{STAGING_ROOT}{LIBDIR}/rustlib/etc"
+    rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/rust-installer-version"
+    rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/manifest-*"
 }

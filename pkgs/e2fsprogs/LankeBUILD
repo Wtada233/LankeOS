@@ -7,10 +7,10 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    ../configure --prefix=/usr --sysconfdir=/etc --enable-elf-shlibs --disable-static --disable-libblkid --disable-libuuid --disable-fsck
+    ../configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --enable-elf-shlibs --disable-static --disable-libblkid --disable-libuuid --disable-fsck
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
-    find {STAGING_ROOT}/usr/lib -name "*.a" -delete
+    find {STAGING_ROOT}{LIBDIR} -name "*.a" -delete
 }
 
 

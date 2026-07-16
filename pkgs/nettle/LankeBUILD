@@ -7,10 +7,10 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     # 我们保留静态库支持，所以不加 --disable-static
-    ./configure --prefix=/usr --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
-    chmod -v 755 {STAGING_ROOT}/usr/lib/lib{hogweed,nettle}.so
+    chmod -v 755 {STAGING_ROOT}{LIBDIR}/lib{hogweed,nettle}.so
 }
 
 

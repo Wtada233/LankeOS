@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./bootstrap.sh --prefix=/usr
+    ./bootstrap.sh --prefix={PREFIX}
 
     # 第一阶段：构建（stage），生成库文件到 stage/ 目录
     ./b2 stage -j$(nproc) threading=multi link=shared
@@ -14,8 +14,8 @@ lankebuild_build() {
     # 第二阶段：安装（install），将构建好的库安装到 STAGING_ROOT
     ./b2 install \
         --prefix="{STAGING_ROOT}/usr" \
-        --includedir="{STAGING_ROOT}/usr/include" \
-        --libdir="{STAGING_ROOT}/usr/lib" \
+        --includedir="{STAGING_ROOT}{INCLUDEDIR}" \
+        --libdir="{STAGING_ROOT}{LIBDIR}" \
         threading=multi \
         link=shared \
         --layout=system \

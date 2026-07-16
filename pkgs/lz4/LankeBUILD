@@ -9,9 +9,9 @@ lankebuild_build() {
     make BUILD_STATIC=no PREFIX=/usr -j$(nproc)
     make BUILD_STATIC=no PREFIX=/usr DESTDIR={STAGING_ROOT} install
     # 添加兼容性链接
-    ln -sfv lz4 {STAGING_ROOT}/usr/bin/lz4c
-    ln -sfv lz4 {STAGING_ROOT}/usr/bin/unlz4
-    ln -sfv lz4 {STAGING_ROOT}/usr/bin/lz4cat
+    ln -sfv lz4 {STAGING_ROOT}{BINDIR}/lz4c
+    ln -sfv lz4 {STAGING_ROOT}{BINDIR}/unlz4
+    ln -sfv lz4 {STAGING_ROOT}{BINDIR}/lz4cat
 }
 
 

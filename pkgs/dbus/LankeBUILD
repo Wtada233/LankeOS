@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared --wrap-mode=nofallback
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Ddefault_library=shared --wrap-mode=nofallback
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
     # 使 D-Bus 和 systemd 使用同一个 machine-id

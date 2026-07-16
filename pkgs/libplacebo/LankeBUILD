@@ -12,7 +12,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     cd libplacebo
     meson setup build \
-        --prefix=/usr \
+        --prefix={PREFIX} \
         --buildtype=release \
         -Ddefault_library=shared \
         -Dtests=false \

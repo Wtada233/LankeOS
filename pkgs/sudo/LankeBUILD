@@ -6,10 +6,10 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr --libexecdir=/usr/lib --with-secure-path --with-all-insults --with-env-editor --disable-static --disable-doc
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --libexecdir=/usr/lib --with-secure-path --with-all-insults --with-env-editor --disable-static --disable-doc
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
-    ln -sfv sudo {STAGING_ROOT}/usr/bin/sudoedit
+    ln -sfv sudo {STAGING_ROOT}{BINDIR}/sudoedit
 }
 
 lankebuild_package() {

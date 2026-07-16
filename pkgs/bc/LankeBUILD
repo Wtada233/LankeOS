@@ -6,10 +6,10 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    CC=gcc CFLAGS="$CFLAGS -std=gnu11" ./configure --prefix=/usr -G -r
+    CC=gcc CFLAGS="$CFLAGS -std=gnu11" ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -G -r
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
-    ln -sfv bc {STAGING_ROOT}/usr/bin/dc
+    ln -sfv bc {STAGING_ROOT}{BINDIR}/dc
 }
 
 

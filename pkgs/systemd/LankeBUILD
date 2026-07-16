@@ -7,25 +7,25 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    meson setup .. --prefix=/usr --buildtype=release -Ddefault_library=shared -Ddefault-dnssec=no -Dfirstboot=false -Dman=disabled -Dpam=enabled -Dlogind=true -Dmode=release -Dwerror=false
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Ddefault_library=shared -Ddefault-dnssec=no -Dfirstboot=false -Dman=disabled -Dpam=enabled -Dlogind=true -Dmode=release -Dwerror=false
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 
     # 添加系统管理链接
     for tool in reboot halt poweroff shutdown telinit runlevel; do
-        ln -sfv systemctl {STAGING_ROOT}/usr/bin/$tool
+        ln -sfv systemctl {STAGING_ROOT}{BINDIR}/$tool
     done
-    ln -sfv resolvectl {STAGING_ROOT}/usr/bin/systemd-resolve
-    ln -sfv resolvectl {STAGING_ROOT}/usr/bin/resolvconf
-    ln -sfv ../lib/systemd/systemd {STAGING_ROOT}/usr/bin/init
-    ln -sfv systemd-run {STAGING_ROOT}/usr/bin/run0
-    ln -sfv systemd-sysext {STAGING_ROOT}/usr/bin/systemd-confext
-    ln -sfv systemd-mount {STAGING_ROOT}/usr/bin/systemd-umount
-    ln -sfv udevadm {STAGING_ROOT}/usr/bin/udevd
+    ln -sfv resolvectl {STAGING_ROOT}{BINDIR}/systemd-resolve
+    ln -sfv resolvectl {STAGING_ROOT}{BINDIR}/resolvconf
+    ln -sfv ../lib/systemd/systemd {STAGING_ROOT}{BINDIR}/init
+    ln -sfv systemd-run {STAGING_ROOT}{BINDIR}/run0
+    ln -sfv systemd-sysext {STAGING_ROOT}{BINDIR}/systemd-confext
+    ln -sfv systemd-mount {STAGING_ROOT}{BINDIR}/systemd-umount
+    ln -sfv udevadm {STAGING_ROOT}{BINDIR}/udevd
 
     # 建立 LankeOS 默认预设策略：禁用自带网络管理，优先使用 NetworkManager
-    mkdir -pv {STAGING_ROOT}/usr/lib/systemd/system-preset
-    cat > {STAGING_ROOT}/usr/lib/systemd/system-preset/99-lankeos.preset << "EOF"
+    mkdir -pv {STAGING_ROOT}{LIBDIR}/systemd/system-preset
+    cat > {STAGING_ROOT}{LIBDIR}/systemd/system-preset/99-lankeos.preset << "EOF"
 disable systemd-networkd.service
 disable systemd-resolved.service
 enable NetworkManager.service

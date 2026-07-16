@@ -15,7 +15,7 @@ lankebuild_build() {
     # Install modules and headers
     make INSTALL_MOD_PATH={STAGING_ROOT} INSTALL_MOD_STRIP=1 \
         DEPMOD=/doesnt/exist modules_install -j$(nproc)
-    make headers_install ARCH=x86_64 INSTALL_HDR_PATH={STAGING_ROOT}/usr -j$(nproc)
+    make headers_install ARCH=x86_64 INSTALL_HDR_PATH={STAGING_ROOT}{PREFIX} -j$(nproc)
 
     # Install kernel image
     mkdir -p {STAGING_ROOT}/mnt/base/boot
@@ -24,8 +24,8 @@ lankebuild_build() {
     cp .config {STAGING_ROOT}/mnt/base/boot/config-lanke
 
     # Cleanup build/source symlinks
-    find {STAGING_ROOT}/usr/lib/modules -type l -name "build" -delete
-    find {STAGING_ROOT}/usr/lib/modules -type l -name "source" -delete
+    find {STAGING_ROOT}{LIBDIR}/modules -type l -name "build" -delete
+    find {STAGING_ROOT}{LIBDIR}/modules -type l -name "source" -delete
 }
 
 lankebuild_package() {

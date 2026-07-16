@@ -9,7 +9,8 @@ lankebuild_build() {
 
     cmake -G Ninja ../libunwind \
         -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
         -DCMAKE_SKIP_RPATH=ON \
         -DLLVM_PATH=../llvm \
         -DLIBUNWIND_ENABLE_STATIC=OFF
@@ -17,7 +18,7 @@ lankebuild_build() {
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 
-    install -Dm644 ../libunwind/LICENSE.TXT {STAGING_ROOT}/usr/share/licenses/libunwind/LICENSE
+    install -Dm644 ../libunwind/LICENSE.TXT {STAGING_ROOT}{DATADIR}/licenses/libunwind/LICENSE
 }
 
 lankebuild_package() {

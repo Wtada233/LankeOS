@@ -5,7 +5,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     mkdir build
     cd build
-    meson setup --prefix=/usr ..
+    meson setup --prefix={PREFIX} --sysconfdir={SYSCONFDIR} ..
     ninja -j$(nproc)
     
     DESTDIR={STAGING_ROOT} ninja install

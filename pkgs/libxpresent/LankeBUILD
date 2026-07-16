@@ -1,6 +1,6 @@
 lankebuild_prepare() {
     cd "{SRC_DIR}"
-    ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --localstatedir={LOCALSTATEDIR} \
         --disable-static 
 }
 lankebuild_build() {

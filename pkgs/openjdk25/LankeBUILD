@@ -31,30 +31,30 @@ lankebuild_build() {
     find "build/linux-x86_64-server-release/images/jdk" -iname '*.so' -exec chmod +x {} \;
 }
 lankebuild_package() {
-    mkdir -p "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk"
+    mkdir -p "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk"
     cp -a "build/linux-x86_64-server-release/images/jdk"/bin "build/linux-x86_64-server-release/images/jdk"/lib "build/linux-x86_64-server-release/images/jdk"/include \
           "build/linux-x86_64-server-release/images/jdk"/release \
-          "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/"
+          "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/"
 
     mkdir -p "{STAGING_ROOT}/etc/java-25-openjdk"
     cp -r "build/linux-x86_64-server-release/images/jdk"/conf/* "{STAGING_ROOT}/etc/java-25-openjdk/"
-    rm -rf "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/conf"
-    ln -sfv ../../../../etc/java-25-openjdk "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/conf"
+    rm -rf "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/conf"
+    ln -sfv ../../../../etc/java-25-openjdk "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/conf"
 
-    mkdir -p "{STAGING_ROOT}/usr/share/licenses/openjdk25"
-    cp -r "build/linux-x86_64-server-release/images/jdk"/legal/* "{STAGING_ROOT}/usr/share/licenses/openjdk25/"
-    rm -rf "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/legal"
-    ln -sfv ../../../share/licenses/openjdk25 "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/legal"
+    mkdir -p "{STAGING_ROOT}{DATADIR}/licenses/openjdk25"
+    cp -r "build/linux-x86_64-server-release/images/jdk"/legal/* "{STAGING_ROOT}{DATADIR}/licenses/openjdk25/"
+    rm -rf "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/legal"
+    ln -sfv ../../../share/licenses/openjdk25 "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/legal"
 
-    for f in "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/bin/"*; do
+    for f in "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/bin/"*; do
         name=$(basename "$f")
         man="build/linux-x86_64-server-release/images/jdk/../jdk/man/man1/${name}.1"
         if [ -f "$man" ]; then
-            mkdir -p "{STAGING_ROOT}/usr/share/man/man1"
-            cp "$man" "{STAGING_ROOT}/usr/share/man/man1/${name}-openjdk25.0"
+            mkdir -p "{STAGING_ROOT}{MANDIR}/man1"
+            cp "$man" "{STAGING_ROOT}{MANDIR}/man1/${name}-openjdk25.0"
         fi
     done
-    rm -rf "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/man"
-    rm -rf "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/lib/src.zip"
-    ln -sfv ../../../share/man "{STAGING_ROOT}/usr/lib/jvm/java-25-openjdk/man"
+    rm -rf "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/man"
+    rm -rf "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/lib/src.zip"
+    ln -sfv ../../../share/man "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/man"
 }

@@ -1,6 +1,6 @@
 lankebuild_prepare() {
     ./autogen.sh
-    ./configure --prefix=/usr --sysconfdir=/etc --disable-static --disable-docs
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --disable-docs
 }
 lankebuild_build() {
     cd "{SRC_DIR}"

@@ -8,8 +8,8 @@ lankebuild_prepare() {
 lankebuild_build() {
     sed -i '/$(MAKE) -C doc/d' Makefile
     make -j$(nproc)
-    make PREFIX=/usr DESTDIR={STAGING_ROOT} install
-    rm -f {STAGING_ROOT}/usr/lib/libgif.a
+    make PREFIX={PREFIX} DESTDIR={STAGING_ROOT} install
+    rm -f {STAGING_ROOT}{LIBDIR}/libgif.a
 }
 
 

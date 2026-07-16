@@ -10,7 +10,7 @@ lankebuild_build() {
     local cmake_args=(
         -G Ninja
         -DCMAKE_BUILD_TYPE=Release
-        -DCMAKE_INSTALL_PREFIX=/usr
+        -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR}
         -DLLVM_ENABLE_PROJECTS='clang;lld'
         -DLLVM_TARGETS_TO_BUILD='X86;AMDGPU;NVPTX;SPIRV'
         -DLLVM_BUILD_LLVM_DYLIB=ON
@@ -55,7 +55,7 @@ lankebuild_build() {
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install-distribution
 
-    install -Dm644 ../llvm/LICENSE.TXT {STAGING_ROOT}/usr/share/licenses/llvm/LICENSE
+    install -Dm644 ../llvm/LICENSE.TXT {STAGING_ROOT}{DATADIR}/licenses/llvm/LICENSE
 }
 
 lankebuild_package() {

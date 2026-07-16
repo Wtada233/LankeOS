@@ -8,7 +8,7 @@ lankebuild_build() {
     # librsvg 2.60.x: meson build with Rust component via cargo-c
     # --disable-static: no static libs
     meson setup build \
-        --prefix=/usr \
+        --prefix={PREFIX} \
         --buildtype=release \
         -Ddefault_library=shared \
         -Dtests=false \

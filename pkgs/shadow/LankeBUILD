@@ -18,16 +18,16 @@ lankebuild_build() {
     sed -e 's:#ENCRYPT_METHOD DES:ENCRYPT_METHOD YESCRYPT:' -e 's:/var/spool/mail:/var/mail:' -e '/PATH=/{s@/sbin:@@;s@/bin:@@}' -i etc/login.defs
 
     # 3. 准备编译：使用 LFS 推荐的参数并显式激活 PAM
-    ./configure --prefix=/usr --sysconfdir=/etc --disable-static --with-bcrypt --with-yescrypt --without-libbsd --with-libpam --with-group-name-max-length=32
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --with-bcrypt --with-yescrypt --without-libbsd --with-libpam --with-group-name-max-length=32
 
     make -j$(nproc)
 
     make exec_prefix=/usr pamddir= DESTDIR={STAGING_ROOT} install
     make -C man DESTDIR={STAGING_ROOT} install-man
     # 关键：修复 passwd 的 SUID 权限，否则无法联动 PAM 改密
-    chmod -v 4711 {STAGING_ROOT}/usr/bin/passwd
+    chmod -v 4711 {STAGING_ROOT}{BINDIR}/passwd
     # 添加 Shadow 链接
-    ln -sfv vipw {STAGING_ROOT}/usr/bin/vigr
+    ln -sfv vipw {STAGING_ROOT}{BINDIR}/vigr
 
     mkdir -p "{STAGING_ROOT}/etc/pam.d/"
     # 5. 打包前的 Hook 逻辑

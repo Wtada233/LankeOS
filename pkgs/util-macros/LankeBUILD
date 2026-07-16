@@ -1,6 +1,6 @@
 lankebuild_prepare() {
     ./autogen.sh
-    ./configure --prefix=/usr
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
 }
 lankebuild_build() {
     make -j$(nproc)

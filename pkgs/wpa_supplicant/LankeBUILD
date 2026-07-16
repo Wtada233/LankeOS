@@ -30,7 +30,7 @@ CONFIG_PKCS12=y
 CONFIG_READLINE=y
 CONFIG_SMARTCARD=y
 CONFIG_WPS=y
-CFLAGS += -I/usr/include/libnl3
+CFLAGS += -I{INCLUDEDIR}/libnl3
 EOF
 
     if pkg-config --exists dbus-1 2>/dev/null; then
@@ -46,22 +46,22 @@ lankebuild_build() {
     cd {WORK_DIR}/wpa_supplicant*/wpa_supplicant
 
     # 编译
-    make BINDIR=/usr/sbin LIBDIR=/usr/lib -j$(nproc)
+    make BINDIR={SBINDIR} LIBDIR={LIBDIR} -j$(nproc)
 
-    install -v -d {STAGING_ROOT}/usr/sbin
-    install -v -m755 wpa_cli wpa_passphrase wpa_supplicant {STAGING_ROOT}/usr/sbin/
-    install -v -m644 systemd/*.service /usr/lib/systemd/system/
+    install -v -d {STAGING_ROOT}{SBINDIR}
+    install -v -m755 wpa_cli wpa_passphrase wpa_supplicant {STAGING_ROOT}{SBINDIR}/
+    install -v -m644 systemd/*.service {LIBDIR}/systemd/system/
 
     # 安装手册页
-    install -v -d {STAGING_ROOT}/usr/share/man/man5 {STAGING_ROOT}/usr/share/man/man8
-    install -v -m644 doc/docbook/wpa_supplicant.conf.5 {STAGING_ROOT}/usr/share/man/man5/
-    install -v -m644 doc/docbook/wpa_{cli,passphrase,supplicant}.8 {STAGING_ROOT}/usr/share/man/man8/
+    install -v -d {STAGING_ROOT}{MANDIR}/man5 {STAGING_ROOT}{MANDIR}/man8
+    install -v -m644 doc/docbook/wpa_supplicant.conf.5 {STAGING_ROOT}{MANDIR}/man5/
+    install -v -m644 doc/docbook/wpa_{cli,passphrase,supplicant}.8 {STAGING_ROOT}{MANDIR}/man8/
 
     # 若启用 D-Bus，安装相关服务文件
     if pkg-config --exists dbus-1 2>/dev/null; then
-        install -v -d {STAGING_ROOT}/usr/share/dbus-1/system-services
+        install -v -d {STAGING_ROOT}{DATADIR}/dbus-1/system-services
         install -v -m644 dbus/fi.w1.wpa_supplicant1.service \
-            {STAGING_ROOT}/usr/share/dbus-1/system-services/
+            {STAGING_ROOT}{DATADIR}/dbus-1/system-services/
         install -v -d {STAGING_ROOT}/etc/dbus-1/system.d
         install -v -m644 dbus/dbus-wpa_supplicant.conf \
             {STAGING_ROOT}/etc/dbus-1/system.d/wpa_supplicant.conf

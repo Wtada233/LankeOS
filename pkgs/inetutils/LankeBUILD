@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     sed -i 's/def HAVE_TERMCAP_TGETENT/ 1/' telnet/telnet.c
-    ./configure --prefix=/usr --bindir=/usr/bin --localstatedir=/var --disable-static --disable-doc --disable-logger --disable-whois --disable-rcp --disable-rexec --disable-rlogin --disable-rsh --disable-servers
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --bindir={BINDIR} --localstatedir={LOCALSTATEDIR} --disable-static --disable-doc --disable-logger --disable-whois --disable-rcp --disable-rexec --disable-rlogin --disable-rsh --disable-servers
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

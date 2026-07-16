@@ -8,7 +8,7 @@ ac_preproc_ok=:' {SRC_DIR}/configure.sh
 
 lankebuild_build() {
     ./configure \
-      --prefix=/usr \
+      --prefix={PREFIX} \
       --enable-ipv6 \
       --disable-debug \
       --disable-xxhash \

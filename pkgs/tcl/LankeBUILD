@@ -8,19 +8,19 @@ lankebuild_prepare() {
 lankebuild_build() {
     SRCDIR=$(pwd)
     cd unix
-    ./configure --prefix=/usr --mandir=/usr/share/man --disable-static --with-system-sqlite
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --mandir={MANDIR} --disable-static --with-system-sqlite
     make -j$(nproc)
-    sed -e "s|$SRCDIR/unix|/usr/lib|"         -e "s|$SRCDIR|/usr/include|"          -i tclConfig.sh
+    sed -e "s|$SRCDIR/unix|{LIBDIR}|"         -e "s|$SRCDIR|{INCLUDEDIR}|"          -i tclConfig.sh
 
-    sed -e "s|$SRCDIR/unix/pkgs/tdbc1.1.12|/usr/lib/tdbc1.1.12|"         -e "s|$SRCDIR/pkgs/tdbc1.1.12/generic|/usr/include|"             -e "s|$SRCDIR/pkgs/tdbc1.1.12/library|/usr/lib/tcl8.6|"          -e "s|$SRCDIR/pkgs/tdbc1.1.12|/usr/include|"                     -i pkgs/tdbc1.1.12/tdbcConfig.sh
+    sed -e "s|$SRCDIR/unix/pkgs/tdbc1.1.12|{LIBDIR}/tdbc1.1.12|"         -e "s|$SRCDIR/pkgs/tdbc1.1.12/generic|{INCLUDEDIR}|"             -e "s|$SRCDIR/pkgs/tdbc1.1.12/library|{LIBDIR}/tcl8.6|"          -e "s|$SRCDIR/pkgs/tdbc1.1.12|{INCLUDEDIR}|"                     -i pkgs/tdbc1.1.12/tdbcConfig.sh
 
-    sed -e "s|$SRCDIR/unix/pkgs/itcl4.3.4|/usr/lib/itcl4.3.4|"         -e "s|$SRCDIR/pkgs/itcl4.3.4/generic|/usr/include|"            -e "s|$SRCDIR/pkgs/itcl4.3.4|/usr/include|"                    -i pkgs/itcl4.3.4/itclConfig.sh
+    sed -e "s|$SRCDIR/unix/pkgs/itcl4.3.4|{LIBDIR}/itcl4.3.4|"         -e "s|$SRCDIR/pkgs/itcl4.3.4/generic|{INCLUDEDIR}|"            -e "s|$SRCDIR/pkgs/itcl4.3.4|{INCLUDEDIR}|"                    -i pkgs/itcl4.3.4/itclConfig.sh
 
     unset SRCDIR
     make DESTDIR={STAGING_ROOT} install
     make DESTDIR={STAGING_ROOT} install-private-headers
-    ln -sf tclsh8.6 {STAGING_ROOT}/usr/bin/tclsh
-    mv -v {STAGING_ROOT}/usr/share/man/man3/{Thread,Tcl_Thread}.3
+    ln -sf tclsh8.6 {STAGING_ROOT}{BINDIR}/tclsh
+    mv -v {STAGING_ROOT}{MANDIR}/man3/{Thread,Tcl_Thread}.3
 }
 
 

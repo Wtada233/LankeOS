@@ -5,11 +5,11 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix=/usr
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     # Remove static library from staging (shared lib kept)
-    rm -f {STAGING_ROOT}/usr/lib/libz.a
+    rm -f {STAGING_ROOT}{LIBDIR}/libz.a
 }
 
 lankebuild_package() {

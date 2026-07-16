@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     echo "Configuring lcms2-2.18..."
-    ./configure --prefix=/usr --disable-static
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
     echo "Building lcms2-2.18..."
     make -j$(nproc)
     echo "Build complete."

@@ -38,25 +38,25 @@ lankebuild_package() {
     make TO_LIB="liblua.so liblua.so.${MAJOR} liblua.so.${VERSION}" \
          INSTALL_DATA='cp -d' \
          INSTALL_TOP="{STAGING_ROOT}/usr" \
-         INSTALL_MAN="{STAGING_ROOT}/usr/share/man/man1" \
+         INSTALL_MAN="{STAGING_ROOT}{MANDIR}/man1" \
          install
 
     # 创建兼容符号链接
-    ln -sf lua "{STAGING_ROOT}/usr/bin/lua${MAJOR}"
-    ln -sf luac "{STAGING_ROOT}/usr/bin/luac${MAJOR}"
-    ln -sf liblua.so.${VERSION} "{STAGING_ROOT}/usr/lib/liblua${MAJOR}.so"
+    ln -sf lua "{STAGING_ROOT}{BINDIR}/lua${MAJOR}"
+    ln -sf luac "{STAGING_ROOT}{BINDIR}/luac${MAJOR}"
+    ln -sf liblua.so.${VERSION} "{STAGING_ROOT}{LIBDIR}/liblua${MAJOR}.so"
 
     # 安装 pkg-config 文件（去掉点号作为 pkgconfig 名称，如 lua55）
     PKGCONFIG_NAME="lua${MAJOR//./}"
-    install -Dm644 lua.pc "{STAGING_ROOT}/usr/lib/pkgconfig/${PKGCONFIG_NAME}.pc"
-    ln -sf "${PKGCONFIG_NAME}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua.pc"
-    ln -sf "${PKGCONFIG_NAME}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua${VERSION}.pc"
-    ln -sf "${PKGCONFIG_NAME}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua-${VERSION}.pc"
+    install -Dm644 lua.pc "{STAGING_ROOT}{LIBDIR}/pkgconfig/${PKGCONFIG_NAME}.pc"
+    ln -sf "${PKGCONFIG_NAME}.pc" "{STAGING_ROOT}{LIBDIR}/pkgconfig/lua.pc"
+    ln -sf "${PKGCONFIG_NAME}.pc" "{STAGING_ROOT}{LIBDIR}/pkgconfig/lua${VERSION}.pc"
+    ln -sf "${PKGCONFIG_NAME}.pc" "{STAGING_ROOT}{LIBDIR}/pkgconfig/lua-${VERSION}.pc"
 
     # 安装文档和许可证
-    install -d "{STAGING_ROOT}/usr/share/doc/{PKG_NAME}"
-    install -m644 doc/*.{png,css,html} "{STAGING_ROOT}/usr/share/doc/{PKG_NAME}/"
-    install -Dm644 ../license-from-upstream "{STAGING_ROOT}/usr/share/licenses/{PKG_NAME}/LICENSE"
+    install -d "{STAGING_ROOT}{DATADIR}/doc/{PKG_NAME}"
+    install -m644 doc/*.{png,css,html} "{STAGING_ROOT}{DATADIR}/doc/{PKG_NAME}/"
+    install -Dm644 ../license-from-upstream "{STAGING_ROOT}{DATADIR}/licenses/{PKG_NAME}/LICENSE"
 
     # ---------- 安装 lua++ ----------
     cd "../lua++-{PKG_VER}"
@@ -68,13 +68,13 @@ lankebuild_package() {
          INSTALL_TOP="{STAGING_ROOT}/usr" \
          install
 
-    ln -sf liblua++.so.${VERSION} "{STAGING_ROOT}/usr/lib/liblua++${MAJOR}.so"
+    ln -sf liblua++.so.${VERSION} "{STAGING_ROOT}{LIBDIR}/liblua++${MAJOR}.so"
 
     PKGCONFIG_NAME_CXX="lua++${MAJOR//./}"
-    install -Dm644 lua++.pc "{STAGING_ROOT}/usr/lib/pkgconfig/${PKGCONFIG_NAME_CXX}.pc"
-    ln -sf "${PKGCONFIG_NAME_CXX}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua++.pc"
-    ln -sf "${PKGCONFIG_NAME_CXX}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua++${VERSION}.pc"
-    ln -sf "${PKGCONFIG_NAME_CXX}.pc" "{STAGING_ROOT}/usr/lib/pkgconfig/lua++-${VERSION}.pc"
+    install -Dm644 lua++.pc "{STAGING_ROOT}{LIBDIR}/pkgconfig/${PKGCONFIG_NAME_CXX}.pc"
+    ln -sf "${PKGCONFIG_NAME_CXX}.pc" "{STAGING_ROOT}{LIBDIR}/pkgconfig/lua++.pc"
+    ln -sf "${PKGCONFIG_NAME_CXX}.pc" "{STAGING_ROOT}{LIBDIR}/pkgconfig/lua++${VERSION}.pc"
+    ln -sf "${PKGCONFIG_NAME_CXX}.pc" "{STAGING_ROOT}{LIBDIR}/pkgconfig/lua++-${VERSION}.pc"
 
     cd ..
 }

@@ -9,7 +9,8 @@ lankebuild_build() {
     echo "Configuring OpenJPEG-2.5.4..."
     cd build
     cmake -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX=/usr \
+          -DCMAKE_INSTALL_PREFIX={PREFIX} \
+          -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
           -DBUILD_STATIC_LIBS=OFF ..
     echo "Building OpenJPEG-2.5.4..."
     make -j$(nproc)
