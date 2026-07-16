@@ -1,8 +1,0 @@
-{
-  "name": "webkitgtk",
-  "version": "2.50.5",
-  "sources": ["https://webkitgtk.org/releases/webkitgtk-2.50.5.tar.xz"],
-  "deps": [],
-  "no_strip": false,
-  "man": "webkitgtk(7) - WebKitGTK 2.50.5\n\nWeb content engine for GTK4 applications.\nProvides WebKit2GTK API for rendering web content.\n"
-}
