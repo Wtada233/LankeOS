@@ -119,19 +119,27 @@ lankebuild_package() {
 
 ## 构建整个发行版
 
-完整构建通常需要以下步骤：
+完整构建可以遵循以下步骤：
 
-1. **构建 lpkg**（已完成）并使用构建好的lpkg运行pkgs/lpkg的build，然后使用lpkg install --force-overwrite替换lpkg，实现自举
-2. **构建基础工具链** — glibc、gcc、binutils、coreutils 等
-3. **构建系统基础设施** — systemd、dbus、util-linux、PAM 等
-4. **构建网络栈** — NetworkManager、wpa_supplicant、openssh、curl
-5. **构建图形栈** — Mesa、Wayland、wlroots、Sway
-6. **构建开发工具** — LLVM、Rust、Python、Ruby
-7. **构建桌面应用** — GTK4、WebKitGTK、Alacritty、Fcitx5
-8. **构建内核和固件**
-9. **打包 Live ISO**
+### 1. 设置工作区：运行LankeOS的一台机器，实体机或虚拟机均可，作为构建宿主
 
-> 注：完整构建指南仍在完善中。目前推荐直接使用 [预构建 ISO](/download)。
+- 安装所有包，比如默认没有安装的wlroots（目前LankeBUILD系统没有build_deps声明，这是一大缺陷，我改天会改善）
+
+### 2. 开始构建
+
+- 依旧运行`git clone https://github.com/Wtada233/LankeOS --depth=1`
+
+- 运行pkgs/*下的hacks.sh（每个包需要的特殊环境，比如python3=python的软链接，特殊python库等LankeOS默认不提供的）
+
+- 在pkgs目录下运行`sudo python3 ../lpkg/main/scripts/lankeos-world-rebuild-helper.py`
+
+- 按照指引进行半自动的重新构建。通常情况下，只需要在每一步按下Ctrl+D，这里半自动是为了方便debug，如果你需要全自动重新构建，请使用yes exit来快速退出shell。
+
+- 运行`sudo python3 ../lpkg/main/scripts/gen_deps.py .`生成provider map并自动标记deps和needed_so等（记得提前安装pyelftools用于快速扫描）
+
+- 在所有打包完成之后，创建新的LankeOS根目录，基本usr merge软链接，基本系统配置文件（passwd等）
+
+- 手动把lpkg cp到rootfs/usr/bin，创建rootfs/etc/resolv.conf和rootfs/etc/ssl的所有必要证书（可直接cp主机的）然后cp所有包到新的rootfs，chroot到新rootfs，使用lpkg安装所有包，使用no-deps直接拒绝解析依赖，完成安装。
 
 ## Live ISO 打包
 
