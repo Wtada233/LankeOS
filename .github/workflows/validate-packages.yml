@@ -100,7 +100,7 @@ jobs:
                 {
                   printf 'code=$(curl -sS -o /dev/null -w "%%{http_code}" --connect-timeout 5 --max-time 10 -L '\''%s'\'' 2>/dev/null) ||:\n' "$url"
                   printf '[ -z "$code" ] && code="000"\n'
-                  printf 'case "$code" in\n200|301|302|307|308) printf "OK|%%s|%%s\\n" '\''%s'\'' '\''%s'\'' ;;\n*) printf "FAIL|%%s|%%s|HTTP %%s\\n" '\''%s'\'' '\''%s'\'' "$code" ;;\nesac\n' "$pkg" "$url" "$pkg" "$url"
+                  printf 'case "$code" in\n200|301|302|303|307|308) printf "OK|%%s|%%s\\n" '\''%s'\'' '\''%s'\'' ;;\n*) printf "FAIL|%%s|%%s|HTTP %%s\\n" '\''%s'\'' '\''%s'\'' "$code" ;;\nesac\n' "$pkg" "$url" "$pkg" "$url"
                 } > "${OUTDIR}/c_${idx}.sh"
                 chmod +x "${OUTDIR}/c_${idx}.sh"
                 ;;
