@@ -63,7 +63,7 @@ jobs:
                 pkg_bad=true
               else
                 # --- 1c. JSON: required fields ---
-                for field in name version sources; do
+                for field in name version; do
                   if ! jq -e ".${field}" "$json_file" > /dev/null 2>&1; then
                     echo "::error file=$json_file::[$pkg_name] Missing required field: '${field}'"
                     JSON_FAIL=$((JSON_FAIL + 1))
@@ -71,13 +71,17 @@ jobs:
                   fi
                 done
 
-                # --- 1d. JSON: sources must be an array (empty is valid, e.g. git-clone builds) ---
+                # --- 1d. JSON: sources (optional; must be an array if present) ---
                 src_type=$(jq -r '.sources | type' "$json_file" 2>/dev/null || echo "missing")
-                if [ "$src_type" != "array" ]; then
-                  echo "::error file=$json_file::[$pkg_name] 'sources' must be an array (got: $src_type)"
-                  JSON_FAIL=$((JSON_FAIL + 1))
-                  pkg_bad=true
-                fi
+                case "$src_type" in
+                  missing|null) ;;  # absent or null → fine, pkg uses git clone or work_sources only
+                  array) ;;          # present and array → fine
+                  *)
+                    echo "::error file=$json_file::[$pkg_name] 'sources' must be an array (got: $src_type)"
+                    JSON_FAIL=$((JSON_FAIL + 1))
+                    pkg_bad=true
+                    ;;
+                esac
               fi
             fi
 
