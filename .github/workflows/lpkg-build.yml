@@ -19,36 +19,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            g++ \
-            make \
-            pkgconf \
-            libcurl4-openssl-dev \
-            libarchive-dev \
-            libssl-dev \
-            libelf-dev
-
-      - name: Build lpkg
-        run: make -C lpkg -j$(nproc)
+      - name: Build lpkg in Docker (Alpine 3.19, static)
+        run: make -C lpkg docker
 
       - name: Install test dependencies
         run: |
+          sudo apt-get update -qq
           sudo apt-get install -y -qq \
-            libgtest-dev \
-            lcov
-          # Install prebuilt gtest libraries; build from source if not available
-          if apt-cache show googletest >/dev/null 2>&1; then
-            sudo apt-get install -y -qq googletest
-          else
-            echo "Building gtest from source..."
-            cd /usr/src/gtest
-            sudo cmake CMakeLists.txt
-            sudo make
-            sudo cp lib/libgtest*.a /usr/lib/x86_64-linux-gnu/ 2>/dev/null || sudo cp lib/libgtest*.a /usr/lib/
-          fi
+            g++ make pkgconf \
+            libcurl4-openssl-dev libarchive-dev libssl-dev libelf-dev \
+            libgtest-dev lcov
 
-      - name: Run tests with coverage
-        run: make -C lpkg test
+      - name: Build and run tests
+        run: make -C lpkg build_test_internal -j$(nproc)
