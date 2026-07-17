@@ -19,16 +19,5 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Build lpkg in Docker (Alpine 3.19, static)
-        run: make -C lpkg docker
-
-      - name: Install test dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq \
-            g++ make pkgconf \
-            libcurl4-openssl-dev libarchive-dev libssl-dev libelf-dev \
-            libgtest-dev lcov
-
-      - name: Build and run tests
-        run: make -C lpkg build_test_internal -j$(nproc)
+      - name: Build static binary and run tests (Alpine 3.19 Docker)
+        run: make -C lpkg docker test
