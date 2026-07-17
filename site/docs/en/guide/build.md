@@ -119,19 +119,36 @@ lankebuild_package() {
 
 ## Building the Entire Distribution
 
-A complete build typically requires the following steps:
+A complete build involves the following steps:
 
-1. **Build lpkg** (done) then use it to build `pkgs/lpkg`, then `lpkg install --force-overwrite` to replace lpkg itself (self-hosting/bootstrap)
-2. **Build base toolchain** — glibc, gcc, binutils, coreutils, etc.
-3. **Build system infrastructure** — systemd, dbus, util-linux, PAM, etc.
-4. **Build network stack** — NetworkManager, wpa_supplicant, openssh, curl
-5. **Build graphics stack** — Mesa, Wayland, wlroots, Sway
-6. **Build development tools** — LLVM, Rust, Python, Ruby
-7. **Build desktop applications** — GTK4, WebKitGTK, Alacritty, Fcitx5
-8. **Build kernel and firmware**
-9. **Package Live ISO**
+### 1. Set Up the Workspace: A Machine Running LankeOS (Physical or VM) as the Build Host
 
-> Note: The complete build guide is still being refined. Using the [pre-built ISO](/en/download) is recommended for now.
+- Install all packages, e.g., wlroots (which is not installed by default). Currently, the LankeBUILD system lacks a `build_deps` declaration — this is a major shortcoming and will be improved in the future.
+
+### 2. Start Building
+
+- Run `git clone https://github.com/Wtada233/LankeOS --depth=1`
+
+- Run `hacks.sh` scripts under each `pkgs/*/` directory (these provide special environment setup required by each package, such as symlinks like `python3=python`, special Python libraries, etc., that LankeOS does not provide by default).
+
+- In the `pkgs` directory, run:
+
+  ```bash
+  sudo python3 ../lpkg/main/scripts/lankeos-world-rebuild-helper.py
+  ```
+
+- Follow the prompts for a semi-automatic rebuild. Normally, you only need to press Ctrl+D at each step. Semi-automatic mode is designed for easier debugging. If you need a fully automatic rebuild, use `yes exit` to quickly exit the shell.
+
+- Generate the provider map and automatically mark dependencies and `needed_so`:
+
+  ```bash
+  sudo python3 ../lpkg/main/scripts/gen_deps.py .
+  ```
+  (Make sure to install `pyelftools` in advance for fast scanning.)
+
+- After all packages are built, create a new LankeOS root directory, set up basic usr merge symlinks, and basic system configuration files (`passwd`, etc.).
+
+- Manually copy `lpkg` to `rootfs/usr/bin`, create `rootfs/etc/resolv.conf` and all necessary certificates under `rootfs/etc/ssl` (you can copy them directly from the host). Then copy all packages to the new rootfs, `chroot` into it, and install all packages using `lpkg` with `--no-deps` to skip dependency resolution.
 
 ## Live ISO Packaging
 
