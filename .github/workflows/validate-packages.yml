@@ -1,0 +1,211 @@
+name: Validate Packages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pkgs/**'
+      - '.github/workflows/validate-packages.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'pkgs/**'
+      - '.github/workflows/validate-packages.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate all LankeBUILD definitions
+        run: |
+          set -euo pipefail
+
+          PKGS_DIR="pkgs"
+
+          # Temp files for tracking
+          FAILED_PKGS=$(mktemp)
+          URL_LIST=$(mktemp)
+          URL_RESULTS=$(mktemp)
+
+          TOTAL=0
+          JSON_FAIL=0
+          SCRIPT_FAIL=0
+
+          echo "========================================="
+          echo "  LankeBUILD Package Validation"
+          echo "========================================="
+          echo ""
+
+          # ========================================================
+          # PHASE 1: Validate JSON and script syntax for every package
+          # ========================================================
+          for pkg_dir in "$PKGS_DIR"/*/; do
+            [ -d "$pkg_dir" ] || continue
+            pkg_name=$(basename "$pkg_dir")
+            json_file="${pkg_dir}LankeBUILD.json"
+            script_file="${pkg_dir}LankeBUILD"
+            TOTAL=$((TOTAL + 1))
+            pkg_bad=false
+
+            # --- 1a. JSON: exists ---
+            if [ ! -f "$json_file" ]; then
+              echo "::error file=$pkg_dir::[$pkg_name] LankeBUILD.json not found"
+              JSON_FAIL=$((JSON_FAIL + 1))
+              pkg_bad=true
+            else
+              # --- 1b. JSON: valid syntax ---
+              if ! jq empty "$json_file" 2>/dev/null; then
+                echo "::error file=$json_file::[$pkg_name] Invalid JSON syntax"
+                JSON_FAIL=$((JSON_FAIL + 1))
+                pkg_bad=true
+              else
+                # --- 1c. JSON: required fields ---
+                for field in name version sources; do
+                  if ! jq -e ".${field}" "$json_file" > /dev/null 2>&1; then
+                    echo "::error file=$json_file::[$pkg_name] Missing required field: '${field}'"
+                    JSON_FAIL=$((JSON_FAIL + 1))
+                    pkg_bad=true
+                  fi
+                done
+
+                # --- 1d. JSON: sources must be an array (empty is valid, e.g. git-clone builds) ---
+                src_type=$(jq -r '.sources | type' "$json_file" 2>/dev/null || echo "missing")
+                if [ "$src_type" != "array" ]; then
+                  echo "::error file=$json_file::[$pkg_name] 'sources' must be an array (got: $src_type)"
+                  JSON_FAIL=$((JSON_FAIL + 1))
+                  pkg_bad=true
+                fi
+              fi
+            fi
+
+            # --- 2a. Script: exists ---
+            if [ ! -f "$script_file" ]; then
+              echo "::error file=$pkg_dir::[$pkg_name] LankeBUILD script not found"
+              SCRIPT_FAIL=$((SCRIPT_FAIL + 1))
+              pkg_bad=true
+            else
+              # --- 2b. Script: bash syntax check ---
+              if ! bash -n "$script_file" 2>/tmp/lankebuild-syntax-err.txt; then
+                echo "::error file=$script_file::[$pkg_name] LankeBUILD script has syntax errors"
+                while IFS= read -r line; do
+                  echo "  $line"
+                done < /tmp/lankebuild-syntax-err.txt
+                SCRIPT_FAIL=$((SCRIPT_FAIL + 1))
+                pkg_bad=true
+              fi
+              rm -f /tmp/lankebuild-syntax-err.txt
+            fi
+
+            # --- 2c. Collect URLs for Phase 2 ---
+            if [ -f "$json_file" ] && jq empty "$json_file" 2>/dev/null; then
+              jq -r '.sources[], (.work_sources // [])[]' "$json_file" 2>/dev/null | while IFS= read -r url; do
+                [ -n "$url" ] && echo "${pkg_name}|${url}" >> "$URL_LIST"
+              done
+            fi
+
+            if [ "$pkg_bad" = true ]; then
+              echo "$pkg_name" >> "$FAILED_PKGS"
+            fi
+          done
+
+          # ========================================================
+          # PHASE 2: Check URL accessibility (parallel, skip file://)
+          # ========================================================
+          echo ""
+          echo "--- Checking URL accessibility ($(sort -u "$URL_LIST" | wc -l) unique URLs) ---"
+          echo ""
+
+          check_url() {
+            local entry="$1"
+            local pkg_name url
+            pkg_name="${entry%%|*}"
+            url="${entry#*|}"
+
+            # Skip file:// URLs
+            case "$url" in
+              file://*)
+                printf 'SKIP|%s|%s\n' "$pkg_name" "$url"
+                return 0
+                ;;
+            esac
+
+            local http_code
+            http_code=$(curl -sS -o /dev/null -w '%{http_code}' \
+              --connect-timeout 10 \
+              --max-time 30 \
+              -L \
+              -A "LankeOS-CI-Validator/1.0" \
+              "$url" 2>/dev/null || echo "000")
+
+            case "$http_code" in
+              200|301|302|307|308)
+                printf 'OK|%s|%s\n' "$pkg_name" "$url"
+                ;;
+              *)
+                printf 'FAIL|%s|%s|HTTP %s\n' "$pkg_name" "$url" "$http_code"
+                ;;
+            esac
+          }
+          export -f check_url
+
+          if [ -s "$URL_LIST" ]; then
+            sort -u "$URL_LIST" | xargs -P 8 -I '{}' bash -c 'check_url "$@"' _ '{}' > "$URL_RESULTS" || true
+          fi
+
+          # Tally URL results from file (avoids subshell variable loss)
+          url_ok=0
+          url_fail=0
+          url_skip=0
+          while IFS='|' read -r status pkg url detail; do
+            case "$status" in
+              OK)   url_ok=$((url_ok + 1)) ;;
+              SKIP)
+                url_skip=$((url_skip + 1))
+                echo "  [SKIP] $pkg: $url"
+                ;;
+              FAIL)
+                url_fail=$((url_fail + 1))
+                echo "::warning file=$PKGS_DIR/$pkg/LankeBUILD.json::[$pkg] Unreachable ($detail): $url"
+                ;;
+            esac
+          done < "$URL_RESULTS"
+
+          # ========================================================
+          # PHASE 3: Print summary & exit
+          # ========================================================
+          echo ""
+          echo "========================================="
+          echo "  Validation Summary"
+          echo "========================================="
+          printf "  Packages scanned:   %d\n" "$TOTAL"
+          printf "  JSON valid:         %d  (failed: %d)\n" "$((TOTAL - JSON_FAIL))" "$JSON_FAIL"
+          printf "  Script syntax OK:   %d  (failed: %d)\n" "$((TOTAL - SCRIPT_FAIL))" "$SCRIPT_FAIL"
+          printf "  URLs reachable:     %d  (failed: %d, skipped: %d)\n" "$url_ok" "$url_fail" "$url_skip"
+          echo "========================================="
+
+          if [ -s "$FAILED_PKGS" ]; then
+            echo ""
+            echo "Failed packages:"
+            cat "$FAILED_PKGS"
+          fi
+
+          # Cleanup
+          rm -f "$FAILED_PKGS" "$URL_LIST" "$URL_RESULTS"
+
+          # Fail on hard errors; URL failures are soft warnings
+          if [ "$JSON_FAIL" -gt 0 ] || [ "$SCRIPT_FAIL" -gt 0 ]; then
+            echo ""
+            echo "::error::Validation FAILED — $JSON_FAIL JSON errors, $SCRIPT_FAIL script syntax errors"
+            exit 1
+          fi
+
+          if [ "$url_fail" -gt 0 ]; then
+            echo ""
+            echo "::warning::$url_fail URLs unreachable (network may be flaky — re-run to confirm)"
+          fi
+
+          echo ""
+          echo "All package definitions are valid!"
