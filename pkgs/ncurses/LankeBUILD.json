@@ -2,7 +2,7 @@
   "name": "ncurses",
   "version": "6.5-20250809",
   "sources": [
-    "https://invisible-mirror.net/archives/ncurses/current/ncurses-6.5-20250809.tgz"
+    "https://lfs.gnlug.org/pub/lfs/lfs-packages/12.4/ncurses-6.5-20250809.tgz"
   ],
   "work_sources": [],
   "release": 2

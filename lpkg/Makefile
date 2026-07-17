@@ -82,11 +82,17 @@ ifeq ($(COVERAGE_MODE),1)
     TEST_LIBS += -lgcov
 endif
 
-.PHONY: all clean install uninstall static test build_test_internal docker
+.PHONY: all clean install uninstall static test build_test_internal docker docker-env docker-sync
 
 all: $(BUILD_DIR)/$(TARGET)
 
-test:
+test: docker-env
+	@$(MAKE) docker-sync
+	@docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make build_test_internal -j$$(nproc)"
+	@echo "------------------------------------------"
+	@echo "Tests completed inside Docker container."
+
+coverage:
 	@echo "Starting comprehensive test suite with coverage..."
 	@rm -rf build_test coverage_report
 	@mkdir -p build_test
@@ -145,8 +151,8 @@ install: all
 static-install: static
 	$(call do_install,$(BUILD_DIR)/$(TARGET)-static)
 
-docker-install: docker
-	$(call do_install,$(BUILD_DIR)/$(TARGET)-docker)
+docker-install: $(BUILD_DIR)/$(TARGET)-docker
+	$(call do_install,$<)
 
 uninstall:
 	rm -f $(INSTALL_BIN_DIR)/$(TARGET)
@@ -156,21 +162,28 @@ uninstall:
 
 DOCKER_ENV_CONTAINER = lpkg-builder
 
-docker:
-	@echo "Using persistent build-env container..."
+docker-env:
 	@mkdir -p $(BUILD_DIR)
 	@if ! docker inspect $(DOCKER_ENV_CONTAINER) >/dev/null 2>&1; then \
-		echo "Initializing pure build environment, downloading packages..."; \
+		echo "Initializing pure build environment..."; \
 		docker run --name $(DOCKER_ENV_CONTAINER) -d alpine:3.19 sleep infinity; \
-		docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx; \
 	elif [ "$$(docker inspect -f '{{.State.Running}}' $(DOCKER_ENV_CONTAINER))" = "false" ]; then \
 		echo "Container exists but is stopped. Starting $(DOCKER_ENV_CONTAINER)..."; \
 		docker start $(DOCKER_ENV_CONTAINER) >/dev/null; \
 	fi
-	@echo "Syncing source code and compiling inside container..."
-	docker exec $(DOCKER_ENV_CONTAINER) sh -c "rm -rf /app/* /app/.* 2>/dev/null; true"
-	docker cp . $(DOCKER_ENV_CONTAINER):/app
+	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx gtest-dev tar
+
+docker-sync:
+	@echo "Syncing source code to container..."
+	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "rm -rf /app/* /app/.* 2>/dev/null; true"
+	@docker cp . $(DOCKER_ENV_CONTAINER):/app
+
+$(BUILD_DIR)/$(TARGET)-docker: docker-env
+	$(MAKE) docker-sync
 	docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make static -j$$(nproc) && strip --strip-all $(BUILD_DIR)/$(TARGET)-static && upx -9 $(BUILD_DIR)/$(TARGET)-static"
-	docker cp $(DOCKER_ENV_CONTAINER):/app/$(BUILD_DIR)/$(TARGET)-static $(BUILD_DIR)/$(TARGET)-docker
+	docker cp $(DOCKER_ENV_CONTAINER):/app/$(BUILD_DIR)/$(TARGET)-static $@
 	@echo "--------------------------------------------------------"
-	@echo "Success! Pure static binary is ready at: $(BUILD_DIR)/$(TARGET)-docker"
+	@echo "Success! Pure static binary is ready at: $@"
+
+docker: $(BUILD_DIR)/$(TARGET)-docker
+

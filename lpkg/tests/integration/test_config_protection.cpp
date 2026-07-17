@@ -4,6 +4,7 @@
 #include "../../main/src/base/utils.hpp"
 #include "../../main/src/config/config.hpp"
 #include "../../main/src/base/constants.hpp"
+#include "../../main/src/i18n/localization.hpp"
 #include "nlohmann/json.hpp"
 #include <filesystem>
 #include <fstream>
@@ -23,7 +24,9 @@ protected:
         pkgs_dir = test_root / "pkgs";
         if (fs::exists(test_root)) fs::remove_all(test_root);
         fs::create_directories(pkgs_dir);
-        
+
+        init_localization();
+
         Config::instance().set_root_path(test_root.string());
         Config::instance().set_architecture("x86_64");
         Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
@@ -31,6 +34,10 @@ protected:
         Config::instance().init_filesystem();
         
         std::ofstream(test_root / "etc/lpkg/mirror.conf") << "file://" + pkgs_dir.string() + "/";
+        std::ofstream(test_root / "etc/lpkg/triggers.conf") <<
+            R"(# Shared library update -> regenerate ldconfig links
+^/usr/lib/.*\.so.*	ldconfig
+)";
     }
 
     void TearDown() override {

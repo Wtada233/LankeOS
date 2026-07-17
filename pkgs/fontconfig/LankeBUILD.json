@@ -2,7 +2,7 @@
   "name": "fontconfig",
   "version": "2.16.0",
   "sources": [
-    "https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.16.0.tar.xz"
+    "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.16.0/fontconfig-2.16.0.tar.gz"
   ],
   "work_sources": [],
   "release": 2
