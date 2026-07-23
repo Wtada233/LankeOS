@@ -1,10 +1,9 @@
 {
   "name": "lpkg",
-  "version": "5.2.3",
+  "version": "5.2.4",
   "sources": [
-    "https://github.com/Wtada233/LankeOS/archive/06f01e3365f3aa35790533e96187687f642190bf.zip"
+    "https://github.com/Wtada233/LankeOS/archive/f0e4b5eb9ecff2fb4c69ed51714f84f778c7432e.zip"
   ],
   "no_strip": true,
-  "work_sources": [],
-  "release": 2
+  "work_sources": []
 }
