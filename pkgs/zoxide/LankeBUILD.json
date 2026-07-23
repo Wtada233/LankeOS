@@ -1,0 +1,8 @@
+{
+  "name": "zoxide",
+  "version": "0.10.0",
+  "sources": [
+    "https://github.com/ajeetdsouza/zoxide/archive/refs/tags/v0.10.0.tar.gz"
+  ],
+  "work_sources": []
+}

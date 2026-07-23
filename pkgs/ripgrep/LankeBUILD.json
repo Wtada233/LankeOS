@@ -1,0 +1,8 @@
+{
+  "name": "ripgrep",
+  "version": "15.2.0",
+  "sources": [
+    "https://github.com/BurntSushi/ripgrep/archive/refs/tags/15.2.0.tar.gz"
+  ],
+  "work_sources": []
+}

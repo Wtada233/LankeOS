@@ -1,0 +1,8 @@
+{
+  "name": "libevent",
+  "version": "2.1.13",
+  "sources": [
+    "https://github.com/libevent/libevent/releases/download/release-2.1.13-stable/libevent-2.1.13-stable.tar.gz"
+  ],
+  "work_sources": []
+}

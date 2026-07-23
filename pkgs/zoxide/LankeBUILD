@@ -1,0 +1,20 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    cargo update
+    cargo fetch --locked --target "x86_64-unknown-linux-gnu"
+}
+
+lankebuild_build() {
+    cargo build --release --frozen --all-features
+    ./target/release/zoxide init fish > zoxide.fish
+}
+
+
+lankebuild_package() {
+    install -D -t "{STAGING_ROOT}/usr/bin" target/release/zoxide
+    install -Dm644 LICENSE -t "{STAGING_ROOT}/usr/share/licenses/zoxide/"
+    install -Dm644 man/man1/*.1 -t "{STAGING_ROOT}/usr/share/man/man1/"
+    install -Dm644 zoxide.fish -t "{STAGING_ROOT}/usr/share/fish/vendor_conf.d/"
+}

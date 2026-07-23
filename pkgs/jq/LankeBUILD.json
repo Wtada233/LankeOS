@@ -1,0 +1,8 @@
+{
+  "name": "jq",
+  "version": "1.8.2",
+  "sources": [
+    "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz"
+  ],
+  "work_sources": []
+}
