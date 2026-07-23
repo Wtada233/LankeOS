@@ -113,7 +113,7 @@ void InstallationTask::prepare(InstallContext *ctx) {
   if (ctx) {
     ensure_dependencies_satisfied(*ctx);
   }
-  check_for_file_conflicts();
+  check_for_file_conflicts(ctx);
 }
 
 /**
@@ -538,7 +538,7 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext &ctx) {
   }
 }
 
-void InstallationTask::check_for_file_conflicts() {
+void InstallationTask::check_for_file_conflicts(InstallContext *ctx) {
   std::map<std::string, std::string> conflicts;
   const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
   auto files = detail::scan_content_files(content_dir);
@@ -562,6 +562,34 @@ void InstallationTask::check_for_file_conflicts() {
 
     auto owners = cache.get_file_owners(path_str);
     if (!owners.empty()) {
+      // 在升级/批量安装上下文中：若文件的所有持有者都满足：
+      //   ① 在同批次 plan 中（即将被升级/替换）
+      //   ② 尚未被处理（不在 installed_set 中）
+      // 则跳过冲突检测。
+      //
+      // 这解决了升级中新增的依赖与旧版本文件冲突的问题：
+      //   包 A v1 持有文件 F → 升级发现新依赖 B 也持有 F
+      //   B 先安装（依赖优先），A 后升级 → 非冲突，所有权自然转移
+      //
+      // 两个新包在同一批次中安装同一文件仍会触发冲突：
+      //   libA 先安装 → installed_set 中有 libA
+      //   libB 安装 → owners={libA}，libA 在 installed_set 中 → 不跳过
+      if (ctx) {
+        bool all_upgrading = true;
+        for (const auto &owner : owners) {
+          if (!ctx->plan.contains(owner)) {
+            all_upgrading = false;
+            break;
+          }
+          if (ctx->installed_set.contains(owner)) {
+            all_upgrading = false;
+            break;
+          }
+        }
+        if (all_upgrading)
+          continue;
+      }
+
       if (!Config::instance().force_overwrite_mode()) {
         conflicts[path_str] = *owners.begin();
       } else {
