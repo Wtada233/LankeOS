@@ -633,6 +633,9 @@ void autoremove() {
 
 /**
  * 升级所有已安装的包
+ *
+ * 和安装流程共享依赖解析机制（resolve_package_dependencies），
+ * 确保新版本引入的新依赖被正确解析并安装。
  */
 void upgrade_packages() {
   log_info(get_string("info.checking_upgradable"));
@@ -654,16 +657,9 @@ void upgrade_packages() {
     }
   }
 
-  // 构建升级计划
-  struct UpgradeEntry {
-    std::string name;
-    std::string old_ver;
-    std::string new_ver;
-    std::string hash;
-    bool held;
-  };
-  std::vector<UpgradeEntry> plan;
-  std::map<std::string, InstallPlan> consistency_plan;
+  // 找出可升级的包，构造升级目标列表
+  // 需要先收集完毕再统一解析，避免在遍历 installed 时修改 plan
+  std::vector<std::pair<std::string, std::string>> upgrade_targets;
   for (const auto &[n, curr] : installed) {
     if (sigint_graceful.load()) {
       log_info(get_string("info.sigint_aborted"));
@@ -674,17 +670,28 @@ void upgrade_packages() {
       continue;
     if (!version_compare(curr, opt->version))
       continue;
-    const bool held = Cache::instance().is_held(n);
-    plan.push_back({n, curr, opt->version, opt->sha256, held});
+    upgrade_targets.emplace_back(n, std::string(constants::VER_LATEST));
+  }
 
-    InstallPlan ip;
-    ip.name = n;
-    ip.actual_version = opt->version;
-    ip.dependencies = opt->dependencies;
-    ip.provides = opt->provides;
-    ip.needed_so = opt->needed_so;
-    ip.is_explicit = held;
-    consistency_plan[n] = std::move(ip);
+  if (upgrade_targets.empty()) {
+    log_info(get_string("info.all_packages_latest"));
+    return;
+  }
+
+  // ── 依赖解析（和 install_packages 使用同一套机制） ──────────────
+  std::map<std::string, InstallPlan> plan;
+  std::vector<std::string> order;
+  std::map<std::string, fs::path> local_candidates;
+  InstallContext ctx{repo,          plan,
+                     order,         local_candidates,
+                     upgrade_targets,
+                     /*force_reinstall=*/false,
+                     /*top_level=*/true,
+                     {}};
+
+  for (const auto &[n, v] : upgrade_targets) {
+    std::set<std::string> vs;
+    detail::resolve_package_dependencies(n, v, true, ctx, vs);
   }
 
   if (plan.empty()) {
@@ -692,11 +699,10 @@ void upgrade_packages() {
     return;
   }
 
-  // 一致性检查
-  detail::check_forward_soname_integrity(consistency_plan, repo);
+  // ── 一致性检查 ──────────────────────────────────────────────────
+  detail::check_forward_soname_integrity(plan, repo);
 
-  if (auto broken = detail::check_plan_consistency(consistency_plan);
-      !broken.empty()) {
+  if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
     log_error(get_string("error.dependency_conflict_title"));
     std::string msg;
     for (const auto &p : broken)
@@ -705,7 +711,7 @@ void upgrade_packages() {
     throw LpkgException(msg);
   }
 
-  if (auto nso_broken = detail::check_needed_so_consistency(consistency_plan);
+  if (auto nso_broken = detail::check_needed_so_consistency(plan);
       !nso_broken.empty()) {
     log_error(get_string("error.dependency_conflict_title"));
     std::string msg;
@@ -715,38 +721,144 @@ void upgrade_packages() {
     throw LpkgException(msg);
   }
 
-  // 用户确认
+  // ── 用户确认 ────────────────────────────────────────────────────
   std::string prompt;
-  for (const auto &e : plan) {
-    prompt +=
-        "  " + e.name + " " + e.old_ver + " \xe2\x86\x92 " + e.new_ver + "\n";
+  for (const auto &n : order) {
+    const auto &p = plan.at(n);
+    const std::string old_ver = Cache::instance().get_installed_version(n);
+    if (!old_ver.empty()) {
+      if (old_ver != p.actual_version) {
+        // 已有旧版本且版本不同 → 升级
+        prompt +=
+            "  " + n + " " + old_ver + " \xe2\x86\x92 " + p.actual_version +
+            "\n";
+      } else {
+        // 已是最新版本（可能是其他依赖引入的已满足依赖）→ 不显示
+        continue;
+      }
+    } else {
+      // 新增的依赖
+      prompt += "  " +
+                string_format(p.is_explicit ? "info.package_list_item"
+                                            : "info.package_list_item_dep",
+                              p.name, p.actual_version) +
+                "\n";
+    }
   }
   if (!user_confirms(prompt + get_string("info.confirm_proceed"))) {
     log_info(get_string("info.installation_aborted"));
     return;
   }
 
-  // 执行升级（WAL 2.0 批量事务）
+  // ── 执行升级（WAL 2.0 批量事务） ────────────────────────────────
+  // 处理顺序由 resolve_package_dependencies 产生的 order 决定
+  // （依赖先处理），确保新依赖在依赖者之前安装
+  ctx.successfully_installed.clear();
+  ctx.installed_set.clear();
+
   std::vector<std::pair<fs::path, fs::path>> upgrade_backups;
-  run_batch_transaction(plan.size(), [&](wal::WalWriter & /*w*/,
-                                         std::vector<std::string> &success) {
+  size_t upgraded_count = 0;
+  run_batch_transaction(order.size(), [&](wal::WalWriter & /*w*/,
+                                          std::vector<std::string> &success) {
     auto &cache = Cache::instance();
 
-    for (const auto &e : plan) {
+    size_t i = 0;
+    while (i < order.size()) {
       if (sigint_graceful.load())
         throw LpkgException(get_string("info.sigint_aborted"));
 
-      log_info(string_format("info.upgrading_package", e.name, e.old_ver,
-                             e.new_ver));
-      InstallationTask t(e.name, e.new_ver, e.held, e.old_ver, "", e.hash,
-                         false);
-      t.run();
+      const std::string &n = order[i];
+      ++i;
 
-      for (const auto &b : t.get_backups())
+      if (ctx.installed_set.contains(n))
+        continue;
+
+      auto &p = plan.at(n);
+      const std::string old_ver = cache.get_installed_version(n);
+
+      // 跳过已是最新版本的包（如依赖已满足的情况）
+      if (!p.force_reinstall && !old_ver.empty() &&
+          old_ver == p.actual_version) {
+        ctx.installed_set.insert(n);
+        continue;
+      }
+
+      // ── 元数据验证：下载后比对真实 metadata 和索引是否一致 ──
+      // （和 install_packages 中的逻辑一致）
+      if (!p.metadata_verified) {
+        InstallationTask check_task(
+            p.name, p.actual_version, p.is_explicit,
+            cache.get_installed_version(p.name), p.local_path, p.sha256,
+            p.force_reinstall);
+        ensure_dir_exists(check_task.tmp_pkg_dir());
+        check_task.download_and_verify_package();
+
+        json meta = detail::read_archive_metadata(check_task.archive_path());
+        std::vector<std::string> dep_strs = meta.value(
+            std::string(constants::J_DEPS), std::vector<std::string>{});
+        auto actual_deps = detail::parse_dep_strings(dep_strs);
+        std::vector<std::string> actual_provides = meta.value(
+            std::string(constants::J_PROVIDES), std::vector<std::string>{});
+        std::vector<std::string> actual_needed_so = meta.value(
+            std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+
+        bool metadata_differs =
+            (actual_deps.size() != p.dependencies.size()) ||
+            (actual_provides != p.provides) ||
+            (actual_needed_so != p.needed_so);
+        if (!metadata_differs) {
+          for (size_t di = 0; di < actual_deps.size(); ++di) {
+            if (actual_deps[di].name != p.dependencies[di].name ||
+                actual_deps[di].constraints !=
+                    p.dependencies[di].constraints) {
+              metadata_differs = true;
+              break;
+            }
+          }
+        }
+
+        if (metadata_differs) {
+          log_info(string_format("info.resolving_metadata", p.name));
+          ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
+                                       actual_provides, actual_needed_so);
+          ctx.local_candidates[p.name] = check_task.archive_path();
+
+          ctx.plan.clear();
+          ctx.install_order.clear();
+          for (const auto &[tn, tv] : ctx.targets) {
+            std::set<std::string> vs;
+            detail::resolve_package_dependencies(tn, tv, true, ctx, vs);
+          }
+          i = 0;
+          continue;
+        }
+
+        p.local_path = check_task.archive_path();
+        p.metadata_verified = true;
+      }
+
+      // 确定 hold 标志：保留当前 hold 状态，新增依赖不 hold
+      const bool hold_pkg = cache.is_held(n);
+
+      if (!old_ver.empty()) {
+        log_info(string_format("info.upgrading_package", n, old_ver,
+                               p.actual_version));
+      } else {
+        log_info(string_format("info.installing_package", n, p.actual_version));
+      }
+
+      InstallationTask task(p.name, p.actual_version, hold_pkg, old_ver,
+                            p.local_path, p.sha256, p.force_reinstall);
+      task.run(&ctx);
+
+      for (const auto &b : task.get_backups())
         upgrade_backups.emplace_back(b);
 
-      cache.write(e.name + ":installed");
-      success.push_back(e.name);
+      cache.write(n + ":installed");
+      success.push_back(n);
+      ctx.installed_set.insert(n);
+      if (!old_ver.empty())
+        ++upgraded_count;
     }
   });
 
@@ -758,7 +870,7 @@ void upgrade_packages() {
   trim_completed();
   cleanup_db_backups();
 
-  log_info(string_format("info.upgraded_packages", plan.size()));
+  log_info(string_format("info.upgraded_packages", upgraded_count));
 }
 
 /** 显示包的 man 页面内容 */
