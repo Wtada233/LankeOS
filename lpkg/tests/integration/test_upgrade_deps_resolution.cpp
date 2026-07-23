@@ -18,13 +18,12 @@ using json = nlohmann::json;
 // ============================================================================
 // 升级依赖解析回归测试
 //
-// 场景：旧版本包 A 自带了 libX.so，新版本包 A 不再自带但依赖外部包 P
-// 来提供 libX.so。升级时必须解析出这个新依赖并先安装 P，
-// 否则 libX.so 会因旧版本的文件清理而丢失。
+// 场景 A（纯依赖发现）：
+//   旧版本无外部依赖，新版本引入了新的依赖包。升级时应自动解析并安装。
 //
-// 该测试验证 upgrade_packages() 使用了和 install_packages() 相同的
-// 依赖解析机制（resolve_package_dependencies），
-// 能正确发现并安装新版本引入的依赖。
+// 场景 B（自有库 → 外部依赖）：
+//   旧版本自带了 libX.so，新版本不再自带但依赖外部包 P。
+//   升级时必须先安装 P 让 P 接管 libX.so，否则旧版本文件清理会删掉 libX.so。
 // ============================================================================
 
 class UpgradeDepsResolutionTest : public ::testing::Test {
@@ -65,7 +64,7 @@ protected:
         fs::remove_all(suite_work_dir);
     }
 
-    /** 创建虚拟包，支持自定义文件和 SONAME */
+    /** 创建虚拟包，支持自定义文件列表 */
     std::string create_pkg(
         const std::string& name, const std::string& ver,
         const std::vector<std::pair<std::string, std::string>>& files,
@@ -102,7 +101,7 @@ protected:
                  fs::copy_options::overwrite_existing);
     }
 
-    /** 更新仓库索引（格式：name|ver:hash:deps:provides:needed_so） */
+    /** 更新仓库索引 */
     void update_index(const std::vector<
         std::tuple<std::string, std::string, std::string,
                    std::string, std::string>>& entries) {
@@ -118,46 +117,31 @@ protected:
     }
 };
 
-// -----------------------------------------------------------------------
-// 核心场景：新版本包不再自带 lib，依赖外部包来提供
-//
-// 步骤：
-// 1. 安装 app v1（自带 /usr/lib/libhelper.so.1，提供 libhelper.so.1）
-// 2. 设置仓库：app v2（依赖 libprovider，不再提供 libhelper.so.1）
-//               libprovider v1（提供 libhelper.so.1）
-// 3. 执行 upgrade_packages()
-// 4. 验证：app 升级到 v2，libprovider 被自动安装，
-//          libhelper.so.1 文件仍然存在
-// -----------------------------------------------------------------------
-TEST_F(UpgradeDepsResolutionTest, UpgradeDiscoversNewDependency) {
-    // ── 第1步：安装 app v1（自带 libhelper.so.1） ────────────────
-    std::string p1 = create_pkg("app", "1.0",
-        {{"usr/bin/app", "#!/bin/sh\necho app\n"},
-         {"usr/lib/libhelper.so.1", "helper lib v1"}},
-        {},          // 无依赖
-        {"libhelper.so.1"});  // 提供 libhelper.so.1
-    ASSERT_NO_THROW(install_packages({p1}));
+// ===================================================================
+// 场景 A：纯依赖发现 — app v1 无外部依赖，app v2 新增依赖 libprovider
+// ===================================================================
 
-    // 验证安装完成
+TEST_F(UpgradeDepsResolutionTest, UpgradeDiscoversNewDependency) {
+    // ── 第1步：安装 app v1（不捆绑任何库） ─────────────────────
+    std::string p1 = create_pkg("app", "1.0",
+        {{"usr/bin/app", "app v1"}});  // 只有 app 自身，不捆绑任何共享库
+    ASSERT_NO_THROW(install_packages({p1}));
     Cache::instance().load();
     ASSERT_TRUE(Cache::instance().is_installed("app"));
     ASSERT_EQ(Cache::instance().get_installed_version("app"), "1.0");
-    ASSERT_TRUE(fs::exists(test_root / "usr/lib/libhelper.so.1"));
 
     // ── 第2步：设置仓库 ─────────────────────────────────────────
-    // app v2：不再自带 libhelper.so.1，依赖 libprovider
+    // app v2：新增依赖 libprovider
     create_pkg("app", "2.0",
-        {{"usr/bin/app", "#!/bin/sh\necho app v2\n"}},
-        {"libprovider"},  // 新依赖
-        {});              // 不再提供 libhelper.so.1
+        {{"usr/bin/app", "app v2"}},
+        {"libprovider"});
 
-    // libprovider v1：提供 libhelper.so.1
+    // libprovider v1：独立的依赖包
     create_pkg("libprovider", "1.0",
-        {{"usr/lib/libhelper.so.1", "helper lib from provider\n"}},
+        {{"usr/lib/libhelper.so.1", "helper from provider\n"}},
         {},
         {"libhelper.so.1"});
 
-    // 将包加入镜像并更新索引
     add_to_mirror("app", "2.0");
     add_to_mirror("libprovider", "1.0");
     update_index({
@@ -166,39 +150,87 @@ TEST_F(UpgradeDepsResolutionTest, UpgradeDiscoversNewDependency) {
     });
 
     // ── 第3步：执行升级 ─────────────────────────────────────────
-    // 此时 app v1 已安装，仓库中有 app v2（依赖 libprovider）
-    // 升级应自动解析出 libprovider 并安装
     EXPECT_NO_THROW(upgrade_packages());
 
-    // ── 第4步：验证结果 ─────────────────────────────────────────
+    // ── 第4步：验证 ─────────────────────────────────────────────
+    Cache::instance().load();
+    // app 应升级到 v2
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_EQ(Cache::instance().get_installed_version("app"), "2.0");
+    // libprovider 应被自动安装
+    EXPECT_TRUE(Cache::instance().is_installed("libprovider"))
+        << "upgrade_packages() 应自动安装新版本引入的依赖";
+}
+
+// ===================================================================
+// 场景 B：自有库 → 外部依赖（真实 bug 场景）
+// app v1 自带 libhelper.so.1，v2 不再自带但依赖 libprovider
+// ===================================================================
+
+TEST_F(UpgradeDepsResolutionTest, BundledLibTransitionsToExternalDep) {
+    // ── 第1步：安装 app v1（自带 libhelper.so.1） ──────────────
+    std::string p1 = create_pkg("app", "1.0",
+        {{"usr/bin/app", "#!/bin/sh\necho app\n"},
+         {"usr/lib/libhelper.so.1", "helper lib v1"}},
+        {},               // 无依赖
+        {"libhelper.so.1"});  // 提供 libhelper.so.1
+    ASSERT_NO_THROW(install_packages({p1}));
+
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("app"));
+    ASSERT_EQ(Cache::instance().get_installed_version("app"), "1.0");
+    ASSERT_TRUE(fs::exists(test_root / "usr/lib/libhelper.so.1"));
+
+    // ── 第2步：设置仓库 ─────────────────────────────────────────
+    // app v2：不再自带 libhelper，依赖 libprovider
+    create_pkg("app", "2.0",
+        {{"usr/bin/app", "#!/bin/sh\necho app v2\n"}},
+        {"libprovider"});
+
+    // libprovider v1：提供 libhelper.so.1
+    create_pkg("libprovider", "1.0",
+        {{"usr/lib/libhelper.so.1", "helper from provider\n"}},
+        {},
+        {"libhelper.so.1"});
+
+    add_to_mirror("app", "2.0");
+    add_to_mirror("libprovider", "1.0");
+    update_index({
+        {"app", "2.0", "libprovider", "", ""},
+        {"libprovider", "1.0", "", "libhelper.so.1", ""},
+    });
+
+    // ── 第3步：执行升级 ─────────────────────────────────────────
+    EXPECT_NO_THROW(upgrade_packages());
+
+    // ── 第4步：验证 ─────────────────────────────────────────────
     Cache::instance().load();
 
     // app 应升级到 v2
-    EXPECT_TRUE(Cache::instance().is_installed("app"));
     EXPECT_EQ(Cache::instance().get_installed_version("app"), "2.0");
 
     // libprovider 应被自动安装
     EXPECT_TRUE(Cache::instance().is_installed("libprovider"))
-        << "upgrade_packages() 应自动安装新版本引入的依赖";
+        << "升级应自动安装新依赖 libprovider";
 
-    // libhelper.so.1 文件应仍然存在（现在由 libprovider 提供）
+    // libhelper.so.1 应仍然存在（现在由 libprovider 提供）
     EXPECT_TRUE(fs::exists(test_root / "usr/lib/libhelper.so.1"))
-        << "升级后 libhelper.so.1 不应被删除（libprovider 提供）";
+        << "libhelper.so.1 不应被删除（libprovider 现在提供该文件）";
 
-    // libhelper.so.1 应该被 libprovider 持有
+    // libhelper.so.1 的所有权应已转移给 libprovider
     auto owners = Cache::instance().get_file_owners("/usr/lib/libhelper.so.1");
     EXPECT_TRUE(owners.contains("libprovider"))
         << "libhelper.so.1 应归属于 libprovider";
+    // app 可能仍共享持有该文件（取决于 old_file 清理时点的注册顺序）
+    // 关键是 libprovider 持有它，且文件未被物理删除
 }
 
-// -----------------------------------------------------------------------
-// 边界情况：新版本依赖已在系统中的包
-//
-// 如果 app v1 自带 libX，app v2 依赖外部包 P，
-// 但 P 已经被安装（恰好满足依赖），升级不应重新安装 P
-// -----------------------------------------------------------------------
+// ===================================================================
+// 边界：新版本依赖的包已经安装 → 升级正常，不重复安装
+// ===================================================================
+
 TEST_F(UpgradeDepsResolutionTest, NoopWhenDepAlreadyInstalled) {
-    // ── 第1步：安装 libprovider 和 app v1 ───────────────────────
+    // ── 第1步：安装 libprovider 和 app v1（不捆绑 lib） ──────
     std::string libpkg = create_pkg("libprovider", "1.0",
         {{"usr/lib/libhelper.so.1", "helper"}},
         {},
@@ -206,10 +238,7 @@ TEST_F(UpgradeDepsResolutionTest, NoopWhenDepAlreadyInstalled) {
     ASSERT_NO_THROW(install_packages({libpkg}));
 
     std::string p1 = create_pkg("app", "1.0",
-        {{"usr/bin/app", "app v1"},
-         {"usr/lib/libhelper.so.1", "helper"}},
-        {},
-        {"libhelper.so.1"});
+        {{"usr/bin/app", "app v1"}});  // app 不捆绑 lib
     ASSERT_NO_THROW(install_packages({p1}));
 
     Cache::instance().load();
@@ -220,15 +249,8 @@ TEST_F(UpgradeDepsResolutionTest, NoopWhenDepAlreadyInstalled) {
     // ── 第2步：设置仓库 ─────────────────────────────────────────
     create_pkg("app", "2.0",
         {{"usr/bin/app", "app v2"}},
-        {"libprovider"},
-        {});
-    create_pkg("libprovider", "1.0",
-        {{"usr/lib/libhelper.so.1", "helper"}},
-        {},
-        {"libhelper.so.1"});
-
+        {"libprovider"});
     add_to_mirror("app", "2.0");
-    add_to_mirror("libprovider", "1.0");
     update_index({
         {"app", "2.0", "libprovider", "", ""},
         {"libprovider", "1.0", "", "libhelper.so.1", ""},
@@ -244,58 +266,46 @@ TEST_F(UpgradeDepsResolutionTest, NoopWhenDepAlreadyInstalled) {
     EXPECT_TRUE(fs::exists(test_root / "usr/lib/libhelper.so.1"));
 }
 
-// -----------------------------------------------------------------------
-// 边界情况：新旧版本 hashes 不同但版本号相同
-// 不应触发升级，也不应改变依赖状态
-// -----------------------------------------------------------------------
+// ===================================================================
+// 边界：版本号相同不触发升级
+// ===================================================================
+
 TEST_F(UpgradeDepsResolutionTest, SameVersionSkipsUpgrade) {
-    // ── 第1步：安装 app v1（自带 lib） ─────────────────────────
     std::string p1 = create_pkg("app", "1.0",
-        {{"usr/bin/app", "app v1"},
-         {"usr/lib/libhelper.so.1", "helper v1"}},
-        {},
-        {"libhelper.so.1"});
+        {{"usr/bin/app", "app v1"}});
     ASSERT_NO_THROW(install_packages({p1}));
     Cache::instance().load();
     ASSERT_EQ(Cache::instance().get_installed_version("app"), "1.0");
 
-    // ── 第2步：仓库中 app v1 有不同 hash，版本号不变 ────────────
+    // 仓库中 app v1 版本号相同
     create_pkg("app", "1.0",
         {{"usr/bin/app", "app v1 rebuilt"}},
-        {"libprovider"},  // 索引说依赖 libprovider
-        {});
+        {"libprovider"});  // 索引说依赖 libprovider
     add_to_mirror("app", "1.0");
     update_index({{"app", "1.0", "libprovider", "", ""}});
 
-    // ── 第3步：升级（版本号相同，不应触发） ────────────────────
     EXPECT_NO_THROW(upgrade_packages());
-
-    // ── 第4步：验证 ─────────────────────────────────────────────
     Cache::instance().load();
     EXPECT_EQ(Cache::instance().get_installed_version("app"), "1.0");
-    // libprovider 不应被安装（未触发升级）
     EXPECT_FALSE(Cache::instance().is_installed("libprovider"))
         << "版本号相同时不应触发升级或安装新依赖";
 }
 
-// -----------------------------------------------------------------------
-// 升级多个包，它们各自引入新的依赖
-// appA v2 依赖 libX，appB v2 依赖 libY
-// → upgrade_packages 应同时解析出 libX 和 libY
-// -----------------------------------------------------------------------
+// ===================================================================
+// 多包同时升级，各自引入新依赖
+// ===================================================================
+
 TEST_F(UpgradeDepsResolutionTest, MultipleUpgradesWithNewDeps) {
-    // ── 第1步：安装 appA v1 和 appB v1 ────────────────────────
     std::string pa1 = create_pkg("appA", "1.0",
-        {{"usr/bin/appA", "A v1"}}, {}, {"libX.so.1"});
+        {{"usr/bin/appA", "A v1"}});
     std::string pb1 = create_pkg("appB", "1.0",
-        {{"usr/bin/appB", "B v1"}}, {}, {"libY.so.1"});
+        {{"usr/bin/appB", "B v1"}});
     ASSERT_NO_THROW(install_packages({pa1}));
     ASSERT_NO_THROW(install_packages({pb1}));
     Cache::instance().load();
     ASSERT_TRUE(Cache::instance().is_installed("appA"));
     ASSERT_TRUE(Cache::instance().is_installed("appB"));
 
-    // ── 第2步：设置仓库 ─────────────────────────────────────────
     create_pkg("appA", "2.0", {{"usr/bin/appA", "A v2"}}, {"libX"});
     create_pkg("appB", "2.0", {{"usr/bin/appB", "B v2"}}, {"libY"});
     create_pkg("libX", "1.0", {{"usr/lib/libX.so.1", "X"}}, {}, {"libX.so.1"});
@@ -312,10 +322,8 @@ TEST_F(UpgradeDepsResolutionTest, MultipleUpgradesWithNewDeps) {
         {"libY", "1.0", "", "libY.so.1", ""},
     });
 
-    // ── 第3步：升级 ─────────────────────────────────────────────
     EXPECT_NO_THROW(upgrade_packages());
 
-    // ── 第4步：验证 ─────────────────────────────────────────────
     Cache::instance().load();
     EXPECT_EQ(Cache::instance().get_installed_version("appA"), "2.0");
     EXPECT_EQ(Cache::instance().get_installed_version("appB"), "2.0");
@@ -323,80 +331,69 @@ TEST_F(UpgradeDepsResolutionTest, MultipleUpgradesWithNewDeps) {
     EXPECT_TRUE(Cache::instance().is_installed("libY"));
 }
 
-// -----------------------------------------------------------------------
-// 无可用依赖：新版本依赖的包在仓库中不存在 → 应抛出异常
-// app v2 依赖 missing-dep，但 missing-dep 不在仓库中
-// -----------------------------------------------------------------------
+// ===================================================================
+// 边界：新依赖在仓库中不存在 → 抛出异常
+// ===================================================================
+
 TEST_F(UpgradeDepsResolutionTest, MissingDepThrows) {
-    // ── 第1步：安装 app v1 ─────────────────────────────────────
     std::string p1 = create_pkg("app", "1.0",
         {{"usr/bin/app", "app v1"}});
     ASSERT_NO_THROW(install_packages({p1}));
     Cache::instance().load();
     ASSERT_TRUE(Cache::instance().is_installed("app"));
 
-    // ── 第2步：设置仓库 ─────────────────────────────────────────
-    // app v2 依赖 missing-dep，但 missing-dep 不在仓库中
     create_pkg("app", "2.0",
         {{"usr/bin/app", "app v2"}},
         {"missing-dep"});
     add_to_mirror("app", "2.0");
     update_index({{"app", "2.0", "missing-dep", "", ""}});
 
-    // ── 第3步：升级应抛出异常 ──────────────────────────────────
     EXPECT_THROW(upgrade_packages(), LpkgException);
 }
 
-// -----------------------------------------------------------------------
-// 之前被标记为 held（不自动移除）的包，升级后仍保持 held 状态
-// -----------------------------------------------------------------------
+// ===================================================================
+// 边界：升级后 held 状态保持不变
+// ===================================================================
+
 TEST_F(UpgradeDepsResolutionTest, HoldPreservedAfterUpgrade) {
-    // ── 第1步：安装 app v1 ─────────────────────────────────────
     std::string p1 = create_pkg("app", "1.0",
         {{"usr/bin/app", "app v1"}});
     ASSERT_NO_THROW(install_packages({p1}));
-
     // 标记为 held
     Cache::instance().load();
-    Cache::instance().add_installed("app", "1.0", true);  // hold = true
+    Cache::instance().add_installed("app", "1.0", true);
     ASSERT_TRUE(Cache::instance().is_held("app"));
 
-    // ── 第2步：设置仓库 ─────────────────────────────────────────
     create_pkg("app", "2.0", {{"usr/bin/app", "app v2"}});
     add_to_mirror("app", "2.0");
     update_index({{"app", "2.0", "", "", ""}});
 
-    // ── 第3步：升级 ─────────────────────────────────────────────
     EXPECT_NO_THROW(upgrade_packages());
 
-    // ── 第4步：验证 hold 状态保留 ─────────────────────────────
     Cache::instance().load();
     EXPECT_TRUE(Cache::instance().is_held("app"))
         << "升级后包应保持 held 状态";
 }
 
-// -----------------------------------------------------------------------
-// 新引入的依赖在 resolve 阶段已安装（恰好在升级前手动安装）
-// → 升级应正常进行，不再重复安装该依赖
-// -----------------------------------------------------------------------
+// ===================================================================
+// 边界：新依赖在升级前已手动安装
+// ===================================================================
+
 TEST_F(UpgradeDepsResolutionTest, NewDepAlreadyInstalledManually) {
-    // ── 第1步：安装 app v1 ─────────────────────────────────────
     std::string p1 = create_pkg("app", "1.0",
         {{"usr/bin/app", "app v1"}});
     ASSERT_NO_THROW(install_packages({p1}));
 
-    // 手动安装 libprovider（app v2 的新依赖）
+    // 提前手动安装 libprovider
     std::string libpkg = create_pkg("libprovider", "1.0",
         {{"usr/lib/libhelper.so.1", "helper"}},
         {},
         {"libhelper.so.1"});
     ASSERT_NO_THROW(install_packages({libpkg}));
-
     Cache::instance().load();
     ASSERT_TRUE(Cache::instance().is_installed("app"));
     ASSERT_TRUE(Cache::instance().is_installed("libprovider"));
 
-    // ── 第2步：设置仓库 ─────────────────────────────────────────
     create_pkg("app", "2.0",
         {{"usr/bin/app", "app v2"}},
         {"libprovider"});
@@ -407,10 +404,7 @@ TEST_F(UpgradeDepsResolutionTest, NewDepAlreadyInstalledManually) {
         {"libprovider", "1.0", "", "libhelper.so.1", ""},
     });
 
-    // ── 第3步：升级 ─────────────────────────────────────────────
     EXPECT_NO_THROW(upgrade_packages());
-
-    // ── 第4步：验证 ─────────────────────────────────────────────
     Cache::instance().load();
     EXPECT_EQ(Cache::instance().get_installed_version("app"), "2.0");
     EXPECT_TRUE(Cache::instance().is_installed("libprovider"));
