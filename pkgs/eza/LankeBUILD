@@ -1,0 +1,31 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    cargo fetch --locked --target host-tuple
+}
+
+lankebuild_build() {
+    cargo build --release --frozen
+}
+
+
+lankebuild_package() {
+    install -Dm0755 -t "{STAGING_ROOT}/usr/bin/" "target/release/eza"
+    ln -s "eza" "{STAGING_ROOT}/usr/bin/exa"
+
+    install -Dm0644 -t "{STAGING_ROOT}/usr/share/bash-completion/completions/" "completions/bash/eza"
+    install -Dm0644 -t "{STAGING_ROOT}/usr/share/zsh/site-functions/" "completions/zsh/_eza"
+    install -Dm0644 -t "{STAGING_ROOT}/usr/share/fish/vendor_completions.d/" "completions/fish/eza.fish"
+
+    install -Dm0644 -t "{STAGING_ROOT}/usr/share/licenses/eza/" LICENSE.txt
+    mkdir -p "{STAGING_ROOT}/usr/share/fish/vendor_conf.d/"
+    cat > "{STAGING_ROOT}/usr/share/fish/vendor_conf.d/eza.fish" << 'EOF'
+if type -q eza
+    alias ls='eza --icons auto'
+    alias ll='eza -lah --icons auto'
+    alias la='eza -a --icons auto'
+    alias tree='eza --tree --icons auto'
+end
+EOF
+}

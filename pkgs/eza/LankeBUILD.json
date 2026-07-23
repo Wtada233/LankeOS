@@ -1,0 +1,8 @@
+{
+  "name": "eza",
+  "version": "0.23.5",
+  "sources": [
+    "https://github.com/eza-community/eza/archive/refs/tags/v0.23.5.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -10,5 +10,10 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    :
+    mkdir -p "{STAGING_ROOT}/usr/share/fish/vendor_conf.d/"
+    cat > "{STAGING_ROOT}/usr/share/fish/vendor_conf.d/starship.fish" << 'EOF'
+if type -q starship
+    starship init fish | source
+end
+EOF
 }

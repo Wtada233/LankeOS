@@ -1,0 +1,8 @@
+{
+  "name": "bat",
+  "version": "0.26.1",
+  "sources": [
+    "https://github.com/sharkdp/bat/archive/refs/tags/v0.26.1.tar.gz"
+  ],
+  "work_sources": []
+}

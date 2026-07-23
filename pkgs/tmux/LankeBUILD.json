@@ -1,0 +1,9 @@
+{
+  "name": "tmux",
+  "version": "3.7",
+  "release": 2,
+  "sources": [
+    "https://github.com/tmux/tmux/releases/download/3.7b/tmux-3.7b.tar.gz"
+  ],
+  "work_sources": []
+}

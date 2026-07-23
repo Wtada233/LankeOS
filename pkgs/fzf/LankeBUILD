@@ -1,0 +1,47 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    git clone https://github.com/junegunn/fzf
+    cd fzf
+    # Prepare environment
+    sed -i 's/-w /-w -linkmode external /' Makefile
+}
+
+lankebuild_build() {
+    cd fzf
+    export CGO_LDFLAGS="${LDFLAGS}"
+    export CGO_CFLAGS="${CFLAGS}"
+    export CGO_CPPFLAGS="${CPPFLAGS}"
+    export CGO_CXXFLAGS="${CXXFLAGS}"
+    export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+    make
+    make bin/fzf
+}
+
+
+lankebuild_package() {
+    cd fzf
+    ## Man page
+    install -Dm644 man/man1/fzf.1 "{STAGING_ROOT}"/usr/share/man/man1/fzf.1
+    install -Dm644 man/man1/fzf-tmux.1 "{STAGING_ROOT}"/usr/share/man/man1/fzf-tmux.1
+
+    ## License
+    install -Dm644 LICENSE "{STAGING_ROOT}"/usr/share/licenses/fzf/LICENSE
+
+    ## Binaries
+    install -dm755 "{STAGING_ROOT}"/usr/bin
+    install -m755 bin/fzf-tmux "{STAGING_ROOT}"/usr/bin/
+    install -m755 bin/fzf "{STAGING_ROOT}"/usr/bin/
+
+    ## Completion and keybindings
+    install -dm755 "{STAGING_ROOT}"/usr/share/fzf
+    install -m644 shell/*.bash shell/*.zsh "{STAGING_ROOT}"/usr/share/fzf
+    install -m755 bin/fzf-preview.sh "{STAGING_ROOT}"/usr/share/fzf/fzf-preview.sh
+
+    ## Fish keybindings
+    install -Dm644 shell/key-bindings.fish "{STAGING_ROOT}"/usr/share/fish/vendor_functions.d/fzf_key_bindings.fish
+
+    ## Vim plugin
+    install -Dm644 doc/fzf.txt "{STAGING_ROOT}"/usr/share/vim/vimfiles/doc/fzf.txt
+    install -Dm644 plugin/fzf.vim "{STAGING_ROOT}"/usr/share/vim/vimfiles/plugin/fzf.vim
+}

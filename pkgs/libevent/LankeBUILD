@@ -1,0 +1,15 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    ./configure --disable-static --prefix=/usr
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+}
+
+
+lankebuild_package() {
+    make install DESTDIR="{STAGING_ROOT}"
+}

@@ -1,0 +1,32 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    cargo fetch --locked --target host-tuple
+}
+
+lankebuild_build() {
+    cargo build --release --frozen --features pcre2
+}
+
+
+lankebuild_package() {
+    install -vDm755 -t "{STAGING_ROOT}/usr/bin" target/release/rg
+
+    mkdir -vp "{STAGING_ROOT}/usr/share/zsh/site-functions"
+    target/release/rg --generate complete-zsh > "{STAGING_ROOT}/usr/share/zsh/site-functions/_rg"
+
+    mkdir -vp "{STAGING_ROOT}/usr/share/bash-completion/completions"
+    target/release/rg --generate complete-bash > "{STAGING_ROOT}/usr/share/bash-completion/completions/rg"
+
+    mkdir -vp "{STAGING_ROOT}/usr/share/fish/vendor_completions.d"
+    target/release/rg --generate complete-fish > "{STAGING_ROOT}/usr/share/fish/vendor_completions.d/rg.fish"
+
+    mkdir -vp "{STAGING_ROOT}/usr/share/man/man1"
+    target/release/rg --generate man > "{STAGING_ROOT}/usr/share/man/man1/rg.1"
+
+    install -vDm644 -t "{STAGING_ROOT}/usr/share/doc/ripgrep" README.md
+    install -vDm644 -t "{STAGING_ROOT}/usr/share/licenses/ripgrep" COPYING
+    install -vDm644 -t "{STAGING_ROOT}/usr/share/licenses/ripgrep" LICENSE-MIT
+    install -vDm644 -t "{STAGING_ROOT}/usr/share/licenses/ripgrep" UNLICENSE
+}
