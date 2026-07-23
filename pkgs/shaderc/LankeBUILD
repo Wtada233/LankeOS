@@ -13,7 +13,6 @@ lankebuild_build() {
     -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
       -D CMAKE_BUILD_TYPE=Release  \
       -D SHADERC_SKIP_TESTS=ON     \
-      -D BUILD_SHARED_LIBS=ON \
       -G Ninja ..
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
