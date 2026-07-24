@@ -234,7 +234,8 @@ warning.reinstall_metadata_read_failed=Failed to read metadata from {}: {}
 warning.query_path_resolve_failed=Failed to resolve path for query: {}
 warning.dep_scan_metadata_parse_failed=Failed to parse metadata for {}: {}
 warning.scan_file_error=Error accessing {} during scan: {}
-
+warning.cleanup_failed=Could not remove backup file/dir: {}. It may be in use or permission denied.
+warning.cleanup_dir_remove_failed=Could not remove directory backup: {}. The directory may not be empty or may have permission issues.
 
 info.recursive_remove_start=Building recursive dependency tree for {}...
 info.recursive_remove_header=Packages to be removed:

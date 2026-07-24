@@ -235,7 +235,8 @@ warning.reinstall_metadata_read_failed=从 {} 读取元数据失败: {}
 warning.query_path_resolve_failed=查询路径解析失败: {}
 warning.dep_scan_metadata_parse_failed=解析 {} 的元数据失败: {}
 warning.scan_file_error=扫描期间访问 {} 出错: {}
-
+warning.cleanup_failed=无法删除备份文件/目录: {}。可能正在使用或权限不足。
+warning.cleanup_dir_remove_failed=无法删除目录备份: {}。目录可能非空或权限不足。
 
 info.recursive_remove_start=正在构建 {} 的递归依赖树...
 info.recursive_remove_header=将要移除的包：

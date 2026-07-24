@@ -58,7 +58,7 @@ enum class WALOpType {
   RM_BEGIN,  // RM_BEGIN <pkg> <ver>
   RM_COMMIT, // RM_COMMIT <pkg> <ver>
   RM_END,    // RM_END <pkg> <ver>
-  RM_DIR,    // RM_DIR <path> <mode> <uid> <gid>
+  CLEANUP,   // CLEANUP <path>                      (不可回滚的 .bak 清理记录)
 
   // DB 操作
   DB,    // DB <path> <milestone>
@@ -85,7 +85,7 @@ struct WALOp {
   std::string arg1; // 参数1
   std::string arg2; // 参数2
   std::string arg3; // 参数3
-  std::string arg4; // 参数4（RM_DIR: gid，split_line 顺序分配）
+  std::string arg4; // 参数4（预留）
   std::string arg5; // 参数5（预留）
   std::string arg6; // 参数6（预留）
 
@@ -105,8 +105,10 @@ struct WALOp {
            type == WALOpType::REMOVE_DIR;      // 旧名称兼容
   }
 
-  /// reverse_execute 需要跳过的行
-  bool skip_in_reverse() const { return is_metadata() || is_restore_audit(); }
+  /// reverse_execute 需要跳过的行（元数据/审计/CLEANUP 均不可逆）
+  bool skip_in_reverse() const {
+    return is_metadata() || is_restore_audit() || type == WALOpType::CLEANUP;
+  }
 };
 
 // ============================================================================
@@ -130,7 +132,6 @@ WALOp parse_op(const std::string &line);
 struct RollbackStats {
   int files_restored = 0;
   int files_cleaned = 0;
-  int dirs_recreated = 0;
   int db_restored = 0;
 };
 

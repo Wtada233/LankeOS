@@ -448,11 +448,14 @@ TEST_F(BreakpointTest, DbNewRmRecovery) {
   EXPECT_TRUE(fs::exists(df));
 }
 
-// RM_DIR 重建
-TEST_F(BreakpointTest, RmDirRecreation) {
-  fs::path d = test_root / "usr/share/gone_pt";
-  write_wal("BEGIN_PKGS 1\nRM_BEGIN p 1.0\nRM_DIR " + d.string() + " 755 0 0\n");
+// CLEANUP 不可回滚性
+TEST_F(BreakpointTest, CleanupIsIrreversible) {
+  fs::path d = test_root / "usr/share/cleanup_test";
+  fs::create_directories(d);
+  write_wal("BEGIN_PKGS 1\nCLEANUP " + d.string() + "\nCOMMIT_PKGS\n");
+  // 有 COMMIT_PKGS → 事务已关闭，recover_packages 应该只做 trim
   recover_packages();
+  // 目录不受 CLEANUP 行影响（COMMIT_PKGS 存在时 rec 不做逆向）
   EXPECT_TRUE(fs::exists(d));
 }
 

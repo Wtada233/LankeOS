@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <ranges>
+#include <random>
 #include <sstream>
 #include <string>
 #include <sys/stat.h>
@@ -29,6 +30,36 @@
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+
+namespace {
+
+std::string random_suffix(size_t len = 6) {
+  static const char chars[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+  static std::random_device rd;
+  std::string s;
+  for (size_t i = 0; i < len; ++i)
+    s += chars[rd() % (sizeof(chars) - 1)];
+  return s;
+}
+
+fs::path unique_bak_path(const fs::path &phys, const std::string &pkg) {
+  std::string clean_str = phys.string();
+  while (clean_str.size() > 1 && clean_str.back() == '/')
+    clean_str.pop_back();
+  fs::path clean(clean_str);
+
+  for (int i = 0; i < 20; ++i) {
+    fs::path bak = clean;
+    bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg + "_" + random_suffix();
+    if (!fs::exists(bak))
+      return bak;
+  }
+  fs::path bak = clean;
+  bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg + "_" + random_suffix();
+  return bak;
+}
+
+} // anonymous namespace
 
 // ===== InstallationTask 实现 =====
 
@@ -167,8 +198,7 @@ void InstallationTask::commit_without_file_ops() {
                 continue;
               }
               log_info(string_format("info.removing_obsolete_file", old_file));
-              fs::path bak = phys;
-              bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
+              fs::path bak = unique_bak_path(phys, pkg_name_);
               // write-ahead: WAL 先于 rename（ARCH.md §3.2）
               wal::log_wal_line("REMOVE_OLD " + phys.string() +
                                 " \xe2\x86\x92 " + bak.string());
@@ -232,8 +262,7 @@ void InstallationTask::backup_existing_files() {
     fs::create_directories(phys_dir, ec);
     if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
       if (!fs::is_directory(physical_path)) {
-        fs::path bak = physical_path;
-        bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg_name_;
+        fs::path bak = unique_bak_path(physical_path, pkg_name_);
         // write-ahead: 先写 WAL 再 rename
         wal::log_wal_line("BACKUP " + physical_path.string() +
                           " \xe2\x86\x92 " + bak.string());

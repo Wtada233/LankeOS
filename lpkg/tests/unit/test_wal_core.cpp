@@ -216,14 +216,10 @@ TEST_F(WalCoreTest, ParseOpRmEnd) {
   EXPECT_EQ(op.type, wal::WALOpType::RM_END);
 }
 
-TEST_F(WalCoreTest, ParseOpRmDir) {
-  auto op = wal::parse_op("RM_DIR /usr/share/vim 755 0 0");
-  EXPECT_EQ(op.type, wal::WALOpType::RM_DIR);
-  EXPECT_EQ(op.arg1, "/usr/share/vim");
-  // split_line assigns sequentially: arg2=mode, arg3=uid, arg4=gid
-  EXPECT_EQ(op.arg2, "755");
-  EXPECT_EQ(op.arg3, "0");
-  EXPECT_EQ(op.arg4, "0");
+TEST_F(WalCoreTest, ParseOpCleanup) {
+  auto op = wal::parse_op("CLEANUP /usr/bin/foo.lpkg_bak_foo_a1b2c3");
+  EXPECT_EQ(op.type, wal::WALOpType::CLEANUP);
+  EXPECT_EQ(op.arg1, "/usr/bin/foo.lpkg_bak_foo_a1b2c3");
 }
 
 TEST_F(WalCoreTest, ParseOpDb) {
@@ -459,34 +455,20 @@ TEST_F(WalCoreTest, ReverseExecuteNewDir) {
 }
 
 // ============================================================================
-// reverse_execute 测试 — RM_DIR 逆向（重建目录）
+// reverse_execute 测试 — CLEANUP 不可逆（被跳过）
 // ============================================================================
 
-TEST_F(WalCoreTest, ReverseExecuteRmDirRecreate) {
-  fs::path dir = test_root / "usr/share/deleted_dir";
-
+TEST_F(WalCoreTest, ReverseExecuteCleanupSkipped) {
+  // CLEANUP 应在 reverse_execute 中被跳过（不可回滚）
   std::vector<wal::WALOp> ops;
-  auto op = wal::parse_op("RM_DIR /usr/share/deleted_dir 755 1000 1000");
-  op.arg1 = dir.string();
+  auto op = wal::parse_op("CLEANUP /nonexistent/cleanup_test");
   ops.push_back(op);
 
   wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
-  EXPECT_TRUE(fs::exists(dir));
-  EXPECT_TRUE(fs::is_directory(dir));
-  EXPECT_EQ(stats.dirs_recreated, 1);
-}
-
-TEST_F(WalCoreTest, ReverseExecuteRmDirAlreadyExists) {
-  // 目录已存在 → 跳过（幂等）
-  fs::path dir = test_root / "usr/share/existing";
-  fs::create_directories(dir);
-
-  std::vector<wal::WALOp> ops;
-  auto op = wal::parse_op("RM_DIR /usr/share/existing 755 0 0");
-  op.arg1 = dir.string();
-
-  wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
-  EXPECT_EQ(stats.dirs_recreated, 0); // 跳过
+  // reverse_execute 跳过了 CLEANUP，无任何操作
+  EXPECT_EQ(stats.files_restored, 0);
+  EXPECT_EQ(stats.files_cleaned, 0);
+  EXPECT_EQ(stats.db_restored, 0);
 }
 
 // ============================================================================
