@@ -124,6 +124,7 @@ setup_live()
         -t overlay \
         overlay \
         -o lowerdir=/mnt/rootfs,upperdir=/mnt/tmp/upper,workdir=/mnt/tmp/work \
+        -o redirect_dir=on \
         /newroot
     if [ "$UPDATED_MODE" = "1" ]; then
         echo "Creating update marker."
@@ -255,6 +256,7 @@ else
         -t overlay \
         overlay \
         -o lowerdir=/mnt/rootfs,upperdir=/mnt/data/upper,workdir=/mnt/data/work \
+        -o redirect_dir=on \
         /newroot
 fi
 ###############################################################################

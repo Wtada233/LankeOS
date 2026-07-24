@@ -8,8 +8,8 @@ sudo find . | cpio -o -H newc | xz --check=crc32 --lzma2=dict=1MiB > ../ISO/boot
 sudo chmod 644 ../ISO/boot/initrd.img
 popd
 pushd ISO/live/
-sudo rm -rf rootfs.sfs
-sudo gensquashfs -D /mnt/lfs/ -c xz -b 1M -X dictsize=1M,level=9,x86,extreme -f rootfs.sfs
+#sudo rm -rf rootfs.sfs
+#sudo gensquashfs -D /mnt/lfs/ -c xz -b 1M -X dictsize=1M,level=9,x86,extreme -f rootfs.sfs
 popd
 
 sudo grub-mkrescue --directory=/usr/lib/grub/x86_64-efi -o lankeos-live.iso ISO -- -volid "LANKE_BASE"
