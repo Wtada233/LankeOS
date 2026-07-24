@@ -202,8 +202,7 @@ void InstallationTask::commit_without_file_ops() {
               // write-ahead: WAL 先于 rename（ARCH.md §3.2）
               wal::log_wal_line("REMOVE_OLD " + phys.string() +
                                 " \xe2\x86\x92 " + bak.string());
-              fs::rename(phys, bak);
-              fsync_parent_dir(bak);
+              safe_rename(phys, bak);
               backups_.emplace_back(phys, bak);
             }
           }
@@ -267,8 +266,7 @@ void InstallationTask::backup_existing_files() {
         wal::log_wal_line("BACKUP " + physical_path.string() +
                           " \xe2\x86\x92 " + bak.string());
         BreakpointManager::instance().hit("backup_after_wal_" + pkg_name_);
-        fs::rename(physical_path, bak);
-        fsync_parent_dir(bak);
+        safe_rename(physical_path, bak);
         backups_.emplace_back(physical_path, bak);
       }
     } else {
@@ -306,8 +304,7 @@ void InstallationTask::rollback_files() {
   // 1. 恢复备份文件
   for (const auto &[orig, bak] : backups_) {
     if (fs::exists(bak)) {
-      fs::rename(bak, orig);
-      fsync_parent_dir(orig);
+      safe_rename(bak, orig);
       wal::log_wal_line("RESTORE_FILE " + bak.string() + " \xe2\x86\x92 " +
                         orig.string());
     }
@@ -767,8 +764,7 @@ void InstallationTask::copy_package_files() {
         wal::log_wal_line("COPY " + tmp_path.string() + " \xe2\x86\x92 " +
                           final_dest.string());
         BreakpointManager::instance().hit("copy_after_wal_" + pkg_name_);
-        fs::rename(tmp_path, final_dest);
-        fsync_parent_dir(final_dest);
+        safe_rename(tmp_path, final_dest);
       }
 
       TriggerManager::instance().check_file((fs::path("/") / f).string());

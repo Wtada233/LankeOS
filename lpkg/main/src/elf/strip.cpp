@@ -2,6 +2,9 @@
 #define _GNU_SOURCE
 #endif
 #include "strip.hpp"
+
+#include "../base/utils.hpp"
+
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
@@ -547,7 +550,10 @@ bool process_archive(const fs::path &path,
   archive_write_close(out);
   archive_write_free(out);
 
-  std::error_code ec;
-  fs::rename(temp_path, path, ec);
-  return !ec;
+  try {
+    ::safe_rename(temp_path, path);
+    return true;
+  } catch (const std::exception &) {
+    return false;
+  }
 }

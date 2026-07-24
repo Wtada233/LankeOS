@@ -96,9 +96,27 @@ void cleanup_tmp_dirs();
  *
  * rename(2) 在同文件系统内是原子的，但如果父目录的 dentry 未落盘，
  * 断电后目录可能指向旧路径，rename 的"原子性"在磁盘上不会体现。
- * 在所有 fs::rename / rename(2) 之后调用此函数以消除此盲点。
+ * safe_rename() 内部已调用此函数，一般不需直接使用。
  */
 void fsync_parent_dir(const std::filesystem::path &child_path);
+
+/**
+ * 安全重命名（overlayfs 兼容）。
+ *
+ * 优先尝试 rename(2)。如果返回 EXDEV（跨设备/跨层，如 overlayfs
+ * 尝试重命名 lower 层目录时），退回到 copy + remove_all——
+ * 与 GNU coreutils `mv` 的 fallback 行为一致。
+ *
+ * 注意：copy+remove 不是原子操作。在普通文件系统上 rename 是原子的；
+ * 在 overlayfs lower 层退化为"逐文件 copy 原子的非目录级原子"。
+ * 但对于包管理器的 BACKUP/RESTORE 语义，结合 WAL 的幂等恢复，此折衷安全。
+ *
+ * @param from  源路径
+ * @param to    目标路径
+ * @throw       LpkgException  rename 和 fallback 都失败时
+ */
+void safe_rename(const std::filesystem::path &from,
+                  const std::filesystem::path &to);
 
 // ============ 字符串工具 ============
 
