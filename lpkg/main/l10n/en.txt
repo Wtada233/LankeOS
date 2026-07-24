@@ -221,6 +221,7 @@ info.depend_install_header=Dependency install scan for '{}':
 warning.repo_mirror_config=Failed to read mirror configuration: {}
 warning.repo_index_missing=Repository index not found: {}
 warning.repo_index_download=Failed to download repository index: {}
+error.copy_failed=Failed to copy '{}' to '{}'.
 error.dependency_depth_exceeded=Dependency depth exceeded for {} (max {}). Possible circular dependency.
 error.wal_open_failed=Failed to open WAL transaction log: {}
 error.wal_write_failed=Failed to write to WAL transaction log: {}
@@ -236,6 +237,7 @@ warning.dep_scan_metadata_parse_failed=Failed to parse metadata for {}: {}
 warning.scan_file_error=Error accessing {} during scan: {}
 warning.cleanup_failed=Could not remove backup file/dir: {}. It may be in use or permission denied.
 warning.cleanup_dir_remove_failed=Could not remove directory backup: {}. The directory may not be empty or may have permission issues.
+warning.wal_rename_fallback=Cross-device rename from '{}' to '{}', falling back to copy+delete (overlayfs compatibility, safe but non-atomic)
 
 info.recursive_remove_start=Building recursive dependency tree for {}...
 info.recursive_remove_header=Packages to be removed:

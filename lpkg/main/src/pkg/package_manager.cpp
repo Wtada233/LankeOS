@@ -429,8 +429,7 @@ void remove_package(const std::string &pkg_name, bool force,
           wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " +
                             bak.string());
           BreakpointManager::instance().hit("rm_backup_after_wal_" + pkg_name);
-          fs::rename(phys, bak);
-          fsync_parent_dir(bak);
+          safe_rename(phys, bak);
           backups.emplace_back(phys, bak);
           ++file_count;
         }
@@ -487,8 +486,7 @@ void remove_package(const std::string &pkg_name, bool force,
         fs::path bak = unique_bak_path(phys, pkg_name);
         wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " +
                           bak.string());
-        fs::rename(phys, bak);
-        fsync_parent_dir(bak);
+        safe_rename(phys, bak);
         backups.emplace_back(phys, bak);
       }
     }
@@ -499,10 +497,8 @@ void remove_package(const std::string &pkg_name, bool force,
       if (fs::exists(fpath)) {
         wal::log_wal_line("DBRM " + fpath.string() + " " + pkg_name +
                           ":removed");
-        fs::rename(fpath, fs::path(fpath.string() + ".lpkg_db_bak_before:" +
-                                   pkg_name + ":removed"));
-        fsync_parent_dir(fs::path(
-            fpath.string() + ".lpkg_db_bak_before:" + pkg_name + ":removed"));
+        safe_rename(fpath, fs::path(fpath.string() + ".lpkg_db_bak_before:" +
+                                             pkg_name + ":removed"));
       }
     };
 
@@ -1193,8 +1189,7 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
               wal::log_wal_line("BACKUP " + phys.string() +
                                 " \xe2\x86\x92 " + bak.string());
               BreakpointManager::instance().hit("rm_backup_after_wal_" + p);
-              fs::rename(phys, bak);
-              fsync_parent_dir(bak);
+              safe_rename(phys, bak);
               backups.emplace_back(phys, bak);
             }
           }
@@ -1232,8 +1227,7 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
             fs::path bak = unique_bak_path(phys, p);
             wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " +
                               bak.string());
-            fs::rename(phys, bak);
-            fsync_parent_dir(bak);
+            safe_rename(phys, bak);
             backups.emplace_back(phys, bak);
           }
 
@@ -1243,10 +1237,8 @@ void remove_package_recursive(const std::string &pkg_name, bool force) {
               if (fs::exists(fp)) {
                 wal::log_wal_line("DBRM " + fp.string() + " " + p +
                                   ":removed");
-                fs::rename(fp, fp.string() + ".lpkg_db_bak_before:" + p +
-                                   ":removed");
-                fsync_parent_dir(fs::path(fp.string() +
-                    ".lpkg_db_bak_before:" + p + ":removed"));
+                safe_rename(fp, fs::path(fp.string() + ".lpkg_db_bak_before:" + p +
+                                                  ":removed"));
               }
             };
             const fs::path df = Config::instance().dep_dir() / p;

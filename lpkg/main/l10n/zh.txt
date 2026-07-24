@@ -222,6 +222,7 @@ info.depend_install_header=依赖安装扫描 '{}':
 warning.repo_mirror_config=无法读取镜像配置: {}
 warning.repo_index_missing=未找到仓库索引: {}
 warning.repo_index_download=下载仓库索引失败: {}
+error.copy_failed=无法复制 '{}' 到 '{}'。
 error.dependency_depth_exceeded=依赖深度超过限制: {} (最大 {}). 可能存在循环依赖。
 error.wal_open_failed=无法打开 WAL 事务日志: {}
 error.wal_write_failed=无法写入 WAL 事务日志: {}
@@ -237,6 +238,7 @@ warning.dep_scan_metadata_parse_failed=解析 {} 的元数据失败: {}
 warning.scan_file_error=扫描期间访问 {} 出错: {}
 warning.cleanup_failed=无法删除备份文件/目录: {}。可能正在使用或权限不足。
 warning.cleanup_dir_remove_failed=无法删除目录备份: {}。目录可能非空或权限不足。
+warning.wal_rename_fallback=跨设备重命名失败 '{}' → '{}'，回退到复制+删除（overlayfs 兼容，安全但非原子操作）
 
 info.recursive_remove_start=正在构建 {} 的递归依赖树...
 info.recursive_remove_header=将要移除的包：

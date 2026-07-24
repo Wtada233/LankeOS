@@ -300,8 +300,7 @@ void atomic_write_with_fsync(const fs::path &dst, const fs::path &tmp) {
     ::fsync(fd);
     ::close(fd);
   }
-  fs::rename(tmp, dst);
-  fsync_parent_dir(dst);
+  safe_rename(tmp, dst);
 }
 
 } // namespace
@@ -378,8 +377,7 @@ void Cache::write_db_file_wal(
   // 2. 备份旧文件（仅当文件已存在时）
   std::string bak_path = db_path.string() + ".lpkg_db_bak_before:" + milestone;
   if (!is_new) {
-    fs::rename(db_path, bak_path);
-    fsync_parent_dir(bak_path);
+    safe_rename(db_path, bak_path);
   }
 
   // 3. 写 .tmp
@@ -421,8 +419,7 @@ void Cache::write_set_file_wal(const fs::path &path,
   // 2. 备份旧文件
   std::string bak_path = path.string() + ".lpkg_db_bak_before:" + milestone;
   if (!is_new) {
-    fs::rename(path, bak_path);
-    fsync_parent_dir(bak_path);
+    safe_rename(path, bak_path);
   }
 
   // 3. 写 .tmp

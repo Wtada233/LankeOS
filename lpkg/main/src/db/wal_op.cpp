@@ -194,17 +194,6 @@ static std::string db_bak_path(const std::string &db_path,
   return db_path + ".lpkg_db_bak_before:" + milestone;
 }
 
-/// 安全的 rename + fsync 父目录
-static bool safe_rename(const fs::path &from, const fs::path &to) {
-  std::error_code ec;
-  fs::rename(from, to, ec);
-  if (!ec) {
-    fsync_parent_dir(to);
-    return true;
-  }
-  return false;
-}
-
 /// 安全删除文件
 static bool safe_remove(const fs::path &p) {
   std::error_code ec;
@@ -242,7 +231,7 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
 
       // fs::exists 对 dangling symlink 返回 false，必须用 is_symlink 补检
       if (fs::exists(bak_path) || fs::is_symlink(bak_path)) {
-        safe_rename(bak_path, orig_path);
+        ::safe_rename(bak_path, orig_path);
         stats.files_restored++;
 
         if (write_audit) {
@@ -309,7 +298,7 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
       // arg1 = DB 文件路径, arg2 = 里程碑
       std::string bak = db_bak_path(op.arg1, op.arg2);
       if (fs::exists(bak)) {
-        safe_rename(bak, op.arg1);
+        ::safe_rename(bak, op.arg1);
         stats.db_restored++;
 
         if (write_audit) {
@@ -325,7 +314,7 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
       // arg1 = DB 文件路径, arg2 = 里程碑
       std::string bak = db_bak_path(op.arg1, op.arg2);
       if (fs::exists(bak)) {
-        safe_rename(bak, op.arg1);
+        ::safe_rename(bak, op.arg1);
         stats.db_restored++;
 
         if (write_audit) {
@@ -351,7 +340,7 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
       // arg1 = DB 文件路径, arg2 = 里程碑
       std::string bak = db_bak_path(op.arg1, op.arg2);
       if (fs::exists(bak)) {
-        safe_rename(bak, op.arg1);
+        ::safe_rename(bak, op.arg1);
         stats.db_restored++;
 
         if (write_audit) {

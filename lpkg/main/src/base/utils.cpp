@@ -311,8 +311,7 @@ void write_set_to_file(const fs::path &path,
     ::fsync(fd);
     ::close(fd);
   }
-  fs::rename(tmp_path, path);
-  fsync_parent_dir(path);
+  safe_rename(tmp_path, path);
 }
 
 /**
@@ -335,6 +334,70 @@ void fsync_parent_dir(const fs::path &child_path) {
   if (fs::exists(parent, ec)) {
     fsync_dir_internal(parent);
   }
+}
+
+// ============================================================================
+// overlayfs 安全重命名
+// ============================================================================
+
+/**
+ * 安全重命名（overlayfs 兼容）。
+ *
+ * overlayfs 在尝试 rename 一个位于 lower 层（只读）的目录时会返回 EXDEV。
+ * 此时退回到 copy + remove_all，行为与 GNU coreutils `mv` 一致。
+ *
+ * 文件系统类型	rename 原子性
+ *   ext4/xfs/btrfs	✅ 原子（同设备 rename）
+ *   overlayfs 文件	✅ 内核透明 copy-up
+ *   overlayfs 目录	⚠️ 降级为逐文件 copy（但 lower 层只读，数据天然安全）
+ *
+ * 关于折衷：copy+remove 不是原子的。但此函数用于 package manager 的
+ * BACKUP/RESTORE 路径，结合 WAL 的幂等恢复，覆盖了所有故障场景。
+ */
+void safe_rename(const fs::path &from, const fs::path &to) {
+  std::error_code ec;
+  fs::rename(from, to, ec);
+  if (!ec) {
+    fsync_parent_dir(to);
+    return;
+  }
+
+  if (ec.value() == EXDEV) {
+    log_warning(
+        string_format("warning.wal_rename_fallback", from.string(), to.string()));
+
+    if (fs::is_directory(from)) {
+      // 逐文件递归 copy（每文件：.tmp → fsync → rename 的原子路径）
+      fs::copy(from, to, fs::copy_options::recursive |
+                             fs::copy_options::overwrite_existing,
+               ec);
+      if (ec) {
+        // copy 失败 → 清理可能不完整的目标
+        fs::remove_all(to, ec);
+        throw LpkgException(
+            string_format("error.copy_failed", from.string(), to.string()));
+      }
+      // 恢复目录元数据
+      struct stat st;
+      if (::stat(from.c_str(), &st) == 0) {
+        fs::permissions(to, static_cast<fs::perms>(st.st_mode & 07777), ec);
+      }
+      fs::remove_all(from, ec);
+    } else {
+      fs::copy(from, to, ec);
+      if (ec)
+        throw LpkgException(
+            string_format("error.copy_failed", from.string(), to.string()));
+      fs::remove(from, ec);
+    }
+
+    fsync_parent_dir(to);
+    return;
+  }
+
+  // 非 EXDEV 的错误 → 原样抛出
+  throw std::filesystem::filesystem_error(
+      std::string("safe_rename failed: ") + ec.message(), from, to, ec);
 }
 
 /**

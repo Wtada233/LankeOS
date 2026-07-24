@@ -281,8 +281,7 @@ void trim_completed() {
     }
   }
 
-  fs::rename(tmp_path, wpath);
-  fsync_parent_dir(wpath);
+  safe_rename(tmp_path, wpath);
 }
 
 // ============================================================================
