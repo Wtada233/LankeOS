@@ -341,6 +341,66 @@ void fsync_parent_dir(const fs::path &child_path) {
 // ============================================================================
 
 /**
+ * 递归 copy 目录或文件（EXDEV fallback 用）。
+ *
+ * overlayfs 上 fs::copy 可能因 lowe r层特殊属性失败，所以手搓逐条目 copy。
+ *   目录：create_directory → 逐条目递归
+ *   文件：copy_file（保留权限）
+ *   符号链接：read_symlink + create_symlink
+ *
+ * 成功后才 remove_all 源。
+ */
+static void copy_recursive(const fs::path &from, const fs::path &to) {
+  std::error_code ec;
+
+  if (fs::is_directory(from)) {
+    // 创建目标目录（继承源权限）
+    fs::create_directory(to, from, ec);
+    if (ec) {
+      fs::remove_all(to, ec);
+      throw LpkgException(
+          string_format("error.copy_failed", from.string(), to.string()));
+    }
+    // 逐条目遍历
+    for (const auto &entry : fs::directory_iterator(from, ec)) {
+      if (ec) break;
+      auto rel = entry.path().filename();
+      copy_recursive(from / rel, to / rel);
+    }
+    if (ec) {
+      fs::remove_all(to, ec);
+      throw LpkgException(
+          string_format("error.copy_failed", from.string(), to.string()));
+    }
+  } else if (fs::is_symlink(from)) {
+    // 符号链接：原样重建
+    auto target = fs::read_symlink(from, ec);
+    if (ec) {
+      throw LpkgException(
+          string_format("error.copy_failed", from.string(), to.string()));
+    }
+    fs::create_symlink(target, to, ec);
+    if (ec) {
+      throw LpkgException(
+          string_format("error.copy_failed", from.string(), to.string()));
+    }
+  } else {
+    // 普通文件
+    fs::copy_file(from, to, fs::copy_options::none, ec);
+    if (ec) {
+      throw LpkgException(
+          string_format("error.copy_failed", from.string(), to.string()));
+    }
+  }
+
+  // 成功后删除源
+  if (fs::is_directory(from))
+    fs::remove_all(from, ec);
+  else
+    fs::remove(from, ec);
+}
+
+/**
  * 安全重命名（overlayfs 兼容）。
  *
  * overlayfs 在尝试 rename 一个位于 lower 层（只读）的目录时会返回 EXDEV。
@@ -365,32 +425,7 @@ void safe_rename(const fs::path &from, const fs::path &to) {
   if (ec.value() == EXDEV) {
     log_warning(
         string_format("warning.wal_rename_fallback", from.string(), to.string()));
-
-    if (fs::is_directory(from)) {
-      // 逐文件递归 copy（每文件：.tmp → fsync → rename 的原子路径）
-      fs::copy(from, to, fs::copy_options::recursive |
-                             fs::copy_options::overwrite_existing,
-               ec);
-      if (ec) {
-        // copy 失败 → 清理可能不完整的目标
-        fs::remove_all(to, ec);
-        throw LpkgException(
-            string_format("error.copy_failed", from.string(), to.string()));
-      }
-      // 恢复目录元数据
-      struct stat st;
-      if (::stat(from.c_str(), &st) == 0) {
-        fs::permissions(to, static_cast<fs::perms>(st.st_mode & 07777), ec);
-      }
-      fs::remove_all(from, ec);
-    } else {
-      fs::copy(from, to, ec);
-      if (ec)
-        throw LpkgException(
-            string_format("error.copy_failed", from.string(), to.string()));
-      fs::remove(from, ec);
-    }
-
+    copy_recursive(from, to);
     fsync_parent_dir(to);
     return;
   }
