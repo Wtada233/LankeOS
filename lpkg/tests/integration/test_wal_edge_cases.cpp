@@ -50,7 +50,7 @@ TEST_F(WalEdgeCaseTest, AllOpTypesParseRoundtrip) {
     {"RM_BEGIN pkg 1.0", wal::WALOpType::RM_BEGIN},
     {"RM_COMMIT pkg 1.0", wal::WALOpType::RM_COMMIT},
     {"RM_END pkg 1.0", wal::WALOpType::RM_END},
-    {"RM_DIR /dir 755 0 0", wal::WALOpType::RM_DIR},
+    {"CLEANUP /usr/bin/foo.lpkg_bak", wal::WALOpType::CLEANUP},
     {"DB /db pkg:installed", wal::WALOpType::DB},
     {"DBNEW /db pkg:installed", wal::WALOpType::DBNEW},
     {"DBRM /db pkg:removed", wal::WALOpType::DBRM},

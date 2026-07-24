@@ -15,11 +15,87 @@
 #include "transaction_log.hpp"
 #include "wal_op.hpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <ranges>
+#include <set>
 #include <vector>
 
 namespace fs = std::filesystem;
+
+namespace {
+
+/**
+ * continue_cleanup — 崩溃续传：继续清理未完成的 .lpkg_bak 清理操作。
+ * 在 recover_packages 中检测到 CLEANUP 条目时调用。
+ * 只清理文件/目录，不做 reverse_execute 回滚。
+ */
+void continue_cleanup(const std::vector<wal::WALOp> &ops) {
+  std::vector<fs::path> all_baks;
+  std::set<std::string> cleaned;
+
+  for (const auto &op : ops) {
+    if ((op.type == wal::WALOpType::BACKUP ||
+         op.type == wal::WALOpType::REMOVE_OLD) &&
+        !op.arg2.empty()) {
+      all_baks.push_back(op.arg2);
+    } else if (op.type == wal::WALOpType::CLEANUP && !op.arg1.empty()) {
+      cleaned.insert(op.arg1);
+    }
+  }
+
+  if (all_baks.empty())
+    return;
+
+  // 去重
+  std::ranges::sort(all_baks);
+  auto last = std::unique(all_baks.begin(), all_baks.end());
+  all_baks.erase(last, all_baks.end());
+
+  // 最深层优先
+  std::ranges::sort(all_baks, [](const fs::path &a, const fs::path &b) {
+    return a.string().size() > b.string().size();
+  });
+
+  for (const auto &bak : all_baks) {
+    if (!fs::exists(bak) && !fs::is_symlink(bak))
+      continue;  // 已删除（不论是否在 CLEANUP 集中）
+
+    std::error_code ec;
+    bool ok = true;
+
+    if (fs::is_directory(bak)) {
+      std::vector<fs::path> entries;
+      for (const auto &entry : fs::recursive_directory_iterator(bak, ec))
+        if (!ec) entries.push_back(entry.path());
+      if (!ec) {
+        std::reverse(entries.begin(), entries.end());
+        for (const auto &e : entries) {
+          if (!fs::remove(e, ec))
+            ok = false;
+        }
+      }
+      if (!fs::remove(bak, ec))
+        ok = false;
+    } else {
+      if (!fs::remove(bak, ec))
+        ok = false;
+    }
+
+    if (ok) {
+      if (!cleaned.contains(bak.string()))
+        wal::log_wal_line("CLEANUP " + bak.string());
+    } else {
+      log_warning(string_format("warning.cleanup_failed", bak.string()));
+    }
+  }
+
+  Cache::instance().load();
+  wal::commit_batch();
+}
+
+} // anonymous namespace
 
 // ============================================================================
 // recover_packages — 断电/崩溃恢复
@@ -101,15 +177,24 @@ void recover_packages() {
     if (ops.empty())
       continue;
 
-    // b) reverse_execute — 跳过 RESTORE_*/REMOVE_*/元数据行和 :batch-start
-    //    只执行正向操作的逆向
-    wal::reverse_execute(ops, "", true);
+    // b) 检查是否已有 CLEANUP 条目（CLEANUP 阶段已开始，不可回滚）
+    bool has_cleanup = false;
+    for (const auto &op : ops) {
+      if (op.type == wal::WALOpType::CLEANUP) {
+        has_cleanup = true;
+        break;
+      }
+    }
 
-    // c) 重载 Cache（从磁盘恢复的 DB 文件）
-    Cache::instance().load();
-
-    // d) 写入 COMMIT_PKGS 以关闭批次
-    wal::commit_batch();
+    if (has_cleanup) {
+      // 已有 CLEANUP → 继续清理，不回滚（CLEANUP 不可逆）
+      continue_cleanup(ops);
+    } else {
+      // 无 CLEANUP → 正常 reverse_execute 回滚
+      wal::reverse_execute(ops, "", true);
+      Cache::instance().load();
+      wal::commit_batch();
+    }
   }
 
   // 4. 清理残留的 .lpkg_db_bak_before:* 备份文件

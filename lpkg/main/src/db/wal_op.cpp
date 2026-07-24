@@ -38,7 +38,7 @@ static constexpr std::pair<std::string_view, WALOpType> TYPE_MAP[] = {
     {"RM_BEGIN", WALOpType::RM_BEGIN},
     {"RM_COMMIT", WALOpType::RM_COMMIT},
     {"RM_END", WALOpType::RM_END},
-    {"RM_DIR", WALOpType::RM_DIR},
+    {"CLEANUP", WALOpType::CLEANUP},
     {"DB", WALOpType::DB},
     {"DBNEW", WALOpType::DBNEW},
     {"DBRM", WALOpType::DBRM},
@@ -73,7 +73,6 @@ WALOpType walop_type_from_name(std::string_view name) {
 // 解析格式:
 //   TYPE arg1 [arg2 [arg3 [arg4 [arg5 [arg6]]]]]
 // 多参数操作（如 BACKUP，COPY）使用 "→" 作分隔符
-// RM_DIR 有 4 个参数: path mode uid gid
 
 static std::vector<std::string_view> split_line(std::string_view line) {
   std::vector<std::string_view> parts;
@@ -305,34 +304,6 @@ RollbackStats reverse_execute(const std::vector<WALOp> &ops,
       break;
     }
 
-    // ── RM_DIR ───────────────────────────────────────────────────────
-    case WALOpType::RM_DIR: {
-      // arg1=path, arg2=mode, arg3=uid, arg4=gid (split_line 顺序分配)
-      fs::path dir = op.arg1;
-      if (!fs::exists(dir)) {
-        std::error_code ec;
-        fs::create_directories(dir, ec);
-        if (!ec) {
-          if (!op.arg2.empty()) {
-            mode_t m = static_cast<mode_t>(std::stoul(op.arg2, nullptr, 8));
-            chmod(dir.c_str(), m);
-          }
-          if (!op.arg3.empty() && !op.arg4.empty()) {
-            uid_t u = static_cast<uid_t>(std::stoul(op.arg3));
-            gid_t g = static_cast<gid_t>(std::stoul(op.arg4));
-            chown(dir.c_str(), u, g);
-          }
-          stats.dirs_recreated++;
-
-          if (write_audit) {
-            wal_append_raw("RESTORE_DIR " + op.arg1);
-          }
-        }
-      }
-      // 目录已存在 → 跳过（幂等）
-      break;
-    }
-
     // ── DB ───────────────────────────────────────────────────────────
     case WALOpType::DB: {
       // arg1 = DB 文件路径, arg2 = 里程碑
@@ -536,7 +507,7 @@ void batch_rollback(const std::vector<std::string> &successfully_installed) {
   //    版本号从 WAL 的 BEGIN 行提取——load() 后的 Cache 对全新安装的包返回空版本
   std::map<std::string, std::string> pkg_versions;
   for (const auto &op : ops) {
-    if (op.type == WALOpType::BEGIN)
+    if (op.type == WALOpType::BEGIN || op.type == WALOpType::RM_BEGIN)
       pkg_versions[op.arg1] = op.arg2;
   }
   for (const auto &pkg : successfully_installed) {
