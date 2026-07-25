@@ -22,7 +22,9 @@ lankebuild_build() {
 
     # 添加 Python 兼容性链接
     ln -sfv python3.13 {STAGING_ROOT}{BINDIR}/python3
+    ln -sfv python3 {STAGING_ROOT}{BINDIR}/python
     ln -sfv python3.13-config {STAGING_ROOT}{BINDIR}/python3-config
+    ln -sfv python3-config {STAGING_ROOT}{BINDIR}/python-config
     ln -sfv pydoc3.13 {STAGING_ROOT}{BINDIR}/pydoc3
     ln -sfv idle3.13 {STAGING_ROOT}{BINDIR}/idle3
 
