@@ -123,18 +123,25 @@ void finalize_staging(const fs::path &staging_root, bool no_strip) {
         if (!entry.is_regular_file() || entry.is_symlink())
           continue;
 
-        // 仅对 ELF 文件进行 strip
-        bool is_elf = false;
+        // 对 ELF（可执行/共享库）和 ar 归档（静态库 .a）进行 strip
+        bool is_strippable = false;
         std::ifstream f(entry.path(), std::ios::binary);
         if (f) {
           std::array<char, 4> magic{};
           f.read(magic.data(), magic.size());
-          if (f.gcount() == 4 && magic[0] == 0x7f && magic[1] == 'E' &&
-              magic[2] == 'L' && magic[3] == 'F') {
-            is_elf = true;
+          if (f.gcount() == 4) {
+            // ELF: \x7fELF
+            if (magic[0] == 0x7f && magic[1] == 'E' &&
+                magic[2] == 'L' && magic[3] == 'F') {
+              is_strippable = true;
+            }
+            // ar 归档: !<arch>\n
+            if (magic[0] == '!' && magic[1] == '<') {
+              is_strippable = true;
+            }
           }
         }
-        if (!is_elf)
+        if (!is_strippable)
           continue;
 
         strip_binary(entry.path());
