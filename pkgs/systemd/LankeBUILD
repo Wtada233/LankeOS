@@ -7,7 +7,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Ddefault_library=shared -Ddefault-dnssec=no -Dfirstboot=false -Dman=disabled -Dpam=enabled -Dlogind=true -Dmode=release -Dwerror=false
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Ddefault_library=shared -Ddefault-dnssec=no -Dfirstboot=false -Dman=disabled -Dpam=enabled -Dlogind=true -Dmode=release -Dwerror=false -Dseccomp=enabled
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 

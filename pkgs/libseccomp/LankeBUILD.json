@@ -1,0 +1,8 @@
+{
+  "name": "libseccomp",
+  "version": "2.6.1",
+  "sources": [
+    "https://github.com/seccomp/libseccomp/releases/download/v2.6.1/libseccomp-2.6.1.tar.gz"
+  ],
+  "work_sources": []
+}
