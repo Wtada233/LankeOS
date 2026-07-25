@@ -28,5 +28,9 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    :
+    mkdir -p "{STAGING_ROOT}/etc/modules-load.d"
+    tee "{STAGING_ROOT}/etc/modules-load.d/bluetooth.conf" > /dev/null << 'EOF'
+bluetooth
+btusb
+EOF
 }
