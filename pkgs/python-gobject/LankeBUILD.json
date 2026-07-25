@@ -1,0 +1,9 @@
+{
+  "name": "python-gobject",
+  "version": "3.56.3",
+  "sources": [
+    "https://download.gnome.org/sources/pygobject/3.56/pygobject-3.56.3.tar.gz"
+  ],
+  "work_sources": [],
+  "release": 1
+}

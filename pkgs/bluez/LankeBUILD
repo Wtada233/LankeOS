@@ -1,0 +1,32 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ICAL_LIBS="-lical -licalvcal" \
+    ./configure \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --localstatedir=/var \
+        --enable-library \
+        --enable-experimental \
+        --enable-btpclient \
+        --enable-midi \
+        --enable-sixaxis \
+        --enable-mesh \
+        --enable-hid2hci \
+        --enable-datafiles \
+        --with-systemdsystemunitdir={LIBDIR}/systemd/system \
+        --with-dbusconfdir={SYSCONFDIR} \
+        --disable-test \
+        --disable-manpages \
+        --enable-deprecated
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

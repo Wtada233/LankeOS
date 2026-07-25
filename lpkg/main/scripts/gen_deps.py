@@ -322,7 +322,7 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rul
     pkg_path = os.path.abspath(os.path.join(target_dir, lpkg))
     repack_path = pkg_path + '.repacked'
     ret = subprocess.run(
-        ['tar', '-I', 'zstd', '-cf', repack_path, '-C', extract_dir, '.'],
+        ['tar', '-I', 'zstd -22 --ultra', '-cf', repack_path, '-C', extract_dir, '.'],
         capture_output=True, text=True,
     )
     if ret.returncode != 0:

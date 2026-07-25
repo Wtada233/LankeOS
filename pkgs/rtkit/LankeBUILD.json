@@ -1,0 +1,9 @@
+{
+  "name": "rtkit",
+  "version": "0.14",
+  "sources": [
+    "https://gitlab.freedesktop.org/pipewire/rtkit/-/archive/v0.14/rtkit-v0.14.tar.gz"
+  ],
+  "work_sources": [],
+  "release": 1
+}

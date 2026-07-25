@@ -1,0 +1,33 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 自动检测版本最高的 OpenJDK
+    local jdk_root jdk_flag=()
+    jdk_root=$(ls -1d /usr/lib/jvm/java-*-openjdk 2>/dev/null | sort -V | tail -1)
+    if [ -n "$jdk_root" ]; then
+        export PATH="$jdk_root/bin:$PATH"
+        jdk_flag=(-DJAVA_HOME="$jdk_root" -DJava_JAVAC_EXECUTABLE="$jdk_root/bin/javac")
+    fi
+
+    mkdir build && cd build
+    cmake .. -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        "${jdk_flag[@]}" \
+        -DLIBICAL_CXX_BINDINGS=true \
+        -DLIBICAL_JAVA_BINDINGS=true \
+        -DLIBICAL_GOBJECT_INTROSPECTION=true \
+        -DLIBICAL_GLIB=true \
+        -DLIBICAL_BUILD_DOCS=false \
+        -DLIBICAL_BUILD_EXAMPLES=false
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    :
+}

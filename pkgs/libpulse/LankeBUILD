@@ -1,0 +1,42 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # git archive 没有 .tarball-version，meson 的 git-version-gen 会返回空
+    if [ ! -f .tarball-version ]; then
+        echo "17.0" > .tarball-version
+    fi
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    meson setup .. \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --buildtype=release \
+        -Ddaemon=false \
+        -Dclient=true \
+        -Ddatabase=simple \
+        -Dstream-restore-clear-old-devices=true \
+        -Drunning-from-build-tree=false \
+        -Dglib=enabled \
+        -Ddbus=enabled \
+        -Dipv6=true \
+        -Dtests=false \
+        -Ddoxygen=false \
+        -Dalsa=enabled \
+        -Dgstreamer=enabled \
+        -Dbluez5=enabled \
+        -Dbluez5-gstreamer=enabled \
+        -Dfftw=enabled \
+        -Dopenssl=enabled
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+
+    # 客户端库不需要 systemd user service（那是给 pulseaudio daemon 用的）
+    # 但安装可能会生成空的 service 目录，清理之
+    rm -rf {STAGING_ROOT}{LIBDIR}/systemd/user
+}
+
+lankebuild_package() {
+    :
+}

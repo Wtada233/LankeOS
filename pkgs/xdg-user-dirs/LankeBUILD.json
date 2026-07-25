@@ -1,0 +1,8 @@
+{
+  "name": "xdg-user-dirs",
+  "version": "0.20",
+  "sources": [
+    "https://gitlab.freedesktop.org/xdg/xdg-user-dirs/-/archive/v0.20/xdg-user-dirs-v0.20.tar.gz"
+  ],
+  "work_sources": []
+}

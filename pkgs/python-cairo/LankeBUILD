@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    meson setup build --prefix={PREFIX} -Dtests=false -Dwheel=false
+    meson compile -C build
+    DESTDIR={STAGING_ROOT} meson install -C build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

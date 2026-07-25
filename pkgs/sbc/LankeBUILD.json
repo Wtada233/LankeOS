@@ -1,0 +1,9 @@
+{
+  "name": "sbc",
+  "version": "2.2",
+  "sources": [
+    "https://www.kernel.org/pub/linux/bluetooth/sbc-2.2.tar.xz"
+  ],
+  "work_sources": [],
+  "release": 1
+}

@@ -1,16 +1,38 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    :
+    # 为单精度复制一份源码树（避免 make clean 互相干扰）
+    cd ..
+    cp -a fftw-{ORIG_PKG_VER} fftw-{ORIG_PKG_VER}-single
+    cd fftw-{ORIG_PKG_VER}
 }
 
 lankebuild_build() {
+    # 双精度: libfftw3.so
+    cd ..
+    cd fftw-{ORIG_PKG_VER}
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
         --enable-shared \
         --disable-static \
+        --disable-fortran \
         --enable-threads \
         --enable-sse2 \
         --enable-avx2
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    # 单精度: libfftw3f.so (--enable-float)
+    cd ..
+    cd fftw-{ORIG_PKG_VER}-single
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
+        --enable-shared \
+        --disable-static \
+        --disable-fortran \
+        --enable-threads \
+        --enable-sse \
+        --enable-sse2 \
+        --enable-avx2 \
+        --enable-float
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

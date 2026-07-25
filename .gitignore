@@ -14,3 +14,6 @@ site/docs/.vitepress/cache/
 # 构建时自动生成的文件
 site/docs/releases.md
 site/docs/lpkg/index.md
+
+# Python缓存
+__pycache__

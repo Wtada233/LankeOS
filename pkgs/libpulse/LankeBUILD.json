@@ -1,0 +1,9 @@
+{
+  "name": "libpulse",
+  "version": "17.0",
+  "sources": [
+    "https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/archive/v17.0/pulseaudio-v17.0.tar.gz"
+  ],
+  "work_sources": [],
+  "release": 1
+}

@@ -1,0 +1,15 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --disable-static CFLAGS="-std=gnu17"
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

@@ -1,0 +1,9 @@
+{
+  "name": "bluez",
+  "version": "5.87",
+  "sources": [
+    "https://www.kernel.org/pub/linux/bluetooth/bluez-5.87.tar.xz"
+  ],
+  "work_sources": [],
+  "release": 1
+}

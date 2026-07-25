@@ -1,0 +1,8 @@
+{
+  "name": "blueman",
+  "version": "2.4.6",
+  "sources": [
+    "https://github.com/blueman-project/blueman/releases/download/2.4.6/blueman-2.4.6.tar.gz"
+  ],
+  "work_sources": []
+}

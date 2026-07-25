@@ -30,6 +30,7 @@ disable systemd-networkd.service
 disable systemd-resolved.service
 enable NetworkManager.service
 enable sshd.service
+enable bluetooth.service
 EOF
 
     echo "systemd-machine-id-setup" >> "{STAGING_HOOKS}/postinst.sh"

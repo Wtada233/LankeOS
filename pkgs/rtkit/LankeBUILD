@@ -1,0 +1,23 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    meson setup .. \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --buildtype=release
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    cat > "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+#!/bin/sh
+systemd-sysusers
+exit 0
+EOF
+}

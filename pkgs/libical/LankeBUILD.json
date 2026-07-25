@@ -1,0 +1,9 @@
+{
+  "name": "libical",
+  "version": "4.0.3",
+  "sources": [
+    "https://github.com/libical/libical/releases/download/v4.0.3/libical-4.0.3.tar.gz"
+  ],
+  "work_sources": [],
+  "release": 1
+}
