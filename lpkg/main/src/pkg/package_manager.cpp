@@ -1,6 +1,22 @@
 #include "package_manager.hpp"
 
-#include "install_common.hpp"
+#include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+#include <algorithm>
+#include <atomic>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <map>
+#include <random>
+#include <set>
+#include <sstream>
+#include <string>
+#include <unordered_set>
+#include <vector>
 
 #include "archive.hpp"
 #include "base/constants.hpp"
@@ -15,27 +31,10 @@
 #include "db/wal_op.hpp"
 #include "downloader.hpp"
 #include "i18n/localization.hpp"
+#include "install_common.hpp"
 #include "repo/repository.hpp"
 #include "trigger/trigger.hpp"
 #include "vercmp/version.hpp"
-
-#include <algorithm>
-#include <atomic>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <map>
-#include <set>
-#include <sstream>
-#include <string>
-#include <unordered_set>
-#include <vector>
-
-#include <random>
-#include <sys/mount.h>
-#include <sys/stat.h>
-#include <sys/wait.h>
-#include <unistd.h>
 
 namespace fs = std::filesystem;
 
@@ -47,273 +46,258 @@ extern std::atomic<bool> sigint_graceful;
 // =====================================================================
 
 /** 将缓存数据写回磁盘 */
-void write_cache() { Cache::instance().write(); }
+void write_cache()
+{
+    Cache::instance().write();
+}
 
 /**
  * 安装包的主入口
  * 流程：解析参数 -> 初始化仓库和缓存 -> 解析依赖 -> 静态一致性检查 ->
  * 用户确认 -> 实际安装 -> 触发运行
  */
-void install_packages(const std::vector<std::string> &pkg_args,
-                      const std::string &hash_file_path, bool force_reinstall) {
-  Cache::instance().load();
-  TmpDirManager tmp;
-  Repository repo;
-  try {
-    repo.load_index();
-  } catch (const std::exception &e) {
-    log_warning(string_format("warning.repo_index_load_failed", e.what()));
-  }
-
-  std::map<std::string, InstallPlan> plan;
-  std::vector<std::string> order;
-  std::map<std::string, fs::path> locals;
-  std::vector<std::pair<std::string, std::string>> targets;
-
-  std::string provided_hash;
-  if (!hash_file_path.empty()) {
-    std::ifstream hf(hash_file_path);
-    if (!(hf >> provided_hash))
-      throw LpkgException(get_string("error.read_hash_failed"));
-  }
-
-  // 安装参数解析
-  for (const auto &arg : pkg_args) {
-    const fs::path p(arg);
-    if (p.extension() == constants::EXT_ZST ||
-        p.extension() == constants::EXT_LPKG ||
-        arg.find('/') != std::string::npos) {
-      if (fs::exists(p)) {
-        try {
-          json meta = detail::read_archive_metadata(fs::absolute(p));
-          std::string n = meta.at(std::string(constants::J_NAME));
-          std::string v = meta.at(std::string(constants::J_VERSION));
-          locals[n] = fs::absolute(p);
-          targets.emplace_back(n, v);
-        } catch (const std::exception &e) {
-          log_error(
-              string_format("warning.skip_invalid_local_pkg", arg, e.what()));
-        }
-      } else {
-        log_error(string_format("error.local_pkg_not_found", arg));
-      }
-    } else {
-      std::string n = arg, v = std::string(constants::VER_LATEST);
-      if (const auto pos = arg.find(':'); pos != std::string::npos) {
-        n = arg.substr(0, pos);
-        v = arg.substr(pos + 1);
-      }
-      targets.emplace_back(n, v);
+void install_packages(const std::vector<std::string>& pkg_args, const std::string& hash_file_path,
+                      bool force_reinstall)
+{
+    Cache::instance().load();
+    TmpDirManager tmp;
+    Repository repo;
+    try {
+        repo.load_index();
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.repo_index_load_failed", e.what()));
     }
-  }
 
-  InstallContext ctx{
-      repo, plan, order, locals, targets, force_reinstall, /*top_level=*/true,
-      {}};
+    std::map<std::string, InstallPlan> plan;
+    std::vector<std::string> order;
+    std::map<std::string, fs::path> locals;
+    std::vector<std::pair<std::string, std::string>> targets;
 
-  // 一致性重试循环
-  while (true) {
-    plan.clear();
-    order.clear();
-    ctx.plan = plan;
-    ctx.install_order = order;
+    std::string provided_hash;
+    if (!hash_file_path.empty()) {
+        std::ifstream hf(hash_file_path);
+        if (!(hf >> provided_hash)) throw LpkgException(get_string("error.read_hash_failed"));
+    }
+
+    // 安装参数解析
+    for (const auto& arg : pkg_args) {
+        const fs::path p(arg);
+        if (p.extension() == constants::EXT_ZST || p.extension() == constants::EXT_LPKG ||
+            arg.find('/') != std::string::npos) {
+            if (fs::exists(p)) {
+                try {
+                    json meta = detail::read_archive_metadata(fs::absolute(p));
+                    std::string n = meta.at(std::string(constants::J_NAME));
+                    std::string v = meta.at(std::string(constants::J_VERSION));
+                    locals[n] = fs::absolute(p);
+                    targets.emplace_back(n, v);
+                } catch (const std::exception& e) {
+                    log_error(string_format("warning.skip_invalid_local_pkg", arg, e.what()));
+                }
+            } else {
+                log_error(string_format("error.local_pkg_not_found", arg));
+            }
+        } else {
+            std::string n = arg, v = std::string(constants::VER_LATEST);
+            if (const auto pos = arg.find(':'); pos != std::string::npos) {
+                n = arg.substr(0, pos);
+                v = arg.substr(pos + 1);
+            }
+            targets.emplace_back(n, v);
+        }
+    }
+
+    InstallContext ctx{repo, plan, order, locals, targets, force_reinstall, /*top_level=*/true, {}};
+
+    // 一致性重试循环
+    while (true) {
+        plan.clear();
+        order.clear();
+        ctx.plan = plan;
+        ctx.install_order = order;
+        ctx.successfully_installed.clear();
+        ctx.installed_set.clear();
+
+        for (const auto& [n, v] : targets) {
+            std::set<std::string> vs;
+            detail::resolve_package_dependencies(n, v, true, ctx, vs);
+        }
+
+        if (!provided_hash.empty()) {
+            if (locals.empty()) throw LpkgException(get_string("error.hash_requires_local"));
+            for (auto& [n, p] : plan)
+                if (!p.local_path.empty()) p.sha256 = provided_hash;
+        }
+
+        if (plan.empty()) {
+            log_info(get_string("info.all_packages_already_installed"));
+            return;
+        }
+
+        if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
+            log_error(get_string("error.dependency_conflict_title"));
+            if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
+                for (const auto& pkg : broken) remove_package(pkg, true);
+                Cache::instance().write();
+                continue;
+            }
+            log_info(get_string("info.installation_aborted"));
+            return;
+        }
+
+        if (auto nso_broken = detail::check_needed_so_consistency(plan); !nso_broken.empty()) {
+            log_error(get_string("error.dependency_conflict_title"));
+            std::string nso_msg;
+            for (const auto& pkg : nso_broken) nso_msg += "  " + pkg + "\n";
+            log_error(nso_msg);
+            if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
+                for (const auto& pkg : nso_broken) remove_package(pkg, true);
+                Cache::instance().write();
+                continue;
+            }
+            log_info(get_string("info.installation_aborted"));
+            return;
+        }
+
+        break;
+    }
+
+    detail::check_forward_soname_integrity(plan, repo);
+
+    // 用户确认
+    std::string prompt;
+    for (const auto& n : order) {
+        const auto& p = plan.at(n);
+        prompt +=
+            "  " +
+            string_format(p.is_explicit ? "info.package_list_item" : "info.package_list_item_dep",
+                          p.name, p.actual_version) +
+            "\n";
+    }
+    if (!user_confirms(prompt + get_string("info.confirm_proceed"))) {
+        log_info(get_string("info.installation_aborted"));
+        return;
+    }
+
     ctx.successfully_installed.clear();
     ctx.installed_set.clear();
 
-    for (const auto &[n, v] : targets) {
-      std::set<std::string> vs;
-      detail::resolve_package_dependencies(n, v, true, ctx, vs);
-    }
+    // 执行安装（WAL 2.0 批量事务）
+    std::vector<std::pair<fs::path, fs::path>> all_backups;
+    run_batch_transaction(
+        order.size(), [&](wal::WalWriter& /*batch_writer*/, std::vector<std::string>& success) {
+            auto& cache = Cache::instance();
 
-    if (!provided_hash.empty()) {
-      if (locals.empty())
-        throw LpkgException(get_string("error.hash_requires_local"));
-      for (auto &[n, p] : plan)
-        if (!p.local_path.empty())
-          p.sha256 = provided_hash;
-    }
+            size_t i = 0;
+            while (i < order.size()) {
+                if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
-    if (plan.empty()) {
-      log_info(get_string("info.all_packages_already_installed"));
-      return;
-    }
+                const std::string& n = order[i];
+                ++i;
 
-    if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
-      log_error(get_string("error.dependency_conflict_title"));
-      if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
-        for (const auto &pkg : broken)
-          remove_package(pkg, true);
-        Cache::instance().write();
-        continue;
-      }
-      log_info(get_string("info.installation_aborted"));
-      return;
-    }
+                if (ctx.installed_set.contains(n)) continue;
 
-    if (auto nso_broken = detail::check_needed_so_consistency(plan);
-        !nso_broken.empty()) {
-      log_error(get_string("error.dependency_conflict_title"));
-      std::string nso_msg;
-      for (const auto &pkg : nso_broken)
-        nso_msg += "  " + pkg + "\n";
-      log_error(nso_msg);
-      if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
-        for (const auto &pkg : nso_broken)
-          remove_package(pkg, true);
-        Cache::instance().write();
-        continue;
-      }
-      log_info(get_string("info.installation_aborted"));
-      return;
-    }
+                auto& p = plan.at(n);
 
-    break;
-  }
+                if (!p.metadata_verified) {
+                    InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
+                                                Cache::instance().get_installed_version(p.name),
+                                                p.local_path, p.sha256, p.force_reinstall);
+                    ensure_dir_exists(check_task.tmp_pkg_dir());
+                    check_task.download_and_verify_package();
 
-  detail::check_forward_soname_integrity(plan, repo);
+                    json meta = detail::read_archive_metadata(check_task.archive_path());
+                    std::vector<std::string> dep_strs =
+                        meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
+                    auto actual_deps = detail::parse_dep_strings(dep_strs);
+                    std::vector<std::string> actual_provides =
+                        meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+                    std::vector<std::string> actual_needed_so =
+                        meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
 
-  // 用户确认
-  std::string prompt;
-  for (const auto &n : order) {
-    const auto &p = plan.at(n);
-    prompt += "  " +
-              string_format(p.is_explicit ? "info.package_list_item"
-                                          : "info.package_list_item_dep",
-                            p.name, p.actual_version) +
-              "\n";
-  }
-  if (!user_confirms(prompt + get_string("info.confirm_proceed"))) {
-    log_info(get_string("info.installation_aborted"));
-    return;
-  }
+                    bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
+                                            (actual_provides != p.provides) ||
+                                            (actual_needed_so != p.needed_so);
+                    if (!metadata_differs) {
+                        for (size_t di = 0; di < actual_deps.size(); ++di) {
+                            if (actual_deps[di].name != p.dependencies[di].name ||
+                                actual_deps[di].constraints != p.dependencies[di].constraints) {
+                                metadata_differs = true;
+                                break;
+                            }
+                        }
+                    }
 
-  ctx.successfully_installed.clear();
-  ctx.installed_set.clear();
+                    if (metadata_differs) {
+                        log_info(string_format("info.resolving_metadata", p.name));
+                        ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
+                                                     actual_provides, actual_needed_so);
+                        ctx.local_candidates[p.name] = check_task.archive_path();
 
-  // 执行安装（WAL 2.0 批量事务）
-  std::vector<std::pair<fs::path, fs::path>> all_backups;
-  run_batch_transaction(order.size(), [&](wal::WalWriter & /*batch_writer*/,
-                                          std::vector<std::string> &success) {
-    auto &cache = Cache::instance();
+                        ctx.plan.clear();
+                        ctx.install_order.clear();
+                        for (const auto& [tn, tv] : ctx.targets) {
+                            std::set<std::string> vs;
+                            detail::resolve_package_dependencies(tn, tv, true, ctx, vs);
+                        }
+                        i = 0;
+                        continue;
+                    }
 
-    size_t i = 0;
-    while (i < order.size()) {
-      if (sigint_graceful.load())
-        throw LpkgException(get_string("info.sigint_aborted"));
+                    p.local_path = check_task.archive_path();
+                    p.metadata_verified = true;
+                }
 
-      const std::string &n = order[i];
-      ++i;
+                InstallationTask task(p.name, p.actual_version, p.is_explicit,
+                                      Cache::instance().get_installed_version(p.name), p.local_path,
+                                      p.sha256, p.force_reinstall);
+                task.run(&ctx);
 
-      if (ctx.installed_set.contains(n))
-        continue;
+                // 收集 .lpkg_bak 路径供批次成功后统一清理（升级/重装时产生）
+                for (const auto& b : task.get_backups()) all_backups.emplace_back(b);
 
-      auto &p = plan.at(n);
-
-      if (!p.metadata_verified) {
-        InstallationTask check_task(
-            p.name, p.actual_version, p.is_explicit,
-            Cache::instance().get_installed_version(p.name), p.local_path,
-            p.sha256, p.force_reinstall);
-        ensure_dir_exists(check_task.tmp_pkg_dir());
-        check_task.download_and_verify_package();
-
-        json meta = detail::read_archive_metadata(check_task.archive_path());
-        std::vector<std::string> dep_strs = meta.value(
-            std::string(constants::J_DEPS), std::vector<std::string>{});
-        auto actual_deps = detail::parse_dep_strings(dep_strs);
-        std::vector<std::string> actual_provides = meta.value(
-            std::string(constants::J_PROVIDES), std::vector<std::string>{});
-        std::vector<std::string> actual_needed_so = meta.value(
-            std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
-
-        bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
-                                (actual_provides != p.provides) ||
-                                (actual_needed_so != p.needed_so);
-        if (!metadata_differs) {
-          for (size_t di = 0; di < actual_deps.size(); ++di) {
-            if (actual_deps[di].name != p.dependencies[di].name ||
-                actual_deps[di].constraints != p.dependencies[di].constraints) {
-              metadata_differs = true;
-              break;
+                cache.write(p.name + ":installed");
+                success.push_back(p.name);
+                ctx.installed_set.insert(p.name);
             }
-          }
-        }
+        });
 
-        if (metadata_differs) {
-          log_info(string_format("info.resolving_metadata", p.name));
-          ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
-                                       actual_provides, actual_needed_so);
-          ctx.local_candidates[p.name] = check_task.archive_path();
-
-          ctx.plan.clear();
-          ctx.install_order.clear();
-          for (const auto &[tn, tv] : ctx.targets) {
-            std::set<std::string> vs;
-            detail::resolve_package_dependencies(tn, tv, true, ctx, vs);
-          }
-          i = 0;
-          continue;
-        }
-
-        p.local_path = check_task.archive_path();
-        p.metadata_verified = true;
-      }
-
-      InstallationTask task(p.name, p.actual_version, p.is_explicit,
-                            Cache::instance().get_installed_version(p.name),
-                            p.local_path, p.sha256, p.force_reinstall);
-      task.run(&ctx);
-
-      // 收集 .lpkg_bak 路径供批次成功后统一清理（升级/重装时产生）
-      for (const auto &b : task.get_backups())
-        all_backups.emplace_back(b);
-
-      cache.write(p.name + ":installed");
-      success.push_back(p.name);
-      ctx.installed_set.insert(p.name);
+    // 清理批次产生的 .lpkg_bak 文件
+    for (const auto& [orig, bak] : all_backups) {
+        std::error_code ec;
+        fs::remove(bak, ec);
     }
-  });
 
-  // 清理批次产生的 .lpkg_bak 文件
-  for (const auto &[orig, bak] : all_backups) {
-    std::error_code ec;
-    fs::remove(bak, ec);
-  }
+    trim_completed();
+    cleanup_db_backups();
 
-  trim_completed();
-  cleanup_db_backups();
-
-  TriggerManager::instance().run_all();
-  log_info(get_string("info.install_complete"));
+    TriggerManager::instance().run_all();
+    log_info(get_string("info.install_complete"));
 }
 
 /** 生成随机后缀（小写字母+数字）用于 .lpkg_bak 重命名防冲突 */
-static std::string random_suffix(size_t len = 6) {
-  static const char chars[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-  static std::random_device rd;
-  std::string s;
-  for (size_t i = 0; i < len; ++i)
-    s += chars[rd() % (sizeof(chars) - 1)];
-  return s;
+static std::string random_suffix(size_t len = 6)
+{
+    static const char chars[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    static std::random_device rd;
+    std::string s;
+    for (size_t i = 0; i < len; ++i) s += chars[rd() % (sizeof(chars) - 1)];
+    return s;
 }
 
 /** 生成不冲突的 .lpkg_bak 路径，如果已存在则重试随机后缀 */
-static fs::path unique_bak_path(const fs::path &phys, const std::string &pkg) {
-  // 去除尾部 '/'，防止 operator+= 追加到文件名中间（目录路径导致）
-  std::string clean_str = phys.string();
-  while (clean_str.size() > 1 && clean_str.back() == '/')
-    clean_str.pop_back();
-  fs::path clean(clean_str);
+static fs::path unique_bak_path(const fs::path& phys, const std::string& pkg)
+{
+    // 去除尾部 '/'，防止 operator+= 追加到文件名中间（目录路径导致）
+    std::string clean_str = phys.string();
+    while (clean_str.size() > 1 && clean_str.back() == '/') clean_str.pop_back();
+    fs::path clean(clean_str);
 
-  for (int i = 0; i < 20; ++i) {
-    fs::path bak = clean;
-    bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg + "_" + random_suffix();
-    if (!fs::exists(bak))
-      return bak;
-  }
-  fs::path bak = clean;
-  bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg + "_" + random_suffix();
-  return bak;
+    while (true) {
+        fs::path bak = clean;
+        bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg + "_" + random_suffix();
+        if (!fs::exists(bak)) return bak;
+    }
 }
 
 /**
@@ -321,378 +305,341 @@ static fs::path unique_bak_path(const fs::path &phys, const std::string &pkg) {
  * 检查是否为 essential 包、是否有其他包依赖它、是否有包依赖其提供的虚拟包名
  * force 模式下跳过所有安全检查
  */
-void remove_package(const std::string &pkg_name, bool force,
-                    bool /*wrap_in_txn*/) {
-  const std::string ver = Cache::instance().get_installed_version(pkg_name);
-  if (ver.empty()) {
-    log_info(string_format("info.package_not_installed", pkg_name));
-    return;
-  }
-
-  if (!force) {
-    if (Cache::instance().is_essential(pkg_name)) {
-      log_error(string_format("error.skip_remove_essential", pkg_name));
-      return;
-    }
-    if (auto rdeps = Cache::instance().get_reverse_deps(pkg_name);
-        !rdeps.empty()) {
-      std::string list;
-      for (const auto &d : rdeps)
-        list += d + " ";
-      log_info(string_format("info.skip_remove_dependency", pkg_name, list));
-      return;
-    }
-    for (const auto &cap : Cache::instance().get_package_provides(pkg_name)) {
-      if (auto rdeps = Cache::instance().get_reverse_deps(cap);
-          !rdeps.empty()) {
-        std::string list;
-        for (const auto &d : rdeps)
-          list += d + " ";
-        log_info(string_format("info.skip_remove_dependency", cap, list));
+void remove_package(const std::string& pkg_name, bool force, bool /*wrap_in_txn*/)
+{
+    const std::string ver = Cache::instance().get_installed_version(pkg_name);
+    if (ver.empty()) {
+        log_info(string_format("info.package_not_installed", pkg_name));
         return;
-      }
     }
-  }
 
-  if (sigint_graceful.load())
-    throw LpkgException(get_string("info.sigint_aborted"));
-
-  log_info(string_format("info.removing_package", pkg_name));
-
-  // WAL 2.0 批量事务：单个包移除 = 一批一包
-  run_batch_transaction(1, [&](wal::WalWriter & /*w*/,
-                               std::vector<std::string> &success) {
-    auto &cache = Cache::instance();
-
-    if (sigint_graceful.load())
-      throw LpkgException(get_string("info.sigint_aborted"));
-
-    detail::run_hook(pkg_name, std::string(constants::PRERM_SH));
-
-    // WAL: RM_BEGIN
-    wal::log_wal_line("RM_BEGIN " + pkg_name + " " + ver);
-
-    std::vector<std::pair<fs::path, fs::path>> backups;
-    std::error_code ec;
-
-    auto owned_entries = cache.get_package_files(pkg_name);
-
-    // 共享文件检查
-    if (!force && !owned_entries.empty()) {
-      std::vector<std::pair<std::string, std::string>> shared;
-      for (const auto &entry : owned_entries) {
-        if (entry.ends_with('/'))
-          continue;
-        auto owners = cache.get_file_owners(entry);
-        std::string others;
-        for (const auto &owner : owners) {
-          if (owner != pkg_name) {
-            if (!others.empty())
-              others += ", ";
-            others += owner;
-          }
+    if (!force) {
+        if (Cache::instance().is_essential(pkg_name)) {
+            log_error(string_format("error.skip_remove_essential", pkg_name));
+            return;
         }
-        if (!others.empty())
-          shared.emplace_back(entry, others);
-      }
-      if (!shared.empty()) {
-        std::string msg = get_string("error.shared_file_header") + "\n";
-        for (const auto &[file, owners] : shared)
-          msg += "  " + string_format("error.shared_file_entry", file, owners) +
-                 "\n";
-        throw LpkgException(msg + get_string("error.removal_aborted"));
-      }
-    }
-
-    // 备份阶段
-    int file_count = 0;
-    if (!owned_entries.empty()) {
-      std::vector<fs::path> paths;
-      for (const auto &e : owned_entries)
-        paths.emplace_back(e);
-      std::ranges::sort(paths, std::greater<>{});
-
-      for (const auto &p : paths) {
-        std::string path_str = p.string();
-        if (path_str.ends_with('/'))
-          continue;
-        const fs::path phys =
-            p.is_absolute()
-                ? Config::instance().root_dir() / fs::path(p).relative_path()
-                : Config::instance().root_dir() / p;
-
-        if (sigint_graceful.load())
-          throw LpkgException(get_string("info.sigint_aborted"));
-
-        if (fs::exists(phys) || fs::is_symlink(phys)) {
-          fs::path bak = unique_bak_path(phys, pkg_name);
-          wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " +
-                            bak.string());
-          BreakpointManager::instance().hit("rm_backup_after_wal_" + pkg_name);
-          safe_rename(phys, bak);
-          backups.emplace_back(phys, bak);
-          ++file_count;
+        if (auto rdeps = Cache::instance().get_reverse_deps(pkg_name); !rdeps.empty()) {
+            std::string list;
+            for (const auto& d : rdeps) list += d + " ";
+            log_info(string_format("info.skip_remove_dependency", pkg_name, list));
+            return;
         }
-      }
-    }
-
-    if (file_count > 0)
-      log_info(string_format("info.files_removed", file_count));
-
-    if (sigint_graceful.load())
-      throw LpkgException(get_string("info.sigint_aborted"));
-
-    // 断点：移除的 BACKUP 阶段完成后、文件删除前
-    BreakpointManager::instance().hit("rm_before_file_removal_" + pkg_name);
-
-    remove_package_files(pkg_name, force);
-
-    if (sigint_graceful.load())
-      throw LpkgException(get_string("info.sigint_aborted"));
-
-    // 目录处理：BACKUP 目录（仅最后持有者 + 安全检查）
-    {
-      std::vector<fs::path> dir_paths;
-      for (const auto &e : owned_entries)
-        if (e.ends_with('/'))
-          dir_paths.emplace_back(fs::path(e));
-      std::ranges::sort(dir_paths, std::greater<>{});
-
-      for (const auto &p : dir_paths) {
-        cache.remove_file_owner(p.string(), pkg_name);
-        if (!cache.get_file_owners(p.string()).empty())
-          continue;
-
-        const fs::path phys =
-            p.is_absolute() ? Config::instance().root_dir() / p.relative_path()
-                            : Config::instance().root_dir() / p;
-        if (!fs::exists(phys) || !fs::is_directory(phys))
-          continue;
-
-        // 安全检查：目录中只能有本包的 .lpkg_bak 文件
-        bool can_backup = true;
-        std::error_code ec2;
-        for (const auto &entry : fs::directory_iterator(phys, ec2)) {
-          auto fname = entry.path().filename().string();
-          if (fname.find(std::string(constants::SUFFIX_LPKG_BAK) + pkg_name +
-                         "_") != std::string::npos)
-            continue;
-          can_backup = false;
-          break;
-        }
-        if (!can_backup)
-          continue;
-
-        fs::path bak = unique_bak_path(phys, pkg_name);
-        wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " +
-                          bak.string());
-        safe_rename(phys, bak);
-        backups.emplace_back(phys, bak);
-      }
-    }
-
-    // DBRM 清理
-    auto cleanup_with_dbr = [&](const fs::path &fpath,
-                                const std::string & /*desc*/) {
-      if (fs::exists(fpath)) {
-        wal::log_wal_line("DBRM " + fpath.string() + " " + pkg_name +
-                          ":removed");
-        safe_rename(fpath, fs::path(fpath.string() + ".lpkg_db_bak_before:" +
-                                             pkg_name + ":removed"));
-      }
-    };
-
-    const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
-    if (fs::exists(dep_file)) {
-      std::ifstream f(dep_file);
-      std::string l;
-      while (std::getline(f, l)) {
-        std::stringstream ss(l);
-        std::string dn;
-        if (ss >> dn)
-          cache.remove_reverse_dep(dn, pkg_name);
-      }
-    }
-    cleanup_with_dbr(dep_file, "dep");
-    cleanup_with_dbr(Config::instance().needed_so_dir() / pkg_name,
-                     "needed_so");
-    cleanup_with_dbr(Config::instance().docs_dir() /
-                         (pkg_name + std::string(constants::SUFFIX_MAN)),
-                     "man");
-
-    fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
-    cache.remove_installed(pkg_name);
-
-    if (sigint_graceful.load())
-      throw LpkgException(get_string("info.sigint_aborted"));
-
-    // DB 落盘
-    cache.write(pkg_name + ":removed");
-
-    // WAL: RM_COMMIT
-    wal::log_wal_line("RM_COMMIT " + pkg_name + " " + ver);
-
-    // ── CLEANUP 阶段（不可回滚）──
-    if (!backups.empty()) {
-      std::vector<fs::path> cleanup_paths;
-      for (const auto &[orig, bak] : backups)
-        cleanup_paths.push_back(bak);
-
-      // 最深层优先（文件先于目录，子目录先于父目录）
-      std::ranges::sort(cleanup_paths, [](const fs::path &a, const fs::path &b) {
-        return a.string().size() > b.string().size();
-      });
-
-      auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
-      cleanup_paths.erase(last, cleanup_paths.end());
-
-      for (const auto &p : cleanup_paths) {
-        if (!fs::exists(p) && !fs::is_symlink(p))
-          continue;
-
-        std::error_code ec2;
-        bool ok = true;
-
-        if (fs::is_directory(p)) {
-          // 从里到外删除目录内容
-          std::vector<fs::path> entries;
-          for (const auto &entry : fs::recursive_directory_iterator(p, ec2))
-            if (!ec2) entries.push_back(entry.path());
-          if (!ec2) {
-            std::ranges::reverse(entries);
-            for (const auto &e : entries) {
-              if (!fs::remove(e, ec2))
-                ok = false;
+        for (const auto& cap : Cache::instance().get_package_provides(pkg_name)) {
+            if (auto rdeps = Cache::instance().get_reverse_deps(cap); !rdeps.empty()) {
+                std::string list;
+                for (const auto& d : rdeps) list += d + " ";
+                log_info(string_format("info.skip_remove_dependency", cap, list));
+                return;
             }
-          }
-          if (!fs::remove(p, ec2))
-            ok = false;
-        } else {
-          if (!fs::remove(p, ec2))
-            ok = false;
         }
-
-        if (ok) {
-          wal::log_wal_line("CLEANUP " + p.string());
-        } else {
-          log_warning(string_format("warning.cleanup_failed", p.string()));
-        }
-      }
     }
 
-    // WAL: RM_END
-    wal::log_wal_line("RM_END " + pkg_name + " " + ver);
+    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
-    success.push_back(pkg_name);
-  });
+    log_info(string_format("info.removing_package", pkg_name));
 
-  trim_completed();
-  cleanup_db_backups();
+    // WAL 2.0 批量事务：单个包移除 = 一批一包
+    run_batch_transaction(1, [&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
+        auto& cache = Cache::instance();
 
-  log_info(string_format("info.package_removed_successfully", pkg_name));
+        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+        detail::run_hook(pkg_name, std::string(constants::PRERM_SH));
+
+        // WAL: RM_BEGIN
+        wal::log_wal_line("RM_BEGIN " + pkg_name + " " + ver);
+
+        std::vector<std::pair<fs::path, fs::path>> backups;
+        std::error_code ec;
+
+        auto owned_entries = cache.get_package_files(pkg_name);
+
+        // 共享文件检查
+        if (!force && !owned_entries.empty()) {
+            std::vector<std::pair<std::string, std::string>> shared;
+            for (const auto& entry : owned_entries) {
+                if (entry.ends_with('/')) continue;
+                auto owners = cache.get_file_owners(entry);
+                std::string others;
+                for (const auto& owner : owners) {
+                    if (owner != pkg_name) {
+                        if (!others.empty()) others += ", ";
+                        others += owner;
+                    }
+                }
+                if (!others.empty()) shared.emplace_back(entry, others);
+            }
+            if (!shared.empty()) {
+                std::string msg = get_string("error.shared_file_header") + "\n";
+                for (const auto& [file, owners] : shared)
+                    msg += "  " + string_format("error.shared_file_entry", file, owners) + "\n";
+                throw LpkgException(msg + get_string("error.removal_aborted"));
+            }
+        }
+
+        // 备份阶段
+        int file_count = 0;
+        if (!owned_entries.empty()) {
+            std::vector<fs::path> paths;
+            for (const auto& e : owned_entries) paths.emplace_back(e);
+            std::ranges::sort(paths, std::greater<>{});
+
+            for (const auto& p : paths) {
+                std::string path_str = p.string();
+                if (path_str.ends_with('/')) continue;
+                if (!force && path_str.starts_with(constants::DIR_ETC_PREFIX)) continue;
+                const fs::path phys =
+                    p.is_absolute() ? Config::instance().root_dir() / fs::path(p).relative_path()
+                                    : Config::instance().root_dir() / p;
+
+                if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+                if (fs::exists(phys) || fs::is_symlink(phys)) {
+                    fs::path bak = unique_bak_path(phys, pkg_name);
+                    wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
+                    BreakpointManager::instance().hit("rm_backup_after_wal_" + pkg_name);
+                    safe_rename(phys, bak);
+                    backups.emplace_back(phys, bak);
+                    ++file_count;
+                }
+            }
+        }
+
+        if (file_count > 0) log_info(string_format("info.files_removed", file_count));
+
+        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+        // 断点：移除的 BACKUP 阶段完成后、文件删除前
+        BreakpointManager::instance().hit("rm_before_file_removal_" + pkg_name);
+
+        remove_package_files(pkg_name, force);
+
+        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+        // 目录处理：BACKUP 目录（仅最后持有者 + 安全检查）
+        {
+            std::vector<fs::path> dir_paths;
+            for (const auto& e : owned_entries)
+                if (e.ends_with('/')) dir_paths.emplace_back(fs::path(e));
+            std::ranges::sort(dir_paths, std::greater<>{});
+
+            for (const auto& p : dir_paths) {
+                cache.remove_file_owner(p.string(), pkg_name);
+                if (!cache.get_file_owners(p.string()).empty()) continue;
+
+                const fs::path phys = p.is_absolute()
+                                          ? Config::instance().root_dir() / p.relative_path()
+                                          : Config::instance().root_dir() / p;
+                if (!fs::exists(phys) || !fs::is_directory(phys)) continue;
+
+                // 安全检查：目录中只能有本包的 .lpkg_bak 文件
+                bool can_backup = true;
+                std::error_code ec2;
+                for (const auto& entry : fs::directory_iterator(phys, ec2)) {
+                    auto fname = entry.path().filename().string();
+                    if (fname.find(std::string(constants::SUFFIX_LPKG_BAK) + pkg_name + "_") !=
+                        std::string::npos)
+                        continue;
+                    can_backup = false;
+                    break;
+                }
+                if (!can_backup) continue;
+
+                fs::path bak = unique_bak_path(phys, pkg_name);
+                wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
+                safe_rename(phys, bak);
+                backups.emplace_back(phys, bak);
+            }
+        }
+
+        // DBRM 清理
+        auto cleanup_with_dbr = [&](const fs::path& fpath, const std::string& /*desc*/) {
+            if (fs::exists(fpath)) {
+                wal::log_wal_line("DBRM " + fpath.string() + " " + pkg_name + ":removed");
+                safe_rename(fpath, fs::path(fpath.string() + ".lpkg_db_bak_before:" + pkg_name +
+                                            ":removed"));
+            }
+        };
+
+        const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
+        if (fs::exists(dep_file)) {
+            std::ifstream f(dep_file);
+            std::string l;
+            while (std::getline(f, l)) {
+                std::stringstream ss(l);
+                std::string dn;
+                if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name);
+            }
+        }
+        cleanup_with_dbr(dep_file, "dep");
+        cleanup_with_dbr(Config::instance().needed_so_dir() / pkg_name, "needed_so");
+        cleanup_with_dbr(
+            Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), "man");
+
+        fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
+        cache.remove_installed(pkg_name);
+
+        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+        // DB 落盘
+        cache.write(pkg_name + ":removed");
+
+        // WAL: RM_COMMIT
+        wal::log_wal_line("RM_COMMIT " + pkg_name + " " + ver);
+
+        // ── CLEANUP 阶段（不可回滚）──
+        if (!backups.empty()) {
+            std::vector<fs::path> cleanup_paths;
+            for (const auto& [orig, bak] : backups) cleanup_paths.push_back(bak);
+
+            // 最深层优先（文件先于目录，子目录先于父目录）
+            std::ranges::sort(cleanup_paths, [](const fs::path& a, const fs::path& b) {
+                return a.string().size() > b.string().size();
+            });
+
+            auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
+            cleanup_paths.erase(last, cleanup_paths.end());
+
+            for (const auto& p : cleanup_paths) {
+                if (!fs::exists(p) && !fs::is_symlink(p)) continue;
+
+                std::error_code ec2;
+                bool ok = true;
+
+                if (fs::is_directory(p)) {
+                    // 从里到外删除目录内容
+                    std::vector<fs::path> entries;
+                    for (const auto& entry : fs::recursive_directory_iterator(p, ec2))
+                        if (!ec2) entries.push_back(entry.path());
+                    if (!ec2) {
+                        std::ranges::reverse(entries);
+                        for (const auto& e : entries) {
+                            if (!fs::remove(e, ec2)) ok = false;
+                        }
+                    }
+                    if (!fs::remove(p, ec2)) ok = false;
+                } else {
+                    if (!fs::remove(p, ec2)) ok = false;
+                }
+
+                if (ok) {
+                    wal::log_wal_line("CLEANUP " + p.string());
+                } else {
+                    log_warning(string_format("warning.cleanup_failed", p.string()));
+                }
+            }
+        }
+
+        // WAL: RM_END
+        wal::log_wal_line("RM_END " + pkg_name + " " + ver);
+
+        success.push_back(pkg_name);
+    });
+
+    trim_completed();
+    cleanup_db_backups();
+
+    log_info(string_format("info.package_removed_successfully", pkg_name));
 }
 
-void remove_package_files(const std::string &pkg_name, bool force) {
-  auto &cache = Cache::instance();
-  auto owned_entries = cache.get_package_files(pkg_name);
-  if (owned_entries.empty())
-    return;
+void remove_package_files(const std::string& pkg_name, bool force)
+{
+    auto& cache = Cache::instance();
+    auto owned_entries = cache.get_package_files(pkg_name);
+    if (owned_entries.empty()) return;
 
-  if (!force) {
-    std::vector<std::pair<std::string, std::string>> shared;
-    for (const auto &entry : owned_entries) {
-      if (entry.ends_with('/'))
-        continue;
-      auto owners = cache.get_file_owners(entry);
-      std::string others;
-      for (const auto &owner : owners) {
-        if (owner != pkg_name) {
-          if (!others.empty())
-            others += ", ";
-          others += owner;
+    if (!force) {
+        std::vector<std::pair<std::string, std::string>> shared;
+        for (const auto& entry : owned_entries) {
+            if (entry.ends_with('/')) continue;
+            auto owners = cache.get_file_owners(entry);
+            std::string others;
+            for (const auto& owner : owners) {
+                if (owner != pkg_name) {
+                    if (!others.empty()) others += ", ";
+                    others += owner;
+                }
+            }
+            if (!others.empty()) shared.emplace_back(entry, others);
         }
-      }
-      if (!others.empty())
-        shared.emplace_back(entry, others);
+        if (!shared.empty()) {
+            std::string msg = get_string("error.shared_file_header") + std::string(constants::NL);
+            for (const auto& [file, owners] : shared) {
+                msg += "  " + string_format("error.shared_file_entry", file, owners) +
+                       std::string(constants::NL);
+            }
+            throw LpkgException(msg + get_string("error.removal_aborted"));
+        }
     }
-    if (!shared.empty()) {
-      std::string msg =
-          get_string("error.shared_file_header") + std::string(constants::NL);
-      for (const auto &[file, owners] : shared) {
-        msg += "  " + string_format("error.shared_file_entry", file, owners) +
-               std::string(constants::NL);
-      }
-      throw LpkgException(msg + get_string("error.removal_aborted"));
+
+    std::vector<fs::path> paths;
+    for (const auto& e : owned_entries) paths.emplace_back(e);
+    std::ranges::sort(paths, std::greater<>{});
+
+    int file_count = 0;
+    for (const auto& p : paths) {
+        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+        std::string path_str = p.string();
+        const fs::path phys = p.is_absolute()
+                                  ? Config::instance().root_dir() / fs::path(p).relative_path()
+                                  : Config::instance().root_dir() / p;
+
+        if (path_str.ends_with('/')) {
+            continue;
+        }
+        if (!force && path_str.starts_with(constants::DIR_ETC_PREFIX)) {
+            cache.remove_file_owner(path_str, pkg_name);
+            continue;
+        }
+        {
+            if (fs::exists(phys) || fs::is_symlink(phys)) {
+                std::error_code ec;
+                fs::remove(phys, ec);
+                if (!ec) ++file_count;
+            }
+            cache.remove_file_owner(path_str, pkg_name);
+        }
     }
-  }
 
-  std::vector<fs::path> paths;
-  for (const auto &e : owned_entries)
-    paths.emplace_back(e);
-  std::ranges::sort(paths, std::greater<>{});
-
-  int file_count = 0;
-  for (const auto &p : paths) {
-    if (sigint_graceful.load())
-      throw LpkgException(get_string("info.sigint_aborted"));
-
-    std::string path_str = p.string();
-    const fs::path phys = p.is_absolute() ? Config::instance().root_dir() /
-                                                fs::path(p).relative_path()
-                                          : Config::instance().root_dir() / p;
-
-    if (path_str.ends_with('/')) {
-      continue;
-    } else {
-      if (fs::exists(phys) || fs::is_symlink(phys)) {
-        std::error_code ec;
-        fs::remove(phys, ec);
-        if (!ec)
-          ++file_count;
-      }
-      cache.remove_file_owner(path_str, pkg_name);
+    if (file_count > 0) {
+        log_info(string_format("info.files_removed", file_count));
     }
-  }
 
-  if (file_count > 0) {
-    log_info(string_format("info.files_removed", file_count));
-  }
-
-  for (const auto &cap : cache.get_package_provides(pkg_name)) {
-    cache.remove_provider(cap, pkg_name);
-  }
+    for (const auto& cap : cache.get_package_provides(pkg_name)) {
+        cache.remove_provider(cap, pkg_name);
+    }
 }
 
 /**
  * 自动移除不再被任何包依赖的孤立包
  */
-void autoremove() {
-  log_info(get_string("info.checking_autoremove"));
-  const auto req = detail::get_all_required_packages();
-  std::vector<std::string> to_rem;
-  auto &cache = Cache::instance();
-  {
-    std::lock_guard lock(cache.get_mutex());
-    for (const auto &name : cache.get_all_installed() | std::views::keys) {
-      if (!req.contains(name))
-        to_rem.push_back(name);
+void autoremove()
+{
+    log_info(get_string("info.checking_autoremove"));
+    const auto req = detail::get_all_required_packages();
+    std::vector<std::string> to_rem;
+    auto& cache = Cache::instance();
+    {
+        std::lock_guard lock(cache.get_mutex());
+        for (const auto& name : cache.get_all_installed() | std::views::keys) {
+            if (!req.contains(name)) to_rem.push_back(name);
+        }
     }
-  }
 
-  if (to_rem.empty()) {
-    log_info(get_string("info.no_autoremove_packages"));
-  } else {
-    log_info(string_format("info.autoremove_candidates", to_rem.size()));
-    for (const auto &n : to_rem) {
-      try {
-        remove_package(n, true);
-      } catch (const std::exception &e) {
-        log_warning(
-            string_format("warning.autoremove_remove_failed", n, e.what()));
-      }
+    if (to_rem.empty()) {
+        log_info(get_string("info.no_autoremove_packages"));
+    } else {
+        log_info(string_format("info.autoremove_candidates", to_rem.size()));
+        for (const auto& n : to_rem) {
+            try {
+                remove_package(n, true);
+            } catch (const std::exception& e) {
+                log_warning(string_format("warning.autoremove_remove_failed", n, e.what()));
+            }
+        }
+        log_info(string_format("info.autoremove_complete", to_rem.size()));
     }
-    log_info(string_format("info.autoremove_complete", to_rem.size()));
-  }
 }
 
 /**
@@ -701,626 +648,584 @@ void autoremove() {
  * 和安装流程共享依赖解析机制（resolve_package_dependencies），
  * 确保新版本引入的新依赖被正确解析并安装。
  */
-void upgrade_packages() {
-  log_info(get_string("info.checking_upgradable"));
-  TmpDirManager tmp;
-  Repository repo;
-  try {
-    repo.load_index();
-  } catch (const std::exception &e) {
-    log_warning(string_format("warning.repo_index_load_failed", e.what()));
-    return;
-  }
-
-  // 快照已安装包列表
-  std::vector<std::pair<std::string, std::string>> installed;
-  {
-    std::lock_guard lock(Cache::instance().get_mutex());
-    for (const auto &[name, ver] : Cache::instance().get_all_installed()) {
-      installed.emplace_back(name, ver);
+void upgrade_packages()
+{
+    log_info(get_string("info.checking_upgradable"));
+    TmpDirManager tmp;
+    Repository repo;
+    try {
+        repo.load_index();
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.repo_index_load_failed", e.what()));
+        return;
     }
-  }
 
-  // 找出可升级的包，构造升级目标列表
-  // 需要先收集完毕再统一解析，避免在遍历 installed 时修改 plan
-  std::vector<std::pair<std::string, std::string>> upgrade_targets;
-  for (const auto &[n, curr] : installed) {
-    if (sigint_graceful.load()) {
-      log_info(get_string("info.sigint_aborted"));
-      return;
+    // 快照已安装包列表
+    std::vector<std::pair<std::string, std::string>> installed;
+    {
+        std::lock_guard lock(Cache::instance().get_mutex());
+        for (const auto& [name, ver] : Cache::instance().get_all_installed()) {
+            installed.emplace_back(name, ver);
+        }
     }
-    auto opt = repo.find_package(n);
-    if (!opt)
-      continue;
-    if (!version_compare(curr, opt->version))
-      continue;
-    upgrade_targets.emplace_back(n, std::string(constants::VER_LATEST));
-  }
 
-  if (upgrade_targets.empty()) {
-    log_info(get_string("info.all_packages_latest"));
-    return;
-  }
-
-  // ── 依赖解析（和 install_packages 使用同一套机制） ──────────────
-  std::map<std::string, InstallPlan> plan;
-  std::vector<std::string> order;
-  std::map<std::string, fs::path> local_candidates;
-  InstallContext ctx{repo,          plan,
-                     order,         local_candidates,
-                     upgrade_targets,
-                     /*force_reinstall=*/false,
-                     /*top_level=*/true,
-                     {}};
-
-  for (const auto &[n, v] : upgrade_targets) {
-    std::set<std::string> vs;
-    detail::resolve_package_dependencies(n, v, true, ctx, vs);
-  }
-
-  if (plan.empty()) {
-    log_info(get_string("info.all_packages_latest"));
-    return;
-  }
-
-  // ── 一致性检查 ──────────────────────────────────────────────────
-  detail::check_forward_soname_integrity(plan, repo);
-
-  if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
-    log_error(get_string("error.dependency_conflict_title"));
-    std::string msg;
-    for (const auto &p : broken)
-      msg += "  " + p + "\n";
-    log_error(msg);
-    throw LpkgException(msg);
-  }
-
-  if (auto nso_broken = detail::check_needed_so_consistency(plan);
-      !nso_broken.empty()) {
-    log_error(get_string("error.dependency_conflict_title"));
-    std::string msg;
-    for (const auto &p : nso_broken)
-      msg += "  " + p + "\n";
-    log_error(msg);
-    throw LpkgException(msg);
-  }
-
-  // ── 用户确认 ────────────────────────────────────────────────────
-  std::string prompt;
-  for (const auto &n : order) {
-    const auto &p = plan.at(n);
-    const std::string old_ver = Cache::instance().get_installed_version(n);
-    if (!old_ver.empty()) {
-      if (old_ver != p.actual_version) {
-        // 已有旧版本且版本不同 → 升级
-        prompt +=
-            "  " + n + " " + old_ver + " \xe2\x86\x92 " + p.actual_version +
-            "\n";
-      } else {
-        // 已是最新版本（可能是其他依赖引入的已满足依赖）→ 不显示
-        continue;
-      }
-    } else {
-      // 新增的依赖
-      prompt += "  " +
-                string_format(p.is_explicit ? "info.package_list_item"
-                                            : "info.package_list_item_dep",
-                              p.name, p.actual_version) +
-                "\n";
+    // 找出可升级的包，构造升级目标列表
+    // 需要先收集完毕再统一解析，避免在遍历 installed 时修改 plan
+    std::vector<std::pair<std::string, std::string>> upgrade_targets;
+    for (const auto& [n, curr] : installed) {
+        if (sigint_graceful.load()) {
+            log_info(get_string("info.sigint_aborted"));
+            return;
+        }
+        auto opt = repo.find_package(n);
+        if (!opt) continue;
+        if (!version_compare(curr, opt->version)) continue;
+        upgrade_targets.emplace_back(n, std::string(constants::VER_LATEST));
     }
-  }
-  if (!user_confirms(prompt + get_string("info.confirm_proceed"))) {
-    log_info(get_string("info.installation_aborted"));
-    return;
-  }
 
-  // ── 执行升级（WAL 2.0 批量事务） ────────────────────────────────
-  // 处理顺序由 resolve_package_dependencies 产生的 order 决定
-  // （依赖先处理），确保新依赖在依赖者之前安装
-  ctx.successfully_installed.clear();
-  ctx.installed_set.clear();
+    if (upgrade_targets.empty()) {
+        log_info(get_string("info.all_packages_latest"));
+        return;
+    }
 
-  std::vector<std::pair<fs::path, fs::path>> upgrade_backups;
-  size_t upgraded_count = 0;
-  run_batch_transaction(order.size(), [&](wal::WalWriter & /*w*/,
-                                          std::vector<std::string> &success) {
-    auto &cache = Cache::instance();
+    // ── 依赖解析（和 install_packages 使用同一套机制） ──────────────
+    std::map<std::string, InstallPlan> plan;
+    std::vector<std::string> order;
+    std::map<std::string, fs::path> local_candidates;
+    InstallContext ctx{repo,
+                       plan,
+                       order,
+                       local_candidates,
+                       upgrade_targets,
+                       /*force_reinstall=*/false,
+                       /*top_level=*/true,
+                       {}};
 
-    size_t i = 0;
-    while (i < order.size()) {
-      if (sigint_graceful.load())
-        throw LpkgException(get_string("info.sigint_aborted"));
+    for (const auto& [n, v] : upgrade_targets) {
+        std::set<std::string> vs;
+        detail::resolve_package_dependencies(n, v, true, ctx, vs);
+    }
 
-      const std::string &n = order[i];
-      ++i;
+    if (plan.empty()) {
+        log_info(get_string("info.all_packages_latest"));
+        return;
+    }
 
-      if (ctx.installed_set.contains(n))
-        continue;
+    // ── 一致性检查 ──────────────────────────────────────────────────
+    detail::check_forward_soname_integrity(plan, repo);
 
-      auto &p = plan.at(n);
-      const std::string old_ver = cache.get_installed_version(n);
+    if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
+        log_error(get_string("error.dependency_conflict_title"));
+        std::string msg;
+        for (const auto& p : broken) msg += "  " + p + "\n";
+        log_error(msg);
+        throw LpkgException(msg);
+    }
 
-      // 跳过已是最新版本的包（如依赖已满足的情况）
-      if (!p.force_reinstall && !old_ver.empty() &&
-          old_ver == p.actual_version) {
-        ctx.installed_set.insert(n);
-        continue;
-      }
+    if (auto nso_broken = detail::check_needed_so_consistency(plan); !nso_broken.empty()) {
+        log_error(get_string("error.dependency_conflict_title"));
+        std::string msg;
+        for (const auto& p : nso_broken) msg += "  " + p + "\n";
+        log_error(msg);
+        throw LpkgException(msg);
+    }
 
-      // ── 元数据验证：下载后比对真实 metadata 和索引是否一致 ──
-      // （和 install_packages 中的逻辑一致）
-      if (!p.metadata_verified) {
-        InstallationTask check_task(
-            p.name, p.actual_version, p.is_explicit,
-            cache.get_installed_version(p.name), p.local_path, p.sha256,
-            p.force_reinstall);
-        ensure_dir_exists(check_task.tmp_pkg_dir());
-        check_task.download_and_verify_package();
-
-        json meta = detail::read_archive_metadata(check_task.archive_path());
-        std::vector<std::string> dep_strs = meta.value(
-            std::string(constants::J_DEPS), std::vector<std::string>{});
-        auto actual_deps = detail::parse_dep_strings(dep_strs);
-        std::vector<std::string> actual_provides = meta.value(
-            std::string(constants::J_PROVIDES), std::vector<std::string>{});
-        std::vector<std::string> actual_needed_so = meta.value(
-            std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
-
-        bool metadata_differs =
-            (actual_deps.size() != p.dependencies.size()) ||
-            (actual_provides != p.provides) ||
-            (actual_needed_so != p.needed_so);
-        if (!metadata_differs) {
-          for (size_t di = 0; di < actual_deps.size(); ++di) {
-            if (actual_deps[di].name != p.dependencies[di].name ||
-                actual_deps[di].constraints !=
-                    p.dependencies[di].constraints) {
-              metadata_differs = true;
-              break;
+    // ── 用户确认 ────────────────────────────────────────────────────
+    std::string prompt;
+    for (const auto& n : order) {
+        const auto& p = plan.at(n);
+        const std::string old_ver = Cache::instance().get_installed_version(n);
+        if (!old_ver.empty()) {
+            if (old_ver != p.actual_version) {
+                // 已有旧版本且版本不同 → 升级
+                prompt += "  " + n + " " + old_ver + " \xe2\x86\x92 " + p.actual_version + "\n";
+            } else {
+                // 已是最新版本（可能是其他依赖引入的已满足依赖）→ 不显示
+                continue;
             }
-          }
+        } else {
+            // 新增的依赖
+            prompt += "  " +
+                      string_format(
+                          p.is_explicit ? "info.package_list_item" : "info.package_list_item_dep",
+                          p.name, p.actual_version) +
+                      "\n";
         }
-
-        if (metadata_differs) {
-          log_info(string_format("info.resolving_metadata", p.name));
-          ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
-                                       actual_provides, actual_needed_so);
-          ctx.local_candidates[p.name] = check_task.archive_path();
-
-          ctx.plan.clear();
-          ctx.install_order.clear();
-          for (const auto &[tn, tv] : ctx.targets) {
-            std::set<std::string> vs;
-            detail::resolve_package_dependencies(tn, tv, true, ctx, vs);
-          }
-          i = 0;
-          continue;
-        }
-
-        p.local_path = check_task.archive_path();
-        p.metadata_verified = true;
-      }
-
-      // 确定 hold 标志：保留当前 hold 状态，新增依赖不 hold
-      const bool hold_pkg = cache.is_held(n);
-
-      if (!old_ver.empty()) {
-        log_info(string_format("info.upgrading_package", n, old_ver,
-                               p.actual_version));
-      } else {
-        log_info(string_format("info.installing_package", n, p.actual_version));
-      }
-
-      InstallationTask task(p.name, p.actual_version, hold_pkg, old_ver,
-                            p.local_path, p.sha256, p.force_reinstall);
-      task.run(&ctx);
-
-      for (const auto &b : task.get_backups())
-        upgrade_backups.emplace_back(b);
-
-      cache.write(n + ":installed");
-      success.push_back(n);
-      ctx.installed_set.insert(n);
-      if (!old_ver.empty())
-        ++upgraded_count;
     }
-  });
+    if (!user_confirms(prompt + get_string("info.confirm_proceed"))) {
+        log_info(get_string("info.installation_aborted"));
+        return;
+    }
 
-  for (const auto &[orig, bak] : upgrade_backups) {
-    std::error_code ec;
-    fs::remove(bak, ec);
-  }
+    // ── 执行升级（WAL 2.0 批量事务） ────────────────────────────────
+    // 处理顺序由 resolve_package_dependencies 产生的 order 决定
+    // （依赖先处理），确保新依赖在依赖者之前安装
+    ctx.successfully_installed.clear();
+    ctx.installed_set.clear();
 
-  trim_completed();
-  cleanup_db_backups();
+    std::vector<std::pair<fs::path, fs::path>> upgrade_backups;
+    size_t upgraded_count = 0;
+    run_batch_transaction(
+        order.size(), [&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
+            auto& cache = Cache::instance();
 
-  log_info(string_format("info.upgraded_packages", upgraded_count));
+            size_t i = 0;
+            while (i < order.size()) {
+                if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+                const std::string& n = order[i];
+                ++i;
+
+                if (ctx.installed_set.contains(n)) continue;
+
+                auto& p = plan.at(n);
+                const std::string old_ver = cache.get_installed_version(n);
+
+                // 跳过已是最新版本的包（如依赖已满足的情况）
+                if (!p.force_reinstall && !old_ver.empty() && old_ver == p.actual_version) {
+                    ctx.installed_set.insert(n);
+                    continue;
+                }
+
+                // ── 元数据验证：下载后比对真实 metadata 和索引是否一致 ──
+                // （和 install_packages 中的逻辑一致）
+                if (!p.metadata_verified) {
+                    InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
+                                                cache.get_installed_version(p.name), p.local_path,
+                                                p.sha256, p.force_reinstall);
+                    ensure_dir_exists(check_task.tmp_pkg_dir());
+                    check_task.download_and_verify_package();
+
+                    json meta = detail::read_archive_metadata(check_task.archive_path());
+                    std::vector<std::string> dep_strs =
+                        meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
+                    auto actual_deps = detail::parse_dep_strings(dep_strs);
+                    std::vector<std::string> actual_provides =
+                        meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+                    std::vector<std::string> actual_needed_so =
+                        meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+
+                    bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
+                                            (actual_provides != p.provides) ||
+                                            (actual_needed_so != p.needed_so);
+                    if (!metadata_differs) {
+                        for (size_t di = 0; di < actual_deps.size(); ++di) {
+                            if (actual_deps[di].name != p.dependencies[di].name ||
+                                actual_deps[di].constraints != p.dependencies[di].constraints) {
+                                metadata_differs = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (metadata_differs) {
+                        log_info(string_format("info.resolving_metadata", p.name));
+                        ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
+                                                     actual_provides, actual_needed_so);
+                        ctx.local_candidates[p.name] = check_task.archive_path();
+
+                        ctx.plan.clear();
+                        ctx.install_order.clear();
+                        for (const auto& [tn, tv] : ctx.targets) {
+                            std::set<std::string> vs;
+                            detail::resolve_package_dependencies(tn, tv, true, ctx, vs);
+                        }
+                        i = 0;
+                        continue;
+                    }
+
+                    p.local_path = check_task.archive_path();
+                    p.metadata_verified = true;
+                }
+
+                // 确定 hold 标志：保留当前 hold 状态，新增依赖不 hold
+                const bool hold_pkg = cache.is_held(n);
+
+                if (!old_ver.empty()) {
+                    log_info(string_format("info.upgrading_package", n, old_ver, p.actual_version));
+                } else {
+                    log_info(string_format("info.installing_package", n, p.actual_version));
+                }
+
+                InstallationTask task(p.name, p.actual_version, hold_pkg, old_ver, p.local_path,
+                                      p.sha256, p.force_reinstall);
+                task.run(&ctx);
+
+                for (const auto& b : task.get_backups()) upgrade_backups.emplace_back(b);
+
+                cache.write(n + ":installed");
+                success.push_back(n);
+                ctx.installed_set.insert(n);
+                if (!old_ver.empty()) ++upgraded_count;
+            }
+        });
+
+    for (const auto& [orig, bak] : upgrade_backups) {
+        std::error_code ec;
+        fs::remove(bak, ec);
+    }
+
+    trim_completed();
+    cleanup_db_backups();
+
+    log_info(string_format("info.upgraded_packages", upgraded_count));
 }
 
 /** 显示包的 man 页面内容 */
-void show_man_page(const std::string &pkg_name) {
-  const fs::path p = Config::instance().docs_dir() / (pkg_name + ".man");
-  if (!fs::exists(p))
-    throw LpkgException(string_format("error.no_man_page", pkg_name));
-  std::ifstream f(p);
-  if (!f.is_open())
-    throw LpkgException(
-        string_format("error.open_man_page_failed", p.string()));
-  std::cout << f.rdbuf();
+void show_man_page(const std::string& pkg_name)
+{
+    const fs::path p = Config::instance().docs_dir() / (pkg_name + ".man");
+    if (!fs::exists(p)) throw LpkgException(string_format("error.no_man_page", pkg_name));
+    std::ifstream f(p);
+    if (!f.is_open()) throw LpkgException(string_format("error.open_man_page_failed", p.string()));
+    std::cout << f.rdbuf();
 }
 
 /**
  * 重新安装一个包
  */
-void reinstall_package(const std::string &arg) {
-  std::string name = arg;
-  if (arg.find('/') != std::string::npos || arg.ends_with(".lpkg")) {
-    try {
-      json meta = detail::read_archive_metadata(fs::absolute(arg));
-      name = meta.at(std::string(constants::J_NAME)).get<std::string>();
-    } catch (const std::exception &e) {
-      log_warning(string_format("warning.reinstall_metadata_read_failed", arg,
-                                e.what()));
+void reinstall_package(const std::string& arg)
+{
+    std::string name = arg;
+    if (arg.find('/') != std::string::npos || arg.ends_with(".lpkg")) {
+        try {
+            json meta = detail::read_archive_metadata(fs::absolute(arg));
+            name = meta.at(std::string(constants::J_NAME)).get<std::string>();
+        } catch (const std::exception& e) {
+            log_warning(string_format("warning.reinstall_metadata_read_failed", arg, e.what()));
+        }
     }
-  }
 
-  if (Cache::instance().get_installed_version(name).empty()) {
-    install_packages({arg});
-    return;
-  }
+    if (Cache::instance().get_installed_version(name).empty()) {
+        install_packages({arg});
+        return;
+    }
 
-  log_info(string_format("info.reinstalling_package", name));
-  const bool old_ovr = Config::instance().force_overwrite_mode();
-  Config::instance().set_force_overwrite_mode(true);
-  try {
+    log_info(string_format("info.reinstalling_package", name));
     install_packages({arg}, "", true);
-  } catch (...) {
-    Config::instance().set_force_overwrite_mode(old_ovr);
-    throw;
-  }
-  Config::instance().set_force_overwrite_mode(old_ovr);
 }
 
 /** 查询指定包安装的所有文件列表 */
-void query_package(const std::string &pkg_name) {
-  if (Cache::instance().get_installed_version(pkg_name).empty()) {
-    log_info(string_format("info.package_not_installed", pkg_name));
-    return;
-  }
-  log_info(string_format("info.package_files", pkg_name));
-  auto files = Cache::instance().get_package_files(pkg_name);
-  for (const auto &f : files) {
-    std::cout << "  " << f << "\n";
-  }
+void query_package(const std::string& pkg_name)
+{
+    if (Cache::instance().get_installed_version(pkg_name).empty()) {
+        log_info(string_format("info.package_not_installed", pkg_name));
+        return;
+    }
+    log_info(string_format("info.package_files", pkg_name));
+    auto files = Cache::instance().get_package_files(pkg_name);
+    for (const auto& f : files) {
+        std::cout << "  " << f << "\n";
+    }
 }
 
 /** 查询指定文件属于哪个包 */
-void query_file(const std::string &filename) {
-  auto &cache = Cache::instance();
-  std::string target = filename;
-  auto owners = cache.get_file_owners(target);
+void query_file(const std::string& filename)
+{
+    auto& cache = Cache::instance();
+    std::string target = filename;
+    auto owners = cache.get_file_owners(target);
 
-  if (owners.empty()) {
-    try {
-      const fs::path abs_p = fs::absolute(filename);
-      if (abs_p.string().starts_with(Config::instance().root_dir().string())) {
-        const std::string logical =
-            "/" + fs::relative(abs_p, Config::instance().root_dir()).string();
-        owners = cache.get_file_owners(logical);
-        if (!owners.empty())
-          target = logical;
-      }
-    } catch (const std::exception &e) {
-      log_warning(string_format("warning.query_path_resolve_failed", filename) +
-                  ": " + e.what());
+    if (owners.empty()) {
+        try {
+            const fs::path p(filename);
+            if (!fs::is_symlink(p)) {
+                const fs::path abs_p = fs::absolute(p);
+                if (abs_p.string().starts_with(Config::instance().root_dir().string())) {
+                    const std::string logical =
+                        "/" + fs::relative(abs_p, Config::instance().root_dir()).string();
+                    owners = cache.get_file_owners(logical);
+                    if (!owners.empty()) target = logical;
+                }
+            }
+        } catch (const std::exception& e) {
+            log_warning(string_format("warning.query_path_resolve_failed", filename) + ": " +
+                        e.what());
+        }
     }
-  }
 
-  if (owners.empty() && !fs::path(filename).is_absolute()) {
-    const std::string fallback = (fs::path("/") / filename).string();
-    owners = cache.get_file_owners(fallback);
-    if (!owners.empty())
-      target = fallback;
-  }
-
-  if (owners.empty()) {
-    log_info(string_format("info.file_not_owned", filename));
-  } else {
-    std::string os;
-    for (auto it = owners.begin(); it != owners.end(); ++it) {
-      os += *it + (std::next(it) == owners.end() ? "" : ", ");
+    if (owners.empty() && !fs::path(filename).is_absolute()) {
+        const std::string fallback = (fs::path("/") / filename).string();
+        owners = cache.get_file_owners(fallback);
+        if (!owners.empty()) target = fallback;
     }
-    log_info(string_format("info.file_owned_by", target, os));
-  }
+
+    if (owners.empty()) {
+        log_info(string_format("info.file_not_owned", filename));
+    } else {
+        std::string os;
+        for (auto it = owners.begin(); it != owners.end(); ++it) {
+            os += *it + (std::next(it) == owners.end() ? "" : ", ");
+        }
+        log_info(string_format("info.file_owned_by", target, os));
+    }
 }
 
 // =====================================================================
 // 递归移除
 // =====================================================================
 
-namespace {
+namespace
+{
 
 /** 生成 N 位随机大写字母数字验证码 */
-std::string generate_code(size_t len = 6) {
-  static const char chars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  std::random_device rd;
-  std::string code;
-  for (size_t i = 0; i < len; ++i)
-    code += chars[rd() % (sizeof(chars) - 1)];
-  return code;
+std::string generate_code(size_t len = 6)
+{
+    static const char chars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    std::random_device rd;
+    std::string code;
+    for (size_t i = 0; i < len; ++i) code += chars[rd() % (sizeof(chars) - 1)];
+    return code;
 }
 
 /** 获取某包及其传递反向依赖的集合 */
-std::unordered_set<std::string>
-collect_recursive_remove_set(const std::string &pkg_name) {
-  std::unordered_set<std::string> result;
-  std::unordered_set<std::string> visited;
-  std::vector<std::string> queue = {pkg_name};
+std::unordered_set<std::string> collect_recursive_remove_set(const std::string& pkg_name)
+{
+    std::unordered_set<std::string> result;
+    std::unordered_set<std::string> visited;
+    std::vector<std::string> queue = {pkg_name};
 
-  while (!queue.empty()) {
-    auto current = std::move(queue.back());
-    queue.pop_back();
-    if (!visited.insert(current).second)
-      continue;
-    result.insert(current);
+    while (!queue.empty()) {
+        auto current = std::move(queue.back());
+        queue.pop_back();
+        if (!visited.insert(current).second) continue;
+        result.insert(current);
 
-    auto rdeps = Cache::instance().get_reverse_deps(current);
-    for (const auto &cap : Cache::instance().get_package_provides(current)) {
-      auto cap_rdeps = Cache::instance().get_reverse_deps(cap);
-      rdeps.insert(cap_rdeps.begin(), cap_rdeps.end());
+        auto rdeps = Cache::instance().get_reverse_deps(current);
+        for (const auto& cap : Cache::instance().get_package_provides(current)) {
+            auto cap_rdeps = Cache::instance().get_reverse_deps(cap);
+            rdeps.insert(cap_rdeps.begin(), cap_rdeps.end());
+        }
+        for (const auto& rdep : rdeps) {
+            if (rdep != current && !visited.contains(rdep)) queue.push_back(rdep);
+        }
     }
-    for (const auto &rdep : rdeps) {
-      if (rdep != current && !visited.contains(rdep))
-        queue.push_back(rdep);
-    }
-  }
-  return result;
+    return result;
 }
 
-} // anonymous namespace
+}  // anonymous namespace
 
 /**
  * 递归移除包及其所有受影响的依赖者。
  */
-void remove_package_recursive(const std::string &pkg_name, bool force) {
-  if (sigint_graceful.load())
-    throw LpkgException(get_string("info.sigint_aborted"));
-  Cache::instance().load();
-  log_info(string_format("info.recursive_remove_start", pkg_name));
+void remove_package_recursive(const std::string& pkg_name, bool force)
+{
+    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+    Cache::instance().load();
+    log_info(string_format("info.recursive_remove_start", pkg_name));
 
-  const std::string ver = Cache::instance().get_installed_version(pkg_name);
-  if (ver.empty()) {
-    log_info(string_format("info.package_not_installed", pkg_name));
-    return;
-  }
-
-  auto affected = collect_recursive_remove_set(pkg_name);
-  if (affected.empty())
-    return;
-
-  if (!force && Cache::instance().is_essential(pkg_name)) {
-    log_error(string_format("error.skip_remove_essential", pkg_name));
-    return;
-  }
-
-  std::vector<std::string> to_remove;
-  std::vector<std::string> essential_pkgs;
-  for (const auto &p : affected) {
-    if (!force && Cache::instance().is_essential(p)) {
-      essential_pkgs.push_back(p);
-      continue;
+    const std::string ver = Cache::instance().get_installed_version(pkg_name);
+    if (ver.empty()) {
+        log_info(string_format("info.package_not_installed", pkg_name));
+        return;
     }
-    to_remove.push_back(p);
-  }
 
-  if (to_remove.empty()) {
-    log_info(get_string("info.recursive_nothing_to_remove"));
-    return;
-  }
+    auto affected = collect_recursive_remove_set(pkg_name);
+    if (affected.empty()) return;
 
-  if (!essential_pkgs.empty()) {
-    std::string msg = get_string("info.recursive_protected_header") + "\n";
-    for (const auto &p : essential_pkgs)
-      msg += "  " + p + "\n";
-    log_warning(msg);
-  }
-
-  log_info(get_string("info.recursive_remove_header"));
-  for (const auto &p : to_remove)
-    log_info(string_format("info.recursive_remove_item", p));
-
-  // 按反向依赖数量升序排列（叶子先删）
-  std::ranges::sort(to_remove, [](const std::string &a, const std::string &b) {
-    return Cache::instance().get_reverse_deps(a).size() <
-           Cache::instance().get_reverse_deps(b).size();
-  });
-
-  // 3 轮验证码确认
-  bool confirmed = true;
-  if (Config::instance().non_interactive_mode() ==
-      NonInteractiveMode::INTERACTIVE) {
-    for (int i = 0; i < 3; ++i) {
-      std::string code = generate_code();
-      log_info(string_format("info.recursive_confirm_prompt",
-                             std::to_string(i + 1), code));
-      std::string input;
-      std::cin >> input;
-      if (input != code) {
-        log_info(get_string("info.recursive_confirm_failed"));
-        confirmed = false;
-        break;
-      }
+    if (!force && Cache::instance().is_essential(pkg_name)) {
+        log_error(string_format("error.skip_remove_essential", pkg_name));
+        return;
     }
-  }
-  if (!confirmed) {
-    log_info(get_string("info.installation_aborted"));
-    return;
-  }
 
-  // WAL 2.0: 整批原子移除
-  // 目录通过 BACKUP WAL 原子化移除，.lpkg_bak 通过 CLEANUP WAL 在事务内清理
-  run_batch_transaction(
-      to_remove.size(), [&](wal::WalWriter & /*w*/,
-                            std::vector<std::string> &success) {
-        auto &cache = Cache::instance();
+    std::vector<std::string> to_remove;
+    std::vector<std::string> essential_pkgs;
+    for (const auto& p : affected) {
+        if (!force && Cache::instance().is_essential(p)) {
+            essential_pkgs.push_back(p);
+            continue;
+        }
+        to_remove.push_back(p);
+    }
+
+    if (to_remove.empty()) {
+        log_info(get_string("info.recursive_nothing_to_remove"));
+        return;
+    }
+
+    if (!essential_pkgs.empty()) {
+        std::string msg = get_string("info.recursive_protected_header") + "\n";
+        for (const auto& p : essential_pkgs) msg += "  " + p + "\n";
+        log_warning(msg);
+    }
+
+    log_info(get_string("info.recursive_remove_header"));
+    for (const auto& p : to_remove) log_info(string_format("info.recursive_remove_item", p));
+
+    // 按反向依赖数量升序排列（叶子先删）
+    std::ranges::sort(to_remove, [](const std::string& a, const std::string& b) {
+        return Cache::instance().get_reverse_deps(a).size() <
+               Cache::instance().get_reverse_deps(b).size();
+    });
+
+    // 3 轮验证码确认
+    bool confirmed = true;
+    if (Config::instance().non_interactive_mode() == NonInteractiveMode::INTERACTIVE) {
+        for (int i = 0; i < 3; ++i) {
+            std::string code = generate_code();
+            log_info(string_format("info.recursive_confirm_prompt", std::to_string(i + 1), code));
+            std::string input;
+            std::cin >> input;
+            if (input != code) {
+                log_info(get_string("info.recursive_confirm_failed"));
+                confirmed = false;
+                break;
+            }
+        }
+    }
+    if (!confirmed) {
+        log_info(get_string("info.installation_aborted"));
+        return;
+    }
+
+    // WAL 2.0: 整批原子移除
+    // 目录通过 BACKUP WAL 原子化移除，.lpkg_bak 通过 CLEANUP WAL 在事务内清理
+    run_batch_transaction(to_remove.size(), [&](wal::WalWriter& /*w*/,
+                                                std::vector<std::string>& success) {
+        auto& cache = Cache::instance();
         std::vector<std::pair<fs::path, fs::path>> all_backups;
 
-        for (const auto &p : to_remove) {
-          log_info(string_format("info.recursive_removing", p));
+        for (const auto& p : to_remove) {
+            log_info(string_format("info.recursive_removing", p));
 
-          if (sigint_graceful.load())
-            throw LpkgException(get_string("info.sigint_aborted"));
+            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
-          std::string ver = cache.get_installed_version(p);
-          detail::run_hook(p, std::string(constants::PRERM_SH));
-          wal::log_wal_line("RM_BEGIN " + p + " " + ver);
+            std::string ver = cache.get_installed_version(p);
+            detail::run_hook(p, std::string(constants::PRERM_SH));
+            wal::log_wal_line("RM_BEGIN " + p + " " + ver);
 
-          auto owned = cache.get_package_files(p);
-          std::vector<std::pair<fs::path, fs::path>> backups;
+            auto owned = cache.get_package_files(p);
+            std::vector<std::pair<fs::path, fs::path>> backups;
 
-          for (const auto &e : owned) {
-            if (e.ends_with('/')) continue;
-            const fs::path phys =
-                fs::path(e).is_absolute()
-                    ? Config::instance().root_dir() / fs::path(e).relative_path()
-                    : Config::instance().root_dir() / e;
-            if (fs::exists(phys) || fs::is_symlink(phys)) {
-              fs::path bak = unique_bak_path(phys, p);
-              wal::log_wal_line("BACKUP " + phys.string() +
-                                " \xe2\x86\x92 " + bak.string());
-              BreakpointManager::instance().hit("rm_backup_after_wal_" + p);
-              safe_rename(phys, bak);
-              backups.emplace_back(phys, bak);
+            for (const auto& e : owned) {
+                if (e.ends_with('/')) continue;
+                const fs::path phys = fs::path(e).is_absolute() ? Config::instance().root_dir() /
+                                                                      fs::path(e).relative_path()
+                                                                : Config::instance().root_dir() / e;
+                if (fs::exists(phys) || fs::is_symlink(phys)) {
+                    fs::path bak = unique_bak_path(phys, p);
+                    wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
+                    BreakpointManager::instance().hit("rm_backup_after_wal_" + p);
+                    safe_rename(phys, bak);
+                    backups.emplace_back(phys, bak);
+                }
             }
-          }
 
-          remove_package_files(p, true);
+            remove_package_files(p, true);
 
-          // 目录 BACKUP（仅最后持有者 + 安全检查）
-          for (const auto &e : owned) {
-            if (!e.ends_with('/')) continue;
-            cache.remove_file_owner(e, p);
-            if (!cache.get_file_owners(e).empty())
-              continue;
+            // 目录 BACKUP（仅最后持有者 + 安全检查）
+            for (const auto& e : owned) {
+                if (!e.ends_with('/')) continue;
+                cache.remove_file_owner(e, p);
+                if (!cache.get_file_owners(e).empty()) continue;
 
-            const fs::path phys =
-                fs::path(e).is_absolute()
-                    ? Config::instance().root_dir() / fs::path(e).relative_path()
-                    : Config::instance().root_dir() / e;
-            if (!fs::exists(phys) || !fs::is_directory(phys))
-              continue;
+                const fs::path phys = fs::path(e).is_absolute() ? Config::instance().root_dir() /
+                                                                      fs::path(e).relative_path()
+                                                                : Config::instance().root_dir() / e;
+                if (!fs::exists(phys) || !fs::is_directory(phys)) continue;
 
-            // 安全检查：目录中只能有本包的 .lpkg_bak 文件
-            bool can_backup = true;
-            std::error_code ec2;
-            for (const auto &entry : fs::directory_iterator(phys, ec2)) {
-              auto fname = entry.path().filename().string();
-              if (fname.find(std::string(constants::SUFFIX_LPKG_BAK) + p +
-                             "_") != std::string::npos)
-                continue;
-              can_backup = false;
-              break;
+                // 安全检查：目录中只能有本包的 .lpkg_bak 文件
+                bool can_backup = true;
+                std::error_code ec2;
+                for (const auto& entry : fs::directory_iterator(phys, ec2)) {
+                    auto fname = entry.path().filename().string();
+                    if (fname.find(std::string(constants::SUFFIX_LPKG_BAK) + p + "_") !=
+                        std::string::npos)
+                        continue;
+                    can_backup = false;
+                    break;
+                }
+                if (!can_backup) continue;
+
+                fs::path bak = unique_bak_path(phys, p);
+                wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
+                safe_rename(phys, bak);
+                backups.emplace_back(phys, bak);
             }
-            if (!can_backup)
-              continue;
 
-            fs::path bak = unique_bak_path(phys, p);
-            wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " +
-                              bak.string());
-            safe_rename(phys, bak);
-            backups.emplace_back(phys, bak);
-          }
-
-          // DBRM 清理（与单包 remove_package 相同）
-          {
-            auto cleanup_dbr = [&](const fs::path &fp, const std::string &) {
-              if (fs::exists(fp)) {
-                wal::log_wal_line("DBRM " + fp.string() + " " + p +
-                                  ":removed");
-                safe_rename(fp, fs::path(fp.string() + ".lpkg_db_bak_before:" + p +
-                                                  ":removed"));
-              }
-            };
-            const fs::path df = Config::instance().dep_dir() / p;
-            if (fs::exists(df)) {
-              std::ifstream fi(df);
-              std::string l;
-              while (std::getline(fi, l)) {
-                std::stringstream ss(l);
-                std::string dn;
-                if (ss >> dn)
-                  cache.remove_reverse_dep(dn, p);
-              }
+            // DBRM 清理（与单包 remove_package 相同）
+            {
+                auto cleanup_dbr = [&](const fs::path& fp, const std::string&) {
+                    if (fs::exists(fp)) {
+                        wal::log_wal_line("DBRM " + fp.string() + " " + p + ":removed");
+                        safe_rename(
+                            fp, fs::path(fp.string() + ".lpkg_db_bak_before:" + p + ":removed"));
+                    }
+                };
+                const fs::path df = Config::instance().dep_dir() / p;
+                if (fs::exists(df)) {
+                    std::ifstream fi(df);
+                    std::string l;
+                    while (std::getline(fi, l)) {
+                        std::stringstream ss(l);
+                        std::string dn;
+                        if (ss >> dn) cache.remove_reverse_dep(dn, p);
+                    }
+                }
+                cleanup_dbr(df, "dep");
+                cleanup_dbr(Config::instance().needed_so_dir() / p, "needed_so");
+                cleanup_dbr(
+                    Config::instance().docs_dir() / (p + std::string(constants::SUFFIX_MAN)),
+                    "man");
+                std::error_code ec;
+                fs::remove_all(Config::instance().hooks_dir() / p, ec);
             }
-            cleanup_dbr(df, "dep");
-            cleanup_dbr(Config::instance().needed_so_dir() / p, "needed_so");
-            cleanup_dbr(Config::instance().docs_dir() /
-                (p + std::string(constants::SUFFIX_MAN)), "man");
-            std::error_code ec;
-            fs::remove_all(Config::instance().hooks_dir() / p, ec);
-          }
 
-          wal::log_wal_line("RM_COMMIT " + p + " " + ver);
-          cache.remove_installed(p);
+            wal::log_wal_line("RM_COMMIT " + p + " " + ver);
+            cache.remove_installed(p);
 
-          for (const auto &b : backups)
-            all_backups.emplace_back(b);
+            for (const auto& b : backups) all_backups.emplace_back(b);
 
-          wal::log_wal_line("RM_END " + p + " " + ver);
-          cache.write(p + ":removed");
-          success.push_back(p);
+            wal::log_wal_line("RM_END " + p + " " + ver);
+            cache.write(p + ":removed");
+            success.push_back(p);
         }
 
         // ── CLEANUP 阶段（不可回滚）：所有包已提交，清理 .lpkg_bak ──
         if (!all_backups.empty()) {
-          std::vector<fs::path> cleanup_paths;
-          for (const auto &[orig, bak] : all_backups)
-            cleanup_paths.push_back(bak);
+            std::vector<fs::path> cleanup_paths;
+            for (const auto& [orig, bak] : all_backups) cleanup_paths.push_back(bak);
 
-          // 最深层优先
-          std::ranges::sort(cleanup_paths, [](const fs::path &a, const fs::path &b) {
-            return a.string().size() > b.string().size();
-          });
+            // 最深层优先
+            std::ranges::sort(cleanup_paths, [](const fs::path& a, const fs::path& b) {
+                return a.string().size() > b.string().size();
+            });
 
-          auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
-          cleanup_paths.erase(last, cleanup_paths.end());
+            auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
+            cleanup_paths.erase(last, cleanup_paths.end());
 
-          for (const auto &p : cleanup_paths) {
-            if (!fs::exists(p) && !fs::is_symlink(p))
-              continue;
+            for (const auto& p : cleanup_paths) {
+                if (!fs::exists(p) && !fs::is_symlink(p)) continue;
 
-            std::error_code ec;
-            bool ok = true;
+                std::error_code ec;
+                bool ok = true;
 
-            if (fs::is_directory(p)) {
-              std::vector<fs::path> entries;
-              for (const auto &entry : fs::recursive_directory_iterator(p, ec))
-                if (!ec) entries.push_back(entry.path());
-              if (!ec) {
-                std::ranges::reverse(entries);
-                for (const auto &e : entries) {
-                  if (!fs::remove(e, ec))
-                    ok = false;
+                if (fs::is_directory(p)) {
+                    std::vector<fs::path> entries;
+                    for (const auto& entry : fs::recursive_directory_iterator(p, ec))
+                        if (!ec) entries.push_back(entry.path());
+                    if (!ec) {
+                        std::ranges::reverse(entries);
+                        for (const auto& e : entries) {
+                            if (!fs::remove(e, ec)) ok = false;
+                        }
+                    }
+                    if (!fs::remove(p, ec)) ok = false;
+                } else {
+                    if (!fs::remove(p, ec)) ok = false;
                 }
-              }
-              if (!fs::remove(p, ec))
-                ok = false;
-            } else {
-              if (!fs::remove(p, ec))
-                ok = false;
-            }
 
-            if (ok) {
-              wal::log_wal_line("CLEANUP " + p.string());
-            } else {
-              log_warning(string_format("warning.cleanup_failed", p.string()));
+                if (ok) {
+                    wal::log_wal_line("CLEANUP " + p.string());
+                } else {
+                    log_warning(string_format("warning.cleanup_failed", p.string()));
+                }
             }
-          }
         }
-      });
+    });
 
-  trim_completed();
-  cleanup_db_backups();
+    trim_completed();
+    cleanup_db_backups();
 
-  log_info(get_string("info.recursive_remove_done"));
+    log_info(get_string("info.recursive_remove_done"));
 }

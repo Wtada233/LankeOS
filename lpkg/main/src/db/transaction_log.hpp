@@ -1,10 +1,12 @@
 #pragma once
 
-#include <string>
-#include <string_view>
 #include <unistd.h>
 
-namespace wal {
+#include <string>
+#include <string_view>
+
+namespace wal
+{
 
 /**
  * WalWriter — WAL 文件原子写入器
@@ -15,47 +17,52 @@ namespace wal {
  * WalWriter 是低级工具 —— 每次 log() 调用都会 write + fsync。
  * 调用者负责以正确的顺序构建 WAL 条目。
  */
-class WalWriter {
+class WalWriter
+{
 public:
-  /// 打开 WAL 文件进行追加写入
-  WalWriter();
-  ~WalWriter();
+    /// 打开 WAL 文件进行追加写入
+    WalWriter();
+    ~WalWriter();
 
-  WalWriter(const WalWriter &) = delete;
-  WalWriter &operator=(const WalWriter &) = delete;
-  WalWriter(WalWriter &&other) noexcept : fd_(other.fd_), lines_(other.lines_) {
-    other.fd_ = -1;
-    other.lines_ = 0;
-  }
-  WalWriter &operator=(WalWriter &&other) noexcept {
-    if (this != &other) {
-      if (fd_ >= 0)
-        ::close(fd_);
-      fd_ = other.fd_;
-      lines_ = other.lines_;
-      other.fd_ = -1;
-      other.lines_ = 0;
+    WalWriter(const WalWriter&) = delete;
+    WalWriter& operator=(const WalWriter&) = delete;
+    WalWriter(WalWriter&& other) noexcept : fd_(other.fd_), lines_(other.lines_)
+    {
+        other.fd_ = -1;
+        other.lines_ = 0;
     }
-    return *this;
-  }
+    WalWriter& operator=(WalWriter&& other) noexcept
+    {
+        if (this != &other) {
+            if (fd_ >= 0) ::close(fd_);
+            fd_ = other.fd_;
+            lines_ = other.lines_;
+            other.fd_ = -1;
+            other.lines_ = 0;
+        }
+        return *this;
+    }
 
-  /// 追加一行到 WAL 并 fsync
-  /// 失败时抛 LpkgException
-  void log(std::string_view line);
+    /// 追加一行到 WAL 并 fsync
+    /// 失败时抛 LpkgException
+    void log(std::string_view line);
 
-  /// 追加一行到 WAL 但跳过 fsync（仅用于非关键路径）
-  /// 失败时静默返回
-  void log_no_fsync(std::string_view line);
+    /// 追加一行到 WAL 但跳过 fsync（仅用于非关键路径）
+    /// 失败时静默返回
+    void log_no_fsync(std::string_view line);
 
-  /// 对 WAL 文件执行 fsync
-  void fsync_wal();
+    /// 对 WAL 文件执行 fsync
+    void fsync_wal();
 
-  /// 获取当前写入的行数
-  size_t lines_written() const { return lines_; }
+    /// 获取当前写入的行数
+    size_t lines_written() const
+    {
+        return lines_;
+    }
 
 private:
-  int fd_ = -1;
-  size_t lines_ = 0;
+    int fd_ = -1;
+    size_t lines_ = 0;
 };
 
 // ── 便捷函数 ────────────────────────────────────────────────────────────
@@ -70,4 +77,4 @@ void log_wal_line(std::string_view line);
 /// 写入 COMMIT_PKGS + fsync
 void commit_batch();
 
-} // namespace wal
+}  // namespace wal

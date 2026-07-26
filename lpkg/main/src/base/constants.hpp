@@ -1,11 +1,15 @@
 #pragma once
+#include <sys/types.h>
+
+#include <cstdint>
 #include <string_view>
 
 /**
  * lpkg 全局常量命名空间
  * 集中管理所有字符串常量，包括分隔符、JSON 键名、路径、命令名等
  */
-namespace constants {
+namespace constants
+{
 // 分隔符字符常量
 inline constexpr std::string_view NL = "\n";
 inline constexpr std::string_view TAB = "\t";
@@ -30,8 +34,7 @@ inline constexpr std::string_view J_WORK_SOURCES = "work_sources";
 // 构建文件与脚本名
 inline constexpr std::string_view LANK_BUILD_JSON = "LankeBUILD.json";
 inline constexpr std::string_view LANK_BUILD_SCRIPT = "LankeBUILD";
-inline constexpr std::string_view LANK_BUILD_PROCESSED =
-    ".LankeBUILD_processed";
+inline constexpr std::string_view LANK_BUILD_PROCESSED = ".LankeBUILD_processed";
 
 // 包元数据文件名
 inline constexpr std::string_view PKG_METADATA_FILE = "metadata.json";
@@ -102,4 +105,37 @@ inline constexpr std::string_view COLOR_WHITE = "\033[1;37m";
 inline constexpr std::string_view COLOR_YELLOW = "\033[1;33m";
 inline constexpr std::string_view COLOR_RED = "\033[1;31m";
 inline constexpr std::string_view COLOR_RESET = "\033[0m";
-} // namespace constants
+
+// 文件权限掩码与模式
+inline constexpr mode_t PERM_MASK_ALL = 07777;
+inline constexpr mode_t PERM_FILE_DEFAULT = 0644;
+inline constexpr mode_t PERM_WAL_LOG = 0644;
+
+// 递归深度限制
+inline constexpr int DEP_LIMIT_DEPEND_SCAN = 64;
+
+// 随机后缀长度与字符集
+inline constexpr size_t RANDOM_SUFFIX_LEN = 6;
+inline constexpr std::string_view RANDOM_SUFFIX_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz";
+// 网络下载
+inline constexpr long CURL_CONNECT_TIMEOUT_SEC = 10;
+inline constexpr long CURL_LOW_SPEED_LIMIT_BPS = 100;
+inline constexpr long CURL_LOW_SPEED_TIME_SEC = 30;
+
+// I/O 缓冲区大小
+inline constexpr size_t ARCHIVE_BUFFER_SIZE = 10240;
+inline constexpr size_t HASH_BUFFER_SIZE = 1024 * 1024;
+inline constexpr size_t PACK_IO_BUFFER_SIZE = 8192;
+
+// 备份重试
+inline constexpr int UNIQUE_BAK_MAX_ATTEMPTS = 20;
+
+// 递归确认轮数
+inline constexpr int RECURSIVE_CONFIRM_ROUNDS = 3;
+
+// 进度上报间隔（文件数）
+inline constexpr int PROGRESS_INTERVAL_FILES = 100;
+
+// ELF 段对齐掩码
+inline constexpr uint64_t ELF_SECTION_ALIGN_MASK = 15;
+}  // namespace constants

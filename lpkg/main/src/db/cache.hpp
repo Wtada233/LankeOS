@@ -12,156 +12,159 @@
  * 维护已安装包列表、文件归属、providers、反向依赖等状态的运行时缓存。
  * 所有读写操作均为线程安全，修改后通过 write() 持久化到磁盘。
  */
-class Cache {
+class Cache
+{
 public:
-  /** 获取全局单例实例 */
-  static Cache &instance();
+    /** 获取全局单例实例 */
+    static Cache& instance();
 
-  Cache(const Cache &) = delete;
-  Cache &operator=(const Cache &) = delete;
+    Cache(const Cache&) = delete;
+    Cache& operator=(const Cache&) = delete;
 
-  /** 从磁盘加载所有缓存数据 */
-  void load();
-  /** 将所有脏数据写入磁盘 */
-  void write();
-  /** 将所有脏数据写入磁盘（兼容旧接口，wal_tag 已无意义） */
-  void write(const std::string &wal_tag);
+    /** 从磁盘加载所有缓存数据 */
+    void load();
+    /** 将所有脏数据写入磁盘 */
+    void write();
+    /** 将所有脏数据写入磁盘（兼容旧接口，wal_tag 已无意义） */
+    void write(const std::string& wal_tag);
 
-  // ===== 包状态查询 =====
+    // ===== 包状态查询 =====
 
-  /** 查询包是否已安装 */
-  bool is_installed(std::string_view name);
-  /** 获取已安装包的版本号 */
-  std::string get_installed_version(std::string_view name);
-  /** 查询包是否为核心包 */
-  bool is_essential(std::string_view name);
-  /** 查询包是否被锁定 */
-  bool is_held(std::string_view name);
+    /** 查询包是否已安装 */
+    bool is_installed(std::string_view name);
+    /** 获取已安装包的版本号 */
+    std::string get_installed_version(std::string_view name);
+    /** 查询包是否为核心包 */
+    bool is_essential(std::string_view name);
+    /** 查询包是否被锁定 */
+    bool is_held(std::string_view name);
 
-  /** 将包标记为已安装 */
-  void add_installed(std::string_view name, std::string_view ver,
-                     bool hold = false);
-  /** 移除已安装包 */
-  void remove_installed(std::string_view name);
+    /** 将包标记为已安装 */
+    void add_installed(std::string_view name, std::string_view ver, bool hold = false);
+    /** 移除已安装包 */
+    void remove_installed(std::string_view name);
 
-  /** 记录文件归属 */
-  void add_file_owner(std::string_view path, std::string_view pkg);
-  /** 移除文件归属 */
-  void remove_file_owner(std::string_view path, std::string_view pkg);
-  /** 查询文件归属的包集合 */
-  std::unordered_set<std::string> get_file_owners(std::string_view path);
-  /** 检查某文件是否由指定包所有 */
-  bool is_file_owned_by(std::string_view path, std::string_view pkg);
+    /** 记录文件归属 */
+    void add_file_owner(std::string_view path, std::string_view pkg);
+    /** 移除文件归属 */
+    void remove_file_owner(std::string_view path, std::string_view pkg);
+    /** 查询文件归属的包集合 */
+    std::unordered_set<std::string> get_file_owners(std::string_view path);
+    /** 检查某文件是否由指定包所有 */
+    bool is_file_owned_by(std::string_view path, std::string_view pkg);
 
-  /** 添加 provider（能力名称 -> 包名） */
-  void add_provider(std::string_view capability, std::string_view pkg);
-  /** 移除 provider */
-  void remove_provider(std::string_view capability, std::string_view pkg);
-  /** 查询提供某能力的包集合 */
-  std::unordered_set<std::string> get_providers(std::string_view capability);
-  /** 检查某能力是否由指定包提供 */
-  bool is_provided_by(std::string_view capability, std::string_view pkg);
+    /** 添加 provider（能力名称 -> 包名） */
+    void add_provider(std::string_view capability, std::string_view pkg);
+    /** 移除 provider */
+    void remove_provider(std::string_view capability, std::string_view pkg);
+    /** 查询提供某能力的包集合 */
+    std::unordered_set<std::string> get_providers(std::string_view capability);
+    /** 检查某能力是否由指定包提供 */
+    bool is_provided_by(std::string_view capability, std::string_view pkg);
 
-  /** 添加反向依赖记录 */
-  void add_reverse_dep(std::string_view dep, std::string_view pkg);
-  /** 移除反向依赖记录 */
-  void remove_reverse_dep(std::string_view dep, std::string_view pkg);
-  /** 查询某包的反向依赖集合 */
-  std::unordered_set<std::string> get_reverse_deps(std::string_view name);
+    /** 添加反向依赖记录 */
+    void add_reverse_dep(std::string_view dep, std::string_view pkg);
+    /** 移除反向依赖记录 */
+    void remove_reverse_dep(std::string_view dep, std::string_view pkg);
+    /** 查询某包的反向依赖集合 */
+    std::unordered_set<std::string> get_reverse_deps(std::string_view name);
 
-  /** 确保反向依赖数据已加载 */
-  void ensure_reverse_deps();
-  /** 确保核心包数据已加载 */
-  void ensure_essentials();
+    /** 确保反向依赖数据已加载 */
+    void ensure_reverse_deps();
+    /** 确保核心包数据已加载 */
+    void ensure_essentials();
 
-  // ===== 反向查询 =====
+    // ===== 反向查询 =====
 
-  /** 获取某包拥有的所有文件 */
-  std::unordered_set<std::string> get_package_files(std::string_view pkg);
-  /** 获取某包提供的所有能力 */
-  std::unordered_set<std::string> get_package_provides(std::string_view pkg);
+    /** 获取某包拥有的所有文件 */
+    std::unordered_set<std::string> get_package_files(std::string_view pkg);
+    /** 获取某包提供的所有能力 */
+    std::unordered_set<std::string> get_package_provides(std::string_view pkg);
 
-  // ===== 迭代支持（调用者需自行管理锁） =====
+    // ===== 迭代支持（调用者需自行管理锁） =====
 
-  /** 获取内部互斥锁引用 */
-  std::mutex &get_mutex() { return mtx; }
-  /** 获取所有已安装包（名称 -> 版本） */
-  const std::map<std::string, std::string, std::less<>> &get_all_installed() {
-    return installed_pkgs;
-  }
-  /** 获取所有锁定包名集合 */
-  const std::unordered_set<std::string> &get_all_held() { return holdpkgs; }
+    /** 获取内部互斥锁引用 */
+    std::mutex& get_mutex()
+    {
+        return mtx;
+    }
+    /** 获取所有已安装包（名称 -> 版本） */
+    const std::map<std::string, std::string, std::less<>>& get_all_installed()
+    {
+        return installed_pkgs;
+    }
+    /** 获取所有锁定包名集合 */
+    const std::unordered_set<std::string>& get_all_held()
+    {
+        return holdpkgs;
+    }
 
-  Cache();
+    Cache();
 
-  // 文件归属数据库（路径 -> 包名集合）
-  std::map<std::string, std::unordered_set<std::string>, std::less<>> file_db;
-  // providers 数据库（能力 -> 包名集合）
-  std::map<std::string, std::unordered_set<std::string>, std::less<>> providers;
-  // 已安装包（包名 -> 版本）
-  std::map<std::string, std::string, std::less<>> installed_pkgs;
-  // 锁定包名集合
-  std::unordered_set<std::string> holdpkgs;
-  // 核心包名集合
-  std::unordered_set<std::string> essentials;
-  // 反向依赖数据库（依赖 -> 依赖它的包集合）
-  std::map<std::string, std::unordered_set<std::string>, std::less<>>
-      reverse_deps;
+    // 文件归属数据库（路径 -> 包名集合）
+    std::map<std::string, std::unordered_set<std::string>, std::less<>> file_db;
+    // providers 数据库（能力 -> 包名集合）
+    std::map<std::string, std::unordered_set<std::string>, std::less<>> providers;
+    // 已安装包（包名 -> 版本）
+    std::map<std::string, std::string, std::less<>> installed_pkgs;
+    // 锁定包名集合
+    std::unordered_set<std::string> holdpkgs;
+    // 核心包名集合
+    std::unordered_set<std::string> essentials;
+    // 反向依赖数据库（依赖 -> 依赖它的包集合）
+    std::map<std::string, std::unordered_set<std::string>, std::less<>> reverse_deps;
 
-  std::mutex mtx;                   // 线程安全互斥锁
-  bool dirty = false;               // 是否有未写入的修改
-  bool reverse_deps_loaded = false; // 反向依赖是否已加载
-  bool essentials_loaded = false;   // 核心包是否已加载
+    std::mutex mtx;                    // 线程安全互斥锁
+    bool dirty = false;                // 是否有未写入的修改
+    bool reverse_deps_loaded = false;  // 反向依赖是否已加载
+    bool essentials_loaded = false;    // 核心包是否已加载
 
-  /** 从文件读取多值数据库（不经过缓存） */
-  std::map<std::string, std::unordered_set<std::string>, std::less<>>
-  read_db_uncached(const std::filesystem::path &path);
+    /** 从文件读取多值数据库（不经过缓存） */
+    std::map<std::string, std::unordered_set<std::string>, std::less<>> read_db_uncached(
+        const std::filesystem::path& path);
 
-  /** 直接写入已安装包列表 */
-  void write_pkgs();
-  /** 直接写入锁定包列表 */
-  void write_holdpkgs();
-  /** 直接写入文件归属数据库 */
-  void write_file_db();
-  /** 直接写入 providers 数据库 */
-  void write_providers();
+    /** 直接写入已安装包列表 */
+    void write_pkgs();
+    /** 直接写入锁定包列表 */
+    void write_holdpkgs();
+    /** 直接写入文件归属数据库 */
+    void write_file_db();
+    /** 直接写入 providers 数据库 */
+    void write_providers();
 
-  /** 从 installed_pkgs 构建 set 格式数据 */
-  std::unordered_set<std::string> build_pkgs_set() const;
+    /** 从 installed_pkgs 构建 set 格式数据 */
+    std::unordered_set<std::string> build_pkgs_set() const;
 
-  /** 直接写入 DB 文件（.tmp + fsync + rename） */
-  void write_db_file_direct(
-      const std::filesystem::path &path,
-      const std::map<std::string, std::unordered_set<std::string>, std::less<>>
-          &db);
-  /** 直接写入 set 文件（.tmp + fsync + rename） */
-  void write_set_file_direct(const std::filesystem::path &path,
-                             const std::unordered_set<std::string> &data);
+    /** 直接写入 DB 文件（.tmp + fsync + rename） */
+    void write_db_file_direct(
+        const std::filesystem::path& path,
+        const std::map<std::string, std::unordered_set<std::string>, std::less<>>& db);
+    /** 直接写入 set 文件（.tmp + fsync + rename） */
+    void write_set_file_direct(const std::filesystem::path& path,
+                               const std::unordered_set<std::string>& data);
 
-  // ── WAL 保护的写入 ────────────────────────────────────────────────
+    // ── WAL 保护的写入 ────────────────────────────────────────────────
 
-  /**
-   * write-ahead DB 写入：WAL → fsync → 备份旧文件 → fsync → 写 .tmp →
-   * fsync → rename → fsync 父目录
-   *
-   * @param db_path     DB 文件路径
-   * @param db          要写入的 DB 内容
-   * @param milestone   里程碑标签（如 "glibc:installed"）
-   * @param wal_op_type WAL 操作类型（DB / DBNEW / DBRM）
-   */
-  void write_db_file_wal(
-      const std::filesystem::path &db_path,
-      const std::map<std::string, std::unordered_set<std::string>, std::less<>>
-          &db,
-      const std::string &milestone, const std::string &wal_op_type = "DB");
+    /**
+     * write-ahead DB 写入：WAL → fsync → 备份旧文件 → fsync → 写 .tmp →
+     * fsync → rename → fsync 父目录
+     *
+     * @param db_path     DB 文件路径
+     * @param db          要写入的 DB 内容
+     * @param milestone   里程碑标签（如 "glibc:installed"）
+     * @param wal_op_type WAL 操作类型（DB / DBNEW / DBRM）
+     */
+    void write_db_file_wal(
+        const std::filesystem::path& db_path,
+        const std::map<std::string, std::unordered_set<std::string>, std::less<>>& db,
+        const std::string& milestone, const std::string& wal_op_type = "DB");
 
-  /**
-   * write-ahead set 写入：与 write_db_file_wal 相同序列
-   */
-  void write_set_file_wal(const std::filesystem::path &path,
-                          const std::unordered_set<std::string> &data,
-                          const std::string &milestone,
-                          const std::string &wal_op_type = "DB");
+    /**
+     * write-ahead set 写入：与 write_db_file_wal 相同序列
+     */
+    void write_set_file_wal(const std::filesystem::path& path,
+                            const std::unordered_set<std::string>& data,
+                            const std::string& milestone, const std::string& wal_op_type = "DB");
 };
 
 // ── WAL 恢复与清理（全局函数） ──────────────────────────────────────

@@ -9,8 +9,7 @@
  * @param output_path   保存路径
  * @param show_progress 是否显示进度条（默认显示）
  */
-void download_file(const std::string &url,
-                   const std::filesystem::path &output_path,
+void download_file(const std::string& url, const std::filesystem::path& output_path,
                    bool show_progress = true);
 
 /**
@@ -20,6 +19,5 @@ void download_file(const std::string &url,
  * @param max_retries   最大重试次数（默认 5 次）
  * @param show_progress 是否显示进度条（默认显示）
  */
-void download_with_retries(const std::string &url,
-                           const std::filesystem::path &output_path,
+void download_with_retries(const std::string& url, const std::filesystem::path& output_path,
                            int max_retries = 5, bool show_progress = true);

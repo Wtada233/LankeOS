@@ -587,7 +587,12 @@ InstallationTask::run(ctx)
 │         throw
 │
 ├── commit_without_file_ops()
-│   ├── register_package() (内存操作)
+│   ├── register_package()
+│   │   ├── 写 deps 文件: WAL: DBNEW <dep_path> <pkg>:installed
+│   │   ├── 写 needed_so 文件: WAL: DBNEW <nso_path> <pkg>:installed
+│   │   ├── 写 man 文件: WAL: DBNEW <man_path> <pkg>:installed
+│   │   │   (先 WAL → fsync → .tmp → fsync → rename → fsync)
+│   │   └── 注册文件所有权 (add_file_owner，内存操作)
 │   ├── 处理 REMOVE_OLD (升级时)
 │   │   WAL: REMOVE_OLD <src> → <dst>  ← fsync
 │   │   rename old_file → .lpkg_bak

@@ -1,15 +1,17 @@
 #include <gtest/gtest.h>
-#include "../../main/src/pkg/package_manager.hpp"
-#include "../../main/src/archive/packer.hpp"
-#include "../../main/src/db/cache.hpp"
-#include "../../main/src/config/config.hpp"
-#include "../../main/src/base/utils.hpp"
-#include "../../main/src/crypto/hash.hpp"
-#include "../../main/src/i18n/localization.hpp"
-#include "../../main/src/base/constants.hpp"
+
+#include <atomic>
 #include <filesystem>
 #include <fstream>
-#include <atomic>
+
+#include "../../main/src/archive/packer.hpp"
+#include "../../main/src/base/constants.hpp"
+#include "../../main/src/base/utils.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/crypto/hash.hpp"
+#include "../../main/src/db/cache.hpp"
+#include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/pkg/package_manager.hpp"
 
 namespace fs = std::filesystem;
 
@@ -27,14 +29,16 @@ std::atomic<bool> sigint_graceful{false};
 //   • 清除标志后 → 后续安装不受影响
 // =========================================================================
 
-class SigIntTest : public ::testing::Test {
+class SigIntTest : public ::testing::Test
+{
 protected:
     fs::path suite_work_dir;
     fs::path test_root;
     fs::path pkg_dir;
     fs::path mirror_dir;
 
-    void SetUp() override {
+    void SetUp() override
+    {
         Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
         Config::instance().set_testing_mode(true);
         init_localization();
@@ -59,14 +63,16 @@ protected:
         sigint_graceful.store(false);
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         Config::instance().set_root_path("/");
         Config::instance().set_testing_mode(false);
         fs::remove_all(suite_work_dir);
     }
 
     std::string create_pkg(const std::string& name, const std::string& ver,
-                           const std::vector<std::string>& deps = {}) {
+                           const std::vector<std::string>& deps = {})
+    {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
         fs::create_directories(work_dir / "content" / "usr" / "bin");
         std::ofstream(work_dir / "content" / "usr" / "bin" / name).close();
@@ -84,7 +90,8 @@ protected:
         return pkg_path;
     }
 
-    void write_index(const std::vector<std::tuple<std::string, std::string, std::string>>& entries) {
+    void write_index(const std::vector<std::tuple<std::string, std::string, std::string>>& entries)
+    {
         std::ofstream idx(mirror_dir / "index.txt");
         for (const auto& [name, ver, deps] : entries) {
             std::string pkg_path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
@@ -97,11 +104,11 @@ protected:
     }
 };
 
-
 // -----------------------------------------------------------------------
 // 1. SIGINT 标志未设置 → 正常安装
 // -----------------------------------------------------------------------
-TEST_F(SigIntTest, NormalInstallWithoutSigInt) {
+TEST_F(SigIntTest, NormalInstallWithoutSigInt)
+{
     sigint_graceful.store(false);
     create_pkg("simple-pkg", "1.0");
     write_index({{"simple-pkg", "1.0", ""}});
@@ -112,11 +119,11 @@ TEST_F(SigIntTest, NormalInstallWithoutSigInt) {
     EXPECT_TRUE(Cache::instance().is_installed("simple-pkg"));
 }
 
-
 // -----------------------------------------------------------------------
 // 2. SIGINT 标志已设置 → 安装被中止
 // -----------------------------------------------------------------------
-TEST_F(SigIntTest, SigIntFlagAbortsInstall) {
+TEST_F(SigIntTest, SigIntFlagAbortsInstall)
+{
     create_pkg("sigint-pkg", "1.0");
     write_index({{"sigint-pkg", "1.0", ""}});
 
@@ -128,11 +135,11 @@ TEST_F(SigIntTest, SigIntFlagAbortsInstall) {
     EXPECT_FALSE(Cache::instance().is_installed("sigint-pkg"));
 }
 
-
 // -----------------------------------------------------------------------
 // 3. 清除 SIGINT 标志后 → 后续安装正常
 // -----------------------------------------------------------------------
-TEST_F(SigIntTest, ClearSigIntFlag_SubsequentInstallOk) {
+TEST_F(SigIntTest, ClearSigIntFlag_SubsequentInstallOk)
+{
     create_pkg("first", "1.0");
     create_pkg("second", "1.0");
     write_index({{"first", "1.0", ""}, {"second", "1.0", ""}});
@@ -150,12 +157,12 @@ TEST_F(SigIntTest, ClearSigIntFlag_SubsequentInstallOk) {
     EXPECT_TRUE(Cache::instance().is_installed("second"));
 }
 
-
 // -----------------------------------------------------------------------
 // 4. SIGINT 后依赖解析被中止
 //     安装一个带依赖的包，SIGINT 在解析阶段触发
 // -----------------------------------------------------------------------
-TEST_F(SigIntTest, SigIntDuringDepResolution) {
+TEST_F(SigIntTest, SigIntDuringDepResolution)
+{
     create_pkg("lib-dep", "1.0");
     create_pkg("main-app", "1.0", {"lib-dep"});
     write_index({{"lib-dep", "1.0", ""}, {"main-app", "1.0", "lib-dep"}});
@@ -170,17 +177,18 @@ TEST_F(SigIntTest, SigIntDuringDepResolution) {
     EXPECT_FALSE(Cache::instance().is_installed("lib-dep"));
 }
 
-
 // -----------------------------------------------------------------------
 // 5. 原子回滚：SIGINT 时已安装的包被回滚
 //     安装两个包，第二个触发 SIGINT → 第一个也应被回滚
 // -----------------------------------------------------------------------
-TEST_F(SigIntTest, AtomicRollbackOnSigInt) {
+TEST_F(SigIntTest, AtomicRollbackOnSigInt)
+{
     create_pkg("first-pkg", "1.0");
     create_pkg("second-pkg", "1.0");
     // main-pkg 同时依赖两者
     create_pkg("main-pkg", "1.0", {"first-pkg"});
-    write_index({{"first-pkg", "1.0", ""}, {"second-pkg", "1.0", ""}, {"main-pkg", "1.0", "first-pkg"}});
+    write_index(
+        {{"first-pkg", "1.0", ""}, {"second-pkg", "1.0", ""}, {"main-pkg", "1.0", "first-pkg"}});
 
     // 正常安装 first-pkg 然后设 SIGINT
     sigint_graceful.store(false);
@@ -196,12 +204,12 @@ TEST_F(SigIntTest, AtomicRollbackOnSigInt) {
     EXPECT_FALSE(Cache::instance().is_installed("main-pkg"));
 }
 
-
 // -----------------------------------------------------------------------
 // 6. SIGINT 不影响只读命令
 //     query 命令不设置 SigIntGuard，不应触发任何 SIGINT 行为
 // -----------------------------------------------------------------------
-TEST_F(SigIntTest, QueryCommandNotAffectedBySigInt) {
+TEST_F(SigIntTest, QueryCommandNotAffectedBySigInt)
+{
     create_pkg("query-pkg", "1.0");
     write_index({{"query-pkg", "1.0", ""}});
 
@@ -216,12 +224,12 @@ TEST_F(SigIntTest, QueryCommandNotAffectedBySigInt) {
     EXPECT_NO_THROW(query_package("query-pkg"));
 }
 
-
 // -----------------------------------------------------------------------
 // 7. SIGINT 标志复位后可以正常安装
 //     模拟用户拒绝后重新尝试的场景
 // -----------------------------------------------------------------------
-TEST_F(SigIntTest, ResetAndRetryAfterSigInt) {
+TEST_F(SigIntTest, ResetAndRetryAfterSigInt)
+{
     create_pkg("retry-pkg", "1.0");
     write_index({{"retry-pkg", "1.0", ""}});
 

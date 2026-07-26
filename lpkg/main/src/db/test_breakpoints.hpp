@@ -25,28 +25,29 @@
  *   commit_before            包 COMMIT 前
  *   file_<N>_of_<total>      处理到 N/total 个文件时
  */
-class BreakpointManager {
+class BreakpointManager
+{
 public:
-  static BreakpointManager &instance();
+    static BreakpointManager& instance();
 
-  /// 设置断点：当被调用时执行 action（通常抛异常）
-  /// 每个断点只触发一次，之后自动清除
-  void set(const std::string &name, std::function<void()> action);
+    /// 设置断点：当被调用时执行 action（通常抛异常）
+    /// 每个断点只触发一次，之后自动清除
+    void set(const std::string& name, std::function<void()> action);
 
-  /// 触发断点（生产代码在关键路径调用）
-  /// 返回 true 表示断点被触发（action 已执行）
-  bool hit(const std::string &name);
+    /// 触发断点（生产代码在关键路径调用）
+    /// 返回 true 表示断点被触发（action 已执行）
+    bool hit(const std::string& name);
 
-  /// 移除指定断点
-  void clear(const std::string &name);
+    /// 移除指定断点
+    void clear(const std::string& name);
 
-  /// 移除所有断点
-  void clear_all();
+    /// 移除所有断点
+    void clear_all();
 
-  /// 是否在 testing mode
-  bool enabled() const;
+    /// 是否在 testing mode
+    bool enabled() const;
 
 private:
-  BreakpointManager() = default;
-  std::vector<std::pair<std::string, std::function<void()>>> breakpoints_;
+    BreakpointManager() = default;
+    std::vector<std::pair<std::string, std::function<void()>>> breakpoints_;
 };

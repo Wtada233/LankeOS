@@ -1,5 +1,9 @@
 #pragma once
 
+#include <functional>
+#include <string>
+#include <vector>
+
 #include "../base/exception.hpp"
 #include "../config/config.hpp"
 #include "../i18n/localization.hpp"
@@ -7,10 +11,6 @@
 #include "test_breakpoints.hpp"
 #include "transaction_log.hpp"
 #include "wal_op.hpp"
-
-#include <functional>
-#include <string>
-#include <vector>
 
 /**
  * run_batch_transaction — 统一批量事务执行器。
@@ -45,41 +45,42 @@
  * @throws            在操作失败时重新抛出，回滚后再抛
  */
 template <typename OpT>
-std::vector<std::string> run_batch_transaction(size_t total, OpT &&op) {
-  // 前提：进入前 trim_completed（在顶层调用者如 install_packages 中执行）
-  trim_completed();
-
-  auto &cache = Cache::instance();
-  std::vector<std::string> successfully_installed;
-
-  try {
-    // 批次开始
-    wal::WalWriter batch_writer = wal::begin_batch(total);
-
-    // 保存批次开始前的 DB 状态
-    // 注意：write() 内部执行 WAL→备份→.tmp→rename→fsync 序列
-    cache.write(":batch-start");
-
-    // 执行包级操作
-    std::forward<OpT>(op)(batch_writer, successfully_installed);
-
-    // 批次提交
-    wal::commit_batch();
-
-    return successfully_installed;
-  } catch (const LpkgException &) {
-    // 批次回滚
-    wal::batch_rollback(successfully_installed);
-    // 回滚完成（COMMIT_PKGS 已写），清理 DB 备份
-    cleanup_db_backups();
+std::vector<std::string> run_batch_transaction(size_t total, OpT&& op)
+{
+    // 前提：进入前 trim_completed（在顶层调用者如 install_packages 中执行）
     trim_completed();
-    throw;
-  } catch (const std::exception &) {
-    wal::batch_rollback(successfully_installed);
-    cleanup_db_backups();
-    trim_completed();
-    throw;
-  }
+
+    auto& cache = Cache::instance();
+    std::vector<std::string> successfully_installed;
+
+    try {
+        // 批次开始
+        wal::WalWriter batch_writer = wal::begin_batch(total);
+
+        // 保存批次开始前的 DB 状态
+        // 注意：write() 内部执行 WAL→备份→.tmp→rename→fsync 序列
+        cache.write(":batch-start");
+
+        // 执行包级操作
+        std::forward<OpT>(op)(batch_writer, successfully_installed);
+
+        // 批次提交
+        wal::commit_batch();
+
+        return successfully_installed;
+    } catch (const LpkgException&) {
+        // 批次回滚
+        wal::batch_rollback(successfully_installed);
+        // 回滚完成（COMMIT_PKGS 已写），清理 DB 备份
+        cleanup_db_backups();
+        trim_completed();
+        throw;
+    } catch (const std::exception&) {
+        wal::batch_rollback(successfully_installed);
+        cleanup_db_backups();
+        trim_completed();
+        throw;
+    }
 }
 
 /**
@@ -93,23 +94,22 @@ std::vector<std::string> run_batch_transaction(size_t total, OpT &&op) {
  * @return                成功处理的包名列表
  */
 template <typename PlanMap, typename PerPkgFn>
-std::vector<std::string>
-run_ordered_batch(const std::vector<std::string> &install_order, PlanMap &plan,
-                  PerPkgFn &&per_pkg_fn) {
-  return run_batch_transaction(
-      install_order.size(),
-      [&](wal::WalWriter &w, std::vector<std::string> &success) {
-        auto &cache = Cache::instance();
+std::vector<std::string> run_ordered_batch(const std::vector<std::string>& install_order,
+                                           PlanMap& plan, PerPkgFn&& per_pkg_fn)
+{
+    return run_batch_transaction(install_order.size(),
+                                 [&](wal::WalWriter& w, std::vector<std::string>& success) {
+                                     auto& cache = Cache::instance();
 
-        for (const auto &name : install_order) {
-          auto &p = plan.at(name);
+                                     for (const auto& name : install_order) {
+                                         auto& p = plan.at(name);
 
-          // 执行包级操作
-          std::forward<PerPkgFn>(per_pkg_fn)(w, p, success);
+                                         // 执行包级操作
+                                         std::forward<PerPkgFn>(per_pkg_fn)(w, p, success);
 
-          // 包完成后 DB 里程碑
-          cache.write(name + ":installed");
-          success.push_back(name);
-        }
-      });
+                                         // 包完成后 DB 里程碑
+                                         cache.write(name + ":installed");
+                                         success.push_back(name);
+                                     }
+                                 });
 }

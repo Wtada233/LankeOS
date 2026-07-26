@@ -6,7 +6,8 @@
 #include "../repo/repository.hpp"
 #include "version.hpp"
 
-namespace detail {
+namespace detail
+{
 
 /**
  * 解析依赖字符串列表为 DependencyInfo 结构体
@@ -16,7 +17,6 @@ namespace detail {
  *
  * 支持复合约束表达区间，解析出所有 (op, version) 对。
  */
-std::vector<DependencyInfo>
-parse_dep_strings(const std::vector<std::string> &dep_strs);
+std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& dep_strs);
 
-} // namespace detail
+}  // namespace detail

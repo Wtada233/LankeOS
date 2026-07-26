@@ -249,3 +249,4 @@ info.recursive_protected_header=Skipping protected packages (essential/held):
 info.recursive_confirm_prompt=Warning {}/3 — enter code [{}] to confirm recursive removal:
 
 info.recursive_confirm_failed=Incorrect code, recursive remove aborted.
+error.file_already_owned=File {} is already owned by package {}, cannot assign to {}.

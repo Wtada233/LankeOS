@@ -1,20 +1,24 @@
 #include <gtest/gtest.h>
-#include "../../main/src/repo/repository.hpp"
-#include "../../main/src/config/config.hpp"
-#include "../../main/src/i18n/localization.hpp"
-#include "../../main/src/base/constants.hpp"
+
 #include <filesystem>
 #include <fstream>
 
+#include "../../main/src/base/constants.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/repo/repository.hpp"
+
 namespace fs = std::filesystem;
 
-class AggregatedIndexTest : public ::testing::Test {
+class AggregatedIndexTest : public ::testing::Test
+{
 protected:
     fs::path suite_work_dir;
     fs::path root;
     fs::path index_dir;
 
-    void SetUp() override {
+    void SetUp() override
+    {
         Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
         Config::instance().set_testing_mode(true);
         init_localization();
@@ -35,22 +39,24 @@ protected:
             << "file://" << (suite_work_dir / "mirror").string() << "/" << std::endl;
     }
 
-    void write_index(const std::string& content) {
+    void write_index(const std::string& content)
+    {
         std::ofstream f(index_dir / "index.txt");
         f << content;
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         Config::instance().set_root_path("/");
         fs::remove_all(suite_work_dir);
     }
 };
 
-TEST_F(AggregatedIndexTest, SingleVersionPerLine) {
+TEST_F(AggregatedIndexTest, SingleVersionPerLine)
+{
     write_index(
         "zlib|1.2.13:abc123::|\n"
-        "libfoo|2.0:def456:glibc::|\n"
-    );
+        "libfoo|2.0:def456:glibc::|\n");
 
     Repository repo;
     repo.load_index();
@@ -68,12 +74,12 @@ TEST_F(AggregatedIndexTest, SingleVersionPerLine) {
     EXPECT_EQ(pkg->dependencies[0].name, "glibc");
 }
 
-TEST_F(AggregatedIndexTest, MultipleVersionsOneLine) {
+TEST_F(AggregatedIndexTest, MultipleVersionsOneLine)
+{
     // New aggregated format: ver1:hash1:deps;ver2:hash2:deps
     write_index(
         "zlib|1.2.13:abc123::;1.3:def456::|\n"
-        "libfoo|2.0:aaa111:glibc>=2.35:;2.1:bbb222:ncurses,glibc>=2.35:|\n"
-    );
+        "libfoo|2.0:aaa111:glibc>=2.35:;2.1:bbb222:ncurses,glibc>=2.35:|\n");
 
     Repository repo;
     repo.load_index();
@@ -105,10 +111,9 @@ TEST_F(AggregatedIndexTest, MultipleVersionsOneLine) {
     ASSERT_EQ(pkg->dependencies.size(), 2);
 }
 
-TEST_F(AggregatedIndexTest, BestMatchingVersion) {
-    write_index(
-        "zlib|1.0:aaaa::;1.5:bbbb::;2.0:cccc::|\n"
-    );
+TEST_F(AggregatedIndexTest, BestMatchingVersion)
+{
+    write_index("zlib|1.0:aaaa::;1.5:bbbb::;2.0:cccc::|\n");
 
     Repository repo;
     repo.load_index();
@@ -129,12 +134,12 @@ TEST_F(AggregatedIndexTest, BestMatchingVersion) {
     EXPECT_EQ(pkg->version, "1.0");
 }
 
-TEST_F(AggregatedIndexTest, ProvidesParsedCorrectly) {
+TEST_F(AggregatedIndexTest, ProvidesParsedCorrectly)
+{
     write_index(
         "vim|9.1:aaa:glibc:editor:|\n"
         "busybox|1.36:bbb::sh,shell:|\n"
-        "zlib|1.2:ccc::|\n"
-    );
+        "zlib|1.2:ccc::|\n");
 
     Repository repo;
     repo.load_index();
@@ -150,14 +155,14 @@ TEST_F(AggregatedIndexTest, ProvidesParsedCorrectly) {
     EXPECT_EQ(pkg->name, "busybox");
 }
 
-TEST_F(AggregatedIndexTest, MixedAggregatedAndSimpleLines) {
+TEST_F(AggregatedIndexTest, MixedAggregatedAndSimpleLines)
+{
     // Mix: some packages single-version, some multi-version
     write_index(
         "zlib|1.2.13:a1::|\n"
         "glibc|2.35:b1::;2.36:b2::|\n"
         "coreutils|9.0:c1::|\n"
-        "libfoo|1.0:d1:ncurses:;2.0:d2:ncurses,glibc:|\n"
-    );
+        "libfoo|1.0:d1:ncurses:;2.0:d2:ncurses,glibc:|\n");
 
     Repository repo;
     repo.load_index();
@@ -177,10 +182,10 @@ TEST_F(AggregatedIndexTest, MixedAggregatedAndSimpleLines) {
     ASSERT_EQ(pkg->dependencies.size(), 2);
 }
 
-TEST_F(AggregatedIndexTest, ProvidesWithAggregatedVersions) {
+TEST_F(AggregatedIndexTest, ProvidesWithAggregatedVersions)
+{
     write_index(
-        "vim|9.0:aaa:ncurses:editor,text-editor:;9.1:bbb:ncurses,glibc:editor,text-editor:|\n"
-    );
+        "vim|9.0:aaa:ncurses:editor,text-editor:;9.1:bbb:ncurses,glibc:editor,text-editor:|\n");
 
     Repository repo;
     repo.load_index();
@@ -198,7 +203,8 @@ TEST_F(AggregatedIndexTest, ProvidesWithAggregatedVersions) {
     ASSERT_TRUE(pkg.has_value());
 }
 
-TEST_F(AggregatedIndexTest, EmptyIndex) {
+TEST_F(AggregatedIndexTest, EmptyIndex)
+{
     write_index("");
 
     Repository repo;
@@ -207,13 +213,13 @@ TEST_F(AggregatedIndexTest, EmptyIndex) {
     EXPECT_FALSE(repo.find_package("anything").has_value());
 }
 
-TEST_F(AggregatedIndexTest, CommentLines) {
+TEST_F(AggregatedIndexTest, CommentLines)
+{
     write_index(
         "# this is a comment\n"
         "zlib|1.0:a::|\n"
         "# another comment\n"
-        "libfoo|2.0:b::|\n"
-    );
+        "libfoo|2.0:b::|\n");
 
     Repository repo;
     repo.load_index();
@@ -222,10 +228,9 @@ TEST_F(AggregatedIndexTest, CommentLines) {
     EXPECT_TRUE(repo.find_package("libfoo").has_value());
 }
 
-TEST_F(AggregatedIndexTest, VersionSortingAcrossAggregatedLine) {
-    write_index(
-        "zlib|1.0:a:;1.5:b:;0.9:c:\n"
-    );
+TEST_F(AggregatedIndexTest, VersionSortingAcrossAggregatedLine)
+{
+    write_index("zlib|1.0:a:;1.5:b:;0.9:c:\n");
 
     Repository repo;
     repo.load_index();

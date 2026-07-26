@@ -14,24 +14,25 @@
  */
 
 #include <gtest/gtest.h>
-#include "../../main/src/pkg/package_manager.hpp"
-#include "../../main/src/pkg/install_common.hpp"
-#include "../../main/src/archive/packer.hpp"
-#include "../../main/src/archive/archive.hpp"
-#include "../../main/src/config/config.hpp"
-#include "../../main/src/base/utils.hpp"
-#include "../../main/src/i18n/localization.hpp"
-#include "../../main/src/base/constants.hpp"
-#include "../../main/src/db/cache.hpp"
-#include "../../main/src/repo/repository.hpp"
-#include "nlohmann/json.hpp"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <cstdlib>
 #include <set>
 #include <string>
 #include <vector>
+
+#include "../../main/src/archive/archive.hpp"
+#include "../../main/src/archive/packer.hpp"
+#include "../../main/src/base/constants.hpp"
+#include "../../main/src/base/utils.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/db/cache.hpp"
+#include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/pkg/install_common.hpp"
+#include "../../main/src/pkg/package_manager.hpp"
+#include "../../main/src/repo/repository.hpp"
+#include "nlohmann/json.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -40,13 +41,15 @@ using json = nlohmann::json;
 // Fixture: set up isolated test root with Config + Cache ready
 // =========================================================================
 
-class RemovalSymlinkTest : public ::testing::Test {
+class RemovalSymlinkTest : public ::testing::Test
+{
 protected:
     fs::path suite_work_dir;
     fs::path test_root;
     fs::path pkg_dir;
 
-    void SetUp() override {
+    void SetUp() override
+    {
         Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
         Config::instance().set_testing_mode(true);
         Config::instance().set_force_overwrite_mode(false);
@@ -67,19 +70,18 @@ protected:
         Cache::instance().load();
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         Config::instance().set_root_path("/");
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
     }
 
     // Helper: build a minimal .lpkg archive from explicit content
     std::string create_package_with_content(
-        const std::string& name,
-        const std::string& version,
+        const std::string& name, const std::string& version,
         const std::map<std::string, std::string>& content_map,
         const std::map<std::string, std::string>& dir_symlinks = {},
-        const std::vector<std::string>& deps = {},
-        const std::vector<std::string>& provides = {},
+        const std::vector<std::string>& deps = {}, const std::vector<std::string>& provides = {},
         const std::vector<std::string>& needed_so = {})
     {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
@@ -103,29 +105,29 @@ protected:
         std::string pkg_filename = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
 
-        pack_package(pkg_path, work_dir.string(), name, version,
-                     deps, provides, "Man page for " + name, needed_so);
+        pack_package(pkg_path, work_dir.string(), name, version, deps, provides,
+                     "Man page for " + name, needed_so);
         fs::remove_all(work_dir);
         return pkg_path;
     }
 
     // Helper: create a simple package with one bin file
-    std::string create_simple_package(const std::string& name,
-                                       const std::string& version = "1.0",
-                                       const std::vector<std::string>& deps = {},
-                                       const std::vector<std::string>& provides = {})
+    std::string create_simple_package(const std::string& name, const std::string& version = "1.0",
+                                      const std::vector<std::string>& deps = {},
+                                      const std::vector<std::string>& provides = {})
     {
         return create_package_with_content(
-            name, version,
-            {{std::string("usr/bin/") + name, "#!/bin/sh\necho " + name}},
-            {}, deps, provides);
+            name, version, {{std::string("usr/bin/") + name, "#!/bin/sh\necho " + name}}, {}, deps,
+            provides);
     }
 
-    bool file_installed(const std::string& logical_path) {
+    bool file_installed(const std::string& logical_path)
+    {
         return fs::exists(test_root / fs::path(logical_path).relative_path());
     }
 
-    bool is_registered(const std::string& name) {
+    bool is_registered(const std::string& name)
+    {
         return Cache::instance().is_installed(name);
     }
 };
@@ -134,26 +136,31 @@ protected:
 // SECTION 1: scan_content_files unit tests
 // =========================================================================
 
-class ScanContentTest : public ::testing::Test {
+class ScanContentTest : public ::testing::Test
+{
 protected:
     fs::path temp_dir;
 
-    void SetUp() override {
+    void SetUp() override
+    {
         temp_dir = fs::absolute("lpkg_scan_test");
         fs::remove_all(temp_dir);
         fs::create_directories(temp_dir);
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         fs::remove_all(temp_dir);
     }
 
-    std::vector<std::string> scan() {
+    std::vector<std::string> scan()
+    {
         return detail::scan_content_files(temp_dir);
     }
 };
 
-TEST_F(ScanContentTest, IncludesRegularFiles) {
+TEST_F(ScanContentTest, IncludesRegularFiles)
+{
     std::ofstream(temp_dir / "file1.txt") << "hello";
     fs::create_directories(temp_dir / "sub");
     std::ofstream(temp_dir / "sub" / "file2.txt") << "world";
@@ -166,7 +173,8 @@ TEST_F(ScanContentTest, IncludesRegularFiles) {
     EXPECT_NE(std::find(result.begin(), result.end(), "sub/file2.txt"), result.end());
 }
 
-TEST_F(ScanContentTest, IncludesRegularDirectories) {
+TEST_F(ScanContentTest, IncludesRegularDirectories)
+{
     fs::create_directories(temp_dir / "empty_dir");
     fs::create_directories(temp_dir / "a" / "b" / "c");
 
@@ -179,7 +187,8 @@ TEST_F(ScanContentTest, IncludesRegularDirectories) {
     EXPECT_NE(std::find(result.begin(), result.end(), "a/b/c/"), result.end());
 }
 
-TEST_F(ScanContentTest, IncludesSymlinksToRegularFiles) {
+TEST_F(ScanContentTest, IncludesSymlinksToRegularFiles)
+{
     std::ofstream(temp_dir / "target.txt") << "real";
     fs::create_symlink("target.txt", temp_dir / "link.txt");
     auto result = scan();
@@ -188,7 +197,8 @@ TEST_F(ScanContentTest, IncludesSymlinksToRegularFiles) {
     EXPECT_NE(std::find(result.begin(), result.end(), "target.txt"), result.end());
 }
 
-TEST_F(ScanContentTest, IncludesSymlinksToDirectories) {
+TEST_F(ScanContentTest, IncludesSymlinksToDirectories)
+{
     fs::create_directories(temp_dir / "real_dir");
     std::ofstream(temp_dir / "real_dir" / "inner.txt") << "deep";
     fs::create_directory_symlink("real_dir", temp_dir / "link_to_dir");
@@ -201,7 +211,8 @@ TEST_F(ScanContentTest, IncludesSymlinksToDirectories) {
     EXPECT_NE(std::find(result.begin(), result.end(), "real_dir/inner.txt"), result.end());
 }
 
-TEST_F(ScanContentTest, MixedContent) {
+TEST_F(ScanContentTest, MixedContent)
+{
     fs::create_directories(temp_dir / "lib");
     std::ofstream(temp_dir / "lib" / "libfoo.so.1") << "elf";
     fs::create_directories(temp_dir / "regular_dir");
@@ -218,11 +229,13 @@ TEST_F(ScanContentTest, MixedContent) {
     EXPECT_NE(std::find(result.begin(), result.end(), "lib64"), result.end());
 }
 
-TEST_F(ScanContentTest, ReturnsEmptyOnEmptyDirectory) {
+TEST_F(ScanContentTest, ReturnsEmptyOnEmptyDirectory)
+{
     EXPECT_TRUE(scan().empty());
 }
 
-TEST_F(ScanContentTest, ReturnsDirectoriesForOnlySubdirs) {
+TEST_F(ScanContentTest, ReturnsDirectoriesForOnlySubdirs)
+{
     fs::create_directories(temp_dir / "a" / "b" / "c");
     auto result = scan();
     // Directories are tracked: a/, a/b/, a/b/c/
@@ -236,7 +249,8 @@ TEST_F(ScanContentTest, ReturnsDirectoriesForOnlySubdirs) {
 // SECTION 2: File database unit tests
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, FileOwnerRegistrationAndQuery) {
+TEST_F(RemovalSymlinkTest, FileOwnerRegistrationAndQuery)
+{
     Cache::instance().add_file_owner("/usr/bin/foo", "pkgA");
     Cache::instance().add_file_owner("/usr/bin/bar", "pkgA");
     Cache::instance().add_file_owner("/usr/bin/baz", "pkgB");
@@ -248,30 +262,26 @@ TEST_F(RemovalSymlinkTest, FileOwnerRegistrationAndQuery) {
     EXPECT_TRUE(Cache::instance().is_file_owned_by("/usr/bin/foo", "pkgA"));
     EXPECT_FALSE(Cache::instance().is_file_owned_by("/usr/bin/foo", "pkgB"));
 
-    Cache::instance().add_file_owner("/usr/bin/shared", "pkgA");
-    Cache::instance().add_file_owner("/usr/bin/shared", "pkgB");
-    auto owners_shared = Cache::instance().get_file_owners("/usr/bin/shared");
-    ASSERT_EQ(owners_shared.size(), 2);
-    EXPECT_TRUE(owners_shared.contains("pkgA"));
-    EXPECT_TRUE(owners_shared.contains("pkgB"));
+    // 强制单所有权：为已被占有的文件添加第二个所有者应抛异常
+    EXPECT_THROW({ Cache::instance().add_file_owner("/usr/bin/foo", "pkgB"); }, LpkgException);
 }
 
-TEST_F(RemovalSymlinkTest, RemoveFileOwner) {
+TEST_F(RemovalSymlinkTest, RemoveFileOwner)
+{
     Cache::instance().add_file_owner("/usr/bin/foo", "pkgA");
     Cache::instance().remove_file_owner("/usr/bin/foo", "pkgA");
     EXPECT_TRUE(Cache::instance().get_file_owners("/usr/bin/foo").empty());
 }
 
-TEST_F(RemovalSymlinkTest, RemoveFileOwnerOnlyClearsOnePackage) {
-    Cache::instance().add_file_owner("/usr/bin/shared", "pkgA");
-    Cache::instance().add_file_owner("/usr/bin/shared", "pkgB");
-    Cache::instance().remove_file_owner("/usr/bin/shared", "pkgA");
-    auto owners = Cache::instance().get_file_owners("/usr/bin/shared");
-    ASSERT_EQ(owners.size(), 1);
-    EXPECT_TRUE(owners.contains("pkgB"));
+TEST_F(RemovalSymlinkTest, RemoveFileOwnerOnlyClearsOnePackage)
+{
+    Cache::instance().add_file_owner("/usr/bin/single", "pkgA");
+    Cache::instance().remove_file_owner("/usr/bin/single", "pkgA");
+    EXPECT_TRUE(Cache::instance().get_file_owners("/usr/bin/single").empty());
 }
 
-TEST_F(RemovalSymlinkTest, GetPackageFilesCollectsAllOwnedFiles) {
+TEST_F(RemovalSymlinkTest, GetPackageFilesCollectsAllOwnedFiles)
+{
     Cache::instance().add_file_owner("/usr/bin/a", "pkgA");
     Cache::instance().add_file_owner("/usr/bin/b", "pkgA");
     Cache::instance().add_file_owner("/usr/bin/c", "pkgB");
@@ -282,7 +292,8 @@ TEST_F(RemovalSymlinkTest, GetPackageFilesCollectsAllOwnedFiles) {
     EXPECT_TRUE(files.contains("/usr/bin/b"));
 }
 
-TEST_F(RemovalSymlinkTest, RemoveFileOwnerFromNonExistentEntry) {
+TEST_F(RemovalSymlinkTest, RemoveFileOwnerFromNonExistentEntry)
+{
     EXPECT_NO_THROW(Cache::instance().remove_file_owner("/does/not/exist", "pkgX"));
 }
 
@@ -290,7 +301,8 @@ TEST_F(RemovalSymlinkTest, RemoveFileOwnerFromNonExistentEntry) {
 // SECTION 3: Package installation — file tracking verification
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, InstallRegistersRegularFiles) {
+TEST_F(RemovalSymlinkTest, InstallRegistersRegularFiles)
+{
     std::string pkg = create_simple_package("hello-pkg", "1.0");
     ASSERT_NO_THROW(install_packages({pkg}));
     write_cache();
@@ -300,13 +312,13 @@ TEST_F(RemovalSymlinkTest, InstallRegistersRegularFiles) {
     EXPECT_TRUE(Cache::instance().get_file_owners("/usr/bin/hello-pkg").contains("hello-pkg"));
 }
 
-TEST_F(RemovalSymlinkTest, InstallRegistersDirectorySymlinks) {
+TEST_F(RemovalSymlinkTest, InstallRegistersDirectorySymlinks)
+{
     // Package-internal dir symlinks (like jvm/conf → /etc/java) ARE package
     // artifacts and must be tracked in the file database.
-    std::string pkg = create_package_with_content(
-        "dirsym-pkg", "1.0",
-        {{"usr/bin/dirsym-pkg", "#!/bin/sh\necho works"}},
-        {{"bin", "usr/bin"}});
+    std::string pkg = create_package_with_content("dirsym-pkg", "1.0",
+                                                  {{"usr/bin/dirsym-pkg", "#!/bin/sh\necho works"}},
+                                                  {{"bin", "usr/bin"}});
 
     ASSERT_NO_THROW(install_packages({pkg}));
     write_cache();
@@ -317,41 +329,29 @@ TEST_F(RemovalSymlinkTest, InstallRegistersDirectorySymlinks) {
     EXPECT_TRUE(Cache::instance().get_file_owners("/usr/bin/dirsym-pkg").contains("dirsym-pkg"));
 }
 
-TEST_F(RemovalSymlinkTest, DirSymlinksCausesSharedFileBlockWithoutBuilderFix) {
+TEST_F(RemovalSymlinkTest, DirSymlinksCausesSharedFileBlockWithoutBuilderFix)
+{
     // Without the builder fix (i.e. when pack_package is called directly),
-    // packages contain USR-Merge dir symlinks, causing removal to fail.
-    std::string pkg1 = create_package_with_content(
-        "blocked-pkg1", "1.0",
-        {{"usr/bin/p1", "data"}},
-        {{"bin", "usr/bin"}});
-    std::string pkg2 = create_package_with_content(
-        "blocked-pkg2", "1.0",
-        {{"usr/bin/p2", "data"}},
-        {{"bin", "usr/bin"}});
+    // packages contain USR-Merge dir symlinks, causing install to fail.
+    std::string pkg1 = create_package_with_content("blocked-pkg1", "1.0", {{"usr/bin/p1", "data"}},
+                                                   {{"bin", "usr/bin"}});
+    std::string pkg2 = create_package_with_content("blocked-pkg2", "1.0", {{"usr/bin/p2", "data"}},
+                                                   {{"bin", "usr/bin"}});
 
     install_packages({pkg1});
     write_cache();
 
     // Second install fails due to file conflict on /bin symlink
-    // (conflict detection catches it at install time)
+    // (single-ownership: /bin already owned by blocked-pkg1)
     ASSERT_THROW(install_packages({pkg2}), LpkgException);
-
-    // But if both WERE somehow installed (e.g. via direct DB manipulation):
-    // removal should be BLOCKED by shared /bin symlink
-    Cache::instance().add_file_owner("/bin", "blocked-pkg2");
-    Cache::instance().add_installed("blocked-pkg2", "1.0", false);
-    EXPECT_THROW(remove_package("blocked-pkg1", false), LpkgException);
-
-    // --force bypasses the check
-    EXPECT_NO_THROW(remove_package("blocked-pkg1", true));
-    // Clean up
-    remove_package("blocked-pkg2", true);
-    write_cache();
 }
 
-TEST_F(RemovalSymlinkTest, ForceRemoveBypassesSharedDirSymlinks) {
-    Cache::instance().add_file_owner("/bin", "pkgA");
-    Cache::instance().add_file_owner("/bin", "pkgB");
+TEST_F(RemovalSymlinkTest, ForceRemoveBypassesSharedDirSymlinks)
+{
+    // Single-ownership: each package has unique files.
+    // Verify that force removal works.
+    Cache::instance().add_file_owner("/usr/bin/pA", "pkgA");
+    Cache::instance().add_file_owner("/usr/bin/pB", "pkgB");
     Cache::instance().add_installed("pkgA", "1.0", true);
     Cache::instance().add_installed("pkgB", "2.0", true);
 
@@ -359,10 +359,11 @@ TEST_F(RemovalSymlinkTest, ForceRemoveBypassesSharedDirSymlinks) {
 }
 
 // =========================================================================
-// SECTION 4: Package removal — real file sharing
+// SECTION 4: Package removal — no file sharing (single-ownership)
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, RemovePackageWithNoSharedFiles) {
+TEST_F(RemovalSymlinkTest, RemovePackageWithNoSharedFiles)
+{
     std::string pkg = create_simple_package("alone-pkg", "1.0");
     install_packages({pkg});
     write_cache();
@@ -373,27 +374,28 @@ TEST_F(RemovalSymlinkTest, RemovePackageWithNoSharedFiles) {
     EXPECT_FALSE(file_installed("usr/bin/alone-pkg"));
 }
 
-TEST_F(RemovalSymlinkTest, RemoveBlockedOnSharedRegularFile) {
-    Cache::instance().add_file_owner("/usr/bin/shared-bin", "pkgA");
-    Cache::instance().add_file_owner("/usr/bin/shared-bin", "pkgB");
+TEST_F(RemovalSymlinkTest, RemoveBlockedOnSharedRegularFile)
+{
+    // 单所有权：没有共享文件，remove 只检查逆向依赖
     Cache::instance().add_file_owner("/usr/bin/a-only", "pkgA");
     Cache::instance().add_installed("pkgA", "1.0", true);
-    Cache::instance().add_installed("pkgB", "2.0", true);
 
-    EXPECT_THROW(remove_package("pkgA", false), LpkgException);
+    // pkgA 没有依赖者，正常移除应成功
+    EXPECT_NO_THROW(remove_package("pkgA", false));
 }
 
-TEST_F(RemovalSymlinkTest, ForceRemoveBypassesSharedFileCheck) {
-    Cache::instance().add_file_owner("/usr/bin/shared-bin", "pkgA");
-    Cache::instance().add_file_owner("/usr/bin/shared-bin", "pkgB");
+TEST_F(RemovalSymlinkTest, ForceRemoveBypassesSharedFileCheck)
+{
+    // 单所有权：force remove 正常工作
+    Cache::instance().add_file_owner("/usr/bin/pkgA", "pkgA");
     Cache::instance().add_installed("pkgA", "1.0", false);
-    Cache::instance().add_installed("pkgB", "2.0", false);
 
     EXPECT_NO_THROW(remove_package("pkgA", true));
     write_cache();
 }
 
-TEST_F(RemovalSymlinkTest, RemoveNonExistentPackage) {
+TEST_F(RemovalSymlinkTest, RemoveNonExistentPackage)
+{
     EXPECT_NO_THROW(remove_package("nonexistent-pkg", false));
     EXPECT_NO_THROW(remove_package("nonexistent-pkg", true));
 }
@@ -402,7 +404,8 @@ TEST_F(RemovalSymlinkTest, RemoveNonExistentPackage) {
 // SECTION 5: Removal blocked by reverse dependencies
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, RemoveBlockedOnReverseDeps) {
+TEST_F(RemovalSymlinkTest, RemoveBlockedOnReverseDeps)
+{
     // remove_package does not throw when blocked by reverse deps;
     // it logs the info and returns. Verify by checking the package
     // is still installed after removal attempt.
@@ -422,7 +425,8 @@ TEST_F(RemovalSymlinkTest, RemoveBlockedOnReverseDeps) {
     EXPECT_TRUE(is_registered("lib-base")) << "lib-base should not have been removed";
 }
 
-TEST_F(RemovalSymlinkTest, RemoveBlockedOnVirtualProvides) {
+TEST_F(RemovalSymlinkTest, RemoveBlockedOnVirtualProvides)
+{
     Cache::instance().add_installed("openssl-pkg", "1.0", true);
     Cache::instance().add_installed("curl-pkg", "1.0", false);
 
@@ -443,7 +447,8 @@ TEST_F(RemovalSymlinkTest, RemoveBlockedOnVirtualProvides) {
 // SECTION 6: Autoremove
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, AutoremoveFindsOrphans) {
+TEST_F(RemovalSymlinkTest, AutoremoveFindsOrphans)
+{
     // app-a is installed explicitly (held=true); lib-b is its auto-installed
     // dependency (held=false). After removing app-a, lib-b should be orphaned.
     Cache::instance().add_installed("app-a", "1.0", true);
@@ -476,34 +481,35 @@ TEST_F(RemovalSymlinkTest, AutoremoveFindsOrphans) {
 // SECTION 7: File conflict detection during install
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, ConflictDetectedOnTwoPackagesSameFile) {
+TEST_F(RemovalSymlinkTest, ConflictDetectedOnTwoPackagesSameFile)
+{
     std::string pkg1 = create_simple_package("first-pkg", "1.0");
     install_packages({pkg1});
     write_cache();
 
     // Second package claims the SAME file path
     std::string pkg2 = create_package_with_content(
-        "second-pkg", "1.0",
-        {{"usr/bin/first-pkg", "#!/bin/sh\necho collision"}});
+        "second-pkg", "1.0", {{"usr/bin/first-pkg", "#!/bin/sh\necho collision"}});
 
     EXPECT_THROW(install_packages({pkg2}), LpkgException);
 }
 
-TEST_F(RemovalSymlinkTest, ForceOverwriteBypassesConflict) {
+TEST_F(RemovalSymlinkTest, ForceOverwriteBypassesConflict)
+{
     std::string pkg1 = create_simple_package("pkg1", "1.0");
     install_packages({pkg1});
     write_cache();
 
-    std::string pkg2 = create_package_with_content(
-        "pkg2", "1.0",
-        {{"usr/bin/pkg1", "#!/bin/sh\necho different"}});
+    std::string pkg2 =
+        create_package_with_content("pkg2", "1.0", {{"usr/bin/pkg1", "#!/bin/sh\necho different"}});
 
     Config::instance().set_force_overwrite_mode(true);
     EXPECT_NO_THROW(install_packages({pkg2}));
     Config::instance().set_force_overwrite_mode(false);
 }
 
-TEST_F(RemovalSymlinkTest, NoConflictWhenFileAlreadyOwnedBySelf) {
+TEST_F(RemovalSymlinkTest, NoConflictWhenFileAlreadyOwnedBySelf)
+{
     std::string pkg = create_simple_package("self-pkg", "1.0");
     install_packages({pkg});
     write_cache();
@@ -514,19 +520,23 @@ TEST_F(RemovalSymlinkTest, NoConflictWhenFileAlreadyOwnedBySelf) {
 // SECTION 8: Shared file error message verification
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, SharedFileErrorShowsActualPackageNames) {
-    Cache::instance().add_file_owner("/usr/bin/overlap", "pkgX");
-    Cache::instance().add_file_owner("/usr/bin/overlap", "pkgY");
-    Cache::instance().add_installed("pkgX", "1.0", true);
-    Cache::instance().add_installed("pkgY", "1.0", false);
+TEST_F(RemovalSymlinkTest, SharedFileErrorShowsActualPackageNames)
+{
+    // 单所有权：文件冲突错误消息应包含现有所有者
+    std::string pkgX = create_simple_package("pkgX", "1.0");
+    install_packages({pkgX});
+    write_cache();
+
+    std::string pkgY =
+        create_package_with_content("pkgY", "1.0", {{"usr/bin/pkgX", "#!/bin/sh\necho different"}});
 
     try {
-        remove_package("pkgX", false);
+        install_packages({pkgY});
         FAIL() << "Expected LpkgException was not thrown";
     } catch (const LpkgException& e) {
         std::string msg = e.what();
-        EXPECT_TRUE(msg.find("pkgY") != std::string::npos)
-            << "Error should contain actual package name (pkgY), got: " << msg;
+        EXPECT_TRUE(msg.find("pkgX") != std::string::npos)
+            << "Error should contain package name (pkgX), got: " << msg;
     }
 }
 
@@ -534,7 +544,8 @@ TEST_F(RemovalSymlinkTest, SharedFileErrorShowsActualPackageNames) {
 // SECTION 9: Package query verification
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, QueryShowsPackageFiles) {
+TEST_F(RemovalSymlinkTest, QueryShowsPackageFiles)
+{
     Cache::instance().add_file_owner("/usr/bin/query-test", "query-test");
     Cache::instance().add_file_owner("/etc/query-test.conf", "query-test");
     Cache::instance().add_file_owner("/usr/bin/other", "other-pkg");
@@ -549,17 +560,16 @@ TEST_F(RemovalSymlinkTest, QueryShowsPackageFiles) {
 // SECTION 10: Upgrade
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, UpgradeRemovesObsoleteFile) {
+TEST_F(RemovalSymlinkTest, UpgradeRemovesObsoleteFile)
+{
     std::string pkg_v1 = create_package_with_content(
         "upgrade-me", "1.0",
-        {{"usr/bin/upgrade-me", "v1 binary"},
-         {"usr/bin/old-utility-v1", "legacy"}});
+        {{"usr/bin/upgrade-me", "v1 binary"}, {"usr/bin/old-utility-v1", "legacy"}});
     install_packages({pkg_v1});
     write_cache();
 
-    std::string pkg_v2 = create_package_with_content(
-        "upgrade-me", "2.0",
-        {{"usr/bin/upgrade-me", "v2 binary"}});
+    std::string pkg_v2 =
+        create_package_with_content("upgrade-me", "2.0", {{"usr/bin/upgrade-me", "v2 binary"}});
     install_packages({pkg_v2});
     write_cache();
 
@@ -571,7 +581,8 @@ TEST_F(RemovalSymlinkTest, UpgradeRemovesObsoleteFile) {
 // SECTION 11: Edge cases
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, InstallThenRemoveCycle) {
+TEST_F(RemovalSymlinkTest, InstallThenRemoveCycle)
+{
     std::string pkg_a = create_simple_package("cycle-a", "1.0");
     std::string pkg_b = create_simple_package("cycle-b", "1.0");
 
@@ -592,7 +603,8 @@ TEST_F(RemovalSymlinkTest, InstallThenRemoveCycle) {
     EXPECT_FALSE(is_registered("cycle-b"));
 }
 
-TEST_F(RemovalSymlinkTest, MultipleInstallsSamePackage) {
+TEST_F(RemovalSymlinkTest, MultipleInstallsSamePackage)
+{
     std::string pkg = create_simple_package("twice-pkg", "1.0");
     install_packages({pkg});
     write_cache();
@@ -605,7 +617,8 @@ TEST_F(RemovalSymlinkTest, MultipleInstallsSamePackage) {
     EXPECT_FALSE(is_registered("twice-pkg"));
 }
 
-TEST_F(RemovalSymlinkTest, ReinstallWorksAfterRemoval) {
+TEST_F(RemovalSymlinkTest, ReinstallWorksAfterRemoval)
+{
     std::string pkg = create_simple_package("reinstall-test", "1.0");
 
     install_packages({pkg});
@@ -625,7 +638,8 @@ TEST_F(RemovalSymlinkTest, ReinstallWorksAfterRemoval) {
     write_cache();
 }
 
-TEST_F(RemovalSymlinkTest, RemoveWithNoHooks) {
+TEST_F(RemovalSymlinkTest, RemoveWithNoHooks)
+{
     Config::instance().set_no_hooks_mode(true);
     std::string pkg = create_simple_package("no-hooks-pkg", "1.0");
     install_packages({pkg});
@@ -637,25 +651,26 @@ TEST_F(RemovalSymlinkTest, RemoveWithNoHooks) {
     Config::instance().set_no_hooks_mode(false);
 }
 
-TEST_F(RemovalSymlinkTest, ForceRemovePreservesOtherPackagesFiles) {
-    Cache::instance().add_file_owner("/usr/bin/shared", "pkgA");
-    Cache::instance().add_file_owner("/usr/bin/shared", "pkgB");
+TEST_F(RemovalSymlinkTest, ForceRemovePreservesOtherPackagesFiles)
+{
+    // 单所有权：每个包有自己的文件，force remove 只删除目标包文件
     Cache::instance().add_file_owner("/usr/bin/a-only", "pkgA");
+    Cache::instance().add_file_owner("/usr/bin/b-only", "pkgB");
     Cache::instance().add_installed("pkgA", "1.0", true);
     Cache::instance().add_installed("pkgB", "1.0", false);
 
     EXPECT_NO_THROW(remove_package("pkgA", true));
 
-    auto owners = Cache::instance().get_file_owners("/usr/bin/shared");
-    EXPECT_TRUE(owners.contains("pkgB"));
-    EXPECT_FALSE(owners.contains("pkgA"));
+    // pkgB 的文件应保留
+    EXPECT_TRUE(Cache::instance().get_file_owners("/usr/bin/b-only").contains("pkgB"));
 }
 
 // =========================================================================
 // SECTION 12: Packer verification
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, PackerIncludesDirectorySymlinks) {
+TEST_F(RemovalSymlinkTest, PackerIncludesDirectorySymlinks)
+{
     // pack_package does NOT filter directory symlinks — that's the
     // builder's job. Verify that raw pack_package includes them.
     fs::path work_dir = suite_work_dir / "packer_test_raw";
@@ -680,7 +695,8 @@ TEST_F(RemovalSymlinkTest, PackerIncludesDirectorySymlinks) {
     fs::remove_all(extract_dir);
 }
 
-TEST_F(RemovalSymlinkTest, PackerIncludesSymlinksToRegularFiles) {
+TEST_F(RemovalSymlinkTest, PackerIncludesSymlinksToRegularFiles)
+{
     fs::path work_dir = suite_work_dir / "packer_sym_test";
     fs::remove_all(work_dir);
     fs::create_directories(work_dir / "content" / "usr" / "lib");
@@ -702,7 +718,8 @@ TEST_F(RemovalSymlinkTest, PackerIncludesSymlinksToRegularFiles) {
     fs::remove_all(extract_dir);
 }
 
-TEST_F(RemovalSymlinkTest, PackedWithCleanupHasNoDirSymlinks) {
+TEST_F(RemovalSymlinkTest, PackedWithCleanupHasNoDirSymlinks)
+{
     // Simulate what the builder does: create dir symlinks, then clean them up.
     fs::path work_dir = suite_work_dir / "packer_clean_test";
     fs::remove_all(work_dir);
@@ -734,7 +751,8 @@ TEST_F(RemovalSymlinkTest, PackedWithCleanupHasNoDirSymlinks) {
 // SECTION 13: Removal with needed_so dependencies
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, NeededSoDepsBlockRemoval) {
+TEST_F(RemovalSymlinkTest, NeededSoDepsBlockRemoval)
+{
     // remove_package returns early if reverse deps exist, it doesn't throw.
     Cache::instance().add_installed("glibc", "2.35", true);
     Cache::instance().add_installed("app-using-libc", "1.0", false);
@@ -764,7 +782,8 @@ TEST_F(RemovalSymlinkTest, NeededSoDepsBlockRemoval) {
 // SECTION 14: Package with dependency tree
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, DependTreeRemoval) {
+TEST_F(RemovalSymlinkTest, DependTreeRemoval)
+{
     std::string leaf = create_simple_package("dep-leaf", "1.0");
     std::string mid = create_simple_package("dep-mid", "1.0", {"dep-leaf"});
     std::string top = create_simple_package("dep-top", "1.0", {"dep-mid"});
@@ -810,7 +829,8 @@ TEST_F(RemovalSymlinkTest, DependTreeRemoval) {
 // SECTION 15: Symlink-to-file tracking
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, SymlinkToFileIsRegistered) {
+TEST_F(RemovalSymlinkTest, SymlinkToFileIsRegistered)
+{
     fs::path work_dir = suite_work_dir / "lib_sym_work";
     fs::remove_all(work_dir);
     fs::create_directories(work_dir / "content" / "usr" / "lib");
@@ -826,7 +846,7 @@ TEST_F(RemovalSymlinkTest, SymlinkToFileIsRegistered) {
 
     auto files = Cache::instance().get_package_files("lib-sym-pkg");
     EXPECT_TRUE(files.contains("/usr/lib/libbar.so.1")) << "regular file must be tracked";
-    EXPECT_TRUE(files.contains("/usr/lib/libbar.so"))   << "symlink to regular file must be tracked";
+    EXPECT_TRUE(files.contains("/usr/lib/libbar.so")) << "symlink to regular file must be tracked";
 
     remove_package("lib-sym-pkg", true);
     write_cache();
@@ -836,7 +856,8 @@ TEST_F(RemovalSymlinkTest, SymlinkToFileIsRegistered) {
 // SECTION 16: Query file finds owner
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, QueryFileFindsOwner) {
+TEST_F(RemovalSymlinkTest, QueryFileFindsOwner)
+{
     std::string pkg = create_simple_package("query-file-pkg", "1.0");
     install_packages({pkg});
     write_cache();
@@ -852,7 +873,8 @@ TEST_F(RemovalSymlinkTest, QueryFileFindsOwner) {
 // SECTION 17: While-true convergence loop
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, ConsistencyCheckDetectsBrokenDeps) {
+TEST_F(RemovalSymlinkTest, ConsistencyCheckDetectsBrokenDeps)
+{
     // app depends on lib >= 2.0 (written in dep file)
     Cache::instance().add_installed("app", "1.0", true);
     Cache::instance().add_installed("lib", "2.0", true);
@@ -878,7 +900,8 @@ TEST_F(RemovalSymlinkTest, ConsistencyCheckDetectsBrokenDeps) {
     EXPECT_TRUE(broken.contains("app")) << "app should be broken by lib downgrade";
 }
 
-TEST_F(RemovalSymlinkTest, ConsistencyCheckOkWhenSatisfied) {
+TEST_F(RemovalSymlinkTest, ConsistencyCheckOkWhenSatisfied)
+{
     Cache::instance().add_installed("app", "1.0", true);
     Cache::instance().add_installed("lib", "2.0", true);
     Cache::instance().add_file_owner("/usr/bin/app", "app");
@@ -902,7 +925,8 @@ TEST_F(RemovalSymlinkTest, ConsistencyCheckOkWhenSatisfied) {
     EXPECT_FALSE(broken.contains("app")) << "app should NOT be broken by lib 2.0";
 }
 
-TEST_F(RemovalSymlinkTest, ConsistencyCheckSkipsPlanPackages) {
+TEST_F(RemovalSymlinkTest, ConsistencyCheckSkipsPlanPackages)
+{
     Cache::instance().add_installed("app", "1.0", true);
     Cache::instance().add_installed("lib", "1.0", true);
     ensure_dir_exists(Config::instance().dep_dir());
@@ -916,8 +940,10 @@ TEST_F(RemovalSymlinkTest, ConsistencyCheckSkipsPlanPackages) {
     // Both app and lib are in plan → consistency check should skip app
     std::map<std::string, InstallPlan> plan;
     InstallPlan p1, p2;
-    p1.name = "app"; p1.actual_version = "1.0";
-    p2.name = "lib"; p2.actual_version = "2.0";
+    p1.name = "app";
+    p1.actual_version = "1.0";
+    p2.name = "lib";
+    p2.actual_version = "2.0";
     plan["app"] = p1;
     plan["lib"] = p2;
 
@@ -925,7 +951,8 @@ TEST_F(RemovalSymlinkTest, ConsistencyCheckSkipsPlanPackages) {
     EXPECT_TRUE(broken.empty()) << "packages in plan should not be reported as broken";
 }
 
-TEST_F(RemovalSymlinkTest, NeededSoConsistencyDetectsDroppedSoname) {
+TEST_F(RemovalSymlinkTest, NeededSoConsistencyDetectsDroppedSoname)
+{
     // app needs libc.so.6 provided by glibc
     Cache::instance().add_installed("app", "1.0", false);
     Cache::instance().add_installed("glibc", "2.35", true);
@@ -943,14 +970,15 @@ TEST_F(RemovalSymlinkTest, NeededSoConsistencyDetectsDroppedSoname) {
     InstallPlan p;
     p.name = "glibc";
     p.actual_version = "3.0";
-    p.provides = {}; // no libc.so.6
+    p.provides = {};  // no libc.so.6
     plan["glibc"] = p;
 
     auto broken = detail::check_needed_so_consistency(plan);
     EXPECT_TRUE(broken.contains("app")) << "app should be broken if glibc drops libc.so.6";
 }
 
-TEST_F(RemovalSymlinkTest, NeededSoConsistencyOkWhenSonameKept) {
+TEST_F(RemovalSymlinkTest, NeededSoConsistencyOkWhenSonameKept)
+{
     Cache::instance().add_installed("app", "1.0", false);
     Cache::instance().add_installed("glibc", "2.35", true);
     ensure_dir_exists(Config::instance().needed_so_dir());
@@ -978,7 +1006,8 @@ TEST_F(RemovalSymlinkTest, NeededSoConsistencyOkWhenSonameKept) {
 // SECTION 18: Directory permission warning
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, DirPermWarningOnMismatch) {
+TEST_F(RemovalSymlinkTest, DirPermWarningOnMismatch)
+{
     // Create a package with a directory having specific permissions
     fs::path work_dir = suite_work_dir / "dirperm_pkg_work";
     fs::remove_all(work_dir);
@@ -986,8 +1015,7 @@ TEST_F(RemovalSymlinkTest, DirPermWarningOnMismatch) {
     std::ofstream(work_dir / "content" / "usr" / "lib" / "testapp" / "data") << "content";
 
     // Set the directory to 0700
-    fs::permissions(work_dir / "content" / "usr" / "lib" / "testapp",
-        fs::perms::owner_all);
+    fs::permissions(work_dir / "content" / "usr" / "lib" / "testapp", fs::perms::owner_all);
 
     std::string pkg_path = (pkg_dir / "dirperm-test.lpkg").string();
     pack_package(pkg_path, work_dir.string(), "dirperm-test", "1.0");
@@ -996,9 +1024,9 @@ TEST_F(RemovalSymlinkTest, DirPermWarningOnMismatch) {
     // Pre-create the target directory with different permissions (0755)
     fs::path target_dir = test_root / "usr" / "lib" / "testapp";
     fs::create_directories(target_dir);
-    fs::permissions(target_dir,
-        fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec |
-        fs::perms::others_read | fs::perms::others_exec);
+    fs::permissions(target_dir, fs::perms::owner_all | fs::perms::group_read |
+                                    fs::perms::group_exec | fs::perms::others_read |
+                                    fs::perms::others_exec);
 
     // Capture stderr during install
     testing::internal::CaptureStderr();
@@ -1006,12 +1034,13 @@ TEST_F(RemovalSymlinkTest, DirPermWarningOnMismatch) {
     std::string stderr_output = testing::internal::GetCapturedStderr();
 
     // Verify warning was printed
-    EXPECT_TRUE(stderr_output.find("permission") != std::string::npos
-             || stderr_output.find("权限") != std::string::npos)
+    EXPECT_TRUE(stderr_output.find("permission") != std::string::npos ||
+                stderr_output.find("权限") != std::string::npos)
         << "Should warn about directory permission mismatch, got: " << stderr_output;
 }
 
-TEST_F(RemovalSymlinkTest, NoDirPermWarningWhenMatch) {
+TEST_F(RemovalSymlinkTest, NoDirPermWarningWhenMatch)
+{
     // Same dir permission in package and on disk → no warning
     fs::path work_dir = suite_work_dir / "dirperm_ok_pkg_work";
     fs::remove_all(work_dir);
@@ -1019,8 +1048,8 @@ TEST_F(RemovalSymlinkTest, NoDirPermWarningWhenMatch) {
     std::ofstream(work_dir / "content" / "usr" / "lib" / "testapp2" / "data") << "content";
 
     fs::permissions(work_dir / "content" / "usr" / "lib" / "testapp2",
-        fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec |
-        fs::perms::others_read | fs::perms::others_exec);
+                    fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec |
+                        fs::perms::others_read | fs::perms::others_exec);
 
     std::string pkg_path = (pkg_dir / "dirperm-ok.lpkg").string();
     pack_package(pkg_path, work_dir.string(), "dirperm-ok", "1.0");
@@ -1029,17 +1058,17 @@ TEST_F(RemovalSymlinkTest, NoDirPermWarningWhenMatch) {
     // Pre-create with same permissions
     fs::path target_dir = test_root / "usr" / "lib" / "testapp2";
     fs::create_directories(target_dir);
-    fs::permissions(target_dir,
-        fs::perms::owner_all | fs::perms::group_read | fs::perms::group_exec |
-        fs::perms::others_read | fs::perms::others_exec);
+    fs::permissions(target_dir, fs::perms::owner_all | fs::perms::group_read |
+                                    fs::perms::group_exec | fs::perms::others_read |
+                                    fs::perms::others_exec);
 
     testing::internal::CaptureStderr();
     ASSERT_NO_THROW(install_packages({pkg_path}));
     std::string stderr_output = testing::internal::GetCapturedStderr();
 
     // Should NOT contain permission warning
-    EXPECT_TRUE(stderr_output.find("permission") == std::string::npos
-             && stderr_output.find("权限") == std::string::npos)
+    EXPECT_TRUE(stderr_output.find("permission") == std::string::npos &&
+                stderr_output.find("权限") == std::string::npos)
         << "Should NOT warn when permissions match, got: " << stderr_output;
 }
 
@@ -1047,7 +1076,8 @@ TEST_F(RemovalSymlinkTest, NoDirPermWarningWhenMatch) {
 // SECTION 19: Repository provider dedup
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, RepoProviderDedupOnDuplicateIndexEntries) {
+TEST_F(RemovalSymlinkTest, RepoProviderDedupOnDuplicateIndexEntries)
+{
     // Create a repo index where the same package version provides the same
     // capability multiple times (simulating a badly-generated index).
     fs::path repo_dir = suite_work_dir / "test_repo";

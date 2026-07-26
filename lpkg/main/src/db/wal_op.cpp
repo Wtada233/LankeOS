@@ -1,23 +1,25 @@
 #include "wal_op.hpp"
 
-#include "../base/constants.hpp"
-#include "../base/exception.hpp"
-#include "../base/utils.hpp"
-#include "../config/config.hpp"
-#include "../i18n/localization.hpp"
-#include "cache.hpp"
-
 #include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <sstream>
-#include <sys/stat.h>
-#include <unistd.h>
+
+#include "base/constants.hpp"
+#include "base/exception.hpp"
+#include "base/utils.hpp"
+#include "cache.hpp"
+#include "config/config.hpp"
+#include "i18n/localization.hpp"
 
 namespace fs = std::filesystem;
 
-namespace wal {
+namespace wal
+{
 
 // ============================================================================
 // 类型名映射
@@ -48,22 +50,22 @@ static constexpr std::pair<std::string_view, WALOpType> TYPE_MAP[] = {
     {"RESTORE_FILE_RM", WALOpType::RESTORE_FILE_RM},
     {"RESTORE_DIR_RM", WALOpType::RESTORE_DIR_RM},
     {"RESTORE_DB_RM", WALOpType::RESTORE_DB_RM},
-    {"REMOVE_FILE", WALOpType::REMOVE_FILE},   // 旧名称，向后兼容解析
-    {"REMOVE_DIR", WALOpType::REMOVE_DIR},     // 旧名称，向后兼容解析
+    {"REMOVE_FILE", WALOpType::REMOVE_FILE},  // 旧名称，向后兼容解析
+    {"REMOVE_DIR", WALOpType::REMOVE_DIR},    // 旧名称，向后兼容解析
 };
 
-std::string_view walop_type_name(WALOpType t) {
-  for (const auto &[name, type] : TYPE_MAP)
-    if (type == t)
-      return name;
-  return "UNKNOWN";
+std::string_view walop_type_name(WALOpType t)
+{
+    for (const auto& [name, type] : TYPE_MAP)
+        if (type == t) return name;
+    return "UNKNOWN";
 }
 
-WALOpType walop_type_from_name(std::string_view name) {
-  for (const auto &[n, type] : TYPE_MAP)
-    if (n == name)
-      return type;
-  throw LpkgException(std::string("Unknown WAL op type: ") + std::string(name));
+WALOpType walop_type_from_name(std::string_view name)
+{
+    for (const auto& [n, type] : TYPE_MAP)
+        if (n == name) return type;
+    throw LpkgException(std::string("Unknown WAL op type: ") + std::string(name));
 }
 
 // ============================================================================
@@ -74,90 +76,85 @@ WALOpType walop_type_from_name(std::string_view name) {
 //   TYPE arg1 [arg2 [arg3 [arg4 [arg5 [arg6]]]]]
 // 多参数操作（如 BACKUP，COPY）使用 "→" 作分隔符
 
-static std::vector<std::string_view> split_line(std::string_view line) {
-  std::vector<std::string_view> parts;
+static std::vector<std::string_view> split_line(std::string_view line)
+{
+    std::vector<std::string_view> parts;
 
-  // 先找第一个空格 → type
-  auto space = line.find(' ');
-  if (space == std::string_view::npos) {
-    parts.push_back(line);
-    return parts;
-  }
+    // 先找第一个空格 → type
+    auto space = line.find(' ');
+    if (space == std::string_view::npos) {
+        parts.push_back(line);
+        return parts;
+    }
 
-  parts.push_back(line.substr(0, space));
-  std::string_view rest = line.substr(space + 1);
+    parts.push_back(line.substr(0, space));
+    std::string_view rest = line.substr(space + 1);
 
-  // 检查是否包含 "→"（多参数格式: BACKUP src → dst 或 COPY src → dst）
-  auto arrow = rest.find(" \xe2\x86\x92 "); // " → " in UTF-8
-  if (arrow != std::string_view::npos) {
-    parts.push_back(rest.substr(0, arrow));
-    rest.remove_prefix(arrow + 5); // skip " → " (3 bytes + 2 spaces)
-    // rest 现在是 arg2（可能后面还有空格参数）
-    auto sp = rest.find(' ');
-    if (sp != std::string_view::npos) {
-      parts.push_back(rest.substr(0, sp));
-      parts.push_back(rest.substr(sp + 1));
+    // 检查是否包含 "→"（多参数格式: BACKUP src → dst 或 COPY src → dst）
+    auto arrow = rest.find(" \xe2\x86\x92 ");  // " → " in UTF-8
+    if (arrow != std::string_view::npos) {
+        parts.push_back(rest.substr(0, arrow));
+        rest.remove_prefix(arrow + 5);  // skip " → " (3 bytes + 2 spaces)
+        // rest 现在是 arg2（可能后面还有空格参数）
+        auto sp = rest.find(' ');
+        if (sp != std::string_view::npos) {
+            parts.push_back(rest.substr(0, sp));
+            parts.push_back(rest.substr(sp + 1));
+        } else {
+            parts.push_back(rest);
+        }
     } else {
-      parts.push_back(rest);
+        // 简单空格分割
+        while (!rest.empty()) {
+            auto sp = rest.find(' ');
+            if (sp == std::string_view::npos) {
+                parts.push_back(rest);
+                break;
+            }
+            parts.push_back(rest.substr(0, sp));
+            rest.remove_prefix(sp + 1);
+        }
     }
-  } else {
-    // 简单空格分割
-    while (!rest.empty()) {
-      auto sp = rest.find(' ');
-      if (sp == std::string_view::npos) {
-        parts.push_back(rest);
-        break;
-      }
-      parts.push_back(rest.substr(0, sp));
-      rest.remove_prefix(sp + 1);
-    }
-  }
-  return parts;
+    return parts;
 }
 
-WALOp parse_op(const std::string &line) {
-  WALOp op;
-  op.raw = line;
+WALOp parse_op(const std::string& line)
+{
+    WALOp op;
+    op.raw = line;
 
-  auto parts = split_line(std::string_view(line));
-  if (parts.empty())
+    auto parts = split_line(std::string_view(line));
+    if (parts.empty()) return op;
+
+    try {
+        op.type = walop_type_from_name(parts[0]);
+    } catch (const LpkgException&) {
+        // 未知类型 — 返回空 op（调用者跳过）
+        op.type = WALOpType::BEGIN_PKGS;  // 哨兵，由 skip 逻辑处理
+        op.arg1 = "__INVALID__";
+        return op;
+    }
+
+    if (parts.size() > 1) op.arg1 = std::string(parts[1]);
+    if (parts.size() > 2) op.arg2 = std::string(parts[2]);
+    if (parts.size() > 3) op.arg3 = std::string(parts[3]);
+    if (parts.size() > 4) op.arg4 = std::string(parts[4]);
+    if (parts.size() > 5) op.arg5 = std::string(parts[5]);
+    if (parts.size() > 6) op.arg6 = std::string(parts[6]);
+
     return op;
-
-  try {
-    op.type = walop_type_from_name(parts[0]);
-  } catch (const LpkgException &) {
-    // 未知类型 — 返回空 op（调用者跳过）
-    op.type = WALOpType::BEGIN_PKGS; // 哨兵，由 skip 逻辑处理
-    op.arg1 = "__INVALID__";
-    return op;
-  }
-
-  if (parts.size() > 1)
-    op.arg1 = std::string(parts[1]);
-  if (parts.size() > 2)
-    op.arg2 = std::string(parts[2]);
-  if (parts.size() > 3)
-    op.arg3 = std::string(parts[3]);
-  if (parts.size() > 4)
-    op.arg4 = std::string(parts[4]);
-  if (parts.size() > 5)
-    op.arg5 = std::string(parts[5]);
-  if (parts.size() > 6)
-    op.arg6 = std::string(parts[6]);
-
-  return op;
 }
 
 // ============================================================================
 // checkpoint: DB 条目是否表示 batch-start 最终状态
 // ============================================================================
 
-static bool is_batch_start_milestone(const WALOp &op) {
-  if (op.type != WALOpType::DB && op.type != WALOpType::DBNEW &&
-      op.type != WALOpType::DBRM)
-    return false;
-  DbMilestone m = DbMilestone::from_string(op.arg2);
-  return m.is_batch_start();
+static bool is_batch_start_milestone(const WALOp& op)
+{
+    if (op.type != WALOpType::DB && op.type != WALOpType::DBNEW && op.type != WALOpType::DBRM)
+        return false;
+    DbMilestone m = DbMilestone::from_string(op.arg2);
+    return m.is_batch_start();
 }
 
 // ============================================================================
@@ -166,356 +163,343 @@ static bool is_batch_start_milestone(const WALOp &op) {
 
 /// 向 WAL 日志追加一行并 fsync（用于回滚审计行和批次标记）
 /// 失败时抛 LpkgException——WAL 不可写意味着系统状态无法保证
-static void wal_append_raw(const std::string &line) {
-  std::string path = wal_log_path();
-  int fd =
-      ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
-  if (fd < 0)
-    throw LpkgException(string_format("error.wal_open_failed", path));
+static void wal_append_raw(const std::string& line)
+{
+    std::string path = wal_log_path();
+    int fd = ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
+    if (fd < 0) throw LpkgException(string_format("error.wal_open_failed", path));
 
-  std::string l = line + "\n";
-  ssize_t written = ::write(fd, l.data(), l.size());
-  if (written < 0 || static_cast<size_t>(written) != l.size()) {
+    std::string l = line + "\n";
+    ssize_t written = ::write(fd, l.data(), l.size());
+    if (written < 0 || static_cast<size_t>(written) != l.size()) {
+        ::close(fd);
+        throw LpkgException(string_format("error.wal_write_failed", path));
+    }
+
+    if (::fsync(fd) != 0) {
+        ::close(fd);
+        throw LpkgException(string_format("error.wal_fsync_failed", path));
+    }
+
     ::close(fd);
-    throw LpkgException(string_format("error.wal_write_failed", path));
-  }
-
-  if (::fsync(fd) != 0) {
-    ::close(fd);
-    throw LpkgException(string_format("error.wal_fsync_failed", path));
-  }
-
-  ::close(fd);
 }
 
 /// 获取 .lpkg_db_bak 备份文件的路径
-static std::string db_bak_path(const std::string &db_path,
-                               const std::string &milestone) {
-  return db_path + ".lpkg_db_bak_before:" + milestone;
+static std::string db_bak_path(const std::string& db_path, const std::string& milestone)
+{
+    return db_path + ".lpkg_db_bak_before:" + milestone;
 }
 
 /// 安全删除文件
-static bool safe_remove(const fs::path &p) {
-  std::error_code ec;
-  return fs::remove(p, ec);
+static bool safe_remove(const fs::path& p)
+{
+    std::error_code ec;
+    return fs::remove(p, ec);
 }
 
-RollbackStats reverse_execute(const std::vector<WALOp> &ops,
-                              const std::string &milestone_target,
-                              bool write_audit) {
-  RollbackStats stats;
+RollbackStats reverse_execute(const std::vector<WALOp>& ops, const std::string& milestone_target,
+                              bool write_audit)
+{
+    RollbackStats stats;
 
-  // 逆序遍历
-  for (int i = static_cast<int>(ops.size()) - 1; i >= 0; --i) {
-    const auto &op = ops[i];
+    // 逆序遍历
+    for (int i = static_cast<int>(ops.size()) - 1; i >= 0; --i) {
+        const auto& op = ops[i];
 
-    // 跳过无效行
-    if (op.arg1 == "__INVALID__")
-      continue;
+        // 跳过无效行
+        if (op.arg1 == "__INVALID__") continue;
 
-    // 跳过元数据和 RESTORE 审计行
-    if (op.skip_in_reverse())
-      continue;
+        // 跳过元数据和 RESTORE 审计行
+        if (op.skip_in_reverse()) continue;
 
-    // 跳过 :batch-start DB 条目（最终状态标记）
-    if (is_batch_start_milestone(op))
-      continue;
+        // 跳过 :batch-start DB 条目（最终状态标记）
+        if (is_batch_start_milestone(op)) continue;
 
-    switch (op.type) {
-    // ── BACKUP / REMOVE_OLD ──────────────────────────────────────────
-    case WALOpType::BACKUP:
-    case WALOpType::REMOVE_OLD: {
-      // arg1 = src (原始路径), arg2 = dst (.lpkg_bak 路径)
-      fs::path bak_path = op.arg2;
-      fs::path orig_path = op.arg1;
+        switch (op.type) {
+            // ── BACKUP / REMOVE_OLD ──────────────────────────────────────────
+            case WALOpType::BACKUP:
+            case WALOpType::REMOVE_OLD: {
+                // arg1 = src (原始路径), arg2 = dst (.lpkg_bak 路径)
+                fs::path bak_path = op.arg2;
+                fs::path orig_path = op.arg1;
 
-      // fs::exists 对 dangling symlink 返回 false，必须用 is_symlink 补检
-      if (fs::exists(bak_path) || fs::is_symlink(bak_path)) {
-        ::safe_rename(bak_path, orig_path);
-        stats.files_restored++;
+                // fs::exists 对 dangling symlink 返回 false，必须用 is_symlink 补检
+                if (fs::exists(bak_path) || fs::is_symlink(bak_path)) {
+                    ::safe_rename(bak_path, orig_path);
+                    stats.files_restored++;
 
-        if (write_audit) {
-          wal_append_raw("RESTORE_FILE " + op.arg2 + " \xe2\x86\x92 " +
-                         op.arg1);
+                    if (write_audit) {
+                        wal_append_raw("RESTORE_FILE " + op.arg2 + " \xe2\x86\x92 " + op.arg1);
+                    }
+                }
+                // bak 不存在 → 已被消费，跳过（幂等）
+                break;
+            }
+
+            // ── COPY ─────────────────────────────────────────────────────────
+            case WALOpType::COPY: {
+                // arg2 = dst（目标文件路径）
+                // 逆向：删除目标文件（含 dangling symlink）
+                fs::path dst = op.arg2;
+                if (fs::exists(dst) || fs::is_symlink(dst)) {
+                    safe_remove(dst);
+                    stats.files_cleaned++;
+
+                    if (write_audit) {
+                        // 逆操作: 删除被 COPY 的目标文件（无备份可恢复）
+                        wal_append_raw("RESTORE_FILE_RM " + op.arg2);
+                    }
+                }
+                break;
+            }
+
+            // ── NEW ──────────────────────────────────────────────────────────
+            case WALOpType::NEW: {
+                // arg1 = 文件路径（含 dangling symlink）
+                fs::path p = op.arg1;
+                if (fs::exists(p) || fs::is_symlink(p)) {
+                    safe_remove(p);
+                    stats.files_cleaned++;
+
+                    if (write_audit) {
+                        // 逆操作: 删除安装时新建的文件（无备份可恢复）
+                        wal_append_raw("RESTORE_FILE_RM " + op.arg1);
+                    }
+                }
+                break;
+            }
+
+            // ── NEW_DIR ──────────────────────────────────────────────────────
+            case WALOpType::NEW_DIR: {
+                // arg1 = 目录路径
+                fs::path p = op.arg1;
+                if (fs::exists(p) && fs::is_directory(p)) {
+                    std::error_code ec;
+                    if (fs::is_empty(p, ec)) {
+                        fs::remove(p, ec);
+                        if (!ec && write_audit) {
+                            // 逆操作: 删除安装时新建的空目录（无备份可恢复）
+                            wal_append_raw("RESTORE_DIR_RM " + op.arg1);
+                        }
+                    }
+                }
+                break;
+            }
+
+            // ── DB ───────────────────────────────────────────────────────────
+            case WALOpType::DB: {
+                // arg1 = DB 文件路径, arg2 = 里程碑
+                std::string bak = db_bak_path(op.arg1, op.arg2);
+                if (fs::exists(bak)) {
+                    ::safe_rename(bak, op.arg1);
+                    stats.db_restored++;
+
+                    if (write_audit) {
+                        wal_append_raw("RESTORE_DB " + bak + " \xe2\x86\x92 " + op.arg1);
+                    }
+                }
+                // bak 不存在 → WAL 已写但备份未完成 → 原文件还在 → 跳过（幂等）
+                break;
+            }
+
+            // ── DBNEW ────────────────────────────────────────────────────────
+            case WALOpType::DBNEW: {
+                // arg1 = DB 文件路径, arg2 = 里程碑
+                std::string bak = db_bak_path(op.arg1, op.arg2);
+                if (fs::exists(bak)) {
+                    ::safe_rename(bak, op.arg1);
+                    stats.db_restored++;
+
+                    if (write_audit) {
+                        // DBNEW 有备份 → 恢复备份（与 DB 逆操作相同）
+                        wal_append_raw("RESTORE_DB " + bak + " \xe2\x86\x92 " + op.arg1);
+                    }
+                } else {
+                    // 无备份 → DB 文件是全新创建的 → 删除以恢复安装前状态
+                    if (fs::exists(op.arg1)) {
+                        safe_remove(op.arg1);
+                        stats.files_cleaned++;
+
+                        if (write_audit) {
+                            wal_append_raw("RESTORE_DB_RM " + op.arg1);
+                        }
+                    }
+                }
+                break;
+            }
+
+            // ── DBRM ─────────────────────────────────────────────────────────
+            case WALOpType::DBRM: {
+                // arg1 = DB 文件路径, arg2 = 里程碑
+                std::string bak = db_bak_path(op.arg1, op.arg2);
+                if (fs::exists(bak)) {
+                    ::safe_rename(bak, op.arg1);
+                    stats.db_restored++;
+
+                    if (write_audit) {
+                        wal_append_raw("RESTORE_DB " + bak + " \xe2\x86\x92 " + op.arg1);
+                    }
+                }
+                // bak 不存在 → 跳过（幂等）
+                break;
+            }
+
+            default:
+                break;
         }
-      }
-      // bak 不存在 → 已被消费，跳过（幂等）
-      break;
-    }
 
-    // ── COPY ─────────────────────────────────────────────────────────
-    case WALOpType::COPY: {
-      // arg2 = dst（目标文件路径）
-      // 逆向：删除目标文件（含 dangling symlink）
-      fs::path dst = op.arg2;
-      if (fs::exists(dst) || fs::is_symlink(dst)) {
-        safe_remove(dst);
-        stats.files_cleaned++;
-
-        if (write_audit) {
-          // 逆操作: 删除被 COPY 的目标文件（无备份可恢复）
-          wal_append_raw("RESTORE_FILE_RM " + op.arg2);
+        // 检查里程碑停止条件
+        if (!milestone_target.empty() && (op.type == WALOpType::DB || op.type == WALOpType::DBNEW ||
+                                          op.type == WALOpType::DBRM)) {
+            if (op.arg2 == milestone_target) {
+                return stats;
+            }
         }
-      }
-      break;
     }
 
-    // ── NEW ──────────────────────────────────────────────────────────
-    case WALOpType::NEW: {
-      // arg1 = 文件路径（含 dangling symlink）
-      fs::path p = op.arg1;
-      if (fs::exists(p) || fs::is_symlink(p)) {
-        safe_remove(p);
-        stats.files_cleaned++;
-
-        if (write_audit) {
-          // 逆操作: 删除安装时新建的文件（无备份可恢复）
-          wal_append_raw("RESTORE_FILE_RM " + op.arg1);
-        }
-      }
-      break;
-    }
-
-    // ── NEW_DIR ──────────────────────────────────────────────────────
-    case WALOpType::NEW_DIR: {
-      // arg1 = 目录路径
-      fs::path p = op.arg1;
-      if (fs::exists(p) && fs::is_directory(p)) {
-        std::error_code ec;
-        if (fs::is_empty(p, ec)) {
-          fs::remove(p, ec);
-          if (!ec && write_audit) {
-            // 逆操作: 删除安装时新建的空目录（无备份可恢复）
-            wal_append_raw("RESTORE_DIR_RM " + op.arg1);
-          }
-        }
-      }
-      break;
-    }
-
-    // ── DB ───────────────────────────────────────────────────────────
-    case WALOpType::DB: {
-      // arg1 = DB 文件路径, arg2 = 里程碑
-      std::string bak = db_bak_path(op.arg1, op.arg2);
-      if (fs::exists(bak)) {
-        ::safe_rename(bak, op.arg1);
-        stats.db_restored++;
-
-        if (write_audit) {
-          wal_append_raw("RESTORE_DB " + bak + " \xe2\x86\x92 " + op.arg1);
-        }
-      }
-      // bak 不存在 → WAL 已写但备份未完成 → 原文件还在 → 跳过（幂等）
-      break;
-    }
-
-    // ── DBNEW ────────────────────────────────────────────────────────
-    case WALOpType::DBNEW: {
-      // arg1 = DB 文件路径, arg2 = 里程碑
-      std::string bak = db_bak_path(op.arg1, op.arg2);
-      if (fs::exists(bak)) {
-        ::safe_rename(bak, op.arg1);
-        stats.db_restored++;
-
-        if (write_audit) {
-          // DBNEW 有备份 → 恢复备份（与 DB 逆操作相同）
-          wal_append_raw("RESTORE_DB " + bak + " \xe2\x86\x92 " + op.arg1);
-        }
-      } else {
-        // 无备份 → DB 文件是全新创建的 → 删除以恢复安装前状态
-        if (fs::exists(op.arg1)) {
-          safe_remove(op.arg1);
-          stats.files_cleaned++;
-
-          if (write_audit) {
-            wal_append_raw("RESTORE_DB_RM " + op.arg1);
-          }
-        }
-      }
-      break;
-    }
-
-    // ── DBRM ─────────────────────────────────────────────────────────
-    case WALOpType::DBRM: {
-      // arg1 = DB 文件路径, arg2 = 里程碑
-      std::string bak = db_bak_path(op.arg1, op.arg2);
-      if (fs::exists(bak)) {
-        ::safe_rename(bak, op.arg1);
-        stats.db_restored++;
-
-        if (write_audit) {
-          wal_append_raw("RESTORE_DB " + bak + " \xe2\x86\x92 " + op.arg1);
-        }
-      }
-      // bak 不存在 → 跳过（幂等）
-      break;
-    }
-
-    default:
-      break;
-    }
-
-    // 检查里程碑停止条件
-    if (!milestone_target.empty() &&
-        (op.type == WALOpType::DB || op.type == WALOpType::DBNEW ||
-         op.type == WALOpType::DBRM)) {
-      if (op.arg2 == milestone_target) {
-        return stats;
-      }
-    }
-  }
-
-  return stats;
+    return stats;
 }
 
 // ============================================================================
 // 批次操作提取
 // ============================================================================
 
-std::vector<WALOp> extract_current_batch_ops(const std::string &wal_path) {
-  std::vector<WALOp> ops;
-  std::ifstream file(wal_path);
-  if (!file.is_open())
+std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path)
+{
+    std::vector<WALOp> ops;
+    std::ifstream file(wal_path);
+    if (!file.is_open()) return ops;
+
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        lines.push_back(line);
+    }
+
+    // 从最后一个 BEGIN_PKGS 开始收集
+    int start_idx = -1;
+    for (int i = static_cast<int>(lines.size()) - 1; i >= 0; --i) {
+        auto op = parse_op(lines[i]);
+        if (op.type == WALOpType::BEGIN_PKGS) {
+            start_idx = i;
+            break;
+        }
+        if (op.type == WALOpType::COMMIT_PKGS) {
+            // 最后一个块已完成，无未提交批次
+            return {};
+        }
+    }
+
+    if (start_idx < 0) return {};
+
+    for (size_t i = start_idx; i < lines.size(); ++i) {
+        auto op = parse_op(lines[i]);
+        if (op.arg1 != "__INVALID__") ops.push_back(op);
+    }
+
     return ops;
-
-  std::vector<std::string> lines;
-  std::string line;
-  while (std::getline(file, line)) {
-    if (line.empty())
-      continue;
-    if (!line.empty() && line.back() == '\r')
-      line.pop_back();
-    lines.push_back(line);
-  }
-
-  // 从最后一个 BEGIN_PKGS 开始收集
-  int start_idx = -1;
-  for (int i = static_cast<int>(lines.size()) - 1; i >= 0; --i) {
-    auto op = parse_op(lines[i]);
-    if (op.type == WALOpType::BEGIN_PKGS) {
-      start_idx = i;
-      break;
-    }
-    if (op.type == WALOpType::COMMIT_PKGS) {
-      // 最后一个块已完成，无未提交批次
-      return {};
-    }
-  }
-
-  if (start_idx < 0)
-    return {};
-
-  for (size_t i = start_idx; i < lines.size(); ++i) {
-    auto op = parse_op(lines[i]);
-    if (op.arg1 != "__INVALID__")
-      ops.push_back(op);
-  }
-
-  return ops;
 }
 
-std::vector<std::vector<WALOp>>
-extract_last_uncommitted_batch(const std::string &wal_path) {
-  std::vector<std::vector<WALOp>> result;
-  std::ifstream file(wal_path);
-  if (!file.is_open())
+std::vector<std::vector<WALOp>> extract_last_uncommitted_batch(const std::string& wal_path)
+{
+    std::vector<std::vector<WALOp>> result;
+    std::ifstream file(wal_path);
+    if (!file.is_open()) return result;
+
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        lines.push_back(line);
+    }
+
+    int depth = 0;
+    int batch_start = -1;
+    bool in_uncommitted = false;
+
+    for (size_t i = 0; i < lines.size(); ++i) {
+        auto op = parse_op(lines[i]);
+        if (op.arg1 == "__INVALID__") continue;
+
+        if (op.type == WALOpType::BEGIN_PKGS) {
+            depth++;
+            if (depth == 1) {
+                batch_start = static_cast<int>(i);
+                in_uncommitted = true;
+            }
+        } else if (op.type == WALOpType::COMMIT_PKGS) {
+            depth--;
+            if (depth == 0 && in_uncommitted) {
+                in_uncommitted = false;
+            }
+        }
+    }
+
+    if (in_uncommitted && batch_start >= 0) {
+        std::vector<WALOp> ops;
+        for (size_t i = static_cast<size_t>(batch_start); i < lines.size(); ++i) {
+            auto op = parse_op(lines[i]);
+            if (op.arg1 != "__INVALID__") ops.push_back(op);
+        }
+        result.push_back(std::move(ops));
+    }
+
     return result;
-
-  std::vector<std::string> lines;
-  std::string line;
-  while (std::getline(file, line)) {
-    if (line.empty())
-      continue;
-    if (!line.empty() && line.back() == '\r')
-      line.pop_back();
-    lines.push_back(line);
-  }
-
-  int depth = 0;
-  int batch_start = -1;
-  bool in_uncommitted = false;
-
-  for (size_t i = 0; i < lines.size(); ++i) {
-    auto op = parse_op(lines[i]);
-    if (op.arg1 == "__INVALID__")
-      continue;
-
-    if (op.type == WALOpType::BEGIN_PKGS) {
-      depth++;
-      if (depth == 1) {
-        batch_start = static_cast<int>(i);
-        in_uncommitted = true;
-      }
-    } else if (op.type == WALOpType::COMMIT_PKGS) {
-      depth--;
-      if (depth == 0 && in_uncommitted) {
-        in_uncommitted = false;
-      }
-    }
-  }
-
-  if (in_uncommitted && batch_start >= 0) {
-    std::vector<WALOp> ops;
-    for (size_t i = static_cast<size_t>(batch_start); i < lines.size(); ++i) {
-      auto op = parse_op(lines[i]);
-      if (op.arg1 != "__INVALID__")
-        ops.push_back(op);
-    }
-    result.push_back(std::move(ops));
-  }
-
-  return result;
 }
 
 // ============================================================================
 // 批次回滚
 // ============================================================================
 
-void batch_rollback(const std::vector<std::string> &successfully_installed) {
-  std::string wpath = wal_log_path();
-  auto ops = extract_current_batch_ops(wpath);
-  if (ops.empty())
-    return;
+void batch_rollback(const std::vector<std::string>& successfully_installed)
+{
+    std::string wpath = wal_log_path();
+    auto ops = extract_current_batch_ops(wpath);
+    if (ops.empty()) return;
 
-  // 1. 清理内存 cache 状态（remove_installed 内部已有锁，不要外层加锁！）
-  auto &cache = Cache::instance();
-  for (const auto &pkg : successfully_installed) {
-    cache.remove_installed(pkg);
-  }
+    // 1. 清理内存 cache 状态（remove_installed 内部已有锁，不要外层加锁！）
+    auto& cache = Cache::instance();
+    for (const auto& pkg : successfully_installed) {
+        cache.remove_installed(pkg);
+    }
 
-  // 2. 逆向执行操作
-  reverse_execute(ops, ":batch-start", true);
+    // 2. 逆向执行操作
+    reverse_execute(ops, ":batch-start", true);
 
-  // 3. 重载 Cache（从磁盘恢复的 DB 文件）
-  cache.load();
+    // 3. 重载 Cache（从磁盘恢复的 DB 文件）
+    cache.load();
 
-  // 4. DB :batch-start（保存回滚后的状态）
-  cache.write(":batch-start");
+    // 4. DB :batch-start（保存回滚后的状态）
+    cache.write(":batch-start");
 
-  // 5. 对每个已成功（已回滚）包写 ROLLBACK + END
-  //    版本号从 WAL 的 BEGIN 行提取——load() 后的 Cache 对全新安装的包返回空版本
-  std::map<std::string, std::string> pkg_versions;
-  for (const auto &op : ops) {
-    if (op.type == WALOpType::BEGIN || op.type == WALOpType::RM_BEGIN)
-      pkg_versions[op.arg1] = op.arg2;
-  }
-  for (const auto &pkg : successfully_installed) {
-    auto it = pkg_versions.find(pkg);
-    std::string ver = (it != pkg_versions.end()) ? it->second : std::string{};
-    wal_append_raw("ROLLBACK " + pkg + " " + ver);
-    wal_append_raw("END " + pkg + " " + ver);
-  }
+    // 5. 对每个已成功（已回滚）包写 ROLLBACK + END
+    //    版本号从 WAL 的 BEGIN 行提取——load() 后的 Cache 对全新安装的包返回空版本
+    std::map<std::string, std::string> pkg_versions;
+    for (const auto& op : ops) {
+        if (op.type == WALOpType::BEGIN || op.type == WALOpType::RM_BEGIN)
+            pkg_versions[op.arg1] = op.arg2;
+    }
+    for (const auto& pkg : successfully_installed) {
+        auto it = pkg_versions.find(pkg);
+        std::string ver = (it != pkg_versions.end()) ? it->second : std::string{};
+        wal_append_raw("ROLLBACK " + pkg + " " + ver);
+        wal_append_raw("END " + pkg + " " + ver);
+    }
 
-  // 6. COMMIT_PKGS
-  wal_append_raw("COMMIT_PKGS");
+    // 6. COMMIT_PKGS
+    wal_append_raw("COMMIT_PKGS");
 }
 
 // ============================================================================
 // WAL 文件路径
 // ============================================================================
 
-std::string wal_log_path() {
-  return (Config::instance().state_dir() / "transaction.log").string();
+std::string wal_log_path()
+{
+    return (Config::instance().state_dir() / "transaction.log").string();
 }
 
-} // namespace wal
+}  // namespace wal

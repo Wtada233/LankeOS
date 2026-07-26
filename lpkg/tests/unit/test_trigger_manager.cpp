@@ -1,42 +1,50 @@
 #include <gtest/gtest.h>
-#include "../../main/src/base/utils.hpp"
-#include "../../main/src/trigger/trigger.hpp"
-#include "../../main/src/config/config.hpp"
-#include "../../main/src/base/constants.hpp"
-#include "../../main/src/i18n/localization.hpp"
+
 #include <filesystem>
 #include <fstream>
-#include <thread>
 #include <iostream>
+#include <thread>
+
+#include "../../main/src/base/constants.hpp"
+#include "../../main/src/base/utils.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/trigger/trigger.hpp"
 
 namespace fs = std::filesystem;
 
-class TriggerAndConfigTest : public ::testing::Test {
+class TriggerAndConfigTest : public ::testing::Test
+{
 protected:
     fs::path test_root;
 
-    void SetUp() override {
+    void SetUp() override
+    {
         test_root = fs::absolute("tmp_trigger_test");
         if (fs::exists(test_root)) fs::remove_all(test_root);
         fs::create_directories(test_root);
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         if (fs::exists(test_root)) fs::remove_all(test_root);
     }
 };
 
 // ===== TriggerManager 测试 =====
 
-class TriggerManagerTest : public ::testing::Test {
+class TriggerManagerTest : public ::testing::Test
+{
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         init_localization();
         Config::instance().set_testing_mode(true);
     }
 
     /** 检查执行 run_all 后是否有输出 */
-    bool has_trigger_output() {
+    bool has_trigger_output()
+    {
         testing::internal::CaptureStdout();
         TriggerManager::instance().run_all();
         std::string output = testing::internal::GetCapturedStdout();
@@ -47,21 +55,24 @@ protected:
     }
 };
 
-TEST_F(TriggerManagerTest, CheckFileActivatesLdconfigForLibSo) {
+TEST_F(TriggerManagerTest, CheckFileActivatesLdconfigForLibSo)
+{
     auto& tm = TriggerManager::instance();
 
     // .so 文件在 /usr/lib 下应触发 ldconfig
     EXPECT_NO_THROW(tm.check_file("/usr/lib/libfoo.so.1"));
 }
 
-TEST_F(TriggerManagerTest, CheckFileActivatesSystemdReload) {
+TEST_F(TriggerManagerTest, CheckFileActivatesSystemdReload)
+{
     auto& tm = TriggerManager::instance();
 
     // .service 文件应触发 systemctl daemon-reload
     EXPECT_NO_THROW(tm.check_file("/usr/lib/systemd/system/foo.service"));
 }
 
-TEST_F(TriggerManagerTest, CheckFileIgnoresNonTriggerPaths) {
+TEST_F(TriggerManagerTest, CheckFileIgnoresNonTriggerPaths)
+{
     auto& tm = TriggerManager::instance();
 
     // 普通文件不应触发任何触发器
@@ -73,12 +84,14 @@ TEST_F(TriggerManagerTest, CheckFileIgnoresNonTriggerPaths) {
     EXPECT_NO_THROW(tm.check_file("/"));
 }
 
-TEST_F(TriggerManagerTest, RunAllHandlesEmptyQueue) {
+TEST_F(TriggerManagerTest, RunAllHandlesEmptyQueue)
+{
     // 空的触发队列应安全执行
     EXPECT_NO_THROW(TriggerManager::instance().run_all());
 }
 
-TEST_F(TriggerManagerTest, MultipleAddsDeduplicate) {
+TEST_F(TriggerManagerTest, MultipleAddsDeduplicate)
+{
     auto& tm = TriggerManager::instance();
 
     // 多次添加同一命令应去重
@@ -90,7 +103,8 @@ TEST_F(TriggerManagerTest, MultipleAddsDeduplicate) {
     EXPECT_NO_THROW(tm.run_all());
 }
 
-TEST_F(TriggerManagerTest, CheckFileMultipleTimesDeduplicates) {
+TEST_F(TriggerManagerTest, CheckFileMultipleTimesDeduplicates)
+{
     auto& tm = TriggerManager::instance();
     tm.check_file("/usr/lib/libtest.so.1");
     tm.check_file("/usr/lib/libtest.so.1");
@@ -98,13 +112,15 @@ TEST_F(TriggerManagerTest, CheckFileMultipleTimesDeduplicates) {
     EXPECT_NO_THROW(tm.run_all());
 }
 
-TEST_F(TriggerManagerTest, AddDirectly) {
+TEST_F(TriggerManagerTest, AddDirectly)
+{
     auto& tm = TriggerManager::instance();
     EXPECT_NO_THROW(tm.add("custom command"));
     EXPECT_NO_THROW(tm.run_all());
 }
 
-TEST_F(TriggerManagerTest, AddAndRunMultipleCommands) {
+TEST_F(TriggerManagerTest, AddAndRunMultipleCommands)
+{
     auto& tm = TriggerManager::instance();
     tm.add("cmd1");
     tm.add("cmd2");
@@ -112,13 +128,15 @@ TEST_F(TriggerManagerTest, AddAndRunMultipleCommands) {
     EXPECT_NO_THROW(tm.run_all());
 }
 
-TEST_F(TriggerManagerTest, IconTriggersMatch) {
+TEST_F(TriggerManagerTest, IconTriggersMatch)
+{
     auto& tm = TriggerManager::instance();
     EXPECT_NO_THROW(tm.check_file("/usr/share/icons/hicolor/48x48/apps/foo.png"));
     EXPECT_NO_THROW(tm.run_all());
 }
 
-TEST_F(TriggerManagerTest, GsettingsTriggerMatch) {
+TEST_F(TriggerManagerTest, GsettingsTriggerMatch)
+{
     auto& tm = TriggerManager::instance();
     EXPECT_NO_THROW(tm.check_file("/usr/share/glib-2.0/schemas/org.foo.bar.xml"));
     EXPECT_NO_THROW(tm.run_all());

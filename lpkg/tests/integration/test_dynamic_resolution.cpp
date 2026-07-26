@@ -1,75 +1,85 @@
 #include <gtest/gtest.h>
-#include "../../main/src/pkg/package_manager.hpp"
-#include "../../main/src/archive/packer.hpp"
-#include "../../main/src/crypto/hash.hpp"
-#include "../../main/src/db/cache.hpp"
-#include "../../main/src/config/config.hpp"
-#include "../../main/src/base/utils.hpp"
-#include "../../main/src/i18n/localization.hpp"
-#include "../../main/src/base/constants.hpp"
-#include "nlohmann/json.hpp"
+
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <cstdlib>
+
+#include "../../main/src/archive/packer.hpp"
+#include "../../main/src/base/constants.hpp"
+#include "../../main/src/base/utils.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/crypto/hash.hpp"
+#include "../../main/src/db/cache.hpp"
+#include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/pkg/package_manager.hpp"
+#include "nlohmann/json.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-class DynamicResolutionTest : public ::testing::Test {
+class DynamicResolutionTest : public ::testing::Test
+{
 protected:
     fs::path suite_work_dir;
     fs::path test_root;
     fs::path pkg_dir;
     fs::path mirror_dir;
 
-    void SetUp() override {
+    void SetUp() override
+    {
         Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
         Config::instance().set_testing_mode(true);
         init_localization();
-        
+
         suite_work_dir = fs::absolute("tmp_dynamic_res_test");
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
         mirror_dir = suite_work_dir / "mirror" / "x86_64";
-        
+
         fs::remove_all(suite_work_dir);
         fs::create_directories(test_root);
         fs::create_directories(pkg_dir);
         fs::create_directories(mirror_dir);
-        
+
         Config::instance().set_root_path(test_root.string());
         Config::instance().set_architecture("x86_64");
         Config::instance().init_filesystem();
-        
-        std::ofstream(test_root / "etc/lpkg/mirror.conf") << "file://" << suite_work_dir.string() << "/mirror/" << std::endl;
+
+        std::ofstream(test_root / "etc/lpkg/mirror.conf")
+            << "file://" << suite_work_dir.string() << "/mirror/" << std::endl;
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         Config::instance().set_root_path("/");
         fs::remove_all(suite_work_dir);
     }
 
-    std::string create_pkg(const std::string& name, const std::string& ver, 
-                        const std::vector<std::string>& deps = {},
-                        const std::vector<std::string>& provides = {}) {
+    std::string create_pkg(const std::string& name, const std::string& ver,
+                           const std::vector<std::string>& deps = {},
+                           const std::vector<std::string>& provides = {})
+    {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
         fs::create_directories(work_dir / "content" / "usr" / "bin");
         std::ofstream(work_dir / "content" / "usr" / "bin" / name).close();
-        
+
         std::string pkg_filename = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
         pack_package(pkg_path, work_dir.string(), name, ver, deps, provides);
-        
+
         // Put in mirror
         fs::path mirror_pkg_dir = mirror_dir / name;
         fs::create_directories(mirror_pkg_dir);
-        fs::copy_file(pkg_path, mirror_pkg_dir / (ver + ".lpkg"), fs::copy_options::overwrite_existing);
-        
+        fs::copy_file(pkg_path, mirror_pkg_dir / (ver + ".lpkg"),
+                      fs::copy_options::overwrite_existing);
+
         fs::remove_all(work_dir);
         return pkg_path;
     }
 
-    void update_index(const std::vector<std::tuple<std::string, std::string, std::string, std::string>>& entries) {
+    void update_index(
+        const std::vector<std::tuple<std::string, std::string, std::string, std::string>>& entries)
+    {
         std::ofstream index(mirror_dir / "index.txt");
         for (const auto& [name, ver, deps, provides] : entries) {
             std::string pkg_filename = name + "-" + ver + ".lpkg";
@@ -83,7 +93,8 @@ protected:
     }
 };
 
-TEST_F(DynamicResolutionTest, DynamicDependencyChange) {
+TEST_F(DynamicResolutionTest, DynamicDependencyChange)
+{
     // 1. Setup: Index says 'app' depends on 'libA'
     create_pkg("libA", "1.0");
     create_pkg("libB", "1.0");
@@ -92,11 +103,7 @@ TEST_F(DynamicResolutionTest, DynamicDependencyChange) {
     create_pkg("app", "1.0", {"libB"});
 
     // But index incorrectly says it depends on 'libA'
-    update_index({
-        {"app", "1.0", "libA", ""},
-        {"libA", "1.0", "", ""},
-        {"libB", "1.0", "", ""}
-    });
+    update_index({{"app", "1.0", "libA", ""}, {"libA", "1.0", "", ""}, {"libB", "1.0", "", ""}});
 
     // 2. Install 'app'
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -108,22 +115,21 @@ TEST_F(DynamicResolutionTest, DynamicDependencyChange) {
     EXPECT_TRUE(Cache::instance().is_installed("libB"));
 }
 
-TEST_F(DynamicResolutionTest, DynamicProviderChange) {
+TEST_F(DynamicResolutionTest, DynamicProviderChange)
+{
     // 1. Setup:
     // Index says 'app' depends on 'virtual-pkg'
     // Index says 'provA' provides 'virtual-pkg'
     // Package 'app' actually provides nothing special.
     // Package 'provB' provides 'virtual-pkg'.
 
-    create_pkg("provA", "1.0", {}, {"other-pkg"}); // provA actually doesn't provide virtual-pkg
+    create_pkg("provA", "1.0", {}, {"other-pkg"});  // provA actually doesn't provide virtual-pkg
     create_pkg("provB", "1.0", {}, {"virtual-pkg"});
     create_pkg("app", "1.0", {"virtual-pkg"});
 
-    update_index({
-        {"app", "1.0", "virtual-pkg", ""},
-        {"provA", "1.0", "", "virtual-pkg"},
-        {"provB", "1.0", "", "virtual-pkg"}
-    });
+    update_index({{"app", "1.0", "virtual-pkg", ""},
+                  {"provA", "1.0", "", "virtual-pkg"},
+                  {"provB", "1.0", "", "virtual-pkg"}});
 
     // 2. Install 'app'.
     // Initial resolution: app -> provA (because provA provides virtual-pkg in index)
@@ -141,7 +147,8 @@ TEST_F(DynamicResolutionTest, DynamicProviderChange) {
 
 // ====== TODO 4.1: Failure Scenario ======
 // Dep name change leads to unresolvable dependency
-TEST_F(DynamicResolutionTest, UnresolvableDriftFailure) {
+TEST_F(DynamicResolutionTest, UnresolvableDriftFailure)
+{
     // Index says 'app' depends on 'lib-old'.
     // Real metadata.json says 'app' depends on 'lib-new'.
     // 'lib-new' does NOT exist in the repository.
@@ -151,8 +158,12 @@ TEST_F(DynamicResolutionTest, UnresolvableDriftFailure) {
     create_pkg("app", "1.0", {"lib-new"});
 
     // Index says it depends on 'lib-old' — only lib-old exists there
-    std::string hash = fs::exists(pkg_dir / "app-1.0.lpkg") ? calculate_sha256(pkg_dir / "app-1.0.lpkg") : "unknown";
-    std::string lib_hash = fs::exists(pkg_dir / "lib-old-1.0.lpkg") ? calculate_sha256(pkg_dir / "lib-old-1.0.lpkg") : "unknown";
+    std::string hash = fs::exists(pkg_dir / "app-1.0.lpkg")
+                           ? calculate_sha256(pkg_dir / "app-1.0.lpkg")
+                           : "unknown";
+    std::string lib_hash = fs::exists(pkg_dir / "lib-old-1.0.lpkg")
+                               ? calculate_sha256(pkg_dir / "lib-old-1.0.lpkg")
+                               : "unknown";
     {
         std::ofstream index(mirror_dir / "index.txt");
         index << "app|1.0:" << hash << ":lib-old|\n";
@@ -165,17 +176,15 @@ TEST_F(DynamicResolutionTest, UnresolvableDriftFailure) {
 
 // ====== TODO 4.2: Discovery Scenario ======
 // Index says app has no deps, real metadata has lib-extra — system discovers and installs it
-TEST_F(DynamicResolutionTest, DiscoverNewDependency) {
+TEST_F(DynamicResolutionTest, DiscoverNewDependency)
+{
     // lib-extra exists in the repo
     create_pkg("lib-extra", "1.0");
     // app actually depends on lib-extra in its metadata
     create_pkg("app", "1.0", {"lib-extra"});
 
     // Index says app has NO deps
-    update_index({
-        {"app", "1.0", "", ""},
-        {"lib-extra", "1.0", "", ""}
-    });
+    update_index({{"app", "1.0", "", ""}, {"lib-extra", "1.0", "", ""}});
 
     // Install should succeed and discover lib-extra
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -187,14 +196,17 @@ TEST_F(DynamicResolutionTest, DiscoverNewDependency) {
 
 // ====== TODO 4.3: Atomic Rollback on Recursive Dep Failure ======
 // Recursive installation of discovered dep fails -> everything rolls back
-TEST_F(DynamicResolutionTest, AtomicRollbackOnFailedDep) {
+TEST_F(DynamicResolutionTest, AtomicRollbackOnFailedDep)
+{
     // app depends on 'broken-dep' (in metadata), and that dep fails to download
     // For this test, we create the package but DON'T put it in the mirror
     create_pkg("app", "1.0", {"broken-dep"});
 
     // Index says app has no deps
     {
-        std::string hash = fs::exists(pkg_dir / "app-1.0.lpkg") ? calculate_sha256(pkg_dir / "app-1.0.lpkg") : "unknown";
+        std::string hash = fs::exists(pkg_dir / "app-1.0.lpkg")
+                               ? calculate_sha256(pkg_dir / "app-1.0.lpkg")
+                               : "unknown";
         std::ofstream index(mirror_dir / "index.txt");
         index << "app|1.0:" << hash << ":|\n";
         // broken-dep is NOT in the index — it will fail resolution

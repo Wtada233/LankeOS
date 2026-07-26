@@ -1,26 +1,31 @@
 #include <gtest/gtest.h>
-#include "repository.hpp"
-#include "config.hpp"
-#include "utils.hpp"
+
 #include <filesystem>
 #include <fstream>
 
+#include "config.hpp"
+#include "repository.hpp"
+#include "utils.hpp"
+
 namespace fs = std::filesystem;
 
-class IntegrationV2Test : public ::testing::Test {
+class IntegrationV2Test : public ::testing::Test
+{
 protected:
-    void SetUp() override {
+    void SetUp() override
+    {
         suite_work_dir = fs::current_path() / "tmp_int_v2_test";
         fs::remove_all(suite_work_dir);
         fs::create_directories(suite_work_dir);
-        
+
         mirror_dir = suite_work_dir / "mirror";
         fs::create_directories(mirror_dir);
 
         Config::instance().set_testing_mode(true);
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         Config::instance().set_root_path("/");
         fs::remove_all(suite_work_dir);
     }
@@ -29,18 +34,20 @@ protected:
     fs::path mirror_dir;
 };
 
-TEST_F(IntegrationV2Test, ArchitectureOverride) {
+TEST_F(IntegrationV2Test, ArchitectureOverride)
+{
     Config::instance().set_architecture("riscv64");
     EXPECT_EQ(Config::instance().get_architecture(), "riscv64");
-    
+
     Config::instance().set_architecture("aarch64");
     EXPECT_EQ(Config::instance().get_architecture(), "aarch64");
-    
-    Config::instance().set_architecture(""); // Reset
+
+    Config::instance().set_architecture("");  // Reset
     EXPECT_NO_THROW(Config::instance().get_architecture());
 }
 
-TEST_F(IntegrationV2Test, RepositoryIndexLoading) {
+TEST_F(IntegrationV2Test, RepositoryIndexLoading)
+{
     std::string arch = Config::instance().get_architecture();
     fs::path arch_dir = mirror_dir / arch;
     fs::create_directories(arch_dir);

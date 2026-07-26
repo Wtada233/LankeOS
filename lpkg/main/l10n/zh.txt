@@ -250,3 +250,4 @@ info.recursive_protected_header=跳过受保护的包（核心/锁定）：
 info.recursive_confirm_prompt=警告 {}/3 — 输入验证码 [{}] 确认递归移除：
 
 info.recursive_confirm_failed=验证码错误，递归移除已中止。
+error.file_already_owned=文件 {} 已被包 {} 拥有，{} 无法占为己有。

@@ -1,48 +1,54 @@
 #include <gtest/gtest.h>
-#include "../../main/src/vercmp/version.hpp"
+
 #include "../../main/src/base/exception.hpp"
+#include "../../main/src/vercmp/version.hpp"
 
 // ===== version_compare 测试 =====
 // version_compare(v1, v2) 返回 true 当且仅当 v1 < v2
 
-TEST(VersionCompare, SimpleNumeric) {
+TEST(VersionCompare, SimpleNumeric)
+{
     EXPECT_TRUE(version_compare("1.0", "2.0"));   // 1.0 < 2.0 → true
     EXPECT_FALSE(version_compare("2.0", "1.0"));  // 2.0 < 1.0 → false
     EXPECT_FALSE(version_compare("1.0", "1.0"));  // equal → false
 }
 
-TEST(VersionCompare, MultiSegment) {
-    EXPECT_TRUE(version_compare("1.0", "1.0.1"));    // 1.0 < 1.0.1 → true
+TEST(VersionCompare, MultiSegment)
+{
+    EXPECT_TRUE(version_compare("1.0", "1.0.1"));  // 1.0 < 1.0.1 → true
     // 缺失段视为 0，所以 1.0.1 == 1.0.1.0 → false（less-than 不成立）
     EXPECT_FALSE(version_compare("1.0.1", "1.0.1.0"));
     // 1.0.1.0 == 1.0.1 → false（less-than 不成立）
     EXPECT_FALSE(version_compare("1.0.1.0", "1.0.1"));
-    EXPECT_FALSE(version_compare("1.0.1", "1.0"));    // 1.0.1 < 1.0 → false
-    EXPECT_TRUE(version_compare("1.0.0.0", "1.0.0.1")); // 1.0.0.0 < 1.0.0.1 → true
+    EXPECT_FALSE(version_compare("1.0.1", "1.0"));       // 1.0.1 < 1.0 → false
+    EXPECT_TRUE(version_compare("1.0.0.0", "1.0.0.1"));  // 1.0.0.0 < 1.0.0.1 → true
 }
 
-TEST(VersionCompare, NumericHandling) {
+TEST(VersionCompare, NumericHandling)
+{
     // 6.16.1 > 6.6.1 — 纯字符串比较会错误，数字比较正确
     EXPECT_FALSE(version_compare("6.16.1", "6.6.1"));  // 6.16.1 < 6.6.1 → false
     EXPECT_TRUE(version_compare("6.6.1", "6.16.1"));   // 6.6.1 < 6.16.1 → true
     EXPECT_FALSE(version_compare("10.0", "9.9.9"));    // 10.0 < 9.9.9 → false
-    EXPECT_FALSE(version_compare("2.10", "2.9"));       // 2.10 < 2.9 → false
-    EXPECT_FALSE(version_compare("1.20", "1.3"));       // 1.20 < 1.3 → false
+    EXPECT_FALSE(version_compare("2.10", "2.9"));      // 2.10 < 2.9 → false
+    EXPECT_FALSE(version_compare("1.20", "1.3"));      // 1.20 < 1.3 → false
 }
 
-TEST(VersionCompare, DifferentLength) {
+TEST(VersionCompare, DifferentLength)
+{
     EXPECT_TRUE(version_compare("1.0", "1.0.1"));   // 1.0 < 1.0.1 → true
     EXPECT_FALSE(version_compare("1.0.1", "1.0"));  // 1.0.1 < 1.0 → false
     // 缺失段视为 0，因此 1.0.0 == 1.0 → false
-    EXPECT_FALSE(version_compare("1.0.0", "1.0"));  // equal → false
-    EXPECT_FALSE(version_compare("1.0", "1.0.0"));  // equal → false
-    EXPECT_FALSE(version_compare("2.0.0", "1.0.0.0.0.1")); // 2.0.0 < 1.x → false
+    EXPECT_FALSE(version_compare("1.0.0", "1.0"));          // equal → false
+    EXPECT_FALSE(version_compare("1.0", "1.0.0"));          // equal → false
+    EXPECT_FALSE(version_compare("2.0.0", "1.0.0.0.0.1"));  // 2.0.0 < 1.x → false
 }
 
-TEST(VersionCompare, PreRelease) {
+TEST(VersionCompare, PreRelease)
+{
     // beta < release
     EXPECT_TRUE(version_compare("1.0-beta", "1.0"));   // beta < release → true
-    EXPECT_FALSE(version_compare("1.0", "1.0-beta"));   // release < beta → false
+    EXPECT_FALSE(version_compare("1.0", "1.0-beta"));  // release < beta → false
 
     // alpha < beta
     EXPECT_TRUE(version_compare("1.0-alpha", "1.0-beta"));
@@ -57,13 +63,15 @@ TEST(VersionCompare, PreRelease) {
     EXPECT_FALSE(version_compare("1.0-rc", "1.0-beta"));
 }
 
-TEST(VersionCompare, PreReleaseMultipleIdentifiers) {
+TEST(VersionCompare, PreReleaseMultipleIdentifiers)
+{
     EXPECT_TRUE(version_compare("1.0-alpha", "1.0-alpha.1"));
     EXPECT_TRUE(version_compare("1.0-beta.1", "1.0-beta.2"));
     EXPECT_TRUE(version_compare("1.0-rc.2", "1.0-rc.3"));
 }
 
-TEST(VersionCompare, InvalidVersionThrows) {
+TEST(VersionCompare, InvalidVersionThrows)
+{
     // 空字符串无法通过版本格式验证
     EXPECT_THROW(version_compare("", "1.0"), LpkgException);
     EXPECT_THROW(version_compare("1.0", ""), LpkgException);
@@ -81,19 +89,22 @@ TEST(VersionCompare, InvalidVersionThrows) {
 
 // ===== version_satisfies 测试 =====
 
-TEST(VersionSatisfies, Equal) {
+TEST(VersionSatisfies, Equal)
+{
     EXPECT_TRUE(version_satisfies("1.0", "=", "1.0"));
     EXPECT_TRUE(version_satisfies("1.0", "==", "1.0"));
     EXPECT_FALSE(version_satisfies("2.0", "=", "1.0"));
     EXPECT_TRUE(version_satisfies("1.0.0", "=", "1.0.0"));
 }
 
-TEST(VersionSatisfies, NotEqual) {
+TEST(VersionSatisfies, NotEqual)
+{
     EXPECT_FALSE(version_satisfies("1.0", "!=", "1.0"));
     EXPECT_TRUE(version_satisfies("2.0", "!=", "1.0"));
 }
 
-TEST(VersionSatisfies, GreaterThan) {
+TEST(VersionSatisfies, GreaterThan)
+{
     EXPECT_TRUE(version_satisfies("2.0", ">", "1.0"));
     EXPECT_FALSE(version_satisfies("1.0", ">", "1.0"));
     EXPECT_FALSE(version_satisfies("1.0", ">", "2.0"));
@@ -101,7 +112,8 @@ TEST(VersionSatisfies, GreaterThan) {
     EXPECT_TRUE(version_satisfies("6.16.1", ">", "6.6.1"));
 }
 
-TEST(VersionSatisfies, GreaterThanOrEqual) {
+TEST(VersionSatisfies, GreaterThanOrEqual)
+{
     EXPECT_TRUE(version_satisfies("1.0", ">=", "1.0"));
     EXPECT_TRUE(version_satisfies("2.0", ">=", "1.0"));
     EXPECT_FALSE(version_satisfies("1.0", ">=", "2.0"));
@@ -111,27 +123,31 @@ TEST(VersionSatisfies, GreaterThanOrEqual) {
     EXPECT_TRUE(version_satisfies("2.0.0", ">=", "2.0.0-rc1"));
 }
 
-TEST(VersionSatisfies, LessThan) {
+TEST(VersionSatisfies, LessThan)
+{
     EXPECT_TRUE(version_satisfies("1.0", "<", "2.0"));
     EXPECT_FALSE(version_satisfies("1.0", "<", "1.0"));
     EXPECT_FALSE(version_satisfies("2.0", "<", "1.0"));
     EXPECT_TRUE(version_satisfies("1.0", "<", "1.0.1"));
 }
 
-TEST(VersionSatisfies, LessThanOrEqual) {
+TEST(VersionSatisfies, LessThanOrEqual)
+{
     EXPECT_TRUE(version_satisfies("1.0", "<=", "1.0"));
     EXPECT_TRUE(version_satisfies("1.0", "<=", "2.0"));
     EXPECT_FALSE(version_satisfies("2.0", "<=", "1.0"));
 }
 
-TEST(VersionSatisfies, PreReleaseConstraints) {
+TEST(VersionSatisfies, PreReleaseConstraints)
+{
     EXPECT_TRUE(version_satisfies("1.0-rc1", ">=", "1.0-alpha1"));
     EXPECT_FALSE(version_satisfies("1.0-rc1", ">=", "1.0"));
     EXPECT_TRUE(version_satisfies("1.0", ">=", "1.0-rc1"));
     // 1.0-rc1（pre-release）< 1.0（release），所以 >= 不满足
 }
 
-TEST(VersionSatisfies, ComplexScenarios) {
+TEST(VersionSatisfies, ComplexScenarios)
+{
     EXPECT_TRUE(version_satisfies("2.0.0", ">=", "1.0.0"));
     EXPECT_TRUE(version_satisfies("2.0.0", ">=", "2.0.0"));
     EXPECT_FALSE(version_satisfies("1.0.0", ">=", "2.0.0"));
@@ -147,14 +163,15 @@ TEST(VersionSatisfies, ComplexScenarios) {
 // ===== Release revision (+) 测试 =====
 // +后缀作为发行修订号，有修订号的版本 > 无后缀版本
 
-TEST(VersionCompare, ReleaseSuffix) {
+TEST(VersionCompare, ReleaseSuffix)
+{
     // 有 +N > 无后缀
     EXPECT_FALSE(version_compare("22.1.7+2", "22.1.7"));  // 22.1.7+2 < 22.1.7 → false
     EXPECT_TRUE(version_compare("22.1.7", "22.1.7+2"));   // 22.1.7 < 22.1.7+2 → true
-    EXPECT_FALSE(version_compare("1.0+1", "1.0"));         // 1.0+1 < 1.0 → false
+    EXPECT_FALSE(version_compare("1.0+1", "1.0"));        // 1.0+1 < 1.0 → false
 
     // +N 数值比较
-    EXPECT_TRUE(version_compare("22.1.7+1", "22.1.7+2")); // +1 < +2 → true
+    EXPECT_TRUE(version_compare("22.1.7+1", "22.1.7+2"));  // +1 < +2 → true
     EXPECT_FALSE(version_compare("22.1.7+2", "22.1.7+1"));
 
     // +N > -pre-release
@@ -178,11 +195,12 @@ TEST(VersionCompare, ReleaseSuffix) {
 // ===== 补丁后缀 (pN) 测试 =====
 // pN 作为补丁后缀，有补丁 > 无补丁，优先级最高
 
-TEST(VersionCompare, PatchSuffix) {
+TEST(VersionCompare, PatchSuffix)
+{
     // 有 pN > 无后缀
     EXPECT_FALSE(version_compare("1.9.17p2", "1.9.17"));  // p2 < 1.9.17 → false
     EXPECT_TRUE(version_compare("1.9.17", "1.9.17p2"));   // 1.9.17 < p2 → true
-    EXPECT_FALSE(version_compare("1.0p", "1.0"));          // p < 1.0 → false
+    EXPECT_FALSE(version_compare("1.0p", "1.0"));         // p < 1.0 → false
 
     // pN 数值比较
     EXPECT_TRUE(version_compare("1.0p1", "1.0p2"));
@@ -199,11 +217,11 @@ TEST(VersionCompare, PatchSuffix) {
     EXPECT_FALSE(version_compare("1.0p2", "1.0p"));
 
     // pN > +N（补丁优先级最高）
-    EXPECT_FALSE(version_compare("1.0p1", "1.0+1"));   // p1 < +1 → false
-    EXPECT_TRUE(version_compare("1.0+1", "1.0p1"));    // +1 < p1 → true
+    EXPECT_FALSE(version_compare("1.0p1", "1.0+1"));  // p1 < +1 → false
+    EXPECT_TRUE(version_compare("1.0+1", "1.0p1"));   // +1 < p1 → true
 
     // pN > -pre-release
-    EXPECT_FALSE(version_compare("1.0p1", "1.0-rc1")); // p1 < -rc1 → false
+    EXPECT_FALSE(version_compare("1.0p1", "1.0-rc1"));  // p1 < -rc1 → false
     EXPECT_TRUE(version_compare("1.0-rc1", "1.0p1"));
 
     // 完整排序链：-pre < base < +1 < p1 < p2

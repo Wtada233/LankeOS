@@ -1,22 +1,25 @@
 #include <gtest/gtest.h>
-#include "../../main/src/archive/packer.hpp"
-#include "../../main/src/scan/scanner.hpp"
-#include "../../main/src/base/utils.hpp"
-#include "../../main/src/config/config.hpp"
-#include "../../main/src/i18n/localization.hpp"
-#include "../../main/src/pkg/package_manager.hpp"
-#include "../../main/src/archive/archive.hpp"
-#include "../../main/src/db/cache.hpp"
-#include "../../main/src/base/constants.hpp"
-#include "nlohmann/json.hpp"
+
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <cstdlib>
+
+#include "../../main/src/archive/archive.hpp"
+#include "../../main/src/archive/packer.hpp"
+#include "../../main/src/base/constants.hpp"
+#include "../../main/src/base/utils.hpp"
+#include "../../main/src/config/config.hpp"
+#include "../../main/src/db/cache.hpp"
+#include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/pkg/package_manager.hpp"
+#include "../../main/src/scan/scanner.hpp"
+#include "nlohmann/json.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-class ToolsTest : public ::testing::Test {
+class ToolsTest : public ::testing::Test
+{
 protected:
     fs::path suite_work_dir;
     fs::path source_dir;
@@ -25,7 +28,8 @@ protected:
     fs::path output_pkg;
     fs::path test_system_root;
 
-    void SetUp() override {
+    void SetUp() override
+    {
         init_localization();
         suite_work_dir = fs::absolute("tmp_tools_test");
         source_dir = suite_work_dir / "lankepkg";
@@ -36,19 +40,21 @@ protected:
 
         fs::create_directories(root_dir / "usr/bin");
         fs::create_directories(hooks_dir);
-        fs::create_directories(test_system_root / "var/lib/lpkg"); // DB dir
-        
+        fs::create_directories(test_system_root / "var/lib/lpkg");  // DB dir
+
         Config::instance().set_root_path(test_system_root.string());
         Config::instance().init_filesystem();
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         Config::instance().set_root_path("/");
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
     }
 };
 
-TEST_F(ToolsTest, PackAndVerifyContent) {
+TEST_F(ToolsTest, PackAndVerifyContent)
+{
     // 1. Prepare source files
     std::ofstream f(root_dir / "usr/bin/hello");
     f << "executable_content";
@@ -65,7 +71,7 @@ TEST_F(ToolsTest, PackAndVerifyContent) {
     // 3. Extract and verify content
     fs::path verify_dir = suite_work_dir / "verify_pack";
     fs::create_directories(verify_dir);
-    
+
     extract_tar_zst(output_pkg, verify_dir);
 
     // Check core file structure (metadata.json replaces files.txt)
@@ -86,7 +92,8 @@ TEST_F(ToolsTest, PackAndVerifyContent) {
     }
 }
 
-TEST_F(ToolsTest, ScanOrphansLogic) {
+TEST_F(ToolsTest, ScanOrphansLogic)
+{
     // 1. Create orphan file
     fs::create_directories(test_system_root / "usr/bin");
     std::ofstream orphan(test_system_root / "usr/bin/orphan");
@@ -97,7 +104,7 @@ TEST_F(ToolsTest, ScanOrphansLogic) {
     std::ofstream owned(test_system_root / "usr/bin/owned");
     owned << "owned";
     owned.close();
-    
+
     {
         std::ofstream db(test_system_root / "var/lib/lpkg/files.db");
         db << "/usr/bin/owned\ttest-pkg" << std::endl;

@@ -1,17 +1,21 @@
 #include <gtest/gtest.h>
-#include "../../main/src/pkg/package_manager.hpp"
-#include "../../main/src/db/cache.hpp"
-#include "../test_base.hpp"
+
 #include <filesystem>
 #include <fstream>
 
+#include "../../main/src/db/cache.hpp"
+#include "../../main/src/pkg/package_manager.hpp"
+#include "../test_base.hpp"
+
 namespace fs = std::filesystem;
 
-class PackageManagerEdgeTest : public IntegrationTestBase {
+class PackageManagerEdgeTest : public IntegrationTestBase
+{
 };
 
 // ── 1. 无效本地包 ──
-TEST_F(PackageManagerEdgeTest, InvalidLocalPackageSkipped) {
+TEST_F(PackageManagerEdgeTest, InvalidLocalPackageSkipped)
+{
     // 创建一个损坏的 .lpkg（不是有效的 tar.zst）
     fs::path bad_pkg = pkg_dir / "corrupt-1.0.lpkg";
     {
@@ -24,38 +28,41 @@ TEST_F(PackageManagerEdgeTest, InvalidLocalPackageSkipped) {
 }
 
 // ── 2. 不存在的本地包路径 ──
-TEST_F(PackageManagerEdgeTest, NonExistentLocalPath) {
+TEST_F(PackageManagerEdgeTest, NonExistentLocalPath)
+{
     fs::path missing = pkg_dir / "nonexistent-1.0.lpkg";
     EXPECT_NO_THROW(install_packages({missing.string()}));
 }
 
 // ── 3. Hash 文件内容为空 → read_hash_failed ──
-TEST_F(PackageManagerEdgeTest, EmptyHashFileFails) {
+TEST_F(PackageManagerEdgeTest, EmptyHashFileFails)
+{
     fs::path hash_file = suite_work_dir / "empty.sha256";
-    { std::ofstream f(hash_file); }
+    {
+        std::ofstream f(hash_file);
+    }
 
     // 带本地包 + 空 hash 文件
     std::string pkg_path = create_pkg("hash-test", "1.0");
-    EXPECT_THROW(
-        install_packages({pkg_path}, hash_file.string()),
-        LpkgException
-    );
+    EXPECT_THROW(install_packages({pkg_path}, hash_file.string()), LpkgException);
 }
 
 // ── 4. 本地包 + hash 参数 ──
-TEST_F(PackageManagerEdgeTest, HashRequiresLocalPath) {
+TEST_F(PackageManagerEdgeTest, HashRequiresLocalPath)
+{
     fs::path hash_file = suite_work_dir / "dummy.sha256";
-    { std::ofstream f(hash_file); f << "deadbeef"; }
+    {
+        std::ofstream f(hash_file);
+        f << "deadbeef";
+    }
 
     // 不带本地包，只有 hash → 应报错
-    EXPECT_THROW(
-        install_packages({"some-remote-pkg"}, hash_file.string()),
-        LpkgException
-    );
+    EXPECT_THROW(install_packages({"some-remote-pkg"}, hash_file.string()), LpkgException);
 }
 
 // ── 5. pkg:version 格式 ──
-TEST_F(PackageManagerEdgeTest, PackageVersionFormat) {
+TEST_F(PackageManagerEdgeTest, PackageVersionFormat)
+{
     // 创建一个包并加入镜像
     std::string pkg_path = create_pkg("ver-pkg", "2.0.0");
 
@@ -83,7 +90,8 @@ TEST_F(PackageManagerEdgeTest, PackageVersionFormat) {
 }
 
 // ── 6. 用户确认拒绝 → 安装中止 ──
-TEST_F(PackageManagerEdgeTest, NonInteractiveModeNoAborts) {
+TEST_F(PackageManagerEdgeTest, NonInteractiveModeNoAborts)
+{
     Config::instance().set_non_interactive_mode(NonInteractiveMode::NO);
     std::string pkg_path = create_pkg("no-install", "1.0");
 
@@ -93,7 +101,8 @@ TEST_F(PackageManagerEdgeTest, NonInteractiveModeNoAborts) {
 }
 
 // ── 7. 版本约束安装（>= / <）──
-TEST_F(PackageManagerEdgeTest, VersionConstraintInstall) {
+TEST_F(PackageManagerEdgeTest, VersionConstraintInstall)
+{
     fs::path mirror_dir = suite_work_dir / "mirror" / "x86_64";
     fs::path pkg_mirror = mirror_dir / "constraint-pkg";
     fs::create_directories(pkg_mirror);
@@ -121,7 +130,8 @@ TEST_F(PackageManagerEdgeTest, VersionConstraintInstall) {
 }
 
 // ── 8. 损坏的仓库索引 → 不崩溃 ──
-TEST_F(PackageManagerEdgeTest, CorruptRepoIndex) {
+TEST_F(PackageManagerEdgeTest, CorruptRepoIndex)
+{
     fs::path mirror_dir = suite_work_dir / "mirror" / "x86_64";
     fs::create_directories(mirror_dir);
     {
@@ -139,13 +149,11 @@ TEST_F(PackageManagerEdgeTest, CorruptRepoIndex) {
 }
 
 // ── 9. 依赖不满足的安装（缺少依赖）──
-TEST_F(PackageManagerEdgeTest, InstallWithMissingDep) {
+TEST_F(PackageManagerEdgeTest, InstallWithMissingDep)
+{
     create_pkg("app", "1.0", {"missing-dep"});
     std::string pkg_path = (pkg_dir / "app-1.0.lpkg").string();
 
     // 应因缺少依赖而抛出异常
-    EXPECT_THROW(
-        install_packages({pkg_path}),
-        LpkgException
-    );
+    EXPECT_THROW(install_packages({pkg_path}), LpkgException);
 }

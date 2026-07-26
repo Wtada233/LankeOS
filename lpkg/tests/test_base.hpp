@@ -1,24 +1,28 @@
 #pragma once
 
-#include "../main/src/config/config.hpp"
-#include "../main/src/base/utils.hpp"
-#include "../main/src/i18n/localization.hpp"
-#include "../main/src/db/cache.hpp"
-#include "../main/src/archive/packer.hpp"
 #include <gtest/gtest.h>
+
 #include <filesystem>
 #include <fstream>
+
+#include "../main/src/archive/packer.hpp"
+#include "../main/src/base/utils.hpp"
+#include "../main/src/config/config.hpp"
+#include "../main/src/db/cache.hpp"
+#include "../main/src/i18n/localization.hpp"
 
 namespace fs = std::filesystem;
 
 /** 集成测试基类：自动处理 Sandbox 环境 Setup/TearDown */
-class IntegrationTestBase : public ::testing::Test {
+class IntegrationTestBase : public ::testing::Test
+{
 protected:
     fs::path suite_work_dir;
     fs::path test_root;
     fs::path pkg_dir;
 
-    void SetUp() override {
+    void SetUp() override
+    {
         Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
         Config::instance().set_testing_mode(true);
         init_localization();
@@ -36,7 +40,8 @@ protected:
         Cache::instance().load();
     }
 
-    void TearDown() override {
+    void TearDown() override
+    {
         Config::instance().set_root_path("/");
         fs::remove_all(suite_work_dir);
     }
@@ -45,7 +50,8 @@ protected:
     std::string create_pkg(const std::string& name, const std::string& version,
                            const std::vector<std::string>& deps = {},
                            const std::vector<std::string>& provides = {},
-                           const std::vector<std::string>& needed_so = {}) {
+                           const std::vector<std::string>& needed_so = {})
+    {
         fs::path work_dir = suite_work_dir / ("_pkg_" + name);
         fs::create_directories(work_dir / "content" / "usr" / "bin");
         std::ofstream bin(work_dir / "content" / "usr" / "bin" / name);
@@ -60,7 +66,8 @@ protected:
     }
 
     /** 创建本地镜像仓库，返回 mirror 目录 */
-    fs::path setup_local_mirror() {
+    fs::path setup_local_mirror()
+    {
         fs::path mirror = suite_work_dir / "mirror" / "x86_64";
         fs::create_directories(mirror);
         {
@@ -71,11 +78,11 @@ protected:
     }
 
     /** 将已创建的包放入镜像 */
-    void add_to_mirror(const std::string& name, const std::string& version) {
+    void add_to_mirror(const std::string& name, const std::string& version)
+    {
         fs::path mirror = suite_work_dir / "mirror" / "x86_64";
         fs::path pkg_subdir = mirror / name;
         fs::create_directories(pkg_subdir);
-        fs::copy(pkg_dir / (name + "-" + version + ".lpkg"),
-                 pkg_subdir / (version + ".lpkg"));
+        fs::copy(pkg_dir / (name + "-" + version + ".lpkg"), pkg_subdir / (version + ".lpkg"));
     }
 };
