@@ -1,0 +1,83 @@
+#!/bin/sh
+#
+# docbook-xsl 1.79.2 — DocBook XSL 样式表
+# 参照 Arch Linux PKGBUILD
+
+_BD=$(dirname {WORK_DIR})
+
+lankebuild_prepare() {
+    cd "{SRC_DIR}/docbook-xsl-1.79.2"
+    patch -Np2 -i "${_BD}/765567_non-recursive_string_subst.patch"
+    cd "{SRC_DIR}/docbook-xsl-nons-1.79.2"
+    patch -Np2 -i "${_BD}/765567_non-recursive_string_subst.patch"
+}
+
+lankebuild_build() {
+    _ver=1.79.2
+    _root="{STAGING_ROOT}/usr/share/xml/docbook"
+
+    for _ns in '' -nons; do
+        _dir="docbook-xsl${_ns}-${_ver}"
+        _pkgroot="$_root/xsl-stylesheets-${_ver}${_ns}"
+
+        cd "{SRC_DIR}/$_dir"
+        install -Dt "$_pkgroot" -m644 VERSION VERSION.xsl
+        for _fn in assembly common eclipse epub epub3 fo highlighting html \
+                   htmlhelp javahelp lib manpages params profiling roundtrip \
+                   template website xhtml xhtml-1_1 xhtml5; do
+            [ -d "$_fn" ] && install -Dt "$_pkgroot/$_fn" -m644 \
+                $_fn/*.{xml,xsl,dtd,ent} 2>/dev/null || true
+        done
+
+        cp -f catalog.xml "$_pkgroot/" 2>/dev/null || true
+
+        ln -s "xsl-stylesheets-${_ver}${_ns}" "$_root/xsl-stylesheets${_ns}"
+    done
+
+    install -Dm644 "{SRC_DIR}/docbook-xsl-1.79.2/COPYING" \
+        "{STAGING_ROOT}{DATADIR}/licenses/docbook-xsl/COPYING"
+
+    # postinst hook：注册样式表路径到主 catalog（Arch 方式）
+    _ver=1.79.2
+    cat > "{STAGING_HOOKS}/postinst.sh" << 'HOOK'
+#!/bin/sh
+_main="/etc/xml/catalog"
+[ -f "$_main" ] || xmlcatalog --noout --create "$_main"
+
+for _v in 1.79.2 current; do
+  for _u in rewriteSystem rewriteURI; do
+    xmlcatalog --noout --add "$_u" \
+      http://cdn.docbook.org/release/xsl/$_v \
+      /usr/share/xml/docbook/xsl-stylesheets-1.79.2 "$_main"
+    xmlcatalog --noout --add "$_u" \
+      http://cdn.docbook.org/release/xsl-nons/$_v \
+      /usr/share/xml/docbook/xsl-stylesheets-1.79.2-nons "$_main"
+    xmlcatalog --noout --add "$_u" \
+      http://docbook.sourceforge.net/release/xsl-ns/$_v \
+      /usr/share/xml/docbook/xsl-stylesheets-1.79.2 "$_main"
+    xmlcatalog --noout --add "$_u" \
+      http://docbook.sourceforge.net/release/xsl/$_v \
+      /usr/share/xml/docbook/xsl-stylesheets-1.79.2-nons "$_main"
+  done
+done
+HOOK
+    chmod +x "{STAGING_HOOKS}/postinst.sh"
+
+    cat > "{STAGING_HOOKS}/prerm.sh" << 'HOOK'
+#!/bin/sh
+_main="/etc/xml/catalog"
+for _v in 1.79.2 current; do
+  for _u in rewriteSystem rewriteURI; do
+    xmlcatalog --noout --del "$_u" \
+      "/usr/share/xml/docbook/xsl-stylesheets-1.79.2" "$_main" 2>/dev/null || true
+    xmlcatalog --noout --del "$_u" \
+      "/usr/share/xml/docbook/xsl-stylesheets-1.79.2-nons" "$_main" 2>/dev/null || true
+  done
+done
+HOOK
+    chmod +x "{STAGING_HOOKS}/prerm.sh"
+}
+
+lankebuild_package() {
+    :
+}

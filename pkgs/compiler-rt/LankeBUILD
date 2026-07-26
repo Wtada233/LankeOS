@@ -1,0 +1,30 @@
+#!/bin/sh
+#
+# compiler-rt 22.1.7 — LLVM compiler runtime libraries
+# 参照 Arch Linux PKGBUILD 适配（完整构建，非仅 builtins）
+
+lankebuild_prepare() {
+    # 源码解压后目录名为 llvm-project-22.1.7.src/
+    mkdir -p build-compiler-rt
+}
+
+lankebuild_build() {
+    cd build-compiler-rt
+
+    cmake -G Ninja ../compiler-rt \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DCOMPILER_RT_INSTALL_PATH=/usr/lib/clang/22
+
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+
+    cd {SRC_DIR}/build-compiler-rt
+    install -Dm644 ../compiler-rt/LICENSE.TXT \
+        "{STAGING_ROOT}{DATADIR}/licenses/compiler-rt/LICENSE"
+}
+
+lankebuild_package() {
+    :
+}

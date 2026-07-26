@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# libunistring 1.4.2 — Unicode 字符串操作库
+# 参照 Arch Linux PKGBUILD
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    install -Dm644 COPYING "{STAGING_ROOT}{DATADIR}/licenses/libunistring/COPYING"
+}
+
+lankebuild_package() {
+    :
+}

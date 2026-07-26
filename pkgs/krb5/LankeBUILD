@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# krb5 1.22.2 — MIT Kerberos 认证库
+# 共享库 + 开发头文件
+
+lankebuild_prepare() {
+    set -e
+}
+
+lankebuild_build() {
+    set -e
+
+    cd src
+
+    ./configure \
+        --prefix=/usr \
+        --sbindir=/usr/bin \
+        --sysconfdir=/etc \
+        --localstatedir=/var/lib \
+        --enable-shared \
+        --with-system-et \
+        --with-system-ss \
+        --disable-rpath \
+        --without-tcl \
+        --enable-dns-for-realm
+
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    # 仅保留共享库
+    rm -f "{STAGING_ROOT}/{LIBDIR}/libgssapi_krb5".a
+    rm -f "{STAGING_ROOT}/{LIBDIR}/libkrb5".a
+    rm -f "{STAGING_ROOT}/{LIBDIR}/libk5crypto".a
+    rm -f "{STAGING_ROOT}/{LIBDIR}/libkrb5support".a
+    rm -f "{STAGING_ROOT}/{LIBDIR}/libcom_err".a
+
+    install -Dm644 ../NOTICE "{STAGING_ROOT}/{DATADIR}/licenses/krb5/NOTICE"
+}
+
+lankebuild_package() {
+    :
+}

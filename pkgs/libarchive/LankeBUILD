@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# libarchive 3.8.8 — 多格式归档库
+
+lankebuild_prepare() {
+    set -e
+}
+
+lankebuild_build() {
+    set -e
+
+    ./configure \
+        --prefix=/usr \
+        --disable-static \
+        --enable-shared
+
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    rm -f "{STAGING_ROOT}/{LIBDIR}/libarchive".a
+
+    install -Dm644 COPYING "{STAGING_ROOT}/{DATADIR}/licenses/libarchive/COPYING"
+}
+
+lankebuild_package() {
+    :
+}

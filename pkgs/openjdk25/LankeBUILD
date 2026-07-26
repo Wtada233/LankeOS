@@ -57,4 +57,12 @@ lankebuild_package() {
     rm -rf "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/man"
     rm -rf "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/lib/src.zip"
     ln -sfv ../../../share/man "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/man"
+
+    # 创建 /usr/bin/* → /usr/lib/jvm/java-25-openjdk/bin/* 软链接（相对路径）
+    mkdir -p "{STAGING_ROOT}/usr/bin"
+    for f in "{STAGING_ROOT}{LIBDIR}/jvm/java-25-openjdk/bin/"*; do
+        name=$(basename "$f")
+        ln -sfv "../lib/jvm/java-25-openjdk/bin/$name" \
+            "{STAGING_ROOT}/usr/bin/$name"
+    done
 }

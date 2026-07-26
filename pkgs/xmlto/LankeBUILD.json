@@ -1,0 +1,12 @@
+{
+  "name": "xmlto",
+  "version": "0.0.29",
+  "sources": [
+    "https://pagure.io/xmlto/archive/0.0.29/xmlto-0.0.29.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "no_strip": true,
+  "provides": [],
+  "release": 1
+}

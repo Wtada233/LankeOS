@@ -1,0 +1,10 @@
+{
+  "name": "opus",
+  "version": "1.6.1",
+  "sources": [
+    "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.6.1.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "release": 1
+}

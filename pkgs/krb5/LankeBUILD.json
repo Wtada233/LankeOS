@@ -1,0 +1,9 @@
+{
+  "name": "krb5",
+  "version": "1.22.2",
+  "sources": [
+    "https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz"
+  ],
+  "work_sources": [],
+  "release": 1
+}

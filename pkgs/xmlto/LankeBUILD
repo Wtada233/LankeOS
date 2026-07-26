@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# xmlto 0.0.29 — XML 格式转换工具
+# 参照 Arch Linux PKGBUILD
+
+lankebuild_prepare() {
+    autoreconf -i
+}
+
+lankebuild_build() {
+    # XML_CATALOG_FILES：指定 docbook-xsl 样式表目录
+    export XML_CATALOG_FILES="/etc/xml/catalog"
+    ./configure BASH=/bin/bash --prefix={PREFIX} --mandir={MANDIR}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    install -Dm644 COPYING "{STAGING_ROOT}{DATADIR}/licenses/xmlto/COPYING"
+}
+
+lankebuild_package() {
+    :
+}

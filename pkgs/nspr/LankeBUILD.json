@@ -1,0 +1,12 @@
+{
+  "name": "nspr",
+  "version": "4.39",
+  "sources": [
+    "https://archive.mozilla.org/pub/nspr/releases/v4.39/src/nspr-4.39.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "no_strip": false,
+  "provides": [],
+  "release": 1
+}

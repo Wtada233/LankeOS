@@ -1,0 +1,12 @@
+{
+  "name": "libunistring",
+  "version": "1.4.2",
+  "sources": [
+    "https://ftpmirror.gnu.org/libunistring/libunistring-1.4.2.tar.xz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "no_strip": false,
+  "provides": [],
+  "release": 1
+}

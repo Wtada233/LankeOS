@@ -1,9 +1,9 @@
 {
   "name": "libxml2",
-  "version": "2.12.6",
+  "version": "2.13.9",
   "sources": [
-    "https://download.gnome.org/sources/libxml2/2.12/libxml2-2.12.6.tar.xz"
+    "https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.9.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 1
 }

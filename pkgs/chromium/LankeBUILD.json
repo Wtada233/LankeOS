@@ -1,0 +1,11 @@
+{
+  "name": "chromium",
+  "version": "150.0.7871.186",
+  "sources": [
+    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-150.0.7871.186-lite.tar.xz",
+    "https://github.com/foutrelis/chromium-launcher/archive/v8/chromium-launcher-8.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "release": 1
+}

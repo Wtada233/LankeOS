@@ -1,0 +1,25 @@
+#!/bin/bash
+#
+# desktop-file-utils 0.28 — .desktop 文件工具集
+# 参照 Arch Linux PKGBUILD 适配
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    mkdir -p build-dfu && cd build-dfu
+
+    meson setup .. \
+        --prefix={PREFIX} \
+        --buildtype=release
+
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+
+    install -Dm644 ../COPYING "{STAGING_ROOT}{DATADIR}/licenses/desktop-file-utils/COPYING"
+}
+
+lankebuild_package() {
+    :
+}

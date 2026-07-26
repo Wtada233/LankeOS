@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+# nspr 4.39 — Netscape Portable Runtime
+# 参照 Arch Linux PKGBUILD 适配
+
+_BD=$(dirname {WORK_DIR})
+
+lankebuild_prepare() {
+    cd nspr
+
+    # Arch 维护的两个修复 patch
+    patch -Np1 -i "${_BD}/0001-linux-prefer-GCC-provided-atomics-to-asssembly-imple.patch"
+    patch -Np1 -i "${_BD}/0002-configure.in-Remove-assembly-files-from-build.patch"
+
+    autoreconf -fvi
+}
+
+lankebuild_build() {
+    cd nspr
+
+    ./configure \
+        --prefix=/usr \
+        --libdir=/usr/lib \
+        --includedir=/usr/include/nspr \
+        --enable-optimize \
+        --disable-debug \
+        --enable-64bit
+
+    make -j$(nproc)
+    make -j$(nproc) DESTDIR={STAGING_ROOT} install
+
+    # mozilla-nspr.pc 兼容 symlink
+    ln -s nspr.pc "{STAGING_ROOT}/usr/lib/pkgconfig/mozilla-nspr.pc"
+
+    # 清理不需要的文件
+    rm -r "{STAGING_ROOT}/usr/include/nspr/md"
+    rm -f "{STAGING_ROOT}/usr/bin/compile-et.pl" \
+          "{STAGING_ROOT}/usr/bin/prerr.properties"
+
+    install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/nspr/LICENSE"
+}
+
+lankebuild_package() {
+    :
+}

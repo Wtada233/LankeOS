@@ -1,0 +1,9 @@
+{
+  "name": "libarchive",
+  "version": "3.8.8",
+  "sources": [
+    "https://github.com/libarchive/libarchive/releases/download/v3.8.8/libarchive-3.8.8.tar.xz"
+  ],
+  "work_sources": [],
+  "release": 1
+}

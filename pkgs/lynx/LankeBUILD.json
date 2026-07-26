@@ -1,0 +1,12 @@
+{
+  "name": "lynx",
+  "version": "2.9.3",
+  "sources": [
+    "https://invisible-mirror.net/archives/lynx/tarballs/lynx2.9.3.tar.bz2"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "no_strip": false,
+  "provides": [],
+  "release": 1
+}

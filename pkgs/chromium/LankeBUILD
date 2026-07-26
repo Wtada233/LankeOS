@@ -1,0 +1,238 @@
+#!/bin/sh
+#
+# Chromium 150.0.7871.186
+# 基于 Arch Linux PKGBUILD 适配 LankeOS
+# 注意：使用 /bin/sh（POSIX sh），无 bashisms
+
+# 构建目录（{WORK_DIR} 被替换为绝对路径，dirname 取父目录）
+_BD=$(dirname {WORK_DIR})
+
+# Chromium 源码目录（处理单/多 tarball 两种情况）
+if [ -d "{SRC_DIR}/chromium-{ORIG_PKG_VER}" ]; then
+    _CS="{SRC_DIR}/chromium-{ORIG_PKG_VER}"
+else
+    _CS="{SRC_DIR}"
+fi
+
+# 系统库 unbundle 列表（空格分隔，供 replace_gn_files.py 使用）
+_SYSTEM_LIBS="brotli dav1d flac fontconfig freetype harfbuzz
+              icu libdrm libjpeg libwebp libxml libxslt
+              openh264 opus zlib zstd"
+
+# 需要删除捆绑文件的目录名（libjpeg 映射为 libjpeg_turbo）
+_UNWANTED_DIRS="brotli dav1d flac fontconfig freetype harfbuzz
+                icu libdrm libjpeg_turbo libwebp libxml libxslt
+                openh264 opus minizip zstd"
+
+
+lankebuild_prepare() {
+    set -e
+    cd "$_CS"
+
+    # --- 基础替换 ---
+    sed -i 's/OFFICIAL_BUILD/GOOGLE_CHROME_BUILD/' \
+        tools/generate_shim_headers/generate_shim_headers.py
+
+    # https://crbug.com/893950
+    sed -i -e 's/<xmlMalloc>/malloc/g' -e 's/<xmlFree>/free/g' \
+           -e '1i #include <cstdlib>' \
+        third_party/blink/renderer/core/xml/*.cc \
+        third_party/blink/renderer/core/xml/parser/xml_document_parser.cc \
+        third_party/libxml/chromium/*.cc
+
+    # --- 应用补丁 ---
+    for _p in \
+        use-oauth2-client-switches-as-default.patch \
+        chromium-138-nodejs-version-check.patch \
+        compiler-rt-adjust-paths.patch \
+        increase-fortify-level.patch \
+        chromium-149-drop-unknown-clang-flag.patch \
+        chromium-147-revert-clang-no-lifetime-dse-flag.patch \
+        chromium-145-fix-SYS_SECCOMP.patch \
+        chromium-149-build-with-wasm-rollup.patch \
+        chromium-147-rust-1.95-bytemuck.patch \
+        glibc-2.42-baud-rate-fix.patch \
+        chromium-149-unbundle-minizip-undo-unicode.patch \
+        chromium-149-use-of-undeclared-identifier-ERROR.patch \
+        chromium-150-fix-ar-unbundle.patch \
+        chromium-150-fix-sysroot-path-error.patch \
+        chromium-150-revert-avx-flag-change.patch; do
+        patch -Np1 -i "$_BD/$_p"
+    done
+
+    # --- 链接系统工具 ---
+    mkdir -p third_party/node/linux/node-linux-x64/bin \
+             third_party/jdk/current/bin \
+             third_party/rust-toolchain/bin
+
+    ln -sf /usr/bin/node third_party/node/linux/node-linux-x64/bin/
+    # 找最高版本的 JDK，jdk 默认不装 /usr/bin/java
+    _jdk=$(ls -d /usr/lib/jvm/java-*-openjdk 2>/dev/null | sort -V | tail -1)
+    if [ -n "$_jdk" ]; then
+        ln -sf "$_jdk/bin/java" third_party/jdk/current/bin/
+    fi
+    ln -sf /usr/bin/rustc third_party/rust-toolchain/bin/
+
+    rm -f third_party/gperf/cipd/bin/gperf
+    ln -sf /usr/bin/gperf third_party/gperf/cipd/bin/
+
+    # --- 删除捆绑库（将被系统库替代的部分）---
+    for _lib in $_UNWANTED_DIRS; do
+        find "third_party/$_lib" -type f \
+            ! -path "third_party/$_lib/chromium/*" \
+            ! -path "third_party/$_lib/google/*" \
+            ! -path "third_party/harfbuzz-ng/utils/hb_scoped.h" \
+            ! -name '*.gn' ! -name '*.gni' ! -name '*.isolate' \
+            -delete 2>/dev/null || true
+    done
+
+    ./build/linux/unbundle/replace_gn_files.py --system-libraries $_SYSTEM_LIBS
+
+    # 生成 dawn commit hash（tarball 已自带，仅在有必要时覆盖）
+    if [ -d third_party/dawn/.git ]; then
+        python3 build/util/lastchange.py -m DAWN_COMMIT_HASH \
+            -s third_party/dawn --revision gpu/webgpu/DAWN_VERSION \
+            --header gpu/webgpu/dawn_commit_hash.h
+    fi
+}
+
+
+lankebuild_build() {
+    # --- 构建 chromium-launcher ---
+    set -e
+    make -C "{SRC_DIR}/chromium-launcher-8" -j$(nproc)
+
+    # --- 构建 Chromium ---
+    cd "$_CS"
+
+    export CC=clang
+    export CXX=clang++
+    export AR=ar
+    export NM=nm
+    export RUSTC_BOOTSTRAP=1
+
+    # 获取版本号
+    _clang_ver=$(clang --version | grep -m1 version | sed 's/.* \([0-9]\{1,\}\)\..*/\1/')
+    _rustc_ver=$(rustc --version | awk '{print $2}')
+
+    # 移除与 Chromium ThinLTO 冲突的 CFLAGS
+    for _flag in "-g" "-fexceptions" "-fcf-protection" \
+                 "-fstack-clash-protection" "-Wp,-D_GLIBCXX_ASSERTIONS"; do
+        CFLAGS=$(echo "$CFLAGS" | sed "s|$_flag||g")
+        CXXFLAGS=$(echo "$CXXFLAGS" | sed "s|$_flag||g")
+    done
+    CFLAGS=$(echo "$CFLAGS" | sed 's/  */ /g')
+    CXXFLAGS=$(echo "$CXXFLAGS" | sed 's/  */ /g')
+
+    CFLAGS="$CFLAGS -Wno-builtin-macro-redefined -Wno-unknown-warning-option"
+    CXXFLAGS="$CXXFLAGS -Wno-builtin-macro-redefined -Wno-unknown-warning-option"
+    CPPFLAGS="$CPPFLAGS -D__DATE__= -D__TIME__= -D__TIMESTAMP__="
+
+    # GN 构建参数（空格分隔字符串，gn 解析为列表）
+    _flags=""
+    _flags="$_flags custom_toolchain=\"//build/toolchain/linux/unbundle:default\""
+    _flags="$_flags host_toolchain=\"//build/toolchain/linux/unbundle:default\""
+    _flags="$_flags is_official_build=true symbol_level=0"
+    _flags="$_flags treat_warnings_as_errors=false fatal_linker_warnings=false"
+    _flags="$_flags disable_fieldtrial_testing_config=true"
+    _flags="$_flags blink_enable_generated_code_formatting=false"
+    _flags="$_flags ffmpeg_branding=\"Chrome\" proprietary_codecs=true"
+    _flags="$_flags rtc_use_pipewire=true link_pulseaudio=true"
+    _flags="$_flags use_custom_libcxx=true use_sysroot=false"
+    _flags="$_flags use_system_libffi=true enable_hangout_services_extension=true"
+    _flags="$_flags enable_widevine=true"
+    _flags="$_flags use_qt5=false use_qt6=false use_clang_modules=false"
+    _flags="$_flags clang_base_path=\"/usr\" clang_use_chrome_plugins=false"
+    _flags="$_flags clang_version=\"$_clang_ver\" chrome_pgo_phase=0"
+    _flags="$_flags rust_sysroot_absolute=\"/usr\" rust_bindgen_root=\"/usr\""
+    _flags="$_flags rustc_version=\"$_rustc_ver\""
+    _flags="$_flags icu_use_data_file=false"
+
+    # 使用系统 gn（需先安装 pkgs/gn）
+    gn gen out/Release --args="$_flags"
+
+    # Chromium 构建极耗内存，留出 4 核给系统
+    _nc=$(nproc)
+    if [ "$_nc" -gt 4 ]; then
+      _jobs=$((_nc - 4))
+    else
+      _jobs=1
+    fi
+    ninja -C out/Release -j$_jobs chrome chrome_sandbox chromedriver.unstripped
+}
+
+
+lankebuild_package() {
+    set -e
+    # --- launcher ---
+    cd "{SRC_DIR}/chromium-launcher-8"
+    make PREFIX=/usr DESTDIR="{STAGING_ROOT}" install
+    install -Dvm644 LICENSE \
+        "{STAGING_ROOT}/usr/share/licenses/chromium/LICENSE.launcher"
+
+    # --- Chromium 二进制 ---
+    cd "$_CS"
+
+    install -Dv out/Release/chrome \
+        "{STAGING_ROOT}/usr/lib/chromium/chromium"
+    install -Dv out/Release/chromedriver.unstripped \
+        "{STAGING_ROOT}/usr/bin/chromedriver"
+    install -Dvm4755 out/Release/chrome_sandbox \
+        "{STAGING_ROOT}/usr/lib/chromium/chrome-sandbox"
+
+    # --- 兼容 symlink ---
+    ln -sf chromium "{STAGING_ROOT}/usr/bin/chromium-browser"
+
+    # --- 桌面文件 / man page / appdata ---
+    install -Dvm644 chrome/installer/linux/common/desktop.template \
+        "{STAGING_ROOT}/usr/share/applications/chromium.desktop"
+    install -Dvm644 chrome/app/resources/manpage.1.in \
+        "{STAGING_ROOT}/usr/share/man/man1/chromium.1"
+
+    sed -i \
+        -e 's/@@MENUNAME/Chromium/g' \
+        -e 's/@@PACKAGE/chromium/g' \
+        -e 's/@@usr_bin_symlink_name/chromium/g' \
+        -e 's|@@uri_scheme|x-scheme-handler/chromium;|g' \
+        -e 's/@@extra_desktop_entries//g' \
+        "{STAGING_ROOT}/usr/share/applications/chromium.desktop" \
+        "{STAGING_ROOT}/usr/share/man/man1/chromium.1"
+
+    # AppData
+    _tmpl=chrome/installer/linux/common/appdata.xml.template
+    _info=chrome/installer/linux/common/chromium-browser.info
+    . "$_info"
+    PACKAGE=chromium
+    export $(grep -o '^[A-Z_]*' "$_info")
+    sed -E -e 's/@@([A-Z_]*)/${\1}/g' -e '/<update_contact>/d' "$_tmpl" | \
+        envsubst | install -Dvm644 /dev/stdin \
+        "{STAGING_ROOT}/usr/share/metainfo/chromium.appdata.xml"
+
+    # --- 资源文件 ---
+    for _f in \
+        chrome_100_percent.pak chrome_200_percent.pak \
+        chrome_crashpad_handler resources.pak v8_context_snapshot.bin \
+        libEGL.so libGLESv2.so libvk_swiftshader.so libvulkan.so.1 \
+        vk_swiftshader_icd.json; do
+        cp "out/Release/$_f" "{STAGING_ROOT}/usr/lib/chromium/"
+    done
+
+    install -Dvm644 -t "{STAGING_ROOT}/usr/lib/chromium/locales" \
+        out/Release/locales/*.pak
+
+    # --- 图标 ---
+    for _s in 16 32 24 48 64 128 256; do
+        if [ "$_s" -le 32 ]; then
+            install -Dvm644 \
+                "chrome/app/theme/default_100_percent/chromium/product_logo_${_s}.png" \
+                "{STAGING_ROOT}/usr/share/icons/hicolor/${_s}x${_s}/apps/chromium.png"
+        else
+            install -Dvm644 \
+                "chrome/app/theme/chromium/product_logo_${_s}.png" \
+                "{STAGING_ROOT}/usr/share/icons/hicolor/${_s}x${_s}/apps/chromium.png"
+        fi
+    done
+
+    # --- 许可证 ---
+    install -Dvm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/chromium/LICENSE"
+}

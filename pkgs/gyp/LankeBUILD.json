@@ -1,0 +1,12 @@
+{
+  "name": "gyp",
+  "version": "20240207.1615ec32",
+  "sources": [
+    "https://chromium.googlesource.com/external/gyp/+archive/1615ec326858f8c2bd8f30b3a86ea71830409ce4.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "no_strip": true,
+  "provides": [],
+  "release": 1
+}

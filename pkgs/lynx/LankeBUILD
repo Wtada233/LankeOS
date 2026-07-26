@@ -1,0 +1,32 @@
+#!/bin/sh
+#
+# lynx 2.9.3 — 文本网页浏览器
+# 参照 Arch Linux PKGBUILD
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --with-ssl=/usr \
+        --enable-externs \
+        --enable-default-colors \
+        --enable-nls \
+        --enable-ipv6 \
+        --mandir={MANDIR}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    # 修复帮助文件路径
+    sed -i "s|^HELPFILE.*$|HELPFILE:file:///usr/share/doc/lynx/lynx_help/lynx_help_main.html|" \
+        "{STAGING_ROOT}/etc/lynx.cfg"
+    install -dm755 "{STAGING_ROOT}{DATADIR}/doc/lynx"
+    cp -rf lynx_help "{STAGING_ROOT}{DATADIR}/doc/lynx/"
+
+}
+
+lankebuild_package() {
+    :
+}

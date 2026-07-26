@@ -1,0 +1,13 @@
+{
+  "name": "docbook-xsl",
+  "version": "1.79.2",
+  "sources": [
+    "https://github.com/docbook/xslt10-stylesheets/releases/download/release%2F1.79.2/docbook-xsl-1.79.2.tar.gz",
+    "https://github.com/docbook/xslt10-stylesheets/releases/download/release%2F1.79.2/docbook-xsl-nons-1.79.2.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "no_strip": true,
+  "provides": [],
+  "release": 1
+}

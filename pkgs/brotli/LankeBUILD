@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# brotli 1.2.0 — 压缩库（Google）
+# 纯共享库构建，移除静态库
+
+lankebuild_prepare() {
+    mkdir -p build-brotli
+}
+
+lankebuild_build() {
+    cd build-brotli
+
+    cmake -G Ninja .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBROTLI_DISABLE_TESTS=ON
+
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+
+    # 仅保留共享库
+    rm -f "{STAGING_ROOT}/{LIBDIR}/libbrotli"*.a
+
+    install -Dm644 ../LICENSE "{STAGING_ROOT}/{DATADIR}/licenses/brotli/LICENSE"
+}
+
+lankebuild_package() {
+    :
+}

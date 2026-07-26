@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# libidn2 2.3.8 — IDNA2008 国际化域名实现
+# 参照 Arch Linux PKGBUILD
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    install -Dm644 COPYING "{STAGING_ROOT}{DATADIR}/licenses/libidn2/COPYING"
+}
+
+lankebuild_package() {
+    :
+}

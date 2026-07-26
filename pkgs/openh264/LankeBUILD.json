@@ -1,0 +1,12 @@
+{
+  "name": "openh264",
+  "version": "2.6.0",
+  "sources": [
+    "https://github.com/cisco/openh264/archive/refs/tags/v2.6.0.tar.gz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "no_strip": false,
+  "provides": [],
+  "release": 1
+}

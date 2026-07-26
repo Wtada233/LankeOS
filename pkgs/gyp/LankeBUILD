@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# gyp — Generate Your Projects（元构建系统）
+# NSS 等项目的构建依赖
+# 参照 Arch Linux PKGBUILD 适配
+
+_BD=$(dirname {WORK_DIR})
+
+lankebuild_prepare() {
+    # 应用 Arch 的 Python 兼容性 patch
+    patch -Np1 -i "${_BD}/0001-Fix-Python-compat-and-remove-six.patch"
+}
+
+lankebuild_build() {
+    python setup.py install --root={STAGING_ROOT} --prefix={PREFIX}
+    install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/gyp/LICENSE"
+}
+
+lankebuild_package() {
+    :
+}

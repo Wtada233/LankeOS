@@ -1,0 +1,16 @@
+{
+  "name": "docbook-xml",
+  "version": "4.5",
+  "sources": [],
+  "work_sources": [
+    "https://archive.docbook.org/xml/4.1.2/docbkx412.zip",
+    "https://archive.docbook.org/xml/4.2/docbook-xml-4.2.zip",
+    "https://archive.docbook.org/xml/4.3/docbook-xml-4.3.zip",
+    "https://archive.docbook.org/xml/4.4/docbook-xml-4.4.zip",
+    "https://archive.docbook.org/xml/4.5/docbook-xml-4.5.zip"
+  ],
+  "deps": [],
+  "no_strip": true,
+  "provides": [],
+  "release": 2
+}

@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# dav1d 1.5.4 — AV1 解码器（VideoLAN）
+# 纯共享库构建
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix={PREFIX} \
+        --buildtype=release \
+        --default-library=shared \
+        -Denable_tools=true \
+        -Denable_tests=false
+
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja -C build install
+
+    # 许可证
+    install -Dm644 COPYING "{STAGING_ROOT}/{DATADIR}/licenses/dav1d/COPYING"
+}
+
+lankebuild_package() {
+    :
+}

@@ -13,4 +13,5 @@ lankebuild_build() {
 lankebuild_package() {
     # Installation handled by builder
     make PREFIX={STAGING_ROOT}{PREFIX} SHAREDIR={STAGING_ROOT}{DATADIR}/hwdata SHARED=yes install
+    make PREFIX={STAGING_ROOT}{PREFIX} SHAREDIR={STAGING_ROOT}{DATADIR}/hwdata SHARED=yes install-lib
 }

@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# xdg-utils 1.2.1 — 桌面集成命令行工具集
+# 参照 Arch Linux PKGBUILD
+
+lankebuild_prepare() {
+    if [ ! -f configure ]; then
+        autoreconf -fiv
+    fi
+}
+
+lankebuild_build() {
+    export XML_CATALOG_FILES=/etc/xml/catalog
+    ./configure --prefix={PREFIX} --mandir={MANDIR}
+    make -j$(nproc) scripts
+
+    # 手动安装脚本（跳过 txt 转换失败导致的 make install 问题）
+    cd scripts
+    for _s in xdg-desktop-menu xdg-desktop-icon xdg-mime xdg-icon-resource \
+              xdg-open xdg-email xdg-screensaver xdg-settings; do
+        install -m755 "$_s" "{STAGING_ROOT}{BINDIR}/$_s"
+    done
+
+    cd ..
+    install -dm755 "{STAGING_ROOT}{DATADIR}/desktop-directories"
+    install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/xdg-utils/LICENSE"
+}
+
+lankebuild_package() {
+    :
+}

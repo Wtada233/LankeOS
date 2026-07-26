@@ -1,0 +1,12 @@
+{
+  "name": "dav1d",
+  "version": "1.5.4",
+  "sources": [
+    "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz"
+  ],
+  "work_sources": [],
+  "deps": [],
+  "no_strip": false,
+  "provides": [],
+  "release": 1
+}

@@ -1,0 +1,94 @@
+#!/bin/sh
+#
+# docbook-xml 4.5 — DocBook XML DTD
+# 参照 Arch Linux PKGBUILD
+
+lankebuild_prepare() {
+    # work_sources 已复制 zip 到 {SRC_DIR}，手动分版本提取
+    for _v in 4.1.2 4.2 4.3 4.4 4.5; do
+        mkdir -p "{SRC_DIR}/dtd-$_v"
+    done
+
+    unzip -o "{SRC_DIR}/docbkx412.zip" -d "{SRC_DIR}/dtd-4.1.2" 2>/dev/null
+    unzip -o "{SRC_DIR}/docbook-xml-4.2.zip" -d "{SRC_DIR}/dtd-4.2" 2>/dev/null
+    unzip -o "{SRC_DIR}/docbook-xml-4.3.zip" -d "{SRC_DIR}/dtd-4.3" 2>/dev/null
+    unzip -o "{SRC_DIR}/docbook-xml-4.4.zip" -d "{SRC_DIR}/dtd-4.4" 2>/dev/null
+    unzip -o "{SRC_DIR}/docbook-xml-4.5.zip" -d "{SRC_DIR}/dtd-4.5" 2>/dev/null
+}
+
+lankebuild_build() {
+    _catalog="{STAGING_ROOT}/etc/xml/docbook-xml"
+    _root="{STAGING_ROOT}/usr/share/xml/docbook"
+    _versions="4.1.2 4.2 4.3 4.4 4.5"
+
+    install -dm755 "{STAGING_ROOT}/etc/xml"
+    xmlcatalog --noout --create "$_catalog" 2>/dev/null
+
+    for _ver in $_versions; do
+        _s="{SRC_DIR}/dtd-$_ver"
+        _d="$_root/xml-dtd-$_ver"
+        install -dm755 "$_d"
+        cp -r "$_s"/* "$_d/" 2>/dev/null
+
+        case $_ver in
+            4.1.2) _x="" ;;  *) _x=" XML" ;;
+        esac
+
+        [ "$_ver" = "4.1.2" ] || {
+            xmlcatalog --noout --add "public" "-//OASIS//DTD DocBook${_x} V$_ver//EN" \
+                "http://www.oasis-open.org/docbook/xml/$_ver/docbookx.dtd" "$_catalog"
+            xmlcatalog --noout --add "public" "-//OASIS//DTD DocBook${_x} CALS Table Model V$_ver//EN" \
+                "http://www.oasis-open.org/docbook/xml/$_ver/calstblx.dtd" "$_catalog"
+            xmlcatalog --noout --add "public" "-//OASIS//DTD XML Exchange Table Model 19990315//EN" \
+                "http://www.oasis-open.org/docbook/xml/$_ver/soextblx.dtd" "$_catalog"
+            xmlcatalog --noout --add "public" "-//OASIS//ELEMENTS DocBook${_x} Information Pool V$_ver//EN" \
+                "http://www.oasis-open.org/docbook/xml/$_ver/dbpoolx.mod" "$_catalog"
+            xmlcatalog --noout --add "public" "-//OASIS//ELEMENTS DocBook${_x} Document Hierarchy V$_ver//EN" \
+                "http://www.oasis-open.org/docbook/xml/$_ver/dbhierx.mod" "$_catalog"
+            xmlcatalog --noout --add "public" "-//OASIS//ENTITIES DocBook${_x} Additional General Entities V$_ver//EN" \
+                "http://www.oasis-open.org/docbook/xml/$_ver/dbgenent.mod" "$_catalog"
+            xmlcatalog --noout --add "public" "-//OASIS//ENTITIES DocBook${_x} Notations V$_ver//EN" \
+                "http://www.oasis-open.org/docbook/xml/$_ver/dbnotnx.mod" "$_catalog"
+            xmlcatalog --noout --add "public" "-//OASIS//ENTITIES DocBook${_x} Character Entities V$_ver//EN" \
+                "http://www.oasis-open.org/docbook/xml/$_ver/dbcentx.mod" "$_catalog"
+        }
+
+        case $_ver in 4.[45])
+            xmlcatalog --noout --add "public" \
+                "-//OASIS//ELEMENTS DocBook XML HTML Tables V$_ver//EN" \
+                "http://www.oasis-open.org/docbook/xml/$_ver/htmltblx.mod" "$_catalog"
+        esac
+
+        xmlcatalog --noout --add "rewriteSystem" \
+            "http://www.oasis-open.org/docbook/xml/$_ver" \
+            "/usr/share/xml/docbook/xml-dtd-$_ver" "$_catalog"
+        xmlcatalog --noout --add "rewriteURI" \
+            "http://www.oasis-open.org/docbook/xml/$_ver" \
+            "/usr/share/xml/docbook/xml-dtd-$_ver" "$_catalog"
+    done
+
+    cat > "{STAGING_HOOKS}/postinst.sh" << 'HOOK'
+#!/bin/sh
+_main="/etc/xml/catalog"
+_sub="file:///etc/xml/docbook-xml"
+[ -f "$_main" ] || xmlcatalog --noout --create "$_main"
+xmlcatalog --noout --add "delegatePublic" "-//OASIS//ENTITIES DocBook XML" "$_sub" "$_main"
+xmlcatalog --noout --add "delegatePublic" "-//OASIS//DTD DocBook XML" "$_sub" "$_main"
+xmlcatalog --noout --add "delegateSystem" "http://www.oasis-open.org/docbook/" "$_sub" "$_main"
+xmlcatalog --noout --add "delegateURI" "http://www.oasis-open.org/docbook/" "$_sub" "$_main"
+HOOK
+    chmod +x "{STAGING_HOOKS}/postinst.sh"
+
+    cat > "{STAGING_HOOKS}/prerm.sh" << 'HOOK'
+#!/bin/sh
+xmlcatalog --noout --del "file:///etc/xml/docbook-xml" "/etc/xml/catalog" 2>/dev/null || true
+HOOK
+    chmod +x "{STAGING_HOOKS}/prerm.sh"
+
+    install -Dm644 "{SRC_DIR}/dtd-4.5/README" \
+        "{STAGING_ROOT}{DATADIR}/licenses/docbook-xml/README" 2>/dev/null || true
+}
+
+lankebuild_package() {
+    :
+}

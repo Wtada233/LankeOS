@@ -1,10 +1,9 @@
 {
   "name": "linux",
-  "version": "7.1.1",
+  "version": "7.1.5",
   "sources": [
-    "https://www.kernel.org/pub/linux/kernel/v7.x/linux-7.1.1.tar.gz"
+    "https://www.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.gz"
   ],
   "no_strip": true,
-  "work_sources": [],
-  "release": 2
+  "work_sources": []
 }

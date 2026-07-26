@@ -1,0 +1,112 @@
+#!/bin/sh
+#
+# nss 3.126 — Network Security Services
+# 参照 Arch Linux PKGBUILD 适配
+# 需要：nspr、p11-kit、gyp（构建依赖）
+
+_BD=$(dirname {WORK_DIR})
+
+lankebuild_prepare() {
+    cd "{SRC_DIR}"
+
+    # 复制 Arch 提供的辅助脚本到源码根目录
+    cp "$_BD/bundle.sh" "$_BD/certdata2pem.py" .
+
+    # 创建证书目录并链接 NSS 内置证书数据
+    mkdir -p certs
+    ln -sf "$PWD/nss/lib/ckfw/builtins/certdata.txt" certs/
+    ln -sf "$PWD/nss/lib/ckfw/builtins/nssckbi.h" certs/
+}
+
+lankebuild_build() {
+    cd "{SRC_DIR}"
+
+    # 1. 生成 PEM 证书包
+    cd certs
+    ../certdata2pem.py
+    cd ..
+
+    # 2. 生成 CA bundle
+    ./bundle.sh
+
+    # 3. 构建 NSS
+    cd nss
+    ./build.sh \
+        --disable-tests \
+        --enable-libpkix \
+        --opt \
+        --system-nspr \
+        --system-sqlite
+
+    # 回到源码根目录（构建产物在 {SRC_DIR}/dist/，模板在 {SRC_DIR}/nss/）
+    cd {SRC_DIR}
+
+    # ---------------------------------------------------------------
+    # 安装
+    # ---------------------------------------------------------------
+    libdir=/usr/lib
+    includedir=/usr/include/nss
+
+    # 获取系统 nspr 版本
+    nsprver="$(pkg-config --modversion nspr 2>/dev/null || echo "4.38")"
+
+    # a) nss.pc — 从模板生成
+    sed nss/pkg/pkg-config/nss.pc.in \
+        -e "s,%prefix%,/usr,g" \
+        -e "s,%exec_prefix%,\${prefix},g" \
+        -e "s,%libdir%,$libdir,g" \
+        -e "s,%includedir%,$includedir,g" \
+        -e "s,%NSPR_VERSION%,$nsprver,g" \
+        -e "s,%NSS_VERSION%,{ORIG_PKG_VER},g" |
+        install -Dm644 /dev/stdin "{STAGING_ROOT}$libdir/pkgconfig/nss.pc"
+
+    ln -s nss.pc "{STAGING_ROOT}$libdir/pkgconfig/mozilla-nss.pc"
+
+    # b) 共享库
+    install -Dt "{STAGING_ROOT}$libdir" dist/Release/lib/*.so
+
+    # c) nss-config — 从模板生成
+    vmajor=$(awk '/NSS_VMAJOR/ {print $3}' nss/lib/nss/nss.h)
+    vminor=$(awk '/NSS_VMINOR/ {print $3}' nss/lib/nss/nss.h)
+    vpatch=$(awk '/NSS_VPATCH/ {print $3}' nss/lib/nss/nss.h)
+
+    sed nss/pkg/pkg-config/nss-config.in \
+        -e "s,@prefix@,/usr,g" \
+        -e "s,@exec_prefix@,/usr,g" \
+        -e "s,@libdir@,$libdir,g" \
+        -e "s,@includedir@,$includedir,g" \
+        -e "s,@MOD_MAJOR_VERSION@,$vmajor,g" \
+        -e "s,@MOD_MINOR_VERSION@,$vminor,g" \
+        -e "s,@MOD_PATCH_VERSION@,$vpatch,g" |
+        install -D /dev/stdin "{STAGING_ROOT}/usr/bin/nss-config"
+
+    # d) 二进制工具
+    for _bin in certutil cmsutil crlutil modutil pk12util \
+                shlibsign signtool signver ssltap; do
+        if [ -f "dist/Release/bin/$_bin" ]; then
+            install -m755 "dist/Release/bin/$_bin" "{STAGING_ROOT}/usr/bin/"
+        fi
+    done
+
+    # e) 头文件
+    install -Dt "{STAGING_ROOT}$includedir" -m644 dist/public/nss/*.h
+
+    # f) man page
+    for _man in certutil cmsutil crlutil modutil pk12util \
+                signtool signver ssltap; do
+        if [ -f "nss/doc/nroff/$_man.1" ]; then
+            install -Dm644 "nss/doc/nroff/$_man.1" \
+                "{STAGING_ROOT}/usr/share/man/man1/$_man.1"
+        fi
+    done
+
+    # g) 替换内置 trust module 为 p11-kit 连接
+    ln -sf pkcs11/p11-kit-trust.so "{STAGING_ROOT}$libdir/libnssckbi.so"
+
+    # h) 许可证
+    install -Dm644 nss/COPYING "{STAGING_ROOT}{DATADIR}/licenses/nss/COPYING"
+}
+
+lankebuild_package() {
+    :
+}

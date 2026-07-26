@@ -1,0 +1,26 @@
+#!/bin/bash
+#
+# openh264 2.6.0 — Cisco H.264 编解码器
+# 参照 Arch Linux PKGBUILD 适配
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 构建（Arch 不传递额外变量）
+    make -j$(nproc)
+
+    # 仅安装共享库
+    make DESTDIR={STAGING_ROOT} PREFIX=/usr install-shared
+
+    # CLI 工具
+    install -D -m755 h264dec -t "{STAGING_ROOT}/usr/bin/"
+    install -D -m755 h264enc -t "{STAGING_ROOT}/usr/bin/"
+
+    install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/openh264/LICENSE"
+}
+
+lankebuild_package() {
+    :
+}

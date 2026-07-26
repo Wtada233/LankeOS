@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# minizip 1.3.1（来自 zlib 源码的 contrib/minizip）
+# 基于 zlib 的 ZIP 格式封装库，autoconf 构建，动态链接系统 zlib
+
+lankebuild_prepare() {
+    # contrib/minizip 用 autoconf，无 CMakeLists.txt
+    :
+}
+
+lankebuild_build() {
+    cd contrib/minizip
+
+    # 从 configure.ac 生成 configure
+    autoreconf -fiv
+
+    ./configure --prefix={PREFIX} --libdir={LIBDIR} --disable-static --enable-demos
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+
+    install -Dm644 ../../LICENSE \
+        "{STAGING_ROOT}{DATADIR}/licenses/minizip/LICENSE"
+}
+
+lankebuild_package() {
+    :
+}

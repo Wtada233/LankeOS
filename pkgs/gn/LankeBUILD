@@ -1,0 +1,22 @@
+#!/bin/sh
+#
+# gn — Meta-build system for Ninja
+# 参照 Arch Linux PKGBUILD 适配
+# Chromium 构建依赖
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 生成 ninja 构建文件（--no-static-libstdc++：LankeOS 无 libstdc++.a）
+    python3 build/gen.py --no-static-libstdc++
+
+    # 编译 gn（不出意外产物在 out/gn）
+    ninja -C out -j$(nproc) gn
+}
+
+lankebuild_package() {
+    install -D out/gn "{STAGING_ROOT}/usr/bin/gn"
+    install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/gn/LICENSE"
+}
