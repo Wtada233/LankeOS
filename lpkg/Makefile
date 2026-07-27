@@ -88,7 +88,7 @@ all: $(BUILD_DIR)/$(TARGET)
 
 test: docker-env
 	@$(MAKE) docker-sync
-	@docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make build_test_internal -j$$(nproc)"
+	@docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make -j$$(nproc) build/run_tests && ./build/run_tests"
 	@echo "------------------------------------------"
 	@echo "Tests completed inside Docker container."
 
@@ -106,7 +106,7 @@ coverage:
 	@echo "Coverage report is available in: coverage_report/index.html"
 
 build_test_internal: $(BUILD_DIR)/$(TEST_TARGET)
-	./$(BUILD_DIR)/$(TEST_TARGET)
+	@FILTER="$(GTEST_FILTER)"; if [ -n "$$FILTER" ]; then ./$(BUILD_DIR)/$(TEST_TARGET) --gtest_filter="$$FILTER"; else ./$(BUILD_DIR)/$(TEST_TARGET); fi
 
 $(BUILD_DIR)/$(TARGET): $(MAIN_OBJS)
 	@mkdir -p $(@D)
@@ -171,7 +171,7 @@ docker-env:
 		echo "Container exists but is stopped. Starting $(DOCKER_ENV_CONTAINER)..."; \
 		docker start $(DOCKER_ENV_CONTAINER) >/dev/null; \
 	fi
-	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx gtest-dev tar
+	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx gtest-dev tar sudo
 
 docker-sync:
 	@echo "Syncing source code to container..."

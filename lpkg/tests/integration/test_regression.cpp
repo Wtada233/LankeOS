@@ -30,6 +30,7 @@ protected:
         Config::instance().set_force_overwrite_mode(false);
         Config::instance().set_no_hooks_mode(false);
         Config::instance().set_no_deps_mode(false);
+        setenv("LANG", "C", 1);
         init_localization();
 
         suite_work_dir = fs::absolute("tmp_regression_test");

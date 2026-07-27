@@ -230,3 +230,16 @@ TEST(VersionCompare, PatchSuffix)
     EXPECT_TRUE(version_compare("1.0+1", "1.0p1"));
     EXPECT_TRUE(version_compare("1.0p1", "1.0p2"));
 }
+
+// 回归测试：git hash 版本号（gn: 0.2385.9ece3f52+1）
+TEST(VersionCompare, GitHashVersion)
+{
+    EXPECT_TRUE(version_compare("0.2385.9ece3f52+1", "0.2385.9ece3f52+2"));
+    EXPECT_FALSE(version_compare("0.2385.9ece3f52+2", "0.2385.9ece3f52+1"));
+    EXPECT_FALSE(version_compare("0.2385.9ece3f52+1", "0.2385.9ece3f52+1"));
+    EXPECT_TRUE(version_compare("0.2385", "0.2385.9ece3f52"));
+    EXPECT_FALSE(version_compare("0.2385.9ece3f52", "0.2385"));
+    EXPECT_TRUE(version_compare("0.2385.9ece3f52", "0.2385.10"));
+    EXPECT_FALSE(version_compare("0.2385.10", "0.2385.9ece3f52"));
+    // hash + 补丁后缀同时存在几乎不会发生，不测试
+}

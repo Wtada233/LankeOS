@@ -53,24 +53,23 @@ void validate_version_format(const std::string& v)
 
     size_t i = 0;
 
-    // --- 1. 主版本号: (\d+)(\.\d+)*  兼容 git hash: (\d+)(\.\d*[0-9a-f][0-9a-f]*)* ---
+    // --- 1. 主版本号: (\d+)(\.\d+)*  兼容 git hash: (\d+)(\.\d+[0-9a-f][0-9a-f]*)* ---
     if (!is_digit(v[i])) fail();
     while (i < v.size() && is_digit(v[i])) i++;
     while (i < v.size() && v[i] == '.') {
         i++;  // consume '.'
         if (i >= v.size() || !is_digit(v[i])) fail();  // 段必须数字开头
-        // 允许数字段包含十六进制字符（git hash: 0.2385.9ece3f52）
-        while (i < v.size() && std::isxdigit(v[i])) i++;
+        while (i < v.size() && is_digit(v[i])) i++;
+        // 如果数字段后紧跟十六进制（git hash 特征），一并消费
+        if (i < v.size() && std::isxdigit(v[i]) && !is_digit(v[i])) {
+            while (i < v.size() && std::isxdigit(v[i])) i++;
+        }
     }
 
-    // --- 2. 补丁后缀: [a-zA-Z]\d* (可选) — 仅当版本号不含 hash 时有效 ---
+    // --- 2. 补丁后缀: [a-zA-Z]\d* (可选) ---
     if (i < v.size() && is_letter(v[i])) {
-        // 检查是否是 hash 的残余（前一段是 hex）
-        bool is_hash_tail = (i > 0 && std::isxdigit(v[i-1]) && !is_digit(v[i]));
-        if (!is_hash_tail) {
-            i++;  // consume letter
-            while (i < v.size() && is_digit(v[i])) i++;
-        }
+        i++;  // consume letter
+        while (i < v.size() && is_digit(v[i])) i++;
     }
 
     // --- 3. 预发布: -[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)* (可选) ---
@@ -135,8 +134,16 @@ struct Version {
                 size_t pos = 0;
                 int num = std::stoi(seg, &pos);
                 main_part.push_back(num);
-                if (pos < seg.length()) {
-                    patch_suffix = seg.substr(pos);
+                if (pos < seg.length() && std::isalpha(seg[pos])) {
+                    // 检查剩余部分是否为有效补丁后缀：字母后只跟数字（如 "17p2" → 17 + "p2"）
+                    std::string tail = seg.substr(pos);
+                    bool is_patch = true;
+                    for (size_t j = 1; j < tail.size(); j++) {
+                        if (!std::isdigit(tail[j])) { is_patch = false; break; }
+                    }
+                    if (is_patch) {
+                        patch_suffix = tail;
+                    }
                 }
             } else {
                 main_part.push_back(parse_int(seg, version_str));

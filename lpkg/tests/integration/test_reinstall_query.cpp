@@ -30,6 +30,7 @@ protected:
         Config::instance().set_force_overwrite_mode(false);
         Config::instance().set_no_hooks_mode(false);
         Config::instance().set_no_deps_mode(false);
+        setenv("LANG", "C", 1);
         init_localization();
 
         suite_work_dir = fs::absolute("tmp_new_features_test");
@@ -202,7 +203,7 @@ TEST_F(NewFeaturesTest, QuerySymlinkDoesNotResolve)
 
     // 不应该显示目标路径的所有权（目标路径属于 symlink_query_test 但不应该被查到）
     // 且应该报告文件不受管理
-    EXPECT_NE(out.find("不属于任何已安装的包"), std::string::npos);
+    EXPECT_NE(out.find("is not owned by any package"), std::string::npos);
 }
 
 /** 回归测试：重装时应检测孤立文件冲突 */
