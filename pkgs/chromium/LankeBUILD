@@ -16,12 +16,12 @@ fi
 
 # 系统库 unbundle 列表（空格分隔，供 replace_gn_files.py 使用）
 _SYSTEM_LIBS="brotli dav1d flac fontconfig freetype harfbuzz
-              icu libdrm libjpeg libwebp libxml libxslt
+              libdrm libjpeg libwebp libxml libxslt
               openh264 opus zlib zstd"
 
 # 需要删除捆绑文件的目录名（libjpeg 映射为 libjpeg_turbo）
 _UNWANTED_DIRS="brotli dav1d flac fontconfig freetype harfbuzz
-                icu libdrm libjpeg_turbo libwebp libxml libxslt
+                libdrm libjpeg_turbo libwebp libxml libxslt
                 openh264 opus minizip zstd"
 
 
@@ -220,17 +220,12 @@ lankebuild_package() {
     install -Dvm644 -t "{STAGING_ROOT}/usr/lib/chromium/locales" \
         out/Release/locales/*.pak
 
-    # --- 图标 ---
+      # --- 图标 ---
     for _s in 16 32 24 48 64 128 256; do
-        if [ "$_s" -le 32 ]; then
-            install -Dvm644 \
-                "chrome/app/theme/default_100_percent/chromium/product_logo_${_s}.png" \
-                "{STAGING_ROOT}/usr/share/icons/hicolor/${_s}x${_s}/apps/chromium.png"
-        else
-            install -Dvm644 \
-                "chrome/app/theme/chromium/product_logo_${_s}.png" \
-                "{STAGING_ROOT}/usr/share/icons/hicolor/${_s}x${_s}/apps/chromium.png"
-        fi
+        _src="chrome/app/theme/default_100_percent/chromium/product_logo_${_s}.png"
+        [ -f "$_src" ] || _src="chrome/app/theme/chromium/product_logo_${_s}.png"
+        install -Dvm644 "$_src" \
+            "{STAGING_ROOT}/usr/share/icons/hicolor/${_s}x${_s}/apps/chromium.png"
     done
 
     # --- 许可证 ---
