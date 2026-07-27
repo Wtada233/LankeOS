@@ -104,6 +104,19 @@ def parse_elf_dynamic(path):
         return [], []
 
 
+def _in_system_lib_dir(fpath, content_dir):
+    """检查 ELF 文件是否在系统标准库路径下（/usr/lib/ 或 /lib/ 直接子级）。
+
+    排除 /usr/lib/chromium/、/usr/lib/firefox/ 等应用内部捆绑库路径，
+    这些路径中的 .so 不应作为系统级 SONAME 提供者。
+    """
+    try:
+        rel = os.path.relpath(fpath, content_dir)
+    except ValueError:
+        return False
+    return os.path.dirname(rel) in ('usr/lib', 'lib', 'usr/lib64', 'lib64')
+
+
 def extract_package_major(version_str):
     """从包版本号中提取主版本号（第一个数字段）。"""
     if not version_str:
@@ -151,6 +164,7 @@ def scan_package(lpkg, target_dir, extract_root):
         return {
             'lpkg': lpkg, 'pkg_name': '', 'pkg_version': '',
             'providers': [], 'needs': set(), 'script_deps': set(),
+            'all_sonames': set(),
             'extract_dir': extract_dir,
         }
 
@@ -164,11 +178,13 @@ def scan_package(lpkg, target_dir, extract_root):
         return {
             'lpkg': lpkg, 'pkg_name': pkg_name, 'pkg_version': pkg_version,
             'providers': [], 'needs': set(), 'script_deps': set(),
+            'all_sonames': set(),
             'extract_dir': extract_dir,
         }
 
     providers = []
     provides_so = []
+    all_sonames = set()      # 包内所有 ELF 的 SONAME（含捆绑库，用于自提供 NEEDED 跳过）
     needs = set()
     script_deps = set()
 
@@ -182,32 +198,36 @@ def scan_package(lpkg, target_dir, extract_root):
                     target = os.path.join(os.path.dirname(fpath), target)
                 real_target = os.path.realpath(target)   # 或者用 os.path.abspath + 循环，但 realpath 递归解析
                 if os.path.isfile(real_target) and is_elf(real_target):
-                    provides_so.append(fname)
-                    providers.append({
-                        'key': fname,
-                        'pkg': pkg_name,
-                        'pkg_version': pkg_version,
-                    })
+                    # 只有 /usr/lib/、/lib/ 等标准路径中的 .so 符号链接才注册为提供者。
+                    # 三个条件：① .so 命名（排除 chromium-browser 等可执行文件软链接）
+                    #          ② 标准库路径（排除 /usr/lib/chromium/ 等捆绑路径）
+                    #          ③ 链接指向 ELF
+                    if '.so' in fname and _in_system_lib_dir(fpath, content_dir):
+                        provides_so.append(fname)
+                        providers.append({
+                            'key': fname,
+                            'pkg': pkg_name,
+                            'pkg_version': pkg_version,
+                        })
                 continue
 
             if is_elf(fpath):
                 sonames, needed = parse_elf_dynamic(fpath)
 
+                # all_sonames：记录包内所有 SONAME（无论路径），用于后续跳过自提供的 NEEDED
+                # 这确保 firefox 的捆绑 libnss3.so 能正确跳过对系统 nss 包的依赖
                 for sn in sonames:
-                    provides_so.append(sn)
-                    providers.append({
-                        'key': sn,
-                        'pkg': pkg_name,
-                        'pkg_version': pkg_version,
-                    })
+                    all_sonames.add(sn)
 
-                if '.so' in fname:
-                    provides_so.append(fname)
-                    providers.append({
-                        'key': fname,
-                        'pkg': pkg_name,
-                        'pkg_version': pkg_version,
-                    })
+                # SONAME 提供者注册（仅系统标准库路径，排除捆绑库）
+                if sonames and _in_system_lib_dir(fpath, content_dir):
+                    for sn in sonames:
+                        provides_so.append(sn)
+                        providers.append({
+                            'key': sn,
+                            'pkg': pkg_name,
+                            'pkg_version': pkg_version,
+                        })
 
                 for n in needed:
                     if '/' in n:
@@ -238,6 +258,7 @@ def scan_package(lpkg, target_dir, extract_root):
         'pkg_version': pkg_version,
         'providers': providers,
         'provides_so': provides_so,
+        'all_sonames': all_sonames,
         'needs': needs,
         'script_deps': script_deps,
         'extract_dir': extract_dir,
@@ -269,15 +290,22 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rul
     deps = {}
     needed_so = sorted(needs)          # ① 直接使用全部 DT_NEEDED
 
+    # 当前包自身提供的 SONAME 全集（含捆绑库，如 firefox 的 /usr/lib/firefox/libnss3.so）
+    # 只要包内任意文件提供了该 SONAME，就跳过依赖解析——运行时 RUNPATH 会找到它
+    self_provided = scan_result.get('all_sonames', set())
+
     for soname in needed_so:           # ② 遍历已排序列表
+        if soname in self_provided:
+            # 包内自带了该 SONAME（可能是系统路径也可能是捆绑路径）
+            # 跳过不产生外部依赖，运行时由 RUNPATH / RPATH 解析
+            continue
         provider = provider_map.get(soname)
         if provider and provider['pkg'] and provider['pkg'] != pkg_name:
             deps.setdefault(provider['pkg'])
 
     # ③ 过滤掉包自身提供的 needed_so（如 python 的 libpython3.13.so.1.0）
-    needed_so = [n for n in needed_so
-                 if not (n in provider_map
-                         and provider_map[n]['pkg'] == pkg_name)]
+    # 使用 self_provided 而非 provider_map 检查，避免因捆绑包先入为主导致过滤失效
+    needed_so = [n for n in needed_so if n not in self_provided]
 
     # --- 2) 执行规则插件 ---
     if rules:
@@ -301,7 +329,7 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rul
         return lpkg, dep_entries, 'no_metadata'
 
     old_provides = set(meta.get('provides', []))
-    new_provides = sorted(old_provides | set(provides_so))
+    new_provides = sorted(set(provides_so))
 
     old_deps = sorted(meta.get('deps', []))
     old_needed = sorted(meta.get('needed_so', []))
