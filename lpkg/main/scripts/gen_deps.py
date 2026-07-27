@@ -351,6 +351,8 @@ def main():
                         help='Show what would change without modifying files')
     parser.add_argument('--no-file-detection', action='store_true',
                         help='Skip file(1) based script detection')
+    parser.add_argument('--tmp-dir', type=str, default=None,
+                        help='Temporary directory for extraction (default: $LPKG_TMP_DIR or system temp)')
     parser.add_argument('--rules-dir', type=str, default=None,
                         help='Path to deprules/ directory (default: <script_dir>/deprules)')
 
@@ -366,7 +368,10 @@ def main():
         print(f'No .lpkg files found in {target_dir}.')
         return
 
-    working_dir = tempfile.mkdtemp(prefix='lpkg_dep_gen_')
+    tmp_base = (args.tmp_dir or os.environ.get('LPKG_TMP_DIR') or
+                tempfile.gettempdir())
+    os.makedirs(tmp_base, exist_ok=True)
+    working_dir = tempfile.mkdtemp(prefix='lpkg_dep_gen_', dir=tmp_base)
     extract_root = os.path.join(working_dir, 'extract')
     os.makedirs(extract_root, exist_ok=True)
 
