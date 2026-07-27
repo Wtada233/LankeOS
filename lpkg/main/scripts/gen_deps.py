@@ -219,8 +219,10 @@ def scan_package(lpkg, target_dir, extract_root):
                 for sn in sonames:
                     all_sonames.add(sn)
 
+                in_lib = _in_system_lib_dir(fpath, content_dir)
+
                 # SONAME 提供者注册（仅系统标准库路径，排除捆绑库）
-                if sonames and _in_system_lib_dir(fpath, content_dir):
+                if sonames and in_lib:
                     for sn in sonames:
                         provides_so.append(sn)
                         providers.append({
@@ -228,6 +230,15 @@ def scan_package(lpkg, target_dir, extract_root):
                             'pkg': pkg_name,
                             'pkg_version': pkg_version,
                         })
+                elif in_lib and '.so' in fname:
+                    # 无 SONAME 回退：部分老库（如 tcl 的 libtcl8.6.so）不设 SONAME
+                    # 但文件名本身就是其他包的 DT_NEEDED 目标，注册文件名作为提供者
+                    provides_so.append(fname)
+                    providers.append({
+                        'key': fname,
+                        'pkg': pkg_name,
+                        'pkg_version': pkg_version,
+                    })
 
                 for n in needed:
                     if '/' in n:
