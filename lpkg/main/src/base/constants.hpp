@@ -30,6 +30,7 @@ inline constexpr std::string_view J_NEEDED_SO = "needed_so";
 inline constexpr std::string_view J_NO_STRIP = "no_strip";
 inline constexpr std::string_view J_SOURCES = "sources";
 inline constexpr std::string_view J_WORK_SOURCES = "work_sources";
+inline constexpr std::string_view J_BUILD_DEPS = "build_deps";
 
 // 构建文件与脚本名
 inline constexpr std::string_view LANK_BUILD_JSON = "LankeBUILD.json";

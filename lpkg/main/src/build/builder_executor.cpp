@@ -131,7 +131,7 @@ void execute_build_phase(const std::string& phase_name, const fs::path& work_dir
                          const fs::path& processed_script_path)
 {
     log_info(string_format("info.executing_phase", phase_name));
-    std::string cmd = ". " + fs::absolute(processed_script_path).string() + " && " + phase_name;
+    std::string cmd = "set -e; . " + fs::absolute(processed_script_path).string() + " && " + phase_name;
     int ret = run_shell(cmd, work_dir);
     if (ret != 0) {
         fs::remove(processed_script_path);

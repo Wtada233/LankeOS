@@ -10,6 +10,9 @@
 #include "base/utils.hpp"
 #include "builder_config.hpp"
 #include "builder_executor.hpp"
+#include "pkg/package_manager.hpp"
+#include "vercmp/dep_parser.hpp"
+#include "repo/repository.hpp"
 #include "i18n/localization.hpp"
 #include "lib_utils.hpp"
 #include "packer.hpp"
@@ -227,6 +230,29 @@ void run_build(const fs::path& build_dir)
         download_and_prepare_sources(cfg.sources, cfg.work_sources, build_dir, work_root);
 
     // 4. 检测源码树
+    // 4.5. 安装构建时依赖（支持版本约束 "cmake >= 3.20"）
+    if (!cfg.build_deps.empty()) {
+        log_info(get_string("info.checking_deps"));
+        // 解析版本约束为 name:version 格式
+        std::vector<std::string> resolved;
+        auto parsed = detail::parse_dep_strings(cfg.build_deps);
+        Repository repo;
+        repo.load_index();
+        for (const auto& dep : parsed) {
+            std::string arg = dep.name;
+            if (!dep.constraints.empty()) {
+                if (auto match = repo.find_best_matching_version(
+                        dep.name, dep.constraints)) {
+                    arg += ":" + match->version;
+                } else {
+                    arg += ":" + dep.constraints[0].version;
+                }
+            }
+            resolved.push_back(arg);
+        }
+        install_packages(resolved, "", false);
+    }
+
     auto actual_work_dir = detect_source_tree(work_root);
 
     // 5. 处理脚本并执行构建阶段

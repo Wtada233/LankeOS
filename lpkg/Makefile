@@ -19,7 +19,7 @@ PKGS_LIST = $(PKGS)
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 5.4.0
+VERSION ?= 5.4.1
 
 BUILD_DIR = build
 MAIN_DIR = main
