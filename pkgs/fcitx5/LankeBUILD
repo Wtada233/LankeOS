@@ -7,19 +7,16 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    cmake -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} -G Ninja .. -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_BUILD_TYPE=Release -DENABLE_X11=OFF -DCMAKE_INSTALL_LIBDIR=lib -DENABLE_ENCHANT=OFF
+    cmake -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} -G Ninja .. -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_BUILD_TYPE=Release -DENABLE_X11=OFF -DCMAKE_INSTALL_LIBDIR=lib -DENABLE_ENCHANT=OFF -Wno-dev
     DESTDIR={STAGING_ROOT} ninja install
 }
 
 
 lankebuild_package() {
     # Installation handled by builder
-    mkdir -p "{STAGING_ROOT}/etc/profile.d"
-    cat > "{STAGING_ROOT}/etc/profile.d/fcitx5.sh" << 'EOF'
-#!/bin/bash
-# start of fcitx5
-export XMODIFIERS=@im=fcitx
-export IMSETTINGS_MODULE=fcitx
-# end of fcitx5
+    install -dm 755 "{STAGING_ROOT}/usr/lib/environment.d"
+    cat > "{STAGING_ROOT}/usr/lib/environment.d/fcitx5.conf" << 'EOF'
+XMODIFIERS=@im=fcitx
+IMSETTINGS_MODULE=fcitx
 EOF
 }

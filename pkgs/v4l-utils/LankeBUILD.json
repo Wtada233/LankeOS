@@ -1,0 +1,8 @@
+{
+  "name": "v4l-utils",
+  "version": "1.32.0",
+  "sources": [
+    "https://linuxtv.org/downloads/v4l-utils/v4l-utils-1.32.0.tar.xz"
+  ],
+  "work_sources": []
+}

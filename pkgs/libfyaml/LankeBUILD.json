@@ -1,0 +1,8 @@
+{
+  "name": "libfyaml",
+  "version": "0.9.6",
+  "sources": [
+    "https://github.com/pantoniou/libfyaml/releases/download/v0.9.6/libfyaml-0.9.6.tar.gz"
+  ],
+  "work_sources": []
+}

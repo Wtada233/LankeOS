@@ -1,0 +1,10 @@
+{
+  "name": "autoconf-archive",
+  "version": "2024.10.16",
+  "sources": [
+    "https://ftpmirror.gnu.org/autoconf-archive/autoconf-archive-2024.10.16.tar.xz"
+  ],
+  "work_sources": [
+    "file://./0001_fix_AX_CXX_COMPILE_STDCXX.patch"
+  ]
+}

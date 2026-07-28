@@ -1,0 +1,8 @@
+{
+  "name": "obs-studio",
+  "version": "32.1.2",
+  "sources": [
+    "https://github.com/obsproject/obs-studio/archive/refs/tags/32.1.2.tar.gz"
+  ],
+  "work_sources": []
+}

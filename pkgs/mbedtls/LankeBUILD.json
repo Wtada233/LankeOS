@@ -1,0 +1,8 @@
+{
+  "name": "mbedtls",
+  "version": "3.6.7",
+  "sources": [
+    "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v3.6.7.tar.gz"
+  ],
+  "work_sources": []
+}

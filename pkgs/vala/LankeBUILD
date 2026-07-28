@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    git clone --depth 1 --branch 0.56.19 https://gitlab.gnome.org/GNOME/vala.git
+}
+
+lankebuild_build() {
+    cd vala
+    NOCONFIGURE=1 ./autogen.sh
+    ./configure --prefix=/usr --disable-valadoc
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+}
+
+
+lankebuild_package() {
+    cd vala
+    make DESTDIR="{STAGING_ROOT}" install
+}

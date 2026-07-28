@@ -1,0 +1,15 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    make amalg PREFIX=/usr BUILDMODE=dynamic TARGET_STRIP=" @:"
+}
+
+lankebuild_build() {
+    # Already built in prepare (single-step build)
+    :
+}
+
+
+lankebuild_package() {
+    make install DESTDIR="{STAGING_ROOT}" PREFIX=/usr
+}

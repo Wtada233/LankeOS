@@ -1,0 +1,8 @@
+{
+  "name": "gsettings-desktop-schemas",
+  "version": "50.1",
+  "sources": [
+    "https://download.gnome.org/sources/gsettings-desktop-schemas/50/gsettings-desktop-schemas-50.1.tar.xz"
+  ],
+  "work_sources": []
+}

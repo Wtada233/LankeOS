@@ -1,0 +1,8 @@
+{
+  "name": "libjuice",
+  "version": "1.7.2",
+  "sources": [
+    "https://github.com/paullouisageneau/libjuice/archive/refs/tags/v1.7.2.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,8 @@
+{
+  "name": "libvpl",
+  "version": "2023.4.0",
+  "sources": [
+    "https://github.com/intel/libvpl/archive/refs/tags/v2023.4.0.tar.gz"
+  ],
+  "work_sources": []
+}

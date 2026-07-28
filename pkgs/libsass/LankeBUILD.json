@@ -1,0 +1,8 @@
+{
+  "name": "libsass",
+  "version": "3.6.6",
+  "sources": [
+    "https://github.com/sass/libsass/archive/refs/tags/3.6.6.tar.gz"
+  ],
+  "work_sources": []
+}

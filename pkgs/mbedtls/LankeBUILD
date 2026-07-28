@@ -1,0 +1,55 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # 获取 git 子模块 framework（tarball 不含）
+    git clone --depth 1 https://github.com/Mbed-TLS/mbedtls-framework.git framework
+
+    # 开启 Arch 额外配置
+    scripts/config.py set MBEDTLS_HAVE_SSE2
+    scripts/config.py set MBEDTLS_THREADING_C
+    scripts/config.py set MBEDTLS_THREADING_PTHREAD
+
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DUSE_SHARED_MBEDTLS_LIBRARY=ON \
+        -DUSE_STATIC_MBEDTLS_LIBRARY=OFF \
+        -DENABLE_TESTING=OFF \
+        -DENABLE_PROGRAMS=ON
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+
+    # namespace includes -> /usr/include/mbedtls3/
+    install -dm 755 "{STAGING_ROOT}/usr/include/mbedtls3"
+    mv "{STAGING_ROOT}/usr/include/everest" "{STAGING_ROOT}/usr/include/mbedtls3/"
+    mv "{STAGING_ROOT}/usr/include/mbedtls" "{STAGING_ROOT}/usr/include/mbedtls3/"
+    mv "{STAGING_ROOT}/usr/include/psa" "{STAGING_ROOT}/usr/include/mbedtls3/"
+
+    # namespace libs -> /usr/lib/mbedtls3/
+    install -dm 755 "{STAGING_ROOT}/usr/lib/mbedtls3"
+    mv "{STAGING_ROOT}"/usr/lib/{cmake,lib*.so*,pkgconfig} "{STAGING_ROOT}/usr/lib/mbedtls3/"
+
+    # 保留关不掉的静态库（everest/p256m），连同存在的 .a 一并移入
+    for _a in "{STAGING_ROOT}"/usr/lib/*.a; do
+        [ -f "$_a" ] && mv "$_a" "{STAGING_ROOT}/usr/lib/mbedtls3/"
+    done
+
+    # rename generic utils -> mbedtls3_前缀
+    for _prog in "{STAGING_ROOT}"/usr/bin/*; do
+        _baseprog=$(basename "$_prog")
+        mv -v "$_prog" "${_prog//$_baseprog/mbedtls3_$_baseprog}"
+    done
+
+    # create symlinks for shared libs in /usr/lib/
+    for _lib in "{STAGING_ROOT}"/usr/lib/mbedtls3/lib*.so.*; do
+        ln -sf mbedtls3/"$(basename "$_lib")" "{STAGING_ROOT}/usr/lib/$(basename "$_lib")"
+    done
+}

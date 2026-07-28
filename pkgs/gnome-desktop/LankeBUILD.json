@@ -1,0 +1,8 @@
+{
+  "name": "gnome-desktop",
+  "version": "44.5",
+  "sources": [
+    "https://download.gnome.org/sources/gnome-desktop/44/gnome-desktop-44.5.tar.xz"
+  ],
+  "work_sources": []
+}

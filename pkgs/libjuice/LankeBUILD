@@ -1,0 +1,18 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DNO_TESTS=ON \
+        -Wno-dev
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}

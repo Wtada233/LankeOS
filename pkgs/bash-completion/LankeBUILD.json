@@ -1,0 +1,8 @@
+{
+  "name": "bash-completion",
+  "version": "2.18.0",
+  "sources": [
+    "https://github.com/scop/bash-completion/releases/download/2.18.0/bash-completion-2.18.0.tar.xz"
+  ],
+  "work_sources": []
+}

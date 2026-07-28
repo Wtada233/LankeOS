@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX=/usr
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+
+    # Qt 应用自动使用 qt6ct 主题
+    install -dm 755 "{STAGING_ROOT}/usr/lib/environment.d"
+    echo "QT_QPA_PLATFORMTHEME=qt6ct" > "{STAGING_ROOT}/usr/lib/environment.d/qt6ct.conf"
+}

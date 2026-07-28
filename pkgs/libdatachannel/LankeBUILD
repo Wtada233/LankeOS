@@ -1,0 +1,29 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # 初始化 git 子模块（tarball 不含）
+    git clone --depth 1 https://github.com/SergiusTheBest/plog.git deps/plog
+    git clone --depth 1 https://github.com/sctplab/usrsctp.git deps/usrsctp
+
+    export CMAKE_POLICY_VERSION_MINIMUM=3.5
+
+    cmake -B build -G Ninja \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DUSE_GNUTLS=0 \
+        -DUSE_NICE=0 \
+        -DUSE_SYSTEM_JUICE=1 \
+        -DUSE_SYSTEM_SRTP=1 \
+        -DNO_EXAMPLES=1 \
+        -DNO_TESTS=1 \
+        -Wno-dev
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}

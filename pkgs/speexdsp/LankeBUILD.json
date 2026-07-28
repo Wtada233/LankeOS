@@ -1,0 +1,8 @@
+{
+  "name": "speexdsp",
+  "version": "1.2.1",
+  "sources": [
+    "https://gitlab.xiph.org/xiph/speexdsp/-/archive/SpeexDSP-1.2.1/speexdsp-SpeexDSP-1.2.1.tar.gz"
+  ],
+  "work_sources": []
+}

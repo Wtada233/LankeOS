@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # 把 cmake wrapper 的 CMakeLists.txt + cmake/ 复制到源码树
+    cp -R qrcodegen-cmake-1.8.0-cmake3/{cmake,CMakeLists.txt} QR-Code-generator-1.8.0
+
+    cmake -B build -S QR-Code-generator-1.8.0 -G Ninja \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DBUILD_SHARED_LIBS=ON
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" cmake --install build
+}

@@ -1,0 +1,19 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Header-only library
+    :
+}
+
+lankebuild_build() {
+    # Nothing to build
+    :
+}
+
+
+lankebuild_package() {
+    install -dm 755 "{STAGING_ROOT}/usr/include"
+    for h in src/*.h; do
+        install -m 644 "$h" "{STAGING_ROOT}/usr/include/"
+    done
+}

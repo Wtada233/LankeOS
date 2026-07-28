@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    cd b3sum
+    cargo fetch --locked --target host-tuple
+}
+
+lankebuild_build() {
+    cmake -B build -S c -W no-dev -D CMAKE_BUILD_TYPE=None -D CMAKE_INSTALL_PREFIX=/usr -D BUILD_SHARED_LIBS=ON -D BLAKE3_USE_TBB=1
+    cmake --build build -j $(nproc)
+    cd b3sum
+    cargo build --release --locked --offline
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" cmake --install build
+    mkdir -p "{STAGING_ROOT}/usr/bin"
+    install -m755 b3sum/target/release/b3sum "{STAGING_ROOT}/usr/bin/"
+}

@@ -1,0 +1,8 @@
+{
+  "name": "libxmlb",
+  "version": "0.3.29",
+  "sources": [
+    "https://github.com/hughsie/libxmlb/releases/download/0.3.29/libxmlb-0.3.29.tar.xz"
+  ],
+  "work_sources": []
+}

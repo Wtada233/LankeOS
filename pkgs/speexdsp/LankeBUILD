@@ -1,0 +1,15 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    ./autogen.sh
+    ./configure --prefix=/usr --disable-static
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+}
+
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+}

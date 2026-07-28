@@ -1,0 +1,8 @@
+{
+  "name": "luajit",
+  "version": "2.1.1785005726",
+  "sources": [
+    "https://github.com/LuaJIT/LuaJIT/archive/a471ab7.tar.gz"
+  ],
+  "work_sources": []
+}

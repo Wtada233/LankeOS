@@ -1,0 +1,37 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # 子模块 obs-browser 和 obs-websocket（cmake 检查目录存在性）
+    git clone --depth 1 https://github.com/obsproject/obs-browser.git plugins/obs-browser
+    git clone --depth 1 https://github.com/obsproject/obs-websocket.git plugins/obs-websocket
+
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_CXX_FLAGS="-O2 -DNDEBUG" \
+        -DCMAKE_C_FLAGS="-O2 -DNDEBUG" \
+        -DENABLE_BROWSER=OFF \
+        -DENABLE_VLC=OFF \
+        -DENABLE_JACK=ON \
+        -DENABLE_WEBRTC=ON \
+        -DENABLE_VST=ON \
+        -DENABLE_LIBFDK=OFF \
+        -DENABLE_AJA=OFF \
+        -DENABLE_NEW_MPEGTS_OUTPUT=OFF \
+        -DENABLE_WEBSOCKET=OFF \
+        -DOBS_VERSION_OVERRIDE=32.1.2 \
+        -DMbedTLS_INCLUDE_DIR="/usr/include/mbedtls3" \
+        -DMbedtls_LIBRARY="/usr/lib/mbedtls3/libmbedtls.so" \
+        -DMbedcrypto_LIBRARY="/usr/lib/mbedtls3/libmbedcrypto.so" \
+        -DMbedx509_LIBRARY="/usr/lib/mbedtls3/libmbedx509.so" \
+        -Wno-dev
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}

@@ -1,0 +1,8 @@
+{
+  "name": "json-glib",
+  "version": "1.10.8",
+  "sources": [
+    "https://download.gnome.org/sources/json-glib/1.10/json-glib-1.10.8.tar.xz"
+  ],
+  "work_sources": []
+}

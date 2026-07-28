@@ -1,0 +1,16 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    meson setup _build --prefix=/usr --buildtype=release --wrap-mode nofallback -D stemmer=true
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+    rm -rf "{STAGING_ROOT}"/usr/{lib,share}/installed-tests/
+}

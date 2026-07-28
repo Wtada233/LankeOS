@@ -1,0 +1,8 @@
+{
+  "name": "libadwaita",
+  "version": "1.9.2",
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/libadwaita/-/archive/1.9.2/libadwaita-1.9.2.tar.gz"
+  ],
+  "work_sources": []
+}

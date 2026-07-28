@@ -11,7 +11,8 @@ lankebuild_build() {
       --disable-documentation \
       --disable-python \
       --disable-lzo \
-      --enable-zstd
+      --enable-zstd \
+      --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

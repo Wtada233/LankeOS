@@ -1,0 +1,8 @@
+{
+  "name": "jansson",
+  "version": "2.15.1",
+  "sources": [
+    "https://github.com/akheron/jansson/releases/download/v2.15.1/jansson-2.15.1.tar.gz"
+  ],
+  "work_sources": []
+}

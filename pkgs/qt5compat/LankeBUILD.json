@@ -1,0 +1,8 @@
+{
+  "name": "qt5compat",
+  "version": "6.11.1",
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qt5compat-everywhere-src-6.11.1.tar.xz"
+  ],
+  "work_sources": []
+}

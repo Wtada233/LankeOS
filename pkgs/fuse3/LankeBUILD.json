@@ -1,0 +1,8 @@
+{
+  "name": "fuse3",
+  "version": "3.18.2",
+  "sources": [
+    "https://github.com/libfuse/libfuse/releases/download/fuse-3.18.2/fuse-3.18.2.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,10 @@
+{
+  "name": "itstool",
+  "version": "2.0.7",
+  "sources": [
+    "https://github.com/itstool/itstool/archive/2.0.7/itstool-2.0.7.tar.gz"
+  ],
+  "work_sources": [
+    "file://./itstool-2.0.7-lxml-1.patch"
+  ]
+}

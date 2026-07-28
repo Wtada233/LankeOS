@@ -1,0 +1,8 @@
+{
+  "name": "swig",
+  "version": "4.4.1",
+  "sources": [
+    "https://github.com/swig/swig/archive/refs/tags/v4.4.1.tar.gz"
+  ],
+  "work_sources": []
+}

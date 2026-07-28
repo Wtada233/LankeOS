@@ -1,0 +1,35 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DQT_BUILD_EXAMPLES=OFF \
+        -DQT_BUILD_TESTS=OFF \
+        -DBUILD_SHARED_LIBS=ON \
+        -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
+        -DFEATURE_openssl_linked=ON \
+        -DFEATURE_system_sqlite=ON \
+        -DFEATURE_journald=ON \
+        -DFEATURE_system_xcb_xinput=ON \
+        -DFEATURE_mimetype_database=OFF \
+        -DFEATURE_xcb=ON \
+        -DFEATURE_xcb_xlib=ON \
+        -DINSTALL_BINDIR=lib/qt6/bin \
+        -DINSTALL_PUBLICBINDIR=bin \
+        -DINSTALL_LIBEXECDIR=lib/qt6 \
+        -DINSTALL_ARCHDATADIR=lib/qt6 \
+        -DINSTALL_DATADIR=share/qt6 \
+        -DINSTALL_INCLUDEDIR=include/qt6 \
+        -DINSTALL_MKSPECSDIR=lib/qt6/mkspecs \
+        -DINSTALL_DOCDIR=share/doc/qt6
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}

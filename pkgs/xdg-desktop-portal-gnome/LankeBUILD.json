@@ -1,0 +1,8 @@
+{
+  "name": "xdg-desktop-portal-gnome",
+  "version": "1.15.3",
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/archive/50.0/xdg-desktop-portal-gnome-50.0.tar.gz"
+  ],
+  "work_sources": []
+}

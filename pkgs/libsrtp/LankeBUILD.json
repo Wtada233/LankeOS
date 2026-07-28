@@ -1,0 +1,8 @@
+{
+  "name": "libsrtp",
+  "version": "2.8.0",
+  "sources": [
+    "https://github.com/cisco/libsrtp/archive/refs/tags/v2.8.0.tar.gz"
+  ],
+  "work_sources": []
+}

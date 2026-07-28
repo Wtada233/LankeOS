@@ -1,0 +1,8 @@
+{
+  "name": "sassc",
+  "version": "3.6.2",
+  "sources": [
+    "https://github.com/sass/sassc/archive/refs/tags/3.6.2.tar.gz"
+  ],
+  "work_sources": []
+}

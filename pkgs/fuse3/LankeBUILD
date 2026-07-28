@@ -1,0 +1,21 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+
+    # Prepare environment
+    meson setup _build --prefix /usr
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+    install -Dm644 util/fuse.conf "{STAGING_ROOT}"/etc/fuse.conf
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+    rm -r "{STAGING_ROOT}"/etc/init.d
+
+    # static device nodes are handled by udev
+    rm -r "{STAGING_ROOT}"/dev
+}

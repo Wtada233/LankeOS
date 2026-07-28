@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    # Prepare environment
+    export LIBSASS_VERSION="{ORIG_PKG_VER}"
+    autoreconf -i
+    ./configure --prefix=/usr --disable-static
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+}
+
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+}
