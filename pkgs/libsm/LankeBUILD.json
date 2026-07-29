@@ -6,9 +6,19 @@
   ],
   "work_sources": [],
   "deps": [
-    "libice"
+    "glibc",
+    "libice",
+    "util-linux"
   ],
-  "provides": [],
+  "provides": [
+    "libSM.so",
+    "libSM.so.6"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libICE.so.6",
+    "libc.so.6",
+    "libuuid.so.1"
+  ]
 }

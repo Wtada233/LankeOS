@@ -5,5 +5,40 @@
     "https://github.com/intel/libva/releases/download/2.23.0/libva-2.23.0.tar.bz2"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libGL.so.1",
+    "libX11-xcb.so.1",
+    "libX11.so.6",
+    "libXext.so.6",
+    "libXfixes.so.3",
+    "libc.so.6",
+    "libdrm.so.2",
+    "libwayland-client.so.0",
+    "libxcb-dri3.so.0",
+    "libxcb.so.1"
+  ],
+  "deps": [
+    "glibc",
+    "libX11",
+    "libXext",
+    "libXfixes",
+    "libdrm",
+    "libglvnd",
+    "libxcb",
+    "wayland",
+    "xwayland"
+  ],
+  "provides": [
+    "libva-drm.so",
+    "libva-drm.so.2",
+    "libva-glx.so",
+    "libva-glx.so.2",
+    "libva-wayland.so",
+    "libva-wayland.so.2",
+    "libva-x11.so",
+    "libva-x11.so.2",
+    "libva.so",
+    "libva.so.2"
+  ]
 }

@@ -5,8 +5,28 @@
     "https://invisible-mirror.net/archives/lynx/tarballs/lynx2.9.3.tar.bz2"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "brotli",
+    "bzip2",
+    "glibc",
+    "libidn2",
+    "ncurses",
+    "openssl",
+    "zlib",
+    "zstd"
+  ],
   "no_strip": false,
   "provides": [],
-  "release": 1
+  "release": 1,
+  "needed_so": [
+    "libbrotlidec.so.1",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libidn2.so.0",
+    "libncursesw.so.6",
+    "libssl.so.3",
+    "libz.so.1",
+    "libzstd.so.1"
+  ]
 }

@@ -5,5 +5,8 @@
     "https://www.x.org/pub/individual/data/xkeyboard-config/xkeyboard-config-2.45.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [],
+  "deps": [],
+  "provides": []
 }

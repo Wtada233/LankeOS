@@ -5,8 +5,42 @@
     "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/llvm-project-22.1.7.src.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "curl",
+    "gcc",
+    "glibc",
+    "libedit",
+    "libffi",
+    "libxml2",
+    "perl",
+    "python",
+    "zlib"
+  ],
   "no_strip": false,
-  "provides": [],
-  "release": 2
+  "provides": [
+    "libLLVM-22.so",
+    "libLLVM.so",
+    "libLLVM.so.22.1",
+    "libLTO.so",
+    "libLTO.so.22.1",
+    "libRemarks.so",
+    "libRemarks.so.22.1",
+    "libclang-cpp.so",
+    "libclang-cpp.so.22.1",
+    "libclang.so",
+    "libclang.so.22.1"
+  ],
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcurl.so.4",
+    "libedit.so.0",
+    "libffi.so.8",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libxml2.so.2",
+    "libz.so.1"
+  ]
 }

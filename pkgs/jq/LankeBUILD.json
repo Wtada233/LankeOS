@@ -5,5 +5,19 @@
     "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6",
+    "libonig.so.5"
+  ],
+  "deps": [
+    "glibc",
+    "oniguruma"
+  ],
+  "provides": [
+    "libjq.so",
+    "libjq.so.1"
+  ]
 }

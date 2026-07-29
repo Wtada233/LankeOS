@@ -5,5 +5,25 @@
     "https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/vulkan-sdk-1.4.350.1.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "deps": [
+    "bash",
+    "gcc",
+    "glibc"
+  ],
+  "provides": [
+    "libSPIRV-Tools-diff.so",
+    "libSPIRV-Tools-link.so",
+    "libSPIRV-Tools-lint.so",
+    "libSPIRV-Tools-opt.so",
+    "libSPIRV-Tools-reduce.so",
+    "libSPIRV-Tools-shared.so",
+    "libSPIRV-Tools.so"
+  ]
 }

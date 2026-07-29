@@ -5,5 +5,13 @@
     "https://dotat.at/prog/unifdef/unifdef-2.12.tar.gz"
   ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "bash",
+    "glibc"
+  ],
+  "provides": []
 }

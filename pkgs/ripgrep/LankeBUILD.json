@@ -4,5 +4,17 @@
   "sources": [
     "https://github.com/BurntSushi/ripgrep/archive/refs/tags/15.2.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libpcre2-8.so.0"
+  ],
+  "deps": [
+    "gcc",
+    "glibc",
+    "pcre2"
+  ],
+  "provides": []
 }

@@ -3,5 +3,17 @@
   "version": "0.18.99",
   "sources": [],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libjson-c.so",
+    "libjson-c.so.5"
+  ]
 }

@@ -5,5 +5,15 @@
     "https://github.com/besser82/libxcrypt/releases/download/v4.4.38/libxcrypt-4.4.38.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libcrypt.so",
+    "libcrypt.so.2"
+  ]
 }

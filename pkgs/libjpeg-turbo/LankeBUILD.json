@@ -5,5 +5,19 @@
     "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.1.1.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libjpeg.so",
+    "libjpeg.so.62",
+    "libturbojpeg.so",
+    "libturbojpeg.so.0"
+  ]
 }

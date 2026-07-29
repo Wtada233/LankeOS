@@ -5,8 +5,11 @@
     "https://chromium.googlesource.com/external/gyp/+archive/1615ec326858f8c2bd8f30b3a86ea71830409ce4.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "python"
+  ],
   "no_strip": true,
   "provides": [],
-  "release": 1
+  "release": 1,
+  "needed_so": []
 }

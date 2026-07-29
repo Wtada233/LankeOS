@@ -5,5 +5,42 @@
     "https://ftpmirror.gnu.org/gettext/gettext-0.26.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libacl.so.1",
+    "libattr.so.1",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgomp.so.1",
+    "libm.so.6",
+    "libncursesw.so.6",
+    "libstdc++.so.6",
+    "libxml2.so.2"
+  ],
+  "deps": [
+    "acl",
+    "attr",
+    "bash",
+    "gawk",
+    "gcc",
+    "glibc",
+    "libxml2",
+    "ncurses",
+    "perl",
+    "ruby",
+    "tcl"
+  ],
+  "provides": [
+    "libasprintf.so",
+    "libasprintf.so.0",
+    "libgettextlib-0.26.so",
+    "libgettextlib.so",
+    "libgettextpo.so",
+    "libgettextpo.so.0",
+    "libgettextsrc-0.26.so",
+    "libgettextsrc.so",
+    "libgnuintl.so.8",
+    "libtextstyle.so",
+    "libtextstyle.so.0"
+  ]
 }

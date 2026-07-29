@@ -5,5 +5,25 @@
     "https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-x86_64.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libdl.so.2",
+    "libfontconfig.so.1",
+    "libfreetype.so.6",
+    "libm.so.6",
+    "libpthread.so.0",
+    "librt.so.1",
+    "libxcb.so.1"
+  ],
+  "deps": [
+    "bash",
+    "fontconfig",
+    "freetype",
+    "glibc",
+    "libxcb",
+    "xwayland"
+  ],
+  "provides": []
 }

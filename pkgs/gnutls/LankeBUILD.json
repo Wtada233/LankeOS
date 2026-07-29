@@ -5,5 +5,31 @@
     "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.11.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgmp.so.10",
+    "libhogweed.so.6",
+    "libm.so.6",
+    "libnettle.so.8",
+    "libp11-kit.so.0",
+    "libstdc++.so.6",
+    "libtasn1.so.6"
+  ],
+  "deps": [
+    "gcc",
+    "glibc",
+    "gmp",
+    "libtasn1",
+    "nettle",
+    "p11-kit"
+  ],
+  "provides": [
+    "libgnutls.so",
+    "libgnutls.so.30",
+    "libgnutlsxx.so",
+    "libgnutlsxx.so.30"
+  ]
 }

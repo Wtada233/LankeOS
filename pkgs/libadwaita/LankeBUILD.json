@@ -4,5 +4,30 @@
   "sources": [
     "https://gitlab.gnome.org/GNOME/libadwaita/-/archive/1.9.2/libadwaita-1.9.2.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libappstream.so.5",
+    "libc.so.6",
+    "libfribidi.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgraphene-1.0.so.0",
+    "libgtk-4.so.1",
+    "libm.so.6",
+    "libpango-1.0.so.0"
+  ],
+  "deps": [
+    "appstream",
+    "fribidi",
+    "glib",
+    "glibc",
+    "graphene",
+    "gtk4",
+    "pango"
+  ],
+  "provides": [
+    "libadwaita-1.so",
+    "libadwaita-1.so.0"
+  ]
 }

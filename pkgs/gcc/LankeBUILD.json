@@ -5,5 +5,52 @@
     "https://ftpmirror.gnu.org/gcc/gcc-16.1.0/gcc-16.1.0.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgmp.so.10",
+    "libm.so.6",
+    "libmpc.so.3",
+    "libmpfr.so.6",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "gmp",
+    "mpc",
+    "mpfr",
+    "python",
+    "zlib",
+    "zstd"
+  ],
+  "provides": [
+    "libasan.so",
+    "libasan.so.8",
+    "libatomic.so",
+    "libatomic.so.1",
+    "libcc1.so",
+    "libcc1.so.0",
+    "libgcc_s.so.1",
+    "libgomp.so",
+    "libgomp.so.1",
+    "libhwasan.so",
+    "libhwasan.so.0",
+    "libitm.so",
+    "libitm.so.1",
+    "liblsan.so",
+    "liblsan.so.0",
+    "libquadmath.so",
+    "libquadmath.so.0",
+    "libssp.so",
+    "libssp.so.0",
+    "libstdc++.so",
+    "libstdc++.so.6",
+    "libtsan.so",
+    "libtsan.so.2",
+    "libubsan.so",
+    "libubsan.so.1"
+  ]
 }

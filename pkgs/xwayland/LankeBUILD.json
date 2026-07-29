@@ -5,8 +5,36 @@
     "https://xorg.freedesktop.org/archive/individual/xserver/xwayland-24.1.4.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "glibc",
+    "libXau",
+    "libXfont2",
+    "libdrm",
+    "libepoxy",
+    "libglvnd",
+    "libxcvt",
+    "libxshmfence",
+    "mesa",
+    "nettle",
+    "pixman",
+    "wayland"
+  ],
   "provides": [],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libGL.so.1",
+    "libXau.so.6",
+    "libXfont2.so.2",
+    "libc.so.6",
+    "libdrm.so.2",
+    "libepoxy.so.0",
+    "libgbm.so.1",
+    "libm.so.6",
+    "libnettle.so.8",
+    "libpixman-1.so.0",
+    "libwayland-client.so.0",
+    "libxcvt.so.0",
+    "libxshmfence.so.1"
+  ]
 }

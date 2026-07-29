@@ -5,5 +5,23 @@
     "https://dbus.freedesktop.org/releases/dbus/dbus-1.16.2.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libX11.so.6",
+    "libc.so.6",
+    "libexpat.so.1",
+    "libsystemd.so.0"
+  ],
+  "deps": [
+    "expat",
+    "glibc",
+    "libX11",
+    "python",
+    "systemd",
+    "xwayland"
+  ],
+  "provides": [
+    "libdbus-1.so",
+    "libdbus-1.so.3"
+  ]
 }

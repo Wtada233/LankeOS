@@ -5,5 +5,39 @@
     "https://download.gnome.org/sources/glib/2.84/glib-2.84.0.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libelf.so.1",
+    "libffi.so.8",
+    "libm.so.6",
+    "libmount.so.1",
+    "libpcre2-8.so.0",
+    "libz.so.1"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "libelf",
+    "libffi",
+    "pcre2",
+    "python",
+    "util-linux",
+    "zlib"
+  ],
+  "provides": [
+    "libgio-2.0.so",
+    "libgio-2.0.so.0",
+    "libgirepository-2.0.so",
+    "libgirepository-2.0.so.0",
+    "libglib-2.0.so",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so",
+    "libgobject-2.0.so.0",
+    "libgthread-2.0.so",
+    "libgthread-2.0.so.0"
+  ]
 }

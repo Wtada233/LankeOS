@@ -4,7 +4,36 @@
   "sources": [
     "https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-1.28.1.tar.xz"
   ],
-  "deps": [],
+  "deps": [
+    "gcc",
+    "glib",
+    "glibc",
+    "libcap",
+    "python"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcap.so.2",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libgstbase-1.0.so",
+    "libgstbase-1.0.so.0",
+    "libgstcheck-1.0.so",
+    "libgstcheck-1.0.so.0",
+    "libgstcontroller-1.0.so",
+    "libgstcontroller-1.0.so.0",
+    "libgstnet-1.0.so",
+    "libgstnet-1.0.so.0",
+    "libgstreamer-1.0.so",
+    "libgstreamer-1.0.so.0"
+  ]
 }

@@ -7,7 +7,41 @@
   "work_sources": [
     "file://./allow-software-rendering.patch"
   ],
-  "deps": [],
+  "deps": [
+    "bash",
+    "cairo",
+    "gcc",
+    "glib",
+    "glibc",
+    "libdisplay-info",
+    "libinput",
+    "libxkbcommon",
+    "mesa",
+    "pango",
+    "pipewire",
+    "pixman",
+    "seatd",
+    "systemd"
+  ],
   "provides": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcairo.so.2",
+    "libdisplay-info.so.3",
+    "libgbm.so.1",
+    "libgcc_s.so.1",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libinput.so.10",
+    "libm.so.6",
+    "libpango-1.0.so.0",
+    "libpangocairo-1.0.so.0",
+    "libpipewire-0.3.so.0",
+    "libpixman-1.so.0",
+    "libseat.so.1",
+    "libudev.so.1",
+    "libxkbcommon.so.0"
+  ]
 }

@@ -5,5 +5,27 @@
     "https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v1.47.3/e2fsprogs-1.47.3.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libblkid.so.1",
+    "libc.so.6",
+    "libuuid.so.1"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "perl",
+    "util-linux"
+  ],
+  "provides": [
+    "libcom_err.so",
+    "libcom_err.so.2",
+    "libe2p.so",
+    "libe2p.so.2",
+    "libext2fs.so",
+    "libext2fs.so.2",
+    "libss.so",
+    "libss.so.2"
+  ]
 }

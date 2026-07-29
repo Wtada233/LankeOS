@@ -4,5 +4,25 @@
   "sources": [
     "https://github.com/hughsie/libxmlb/releases/download/0.3.29/libxmlb-0.3.29.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "liblzma.so.5",
+    "libstemmer.so.0",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "glib",
+    "glibc",
+    "libstemmer",
+    "xz",
+    "zstd"
+  ],
+  "provides": [
+    "libxmlb.so",
+    "libxmlb.so.2"
+  ]
 }

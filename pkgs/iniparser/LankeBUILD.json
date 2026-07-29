@@ -4,5 +4,15 @@
   "sources": [
     "https://github.com/ndevilla/iniparser/archive/refs/tags/v4.2.6.tar.gz"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libiniparser.so",
+    "libiniparser.so.4"
+  ]
 }

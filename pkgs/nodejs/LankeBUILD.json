@@ -5,5 +5,29 @@
     "https://nodejs.org/dist/v26.2.0/node-v26.2.0.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libgcc_s.so.1",
+    "libicui18n.so.77",
+    "libicuuc.so.77",
+    "libm.so.6",
+    "libnghttp2.so.14",
+    "libssl.so.3",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "icu",
+    "nghttp2",
+    "openssl",
+    "python",
+    "zlib"
+  ],
+  "provides": []
 }

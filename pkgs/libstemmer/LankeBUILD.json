@@ -6,5 +6,15 @@
   ],
   "work_sources": [
     "file://./0001-Make-libstemmer-a-shared-library.patch"
+  ],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libstemmer.so",
+    "libstemmer.so.0"
   ]
 }

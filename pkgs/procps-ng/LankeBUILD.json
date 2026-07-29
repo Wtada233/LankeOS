@@ -5,5 +5,18 @@
     "https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-4.0.5.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libncursesw.so.6"
+  ],
+  "deps": [
+    "glibc",
+    "ncurses"
+  ],
+  "provides": [
+    "libproc2.so",
+    "libproc2.so.1"
+  ]
 }

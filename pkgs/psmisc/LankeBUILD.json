@@ -5,5 +5,14 @@
     "https://sourceforge.net/projects/psmisc/files/psmisc/psmisc-23.7.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libncursesw.so.6"
+  ],
+  "deps": [
+    "glibc",
+    "ncurses"
+  ],
+  "provides": []
 }

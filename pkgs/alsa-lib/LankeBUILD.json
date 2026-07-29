@@ -5,5 +5,19 @@
     "https://github.com/alsa-project/alsa-lib/archive/refs/tags/v1.2.15.3.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libasound.so",
+    "libasound.so.2",
+    "libatopology.so",
+    "libatopology.so.2"
+  ]
 }

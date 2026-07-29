@@ -5,5 +5,36 @@
     "https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/releases/1.54.0/downloads/NetworkManager-1.54.0.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcurl.so.4",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgnutls.so.30",
+    "libgobject-2.0.so.0",
+    "libndp.so.0",
+    "libnewt.so.0.52",
+    "libpsl.so.5",
+    "libreadline.so.8",
+    "libsystemd.so.0",
+    "libudev.so.1"
+  ],
+  "deps": [
+    "curl",
+    "glib",
+    "glibc",
+    "gnutls",
+    "libndp",
+    "libpsl",
+    "newt",
+    "readline",
+    "systemd"
+  ],
+  "provides": [
+    "libnm.so",
+    "libnm.so.0"
+  ]
 }

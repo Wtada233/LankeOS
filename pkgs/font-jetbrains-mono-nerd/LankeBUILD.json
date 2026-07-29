@@ -4,5 +4,8 @@
   "sources": [
     "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/JetBrainsMono.zip"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [],
+  "deps": [],
+  "provides": []
 }

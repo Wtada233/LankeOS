@@ -5,8 +5,22 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXtst-1.2.5.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
-  "provides": [],
+  "deps": [
+    "glibc",
+    "libX11",
+    "libXext",
+    "libXi"
+  ],
+  "provides": [
+    "libXtst.so",
+    "libXtst.so.6"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libX11.so.6",
+    "libXext.so.6",
+    "libXi.so.6",
+    "libc.so.6"
+  ]
 }

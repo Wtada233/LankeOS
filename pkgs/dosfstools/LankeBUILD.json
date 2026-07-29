@@ -5,5 +5,12 @@
     "https://github.com/dosfstools/dosfstools/releases/download/v4.2/dosfstools-4.2.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": []
 }

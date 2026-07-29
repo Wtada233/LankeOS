@@ -4,5 +4,8 @@
   "work_sources": [
     "https://github.com/notofonts/noto-cjk/raw/refs/heads/main/Sans/Mono/NotoSansMonoCJKsc-Regular.otf"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [],
+  "deps": [],
+  "provides": []
 }

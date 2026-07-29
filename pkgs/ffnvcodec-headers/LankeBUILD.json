@@ -4,5 +4,8 @@
   "sources": [
     "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.1.15.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [],
+  "deps": [],
+  "provides": []
 }

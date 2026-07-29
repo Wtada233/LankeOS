@@ -9,5 +9,6 @@
   "deps": [],
   "no_strip": true,
   "provides": [],
-  "release": 1
+  "release": 1,
+  "needed_so": []
 }

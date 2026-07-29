@@ -5,5 +5,16 @@
     "https://gitlab.xiph.org/xiph/rnnoise/-/archive/v0.2/rnnoise-v0.2.tar.gz",
     "https://media.xiph.org/rnnoise/models/rnnoise_data-0b50c45.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "librnnoise.so",
+    "librnnoise.so.0"
+  ]
 }

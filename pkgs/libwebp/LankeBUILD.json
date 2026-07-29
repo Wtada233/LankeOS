@@ -4,7 +4,35 @@
   "sources": [
     "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.5.0.tar.gz"
   ],
-  "deps": [],
+  "deps": [
+    "giflib",
+    "glibc",
+    "libjpeg-turbo",
+    "libpng",
+    "libtiff",
+    "zlib"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgif.so.7",
+    "libjpeg.so.62",
+    "libm.so.6",
+    "libpng16.so.16",
+    "libtiff.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libsharpyuv.so",
+    "libsharpyuv.so.0",
+    "libwebp.so",
+    "libwebp.so.7",
+    "libwebpdecoder.so",
+    "libwebpdecoder.so.3",
+    "libwebpdemux.so",
+    "libwebpdemux.so.2",
+    "libwebpmux.so",
+    "libwebpmux.so.3"
+  ]
 }

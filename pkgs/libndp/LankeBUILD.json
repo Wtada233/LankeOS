@@ -5,5 +5,16 @@
     "http://libndp.org/files/libndp-1.9.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libndp.so",
+    "libndp.so.0"
+  ]
 }

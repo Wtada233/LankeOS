@@ -5,5 +5,11 @@
     "https://ftpmirror.gnu.org/autoconf/autoconf-2.72.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [],
+  "deps": [
+    "bash",
+    "perl"
+  ],
+  "provides": []
 }

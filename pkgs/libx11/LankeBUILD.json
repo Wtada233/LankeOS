@@ -5,8 +5,20 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libX11-1.8.10.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
-  "provides": [],
+  "deps": [
+    "glibc",
+    "libxcb"
+  ],
+  "provides": [
+    "libX11-xcb.so",
+    "libX11-xcb.so.1",
+    "libX11.so",
+    "libX11.so.6"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libxcb.so.1"
+  ]
 }

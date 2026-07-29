@@ -5,5 +5,29 @@
     "https://gitlab.freedesktop.org/glvnd/libglvnd/-/archive/v1.7.0/libglvnd-v1.7.0.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libX11.so.6",
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc",
+    "libX11"
+  ],
+  "provides": [
+    "libEGL.so",
+    "libEGL.so.1",
+    "libGL.so",
+    "libGL.so.1",
+    "libGLESv1_CM.so",
+    "libGLESv1_CM.so.1",
+    "libGLESv2.so",
+    "libGLESv2.so.2",
+    "libGLX.so",
+    "libGLX.so.0",
+    "libGLdispatch.so",
+    "libGLdispatch.so.0",
+    "libOpenGL.so",
+    "libOpenGL.so.0"
+  ]
 }

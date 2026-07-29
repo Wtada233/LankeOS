@@ -5,5 +5,15 @@
     "https://mirrors.edge.kernel.org/pub/linux/libs/ell/ell-0.83.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libell.so",
+    "libell.so.0"
+  ]
 }

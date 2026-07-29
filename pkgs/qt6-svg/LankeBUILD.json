@@ -4,5 +4,32 @@
   "sources": [
     "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtsvg-everywhere-src-6.11.1.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libGLX.so.0",
+    "libOpenGL.so.0",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libxkbcommon.so.0",
+    "libz.so.1"
+  ],
+  "deps": [
+    "gcc",
+    "glibc",
+    "libglvnd",
+    "libxkbcommon",
+    "qt6-base",
+    "zlib"
+  ],
+  "provides": [
+    "libQt6Svg.so",
+    "libQt6Svg.so.6",
+    "libQt6SvgWidgets.so",
+    "libQt6SvgWidgets.so.6"
+  ]
 }

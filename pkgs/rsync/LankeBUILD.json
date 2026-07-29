@@ -5,5 +5,27 @@
     "https://rsync.samba.org/ftp/rsync/src/rsync-3.4.1.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libacl.so.1",
+    "libattr.so.1",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "liblz4.so.1",
+    "libpopt.so.0",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "acl",
+    "attr",
+    "bash",
+    "glibc",
+    "lz4",
+    "openssl",
+    "popt",
+    "zlib",
+    "zstd"
+  ],
+  "provides": []
 }

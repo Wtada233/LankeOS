@@ -5,5 +5,23 @@
     "https://www.kernel.org/pub/linux/utils/kernel/kmod/kmod-34.2.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libcrypto.so.3",
+    "liblzma.so.5",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "glibc",
+    "openssl",
+    "xz",
+    "zlib",
+    "zstd"
+  ],
+  "provides": [
+    "libkmod.so",
+    "libkmod.so.2"
+  ]
 }

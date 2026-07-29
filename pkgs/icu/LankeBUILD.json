@@ -5,5 +5,31 @@
     "https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-src.tgz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "deps": [
+    "bash",
+    "gcc",
+    "glibc"
+  ],
+  "provides": [
+    "libicudata.so",
+    "libicudata.so.77",
+    "libicui18n.so",
+    "libicui18n.so.77",
+    "libicuio.so",
+    "libicuio.so.77",
+    "libicutest.so",
+    "libicutest.so.77",
+    "libicutu.so",
+    "libicutu.so.77",
+    "libicuuc.so",
+    "libicuuc.so.77"
+  ]
 }

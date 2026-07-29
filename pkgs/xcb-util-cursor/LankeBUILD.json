@@ -5,8 +5,25 @@
     "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-cursor-0.1.6.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
-  "provides": [],
+  "deps": [
+    "glibc",
+    "libxcb",
+    "xcb-util-image",
+    "xcb-util-renderutil",
+    "xwayland"
+  ],
+  "provides": [
+    "libxcb-cursor.so",
+    "libxcb-cursor.so.0"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libxcb-image.so.0",
+    "libxcb-render-util.so.0",
+    "libxcb-render.so.0",
+    "libxcb-shm.so.0",
+    "libxcb.so.1"
+  ]
 }

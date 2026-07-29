@@ -5,6 +5,16 @@
     "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.6.1.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
-  "release": 1
+  "deps": [
+    "glibc"
+  ],
+  "release": 1,
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libopus.so",
+    "libopus.so.0"
+  ]
 }

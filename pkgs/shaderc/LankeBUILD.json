@@ -5,5 +5,25 @@
     "https://github.com/google/shaderc/archive/v2026.2/shaderc-2026.2.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libSPIRV-Tools-opt.so",
+    "libSPIRV-Tools.so",
+    "libSPIRV.so.16",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libglslang.so.16",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "deps": [
+    "SPIRV-Tools",
+    "gcc",
+    "glibc",
+    "glslang"
+  ],
+  "provides": [
+    "libshaderc_shared.so",
+    "libshaderc_shared.so.1"
+  ]
 }

@@ -4,5 +4,8 @@
   "sources": [
     "https://github.com/troydhanson/uthash/archive/refs/tags/v2.3.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [],
+  "deps": [],
+  "provides": []
 }

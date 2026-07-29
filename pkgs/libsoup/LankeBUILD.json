@@ -4,7 +4,28 @@
   "sources": [
     "https://download.gnome.org/sources/libsoup/3.6/libsoup-3.6.6.tar.xz"
   ],
-  "deps": [],
+  "deps": [
+    "glib",
+    "glibc",
+    "libpsl",
+    "nghttp2",
+    "sqlite",
+    "zlib"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libnghttp2.so.14",
+    "libpsl.so.5",
+    "libsqlite3.so",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libsoup-3.0.so",
+    "libsoup-3.0.so.0"
+  ]
 }

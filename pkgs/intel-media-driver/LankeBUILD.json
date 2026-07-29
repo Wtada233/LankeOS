@@ -5,5 +5,23 @@
     "https://github.com/intel/media-driver/archive/refs/tags/intel-media-26.1.5.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libigdgmm.so.12",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libva.so.2"
+  ],
+  "deps": [
+    "gcc",
+    "glibc",
+    "intel-gmmlib",
+    "libva"
+  ],
+  "provides": [
+    "libigfxcmrt.so",
+    "libigfxcmrt.so.7"
+  ]
 }

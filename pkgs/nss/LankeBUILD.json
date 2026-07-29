@@ -5,8 +5,31 @@
     "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_126_RTM/src/nss-3.126.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "bash",
+    "glibc",
+    "nspr",
+    "sqlite",
+    "zlib"
+  ],
   "no_strip": false,
-  "provides": [],
-  "release": 1
+  "provides": [
+    "libfreebl3.so",
+    "libfreeblpriv3.so",
+    "libnss3.so",
+    "libnsssysinit.so",
+    "libnssutil3.so",
+    "libsmime3.so",
+    "libsoftokn3.so",
+    "libssl3.so"
+  ],
+  "release": 1,
+  "needed_so": [
+    "libc.so.6",
+    "libnspr4.so",
+    "libplc4.so",
+    "libplds4.so",
+    "libsqlite3.so",
+    "libz.so.1"
+  ]
 }

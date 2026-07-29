@@ -4,7 +4,21 @@
   "sources": [
     "https://download.gnome.org/sources/libgudev/238/libgudev-238.tar.xz"
   ],
-  "deps": [],
+  "deps": [
+    "glib",
+    "glibc",
+    "systemd"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libudev.so.1"
+  ],
+  "provides": [
+    "libgudev-1.0.so",
+    "libgudev-1.0.so.0"
+  ]
 }

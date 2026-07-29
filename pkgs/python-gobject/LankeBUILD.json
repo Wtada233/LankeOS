@@ -5,5 +5,23 @@
     "https://download.gnome.org/sources/pygobject/3.56/pygobject-3.56.3.tar.gz"
   ],
   "work_sources": [],
-  "release": 1
+  "release": 1,
+  "needed_so": [
+    "libc.so.6",
+    "libcairo-gobject.so.2",
+    "libcairo.so.2",
+    "libffi.so.8",
+    "libgirepository-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "deps": [
+    "cairo",
+    "glib",
+    "glibc",
+    "libffi",
+    "python",
+    "python-cairo"
+  ],
+  "provides": []
 }

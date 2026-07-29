@@ -5,5 +5,31 @@
     "https://github.com/libarchive/libarchive/releases/download/v3.8.8/libarchive-3.8.8.tar.xz"
   ],
   "work_sources": [],
-  "release": 1
+  "release": 1,
+  "needed_so": [
+    "libacl.so.1",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "liblz4.so.1",
+    "liblzma.so.5",
+    "libxml2.so.2",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "acl",
+    "bzip2",
+    "glibc",
+    "libxml2",
+    "lz4",
+    "openssl",
+    "xz",
+    "zlib",
+    "zstd"
+  ],
+  "provides": [
+    "libarchive.so",
+    "libarchive.so.13"
+  ]
 }

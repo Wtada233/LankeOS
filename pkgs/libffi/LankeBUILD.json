@@ -5,5 +5,15 @@
     "https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libffi.so",
+    "libffi.so.8"
+  ]
 }

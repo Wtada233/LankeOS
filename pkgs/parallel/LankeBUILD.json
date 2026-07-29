@@ -4,5 +4,11 @@
   "sources": [
     "https://ftpmirror.gnu.org/gnu/parallel/parallel-20250522.tar.bz2"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [],
+  "deps": [
+    "bash",
+    "perl"
+  ],
+  "provides": []
 }

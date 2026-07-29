@@ -5,5 +5,8 @@
     "https://github.com/Mic92/iana-etc/releases/download/20250807/iana-etc-20250807.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [],
+  "deps": [],
+  "provides": []
 }

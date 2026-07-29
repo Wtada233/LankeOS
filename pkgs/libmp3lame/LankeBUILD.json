@@ -5,5 +5,18 @@
     "https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6",
+    "libncursesw.so.6"
+  ],
+  "deps": [
+    "glibc",
+    "ncurses"
+  ],
+  "provides": [
+    "libmp3lame.so",
+    "libmp3lame.so.0"
+  ]
 }

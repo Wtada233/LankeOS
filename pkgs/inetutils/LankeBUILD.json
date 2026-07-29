@@ -5,5 +5,18 @@
     "https://ftpmirror.gnu.org/inetutils/inetutils-2.6.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libncursesw.so.6",
+    "libreadline.so.8"
+  ],
+  "deps": [
+    "glibc",
+    "libxcrypt",
+    "ncurses",
+    "readline"
+  ],
+  "provides": []
 }

@@ -5,5 +5,18 @@
     "https://www.cpan.org/src/5.0/perl-5.42.0.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libgdbm.so.6",
+    "libgdbm_compat.so.4",
+    "libm.so.6"
+  ],
+  "deps": [
+    "gdbm",
+    "glibc",
+    "libxcrypt"
+  ],
+  "provides": []
 }

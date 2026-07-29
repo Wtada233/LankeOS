@@ -5,5 +5,13 @@
     "https://ftpmirror.gnu.org/gzip/gzip-1.14.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "bash",
+    "glibc"
+  ],
+  "provides": []
 }

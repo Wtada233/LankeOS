@@ -2,5 +2,26 @@
   "name": "libplacebo",
   "version": "7.360.1",
   "sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libglslang-default-resource-limits.so.16",
+    "libglslang.so.16",
+    "liblcms2.so.2",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libvulkan.so.1"
+  ],
+  "deps": [
+    "gcc",
+    "glibc",
+    "glslang",
+    "lcms2",
+    "vulkan-loader"
+  ],
+  "provides": [
+    "libplacebo.so",
+    "libplacebo.so.360"
+  ]
 }

@@ -5,5 +5,18 @@
     "https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz"
   ],
   "work_sources": [],
-  "release": 3
+  "release": 3,
+  "needed_so": [
+    "libc.so.6",
+    "libhistory.so.8",
+    "libm.so.6",
+    "libncursesw.so.6",
+    "libreadline.so.8"
+  ],
+  "deps": [
+    "glibc",
+    "ncurses",
+    "readline"
+  ],
+  "provides": []
 }

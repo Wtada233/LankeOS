@@ -5,5 +5,16 @@
     "https://downloads.sourceforge.net/giflib/giflib-5.2.2.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libgif.so",
+    "libgif.so.7"
+  ]
 }

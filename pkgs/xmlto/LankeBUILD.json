@@ -5,8 +5,14 @@
     "https://pagure.io/xmlto/archive/0.0.29/xmlto-0.0.29.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "bash",
+    "glibc"
+  ],
   "no_strip": true,
   "provides": [],
-  "release": 1
+  "release": 1,
+  "needed_so": [
+    "libc.so.6"
+  ]
 }

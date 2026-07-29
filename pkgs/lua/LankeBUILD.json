@@ -10,5 +10,23 @@
     "file://./lua.pc",
     "file://./license-from-upstream"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "deps": [
+    "gcc",
+    "glibc"
+  ],
+  "provides": [
+    "liblua++.so",
+    "liblua++.so.5.5",
+    "liblua++5.5.so",
+    "liblua.so",
+    "liblua.so.5.5",
+    "liblua5.5.so"
+  ]
 }

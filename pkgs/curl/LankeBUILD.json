@@ -5,5 +5,27 @@
     "https://curl.se/download/curl-8.11.1.tar.xz"
   ],
   "work_sources": [],
-  "release": 3
+  "release": 3,
+  "needed_so": [
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libnghttp2.so.14",
+    "libpsl.so.5",
+    "libssl.so.3",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "libpsl",
+    "nghttp2",
+    "openssl",
+    "zlib",
+    "zstd"
+  ],
+  "provides": [
+    "libcurl.so",
+    "libcurl.so.4"
+  ]
 }

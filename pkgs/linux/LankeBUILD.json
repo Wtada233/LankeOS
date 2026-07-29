@@ -5,5 +5,8 @@
     "https://www.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.gz"
   ],
   "no_strip": true,
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [],
+  "deps": [],
+  "provides": []
 }

@@ -5,5 +5,17 @@
     "https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.76.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libcap.so",
+    "libcap.so.2",
+    "libpsx.so",
+    "libpsx.so.2"
+  ]
 }

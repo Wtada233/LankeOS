@@ -5,5 +5,15 @@
     "https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "liblz4.so",
+    "liblz4.so.1"
+  ]
 }

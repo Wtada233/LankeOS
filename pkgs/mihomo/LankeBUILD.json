@@ -6,5 +6,13 @@
   ],
   "work_sources": [],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libresolv.so.2"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": []
 }

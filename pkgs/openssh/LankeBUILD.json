@@ -5,5 +5,18 @@
     "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-9.9p1.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libcrypto.so.3",
+    "libz.so.1"
+  ],
+  "deps": [
+    "glibc",
+    "libxcrypt",
+    "openssl",
+    "zlib"
+  ],
+  "provides": []
 }

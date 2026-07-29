@@ -5,5 +5,22 @@
     "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.bz2"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "bash",
+    "glibc"
+  ],
+  "provides": [
+    "libpcre2-16.so",
+    "libpcre2-16.so.0",
+    "libpcre2-32.so",
+    "libpcre2-32.so.0",
+    "libpcre2-8.so",
+    "libpcre2-8.so.0",
+    "libpcre2-posix.so",
+    "libpcre2-posix.so.3"
+  ]
 }

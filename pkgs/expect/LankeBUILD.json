@@ -7,5 +7,19 @@
   "work_sources": [
     "https://www.linuxfromscratch.org/patches/lfs/12.4/expect-5.45.4-gcc15-1.patch"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libexpect5.45.4.so",
+    "libm.so.6",
+    "libtcl8.6.so"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "tcl"
+  ],
+  "provides": [
+    "libexpect5.45.4.so"
+  ]
 }

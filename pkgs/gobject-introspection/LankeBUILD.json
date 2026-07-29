@@ -5,5 +5,24 @@
     "https://download.gnome.org/sources/gobject-introspection/1.84/gobject-introspection-1.84.0.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libffi.so.8",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libm.so.6"
+  ],
+  "deps": [
+    "glib",
+    "glibc",
+    "libffi",
+    "python"
+  ],
+  "provides": [
+    "libgirepository-1.0.so",
+    "libgirepository-1.0.so.1"
+  ]
 }

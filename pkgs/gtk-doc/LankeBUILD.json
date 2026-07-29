@@ -4,5 +4,11 @@
   "sources": [
     "https://gitlab.gnome.org/GNOME/gtk-doc/-/archive/1.36.1/gtk-doc-1.36.1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [],
+  "deps": [
+    "bash",
+    "python"
+  ],
+  "provides": []
 }

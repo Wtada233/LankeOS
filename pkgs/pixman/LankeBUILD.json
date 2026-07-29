@@ -5,5 +5,17 @@
     "https://cairographics.org/releases/pixman-0.46.4.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libpixman-1.so",
+    "libpixman-1.so.0"
+  ]
 }

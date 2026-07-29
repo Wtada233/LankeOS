@@ -4,7 +4,26 @@
   "sources": [
     "https://github.com/uclouvain/openjpeg/archive/v2.5.4/openjpeg-2.5.4.tar.gz"
   ],
-  "deps": [],
+  "deps": [
+    "glibc",
+    "lcms2",
+    "libpng",
+    "libtiff",
+    "zlib"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "liblcms2.so.2",
+    "libm.so.6",
+    "libmvec.so.1",
+    "libpng16.so.16",
+    "libtiff.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libopenjp2.so",
+    "libopenjp2.so.7"
+  ]
 }

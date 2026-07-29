@@ -8,5 +8,22 @@
     "https://www.linuxfromscratch.org/patches/lfs/12.4/coreutils-9.7-upstream_fix-1.patch",
     "https://www.linuxfromscratch.org/patches/lfs/12.4/coreutils-9.7-i18n-1.patch"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libacl.so.1",
+    "libattr.so.1",
+    "libc.so.6",
+    "libcap.so.2",
+    "libcrypto.so.3",
+    "libgmp.so.10"
+  ],
+  "deps": [
+    "acl",
+    "attr",
+    "glibc",
+    "gmp",
+    "libcap",
+    "openssl"
+  ],
+  "provides": []
 }

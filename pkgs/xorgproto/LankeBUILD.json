@@ -8,5 +8,6 @@
   "deps": [],
   "provides": [],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": []
 }

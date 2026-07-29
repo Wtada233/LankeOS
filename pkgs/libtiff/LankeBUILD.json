@@ -5,5 +5,29 @@
     "https://download.osgeo.org/libtiff/tiff-4.7.0.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libjpeg.so.62",
+    "liblzma.so.5",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "gcc",
+    "glibc",
+    "libjpeg-turbo",
+    "xz",
+    "zlib",
+    "zstd"
+  ],
+  "provides": [
+    "libtiff.so",
+    "libtiff.so.6",
+    "libtiffxx.so",
+    "libtiffxx.so.6"
+  ]
 }

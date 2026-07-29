@@ -5,5 +5,27 @@
     "https://github.com/linux-pam/linux-pam/archive/refs/tags/v1.7.2.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libgdbm.so.6",
+    "libsystemd.so.0"
+  ],
+  "deps": [
+    "bash",
+    "gdbm",
+    "glibc",
+    "libxcrypt",
+    "systemd"
+  ],
+  "provides": [
+    "libpam.so",
+    "libpam.so.0",
+    "libpam_misc.so",
+    "libpam_misc.so.0",
+    "libpamc.so",
+    "libpamc.so.0"
+  ]
 }

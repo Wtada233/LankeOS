@@ -5,5 +5,27 @@
     "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz"
   ],
   "work_sources": [],
-  "release": 3
+  "release": 3,
+  "needed_so": [
+    "libc.so.6",
+    "libwayland-client.so.0",
+    "libxcb-xkb.so.1",
+    "libxcb.so.1",
+    "libxml2.so.2"
+  ],
+  "deps": [
+    "glibc",
+    "libxcb",
+    "libxml2",
+    "wayland",
+    "xwayland"
+  ],
+  "provides": [
+    "libxkbcommon-x11.so",
+    "libxkbcommon-x11.so.0",
+    "libxkbcommon.so",
+    "libxkbcommon.so.0",
+    "libxkbregistry.so",
+    "libxkbregistry.so.0"
+  ]
 }

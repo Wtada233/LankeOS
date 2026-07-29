@@ -5,8 +5,18 @@
     "https://archive.mozilla.org/pub/nspr/releases/v4.39/src/nspr-4.39.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "bash",
+    "glibc"
+  ],
   "no_strip": false,
-  "provides": [],
-  "release": 1
+  "provides": [
+    "libnspr4.so",
+    "libplc4.so",
+    "libplds4.so"
+  ],
+  "release": 1,
+  "needed_so": [
+    "libc.so.6"
+  ]
 }

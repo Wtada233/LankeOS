@@ -5,8 +5,18 @@
     "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "glibc",
+    "zlib"
+  ],
   "no_strip": false,
-  "provides": [],
-  "release": 1
+  "provides": [
+    "libminizip.so",
+    "libminizip.so.1"
+  ],
+  "release": 1,
+  "needed_so": [
+    "libc.so.6",
+    "libz.so.1"
+  ]
 }

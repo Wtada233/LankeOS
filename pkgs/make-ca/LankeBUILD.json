@@ -5,5 +5,10 @@
     "https://github.com/lfs-book/make-ca/archive/refs/tags/v1.16.1.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [],
+  "deps": [
+    "bash"
+  ],
+  "provides": []
 }

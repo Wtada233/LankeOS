@@ -2,5 +2,14 @@
   "name": "fzf",
   "version": "0.74.1",
   "sources": [],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libresolv.so.2"
+  ],
+  "deps": [
+    "bash",
+    "glibc"
+  ],
+  "provides": []
 }

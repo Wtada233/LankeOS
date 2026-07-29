@@ -5,5 +5,27 @@
     "https://github.com/thom311/libnl/releases/download/libnl3_11_0/libnl-3.11.0.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libnl-3.so",
+    "libnl-3.so.200",
+    "libnl-cli-3.so",
+    "libnl-cli-3.so.200",
+    "libnl-genl-3.so",
+    "libnl-genl-3.so.200",
+    "libnl-idiag-3.so",
+    "libnl-idiag-3.so.200",
+    "libnl-nf-3.so",
+    "libnl-nf-3.so.200",
+    "libnl-route-3.so",
+    "libnl-route-3.so.200",
+    "libnl-xfrm-3.so",
+    "libnl-xfrm-3.so.200"
+  ]
 }

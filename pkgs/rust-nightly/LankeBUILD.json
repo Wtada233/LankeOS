@@ -10,5 +10,29 @@
     "file://./0004-compiler-Change-LLVM-targets.patch",
     "file://./0005-compiler-Use-ld.lld-by-default.patch"
   ],
-  "release": 1
+  "release": 1,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libLLVM.so.22.1",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libcurl.so.4",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libssl.so.3",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "deps": [
+    "bash",
+    "curl",
+    "gcc",
+    "glibc",
+    "llvm",
+    "openssl",
+    "zlib"
+  ],
+  "provides": [
+    "librustc_driver-89afc71aa65b0fab.so"
+  ]
 }

@@ -4,5 +4,18 @@
   "sources": [
     "https://github.com/BLAKE3-team/BLAKE3/archive/refs/tags/1.8.5.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1"
+  ],
+  "deps": [
+    "gcc",
+    "glibc"
+  ],
+  "provides": [
+    "libblake3.so",
+    "libblake3.so.0"
+  ]
 }

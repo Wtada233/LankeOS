@@ -4,5 +4,24 @@
   "sources": [
     "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libfontconfig.so.1",
+    "libfreetype.so.6",
+    "libfribidi.so.0",
+    "libharfbuzz.so.0",
+    "libm.so.6"
+  ],
+  "deps": [
+    "fontconfig",
+    "freetype",
+    "fribidi",
+    "glibc",
+    "harfbuzz"
+  ],
+  "provides": [
+    "libass.so",
+    "libass.so.9"
+  ]
 }

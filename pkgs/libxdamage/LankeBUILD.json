@@ -5,8 +5,20 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXdamage-1.1.6.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
-  "provides": [],
+  "deps": [
+    "glibc",
+    "libX11",
+    "libXfixes"
+  ],
+  "provides": [
+    "libXdamage.so",
+    "libXdamage.so.1"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libX11.so.6",
+    "libXfixes.so.3",
+    "libc.so.6"
+  ]
 }

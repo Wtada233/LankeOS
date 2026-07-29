@@ -5,5 +5,15 @@
     "http://bitmath.org/code/mtdev/mtdev-1.1.7.tar.bz2"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libmtdev.so",
+    "libmtdev.so.1"
+  ]
 }

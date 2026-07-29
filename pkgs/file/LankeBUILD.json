@@ -5,5 +5,24 @@
     "https://astron.com/pub/file/file-5.46.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "liblzma.so.5",
+    "libm.so.6",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "bzip2",
+    "glibc",
+    "xz",
+    "zlib",
+    "zstd"
+  ],
+  "provides": [
+    "libmagic.so",
+    "libmagic.so.1"
+  ]
 }

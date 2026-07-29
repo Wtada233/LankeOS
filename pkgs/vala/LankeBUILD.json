@@ -2,5 +2,20 @@
   "name": "vala",
   "version": "0.56.19",
   "sources": [],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "deps": [
+    "bash",
+    "glib",
+    "glibc"
+  ],
+  "provides": [
+    "libvala-0.56.so",
+    "libvala-0.56.so.0"
+  ]
 }

@@ -5,5 +5,16 @@
     "https://github.com/kkos/oniguruma/releases/download/v6.9.10/onig-6.9.10.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "bash",
+    "glibc"
+  ],
+  "provides": [
+    "libonig.so",
+    "libonig.so.5"
+  ]
 }

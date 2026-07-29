@@ -5,8 +5,11 @@
     "https://xorg.freedesktop.org/archive/individual/proto/xcb-proto-1.17.0.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "python"
+  ],
   "provides": [],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": []
 }

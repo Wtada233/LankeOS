@@ -5,5 +5,32 @@
     "https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/archive/v17.0/pulseaudio-v17.0.tar.gz"
   ],
   "work_sources": [],
-  "release": 1
+  "release": 1,
+  "needed_so": [
+    "libc.so.6",
+    "libdbus-1.so.3",
+    "libglib-2.0.so.0",
+    "libm.so.6",
+    "libsndfile.so.1",
+    "libsystemd.so.0",
+    "libxcb.so.1"
+  ],
+  "deps": [
+    "bash",
+    "dbus",
+    "glib",
+    "glibc",
+    "libsndfile",
+    "libxcb",
+    "systemd",
+    "xwayland"
+  ],
+  "provides": [
+    "libpulse-mainloop-glib.so",
+    "libpulse-mainloop-glib.so.0",
+    "libpulse-simple.so",
+    "libpulse-simple.so.0",
+    "libpulse.so",
+    "libpulse.so.0"
+  ]
 }

@@ -5,5 +5,22 @@
     "https://www.alsa-project.org/files/pub/utils/alsa-utils-1.2.16.tar.bz2"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libasound.so.2",
+    "libatopology.so.2",
+    "libc.so.6",
+    "libformw.so.6",
+    "libm.so.6",
+    "libmenuw.so.6",
+    "libncursesw.so.6",
+    "libpanelw.so.6"
+  ],
+  "deps": [
+    "alsa-lib",
+    "bash",
+    "glibc",
+    "ncurses"
+  ],
+  "provides": []
 }

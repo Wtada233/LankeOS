@@ -2,8 +2,20 @@
   "name": "acl",
   "version": "2.3.2",
   "sources": [
-    "https://master.dl.sourceforge.net/project/linux4m/50.0/addons/acl/src/acl-2.3.2.tar.xz"
+    "https://download.savannah.gnu.org/releases/acl/acl-2.3.2.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libattr.so.1",
+    "libc.so.6"
+  ],
+  "deps": [
+    "attr",
+    "glibc"
+  ],
+  "provides": [
+    "libacl.so",
+    "libacl.so.1"
+  ]
 }

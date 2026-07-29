@@ -4,7 +4,34 @@
   "sources": [
     "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.1.tar.xz"
   ],
-  "deps": [],
+  "deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "gmp",
+    "libffi",
+    "libxcrypt",
+    "libyaml",
+    "openssl",
+    "zlib"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libcrypto.so.3",
+    "libffi.so.8",
+    "libgcc_s.so.1",
+    "libgmp.so.10",
+    "libm.so.6",
+    "libssl.so.3",
+    "libyaml-0.so.2",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libruby.so",
+    "libruby.so.4.0"
+  ]
 }

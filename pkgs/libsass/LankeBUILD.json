@@ -4,5 +4,19 @@
   "sources": [
     "https://github.com/sass/libsass/archive/refs/tags/3.6.6.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "deps": [
+    "gcc",
+    "glibc"
+  ],
+  "provides": [
+    "libsass.so",
+    "libsass.so.1"
+  ]
 }

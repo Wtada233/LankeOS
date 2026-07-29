@@ -5,8 +5,15 @@
     "https://gn.googlesource.com/gn/+archive/9ece3f5254c273cb46606a6571963f931c3b012d.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "gcc",
+    "glibc"
+  ],
   "no_strip": false,
   "provides": [],
-  "release": 1
+  "release": 1,
+  "needed_so": [
+    "libc.so.6",
+    "libstdc++.so.6"
+  ]
 }

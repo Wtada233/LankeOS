@@ -5,5 +5,25 @@
     "https://github.com/systemd/systemd/archive/v261/systemd-261.tar.gz"
   ],
   "work_sources": [],
-  "release": 3
+  "release": 3,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "python"
+  ],
+  "provides": [
+    "libnss_myhostname.so.2",
+    "libnss_mymachines.so.2",
+    "libnss_resolve.so.2",
+    "libnss_systemd.so.2",
+    "libsystemd.so",
+    "libsystemd.so.0",
+    "libudev.so",
+    "libudev.so.1"
+  ]
 }

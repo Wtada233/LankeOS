@@ -5,5 +5,18 @@
     "https://ftpmirror.gnu.org/groff/groff-1.23.0.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "perl"
+  ],
+  "provides": []
 }

@@ -4,5 +4,16 @@
   "sources": [
     "https://gitlab.xiph.org/xiph/speexdsp/-/archive/SpeexDSP-1.2.1/speexdsp-SpeexDSP-1.2.1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libspeexdsp.so",
+    "libspeexdsp.so.1"
+  ]
 }

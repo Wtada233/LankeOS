@@ -6,5 +6,20 @@
   ],
   "no_strip": true,
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libfreetype.so.6",
+    "liblzma.so.5",
+    "libtasn1.so.6"
+  ],
+  "deps": [
+    "bash",
+    "freetype",
+    "glibc",
+    "libtasn1",
+    "python",
+    "xz"
+  ],
+  "provides": []
 }

@@ -3,5 +3,31 @@
   "version": "1.1.10",
   "sources": [],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libFcitx5Utils.so.2",
+    "libboost_iostreams.so.1.90.0",
+    "libboost_random.so.1.90.0",
+    "libboost_regex.so.1.90.0",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "boost",
+    "fcitx5",
+    "gcc",
+    "glibc",
+    "zstd"
+  ],
+  "provides": [
+    "libIMECore.so",
+    "libIMECore.so.0",
+    "libIMEPinyin.so",
+    "libIMEPinyin.so.0",
+    "libIMETable.so",
+    "libIMETable.so.0"
+  ]
 }

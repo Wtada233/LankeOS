@@ -5,8 +5,18 @@
     "https://ftpmirror.gnu.org/libidn/libidn2-2.3.8.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "glibc",
+    "libunistring"
+  ],
   "no_strip": false,
-  "provides": [],
-  "release": 1
+  "provides": [
+    "libidn2.so",
+    "libidn2.so.0"
+  ],
+  "release": 1,
+  "needed_so": [
+    "libc.so.6",
+    "libunistring.so.5"
+  ]
 }

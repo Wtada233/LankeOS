@@ -5,5 +5,21 @@
     "https://github.com/nayuki/QR-Code-generator/archive/refs/tags/v1.8.0.tar.gz",
     "https://github.com/EasyCoding/qrcodegen-cmake/archive/refs/tags/v1.8.0-cmake3.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "deps": [
+    "gcc",
+    "glibc"
+  ],
+  "provides": [
+    "libqrcodegen.so",
+    "libqrcodegen.so.1",
+    "libqrcodegencpp.so",
+    "libqrcodegencpp.so.1"
+  ]
 }

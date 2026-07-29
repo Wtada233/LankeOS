@@ -5,5 +5,15 @@
     "https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libtextstyle.so.0"
+  ],
+  "deps": [
+    "bash",
+    "gettext",
+    "glibc"
+  ],
+  "provides": []
 }

@@ -6,5 +6,8 @@
   ],
   "work_sources": [
     "file://./0001_fix_AX_CXX_COMPILE_STDCXX.patch"
-  ]
+  ],
+  "needed_so": [],
+  "deps": [],
+  "provides": []
 }

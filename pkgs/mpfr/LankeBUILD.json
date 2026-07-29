@@ -5,5 +5,18 @@
     "https://ftpmirror.gnu.org/mpfr/mpfr-4.2.2.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgmp.so.10"
+  ],
+  "deps": [
+    "glibc",
+    "gmp"
+  ],
+  "provides": [
+    "libmpfr.so",
+    "libmpfr.so.6"
+  ]
 }

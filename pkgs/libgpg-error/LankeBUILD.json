@@ -4,7 +4,17 @@
   "sources": [
     "https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.54.tar.bz2"
   ],
-  "deps": [],
+  "deps": [
+    "bash",
+    "glibc"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libgpg-error.so",
+    "libgpg-error.so.0"
+  ]
 }

@@ -4,5 +4,8 @@
   "sources": [
     "https://github.com/simd-everywhere/simde/archive/refs/tags/v0.8.2.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [],
+  "deps": [],
+  "provides": []
 }

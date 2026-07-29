@@ -5,5 +5,33 @@
     "https://github.com/harfbuzz/harfbuzz/releases/download/11.4.1/harfbuzz-11.4.1.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libcairo.so.2",
+    "libfreetype.so.6",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libicuuc.so.77",
+    "libm.so.6"
+  ],
+  "deps": [
+    "cairo",
+    "freetype",
+    "glib",
+    "glibc",
+    "icu"
+  ],
+  "provides": [
+    "libharfbuzz-cairo.so",
+    "libharfbuzz-cairo.so.0",
+    "libharfbuzz-gobject.so",
+    "libharfbuzz-gobject.so.0",
+    "libharfbuzz-icu.so",
+    "libharfbuzz-icu.so.0",
+    "libharfbuzz-subset.so",
+    "libharfbuzz-subset.so.0",
+    "libharfbuzz.so",
+    "libharfbuzz.so.0"
+  ]
 }

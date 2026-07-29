@@ -5,5 +5,14 @@
     "https://downloads.sourceforge.net/project/infozip/Zip%203.x%20%28latest%29/3.0/zip30.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libbz2.so.1.0",
+    "libc.so.6"
+  ],
+  "deps": [
+    "bzip2",
+    "glibc"
+  ],
+  "provides": []
 }

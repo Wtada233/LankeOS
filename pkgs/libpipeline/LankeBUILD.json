@@ -5,5 +5,15 @@
     "https://download.savannah.gnu.org/releases/libpipeline/libpipeline-1.5.8.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libpipeline.so",
+    "libpipeline.so.1"
+  ]
 }

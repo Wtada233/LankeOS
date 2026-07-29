@@ -5,5 +5,15 @@
     "https://ftpmirror.gnu.org/grep/grep-3.12.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libpcre2-8.so.0"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "pcre2"
+  ],
+  "provides": []
 }

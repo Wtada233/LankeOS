@@ -5,5 +5,22 @@
     "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "liblz4.so.1",
+    "liblzma.so.5",
+    "libz.so.1"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "lz4",
+    "xz",
+    "zlib"
+  ],
+  "provides": [
+    "libzstd.so",
+    "libzstd.so.1"
+  ]
 }

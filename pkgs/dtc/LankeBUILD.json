@@ -4,5 +4,18 @@
   "sources": [
     "https://git.kernel.org/pub/scm/utils/dtc/dtc.git/snapshot/dtc-1.8.1.tar.gz"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libyaml-0.so.2"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "libyaml"
+  ],
+  "provides": [
+    "libfdt.so",
+    "libfdt.so.1"
+  ]
 }

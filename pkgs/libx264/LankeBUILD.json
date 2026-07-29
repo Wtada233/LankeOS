@@ -5,5 +5,22 @@
     "https://anduin.linuxfromscratch.org/BLFS/x264/x264-20250815.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libavcodec.so.62",
+    "libavformat.so.62",
+    "libavutil.so.60",
+    "libc.so.6",
+    "libm.so.6",
+    "libmvec.so.1",
+    "libswscale.so.9"
+  ],
+  "deps": [
+    "ffmpeg",
+    "glibc"
+  ],
+  "provides": [
+    "libx264.so",
+    "libx264.so.165"
+  ]
 }

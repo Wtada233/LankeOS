@@ -5,5 +5,18 @@
     "https://download-mirror.savannah.gnu.org/releases/man-db/man-db-2.13.1.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgdbm.so.6",
+    "libpipeline.so.1",
+    "libz.so.1"
+  ],
+  "deps": [
+    "gdbm",
+    "glibc",
+    "libpipeline",
+    "zlib"
+  ],
+  "provides": []
 }

@@ -5,5 +5,20 @@
     "https://github.com/swaywm/swaybg/releases/download/v1.2.1/swaybg-1.2.1.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libcairo.so.2",
+    "libgdk_pixbuf-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libwayland-client.so.0"
+  ],
+  "deps": [
+    "cairo",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "wayland"
+  ],
+  "provides": []
 }

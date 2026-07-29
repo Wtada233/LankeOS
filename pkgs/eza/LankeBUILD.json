@@ -4,5 +4,17 @@
   "sources": [
     "https://github.com/eza-community/eza/archive/refs/tags/v0.23.5.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libz.so.1"
+  ],
+  "deps": [
+    "gcc",
+    "glibc",
+    "zlib"
+  ],
+  "provides": []
 }

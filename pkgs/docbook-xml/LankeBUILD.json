@@ -12,5 +12,6 @@
   "deps": [],
   "no_strip": true,
   "provides": [],
-  "release": 2
+  "release": 2,
+  "needed_so": []
 }

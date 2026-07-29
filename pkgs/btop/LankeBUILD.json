@@ -4,5 +4,16 @@
   "sources": [
     "https://github.com/aristocratos/btop/archive/refs/tags/v1.4.7.tar.gz"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "deps": [
+    "gcc",
+    "glibc"
+  ],
+  "provides": []
 }

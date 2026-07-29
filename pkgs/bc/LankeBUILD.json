@@ -5,5 +5,14 @@
     "https://github.com/gavinhoward/bc/releases/download/7.0.3/bc-7.0.3.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libreadline.so.8"
+  ],
+  "deps": [
+    "glibc",
+    "readline"
+  ],
+  "provides": []
 }

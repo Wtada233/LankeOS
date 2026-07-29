@@ -4,5 +4,27 @@
   "sources": [
     "https://github.com/libevent/libevent/releases/download/release-2.1.13-stable/libevent-2.1.13-stable.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libssl.so.3"
+  ],
+  "deps": [
+    "glibc",
+    "openssl",
+    "python"
+  ],
+  "provides": [
+    "libevent-2.1.so.7",
+    "libevent.so",
+    "libevent_core-2.1.so.7",
+    "libevent_core.so",
+    "libevent_extra-2.1.so.7",
+    "libevent_extra.so",
+    "libevent_openssl-2.1.so.7",
+    "libevent_openssl.so",
+    "libevent_pthreads-2.1.so.7",
+    "libevent_pthreads.so"
+  ]
 }

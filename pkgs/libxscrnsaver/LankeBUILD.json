@@ -5,8 +5,20 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXScrnSaver-1.2.4.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
-  "provides": [],
+  "deps": [
+    "glibc",
+    "libX11",
+    "libXext"
+  ],
+  "provides": [
+    "libXss.so",
+    "libXss.so.1"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libX11.so.6",
+    "libXext.so.6",
+    "libc.so.6"
+  ]
 }

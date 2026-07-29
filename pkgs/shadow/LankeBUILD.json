@@ -5,5 +5,26 @@
     "https://github.com/shadow-maint/shadow/releases/download/4.19.3/shadow-4.19.3.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libacl.so.1",
+    "libattr.so.1",
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libpam.so.0",
+    "libpam_misc.so.0",
+    "libsystemd.so.0"
+  ],
+  "deps": [
+    "Linux-PAM",
+    "acl",
+    "attr",
+    "glibc",
+    "libxcrypt",
+    "systemd"
+  ],
+  "provides": [
+    "libsubid.so",
+    "libsubid.so.5"
+  ]
 }

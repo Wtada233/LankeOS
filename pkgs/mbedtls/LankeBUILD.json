@@ -4,5 +4,20 @@
   "sources": [
     "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v3.6.7.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "bash",
+    "glibc"
+  ],
+  "provides": [
+    "libmbedcrypto.so.16",
+    "libmbedcrypto.so.3.6.7",
+    "libmbedtls.so.21",
+    "libmbedtls.so.3.6.7",
+    "libmbedx509.so.3.6.7",
+    "libmbedx509.so.7"
+  ]
 }

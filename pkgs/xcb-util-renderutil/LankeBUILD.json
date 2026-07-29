@@ -5,8 +5,20 @@
     "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-renderutil-0.3.10.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
-  "provides": [],
+  "deps": [
+    "glibc",
+    "libxcb",
+    "xwayland"
+  ],
+  "provides": [
+    "libxcb-render-util.so",
+    "libxcb-render-util.so.0"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libxcb-render.so.0",
+    "libxcb.so.1"
+  ]
 }

@@ -5,8 +5,16 @@
     "https://deb.debian.org/debian/pool/main/d/desktop-file-utils/desktop-file-utils_0.28.orig.tar.xz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "glib",
+    "glibc"
+  ],
   "no_strip": false,
   "provides": [],
-  "release": 1
+  "release": 1,
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0"
+  ]
 }

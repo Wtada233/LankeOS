@@ -5,5 +5,19 @@
     "https://ftpmirror.gnu.org/nettle/nettle-3.10.2.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgmp.so.10"
+  ],
+  "deps": [
+    "glibc",
+    "gmp"
+  ],
+  "provides": [
+    "libhogweed.so",
+    "libhogweed.so.6",
+    "libnettle.so",
+    "libnettle.so.8"
+  ]
 }

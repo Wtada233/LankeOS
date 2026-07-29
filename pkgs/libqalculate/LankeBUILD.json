@@ -4,5 +4,34 @@
   "sources": [
     "https://github.com/Qalculate/libqalculate/releases/download/v5.11.0/libqalculate-5.11.0.tar.gz"
   ],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libcurl.so.4",
+    "libgcc_s.so.1",
+    "libgmp.so.10",
+    "libhistory.so.8",
+    "libicuuc.so.77",
+    "libm.so.6",
+    "libmpfr.so.6",
+    "libncursesw.so.6",
+    "libreadline.so.8",
+    "libstdc++.so.6",
+    "libxml2.so.2"
+  ],
+  "deps": [
+    "curl",
+    "gcc",
+    "glibc",
+    "gmp",
+    "icu",
+    "libxml2",
+    "mpfr",
+    "ncurses",
+    "readline"
+  ],
+  "provides": [
+    "libqalculate.so",
+    "libqalculate.so.23"
+  ]
 }

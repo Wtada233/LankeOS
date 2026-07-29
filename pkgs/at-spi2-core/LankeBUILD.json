@@ -5,5 +5,34 @@
     "https://download.gnome.org/sources/at-spi2-core/2.56/at-spi2-core-2.56.4.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libX11.so.6",
+    "libXi.so.6",
+    "libXtst.so.6",
+    "libc.so.6",
+    "libdbus-1.so.3",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "deps": [
+    "bash",
+    "dbus",
+    "glib",
+    "glibc",
+    "libX11",
+    "libXi",
+    "libXtst",
+    "xwayland"
+  ],
+  "provides": [
+    "libatk-1.0.so",
+    "libatk-1.0.so.0",
+    "libatk-bridge-2.0.so",
+    "libatk-bridge-2.0.so.0",
+    "libatspi.so",
+    "libatspi.so.0"
+  ]
 }

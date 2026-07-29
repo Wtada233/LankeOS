@@ -4,7 +4,17 @@
   "sources": [
     "https://github.com/nghttp2/nghttp2/releases/download/v1.64.0/nghttp2-1.64.0.tar.xz"
   ],
-  "deps": [],
+  "deps": [
+    "glibc",
+    "python"
+  ],
   "no_strip": false,
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libnghttp2.so",
+    "libnghttp2.so.14"
+  ]
 }

@@ -5,5 +5,21 @@
     "https://ftpmirror.gnu.org/gawk/gawk-5.3.2.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libgmp.so.10",
+    "libm.so.6",
+    "libmpfr.so.6",
+    "libreadline.so.8"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "gmp",
+    "mpfr",
+    "perl",
+    "readline"
+  ],
+  "provides": []
 }

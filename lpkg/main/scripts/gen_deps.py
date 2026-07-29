@@ -134,6 +134,52 @@ def read_metadata(path):
         return None
 
 
+def _update_lankebuild_json(pkg_name, needed_so, deps, provides, metadata_target, dry_run=False):
+    """
+    在 metadata_target 目录中递归查找匹配 name 字段的 LankeBUILD.json，
+    更新其 needed_so、deps 和 provides 字段。
+    """
+    matches = []
+    for root, dirs, files in os.walk(metadata_target):
+        for f in files:
+            if f == 'LankeBUILD.json':
+                path = os.path.join(root, f)
+                try:
+                    with open(path, 'r', encoding='utf-8') as fh:
+                        data = json.load(fh)
+                    if data.get('name') == pkg_name:
+                        matches.append(path)
+                except (json.JSONDecodeError, OSError):
+                    continue
+
+    if not matches:
+        print(f'      [WARN] metadata-target 中未找到包 "{pkg_name}" 的 LankeBUILD.json',
+              file=sys.stderr)
+        return
+
+    if len(matches) > 1:
+        print(f'      [WARN] 包 "{pkg_name}" 在 metadata-target 中找到 '
+              f'{len(matches)} 个 LankeBUILD.json，将修改第一个')
+
+    target_path = matches[0]
+
+    if dry_run:
+        print(f'      [~] metadata-target: 将更新 {target_path}')
+        return
+
+    with open(target_path, 'r', encoding='utf-8') as fh:
+        data = json.load(fh)
+
+    data['needed_so'] = needed_so
+    data['deps'] = deps
+    data['provides'] = provides
+
+    with open(target_path, 'w', encoding='utf-8') as fh:
+        json.dump(data, fh, indent=2, ensure_ascii=False)
+
+    print(f'      [*] metadata-target: 已更新 {target_path}')
+
+
 # ---------------------------------------------------------------------------
 # Phase 1：并行解包 + 扫描
 # ---------------------------------------------------------------------------
@@ -281,7 +327,7 @@ def scan_package(lpkg, target_dir, extract_root):
 # ---------------------------------------------------------------------------
 
 
-def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rules=None, rule_context=None):
+def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rules=None, rule_context=None, metadata_target=None):
     """
     Phase 2 工作单元。
 
@@ -342,6 +388,11 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rul
     old_provides = set(meta.get('provides', []))
     new_provides = sorted(set(provides_so))
 
+    # --- LankeBUILD.json metadata 更新（如果 --metadata-target 已设置） ---
+    if metadata_target and pkg_name:
+        _update_lankebuild_json(pkg_name, needed_so_entries, dep_entries,
+                                new_provides, metadata_target, dry_run)
+
     old_deps = sorted(meta.get('deps', []))
     old_needed = sorted(meta.get('needed_so', []))
     if old_deps == dep_entries and old_needed == needed_so_entries and old_provides == set(new_provides):
@@ -394,6 +445,9 @@ def main():
                         help='Temporary directory for extraction (default: $LPKG_TMP_DIR or system temp)')
     parser.add_argument('--rules-dir', type=str, default=None,
                         help='Path to deprules/ directory (default: <script_dir>/deprules)')
+    parser.add_argument('--metadata-target', type=str, default=None,
+                        help='目录，包含 LankeBUILD.json 文件（递归查找），'
+                             '根据 name 字段匹配并更新 needed_so、deps 和 provides）')
 
     args = parser.parse_args()
     target_dir = os.path.abspath(args.directory)
@@ -483,7 +537,7 @@ def main():
     with ThreadPoolExecutor(max_workers=args.jobs) as ex:
         futures = {
             ex.submit(resolve_and_update, r, provider_map, target_dir,
-                       args.dry_run, rules, rule_context): r
+                       args.dry_run, rules, rule_context, args.metadata_target): r
             for r in all_results
         }
         for i, future in enumerate(as_completed(futures), 1):

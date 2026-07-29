@@ -5,5 +5,14 @@
     "https://ftpmirror.gnu.org/patch/patch-2.8.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libattr.so.1",
+    "libc.so.6"
+  ],
+  "deps": [
+    "attr",
+    "glibc"
+  ],
+  "provides": []
 }

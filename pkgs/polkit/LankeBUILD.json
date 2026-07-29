@@ -5,5 +5,29 @@
     "https://github.com/polkit-org/polkit/archive/127/polkit-127.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libduktape.so.207",
+    "libexpat.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libpam.so.0",
+    "libsystemd.so.0"
+  ],
+  "deps": [
+    "Linux-PAM",
+    "duktape",
+    "expat",
+    "glib",
+    "glibc",
+    "systemd"
+  ],
+  "provides": [
+    "libpolkit-agent-1.so",
+    "libpolkit-agent-1.so.0",
+    "libpolkit-gobject-1.so",
+    "libpolkit-gobject-1.so.0"
+  ]
 }

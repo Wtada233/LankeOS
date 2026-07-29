@@ -5,5 +5,14 @@
     "https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-2.47.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libexpat.so.1"
+  ],
+  "deps": [
+    "expat",
+    "glibc"
+  ],
+  "provides": []
 }

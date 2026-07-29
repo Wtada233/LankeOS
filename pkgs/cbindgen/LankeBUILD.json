@@ -5,5 +5,15 @@
     "https://github.com/eqrion/cbindgen/archive/refs/tags/v0.29.4.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1"
+  ],
+  "deps": [
+    "gcc",
+    "glibc"
+  ],
+  "provides": []
 }

@@ -5,5 +5,24 @@
     "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libharfbuzz.so.0",
+    "libpng16.so.16",
+    "libz.so.1"
+  ],
+  "deps": [
+    "bash",
+    "bzip2",
+    "glibc",
+    "harfbuzz",
+    "libpng",
+    "zlib"
+  ],
+  "provides": [
+    "libfreetype.so",
+    "libfreetype.so.6"
+  ]
 }

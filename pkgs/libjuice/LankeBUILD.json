@@ -4,5 +4,15 @@
   "sources": [
     "https://github.com/paullouisageneau/libjuice/archive/refs/tags/v1.7.2.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libjuice.so",
+    "libjuice.so.1.7.2"
+  ]
 }

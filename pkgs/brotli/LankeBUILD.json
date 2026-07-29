@@ -5,8 +5,21 @@
     "https://github.com/google/brotli/archive/refs/tags/v1.2.0.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
+  "deps": [
+    "glibc"
+  ],
   "no_strip": false,
-  "provides": [],
-  "release": 1
+  "provides": [
+    "libbrotlicommon.so",
+    "libbrotlicommon.so.1",
+    "libbrotlidec.so",
+    "libbrotlidec.so.1",
+    "libbrotlienc.so",
+    "libbrotlienc.so.1"
+  ],
+  "release": 1,
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ]
 }

@@ -4,5 +4,42 @@
   "sources": [
     "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtwayland-everywhere-src-6.11.1.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libEGL.so.1",
+    "libGLX.so.0",
+    "libOpenGL.so.0",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6OpenGL.so.6",
+    "libQt6Svg.so.6",
+    "libQt6WaylandClient.so.6",
+    "libc.so.6",
+    "libdrm.so.2",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libwayland-client.so.0",
+    "libwayland-cursor.so.0",
+    "libwayland-egl.so.1",
+    "libwayland-server.so.0",
+    "libxkbcommon.so.0"
+  ],
+  "deps": [
+    "gcc",
+    "glibc",
+    "libdrm",
+    "libglvnd",
+    "libxkbcommon",
+    "qt6-base",
+    "qt6-svg",
+    "wayland"
+  ],
+  "provides": [
+    "libQt6WaylandCompositor.so",
+    "libQt6WaylandCompositor.so.6",
+    "libQt6WaylandEglCompositorHwIntegration.so",
+    "libQt6WaylandEglCompositorHwIntegration.so.6"
+  ]
 }

@@ -4,5 +4,32 @@
   "sources": [
     "https://github.com/flatpak/xdg-desktop-portal/releases/download/1.22.1/xdg-desktop-portal-1.22.1.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libfuse3.so.4",
+    "libgdk_pixbuf-2.0.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgstpbutils-1.0.so.0",
+    "libgstreamer-1.0.so.0",
+    "libgudev-1.0.so.0",
+    "libjson-glib-1.0.so.0",
+    "libpipewire-0.3.so.0",
+    "libsystemd.so.0"
+  ],
+  "deps": [
+    "fuse3",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "gst-plugins-base",
+    "gstreamer",
+    "json-glib",
+    "libgudev",
+    "pipewire",
+    "systemd"
+  ],
+  "provides": []
 }

@@ -5,5 +5,14 @@
     "https://www.greenwoodsoftware.com/less/less-679.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libncursesw.so.6"
+  ],
+  "deps": [
+    "glibc",
+    "ncurses"
+  ],
+  "provides": []
 }

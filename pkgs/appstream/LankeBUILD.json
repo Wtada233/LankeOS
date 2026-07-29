@@ -4,5 +4,51 @@
   "sources": [
     "https://github.com/ximion/appstream/archive/refs/tags/v1.1.5.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "needed_so": [
+    "libblake3.so.0",
+    "libc.so.6",
+    "libcairo.so.2",
+    "libcurl.so.4",
+    "libfontconfig.so.1",
+    "libfreetype.so.6",
+    "libfyaml.so.0",
+    "libgdk_pixbuf-2.0.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libm.so.6",
+    "libpango-1.0.so.0",
+    "librsvg-2.so.2",
+    "libstemmer.so.0",
+    "libsystemd.so.0",
+    "libxml2.so.2",
+    "libxmlb.so.2",
+    "libzstd.so.1"
+  ],
+  "deps": [
+    "b3sum",
+    "cairo",
+    "curl",
+    "fontconfig",
+    "freetype",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "libfyaml",
+    "librsvg",
+    "libstemmer",
+    "libxml2",
+    "libxmlb",
+    "pango",
+    "systemd",
+    "zstd"
+  ],
+  "provides": [
+    "libappstream-compose.so",
+    "libappstream-compose.so.0",
+    "libappstream.so",
+    "libappstream.so.5"
+  ]
 }

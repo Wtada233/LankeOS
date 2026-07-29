@@ -5,5 +5,18 @@
     "https://downloads.sourceforge.net/tcl/tcl8.6.16-src.tar.gz"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 2,
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6",
+    "libtcl8.6.so",
+    "libz.so.1"
+  ],
+  "deps": [
+    "glibc",
+    "zlib"
+  ],
+  "provides": [
+    "libtcl8.6.so"
+  ]
 }
