@@ -12,7 +12,7 @@ pushd ISO/live/
 #sudo gensquashfs -D /mnt/lfs/ -c xz -b 1M -X dictsize=1M,level=9,x86,extreme -f rootfs.sfs
 popd
 pushd ISO/boot/
-cp -a ../../../../../tools/krnl/{config-lanke,System.map-lanke,vmlinuz-lanke} ./
+sudo cp -a ../../../../../tools/krnl/{config-lanke,System.map-lanke,vmlinuz-lanke} ./
 popd
 
 sudo grub-mkrescue --directory=/usr/lib/grub/x86_64-efi -o lankeos-live.iso ISO -- -volid "LANKE_BASE"
