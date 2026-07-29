@@ -112,7 +112,7 @@
     "libclc",
     "libva",
     "libxml2",
-    "libxrandr",
+    "libXrandr",
     "cbindgen",
     "cmake",
     "meson",

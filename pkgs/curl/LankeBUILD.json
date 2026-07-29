@@ -44,7 +44,6 @@
     "gnutls",
     "krb5",
     "libidn2",
-    "nettle",
-    "patchelf"
+    "nettle"
   ]
 }

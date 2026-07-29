@@ -28,7 +28,7 @@
     "dbus",
     "git",
     "gobject-introspection",
-    "libx11",
+    "libX11",
     "libxslt",
     "vala"
   ]

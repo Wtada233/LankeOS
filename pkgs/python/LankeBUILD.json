@@ -51,7 +51,6 @@
     "bzip2",
     "expat",
     "gcc",
-    "gdb",
     "gdbm",
     "glibc",
     "libffi",

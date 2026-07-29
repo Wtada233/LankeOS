@@ -25,6 +25,6 @@
     "gcc",
     "make",
     "pkgconf",
-    "xorg-util-macros"
+    "util-macros"
   ]
 }

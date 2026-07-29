@@ -23,6 +23,6 @@
     "make",
     "pkgconf",
     "xorgproto",
-    "xorg-util-macros"
+    "util-macros"
   ]
 }

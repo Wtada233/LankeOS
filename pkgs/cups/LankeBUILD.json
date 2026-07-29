@@ -52,7 +52,6 @@
     "zlib",
     "make",
     "pkgconf",
-    "gnutls",
-    "libusb"
+    "gnutls"
   ]
 }

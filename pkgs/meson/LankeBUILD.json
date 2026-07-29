@@ -20,7 +20,6 @@
     "git",
     "glib",
     "gobject-introspection",
-    "graphviz",
     "gtk3",
     "gtk-doc",
     "itstool",
@@ -33,7 +32,7 @@
     "rust",
     "rust-bindgen",
     "vulkan-headers",
-    "vulkan-icd-loader",
+    "vulkan-loader",
     "wayland",
     "wayland-protocols",
     "zlib"

@@ -53,7 +53,7 @@
     "llvm",
     "lz4",
     "p11-kit",
-    "pam",
+    "Linux-PAM",
     "pcre2",
     "rsync",
     "shadow",
