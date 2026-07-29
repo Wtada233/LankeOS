@@ -199,7 +199,6 @@ void repo_transitive_rdeps(
 /** 加载仓库并构建反向依赖图；失败时返回空 map */
 auto load_repo_revdep() -> std::unordered_map<std::string, std::unordered_set<std::string>>
 {
-    ensure_dir_exists(Config::get_tmp_dir());
     Repository repo;
     try {
         repo.load_index();
@@ -472,7 +471,6 @@ ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all)
 
 ScanNode scan_install_tree(const std::string& pkg_name, bool show_all)
 {
-    ensure_dir_exists(Config::get_tmp_dir());
     Repository repo;
     try {
         repo.load_index();
@@ -540,7 +538,6 @@ ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all)
     root.reason = not_installed ? "target package (local)" : "already installed (local)";
 
     // 解析传递依赖仓库
-    ensure_dir_exists(Config::get_tmp_dir());
     Repository repo;
     try {
         repo.load_index();

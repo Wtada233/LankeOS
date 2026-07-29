@@ -95,8 +95,10 @@ fs::path Config::get_tmp_dir()
         // cleanup_tmp_dirs 通过 lpkg_ 前缀识别并 kill(pid,0) 检查存活性，
         // 随机后缀不会影响清理逻辑（stoi 在首个非数字处停止）。
         std::random_device rd;
-        return fs::path("/tmp") /
-               ("lpkg_" + std::to_string(getpid()) + "_" + std::to_string(rd() % 10000));
+        auto dir = fs::path("/tmp") /
+                   ("lpkg_" + std::to_string(getpid()) + "_" + std::to_string(rd() % 10000));
+        fs::create_directories(dir);
+        return dir;
     }();
     return tmp_dir;
 }
