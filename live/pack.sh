@@ -11,9 +11,12 @@ pushd ISO/live/
 #sudo rm -rf rootfs.sfs
 #sudo gensquashfs -D /mnt/lfs/ -c xz -b 1M -X dictsize=1M,level=9,x86,extreme -f rootfs.sfs
 popd
+pushd ISO/boot/
+cp -a ../../../../../tools/krnl/{config-lanke,System.map-lanke,vmlinuz-lanke} ./
+popd
 
 sudo grub-mkrescue --directory=/usr/lib/grub/x86_64-efi -o lankeos-live.iso ISO -- -volid "LANKE_BASE"
-sudo rm ISO/live/rootfs.sfs ISO/boot/initrd.img
+sudo rm ISO/live/rootfs.sfs ISO/boot/initrd.img ISO/boot/{config-lanke,System.map-lanke,vmlinuz-lanke}
 #qemu-system-x86_64 \
 #              -m 4G \
 #              -cdrom lankeos-live.iso \
