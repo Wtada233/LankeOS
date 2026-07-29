@@ -11,5 +11,19 @@
     "libnfnetlink",
     "make",
     "pkgconf"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libmnl.so.0",
+    "libnfnetlink.so.0"
+  ],
+  "deps": [
+    "glibc",
+    "libmnl",
+    "libnfnetlink"
+  ],
+  "provides": [
+    "libnetfilter_conntrack.so",
+    "libnetfilter_conntrack.so.3"
   ]
 }

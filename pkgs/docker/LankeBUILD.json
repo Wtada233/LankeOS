@@ -15,5 +15,15 @@
     "git",
     "make",
     "sed"
-  ]
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libresolv.so.2",
+    "libsystemd.so.0"
+  ],
+  "deps": [
+    "glibc",
+    "systemd"
+  ],
+  "provides": []
 }

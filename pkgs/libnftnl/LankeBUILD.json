@@ -11,5 +11,17 @@
     "libmnl",
     "make",
     "pkgconf"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libmnl.so.0"
+  ],
+  "deps": [
+    "glibc",
+    "libmnl"
+  ],
+  "provides": [
+    "libnftnl.so",
+    "libnftnl.so.11"
   ]
 }

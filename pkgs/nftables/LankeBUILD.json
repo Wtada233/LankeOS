@@ -20,5 +20,25 @@
     "automake",
     "libtool",
     "python"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libgmp.so.10",
+    "libjansson.so.4",
+    "libmnl.so.0",
+    "libnftnl.so.11",
+    "libreadline.so.8"
+  ],
+  "deps": [
+    "glibc",
+    "gmp",
+    "jansson",
+    "libmnl",
+    "libnftnl",
+    "readline"
+  ],
+  "provides": [
+    "libnftables.so",
+    "libnftables.so.1"
   ]
 }

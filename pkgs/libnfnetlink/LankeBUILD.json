@@ -9,5 +9,15 @@
     "gcc",
     "glibc",
     "make"
+  ],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "deps": [
+    "glibc"
+  ],
+  "provides": [
+    "libnfnetlink.so",
+    "libnfnetlink.so.0"
   ]
 }

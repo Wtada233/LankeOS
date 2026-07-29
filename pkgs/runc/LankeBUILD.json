@@ -12,5 +12,18 @@
     "git",
     "libseccomp",
     "make"
-  ]
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libpathrs.so",
+    "libresolv.so.2",
+    "libseccomp.so.2"
+  ],
+  "deps": [
+    "bash",
+    "glibc",
+    "libpathrs",
+    "libseccomp"
+  ],
+  "provides": []
 }

@@ -15,7 +15,7 @@
     "libplc4.so",
     "libplds4.so"
   ],
-  "release": 1,
+  "release": 2,
   "needed_so": [
     "libc.so.6"
   ],
@@ -24,6 +24,5 @@
     "glibc",
     "make",
     "zip"
-  ],
-  "release": 2
+  ]
 }

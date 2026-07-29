@@ -10,5 +10,19 @@
     "glibc",
     "cargo",
     "make"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1"
+  ],
+  "deps": [
+    "gcc",
+    "glibc"
+  ],
+  "provides": [
+    "libpathrs.so",
+    "libpathrs.so.0",
+    "libpathrs.so.0.2.5"
   ]
 }

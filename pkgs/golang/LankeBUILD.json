@@ -8,11 +8,15 @@
   "no_strip": false,
   "release": 2,
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6",
+    "libstdc++.so.6",
+    "libtiff.so.6"
   ],
   "deps": [
     "bash",
+    "gcc",
     "glibc",
+    "libtiff",
     "perl",
     "python"
   ],
