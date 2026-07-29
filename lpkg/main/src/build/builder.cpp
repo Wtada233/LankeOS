@@ -3,6 +3,7 @@
 #include <array>
 #include <ctime>
 #include <fstream>
+#include <iostream>
 #include <map>
 
 #include "base/constants.hpp"
@@ -250,7 +251,53 @@ void run_build(const fs::path& build_dir)
             }
             resolved.push_back(arg);
         }
+        // 在 -n 模式下，如果有 build_deps 则拒绝构建
+        if (Config::instance().non_interactive_mode() == NonInteractiveMode::NO) {
+            throw LpkgException(get_string("error.build_deps_refused_n"));
+        }
         install_packages(resolved, "", false);
+    }
+
+    // 4.75. autohacks — 执行构建前的环境修补脚本
+    {
+        fs::path hacks_path = json_path.parent_path() / "hacks.sh";
+        if (fs::exists(hacks_path)) {
+            log_info(string_format("info.autohacks_found", hacks_path.string()));
+
+            // 读取并显示脚本内容
+            std::ifstream hacks_file(hacks_path);
+            std::string hacks_content((std::istreambuf_iterator<char>(hacks_file)),
+                                       std::istreambuf_iterator<char>());
+            std::cout << "─────────────────────────────────────────\n";
+            std::cout << hacks_content << "\n";
+            std::cout << "─────────────────────────────────────────\n";
+
+            auto& cfg_ref = Config::instance();
+            bool should_run = false;
+            switch (cfg_ref.non_interactive_mode()) {
+                case NonInteractiveMode::YES:
+                    should_run = true;
+                    break;
+                case NonInteractiveMode::NO:
+                    should_run = false;
+                    log_info(get_string("info.autohacks_skipped"));
+                    break;
+                case NonInteractiveMode::INTERACTIVE:
+                default:
+                    should_run = user_confirms(get_string("prompt.autohacks_run"));
+                    break;
+            }
+
+            if (should_run) {
+                log_info(get_string("info.autohacks_running"));
+                std::string cmd = "bash \"" + hacks_path.string() + "\"";
+                int rc = std::system(cmd.c_str());
+                if (rc != 0) {
+                    throw LpkgException(string_format("error.autohacks_failed", rc));
+                }
+                log_info(get_string("info.autohacks_done"));
+            }
+        }
     }
 
     auto actual_work_dir = detect_source_tree(work_root);

@@ -251,3 +251,12 @@ info.recursive_confirm_prompt=警告 {}/3 — 输入验证码 [{}] 确认递归�
 
 info.recursive_confirm_failed=验证码错误，递归移除已中止。
 error.file_already_owned=文件 {} 已被包 {} 拥有，{} 无法占为己有。
+
+# autohacks
+info.autohacks_found=发现 autohacks 脚本：{}
+info.autohacks_running=正在执行 autohacks 脚本...
+info.autohacks_done=Autohacks 执行完成。
+info.autohacks_skipped=已跳过 autohacks（-n）。
+prompt.autohacks_run=是否执行此 autohacks 脚本？
+error.autohacks_failed=Autohacks 脚本执行失败，退出码：{}
+error.build_deps_refused_n=-n 已设置但此包需要 build_deps。请去掉 -n 或先手动安装依赖。

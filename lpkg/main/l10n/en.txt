@@ -250,3 +250,12 @@ info.recursive_confirm_prompt=Warning {}/3 — enter code [{}] to confirm recurs
 
 info.recursive_confirm_failed=Incorrect code, recursive remove aborted.
 error.file_already_owned=File {} is already owned by package {}, cannot assign to {}.
+
+# autohacks
+info.autohacks_found=Found autohacks script: {}
+info.autohacks_running=Running autohacks script...
+info.autohacks_done=Autohacks completed.
+info.autohacks_skipped=Skipped autohacks (-n).
+prompt.autohacks_run=Run this autohacks script?
+error.autohacks_failed=Autohacks script failed with exit code {}
+error.build_deps_refused_n=-n flag is set but this package requires build_deps. Remove -n or install deps manually first.
