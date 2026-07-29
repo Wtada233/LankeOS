@@ -1,0 +1,30 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    ./configure --prefix=/usr \
+        --sysconfdir=/etc \
+        --sbindir=/usr/bin \
+        --libexecdir=/usr/lib \
+        --enable-bpf-compiler \
+        --enable-devel \
+        --enable-libipq \
+        --enable-shared \
+        --disable-static
+    sed -i 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+}
+
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+
+    # 强制使用 nftables 后端（make install 默认 legacy）
+    for x in iptables iptables-restore iptables-save iptables-xml \
+             ip6tables ip6tables-restore ip6tables-save \
+             arptables ebtables; do
+        ln -sf xtables-nft-multi "{STAGING_ROOT}/usr/bin/$x"
+    done
+}

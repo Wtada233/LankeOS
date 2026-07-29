@@ -1,0 +1,21 @@
+{
+  "name": "iptables",
+  "version": "1.8.13",
+  "sources": [
+    "https://www.netfilter.org/projects/iptables/files/iptables-1.8.13.tar.xz"
+  ],
+  "work_sources": [],
+  "build_deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "libmnl",
+    "libnftnl",
+    "nftables",
+    "libpcap",
+    "libnetfilter_conntrack",
+    "libnfnetlink",
+    "make",
+    "sed"
+  ]
+}

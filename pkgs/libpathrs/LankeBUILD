@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    export RUSTFLAGS="-C panic=abort"
+    # 添加 cdylib crate-type，否则 cargo 不产生 .so
+    sed -i 's/crate-type = \["rlib"\]/crate-type = ["cdylib", "rlib"]/' Cargo.toml
+    cargo fetch --locked --target host-tuple
+}
+
+lankebuild_build() {
+    cargo build --frozen --release --features=capi
+}
+
+
+lankebuild_package() {
+    ./install.sh DESTDIR="{STAGING_ROOT}" --prefix=/usr --lib=/usr/lib --disable-static
+}

@@ -1,0 +1,14 @@
+{
+  "name": "libpathrs",
+  "version": "0.2.5",
+  "sources": [
+    "https://github.com/cyphar/libpathrs/releases/download/v0.2.5/libpathrs-0.2.5.tar.xz"
+  ],
+  "work_sources": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "cargo",
+    "make"
+  ]
+}

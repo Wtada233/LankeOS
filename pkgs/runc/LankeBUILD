@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    go mod download
+}
+
+lankebuild_build() {
+    export GOFLAGS="-trimpath -mod=readonly -modcacherw"
+    export BUILDTAGS="seccomp"
+    make runc
+}
+
+
+lankebuild_package() {
+    install -Dm755 runc "{STAGING_ROOT}/usr/bin/runc"
+    install -Dm644 contrib/completions/bash/runc "{STAGING_ROOT}/usr/share/bash-completion/completions/runc"
+}

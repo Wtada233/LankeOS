@@ -1,0 +1,15 @@
+{
+  "name": "libnftnl",
+  "version": "1.3.1",
+  "sources": [
+    "https://www.netfilter.org/projects/libnftnl/files/libnftnl-1.3.1.tar.xz"
+  ],
+  "work_sources": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libmnl",
+    "make",
+    "pkgconf"
+  ]
+}

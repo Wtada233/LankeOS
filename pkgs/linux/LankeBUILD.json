@@ -25,5 +25,6 @@
     "xz",
     "zlib",
     "zstd"
-  ]
+  ],
+  "release": 2
 }

@@ -36,6 +36,7 @@ lankebuild_build() {
     rm -r "{STAGING_ROOT}/usr/include/nspr/md"
     rm -f "{STAGING_ROOT}/usr/bin/compile-et.pl" \
           "{STAGING_ROOT}/usr/bin/prerr.properties"
+    rm -f "{STAGING_ROOT}/usr/lib/libnspr4.a"
 
     install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/nspr/LICENSE"
 }

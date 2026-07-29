@@ -1,0 +1,63 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    export GOPATH="$PWD"
+    export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+    export DISABLE_WARN_OUTSIDE_CONTAINER=1
+
+    # 将 tarball 提取目录映射到 GOPATH
+    mkdir -p src/github.com/docker
+    ln -sf "$PWD/cli-29.6.2" src/github.com/docker/cli
+
+    # moby 的 Go module 是 github.com/moby/moby/v2
+    mkdir -p src/github.com/moby/moby
+    ln -sf "$PWD/moby-docker-v29.6.2" src/github.com/moby/moby/v2
+
+    mkdir -p src/github.com/krallin
+    ln -sf "$PWD/tini-de40ad007797e0dcd8b7126f27bb87401d224240" src/github.com/krallin/tini
+}
+
+lankebuild_build() {
+    export GOPATH="$PWD"
+    export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
+    export DISABLE_WARN_OUTSIDE_CONTAINER=1
+
+    # CLI
+    cd src/github.com/docker/cli
+    DOCKER_GITCOMMIT=a744842f5b make VERSION=29.6.2 dynbinary
+    cd "$GOPATH"
+
+    # Daemon
+    cd src/github.com/moby/moby/v2
+    DOCKER_GITCOMMIT=1d2e4ee609 \
+    DOCKER_BUILDTAGS='seccomp journald' \
+    VERSION=29.6.2 \
+    hack/make.sh dynbinary
+    cd "$GOPATH"
+
+    # docker-init (tini)
+    cd src/github.com/krallin/tini
+    cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 .
+    make tini
+    cd "$GOPATH"
+}
+
+
+lankebuild_package() {
+    install -Dm755 src/github.com/krallin/tini/tini "{STAGING_ROOT}/usr/bin/docker-init"
+    install -Dm755 src/github.com/moby/moby/v2/bundles/dynbinary-daemon/dockerd "{STAGING_ROOT}/usr/bin/dockerd"
+    install -Dm755 src/github.com/moby/moby/v2/bundles/dynbinary-daemon/docker-proxy "{STAGING_ROOT}/usr/bin/docker-proxy"
+    install -Dm644 src/github.com/moby/moby/v2/contrib/init/systemd/docker.service "{STAGING_ROOT}/usr/lib/systemd/system/docker.service"
+    install -Dm644 src/github.com/moby/moby/v2/contrib/init/systemd/docker.socket "{STAGING_ROOT}/usr/lib/systemd/system/docker.socket"
+    install -Dm755 src/github.com/docker/cli/build/docker "{STAGING_ROOT}/usr/bin/docker"
+
+    # sysusers - 创建 docker 用户组
+    install -Dm644 /dev/null "{STAGING_ROOT}/usr/lib/sysusers.d/docker.conf"
+    echo "g docker - -" > "{STAGING_ROOT}/usr/lib/sysusers.d/docker.conf"
+
+    # bash 补全
+    mkdir -p "{STAGING_ROOT}/usr/share/bash-completion/completions"
+    src/github.com/docker/cli/build/docker completion bash > "{STAGING_ROOT}/usr/share/bash-completion/completions/docker" 2>/dev/null || true
+    install -Dm644 /dev/null "{STAGING_HOOKS}"/postinst.sh
+    echo "systemd-sysusers" > "{STAGING_HOOKS}"/postinst.sh
+}

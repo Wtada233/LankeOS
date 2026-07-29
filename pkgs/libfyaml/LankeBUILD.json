@@ -24,5 +24,6 @@
     "llvm",
     "gcc",
     "make"
-  ]
+  ],
+  "release": 2
 }

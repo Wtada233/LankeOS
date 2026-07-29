@@ -1,8 +1,7 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    # Prepare environment
-    ./configure --prefix=/usr --disable-static
+    ./configure --prefix=/usr
 }
 
 lankebuild_build() {

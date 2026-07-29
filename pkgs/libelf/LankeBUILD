@@ -6,7 +6,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --disable-debuginfod --enable-libdebuginfod=dummy
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-debuginfod --enable-libdebuginfod=dummy
     make -C lib -j$(nproc)
     make -C libelf -j$(nproc)
     make -C libelf install DESTDIR={STAGING_ROOT}

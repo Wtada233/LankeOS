@@ -1,8 +1,7 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    # Prepare environment
-    ./configure --prefix=/usr --disable-static
+    ./configure --prefix=/usr
 }
 
 lankebuild_build() {
@@ -12,4 +11,5 @@ lankebuild_build() {
 
 lankebuild_package() {
     make DESTDIR="{STAGING_ROOT}" install
+    rm -f "{STAGING_ROOT}/usr/lib"/libpcap*.a
 }

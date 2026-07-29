@@ -1,0 +1,13 @@
+{
+  "name": "libnfnetlink",
+  "version": "1.0.2",
+  "sources": [
+    "https://www.netfilter.org/projects/libnfnetlink/files/libnfnetlink-1.0.2.tar.bz2"
+  ],
+  "work_sources": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "make"
+  ]
+}

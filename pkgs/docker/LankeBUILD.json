@@ -1,0 +1,19 @@
+{
+  "name": "docker",
+  "version": "29.6.2",
+  "sources": [
+    "https://github.com/docker/cli/archive/refs/tags/v29.6.2.tar.gz",
+    "https://github.com/moby/moby/archive/refs/tags/docker-v29.6.2.tar.gz",
+    "https://github.com/krallin/tini/archive/de40ad007797e0dcd8b7126f27bb87401d224240.tar.gz"
+  ],
+  "work_sources": [],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "golang",
+    "cmake",
+    "git",
+    "make",
+    "sed"
+  ]
+}

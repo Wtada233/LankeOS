@@ -1,7 +1,6 @@
 #!/bin/bash
 
 lankebuild_prepare() {
-    # Prepare environment
     ./configure --prefix=/usr --disable-static
 }
 

@@ -1,0 +1,37 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    export CONFIG_SHELL=/bin/bash
+
+    ./configure \
+        CONFIG_SHELL=/bin/bash \
+        --prefix=/usr \
+        --sbindir=/usr/bin \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --enable-cmdlib \
+        --enable-dmeventd \
+        --enable-pkgconfig \
+        --enable-udev_rules \
+        --enable-udev_sync \
+        --with-default-dm-run-dir=/run \
+        --with-default-locking-dir=/run/lock/lvm \
+        --with-default-pid-dir=/run \
+        --with-default-run-dir=/run/lvm \
+        --with-libexecdir=/usr/lib/lvm2 \
+        --with-systemdsystemunitdir=/usr/lib/systemd/system \
+        --with-udev-prefix=/usr
+}
+
+lankebuild_build() {
+    make device-mapper -j$(nproc)
+}
+
+
+lankebuild_package() {
+    make install_device-mapper DESTDIR="{STAGING_ROOT}"
+    make install_systemd_units DESTDIR="{STAGING_ROOT}"
+    rm -f "{STAGING_ROOT}/usr/lib/systemd/system/"{blk-availability.service,lvm*}
+    install -d -m0755 "{STAGING_ROOT}/usr/lib/systemd/system/sockets.target.wants"
+    ln -sf ../dm-event.socket "{STAGING_ROOT}/usr/lib/systemd/system/sockets.target.wants/dm-event.socket"
+}

@@ -9,6 +9,9 @@
   "needed_so": [],
   "deps": [],
   "provides": [],
-  "build_deps": [],
+  "build_deps": [
+    "docker",
+    "make"
+  ],
   "release": 2
 }

@@ -24,5 +24,6 @@
     "glibc",
     "make",
     "zip"
-  ]
+  ],
+  "release": 2
 }

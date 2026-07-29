@@ -164,6 +164,10 @@ EOF
     if [ "$UPDATED_MODE" = "1" ]; then
         inject_update_notice
     fi
+    # containerd bind (live)
+    mkdir -p /mnt/tmp/containerd
+    mkdir -p /newroot/var/lib/containerd
+    mount --bind /mnt/tmp/containerd /newroot/var/lib/containerd
 }
 ###############################################################################
 # 查找启动介质
@@ -258,6 +262,11 @@ else
         -o lowerdir=/mnt/rootfs,upperdir=/mnt/data/upper,workdir=/mnt/data/work \
         -o redirect_dir=on \
         /newroot
+    # containerd bind (persistent)
+    mkdir -p /mnt/data/containerd
+    mkdir -p /newroot/var/lib/containerd
+    mount --bind /mnt/data/containerd /newroot/var/lib/containerd
+
 fi
 ###############################################################################
 # 注入安装器

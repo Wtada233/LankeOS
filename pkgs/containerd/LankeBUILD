@@ -1,0 +1,17 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    sed -i 's,/sbin,/usr/bin,;s,/usr/local,/usr,' containerd.service
+}
+
+lankebuild_build() {
+    export GOFLAGS="-trimpath -mod=readonly -modcacherw"
+    make VERSION=v2.3.3 GO_BUILD_FLAGS="-trimpath -mod=readonly -modcacherw" GO_GCFLAGS="" EXTRA_LDFLAGS="-buildid="
+}
+
+
+lankebuild_package() {
+    make PREFIX=/usr DESTDIR="{STAGING_ROOT}" install
+    install -Dm644 containerd.service "{STAGING_ROOT}/usr/lib/systemd/system/containerd.service"
+    install -Dm644 contrib/autocomplete/ctr "{STAGING_ROOT}/usr/share/bash-completion/completions/ctr"
+}

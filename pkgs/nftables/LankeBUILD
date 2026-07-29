@@ -1,0 +1,22 @@
+#!/bin/bash
+
+lankebuild_prepare() {
+    autoreconf -fiv
+    ./configure --prefix=/usr \
+        --sbindir=/usr/bin \
+        --sysconfdir=/usr/share \
+        --with-json \
+        --with-cli=readline \
+        --disable-python \
+        --disable-debug
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+}
+
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+    install -Dm644 /dev/null "{STAGING_ROOT}/etc/nftables.conf"
+}

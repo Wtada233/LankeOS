@@ -1,0 +1,14 @@
+{
+  "name": "libpcap",
+  "version": "1.10.6",
+  "sources": [
+    "https://www.tcpdump.org/release/libpcap-1.10.6.tar.gz"
+  ],
+  "work_sources": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "make",
+    "flex"
+  ]
+}

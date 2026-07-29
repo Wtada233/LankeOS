@@ -9,6 +9,9 @@ lankebuild_build() {
     mkdir -p {STAGING_ROOT}{LIBDIR}
     cp -a {SRC_DIR} {STAGING_ROOT}{LIBDIR}/go
 
+    # 删除预编译包中的冗余文件（对照 Arch 精简）
+    rm -f {STAGING_ROOT}{LIBDIR}/go/{codereview.cfg,CONTRIBUTING.md,LICENSE,PATENTS,README.md,SECURITY.md}
+
     # 创建符号链接
     mkdir -p {STAGING_ROOT}{BINDIR}
     for bin in go gofmt; do
