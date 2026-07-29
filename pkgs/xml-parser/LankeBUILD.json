@@ -14,5 +14,12 @@
     "expat",
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "expat",
+    "glibc",
+    "perl",
+    "make",
+    "gcc"
+  ]
 }

@@ -15,5 +15,10 @@
   "provides": [
     "libpopt.so",
     "libpopt.so.0"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "make"
   ]
 }

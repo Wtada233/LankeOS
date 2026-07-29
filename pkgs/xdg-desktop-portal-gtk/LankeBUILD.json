@@ -22,5 +22,17 @@
     "glibc",
     "gtk3"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "fontconfig",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "gtk3",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "python"
+  ]
 }

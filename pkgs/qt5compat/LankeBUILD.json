@@ -24,5 +24,14 @@
   "provides": [
     "libQt6Core5Compat.so",
     "libQt6Core5Compat.so.6"
+  ],
+  "build_deps": [
+    "cmake",
+    "gcc",
+    "glibc",
+    "icu",
+    "ninja",
+    "pkgconf",
+    "qt6-base"
   ]
 }

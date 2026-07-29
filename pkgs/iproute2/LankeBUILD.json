@@ -18,5 +18,13 @@
     "libelf",
     "python"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "libcap",
+    "libelf",
+    "python",
+    "gcc",
+    "make"
+  ]
 }

@@ -31,5 +31,21 @@
   "provides": [
     "libbluetooth.so",
     "libbluetooth.so.3"
+  ],
+  "build_deps": [
+    "alsa-lib",
+    "dbus",
+    "glib",
+    "glibc",
+    "json-c",
+    "libical",
+    "readline",
+    "systemd",
+    "cups",
+    "ell",
+    "git",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

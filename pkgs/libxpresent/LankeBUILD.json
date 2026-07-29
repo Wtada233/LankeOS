@@ -24,5 +24,16 @@
     "libXfixes.so.3",
     "libXrandr.so.2",
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libXext",
+    "libXfixes",
+    "libXrandr",
+    "gcc",
+    "make",
+    "pkgconf",
+    "xorg-util-macros"
   ]
 }

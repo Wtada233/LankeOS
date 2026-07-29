@@ -22,5 +22,12 @@
   "provides": [
     "libLLVMSPIRVLib.so",
     "libLLVMSPIRVLib.so.22.1"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "llvm",
+    "cmake",
+    "ninja"
   ]
 }

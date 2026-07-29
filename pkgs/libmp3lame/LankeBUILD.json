@@ -18,5 +18,11 @@
   "provides": [
     "libmp3lame.so",
     "libmp3lame.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "ncurses",
+    "gcc",
+    "make"
   ]
 }

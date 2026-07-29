@@ -15,5 +15,12 @@
   "provides": [
     "libattr.so",
     "libattr.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make",
+    "gettext",
+    "git"
   ]
 }

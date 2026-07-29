@@ -29,5 +29,19 @@
     "libpolkit-agent-1.so.0",
     "libpolkit-gobject-1.so",
     "libpolkit-gobject-1.so.0"
+  ],
+  "build_deps": [
+    "Linux-PAM",
+    "dbus",
+    "duktape",
+    "expat",
+    "glib",
+    "glibc",
+    "gobject-introspection",
+    "gtk-doc",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "systemd"
   ]
 }

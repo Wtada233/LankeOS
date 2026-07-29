@@ -20,5 +20,13 @@
     "libX11.so.6",
     "libXext.so.6",
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libXext",
+    "gcc",
+    "pkgconf",
+    "make"
   ]
 }

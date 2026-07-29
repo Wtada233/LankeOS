@@ -29,5 +29,15 @@
     "libGLdispatch.so.0",
     "libOpenGL.so",
     "libOpenGL.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libXext",
+    "xorgproto",
+    "meson",
+    "ninja",
+    "python",
+    "gcc"
   ]
 }

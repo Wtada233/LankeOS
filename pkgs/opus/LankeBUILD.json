@@ -16,5 +16,10 @@
   "provides": [
     "libopus.so",
     "libopus.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "pkgconf"
   ]
 }

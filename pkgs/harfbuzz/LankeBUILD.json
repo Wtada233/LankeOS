@@ -33,5 +33,21 @@
     "libharfbuzz-subset.so.0",
     "libharfbuzz.so",
     "libharfbuzz.so.0"
+  ],
+  "build_deps": [
+    "cairo",
+    "freetype",
+    "glib",
+    "glibc",
+    "icu",
+    "gcc",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "gobject-introspection",
+    "gtk-doc",
+    "libpng",
+    "python",
+    "zlib"
   ]
 }

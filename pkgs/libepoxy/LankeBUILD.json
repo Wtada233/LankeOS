@@ -15,5 +15,16 @@
   "provides": [
     "libepoxy.so",
     "libepoxy.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "meson",
+    "ninja",
+    "doxygen",
+    "git",
+    "systemd",
+    "mesa",
+    "pkgconf",
+    "gcc"
   ]
 }

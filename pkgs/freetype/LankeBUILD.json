@@ -24,5 +24,15 @@
   "provides": [
     "libfreetype.so",
     "libfreetype.so.6"
+  ],
+  "build_deps": [
+    "bash",
+    "bzip2",
+    "glibc",
+    "harfbuzz",
+    "libpng",
+    "zlib",
+    "gcc",
+    "make"
   ]
 }

@@ -21,5 +21,13 @@
   "provides": [
     "libsdbus-c++.so",
     "libsdbus-c++.so.2"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "systemd",
+    "cmake",
+    "ninja",
+    "doxygen"
   ]
 }

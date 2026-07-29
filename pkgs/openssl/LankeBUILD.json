@@ -18,5 +18,10 @@
     "libcrypto.so.3",
     "libssl.so",
     "libssl.so.3"
+  ],
+  "build_deps": [
+    "glibc",
+    "perl",
+    "gcc"
   ]
 }

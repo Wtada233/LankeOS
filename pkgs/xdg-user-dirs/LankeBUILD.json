@@ -11,5 +11,14 @@
   "deps": [
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "systemd",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "python"
+  ]
 }

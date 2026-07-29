@@ -19,5 +19,13 @@
   "provides": [
     "libgraphene-1.0.so",
     "libgraphene-1.0.so.0"
+  ],
+  "build_deps": [
+    "glib",
+    "glibc",
+    "meson",
+    "ninja",
+    "git",
+    "gobject-introspection"
   ]
 }

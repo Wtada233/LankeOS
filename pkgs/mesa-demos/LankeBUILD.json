@@ -36,5 +36,26 @@
     "libwayland-client.so.0",
     "libwayland-egl.so.1",
     "libxkbcommon.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libXext",
+    "libdecor",
+    "libdrm",
+    "libglvnd",
+    "libxkbcommon",
+    "mesa",
+    "vulkan-loader",
+    "wayland",
+    "xwayland",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "glslang",
+    "glu",
+    "vulkan-headers",
+    "wayland-protocols"
   ]
 }

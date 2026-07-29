@@ -27,5 +27,24 @@
   "provides": [
     "libcurl.so",
     "libcurl.so.4"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "libpsl",
+    "nghttp2",
+    "openssl",
+    "zlib",
+    "zstd",
+    "gcc",
+    "make",
+    "pkgconf",
+    "brotli",
+    "git",
+    "gnutls",
+    "krb5",
+    "libidn2",
+    "nettle",
+    "patchelf"
   ]
 }

@@ -18,5 +18,17 @@
     "openssl",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "libxcrypt",
+    "openssl",
+    "zlib",
+    "krb5",
+    "libedit",
+    "linux",
+    "Linux-PAM",
+    "gcc",
+    "pkgconf"
+  ]
 }

@@ -26,5 +26,17 @@
     "openssl",
     "readline"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "dbus",
+    "glibc",
+    "libnl",
+    "ncurses",
+    "openssl",
+    "readline",
+    "gcc",
+    "pkgconf",
+    "make",
+    "git"
+  ]
 }

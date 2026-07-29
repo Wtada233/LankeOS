@@ -26,5 +26,14 @@
   "provides": [
     "libdatachannel.so",
     "libdatachannel.so.0.24"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libjuice",
+    "libsrtp",
+    "openssl",
+    "cmake",
+    "ninja"
   ]
 }

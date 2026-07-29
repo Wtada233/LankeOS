@@ -15,5 +15,10 @@
   "provides": [
     "libogg.so",
     "libogg.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

@@ -27,5 +27,19 @@
     "zlib",
     "zstd"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "acl",
+    "attr",
+    "bash",
+    "glibc",
+    "lz4",
+    "openssl",
+    "popt",
+    "zlib",
+    "zstd",
+    "gcc",
+    "make",
+    "git"
+  ]
 }

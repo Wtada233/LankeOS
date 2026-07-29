@@ -20,5 +20,12 @@
   "provides": [
     "libslang.so",
     "libslang.so.2"
+  ],
+  "build_deps": [
+    "glibc",
+    "libpng",
+    "zlib",
+    "gcc",
+    "make"
   ]
 }

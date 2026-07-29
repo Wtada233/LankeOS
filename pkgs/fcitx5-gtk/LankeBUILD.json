@@ -45,5 +45,27 @@
   "provides": [
     "libFcitx5GClient.so",
     "libFcitx5GClient.so.2"
+  ],
+  "build_deps": [
+    "at-spi2-core",
+    "cairo",
+    "cmake",
+    "extra-cmake-modules",
+    "gcc",
+    "gdk-pixbuf",
+    "git",
+    "glib",
+    "glibc",
+    "gobject-introspection",
+    "gtk3",
+    "harfbuzz",
+    "libX11",
+    "libxkbcommon",
+    "ninja",
+    "pango",
+    "pkgconf",
+    "vulkan-headers",
+    "xwayland",
+    "zlib"
   ]
 }

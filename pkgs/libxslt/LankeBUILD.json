@@ -21,5 +21,13 @@
     "libexslt.so.0",
     "libxslt.so",
     "libxslt.so.1"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "libxml2",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

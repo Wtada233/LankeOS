@@ -17,5 +17,11 @@
   "provides": [
     "libedit.so",
     "libedit.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "ncurses",
+    "gcc",
+    "make"
   ]
 }

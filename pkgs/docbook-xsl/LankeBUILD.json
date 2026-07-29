@@ -10,5 +10,6 @@
   "no_strip": true,
   "provides": [],
   "release": 1,
-  "needed_so": []
+  "needed_so": [],
+  "build_deps": []
 }

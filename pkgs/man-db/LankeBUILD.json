@@ -18,5 +18,14 @@
     "libpipeline",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gdbm",
+    "glibc",
+    "libpipeline",
+    "zlib",
+    "gcc",
+    "make",
+    "pkgconf"
+  ]
 }

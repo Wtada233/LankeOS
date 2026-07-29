@@ -19,5 +19,16 @@
     "python-cairo",
     "python-gobject"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bluez",
+    "glib",
+    "glibc",
+    "python",
+    "intltool",
+    "iproute2",
+    "gcc",
+    "make",
+    "pkgconf"
+  ]
 }

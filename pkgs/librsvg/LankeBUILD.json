@@ -32,5 +32,21 @@
   "provides": [
     "librsvg-2.so",
     "librsvg-2.so.2"
+  ],
+  "build_deps": [
+    "cairo",
+    "gcc",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "libxml2",
+    "pango",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "git",
+    "gobject-introspection",
+    "llvm",
+    "rust"
   ]
 }

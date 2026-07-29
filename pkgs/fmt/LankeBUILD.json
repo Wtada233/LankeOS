@@ -19,5 +19,13 @@
   "provides": [
     "libfmt.so",
     "libfmt.so.11"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "cmake",
+    "ninja",
+    "doxygen",
+    "git"
   ]
 }

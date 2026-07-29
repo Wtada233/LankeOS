@@ -16,5 +16,12 @@
     "perl",
     "python"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "perl",
+    "python",
+    "gcc"
+  ]
 }

@@ -15,5 +15,11 @@
   "provides": [
     "libtasn1.so",
     "libtasn1.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

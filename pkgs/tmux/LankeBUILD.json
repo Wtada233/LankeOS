@@ -20,5 +20,13 @@
     "ncurses",
     "systemd"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "libevent",
+    "ncurses",
+    "systemd",
+    "git",
+    "gcc"
+  ]
 }

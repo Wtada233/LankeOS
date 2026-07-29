@@ -20,5 +20,16 @@
     "glibc",
     "wayland"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "cairo",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "wayland",
+    "meson",
+    "ninja",
+    "gcc",
+    "wayland-protocols"
+  ]
 }

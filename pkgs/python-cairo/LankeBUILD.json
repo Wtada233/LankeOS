@@ -15,5 +15,14 @@
     "glibc",
     "python"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "cairo",
+    "gcc",
+    "glibc",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "python"
+  ]
 }

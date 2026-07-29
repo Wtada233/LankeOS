@@ -28,5 +28,16 @@
   "provides": [
     "libqt6ct-common.so",
     "libqt6ct-common.so.0.11"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libglvnd",
+    "libxkbcommon",
+    "qt6-base",
+    "cmake",
+    "ninja",
+    "git",
+    "qt6-tools"
   ]
 }

@@ -15,5 +15,11 @@
   "provides": [
     "libz.so",
     "libz.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "make",
+    "gcc",
+    "pkgconf"
   ]
 }

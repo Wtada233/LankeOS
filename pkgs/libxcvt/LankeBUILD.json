@@ -17,5 +17,12 @@
   "needed_so": [
     "libc.so.6",
     "libm.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf"
   ]
 }

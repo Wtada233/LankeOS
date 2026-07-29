@@ -22,5 +22,13 @@
   "provides": [
     "liblcms2.so",
     "liblcms2.so.2"
+  ],
+  "build_deps": [
+    "glibc",
+    "libjpeg-turbo",
+    "libtiff",
+    "zlib",
+    "gcc",
+    "make"
   ]
 }

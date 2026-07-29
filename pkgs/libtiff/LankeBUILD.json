@@ -29,5 +29,15 @@
     "libtiff.so.6",
     "libtiffxx.so",
     "libtiffxx.so.6"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libjpeg-turbo",
+    "xz",
+    "zlib",
+    "zstd",
+    "make",
+    "pkgconf"
   ]
 }

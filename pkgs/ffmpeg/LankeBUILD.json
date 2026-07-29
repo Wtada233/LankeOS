@@ -63,5 +63,32 @@
     "libswresample.so.6",
     "libswscale.so",
     "libswscale.so.9"
+  ],
+  "build_deps": [
+    "alsa-lib",
+    "bzip2",
+    "ffnvcodec-headers",
+    "gcc",
+    "git",
+    "glibc",
+    "libX11",
+    "libXext",
+    "libXv",
+    "libdrm",
+    "libmp3lame",
+    "libva",
+    "libvorbis",
+    "libx264",
+    "libx265",
+    "libxcb",
+    "llvm",
+    "make",
+    "mesa",
+    "nasm",
+    "pkgconf",
+    "vulkan-headers",
+    "xwayland",
+    "xz",
+    "zlib"
   ]
 }

@@ -22,5 +22,13 @@
   "provides": [
     "libx264.so",
     "libx264.so.165"
+  ],
+  "build_deps": [
+    "ffmpeg",
+    "glibc",
+    "gcc",
+    "make",
+    "nasm",
+    "pkgconf"
   ]
 }

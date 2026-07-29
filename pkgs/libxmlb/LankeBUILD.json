@@ -24,5 +24,20 @@
   "provides": [
     "libxmlb.so",
     "libxmlb.so.2"
+  ],
+  "build_deps": [
+    "glib",
+    "glibc",
+    "libstemmer",
+    "xz",
+    "zstd",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "git",
+    "gobject-introspection",
+    "gtk-doc",
+    "shared-mime-info"
   ]
 }

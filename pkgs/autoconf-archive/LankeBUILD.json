@@ -9,5 +9,8 @@
   ],
   "needed_so": [],
   "deps": [],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "make"
+  ]
 }

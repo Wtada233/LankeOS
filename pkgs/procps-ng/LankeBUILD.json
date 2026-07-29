@@ -18,5 +18,14 @@
   "provides": [
     "libproc2.so",
     "libproc2.so.1"
+  ],
+  "build_deps": [
+    "dejagnu",
+    "gettext",
+    "glibc",
+    "gcc",
+    "make",
+    "ncurses",
+    "systemd"
   ]
 }

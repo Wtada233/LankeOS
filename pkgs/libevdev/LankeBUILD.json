@@ -16,5 +16,13 @@
   "provides": [
     "libevdev.so",
     "libevdev.so.2"
+  ],
+  "build_deps": [
+    "glibc",
+    "meson",
+    "ninja",
+    "python",
+    "pkgconf",
+    "gcc"
   ]
 }

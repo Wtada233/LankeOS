@@ -22,5 +22,15 @@
     "libSM.so.6",
     "libX11.so.6",
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libice",
+    "libsm",
+    "gcc",
+    "make",
+    "pkgconf",
+    "xorg-util-macros"
   ]
 }

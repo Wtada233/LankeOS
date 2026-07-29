@@ -25,5 +25,15 @@
   "provides": [
     "libshaderc_shared.so",
     "libshaderc_shared.so.1"
+  ],
+  "build_deps": [
+    "SPIRV-Tools",
+    "gcc",
+    "glibc",
+    "glslang",
+    "cmake",
+    "ninja",
+    "python",
+    "SPIRV-Headers"
   ]
 }

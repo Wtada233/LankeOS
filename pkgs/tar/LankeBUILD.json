@@ -14,5 +14,11 @@
     "acl",
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "acl",
+    "glibc",
+    "gcc",
+    "attr"
+  ]
 }

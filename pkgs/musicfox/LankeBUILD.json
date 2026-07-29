@@ -16,5 +16,11 @@
     "flac",
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "alsa-lib",
+    "flac",
+    "glibc",
+    "golang"
+  ]
 }

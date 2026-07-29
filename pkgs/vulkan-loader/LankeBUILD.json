@@ -16,5 +16,18 @@
   "provides": [
     "libvulkan.so",
     "libvulkan.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "cmake",
+    "ninja",
+    "pkgconf",
+    "libX11",
+    "libxcb",
+    "libXau",
+    "libXdmcp",
+    "wayland",
+    "vulkan-headers"
   ]
 }

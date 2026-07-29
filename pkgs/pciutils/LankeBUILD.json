@@ -23,5 +23,14 @@
   "provides": [
     "libpci.so",
     "libpci.so.3"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "kmod",
+    "systemd",
+    "zlib",
+    "gcc",
+    "pkgconf"
   ]
 }

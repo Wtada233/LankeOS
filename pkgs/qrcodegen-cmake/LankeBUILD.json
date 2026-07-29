@@ -21,5 +21,12 @@
     "libqrcodegen.so.1",
     "libqrcodegencpp.so",
     "libqrcodegencpp.so.1"
+  ],
+  "build_deps": [
+    "cmake",
+    "gcc",
+    "glibc",
+    "ninja",
+    "pkgconf"
   ]
 }

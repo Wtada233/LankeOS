@@ -37,5 +37,17 @@
     "libopcodes.so",
     "libsframe.so",
     "libsframe.so.2"
+  ],
+  "build_deps": [
+    "flex",
+    "gcc",
+    "glibc",
+    "perl",
+    "zlib",
+    "zstd",
+    "bc",
+    "dejagnu",
+    "git",
+    "make"
   ]
 }

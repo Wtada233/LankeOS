@@ -16,5 +16,11 @@
     "glibc",
     "pcre2"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "pcre2",
+    "rust"
+  ]
 }

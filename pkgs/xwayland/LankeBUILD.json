@@ -36,5 +36,23 @@
     "libwayland-client.so.0",
     "libxcvt.so.0",
     "libxshmfence.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "libXau",
+    "libXfont2",
+    "libdrm",
+    "libepoxy",
+    "libglvnd",
+    "libxcvt",
+    "libxshmfence",
+    "mesa",
+    "nettle",
+    "pixman",
+    "wayland",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "gcc"
   ]
 }

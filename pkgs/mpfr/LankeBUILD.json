@@ -18,5 +18,11 @@
   "provides": [
     "libmpfr.so",
     "libmpfr.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "gmp",
+    "gcc",
+    "make"
   ]
 }

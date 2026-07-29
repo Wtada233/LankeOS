@@ -15,5 +15,12 @@
     "gettext",
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "gettext",
+    "glibc",
+    "gcc",
+    "make"
+  ]
 }

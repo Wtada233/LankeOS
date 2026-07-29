@@ -14,5 +14,10 @@
   "provides": [
     "libjansson.so",
     "libjansson.so.4"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

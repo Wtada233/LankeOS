@@ -24,5 +24,15 @@
     "libnewt.so",
     "libnewt.so.0.52",
     "whiptcl.so"
+  ],
+  "build_deps": [
+    "glibc",
+    "popt",
+    "python",
+    "slang",
+    "tcl",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

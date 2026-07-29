@@ -22,5 +22,11 @@
     "libpcre2-8.so.0",
     "libpcre2-posix.so",
     "libpcre2-posix.so.3"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "gcc",
+    "pkgconf"
   ]
 }

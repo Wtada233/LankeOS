@@ -52,5 +52,25 @@
     "libtsan.so.2",
     "libubsan.so",
     "libubsan.so.1"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "gmp",
+    "mpc",
+    "mpfr",
+    "python",
+    "zlib",
+    "zstd",
+    "binutils",
+    "dejagnu",
+    "doxygen",
+    "expect",
+    "git",
+    "inetutils",
+    "rust",
+    "tcl",
+    "make",
+    "gcc"
   ]
 }

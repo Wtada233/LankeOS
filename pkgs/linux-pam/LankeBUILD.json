@@ -27,5 +27,16 @@
     "libpam_misc.so.0",
     "libpamc.so",
     "libpamc.so.0"
+  ],
+  "build_deps": [
+    "bash",
+    "gdbm",
+    "glibc",
+    "libxcrypt",
+    "systemd",
+    "gcc",
+    "meson",
+    "ninja",
+    "pkgconf"
   ]
 }

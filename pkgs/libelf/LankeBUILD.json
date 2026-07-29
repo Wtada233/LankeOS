@@ -24,5 +24,19 @@
   "provides": [
     "libelf.so",
     "libelf.so.1"
+  ],
+  "build_deps": [
+    "bzip2",
+    "glibc",
+    "xz",
+    "zlib",
+    "zstd",
+    "gcc",
+    "make",
+    "curl",
+    "git",
+    "json-c",
+    "libarchive",
+    "sqlite"
   ]
 }

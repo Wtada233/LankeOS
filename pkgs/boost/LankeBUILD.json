@@ -122,5 +122,17 @@
     "libboost_wave.so.1.90.0",
     "libboost_wserialization.so",
     "libboost_wserialization.so.1.90.0"
+  ],
+  "build_deps": [
+    "bzip2",
+    "gcc",
+    "glibc",
+    "icu",
+    "openssl",
+    "xz",
+    "zlib",
+    "zstd",
+    "python",
+    "make"
   ]
 }

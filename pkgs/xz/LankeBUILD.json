@@ -16,5 +16,13 @@
   "provides": [
     "liblzma.so",
     "liblzma.so.5"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "make",
+    "gcc",
+    "pkgconf",
+    "git"
   ]
 }

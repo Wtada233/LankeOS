@@ -22,5 +22,15 @@
     "libXext.so.6",
     "libXrender.so.1",
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libXext",
+    "libXrender",
+    "gcc",
+    "make",
+    "pkgconf",
+    "xorg-util-macros"
   ]
 }

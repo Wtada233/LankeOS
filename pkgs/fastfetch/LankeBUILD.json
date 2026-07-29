@@ -14,5 +14,20 @@
     "bash",
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "cmake",
+    "gcc",
+    "glibc",
+    "libglvnd",
+    "libpulse",
+    "libva",
+    "libxcb",
+    "libXrandr",
+    "lua",
+    "make",
+    "sqlite",
+    "zlib"
+  ]
 }

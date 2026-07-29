@@ -44,5 +44,13 @@
     "libthread_db.so",
     "libthread_db.so.1",
     "libutil.so.1"
+  ],
+  "build_deps": [
+    "bash",
+    "git",
+    "python",
+    "gcc",
+    "make",
+    "binutils"
   ]
 }

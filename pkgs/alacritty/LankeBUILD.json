@@ -20,5 +20,16 @@
     "gcc",
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "fontconfig",
+    "freetype",
+    "gcc",
+    "glibc",
+    "cmake",
+    "git",
+    "libxcb",
+    "ncurses",
+    "rust"
+  ]
 }

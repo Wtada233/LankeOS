@@ -38,5 +38,18 @@
     "libsmartcols.so.1",
     "libuuid.so",
     "libuuid.so.1"
+  ],
+  "build_deps": [
+    "bash",
+    "file",
+    "glibc",
+    "libxcrypt",
+    "ncurses",
+    "readline",
+    "zlib",
+    "gcc",
+    "pkgconf",
+    "bash-completion",
+    "git"
   ]
 }

@@ -12,5 +12,13 @@
   "deps": [
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make",
+    "git",
+    "gperf",
+    "python"
+  ]
 }

@@ -22,5 +22,15 @@
   "provides": [
     "libzstd.so",
     "libzstd.so.1"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "lz4",
+    "xz",
+    "zlib",
+    "gcc",
+    "cmake",
+    "ninja"
   ]
 }

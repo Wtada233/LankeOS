@@ -31,5 +31,18 @@
   "provides": [
     "libarchive.so",
     "libarchive.so.13"
+  ],
+  "build_deps": [
+    "acl",
+    "bzip2",
+    "glibc",
+    "libxml2",
+    "lz4",
+    "openssl",
+    "xz",
+    "zlib",
+    "zstd",
+    "gcc",
+    "make"
   ]
 }

@@ -28,5 +28,10 @@
     "liblua.so",
     "liblua.so.5.5",
     "liblua5.5.so"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "make"
   ]
 }

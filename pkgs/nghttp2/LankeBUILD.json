@@ -16,5 +16,12 @@
   "provides": [
     "libnghttp2.so",
     "libnghttp2.so.14"
+  ],
+  "build_deps": [
+    "glibc",
+    "python",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

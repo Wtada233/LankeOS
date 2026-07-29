@@ -27,5 +27,18 @@
   "provides": [
     "libwireplumber-0.5.so",
     "libwireplumber-0.5.so.0"
+  ],
+  "build_deps": [
+    "glib",
+    "glibc",
+    "lua",
+    "pipewire",
+    "systemd",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "gobject-introspection",
+    "git"
   ]
 }

@@ -22,5 +22,13 @@
     "libgdbm.so.6",
     "libgdbm_compat.so",
     "libgdbm_compat.so.4"
+  ],
+  "build_deps": [
+    "glibc",
+    "ncurses",
+    "readline",
+    "git",
+    "gcc",
+    "make"
   ]
 }

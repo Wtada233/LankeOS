@@ -10,5 +10,9 @@
   "deps": [
     "bash"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "git"
+  ]
 }

@@ -31,5 +31,11 @@
     "libicutu.so.77",
     "libicuuc.so",
     "libicuuc.so.77"
+  ],
+  "build_deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "make"
   ]
 }

@@ -15,5 +15,14 @@
     "glibc",
     "pcre2"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "pcre2",
+    "make",
+    "git",
+    "gperf",
+    "texinfo"
+  ]
 }

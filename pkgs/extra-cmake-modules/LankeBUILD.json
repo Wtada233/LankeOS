@@ -11,5 +11,12 @@
     "bash",
     "python"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "cmake",
+    "ninja",
+    "python",
+    "qt6-tools"
+  ]
 }

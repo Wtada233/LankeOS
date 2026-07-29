@@ -18,5 +18,14 @@
     "ncurses",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "file",
+    "glibc",
+    "ncurses",
+    "zlib",
+    "gcc",
+    "make",
+    "pkgconf"
+  ]
 }

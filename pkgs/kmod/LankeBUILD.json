@@ -23,5 +23,15 @@
   "provides": [
     "libkmod.so",
     "libkmod.so.2"
+  ],
+  "build_deps": [
+    "glibc",
+    "openssl",
+    "xz",
+    "zlib",
+    "zstd",
+    "libelf",
+    "gcc",
+    "make"
   ]
 }

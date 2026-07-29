@@ -15,5 +15,13 @@
   "needed_so": [
     "libc.so.6",
     "libstdc++.so.6"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "llvm",
+    "git",
+    "ninja",
+    "python"
   ]
 }

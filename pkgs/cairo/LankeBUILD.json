@@ -45,5 +45,26 @@
     "libcairo-script-interpreter.so.2",
     "libcairo.so",
     "libcairo.so.2"
+  ],
+  "build_deps": [
+    "bash",
+    "fontconfig",
+    "freetype",
+    "glib",
+    "glibc",
+    "libX11",
+    "libXext",
+    "libXrender",
+    "libpng",
+    "libxcb",
+    "pixman",
+    "xwayland",
+    "zlib",
+    "gcc",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "git",
+    "gtk-doc"
   ]
 }

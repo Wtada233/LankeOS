@@ -16,5 +16,11 @@
   "provides": [
     "libndp.so",
     "libndp.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "git",
+    "gcc",
+    "make"
   ]
 }

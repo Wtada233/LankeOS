@@ -31,5 +31,16 @@
     "libQt6Svg.so.6",
     "libQt6SvgWidgets.so",
     "libQt6SvgWidgets.so.6"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libglvnd",
+    "libxkbcommon",
+    "qt6-base",
+    "zlib",
+    "cmake",
+    "ninja",
+    "git"
   ]
 }

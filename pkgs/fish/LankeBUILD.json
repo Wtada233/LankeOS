@@ -17,5 +17,17 @@
     "glibc",
     "pcre2"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "pcre2",
+    "cmake",
+    "ninja",
+    "expect",
+    "git",
+    "jq",
+    "procps-ng",
+    "rust"
+  ]
 }

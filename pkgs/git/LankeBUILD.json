@@ -24,5 +24,22 @@
     "python",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "curl",
+    "expat",
+    "glibc",
+    "openssl",
+    "perl",
+    "python",
+    "zlib",
+    "git",
+    "openssh",
+    "rust",
+    "xmlto",
+    "gcc",
+    "make",
+    "pkgconf"
+  ]
 }

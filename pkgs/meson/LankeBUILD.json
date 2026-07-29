@@ -10,5 +10,32 @@
   "deps": [
     "python"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "python",
+    "boost",
+    "llvm",
+    "cmake",
+    "doxygen",
+    "git",
+    "glib",
+    "gobject-introspection",
+    "graphviz",
+    "gtk3",
+    "gtk-doc",
+    "itstool",
+    "libelf",
+    "nasm",
+    "openssh",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools",
+    "rust",
+    "rust-bindgen",
+    "vulkan-headers",
+    "vulkan-icd-loader",
+    "wayland",
+    "wayland-protocols",
+    "zlib"
+  ]
 }

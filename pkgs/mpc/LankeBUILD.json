@@ -20,5 +20,13 @@
   "provides": [
     "libmpc.so",
     "libmpc.so.3"
+  ],
+  "build_deps": [
+    "glibc",
+    "gmp",
+    "mpfr",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

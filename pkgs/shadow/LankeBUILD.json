@@ -26,5 +26,20 @@
   "provides": [
     "libsubid.so",
     "libsubid.so.5"
+  ],
+  "build_deps": [
+    "Linux-PAM",
+    "acl",
+    "attr",
+    "glibc",
+    "libxcrypt",
+    "systemd",
+    "gcc",
+    "make",
+    "docbook-xsl",
+    "git",
+    "itstool",
+    "libcap",
+    "libxslt"
   ]
 }

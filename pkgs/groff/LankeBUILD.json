@@ -18,5 +18,13 @@
     "glibc",
     "perl"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "perl",
+    "make",
+    "git"
+  ]
 }

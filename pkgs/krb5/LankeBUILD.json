@@ -44,5 +44,14 @@
     "libkrb5support.so.0",
     "libverto.so",
     "libverto.so.0"
+  ],
+  "build_deps": [
+    "bash",
+    "e2fsprogs",
+    "glibc",
+    "openssl",
+    "gcc",
+    "make",
+    "perl"
   ]
 }

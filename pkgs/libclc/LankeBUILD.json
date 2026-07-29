@@ -9,5 +9,12 @@
   "no_strip": true,
   "provides": [],
   "release": 2,
-  "needed_so": []
+  "needed_so": [],
+  "build_deps": [
+    "llvm",
+    "cmake",
+    "ninja",
+    "python",
+    "SPIRV-LLVM-Translator"
+  ]
 }

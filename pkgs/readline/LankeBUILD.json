@@ -19,5 +19,11 @@
     "libhistory.so.8",
     "libreadline.so",
     "libreadline.so.8"
+  ],
+  "build_deps": [
+    "glibc",
+    "ncurses",
+    "gcc",
+    "make"
   ]
 }

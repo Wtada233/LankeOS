@@ -19,5 +19,20 @@
     "pcre2",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "pcre2",
+    "zlib",
+    "make",
+    "boost",
+    "git",
+    "golang",
+    "openjdk25",
+    "lua",
+    "python",
+    "ruby",
+    "tcl"
+  ]
 }

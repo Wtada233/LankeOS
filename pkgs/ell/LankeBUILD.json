@@ -15,5 +15,12 @@
   "provides": [
     "libell.so",
     "libell.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "dbus",
+    "procps-ng",
+    "gcc",
+    "make"
   ]
 }

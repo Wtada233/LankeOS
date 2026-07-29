@@ -23,5 +23,19 @@
     "python",
     "python-cairo"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "cairo",
+    "gcc",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "gobject-introspection",
+    "gtk4",
+    "libffi",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "python"
+  ]
 }

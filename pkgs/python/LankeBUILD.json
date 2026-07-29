@@ -44,5 +44,25 @@
     "libpython3.13.so",
     "libpython3.13.so.1.0",
     "libpython3.so"
+  ],
+  "build_deps": [
+    "bash",
+    "bluez",
+    "bzip2",
+    "expat",
+    "gcc",
+    "gdb",
+    "gdbm",
+    "glibc",
+    "libffi",
+    "llvm",
+    "make",
+    "ncurses",
+    "openssl",
+    "readline",
+    "sqlite",
+    "util-linux",
+    "xz",
+    "zlib"
   ]
 }

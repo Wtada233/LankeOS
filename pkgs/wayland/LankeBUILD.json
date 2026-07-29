@@ -27,5 +27,15 @@
     "libwayland-egl.so.1",
     "libwayland-server.so",
     "libwayland-server.so.0"
+  ],
+  "build_deps": [
+    "expat",
+    "glibc",
+    "libffi",
+    "libxml2",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf"
   ]
 }

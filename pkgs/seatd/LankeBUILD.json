@@ -17,5 +17,12 @@
   "provides": [
     "libseat.so",
     "libseat.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "systemd",
+    "gcc",
+    "meson",
+    "ninja"
   ]
 }

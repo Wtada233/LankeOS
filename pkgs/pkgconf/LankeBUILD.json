@@ -15,5 +15,10 @@
   "provides": [
     "libpkgconf.so",
     "libpkgconf.so.7"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "make"
   ]
 }

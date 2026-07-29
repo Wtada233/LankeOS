@@ -25,5 +25,19 @@
     "libxcb",
     "xwayland"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "fontconfig",
+    "freetype",
+    "glibc",
+    "libxcb",
+    "xwayland",
+    "gcc",
+    "make",
+    "pkgconf",
+    "git",
+    "nlohmann-json",
+    "qt6-base"
+  ]
 }

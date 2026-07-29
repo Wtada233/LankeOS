@@ -19,5 +19,16 @@
     "glibc",
     "libxml2"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gcc",
+    "glib",
+    "glibc",
+    "libxml2",
+    "meson",
+    "ninja",
+    "docbook-xsl",
+    "gettext",
+    "xmlto"
+  ]
 }

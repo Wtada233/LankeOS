@@ -15,5 +15,11 @@
   "provides": [
     "libyaml-0.so.2",
     "libyaml.so"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "pkgconf",
+    "make"
   ]
 }

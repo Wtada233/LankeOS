@@ -29,5 +29,17 @@
     "libIMEPinyin.so.0",
     "libIMETable.so",
     "libIMETable.so.0"
+  ],
+  "build_deps": [
+    "boost",
+    "fcitx5",
+    "glibc",
+    "zstd",
+    "extra-cmake-modules",
+    "git",
+    "python",
+    "cmake",
+    "ninja",
+    "gcc"
   ]
 }

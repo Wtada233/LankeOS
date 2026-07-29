@@ -16,5 +16,11 @@
   "provides": [
     "libgpg-error.so",
     "libgpg-error.so.0"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "make",
+    "gcc"
   ]
 }

@@ -21,5 +21,15 @@
     "libXext.so.6",
     "libXmuu.so.1",
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libXau",
+    "libXext",
+    "libxmu",
+    "gcc",
+    "pkgconf",
+    "make"
   ]
 }

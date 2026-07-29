@@ -19,5 +19,11 @@
   "provides": [
     "libjq.so",
     "libjq.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "oniguruma",
+    "gcc",
+    "make"
   ]
 }

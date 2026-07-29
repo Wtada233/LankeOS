@@ -24,5 +24,15 @@
   "provides": [
     "libmagic.so",
     "libmagic.so.1"
+  ],
+  "build_deps": [
+    "bzip2",
+    "gcc",
+    "git",
+    "glibc",
+    "make",
+    "xz",
+    "zlib",
+    "zstd"
   ]
 }

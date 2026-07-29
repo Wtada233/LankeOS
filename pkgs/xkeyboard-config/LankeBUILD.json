@@ -8,5 +8,14 @@
   "release": 2,
   "needed_so": [],
   "deps": [],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "meson",
+    "ninja",
+    "pkgconf",
+    "libxkbcommon",
+    "libxslt",
+    "xkbcomp",
+    "python"
+  ]
 }

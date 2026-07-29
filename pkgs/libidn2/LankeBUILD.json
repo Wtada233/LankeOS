@@ -18,5 +18,11 @@
   "needed_so": [
     "libc.so.6",
     "libunistring.so.5"
+  ],
+  "build_deps": [
+    "glibc",
+    "libunistring",
+    "gcc",
+    "make"
   ]
 }

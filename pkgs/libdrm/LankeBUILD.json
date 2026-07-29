@@ -25,5 +25,14 @@
     "libdrm_nouveau.so.2",
     "libdrm_radeon.so",
     "libdrm_radeon.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "libpciaccess",
+    "meson",
+    "ninja",
+    "cairo",
+    "pkgconf",
+    "gcc"
   ]
 }

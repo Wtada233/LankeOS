@@ -14,5 +14,10 @@
   "provides": [
     "libseccomp.so",
     "libseccomp.so.2"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

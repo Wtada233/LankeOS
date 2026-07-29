@@ -18,5 +18,14 @@
   "provides": [
     "libpsl.so",
     "libpsl.so.5"
+  ],
+  "build_deps": [
+    "glibc",
+    "icu",
+    "python",
+    "gcc",
+    "make",
+    "gtk-doc",
+    "libxslt"
   ]
 }

@@ -56,5 +56,37 @@
     "pixman",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "alsa-lib",
+    "at-spi2-core",
+    "cairo",
+    "cbindgen",
+    "dbus",
+    "diffutils",
+    "fontconfig",
+    "freetype",
+    "gcc",
+    "gdk-pixbuf",
+    "git",
+    "glib",
+    "glibc",
+    "gtk3",
+    "harfbuzz",
+    "libffi",
+    "libjpeg-turbo",
+    "libwebp",
+    "llvm",
+    "mesa",
+    "nasm",
+    "nodejs",
+    "pango",
+    "pixman",
+    "python",
+    "rust",
+    "unzip",
+    "yasm",
+    "zip",
+    "zlib"
+  ]
 }

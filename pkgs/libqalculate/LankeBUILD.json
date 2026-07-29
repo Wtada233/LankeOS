@@ -33,5 +33,20 @@
   "provides": [
     "libqalculate.so",
     "libqalculate.so.23"
+  ],
+  "build_deps": [
+    "curl",
+    "gcc",
+    "glibc",
+    "gmp",
+    "icu",
+    "libxml2",
+    "mpfr",
+    "ncurses",
+    "readline",
+    "make",
+    "doxygen",
+    "git",
+    "intltool"
   ]
 }

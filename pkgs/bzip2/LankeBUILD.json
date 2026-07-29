@@ -19,5 +19,11 @@
     "libbz2.so",
     "libbz2.so.1",
     "libbz2.so.1.0"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

@@ -16,5 +16,12 @@
     "ncurses",
     "perl"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "ncurses",
+    "perl",
+    "gcc"
+  ]
 }

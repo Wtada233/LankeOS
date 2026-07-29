@@ -27,5 +27,11 @@
     "libnl-route-3.so.200",
     "libnl-xfrm-3.so",
     "libnl-xfrm-3.so.200"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make",
+    "git"
   ]
 }

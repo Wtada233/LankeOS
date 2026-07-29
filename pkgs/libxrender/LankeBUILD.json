@@ -18,5 +18,13 @@
   "needed_so": [
     "libX11.so.6",
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "gcc",
+    "make",
+    "pkgconf",
+    "xorg-util-macros"
   ]
 }

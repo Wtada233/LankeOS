@@ -20,5 +20,13 @@
   "provides": [
     "libsndfile.so",
     "libsndfile.so.1"
+  ],
+  "build_deps": [
+    "alsa-lib",
+    "glibc",
+    "libmp3lame",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

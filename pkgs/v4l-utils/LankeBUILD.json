@@ -44,5 +44,21 @@
     "libv4l2rds.so.0",
     "libv4lconvert.so",
     "libv4lconvert.so.0"
+  ],
+  "build_deps": [
+    "alsa-lib",
+    "gcc",
+    "glibc",
+    "json-c",
+    "libglvnd",
+    "libjpeg-turbo",
+    "qt5compat",
+    "qt6-base",
+    "systemd",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "llvm",
+    "doxygen"
   ]
 }

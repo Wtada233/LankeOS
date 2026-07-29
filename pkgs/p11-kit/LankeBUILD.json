@@ -22,5 +22,15 @@
     "libp11-kit.so",
     "libp11-kit.so.0",
     "p11-kit-proxy.so"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "libffi",
+    "libtasn1",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf"
   ]
 }

@@ -23,5 +23,22 @@
   "provides": [
     "libdbus-1.so",
     "libdbus-1.so.3"
+  ],
+  "build_deps": [
+    "expat",
+    "glibc",
+    "libX11",
+    "python",
+    "systemd",
+    "xwayland",
+    "gcc",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "docbook-xsl",
+    "doxygen",
+    "git",
+    "glib",
+    "xmlto"
   ]
 }

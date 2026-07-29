@@ -18,5 +18,16 @@
     "libcap",
     "systemd"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "dbus",
+    "glibc",
+    "libcap",
+    "systemd",
+    "gcc",
+    "meson",
+    "ninja",
+    "git",
+    "vim"
+  ]
 }

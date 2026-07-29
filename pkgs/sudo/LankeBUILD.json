@@ -19,5 +19,13 @@
     "openssl",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "Linux-PAM",
+    "glibc",
+    "openssl",
+    "zlib",
+    "gcc",
+    "make"
+  ]
 }

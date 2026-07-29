@@ -19,5 +19,11 @@
   "provides": [
     "libigdgmm.so",
     "libigdgmm.so.12"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "cmake",
+    "make"
   ]
 }

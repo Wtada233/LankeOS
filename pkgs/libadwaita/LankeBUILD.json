@@ -29,5 +29,21 @@
   "provides": [
     "libadwaita-1.so",
     "libadwaita-1.so.0"
+  ],
+  "build_deps": [
+    "appstream",
+    "fribidi",
+    "glib",
+    "glibc",
+    "graphene",
+    "gtk4",
+    "pango",
+    "meson",
+    "ninja",
+    "gobject-introspection",
+    "sassc",
+    "vala",
+    "gcc",
+    "pkgconf"
   ]
 }

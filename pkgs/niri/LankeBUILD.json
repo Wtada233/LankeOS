@@ -43,5 +43,24 @@
     "libseat.so.1",
     "libudev.so.1",
     "libxkbcommon.so.0"
+  ],
+  "build_deps": [
+    "bash",
+    "cairo",
+    "gcc",
+    "glib",
+    "glibc",
+    "libdisplay-info",
+    "libinput",
+    "libxkbcommon",
+    "mesa",
+    "pango",
+    "pipewire",
+    "pixman",
+    "seatd",
+    "systemd",
+    "llvm",
+    "git",
+    "rust"
   ]
 }

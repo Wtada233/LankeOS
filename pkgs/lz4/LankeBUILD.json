@@ -15,5 +15,12 @@
   "provides": [
     "liblz4.so",
     "liblz4.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "diffutils",
+    "git",
+    "meson",
+    "ninja"
   ]
 }

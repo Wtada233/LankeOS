@@ -20,5 +20,15 @@
     "libICE.so.6",
     "libc.so.6",
     "libuuid.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "libice",
+    "util-linux",
+    "util-macros",
+    "xtrans",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

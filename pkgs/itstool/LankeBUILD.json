@@ -11,5 +11,8 @@
   "deps": [
     "python"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "python"
+  ]
 }

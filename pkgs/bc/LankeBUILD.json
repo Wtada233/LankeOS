@@ -14,5 +14,11 @@
     "glibc",
     "readline"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "readline",
+    "gcc",
+    "make"
+  ]
 }

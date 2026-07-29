@@ -8,5 +8,6 @@
   "release": 2,
   "needed_so": [],
   "deps": [],
-  "provides": []
+  "provides": [],
+  "build_deps": []
 }

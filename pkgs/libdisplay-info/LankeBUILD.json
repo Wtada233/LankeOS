@@ -16,5 +16,14 @@
   "provides": [
     "libdisplay-info.so",
     "libdisplay-info.so.3"
+  ],
+  "build_deps": [
+    "glibc",
+    "meson",
+    "ninja",
+    "hwdata",
+    "python",
+    "pkgconf",
+    "gcc"
   ]
 }

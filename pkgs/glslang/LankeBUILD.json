@@ -27,5 +27,13 @@
     "libglslang-default-resource-limits.so.16",
     "libglslang.so",
     "libglslang.so.16"
+  ],
+  "build_deps": [
+    "SPIRV-Tools",
+    "gcc",
+    "glibc",
+    "cmake",
+    "ninja",
+    "SPIRV-Headers"
   ]
 }

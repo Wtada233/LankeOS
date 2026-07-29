@@ -14,5 +14,11 @@
     "glibc",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "zlib",
+    "gcc",
+    "make"
+  ]
 }

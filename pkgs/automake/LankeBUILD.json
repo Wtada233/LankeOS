@@ -11,5 +11,18 @@
     "bash",
     "perl"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "perl",
+    "gcc",
+    "make",
+    "autoconf",
+    "dejagnu",
+    "gettext",
+    "git",
+    "python",
+    "vala",
+    "zip"
+  ]
 }

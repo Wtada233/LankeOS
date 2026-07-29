@@ -21,5 +21,11 @@
   ],
   "provides": [
     "libexpect5.45.4.so"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

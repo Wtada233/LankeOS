@@ -38,5 +38,21 @@
     "libstdc++.so.6",
     "libsystemd.so.0",
     "libz.so.1"
+  ],
+  "build_deps": [
+    "Linux-PAM",
+    "acl",
+    "bash",
+    "dbus",
+    "gcc",
+    "glibc",
+    "libxcrypt",
+    "openssl",
+    "systemd",
+    "zlib",
+    "make",
+    "pkgconf",
+    "gnutls",
+    "libusb"
   ]
 }

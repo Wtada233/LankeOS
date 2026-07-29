@@ -16,5 +16,13 @@
   "provides": [
     "libsrtp2.so",
     "libsrtp2.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "openssl",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "gcc"
   ]
 }

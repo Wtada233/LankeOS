@@ -52,5 +52,17 @@
     "libQt6QmlWorkerScript.so.6",
     "libQt6QmlXmlListModel.so",
     "libQt6QmlXmlListModel.so.6"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libglvnd",
+    "qt6-base",
+    "cmake",
+    "ninja",
+    "git",
+    "python",
+    "qt6-svg",
+    "vulkan-headers"
   ]
 }

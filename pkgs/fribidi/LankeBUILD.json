@@ -15,5 +15,13 @@
   "provides": [
     "libfribidi.so",
     "libfribidi.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "gcc",
+    "git"
   ]
 }

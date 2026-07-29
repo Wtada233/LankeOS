@@ -16,5 +16,10 @@
   "provides": [
     "libfl.so",
     "libfl.so.2"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

@@ -20,5 +20,18 @@
   "provides": [
     "libgudev-1.0.so",
     "libgudev-1.0.so.0"
+  ],
+  "build_deps": [
+    "glib",
+    "glibc",
+    "systemd",
+    "gobject-introspection",
+    "gtk-doc",
+    "meson",
+    "vala",
+    "git",
+    "ninja",
+    "gcc",
+    "pkgconf"
   ]
 }

@@ -42,5 +42,19 @@
     "libstdc++.so.6",
     "libxml2.so.2",
     "libz.so.1"
+  ],
+  "build_deps": [
+    "curl",
+    "gcc",
+    "glibc",
+    "libedit",
+    "libffi",
+    "libxml2",
+    "perl",
+    "python",
+    "zlib",
+    "cmake",
+    "ninja",
+    "zstd"
   ]
 }

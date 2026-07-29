@@ -36,5 +36,22 @@
   "provides": [
     "libnm.so",
     "libnm.so.0"
+  ],
+  "build_deps": [
+    "curl",
+    "glib",
+    "glibc",
+    "gnutls",
+    "gobject-introspection",
+    "gcc",
+    "libndp",
+    "libpsl",
+    "meson",
+    "newt",
+    "ninja",
+    "pkgconf",
+    "polkit",
+    "readline",
+    "systemd"
   ]
 }

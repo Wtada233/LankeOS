@@ -17,5 +17,11 @@
     "glibc",
     "libsass"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libsass",
+    "make"
+  ]
 }

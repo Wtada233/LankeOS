@@ -16,5 +16,12 @@
   "release": 2,
   "needed_so": [
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "util-macros",
+    "xtrans",
+    "gcc",
+    "make"
   ]
 }

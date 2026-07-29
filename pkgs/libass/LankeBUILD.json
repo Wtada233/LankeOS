@@ -23,5 +23,15 @@
   "provides": [
     "libass.so",
     "libass.so.9"
+  ],
+  "build_deps": [
+    "fontconfig",
+    "freetype",
+    "fribidi",
+    "glibc",
+    "harfbuzz",
+    "gcc",
+    "make",
+    "nasm"
   ]
 }

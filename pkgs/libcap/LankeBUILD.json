@@ -17,5 +17,10 @@
     "libcap.so.2",
     "libpsx.so",
     "libpsx.so.2"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

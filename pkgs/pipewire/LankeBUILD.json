@@ -58,5 +58,27 @@
     "libjackserver.so.0",
     "libpipewire-0.3.so",
     "libpipewire-0.3.so.0"
+  ],
+  "build_deps": [
+    "alsa-lib",
+    "bash",
+    "bluez",
+    "dbus",
+    "fftw",
+    "glib",
+    "glibc",
+    "gst-plugins-base",
+    "gstreamer",
+    "libpulse",
+    "libsndfile",
+    "ncurses",
+    "opus",
+    "readline",
+    "sbc",
+    "systemd",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf"
   ]
 }

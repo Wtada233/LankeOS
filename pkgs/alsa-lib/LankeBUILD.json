@@ -19,5 +19,10 @@
     "libasound.so.2",
     "libatopology.so",
     "libatopology.so.2"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

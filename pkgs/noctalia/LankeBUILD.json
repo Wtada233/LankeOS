@@ -62,5 +62,33 @@
     "wayland",
     "wireplumber"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "Linux-PAM",
+    "bash",
+    "cairo",
+    "curl",
+    "fontconfig",
+    "freetype",
+    "gcc",
+    "glib",
+    "glibc",
+    "harfbuzz",
+    "libglvnd",
+    "libqalculate",
+    "librsvg",
+    "libwebp",
+    "libxkbcommon",
+    "libxml2",
+    "pango",
+    "pipewire",
+    "polkit",
+    "python",
+    "sdbus-cpp",
+    "wayland",
+    "wireplumber",
+    "meson",
+    "ninja",
+    "pkgconf"
+  ]
 }

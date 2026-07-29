@@ -40,5 +40,21 @@
     "libva-x11.so.2",
     "libva.so",
     "libva.so.2"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libXext",
+    "libXfixes",
+    "libdrm",
+    "libglvnd",
+    "libxcb",
+    "wayland",
+    "xwayland",
+    "meson",
+    "ninja",
+    "gcc",
+    "mesa",
+    "pkgconf"
   ]
 }

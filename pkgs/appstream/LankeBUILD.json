@@ -50,5 +50,33 @@
     "libappstream-compose.so.0",
     "libappstream.so",
     "libappstream.so.5"
+  ],
+  "build_deps": [
+    "b3sum",
+    "cairo",
+    "curl",
+    "fontconfig",
+    "freetype",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "libfyaml",
+    "librsvg",
+    "libstemmer",
+    "libxml2",
+    "libxmlb",
+    "pango",
+    "systemd",
+    "zstd",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "bash-completion",
+    "git",
+    "gobject-introspection",
+    "gperf",
+    "qt6-tools",
+    "vala"
   ]
 }

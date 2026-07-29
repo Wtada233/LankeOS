@@ -14,5 +14,11 @@
     "glibc",
     "ncurses"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "ncurses",
+    "gcc",
+    "make"
+  ]
 }

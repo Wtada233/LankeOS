@@ -34,5 +34,19 @@
     "libpangocairo-1.0.so.0",
     "libpangoft2-1.0.so",
     "libpangoft2-1.0.so.0"
+  ],
+  "build_deps": [
+    "cairo",
+    "fontconfig",
+    "freetype",
+    "fribidi",
+    "glib",
+    "glibc",
+    "harfbuzz",
+    "gobject-introspection",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf"
   ]
 }

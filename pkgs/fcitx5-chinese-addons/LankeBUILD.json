@@ -29,5 +29,17 @@
     "glibc",
     "libime"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "boost",
+    "cmake",
+    "curl",
+    "extra-cmake-modules",
+    "fcitx5",
+    "gcc",
+    "git",
+    "glibc",
+    "libime",
+    "ninja"
+  ]
 }

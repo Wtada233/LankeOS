@@ -10,5 +10,11 @@
     "bash",
     "perl"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "perl",
+    "gcc",
+    "pkgconf"
+  ]
 }

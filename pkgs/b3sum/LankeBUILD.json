@@ -17,5 +17,13 @@
   "provides": [
     "libblake3.so",
     "libblake3.so.0"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "cmake",
+    "make",
+    "rust",
+    "git"
   ]
 }

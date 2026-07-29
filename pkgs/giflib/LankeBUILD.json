@@ -16,5 +16,14 @@
   "provides": [
     "libgif.so",
     "libgif.so.7"
+  ],
+  "build_deps": [
+    "glibc",
+    "docbook-xml",
+    "docbook-xsl",
+    "git",
+    "xmlto",
+    "gcc",
+    "make"
   ]
 }

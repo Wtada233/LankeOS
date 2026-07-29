@@ -8,5 +8,22 @@
   "work_sources": [],
   "needed_so": [],
   "deps": [],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bc",
+    "binutils",
+    "gettext",
+    "glibc",
+    "libelf",
+    "gcc",
+    "openssl",
+    "perl",
+    "python",
+    "rust",
+    "rust-bindgen",
+    "tar",
+    "xz",
+    "zlib",
+    "zstd"
+  ]
 }

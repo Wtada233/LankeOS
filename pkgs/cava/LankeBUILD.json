@@ -22,5 +22,16 @@
     "ncurses",
     "pipewire"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "alsa-lib",
+    "fftw",
+    "glibc",
+    "iniparser",
+    "ncurses",
+    "pipewire",
+    "gcc",
+    "make",
+    "pkgconf"
+  ]
 }

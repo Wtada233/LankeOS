@@ -17,5 +17,10 @@
     "libduktape.so.207",
     "libduktaped.so",
     "libduktaped.so.207"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

@@ -20,5 +20,16 @@
   "provides": [
     "libfontconfig.so",
     "libfontconfig.so.1"
+  ],
+  "build_deps": [
+    "expat",
+    "freetype",
+    "glibc",
+    "gcc",
+    "make",
+    "pkgconf",
+    "git",
+    "gperf",
+    "meson"
   ]
 }

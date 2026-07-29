@@ -65,5 +65,35 @@
     "zlib",
     "zstd"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "Linux-PAM",
+    "alsa-lib",
+    "bzip2",
+    "cairo",
+    "curl",
+    "dtc",
+    "gcc",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "gnutls",
+    "gtk3",
+    "libX11",
+    "libepoxy",
+    "libjpeg-turbo",
+    "libpng",
+    "libslirp",
+    "libxkbcommon",
+    "make",
+    "mesa",
+    "ncurses",
+    "pipewire",
+    "pixman",
+    "pkgconf",
+    "systemd",
+    "xwayland",
+    "zlib",
+    "zstd"
+  ]
 }

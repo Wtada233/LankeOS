@@ -24,5 +24,14 @@
   "provides": [
     "libgirepository-1.0.so",
     "libgirepository-1.0.so.1"
+  ],
+  "build_deps": [
+    "glib",
+    "glibc",
+    "libffi",
+    "python",
+    "git",
+    "meson",
+    "ninja"
   ]
 }

@@ -17,5 +17,16 @@
   "provides": [
     "libfdt.so",
     "libfdt.so.1"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "libyaml",
+    "git",
+    "meson",
+    "swig",
+    "gcc",
+    "ninja",
+    "pkgconf"
   ]
 }

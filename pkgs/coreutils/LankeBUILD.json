@@ -25,5 +25,19 @@
     "libcap",
     "openssl"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "acl",
+    "attr",
+    "glibc",
+    "gmp",
+    "libcap",
+    "openssl",
+    "gcc",
+    "make",
+    "git",
+    "gperf",
+    "python",
+    "wget"
+  ]
 }

@@ -18,5 +18,16 @@
     "libgnutls.so.30",
     "libgobject-2.0.so.0"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glib",
+    "glibc",
+    "gnutls",
+    "git",
+    "gsettings-desktop-schemas",
+    "meson",
+    "gcc",
+    "ninja",
+    "pkgconf"
+  ]
 }

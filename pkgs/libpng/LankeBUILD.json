@@ -20,5 +20,13 @@
     "libpng.so",
     "libpng16.so",
     "libpng16.so.16"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "zlib",
+    "gcc",
+    "make",
+    "git"
   ]
 }

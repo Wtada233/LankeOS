@@ -32,5 +32,19 @@
     "libpangocairo-1.0.so.0",
     "libwayland-client.so.0",
     "libwayland-cursor.so.0"
+  ],
+  "build_deps": [
+    "cairo",
+    "dbus",
+    "glib",
+    "glibc",
+    "gtk3",
+    "pango",
+    "wayland",
+    "meson",
+    "ninja",
+    "wayland-protocols",
+    "pkgconf",
+    "gcc"
   ]
 }

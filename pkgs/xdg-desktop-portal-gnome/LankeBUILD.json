@@ -36,5 +36,24 @@
     "wayland",
     "xwayland"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "cairo",
+    "fontconfig",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "gnome-desktop",
+    "graphene",
+    "gtk4",
+    "libX11",
+    "libadwaita",
+    "wayland",
+    "xwayland",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "python"
+  ]
 }

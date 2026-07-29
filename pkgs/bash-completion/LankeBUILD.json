@@ -9,5 +9,9 @@
   "deps": [
     "perl"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "perl",
+    "make"
+  ]
 }

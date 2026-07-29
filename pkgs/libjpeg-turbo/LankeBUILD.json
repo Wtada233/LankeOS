@@ -19,5 +19,12 @@
     "libjpeg.so.62",
     "libturbojpeg.so",
     "libturbojpeg.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "cmake",
+    "nasm",
+    "ninja",
+    "gcc"
   ]
 }

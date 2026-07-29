@@ -33,5 +33,22 @@
   "provides": [
     "libruby.so",
     "libruby.so.4.0"
+  ],
+  "build_deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "gmp",
+    "libffi",
+    "libxcrypt",
+    "libyaml",
+    "openssl",
+    "zlib",
+    "make",
+    "gdbm",
+    "doxygen",
+    "procps-ng",
+    "readline",
+    "rust"
   ]
 }

@@ -18,5 +18,11 @@
   "provides": [
     "libfyaml.so",
     "libfyaml.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "llvm",
+    "gcc",
+    "make"
   ]
 }

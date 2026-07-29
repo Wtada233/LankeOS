@@ -29,5 +29,17 @@
     "python",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "icu",
+    "nghttp2",
+    "openssl",
+    "python",
+    "zlib",
+    "make",
+    "pkgconf"
+  ]
 }

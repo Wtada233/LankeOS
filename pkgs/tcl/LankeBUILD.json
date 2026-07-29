@@ -18,5 +18,10 @@
   ],
   "provides": [
     "libtcl8.6.so"
+  ],
+  "build_deps": [
+    "glibc",
+    "zlib",
+    "gcc"
   ]
 }

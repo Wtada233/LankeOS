@@ -21,5 +21,18 @@
   "provides": [
     "libnotify.so",
     "libnotify.so.4"
+  ],
+  "build_deps": [
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "gcc",
+    "pkgconf",
+    "meson",
+    "ninja",
+    "dbus",
+    "git",
+    "gobject-introspection",
+    "gtk4"
   ]
 }

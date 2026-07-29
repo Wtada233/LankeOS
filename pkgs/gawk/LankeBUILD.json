@@ -21,5 +21,15 @@
     "perl",
     "readline"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "gmp",
+    "mpfr",
+    "perl",
+    "readline",
+    "gcc",
+    "make"
+  ]
 }

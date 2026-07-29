@@ -17,5 +17,11 @@
   "provides": [
     "libgcrypt.so",
     "libgcrypt.so.20"
+  ],
+  "build_deps": [
+    "glibc",
+    "libgpg-error",
+    "gcc",
+    "make"
   ]
 }

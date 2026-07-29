@@ -45,5 +45,24 @@
     "libpng16.so.16",
     "libstdc++.so.6",
     "libz.so.1"
+  ],
+  "build_deps": [
+    "alsa-lib",
+    "freetype",
+    "gcc",
+    "giflib",
+    "glibc",
+    "harfbuzz",
+    "lcms2",
+    "libX11",
+    "libXext",
+    "libXi",
+    "libXrender",
+    "libXtst",
+    "libjpeg-turbo",
+    "libpng",
+    "xwayland",
+    "zlib",
+    "make"
   ]
 }

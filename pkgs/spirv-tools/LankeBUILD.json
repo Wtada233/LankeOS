@@ -25,5 +25,12 @@
     "libSPIRV-Tools-reduce.so",
     "libSPIRV-Tools-shared.so",
     "libSPIRV-Tools.so"
+  ],
+  "build_deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "cmake",
+    "ninja"
   ]
 }

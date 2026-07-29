@@ -26,5 +26,12 @@
     "libevent_openssl.so",
     "libevent_pthreads-2.1.so.7",
     "libevent_pthreads.so"
+  ],
+  "build_deps": [
+    "glibc",
+    "openssl",
+    "python",
+    "gcc",
+    "make"
   ]
 }

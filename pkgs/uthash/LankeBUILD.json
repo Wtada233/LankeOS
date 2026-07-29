@@ -7,5 +7,6 @@
   "work_sources": [],
   "needed_so": [],
   "deps": [],
-  "provides": []
+  "provides": [],
+  "build_deps": []
 }

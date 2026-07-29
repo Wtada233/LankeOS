@@ -16,5 +16,11 @@
   "provides": [
     "libexpat.so",
     "libexpat.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "git",
+    "gcc",
+    "make"
   ]
 }

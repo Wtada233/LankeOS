@@ -18,5 +18,15 @@
   "needed_so": [
     "libc.so.6",
     "libxcb.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "libxcb",
+    "gcc",
+    "make",
+    "pkgconf",
+    "gperf",
+    "xorgproto",
+    "util-macros"
   ]
 }

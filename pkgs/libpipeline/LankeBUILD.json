@@ -15,5 +15,10 @@
   "provides": [
     "libpipeline.so",
     "libpipeline.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make"
   ]
 }

@@ -50,5 +50,28 @@
     "libFcitx5Core.so.7",
     "libFcitx5Utils.so",
     "libFcitx5Utils.so.2"
+  ],
+  "build_deps": [
+    "bash",
+    "cairo",
+    "cmake",
+    "expat",
+    "extra-cmake-modules",
+    "gcc",
+    "gdk-pixbuf",
+    "git",
+    "glib",
+    "glibc",
+    "json-c",
+    "libxkbcommon",
+    "ninja",
+    "nlohmann-json",
+    "pango",
+    "pkgconf",
+    "systemd",
+    "util-linux",
+    "wayland",
+    "wayland-protocols",
+    "zlib"
   ]
 }

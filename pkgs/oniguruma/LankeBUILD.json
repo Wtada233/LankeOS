@@ -16,5 +16,10 @@
   "provides": [
     "libonig.so",
     "libonig.so.5"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "make"
   ]
 }

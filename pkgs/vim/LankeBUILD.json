@@ -46,5 +46,34 @@
     "wayland",
     "xwayland"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "acl",
+    "bash",
+    "cairo",
+    "gawk",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "gtk3",
+    "libX11",
+    "libice",
+    "libsm",
+    "libxt",
+    "ncurses",
+    "pango",
+    "perl",
+    "python",
+    "wayland",
+    "xwayland",
+    "gcc",
+    "pkgconf",
+    "make",
+    "git",
+    "libgcrypt",
+    "lua",
+    "ruby",
+    "tcl",
+    "zlib"
+  ]
 }

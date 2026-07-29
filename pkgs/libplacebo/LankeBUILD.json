@@ -23,5 +23,17 @@
   "provides": [
     "libplacebo.so",
     "libplacebo.so.360"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "glslang",
+    "lcms2",
+    "vulkan-loader",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "libglvnd",
+    "vulkan-headers"
   ]
 }

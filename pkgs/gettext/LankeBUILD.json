@@ -42,5 +42,19 @@
     "libgnuintl.so.8",
     "libtextstyle.so",
     "libtextstyle.so.0"
+  ],
+  "build_deps": [
+    "acl",
+    "attr",
+    "bash",
+    "gawk",
+    "gcc",
+    "glibc",
+    "libxml2",
+    "ncurses",
+    "perl",
+    "ruby",
+    "tcl",
+    "make"
   ]
 }

@@ -34,5 +34,14 @@
   ],
   "provides": [
     "librustc_driver-89afc71aa65b0fab.so"
+  ],
+  "build_deps": [
+    "bash",
+    "curl",
+    "gcc",
+    "glibc",
+    "llvm",
+    "openssl",
+    "zlib"
   ]
 }

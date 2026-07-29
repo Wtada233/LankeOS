@@ -17,5 +17,14 @@
   "provides": [
     "libpciaccess.so",
     "libpciaccess.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "zlib",
+    "gcc",
+    "pkgconf",
+    "meson",
+    "ninja",
+    "util-macros"
   ]
 }

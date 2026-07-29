@@ -20,5 +20,12 @@
   "provides": [
     "libx265.so",
     "libx265.so.215"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "cmake",
+    "ninja",
+    "nasm"
   ]
 }

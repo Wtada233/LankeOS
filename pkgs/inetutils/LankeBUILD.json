@@ -18,5 +18,13 @@
     "ncurses",
     "readline"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "libxcrypt",
+    "ncurses",
+    "readline",
+    "gcc",
+    "make"
+  ]
 }

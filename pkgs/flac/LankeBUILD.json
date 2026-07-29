@@ -23,5 +23,16 @@
     "libFLAC++.so.11",
     "libFLAC.so",
     "libFLAC.so.14"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libogg",
+    "make",
+    "cmake",
+    "doxygen",
+    "git",
+    "nasm",
+    "ninja"
   ]
 }

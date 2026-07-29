@@ -22,5 +22,17 @@
     "glibc",
     "ncurses"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "alsa-lib",
+    "bash",
+    "glibc",
+    "ncurses",
+    "gcc",
+    "make",
+    "docbook-xsl",
+    "fftw",
+    "systemd",
+    "xmlto"
+  ]
 }

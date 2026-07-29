@@ -19,5 +19,12 @@
     "libhogweed.so.6",
     "libnettle.so",
     "libnettle.so.8"
+  ],
+  "build_deps": [
+    "glibc",
+    "gmp",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

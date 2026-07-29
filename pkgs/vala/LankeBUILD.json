@@ -17,5 +17,19 @@
   "provides": [
     "libvala-0.56.so",
     "libvala-0.56.so.0"
+  ],
+  "build_deps": [
+    "bash",
+    "glib",
+    "glibc",
+    "gcc",
+    "pkgconf",
+    "autoconf-archive",
+    "dbus",
+    "git",
+    "gobject-introspection",
+    "libx11",
+    "libxslt",
+    "vala"
   ]
 }

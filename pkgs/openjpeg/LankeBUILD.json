@@ -25,5 +25,15 @@
   "provides": [
     "libopenjp2.so",
     "libopenjp2.so.7"
+  ],
+  "build_deps": [
+    "glibc",
+    "lcms2",
+    "libpng",
+    "libtiff",
+    "zlib",
+    "cmake",
+    "gcc",
+    "pkgconf"
   ]
 }

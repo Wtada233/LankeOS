@@ -27,5 +27,20 @@
     "libxkbcommon.so.0",
     "libxkbregistry.so",
     "libxkbregistry.so.0"
+  ],
+  "build_deps": [
+    "glibc",
+    "libxcb",
+    "libxml2",
+    "wayland",
+    "xwayland",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "wayland-protocols",
+    "xkeyboard-config",
+    "xorgproto",
+    "mesa"
   ]
 }

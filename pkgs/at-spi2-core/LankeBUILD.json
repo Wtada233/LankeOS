@@ -34,5 +34,22 @@
     "libatk-bridge-2.0.so.0",
     "libatspi.so",
     "libatspi.so.0"
+  ],
+  "build_deps": [
+    "bash",
+    "dbus",
+    "glib",
+    "glibc",
+    "libX11",
+    "libXi",
+    "libXtst",
+    "xwayland",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "git",
+    "gobject-introspection",
+    "libxml2"
   ]
 }

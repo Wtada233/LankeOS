@@ -23,5 +23,13 @@
   "provides": [
     "libigfxcmrt.so",
     "libigfxcmrt.so.7"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "intel-gmmlib",
+    "libva",
+    "cmake",
+    "make"
   ]
 }

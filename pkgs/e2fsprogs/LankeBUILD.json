@@ -27,5 +27,16 @@
     "libext2fs.so.2",
     "libss.so",
     "libss.so.2"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "perl",
+    "util-linux",
+    "fuse3",
+    "git",
+    "systemd",
+    "gcc",
+    "make"
   ]
 }

@@ -18,5 +18,12 @@
     "glibc",
     "libxcrypt"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gdbm",
+    "glibc",
+    "libxcrypt",
+    "gcc",
+    "pkgconf"
+  ]
 }

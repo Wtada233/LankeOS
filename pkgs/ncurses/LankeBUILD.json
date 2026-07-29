@@ -31,5 +31,12 @@
     "libpanelw.so.6",
     "libtinfo.so",
     "libtinfo.so.6"
+  ],
+  "build_deps": [
+    "bash",
+    "gcc",
+    "glibc",
+    "make",
+    "pkgconf"
   ]
 }

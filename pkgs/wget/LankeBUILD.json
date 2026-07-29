@@ -23,5 +23,21 @@
     "util-linux",
     "zlib"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "libpsl",
+    "openssl",
+    "pcre2",
+    "util-linux",
+    "zlib",
+    "gcc",
+    "pkgconf",
+    "make",
+    "autoconf-archive",
+    "git",
+    "gperf",
+    "perl",
+    "python"
+  ]
 }

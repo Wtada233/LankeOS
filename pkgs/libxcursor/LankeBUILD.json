@@ -22,5 +22,13 @@
     "libXfixes.so.3",
     "libXrender.so.1",
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libXfixes",
+    "libXrender",
+    "gcc",
+    "make"
   ]
 }

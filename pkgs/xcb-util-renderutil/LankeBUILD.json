@@ -20,5 +20,15 @@
     "libc.so.6",
     "libxcb-render.so.0",
     "libxcb.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "libxcb",
+    "xwayland",
+    "gcc",
+    "make",
+    "pkgconf",
+    "xorgproto",
+    "util-macros"
   ]
 }

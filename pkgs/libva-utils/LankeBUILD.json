@@ -28,5 +28,17 @@
     "wayland",
     "xwayland"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libX11",
+    "libdrm",
+    "libva",
+    "wayland",
+    "xwayland",
+    "make",
+    "pkgconf",
+    "mesa"
+  ]
 }

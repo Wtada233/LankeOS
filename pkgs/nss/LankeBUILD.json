@@ -31,5 +31,15 @@
     "libplds4.so",
     "libsqlite3.so",
     "libz.so.1"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "nspr",
+    "sqlite",
+    "zlib",
+    "perl",
+    "python",
+    "make"
   ]
 }

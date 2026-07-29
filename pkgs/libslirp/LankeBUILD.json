@@ -16,5 +16,13 @@
   "provides": [
     "libslirp.so",
     "libslirp.so.0"
+  ],
+  "build_deps": [
+    "glib",
+    "glibc",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "gcc"
   ]
 }

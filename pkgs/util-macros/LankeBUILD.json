@@ -9,5 +9,8 @@
   "provides": [],
   "no_strip": false,
   "release": 2,
-  "needed_so": []
+  "needed_so": [],
+  "build_deps": [
+    "gcc"
+  ]
 }

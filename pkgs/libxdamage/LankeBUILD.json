@@ -20,5 +20,12 @@
     "libX11.so.6",
     "libXfixes.so.3",
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "libX11",
+    "libXfixes",
+    "gcc",
+    "make"
   ]
 }

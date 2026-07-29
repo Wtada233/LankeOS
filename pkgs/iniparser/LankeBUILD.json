@@ -14,5 +14,11 @@
   "provides": [
     "libiniparser.so",
     "libiniparser.so.4"
+  ],
+  "build_deps": [
+    "glibc",
+    "cmake",
+    "ninja",
+    "gcc"
   ]
 }

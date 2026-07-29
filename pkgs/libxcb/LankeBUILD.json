@@ -68,5 +68,16 @@
     "libXau.so.6",
     "libXdmcp.so.6",
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "libXau",
+    "libXdmcp",
+    "gcc",
+    "make",
+    "pkgconf",
+    "python",
+    "xorgproto",
+    "util-macros"
   ]
 }

@@ -16,5 +16,13 @@
   "release": 2,
   "needed_so": [
     "libc.so.6"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make",
+    "pkgconf",
+    "xorgproto",
+    "util-macros"
   ]
 }

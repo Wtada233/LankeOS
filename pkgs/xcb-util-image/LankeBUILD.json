@@ -22,5 +22,16 @@
     "libxcb-shm.so.0",
     "libxcb-util.so.1",
     "libxcb.so.1"
+  ],
+  "build_deps": [
+    "glibc",
+    "libxcb",
+    "xcb-util",
+    "xwayland",
+    "gcc",
+    "make",
+    "pkgconf",
+    "xorgproto",
+    "util-macros"
   ]
 }

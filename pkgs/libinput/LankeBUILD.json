@@ -25,5 +25,24 @@
   "provides": [
     "libinput.so",
     "libinput.so.10"
+  ],
+  "build_deps": [
+    "glibc",
+    "libevdev",
+    "lua",
+    "mtdev",
+    "python",
+    "systemd",
+    "cairo",
+    "glib",
+    "gtk4",
+    "libX11",
+    "wayland",
+    "wayland-protocols",
+    "git",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf"
   ]
 }

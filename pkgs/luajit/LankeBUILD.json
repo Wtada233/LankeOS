@@ -18,5 +18,10 @@
   "provides": [
     "libluajit-5.1.so",
     "libluajit-5.1.so.2"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "make"
   ]
 }

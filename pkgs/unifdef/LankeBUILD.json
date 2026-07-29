@@ -13,5 +13,10 @@
     "bash",
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "gcc"
+  ]
 }

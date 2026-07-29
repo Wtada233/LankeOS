@@ -17,5 +17,12 @@
   "provides": [
     "libacl.so",
     "libacl.so.1"
+  ],
+  "build_deps": [
+    "attr",
+    "glibc",
+    "gcc",
+    "make",
+    "git"
   ]
 }

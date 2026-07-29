@@ -13,5 +13,17 @@
     "glibc",
     "libcap"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "glibc",
+    "libcap",
+    "bash-completion",
+    "docbook-xsl",
+    "git",
+    "libxslt",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf"
+  ]
 }

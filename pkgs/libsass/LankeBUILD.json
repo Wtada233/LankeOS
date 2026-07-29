@@ -18,5 +18,10 @@
   "provides": [
     "libsass.so",
     "libsass.so.1"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "make"
   ]
 }

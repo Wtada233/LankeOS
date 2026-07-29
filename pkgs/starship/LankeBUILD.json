@@ -14,5 +14,13 @@
     "gcc",
     "glibc"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "rust",
+    "cmake",
+    "git",
+    "python"
+  ]
 }

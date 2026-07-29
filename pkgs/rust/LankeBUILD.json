@@ -34,5 +34,21 @@
   ],
   "provides": [
     "librustc_driver-392db76e949c5b60.so"
+  ],
+  "build_deps": [
+    "bash",
+    "curl",
+    "gcc",
+    "glibc",
+    "llvm",
+    "openssl",
+    "zlib",
+    "cmake",
+    "libffi",
+    "ninja",
+    "perl",
+    "procps-ng",
+    "python",
+    "rust"
   ]
 }

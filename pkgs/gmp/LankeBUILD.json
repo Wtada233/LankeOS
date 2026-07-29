@@ -21,5 +21,10 @@
     "libgmp.so.10",
     "libgmpxx.so",
     "libgmpxx.so.4"
+  ],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "make"
   ]
 }

@@ -16,5 +16,12 @@
   "provides": [
     "libltdl.so",
     "libltdl.so.7"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

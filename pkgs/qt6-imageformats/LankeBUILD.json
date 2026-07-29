@@ -28,5 +28,16 @@
     "libwebp",
     "qt6-base"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "gcc",
+    "glibc",
+    "libglvnd",
+    "libtiff",
+    "libwebp",
+    "qt6-base",
+    "cmake",
+    "ninja",
+    "git"
+  ]
 }

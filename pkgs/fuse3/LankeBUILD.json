@@ -14,5 +14,13 @@
   "provides": [
     "libfuse3.so",
     "libfuse3.so.4"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "systemd"
   ]
 }

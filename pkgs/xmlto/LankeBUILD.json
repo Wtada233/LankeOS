@@ -14,5 +14,11 @@
   "release": 1,
   "needed_so": [
     "libc.so.6"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "make",
+    "docbook-xsl"
   ]
 }

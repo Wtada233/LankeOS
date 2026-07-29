@@ -10,5 +10,15 @@
     "bash",
     "python"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "python",
+    "gcc",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "bc",
+    "gtk3"
+  ]
 }

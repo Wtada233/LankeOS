@@ -22,5 +22,14 @@
   "provides": [
     "libxml2.so",
     "libxml2.so.2"
+  ],
+  "build_deps": [
+    "bash",
+    "glibc",
+    "ncurses",
+    "readline",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

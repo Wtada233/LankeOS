@@ -15,5 +15,11 @@
   "provides": [
     "libffi.so",
     "libffi.so.8"
+  ],
+  "build_deps": [
+    "glibc",
+    "gcc",
+    "make",
+    "dejagnu"
   ]
 }

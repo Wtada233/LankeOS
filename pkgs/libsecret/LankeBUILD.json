@@ -21,5 +21,15 @@
   "provides": [
     "libsecret-1.so",
     "libsecret-1.so.0"
+  ],
+  "build_deps": [
+    "glib",
+    "glibc",
+    "gnutls",
+    "gobject-introspection",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "gcc"
   ]
 }

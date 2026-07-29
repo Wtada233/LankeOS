@@ -21,5 +21,19 @@
     "python",
     "xz"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "bash",
+    "freetype",
+    "glibc",
+    "libtasn1",
+    "python",
+    "xz",
+    "gcc",
+    "make",
+    "pkgconf",
+    "fuse3",
+    "gettext",
+    "texinfo"
+  ]
 }

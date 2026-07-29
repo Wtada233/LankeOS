@@ -23,5 +23,12 @@
     "libvorbisenc.so.2",
     "libvorbisfile.so",
     "libvorbisfile.so.3"
+  ],
+  "build_deps": [
+    "glibc",
+    "libogg",
+    "gcc",
+    "make",
+    "pkgconf"
   ]
 }

@@ -41,5 +41,20 @@
     "libgnome-desktop-4.so.2",
     "libgnome-rr-4.so",
     "libgnome-rr-4.so.2"
+  ],
+  "build_deps": [
+    "cairo",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "gtk3",
+    "gtk4",
+    "libseccomp",
+    "libxkbcommon",
+    "systemd",
+    "meson",
+    "ninja",
+    "git",
+    "gobject-introspection"
   ]
 }

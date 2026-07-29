@@ -31,5 +31,22 @@
     "pipewire",
     "systemd"
   ],
-  "provides": []
+  "provides": [],
+  "build_deps": [
+    "fuse3",
+    "gdk-pixbuf",
+    "glib",
+    "glibc",
+    "gst-plugins-base",
+    "gstreamer",
+    "json-glib",
+    "libgudev",
+    "pipewire",
+    "systemd",
+    "meson",
+    "ninja",
+    "gcc",
+    "pkgconf",
+    "python"
+  ]
 }

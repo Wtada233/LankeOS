@@ -27,5 +27,17 @@
   "provides": [
     "libsoup-3.0.so",
     "libsoup-3.0.so.0"
+  ],
+  "build_deps": [
+    "glib",
+    "glibc",
+    "libpsl",
+    "nghttp2",
+    "sqlite",
+    "zlib",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "gcc"
   ]
 }
