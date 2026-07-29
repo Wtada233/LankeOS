@@ -155,10 +155,11 @@
     "llvm",
     "compiler-rt",
     "rsync",
-    "rust",
+    "rust-nightly",
     "rust-bindgen",
     "qt6-base",
     "ninja",
-    "openjdk25"
+    "openjdk25",
+    "krb5"
   ]
 }
