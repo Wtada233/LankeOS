@@ -7,9 +7,10 @@ lankebuild_prepare() {
     cargo fetch --locked --target host-tuple
     patch -p1 < {WORK_DIR}/allow-software-rendering.patch
 
-    # Portal: 文件选择器用 GTK 而非 Nautilus
+    # Portal: 文件选择器用 GTK + 删除不存在 gnome-keyring
     sed -i '/^org.freedesktop.impl.portal.Notification/a\
 org.freedesktop.impl.portal.FileChooser=gtk;' resources/niri-portals.conf
+    sed -i '/gnome-keyring/d' resources/niri-portals.conf
 }
 
 lankebuild_build() {
