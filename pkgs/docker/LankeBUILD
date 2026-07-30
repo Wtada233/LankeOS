@@ -35,16 +35,19 @@ lankebuild_build() {
     hack/make.sh dynbinary
     cd "$GOPATH"
 
-    # docker-init (tini)
+    # docker-init (tini) — 使用 glibc 环境静态编译
     cd src/github.com/krallin/tini
-    cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 .
-    make tini
+    docker run --rm -v "$PWD:/build" -w /build debian:stable-slim sh -c "
+        apt-get update -qq && apt-get install -y -qq --no-install-recommends build-essential cmake
+        cmake -DCMAKE_BUILD_TYPE=Release .
+        make tini-static
+    "
     cd "$GOPATH"
 }
 
 
 lankebuild_package() {
-    install -Dm755 src/github.com/krallin/tini/tini "{STAGING_ROOT}/usr/bin/docker-init"
+    install -Dm755 src/github.com/krallin/tini/tini-static "{STAGING_ROOT}/usr/bin/docker-init"
     install -Dm755 src/github.com/moby/moby/v2/bundles/dynbinary-daemon/dockerd "{STAGING_ROOT}/usr/bin/dockerd"
     install -Dm755 src/github.com/moby/moby/v2/bundles/dynbinary-daemon/docker-proxy "{STAGING_ROOT}/usr/bin/docker-proxy"
     install -Dm644 src/github.com/moby/moby/v2/contrib/init/systemd/docker.service "{STAGING_ROOT}/usr/lib/systemd/system/docker.service"

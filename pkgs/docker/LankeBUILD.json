@@ -14,7 +14,8 @@
     "cmake",
     "git",
     "make",
-    "sed"
+    "sed",
+    "docker"
   ],
   "needed_so": [
     "libc.so.6",
