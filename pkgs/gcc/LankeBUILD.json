@@ -71,7 +71,6 @@
     "rust",
     "tcl",
     "make",
-    "gcc",
-    "findutils"
+    "gcc"
   ]
 }
