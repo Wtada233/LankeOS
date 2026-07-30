@@ -8,6 +8,7 @@
     "automake",
     "binutils",
     "bison",
+    "coreutils",
     "file",
     "findutils",
     "flex",
@@ -24,6 +25,7 @@
     "pkgconf",
     "sed",
     "texinfo",
+    "util-linux",
     "which"
   ],
   "provides": []
