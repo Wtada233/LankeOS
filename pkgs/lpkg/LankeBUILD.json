@@ -1,6 +1,6 @@
 {
   "name": "lpkg",
-  "version": "5.4.2",
+  "version": "5.4.3",
   "sources": [
     "https://github.com/Wtada233/LankeOS/archive/44f0d23ef3e1ce86d23ba233439bfd0173f2afd0.zip"
   ],
@@ -11,7 +11,10 @@
   "provides": [],
   "build_deps": [
     "docker",
-    "make"
-  ],
-  "release": 2
+    "make",
+    "containerd",
+    "nftables",
+    "linux",
+    "iptables"
+  ]
 }

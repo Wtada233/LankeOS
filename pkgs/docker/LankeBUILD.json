@@ -15,7 +15,11 @@
     "git",
     "make",
     "sed",
-    "docker"
+    "docker",
+    "containerd",
+    "nftables",
+    "linux",
+    "iptables"
   ],
   "needed_so": [
     "libc.so.6",
