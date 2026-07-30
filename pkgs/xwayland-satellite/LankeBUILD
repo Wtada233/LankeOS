@@ -17,5 +17,5 @@ lankebuild_package() {
     cd "{SRC_DIR}"
     install -vDm 755 target/release/xwayland-satellite -t "{STAGING_ROOT}{BINDIR}/"
     install -vDm 644 resources/xwayland-satellite.service -t "{STAGING_ROOT}{LIBDIR}/systemd/user/"
-    install -vDm 644 LICENSE -t "{STAGING_ROOT}{DATADIR}/licenses/{STAGING_ROOT}/"
+    install -vDm 644 LICENSE -t "{STAGING_ROOT}{DATADIR}/licenses/"
 }
