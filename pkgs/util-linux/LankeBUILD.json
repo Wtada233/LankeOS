@@ -40,16 +40,17 @@
     "libuuid.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "bash-completion",
     "file",
+    "gcc",
+    "git",
     "glibc",
     "libxcrypt",
     "ncurses",
-    "readline",
-    "zlib",
-    "gcc",
     "pkgconf",
-    "bash-completion",
-    "git"
+    "readline",
+    "zlib"
   ]
 }

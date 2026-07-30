@@ -19,17 +19,18 @@
     "libvala-0.56.so.0"
   ],
   "build_deps": [
+    "autoconf-archive",
+    "base-devel",
     "bash",
+    "dbus",
+    "gcc",
+    "git",
     "glib",
     "glibc",
-    "gcc",
-    "pkgconf",
-    "autoconf-archive",
-    "dbus",
-    "git",
     "gobject-introspection",
     "libX11",
     "libxslt",
+    "pkgconf",
     "vala"
   ]
 }

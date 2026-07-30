@@ -21,14 +21,15 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "docbook-xsl",
     "gcc",
+    "gettext",
     "glib",
     "glibc",
     "libxml2",
     "meson",
     "ninja",
-    "docbook-xsl",
-    "gettext",
     "xmlto"
   ]
 }

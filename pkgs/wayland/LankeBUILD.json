@@ -29,13 +29,14 @@
     "libwayland-server.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "expat",
+    "gcc",
     "glibc",
     "libffi",
     "libxml2",
     "meson",
     "ninja",
-    "gcc",
     "pkgconf"
   ]
 }

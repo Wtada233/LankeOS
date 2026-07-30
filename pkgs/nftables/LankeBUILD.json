@@ -6,6 +6,9 @@
   ],
   "work_sources": [],
   "build_deps": [
+    "autoconf",
+    "automake",
+    "base-devel",
     "bash",
     "gcc",
     "glibc",
@@ -13,13 +16,11 @@
     "jansson",
     "libmnl",
     "libnftnl",
-    "readline",
+    "libtool",
     "make",
     "pkgconf",
-    "autoconf",
-    "automake",
-    "libtool",
-    "python"
+    "python",
+    "readline"
   ],
   "needed_so": [
     "libc.so.6",

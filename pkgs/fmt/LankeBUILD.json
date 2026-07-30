@@ -21,11 +21,12 @@
     "libfmt.so.11"
   ],
   "build_deps": [
-    "gcc",
-    "glibc",
+    "base-devel",
     "cmake",
-    "ninja",
     "doxygen",
-    "git"
+    "gcc",
+    "git",
+    "glibc",
+    "ninja"
   ]
 }

@@ -29,14 +29,15 @@
     "libss.so.2"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
-    "glibc",
-    "perl",
-    "util-linux",
     "fuse3",
-    "git",
-    "systemd",
     "gcc",
-    "make"
+    "git",
+    "glibc",
+    "make",
+    "perl",
+    "systemd",
+    "util-linux"
   ]
 }

@@ -65,6 +65,7 @@
   "provides": [],
   "build_deps": [
     "Linux-PAM",
+    "base-devel",
     "bash",
     "cairo",
     "curl",
@@ -80,15 +81,15 @@
     "libwebp",
     "libxkbcommon",
     "libxml2",
+    "meson",
+    "ninja",
     "pango",
     "pipewire",
+    "pkgconf",
     "polkit",
     "python",
     "sdbus-cpp",
     "wayland",
-    "wireplumber",
-    "meson",
-    "ninja",
-    "pkgconf"
+    "wireplumber"
   ]
 }

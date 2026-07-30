@@ -20,15 +20,16 @@
   ],
   "provides": [],
   "build_deps": [
+    "Linux-PAM",
+    "base-devel",
+    "gcc",
     "glibc",
-    "libxcrypt",
-    "openssl",
-    "zlib",
     "krb5",
     "libedit",
+    "libxcrypt",
     "linux",
-    "Linux-PAM",
-    "gcc",
-    "pkgconf"
+    "openssl",
+    "pkgconf",
+    "zlib"
   ]
 }

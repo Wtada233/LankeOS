@@ -29,16 +29,17 @@
     "libwireplumber-0.5.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
+    "git",
     "glib",
     "glibc",
+    "gobject-introspection",
     "lua",
-    "pipewire",
-    "systemd",
     "meson",
     "ninja",
-    "gcc",
+    "pipewire",
     "pkgconf",
-    "gobject-introspection",
-    "git"
+    "systemd"
   ]
 }

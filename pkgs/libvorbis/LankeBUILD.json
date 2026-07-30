@@ -25,9 +25,10 @@
     "libvorbisfile.so.3"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libogg",
-    "gcc",
     "make",
     "pkgconf"
   ]

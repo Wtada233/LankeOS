@@ -33,13 +33,14 @@
     "libz.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "glibc",
+    "make",
     "nspr",
-    "sqlite",
-    "zlib",
     "perl",
     "python",
-    "make"
+    "sqlite",
+    "zlib"
   ]
 }

@@ -23,17 +23,18 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bash",
     "freetype",
+    "fuse3",
+    "gcc",
+    "gettext",
     "glibc",
     "libtasn1",
-    "python",
-    "xz",
-    "gcc",
     "make",
     "pkgconf",
-    "fuse3",
-    "gettext",
-    "texinfo"
+    "python",
+    "texinfo",
+    "xz"
   ]
 }

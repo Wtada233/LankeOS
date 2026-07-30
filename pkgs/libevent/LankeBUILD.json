@@ -28,10 +28,11 @@
     "libevent_pthreads.so"
   ],
   "build_deps": [
-    "glibc",
-    "openssl",
-    "python",
+    "base-devel",
     "gcc",
-    "make"
+    "glibc",
+    "make",
+    "openssl",
+    "python"
   ]
 }

@@ -21,11 +21,12 @@
     "libgraphene-1.0.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "git",
     "glib",
     "glibc",
+    "gobject-introspection",
     "meson",
-    "ninja",
-    "git",
-    "gobject-introspection"
+    "ninja"
   ]
 }

@@ -54,14 +54,15 @@
     "libQt6QmlXmlListModel.so.6"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "gcc",
+    "git",
     "glibc",
     "libglvnd",
-    "qt6-base",
-    "cmake",
     "ninja",
-    "git",
     "python",
+    "qt6-base",
     "qt6-svg",
     "vulkan-headers"
   ]

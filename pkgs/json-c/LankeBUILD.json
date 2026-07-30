@@ -17,8 +17,9 @@
     "libjson-c.so.5"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "cmake",
-    "gcc"
+    "gcc",
+    "glibc"
   ]
 }

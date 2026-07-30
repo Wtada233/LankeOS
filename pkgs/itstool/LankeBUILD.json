@@ -13,6 +13,7 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "python"
   ]
 }

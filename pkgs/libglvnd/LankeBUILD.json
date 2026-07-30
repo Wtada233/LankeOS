@@ -31,13 +31,14 @@
     "libOpenGL.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libX11",
     "libXext",
-    "xorgproto",
     "meson",
     "ninja",
     "python",
-    "gcc"
+    "xorgproto"
   ]
 }

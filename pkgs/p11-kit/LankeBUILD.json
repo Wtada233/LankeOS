@@ -24,13 +24,14 @@
     "p11-kit-proxy.so"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
     "glibc",
     "libffi",
     "libtasn1",
     "meson",
     "ninja",
-    "gcc",
     "pkgconf"
   ]
 }

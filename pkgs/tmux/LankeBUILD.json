@@ -22,11 +22,12 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "gcc",
+    "git",
     "glibc",
     "libevent",
     "ncurses",
-    "systemd",
-    "git",
-    "gcc"
+    "systemd"
   ]
 }

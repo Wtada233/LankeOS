@@ -22,16 +22,17 @@
     "libgudev-1.0.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
+    "git",
     "glib",
     "glibc",
-    "systemd",
     "gobject-introspection",
     "gtk-doc",
     "meson",
-    "vala",
-    "git",
     "ninja",
-    "gcc",
-    "pkgconf"
+    "pkgconf",
+    "systemd",
+    "vala"
   ]
 }

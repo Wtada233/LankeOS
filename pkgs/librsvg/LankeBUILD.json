@@ -34,19 +34,20 @@
     "librsvg-2.so.2"
   ],
   "build_deps": [
+    "base-devel",
     "cairo",
     "gcc",
     "gdk-pixbuf",
+    "git",
     "glib",
     "glibc",
+    "gobject-introspection",
     "libxml2",
-    "pango",
+    "llvm",
     "meson",
     "ninja",
+    "pango",
     "pkgconf",
-    "git",
-    "gobject-introspection",
-    "llvm",
     "rust"
   ]
 }

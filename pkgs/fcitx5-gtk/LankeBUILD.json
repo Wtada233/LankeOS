@@ -48,6 +48,7 @@
   ],
   "build_deps": [
     "at-spi2-core",
+    "base-devel",
     "cairo",
     "cmake",
     "extra-cmake-modules",

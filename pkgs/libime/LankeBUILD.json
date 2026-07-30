@@ -31,15 +31,16 @@
     "libIMETable.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "boost",
-    "fcitx5",
-    "glibc",
-    "zstd",
-    "extra-cmake-modules",
-    "git",
-    "python",
     "cmake",
+    "extra-cmake-modules",
+    "fcitx5",
+    "gcc",
+    "git",
+    "glibc",
     "ninja",
-    "gcc"
+    "python",
+    "zstd"
   ]
 }

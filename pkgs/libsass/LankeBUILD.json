@@ -20,6 +20,7 @@
     "libsass.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "make"

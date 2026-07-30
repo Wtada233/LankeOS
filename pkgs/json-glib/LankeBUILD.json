@@ -20,12 +20,13 @@
     "libjson-glib-1.0.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glib",
     "glibc",
+    "gobject-introspection",
     "meson",
     "ninja",
-    "gobject-introspection",
-    "gcc",
     "pkgconf"
   ]
 }

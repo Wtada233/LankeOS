@@ -22,11 +22,12 @@
     "libpng16.so.16"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
-    "glibc",
-    "zlib",
     "gcc",
+    "git",
+    "glibc",
     "make",
-    "git"
+    "zlib"
   ]
 }

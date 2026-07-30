@@ -18,12 +18,13 @@
     "libc.so.6"
   ],
   "build_deps": [
-    "glibc",
-    "gcc",
-    "meson",
-    "ninja",
-    "pkgconf",
+    "base-devel",
     "doxygen",
-    "nasm"
+    "gcc",
+    "glibc",
+    "meson",
+    "nasm",
+    "ninja",
+    "pkgconf"
   ]
 }

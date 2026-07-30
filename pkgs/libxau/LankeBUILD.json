@@ -18,11 +18,12 @@
     "libc.so.6"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "gcc",
+    "glibc",
     "make",
     "pkgconf",
-    "xorgproto",
-    "util-macros"
+    "util-macros",
+    "xorgproto"
   ]
 }

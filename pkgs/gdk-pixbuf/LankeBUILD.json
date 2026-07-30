@@ -29,15 +29,16 @@
     "libgdk_pixbuf-2.0.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glib",
     "glibc",
+    "gobject-introspection",
     "libjpeg-turbo",
     "libpng",
     "libtiff",
-    "gcc",
     "meson",
     "ninja",
-    "pkgconf",
-    "gobject-introspection"
+    "pkgconf"
   ]
 }

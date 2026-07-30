@@ -21,8 +21,9 @@
     "libatopology.so.2"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "gcc",
+    "glibc",
     "make"
   ]
 }

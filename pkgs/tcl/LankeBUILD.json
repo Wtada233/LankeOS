@@ -20,8 +20,9 @@
     "libtcl8.6.so"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
-    "zlib",
-    "gcc"
+    "zlib"
   ]
 }

@@ -43,18 +43,19 @@
     "libgnome-rr-4.so.2"
   ],
   "build_deps": [
+    "base-devel",
     "cairo",
     "gdk-pixbuf",
+    "git",
     "glib",
     "glibc",
+    "gobject-introspection",
     "gtk3",
     "gtk4",
     "libseccomp",
     "libxkbcommon",
-    "systemd",
     "meson",
     "ninja",
-    "git",
-    "gobject-introspection"
+    "systemd"
   ]
 }

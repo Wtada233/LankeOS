@@ -12,9 +12,10 @@
   ],
   "provides": [],
   "build_deps": [
-    "python",
+    "base-devel",
     "cmake",
+    "git",
     "ninja",
-    "git"
+    "python"
   ]
 }

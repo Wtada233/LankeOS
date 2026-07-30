@@ -19,10 +19,11 @@
     "libm.so.6"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "meson",
     "ninja",
-    "gcc",
     "pkgconf"
   ]
 }

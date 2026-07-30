@@ -18,9 +18,10 @@
     "libgpg-error.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
     "glibc",
-    "make",
-    "gcc"
+    "make"
   ]
 }

@@ -20,10 +20,11 @@
     "libproc2.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "dejagnu",
+    "gcc",
     "gettext",
     "glibc",
-    "gcc",
     "make",
     "ncurses",
     "systemd"

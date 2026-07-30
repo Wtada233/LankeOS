@@ -47,24 +47,25 @@
     "libcairo.so.2"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "fontconfig",
     "freetype",
+    "gcc",
+    "git",
     "glib",
     "glibc",
+    "gtk-doc",
     "libX11",
     "libXext",
     "libXrender",
     "libpng",
     "libxcb",
-    "pixman",
-    "xwayland",
-    "zlib",
-    "gcc",
     "meson",
     "ninja",
+    "pixman",
     "pkgconf",
-    "git",
-    "gtk-doc"
+    "xwayland",
+    "zlib"
   ]
 }

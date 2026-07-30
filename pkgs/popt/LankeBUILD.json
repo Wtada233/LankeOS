@@ -17,6 +17,7 @@
     "libpopt.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "make"

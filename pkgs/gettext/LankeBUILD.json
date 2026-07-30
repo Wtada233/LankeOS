@@ -46,15 +46,16 @@
   "build_deps": [
     "acl",
     "attr",
+    "base-devel",
     "bash",
     "gawk",
     "gcc",
     "glibc",
     "libxml2",
+    "make",
     "ncurses",
     "perl",
     "ruby",
-    "tcl",
-    "make"
+    "tcl"
   ]
 }

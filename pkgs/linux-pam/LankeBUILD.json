@@ -29,14 +29,15 @@
     "libpamc.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
     "gdbm",
     "glibc",
     "libxcrypt",
-    "systemd",
-    "gcc",
     "meson",
     "ninja",
-    "pkgconf"
+    "pkgconf",
+    "systemd"
   ]
 }

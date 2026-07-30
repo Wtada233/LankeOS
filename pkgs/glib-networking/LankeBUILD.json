@@ -20,13 +20,14 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "gcc",
+    "git",
     "glib",
     "glibc",
     "gnutls",
-    "git",
     "gsettings-desktop-schemas",
     "meson",
-    "gcc",
     "ninja",
     "pkgconf"
   ]

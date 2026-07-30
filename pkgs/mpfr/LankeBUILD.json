@@ -20,9 +20,10 @@
     "libmpfr.so.6"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "gmp",
-    "gcc",
     "make"
   ]
 }

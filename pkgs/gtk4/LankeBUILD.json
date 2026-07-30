@@ -84,13 +84,17 @@
     "libgtk-4.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "cairo",
     "cups",
+    "docbook-xsl",
     "fontconfig",
     "fribidi",
+    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",
+    "gobject-introspection",
     "graphene",
     "gst-plugins-bad",
     "gst-plugins-base",
@@ -109,19 +113,16 @@
     "libpng",
     "libtiff",
     "libxkbcommon",
-    "pango",
-    "vulkan-loader",
-    "wayland",
-    "xwayland",
-    "gcc",
     "meson",
     "ninja",
+    "pango",
     "pkgconf",
-    "docbook-xsl",
-    "gobject-introspection",
     "sassc",
     "shaderc",
     "vulkan-headers",
-    "wayland-protocols"
+    "vulkan-loader",
+    "wayland",
+    "wayland-protocols",
+    "xwayland"
   ]
 }

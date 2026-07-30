@@ -39,15 +39,16 @@
     "libsframe.so.2"
   ],
   "build_deps": [
-    "flex",
-    "gcc",
-    "glibc",
-    "perl",
-    "zlib",
-    "zstd",
+    "base-devel",
     "bc",
     "dejagnu",
+    "flex",
+    "gcc",
     "git",
-    "make"
+    "glibc",
+    "make",
+    "perl",
+    "zlib",
+    "zstd"
   ]
 }

@@ -16,9 +16,10 @@
     "libjuice.so.1.7.2"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "cmake",
-    "ninja",
-    "gcc"
+    "gcc",
+    "glibc",
+    "ninja"
   ]
 }

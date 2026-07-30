@@ -28,15 +28,16 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "dbus",
+    "gcc",
+    "git",
     "glibc",
     "libnl",
+    "make",
     "ncurses",
     "openssl",
-    "readline",
-    "gcc",
     "pkgconf",
-    "make",
-    "git"
+    "readline"
   ]
 }

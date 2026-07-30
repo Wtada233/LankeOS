@@ -29,15 +29,16 @@
     "libsoup-3.0.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glib",
     "glibc",
     "libpsl",
-    "nghttp2",
-    "sqlite",
-    "zlib",
     "meson",
+    "nghttp2",
     "ninja",
     "pkgconf",
-    "gcc"
+    "sqlite",
+    "zlib"
   ]
 }

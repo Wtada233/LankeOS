@@ -18,10 +18,11 @@
     "libc.so.6"
   ],
   "build_deps": [
-    "glibc",
-    "util-macros",
-    "xtrans",
+    "base-devel",
     "gcc",
-    "make"
+    "glibc",
+    "make",
+    "util-macros",
+    "xtrans"
   ]
 }

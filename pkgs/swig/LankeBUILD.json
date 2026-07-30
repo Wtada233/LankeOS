@@ -21,18 +21,19 @@
   ],
   "provides": [],
   "build_deps": [
-    "gcc",
-    "glibc",
-    "pcre2",
-    "zlib",
-    "make",
+    "base-devel",
     "boost",
+    "gcc",
     "git",
+    "glibc",
     "golang",
-    "openjdk25",
     "lua",
+    "make",
+    "openjdk25",
+    "pcre2",
     "python",
     "ruby",
-    "tcl"
+    "tcl",
+    "zlib"
   ]
 }

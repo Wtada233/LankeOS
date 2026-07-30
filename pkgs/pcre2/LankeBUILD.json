@@ -24,9 +24,10 @@
     "libpcre2-posix.so.3"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
-    "glibc",
     "gcc",
+    "glibc",
     "pkgconf"
   ]
 }

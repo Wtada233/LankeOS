@@ -30,16 +30,17 @@
     "libzstd.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "brotli",
     "bzip2",
+    "gcc",
     "glibc",
     "libidn2",
+    "make",
     "ncurses",
     "openssl",
-    "zlib",
-    "zstd",
-    "gcc",
     "pkgconf",
-    "make"
+    "zlib",
+    "zstd"
   ]
 }

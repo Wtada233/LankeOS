@@ -96,6 +96,7 @@
   ],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
     "bash-completion",
     "bluez",
     "bzip2",
@@ -139,6 +140,8 @@
     "libvorbis",
     "libvpl",
     "libwebp",
+    "libx264",
+    "libx265",
     "libxcb",
     "libxkbcommon",
     "libxml2",
@@ -162,8 +165,6 @@
     "vulkan-headers",
     "vulkan-loader",
     "wayland",
-    "libx264",
-    "libx265",
     "xwayland",
     "zlib"
   ]

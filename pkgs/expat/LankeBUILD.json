@@ -18,9 +18,10 @@
     "libexpat.so.1"
   ],
   "build_deps": [
-    "glibc",
-    "git",
+    "base-devel",
     "gcc",
+    "git",
+    "glibc",
     "make"
   ]
 }

@@ -34,15 +34,16 @@
   ],
   "build_deps": [
     "acl",
+    "base-devel",
     "bzip2",
+    "gcc",
     "glibc",
     "libxml2",
     "lz4",
+    "make",
     "openssl",
     "xz",
     "zlib",
-    "zstd",
-    "gcc",
-    "make"
+    "zstd"
   ]
 }

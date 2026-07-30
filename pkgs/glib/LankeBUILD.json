@@ -41,18 +41,19 @@
     "libgthread-2.0.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
     "glibc",
+    "gobject-introspection",
     "libelf",
     "libffi",
-    "pcre2",
-    "python",
-    "util-linux",
-    "zlib",
-    "gcc",
     "meson",
     "ninja",
+    "pcre2",
     "pkgconf",
-    "gobject-introspection"
+    "python",
+    "util-linux",
+    "zlib"
   ]
 }

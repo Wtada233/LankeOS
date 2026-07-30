@@ -17,11 +17,12 @@
     "libfribidi.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
+    "git",
     "glibc",
     "meson",
     "ninja",
-    "pkgconf",
-    "gcc",
-    "git"
+    "pkgconf"
   ]
 }

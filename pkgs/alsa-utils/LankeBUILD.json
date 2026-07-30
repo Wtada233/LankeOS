@@ -25,13 +25,14 @@
   "provides": [],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
     "bash",
-    "glibc",
-    "ncurses",
-    "gcc",
-    "make",
     "docbook-xsl",
     "fftw",
+    "gcc",
+    "glibc",
+    "make",
+    "ncurses",
     "systemd",
     "xmlto"
   ]

@@ -26,13 +26,14 @@
     "libfreetype.so.6"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "bzip2",
+    "gcc",
     "glibc",
     "harfbuzz",
     "libpng",
-    "zlib",
-    "gcc",
-    "make"
+    "make",
+    "zlib"
   ]
 }

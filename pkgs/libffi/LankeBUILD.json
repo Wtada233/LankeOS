@@ -17,9 +17,10 @@
     "libffi.so.8"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
+    "dejagnu",
     "gcc",
-    "make",
-    "dejagnu"
+    "glibc",
+    "make"
   ]
 }

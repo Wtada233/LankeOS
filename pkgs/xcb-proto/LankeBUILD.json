@@ -13,10 +13,11 @@
   "release": 2,
   "needed_so": [],
   "build_deps": [
-    "python",
+    "base-devel",
     "gcc",
-    "pkgconf",
+    "libxml2",
     "make",
-    "libxml2"
+    "pkgconf",
+    "python"
   ]
 }

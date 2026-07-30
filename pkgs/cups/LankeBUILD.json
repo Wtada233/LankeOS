@@ -42,16 +42,17 @@
   "build_deps": [
     "Linux-PAM",
     "acl",
+    "base-devel",
     "bash",
     "dbus",
     "gcc",
     "glibc",
+    "gnutls",
     "libxcrypt",
-    "openssl",
-    "systemd",
-    "zlib",
     "make",
+    "openssl",
     "pkgconf",
-    "gnutls"
+    "systemd",
+    "zlib"
   ]
 }

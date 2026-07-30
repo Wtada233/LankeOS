@@ -35,18 +35,19 @@
     "libqalculate.so.23"
   ],
   "build_deps": [
+    "base-devel",
     "curl",
+    "doxygen",
     "gcc",
+    "git",
     "glibc",
     "gmp",
     "icu",
+    "intltool",
     "libxml2",
+    "make",
     "mpfr",
     "ncurses",
-    "readline",
-    "make",
-    "doxygen",
-    "git",
-    "intltool"
+    "readline"
   ]
 }

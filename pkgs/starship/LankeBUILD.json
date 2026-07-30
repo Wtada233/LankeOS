@@ -16,11 +16,12 @@
   ],
   "provides": [],
   "build_deps": [
-    "gcc",
-    "glibc",
-    "rust",
+    "base-devel",
     "cmake",
+    "gcc",
     "git",
-    "python"
+    "glibc",
+    "python",
+    "rust"
   ]
 }

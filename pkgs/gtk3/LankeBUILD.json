@@ -75,13 +75,17 @@
   ],
   "build_deps": [
     "at-spi2-core",
+    "base-devel",
     "cairo",
     "cups",
     "fontconfig",
     "fribidi",
+    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",
+    "gobject-introspection",
+    "gtk-doc",
     "harfbuzz",
     "libX11",
     "libXcomposite",
@@ -94,16 +98,13 @@
     "libXrandr",
     "libepoxy",
     "libxkbcommon",
-    "pango",
-    "wayland",
-    "xwayland",
-    "gcc",
-    "gobject-introspection",
-    "gtk-doc",
     "meson",
     "ninja",
+    "pango",
     "pkgconf",
     "sassc",
-    "wayland-protocols"
+    "wayland",
+    "wayland-protocols",
+    "xwayland"
   ]
 }

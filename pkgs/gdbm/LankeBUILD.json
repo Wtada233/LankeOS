@@ -24,11 +24,12 @@
     "libgdbm_compat.so.4"
   ],
   "build_deps": [
-    "glibc",
-    "ncurses",
-    "readline",
-    "git",
+    "base-devel",
     "gcc",
-    "make"
+    "git",
+    "glibc",
+    "make",
+    "ncurses",
+    "readline"
   ]
 }

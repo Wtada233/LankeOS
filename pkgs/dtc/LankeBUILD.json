@@ -19,14 +19,15 @@
     "libfdt.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
+    "git",
     "glibc",
     "libyaml",
-    "git",
     "meson",
-    "swig",
-    "gcc",
     "ninja",
-    "pkgconf"
+    "pkgconf",
+    "swig"
   ]
 }

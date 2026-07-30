@@ -17,8 +17,9 @@
   "provides": [],
   "build_deps": [
     "attr",
-    "glibc",
+    "base-devel",
     "gcc",
+    "glibc",
     "pkgconf"
   ]
 }

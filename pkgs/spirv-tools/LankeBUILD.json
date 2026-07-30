@@ -27,10 +27,11 @@
     "libSPIRV-Tools.so"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "cmake",
     "gcc",
     "glibc",
-    "cmake",
     "ninja"
   ]
 }

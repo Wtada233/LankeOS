@@ -20,12 +20,13 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "file",
-    "glibc",
-    "ncurses",
-    "zlib",
     "gcc",
+    "glibc",
     "make",
-    "pkgconf"
+    "ncurses",
+    "pkgconf",
+    "zlib"
   ]
 }

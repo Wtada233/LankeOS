@@ -44,17 +44,18 @@
     "libz.so.1"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "curl",
     "gcc",
     "glibc",
     "libedit",
     "libffi",
     "libxml2",
+    "ninja",
     "perl",
     "python",
     "zlib",
-    "cmake",
-    "ninja",
     "zstd"
   ]
 }

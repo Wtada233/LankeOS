@@ -25,12 +25,13 @@
     "libpci.so.3"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
     "glibc",
     "kmod",
+    "pkgconf",
     "systemd",
-    "zlib",
-    "gcc",
-    "pkgconf"
+    "zlib"
   ]
 }

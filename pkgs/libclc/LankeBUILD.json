@@ -11,10 +11,11 @@
   "release": 2,
   "needed_so": [],
   "build_deps": [
-    "llvm",
+    "SPIRV-LLVM-Translator",
+    "base-devel",
     "cmake",
+    "llvm",
     "ninja",
-    "python",
-    "SPIRV-LLVM-Translator"
+    "python"
   ]
 }

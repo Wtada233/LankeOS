@@ -19,12 +19,13 @@
     "libpciaccess.so.0"
   ],
   "build_deps": [
-    "glibc",
-    "zlib",
+    "base-devel",
     "gcc",
-    "pkgconf",
+    "glibc",
     "meson",
     "ninja",
-    "util-macros"
+    "pkgconf",
+    "util-macros",
+    "zlib"
   ]
 }

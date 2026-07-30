@@ -6,9 +6,10 @@
   ],
   "work_sources": [],
   "build_deps": [
+    "base-devel",
+    "cargo",
     "gcc",
     "glibc",
-    "cargo",
     "make"
   ],
   "needed_so": [

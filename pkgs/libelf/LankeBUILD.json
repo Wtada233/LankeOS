@@ -26,17 +26,18 @@
     "libelf.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "bzip2",
-    "glibc",
-    "xz",
-    "zlib",
-    "zstd",
-    "gcc",
-    "make",
     "curl",
+    "gcc",
     "git",
+    "glibc",
     "json-c",
     "libarchive",
-    "sqlite"
+    "make",
+    "sqlite",
+    "xz",
+    "zlib",
+    "zstd"
   ]
 }

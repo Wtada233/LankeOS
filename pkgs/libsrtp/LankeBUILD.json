@@ -18,11 +18,12 @@
     "libsrtp2.so.1"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
-    "openssl",
     "meson",
     "ninja",
-    "pkgconf",
-    "gcc"
+    "openssl",
+    "pkgconf"
   ]
 }

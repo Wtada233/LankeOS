@@ -43,17 +43,18 @@
     "libQt6WaylandEglCompositorHwIntegration.so.6"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "gcc",
+    "git",
     "glibc",
     "libdrm",
     "libglvnd",
     "libxkbcommon",
+    "ninja",
     "qt6-base",
     "qt6-svg",
-    "wayland",
-    "cmake",
-    "ninja",
-    "git",
-    "vulkan-headers"
+    "vulkan-headers",
+    "wayland"
   ]
 }

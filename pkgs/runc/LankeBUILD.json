@@ -6,10 +6,11 @@
   ],
   "work_sources": [],
   "build_deps": [
+    "base-devel",
     "bash",
+    "git",
     "glibc",
     "golang",
-    "git",
     "libseccomp",
     "make"
   ],

@@ -21,9 +21,10 @@
     "libnettle.so.8"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "gmp",
-    "gcc",
     "make",
     "pkgconf"
   ]

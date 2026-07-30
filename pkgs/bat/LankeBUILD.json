@@ -18,12 +18,13 @@
   ],
   "provides": [],
   "build_deps": [
-    "gcc",
-    "glibc",
-    "zlib",
-    "rust",
-    "llvm",
+    "base-devel",
     "cmake",
-    "git"
+    "gcc",
+    "git",
+    "glibc",
+    "llvm",
+    "rust",
+    "zlib"
   ]
 }

@@ -38,7 +38,11 @@
     "libxkbcommon.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
+    "glslang",
+    "glu",
     "libX11",
     "libXext",
     "libdecor",
@@ -46,16 +50,13 @@
     "libglvnd",
     "libxkbcommon",
     "mesa",
-    "vulkan-loader",
-    "wayland",
-    "xwayland",
     "meson",
     "ninja",
-    "gcc",
     "pkgconf",
-    "glslang",
-    "glu",
     "vulkan-headers",
-    "wayland-protocols"
+    "vulkan-loader",
+    "wayland",
+    "wayland-protocols",
+    "xwayland"
   ]
 }

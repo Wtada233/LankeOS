@@ -6,16 +6,17 @@
   ],
   "work_sources": [],
   "build_deps": [
+    "base-devel",
     "bash",
     "gcc",
     "glibc",
     "libmnl",
-    "libnftnl",
-    "nftables",
-    "libpcap",
     "libnetfilter_conntrack",
     "libnfnetlink",
+    "libnftnl",
+    "libpcap",
     "make",
+    "nftables",
     "sed"
   ],
   "needed_so": [

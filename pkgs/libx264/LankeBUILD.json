@@ -24,9 +24,10 @@
     "libx264.so.165"
   ],
   "build_deps": [
+    "base-devel",
     "ffmpeg",
-    "glibc",
     "gcc",
+    "glibc",
     "make",
     "nasm",
     "pkgconf"

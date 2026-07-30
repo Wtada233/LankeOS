@@ -22,10 +22,11 @@
   "provides": [],
   "build_deps": [
     "Linux-PAM",
-    "glibc",
-    "openssl",
-    "zlib",
+    "base-devel",
     "gcc",
-    "make"
+    "glibc",
+    "make",
+    "openssl",
+    "zlib"
   ]
 }

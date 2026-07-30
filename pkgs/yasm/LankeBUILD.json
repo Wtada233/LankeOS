@@ -14,10 +14,11 @@
   ],
   "provides": [],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "gcc",
-    "make",
     "git",
+    "glibc",
+    "make",
     "python",
     "systemd",
     "xmlto"

@@ -16,9 +16,10 @@
     "libiniparser.so.4"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "cmake",
-    "ninja",
-    "gcc"
+    "gcc",
+    "glibc",
+    "ninja"
   ]
 }

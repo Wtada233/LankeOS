@@ -24,12 +24,13 @@
     "libxml2.so.2"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
-    "glibc",
-    "ncurses",
-    "readline",
     "gcc",
+    "glibc",
     "make",
-    "pkgconf"
+    "ncurses",
+    "pkgconf",
+    "readline"
   ]
 }

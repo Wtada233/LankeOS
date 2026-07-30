@@ -6,10 +6,11 @@
   ],
   "work_sources": [],
   "build_deps": [
+    "base-devel",
     "gcc",
+    "git",
     "glibc",
     "golang",
-    "git",
     "make"
   ],
   "needed_so": [

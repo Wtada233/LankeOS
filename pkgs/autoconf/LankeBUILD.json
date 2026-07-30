@@ -13,9 +13,10 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bash",
-    "perl",
     "gcc",
-    "make"
+    "make",
+    "perl"
   ]
 }

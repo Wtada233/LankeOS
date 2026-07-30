@@ -1,0 +1,30 @@
+{
+  "name": "base-devel",
+  "version": "1",
+  "sources": [],
+  "work_sources": [],
+  "deps": [
+    "autoconf",
+    "automake",
+    "binutils",
+    "bison",
+    "file",
+    "findutils",
+    "flex",
+    "gawk",
+    "gcc",
+    "gettext",
+    "grep",
+    "groff",
+    "gzip",
+    "libtool",
+    "m4",
+    "make",
+    "patch",
+    "pkgconf",
+    "sed",
+    "texinfo",
+    "which"
+  ],
+  "provides": []
+}

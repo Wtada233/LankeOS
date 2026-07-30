@@ -23,16 +23,17 @@
     "libnotify.so.4"
   ],
   "build_deps": [
+    "base-devel",
+    "dbus",
+    "gcc",
     "gdk-pixbuf",
+    "git",
     "glib",
     "glibc",
-    "gcc",
-    "pkgconf",
+    "gobject-introspection",
+    "gtk4",
     "meson",
     "ninja",
-    "dbus",
-    "git",
-    "gobject-introspection",
-    "gtk4"
+    "pkgconf"
   ]
 }

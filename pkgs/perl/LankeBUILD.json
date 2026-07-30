@@ -20,10 +20,11 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "gdbm",
     "glibc",
     "libxcrypt",
-    "gcc",
     "pkgconf"
   ]
 }

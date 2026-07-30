@@ -17,10 +17,11 @@
     "libell.so.0"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "dbus",
-    "procps-ng",
     "gcc",
-    "make"
+    "glibc",
+    "make",
+    "procps-ng"
   ]
 }

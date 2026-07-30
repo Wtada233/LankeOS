@@ -18,16 +18,17 @@
     "libvulkan.so.1"
   ],
   "build_deps": [
-    "glibc",
-    "gcc",
+    "base-devel",
     "cmake",
-    "ninja",
-    "pkgconf",
+    "gcc",
+    "glibc",
     "libX11",
-    "libxcb",
     "libXau",
     "libXdmcp",
-    "wayland",
-    "vulkan-headers"
+    "libxcb",
+    "ninja",
+    "pkgconf",
+    "vulkan-headers",
+    "wayland"
   ]
 }

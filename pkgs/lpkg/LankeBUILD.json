@@ -10,11 +10,12 @@
   "deps": [],
   "provides": [],
   "build_deps": [
-    "docker",
-    "make",
+    "base-devel",
     "containerd",
-    "nftables",
+    "docker",
+    "iptables",
     "linux",
-    "iptables"
+    "make",
+    "nftables"
   ]
 }

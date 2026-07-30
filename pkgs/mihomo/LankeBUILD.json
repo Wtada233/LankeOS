@@ -16,6 +16,7 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "glibc",
     "golang"
   ]

@@ -29,9 +29,10 @@
     "libnl-xfrm-3.so.200"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "gcc",
-    "make",
-    "git"
+    "git",
+    "glibc",
+    "make"
   ]
 }

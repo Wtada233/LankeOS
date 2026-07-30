@@ -18,11 +18,12 @@
     "libslirp.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glib",
     "glibc",
     "meson",
     "ninja",
-    "pkgconf",
-    "gcc"
+    "pkgconf"
   ]
 }

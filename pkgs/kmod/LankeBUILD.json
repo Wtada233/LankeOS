@@ -25,13 +25,14 @@
     "libkmod.so.2"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
+    "libelf",
+    "make",
     "openssl",
     "xz",
     "zlib",
-    "zstd",
-    "libelf",
-    "gcc",
-    "make"
+    "zstd"
   ]
 }

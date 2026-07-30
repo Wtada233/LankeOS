@@ -23,13 +23,14 @@
     "libxcb.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "libxcb",
-    "xcb-util-cursor",
-    "xwayland",
-    "rust",
     "llvm",
-    "pkgconf"
+    "pkgconf",
+    "rust",
+    "xcb-util-cursor",
+    "xwayland"
   ]
 }

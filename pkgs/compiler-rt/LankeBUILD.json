@@ -21,11 +21,12 @@
     "libstdc++.so.6"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "gcc",
     "glibc",
-    "python",
-    "cmake",
+    "llvm",
     "ninja",
-    "llvm"
+    "python"
   ]
 }

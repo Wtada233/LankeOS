@@ -26,20 +26,21 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bash",
     "curl",
     "expat",
+    "gcc",
+    "git",
     "glibc",
+    "make",
+    "openssh",
     "openssl",
     "perl",
+    "pkgconf",
     "python",
-    "zlib",
-    "git",
-    "openssh",
     "rust",
     "xmlto",
-    "gcc",
-    "make",
-    "pkgconf"
+    "zlib"
   ]
 }

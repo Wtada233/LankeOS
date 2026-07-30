@@ -70,14 +70,15 @@
     "libc.so.6"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libXau",
     "libXdmcp",
-    "gcc",
     "make",
     "pkgconf",
     "python",
-    "xorgproto",
-    "util-macros"
+    "util-macros",
+    "xorgproto"
   ]
 }

@@ -60,6 +60,7 @@
   "build_deps": [
     "alsa-lib",
     "at-spi2-core",
+    "base-devel",
     "cairo",
     "cbindgen",
     "dbus",

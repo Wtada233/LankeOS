@@ -18,10 +18,11 @@
     "libnghttp2.so.14"
   ],
   "build_deps": [
-    "glibc",
-    "python",
+    "base-devel",
     "gcc",
+    "glibc",
     "make",
-    "pkgconf"
+    "pkgconf",
+    "python"
   ]
 }

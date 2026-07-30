@@ -22,11 +22,12 @@
     "libmpc.so.3"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "gmp",
-    "mpfr",
-    "gcc",
     "make",
+    "mpfr",
     "pkgconf"
   ]
 }

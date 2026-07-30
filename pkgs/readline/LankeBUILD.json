@@ -21,9 +21,10 @@
     "libreadline.so.8"
   ],
   "build_deps": [
-    "glibc",
-    "ncurses",
+    "base-devel",
     "gcc",
-    "make"
+    "glibc",
+    "make",
+    "ncurses"
   ]
 }

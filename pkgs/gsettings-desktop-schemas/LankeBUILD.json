@@ -9,9 +9,10 @@
   "deps": [],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glib",
     "gobject-introspection",
-    "gcc",
     "meson",
     "ninja",
     "pkgconf"

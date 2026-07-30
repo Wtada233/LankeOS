@@ -13,12 +13,13 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
-    "systemd",
     "meson",
     "ninja",
-    "gcc",
     "pkgconf",
-    "python"
+    "python",
+    "systemd"
   ]
 }

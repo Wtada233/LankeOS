@@ -25,12 +25,13 @@
     "libsqlite3.so.3.49.1"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
+    "make",
     "ncurses",
     "readline",
-    "zlib",
     "tcl",
-    "gcc",
-    "make"
+    "zlib"
   ]
 }

@@ -20,9 +20,10 @@
     "libunistring.so.5"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libunistring",
-    "gcc",
     "make"
   ]
 }

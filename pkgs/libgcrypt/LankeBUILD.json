@@ -19,9 +19,10 @@
     "libgcrypt.so.20"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libgpg-error",
-    "gcc",
     "make"
   ]
 }

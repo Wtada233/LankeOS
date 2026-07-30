@@ -35,18 +35,19 @@
     "libharfbuzz.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "cairo",
     "freetype",
+    "gcc",
     "glib",
     "glibc",
+    "gobject-introspection",
+    "gtk-doc",
     "icu",
-    "gcc",
+    "libpng",
     "meson",
     "ninja",
     "pkgconf",
-    "gobject-introspection",
-    "gtk-doc",
-    "libpng",
     "python",
     "zlib"
   ]

@@ -18,10 +18,11 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
     "glibc",
     "ncurses",
-    "perl",
-    "gcc"
+    "perl"
   ]
 }

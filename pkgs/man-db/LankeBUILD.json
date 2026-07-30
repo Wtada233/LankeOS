@@ -20,12 +20,13 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "gdbm",
     "glibc",
     "libpipeline",
-    "zlib",
-    "gcc",
     "make",
-    "pkgconf"
+    "pkgconf",
+    "zlib"
   ]
 }

@@ -16,9 +16,10 @@
     "libc.so.6"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "docbook-xsl",
     "glibc",
-    "make",
-    "docbook-xsl"
+    "make"
   ]
 }

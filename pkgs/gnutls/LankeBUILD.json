@@ -33,13 +33,14 @@
     "libgnutlsxx.so.30"
   ],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "gmp",
     "libtasn1",
+    "make",
     "nettle",
     "p11-kit",
-    "make",
     "pkgconf"
   ]
 }

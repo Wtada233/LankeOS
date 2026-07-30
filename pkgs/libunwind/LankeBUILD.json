@@ -18,9 +18,10 @@
     "libc.so.6"
   ],
   "build_deps": [
-    "gcc",
+    "base-devel",
     "cmake",
-    "ninja",
-    "glibc"
+    "gcc",
+    "glibc",
+    "ninja"
   ]
 }

@@ -29,14 +29,15 @@
   "build_deps": [
     "acl",
     "attr",
+    "base-devel",
+    "gcc",
+    "git",
     "glibc",
     "gmp",
-    "libcap",
-    "openssl",
-    "gcc",
-    "make",
-    "git",
     "gperf",
+    "libcap",
+    "make",
+    "openssl",
     "python",
     "wget"
   ]

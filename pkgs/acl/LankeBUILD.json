@@ -20,9 +20,10 @@
   ],
   "build_deps": [
     "attr",
-    "glibc",
+    "base-devel",
     "gcc",
-    "make",
-    "git"
+    "git",
+    "glibc",
+    "make"
   ]
 }

@@ -53,6 +53,8 @@
     "libwlroots-0.20.so"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "lcms2",
     "libdisplay-info",
@@ -62,17 +64,16 @@
     "libxcb",
     "libxkbcommon",
     "mesa",
+    "meson",
+    "ninja",
     "pixman",
+    "pkgconf",
     "seatd",
     "systemd",
+    "vulkan-headers",
     "vulkan-loader",
     "wayland",
     "xcb-util-wm",
-    "xwayland",
-    "meson",
-    "ninja",
-    "gcc",
-    "pkgconf",
-    "vulkan-headers"
+    "xwayland"
   ]
 }

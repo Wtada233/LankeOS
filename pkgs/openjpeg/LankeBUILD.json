@@ -27,13 +27,14 @@
     "libopenjp2.so.7"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
+    "gcc",
     "glibc",
     "lcms2",
     "libpng",
     "libtiff",
-    "zlib",
-    "cmake",
-    "gcc",
-    "pkgconf"
+    "pkgconf",
+    "zlib"
   ]
 }

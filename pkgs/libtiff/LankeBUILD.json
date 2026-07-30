@@ -31,13 +31,14 @@
     "libtiffxx.so.6"
   ],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "libjpeg-turbo",
+    "make",
+    "pkgconf",
     "xz",
     "zlib",
-    "zstd",
-    "make",
-    "pkgconf"
+    "zstd"
   ]
 }

@@ -25,20 +25,21 @@
     "libdbus-1.so.3"
   ],
   "build_deps": [
+    "base-devel",
+    "docbook-xsl",
+    "doxygen",
     "expat",
+    "gcc",
+    "git",
+    "glib",
     "glibc",
     "libX11",
-    "python",
-    "systemd",
-    "xwayland",
-    "gcc",
     "meson",
     "ninja",
     "pkgconf",
-    "docbook-xsl",
-    "doxygen",
-    "git",
-    "glib",
-    "xmlto"
+    "python",
+    "systemd",
+    "xmlto",
+    "xwayland"
   ]
 }

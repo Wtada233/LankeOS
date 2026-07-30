@@ -27,22 +27,23 @@
     "libinput.so.10"
   ],
   "build_deps": [
-    "glibc",
-    "libevdev",
-    "lua",
-    "mtdev",
-    "python",
-    "systemd",
+    "base-devel",
     "cairo",
+    "gcc",
+    "git",
     "glib",
+    "glibc",
     "gtk4",
     "libX11",
-    "wayland",
-    "wayland-protocols",
-    "git",
+    "libevdev",
+    "lua",
     "meson",
+    "mtdev",
     "ninja",
-    "gcc",
-    "pkgconf"
+    "pkgconf",
+    "python",
+    "systemd",
+    "wayland",
+    "wayland-protocols"
   ]
 }

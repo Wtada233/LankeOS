@@ -33,6 +33,7 @@
     "libicuuc.so.77"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "gcc",
     "glibc",

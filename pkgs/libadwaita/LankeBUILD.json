@@ -32,18 +32,19 @@
   ],
   "build_deps": [
     "appstream",
+    "base-devel",
     "fribidi",
+    "gcc",
     "glib",
     "glibc",
+    "gobject-introspection",
     "graphene",
     "gtk4",
-    "pango",
     "meson",
     "ninja",
-    "gobject-introspection",
+    "pango",
+    "pkgconf",
     "sassc",
-    "vala",
-    "gcc",
-    "pkgconf"
+    "vala"
   ]
 }

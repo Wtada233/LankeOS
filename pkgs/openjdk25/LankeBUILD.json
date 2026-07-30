@@ -48,6 +48,7 @@
   ],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
     "freetype",
     "gcc",
     "giflib",
@@ -61,8 +62,8 @@
     "libXtst",
     "libjpeg-turbo",
     "libpng",
+    "make",
     "xwayland",
-    "zlib",
-    "make"
+    "zlib"
   ]
 }

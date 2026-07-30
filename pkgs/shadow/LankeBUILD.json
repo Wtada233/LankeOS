@@ -31,15 +31,16 @@
     "Linux-PAM",
     "acl",
     "attr",
-    "glibc",
-    "libxcrypt",
-    "systemd",
-    "gcc",
-    "make",
+    "base-devel",
     "docbook-xsl",
+    "gcc",
     "git",
+    "glibc",
     "itstool",
     "libcap",
-    "libxslt"
+    "libxcrypt",
+    "libxslt",
+    "make",
+    "systemd"
   ]
 }

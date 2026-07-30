@@ -12,13 +12,14 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bash",
-    "python",
+    "bc",
     "gcc",
+    "gtk3",
     "meson",
     "ninja",
     "pkgconf",
-    "bc",
-    "gtk3"
+    "python"
   ]
 }

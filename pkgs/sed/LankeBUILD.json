@@ -17,9 +17,10 @@
   "provides": [],
   "build_deps": [
     "acl",
-    "glibc",
+    "base-devel",
     "gcc",
-    "make",
-    "gettext"
+    "gettext",
+    "glibc",
+    "make"
   ]
 }

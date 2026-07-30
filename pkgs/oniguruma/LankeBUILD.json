@@ -18,6 +18,7 @@
     "libonig.so.5"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "glibc",
     "make"

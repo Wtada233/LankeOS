@@ -38,12 +38,13 @@
     "libnm.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "curl",
+    "gcc",
     "glib",
     "glibc",
     "gnutls",
     "gobject-introspection",
-    "gcc",
     "libndp",
     "libpsl",
     "meson",

@@ -17,9 +17,10 @@
     "libyaml.so"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "gcc",
-    "pkgconf",
-    "make"
+    "glibc",
+    "make",
+    "pkgconf"
   ]
 }

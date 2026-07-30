@@ -6,10 +6,11 @@
   ],
   "work_sources": [],
   "build_deps": [
+    "base-devel",
+    "flex",
     "gcc",
     "glibc",
-    "make",
-    "flex"
+    "make"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2",

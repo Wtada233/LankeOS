@@ -35,17 +35,18 @@
     "libbtrfsutil.so.1.4"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "e2fsprogs",
+    "gcc",
+    "git",
     "glibc",
+    "make",
+    "pkgconf",
+    "ripgrep",
     "systemd",
     "util-linux",
     "zlib",
-    "zstd",
-    "gcc",
-    "make",
-    "pkgconf",
-    "git",
-    "ripgrep"
+    "zstd"
   ]
 }

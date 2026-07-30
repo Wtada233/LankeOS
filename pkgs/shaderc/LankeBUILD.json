@@ -27,13 +27,14 @@
     "libshaderc_shared.so.1"
   ],
   "build_deps": [
+    "SPIRV-Headers",
     "SPIRV-Tools",
+    "base-devel",
+    "cmake",
     "gcc",
     "glibc",
     "glslang",
-    "cmake",
     "ninja",
-    "python",
-    "SPIRV-Headers"
+    "python"
   ]
 }

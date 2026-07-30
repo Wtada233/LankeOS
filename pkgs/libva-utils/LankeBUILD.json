@@ -30,15 +30,16 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "libX11",
     "libdrm",
     "libva",
-    "wayland",
-    "xwayland",
     "make",
+    "mesa",
     "pkgconf",
-    "mesa"
+    "wayland",
+    "xwayland"
   ]
 }

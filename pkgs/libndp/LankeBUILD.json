@@ -18,9 +18,10 @@
     "libndp.so.0"
   ],
   "build_deps": [
-    "glibc",
-    "git",
+    "base-devel",
     "gcc",
+    "git",
+    "glibc",
     "make"
   ]
 }

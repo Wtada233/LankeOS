@@ -28,12 +28,13 @@
     "libdatachannel.so.0.24"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "gcc",
     "glibc",
     "libjuice",
     "libsrtp",
-    "openssl",
-    "cmake",
-    "ninja"
+    "ninja",
+    "openssl"
   ]
 }

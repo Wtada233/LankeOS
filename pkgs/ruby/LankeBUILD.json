@@ -35,20 +35,21 @@
     "libruby.so.4.0"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "doxygen",
     "gcc",
+    "gdbm",
     "glibc",
     "gmp",
     "libffi",
     "libxcrypt",
     "libyaml",
-    "openssl",
-    "zlib",
     "make",
-    "gdbm",
-    "doxygen",
+    "openssl",
     "procps-ng",
     "readline",
-    "rust"
+    "rust",
+    "zlib"
   ]
 }

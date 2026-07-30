@@ -10,6 +10,7 @@
   "deps": [],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "gcc",
     "make",
     "pkgconf"

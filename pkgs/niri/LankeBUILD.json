@@ -45,22 +45,23 @@
     "libxkbcommon.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "cairo",
     "gcc",
+    "git",
     "glib",
     "glibc",
     "libdisplay-info",
     "libinput",
     "libxkbcommon",
+    "llvm",
     "mesa",
     "pango",
     "pipewire",
     "pixman",
+    "rust",
     "seatd",
-    "systemd",
-    "llvm",
-    "git",
-    "rust"
+    "systemd"
   ]
 }

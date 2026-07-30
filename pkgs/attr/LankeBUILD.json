@@ -17,10 +17,11 @@
     "libattr.so.1"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "gcc",
-    "make",
     "gettext",
-    "git"
+    "git",
+    "glibc",
+    "make"
   ]
 }

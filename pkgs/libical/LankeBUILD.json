@@ -44,17 +44,18 @@
     "libicalvcard.so.4.0"
   ],
   "build_deps": [
-    "gcc",
-    "glib",
-    "glibc",
-    "icu",
-    "libxml2",
+    "base-devel",
     "cmake",
     "doxygen",
-    "gobject-introspection",
+    "gcc",
     "git",
+    "glib",
+    "glibc",
+    "gobject-introspection",
+    "icu",
+    "libxml2",
+    "ninja",
     "openjdk25",
-    "vala",
-    "ninja"
+    "vala"
   ]
 }

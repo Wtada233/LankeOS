@@ -20,11 +20,12 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libxcrypt",
+    "make",
     "ncurses",
-    "readline",
-    "gcc",
-    "make"
+    "readline"
   ]
 }

@@ -24,11 +24,12 @@
     "libc.so.6"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libX11",
     "libXext",
     "libXrender",
-    "gcc",
     "make",
     "pkgconf",
     "util-macros"

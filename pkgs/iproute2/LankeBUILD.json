@@ -20,11 +20,12 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libcap",
     "libelf",
-    "python",
-    "gcc",
-    "make"
+    "make",
+    "python"
   ]
 }

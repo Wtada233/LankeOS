@@ -34,18 +34,19 @@
   ],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
+    "cups",
     "dbus",
+    "ell",
+    "gcc",
+    "git",
     "glib",
     "glibc",
     "json-c",
     "libical",
-    "readline",
-    "systemd",
-    "cups",
-    "ell",
-    "git",
-    "gcc",
     "make",
-    "pkgconf"
+    "pkgconf",
+    "readline",
+    "systemd"
   ]
 }

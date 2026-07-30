@@ -17,8 +17,9 @@
   "provides": [],
   "build_deps": [
     "acl",
-    "glibc",
+    "attr",
+    "base-devel",
     "gcc",
-    "attr"
+    "glibc"
   ]
 }

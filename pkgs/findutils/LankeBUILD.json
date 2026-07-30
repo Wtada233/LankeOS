@@ -16,12 +16,13 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bash",
-    "glibc",
     "gcc",
-    "make",
     "git",
+    "glibc",
     "gperf",
+    "make",
     "python",
     "wget"
   ]

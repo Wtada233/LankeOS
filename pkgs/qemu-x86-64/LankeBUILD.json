@@ -69,6 +69,7 @@
   "build_deps": [
     "Linux-PAM",
     "alsa-lib",
+    "base-devel",
     "bzip2",
     "cairo",
     "curl",

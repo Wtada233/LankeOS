@@ -19,10 +19,11 @@
     "libxkbfile.so.1"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libX11",
     "libxkbfile",
-    "gcc",
     "make",
     "pkgconf"
   ]

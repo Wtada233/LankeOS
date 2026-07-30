@@ -31,15 +31,16 @@
   "build_deps": [
     "acl",
     "attr",
+    "base-devel",
     "bash",
+    "gcc",
+    "git",
     "glibc",
     "lz4",
+    "make",
     "openssl",
     "popt",
     "zlib",
-    "zstd",
-    "gcc",
-    "make",
-    "git"
+    "zstd"
   ]
 }

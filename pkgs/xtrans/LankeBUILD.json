@@ -11,8 +11,9 @@
   "release": 2,
   "needed_so": [],
   "build_deps": [
-    "make",
+    "base-devel",
     "gcc",
+    "make",
     "pkgconf"
   ]
 }

@@ -6,6 +6,7 @@
   ],
   "work_sources": [],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "libnfnetlink",

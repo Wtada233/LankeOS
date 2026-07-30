@@ -27,14 +27,15 @@
     "libxcb.so.1"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libxcb",
-    "xcb-util-image",
-    "xcb-util-renderutil",
-    "xwayland",
-    "gcc",
     "make",
     "pkgconf",
-    "xorgproto"
+    "xcb-util-image",
+    "xcb-util-renderutil",
+    "xorgproto",
+    "xwayland"
   ]
 }

@@ -16,9 +16,10 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bzip2",
-    "glibc",
     "gcc",
+    "glibc",
     "make"
   ]
 }

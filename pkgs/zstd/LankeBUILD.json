@@ -24,13 +24,14 @@
     "libzstd.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "cmake",
+    "gcc",
     "glibc",
     "lz4",
+    "ninja",
     "xz",
-    "zlib",
-    "gcc",
-    "cmake",
-    "ninja"
+    "zlib"
   ]
 }

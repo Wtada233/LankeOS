@@ -21,14 +21,15 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bluez",
+    "gcc",
     "glib",
     "glibc",
-    "python",
     "intltool",
     "iproute2",
-    "gcc",
     "make",
-    "pkgconf"
+    "pkgconf",
+    "python"
   ]
 }

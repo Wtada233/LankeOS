@@ -21,11 +21,12 @@
     "libmbedx509.so.7"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
-    "glibc",
-    "gcc",
     "cmake",
+    "gcc",
     "git",
+    "glibc",
     "ninja",
     "python"
   ]

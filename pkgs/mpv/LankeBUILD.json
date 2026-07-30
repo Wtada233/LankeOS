@@ -76,10 +76,11 @@
   ],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
     "ffmpeg",
     "ffnvcodec-headers",
-    "git",
     "gcc",
+    "git",
     "glibc",
     "lcms2",
     "libX11",

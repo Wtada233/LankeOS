@@ -25,12 +25,13 @@
     "libass.so.9"
   ],
   "build_deps": [
+    "base-devel",
     "fontconfig",
     "freetype",
     "fribidi",
+    "gcc",
     "glibc",
     "harfbuzz",
-    "gcc",
     "make",
     "nasm"
   ]

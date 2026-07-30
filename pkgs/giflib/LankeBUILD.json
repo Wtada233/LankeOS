@@ -18,12 +18,13 @@
     "libgif.so.7"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "docbook-xml",
     "docbook-xsl",
-    "git",
-    "xmlto",
     "gcc",
-    "make"
+    "git",
+    "glibc",
+    "make",
+    "xmlto"
   ]
 }

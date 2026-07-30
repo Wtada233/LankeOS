@@ -22,10 +22,11 @@
     "libx265.so.215"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "gcc",
     "glibc",
-    "cmake",
-    "ninja",
-    "nasm"
+    "nasm",
+    "ninja"
   ]
 }

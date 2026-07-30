@@ -15,15 +15,16 @@
   ],
   "provides": [],
   "build_deps": [
-    "glibc",
-    "libcap",
+    "base-devel",
     "bash-completion",
     "docbook-xsl",
+    "gcc",
     "git",
+    "glibc",
+    "libcap",
     "libxslt",
     "meson",
     "ninja",
-    "gcc",
     "pkgconf"
   ]
 }

@@ -18,8 +18,9 @@
     "libc.so.6"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "gcc",
+    "glibc",
     "make",
     "pkgconf"
   ]

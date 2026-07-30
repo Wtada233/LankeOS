@@ -51,20 +51,21 @@
     "libQt6UiTools.so.6"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "gcc",
+    "git",
     "glibc",
     "libglvnd",
     "libinput",
     "libxkbcommon",
-    "mtdev",
-    "qt6-base",
-    "systemd",
-    "zstd",
     "llvm",
-    "cmake",
+    "mtdev",
     "ninja",
-    "git",
+    "qt6-base",
     "qt6-declarative",
-    "vulkan-headers"
+    "systemd",
+    "vulkan-headers",
+    "zstd"
   ]
 }

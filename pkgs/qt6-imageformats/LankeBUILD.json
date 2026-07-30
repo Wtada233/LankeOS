@@ -30,14 +30,15 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "gcc",
+    "git",
     "glibc",
     "libglvnd",
     "libtiff",
     "libwebp",
-    "qt6-base",
-    "cmake",
     "ninja",
-    "git"
+    "qt6-base"
   ]
 }

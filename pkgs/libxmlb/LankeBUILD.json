@@ -26,18 +26,19 @@
     "libxmlb.so.2"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
+    "git",
     "glib",
     "glibc",
-    "libstemmer",
-    "xz",
-    "zstd",
-    "meson",
-    "ninja",
-    "gcc",
-    "pkgconf",
-    "git",
     "gobject-introspection",
     "gtk-doc",
-    "shared-mime-info"
+    "libstemmer",
+    "meson",
+    "ninja",
+    "pkgconf",
+    "shared-mime-info",
+    "xz",
+    "zstd"
   ]
 }

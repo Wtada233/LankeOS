@@ -25,19 +25,20 @@
   ],
   "provides": [],
   "build_deps": [
+    "autoconf-archive",
+    "base-devel",
+    "gcc",
+    "git",
     "glibc",
+    "gperf",
     "libpsl",
+    "make",
     "openssl",
     "pcre2",
-    "util-linux",
-    "zlib",
-    "gcc",
-    "pkgconf",
-    "make",
-    "autoconf-archive",
-    "git",
-    "gperf",
     "perl",
-    "python"
+    "pkgconf",
+    "python",
+    "util-linux",
+    "zlib"
   ]
 }

@@ -34,17 +34,18 @@
     "libwayland-cursor.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "cairo",
     "dbus",
+    "gcc",
     "glib",
     "glibc",
     "gtk3",
-    "pango",
-    "wayland",
     "meson",
     "ninja",
-    "wayland-protocols",
+    "pango",
     "pkgconf",
-    "gcc"
+    "wayland",
+    "wayland-protocols"
   ]
 }

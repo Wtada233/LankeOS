@@ -61,24 +61,25 @@
   ],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
     "bash",
     "bluez",
     "dbus",
     "fftw",
+    "gcc",
     "glib",
     "glibc",
     "gst-plugins-base",
     "gstreamer",
     "libpulse",
     "libsndfile",
+    "meson",
     "ncurses",
+    "ninja",
     "opus",
+    "pkgconf",
     "readline",
     "sbc",
-    "systemd",
-    "meson",
-    "ninja",
-    "gcc",
-    "pkgconf"
+    "systemd"
   ]
 }

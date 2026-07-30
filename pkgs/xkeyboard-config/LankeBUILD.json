@@ -10,12 +10,13 @@
   "deps": [],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "libxkbcommon",
+    "libxslt",
     "meson",
     "ninja",
     "pkgconf",
-    "libxkbcommon",
-    "libxslt",
-    "xkbcomp",
-    "python"
+    "python",
+    "xkbcomp"
   ]
 }

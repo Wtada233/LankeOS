@@ -51,8 +51,11 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "cairo",
+    "gcc",
     "gdk-pixbuf",
+    "git",
     "glib",
     "glibc",
     "json-c",
@@ -61,18 +64,16 @@
     "libinput",
     "libxcb",
     "libxkbcommon",
+    "meson",
+    "ninja",
     "pango",
     "pcre2",
     "pixman",
     "systemd",
     "wayland",
+    "wayland-protocols",
     "wlroots",
     "xcb-util-wm",
-    "xwayland",
-    "git",
-    "meson",
-    "ninja",
-    "wayland-protocols",
-    "gcc"
+    "xwayland"
   ]
 }

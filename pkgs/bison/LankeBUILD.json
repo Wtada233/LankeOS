@@ -17,10 +17,11 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
     "gettext",
     "glibc",
-    "gcc",
     "make"
   ]
 }

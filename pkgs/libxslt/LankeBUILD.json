@@ -23,10 +23,11 @@
     "libxslt.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
     "glibc",
     "libxml2",
-    "gcc",
     "make",
     "pkgconf"
   ]

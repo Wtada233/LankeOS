@@ -20,14 +20,15 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "dbus",
+    "gcc",
+    "git",
     "glibc",
     "libcap",
-    "systemd",
-    "gcc",
     "meson",
     "ninja",
-    "git",
+    "systemd",
     "vim"
   ]
 }

@@ -19,10 +19,11 @@
     "libseat.so.1"
   ],
   "build_deps": [
-    "glibc",
-    "systemd",
+    "base-devel",
     "gcc",
+    "glibc",
     "meson",
-    "ninja"
+    "ninja",
+    "systemd"
   ]
 }

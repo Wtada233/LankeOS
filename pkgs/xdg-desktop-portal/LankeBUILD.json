@@ -33,7 +33,9 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "fuse3",
+    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",
@@ -41,12 +43,11 @@
     "gstreamer",
     "json-glib",
     "libgudev",
-    "pipewire",
-    "systemd",
     "meson",
     "ninja",
-    "gcc",
+    "pipewire",
     "pkgconf",
-    "python"
+    "python",
+    "systemd"
   ]
 }

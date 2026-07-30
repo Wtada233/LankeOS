@@ -20,10 +20,11 @@
     "libz.so.1"
   ],
   "build_deps": [
-    "glibc",
-    "zlib",
+    "base-devel",
     "gcc",
+    "glibc",
     "make",
-    "pkgconf"
+    "pkgconf",
+    "zlib"
   ]
 }

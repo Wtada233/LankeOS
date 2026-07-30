@@ -24,6 +24,7 @@
     "libfftw3f_threads.so.3"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "gcc",
     "glibc",

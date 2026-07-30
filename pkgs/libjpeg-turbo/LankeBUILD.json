@@ -21,10 +21,11 @@
     "libturbojpeg.so.0"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "cmake",
+    "gcc",
+    "glibc",
     "nasm",
-    "ninja",
-    "gcc"
+    "ninja"
   ]
 }

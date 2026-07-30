@@ -30,6 +30,7 @@
     "liblua5.5.so"
   ],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "make"

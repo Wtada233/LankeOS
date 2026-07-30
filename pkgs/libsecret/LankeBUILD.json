@@ -23,13 +23,14 @@
     "libsecret-1.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glib",
     "glibc",
     "gnutls",
     "gobject-introspection",
     "meson",
     "ninja",
-    "pkgconf",
-    "gcc"
+    "pkgconf"
   ]
 }

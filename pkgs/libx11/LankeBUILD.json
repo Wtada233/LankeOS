@@ -22,12 +22,13 @@
     "libxcb.so.1"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libxcb",
-    "gcc",
     "make",
     "pkgconf",
-    "xorgproto",
-    "util-macros"
+    "util-macros",
+    "xorgproto"
   ]
 }

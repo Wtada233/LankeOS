@@ -29,11 +29,12 @@
     "libglslang.so.16"
   ],
   "build_deps": [
+    "SPIRV-Headers",
     "SPIRV-Tools",
+    "base-devel",
+    "cmake",
     "gcc",
     "glibc",
-    "cmake",
-    "ninja",
-    "SPIRV-Headers"
+    "ninja"
   ]
 }

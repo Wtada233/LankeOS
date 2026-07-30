@@ -25,11 +25,12 @@
     "libigfxcmrt.so.7"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "gcc",
     "glibc",
     "intel-gmmlib",
     "libva",
-    "cmake",
     "make"
   ]
 }

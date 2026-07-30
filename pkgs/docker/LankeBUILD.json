@@ -8,18 +8,19 @@
   ],
   "work_sources": [],
   "build_deps": [
+    "base-devel",
     "bash",
+    "cmake",
+    "containerd",
+    "docker",
+    "git",
     "glibc",
     "golang",
-    "cmake",
-    "git",
-    "make",
-    "sed",
-    "docker",
-    "containerd",
-    "nftables",
+    "iptables",
     "linux",
-    "iptables"
+    "make",
+    "nftables",
+    "sed"
   ],
   "needed_so": [
     "libc.so.6",

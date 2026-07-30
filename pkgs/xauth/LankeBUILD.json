@@ -23,13 +23,14 @@
     "libc.so.6"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "libX11",
     "libXau",
     "libXext",
     "libxmu",
-    "gcc",
-    "pkgconf",
-    "make"
+    "make",
+    "pkgconf"
   ]
 }

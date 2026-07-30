@@ -16,8 +16,9 @@
     "libfuse3.so.4"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "gcc",
+    "glibc",
     "meson",
     "ninja",
     "pkgconf",

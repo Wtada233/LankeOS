@@ -20,9 +20,10 @@
     "libfyaml.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
     "llvm",
-    "gcc",
     "make"
   ],
   "release": 2

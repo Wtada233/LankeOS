@@ -18,12 +18,13 @@
     "libdisplay-info.so.3"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
+    "hwdata",
     "meson",
     "ninja",
-    "hwdata",
-    "python",
     "pkgconf",
-    "gcc"
+    "python"
   ]
 }

@@ -25,13 +25,14 @@
   "provides": [],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
     "fftw",
+    "gcc",
     "glibc",
     "iniparser",
+    "make",
     "ncurses",
     "pipewire",
-    "gcc",
-    "make",
     "pkgconf"
   ]
 }

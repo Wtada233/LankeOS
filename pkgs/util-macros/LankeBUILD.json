@@ -11,6 +11,7 @@
   "release": 2,
   "needed_so": [],
   "build_deps": [
+    "base-devel",
     "gcc"
   ]
 }

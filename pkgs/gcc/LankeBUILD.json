@@ -54,23 +54,24 @@
     "libubsan.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
-    "glibc",
-    "gmp",
-    "mpc",
-    "mpfr",
-    "python",
-    "zlib",
-    "zstd",
     "binutils",
     "dejagnu",
     "doxygen",
     "expect",
-    "git",
-    "inetutils",
-    "tcl",
-    "make",
     "gcc",
-    "linux"
+    "git",
+    "glibc",
+    "gmp",
+    "inetutils",
+    "linux",
+    "make",
+    "mpc",
+    "mpfr",
+    "python",
+    "tcl",
+    "zlib",
+    "zstd"
   ]
 }

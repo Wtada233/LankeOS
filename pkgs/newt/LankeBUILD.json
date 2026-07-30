@@ -26,13 +26,14 @@
     "whiptcl.so"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
+    "make",
+    "pkgconf",
     "popt",
     "python",
     "slang",
-    "tcl",
-    "gcc",
-    "make",
-    "pkgconf"
+    "tcl"
   ]
 }

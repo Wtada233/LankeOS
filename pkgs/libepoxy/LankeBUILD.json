@@ -17,14 +17,15 @@
     "libepoxy.so.0"
   ],
   "build_deps": [
+    "base-devel",
+    "doxygen",
+    "gcc",
+    "git",
     "glibc",
+    "mesa",
     "meson",
     "ninja",
-    "doxygen",
-    "git",
-    "systemd",
-    "mesa",
     "pkgconf",
-    "gcc"
+    "systemd"
   ]
 }

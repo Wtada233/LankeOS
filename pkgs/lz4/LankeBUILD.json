@@ -17,9 +17,10 @@
     "liblz4.so.1"
   ],
   "build_deps": [
-    "glibc",
+    "base-devel",
     "diffutils",
     "git",
+    "glibc",
     "meson",
     "ninja"
   ]

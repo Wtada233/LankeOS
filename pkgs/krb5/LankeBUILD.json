@@ -46,12 +46,13 @@
     "libverto.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "e2fsprogs",
-    "glibc",
-    "openssl",
     "gcc",
+    "glibc",
     "make",
+    "openssl",
     "perl"
   ]
 }

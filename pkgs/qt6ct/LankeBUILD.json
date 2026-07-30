@@ -30,14 +30,15 @@
     "libqt6ct-common.so.0.11"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "gcc",
+    "git",
     "glibc",
     "libglvnd",
     "libxkbcommon",
-    "qt6-base",
-    "cmake",
     "ninja",
-    "git",
+    "qt6-base",
     "qt6-tools"
   ]
 }

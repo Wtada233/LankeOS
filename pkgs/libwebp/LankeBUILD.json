@@ -36,14 +36,15 @@
     "libwebpmux.so.3"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
+    "gcc",
     "giflib",
     "glibc",
     "libjpeg-turbo",
     "libpng",
     "libtiff",
-    "zlib",
-    "cmake",
     "ninja",
-    "gcc"
+    "zlib"
   ]
 }

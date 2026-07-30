@@ -36,20 +36,21 @@
     "libatspi.so.0"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "dbus",
+    "gcc",
+    "git",
     "glib",
     "glibc",
+    "gobject-introspection",
     "libX11",
     "libXi",
     "libXtst",
-    "xwayland",
+    "libxml2",
     "meson",
     "ninja",
-    "gcc",
     "pkgconf",
-    "git",
-    "gobject-introspection",
-    "libxml2"
+    "xwayland"
   ]
 }

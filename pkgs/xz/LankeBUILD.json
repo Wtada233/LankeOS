@@ -18,11 +18,12 @@
     "liblzma.so.5"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "gcc",
+    "git",
     "glibc",
     "make",
-    "gcc",
-    "pkgconf",
-    "git"
+    "pkgconf"
   ]
 }

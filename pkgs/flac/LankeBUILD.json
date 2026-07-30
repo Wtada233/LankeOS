@@ -25,13 +25,14 @@
     "libFLAC.so.14"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
+    "doxygen",
     "gcc",
+    "git",
     "glibc",
     "libogg",
     "make",
-    "cmake",
-    "doxygen",
-    "git",
     "nasm",
     "ninja"
   ]

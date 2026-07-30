@@ -27,12 +27,13 @@
     "libdrm_radeon.so.1"
   ],
   "build_deps": [
+    "base-devel",
+    "cairo",
+    "gcc",
     "glibc",
     "libpciaccess",
     "meson",
     "ninja",
-    "cairo",
-    "pkgconf",
-    "gcc"
+    "pkgconf"
   ]
 }

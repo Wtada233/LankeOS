@@ -19,6 +19,7 @@
   "provides": [],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
     "flac",
     "glibc",
     "golang"

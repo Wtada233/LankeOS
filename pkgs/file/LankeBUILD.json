@@ -26,6 +26,7 @@
     "libmagic.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "bzip2",
     "gcc",
     "git",

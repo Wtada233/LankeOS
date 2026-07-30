@@ -18,17 +18,18 @@
   ],
   "provides": [],
   "build_deps": [
-    "gcc",
-    "glibc",
-    "llvm",
+    "base-devel",
     "cmake",
     "flex",
     "fmt",
+    "gcc",
+    "glibc",
+    "llvm",
+    "make",
+    "pkgconf",
     "python",
     "qt6-base",
     "qt6-svg",
-    "sqlite",
-    "pkgconf",
-    "make"
+    "sqlite"
   ]
 }

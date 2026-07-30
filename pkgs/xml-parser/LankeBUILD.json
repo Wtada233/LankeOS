@@ -16,10 +16,11 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "expat",
+    "gcc",
     "glibc",
-    "perl",
     "make",
-    "gcc"
+    "perl"
   ]
 }

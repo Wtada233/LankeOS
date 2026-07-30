@@ -23,11 +23,12 @@
     "libsdbus-c++.so.2"
   ],
   "build_deps": [
+    "base-devel",
+    "cmake",
+    "doxygen",
     "gcc",
     "glibc",
-    "systemd",
-    "cmake",
     "ninja",
-    "doxygen"
+    "systemd"
   ]
 }

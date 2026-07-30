@@ -47,18 +47,19 @@
   ],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
+    "doxygen",
     "gcc",
     "glibc",
     "json-c",
     "libglvnd",
     "libjpeg-turbo",
-    "qt5compat",
-    "qt6-base",
-    "systemd",
+    "llvm",
     "meson",
     "ninja",
     "pkgconf",
-    "llvm",
-    "doxygen"
+    "qt5compat",
+    "qt6-base",
+    "systemd"
   ]
 }

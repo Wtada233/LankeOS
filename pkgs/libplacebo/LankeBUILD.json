@@ -25,15 +25,16 @@
     "libplacebo.so.360"
   ],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "glslang",
     "lcms2",
-    "vulkan-loader",
+    "libglvnd",
     "meson",
     "ninja",
     "pkgconf",
-    "libglvnd",
-    "vulkan-headers"
+    "vulkan-headers",
+    "vulkan-loader"
   ]
 }

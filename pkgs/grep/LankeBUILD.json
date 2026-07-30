@@ -17,12 +17,13 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bash",
-    "glibc",
-    "pcre2",
-    "make",
     "git",
+    "glibc",
     "gperf",
+    "make",
+    "pcre2",
     "texinfo"
   ]
 }

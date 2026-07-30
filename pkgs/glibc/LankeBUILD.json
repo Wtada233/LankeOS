@@ -47,12 +47,13 @@
     "libutil.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
-    "git",
-    "python",
-    "gcc",
-    "make",
     "binutils",
-    "findutils"
+    "findutils",
+    "gcc",
+    "git",
+    "make",
+    "python"
   ]
 }

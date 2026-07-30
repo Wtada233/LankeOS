@@ -29,21 +29,22 @@
     "libcurl.so.4"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
-    "glibc",
-    "libpsl",
-    "nghttp2",
-    "openssl",
-    "zlib",
-    "zstd",
-    "gcc",
-    "make",
-    "pkgconf",
     "brotli",
+    "gcc",
     "git",
+    "glibc",
     "gnutls",
     "krb5",
     "libidn2",
-    "nettle"
+    "libpsl",
+    "make",
+    "nettle",
+    "nghttp2",
+    "openssl",
+    "pkgconf",
+    "zlib",
+    "zstd"
   ]
 }

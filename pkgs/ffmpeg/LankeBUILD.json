@@ -66,6 +66,7 @@
   ],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
     "bzip2",
     "ffnvcodec-headers",
     "gcc",

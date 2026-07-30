@@ -20,8 +20,9 @@
     "libssl.so.3"
   ],
   "build_deps": [
+    "base-devel",
+    "gcc",
     "glibc",
-    "perl",
-    "gcc"
+    "perl"
   ]
 }

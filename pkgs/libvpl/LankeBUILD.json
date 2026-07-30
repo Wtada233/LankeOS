@@ -21,10 +21,11 @@
     "libvpl.so.2"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
+    "cmake",
     "gcc",
     "glibc",
-    "cmake",
     "ninja"
   ]
 }

@@ -38,8 +38,10 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "cairo",
     "fontconfig",
+    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",
@@ -48,12 +50,11 @@
     "gtk4",
     "libX11",
     "libadwaita",
-    "wayland",
-    "xwayland",
     "meson",
     "ninja",
-    "gcc",
     "pkgconf",
-    "python"
+    "python",
+    "wayland",
+    "xwayland"
   ]
 }

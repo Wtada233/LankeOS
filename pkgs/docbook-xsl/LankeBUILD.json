@@ -11,5 +11,7 @@
   "provides": [],
   "release": 1,
   "needed_so": [],
-  "build_deps": []
+  "build_deps": [
+    "base-devel"
+  ]
 }

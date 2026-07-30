@@ -31,6 +31,7 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "boost",
     "cmake",
     "curl",

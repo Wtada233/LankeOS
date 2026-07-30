@@ -19,9 +19,10 @@
     "libedit.so.0"
   ],
   "build_deps": [
-    "glibc",
-    "ncurses",
+    "base-devel",
     "gcc",
-    "make"
+    "glibc",
+    "make",
+    "ncurses"
   ]
 }

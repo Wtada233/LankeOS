@@ -22,12 +22,13 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
+    "cmake",
     "fontconfig",
     "freetype",
     "gcc",
-    "glibc",
-    "cmake",
     "git",
+    "glibc",
     "libxcb",
     "ncurses",
     "rust"

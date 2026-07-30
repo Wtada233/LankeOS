@@ -124,15 +124,16 @@
     "libboost_wserialization.so.1.90.0"
   ],
   "build_deps": [
+    "base-devel",
     "bzip2",
     "gcc",
     "glibc",
     "icu",
+    "make",
     "openssl",
+    "python",
     "xz",
     "zlib",
-    "zstd",
-    "python",
-    "make"
+    "zstd"
   ]
 }

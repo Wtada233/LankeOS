@@ -21,9 +21,10 @@
     "libjq.so.1"
   ],
   "build_deps": [
-    "glibc",
-    "oniguruma",
+    "base-devel",
     "gcc",
-    "make"
+    "glibc",
+    "make",
+    "oniguruma"
   ]
 }

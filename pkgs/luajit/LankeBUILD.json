@@ -20,6 +20,7 @@
     "libluajit-5.1.so.2"
   ],
   "build_deps": [
+    "base-devel",
     "gcc",
     "glibc",
     "make"

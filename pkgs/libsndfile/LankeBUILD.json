@@ -23,9 +23,10 @@
   ],
   "build_deps": [
     "alsa-lib",
+    "base-devel",
+    "gcc",
     "glibc",
     "libmp3lame",
-    "gcc",
     "make",
     "pkgconf"
   ]

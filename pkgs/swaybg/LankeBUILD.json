@@ -22,14 +22,15 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "cairo",
+    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",
-    "wayland",
     "meson",
     "ninja",
-    "gcc",
+    "wayland",
     "wayland-protocols"
   ]
 }
