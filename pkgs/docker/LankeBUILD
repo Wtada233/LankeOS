@@ -35,14 +35,19 @@ lankebuild_build() {
     hack/make.sh dynbinary
     cd "$GOPATH"
 
-    # docker-init (tini) — 使用 glibc 环境静态编译
+    # docker-init (tini)
     cd src/github.com/krallin/tini
-    docker run --rm -v "$PWD:/build" -w /build debian:stable-slim sh -c "
-        apt-get update -qq && apt-get install -y -qq --no-install-recommends build-essential cmake
-        cmake -DCMAKE_BUILD_TYPE=Release .
+    CID=$(docker run -d debian:stable-slim sleep infinity)
+
+    docker cp . "$CID":/build
+    docker exec "$CID" sh -c "
+        apt-get update -qq && apt-get install -y -qq --no-install-recommends build-essential cmake &&
+        cd /build &&
+        cmake -DCMAKE_BUILD_TYPE=Release . &&
         make tini-static
     "
-    cd "$GOPATH"
+    docker cp "$CID":/build/tini-static .
+    docker rm -f "$CID"
 }
 
 
