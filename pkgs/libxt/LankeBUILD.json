@@ -25,13 +25,10 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libX11",
     "libice",
     "libsm",
-    "make",
-    "pkgconf",
     "util-macros"
   ]
 }

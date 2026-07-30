@@ -24,13 +24,11 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glib",
     "glibc",
     "gnutls",
     "gobject-introspection",
     "meson",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

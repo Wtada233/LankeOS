@@ -43,13 +43,10 @@
     "base-devel",
     "bash",
     "bash-completion",
-    "file",
-    "gcc",
     "git",
     "glibc",
     "libxcrypt",
     "ncurses",
-    "pkgconf",
     "readline",
     "zlib"
   ]

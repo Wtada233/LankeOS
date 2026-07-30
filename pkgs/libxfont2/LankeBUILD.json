@@ -25,11 +25,10 @@
     "libz.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "fontenc",
     "freetype",
     "glibc",
-    "zlib",
-    "gcc",
-    "make"
+    "zlib"
   ]
 }

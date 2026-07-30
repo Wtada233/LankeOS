@@ -67,7 +67,6 @@
     "diffutils",
     "fontconfig",
     "freetype",
-    "gcc",
     "gdk-pixbuf",
     "git",
     "glib",

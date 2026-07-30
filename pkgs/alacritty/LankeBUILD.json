@@ -26,7 +26,6 @@
     "cmake",
     "fontconfig",
     "freetype",
-    "gcc",
     "git",
     "glibc",
     "libxcb",

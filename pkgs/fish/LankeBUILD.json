@@ -22,7 +22,6 @@
     "base-devel",
     "cmake",
     "expect",
-    "gcc",
     "git",
     "glibc",
     "jq",

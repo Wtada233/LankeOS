@@ -29,10 +29,8 @@
     "fontconfig",
     "freetype",
     "fribidi",
-    "gcc",
     "glibc",
     "harfbuzz",
-    "make",
     "nasm"
   ]
 }

@@ -19,7 +19,6 @@
     "acl",
     "attr",
     "base-devel",
-    "gcc",
     "glibc"
   ]
 }

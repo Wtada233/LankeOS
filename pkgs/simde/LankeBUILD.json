@@ -9,6 +9,7 @@
   "deps": [],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "meson"
   ]
 }

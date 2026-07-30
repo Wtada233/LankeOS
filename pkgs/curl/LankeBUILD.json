@@ -32,18 +32,15 @@
     "base-devel",
     "bash",
     "brotli",
-    "gcc",
     "git",
     "glibc",
     "gnutls",
     "krb5",
     "libidn2",
     "libpsl",
-    "make",
     "nettle",
     "nghttp2",
     "openssl",
-    "pkgconf",
     "zlib",
     "zstd"
   ]

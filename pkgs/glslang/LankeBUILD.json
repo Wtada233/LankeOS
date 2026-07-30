@@ -33,7 +33,6 @@
     "SPIRV-Tools",
     "base-devel",
     "cmake",
-    "gcc",
     "glibc",
     "ninja"
   ]

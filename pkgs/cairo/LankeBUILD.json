@@ -51,7 +51,6 @@
     "bash",
     "fontconfig",
     "freetype",
-    "gcc",
     "git",
     "glib",
     "glibc",
@@ -64,7 +63,6 @@
     "meson",
     "ninja",
     "pixman",
-    "pkgconf",
     "xwayland",
     "zlib"
   ]

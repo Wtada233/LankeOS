@@ -24,13 +24,10 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libX11",
     "libXau",
     "libXext",
-    "libxmu",
-    "make",
-    "pkgconf"
+    "libxmu"
   ]
 }

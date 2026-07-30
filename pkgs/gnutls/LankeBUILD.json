@@ -34,13 +34,10 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "gmp",
     "libtasn1",
-    "make",
     "nettle",
-    "p11-kit",
-    "pkgconf"
+    "p11-kit"
   ]
 }

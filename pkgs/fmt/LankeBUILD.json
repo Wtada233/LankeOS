@@ -24,7 +24,6 @@
     "base-devel",
     "cmake",
     "doxygen",
-    "gcc",
     "git",
     "glibc",
     "ninja"

@@ -58,7 +58,6 @@
     "cmake",
     "expat",
     "extra-cmake-modules",
-    "gcc",
     "gdk-pixbuf",
     "git",
     "glib",
@@ -68,9 +67,7 @@
     "ninja",
     "nlohmann-json",
     "pango",
-    "pkgconf",
     "systemd",
-    "util-linux",
     "wayland",
     "wayland-protocols",
     "zlib"

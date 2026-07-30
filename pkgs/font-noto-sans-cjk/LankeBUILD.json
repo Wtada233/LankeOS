@@ -9,5 +9,7 @@
   "needed_so": [],
   "deps": [],
   "provides": [],
-  "build_deps": []
+  "build_deps": [
+    "base-devel"
+  ]
 }

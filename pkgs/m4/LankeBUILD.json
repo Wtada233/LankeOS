@@ -15,11 +15,9 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "gcc",
     "git",
     "glibc",
     "gperf",
-    "make",
     "python"
   ]
 }

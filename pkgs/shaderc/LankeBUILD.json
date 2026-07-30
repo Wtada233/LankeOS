@@ -31,7 +31,6 @@
     "SPIRV-Tools",
     "base-devel",
     "cmake",
-    "gcc",
     "glibc",
     "glslang",
     "ninja",

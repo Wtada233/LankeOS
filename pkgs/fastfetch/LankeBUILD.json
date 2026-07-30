@@ -19,7 +19,6 @@
     "base-devel",
     "bash",
     "cmake",
-    "gcc",
     "glibc",
     "libXrandr",
     "libglvnd",
@@ -27,7 +26,6 @@
     "libva",
     "libxcb",
     "lua",
-    "make",
     "sqlite",
     "zlib"
   ]

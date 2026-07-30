@@ -23,8 +23,6 @@
   "build_deps": [
     "base-devel",
     "docbook-xsl",
-    "gcc",
-    "gettext",
     "glib",
     "glibc",
     "libxml2",

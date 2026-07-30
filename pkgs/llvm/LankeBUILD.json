@@ -47,7 +47,6 @@
     "base-devel",
     "cmake",
     "curl",
-    "gcc",
     "glibc",
     "libedit",
     "libffi",

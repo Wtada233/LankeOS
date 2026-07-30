@@ -33,14 +33,12 @@
     "attr",
     "base-devel",
     "docbook-xsl",
-    "gcc",
     "git",
     "glibc",
     "itstool",
     "libcap",
     "libxcrypt",
     "libxslt",
-    "make",
     "systemd"
   ]
 }

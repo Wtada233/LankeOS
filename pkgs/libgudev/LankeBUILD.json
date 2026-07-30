@@ -23,7 +23,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "git",
     "glib",
     "glibc",
@@ -31,7 +30,6 @@
     "gtk-doc",
     "meson",
     "ninja",
-    "pkgconf",
     "systemd",
     "vala"
   ]

@@ -9,9 +9,9 @@
   "deps": [],
   "provides": [],
   "build_deps": [
-    "gcc",
+    "base-devel",
     "cmake",
-    "ninja",
-    "git"
+    "git",
+    "ninja"
   ]
 }

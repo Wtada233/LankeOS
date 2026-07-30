@@ -8,10 +8,7 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "glibc",
-    "make",
-    "sed",
     "systemd"
   ],
   "needed_so": [

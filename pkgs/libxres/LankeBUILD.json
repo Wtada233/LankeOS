@@ -23,12 +23,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libX11",
     "libXext",
-    "make",
-    "pkgconf",
     "util-macros"
   ]
 }

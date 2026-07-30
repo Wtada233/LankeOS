@@ -20,11 +20,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libX11",
-    "libxkbfile",
-    "make",
-    "pkgconf"
+    "libxkbfile"
   ]
 }

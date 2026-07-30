@@ -21,10 +21,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libX11",
-    "make",
     "util-macros"
   ]
 }

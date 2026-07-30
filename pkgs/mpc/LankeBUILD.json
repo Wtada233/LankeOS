@@ -23,11 +23,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "gmp",
-    "make",
-    "mpfr",
-    "pkgconf"
+    "mpfr"
   ]
 }

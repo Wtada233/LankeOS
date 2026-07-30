@@ -19,12 +19,10 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "hwdata",
     "meson",
     "ninja",
-    "pkgconf",
     "python"
   ]
 }

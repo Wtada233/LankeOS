@@ -14,10 +14,7 @@
   "needed_so": [],
   "build_deps": [
     "base-devel",
-    "gcc",
     "libxml2",
-    "make",
-    "pkgconf",
     "python"
   ]
 }

@@ -27,12 +27,9 @@
     "alsa-lib",
     "base-devel",
     "fftw",
-    "gcc",
     "glibc",
     "iniparser",
-    "make",
     "ncurses",
-    "pipewire",
-    "pkgconf"
+    "pipewire"
   ]
 }

@@ -18,8 +18,6 @@
   "build_deps": [
     "attr",
     "base-devel",
-    "gcc",
-    "glibc",
-    "pkgconf"
+    "glibc"
   ]
 }

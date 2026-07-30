@@ -28,10 +28,8 @@
   "build_deps": [
     "base-devel",
     "bzip2",
-    "gcc",
     "git",
     "glibc",
-    "make",
     "xz",
     "zlib",
     "zstd"

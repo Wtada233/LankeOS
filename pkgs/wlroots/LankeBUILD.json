@@ -54,7 +54,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "lcms2",
     "libdisplay-info",
@@ -67,7 +66,6 @@
     "meson",
     "ninja",
     "pixman",
-    "pkgconf",
     "seatd",
     "systemd",
     "vulkan-headers",

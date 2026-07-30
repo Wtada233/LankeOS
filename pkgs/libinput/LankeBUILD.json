@@ -29,7 +29,6 @@
   "build_deps": [
     "base-devel",
     "cairo",
-    "gcc",
     "git",
     "glib",
     "glibc",
@@ -40,7 +39,6 @@
     "meson",
     "mtdev",
     "ninja",
-    "pkgconf",
     "python",
     "systemd",
     "wayland",

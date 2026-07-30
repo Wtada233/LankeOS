@@ -36,7 +36,6 @@
     "base-devel",
     "bash",
     "glibc",
-    "make",
     "nspr",
     "perl",
     "python",

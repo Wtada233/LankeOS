@@ -27,7 +27,6 @@
     "base-devel",
     "bash",
     "cmake",
-    "gcc",
     "glibc",
     "lz4",
     "ninja",

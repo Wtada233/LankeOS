@@ -40,7 +40,6 @@
   "build_deps": [
     "base-devel",
     "curl",
-    "gcc",
     "glib",
     "glibc",
     "gnutls",
@@ -50,7 +49,6 @@
     "meson",
     "newt",
     "ninja",
-    "pkgconf",
     "polkit",
     "readline",
     "systemd"

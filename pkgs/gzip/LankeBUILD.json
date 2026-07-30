@@ -17,11 +17,8 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "glibc",
     "less",
-    "make",
-    "pkgconf",
     "python"
   ]
 }

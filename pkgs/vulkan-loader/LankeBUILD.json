@@ -20,14 +20,12 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "gcc",
     "glibc",
     "libX11",
     "libXau",
     "libXdmcp",
     "libxcb",
     "ninja",
-    "pkgconf",
     "vulkan-headers",
     "wayland"
   ]

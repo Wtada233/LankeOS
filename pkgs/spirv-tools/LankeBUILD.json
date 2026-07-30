@@ -30,7 +30,6 @@
     "base-devel",
     "bash",
     "cmake",
-    "gcc",
     "glibc",
     "ninja"
   ]

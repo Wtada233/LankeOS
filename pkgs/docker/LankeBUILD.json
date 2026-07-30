@@ -18,9 +18,7 @@
     "golang",
     "iptables",
     "linux",
-    "make",
-    "nftables",
-    "sed"
+    "nftables"
   ],
   "needed_so": [
     "libc.so.6",

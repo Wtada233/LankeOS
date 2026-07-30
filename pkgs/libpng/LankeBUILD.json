@@ -24,10 +24,8 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "git",
     "glibc",
-    "make",
     "zlib"
   ]
 }

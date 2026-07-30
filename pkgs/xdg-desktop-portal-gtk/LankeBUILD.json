@@ -26,14 +26,12 @@
   "build_deps": [
     "base-devel",
     "fontconfig",
-    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",
     "gtk3",
     "meson",
     "ninja",
-    "pkgconf",
     "python"
   ]
 }

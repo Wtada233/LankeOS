@@ -35,7 +35,6 @@
   "build_deps": [
     "base-devel",
     "fuse3",
-    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",
@@ -46,7 +45,6 @@
     "meson",
     "ninja",
     "pipewire",
-    "pkgconf",
     "python",
     "systemd"
   ]

@@ -26,11 +26,8 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "glibc",
-    "make",
     "ncurses",
-    "pkgconf",
     "readline"
   ]
 }

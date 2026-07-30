@@ -24,11 +24,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libxcb",
     "llvm",
-    "pkgconf",
     "rust",
     "xcb-util-cursor",
     "xwayland"

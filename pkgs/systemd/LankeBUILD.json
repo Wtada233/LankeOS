@@ -33,7 +33,6 @@
     "bash",
     "curl",
     "docbook-xsl",
-    "gcc",
     "git",
     "glibc",
     "gnutls",
@@ -54,11 +53,9 @@
     "ninja",
     "p11-kit",
     "pcre2",
-    "pkgconf",
     "python",
     "rsync",
     "shadow",
-    "util-linux",
     "xz"
   ]
 }

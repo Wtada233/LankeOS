@@ -24,7 +24,6 @@
   "build_deps": [
     "base-devel",
     "cairo",
-    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",

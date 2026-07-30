@@ -38,14 +38,10 @@
     "base-devel",
     "bash",
     "e2fsprogs",
-    "gcc",
     "git",
     "glibc",
-    "make",
-    "pkgconf",
     "ripgrep",
     "systemd",
-    "util-linux",
     "zlib",
     "zstd"
   ]

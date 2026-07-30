@@ -15,7 +15,6 @@
     "libxslt",
     "meson",
     "ninja",
-    "pkgconf",
     "python",
     "xkbcomp"
   ]

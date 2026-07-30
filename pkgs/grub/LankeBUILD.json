@@ -27,14 +27,9 @@
     "bash",
     "freetype",
     "fuse3",
-    "gcc",
-    "gettext",
     "glibc",
     "libtasn1",
-    "make",
-    "pkgconf",
     "python",
-    "texinfo",
     "xz"
   ]
 }

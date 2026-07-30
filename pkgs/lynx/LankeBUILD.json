@@ -33,13 +33,10 @@
     "base-devel",
     "brotli",
     "bzip2",
-    "gcc",
     "glibc",
     "libidn2",
-    "make",
     "ncurses",
     "openssl",
-    "pkgconf",
     "zlib",
     "zstd"
   ]

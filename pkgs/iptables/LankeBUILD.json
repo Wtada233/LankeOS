@@ -8,16 +8,13 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "glibc",
     "libmnl",
     "libnetfilter_conntrack",
     "libnfnetlink",
     "libnftnl",
     "libpcap",
-    "make",
-    "nftables",
-    "sed"
+    "nftables"
   ],
   "needed_so": [
     "libc.so.6",

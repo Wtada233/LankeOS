@@ -20,7 +20,6 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "glibc",
-    "make"
+    "glibc"
   ]
 }

@@ -56,7 +56,6 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "gcc",
     "git",
     "glibc",
     "libglvnd",

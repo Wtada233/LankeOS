@@ -28,11 +28,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libxcb",
-    "make",
-    "pkgconf",
     "xcb-util-image",
     "xcb-util-renderutil",
     "xorgproto",

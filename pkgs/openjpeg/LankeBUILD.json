@@ -29,12 +29,10 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "gcc",
     "glibc",
     "lcms2",
     "libpng",
     "libtiff",
-    "pkgconf",
     "zlib"
   ]
 }

@@ -28,11 +28,9 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "gcc",
     "glibc",
     "icu",
     "ninja",
-    "pkgconf",
     "qt6-base"
   ]
 }

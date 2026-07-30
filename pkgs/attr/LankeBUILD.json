@@ -18,10 +18,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
-    "gettext",
     "git",
-    "glibc",
-    "make"
+    "glibc"
   ]
 }

@@ -18,13 +18,11 @@
     "base-devel",
     "bash-completion",
     "docbook-xsl",
-    "gcc",
     "git",
     "glibc",
     "libcap",
     "libxslt",
     "meson",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

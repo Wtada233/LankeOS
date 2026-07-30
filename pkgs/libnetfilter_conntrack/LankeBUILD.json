@@ -7,11 +7,8 @@
   "work_sources": [],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
-    "libnfnetlink",
-    "make",
-    "pkgconf"
+    "libnfnetlink"
   ],
   "needed_so": [
     "libc.so.6",

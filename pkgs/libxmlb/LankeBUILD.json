@@ -27,7 +27,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "git",
     "glib",
     "glibc",
@@ -36,7 +35,6 @@
     "libstemmer",
     "meson",
     "ninja",
-    "pkgconf",
     "shared-mime-info",
     "xz",
     "zstd"

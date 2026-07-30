@@ -19,7 +19,6 @@
     "base-devel",
     "bash",
     "docbook-xsl",
-    "glibc",
-    "make"
+    "glibc"
   ]
 }

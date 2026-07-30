@@ -39,7 +39,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "glslang",
     "glu",
@@ -52,7 +51,6 @@
     "mesa",
     "meson",
     "ninja",
-    "pkgconf",
     "vulkan-headers",
     "vulkan-loader",
     "wayland",

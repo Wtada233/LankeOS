@@ -14,11 +14,9 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "meson",
     "ninja",
-    "pkgconf",
     "python",
     "systemd"
   ]

@@ -30,7 +30,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "git",
     "glib",
     "glibc",
@@ -39,7 +38,6 @@
     "meson",
     "ninja",
     "pipewire",
-    "pkgconf",
     "systemd"
   ]
 }

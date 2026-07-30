@@ -27,18 +27,14 @@
   "build_deps": [
     "autoconf-archive",
     "base-devel",
-    "gcc",
     "git",
     "glibc",
     "gperf",
     "libpsl",
-    "make",
     "openssl",
     "pcre2",
     "perl",
-    "pkgconf",
     "python",
-    "util-linux",
     "zlib"
   ]
 }

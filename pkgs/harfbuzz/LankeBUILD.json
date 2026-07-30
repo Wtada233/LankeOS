@@ -38,7 +38,6 @@
     "base-devel",
     "cairo",
     "freetype",
-    "gcc",
     "glib",
     "glibc",
     "gobject-introspection",
@@ -47,7 +46,6 @@
     "libpng",
     "meson",
     "ninja",
-    "pkgconf",
     "python",
     "zlib"
   ]

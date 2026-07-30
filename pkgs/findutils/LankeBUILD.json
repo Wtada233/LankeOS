@@ -18,11 +18,9 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "git",
     "glibc",
     "gperf",
-    "make",
     "python",
     "wget"
   ]

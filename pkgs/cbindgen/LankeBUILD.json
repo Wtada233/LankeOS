@@ -17,7 +17,7 @@
   ],
   "provides": [],
   "build_deps": [
-    "gcc",
+    "base-devel",
     "glibc",
     "rust"
   ]

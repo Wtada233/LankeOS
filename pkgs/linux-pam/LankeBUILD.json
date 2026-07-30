@@ -31,13 +31,11 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "gdbm",
     "glibc",
     "libxcrypt",
     "meson",
     "ninja",
-    "pkgconf",
     "systemd"
   ]
 }

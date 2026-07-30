@@ -49,11 +49,7 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "binutils",
-    "findutils",
-    "gcc",
     "git",
-    "make",
     "python"
   ]
 }

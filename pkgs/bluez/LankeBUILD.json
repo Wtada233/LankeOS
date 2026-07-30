@@ -38,14 +38,11 @@
     "cups",
     "dbus",
     "ell",
-    "gcc",
     "git",
     "glib",
     "glibc",
     "json-c",
     "libical",
-    "make",
-    "pkgconf",
     "readline",
     "systemd"
   ]

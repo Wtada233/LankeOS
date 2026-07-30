@@ -21,12 +21,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "gperf",
     "libxcb",
-    "make",
-    "pkgconf",
     "util-macros",
     "xorgproto"
   ]

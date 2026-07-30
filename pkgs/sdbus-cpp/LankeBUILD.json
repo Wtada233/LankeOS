@@ -26,7 +26,6 @@
     "base-devel",
     "cmake",
     "doxygen",
-    "gcc",
     "glibc",
     "ninja",
     "systemd"

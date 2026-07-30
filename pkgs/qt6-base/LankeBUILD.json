@@ -171,7 +171,6 @@
     "dbus",
     "fontconfig",
     "freetype",
-    "gcc",
     "gdk-pixbuf",
     "git",
     "glib",

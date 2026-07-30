@@ -22,10 +22,7 @@
   "build_deps": [
     "base-devel",
     "dejagnu",
-    "gcc",
-    "gettext",
     "glibc",
-    "make",
     "ncurses",
     "systemd"
   ]

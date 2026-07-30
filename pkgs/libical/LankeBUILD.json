@@ -47,7 +47,6 @@
     "base-devel",
     "cmake",
     "doxygen",
-    "gcc",
     "git",
     "glib",
     "glibc",

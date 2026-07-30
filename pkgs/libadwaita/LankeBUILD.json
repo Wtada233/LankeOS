@@ -34,7 +34,6 @@
     "appstream",
     "base-devel",
     "fribidi",
-    "gcc",
     "glib",
     "glibc",
     "gobject-introspection",
@@ -43,7 +42,6 @@
     "meson",
     "ninja",
     "pango",
-    "pkgconf",
     "sassc",
     "vala"
   ]

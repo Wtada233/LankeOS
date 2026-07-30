@@ -39,7 +39,6 @@
     "base-devel",
     "bash",
     "dbus",
-    "gcc",
     "git",
     "glib",
     "glibc",
@@ -50,7 +49,6 @@
     "libxml2",
     "meson",
     "ninja",
-    "pkgconf",
     "xwayland"
   ]
 }

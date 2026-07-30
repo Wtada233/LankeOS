@@ -12,9 +12,6 @@
   "build_deps": [
     "base-devel",
     "bc",
-    "binutils",
-    "gcc",
-    "gettext",
     "glibc",
     "libelf",
     "openssl",

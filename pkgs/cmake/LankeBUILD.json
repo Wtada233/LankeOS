@@ -27,17 +27,15 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "bash",
     "fontconfig",
     "freetype",
+    "git",
     "glibc",
     "libxcb",
-    "xwayland",
-    "gcc",
-    "make",
-    "pkgconf",
-    "git",
     "nlohmann-json",
-    "qt6-base"
+    "qt6-base",
+    "xwayland"
   ]
 }

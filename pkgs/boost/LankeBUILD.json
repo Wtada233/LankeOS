@@ -126,10 +126,8 @@
   "build_deps": [
     "base-devel",
     "bzip2",
-    "gcc",
     "glibc",
     "icu",
-    "make",
     "openssl",
     "python",
     "xz",

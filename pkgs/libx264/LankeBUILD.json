@@ -26,10 +26,7 @@
   "build_deps": [
     "base-devel",
     "ffmpeg",
-    "gcc",
     "glibc",
-    "make",
-    "nasm",
-    "pkgconf"
+    "nasm"
   ]
 }

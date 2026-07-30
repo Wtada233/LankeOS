@@ -18,8 +18,6 @@
   "build_deps": [
     "base-devel",
     "bzip2",
-    "gcc",
-    "glibc",
-    "make"
+    "glibc"
   ]
 }

@@ -42,11 +42,8 @@
     "base-devel",
     "bc",
     "dejagnu",
-    "flex",
-    "gcc",
     "git",
     "glibc",
-    "make",
     "perl",
     "zlib",
     "zstd"

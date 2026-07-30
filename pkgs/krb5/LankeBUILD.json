@@ -49,9 +49,7 @@
     "base-devel",
     "bash",
     "e2fsprogs",
-    "gcc",
     "glibc",
-    "make",
     "openssl",
     "perl"
   ]

@@ -41,13 +41,11 @@
     "fontconfig",
     "freetype",
     "fribidi",
-    "gcc",
     "glib",
     "glibc",
     "gobject-introspection",
     "harfbuzz",
     "meson",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

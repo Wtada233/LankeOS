@@ -19,11 +19,9 @@
   "build_deps": [
     "base-devel",
     "cairo",
-    "gcc",
     "glibc",
     "meson",
     "ninja",
-    "pkgconf",
     "python"
   ]
 }

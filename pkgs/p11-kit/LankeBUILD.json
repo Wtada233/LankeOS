@@ -26,12 +26,10 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "glibc",
     "libffi",
     "libtasn1",
     "meson",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

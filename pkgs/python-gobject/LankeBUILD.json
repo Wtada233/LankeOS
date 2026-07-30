@@ -27,7 +27,6 @@
   "build_deps": [
     "base-devel",
     "cairo",
-    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",
@@ -36,7 +35,6 @@
     "libffi",
     "meson",
     "ninja",
-    "pkgconf",
     "python"
   ]
 }

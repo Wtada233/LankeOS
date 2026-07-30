@@ -42,7 +42,6 @@
     "gtk-doc",
     "meson",
     "ninja",
-    "pkgconf",
     "systemd"
   ]
 }

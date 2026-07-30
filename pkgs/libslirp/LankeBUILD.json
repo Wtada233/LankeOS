@@ -19,11 +19,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glib",
     "glibc",
     "meson",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

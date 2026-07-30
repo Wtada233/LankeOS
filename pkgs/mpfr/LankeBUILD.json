@@ -21,9 +21,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
-    "gmp",
-    "make"
+    "gmp"
   ]
 }

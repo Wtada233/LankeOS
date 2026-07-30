@@ -25,7 +25,6 @@
   "build_deps": [
     "base-devel",
     "dbus",
-    "gcc",
     "gdk-pixbuf",
     "git",
     "glib",
@@ -33,7 +32,6 @@
     "gobject-introspection",
     "gtk4",
     "meson",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

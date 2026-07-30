@@ -14,8 +14,6 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
-    "perl",
-    "pkgconf"
+    "perl"
   ]
 }

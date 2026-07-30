@@ -21,10 +21,8 @@
     "base-devel",
     "docbook-xml",
     "docbook-xsl",
-    "gcc",
     "git",
     "glibc",
-    "make",
     "xmlto"
   ]
 }

@@ -22,8 +22,6 @@
     "git",
     "glibc",
     "gperf",
-    "make",
-    "pcre2",
-    "texinfo"
+    "pcre2"
   ]
 }

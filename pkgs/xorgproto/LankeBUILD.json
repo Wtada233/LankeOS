@@ -14,7 +14,6 @@
     "base-devel",
     "meson",
     "ninja",
-    "pkgconf",
     "util-macros"
   ]
 }

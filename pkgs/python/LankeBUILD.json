@@ -51,17 +51,14 @@
     "bluez",
     "bzip2",
     "expat",
-    "gcc",
     "gdbm",
     "glibc",
     "libffi",
     "llvm",
-    "make",
     "ncurses",
     "openssl",
     "readline",
     "sqlite",
-    "util-linux",
     "xz",
     "zlib"
   ]

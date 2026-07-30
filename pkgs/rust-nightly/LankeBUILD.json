@@ -36,9 +36,9 @@
     "librustc_driver-89afc71aa65b0fab.so"
   ],
   "build_deps": [
+    "base-devel",
     "bash",
     "curl",
-    "gcc",
     "glibc",
     "llvm",
     "openssl",

@@ -36,7 +36,6 @@
   "build_deps": [
     "base-devel",
     "cairo",
-    "gcc",
     "gdk-pixbuf",
     "git",
     "glib",
@@ -47,7 +46,6 @@
     "meson",
     "ninja",
     "pango",
-    "pkgconf",
     "rust"
   ]
 }

@@ -18,9 +18,7 @@
   "build_deps": [
     "base-devel",
     "expat",
-    "gcc",
     "glibc",
-    "make",
     "perl"
   ]
 }

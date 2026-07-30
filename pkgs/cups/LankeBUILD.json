@@ -45,13 +45,10 @@
     "base-devel",
     "bash",
     "dbus",
-    "gcc",
     "glibc",
     "gnutls",
     "libxcrypt",
-    "make",
     "openssl",
-    "pkgconf",
     "systemd",
     "zlib"
   ]

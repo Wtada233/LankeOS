@@ -22,14 +22,12 @@
   "build_deps": [
     "Linux-PAM",
     "base-devel",
-    "gcc",
     "glibc",
     "krb5",
     "libedit",
     "libxcrypt",
     "linux",
     "openssl",
-    "pkgconf",
     "zlib"
   ]
 }

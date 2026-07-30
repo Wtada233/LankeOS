@@ -26,9 +26,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
-    "make",
     "ncurses",
     "readline",
     "tcl",

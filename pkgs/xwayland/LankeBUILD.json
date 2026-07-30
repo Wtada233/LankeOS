@@ -39,7 +39,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libXau",
     "libXfont2",
@@ -53,7 +52,6 @@
     "nettle",
     "ninja",
     "pixman",
-    "pkgconf",
     "wayland"
   ]
 }

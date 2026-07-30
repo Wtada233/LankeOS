@@ -19,13 +19,11 @@
   "build_deps": [
     "base-devel",
     "doxygen",
-    "gcc",
     "git",
     "glibc",
     "mesa",
     "meson",
     "ninja",
-    "pkgconf",
     "systemd"
   ]
 }

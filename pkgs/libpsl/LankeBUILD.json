@@ -21,12 +21,10 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "gtk-doc",
     "icu",
     "libxslt",
-    "make",
     "python"
   ]
 }

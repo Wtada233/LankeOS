@@ -20,11 +20,9 @@
   "build_deps": [
     "base-devel",
     "doxygen",
-    "gcc",
     "glibc",
     "meson",
     "nasm",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

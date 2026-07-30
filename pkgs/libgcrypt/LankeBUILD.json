@@ -20,9 +20,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
-    "libgpg-error",
-    "make"
+    "libgpg-error"
   ]
 }

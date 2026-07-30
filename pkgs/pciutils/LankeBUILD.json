@@ -27,10 +27,8 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "glibc",
     "kmod",
-    "pkgconf",
     "systemd",
     "zlib"
   ]

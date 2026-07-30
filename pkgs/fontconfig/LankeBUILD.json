@@ -22,13 +22,11 @@
     "libfontconfig.so.1"
   ],
   "build_deps": [
+    "base-devel",
     "expat",
     "freetype",
-    "glibc",
-    "gcc",
-    "make",
-    "pkgconf",
     "git",
+    "glibc",
     "gperf",
     "meson"
   ]

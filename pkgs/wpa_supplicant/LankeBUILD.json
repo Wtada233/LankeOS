@@ -30,14 +30,11 @@
   "build_deps": [
     "base-devel",
     "dbus",
-    "gcc",
     "git",
     "glibc",
     "libnl",
-    "make",
     "ncurses",
     "openssl",
-    "pkgconf",
     "readline"
   ]
 }

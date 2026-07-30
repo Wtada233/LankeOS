@@ -23,14 +23,12 @@
     "base-devel",
     "bash",
     "dbus",
-    "gcc",
     "git",
     "glib",
     "glibc",
     "gobject-introspection",
     "libX11",
     "libxslt",
-    "pkgconf",
     "vala"
   ]
 }

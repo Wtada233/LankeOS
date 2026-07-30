@@ -25,9 +25,7 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "gcc",
     "glibc",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

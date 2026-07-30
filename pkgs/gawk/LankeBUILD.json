@@ -25,10 +25,8 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "glibc",
     "gmp",
-    "make",
     "mpfr",
     "perl",
     "readline"

@@ -23,10 +23,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libpng",
-    "make",
     "zlib"
   ]
 }

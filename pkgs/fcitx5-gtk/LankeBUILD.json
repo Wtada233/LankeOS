@@ -52,7 +52,6 @@
     "cairo",
     "cmake",
     "extra-cmake-modules",
-    "gcc",
     "gdk-pixbuf",
     "git",
     "glib",
@@ -64,7 +63,6 @@
     "libxkbcommon",
     "ninja",
     "pango",
-    "pkgconf",
     "vulkan-headers",
     "xwayland",
     "zlib"

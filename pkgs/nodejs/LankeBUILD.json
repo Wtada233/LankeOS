@@ -33,13 +33,10 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
     "glibc",
     "icu",
-    "make",
     "nghttp2",
     "openssl",
-    "pkgconf",
     "python",
     "zlib"
   ]

@@ -32,11 +32,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libjpeg-turbo",
-    "make",
-    "pkgconf",
     "xz",
     "zlib",
     "zstd"

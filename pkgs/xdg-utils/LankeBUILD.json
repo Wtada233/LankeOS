@@ -16,11 +16,8 @@
     "base-devel",
     "bash",
     "docbook-xsl",
-    "gcc",
     "git",
     "lynx",
-    "make",
-    "pkgconf",
     "xmlto"
   ]
 }

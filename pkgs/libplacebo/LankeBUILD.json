@@ -26,14 +26,12 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "glslang",
     "lcms2",
     "libglvnd",
     "meson",
     "ninja",
-    "pkgconf",
     "vulkan-headers",
     "vulkan-loader"
   ]

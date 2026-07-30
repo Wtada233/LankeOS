@@ -15,11 +15,9 @@
     "base-devel",
     "bash",
     "bc",
-    "gcc",
     "gtk3",
     "meson",
     "ninja",
-    "pkgconf",
     "python"
   ]
 }

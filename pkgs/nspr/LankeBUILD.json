@@ -23,7 +23,6 @@
     "base-devel",
     "bash",
     "glibc",
-    "make",
     "zip"
   ]
 }

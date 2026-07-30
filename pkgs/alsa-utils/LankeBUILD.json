@@ -29,9 +29,7 @@
     "bash",
     "docbook-xsl",
     "fftw",
-    "gcc",
     "glibc",
-    "make",
     "ncurses",
     "systemd",
     "xmlto"

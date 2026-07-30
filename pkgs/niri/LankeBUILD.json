@@ -48,7 +48,6 @@
     "base-devel",
     "bash",
     "cairo",
-    "gcc",
     "git",
     "glib",
     "glibc",

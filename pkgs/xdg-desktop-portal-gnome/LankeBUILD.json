@@ -41,7 +41,6 @@
     "base-devel",
     "cairo",
     "fontconfig",
-    "gcc",
     "gdk-pixbuf",
     "glib",
     "glibc",
@@ -52,7 +51,6 @@
     "libadwaita",
     "meson",
     "ninja",
-    "pkgconf",
     "python",
     "wayland",
     "xwayland"

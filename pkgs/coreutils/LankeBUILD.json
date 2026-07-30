@@ -30,13 +30,11 @@
     "acl",
     "attr",
     "base-devel",
-    "gcc",
     "git",
     "glibc",
     "gmp",
     "gperf",
     "libcap",
-    "make",
     "openssl",
     "python",
     "wget"

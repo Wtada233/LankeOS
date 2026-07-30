@@ -20,9 +20,6 @@
   "build_deps": [
     "base-devel",
     "bash",
-    "gcc",
-    "glibc",
-    "make",
-    "pkgconf"
+    "glibc"
   ]
 }

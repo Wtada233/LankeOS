@@ -23,12 +23,10 @@
   "build_deps": [
     "base-devel",
     "boost",
-    "gcc",
     "git",
     "glibc",
     "golang",
     "lua",
-    "make",
     "openjdk25",
     "pcre2",
     "python",

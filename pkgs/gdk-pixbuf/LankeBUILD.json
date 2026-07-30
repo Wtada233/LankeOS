@@ -30,7 +30,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glib",
     "glibc",
     "gobject-introspection",
@@ -38,7 +37,6 @@
     "libpng",
     "libtiff",
     "meson",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

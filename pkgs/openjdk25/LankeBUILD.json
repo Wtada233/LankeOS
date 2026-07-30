@@ -50,7 +50,6 @@
     "alsa-lib",
     "base-devel",
     "freetype",
-    "gcc",
     "giflib",
     "glibc",
     "harfbuzz",
@@ -62,7 +61,6 @@
     "libXtst",
     "libjpeg-turbo",
     "libpng",
-    "make",
     "xwayland",
     "zlib"
   ]

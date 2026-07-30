@@ -8,9 +8,7 @@
   "build_deps": [
     "base-devel",
     "cargo",
-    "gcc",
-    "glibc",
-    "make"
+    "glibc"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2",

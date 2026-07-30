@@ -20,13 +20,9 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "flex",
     "fmt",
-    "gcc",
     "glibc",
     "llvm",
-    "make",
-    "pkgconf",
     "python",
     "qt6-base",
     "qt6-svg",

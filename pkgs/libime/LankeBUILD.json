@@ -36,7 +36,6 @@
     "cmake",
     "extra-cmake-modules",
     "fcitx5",
-    "gcc",
     "git",
     "glibc",
     "ninja",

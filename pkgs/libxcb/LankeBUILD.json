@@ -71,12 +71,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libXau",
     "libXdmcp",
-    "make",
-    "pkgconf",
     "python",
     "util-macros",
     "xorgproto"

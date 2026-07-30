@@ -23,9 +23,7 @@
   "build_deps": [
     "Linux-PAM",
     "base-devel",
-    "gcc",
     "glibc",
-    "make",
     "openssl",
     "zlib"
   ]

@@ -31,14 +31,11 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libX11",
     "libdrm",
     "libva",
-    "make",
     "mesa",
-    "pkgconf",
     "wayland",
     "xwayland"
   ]

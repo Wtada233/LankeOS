@@ -31,12 +31,10 @@
   "build_deps": [
     "base-devel",
     "expat",
-    "gcc",
     "glibc",
     "libffi",
     "libxml2",
     "meson",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

@@ -11,8 +11,7 @@
     "git",
     "glibc",
     "golang",
-    "libseccomp",
-    "make"
+    "libseccomp"
   ],
   "needed_so": [
     "libc.so.6",

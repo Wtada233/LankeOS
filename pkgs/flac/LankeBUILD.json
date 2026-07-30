@@ -28,11 +28,9 @@
     "base-devel",
     "cmake",
     "doxygen",
-    "gcc",
     "git",
     "glibc",
     "libogg",
-    "make",
     "nasm",
     "ninja"
   ]

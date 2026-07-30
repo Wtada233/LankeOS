@@ -32,12 +32,9 @@
     "base-devel",
     "bash",
     "fuse3",
-    "gcc",
     "git",
     "glibc",
-    "make",
     "perl",
-    "systemd",
-    "util-linux"
+    "systemd"
   ]
 }

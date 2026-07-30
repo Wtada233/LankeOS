@@ -26,10 +26,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
-    "libogg",
-    "make",
-    "pkgconf"
+    "libogg"
   ]
 }

@@ -30,7 +30,6 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "gcc",
     "glibc",
     "libjuice",
     "libsrtp",

@@ -22,7 +22,6 @@
   "build_deps": [
     "base-devel",
     "dbus",
-    "gcc",
     "git",
     "glibc",
     "libcap",

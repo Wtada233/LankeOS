@@ -25,11 +25,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libX11",
     "libXfixes",
-    "libXrender",
-    "make"
+    "libXrender"
   ]
 }

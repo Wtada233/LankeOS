@@ -23,11 +23,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libxcb",
-    "make",
-    "pkgconf",
     "util-macros",
     "xorgproto",
     "xwayland"

@@ -23,13 +23,10 @@
   "build_deps": [
     "base-devel",
     "bluez",
-    "gcc",
     "glib",
     "glibc",
     "intltool",
     "iproute2",
-    "make",
-    "pkgconf",
     "python"
   ]
 }

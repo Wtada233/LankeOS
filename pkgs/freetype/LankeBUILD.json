@@ -29,11 +29,9 @@
     "base-devel",
     "bash",
     "bzip2",
-    "gcc",
     "glibc",
     "harfbuzz",
     "libpng",
-    "make",
     "zlib"
   ]
 }

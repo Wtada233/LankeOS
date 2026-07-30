@@ -37,14 +37,12 @@
     "base-devel",
     "cairo",
     "dbus",
-    "gcc",
     "glib",
     "glibc",
     "gtk3",
     "meson",
     "ninja",
     "pango",
-    "pkgconf",
     "wayland",
     "wayland-protocols"
   ]

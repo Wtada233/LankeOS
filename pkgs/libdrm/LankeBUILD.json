@@ -29,11 +29,9 @@
   "build_deps": [
     "base-devel",
     "cairo",
-    "gcc",
     "glibc",
     "libpciaccess",
     "meson",
-    "ninja",
-    "pkgconf"
+    "ninja"
   ]
 }

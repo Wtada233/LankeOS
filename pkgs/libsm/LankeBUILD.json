@@ -23,12 +23,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "gcc",
     "glibc",
     "libice",
-    "make",
-    "pkgconf",
-    "util-linux",
     "util-macros",
     "xtrans"
   ]
