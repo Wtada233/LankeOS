@@ -4,7 +4,7 @@ lankebuild_prepare() {
     cd "{SRC_DIR}"
 
     # 下载所有依赖（锁定版本）
-    cargo fetch --locked --target "$(rustc --print host-tuple)"
+    cargo fetch --locked --target host-tuple
 }
 
 lankebuild_build() {

@@ -4,8 +4,12 @@ lankebuild_prepare() {
     cd $(ls -d */ | head -1)
 
     # 下载所有依赖（锁定版本）
-    cargo fetch --locked --target "$(rustc --print host-tuple)"
+    cargo fetch --locked --target host-tuple
     patch -p1 < {WORK_DIR}/allow-software-rendering.patch
+
+    # Portal: 文件选择器用 GTK 而非 Nautilus
+    sed -i '/^org.freedesktop.impl.portal.Notification/a\
+org.freedesktop.impl.portal.FileChooser=gtk;' resources/niri-portals.conf
 }
 
 lankebuild_build() {
