@@ -1,11 +1,12 @@
 {
   "name": "glibc",
-  "version": "2.42",
+  "version": "2.43",
   "sources": [
-    "https://ftpmirror.gnu.org/glibc/glibc-2.42.tar.xz"
+    "https://ftpmirror.gnu.org/glibc/glibc-2.43.tar.xz"
   ],
   "work_sources": [
-    "https://www.linuxfromscratch.org/patches/lfs/12.4/glibc-2.42-fhs-1.patch",
+    "https://www.linuxfromscratch.org/patches/lfs/13.0/glibc-fhs-1.patch",
+    "https://www.linuxfromscratch.org/patches/downloads/glibc/glibc-2.43-upstream_fixes-1.patch",
     "https://www.iana.org/time-zones/repository/releases/tzdata2025b.tar.gz"
   ],
   "release": 3,
@@ -51,6 +52,7 @@
     "python",
     "gcc",
     "make",
-    "binutils"
+    "binutils",
+    "findutils"
   ]
 }

@@ -12,15 +12,13 @@ lankebuild_build() {
             break
         fi
     done
-    patch -Np1 -i {WORK_DIR}/glibc-2.42-fhs-1.patch
-    sed -e '/unistd.h/i #include <string.h>' -e '/libc_rwlock_init/c\  __libc_rwlock_define_initialized (, reset_lock);\n  memcpy (&lock, &reset_lock, sizeof (lock));' -i stdlib/abort.c
+    for p in "{WORK_DIR}"/*.patch; do
+        patch -p1 < "$p"
+    done
     mkdir build && cd build
     echo 'rootsbindir={BINDIR}' > configparms
-    CC=gcc CXX=g++ ../configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-werror --enable-kernel=5.4 --enable-stack-protector=strong --disable-nscd libc_cv_slibdir={LIBDIR}
-    CC=gcc CXX=g++ make
-
-    # 跳过过时的完整性检查（手册推荐）
-    sed '/test-installation/s@\$(PERL)@echo not running@' -i ../Makefile
+    CC=gcc CXX=g++ ../configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-werror --enable-kernel=5.10 --enable-stack-protector=strong --disable-nscd libc_cv_slibdir={LIBDIR} --disable-static
+    CC=gcc CXX=g++ make -j$(nproc)
 
     make DESTDIR={STAGING_ROOT} install
 
@@ -28,6 +26,7 @@ lankebuild_build() {
     sed '/RTLDLIST=/s@/usr@@g' -i {STAGING_ROOT}{BINDIR}/ldd
 
     # Locales
+    mkdir -p "{STAGING_ROOT}/{LIBDIR}/locale"
     localedef --prefix="{STAGING_ROOT}" -i C -f UTF-8 C.UTF-8
     localedef --prefix="{STAGING_ROOT}" -i en_US -f UTF-8 en_US.UTF-8
     localedef --prefix="{STAGING_ROOT}" -i zh_CN -f UTF-8 zh_CN.UTF-8
@@ -45,7 +44,21 @@ lankebuild_build() {
     done
     cp -v zone.tab zone1970.tab iso3166.tab $ZONEINFO
     zic -d $ZONEINFO -p America/New_York
-    rm -fv "{STAGING_ROOT}/{LIBDIR}/"*.a
+    # 删除可选的静态库，保留编译工具链必需的
+    # libc_nonshared.a / libdl.a / libpthread.a / librt.a /
+    # libutil.a / libanl.a / libmcheck.a / libg.a 用于日常编译，不能删
+    # libc.a / libm.a / libresolv.a 等仅用于 -static 链接，可以删
+    find "{STAGING_ROOT}/{LIBDIR}" -maxdepth 1 -type f -name '*.a' \
+        -not -name 'libc_nonshared.a' \
+        -not -name 'libpthread_nonshared.a' \
+        -not -name 'libdl.a' \
+        -not -name 'libpthread.a' \
+        -not -name 'librt.a' \
+        -not -name 'libutil.a' \
+        -not -name 'libanl.a' \
+        -not -name 'libmcheck.a' \
+        -not -name 'libg.a' \
+        -delete
 }
 
 

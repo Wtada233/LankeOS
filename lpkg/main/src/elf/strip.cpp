@@ -153,7 +153,7 @@ FileType identify_file_type(const fs::path& path)
 /**
  * 对可重定位文件（ET_REL .o 文件）进行 strip
  * 通过 libelf API 重建文件，只保留非调试节区，
- * 同时更新节区索引映射（包括 SHT_SYMTAB 中的符号索引）
+ * 同时更新节区索引映射（包括 SHT_SYMTAB 中的符号索引和 SHT_GROUP 中的节区索引）
  */
 static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrndx, int elf_class,
                                  std::vector<uint8_t>& output_data)
@@ -210,8 +210,9 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
         else if (new_shdr.sh_link != 0)
             new_shdr.sh_link = SHN_UNDEF;
 
+        // SHT_GROUP 的 sh_info 是符号表索引，不是节区索引，不应重映射
         if (new_shdr.sh_type == SHT_REL || new_shdr.sh_type == SHT_RELA ||
-            (new_shdr.sh_flags & SHF_INFO_LINK)) {
+            ((new_shdr.sh_flags & SHF_INFO_LINK) && new_shdr.sh_type != SHT_GROUP)) {
             if (idx_map.count(new_shdr.sh_info))
                 new_shdr.sh_info = idx_map[new_shdr.sh_info];
             else
@@ -238,6 +239,17 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
                     gelf_update_sym(out_data, i, &sym);
                 }
             }
+            // 重映射 SHT_GROUP 数据中的节区索引
+            if (new_shdr.sh_type == SHT_GROUP) {
+                Elf32_Word* group_data = static_cast<Elf32_Word*>(out_data->d_buf);
+                size_t group_count = out_data->d_size / sizeof(Elf32_Word);
+                for (size_t i = 1; i < group_count; ++i) {
+                    if (idx_map.count(group_data[i]))
+                        group_data[i] = idx_map[group_data[i]];
+                    else
+                        group_data[i] = 0;
+                }
+            }
         }
     }
 
@@ -253,7 +265,12 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
     off_t size = lseek(out_fd, 0, SEEK_END);
     output_data.resize(size);
     lseek(out_fd, 0, SEEK_SET);
-    [[maybe_unused]] ssize_t bytes_read = read(out_fd, output_data.data(), size);
+    ssize_t bytes_read = read(out_fd, output_data.data(), size);
+    if (bytes_read != size) {
+        elf_end(out_elf);
+        close(out_fd);
+        return false;
+    }
 
     elf_end(out_elf);
     close(out_fd);
@@ -332,8 +349,9 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
             ks.shdr.sh_link = SHN_UNDEF;
         }
 
+        // SHT_GROUP 的 sh_info 是符号表索引，不是节区索引，不应重映射
         if (ks.shdr.sh_type == SHT_REL || ks.shdr.sh_type == SHT_RELA ||
-            (ks.shdr.sh_flags & SHF_INFO_LINK)) {
+            ((ks.shdr.sh_flags & SHF_INFO_LINK) && ks.shdr.sh_type != SHT_GROUP)) {
             if (el_idx_map.count(ks.shdr.sh_info)) {
                 ks.shdr.sh_info = el_idx_map[ks.shdr.sh_info];
             } else {
@@ -506,7 +524,14 @@ bool process_archive(const fs::path& path, [[maybe_unused]] std::string& error_m
         size_t size = archive_entry_size(entry);
         std::vector<uint8_t> data(size);
 
-        archive_read_data(a, data.data(), size);
+        ssize_t bytes_read = archive_read_data(a, data.data(), size);
+        if (bytes_read < 0 || static_cast<size_t>(bytes_read) != size) {
+            archive_read_free(a);
+            archive_write_close(out);
+            archive_write_free(out);
+            fs::remove(temp_path);
+            return false;
+        }
 
         // 对 .o 目标文件进行 strip 处理
         if (std::string_view(name).ends_with(".o")) {
@@ -514,14 +539,40 @@ bool process_archive(const fs::path& path, [[maybe_unused]] std::string& error_m
             std::string inner_error_msg;
             if (strip_elf_data(data, stripped_data, inner_error_msg)) {
                 archive_entry_set_size(entry, stripped_data.size());
-                archive_write_header(out, entry);
-                archive_write_data(out, stripped_data.data(), stripped_data.size());
+                if (archive_write_header(out, entry) != ARCHIVE_OK) {
+                    archive_read_free(a);
+                    archive_write_close(out);
+                    archive_write_free(out);
+                    fs::remove(temp_path);
+                    return false;
+                }
+                ssize_t written = archive_write_data(out, stripped_data.data(), stripped_data.size());
+                if (written < 0 || static_cast<size_t>(written) != stripped_data.size()) {
+                    archive_read_free(a);
+                    archive_write_close(out);
+                    archive_write_free(out);
+                    fs::remove(temp_path);
+                    return false;
+                }
                 continue;
             }
         }
 
-        archive_write_header(out, entry);
-        archive_write_data(out, data.data(), size);
+        if (archive_write_header(out, entry) != ARCHIVE_OK) {
+            archive_read_free(a);
+            archive_write_close(out);
+            archive_write_free(out);
+            fs::remove(temp_path);
+            return false;
+        }
+        ssize_t written = archive_write_data(out, data.data(), size);
+        if (written < 0 || static_cast<size_t>(written) != size) {
+            archive_read_free(a);
+            archive_write_close(out);
+            archive_write_free(out);
+            fs::remove(temp_path);
+            return false;
+        }
     }
 
     archive_read_free(a);
