@@ -45,7 +45,7 @@ lankebuild_build() {
     done
     cp -v zone.tab zone1970.tab iso3166.tab $ZONEINFO
     zic -d $ZONEINFO -p America/New_York
-    rm -fv "{STAGING_ROOT}/{LIBDIR}/*.a"
+    rm -fv "{STAGING_ROOT}/{LIBDIR}/"*.a
 }
 
 
