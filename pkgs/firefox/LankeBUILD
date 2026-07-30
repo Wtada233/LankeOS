@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Firefox 152 构建脚本
-# 通过 --disable-libnotify 跳过 libnotify 依赖
 
 lankebuild_prepare() {
     # ------------------------------------------------------------
