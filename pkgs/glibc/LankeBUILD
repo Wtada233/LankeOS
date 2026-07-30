@@ -27,8 +27,10 @@ lankebuild_build() {
     # 修正 ldd 中的硬编码路径
     sed '/RTLDLIST=/s@/usr@@g' -i {STAGING_ROOT}{BINDIR}/ldd
 
-    # LFS Locales (受上面 SUPPORTED 文件控制，只安装中英文)
-    make DESTDIR={STAGING_ROOT} localedata/install-locales
+    # Locales
+    localedef --prefix="{STAGING_ROOT}" -i C -f UTF-8 C.UTF-8
+    localedef --prefix="{STAGING_ROOT}" -i en_US -f UTF-8 en_US.UTF-8
+    localedef --prefix="{STAGING_ROOT}" -i zh_CN -f UTF-8 zh_CN.UTF-8
     # 添加 ld.so 兼容性链接 (Usr-Merge 规范)
     ln -sfv ../lib/ld-linux-x86-64.so.2 {STAGING_ROOT}{BINDIR}/ld.so
 
@@ -43,6 +45,11 @@ lankebuild_build() {
     done
     cp -v zone.tab zone1970.tab iso3166.tab $ZONEINFO
     zic -d $ZONEINFO -p America/New_York
+    rm -fv "{STAGING_ROOT}/{LIBDIR}/*.a"
+}
+
+
+lankebuild_package() {
     # Config files
     cat > {STAGING_ROOT}/etc/nsswitch.conf << "EOF"
 passwd: files systemd
@@ -60,10 +67,4 @@ EOF
 /opt/lib
 include /etc/ld.so.conf.d/*.conf
 EOF
-}
-
-
-lankebuild_package() {
-    # Installation handled by builder
-    :
 }

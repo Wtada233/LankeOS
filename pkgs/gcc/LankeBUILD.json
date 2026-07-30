@@ -68,9 +68,9 @@
     "expect",
     "git",
     "inetutils",
-    "rust",
     "tcl",
     "make",
-    "gcc"
+    "gcc",
+    "linux"
   ]
 }
