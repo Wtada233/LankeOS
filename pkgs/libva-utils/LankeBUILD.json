@@ -36,7 +36,6 @@
     "libdrm",
     "libva",
     "mesa",
-    "wayland",
-    "xwayland"
+    "wayland"
   ]
 }

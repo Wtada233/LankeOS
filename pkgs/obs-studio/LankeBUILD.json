@@ -157,7 +157,6 @@
     "systemd",
     "v4l-utils",
     "wayland",
-    "xwayland",
     "zlib"
   ]
 }

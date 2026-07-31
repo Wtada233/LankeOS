@@ -48,7 +48,6 @@
     "libXtst",
     "libxml2",
     "meson",
-    "ninja",
-    "xwayland"
+    "ninja"
   ]
 }

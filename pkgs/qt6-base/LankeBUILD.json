@@ -207,7 +207,6 @@
     "xcb-util-keysyms",
     "xcb-util-renderutil",
     "xcb-util-wm",
-    "xwayland",
     "zlib",
     "zstd"
   ]

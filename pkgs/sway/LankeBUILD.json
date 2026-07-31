@@ -72,7 +72,6 @@
     "wayland",
     "wayland-protocols",
     "wlroots",
-    "xcb-util-wm",
-    "xwayland"
+    "xcb-util-wm"
   ]
 }

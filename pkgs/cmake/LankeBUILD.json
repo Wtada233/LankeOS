@@ -35,7 +35,6 @@
     "glibc",
     "libxcb",
     "nlohmann-json",
-    "qt6-base",
-    "xwayland"
+    "qt6-base"
   ]
 }

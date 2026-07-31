@@ -52,7 +52,6 @@
     "meson",
     "ninja",
     "python",
-    "wayland",
-    "xwayland"
+    "wayland"
   ]
 }

@@ -26,7 +26,6 @@
     "glibc",
     "libxcb",
     "util-macros",
-    "xorgproto",
-    "xwayland"
+    "xorgproto"
   ]
 }

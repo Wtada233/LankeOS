@@ -37,7 +37,6 @@
     "ninja",
     "python",
     "systemd",
-    "xmlto",
-    "xwayland"
+    "xmlto"
   ]
 }

@@ -85,7 +85,6 @@
     "mesa",
     "nasm",
     "vulkan-headers",
-    "xwayland",
     "xz",
     "zlib"
   ]

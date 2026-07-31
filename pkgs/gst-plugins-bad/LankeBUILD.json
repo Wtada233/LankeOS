@@ -199,7 +199,6 @@
     "vulkan-headers",
     "vulkan-loader",
     "wayland",
-    "xwayland",
     "zlib"
   ]
 }

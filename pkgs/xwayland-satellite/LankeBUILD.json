@@ -28,7 +28,6 @@
     "libxcb",
     "llvm",
     "rust",
-    "xcb-util-cursor",
-    "xwayland"
+    "xcb-util-cursor"
   ]
 }

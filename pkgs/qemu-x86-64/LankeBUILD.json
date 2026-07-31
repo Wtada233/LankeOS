@@ -90,7 +90,6 @@
     "pipewire",
     "pixman",
     "systemd",
-    "xwayland",
     "zlib",
     "zstd"
   ]

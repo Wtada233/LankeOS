@@ -29,7 +29,6 @@
     "libxcb",
     "util-macros",
     "xcb-util",
-    "xorgproto",
-    "xwayland"
+    "xorgproto"
   ]
 }

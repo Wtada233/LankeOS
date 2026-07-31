@@ -64,7 +64,6 @@
     "ninja",
     "pango",
     "vulkan-headers",
-    "xwayland",
     "zlib"
   ]
 }

@@ -60,7 +60,6 @@
     "rtkit",
     "sbc",
     "speexdsp",
-    "systemd",
-    "xwayland"
+    "systemd"
   ]
 }

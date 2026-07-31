@@ -120,7 +120,6 @@
     "vulkan-headers",
     "vulkan-loader",
     "wayland",
-    "wayland-protocols",
-    "xwayland"
+    "wayland-protocols"
   ]
 }

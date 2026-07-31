@@ -153,12 +153,10 @@
     "pango",
     "pipewire",
     "python",
-    "qt6-base",
     "rsync",
     "rust-bindgen",
     "rust-nightly",
     "systemd",
-    "xwayland",
     "zlib",
     "zstd"
   ]

@@ -70,7 +70,6 @@
     "ruby",
     "tcl",
     "wayland",
-    "xwayland",
     "zlib"
   ]
 }

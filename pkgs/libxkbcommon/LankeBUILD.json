@@ -39,7 +39,6 @@
     "wayland",
     "wayland-protocols",
     "xkeyboard-config",
-    "xorgproto",
-    "xwayland"
+    "xorgproto"
   ]
 }

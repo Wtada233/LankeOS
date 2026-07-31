@@ -105,7 +105,6 @@
     "vulkan-loader",
     "wayland",
     "wayland-protocols",
-    "xwayland",
     "zlib"
   ]
 }
