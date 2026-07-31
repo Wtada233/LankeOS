@@ -10,9 +10,7 @@
     "libgobject-2.0.so.0"
   ],
   "deps": [
-    "bash",
-    "glib",
-    "glibc"
+    "bash"
   ],
   "provides": [
     "libvala-0.56.so",

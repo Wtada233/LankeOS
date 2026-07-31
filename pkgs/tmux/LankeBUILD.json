@@ -14,12 +14,7 @@
     "libresolv.so.2",
     "libsystemd.so.0"
   ],
-  "deps": [
-    "glibc",
-    "libevent",
-    "ncurses",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

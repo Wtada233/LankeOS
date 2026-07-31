@@ -12,10 +12,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libfmt.so",
     "libfmt.so.11"

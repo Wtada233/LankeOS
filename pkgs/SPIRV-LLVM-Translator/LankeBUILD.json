@@ -14,11 +14,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "llvm"
-  ],
+  "deps": [],
   "provides": [
     "libLLVMSPIRVLib.so",
     "libLLVMSPIRVLib.so.22.1"

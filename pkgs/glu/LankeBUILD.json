@@ -5,11 +5,7 @@
     "https://archive.mesa3d.org/glu/glu-9.0.3.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libglvnd"
-  ],
+  "deps": [],
   "provides": [
     "libGLU.so",
     "libGLU.so.1"

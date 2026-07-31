@@ -10,9 +10,7 @@
     "libyaml-0.so.2"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "libyaml"
+    "bash"
   ],
   "provides": [
     "libfdt.so",

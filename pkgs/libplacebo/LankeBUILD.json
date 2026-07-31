@@ -13,13 +13,7 @@
     "libstdc++.so.6",
     "libvulkan.so.1"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "glslang",
-    "lcms2",
-    "vulkan-loader"
-  ],
+  "deps": [],
   "provides": [
     "libplacebo.so",
     "libplacebo.so.360"

@@ -12,12 +12,7 @@
     "libdbus-1.so.3",
     "libsystemd.so.0"
   ],
-  "deps": [
-    "dbus",
-    "glibc",
-    "libcap",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

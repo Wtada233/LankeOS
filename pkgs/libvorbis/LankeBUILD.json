@@ -12,10 +12,7 @@
     "libmvec.so.1",
     "libogg.so.0"
   ],
-  "deps": [
-    "glibc",
-    "libogg"
-  ],
+  "deps": [],
   "provides": [
     "libvorbis.so",
     "libvorbis.so.0",

@@ -15,9 +15,7 @@
     "libtcl8.6.so"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "tcl"
+    "bash"
   ],
   "provides": [
     "libexpect5.45.4.so"

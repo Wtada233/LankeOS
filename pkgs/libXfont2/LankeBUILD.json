@@ -5,12 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXfont2-2.0.7.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "fontenc",
-    "freetype",
-    "glibc",
-    "zlib"
-  ],
+  "deps": [],
   "provides": [
     "libXfont2.so",
     "libXfont2.so.2"

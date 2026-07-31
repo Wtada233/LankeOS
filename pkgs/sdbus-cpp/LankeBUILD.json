@@ -13,11 +13,7 @@
     "libstdc++.so.6",
     "libsystemd.so.0"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [
     "libsdbus-c++.so",
     "libsdbus-c++.so.2"

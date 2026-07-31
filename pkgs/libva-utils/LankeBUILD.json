@@ -20,12 +20,6 @@
     "libwayland-client.so.0"
   ],
   "deps": [
-    "gcc",
-    "glibc",
-    "libX11",
-    "libdrm",
-    "libva",
-    "wayland",
     "xwayland"
   ],
   "provides": [],

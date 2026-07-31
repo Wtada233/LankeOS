@@ -5,12 +5,7 @@
     "https://www.x.org/releases/individual/lib/libXmu-1.2.1.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11",
-    "libXext",
-    "libxt"
-  ],
+  "deps": [],
   "provides": [
     "libXmu.so",
     "libXmu.so.6",

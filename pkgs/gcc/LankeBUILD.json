@@ -18,13 +18,7 @@
   ],
   "deps": [
     "bash",
-    "glibc",
-    "gmp",
-    "mpc",
-    "mpfr",
-    "python",
-    "zlib",
-    "zstd"
+    "python"
   ],
   "provides": [
     "libasan.so",

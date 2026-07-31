@@ -17,13 +17,7 @@
     "libpipewire-0.3.so.0",
     "libsystemd.so.0"
   ],
-  "deps": [
-    "glib",
-    "glibc",
-    "lua",
-    "pipewire",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [
     "libwireplumber-0.5.so",
     "libwireplumber-0.5.so.0"

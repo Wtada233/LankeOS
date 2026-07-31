@@ -5,11 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXv-1.0.12.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11",
-    "libXext"
-  ],
+  "deps": [],
   "provides": [
     "libXv.so",
     "libXv.so.1"

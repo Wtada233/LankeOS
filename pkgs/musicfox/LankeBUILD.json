@@ -11,11 +11,7 @@
     "libc.so.6",
     "libresolv.so.2"
   ],
-  "deps": [
-    "alsa-lib",
-    "flac",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "alsa-lib",

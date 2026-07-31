@@ -12,10 +12,7 @@
     "libtcl8.6.so",
     "libz.so.1"
   ],
-  "deps": [
-    "glibc",
-    "zlib"
-  ],
+  "deps": [],
   "provides": [
     "libtcl8.6.so"
   ],

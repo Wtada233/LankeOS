@@ -10,10 +10,7 @@
     "libc.so.6",
     "libpciaccess.so.0"
   ],
-  "deps": [
-    "glibc",
-    "libpciaccess"
-  ],
+  "deps": [],
   "provides": [
     "libdrm.so",
     "libdrm.so.2",

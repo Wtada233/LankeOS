@@ -27,23 +27,10 @@
     "libwayland-client.so.0"
   ],
   "deps": [
-    "acl",
     "bash",
-    "cairo",
     "gawk",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "gtk3",
-    "libX11",
-    "libice",
-    "libsm",
-    "libxt",
-    "ncurses",
-    "pango",
     "perl",
     "python",
-    "wayland",
     "xwayland"
   ],
   "provides": [],

@@ -26,13 +26,7 @@
     "libpcap.so.1"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "libmnl",
-    "libnetfilter_conntrack",
-    "libnfnetlink",
-    "libnftnl",
-    "libpcap"
+    "bash"
   ],
   "provides": [
     "libip4tc.so",

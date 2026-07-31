@@ -13,11 +13,7 @@
     "libsystemd.so.0"
   ],
   "deps": [
-    "expat",
-    "glibc",
-    "libX11",
     "python",
-    "systemd",
     "xwayland"
   ],
   "provides": [

@@ -44,31 +44,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "alsa-lib",
-    "ffmpeg",
-    "glibc",
-    "lcms2",
-    "libX11",
-    "libXScrnSaver",
-    "libXext",
-    "libXfixes",
-    "libXpresent",
-    "libXrandr",
-    "libXv",
-    "libass",
-    "libdisplay-info",
-    "libdrm",
-    "libglvnd",
-    "libjpeg-turbo",
-    "libplacebo",
-    "libva",
-    "libxkbcommon",
-    "mesa",
-    "pipewire",
-    "vulkan-loader",
-    "wayland",
-    "xwayland",
-    "zlib"
+    "xwayland"
   ],
   "provides": [
     "libmpv.so",

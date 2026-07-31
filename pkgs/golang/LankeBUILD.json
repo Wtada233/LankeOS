@@ -14,9 +14,6 @@
   ],
   "deps": [
     "bash",
-    "gcc",
-    "glibc",
-    "libtiff",
     "perl",
     "python"
   ],

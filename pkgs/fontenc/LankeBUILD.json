@@ -5,10 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libfontenc-1.1.8.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "zlib"
-  ],
+  "deps": [],
   "provides": [
     "libfontenc.so",
     "libfontenc.so.1"

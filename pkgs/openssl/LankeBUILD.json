@@ -10,7 +10,6 @@
     "libc.so.6"
   ],
   "deps": [
-    "glibc",
     "perl"
   ],
   "provides": [

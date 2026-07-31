@@ -13,13 +13,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "deps": [
-    "glibc",
-    "openssl",
-    "xz",
-    "zlib",
-    "zstd"
-  ],
+  "deps": [],
   "provides": [
     "libkmod.so",
     "libkmod.so.2"

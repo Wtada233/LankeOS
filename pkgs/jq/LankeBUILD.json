@@ -12,10 +12,7 @@
     "libm.so.6",
     "libonig.so.5"
   ],
-  "deps": [
-    "glibc",
-    "oniguruma"
-  ],
+  "deps": [],
   "provides": [
     "libjq.so",
     "libjq.so.1"

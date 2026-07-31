@@ -17,13 +17,7 @@
     "libpng16.so.16",
     "libtiff.so.6"
   ],
-  "deps": [
-    "glib",
-    "glibc",
-    "libjpeg-turbo",
-    "libpng",
-    "libtiff"
-  ],
+  "deps": [],
   "provides": [
     "libgdk_pixbuf-2.0.so",
     "libgdk_pixbuf-2.0.so.0"

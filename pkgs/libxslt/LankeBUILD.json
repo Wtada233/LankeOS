@@ -12,9 +12,7 @@
     "libxml2.so.2"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "libxml2"
+    "bash"
   ],
   "provides": [
     "libexslt.so",

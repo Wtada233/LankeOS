@@ -28,19 +28,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "at-spi2-core",
-    "cairo",
-    "gcc",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "gtk3",
-    "harfbuzz",
-    "libX11",
-    "libxkbcommon",
-    "pango",
-    "xwayland",
-    "zlib"
+    "xwayland"
   ],
   "provides": [
     "libFcitx5GClient.so",

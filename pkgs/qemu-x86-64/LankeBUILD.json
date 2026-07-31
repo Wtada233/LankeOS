@@ -38,32 +38,7 @@
     "libzstd.so.1"
   ],
   "deps": [
-    "Linux-PAM",
-    "alsa-lib",
-    "bzip2",
-    "cairo",
-    "curl",
-    "dtc",
-    "gcc",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "gnutls",
-    "gtk3",
-    "libX11",
-    "libepoxy",
-    "libjpeg-turbo",
-    "libpng",
-    "libslirp",
-    "libxkbcommon",
-    "mesa",
-    "ncurses",
-    "pipewire",
-    "pixman",
-    "systemd",
-    "xwayland",
-    "zlib",
-    "zstd"
+    "xwayland"
   ],
   "provides": [],
   "build_deps": [

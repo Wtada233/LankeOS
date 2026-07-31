@@ -17,14 +17,7 @@
     "libcrypto.so.3",
     "libgmp.so.10"
   ],
-  "deps": [
-    "acl",
-    "attr",
-    "glibc",
-    "gmp",
-    "libcap",
-    "openssl"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "acl",

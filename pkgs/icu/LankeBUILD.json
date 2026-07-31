@@ -14,9 +14,7 @@
     "libstdc++.so.6"
   ],
   "deps": [
-    "bash",
-    "gcc",
-    "glibc"
+    "bash"
   ],
   "provides": [
     "libicudata.so",

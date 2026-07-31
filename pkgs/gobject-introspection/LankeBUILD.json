@@ -16,9 +16,6 @@
     "libm.so.6"
   ],
   "deps": [
-    "glib",
-    "glibc",
-    "libffi",
     "python"
   ],
   "provides": [

@@ -11,10 +11,7 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0"
   ],
-  "deps": [
-    "glib",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libjson-glib-1.0.so",
     "libjson-glib-1.0.so.0"

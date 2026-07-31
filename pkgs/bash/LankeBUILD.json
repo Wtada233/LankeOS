@@ -13,11 +13,7 @@
     "libncursesw.so.6",
     "libreadline.so.8"
   ],
-  "deps": [
-    "glibc",
-    "ncurses",
-    "readline"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

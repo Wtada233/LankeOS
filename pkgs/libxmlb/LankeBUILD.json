@@ -14,13 +14,7 @@
     "libstemmer.so.0",
     "libzstd.so.1"
   ],
-  "deps": [
-    "glib",
-    "glibc",
-    "libstemmer",
-    "xz",
-    "zstd"
-  ],
+  "deps": [],
   "provides": [
     "libxmlb.so",
     "libxmlb.so.2"

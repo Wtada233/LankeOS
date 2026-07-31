@@ -5,9 +5,7 @@
     "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/llvm-project-22.1.7.src.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "no_strip": false,
   "provides": [
     "libunwind.so",

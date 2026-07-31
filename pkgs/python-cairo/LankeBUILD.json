@@ -11,8 +11,6 @@
     "libcairo.so.2"
   ],
   "deps": [
-    "cairo",
-    "glibc",
     "python"
   ],
   "provides": [],

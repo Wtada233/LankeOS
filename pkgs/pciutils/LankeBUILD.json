@@ -14,11 +14,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "kmod",
-    "systemd",
-    "zlib"
+    "bash"
   ],
   "provides": [
     "libpci.so",

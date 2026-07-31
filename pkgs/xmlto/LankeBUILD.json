@@ -6,8 +6,7 @@
   ],
   "work_sources": [],
   "deps": [
-    "bash",
-    "glibc"
+    "bash"
   ],
   "no_strip": true,
   "provides": [],

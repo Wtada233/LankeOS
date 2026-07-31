@@ -17,12 +17,7 @@
     "libzstd.so.1"
   ],
   "deps": [
-    "flex",
-    "gcc",
-    "glibc",
-    "perl",
-    "zlib",
-    "zstd"
+    "perl"
   ],
   "provides": [
     "libbfd-2.45.so",

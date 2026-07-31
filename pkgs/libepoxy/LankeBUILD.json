@@ -9,9 +9,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libepoxy.so",
     "libepoxy.so.0"

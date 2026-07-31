@@ -14,10 +14,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "gcc",
-    "glibc",
-    "pcre2",
-    "zlib"
+    "ruby"
   ],
   "provides": [],
   "build_deps": [

@@ -21,5 +21,6 @@
     "unzip",
     "zip"
   ],
-  "provides": []
+  "provides": [],
+  "needed_so": []
 }

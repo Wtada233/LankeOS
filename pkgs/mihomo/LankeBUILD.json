@@ -11,9 +11,7 @@
     "libc.so.6",
     "libresolv.so.2"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

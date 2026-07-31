@@ -18,13 +18,7 @@
     "libstdc++.so.6",
     "libxkbcommon.so.0"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libglvnd",
-    "libxkbcommon",
-    "qt6-base"
-  ],
+  "deps": [],
   "provides": [
     "libqt6ct-common.so",
     "libqt6ct-common.so.0.11"

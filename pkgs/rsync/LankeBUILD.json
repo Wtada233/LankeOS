@@ -17,15 +17,7 @@
     "libzstd.so.1"
   ],
   "deps": [
-    "acl",
-    "attr",
-    "bash",
-    "glibc",
-    "lz4",
-    "openssl",
-    "popt",
-    "zlib",
-    "zstd"
+    "bash"
   ],
   "provides": [],
   "build_deps": [

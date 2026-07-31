@@ -4,10 +4,7 @@
   "sources": [
     "https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.11.0.tar.bz2"
   ],
-  "deps": [
-    "glibc",
-    "libgpg-error"
-  ],
+  "deps": [],
   "no_strip": false,
   "release": 2,
   "needed_so": [

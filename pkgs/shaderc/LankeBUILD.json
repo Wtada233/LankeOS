@@ -16,12 +16,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "SPIRV-Tools",
-    "gcc",
-    "glibc",
-    "glslang"
-  ],
+  "deps": [],
   "provides": [
     "libshaderc_shared.so",
     "libshaderc_shared.so.1"

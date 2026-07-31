@@ -5,9 +5,7 @@
     "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "no_strip": false,
   "provides": [
     "libdav1d.so",

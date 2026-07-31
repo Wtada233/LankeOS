@@ -18,14 +18,8 @@
     "libxml2.so.2"
   ],
   "deps": [
-    "acl",
-    "attr",
     "bash",
     "gawk",
-    "gcc",
-    "glibc",
-    "libxml2",
-    "ncurses",
     "perl",
     "ruby",
     "tcl"

@@ -14,10 +14,7 @@
     "libreadline.so.8"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "ncurses",
-    "readline"
+    "bash"
   ],
   "provides": [
     "libxml2.so",

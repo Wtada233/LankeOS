@@ -11,8 +11,6 @@
     "libssl.so.3"
   ],
   "deps": [
-    "glibc",
-    "openssl",
     "python"
   ],
   "provides": [

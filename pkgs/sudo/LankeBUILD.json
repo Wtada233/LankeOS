@@ -13,12 +13,7 @@
     "libssl.so.3",
     "libz.so.1"
   ],
-  "deps": [
-    "Linux-PAM",
-    "glibc",
-    "openssl",
-    "zlib"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "Linux-PAM",

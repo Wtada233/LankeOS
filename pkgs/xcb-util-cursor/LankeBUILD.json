@@ -6,10 +6,6 @@
   ],
   "work_sources": [],
   "deps": [
-    "glibc",
-    "libxcb",
-    "xcb-util-image",
-    "xcb-util-renderutil",
     "xwayland"
   ],
   "provides": [

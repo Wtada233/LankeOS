@@ -11,10 +11,7 @@
     "libc.so.6",
     "libncursesw.so.6"
   ],
-  "deps": [
-    "glibc",
-    "ncurses"
-  ],
+  "deps": [],
   "provides": [
     "libproc2.so",
     "libproc2.so.1"

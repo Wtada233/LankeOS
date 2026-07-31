@@ -15,12 +15,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "icu",
-    "qt6-base"
-  ],
+  "deps": [],
   "provides": [
     "libQt6Core5Compat.so",
     "libQt6Core5Compat.so.6"

@@ -102,7 +102,7 @@ def _parse_python_imports(filepath):
 # ---------------------------------------------------------------------------
 
 
-def rule(scan_result, deps, needed_so, provider_map, context):
+def rule(scan_result, deps, needed_so, context):
     """扫描 .py 文件 import 语句，添加对应包依赖。"""
     pkg_name = scan_result.get('pkg_name', '')
     extract_dir = scan_result.get('extract_dir', '')

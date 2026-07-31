@@ -14,11 +14,7 @@
     "libtcl8.6.so"
   ],
   "deps": [
-    "glibc",
-    "popt",
-    "python",
-    "slang",
-    "tcl"
+    "python"
   ],
   "provides": [
     "libnewt.so",

@@ -5,15 +5,7 @@
     "https://gitlab.freedesktop.org/libdecor/libdecor/-/releases/0.2.5/downloads/libdecor-0.2.5.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "cairo",
-    "dbus",
-    "glib",
-    "glibc",
-    "gtk3",
-    "pango",
-    "wayland"
-  ],
+  "deps": [],
   "provides": [
     "libdecor-0.so",
     "libdecor-0.so.0"

@@ -44,27 +44,7 @@
     "libzstd.so.1"
   ],
   "deps": [
-    "SPIRV-LLVM-Translator",
-    "SPIRV-Tools",
-    "expat",
-    "gcc",
-    "glibc",
-    "libX11",
-    "libXext",
-    "libXxf86vm",
-    "libdisplay-info",
-    "libdrm",
-    "libelf",
-    "libpng",
-    "libxcb",
-    "libxshmfence",
-    "llvm",
-    "python",
-    "systemd",
-    "wayland",
-    "xcb-util-keysyms",
-    "zlib",
-    "zstd"
+    "python"
   ],
   "provides": [
     "libEGL_mesa.so",

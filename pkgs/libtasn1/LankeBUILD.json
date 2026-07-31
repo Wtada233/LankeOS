@@ -9,9 +9,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libtasn1.so",
     "libtasn1.so.6"

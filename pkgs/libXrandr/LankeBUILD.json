@@ -5,12 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXrandr-1.5.4.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11",
-    "libXext",
-    "libXrender"
-  ],
+  "deps": [],
   "provides": [
     "libXrandr.so",
     "libXrandr.so.2"

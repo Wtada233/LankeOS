@@ -13,11 +13,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "lz4",
-    "xz",
-    "zlib"
+    "bash"
   ],
   "provides": [
     "libzstd.so",

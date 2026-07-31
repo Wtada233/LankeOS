@@ -19,12 +19,6 @@
   ],
   "deps": [
     "bash",
-    "dbus",
-    "glib",
-    "glibc",
-    "libX11",
-    "libXi",
-    "libXtst",
     "xwayland"
   ],
   "provides": [

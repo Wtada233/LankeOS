@@ -17,9 +17,7 @@
     "libudev.so.1"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "systemd"
+    "bash"
   ],
   "provides": [
     "libdevmapper-event.so",

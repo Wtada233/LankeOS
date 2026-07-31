@@ -12,11 +12,7 @@
     "libsass.so.1",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libsass"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

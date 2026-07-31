@@ -18,13 +18,7 @@
   ],
   "deps": [
     "bash",
-    "glibc",
-    "libelf",
-    "libffi",
-    "pcre2",
-    "python",
-    "util-linux",
-    "zlib"
+    "python"
   ],
   "provides": [
     "libgio-2.0.so",

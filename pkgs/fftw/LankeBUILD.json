@@ -10,8 +10,7 @@
     "libm.so.6"
   ],
   "deps": [
-    "bash",
-    "glibc"
+    "bash"
   ],
   "provides": [
     "libfftw3.so",

@@ -26,19 +26,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "bash",
-    "bzip2",
-    "expat",
-    "gdbm",
-    "glibc",
-    "libffi",
-    "ncurses",
-    "openssl",
-    "readline",
-    "sqlite",
-    "util-linux",
-    "xz",
-    "zlib"
+    "bash"
   ],
   "provides": [
     "libpython3.13.so",

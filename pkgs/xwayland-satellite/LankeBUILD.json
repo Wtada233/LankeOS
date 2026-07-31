@@ -6,10 +6,6 @@
   ],
   "work_sources": [],
   "deps": [
-    "gcc",
-    "glibc",
-    "libxcb",
-    "xcb-util-cursor",
     "xwayland"
   ],
   "provides": [],

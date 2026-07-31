@@ -16,14 +16,7 @@
     "libpam.so.0",
     "libsystemd.so.0"
   ],
-  "deps": [
-    "Linux-PAM",
-    "duktape",
-    "expat",
-    "glib",
-    "glibc",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [
     "libpolkit-agent-1.so",
     "libpolkit-agent-1.so.0",

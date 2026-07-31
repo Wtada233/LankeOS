@@ -10,10 +10,7 @@
     "libc.so.6",
     "libncursesw.so.6"
   ],
-  "deps": [
-    "glibc",
-    "ncurses"
-  ],
+  "deps": [],
   "provides": [
     "libedit.so",
     "libedit.so.0"

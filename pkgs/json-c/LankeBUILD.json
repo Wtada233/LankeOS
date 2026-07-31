@@ -9,9 +9,7 @@
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libjson-c.so",
     "libjson-c.so.5"

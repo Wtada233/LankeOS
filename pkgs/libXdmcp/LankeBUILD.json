@@ -5,9 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXdmcp-1.1.5.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libXdmcp.so",
     "libXdmcp.so.6"

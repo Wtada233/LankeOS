@@ -5,11 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/app/xkbcomp-1.4.7.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11",
-    "libxkbfile"
-  ],
+  "deps": [],
   "provides": [],
   "no_strip": false,
   "release": 2,

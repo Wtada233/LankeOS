@@ -13,11 +13,7 @@
     "libogg.so.0",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libogg"
-  ],
+  "deps": [],
   "provides": [
     "libFLAC++.so",
     "libFLAC++.so.11",

@@ -12,14 +12,15 @@ gen_deps.py — Auto-generate dependencies for .lpkg packages.
 
   needed_so: ["libc.so.6", "libz.so.1", ...]
     原始探测结果：当前包所有 ELF 文件的 DT_NEEDED 条目。
+    运行时依赖的权威表达——安装时 lpkg 据此校验提供者是否存在。
 
   deps: ["glibc", "zlib", ...]
-    needed_so 经 provider_map 解析得到的包名列表（无版本约束）。
-    然后由 deprules/ 中的规则插件补充（脚本解释器、xwayland 注入等）。
+    默认不自动生成（needed_so 一层即足够），由 deprules/ 中的
+    规则插件按需填充（脚本解释器、meta 包保护、xwayland 注入等）。
 
 === 功能 ===
   • ELF 动态链接分析（pyelftools 优先，回退 readelf）
-  • SONAME 收集（needed_so）与提供者解析（deps）
+  • SONAME 收集（needed_so，过滤包自身提供的条目）
   • 可扩展规则系统（deprules/ 目录下的 .py 文件自动加载）
   • 流水线架构：一次解包，同时扫描 SONAME + NEEDED
   • 并行流水线 + dry-run 模式
@@ -194,7 +195,7 @@ def scan_package(lpkg, target_dir, extract_root):
 
     返回：
       lpkg, pkg_name, pkg_version,
-      providers, provides_so, needs, script_deps, extract_dir
+      provides_so, needs, script_deps, extract_dir
     """
     pkg_path = os.path.abspath(os.path.join(target_dir, lpkg))
     pkg_name = ''
@@ -209,7 +210,7 @@ def scan_package(lpkg, target_dir, extract_root):
     if ret.returncode != 0:
         return {
             'lpkg': lpkg, 'pkg_name': '', 'pkg_version': '',
-            'providers': [], 'needs': set(), 'script_deps': set(),
+            'needs': set(), 'script_deps': set(),
             'all_sonames': set(),
             'extract_dir': extract_dir,
         }
@@ -223,12 +224,11 @@ def scan_package(lpkg, target_dir, extract_root):
     if not os.path.isdir(content_dir):
         return {
             'lpkg': lpkg, 'pkg_name': pkg_name, 'pkg_version': pkg_version,
-            'providers': [], 'needs': set(), 'script_deps': set(),
+            'needs': set(), 'script_deps': set(),
             'all_sonames': set(),
             'extract_dir': extract_dir,
         }
 
-    providers = []
     provides_so = []
     all_sonames = set()      # 包内所有 ELF 的 SONAME（含捆绑库，用于自提供 NEEDED 跳过）
     needs = set()
@@ -250,11 +250,6 @@ def scan_package(lpkg, target_dir, extract_root):
                     #          ③ 链接指向 ELF
                     if '.so' in fname and _in_system_lib_dir(fpath, content_dir):
                         provides_so.append(fname)
-                        providers.append({
-                            'key': fname,
-                            'pkg': pkg_name,
-                            'pkg_version': pkg_version,
-                        })
                 continue
 
             if is_elf(fpath):
@@ -271,20 +266,10 @@ def scan_package(lpkg, target_dir, extract_root):
                 if sonames and in_lib:
                     for sn in sonames:
                         provides_so.append(sn)
-                        providers.append({
-                            'key': sn,
-                            'pkg': pkg_name,
-                            'pkg_version': pkg_version,
-                        })
                 elif in_lib and '.so' in fname:
                     # 无 SONAME 回退：部分老库（如 tcl 的 libtcl8.6.so）不设 SONAME
                     # 但文件名本身就是其他包的 DT_NEEDED 目标，注册文件名作为提供者
                     provides_so.append(fname)
-                    providers.append({
-                        'key': fname,
-                        'pkg': pkg_name,
-                        'pkg_version': pkg_version,
-                    })
 
                 for n in needed:
                     if '/' in n:
@@ -313,7 +298,6 @@ def scan_package(lpkg, target_dir, extract_root):
         'lpkg': lpkg,
         'pkg_name': pkg_name,
         'pkg_version': pkg_version,
-        'providers': providers,
         'provides_so': provides_so,
         'all_sonames': all_sonames,
         'needs': needs,
@@ -327,12 +311,11 @@ def scan_package(lpkg, target_dir, extract_root):
 # ---------------------------------------------------------------------------
 
 
-def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rules=None, rule_context=None, metadata_target=None):
+def resolve_and_update(scan_result, target_dir, dry_run=False, rules=None, rule_context=None, metadata_target=None):
     """
     Phase 2 工作单元。
 
-    将包的 DT_NEEDED 解析到全局 provider_map，
-    然后执行 deprules/ 中的规则插件（脚本解释器、xwayland 注入等），
+    执行 deprules/ 中的规则插件（脚本解释器、xwayland 注入等），
     更新 metadata.json，若有变化则重新打包 .lpkg。
     """
     lpkg = scan_result['lpkg']
@@ -344,24 +327,19 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rul
     if not pkg_name:
         return lpkg, [], 'no_pkg_name'
 
-    deps = {}
+    deps = {}                          # 默认空：deps 由 deprules 规则填充，不再由 needed_so 解析
     needed_so = sorted(needs)          # ① 直接使用全部 DT_NEEDED
 
     # 当前包自身提供的 SONAME 全集（含捆绑库，如 firefox 的 /usr/lib/firefox/libnss3.so）
     # 只要包内任意文件提供了该 SONAME，就跳过依赖解析——运行时 RUNPATH 会找到它
     self_provided = scan_result.get('all_sonames', set())
 
-    for soname in needed_so:           # ② 遍历已排序列表
-        if soname in self_provided:
-            # 包内自带了该 SONAME（可能是系统路径也可能是捆绑路径）
-            # 跳过不产生外部依赖，运行时由 RUNPATH / RPATH 解析
-            continue
-        provider = provider_map.get(soname)
-        if provider and provider['pkg'] and provider['pkg'] != pkg_name:
-            deps.setdefault(provider['pkg'])
+    # ② （已移除）needed_so → provider_map 包名匹配生成 deps 的逻辑。
+    #    needed_so 一层即足够：安装时 lpkg 直接校验 SONAME 提供者，
+    #    包级 deps 由 deprules 规则按需填充。
 
     # ③ 过滤掉包自身提供的 needed_so（如 python 的 libpython3.13.so.1.0）
-    # 使用 self_provided 而非 provider_map 检查，避免因捆绑包先入为主导致过滤失效
+    # 使用 self_provided 而非全局 provider 判断，避免因捆绑包先入为主导致过滤失效
     needed_so = [n for n in needed_so if n not in self_provided]
 
     # --- 2) 执行规则插件 ---
@@ -371,7 +349,7 @@ def resolve_and_update(scan_result, provider_map, target_dir, dry_run=False, rul
         ctx['pkg_version'] = scan_result.get('pkg_version', '')
         for rule_name, rule_desc, rule_fn in rules:
             try:
-                rule_fn(scan_result, deps, needed_so, provider_map, ctx)
+                rule_fn(scan_result, deps, needed_so, ctx)
             except Exception as e:
                 print(f'      [!] 规则 {rule_name} 失败 ({pkg_name}): {e}', file=sys.stderr)
 
@@ -506,19 +484,6 @@ def main():
             if i % 10 == 0 or i == len(lpkg_files):
                 print(f'   Scan: {i}/{len(lpkg_files)}')
 
-    # 构建全局提供者映射
-    provider_map = {}
-    for result in all_results:
-        for prov in result['providers']:
-            key = prov['key']
-            if key and key not in provider_map:
-                provider_map[key] = {
-                    'pkg': prov['pkg'],
-                    'pkg_version': prov['pkg_version'],
-                }
-
-    print(f'[*] Provider map: {len(provider_map)} entries (SONAME + .so filenames)')
-
     # ==================================================================
     # Phase 2: 并行解析 + 回填
     # ==================================================================
@@ -536,7 +501,7 @@ def main():
 
     with ThreadPoolExecutor(max_workers=args.jobs) as ex:
         futures = {
-            ex.submit(resolve_and_update, r, provider_map, target_dir,
+            ex.submit(resolve_and_update, r, target_dir,
                        args.dry_run, rules, rule_context, args.metadata_target): r
             for r in all_results
         }

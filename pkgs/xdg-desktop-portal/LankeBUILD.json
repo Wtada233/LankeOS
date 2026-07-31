@@ -19,18 +19,7 @@
     "libpipewire-0.3.so.0",
     "libsystemd.so.0"
   ],
-  "deps": [
-    "fuse3",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "gst-plugins-base",
-    "gstreamer",
-    "json-glib",
-    "libgudev",
-    "pipewire",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

@@ -18,14 +18,7 @@
     "libreadline.so.8",
     "libssl.so.3"
   ],
-  "deps": [
-    "dbus",
-    "glibc",
-    "libnl",
-    "ncurses",
-    "openssl",
-    "readline"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

@@ -16,10 +16,7 @@
     "libssl.so.3"
   ],
   "deps": [
-    "bash",
-    "e2fsprogs",
-    "glibc",
-    "openssl"
+    "bash"
   ],
   "provides": [
     "libgssapi_krb5.so",

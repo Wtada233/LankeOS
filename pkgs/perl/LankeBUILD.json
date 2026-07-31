@@ -13,11 +13,7 @@
     "libgdbm_compat.so.4",
     "libm.so.6"
   ],
-  "deps": [
-    "gdbm",
-    "glibc",
-    "libxcrypt"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

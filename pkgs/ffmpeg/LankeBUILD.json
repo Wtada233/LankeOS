@@ -31,22 +31,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "alsa-lib",
-    "bzip2",
-    "glibc",
-    "libX11",
-    "libXext",
-    "libXv",
-    "libdrm",
-    "libmp3lame",
-    "libva",
-    "libvorbis",
-    "libx264",
-    "libx265",
-    "libxcb",
-    "xwayland",
-    "xz",
-    "zlib"
+    "xwayland"
   ],
   "provides": [
     "libavcodec.so",

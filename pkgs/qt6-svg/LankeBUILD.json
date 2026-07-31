@@ -18,14 +18,7 @@
     "libxkbcommon.so.0",
     "libz.so.1"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libglvnd",
-    "libxkbcommon",
-    "qt6-base",
-    "zlib"
-  ],
+  "deps": [],
   "provides": [
     "libQt6Svg.so",
     "libQt6Svg.so.6",

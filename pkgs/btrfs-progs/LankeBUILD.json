@@ -18,13 +18,7 @@
     "libzstd.so.1"
   ],
   "deps": [
-    "bash",
-    "e2fsprogs",
-    "glibc",
-    "systemd",
-    "util-linux",
-    "zlib",
-    "zstd"
+    "bash"
   ],
   "provides": [
     "libbtrfs.so",

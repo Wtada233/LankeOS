@@ -25,18 +25,7 @@
   ],
   "deps": [
     "bash",
-    "fontconfig",
-    "freetype",
-    "glib",
-    "glibc",
-    "libX11",
-    "libXext",
-    "libXrender",
-    "libpng",
-    "libxcb",
-    "pixman",
-    "xwayland",
-    "zlib"
+    "xwayland"
   ],
   "provides": [
     "libcairo-gobject.so",

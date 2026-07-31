@@ -28,20 +28,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "bash",
-    "cairo",
-    "expat",
-    "gcc",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "json-c",
-    "libxkbcommon",
-    "pango",
-    "systemd",
-    "util-linux",
-    "wayland",
-    "zlib"
+    "bash"
   ],
   "provides": [
     "libFcitx5Config.so",

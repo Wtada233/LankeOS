@@ -19,12 +19,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libglvnd",
-    "qt6-base"
-  ],
+  "deps": [],
   "provides": [
     "libQt6LabsFolderListModel.so",
     "libQt6LabsFolderListModel.so.6",

@@ -10,10 +10,7 @@
     "libc.so.6",
     "libgcc_s.so.1"
   ],
-  "deps": [
-    "gcc",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libblake3.so",
     "libblake3.so.0"

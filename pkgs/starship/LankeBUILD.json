@@ -10,10 +10,7 @@
     "libgcc_s.so.1",
     "libm.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

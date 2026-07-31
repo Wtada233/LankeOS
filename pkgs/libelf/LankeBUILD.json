@@ -14,13 +14,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "deps": [
-    "bzip2",
-    "glibc",
-    "xz",
-    "zlib",
-    "zstd"
-  ],
+  "deps": [],
   "provides": [
     "libelf.so",
     "libelf.so.1"

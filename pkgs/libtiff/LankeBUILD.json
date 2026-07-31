@@ -16,14 +16,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libjpeg-turbo",
-    "xz",
-    "zlib",
-    "zstd"
-  ],
+  "deps": [],
   "provides": [
     "libtiff.so",
     "libtiff.so.6",

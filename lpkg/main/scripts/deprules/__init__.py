@@ -6,15 +6,14 @@ deprules — gen_deps.py 的规则插件系统。
     __rule_name__ = "短名称"              # 必填
     __rule_description__ = "描述"          # 必填
 
-    def rule(scan_result, deps, needed_so, provider_map, context):
+    def rule(scan_result, deps, needed_so, context):
         '''
         修改 deps / needed_so（原地修改，无需返回值）。
 
         参数:
             scan_result : dict — Phase 1 扫描结果
-            deps        : dict[str, None]  已解析的包依赖（SONAME 层）
+            deps        : dict[str, None]  规则填充的包级依赖（默认空）
             needed_so   : list[str]        已收集的 SONAME 列表
-            provider_map: dict[str, dict]  SONAME → {pkg, pkg_version}
             context     : dict             包含 dry_run, rules_dir 等
         '''
         pass

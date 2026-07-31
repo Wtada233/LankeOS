@@ -18,15 +18,7 @@
     "libharfbuzz.so.0",
     "libm.so.6"
   ],
-  "deps": [
-    "cairo",
-    "fontconfig",
-    "freetype",
-    "fribidi",
-    "glib",
-    "glibc",
-    "harfbuzz"
-  ],
+  "deps": [],
   "provides": [
     "libpango-1.0.so",
     "libpango-1.0.so.0",

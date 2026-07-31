@@ -12,8 +12,6 @@
   ],
   "deps": [
     "bash",
-    "glibc",
-    "ncurses",
     "perl"
   ],
   "provides": [],

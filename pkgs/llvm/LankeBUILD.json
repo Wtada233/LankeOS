@@ -6,15 +6,8 @@
   ],
   "work_sources": [],
   "deps": [
-    "curl",
-    "gcc",
-    "glibc",
-    "libedit",
-    "libffi",
-    "libxml2",
     "perl",
-    "python",
-    "zlib"
+    "python"
   ],
   "no_strip": false,
   "provides": [

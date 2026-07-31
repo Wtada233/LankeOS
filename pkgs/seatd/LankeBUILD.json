@@ -10,10 +10,7 @@
     "libc.so.6",
     "libsystemd.so.0"
   ],
-  "deps": [
-    "glibc",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [
     "libseat.so",
     "libseat.so.1"

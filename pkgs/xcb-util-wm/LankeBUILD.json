@@ -5,10 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-wm-0.4.2.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libxcb"
-  ],
+  "deps": [],
   "provides": [
     "libxcb-ewmh.so",
     "libxcb-ewmh.so.2",

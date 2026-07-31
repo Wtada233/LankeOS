@@ -14,10 +14,6 @@
     "libxml2.so.2"
   ],
   "deps": [
-    "glibc",
-    "libxcb",
-    "libxml2",
-    "wayland",
     "xwayland"
   ],
   "provides": [

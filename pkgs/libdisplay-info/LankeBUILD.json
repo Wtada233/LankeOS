@@ -10,9 +10,7 @@
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libdisplay-info.so",
     "libdisplay-info.so.3"

@@ -5,10 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXfixes-6.0.1.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11"
-  ],
+  "deps": [],
   "provides": [
     "libXfixes.so",
     "libXfixes.so.3"

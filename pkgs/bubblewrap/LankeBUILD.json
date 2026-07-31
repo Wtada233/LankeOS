@@ -9,10 +9,7 @@
     "libc.so.6",
     "libcap.so.2"
   ],
-  "deps": [
-    "glibc",
-    "libcap"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

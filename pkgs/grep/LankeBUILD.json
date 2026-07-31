@@ -11,9 +11,7 @@
     "libpcre2-8.so.0"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "pcre2"
+    "bash"
   ],
   "provides": [],
   "build_deps": [

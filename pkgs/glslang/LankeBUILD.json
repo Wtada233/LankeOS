@@ -15,11 +15,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "SPIRV-Tools",
-    "gcc",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libSPIRV.so",
     "libSPIRV.so.16",

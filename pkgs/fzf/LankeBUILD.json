@@ -8,8 +8,7 @@
     "libresolv.so.2"
   ],
   "deps": [
-    "bash",
-    "glibc"
+    "bash"
   ],
   "provides": [],
   "build_deps": [

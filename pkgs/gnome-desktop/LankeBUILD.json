@@ -21,17 +21,7 @@
     "libudev.so.1",
     "libxkbregistry.so.0"
   ],
-  "deps": [
-    "cairo",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "gtk3",
-    "gtk4",
-    "libseccomp",
-    "libxkbcommon",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [
     "libgnome-bg-4.so",
     "libgnome-bg-4.so.2",

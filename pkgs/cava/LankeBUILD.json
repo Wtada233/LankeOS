@@ -14,14 +14,7 @@
     "libncursesw.so.6",
     "libpipewire-0.3.so.0"
   ],
-  "deps": [
-    "alsa-lib",
-    "fftw",
-    "glibc",
-    "iniparser",
-    "ncurses",
-    "pipewire"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "alsa-lib",

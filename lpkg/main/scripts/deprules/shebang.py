@@ -130,7 +130,7 @@ def _should_file_detect(path):
 # ---------------------------------------------------------------------------
 
 
-def rule(scan_result, deps, needed_so, provider_map, context):
+def rule(scan_result, deps, needed_so, context):
     """将 Phase 1 + 补充扫描的脚本解释器数据映射为包名依赖。"""
     pkg_name = scan_result.get('pkg_name', '')
     script_deps = scan_result.get('script_deps', set())

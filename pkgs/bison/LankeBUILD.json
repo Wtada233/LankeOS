@@ -11,9 +11,7 @@
     "libtextstyle.so.0"
   ],
   "deps": [
-    "bash",
-    "gettext",
-    "glibc"
+    "bash"
   ],
   "provides": [],
   "build_deps": [

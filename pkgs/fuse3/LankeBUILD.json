@@ -8,9 +8,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libfuse3.so",
     "libfuse3.so.4"

@@ -14,9 +14,7 @@
   ],
   "deps": [
     "bash",
-    "glibc",
-    "perl",
-    "util-linux"
+    "perl"
   ],
   "provides": [
     "libcom_err.so",

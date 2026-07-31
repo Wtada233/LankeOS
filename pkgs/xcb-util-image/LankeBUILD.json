@@ -6,9 +6,6 @@
   ],
   "work_sources": [],
   "deps": [
-    "glibc",
-    "libxcb",
-    "xcb-util",
     "xwayland"
   ],
   "provides": [

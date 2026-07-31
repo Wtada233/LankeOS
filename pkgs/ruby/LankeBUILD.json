@@ -5,15 +5,7 @@
     "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.1.tar.xz"
   ],
   "deps": [
-    "bash",
-    "gcc",
-    "glibc",
-    "gmp",
-    "libffi",
-    "libxcrypt",
-    "libyaml",
-    "openssl",
-    "zlib"
+    "bash"
   ],
   "no_strip": false,
   "release": 2,

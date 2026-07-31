@@ -5,12 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXcursor-1.2.3.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11",
-    "libXfixes",
-    "libXrender"
-  ],
+  "deps": [],
   "provides": [
     "libXcursor.so",
     "libXcursor.so.1"

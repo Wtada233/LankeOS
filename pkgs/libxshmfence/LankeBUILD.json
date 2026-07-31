@@ -5,9 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libxshmfence-1.3.2.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libxshmfence.so",
     "libxshmfence.so.1"

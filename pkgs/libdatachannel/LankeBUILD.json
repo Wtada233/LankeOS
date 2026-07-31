@@ -16,13 +16,7 @@
     "libssl.so.3",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libjuice",
-    "libsrtp",
-    "openssl"
-  ],
+  "deps": [],
   "provides": [
     "libdatachannel.so",
     "libdatachannel.so.0.24"

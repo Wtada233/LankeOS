@@ -5,9 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libxcvt-0.1.2.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libxcvt.so",
     "libxcvt.so.0"

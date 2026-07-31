@@ -14,11 +14,7 @@
     "libsystemd.so.0"
   ],
   "deps": [
-    "bash",
-    "gdbm",
-    "glibc",
-    "libxcrypt",
-    "systemd"
+    "bash"
   ],
   "provides": [
     "libpam.so",

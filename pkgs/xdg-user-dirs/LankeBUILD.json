@@ -8,9 +8,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

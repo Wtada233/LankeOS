@@ -19,10 +19,6 @@
   ],
   "deps": [
     "bash",
-    "fontconfig",
-    "freetype",
-    "glibc",
-    "libxcb",
     "xwayland"
   ],
   "provides": [],

@@ -10,10 +10,7 @@
     "libattr.so.1",
     "libc.so.6"
   ],
-  "deps": [
-    "attr",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "attr",

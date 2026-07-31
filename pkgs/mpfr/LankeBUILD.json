@@ -11,10 +11,7 @@
     "libc.so.6",
     "libgmp.so.10"
   ],
-  "deps": [
-    "glibc",
-    "gmp"
-  ],
+  "deps": [],
   "provides": [
     "libmpfr.so",
     "libmpfr.so.6"

@@ -4,12 +4,7 @@
   "sources": [
     "https://downloads.sourceforge.net/lcms/lcms2-2.18.tar.gz"
   ],
-  "deps": [
-    "glibc",
-    "libjpeg-turbo",
-    "libtiff",
-    "zlib"
-  ],
+  "deps": [],
   "no_strip": false,
   "release": 2,
   "needed_so": [

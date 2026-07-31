@@ -21,14 +21,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "boost",
-    "curl",
-    "fcitx5",
-    "gcc",
-    "glibc",
-    "libime"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

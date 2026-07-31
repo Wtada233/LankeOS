@@ -22,17 +22,7 @@
     "libstdc++.so.6",
     "libudev.so.1"
   ],
-  "deps": [
-    "alsa-lib",
-    "gcc",
-    "glibc",
-    "json-c",
-    "libglvnd",
-    "libjpeg-turbo",
-    "qt5compat",
-    "qt6-base",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [
     "libdvbv5.so",
     "libdvbv5.so.0",

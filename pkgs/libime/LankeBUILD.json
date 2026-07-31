@@ -15,13 +15,7 @@
     "libstdc++.so.6",
     "libzstd.so.1"
   ],
-  "deps": [
-    "boost",
-    "fcitx5",
-    "gcc",
-    "glibc",
-    "zstd"
-  ],
+  "deps": [],
   "provides": [
     "libIMECore.so",
     "libIMECore.so.0",

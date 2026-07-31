@@ -18,14 +18,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "bash",
-    "file",
-    "glibc",
-    "libxcrypt",
-    "ncurses",
-    "readline",
-    "systemd",
-    "zlib"
+    "bash"
   ],
   "provides": [
     "libblkid.so",

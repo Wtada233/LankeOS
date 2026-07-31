@@ -6,11 +6,7 @@
   ],
   "work_sources": [],
   "deps": [
-    "bash",
-    "glibc",
-    "nspr",
-    "sqlite",
-    "zlib"
+    "bash"
   ],
   "no_strip": false,
   "provides": [

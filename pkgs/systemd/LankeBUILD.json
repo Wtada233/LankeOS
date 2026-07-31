@@ -13,7 +13,6 @@
   ],
   "deps": [
     "bash",
-    "glibc",
     "python"
   ],
   "provides": [

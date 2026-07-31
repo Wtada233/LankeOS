@@ -13,10 +13,7 @@
     "libtasn1.so.6"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "libffi",
-    "libtasn1"
+    "bash"
   ],
   "provides": [
     "libp11-kit.so",

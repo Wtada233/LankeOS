@@ -13,12 +13,7 @@
     "libstdc++.so.6",
     "libxml2.so.2"
   ],
-  "deps": [
-    "gcc",
-    "glib",
-    "glibc",
-    "libxml2"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

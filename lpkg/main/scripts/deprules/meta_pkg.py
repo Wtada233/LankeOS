@@ -14,7 +14,7 @@ __rule_description__ = '保护元包（base、base-devel）的手工维护依赖
 META_PACKAGES = frozenset({'base', 'base-devel'})
 
 
-def rule(scan_result, deps, needed_so, provider_map, context):
+def rule(scan_result, deps, needed_so, context):
     pkg_name = scan_result.get('pkg_name', '')
     if pkg_name not in META_PACKAGES:
         return

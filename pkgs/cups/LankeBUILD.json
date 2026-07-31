@@ -6,16 +6,7 @@
   ],
   "work_sources": [],
   "deps": [
-    "Linux-PAM",
-    "acl",
-    "bash",
-    "dbus",
-    "gcc",
-    "glibc",
-    "libxcrypt",
-    "openssl",
-    "systemd",
-    "zlib"
+    "bash"
   ],
   "provides": [
     "libcups.so",

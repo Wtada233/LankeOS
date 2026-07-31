@@ -5,10 +5,7 @@
     "https://deb.debian.org/debian/pool/main/d/desktop-file-utils/desktop-file-utils_0.28.orig.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glib",
-    "glibc"
-  ],
+  "deps": [],
   "no_strip": false,
   "provides": [],
   "release": 1,

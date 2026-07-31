@@ -10,9 +10,7 @@
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libevdev.so",
     "libevdev.so.2"

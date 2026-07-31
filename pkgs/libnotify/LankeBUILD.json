@@ -13,11 +13,7 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0"
   ],
-  "deps": [
-    "gdk-pixbuf",
-    "glib",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libnotify.so",
     "libnotify.so.4"

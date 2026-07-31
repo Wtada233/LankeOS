@@ -5,9 +5,7 @@
     "https://www.x.org/releases/individual/lib/libICE-1.1.2.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libICE.so",
     "libICE.so.6"

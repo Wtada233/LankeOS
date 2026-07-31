@@ -5,11 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXinerama-1.1.5.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11",
-    "libXext"
-  ],
+  "deps": [],
   "provides": [
     "libXinerama.so",
     "libXinerama.so.1"

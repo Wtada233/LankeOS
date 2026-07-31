@@ -15,11 +15,7 @@
     "libmnl.so.0",
     "libnfnetlink.so.0"
   ],
-  "deps": [
-    "glibc",
-    "libmnl",
-    "libnfnetlink"
-  ],
+  "deps": [],
   "provides": [
     "libnetfilter_conntrack.so",
     "libnetfilter_conntrack.so.3"

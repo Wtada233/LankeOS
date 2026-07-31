@@ -5,11 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXres-1.2.2.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11",
-    "libXext"
-  ],
+  "deps": [],
   "provides": [
     "libXRes.so",
     "libXRes.so.1"

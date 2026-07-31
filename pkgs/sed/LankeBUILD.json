@@ -10,10 +10,7 @@
     "libacl.so.1",
     "libc.so.6"
   ],
-  "deps": [
-    "acl",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "acl",

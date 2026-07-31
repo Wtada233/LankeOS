@@ -32,22 +32,7 @@
     "libudev.so.1"
   ],
   "deps": [
-    "alsa-lib",
-    "bash",
-    "bluez",
-    "dbus",
-    "fftw",
-    "glib",
-    "glibc",
-    "gst-plugins-base",
-    "gstreamer",
-    "libpulse",
-    "libsndfile",
-    "ncurses",
-    "opus",
-    "readline",
-    "sbc",
-    "systemd"
+    "bash"
   ],
   "provides": [
     "libjack.so",

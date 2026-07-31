@@ -32,21 +32,6 @@
     "libxkbcommon.so.0"
   ],
   "deps": [
-    "glibc",
-    "lcms2",
-    "libdisplay-info",
-    "libdrm",
-    "libglvnd",
-    "libinput",
-    "libxcb",
-    "libxkbcommon",
-    "mesa",
-    "pixman",
-    "seatd",
-    "systemd",
-    "vulkan-loader",
-    "wayland",
-    "xcb-util-wm",
     "xwayland"
   ],
   "provides": [

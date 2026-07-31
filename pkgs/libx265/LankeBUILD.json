@@ -13,10 +13,7 @@
     "libmvec.so.1",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libx265.so",
     "libx265.so.215"

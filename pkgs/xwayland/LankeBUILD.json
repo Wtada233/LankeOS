@@ -5,20 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/xserver/xwayland-24.1.4.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libXau",
-    "libXfont2",
-    "libdrm",
-    "libepoxy",
-    "libglvnd",
-    "libxcvt",
-    "libxshmfence",
-    "mesa",
-    "nettle",
-    "pixman",
-    "wayland"
-  ],
+  "deps": [],
   "provides": [],
   "no_strip": false,
   "release": 2,

@@ -11,10 +11,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libsass.so",
     "libsass.so.1"

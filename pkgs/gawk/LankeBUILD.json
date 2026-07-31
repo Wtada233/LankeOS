@@ -15,11 +15,7 @@
   ],
   "deps": [
     "bash",
-    "glibc",
-    "gmp",
-    "mpfr",
-    "perl",
-    "readline"
+    "perl"
   ],
   "provides": [],
   "build_deps": [

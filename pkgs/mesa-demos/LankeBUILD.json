@@ -6,16 +6,6 @@
   ],
   "work_sources": [],
   "deps": [
-    "glibc",
-    "libX11",
-    "libXext",
-    "libdecor",
-    "libdrm",
-    "libglvnd",
-    "libxkbcommon",
-    "mesa",
-    "vulkan-loader",
-    "wayland",
     "xwayland"
   ],
   "provides": [],

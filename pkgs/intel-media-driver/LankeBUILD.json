@@ -14,12 +14,7 @@
     "libstdc++.so.6",
     "libva.so.2"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "intel-gmmlib",
-    "libva"
-  ],
+  "deps": [],
   "provides": [
     "libigfxcmrt.so",
     "libigfxcmrt.so.7"

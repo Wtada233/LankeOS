@@ -51,7 +51,7 @@ SKIP_PKGS = frozenset({
 })
 
 
-def rule(scan_result, deps, needed_so, provider_map, context):
+def rule(scan_result, deps, needed_so, context):
     """检测 X11 SONAME → 注入 xwayland 依赖。"""
     pkg_name = scan_result.get('pkg_name', '')
     if pkg_name in SKIP_PKGS:

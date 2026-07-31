@@ -12,9 +12,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "bash",
-    "glibc",
-    "zlib"
+    "bash"
   ],
   "provides": [
     "libpng.so",

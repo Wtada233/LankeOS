@@ -10,10 +10,7 @@
     "libX11.so.6",
     "libc.so.6"
   ],
-  "deps": [
-    "glibc",
-    "libX11"
-  ],
+  "deps": [],
   "provides": [
     "libEGL.so",
     "libEGL.so.1",

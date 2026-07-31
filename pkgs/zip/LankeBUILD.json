@@ -10,10 +10,7 @@
     "libbz2.so.1.0",
     "libc.so.6"
   ],
-  "deps": [
-    "bzip2",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

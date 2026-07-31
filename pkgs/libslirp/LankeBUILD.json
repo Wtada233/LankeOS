@@ -9,10 +9,7 @@
     "libc.so.6",
     "libglib-2.0.so.0"
   ],
-  "deps": [
-    "glib",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libslirp.so",
     "libslirp.so.0"

@@ -17,10 +17,7 @@
     "libpanelw.so.6"
   ],
   "deps": [
-    "alsa-lib",
-    "bash",
-    "glibc",
-    "ncurses"
+    "bash"
   ],
   "provides": [],
   "build_deps": [

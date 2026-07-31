@@ -4,12 +4,7 @@
   "sources": [
     "https://www.sqlite.org/2025/sqlite-autoconf-3490100.tar.gz"
   ],
-  "deps": [
-    "glibc",
-    "ncurses",
-    "readline",
-    "zlib"
-  ],
+  "deps": [],
   "no_strip": false,
   "release": 2,
   "needed_so": [

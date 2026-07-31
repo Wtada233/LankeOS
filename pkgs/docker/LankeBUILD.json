@@ -26,8 +26,12 @@
     "libsystemd.so.0"
   ],
   "deps": [
-    "glibc",
-    "systemd"
+    "containerd",
+    "iproute2",
+    "iptables",
+    "libseccomp",
+    "libtool",
+    "nftables"
   ],
   "provides": []
 }

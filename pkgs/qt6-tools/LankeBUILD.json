@@ -29,17 +29,7 @@
     "libxkbcommon.so.0",
     "libzstd.so.1"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libglvnd",
-    "libinput",
-    "libxkbcommon",
-    "mtdev",
-    "qt6-base",
-    "systemd",
-    "zstd"
-  ],
+  "deps": [],
   "provides": [
     "libQt6Designer.so",
     "libQt6Designer.so.6",

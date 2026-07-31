@@ -24,14 +24,7 @@
     "libnftnl.so.11",
     "libreadline.so.8"
   ],
-  "deps": [
-    "glibc",
-    "gmp",
-    "jansson",
-    "libmnl",
-    "libnftnl",
-    "readline"
-  ],
+  "deps": [],
   "provides": [
     "libnftables.so",
     "libnftables.so.1"

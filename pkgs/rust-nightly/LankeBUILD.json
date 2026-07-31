@@ -24,13 +24,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "bash",
-    "curl",
-    "gcc",
-    "glibc",
-    "llvm",
-    "openssl",
-    "zlib"
+    "bash"
   ],
   "provides": [
     "librustc_driver-89afc71aa65b0fab.so"

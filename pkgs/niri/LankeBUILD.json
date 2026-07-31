@@ -8,20 +8,7 @@
     "file://./allow-software-rendering.patch"
   ],
   "deps": [
-    "bash",
-    "cairo",
-    "gcc",
-    "glib",
-    "glibc",
-    "libdisplay-info",
-    "libinput",
-    "libxkbcommon",
-    "mesa",
-    "pango",
-    "pipewire",
-    "pixman",
-    "seatd",
-    "systemd"
+    "bash"
   ],
   "provides": [],
   "release": 2,

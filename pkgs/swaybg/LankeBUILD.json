@@ -13,13 +13,7 @@
     "libgobject-2.0.so.0",
     "libwayland-client.so.0"
   ],
-  "deps": [
-    "cairo",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "wayland"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

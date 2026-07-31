@@ -18,14 +18,7 @@
     "libstdc++.so.6",
     "libtasn1.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "gmp",
-    "libtasn1",
-    "nettle",
-    "p11-kit"
-  ],
+  "deps": [],
   "provides": [
     "libgnutls.so",
     "libgnutls.so.30",

@@ -41,28 +41,6 @@
     "libxkbcommon.so.0"
   ],
   "deps": [
-    "at-spi2-core",
-    "cairo",
-    "cups",
-    "fontconfig",
-    "fribidi",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "harfbuzz",
-    "libX11",
-    "libXcomposite",
-    "libXcursor",
-    "libXdamage",
-    "libXext",
-    "libXfixes",
-    "libXi",
-    "libXinerama",
-    "libXrandr",
-    "libepoxy",
-    "libxkbcommon",
-    "pango",
-    "wayland",
     "xwayland"
   ],
   "provides": [

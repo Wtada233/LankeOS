@@ -5,10 +5,7 @@
     "https://github.com/cisco/openh264/archive/refs/tags/v2.6.0.tar.gz"
   ],
   "work_sources": [],
-  "deps": [
-    "gcc",
-    "glibc"
-  ],
+  "deps": [],
   "no_strip": false,
   "provides": [
     "libopenh264.so",

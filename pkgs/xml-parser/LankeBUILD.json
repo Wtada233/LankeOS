@@ -10,10 +10,7 @@
     "libc.so.6",
     "libexpat.so.1"
   ],
-  "deps": [
-    "expat",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

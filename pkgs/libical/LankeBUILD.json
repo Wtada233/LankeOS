@@ -18,13 +18,7 @@
     "libstdc++.so.6",
     "libxml2.so.2"
   ],
-  "deps": [
-    "gcc",
-    "glib",
-    "glibc",
-    "icu",
-    "libxml2"
-  ],
+  "deps": [],
   "provides": [
     "libical-glib.so",
     "libical-glib.so.4.0",

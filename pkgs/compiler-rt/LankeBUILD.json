@@ -6,8 +6,6 @@
   ],
   "work_sources": [],
   "deps": [
-    "gcc",
-    "glibc",
     "python"
   ],
   "no_strip": false,

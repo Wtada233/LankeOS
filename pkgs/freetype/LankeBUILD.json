@@ -14,12 +14,7 @@
     "libz.so.1"
   ],
   "deps": [
-    "bash",
-    "bzip2",
-    "glibc",
-    "harfbuzz",
-    "libpng",
-    "zlib"
+    "bash"
   ],
   "provides": [
     "libfreetype.so",

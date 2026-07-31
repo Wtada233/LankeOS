@@ -12,9 +12,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libnfnetlink.so",
     "libnfnetlink.so.0"

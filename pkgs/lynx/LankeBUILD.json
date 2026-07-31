@@ -5,16 +5,7 @@
     "https://invisible-mirror.net/archives/lynx/tarballs/lynx2.9.3.tar.bz2"
   ],
   "work_sources": [],
-  "deps": [
-    "brotli",
-    "bzip2",
-    "glibc",
-    "libidn2",
-    "ncurses",
-    "openssl",
-    "zlib",
-    "zstd"
-  ],
+  "deps": [],
   "no_strip": false,
   "provides": [],
   "release": 1,

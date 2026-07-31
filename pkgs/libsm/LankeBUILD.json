@@ -5,11 +5,7 @@
     "https://www.x.org/releases/individual/lib/libSM-1.2.6.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libice",
-    "util-linux"
-  ],
+  "deps": [],
   "provides": [
     "libSM.so",
     "libSM.so.6"

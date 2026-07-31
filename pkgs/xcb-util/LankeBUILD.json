@@ -5,10 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-0.4.1.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libxcb"
-  ],
+  "deps": [],
   "provides": [
     "libxcb-util.so",
     "libxcb-util.so.1"

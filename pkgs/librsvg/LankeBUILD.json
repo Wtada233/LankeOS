@@ -20,15 +20,7 @@
     "libpangocairo-1.0.so.0",
     "libxml2.so.2"
   ],
-  "deps": [
-    "cairo",
-    "gcc",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "libxml2",
-    "pango"
-  ],
+  "deps": [],
   "provides": [
     "librsvg-2.so",
     "librsvg-2.so.2"

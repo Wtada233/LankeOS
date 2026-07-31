@@ -5,10 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXext-1.3.6.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11"
-  ],
+  "deps": [],
   "provides": [
     "libXext.so",
     "libXext.so.6"

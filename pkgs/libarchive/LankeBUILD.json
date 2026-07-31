@@ -17,17 +17,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "deps": [
-    "acl",
-    "bzip2",
-    "glibc",
-    "libxml2",
-    "lz4",
-    "openssl",
-    "xz",
-    "zlib",
-    "zstd"
-  ],
+  "deps": [],
   "provides": [
     "libarchive.so",
     "libarchive.so.13"

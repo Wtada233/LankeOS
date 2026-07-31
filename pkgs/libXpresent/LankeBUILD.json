@@ -5,13 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXpresent-1.0.1.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11",
-    "libXext",
-    "libXfixes",
-    "libXrandr"
-  ],
+  "deps": [],
   "provides": [
     "libXpresent.so",
     "libXpresent.so.1"

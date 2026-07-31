@@ -19,17 +19,7 @@
     "libstdc++.so.6",
     "libxml2.so.2"
   ],
-  "deps": [
-    "curl",
-    "gcc",
-    "glibc",
-    "gmp",
-    "icu",
-    "libxml2",
-    "mpfr",
-    "ncurses",
-    "readline"
-  ],
+  "deps": [],
   "provides": [
     "libqalculate.so",
     "libqalculate.so.23"

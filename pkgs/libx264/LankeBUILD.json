@@ -15,10 +15,7 @@
     "libmvec.so.1",
     "libswscale.so.9"
   ],
-  "deps": [
-    "ffmpeg",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libx264.so",
     "libx264.so.165"

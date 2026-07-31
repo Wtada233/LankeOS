@@ -12,11 +12,7 @@
     "libpng16.so.16",
     "libz.so.1"
   ],
-  "deps": [
-    "glibc",
-    "libpng",
-    "zlib"
-  ],
+  "deps": [],
   "provides": [
     "libslang.so",
     "libslang.so.2"

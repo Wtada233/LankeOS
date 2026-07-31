@@ -30,23 +30,6 @@
     "libxkbcommon.so.0"
   ],
   "deps": [
-    "cairo",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "json-c",
-    "libdrm",
-    "libevdev",
-    "libinput",
-    "libxcb",
-    "libxkbcommon",
-    "pango",
-    "pcre2",
-    "pixman",
-    "systemd",
-    "wayland",
-    "wlroots",
-    "xcb-util-wm",
     "xwayland"
   ],
   "provides": [],

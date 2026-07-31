@@ -15,11 +15,7 @@
   ],
   "deps": [
     "bash",
-    "freetype",
-    "glibc",
-    "libtasn1",
-    "python",
-    "xz"
+    "python"
   ],
   "provides": [],
   "build_deps": [

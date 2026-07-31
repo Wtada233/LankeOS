@@ -10,8 +10,7 @@
     "libc.so.6"
   ],
   "deps": [
-    "bash",
-    "glibc"
+    "bash"
   ],
   "provides": [
     "libpcre2-16.so",

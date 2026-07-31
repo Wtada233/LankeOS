@@ -5,12 +5,7 @@
     "https://gitlab.freedesktop.org/xorg/lib/libXt/-/archive/libXt-1.3.1/libXt-libXt-1.3.1.tar.gz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11",
-    "libice",
-    "libsm"
-  ],
+  "deps": [],
   "provides": [
     "libXt.so",
     "libXt.so.6"

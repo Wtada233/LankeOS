@@ -15,12 +15,7 @@
     "libudev.so.1"
   ],
   "deps": [
-    "glibc",
-    "libevdev",
-    "lua",
-    "mtdev",
-    "python",
-    "systemd"
+    "python"
   ],
   "provides": [
     "libinput.so",

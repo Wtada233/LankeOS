@@ -23,16 +23,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "deps": [
-    "bzip2",
-    "gcc",
-    "glibc",
-    "icu",
-    "openssl",
-    "xz",
-    "zlib",
-    "zstd"
-  ],
+  "deps": [],
   "provides": [
     "libboost_atomic.so",
     "libboost_atomic.so.1.90.0",

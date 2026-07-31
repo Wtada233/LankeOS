@@ -15,14 +15,7 @@
     "libpam_misc.so.0",
     "libsystemd.so.0"
   ],
-  "deps": [
-    "Linux-PAM",
-    "acl",
-    "attr",
-    "glibc",
-    "libxcrypt",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [
     "libsubid.so",
     "libsubid.so.5"

@@ -5,10 +5,7 @@
     "https://gn.googlesource.com/gn/+archive/9ece3f5254c273cb46606a6571963f931c3b012d.tar.gz"
   ],
   "work_sources": [],
-  "deps": [
-    "gcc",
-    "glibc"
-  ],
+  "deps": [],
   "no_strip": false,
   "provides": [],
   "release": 1,

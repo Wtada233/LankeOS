@@ -23,17 +23,6 @@
     "libwayland-client.so.0"
   ],
   "deps": [
-    "cairo",
-    "fontconfig",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "gnome-desktop",
-    "graphene",
-    "gtk4",
-    "libX11",
-    "libadwaita",
-    "wayland",
     "xwayland"
   ],
   "provides": [],

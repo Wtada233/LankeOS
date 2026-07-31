@@ -20,14 +20,7 @@
     "libwebpdemux.so.2",
     "libwebpmux.so.3"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "libglvnd",
-    "libtiff",
-    "libwebp",
-    "qt6-base"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

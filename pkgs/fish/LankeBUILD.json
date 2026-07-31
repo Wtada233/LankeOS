@@ -12,11 +12,7 @@
     "libpcre2-32.so.0",
     "libpcre2-8.so.0"
   ],
-  "deps": [
-    "gcc",
-    "glibc",
-    "pcre2"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",

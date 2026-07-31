@@ -16,13 +16,8 @@
   ],
   "deps": [
     "bash",
-    "curl",
-    "expat",
-    "glibc",
-    "openssl",
     "perl",
-    "python",
-    "zlib"
+    "python"
   ],
   "provides": [],
   "build_deps": [

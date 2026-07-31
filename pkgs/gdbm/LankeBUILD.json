@@ -12,11 +12,7 @@
     "libncursesw.so.6",
     "libreadline.so.8"
   ],
-  "deps": [
-    "glibc",
-    "ncurses",
-    "readline"
-  ],
+  "deps": [],
   "provides": [
     "libgdbm.so",
     "libgdbm.so.6",

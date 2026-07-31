@@ -9,10 +9,7 @@
     "libc.so.6",
     "libcrypto.so.3"
   ],
-  "deps": [
-    "glibc",
-    "openssl"
-  ],
+  "deps": [],
   "provides": [
     "libsrtp2.so",
     "libsrtp2.so.1"

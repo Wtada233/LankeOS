@@ -9,8 +9,7 @@
     "libc.so.6"
   ],
   "deps": [
-    "bash",
-    "glibc"
+    "bash"
   ],
   "provides": [
     "libmbedcrypto.so.16",

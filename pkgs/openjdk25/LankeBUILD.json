@@ -6,22 +6,7 @@
   ],
   "work_sources": [],
   "deps": [
-    "alsa-lib",
-    "freetype",
-    "gcc",
-    "giflib",
-    "glibc",
-    "harfbuzz",
-    "lcms2",
-    "libX11",
-    "libXext",
-    "libXi",
-    "libXrender",
-    "libXtst",
-    "libjpeg-turbo",
-    "libpng",
-    "xwayland",
-    "zlib"
+    "xwayland"
   ],
   "provides": [],
   "no_strip": true,

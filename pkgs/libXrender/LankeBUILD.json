@@ -5,10 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXrender-0.9.11.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libX11"
-  ],
+  "deps": [],
   "provides": [
     "libXrender.so",
     "libXrender.so.1"

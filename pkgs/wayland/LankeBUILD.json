@@ -12,12 +12,7 @@
     "libffi.so.8",
     "libxml2.so.2"
   ],
-  "deps": [
-    "expat",
-    "glibc",
-    "libffi",
-    "libxml2"
-  ],
+  "deps": [],
   "provides": [
     "libwayland-client.so",
     "libwayland-client.so.0",

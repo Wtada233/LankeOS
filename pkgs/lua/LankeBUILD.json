@@ -17,10 +17,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "gcc",
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "liblua++.so",
     "liblua++.so.5.5",

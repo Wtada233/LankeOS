@@ -17,10 +17,7 @@
     "libnl-genl-3.so.200"
   ],
   "deps": [
-    "bash",
-    "dbus",
-    "glibc",
-    "libnl"
+    "bash"
   ],
   "provides": [
     "libpcap.so",

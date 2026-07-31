@@ -5,8 +5,7 @@
     "https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.54.tar.bz2"
   ],
   "deps": [
-    "bash",
-    "glibc"
+    "bash"
   ],
   "no_strip": false,
   "release": 2,

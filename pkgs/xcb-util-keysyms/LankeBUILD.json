@@ -5,10 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-keysyms-0.4.1.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc",
-    "libxcb"
-  ],
+  "deps": [],
   "provides": [
     "libxcb-keysyms.so",
     "libxcb-keysyms.so.1"

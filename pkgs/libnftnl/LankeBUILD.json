@@ -14,10 +14,7 @@
     "libc.so.6",
     "libmnl.so.0"
   ],
-  "deps": [
-    "glibc",
-    "libmnl"
-  ],
+  "deps": [],
   "provides": [
     "libnftnl.so",
     "libnftnl.so.11"

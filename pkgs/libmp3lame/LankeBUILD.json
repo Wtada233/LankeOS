@@ -11,10 +11,7 @@
     "libm.so.6",
     "libncursesw.so.6"
   ],
-  "deps": [
-    "glibc",
-    "ncurses"
-  ],
+  "deps": [],
   "provides": [
     "libmp3lame.so",
     "libmp3lame.so.0"

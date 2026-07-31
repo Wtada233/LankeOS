@@ -17,12 +17,6 @@
   ],
   "deps": [
     "bash",
-    "dbus",
-    "glib",
-    "glibc",
-    "libsndfile",
-    "libxcb",
-    "systemd",
     "xwayland"
   ],
   "provides": [

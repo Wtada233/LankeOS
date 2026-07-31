@@ -36,26 +36,7 @@
     "libwebpdemux.so.2",
     "libz.so.1"
   ],
-  "deps": [
-    "alsa-lib",
-    "at-spi2-core",
-    "cairo",
-    "dbus",
-    "fontconfig",
-    "freetype",
-    "gcc",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "gtk3",
-    "harfbuzz",
-    "libffi",
-    "libjpeg-turbo",
-    "libwebp",
-    "pango",
-    "pixman",
-    "zlib"
-  ],
+  "deps": [],
   "provides": [],
   "build_deps": [
     "alsa-lib",

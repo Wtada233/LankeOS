@@ -12,11 +12,7 @@
     "libm.so.6",
     "libmp3lame.so.0"
   ],
-  "deps": [
-    "alsa-lib",
-    "glibc",
-    "libmp3lame"
-  ],
+  "deps": [],
   "provides": [
     "libsndfile.so",
     "libsndfile.so.1"

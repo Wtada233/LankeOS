@@ -18,16 +18,7 @@
     "libsystemd.so.0",
     "libudev.so.1"
   ],
-  "deps": [
-    "alsa-lib",
-    "dbus",
-    "glib",
-    "glibc",
-    "json-c",
-    "libical",
-    "readline",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [
     "libbluetooth.so",
     "libbluetooth.so.3"

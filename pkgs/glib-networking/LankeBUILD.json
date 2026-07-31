@@ -4,11 +4,7 @@
   "sources": [
     "https://download.gnome.org/sources/glib-networking/2.80/glib-networking-2.80.1.tar.xz"
   ],
-  "deps": [
-    "glib",
-    "glibc",
-    "gnutls"
-  ],
+  "deps": [],
   "no_strip": false,
   "release": 2,
   "needed_so": [

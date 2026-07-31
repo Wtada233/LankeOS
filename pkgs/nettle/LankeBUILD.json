@@ -10,10 +10,7 @@
     "libc.so.6",
     "libgmp.so.10"
   ],
-  "deps": [
-    "glibc",
-    "gmp"
-  ],
+  "deps": [],
   "provides": [
     "libhogweed.so",
     "libhogweed.so.6",

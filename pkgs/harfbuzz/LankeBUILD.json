@@ -15,13 +15,7 @@
     "libicuuc.so.77",
     "libm.so.6"
   ],
-  "deps": [
-    "cairo",
-    "freetype",
-    "glib",
-    "glibc",
-    "icu"
-  ],
+  "deps": [],
   "provides": [
     "libharfbuzz-cairo.so",
     "libharfbuzz-cairo.so.0",

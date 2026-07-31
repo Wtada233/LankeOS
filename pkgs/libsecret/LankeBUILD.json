@@ -4,11 +4,7 @@
   "sources": [
     "https://download.gnome.org/sources/libsecret/0.21/libsecret-0.21.7.tar.xz"
   ],
-  "deps": [
-    "glib",
-    "glibc",
-    "gnutls"
-  ],
+  "deps": [],
   "no_strip": false,
   "release": 2,
   "needed_so": [

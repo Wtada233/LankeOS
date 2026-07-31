@@ -5,9 +5,7 @@
     "https://xorg.freedesktop.org/archive/individual/lib/libXau-1.0.11.tar.xz"
   ],
   "work_sources": [],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libXau.so",
     "libXau.so.6"

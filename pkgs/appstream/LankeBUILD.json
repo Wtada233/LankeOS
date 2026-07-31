@@ -27,24 +27,7 @@
     "libxmlb.so.2",
     "libzstd.so.1"
   ],
-  "deps": [
-    "b3sum",
-    "cairo",
-    "curl",
-    "fontconfig",
-    "freetype",
-    "gdk-pixbuf",
-    "glib",
-    "glibc",
-    "libfyaml",
-    "librsvg",
-    "libstemmer",
-    "libxml2",
-    "libxmlb",
-    "pango",
-    "systemd",
-    "zstd"
-  ],
+  "deps": [],
   "provides": [
     "libappstream-compose.so",
     "libappstream-compose.so.0",

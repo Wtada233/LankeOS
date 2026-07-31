@@ -11,9 +11,7 @@
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [
-    "glibc"
-  ],
+  "deps": [],
   "provides": [
     "libasound.so",
     "libasound.so.2",

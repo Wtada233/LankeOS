@@ -22,17 +22,7 @@
     "libsystemd.so.0",
     "libudev.so.1"
   ],
-  "deps": [
-    "curl",
-    "glib",
-    "glibc",
-    "gnutls",
-    "libndp",
-    "libpsl",
-    "newt",
-    "readline",
-    "systemd"
-  ],
+  "deps": [],
   "provides": [
     "libnm.so",
     "libnm.so.0"
