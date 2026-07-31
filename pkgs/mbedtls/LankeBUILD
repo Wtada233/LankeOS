@@ -1,6 +1,9 @@
 lankebuild_prepare() {
-    # 获取 git 子模块 framework（tarball 不含）
-    git clone --depth 1 https://github.com/Mbed-TLS/mbedtls-framework.git framework
+    # tarball 不含 framework submodule，从 v3.6.7 的 gitlink commit 恢复
+    # 先删 tarball 里的 gitlink 空目录，否则 mv 会把它挪进空目录里
+    cd mbedtls-{ORIG_PKG_VER}
+    rm -rf framework
+    mv "{WORK_DIR}/mbedtls-framework-dde0c4a0e448a0552f18817dcea633bb851fd288" framework
 
     # 开启 Arch 额外配置
     scripts/config.py set MBEDTLS_HAVE_SSE2
@@ -18,11 +21,13 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    cd mbedtls-{ORIG_PKG_VER}
     ninja -C build -j$(nproc)
 }
 
 
 lankebuild_package() {
+    cd mbedtls-{ORIG_PKG_VER}
     DESTDIR="{STAGING_ROOT}" ninja -C build install
 
     # namespace includes -> /usr/include/mbedtls3/

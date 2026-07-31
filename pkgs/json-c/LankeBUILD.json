@@ -1,7 +1,9 @@
 {
   "name": "json-c",
-  "version": "0.18.99",
-  "sources": [],
+  "version": "0.19",
+  "sources": [
+    "https://github.com/json-c/json-c/archive/refs/tags/json-c-0.19-20260627.tar.gz"
+  ],
   "work_sources": [],
   "release": 2,
   "needed_so": [

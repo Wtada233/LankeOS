@@ -1,7 +1,9 @@
 {
   "name": "sway",
   "version": "1.12",
-  "sources": [],
+  "sources": [
+    "https://github.com/swaywm/sway/archive/refs/tags/1.12.tar.gz"
+  ],
   "work_sources": [],
   "release": 2,
   "needed_so": [

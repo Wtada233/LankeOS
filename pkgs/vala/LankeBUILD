@@ -1,9 +1,10 @@
 lankebuild_prepare() {
-    git clone --depth 1 --branch 0.56.19 https://gitlab.gnome.org/GNOME/vala.git
+    # tarball 无 .tarball-version 也无 git，git-version-gen 拿不到版本 → 手动写
+    #（configure.ac 用 git-version-gen 读 .tarball-version 或 git describe）
+    echo "{ORIG_PKG_VER}" > .tarball-version
 }
 
 lankebuild_build() {
-    cd vala
     NOCONFIGURE=1 ./autogen.sh
     ./configure --prefix=/usr --disable-valadoc
     sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
@@ -12,6 +13,5 @@ lankebuild_build() {
 
 
 lankebuild_package() {
-    cd vala
     make DESTDIR="{STAGING_ROOT}" install
 }

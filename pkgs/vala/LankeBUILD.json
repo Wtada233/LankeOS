@@ -1,7 +1,9 @@
 {
   "name": "vala",
   "version": "0.56.19",
-  "sources": [],
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/vala/-/archive/0.56.19/vala-0.56.19.tar.gz"
+  ],
   "work_sources": [],
   "needed_so": [
     "libc.so.6",

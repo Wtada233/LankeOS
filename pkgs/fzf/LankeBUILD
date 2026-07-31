@@ -1,24 +1,20 @@
 lankebuild_prepare() {
-    git clone https://github.com/junegunn/fzf
-    cd fzf
-    # Prepare environment
+    # Prepare environment（tarball 已解压，cwd 即源码目录）
     sed -i 's/-w /-w -linkmode external /' Makefile
 }
 
 lankebuild_build() {
-    cd fzf
     export CGO_LDFLAGS="${LDFLAGS}"
     export CGO_CFLAGS="${CFLAGS}"
     export CGO_CPPFLAGS="${CPPFLAGS}"
     export CGO_CXXFLAGS="${CXXFLAGS}"
     export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
-    make
-    make bin/fzf
+    make FZF_VERSION={ORIG_PKG_VER} FZF_REVISION=nohash -j$(nproc)
+    make bin/fzf FZF_VERSION={ORIG_PKG_VER} FZF_REVISION=nohash -j$(nproc)
 }
 
 
 lankebuild_package() {
-    cd fzf
     ## Man page
     install -Dm644 man/man1/fzf.1 "{STAGING_ROOT}"/usr/share/man/man1/fzf.1
     install -Dm644 man/man1/fzf-tmux.1 "{STAGING_ROOT}"/usr/share/man/man1/fzf-tmux.1

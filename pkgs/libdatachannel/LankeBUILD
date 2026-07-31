@@ -1,7 +1,10 @@
 lankebuild_prepare() {
-    # 初始化 git 子模块（tarball 不含）
-    git clone --depth 1 https://github.com/SergiusTheBest/plog.git deps/plog
-    git clone --depth 1 https://github.com/sctplab/usrsctp.git deps/usrsctp
+    # tarball 不含子模块，从依赖的 tag tarball 恢复
+    # 先删掉 tarball 里的 gitlink 空目录，否则 mv 会把它挪进空目录里
+    cd libdatachannel-{ORIG_PKG_VER}
+    rm -rf deps/plog deps/usrsctp
+    mv "{WORK_DIR}/plog-1.1.10" deps/plog
+    mv "{WORK_DIR}/usrsctp-0.9.5.0" deps/usrsctp
 
     export CMAKE_POLICY_VERSION_MINIMUM=3.5
 
@@ -18,10 +21,12 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    cd libdatachannel-{ORIG_PKG_VER}
     ninja -C build -j$(nproc)
 }
 
 
 lankebuild_package() {
+    cd libdatachannel-{ORIG_PKG_VER}
     DESTDIR="{STAGING_ROOT}" ninja -C build install
 }

@@ -1,7 +1,9 @@
 {
   "name": "fzf",
   "version": "0.74.1",
-  "sources": [],
+  "sources": [
+    "https://github.com/junegunn/fzf/archive/refs/tags/v0.74.1.tar.gz"
+  ],
   "work_sources": [],
   "needed_so": [
     "libc.so.6",

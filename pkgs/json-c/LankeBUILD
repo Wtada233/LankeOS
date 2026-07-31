@@ -4,10 +4,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    # 使用 GitHub 镜像下载
-    git clone https://github.com/json-c/json-c
-    CURRENT_WORK_DIR="/root/json-c"
-    cd json-c
+    # tarball 已解压，cwd 即源码目录
     mkdir build && cd build
     # 核心：绕过 CMake 4.x 限制的策略设置
     cmake .. -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBUILD_STATIC_LIBS=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR}
