@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # gn — Meta-build system for Ninja
 # 参照 Arch Linux PKGBUILD 适配

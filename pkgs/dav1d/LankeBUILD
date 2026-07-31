@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # dav1d 1.5.4 — AV1 解码器（VideoLAN）
 # 纯共享库构建

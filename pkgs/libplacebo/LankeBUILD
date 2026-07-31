@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     if [ ! -d "libplacebo" ]; then
         git clone --recursive --depth=1 -b v7.360.1 \

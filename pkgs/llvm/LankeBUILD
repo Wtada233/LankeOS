@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     rm -f llvm/cmake/modules/Findzstd.cmake
 }

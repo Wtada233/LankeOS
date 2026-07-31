@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # cava uses autotools, need to generate configure first
     autoreconf -fi

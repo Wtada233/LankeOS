@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     mv *.patch fix.patch
     cd {WORK_DIR}/wpa_supplicant*

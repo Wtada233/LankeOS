@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # Prepare environment
     cargo fetch --locked --target host-tuple

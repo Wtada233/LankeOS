@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     sed -i 's,/sbin,/usr/bin,;s,/usr/local,/usr,' containerd.service
 }

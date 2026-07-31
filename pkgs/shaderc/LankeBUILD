@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     sed '/build-version/d'   -i glslc/CMakeLists.txt            &&
     sed '/third_party/d'     -i CMakeLists.txt                  &&

@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # Lpkg 已将源码解压到 work/ 下
     :

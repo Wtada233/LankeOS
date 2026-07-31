@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     git clone --depth 1 --branch 0.56.19 https://gitlab.gnome.org/GNOME/vala.git
 }

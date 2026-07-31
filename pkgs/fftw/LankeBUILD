@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # 为单精度复制一份源码树（避免 make clean 互相干扰）
     cd ..

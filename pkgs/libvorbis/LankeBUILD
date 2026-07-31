@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
                 --enable-shared \

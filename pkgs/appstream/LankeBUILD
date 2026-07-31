@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # Prepare environment
     meson setup _build --prefix=/usr --buildtype=release --wrap-mode nofallback --libexecdir=lib     -Dcompose=true -D docs=false -D apidocs=false -D man=false

@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # 进入解压后的源码目录
     cd rustc-1.96.0-src || exit 1

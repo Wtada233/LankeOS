@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     make amalg PREFIX=/usr BUILDMODE=dynamic TARGET_STRIP=" @:"
 }

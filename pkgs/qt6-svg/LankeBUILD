@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     cmake -B build -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/usr \

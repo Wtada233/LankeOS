@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # Prepare environment
     cd autoconf-archive-2024.10.16

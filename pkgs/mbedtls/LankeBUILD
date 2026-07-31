@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # 获取 git 子模块 framework（tarball 不含）
     git clone --depth 1 https://github.com/Mbed-TLS/mbedtls-framework.git framework

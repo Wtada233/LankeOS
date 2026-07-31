@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # Fetch all Go module dependencies
     go mod download

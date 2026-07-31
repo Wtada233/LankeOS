@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     cd rnnoise-v0.2
     cp -r ../src ./

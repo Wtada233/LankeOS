@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     export RUSTFLAGS="-C panic=abort"
     # 添加 cdylib crate-type，否则 cargo 不产生 .so

@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # GCC 16: gcc -E 不因 Syntax error 报错，跳过 sanity check
     sed -i '/if \$ac_preproc_ok/i\

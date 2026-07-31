@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # 进入解压后的源码目录
     cd rustc-nightly-src || exit 1

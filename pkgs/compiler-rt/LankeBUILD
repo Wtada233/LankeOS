@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # compiler-rt 22.1.7 — LLVM compiler runtime libraries
 # 参照 Arch Linux PKGBUILD 适配（完整构建，非仅 builtins）

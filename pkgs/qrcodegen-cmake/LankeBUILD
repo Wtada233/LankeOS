@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # 把 cmake wrapper 的 CMakeLists.txt + cmake/ 复制到源码树
     cp -R qrcodegen-cmake-1.8.0-cmake3/{cmake,CMakeLists.txt} QR-Code-generator-1.8.0

@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     make install PREFIX=/usr DESTDIR="{STAGING_ROOT}"
 }

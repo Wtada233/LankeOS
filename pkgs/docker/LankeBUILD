@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     export GOPATH="$PWD"
     export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"

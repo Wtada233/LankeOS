@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     grep -rl '^#!.*python$' | xargs sed -i '1s/python/&3/'
 }

@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # gyp — Generate Your Projects（元构建系统）
 # NSS 等项目的构建依赖

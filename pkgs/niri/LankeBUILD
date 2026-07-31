@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     cd $(ls -d */ | head -1)
 

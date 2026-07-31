@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     export GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct
     export GONOSUMCHECK=*

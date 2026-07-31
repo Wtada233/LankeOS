@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     cd itstool-2.0.7
     patch -Np1 -i "{WORK_DIR}"/itstool-2.0.7-lxml-1.patch

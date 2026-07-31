@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     meson setup _build --prefix=/usr --buildtype=release \
         -Dgconv=disabled \

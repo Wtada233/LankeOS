@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # 子模块 obs-browser 和 obs-websocket（cmake 检查目录存在性）
     git clone --depth 1 https://github.com/obsproject/obs-browser.git plugins/obs-browser

@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     mkdir -p build-libclc
 }

@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     sed -r '/cmake_policy.*(0025|0054)/d' -i source/CMakeLists.txt
     # 使用自定义配置，启用共享库

@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # GTK3 从 3.24.36 开始使用 Meson 构建[reference:2]
     # 创建独立的构建目录

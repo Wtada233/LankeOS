@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # minizip 1.3.1（来自 zlib 源码的 contrib/minizip）
 # 基于 zlib 的 ZIP 格式封装库，autoconf 构建，动态链接系统 zlib

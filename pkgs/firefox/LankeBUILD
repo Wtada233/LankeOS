@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Firefox 152 构建脚本
 
 lankebuild_prepare() {

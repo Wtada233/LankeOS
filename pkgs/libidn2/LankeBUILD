@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # libidn2 2.3.8 — IDNA2008 国际化域名实现
 # 参照 Arch Linux PKGBUILD

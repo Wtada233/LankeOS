@@ -1,5 +1,3 @@
-#!/bin/bash
-
 lankebuild_prepare() {
     # BLFS 推荐配置，启用 GPL 和必要的编码器
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}            \
