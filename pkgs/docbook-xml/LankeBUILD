@@ -1,5 +1,5 @@
 #
-# docbook-xml 4.5 — DocBook XML DTD
+# docbook-xml — DocBook XML DTD
 # 参照 Arch Linux PKGBUILD
 
 lankebuild_prepare() {

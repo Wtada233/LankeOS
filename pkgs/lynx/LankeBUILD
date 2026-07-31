@@ -1,5 +1,5 @@
 #
-# lynx 2.9.3 — 文本网页浏览器
+# lynx — 文本网页浏览器
 # 参照 Arch Linux PKGBUILD
 
 lankebuild_prepare() {

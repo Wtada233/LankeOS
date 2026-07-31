@@ -1,7 +1,7 @@
 lankebuild_prepare() {
     # git archive 没有 .tarball-version，meson 的 git-version-gen 会返回空
     if [ ! -f .tarball-version ]; then
-        echo "17.0" > .tarball-version
+        echo "{ORIG_PKG_VER}" > .tarball-version
     fi
 }
 

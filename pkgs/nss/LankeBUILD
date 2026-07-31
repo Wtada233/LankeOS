@@ -1,5 +1,5 @@
 #
-# nss 3.126 — Network Security Services
+# nss — Network Security Services
 # 参照 Arch Linux PKGBUILD 适配
 # 需要：nspr、p11-kit、gyp（构建依赖）
 

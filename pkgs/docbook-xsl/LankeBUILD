@@ -1,18 +1,18 @@
 #
-# docbook-xsl 1.79.2 — DocBook XSL 样式表
+# docbook-xsl — DocBook XSL 样式表
 # 参照 Arch Linux PKGBUILD
 
 _BD=$(dirname {WORK_DIR})
 
 lankebuild_prepare() {
-    cd "{SRC_DIR}/docbook-xsl-1.79.2"
+    cd "{SRC_DIR}/docbook-xsl-{ORIG_PKG_VER}"
     patch -Np2 -i "${_BD}/765567_non-recursive_string_subst.patch"
-    cd "{SRC_DIR}/docbook-xsl-nons-1.79.2"
+    cd "{SRC_DIR}/docbook-xsl-nons-{ORIG_PKG_VER}"
     patch -Np2 -i "${_BD}/765567_non-recursive_string_subst.patch"
 }
 
 lankebuild_build() {
-    _ver=1.79.2
+    _ver={ORIG_PKG_VER}
     _root="{STAGING_ROOT}/usr/share/xml/docbook"
 
     for _ns in '' -nons; do
@@ -33,30 +33,30 @@ lankebuild_build() {
         ln -s "xsl-stylesheets-${_ver}${_ns}" "$_root/xsl-stylesheets${_ns}"
     done
 
-    install -Dm644 "{SRC_DIR}/docbook-xsl-1.79.2/COPYING" \
+    install -Dm644 "{SRC_DIR}/docbook-xsl-{ORIG_PKG_VER}/COPYING" \
         "{STAGING_ROOT}{DATADIR}/licenses/docbook-xsl/COPYING"
 
     # postinst hook：注册样式表路径到主 catalog（Arch 方式）
-    _ver=1.79.2
+    _ver={ORIG_PKG_VER}
     cat > "{STAGING_HOOKS}/postinst.sh" << 'HOOK'
 #!/bin/sh
 _main="/etc/xml/catalog"
 [ -f "$_main" ] || xmlcatalog --noout --create "$_main"
 
-for _v in 1.79.2 current; do
+for _v in {ORIG_PKG_VER} current; do
   for _u in rewriteSystem rewriteURI; do
     xmlcatalog --noout --add "$_u" \
       http://cdn.docbook.org/release/xsl/$_v \
-      /usr/share/xml/docbook/xsl-stylesheets-1.79.2 "$_main"
+      /usr/share/xml/docbook/xsl-stylesheets-{ORIG_PKG_VER} "$_main"
     xmlcatalog --noout --add "$_u" \
       http://cdn.docbook.org/release/xsl-nons/$_v \
-      /usr/share/xml/docbook/xsl-stylesheets-1.79.2-nons "$_main"
+      /usr/share/xml/docbook/xsl-stylesheets-{ORIG_PKG_VER}-nons "$_main"
     xmlcatalog --noout --add "$_u" \
       http://docbook.sourceforge.net/release/xsl-ns/$_v \
-      /usr/share/xml/docbook/xsl-stylesheets-1.79.2 "$_main"
+      /usr/share/xml/docbook/xsl-stylesheets-{ORIG_PKG_VER} "$_main"
     xmlcatalog --noout --add "$_u" \
       http://docbook.sourceforge.net/release/xsl/$_v \
-      /usr/share/xml/docbook/xsl-stylesheets-1.79.2-nons "$_main"
+      /usr/share/xml/docbook/xsl-stylesheets-{ORIG_PKG_VER}-nons "$_main"
   done
 done
 HOOK
@@ -65,12 +65,12 @@ HOOK
     cat > "{STAGING_HOOKS}/prerm.sh" << 'HOOK'
 #!/bin/sh
 _main="/etc/xml/catalog"
-for _v in 1.79.2 current; do
+for _v in {ORIG_PKG_VER} current; do
   for _u in rewriteSystem rewriteURI; do
     xmlcatalog --noout --del "$_u" \
-      "/usr/share/xml/docbook/xsl-stylesheets-1.79.2" "$_main" 2>/dev/null || true
+      "/usr/share/xml/docbook/xsl-stylesheets-{ORIG_PKG_VER}" "$_main" 2>/dev/null || true
     xmlcatalog --noout --del "$_u" \
-      "/usr/share/xml/docbook/xsl-stylesheets-1.79.2-nons" "$_main" 2>/dev/null || true
+      "/usr/share/xml/docbook/xsl-stylesheets-{ORIG_PKG_VER}-nons" "$_main" 2>/dev/null || true
   done
 done
 HOOK

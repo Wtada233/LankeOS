@@ -1,5 +1,5 @@
 #
-# opus 1.6.1 — 音频编解码器（Xiph.Org）
+# opus — 音频编解码器（Xiph.Org）
 # 共享库构建
 
 lankebuild_prepare() {

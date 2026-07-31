@@ -1,5 +1,5 @@
 #
-# nspr 4.39 — Netscape Portable Runtime
+# nspr — Netscape Portable Runtime
 # 参照 Arch Linux PKGBUILD 适配
 
 _BD=$(dirname {WORK_DIR})

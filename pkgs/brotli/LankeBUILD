@@ -1,5 +1,5 @@
 #
-# brotli 1.2.0 — 压缩库（Google）
+# brotli — 压缩库（Google）
 # 纯共享库构建，移除静态库
 
 lankebuild_prepare() {

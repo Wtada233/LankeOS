@@ -1,5 +1,5 @@
 #
-# xmlto 0.0.29 — XML 格式转换工具
+# xmlto — XML 格式转换工具
 # 参照 Arch Linux PKGBUILD
 
 lankebuild_prepare() {

@@ -5,11 +5,11 @@ lankebuild_prepare() {
 
     # 将 tarball 提取目录映射到 GOPATH
     mkdir -p src/github.com/docker
-    ln -sf "$PWD/cli-29.6.2" src/github.com/docker/cli
+    ln -sf "$PWD"/cli-* src/github.com/docker/cli
 
     # moby 的 Go module 是 github.com/moby/moby/v2
     mkdir -p src/github.com/moby/moby
-    ln -sf "$PWD/moby-docker-v29.6.2" src/github.com/moby/moby/v2
+    ln -sf "$PWD"/moby-docker-v* src/github.com/moby/moby/v2
 
     mkdir -p src/github.com/krallin
     ln -sf "$PWD/tini-de40ad007797e0dcd8b7126f27bb87401d224240" src/github.com/krallin/tini
@@ -22,14 +22,14 @@ lankebuild_build() {
 
     # CLI
     cd src/github.com/docker/cli
-    DOCKER_GITCOMMIT=a744842f5b make VERSION=29.6.2 dynbinary
+    DOCKER_GITCOMMIT=a744842f5b make VERSION={ORIG_PKG_VER} dynbinary
     cd "$GOPATH"
 
     # Daemon
     cd src/github.com/moby/moby/v2
     DOCKER_GITCOMMIT=1d2e4ee609 \
     DOCKER_BUILDTAGS='seccomp journald' \
-    VERSION=29.6.2 \
+    VERSION={ORIG_PKG_VER} \
     hack/make.sh dynbinary
     cd "$GOPATH"
 

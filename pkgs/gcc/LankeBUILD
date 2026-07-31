@@ -11,7 +11,7 @@ lankebuild_build() {
     ln -sfv gcc {STAGING_ROOT}{BINDIR}/cc
     ln -sfv ../bin/cpp "{STAGING_ROOT}{LIBDIR}/cpp"
     mkdir -pv "{STAGING_ROOT}{LIBDIR}/bfd-plugins"
-    ln -sfv ../../libexec/gcc/x86_64-pc-linux-gnu/16.1.0/liblto_plugin.so            "{STAGING_ROOT}{LIBDIR}/bfd-plugins/liblto_plugin.so"
+    ln -sfv ../../libexec/gcc/x86_64-pc-linux-gnu/{ORIG_PKG_VER}/liblto_plugin.so            "{STAGING_ROOT}{LIBDIR}/bfd-plugins/liblto_plugin.so"
     rm -fv "{STAGING_ROOT}/{LIBDIR}/"*.a
 }
 

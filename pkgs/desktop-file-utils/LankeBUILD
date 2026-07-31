@@ -1,5 +1,5 @@
 #
-# desktop-file-utils 0.28 — .desktop 文件工具集
+# desktop-file-utils — .desktop 文件工具集
 # 参照 Arch Linux PKGBUILD 适配
 
 lankebuild_prepare() {

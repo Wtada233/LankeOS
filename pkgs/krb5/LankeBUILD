@@ -1,5 +1,5 @@
 #
-# krb5 1.22.2 — MIT Kerberos 认证库
+# krb5 — MIT Kerberos 认证库
 # 共享库 + 开发头文件
 
 lankebuild_prepare() {

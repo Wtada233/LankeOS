@@ -2,7 +2,7 @@ lankebuild_prepare() {
     sed '/build-version/d'   -i glslc/CMakeLists.txt            &&
     sed '/third_party/d'     -i CMakeLists.txt                  &&
     sed 's|SPIRV|glslang/&|' -i libshaderc_util/src/compiler.cc &&
-    echo '"2026.2"' > glslc/src/build-version.inc
+    echo '"{ORIG_PKG_VER}"' > glslc/src/build-version.inc
 }
 
 lankebuild_build() {

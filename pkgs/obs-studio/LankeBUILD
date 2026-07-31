@@ -17,7 +17,7 @@ lankebuild_prepare() {
         -DENABLE_AJA=OFF \
         -DENABLE_NEW_MPEGTS_OUTPUT=OFF \
         -DENABLE_WEBSOCKET=OFF \
-        -DOBS_VERSION_OVERRIDE=32.1.2 \
+        -DOBS_VERSION_OVERRIDE={ORIG_PKG_VER} \
         -DMbedTLS_INCLUDE_DIR="/usr/include/mbedtls3" \
         -DMbedtls_LIBRARY="/usr/lib/mbedtls3/libmbedtls.so" \
         -DMbedcrypto_LIBRARY="/usr/lib/mbedtls3/libmbedcrypto.so" \

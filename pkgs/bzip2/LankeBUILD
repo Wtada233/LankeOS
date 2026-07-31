@@ -20,7 +20,7 @@ includedir=\${prefix}/include
 
 Name: bzip2
 Description: A file compression library
-Version: 1.0.8
+Version: {ORIG_PKG_VER}
 Libs: -L\${libdir} -lbz2
 Cflags: -I\${includedir}
 EOF

@@ -1,5 +1,5 @@
 #
-# libarchive 3.8.8 — 多格式归档库
+# libarchive — 多格式归档库
 
 lankebuild_prepare() {
     set -e

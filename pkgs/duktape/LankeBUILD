@@ -14,7 +14,7 @@ libdir=$prefix/lib
 includedir=$prefix/include
 Name: duktape
 Description: Duktape engine
-Version: 2.7.0
+Version: {ORIG_PKG_VER}
 Libs: -L$libdir -lduktape -lm
 Cflags: -I$includedir
 EOF

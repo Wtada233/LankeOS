@@ -1,5 +1,5 @@
 #
-# openh264 2.6.0 — Cisco H.264 编解码器
+# openh264 — Cisco H.264 编解码器
 # 参照 Arch Linux PKGBUILD 适配
 
 lankebuild_prepare() {

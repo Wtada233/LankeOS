@@ -1,5 +1,5 @@
 #
-# dav1d 1.5.4 — AV1 解码器（VideoLAN）
+# dav1d — AV1 解码器（VideoLAN）
 # 纯共享库构建
 
 lankebuild_prepare() {
