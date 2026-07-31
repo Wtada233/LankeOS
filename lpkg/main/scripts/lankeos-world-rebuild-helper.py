@@ -278,7 +278,8 @@ def build_loop(order, cycles, args):
     original_cwd = os.getcwd()
 
     for idx, pkg in enumerate(order, 1):
-        pkg_dir = os.path.join(original_cwd, pkg.lower())
+        # 目录与包 name 字段一致（lpkg 以包名为准），无需小写转换
+        pkg_dir = os.path.join(original_cwd, pkg)
         has_cycle = pkg in cycles
 
         print(f"\n{'='*60}")

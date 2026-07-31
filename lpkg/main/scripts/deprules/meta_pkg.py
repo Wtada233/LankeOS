@@ -1,7 +1,7 @@
 """
 meta_pkg — 元包（meta-package）保护规则
 
-元包如 base-devel 不包含 ELF，手工维护 deps 列表。
+元包如 base、base-devel 不包含 ELF，手工维护 deps 列表。
 此规则检测已知元包，在 gen_deps 覆盖前恢复其手工维护的 deps。
 """
 
@@ -9,9 +9,9 @@ import os
 import json
 
 __rule_name__ = 'meta_pkg'
-__rule_description__ = '保护元包（base-devel 等）的手工维护依赖不被自动覆盖'
+__rule_description__ = '保护元包（base、base-devel）的手工维护依赖不被自动覆盖'
 
-META_PACKAGES = frozenset({'base-devel'})
+META_PACKAGES = frozenset({'base', 'base-devel'})
 
 
 def rule(scan_result, deps, needed_so, provider_map, context):
