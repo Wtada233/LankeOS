@@ -6,27 +6,20 @@
   "deps": [
     "autoconf",
     "automake",
+    "base",
     "binutils",
     "bison",
-    "coreutils",
-    "file",
-    "findutils",
     "flex",
-    "gawk",
     "gcc",
-    "gettext",
-    "grep",
     "groff",
-    "gzip",
     "libtool",
     "m4",
     "make",
     "patch",
     "pkgconf",
-    "sed",
     "texinfo",
-    "util-linux",
-    "which"
+    "unzip",
+    "zip"
   ],
   "provides": []
 }
