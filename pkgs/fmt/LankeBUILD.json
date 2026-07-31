@@ -22,7 +22,6 @@
     "cmake",
     "doxygen",
     "git",
-    "glibc",
     "ninja"
   ]
 }

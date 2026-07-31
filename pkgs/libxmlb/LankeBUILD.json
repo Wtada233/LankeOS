@@ -23,7 +23,6 @@
     "base-devel",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "gtk-doc",
     "libstemmer",

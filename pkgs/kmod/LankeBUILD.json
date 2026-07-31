@@ -20,9 +20,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libelf",
-    "openssl",
     "xz",
     "zlib",
     "zstd"

@@ -29,7 +29,6 @@
     "SPIRV-Tools",
     "base-devel",
     "cmake",
-    "glibc",
     "ninja"
   ]
 }

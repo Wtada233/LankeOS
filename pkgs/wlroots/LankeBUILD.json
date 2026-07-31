@@ -39,7 +39,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "lcms2",
     "libdisplay-info",
     "libdrm",
@@ -52,7 +51,6 @@
     "ninja",
     "pixman",
     "seatd",
-    "systemd",
     "vulkan-headers",
     "vulkan-loader",
     "wayland",

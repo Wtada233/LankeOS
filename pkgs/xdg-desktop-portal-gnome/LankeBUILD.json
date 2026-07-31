@@ -32,7 +32,6 @@
     "fontconfig",
     "gdk-pixbuf",
     "glib",
-    "glibc",
     "gnome-desktop",
     "graphene",
     "gtk4",

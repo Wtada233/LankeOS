@@ -21,7 +21,6 @@
     "base-devel",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "meson",
     "ninja"

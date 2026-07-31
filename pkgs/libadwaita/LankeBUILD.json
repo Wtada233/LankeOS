@@ -27,7 +27,6 @@
     "base-devel",
     "fribidi",
     "glib",
-    "glibc",
     "gobject-introspection",
     "graphene",
     "gtk4",

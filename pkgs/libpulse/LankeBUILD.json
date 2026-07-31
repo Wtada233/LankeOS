@@ -31,13 +31,11 @@
     "alsa-lib",
     "attr",
     "base-devel",
-    "bash",
     "bluez",
     "dbus",
     "fftw",
     "git",
     "glib",
-    "glibc",
     "gst-plugins-base",
     "gstreamer",
     "gtk3",
@@ -50,10 +48,8 @@
     "libxcb",
     "meson",
     "ninja",
-    "openssl",
     "rtkit",
     "sbc",
-    "speexdsp",
-    "systemd"
+    "speexdsp"
   ]
 }

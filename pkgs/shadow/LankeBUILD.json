@@ -27,11 +27,9 @@
     "base-devel",
     "docbook-xsl",
     "git",
-    "glibc",
     "itstool",
     "libcap",
     "libxcrypt",
-    "libxslt",
-    "systemd"
+    "libxslt"
   ]
 }

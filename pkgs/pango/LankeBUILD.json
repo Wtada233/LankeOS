@@ -34,7 +34,6 @@
     "freetype",
     "fribidi",
     "glib",
-    "glibc",
     "gobject-introspection",
     "harfbuzz",
     "meson",

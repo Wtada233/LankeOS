@@ -24,7 +24,6 @@
     "gdk-pixbuf",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "gtk4",
     "meson",

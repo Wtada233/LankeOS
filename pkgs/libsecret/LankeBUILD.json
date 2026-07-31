@@ -21,7 +21,6 @@
   "build_deps": [
     "base-devel",
     "glib",
-    "glibc",
     "gnutls",
     "gobject-introspection",
     "meson",

@@ -15,7 +15,6 @@
     "libtasn1.so.6"
   ],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

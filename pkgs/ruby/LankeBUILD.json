@@ -28,16 +28,12 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "doxygen",
     "gdbm",
-    "glibc",
     "gmp",
     "libffi",
     "libxcrypt",
     "libyaml",
-    "openssl",
-    "procps-ng",
     "readline",
     "rust",
     "zlib"

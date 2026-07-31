@@ -25,7 +25,6 @@
     "cairo",
     "gdk-pixbuf",
     "glib",
-    "glibc",
     "gobject-introspection",
     "gtk4",
     "libffi",

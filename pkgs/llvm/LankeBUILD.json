@@ -40,7 +40,6 @@
     "base-devel",
     "cmake",
     "curl",
-    "glibc",
     "libedit",
     "libffi",
     "libxml2",

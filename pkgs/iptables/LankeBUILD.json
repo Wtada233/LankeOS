@@ -7,8 +7,6 @@
   "work_sources": [],
   "build_deps": [
     "base-devel",
-    "bash",
-    "glibc",
     "libmnl",
     "libnetfilter_conntrack",
     "libnfnetlink",

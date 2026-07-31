@@ -55,7 +55,6 @@
     "bzip2",
     "ffnvcodec-headers",
     "git",
-    "glibc",
     "libX11",
     "libXext",
     "libXv",

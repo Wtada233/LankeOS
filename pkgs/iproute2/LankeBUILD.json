@@ -18,7 +18,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libcap",
     "libelf",
     "python"

@@ -6,8 +6,7 @@
   ],
   "work_sources": [],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2",

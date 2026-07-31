@@ -20,7 +20,6 @@
     "docbook-xml",
     "docbook-xsl",
     "git",
-    "glibc",
     "xmlto"
   ]
 }

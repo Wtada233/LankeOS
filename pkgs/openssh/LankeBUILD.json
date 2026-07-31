@@ -17,12 +17,9 @@
   "build_deps": [
     "Linux-PAM",
     "base-devel",
-    "glibc",
     "krb5",
     "libedit",
     "libxcrypt",
-    "linux",
-    "openssl",
     "zlib"
   ]
 }

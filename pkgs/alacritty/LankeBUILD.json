@@ -22,7 +22,6 @@
     "fontconfig",
     "freetype",
     "git",
-    "glibc",
     "libxcb",
     "ncurses",
     "rust"

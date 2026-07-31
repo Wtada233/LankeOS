@@ -31,11 +31,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "curl",
-    "glibc",
     "llvm",
-    "openssl",
     "zlib"
   ]
 }

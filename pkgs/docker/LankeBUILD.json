@@ -9,15 +9,12 @@
   "work_sources": [],
   "build_deps": [
     "base-devel",
-    "bash",
     "cmake",
     "containerd",
     "docker",
     "git",
-    "glibc",
     "golang",
     "iptables",
-    "linux",
     "nftables"
   ],
   "needed_so": [

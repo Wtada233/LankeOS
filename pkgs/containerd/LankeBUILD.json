@@ -8,7 +8,6 @@
   "build_deps": [
     "base-devel",
     "git",
-    "glibc",
     "golang"
   ],
   "needed_so": [

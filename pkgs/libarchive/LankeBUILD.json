@@ -26,10 +26,8 @@
     "acl",
     "base-devel",
     "bzip2",
-    "glibc",
     "libxml2",
     "lz4",
-    "openssl",
     "xz",
     "zlib",
     "zstd"

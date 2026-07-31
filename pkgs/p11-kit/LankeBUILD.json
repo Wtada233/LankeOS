@@ -22,8 +22,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
-    "glibc",
     "libffi",
     "libtasn1",
     "meson",

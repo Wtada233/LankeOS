@@ -60,7 +60,6 @@
     "fribidi",
     "gdk-pixbuf",
     "glib",
-    "glibc",
     "gobject-introspection",
     "gtk-doc",
     "harfbuzz",

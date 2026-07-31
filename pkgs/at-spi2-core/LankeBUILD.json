@@ -31,11 +31,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "dbus",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "libX11",
     "libXi",

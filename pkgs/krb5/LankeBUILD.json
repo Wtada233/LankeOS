@@ -44,10 +44,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
-    "e2fsprogs",
-    "glibc",
-    "openssl",
     "perl"
   ]
 }

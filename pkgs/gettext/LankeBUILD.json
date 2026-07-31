@@ -41,8 +41,6 @@
     "acl",
     "attr",
     "base-devel",
-    "bash",
-    "glibc",
     "libxml2",
     "ncurses",
     "perl",

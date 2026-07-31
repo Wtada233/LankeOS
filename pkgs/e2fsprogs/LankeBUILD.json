@@ -28,11 +28,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "fuse3",
     "git",
-    "glibc",
-    "perl",
-    "systemd"
+    "perl"
   ]
 }

@@ -56,7 +56,6 @@
     "ffmpeg",
     "ffnvcodec-headers",
     "git",
-    "glibc",
     "lcms2",
     "libX11",
     "libXScrnSaver",

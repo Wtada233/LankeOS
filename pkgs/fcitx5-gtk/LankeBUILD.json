@@ -43,7 +43,6 @@
     "gdk-pixbuf",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "gtk3",
     "harfbuzz",

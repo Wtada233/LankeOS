@@ -13,7 +13,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "bash",
     "bc",
     "gtk3",
     "meson",

@@ -16,9 +16,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "diffutils",
     "git",
-    "glibc",
     "meson",
     "ninja"
   ]

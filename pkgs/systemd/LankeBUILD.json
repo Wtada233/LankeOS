@@ -29,11 +29,9 @@
     "Linux-PAM",
     "acl",
     "base-devel",
-    "bash",
     "curl",
     "docbook-xsl",
     "git",
-    "glibc",
     "gnutls",
     "gperf",
     "intltool",
@@ -54,7 +52,6 @@
     "pcre2",
     "python",
     "rsync",
-    "shadow",
     "xz"
   ]
 }

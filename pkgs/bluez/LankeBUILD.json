@@ -31,10 +31,8 @@
     "ell",
     "git",
     "glib",
-    "glibc",
     "json-c",
     "libical",
-    "readline",
-    "systemd"
+    "readline"
   ]
 }

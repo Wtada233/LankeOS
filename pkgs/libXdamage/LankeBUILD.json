@@ -19,7 +19,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libX11",
     "libXfixes"
   ]

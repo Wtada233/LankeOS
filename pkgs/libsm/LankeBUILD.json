@@ -19,7 +19,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libice",
     "util-macros",
     "xtrans"

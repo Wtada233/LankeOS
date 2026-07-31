@@ -16,8 +16,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
-    "docbook-xsl",
-    "glibc"
+    "docbook-xsl"
   ]
 }

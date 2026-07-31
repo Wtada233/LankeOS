@@ -48,7 +48,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "git",
     "python"
   ]

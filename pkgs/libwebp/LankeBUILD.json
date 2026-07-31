@@ -32,7 +32,6 @@
     "base-devel",
     "cmake",
     "giflib",
-    "glibc",
     "libjpeg-turbo",
     "libpng",
     "libtiff",

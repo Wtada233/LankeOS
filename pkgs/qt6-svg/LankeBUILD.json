@@ -29,7 +29,6 @@
     "base-devel",
     "cmake",
     "git",
-    "glibc",
     "libglvnd",
     "libxkbcommon",
     "ninja",

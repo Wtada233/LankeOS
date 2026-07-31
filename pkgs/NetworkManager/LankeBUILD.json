@@ -31,7 +31,6 @@
     "base-devel",
     "curl",
     "glib",
-    "glibc",
     "gnutls",
     "gobject-introspection",
     "libndp",
@@ -40,7 +39,6 @@
     "newt",
     "ninja",
     "polkit",
-    "readline",
-    "systemd"
+    "readline"
   ]
 }

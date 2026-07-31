@@ -64,7 +64,6 @@
     "fribidi",
     "gdk-pixbuf",
     "glib",
-    "glibc",
     "gobject-introspection",
     "graphene",
     "gst-plugins-bad",

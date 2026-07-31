@@ -16,7 +16,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "cmake",
-    "glibc"
+    "cmake"
   ]
 }

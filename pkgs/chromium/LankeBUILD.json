@@ -80,7 +80,6 @@
     "freetype",
     "git",
     "glib",
-    "glibc",
     "gn",
     "gperf",
     "harfbuzz",
@@ -116,7 +115,6 @@
     "rsync",
     "rust-bindgen",
     "rust-nightly",
-    "systemd",
     "zlib",
     "zstd"
   ]

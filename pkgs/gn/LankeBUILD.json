@@ -16,7 +16,6 @@
   "build_deps": [
     "base-devel",
     "git",
-    "glibc",
     "llvm",
     "ninja",
     "python"

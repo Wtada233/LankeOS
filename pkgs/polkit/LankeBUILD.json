@@ -30,11 +30,9 @@
     "duktape",
     "expat",
     "glib",
-    "glibc",
     "gobject-introspection",
     "gtk-doc",
     "meson",
-    "ninja",
-    "systemd"
+    "ninja"
   ]
 }

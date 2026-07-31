@@ -16,8 +16,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "dbus",
-    "glibc",
-    "procps-ng"
+    "dbus"
   ]
 }

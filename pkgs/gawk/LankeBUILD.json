@@ -20,8 +20,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "bash",
-    "glibc",
     "gmp",
     "mpfr",
     "perl",

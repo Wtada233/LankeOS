@@ -15,7 +15,6 @@
     "libyaml.so"
   ],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

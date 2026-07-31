@@ -26,7 +26,6 @@
     "base-devel",
     "cmake",
     "git",
-    "glibc",
     "libglvnd",
     "libtiff",
     "libwebp",

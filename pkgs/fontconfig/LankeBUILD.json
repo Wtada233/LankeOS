@@ -22,7 +22,6 @@
     "expat",
     "freetype",
     "git",
-    "glibc",
     "gperf",
     "meson"
   ]

@@ -22,13 +22,10 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "bash",
     "curl",
     "expat",
     "git",
-    "glibc",
     "openssh",
-    "openssl",
     "perl",
     "python",
     "rust",

@@ -21,9 +21,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "cmake",
-    "glibc",
     "lz4",
     "ninja",
     "xz",

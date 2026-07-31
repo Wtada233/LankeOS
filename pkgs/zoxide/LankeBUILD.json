@@ -15,7 +15,6 @@
   "build_deps": [
     "base-devel",
     "git",
-    "glibc",
     "rust"
   ]
 }

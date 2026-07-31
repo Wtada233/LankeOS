@@ -26,12 +26,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "gdbm",
-    "glibc",
     "libxcrypt",
     "meson",
-    "ninja",
-    "systemd"
+    "ninja"
   ]
 }

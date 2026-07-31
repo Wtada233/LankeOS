@@ -17,7 +17,6 @@
     "libsass.so.1"
   ],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

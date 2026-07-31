@@ -24,17 +24,14 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "brotli",
     "git",
-    "glibc",
     "gnutls",
     "krb5",
     "libidn2",
     "libpsl",
     "nettle",
     "nghttp2",
-    "openssl",
     "zlib",
     "zstd"
   ]

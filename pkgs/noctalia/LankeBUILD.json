@@ -45,13 +45,11 @@
   "build_deps": [
     "Linux-PAM",
     "base-devel",
-    "bash",
     "cairo",
     "curl",
     "fontconfig",
     "freetype",
     "glib",
-    "glibc",
     "harfbuzz",
     "libglvnd",
     "libqalculate",

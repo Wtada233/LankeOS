@@ -45,7 +45,6 @@
     "gdk-pixbuf",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "gperf",
     "libfyaml",
@@ -57,7 +56,6 @@
     "ninja",
     "pango",
     "qt6-tools",
-    "systemd",
     "vala",
     "zstd"
   ]

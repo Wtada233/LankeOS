@@ -14,7 +14,6 @@
   "build_deps": [
     "base-devel",
     "git",
-    "glibc",
     "gperf",
     "python"
   ]

@@ -22,10 +22,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
-    "glibc",
     "kmod",
-    "systemd",
     "zlib"
   ]
 }

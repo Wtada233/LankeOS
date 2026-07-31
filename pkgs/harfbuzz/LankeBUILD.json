@@ -33,7 +33,6 @@
     "cairo",
     "freetype",
     "glib",
-    "glibc",
     "gobject-introspection",
     "gtk-doc",
     "icu",

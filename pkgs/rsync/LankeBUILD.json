@@ -24,11 +24,8 @@
     "acl",
     "attr",
     "base-devel",
-    "bash",
     "git",
-    "glibc",
     "lz4",
-    "openssl",
     "popt",
     "zlib",
     "zstd"

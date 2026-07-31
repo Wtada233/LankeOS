@@ -26,7 +26,6 @@
     "cairo",
     "git",
     "glib",
-    "glibc",
     "gtk4",
     "libX11",
     "libevdev",
@@ -35,7 +34,6 @@
     "mtdev",
     "ninja",
     "python",
-    "systemd",
     "wayland",
     "wayland-protocols"
   ]

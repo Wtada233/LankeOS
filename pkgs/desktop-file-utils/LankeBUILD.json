@@ -18,7 +18,6 @@
     "base-devel",
     "git",
     "glib",
-    "glibc",
     "meson",
     "ninja"
   ]

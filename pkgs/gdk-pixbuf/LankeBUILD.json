@@ -25,7 +25,6 @@
   "build_deps": [
     "base-devel",
     "glib",
-    "glibc",
     "gobject-introspection",
     "libjpeg-turbo",
     "libpng",

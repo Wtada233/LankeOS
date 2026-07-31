@@ -17,7 +17,6 @@
     "libduktaped.so.207"
   ],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

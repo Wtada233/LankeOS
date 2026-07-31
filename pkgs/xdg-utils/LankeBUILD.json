@@ -14,7 +14,6 @@
   "needed_so": [],
   "build_deps": [
     "base-devel",
-    "bash",
     "docbook-xsl",
     "git",
     "lynx",

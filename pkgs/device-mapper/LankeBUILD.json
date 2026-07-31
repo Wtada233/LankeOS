@@ -6,10 +6,7 @@
   ],
   "work_sources": [],
   "build_deps": [
-    "base-devel",
-    "bash",
-    "glibc",
-    "systemd"
+    "base-devel"
   ],
   "needed_so": [
     "libc.so.6",

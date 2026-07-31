@@ -40,7 +40,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "cairo",
     "cmake",
     "expat",
@@ -48,13 +47,11 @@
     "gdk-pixbuf",
     "git",
     "glib",
-    "glibc",
     "json-c",
     "libxkbcommon",
     "ninja",
     "nlohmann-json",
     "pango",
-    "systemd",
     "wayland",
     "wayland-protocols",
     "zlib"

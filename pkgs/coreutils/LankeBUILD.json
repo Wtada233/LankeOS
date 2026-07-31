@@ -24,12 +24,9 @@
     "attr",
     "base-devel",
     "git",
-    "glibc",
     "gmp",
     "gperf",
     "libcap",
-    "openssl",
-    "python",
-    "wget"
+    "python"
   ]
 }

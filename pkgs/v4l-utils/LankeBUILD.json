@@ -39,7 +39,6 @@
     "alsa-lib",
     "base-devel",
     "doxygen",
-    "glibc",
     "json-c",
     "libglvnd",
     "libjpeg-turbo",
@@ -47,7 +46,6 @@
     "meson",
     "ninja",
     "qt5compat",
-    "qt6-base",
-    "systemd"
+    "qt6-base"
   ]
 }

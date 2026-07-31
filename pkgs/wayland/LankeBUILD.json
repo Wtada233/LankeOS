@@ -26,7 +26,6 @@
   "build_deps": [
     "base-devel",
     "expat",
-    "glibc",
     "libffi",
     "libxml2",
     "meson",

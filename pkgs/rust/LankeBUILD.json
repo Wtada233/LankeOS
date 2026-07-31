@@ -31,16 +31,12 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "cmake",
     "curl",
-    "glibc",
     "libffi",
     "llvm",
     "ninja",
-    "openssl",
     "perl",
-    "procps-ng",
     "python",
     "rust",
     "zlib"

@@ -23,7 +23,6 @@
     "base-devel",
     "bzip2",
     "git",
-    "glibc",
     "xz",
     "zlib",
     "zstd"

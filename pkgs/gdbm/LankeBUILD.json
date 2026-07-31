@@ -22,7 +22,6 @@
   "build_deps": [
     "base-devel",
     "git",
-    "glibc",
     "ncurses",
     "readline"
   ]

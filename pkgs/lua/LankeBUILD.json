@@ -27,7 +27,6 @@
     "liblua5.5.so"
   ],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

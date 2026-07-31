@@ -21,7 +21,6 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "glibc",
     "nasm",
     "ninja"
   ]

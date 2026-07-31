@@ -12,14 +12,11 @@
   "build_deps": [
     "base-devel",
     "bc",
-    "glibc",
     "libelf",
-    "openssl",
     "perl",
     "python",
     "rust",
     "rust-bindgen",
-    "tar",
     "xz",
     "zlib",
     "zstd"

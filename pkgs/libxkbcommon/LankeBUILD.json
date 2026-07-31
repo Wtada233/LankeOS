@@ -26,7 +26,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libxcb",
     "libxml2",
     "mesa",

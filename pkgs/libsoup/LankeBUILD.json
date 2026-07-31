@@ -24,7 +24,6 @@
   "build_deps": [
     "base-devel",
     "glib",
-    "glibc",
     "libpsl",
     "meson",
     "nghttp2",

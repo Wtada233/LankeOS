@@ -29,7 +29,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "glslang",
     "glu",
     "libX11",

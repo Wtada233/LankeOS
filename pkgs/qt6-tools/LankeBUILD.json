@@ -44,7 +44,6 @@
     "base-devel",
     "cmake",
     "git",
-    "glibc",
     "libglvnd",
     "libinput",
     "libxkbcommon",
@@ -53,7 +52,6 @@
     "ninja",
     "qt6-base",
     "qt6-declarative",
-    "systemd",
     "vulkan-headers",
     "zstd"
   ]

@@ -16,8 +16,6 @@
     "librnnoise.so.0"
   ],
   "build_deps": [
-    "base-devel",
-    "glibc",
-    "wget"
+    "base-devel"
   ]
 }

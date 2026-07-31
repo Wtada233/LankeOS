@@ -19,11 +19,9 @@
   "build_deps": [
     "autoconf-archive",
     "base-devel",
-    "bash",
     "dbus",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "libX11",
     "libxslt",

@@ -21,8 +21,6 @@
     "libexpect5.45.4.so"
   ],
   "build_deps": [
-    "base-devel",
-    "bash",
-    "glibc"
+    "base-devel"
   ]
 }

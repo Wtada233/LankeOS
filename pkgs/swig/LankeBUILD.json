@@ -21,7 +21,6 @@
     "base-devel",
     "boost",
     "git",
-    "glibc",
     "golang",
     "lua",
     "openjdk25",

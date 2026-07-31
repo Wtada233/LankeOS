@@ -23,7 +23,6 @@
     "base-devel",
     "fontenc",
     "freetype",
-    "glibc",
     "zlib"
   ]
 }

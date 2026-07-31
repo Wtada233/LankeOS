@@ -17,7 +17,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "glibc",
     "ncurses",
     "readline"
   ]

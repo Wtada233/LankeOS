@@ -19,7 +19,6 @@
     "base-devel",
     "git",
     "glib",
-    "glibc",
     "gnutls",
     "gsettings-desktop-schemas",
     "meson",

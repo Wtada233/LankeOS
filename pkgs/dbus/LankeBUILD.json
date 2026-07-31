@@ -27,12 +27,10 @@
     "expat",
     "git",
     "glib",
-    "glibc",
     "libX11",
     "meson",
     "ninja",
     "python",
-    "systemd",
     "xmlto"
   ]
 }

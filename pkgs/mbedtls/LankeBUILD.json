@@ -21,10 +21,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "cmake",
     "git",
-    "glibc",
     "ninja",
     "python"
   ]

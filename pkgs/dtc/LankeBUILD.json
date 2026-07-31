@@ -18,9 +18,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "git",
-    "glibc",
     "libyaml",
     "meson",
     "ninja",

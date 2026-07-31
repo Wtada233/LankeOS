@@ -52,7 +52,6 @@
     "base-devel",
     "cmake",
     "git",
-    "glibc",
     "libglvnd",
     "ninja",
     "python",

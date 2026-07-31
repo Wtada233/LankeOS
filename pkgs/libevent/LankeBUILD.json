@@ -27,8 +27,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
-    "openssl",
     "python"
   ]
 }

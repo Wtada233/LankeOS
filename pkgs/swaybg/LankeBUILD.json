@@ -20,7 +20,6 @@
     "cairo",
     "gdk-pixbuf",
     "glib",
-    "glibc",
     "meson",
     "ninja",
     "wayland",

@@ -31,7 +31,6 @@
     "gdk-pixbuf",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "libxml2",
     "llvm",

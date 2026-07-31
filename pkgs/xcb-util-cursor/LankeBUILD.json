@@ -24,7 +24,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libxcb",
     "xcb-util-image",
     "xcb-util-renderutil",

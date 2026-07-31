@@ -27,7 +27,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "gmp",
     "libtasn1",
     "nettle",

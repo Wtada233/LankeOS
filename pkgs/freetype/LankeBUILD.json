@@ -22,9 +22,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "bzip2",
-    "glibc",
     "harfbuzz",
     "libpng",
     "zlib"

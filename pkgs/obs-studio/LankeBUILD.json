@@ -98,7 +98,6 @@
     "freetype",
     "git",
     "glib",
-    "glibc",
     "jansson",
     "libX11",
     "libdatachannel",
@@ -122,7 +121,6 @@
     "rnnoise",
     "speexdsp",
     "swig",
-    "systemd",
     "v4l-utils",
     "wayland",
     "zlib"

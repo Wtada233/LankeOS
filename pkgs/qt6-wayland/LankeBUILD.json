@@ -37,7 +37,6 @@
     "base-devel",
     "cmake",
     "git",
-    "glibc",
     "libdrm",
     "libglvnd",
     "libxkbcommon",

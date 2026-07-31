@@ -19,7 +19,6 @@
     "base-devel",
     "cmake",
     "git",
-    "glibc",
     "rust"
   ]
 }

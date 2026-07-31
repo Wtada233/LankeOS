@@ -30,12 +30,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
-    "e2fsprogs",
     "git",
-    "glibc",
     "ripgrep",
-    "systemd",
     "zlib",
     "zstd"
   ]

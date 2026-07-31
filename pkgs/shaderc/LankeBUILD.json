@@ -26,7 +26,6 @@
     "SPIRV-Tools",
     "base-devel",
     "cmake",
-    "glibc",
     "glslang",
     "ninja",
     "python"

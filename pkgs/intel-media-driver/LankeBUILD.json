@@ -22,7 +22,6 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "glibc",
     "intel-gmmlib",
     "libva"
   ]

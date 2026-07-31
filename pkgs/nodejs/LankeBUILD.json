@@ -26,11 +26,8 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "bash",
-    "glibc",
     "icu",
     "nghttp2",
-    "openssl",
     "python",
     "zlib"
   ]

@@ -14,7 +14,6 @@
   "deps": [],
   "provides": [],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

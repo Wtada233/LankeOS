@@ -25,7 +25,6 @@
     "cmake",
     "doxygen",
     "git",
-    "glibc",
     "libogg",
     "nasm",
     "ninja"

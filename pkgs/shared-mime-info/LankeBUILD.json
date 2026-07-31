@@ -19,7 +19,6 @@
     "base-devel",
     "docbook-xsl",
     "glib",
-    "glibc",
     "libxml2",
     "meson",
     "ninja",

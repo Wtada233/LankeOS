@@ -16,9 +16,7 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "bash",
     "cmake",
-    "glibc",
     "libXrandr",
     "libglvnd",
     "libpulse",

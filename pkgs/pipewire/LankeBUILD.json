@@ -47,12 +47,10 @@
   "build_deps": [
     "alsa-lib",
     "base-devel",
-    "bash",
     "bluez",
     "dbus",
     "fftw",
     "glib",
-    "glibc",
     "gst-plugins-base",
     "gstreamer",
     "libpulse",
@@ -62,7 +60,6 @@
     "ninja",
     "opus",
     "readline",
-    "sbc",
-    "systemd"
+    "sbc"
   ]
 }

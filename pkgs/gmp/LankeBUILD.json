@@ -20,7 +20,6 @@
     "libgmpxx.so.4"
   ],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

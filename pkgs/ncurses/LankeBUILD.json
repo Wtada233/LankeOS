@@ -31,8 +31,6 @@
     "libtinfo.so.6"
   ],
   "build_deps": [
-    "base-devel",
-    "bash",
-    "glibc"
+    "base-devel"
   ]
 }

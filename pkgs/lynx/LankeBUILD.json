@@ -24,10 +24,8 @@
     "base-devel",
     "brotli",
     "bzip2",
-    "glibc",
     "libidn2",
     "ncurses",
-    "openssl",
     "zlib",
     "zstd"
   ]

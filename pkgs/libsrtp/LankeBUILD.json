@@ -16,9 +16,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "meson",
-    "ninja",
-    "openssl"
+    "ninja"
   ]
 }

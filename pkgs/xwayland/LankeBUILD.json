@@ -26,7 +26,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libXau",
     "libXfont2",
     "libdrm",

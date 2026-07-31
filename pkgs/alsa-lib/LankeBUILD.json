@@ -19,7 +19,6 @@
     "libatopology.so.2"
   ],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

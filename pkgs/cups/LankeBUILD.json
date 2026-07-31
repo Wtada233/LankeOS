@@ -34,13 +34,9 @@
     "Linux-PAM",
     "acl",
     "base-devel",
-    "bash",
     "dbus",
-    "glibc",
     "gnutls",
     "libxcrypt",
-    "openssl",
-    "systemd",
     "zlib"
   ]
 }

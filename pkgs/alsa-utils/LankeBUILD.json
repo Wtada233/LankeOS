@@ -23,12 +23,9 @@
   "build_deps": [
     "alsa-lib",
     "base-devel",
-    "bash",
     "docbook-xsl",
     "fftw",
-    "glibc",
     "ncurses",
-    "systemd",
     "xmlto"
   ]
 }

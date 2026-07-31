@@ -19,9 +19,7 @@
   "build_deps": [
     "base-devel",
     "git",
-    "glibc",
     "libevent",
-    "ncurses",
-    "systemd"
+    "ncurses"
   ]
 }

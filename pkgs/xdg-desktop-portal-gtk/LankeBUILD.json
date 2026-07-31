@@ -22,7 +22,6 @@
     "fontconfig",
     "gdk-pixbuf",
     "glib",
-    "glibc",
     "gtk3",
     "meson",
     "ninja",

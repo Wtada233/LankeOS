@@ -36,7 +36,6 @@
     "base-devel",
     "freetype",
     "giflib",
-    "glibc",
     "harfbuzz",
     "lcms2",
     "libX11",

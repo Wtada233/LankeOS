@@ -24,7 +24,6 @@
     "bzip2",
     "curl",
     "git",
-    "glibc",
     "json-c",
     "libarchive",
     "sqlite",

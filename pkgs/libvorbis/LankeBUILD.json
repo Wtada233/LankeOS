@@ -23,7 +23,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libogg"
   ]
 }

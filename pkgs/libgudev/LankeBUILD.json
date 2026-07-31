@@ -21,12 +21,10 @@
     "base-devel",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "gtk-doc",
     "meson",
     "ninja",
-    "systemd",
     "vala"
   ]
 }

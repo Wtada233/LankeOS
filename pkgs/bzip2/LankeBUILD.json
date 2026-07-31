@@ -20,8 +20,6 @@
     "libbz2.so.1.0"
   ],
   "build_deps": [
-    "base-devel",
-    "bash",
-    "glibc"
+    "base-devel"
   ]
 }

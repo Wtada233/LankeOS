@@ -37,12 +37,10 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "fontconfig",
     "freetype",
     "git",
     "glib",
-    "glibc",
     "gtk-doc",
     "libX11",
     "libXext",

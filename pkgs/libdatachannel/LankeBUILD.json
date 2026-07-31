@@ -24,10 +24,8 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "glibc",
     "libjuice",
     "libsrtp",
-    "ninja",
-    "openssl"
+    "ninja"
   ]
 }

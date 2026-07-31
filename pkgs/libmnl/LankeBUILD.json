@@ -6,8 +6,7 @@
   ],
   "work_sources": [],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ],
   "needed_so": [
     "libc.so.6"

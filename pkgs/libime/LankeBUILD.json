@@ -31,7 +31,6 @@
     "extra-cmake-modules",
     "fcitx5",
     "git",
-    "glibc",
     "ninja",
     "python",
     "zstd"

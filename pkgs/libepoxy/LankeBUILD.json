@@ -18,10 +18,8 @@
     "base-devel",
     "doxygen",
     "git",
-    "glibc",
     "mesa",
     "meson",
-    "ninja",
-    "systemd"
+    "ninja"
   ]
 }

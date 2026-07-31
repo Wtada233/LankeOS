@@ -22,7 +22,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libxcb",
     "util-macros",
     "xcb-util",

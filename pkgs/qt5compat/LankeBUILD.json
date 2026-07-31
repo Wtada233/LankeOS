@@ -23,7 +23,6 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "glibc",
     "icu",
     "ninja",
     "qt6-base"

@@ -17,8 +17,6 @@
     "libgpg-error.so.0"
   ],
   "build_deps": [
-    "base-devel",
-    "bash",
-    "glibc"
+    "base-devel"
   ]
 }

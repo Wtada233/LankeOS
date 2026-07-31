@@ -17,7 +17,6 @@
     "base-devel",
     "cmake",
     "git",
-    "glibc",
     "llvm",
     "rust",
     "zlib"

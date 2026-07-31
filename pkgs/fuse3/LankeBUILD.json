@@ -15,9 +15,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "meson",
-    "ninja",
-    "systemd"
+    "ninja"
   ]
 }

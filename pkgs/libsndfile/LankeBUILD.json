@@ -20,7 +20,6 @@
   "build_deps": [
     "alsa-lib",
     "base-devel",
-    "glibc",
     "libmp3lame"
   ]
 }

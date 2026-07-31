@@ -20,8 +20,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
-    "glibc",
     "zip"
   ]
 }

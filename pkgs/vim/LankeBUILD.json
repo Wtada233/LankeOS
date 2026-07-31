@@ -37,12 +37,10 @@
   "build_deps": [
     "acl",
     "base-devel",
-    "bash",
     "cairo",
     "gdk-pixbuf",
     "git",
     "glib",
-    "glibc",
     "gtk3",
     "libX11",
     "libgcrypt",

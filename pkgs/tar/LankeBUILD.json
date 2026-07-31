@@ -15,7 +15,6 @@
   "build_deps": [
     "acl",
     "attr",
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

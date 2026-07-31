@@ -30,7 +30,6 @@
     "cairo",
     "dbus",
     "glib",
-    "glibc",
     "gtk3",
     "meson",
     "ninja",

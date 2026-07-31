@@ -17,7 +17,6 @@
   "build_deps": [
     "base-devel",
     "gdbm",
-    "glibc",
     "libpipeline",
     "zlib"
   ]

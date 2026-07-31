@@ -29,7 +29,6 @@
     "curl",
     "doxygen",
     "git",
-    "glibc",
     "gmp",
     "icu",
     "intltool",

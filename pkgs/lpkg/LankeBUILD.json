@@ -14,7 +14,6 @@
     "containerd",
     "docker",
     "iptables",
-    "linux",
     "nftables"
   ]
 }

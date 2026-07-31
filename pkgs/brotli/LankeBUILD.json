@@ -24,7 +24,6 @@
     "base-devel",
     "cmake",
     "git",
-    "glibc",
     "ninja"
   ]
 }

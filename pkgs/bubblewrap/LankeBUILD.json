@@ -16,7 +16,6 @@
     "bash-completion",
     "docbook-xsl",
     "git",
-    "glibc",
     "libcap",
     "libxslt",
     "meson",

@@ -7,7 +7,6 @@
   "work_sources": [],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libnfnetlink"
   ],
   "needed_so": [

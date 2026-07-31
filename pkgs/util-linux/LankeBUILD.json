@@ -34,10 +34,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "bash-completion",
     "git",
-    "glibc",
     "libxcrypt",
     "ncurses",
     "readline",

@@ -18,7 +18,6 @@
     "base-devel",
     "cmake",
     "fmt",
-    "glibc",
     "llvm",
     "python",
     "qt6-base",

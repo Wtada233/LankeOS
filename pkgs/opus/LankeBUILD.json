@@ -16,7 +16,6 @@
     "libopus.so.0"
   ],
   "build_deps": [
-    "base-devel",
-    "glibc"
+    "base-devel"
   ]
 }

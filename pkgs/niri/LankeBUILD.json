@@ -33,11 +33,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "bash",
     "cairo",
     "git",
     "glib",
-    "glibc",
     "libdisplay-info",
     "libinput",
     "libxkbcommon",
@@ -47,7 +45,6 @@
     "pipewire",
     "pixman",
     "rust",
-    "seatd",
-    "systemd"
+    "seatd"
   ]
 }

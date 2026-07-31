@@ -21,7 +21,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libxcb",
     "util-macros",
     "xorgproto"

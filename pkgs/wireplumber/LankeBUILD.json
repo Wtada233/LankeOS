@@ -26,12 +26,10 @@
     "base-devel",
     "git",
     "glib",
-    "glibc",
     "gobject-introspection",
     "lua",
     "meson",
     "ninja",
-    "pipewire",
-    "systemd"
+    "pipewire"
   ]
 }

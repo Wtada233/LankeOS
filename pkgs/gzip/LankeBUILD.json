@@ -15,9 +15,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "bash",
-    "glibc",
-    "less",
     "python"
   ]
 }

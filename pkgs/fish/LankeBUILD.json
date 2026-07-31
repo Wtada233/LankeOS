@@ -19,11 +19,9 @@
     "cmake",
     "expect",
     "git",
-    "glibc",
     "jq",
     "ninja",
     "pcre2",
-    "procps-ng",
     "rust"
   ]
 }

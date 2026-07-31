@@ -67,7 +67,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "glibc",
     "libXau",
     "libXdmcp",
     "python",

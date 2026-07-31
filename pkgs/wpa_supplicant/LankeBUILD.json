@@ -24,10 +24,8 @@
     "base-devel",
     "dbus",
     "git",
-    "glibc",
     "libnl",
     "ncurses",
-    "openssl",
     "readline"
   ]
 }

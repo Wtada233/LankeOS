@@ -19,8 +19,6 @@
   "build_deps": [
     "base-devel",
     "dejagnu",
-    "glibc",
-    "ncurses",
-    "systemd"
+    "ncurses"
   ]
 }

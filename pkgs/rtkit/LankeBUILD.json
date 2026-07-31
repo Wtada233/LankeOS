@@ -18,11 +18,9 @@
     "base-devel",
     "dbus",
     "git",
-    "glibc",
     "libcap",
     "meson",
     "ninja",
-    "systemd",
     "vim"
   ]
 }

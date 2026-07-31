@@ -21,7 +21,6 @@
     "base-devel",
     "bluez",
     "glib",
-    "glibc",
     "intltool",
     "iproute2",
     "python"
