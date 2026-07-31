@@ -1,15 +1,11 @@
 {
   "name": "lz4",
   "version": "1.10.0",
-  "sources": [
-    "https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "liblz4.so",
     "liblz4.so.1"
@@ -19,5 +15,9 @@
     "git",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/lz4/lz4/releases/download/v1.10.0/lz4-1.10.0.tar.gz"
+  ],
+  "work_sources": []
 }

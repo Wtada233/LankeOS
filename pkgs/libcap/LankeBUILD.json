@@ -1,15 +1,11 @@
 {
   "name": "libcap",
   "version": "2.76",
-  "sources": [
-    "https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.76.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libcap.so",
     "libcap.so.2",
@@ -18,5 +14,9 @@
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.76.tar.xz"
+  ],
+  "work_sources": []
 }

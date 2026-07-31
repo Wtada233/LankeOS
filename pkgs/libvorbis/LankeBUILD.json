@@ -1,18 +1,14 @@
 {
   "name": "libvorbis",
   "version": "1.3.7",
-  "sources": [
-    "https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libm.so.6",
     "libmvec.so.1",
     "libogg.so.0"
   ],
-  "deps": [],
   "provides": [
     "libvorbis.so",
     "libvorbis.so.0",
@@ -24,5 +20,9 @@
   "build_deps": [
     "base-devel",
     "libogg"
-  ]
+  ],
+  "sources": [
+    "https://downloads.xiph.org/releases/vorbis/libvorbis-1.3.7.tar.xz"
+  ],
+  "work_sources": []
 }

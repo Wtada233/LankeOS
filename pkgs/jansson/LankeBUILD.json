@@ -1,19 +1,19 @@
 {
   "name": "jansson",
   "version": "2.15.1",
-  "sources": [
-    "https://github.com/akheron/jansson/releases/download/v2.15.1/jansson-2.15.1.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libjansson.so",
     "libjansson.so.4"
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://github.com/akheron/jansson/releases/download/v2.15.1/jansson-2.15.1.tar.gz"
+  ],
+  "work_sources": []
 }

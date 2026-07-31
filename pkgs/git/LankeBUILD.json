@@ -1,11 +1,12 @@
 {
   "name": "git",
   "version": "2.48.0",
-  "sources": [
-    "https://www.kernel.org/pub/software/scm/git/git-2.48.0.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash",
+    "perl",
+    "python"
+  ],
   "needed_so": [
     "libc.so.6",
     "libcrypto.so.3",
@@ -13,11 +14,6 @@
     "libexpat.so.1",
     "libssl.so.3",
     "libz.so.1"
-  ],
-  "deps": [
-    "bash",
-    "perl",
-    "python"
   ],
   "provides": [],
   "build_deps": [
@@ -31,5 +27,9 @@
     "rust",
     "xmlto",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://www.kernel.org/pub/software/scm/git/git-2.48.0.tar.xz"
+  ],
+  "work_sources": []
 }

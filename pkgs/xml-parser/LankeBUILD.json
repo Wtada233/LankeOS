@@ -1,20 +1,20 @@
 {
   "name": "xml-parser",
   "version": "2.47",
-  "sources": [
-    "https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-2.47.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libexpat.so.1"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "expat",
     "perl"
-  ]
+  ],
+  "sources": [
+    "https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-2.47.tar.gz"
+  ],
+  "work_sources": []
 }

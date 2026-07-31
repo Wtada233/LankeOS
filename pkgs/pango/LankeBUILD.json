@@ -1,11 +1,8 @@
 {
   "name": "pango",
   "version": "1.56.4",
-  "sources": [
-    "https://download.gnome.org/sources/pango/1.56/pango-1.56.4.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libcairo.so.2",
@@ -18,7 +15,6 @@
     "libharfbuzz.so.0",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libpango-1.0.so",
     "libpango-1.0.so.0",
@@ -38,5 +34,9 @@
     "harfbuzz",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/pango/1.56/pango-1.56.4.tar.xz"
+  ],
+  "work_sources": []
 }

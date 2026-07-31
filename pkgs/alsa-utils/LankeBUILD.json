@@ -1,11 +1,10 @@
 {
   "name": "alsa-utils",
   "version": "1.2.16",
-  "sources": [
-    "https://www.alsa-project.org/files/pub/utils/alsa-utils-1.2.16.tar.bz2"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libasound.so.2",
     "libatopology.so.2",
@@ -16,9 +15,6 @@
     "libncursesw.so.6",
     "libpanelw.so.6"
   ],
-  "deps": [
-    "bash"
-  ],
   "provides": [],
   "build_deps": [
     "alsa-lib",
@@ -27,5 +23,9 @@
     "fftw",
     "ncurses",
     "xmlto"
-  ]
+  ],
+  "sources": [
+    "https://www.alsa-project.org/files/pub/utils/alsa-utils-1.2.16.tar.bz2"
+  ],
+  "work_sources": []
 }

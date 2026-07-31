@@ -1,16 +1,12 @@
 {
   "name": "seatd",
   "version": "0.9.2",
-  "sources": [
-    "https://git.sr.ht/~kennylevinsen/seatd/archive/0.9.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libsystemd.so.0"
   ],
-  "deps": [],
   "provides": [
     "libseat.so",
     "libseat.so.1"
@@ -19,5 +15,9 @@
     "base-devel",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://git.sr.ht/~kennylevinsen/seatd/archive/0.9.2.tar.gz"
+  ],
+  "work_sources": []
 }

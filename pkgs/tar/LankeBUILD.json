@@ -1,20 +1,20 @@
 {
   "name": "tar",
   "version": "1.35",
-  "sources": [
-    "https://ftpmirror.gnu.org/tar/tar-1.35.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libacl.so.1",
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "acl",
     "attr",
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/tar/tar-1.35.tar.xz"
+  ],
+  "work_sources": []
 }

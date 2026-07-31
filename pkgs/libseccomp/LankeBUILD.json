@@ -1,19 +1,19 @@
 {
   "name": "libseccomp",
   "version": "2.6.1",
-  "sources": [
-    "https://github.com/seccomp/libseccomp/releases/download/v2.6.1/libseccomp-2.6.1.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libseccomp.so",
     "libseccomp.so.2"
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://github.com/seccomp/libseccomp/releases/download/v2.6.1/libseccomp-2.6.1.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,18 +1,14 @@
 {
   "name": "rtkit",
   "version": "0.14",
-  "sources": [
-    "https://gitlab.freedesktop.org/pipewire/rtkit/-/archive/v0.14/rtkit-v0.14.tar.gz"
-  ],
-  "work_sources": [],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libcap.so.2",
     "libdbus-1.so.3",
     "libsystemd.so.0"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -22,5 +18,9 @@
     "meson",
     "ninja",
     "vim"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/pipewire/rtkit/-/archive/v0.14/rtkit-v0.14.tar.gz"
+  ],
+  "work_sources": []
 }

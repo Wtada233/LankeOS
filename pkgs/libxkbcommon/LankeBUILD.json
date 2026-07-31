@@ -1,20 +1,16 @@
 {
   "name": "libxkbcommon",
   "version": "1.13.1",
-  "sources": [
-    "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz"
-  ],
-  "work_sources": [],
   "release": 3,
+  "deps": [
+    "xwayland"
+  ],
   "needed_so": [
     "libc.so.6",
     "libwayland-client.so.0",
     "libxcb-xkb.so.1",
     "libxcb.so.1",
     "libxml2.so.2"
-  ],
-  "deps": [
-    "xwayland"
   ],
   "provides": [
     "libxkbcommon-x11.so",
@@ -35,5 +31,9 @@
     "wayland-protocols",
     "xkeyboard-config",
     "xorgproto"
-  ]
+  ],
+  "sources": [
+    "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz"
+  ],
+  "work_sources": []
 }

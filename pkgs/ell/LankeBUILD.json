@@ -1,15 +1,11 @@
 {
   "name": "ell",
   "version": "0.83",
-  "sources": [
-    "https://mirrors.edge.kernel.org/pub/linux/libs/ell/ell-0.83.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libell.so",
     "libell.so.0"
@@ -17,5 +13,9 @@
   "build_deps": [
     "base-devel",
     "dbus"
-  ]
+  ],
+  "sources": [
+    "https://mirrors.edge.kernel.org/pub/linux/libs/ell/ell-0.83.tar.xz"
+  ],
+  "work_sources": []
 }

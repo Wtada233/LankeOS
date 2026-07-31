@@ -1,11 +1,10 @@
 {
   "name": "binutils",
   "version": "2.45",
-  "sources": [
-    "https://sourceware.org/pub/binutils/releases/binutils-2.45.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "perl"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -15,9 +14,6 @@
     "libstdc++.so.6",
     "libz.so.1",
     "libzstd.so.1"
-  ],
-  "deps": [
-    "perl"
   ],
   "provides": [
     "libbfd-2.45.so",
@@ -41,5 +37,9 @@
     "perl",
     "zlib",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://sourceware.org/pub/binutils/releases/binutils-2.45.tar.xz"
+  ],
+  "work_sources": []
 }

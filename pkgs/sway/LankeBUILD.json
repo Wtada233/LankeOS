@@ -1,11 +1,10 @@
 {
   "name": "sway",
   "version": "1.12",
-  "sources": [
-    "https://github.com/swaywm/sway/archive/refs/tags/1.12.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "xwayland"
+  ],
   "needed_so": [
     "libc.so.6",
     "libcairo.so.2",
@@ -31,9 +30,6 @@
     "libxcb.so.1",
     "libxkbcommon.so.0"
   ],
-  "deps": [
-    "xwayland"
-  ],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -56,5 +52,9 @@
     "wayland-protocols",
     "wlroots",
     "xcb-util-wm"
-  ]
+  ],
+  "sources": [
+    "https://github.com/swaywm/sway/archive/refs/tags/1.12.tar.gz"
+  ],
+  "work_sources": []
 }

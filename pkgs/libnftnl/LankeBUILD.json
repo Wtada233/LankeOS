@@ -1,21 +1,21 @@
 {
   "name": "libnftnl",
   "version": "1.3.1",
-  "sources": [
-    "https://www.netfilter.org/projects/libnftnl/files/libnftnl-1.3.1.tar.xz"
-  ],
-  "work_sources": [],
-  "build_deps": [
-    "base-devel",
-    "libmnl"
-  ],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libmnl.so.0"
   ],
-  "deps": [],
   "provides": [
     "libnftnl.so",
     "libnftnl.so.11"
-  ]
+  ],
+  "build_deps": [
+    "base-devel",
+    "libmnl"
+  ],
+  "sources": [
+    "https://www.netfilter.org/projects/libnftnl/files/libnftnl-1.3.1.tar.xz"
+  ],
+  "work_sources": []
 }

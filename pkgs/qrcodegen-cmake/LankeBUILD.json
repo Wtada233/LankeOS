@@ -1,18 +1,13 @@
 {
   "name": "qrcodegen-cmake",
   "version": "1.8.0",
-  "sources": [
-    "https://github.com/nayuki/QR-Code-generator/archive/refs/tags/v1.8.0.tar.gz",
-    "https://github.com/EasyCoding/qrcodegen-cmake/archive/refs/tags/v1.8.0-cmake3.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [],
   "provides": [
     "libqrcodegen.so",
     "libqrcodegen.so.1",
@@ -23,5 +18,10 @@
     "base-devel",
     "cmake",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/nayuki/QR-Code-generator/archive/refs/tags/v1.8.0.tar.gz",
+    "https://github.com/EasyCoding/qrcodegen-cmake/archive/refs/tags/v1.8.0-cmake3.tar.gz"
+  ],
+  "work_sources": []
 }

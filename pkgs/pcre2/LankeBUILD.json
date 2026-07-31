@@ -1,16 +1,12 @@
 {
   "name": "pcre2",
   "version": "10.47",
-  "sources": [
-    "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.bz2"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [
-    "libc.so.6"
-  ],
   "deps": [
     "bash"
+  ],
+  "needed_so": [
+    "libc.so.6"
   ],
   "provides": [
     "libpcre2-16.so",
@@ -24,5 +20,9 @@
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.bz2"
+  ],
+  "work_sources": []
 }

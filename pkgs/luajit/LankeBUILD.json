@@ -1,22 +1,22 @@
 {
   "name": "luajit",
   "version": "2.1.1785005726",
-  "sources": [
-    "https://github.com/LuaJIT/LuaJIT/archive/a471ab7.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libgcc_s.so.1",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libluajit-5.1.so",
     "libluajit-5.1.so.2"
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://github.com/LuaJIT/LuaJIT/archive/a471ab7.tar.gz"
+  ],
+  "work_sources": []
 }

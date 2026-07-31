@@ -1,26 +1,26 @@
 {
   "name": "libsm",
   "version": "1.2.6",
-  "sources": [
-    "https://www.x.org/releases/individual/lib/libSM-1.2.6.tar.xz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "provides": [
-    "libSM.so",
-    "libSM.so.6"
-  ],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libICE.so.6",
     "libc.so.6",
     "libuuid.so.1"
+  ],
+  "provides": [
+    "libSM.so",
+    "libSM.so.6"
   ],
   "build_deps": [
     "base-devel",
     "libice",
     "util-macros",
     "xtrans"
-  ]
+  ],
+  "sources": [
+    "https://www.x.org/releases/individual/lib/libSM-1.2.6.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

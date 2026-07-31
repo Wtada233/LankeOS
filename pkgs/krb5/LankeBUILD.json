@@ -1,11 +1,10 @@
 {
   "name": "krb5",
   "version": "1.22.2",
-  "sources": [
-    "https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 1,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libc.so.6",
     "libcom_err.so.2",
@@ -14,9 +13,6 @@
     "libresolv.so.2",
     "libss.so.2",
     "libssl.so.3"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libgssapi_krb5.so",
@@ -45,5 +41,9 @@
   "build_deps": [
     "base-devel",
     "perl"
-  ]
+  ],
+  "sources": [
+    "https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz"
+  ],
+  "work_sources": []
 }

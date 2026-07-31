@@ -1,28 +1,28 @@
 {
   "name": "xcb-util-renderutil",
   "version": "0.3.10",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-renderutil-0.3.10.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [
     "xwayland"
   ],
-  "provides": [
-    "libxcb-render-util.so",
-    "libxcb-render-util.so.0"
-  ],
-  "no_strip": false,
-  "release": 2,
   "needed_so": [
     "libc.so.6",
     "libxcb-render.so.0",
     "libxcb.so.1"
+  ],
+  "provides": [
+    "libxcb-render-util.so",
+    "libxcb-render-util.so.0"
   ],
   "build_deps": [
     "base-devel",
     "libxcb",
     "util-macros",
     "xorgproto"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-renderutil-0.3.10.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

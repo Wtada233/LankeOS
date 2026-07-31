@@ -1,14 +1,8 @@
 {
   "name": "lynx",
   "version": "2.9.3",
-  "sources": [
-    "https://invisible-mirror.net/archives/lynx/tarballs/lynx2.9.3.tar.bz2"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "no_strip": false,
-  "provides": [],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libbrotlidec.so.1",
     "libbz2.so.1.0",
@@ -20,6 +14,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "brotli",
@@ -28,5 +23,10 @@
     "ncurses",
     "zlib",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://invisible-mirror.net/archives/lynx/tarballs/lynx2.9.3.tar.bz2"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

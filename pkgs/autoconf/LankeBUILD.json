@@ -1,19 +1,19 @@
 {
   "name": "autoconf",
   "version": "2.72",
-  "sources": [
-    "https://ftpmirror.gnu.org/autoconf/autoconf-2.72.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [],
   "deps": [
     "bash",
     "perl"
   ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "perl"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/autoconf/autoconf-2.72.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,24 +1,24 @@
 {
   "name": "desktop-file-utils",
   "version": "0.28",
-  "sources": [
-    "https://deb.debian.org/debian/pool/main/d/desktop-file-utils/desktop-file-utils_0.28.orig.tar.xz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "no_strip": false,
-  "provides": [],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0"
   ],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "git",
     "glib",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://deb.debian.org/debian/pool/main/d/desktop-file-utils/desktop-file-utils_0.28.orig.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

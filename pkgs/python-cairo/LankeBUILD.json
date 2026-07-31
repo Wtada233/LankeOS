@@ -1,17 +1,13 @@
 {
   "name": "python-cairo",
   "version": "1.29.0",
-  "sources": [
-    "https://github.com/pygobject/pycairo/releases/download/v1.29.0/pycairo-1.29.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 1,
+  "deps": [
+    "python"
+  ],
   "needed_so": [
     "libc.so.6",
     "libcairo.so.2"
-  ],
-  "deps": [
-    "python"
   ],
   "provides": [],
   "build_deps": [
@@ -20,5 +16,9 @@
     "meson",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://github.com/pygobject/pycairo/releases/download/v1.29.0/pycairo-1.29.0.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,19 +1,15 @@
 {
   "name": "systemd",
   "version": "261",
-  "sources": [
-    "https://github.com/systemd/systemd/archive/v261/systemd-261.tar.gz"
-  ],
-  "work_sources": [],
   "release": 3,
+  "deps": [
+    "bash",
+    "python"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libm.so.6"
-  ],
-  "deps": [
-    "bash",
-    "python"
   ],
   "provides": [
     "libnss_myhostname.so.2",
@@ -53,5 +49,9 @@
     "python",
     "rsync",
     "xz"
-  ]
+  ],
+  "sources": [
+    "https://github.com/systemd/systemd/archive/v261/systemd-261.tar.gz"
+  ],
+  "work_sources": []
 }

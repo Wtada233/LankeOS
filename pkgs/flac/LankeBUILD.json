@@ -1,11 +1,8 @@
 {
   "name": "flac",
   "version": "1.5.0",
-  "sources": [
-    "https://github.com/xiph/flac/releases/download/1.5.0/flac-1.5.0.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
@@ -13,7 +10,6 @@
     "libogg.so.0",
     "libstdc++.so.6"
   ],
-  "deps": [],
   "provides": [
     "libFLAC++.so",
     "libFLAC++.so.11",
@@ -28,5 +24,9 @@
     "libogg",
     "nasm",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/xiph/flac/releases/download/1.5.0/flac-1.5.0.tar.xz"
+  ],
+  "work_sources": []
 }

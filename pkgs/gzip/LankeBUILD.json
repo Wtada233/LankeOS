@@ -1,20 +1,20 @@
 {
   "name": "gzip",
   "version": "1.14",
-  "sources": [
-    "https://ftpmirror.gnu.org/gzip/gzip-1.14.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [
-    "libc.so.6"
-  ],
   "deps": [
     "bash"
+  ],
+  "needed_so": [
+    "libc.so.6"
   ],
   "provides": [],
   "build_deps": [
     "base-devel",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/gzip/gzip-1.14.tar.xz"
+  ],
+  "work_sources": []
 }

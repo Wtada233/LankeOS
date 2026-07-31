@@ -1,10 +1,7 @@
 {
   "name": "xdg-desktop-portal-gtk",
   "version": "1.15.3",
-  "sources": [
-    "https://github.com/flatpak/xdg-desktop-portal-gtk/releases/download/1.15.3/xdg-desktop-portal-gtk-1.15.3.tar.xz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libfontconfig.so.1",
@@ -15,7 +12,6 @@
     "libgobject-2.0.so.0",
     "libgtk-3.so.0"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -26,5 +22,9 @@
     "meson",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://github.com/flatpak/xdg-desktop-portal-gtk/releases/download/1.15.3/xdg-desktop-portal-gtk-1.15.3.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,16 +1,11 @@
 {
   "name": "mbedtls",
   "version": "3.6.7",
-  "sources": [
-    "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v3.6.7.tar.gz",
-    "https://github.com/Mbed-TLS/mbedtls-framework/archive/dde0c4a0e448a0552f18817dcea633bb851fd288.tar.gz"
-  ],
-  "work_sources": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
   "deps": [
     "bash"
+  ],
+  "needed_so": [
+    "libc.so.6"
   ],
   "provides": [
     "libmbedcrypto.so.16",
@@ -26,5 +21,10 @@
     "git",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v3.6.7.tar.gz",
+    "https://github.com/Mbed-TLS/mbedtls-framework/archive/dde0c4a0e448a0552f18817dcea633bb851fd288.tar.gz"
+  ],
+  "work_sources": []
 }

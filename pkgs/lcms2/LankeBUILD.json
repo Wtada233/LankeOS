@@ -1,12 +1,8 @@
 {
   "name": "lcms2",
   "version": "2.18",
-  "sources": [
-    "https://downloads.sourceforge.net/lcms/lcms2-2.18.tar.gz"
-  ],
-  "deps": [],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libjpeg.so.62",
@@ -23,5 +19,9 @@
     "libjpeg-turbo",
     "libtiff",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://downloads.sourceforge.net/lcms/lcms2-2.18.tar.gz"
+  ],
+  "no_strip": false
 }

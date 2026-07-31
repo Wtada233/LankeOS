@@ -1,18 +1,14 @@
 {
   "name": "wayland",
   "version": "1.24.0",
-  "sources": [
-    "https://gitlab.freedesktop.org/wayland/wayland/-/archive/1.24.0/wayland-1.24.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libexpat.so.1",
     "libffi.so.8",
     "libxml2.so.2"
   ],
-  "deps": [],
   "provides": [
     "libwayland-client.so",
     "libwayland-client.so.0",
@@ -30,5 +26,9 @@
     "libxml2",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/wayland/wayland/-/archive/1.24.0/wayland-1.24.0.tar.gz"
+  ],
+  "work_sources": []
 }

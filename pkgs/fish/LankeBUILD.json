@@ -1,10 +1,8 @@
 {
   "name": "fish",
   "version": "4.8.0",
-  "sources": [
-    "https://github.com/fish-shell/fish-shell/releases/download/4.8.0/fish-4.8.0.tar.xz"
-  ],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
@@ -12,7 +10,6 @@
     "libpcre2-32.so.0",
     "libpcre2-8.so.0"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -23,5 +20,8 @@
     "ninja",
     "pcre2",
     "rust"
+  ],
+  "sources": [
+    "https://github.com/fish-shell/fish-shell/releases/download/4.8.0/fish-4.8.0.tar.xz"
   ]
 }

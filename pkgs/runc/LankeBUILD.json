@@ -1,15 +1,8 @@
 {
   "name": "runc",
   "version": "1.5.1",
-  "sources": [
-    "https://github.com/opencontainers/runc/releases/download/v1.5.1/runc-1.5.1.tar.xz"
-  ],
-  "work_sources": [],
-  "build_deps": [
-    "base-devel",
-    "git",
-    "golang",
-    "libseccomp"
+  "deps": [
+    "bash"
   ],
   "needed_so": [
     "libc.so.6",
@@ -17,8 +10,15 @@
     "libresolv.so.2",
     "libseccomp.so.2"
   ],
-  "deps": [
-    "bash"
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "git",
+    "golang",
+    "libseccomp"
   ],
-  "provides": []
+  "sources": [
+    "https://github.com/opencontainers/runc/releases/download/v1.5.1/runc-1.5.1.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,15 +1,15 @@
 {
   "name": "simde",
   "version": "0.8.2",
-  "sources": [
-    "https://github.com/simd-everywhere/simde/archive/refs/tags/v0.8.2.tar.gz"
-  ],
-  "work_sources": [],
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "meson"
-  ]
+  ],
+  "sources": [
+    "https://github.com/simd-everywhere/simde/archive/refs/tags/v0.8.2.tar.gz"
+  ],
+  "work_sources": []
 }

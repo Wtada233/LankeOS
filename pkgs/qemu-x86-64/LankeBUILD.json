@@ -1,10 +1,10 @@
 {
   "name": "qemu-x86-64",
   "version": "9.2.3",
-  "sources": [
-    "https://download.qemu.org/qemu-9.2.3.tar.xz"
-  ],
   "release": 2,
+  "deps": [
+    "xwayland"
+  ],
   "needed_so": [
     "libX11.so.6",
     "libasound.so.2",
@@ -37,9 +37,6 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "deps": [
-    "xwayland"
-  ],
   "provides": [],
   "build_deps": [
     "Linux-PAM",
@@ -65,5 +62,8 @@
     "pixman",
     "zlib",
     "zstd"
+  ],
+  "sources": [
+    "https://download.qemu.org/qemu-9.2.3.tar.xz"
   ]
 }

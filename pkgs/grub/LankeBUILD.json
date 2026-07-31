@@ -1,21 +1,16 @@
 {
   "name": "grub",
   "version": "2.14",
-  "sources": [
-    "https://ftpmirror.gnu.org/gnu/grub/grub-2.14.tar.xz"
-  ],
-  "no_strip": true,
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash",
+    "python"
+  ],
   "needed_so": [
     "libc.so.6",
     "libfreetype.so.6",
     "liblzma.so.5",
     "libtasn1.so.6"
-  ],
-  "deps": [
-    "bash",
-    "python"
   ],
   "provides": [],
   "build_deps": [
@@ -25,5 +20,10 @@
     "libtasn1",
     "python",
     "xz"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/gnu/grub/grub-2.14.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": true
 }

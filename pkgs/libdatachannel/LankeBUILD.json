@@ -1,12 +1,7 @@
 {
   "name": "libdatachannel",
   "version": "0.24.5",
-  "sources": [
-    "https://github.com/paullouisageneau/libdatachannel/archive/refs/tags/v0.24.5.tar.gz",
-    "https://github.com/SergiusTheBest/plog/archive/refs/tags/1.1.10.tar.gz",
-    "https://github.com/sctplab/usrsctp/archive/refs/tags/0.9.5.0.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -18,7 +13,6 @@
     "libssl.so.3",
     "libstdc++.so.6"
   ],
-  "deps": [],
   "provides": [
     "libdatachannel.so",
     "libdatachannel.so.0.24"
@@ -29,5 +23,11 @@
     "libjuice",
     "libsrtp",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/paullouisageneau/libdatachannel/archive/refs/tags/v0.24.5.tar.gz",
+    "https://github.com/SergiusTheBest/plog/archive/refs/tags/1.1.10.tar.gz",
+    "https://github.com/sctplab/usrsctp/archive/refs/tags/0.9.5.0.tar.gz"
+  ],
+  "work_sources": []
 }

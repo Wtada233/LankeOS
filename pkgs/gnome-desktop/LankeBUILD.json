@@ -1,10 +1,7 @@
 {
   "name": "gnome-desktop",
   "version": "44.5",
-  "sources": [
-    "https://download.gnome.org/sources/gnome-desktop/44/gnome-desktop-44.5.tar.xz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libcairo.so.2",
@@ -21,7 +18,6 @@
     "libudev.so.1",
     "libxkbregistry.so.0"
   ],
-  "deps": [],
   "provides": [
     "libgnome-bg-4.so",
     "libgnome-bg-4.so.2",
@@ -45,5 +41,9 @@
     "libxkbcommon",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gnome-desktop/44/gnome-desktop-44.5.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,14 +1,11 @@
 {
   "name": "iniparser",
   "version": "4.2.6",
-  "sources": [
-    "https://github.com/ndevilla/iniparser/archive/refs/tags/v4.2.6.tar.gz"
-  ],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libiniparser.so",
     "libiniparser.so.4"
@@ -17,5 +14,8 @@
     "base-devel",
     "cmake",
     "ninja"
+  ],
+  "sources": [
+    "https://github.com/ndevilla/iniparser/archive/refs/tags/v4.2.6.tar.gz"
   ]
 }

@@ -1,12 +1,8 @@
 {
   "name": "libpcap",
   "version": "1.10.6",
-  "sources": [
-    "https://www.tcpdump.org/release/libpcap-1.10.6.tar.gz"
-  ],
-  "work_sources": [],
-  "build_deps": [
-    "base-devel"
+  "deps": [
+    "bash"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -15,11 +11,15 @@
     "libnl-3.so.200",
     "libnl-genl-3.so.200"
   ],
-  "deps": [
-    "bash"
-  ],
   "provides": [
     "libpcap.so",
     "libpcap.so.1"
-  ]
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://www.tcpdump.org/release/libpcap-1.10.6.tar.gz"
+  ],
+  "work_sources": []
 }

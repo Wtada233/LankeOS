@@ -1,13 +1,9 @@
 {
   "name": "linux",
   "version": "7.1.5",
-  "sources": [
-    "https://www.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.gz"
-  ],
-  "no_strip": true,
-  "work_sources": [],
-  "needed_so": [],
+  "release": 2,
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -21,5 +17,9 @@
     "zlib",
     "zstd"
   ],
-  "release": 2
+  "sources": [
+    "https://www.kernel.org/pub/linux/kernel/v7.x/linux-7.1.5.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": true
 }

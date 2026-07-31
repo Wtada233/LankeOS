@@ -1,11 +1,10 @@
 {
   "name": "rsync",
   "version": "3.4.1",
-  "sources": [
-    "https://rsync.samba.org/ftp/rsync/src/rsync-3.4.1.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libacl.so.1",
     "libattr.so.1",
@@ -15,9 +14,6 @@
     "libpopt.so.0",
     "libz.so.1",
     "libzstd.so.1"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [],
   "build_deps": [
@@ -29,5 +25,9 @@
     "popt",
     "zlib",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://rsync.samba.org/ftp/rsync/src/rsync-3.4.1.tar.gz"
+  ],
+  "work_sources": []
 }

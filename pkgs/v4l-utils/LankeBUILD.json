@@ -1,10 +1,7 @@
 {
   "name": "v4l-utils",
   "version": "1.32.0",
-  "sources": [
-    "https://linuxtv.org/downloads/v4l-utils/v4l-utils-1.32.0.tar.xz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libGL.so.1",
     "libQt6Core.so.6",
@@ -22,7 +19,6 @@
     "libstdc++.so.6",
     "libudev.so.1"
   ],
-  "deps": [],
   "provides": [
     "libdvbv5.so",
     "libdvbv5.so.0",
@@ -47,5 +43,9 @@
     "ninja",
     "qt5compat",
     "qt6-base"
-  ]
+  ],
+  "sources": [
+    "https://linuxtv.org/downloads/v4l-utils/v4l-utils-1.32.0.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,11 +1,10 @@
 {
   "name": "btrfs-progs",
   "version": "7.0",
-  "sources": [
-    "https://github.com/kdave/btrfs-progs/archive/refs/tags/v7.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 3,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libblkid.so.1",
@@ -16,9 +15,6 @@
     "libuuid.so.1",
     "libz.so.1",
     "libzstd.so.1"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libbtrfs.so",
@@ -34,5 +30,9 @@
     "ripgrep",
     "zlib",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://github.com/kdave/btrfs-progs/archive/refs/tags/v7.0.tar.gz"
+  ],
+  "work_sources": []
 }

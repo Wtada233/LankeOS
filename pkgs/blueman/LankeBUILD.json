@@ -1,20 +1,16 @@
 {
   "name": "blueman",
   "version": "2.4.6",
-  "sources": [
-    "https://github.com/blueman-project/blueman/releases/download/2.4.6/blueman-2.4.6.tar.gz"
+  "deps": [
+    "python",
+    "python-cairo",
+    "python-gobject"
   ],
-  "work_sources": [],
   "needed_so": [
     "libbluetooth.so.3",
     "libc.so.6",
     "libglib-2.0.so.0",
     "libgthread-2.0.so.0"
-  ],
-  "deps": [
-    "python",
-    "python-cairo",
-    "python-gobject"
   ],
   "provides": [],
   "build_deps": [
@@ -24,5 +20,9 @@
     "intltool",
     "iproute2",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://github.com/blueman-project/blueman/releases/download/2.4.6/blueman-2.4.6.tar.gz"
+  ],
+  "work_sources": []
 }

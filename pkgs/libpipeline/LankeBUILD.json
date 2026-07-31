@@ -1,20 +1,20 @@
 {
   "name": "libpipeline",
   "version": "1.5.8",
-  "sources": [
-    "https://download.savannah.gnu.org/releases/libpipeline/libpipeline-1.5.8.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libpipeline.so",
     "libpipeline.so.1"
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://download.savannah.gnu.org/releases/libpipeline/libpipeline-1.5.8.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,17 +1,13 @@
 {
   "name": "json-c",
   "version": "0.19",
-  "sources": [
-    "https://github.com/json-c/json-c/archive/refs/tags/json-c-0.19-20260627.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libjson-c.so",
     "libjson-c.so.5"
@@ -19,5 +15,9 @@
   "build_deps": [
     "base-devel",
     "cmake"
-  ]
+  ],
+  "sources": [
+    "https://github.com/json-c/json-c/archive/refs/tags/json-c-0.19-20260627.tar.gz"
+  ],
+  "work_sources": []
 }

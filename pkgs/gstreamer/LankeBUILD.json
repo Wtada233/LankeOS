@@ -1,14 +1,10 @@
 {
   "name": "gstreamer",
   "version": "1.28.1",
-  "sources": [
-    "https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-1.28.1.tar.xz"
-  ],
+  "release": 2,
   "deps": [
     "python"
   ],
-  "no_strip": false,
-  "release": 2,
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -98,5 +94,9 @@
     "vulkan-loader",
     "wayland",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-1.28.1.tar.xz"
+  ],
+  "no_strip": false
 }

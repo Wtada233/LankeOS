@@ -1,11 +1,14 @@
 {
   "name": "vim",
   "version": "9.1.1629",
-  "sources": [
-    "https://github.com/vim/vim/archive/v9.1.1629/vim-9.1.1629.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash",
+    "gawk",
+    "perl",
+    "python",
+    "xwayland"
+  ],
   "needed_so": [
     "libICE.so.6",
     "libSM.so.6",
@@ -25,13 +28,6 @@
     "libpango-1.0.so.0",
     "libpangocairo-1.0.so.0",
     "libwayland-client.so.0"
-  ],
-  "deps": [
-    "bash",
-    "gawk",
-    "perl",
-    "python",
-    "xwayland"
   ],
   "provides": [],
   "build_deps": [
@@ -56,5 +52,9 @@
     "tcl",
     "wayland",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/vim/vim/archive/v9.1.1629/vim-9.1.1629.tar.gz"
+  ],
+  "work_sources": []
 }

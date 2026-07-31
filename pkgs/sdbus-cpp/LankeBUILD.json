@@ -1,10 +1,8 @@
 {
   "name": "sdbus-cpp",
   "version": "2.3.1",
-  "sources": [
-    "https://github.com/Kistler-Group/sdbus-cpp/archive/refs/tags/v2.3.1.tar.gz"
-  ],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -13,7 +11,6 @@
     "libstdc++.so.6",
     "libsystemd.so.0"
   ],
-  "deps": [],
   "provides": [
     "libsdbus-c++.so",
     "libsdbus-c++.so.2"
@@ -23,5 +20,8 @@
     "cmake",
     "doxygen",
     "ninja"
+  ],
+  "sources": [
+    "https://github.com/Kistler-Group/sdbus-cpp/archive/refs/tags/v2.3.1.tar.gz"
   ]
 }

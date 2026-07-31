@@ -1,11 +1,8 @@
 {
   "name": "bash",
   "version": "5.3",
-  "sources": [
-    "https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz"
-  ],
-  "work_sources": [],
   "release": 3,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libhistory.so.8",
@@ -13,11 +10,14 @@
     "libncursesw.so.6",
     "libreadline.so.8"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "ncurses",
     "readline"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/bash/bash-5.3.tar.gz"
+  ],
+  "work_sources": []
 }

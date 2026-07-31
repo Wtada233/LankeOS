@@ -1,20 +1,16 @@
 {
   "name": "freetype",
   "version": "2.13.3",
-  "sources": [
-    "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libbz2.so.1.0",
     "libc.so.6",
     "libharfbuzz.so.0",
     "libpng16.so.16",
     "libz.so.1"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libfreetype.so",
@@ -26,5 +22,9 @@
     "harfbuzz",
     "libpng",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz"
+  ],
+  "work_sources": []
 }

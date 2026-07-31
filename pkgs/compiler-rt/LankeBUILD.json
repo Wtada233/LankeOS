@@ -1,16 +1,10 @@
 {
   "name": "compiler-rt",
   "version": "22.1.7",
-  "sources": [
-    "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/llvm-project-22.1.7.src.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [
     "python"
   ],
-  "no_strip": false,
-  "provides": [],
-  "release": 2,
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -18,11 +12,17 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",
     "llvm",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/llvm-project-22.1.7.src.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

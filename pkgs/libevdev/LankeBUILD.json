@@ -1,16 +1,12 @@
 {
   "name": "libevdev",
   "version": "1.13.6",
-  "sources": [
-    "https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-1.13.6/libevdev-libevdev-1.13.6.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libevdev.so",
     "libevdev.so.2"
@@ -20,5 +16,9 @@
     "meson",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-1.13.6/libevdev-libevdev-1.13.6.tar.gz"
+  ],
+  "work_sources": []
 }

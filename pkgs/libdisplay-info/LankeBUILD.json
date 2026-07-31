@@ -1,16 +1,12 @@
 {
   "name": "libdisplay-info",
   "version": "0.3.0",
-  "sources": [
-    "https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/0.3.0/libdisplay-info-0.3.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libdisplay-info.so",
     "libdisplay-info.so.3"
@@ -21,5 +17,9 @@
     "meson",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/0.3.0/libdisplay-info-0.3.0.tar.gz"
+  ],
+  "work_sources": []
 }

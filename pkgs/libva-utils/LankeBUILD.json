@@ -1,11 +1,10 @@
 {
   "name": "libva-utils",
   "version": "2.23.0",
-  "sources": [
-    "https://github.com/intel/libva-utils/releases/download/2.23.0/libva-utils-2.23.0.tar.bz2"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "xwayland"
+  ],
   "needed_so": [
     "libX11.so.6",
     "libc.so.6",
@@ -19,9 +18,6 @@
     "libva.so.2",
     "libwayland-client.so.0"
   ],
-  "deps": [
-    "xwayland"
-  ],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -30,5 +26,9 @@
     "libva",
     "mesa",
     "wayland"
-  ]
+  ],
+  "sources": [
+    "https://github.com/intel/libva-utils/releases/download/2.23.0/libva-utils-2.23.0.tar.bz2"
+  ],
+  "work_sources": []
 }

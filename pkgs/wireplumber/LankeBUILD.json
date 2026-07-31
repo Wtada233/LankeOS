@@ -1,11 +1,8 @@
 {
   "name": "wireplumber",
   "version": "0.5.14",
-  "sources": [
-    "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.14/wireplumber-0.5.14.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgio-2.0.so.0",
@@ -17,7 +14,6 @@
     "libpipewire-0.3.so.0",
     "libsystemd.so.0"
   ],
-  "deps": [],
   "provides": [
     "libwireplumber-0.5.so",
     "libwireplumber-0.5.so.0"
@@ -31,5 +27,9 @@
     "meson",
     "ninja",
     "pipewire"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.14/wireplumber-0.5.14.tar.gz"
+  ],
+  "work_sources": []
 }

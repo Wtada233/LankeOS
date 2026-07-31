@@ -1,25 +1,25 @@
 {
   "name": "libXcomposite",
   "version": "0.4.6",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libXcomposite-0.4.6.tar.xz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "provides": [
-    "libXcomposite.so",
-    "libXcomposite.so.1"
-  ],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libX11.so.6",
     "libc.so.6"
+  ],
+  "provides": [
+    "libXcomposite.so",
+    "libXcomposite.so.1"
   ],
   "build_deps": [
     "base-devel",
     "libX11",
     "util-macros",
     "xorgproto"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXcomposite-0.4.6.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

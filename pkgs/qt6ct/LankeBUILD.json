@@ -1,10 +1,7 @@
 {
   "name": "qt6ct",
   "version": "0.11",
-  "sources": [
-    "https://www.opencode.net/trialuser/qt6ct/-/archive/0.11/qt6ct-0.11.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libGLX.so.0",
@@ -18,7 +15,6 @@
     "libstdc++.so.6",
     "libxkbcommon.so.0"
   ],
-  "deps": [],
   "provides": [
     "libqt6ct-common.so",
     "libqt6ct-common.so.0.11"
@@ -32,5 +28,9 @@
     "ninja",
     "qt6-base",
     "qt6-tools"
-  ]
+  ],
+  "sources": [
+    "https://www.opencode.net/trialuser/qt6ct/-/archive/0.11/qt6ct-0.11.tar.gz"
+  ],
+  "work_sources": []
 }

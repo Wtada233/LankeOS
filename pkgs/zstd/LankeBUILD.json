@@ -1,19 +1,15 @@
 {
   "name": "zstd",
   "version": "1.5.7",
-  "sources": [
-    "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libc.so.6",
     "liblz4.so.1",
     "liblzma.so.5",
     "libz.so.1"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libzstd.so",
@@ -26,5 +22,9 @@
     "ninja",
     "xz",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz"
+  ],
+  "work_sources": []
 }

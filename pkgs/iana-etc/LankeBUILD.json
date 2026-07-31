@@ -1,15 +1,15 @@
 {
   "name": "iana-etc",
   "version": "20250807",
-  "sources": [
-    "https://github.com/Mic92/iana-etc/releases/download/20250807/iana-etc-20250807.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://github.com/Mic92/iana-etc/releases/download/20250807/iana-etc-20250807.tar.gz"
+  ],
+  "work_sources": []
 }

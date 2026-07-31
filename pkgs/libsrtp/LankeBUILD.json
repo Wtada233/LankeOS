@@ -1,15 +1,11 @@
 {
   "name": "libsrtp",
   "version": "2.8.0",
-  "sources": [
-    "https://github.com/cisco/libsrtp/archive/refs/tags/v2.8.0.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libcrypto.so.3"
   ],
-  "deps": [],
   "provides": [
     "libsrtp2.so",
     "libsrtp2.so.1"
@@ -18,5 +14,9 @@
     "base-devel",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/cisco/libsrtp/archive/refs/tags/v2.8.0.tar.gz"
+  ],
+  "work_sources": []
 }

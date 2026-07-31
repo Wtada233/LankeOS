@@ -1,14 +1,18 @@
 {
   "name": "nss",
   "version": "3.126",
-  "sources": [
-    "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_126_RTM/src/nss-3.126.tar.gz"
-  ],
-  "work_sources": [],
+  "release": 1,
   "deps": [
     "bash"
   ],
-  "no_strip": false,
+  "needed_so": [
+    "libc.so.6",
+    "libnspr4.so",
+    "libplc4.so",
+    "libplds4.so",
+    "libsqlite3.so",
+    "libz.so.1"
+  ],
   "provides": [
     "libfreebl3.so",
     "libfreeblpriv3.so",
@@ -19,15 +23,6 @@
     "libsoftokn3.so",
     "libssl3.so"
   ],
-  "release": 1,
-  "needed_so": [
-    "libc.so.6",
-    "libnspr4.so",
-    "libplc4.so",
-    "libplds4.so",
-    "libsqlite3.so",
-    "libz.so.1"
-  ],
   "build_deps": [
     "base-devel",
     "nspr",
@@ -35,5 +30,10 @@
     "python",
     "sqlite",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_126_RTM/src/nss-3.126.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

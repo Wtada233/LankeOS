@@ -1,18 +1,18 @@
 {
   "name": "parallel",
   "version": "20250522",
-  "sources": [
-    "https://ftpmirror.gnu.org/gnu/parallel/parallel-20250522.tar.bz2"
-  ],
   "release": 2,
-  "needed_so": [],
   "deps": [
     "bash",
     "perl"
   ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "perl"
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/gnu/parallel/parallel-20250522.tar.bz2"
   ]
 }

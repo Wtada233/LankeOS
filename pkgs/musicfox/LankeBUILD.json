@@ -1,22 +1,22 @@
 {
   "name": "musicfox",
   "version": "4.8.5",
-  "sources": [
-    "https://github.com/go-musicfox/go-musicfox/archive/refs/tags/v4.8.5.tar.gz"
-  ],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libFLAC.so.14",
     "libasound.so.2",
     "libc.so.6",
     "libresolv.so.2"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "alsa-lib",
     "base-devel",
     "flac",
     "golang"
+  ],
+  "sources": [
+    "https://github.com/go-musicfox/go-musicfox/archive/refs/tags/v4.8.5.tar.gz"
   ]
 }

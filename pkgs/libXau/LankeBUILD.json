@@ -1,23 +1,23 @@
 {
   "name": "libXau",
   "version": "1.0.11",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libXau-1.0.11.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
   "provides": [
     "libXau.so",
     "libXau.so.6"
-  ],
-  "no_strip": false,
-  "release": 2,
-  "needed_so": [
-    "libc.so.6"
   ],
   "build_deps": [
     "base-devel",
     "util-macros",
     "xorgproto"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXau-1.0.11.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

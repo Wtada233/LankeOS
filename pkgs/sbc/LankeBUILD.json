@@ -1,20 +1,20 @@
 {
   "name": "sbc",
   "version": "2.2",
-  "sources": [
-    "https://www.kernel.org/pub/linux/bluetooth/sbc-2.2.tar.xz"
-  ],
-  "work_sources": [],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libsbc.so",
     "libsbc.so.1"
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://www.kernel.org/pub/linux/bluetooth/sbc-2.2.tar.xz"
+  ],
+  "work_sources": []
 }

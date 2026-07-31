@@ -1,15 +1,15 @@
 {
   "name": "filesystem",
   "version": "1.5.0",
-  "sources": [],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [],
   "deps": [
     "bash"
   ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [],
+  "work_sources": []
 }

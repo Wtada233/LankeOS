@@ -1,11 +1,14 @@
 {
   "name": "gettext",
   "version": "0.26",
-  "sources": [
-    "https://ftpmirror.gnu.org/gettext/gettext-0.26.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash",
+    "gawk",
+    "perl",
+    "ruby",
+    "tcl"
+  ],
   "needed_so": [
     "libacl.so.1",
     "libattr.so.1",
@@ -16,13 +19,6 @@
     "libncursesw.so.6",
     "libstdc++.so.6",
     "libxml2.so.2"
-  ],
-  "deps": [
-    "bash",
-    "gawk",
-    "perl",
-    "ruby",
-    "tcl"
   ],
   "provides": [
     "libasprintf.so",
@@ -46,5 +42,9 @@
     "perl",
     "ruby",
     "tcl"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/gettext/gettext-0.26.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,16 +1,12 @@
 {
   "name": "openssl",
   "version": "3.5.2",
-  "sources": [
-    "https://github.com/openssl/openssl/releases/download/openssl-3.5.2/openssl-3.5.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [
-    "libc.so.6"
-  ],
   "deps": [
     "perl"
+  ],
+  "needed_so": [
+    "libc.so.6"
   ],
   "provides": [
     "libcrypto.so",
@@ -21,5 +17,9 @@
   "build_deps": [
     "base-devel",
     "perl"
-  ]
+  ],
+  "sources": [
+    "https://github.com/openssl/openssl/releases/download/openssl-3.5.2/openssl-3.5.2.tar.gz"
+  ],
+  "work_sources": []
 }

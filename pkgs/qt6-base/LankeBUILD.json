@@ -1,10 +1,11 @@
 {
   "name": "qt6-base",
   "version": "6.11.1",
-  "sources": [
-    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtbase-everywhere-src-6.11.1.tar.xz"
+  "deps": [
+    "bash",
+    "python",
+    "xwayland"
   ],
-  "work_sources": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libEGL.so.1",
@@ -75,11 +76,6 @@
     "libxkbcommon.so.0",
     "libz.so.1",
     "libzstd.so.1"
-  ],
-  "deps": [
-    "bash",
-    "python",
-    "xwayland"
   ],
   "provides": [
     "libQt6Concurrent.so",
@@ -165,5 +161,9 @@
     "xcb-util-wm",
     "zlib",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtbase-everywhere-src-6.11.1.tar.xz"
+  ],
+  "work_sources": []
 }

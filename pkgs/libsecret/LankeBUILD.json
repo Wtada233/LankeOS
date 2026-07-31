@@ -1,12 +1,8 @@
 {
   "name": "libsecret",
   "version": "0.21.7",
-  "sources": [
-    "https://download.gnome.org/sources/libsecret/0.21/libsecret-0.21.7.tar.xz"
-  ],
-  "deps": [],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgio-2.0.so.0",
@@ -25,5 +21,9 @@
     "gobject-introspection",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/libsecret/0.21/libsecret-0.21.7.tar.xz"
+  ],
+  "no_strip": false
 }

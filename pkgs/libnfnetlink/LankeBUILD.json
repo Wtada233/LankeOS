@@ -1,19 +1,19 @@
 {
   "name": "libnfnetlink",
   "version": "1.0.2",
-  "sources": [
-    "https://www.netfilter.org/projects/libnfnetlink/files/libnfnetlink-1.0.2.tar.bz2"
-  ],
-  "work_sources": [],
-  "build_deps": [
-    "base-devel"
-  ],
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libnfnetlink.so",
     "libnfnetlink.so.0"
-  ]
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://www.netfilter.org/projects/libnfnetlink/files/libnfnetlink-1.0.2.tar.bz2"
+  ],
+  "work_sources": []
 }

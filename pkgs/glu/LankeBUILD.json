@@ -1,17 +1,8 @@
 {
   "name": "glu",
   "version": "9.0.3",
-  "sources": [
-    "https://archive.mesa3d.org/glu/glu-9.0.3.tar.xz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "provides": [
-    "libGLU.so",
-    "libGLU.so.1"
-  ],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libOpenGL.so.0",
     "libc.so.6",
@@ -19,9 +10,18 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
+  "provides": [
+    "libGLU.so",
+    "libGLU.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "libglvnd",
     "meson"
-  ]
+  ],
+  "sources": [
+    "https://archive.mesa3d.org/glu/glu-9.0.3.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

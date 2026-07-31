@@ -1,12 +1,8 @@
 {
   "name": "glib-networking",
   "version": "2.80.1",
-  "sources": [
-    "https://download.gnome.org/sources/glib-networking/2.80/glib-networking-2.80.1.tar.xz"
-  ],
-  "deps": [],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgio-2.0.so.0",
@@ -23,5 +19,9 @@
     "gsettings-desktop-schemas",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/glib-networking/2.80/glib-networking-2.80.1.tar.xz"
+  ],
+  "no_strip": false
 }

@@ -1,16 +1,12 @@
 {
   "name": "libglvnd",
   "version": "1.7.0",
-  "sources": [
-    "https://gitlab.freedesktop.org/glvnd/libglvnd/-/archive/v1.7.0/libglvnd-v1.7.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libX11.so.6",
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libEGL.so",
     "libEGL.so.1",
@@ -35,5 +31,9 @@
     "ninja",
     "python",
     "xorgproto"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/glvnd/libglvnd/-/archive/v1.7.0/libglvnd-v1.7.0.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,20 +1,16 @@
 {
   "name": "newt",
   "version": "0.52.24",
-  "sources": [
-    "https://releases.pagure.org/newt/newt-0.52.24.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "python"
+  ],
   "needed_so": [
     "libc.so.6",
     "libm.so.6",
     "libpopt.so.0",
     "libslang.so.2",
     "libtcl8.6.so"
-  ],
-  "deps": [
-    "python"
   ],
   "provides": [
     "libnewt.so",
@@ -27,5 +23,9 @@
     "python",
     "slang",
     "tcl"
-  ]
+  ],
+  "sources": [
+    "https://releases.pagure.org/newt/newt-0.52.24.tar.gz"
+  ],
+  "work_sources": []
 }

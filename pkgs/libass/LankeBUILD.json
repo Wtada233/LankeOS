@@ -1,10 +1,8 @@
 {
   "name": "libass",
   "version": "0.17.5",
-  "sources": [
-    "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz"
-  ],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libfontconfig.so.1",
@@ -13,7 +11,6 @@
     "libharfbuzz.so.0",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libass.so",
     "libass.so.9"
@@ -25,5 +22,8 @@
     "fribidi",
     "harfbuzz",
     "nasm"
+  ],
+  "sources": [
+    "https://github.com/libass/libass/releases/download/0.17.5/libass-0.17.5.tar.xz"
   ]
 }

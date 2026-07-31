@@ -1,10 +1,7 @@
 {
   "name": "libadwaita",
   "version": "1.9.2",
-  "sources": [
-    "https://gitlab.gnome.org/GNOME/libadwaita/-/archive/1.9.2/libadwaita-1.9.2.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libappstream.so.5",
     "libc.so.6",
@@ -17,7 +14,6 @@
     "libm.so.6",
     "libpango-1.0.so.0"
   ],
-  "deps": [],
   "provides": [
     "libadwaita-1.so",
     "libadwaita-1.so.0"
@@ -35,5 +31,9 @@
     "pango",
     "sassc",
     "vala"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/libadwaita/-/archive/1.9.2/libadwaita-1.9.2.tar.gz"
+  ],
+  "work_sources": []
 }

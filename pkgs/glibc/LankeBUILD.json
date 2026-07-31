@@ -1,19 +1,11 @@
 {
   "name": "glibc",
   "version": "2.43",
-  "sources": [
-    "https://ftpmirror.gnu.org/glibc/glibc-2.43.tar.xz"
-  ],
-  "work_sources": [
-    "https://www.linuxfromscratch.org/patches/lfs/13.0/glibc-fhs-1.patch",
-    "https://www.linuxfromscratch.org/patches/downloads/glibc/glibc-2.43-upstream_fixes-1.patch",
-    "https://www.iana.org/time-zones/repository/releases/tzdata2025b.tar.gz"
-  ],
   "release": 3,
-  "needed_so": [],
   "deps": [
     "bash"
   ],
+  "needed_so": [],
   "provides": [
     "ld-linux-x86-64.so.2",
     "libBrokenLocale.so",
@@ -50,5 +42,13 @@
     "base-devel",
     "git",
     "python"
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/glibc/glibc-2.43.tar.xz"
+  ],
+  "work_sources": [
+    "https://www.linuxfromscratch.org/patches/lfs/13.0/glibc-fhs-1.patch",
+    "https://www.linuxfromscratch.org/patches/downloads/glibc/glibc-2.43-upstream_fixes-1.patch",
+    "https://www.iana.org/time-zones/repository/releases/tzdata2025b.tar.gz"
   ]
 }

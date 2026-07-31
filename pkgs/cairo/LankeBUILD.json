@@ -1,11 +1,11 @@
 {
   "name": "cairo",
   "version": "1.18.4",
-  "sources": [
-    "https://cairographics.org/releases/cairo-1.18.4.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash",
+    "xwayland"
+  ],
   "needed_so": [
     "libX11.so.6",
     "libXext.so.6",
@@ -22,10 +22,6 @@
     "libxcb-shm.so.0",
     "libxcb.so.1",
     "libz.so.1"
-  ],
-  "deps": [
-    "bash",
-    "xwayland"
   ],
   "provides": [
     "libcairo-gobject.so",
@@ -51,5 +47,9 @@
     "ninja",
     "pixman",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://cairographics.org/releases/cairo-1.18.4.tar.xz"
+  ],
+  "work_sources": []
 }

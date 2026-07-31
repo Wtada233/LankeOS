@@ -1,19 +1,19 @@
 {
   "name": "unifdef",
   "version": "2.12",
-  "sources": [
-    "https://dotat.at/prog/unifdef/unifdef-2.12.tar.gz"
-  ],
-  "no_strip": false,
   "release": 2,
-  "needed_so": [
-    "libc.so.6"
-  ],
   "deps": [
     "bash"
+  ],
+  "needed_so": [
+    "libc.so.6"
   ],
   "provides": [],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://dotat.at/prog/unifdef/unifdef-2.12.tar.gz"
+  ],
+  "no_strip": false
 }

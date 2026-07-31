@@ -1,11 +1,8 @@
 {
   "name": "harfbuzz",
   "version": "11.4.1",
-  "sources": [
-    "https://github.com/harfbuzz/harfbuzz/releases/download/11.4.1/harfbuzz-11.4.1.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libcairo.so.2",
@@ -15,7 +12,6 @@
     "libicuuc.so.77",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libharfbuzz-cairo.so",
     "libharfbuzz-cairo.so.0",
@@ -41,5 +37,9 @@
     "ninja",
     "python",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/harfbuzz/harfbuzz/releases/download/11.4.1/harfbuzz-11.4.1.tar.xz"
+  ],
+  "work_sources": []
 }

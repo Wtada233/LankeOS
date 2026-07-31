@@ -1,15 +1,11 @@
 {
   "name": "gtk-doc",
   "version": "1.36.1",
-  "sources": [
-    "https://gitlab.gnome.org/GNOME/gtk-doc/-/archive/1.36.1/gtk-doc-1.36.1.tar.gz"
-  ],
-  "work_sources": [],
-  "needed_so": [],
   "deps": [
     "bash",
     "python"
   ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -18,5 +14,9 @@
     "meson",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/gtk-doc/-/archive/1.36.1/gtk-doc-1.36.1.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,20 +1,16 @@
 {
   "name": "Linux-PAM",
   "version": "1.7.2",
-  "sources": [
-    "https://github.com/linux-pam/linux-pam/archive/refs/tags/v1.7.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libcrypt.so.2",
     "libgdbm.so.6",
     "libsystemd.so.0"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libpam.so",
@@ -30,5 +26,9 @@
     "libxcrypt",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/linux-pam/linux-pam/archive/refs/tags/v1.7.2.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,16 +1,12 @@
 {
   "name": "oniguruma",
   "version": "6.9.10",
-  "sources": [
-    "https://github.com/kkos/oniguruma/releases/download/v6.9.10/onig-6.9.10.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [
-    "libc.so.6"
-  ],
   "deps": [
     "bash"
+  ],
+  "needed_so": [
+    "libc.so.6"
   ],
   "provides": [
     "libonig.so",
@@ -18,5 +14,9 @@
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://github.com/kkos/oniguruma/releases/download/v6.9.10/onig-6.9.10.tar.gz"
+  ],
+  "work_sources": []
 }

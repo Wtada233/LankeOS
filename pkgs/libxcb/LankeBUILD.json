@@ -1,11 +1,13 @@
 {
   "name": "libxcb",
   "version": "1.17.0",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.17.0.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [],
+  "needed_so": [
+    "libXau.so.6",
+    "libXdmcp.so.6",
+    "libc.so.6"
+  ],
   "provides": [
     "libxcb-composite.so",
     "libxcb-composite.so.0",
@@ -58,13 +60,6 @@
     "libxcb.so",
     "libxcb.so.1"
   ],
-  "no_strip": false,
-  "release": 2,
-  "needed_so": [
-    "libXau.so.6",
-    "libXdmcp.so.6",
-    "libc.so.6"
-  ],
   "build_deps": [
     "base-devel",
     "libXau",
@@ -72,5 +67,10 @@
     "python",
     "util-macros",
     "xorgproto"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.17.0.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

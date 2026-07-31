@@ -1,20 +1,20 @@
 {
   "name": "bison",
   "version": "3.8.2",
-  "sources": [
-    "https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libc.so.6",
     "libtextstyle.so.0"
   ],
-  "deps": [
-    "bash"
-  ],
   "provides": [],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/bison/bison-3.8.2.tar.xz"
+  ],
+  "work_sources": []
 }

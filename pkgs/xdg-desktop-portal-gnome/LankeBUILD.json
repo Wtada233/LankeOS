@@ -1,10 +1,9 @@
 {
   "name": "xdg-desktop-portal-gnome",
   "version": "1.15.3",
-  "sources": [
-    "https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/archive/50.0/xdg-desktop-portal-gnome-50.0.tar.gz"
+  "deps": [
+    "xwayland"
   ],
-  "work_sources": [],
   "needed_so": [
     "libX11.so.6",
     "libadwaita-1.so.0",
@@ -22,9 +21,6 @@
     "libm.so.6",
     "libwayland-client.so.0"
   ],
-  "deps": [
-    "xwayland"
-  ],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -41,5 +37,9 @@
     "ninja",
     "python",
     "wayland"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/archive/50.0/xdg-desktop-portal-gnome-50.0.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,15 +1,11 @@
 {
   "name": "libepoxy",
   "version": "1.5.10",
-  "sources": [
-    "https://download.gnome.org/sources/libepoxy/1.5/libepoxy-1.5.10.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libepoxy.so",
     "libepoxy.so.0"
@@ -21,5 +17,9 @@
     "mesa",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/libepoxy/1.5/libepoxy-1.5.10.tar.xz"
+  ],
+  "work_sources": []
 }

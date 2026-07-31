@@ -1,17 +1,10 @@
 {
   "name": "niri",
   "version": "26.04",
-  "sources": [
-    "https://github.com/niri-wm/niri/archive/refs/tags/v26.04.tar.gz"
-  ],
-  "work_sources": [
-    "file://./allow-software-rendering.patch"
-  ],
+  "release": 2,
   "deps": [
     "bash"
   ],
-  "provides": [],
-  "release": 2,
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -31,6 +24,7 @@
     "libudev.so.1",
     "libxkbcommon.so.0"
   ],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cairo",
@@ -46,5 +40,11 @@
     "pixman",
     "rust",
     "seatd"
+  ],
+  "sources": [
+    "https://github.com/niri-wm/niri/archive/refs/tags/v26.04.tar.gz"
+  ],
+  "work_sources": [
+    "file://./allow-software-rendering.patch"
   ]
 }

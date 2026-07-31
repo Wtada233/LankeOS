@@ -1,17 +1,13 @@
 {
   "name": "libevent",
   "version": "2.1.13",
-  "sources": [
-    "https://github.com/libevent/libevent/releases/download/release-2.1.13-stable/libevent-2.1.13-stable.tar.gz"
+  "deps": [
+    "python"
   ],
-  "work_sources": [],
   "needed_so": [
     "libc.so.6",
     "libcrypto.so.3",
     "libssl.so.3"
-  ],
-  "deps": [
-    "python"
   ],
   "provides": [
     "libevent-2.1.so.7",
@@ -28,5 +24,9 @@
   "build_deps": [
     "base-devel",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://github.com/libevent/libevent/releases/download/release-2.1.13-stable/libevent-2.1.13-stable.tar.gz"
+  ],
+  "work_sources": []
 }

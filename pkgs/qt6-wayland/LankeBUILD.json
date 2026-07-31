@@ -1,10 +1,7 @@
 {
   "name": "qt6-wayland",
   "version": "6.11.1",
-  "sources": [
-    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtwayland-everywhere-src-6.11.1.tar.xz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libEGL.so.1",
     "libGLX.so.0",
@@ -26,7 +23,6 @@
     "libwayland-server.so.0",
     "libxkbcommon.so.0"
   ],
-  "deps": [],
   "provides": [
     "libQt6WaylandCompositor.so",
     "libQt6WaylandCompositor.so.6",
@@ -45,5 +41,9 @@
     "qt6-svg",
     "vulkan-headers",
     "wayland"
-  ]
+  ],
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtwayland-everywhere-src-6.11.1.tar.xz"
+  ],
+  "work_sources": []
 }

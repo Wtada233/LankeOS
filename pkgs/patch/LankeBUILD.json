@@ -1,19 +1,19 @@
 {
   "name": "patch",
   "version": "2.8",
-  "sources": [
-    "https://ftpmirror.gnu.org/patch/patch-2.8.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libattr.so.1",
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "attr",
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/patch/patch-2.8.tar.xz"
+  ],
+  "work_sources": []
 }

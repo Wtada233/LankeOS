@@ -1,18 +1,8 @@
 {
   "name": "iptables",
   "version": "1.8.13",
-  "sources": [
-    "https://www.netfilter.org/projects/iptables/files/iptables-1.8.13.tar.xz"
-  ],
-  "work_sources": [],
-  "build_deps": [
-    "base-devel",
-    "libmnl",
-    "libnetfilter_conntrack",
-    "libnfnetlink",
-    "libnftnl",
-    "libpcap",
-    "nftables"
+  "deps": [
+    "bash"
   ],
   "needed_so": [
     "libc.so.6",
@@ -23,9 +13,6 @@
     "libnftnl.so.11",
     "libpcap.so.1"
   ],
-  "deps": [
-    "bash"
-  ],
   "provides": [
     "libip4tc.so",
     "libip4tc.so.2",
@@ -35,5 +22,18 @@
     "libipq.so.0",
     "libxtables.so",
     "libxtables.so.12"
-  ]
+  ],
+  "build_deps": [
+    "base-devel",
+    "libmnl",
+    "libnetfilter_conntrack",
+    "libnfnetlink",
+    "libnftnl",
+    "libpcap",
+    "nftables"
+  ],
+  "sources": [
+    "https://www.netfilter.org/projects/iptables/files/iptables-1.8.13.tar.xz"
+  ],
+  "work_sources": []
 }

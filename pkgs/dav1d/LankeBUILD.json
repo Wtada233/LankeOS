@@ -1,19 +1,14 @@
 {
   "name": "dav1d",
   "version": "1.5.4",
-  "sources": [
-    "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 1,
   "deps": [],
-  "no_strip": false,
+  "needed_so": [
+    "libc.so.6"
+  ],
   "provides": [
     "libdav1d.so",
     "libdav1d.so.7"
-  ],
-  "release": 1,
-  "needed_so": [
-    "libc.so.6"
   ],
   "build_deps": [
     "base-devel",
@@ -21,5 +16,10 @@
     "meson",
     "nasm",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://downloads.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

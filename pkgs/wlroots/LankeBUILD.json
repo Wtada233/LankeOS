@@ -1,28 +1,10 @@
 {
-  "build_deps": [
-    "base-devel",
-    "lcms2",
-    "libdisplay-info",
-    "libdrm",
-    "libglvnd",
-    "libinput",
-    "libxcb",
-    "libxkbcommon",
-    "mesa",
-    "meson",
-    "ninja",
-    "pixman",
-    "seatd",
-    "vulkan-headers",
-    "vulkan-loader",
-    "wayland",
-    "xcb-util-wm",
-    "xwayland"
-  ],
+  "name": "wlroots",
+  "version": "0.20.2",
+  "release": 2,
   "deps": [
     "xwayland"
   ],
-  "name": "wlroots",
   "needed_so": [
     "libEGL.so.1",
     "libGLESv2.so.2",
@@ -51,10 +33,28 @@
   "provides": [
     "libwlroots-0.20.so"
   ],
-  "release": 2,
+  "build_deps": [
+    "base-devel",
+    "lcms2",
+    "libdisplay-info",
+    "libdrm",
+    "libglvnd",
+    "libinput",
+    "libxcb",
+    "libxkbcommon",
+    "mesa",
+    "meson",
+    "ninja",
+    "pixman",
+    "seatd",
+    "vulkan-headers",
+    "vulkan-loader",
+    "wayland",
+    "xcb-util-wm",
+    "xwayland"
+  ],
   "sources": [
     "https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/0.20.2/wlroots-0.20.2.tar.gz"
   ],
-  "version": "0.20.2",
   "work_sources": []
 }

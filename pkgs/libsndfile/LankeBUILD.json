@@ -1,18 +1,14 @@
 {
   "name": "libsndfile",
   "version": "1.2.2",
-  "sources": [
-    "https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz"
-  ],
-  "work_sources": [],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libasound.so.2",
     "libc.so.6",
     "libm.so.6",
     "libmp3lame.so.0"
   ],
-  "deps": [],
   "provides": [
     "libsndfile.so",
     "libsndfile.so.1"
@@ -21,5 +17,9 @@
     "alsa-lib",
     "base-devel",
     "libmp3lame"
-  ]
+  ],
+  "sources": [
+    "https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz"
+  ],
+  "work_sources": []
 }

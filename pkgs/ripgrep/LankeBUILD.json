@@ -1,21 +1,21 @@
 {
   "name": "ripgrep",
   "version": "15.2.0",
-  "sources": [
-    "https://github.com/BurntSushi/ripgrep/archive/refs/tags/15.2.0.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libgcc_s.so.1",
     "libpcre2-8.so.0"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "pcre2",
     "rust"
-  ]
+  ],
+  "sources": [
+    "https://github.com/BurntSushi/ripgrep/archive/refs/tags/15.2.0.tar.gz"
+  ],
+  "work_sources": []
 }

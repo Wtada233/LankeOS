@@ -1,14 +1,10 @@
 {
   "name": "gst-plugins-base",
   "version": "1.28.1",
-  "sources": [
-    "https://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.28.1.tar.xz"
-  ],
+  "release": 2,
   "deps": [
     "xwayland"
   ],
-  "no_strip": false,
-  "release": 2,
   "needed_so": [
     "libEGL.so.1",
     "libGLX.so.0",
@@ -139,5 +135,9 @@
     "vulkan-loader",
     "wayland",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-1.28.1.tar.xz"
+  ],
+  "no_strip": false
 }

@@ -1,20 +1,16 @@
 {
   "name": "dbus",
   "version": "1.16.2",
-  "sources": [
-    "https://dbus.freedesktop.org/releases/dbus/dbus-1.16.2.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "python",
+    "xwayland"
+  ],
   "needed_so": [
     "libX11.so.6",
     "libc.so.6",
     "libexpat.so.1",
     "libsystemd.so.0"
-  ],
-  "deps": [
-    "python",
-    "xwayland"
   ],
   "provides": [
     "libdbus-1.so",
@@ -32,5 +28,9 @@
     "ninja",
     "python",
     "xmlto"
-  ]
+  ],
+  "sources": [
+    "https://dbus.freedesktop.org/releases/dbus/dbus-1.16.2.tar.xz"
+  ],
+  "work_sources": []
 }

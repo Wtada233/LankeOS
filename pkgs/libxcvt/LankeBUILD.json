@@ -1,24 +1,24 @@
 {
   "name": "libxcvt",
   "version": "0.1.2",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libxcvt-0.1.2.tar.xz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "provides": [
-    "libxcvt.so",
-    "libxcvt.so.0"
-  ],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libm.so.6"
+  ],
+  "provides": [
+    "libxcvt.so",
+    "libxcvt.so.0"
   ],
   "build_deps": [
     "base-devel",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libxcvt-0.1.2.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

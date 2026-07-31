@@ -1,14 +1,10 @@
 {
   "name": "nghttp2",
   "version": "1.64.0",
-  "sources": [
-    "https://github.com/nghttp2/nghttp2/releases/download/v1.64.0/nghttp2-1.64.0.tar.xz"
-  ],
+  "release": 2,
   "deps": [
     "python"
   ],
-  "no_strip": false,
-  "release": 2,
   "needed_so": [
     "libc.so.6"
   ],
@@ -19,5 +15,9 @@
   "build_deps": [
     "base-devel",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://github.com/nghttp2/nghttp2/releases/download/v1.64.0/nghttp2-1.64.0.tar.xz"
+  ],
+  "no_strip": false
 }

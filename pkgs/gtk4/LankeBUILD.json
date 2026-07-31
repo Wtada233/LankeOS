@@ -1,11 +1,10 @@
 {
   "name": "gtk4",
   "version": "4.22.4",
-  "sources": [
-    "https://download.gnome.org/sources/gtk/4.22/gtk-4.22.4.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "xwayland"
+  ],
   "needed_so": [
     "libX11.so.6",
     "libXcursor.so.1",
@@ -48,9 +47,6 @@
     "libwayland-egl.so.1",
     "libxkbcommon.so.0"
   ],
-  "deps": [
-    "xwayland"
-  ],
   "provides": [
     "libgtk-4.so",
     "libgtk-4.so.1"
@@ -92,5 +88,9 @@
     "vulkan-loader",
     "wayland",
     "wayland-protocols"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gtk/4.22/gtk-4.22.4.tar.xz"
+  ],
+  "work_sources": []
 }

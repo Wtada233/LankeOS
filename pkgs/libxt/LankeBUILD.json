@@ -1,22 +1,17 @@
 {
   "name": "libxt",
   "version": "1.3.1",
-  "sources": [
-    "https://gitlab.freedesktop.org/xorg/lib/libXt/-/archive/libXt-1.3.1/libXt-libXt-1.3.1.tar.gz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "provides": [
-    "libXt.so",
-    "libXt.so.6"
-  ],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libICE.so.6",
     "libSM.so.6",
     "libX11.so.6",
     "libc.so.6"
+  ],
+  "provides": [
+    "libXt.so",
+    "libXt.so.6"
   ],
   "build_deps": [
     "base-devel",
@@ -24,5 +19,10 @@
     "libice",
     "libsm",
     "util-macros"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/xorg/lib/libXt/-/archive/libXt-1.3.1/libXt-libXt-1.3.1.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

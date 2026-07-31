@@ -1,23 +1,23 @@
 {
   "name": "libice",
   "version": "1.1.2",
-  "sources": [
-    "https://www.x.org/releases/individual/lib/libICE-1.1.2.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
   "provides": [
     "libICE.so",
     "libICE.so.6"
-  ],
-  "no_strip": false,
-  "release": 2,
-  "needed_so": [
-    "libc.so.6"
   ],
   "build_deps": [
     "base-devel",
     "util-macros",
     "xtrans"
-  ]
+  ],
+  "sources": [
+    "https://www.x.org/releases/individual/lib/libICE-1.1.2.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

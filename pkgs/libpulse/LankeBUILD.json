@@ -1,11 +1,11 @@
 {
   "name": "libpulse",
   "version": "17.0",
-  "sources": [
-    "https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/archive/v17.0/pulseaudio-v17.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 1,
+  "deps": [
+    "bash",
+    "xwayland"
+  ],
   "needed_so": [
     "libc.so.6",
     "libdbus-1.so.3",
@@ -14,10 +14,6 @@
     "libsndfile.so.1",
     "libsystemd.so.0",
     "libxcb.so.1"
-  ],
-  "deps": [
-    "bash",
-    "xwayland"
   ],
   "provides": [
     "libpulse-mainloop-glib.so",
@@ -51,5 +47,9 @@
     "rtkit",
     "sbc",
     "speexdsp"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/archive/v17.0/pulseaudio-v17.0.tar.gz"
+  ],
+  "work_sources": []
 }

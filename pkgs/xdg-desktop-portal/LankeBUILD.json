@@ -1,10 +1,7 @@
 {
   "name": "xdg-desktop-portal",
   "version": "1.22.1",
-  "sources": [
-    "https://github.com/flatpak/xdg-desktop-portal/releases/download/1.22.1/xdg-desktop-portal-1.22.1.tar.xz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libfuse3.so.4",
@@ -19,7 +16,6 @@
     "libpipewire-0.3.so.0",
     "libsystemd.so.0"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -34,5 +30,9 @@
     "ninja",
     "pipewire",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://github.com/flatpak/xdg-desktop-portal/releases/download/1.22.1/xdg-desktop-portal-1.22.1.tar.xz"
+  ],
+  "work_sources": []
 }

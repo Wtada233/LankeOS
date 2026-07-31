@@ -1,18 +1,14 @@
 {
   "name": "fontconfig",
   "version": "2.16.0",
-  "sources": [
-    "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.16.0/fontconfig-2.16.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libexpat.so.1",
     "libfreetype.so.6",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libfontconfig.so",
     "libfontconfig.so.1"
@@ -24,5 +20,9 @@
     "git",
     "gperf",
     "meson"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.16.0/fontconfig-2.16.0.tar.gz"
+  ],
+  "work_sources": []
 }

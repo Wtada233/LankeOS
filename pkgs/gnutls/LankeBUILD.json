@@ -1,11 +1,8 @@
 {
   "name": "gnutls",
   "version": "3.8.11",
-  "sources": [
-    "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.11.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -18,7 +15,6 @@
     "libstdc++.so.6",
     "libtasn1.so.6"
   ],
-  "deps": [],
   "provides": [
     "libgnutls.so",
     "libgnutls.so.30",
@@ -31,5 +27,9 @@
     "libtasn1",
     "nettle",
     "p11-kit"
-  ]
+  ],
+  "sources": [
+    "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.11.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,19 +1,19 @@
 {
   "name": "xdg-user-dirs",
   "version": "0.20",
-  "sources": [
-    "https://gitlab.freedesktop.org/xdg/xdg-user-dirs/-/archive/v0.20/xdg-user-dirs-v0.20.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "meson",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/xdg/xdg-user-dirs/-/archive/v0.20/xdg-user-dirs-v0.20.tar.gz"
+  ],
+  "work_sources": []
 }

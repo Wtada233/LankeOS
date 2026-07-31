@@ -1,11 +1,8 @@
 {
   "name": "firefox",
   "version": "152.0",
-  "sources": [
-    "https://archive.mozilla.org/pub/firefox/releases/152.0/source/firefox-152.0.source.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libasound.so.2",
@@ -36,7 +33,6 @@
     "libwebpdemux.so.2",
     "libz.so.1"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "alsa-lib",
@@ -67,5 +63,9 @@
     "yasm",
     "zip",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://archive.mozilla.org/pub/firefox/releases/152.0/source/firefox-152.0.source.tar.xz"
+  ],
+  "work_sources": []
 }

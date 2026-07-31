@@ -1,12 +1,8 @@
 {
   "name": "opus",
   "version": "1.6.1",
-  "sources": [
-    "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.6.1.tar.gz"
-  ],
-  "work_sources": [],
-  "deps": [],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libm.so.6"
@@ -17,5 +13,9 @@
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.6.1.tar.gz"
+  ],
+  "work_sources": []
 }

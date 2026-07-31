@@ -1,12 +1,8 @@
 {
   "name": "sqlite",
   "version": "3.49.1",
-  "sources": [
-    "https://www.sqlite.org/2025/sqlite-autoconf-3490100.tar.gz"
-  ],
-  "deps": [],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libm.so.6",
@@ -25,5 +21,9 @@
     "readline",
     "tcl",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://www.sqlite.org/2025/sqlite-autoconf-3490100.tar.gz"
+  ],
+  "no_strip": false
 }

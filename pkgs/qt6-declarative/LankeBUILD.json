@@ -1,10 +1,7 @@
 {
   "name": "qt6-declarative",
   "version": "6.11.1",
-  "sources": [
-    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtdeclarative-everywhere-src-6.11.1.tar.xz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libGLX.so.0",
@@ -19,7 +16,6 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [],
   "provides": [
     "libQt6LabsFolderListModel.so",
     "libQt6LabsFolderListModel.so.6",
@@ -58,5 +54,9 @@
     "qt6-base",
     "qt6-svg",
     "vulkan-headers"
-  ]
+  ],
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtdeclarative-everywhere-src-6.11.1.tar.xz"
+  ],
+  "work_sources": []
 }

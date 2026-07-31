@@ -1,13 +1,9 @@
 {
   "name": "xkeyboard-config",
   "version": "2.45",
-  "sources": [
-    "https://www.x.org/pub/individual/data/xkeyboard-config/xkeyboard-config-2.45.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -17,5 +13,9 @@
     "ninja",
     "python",
     "xkbcomp"
-  ]
+  ],
+  "sources": [
+    "https://www.x.org/pub/individual/data/xkeyboard-config/xkeyboard-config-2.45.tar.xz"
+  ],
+  "work_sources": []
 }

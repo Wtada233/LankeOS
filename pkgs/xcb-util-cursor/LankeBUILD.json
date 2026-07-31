@@ -1,19 +1,10 @@
 {
   "name": "xcb-util-cursor",
   "version": "0.1.6",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-cursor-0.1.6.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [
     "xwayland"
   ],
-  "provides": [
-    "libxcb-cursor.so",
-    "libxcb-cursor.so.0"
-  ],
-  "no_strip": false,
-  "release": 2,
   "needed_so": [
     "libc.so.6",
     "libxcb-image.so.0",
@@ -22,11 +13,20 @@
     "libxcb-shm.so.0",
     "libxcb.so.1"
   ],
+  "provides": [
+    "libxcb-cursor.so",
+    "libxcb-cursor.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "libxcb",
     "xcb-util-image",
     "xcb-util-renderutil",
     "xorgproto"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-cursor-0.1.6.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

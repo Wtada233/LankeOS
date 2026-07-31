@@ -1,11 +1,10 @@
 {
   "name": "ffmpeg",
   "version": "8.1.2",
-  "sources": [
-    "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "xwayland"
+  ],
   "needed_so": [
     "libX11.so.6",
     "libXext.so.6",
@@ -29,9 +28,6 @@
     "libxcb-xfixes.so.0",
     "libxcb.so.1",
     "libz.so.1"
-  ],
-  "deps": [
-    "xwayland"
   ],
   "provides": [
     "libavcodec.so",
@@ -71,5 +67,9 @@
     "vulkan-headers",
     "xz",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz"
+  ],
+  "work_sources": []
 }

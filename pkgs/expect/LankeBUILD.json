@@ -1,26 +1,26 @@
 {
   "name": "expect",
   "version": "5.45.4",
-  "sources": [
-    "https://prdownloads.sourceforge.net/expect/expect5.45.4.tar.gz"
-  ],
-  "work_sources": [
-    "https://www.linuxfromscratch.org/patches/lfs/12.4/expect-5.45.4-gcc15-1.patch"
-  ],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libc.so.6",
     "libexpect5.45.4.so",
     "libm.so.6",
     "libtcl8.6.so"
   ],
-  "deps": [
-    "bash"
-  ],
   "provides": [
     "libexpect5.45.4.so"
   ],
   "build_deps": [
     "base-devel"
+  ],
+  "sources": [
+    "https://prdownloads.sourceforge.net/expect/expect5.45.4.tar.gz"
+  ],
+  "work_sources": [
+    "https://www.linuxfromscratch.org/patches/lfs/12.4/expect-5.45.4-gcc15-1.patch"
   ]
 }

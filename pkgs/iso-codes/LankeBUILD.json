@@ -1,17 +1,17 @@
 {
   "name": "iso-codes",
   "version": "4.20.1",
-  "sources": [
-    "https://salsa.debian.org/iso-codes-team/iso-codes/-/archive/v4.20.1/iso-codes-v4.20.1.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://salsa.debian.org/iso-codes-team/iso-codes/-/archive/v4.20.1/iso-codes-v4.20.1.tar.gz"
+  ],
+  "work_sources": []
 }

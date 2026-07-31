@@ -1,18 +1,14 @@
 {
   "name": "jq",
   "version": "1.8.2",
-  "sources": [
-    "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libm.so.6",
     "libonig.so.5"
   ],
-  "deps": [],
   "provides": [
     "libjq.so",
     "libjq.so.1"
@@ -20,5 +16,9 @@
   "build_deps": [
     "base-devel",
     "oniguruma"
-  ]
+  ],
+  "sources": [
+    "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz"
+  ],
+  "work_sources": []
 }

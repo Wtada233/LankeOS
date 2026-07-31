@@ -1,17 +1,17 @@
 {
   "name": "bash-completion",
   "version": "2.18.0",
-  "sources": [
-    "https://github.com/scop/bash-completion/releases/download/2.18.0/bash-completion-2.18.0.tar.xz"
-  ],
-  "work_sources": [],
-  "needed_so": [],
   "deps": [
     "perl"
   ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "perl"
-  ]
+  ],
+  "sources": [
+    "https://github.com/scop/bash-completion/releases/download/2.18.0/bash-completion-2.18.0.tar.xz"
+  ],
+  "work_sources": []
 }

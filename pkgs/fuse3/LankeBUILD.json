@@ -1,14 +1,10 @@
 {
   "name": "fuse3",
   "version": "3.18.2",
-  "sources": [
-    "https://github.com/libfuse/libfuse/releases/download/fuse-3.18.2/fuse-3.18.2.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libfuse3.so",
     "libfuse3.so.4"
@@ -17,5 +13,9 @@
     "base-devel",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/libfuse/libfuse/releases/download/fuse-3.18.2/fuse-3.18.2.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,11 +1,8 @@
 {
   "name": "shaderc",
   "version": "2026.2",
-  "sources": [
-    "https://github.com/google/shaderc/archive/v2026.2/shaderc-2026.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libSPIRV-Tools-opt.so",
     "libSPIRV-Tools.so",
@@ -16,7 +13,6 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [],
   "provides": [
     "libshaderc_shared.so",
     "libshaderc_shared.so.1"
@@ -29,5 +25,9 @@
     "glslang",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://github.com/google/shaderc/archive/v2026.2/shaderc-2026.2.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,17 +1,17 @@
 {
   "name": "unzip",
   "version": "6.0",
-  "sources": [
-    "https://downloads.sourceforge.net/project/infozip/UnZip%206.x%20%28latest%29/UnZip%206.0/unzip60.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://downloads.sourceforge.net/project/infozip/UnZip%206.x%20%28latest%29/UnZip%206.0/unzip60.tar.gz"
+  ],
+  "work_sources": []
 }

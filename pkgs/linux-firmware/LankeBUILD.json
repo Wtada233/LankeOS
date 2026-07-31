@@ -1,19 +1,19 @@
 {
   "name": "linux-firmware",
   "version": "20260622",
-  "sources": [
-    "https://gitlab.com/kernel-firmware/linux-firmware/-/archive/20260622/linux-firmware-20260622.tar.gz"
-  ],
-  "work_sources": [],
-  "no_strip": true,
   "release": 2,
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "git",
     "parallel",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.com/kernel-firmware/linux-firmware/-/archive/20260622/linux-firmware-20260622.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": true
 }

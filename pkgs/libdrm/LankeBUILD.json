@@ -1,16 +1,12 @@
 {
   "name": "libdrm",
   "version": "2.4.131",
-  "sources": [
-    "https://dri.freedesktop.org/libdrm/libdrm-2.4.131.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libpciaccess.so.0"
   ],
-  "deps": [],
   "provides": [
     "libdrm.so",
     "libdrm.so.2",
@@ -29,5 +25,9 @@
     "libpciaccess",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://dri.freedesktop.org/libdrm/libdrm-2.4.131.tar.xz"
+  ],
+  "work_sources": []
 }

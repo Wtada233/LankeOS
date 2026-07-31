@@ -1,16 +1,12 @@
 {
   "name": "nettle",
   "version": "3.10.2",
-  "sources": [
-    "https://ftpmirror.gnu.org/nettle/nettle-3.10.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgmp.so.10"
   ],
-  "deps": [],
   "provides": [
     "libhogweed.so",
     "libhogweed.so.6",
@@ -20,5 +16,9 @@
   "build_deps": [
     "base-devel",
     "gmp"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/nettle/nettle-3.10.2.tar.gz"
+  ],
+  "work_sources": []
 }

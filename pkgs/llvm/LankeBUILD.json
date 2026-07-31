@@ -1,15 +1,23 @@
 {
   "name": "llvm",
   "version": "22.1.7",
-  "sources": [
-    "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/llvm-project-22.1.7.src.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [
     "perl",
     "python"
   ],
-  "no_strip": false,
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcurl.so.4",
+    "libedit.so.0",
+    "libffi.so.8",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libxml2.so.2",
+    "libz.so.1"
+  ],
   "provides": [
     "libLLVM-22.so",
     "libLLVM.so",
@@ -23,19 +31,6 @@
     "libclang.so",
     "libclang.so.22.1"
   ],
-  "release": 2,
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libcurl.so.4",
-    "libedit.so.0",
-    "libffi.so.8",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libstdc++.so.6",
-    "libxml2.so.2",
-    "libz.so.1"
-  ],
   "build_deps": [
     "base-devel",
     "cmake",
@@ -48,5 +43,10 @@
     "python",
     "zlib",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/llvm-project-22.1.7.src.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

@@ -1,11 +1,10 @@
 {
   "name": "fcitx5-gtk",
   "version": "5.1.7",
-  "sources": [
-    "https://github.com/fcitx/fcitx5-gtk/archive/refs/tags/5.1.7.tar.gz"
-  ],
-  "work_sources": [],
   "release": 3,
+  "deps": [
+    "xwayland"
+  ],
   "needed_so": [
     "libX11.so.6",
     "libatk-1.0.so.0",
@@ -26,9 +25,6 @@
     "libstdc++.so.6",
     "libxkbcommon.so.0",
     "libz.so.1"
-  ],
-  "deps": [
-    "xwayland"
   ],
   "provides": [
     "libFcitx5GClient.so",
@@ -52,5 +48,9 @@
     "pango",
     "vulkan-headers",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/fcitx/fcitx5-gtk/archive/refs/tags/5.1.7.tar.gz"
+  ],
+  "work_sources": []
 }

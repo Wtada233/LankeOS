@@ -1,19 +1,19 @@
 {
   "name": "itstool",
   "version": "2.0.7",
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python"
+  ],
   "sources": [
     "https://github.com/itstool/itstool/archive/2.0.7/itstool-2.0.7.tar.gz"
   ],
   "work_sources": [
     "file://./itstool-2.0.7-lxml-1.patch"
-  ],
-  "needed_so": [],
-  "deps": [
-    "python"
-  ],
-  "provides": [],
-  "build_deps": [
-    "base-devel",
-    "python"
   ]
 }

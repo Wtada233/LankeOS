@@ -1,11 +1,8 @@
 {
   "name": "libx264",
   "version": "20250815",
-  "sources": [
-    "https://anduin.linuxfromscratch.org/BLFS/x264/x264-20250815.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libavcodec.so.62",
     "libavformat.so.62",
@@ -15,7 +12,6 @@
     "libmvec.so.1",
     "libswscale.so.9"
   ],
-  "deps": [],
   "provides": [
     "libx264.so",
     "libx264.so.165"
@@ -24,5 +20,9 @@
     "base-devel",
     "ffmpeg",
     "nasm"
-  ]
+  ],
+  "sources": [
+    "https://anduin.linuxfromscratch.org/BLFS/x264/x264-20250815.tar.xz"
+  ],
+  "work_sources": []
 }

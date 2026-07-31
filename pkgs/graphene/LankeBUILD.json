@@ -1,18 +1,14 @@
 {
   "name": "graphene",
   "version": "1.10.8",
-  "sources": [
-    "https://download.gnome.org/sources/graphene/1.10/graphene-1.10.8.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libgraphene-1.0.so",
     "libgraphene-1.0.so.0"
@@ -24,5 +20,9 @@
     "gobject-introspection",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/graphene/1.10/graphene-1.10.8.tar.xz"
+  ],
+  "work_sources": []
 }

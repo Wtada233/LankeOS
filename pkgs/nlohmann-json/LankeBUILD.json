@@ -1,17 +1,17 @@
 {
   "name": "nlohmann-json",
   "version": "3.12.0",
-  "sources": [
-    "https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz"
-  ],
-  "work_sources": [],
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",
     "git",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/nlohmann/json/archive/refs/tags/v3.12.0.tar.gz"
+  ],
+  "work_sources": []
 }

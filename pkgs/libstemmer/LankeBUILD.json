@@ -1,21 +1,21 @@
 {
   "name": "libstemmer",
   "version": "3.1.1",
-  "sources": [
-    "https://github.com/snowballstem/snowball/archive/refs/tags/v3.1.1.tar.gz"
-  ],
-  "work_sources": [
-    "file://./0001-Make-libstemmer-a-shared-library.patch"
-  ],
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libstemmer.so",
     "libstemmer.so.0"
   ],
   "build_deps": [
     "base-devel"
+  ],
+  "sources": [
+    "https://github.com/snowballstem/snowball/archive/refs/tags/v3.1.1.tar.gz"
+  ],
+  "work_sources": [
+    "file://./0001-Make-libstemmer-a-shared-library.patch"
   ]
 }

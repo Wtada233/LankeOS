@@ -1,8 +1,6 @@
 {
   "name": "base",
   "version": "1",
-  "sources": [],
-  "work_sources": [],
   "deps": [
     "bash",
     "coreutils",
@@ -32,6 +30,8 @@
     "wget",
     "which"
   ],
+  "needed_so": [],
   "provides": [],
-  "needed_so": []
+  "sources": [],
+  "work_sources": []
 }

@@ -1,18 +1,18 @@
 {
   "name": "man-pages",
   "version": "6.15",
-  "sources": [
-    "https://www.kernel.org/pub/linux/docs/man-pages/man-pages-6.15.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [],
   "deps": [
     "bash"
   ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "git"
-  ]
+  ],
+  "sources": [
+    "https://www.kernel.org/pub/linux/docs/man-pages/man-pages-6.15.tar.xz"
+  ],
+  "work_sources": []
 }

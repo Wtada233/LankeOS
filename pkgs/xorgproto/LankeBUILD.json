@@ -1,19 +1,19 @@
 {
   "name": "xorgproto",
   "version": "2024.1",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-2024.1.tar.xz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "provides": [],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "meson",
     "ninja",
     "util-macros"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-2024.1.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

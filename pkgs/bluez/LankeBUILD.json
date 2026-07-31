@@ -1,11 +1,8 @@
 {
   "name": "bluez",
   "version": "5.87",
-  "sources": [
-    "https://www.kernel.org/pub/linux/bluetooth/bluez-5.87.tar.xz"
-  ],
-  "work_sources": [],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libasound.so.2",
     "libc.so.6",
@@ -18,7 +15,6 @@
     "libsystemd.so.0",
     "libudev.so.1"
   ],
-  "deps": [],
   "provides": [
     "libbluetooth.so",
     "libbluetooth.so.3"
@@ -34,5 +30,9 @@
     "json-c",
     "libical",
     "readline"
-  ]
+  ],
+  "sources": [
+    "https://www.kernel.org/pub/linux/bluetooth/bluez-5.87.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,16 +1,13 @@
 {
   "name": "dtc",
   "version": "1.8.1",
-  "sources": [
-    "https://git.kernel.org/pub/scm/utils/dtc/dtc.git/snapshot/dtc-1.8.1.tar.gz"
-  ],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libc.so.6",
     "libyaml-0.so.2"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libfdt.so",
@@ -23,5 +20,8 @@
     "meson",
     "ninja",
     "swig"
+  ],
+  "sources": [
+    "https://git.kernel.org/pub/scm/utils/dtc/dtc.git/snapshot/dtc-1.8.1.tar.gz"
   ]
 }

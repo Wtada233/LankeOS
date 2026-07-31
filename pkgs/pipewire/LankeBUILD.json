@@ -1,11 +1,10 @@
 {
   "name": "pipewire",
   "version": "1.6.2",
-  "sources": [
-    "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.2/pipewire-1.6.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 4,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libasound.so.2",
@@ -30,9 +29,6 @@
     "libsndfile.so.1",
     "libsystemd.so.0",
     "libudev.so.1"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libjack.so",
@@ -61,5 +57,9 @@
     "opus",
     "readline",
     "sbc"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.2/pipewire-1.6.2.tar.gz"
+  ],
+  "work_sources": []
 }

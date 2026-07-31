@@ -1,23 +1,23 @@
 {
   "name": "minizip",
   "version": "1.3.1",
-  "sources": [
-    "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "no_strip": false,
-  "provides": [
-    "libminizip.so",
-    "libminizip.so.1"
-  ],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libz.so.1"
   ],
+  "provides": [
+    "libminizip.so",
+    "libminizip.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

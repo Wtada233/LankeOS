@@ -1,11 +1,10 @@
 {
   "name": "gobject-introspection",
   "version": "1.84.0",
-  "sources": [
-    "https://download.gnome.org/sources/gobject-introspection/1.84/gobject-introspection-1.84.0.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "python"
+  ],
   "needed_so": [
     "libc.so.6",
     "libffi.so.8",
@@ -14,9 +13,6 @@
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",
     "libm.so.6"
-  ],
-  "deps": [
-    "python"
   ],
   "provides": [
     "libgirepository-1.0.so",
@@ -30,5 +26,9 @@
     "meson",
     "ninja",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gobject-introspection/1.84/gobject-introspection-1.84.0.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,14 +1,10 @@
 {
   "name": "libjuice",
   "version": "1.7.2",
-  "sources": [
-    "https://github.com/paullouisageneau/libjuice/archive/refs/tags/v1.7.2.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libjuice.so",
     "libjuice.so.1.7.2"
@@ -17,5 +13,9 @@
     "base-devel",
     "cmake",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/paullouisageneau/libjuice/archive/refs/tags/v1.7.2.tar.gz"
+  ],
+  "work_sources": []
 }

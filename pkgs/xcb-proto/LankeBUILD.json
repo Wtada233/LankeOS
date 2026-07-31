@@ -1,20 +1,20 @@
 {
   "name": "xcb-proto",
   "version": "1.17.0",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/proto/xcb-proto-1.17.0.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [
     "python"
   ],
-  "provides": [],
-  "no_strip": false,
-  "release": 2,
   "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libxml2",
     "python"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/proto/xcb-proto-1.17.0.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

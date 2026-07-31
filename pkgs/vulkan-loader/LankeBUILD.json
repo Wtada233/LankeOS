@@ -1,16 +1,12 @@
 {
   "name": "vulkan-loader",
   "version": "1.4.350.1",
-  "sources": [
-    "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-1.4.350.1.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libvulkan.so",
     "libvulkan.so.1"
@@ -25,5 +21,9 @@
     "ninja",
     "vulkan-headers",
     "wayland"
-  ]
+  ],
+  "sources": [
+    "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-1.4.350.1.tar.gz"
+  ],
+  "work_sources": []
 }

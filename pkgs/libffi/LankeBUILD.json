@@ -1,15 +1,11 @@
 {
   "name": "libffi",
   "version": "3.5.2",
-  "sources": [
-    "https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libffi.so",
     "libffi.so.8"
@@ -17,5 +13,9 @@
   "build_deps": [
     "base-devel",
     "dejagnu"
-  ]
+  ],
+  "sources": [
+    "https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz"
+  ],
+  "work_sources": []
 }

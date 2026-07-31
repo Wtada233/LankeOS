@@ -1,23 +1,23 @@
 {
   "name": "libidn2",
   "version": "2.3.8",
-  "sources": [
-    "https://ftpmirror.gnu.org/libidn/libidn2-2.3.8.tar.gz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "no_strip": false,
-  "provides": [
-    "libidn2.so",
-    "libidn2.so.0"
-  ],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libunistring.so.5"
   ],
+  "provides": [
+    "libidn2.so",
+    "libidn2.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "libunistring"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/libidn/libidn2-2.3.8.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

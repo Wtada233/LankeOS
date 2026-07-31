@@ -1,20 +1,20 @@
 {
   "name": "speexdsp",
   "version": "1.2.1",
-  "sources": [
-    "https://gitlab.xiph.org/xiph/speexdsp/-/archive/SpeexDSP-1.2.1/speexdsp-SpeexDSP-1.2.1.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libspeexdsp.so",
     "libspeexdsp.so.1"
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.xiph.org/xiph/speexdsp/-/archive/SpeexDSP-1.2.1/speexdsp-SpeexDSP-1.2.1.tar.gz"
+  ],
+  "work_sources": []
 }

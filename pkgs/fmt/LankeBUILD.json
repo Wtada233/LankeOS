@@ -1,18 +1,14 @@
 {
   "name": "fmt",
   "version": "11.0.2",
-  "sources": [
-    "https://github.com/fmtlib/fmt/archive/refs/tags/11.0.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [],
   "provides": [
     "libfmt.so",
     "libfmt.so.11"
@@ -23,5 +19,9 @@
     "doxygen",
     "git",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/fmtlib/fmt/archive/refs/tags/11.0.2.tar.gz"
+  ],
+  "work_sources": []
 }

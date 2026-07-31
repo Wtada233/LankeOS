@@ -1,10 +1,10 @@
 {
   "name": "obs-studio",
   "version": "32.1.2",
-  "sources": [
-    "https://github.com/obsproject/obs-studio/archive/refs/tags/32.1.2.tar.gz"
+  "deps": [
+    "python",
+    "xwayland"
   ],
-  "work_sources": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libEGL.so.1",
@@ -70,10 +70,6 @@
     "libxkbcommon.so.0",
     "libz.so.1"
   ],
-  "deps": [
-    "python",
-    "xwayland"
-  ],
   "provides": [
     "libobs-frontend-api.so",
     "libobs-frontend-api.so.0",
@@ -124,5 +120,9 @@
     "v4l-utils",
     "wayland",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/obsproject/obs-studio/archive/refs/tags/32.1.2.tar.gz"
+  ],
+  "work_sources": []
 }

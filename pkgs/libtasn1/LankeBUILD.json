@@ -1,20 +1,20 @@
 {
   "name": "libtasn1",
   "version": "4.19.0",
-  "sources": [
-    "https://ftpmirror.gnu.org/libtasn1/libtasn1-4.19.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libtasn1.so",
     "libtasn1.so.6"
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/libtasn1/libtasn1-4.19.0.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,22 +1,17 @@
 {
   "name": "libXrandr",
   "version": "1.5.4",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libXrandr-1.5.4.tar.xz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "provides": [
-    "libXrandr.so",
-    "libXrandr.so.2"
-  ],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libX11.so.6",
     "libXext.so.6",
     "libXrender.so.1",
     "libc.so.6"
+  ],
+  "provides": [
+    "libXrandr.so",
+    "libXrandr.so.2"
   ],
   "build_deps": [
     "base-devel",
@@ -24,5 +19,10 @@
     "libXext",
     "libXrender",
     "util-macros"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXrandr-1.5.4.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

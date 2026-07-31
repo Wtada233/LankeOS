@@ -1,12 +1,8 @@
 {
   "name": "gsettings-desktop-schemas",
   "version": "50.1",
-  "sources": [
-    "https://download.gnome.org/sources/gsettings-desktop-schemas/50/gsettings-desktop-schemas-50.1.tar.xz"
-  ],
-  "work_sources": [],
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -14,5 +10,9 @@
     "gobject-introspection",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gsettings-desktop-schemas/50/gsettings-desktop-schemas-50.1.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,6 +1,13 @@
 {
   "name": "docbook-xml",
   "version": "4.5",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
   "sources": [],
   "work_sources": [
     "https://archive.docbook.org/xml/4.1.2/docbkx412.zip",
@@ -9,12 +16,5 @@
     "https://archive.docbook.org/xml/4.4/docbook-xml-4.4.zip",
     "https://archive.docbook.org/xml/4.5/docbook-xml-4.5.zip"
   ],
-  "deps": [],
-  "no_strip": true,
-  "provides": [],
-  "release": 2,
-  "needed_so": [],
-  "build_deps": [
-    "base-devel"
-  ]
+  "no_strip": true
 }

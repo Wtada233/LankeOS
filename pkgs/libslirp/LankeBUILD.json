@@ -1,15 +1,12 @@
 {
   "name": "libslirp",
   "version": "4.9.0",
-  "sources": [
-    "https://gitlab.freedesktop.org/slirp/libslirp/-/archive/v4.9.0/libslirp-v4.9.0.tar.gz"
-  ],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libglib-2.0.so.0"
   ],
-  "deps": [],
   "provides": [
     "libslirp.so",
     "libslirp.so.0"
@@ -19,5 +16,8 @@
     "glib",
     "meson",
     "ninja"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/slirp/libslirp/-/archive/v4.9.0/libslirp-v4.9.0.tar.gz"
   ]
 }

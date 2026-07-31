@@ -1,11 +1,10 @@
 {
   "name": "fcitx5",
   "version": "5.1.12",
-  "sources": [
-    "https://github.com/fcitx/fcitx5/archive/refs/tags/5.1.12.tar.gz"
-  ],
-  "work_sources": [],
   "release": 3,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libc.so.6",
     "libcairo.so.2",
@@ -26,9 +25,6 @@
     "libwayland-cursor.so.0",
     "libxkbcommon.so.0",
     "libz.so.1"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libFcitx5Config.so",
@@ -55,5 +51,9 @@
     "wayland",
     "wayland-protocols",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/fcitx/fcitx5/archive/refs/tags/5.1.12.tar.gz"
+  ],
+  "work_sources": []
 }

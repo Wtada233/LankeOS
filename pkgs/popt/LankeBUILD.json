@@ -1,20 +1,20 @@
 {
   "name": "popt",
   "version": "1.19",
-  "sources": [
-    "http://ftp.rpm.org/popt/releases/popt-1.x/popt-1.19.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libpopt.so",
     "libpopt.so.0"
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "http://ftp.rpm.org/popt/releases/popt-1.x/popt-1.19.tar.gz"
+  ],
+  "work_sources": []
 }

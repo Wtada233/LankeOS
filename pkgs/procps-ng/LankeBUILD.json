@@ -1,17 +1,13 @@
 {
   "name": "procps-ng",
   "version": "4.0.5",
-  "sources": [
-    "https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-4.0.5.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libncursesw.so.6"
   ],
-  "deps": [],
   "provides": [
     "libproc2.so",
     "libproc2.so.1"
@@ -20,5 +16,9 @@
     "base-devel",
     "dejagnu",
     "ncurses"
-  ]
+  ],
+  "sources": [
+    "https://sourceforge.net/projects/procps-ng/files/Production/procps-ng-4.0.5.tar.xz"
+  ],
+  "work_sources": []
 }

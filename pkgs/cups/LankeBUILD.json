@@ -1,21 +1,10 @@
 {
   "name": "cups",
   "version": "2.4.19",
-  "sources": [
-    "https://github.com/OpenPrinting/cups/releases/download/v2.4.19/cups-2.4.19-source.tar.gz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [
     "bash"
   ],
-  "provides": [
-    "libcups.so",
-    "libcups.so.2",
-    "libcupsimage.so",
-    "libcupsimage.so.2"
-  ],
-  "no_strip": false,
-  "release": 2,
   "needed_so": [
     "libacl.so.1",
     "libc.so.6",
@@ -30,6 +19,12 @@
     "libsystemd.so.0",
     "libz.so.1"
   ],
+  "provides": [
+    "libcups.so",
+    "libcups.so.2",
+    "libcupsimage.so",
+    "libcupsimage.so.2"
+  ],
   "build_deps": [
     "Linux-PAM",
     "acl",
@@ -38,5 +33,10 @@
     "gnutls",
     "libxcrypt",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/OpenPrinting/cups/releases/download/v2.4.19/cups-2.4.19-source.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

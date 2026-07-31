@@ -1,18 +1,14 @@
 {
   "name": "gdbm",
   "version": "1.26",
-  "sources": [
-    "https://ftpmirror.gnu.org/gdbm/gdbm-1.26.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libncursesw.so.6",
     "libreadline.so.8"
   ],
-  "deps": [],
   "provides": [
     "libgdbm.so",
     "libgdbm.so.6",
@@ -24,5 +20,9 @@
     "git",
     "ncurses",
     "readline"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/gdbm/gdbm-1.26.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,11 +1,8 @@
 {
   "name": "libx265",
   "version": "4.1",
-  "sources": [
-    "https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
@@ -13,7 +10,6 @@
     "libmvec.so.1",
     "libstdc++.so.6"
   ],
-  "deps": [],
   "provides": [
     "libx265.so",
     "libx265.so.215"
@@ -23,5 +19,9 @@
     "cmake",
     "nasm",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz"
+  ],
+  "work_sources": []
 }

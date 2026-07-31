@@ -1,10 +1,7 @@
 {
   "name": "appstream",
   "version": "1.1.5",
-  "sources": [
-    "https://github.com/ximion/appstream/archive/refs/tags/v1.1.5.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libblake3.so.0",
     "libc.so.6",
@@ -27,7 +24,6 @@
     "libxmlb.so.2",
     "libzstd.so.1"
   ],
-  "deps": [],
   "provides": [
     "libappstream-compose.so",
     "libappstream-compose.so.0",
@@ -58,5 +54,9 @@
     "qt6-tools",
     "vala",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://github.com/ximion/appstream/archive/refs/tags/v1.1.5.tar.gz"
+  ],
+  "work_sources": []
 }

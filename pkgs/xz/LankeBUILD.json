@@ -1,16 +1,12 @@
 {
   "name": "xz",
   "version": "5.8.1",
-  "sources": [
-    "https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [
-    "libc.so.6"
-  ],
   "deps": [
     "bash"
+  ],
+  "needed_so": [
+    "libc.so.6"
   ],
   "provides": [
     "liblzma.so",
@@ -19,5 +15,9 @@
   "build_deps": [
     "base-devel",
     "git"
-  ]
+  ],
+  "sources": [
+    "https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,20 +1,20 @@
 {
   "name": "pkgconf",
   "version": "2.5.1",
-  "sources": [
-    "https://distfiles.ariadne.space/pkgconf/pkgconf-2.5.1.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libpkgconf.so",
     "libpkgconf.so.7"
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://distfiles.ariadne.space/pkgconf/pkgconf-2.5.1.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,16 +1,12 @@
 {
   "name": "libtool",
   "version": "2.5.4",
-  "sources": [
-    "https://ftpmirror.gnu.org/libtool/libtool-2.5.4.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [
-    "libc.so.6"
-  ],
   "deps": [
     "bash"
+  ],
+  "needed_so": [
+    "libc.so.6"
   ],
   "provides": [
     "libltdl.so",
@@ -18,5 +14,9 @@
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/libtool/libtool-2.5.4.tar.xz"
+  ],
+  "work_sources": []
 }

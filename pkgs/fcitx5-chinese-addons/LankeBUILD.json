@@ -1,11 +1,8 @@
 {
   "name": "fcitx5-chinese-addons",
   "version": "5.1.8",
-  "sources": [
-    "https://github.com/fcitx/fcitx5-chinese-addons/archive/refs/tags/5.1.8.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libFcitx5Config.so.6",
@@ -21,7 +18,6 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -33,5 +29,9 @@
     "git",
     "libime",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/fcitx/fcitx5-chinese-addons/archive/refs/tags/5.1.8.tar.gz"
+  ],
+  "work_sources": []
 }

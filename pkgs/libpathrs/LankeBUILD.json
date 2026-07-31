@@ -1,23 +1,23 @@
 {
   "name": "libpathrs",
   "version": "0.2.5",
-  "sources": [
-    "https://github.com/cyphar/libpathrs/releases/download/v0.2.5/libpathrs-0.2.5.tar.xz"
-  ],
-  "work_sources": [],
-  "build_deps": [
-    "base-devel",
-    "cargo"
-  ],
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libgcc_s.so.1"
   ],
-  "deps": [],
   "provides": [
     "libpathrs.so",
     "libpathrs.so.0",
     "libpathrs.so.0.2.5"
-  ]
+  ],
+  "build_deps": [
+    "base-devel",
+    "cargo"
+  ],
+  "sources": [
+    "https://github.com/cyphar/libpathrs/releases/download/v0.2.5/libpathrs-0.2.5.tar.xz"
+  ],
+  "work_sources": []
 }

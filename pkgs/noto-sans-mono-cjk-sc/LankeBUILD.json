@@ -1,14 +1,14 @@
 {
   "name": "noto-sans-mono-cjk-sc",
   "version": "2.004",
-  "work_sources": [
-    "https://github.com/notofonts/noto-cjk/raw/refs/heads/main/Sans/Mono/NotoSansMonoCJKsc-Regular.otf"
-  ],
   "release": 2,
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel"
+  ],
+  "work_sources": [
+    "https://github.com/notofonts/noto-cjk/raw/refs/heads/main/Sans/Mono/NotoSansMonoCJKsc-Regular.otf"
   ]
 }

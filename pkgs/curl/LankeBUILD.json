@@ -1,11 +1,10 @@
 {
   "name": "curl",
   "version": "8.11.1",
-  "sources": [
-    "https://curl.se/download/curl-8.11.1.tar.xz"
-  ],
-  "work_sources": [],
   "release": 3,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libc.so.6",
     "libcrypto.so.3",
@@ -14,9 +13,6 @@
     "libssl.so.3",
     "libz.so.1",
     "libzstd.so.1"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libcurl.so",
@@ -34,5 +30,9 @@
     "nghttp2",
     "zlib",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://curl.se/download/curl-8.11.1.tar.xz"
+  ],
+  "work_sources": []
 }

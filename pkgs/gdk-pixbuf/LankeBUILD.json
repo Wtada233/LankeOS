@@ -1,11 +1,8 @@
 {
   "name": "gdk-pixbuf",
   "version": "2.42.12",
-  "sources": [
-    "https://download.gnome.org/sources/gdk-pixbuf/2.42/gdk-pixbuf-2.42.12.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgio-2.0.so.0",
@@ -17,7 +14,6 @@
     "libpng16.so.16",
     "libtiff.so.6"
   ],
-  "deps": [],
   "provides": [
     "libgdk_pixbuf-2.0.so",
     "libgdk_pixbuf-2.0.so.0"
@@ -31,5 +27,9 @@
     "libtiff",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gdk-pixbuf/2.42/gdk-pixbuf-2.42.12.tar.xz"
+  ],
+  "work_sources": []
 }

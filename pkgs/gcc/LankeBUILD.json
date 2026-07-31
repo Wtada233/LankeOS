@@ -1,11 +1,11 @@
 {
   "name": "gcc",
   "version": "16.1.0",
-  "sources": [
-    "https://ftpmirror.gnu.org/gcc/gcc-16.1.0/gcc-16.1.0.tar.xz"
-  ],
-  "work_sources": [],
   "release": 3,
+  "deps": [
+    "bash",
+    "python"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -15,10 +15,6 @@
     "libmpfr.so.6",
     "libz.so.1",
     "libzstd.so.1"
-  ],
-  "deps": [
-    "bash",
-    "python"
   ],
   "provides": [
     "libasan.so",
@@ -61,5 +57,9 @@
     "tcl",
     "zlib",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/gcc/gcc-16.1.0/gcc-16.1.0.tar.xz"
+  ],
+  "work_sources": []
 }

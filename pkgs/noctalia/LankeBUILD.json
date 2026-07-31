@@ -1,10 +1,11 @@
 {
   "name": "noctalia",
   "version": "5.0.0-beta1",
-  "sources": [
-    "https://github.com/noctalia-dev/noctalia/releases/download/v5.0.0-beta1/noctalia-latest.tar.gz"
-  ],
   "release": 2,
+  "deps": [
+    "bash",
+    "python"
+  ],
   "needed_so": [
     "libEGL.so.1",
     "libGLESv2.so.2",
@@ -37,10 +38,6 @@
     "libxkbcommon.so.0",
     "libxml2.so.2"
   ],
-  "deps": [
-    "bash",
-    "python"
-  ],
   "provides": [],
   "build_deps": [
     "Linux-PAM",
@@ -66,5 +63,8 @@
     "sdbus-cpp",
     "wayland",
     "wireplumber"
+  ],
+  "sources": [
+    "https://github.com/noctalia-dev/noctalia/releases/download/v5.0.0-beta1/noctalia-latest.tar.gz"
   ]
 }

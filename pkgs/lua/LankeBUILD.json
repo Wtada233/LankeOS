@@ -1,23 +1,14 @@
 {
   "name": "lua",
   "version": "5.5.0",
-  "sources": [
-    "https://www.lua.org/ftp/lua-5.5.0.tar.gz"
-  ],
-  "work_sources": [
-    "file://./liblua.so.patch",
-    "file://./paths.patch",
-    "file://./lua.pc",
-    "file://./license-from-upstream"
-  ],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [],
   "provides": [
     "liblua++.so",
     "liblua++.so.5.5",
@@ -28,5 +19,14 @@
   ],
   "build_deps": [
     "base-devel"
+  ],
+  "sources": [
+    "https://www.lua.org/ftp/lua-5.5.0.tar.gz"
+  ],
+  "work_sources": [
+    "file://./liblua.so.patch",
+    "file://./paths.patch",
+    "file://./lua.pc",
+    "file://./license-from-upstream"
   ]
 }

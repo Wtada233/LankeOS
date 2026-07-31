@@ -1,17 +1,13 @@
 {
   "name": "pixman",
   "version": "0.46.4",
-  "sources": [
-    "https://cairographics.org/releases/pixman-0.46.4.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libpixman-1.so",
     "libpixman-1.so.0"
@@ -20,5 +16,9 @@
     "base-devel",
     "libpng",
     "meson"
-  ]
+  ],
+  "sources": [
+    "https://cairographics.org/releases/pixman-0.46.4.tar.gz"
+  ],
+  "work_sources": []
 }

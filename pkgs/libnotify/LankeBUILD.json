@@ -1,11 +1,8 @@
 {
   "name": "libnotify",
   "version": "0.8.8",
-  "sources": [
-    "https://download.gnome.org/sources/libnotify/0.8/libnotify-0.8.8.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgdk_pixbuf-2.0.so.0",
@@ -13,7 +10,6 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0"
   ],
-  "deps": [],
   "provides": [
     "libnotify.so",
     "libnotify.so.4"
@@ -28,5 +24,9 @@
     "gtk4",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/libnotify/0.8/libnotify-0.8.8.tar.xz"
+  ],
+  "work_sources": []
 }

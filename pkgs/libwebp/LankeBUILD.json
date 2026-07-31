@@ -1,12 +1,8 @@
 {
   "name": "libwebp",
   "version": "1.5.0",
-  "sources": [
-    "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.5.0.tar.gz"
-  ],
-  "deps": [],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgif.so.7",
@@ -37,5 +33,9 @@
     "libtiff",
     "ninja",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.5.0.tar.gz"
+  ],
+  "no_strip": false
 }

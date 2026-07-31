@@ -1,8 +1,6 @@
 {
   "name": "base-devel",
   "version": "1",
-  "sources": [],
-  "work_sources": [],
   "deps": [
     "autoconf",
     "automake",
@@ -21,6 +19,8 @@
     "unzip",
     "zip"
   ],
+  "needed_so": [],
   "provides": [],
-  "needed_so": []
+  "sources": [],
+  "work_sources": []
 }

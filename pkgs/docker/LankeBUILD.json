@@ -1,12 +1,20 @@
 {
   "name": "docker",
   "version": "29.6.2",
-  "sources": [
-    "https://github.com/docker/cli/archive/refs/tags/v29.6.2.tar.gz",
-    "https://github.com/moby/moby/archive/refs/tags/docker-v29.6.2.tar.gz",
-    "https://github.com/krallin/tini/archive/de40ad007797e0dcd8b7126f27bb87401d224240.tar.gz"
+  "deps": [
+    "containerd",
+    "iproute2",
+    "iptables",
+    "libseccomp",
+    "libtool",
+    "nftables"
   ],
-  "work_sources": [],
+  "needed_so": [
+    "libc.so.6",
+    "libresolv.so.2",
+    "libsystemd.so.0"
+  ],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",
@@ -17,18 +25,10 @@
     "iptables",
     "nftables"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libresolv.so.2",
-    "libsystemd.so.0"
+  "sources": [
+    "https://github.com/docker/cli/archive/refs/tags/v29.6.2.tar.gz",
+    "https://github.com/moby/moby/archive/refs/tags/docker-v29.6.2.tar.gz",
+    "https://github.com/krallin/tini/archive/de40ad007797e0dcd8b7126f27bb87401d224240.tar.gz"
   ],
-  "deps": [
-    "containerd",
-    "iproute2",
-    "iptables",
-    "libseccomp",
-    "libtool",
-    "nftables"
-  ],
-  "provides": []
+  "work_sources": []
 }

@@ -1,16 +1,12 @@
 {
   "name": "libndp",
   "version": "1.9",
-  "sources": [
-    "http://libndp.org/files/libndp-1.9.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libndp.so",
     "libndp.so.0"
@@ -18,5 +14,9 @@
   "build_deps": [
     "base-devel",
     "git"
-  ]
+  ],
+  "sources": [
+    "http://libndp.org/files/libndp-1.9.tar.gz"
+  ],
+  "work_sources": []
 }

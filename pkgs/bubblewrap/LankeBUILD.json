@@ -1,15 +1,11 @@
 {
   "name": "bubblewrap",
   "version": "0.11.2",
-  "sources": [
-    "https://github.com/containers/bubblewrap/releases/download/v0.11.2/bubblewrap-0.11.2.tar.xz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libcap.so.2"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -20,5 +16,9 @@
     "libxslt",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/containers/bubblewrap/releases/download/v0.11.2/bubblewrap-0.11.2.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,16 +1,10 @@
 {
   "name": "openjdk25",
   "version": "25.0.4",
-  "sources": [
-    "https://github.com/openjdk/jdk25u/archive/refs/tags/jdk-25.0.4+6.tar.gz"
-  ],
-  "work_sources": [],
+  "release": 3,
   "deps": [
     "xwayland"
   ],
-  "provides": [],
-  "no_strip": true,
-  "release": 3,
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libX11.so.6",
@@ -31,6 +25,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
+  "provides": [],
   "build_deps": [
     "alsa-lib",
     "base-devel",
@@ -46,5 +41,10 @@
     "libjpeg-turbo",
     "libpng",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/openjdk/jdk25u/archive/refs/tags/jdk-25.0.4+6.tar.gz"
+  ],
+  "work_sources": [],
+  "no_strip": true
 }

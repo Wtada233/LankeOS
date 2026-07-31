@@ -1,11 +1,10 @@
 {
   "name": "util-linux",
   "version": "2.41.1",
-  "sources": [
-    "https://www.kernel.org/pub/linux/utils/util-linux/v2.41/util-linux-2.41.1.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -16,9 +15,6 @@
     "libreadline.so.8",
     "libudev.so.1",
     "libz.so.1"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libblkid.so",
@@ -40,5 +36,9 @@
     "ncurses",
     "readline",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://www.kernel.org/pub/linux/utils/util-linux/v2.41/util-linux-2.41.1.tar.xz"
+  ],
+  "work_sources": []
 }

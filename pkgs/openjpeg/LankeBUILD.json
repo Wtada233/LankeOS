@@ -1,12 +1,8 @@
 {
   "name": "openjpeg",
   "version": "2.5.4",
-  "sources": [
-    "https://github.com/uclouvain/openjpeg/archive/v2.5.4/openjpeg-2.5.4.tar.gz"
-  ],
-  "deps": [],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "liblcms2.so.2",
@@ -27,5 +23,9 @@
     "libpng",
     "libtiff",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/uclouvain/openjpeg/archive/v2.5.4/openjpeg-2.5.4.tar.gz"
+  ],
+  "no_strip": false
 }

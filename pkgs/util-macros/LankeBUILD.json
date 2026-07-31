@@ -1,16 +1,16 @@
 {
   "name": "util-macros",
   "version": "1.20.2",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
   "sources": [
     "https://gitlab.freedesktop.org/xorg/util/macros/-/archive/util-macros-1.20.2/macros-util-macros-1.20.2.tar.gz"
   ],
   "work_sources": [],
-  "deps": [],
-  "provides": [],
-  "no_strip": false,
-  "release": 2,
-  "needed_so": [],
-  "build_deps": [
-    "base-devel"
-  ]
+  "no_strip": false
 }

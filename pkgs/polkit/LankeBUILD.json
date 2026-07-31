@@ -1,11 +1,8 @@
 {
   "name": "polkit",
   "version": "127",
-  "sources": [
-    "https://github.com/polkit-org/polkit/archive/127/polkit-127.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libduktape.so.207",
@@ -16,7 +13,6 @@
     "libpam.so.0",
     "libsystemd.so.0"
   ],
-  "deps": [],
   "provides": [
     "libpolkit-agent-1.so",
     "libpolkit-agent-1.so.0",
@@ -34,5 +30,9 @@
     "gtk-doc",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/polkit-org/polkit/archive/127/polkit-127.tar.gz"
+  ],
+  "work_sources": []
 }

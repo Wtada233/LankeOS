@@ -1,16 +1,12 @@
 {
   "name": "libpciaccess",
   "version": "0.18.1",
-  "sources": [
-    "https://www.x.org/pub/individual/lib/libpciaccess-0.18.1.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libz.so.1"
   ],
-  "deps": [],
   "provides": [
     "libpciaccess.so",
     "libpciaccess.so.0"
@@ -21,5 +17,9 @@
     "ninja",
     "util-macros",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://www.x.org/pub/individual/lib/libpciaccess-0.18.1.tar.xz"
+  ],
+  "work_sources": []
 }

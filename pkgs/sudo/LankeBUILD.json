@@ -1,11 +1,8 @@
 {
   "name": "sudo",
   "version": "1.9.17p2",
-  "sources": [
-    "https://www.sudo.ws/dist/sudo-1.9.17p2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libcrypto.so.3",
@@ -13,11 +10,14 @@
     "libssl.so.3",
     "libz.so.1"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "Linux-PAM",
     "base-devel",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://www.sudo.ws/dist/sudo-1.9.17p2.tar.gz"
+  ],
+  "work_sources": []
 }

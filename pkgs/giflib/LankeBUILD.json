@@ -1,16 +1,12 @@
 {
   "name": "giflib",
   "version": "5.2.2",
-  "sources": [
-    "https://downloads.sourceforge.net/giflib/giflib-5.2.2.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [
     "libgif.so",
     "libgif.so.7"
@@ -21,5 +17,9 @@
     "docbook-xsl",
     "git",
     "xmlto"
-  ]
+  ],
+  "sources": [
+    "https://downloads.sourceforge.net/giflib/giflib-5.2.2.tar.gz"
+  ],
+  "work_sources": []
 }

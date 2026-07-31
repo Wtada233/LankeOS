@@ -1,11 +1,8 @@
 {
   "name": "libical",
   "version": "4.0.3",
-  "sources": [
-    "https://github.com/libical/libical/releases/download/v4.0.3/libical-4.0.3.tar.gz"
-  ],
-  "work_sources": [],
   "release": 1,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
@@ -18,7 +15,6 @@
     "libstdc++.so.6",
     "libxml2.so.2"
   ],
-  "deps": [],
   "provides": [
     "libical-glib.so",
     "libical-glib.so.4.0",
@@ -49,5 +45,9 @@
     "ninja",
     "openjdk25",
     "vala"
-  ]
+  ],
+  "sources": [
+    "https://github.com/libical/libical/releases/download/v4.0.3/libical-4.0.3.tar.gz"
+  ],
+  "work_sources": []
 }

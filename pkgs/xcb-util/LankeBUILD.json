@@ -1,20 +1,15 @@
 {
   "name": "xcb-util",
   "version": "0.4.1",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-0.4.1.tar.xz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "provides": [
-    "libxcb-util.so",
-    "libxcb-util.so.1"
-  ],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libxcb.so.1"
+  ],
+  "provides": [
+    "libxcb-util.so",
+    "libxcb-util.so.1"
   ],
   "build_deps": [
     "base-devel",
@@ -22,5 +17,10 @@
     "libxcb",
     "util-macros",
     "xorgproto"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-0.4.1.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

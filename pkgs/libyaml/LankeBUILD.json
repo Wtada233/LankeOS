@@ -1,12 +1,8 @@
 {
   "name": "libyaml",
   "version": "0.2.5",
-  "sources": [
-    "https://github.com/yaml/libyaml/releases/download/0.2.5/yaml-0.2.5.tar.gz"
-  ],
-  "deps": [],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
@@ -16,5 +12,9 @@
   ],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://github.com/yaml/libyaml/releases/download/0.2.5/yaml-0.2.5.tar.gz"
+  ],
+  "no_strip": false
 }

@@ -1,11 +1,8 @@
 {
   "name": "swaybg",
   "version": "1.2.1",
-  "sources": [
-    "https://github.com/swaywm/swaybg/releases/download/v1.2.1/swaybg-1.2.1.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libcairo.so.2",
@@ -13,7 +10,6 @@
     "libgobject-2.0.so.0",
     "libwayland-client.so.0"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -24,5 +20,9 @@
     "ninja",
     "wayland",
     "wayland-protocols"
-  ]
+  ],
+  "sources": [
+    "https://github.com/swaywm/swaybg/releases/download/v1.2.1/swaybg-1.2.1.tar.gz"
+  ],
+  "work_sources": []
 }

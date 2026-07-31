@@ -1,16 +1,12 @@
 {
   "name": "readline",
   "version": "8.3",
-  "sources": [
-    "https://ftpmirror.gnu.org/readline/readline-8.3.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libncursesw.so.6"
   ],
-  "deps": [],
   "provides": [
     "libhistory.so",
     "libhistory.so.8",
@@ -20,5 +16,9 @@
   "build_deps": [
     "base-devel",
     "ncurses"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/readline/readline-8.3.tar.gz"
+  ],
+  "work_sources": []
 }

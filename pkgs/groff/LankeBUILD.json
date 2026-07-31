@@ -1,25 +1,25 @@
 {
   "name": "groff",
   "version": "1.23.0",
-  "sources": [
-    "https://ftpmirror.gnu.org/groff/groff-1.23.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash",
+    "perl"
+  ],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "deps": [
-    "bash",
-    "perl"
-  ],
   "provides": [],
   "build_deps": [
     "base-devel",
     "git",
     "perl"
-  ]
+  ],
+  "sources": [
+    "https://ftpmirror.gnu.org/groff/groff-1.23.0.tar.gz"
+  ],
+  "work_sources": []
 }

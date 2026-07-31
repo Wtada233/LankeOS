@@ -1,22 +1,22 @@
 {
   "name": "xkbcomp",
   "version": "1.4.7",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/app/xkbcomp-1.4.7.tar.xz"
-  ],
-  "work_sources": [],
-  "deps": [],
-  "provides": [],
-  "no_strip": false,
   "release": 2,
+  "deps": [],
   "needed_so": [
     "libX11.so.6",
     "libc.so.6",
     "libxkbfile.so.1"
   ],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libX11",
     "libxkbfile"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/app/xkbcomp-1.4.7.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

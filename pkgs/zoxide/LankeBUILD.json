@@ -1,20 +1,20 @@
 {
   "name": "zoxide",
   "version": "0.10.0",
-  "sources": [
-    "https://github.com/ajeetdsouza/zoxide/archive/refs/tags/v0.10.0.tar.gz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
     "libm.so.6"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "git",
     "rust"
-  ]
+  ],
+  "sources": [
+    "https://github.com/ajeetdsouza/zoxide/archive/refs/tags/v0.10.0.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,15 +1,15 @@
 {
   "name": "hwdata",
   "version": "0.403",
-  "sources": [
-    "https://github.com/vcrhonek/hwdata/archive/refs/tags/v0.403.tar.gz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://github.com/vcrhonek/hwdata/archive/refs/tags/v0.403.tar.gz"
+  ],
+  "work_sources": []
 }

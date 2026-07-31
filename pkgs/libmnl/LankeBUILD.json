@@ -1,19 +1,19 @@
 {
   "name": "libmnl",
   "version": "1.0.5",
-  "sources": [
-    "https://www.netfilter.org/projects/libmnl/files/libmnl-1.0.5.tar.bz2"
-  ],
-  "work_sources": [],
-  "build_deps": [
-    "base-devel"
-  ],
+  "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "deps": [],
   "provides": [
     "libmnl.so",
     "libmnl.so.0"
-  ]
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://www.netfilter.org/projects/libmnl/files/libmnl-1.0.5.tar.bz2"
+  ],
+  "work_sources": []
 }

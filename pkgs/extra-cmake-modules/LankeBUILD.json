@@ -1,16 +1,12 @@
 {
   "name": "extra-cmake-modules",
   "version": "6.10.0",
-  "sources": [
-    "https://download.kde.org/stable/frameworks/6.10/extra-cmake-modules-6.10.0.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [],
   "deps": [
     "bash",
     "python"
   ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -18,5 +14,9 @@
     "ninja",
     "python",
     "qt6-tools"
-  ]
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.10/extra-cmake-modules-6.10.0.tar.xz"
+  ],
+  "work_sources": []
 }

@@ -1,25 +1,25 @@
 {
   "name": "device-mapper",
   "version": "2.03.41",
-  "sources": [
-    "https://sourceware.org/pub/lvm2/releases/LVM2.2.03.41.tgz"
-  ],
-  "work_sources": [],
-  "build_deps": [
-    "base-devel"
+  "deps": [
+    "bash"
   ],
   "needed_so": [
     "libc.so.6",
     "libm.so.6",
     "libudev.so.1"
   ],
-  "deps": [
-    "bash"
-  ],
   "provides": [
     "libdevmapper-event.so",
     "libdevmapper-event.so.1.02",
     "libdevmapper.so",
     "libdevmapper.so.1.02"
-  ]
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://sourceware.org/pub/lvm2/releases/LVM2.2.03.41.tgz"
+  ],
+  "work_sources": []
 }

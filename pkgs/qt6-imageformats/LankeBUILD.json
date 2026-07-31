@@ -1,10 +1,7 @@
 {
   "name": "qt6-imageformats",
   "version": "6.11.1",
-  "sources": [
-    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtimageformats-everywhere-src-6.11.1.tar.xz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libGLX.so.0",
     "libOpenGL.so.0",
@@ -20,7 +17,6 @@
     "libwebpdemux.so.2",
     "libwebpmux.so.3"
   ],
-  "deps": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -31,5 +27,9 @@
     "libwebp",
     "ninja",
     "qt6-base"
-  ]
+  ],
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtimageformats-everywhere-src-6.11.1.tar.xz"
+  ],
+  "work_sources": []
 }

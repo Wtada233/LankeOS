@@ -1,11 +1,8 @@
 {
   "name": "NetworkManager",
   "version": "1.54.0",
-  "sources": [
-    "https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/releases/1.54.0/downloads/NetworkManager-1.54.0.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -22,7 +19,6 @@
     "libsystemd.so.0",
     "libudev.so.1"
   ],
-  "deps": [],
   "provides": [
     "libnm.so",
     "libnm.so.0"
@@ -40,5 +36,9 @@
     "ninja",
     "polkit",
     "readline"
-  ]
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/releases/1.54.0/downloads/NetworkManager-1.54.0.tar.xz"
+  ],
+  "work_sources": []
 }

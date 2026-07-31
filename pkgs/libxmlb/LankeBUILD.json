@@ -1,10 +1,7 @@
 {
   "name": "libxmlb",
   "version": "0.3.29",
-  "sources": [
-    "https://github.com/hughsie/libxmlb/releases/download/0.3.29/libxmlb-0.3.29.tar.xz"
-  ],
-  "work_sources": [],
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libgio-2.0.so.0",
@@ -14,7 +11,6 @@
     "libstemmer.so.0",
     "libzstd.so.1"
   ],
-  "deps": [],
   "provides": [
     "libxmlb.so",
     "libxmlb.so.2"
@@ -31,5 +27,9 @@
     "shared-mime-info",
     "xz",
     "zstd"
-  ]
+  ],
+  "sources": [
+    "https://github.com/hughsie/libxmlb/releases/download/0.3.29/libxmlb-0.3.29.tar.xz"
+  ],
+  "work_sources": []
 }

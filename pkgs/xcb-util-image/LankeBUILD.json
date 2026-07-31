@@ -1,24 +1,19 @@
 {
   "name": "xcb-util-image",
   "version": "0.4.1",
-  "sources": [
-    "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-image-0.4.1.tar.xz"
-  ],
-  "work_sources": [],
+  "release": 2,
   "deps": [
     "xwayland"
   ],
-  "provides": [
-    "libxcb-image.so",
-    "libxcb-image.so.0"
-  ],
-  "no_strip": false,
-  "release": 2,
   "needed_so": [
     "libc.so.6",
     "libxcb-shm.so.0",
     "libxcb-util.so.1",
     "libxcb.so.1"
+  ],
+  "provides": [
+    "libxcb-image.so",
+    "libxcb-image.so.0"
   ],
   "build_deps": [
     "base-devel",
@@ -26,5 +21,10 @@
     "util-macros",
     "xcb-util",
     "xorgproto"
-  ]
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-image-0.4.1.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
 }

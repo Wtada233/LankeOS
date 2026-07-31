@@ -1,16 +1,13 @@
 {
   "name": "fftw",
   "version": "3.3.10",
-  "sources": [
-    "https://www.fftw.org/fftw-3.3.10.tar.gz"
-  ],
   "release": 3,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libc.so.6",
     "libm.so.6"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libfftw3.so",
@@ -24,5 +21,8 @@
   ],
   "build_deps": [
     "base-devel"
+  ],
+  "sources": [
+    "https://www.fftw.org/fftw-3.3.10.tar.gz"
   ]
 }

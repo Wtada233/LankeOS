@@ -1,20 +1,16 @@
 {
   "name": "pciutils",
   "version": "3.15.0",
-  "sources": [
-    "https://mj.ucw.cz/download/linux/pci/pciutils-3.15.0.tar.gz"
-  ],
-  "work_sources": [],
   "release": 3,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "libc.so.6",
     "libkmod.so.2",
     "libresolv.so.2",
     "libudev.so.1",
     "libz.so.1"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libpci.so",
@@ -24,5 +20,9 @@
     "base-devel",
     "kmod",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://mj.ucw.cz/download/linux/pci/pciutils-3.15.0.tar.gz"
+  ],
+  "work_sources": []
 }

@@ -1,15 +1,15 @@
 {
   "name": "font-noto-sans-cjk",
   "version": "2.004",
-  "sources": [
-    "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTC/NotoSansCJK-Regular.ttc"
-  ],
-  "work_sources": [],
   "release": 2,
-  "needed_so": [],
   "deps": [],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel"
-  ]
+  ],
+  "sources": [
+    "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTC/NotoSansCJK-Regular.ttc"
+  ],
+  "work_sources": []
 }

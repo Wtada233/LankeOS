@@ -1,10 +1,9 @@
 {
   "name": "swig",
   "version": "4.4.1",
-  "sources": [
-    "https://github.com/swig/swig/archive/refs/tags/v4.4.1.tar.gz"
+  "deps": [
+    "ruby"
   ],
-  "work_sources": [],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
@@ -12,9 +11,6 @@
     "libpcre2-8.so.0",
     "libstdc++.so.6",
     "libz.so.1"
-  ],
-  "deps": [
-    "ruby"
   ],
   "provides": [],
   "build_deps": [
@@ -29,5 +25,9 @@
     "ruby",
     "tcl",
     "zlib"
-  ]
+  ],
+  "sources": [
+    "https://github.com/swig/swig/archive/refs/tags/v4.4.1.tar.gz"
+  ],
+  "work_sources": []
 }

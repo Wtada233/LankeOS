@@ -1,19 +1,15 @@
 {
   "name": "p11-kit",
   "version": "0.26.1",
-  "sources": [
-    "https://github.com/p11-glue/p11-kit/releases/download/0.26.1/p11-kit-0.26.1.tar.xz"
-  ],
-  "work_sources": [],
   "release": 2,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libffi.so.8",
     "libtasn1.so.6"
-  ],
-  "deps": [
-    "bash"
   ],
   "provides": [
     "libp11-kit.so",
@@ -26,5 +22,9 @@
     "libtasn1",
     "meson",
     "ninja"
-  ]
+  ],
+  "sources": [
+    "https://github.com/p11-glue/p11-kit/releases/download/0.26.1/p11-kit-0.26.1.tar.xz"
+  ],
+  "work_sources": []
 }
