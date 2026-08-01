@@ -1,19 +1,19 @@
 set -e
 
 lankebuild_prepare() {
-    echo "Preparing libgcrypt-1.11.0..."
+    echo "Preparing libgcrypt-{ORIG_PKG_VER}"
 }
 
 lankebuild_build() {
-    echo "Configuring libgcrypt-1.11.0..."
+    echo "Configuring libgcrypt-{ORIG_PKG_VER}"
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
-    echo "Building libgcrypt-1.11.0..."
+    echo "Building libgcrypt-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging libgcrypt-1.11.0..."
+    echo "Packaging libgcrypt-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" install
     echo "Package staging complete."
 }

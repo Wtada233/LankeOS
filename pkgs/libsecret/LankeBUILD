@@ -5,7 +5,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    echo "Configuring libsecret-0.21.7..."
+    echo "Configuring libsecret-{ORIG_PKG_VER}"
     cd build
     meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR}        \
                    --buildtype=release  \
@@ -14,13 +14,13 @@ lankebuild_build() {
                    -Dintrospection=true \
                    -Dvapi=false         \
                    -Dcrypto=gnutls
-    echo "Building libsecret-0.21.7..."
+    echo "Building libsecret-{ORIG_PKG_VER}"
     ninja -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging libsecret-0.21.7..."
+    echo "Packaging libsecret-{ORIG_PKG_VER}"
     cd build
     DESTDIR="{STAGING_ROOT}" ninja install
     echo "Package staging complete."

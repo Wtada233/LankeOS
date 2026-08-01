@@ -1,8 +1,17 @@
 lankebuild_prepare() {
-    # Download bootstrap JDK (don't pollute source tree detection)
-    BOOT_JDK_DIR="/tmp/openjdk25-boot-jdk"
+    # Download bootstrap JDK — 自动匹配 ORIG_PKG_VER 的 major，取 temurin<major>-binaries 最新 tag 的 x64 hotspot JDK
+    # （避免版本升级后仍用旧 major 的 boot JDK，如以后做 openjdk30 会自动用 temurin30）
+    MAJOR=$(printf '%s' "{ORIG_PKG_VER}" | grep -oE '^[0-9]+')
+    BOOT_JDK_DIR="/tmp/openjdk${MAJOR}-boot-jdk"
     if [ ! -d "$BOOT_JDK_DIR" ]; then
-        wget -q "https://github.com/adoptium/temurin25-binaries/releases/download/jdk-25.0.2%2B10/OpenJDK25U-jdk_x64_linux_hotspot_25.0.2_10.tar.gz" -O /tmp/boot-jdk.tar.gz
+        BOOT_URL=$(curl -fsSL "https://api.github.com/repos/adoptium/temurin${MAJOR}-binaries/releases/latest" \
+                   | grep -oP '"browser_download_url": *"\K[^"]+' \
+                   | grep -E '\-jdk_x64_linux_hotspot' \
+                   | grep -vE 'debugimage|testimage|\.sha256|\.json|\.sig' \
+                   | head -1)
+        test -n "$BOOT_URL" || { echo "无法获取 temurin${MAJOR} boot JDK"; exit 1; }
+        echo "=> boot JDK（JDK ${MAJOR} 最新）: $BOOT_URL"
+        wget -q "$BOOT_URL" -O /tmp/boot-jdk.tar.gz
         mkdir -p "$BOOT_JDK_DIR"
         tar -xzf /tmp/boot-jdk.tar.gz -C "$BOOT_JDK_DIR" --strip-components=1
         rm -f /tmp/boot-jdk.tar.gz

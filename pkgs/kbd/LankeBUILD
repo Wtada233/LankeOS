@@ -10,7 +10,7 @@ lankebuild_build() {
             break
         fi
     done
-    patch -Np1 -i {WORK_DIR}/kbd-2.8.0-backspace-1.patch
+    patch -Np1 -i {WORK_DIR}/kbd-*-backspace-1.patch
     sed -i '/RESIZECONS_PROGS=/s/yes/no/' configure
     sed -i 's/resizecons.8 //' docs/man/man8/Makefile.in
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --disable-vlock

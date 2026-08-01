@@ -3,12 +3,12 @@ lankebuild_prepare() {
     # 先删 tarball 里的 gitlink 空目录，否则 mv 会把它挪进空目录里
     cd libplacebo-{ORIG_PKG_VER}
     rm -rf 3rdparty/Vulkan-Headers 3rdparty/fast_float 3rdparty/glad 3rdparty/jinja 3rdparty/markupsafe demos/3rdparty/nuklear
-    mv "{WORK_DIR}/Vulkan-Headers-vulkan-sdk-1.4.350.1" 3rdparty/Vulkan-Headers
-    mv "{WORK_DIR}/fast_float-8.2.9" 3rdparty/fast_float
-    mv "{WORK_DIR}/glad-2.0.8" 3rdparty/glad
-    mv "{WORK_DIR}/jinja-3.1.6" 3rdparty/jinja
-    mv "{WORK_DIR}/markupsafe-3.0.3" 3rdparty/markupsafe
-    mv "{WORK_DIR}/Nuklear-4.13.3" demos/3rdparty/nuklear
+    mv "{WORK_DIR}"/Vulkan-Headers-v* 3rdparty/Vulkan-Headers
+    mv "{WORK_DIR}"/fast_float-* 3rdparty/fast_float
+    mv "{WORK_DIR}"/glad-* 3rdparty/glad
+    mv "{WORK_DIR}"/jinja-* 3rdparty/jinja
+    mv "{WORK_DIR}"/markupsafe-* 3rdparty/markupsafe
+    mv "{WORK_DIR}"/Nuklear-* demos/3rdparty/nuklear
 }
 
 lankebuild_build() {

@@ -1,19 +1,19 @@
 set -e
 
 lankebuild_prepare() {
-    echo "Preparing nghttp2-1.64.0..."
+    echo "Preparing nghttp2-{ORIG_PKG_VER}"
 }
 
 lankebuild_build() {
-    echo "Configuring nghttp2-1.64.0..."
+    echo "Configuring nghttp2-{ORIG_PKG_VER}"
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --enable-lib-only
-    echo "Building nghttp2-1.64.0..."
+    echo "Building nghttp2-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging nghttp2-1.64.0..."
+    echo "Packaging nghttp2-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" install
     echo "Package staging complete."
 }

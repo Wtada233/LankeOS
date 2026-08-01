@@ -10,7 +10,7 @@ lankebuild_build() {
             break
         fi
     done
-    patch -Np1 -i {WORK_DIR}/expect-5.45.4-gcc15-1.patch
+    patch -Np1 -i {WORK_DIR}/expect-*-gcc15-1.patch
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --with-tcl={LIBDIR} --enable-shared --disable-rpath --mandir={MANDIR} --with-tclinclude={INCLUDEDIR} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install

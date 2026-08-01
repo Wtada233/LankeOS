@@ -5,7 +5,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    echo "Configuring libsoup-3.6.6..."
+    echo "Configuring libsoup-{ORIG_PKG_VER}"
     cd build
     meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR}        \
                    --buildtype=release  \
@@ -13,13 +13,13 @@ lankebuild_build() {
                    -Dtests=false        \
                    -Dsysprof=disabled   \
                    -Dbrotli=disabled
-    echo "Building libsoup-3.6.6..."
+    echo "Building libsoup-{ORIG_PKG_VER}"
     ninja -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging libsoup-3.6.6..."
+    echo "Packaging libsoup-{ORIG_PKG_VER}"
     cd build
     DESTDIR="{STAGING_ROOT}" ninja install
     echo "Package staging complete."

@@ -1,19 +1,19 @@
 set -e
 
 lankebuild_prepare() {
-    echo "Preparing libgpg-error-1.54..."
+    echo "Preparing libgpg-error-{ORIG_PKG_VER}"
 }
 
 lankebuild_build() {
-    echo "Configuring libgpg-error-1.54..."
+    echo "Configuring libgpg-error-{ORIG_PKG_VER}"
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
-    echo "Building libgpg-error-1.54..."
+    echo "Building libgpg-error-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging libgpg-error-1.54..."
+    echo "Packaging libgpg-error-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" install
     echo "Package staging complete."
 }

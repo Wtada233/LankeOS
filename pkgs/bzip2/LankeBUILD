@@ -9,7 +9,7 @@ lankebuild_build() {
             break
         fi
     done
-    patch -Np1 -i {WORK_DIR}/bzip2-1.0.8-install_docs-1.patch
+    patch -Np1 -i {WORK_DIR}/bzip2-*-install_docs-1.patch
 
     cat > bzip2.pc <<EOF
 prefix=/usr
@@ -29,7 +29,7 @@ EOF
 }
 
 lankebuild_package() {
-    cd bzip2-1.0.8
+    cd bzip2-*/
 
     install -dm755 {STAGING_ROOT}{BINDIR} {STAGING_ROOT}{LIBDIR} {STAGING_ROOT}{INCLUDEDIR} {STAGING_ROOT}{MANDIR}/man1
 

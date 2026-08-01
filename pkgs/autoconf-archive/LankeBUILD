@@ -1,15 +1,15 @@
 lankebuild_prepare() {
     # Prepare environment
-    cd autoconf-archive-2024.10.16
+    cd autoconf-archive-*/
     patch -Np1 -i "{WORK_DIR}"/0001_fix_AX_CXX_COMPILE_STDCXX.patch
     ./configure --prefix=/usr
 }
 
 lankebuild_build() {
-    make -C autoconf-archive-2024.10.16 -j$(nproc)
+    make -C autoconf-archive-*/ -j$(nproc)
 }
 
 
 lankebuild_package() {
-    make -C autoconf-archive-2024.10.16 DESTDIR="{STAGING_ROOT}" install
+    make -C autoconf-archive-*/ DESTDIR="{STAGING_ROOT}" install
 }

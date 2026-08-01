@@ -1,17 +1,17 @@
 lankebuild_prepare() {
-    cd itstool-2.0.7
-    patch -Np1 -i "{WORK_DIR}"/itstool-2.0.7-lxml-1.patch
+    cd itstool-*/
+    patch -Np1 -i "{WORK_DIR}"/itstool-*-lxml-1.patch
     # Prepare environment
     PYTHON=/usr/bin/python3 ./autogen.sh --prefix=/usr
 }
 
 lankebuild_build() {
-    cd itstool-2.0.7
+    cd itstool-*/
     make -j$(nproc)
 }
 
 
 lankebuild_package() {
-    cd itstool-2.0.7
+    cd itstool-*/
     make DESTDIR="{STAGING_ROOT}" install
 }

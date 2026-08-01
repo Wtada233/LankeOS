@@ -5,16 +5,16 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    echo "Configuring libgudev-238..."
+    echo "Configuring libgudev-{ORIG_PKG_VER}"
     cd build
     meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release
-    echo "Building libgudev-238..."
+    echo "Building libgudev-{ORIG_PKG_VER}"
     ninja -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging libgudev-238..."
+    echo "Packaging libgudev-{ORIG_PKG_VER}"
     cd build
     DESTDIR="{STAGING_ROOT}" ninja install
     echo "Package staging complete."

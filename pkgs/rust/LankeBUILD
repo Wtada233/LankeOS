@@ -1,6 +1,6 @@
 lankebuild_prepare() {
     # 进入解压后的源码目录
-    cd rustc-1.96.0-src || exit 1
+    cd rustc-*-src || exit 1
 
     # 应用所有补丁（来自 work_sources）
     for patch in ../*.patch; do
@@ -12,7 +12,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    cd rustc-1.96.0-src || exit 1
+    cd rustc-*-src || exit 1
 
     # 生成 bootstrap.toml（适配 LankeOS x86_64）
     cat > bootstrap.toml << EOF

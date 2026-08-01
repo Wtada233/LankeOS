@@ -4,8 +4,8 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    tar -xf swaybg-1.2.1.tar.gz
-    cd "swaybg-1.2.1"
+    tar -xf swaybg-*.tar.gz
+    cd swaybg-*/
     meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release
     ninja -C build -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja -C build install

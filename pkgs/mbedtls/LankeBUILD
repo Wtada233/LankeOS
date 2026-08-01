@@ -3,7 +3,7 @@ lankebuild_prepare() {
     # 先删 tarball 里的 gitlink 空目录，否则 mv 会把它挪进空目录里
     cd mbedtls-{ORIG_PKG_VER}
     rm -rf framework
-    mv "{WORK_DIR}/mbedtls-framework-dde0c4a0e448a0552f18817dcea633bb851fd288" framework
+    mv "{WORK_DIR}"/mbedtls-framework-* framework
 
     # 开启 Arch 额外配置
     scripts/config.py set MBEDTLS_HAVE_SSE2

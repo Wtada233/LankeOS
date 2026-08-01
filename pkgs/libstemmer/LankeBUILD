@@ -1,17 +1,17 @@
 lankebuild_prepare() {
-    cd snowball-3.1.1
+    cd snowball-*/
     patch -p1 < "{WORK_DIR}"/0001-Make-libstemmer-a-shared-library.patch
     # Prepare environment
 }
 
 lankebuild_build() {
-    cd snowball-3.1.1
+    cd snowball-*/
     make -j$(nproc)
 }
 
 
 lankebuild_package() {
-    cd snowball-3.1.1
+    cd snowball-*/
     install -Dm644 include/libstemmer.h -t "{STAGING_ROOT}/usr/include"
     install -Dm644 libstemmer.so.0 "{STAGING_ROOT}/usr/lib/libstemmer.so.0.0.0"
     ln -s libstemmer.so.0.0.0 "{STAGING_ROOT}/usr/lib/libstemmer.so.0"

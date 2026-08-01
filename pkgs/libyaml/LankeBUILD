@@ -5,15 +5,15 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    echo "Configuring yaml-0.2.5..."
+    echo "Configuring yaml-{ORIG_PKG_VER}"
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
-    echo "Building yaml-0.2.5..."
+    echo "Building yaml-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging yaml-0.2.5..."
+    echo "Packaging yaml-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" install
     echo "Package staging complete."
 }

@@ -1,19 +1,19 @@
 set -e
 
 lankebuild_prepare() {
-    echo "Preparing unifdef-2.12..."
+    echo "Preparing unifdef-{ORIG_PKG_VER}"
     # C23 将 constexpr 设为关键字，老代码用了同名标识符
     sed -i 's/\bconstexpr\b/const_expr/g' unifdef.c
 }
 
 lankebuild_build() {
-    echo "Building unifdef-2.12..."
+    echo "Building unifdef-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging unifdef-2.12..."
+    echo "Packaging unifdef-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" prefix=/usr install
     echo "Package staging complete."
 }

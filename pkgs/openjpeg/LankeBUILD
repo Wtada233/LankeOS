@@ -5,19 +5,19 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    echo "Configuring OpenJPEG-2.5.4..."
+    echo "Configuring OpenJPEG-{ORIG_PKG_VER}"
     cd build
     cmake -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX={PREFIX} \
           -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
           -DBUILD_STATIC_LIBS=OFF ..
-    echo "Building OpenJPEG-2.5.4..."
+    echo "Building OpenJPEG-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging OpenJPEG-2.5.4..."
+    echo "Packaging OpenJPEG-{ORIG_PKG_VER}"
     cd build
     make DESTDIR="{STAGING_ROOT}" install
     echo "Package staging complete."

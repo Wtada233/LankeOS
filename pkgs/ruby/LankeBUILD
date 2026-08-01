@@ -1,22 +1,22 @@
 set -e
 
 lankebuild_prepare() {
-    echo "Preparing ruby-4.0.1..."
+    echo "Preparing ruby-{ORIG_PKG_VER}"
 }
 
 lankebuild_build() {
-    echo "Configuring ruby-4.0.1..."
+    echo "Configuring ruby-{ORIG_PKG_VER}"
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}          \
                 --enable-shared        \
                 --disable-install-doc  \
-                --docdir={DATADIR}/doc/ruby-4.0.1
-    echo "Building ruby-4.0.1..."
+                --docdir={DATADIR}/doc/ruby-{ORIG_PKG_VER}
+    echo "Building ruby-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging ruby-4.0.1..."
+    echo "Packaging ruby-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" install
     echo "Package staging complete."
 }

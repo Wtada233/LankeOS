@@ -99,7 +99,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     # --- 构建 chromium-launcher ---
     set -e
-    make -C "{SRC_DIR}/chromium-launcher-8" -j$(nproc)
+    make -C "{SRC_DIR}"/chromium-launcher-* -j$(nproc)
 
     # --- 构建 Chromium ---
     cd "$_CS"
@@ -164,7 +164,7 @@ lankebuild_build() {
 lankebuild_package() {
     set -e
     # --- launcher ---
-    cd "{SRC_DIR}/chromium-launcher-8"
+    cd "{SRC_DIR}"/chromium-launcher-*
     make PREFIX=/usr DESTDIR="{STAGING_ROOT}" install
     install -Dvm644 LICENSE \
         "{STAGING_ROOT}/usr/share/licenses/chromium/LICENSE.launcher"

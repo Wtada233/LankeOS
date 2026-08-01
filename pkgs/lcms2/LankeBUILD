@@ -1,19 +1,19 @@
 set -e
 
 lankebuild_prepare() {
-    echo "Preparing Little CMS-2.18..."
+    echo "Preparing Little CMS-{ORIG_PKG_VER}"
 }
 
 lankebuild_build() {
-    echo "Configuring lcms2-2.18..."
+    echo "Configuring lcms2-{ORIG_PKG_VER}"
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
-    echo "Building lcms2-2.18..."
+    echo "Building lcms2-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging lcms2-2.18..."
+    echo "Packaging lcms2-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" install
     echo "Package staging complete."
 }

@@ -5,20 +5,20 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    echo "Configuring glib-networking-2.86.0..."
+    echo "Configuring glib-networking-{ORIG_PKG_VER}"
     cd build
     meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR}        \
                    --buildtype=release  \
                    -Dgnutls=enabled     \
                    -Dlibproxy=disabled   \
                    -Dgnome_proxy=disabled
-    echo "Building glib-networking-2.86.0..."
+    echo "Building glib-networking-{ORIG_PKG_VER}"
     ninja -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging glib-networking-2.86.0..."
+    echo "Packaging glib-networking-{ORIG_PKG_VER}"
     cd build
     DESTDIR="{STAGING_ROOT}" ninja install
     echo "Package staging complete."

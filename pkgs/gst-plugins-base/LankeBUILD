@@ -5,7 +5,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    echo "Configuring gst-plugins-base-1.28.1..."
+    echo "Configuring gst-plugins-base-{ORIG_PKG_VER}"
     cd build
     meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR}        \
                    --buildtype=release  \
@@ -13,13 +13,13 @@ lankebuild_build() {
                    -Dtests=disabled     \
                    -Dintrospection=enabled \
                    -Dnls=disabled
-    echo "Building gst-plugins-base-1.28.1..."
+    echo "Building gst-plugins-base-{ORIG_PKG_VER}"
     ninja -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging gst-plugins-base-1.28.1..."
+    echo "Packaging gst-plugins-base-{ORIG_PKG_VER}"
     cd build
     DESTDIR="{STAGING_ROOT}" ninja install
 

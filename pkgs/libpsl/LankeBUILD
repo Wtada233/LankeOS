@@ -1,19 +1,19 @@
 set -e
 
 lankebuild_prepare() {
-    echo "Preparing libpsl-0.21.5..."
+    echo "Preparing libpsl-{ORIG_PKG_VER}"
 }
 
 lankebuild_build() {
-    echo "Configuring libpsl-0.21.5..."
+    echo "Configuring libpsl-{ORIG_PKG_VER}"
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
-    echo "Building libpsl-0.21.5..."
+    echo "Building libpsl-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging libpsl-0.21.5..."
+    echo "Packaging libpsl-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" install
     echo "Package staging complete."
 }

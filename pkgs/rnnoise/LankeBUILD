@@ -1,5 +1,5 @@
 lankebuild_prepare() {
-    cd rnnoise-v0.2
+    cd rnnoise-v*
     cp -r ../src ./
     cp -r ../models ./ 2>/dev/null || true
     autoreconf -isf
@@ -7,12 +7,12 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    cd rnnoise-v0.2
+    cd rnnoise-v*
     make -j$(nproc)
 }
 
 
 lankebuild_package() {
-    cd rnnoise-v0.2
+    cd rnnoise-v*
     make DESTDIR="{STAGING_ROOT}" install
 }

@@ -5,20 +5,20 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    echo "Configuring libwebp-1.5.0..."
+    echo "Configuring libwebp-{ORIG_PKG_VER}"
     cd build
     cmake .. -G Ninja \
         -DCMAKE_INSTALL_PREFIX={PREFIX} \
         -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=ON
-    echo "Building libwebp-1.5.0..."
+    echo "Building libwebp-{ORIG_PKG_VER}"
     ninja -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging libwebp-1.5.0..."
+    echo "Packaging libwebp-{ORIG_PKG_VER}"
     cd build
     DESTDIR="{STAGING_ROOT}" ninja install
     echo "Package staging complete."

@@ -1,22 +1,22 @@
 set -e
 
 lankebuild_prepare() {
-    echo "Preparing sqlite-3.49.1..."
+    echo "Preparing sqlite-{ORIG_PKG_VER}"
 }
 
 lankebuild_build() {
-    echo "Configuring sqlite-3.49.1..."
+    echo "Configuring sqlite-{ORIG_PKG_VER}"
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}          \
                 --disable-static      \
                 --enable-threadsafe   \
                 CFLAGS="-O2 -DSQLITE_ENABLE_COLUMN_METADATA"
-    echo "Building sqlite-3.49.1..."
+    echo "Building sqlite-{ORIG_PKG_VER}"
     make -j$(nproc)
     echo "Build complete."
 }
 
 lankebuild_package() {
-    echo "Packaging sqlite-3.49.1..."
+    echo "Packaging sqlite-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" install
     echo "Package staging complete."
 }
