@@ -14,7 +14,7 @@
     "perl"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/texinfo/texinfo-7.3.tar.xz"
+    "https://ftpmirror.gnu.org/texinfo/texinfo-7.3.tar.xz"
   ],
   "work_sources": []
 }

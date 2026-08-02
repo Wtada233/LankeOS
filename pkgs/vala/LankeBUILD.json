@@ -13,7 +13,7 @@
     "git",
     "glib",
     "gobject-introspection",
-    "libX11",
+    "libx11",
     "libxslt",
     "vala"
   ],

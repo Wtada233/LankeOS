@@ -10,8 +10,8 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "libX11",
-    "libXrandr",
+    "libx11",
+    "libxrandr",
     "libglvnd",
     "libpulse",
     "libva",

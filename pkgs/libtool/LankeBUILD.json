@@ -11,7 +11,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/libtool/libtool-2.6.2.tar.xz"
+    "https://ftpmirror.gnu.org/libtool/libtool-2.6.2.tar.xz"
   ],
   "work_sources": []
 }

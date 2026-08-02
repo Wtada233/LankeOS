@@ -19,7 +19,7 @@
     "gobject-introspection",
     "gtk3",
     "harfbuzz",
-    "libX11",
+    "libx11",
     "libxkbcommon",
     "ninja",
     "pango",

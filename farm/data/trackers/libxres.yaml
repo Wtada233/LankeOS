@@ -1,0 +1,5 @@
+pkg-name: libxres
+tracker-template: html-index
+url: 'https://xorg.freedesktop.org/archive/individual/lib/'
+pattern: 'libXres-(\d[\d.]*)\.tar\.(?:xz|bz2|gz)'
+template: 'https://xorg.freedesktop.org/archive/individual/lib/{name}-{version}.tar.xz'

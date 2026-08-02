@@ -8,9 +8,9 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "libX11",
-    "libXau",
-    "libXdmcp",
+    "libx11",
+    "libxau",
+    "libxdmcp",
     "libxcb",
     "ninja",
     "vulkan-headers",

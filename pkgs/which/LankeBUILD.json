@@ -9,7 +9,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/which/which-2.25.tar.gz"
+    "https://ftpmirror.gnu.org/which/which-2.25.tar.gz"
   ],
   "work_sources": []
 }

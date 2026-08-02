@@ -10,7 +10,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/sed/sed-4.10.tar.xz"
+    "https://ftpmirror.gnu.org/sed/sed-4.10.tar.xz"
   ],
   "work_sources": []
 }

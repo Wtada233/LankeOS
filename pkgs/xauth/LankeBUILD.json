@@ -7,9 +7,9 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "libX11",
-    "libXau",
-    "libXext",
+    "libx11",
+    "libxau",
+    "libxext",
     "libxmu"
   ],
   "sources": [

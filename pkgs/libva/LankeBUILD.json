@@ -9,9 +9,9 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "libX11",
-    "libXext",
-    "libXfixes",
+    "libx11",
+    "libxext",
+    "libxfixes",
     "libdrm",
     "libglvnd",
     "libxcb",

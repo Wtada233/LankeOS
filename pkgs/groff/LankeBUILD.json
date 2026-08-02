@@ -14,7 +14,7 @@
     "perl"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/groff/groff-1.24.1.tar.gz"
+    "https://ftpmirror.gnu.org/groff/groff-1.24.1.tar.gz"
   ],
   "work_sources": []
 }

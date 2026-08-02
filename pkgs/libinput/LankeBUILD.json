@@ -13,7 +13,7 @@
     "git",
     "glib",
     "gtk4",
-    "libX11",
+    "libx11",
     "libevdev",
     "lua",
     "meson",

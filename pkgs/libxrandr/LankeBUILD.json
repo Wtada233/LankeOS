@@ -1,0 +1,21 @@
+{
+  "name": "libxrandr",
+  "version": "1.5.5",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "libx11",
+    "libxext",
+    "libxrender",
+    "util-macros",
+    "xorgproto"
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXrandr-1.5.5.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
+}

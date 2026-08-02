@@ -13,6 +13,6 @@
     "perl"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/parallel/parallel-20260722.tar.bz2"
+    "https://ftpmirror.gnu.org/parallel/parallel-20260722.tar.bz2"
   ]
 }

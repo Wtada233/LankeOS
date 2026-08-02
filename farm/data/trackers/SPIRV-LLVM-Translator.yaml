@@ -1,8 +1,0 @@
-pkg-name: SPIRV-LLVM-Translator
-tracker-template: github
-repo: KhronosGroup/SPIRV-LLVM-Translator
-mode: tags
-tag-prefix: v
-template: https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/{tag}.tar.gz
-order: after(llvm)
-major-of: llvm

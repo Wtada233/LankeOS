@@ -20,7 +20,7 @@
     "git",
     "glib",
     "jansson",
-    "libX11",
+    "libx11",
     "libdatachannel",
     "libdrm",
     "libglvnd",

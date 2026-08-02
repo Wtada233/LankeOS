@@ -1,0 +1,19 @@
+{
+  "name": "libxcursor",
+  "version": "1.2.3",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "libx11",
+    "libxfixes",
+    "libxrender"
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXcursor-1.2.3.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
+}

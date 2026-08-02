@@ -16,7 +16,7 @@
     "python"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/coreutils/coreutils-9.11.tar.xz"
+    "https://ftpmirror.gnu.org/coreutils/coreutils-9.11.tar.xz"
   ],
   "work_sources": []
 }

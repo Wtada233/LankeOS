@@ -16,7 +16,7 @@
     "readline"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/gawk/gawk-5.4.1.tar.xz"
+    "https://ftpmirror.gnu.org/gawk/gawk-5.4.1.tar.xz"
   ],
   "work_sources": []
 }

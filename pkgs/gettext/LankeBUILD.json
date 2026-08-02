@@ -22,7 +22,7 @@
     "tcl"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/gettext/gettext-1.0.tar.xz"
+    "https://ftpmirror.gnu.org/gettext/gettext-1.0.tar.xz"
   ],
   "work_sources": []
 }

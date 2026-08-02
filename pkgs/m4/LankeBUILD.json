@@ -12,7 +12,7 @@
     "python"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/m4/m4-1.4.21.tar.xz"
+    "https://ftpmirror.gnu.org/m4/m4-1.4.21.tar.xz"
   ],
   "work_sources": []
 }

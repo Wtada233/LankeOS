@@ -1,0 +1,20 @@
+{
+  "name": "spirv-tools",
+  "version": "1.4.357.0",
+  "release": 2,
+  "deps": [
+    "bash"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "spirv-headers"
+  ],
+  "sources": [
+    "https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz"
+  ],
+  "work_sources": []
+}

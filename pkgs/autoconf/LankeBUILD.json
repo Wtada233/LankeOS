@@ -13,7 +13,7 @@
     "perl"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/autoconf/autoconf-2.73.tar.xz"
+    "https://ftpmirror.gnu.org/autoconf/autoconf-2.73.tar.xz"
   ],
   "work_sources": []
 }

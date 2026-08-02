@@ -9,7 +9,7 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "libX11",
+    "libx11",
     "libdrm",
     "libva",
     "mesa",

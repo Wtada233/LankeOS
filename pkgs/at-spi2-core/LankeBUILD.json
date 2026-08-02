@@ -14,9 +14,9 @@
     "git",
     "glib",
     "gobject-introspection",
-    "libX11",
-    "libXi",
-    "libXtst",
+    "libx11",
+    "libxi",
+    "libxtst",
     "libxml2",
     "meson",
     "ninja"

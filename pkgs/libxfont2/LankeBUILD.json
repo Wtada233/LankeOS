@@ -1,0 +1,19 @@
+{
+  "name": "libxfont2",
+  "version": "2.0.8",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "fontenc",
+    "freetype",
+    "zlib"
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXfont2-2.0.8.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
+}

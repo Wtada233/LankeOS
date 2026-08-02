@@ -1,0 +1,20 @@
+{
+  "name": "libxv",
+  "version": "1.0.13",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "libx11",
+    "libxext",
+    "util-macros",
+    "xorgproto"
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXv-1.0.13.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
+}

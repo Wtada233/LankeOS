@@ -1,0 +1,5 @@
+pkg-name: libx11
+tracker-template: html-index
+url: https://xorg.freedesktop.org/archive/individual/lib/
+pattern: 'libX11-([0-9][0-9.]*)\.tar\.xz'
+template: 'https://xorg.freedesktop.org/archive/individual/lib/libX11-{version}.tar.xz'

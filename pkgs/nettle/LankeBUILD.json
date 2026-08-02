@@ -10,7 +10,7 @@
     "gmp"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/nettle/nettle-4.0.tar.gz"
+    "https://ftpmirror.gnu.org/nettle/nettle-4.0.tar.gz"
   ],
   "work_sources": []
 }

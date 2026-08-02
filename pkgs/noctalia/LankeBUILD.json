@@ -9,7 +9,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "Linux-PAM",
+    "linux-pam",
     "base-devel",
     "cairo",
     "curl",

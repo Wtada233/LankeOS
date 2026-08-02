@@ -6,8 +6,8 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "SPIRV-Headers",
-    "SPIRV-Tools",
+    "spirv-headers",
+    "spirv-tools",
     "base-devel",
     "cmake",
     "ninja"

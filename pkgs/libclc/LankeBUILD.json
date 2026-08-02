@@ -6,7 +6,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "SPIRV-LLVM-Translator",
+    "spirv-llvm-translator",
     "base-devel",
     "cmake",
     "llvm",

@@ -1,0 +1,19 @@
+{
+  "name": "libxfixes",
+  "version": "6.0.2",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "libx11",
+    "util-macros",
+    "xorgproto"
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXfixes-6.0.2.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
+}

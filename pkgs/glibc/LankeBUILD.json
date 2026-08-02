@@ -13,7 +13,7 @@
     "python"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/glibc/glibc-2.44.tar.xz"
+    "https://ftpmirror.gnu.org/glibc/glibc-2.44.tar.xz"
   ],
   "work_sources": [
     "https://www.iana.org/time-zones/repository/releases/tzdata2026c.tar.gz"

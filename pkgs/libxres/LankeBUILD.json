@@ -1,0 +1,20 @@
+{
+  "name": "libxres",
+  "version": "1.2.3",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "libx11",
+    "libxext",
+    "util-macros",
+    "xorgproto"
+  ],
+  "sources": [
+    "https://xorg.freedesktop.org/archive/individual/lib/libXres-1.2.3.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
+}
