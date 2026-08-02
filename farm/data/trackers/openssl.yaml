@@ -1,6 +1,9 @@
+# 4.0 移除了 TLSv1_method 等旧 API，python/curl 等生态未跟进；Arch 也停在 3.x。锁 3。
+# mode 用 tags（releases 模式只看 releases/latest 单个版本，过滤不了主版本）。
 pkg-name: openssl
 tracker-template: github
 repo: openssl/openssl
-mode: releases
+mode: tags
 tag-prefix: openssl-
+major-version-lock: 3
 template: 'https://github.com/openssl/openssl/releases/download/{tag}/{name}-{version}.tar.gz'

@@ -10,7 +10,8 @@
     "libX11",
     "libXext",
     "libXrender",
-    "util-macros"
+    "util-macros",
+    "xorgproto"
   ],
   "sources": [
     "https://xorg.freedesktop.org/archive/individual/lib/libXrandr-1.5.5.tar.xz"

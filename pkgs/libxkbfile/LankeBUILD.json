@@ -8,7 +8,9 @@
   "build_deps": [
     "base-devel",
     "libX11",
-    "util-macros"
+    "meson",
+    "ninja",
+    "xorgproto"
   ],
   "sources": [
     "https://xorg.freedesktop.org/archive/individual/lib/libxkbfile-1.2.0.tar.xz"

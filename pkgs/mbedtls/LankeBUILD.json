@@ -1,6 +1,6 @@
 {
   "name": "mbedtls",
-  "version": "4.2.0",
+  "version": "3.6.7",
   "deps": [
     "bash"
   ],
@@ -14,7 +14,7 @@
     "python"
   ],
   "sources": [
-    "git+https://github.com/Mbed-TLS/mbedtls@v4.2.0"
+    "git+https://github.com/Mbed-TLS/mbedtls@v3.6.7"
   ],
   "work_sources": []
 }

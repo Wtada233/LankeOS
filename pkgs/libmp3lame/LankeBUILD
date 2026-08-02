@@ -1,4 +1,11 @@
 lankebuild_prepare() {
+    # LAME 4.0 frontend 的 ID3TAGS_EXTENDED（HAVE_ICONV 触发）有 ucs2 旧 API 调用，
+    # GCC 14+ 默认把 incompatible-pointer-types / implicit-function-declaration 当 error。
+    # Arch 同样处理：降级成警告（见 Arch lame PKGBUILD）。
+    export CFLAGS="${CFLAGS} -Wno-implicit-function-declaration -Wno-incompatible-pointer-types"
+    # hip_finish_pinfo 漏在导出表外（lame 4.0 libmp3lame.sym），前端链接 undefined reference。
+    # Arch/Debian lame-symbols.patch：在 hip_decode1_headersB 后补一行。
+    sed -i '/^hip_decode1_headersB$/a hip_finish_pinfo' include/libmp3lame.sym
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
                 --enable-shared \
                 --disable-static

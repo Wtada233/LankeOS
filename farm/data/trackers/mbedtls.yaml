@@ -1,7 +1,9 @@
 # git src：mbedtls-framework 子模块随 mbedtls tag 对齐
+# v4 拆分出 tf-psa-crypto（其自身还有 framework 嵌套 submodule），构建复杂；锁 v3 稳定线。
 pkg-name: mbedtls
 tracker-template: github
 repo: Mbed-TLS/mbedtls
 mode: tags
 tag-prefix: v
+major-version-lock: 3
 template: git+https://github.com/{repo}@{tag}

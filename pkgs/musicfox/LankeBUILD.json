@@ -9,7 +9,8 @@
     "alsa-lib",
     "base-devel",
     "flac",
-    "golang"
+    "golang",
+    "libogg"
   ],
   "sources": [
     "https://github.com/go-musicfox/go-musicfox/archive/refs/tags/v5.0.1.tar.gz"

@@ -4,12 +4,20 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    python3 setup.py build
-    python3 setup.py install --root={STAGING_ROOT}
+    # PEP 517 wheel 构建（Arch 同款）。setup.py install 生成的 load_entry_point 脚本
+    # 在新 setuptools/importlib.metadata 下解析失败（StopIteration），wheel 装出的
+    # .dist-info + console script 才是规范路径。
+    python3 -m build --wheel --no-isolation
 }
 
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    # wheel 安装 + 补充文件（对齐 Arch package()：vim 高亮 + bash/zsh 补全）
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+
+    install -d "{STAGING_ROOT}/usr/share/vim/vimfiles"
+    cp -rt "{STAGING_ROOT}/usr/share/vim/vimfiles" data/syntax-highlighting/vim/*/
+
+    install -Dm644 data/shell-completions/bash/* -t "{STAGING_ROOT}/usr/share/bash-completion/completions"
+    install -Dm644 data/shell-completions/zsh/* -t "{STAGING_ROOT}/usr/share/zsh/site-functions"
 }

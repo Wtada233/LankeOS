@@ -1,13 +1,13 @@
+# libxkbfile 1.2.0 起从 autotools 迁移到 meson（tar 里只有 meson.build，无 configure）。
 lankebuild_prepare() {
-    cd "{SRC_DIR}"
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --localstatedir={LOCALSTATEDIR} \
-        --disable-static 
+    # Prepare environment
+    meson setup _build --prefix={PREFIX} --buildtype=release
 }
+
 lankebuild_build() {
-    cd "{SRC_DIR}"
-    make -j$(nproc)
+    meson compile -C _build -j$(nproc)
 }
+
 lankebuild_package() {
-    cd "{SRC_DIR}"
-    make DESTDIR="{STAGING_ROOT}" install
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
 }

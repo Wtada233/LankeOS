@@ -1,0 +1,5 @@
+pkg-name: libmpg123
+tracker-template: html-index
+url: https://www.mpg123.de/download/
+pattern: mpg123-([\d.]+)\.tar\.bz2
+template: https://www.mpg123.de/download/mpg123-{version}.tar.bz2

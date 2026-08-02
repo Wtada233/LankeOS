@@ -9,7 +9,8 @@
     "base-devel",
     "libX11",
     "libXext",
-    "util-macros"
+    "util-macros",
+    "xorgproto"
   ],
   "sources": [
     "https://xorg.freedesktop.org/archive/individual/lib/libXScrnSaver-1.2.5.tar.xz"

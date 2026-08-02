@@ -8,6 +8,7 @@
   "build_deps": [
     "base-devel",
     "libX11",
+    "libXfixes",
     "util-macros",
     "xorgproto"
   ],

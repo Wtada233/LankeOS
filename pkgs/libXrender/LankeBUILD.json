@@ -8,7 +8,8 @@
   "build_deps": [
     "base-devel",
     "libX11",
-    "util-macros"
+    "util-macros",
+    "xorgproto"
   ],
   "sources": [
     "https://xorg.freedesktop.org/archive/individual/lib/libXrender-0.9.12.tar.xz"

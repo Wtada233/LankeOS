@@ -8,7 +8,9 @@
   "build_deps": [
     "base-devel",
     "libX11",
-    "libXfixes"
+    "libXfixes",
+    "util-macros",
+    "xorgproto"
   ],
   "sources": [
     "https://xorg.freedesktop.org/archive/individual/lib/libXdamage-1.1.7.tar.xz"

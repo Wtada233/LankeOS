@@ -10,6 +10,7 @@
   "build_deps": [
     "base-devel",
     "cmake",
+    "libX11",
     "libXrandr",
     "libglvnd",
     "libpulse",
@@ -17,6 +18,7 @@
     "libxcb",
     "lua",
     "sqlite",
+    "xorgproto",
     "zlib"
   ],
   "sources": [

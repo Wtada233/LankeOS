@@ -8,5 +8,4 @@ script-content: |
   ver=${tag#"release-"}
   ver=${ver//-/.}
   echo "$ver"
-  vunder=${ver//./_}
-  echo "https://github.com/unicode-org/icu/releases/download/${tag}/icu4c-${vunder}-src.tgz"
+  echo "https://github.com/unicode-org/icu/releases/download/${tag}/icu4c-${ver}-sources.tgz"

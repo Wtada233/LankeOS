@@ -12,5 +12,6 @@
   "sources": [
     "https://github.com/cisco/libsrtp/archive/refs/tags/v2.8.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 1
 }

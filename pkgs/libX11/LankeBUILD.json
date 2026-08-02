@@ -9,7 +9,8 @@
     "base-devel",
     "libxcb",
     "util-macros",
-    "xorgproto"
+    "xorgproto",
+    "xtrans"
   ],
   "sources": [
     "https://xorg.freedesktop.org/archive/individual/lib/libX11-1.8.13.tar.xz"

@@ -1,7 +1,7 @@
 {
   "name": "libpsl",
   "version": "0.23.1",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

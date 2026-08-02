@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} \
+                --enable-shared \
+                --disable-static \
+                --with-audio=alsa,jack,pulse
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}
