@@ -1,26 +1,10 @@
 {
   "name": "libqalculate",
-  "version": "5.11.0",
+  "version": "5.12.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libcurl.so.4",
-    "libgcc_s.so.1",
-    "libgmp.so.10",
-    "libhistory.so.8",
-    "libicuuc.so.77",
-    "libm.so.6",
-    "libmpfr.so.6",
-    "libncursesw.so.6",
-    "libreadline.so.8",
-    "libstdc++.so.6",
-    "libxml2.so.2"
-  ],
-  "provides": [
-    "libqalculate.so",
-    "libqalculate.so.23"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "curl",
@@ -35,6 +19,6 @@
     "readline"
   ],
   "sources": [
-    "https://github.com/Qalculate/libqalculate/releases/download/v5.11.0/libqalculate-5.11.0.tar.gz"
+    "https://github.com/Qalculate/libqalculate/releases/download/v5.12.0/libqalculate-5.12.0.tar.gz"
   ]
 }

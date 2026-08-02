@@ -1,0 +1,5 @@
+pkg-name: popt
+tracker-template: html-index
+url: 'http://ftp.rpm.org/popt/releases/popt-1.x/'
+pattern: 'popt-(\d[\d.]*)\.tar\.'
+template: 'http://ftp.rpm.org/popt/releases/popt-1.x/popt-{version}.tar.gz'

@@ -134,6 +134,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 void remove_package(const std::string& pkg_name, bool force = false, bool wrap_in_txn = true);
 void autoremove();
 void upgrade_packages();
+void force_solve_conflict();
 void reinstall_package(const std::string& pkg_name);
 void query_package(const std::string& pkg_name);
 void query_file(const std::string& filename);

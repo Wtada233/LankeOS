@@ -1,17 +1,10 @@
 {
   "name": "json-c",
-  "version": "0.19",
+  "version": "0.19.20260627",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libm.so.6"
-  ],
-  "provides": [
-    "libjson-c.so",
-    "libjson-c.so.5"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake"

@@ -1,15 +1,9 @@
 {
   "name": "xauth",
-  "version": "1.1.3",
+  "version": "1.1.5",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libX11.so.6",
-    "libXau.so.6",
-    "libXext.so.6",
-    "libXmuu.so.1",
-    "libc.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -19,7 +13,7 @@
     "libxmu"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/releases/individual/app/xauth-1.1.3.tar.gz"
+    "https://xorg.freedesktop.org/releases/individual/app/xauth-1.1.5.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

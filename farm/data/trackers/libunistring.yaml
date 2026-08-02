@@ -1,0 +1,5 @@
+pkg-name: libunistring
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/libunistring/
+pattern: 'libunistring-(\d[\d.]*)\.tar\.xz'
+template: https://ftp.gnu.org/gnu/libunistring/libunistring-{version}.tar.xz

@@ -1,0 +1,5 @@
+pkg-name: glu
+tracker-template: html-index
+url: https://archive.mesa3d.org/glu/
+pattern: 'glu-(\d[\d.]*)\.tar\.xz'
+template: https://archive.mesa3d.org/glu/{name}-{version}.tar.xz

@@ -1,0 +1,5 @@
+pkg-name: newt
+tracker-template: html-index
+url: https://releases.pagure.org/newt/
+pattern: 'newt-([0-9.]+)\.tar\.gz'
+template: https://releases.pagure.org/newt/newt-{version}.tar.gz

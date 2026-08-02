@@ -1,0 +1,5 @@
+pkg-name: libtool
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/libtool/
+pattern: 'libtool-(\d[\d.]*)\.tar\.xz'
+template: https://ftp.gnu.org/gnu/libtool/libtool-{version}.tar.xz

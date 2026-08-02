@@ -1,0 +1,5 @@
+pkg-name: libnftnl
+tracker-template: html-index
+url: https://www.netfilter.org/projects/libnftnl/downloads.html
+pattern: 'libnftnl-(\d[\d.]*)\.tar\.xz'
+template: https://www.netfilter.org/projects/libnftnl/files/libnftnl-{version}.tar.xz

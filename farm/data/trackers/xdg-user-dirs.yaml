@@ -1,0 +1,7 @@
+pkg-name: xdg-user-dirs
+tracker-template: gitlab
+host: gitlab.freedesktop.org
+project: xdg/xdg-user-dirs
+mode: tags
+tag-prefix: v
+template: https://gitlab.freedesktop.org/xdg/xdg-user-dirs/-/archive/{tag}/xdg-user-dirs-{tag}.tar.gz

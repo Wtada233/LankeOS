@@ -10,9 +10,6 @@ lankebuild_build() {
             break
         fi
     done
-    for p in "{WORK_DIR}"/*.patch; do
-        patch -p1 < "$p"
-    done
     mkdir build && cd build
     echo 'rootsbindir={BINDIR}' > configparms
     CC=gcc CXX=g++ ../configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-werror --enable-kernel=5.10 --enable-stack-protector=strong --disable-nscd libc_cv_slibdir={LIBDIR} --disable-static
@@ -32,7 +29,7 @@ lankebuild_build() {
     ln -sfv ../lib/ld-linux-x86-64.so.2 {STAGING_ROOT}{BINDIR}/ld.so
 
     # Timezone data
-    tar -xf {WORK_DIR}/tzdata2025b.tar.gz
+    tar -xf {WORK_DIR}/tzdata*.tar.gz
     ZONEINFO={STAGING_ROOT}{DATADIR}/zoneinfo
     mkdir -pv $ZONEINFO/{posix,right}
     for tz in etcetera southamerica northamerica europe africa antarctica asia australasia backward; do

@@ -3,10 +3,7 @@
   "version": "3.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libbz2.so.1.0",
-    "libc.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",

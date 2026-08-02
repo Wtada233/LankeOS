@@ -1,0 +1,6 @@
+pkg-name: font-jetbrains-mono-nerd
+tracker-template: github
+repo: ryanoasis/nerd-fonts
+mode: releases
+tag-prefix: v
+template: https://github.com/ryanoasis/nerd-fonts/releases/download/{tag}/JetBrainsMono.zip

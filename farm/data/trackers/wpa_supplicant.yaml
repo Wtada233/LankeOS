@@ -1,0 +1,5 @@
+pkg-name: wpa_supplicant
+tracker-template: html-index
+url: "https://w1.fi/releases/"
+pattern: 'wpa_supplicant-(\d[\d.]*)\.tar\.gz'
+template: "https://w1.fi/releases/wpa_supplicant-{version}.tar.gz"

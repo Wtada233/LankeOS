@@ -1,0 +1,6 @@
+pkg-name: xz
+tracker-template: github
+repo: tukaani-project/xz
+mode: releases
+tag-prefix: v
+template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.xz

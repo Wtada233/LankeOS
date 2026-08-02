@@ -1,15 +1,9 @@
 {
   "name": "shared-mime-info",
-  "version": "2.4",
+  "version": "2.5.1",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libglib-2.0.so.0",
-    "libstdc++.so.6",
-    "libxml2.so.2"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -21,7 +15,7 @@
     "xmlto"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/xdg/shared-mime-info/-/archive/2.4/shared-mime-info-2.4.tar.gz"
+    "https://gitlab.freedesktop.org/xdg/shared-mime-info/-/archive/2.5.1/shared-mime-info-2.5.1.tar.gz"
   ],
   "work_sources": []
 }

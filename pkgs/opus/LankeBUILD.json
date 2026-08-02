@@ -3,14 +3,8 @@
   "version": "1.6.1",
   "release": 1,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6"
-  ],
-  "provides": [
-    "libopus.so",
-    "libopus.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],

@@ -1,0 +1,5 @@
+pkg-name: coreutils
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/coreutils/
+pattern: 'coreutils-(\d[\d.]*)\.tar\.xz'
+template: https://ftp.gnu.org/gnu/coreutils/coreutils-{version}.tar.xz

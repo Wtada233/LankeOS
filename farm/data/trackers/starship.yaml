@@ -1,0 +1,6 @@
+pkg-name: starship
+tracker-template: github
+repo: starship/starship
+mode: tags
+tag-prefix: v
+template: https://github.com/starship/starship/archive/refs/tags/{tag}.tar.gz

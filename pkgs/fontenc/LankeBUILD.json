@@ -1,22 +1,16 @@
 {
   "name": "fontenc",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libz.so.1"
-  ],
-  "provides": [
-    "libfontenc.so",
-    "libfontenc.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "zlib"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libfontenc-1.1.8.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/lib/libfontenc-1.1.9.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

@@ -1,0 +1,13 @@
+pkg-name: krb5
+tracker-template: script
+script-content: |
+  BASE="https://web.mit.edu/kerberos/dist/krb5"
+  html=$(curl -s "$BASE/")
+  dirs=$(echo "$html" | grep -oE 'href="[0-9]+\.[0-9]+/"' | sed -E 's/href="([0-9.]+)\/"/\1/' | sort -V)
+  latest_dir=$(echo "$dirs" | tail -1)
+  if [ -z "$latest_dir" ]; then exit 1; fi
+  html2=$(curl -s "$BASE/$latest_dir/")
+  ver=$(echo "$html2" | grep -oE 'krb5-[0-9.]+\.tar\.gz' | sed -E 's/krb5-([0-9.]+)\.tar\.gz/\1/' | sort -V | tail -1)
+  if [ -z "$ver" ]; then exit 1; fi
+  echo "$ver"
+  echo "https://web.mit.edu/kerberos/dist/krb5/$latest_dir/krb5-$ver.tar.gz"

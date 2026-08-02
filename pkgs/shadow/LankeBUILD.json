@@ -1,21 +1,10 @@
 {
   "name": "shadow",
-  "version": "4.19.3",
+  "version": "4.20.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libacl.so.1",
-    "libattr.so.1",
-    "libc.so.6",
-    "libcrypt.so.2",
-    "libpam.so.0",
-    "libpam_misc.so.0",
-    "libsystemd.so.0"
-  ],
-  "provides": [
-    "libsubid.so",
-    "libsubid.so.5"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "Linux-PAM",
     "acl",
@@ -29,7 +18,7 @@
     "libxslt"
   ],
   "sources": [
-    "https://github.com/shadow-maint/shadow/releases/download/4.19.3/shadow-4.19.3.tar.xz"
+    "https://github.com/shadow-maint/shadow/releases/download/4.20.0/shadow-4.20.0.tar.xz"
   ],
   "work_sources": []
 }

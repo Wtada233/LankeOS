@@ -1,0 +1,5 @@
+pkg-name: libtasn1
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/libtasn1/
+pattern: 'libtasn1-(\d[\d.]*)\.tar\.gz'
+template: https://ftp.gnu.org/gnu/libtasn1/libtasn1-{version}.tar.gz

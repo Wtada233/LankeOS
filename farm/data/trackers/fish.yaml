@@ -1,0 +1,6 @@
+pkg-name: fish
+tracker-template: github
+repo: fish-shell/fish-shell
+mode: releases
+tag-prefix: ""
+template: https://github.com/fish-shell/fish-shell/releases/download/{tag}/fish-{version}.tar.xz

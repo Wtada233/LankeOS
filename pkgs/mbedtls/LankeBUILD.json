@@ -1,20 +1,11 @@
 {
   "name": "mbedtls",
-  "version": "3.6.7",
+  "version": "4.2.0",
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libmbedcrypto.so.16",
-    "libmbedcrypto.so.3.6.7",
-    "libmbedtls.so.21",
-    "libmbedtls.so.3.6.7",
-    "libmbedx509.so.3.6.7",
-    "libmbedx509.so.7"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",
@@ -23,8 +14,7 @@
     "python"
   ],
   "sources": [
-    "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v3.6.7.tar.gz",
-    "https://github.com/Mbed-TLS/mbedtls-framework/archive/dde0c4a0e448a0552f18817dcea633bb851fd288.tar.gz"
+    "git+https://github.com/Mbed-TLS/mbedtls@v4.2.0"
   ],
   "work_sources": []
 }

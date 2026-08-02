@@ -1,0 +1,6 @@
+pkg-name: libvpl
+tracker-template: github
+repo: intel/libvpl
+mode: tags
+tag-prefix: v
+template: https://github.com/intel/libvpl/archive/refs/tags/{tag}.tar.gz

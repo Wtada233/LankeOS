@@ -1,0 +1,6 @@
+pkg-name: fcitx5-chinese-addons
+tracker-template: github
+repo: fcitx/fcitx5-chinese-addons
+mode: tags
+tag-prefix: ""
+template: https://github.com/fcitx/fcitx5-chinese-addons/archive/refs/tags/{tag}.tar.gz

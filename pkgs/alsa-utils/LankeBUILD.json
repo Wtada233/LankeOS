@@ -5,16 +5,7 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libasound.so.2",
-    "libatopology.so.2",
-    "libc.so.6",
-    "libformw.so.6",
-    "libm.so.6",
-    "libmenuw.so.6",
-    "libncursesw.so.6",
-    "libpanelw.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "alsa-lib",

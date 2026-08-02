@@ -1,0 +1,5 @@
+pkg-name: gst-plugins-base
+tracker-template: html-index
+url: https://gstreamer.freedesktop.org/src/gst-plugins-base/
+pattern: 'gst-plugins-base-([\d.]+)\.tar\.(?:xz|gz)'
+template: https://gstreamer.freedesktop.org/src/gst-plugins-base/gst-plugins-base-{version}.tar.xz

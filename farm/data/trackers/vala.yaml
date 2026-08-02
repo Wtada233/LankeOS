@@ -1,0 +1,6 @@
+pkg-name: vala
+tracker-template: gitlab
+host: gitlab.gnome.org
+project: GNOME/vala
+mode: tags
+template: 'https://gitlab.gnome.org/{project}/-/archive/{tag}/vala-{tag}.tar.gz'

@@ -4,12 +4,7 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libpathrs.so",
-    "libresolv.so.2",
-    "libseccomp.so.2"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",

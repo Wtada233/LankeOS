@@ -1,0 +1,6 @@
+pkg-name: ffnvcodec-headers
+tracker-template: github
+repo: FFmpeg/nv-codec-headers
+mode: tags
+tag-prefix: "n"
+template: https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/{tag}.tar.gz

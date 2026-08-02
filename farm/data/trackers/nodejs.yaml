@@ -1,0 +1,5 @@
+pkg-name: nodejs
+tracker-template: html-index
+url: 'https://nodejs.org/dist/'
+pattern: 'v([\d]+\.[\d]+\.[\d]+)/'
+template: 'https://nodejs.org/dist/v{version}/node-v{version}.tar.xz'

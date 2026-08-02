@@ -1,0 +1,6 @@
+pkg-name: libxkbcommon
+tracker-template: github
+repo: xkbcommon/libxkbcommon
+mode: tags
+tag-prefix: xkbcommon-
+template: https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/{tag}.tar.gz

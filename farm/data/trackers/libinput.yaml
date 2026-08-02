@@ -1,0 +1,7 @@
+pkg-name: libinput
+tracker-template: gitlab
+host: gitlab.freedesktop.org
+project: libinput/libinput
+mode: tags
+tag-prefix: ''
+template: https://gitlab.freedesktop.org/libinput/libinput/-/archive/{tag}/libinput-{tag}.tar.gz

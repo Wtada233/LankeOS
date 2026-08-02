@@ -1,0 +1,25 @@
+[package]
+name = "lankefarm"
+version = "0.1.0"
+edition = "2021"
+description = "LankeOS build farm — ABI-driven incremental package builder (design per farm/ARCH.md)"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml = "0.9"
+thiserror = "2"
+regex = "1"
+ureq = { version = "2", features = ["tls"] }
+clap = { version = "4", features = ["derive"] }
+tar = "0.4"
+zstd = "0.13"
+goblin = "0.9"
+rusqlite = { version = "0.31", features = ["bundled"] }
+sha2 = "0.10"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3

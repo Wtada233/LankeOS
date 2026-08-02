@@ -1,0 +1,10 @@
+pkg-name: rust-nightly
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -e
+  channel=$(curl -fsSL https://static.rust-lang.org/dist/channel-rust-nightly.toml)
+  date=$(printf '%s\n' "$channel" | sed -n 's/^date = "\([^"]*\)"/\1/p' | head -n1)
+  [ -n "$date" ]
+  echo "$date"
+  echo "https://static.rust-lang.org/dist/${date}/rustc-nightly-src.tar.xz"

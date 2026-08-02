@@ -1,0 +1,6 @@
+pkg-name: libical
+tracker-template: github
+repo: libical/libical
+mode: releases
+tag-prefix: v
+template: https://github.com/libical/libical/releases/download/{tag}/libical-{version}.tar.gz

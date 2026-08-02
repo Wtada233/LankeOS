@@ -1,0 +1,5 @@
+pkg-name: kmod
+tracker-template: html-index
+url: https://www.kernel.org/pub/linux/utils/kernel/kmod/
+pattern: 'kmod-([\d.]+)\.tar\.xz'
+template: https://www.kernel.org/pub/linux/utils/kernel/kmod/kmod-{version}.tar.xz

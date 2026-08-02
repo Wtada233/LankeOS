@@ -1,17 +1,10 @@
 {
   "name": "libXScrnSaver",
-  "version": "1.2.4",
+  "version": "1.2.5",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libX11.so.6",
-    "libXext.so.6",
-    "libc.so.6"
-  ],
-  "provides": [
-    "libXss.so",
-    "libXss.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libX11",
@@ -19,7 +12,7 @@
     "util-macros"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libXScrnSaver-1.2.4.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/lib/libXScrnSaver-1.2.5.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

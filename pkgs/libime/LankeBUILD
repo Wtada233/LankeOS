@@ -1,12 +1,10 @@
 lankebuild_prepare() {
-    # tarball 不含 submodule，从固定 hash 恢复 kenlm（kenlm 无发布系统，固定 pin）
-    # 先删 tarball 里的 gitlink 空目录，否则 mv 会把它挪进空目录里
-    rm -rf libime-{ORIG_PKG_VER}/src/libime/core/kenlm
-    mv "{WORK_DIR}"/kenlm-* libime-{ORIG_PKG_VER}/src/libime/core/kenlm
+    # git src：lpkg 的 libgit2 clone 已 --recurse-submodules，kenlm 在 src/libime/core/kenlm 就位
+    :
 }
 
 lankebuild_build() {
-    cd libime-{ORIG_PKG_VER}
+    # git clone 是单目录，lpkg 已在仓库根
 
     cmake -G Ninja -B build \
         -DCMAKE_INSTALL_PREFIX={PREFIX} \

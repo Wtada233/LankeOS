@@ -1,0 +1,5 @@
+pkg-name: dav1d
+tracker-template: html-index
+url: https://downloads.videolan.org/pub/videolan/dav1d/
+pattern: '(\d[\d.]*)/'
+template: https://downloads.videolan.org/pub/videolan/dav1d/{version}/dav1d-{version}.tar.xz

@@ -1,25 +1,10 @@
 {
   "name": "glslang",
-  "version": "16.2.0",
+  "version": "16.4.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libSPIRV-Tools-opt.so",
-    "libSPIRV-Tools.so",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libstdc++.so.6"
-  ],
-  "provides": [
-    "libSPIRV.so",
-    "libSPIRV.so.16",
-    "libglslang-default-resource-limits.so",
-    "libglslang-default-resource-limits.so.16",
-    "libglslang.so",
-    "libglslang.so.16"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "SPIRV-Headers",
     "SPIRV-Tools",
@@ -28,7 +13,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/KhronosGroup/glslang/archive/refs/tags/16.2.0.tar.gz"
+    "https://github.com/KhronosGroup/glslang/archive/refs/tags/16.4.0.tar.gz"
   ],
   "work_sources": []
 }

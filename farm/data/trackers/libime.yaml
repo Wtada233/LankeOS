@@ -1,0 +1,7 @@
+# git src：lpkg clone --recurse-submodules，kenlm 子模块随 libime tag 对齐
+pkg-name: libime
+tracker-template: github
+repo: fcitx/libime
+mode: tags
+tag-prefix: ''
+template: git+https://github.com/{repo}@{tag}

@@ -1,0 +1,5 @@
+pkg-name: pciutils
+tracker-template: html-index
+url: 'https://mj.ucw.cz/download/linux/pci/'
+pattern: 'pciutils-([0-9.]+)\.tar\.gz'
+template: 'https://mj.ucw.cz/download/linux/pci/pciutils-{version}.tar.gz'

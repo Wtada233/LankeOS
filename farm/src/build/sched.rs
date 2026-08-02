@@ -1,0 +1,160 @@
+//! sched.rs — 构建顺序（拓扑 + 环切割 + ABI 受害者重排）。纯排序，无构建副作用。
+
+use std::cmp::Reverse;
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
+use std::path::Path;
+
+use crate::graph::Index;
+use crate::tr;
+use crate::ux;
+
+/// Kahn 拓扑排序（只用 needed_so 链接依赖）＋ 环切割。`_pkgs_dir` 保留签名兼容（排序不用配方）。
+pub(crate) fn topo_order(_pkgs_dir: &Path, targets: &[String], old: &Index) -> Vec<String> {
+    let names: HashSet<&str> = targets.iter().map(String::as_str).collect();
+    // graph: pkg → 需要先重建的包。**只用 needed_so（link_deps）**——build_deps/deps 是
+    // 构建工具依赖（base-devel→git→curl），混进去会制造海量伪环（glibc→git 这类：glibc
+    // build 要 git，git 又链 libc），切环刷屏且无关 ABI。SONAME 检查已剥离后 build_deps 排序
+    // 不再关键；只有链接依赖（needed_so → provider）决定重建顺序，天然近 DAG。
+    let mut graph: HashMap<String, Vec<String>> = HashMap::new();
+    let mut in_deg: HashMap<String, usize> = HashMap::new();
+    let mut rev: HashMap<String, Vec<String>> = HashMap::new();
+    for n in targets {
+        let mut set: HashSet<String> = HashSet::new();
+        for d in crate::graph::link_deps(old, n) {
+            if d.as_str() != n.as_str() && names.contains(d.as_str()) {
+                set.insert(d);
+            }
+        }
+        let mut deps: Vec<String> = set.into_iter().collect();
+        deps.sort();
+        graph.insert(n.clone(), deps.clone());
+        in_deg.insert(n.clone(), deps.len());
+        for d in deps {
+            rev.entry(d).or_default().push(n.clone());
+        }
+    }
+
+    // 确定性就绪队列：名字升序（BinaryHeap<Reverse> 弹最小值）
+    let mut heap: BinaryHeap<Reverse<String>> = targets
+        .iter()
+        .filter(|n| in_deg[*n] == 0)
+        .map(|n| Reverse(n.clone()))
+        .collect();
+    let mut order: Vec<String> = Vec::new();
+
+    while order.len() < targets.len() {
+        if heap.is_empty() {
+            // 剩余节点构成环：三色 DFS 找一条后向边切断，警告后继续（循环会逐条断开）
+            if let Some((u, v)) = find_cycle_edge(&graph, &in_deg) {
+                eprintln!("  {}", ux::yellow(&tr!("build.cycle", u, v)));
+                graph.get_mut(&u).unwrap().retain(|x| x != &v);
+                if let Some(ds) = rev.get_mut(&v) {
+                    ds.retain(|x| x != &u);
+                }
+                let e = in_deg.get_mut(&u).unwrap();
+                *e -= 1;
+                if *e == 0 {
+                    heap.push(Reverse(u));
+                }
+                continue;
+            }
+            // 理论不可达兜底：剩余按序追加
+            let mut rest: Vec<String> = targets
+                .iter()
+                .filter(|n| !order.contains(n))
+                .cloned()
+                .collect();
+            rest.sort();
+            order.extend(rest);
+            break;
+        }
+        let n = heap.pop().unwrap().0;
+        order.push(n.clone());
+        if let Some(dependers) = rev.get(&n) {
+            for d in dependers {
+                let e = in_deg.get_mut(d).unwrap();
+                *e -= 1;
+                if *e == 0 {
+                    heap.push(Reverse(d.clone()));
+                }
+            }
+        }
+    }
+    order
+}
+
+/// 在剩余子图（未就绪，in_deg > 0）中找一条构成环的后向边 (u→v)。三色 DFS，确定性。
+/// 子图无环返回 None。
+fn find_cycle_edge(
+    graph: &HashMap<String, Vec<String>>,
+    in_deg: &HashMap<String, usize>,
+) -> Option<(String, String)> {
+    let mut nodes: Vec<String> = graph
+        .keys()
+        .filter(|n| in_deg.get(*n).copied().unwrap_or(0) > 0)
+        .cloned()
+        .collect();
+    nodes.sort();
+    if nodes.is_empty() {
+        return None;
+    }
+    let rem: HashSet<String> = nodes.iter().cloned().collect();
+    let mut color: HashMap<String, u8> = HashMap::new(); // 0=白 1=灰 2=黑
+    for n in &nodes {
+        color.insert(n.clone(), 0);
+    }
+    for root in &nodes {
+        if color.get(root).copied().unwrap_or(0) != 0 {
+            continue;
+        }
+        color.insert(root.clone(), 1);
+        let mut stack: Vec<(String, usize)> = vec![(root.clone(), 0)]; // (node, 邻接索引)
+        while let Some((u, i)) = stack.last().cloned() {
+            let neighbors = graph.get(&u).map(|v| v.as_slice()).unwrap_or(&[]);
+            if i < neighbors.len() {
+                let v = &neighbors[i];
+                if let Some(top) = stack.last_mut() {
+                    top.1 += 1;
+                }
+                if !rem.contains(v) {
+                    continue;
+                }
+                match color.get(v).copied().unwrap_or(0) {
+                    1 => return Some((u, v.clone())), // u→v 后向边：u、v 同栈=成环
+                    0 => {
+                        color.insert(v.clone(), 1);
+                        stack.push((v.clone(), 0));
+                    }
+                    _ => {}
+                }
+            } else {
+                color.insert(u.clone(), 2);
+                stack.pop();
+            }
+        }
+    }
+    None
+}
+
+/// ABI 受害者入队后按**依赖算法**重排队列（deps-first，环切割）。
+/// 被依赖的受害者先建，依赖它们的后建——否则按字母序先建 appstream 时，其构建依赖树里还引用旧
+/// SONAME 的受害者（如 librsvg 引用 libxml2.so.2）未重建，装构建依赖硬报错。
+///
+/// **先去重**：`seen` 只挡"已构建"的包，同一受害者可能被多个 ABI 断裂重复入队（chromium 的
+/// 依赖 libA/libB/libC 各断裂一次 → 3 个 chromium 条目）。重复条目传给 topo_order 会污染
+/// in_deg/rev（rev[libA] 含 3 个 chromium，弹出 libA 时 in_deg 多减 3 次 → 顺序错乱、chromium
+/// 可能在其依赖重建前被构建）。去重后每包唯一；victim 标记取 OR（任一断裂入队 → 按传播重建
+/// bump release）。
+pub(crate) fn reorder_queue(queue: &mut VecDeque<(String, bool)>, pkgs_dir: &Path, old: &Index) {
+    if queue.len() < 2 {
+        return;
+    }
+    let mut flags: HashMap<String, bool> = HashMap::new();
+    for (n, is_victim) in queue.iter() {
+        *flags.entry(n.clone()).or_insert(false) |= *is_victim;
+    }
+    let mut names: Vec<String> = flags.keys().cloned().collect();
+    names.sort();
+    let order = topo_order(pkgs_dir, &names, old);
+    *queue = order.into_iter().map(|n| (n.clone(), flags[&n])).collect();
+}

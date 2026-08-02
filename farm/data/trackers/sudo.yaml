@@ -1,0 +1,5 @@
+pkg-name: sudo
+tracker-template: html-index
+url: https://www.sudo.ws/dist/
+pattern: 'sudo-(\d[\d.]*(?:p\d+)?)\.tar\.gz'
+template: https://www.sudo.ws/dist/sudo-{version}.tar.gz

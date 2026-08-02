@@ -3,20 +3,8 @@
   "version": "3.6.6",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libgio-2.0.so.0",
-    "libglib-2.0.so.0",
-    "libgobject-2.0.so.0",
-    "libnghttp2.so.14",
-    "libpsl.so.5",
-    "libsqlite3.so",
-    "libz.so.1"
-  ],
-  "provides": [
-    "libsoup-3.0.so",
-    "libsoup-3.0.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "glib",

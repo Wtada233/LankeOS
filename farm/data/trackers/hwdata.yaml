@@ -1,0 +1,6 @@
+pkg-name: hwdata
+tracker-template: github
+repo: vcrhonek/hwdata
+mode: tags
+tag-prefix: v
+template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'

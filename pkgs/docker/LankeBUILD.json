@@ -1,6 +1,6 @@
 {
   "name": "docker",
-  "version": "29.6.2",
+  "version": "29.7.1",
   "deps": [
     "containerd",
     "iproute2",
@@ -9,25 +9,18 @@
     "libtool",
     "nftables"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libresolv.so.2",
-    "libsystemd.so.0"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",
-    "containerd",
     "docker",
     "git",
-    "golang",
-    "iptables",
-    "nftables"
+    "golang"
   ],
   "sources": [
-    "https://github.com/docker/cli/archive/refs/tags/v29.6.2.tar.gz",
-    "https://github.com/moby/moby/archive/refs/tags/docker-v29.6.2.tar.gz",
+    "https://github.com/docker/cli/archive/refs/tags/v29.7.1.tar.gz",
+    "https://github.com/moby/moby/archive/refs/tags/docker-v29.7.1.tar.gz",
     "https://github.com/krallin/tini/archive/refs/tags/v0.19.0.tar.gz"
   ],
   "work_sources": []

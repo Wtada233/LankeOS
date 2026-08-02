@@ -1,0 +1,6 @@
+pkg-name: ninja
+tracker-template: github
+repo: ninja-build/ninja
+mode: tags
+tag-prefix: v
+template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'

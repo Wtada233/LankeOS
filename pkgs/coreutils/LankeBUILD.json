@@ -1,16 +1,9 @@
 {
   "name": "coreutils",
-  "version": "9.7",
+  "version": "9.11",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libacl.so.1",
-    "libattr.so.1",
-    "libc.so.6",
-    "libcap.so.2",
-    "libcrypto.so.3",
-    "libgmp.so.10"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "acl",
@@ -23,10 +16,7 @@
     "python"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/coreutils/coreutils-9.7.tar.xz"
+    "https://ftp.gnu.org/gnu/coreutils/coreutils-9.11.tar.xz"
   ],
-  "work_sources": [
-    "https://www.linuxfromscratch.org/patches/lfs/12.4/coreutils-9.7-upstream_fix-1.patch",
-    "https://www.linuxfromscratch.org/patches/lfs/12.4/coreutils-9.7-i18n-1.patch"
-  ]
+  "work_sources": []
 }

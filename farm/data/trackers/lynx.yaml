@@ -1,0 +1,5 @@
+pkg-name: lynx
+tracker-template: html-index
+url: https://invisible-mirror.net/archives/lynx/tarballs/
+pattern: lynx([\d.]+)\.tar\.bz2
+template: https://invisible-mirror.net/archives/lynx/tarballs/lynx{version}.tar.bz2

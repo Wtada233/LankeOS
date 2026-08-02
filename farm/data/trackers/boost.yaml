@@ -1,0 +1,6 @@
+pkg-name: boost
+tracker-template: github
+repo: boostorg/boost
+mode: releases
+tag-prefix: boost-
+template: https://github.com/{repo}/releases/download/boost-{version}/boost-{version}-b2-nodocs.tar.xz

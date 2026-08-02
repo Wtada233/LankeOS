@@ -1,0 +1,5 @@
+pkg-name: xcb-proto
+tracker-template: html-index
+url: "https://xorg.freedesktop.org/archive/individual/proto/"
+pattern: 'xcb-proto-(\d[\d.]*)\.tar\.(?:gz|xz|bz2)'
+template: "https://xorg.freedesktop.org/archive/individual/proto/xcb-proto-{version}.tar.xz"

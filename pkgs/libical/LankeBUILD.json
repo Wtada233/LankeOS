@@ -1,38 +1,10 @@
 {
   "name": "libical",
-  "version": "4.0.3",
+  "version": "4.0.4",
   "release": 1,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libglib-2.0.so.0",
-    "libgobject-2.0.so.0",
-    "libicudata.so.77",
-    "libicui18n.so.77",
-    "libicuuc.so.77",
-    "libm.so.6",
-    "libstdc++.so.6",
-    "libxml2.so.2"
-  ],
-  "provides": [
-    "libical-glib.so",
-    "libical-glib.so.4.0",
-    "libical.so",
-    "libical.so.4.0",
-    "libical_cxx.so",
-    "libical_cxx.so.4.0",
-    "libical_jni.so",
-    "libical_jni.so.4.0",
-    "libicalss.so",
-    "libicalss.so.4.0",
-    "libicalss_cxx.so",
-    "libicalss_cxx.so.4.0",
-    "libicalvcal.so",
-    "libicalvcal.so.4.0",
-    "libicalvcard.so",
-    "libicalvcard.so.4.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",
@@ -47,7 +19,7 @@
     "vala"
   ],
   "sources": [
-    "https://github.com/libical/libical/releases/download/v4.0.3/libical-4.0.3.tar.gz"
+    "https://github.com/libical/libical/releases/download/v4.0.4/libical-4.0.4.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,25 +1,12 @@
 {
   "name": "libxkbcommon",
-  "version": "1.13.1",
+  "version": "1.13.2",
   "release": 3,
   "deps": [
     "xwayland"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libwayland-client.so.0",
-    "libxcb-xkb.so.1",
-    "libxcb.so.1",
-    "libxml2.so.2"
-  ],
-  "provides": [
-    "libxkbcommon-x11.so",
-    "libxkbcommon-x11.so.0",
-    "libxkbcommon.so",
-    "libxkbcommon.so.0",
-    "libxkbregistry.so",
-    "libxkbregistry.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libxcb",
@@ -33,7 +20,7 @@
     "xorgproto"
   ],
   "sources": [
-    "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.1.tar.gz"
+    "https://github.com/xkbcommon/libxkbcommon/archive/refs/tags/xkbcommon-1.13.2.tar.gz"
   ],
   "work_sources": []
 }

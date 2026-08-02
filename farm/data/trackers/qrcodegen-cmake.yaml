@@ -1,0 +1,14 @@
+pkg-name: qrcodegen-cmake
+tracker-template: github
+repo: nayuki/QR-Code-generator
+mode: tags
+tag-prefix: v
+template: 'https://github.com/nayuki/QR-Code-generator/archive/refs/tags/{tag}.tar.gz'
+sources:
+  - pkg-name: qrcodegen-cmake
+    url-match: "EasyCoding/qrcodegen-cmake"
+    tracker-template: github
+    repo: EasyCoding/qrcodegen-cmake
+    mode: tags
+    tag-prefix: v
+    template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'

@@ -1,0 +1,6 @@
+pkg-name: jq
+tracker-template: github
+repo: jqlang/jq
+mode: releases
+tag-prefix: jq-
+template: https://github.com/{repo}/releases/download/{tag}/jq-{version}.tar.gz

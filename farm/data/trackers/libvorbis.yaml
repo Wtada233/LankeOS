@@ -1,0 +1,5 @@
+pkg-name: libvorbis
+tracker-template: html-index
+url: https://downloads.xiph.org/releases/vorbis/
+pattern: libvorbis-(\d[\d.]*)\.tar\.xz
+template: https://downloads.xiph.org/releases/vorbis/libvorbis-{version}.tar.xz

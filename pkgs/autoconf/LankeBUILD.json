@@ -1,6 +1,6 @@
 {
   "name": "autoconf",
-  "version": "2.72",
+  "version": "2.73",
   "release": 2,
   "deps": [
     "bash",
@@ -13,7 +13,7 @@
     "perl"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/autoconf/autoconf-2.72.tar.xz"
+    "https://ftp.gnu.org/gnu/autoconf/autoconf-2.73.tar.xz"
   ],
   "work_sources": []
 }

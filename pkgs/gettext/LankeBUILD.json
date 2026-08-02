@@ -1,6 +1,6 @@
 {
   "name": "gettext",
-  "version": "0.26",
+  "version": "1.0",
   "release": 2,
   "deps": [
     "bash",
@@ -9,30 +9,8 @@
     "ruby",
     "tcl"
   ],
-  "needed_so": [
-    "libacl.so.1",
-    "libattr.so.1",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libgomp.so.1",
-    "libm.so.6",
-    "libncursesw.so.6",
-    "libstdc++.so.6",
-    "libxml2.so.2"
-  ],
-  "provides": [
-    "libasprintf.so",
-    "libasprintf.so.0",
-    "libgettextlib-0.26.so",
-    "libgettextlib.so",
-    "libgettextpo.so",
-    "libgettextpo.so.0",
-    "libgettextsrc-0.26.so",
-    "libgettextsrc.so",
-    "libgnuintl.so.8",
-    "libtextstyle.so",
-    "libtextstyle.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "acl",
     "attr",
@@ -44,7 +22,7 @@
     "tcl"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/gettext/gettext-0.26.tar.xz"
+    "https://ftp.gnu.org/gnu/gettext/gettext-1.0.tar.xz"
   ],
   "work_sources": []
 }

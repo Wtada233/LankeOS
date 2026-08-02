@@ -1,0 +1,5 @@
+pkg-name: libxkbfile
+tracker-template: html-index
+url: https://xorg.freedesktop.org/archive/individual/lib/
+pattern: libxkbfile-(\d[\d.]*)\.tar\.xz
+template: https://xorg.freedesktop.org/archive/individual/lib/libxkbfile-{version}.tar.xz

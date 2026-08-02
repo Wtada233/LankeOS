@@ -1,28 +1,19 @@
 {
   "name": "libxml2",
-  "version": "2.13.9",
+  "version": "2.15.3",
   "release": 1,
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libhistory.so.8",
-    "libm.so.6",
-    "libncursesw.so.6",
-    "libreadline.so.8"
-  ],
-  "provides": [
-    "libxml2.so",
-    "libxml2.so.2"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "ncurses",
     "readline"
   ],
   "sources": [
-    "https://download.gnome.org/sources/libxml2/2.13/libxml2-2.13.9.tar.xz"
+    "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz"
   ],
   "work_sources": []
 }

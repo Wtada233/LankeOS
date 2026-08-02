@@ -1,0 +1,5 @@
+pkg-name: bzip2
+tracker-template: html-index
+url: https://www.sourceware.org/pub/bzip2/
+pattern: 'bzip2-(\d[\d.]*)\.tar\.gz'
+template: https://www.sourceware.org/pub/bzip2/bzip2-{version}.tar.gz

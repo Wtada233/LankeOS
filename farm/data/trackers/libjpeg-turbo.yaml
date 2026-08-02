@@ -1,0 +1,6 @@
+pkg-name: libjpeg-turbo
+tracker-template: github
+repo: libjpeg-turbo/libjpeg-turbo
+mode: tags
+tag-prefix: ''
+template: https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/{tag}.tar.gz

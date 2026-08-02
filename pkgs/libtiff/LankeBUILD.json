@@ -1,24 +1,10 @@
 {
   "name": "libtiff",
-  "version": "4.7.0",
+  "version": "4.7.2",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libjpeg.so.62",
-    "liblzma.so.5",
-    "libm.so.6",
-    "libstdc++.so.6",
-    "libz.so.1",
-    "libzstd.so.1"
-  ],
-  "provides": [
-    "libtiff.so",
-    "libtiff.so.6",
-    "libtiffxx.so",
-    "libtiffxx.so.6"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libjpeg-turbo",
@@ -27,7 +13,7 @@
     "zstd"
   ],
   "sources": [
-    "https://download.osgeo.org/libtiff/tiff-4.7.0.tar.gz"
+    "https://download.osgeo.org/libtiff/tiff-4.7.2.tar.gz"
   ],
   "work_sources": []
 }

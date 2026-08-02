@@ -1,0 +1,5 @@
+pkg-name: gperf
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/gperf/
+pattern: 'gperf-([\d.]+)\.tar\.(?:gz|xz)'
+template: https://ftp.gnu.org/gnu/gperf/gperf-{version}.tar.gz

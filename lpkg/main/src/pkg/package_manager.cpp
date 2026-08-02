@@ -134,29 +134,22 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
             return;
         }
 
+        // 冲突包（版本约束不满足 / SONAME 缺失）→ **硬报错**，install/upgrade 不再自动卸载。
+        // 需要删除冲突包请显式运行 `lpkg force-solve-conflict`（要求输入确认短语）。
         if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
             log_error(get_string("error.dependency_conflict_title"));
-            if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
-                for (const auto& pkg : broken) remove_package(pkg, true);
-                Cache::instance().write();
-                continue;
-            }
-            log_info(get_string("info.installation_aborted"));
-            return;
+            std::string msg;
+            for (const auto& p : broken) msg += "  " + p + "\n";
+            log_error(msg);
+            throw LpkgException(msg);
         }
 
         if (auto nso_broken = detail::check_needed_so_consistency(plan); !nso_broken.empty()) {
             log_error(get_string("error.dependency_conflict_title"));
-            std::string nso_msg;
-            for (const auto& pkg : nso_broken) nso_msg += "  " + pkg + "\n";
-            log_error(nso_msg);
-            if (user_confirms(get_string("prompt.remove_conflict_pkgs"))) {
-                for (const auto& pkg : nso_broken) remove_package(pkg, true);
-                Cache::instance().write();
-                continue;
-            }
-            log_info(get_string("info.installation_aborted"));
-            return;
+            std::string msg;
+            for (const auto& p : nso_broken) msg += "  " + p + "\n";
+            log_error(msg);
+            throw LpkgException(msg);
         }
 
         break;
@@ -869,6 +862,87 @@ void upgrade_packages()
     cleanup_db_backups();
 
     log_info(string_format("info.upgraded_packages", upgraded_count));
+}
+
+/**
+ * force-solve-conflict — 显式删除所有被当前仓库状态打破的已安装包。
+ *
+ * 判定"打破"：已安装包的 needed_so 中任一 SONAME 当前仓库无人提供（ABI 断裂），
+ * 或其依赖版本约束在仓库中无法满足。列出冲突包后要求输入确认短语
+ * `I understand that this may break my system.` 才真正删除（防误操作）。
+ *
+ * 设计（配合 rebuild 流程）：install/upgrade 遇冲突一律硬报错、不再自动卸载；
+ * 本命令是唯一显式的冲突清理入口。farm 容器内用
+ * `echo "I understand that this may break my system." | lpkg force-solve-conflict` 喂入短语，
+ * 删除后 upgrade/rebuild 即可继续。
+ */
+void force_solve_conflict()
+{
+    constexpr const char* PHRASE = "I understand that this may break my system.";
+
+    log_info(get_string("info.force_solve_start"));
+    Repository repo;
+    repo.load_index();
+
+    std::set<std::string> broken;
+    auto& cache = Cache::instance();
+    {
+        std::lock_guard lock(cache.get_mutex());
+        for (const auto& [pkg, ver] : cache.get_all_installed()) {
+            // needed_so：当前仓库无人提供 → 打破
+            const fs::path nso_file = Config::instance().needed_so_dir() / pkg;
+            if (fs::exists(nso_file)) {
+                std::ifstream f(nso_file);
+                std::string soname;
+                while (std::getline(f, soname)) {
+                    if (soname.empty()) continue;
+                    if (!repo.find_provider(soname)) {
+                        broken.insert(pkg);
+                        break;
+                    }
+                }
+            }
+            if (broken.count(pkg)) continue;
+            // deps：版本约束在仓库中无法满足 → 打破
+            const fs::path dep_file = Config::instance().dep_dir() / pkg;
+            if (fs::exists(dep_file)) {
+                std::ifstream f(dep_file);
+                std::string line;
+                while (std::getline(f, line)) {
+                    if (line.empty()) continue;
+                    for (const auto& dep : detail::parse_dep_strings({line})) {
+                        if (dep.constraints.empty()) continue;
+                        if (!repo.find_best_matching_version(dep.name, dep.constraints)) {
+                            broken.insert(pkg);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (broken.empty()) {
+        log_info(get_string("info.force_solve_none"));
+        return;
+    }
+
+    log_warning(get_string("error.dependency_conflict_title"));
+    for (const auto& p : broken) log_warning(string_format("warning.force_solve_pkg", p));
+
+    // 必须输入确认短语——任何非交互模式都不绕过（显式破坏性操作）
+    std::cout << string_format("info.force_solve_confirm", PHRASE);
+    std::cout.flush();
+    std::string input;
+    std::getline(std::cin, input);
+    if (!input.empty() && input.back() == '\r') input.pop_back();
+    if (input != PHRASE) {
+        throw LpkgException(get_string("error.force_solve_phrase_mismatch"));
+    }
+
+    for (const auto& p : broken) remove_package(p, true);
+    cache.write();
+    log_info(string_format("info.force_solve_removed", broken.size()));
 }
 
 /** 显示包的 man 页面内容 */

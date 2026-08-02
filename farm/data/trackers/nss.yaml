@@ -1,0 +1,10 @@
+pkg-name: nss
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -euo pipefail
+  html=$(curl -fsSL https://ftp.mozilla.org/pub/security/nss/releases/)
+  ver=$(printf '%s' "$html" | grep -oE 'NSS_[0-9]+(_[0-9]+)*_RTM' | sed -E 's/^NSS_//; s/_RTM$//; s/_/./g' | sort -V | tail -n1)
+  dir="NSS_$(printf '%s' "$ver" | tr '.' '_')_RTM"
+  echo "$ver"
+  echo "https://ftp.mozilla.org/pub/security/nss/releases/${dir}/src/nss-${ver}.tar.gz"

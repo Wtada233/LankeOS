@@ -3,10 +3,7 @@
   "version": "2.8",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libattr.so.1",
-    "libc.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "attr",

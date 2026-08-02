@@ -1,0 +1,5 @@
+pkg-name: gcc
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/gcc/
+pattern: 'gcc-(\d[\d.]*)'
+template: https://ftp.gnu.org/gnu/gcc/gcc-{version}/gcc-{version}.tar.xz

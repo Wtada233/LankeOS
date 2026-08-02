@@ -1,12 +1,9 @@
 {
   "name": "gn",
-  "version": "0.2385.9ece3f52",
+  "version": "20260731.3fd3b062",
   "release": 1,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libstdc++.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -16,7 +13,7 @@
     "python"
   ],
   "sources": [
-    "https://gn.googlesource.com/gn/+archive/9ece3f5254c273cb46606a6571963f931c3b012d.tar.gz"
+    "https://gn.googlesource.com/gn/+archive/3fd3b0624d8cba16927853600130b2c33d4e7928.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

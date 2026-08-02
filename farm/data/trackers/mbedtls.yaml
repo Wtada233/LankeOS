@@ -1,0 +1,7 @@
+# git src：mbedtls-framework 子模块随 mbedtls tag 对齐
+pkg-name: mbedtls
+tracker-template: github
+repo: Mbed-TLS/mbedtls
+mode: tags
+tag-prefix: v
+template: git+https://github.com/{repo}@{tag}

@@ -1,0 +1,5 @@
+pkg-name: ripgrep
+tracker-template: github
+repo: BurntSushi/ripgrep
+mode: releases
+template: "https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz"

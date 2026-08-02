@@ -1,0 +1,6 @@
+pkg-name: rust-bindgen
+tracker-template: github
+repo: rust-lang/rust-bindgen
+mode: tags
+tag-prefix: v
+template: "https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz"

@@ -1,24 +1,15 @@
 {
   "name": "alsa-lib",
-  "version": "1.2.15.3",
+  "version": "1.2.16.1",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libm.so.6"
-  ],
-  "provides": [
-    "libasound.so",
-    "libasound.so.2",
-    "libatopology.so",
-    "libatopology.so.2"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],
   "sources": [
-    "https://github.com/alsa-project/alsa-lib/archive/refs/tags/v1.2.15.3.tar.gz"
+    "https://github.com/alsa-project/alsa-lib/archive/refs/tags/v1.2.16.1.tar.gz"
   ],
   "work_sources": []
 }

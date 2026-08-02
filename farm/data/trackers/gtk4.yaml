@@ -1,0 +1,5 @@
+pkg-name: gtk4
+tracker-template: gnome
+source-name: gtk
+major-version-lock: 4
+template: 'https://download.gnome.org/sources/gtk/{path_version}/gtk-{version}.tar.xz'

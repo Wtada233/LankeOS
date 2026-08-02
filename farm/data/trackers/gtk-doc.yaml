@@ -1,0 +1,6 @@
+pkg-name: gtk-doc
+tracker-template: gitlab
+host: gitlab.gnome.org
+project: GNOME/gtk-doc
+mode: tags
+template: 'https://gitlab.gnome.org/GNOME/gtk-doc/-/archive/{tag}/gtk-doc-{tag}.tar.gz'

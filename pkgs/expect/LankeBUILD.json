@@ -5,15 +5,8 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libexpect5.45.4.so",
-    "libm.so.6",
-    "libtcl8.6.so"
-  ],
-  "provides": [
-    "libexpect5.45.4.so"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],

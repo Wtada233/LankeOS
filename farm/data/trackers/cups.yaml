@@ -1,0 +1,6 @@
+pkg-name: cups
+tracker-template: github
+repo: OpenPrinting/cups
+mode: releases
+tag-prefix: v
+template: https://github.com/OpenPrinting/cups/releases/download/{tag}/cups-{version}-source.tar.gz

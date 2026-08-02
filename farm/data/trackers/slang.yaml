@@ -1,0 +1,5 @@
+pkg-name: slang
+tracker-template: html-index
+url: https://www.jedsoft.org/releases/slang/
+pattern: 'slang-(\d[\d.]*[a-z]?)\.tar\.bz2'
+template: https://www.jedsoft.org/releases/slang/slang-{version}.tar.bz2

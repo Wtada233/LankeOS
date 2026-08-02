@@ -1,19 +1,16 @@
 {
   "name": "sed",
-  "version": "4.9",
+  "version": "4.10",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libacl.so.1",
-    "libc.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "acl",
     "base-devel"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/sed/sed-4.9.tar.xz"
+    "https://ftp.gnu.org/gnu/sed/sed-4.10.tar.xz"
   ],
   "work_sources": []
 }

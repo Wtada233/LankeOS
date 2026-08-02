@@ -1,0 +1,5 @@
+pkg-name: readline
+tracker-template: html-index
+url: "https://ftp.gnu.org/gnu/readline/"
+pattern: 'readline-(\d+(?:\.\d+)*)\.tar\.gz'
+template: "https://ftp.gnu.org/gnu/readline/readline-{version}.tar.gz"

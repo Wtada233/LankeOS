@@ -1,0 +1,5 @@
+pkg-name: gnutls
+tracker-template: html-index
+url: https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/
+pattern: 'gnutls-([\d.]+)\.tar\.xz'
+template: https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-{version}.tar.xz

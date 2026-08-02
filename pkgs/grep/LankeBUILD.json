@@ -5,10 +5,7 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libpcre2-8.so.0"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",

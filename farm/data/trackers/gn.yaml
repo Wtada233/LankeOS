@@ -1,0 +1,13 @@
+pkg-name: gn
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -e
+  # VERSION 文件路径 404，改用提交日期 + hash 作版本
+  json=$(curl -fsSL "https://gn.googlesource.com/gn/+log/main?format=JSON&n=1" | sed "1s/)]}'//")
+  HASH=$(printf '%s' "$json" | grep -oE '"commit": "[0-9a-f]{40}"' | head -1 | grep -oE '[0-9a-f]{40}')
+  TIME=$(printf '%s' "$json" | grep -oE '"time": "[^"]*"' | head -1 | cut -d'"' -f4)
+  # git 时间格式 "Fri Jul 31 14:17:37 2026 +1000"，GNU date 解析不了时区后缀，取月日年
+  DATE=$(date -u -d "$(echo "$TIME" | awk '{print $2, $3, $5}')" +%Y%m%d)
+  echo "${DATE}.${HASH:0:8}"
+  echo "https://gn.googlesource.com/gn/+archive/${HASH}.tar.gz"

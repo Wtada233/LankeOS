@@ -1,19 +1,11 @@
 {
   "name": "vala",
-  "version": "0.56.19",
+  "version": "0.57.0",
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libglib-2.0.so.0",
-    "libgmodule-2.0.so.0",
-    "libgobject-2.0.so.0"
-  ],
-  "provides": [
-    "libvala-0.56.so",
-    "libvala-0.56.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "autoconf-archive",
     "base-devel",
@@ -26,7 +18,7 @@
     "vala"
   ],
   "sources": [
-    "https://gitlab.gnome.org/GNOME/vala/-/archive/0.56.19/vala-0.56.19.tar.gz"
+    "https://gitlab.gnome.org/GNOME/vala/-/archive/0.57.0/vala-0.57.0.tar.gz"
   ],
   "work_sources": []
 }

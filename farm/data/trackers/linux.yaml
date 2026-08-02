@@ -1,0 +1,5 @@
+pkg-name: linux
+tracker-template: html-index
+url: https://www.kernel.org/pub/linux/kernel/v7.x/
+pattern: linux-([\d.]+)\.tar\.gz
+template: https://www.kernel.org/pub/linux/kernel/v7.x/linux-{version}.tar.gz

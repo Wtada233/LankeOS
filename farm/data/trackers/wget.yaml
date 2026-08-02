@@ -1,0 +1,5 @@
+pkg-name: wget
+tracker-template: html-index
+url: "https://ftp.gnu.org/gnu/wget/"
+pattern: 'wget-(\d[\d.]*)\.tar\.gz'
+template: "https://ftp.gnu.org/gnu/wget/wget-{version}.tar.gz"

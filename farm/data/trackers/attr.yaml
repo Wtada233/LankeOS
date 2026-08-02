@@ -1,0 +1,5 @@
+pkg-name: attr
+tracker-template: html-index
+url: https://download-mirror.savannah.gnu.org/releases/attr/
+pattern: attr-(\d[\d.]*)\.tar\.gz
+template: https://download-mirror.savannah.gnu.org/releases/attr/{name}-{version}.tar.gz

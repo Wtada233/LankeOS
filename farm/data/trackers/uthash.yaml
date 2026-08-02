@@ -1,0 +1,6 @@
+pkg-name: uthash
+tracker-template: github
+repo: troydhanson/uthash
+mode: tags
+tag-prefix: v
+template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'

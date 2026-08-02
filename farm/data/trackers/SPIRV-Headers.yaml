@@ -1,0 +1,8 @@
+pkg-name: SPIRV-Headers
+tracker-template: github
+repo: KhronosGroup/SPIRV-Headers
+mode: tags
+tag-prefix: vulkan-sdk-
+template: https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/{tag}.tar.gz
+order: after(vulkan-headers)
+same-version: vulkan-headers

@@ -1,0 +1,6 @@
+pkg-name: libpathrs
+tracker-template: github
+repo: cyphar/libpathrs
+mode: releases
+tag-prefix: v
+template: https://github.com/{repo}/releases/download/{tag}/libpathrs-{version}.tar.xz

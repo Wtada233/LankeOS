@@ -1,21 +1,19 @@
 {
   "name": "kbd",
-  "version": "2.8.0",
+  "version": "2.10.0",
   "release": 2,
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel"
   ],
   "sources": [
-    "https://www.kernel.org/pub/linux/utils/kbd/kbd-2.8.0.tar.xz"
+    "https://www.kernel.org/pub/linux/utils/kbd/kbd-2.10.0.tar.xz"
   ],
   "work_sources": [
-    "https://www.linuxfromscratch.org/patches/lfs/12.4/kbd-2.8.0-backspace-1.patch"
+    "https://www.linuxfromscratch.org/patches/downloads/kbd/kbd-2.10.0-backspace-1.patch"
   ]
 }

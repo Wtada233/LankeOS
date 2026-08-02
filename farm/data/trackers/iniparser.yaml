@@ -1,0 +1,6 @@
+pkg-name: iniparser
+tracker-template: github
+repo: ndevilla/iniparser
+mode: tags
+tag-prefix: v
+template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'

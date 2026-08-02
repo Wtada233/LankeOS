@@ -1,0 +1,13 @@
+pkg-name: sqlite
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -e
+  # 下载页无直连 href，用 PRODUCT 行（PRODUCT,版本,路径/filename）
+  html=$(curl -s https://www.sqlite.org/download.html)
+  prod=$(echo "$html" | grep -oE 'PRODUCT,[0-9.]+,[0-9]+/sqlite-autoconf-[0-9]+\.tar\.gz' | head -1)
+  ver=$(echo "$prod" | cut -d, -f2)
+  path=$(echo "$prod" | cut -d, -f3)
+  test -n "$ver" || exit 1
+  echo "$ver"
+  echo "https://www.sqlite.org/$path"

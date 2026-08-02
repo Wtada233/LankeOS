@@ -1,0 +1,5 @@
+pkg-name: libogg
+tracker-template: html-index
+url: https://downloads.xiph.org/releases/ogg/
+pattern: 'libogg-(\d[\d.]*)\.tar\.xz'
+template: https://downloads.xiph.org/releases/ogg/libogg-{version}.tar.xz

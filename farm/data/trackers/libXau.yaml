@@ -1,0 +1,5 @@
+pkg-name: libXau
+tracker-template: html-index
+url: https://xorg.freedesktop.org/archive/individual/lib/
+pattern: 'libXau-([0-9][0-9.]*)\.tar\.xz'
+template: 'https://xorg.freedesktop.org/archive/individual/lib/libXau-{version}.tar.xz'

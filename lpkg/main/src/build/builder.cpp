@@ -61,7 +61,7 @@ fs::path setup_build_directories(const fs::path& build_dir)
     ensure_dir_exists(staging_hooks);
     {
         std::ofstream h(staging_hooks / constants::POSTINST_SH);
-        h << "#!/bin/sh" << constants::NL;
+        h << "#!/bin/bash" << constants::NL;
     }
     fs::permissions(staging_hooks / constants::POSTINST_SH,
                     fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,

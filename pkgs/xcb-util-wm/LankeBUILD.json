@@ -3,16 +3,8 @@
   "version": "0.4.2",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libxcb.so.1"
-  ],
-  "provides": [
-    "libxcb-ewmh.so",
-    "libxcb-ewmh.so.2",
-    "libxcb-icccm.so",
-    "libxcb-icccm.so.4"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libxcb",

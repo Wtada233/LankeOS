@@ -1,22 +1,12 @@
 {
   "name": "libinput",
-  "version": "1.30.901",
+  "version": "1.31.3",
   "release": 2,
   "deps": [
     "python"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libevdev.so.2",
-    "liblua.so.5.5",
-    "libm.so.6",
-    "libmtdev.so.1",
-    "libudev.so.1"
-  ],
-  "provides": [
-    "libinput.so",
-    "libinput.so.10"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cairo",
@@ -34,7 +24,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/libinput/libinput/-/archive/1.30.901/libinput-1.30.901.tar.gz"
+    "https://gitlab.freedesktop.org/libinput/libinput/-/archive/1.31.3/libinput-1.31.3.tar.gz"
   ],
   "work_sources": []
 }

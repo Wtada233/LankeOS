@@ -3,22 +3,8 @@
   "version": "5.87",
   "release": 1,
   "deps": [],
-  "needed_so": [
-    "libasound.so.2",
-    "libc.so.6",
-    "libdbus-1.so.3",
-    "libglib-2.0.so.0",
-    "libical.so.4.0",
-    "libicalvcal.so.4.0",
-    "libjson-c.so.5",
-    "libreadline.so.8",
-    "libsystemd.so.0",
-    "libudev.so.1"
-  ],
-  "provides": [
-    "libbluetooth.so",
-    "libbluetooth.so.3"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "alsa-lib",
     "base-devel",

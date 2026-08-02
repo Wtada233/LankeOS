@@ -1,14 +1,9 @@
 {
   "name": "openssh",
-  "version": "9.9",
+  "version": "10.4p1",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libcrypt.so.2",
-    "libcrypto.so.3",
-    "libz.so.1"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "Linux-PAM",
@@ -19,7 +14,7 @@
     "zlib"
   ],
   "sources": [
-    "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-9.9p1.tar.gz"
+    "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.4p1.tar.gz"
   ],
   "work_sources": []
 }

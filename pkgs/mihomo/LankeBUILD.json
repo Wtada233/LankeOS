@@ -1,19 +1,16 @@
 {
   "name": "mihomo",
-  "version": "1.19.27",
+  "version": "1.19.29",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libresolv.so.2"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "golang"
   ],
   "sources": [
-    "https://github.com/MetaCubeX/mihomo/archive/refs/tags/v1.19.27.tar.gz"
+    "https://github.com/MetaCubeX/mihomo/archive/refs/tags/v1.19.29.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

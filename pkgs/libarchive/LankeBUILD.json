@@ -1,23 +1,10 @@
 {
   "name": "libarchive",
-  "version": "3.8.8",
+  "version": "3.8.9",
   "release": 1,
   "deps": [],
-  "needed_so": [
-    "libacl.so.1",
-    "libbz2.so.1.0",
-    "libc.so.6",
-    "libcrypto.so.3",
-    "liblz4.so.1",
-    "liblzma.so.5",
-    "libxml2.so.2",
-    "libz.so.1",
-    "libzstd.so.1"
-  ],
-  "provides": [
-    "libarchive.so",
-    "libarchive.so.13"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "acl",
     "base-devel",
@@ -29,7 +16,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/libarchive/libarchive/releases/download/v3.8.8/libarchive-3.8.8.tar.xz"
+    "https://github.com/libarchive/libarchive/releases/download/v3.8.9/libarchive-3.8.9.tar.xz"
   ],
   "work_sources": []
 }

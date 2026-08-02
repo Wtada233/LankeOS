@@ -1,0 +1,7 @@
+pkg-name: speexdsp
+tracker-template: gitlab
+host: gitlab.xiph.org
+project: xiph/speexdsp
+mode: tags
+tag-prefix: SpeexDSP-
+template: https://gitlab.xiph.org/xiph/speexdsp/-/archive/{tag}/speexdsp-{tag}.tar.gz

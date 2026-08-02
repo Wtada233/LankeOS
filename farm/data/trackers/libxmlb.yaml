@@ -1,0 +1,5 @@
+pkg-name: libxmlb
+tracker-template: github
+repo: hughsie/libxmlb
+mode: releases
+template: https://github.com/hughsie/libxmlb/releases/download/{tag}/libxmlb-{version}.tar.xz

@@ -1,6 +1,6 @@
 {
   "name": "xtrans",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -9,7 +9,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/xtrans-1.5.0.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/lib/xtrans-1.6.0.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

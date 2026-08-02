@@ -1,0 +1,5 @@
+pkg-name: libx264
+tracker-template: html-index
+url: https://anduin.linuxfromscratch.org/BLFS/x264/
+pattern: x264-(\d{8})\.tar\.xz
+template: https://anduin.linuxfromscratch.org/BLFS/x264/x264-{version}.tar.xz

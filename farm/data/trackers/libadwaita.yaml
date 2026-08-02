@@ -1,0 +1,7 @@
+pkg-name: libadwaita
+tracker-template: gitlab
+host: gitlab.gnome.org
+project: 'GNOME/libadwaita'
+mode: tags
+tag-prefix: ''
+template: 'https://gitlab.gnome.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz'

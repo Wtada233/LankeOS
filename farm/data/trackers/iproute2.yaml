@@ -1,0 +1,5 @@
+pkg-name: iproute2
+tracker-template: html-index
+url: https://www.kernel.org/pub/linux/utils/net/iproute2/
+pattern: 'iproute2-([\d.]+)\.tar\.xz'
+template: https://www.kernel.org/pub/linux/utils/net/iproute2/iproute2-{version}.tar.xz

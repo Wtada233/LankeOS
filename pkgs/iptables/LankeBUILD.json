@@ -4,25 +4,8 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libmnl.so.0",
-    "libnetfilter_conntrack.so.3",
-    "libnfnetlink.so.0",
-    "libnftnl.so.11",
-    "libpcap.so.1"
-  ],
-  "provides": [
-    "libip4tc.so",
-    "libip4tc.so.2",
-    "libip6tc.so",
-    "libip6tc.so.2",
-    "libipq.so",
-    "libipq.so.0",
-    "libxtables.so",
-    "libxtables.so.12"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libmnl",

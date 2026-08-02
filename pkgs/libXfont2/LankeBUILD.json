@@ -1,19 +1,10 @@
 {
   "name": "libXfont2",
-  "version": "2.0.7",
+  "version": "2.0.8",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libfontenc.so.1",
-    "libfreetype.so.6",
-    "libm.so.6",
-    "libz.so.1"
-  ],
-  "provides": [
-    "libXfont2.so",
-    "libXfont2.so.2"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "fontenc",
@@ -21,7 +12,7 @@
     "zlib"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libXfont2-2.0.7.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/lib/libXfont2-2.0.8.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

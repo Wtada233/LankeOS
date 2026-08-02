@@ -1,10 +1,20 @@
-build_test/
-build/
-coverage_report/
+lpkg/build_test/
+lpkg/build/
+lpkg/coverage_report/
 
-run_tests
 *.o
 lrepo-mgr.json
+
+# Rust (farm)
+farm/target/
+
+# 构建期预下载的源归档（farm 源预下载 §8.6 / lpkg build 的缓存位置 pkgs/<pkg>/）
+pkgs/*/*.tar.gz
+pkgs/*/*.tar.xz
+pkgs/*/*.tar.bz2
+pkgs/*/*.tgz
+pkgs/*/*.zip
+pkgs/*/*.zst
 
 # 官网 (site/)
 site/node_modules/

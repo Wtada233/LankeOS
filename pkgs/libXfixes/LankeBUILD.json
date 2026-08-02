@@ -1,22 +1,16 @@
 {
   "name": "libXfixes",
-  "version": "6.0.1",
+  "version": "6.0.2",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libX11.so.6",
-    "libc.so.6"
-  ],
-  "provides": [
-    "libXfixes.so",
-    "libXfixes.so.3"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libX11"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libXfixes-6.0.1.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/lib/libXfixes-6.0.2.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

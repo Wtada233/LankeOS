@@ -3,13 +3,8 @@
   "version": "4.2.6",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libiniparser.so",
-    "libiniparser.so.4"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",

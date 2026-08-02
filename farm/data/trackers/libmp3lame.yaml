@@ -1,0 +1,6 @@
+pkg-name: libmp3lame
+tracker-template: sourceforge
+project: lame
+path: lame
+pattern: 'lame-(\d+\.\d[\d.]*)\.tar\.gz'
+template: https://downloads.sourceforge.net/project/{project}/lame/{path_version}/lame-{version}.tar.gz

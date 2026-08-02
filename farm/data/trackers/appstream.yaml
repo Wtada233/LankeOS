@@ -1,0 +1,6 @@
+pkg-name: appstream
+tracker-template: github
+repo: ximion/appstream
+mode: tags
+tag-prefix: v
+template: https://github.com/ximion/appstream/archive/refs/tags/{tag}.tar.gz

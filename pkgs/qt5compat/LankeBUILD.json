@@ -2,20 +2,8 @@
   "name": "qt5compat",
   "version": "6.11.1",
   "deps": [],
-  "needed_so": [
-    "libQt6Core.so.6",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libicudata.so.77",
-    "libicui18n.so.77",
-    "libicuuc.so.77",
-    "libm.so.6",
-    "libstdc++.so.6"
-  ],
-  "provides": [
-    "libQt6Core5Compat.so",
-    "libQt6Core5Compat.so.6"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",

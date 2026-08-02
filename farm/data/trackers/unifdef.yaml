@@ -1,0 +1,5 @@
+pkg-name: unifdef
+tracker-template: html-index
+url: https://dotat.at/prog/unifdef/
+pattern: 'unifdef-(\d[\d.]*)\.tar\.gz'
+template: 'https://dotat.at/prog/unifdef/unifdef-{version}.tar.gz'

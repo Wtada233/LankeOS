@@ -1,17 +1,15 @@
 {
   "name": "which",
-  "version": "2.21",
+  "version": "2.25",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/which/which-2.21.tar.gz"
+    "https://ftp.gnu.org/gnu/which/which-2.25.tar.gz"
   ],
   "work_sources": []
 }

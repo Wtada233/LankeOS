@@ -1,0 +1,5 @@
+pkg-name: python
+tracker-template: html-index
+url: 'https://www.python.org/ftp/python/'
+pattern: '(\d+\.\d+\.\d+)/'
+template: 'https://www.python.org/ftp/python/{version}/Python-{version}.tar.xz'

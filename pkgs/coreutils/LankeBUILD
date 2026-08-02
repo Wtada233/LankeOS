@@ -4,14 +4,6 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    for dir in */; do
-        if [ -d "$dir" ]; then
-            cd "$dir"
-            break
-        fi
-    done
-    patch -Np1 -i {WORK_DIR}/coreutils-*-i18n-1.patch
-    patch -Np1 -i {WORK_DIR}/coreutils-*-upstream_fix-1.patch
     autoreconf -fv
     automake -af
     FORCE_UNSAFE_CONFIGURE=1 ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --enable-no-install-program=kill,uptime

@@ -1,20 +1,10 @@
 {
   "name": "libxmu",
-  "version": "1.2.1",
+  "version": "1.3.1",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libX11.so.6",
-    "libXext.so.6",
-    "libXt.so.6",
-    "libc.so.6"
-  ],
-  "provides": [
-    "libXmu.so",
-    "libXmu.so.6",
-    "libXmuu.so",
-    "libXmuu.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libX11",
@@ -23,7 +13,7 @@
     "util-macros"
   ],
   "sources": [
-    "https://www.x.org/releases/individual/lib/libXmu-1.2.1.tar.xz"
+    "https://www.x.org/releases/individual/lib/libXmu-1.3.1.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

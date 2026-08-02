@@ -1,0 +1,7 @@
+# git src：plog/usrsctp 子模块随 libdatachannel tag 对齐，不再单独追踪
+pkg-name: libdatachannel
+tracker-template: github
+repo: paullouisageneau/libdatachannel
+mode: tags
+tag-prefix: v
+template: git+https://github.com/{repo}@{tag}

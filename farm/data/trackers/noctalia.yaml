@@ -1,0 +1,6 @@
+pkg-name: noctalia
+tracker-template: github
+repo: noctalia-dev/noctalia
+mode: releases
+tag-prefix: v
+template: 'https://github.com/{repo}/releases/download/{tag}/noctalia-latest.tar.gz'

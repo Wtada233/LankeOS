@@ -1,0 +1,5 @@
+pkg-name: xwayland
+tracker-template: html-index
+url: https://xorg.freedesktop.org/archive/individual/xserver/
+pattern: xwayland-([\d.]+)\.tar\.xz
+template: https://xorg.freedesktop.org/archive/individual/xserver/xwayland-{version}.tar.xz

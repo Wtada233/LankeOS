@@ -1,0 +1,6 @@
+pkg-name: intel-media-driver
+tracker-template: github
+repo: intel/media-driver
+mode: tags
+tag-prefix: intel-media-
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

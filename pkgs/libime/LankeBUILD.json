@@ -1,27 +1,10 @@
 {
   "name": "libime",
-  "version": "1.1.10",
+  "version": "1.1.15",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libFcitx5Utils.so.2",
-    "libboost_iostreams.so.1.90.0",
-    "libboost_random.so.1.90.0",
-    "libboost_regex.so.1.90.0",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libstdc++.so.6",
-    "libzstd.so.1"
-  ],
-  "provides": [
-    "libIMECore.so",
-    "libIMECore.so.0",
-    "libIMEPinyin.so",
-    "libIMEPinyin.so.0",
-    "libIMETable.so",
-    "libIMETable.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "boost",
@@ -34,8 +17,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/fcitx/libime/archive/1.1.10.tar.gz",
-    "https://github.com/kpu/kenlm/archive/bcd4af619a2fa45f5876d8855f7876cc09f663af.tar.gz"
+    "git+https://github.com/fcitx/libime@1.1.15"
   ],
   "work_sources": []
 }

@@ -1,27 +1,19 @@
 {
   "name": "libpng",
-  "version": "1.6.50",
+  "version": "1.6.58",
   "release": 2,
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libz.so.1"
-  ],
-  "provides": [
-    "libpng.so",
-    "libpng16.so",
-    "libpng16.so.16"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "git",
     "zlib"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/libpng/libpng-1.6.50.tar.xz"
+    "https://downloads.sourceforge.net/libpng/libpng-1.6.58.tar.xz"
   ],
   "work_sources": []
 }

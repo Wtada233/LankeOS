@@ -1,22 +1,15 @@
 {
   "name": "libcap",
-  "version": "2.76",
+  "version": "2.78",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libcap.so",
-    "libcap.so.2",
-    "libpsx.so",
-    "libpsx.so.2"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],
   "sources": [
-    "https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.76.tar.xz"
+    "https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.78.tar.xz"
   ],
   "work_sources": []
 }

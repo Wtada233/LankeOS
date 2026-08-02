@@ -1,30 +1,13 @@
 {
   "name": "at-spi2-core",
-  "version": "2.56.4",
+  "version": "2.60.6",
   "release": 2,
   "deps": [
     "bash",
     "xwayland"
   ],
-  "needed_so": [
-    "libX11.so.6",
-    "libXi.so.6",
-    "libXtst.so.6",
-    "libc.so.6",
-    "libdbus-1.so.3",
-    "libgio-2.0.so.0",
-    "libglib-2.0.so.0",
-    "libgmodule-2.0.so.0",
-    "libgobject-2.0.so.0"
-  ],
-  "provides": [
-    "libatk-1.0.so",
-    "libatk-1.0.so.0",
-    "libatk-bridge-2.0.so",
-    "libatk-bridge-2.0.so.0",
-    "libatspi.so",
-    "libatspi.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "dbus",
@@ -39,7 +22,7 @@
     "ninja"
   ],
   "sources": [
-    "https://download.gnome.org/sources/at-spi2-core/2.56/at-spi2-core-2.56.4.tar.xz"
+    "https://download.gnome.org/sources/at-spi2-core/2.60/at-spi2-core-2.60.6.tar.xz"
   ],
   "work_sources": []
 }

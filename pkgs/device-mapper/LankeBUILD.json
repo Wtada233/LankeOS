@@ -4,17 +4,8 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libudev.so.1"
-  ],
-  "provides": [
-    "libdevmapper-event.so",
-    "libdevmapper-event.so.1.02",
-    "libdevmapper.so",
-    "libdevmapper.so.1.02"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],

@@ -1,0 +1,6 @@
+pkg-name: libyaml
+tracker-template: github
+repo: yaml/libyaml
+mode: releases
+tag-prefix: ""
+template: https://github.com/yaml/libyaml/releases/download/{tag}/yaml-{version}.tar.gz

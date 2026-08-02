@@ -1,0 +1,5 @@
+pkg-name: libpciaccess
+tracker-template: html-index
+url: 'https://www.x.org/pub/individual/lib/'
+pattern: 'libpciaccess-(\d[\d.]*)\.tar\.'
+template: 'https://www.x.org/pub/individual/lib/libpciaccess-{version}.tar.xz'

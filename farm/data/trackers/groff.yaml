@@ -1,0 +1,5 @@
+pkg-name: groff
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/groff/
+pattern: 'groff-([\d.]+)\.tar\.(?:gz|xz)'
+template: https://ftp.gnu.org/gnu/groff/groff-{version}.tar.gz

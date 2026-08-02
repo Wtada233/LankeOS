@@ -1,13 +1,10 @@
 {
   "name": "fzf",
-  "version": "0.74.1",
+  "version": "0.74.2",
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libresolv.so.2"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -15,7 +12,7 @@
     "golang"
   ],
   "sources": [
-    "https://github.com/junegunn/fzf/archive/refs/tags/v0.74.1.tar.gz"
+    "https://github.com/junegunn/fzf/archive/refs/tags/v0.74.2.tar.gz"
   ],
   "work_sources": []
 }

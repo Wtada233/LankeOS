@@ -1,0 +1,5 @@
+pkg-name: libidn2
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/libidn/
+pattern: 'libidn2-(\d[\d.]*)\.tar\.(?:gz|xz|bz2)'
+template: https://ftp.gnu.org/gnu/libidn/libidn2-{version}.tar.gz

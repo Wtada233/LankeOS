@@ -1,0 +1,5 @@
+pkg-name: firefox
+tracker-template: html-index
+url: https://archive.mozilla.org/pub/firefox/releases/
+pattern: '(\d[\d.]*)/'
+template: https://archive.mozilla.org/pub/firefox/releases/{version}/source/firefox-{version}.source.tar.xz

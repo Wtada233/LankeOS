@@ -1,0 +1,6 @@
+pkg-name: duktape
+tracker-template: github
+repo: svaarala/duktape
+mode: tags
+tag-prefix: v
+template: https://duktape.org/duktape-{version}.tar.xz

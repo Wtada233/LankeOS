@@ -1,0 +1,5 @@
+pkg-name: itstool
+tracker-template: github
+repo: itstool/itstool
+mode: tags
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

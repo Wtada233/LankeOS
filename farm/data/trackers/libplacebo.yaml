@@ -1,0 +1,8 @@
+# libplacebo 用 git src：lpkg 的 libgit2 clone v<tag> 并 --recurse-submodules，
+# 3rdparty 子模块（Vulkan-Headers/fast_float/glad/jinja/markupsafe/nuklear）随 tag 自动对齐，不再单独追踪。
+pkg-name: libplacebo
+tracker-template: github
+repo: haasn/libplacebo
+mode: tags
+tag-prefix: v
+template: 'git+https://github.com/{repo}@{tag}'

@@ -1,0 +1,5 @@
+pkg-name: util-linux
+tracker-template: html-index
+url: https://www.kernel.org/pub/linux/utils/util-linux/v2.41/
+pattern: 'util-linux-(\d+\.\d+(?:\.\d+)?)\.tar\.xz'
+template: 'https://www.kernel.org/pub/linux/utils/util-linux/v2.41/util-linux-{version}.tar.xz'

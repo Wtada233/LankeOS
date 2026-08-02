@@ -1,0 +1,5 @@
+pkg-name: mpfr
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/mpfr/
+pattern: 'mpfr-([0-9.]+)\.tar\.xz'
+template: https://ftp.gnu.org/gnu/mpfr/mpfr-{version}.tar.xz

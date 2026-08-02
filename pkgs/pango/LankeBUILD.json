@@ -1,28 +1,10 @@
 {
   "name": "pango",
-  "version": "1.56.4",
+  "version": "1.90.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libcairo.so.2",
-    "libfontconfig.so.1",
-    "libfreetype.so.6",
-    "libfribidi.so.0",
-    "libgio-2.0.so.0",
-    "libglib-2.0.so.0",
-    "libgobject-2.0.so.0",
-    "libharfbuzz.so.0",
-    "libm.so.6"
-  ],
-  "provides": [
-    "libpango-1.0.so",
-    "libpango-1.0.so.0",
-    "libpangocairo-1.0.so",
-    "libpangocairo-1.0.so.0",
-    "libpangoft2-1.0.so",
-    "libpangoft2-1.0.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cairo",
@@ -36,7 +18,7 @@
     "ninja"
   ],
   "sources": [
-    "https://download.gnome.org/sources/pango/1.56/pango-1.56.4.tar.xz"
+    "https://download.gnome.org/sources/pango/1.90/pango-1.90.0.tar.xz"
   ],
   "work_sources": []
 }

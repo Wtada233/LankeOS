@@ -3,13 +3,8 @@
   "version": "1.3.6",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libogg.so",
-    "libogg.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],

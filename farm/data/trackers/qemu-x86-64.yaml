@@ -1,0 +1,5 @@
+pkg-name: qemu-x86-64
+tracker-template: html-index
+url: 'https://download.qemu.org/'
+pattern: 'qemu-(\d[\d.]*)\.tar\.'
+template: 'https://download.qemu.org/qemu-{version}.tar.xz'

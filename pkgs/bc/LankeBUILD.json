@@ -3,10 +3,7 @@
   "version": "7.0.3",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libreadline.so.8"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",

@@ -1,0 +1,5 @@
+pkg-name: xkbcomp
+tracker-template: html-index
+url: https://xorg.freedesktop.org/archive/individual/app/
+pattern: 'xkbcomp-(\d[\d.]*)\.tar\.xz'
+template: https://xorg.freedesktop.org/archive/individual/app/xkbcomp-{version}.tar.xz

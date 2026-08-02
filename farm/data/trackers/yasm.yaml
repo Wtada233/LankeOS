@@ -1,0 +1,5 @@
+pkg-name: yasm
+tracker-template: html-index
+url: https://www.tortall.net/projects/yasm/releases/
+pattern: yasm-([\d.]+)\.tar\.gz
+template: https://www.tortall.net/projects/yasm/releases/yasm-{version}.tar.gz

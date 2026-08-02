@@ -1,0 +1,6 @@
+pkg-name: libffi
+tracker-template: github
+repo: libffi/libffi
+mode: releases
+tag-prefix: v
+template: https://github.com/libffi/libffi/releases/download/{tag}/libffi-{version}.tar.gz

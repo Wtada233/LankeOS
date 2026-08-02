@@ -1,19 +1,10 @@
 {
   "name": "libjpeg-turbo",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libm.so.6"
-  ],
-  "provides": [
-    "libjpeg.so",
-    "libjpeg.so.62",
-    "libturbojpeg.so",
-    "libturbojpeg.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",
@@ -21,7 +12,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.1.1.tar.gz"
+    "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/3.2.0.tar.gz"
   ],
   "work_sources": []
 }

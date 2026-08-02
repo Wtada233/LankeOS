@@ -1,0 +1,5 @@
+pkg-name: libgcrypt
+tracker-template: html-index
+url: https://www.gnupg.org/ftp/gcrypt/libgcrypt/
+pattern: 'libgcrypt-(\d[\d.]*)\.tar\.(?:gz|bz2|xz)'
+template: https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-{version}.tar.bz2

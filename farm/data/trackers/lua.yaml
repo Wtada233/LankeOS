@@ -1,0 +1,5 @@
+pkg-name: lua
+tracker-template: html-index
+url: https://www.lua.org/ftp/
+pattern: lua-([\d.]+)\.tar\.gz
+template: https://www.lua.org/ftp/lua-{version}.tar.gz

@@ -1,0 +1,5 @@
+pkg-name: xml-parser
+tracker-template: html-index
+url: https://cpan.metacpan.org/authors/id/T/TO/TODDR/
+pattern: 'XML-Parser-(\d[\d.]*)\.tar\.gz'
+template: https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-{version}.tar.gz

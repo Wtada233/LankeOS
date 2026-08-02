@@ -1,0 +1,6 @@
+pkg-name: systemd
+tracker-template: github
+repo: systemd/systemd
+mode: tags
+tag-prefix: v
+template: https://github.com/systemd/systemd/archive/refs/tags/{tag}.tar.gz

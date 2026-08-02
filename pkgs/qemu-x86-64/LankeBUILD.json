@@ -1,42 +1,11 @@
 {
   "name": "qemu-x86-64",
-  "version": "9.2.3",
+  "version": "11.0.3",
   "release": 2,
   "deps": [
     "xwayland"
   ],
-  "needed_so": [
-    "libX11.so.6",
-    "libasound.so.2",
-    "libatomic.so.1",
-    "libbz2.so.1.0",
-    "libc.so.6",
-    "libcairo.so.2",
-    "libcurl.so.4",
-    "libepoxy.so.0",
-    "libfdt.so.1",
-    "libgbm.so.1",
-    "libgdk-3.so.0",
-    "libgdk_pixbuf-2.0.so.0",
-    "libgio-2.0.so.0",
-    "libglib-2.0.so.0",
-    "libgmodule-2.0.so.0",
-    "libgnutls.so.30",
-    "libgobject-2.0.so.0",
-    "libgtk-3.so.0",
-    "libjpeg.so.62",
-    "libm.so.6",
-    "libncursesw.so.6",
-    "libpam.so.0",
-    "libpipewire-0.3.so.0",
-    "libpixman-1.so.0",
-    "libpng16.so.16",
-    "libslirp.so.0",
-    "libudev.so.1",
-    "libxkbcommon.so.0",
-    "libz.so.1",
-    "libzstd.so.1"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "Linux-PAM",
@@ -64,6 +33,6 @@
     "zstd"
   ],
   "sources": [
-    "https://download.qemu.org/qemu-9.2.3.tar.xz"
+    "https://download.qemu.org/qemu-11.0.3.tar.xz"
   ]
 }

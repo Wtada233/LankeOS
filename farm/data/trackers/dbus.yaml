@@ -1,0 +1,5 @@
+pkg-name: dbus
+tracker-template: html-index
+url: https://dbus.freedesktop.org/releases/dbus/
+pattern: 'dbus-(\d[\d.]*)\.tar\.xz'
+template: https://dbus.freedesktop.org/releases/dbus/dbus-{version}.tar.xz

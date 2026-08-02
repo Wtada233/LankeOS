@@ -153,7 +153,7 @@ int run_command(const std::vector<std::string>& args, const fs::path& work_dir)
  */
 int run_shell(const std::string& cmd, const fs::path& work_dir)
 {
-    return run_command({std::string(constants::BIN_SH), "-c", cmd}, work_dir);
+    return run_command({std::string(constants::BIN_BASH), "-c", cmd}, work_dir);
 }
 
 /**

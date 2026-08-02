@@ -6,12 +6,7 @@
     "bash",
     "python"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libfreetype.so.6",
-    "liblzma.so.5",
-    "libtasn1.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",

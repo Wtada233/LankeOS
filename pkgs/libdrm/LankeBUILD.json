@@ -1,24 +1,10 @@
 {
   "name": "libdrm",
-  "version": "2.4.131",
+  "version": "2.4.134",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libpciaccess.so.0"
-  ],
-  "provides": [
-    "libdrm.so",
-    "libdrm.so.2",
-    "libdrm_amdgpu.so",
-    "libdrm_amdgpu.so.1",
-    "libdrm_intel.so",
-    "libdrm_intel.so.1",
-    "libdrm_nouveau.so",
-    "libdrm_nouveau.so.2",
-    "libdrm_radeon.so",
-    "libdrm_radeon.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cairo",
@@ -27,7 +13,7 @@
     "ninja"
   ],
   "sources": [
-    "https://dri.freedesktop.org/libdrm/libdrm-2.4.131.tar.xz"
+    "https://dri.freedesktop.org/libdrm/libdrm-2.4.134.tar.xz"
   ],
   "work_sources": []
 }

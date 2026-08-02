@@ -2,15 +2,8 @@
   "name": "b3sum",
   "version": "1.8.5",
   "deps": [],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libgcc_s.so.1"
-  ],
-  "provides": [
-    "libblake3.so",
-    "libblake3.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",

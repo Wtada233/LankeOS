@@ -2,13 +2,8 @@
   "name": "libseccomp",
   "version": "2.6.1",
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libseccomp.so",
-    "libseccomp.so.2"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],

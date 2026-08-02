@@ -1,0 +1,16 @@
+pkg-name: zip
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -e
+  rss=$(curl -s "https://sourceforge.net/projects/infozip/rss?path=/Zip%203.x%20%28latest%29")
+  file=$(echo "$rss" | grep -oP 'zip[0-9]+\.tar\.gz' | sort -Vu | tail -1)
+  nums=${file#zip}
+  nums=${nums%.tar.gz}
+  if [[ ${#nums} -eq 2 ]]; then
+    ver="${nums:0:1}.${nums:1:1}"
+  else
+    ver="${nums:0:1}.${nums:1:2}"
+  fi
+  echo "$ver"
+  echo "https://downloads.sourceforge.net/project/infozip/Zip%203.x%20%28latest%29/${ver}/zip${nums}.tar.gz"

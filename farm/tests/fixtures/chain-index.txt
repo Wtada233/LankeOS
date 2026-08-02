@@ -1,0 +1,5 @@
+# rust > llvm > libxml2 链条：验证 ABI 传播不穿透未变化的中间层
+libxml2|2.9.0:hash::libxml2.so,libxml2.so.2:ld-linux.so.2,libc.so.6|
+llvm|18.1.0:hash::libLLVM.so,libLLVM.so.18:libxml2.so.2,libc.so.6|
+rust|1.80.0:hash::rustc:libLLVM.so.18,libc.so.6|
+glibc|2.39:hash::libc.so,libc.so.6,ld-linux.so.2:|

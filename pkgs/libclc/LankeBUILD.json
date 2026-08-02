@@ -1,6 +1,6 @@
 {
   "name": "libclc",
-  "version": "22.1.7",
+  "version": "22.1.8",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -14,7 +14,7 @@
     "python"
   ],
   "sources": [
-    "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.7/llvm-project-22.1.7.src.tar.xz"
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/llvm-project-22.1.8.src.tar.xz"
   ],
   "work_sources": [],
   "no_strip": true

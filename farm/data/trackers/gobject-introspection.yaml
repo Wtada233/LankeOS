@@ -1,0 +1,3 @@
+pkg-name: gobject-introspection
+tracker-template: gnome
+template: https://download.gnome.org/sources/gobject-introspection/{path_version}/gobject-introspection-{version}.tar.xz

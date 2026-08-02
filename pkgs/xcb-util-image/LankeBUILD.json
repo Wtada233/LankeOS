@@ -5,16 +5,8 @@
   "deps": [
     "xwayland"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libxcb-shm.so.0",
-    "libxcb-util.so.1",
-    "libxcb.so.1"
-  ],
-  "provides": [
-    "libxcb-image.so",
-    "libxcb-image.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libxcb",

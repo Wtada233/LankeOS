@@ -1,0 +1,5 @@
+pkg-name: libtiff
+tracker-template: html-index
+url: https://download.osgeo.org/libtiff/
+pattern: 'tiff-(\d[\d.]*)\.tar\.gz'
+template: https://download.osgeo.org/libtiff/tiff-{version}.tar.gz

@@ -1,0 +1,5 @@
+pkg-name: iptables
+tracker-template: html-index
+url: https://www.netfilter.org/projects/iptables/downloads.html
+pattern: 'iptables-([\d.]+)\.tar\.xz'
+template: https://www.netfilter.org/projects/iptables/files/iptables-{version}.tar.xz

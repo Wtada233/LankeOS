@@ -1,6 +1,6 @@
 {
   "name": "parallel",
-  "version": "20250522",
+  "version": "20260722",
   "release": 2,
   "deps": [
     "bash",
@@ -13,6 +13,6 @@
     "perl"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/gnu/parallel/parallel-20250522.tar.bz2"
+    "https://ftp.gnu.org/gnu/parallel/parallel-20260722.tar.bz2"
   ]
 }

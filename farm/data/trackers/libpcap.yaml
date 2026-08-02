@@ -1,0 +1,5 @@
+pkg-name: libpcap
+tracker-template: html-index
+url: https://www.tcpdump.org/release/
+pattern: 'libpcap-(\d[\d.]*)\.tar\.gz'
+template: https://www.tcpdump.org/release/libpcap-{version}.tar.gz

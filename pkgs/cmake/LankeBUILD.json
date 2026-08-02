@@ -1,22 +1,12 @@
 {
   "name": "cmake",
-  "version": "4.2.3",
+  "version": "4.4.2",
   "release": 2,
   "deps": [
     "bash",
     "xwayland"
   ],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libdl.so.2",
-    "libfontconfig.so.1",
-    "libfreetype.so.6",
-    "libm.so.6",
-    "libpthread.so.0",
-    "librt.so.1",
-    "libxcb.so.1"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -28,7 +18,7 @@
     "qt6-base"
   ],
   "sources": [
-    "https://github.com/Kitware/CMake/releases/download/v4.2.3/cmake-4.2.3-linux-x86_64.tar.gz"
+    "https://github.com/Kitware/CMake/releases/download/v4.4.2/cmake-4.4.2-linux-x86_64.tar.gz"
   ],
   "work_sources": []
 }

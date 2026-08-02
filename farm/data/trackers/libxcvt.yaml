@@ -1,0 +1,5 @@
+pkg-name: libxcvt
+tracker-template: html-index
+url: https://xorg.freedesktop.org/archive/individual/lib/
+pattern: libxcvt-(\d[\d.]*)\.tar\.xz
+template: https://xorg.freedesktop.org/archive/individual/lib/libxcvt-{version}.tar.xz

@@ -1,0 +1,5 @@
+pkg-name: acl
+tracker-template: html-index
+url: https://download.savannah.gnu.org/releases/acl/
+pattern: 'acl-([\d.]+)\.tar\.'
+template: https://download.savannah.gnu.org/releases/acl/acl-{version}.tar.xz

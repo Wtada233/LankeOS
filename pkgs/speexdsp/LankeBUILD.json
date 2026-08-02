@@ -2,14 +2,8 @@
   "name": "speexdsp",
   "version": "1.2.1",
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6"
-  ],
-  "provides": [
-    "libspeexdsp.so",
-    "libspeexdsp.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],

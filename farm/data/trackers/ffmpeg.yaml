@@ -1,0 +1,5 @@
+pkg-name: ffmpeg
+tracker-template: html-index
+url: https://ffmpeg.org/releases/
+pattern: 'ffmpeg-(\d[\d.]*)\.tar\.xz'
+template: https://ffmpeg.org/releases/ffmpeg-{version}.tar.xz

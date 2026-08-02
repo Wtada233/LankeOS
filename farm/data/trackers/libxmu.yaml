@@ -1,0 +1,5 @@
+pkg-name: libxmu
+tracker-template: html-index
+url: https://www.x.org/releases/individual/lib/
+pattern: libXmu-([\d.]+)\.tar\.xz
+template: https://www.x.org/releases/individual/lib/libXmu-{version}.tar.xz

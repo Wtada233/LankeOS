@@ -1,0 +1,7 @@
+pkg-name: linux-firmware
+tracker-template: gitlab
+host: gitlab.com
+project: kernel-firmware/linux-firmware
+mode: tags
+tag-prefix: ""
+template: https://gitlab.com/kernel-firmware/linux-firmware/-/archive/{version}/linux-firmware-{version}.tar.gz

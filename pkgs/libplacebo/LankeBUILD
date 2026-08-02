@@ -1,18 +1,11 @@
 lankebuild_prepare() {
-    # tarball 不含 submodule，从依赖的 tag tarball 恢复
-    # 先删 tarball 里的 gitlink 空目录，否则 mv 会把它挪进空目录里
-    cd libplacebo-{ORIG_PKG_VER}
-    rm -rf 3rdparty/Vulkan-Headers 3rdparty/fast_float 3rdparty/glad 3rdparty/jinja 3rdparty/markupsafe demos/3rdparty/nuklear
-    mv "{WORK_DIR}"/Vulkan-Headers-v* 3rdparty/Vulkan-Headers
-    mv "{WORK_DIR}"/fast_float-* 3rdparty/fast_float
-    mv "{WORK_DIR}"/glad-* 3rdparty/glad
-    mv "{WORK_DIR}"/jinja-* 3rdparty/jinja
-    mv "{WORK_DIR}"/markupsafe-* 3rdparty/markupsafe
-    mv "{WORK_DIR}"/Nuklear-* demos/3rdparty/nuklear
+    # git src：lpkg 的 libgit2 clone v<tag> 已 --recurse-submodules，
+    # 3rdparty/* 子模块（Vulkan-Headers/fast_float/glad/jinja/markupsafe/nuklear）已在对应提交就位
+    :
 }
 
 lankebuild_build() {
-    cd libplacebo-{ORIG_PKG_VER}
+    # git clone 是单目录，lpkg 已在仓库根目录
     meson setup build \
         --prefix={PREFIX} \
         --buildtype=release \

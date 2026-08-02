@@ -1,6 +1,6 @@
 {
   "name": "vulkan-headers",
-  "version": "1.4.350.1",
+  "version": "1.4.357.0",
   "release": 2,
   "deps": [
     "python"
@@ -15,7 +15,7 @@
     "python"
   ],
   "sources": [
-    "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.350.1.tar.gz"
+    "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz"
   ],
   "work_sources": []
 }

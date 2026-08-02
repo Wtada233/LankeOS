@@ -1,0 +1,6 @@
+pkg-name: libxcrypt
+tracker-template: github
+repo: besser82/libxcrypt
+mode: releases
+tag-prefix: v
+template: https://github.com/besser82/libxcrypt/releases/download/{tag}/libxcrypt-{version}.tar.xz

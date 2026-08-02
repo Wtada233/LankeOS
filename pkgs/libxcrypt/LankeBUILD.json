@@ -1,20 +1,15 @@
 {
   "name": "libxcrypt",
-  "version": "4.4.38",
+  "version": "4.5.2",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libcrypt.so",
-    "libcrypt.so.2"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],
   "sources": [
-    "https://github.com/besser82/libxcrypt/releases/download/v4.4.38/libxcrypt-4.4.38.tar.xz"
+    "https://github.com/besser82/libxcrypt/releases/download/v4.5.2/libxcrypt-4.5.2.tar.xz"
   ],
   "work_sources": []
 }

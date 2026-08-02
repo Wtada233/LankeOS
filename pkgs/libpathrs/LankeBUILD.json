@@ -2,16 +2,8 @@
   "name": "libpathrs",
   "version": "0.2.5",
   "deps": [],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libgcc_s.so.1"
-  ],
-  "provides": [
-    "libpathrs.so",
-    "libpathrs.so.0",
-    "libpathrs.so.0.2.5"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cargo"

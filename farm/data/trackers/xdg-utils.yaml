@@ -1,0 +1,5 @@
+pkg-name: xdg-utils
+tracker-template: html-index
+url: https://deb.debian.org/debian/pool/main/x/xdg-utils/
+pattern: 'xdg-utils_(\d[\d.]*)\.orig\.tar\.gz'
+template: https://deb.debian.org/debian/pool/main/x/xdg-utils/xdg-utils_{version}.orig.tar.gz

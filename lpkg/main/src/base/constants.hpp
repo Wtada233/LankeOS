@@ -73,7 +73,7 @@ inline constexpr std::string_view DIR_ETC_PREFIX = "/etc/";
 // 脚本与 Shell 路径
 inline constexpr std::string_view POSTINST_SH = "postinst.sh";
 inline constexpr std::string_view PRERM_SH = "prerm.sh";
-inline constexpr std::string_view BIN_SH = "/bin/sh";
+inline constexpr std::string_view BIN_BASH = "/bin/bash";
 
 // 文件后缀与扩展名
 inline constexpr std::string_view EXT_LPKG = ".lpkg";
@@ -93,6 +93,7 @@ inline constexpr std::string_view CMD_QUERY = "query";
 inline constexpr std::string_view CMD_MAN = "man";
 inline constexpr std::string_view CMD_PACK = "pack";
 inline constexpr std::string_view CMD_BUILD = "build";
+inline constexpr std::string_view CMD_FORCE_SOLVE = "force-solve-conflict";
 inline constexpr std::string_view CMD_SCAN = "scan";
 inline constexpr std::string_view CMD_DEPEND = "depend";
 inline constexpr std::string_view CMD_REC = "rec";

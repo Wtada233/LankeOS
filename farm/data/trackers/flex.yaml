@@ -1,0 +1,6 @@
+pkg-name: flex
+tracker-template: github
+repo: westes/flex
+mode: releases
+tag-prefix: "v"
+template: https://github.com/westes/flex/releases/download/{tag}/flex-{version}.tar.gz

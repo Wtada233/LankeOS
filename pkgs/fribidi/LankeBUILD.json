@@ -3,13 +3,8 @@
   "version": "1.0.16",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libfribidi.so",
-    "libfribidi.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "git",

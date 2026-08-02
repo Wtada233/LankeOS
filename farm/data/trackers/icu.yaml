@@ -1,0 +1,12 @@
+pkg-name: icu
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -euo pipefail
+  json=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} -H "Accept: application/vnd.github+json" "https://api.github.com/repos/unicode-org/icu/releases/latest")
+  tag=$(printf '%s' "$json" | grep -o '"tag_name": *"[^"]*"' | head -n1 | cut -d'"' -f4)
+  ver=${tag#"release-"}
+  ver=${ver//-/.}
+  echo "$ver"
+  vunder=${ver//./_}
+  echo "https://github.com/unicode-org/icu/releases/download/${tag}/icu4c-${vunder}-src.tgz"

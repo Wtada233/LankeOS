@@ -1,0 +1,5 @@
+pkg-name: ell
+tracker-template: html-index
+url: https://mirrors.edge.kernel.org/pub/linux/libs/ell/
+pattern: ell-(\d[\d.]*)\.tar\.xz
+template: https://mirrors.edge.kernel.org/pub/linux/libs/ell/ell-{version}.tar.xz

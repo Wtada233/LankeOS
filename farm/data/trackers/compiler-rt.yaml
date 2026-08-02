@@ -1,0 +1,9 @@
+pkg-name: compiler-rt
+tracker-template: github
+repo: llvm/llvm-project
+# 所有 LLVM 子包 follow llvm 版本（llvm-project 同源发布）
+same-version: llvm
+order: after(llvm)
+mode: releases
+tag-prefix: llvmorg-
+template: https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-project-{version}.src.tar.xz

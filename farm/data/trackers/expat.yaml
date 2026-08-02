@@ -1,0 +1,9 @@
+pkg-name: expat
+tracker-template: script
+script-content: |
+  data=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} https://api.github.com/repos/libexpat/libexpat/releases/latest)
+  version=$(printf '%s\n' "$data" | grep -o '"tag_name": *"R_[0-9_]*"' | head -n1 | sed 's/.*R_//; s/"//' | tr '_' '.')
+  url=$(printf '%s\n' "$data" | grep -o '"browser_download_url": *"[^"]*"' | sed -E 's/.*"([^"]*)"$/\1/' | grep -F "expat-${version}.tar.gz" | head -n1)
+  test -n "$version" -a -n "$url" || exit 1
+  echo "$version"
+  echo "$url"

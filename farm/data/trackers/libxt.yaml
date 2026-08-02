@@ -1,0 +1,7 @@
+pkg-name: libxt
+tracker-template: gitlab
+host: gitlab.freedesktop.org
+project: xorg/lib/libXt
+mode: tags
+tag-prefix: libXt-
+template: https://gitlab.freedesktop.org/xorg/lib/libXt/-/archive/libXt-{version}/libXt-libXt-{version}.tar.gz

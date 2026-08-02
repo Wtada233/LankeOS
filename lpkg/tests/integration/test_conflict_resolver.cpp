@@ -101,6 +101,8 @@ TEST_F(ConflictResolverTest, AutoUpgradeToSatisfyDependency)
 
 TEST_F(ConflictResolverTest, PromptToRemoveBrokenExistingPackage)
 {
+    // 新版语义：install 遇 broken 包（升级让已装包不满足版本约束）**硬报错**，
+    // 不再自动删除——删除走显式 `force-solve-conflict`。
     std::string p_lib1 = create_pkg("libtest", "1.0");
     std::string p_old = create_pkg("oldapp", "1.0", {"libtest == 1.0"});
     install_packages({p_lib1, p_old});
@@ -108,19 +110,17 @@ TEST_F(ConflictResolverTest, PromptToRemoveBrokenExistingPackage)
     std::string p_lib2 = create_pkg("libtest", "2.0");
     std::string p_new = create_pkg("newapp", "1.0", {"libtest >= 2.0"});
 
-    EXPECT_NO_THROW(install_packages({p_new, p_lib2}));
-
+    EXPECT_THROW(install_packages({p_new, p_lib2}), LpkgException);
+    // oldapp 未被自动删除；libtest 也未升级（事务回滚）
     {
         std::ifstream pkgs(Config::instance().pkgs_file());
         std::string line;
-        bool found_old = false, found_new = false, found_lib2 = false;
+        bool found_old = false, found_lib1 = false;
         while (std::getline(pkgs, line)) {
             if (line.starts_with("oldapp:")) found_old = true;
-            if (line.starts_with("newapp:")) found_new = true;
-            if (line == "libtest:2.0") found_lib2 = true;
+            if (line == "libtest:1.0") found_lib1 = true;
         }
-        EXPECT_FALSE(found_old) << "Broken package oldapp was not removed!";
-        EXPECT_TRUE(found_new);
-        EXPECT_TRUE(found_lib2);
+        EXPECT_TRUE(found_old) << "Broken package oldapp 不应被自动删除";
+        EXPECT_TRUE(found_lib1) << "libtest 不应被升级（硬报错应回滚）";
     }
 }

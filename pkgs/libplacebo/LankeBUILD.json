@@ -3,20 +3,8 @@
   "version": "7.360.1",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libglslang-default-resource-limits.so.16",
-    "libglslang.so.16",
-    "liblcms2.so.2",
-    "libm.so.6",
-    "libstdc++.so.6",
-    "libvulkan.so.1"
-  ],
-  "provides": [
-    "libplacebo.so",
-    "libplacebo.so.360"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "glslang",
@@ -28,12 +16,6 @@
     "vulkan-loader"
   ],
   "sources": [
-    "https://github.com/haasn/libplacebo/archive/refs/tags/v7.360.1.tar.gz",
-    "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.350.1.tar.gz",
-    "https://github.com/fastfloat/fast_float/archive/refs/tags/v8.2.9.tar.gz",
-    "https://github.com/Dav1dde/glad/archive/refs/tags/v2.0.8.tar.gz",
-    "https://github.com/pallets/jinja/archive/refs/tags/3.1.6.tar.gz",
-    "https://github.com/pallets/markupsafe/archive/refs/tags/3.0.3.tar.gz",
-    "https://github.com/Immediate-Mode-UI/Nuklear/archive/refs/tags/v4.13.3.tar.gz"
+    "git+https://github.com/haasn/libplacebo@v7.360.1"
   ]
 }

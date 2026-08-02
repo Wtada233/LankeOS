@@ -1,0 +1,11 @@
+# doxygen.nl/files/ 被 Cloudflare 拦（403），改用 GitHub releases。
+# tag 形如 Release_1_17_0 → 版本 1.17.0；源码走 GitHub archive tarball。
+pkg-name: doxygen
+tracker-template: script
+script-content: |
+  data=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} https://api.github.com/repos/doxygen/doxygen/releases/latest)
+  tag=$(printf '%s\n' "$data" | grep -o '"tag_name": *"Release_[0-9_]*"' | head -n1 | sed 's/.*"tag_name": *"//; s/"//')
+  version=$(printf '%s' "$tag" | sed 's/^Release_//; s/_/./g')
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "https://github.com/doxygen/doxygen/archive/refs/tags/${tag}.tar.gz"

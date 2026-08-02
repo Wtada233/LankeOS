@@ -1,0 +1,11 @@
+pkg-name: libnl
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -e
+  api="https://api.github.com/repos/thom311/libnl/releases/latest"
+  json=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} "$api")
+  tag=$(echo "$json" | grep -o '"tag_name": *"[^"]*"' | head -n1 | sed 's/.*"\([^"]*\)"$/\1/')
+  version=$(echo "$tag" | sed 's/libnl3_/3./; s/_/./g')
+  echo "$version"
+  echo "https://github.com/thom311/libnl/releases/download/$tag/libnl-$version.tar.gz"

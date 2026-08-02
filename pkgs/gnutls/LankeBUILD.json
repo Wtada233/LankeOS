@@ -1,26 +1,10 @@
 {
   "name": "gnutls",
-  "version": "3.8.11",
+  "version": "3.8.13",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libgmp.so.10",
-    "libhogweed.so.6",
-    "libm.so.6",
-    "libnettle.so.8",
-    "libp11-kit.so.0",
-    "libstdc++.so.6",
-    "libtasn1.so.6"
-  ],
-  "provides": [
-    "libgnutls.so",
-    "libgnutls.so.30",
-    "libgnutlsxx.so",
-    "libgnutlsxx.so.30"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "gmp",
@@ -29,7 +13,7 @@
     "p11-kit"
   ],
   "sources": [
-    "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.11.tar.xz"
+    "https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.13.tar.xz"
   ],
   "work_sources": []
 }

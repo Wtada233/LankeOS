@@ -1,8 +1,5 @@
 lankebuild_prepare() {
-    # 子模块 obs-browser 和 obs-websocket（cmake 检查目录存在性）
-    git clone --depth 1 https://github.com/obsproject/obs-browser.git plugins/obs-browser
-    git clone --depth 1 https://github.com/obsproject/obs-websocket.git plugins/obs-websocket
-
+    # git src：obs-browser/obs-websocket 子模块已随 clone --recurse-submodules 就位
     cmake -B build -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_BUILD_TYPE=None \

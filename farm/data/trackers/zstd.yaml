@@ -1,0 +1,6 @@
+pkg-name: zstd
+tracker-template: github
+repo: facebook/zstd
+mode: releases
+tag-prefix: v
+template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.gz

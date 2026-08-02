@@ -45,7 +45,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
 
     const bool use_chroot =
         (Config::instance().root_dir() != "/" && Config::instance().root_dir().string() != "/");
-    std::vector<std::string> args = {std::string(constants::BIN_SH), "-c"};
+    std::vector<std::string> args = {std::string(constants::BIN_BASH), "-c"};
 
     if (use_chroot) {
         if (!fs::exists(Config::instance().root_dir() / "bin/sh")) {

@@ -1,0 +1,8 @@
+pkg-name: fftw
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -e
+  ver=$(curl -fsSL https://www.fftw.org/download.html | grep -oE 'fftw-[0-9]+(\.[0-9]+)+\.tar\.gz' | sed -E 's/fftw-([0-9.]+)\.tar\.gz/\1/' | sort -V | tail -n1)
+  echo "$ver"
+  echo "https://www.fftw.org/fftw-${ver}.tar.gz"

@@ -3,16 +3,8 @@
   "version": "1.2.2",
   "release": 1,
   "deps": [],
-  "needed_so": [
-    "libasound.so.2",
-    "libc.so.6",
-    "libm.so.6",
-    "libmp3lame.so.0"
-  ],
-  "provides": [
-    "libsndfile.so",
-    "libsndfile.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "alsa-lib",
     "base-devel",

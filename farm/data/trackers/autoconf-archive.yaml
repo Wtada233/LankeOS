@@ -1,0 +1,5 @@
+pkg-name: autoconf-archive
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/autoconf-archive/
+pattern: autoconf-archive-([\d.]+)\.tar\.(?:gz|xz)
+template: https://ftp.gnu.org/gnu/autoconf-archive/{name}-{version}.tar.xz

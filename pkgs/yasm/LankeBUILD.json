@@ -3,9 +3,7 @@
   "version": "1.3.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",

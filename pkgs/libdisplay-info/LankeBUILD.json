@@ -1,16 +1,10 @@
 {
   "name": "libdisplay-info",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6"
-  ],
-  "provides": [
-    "libdisplay-info.so",
-    "libdisplay-info.so.3"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "hwdata",
@@ -19,7 +13,7 @@
     "python"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/0.3.0/libdisplay-info-0.3.0.tar.gz"
+    "https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/0.4.0/libdisplay-info-0.4.0.tar.gz"
   ],
   "work_sources": []
 }

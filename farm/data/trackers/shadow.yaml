@@ -1,0 +1,5 @@
+pkg-name: shadow
+tracker-template: github
+repo: shadow-maint/shadow
+mode: releases
+template: "https://github.com/{repo}/releases/download/{tag}/shadow-{version}.tar.xz"

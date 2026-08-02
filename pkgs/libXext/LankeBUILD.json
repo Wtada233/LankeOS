@@ -1,22 +1,16 @@
 {
   "name": "libXext",
-  "version": "1.3.6",
+  "version": "1.3.7",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libX11.so.6",
-    "libc.so.6"
-  ],
-  "provides": [
-    "libXext.so",
-    "libXext.so.6"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libX11"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libXext-1.3.6.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/lib/libXext-1.3.7.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

@@ -2,20 +2,7 @@
   "name": "xdg-desktop-portal",
   "version": "1.22.1",
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libfuse3.so.4",
-    "libgdk_pixbuf-2.0.so.0",
-    "libgio-2.0.so.0",
-    "libglib-2.0.so.0",
-    "libgobject-2.0.so.0",
-    "libgstpbutils-1.0.so.0",
-    "libgstreamer-1.0.so.0",
-    "libgudev-1.0.so.0",
-    "libjson-glib-1.0.so.0",
-    "libpipewire-0.3.so.0",
-    "libsystemd.so.0"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",

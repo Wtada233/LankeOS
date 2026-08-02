@@ -1,0 +1,5 @@
+pkg-name: libva-utils
+tracker-template: github
+repo: intel/libva-utils
+mode: releases
+template: https://github.com/intel/libva-utils/releases/download/{version}/libva-utils-{version}.tar.bz2

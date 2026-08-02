@@ -1,0 +1,5 @@
+pkg-name: findutils
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/findutils/
+pattern: 'findutils-(\d[\d.]*)\.tar\.xz'
+template: https://ftp.gnu.org/gnu/findutils/findutils-{version}.tar.xz

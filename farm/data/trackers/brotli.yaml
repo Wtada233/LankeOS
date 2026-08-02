@@ -1,0 +1,6 @@
+pkg-name: brotli
+tracker-template: github
+repo: google/brotli
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

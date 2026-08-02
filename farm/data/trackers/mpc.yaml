@@ -1,0 +1,5 @@
+pkg-name: mpc
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/mpc/
+pattern: 'mpc-([0-9.]+)\.tar\.gz'
+template: https://ftp.gnu.org/gnu/mpc/mpc-{version}.tar.gz

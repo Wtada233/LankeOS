@@ -1,14 +1,11 @@
 {
   "name": "findutils",
-  "version": "4.10.0",
+  "version": "4.11.0",
   "release": 2,
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -17,7 +14,7 @@
     "python"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/findutils/findutils-4.10.0.tar.xz"
+    "https://ftp.gnu.org/gnu/findutils/findutils-4.11.0.tar.xz"
   ],
   "work_sources": []
 }

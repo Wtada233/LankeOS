@@ -77,6 +77,7 @@ void print_usage(const cxxopts::Options& options)
     std::cerr << get_string("info.autoremove_desc") << std::endl;
     std::cerr << get_string("info.upgrade_desc") << "  " << get_string("info.upgrade_opts")
               << std::endl;
+    std::cerr << get_string("info.force_solve_desc") << std::endl;
     std::cerr << get_string("info.reinstall_desc") << "  " << get_string("info.reinstall_opts")
               << std::endl;
     std::cerr << get_string("info.query_desc") << "  " << get_string("info.query_opts")
@@ -145,6 +146,13 @@ static int handle_command(const std::string& command, const cxxopts::ParseResult
     } else if (command == constants::CMD_UPGRADE) {
         pre_operation_check(result, usage, 0, 0);
         upgrade_packages();
+        write_cache();
+
+    } else if (command == constants::CMD_FORCE_SOLVE) {
+        // 显式删除所有被当前仓库打破的包（ABI 断裂/SONAME 缺失的依赖者）。
+        // 要求输入确认短语后才执行；install/upgrade 的冲突不再自动卸载。
+        pre_operation_check(result, usage, 0, 0);
+        force_solve_conflict();
         write_cache();
 
     } else if (command == constants::CMD_REINSTALL) {
@@ -358,7 +366,7 @@ int main(int argc, char* argv[])
         std::optional<SigIntGuard> sig_guard;
         if (command == constants::CMD_INSTALL || command == constants::CMD_REMOVE ||
             command == constants::CMD_AUTOREMOVE || command == constants::CMD_UPGRADE ||
-            command == constants::CMD_REINSTALL) {
+            command == constants::CMD_REINSTALL || command == constants::CMD_FORCE_SOLVE) {
             sig_guard.emplace();
         }
 

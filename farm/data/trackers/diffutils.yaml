@@ -1,0 +1,5 @@
+pkg-name: diffutils
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/diffutils/
+pattern: 'diffutils-(\d[\d.]*)\.tar\.xz'
+template: https://ftp.gnu.org/gnu/diffutils/diffutils-{version}.tar.xz

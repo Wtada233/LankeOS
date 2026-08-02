@@ -1,14 +1,11 @@
 {
   "name": "fastfetch",
-  "version": "2.58.0",
+  "version": "2.66.0",
   "release": 2,
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -23,7 +20,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/fastfetch-cli/fastfetch/archive/refs/tags/2.58.0.tar.gz"
+    "https://github.com/fastfetch-cli/fastfetch/archive/refs/tags/2.66.0.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,0 +1,24 @@
+pkg-name: docker
+tracker-template: github
+repo: docker/cli
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+sources:
+  # moby 的 docker 发布 tag 是 docker-vX.Y.Z（v 前缀会命中旧 v28.x）；tag 不在 API 前 100，用 same-version 锁定
+  - pkg-name: moby
+    url-match: "moby/moby"
+    tracker-template: github
+    repo: moby/moby
+    mode: tags
+    tag-prefix: docker-v
+    template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'
+    same-version: docker
+  # tini 从提交哈希改为 tag（LankeBUILD 用 tini-v* 通配符，更新安全）
+  - pkg-name: tini
+    url-match: "krallin/tini"
+    tracker-template: github
+    repo: krallin/tini
+    mode: tags
+    tag-prefix: v
+    template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'

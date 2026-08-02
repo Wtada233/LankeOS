@@ -1,27 +1,18 @@
 {
   "name": "libxslt",
-  "version": "1.1.39",
+  "version": "1.1.45",
   "release": 2,
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libxml2.so.2"
-  ],
-  "provides": [
-    "libexslt.so",
-    "libexslt.so.0",
-    "libxslt.so",
-    "libxslt.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libxml2"
   ],
   "sources": [
-    "https://download.gnome.org/sources/libxslt/1.1/libxslt-1.1.39.tar.xz"
+    "https://download.gnome.org/sources/libxslt/1.1/libxslt-1.1.45.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,0 +1,6 @@
+pkg-name: fcitx5
+tracker-template: github
+repo: fcitx/fcitx5
+mode: tags
+tag-prefix: ""
+template: https://github.com/fcitx/fcitx5/archive/refs/tags/{tag}.tar.gz

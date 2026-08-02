@@ -4,10 +4,7 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libresolv.so.2"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",

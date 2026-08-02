@@ -1,20 +1,15 @@
 {
   "name": "zlib",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libz.so",
-    "libz.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],
   "sources": [
-    "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
+    "https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,0 +1,5 @@
+pkg-name: gst-plugins-bad
+tracker-template: html-index
+url: https://gstreamer.freedesktop.org/src/gst-plugins-bad/
+pattern: 'gst-plugins-bad-([\d.]+)\.tar\.(?:xz|gz)'
+template: https://gstreamer.freedesktop.org/src/gst-plugins-bad/gst-plugins-bad-{version}.tar.xz

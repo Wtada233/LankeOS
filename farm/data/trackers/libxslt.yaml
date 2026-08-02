@@ -1,0 +1,5 @@
+pkg-name: libxslt
+tracker-template: html-index
+url: https://download.gnome.org/sources/libxslt/1.1/
+pattern: libxslt-([\d.]+)\.tar\.xz
+template: https://download.gnome.org/sources/libxslt/1.1/libxslt-{version}.tar.xz

@@ -1,23 +1,10 @@
 {
   "name": "wireplumber",
-  "version": "0.5.14",
+  "version": "0.5.15",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libgio-2.0.so.0",
-    "libglib-2.0.so.0",
-    "libgmodule-2.0.so.0",
-    "libgobject-2.0.so.0",
-    "liblua.so.5.5",
-    "libm.so.6",
-    "libpipewire-0.3.so.0",
-    "libsystemd.so.0"
-  ],
-  "provides": [
-    "libwireplumber-0.5.so",
-    "libwireplumber-0.5.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "git",
@@ -29,7 +16,7 @@
     "pipewire"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.14/wireplumber-0.5.14.tar.gz"
+    "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.15/wireplumber-0.5.15.tar.gz"
   ],
   "work_sources": []
 }

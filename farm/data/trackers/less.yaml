@@ -1,0 +1,8 @@
+pkg-name: less
+tracker-template: script
+script-content: |
+  HTML=$(curl -s https://www.greenwoodsoftware.com/less/)
+  ver=$(echo "$HTML" | grep -o 'current released version is less-[0-9]*' | sed 's/.*less-//' | head -1)
+  if [ -z "$ver" ]; then exit 1; fi
+  echo "$ver"
+  echo "https://www.greenwoodsoftware.com/less/less-$ver.tar.gz"

@@ -1,0 +1,5 @@
+pkg-name: bluez
+tracker-template: html-index
+url: https://www.kernel.org/pub/linux/bluetooth/
+pattern: 'bluez-(\d[\d.]*)\.tar\.xz'
+template: https://www.kernel.org/pub/linux/bluetooth/bluez-{version}.tar.xz

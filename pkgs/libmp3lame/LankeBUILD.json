@@ -1,23 +1,16 @@
 {
   "name": "libmp3lame",
-  "version": "3.100",
+  "version": "4.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libncursesw.so.6"
-  ],
-  "provides": [
-    "libmp3lame.so",
-    "libmp3lame.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "ncurses"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz"
+    "https://downloads.sourceforge.net/project/lame/lame/4.0/lame-4.0.tar.gz"
   ],
   "work_sources": []
 }

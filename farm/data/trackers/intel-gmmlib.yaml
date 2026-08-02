@@ -1,0 +1,6 @@
+pkg-name: intel-gmmlib
+tracker-template: github
+repo: intel/gmmlib
+mode: tags
+tag-prefix: intel-gmmlib-
+template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'

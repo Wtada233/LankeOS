@@ -811,13 +811,14 @@ TEST_F(NeededSoTest, SonameChangeInUpgradeBreaksDependents)
         {"app", "1.0", "libM", "", "libM.so.1"},
     });
 
-    // 一致性检查检测到升级会破坏 app → NonInteractive YES 自动移除 app
-    EXPECT_NO_THROW(install_packages({"libM"}));
+    // 一致性检查检测到升级会破坏 app → 新版语义：**硬报错**，不再自动移除 app
+    // （删除走显式 `force-solve-conflict`）
+    EXPECT_THROW(install_packages({"libM"}), LpkgException);
 
     Cache::instance().load();
-    EXPECT_EQ(Cache::instance().get_installed_version("libM"), "2.0");
-    // app 被一致性检查自动移除（libM.so.1 不再提供）
-    EXPECT_FALSE(Cache::instance().is_installed("app"));
+    // 事务回滚：libM 仍 1.0，app 未被自动移除
+    EXPECT_EQ(Cache::instance().get_installed_version("libM"), "1.0");
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
 }
 
 // -----------------------------------------------------------------------

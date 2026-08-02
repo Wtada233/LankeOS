@@ -1,6 +1,6 @@
 {
   "name": "font-jetbrains-mono-nerd",
-  "version": "3.3.0",
+  "version": "3.4.0",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -9,6 +9,6 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/JetBrainsMono.zip"
+    "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/JetBrainsMono.zip"
   ]
 }

@@ -1,0 +1,11 @@
+pkg-name: unzip
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -euo pipefail
+  feed="https://sourceforge.net/projects/infozip/rss?path=/UnZip%206.x%20%28latest%29/UnZip%206.0"
+  html=$(curl -fsSL "$feed")
+  file=$(printf '%s' "$html" | grep -oE 'unzip[0-9]+\.tar\.gz' | head -n1)
+  ver=$(printf '%s' "$file" | sed -E 's/unzip([0-9]+)\.tar\.gz/\1/')
+  echo "$ver" | sed -E 's/([0-9])([0-9]+)/\1.\2/'
+  echo "https://downloads.sourceforge.net/project/infozip/UnZip%206.x%20%28latest%29/UnZip%206.0/$file"

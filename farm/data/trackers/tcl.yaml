@@ -1,0 +1,6 @@
+pkg-name: tcl
+tracker-template: sourceforge
+project: tcl
+path: ""
+pattern: 'tcl([\d.]+)-src\.tar\.gz'
+template: https://downloads.sourceforge.net/project/tcl/tcl{version}-src.tar.gz

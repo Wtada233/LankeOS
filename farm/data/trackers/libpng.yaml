@@ -1,0 +1,6 @@
+pkg-name: libpng
+tracker-template: sourceforge
+project: libpng
+path: ''
+pattern: 'libpng-(\d[\d.]*)\.tar\.xz'
+template: 'https://downloads.sourceforge.net/{project}/libpng-{version}.tar.xz'

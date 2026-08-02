@@ -1,0 +1,21 @@
+pkg-name: nano
+tracker-template: script
+script-content: |
+  base="https://www.nano-editor.org/dist"
+  main_html=$(curl -sL "$base/")
+  main_versions=$(printf '%s' "$main_html" | grep -oE 'href="v[0-9]+/"' | grep -oE '[0-9]+' | sort -n)
+  if [ -z "$main_versions" ]; then
+      echo "none"
+      exit 1
+  fi
+  latest_main=$(printf '%s\n' "$main_versions" | tail -1)
+  sub_html=$(curl -sL "$base/v$latest_main/")
+  files=$(printf '%s' "$sub_html" | grep -oE 'nano-[0-9.]+\.tar\.xz')
+  if [ -z "$files" ]; then
+      echo "none"
+      exit 1
+  fi
+  versions=$(printf '%s\n' "$files" | sed -E 's/nano-([0-9.]+)\.tar\.xz/\1/')
+  latest=$(printf '%s\n' "$versions" | sort -V | tail -1)
+  echo "$latest"
+  echo "$base/v$latest_main/nano-$latest.tar.xz"

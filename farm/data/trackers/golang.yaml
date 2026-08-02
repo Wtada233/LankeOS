@@ -1,0 +1,5 @@
+pkg-name: golang
+tracker-template: html-index
+url: https://go.dev/dl/
+pattern: 'go(1\.[\d.]+)\.linux-amd64\.tar\.gz'
+template: https://go.dev/dl/go{version}.linux-amd64.tar.gz

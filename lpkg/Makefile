@@ -3,9 +3,15 @@ CXX ?= g++
 
 # Use pkg-config to resolve dependencies
 # Removed libcares from explicit list as libcurl should bring it in if needed
-PKGS = libcurl libarchive libcrypto libelf
+# libgit2 是静态库，其 openssl.c 引用 SSL_set_bio（在 libssl）。静态库依赖的共享库必须排在
+# 它**之后**（--as-needed 下前置的 -lssl 无符号引用会被丢弃 → "DSO missing from command line"）。
+# 故 openssl 放最后，保证 -lssl -lcrypto 紧跟 -lgit2。
+PKGS = libcurl libarchive libelf libgit2 openssl
 PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS))
 LIBS = $(shell pkg-config --libs $(PKGS))
+# 动态链接（测试二进制必须动态——全静态链接会改变运行时行为，导致 Tar/pack 等异常）。
+# Alpine 默认 --no-copy-dt-needed-entries：.so 的传递依赖（libarchive→libz 等）不自动继承，
+# 用 --copy-dt-needed-entries 恢复（链接器从共享库的 DT_NEEDED 复制传递依赖）。
 TEST_LIBS = $(LIBS) -lgtest -lgtest_main -lpthread
 
 # Override LIBS for static build
@@ -19,7 +25,7 @@ PKGS_LIST = $(PKGS)
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 5.4.3
+VERSION ?= 5.4.5
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -55,7 +61,8 @@ COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$
            -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\" \
            -DLPKG_VERSION=\"$(VERSION)\" \
            -DFMT_HEADER_ONLY \
-           -Werror -Wall -Wextra
+           -Werror -Wall -Wextra \
+           -Wl,--copy-dt-needed-entries
 
 CXXFLAGS = $(COMMON_CXXFLAGS) -O2
 TEST_CXXFLAGS = $(COMMON_CXXFLAGS) -g
@@ -88,6 +95,8 @@ all: $(BUILD_DIR)/$(TARGET)
 
 test: docker-env
 	@$(MAKE) docker-sync
+	@# 装 l10n 到编译路径（LPKG_L10N_DIR=/usr/share/lpkg/l10n），否则 get_string 全返回 [MISSING_STRING]
+	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "mkdir -p /usr/share/lpkg && cp -r /app/main/l10n /usr/share/lpkg/"
 	@docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make -j$$(nproc) build/run_tests && ./build/run_tests"
 	@echo "------------------------------------------"
 	@echo "Tests completed inside Docker container."
@@ -171,7 +180,10 @@ docker-env:
 		echo "Container exists but is stopped. Starting $(DOCKER_ENV_CONTAINER)..."; \
 		docker start $(DOCKER_ENV_CONTAINER) >/dev/null; \
 	fi
-	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx gtest-dev tar sudo
+	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base bash pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx gtest-dev tar sudo git cmake
+	# 从源码构建 libgit2-static（bundled http-parser、USE_SSH=OFF）：alpine 的 libgit2-static 依赖系统
+	# http-parser/ssh2，而 http-parser 无静态库，全静态链接会失败。
+	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "if [ ! -f /usr/lib/libgit2.a ]; then rm -rf /tmp/libgit2 && git clone -q --depth 1 --branch v1.7.2 https://github.com/libgit2/libgit2.git /tmp/libgit2 && cd /tmp/libgit2 && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=OFF -DBUILD_CLI=OFF -DBUILD_TESTS=OFF -DUSE_SSH=OFF -DUSE_HTTPS=OpenSSL >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null; fi"
 
 docker-sync:
 	@echo "Syncing source code to container..."

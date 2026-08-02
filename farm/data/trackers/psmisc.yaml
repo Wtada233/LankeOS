@@ -1,0 +1,6 @@
+pkg-name: psmisc
+tracker-template: sourceforge
+project: psmisc
+path: psmisc
+pattern: 'psmisc-(\d[\d.]*)\.tar\.'
+template: 'https://downloads.sourceforge.net/project/{project}/{path}/psmisc-{version}.tar.xz'

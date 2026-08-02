@@ -5,15 +5,8 @@
   "deps": [
     "xwayland"
   ],
-  "needed_so": [
-    "libc.so.6",
-    "libxcb-render.so.0",
-    "libxcb.so.1"
-  ],
-  "provides": [
-    "libxcb-render-util.so",
-    "libxcb-render-util.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libxcb",

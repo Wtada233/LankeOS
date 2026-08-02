@@ -1,0 +1,5 @@
+pkg-name: dejagnu
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/dejagnu/
+pattern: 'dejagnu-(\d[\d.]*)\.tar\.gz'
+template: https://ftp.gnu.org/gnu/dejagnu/dejagnu-{version}.tar.gz

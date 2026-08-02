@@ -2,14 +2,8 @@
   "name": "rnnoise",
   "version": "0.2",
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libm.so.6"
-  ],
-  "provides": [
-    "librnnoise.so",
-    "librnnoise.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],

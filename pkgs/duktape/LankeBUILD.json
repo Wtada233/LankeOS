@@ -3,15 +3,8 @@
   "version": "2.7.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libduktape.so",
-    "libduktape.so.207",
-    "libduktaped.so",
-    "libduktaped.so.207"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],

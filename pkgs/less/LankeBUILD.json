@@ -1,19 +1,16 @@
 {
   "name": "less",
-  "version": "679",
+  "version": "704",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libncursesw.so.6"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
     "ncurses"
   ],
   "sources": [
-    "https://www.greenwoodsoftware.com/less/less-679.tar.gz"
+    "https://www.greenwoodsoftware.com/less/less-704.tar.gz"
   ],
   "work_sources": []
 }

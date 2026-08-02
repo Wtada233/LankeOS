@@ -1,0 +1,6 @@
+pkg-name: bubblewrap
+tracker-template: github
+repo: containers/bubblewrap
+mode: releases
+tag-prefix: v
+template: https://github.com/{repo}/releases/download/v{version}/bubblewrap-{version}.tar.xz

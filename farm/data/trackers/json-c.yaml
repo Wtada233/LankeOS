@@ -1,0 +1,12 @@
+pkg-name: json-c
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  json=$(curl -sL "https://api.github.com/repos/json-c/json-c/tags")
+  tag=$(echo "$json" | grep -oE '"name": *"json-c-[0-9]+\.[0-9]+-[0-9]+"' | sed -E 's/.*"json-c-([0-9]+\.[0-9]+-[0-9]+)"/\1/' | sort -V | tail -n1)
+  if [ -z "$tag" ]; then
+    tag="0.19-20260627"
+  fi
+  version=$(echo "$tag" | sed 's/-/./')
+  echo "$version"
+  echo "https://github.com/json-c/json-c/archive/refs/tags/json-c-$tag.tar.gz"

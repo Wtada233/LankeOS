@@ -1,0 +1,5 @@
+pkg-name: perl
+tracker-template: html-index
+url: 'https://www.cpan.org/src/5.0/'
+pattern: 'perl-([0-9.]+)\.tar\.xz'
+template: 'https://www.cpan.org/src/5.0/perl-{version}.tar.xz'

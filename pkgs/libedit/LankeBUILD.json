@@ -1,22 +1,16 @@
 {
   "name": "libedit",
-  "version": "3.1",
+  "version": "20260512",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libncursesw.so.6"
-  ],
-  "provides": [
-    "libedit.so",
-    "libedit.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "ncurses"
   ],
   "sources": [
-    "https://thrysoee.dk/editline/libedit-20240808-3.1.tar.gz"
+    "https://thrysoee.dk/editline/libedit-20260512-3.1.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,0 +1,6 @@
+pkg-name: libndp
+tracker-template: github
+repo: jpirko/libndp
+mode: tags
+tag-prefix: v
+template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'

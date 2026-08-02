@@ -1,26 +1,13 @@
 {
   "name": "systemd",
-  "version": "261",
+  "version": "261.2",
   "release": 3,
   "deps": [
     "bash",
     "python"
   ],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libm.so.6"
-  ],
-  "provides": [
-    "libnss_myhostname.so.2",
-    "libnss_mymachines.so.2",
-    "libnss_resolve.so.2",
-    "libnss_systemd.so.2",
-    "libsystemd.so",
-    "libsystemd.so.0",
-    "libudev.so",
-    "libudev.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "Linux-PAM",
     "acl",
@@ -51,7 +38,7 @@
     "xz"
   ],
   "sources": [
-    "https://github.com/systemd/systemd/archive/v261/systemd-261.tar.gz"
+    "https://github.com/systemd/systemd/archive/refs/tags/v261.2.tar.gz"
   ],
   "work_sources": []
 }

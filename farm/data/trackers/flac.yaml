@@ -1,0 +1,6 @@
+pkg-name: flac
+tracker-template: github
+repo: xiph/flac
+mode: releases
+tag-prefix: ""
+template: https://github.com/xiph/flac/releases/download/{tag}/flac-{version}.tar.xz

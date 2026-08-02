@@ -1,24 +1,17 @@
 {
   "name": "libXxf86vm",
-  "version": "1.1.5",
+  "version": "1.1.7",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libX11.so.6",
-    "libXext.so.6",
-    "libc.so.6"
-  ],
-  "provides": [
-    "libXxf86vm.so",
-    "libXxf86vm.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libX11",
     "libXext"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libXxf86vm-1.1.5.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/lib/libXxf86vm-1.1.7.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

@@ -1,0 +1,6 @@
+pkg-name: sdbus-cpp
+tracker-template: github
+repo: Kistler-Group/sdbus-cpp
+mode: tags
+tag-prefix: v
+template: "https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz"

@@ -1,27 +1,13 @@
 {
   "name": "e2fsprogs",
-  "version": "1.47.3",
+  "version": "1.47.4",
   "release": 2,
   "deps": [
     "bash",
     "perl"
   ],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libblkid.so.1",
-    "libc.so.6",
-    "libuuid.so.1"
-  ],
-  "provides": [
-    "libcom_err.so",
-    "libcom_err.so.2",
-    "libe2p.so",
-    "libe2p.so.2",
-    "libext2fs.so",
-    "libext2fs.so.2",
-    "libss.so",
-    "libss.so.2"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "fuse3",
@@ -29,7 +15,7 @@
     "perl"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v1.47.3/e2fsprogs-1.47.3.tar.gz"
+    "https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/1.47.4/e2fsprogs-1.47.4.tar.gz"
   ],
   "work_sources": []
 }

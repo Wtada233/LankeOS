@@ -1,0 +1,7 @@
+pkg-name: libdecor
+tracker-template: gitlab
+host: gitlab.freedesktop.org
+project: libdecor/libdecor
+mode: releases
+tag-prefix: ""
+template: https://gitlab.freedesktop.org/libdecor/libdecor/-/releases/{tag}/downloads/libdecor-{tag}.tar.xz

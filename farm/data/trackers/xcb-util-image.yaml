@@ -1,0 +1,5 @@
+pkg-name: xcb-util-image
+tracker-template: html-index
+url: "https://xorg.freedesktop.org/archive/individual/xcb/"
+pattern: 'xcb-util-image-(\d[\d.]*)\.tar\.(?:gz|xz|bz2)'
+template: "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-image-{version}.tar.xz"

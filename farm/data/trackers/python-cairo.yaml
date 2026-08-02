@@ -1,0 +1,6 @@
+pkg-name: python-cairo
+tracker-template: github
+repo: pygobject/pycairo
+mode: releases
+tag-prefix: v
+template: 'https://github.com/pygobject/pycairo/releases/download/{tag}/pycairo-{version}.tar.gz'

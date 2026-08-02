@@ -1,0 +1,7 @@
+pkg-name: iso-codes
+tracker-template: gitlab
+host: salsa.debian.org
+project: iso-codes-team/iso-codes
+mode: tags
+tag-prefix: v
+template: https://salsa.debian.org/{project}/-/archive/{tag}/iso-codes-{tag}.tar.gz

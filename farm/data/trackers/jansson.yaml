@@ -1,0 +1,6 @@
+pkg-name: jansson
+tracker-template: github
+repo: akheron/jansson
+mode: releases
+tag-prefix: v
+template: https://github.com/{repo}/releases/download/{tag}/jansson-{version}.tar.gz

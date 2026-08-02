@@ -1,0 +1,5 @@
+pkg-name: harfbuzz
+tracker-template: github
+repo: harfbuzz/harfbuzz
+mode: releases
+template: 'https://github.com/{repo}/releases/download/{tag}/harfbuzz-{tag}.tar.xz'

@@ -1,0 +1,5 @@
+pkg-name: which
+tracker-template: html-index
+url: "https://ftp.gnu.org/gnu/which/"
+pattern: 'which-(\d[\d.]*)\.tar\.gz'
+template: "https://ftp.gnu.org/gnu/which/which-{version}.tar.gz"

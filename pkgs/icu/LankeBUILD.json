@@ -1,36 +1,17 @@
 {
   "name": "icu",
-  "version": "77.1",
+  "version": "78.3",
   "release": 2,
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libstdc++.so.6"
-  ],
-  "provides": [
-    "libicudata.so",
-    "libicudata.so.77",
-    "libicui18n.so",
-    "libicui18n.so.77",
-    "libicuio.so",
-    "libicuio.so.77",
-    "libicutest.so",
-    "libicutest.so.77",
-    "libicutu.so",
-    "libicutu.so.77",
-    "libicuuc.so",
-    "libicuuc.so.77"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],
   "sources": [
-    "https://github.com/unicode-org/icu/releases/download/release-77-1/icu4c-77_1-src.tgz"
+    "https://github.com/unicode-org/icu/releases/download/release-78.3/icu4c-78_3-src.tgz"
   ],
   "work_sources": []
 }

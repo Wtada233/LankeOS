@@ -3,26 +3,8 @@
   "version": "1.7.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libX11.so.6",
-    "libc.so.6"
-  ],
-  "provides": [
-    "libEGL.so",
-    "libEGL.so.1",
-    "libGL.so",
-    "libGL.so.1",
-    "libGLESv1_CM.so",
-    "libGLESv1_CM.so.1",
-    "libGLESv2.so",
-    "libGLESv2.so.2",
-    "libGLX.so",
-    "libGLX.so.0",
-    "libGLdispatch.so",
-    "libGLdispatch.so.0",
-    "libOpenGL.so",
-    "libOpenGL.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libX11",

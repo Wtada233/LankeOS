@@ -1,0 +1,5 @@
+pkg-name: fontenc
+tracker-template: html-index
+url: https://xorg.freedesktop.org/archive/individual/lib/
+pattern: 'libfontenc-(\d[\d.]*)\.tar\.xz'
+template: https://xorg.freedesktop.org/archive/individual/lib/libfontenc-{version}.tar.xz

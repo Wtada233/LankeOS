@@ -1,0 +1,5 @@
+pkg-name: meson
+tracker-template: github
+repo: mesonbuild/meson
+mode: releases
+template: https://github.com/mesonbuild/meson/releases/download/{tag}/meson-{version}.tar.gz

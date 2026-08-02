@@ -1,0 +1,6 @@
+pkg-name: libsrtp
+tracker-template: github
+repo: cisco/libsrtp
+mode: tags
+tag-prefix: v
+template: https://github.com/cisco/libsrtp/archive/refs/tags/v{version}.tar.gz

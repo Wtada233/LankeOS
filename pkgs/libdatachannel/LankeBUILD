@@ -1,10 +1,5 @@
 lankebuild_prepare() {
-    # tarball 不含子模块，从依赖的 tag tarball 恢复
-    # 先删掉 tarball 里的 gitlink 空目录，否则 mv 会把它挪进空目录里
-    cd libdatachannel-{ORIG_PKG_VER}
-    rm -rf deps/plog deps/usrsctp
-    mv "{WORK_DIR}"/plog-* deps/plog
-    mv "{WORK_DIR}"/usrsctp-* deps/usrsctp
+    # git src：plog/usrsctp 子模块已随 clone --recurse-submodules 就位
 
     export CMAKE_POLICY_VERSION_MINIMUM=3.5
 
@@ -21,12 +16,10 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    cd libdatachannel-{ORIG_PKG_VER}
     ninja -C build -j$(nproc)
 }
 
 
 lankebuild_package() {
-    cd libdatachannel-{ORIG_PKG_VER}
     DESTDIR="{STAGING_ROOT}" ninja -C build install
 }

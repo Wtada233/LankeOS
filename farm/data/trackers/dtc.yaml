@@ -1,0 +1,8 @@
+pkg-name: dtc
+tracker-template: script
+script-content: |
+  tags=$(git ls-remote --tags https://git.kernel.org/pub/scm/utils/dtc/dtc.git 2>/dev/null)
+  version=$(printf '%s\n' "$tags" | grep 'refs/tags/v[0-9][0-9.]*$' | sed 's#.*refs/tags/v##' | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "https://git.kernel.org/pub/scm/utils/dtc/dtc.git/snapshot/dtc-$version.tar.gz"

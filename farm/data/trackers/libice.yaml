@@ -1,0 +1,5 @@
+pkg-name: libice
+tracker-template: html-index
+url: https://www.x.org/releases/individual/lib/
+pattern: 'libICE-(\d[\d.]*)\.tar\.(?:xz|bz2|gz)'
+template: https://www.x.org/releases/individual/lib/libICE-{version}.tar.xz

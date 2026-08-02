@@ -1,0 +1,6 @@
+pkg-name: giflib
+tracker-template: sourceforge
+project: giflib
+path: ""
+pattern: 'giflib-(\d[\d.]*)\.tar\.gz'
+template: https://downloads.sourceforge.net/{project}/{name}-{version}.tar.gz

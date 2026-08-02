@@ -1,22 +1,16 @@
 {
   "name": "libgcrypt",
-  "version": "1.11.0",
+  "version": "1.12.2",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libgpg-error.so.0"
-  ],
-  "provides": [
-    "libgcrypt.so",
-    "libgcrypt.so.20"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "libgpg-error"
   ],
   "sources": [
-    "https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.11.0.tar.bz2"
+    "https://www.gnupg.org/ftp/gcrypt/libgcrypt/libgcrypt-1.12.2.tar.bz2"
   ],
   "no_strip": false
 }

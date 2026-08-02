@@ -1,0 +1,6 @@
+pkg-name: openssl
+tracker-template: github
+repo: openssl/openssl
+mode: releases
+tag-prefix: openssl-
+template: 'https://github.com/openssl/openssl/releases/download/{tag}/{name}-{version}.tar.gz'

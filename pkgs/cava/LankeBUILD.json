@@ -3,15 +3,7 @@
   "version": "1.0.0",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libasound.so.2",
-    "libc.so.6",
-    "libfftw3.so.3",
-    "libiniparser.so.4",
-    "libm.so.6",
-    "libncursesw.so.6",
-    "libpipewire-0.3.so.0"
-  ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
     "alsa-lib",

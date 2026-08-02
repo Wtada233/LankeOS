@@ -1,6 +1,6 @@
 {
   "name": "xorgproto",
-  "version": "2024.1",
+  "version": "2025.1",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -12,7 +12,7 @@
     "util-macros"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-2024.1.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-2025.1.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

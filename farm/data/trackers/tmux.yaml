@@ -1,0 +1,5 @@
+pkg-name: tmux
+tracker-template: github
+repo: tmux/tmux
+mode: releases
+template: 'https://github.com/{repo}/releases/download/{tag}/tmux-{version}.tar.gz'

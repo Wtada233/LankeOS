@@ -1,0 +1,10 @@
+pkg-name: libx265
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  base="https://api.bitbucket.org/2.0/repositories/multicoreware/x265_git/downloads"
+  json=$(curl -fsSL "$base?pagelen=100")
+  versions=$(printf '%s' "$json" | grep -oE 'x265_[0-9][0-9.]*\.tar\.gz' | sed -E 's/x265_([0-9][0-9.]*)\.tar\.gz/\1/' | sort -V)
+  version=$(printf '%s\n' "$versions" | tail -n1)
+  echo "$version"
+  echo "$base/x265_${version}.tar.gz"

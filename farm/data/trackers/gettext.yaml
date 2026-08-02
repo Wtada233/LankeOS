@@ -1,0 +1,5 @@
+pkg-name: gettext
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/gettext/
+pattern: 'gettext-(\d[\d.]*)\.tar\.xz'
+template: https://ftp.gnu.org/gnu/gettext/{name}-{version}.tar.xz

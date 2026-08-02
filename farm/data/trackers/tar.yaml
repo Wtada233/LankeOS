@@ -1,0 +1,5 @@
+pkg-name: tar
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/tar/
+pattern: 'tar-(\d[\d.]*)\.tar\.xz'
+template: https://ftp.gnu.org/gnu/tar/tar-{version}.tar.xz

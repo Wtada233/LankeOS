@@ -1,20 +1,10 @@
 {
   "name": "libelf",
-  "version": "0.193",
+  "version": "0.195",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libbz2.so.1.0",
-    "libc.so.6",
-    "liblzma.so.5",
-    "libz.so.1",
-    "libzstd.so.1"
-  ],
-  "provides": [
-    "libelf.so",
-    "libelf.so.1"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "bzip2",
@@ -28,7 +18,7 @@
     "zstd"
   ],
   "sources": [
-    "https://sourceware.org/ftp/elfutils/0.193/elfutils-0.193.tar.bz2"
+    "https://sourceware.org/ftp/elfutils/0.195/elfutils-0.195.tar.bz2"
   ],
   "work_sources": []
 }

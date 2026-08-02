@@ -1,0 +1,12 @@
+pkg-name: gyp
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  set -euo pipefail
+  json=$(curl -fsSL "https://chromium.googlesource.com/external/gyp/+log/HEAD?format=JSON&n=1" | sed "1s/)]}'//")
+  commit=$(printf '%s' "$json" | grep -oE '"commit": "[0-9a-f]{40}"' | head -1 | grep -oE '[0-9a-f]{40}')
+  commit_time=$(printf '%s' "$json" | grep -oE '"time": "[^"]*"' | head -1 | cut -d'"' -f4)
+  date=$(date -u -d "$commit_time" +%Y%m%d)
+  short=${commit:0:8}
+  echo "$date.$short"
+  echo "https://chromium.googlesource.com/external/gyp/+archive/$commit.tar.gz"

@@ -1,22 +1,17 @@
 {
   "name": "libgpg-error",
-  "version": "1.54",
+  "version": "1.61",
   "release": 2,
   "deps": [
     "bash"
   ],
-  "needed_so": [
-    "libc.so.6"
-  ],
-  "provides": [
-    "libgpg-error.so",
-    "libgpg-error.so.0"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel"
   ],
   "sources": [
-    "https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.54.tar.bz2"
+    "https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-1.61.tar.bz2"
   ],
   "no_strip": false
 }

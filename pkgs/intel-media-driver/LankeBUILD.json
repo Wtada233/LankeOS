@@ -1,20 +1,10 @@
 {
   "name": "intel-media-driver",
-  "version": "26.1.5",
+  "version": "600.0132",
   "release": 2,
   "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libigdgmm.so.12",
-    "libm.so.6",
-    "libstdc++.so.6",
-    "libva.so.2"
-  ],
-  "provides": [
-    "libigfxcmrt.so",
-    "libigfxcmrt.so.7"
-  ],
+  "needed_so": [],
+  "provides": [],
   "build_deps": [
     "base-devel",
     "cmake",
@@ -22,7 +12,7 @@
     "libva"
   ],
   "sources": [
-    "https://github.com/intel/media-driver/archive/refs/tags/intel-media-26.1.5.tar.gz"
+    "https://github.com/intel/media-driver/archive/refs/tags/intel-media-600.0132.tar.gz"
   ],
   "work_sources": []
 }
