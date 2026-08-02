@@ -164,6 +164,9 @@ int prepare_repo(const fs::path& dest, const std::string& url,
     return last_err;
 }
 
+/** 前向声明：update_one_submodule 递归子模块时调用（--recursive 的等价）。定义在下方。 */
+int update_submodules(git_repository* repo, GitProgress* prog);
+
 /** 更新单个 submodule：手动建仓库 → 浅拉默认分支 → 锁定 commit 不在浅层则完整拉兜底 → checkout 到锁定 commit。 */
 int update_one_submodule(git_repository* parent, const std::string& name, GitProgress* prog)
 {
@@ -222,6 +225,11 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
         }
     } else {
         err = -1;
+    }
+    // 递归：该 submodule 自身可能还有 submodule（--recursive 等价，如 mbedtls→tf-psa-crypto→framework）。
+    // 必须在 free(sub) 之前调用；git submodule 结构是 DAG（无环），递归天然终止。
+    if (err == 0) {
+        err = update_submodules(sub, prog);
     }
     if (commit_obj != nullptr) {
         git_object_free(commit_obj);
