@@ -35,7 +35,8 @@ src/
     seed.rs        cmd_seed
   build/           调度层
     mod.rs         run_build 核心（增量选择/计划预览/队列循环/ABI 传播/备份清理编排）+ 全部测试
-    sched.rs       topo_order（needed_so+deps+build_deps 拓扑，确定性）/ find_cycle_edge / reorder_queue
+    sched.rs       topo_order（**只按 needed_so** 拓扑，确定性）/ find_cycle_edge / reorder_queue
+    groups.rs      data/build/*.yaml 声明式 ABI 重建组（python 生态等不链但 ABI 敏感）
     prompt.rs      BLOCKED/源缺失的交互接管（开 shell/跳过/结束）+ 构建计划预览/确认
     sources.rs     源预下载
     repo.rs        版本判定/漂移 repack/上传/index 更新/备份清理/配方读写
@@ -65,7 +66,7 @@ src/
 - **`provides`**：本包提供的 SONAME/能力（如 `libmagic.so.1`）
 - **`deps`**：包级运行时依赖（由 gen_deps/deprules 规则生成，**farm 不扫不比**）
 
-farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不读不改；但 `deps` 参与**拓扑排序边**，见 §4）。
+farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不读不改；`deps`/`build_deps` **不参与构建序**——见 §4）。
 
 ## 4. build 调度（run_build）
 
@@ -73,7 +74,7 @@ farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不
 
 1. **旧索引基线**：`load_old_index` 读 `out/<arch>/index.txt`（**完整 needed_so**，单一真源）。缺失/为空 → 报错（**禁止无基线构建**，`farm seed` 是唯一入口）；旧索引全零 needed_so（剥离时代遗留）→ 警告重新 seed，否则 ABI 传播失明。
 2. **增量选择**：`--all` 时用 `needs_build`（配方 effective_version vs 旧索引）跳过一致的包；指定 `pkg` 强制重建。
-3. **拓扑排序**：`sched::topo_order` 用 **三类边**（needed_so 链接边 + index deps 边 + 配方 build_deps 边，混入的伪环由环切割逐条断开）做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。
+3. **拓扑排序**：`sched::topo_order` **只按 needed_so 链接边**做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps`/`build_deps` **不参与构建序**——build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，无需排队；混入它们反而引入伪环（把 glibc 排到 python/cmake 之后，错误）。
 4. **计划预览 + 确认**（2.5）：交互模式（stdin 是 tty）列出 topo 顺序（包 + 版本）并让 operator 确认（回车继续 / n 取消）；非交互（CI/测试/脚本）直接开始。
 5. **预下载拆分**：确认后**只给确认集** bulk 预下载全部源；ABI 受害者动态入队**不预下载**（构建时由 lpkg build 自己下载）。批量预下载失败不阻塞——循环里每个确认集包会再走一次源就绪门（带交互接管）。
 6. **逐包循环**（队列，受害者带 `is_victim` 标记）：
@@ -87,7 +88,19 @@ farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不
 
 ### 排序与 ABI 受害者重排（build/sched.rs）
 
-- `topo_order`：三类边 Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响）**。
+- `topo_order`：**只按 needed_so** Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响）**。
+
+### 声明式 ABI 重建组（build/groups.rs，data/build/*.yaml）
+
+构建序只看 needed_so → "不链 libpython 但 ABI 敏感"的包（python-cairo/gobject/blueman/meson…）没有链接边、不会自动成为 ABI 受害者。用**声明式 YAML** 声明强制重建：
+
+```yaml
+# data/build/python.yaml
+rebuild-on-abichange: python
+packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` glob
+```
+
+`rebuild-on-abichange` 包的 SONAME 断裂时，`groups.victims_for` 把匹配 `packages` glob 的配方包并入 ABI 受害者集（与 `direct_victims` 并集、去重、排序入队，release bump + 重建）。目录缺失/为空 → 空组（无害）。与 data/trackers 同一套 YAML 模式。
 - `reorder_queue`：受害者入队后按依赖算法重排，**先去重**（同一受害者被多个断裂重复入队 → `rev` 被污染导致顺序错乱）+ victim 标记取 OR。保证"被依赖者先建"（如 librsvg 先于 appstream）且叶子（chromium）**维持队尾、只构建一次**。
 
 ## 5. 构建执行（lpkg_binding）
@@ -138,7 +151,8 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 - **`removed_sonames(old, pkg, new_provides)`**：旧索引 provides − 新扫描 versioned provides → 被移除的 SONAME（ABI 断裂信号）
 - **`RevMap`**（graph.rs）：soname → 需要它的包（旧索引 needed_so 反图）
 - **`direct_victims(revmap, removed)`**：直接链接被移除 SONAME 的包
-- **传播**：只有 SONAME 变化才触发；受害者 release bump + 入队重建；受害者自身的 provides 变化再级联（固定点）
+- **`groups.victims_for(on, all_pkgs)`**：data/build/*.yaml 声明式重建组（不链但 ABI 敏感，见 §4）
+- **传播**：只有 SONAME 变化才触发；受害者 = `direct_victims` ∪ `groups.victims_for`（并集、去重、排序）；受害者 release bump + 入队重建；受害者自身的 provides 变化再级联（固定点）
 
 **index.txt 是单一真源**：完整 needed_so/provides 同时供容器可见索引与 farm 传播（removed_sonames / revmap / link_deps / 备份清理），不再剥 needed_so、**不再有 `.abi.json`**。lpkg 的 SONAME 检查在容器里真实运行，过渡期由 `--missing-so-no-error` / `--use-system-soname` 显式容忍（见 §5）。
 
@@ -208,4 +222,4 @@ build --all ──> run_build
 - **src 内单元测试**（`#[cfg(test)]`）：内部函数（topo/reorder/scan/i18n/ux/repack/seed/repo）
 - **tests/integration.rs**：公共 API 集成（ABI 传播、track 排序、real index）
 
-**113 个测试全绿**（98 lib + 9 + 6）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、index 写回完整 needed_so（单一真源）。
+**116 个测试全绿**（101 lib + 9 + 6）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被强制重建）**、index 写回完整 needed_so（单一真源）。

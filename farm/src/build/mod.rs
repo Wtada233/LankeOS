@@ -25,8 +25,10 @@ mod repo;
 pub(crate) use repo::{effective_version, needs_build, repack_if_drift, place_in_repo, update_repo_index, bump_release, update_lankebuild_metadata, load_old_index, sorted_pkg_names, sha256_file, recipe_hash, cleanup_backups};
 mod prompt;
 mod sources;
+mod groups;
 pub(crate) use sources::pre_download_sources;
 pub(crate) use prompt::{prompt_blocked, PromptChoice};
+pub(crate) use groups::RebuildGroups;
 pub(crate) use sched::{topo_order, reorder_queue};
 
 /// farm build 输入。
@@ -43,6 +45,8 @@ pub struct BuildOptions {
     pub download_retries: u32,
     /// 交互模式：stdin 为 tty 时构建计划预览需 operator 确认；非交互（CI/测试/脚本）跳过。
     pub interactive: bool,
+    /// 声明式重建组目录（`data/build/*.yaml`，与 data/trackers 同模式）。
+    pub build_data_dir: PathBuf,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -102,6 +106,8 @@ pub fn run_build(
     //    （禁止无基线构建：needed_so provider 校验、ABI diff 都需要它）。
     let old = load_old_index(&opts.out_dir, &opts.arch)?;
     let revmap = RevMap::build(&old);
+    // 声明式重建组（data/build/*.yaml）：不链但 ABI 敏感的包（python 生态等）。
+    let groups = RebuildGroups::load(&opts.build_data_dir);
 
     // 2. 增量选择（用户规则）：effective_version 与本地 repo 旧索引一致的包跳过构建。
     //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version+release（如 1.1+2）。
@@ -295,8 +301,12 @@ pub fn run_build(
         let removed = abi::removed_sonames(&old, &pkg, &outcome.provides);
         if !removed.is_empty() {
             report.abi_broken.push(pkg.clone());
+            // 直连受害者（链接被移除 SONAME 的包）+ 声明式重建组受害者（data/build/*.yaml：
+            // 不链 libpython 但 ABI 敏感的 python 生态等）。并集、去重、排序。
             let mut victims = abi::direct_victims(&revmap, &removed);
+            victims.extend(groups.victims_for(&pkg, &all_pkgs));
             victims.sort();
+            victims.dedup();
             for v in victims {
                 if !seen.contains(&v) {
                     println!(
@@ -818,6 +828,7 @@ mod tests {
             image: String::new(),
             download_retries: 3,
             interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.built.contains(&"libfoo".to_string()));
@@ -914,6 +925,7 @@ mod tests {
             image: String::new(),
             download_retries: 3,
             interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.abi_broken.contains(&"a".to_string()));
@@ -936,6 +948,115 @@ mod tests {
     }
 
     #[test]
+    fn rebuild_group_victims_rebuilt_on_abi_change() {
+        // data/build/*.yaml 声明式重建组：python 的 libpython SONAME 断裂时，强制重建
+        // **不链 libpython** 的 python 生态包（python-*、blueman）——它们没有 needed_so 链接边，
+        // 不会进 direct_victims，必须靠声明式组传播（用户规则）。
+        let dir = temp_dir("farm-group-abi");
+        let out = temp_dir("farm-group-abi-out");
+        let gdir = temp_dir("farm-group-abi-data");
+        fs::create_dir_all(&gdir).unwrap();
+        fs::write(
+            gdir.join("python.yaml"),
+            "rebuild-on-abichange: python\npackages: python-* blueman\n",
+        )
+        .unwrap();
+        // 旧索引：python-cairo/gobject/blueman **不链** libpython（只有 libc/libcairo/libgobject）
+        write_baseline(
+            &out,
+            "python|3.14:h::libpython3.14.so,libpython3.14.so.1:libc.so.6|\n\
+             python-cairo|1.0:h::libpycairo.so:libcairo.so.2,libc.so.6|\n\
+             python-gobject|1.0:h::libpygobject.so:libgobject-2.0.so.0,libc.so.6|\n\
+             blueman|2.4:h:::libc.so.6|\n",
+        );
+        write_pkg(&dir, "python", &["libpython3.14.so", "libpython3.14.so.1"], &["libc.so.6"], &[]);
+        write_pkg(&dir, "python-cairo", &["libpycairo.so"], &["libcairo.so.2", "libc.so.6"], &[]);
+        write_pkg(&dir, "python-gobject", &["libpygobject.so"], &["libgobject-2.0.so.0", "libc.so.6"], &[]);
+        write_pkg(&dir, "blueman", &[], &["libc.so.6"], &[]);
+
+        // python 重建 → SONAME .14→.15 断裂（removed libpython3.14.so.1），直连受害者为空
+        let python_lpkg = stage_lpkg(
+            &out, "python", "1.0", &["libc.so.6"],
+            &["libpython3.14.so", "libpython3.15.so", "libpython3.15.so.1"],
+        );
+        let pc = stage_lpkg(&out, "python-cairo", "1.0", &["libcairo.so.2", "libc.so.6"], &["libpycairo.so"]);
+        let pg = stage_lpkg(&out, "python-gobject", "1.0", &["libgobject-2.0.so.0", "libc.so.6"], &["libpygobject.so"]);
+        let bl = stage_lpkg(&out, "blueman", "1.0", &["libc.so.6"], &[]);
+        let mut outcomes = HashMap::new();
+        outcomes.insert(
+            "python".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libc.so.6".into()],
+                provides: vec![
+                    "libpython3.14.so".into(),
+                    "libpython3.15.so".into(),
+                    "libpython3.15.so.1".into(),
+                ],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(python_lpkg),
+            },
+        );
+        outcomes.insert(
+            "python-cairo".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libcairo.so.2".into(), "libc.so.6".into()],
+                provides: vec!["libpycairo.so".into()],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(pc),
+            },
+        );
+        outcomes.insert(
+            "python-gobject".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libgobject-2.0.so.0".into(), "libc.so.6".into()],
+                provides: vec!["libpygobject.so".into()],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(pg),
+            },
+        );
+        outcomes.insert(
+            "blueman".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libc.so.6".into()],
+                provides: vec![],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(bl),
+            },
+        );
+        let mut binding = StubBinding::new(outcomes);
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["python".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: gdir.clone(),
+        };
+        let report = run_build(&opts, &mut binding, None).unwrap();
+        assert!(report.abi_broken.contains(&"python".to_string()));
+        assert!(
+            report.built.contains(&"python-cairo".to_string()),
+            "不链 libpython 的 python 生态包应被声明式组重建: {:?}",
+            report.built
+        );
+        assert!(report.built.contains(&"python-gobject".to_string()));
+        assert!(report.built.contains(&"blueman".to_string()));
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+        fs::remove_dir_all(&gdir).ok();
+    }
+
+    #[test]
     fn build_requires_seeded_old_index() {
         // §7.2 基线强制：没有 seed 落地的本地 repo 索引 → 直接报错，禁止无基线构建（盲人摸象）。
         let dir = temp_dir("farm-build-nobaseline");
@@ -950,6 +1071,7 @@ mod tests {
             image: String::new(),
             download_retries: 3,
             interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
         };
         let err = run_build(&opts, &mut binding, None).unwrap_err();
         assert!(
@@ -1026,6 +1148,7 @@ mod tests {
             image: String::new(),
             download_retries: 3,
             interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
 
@@ -1078,6 +1201,7 @@ mod tests {
             image: String::new(),
             download_retries: 3,
             interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
         assert!(
@@ -1109,6 +1233,7 @@ mod tests {
             image: String::new(),
             download_retries: 3,
             interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
         assert!(

@@ -1,0 +1,5 @@
+# 声明式 ABI 重建组：python 的 libpython SONAME 断裂时，强制重建这些**不链 libpython**、
+# 但靠 python 运行时/工具链运行的包（它们不产生 needed_so 链接边，不会自动成为 ABI 受害者）。
+# packages 是空格分隔的 glob（`*` 通配）；匹配 farm 配方目录里的包名。
+rebuild-on-abichange: python
+packages: python-* meson gobject-introspection blueman

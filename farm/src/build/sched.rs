@@ -8,43 +8,24 @@ use crate::graph::Index;
 use crate::tr;
 use crate::ux;
 
-/// Kahn 拓扑排序（只用 needed_so 链接依赖）＋ 环切割。`_pkgs_dir` 保留签名兼容（排序不用配方）。
-pub(crate) fn topo_order(pkgs_dir: &Path, targets: &[String], old: &Index) -> Vec<String> {
+/// Kahn 拓扑排序，**只根据 needed_so 链接边**＋环切割。`_pkgs_dir` 保留签名兼容（排序不用配方）。
+///
+/// 设计：构建序只看**链接依赖**——需要重建的链接库必须先建，依赖者才能按新 ABI 链接。
+/// `deps`/`build_deps` **不参与排序**：build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，
+/// 无需排队；"不链 libpython 但 ABI 敏感"的包（python-cairo/gobject/blueman/meson…）由
+/// `data/build/*.yaml` 声明式重建组处理（`build/groups.rs`），不产生伪环。
+pub(crate) fn topo_order(_pkgs_dir: &Path, targets: &[String], old: &Index) -> Vec<String> {
     let names: HashSet<&str> = targets.iter().map(String::as_str).collect();
-    // graph: pkg → 需要先重建的包。三类边（都在 targets 集内）：
-    //   - needed_so（link_deps）：链接库 → provider
-    //   - deps：包级运行时依赖（python 模块等不链 libpython、靠 deps 依赖的包）
-    //   - build_deps：构建工具依赖（从 LankeBUILD.json 读）
-    // 混入 deps/build_deps 会引入伪环（glibc→git→libc），由 find_cycle_edge 逐条切断。
     let mut graph: HashMap<String, Vec<String>> = HashMap::new();
     let mut in_deg: HashMap<String, usize> = HashMap::new();
     let mut rev: HashMap<String, Vec<String>> = HashMap::new();
     for n in targets {
-        let mut set: HashSet<String> = HashSet::new();
-        // needed_so 边
-        for d in crate::graph::link_deps(old, n) {
-            if d.as_str() != n.as_str() && names.contains(d.as_str()) {
-                set.insert(d);
-            }
-        }
-        // deps 边（旧索引 deps 字段）
-        if let Some(info) = old.packages.get(n) {
-            for d in &info.deps {
-                if d.as_str() != n.as_str() && names.contains(d.as_str()) {
-                    set.insert(d.clone());
-                }
-            }
-        }
-        // build_deps 边（配方 LankeBUILD.json）
-        if let Some(b) = super::read_lankebuild(pkgs_dir, n) {
-            for d in b.build_deps {
-                if d.as_str() != n.as_str() && names.contains(d.as_str()) {
-                    set.insert(d.clone());
-                }
-            }
-        }
-        let mut deps: Vec<String> = set.into_iter().collect();
+        let mut deps: Vec<String> = crate::graph::link_deps(old, n)
+            .into_iter()
+            .filter(|d| d.as_str() != n.as_str() && names.contains(d.as_str()))
+            .collect();
         deps.sort();
+        deps.dedup();
         graph.insert(n.clone(), deps.clone());
         in_deg.insert(n.clone(), deps.len());
         for d in deps {

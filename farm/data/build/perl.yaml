@@ -1,0 +1,4 @@
+# 声明式 ABI 重建组：perl 的 libperl SONAME 断裂时，强制重建 perl 模块（XML::Parser 链 libperl，
+# 但以 perl 运行时/工具链为准）。packages 是空格分隔的 glob（`*` 通配）。
+rebuild-on-abichange: perl
+packages: xml-parser

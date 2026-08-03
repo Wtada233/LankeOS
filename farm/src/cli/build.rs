@@ -69,6 +69,7 @@ pub(crate) fn cmd_build(args: &Args) -> ExitCode {
         image: base_image,
         download_retries: args.download_retries.unwrap_or(3),
         interactive: std::io::stdin().is_terminal(),
+        build_data_dir: PathBuf::from("data/build"),
     };
     let report = match build::run_build(&opts, &mut binding, state.as_ref()) {
         Ok(r) => r,
