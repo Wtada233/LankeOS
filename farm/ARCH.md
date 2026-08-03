@@ -122,7 +122,7 @@ packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` g
    cd /work/<pkg> && \
    lpkg install lpkg -y && \
    ( lpkg upgrade -y --missing-so-no-error || { echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y --missing-so-no-error && lpkg upgrade -y --missing-so-no-error; } ) || exit 1 ; \
-   [ -d /backups ] && cp -a /backups/. /usr/lib/ ; \
+   [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig ; \
    lpkg build -y --use-system-soname
    ```
    - `upgrade` 失败（含 force-solve-conflict 重试）→ `|| exit 1` 致命，不继续 build
