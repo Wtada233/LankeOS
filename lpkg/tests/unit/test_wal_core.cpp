@@ -412,7 +412,7 @@ TEST_F(WalCoreTest, ReverseExecuteBackupRestore)
     EXPECT_TRUE(fs::exists(bak));
     EXPECT_FALSE(fs::exists(phys));
 
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
 
     // 文件应被恢复
     EXPECT_TRUE(fs::exists(phys));
@@ -432,7 +432,7 @@ TEST_F(WalCoreTest, ReverseExecuteBackupAlreadyConsumed)
     ops[0].arg1 = phys.string();
     ops[0].arg2 = bak.string();
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     // 没有备份可恢复，跳过（幂等）
     EXPECT_EQ(stats.files_restored, 0);
 }
@@ -451,7 +451,7 @@ TEST_F(WalCoreTest, ReverseExecuteCopyRemove)
     ops.push_back(wal::parse_op("COPY dummy → dummy"));
     ops[0].arg2 = dst.string();
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_FALSE(fs::exists(dst));
     EXPECT_EQ(stats.files_cleaned, 1);
 }
@@ -465,7 +465,7 @@ TEST_F(WalCoreTest, ReverseExecuteCopyNoTarget)
     ops.push_back(wal::parse_op("COPY dummy → dummy"));
     ops[0].arg2 = dst.string();
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.files_cleaned, 0);
 }
 
@@ -482,7 +482,7 @@ TEST_F(WalCoreTest, ReverseExecuteNewFile)
     ops.push_back(wal::parse_op("NEW dummy"));
     ops[0].arg1 = p.string();
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_FALSE(fs::exists(p));
     EXPECT_EQ(stats.files_cleaned, 1);
 }
@@ -496,7 +496,7 @@ TEST_F(WalCoreTest, ReverseExecuteNewDir)
     ops.push_back(wal::parse_op("NEW_DIR dummy"));
     ops[0].arg1 = p.string();
 
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
     EXPECT_FALSE(fs::exists(p));
 }
 
@@ -511,7 +511,7 @@ TEST_F(WalCoreTest, ReverseExecuteCleanupSkipped)
     auto op = wal::parse_op("CLEANUP /nonexistent/cleanup_test");
     ops.push_back(op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     // reverse_execute 跳过了 CLEANUP，无任何操作
     EXPECT_EQ(stats.files_restored, 0);
     EXPECT_EQ(stats.files_cleaned, 0);
@@ -546,7 +546,7 @@ TEST_F(WalCoreTest, ReverseExecuteDbRestore)
     op.arg2 = "glibc:installed";
     ops.push_back(op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.db_restored, 1);
     EXPECT_FALSE(fs::exists(bak_path));  // 备份已被消费
 
@@ -566,7 +566,7 @@ TEST_F(WalCoreTest, ReverseExecuteDbBakMissing)
     op.arg2 = "glibc:installed";
     ops.push_back(op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.db_restored, 0);
 }
 
@@ -594,7 +594,7 @@ TEST_F(WalCoreTest, ReverseExecuteDbNewWithBackup)
     op.arg2 = "bash:installed";
     ops.push_back(op);
 
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
     EXPECT_FALSE(fs::exists(bak_path));
     EXPECT_EQ(read_file("var/lib/lpkg/needed_so_new"), "old content\n");
 }
@@ -614,7 +614,7 @@ TEST_F(WalCoreTest, ReverseExecuteDbNewNoBackup)
     op.arg2 = "bash:installed";
     ops.push_back(op);
 
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
     EXPECT_FALSE(fs::exists(db_path));
 }
 
@@ -638,7 +638,7 @@ TEST_F(WalCoreTest, ReverseExecuteDbRmWithBackup)
     op.arg2 = "vim:removed";
     ops.push_back(op);
 
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
     EXPECT_FALSE(fs::exists(bak_path));
     EXPECT_EQ(read_file("var/lib/lpkg/deps_vim"), "glibc\nopenssl\n");
 }
@@ -663,7 +663,7 @@ TEST_F(WalCoreTest, ReverseExecuteAuditNamingDbNewNoBackup)
     op.arg2 = "testpkg:installed";
     ops.push_back(op);
 
-    wal::reverse_execute(ops, "", true);  // write_audit = true
+    wal::reverse_execute(ops, true);  // write_audit = true
 
     std::string wal_content = read_wal();
     EXPECT_NE(wal_content.find("RESTORE_DB_RM " + db_path.string()), std::string::npos)
@@ -682,7 +682,7 @@ TEST_F(WalCoreTest, ReverseExecuteAuditNamingCopyReverse)
     op.arg2 = fpath.string();
     ops.push_back(op);
 
-    wal::reverse_execute(ops, "", true);
+    wal::reverse_execute(ops, true);
 
     std::string wal_content = read_wal();
     EXPECT_NE(wal_content.find("RESTORE_FILE_RM " + fpath.string()), std::string::npos)
@@ -714,7 +714,7 @@ TEST_F(WalCoreTest, ReverseExecuteSkipMetadataLines)
     fs::path p = test_root / "usr/bin/testfile";
     ops.back().arg1 = p.string();
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     // NEW 的逆向应该删除了文件
     EXPECT_FALSE(fs::exists(p));
     EXPECT_EQ(stats.files_cleaned, 1);
@@ -741,7 +741,7 @@ TEST_F(WalCoreTest, ReverseExecuteMilestoneStop)
     ops.push_back(wal::parse_op("DB /pkgs :batch-start"));  // 应跳过（batch-start）
 
     // 两个 BACKUP 作为正向操作
-    wal::RollbackStats stats = wal::reverse_execute(ops, ":batch-start", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
 
     // 到达 :batch-start 即停止，不再处理前面的 BACKUP
     // stats 依赖于具体文件状态，但核心行为是遇到里程碑后提前返回
@@ -898,12 +898,12 @@ TEST_F(WalCoreTest, ReverseExecuteIdempotentBackup)
     ops[0].arg2 = bak.string();
 
     // 第一次逆向：恢复文件
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
     EXPECT_TRUE(fs::exists(phys));
     EXPECT_FALSE(fs::exists(bak));
 
     // 第二次逆向：备份已被消费，跳过（幂等）
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_TRUE(fs::exists(phys));
     EXPECT_EQ(stats.files_restored, 0);
 }
@@ -918,11 +918,11 @@ TEST_F(WalCoreTest, ReverseExecuteIdempotentNew)
     ops[0].arg1 = p.string();
 
     // 第一次：删除
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
     EXPECT_FALSE(fs::exists(p));
 
     // 第二次：文件不存在，跳过
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.files_cleaned, 0);
 }
 
@@ -936,11 +936,11 @@ TEST_F(WalCoreTest, ReverseExecuteIdempotentCopy)
     ops[0].arg2 = p.string();
 
     // 第一次：删除
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
     EXPECT_FALSE(fs::exists(p));
 
     // 第二次：跳过
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.files_cleaned, 0);
 }
 

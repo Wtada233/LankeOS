@@ -1,9 +1,11 @@
-//! 三字段一致性校验（Tier 0）与 repack/传播决策（§6）。
+//! 元数据一致性校验与 repack/传播决策（§6）。
 //!
-//! 实际扫描结果 vs metadata.json（配方/上一版）三字段独立比较：
+//! 实际扫描结果 vs metadata.json（配方/上一版）比较**两**个 farm 所有权的字段：
 //! - `provides` 漂移 → ABI 面变化 → 最高信号：repack 修正 + 传播重建依赖者
 //! - `needed_so` 漂移 → 元数据陈旧（二进制没变）→ repack（不 rebuild）
-//! - `deps` 漂移 → 规则驱动（新 shebang 解释器等）→ repack
+//!
+//! **`deps` 不参与比较**：deps 由 gen_deps/deprules 规则生成，farm 不扫不比（repack.rs 同
+//! 契约"deps 不读不改"）。`ScanResult.deps` 保留以表达扫描输出形状，但 decide 不读它。
 
 use std::collections::HashSet;
 
@@ -27,30 +29,23 @@ impl ScanResult {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerifyAction {
-    /// 三字段全部一致 → 直接进 local repo
+    /// 两字段全部一致 → 直接进 local repo
     Unchanged,
-    /// needed_so / deps 漂移（二进制未变，只元数据错）→ repack（不 rebuild）
-    Repack {
-        needed_drift: bool,
-        deps_drift: bool,
-    },
+    /// needed_so 漂移（二进制未变，只元数据错）→ repack（不 rebuild）
+    Repack { needed_drift: bool },
     /// provides 漂移 → ABI 面变化 → repack 修正 + 传播重建依赖者
     AbiBreak,
 }
 
 /// 决策：实际扫描 vs 期望 metadata。
-/// provides 漂移优先（ABI 面变化是最高信号）。
+/// provides 漂移优先（ABI 面变化是最高信号）。deps 不比较（见模块头注释）。
 pub fn decide(actual: &ScanResult, meta: &ScanResult) -> VerifyAction {
     let needed_drift = sorted(&actual.needed_so) != sorted(&meta.needed_so);
-    let deps_drift = sorted(&actual.deps) != sorted(&meta.deps);
     let provides_drift = set(&actual.provides) != set(&meta.provides);
     if provides_drift {
         VerifyAction::AbiBreak
-    } else if needed_drift || deps_drift {
-        VerifyAction::Repack {
-            needed_drift,
-            deps_drift,
-        }
+    } else if needed_drift {
+        VerifyAction::Repack { needed_drift }
     } else {
         VerifyAction::Unchanged
     }
@@ -90,28 +85,20 @@ mod tests {
         };
         assert_eq!(
             decide(&actual, &meta),
-            VerifyAction::Repack {
-                needed_drift: true,
-                deps_drift: false
-            }
+            VerifyAction::Repack { needed_drift: true }
         );
     }
 
     #[test]
-    fn deps_drift_is_repack() {
+    fn deps_drift_is_ignored() {
+        // deps 由 gen_deps 生成，farm 不扫不比——只 deps 漂移必须判定为 Unchanged（不 repack）
         let actual = ScanResult::new(
             &["libc.so.6"],
             &["libz.so", "libz.so.1"],
             &["bash", "python"],
         );
         let meta = ScanResult::new(&["libc.so.6"], &["libz.so", "libz.so.1"], &["bash"]);
-        assert_eq!(
-            decide(&actual, &meta),
-            VerifyAction::Repack {
-                needed_drift: false,
-                deps_drift: true
-            }
-        );
+        assert_eq!(decide(&actual, &meta), VerifyAction::Unchanged);
     }
 
     #[test]

@@ -150,14 +150,14 @@ struct RollbackStats {
  * 对每条操作按类型执行逆向，每个操作后写入 RESTORE_* 审计行。
  * 跳过 RESTORE_x/REMOVE_x/元数据行和 :batch-start DB 条目。
  *
+ * 没有"里程碑提前停止"机制：:batch-start DB 条目本就被跳过（最终状态标记），
+ * 逆序跑完整个批次恰好恢复到批次开始状态，不需要（也无法）提前停。
+ *
  * @param ops              待逆向执行的操作（正向顺序）
- * @param milestone_target
- * 目标里程碑（":batch-start"），达到后停止回滚。空=全部逆序
  * @param write_audit      是否写 RESTORE WAL 审计行
  * @return RollbackStats
  */
-RollbackStats reverse_execute(const std::vector<WALOp>& ops,
-                              const std::string& milestone_target = "", bool write_audit = true);
+RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit = true);
 
 // ============================================================================
 // 批次操作提取
@@ -165,10 +165,6 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops,
 
 /// 从 WAL 日志文件提取当前（最后一个未完成的）批次的操作行列表
 std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path);
-
-/// 从 WAL 日志文件中提取最后一个未完成批次的列表
-/// 注意：架构保证最多存在一个未完成批次，因此最多返回一个批次
-std::vector<std::vector<WALOp>> extract_last_uncommitted_batch(const std::string& wal_path);
 
 // ============================================================================
 // 批次回滚
@@ -178,7 +174,7 @@ std::vector<std::vector<WALOp>> extract_last_uncommitted_batch(const std::string
  * 完整的批次回滚。
  * 1. 提取当前批次 WAL 行
  * 2. 清理内存 cache
- * 3. reverse_execute(ops, ":batch-start")
+ * 3. reverse_execute(ops)
  * 4. DB /pkgs :batch-start
  * 5. ROLLBACK pkg + END pkg 对每个已回滚包
  * 6. COMMIT_PKGS

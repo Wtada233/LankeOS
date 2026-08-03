@@ -178,7 +178,7 @@ void recover_packages()
             continue_cleanup(ops);
         } else {
             // 无 CLEANUP → 正常 reverse_execute 回滚
-            wal::reverse_execute(ops, "", true);
+            wal::reverse_execute(ops, true);
             Cache::instance().load();
             wal::commit_batch();
         }

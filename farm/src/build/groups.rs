@@ -71,6 +71,33 @@ impl RebuildGroups {
         v.sort();
         v
     }
+
+    /// (victim, on) 依赖边：`on` 的组受害者必须在 `on` 构建**之后**构建。
+    /// 这与 needed_so 链接边同等对待——**`--all` 模式下组受害者已在初始队列**，
+    /// 若没有这条边，topo 只按链接边排，python-cairo（不链 libpython）会被排到
+    /// python 之前，容器里 `lpkg upgrade` 时本地 repo 还是旧 python，构建白跑。
+    ///
+    /// 只包含**两边都在 `names` 中**的边（`on` 不在本轮 targets 里就没有排序约束）；
+    /// 去重且 (victim, on) 字典序排序，确定性。
+    pub fn trigger_edges_in(&self, names: &[String]) -> Vec<(String, String)> {
+        let present: HashSet<&str> = names.iter().map(String::as_str).collect();
+        let mut edges: Vec<(String, String)> = Vec::new();
+        for (on, globs) in &self.map {
+            if !present.contains(on.as_str()) {
+                continue;
+            }
+            for g in globs {
+                for p in names {
+                    if p.as_str() != on.as_str() && glob_match(g, p) {
+                        edges.push((p.clone(), on.clone()));
+                    }
+                }
+            }
+        }
+        edges.sort();
+        edges.dedup();
+        edges
+    }
 }
 
 /// 简单 glob：只支持 `*`（任意字符序列）。确定性、无 panic。
@@ -118,6 +145,80 @@ mod tests {
         assert!(glob_match("a*c", "abc"));
         assert!(glob_match("a*c", "ac"));
         assert!(!glob_match("a*c", "ab"));
+    }
+
+    #[test]
+    fn load_parses_multiple_space_separated_globs() {
+        // 回归：从真实 YAML 内容走 serde_yaml 路径（不是手动 map.insert），
+        // 确认 `packages: python-* meson gobject-introspection blueman` 解析出全部 4 个 glob，
+        // 而不是只解析出第一个。
+        let dir = std::env::temp_dir().join(format!("farm-groups-load-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("python.yaml"),
+            "rebuild-on-abichange: python\npackages: python-* meson gobject-introspection blueman\n",
+        )
+        .unwrap();
+        let g = RebuildGroups::load(&dir);
+        let all: Vec<String> = [
+            "python",
+            "python-cairo",
+            "python-gobject",
+            "meson",
+            "gobject-introspection",
+            "blueman",
+            "glib",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        let v = g.victims_for("python", &all);
+        assert_eq!(
+            v,
+            vec![
+                "blueman",
+                "gobject-introspection",
+                "meson",
+                "python-cairo",
+                "python-gobject"
+            ],
+            "serde_yaml 必须解析出全部 4 个 glob: {v:?}"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn trigger_edges_only_when_on_in_names() {
+        let mut groups = RebuildGroups::default();
+        groups.map.insert(
+            "python".into(),
+            vec!["python-*".into(), "meson".into()],
+        );
+        // 两边都在 names → 产出边
+        let all: Vec<String> = ["python", "python-cairo", "python-gobject", "meson"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let e = groups.trigger_edges_in(&all);
+        assert_eq!(
+            e,
+            vec![
+                ("meson".to_string(), "python".to_string()),
+                ("python-cairo".to_string(), "python".to_string()),
+                ("python-gobject".to_string(), "python".to_string()),
+            ]
+        );
+        // on 不在 names → 无约束（python 不重建，组受害者不强制排序）
+        let without_on: Vec<String> = ["python-cairo", "meson"].iter().map(|s| s.to_string()).collect();
+        assert!(groups.trigger_edges_in(&without_on).is_empty());
+        // 去重：同一 (victim,on) 不会被重复产出
+        let dup: Vec<String> = ["python", "python-cairo", "python-cairo", "meson"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let e2 = groups.trigger_edges_in(&dup);
+        assert_eq!(e2.len(), 2, "python-cairo 只应出现一次: {e2:?}");
     }
 
     #[test]

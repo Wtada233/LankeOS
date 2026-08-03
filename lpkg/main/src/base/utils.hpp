@@ -87,6 +87,11 @@ std::unordered_set<std::string> read_set_from_file(const std::filesystem::path& 
 /** 将字符串集合写入文件（每行一个元素） */
 void write_set_to_file(const std::filesystem::path& path,
                        const std::unordered_set<std::string>& data);
+/**
+ * 原子写入原始字符串内容：.tmp → fsync → rename（safe_rename 内含父目录 fsync）。
+ * 断电在 rename 前 → 原文件不变；断电在 rename 后 → 新文件完整。顺序保持内容原样。
+ */
+void write_string_to_file(const std::filesystem::path& path, std::string_view content);
 /** 清理所有临时目录 */
 void cleanup_tmp_dirs();
 

@@ -1,9 +1,15 @@
 //! repack.rs — 解包 .lpkg → 改 metadata.json → 重打（§6：repack 不 rebuild）。
 //!
 //! 语义对标 Gentoo stage3 解压：保留 mode（含 SUID/SGID）+ numeric-owner；解包不用 /tmp
-//! （NOSUID，suid 程序受影响，§6）。当前用 tar crate 保留 mode；**xattr 保留需 libarchive**
-//! （ADR #13 绑定优先），记 TODO。repack 有效性由构建不变量保证（§6：构建成功 ⇒ needed_so
-//! 的 provider 当时都在 local repo），无需额外 guard。
+//! （NOSUID，suid 程序受影响，§6）。当前用 tar crate 保留 mode。
+//!
+//! **xattr 保留：明确不做（已决策，原 TODO）**。tar 0.4.46 的 Builder 不暴露 PAX xattr 写入
+//! （`SCHILY.xattr.*`），解包侧虽有 `xattr` feature 也补不上 repack 的写入侧；libarchive 绑定
+//! （ADR #13 绑定优先）成本高。LankeOS 是 LFS 系系统，默认无 SELinux xattr；SUID/SGID 已由
+//! mode 保留覆盖。若将来需要 `security.capability`（如 systemd native 构建），才需引入 libarchive。
+//!
+//! repack 有效性由构建不变量保证（§6：构建成功 ⇒ needed_so 的 provider 当时都在 local repo），
+//! 无需额外 guard。
 //!
 //! repack 只改 `needed_so`/`provides`（用户明确：deps 不动，由 gen_deps/deprules 规则生成）。
 //! **同时返回 LankeBUILD.json 需要的字段**（`update_lankebuild` 在调用方），确保仓库源定义

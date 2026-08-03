@@ -145,7 +145,7 @@ TEST_F(DynamicResolutionTest, DynamicProviderChange)
     EXPECT_FALSE(Cache::instance().is_installed("provA"));
 }
 
-// ====== TODO 4.1: Failure Scenario ======
+// ====== 4.1: Failure Scenario ======
 // Dep name change leads to unresolvable dependency
 TEST_F(DynamicResolutionTest, UnresolvableDriftFailure)
 {
@@ -174,7 +174,7 @@ TEST_F(DynamicResolutionTest, UnresolvableDriftFailure)
     EXPECT_THROW(install_packages({"app"}), LpkgException);
 }
 
-// ====== TODO 4.2: Discovery Scenario ======
+// ====== 4.2: Discovery Scenario ======
 // Index says app has no deps, real metadata has lib-extra — system discovers and installs it
 TEST_F(DynamicResolutionTest, DiscoverNewDependency)
 {
@@ -194,7 +194,7 @@ TEST_F(DynamicResolutionTest, DiscoverNewDependency)
     EXPECT_TRUE(Cache::instance().is_installed("lib-extra"));
 }
 
-// ====== TODO 4.3: Atomic Rollback on Recursive Dep Failure ======
+// ====== 4.3: Atomic Rollback on Recursive Dep Failure ======
 // Recursive installation of discovered dep fails -> everything rolls back
 TEST_F(DynamicResolutionTest, AtomicRollbackOnFailedDep)
 {

@@ -4,18 +4,37 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::path::Path;
 
+use crate::build::groups::RebuildGroups;
 use crate::graph::Index;
 use crate::tr;
 use crate::ux;
 
-/// Kahn 拓扑排序，**只根据 needed_so 链接边**＋环切割。`_pkgs_dir` 保留签名兼容（排序不用配方）。
+/// Kahn 拓扑排序，**按 needed_so 链接边 + 声明式重建组边**＋环切割。`_pkgs_dir` 保留签名兼容。
 ///
 /// 设计：构建序只看**链接依赖**——需要重建的链接库必须先建，依赖者才能按新 ABI 链接。
 /// `deps`/`build_deps` **不参与排序**：build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，
-/// 无需排队；"不链 libpython 但 ABI 敏感"的包（python-cairo/gobject/blueman/meson…）由
-/// `data/build/*.yaml` 声明式重建组处理（`build/groups.rs`），不产生伪环。
-pub(crate) fn topo_order(_pkgs_dir: &Path, targets: &[String], old: &Index) -> Vec<String> {
+/// 无需排队。"不链 libpython 但 ABI 敏感"的包（python-cairo/gobject/blueman/meson…）由
+/// `data/build/*.yaml` 声明式重建组处理（`build/groups.rs`）——这些组受害者没有 needed_so 链接边，
+/// 必须靠 `extra_edges`（victim → on）强制排在触发包 `on` 之后，否则 `--all` 模式下 python-cairo
+/// 会在 python 重建前构建（容器升级时 repo 还是旧 python，构建基于旧 ABI 白跑）。
+pub(crate) fn topo_order(
+    _pkgs_dir: &Path,
+    targets: &[String],
+    old: &Index,
+    extra_edges: &[(String, String)],
+) -> Vec<String> {
     let names: HashSet<&str> = targets.iter().map(String::as_str).collect();
+
+    // 声明式重建组边：victim → on（victim 依赖 on，on 必须在前）。
+    // 与链接边一样只对 targets 内的包生效（on 不在 targets 则无排序约束）。
+    let mut group_deps: HashMap<String, Vec<String>> = HashMap::new();
+    for (victim, on) in extra_edges {
+        if victim == on || !names.contains(victim.as_str()) || !names.contains(on.as_str()) {
+            continue;
+        }
+        group_deps.entry(victim.clone()).or_default().push(on.clone());
+    }
+
     let mut graph: HashMap<String, Vec<String>> = HashMap::new();
     let mut in_deg: HashMap<String, usize> = HashMap::new();
     let mut rev: HashMap<String, Vec<String>> = HashMap::new();
@@ -24,6 +43,9 @@ pub(crate) fn topo_order(_pkgs_dir: &Path, targets: &[String], old: &Index) -> V
             .into_iter()
             .filter(|d| d.as_str() != n.as_str() && names.contains(d.as_str()))
             .collect();
+        if let Some(gd) = group_deps.get(n) {
+            deps.extend(gd.iter().cloned());
+        }
         deps.sort();
         deps.dedup();
         graph.insert(n.clone(), deps.clone());
@@ -144,7 +166,12 @@ fn find_cycle_edge(
 /// in_deg/rev（rev[libA] 含 3 个 chromium，弹出 libA 时 in_deg 多减 3 次 → 顺序错乱、chromium
 /// 可能在其依赖重建前被构建）。去重后每包唯一；victim 标记取 OR（任一断裂入队 → 按传播重建
 /// bump release）。
-pub(crate) fn reorder_queue(queue: &mut VecDeque<(String, bool)>, pkgs_dir: &Path, old: &Index) {
+pub(crate) fn reorder_queue(
+    queue: &mut VecDeque<(String, bool)>,
+    pkgs_dir: &Path,
+    old: &Index,
+    groups: &RebuildGroups,
+) {
     if queue.len() < 2 {
         return;
     }
@@ -154,6 +181,9 @@ pub(crate) fn reorder_queue(queue: &mut VecDeque<(String, bool)>, pkgs_dir: &Pat
     }
     let mut names: Vec<String> = flags.keys().cloned().collect();
     names.sort();
-    let order = topo_order(pkgs_dir, &names, old);
+    // 组边一并参与重排：组受害者（python-* 等）排在触发包 python 之后，
+    // 与 needed_so 链接边同样处理，避免 `--all` 初始队列里 python-cairo 先于 python。
+    let edges = groups.trigger_edges_in(&names);
+    let order = topo_order(pkgs_dir, &names, old, &edges);
     *queue = order.into_iter().map(|n| (n.clone(), flags[&n])).collect();
 }

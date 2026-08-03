@@ -22,7 +22,6 @@
 11. [rec 恢复（Fallback Only）](#11-rec-恢复fallback-only)
 12. [WAL Trim](#12-wal-trim)
 13. [实现步骤](#13-实现步骤)
-14. [旧文件清理清单](#14-旧文件清理清单)
 
 ---
 
@@ -367,7 +366,7 @@ WAL: BACKUP /usr/share/doc/foo/ → /usr/share/doc/foo.lpkg_bak_foo_a1b2c3
 
 ### 4.1 问题
 
-旧版用 `Cache::write(wal_tag)`，`wal_tag=包名` 作为 `.lpkg_db_bak_<tag>` 后缀。当批量多个包时，`.lpkg_db_bak_A` 和 `.lpkg_db_bak_B` 无法确定哪个对应什么系统状态。
+批量多包时，DB 的每次写入必须标注"这次写发生在哪个包的安装/移除之后"，否则回滚无法确定每个 `.lpkg_db_bak_before:*` 备份对应什么系统状态，也就无法确定性地链式恢复到批次开始状态。
 
 ### 4.2 DbMilestone 类型
 
@@ -487,7 +486,7 @@ force_overwrite 时直接在内存改所有权，批次成功则随 DB 写盘持
  *     └── rethrow
  */
 template<typename OpT>
-void run_batch_transaction(const std::string &wal_tag, size_t total, OpT &op);
+std::vector<std::string> run_batch_transaction(size_t total, OpT&& op);
 ```
 
 ### 5.2 不变量
@@ -524,7 +523,7 @@ install_packages(args)
 ├── 一致性重试循环
 ├── 用户确认
 │
-├── run_batch_transaction("pkgs", N, [&] {
+├── run_batch_transaction(N, [&] {
 │   │
 │   ├── Cache::write(":batch-start")    ← WAL: DB /pkgs :batch-start (备份批次开始状态)
 │   │                                    ← fsync WAL, fsync 备份
@@ -591,7 +590,7 @@ InstallationTask::run(ctx)
 │   │   ├── 写 deps 文件: WAL: DBNEW <dep_path> <pkg>:installed
 │   │   ├── 写 needed_so 文件: WAL: DBNEW <nso_path> <pkg>:installed
 │   │   ├── 写 man 文件: WAL: DBNEW <man_path> <pkg>:installed
-│   │   │   (先 WAL → fsync → .tmp → fsync → rename → fsync)
+│   │   │   (WAL → write_string_to_file: .tmp → fsync → rename → fsync 父目录，已实现)
 │   │   └── 注册文件所有权 (add_file_owner，内存操作)
 │   ├── 处理 REMOVE_OLD (升级时)
 │   │   WAL: REMOVE_OLD <src> → <dst>  ← fsync
@@ -643,7 +642,7 @@ remove_package(pkg_name, force, wrap_in_txn)
 ├── recover_packages() + trim_completed()  (if wrap_in_txn)
 ├── 版本检查 + 安全检查
 │
-├── run_batch_transaction("remove-" + pkg, 1, [&] {
+├── run_batch_transaction(1, [&] {
 │   do_remove_package(pkg, force)
 │ })
 ```
@@ -770,16 +769,14 @@ struct RollbackStats {
  * 逆向执行一组 WAL 操作。
  *
  * 对每条操作按类型执行逆向，每个操作后写入 RESTORE_* 审计行。
+ * 跳过 RESTORE_x/REMOVE_x/元数据行和 :batch-start DB 条目（最终状态标记）。
  *
  * @param ops              待逆向执行的操作（正向顺序）
- * @param milestone_target 目标里程碑（":batch-start"），
- *                         达到后停止回滚。空=全部逆序
  * @param write_audit      是否写 RESTORE WAL 审计行（正常=true，rec 时=true）
  * @return RollbackStats
  */
 RollbackStats reverse_execute(
     const std::vector<WALOp> &ops,
-    const std::string &milestone_target = "",
     bool write_audit = true);
 
 /**
@@ -792,10 +789,10 @@ std::vector<WALOp> extract_current_batch_ops();
  * 完整的批次回滚。
  * 1. 提取当前批次 WAL 行
  * 2. 清理内存 cache
- * 4. reverse_execute(ops, ":batch-start")
- * 5. DB /pkgs :batch-start
- * 6. ROLLBACK pkg + END pkg 对每个已回滚包
- * 7. COMMIT_PKGS
+ * 3. reverse_execute(ops)
+ * 4. DB /pkgs :batch-start
+ * 5. ROLLBACK pkg + END pkg 对每个已回滚包
+ * 6. COMMIT_PKGS
  */
 void batch_rollback(const std::vector<std::string> &success);
 
@@ -815,31 +812,6 @@ void batch_rollback(const std::vector<std::string> &success);
 | `DBNEW` | .bak 存在→rename 回; 不存在→删除文件 | fsync 父目录 + WAL | `RESTORE_DB` 或 `RESTORE_DB_RM` | - |
 | `DBRM` | .bak 存在→rename 回 | fsync 父目录 + WAL | `RESTORE_DB <bak> → <db>` | .bak 不存在→跳过 |
 | `CLEANUP` | **跳过（不可回滚）** | 不执行 | 不写入 | - |
-
-### 9.3 里程碑停止机制
-
-```cpp
-RollbackStats reverse_execute(ops, milestone_target, write_audit) {
-    for (int i = ops.size() - 1; i >= 0; --i) {
-        const auto &op = ops[i];
-        
-        if (op.type == "DB" || op.type == "DBNEW" || op.type == "DBRM") {
-            // 执行逆向恢复（见上表）
-            // ...
-            
-            // 检查是否达到了目标里程碑
-            if (!milestone_target.empty() && op.arg2 == milestone_target) {
-                // DB 已达到目标状态，停止进一步回滚
-                // 之前的操作不需要再逆向了
-                return stats;
-            }
-        }
-        
-        // 其他操作类型处理...
-    }
-    return stats;
-}
-```
 
 ---
 
@@ -995,7 +967,7 @@ void recover_packages() {
     //       │   ├── 对新增删除写 CLEANUP 日志
     //       │   ├── Cache::load()
     //       │   └── COMMIT_PKGS
-    //       └─ 无 CLEANUP → reverse_execute(ops, "", true)
+    //       └─ 无 CLEANUP → reverse_execute(ops, true)
     //           ├── 跳过 RESTORE_*/REMOVE_*/元数据/CLEANUP/:batch-start
     //           ├── 只执行正向操作的逆向
     //           ├── Cache::load()
@@ -1078,48 +1050,6 @@ trim 不关心具体行内容，只跟踪 BATCH 边界。RESTORE_* 等行在已�
 - **6.4 二次回滚幂等** — `test_breakpoints.cpp`。验证 rollback 各阶段中断后 `recover_packages` 能正确继续。
 - **6.5 集成测试** — 多个测试文件覆盖：批量安装/移除/升级、依赖链、provides 解析、版本约束、config 保护、SIGINT 保护、并发锁、autoremove、recursive remove。总计 444 tests。
 - **6.6 CLEANUP 阶段测试** — `test_cleanup.cpp`（22 tests）。覆盖 CLEANUP 解析与不可逆性、目录 BACKUP 恢复、随机后缀唯一性、rec CLEANUP 续传、安全检查、现有行为回归。
-
----
-
-## 14. 旧文件清理清单
-
-### 14.1 已删除的文件
-
-| 文件 | 原因 |
-|------|------|
-| `ARCH.md` | 已被 TODO.md 替代 |
-| `transaction_log.cpp` / `.hpp` | 旧 WAL 实现，废弃 |
-| `wal_op.cpp` / `.hpp` | 旧 WAL 操作实现，废弃（将重写） |
-| `recover.cpp` | 旧 rec 实现，废弃（将重写） |
-| `test_transaction_log.cpp` | 测试已删除的基础设施 |
-| `test_log_trim.cpp` | 同上 |
-| `test_log_trim_recovery.cpp` | 同上 |
-| `test_db_wal.cpp` | 同上 |
-| `test_atomic_rollback.cpp` | 同上 |
-| `test_atomic_transaction_fixes.cpp` | 同上 |
-| `test_atomicity_boundary.cpp` | 同上 |
-| `test_stress_recovery.cpp` | 同上 |
-
-### 14.2 待删除的旧函数
-
-| 函数 | 替代 |
-|------|------|
-| `rollback_installed_package()` | `batch_rollback()` + `reverse_execute()` |
-| `rollback_committed_packages()` | `batch_rollback()` |
-| `with_batch_transaction()` | `run_batch_transaction()` |
-| `deferred_remove_baks` / `clean_deferred_remove_baks()` | 移至 batch_rollback 管理 |
-| `remove_package()` catch 中调 `recover_packages()` | 调 `batch_rollback()` |
-
-### 14.3 待重写的文件
-
-| 文件 | 重写内容 |
-|------|---------|
-| `wal_op.hpp` | 新 DbMilestone、WALOp、reverse_execute、batch_rollback API |
-| `wal_op.cpp` | reverse_execute 实现（含 RESTORE 审计）、batch_rollback、extract_current_batch_ops |
-| `transaction_log.hpp` | 新 WalWriter 类 |
-| `transaction_log.cpp` | 原子 WAL 写入 + fsync |
-| `recover.cpp` | 新 recover_packages + trim_completed |
-| `cache.cpp` / `.hpp` | 新 write_db_file write_ahead 顺序 |
 
 ---
 

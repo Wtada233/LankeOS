@@ -299,15 +299,23 @@ std::unordered_set<std::string> read_set_from_file(const fs::path& path)
  */
 void write_set_to_file(const fs::path& path, const std::unordered_set<std::string>& data)
 {
+    std::string content;
+    for (const auto& item : data) {
+        content += item;
+        content += '\n';
+    }
+    write_string_to_file(path, content);
+}
+
+void write_string_to_file(const fs::path& path, std::string_view content)
+{
     fs::path tmp_path = path.string() + ".tmp";
     {
         std::ofstream file(tmp_path);
         if (!file.is_open()) {
             throw LpkgException(string_format("error.create_file_failed", tmp_path.string()));
         }
-        for (const auto& item : data) {
-            file << item << "\n";
-        }
+        file.write(content.data(), static_cast<std::streamsize>(content.size()));
         file.flush();
     }
     // fsync 确保 .tmp 内容在断电前完整落盘，然后 rename 原子替换

@@ -9,7 +9,7 @@ LankeOS build farm 是一个 **ABI 驱动的增量包构建系统**：基于 `ne
 - **增量**：只构建配方版本与本地 repo 不一致的包，或 ABI 断裂的受害者
 - **容器隔离**：所有构建在 fresh docker 容器内进行（禁止主机构建，`--image` 必填）
 - **ABI 精确**：用旧索引的 needed_so/provides 算 removed SONAME → 直连受害者，不做树状闭包
-- **单一真源**：`out/<arch>/index.txt` 含**完整 needed_so**（不再剥、不再维护第二份 `.abi.json`），同时供容器可见索引与 farm 的 ABI 传播
+- **单一真源**：`out/<arch>/index.txt` 含**完整 needed_so**，同时供容器可见索引与 farm 的 ABI 传播
 - **ABI 过渡备份**：检测到 SONAME 断裂时把旧 SONAME 的 .so 备份到 `out/backups/<pkg>/`，每个构建容器内恢复，让旧二进制在过渡期存活；**整个 build 完成后**清理
 - **确定性构建序**：拓扑排序同级包按名字升序固定顺序，绝无随机（有回归测试）
 - **构建计划确认**：开始前列出 topo 顺序供 operator 确认；预下载只给"确认集"，ABI 受害者构建时由 lpkg build 自己下载
@@ -35,7 +35,7 @@ src/
     seed.rs        cmd_seed
   build/           调度层
     mod.rs         run_build 核心（增量选择/计划预览/队列循环/ABI 传播/备份清理编排）+ 全部测试
-    sched.rs       topo_order（**只按 needed_so** 拓扑，确定性）/ find_cycle_edge / reorder_queue
+    sched.rs       topo_order（**needed_so + 声明式组边** 拓扑，确定性）/ find_cycle_edge / reorder_queue
     groups.rs      data/build/*.yaml 声明式 ABI 重建组（python 生态等不链但 ABI 敏感）
     prompt.rs      BLOCKED/源缺失的交互接管（开 shell/跳过/结束）+ 构建计划预览/确认
     sources.rs     源预下载
@@ -72,9 +72,9 @@ farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不
 
 `build/mod.rs::run_build` 主流程：
 
-1. **旧索引基线**：`load_old_index` 读 `out/<arch>/index.txt`（**完整 needed_so**，单一真源）。缺失/为空 → 报错（**禁止无基线构建**，`farm seed` 是唯一入口）；旧索引全零 needed_so（剥离时代遗留）→ 警告重新 seed，否则 ABI 传播失明。
+1. **旧索引基线**：`load_old_index` 读 `out/<arch>/index.txt`（**完整 needed_so**，单一真源）。缺失/为空 → 报错（**禁止无基线构建**，`farm seed` 是唯一入口）；旧索引全零 needed_so → 警告重新 seed，否则 ABI 传播失明。
 2. **增量选择**：`--all` 时用 `needs_build`（配方 effective_version vs 旧索引）跳过一致的包；指定 `pkg` 强制重建。
-3. **拓扑排序**：`sched::topo_order` **只按 needed_so 链接边**做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps`/`build_deps` **不参与构建序**——build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，无需排队；混入它们反而引入伪环（把 glibc 排到 python/cmake 之后，错误）。
+3. **拓扑排序**：`sched::topo_order` 按 **needed_so 链接边 ∪ 声明式重建组边**（victim → on）做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps`/`build_deps` **不参与构建序**——build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，无需排队；混入它们反而引入伪环（把 glibc 排到 python/cmake 之后，错误）。组边保证"不链 libpython 的 python-* 包"也排在 python 之后（见 §4 声明式组）。
 4. **计划预览 + 确认**（2.5）：交互模式（stdin 是 tty）列出 topo 顺序（包 + 版本）并让 operator 确认（回车继续 / n 取消）；非交互（CI/测试/脚本）直接开始。
 5. **预下载拆分**：确认后**只给确认集** bulk 预下载全部源；ABI 受害者动态入队**不预下载**（构建时由 lpkg build 自己下载）。批量预下载失败不阻塞——循环里每个确认集包会再走一次源就绪门（带交互接管）。
 6. **逐包循环**（队列，受害者带 `is_victim` 标记）：
@@ -88,11 +88,11 @@ farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不
 
 ### 排序与 ABI 受害者重排（build/sched.rs）
 
-- `topo_order`：**只按 needed_so** Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响）**。
+- `topo_order`：**needed_so 链接边 + 声明式组边** Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响 + 组受害者排触发包之后）**。
 
 ### 声明式 ABI 重建组（build/groups.rs，data/build/*.yaml）
 
-构建序只看 needed_so → "不链 libpython 但 ABI 敏感"的包（python-cairo/gobject/blueman/meson…）没有链接边、不会自动成为 ABI 受害者。用**声明式 YAML** 声明强制重建：
+构建序只看 needed_so → "不链 libpython 但 ABI 敏感"的包（python-cairo/gobject/blueman/meson…）没有链接边、不会自动成为 ABI 受害者。用**声明式 YAML** 声明强制重建。**组受害者必须排在触发包之后**：`topo_order` 把组边（victim → on）与 needed_so 链接边同等入图（`groups.trigger_edges_in`），否则 `--all` 初始队列里 python-cairo 会在 python 重建前构建（容器 `lpkg upgrade` 时本地 repo 还是旧 python，构建基于旧 ABI 白跑）。
 
 ```yaml
 # data/build/python.yaml
@@ -135,13 +135,17 @@ packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` g
 
 ## 6. 验证三分支（verify.rs）
 
-`verify::decide(actual_scan, expected_meta)`：
+`verify::decide(actual_scan, expected_meta)`（`build/repo.rs::repack_if_drift` 复用，单一判定源）：
 
-- **Unchanged**：needed_so/provides/deps 全一致 → 直接进 repo
-- **Repack**（needed_so/deps 漂移）：二进制未变只元数据错 → repack（不 rebuild）
+- **Unchanged**：needed_so/provides 全一致 → 直接进 repo
+- **Repack**（needed_so 漂移）：二进制未变只元数据错 → repack（不 rebuild）
 - **AbiBreak**（provides 漂移）：ABI 面变化 → repack 修正 + 传播重建依赖者
 
 provides 漂移优先（ABI 面是最高信号）。
+
+**`deps` 不参与判定**：deps 由 gen_deps/deprules 规则生成，farm 不扫不比（`BuildOutcome.deps` 恒空，
+`ScanResult.deps` 保留但 `decide` 不读）。**xattr 保留明确不做**（见 repack.rs 决策：tar Builder
+不写 PAX xattr，libarchive 绑定成本高，LFS 无 SELinux 默认场景）。
 
 ### 交互接管（build/prompt.rs）
 
@@ -160,7 +164,7 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 - **`groups.victims_for(on, all_pkgs)`**：data/build/*.yaml 声明式重建组（不链但 ABI 敏感，见 §4）
 - **传播**：只有 SONAME 变化才触发；受害者 = `direct_victims` ∪ `groups.victims_for`（并集、去重、排序）；受害者 release bump + 入队重建；受害者自身的 provides 变化再级联（固定点）
 
-**index.txt 是单一真源**：完整 needed_so/provides 同时供容器可见索引与 farm 传播（removed_sonames / revmap / link_deps / 备份清理），不再剥 needed_so、**不再有 `.abi.json`**。lpkg 的 SONAME 检查在容器里真实运行，过渡期由 `--missing-so-no-error` / `--use-system-soname` 显式容忍（见 §5）。
+**index.txt 是单一真源**：完整 needed_so/provides 同时供容器可见索引与 farm 传播（removed_sonames / revmap / link_deps / 备份清理）。lpkg 的 SONAME 检查在容器里真实运行，过渡期由 `--missing-so-no-error` / `--use-system-soname` 显式容忍（见 §5）。
 
 ### ABI 过渡备份机制
 
@@ -173,7 +177,7 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 `seed.rs`：
 1. 下载远端 `index.txt` → 解析（含**完整 needed_so**）
 2. 并行（`-j`，默认 CPU 核数）逐包：下载 + **SHA256 校验** + 清旧版本（本地已有该版本 → 增量跳过下载）
-3. 本地 `index.txt` **原样保留**（不剥 needed_so、不重写哈希），`.lpkg` **不剥不重打**——单一真源，容器与 farm 共用
+3. 本地 `index.txt` **原样保留**（不重写哈希），`.lpkg` **不重打**——单一真源，容器与 farm 共用
 
 ## 9. track 系统
 
@@ -210,7 +214,7 @@ SQLite（`out/farm-state.db`，可选 `--state`）：
 ```
 seed ──> out/<arch>/
            index.txt   (完整 needed_so/provides/deps，单一真源)
-           <pkg>/<ver>.lpkg  (完整 metadata，含 needed_so，不剥)
+           <pkg>/<ver>.lpkg  (完整 metadata，含 needed_so)
            backups/    (ABI 断裂备份的旧 .so，整个 build 后清理)
 
 build --all ──> run_build

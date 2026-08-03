@@ -798,20 +798,27 @@ void InstallationTask::register_package()
 
     std::vector<std::string> sorted_deps(dep_entries.begin(), dep_entries.end());
     std::sort(sorted_deps.begin(), sorted_deps.end());
+    // WAL → 原子写（I-FSYNC 纪律：DBNEW 的 .tmp+fsync+rename，见 ARCH §6.2）
     wal::log_wal_line("DBNEW " + (Config::instance().dep_dir() / pkg_name_).string() + " " +
                       pkg_name_ + ":installed");
-    std::ofstream deps_out(Config::instance().dep_dir() / pkg_name_);
-    for (const auto& entry : sorted_deps) {
-        deps_out << entry << constants::NL;
+    {
+        std::string deps_content;
+        for (const auto& entry : sorted_deps) {
+            deps_content += entry;
+            deps_content += constants::NL;
+        }
+        write_string_to_file(Config::instance().dep_dir() / pkg_name_, deps_content);
     }
 
     if (!needed_so_.empty()) {
         wal::log_wal_line("DBNEW " + (Config::instance().needed_so_dir() / pkg_name_).string() +
                           " " + pkg_name_ + ":installed");
-        std::ofstream nso_out(Config::instance().needed_so_dir() / pkg_name_);
+        std::string nso_content;
         for (const auto& sn : needed_so_) {
-            nso_out << sn << constants::NL;
+            nso_content += sn;
+            nso_content += constants::NL;
         }
+        write_string_to_file(Config::instance().needed_so_dir() / pkg_name_, nso_content);
     }
 
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
@@ -829,8 +836,7 @@ void InstallationTask::register_package()
     const fs::path man_path =
         Config::instance().docs_dir() / (pkg_name_ + std::string(constants::SUFFIX_MAN));
     if (!man_content_.empty()) {
-        std::ofstream man_out(man_path);
-        man_out << man_content_;
+        write_string_to_file(man_path, man_content_);
     } else {
         std::error_code ec;
         fs::remove(man_path, ec);

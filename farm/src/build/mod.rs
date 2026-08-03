@@ -126,7 +126,10 @@ pub fn run_build(
     } else {
         opts.targets.clone()
     };
-    let mut queue: VecDeque<(String, bool)> = topo_order(&opts.pkgs_dir, &initial, &old)
+    // 组边参与初始排序：声明式组受害者（python-* 等）排在触发包之后——
+    // `--all` 时它们已在初始队列，没有 needed_so 链接边，须靠组边强制 python 先建。
+    let group_edges = groups.trigger_edges_in(&initial);
+    let mut queue: VecDeque<(String, bool)> = topo_order(&opts.pkgs_dir, &initial, &old, &group_edges)
         .into_iter()
         .map(|p| (p, false))
         .collect();
@@ -335,7 +338,7 @@ pub fn run_build(
             // 受害者按**依赖算法**重排：被依赖的受害者先建，依赖它们的后建。
             // 否则按字母序先建 appstream 时，其构建依赖树里的 librsvg（同样是 libxml2 受害者，
             // 还引用旧 libxml2.so.2）未重建 → 装构建依赖时 SONAME 无 provider 硬报错。
-            reorder_queue(&mut queue, &opts.pkgs_dir, &old);
+            reorder_queue(&mut queue, &opts.pkgs_dir, &old, &groups);
         }
 
         if let Some(st) = state {
@@ -560,7 +563,7 @@ mod tests {
             ("b", vec!["libb.so.1"], vec!["liba.so.1"]),
             ("c", vec![], vec!["libb.so.1"]),
         ]);
-        let order = topo_order(&dir, &["a".into(), "b".into(), "c".into()], &old);
+        let order = topo_order(&dir, &["a".into(), "b".into(), "c".into()], &old, &[]);
         let pos = |x: &str| order.iter().position(|n| n == x).unwrap();
         assert!(pos("a") < pos("b"));
         assert!(pos("b") < pos("c"));
@@ -613,7 +616,7 @@ mod tests {
             .iter()
             .map(|s| s.to_string())
             .collect();
-        let order = topo_order(&dir, &targets, &old);
+        let order = topo_order(&dir, &targets, &old, &[]);
         let pos = |s: &str| order.iter().position(|n| n == s).unwrap();
         assert!(pos("glibc") < pos("zlib"), "链接链应自底向上: {order:?}");
         assert!(pos("zlib") < pos("curl"));
@@ -637,7 +640,7 @@ mod tests {
             ("c", vec![], vec!["liba.so.1"]),
         ]);
         let targets: Vec<String> = ["a", "b", "c"].iter().map(|s| s.to_string()).collect();
-        let order = topo_order(&dir, &targets, &old);
+        let order = topo_order(&dir, &targets, &old, &[]);
         assert_eq!(order.len(), 3, "环切断后应覆盖所有包: {order:?}");
         for t in &targets {
             assert!(order.contains(t), "不应丢包 {t}: {order:?}");
@@ -645,6 +648,58 @@ mod tests {
         let pos = |s: &str| order.iter().position(|n| n == s).unwrap();
         assert!(pos("a") < pos("c"), "c 依赖 a，应在其后: {order:?}");
         fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn topo_order_group_victims_after_trigger() {
+        // 用户 bug 复现：`--all` 模式下 python-cairo（不链 libpython，无 needed_so 边）
+        // 必须排在触发包 python 之后——否则容器 upgrade 时本地 repo 还是旧 python。
+        // 组边（victim → on）强制排序；python 不在 targets 则无约束。
+        let dir = std::env::temp_dir().join("farm-build-topo-group");
+        let _ = std::fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        write_pkg(&dir, "python", &["libpython3.14.so", "libpython3.14.so.1"], &["libc.so.6"], &[]);
+        // python-cairo 只链 libcairo/libc，**不链 libpython**（组依赖的由来）
+        write_pkg(
+            &dir,
+            "python-cairo",
+            &["libpycairo.so"],
+            &["libcairo.so.2", "libc.so.6"],
+            &[],
+        );
+        write_pkg(&dir, "blueman", &[], &["libc.so.6"], &[]);
+        let old = index_of(&[
+            ("python", vec!["libpython3.14.so", "libpython3.14.so.1"], vec!["libc.so.6"]),
+            ("python-cairo", vec!["libpycairo.so"], vec!["libcairo.so.2", "libc.so.6"]),
+            ("blueman", vec![], vec!["libc.so.6"]),
+        ]);
+        let gdir = std::env::temp_dir().join(format!("farm-topo-group-data-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&gdir);
+        fs::create_dir_all(&gdir).unwrap();
+        fs::write(
+            gdir.join("python.yaml"),
+            "rebuild-on-abichange: python\npackages: python-* blueman\n",
+        )
+        .unwrap();
+        let groups = RebuildGroups::load(&gdir);
+        let targets: Vec<String> = ["python", "python-cairo", "blueman"].iter().map(|s| s.to_string()).collect();
+        let edges = groups.trigger_edges_in(&targets);
+        let order = topo_order(&dir, &targets, &old, &edges);
+        let pos = |x: &str| order.iter().position(|n| n == x).unwrap();
+        assert!(
+            pos("python") < pos("python-cairo"),
+            "组受害者 python-cairo 必须在 python 之后: {order:?}"
+        );
+        assert!(pos("python") < pos("blueman"), "blueman 也应在 python 之后: {order:?}");
+
+        // python 不在 targets（不重建）→ 无组边约束，python-cairo 可独立排
+        let targets2: Vec<String> = ["python-cairo", "blueman"].iter().map(|s| s.to_string()).collect();
+        let edges2 = groups.trigger_edges_in(&targets2);
+        assert!(edges2.is_empty(), "python 不在 targets 时不应有组边: {edges2:?}");
+        let order2 = topo_order(&dir, &targets2, &old, &edges2);
+        assert_eq!(order2.len(), 2, "排序仍覆盖全部包: {order2:?}");
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&gdir).ok();
     }
 
     #[test]
@@ -664,11 +719,11 @@ mod tests {
         ]);
         // 故意乱序输入（z,m,a）：heap 按名字升序弹出，输出与输入无关
         let targets: Vec<String> = ["z", "m", "a"].iter().map(|s| s.to_string()).collect();
-        let order = topo_order(&dir, &targets, &old);
+        let order = topo_order(&dir, &targets, &old, &[]);
         assert_eq!(order, vec!["a", "m", "z"], "同级应名字升序: {order:?}");
         assert_eq!(
             order,
-            topo_order(&dir, &targets, &old),
+            topo_order(&dir, &targets, &old, &[]),
             "两次运行必须逐位一致（确定性）"
         );
         fs::remove_dir_all(&dir).ok();
@@ -691,7 +746,7 @@ mod tests {
         ]);
         let mut queue: VecDeque<(String, bool)> =
             vec![("appstream".to_string(), true), ("librsvg".to_string(), true)].into();
-        reorder_queue(&mut queue, &dir, &old);
+        reorder_queue(&mut queue, &dir, &old, &RebuildGroups::default());
         let names: Vec<&str> = queue.iter().map(|(n, _)| n.as_str()).collect();
         let pos = |s: &str| names.iter().position(|n| *n == s).unwrap();
         assert!(pos("librsvg") < pos("appstream"), "被依赖的受害者应先建: {names:?}");
@@ -724,7 +779,7 @@ mod tests {
             ("chromium".to_string(), true), // libC 断裂
         ]
         .into();
-        reorder_queue(&mut queue, &dir, &old);
+        reorder_queue(&mut queue, &dir, &old, &RebuildGroups::default());
         let chromium_count = queue.iter().filter(|(n, _)| n == "chromium").count();
         assert_eq!(chromium_count, 1, "chromium 应只出现一次: {queue:?}");
         let chromium_flag = queue.iter().find(|(n, _)| n == "chromium").unwrap().1;
@@ -766,7 +821,7 @@ mod tests {
             ("P".to_string(), true),
         ]
         .into();
-        reorder_queue(&mut queue, &dir, &old);
+        reorder_queue(&mut queue, &dir, &old, &RebuildGroups::default());
         let pos = |s: &str| queue.iter().position(|(n, _)| n == s).unwrap();
         assert!(
             pos("P") < pos("A") && pos("P") < pos("B") && pos("P") < pos("C"),
@@ -794,17 +849,17 @@ mod tests {
         // libA 断裂后：队列 = [libB, libC, chromium(victim)]
         let mut q1: VecDeque<(String, bool)> =
             vec![("libB".to_string(), false), ("libC".to_string(), false), ("chromium".to_string(), true)].into();
-        reorder_queue(&mut q1, &dir, &old);
+        reorder_queue(&mut q1, &dir, &old, &RebuildGroups::default());
         assert_eq!(q1.back().map(|(n, _)| n.as_str()), Some("chromium"), "libA 断裂后 chromium 应仍在队尾: {q1:?}");
         // libB 断裂后：队列 = [libC, chromium]
         let mut q2: VecDeque<(String, bool)> =
             vec![("libC".to_string(), false), ("chromium".to_string(), true)].into();
-        reorder_queue(&mut q2, &dir, &old);
+        reorder_queue(&mut q2, &dir, &old, &RebuildGroups::default());
         assert_eq!(q2.back().map(|(n, _)| n.as_str()), Some("chromium"), "libB 断裂后 chromium 应仍在队尾: {q2:?}");
         // libC 断裂后：队列 = [chromium]（依赖全建完）
         let mut q3: VecDeque<(String, bool)> =
             vec![("chromium".to_string(), true)].into();
-        reorder_queue(&mut q3, &dir, &old);
+        reorder_queue(&mut q3, &dir, &old, &RebuildGroups::default());
         assert_eq!(q3.len(), 1, "chromium 只应出现一次: {q3:?}");
         fs::remove_dir_all(&dir).ok();
     }

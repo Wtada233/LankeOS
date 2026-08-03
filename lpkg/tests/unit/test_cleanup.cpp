@@ -125,7 +125,7 @@ TEST_F(CleanupTest, ReverseExecuteSkipsCleanup)
     auto op = wal::parse_op("CLEANUP /nonexistent/cleanup_test");
     ops.push_back(op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", true);
+    wal::RollbackStats stats = wal::reverse_execute(ops, true);
     EXPECT_EQ(stats.files_restored, 0);
     EXPECT_EQ(stats.files_cleaned, 0);
     EXPECT_EQ(stats.db_restored, 0);
@@ -153,7 +153,7 @@ TEST_F(CleanupTest, ReverseExecuteSkipsCleanupAmongOtherOps)
     auto cl_op = wal::parse_op("CLEANUP /usr/bin/old_file.lpkg_bak_test_abc123");
     ops.push_back(cl_op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
 
     // BACKUP 应被恢复，CLEANUP 应被跳过
     EXPECT_EQ(stats.files_restored, 1);
@@ -185,7 +185,7 @@ TEST_F(CleanupTest, BackupDirReverseRestore)
     op.arg2 = dir_bak.string();
     ops.push_back(op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
 
     EXPECT_EQ(stats.files_restored, 1);
     EXPECT_TRUE(fs::exists(dir));
@@ -237,7 +237,7 @@ TEST_F(CleanupTest, BackupDirNestedRestore)
     op3.arg2 = outer_bak.string();
     ops.push_back(op3);
 
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
 
     // 外层目录恢复
     EXPECT_TRUE(fs::exists(outer));
@@ -265,7 +265,7 @@ TEST_F(CleanupTest, BackupDirReverseRestoreIdempotent)
     // .bak 不存在（已消费），目录已存在
     ops.push_back(op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.files_restored, 0);  // 跳过
     EXPECT_TRUE(fs::exists(dir));
 }
@@ -490,7 +490,7 @@ TEST_F(CleanupTest, ReverseExecuteBackupRestoresFile)
     op.arg2 = dst.string();
     ops.push_back(op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.files_restored, 1);
     EXPECT_TRUE(fs::exists(src));
     EXPECT_FALSE(fs::exists(dst));
@@ -507,7 +507,7 @@ TEST_F(CleanupTest, ReverseExecuteCopyRemovesFile)
     op.arg2 = dst.string();
     ops.push_back(op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.files_cleaned, 1);
     EXPECT_FALSE(fs::exists(dst));
 }
@@ -532,7 +532,7 @@ TEST_F(CleanupTest, ReverseExecuteDbRestores)
     op.arg2 = "pkg:installed";
     ops.push_back(op);
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.db_restored, 1);
     EXPECT_TRUE(fs::exists(db));
     EXPECT_FALSE(fs::exists(db_bak));
@@ -591,7 +591,7 @@ TEST_F(CleanupTest, CleanupDoesNotAffectReverseExecuteStats)
     ops.push_back(wal::parse_op("CLEANUP /tmp/foo.bak"));
     ops.push_back(wal::parse_op("CLEANUP /tmp/bar.bak"));
 
-    wal::RollbackStats stats = wal::reverse_execute(ops, "", false);
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
     EXPECT_EQ(stats.files_restored, 0);
     EXPECT_EQ(stats.files_cleaned, 0);
     EXPECT_EQ(stats.db_restored, 0);
@@ -634,7 +634,7 @@ TEST_F(CleanupTest, RollbackAfterRmCommitWithoutCleanup)
     EXPECT_TRUE(fs::exists(bak));
     EXPECT_FALSE(fs::exists(src));
 
-    wal::reverse_execute(ops, "", false);
+    wal::reverse_execute(ops, false);
 
     // BACKUP 恢复：文件应回来
     EXPECT_FALSE(fs::exists(bak));

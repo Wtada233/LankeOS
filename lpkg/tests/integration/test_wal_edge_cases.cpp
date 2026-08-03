@@ -238,7 +238,7 @@ TEST_F(WalEdgeCaseTest, NewDirAndNewFileReverseTogether)
 
 // ── milestone 停止：到达 :batch-start 后停止 ───────────────────────
 
-TEST_F(WalEdgeCaseTest, MilestoneStopAtBatchStart)
+TEST_F(WalEdgeCaseTest, BatchStartMilestoneSkippedInReverse)
 {
     std::string pkgs = (Config::instance().state_dir() / "pkgs").string();
     std::string bak = pkgs + ".lpkg_db_bak_before:pkg:installed";
@@ -260,7 +260,7 @@ TEST_F(WalEdgeCaseTest, MilestoneStopAtBatchStart)
         ops[2].arg2 = ":batch-start";
     }
 
-    wal::reverse_execute(ops, ":batch-start", false);
+    wal::reverse_execute(ops, false);
 
     // :batch-start 行应被跳过，pkg:installed 行应恢复 DB
     EXPECT_FALSE(fs::exists(bak));

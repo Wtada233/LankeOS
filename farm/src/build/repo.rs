@@ -29,7 +29,7 @@ pub(crate) fn needs_build(pkgs_dir: &Path, pkg: &str, old: &Index) -> bool {
 
 /// 元数据漂移检测 + repack（gen_deps 语义，§6）：解包 .lpkg，扫描实际 vs 包内 metadata.json 的
 /// needed_so/provides，**不一致才**改 metadata.json 并重打包（不 rebuild）。deps 不读不改。
-/// 返回是否发生了 repack。
+/// 判定统一走 `verify::decide`（与 ARCH §6 三分支一致）。返回是否发生了 repack。
 pub(crate) fn repack_if_drift(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &str) -> bool {
     let Some(lpkg) = &outcome.lpkg_path else { return false };
     let extract = opts.out_dir.join("extract").join(pkg);
@@ -45,9 +45,17 @@ pub(crate) fn repack_if_drift(outcome: &BuildOutcome, opts: &BuildOptions, pkg: 
         .as_array()
         .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
         .unwrap_or_default();
-    if sorted_str(&meta_needed) == sorted_str(&outcome.needed_so)
-        && sorted_str(&meta_provides) == sorted_str(&outcome.provides)
-    {
+    let actual = crate::verify::ScanResult {
+        needed_so: outcome.needed_so.clone(),
+        provides: outcome.provides.clone(),
+        deps: Vec::new(), // farm 不扫 deps（gen_deps 生成，decide 不比较）
+    };
+    let expected = crate::verify::ScanResult {
+        needed_so: meta_needed,
+        provides: meta_provides,
+        deps: Vec::new(),
+    };
+    if crate::verify::decide(&actual, &expected) == crate::verify::VerifyAction::Unchanged {
         return false; // 无漂移
     }
     // 漂移 → repack（改 metadata.json + 重打包，复用 scan 的解包目录）
@@ -275,12 +283,6 @@ pub(crate) fn update_repo_index(out_dir: &Path, arch: &str, pkg: &str, version: 
         ));
     }
     fs::write(&path, lines.join("\n") + "\n").map_err(|e| format!("写 {path:?} 失败: {e}"))
-}
-
-fn sorted_str(v: &[String]) -> Vec<&str> {
-    let mut s: Vec<&str> = v.iter().map(String::as_str).collect();
-    s.sort_unstable();
-    s
 }
 
 pub(crate) fn sha256_file(path: &Path) -> Result<String, String> {

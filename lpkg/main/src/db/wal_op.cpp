@@ -93,16 +93,12 @@ static std::vector<std::string_view> split_line(std::string_view line)
     // 检查是否包含 "→"（多参数格式: BACKUP src → dst 或 COPY src → dst）
     auto arrow = rest.find(" \xe2\x86\x92 ");  // " → " in UTF-8
     if (arrow != std::string_view::npos) {
+        // 箭头格式恰好两参（BACKUP/COPY/REMOVE_OLD/RESTORE_*）：
+        // arg1 = 箭头前整段（src），arg2 = 箭头后整段（dst）。
+        // **不再按空格继续切 dst**——目标路径可含空格，之前会把含空格的 dst 误拆成两参。
         parts.push_back(rest.substr(0, arrow));
         rest.remove_prefix(arrow + 5);  // skip " → " (3 bytes + 2 spaces)
-        // rest 现在是 arg2（可能后面还有空格参数）
-        auto sp = rest.find(' ');
-        if (sp != std::string_view::npos) {
-            parts.push_back(rest.substr(0, sp));
-            parts.push_back(rest.substr(sp + 1));
-        } else {
-            parts.push_back(rest);
-        }
+        parts.push_back(rest);
     } else {
         // 简单空格分割
         while (!rest.empty()) {
@@ -197,8 +193,7 @@ static bool safe_remove(const fs::path& p)
     return fs::remove(p, ec);
 }
 
-RollbackStats reverse_execute(const std::vector<WALOp>& ops, const std::string& milestone_target,
-                              bool write_audit)
+RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
 {
     RollbackStats stats;
 
@@ -347,14 +342,6 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, const std::string& 
             default:
                 break;
         }
-
-        // 检查里程碑停止条件
-        if (!milestone_target.empty() && (op.type == WALOpType::DB || op.type == WALOpType::DBNEW ||
-                                          op.type == WALOpType::DBRM)) {
-            if (op.arg2 == milestone_target) {
-                return stats;
-            }
-        }
     }
 
     return stats;
@@ -402,54 +389,6 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path)
     return ops;
 }
 
-std::vector<std::vector<WALOp>> extract_last_uncommitted_batch(const std::string& wal_path)
-{
-    std::vector<std::vector<WALOp>> result;
-    std::ifstream file(wal_path);
-    if (!file.is_open()) return result;
-
-    std::vector<std::string> lines;
-    std::string line;
-    while (std::getline(file, line)) {
-        if (line.empty()) continue;
-        if (!line.empty() && line.back() == '\r') line.pop_back();
-        lines.push_back(line);
-    }
-
-    int depth = 0;
-    int batch_start = -1;
-    bool in_uncommitted = false;
-
-    for (size_t i = 0; i < lines.size(); ++i) {
-        auto op = parse_op(lines[i]);
-        if (op.arg1 == "__INVALID__") continue;
-
-        if (op.type == WALOpType::BEGIN_PKGS) {
-            depth++;
-            if (depth == 1) {
-                batch_start = static_cast<int>(i);
-                in_uncommitted = true;
-            }
-        } else if (op.type == WALOpType::COMMIT_PKGS) {
-            depth--;
-            if (depth == 0 && in_uncommitted) {
-                in_uncommitted = false;
-            }
-        }
-    }
-
-    if (in_uncommitted && batch_start >= 0) {
-        std::vector<WALOp> ops;
-        for (size_t i = static_cast<size_t>(batch_start); i < lines.size(); ++i) {
-            auto op = parse_op(lines[i]);
-            if (op.arg1 != "__INVALID__") ops.push_back(op);
-        }
-        result.push_back(std::move(ops));
-    }
-
-    return result;
-}
-
 // ============================================================================
 // 批次回滚
 // ============================================================================
@@ -467,7 +406,7 @@ void batch_rollback(const std::vector<std::string>& successfully_installed)
     }
 
     // 2. 逆向执行操作
-    reverse_execute(ops, ":batch-start", true);
+    reverse_execute(ops, true);
 
     // 3. 重载 Cache（从磁盘恢复的 DB 文件）
     cache.load();
