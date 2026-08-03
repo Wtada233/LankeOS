@@ -1,5 +1,6 @@
 pkg-name: freetype
-tracker-template: html-index
-url: https://download.savannah.gnu.org/releases/freetype/
+tracker-template: sourceforge
+project: freetype
+path: freetype2
 pattern: 'freetype-(\d[\d.]*)\.tar\.xz'
-template: https://download.savannah.gnu.org/releases/freetype/freetype-{version}.tar.xz
+template: https://downloads.sourceforge.net/project/freetype/freetype2/{path_version}/freetype-{version}.tar.xz
