@@ -102,7 +102,12 @@ pub(crate) fn place_in_repo(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &s
 ///
 /// **只备份旧 provides 有、新打包消失的 SONAME**（`removed = old_provides − new_provides`）：
 /// - 版本化 `.so.*`：SONAME 本体 + 实体（libfoo.so.1 / libfoo.so.1.2.3）
-/// - 无 SONAME 的实体库（如 tcl 的 libtcl8.6.so，普通文件）：文件名即身份，直接备份
+/// - 无 SONAME 的运行时库（如 tcl 的 libtcl8.6.so、expect 的 libexpect5.45.4.so）：文件名即身份
+/// - 符号链接**保留本身**（ldconfig 要求版本化 SONAME 是符号链接，否则报 dirty），并**复刻目录树**
+///   备份它指向的实体：/usr/lib/xxx.so.x -> xxx/xxx.so.x.x
+///   ⇒ out/backups/xxx.so.x (symlink) + out/backups/xxx/xxx.so.x.x (实体)
+/// - **绝对目标容错**：指向 /usr/lib/xxx（或 lib/usr/lib64/lib64）时在 archive 里定位（content/ → /），
+///   符号链接转为相对路径（相对备份树根 /usr/lib），目标文件放在对应位置
 /// - 排除裸 `.so` dev 符号链接（指向版本化文件的 xxx.so，那归新包）
 /// 扫全部系统库目录（usr/lib、lib、usr/lib64、lib64）——lib64 是 lib 的合并符号链接时
 /// 内容重复，但备份目录扁平去重（同名覆盖，无害）。
@@ -150,18 +155,45 @@ pub(crate) fn backup_removed_sonames(
                         continue;
                     }
                 } else {
-                    // 无 SONAME 的实体库（如 tcl 的 libtcl8.6.so，普通文件，文件名即身份）→ 直接备份。
-                    // dev symlink（xxx.so 指向版本化文件）归新包，绝不备份。
-                    if ft.file_type().is_symlink() || !removed.iter().any(|r| r == &fname) {
+                    // 无 SONAME 的运行时库（文件名即身份，如 tcl 的 libtcl8.6.so、
+                    // expect 的 libexpect5.45.4.so）：文件名必须是被移除的提供名。
+                    if !removed.iter().any(|r| r == &fname) {
                         continue;
+                    }
+                    // dev symlink（libfoo.so → libfoo.so.1，目标版本化）归新包，跳过；
+                    // 模块库 symlink（libexpect5.45.4.so → 子目录内未版本化实体）是运行时 SONAME，保留。
+                    if ft.file_type().is_symlink() {
+                        let target = fs::read_link(&p).unwrap_or_default();
+                        let target_name = target.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                        if target_name.contains(".so.") {
+                            continue;
+                        }
                     }
                 }
 
                 let dest = backup_dir.join(&fname);
                 if ft.file_type().is_symlink() {
+                    // 保留符号链接本身——ldconfig 要求版本化 SONAME 是符号链接（否则报 "not a symlink"
+                    // 的 dirty 警告）；并**复刻目录树**备份它指向的实体：
+                    //   /usr/lib/xxx.so.x -> xxx/xxx.so.x.x
+                    //   ⇒ out/backups/xxx.so.x (symlink) + out/backups/xxx/xxx.so.x.x (实体)
+                    // 目标可能已被同目录实体/中间链接备份过（版本化链）→ 不覆盖（保留符号链接）。
                     if let Ok(target) = fs::read_link(&p) {
+                        // 绝对目标在 archive 里定位（content/ → /），符号链接一律转相对（相对备份树根 /usr/lib）
+                        let (src, rel) = resolve_link_target(&target, &lib_dir, &tmp.join("content"));
+                        if fs::symlink_metadata(&src).is_ok() {
+                            if let Some(parent) = rel.parent() {
+                                if !parent.as_os_str().is_empty() {
+                                    let _ = fs::create_dir_all(backup_dir.join(parent));
+                                }
+                            }
+                            let backup_dest = backup_dir.join(&rel);
+                            if fs::symlink_metadata(&backup_dest).is_err() {
+                                let _ = fs::copy(&src, &backup_dest); // fs::copy 跟随符号链接 → 实体内容
+                            }
+                        }
                         let _ = fs::remove_file(&dest);
-                        let _ = std::os::unix::fs::symlink(target, &dest);
+                        let _ = std::os::unix::fs::symlink(&rel, &dest);
                     }
                 } else {
                     let _ = fs::copy(&p, &dest);
@@ -179,6 +211,32 @@ fn is_removed_soname_file(fname: &str, removed: &[&str]) -> bool {
     removed.iter().any(|r| {
         fname == *r || fname.strip_prefix(r).is_some_and(|rest| rest.starts_with('.'))
     })
+}
+
+/// 把符号链接目标映射为 (archive 内的源文件路径, 备份树内的相对路径)。
+///
+/// - 相对目标（expect5.45.4/libexpect5.45.4.so）→ 源 = lib_dir/target，备份路径 = target（复刻目录树）
+/// - 绝对目标（/usr/lib/xxx.so.1.2.3）→ 在 archive 里定位（content/ 映射到 /），备份路径转为
+///   **相对备份树根 /usr/lib**（剥标准库目录前缀）——符号链接一律落相对路径，注入后能解析。
+fn resolve_link_target(target: &Path, lib_dir: &Path, content_root: &Path) -> (PathBuf, PathBuf) {
+    if target.is_absolute() {
+        let abs = target.strip_prefix("/").unwrap_or(target);
+        let src = content_root.join(abs);
+        let rel = if let Ok(rest) = abs.strip_prefix("usr/lib/") {
+            PathBuf::from(rest)
+        } else if let Ok(rest) = abs.strip_prefix("usr/lib64/") {
+            PathBuf::from(rest)
+        } else if let Ok(rest) = abs.strip_prefix("lib/") {
+            PathBuf::from(rest)
+        } else if let Ok(rest) = abs.strip_prefix("lib64/") {
+            PathBuf::from(rest)
+        } else {
+            PathBuf::from(target.file_name().unwrap_or_default())
+        };
+        (src, rel)
+    } else {
+        (lib_dir.join(target), target.to_path_buf())
+    }
 }
 
 /// ABI 过渡备份的清理：**整个 build 完成**（而非单包）后调用。
@@ -206,25 +264,36 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
         .flat_map(|p| p.needed_so.iter().cloned())
         .collect();
     let mut any_removed = false;
-    if let Ok(rd) = fs::read_dir(&backups) {
+
+    /// 递归遍历备份树：清理无引用的备份文件（含复刻的子目录实体，如
+    /// expect5.45.4/libexpect5.45.4.so），并剪除随之变空的子目录。
+    fn walk(dir: &Path, referenced: &std::collections::HashSet<String>, any_removed: &mut bool) {
+        let Ok(rd) = fs::read_dir(dir) else { return };
         for e in rd.flatten() {
             let p = e.path();
             let Ok(ft) = fs::symlink_metadata(&p) else { continue };
-            if !ft.file_type().is_file() && !ft.file_type().is_symlink() {
-                continue; // 只清扁平备份文件；非文件/符号链接条目不处理
+            if ft.file_type().is_dir() {
+                walk(&p, referenced, any_removed);
+                // 子目录变空（其目标文件被清理）→ 剪除
+                if fs::read_dir(&p).map(|mut r| r.next().is_none()).unwrap_or(false) {
+                    let _ = fs::remove_dir(&p);
+                }
+                continue;
             }
             let fname = e.file_name().to_string_lossy().into_owned();
             // 版本化 .so.* → SONAME 前缀；无 SONAME 的实体库（libtcl8.6.so）→ 文件名即身份
-            let soname = soname_of(&fname).map(str::to_string).unwrap_or_else(|| fname.clone());
+            let soname = soname_of(&fname).map(str::to_string).unwrap_or(fname);
             if referenced.contains(&soname) {
                 continue; // 仍有包需要旧 SONAME → 保留
             }
             if fs::remove_file(&p).is_ok() {
                 println!("{}", tr!("build.backup_clean", p.display()));
-                any_removed = true;
+                *any_removed = true;
             }
         }
     }
+    walk(&backups, &referenced, &mut any_removed);
+
     // 根目录变空 → 一并清掉（下次 build 有新备份时重建）
     if any_removed || fs::read_dir(&backups).map(|mut r| r.next().is_none()).unwrap_or(false) {
         let _ = fs::remove_dir(&backups);

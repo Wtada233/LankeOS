@@ -1422,7 +1422,7 @@ mod tests {
     fn backup_keeps_runtime_soname_and_patch_but_not_dev_symlink() {
         // 旧 libfoo 1.0：dev symlink libfoo.so + SONAME symlink libfoo.so.1 + 实体 libfoo.so.1.2.3。
         // 新 libfoo 2.0：连 dev symlink 一起移除（provides 只剩 libfoo.so.2）→ removed = {libfoo.so, libfoo.so.1}。
-        // 应只备份运行时 SONAME 文件（libfoo.so.1 符号链接 + 实体 libfoo.so.1.2.3），dev symlink libfoo.so 绝不备份。
+        // 应只备份运行时 SONAME 文件（libfoo.so.1 解引用内容 + 实体 libfoo.so.1.2.3），dev symlink libfoo.so 绝不备份。
         let dir = temp_dir("farm-backup-files");
         let out = temp_dir("farm-backup-files-out");
         fs::create_dir_all(dir.join("content/usr/lib")).unwrap();
@@ -1469,13 +1469,160 @@ mod tests {
                 .unwrap()
                 .file_type()
                 .is_symlink(),
-            "SONAME 符号链接 libfoo.so.1 应被备份（保持符号链接，供运行时解析）"
+            "SONAME libfoo.so.1 应保留为符号链接（ldconfig 要求版本化 SONAME 是符号链接）"
+        );
+        assert!(
+            fs::exists(out.join("backups/libfoo.so.1")).unwrap_or(false),
+            "SONAME 符号链接的目标 libfoo.so.1.2.3 应一并备份（不 dangling）"
         );
         assert!(
             out.join("backups/libfoo.so.1.2.3").is_file(),
             "patch 实体 libfoo.so.1.2.3 应被备份（SONAME 符号链接的落点）"
         );
         fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn backup_preserves_symlinks_and_replicates_subdir_targets() {
+        // 模块库布局（expect 类）：SONAME 是符号链接指向子目录内的实体。
+        //   libexpect5.45.4.so → expect5.45.4/libexpect5.45.4.so  （无 SONAME 实体库，未版本化）
+        //   libexpect.so.5     → expect5.45.4/libexpect.so.5      （版本化 SONAME 指向子目录）
+        // ABI 断裂时：符号链接保留本身（ldconfig 需要版本化 SONAME 是符号链接），并**复刻目录树**
+        // 备份目标实体——out/backups/libexpect5.45.4.so (symlink) +
+        // out/backups/expect5.45.4/libexpect5.45.4.so (实体)。绝不 dangling。
+        let dir = temp_dir("farm-backup-subdir");
+        let out = temp_dir("farm-backup-subdir-out");
+        fs::create_dir_all(dir.join("content/usr/lib/expect5.45.4")).unwrap();
+        let real_v45 = dir.join("content/usr/lib/expect5.45.4/libexpect5.45.4.so");
+        let real_v5 = dir.join("content/usr/lib/expect5.45.4/libexpect.so.5");
+        fs::write(&real_v45, [0x7f, b'E', b'L', b'F', 2, 1, 1]).unwrap();
+        fs::write(&real_v5, [0x7f, b'E', b'L', b'F', 2, 1, 1, 2]).unwrap();
+        std::os::unix::fs::symlink(
+            "expect5.45.4/libexpect5.45.4.so",
+            dir.join("content/usr/lib/libexpect5.45.4.so"),
+        )
+        .unwrap();
+        std::os::unix::fs::symlink(
+            "expect5.45.4/libexpect.so.5",
+            dir.join("content/usr/lib/libexpect.so.5"),
+        )
+        .unwrap();
+        let meta = serde_json::json!({
+            "name": "expect",
+            "version": "5.45.4",
+            "deps": [],
+            "provides": ["libexpect5.45.4.so", "libexpect.so.5"],
+            "needed_so": [],
+        });
+        fs::write(dir.join("metadata.json"), serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        let lpkg = out.join("old-expect.lpkg");
+        {
+            let f = fs::File::create(&lpkg).unwrap();
+            let enc = zstd::stream::write::Encoder::new(f, 3).unwrap();
+            let mut b = tar::Builder::new(enc);
+            b.follow_symlinks(false);
+            b.append_dir_all(".", &dir).unwrap();
+            let enc = b.into_inner().unwrap();
+            enc.finish().unwrap();
+        }
+
+        super::repo::backup_removed_sonames(&out, &lpkg, "expect", &["libexpect6.0.so".to_string()])
+            .unwrap();
+
+        // 符号链接保留本身 + 目标实体复刻进子目录 → 不 dangling
+        for (name, real) in [
+            ("libexpect5.45.4.so", &real_v45),
+            ("libexpect.so.5", &real_v5),
+        ] {
+            let link = out.join("backups").join(name);
+            assert!(
+                fs::symlink_metadata(&link).unwrap().file_type().is_symlink(),
+                "{name} 应保留为符号链接（ldconfig 要求）"
+            );
+            assert_eq!(
+                fs::read_link(&link).unwrap(),
+                std::path::PathBuf::from(format!("expect5.45.4/{name}")),
+                "{name} 符号链接目标应原样保留"
+            );
+            assert!(fs::exists(&link).unwrap_or(false), "{name} 的目标实体应复刻进备份 → 不 dangling");
+            let target = out.join("backups/expect5.45.4").join(name);
+            assert!(target.is_file(), "子目录实体 {target:?} 应被备份");
+            assert_eq!(fs::read(&target).unwrap(), fs::read(real).unwrap());
+        }
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn backup_converts_absolute_targets_to_relative() {
+        // 绝对目标容错：libfoo.so.1 -> /usr/lib/expect5.45.4/libexpect5.45.4.so。
+        // 应在 archive 里定位目标（content/ → /），符号链接转为相对（相对备份树根 /usr/lib），
+        // 目标实体复刻到对应位置 → 注入后不 dangling。
+        let dir = temp_dir("farm-backup-abs");
+        let out = temp_dir("farm-backup-abs-out");
+        fs::create_dir_all(dir.join("content/usr/lib/expect5.45.4")).unwrap();
+        let real = dir.join("content/usr/lib/expect5.45.4/libexpect5.45.4.so");
+        fs::write(&real, [0x7f, b'E', b'L', b'F', 2, 1, 1]).unwrap();
+        std::os::unix::fs::symlink(
+            "/usr/lib/expect5.45.4/libexpect5.45.4.so",
+            dir.join("content/usr/lib/libfoo.so.1"),
+        )
+        .unwrap();
+        let meta = serde_json::json!({
+            "name": "foo",
+            "version": "1.0",
+            "deps": [],
+            "provides": ["libfoo.so.1"],
+            "needed_so": [],
+        });
+        fs::write(dir.join("metadata.json"), serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        let lpkg = out.join("old-foo.lpkg");
+        {
+            let f = fs::File::create(&lpkg).unwrap();
+            let enc = zstd::stream::write::Encoder::new(f, 3).unwrap();
+            let mut b = tar::Builder::new(enc);
+            b.follow_symlinks(false);
+            b.append_dir_all(".", &dir).unwrap();
+            let enc = b.into_inner().unwrap();
+            enc.finish().unwrap();
+        }
+
+        super::repo::backup_removed_sonames(&out, &lpkg, "foo", &["libfoo.so.2".to_string()])
+            .unwrap();
+
+        let link = out.join("backups/libfoo.so.1");
+        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert_eq!(
+            fs::read_link(&link).unwrap(),
+            std::path::PathBuf::from("expect5.45.4/libexpect5.45.4.so"),
+            "绝对目标应转为相对路径"
+        );
+        assert!(fs::exists(&link).unwrap_or(false), "目标应复刻 → 不 dangling");
+        let target = out.join("backups/expect5.45.4/libexpect5.45.4.so");
+        assert!(target.is_file());
+        assert_eq!(fs::read(&target).unwrap(), fs::read(&real).unwrap());
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn cleanup_prunes_replicated_subdir_targets() {
+        // 复刻树（expect 类）在 SONAME 无引用时：符号链接 + 子目录实体 + 子目录本身都应收割。
+        let out = temp_dir("farm-backup-clean-subdir-out");
+        // index 只引用 libgettext.so / libc.so.6 → libexpect5.45.4.so 无引用
+        write_baseline(&out, "gettext|1.0:h::libgettext.so:libc.so.6|\n");
+        fs::create_dir_all(out.join("backups/expect5.45.4")).unwrap();
+        std::os::unix::fs::symlink(
+            "expect5.45.4/libexpect5.45.4.so",
+            out.join("backups/libexpect5.45.4.so"),
+        )
+        .unwrap();
+        fs::write(out.join("backups/expect5.45.4/libexpect5.45.4.so"), b"x").unwrap();
+
+        super::repo::cleanup_backups(&out, "x86_64");
+
+        assert!(!out.join("backups").exists(), "无引用的复刻树（含子目录）应整体清理");
         fs::remove_dir_all(&out).ok();
     }
 
