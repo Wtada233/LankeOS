@@ -449,6 +449,20 @@ void check_forward_soname_integrity(const std::map<std::string, InstallPlan>& pl
             }
 
             if (!provided) {
+                // --use-system-soname：系统 /usr/lib 已有该 .so（如 ABI 过渡 backup 的旧
+                // SONAME）→ 视为满足。配合 farm 的备份机制：旧二进制过渡期加载旧 .so。
+                if (Config::instance().use_system_soname_mode()
+                    && Config::instance().has_system_soname(soname)) {
+                    provided = true;
+                }
+            }
+
+            if (!provided) {
+                if (Config::instance().missing_so_no_error_mode()) {
+                    // --missing-so-no-error：bootstrap/过渡期容忍缺失 SONAME，警告继续
+                    log_warning(string_format("warning.missing_so_no_error", soname, pname));
+                    continue;
+                }
                 all_ok = false;
                 errors += "  " + string_format("error.unresolved_soname", soname) + "\n";
             }

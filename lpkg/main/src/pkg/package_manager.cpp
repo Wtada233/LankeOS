@@ -145,11 +145,16 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
         }
 
         if (auto nso_broken = detail::check_needed_so_consistency(plan); !nso_broken.empty()) {
-            log_error(get_string("error.dependency_conflict_title"));
-            std::string msg;
-            for (const auto& p : nso_broken) msg += "  " + p + "\n";
-            log_error(msg);
-            throw LpkgException(msg);
+            if (Config::instance().missing_so_no_error_mode()) {
+                // --missing-so-no-error：bootstrap/过渡期容忍（check_needed_so_consistency
+                // 内部已逐包 log_warning），旧二进制继续靠 backup 的旧 .so 运行。
+            } else {
+                log_error(get_string("error.dependency_conflict_title"));
+                std::string msg;
+                for (const auto& p : nso_broken) msg += "  " + p + "\n";
+                log_error(msg);
+                throw LpkgException(msg);
+            }
         }
 
         break;
@@ -716,11 +721,15 @@ void upgrade_packages()
     }
 
     if (auto nso_broken = detail::check_needed_so_consistency(plan); !nso_broken.empty()) {
-        log_error(get_string("error.dependency_conflict_title"));
-        std::string msg;
-        for (const auto& p : nso_broken) msg += "  " + p + "\n";
-        log_error(msg);
-        throw LpkgException(msg);
+        if (Config::instance().missing_so_no_error_mode()) {
+            // --missing-so-no-error：过渡期容忍（check_needed_so_consistency 内部已逐包警告）
+        } else {
+            log_error(get_string("error.dependency_conflict_title"));
+            std::string msg;
+            for (const auto& p : nso_broken) msg += "  " + p + "\n";
+            log_error(msg);
+            throw LpkgException(msg);
+        }
     }
 
     // ── 用户确认 ────────────────────────────────────────────────────
