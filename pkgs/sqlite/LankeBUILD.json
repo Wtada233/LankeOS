@@ -13,7 +13,7 @@
     "zlib"
   ],
   "sources": [
-    "https://www.sqlite.org/2026/sqlite-autoconf-3530400.tar.gz"
+    "https://www.sqlite.org/2026/sqlite-src-3530400.zip"
   ],
   "no_strip": false
 }
