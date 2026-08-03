@@ -1,13 +1,39 @@
-//! prompt.rs — BLOCKED/源缺失的交互接管（开 shell / 跳过 / 结束）。
+//! prompt.rs — BLOCKED/源缺失的交互接管（开 shell / 跳过 / 结束）+ 构建计划预览/确认。
+
+use std::collections::VecDeque;
+use std::io::Write;
 
 use crate::tr;
 use crate::ux;
-use super::BuildOptions;
+use super::{effective_version, BuildOptions};
 
 pub(crate) enum PromptChoice {
     Retry,
     Skip,
     End,
+}
+
+/// 构建计划预览：按 topo 顺序列出待构建包（+ 版本），供 operator 在开始前确认。
+/// 只含"最开始能确认需要 build"的初始集；ABI 受害者是动态入队的，不在预览里。
+pub(crate) fn print_build_plan(queue: &VecDeque<(String, bool)>, opts: &BuildOptions) {
+    println!();
+    println!("{}", tr!("build.plan", queue.len()));
+    for (pkg, _is_victim) in queue {
+        let ver = effective_version(&opts.pkgs_dir, pkg).unwrap_or_else(|| "?".to_string());
+        println!("  {pkg}  {ver}");
+    }
+    println!();
+}
+
+/// operator 确认（仅交互模式调用）：回车继续，n 取消；读取失败一律视为继续（避免误取消）。
+pub(crate) fn confirm_plan() -> bool {
+    eprint!("{}", tr!("build.plan_confirm"));
+    let _ = std::io::stdout().flush();
+    let mut input = String::new();
+    match std::io::stdin().read_line(&mut input) {
+        Ok(_) => !input.trim().eq_ignore_ascii_case("n"),
+        Err(_) => true,
+    }
 }
 
 

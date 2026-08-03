@@ -74,16 +74,156 @@ pub(crate) fn place_in_repo(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &s
     fs::create_dir_all(&repo_pkg_dir).map_err(|e| format!("创建 {repo_pkg_dir:?} 失败: {e}"))?;
     let dest = repo_pkg_dir.join(format!("{version}.lpkg"));
     fs::rename(lpkg, &dest).map_err(|e| format!("移动 {lpkg:?} → {dest:?} 失败: {e}"))?;
-    // 取代旧版本：清掉该目录下其他 .lpkg
+    // 取代旧版本：先备份旧包中「新版不再提供」的 SONAME .so，再清旧版本
     if let Ok(rd) = fs::read_dir(&repo_pkg_dir) {
         for e in rd.flatten() {
             let p = e.path();
             if p.extension().and_then(|x| x.to_str()) == Some("lpkg") && p != dest {
+                let _ = backup_removed_sonames(&opts.out_dir, &p, pkg, &outcome.provides);
                 let _ = fs::remove_file(&p);
             }
         }
     }
     Ok(dest)
+}
+
+/// ABI 过渡：把旧包中「新版不再提供」的 SONAME 对应 .so 备份到 `out/backups/<pkg>/`。
+/// 容器构建时 cp 进 /usr/lib（见 lpkg_binding），旧二进制（链旧 SONAME，如 gettext 链
+/// libxml2.so.2）在过渡期能加载旧 .so；新构建用新 .so。
+///
+/// **只备份旧 provides 有、新打包消失的 SONAME**（`removed = old_provides − new_provides`），
+/// 且只备份版本化 `.so.*` 文件（SONAME 本体 + 其实体），排除裸 `.so` dev 符号链接（那归新包）。
+/// 扫全部系统库目录（usr/lib、lib、usr/lib64、lib64）——lib64 是 lib 的合并符号链接时
+/// 内容重复，但备份目录扁平去重（同名覆盖，无害）。
+fn backup_removed_sonames(
+    out_dir: &Path,
+    old_lpkg: &Path,
+    pkg: &str,
+    new_provides: &[String],
+) -> Result<(), String> {
+    let Ok(meta) = crate::scan::read_lpkg_metadata(old_lpkg) else {
+        return Ok(());
+    };
+    let old_provides: Vec<String> = meta["provides"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+    let removed: Vec<&str> = old_provides
+        .iter()
+        .filter(|p| !new_provides.contains(p))
+        .map(|s| s.as_str())
+        .collect();
+    if removed.is_empty() {
+        return Ok(());
+    }
+    // 提取旧包，把各系统库目录下匹配被移除 SONAME 的版本化 .so 复制到备份目录
+    let tmp = out_dir.join("backup_tmp").join(pkg);
+    crate::scan::extract_lpkg(old_lpkg, &tmp)?;
+    let backup_dir = out_dir.join("backups").join(pkg);
+    fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败: {e}"))?;
+    for sub in ["usr/lib", "lib", "usr/lib64", "lib64"] {
+        let lib_dir = tmp.join("content").join(sub);
+        if !lib_dir.is_dir() {
+            continue;
+        }
+        if let Ok(rd) = fs::read_dir(&lib_dir) {
+            for e in rd.flatten() {
+                let p = e.path();
+                let fname = p.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+                // 只备份版本化 .so.*（排除裸 .so dev 符号链接——那归新包），且文件名属于某被移除 SONAME
+                if !fname.contains(".so.") || !is_removed_soname_file(&fname, &removed) {
+                    continue;
+                }
+                let dest = backup_dir.join(&fname);
+                let Ok(ft) = fs::symlink_metadata(&p) else { continue };
+                if ft.file_type().is_symlink() {
+                    if let Ok(target) = fs::read_link(&p) {
+                        let _ = fs::remove_file(&dest);
+                        let _ = std::os::unix::fs::symlink(target, &dest);
+                    }
+                } else {
+                    let _ = fs::copy(&p, &dest);
+                }
+            }
+        }
+    }
+    let _ = fs::remove_dir_all(&tmp);
+    Ok(())
+}
+
+/// 文件名是否属于某被移除的 SONAME：`r` 本身或其版本化派生名 `r.x.y`。
+/// 用精确前缀（`r.` 而非 `starts_with(r)`）避免 `libfoo.so.2` 误匹配 `libfoo.so.20`。
+fn is_removed_soname_file(fname: &str, removed: &[&str]) -> bool {
+    removed.iter().any(|r| {
+        fname == *r || fname.strip_prefix(r).is_some_and(|rest| rest.starts_with('.'))
+    })
+}
+
+/// ABI 过渡备份的清理：**整个 build 完成**（而非单包）后调用。
+///
+/// 语义：备份存在的意义是让仍在引用旧 SONAME 的旧二进制在过渡期能加载；全部相关包重建完毕后，
+/// 当前 ABI 数据库（abidb）不再有任何包的 `needed_so` 引用旧 SONAME → 备份作废。仍有引用
+/// （有包被跳过 / BLOCKED 未重建）则保留，留待下次 build 完成后再次清理。
+/// 只在 abidb 可读时清理；读不到（异常状态）则保守保留，绝不误删。
+pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
+    let backups = out_dir.join("backups");
+    if !backups.is_dir() {
+        return;
+    }
+    let Ok(idx) = crate::abidb::load_index(out_dir, arch) else {
+        return;
+    };
+    let referenced: std::collections::HashSet<String> = idx
+        .packages
+        .values()
+        .flat_map(|p| p.needed_so.iter().cloned())
+        .collect();
+    let mut any_removed = false;
+    if let Ok(rd) = fs::read_dir(&backups) {
+        for e in rd.flatten() {
+            let dir = e.path();
+            if !dir.is_dir() {
+                continue;
+            }
+            let sonames: Vec<String> = fs::read_dir(&dir)
+                .map(|rd| {
+                    rd.flatten()
+                        .filter_map(|f| {
+                            let name = f.file_name().to_string_lossy().into_owned();
+                            soname_of(&name).map(str::to_string)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            if sonames.iter().any(|s| referenced.contains(s)) {
+                continue; // 仍有包需要旧 SONAME → 保留
+            }
+            if fs::remove_dir_all(&dir).is_ok() {
+                println!("{}", tr!("build.backup_clean", dir.display()));
+                any_removed = true;
+            }
+        }
+    }
+    // 根目录变空 → 一并清掉（下次 build 有新备份时重建）
+    if any_removed || fs::read_dir(&backups).map(|mut r| r.next().is_none()).unwrap_or(false) {
+        let _ = fs::remove_dir(&backups);
+    }
+}
+
+/// 备份文件名 → SONAME：`libfoo.so.1.2.3` → `libfoo.so.1`（前 3 段，第二段须是 `so`）。
+/// 与 scan 的 SONAME 约定一致（`lib<name>.so.<major>`），非版本化/非库文件返回 None。
+fn soname_of(filename: &str) -> Option<&str> {
+    let mut parts = filename.splitn(4, '.');
+    let a = parts.next()?;
+    if parts.next()? != "so" {
+        return None;
+    }
+    let c = parts.next()?;
+    if c.is_empty() || !c.as_bytes()[0].is_ascii_digit() {
+        return None;
+    }
+    let len = a.len() + 1 + 2 + 1 + c.len();
+    filename.get(..len)
 }
 
 /// 更新本地 repo index.txt：替换该包的版本块（保留 deps；新 version/hash/provides/needed_so）。
@@ -210,5 +350,37 @@ pub(crate) fn recipe_hash(pkgs_dir: &Path, pkg: &str) -> Option<String> {
         hasher.update(content.as_bytes());
     }
     Some(format!("{:x}", hasher.finalize()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn removed_soname_file_matches_exact_soname() {
+        let removed = ["libfoo.so.2"];
+        // SONAME 本体 + 其实体版本文件 → 匹配
+        assert!(is_removed_soname_file("libfoo.so.2", &removed));
+        assert!(is_removed_soname_file("libfoo.so.2.1.3", &removed));
+        // 精确前缀（`r.`），绝不误匹配别的 major：libfoo.so.2 不该吞掉 libfoo.so.20
+        assert!(!is_removed_soname_file("libfoo.so.20", &removed), "不应误匹配 libfoo.so.20");
+        assert!(!is_removed_soname_file("libfoo.so.1", &removed));
+        // 裸 .so dev 符号链接（归新包）→ 不匹配
+        assert!(!is_removed_soname_file("libfoo.so", &removed));
+    }
+
+    #[test]
+    fn soname_of_derives_versioned_soname() {
+        // 备份文件名 → SONAME（lib<name>.so.<major>，取前 3 段）
+        assert_eq!(soname_of("libfoo.so.1"), Some("libfoo.so.1"));
+        assert_eq!(soname_of("libfoo.so.1.2.3"), Some("libfoo.so.1"));
+        assert_eq!(soname_of("libxml2.so.2"), Some("libxml2.so.2"));
+        assert_eq!(soname_of("ld-linux.so.2"), Some("ld-linux.so.2"));
+        // 非库 / 无版本 / 第二段不是 so → None
+        assert_eq!(soname_of("libfoo.so"), None, "裸 .so 无 SONAME");
+        assert_eq!(soname_of("libfoo.1"), None, "第二段须是 so");
+        assert_eq!(soname_of("README.txt"), None);
+        assert_eq!(soname_of(""), None);
+    }
 }
 

@@ -1,3 +1,4 @@
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use lankefarm::build::{self, BuildOptions};
@@ -67,6 +68,7 @@ pub(crate) fn cmd_build(args: &Args) -> ExitCode {
         arch,
         image: base_image,
         download_retries: args.download_retries.unwrap_or(3),
+        interactive: std::io::stdin().is_terminal(),
     };
     let report = match build::run_build(&opts, &mut binding, state.as_ref()) {
         Ok(r) => r,

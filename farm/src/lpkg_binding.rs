@@ -175,6 +175,13 @@ impl RealBinding {
             return Err(format!("docker cp {pkg} 配方进容器失败"));
         }
 
+        // 3.5 ABI 过渡：把备份的旧 SONAME .so 注入容器（/backups，构建脚本里 cp 到 /usr/lib）。
+        //    旧二进制（如链旧 libxml2.so.2 的 gettext）靠它继续运行，新构建用新 .so。
+        let backups = self.out_dir.join("backups");
+        if backups.is_dir() {
+            let _ = run_quiet(&["cp", backups.to_string_lossy().as_ref(), &format!("{cid}:/backups")]);
+        }
+
         // 4. 容器内构建——**实时流式日志**，不捕获（捕获 = 黑盒，构建完成才输出；
         //    且 stdout 末尾混入 ls 结果会污染文件名提取）。
         //    先清空安装数据库（deps/needed_so/provides.db）——repo 索引已剥掉 needed_so，再清
@@ -187,8 +194,9 @@ impl RealBinding {
             "cd /work/{pkg} && \
              rm -rf /var/lib/lpkg/deps && rm -rf /var/lib/lpkg/needed_so && rm -rf /var/lib/lpkg/provides.db && \
              lpkg install lpkg -y && \
-             ( lpkg upgrade -y || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y && lpkg upgrade -y; }} ) && \
-             lpkg build -y"
+             ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y --missing-so-no-error && lpkg upgrade -y --missing-so-no-error; }} ) && \
+             [ -d /backups ] && cp -a /backups/. /usr/lib/ ; \
+             lpkg build -y --use-system-soname"
         );
         let status = std::process::Command::new("docker")
             .args(["exec", &cid, "sh", "-c", &script])

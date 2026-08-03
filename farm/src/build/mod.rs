@@ -12,7 +12,6 @@
 
 use std::collections::{HashSet, VecDeque};
 use std::fs;
-use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
 use crate::tr;
@@ -23,7 +22,7 @@ use crate::state::{JobStatus, State};
 use crate::ux;
 mod sched;
 mod repo;
-pub(crate) use repo::{effective_version, needs_build, repack_if_drift, place_in_repo, update_repo_index, bump_release, update_lankebuild_metadata, load_old_index, sorted_pkg_names, sha256_file, recipe_hash};
+pub(crate) use repo::{effective_version, needs_build, repack_if_drift, place_in_repo, update_repo_index, bump_release, update_lankebuild_metadata, load_old_index, sorted_pkg_names, sha256_file, recipe_hash, cleanup_backups};
 mod prompt;
 mod sources;
 pub(crate) use sources::pre_download_sources;
@@ -42,6 +41,8 @@ pub struct BuildOptions {
     pub image: String,
     /// 源预下载网络重试次数（§8.6，默认 3）。
     pub download_retries: u32,
+    /// 交互模式：stdin 为 tty 时构建计划预览需 operator 确认；非交互（CI/测试/脚本）跳过。
+    pub interactive: bool,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -124,6 +125,24 @@ pub fn run_build(
         .map(|p| (p, false))
         .collect();
 
+    // 2.5 构建计划预览：topo 顺序（仅"最开始能确认需要 build"的包；ABI 受害者随后动态入队）。
+    // 交互模式 → 列出顺序并让 operator 确认才开始；确认后**只为确认集**预下载全部源。
+    // ABI 受害者不预下载——构建时由 lpkg build 自己下载（URL 未知性 + 不浪费等待）。
+    if !queue.is_empty() {
+        prompt::print_build_plan(&queue, opts);
+        if opts.interactive && !prompt::confirm_plan() {
+            println!("{}", tr!("build.plan_cancel"));
+            return Ok(BuildReport::default());
+        }
+        for (pkg, _) in &queue {
+            if let Err(e) = pre_download_sources(&opts.pkgs_dir, pkg, opts.download_retries) {
+                // 批量预下载是尽力而为：失败不阻塞，循环里每个确认集包会再走一次
+                // 源就绪门（带交互接管），这里只先打警告。
+                eprintln!("  {}", ux::yellow(&tr!("build.source_missing", pkg, e)));
+            }
+        }
+    }
+
     let mut seen: HashSet<String> = HashSet::new();
     let mut report = BuildReport::default();
 
@@ -155,28 +174,31 @@ pub fn run_build(
         // **任何失败都不允许自动跳过**——源预下载失败同样走提示：1) 开 shell 修复 2) 跳过 3) 结束。
         // 只有 operator 明确选"跳过"才跳过（否则依赖序会被打乱、后面的包基于缺失的依赖构建）。
         let (done, end_build) = 'pkg: loop {
-            // §8.6 源预下载：宿主侧预取，源就绪才构建
-            if let Err(e) = pre_download_sources(&opts.pkgs_dir, &pkg, opts.download_retries) {
-                eprintln!("  {}", ux::yellow(&tr!("build.source_missing", pkg, e)));
-                if !std::io::stdin().is_terminal() {
-                    // 非交互：无 operator 可提示 → 标记 source-missing 阻塞继续（不静默丢弃）
-                    eprintln!("{}", tr!("build.source_missing_ni", pkg));
-                    report.source_missing.push(pkg.clone());
-                    if let Some(st) = state {
-                        let _ = st.set_job(&pkg, JobStatus::Blocked, Some("source-missing"), rhash.as_deref());
-                    }
-                    break 'pkg (BuildDone::Blocked, false);
-                }
-                match prompt_blocked(&pkg, opts, &format!("源预下载失败：{e}")) {
-                    PromptChoice::Retry => continue, // 开 shell 手动放置源/修网络后重试
-                    PromptChoice::Skip => {
+            // §8.6 源预下载：宿主侧预取，源就绪才构建。
+            // ABI 受害者跳过——预下载只给确认集（上面已 bulk 预取）；受害者构建时由 lpkg build 自己下载。
+            if !is_victim {
+                if let Err(e) = pre_download_sources(&opts.pkgs_dir, &pkg, opts.download_retries) {
+                    eprintln!("  {}", ux::yellow(&tr!("build.source_missing", pkg, e)));
+                    if !opts.interactive {
+                        // 非交互：无 operator 可提示 → 标记 source-missing 阻塞继续（不静默丢弃）
+                        eprintln!("{}", tr!("build.source_missing_ni", pkg));
                         report.source_missing.push(pkg.clone());
                         if let Some(st) = state {
-                            let _ = st.set_job(&pkg, JobStatus::Skipped, Some("operator skip: source"), rhash.as_deref());
+                            let _ = st.set_job(&pkg, JobStatus::Blocked, Some("source-missing"), rhash.as_deref());
                         }
-                        break 'pkg (BuildDone::Skipped, false);
+                        break 'pkg (BuildDone::Blocked, false);
                     }
-                    PromptChoice::End => break 'pkg (BuildDone::Blocked, true),
+                    match prompt_blocked(&pkg, opts, &format!("源预下载失败：{e}")) {
+                        PromptChoice::Retry => continue, // 开 shell 手动放置源/修网络后重试
+                        PromptChoice::Skip => {
+                            report.source_missing.push(pkg.clone());
+                            if let Some(st) = state {
+                                let _ = st.set_job(&pkg, JobStatus::Skipped, Some("operator skip: source"), rhash.as_deref());
+                            }
+                            break 'pkg (BuildDone::Skipped, false);
+                        }
+                        PromptChoice::End => break 'pkg (BuildDone::Blocked, true),
+                    }
                 }
             }
 
@@ -192,7 +214,7 @@ pub fn run_build(
             if let Some(st) = state {
                 let _ = st.set_job(&pkg, JobStatus::Blocked, Some(&stage), rhash.as_deref());
             }
-            if !std::io::stdin().is_terminal() {
+            if !opts.interactive {
                 eprintln!("{}", tr!("build.blocked_ni", pkg, stage));
                 break 'pkg (BuildDone::Blocked, false);
             }
@@ -303,6 +325,12 @@ pub fn run_build(
             let _ = st.record_build(&pkg, &ver, true);
         }
     }
+
+    // ABI 过渡备份清理：**整个 build 完成后**（而非单包完成）。此时所有引用旧 SONAME 的包
+    // 都已重建（直连受害者 + 级联），备份的旧 .so 不再被当前 abidb 任何 needed_so 引用 → 删除；
+    // 仍有包被跳过 / BLOCKED 未重建则保留，留待下次 build 完成后再清。
+    cleanup_backups(&opts.out_dir, &opts.arch);
+
     Ok(report)
 }
 
@@ -376,13 +404,37 @@ mod tests {
         fs::write(dir.join("LankeBUILD.json"), serde_json::to_string_pretty(&json).unwrap()).unwrap();
     }
 
+    /// 写带 sources + provides + needed_so 的包（victim 跳过预下载集成测试用）。
+    fn write_pkg_full(
+        pkgs: &Path,
+        name: &str,
+        provides: &[&str],
+        needed: &[&str],
+        sources: &[&str],
+    ) {
+        let dir = pkgs.join(name);
+        fs::create_dir_all(&dir).unwrap();
+        let json = serde_json::json!({
+            "name": name,
+            "version": "1.0",
+            "provides": provides,
+            "needed_so": needed,
+            "sources": sources,
+        });
+        fs::write(dir.join("LankeBUILD.json"), serde_json::to_string_pretty(&json).unwrap()).unwrap();
+    }
+
     /// 起一个本地 HTTP 服务器 fixture（serve.rs），serve 临时目录。返回 (handle, port, root)。
-    /// 线程随测试进程退出；root 由调用方清理。
+    /// 线程随测试进程退出；root 由调用方清理。**原子递增端口 + 按端口分 root**——
+    /// 多个测试并行起服务器不会互相冲突（各自独立目录）。基数取 18100：避开
+    /// net.rs 测试硬编码的 18080/18081（历史遗留固定端口）。
     fn spawn_test_server() -> (std::thread::JoinHandle<()>, u16, std::path::PathBuf) {
-        let root = std::env::temp_dir().join(format!("farm-serve-test-{}", std::process::id()));
+        use std::sync::atomic::{AtomicU16, Ordering};
+        static NEXT_PORT: AtomicU16 = AtomicU16::new(18100);
+        let port = NEXT_PORT.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!("farm-serve-test-{}-{port}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
-        let port: u16 = 18080;
         let r = root.clone();
         let h = std::thread::spawn(move || {
             let _ = crate::serve::serve("127.0.0.1", &r, port);
@@ -748,6 +800,7 @@ mod tests {
             arch: "x86_64".into(),
             image: String::new(),
             download_retries: 3,
+            interactive: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.built.contains(&"libfoo".to_string()));
@@ -850,6 +903,7 @@ mod tests {
             arch: "x86_64".into(),
             image: String::new(),
             download_retries: 3,
+            interactive: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.abi_broken.contains(&"a".to_string()));
@@ -885,11 +939,170 @@ mod tests {
             arch: "x86_64".into(),
             image: String::new(),
             download_retries: 3,
+            interactive: false,
         };
         let err = run_build(&opts, &mut binding, None).unwrap_err();
         assert!(
             err.contains("farm seed"),
             "应明确提示先 seed（{err}），而非静默当首次构建"
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn abi_victim_skips_pre_download_confirmed_bulk_predownloaded() {
+        // 预下载拆分（用户规则）：确认集（初始 target）开始构建前 bulk 预下载全部源；
+        // ABI 受害者动态入队，**不预下载**——构建时由 lpkg build 自己下载。
+        // 复现 gettext/bootstrap 场景：victim b 的源 URL 故意不可达——若没跳过，b 会进
+        // source-missing；跳过后 StubBinding 直接成功。
+        let (_h, port, root) = spawn_test_server();
+        fs::write(root.join("asrc.tar.gz"), b"hello-src").unwrap();
+        let dir = temp_dir("farm-victim-nopredl");
+        let out = temp_dir("farm-victim-nopredl-out");
+        write_baseline(
+            &out,
+            "a|1.0:h::libfoo.so,libfoo.so.1:|\nb|1.0:h::libb.so:libfoo.so.1,libc.so.6|\n",
+        );
+        let a_src = format!("http://127.0.0.1:{port}/asrc.tar.gz");
+        write_pkg_full(&dir, "a", &["libfoo.so", "libfoo.so.1"], &[], &[&a_src]);
+        // b 的源故意不可达：victim 不预下载，才不至于 source-missing
+        write_pkg_full(
+            &dir,
+            "b",
+            &["libb.so"],
+            &["libfoo.so.1", "libc.so.6"],
+            &["http://127.0.0.1:1/nope.tar.gz"],
+        );
+
+        // a 重建 → SONAME .1→.2（ABI 断裂）→ b 直连受害者
+        let a_lpkg = stage_lpkg(
+            &out, "a", "1.0", &["libc.so.6"],
+            &["libfoo.so", "libfoo.so.2"],
+        );
+        let b_lpkg = stage_lpkg(
+            &out, "b", "1.0+1", &["libfoo.so.2", "libc.so.6"],
+            &["libb.so"],
+        );
+        let mut outcomes = HashMap::new();
+        outcomes.insert(
+            "a".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libc.so.6".into()],
+                provides: vec!["libfoo.so".into(), "libfoo.so.2".into()],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(a_lpkg),
+            },
+        );
+        outcomes.insert(
+            "b".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libfoo.so.2".into(), "libc.so.6".into()],
+                provides: vec!["libb.so".into()],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(b_lpkg),
+            },
+        );
+        let mut binding = StubBinding::new(outcomes);
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["a".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+        };
+        let report = run_build(&opts, &mut binding, None).unwrap();
+
+        assert!(report.built.contains(&"a".to_string()));
+        assert!(
+            report.built.contains(&"b".to_string()),
+            "ABI 断裂应重建直连受害者 b: {:?}",
+            report.built
+        );
+        assert!(
+            report.source_missing.is_empty(),
+            "victim 跳过预下载，不应 source-missing: {:?}",
+            report.source_missing
+        );
+        assert!(
+            dir.join("a/asrc.tar.gz").exists(),
+            "确认集 a 应在构建前 bulk 预下载源"
+        );
+        assert!(
+            !dir.join("b/nope.tar.gz").exists(),
+            "victim b 不应预下载（靠 lpkg build 自己下载）"
+        );
+
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+        fs::remove_dir_all(&root).ok();
+        drop(_h);
+    }
+
+    #[test]
+    fn backup_cleaned_when_soname_unreferenced() {
+        // 整个 build 完成后清理 ABI 过渡备份：备份的旧 SONAME 已不再被任何包 needed_so 引用
+        // → 删除（含空根目录）。本用例：无可构建包（队列空），cleanup 仍执行。
+        let dir = temp_dir("farm-backup-clean");
+        let out = temp_dir("farm-backup-clean-out");
+        write_baseline(&out, "libfoo|1.0:h::libfoo.so,libfoo.so.1:|\n");
+        write_pkg(&dir, "libfoo", &["libfoo.so", "libfoo.so.1"], &[], &[]);
+        // 预置一个"已无引用"的备份（libz.so.1 不在 abidb 任何 needed_so 里）
+        fs::create_dir_all(out.join("backups/libz")).unwrap();
+        fs::write(out.join("backups/libz/libz.so.1"), b"").unwrap();
+        fs::write(out.join("backups/libz/libz.so.1.2.3"), b"").unwrap();
+
+        let mut binding = StubBinding::new(HashMap::new());
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec![],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+        };
+        let _ = run_build(&opts, &mut binding, None).unwrap();
+        assert!(
+            !out.join("backups").exists(),
+            "无引用的备份目录应整体清理"
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn backup_kept_when_soname_still_referenced() {
+        // 反向：仍有包的 needed_so 引用旧 SONAME（该包被跳过/BLOCKED 未重建）→ 备份保留，
+        // 等下次 build 完成后再清。本用例 gettext 需要 libxml2.so.2 → libxml2 备份保留。
+        let dir = temp_dir("farm-backup-keep");
+        let out = temp_dir("farm-backup-keep-out");
+        write_baseline(&out, "gettext|1.0:h::libgettext.so:libxml2.so.2,libc.so.6|\n");
+        write_pkg(&dir, "gettext", &["libgettext.so"], &["libxml2.so.2", "libc.so.6"], &[]);
+        fs::create_dir_all(out.join("backups/libxml2")).unwrap();
+        fs::write(out.join("backups/libxml2/libxml2.so.2"), b"").unwrap();
+        fs::write(out.join("backups/libxml2/libxml2.so.2.9.14"), b"").unwrap();
+
+        let mut binding = StubBinding::new(HashMap::new());
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec![],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+        };
+        let _ = run_build(&opts, &mut binding, None).unwrap();
+        assert!(
+            out.join("backups/libxml2/libxml2.so.2").exists(),
+            "仍有引用的备份应保留（过渡未完成）"
         );
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&out).ok();
