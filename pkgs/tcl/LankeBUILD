@@ -5,19 +5,43 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     SRCDIR=$(pwd)
+    # 从 {ORIG_PKG_VER}（如 9.0.4）派生 tcl 版本组件，不写死 8.6（参考 perl 的做法）。
+    TCL_VER="{ORIG_PKG_VER}"
+    TCL_MAJOR=$(printf '%s' "$TCL_VER" | cut -d. -f1)
+    TCL_MINOR=$(printf '%s' "$TCL_VER" | cut -d. -f2)
+    TCL_VERSIONED=tcl${TCL_MAJOR}.${TCL_MINOR}      # tcl9.0（tdbc library 目录）
+    TCLSH_VERSIONED=tclsh${TCL_MAJOR}.${TCL_MINOR}  # tclsh9.0
     cd unix
+    # tcl 9 的 bundled 包 configure（configure-packages）需要"可运行的 tclsh 9"（zipfs）。
+    # 构建目录 tclsh 的 rpath 指向安装目录 /usr/lib，libtcl9.0.so 尚未安装 → 加载失败、
+    # configure 找不到可用 tclsh 9。导出 LD_LIBRARY_PATH 指向构建目录让 tclsh 可运行
+    # （根因修复，保留 zipfs；若仍失败可改 --disable-zipfs）。
+    export LD_LIBRARY_PATH="$SRCDIR/unix${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --mandir={MANDIR} --disable-static --with-system-sqlite
     make -j$(nproc)
     sed -e "s|$SRCDIR/unix|{LIBDIR}|"         -e "s|$SRCDIR|{INCLUDEDIR}|"          -i tclConfig.sh
 
-    sed -e "s|$SRCDIR/unix/pkgs/tdbc1.1.12|{LIBDIR}/tdbc1.1.12|"         -e "s|$SRCDIR/pkgs/tdbc1.1.12/generic|{INCLUDEDIR}|"             -e "s|$SRCDIR/pkgs/tdbc1.1.12/library|{LIBDIR}/tcl8.6|"          -e "s|$SRCDIR/pkgs/tdbc1.1.12|{INCLUDEDIR}|"                     -i pkgs/tdbc1.1.12/tdbcConfig.sh
-
-    sed -e "s|$SRCDIR/unix/pkgs/itcl4.3.4|{LIBDIR}/itcl4.3.4|"         -e "s|$SRCDIR/pkgs/itcl4.3.4/generic|{INCLUDEDIR}|"            -e "s|$SRCDIR/pkgs/itcl4.3.4|{INCLUDEDIR}|"                    -i pkgs/itcl4.3.4/itclConfig.sh
+    # 捆绑子包（tdbc/itcl）目录版本随 tcl 发布变化，从源码树 glob 派生，不写死
+    for cfg in pkgs/tdbc*/tdbcConfig.sh pkgs/itcl*/itclConfig.sh; do
+        [ -f "$cfg" ] || continue
+        P=$(basename "$(dirname "$cfg")")
+        case "$P" in
+            tdbc*)
+                sed -e "s|$SRCDIR/unix/pkgs/$P|{LIBDIR}/$P|" \
+                    -e "s|$SRCDIR/pkgs/$P/generic|{INCLUDEDIR}|" \
+                    -e "s|$SRCDIR/pkgs/$P/library|{LIBDIR}/$TCL_VERSIONED|" \
+                    -e "s|$SRCDIR/pkgs/$P|{INCLUDEDIR}|" -i "$cfg" ;;
+            itcl*)
+                sed -e "s|$SRCDIR/unix/pkgs/$P|{LIBDIR}/$P|" \
+                    -e "s|$SRCDIR/pkgs/$P/generic|{INCLUDEDIR}|" \
+                    -e "s|$SRCDIR/pkgs/$P|{INCLUDEDIR}|" -i "$cfg" ;;
+        esac
+    done
 
     unset SRCDIR
     make DESTDIR={STAGING_ROOT} install
     make DESTDIR={STAGING_ROOT} install-private-headers
-    ln -sf tclsh8.6 {STAGING_ROOT}{BINDIR}/tclsh
+    ln -sf $TCLSH_VERSIONED {STAGING_ROOT}{BINDIR}/tclsh
     mv -v {STAGING_ROOT}{MANDIR}/man3/{Thread,Tcl_Thread}.3
 }
 
