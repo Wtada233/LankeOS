@@ -2,8 +2,13 @@
 //!
 //! 契约：stdout 第一行 = 版本，后续行 = 具体下载 URL。
 
+use std::sync::atomic::{AtomicU32, Ordering};
+
 use crate::net::Fetcher;
 use crate::track::{need, ProbeResult, TrackerConfig};
+
+/// 每个 probe 调用分配一个唯一序号，配合 PID 保证临时脚本文件名互不冲突。
+static SCRIPT_SEQ: AtomicU32 = AtomicU32::new(0);
 
 /// 探测：运行内嵌 bash 脚本（stdout 第一行版本，后续行 URL）。
 /// `major` 非空时通过 `MAJOR` 环境变量传给脚本（约束 major-of / major-version-lock）。
@@ -14,8 +19,17 @@ pub fn probe(
     major: Option<&str>,
 ) -> Result<ProbeResult, String> {
     let content = need(&cfg.script_content, "script-content")?;
-    // 写到临时文件再跑，避免 -c 的参数转义地狱
-    let tmp = std::env::temp_dir().join(format!("lankefarm-track-{}.sh", cfg.pkg_name));
+    // 写到临时文件再跑，避免 -c 的参数转义地狱。
+    // 文件名必须唯一（pkg-name + PID + 序号）：曾用固定 `lankefarm-track-{pkg}.sh`，
+    // 两个并发 `farm track` 进程会互相覆盖/删除彼此的脚本——A 的 remove_file 删掉
+    // B 刚写好、尚未执行的文件 → B 的 bash ENOENT → 探测失败（真实 TOCTOU，曾致
+    // track_all_cycle 集成测试间歇性 flaky，与 docker/farm build 抢占无关）。
+    let tmp = std::env::temp_dir().join(format!(
+        "lankefarm-track-{}-{}-{}.sh",
+        cfg.pkg_name,
+        std::process::id(),
+        SCRIPT_SEQ.fetch_add(1, Ordering::Relaxed),
+    ));
     std::fs::write(&tmp, content).map_err(|e| format!("写临时脚本失败: {e}"))?;
     let mut cmd = std::process::Command::new("bash");
     cmd.arg(&tmp).env("PKG_NAME", &cfg.pkg_name);
