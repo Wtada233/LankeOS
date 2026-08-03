@@ -100,7 +100,13 @@ rebuild-on-abichange: python
 packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` glob
 ```
 
-`rebuild-on-abichange` 包的 SONAME 断裂时，`groups.victims_for` 把匹配 `packages` glob 的配方包并入 ABI 受害者集（与 `direct_victims` 并集、去重、排序入队，release bump + 重建）。目录缺失/为空 → 空组（无害）。与 data/trackers 同一套 YAML 模式。
+`rebuild-on-abichange` 包触发时，`groups.victims_for` 把匹配 `packages` glob 的配方包并入重建受害者集（与 `direct_victims` 并集、去重、排序入队，release bump + 重建）。
+
+**触发语义（用户规则）**：
+- 有版本化 SONAME 的包（python…）→ **只在 SONAME 断裂时**触发（removed_sonames 非空）
+- 无版本化 SONAME 的纯脚本解释器（perl…）→ **任何重建**都算运行时变化 → 触发（ABI 信号不存在，靠这个补）
+
+目录缺失/为空 → 空组（无害）。与 data/trackers 同一套 YAML 模式。
 - `reorder_queue`：受害者入队后按依赖算法重排，**先去重**（同一受害者被多个断裂重复入队 → `rev` 被污染导致顺序错乱）+ victim 标记取 OR。保证"被依赖者先建"（如 librsvg 先于 appstream）且叶子（chromium）**维持队尾、只构建一次**。
 
 ## 5. 构建执行（lpkg_binding）
@@ -222,4 +228,4 @@ build --all ──> run_build
 - **src 内单元测试**（`#[cfg(test)]`）：内部函数（topo/reorder/scan/i18n/ux/repack/seed/repo）
 - **tests/integration.rs**：公共 API 集成（ABI 传播、track 排序、real index）
 
-**116 个测试全绿**（101 lib + 9 + 6）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被强制重建）**、index 写回完整 needed_so（单一真源）。
+**117 个测试全绿**（102 lib + 9 + 6）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）。

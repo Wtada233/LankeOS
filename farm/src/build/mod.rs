@@ -296,23 +296,39 @@ pub fn run_build(
         let _ = fs::remove_dir_all(opts.out_dir.join("extract").join(&pkg));
         let _ = fs::remove_dir_all(opts.out_dir.join(".staging").join(&pkg));
 
-        // ABI 传播（§7.2）：**只有 SONAME 变化才触发**（removed SONAME → 直连受害者重建）。
-        // 变化的 SONAME 无包直接 need → 改好元数据直接进仓库，不传播。
+        // ABI 传播（§7.2）：removed SONAME → 直连受害者重建；声明式重建组（data/build/*.yaml）
+        // 额外重建"不链但 ABI/运行时敏感"的包。变化的 SONAME 无包直接 need → 改好元数据进仓库。
+        //
+        // 触发语义（用户规则）：
+        //   - 有版本化 SONAME 的包（python…）：只在 SONAME 断裂时触发（removed 非空）
+        //   - 无版本化 SONAME 的纯脚本解释器（perl…）：**任何重建**都算运行时变化 → 触发
         let removed = abi::removed_sonames(&old, &pkg, &outcome.provides);
+        let script_interpreter = !outcome.provides.iter().any(|p| crate::graph::is_soname_versioned(p));
+        let group_trigger = !removed.is_empty() || script_interpreter;
         if !removed.is_empty() {
             report.abi_broken.push(pkg.clone());
-            // 直连受害者（链接被移除 SONAME 的包）+ 声明式重建组受害者（data/build/*.yaml：
-            // 不链 libpython 但 ABI 敏感的 python 生态等）。并集、去重、排序。
-            let mut victims = abi::direct_victims(&revmap, &removed);
+        }
+        // 直连受害者（链接被移除 SONAME 的包，只在真 ABI 断裂时）∪ 声明式重建组受害者
+        let mut victims = abi::direct_victims(&revmap, &removed);
+        if group_trigger {
             victims.extend(groups.victims_for(&pkg, &all_pkgs));
+        }
+        if !victims.is_empty() {
             victims.sort();
             victims.dedup();
             for v in victims {
                 if !seen.contains(&v) {
-                    println!(
-                        "  {}",
-                        ux::yellow(&tr!("build.abi", pkg, removed.join(", "), v))
-                    );
+                    if !removed.is_empty() {
+                        println!(
+                            "  {}",
+                            ux::yellow(&tr!("build.abi", pkg, removed.join(", "), v))
+                        );
+                    } else {
+                        println!(
+                            "  {}",
+                            ux::yellow(&tr!("build.group_rebuild", pkg, v))
+                        );
+                    }
                     queue.push_back((v, true)); // 传播重建 → 触发 release bump
                 }
             }
@@ -1051,6 +1067,81 @@ mod tests {
         );
         assert!(report.built.contains(&"python-gobject".to_string()));
         assert!(report.built.contains(&"blueman".to_string()));
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+        fs::remove_dir_all(&gdir).ok();
+    }
+
+    #[test]
+    fn script_interpreter_rebuild_triggers_group_without_soname() {
+        // perl 是纯脚本解释器：**无版本化 SONAME**（provides 空）→ removed_sonames 永远为空，
+        // ABI 断裂信号不存在。声明式重建组必须对这类包"任何重建都触发"（用户规则：xml-parser
+        // rebuild-on perl）。
+        let dir = temp_dir("farm-group-perl");
+        let out = temp_dir("farm-group-perl-out");
+        let gdir = temp_dir("farm-group-perl-data");
+        fs::create_dir_all(&gdir).unwrap();
+        fs::write(
+            gdir.join("perl.yaml"),
+            "rebuild-on-abichange: perl\npackages: xml-parser\n",
+        )
+        .unwrap();
+        // perl 不提供任何 SONAME（provides 空，4 个冒号）；xml-parser 只链 expat，不链 libperl
+        write_baseline(
+            &out,
+            "perl|5.42:h:::libc.so.6|\n\
+             xml-parser|2.47:h:::libc.so.6,libexpat.so.1|\n",
+        );
+        write_pkg(&dir, "perl", &[], &["libc.so.6"], &[]);
+        write_pkg(&dir, "xml-parser", &[], &["libc.so.6", "libexpat.so.1"], &[]);
+
+        let perl_lpkg = stage_lpkg(&out, "perl", "1.0", &["libc.so.6"], &[]);
+        let xp_lpkg = stage_lpkg(&out, "xml-parser", "1.0", &["libc.so.6", "libexpat.so.1"], &[]);
+        let mut outcomes = HashMap::new();
+        outcomes.insert(
+            "perl".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libc.so.6".into()],
+                provides: vec![],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(perl_lpkg),
+            },
+        );
+        outcomes.insert(
+            "xml-parser".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libc.so.6".into(), "libexpat.so.1".into()],
+                provides: vec![],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(xp_lpkg),
+            },
+        );
+        let mut binding = StubBinding::new(outcomes);
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["perl".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: gdir.clone(),
+        };
+        let report = run_build(&opts, &mut binding, None).unwrap();
+        assert!(
+            report.abi_broken.is_empty(),
+            "perl 无 SONAME，不应报 ABI 断裂: {:?}",
+            report.abi_broken
+        );
+        assert!(
+            report.built.contains(&"xml-parser".to_string()),
+            "无 SONAME 的 perl 被重建 → 声明式组应强制重建 xml-parser: {:?}",
+            report.built
+        );
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&out).ok();
         fs::remove_dir_all(&gdir).ok();
