@@ -240,3 +240,28 @@ TEST_F(AggregatedIndexTest, VersionSortingAcrossAggregatedLine)
     ASSERT_TRUE(pkg.has_value());
     EXPECT_EQ(pkg->version, "1.5");
 }
+
+// 回归：find_provider 必须返回真正提供该 capability 的版本。
+// 曾直接返回 find_package(name)（最新版）——旧版提供、最新版不提供的
+// capability 会被误判为"无提供者"，导致假"未解析 SONAME"失败。
+TEST_F(AggregatedIndexTest, FindProviderReturnsVersionThatActuallyProvides)
+{
+    write_index(
+        "libfoo|1.0:aaa::libold.so.1:libc.so.6;2.0:bbb::libnew.so.1:libc.so.6|\n");
+
+    Repository repo;
+    repo.load_index();
+
+    // libold.so.1 只有 v1.0 提供 → 必须返回 v1.0，而不是最新版 v2.0
+    auto old_prov = repo.find_provider("libold.so.1");
+    ASSERT_TRUE(old_prov.has_value());
+    EXPECT_EQ(old_prov->version, "1.0");
+
+    // libnew.so.1 由最新版提供 → 返回 v2.0
+    auto new_prov = repo.find_provider("libnew.so.1");
+    ASSERT_TRUE(new_prov.has_value());
+    EXPECT_EQ(new_prov->version, "2.0");
+
+    // 无提供者 → nullopt
+    EXPECT_FALSE(repo.find_provider("libmissing.so.1").has_value());
+}

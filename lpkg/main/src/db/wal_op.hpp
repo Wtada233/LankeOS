@@ -182,6 +182,21 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path);
 void batch_rollback(const std::vector<std::string>& successfully_installed);
 
 // ============================================================================
+// WAL 保护的原始文本文件写入
+// ============================================================================
+
+/**
+ * 以 write-ahead 顺序写一个原始文本文件（deps/needed_so/man 等 per-package
+ * 元数据文件），已存在的旧文件先备份为 .lpkg_db_bak_before:<milestone>，
+ * 回滚时 reverse_execute 的 DB/DBNEW/DBRM 分支可恢复旧内容。
+ *
+ * @param create_empty  content 为空且文件不存在时是否仍创建空文件
+ *                     （deps 文件需要：空内容表示"无依赖"这一显式状态）
+ */
+void write_string_file_wal(const std::string& path, const std::string& content,
+                           const std::string& milestone, bool create_empty = false);
+
+// ============================================================================
 // WAL 文件路径
 // ============================================================================
 

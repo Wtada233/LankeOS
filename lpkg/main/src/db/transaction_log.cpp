@@ -75,10 +75,13 @@ void WalWriter::fsync_wal()
 // 便捷函数
 // ============================================================================
 
-WalWriter begin_batch(size_t total_packages)
+WalWriter begin_batch()
 {
     WalWriter w;
-    w.log("BEGIN_PKGS " + std::to_string(total_packages));
+    // 不写包数 N：批次开启时无法预知最终包数（metadata 重解析会增长批次），
+    // 且恢复逻辑从不读取 N（只按 BEGIN_PKGS/COMMIT_PKGS 类型做 depth 跟踪）。
+    // 一个不可信的数字不应留在协议里。
+    w.log("BEGIN_PKGS");
     return w;
 }
 

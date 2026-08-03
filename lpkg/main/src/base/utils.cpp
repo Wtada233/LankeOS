@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <random>
 
 #include "config.hpp"
 #include "elf/strip.hpp"
@@ -317,6 +318,10 @@ void write_string_to_file(const fs::path& path, std::string_view content)
         }
         file.write(content.data(), static_cast<std::streamsize>(content.size()));
         file.flush();
+        // 磁盘满/IO 错误不检查会静默产生截断文件并 rename 进正式位置
+        if (!file) {
+            throw LpkgException(string_format("error.db_write_failed", tmp_path.string()));
+        }
     }
     // fsync 确保 .tmp 内容在断电前完整落盘，然后 rename 原子替换
     int fd = ::open(tmp_path.c_str(), O_WRONLY);
@@ -348,6 +353,41 @@ void fsync_parent_dir(const fs::path& child_path)
     if (fs::exists(parent, ec)) {
         fsync_dir_internal(parent);
     }
+}
+
+// ============================================================================
+// 包路径 / 备份路径工具
+// ============================================================================
+
+/**
+ * 生成随机小写字母+数字后缀（用于 .lpkg_bak 重命名防冲突）
+ */
+std::string random_suffix(size_t len)
+{
+    static const char chars[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    static std::random_device rd;
+    std::string s;
+    for (size_t i = 0; i < len; ++i) s += chars[rd() % (sizeof(chars) - 1)];
+    return s;
+}
+
+/**
+ * 生成不冲突的 .lpkg_bak 路径。随机后缀空间 36^6 足够大，正常不会冲突；
+ * 若超过 UNIQUE_BAK_MAX_ATTEMPTS 次仍冲突（几乎不可能），抛异常而非无限循环。
+ */
+std::filesystem::path unique_bak_path(const std::filesystem::path& phys, const std::string& pkg)
+{
+    // 去除尾部 '/'，防止 operator+= 追加到文件名中间（目录路径导致）
+    std::string clean_str = phys.string();
+    while (clean_str.size() > 1 && clean_str.back() == '/') clean_str.pop_back();
+    const fs::path clean(clean_str);
+
+    for (int attempt = 0; attempt < constants::UNIQUE_BAK_MAX_ATTEMPTS; ++attempt) {
+        fs::path bak = clean;
+        bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg + "_" + random_suffix();
+        if (!fs::exists(bak)) return bak;
+    }
+    throw LpkgException(string_format("error.bak_collision", phys.string(), pkg));
 }
 
 // ============================================================================

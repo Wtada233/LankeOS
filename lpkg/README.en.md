@@ -8,7 +8,7 @@ English | [中文](README.md)
 
 -   **Full lifecycle management**: Install, uninstall, upgrade, and reinstall packages.
 -   **needed_so verification**: Automatically validates every ELF DT_NEEDED SONAME against the repository before installation. Rejects packages with unresolvable SONAMEs, preventing the "empty provides still installs" class of bugs.
--   **SIGINT graceful shutdown**: Pacman-style two-stage protection — first Ctrl+C waits for the current operation to finish and rolls back, second Ctrl+C force terminates.
+-   **SIGINT graceful shutdown**: Ctrl+C sets a graceful-shutdown flag; the current operation (including any required rollback) runs to completion before exiting. There is no force-terminate — rollback is never interrupted mid-flight.
 -   **Smart version parsing**: Supports multi-segment revision numbers (e.g. `1.0.0.1`) with a rigorous comparison algorithm that correctly handles cases like `6.16.1 > 6.6.1`. Supports compound range constraints (e.g. `>= 2.0.0 < 3.0.0`).
 -   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their respective hashes, deps, provides, and needed_so.
 -   **Embedded metadata**: All metadata (name, version, dependencies, needed_so, virtual provides, man page) is stored in a `metadata.json` inside each package.

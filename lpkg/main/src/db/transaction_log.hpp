@@ -67,9 +67,9 @@ private:
 
 // ── 便捷函数 ────────────────────────────────────────────────────────────
 
-/// 打开 WAL 文件，写入 BEGIN_PKGS <N> + fsync，返回 WalWriter 实例
+/// 打开 WAL 文件，写入 BEGIN_PKGS + fsync，返回 WalWriter 实例
 /// 调用者持有该实例用于后续 WAL 写入（使用 move 语义）
-WalWriter begin_batch(size_t total_packages);
+WalWriter begin_batch();
 
 /// 对当前批次的单条 WAL 行进行 log + fsync
 void log_wal_line(std::string_view line);

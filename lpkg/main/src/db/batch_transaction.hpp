@@ -18,7 +18,7 @@
  * 事务协议：
  *
  *   正向路径：
- *     BEGIN_PKGS N → Cache::write(":batch-start") → execute(batch_writer)
+ *     BEGIN_PKGS → Cache::write(":batch-start") → execute(batch_writer)
  *     → 逐包 Cache::write(pkg + ":installed") → COMMIT_PKGS
  *
  *   异常路径（catch）：
@@ -39,13 +39,12 @@
  * 模板参数 OpT 是一个可调用对象 OpT(WalWriter&)，负责执行包级操作。
  * 它接收 WalWriter 引用用于写入 WAL 行。
  *
- * @param total       批次中包的数量
  * @param op          包级操作的可调用对象
  * @return            成功安装的包名列表
  * @throws            在操作失败时重新抛出，回滚后再抛
  */
 template <typename OpT>
-std::vector<std::string> run_batch_transaction(size_t total, OpT&& op)
+std::vector<std::string> run_batch_transaction(OpT&& op)
 {
     // 前提：进入前 trim_completed（在顶层调用者如 install_packages 中执行）
     trim_completed();
@@ -54,8 +53,9 @@ std::vector<std::string> run_batch_transaction(size_t total, OpT&& op)
     std::vector<std::string> successfully_installed;
 
     try {
-        // 批次开始
-        wal::WalWriter batch_writer = wal::begin_batch(total);
+        // 批次开始（BEGIN_PKGS 不带包数——批次开启时无法预知最终包数，
+        // 且恢复逻辑不读取该数）
+        wal::WalWriter batch_writer = wal::begin_batch();
 
         // 保存批次开始前的 DB 状态
         // 注意：write() 内部执行 WAL→备份→.tmp→rename→fsync 序列
@@ -92,8 +92,7 @@ template <typename PlanMap, typename PerPkgFn>
 std::vector<std::string> run_ordered_batch(const std::vector<std::string>& install_order,
                                            PlanMap& plan, PerPkgFn&& per_pkg_fn)
 {
-    return run_batch_transaction(install_order.size(),
-                                 [&](wal::WalWriter& w, std::vector<std::string>& success) {
+    return run_batch_transaction([&](wal::WalWriter& w, std::vector<std::string>& success) {
                                      auto& cache = Cache::instance();
 
                                      for (const auto& name : install_order) {

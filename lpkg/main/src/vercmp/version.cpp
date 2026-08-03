@@ -103,6 +103,7 @@ void validate_version_format(const std::string& v)
 struct Version {
     std::vector<int> main_part;
     std::string patch_suffix;                   // pN 补丁后缀，如 "p2"、"p"，空串表示无
+    std::string alpha_suffix;                   // git hash 等字母数字后缀（如 "0a1b2"→"a1b2"），空串表示无
     std::vector<std::string> release_part;      // + 发行修订号，如 ["2"]、"["2", "1"]
     std::vector<std::string> pre_release_part;  // - 预发布，如 ["rc", "1"]（不变）
 
@@ -131,8 +132,14 @@ struct Version {
             ++next;
             if (next == end) {
                 // 最后一个段：检查是否有补丁后缀（如 "17p2" → 17 + "p2"）
+                // 或 git hash 字母数字后缀（如 "0a1b2" → 0 + "a1b2"）
                 size_t pos = 0;
-                int num = std::stoi(seg, &pos);
+                int num = 0;
+                try {
+                    num = std::stoi(seg, &pos);
+                } catch (const std::exception&) {
+                    throw LpkgException(string_format("error.invalid_version_format", version_str));
+                }
                 main_part.push_back(num);
                 if (pos < seg.length() && std::isalpha(seg[pos])) {
                     // 检查剩余部分是否为有效补丁后缀：字母后只跟数字（如 "17p2" → 17 + "p2"）
@@ -143,6 +150,9 @@ struct Version {
                     }
                     if (is_patch) {
                         patch_suffix = tail;
+                    } else {
+                        // git hash 等字母数字后缀——保留，确保不同修订不被判为相等
+                        alpha_suffix = tail;
                     }
                 }
             } else {
@@ -261,6 +271,15 @@ bool version_compare(const std::string& v1_str, const std::string& v2_str)
         if (num1 != num2) return num1 < num2;
     }
 
+    // 2.5 alpha/git 后缀比较（如 "0a1b2"）— 字典序；有后缀者大于无后缀的基础版。
+    //    必须比较，否则两个不同 git 修订会被判为相等。
+    if (!v1.alpha_suffix.empty() && v2.alpha_suffix.empty()) return false;  // v1 > v2
+    if (v1.alpha_suffix.empty() && !v2.alpha_suffix.empty()) return true;   // v1 < v2
+    if (!v1.alpha_suffix.empty() && !v2.alpha_suffix.empty()) {
+        if (v1.alpha_suffix < v2.alpha_suffix) return true;
+        if (v1.alpha_suffix > v2.alpha_suffix) return false;
+    }
+
     // 3. 发行修订号比较（+）— 高于基础版和预发布
     bool v1_rel = !v1.release_part.empty();
     bool v2_rel = !v2.release_part.empty();
@@ -288,17 +307,14 @@ bool version_compare(const std::string& v1_str, const std::string& v2_str)
 bool version_satisfies(const std::string& current_version, const std::string& op,
                        const std::string& required_version)
 {
-    if (op == "=" || op == "==") {
-        return current_version == required_version;
-    }
-    if (op == "!=") {
-        return current_version != required_version;
-    }
-
+    // 所有运算符（含 =/==/!=）都按版本语义比较：
+    //   "1.0 == 1.0.0" 为真（version_compare 对缺失段补 0），字符串比较则误判。
     bool less = version_compare(current_version, required_version);
     bool greater = version_compare(required_version, current_version);
     bool equal = !less && !greater;
 
+    if (op == "=" || op == "==") return equal;
+    if (op == "!=") return !equal;
     if (op == "<") return less;
     if (op == "<=") return less || equal;
     if (op == ">") return greater;

@@ -34,36 +34,6 @@ extern std::atomic<bool> sigint_graceful;
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-namespace
-{
-
-/** 生成随机后缀（小写字母+数字）用于 .lpkg_bak 重命名防冲突 */
-std::string random_suffix(size_t len = 6)
-{
-    static const char chars[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-    static std::random_device rd;
-    std::string s;
-    for (size_t i = 0; i < len; ++i) s += chars[rd() % (sizeof(chars) - 1)];
-    return s;
-}
-
-/** 生成不冲突的 .lpkg_bak 路径，如果已存在则重试随机后缀 */
-fs::path unique_bak_path(const fs::path& phys, const std::string& pkg)
-{
-    // 去除尾部 '/'，防止 operator+= 追加到文件名中间（目录路径导致）
-    std::string clean_str = phys.string();
-    while (clean_str.size() > 1 && clean_str.back() == '/') clean_str.pop_back();
-    fs::path clean(clean_str);
-
-    while (true) {
-        fs::path bak = clean;
-        bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg + "_" + random_suffix();
-        if (!fs::exists(bak)) return bak;
-    }
-}
-
-}  // anonymous namespace
-
 // ===== InstallationTask 实现 =====
 
 InstallationTask::InstallationTask(std::string pkg_name, std::string version, bool explicit_install,
@@ -446,7 +416,8 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
             bool found_in_plan = false;
             for (const auto& [pkg_name, pplan] : ctx.plan) {
                 for (const auto& prov : pplan.provides) {
-                    if (prov == dep_name || prov.find(dep_name) != std::string::npos) {
+                    // 精确匹配：子串匹配会把依赖 foo 误判为被 libfoo-dev 满足
+                    if (prov == dep_name) {
                         found_in_plan = true;
                         break;
                     }
@@ -525,10 +496,17 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
 
             if (!provided) {
                 if (auto prov_pkg = ctx.repo.find_provider(soname)) {
-                    for (const auto& prov : prov_pkg->provides) {
-                        if (prov == soname) {
-                            provided = true;
-                            break;
+                    // 提供者已被"认领"（已安装，或在本批次计划中以另一版本出现）时，
+                    // 其版本已被锁定——仓库里其它版本提供此 SONAME 不能算数。
+                    // 否则依赖者声明的版本约束/已装版本会被仓库旧版本悄悄绕过。
+                    bool claimed = ctx.plan.contains(prov_pkg->name) ||
+                                   Cache::instance().is_installed(prov_pkg->name);
+                    if (!claimed) {
+                        for (const auto& prov : prov_pkg->provides) {
+                            if (prov == soname) {
+                                provided = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -673,12 +651,21 @@ void InstallationTask::copy_package_files()
                 has_config_conflicts_ = true;
             }
 
+            // 目录无法被符号链接替换：backup_existing_files 不备份目录，若静默
+            // remove 会留下无 WAL 记录的破坏且回滚无法恢复——作为文件冲突拒绝。
+            if (fs::is_directory(dest) && !fs::is_symlink(dest)) {
+                throw LpkgException(string_format(
+                    "error.copy_failed_rollback", f, physical_path.string(),
+                    get_string("error.dir_replaced_by_symlink")));
+            }
+
             if (fs::exists(dest) || fs::is_symlink(dest)) fs::remove(dest);
             fs::create_symlink(link_target, dest);
             struct stat st;
             if (lstat(src_path.c_str(), &st) == 0) {
                 (void)lchown(dest.c_str(), st.st_uid, st.st_gid);
             }
+            fsync_parent_dir(dest);
             TriggerManager::instance().check_file((fs::path("/") / f).string());
             continue;
         }
@@ -774,7 +761,8 @@ void InstallationTask::register_package()
         for (const auto& cap : cache.get_package_provides(pkg_name_)) {
             cache.remove_provider(cap, pkg_name_);
         }
-        fs::remove(Config::instance().needed_so_dir() / pkg_name_);
+        // 旧 needed_so 文件不在此处删除——由下方的 write_string_file_wal 备份后
+        // 覆盖（回滚时可恢复旧版 needed_so 元数据）。
     }
 
     std::unordered_set<std::string> dep_entries;
@@ -798,27 +786,27 @@ void InstallationTask::register_package()
 
     std::vector<std::string> sorted_deps(dep_entries.begin(), dep_entries.end());
     std::sort(sorted_deps.begin(), sorted_deps.end());
-    // WAL → 原子写（I-FSYNC 纪律：DBNEW 的 .tmp+fsync+rename，见 ARCH §6.2）
-    wal::log_wal_line("DBNEW " + (Config::instance().dep_dir() / pkg_name_).string() + " " +
-                      pkg_name_ + ":installed");
+    // WAL → 原子写（write-ahead：已存在的旧文件先备份，升级回滚可恢复旧版元数据）
     {
         std::string deps_content;
         for (const auto& entry : sorted_deps) {
             deps_content += entry;
             deps_content += constants::NL;
         }
-        write_string_to_file(Config::instance().dep_dir() / pkg_name_, deps_content);
+        wal::write_string_file_wal((Config::instance().dep_dir() / pkg_name_).string(),
+                                   deps_content, pkg_name_ + ":installed",
+                                   /*create_empty=*/true);
     }
 
-    if (!needed_so_.empty()) {
-        wal::log_wal_line("DBNEW " + (Config::instance().needed_so_dir() / pkg_name_).string() +
-                          " " + pkg_name_ + ":installed");
+    {
         std::string nso_content;
         for (const auto& sn : needed_so_) {
             nso_content += sn;
             nso_content += constants::NL;
         }
-        write_string_to_file(Config::instance().needed_so_dir() / pkg_name_, nso_content);
+        // 空内容 → DBRM 备份并删除旧文件（回滚恢复）；非空 → DBNEW/DB + 备份
+        wal::write_string_file_wal((Config::instance().needed_so_dir() / pkg_name_).string(),
+                                   nso_content, pkg_name_ + ":installed");
     }
 
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
@@ -828,19 +816,10 @@ void InstallationTask::register_package()
         cache.add_file_owner((fs::path("/") / f).string(), pkg_name_);
     }
 
-    wal::log_wal_line(
-        "DBNEW " +
-        (Config::instance().docs_dir() / (pkg_name_ + std::string(constants::SUFFIX_MAN)))
-            .string() +
-        " " + pkg_name_ + ":installed");
     const fs::path man_path =
         Config::instance().docs_dir() / (pkg_name_ + std::string(constants::SUFFIX_MAN));
-    if (!man_content_.empty()) {
-        write_string_to_file(man_path, man_content_);
-    } else {
-        std::error_code ec;
-        fs::remove(man_path, ec);
-    }
+    // 空 man → DBRM 备份并删除旧文件（回滚恢复）；非空 → DBNEW/DB + 备份
+    wal::write_string_file_wal(man_path.string(), man_content_, pkg_name_ + ":installed");
 
     for (const auto& cap : provides_) {
         cache.add_provider(cap, pkg_name_);

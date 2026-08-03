@@ -48,9 +48,11 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
     std::vector<std::string> args = {std::string(constants::BIN_BASH), "-c"};
 
     if (use_chroot) {
-        if (!fs::exists(Config::instance().root_dir() / "bin/sh")) {
+        // 钩子由 BIN_BASH 执行，chroot 后按 /bin/bash 解析——必须检查 bash 而非 sh
+        const fs::path bash_rel = std::string(constants::BIN_BASH).substr(1);  // "bin/bash"
+        if (!fs::exists(Config::instance().root_dir() / bash_rel)) {
             log_warning(string_format("warning.hook_failed_setup", std::string(hook_name),
-                                      get_string("error.sh_not_found")));
+                                      get_string("error.bash_not_found")));
             return;
         }
         const fs::path hook_rel = fs::relative(hook_path, Config::instance().root_dir());
@@ -213,12 +215,12 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
 
     if (latest_version.empty()) latest_version = std::string(constants::VER_DEFAULT);
 
-    // 检查是否需要安装/升级（非强制重装时跳过已安装的包）
+    // 检查是否需要安装/升级（非强制重装时跳过已安装的包）。
+    // installed_version == "virtual" 表示该名字是某已装包提供的虚拟能力而非
+    // 真实包——不能当作"已安装"跳过，否则 version_compare("virtual", ...) 会
+    // 因版本格式非法而抛异常。
     if (!ctx.force_reinstall || !is_explicit) {
-        if (!is_explicit && !installed_version.empty() &&
-            !version_compare(installed_version, latest_version))
-            return;
-        if (is_explicit && !installed_version.empty() &&
+        if (!installed_version.empty() && installed_version != "virtual" &&
             !version_compare(installed_version, latest_version))
             return;
     }
@@ -262,10 +264,17 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
                                      ? ctx.plan[dep.name].actual_version
                                      : Cache::instance().get_installed_version(dep.name);
             if (!dep.constraints.empty() && !cand_v.empty() && cand_v != "virtual" &&
-                !version_satisfies_all(cand_v, dep.constraints))
-                throw LpkgException(string_format("error.candidate_dep_version_mismatch", dep.name,
-                                                  cand_v, dep.constraints[0].op,
-                                                  dep.constraints[0].version));
+                !version_satisfies_all(cand_v, dep.constraints)) {
+                // 复合约束（如 ">= 2.0.0 < 3.0.0"）要完整报出，不只报第一个
+                std::string cons_str;
+                for (size_t ci = 0; ci < dep.constraints.size(); ++ci) {
+                    if (ci) cons_str += " ";
+                    cons_str += dep.constraints[ci].op + " " + dep.constraints[ci].version;
+                }
+                throw LpkgException(
+                    string_format("error.candidate_dep_version_mismatch", dep.name, cand_v,
+                                  cons_str));
+            }
         }
     }
     ctx.plan[pkg_name] = std::move(p);
@@ -439,10 +448,17 @@ void check_forward_soname_integrity(const std::map<std::string, InstallPlan>& pl
             // 3) repo — 必须确认返回的版本确实提供此 SONAME
             if (!provided) {
                 if (auto prov_pkg = repo.find_provider(soname)) {
-                    for (const auto& prov : prov_pkg->provides) {
-                        if (prov == soname) {
-                            provided = true;
-                            break;
+                    // 提供者已被"认领"（已安装或在计划中）时版本已锁定，仓库里
+                    // 其它版本（如旧版）提供此 SONAME 不能算数——否则会绕过依赖者
+                    // 的版本约束或已装版本的 ABI 事实。
+                    bool claimed = plan.contains(prov_pkg->name) ||
+                                   Cache::instance().is_installed(prov_pkg->name);
+                    if (!claimed) {
+                        for (const auto& prov : prov_pkg->provides) {
+                            if (prov == soname) {
+                                provided = true;
+                                break;
+                            }
                         }
                     }
                 }

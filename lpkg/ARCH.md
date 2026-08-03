@@ -29,7 +29,7 @@
 
 ### 1.1 批次模型（不变）
 
-- **I-1**: 所有写操作（install / remove / upgrade / reinstall / autoremove）均为批次事务，即使只有一个包也走 `BEGIN_PKGS 1 → ... → COMMIT_PKGS`。不存在"独立包事务"。
+- **I-1**: 所有写操作（install / remove / upgrade / reinstall / autoremove）均为批次事务，即使只有一个包也走 `BEGIN_PKGS → ... → COMMIT_PKGS`。不存在"独立包事务"。
 - **I-2**: 批次内每个包安装/移除完成后：`.lpkg_bak` 保留（延迟到 COMMIT_PKGS 后清理），`.lpkgtmp` 已清，内存 COMMIT 已写，DB 已落盘（带 WAL 保护）。
 - **I-3**: 批次提交前（`COMMIT_PKGS` 未写），整个批次视为未完成，可整体回滚。
 
@@ -73,7 +73,7 @@
 
 | 分类 | 行前缀 | 含义 | fsync |
 |------|--------|------|-------|
-| **批次边界** | `BEGIN_PKGS <N>` | 批次开始，N=包数 | 写后 fsync |
+| **批次边界** | `BEGIN_PKGS` | 批次开始 | 写后 fsync |
 | | `COMMIT_PKGS` | 批次完结（成功或回滚后） | 写后 fsync |
 | **安装操作** | `BEGIN <pkg> <ver>` | 单包安装开始 | 写后 fsync |
 | | `COMMIT <pkg> <ver>` | 单包安装提交 | 写后 fsync |
@@ -121,7 +121,7 @@
 
 **成功安装单个包**：
 ```
-BEGIN_PKGS 1                        ← fsync
+BEGIN_PKGS                        ← fsync
 BEGIN curl 8.11.1                    ← fsync
 BACKUP /usr/bin/curl → /usr/bin/curl.lpkg_bak_curl  ← fsync
 NEW /usr/share/doc/curl/README      ← fsync
@@ -135,7 +135,7 @@ COMMIT_PKGS                          ← fsync
 
 **批量 [A, B] 中 B 失败 → 全批次回滚（含 RESTORE 审计）**：
 ```
-BEGIN_PKGS 2                        ← fsync
+BEGIN_PKGS                        ← fsync
 BEGIN A 1.0                          ← fsync
 BACKUP /usr/bin/a → /usr/bin/a.lpkg_bak_A  ← fsync
 COPY /tmp/a → /usr/bin/a             ← fsync
@@ -161,7 +161,7 @@ COMMIT_PKGS                           ← fsync
 
 **移除失败回滚**：
 ```
-BEGIN_PKGS 1                        ← fsync
+BEGIN_PKGS                        ← fsync
 RM_BEGIN curl 8.11.1                 ← fsync
 BACKUP /usr/bin/curl → /usr/bin/curl.lpkg_bak_curl_a1b2c3   ← fsync
 BACKUP /usr/share/man/man1/curl.1 → /usr/share/man/man1/curl.1.lpkg_bak_curl_d4e5f6  ← fsync
@@ -177,7 +177,7 @@ COMMIT_PKGS                           ← fsync
 
 **升级失败回滚到旧版本**：
 ```
-BEGIN_PKGS 1
+BEGIN_PKGS
 BEGIN libfoo 2.0
 BACKUP /usr/lib/libfoo.so.1 → /usr/lib/libfoo.so.1.lpkg_bak_libfoo
 NEW /usr/lib/libfoo.so.2
@@ -199,14 +199,14 @@ COMMIT_PKGS
 
 假设 rollback 中途崩溃：
 ```
-BEGIN_PKGS 2
+BEGIN_PKGS
 ... (install A, B fails) ...
 RESTORE_DB /var/lib/lpkg/pkgs.lpkg_db_bak_before:A:installed → /var/lib/lpkg/pkgs
 ── 断电 here ──
 ```
 
 重启 `recover_packages()`：
-1. 读 WAL，看到 `BEGIN_PKGS 2` 无 `COMMIT_PKGS` → 未完成事务
+1. 读 WAL，看到 `BEGIN_PKGS` 无 `COMMIT_PKGS` → 未完成事务
 2. 逆序处理所有行（包括 RESTORE_DB）
 3. 遇到 `RESTORE_DB /bakA → /pkgs`：
    - `/bakA` 已经被消费（被 rename 到 /pkgs），不存在
@@ -523,7 +523,7 @@ install_packages(args)
 ├── 一致性重试循环
 ├── 用户确认
 │
-├── run_batch_transaction(N, [&] {
+├── run_batch_transaction( [&] {
 │   │
 │   ├── Cache::write(":batch-start")    ← WAL: DB /pkgs :batch-start (备份批次开始状态)
 │   │                                    ← fsync WAL, fsync 备份
@@ -834,7 +834,7 @@ void batch_rollback(const std::vector<std::string> &success);
 场景 A：rollback 在 RESTORE_DB 完成后、RESTORE_FILE 前崩溃
 ```
 WAL 状态：
-  BEGIN_PKGS 2
+  BEGIN_PKGS
   ... install A, install B fails ...
   RESTORE_DB /bak → /pkgs     ← 已完成
   RESTORE_FILE /bak → /a      ← 未执行（崩溃在此）
@@ -852,7 +852,7 @@ WAL 状态：
 场景 B：rollback 全部完成但 COMMIT_PKGS 未写（在 COMMIT_PKGS 写入前崩溃）
 ```
 WAL 状态：
-  BEGIN_PKGS 2
+  BEGIN_PKGS
   ... install A, install B fails ...
   RESTORE_DB /bak → /pkgs
   RESTORE_FILE /bak → /a
@@ -1057,27 +1057,27 @@ trim 不关心具体行内容，只跟踪 BATCH 边界。RESTORE_* 等行在已�
 
 ```
 成功安装:
-  BEGIN_PKGS 1 → ... → COMMIT_PKGS
+  BEGIN_PKGS → ... → COMMIT_PKGS
 
 成功移除:
-  BEGIN_PKGS 1 → RM_BEGIN → BACKUP... → BACKUP dir(最后持有者)... → DBRM... → DB... → RM_COMMIT
+  BEGIN_PKGS → RM_BEGIN → BACKUP... → BACKUP dir(最后持有者)... → DBRM... → DB... → RM_COMMIT
   └─ CLEANUP 阶段: 清理 .lpkg_bak（文件/目录，最深优先）→ RM_END → COMMIT_PKGS
 
 安装失败回滚:
-  BEGIN_PKGS 2 → ... A OK → ... B FAIL → ROLLBACK B → END B
+  BEGIN_PKGS → ... A OK → ... B FAIL → ROLLBACK B → END B
   → RESTORE_DB → RESTORE_FILE → REMOVE_FILE → DB :batch-start
   → ROLLBACK A → END A → COMMIT_PKGS
 
 移除失败回滚:
-  BEGIN_PKGS 1 → RM_BEGIN → BACKUP... → (异常)
+  BEGIN_PKGS → RM_BEGIN → BACKUP... → (异常)
   → RESTORE_FILE... → DB :batch-start → COMMIT_PKGS
 
 安装时断电:
-  BEGIN_PKGS 2 → BEGIN A → BACKUP ... 断电
+  BEGIN_PKGS → BEGIN A → BACKUP ... 断电
   → rec: reverse_execute → COMMIT_PKGS
 
 rollback 自身断电:
-  BEGIN_PKGS 2 → ... → RESTORE_DB → 断电
+  BEGIN_PKGS → ... → RESTORE_DB → 断电
   → rec: 跳过 RESTORE_DB (bak已消费), 继续逆向其他
   → COMMIT_PKGS
 ```

@@ -4,6 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <ranges>
+#include <set>
 #include <sstream>
 #include <string_view>
 
@@ -140,12 +141,29 @@ void Repository::load_index()
     }
 }
 
-/** 根据 capability 查找提供该能力的第一个包 */
+/**
+ * 根据 capability 查找提供该能力的包。
+ *
+ * 返回的版本**必须确实提供该 capability**：providers_ 只在索引解析时记录
+ * 包名（含所有版本），而 find_package 只回最新版——若最新版已不再提供该
+ * capability（旧版提供、新版丢弃），直接返回最新版会导致"明明有提供者却报
+ * 未解析"的假失败。因此从每个候选包的最新版本向下找第一个提供该
+ * capability 的版本。
+ */
 std::optional<PackageInfo> Repository::find_provider(const std::string& capability)
 {
     auto it = providers_.find(capability);
     if (it == providers_.end() || it->second.empty()) return std::nullopt;
-    return find_package(it->second[0]);
+    for (const auto& pkg_name : it->second) {
+        auto pit = packages_.find(pkg_name);
+        if (pit == packages_.end() || pit->second.empty()) continue;
+        for (auto rit = pit->second.rbegin(); rit != pit->second.rend(); ++rit) {
+            for (const auto& prov : rit->provides) {
+                if (prov == capability) return *rit;
+            }
+        }
+    }
+    return std::nullopt;
 }
 
 /** 更新（或新增）某包某版本的元数据 */
@@ -155,6 +173,13 @@ void Repository::update_package_info(const std::string& name, const std::string&
                                      const std::vector<std::string>& needed_so)
 {
     auto& versions = packages_[name];
+
+    // 记录更新前该包（跨所有版本）提供的 capability，用于计算受影响集合
+    std::set<std::string> old_provs;
+    for (const auto& pkg : versions) {
+        for (const auto& p : pkg.provides) old_provs.insert(p);
+    }
+
     bool found = false;
     for (auto& pkg : versions) {
         if (pkg.version == version) {
@@ -178,32 +203,38 @@ void Repository::update_package_info(const std::string& name, const std::string&
         });
     }
 
-    // 增量更新 providers 映射：只移除旧版本中不再提供的条目，添加新版本
-    // 遍历所有版本的 provides，删除该包名下所有旧记录后重新插入
+    // 增量更新 providers_：只处理本包，不再整表重建。整表重建遍历 unordered_map
+    // 的 packages_（迭代顺序不确定），会破坏 find_provider 返回的"第一个提供者"
+    // 的确定性。这里只移除本包名、按当前 provides 重新加入，并只对受影响
+    // capability 的候选列表按包名字典序排序，保证结果确定。
+    std::set<std::string> affected = old_provs;
+    for (const auto& pkg : versions) {
+        for (const auto& p : pkg.provides) affected.insert(p);
+    }
+
+    // a) 从所有 capability 的候选列表中移除本包名
     for (auto it = providers_.begin(); it != providers_.end();) {
         auto& vec = it->second;
-        for (auto vit = vec.begin(); vit != vec.end();) {
-            if (*vit == name) {
-                vit = vec.erase(vit);
-            } else {
-                ++vit;
-            }
-        }
+        vec.erase(std::remove(vec.begin(), vec.end(), name), vec.end());
         if (vec.empty()) {
             it = providers_.erase(it);
         } else {
             ++it;
         }
     }
-    for (const auto& [pkg_name, pkg_versions] : packages_) {
-        for (const auto& pkg : pkg_versions) {
-            for (const auto& prov : pkg.provides) {
-                auto& pv = providers_[prov];
-                if (pv.empty() || pv.back() != pkg_name) {
-                    pv.push_back(pkg_name);
-                }
+    // b) 重新加入本包当前提供的 capability
+    for (const auto& pkg : versions) {
+        for (const auto& prov : pkg.provides) {
+            auto& pv = providers_[prov];
+            if (std::find(pv.begin(), pv.end(), name) == pv.end()) {
+                pv.push_back(name);
             }
         }
+    }
+    // c) 受影响 capability 的候选按包名字典序排序 → find_provider 结果确定
+    for (const auto& cap : affected) {
+        auto it = providers_.find(cap);
+        if (it != providers_.end()) std::ranges::sort(it->second);
     }
 }
 

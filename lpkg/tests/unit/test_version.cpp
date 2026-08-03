@@ -243,3 +243,38 @@ TEST(VersionCompare, GitHashVersion)
     EXPECT_FALSE(version_compare("0.2385.10", "0.2385.9ece3f52"));
     // hash + 补丁后缀同时存在几乎不会发生，不测试
 }
+
+// 回归：git hash 字母后缀不能被丢弃——两个不同修订必须判为不等。
+// 1.0.0a1b2 的 "a1b2" 曾因不是合法补丁后缀被静默丢弃，与 1.0.0 判等。
+TEST(VersionCompare, GitHashAlphaSuffixDistinctness)
+{
+    // 与自身相等
+    EXPECT_FALSE(version_compare("1.0.0a1b2", "1.0.0a1b2"));
+    // 与基础版不等：有后缀者大于无后缀者
+    EXPECT_TRUE(version_compare("1.0.0", "1.0.0a1b2"));
+    EXPECT_FALSE(version_compare("1.0.0a1b2", "1.0.0"));
+    // 两个不同 git 修订不等（字典序）
+    EXPECT_TRUE(version_compare("1.0.0a1b2", "1.0.0a1b3"));
+    EXPECT_FALSE(version_compare("1.0.0a1b3", "1.0.0a1b2"));
+    // 后缀不改变主版本比较（数字段仍主导）
+    EXPECT_TRUE(version_compare("1.0.0a1b2", "1.0.1"));
+    // 0.2385.9ece3f52 的现有语义保持不变（前导数字段仍参与数值比较）
+    EXPECT_TRUE(version_compare("0.2385", "0.2385.9ece3f52"));
+    EXPECT_FALSE(version_compare("0.2385.9ece3f52", "0.2385"));
+}
+
+// 回归：= / == / != 必须按版本语义比较，不能做原始字符串比较。
+// 1.0 与 1.0.0 语义相等（version_compare 对缺失段补 0），字符串比较则误判。
+TEST(VersionCompare, EqualConstraintUsesSemanticComparison)
+{
+    EXPECT_TRUE(version_satisfies("1.0.0", "=", "1.0"));
+    EXPECT_TRUE(version_satisfies("1.0", "==", "1.0.0"));
+    EXPECT_TRUE(version_satisfies("1.0", "=", "1.0"));
+    EXPECT_FALSE(version_satisfies("2.0", "=", "1.0"));
+    // != 语义：1.0 与 1.0.0 不视为不同
+    EXPECT_FALSE(version_satisfies("1.0", "!=", "1.0.0"));
+    EXPECT_TRUE(version_satisfies("2.0", "!=", "1.0"));
+    // 其它运算符不受影响
+    EXPECT_TRUE(version_satisfies("1.0", "<=", "1.0.0"));
+    EXPECT_TRUE(version_satisfies("1.0.0", ">=", "1.0"));
+}

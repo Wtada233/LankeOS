@@ -390,6 +390,64 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path)
 }
 
 // ============================================================================
+// WAL 保护的原始文本文件写入
+// ============================================================================
+
+/**
+ * 以 write-ahead 顺序写一个原始文本文件（deps / needed_so / man 等 per-package
+ * 元数据文件），保证回滚能恢复旧内容。
+ *
+ *  - content 非空：WAL 行用 DBNEW（新文件）或 DB（已存在，先备份旧内容）；
+ *    reverse_execute 的 DBNEW 分支无备份时删除新文件，DB 分支从备份恢复旧内容。
+ *  - content 为空且文件已存在：WAL 行用 DBRM（备份后删除），回滚时恢复旧内容。
+ *  - content 为空且文件不存在：默认无操作；create_empty=true 时创建空文件（DBNEW）。
+ *
+ * 备份命名与 cache.cpp 的 .lpkg_db_bak_before:<milestone> 一致。
+ */
+void write_string_file_wal(const std::string& path, const std::string& content,
+                           const std::string& milestone, bool create_empty)
+{
+    const fs::path p(path);
+    const bool is_new = !fs::exists(p);
+
+    if (content.empty() && !is_new) {
+        // 内容为空且旧文件存在：DBRM 备份后删除，回滚恢复旧内容
+        wal_append_raw("DBRM " + path + " " + milestone);
+        std::string bak = path + ".lpkg_db_bak_before:" + milestone;
+        safe_rename(p, bak);
+        return;
+    }
+    if (content.empty() && is_new) {
+        // 内容为空且文件不存在：默认不创建；deps 文件需显式创建空文件
+        if (!create_empty) return;
+        wal_append_raw("DBNEW " + path + " " + milestone);
+    } else {
+        wal_append_raw((is_new ? "DBNEW " : "DB ") + path + " " + milestone);
+        if (!is_new) {
+            std::string bak = path + ".lpkg_db_bak_before:" + milestone;
+            safe_rename(p, bak);
+        }
+    }
+
+    const fs::path tmp = fs::path(path + ".tmp");
+    {
+        std::ofstream f(tmp, std::ios::trunc);
+        if (!f.is_open())
+            throw LpkgException(string_format("error.create_file_failed", tmp.string()));
+        f.write(content.data(), static_cast<std::streamsize>(content.size()));
+        f.flush();
+        if (!f) throw LpkgException(string_format("error.db_write_failed", path));
+    }
+    int fd = ::open(tmp.c_str(), O_WRONLY);
+    if (fd >= 0) {
+        ::fsync(fd);
+        ::close(fd);
+    }
+    safe_rename(tmp, p);
+    fsync_parent_dir(p);
+}
+
+// ============================================================================
 // 批次回滚
 // ============================================================================
 

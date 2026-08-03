@@ -963,13 +963,13 @@ TEST_F(WalCoreTest, WalWriterLogAndFsync)
 
 TEST_F(WalCoreTest, BeginBatchAndCommitBatch)
 {
-    auto writer = wal::begin_batch(3);
+    auto writer = wal::begin_batch();
     EXPECT_GT(writer.lines_written(), 0);
 
     wal::commit_batch();
 
     std::string content = read_file("var/lib/lpkg/transaction.log");
-    EXPECT_NE(content.find("BEGIN_PKGS 3"), std::string::npos);
+    EXPECT_NE(content.find("BEGIN_PKGS"), std::string::npos);
     EXPECT_NE(content.find("COMMIT_PKGS"), std::string::npos);
 }
 
@@ -982,7 +982,7 @@ TEST_F(WalCoreTest, FullInstallWalScenario)
     // 模拟一个包安装完成的 WAL
     wal::commit_batch();  // 清除之前的
 
-    auto w = wal::begin_batch(1);
+    auto w = wal::begin_batch();
     wal::log_wal_line("BEGIN curl 8.11.1");
     wal::log_wal_line("BACKUP /usr/bin/curl → /usr/bin/curl.lpkg_bak_curl");
     wal::log_wal_line("NEW /usr/share/doc/curl/README");
@@ -993,7 +993,7 @@ TEST_F(WalCoreTest, FullInstallWalScenario)
     wal::commit_batch();
 
     std::string content = read_file("var/lib/lpkg/transaction.log");
-    EXPECT_NE(content.find("BEGIN_PKGS 1"), std::string::npos);
+    EXPECT_NE(content.find("BEGIN_PKGS"), std::string::npos);
     EXPECT_NE(content.find("BEGIN curl"), std::string::npos);
     EXPECT_NE(content.find("COMMIT curl"), std::string::npos);
     EXPECT_NE(content.find("END curl"), std::string::npos);

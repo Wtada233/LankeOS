@@ -109,22 +109,23 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
     InstallContext ctx{repo, plan, order, locals, targets, force_reinstall, /*top_level=*/true, {}};
 
-    // 一致性重试循环
-    while (true) {
-        plan.clear();
-        order.clear();
-        ctx.plan = plan;
-        ctx.install_order = order;
-        ctx.successfully_installed.clear();
-        ctx.installed_set.clear();
+    // 解析安装计划。真正的"元数据一致性重解析"发生在 run_batch_transaction 内部
+    // 的 metadata verification 循环（见下），此处不再需要外层死循环。
+    plan.clear();
+    order.clear();
+    ctx.successfully_installed.clear();
+    ctx.installed_set.clear();
 
-        for (const auto& [n, v] : targets) {
+    for (const auto& [n, v] : targets) {
             std::set<std::string> vs;
             detail::resolve_package_dependencies(n, v, true, ctx, vs);
         }
 
         if (!provided_hash.empty()) {
             if (locals.empty()) throw LpkgException(get_string("error.hash_requires_local"));
+            // 单个 --hash 无法校验多个本地包（至多一个能通过哈希校验）
+            if (locals.size() > 1)
+                throw LpkgException(get_string("error.hash_requires_single_local"));
             for (auto& [n, p] : plan)
                 if (!p.local_path.empty()) p.sha256 = provided_hash;
         }
@@ -157,9 +158,6 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
             }
         }
 
-        break;
-    }
-
     detail::check_forward_soname_integrity(plan, repo);
 
     // 用户确认
@@ -183,7 +181,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     // 执行安装（WAL 2.0 批量事务）
     std::vector<std::pair<fs::path, fs::path>> all_backups;
     run_batch_transaction(
-        order.size(), [&](wal::WalWriter& /*batch_writer*/, std::vector<std::string>& success) {
+        [&](wal::WalWriter& /*batch_writer*/, std::vector<std::string>& success) {
             auto& cache = Cache::instance();
 
             size_t i = 0;
@@ -273,31 +271,6 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     log_info(get_string("info.install_complete"));
 }
 
-/** 生成随机后缀（小写字母+数字）用于 .lpkg_bak 重命名防冲突 */
-static std::string random_suffix(size_t len = 6)
-{
-    static const char chars[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-    static std::random_device rd;
-    std::string s;
-    for (size_t i = 0; i < len; ++i) s += chars[rd() % (sizeof(chars) - 1)];
-    return s;
-}
-
-/** 生成不冲突的 .lpkg_bak 路径，如果已存在则重试随机后缀 */
-static fs::path unique_bak_path(const fs::path& phys, const std::string& pkg)
-{
-    // 去除尾部 '/'，防止 operator+= 追加到文件名中间（目录路径导致）
-    std::string clean_str = phys.string();
-    while (clean_str.size() > 1 && clean_str.back() == '/') clean_str.pop_back();
-    fs::path clean(clean_str);
-
-    while (true) {
-        fs::path bak = clean;
-        bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg + "_" + random_suffix();
-        if (!fs::exists(bak)) return bak;
-    }
-}
-
 /**
  * 移除已安装的包
  * 检查是否为 essential 包、是否有其他包依赖它、是否有包依赖其提供的虚拟包名
@@ -337,7 +310,7 @@ void remove_package(const std::string& pkg_name, bool force, bool /*wrap_in_txn*
     log_info(string_format("info.removing_package", pkg_name));
 
     // WAL 2.0 批量事务：单个包移除 = 一批一包
-    run_batch_transaction(1, [&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
+    run_batch_transaction([&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
         auto& cache = Cache::instance();
 
         if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
@@ -467,6 +440,20 @@ void remove_package(const std::string& pkg_name, bool force, bool /*wrap_in_txn*
                 std::stringstream ss(l);
                 std::string dn;
                 if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name);
+            }
+        }
+        // needed_so 派生的反向依赖（register_package 按提供者加边）也要清理，
+        // 否则同一进程内 get_reverse_deps(provider) 会返回已移除的包。
+        {
+            const fs::path nso_file = Config::instance().needed_so_dir() / pkg_name;
+            if (fs::exists(nso_file)) {
+                std::ifstream f(nso_file);
+                std::string soname;
+                while (std::getline(f, soname)) {
+                    if (soname.empty()) continue;
+                    for (const auto& prov_pkg : cache.get_providers(soname))
+                        cache.remove_reverse_dep(prov_pkg, pkg_name);
+                }
             }
         }
         cleanup_with_dbr(dep_file, "dep");
@@ -768,7 +755,7 @@ void upgrade_packages()
     std::vector<std::pair<fs::path, fs::path>> upgrade_backups;
     size_t upgraded_count = 0;
     run_batch_transaction(
-        order.size(), [&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
+        [&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
             auto& cache = Cache::instance();
 
             size_t i = 0;
@@ -939,7 +926,11 @@ void force_solve_conflict()
     log_warning(get_string("error.dependency_conflict_title"));
     for (const auto& p : broken) log_warning(string_format("warning.force_solve_pkg", p));
 
-    // 必须输入确认短语——任何非交互模式都不绕过（显式破坏性操作）
+    // 必须输入确认短语——任何非交互模式都不绕过（显式破坏性操作）。
+    // 非交互模式（-y/-n）直接报错而非阻塞读 stdin，避免脚本永久挂起。
+    if (Config::instance().non_interactive_mode() != NonInteractiveMode::INTERACTIVE) {
+        throw LpkgException(get_string("error.force_solve_requires_interactive"));
+    }
     std::cout << string_format("info.force_solve_confirm", PHRASE);
     std::cout.flush();
     std::string input;
@@ -1014,7 +1005,11 @@ void query_file(const std::string& filename)
             const fs::path p(filename);
             if (!fs::is_symlink(p)) {
                 const fs::path abs_p = fs::absolute(p);
-                if (abs_p.string().starts_with(Config::instance().root_dir().string())) {
+                // 前缀判断必须带目录边界：root=/lanke 时 /lankefoo 不应算在根内
+                const std::string root = Config::instance().root_dir().string();
+                const std::string abs_s = abs_p.string();
+                const bool in_root = (abs_s == root) || abs_s.starts_with(root + "/");
+                if (in_root) {
                     const std::string logical =
                         "/" + fs::relative(abs_p, Config::instance().root_dir()).string();
                     owners = cache.get_file_owners(logical);
@@ -1163,8 +1158,7 @@ void remove_package_recursive(const std::string& pkg_name, bool force)
 
     // WAL 2.0: 整批原子移除
     // 目录通过 BACKUP WAL 原子化移除，.lpkg_bak 通过 CLEANUP WAL 在事务内清理
-    run_batch_transaction(to_remove.size(), [&](wal::WalWriter& /*w*/,
-                                                std::vector<std::string>& success) {
+    run_batch_transaction([&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
         auto& cache = Cache::instance();
         std::vector<std::pair<fs::path, fs::path>> all_backups;
 
@@ -1243,6 +1237,19 @@ void remove_package_recursive(const std::string& pkg_name, bool force)
                         std::stringstream ss(l);
                         std::string dn;
                         if (ss >> dn) cache.remove_reverse_dep(dn, p);
+                    }
+                }
+                // needed_so 派生的反向依赖也要清理（同 remove_package）
+                {
+                    const fs::path nsf = Config::instance().needed_so_dir() / p;
+                    if (fs::exists(nsf)) {
+                        std::ifstream fi(nsf);
+                        std::string soname;
+                        while (std::getline(fi, soname)) {
+                            if (soname.empty()) continue;
+                            for (const auto& prov_pkg : cache.get_providers(soname))
+                                cache.remove_reverse_dep(prov_pkg, p);
+                        }
                     }
                 }
                 cleanup_dbr(df, "dep");

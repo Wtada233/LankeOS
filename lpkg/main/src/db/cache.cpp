@@ -256,6 +256,7 @@ void Cache::ensure_essentials()
 
 void Cache::write()
 {
+    std::lock_guard<std::mutex> lock(mtx);
     if (dirty) {
         write_file_db();
         write_providers();
@@ -271,6 +272,7 @@ void Cache::write(const std::string& milestone)
     //   WAL DB <path> <milestone> → fsync → 备份 → fsync →
     //   .tmp → fsync → rename → fsync parent
     // 反向回滚时从 .lpkg_db_bak_before:<milestone> 恢复
+    std::lock_guard<std::mutex> lock(mtx);
 
     auto& config = Config::instance();
     auto pkgs_data = build_pkgs_set();
@@ -347,6 +349,10 @@ void Cache::write_db_file_direct(
             }
             f << key << "\t" << joined << "\n";
         }
+        // 磁盘满/IO 错误会使 ofstream 进入 fail 态——不检查会把截断的 DB 文件
+        // rename 进正式位置，静默损坏数据库。先 flush 让缓冲错误在析构前暴露。
+        f.flush();
+        if (!f) throw LpkgException(string_format("error.db_write_failed", tmp.string()));
     }
 
     atomic_write_with_fsync(path, tmp);
@@ -361,6 +367,8 @@ void Cache::write_set_file_direct(const fs::path& path, const std::unordered_set
         if (!f.is_open())
             throw LpkgException(string_format("error.create_file_failed", tmp.string()));
         for (const auto& item : data) f << item << "\n";
+        f.flush();
+        if (!f) throw LpkgException(string_format("error.db_write_failed", tmp.string()));
     }
 
     atomic_write_with_fsync(path, tmp);
@@ -413,6 +421,9 @@ void Cache::write_db_file_wal(
             }
             f << key << "\t" << joined << "\n";
         }
+        // 写失败（磁盘满等）必须中止，不能把截断文件 rename 进正式位置
+        f.flush();
+        if (!f) throw LpkgException(string_format("error.db_write_failed", tmp.string()));
     }
 
     // 4. fsync .tmp
@@ -446,6 +457,8 @@ void Cache::write_set_file_wal(const fs::path& path, const std::unordered_set<st
         if (!f.is_open())
             throw LpkgException(string_format("error.create_file_failed", tmp.string()));
         for (const auto& item : data) f << item << "\n";
+        f.flush();
+        if (!f) throw LpkgException(string_format("error.db_write_failed", tmp.string()));
     }
 
     // 4. fsync .tmp + rename + fsync parent
