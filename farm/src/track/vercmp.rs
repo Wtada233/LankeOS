@@ -17,6 +17,8 @@ use std::cmp::Ordering;
 struct Version {
     main_part: Vec<u64>,
     patch_suffix: String,
+    /// git 修订/纯字母后缀（如 `1.0beta`、`0a1b2`→`a1b2`）；非空 > 基础版，字典序比较
+    alpha_suffix: String,
     release_part: Vec<String>,
     pre_release_part: Vec<String>,
 }
@@ -51,6 +53,10 @@ impl Version {
                     && tail[1..].bytes().all(|b| b.is_ascii_digit());
                 if is_patch {
                     v.patch_suffix = tail.to_string();
+                } else if !tail.is_empty() && tail.as_bytes()[0].is_ascii_alphabetic() {
+                    // git 修订/纯字母后缀（"beta"、"a1b2"）：曾整个丢弃 → `1.0beta` 与
+                    // `1.0` 被误判相等。与 lpkg 对齐：非空 > 基础版，字典序比较。
+                    v.alpha_suffix = tail.to_string();
                 }
             }
         }
@@ -97,6 +103,21 @@ fn compare(a: &Version, b: &Version) -> Ordering {
     let ord = cmp_patch(&a.patch_suffix, &b.patch_suffix);
     if ord != Ordering::Equal {
         return ord;
+    }
+    // alpha/git 后缀（"1.0beta"、"0a1b2"）：非空 > 基础版，字典序（与 lpkg version.cpp 对齐）
+    let a_alpha = !a.alpha_suffix.is_empty();
+    let b_alpha = !b.alpha_suffix.is_empty();
+    if a_alpha && !b_alpha {
+        return Ordering::Greater;
+    }
+    if !a_alpha && b_alpha {
+        return Ordering::Less;
+    }
+    if a_alpha && b_alpha {
+        let ord = a.alpha_suffix.cmp(&b.alpha_suffix);
+        if ord != Ordering::Equal {
+            return ord;
+        }
     }
     let a_rel = !a.release_part.is_empty();
     let b_rel = !b.release_part.is_empty();
@@ -224,5 +245,18 @@ mod tests {
     #[test]
     fn alpha_segments() {
         assert_eq!(cmp_version("1.0.a", "1.0.b"), Ordering::Less);
+    }
+
+    #[test]
+    fn alpha_suffix_greater_than_base() {
+        // 回归：`1.0beta` 曾解析为 [1,0] 与 `1.0` 判等——纯字母后缀必须保留且高于基础版
+        assert_eq!(cmp_version("1.0beta", "1.0"), Ordering::Greater);
+        assert_eq!(cmp_version("1.0", "1.0beta"), Ordering::Less);
+        assert_eq!(cmp_version("1.0beta", "1.0alpha"), Ordering::Greater); // 字典序
+        // 补丁后缀（pN）仍优先于 alpha 后缀（与 lpkg 一致）
+        assert_eq!(cmp_version("1.0p2", "1.0beta"), Ordering::Greater);
+        // git 修订式 alpha（0a1b2）不相等
+        assert_eq!(cmp_version("0.1a1b2", "0.1"), Ordering::Greater);
+        assert_ne!(cmp_version("0.1a1b2", "0.1a1c3"), Ordering::Equal);
     }
 }

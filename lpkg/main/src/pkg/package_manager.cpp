@@ -271,6 +271,243 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     log_info(get_string("info.install_complete"));
 }
 
+namespace
+{
+
+/**
+ * 清理一批 .lpkg_bak 文件/目录（CLEANUP 阶段，不可回滚）。
+ *
+ * **write-ahead 顺序：先写 CLEANUP WAL 行，再物理删除。**
+ * 原实现是"先删后记"：若在删除后、日志写入前崩溃，且批次中尚无任何 CLEANUP 行，
+ * 恢复走 reverse_execute → DB 恢复到 pkg:installed 但 .bak 已删 → 磁盘与 DB 不一致。
+ * 改为先记日志后：
+ *   - 崩溃在"日志后、删除前"→ 恢复看到 CLEANUP → continue_cleanup 续删 → 一致
+ *   - 崩溃在"删除后、下一条日志前"→ 已有 CLEANUP 行 → continue_cleanup 续删 → 一致
+ *   - 崩溃在首条 CLEANUP 前 → 无 CLEANUP 行 → reverse_execute 整体恢复 → 一致
+ * 删除失败仅告警（残留 .bak 由下次 rec/cleanup 续删），不中断事务。
+ */
+void cleanup_baks(std::vector<std::pair<fs::path, fs::path>>& backups)
+{
+    if (backups.empty()) return;
+
+    std::vector<fs::path> cleanup_paths;
+    for (const auto& [orig, bak] : backups) cleanup_paths.push_back(bak);
+
+    // 最深层优先（文件先于目录，子目录先于父目录）
+    std::ranges::sort(cleanup_paths, [](const fs::path& a, const fs::path& b) {
+        return a.string().size() > b.string().size();
+    });
+    auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
+    cleanup_paths.erase(last, cleanup_paths.end());
+
+    for (const auto& p : cleanup_paths) {
+        if (!fs::exists(p) && !fs::is_symlink(p)) continue;
+
+        // write-ahead：先记日志再删除（见函数注释）
+        wal::log_wal_line("CLEANUP " + p.string());
+
+        // 断点：CLEANUP 日志写入后、物理删除前 —— 测试 write-ahead 崩溃窗口
+        //（此刻 .bak 仍在磁盘，异常/崩溃可由 batch_rollback/rec 完整恢复）
+        BreakpointManager::instance().hit("cleanup_after_wal");
+
+        std::error_code ec2;
+        bool ok = true;
+        if (fs::is_directory(p)) {
+            // 从里到外删除目录内容
+            std::vector<fs::path> entries;
+            for (const auto& entry : fs::recursive_directory_iterator(p, ec2))
+                if (!ec2) entries.push_back(entry.path());
+            if (!ec2) {
+                std::ranges::reverse(entries);
+                for (const auto& e : entries) {
+                    if (!fs::remove(e, ec2)) ok = false;
+                }
+            }
+            if (!fs::remove(p, ec2)) ok = false;
+        } else {
+            if (!fs::remove(p, ec2)) ok = false;
+        }
+
+        if (!ok) log_warning(string_format("warning.cleanup_failed", p.string()));
+    }
+}
+
+/**
+ * 单包移除核心（须在 run_batch_transaction 内调用）。
+ *
+ * remove_package 与 remove_package_recursive 共用此实现（原先是两处近乎逐字
+ * 重复的移除逻辑，去重后差异只剩"单包 vs 多包"与是否做共享文件检查）。
+ *
+ * 文件备份（BACKUP + rename 到 .lpkg_bak）产出进入 backups，由调用方在合适时机
+ * 统一走 cleanup_baks() 清理（CLEANUP 阶段，事务内、COMMIT_PKGS 前）。
+ */
+void do_remove_package(const std::string& pkg_name, bool force, const std::string& ver,
+                       std::vector<std::pair<fs::path, fs::path>>& backups)
+{
+    auto& cache = Cache::instance();
+
+    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+    detail::run_hook(pkg_name, std::string(constants::PRERM_SH));
+
+    // WAL: RM_BEGIN
+    wal::log_wal_line("RM_BEGIN " + pkg_name + " " + ver);
+
+    std::error_code ec;
+
+    auto owned_entries = cache.get_package_files(pkg_name);
+
+    // 共享文件检查
+    if (!force && !owned_entries.empty()) {
+        std::vector<std::pair<std::string, std::string>> shared;
+        for (const auto& entry : owned_entries) {
+            if (entry.ends_with('/')) continue;
+            auto owners = cache.get_file_owners(entry);
+            std::string others;
+            for (const auto& owner : owners) {
+                if (owner != pkg_name) {
+                    if (!others.empty()) others += ", ";
+                    others += owner;
+                }
+            }
+            if (!others.empty()) shared.emplace_back(entry, others);
+        }
+        if (!shared.empty()) {
+            std::string msg = get_string("error.shared_file_header") + "\n";
+            for (const auto& [file, owners] : shared)
+                msg += "  " + string_format("error.shared_file_entry", file, owners) + "\n";
+            throw LpkgException(msg + get_string("error.removal_aborted"));
+        }
+    }
+
+    // 备份阶段
+    int file_count = 0;
+    if (!owned_entries.empty()) {
+        std::vector<fs::path> paths;
+        for (const auto& e : owned_entries) paths.emplace_back(e);
+        std::ranges::sort(paths, std::greater<>{});
+
+        for (const auto& p : paths) {
+            std::string path_str = p.string();
+            if (path_str.ends_with('/')) continue;
+            if (!force && path_str.starts_with(constants::DIR_ETC_PREFIX)) continue;
+            const fs::path phys =
+                p.is_absolute() ? Config::instance().root_dir() / fs::path(p).relative_path()
+                                : Config::instance().root_dir() / p;
+
+            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+            if (fs::exists(phys) || fs::is_symlink(phys)) {
+                fs::path bak = unique_bak_path(phys, pkg_name);
+                wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
+                BreakpointManager::instance().hit("rm_backup_after_wal_" + pkg_name);
+                safe_rename(phys, bak);
+                backups.emplace_back(phys, bak);
+                ++file_count;
+            }
+        }
+    }
+
+    if (file_count > 0) log_info(string_format("info.files_removed", file_count));
+
+    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+    // 断点：移除的 BACKUP 阶段完成后、文件删除前
+    BreakpointManager::instance().hit("rm_before_file_removal_" + pkg_name);
+
+    remove_package_files(pkg_name, force);
+
+    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+    // 目录处理：BACKUP 目录（仅最后持有者 + 安全检查）
+    {
+        std::vector<fs::path> dir_paths;
+        for (const auto& e : owned_entries)
+            if (e.ends_with('/')) dir_paths.emplace_back(fs::path(e));
+        std::ranges::sort(dir_paths, std::greater<>{});
+
+        for (const auto& p : dir_paths) {
+            cache.remove_file_owner(p.string(), pkg_name);
+            if (!cache.get_file_owners(p.string()).empty()) continue;
+
+            const fs::path phys = p.is_absolute()
+                                      ? Config::instance().root_dir() / p.relative_path()
+                                      : Config::instance().root_dir() / p;
+            if (!fs::exists(phys) || !fs::is_directory(phys)) continue;
+
+            // 安全检查：目录中只能有本包的 .lpkg_bak 文件
+            bool can_backup = true;
+            std::error_code ec2;
+            for (const auto& entry : fs::directory_iterator(phys, ec2)) {
+                auto fname = entry.path().filename().string();
+                if (fname.find(std::string(constants::SUFFIX_LPKG_BAK) + pkg_name + "_") !=
+                    std::string::npos)
+                    continue;
+                can_backup = false;
+                break;
+            }
+            if (!can_backup) continue;
+
+            fs::path bak = unique_bak_path(phys, pkg_name);
+            wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
+            safe_rename(phys, bak);
+            backups.emplace_back(phys, bak);
+        }
+    }
+
+    // DBRM 清理
+    auto cleanup_with_dbr = [&](const fs::path& fpath, const std::string& /*desc*/) {
+        if (fs::exists(fpath)) {
+            wal::log_wal_line("DBRM " + fpath.string() + " " + pkg_name + ":removed");
+            safe_rename(fpath, fs::path(fpath.string() + ".lpkg_db_bak_before:" + pkg_name +
+                                        ":removed"));
+        }
+    };
+
+    const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
+    if (fs::exists(dep_file)) {
+        std::ifstream f(dep_file);
+        std::string l;
+        while (std::getline(f, l)) {
+            std::stringstream ss(l);
+            std::string dn;
+            if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name);
+        }
+    }
+    // needed_so 派生的反向依赖（register_package 按提供者加边）也要清理，
+    // 否则同一进程内 get_reverse_deps(provider) 会返回已移除的包。
+    {
+        const fs::path nso_file = Config::instance().needed_so_dir() / pkg_name;
+        if (fs::exists(nso_file)) {
+            std::ifstream f(nso_file);
+            std::string soname;
+            while (std::getline(f, soname)) {
+                if (soname.empty()) continue;
+                for (const auto& prov_pkg : cache.get_providers(soname))
+                    cache.remove_reverse_dep(prov_pkg, pkg_name);
+            }
+        }
+    }
+    cleanup_with_dbr(dep_file, "dep");
+    cleanup_with_dbr(Config::instance().needed_so_dir() / pkg_name, "needed_so");
+    cleanup_with_dbr(
+        Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), "man");
+
+    fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
+    cache.remove_installed(pkg_name);
+
+    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+    // DB 落盘（先于 RM_COMMIT：提交标记前 DB 已持久化，崩溃可恢复）
+    cache.write(pkg_name + ":removed");
+
+    // WAL: RM_COMMIT + RM_END
+    wal::log_wal_line("RM_COMMIT " + pkg_name + " " + ver);
+    wal::log_wal_line("RM_END " + pkg_name + " " + ver);
+}
+
+}  // anonymous namespace
+
 /**
  * 移除已安装的包
  * 检查是否为 essential 包、是否有其他包依赖它、是否有包依赖其提供的虚拟包名
@@ -311,212 +548,11 @@ void remove_package(const std::string& pkg_name, bool force, bool /*wrap_in_txn*
 
     // WAL 2.0 批量事务：单个包移除 = 一批一包
     run_batch_transaction([&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
-        auto& cache = Cache::instance();
-
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-        detail::run_hook(pkg_name, std::string(constants::PRERM_SH));
-
-        // WAL: RM_BEGIN
-        wal::log_wal_line("RM_BEGIN " + pkg_name + " " + ver);
-
         std::vector<std::pair<fs::path, fs::path>> backups;
-        std::error_code ec;
+        do_remove_package(pkg_name, force, ver, backups);
 
-        auto owned_entries = cache.get_package_files(pkg_name);
-
-        // 共享文件检查
-        if (!force && !owned_entries.empty()) {
-            std::vector<std::pair<std::string, std::string>> shared;
-            for (const auto& entry : owned_entries) {
-                if (entry.ends_with('/')) continue;
-                auto owners = cache.get_file_owners(entry);
-                std::string others;
-                for (const auto& owner : owners) {
-                    if (owner != pkg_name) {
-                        if (!others.empty()) others += ", ";
-                        others += owner;
-                    }
-                }
-                if (!others.empty()) shared.emplace_back(entry, others);
-            }
-            if (!shared.empty()) {
-                std::string msg = get_string("error.shared_file_header") + "\n";
-                for (const auto& [file, owners] : shared)
-                    msg += "  " + string_format("error.shared_file_entry", file, owners) + "\n";
-                throw LpkgException(msg + get_string("error.removal_aborted"));
-            }
-        }
-
-        // 备份阶段
-        int file_count = 0;
-        if (!owned_entries.empty()) {
-            std::vector<fs::path> paths;
-            for (const auto& e : owned_entries) paths.emplace_back(e);
-            std::ranges::sort(paths, std::greater<>{});
-
-            for (const auto& p : paths) {
-                std::string path_str = p.string();
-                if (path_str.ends_with('/')) continue;
-                if (!force && path_str.starts_with(constants::DIR_ETC_PREFIX)) continue;
-                const fs::path phys =
-                    p.is_absolute() ? Config::instance().root_dir() / fs::path(p).relative_path()
-                                    : Config::instance().root_dir() / p;
-
-                if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-                if (fs::exists(phys) || fs::is_symlink(phys)) {
-                    fs::path bak = unique_bak_path(phys, pkg_name);
-                    wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
-                    BreakpointManager::instance().hit("rm_backup_after_wal_" + pkg_name);
-                    safe_rename(phys, bak);
-                    backups.emplace_back(phys, bak);
-                    ++file_count;
-                }
-            }
-        }
-
-        if (file_count > 0) log_info(string_format("info.files_removed", file_count));
-
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-        // 断点：移除的 BACKUP 阶段完成后、文件删除前
-        BreakpointManager::instance().hit("rm_before_file_removal_" + pkg_name);
-
-        remove_package_files(pkg_name, force);
-
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-        // 目录处理：BACKUP 目录（仅最后持有者 + 安全检查）
-        {
-            std::vector<fs::path> dir_paths;
-            for (const auto& e : owned_entries)
-                if (e.ends_with('/')) dir_paths.emplace_back(fs::path(e));
-            std::ranges::sort(dir_paths, std::greater<>{});
-
-            for (const auto& p : dir_paths) {
-                cache.remove_file_owner(p.string(), pkg_name);
-                if (!cache.get_file_owners(p.string()).empty()) continue;
-
-                const fs::path phys = p.is_absolute()
-                                          ? Config::instance().root_dir() / p.relative_path()
-                                          : Config::instance().root_dir() / p;
-                if (!fs::exists(phys) || !fs::is_directory(phys)) continue;
-
-                // 安全检查：目录中只能有本包的 .lpkg_bak 文件
-                bool can_backup = true;
-                std::error_code ec2;
-                for (const auto& entry : fs::directory_iterator(phys, ec2)) {
-                    auto fname = entry.path().filename().string();
-                    if (fname.find(std::string(constants::SUFFIX_LPKG_BAK) + pkg_name + "_") !=
-                        std::string::npos)
-                        continue;
-                    can_backup = false;
-                    break;
-                }
-                if (!can_backup) continue;
-
-                fs::path bak = unique_bak_path(phys, pkg_name);
-                wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
-                safe_rename(phys, bak);
-                backups.emplace_back(phys, bak);
-            }
-        }
-
-        // DBRM 清理
-        auto cleanup_with_dbr = [&](const fs::path& fpath, const std::string& /*desc*/) {
-            if (fs::exists(fpath)) {
-                wal::log_wal_line("DBRM " + fpath.string() + " " + pkg_name + ":removed");
-                safe_rename(fpath, fs::path(fpath.string() + ".lpkg_db_bak_before:" + pkg_name +
-                                            ":removed"));
-            }
-        };
-
-        const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
-        if (fs::exists(dep_file)) {
-            std::ifstream f(dep_file);
-            std::string l;
-            while (std::getline(f, l)) {
-                std::stringstream ss(l);
-                std::string dn;
-                if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name);
-            }
-        }
-        // needed_so 派生的反向依赖（register_package 按提供者加边）也要清理，
-        // 否则同一进程内 get_reverse_deps(provider) 会返回已移除的包。
-        {
-            const fs::path nso_file = Config::instance().needed_so_dir() / pkg_name;
-            if (fs::exists(nso_file)) {
-                std::ifstream f(nso_file);
-                std::string soname;
-                while (std::getline(f, soname)) {
-                    if (soname.empty()) continue;
-                    for (const auto& prov_pkg : cache.get_providers(soname))
-                        cache.remove_reverse_dep(prov_pkg, pkg_name);
-                }
-            }
-        }
-        cleanup_with_dbr(dep_file, "dep");
-        cleanup_with_dbr(Config::instance().needed_so_dir() / pkg_name, "needed_so");
-        cleanup_with_dbr(
-            Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), "man");
-
-        fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
-        cache.remove_installed(pkg_name);
-
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-        // DB 落盘
-        cache.write(pkg_name + ":removed");
-
-        // WAL: RM_COMMIT
-        wal::log_wal_line("RM_COMMIT " + pkg_name + " " + ver);
-
-        // ── CLEANUP 阶段（不可回滚）──
-        if (!backups.empty()) {
-            std::vector<fs::path> cleanup_paths;
-            for (const auto& [orig, bak] : backups) cleanup_paths.push_back(bak);
-
-            // 最深层优先（文件先于目录，子目录先于父目录）
-            std::ranges::sort(cleanup_paths, [](const fs::path& a, const fs::path& b) {
-                return a.string().size() > b.string().size();
-            });
-
-            auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
-            cleanup_paths.erase(last, cleanup_paths.end());
-
-            for (const auto& p : cleanup_paths) {
-                if (!fs::exists(p) && !fs::is_symlink(p)) continue;
-
-                std::error_code ec2;
-                bool ok = true;
-
-                if (fs::is_directory(p)) {
-                    // 从里到外删除目录内容
-                    std::vector<fs::path> entries;
-                    for (const auto& entry : fs::recursive_directory_iterator(p, ec2))
-                        if (!ec2) entries.push_back(entry.path());
-                    if (!ec2) {
-                        std::ranges::reverse(entries);
-                        for (const auto& e : entries) {
-                            if (!fs::remove(e, ec2)) ok = false;
-                        }
-                    }
-                    if (!fs::remove(p, ec2)) ok = false;
-                } else {
-                    if (!fs::remove(p, ec2)) ok = false;
-                }
-
-                if (ok) {
-                    wal::log_wal_line("CLEANUP " + p.string());
-                } else {
-                    log_warning(string_format("warning.cleanup_failed", p.string()));
-                }
-            }
-        }
-
-        // WAL: RM_END
-        wal::log_wal_line("RM_END " + pkg_name + " " + ver);
+        // ── CLEANUP 阶段（事务内、COMMIT_PKGS 前；write-ahead：先记日志再删）──
+        cleanup_baks(backups);
 
         success.push_back(pkg_name);
     });
@@ -928,6 +964,8 @@ void force_solve_conflict()
 
     // 必须输入确认短语——任何非交互模式都不绕过（显式破坏性操作）。
     // 非交互模式（-y/-n）直接报错而非阻塞读 stdin，避免脚本永久挂起。
+    // 脚本/容器喂短语的正确姿势：`echo 'I understand...' | lpkg force-solve-conflict`
+    // （不带 -y，stdin 即 TTY/管道，lpkg 从 stdin 读短语）。
     if (Config::instance().non_interactive_mode() != NonInteractiveMode::INTERACTIVE) {
         throw LpkgException(get_string("error.force_solve_requires_interactive"));
     }
@@ -1168,150 +1206,12 @@ void remove_package_recursive(const std::string& pkg_name, bool force)
             if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
             std::string ver = cache.get_installed_version(p);
-            detail::run_hook(p, std::string(constants::PRERM_SH));
-            wal::log_wal_line("RM_BEGIN " + p + " " + ver);
-
-            auto owned = cache.get_package_files(p);
-            std::vector<std::pair<fs::path, fs::path>> backups;
-
-            for (const auto& e : owned) {
-                if (e.ends_with('/')) continue;
-                const fs::path phys = fs::path(e).is_absolute() ? Config::instance().root_dir() /
-                                                                      fs::path(e).relative_path()
-                                                                : Config::instance().root_dir() / e;
-                if (fs::exists(phys) || fs::is_symlink(phys)) {
-                    fs::path bak = unique_bak_path(phys, p);
-                    wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
-                    BreakpointManager::instance().hit("rm_backup_after_wal_" + p);
-                    safe_rename(phys, bak);
-                    backups.emplace_back(phys, bak);
-                }
-            }
-
-            remove_package_files(p, true);
-
-            // 目录 BACKUP（仅最后持有者 + 安全检查）
-            for (const auto& e : owned) {
-                if (!e.ends_with('/')) continue;
-                cache.remove_file_owner(e, p);
-                if (!cache.get_file_owners(e).empty()) continue;
-
-                const fs::path phys = fs::path(e).is_absolute() ? Config::instance().root_dir() /
-                                                                      fs::path(e).relative_path()
-                                                                : Config::instance().root_dir() / e;
-                if (!fs::exists(phys) || !fs::is_directory(phys)) continue;
-
-                // 安全检查：目录中只能有本包的 .lpkg_bak 文件
-                bool can_backup = true;
-                std::error_code ec2;
-                for (const auto& entry : fs::directory_iterator(phys, ec2)) {
-                    auto fname = entry.path().filename().string();
-                    if (fname.find(std::string(constants::SUFFIX_LPKG_BAK) + p + "_") !=
-                        std::string::npos)
-                        continue;
-                    can_backup = false;
-                    break;
-                }
-                if (!can_backup) continue;
-
-                fs::path bak = unique_bak_path(phys, p);
-                wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
-                safe_rename(phys, bak);
-                backups.emplace_back(phys, bak);
-            }
-
-            // DBRM 清理（与单包 remove_package 相同）
-            {
-                auto cleanup_dbr = [&](const fs::path& fp, const std::string&) {
-                    if (fs::exists(fp)) {
-                        wal::log_wal_line("DBRM " + fp.string() + " " + p + ":removed");
-                        safe_rename(
-                            fp, fs::path(fp.string() + ".lpkg_db_bak_before:" + p + ":removed"));
-                    }
-                };
-                const fs::path df = Config::instance().dep_dir() / p;
-                if (fs::exists(df)) {
-                    std::ifstream fi(df);
-                    std::string l;
-                    while (std::getline(fi, l)) {
-                        std::stringstream ss(l);
-                        std::string dn;
-                        if (ss >> dn) cache.remove_reverse_dep(dn, p);
-                    }
-                }
-                // needed_so 派生的反向依赖也要清理（同 remove_package）
-                {
-                    const fs::path nsf = Config::instance().needed_so_dir() / p;
-                    if (fs::exists(nsf)) {
-                        std::ifstream fi(nsf);
-                        std::string soname;
-                        while (std::getline(fi, soname)) {
-                            if (soname.empty()) continue;
-                            for (const auto& prov_pkg : cache.get_providers(soname))
-                                cache.remove_reverse_dep(prov_pkg, p);
-                        }
-                    }
-                }
-                cleanup_dbr(df, "dep");
-                cleanup_dbr(Config::instance().needed_so_dir() / p, "needed_so");
-                cleanup_dbr(
-                    Config::instance().docs_dir() / (p + std::string(constants::SUFFIX_MAN)),
-                    "man");
-                std::error_code ec;
-                fs::remove_all(Config::instance().hooks_dir() / p, ec);
-            }
-
-            wal::log_wal_line("RM_COMMIT " + p + " " + ver);
-            cache.remove_installed(p);
-
-            for (const auto& b : backups) all_backups.emplace_back(b);
-
-            wal::log_wal_line("RM_END " + p + " " + ver);
-            cache.write(p + ":removed");
+            do_remove_package(p, true, ver, all_backups);
             success.push_back(p);
         }
 
-        // ── CLEANUP 阶段（不可回滚）：所有包已提交，清理 .lpkg_bak ──
-        if (!all_backups.empty()) {
-            std::vector<fs::path> cleanup_paths;
-            for (const auto& [orig, bak] : all_backups) cleanup_paths.push_back(bak);
-
-            // 最深层优先
-            std::ranges::sort(cleanup_paths, [](const fs::path& a, const fs::path& b) {
-                return a.string().size() > b.string().size();
-            });
-
-            auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
-            cleanup_paths.erase(last, cleanup_paths.end());
-
-            for (const auto& p : cleanup_paths) {
-                if (!fs::exists(p) && !fs::is_symlink(p)) continue;
-
-                std::error_code ec;
-                bool ok = true;
-
-                if (fs::is_directory(p)) {
-                    std::vector<fs::path> entries;
-                    for (const auto& entry : fs::recursive_directory_iterator(p, ec))
-                        if (!ec) entries.push_back(entry.path());
-                    if (!ec) {
-                        std::ranges::reverse(entries);
-                        for (const auto& e : entries) {
-                            if (!fs::remove(e, ec)) ok = false;
-                        }
-                    }
-                    if (!fs::remove(p, ec)) ok = false;
-                } else {
-                    if (!fs::remove(p, ec)) ok = false;
-                }
-
-                if (ok) {
-                    wal::log_wal_line("CLEANUP " + p.string());
-                } else {
-                    log_warning(string_format("warning.cleanup_failed", p.string()));
-                }
-            }
-        }
+        // ── CLEANUP 阶段（事务内、COMMIT_PKGS 前；write-ahead：先记日志再删）──
+        cleanup_baks(all_backups);
     });
 
     trim_completed();

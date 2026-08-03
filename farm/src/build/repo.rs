@@ -29,14 +29,21 @@ pub(crate) fn needs_build(pkgs_dir: &Path, pkg: &str, old: &Index) -> bool {
 
 /// 元数据漂移检测 + repack（gen_deps 语义，§6）：解包 .lpkg，扫描实际 vs 包内 metadata.json 的
 /// needed_so/provides，**不一致才**改 metadata.json 并重打包（不 rebuild）。deps 不读不改。
-/// 判定统一走 `verify::decide`（与 ARCH §6 三分支一致）。返回是否发生了 repack。
-pub(crate) fn repack_if_drift(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &str) -> bool {
-    let Some(lpkg) = &outcome.lpkg_path else { return false };
+/// 判定统一走 `verify::decide`（与 ARCH §6 三分支一致）。
+///
+/// 返回 `Ok(true)`=已 repack，`Ok(false)`=无漂移，`Err`=repack 失败。
+/// **repack 失败绝不静默降级为"无漂移"**——否则 .lpkg 内 metadata.json（旧值）与
+/// index.txt（实际扫描值）永久失配，且每次构建重演同一失败（数据腐坏）。上层应 BLOCK。
+pub(crate) fn repack_if_drift(
+    outcome: &BuildOutcome,
+    opts: &BuildOptions,
+    pkg: &str,
+) -> Result<bool, String> {
+    let Some(lpkg) = &outcome.lpkg_path else { return Ok(false) };
     let extract = opts.out_dir.join("extract").join(pkg);
     // 期望值 = .lpkg 内 metadata.json（由 lpkg build 从 LankeBUILD.json 写入）
-    let Ok(meta) = crate::scan::read_metadata_json(&extract.join("metadata.json")) else {
-        return false;
-    };
+    let meta = crate::scan::read_metadata_json(&extract.join("metadata.json"))
+        .map_err(|e| format!("读 {} 的 metadata.json 失败: {e}", extract.join("metadata.json").display()))?;
     let meta_needed: Vec<String> = meta["needed_so"]
         .as_array()
         .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
@@ -56,15 +63,12 @@ pub(crate) fn repack_if_drift(outcome: &BuildOutcome, opts: &BuildOptions, pkg: 
         deps: Vec::new(),
     };
     if crate::verify::decide(&actual, &expected) == crate::verify::VerifyAction::Unchanged {
-        return false; // 无漂移
+        return Ok(false); // 无漂移
     }
     // 漂移 → repack（改 metadata.json + 重打包，复用 scan 的解包目录）
     match repack::repack_with_metadata(lpkg, &extract, &outcome.needed_so, &outcome.provides) {
-        Ok(()) => true,
-        Err(e) => {
-            eprintln!("{}", tr!("build.repack_fail", pkg, e));
-            false
-        }
+        Ok(()) => Ok(true),
+        Err(e) => Err(format!("repack {} 失败: {e}", pkg)),
     }
 }
 
@@ -82,13 +86,17 @@ pub(crate) fn place_in_repo(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &s
     fs::create_dir_all(&repo_pkg_dir).map_err(|e| format!("创建 {repo_pkg_dir:?} 失败: {e}"))?;
     let dest = repo_pkg_dir.join(format!("{version}.lpkg"));
     fs::rename(lpkg, &dest).map_err(|e| format!("移动 {lpkg:?} → {dest:?} 失败: {e}"))?;
-    // 取代旧版本：先备份旧包中「新版不再提供」的 SONAME .so，再清旧版本
+    // 取代旧版本：先备份旧包中「新版不再提供」的 SONAME .so，再清旧版本。
+    // **备份失败必须保留旧版本并报错**（曾静默吞掉：备份失败仍删旧版 → 过渡期
+    // 旧二进制失去旧 .so 永久断链，不可恢复）。
     if let Ok(rd) = fs::read_dir(&repo_pkg_dir) {
         for e in rd.flatten() {
             let p = e.path();
             if p.extension().and_then(|x| x.to_str()) == Some("lpkg") && p != dest {
-                let _ = backup_removed_sonames(&opts.out_dir, &p, pkg, &outcome.provides);
-                let _ = fs::remove_file(&p);
+                backup_removed_sonames(&opts.out_dir, &p, pkg, &outcome.provides).map_err(|e| {
+                    format!("备份 {} 的旧 SONAME 失败（{e}），保留旧版本不删除", p.display())
+                })?;
+                fs::remove_file(&p).map_err(|e| format!("删除旧版本 {:?} 失败: {e}", p))?;
             }
         }
     }
@@ -487,6 +495,41 @@ mod tests {
         assert_eq!(soname_of("libfoo.1"), None, "第二段须是 so");
         assert_eq!(soname_of("README.txt"), None);
         assert_eq!(soname_of(""), None);
+    }
+
+    #[test]
+    fn repack_if_drift_errors_when_metadata_missing() {
+        // 曾静默返回 false（当作"无漂移"）→ 照发陈旧 metadata，.lpkg 与 index 永久失配。
+        // 现在 metadata.json 不可读必须 Err（上层 BLOCK，不得静默发布）。
+        let out = std::env::temp_dir().join(format!("farm-repack-meta-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&out);
+        fs::create_dir_all(out.join("extract").join("p")).unwrap();
+        fs::create_dir_all(out.join(".staging").join("p")).unwrap();
+        let lpkg = out.join(".staging").join("p").join("p-1.0.lpkg");
+        fs::write(&lpkg, b"not-a-real-lpkg").unwrap();
+
+        let opts = BuildOptions {
+            pkgs_dir: out.join("pkgs"),
+            out_dir: out.clone(),
+            targets: vec!["p".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 1,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+        };
+        let outcome = BuildOutcome {
+            ok: true,
+            needed_so: vec![],
+            provides: vec!["liba.so.1".into()],
+            deps: vec![],
+            failure_stage: None,
+            lpkg_path: Some(lpkg),
+        };
+
+        let res = repack_if_drift(&outcome, &opts, "p");
+        assert!(res.is_err(), "metadata.json 缺失必须报错而非静默当无漂移");
+        fs::remove_dir_all(&out).ok();
     }
 }
 

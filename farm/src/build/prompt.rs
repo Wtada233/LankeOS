@@ -44,6 +44,9 @@ pub(crate) fn prompt_blocked(pkg: &str, opts: &BuildOptions, stage: &str) -> Pro
         eprintln!("{}", tr!("build.prompt"));
         let mut input = String::new();
         match std::io::stdin().read_line(&mut input) {
+            // EOF（SSH 断开/后台化）返回 Ok(0)——空串会落入 `_` 分支死循环空转，
+            // 必须视为"结束构建"而非"无效输入重试"。
+            Ok(0) => return PromptChoice::End,
             Ok(_) => match input.trim() {
                 "1" => {
                     open_shell(pkg, opts);

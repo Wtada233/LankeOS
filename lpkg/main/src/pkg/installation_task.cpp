@@ -245,70 +245,28 @@ void InstallationTask::backup_existing_files()
 }
 
 /**
- * 清理备份文件。
- * 在批次模式下（有 WAL 上下文时），此方法为空操作——
- * 所有 .lpkg_bak 延迟到 COMMIT_PKGS 后统一清理。
- * 在非批次模式（旧版调用路径）中，立即清理备份以保持向后兼容。
- */
-void InstallationTask::cleanup_backups()
-{
-    for (const auto& [orig, bak] : backups_) {
-        std::error_code ec;
-        fs::remove(bak, ec);
-    }
-    backups_.clear();
-    new_files_.clear();
-    new_dirs_.clear();
-}
-
-/**
- * 包级文件回滚（WAL 2.0）。
+ * 包级回滚标记（WAL 2.0）。
  *
- * 在 copy_package_files() 的 catch 中触发。
- * 每步逆向操作后写入 RESTORE_* / REMOVE_* 审计 WAL 行，
- * 确保回滚过程中断电能通过 rec 的幂等续传完成。
+ * **这里不做任何文件系统撤销**——所有正向操作的逆序执行统一由
+ * `batch_rollback` → `reverse_execute` 完成（所有 install/upgrade 都经
+ * `run_batch_transaction`，包级失败必然触发批次回滚，撤销紧接着发生）。
+ *
+ * 曾在此处先恢复文件再写 RESTORE 审计，与 `reverse_execute` 形成**双重回滚**：
+ * rollback_files 从 .lpkg_bak 恢复的旧文件，被 reverse_execute 的 COPY 逆操作
+ * （无条件删除 dst）再次删除 → 升级中途失败的包丢失旧文件（数据破坏）。
+ * 撤销职责收拢到 reverse_execute 单一路径后，该问题消失，且"rollback_files 删除
+ * 新文件失败"的残留也能由 reverse_execute 兜底重试。
+ *
+ * 本函数只清理内存追踪并写 ROLLBACK/END 标记（失败包的包级回滚记录；
+ * 成功包的 ROLLBACK 由 batch_rollback 统一写）。
  */
 void InstallationTask::rollback_files()
 {
-    // 1. 恢复备份文件
-    for (const auto& [orig, bak] : backups_) {
-        if (fs::exists(bak)) {
-            safe_rename(bak, orig);
-            wal::log_wal_line("RESTORE_FILE " + bak.string() + " \xe2\x86\x92 " + orig.string());
-        }
-    }
-
-    // 2. 删除新文件
-    for (const auto& f : new_files_) {
-        if (fs::exists(f) || fs::is_symlink(f)) {
-            std::error_code ec;
-            fs::remove(f, ec);
-            if (!ec) {
-                // 逆操作: 删除安装时新建的文件（无备份可恢复）
-                wal::log_wal_line("RESTORE_FILE_RM " + f.string());
-            }
-        }
-    }
-
-    // 3. 删除新目录（仅当为空）
-    for (const auto& d : new_dirs_) {
-        if (fs::exists(d) && fs::is_directory(d)) {
-            std::error_code ec;
-            if (fs::is_empty(d, ec)) {
-                fs::remove(d, ec);
-                if (!ec) {
-                    // 逆操作: 删除安装时新建的空目录（无备份可恢复）
-                    wal::log_wal_line("RESTORE_DIR_RM " + d.string());
-                }
-            }
-        }
-    }
-
-    // 4. WAL: ROLLBACK + END
+    // WAL: ROLLBACK + END
     wal::log_wal_line("ROLLBACK " + pkg_name_ + " " + actual_version_);
     wal::log_wal_line("END " + pkg_name_ + " " + actual_version_);
 
-    // 5. 清空内部追踪
+    // 清空内部追踪（撤销由 reverse_execute 依据 WAL 完成）
     backups_.clear();
     new_files_.clear();
     new_dirs_.clear();
@@ -705,6 +663,11 @@ void InstallationTask::copy_package_files()
                 has_config_conflicts_ = true;
                 fs::copy(src_path, final_dest,
                          fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+                // config 冲突文件虽不进 WAL（"请审阅"文件），仍按纪律 fsync，避免断电丢内容
+                if (int cfd = ::open(final_dest.c_str(), O_RDONLY); cfd >= 0) {
+                    ::fsync(cfd);
+                    ::close(cfd);
+                }
             } else {
                 fs::path tmp_path = final_dest;
                 tmp_path += ".lpkgtmp";

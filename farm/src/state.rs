@@ -1,9 +1,12 @@
 //! state.rs — SQLite 持久状态（§11）。
 //!
 //! 心智模型：**容器易失，repo 持久，SQLite 记账**。
-//! - job 队列 / 构建历史 / 配方 hash：跨运行持久；
-//! - BLOCKED 续跑（§8.5）：`farm build --all` 按配方 hash 对比自动 requeue 被改过的包，
-//!   免 headless 手动 retry，且不会在 operator 编辑中途误触发。
+//! - job 队列 / 构建历史 / 配方 hash：跨运行持久，供 operator 用 `--state` 查看与排查；
+//! - ⚠️ 当前只有写端（`set_job`/`record_build`），`job_recipe_hash`/`list_by_status` 等读端
+//!   尚无调用方：**"配方 hash 变化自动 requeue"尚未实现**。BLOCKED 包的续跑目前靠 operator
+//!   手动 `farm build <pkg>` 重跑。若将来实现差分 requeue，读端已就绪。
+//!   注意失败路径（source 缺失 / repack / repo / index 失败）也会 `set_job(Blocked)` 落库，
+//!   避免 job 永久停在 Building。
 
 use std::path::Path;
 

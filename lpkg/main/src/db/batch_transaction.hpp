@@ -71,9 +71,17 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
     } catch (const std::exception&) {
         // LpkgException 是 std::runtime_error 的子类，一并覆盖。
         // 批次回滚 → 回滚完成（COMMIT_PKGS 已写）→ 清理 DB 备份 → 重抛原异常。
-        wal::batch_rollback(successfully_installed);
-        cleanup_db_backups();
-        trim_completed();
+        try {
+            wal::batch_rollback(successfully_installed);
+            cleanup_db_backups();
+            trim_completed();
+        } catch (...) {
+            // **回滚自身失败**（如 reverse_execute 的 safe_rename 中途报错）：
+            // 绝不清理 DB 备份、不 trim——保留 WAL 的未提交批次与全部
+            // .lpkg_db_bak_before:* / .lpkg_bak，交给下次 recover_packages 幂等续传。
+            // 曾无条件执行 cleanup_db_backups()：reverse_execute 尚未消费的
+            // DB 备份被删 → 恢复时 DB 无法还原，磁盘文件与 DB 永久不一致。
+        }
         throw;
     }
 }

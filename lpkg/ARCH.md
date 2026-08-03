@@ -44,7 +44,7 @@
 ### 1.3 备份清理纪律
 
 - **I-BAK-1**: `.lpkg_bak` 文件在 `COMMIT_PKGS` 之前绝不删除。即使批次中一个包已成功安装，其 `.lpkg_bak` 也必须保留到批次提交后。
-- **I-BAK-2**: 安装流程的 `cleanup_backups()` 在批次模式下为空操作。实际清理由 `COMMIT_PKGS` 后的统一清理阶段执行。
+- **I-BAK-2**: 安装流程的 `.lpkg_bak` 清理统一在 `COMMIT_PKGS` 之后执行（调用方收集 `task.get_backups()` 后 `fs::remove`）。批次内绝不提前清理，确保批量回滚时可恢复每个已安装包的文件。
 - **I-BAK-3**: 移除流程的 `.lpkg_bak` 清理在 `RM_COMMIT` 后的 `CLEANUP` 阶段执行（事务内，`COMMIT_PKGS` 前）。`RM_COMMIT` 前 `.lpkg_bak` 文件/目录不变。
 
 ### 1.4 WAL 语义
@@ -500,7 +500,7 @@ std::vector<std::string> run_batch_transaction(size_t total, OpT&& op);
 
 | 触发条件 | 回滚范围 | 路径 |
 |---------|---------|------|
-| 安装包中途失败 | 当前包 | `InstallationTask::run()` 的 catch → 包级文件回滚 |
+| 安装包中途失败 | 整个批次 | `InstallationTask::run()` 的 catch → 写 ROLLBACK/END 标记 → `batch_rollback()`（单撤销路径，§6.3） |
 | 整批中后续包失败 | 前序已成功包 | `run_batch_transaction` 的 catch → `batch_rollback()` |
 | Ctrl+C | 整个批次 | 检查点抛异常 → 同异常路径 |
 | 致命错误 | 整个批次 | 同异常路径 |
@@ -599,8 +599,7 @@ InstallationTask::run(ctx)
 │   └── run_post_install_hook()
 │
 ├── WAL: COMMIT <pkg> <ver>             ← fsync
-├── cleanup_backups()
-│   (不移除 .bak！所有 .lpkg_bak 延迟到 COMMIT_PKGS 后统一清理，
+│   (注意：不移除 .bak！所有 .lpkg_bak 延迟到 COMMIT_PKGS 后统一清理，
 │   确保批量回滚时可恢复每个已安装包的文件)
 ├── WAL: END <pkg> <ver>               ← fsync
 │
@@ -609,26 +608,25 @@ InstallationTask::run(ctx)
 
 ### 6.3 包级回滚（InstallationTask::rollback）
 
-包级回滚在 `copy_package_files()` 的 catch 中触发，只做文件恢复：
+**只写回滚标记，不做任何文件系统撤销**（单撤销路径，见下方说明）：
 
 ```
 rollback()
 │
-├── for each 已备份文件 (backups_):
-│   ├── rename .lpkg_bak → 原位置
-│   ├── fsync 原位置父目录
-│   ├── WAL: RESTORE_FILE <bak> → <orig>  ← fsync
-│
-├── for each 新文件 (new_files_):
-│   ├── fs::remove(新文件)
-│   ├── WAL: REMOVE_FILE <path>          ← fsync
-│
-├── for each 新目录 (new_dirs_):
-│   ├── 仅当空时 fs::remove
-│   ├── WAL: REMOVE_DIR <path>           ← fsync
+├── WAL: ROLLBACK <pkg> <ver>          ← fsync（失败包的包级回滚标记，仅信息性）
+├── WAL: END <pkg> <ver>               ← fsync
 │
 └── backups_.clear(); new_files_.clear(); new_dirs_.clear();
 ```
+
+> **单撤销路径（2026-08-03 重构）**：所有正向操作的逆序执行统一由
+> `batch_rollback` → `reverse_execute` 完成（所有 install/upgrade 都经
+> `run_batch_transaction`，包级失败必然触发批次回滚）。rollback_files 曾在此处
+> 恢复 `.lpkg_bak` 并写 RESTORE_* 审计，与 reverse_execute 形成**双重回滚**——
+> rollback_files 恢复的旧文件被 reverse_execute 的 COPY 逆操作（无条件删除 dst）
+> 再次删除，升级中途失败的包丢失旧文件。撤销职责收拢后该问题消失，且
+> "rollback_files 删新文件失败"的残留也能由 reverse_execute 兜底重试。
+> 失败包的 ROLLBACK 标记由 rollback_files 写；成功包的由 batch_rollback 统一写。
 
 ---
 
@@ -1025,11 +1023,11 @@ trim 不关心具体行内容，只跟踪 BATCH 边界。RESTORE_* 等行在已�
 
 - **2.1 `run_batch_transaction`** — 模板定义于 `batch_transaction.hpp`。正向：`BEGIN_PKGS` → `Cache::write(":batch-start")` → 逐包执行 → `COMMIT_PKGS`。异常路径：catch → `batch_rollback` → rethrow。
 - **2.2 `install_packages`** — 重构于 `package_manager.cpp`。一致性重试循环在 batch 外部，实际安装封装在 `run_batch_transaction` 中。每包后 `Cache::write(pkg + ":installed")`。安装完成后收集 `.lpkg_bak` 路径并统一清理。
-- **2.3 `InstallationTask`** — 重构于 `installation_task.cpp`。`run()` 写入 WAL `BEGIN`/`COMMIT`/`END` 标记。`backup_existing_files()` 写入 `BACKUP`/`NEW`/`NEW_DIR`（write-ahead）。`copy_package_files()` 写入 `COPY`。`rollback_files()` 执行文件级回滚 + RESTORE_* 审计。`.lpkg_bak` 延迟到批次提交后清理。
+- **2.3 `InstallationTask`** — 重构于 `installation_task.cpp`。`run()` 写入 WAL `BEGIN`/`COMMIT`/`END` 标记。`backup_existing_files()` 写入 `BACKUP`/`NEW`/`NEW_DIR`（write-ahead）。`copy_package_files()` 写入 `COPY`。`rollback_files()` 只写 `ROLLBACK`/`END` 标记（**单撤销路径**，文件撤销统一由 `batch_rollback` → `reverse_execute` 完成，见 §6.3）。`.lpkg_bak` 延迟到批次提交后清理。
 
 ### 第 3 阶段：移除事务
 
-- **3.1 `remove_package`** — 重构于 `package_manager.cpp`。单包移除封装在 `run_batch_transaction(1, ...)` 中。流程：`RM_BEGIN` → `BACKUP`（文件+目录，随机后缀）→ `DBRM`（deps/needed_so/man）→ `RM_COMMIT` → `CLEANUP` 阶段（最深优先删除所有 .lpkg_bak，写 CLEANUP WAL）→ `RM_END`。
+- **3.1 `remove_package`** — 重构于 `package_manager.cpp`。单包移除封装在 `run_batch_transaction` 中。与递归移除共用 `do_remove_package`/`cleanup_baks`（去重）。流程：`RM_BEGIN` → `BACKUP`（文件+目录，随机后缀）→ `DBRM`（deps/needed_so/man）→ `RM_COMMIT` → `RM_END` → `CLEANUP` 阶段（`cleanup_baks`，**write-ahead：先写 CLEANUP WAL 再删**，最深优先）。
 - **3.2 `remove_package_recursive`** — 重构于 `package_manager.cpp`。所有受影响包在同一个 `run_batch_transaction` 中移除，任一失败则整批回滚。
 
 ### 第 4 阶段：升级事务
@@ -1048,8 +1046,10 @@ trim 不关心具体行内容，只跟踪 BATCH 边界。RESTORE_* 等行在已�
 - **6.2 幂等性** — `test_wal_core.cpp`（63 tests）。覆盖所有操作类型的 `reverse_execute` 幂等性（NULL→跳过、重复→跳过）。
 - **6.3 里程碑链式恢复** — `test_wal_core.cpp` + `test_breakpoints.cpp`。验证 DB 备份链 `batch-start ← A:installed ← B:installed` 的正确逆序恢复。
 - **6.4 二次回滚幂等** — `test_breakpoints.cpp`。验证 rollback 各阶段中断后 `recover_packages` 能正确继续。
-- **6.5 集成测试** — 多个测试文件覆盖：批量安装/移除/升级、依赖链、provides 解析、版本约束、config 保护、SIGINT 保护、并发锁、autoremove、recursive remove。总计 444 tests。
+- **6.5 集成测试** — 多个测试文件覆盖：批量安装/移除/升级、依赖链、provides 解析、版本约束、config 保护、SIGINT 保护、并发锁、autoremove、recursive remove。
 - **6.6 CLEANUP 阶段测试** — `test_cleanup.cpp`（22 tests）。覆盖 CLEANUP 解析与不可逆性、目录 BACKUP 恢复、随机后缀唯一性、rec CLEANUP 续传、安全检查、现有行为回归。
+- **6.7 双重回滚回归（2026-08-03）** — `test_active_rollback.cpp`。升级中途 COPY 失败 / COMMIT 后失败 → 旧文件必须保留（曾双重回滚删旧文件）；CLEANUP write-ahead 崩溃窗口 → 整批可恢复。
+- **6.8 全量** — 当前 **492 tests 全绿**（docker 容器 `make test`），覆盖上述全部章节。
 
 ---
 

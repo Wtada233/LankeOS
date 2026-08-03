@@ -109,7 +109,6 @@ private:
     void ensure_dependencies_satisfied(InstallContext& ctx);
     void check_for_file_conflicts(InstallContext* ctx = nullptr);
     void backup_existing_files();
-    void cleanup_backups();
     void commit_without_file_ops();
     void register_package();
     void run_post_install_hook();

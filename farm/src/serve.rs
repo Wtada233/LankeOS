@@ -13,12 +13,33 @@ use std::thread;
 /// 启动静态文件服务器（阻塞直到被关停）。
 /// `bind`：独立 `farm serve` 用 `0.0.0.0`（局域网可访问）；build 内嵌用 `127.0.0.1`（容器经 host 网络访问）。
 pub fn serve(bind: &str, root: &Path, port: u16) -> Result<(), String> {
+    serve_inner::<fn(u16) -> Result<(), String>>(bind, root, port, None)
+}
+
+/// 同 `serve`，但 **bind 成功后、进入服务循环前** 回调 `on_bound`（传实际绑定端口）。
+/// 供 `farm build` 内嵌服务器确定性等待"就绪"或暴露"绑定失败"——否则默认端口 80
+/// 在非 root 下静默失败，容器内 `lpkg upgrade` 拉不到依赖且无任何提示。
+pub fn serve_ready<F>(bind: &str, root: &Path, port: u16, on_bound: F) -> Result<(), String>
+where
+    F: FnOnce(u16) -> Result<(), String>,
+{
+    serve_inner(bind, root, port, Some(on_bound))
+}
+
+fn serve_inner<F>(bind: &str, root: &Path, port: u16, on_bound: Option<F>) -> Result<(), String>
+where
+    F: FnOnce(u16) -> Result<(), String>,
+{
     let root_abs = root
         .canonicalize()
         .map_err(|e| format!("root {root:?} 不可访问: {e}"))?;
     let listener = TcpListener::bind((bind, port))
         .map_err(|e| format!("绑定 {bind}:{port} 失败: {e}"))?;
-    println!("[serve] 本地 repo 服务器 http://{bind}:{port}（root={root_abs:?}）");
+    let actual = listener.local_addr().map(|a| a.port()).unwrap_or(port);
+    println!("[serve] 本地 repo 服务器 http://{bind}:{actual}（root={root_abs:?}）");
+    if let Some(cb) = on_bound {
+        cb(actual)?;
+    }
     for stream in listener.incoming() {
         let Ok(s) = stream else { continue };
         let root = root_abs.clone();

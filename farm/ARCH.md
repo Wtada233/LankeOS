@@ -46,7 +46,7 @@ src/
   repack.rs        metadata.json 漂移修正 + 重打
   seed.rs          冷启动播种
   serve.rs         静态 HTTP 服务器
-  state.rs         SQLite 状态库（job 状态/续跑）
+  state.rs         SQLite 状态库（job 状态记录；自动 requeue 未实现，见 §11 附注）
   track/           tracker 模板（github/gitlab/sourceforge/gnome/gcs/html-index/script）
   net.rs           HTTP 下载
   lpkg_binding.rs  唯一碰 lpkg 的接缝（docker 编排 + ABI 过渡备份注入）
@@ -121,7 +121,7 @@ packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` g
    ```
    cd /work/<pkg> && \
    lpkg install lpkg -y && \
-   ( lpkg upgrade -y --missing-so-no-error || { echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y --missing-so-no-error && lpkg upgrade -y --missing-so-no-error; } ) || exit 1 ; \
+   ( lpkg upgrade -y --missing-so-no-error || { echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; } ) || exit 1 ; \
    [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig ; \
    lpkg build -y --use-system-soname
    ```
@@ -131,7 +131,8 @@ packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` g
    - **dev symlink（`xxx.so`）指向新 so → 新构建完美链接新 so；旧二进制链旧 SONAME 在过渡期加载备份的旧 so**——新旧两条 ABI 并行存活到全部重建完
 6. `docker cp` 产物回宿主 staging
 
-`ContainerGuard` RAII：所有失败路径自动 `docker rm -f`（命名容器 `lankefarm-build`，启动前清残留）。
+`ContainerGuard` RAII：所有失败路径自动 `docker rm -f`。容器名唯一（`lankefarm-build-<pid>-<pkg>`，
+> 并发 build 进程互不踩踏）；启动前只清理"创建者 PID 已死"的孤儿容器（SIGKILL/断电，RAII 未执行时）。
 
 ## 6. 验证三分支（verify.rs）
 
@@ -198,7 +199,10 @@ SQLite（`out/farm-state.db`，可选 `--state`）：
 - `jobs` 表：每包状态（`Building`/`Done`/`Blocked`/`Skipped`）+ 失败阶段 + 配方 hash
 - `build_history`：版本 + 成功/失败
 
-支持续跑/差分（配方 hash 变化 → 重新入队）。
+> ⚠️ 现状：**只有写端**（`set_job`/`record_build`），`job_recipe_hash`/`list_by_status` 等读端
+> 尚无调用方。**"配方 hash 变化自动 requeue"尚未实现**——BLOCKED 包需 operator 手动
+> `farm build <pkg>` 重跑。失败路径（source 缺失 / repack / repo / index 失败）也会
+> `set_job(Blocked)` 落库，job 不会永久停在 `Building`。若将来实现差分 requeue，读端已就绪。
 
 ## 12. serve（本地 repo HTTP）
 
@@ -232,4 +236,4 @@ build --all ──> run_build
 - **src 内单元测试**（`#[cfg(test)]`）：内部函数（topo/reorder/scan/i18n/ux/repack/seed/repo）
 - **tests/integration.rs**：公共 API 集成（ABI 传播、track 排序、real index）
 
-**117 个测试全绿**（102 lib + 9 + 6）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）。
+**137 个测试全绿**（121 lib + 9 bin + 7 integration）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**。

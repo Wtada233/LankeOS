@@ -120,7 +120,8 @@ fn source_gate(pkg: &str, opts: &BuildOptions, is_victim: bool) -> Result<(), St
 
 /// 进程内交互接管（§8.5）：BLOCKED 时提示 operator 选择，不退出进程。
 /// 主调度：返回构建报告（built/repacked/abi_broken/blocked）。
-/// `state` 非空时记录 job 状态 + 配方 hash（§11 持久化，供续跑/差分）。
+/// `state` 非空时记录 job 状态 + 配方 hash（§11 持久化；读端/差分 requeue 尚未实现，
+/// 仅作 operator 排查用）。失败路径（source 缺失 / repack / repo / index）也落 Blocked 库。
 pub fn run_build(
     opts: &BuildOptions,
     binding: &mut dyn LpkgBinding,
@@ -259,7 +260,18 @@ pub fn run_build(
 
         // 元数据漂移检测 + repack（打包完成 → SONAME 检测 → 与 .lpkg 内 metadata.json 比对 → 漂移才 repack）。
         // 只比 needed_so/provides；deps 由 gen_deps/deprules 生成，不读不改。
-        let drifted = repack_if_drift(&outcome, opts, &pkg);
+        // **repack 失败 → BLOCK**（曾静默降级为"无漂移"照发陈旧 metadata，.lpkg 与 index 永久失配）。
+        let drifted = match repack_if_drift(&outcome, opts, &pkg) {
+            Ok(d) => d,
+            Err(e) => {
+                eprintln!("{}", tr!("build.repack_fail", pkg, e));
+                report.blocked.push(pkg.clone());
+                if let Some(st) = state {
+                    let _ = st.set_job(&pkg, JobStatus::Blocked, Some("repack"), rhash.as_deref());
+                }
+                continue;
+            }
+        };
         if drifted {
             update_lankebuild_metadata(&opts.pkgs_dir, &pkg, &outcome);
             report.repacked.push(pkg.clone());
@@ -276,6 +288,9 @@ pub fn run_build(
             Err(e) => {
                 eprintln!("{}", tr!("build.repo_fail", pkg, e));
                 report.blocked.push(pkg.clone());
+                if let Some(st) = state {
+                    let _ = st.set_job(&pkg, JobStatus::Blocked, Some("repo"), rhash.as_deref());
+                }
                 continue;
             }
         };
@@ -288,6 +303,9 @@ pub fn run_build(
                                           &outcome.provides, &outcome.needed_so) {
             eprintln!("{}", tr!("build.index_fail", pkg, e));
             report.blocked.push(pkg.clone());
+            if let Some(st) = state {
+                let _ = st.set_job(&pkg, JobStatus::Blocked, Some("index"), rhash.as_deref());
+            }
             continue;
         }
         report.built.push(pkg.clone());

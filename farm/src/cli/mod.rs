@@ -124,7 +124,7 @@ enum Command {
         /// 产物/解包/发布目录
         #[arg(long, default_value = "out")]
         out: PathBuf,
-        /// SQLite 状态库（job 状态/续跑）
+        /// SQLite 状态库（job 状态记录，供 operator 排查；自动 requeue 未实现）
         #[arg(long)]
         state: Option<PathBuf>,
         /// 架构（发布到 out/<arch>/<pkg>/）
@@ -526,6 +526,8 @@ struct TrackSched {
     queue: VecDeque<String>,
     /// 每个包剩余未解析的前置数（=0 才可出队）
     indeg: HashMap<String, usize>,
+    /// 环兜底被"强制就绪"的包：不再递减其 indeg（保持真实计数，避免 0 下溢）
+    forced: HashSet<String>,
     /// 尚未完成探测的包数（=0 即全部结束）
     remaining: usize,
     /// 本轮已解析出的新版本（供 same-version / major-of 读取）
@@ -541,6 +543,7 @@ fn track_worker(
     configs: &HashMap<String, TrackerConfig>,
     versions: &HashMap<String, String>,
     dependents: &HashMap<String, Vec<String>>,
+    pkg_to_dir: &HashMap<String, String>,
     pkgs_dir: &Path,
     fetcher: &RealFetcher,
     proposals: &AtomicUsize,
@@ -561,11 +564,14 @@ fn track_worker(
         };
         let cfg = &configs[&name];
         let current = &versions[&name];
+        // pkg-name → 目录：same-version/major-of/after 引用的都是 pkg-name，目录名可能不同
+        let dir_of =
+            |pkg: &str| pkg_to_dir.get(pkg).cloned().unwrap_or_else(|| pkg.to_string());
         let lookup = |pkg: &str| {
             if let Some(v) = sched.0.lock().unwrap().resolved.get(pkg) {
                 return Some(v.clone());
             }
-            load_build_json(&pkgs_dir.join(pkg)).ok().map(|b| b.version)
+            load_build_json(&pkgs_dir.join(dir_of(pkg))).ok().map(|b| b.version)
         };
         let result = cfg.propose_with(fetcher, &lookup, current);
 
@@ -602,6 +608,11 @@ fn track_worker(
         }
         if let Some(deps) = dependents.get(&name) {
             for d in deps {
+                // 环内被强制的包：保持其 indeg 真实计数不变（否则 0-1 下溢），
+                // 且它们已在初始就绪集里，无需再次入队。
+                if guard.forced.contains(d.as_str()) {
+                    continue;
+                }
                 let e = guard.indeg.get_mut(d).unwrap();
                 *e -= 1;
                 if *e == 0 {
@@ -616,7 +627,8 @@ fn track_worker(
         // 批量应用（--all --run）：释放锁后再写 LankeBUILD.json，避免持锁做 I/O/网络探测
         if apply {
             if let Some(p) = pending_apply {
-                apply_proposal(&p.pkg_name, pkgs_dir, cfg, &p, fetcher, &lookup);
+                // 写回目标目录 = pkg-name 对应的目录（目录名可能与 pkg-name 不同）
+                apply_proposal(&dir_of(&p.pkg_name), pkgs_dir, cfg, &p, fetcher, &lookup);
             }
         }
     }
@@ -650,10 +662,16 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
         }
     };
 
-    // 探测集：有 tracker 且有有效 LankeBUILD.json 的包；无 tracker 的走 no_tracker 计数
+    // 探测集：有 tracker 且有有效 LankeBUILD.json 的包；无 tracker 的走 no_tracker 计数。
+    // **统一键为 pkg-name（build.name）**：trackers/dep_edges 都以 tracker 的 pkg-name 为键，
+    // 目录名可能与 pkg-name 不一致（LankeBUILD.json 的 name 字段 ≠ 目录名）。
+    // 曾用目录名做 configs/versions 的键 → dep_edges 按 pkg-name 查不到 → order/same-version/
+    // major-of 边被静默丢弃；apply_proposal 也把 pkg-name 当目录名写，会写到错误路径。
+    // pkg_to_dir 维护 pkg-name → 目录 的映射，供文件读写（lookup / apply）。
     let mut configs: HashMap<String, TrackerConfig> = HashMap::new();
     let mut versions: HashMap<String, String> = HashMap::new();
     let mut no_tracker: Vec<String> = Vec::new();
+    let mut pkg_to_dir: HashMap<String, String> = HashMap::new();
     let mut sorted = entries.clone();
     sorted.sort();
     for name in &sorted {
@@ -662,8 +680,9 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
         };
         match trackers.get(&build.name) {
             Some(cfg) => {
-                configs.insert(name.clone(), cfg.clone());
-                versions.insert(name.clone(), build.version);
+                configs.insert(build.name.clone(), cfg.clone());
+                versions.insert(build.name.clone(), build.version);
+                pkg_to_dir.insert(build.name.clone(), name.clone());
             }
             None => no_tracker.push(name.clone()),
         }
@@ -697,16 +716,20 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
             }
         }
     }
+    // 环兜底：被环阻塞的包记入 forced 集（强制就绪），但**不修改真实 indeg**——
+    // 曾直接置 0，worker 释放依赖者时对已是 0 的 indeg 执行 `*e -= 1` → debug 构建
+    // panic / release 构建 usize::MAX 下溢（未定义行为）。
+    let mut forced: HashSet<String> = HashSet::new();
     if sim_done < probe_names.len() {
         for n in &probe_names {
             if sim_indeg[n.as_str()] > 0 {
-                *indeg.get_mut(n.as_str()).unwrap() = 0; // 环内包强制就绪
+                forced.insert(n.clone());
             }
         }
     }
     let mut ready: Vec<String> = probe_names
         .iter()
-        .filter(|n| indeg[n.as_str()] == 0)
+        .filter(|n| indeg[n.as_str()] == 0 || forced.contains(n.as_str()))
         .cloned()
         .collect();
     ready.sort();
@@ -715,6 +738,7 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
         Mutex::new(TrackSched {
             queue: ready.into(),
             indeg,
+            forced,
             remaining: configs.len(),
             resolved: HashMap::new(),
         }),
@@ -725,6 +749,7 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
     let configs = Arc::new(configs);
     let versions = Arc::new(versions);
     let dependents = Arc::new(dependents);
+    let pkg_to_dir = Arc::new(pkg_to_dir);
     let fetcher = Arc::new(build_fetcher(args));
 
     if jobs > 1 {
@@ -738,6 +763,7 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
         let configs = Arc::clone(&configs);
         let versions = Arc::clone(&versions);
         let dependents = Arc::clone(&dependents);
+        let pkg_to_dir = Arc::clone(&pkg_to_dir);
         let fetcher = Arc::clone(&fetcher);
         let root = root.clone();
         handles.push(thread::spawn(move || {
@@ -746,6 +772,7 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
                 &configs,
                 &versions,
                 &dependents,
+                &pkg_to_dir,
                 &root,
                 &fetcher,
                 &proposals,
@@ -760,9 +787,11 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
 
     let proposals = proposals.load(Ordering::Relaxed);
     let errors = errors.load(Ordering::Relaxed);
+    // 孤儿 tracker = 无对应包（pkg-name 不在 pkg_to_dir 里）。曾按目录名比较，
+    // 目录名 ≠ pkg-name 时会把有效 tracker 误报为孤儿。
     let orphans: Vec<String> = trackers
         .keys()
-        .filter(|n| !entries.contains(n))
+        .filter(|n| !pkg_to_dir.contains_key(n.as_str()))
         .cloned()
         .collect();
     println!();

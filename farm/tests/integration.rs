@@ -210,6 +210,53 @@ fn track_all_parallel_respects_after_ordering() {
     assert!(stdout.contains("提案 2"), "stdout: {stdout}");
 }
 
+/// 依赖环（alpha after(beta)，beta after(alpha)）不得让 track --all 卡死或崩溃。
+/// 回归：环兜底曾把环内包 indeg 强制置 0，worker 释放依赖者时对已是 0 的 indeg 执行
+/// `*e -= 1` → debug 构建 panic / release 构建 usize::MAX 下溢（未定义行为）。
+#[test]
+fn track_all_cycle_does_not_crash_or_hang() {
+    let tmp = std::env::temp_dir().join(format!("lankefarm-track-cycle-{}", std::process::id()));
+    let pkgs = tmp.join("pkgs");
+    let data = tmp.join("data/trackers");
+    std::fs::create_dir_all(pkgs.join("alpha")).unwrap();
+    std::fs::create_dir_all(pkgs.join("beta")).unwrap();
+    std::fs::create_dir_all(&data).unwrap();
+    let write = |p: &std::path::Path, c: &str| std::fs::write(p, c).unwrap();
+    write(
+        &pkgs.join("alpha/LankeBUILD.json"),
+        r#"{"name":"alpha","version":"1.0","sources":["https://example.com/a-1.0.tar.gz"]}"#,
+    );
+    write(
+        &pkgs.join("beta/LankeBUILD.json"),
+        r#"{"name":"beta","version":"1.0","sources":["https://example.com/b-1.0.tar.gz"]}"#,
+    );
+    // 互指 after → 依赖环
+    write(
+        &data.join("alpha.yaml"),
+        "pkg-name: alpha\ntracker-template: script\norder: after(beta)\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/a-2.0.tar.gz\"\n",
+    );
+    write(
+        &data.join("beta.yaml"),
+        "pkg-name: beta\ntracker-template: script\norder: after(alpha)\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/b-2.0.tar.gz\"\n",
+    );
+
+    let bin = env!("CARGO_BIN_EXE_lankefarm");
+    let out = std::process::Command::new(bin)
+        .args(["track", "--all", "--pkgs"])
+        .arg(&pkgs)
+        .args(["--data"])
+        .arg(&data)
+        .args(["-j", "4"])
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let _ = std::fs::remove_dir_all(&tmp);
+    assert!(out.status.success(), "退出码非零（环处理崩溃/下溢？），stdout: {stdout}");
+    assert!(stdout.contains("alpha: 1.0 → 2.0"), "stdout: {stdout}");
+    assert!(stdout.contains("beta: 1.0 → 2.0"), "stdout: {stdout}");
+    assert!(stdout.contains("提案 2"), "stdout: {stdout}");
+}
+
 /// 多源包按 `url-match` 正则匹配实际 URL（非索引）：sources[1] 与 work_sources[0] 都被正确升级。
 #[test]
 fn track_run_regex_matches_sources_and_work_sources() {

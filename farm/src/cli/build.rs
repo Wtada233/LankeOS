@@ -48,16 +48,42 @@ pub(crate) fn cmd_build(args: &Args) -> ExitCode {
     };
     let arch = args.arch.clone().unwrap_or_else(|| "x86_64".to_string());
     let repo_port = args.repo_port.unwrap_or(80);
-    // 内嵌本地 repo 服务器（容器 lpkg upgrade 从这拉依赖，§8）
+    // 内嵌本地 repo 服务器（容器 lpkg upgrade 从这拉依赖，§8）。
+    // serve_ready 绑定成功后经 channel 确认就绪；绑定失败（如非 root 绑默认端口 80）
+    // 立即暴露并退出，不再静默吞掉 + 盲等 300ms。
     println!("[serve] 内嵌本地 repo 服务器 http://127.0.0.1:{repo_port}（docker 模式）");
+    let (serve_tx, serve_rx) = std::sync::mpsc::channel::<Result<(), String>>();
     let serve_handle = {
         let repo_root = out_dir.clone();
         let port = repo_port;
         std::thread::spawn(move || {
-            let _ = lankefarm::serve::serve("127.0.0.1", &repo_root, port);
+            let res = lankefarm::serve::serve_ready("127.0.0.1", &repo_root, port, |_actual| {
+                serve_tx
+                    .send(Ok(()))
+                    .map_err(|e| format!("serve 就绪信号发送失败: {e}"))
+            });
+            if let Err(e) = &res {
+                let _ = serve_tx.send(Err(e.clone()));
+            }
+            res
         })
     };
-    std::thread::sleep(std::time::Duration::from_millis(300));
+    match serve_rx.recv_timeout(std::time::Duration::from_secs(5)) {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => {
+            eprintln!("{}", lankefarm::tr!("build.serve_fail", repo_port, e));
+            drop(serve_handle);
+            return ExitCode::from(2);
+        }
+        Err(_) => {
+            eprintln!(
+                "{}",
+                lankefarm::tr!("build.serve_fail", repo_port, "5s 内未就绪")
+            );
+            drop(serve_handle);
+            return ExitCode::from(2);
+        }
+    }
 
     // RealBinding：--image 走 fresh container 编排（§8），否则宿主 lpkg build
     let mut binding = RealBinding::new(base_image.clone(), pkgs_dir.clone(), out_dir.clone(), arch.clone(), repo_port);

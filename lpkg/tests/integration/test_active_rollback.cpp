@@ -343,3 +343,136 @@ TEST_F(ActiveRollbackTest, DanglingSymlinkBakIsRestored)
     EXPECT_TRUE(fs::is_symlink(sym)) << "symlink restored (was dangling)";
     EXPECT_FALSE(fs::exists(sym_bak)) << "symlink bak consumed";
 }
+
+// ============================================================================
+// 回归：升级中途 COPY 失败 → 双重回滚防护（旧文件不得被二次删除）
+//
+// 曾有一个数据破坏 bug：失败包的 rollback_files() 先把 .lpkg_bak rename 回原位
+// （恢复旧文件），随后 batch_rollback 的 reverse_execute 又对该包的 COPY 行逆序
+// 执行（无条件删除 dst）→ 把刚恢复的旧文件删掉。reverse_execute 必须跳过
+// 已包级回滚（WAL 含 ROLLBACK 行）包的正向文件操作。
+// ============================================================================
+
+TEST_F(ActiveRollbackTest, UpgradeCopyFailPreservesOldFile)
+{
+    setup_local_mirror();
+
+    std::string pV1 = create_pkg("du", "1.0");  // content: usr/bin/du
+    add_to_mirror("du", "1.0");
+    install_packages({pV1});
+    EXPECT_EQ(Cache::instance().get_installed_version("du"), "1.0");
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/du"));
+
+    // 发布 v2（同名文件，内容 "v2\n"）
+    {
+        fs::path work = suite_work_dir / "_pkg_du_v2";
+        fs::create_directories(work / "content" / "usr" / "bin");
+        std::ofstream(work / "content" / "usr" / "bin" / "du") << "v2\n";
+        std::ofstream(work / "metadata.json")
+            << R"({"name":"du","version":"2.0","deps":[],"provides":[],"needed_so":[]})";
+        std::string v2 = (pkg_dir / "du-2.0.lpkg").string();
+        pack_package(v2, work.string(), "du", "2.0", {}, {});
+        fs::path m = suite_work_dir / "mirror" / "x86_64";
+        fs::create_directories(m / "du");
+        fs::copy(v2, m / "du" / "2.0.lpkg");
+        std::ofstream idx(m / "index.txt");
+        idx << "du|1.0:::;2.0:::|\n";
+    }
+
+    // 断点：COPY WAL 写入后、rename 前抛异常 —— 此时文件 du 已被 BACKUP
+    //（旧内容在 .bak），且 COPY WAL 行已写。这是升级中途失败的精确触发点。
+    BreakpointManager::instance().set("copy_after_wal_du",
+                                      [] { throw LpkgException("injected copy failure"); });
+
+    EXPECT_THROW(upgrade_packages(), LpkgException);
+
+    // 回滚后应保持在 v1，且 /usr/bin/du 必须仍是旧内容
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version("du"), "1.0");
+    ASSERT_TRUE(fs::exists(test_root / "usr/bin/du"))
+        << "BUG: 升级失败回滚后旧文件被二次删除";
+    std::ifstream f(test_root / "usr/bin/du");
+    std::string c((std::istreambuf_iterator<char>(f)), {});
+    EXPECT_EQ(c, "#!/bin/sh\necho du\n") << "旧文件内容应保持 v1";
+
+    // WAL 应已 trim（回滚完成）
+    std::ifstream wf(wal::wal_log_path());
+    std::string wc((std::istreambuf_iterator<char>(wf)), {});
+    EXPECT_EQ(wc.find("BEGIN_PKGS"), std::string::npos);
+}
+
+// ============================================================================
+// 回归：升级在 COMMIT 后、END 前失败 → 旧文件保留 + register 的 DB 写入被撤销
+//（覆盖 register_package 的 DBNEW/DBRM 元数据行在包级回滚后仍需逆序执行的路径）
+// ============================================================================
+
+TEST_F(ActiveRollbackTest, UpgradeCommitFailPreservesOldFilesAndDb)
+{
+    setup_local_mirror();
+
+    std::string pV1 = create_pkg("du2", "1.0");  // content: usr/bin/du2
+    add_to_mirror("du2", "1.0");
+    install_packages({pV1});
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/du2"));
+
+    // 发布 v2（同名文件 + 一个 deps 条目，使 register_package 写 deps 文件）
+    {
+        fs::path work = suite_work_dir / "_pkg_du2_v2";
+        fs::create_directories(work / "content" / "usr" / "bin");
+        std::ofstream(work / "content" / "usr" / "bin" / "du2") << "v2\n";
+        std::ofstream(work / "metadata.json")
+            << R"({"name":"du2","version":"2.0","deps":["bash"],"provides":[],"needed_so":[]})";
+        std::string v2 = (pkg_dir / "du2-2.0.lpkg").string();
+        pack_package(v2, work.string(), "du2", "2.0", {"bash"}, {});
+        fs::path m = suite_work_dir / "mirror" / "x86_64";
+        fs::create_directories(m / "du2");
+        fs::copy(v2, m / "du2" / "2.0.lpkg");
+        std::ofstream idx(m / "index.txt");
+        idx << "du2|1.0:::;2.0:::|\n";
+    }
+
+    // 断点：COMMIT 写入后、END 前抛异常（所有文件已复制、register 已完成）
+    BreakpointManager::instance().set("after_commit_du2",
+                                      [] { throw LpkgException("injected post-commit failure"); });
+
+    EXPECT_THROW(upgrade_packages(), LpkgException);
+
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version("du2"), "1.0");
+    ASSERT_TRUE(fs::exists(test_root / "usr/bin/du2"))
+        << "BUG: 升级 COMMIT 后失败回滚，旧二进制被二次删除";
+    std::ifstream f(test_root / "usr/bin/du2");
+    std::string c((std::istreambuf_iterator<char>(f)), {});
+    EXPECT_EQ(c, "#!/bin/sh\necho du2\n") << "旧二进制内容应保持 v1";
+}
+
+// ============================================================================
+// 回归：CLEANUP 阶段 write-ahead —— CLEANUP WAL 行写入后、物理删除前崩溃，
+// .bak 仍在磁盘 → 整批可被 batch_rollback 恢复（旧的"先删后记"顺序下，
+// 该崩溃窗口会导致 .bak 已删但无日志 → DB 恢复为 installed 而文件丢失）
+// ============================================================================
+
+TEST_F(ActiveRollbackTest, CleanupAfterWalBreakpointRestoresPackage)
+{
+    std::string p = create_pkg("bp_cleanup_wa", "1.0");
+    install_packages({p});
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/bp_cleanup_wa"));
+
+    // 断点：CLEANUP WAL 行写入后、物理删除前抛异常
+    BreakpointManager::instance().set("cleanup_after_wal",
+                                      [] { throw LpkgException("injected cleanup crash"); });
+
+    EXPECT_THROW(remove_package("bp_cleanup_wa", false), LpkgException);
+
+    // write-ahead 保证此刻 .bak 未删 → 回滚后包应完整恢复
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().get_installed_version("bp_cleanup_wa").empty())
+        << "package should be restored after cleanup-stage rollback";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/bp_cleanup_wa"))
+        << "binary should be restored (bak not yet deleted at crash point)";
+
+    // 回滚后 WAL 应已 trim
+    std::ifstream wf(wal::wal_log_path());
+    std::string wc((std::istreambuf_iterator<char>(wf)), {});
+    EXPECT_EQ(wc.find("BEGIN_PKGS"), std::string::npos);
+}

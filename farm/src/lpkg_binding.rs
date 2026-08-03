@@ -101,6 +101,51 @@ impl Drop for ContainerGuard {
     }
 }
 
+/// 容器名只保留 `[a-zA-Z0-9._-]`（docker create --name 的合法字符集），其余转 `-`。
+fn sanitize_name(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
+            out.push(c);
+        } else {
+            out.push('-');
+        }
+    }
+    if out.is_empty() {
+        out.push('x');
+    }
+    out
+}
+
+/// 清理上次崩溃（SIGKILL/断电，`ContainerGuard::drop` 未执行）遗留的孤儿构建容器。
+/// 容器名内嵌创建者 PID（`lankefarm-build-<pid>-<pkg>`）：只清理 PID 已不存在的容器，
+/// 并发 build 进程的**活**容器不会被误杀（固定名方案下后启动者会 rm 掉前者的在途容器）。
+fn cleanup_stale_build_containers(
+    run_quiet: &dyn Fn(&[&str]) -> std::io::Result<std::process::ExitStatus>,
+) {
+    let Ok(out) = std::process::Command::new("docker")
+        .args(["ps", "-aq", "--filter", "name=lankefarm-build-"])
+        .output()
+    else {
+        return;
+    };
+    for line in String::from_utf8_lossy(&out.stdout).lines() {
+        let name = line.trim();
+        if name.is_empty() {
+            continue;
+        }
+        let Some(pid_part) = name.strip_prefix("lankefarm-build-").and_then(|s| s.split('-').next()) else {
+            continue;
+        };
+        let Ok(pid) = pid_part.parse::<u32>() else {
+            continue;
+        };
+        if !std::path::Path::new(&format!("/proc/{pid}")).exists() {
+            let _ = run_quiet(&["rm", "-f", name]);
+        }
+    }
+}
+
 impl RealBinding {
     pub fn new(
         base_image: impl Into<String>,
@@ -121,9 +166,9 @@ impl RealBinding {
     /// docker cp 编排：配方拷进容器 → 容器内 lpkg upgrade+build → .lpkg 拷回 staging。
     /// 不 bind-mount pkgs（容器易失，残留随容器销毁）；容器经 host 网络从内嵌 repo 服务器拉依赖。
     fn docker_build(&self, pkg: &str, staging: &Path) -> Result<PathBuf, String> {
-        // 固定容器名：启动前清掉上次中断（Ctrl-C/崩溃）残留的孤儿容器，也避免并发重名冲突。
+        // 唯一容器名（进程 PID + 包名）：并发 build 进程互不踩踏——固定名 `lankefarm-build`
+        // 时后启动进程的 `rm -f`/`create --name` 会杀/撞前者的在途容器。
         // 静默命令（rm/start/cp/配置）：屏蔽 docker 的 cid 回显与 cp 进度噪音；构建 exec 单独流式。
-        const NAME: &str = "lankefarm-build";
         let run_quiet = |args: &[&str]| {
             std::process::Command::new("docker")
                 .args(args)
@@ -131,14 +176,17 @@ impl RealBinding {
                 .stderr(Stdio::null())
                 .status()
         };
-        let _ = run_quiet(&["rm", "-f", NAME]);
+        // 只清理"创建者 PID 已死"的孤儿容器（SIGKILL/断电，RAII 未执行）；活容器不动——
+        // 否则并发进程的构建会被误杀。
+        cleanup_stale_build_containers(&run_quiet);
+        let name = format!("lankefarm-build-{}-{}", std::process::id(), sanitize_name(pkg));
 
         // 1. create + start 常驻容器。`sh -c "mkdir -p /work && tail -f /dev/null"`：
         //    mkdir 必须在 docker cp 前就位——对不存在的 /work，docker cp <dir> :/work/ 会把
         //    配方内容直接铺进 /work，而不是建 /work/<pkg>（实测）。tail -f 保活，busybox/coreutils 都支持。
         let create = std::process::Command::new("docker")
             // DooD：挂宿主 docker socket，容器内可 docker run（docker 包 build tini 静态需要）。
-            .args(["create", "--network=host", "--name", NAME,
+            .args(["create", "--network=host", "--name", &name,
                    "-v", "/var/run/docker.sock:/var/run/docker.sock",
                    &self.base_image,
                    "sh", "-c", "mkdir -p /work && tail -f /dev/null"])
@@ -193,10 +241,13 @@ impl RealBinding {
         //    清理后重试（仅依赖环触发）。升级完成后把备份的旧 .so 恢复进 /usr/lib——新构建链新
         //    SO（dev symlink），旧二进制链旧 SONAME 在过渡期能加载；恢复后 ldconfig 刷新缓存，
         //    旧二进制运行时能按 SONAME 命中 ld.so.cache。
+        // force-solve-conflict 是显式破坏性操作，lpkg 在非交互（-y）下直接拒绝执行——
+        // 它的确认短语从 stdin 读取，正确姿势是 `echo '...' | lpkg force-solve-conflict`
+        // （不带 -y）。带 -y 会把短语机制废掉，兜底永远失败 → 构建被 BLOCKED。
         let script = format!(
             "cd /work/{pkg} && \
              lpkg install lpkg -y && \
-             ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y --missing-so-no-error && lpkg upgrade -y --missing-so-no-error; }} ) || exit 1 ; \
+             ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; }} ) || exit 1 ; \
              [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig ; \
              lpkg build -y --use-system-soname"
         );
