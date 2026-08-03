@@ -162,17 +162,22 @@ fn is_removed_soname_file(fname: &str, removed: &[&str]) -> bool {
 /// ABI 过渡备份的清理：**整个 build 完成**（而非单包）后调用。
 ///
 /// 语义：备份存在的意义是让仍在引用旧 SONAME 的旧二进制在过渡期能加载；全部相关包重建完毕后，
-/// 当前 ABI 数据库（abidb）不再有任何包的 `needed_so` 引用旧 SONAME → 备份作废。仍有引用
-/// （有包被跳过 / BLOCKED 未重建）则保留，留待下次 build 完成后再次清理。
-/// 只在 abidb 可读时清理；读不到（异常状态）则保守保留，绝不误删。
+/// 当前 index.txt（完整 needed_so，单一真源）不再有任何包的 `needed_so` 引用旧 SONAME → 备份作废。
+/// 仍有引用（有包被跳过 / BLOCKED 未重建）则保留，留待下次 build 完成后再次清理。
+/// 只在 index.txt 可读且含 needed_so 时清理；读不到/为空/全无 needed_so（剥离时代遗留）则保守保留，
+/// 绝不误删。
 pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
     let backups = out_dir.join("backups");
     if !backups.is_dir() {
         return;
     }
-    let Ok(idx) = crate::abidb::load_index(out_dir, arch) else {
+    let Ok(text) = fs::read_to_string(out_dir.join(arch).join("index.txt")) else {
         return;
     };
+    let idx = Index::parse(&text);
+    if idx.packages.is_empty() || idx.packages.values().all(|p| p.needed_so.is_empty()) {
+        return; // 剥离时代遗留的旧索引 → 引用无从判断，保守保留
+    }
     let referenced: std::collections::HashSet<String> = idx
         .packages
         .values()
@@ -226,11 +231,11 @@ fn soname_of(filename: &str) -> Option<&str> {
     filename.get(..len)
 }
 
-/// 更新本地 repo index.txt：替换该包的版本块（保留 deps；新 version/hash/provides/needed_so）。
-/// 更新本地 repo index.txt：替换该包的版本块。**剥掉 needed_so**（容器可见的索引不带 SONAME，
-/// lpkg 一致性检查失效；完整 needed_so 在 abidb 里供 farm 传播用）。
+/// 更新本地 repo index.txt：替换该包的版本块（保留旧 deps；新 version/hash/provides）。
+/// **写回完整 needed_so**——index.txt 是唯一真源（容器可见索引与 farm 的 ABI 传播共用，
+/// 不再剥 needed_so、不再有第二份 .abi.json）。
 pub(crate) fn update_repo_index(out_dir: &Path, arch: &str, pkg: &str, version: &str, hash: &str,
-                     provides: &[String]) -> Result<(), String> {
+                     provides: &[String], needed_so: &[String]) -> Result<(), String> {
     let path = out_dir.join(arch).join("index.txt");
     let content = fs::read_to_string(&path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
     let mut found = false;
@@ -254,15 +259,20 @@ pub(crate) fn update_repo_index(out_dir: &Path, arch: &str, pkg: &str, version: 
         let vparts: Vec<&str> = last_block.splitn(6, ':').collect();
         let old_deps = vparts.get(2).copied().unwrap_or("");
         let new_line = format!(
-            "{pkg}|{version}:{hash}:{old_deps}:{}:|{pkg_level}",
-            provides.join(",")
+            "{pkg}|{version}:{hash}:{old_deps}:{}:{}|{pkg_level}",
+            provides.join(","),
+            needed_so.join(",")
         );
         lines.push(new_line);
         found = true;
     }
     if !found {
-        // 新包：追加一行（deps 空，needed_so 空）
-        lines.push(format!("{pkg}|{version}:{hash}::{}:|", provides.join(",")));
+        // 新包：追加一行（deps 空，写完整 provides + needed_so）
+        lines.push(format!(
+            "{pkg}|{version}:{hash}::{provides}:{needed_so}|",
+            provides = provides.join(","),
+            needed_so = needed_so.join(",")
+        ));
     }
     fs::write(&path, lines.join("\n") + "\n").map_err(|e| format!("写 {path:?} 失败: {e}"))
 }
@@ -309,12 +319,25 @@ pub(crate) fn update_lankebuild_metadata(pkgs_dir: &Path, pkg: &str, outcome: &B
 }
 
 /// 旧索引（ABI diff 基准，§7.2）：读本地 repo 的 `<out>/<arch>/index.txt`（seed 播种/发布产物）。
-/// **必须有**——无基线构建是盲人摸象（needed_so 的 provider 无从校验、ABI diff 无从对比）。
+/// index.txt 含**完整 needed_so**（单一真源），传播（removed_sonames/revmap）、构建序（link_deps）
+/// 都从这里读。**必须有**——无基线构建是盲人摸象（needed_so 的 provider 无从校验、ABI diff 无从对比）。
 /// 缺失/为空 → 报错，要求先 `farm seed` 引入 repo 数据；不做网络 fallback，在线状态由 seed 显式落地。
-/// 旧索引基线 = farm 自己的 ABI 数据库（out/<arch>/.abi.json），含完整 needed_so/provides。
-/// 容器可见的 index.txt 已剥掉 needed_so，传播必须从这里读（禁止无基线构建）。
 pub(crate) fn load_old_index(out_dir: &Path, arch: &str) -> Result<Index, String> {
-    crate::abidb::load_index(out_dir, arch)
+    let path = out_dir.join(arch).join("index.txt");
+    let text = fs::read_to_string(&path).map_err(|e| {
+        format!("缺少本地 repo 索引 {path:?}（{e}）——请先 `farm seed` 播种，禁止无基线构建")
+    })?;
+    let idx = Index::parse(&text);
+    if idx.packages.is_empty() {
+        return Err(format!(
+            "本地 repo 索引 {path:?} 为空——请先 `farm seed` 播种，禁止无基线构建"
+        ));
+    }
+    // 全零 needed_so = 剥离时代遗留的旧索引（曾剥 needed_so）→ 传播会失明，提示重新 seed
+    if idx.packages.values().all(|p| p.needed_so.is_empty()) {
+        println!("{}", tr!("build.index_no_soname", path.display()));
+    }
+    Ok(idx)
 }
 
 pub(crate) fn sorted_pkg_names(pkgs_dir: &Path) -> Vec<String> {

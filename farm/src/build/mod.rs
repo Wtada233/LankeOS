@@ -270,20 +270,12 @@ pub fn run_build(
         };
         let version = effective_version(&opts.pkgs_dir, &pkg).unwrap_or_else(|| "?".into());
         let hash = sha256_file(&final_lpkg).unwrap_or_default();
-        // index.txt（容器可见）：剥掉 needed_so——lpkg 的 SONAME 检查失效，构建不再被
-        // ABI 断裂/bootstrap 环硬报错卡死。provides/deps 保留（依赖解析仍可用）。
+        // index.txt：**写回完整 needed_so**（单一真源）。容器可见索引与 farm 的 ABI 传播共用，
+        // 不再剥 needed_so、不再维护第二份 .abi.json；构建顺序/传播/备份清理都从这里读。
+        // 容器的 SONAME 检查由 --missing-so-no-error / --use-system-soname 在过渡期容忍。
         if let Err(e) = update_repo_index(&opts.out_dir, &opts.arch, &pkg, &version, &hash,
-                                          &outcome.provides) {
+                                          &outcome.provides, &outcome.needed_so) {
             eprintln!("{}", tr!("build.index_fail", pkg, e));
-            report.blocked.push(pkg.clone());
-            continue;
-        }
-        // farm 自己的 ABI 数据库：完整的 needed_so/provides，供传播（removed_sonames/revmap）
-        // 与构建序（link_deps）读。三处同步（LankeBUILD.json / metadata.json / 本库）。
-        if let Err(e) = crate::abidb::update_pkg(
-            &opts.out_dir, &opts.arch, &pkg, &version, &outcome.provides, &outcome.needed_so,
-        ) {
-            eprintln!("{}", tr!("build.abidb_fail", pkg, e));
             report.blocked.push(pkg.clone());
             continue;
         }
@@ -327,7 +319,7 @@ pub fn run_build(
     }
 
     // ABI 过渡备份清理：**整个 build 完成后**（而非单包完成）。此时所有引用旧 SONAME 的包
-    // 都已重建（直连受害者 + 级联），备份的旧 .so 不再被当前 abidb 任何 needed_so 引用 → 删除；
+    // 都已重建（直连受害者 + 级联），备份的旧 .so 不再被当前 index.txt 任何 needed_so 引用 → 删除；
     // 仍有包被跳过 / BLOCKED 未重建则保留，留待下次 build 完成后再清。
     cleanup_backups(&opts.out_dir, &opts.arch);
 
@@ -450,12 +442,10 @@ mod tests {
         d
     }
 
-    /// 写 seed 基线：index.txt（容器可见，剥 needed_so） + .abi.json（farm 传播基线）。
+    /// 写 seed 基线：index.txt（完整 needed_so，单一真源）。
     fn write_baseline(out: &Path, index_text: &str) {
         fs::create_dir_all(out.join("x86_64")).unwrap();
         fs::write(out.join("x86_64/index.txt"), index_text).unwrap();
-        let idx = Index::parse(index_text);
-        crate::abidb::write_all(out, "x86_64", &idx).unwrap();
     }
 
     // ── §8.6 源预下载测试矩阵 ────────────────────────────────────────────────
@@ -771,7 +761,7 @@ mod tests {
         // 真实路径集成测试：合成 .lpkg → SONAME 检测漂移 → repack 重打包 → 上传本地仓库 + 更新 index。
         let dir = temp_dir("farm-build-repack");
         let out = temp_dir("farm-build-out");
-        // seed 过的旧索引（§7.2 基线）：index.txt + abidb
+        // seed 过的旧索引（§7.2 基线）：index.txt（完整 needed_so，单一真源）
         write_baseline(&out, "libfoo|1.0:oldhash::libfoo.so,libfoo.so.1:|\n");
         write_pkg(&dir, "libfoo", &["libfoo.so", "libfoo.so.1"], &["libc.so.6"], &[]);
 
@@ -815,18 +805,11 @@ mod tests {
             "旧版本应被取代"
         );
 
-        // index.txt 已更新（保留 version+deps，更新 provides；needed_so 剥掉——容器索引不带 SONAME）
+        // index.txt 已更新（保留 version+deps，更新 provides；**写回完整 needed_so**——单一真源）
         let idx = fs::read_to_string(out.join("x86_64/index.txt")).unwrap();
         assert!(idx.starts_with("libfoo|1.0:"), "index 版本保留: {idx}");
-        assert!(!idx.contains("libm.so.6"), "index 应剥掉 needed_so: {idx}");
+        assert!(idx.contains("libm.so.6"), "index 应含完整 needed_so: {idx}");
         assert!(idx.contains("libfoo.so,libfoo.so.1"), "index 保留 provides: {idx}");
-        // needed_so 在 farm 自己的 abidb 里
-        let abi = crate::abidb::load_index(&out, "x86_64").unwrap();
-        assert!(
-            abi.packages["libfoo"].needed_so.contains(&"libm.so.6".to_string()),
-            "abidb 应更新 needed_so: {:?}",
-            abi.packages["libfoo"].needed_so
-        );
 
         // 仓库 .lpkg 的 metadata.json 已修正（repack 重打包，不 rebuild）
         let extract2 = out.join("extract").join("libfoo-check");
@@ -1051,9 +1034,10 @@ mod tests {
         // → 删除（含空根目录）。本用例：无可构建包（队列空），cleanup 仍执行。
         let dir = temp_dir("farm-backup-clean");
         let out = temp_dir("farm-backup-clean-out");
-        write_baseline(&out, "libfoo|1.0:h::libfoo.so,libfoo.so.1:|\n");
-        write_pkg(&dir, "libfoo", &["libfoo.so", "libfoo.so.1"], &[], &[]);
-        // 预置一个"已无引用"的备份（libz.so.1 不在 abidb 任何 needed_so 里）
+        // libfoo 需 libc.so.6（index.txt 要有 needed_so，cleanup 的"剥离时代遗留"守卫才放行）
+        write_baseline(&out, "libfoo|1.0:h::libfoo.so,libfoo.so.1:libc.so.6|\n");
+        write_pkg(&dir, "libfoo", &["libfoo.so", "libfoo.so.1"], &["libc.so.6"], &[]);
+        // 预置一个"已无引用"的备份（libz.so.1 不在 index.txt 任何 needed_so 里）
         fs::create_dir_all(out.join("backups/libz")).unwrap();
         fs::write(out.join("backups/libz/libz.so.1"), b"").unwrap();
         fs::write(out.join("backups/libz/libz.so.1.2.3"), b"").unwrap();

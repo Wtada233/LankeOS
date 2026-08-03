@@ -5,7 +5,6 @@
 //! stub 绑定用于集成测试与 `--demo` 模式，绕开真实构建。
 
 pub mod abi;
-pub mod abidb;
 pub mod build;
 pub mod graph;
 pub mod i18n;

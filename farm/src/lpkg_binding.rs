@@ -184,15 +184,16 @@ impl RealBinding {
 
         // 4. 容器内构建——**实时流式日志**，不捕获（捕获 = 黑盒，构建完成才输出；
         //    且 stdout 末尾混入 ls 结果会污染文件名提取）。
-        //    先清空安装数据库（deps/needed_so/provides.db）——repo 索引已剥掉 needed_so，再清
-        //    安装侧记录，lpkg 的 SONAME 一致性检查完全失效，ABI 断裂/bootstrap 环不再硬报错；
-        //    farm 的 ABI 传播从宿主侧自己的 abidb 读，不受影响。
-        //    然后 `lpkg install lpkg`（基础镜像里旧版无 force-solve-conflict）→ `lpkg upgrade` 拉
-        //    127.0.0.1 内嵌 repo 最新依赖；upgrade 若仍报错，用确认短语喂 force-solve-conflict
-        //    清理后重试（正常不触发，因索引已剥 needed_so）。
+        //    index.txt 现含**完整 needed_so**（单一真源），lpkg 的 SONAME 检查（前向/后向）在
+        //    容器里真实运行——过渡期的缺失 SONAME 由 `--missing-so-no-error`（upgrade）与
+        //    `--use-system-soname`（build，配合备份恢复的旧 .so）显式容忍，不再靠剥索引/清状态
+        //    压制检查（那些 hack 已删）。
+        //    流程：`lpkg install lpkg`（基础镜像里旧版无 force-solve-conflict）→ `lpkg upgrade`
+        //    拉 127.0.0.1 内嵌 repo 最新依赖；upgrade 若仍报错，用确认短语喂 force-solve-conflict
+        //    清理后重试（仅依赖环触发）。升级完成后把备份的旧 .so 恢复进 /usr/lib——新构建链新
+        //    SO（dev symlink），旧二进制链旧 SONAME 在过渡期能加载。
         let script = format!(
             "cd /work/{pkg} && \
-             rm -rf /var/lib/lpkg/deps && rm -rf /var/lib/lpkg/needed_so && rm -rf /var/lib/lpkg/provides.db && \
              lpkg install lpkg -y && \
              ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y --missing-so-no-error && lpkg upgrade -y --missing-so-no-error; }} ) && \
              [ -d /backups ] && cp -a /backups/. /usr/lib/ ; \
