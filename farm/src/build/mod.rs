@@ -622,6 +622,33 @@ mod tests {
     }
 
     #[test]
+    fn topo_order_siblings_name_ordered_and_deterministic() {
+        // 用户规则：构建顺序必须**确定**——同级包（无相互依赖）固定按名字升序；
+        // 输入乱序不影响结果，且两次运行逐位一致（绝不允许随机）。
+        let dir = std::env::temp_dir().join("farm-build-topo-siblings");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        write_pkg(&dir, "a", &["liba.so.1"], &[], &[]);
+        write_pkg(&dir, "m", &["libm.so.1"], &[], &[]);
+        write_pkg(&dir, "z", &["libz.so.1"], &[], &[]);
+        let old = index_of(&[
+            ("a", vec!["liba.so.1"], vec![]),
+            ("m", vec!["libm.so.1"], vec![]),
+            ("z", vec!["libz.so.1"], vec![]),
+        ]);
+        // 故意乱序输入（z,m,a）：heap 按名字升序弹出，输出与输入无关
+        let targets: Vec<String> = ["z", "m", "a"].iter().map(|s| s.to_string()).collect();
+        let order = topo_order(&dir, &targets, &old);
+        assert_eq!(order, vec!["a", "m", "z"], "同级应名字升序: {order:?}");
+        assert_eq!(
+            order,
+            topo_order(&dir, &targets, &old),
+            "两次运行必须逐位一致（确定性）"
+        );
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn reorder_queue_puts_dependency_victims_first() {
         // 复现 appstream 痛点：appstream 的 build_deps 含 librsvg，两者都是 libxml2 受害者。
         // 字母序入队 appstream 先，但 appstream 需要重建后的 librsvg → 重排必须把被依赖者放前。

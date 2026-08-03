@@ -195,7 +195,7 @@ impl RealBinding {
         let script = format!(
             "cd /work/{pkg} && \
              lpkg install lpkg -y && \
-             ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y --missing-so-no-error && lpkg upgrade -y --missing-so-no-error; }} ) && \
+             ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y --missing-so-no-error && lpkg upgrade -y --missing-so-no-error; }} ) || exit 1 ; \
              [ -d /backups ] && cp -a /backups/. /usr/lib/ ; \
              lpkg build -y --use-system-soname"
         );

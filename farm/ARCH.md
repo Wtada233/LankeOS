@@ -9,12 +9,17 @@ LankeOS build farm 是一个 **ABI 驱动的增量包构建系统**：基于 `ne
 - **增量**：只构建配方版本与本地 repo 不一致的包，或 ABI 断裂的受害者
 - **容器隔离**：所有构建在 fresh docker 容器内进行（禁止主机构建，`--image` 必填）
 - **ABI 精确**：用旧索引的 needed_so/provides 算 removed SONAME → 直连受害者，不做树状闭包
+- **单一真源**：`out/<arch>/index.txt` 含**完整 needed_so**（不再剥、不再维护第二份 `.abi.json`），同时供容器可见索引与 farm 的 ABI 传播
+- **ABI 过渡备份**：检测到 SONAME 断裂时把旧 SONAME 的 .so 备份到 `out/backups/<pkg>/`，每个构建容器内恢复，让旧二进制在过渡期存活；**整个 build 完成后**清理
+- **确定性构建序**：拓扑排序同级包按名字升序固定顺序，绝无随机（有回归测试）
+- **构建计划确认**：开始前列出 topo 顺序供 operator 确认；预下载只给"确认集"，ABI 受害者构建时由 lpkg build 自己下载
 
 ```
-farm build <pkg>|--all   → 增量选择 → 拓扑排序 → 逐包容器构建 → scan → verify 三分支 → repack/传播 → 进 repo
+farm build <pkg>|--all   → 增量选择 → 拓扑排序 → 计划预览+确认 → bulk 预下载(确认集)
+                          → 逐包容器构建 → scan → verify 三分支 → repack/传播/备份 → 进 repo → 备份清理
 farm track <pkg> --run   → 探测上游版本 → 更新 LankeBUILD.json
 farm gen-trackers        → LLM 批量生成 tracker yaml
-farm seed --remote       → 冷启动播种远程 repo（并行下载 + 剥离 needed_so + 建 abidb）
+farm seed --remote       → 冷启动播种远程 repo（并行下载 + SHA256 校验；index/.lpkg 原样完整）
 farm serve               → 本地 repo 静态 HTTP 服务器
 ```
 
@@ -29,13 +34,12 @@ src/
     serve.rs       cmd_serve
     seed.rs        cmd_seed
   build/           调度层
-    mod.rs         run_build 核心（增量选择/队列循环/ABI 传播编排）+ 全部测试
-    sched.rs       topo_order（needed_so 拓扑）/ find_cycle_edge / reorder_queue
-    prompt.rs      BLOCKED/源缺失的交互接管（开 shell/跳过/结束）
-    sources.rs     源预下载（§8.6）
-    repo.rs        版本判定/漂移 repack/上传/index 更新/配方读写
+    mod.rs         run_build 核心（增量选择/计划预览/队列循环/ABI 传播/备份清理编排）+ 全部测试
+    sched.rs       topo_order（needed_so+deps+build_deps 拓扑，确定性）/ find_cycle_edge / reorder_queue
+    prompt.rs      BLOCKED/源缺失的交互接管（开 shell/跳过/结束）+ 构建计划预览/确认
+    sources.rs     源预下载
+    repo.rs        版本判定/漂移 repack/上传/index 更新/备份清理/配方读写
   abi.rs           removed_sonames / detect_abi_breaks / propagate
-  abidb.rs         farm 自己的 SONAME 数据库（传播基线）
   graph.rs         index.txt 解析 + Index/RevMap + link_deps
   scan.rs          .lpkg 解包 + ELF needed_so/provides 扫描
   repack.rs        metadata.json 漂移修正 + 重打
@@ -44,14 +48,14 @@ src/
   state.rs         SQLite 状态库（job 状态/续跑）
   track/           tracker 模板（github/gitlab/sourceforge/gnome/gcs/html-index/script）
   net.rs           HTTP 下载
-  lpkg_binding.rs  唯一碰 lpkg 的接缝（docker 编排）
+  lpkg_binding.rs  唯一碰 lpkg 的接缝（docker 编排 + ABI 过渡备份注入）
   i18n.rs          l10n（tr! 宏 + zh/en 目录 + LANG 切换）
   ux.rs            ANSI 颜色（非 TTY 自动降级）
   llm.rs           gen-trackers 的 LLM 客户端
   verify.rs        构建产物 vs 期望 metadata 的三分支判定
 ```
 
-分层：`cli`（参数/命令）→ `build`（调度编排）→ `abi`/`graph`/`abidb`/`scan`/`repack`（逻辑）→ `lpkg_binding`（容器接口）。逻辑层不碰 lpkg，所有 lpkg 交互收敛在 `LpkgBinding` trait（`lpkg_binding.rs`，唯一碰 lpkg 的接缝）。
+分层：`cli`（参数/命令）→ `build`（调度编排）→ `abi`/`graph`/`scan`/`repack`（逻辑）→ `lpkg_binding`（容器接口）。逻辑层不碰 lpkg，所有 lpkg 交互收敛在 `LpkgBinding` trait（`lpkg_binding.rs`，唯一碰 lpkg 的接缝）。
 
 ## 3. 三个依赖字段
 
@@ -61,43 +65,52 @@ src/
 - **`provides`**：本包提供的 SONAME/能力（如 `libmagic.so.1`）
 - **`deps`**：包级运行时依赖（由 gen_deps/deprules 规则生成，**farm 不扫不比**）
 
-farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不读不改）。
+farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不读不改；但 `deps` 参与**拓扑排序边**，见 §4）。
 
 ## 4. build 调度（run_build）
 
 `build/mod.rs::run_build` 主流程：
 
-1. **旧索引基线**：`load_old_index` 读 `abidb::load_index`（`out/<arch>/.abi.json`）。缺失/为空 → 报错（**禁止无基线构建**，`farm seed` 是唯一入口）。
+1. **旧索引基线**：`load_old_index` 读 `out/<arch>/index.txt`（**完整 needed_so**，单一真源）。缺失/为空 → 报错（**禁止无基线构建**，`farm seed` 是唯一入口）；旧索引全零 needed_so（剥离时代遗留）→ 警告重新 seed，否则 ABI 传播失明。
 2. **增量选择**：`--all` 时用 `needs_build`（配方 effective_version vs 旧索引）跳过一致的包；指定 `pkg` 强制重建。
-3. **拓扑排序**：`sched::topo_order` 只用 needed_so 链接边（build_deps/deps 排除，避免伪环），环切割。
-4. **逐包循环**（队列，受害者带 `is_victim` 标记）：
+3. **拓扑排序**：`sched::topo_order` 用 **三类边**（needed_so 链接边 + index deps 边 + 配方 build_deps 边，混入的伪环由环切割逐条断开）做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。
+4. **计划预览 + 确认**（2.5）：交互模式（stdin 是 tty）列出 topo 顺序（包 + 版本）并让 operator 确认（回车继续 / n 取消）；非交互（CI/测试/脚本）直接开始。
+5. **预下载拆分**：确认后**只给确认集** bulk 预下载全部源；ABI 受害者动态入队**不预下载**（构建时由 lpkg build 自己下载）。批量预下载失败不阻塞——循环里每个确认集包会再走一次源就绪门（带交互接管）。
+6. **逐包循环**（队列，受害者带 `is_victim` 标记）：
    - 受害者先 `bump_release`（release+1，用户规则 1）
-   - 源预下载 → 容器构建（见 §5）
+   - 确认集包走源就绪门（已 bulk 预取，幂等）→ 容器构建（见 §5）
    - `scan` 产物 → `verify::decide` 三分支（见 §6）
-   - 漂移 → `repack` 双写（metadata.json + LankeBUILD.json + abidb）
-   - 进 repo（`place_in_repo` 命名 `<version>.lpkg`）+ 更新 index（**剥掉 needed_so**，写剥离后哈希）
+   - 漂移 → `repack` 双写（metadata.json + LankeBUILD.json）
+   - 进 repo（`place_in_repo` 命名 `<version>.lpkg`，取代旧版本前先备份旧 so，见 §7）+ 更新 index（**写回完整 needed_so**）
    - ABI 传播（见 §7）→ 受害者入队 → `sched::reorder_queue` 去重重排
+7. **备份清理**：**整个 build 完成后**（而非单包完成）调用 `cleanup_backups`——备份的旧 SONAME 已不再被任何包 needed_so 引用 → 删除（含空根目录）；仍有包被跳过 / BLOCKED 未重建 → 保留，留待下次 build 完成后再清。
 
 ### 排序与 ABI 受害者重排（build/sched.rs）
 
-- `topo_order`：needed_so → provider 的链接图，Kahn 拓扑 + 三色 DFS 环切割。**确定性**（名字升序弹出）。
+- `topo_order`：三类边 Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响）**。
 - `reorder_queue`：受害者入队后按依赖算法重排，**先去重**（同一受害者被多个断裂重复入队 → `rev` 被污染导致顺序错乱）+ victim 标记取 OR。保证"被依赖者先建"（如 librsvg 先于 appstream）且叶子（chromium）**维持队尾、只构建一次**。
 
 ## 5. 构建执行（lpkg_binding）
 
-`RealBinding::docker_build`（fresh 容器，`docker create --network=host` + exec）：
+`RealBinding::docker_build`（fresh 容器，`docker create --network=host` + DooD socket 挂载 + exec）：
 
 1. 常驻容器 `tail -f /dev/null` 保活，`/work` 预建（docker cp 对不存在目录是"铺内容"而非建子目录）
 2. 写 `/etc/lpkg/mirror.conf` → `http://127.0.0.1:<repo_port>/`（容器经 host 网络访问内嵌 repo 服务器）
 3. `docker cp` 配方（含预下载源）→ `/work/<pkg>/`
-4. 容器内脚本：
+4. ABI 过渡备份注入：`docker cp out/backups` → 容器 `/backups`（若有）
+5. 容器内脚本（**无任何 rm -rf 状态清空 hack**；SONAME 检查真实运行，过渡期由 flag 显式容忍）：
    ```
-   rm -rf /var/lib/lpkg/{deps,needed_so,provides.db}   # 清安装库，SONAME 检查失效
-   lpkg install lpkg -y &&                              # 自更新到带 force-solve-conflict 的 lpkg
-   ( lpkg upgrade -y || { echo 'I understand...' | lpkg force-solve-conflict -y && lpkg upgrade -y; } ) &&
-   lpkg build -y
+   cd /work/<pkg> && \
+   lpkg install lpkg -y && \
+   ( lpkg upgrade -y --missing-so-no-error || { echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y --missing-so-no-error && lpkg upgrade -y --missing-so-no-error; } ) || exit 1 ; \
+   [ -d /backups ] && cp -a /backups/. /usr/lib/ ; \
+   lpkg build -y --use-system-soname
    ```
-5. `docker cp` 产物回宿主 staging
+   - `upgrade` 失败（含 force-solve-conflict 重试）→ `|| exit 1` 致命，不继续 build
+   - `--missing-so-no-error`：bootstrap/过渡期容忍缺失 SONAME（lpkg 前向 `check_forward_soname_integrity` 与后向 `check_needed_so_consistency` **都纳入该 flag**；真实系统不带 flag 仍硬抛，不变量保留）
+   - 备份恢复后 `--use-system-soname`：build 的 needed_so 检测命中 /usr/lib 里备份的旧 .so
+   - **dev symlink（`xxx.so`）指向新 so → 新构建完美链接新 so；旧二进制链旧 SONAME 在过渡期加载备份的旧 so**——新旧两条 ABI 并行存活到全部重建完
+6. `docker cp` 产物回宿主 staging
 
 `ContainerGuard` RAII：所有失败路径自动 `docker rm -f`（命名容器 `lankefarm-build`，启动前清残留）。
 
@@ -118,26 +131,29 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 - `2) 跳过此包`（仅 operator 明确选择才跳过）
 - `3) 结束构建`
 
-非交互（无 TTY）→ 标记 Blocked 继续，不静默丢弃。
+非交互（`interactive=false`，由 CLI 入口 `stdin().is_terminal()` 决定）→ 标记 Blocked 继续，不静默丢弃。
 
-## 7. ABI 检测与传播（abi.rs + abidb.rs）
+## 7. ABI 检测与传播（abi.rs）
 
 - **`removed_sonames(old, pkg, new_provides)`**：旧索引 provides − 新扫描 versioned provides → 被移除的 SONAME（ABI 断裂信号）
 - **`RevMap`**（graph.rs）：soname → 需要它的包（旧索引 needed_so 反图）
 - **`direct_victims(revmap, removed)`**：直接链接被移除 SONAME 的包
 - **传播**：只有 SONAME 变化才触发；受害者 release bump + 入队重建；受害者自身的 provides 变化再级联（固定点）
 
-**abidb（`out/<arch>/.abi.json`）**：farm 自己的 SONAME 数据库，存完整 provides + needed_so。**容器可见的 index.txt 剥掉 needed_so**（只留 provides/deps）→ lpkg 的一致性检查失效、构建不被 bootstrap 环卡死；farm 的传播从 abidb 读，两不干扰。每次 repack 三处同步：LankeBUILD.json + metadata.json + abidb。
+**index.txt 是单一真源**：完整 needed_so/provides 同时供容器可见索引与 farm 传播（removed_sonames / revmap / link_deps / 备份清理），不再剥 needed_so、**不再有 `.abi.json`**。lpkg 的 SONAME 检查在容器里真实运行，过渡期由 `--missing-so-no-error` / `--use-system-soname` 显式容忍（见 §5）。
+
+### ABI 过渡备份机制
+
+- **触发（`backup_removed_sonames`）**：`place_in_repo` 取代旧 .lpkg 时，计算 `removed = 旧 provides − 新 provides`（**只备份旧提供、新打包消失的 SONAME**），从旧包中把属于这些 SONAME 的版本化 `.so.*`（SONAME 本体 + 实体，含符号链接；精确 `r.` 前缀匹配，不误吞 `libfoo.so.20`）备份到 `out/backups/<pkg>/`。扫全部系统库目录（usr/lib、lib、usr/lib64、lib64），扁平去重。
+- **注入（`lpkg_binding`）**：每个构建容器启动后把备份 cp 进 `/usr/lib`——dev symlink 仍指向新 so，新构建链新 so，旧二进制链旧 so。
+- **清理（`cleanup_backups`）**：**整个 build 完成**后扫描 `out/backups/`，某备份的 SONAME 已无任何包 needed_so 引用 → 删除（含空根）；仍有引用（有包跳过/BLOCKED）→ 保留。index.txt 不可读/为空/全零 needed_so → 保守保留，绝不误删。
 
 ## 8. seed（冷启动播种）
 
 `seed.rs`：
-1. 下载远端 `index.txt` → 解析
-2. **abidb 全量写入**（完整 provides + needed_so）
-3. 并行（`-j`，默认 CPU 核数）逐包：下载 + SHA256 校验 + **剥离 .lpkg metadata 的 needed_so**（保留 provides）+ 清旧版本
-4. index.txt 写剥离版（needed_so 空 + **剥离后 .lpkg 的哈希**）
-
-增量：本地已有该版本且 metadata 已剥 → 跳过下载（省流量）。解包目录随用随清。
+1. 下载远端 `index.txt` → 解析（含**完整 needed_so**）
+2. 并行（`-j`，默认 CPU 核数）逐包：下载 + **SHA256 校验** + 清旧版本（本地已有该版本 → 增量跳过下载）
+3. 本地 `index.txt` **原样保留**（不剥 needed_so、不重写哈希），`.lpkg` **不剥不重打**——单一真源，容器与 farm 共用
 
 ## 9. track 系统
 
@@ -173,21 +189,23 @@ SQLite（`out/farm-state.db`，可选 `--state`）：
 
 ```
 seed ──> out/<arch>/
-           index.txt   (needed_so 剥离 + 剥离后哈希，容器可见)
-           .abi.json   (完整 provides/needed_so，farm 传播基线)
-           <pkg>/<ver>.lpkg  (metadata 剥离 needed_so)
+           index.txt   (完整 needed_so/provides/deps，单一真源)
+           <pkg>/<ver>.lpkg  (完整 metadata，含 needed_so，不剥)
+           backups/    (ABI 断裂备份的旧 .so，整个 build 后清理)
 
 build --all ──> run_build
-  needs_build 过滤 → topo_order → 队列
-  └─ 逐包: 预下载 → docker build → scan → verify::decide
-       ├─ Unchanged → 进 repo
-       ├─ Repack    → repack metadata + LankeBUILD + abidb → 进 repo
-       └─ AbiBreak  → repack + 传播（removed SONAME → direct_victims → 入队重排）
+  needs_build 过滤 → topo_order(确定性，三类边) → 计划预览+确认 → bulk 预下载(确认集)
+  └─ 逐包: 源就绪门(非victim) → docker build(upgrade --missing-so-no-error + 备份恢复 + build --use-system-soname)
+           → scan → verify::decide
+       ├─ Unchanged → 进 repo → index 更新(完整 needed_so)
+       ├─ Repack    → repack metadata + LankeBUILD → 进 repo → index 更新
+       └─ AbiBreak  → 备份旧 so + repack + 传播(removed SONAME → direct_victims → 入队重排)
+  完成后: cleanup_backups(无 needed_so 引用则删)
 ```
 
 ## 15. 测试
 
-- **src 内单元测试**（`#[cfg(test)]`）：内部函数（topo/reorder/scan/i18n/ux/repack/seed）
+- **src 内单元测试**（`#[cfg(test)]`）：内部函数（topo/reorder/scan/i18n/ux/repack/seed/repo）
 - **tests/integration.rs**：公共 API 集成（ABI 传播、track 排序、real index）
 
-107 个测试全绿、clippy 0 警告。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、index 剥离 + 哈希替换。
+**113 个测试全绿**（98 lib + 9 + 6）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、index 写回完整 needed_so（单一真源）。
