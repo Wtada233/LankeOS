@@ -23,20 +23,27 @@ use crate::track::vercmp;
 /// 提取 URL/HTML/XML 中符合正则（含一个捕获组）的最大版本。
 /// `major` 非空时只匹配该主版本号的 tag（约束 major-of，§9）。
 /// 默认稳定版优先，无稳定版才回落（§9：track 追上游最新**稳定**版）。
-pub(crate) fn max_match(re: &Regex, text: &str, major: Option<&str>) -> Option<String> {
+pub(crate) fn max_match(
+    re: &Regex,
+    text: &str,
+    major: Option<&str>,
+    cap: Option<&str>,
+) -> Option<String> {
     let versions: Vec<String> = re
         .captures_iter(text)
         .filter_map(|c| c.get(1).map(|m| m.as_str().to_string()))
         .filter(|v| v.starts_with(|ch: char| ch.is_ascii_digit()))
         .collect();
-    max_version_stable_first(versions, major)
+    max_version_stable_first(versions, major, cap)
 }
 
-/// 稳定版优先取最大版本；`major` 非空时先按主版本过滤。
-fn max_version_stable_first(versions: Vec<String>, major: Option<&str>) -> Option<String> {
+/// 稳定版优先取最大版本；`major` 非空时先按主版本过滤，`cap` 封顶（超过则排除，
+/// 如 tcl 锁 8.6.x：max-version 8.6.16 时 9.0.1 被过滤掉）。
+fn max_version_stable_first(versions: Vec<String>, major: Option<&str>, cap: Option<&str>) -> Option<String> {
     let filtered: Vec<String> = versions
         .into_iter()
         .filter(|v| matches_major(v, major))
+        .filter(|v| cap.is_none_or(|c| vercmp::cmp_version(v, c) != std::cmp::Ordering::Greater))
         .collect();
     let stable: Vec<&String> = filtered.iter().filter(|v| is_stable(v)).collect();
     let pool: Vec<&String> = if stable.is_empty() {
@@ -108,7 +115,7 @@ pub(crate) fn max_tag_version(
         .filter_map(|t| strip_version(t, prefix))
         .filter(|v| matches_major(v, major))
         .collect();
-    max_version_stable_first(versions, major)
+    max_version_stable_first(versions, major, None)
 }
 
 /// 剥离 tag 前缀并校验版本形态：`v1.2.3` + prefix=`v` → `1.2.3`。
@@ -143,5 +150,28 @@ pub(crate) fn minor_is_even(dir: &str) -> bool {
     match parts.next() {
         Some(minor) => minor.parse::<u64>().map(|m| m % 2 == 0).unwrap_or(false),
         None => true,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn max_match_respects_cap() {
+        // tcl 锁定场景：max-version 8.6.16 → 9.x 被过滤，取 8.6.16
+        let re = Regex::new(r"tcl([\d.]+)-src\.tar\.gz").unwrap();
+        let rss = "tcl8.6.14-src.tar.gz tcl8.6.16-src.tar.gz tcl9.0.1-src.tar.gz tcl9.0.4-src.tar.gz";
+        assert_eq!(max_match(&re, rss, None, None).as_deref(), Some("9.0.4"));
+        assert_eq!(
+            max_match(&re, rss, None, Some("8.6.16")).as_deref(),
+            Some("8.6.16"),
+            "cap 应过滤超过封顶的版本"
+        );
+        assert_eq!(
+            max_match(&re, rss, Some("8"), Some("8.6.16")).as_deref(),
+            Some("8.6.16"),
+            "cap 与 major 约束应叠加"
+        );
     }
 }

@@ -21,7 +21,7 @@ pub fn probe(
     let html = fetcher.get(url)?;
     let re = Regex::new(pattern).map_err(|e| format!("正则无效 {}: {e}", pattern))?;
     let version =
-        templates::max_match(&re, &html, major).ok_or_else(|| format!("{url} 中未匹配到版本"))?;
+        templates::max_match(&re, &html, major, None).ok_or_else(|| format!("{url} 中未匹配到版本"))?;
     let name = cfg.source_name().to_string();
     let src = templates::substitute(template, &[("name", &name), ("version", &version)]);
     Ok(ProbeResult {

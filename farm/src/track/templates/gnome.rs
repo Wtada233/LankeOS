@@ -68,7 +68,7 @@ pub fn probe(
             Ok(h) => h,
             Err(_) => continue,
         };
-        if let Some(v) = templates::max_match(&file_re, &html2, major) {
+        if let Some(v) = templates::max_match(&file_re, &html2, major, None) {
             found = Some((d.to_string(), v));
             break;
         }

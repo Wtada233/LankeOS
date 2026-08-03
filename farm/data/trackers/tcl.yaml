@@ -3,4 +3,6 @@ tracker-template: sourceforge
 project: tcl
 path: Tcl
 pattern: 'tcl([\d.]+)-src\.tar\.gz'
-template: https://downloads.sourceforge.net/project/tcl/Tcl/{path_version}/tcl{version}-src.tar.gz
+# 锁定 8.6 系列：expect 5.45.4 无 tcl 9 上游兼容，9.0.x 会编译失败（Arch 仓库实际也是 8.6.16）
+max-version: 8.6.16
+template: https://downloads.sourceforge.net/sourceforge/tcl/tcl{version}-src.tar.gz

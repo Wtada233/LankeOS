@@ -40,7 +40,7 @@ pub fn probe(
     }
 
     let re = Regex::new(pattern).map_err(|e| format!("正则无效 {}: {e}", pattern))?;
-    let version = templates::max_match(&re, &all_xml, major)
+    let version = templates::max_match(&re, &all_xml, major, None)
         .ok_or_else(|| format!("{url} GCS 列表未匹配到版本"))?;
     let name = cfg.source_name().to_string();
     let src = templates::substitute(template, &[("name", &name), ("version", &version)]);
