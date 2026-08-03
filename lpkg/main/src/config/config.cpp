@@ -7,6 +7,7 @@
 #include <fstream>
 #include <random>
 
+#include "base/constants.hpp"
 #include "exception.hpp"
 #include "localization.hpp"
 #include "utils.hpp"
@@ -125,6 +126,29 @@ void Config::set_no_deps_mode(bool v) noexcept
 {
     std::lock_guard<std::mutex> lock(config_mutex_);
     no_deps_mode_ = v;
+}
+
+void Config::set_missing_so_no_error_mode(bool v) noexcept
+{
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    missing_so_no_error_mode_ = v;
+}
+
+void Config::set_use_system_soname_mode(bool v) noexcept
+{
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    use_system_soname_mode_ = v;
+}
+
+bool Config::has_system_soname(const std::string& soname) const noexcept
+{
+    // 系统 /usr/lib（或 /usr/lib64）已有该 .so 文件（如 ABI 过渡备份的旧 SONAME）→ 视为已满足。
+    for (const std::string_view sub : { constants::USR_LIB, constants::USR_LIB64 }) {
+        if (fs::exists(root_dir_ / fs::path(sub) / soname)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Config::set_testing_mode(bool v) noexcept

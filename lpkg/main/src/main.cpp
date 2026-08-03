@@ -282,6 +282,10 @@ int main(int argc, char* argv[])
             "no-hooks", get_string("help.no_hooks"),
             cxxopts::value<bool>()->default_value("false"))(
             "no-deps", get_string("help.no_deps"), cxxopts::value<bool>()->default_value("false"))(
+            "missing-so-no-error", get_string("help.missing_so_no_error"),
+            cxxopts::value<bool>()->default_value("false"))(
+            "use-system-soname", get_string("help.use_system_soname"),
+            cxxopts::value<bool>()->default_value("false"))(
             "r,recursive", get_string("help.recursive"),
             cxxopts::value<bool>()->default_value("false"))("root", get_string("help.root_dir"),
                                                             cxxopts::value<std::string>())(
@@ -330,6 +334,10 @@ int main(int argc, char* argv[])
             Config::instance().set_no_hooks_mode(result["no-hooks"].as<bool>());
         if (result.count("no-deps"))
             Config::instance().set_no_deps_mode(result["no-deps"].as<bool>());
+        if (result.count("missing-so-no-error"))
+            Config::instance().set_missing_so_no_error_mode(result["missing-so-no-error"].as<bool>());
+        if (result.count("use-system-soname"))
+            Config::instance().set_use_system_soname_mode(result["use-system-soname"].as<bool>());
         if (result.count("root"))
             Config::instance().set_root_path(result["root"].as<std::string>());
         if (result.count("arch"))

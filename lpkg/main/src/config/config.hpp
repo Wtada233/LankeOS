@@ -153,6 +153,25 @@ public:
     /** 设置跳过依赖模式 */
     void set_no_deps_mode(bool v) noexcept;
 
+    /** 缺失 SONAME 不报错（bootstrap/过渡期容忍） */
+    bool missing_so_no_error_mode() const noexcept
+    {
+        return missing_so_no_error_mode_;
+    }
+    /** 设置缺失 SONAME 不报错模式 */
+    void set_missing_so_no_error_mode(bool v) noexcept;
+
+    /** 优先用系统 .so 满足 needed_so（backup 的旧 SONAME 在 /usr/lib） */
+    bool use_system_soname_mode() const noexcept
+    {
+        return use_system_soname_mode_;
+    }
+    /** 设置优先用系统 .so 模式 */
+    void set_use_system_soname_mode(bool v) noexcept;
+
+    /** 系统 /usr/lib（或 lib64）是否已有该 SONAME 文件（如 ABI 过渡备份的旧 .so） */
+    bool has_system_soname(const std::string& soname) const noexcept;
+
     /** 是否测试模式（用于构建测试） */
     bool testing_mode() const noexcept
     {
@@ -208,6 +227,8 @@ private:
     bool force_overwrite_mode_ = false;                                         // 强制覆盖
     bool no_hooks_mode_ = false;                                                // 禁用钩子
     bool no_deps_mode_ = false;                                                 // 跳过依赖
+    bool missing_so_no_error_mode_ = false;                                     // 缺失 SONAME 不报错
+    bool use_system_soname_mode_ = false;                                       // 优先用系统 .so 满足 needed_so
     bool testing_mode_ = false;                                                 // 测试模式
 
     // --- 架构覆盖 ---------------------------------------------------------
