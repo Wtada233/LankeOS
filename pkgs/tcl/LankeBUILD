@@ -5,18 +5,15 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     SRCDIR=$(pwd)
-    # 从 {ORIG_PKG_VER}（如 9.0.4）派生 tcl 版本组件，不写死 8.6（参考 perl 的做法）。
+    rm -rf pkgs/sqlite3*
+    # 从 {ORIG_PKG_VER}（如 8.6.16）派生 tcl 版本组件，不写死（参考 perl 的做法）。
     TCL_VER="{ORIG_PKG_VER}"
     TCL_MAJOR=$(printf '%s' "$TCL_VER" | cut -d. -f1)
     TCL_MINOR=$(printf '%s' "$TCL_VER" | cut -d. -f2)
     TCL_VERSIONED=tcl${TCL_MAJOR}.${TCL_MINOR}      # tcl9.0（tdbc library 目录）
     TCLSH_VERSIONED=tclsh${TCL_MAJOR}.${TCL_MINOR}  # tclsh9.0
     cd unix
-    # tcl 9 的 bundled 包 configure（configure-packages）需要"可运行的 tclsh 9"（zipfs）。
-    # 构建目录 tclsh 的 rpath 指向安装目录 /usr/lib，libtcl9.0.so 尚未安装 → 加载失败、
-    # configure 找不到可用 tclsh 9。导出 LD_LIBRARY_PATH 指向构建目录让 tclsh 可运行
-    # （根因修复，保留 zipfs；若仍失败可改 --disable-zipfs）。
-    export LD_LIBRARY_PATH="$SRCDIR/unix${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
     ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --mandir={MANDIR} --disable-static --with-system-sqlite
     make -j$(nproc)
     sed -e "s|$SRCDIR/unix|{LIBDIR}|"         -e "s|$SRCDIR|{INCLUDEDIR}|"          -i tclConfig.sh

@@ -1,7 +1,7 @@
 {
   "name": "tcl",
-  "version": "9.0.4",
-  "release": 2,
+  "version": "8.6.16",
+  "release": 3,
   "deps": [],
   "needed_so": [],
   "provides": [],
@@ -10,7 +10,7 @@
     "zlib"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/project/tcl/Tcl/9.0.4/tcl9.0.4-src.tar.gz"
+    "https://downloads.sourceforge.net/sourceforge/tcl/tcl8.6.16-src.tar.gz"
   ],
   "work_sources": []
 }
