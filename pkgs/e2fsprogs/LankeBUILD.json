@@ -15,7 +15,7 @@
     "perl"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/1.47.4/e2fsprogs-1.47.4.tar.gz"
+    "https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v1.47.4/e2fsprogs-1.47.4.tar.gz"
   ],
   "work_sources": []
 }

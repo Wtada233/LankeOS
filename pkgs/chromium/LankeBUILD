@@ -55,7 +55,8 @@ lankebuild_prepare() {
         chromium-149-use-of-undeclared-identifier-ERROR.patch \
         chromium-150-fix-ar-unbundle.patch \
         chromium-150-fix-sysroot-path-error.patch \
-        chromium-150-revert-avx-flag-change.patch; do
+        chromium-150-revert-avx-flag-change.patch \
+        chromium-151-dont-depends-on-histograms.xml-if-it-is-not-git-checkout.patch; do
         patch -Np1 -i "$_BD/$_p"
     done
 

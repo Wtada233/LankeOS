@@ -25,6 +25,7 @@
     "glib",
     "gn",
     "gperf",
+    "gtk3",
     "harfbuzz",
     "krb5",
     "libx11",
