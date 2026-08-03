@@ -10,7 +10,7 @@
     "zlib"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/project/tcl/tcl9.0.4-src.tar.gz"
+    "https://downloads.sourceforge.net/project/tcl/Tcl/9.0.4/tcl9.0.4-src.tar.gz"
   ],
   "work_sources": []
 }
