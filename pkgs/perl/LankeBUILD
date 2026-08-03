@@ -4,13 +4,12 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    # -Dusedevel：5.45 是奇数开发版，Configure 默认拒绝非交互构建（"Do you really want to continue? [n]"）。
-    # lib 目录结构 perl{major}/{major}.{minor}（如 perl5/5.45），"perl5" 的 5 也是 major，
-    # 全部从 {ORIG_PKG_VER}（如 5.45.1）派生，不写死。
+    # lib 目录结构 perl{major}/{major}.{minor}（如 perl5/5.44），"perl5" 的 5 也是 major，
+    # 全部从 {ORIG_PKG_VER}（如 5.44.0）派生，不写死。
     PERL_MAJOR=$(printf '%s' '{ORIG_PKG_VER}' | cut -d. -f1)
     PERL_MINOR=$(printf '%s' '{ORIG_PKG_VER}' | cut -d. -f2)
     PERL_LIBDIR=perl${PERL_MAJOR}/${PERL_MAJOR}.${PERL_MINOR}
-    sh Configure -des -Dusedevel -Dprefix={PREFIX} -Dvendorprefix={PREFIX} \
+    sh Configure -des -Dprefix={PREFIX} -Dvendorprefix={PREFIX} \
         -Dprivlib={LIBDIR}/${PERL_LIBDIR}/core_perl \
         -Darchlib={LIBDIR}/${PERL_LIBDIR}/core_perl \
         -Dsitelib={LIBDIR}/${PERL_LIBDIR}/site_perl \
@@ -19,6 +18,15 @@ lankebuild_build() {
         -Dvendorarch={LIBDIR}/${PERL_LIBDIR}/vendor_perl
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
+
+    # 创建无版本号软链接（perl 的 installperl 没生成：perl5.45.1 → perl 等）。
+    # texinfo 等按 `perl` 命令查找，缺了会 "configure: perl not found"。
+    PERL_FULL='{ORIG_PKG_VER}'
+    cd "{STAGING_ROOT}{BINDIR}"
+    for f in *"$PERL_FULL"; do
+        [ -e "$f" ] || continue
+        ln -sf "$f" "${f%$PERL_FULL}"
+    done
 }
 
 

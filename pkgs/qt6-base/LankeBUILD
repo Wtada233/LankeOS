@@ -10,7 +10,7 @@ lankebuild_prepare() {
         -DFEATURE_system_sqlite=ON \
         -DFEATURE_journald=ON \
         -DFEATURE_system_xcb_xinput=ON \
-        -DFEATURE_mimetype_database=OFF \
+        -DFEATURE_mimetype_database=ON \
         -DFEATURE_xcb=ON \
         -DFEATURE_xcb_xlib=ON \
         -DINSTALL_BINDIR=lib/qt6/bin \

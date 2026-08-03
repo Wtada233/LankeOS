@@ -1,6 +1,8 @@
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    # shadow 上游 bug：find_new_sub_*ids.c 用 uintmax_t 但漏 <stdint.h>（LFS §8.30 同款修复）
+    sed -i '/stdio.h/i #include <stdint.h>' lib/find_new_sub_*ids.c
+    # passwd 路径被硬编码，configure 前需存在（LFS §8.30），否则安装脚本会建到错误位置
+    touch /usr/bin/passwd
 }
 
 lankebuild_build() {
@@ -34,6 +36,7 @@ pwconv
 grpconv
 mkdir -p /etc/default
 useradd -D --gid 999
+touch /etc/sub{u,g}id
 EOF
 
     cat > "{STAGING_ROOT}/etc/pam.d/chsh" << 'EOF'

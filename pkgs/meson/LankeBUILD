@@ -15,6 +15,9 @@ lankebuild_package() {
     # wheel 安装 + 补充文件（对齐 Arch package()：vim 高亮 + bash/zsh 补全）
     python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
 
+    # 清理 __pycache__（与 python 配方一致，.pyc 冗余）
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+
     install -d "{STAGING_ROOT}/usr/share/vim/vimfiles"
     cp -rt "{STAGING_ROOT}/usr/share/vim/vimfiles" data/syntax-highlighting/vim/*/
 

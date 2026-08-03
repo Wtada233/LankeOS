@@ -14,10 +14,13 @@
     "glib",
     "intltool",
     "iproute2",
-    "python"
+    "python",
+    "python-cairo",
+    "python-gobject"
   ],
   "sources": [
     "https://github.com/blueman-project/blueman/releases/download/2.4.6/blueman-2.4.6.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

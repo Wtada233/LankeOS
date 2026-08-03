@@ -46,10 +46,12 @@
     "uthash",
     "v4l-utils",
     "wayland",
+    "xorgproto",
     "zlib"
   ],
   "sources": [
     "git+https://github.com/obsproject/obs-studio@32.2.1"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 1
 }

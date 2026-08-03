@@ -32,5 +32,22 @@ EOF
 
 lankebuild_package() {
     # Installation handled by builder
-    :
+    mkdir -p "{STAGING_ROOT}"/usr/share/polkit-1/rules.d
+    cat > "{STAGING_ROOT}"/usr/share/polkit-1/rules.d/99-shutdown-nopasswd.rules << 'EOF'
+polkit.addRule(function(action, subject) {
+    // 匹配所有与关机、重启相关的 action
+    if (action.id == "org.freedesktop.login1.power-off" ||
+        action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
+        action.id == "org.freedesktop.login1.power-off-ignore-inhibit" ||
+        action.id == "org.freedesktop.login1.reboot" ||
+        action.id == "org.freedesktop.login1.reboot-multiple-sessions" ||
+        action.id == "org.freedesktop.login1.reboot-ignore-inhibit") {
+
+        // 如果用户属于 wheel 组，直接放行
+        if (subject.isInGroup("wheel")) {
+            return polkit.Result.YES;
+        }
+    }
+});
+EOF
 }

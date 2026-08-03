@@ -1,7 +1,7 @@
 {
   "name": "perl",
-  "version": "5.45.1",
-  "release": 2,
+  "version": "5.44.0",
+  "release": 1,
   "deps": [],
   "needed_so": [],
   "provides": [],
@@ -11,7 +11,7 @@
     "libxcrypt"
   ],
   "sources": [
-    "https://www.cpan.org/src/5.0/perl-5.45.1.tar.xz"
+    "https://www.cpan.org/src/5.0/perl-5.44.0.tar.xz"
   ],
   "work_sources": []
 }

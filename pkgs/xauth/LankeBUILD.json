@@ -10,7 +10,9 @@
     "libx11",
     "libxau",
     "libxext",
-    "libxmu"
+    "libxmu",
+    "util-macros",
+    "xorgproto"
   ],
   "sources": [
     "https://xorg.freedesktop.org/releases/individual/app/xauth-1.1.5.tar.gz"

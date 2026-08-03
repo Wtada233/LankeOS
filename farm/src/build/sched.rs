@@ -9,20 +9,38 @@ use crate::tr;
 use crate::ux;
 
 /// Kahn 拓扑排序（只用 needed_so 链接依赖）＋ 环切割。`_pkgs_dir` 保留签名兼容（排序不用配方）。
-pub(crate) fn topo_order(_pkgs_dir: &Path, targets: &[String], old: &Index) -> Vec<String> {
+pub(crate) fn topo_order(pkgs_dir: &Path, targets: &[String], old: &Index) -> Vec<String> {
     let names: HashSet<&str> = targets.iter().map(String::as_str).collect();
-    // graph: pkg → 需要先重建的包。**只用 needed_so（link_deps）**——build_deps/deps 是
-    // 构建工具依赖（base-devel→git→curl），混进去会制造海量伪环（glibc→git 这类：glibc
-    // build 要 git，git 又链 libc），切环刷屏且无关 ABI。SONAME 检查已剥离后 build_deps 排序
-    // 不再关键；只有链接依赖（needed_so → provider）决定重建顺序，天然近 DAG。
+    // graph: pkg → 需要先重建的包。三类边（都在 targets 集内）：
+    //   - needed_so（link_deps）：链接库 → provider
+    //   - deps：包级运行时依赖（python 模块等不链 libpython、靠 deps 依赖的包）
+    //   - build_deps：构建工具依赖（从 LankeBUILD.json 读）
+    // 混入 deps/build_deps 会引入伪环（glibc→git→libc），由 find_cycle_edge 逐条切断。
     let mut graph: HashMap<String, Vec<String>> = HashMap::new();
     let mut in_deg: HashMap<String, usize> = HashMap::new();
     let mut rev: HashMap<String, Vec<String>> = HashMap::new();
     for n in targets {
         let mut set: HashSet<String> = HashSet::new();
+        // needed_so 边
         for d in crate::graph::link_deps(old, n) {
             if d.as_str() != n.as_str() && names.contains(d.as_str()) {
                 set.insert(d);
+            }
+        }
+        // deps 边（旧索引 deps 字段）
+        if let Some(info) = old.packages.get(n) {
+            for d in &info.deps {
+                if d.as_str() != n.as_str() && names.contains(d.as_str()) {
+                    set.insert(d.clone());
+                }
+            }
+        }
+        // build_deps 边（配方 LankeBUILD.json）
+        if let Some(b) = super::read_lankebuild(pkgs_dir, n) {
+            for d in b.build_deps {
+                if d.as_str() != n.as_str() && names.contains(d.as_str()) {
+                    set.insert(d.clone());
+                }
             }
         }
         let mut deps: Vec<String> = set.into_iter().collect();

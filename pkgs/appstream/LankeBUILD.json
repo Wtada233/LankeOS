@@ -32,5 +32,6 @@
   "sources": [
     "https://github.com/ximion/appstream/archive/refs/tags/v1.1.5.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 2
 }

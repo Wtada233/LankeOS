@@ -137,7 +137,10 @@ impl RealBinding {
         //    mkdir 必须在 docker cp 前就位——对不存在的 /work，docker cp <dir> :/work/ 会把
         //    配方内容直接铺进 /work，而不是建 /work/<pkg>（实测）。tail -f 保活，busybox/coreutils 都支持。
         let create = std::process::Command::new("docker")
-            .args(["create", "--network=host", "--name", NAME, &self.base_image,
+            // DooD：挂宿主 docker socket，容器内可 docker run（docker 包 build tini 静态需要）。
+            .args(["create", "--network=host", "--name", NAME,
+                   "-v", "/var/run/docker.sock:/var/run/docker.sock",
+                   &self.base_image,
                    "sh", "-c", "mkdir -p /work && tail -f /dev/null"])
             .output()
             .map_err(|e| format!("docker create 失败: {e}"))?;

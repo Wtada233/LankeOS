@@ -4,6 +4,7 @@
   "release": 2,
   "deps": [
     "bash",
+    "xorgproto",
     "xwayland"
   ],
   "needed_so": [],

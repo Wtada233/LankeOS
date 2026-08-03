@@ -4,13 +4,15 @@
   "release": 2,
   "deps": [
     "bash",
-    "perl"
+    "perl",
+    "xml-parser"
   ],
   "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
-    "perl"
+    "perl",
+    "xml-parser"
   ],
   "sources": [
     "https://launchpad.net/intltool/trunk/0.51.0/+download/intltool-0.51.0.tar.gz"

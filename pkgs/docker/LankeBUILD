@@ -12,8 +12,8 @@ lankebuild_prepare() {
     ln -sf "$PWD"/moby-docker-v* src/github.com/moby/moby/v2
 
     mkdir -p src/github.com/krallin
-    # tini 源用 tag（v0.19.0），通配符适配后续 tag 更新
-    ln -sf "$PWD"/tini-v* src/github.com/krallin/tini
+    # tini 源用 tag（v0.19.0），GitHub archive 去 v 前缀 → 目录 tini-0.19.0，通配符 tini-*
+    ln -sf "$PWD"/tini-* src/github.com/krallin/tini
 }
 
 lankebuild_build() {

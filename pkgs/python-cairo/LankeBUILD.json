@@ -1,7 +1,7 @@
 {
   "name": "python-cairo",
   "version": "1.29.0",
-  "release": 1,
+  "release": 2,
   "deps": [
     "python"
   ],
@@ -12,7 +12,8 @@
     "cairo",
     "meson",
     "ninja",
-    "python"
+    "python",
+    "xorgproto"
   ],
   "sources": [
     "https://github.com/pygobject/pycairo/releases/download/v1.29.0/pycairo-1.29.0.tar.gz"

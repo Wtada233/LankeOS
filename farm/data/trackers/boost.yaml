@@ -1,6 +1,16 @@
+# boost 的 beta/rc 标签（boost-1.92.0.beta1）混在 tags 里，
+# script 只认纯稳定版 boost-x.y.z（无后缀）。
+# 源码用官方 archives.boost.io 完整 tarball（下划线命名 boost_1_91_0.tar.gz，
+# GitHub archive 是超项目不含子模块，build 不了）。
 pkg-name: boost
-tracker-template: github
-repo: boostorg/boost
-mode: releases
-tag-prefix: boost-
-template: https://github.com/{repo}/releases/download/boost-{version}/boost-{version}-b2-nodocs.tar.xz
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  json=$(curl -fsSL "https://api.github.com/repos/boostorg/boost/tags?per_page=100") || exit 1
+  for ver in $(printf '%s\n' "$json" | grep -oE '"name": *"boost-[0-9]+\.[0-9]+\.[0-9]+"' | sed 's/.*"boost-//;s/"//' | sort -uVr); do
+      fver=${ver//./_}
+      echo "$ver"
+      echo "https://archives.boost.io/release/${ver}/source/boost_${fver}.tar.gz"
+      exit 0
+  done
+  exit 1

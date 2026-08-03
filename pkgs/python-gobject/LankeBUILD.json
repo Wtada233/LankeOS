@@ -1,7 +1,7 @@
 {
   "name": "python-gobject",
   "version": "3.56.3",
-  "release": 1,
+  "release": 2,
   "deps": [
     "python",
     "python-cairo"
@@ -18,7 +18,9 @@
     "libffi",
     "meson",
     "ninja",
-    "python"
+    "python",
+    "python-cairo",
+    "xorgproto"
   ],
   "sources": [
     "https://download.gnome.org/sources/pygobject/3.56/pygobject-3.56.3.tar.gz"

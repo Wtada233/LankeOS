@@ -8,13 +8,16 @@
   "build_deps": [
     "base-devel",
     "cmake",
+    "git",
     "libx11",
     "libxau",
     "libxdmcp",
     "libxcb",
+    "libxrandr",
     "ninja",
     "vulkan-headers",
-    "wayland"
+    "wayland",
+    "xorgproto"
   ],
   "sources": [
     "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz"

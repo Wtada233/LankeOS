@@ -1,6 +1,6 @@
 {
   "name": "boost",
-  "version": "1.92.0.beta1",
+  "version": "1.91.0",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -15,7 +15,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/boostorg/boost/releases/download/boost-1.92.0.beta1/boost-1.92.0.beta1-b2-nodocs.tar.xz"
+    "https://archives.boost.io/release/1.91.0/source/boost_1_91_0.tar.gz"
   ],
   "work_sources": []
 }
