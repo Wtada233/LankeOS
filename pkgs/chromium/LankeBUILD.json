@@ -3,6 +3,7 @@
   "version": "153.0.7984.0",
   "release": 1,
   "deps": [
+    "gtk3",
     "xwayland"
   ],
   "needed_so": [],
