@@ -61,7 +61,7 @@ pub(crate) fn prompt_blocked(pkg: &str, opts: &BuildOptions, stage: &str) -> Pro
 /// 打开**宿主 shell**（pkgs/<pkg>/）让 operator 修复配方/源——修改持久化，
 /// 退出后"继续构建"（docker cp 重新拷入修复后的配方）才真正生效。
 /// 绝不开新容器（容器易失，改了等于没改）。
-fn open_shell(pkg: &str, opts: &BuildOptions) {
+pub(crate) fn open_shell(pkg: &str, opts: &BuildOptions) {
     let workdir = opts.pkgs_dir.join(pkg);
     eprintln!("{}", tr!("build.fix_shell", workdir.display()));
     let _ = std::process::Command::new("bash").current_dir(&workdir).status();

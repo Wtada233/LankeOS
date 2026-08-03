@@ -94,6 +94,30 @@ pub fn read_lankebuild(pkgs_dir: &Path, pkg: &str) -> Option<LankeBuild> {
     serde_json::from_str(&content).ok()
 }
 
+/// 源就绪门（§8.6）：第一次安装计划中能确定的 http/https 源**必须全部下载**（用户规则）。
+///
+/// - 交互模式：下载失败 → 开宿主 shell 让 operator 手动介入（放置源/修网络/改 URL），
+///   退出后重试。**不许退出、不许跳过**——直到源就绪才放行。
+/// - 非交互模式：无 operator 可介入 → 返回 Err（整个构建终止，不出现 source-missing 继续）。
+/// - 唯一允许"跳过"的是 `git+`/`file://` 源（`is_skip_source`，git 构建时由 lpkg 处理）。
+/// - ABI 受害者（is_victim）不在第一次安装计划内，不预下载（构建时由 lpkg build 自己下载）。
+fn source_gate(pkg: &str, opts: &BuildOptions, is_victim: bool) -> Result<(), String> {
+    if is_victim {
+        return Ok(());
+    }
+    loop {
+        match pre_download_sources(&opts.pkgs_dir, pkg, opts.download_retries) {
+            Ok(()) => return Ok(()),
+            Err(e) if opts.interactive => {
+                eprintln!("  {}", ux::yellow(&tr!("build.source_missing", pkg, e)));
+                // 开 shell 手动介入；退出后回到循环顶部重试（仍失败会再次开 shell）
+                prompt::open_shell(pkg, opts);
+            }
+            Err(e) => return Err(tr!("build.source_missing_fatal", pkg, e)),
+        }
+    }
+}
+
 /// 进程内交互接管（§8.5）：BLOCKED 时提示 operator 选择，不退出进程。
 /// 主调度：返回构建报告（built/repacked/abi_broken/blocked）。
 /// `state` 非空时记录 job 状态 + 配方 hash（§11 持久化，供续跑/差分）。
@@ -143,12 +167,10 @@ pub fn run_build(
             println!("{}", tr!("build.plan_cancel"));
             return Ok(BuildReport::default());
         }
+        // 确认集全部 http/https 源**必须预下载**（用户规则）：任何失败都不允许跳过/标记 missing
+        // 继续——交互模式开宿主 shell 手动介入后重试，非交互则整个构建终止。
         for (pkg, _) in &queue {
-            if let Err(e) = pre_download_sources(&opts.pkgs_dir, pkg, opts.download_retries) {
-                // 批量预下载是尽力而为：失败不阻塞，循环里每个确认集包会再走一次
-                // 源就绪门（带交互接管），这里只先打警告。
-                eprintln!("  {}", ux::yellow(&tr!("build.source_missing", pkg, e)));
-            }
+            source_gate(pkg, opts, false)?;
         }
     }
 
@@ -180,35 +202,15 @@ pub fn run_build(
         }
 
         // 源预下载 + 构建 → 统一的进程内交互接管（§8.5，不退出进程）。
-        // **任何失败都不允许自动跳过**——源预下载失败同样走提示：1) 开 shell 修复 2) 跳过 3) 结束。
-        // 只有 operator 明确选"跳过"才跳过（否则依赖序会被打乱、后面的包基于缺失的依赖构建）。
+        // 源预下载失败**不允许跳过 / 不允许标记 missing 继续**（用户规则）：交互模式开宿主
+        // shell 手动介入后重试；非交互无 operator → 整个构建硬终止。
+        // 构建失败仍走原菜单：1) 开 shell 修复 2) 跳过 3) 结束。
         let (done, end_build) = 'pkg: loop {
             // §8.6 源预下载：宿主侧预取，源就绪才构建。
-            // ABI 受害者跳过——预下载只给确认集（上面已 bulk 预取）；受害者构建时由 lpkg build 自己下载。
-            if !is_victim {
-                if let Err(e) = pre_download_sources(&opts.pkgs_dir, &pkg, opts.download_retries) {
-                    eprintln!("  {}", ux::yellow(&tr!("build.source_missing", pkg, e)));
-                    if !opts.interactive {
-                        // 非交互：无 operator 可提示 → 标记 source-missing 阻塞继续（不静默丢弃）
-                        eprintln!("{}", tr!("build.source_missing_ni", pkg));
-                        report.source_missing.push(pkg.clone());
-                        if let Some(st) = state {
-                            let _ = st.set_job(&pkg, JobStatus::Blocked, Some("source-missing"), rhash.as_deref());
-                        }
-                        break 'pkg (BuildDone::Blocked, false);
-                    }
-                    match prompt_blocked(&pkg, opts, &format!("源预下载失败：{e}")) {
-                        PromptChoice::Retry => continue, // 开 shell 手动放置源/修网络后重试
-                        PromptChoice::Skip => {
-                            report.source_missing.push(pkg.clone());
-                            if let Some(st) = state {
-                                let _ = st.set_job(&pkg, JobStatus::Skipped, Some("operator skip: source"), rhash.as_deref());
-                            }
-                            break 'pkg (BuildDone::Skipped, false);
-                        }
-                        PromptChoice::End => break 'pkg (BuildDone::Blocked, true),
-                    }
-                }
+            // ABI 受害者不在第一次安装计划内，不预下载（构建时由 lpkg build 自己下载）。
+            if let Err(e) = source_gate(&pkg, opts, is_victim) {
+                // 非交互下源无法下载 → 构建终止（不允许 source-missing 状态继续）
+                return Err(e);
             }
 
             // 构建失败 → 交互接管
@@ -532,6 +534,32 @@ mod tests {
         assert!(!err.is_empty(), "应返回 source-missing 错误");
         assert!(!pkgs.join("p/nope.tar.gz").exists());
         fs::remove_dir_all(&pkgs).ok();
+    }
+
+    #[test]
+    fn source_missing_aborts_build_in_non_interactive() {
+        // 用户规则：http/https 源必须下载，**不允许 source-missing 继续**。
+        // 非交互无 operator 介入 → run_build 整体硬终止（Err），而不是标记 missing 跳过继续。
+        let dir = temp_dir("farm-src-missing-abort");
+        let out = temp_dir("farm-src-missing-abort-out");
+        write_baseline(&out, "a|1.0:h::liba.so.1:|\n");
+        write_pkg_full(&dir, "a", &["liba.so.1"], &[], &["http://127.0.0.1:1/nope.tar.gz"]);
+        let mut binding = StubBinding::new(HashMap::new());
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["a".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 1,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+        };
+        let err = run_build(&opts, &mut binding, None).unwrap_err();
+        assert!(err.contains("source-missing"), "非交互源缺失应硬终止：{err}");
+        assert!(!dir.join("a/nope.tar.gz").exists());
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
     }
 
     #[test]
