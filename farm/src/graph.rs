@@ -43,11 +43,31 @@ pub fn is_soname_versioned(s: &str) -> bool {
             .is_some_and(|c| c.is_ascii_digit())
 }
 
-/// 从 provides 列表中筛出版本化 SONAME 集合（ABI 面）。
+/// 从 provides 列表中筛出 ABI 面 SONAME 集合。
+///
+/// 包含：
+/// - 版本化 `.so.*`（libfoo.so.1）——ABI 主信号
+/// - 无版本化但**同包无版本化兄弟项**的裸 `.so`——即**无 SONAME 的实体库**
+///   （tcl 的 libtcl8.6.so、expect 的 libexpect5.45.4.so），运行时 DT_NEEDED 目标，
+///   其提供面变化同样是 ABI 断裂
+/// 排除：
+/// - dev symlink（libfoo.so 指向 libfoo.so.1，同包必有版本化兄弟项）
+/// - 虚拟提供 / 非库名（rustc、golang）
 pub fn soname_provides_of(provides: &[String]) -> HashSet<String> {
+    let versioned: Vec<&String> = provides.iter().filter(|p| is_soname_versioned(p)).collect();
     provides
         .iter()
-        .filter(|p| is_soname_versioned(p))
+        .filter(|p| {
+            let p = p.as_str();
+            if is_soname_versioned(p) {
+                return true;
+            }
+            let bare = p.strip_suffix(".so").unwrap_or(p);
+            p.ends_with(".so")
+                && !versioned
+                    .iter()
+                    .any(|v| v.strip_prefix(bare).is_some_and(|r| r.starts_with(".so.")))
+        })
         .cloned()
         .collect()
 }

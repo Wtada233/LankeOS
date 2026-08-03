@@ -100,7 +100,8 @@ pub(crate) fn place_in_repo(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &s
 /// 容器构建时 cp 进 /usr/lib（见 lpkg_binding），旧二进制（链旧 SONAME，如 gettext 链
 /// libxml2.so.2）在过渡期能加载旧 .so；新构建用新 .so。
 ///
-/// **只备份旧 provides 有、新打包消失的 SONAME**（`removed = old_provides − new_provides`）：
+/// **只备份旧 provides 有、新打包消失的 ABI 面 SONAME**（与检测端 `removed_sonames` **共用**
+/// `soname_provides_of`：`removed = ABI(old) − ABI(new)`，保证备份与 ABI 检查逻辑完全对称）：
 /// - 版本化 `.so.*`：SONAME 本体 + 实体（libfoo.so.1 / libfoo.so.1.2.3）
 /// - 无 SONAME 的运行时库（如 tcl 的 libtcl8.6.so、expect 的 libexpect5.45.4.so）：文件名即身份
 /// - 符号链接**保留本身**（ldconfig 要求版本化 SONAME 是符号链接，否则报 dirty），并**复刻目录树**
@@ -124,14 +125,17 @@ pub(crate) fn backup_removed_sonames(
         .as_array()
         .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
         .unwrap_or_default();
-    let removed: Vec<&str> = old_provides
-        .iter()
-        .filter(|p| !new_provides.contains(p))
-        .map(|s| s.as_str())
-        .collect();
-    if removed.is_empty() {
+    // ABI 面 SONAME 差集（与检测端 removed_sonames 共用 soname_provides_of，保证对称）：
+    // 版本化 .so.* + 无 SONAME 实体库；dev symlink / 虚拟提供不算 ABI 面，不进入备份。
+    let removed_set: std::collections::HashSet<String> = {
+        let old_s = crate::graph::soname_provides_of(&old_provides);
+        let new_s = crate::graph::soname_provides_of(new_provides);
+        old_s.difference(&new_s).cloned().collect()
+    };
+    if removed_set.is_empty() {
         return Ok(());
     }
+    let removed: Vec<&str> = removed_set.iter().map(String::as_str).collect();
     // 提取旧包，把各系统库目录下匹配被移除 SONAME 的版本化 .so 复制到备份目录
     let tmp = out_dir.join("backup_tmp").join(pkg);
     crate::scan::extract_lpkg(old_lpkg, &tmp)?;

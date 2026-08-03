@@ -139,6 +139,41 @@ glibc|2.39:hash::libc.so,libc.so.6,ld-linux.so.2:|
     }
 
     #[test]
+    fn removed_sonames_detects_unversioned_soname_change() {
+        // tcl 8.6 → 9.0：无 SONAME 实体库 libtcl8.6.so → libtcl9.0.so 必须被识别为 ABI 断裂
+        //（tcl 的 provides 只有裸 .so，没有版本化兄弟项 → 是实体库不是 dev symlink）。
+        let old = Index::parse("tcl|8.6.16:hash::libtcl8.6.so:libc.so.6,libtcl8.6.so|\n");
+        assert_eq!(
+            removed_sonames(&old, "tcl", &["libtcl9.0.so".to_string()]),
+            vec!["libtcl8.6.so"]
+        );
+        // dev symlink（libfoo.so 有版本化兄弟 libfoo.so.1）不算 ABI 信号，不能被误报
+        assert_eq!(
+            removed_sonames(&old, "tcl", &["libtcl8.6.so".to_string()]),
+            Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn unversioned_break_rebuilds_expect() {
+        // tcl 8.6 → 9.0 移除 libtcl8.6.so → 链接它的 expect（needed_so 含 libtcl8.6.so）
+        // 是直连受害者；expect 自己的 libexpect5.45.4.so（无 SONAME 实体库）是 ABI 信号，
+        // 重建后 provides 未变 → 不级联。
+        let old = Index::parse(
+            "tcl|8.6.16:hash::libtcl8.6.so:libc.so.6,libtcl8.6.so|\n\
+             expect|5.45.4:hash::libexpect5.45.4.so:libtcl8.6.so,libc.so.6|\n",
+        );
+        let rev = RevMap::build(&old);
+        let new_provides = vec!["libtcl9.0.so".to_string()];
+        let victims = vec!["expect".to_string()];
+        let mut binding = abi_preserving_stub(&old, &victims);
+
+        let res = propagate(&old, &rev, "tcl", &new_provides, &mut binding);
+        assert_eq!(res.rebuilt, vec!["expect", "tcl"]);
+        assert!(res.blocked.is_empty());
+    }
+
+    #[test]
     fn libxml2_break_only_rebuilds_llvm_rust_untouched() {
         let old = Index::parse(CHAIN);
         let rev = RevMap::build(&old);
@@ -174,6 +209,33 @@ glibc|2.39:hash::libc.so,libc.so.6,ld-linux.so.2:|
         let res = propagate(&old, &rev, "libxml2", &new_provides, &mut binding);
         assert_eq!(res.rebuilt, vec!["libxml2", "llvm", "rust"]);
         assert!(res.blocked.is_empty());
+    }
+
+    #[test]
+    fn detection_and_backup_share_abi_soname_set() {
+        // 对称性锁死：备份端（repo::backup_removed_sonames 内部）与检测端（removed_sonames）
+        // 必须用同一个 ABI 面集合（soname_provides_of）。dev symlink（libfoo.so 有版本化兄弟
+        // libfoo.so.1）两端都排除；无 SONAME 实体库（libtcl8.6.so）两端都纳入。
+        let old = Index::parse(
+            "libfoo|1.0:hash::libfoo.so,libfoo.so.1:libc.so.6|\n\
+             tcl|8.6.16:hash::libtcl8.6.so:libc.so.6,libtcl8.6.so|\n",
+        );
+        // 检测端
+        let det = removed_sonames(&old, "libfoo", &["libfoo.so".to_string(), "libfoo.so.2".to_string()]);
+        // 备份端（同一计算：ABI(old) − ABI(new)）
+        let old_s = soname_provides_of(&old.packages["libfoo"].provides);
+        let new_s = soname_provides_of(&["libfoo.so".to_string(), "libfoo.so.2".to_string()]);
+        let bak: Vec<String> = old_s.difference(&new_s).cloned().collect();
+        assert_eq!(det, bak, "dev symlink 场景：检测与备份必须一致");
+        assert_eq!(det, vec!["libfoo.so.1"], "libfoo.so（dev symlink）不应是 ABI 面");
+
+        // tcl 无 SONAME 实体库：两端都识别 libtcl8.6.so 为 ABI 面
+        let det2 = removed_sonames(&old, "tcl", &["libtcl9.0.so".to_string()]);
+        let old_s2 = soname_provides_of(&old.packages["tcl"].provides);
+        let new_s2 = soname_provides_of(&["libtcl9.0.so".to_string()]);
+        let bak2: Vec<String> = old_s2.difference(&new_s2).cloned().collect();
+        assert_eq!(det2, bak2, "无 SONAME 实体库场景：检测与备份必须一致");
+        assert_eq!(det2, vec!["libtcl8.6.so"]);
     }
 
     #[test]

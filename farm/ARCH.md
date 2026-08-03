@@ -158,7 +158,7 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 
 ## 7. ABI 检测与传播（abi.rs）
 
-- **`removed_sonames(old, pkg, new_provides)`**：旧索引 provides − 新扫描 versioned provides → 被移除的 SONAME（ABI 断裂信号）
+- **`removed_sonames(old, pkg, new_provides)`**：旧索引 provides − 新扫描 provides（ABI 面 = 版本化 `.so.*` **+ 无 SONAME 实体库**如 tcl 的 `libtcl8.6.so`/expect 的 `libexpect5.45.4.so`；dev symlink 与虚拟提供排除）→ 被移除的 SONAME（ABI 断裂信号）
 - **`RevMap`**（graph.rs）：soname → 需要它的包（旧索引 needed_so 反图）
 - **`direct_victims(revmap, removed)`**：直接链接被移除 SONAME 的包
 - **`groups.victims_for(on, all_pkgs)`**：data/build/*.yaml 声明式重建组（不链但 ABI 敏感，见 §4）
