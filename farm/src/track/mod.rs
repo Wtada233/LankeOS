@@ -659,80 +659,72 @@ script-content: |
     }
 
     #[test]
-    fn real_tracker_yamls_use_version_constraints() {
-        // 校验 data/trackers 里应用的新字段能解析（order / same-version / major-of / extra-sources）
-        let read = |p: &str| {
-            serde_yaml::from_str::<TrackerConfig>(&std::fs::read_to_string(p).unwrap()).unwrap()
-        };
-        let vh = read("data/trackers/vulkan-headers.yaml");
+    fn tracker_yaml_fields_and_ordering() {
+        // 用内嵌 fixture 校验字段解析 + order_entries 排序。
+        // 不读 data/trackers 真实文件——那是项目数据，改名/增删会导致测试假失败。
+        let read = |yaml: &str| serde_yaml::from_str::<TrackerConfig>(yaml).unwrap();
+
+        // 字段解析：order / same-version / major-of / 模板字段
+        let vh = read("pkg-name: vulkan-headers\ntracker-template: github\n");
         assert_eq!(vh.order, None); // 版本源头，无需前置
         assert_eq!(vh.same_version, None);
-        let sh = read("data/trackers/SPIRV-Headers.yaml");
+        let sh = read(
+            "pkg-name: spirv-headers\ntracker-template: github\n\
+             order: after(vulkan-headers)\nsame-version: vulkan-headers\n",
+        );
         assert_eq!(sh.order.as_deref(), Some("after(vulkan-headers)"));
         assert_eq!(sh.same_version.as_deref(), Some("vulkan-headers"));
-        let sllvm = read("data/trackers/SPIRV-LLVM-Translator.yaml");
+        let sllvm = read(
+            "pkg-name: spirv-llvm-translator\ntracker-template: github\n\
+             order: after(llvm)\nmajor-of: llvm\n",
+        );
         assert_eq!(sllvm.order.as_deref(), Some("after(llvm)"));
         assert_eq!(sllvm.major_of.as_deref(), Some("llvm"));
-        let libpl = read("data/trackers/libplacebo.yaml");
-        // libplacebo 改用 git+ 源：3rdparty 子模块（Vulkan-Headers/fast_float/glad/jinja/markupsafe/nuklear）
-        // 随 tag 自动对齐，tracker 不再声明 sources: 正则匹配条目
-        assert_eq!(libpl.tracker_template, "github");
+        let libpl = read(
+            "pkg-name: libplacebo\ntracker-template: github\nrepo: haasn/libplacebo\n\
+             mode: tags\ntag-prefix: v\ntemplate: git+https://github.com/{repo}@{tag}\n",
+        );
         assert_eq!(libpl.repo.as_deref(), Some("haasn/libplacebo"));
         assert_eq!(libpl.mode.as_deref(), Some("tags"));
         assert_eq!(libpl.tag_prefix.as_deref(), Some("v"));
-        assert_eq!(
-            libpl.template.as_deref(),
-            Some("git+https://github.com/{repo}@{tag}")
-        );
-        assert!(libpl.sources.is_empty(), "vendored 依赖走 git submodule，不再声明 sources:");
-
-        // qt6 全家桶：模块版本跟随 qt6-base（same-version + order: after(qt6-base)）
-        let qt6_modules = [
-            "qt6-declarative",
-            "qt6-imageformats",
-            "qt6-svg",
-            "qt6-tools",
-            "qt6-wayland",
-            "qt5compat",
-        ];
-        for m in qt6_modules {
-            let c = read(&format!("data/trackers/{m}.yaml"));
-            assert_eq!(c.order.as_deref(), Some("after(qt6-base)"), "{m}");
-            assert_eq!(c.same_version.as_deref(), Some("qt6-base"), "{m}");
-        }
-        let qtbase = read("data/trackers/qt6-base.yaml");
-        assert_eq!(qtbase.order, None); // 版本源头，无需前置
+        assert!(libpl.sources.is_empty());
+        let qtbase = read("pkg-name: qt6-base\ntracker-template: github\n");
+        assert_eq!(qtbase.order, None);
         assert_eq!(qtbase.same_version, None);
-        let qt6ct = read("data/trackers/qt6ct.yaml");
-        assert_eq!(qt6ct.same_version, None); // 第三方工具，独立版本号
 
-        // 端到端：用全部真实 tracker 配置跑 order_entries，相对顺序必须正确
-        let mut real = HashMap::new();
-        for f in std::fs::read_dir("data/trackers").unwrap().flatten() {
-            if let Ok(content) = std::fs::read_to_string(f.path()) {
-                if let Ok(c) = serde_yaml::from_str::<TrackerConfig>(&content) {
-                    real.insert(c.pkg_name.clone(), c);
-                }
-            }
+        // order_entries 端到端：fixture 集上的相对顺序必须正确
+        let mut trackers = HashMap::new();
+        for (name, y) in [
+            ("vulkan-headers", "pkg-name: vulkan-headers\ntracker-template: github\n"),
+            ("spirv-headers",
+                "pkg-name: spirv-headers\ntracker-template: github\norder: after(vulkan-headers)\n"),
+            ("spirv-llvm-translator",
+                "pkg-name: spirv-llvm-translator\ntracker-template: github\norder: after(llvm)\n"),
+            ("llvm", "pkg-name: llvm\ntracker-template: github\n"),
+            ("vulkan-loader", "pkg-name: vulkan-loader\ntracker-template: github\n"),
+            ("qt6-base", "pkg-name: qt6-base\ntracker-template: github\n"),
+            ("qt6-declarative",
+                "pkg-name: qt6-declarative\ntracker-template: github\norder: after(qt6-base)\n"),
+            ("qt6-imageformats",
+                "pkg-name: qt6-imageformats\ntracker-template: github\norder: after(qt6-base)\n"),
+            ("qt6-svg",
+                "pkg-name: qt6-svg\ntracker-template: github\norder: after(qt6-base)\n"),
+            ("qt5compat",
+                "pkg-name: qt5compat\ntracker-template: github\norder: after(qt6-base)\n"),
+            ("lastpkg", "pkg-name: lastpkg\ntracker-template: github\norder: last\n"),
+        ] {
+            let c = read(y);
+            trackers.insert(name.to_string(), c);
         }
-        let ordered = order_entries(real.keys().cloned().collect(), &real);
+        let names: Vec<String> = trackers.keys().cloned().collect();
+        let ordered = order_entries(names, &trackers);
         let pos = |p: &str| ordered.iter().position(|n| n == p).unwrap();
-        assert!(
-            pos("llvm") < pos("SPIRV-LLVM-Translator"),
-            "ordered: {ordered:?}"
-        );
-        assert!(
-            pos("vulkan-headers") < pos("SPIRV-Headers"),
-            "ordered: {ordered:?}"
-        );
-        assert!(
-            pos("vulkan-headers") < pos("vulkan-loader"),
-            "ordered: {ordered:?}"
-        );
-        // qt6 模块必须在 qt6-base 之后处理（same-version 读取 qt6-base 本轮新版本）
-        for m in ["qt6-declarative", "qt6-imageformats", "qt6-svg", "qt6-tools",
-                  "qt6-wayland", "qt5compat"] {
+        assert!(pos("llvm") < pos("spirv-llvm-translator"), "ordered: {ordered:?}");
+        assert!(pos("vulkan-headers") < pos("spirv-headers"), "ordered: {ordered:?}");
+        assert!(pos("vulkan-headers") < pos("vulkan-loader"), "ordered: {ordered:?}");
+        for m in ["qt6-declarative", "qt6-imageformats", "qt6-svg", "qt5compat"] {
             assert!(pos("qt6-base") < pos(m), "qt6-base 应排在 {m} 之前，ordered: {ordered:?}");
         }
+        assert_eq!(ordered.last().map(String::as_str), Some("lastpkg"));
     }
 }
