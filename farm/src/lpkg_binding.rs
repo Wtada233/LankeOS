@@ -191,12 +191,13 @@ impl RealBinding {
         //    流程：`lpkg install lpkg`（基础镜像里旧版无 force-solve-conflict）→ `lpkg upgrade`
         //    拉 127.0.0.1 内嵌 repo 最新依赖；upgrade 若仍报错，用确认短语喂 force-solve-conflict
         //    清理后重试（仅依赖环触发）。升级完成后把备份的旧 .so 恢复进 /usr/lib——新构建链新
-        //    SO（dev symlink），旧二进制链旧 SONAME 在过渡期能加载。
+        //    SO（dev symlink），旧二进制链旧 SONAME 在过渡期能加载；恢复后 ldconfig 刷新缓存，
+        //    旧二进制运行时能按 SONAME 命中 ld.so.cache。
         let script = format!(
             "cd /work/{pkg} && \
              lpkg install lpkg -y && \
              ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict -y --missing-so-no-error && lpkg upgrade -y --missing-so-no-error; }} ) || exit 1 ; \
-             [ -d /backups ] && cp -a /backups/. /usr/lib/ ; \
+             [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig ; \
              lpkg build -y --use-system-soname"
         );
         let status = std::process::Command::new("docker")

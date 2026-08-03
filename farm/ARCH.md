@@ -10,7 +10,7 @@ LankeOS build farm 是一个 **ABI 驱动的增量包构建系统**：基于 `ne
 - **容器隔离**：所有构建在 fresh docker 容器内进行（禁止主机构建，`--image` 必填）
 - **ABI 精确**：用旧索引的 needed_so/provides 算 removed SONAME → 直连受害者，不做树状闭包
 - **单一真源**：`out/<arch>/index.txt` 含**完整 needed_so**，同时供容器可见索引与 farm 的 ABI 传播
-- **ABI 过渡备份**：检测到 SONAME 断裂时把旧 SONAME 的 .so 备份到 `out/backups/<pkg>/`，每个构建容器内恢复，让旧二进制在过渡期存活；**整个 build 完成后**清理
+- **ABI 过渡备份**：检测到 SONAME 断裂时把旧 SONAME 的 .so 备份到 `out/backups/`（**扁平**，不按包分子目录——同一 SONAME 文件被两个包同时提供本就冲突，跨包同名覆盖无害），每个构建容器内恢复 + ldconfig，让旧二进制在过渡期存活；**整个 build 完成后**清理
 - **确定性构建序**：拓扑排序同级包按名字升序固定顺序，绝无随机（有回归测试）
 - **构建计划确认**：开始前列出 topo 顺序供 operator 确认；预下载只给"确认集"，ABI 受害者构建时由 lpkg build 自己下载
 
@@ -116,7 +116,7 @@ packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` g
 1. 常驻容器 `tail -f /dev/null` 保活，`/work` 预建（docker cp 对不存在目录是"铺内容"而非建子目录）
 2. 写 `/etc/lpkg/mirror.conf` → `http://127.0.0.1:<repo_port>/`（容器经 host 网络访问内嵌 repo 服务器）
 3. `docker cp` 配方（含预下载源）→ `/work/<pkg>/`
-4. ABI 过渡备份注入：`docker cp out/backups` → 容器 `/backups`（若有）
+4. ABI 过渡备份注入：`docker cp out/backups`（扁平，文件直接是 `<soname>.so.*`）→ 容器 `/backups`（若有）；容器内 `cp -a /backups/. /usr/lib/ && ldconfig`
 5. 容器内脚本（**无任何 rm -rf 状态清空 hack**；SONAME 检查真实运行，过渡期由 flag 显式容忍）：
    ```
    cd /work/<pkg> && \
@@ -168,9 +168,9 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 
 ### ABI 过渡备份机制
 
-- **触发（`backup_removed_sonames`）**：`place_in_repo` 取代旧 .lpkg 时，计算 `removed = 旧 provides − 新 provides`（**只备份旧提供、新打包消失的 SONAME**），从旧包中把属于这些 SONAME 的版本化 `.so.*`（SONAME 本体 + 实体，含符号链接；精确 `r.` 前缀匹配，不误吞 `libfoo.so.20`）备份到 `out/backups/<pkg>/`。扫全部系统库目录（usr/lib、lib、usr/lib64、lib64），扁平去重。
-- **注入（`lpkg_binding`）**：每个构建容器启动后把备份 cp 进 `/usr/lib`——dev symlink 仍指向新 so，新构建链新 so，旧二进制链旧 so。
-- **清理（`cleanup_backups`）**：**整个 build 完成**后扫描 `out/backups/`，某备份的 SONAME 已无任何包 needed_so 引用 → 删除（含空根）；仍有引用（有包跳过/BLOCKED）→ 保留。index.txt 不可读/为空/全零 needed_so → 保守保留，绝不误删。
+- **触发（`backup_removed_sonames`）**：`place_in_repo` 取代旧 .lpkg 时，计算 `removed = 旧 provides − 新 provides`（**只备份旧提供、新打包消失的 SONAME**），从旧包中把属于这些 SONAME 的文件备份到 `out/backups/`（扁平）：版本化 `.so.*`（SONAME 本体 + 实体，含符号链接；精确 `r.` 前缀匹配，不误吞 `libfoo.so.20`）+ **无 SONAME 的实体库**（如 tcl 的 `libtcl8.6.so`，普通文件，文件名即身份）；dev symlink（`xxx.so` 指向版本化文件）归新包，不备份。扫全部系统库目录（usr/lib、lib、usr/lib64、lib64），同名覆盖去重。
+- **注入（`lpkg_binding`）**：每个构建容器启动后把备份 cp 进 `/usr/lib` 并 `ldconfig` 刷新缓存——dev symlink 仍指向新 so，新构建链新 so，旧二进制链旧 so 且能按 SONAME 命中 ld.so.cache。
+- **清理（`cleanup_backups`）**：**整个 build 完成**后扫描 `out/backups/`（只清扁平 `<soname>.so.*` 文件），某备份的 SONAME 已无任何包 needed_so 引用 → 删除（含空根）；仍有引用（有包跳过/BLOCKED）→ 保留。index.txt 不可读/为空/全零 needed_so → 保守保留，绝不误删。
 
 ## 8. seed（冷启动播种）
 
@@ -215,7 +215,7 @@ SQLite（`out/farm-state.db`，可选 `--state`）：
 seed ──> out/<arch>/
            index.txt   (完整 needed_so/provides/deps，单一真源)
            <pkg>/<ver>.lpkg  (完整 metadata，含 needed_so)
-           backups/    (ABI 断裂备份的旧 .so，整个 build 后清理)
+           backups/    (ABI 断裂备份的旧 .so，扁平 <soname>.so.*，整个 build 后清理)
 
 build --all ──> run_build
   needs_build 过滤 → topo_order(确定性，三类边) → 计划预览+确认 → bulk 预下载(确认集)

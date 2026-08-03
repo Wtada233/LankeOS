@@ -95,15 +95,18 @@ pub(crate) fn place_in_repo(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &s
     Ok(dest)
 }
 
-/// ABI 过渡：把旧包中「新版不再提供」的 SONAME 对应 .so 备份到 `out/backups/<pkg>/`。
+/// ABI 过渡：把旧包中「新版不再提供」的 SONAME 对应 .so 备份到 `out/backups/`（**扁平**，
+/// 不按包分子目录——同一 SONAME 文件被两个包同时提供本就冲突，跨包同名覆盖无害）。
 /// 容器构建时 cp 进 /usr/lib（见 lpkg_binding），旧二进制（链旧 SONAME，如 gettext 链
 /// libxml2.so.2）在过渡期能加载旧 .so；新构建用新 .so。
 ///
-/// **只备份旧 provides 有、新打包消失的 SONAME**（`removed = old_provides − new_provides`），
-/// 且只备份版本化 `.so.*` 文件（SONAME 本体 + 其实体），排除裸 `.so` dev 符号链接（那归新包）。
+/// **只备份旧 provides 有、新打包消失的 SONAME**（`removed = old_provides − new_provides`）：
+/// - 版本化 `.so.*`：SONAME 本体 + 实体（libfoo.so.1 / libfoo.so.1.2.3）
+/// - 无 SONAME 的实体库（如 tcl 的 libtcl8.6.so，普通文件）：文件名即身份，直接备份
+/// - 排除裸 `.so` dev 符号链接（指向版本化文件的 xxx.so，那归新包）
 /// 扫全部系统库目录（usr/lib、lib、usr/lib64、lib64）——lib64 是 lib 的合并符号链接时
 /// 内容重复，但备份目录扁平去重（同名覆盖，无害）。
-fn backup_removed_sonames(
+pub(crate) fn backup_removed_sonames(
     out_dir: &Path,
     old_lpkg: &Path,
     pkg: &str,
@@ -127,7 +130,7 @@ fn backup_removed_sonames(
     // 提取旧包，把各系统库目录下匹配被移除 SONAME 的版本化 .so 复制到备份目录
     let tmp = out_dir.join("backup_tmp").join(pkg);
     crate::scan::extract_lpkg(old_lpkg, &tmp)?;
-    let backup_dir = out_dir.join("backups").join(pkg);
+    let backup_dir = out_dir.join("backups"); // 扁平：备份文件直接放 out/backups/<soname>.so.*
     fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败: {e}"))?;
     for sub in ["usr/lib", "lib", "usr/lib64", "lib64"] {
         let lib_dir = tmp.join("content").join(sub);
@@ -138,12 +141,23 @@ fn backup_removed_sonames(
             for e in rd.flatten() {
                 let p = e.path();
                 let fname = p.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-                // 只备份版本化 .so.*（排除裸 .so dev 符号链接——那归新包），且文件名属于某被移除 SONAME
-                if !fname.contains(".so.") || !is_removed_soname_file(&fname, &removed) {
-                    continue;
-                }
-                let dest = backup_dir.join(&fname);
                 let Ok(ft) = fs::symlink_metadata(&p) else { continue };
+
+                if fname.contains(".so.") {
+                    // 版本化 .so.*：SONAME 本体 + 实体（libfoo.so.1 / libfoo.so.1.2.3），
+                    // 精确 `r.` 前缀匹配，不误吞 libfoo.so.20
+                    if !is_removed_soname_file(&fname, &removed) {
+                        continue;
+                    }
+                } else {
+                    // 无 SONAME 的实体库（如 tcl 的 libtcl8.6.so，普通文件，文件名即身份）→ 直接备份。
+                    // dev symlink（xxx.so 指向版本化文件）归新包，绝不备份。
+                    if ft.file_type().is_symlink() || !removed.iter().any(|r| r == &fname) {
+                        continue;
+                    }
+                }
+
+                let dest = backup_dir.join(&fname);
                 if ft.file_type().is_symlink() {
                     if let Ok(target) = fs::read_link(&p) {
                         let _ = fs::remove_file(&dest);
@@ -194,25 +208,19 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
     let mut any_removed = false;
     if let Ok(rd) = fs::read_dir(&backups) {
         for e in rd.flatten() {
-            let dir = e.path();
-            if !dir.is_dir() {
-                continue;
+            let p = e.path();
+            let Ok(ft) = fs::symlink_metadata(&p) else { continue };
+            if !ft.file_type().is_file() && !ft.file_type().is_symlink() {
+                continue; // 只清扁平备份文件；非文件/符号链接条目不处理
             }
-            let sonames: Vec<String> = fs::read_dir(&dir)
-                .map(|rd| {
-                    rd.flatten()
-                        .filter_map(|f| {
-                            let name = f.file_name().to_string_lossy().into_owned();
-                            soname_of(&name).map(str::to_string)
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            if sonames.iter().any(|s| referenced.contains(s)) {
+            let fname = e.file_name().to_string_lossy().into_owned();
+            // 版本化 .so.* → SONAME 前缀；无 SONAME 的实体库（libtcl8.6.so）→ 文件名即身份
+            let soname = soname_of(&fname).map(str::to_string).unwrap_or_else(|| fname.clone());
+            if referenced.contains(&soname) {
                 continue; // 仍有包需要旧 SONAME → 保留
             }
-            if fs::remove_dir_all(&dir).is_ok() {
-                println!("{}", tr!("build.backup_clean", dir.display()));
+            if fs::remove_file(&p).is_ok() {
+                println!("{}", tr!("build.backup_clean", p.display()));
                 any_removed = true;
             }
         }

@@ -1362,9 +1362,9 @@ mod tests {
         write_baseline(&out, "libfoo|1.0:h::libfoo.so,libfoo.so.1:libc.so.6|\n");
         write_pkg(&dir, "libfoo", &["libfoo.so", "libfoo.so.1"], &["libc.so.6"], &[]);
         // 预置一个"已无引用"的备份（libz.so.1 不在 index.txt 任何 needed_so 里）
-        fs::create_dir_all(out.join("backups/libz")).unwrap();
-        fs::write(out.join("backups/libz/libz.so.1"), b"").unwrap();
-        fs::write(out.join("backups/libz/libz.so.1.2.3"), b"").unwrap();
+        fs::create_dir_all(out.join("backups")).unwrap();
+        fs::write(out.join("backups/libz.so.1"), b"").unwrap();
+        fs::write(out.join("backups/libz.so.1.2.3"), b"").unwrap();
 
         let mut binding = StubBinding::new(HashMap::new());
         let opts = BuildOptions {
@@ -1394,9 +1394,9 @@ mod tests {
         let out = temp_dir("farm-backup-keep-out");
         write_baseline(&out, "gettext|1.0:h::libgettext.so:libxml2.so.2,libc.so.6|\n");
         write_pkg(&dir, "gettext", &["libgettext.so"], &["libxml2.so.2", "libc.so.6"], &[]);
-        fs::create_dir_all(out.join("backups/libxml2")).unwrap();
-        fs::write(out.join("backups/libxml2/libxml2.so.2"), b"").unwrap();
-        fs::write(out.join("backups/libxml2/libxml2.so.2.9.14"), b"").unwrap();
+        fs::create_dir_all(out.join("backups")).unwrap();
+        fs::write(out.join("backups/libxml2.so.2"), b"").unwrap();
+        fs::write(out.join("backups/libxml2.so.2.9.14"), b"").unwrap();
 
         let mut binding = StubBinding::new(HashMap::new());
         let opts = BuildOptions {
@@ -1411,9 +1411,107 @@ mod tests {
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
         assert!(
-            out.join("backups/libxml2/libxml2.so.2").exists(),
+            out.join("backups/libxml2.so.2").exists(),
             "仍有引用的备份应保留（过渡未完成）"
         );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn backup_keeps_runtime_soname_and_patch_but_not_dev_symlink() {
+        // 旧 libfoo 1.0：dev symlink libfoo.so + SONAME symlink libfoo.so.1 + 实体 libfoo.so.1.2.3。
+        // 新 libfoo 2.0：连 dev symlink 一起移除（provides 只剩 libfoo.so.2）→ removed = {libfoo.so, libfoo.so.1}。
+        // 应只备份运行时 SONAME 文件（libfoo.so.1 符号链接 + 实体 libfoo.so.1.2.3），dev symlink libfoo.so 绝不备份。
+        let dir = temp_dir("farm-backup-files");
+        let out = temp_dir("farm-backup-files-out");
+        fs::create_dir_all(dir.join("content/usr/lib")).unwrap();
+        fs::write(dir.join("content/usr/lib/libfoo.so.1.2.3"), [0x7f, b'E', b'L', b'F', 2, 1, 1])
+            .unwrap();
+        std::os::unix::fs::symlink("libfoo.so.1.2.3", dir.join("content/usr/lib/libfoo.so.1"))
+            .unwrap();
+        std::os::unix::fs::symlink("libfoo.so.1", dir.join("content/usr/lib/libfoo.so")).unwrap();
+        let meta = serde_json::json!({
+            "name": "libfoo",
+            "version": "1.0",
+            "deps": [],
+            "provides": ["libfoo.so", "libfoo.so.1"],
+            "needed_so": [],
+        });
+        fs::write(dir.join("metadata.json"), serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        let lpkg = out.join("old-libfoo.lpkg");
+        {
+            let f = fs::File::create(&lpkg).unwrap();
+            let enc = zstd::stream::write::Encoder::new(f, 3).unwrap();
+            let mut b = tar::Builder::new(enc);
+            // 必须 follow_symlinks(false)——默认 follow=true 会把 content 里的符号链接
+            // 解引用成普通文件副本，与真实 .lpkg（lpkg packer 用 libarchive 保留 symlink）不符
+            b.follow_symlinks(false);
+            b.append_dir_all(".", &dir).unwrap();
+            let enc = b.into_inner().unwrap();
+            enc.finish().unwrap();
+        }
+
+        super::repo::backup_removed_sonames(
+            &out,
+            &lpkg,
+            "libfoo",
+            &["libfoo.so.2".to_string()], // 新版本：连 dev symlink 都不提供了
+        )
+        .unwrap();
+
+        assert!(
+            !out.join("backups/libfoo.so").exists(),
+            "dev symlink (libfoo.so) 即使被移除也不应备份"
+        );
+        assert!(
+            fs::symlink_metadata(out.join("backups/libfoo.so.1"))
+                .unwrap()
+                .file_type()
+                .is_symlink(),
+            "SONAME 符号链接 libfoo.so.1 应被备份（保持符号链接，供运行时解析）"
+        );
+        assert!(
+            out.join("backups/libfoo.so.1.2.3").is_file(),
+            "patch 实体 libfoo.so.1.2.3 应被备份（SONAME 符号链接的落点）"
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn backup_includes_unversioned_nosoname_regular_lib() {
+        // tcl 类：libtcl8.6.so 是无 SONAME 的实体库（普通文件，文件名即身份，非符号链接）。
+        // tcl 8.6 → 9.0 时 removed = {libtcl8.6.so} → 必须直接备份，否则旧二进制过渡期无 .so 可加载。
+        let dir = temp_dir("farm-backup-nosoname");
+        let out = temp_dir("farm-backup-nosoname-out");
+        fs::create_dir_all(dir.join("content/usr/lib")).unwrap();
+        fs::write(dir.join("content/usr/lib/libtcl8.6.so"), [0x7f, b'E', b'L', b'F', 2, 1, 1])
+            .unwrap();
+        let meta = serde_json::json!({
+            "name": "tcl",
+            "version": "8.6.16",
+            "deps": [],
+            "provides": ["libtcl8.6.so"],
+            "needed_so": [],
+        });
+        fs::write(dir.join("metadata.json"), serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        let lpkg = out.join("old-tcl.lpkg");
+        {
+            let f = fs::File::create(&lpkg).unwrap();
+            let enc = zstd::stream::write::Encoder::new(f, 3).unwrap();
+            let mut b = tar::Builder::new(enc);
+            b.follow_symlinks(false);
+            b.append_dir_all(".", &dir).unwrap();
+            let enc = b.into_inner().unwrap();
+            enc.finish().unwrap();
+        }
+
+        super::repo::backup_removed_sonames(&out, &lpkg, "tcl", &["libtcl9.0.so".to_string()])
+            .unwrap();
+
+        let bak = out.join("backups/libtcl8.6.so");
+        assert!(bak.is_file(), "无 SONAME 的实体库 libtcl8.6.so 应被直接备份（文件）");
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&out).ok();
     }
