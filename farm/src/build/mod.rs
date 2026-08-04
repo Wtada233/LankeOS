@@ -1437,6 +1437,137 @@ mod tests {
     }
 
     #[test]
+    fn backup_keeps_physical_when_referenced_symlink_name_mismatches() {
+        // display-info 类：soversion=3 + version=0.3.0 ⇒ SONAME 符号链接 libdisplay-info.so.3
+        // 指向实体 libdisplay-info.so.0.3.0。实体自身文件名派生的 SONAME（libdisplay-info.so.0）
+        // 未被引用，但指向它的符号链接 libdisplay-info.so.3 仍被某包 needed_so 引用。
+        // 回归：实体不得被删，否则仍被使用的 SONAME 链接 dangling。
+        let dir = temp_dir("farm-backup-name-mismatch");
+        let out = temp_dir("farm-backup-name-mismatch-out");
+        write_pkg(&dir, "wlroots", &["libwlroots.so"], &["libdisplay-info.so.3", "libc.so.6"], &[]);
+        write_baseline(&out, "wlroots|1.0:h::libwlroots.so:libdisplay-info.so.3,libc.so.6|\n");
+        fs::create_dir_all(out.join("backups")).unwrap();
+        fs::write(out.join("backups/libdisplay-info.so.0.3.0"), b"ELF").unwrap();
+        std::os::unix::fs::symlink(
+            "libdisplay-info.so.0.3.0",
+            out.join("backups/libdisplay-info.so.3"),
+        )
+        .unwrap();
+
+        let mut binding = StubBinding::new(HashMap::new());
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec![],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+        };
+        let _ = run_build(&opts, &mut binding, None).unwrap();
+
+        assert!(
+            out.join("backups/libdisplay-info.so.0.3.0").is_file(),
+            "仍被引用的符号链接 libdisplay-info.so.3 指向的实体不得删除"
+        );
+        assert!(
+            fs::symlink_metadata(out.join("backups/libdisplay-info.so.3"))
+                .unwrap()
+                .file_type()
+                .is_symlink(),
+            "仍被引用的 SONAME 符号链接应保留"
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn backup_cleans_unreferenced_mismatch_symlink_and_target_together() {
+        // 同名不匹配场景的反向：libdisplay-info.so.3 与其实体均未被任何包 needed_so 引用
+        // → 符号链接与实体一起清理（保护集仅含「被引用的符号链接」目标）。
+        let dir = temp_dir("farm-backup-name-mismatch-clean");
+        let out = temp_dir("farm-backup-name-mismatch-clean-out");
+        write_pkg(&dir, "wlroots", &["libwlroots.so"], &["libc.so.6"], &[]);
+        write_baseline(&out, "wlroots|1.0:h::libwlroots.so:libc.so.6|\n");
+        fs::create_dir_all(out.join("backups")).unwrap();
+        fs::write(out.join("backups/libdisplay-info.so.0.3.0"), b"ELF").unwrap();
+        std::os::unix::fs::symlink(
+            "libdisplay-info.so.0.3.0",
+            out.join("backups/libdisplay-info.so.3"),
+        )
+        .unwrap();
+
+        let mut binding = StubBinding::new(HashMap::new());
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec![],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+        };
+        let _ = run_build(&opts, &mut binding, None).unwrap();
+
+        assert!(
+            !out.join("backups/libdisplay-info.so.0.3.0").exists(),
+            "无引用的实体应被清理"
+        );
+        assert!(
+            !out.join("backups/libdisplay-info.so.3").exists(),
+            "无引用的符号链接应一并清理"
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn backup_keeps_subdir_physical_when_referenced_symlink_points_into_it() {
+        // 目标实体在备份树子目录内（expect 类布局）：libfoo.so.3 → sub/libfoo.so.0.3.0。
+        // 子目录内实体自身 SONAME（libfoo.so.0）未被引用，但顶层符号链接仍被引用 → 实体保留。
+        let dir = temp_dir("farm-backup-subdir-target");
+        let out = temp_dir("farm-backup-subdir-target-out");
+        write_pkg(&dir, "wlroots", &["libwlroots.so"], &["libfoo.so.3", "libc.so.6"], &[]);
+        write_baseline(&out, "wlroots|1.0:h::libwlroots.so:libfoo.so.3,libc.so.6|\n");
+        fs::create_dir_all(out.join("backups/sub")).unwrap();
+        fs::write(out.join("backups/sub/libfoo.so.0.3.0"), b"ELF").unwrap();
+        std::os::unix::fs::symlink(
+            "sub/libfoo.so.0.3.0",
+            out.join("backups/libfoo.so.3"),
+        )
+        .unwrap();
+
+        let mut binding = StubBinding::new(HashMap::new());
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec![],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+        };
+        let _ = run_build(&opts, &mut binding, None).unwrap();
+
+        assert!(
+            out.join("backups/sub/libfoo.so.0.3.0").is_file(),
+            "子目录内被仍引用符号链接指向的实体不得删除"
+        );
+        assert!(
+            fs::symlink_metadata(out.join("backups/libfoo.so.3"))
+                .unwrap()
+                .file_type()
+                .is_symlink(),
+            "顶层仍被引用的符号链接应保留"
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
     fn backup_keeps_runtime_soname_and_patch_but_not_dev_symlink() {
         // 旧 libfoo 1.0：dev symlink libfoo.so + SONAME symlink libfoo.so.1 + 实体 libfoo.so.1.2.3。
         // 新 libfoo 2.0：连 dev symlink 一起移除（provides 只剩 libfoo.so.2）→ removed = {libfoo.so, libfoo.so.1}。

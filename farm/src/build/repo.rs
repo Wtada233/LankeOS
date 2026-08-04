@@ -277,15 +277,55 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
         .collect();
     let mut any_removed = false;
 
-    /// 递归遍历备份树：清理无引用的备份文件（含复刻的子目录实体，如
-    /// expect5.45.4/libexpect5.45.4.so），并剪除随之变空的子目录。
-    fn walk(dir: &Path, referenced: &std::collections::HashSet<String>, any_removed: &mut bool) {
+    /// 预扫描：收集「仍被引用的符号链接」指向的实体目标路径。
+    /// 实体文件的删除不能只看自身文件名派生的 SONAME——符号链接名与实体文件名可能
+    /// SONAME 不一致（display-info 类：soversion=3、version=0.3.0 ⇒
+    /// libdisplay-info.so.3 → libdisplay-info.so.0.3.0）。此时实体自身派生 SONAME
+    /// （libdisplay-info.so.0）未被引用，但指向它的符号链接仍被 needed_so 引用；
+    /// 删实体 = 令仍被使用的 SONAME 链接 dangling。
+    fn collect_referenced_link_targets(
+        dir: &Path,
+        backups_root: &Path,
+        referenced: &std::collections::HashSet<String>,
+        protected: &mut std::collections::HashSet<PathBuf>,
+    ) {
         let Ok(rd) = fs::read_dir(dir) else { return };
         for e in rd.flatten() {
             let p = e.path();
             let Ok(ft) = fs::symlink_metadata(&p) else { continue };
             if ft.file_type().is_dir() {
-                walk(&p, referenced, any_removed);
+                collect_referenced_link_targets(&p, backups_root, referenced, protected);
+            } else if ft.file_type().is_symlink() {
+                let fname = e.file_name().to_string_lossy().into_owned();
+                let soname = soname_of(&fname).map(str::to_string).unwrap_or(fname);
+                if referenced.contains(&soname) {
+                    if let Ok(target) = fs::read_link(&p) {
+                        let resolved = if target.is_absolute() {
+                            backups_root.join(abs_target_rel(&target))
+                        } else {
+                            p.parent().unwrap_or(dir).join(&target)
+                        };
+                        protected.insert(normalize_lexically(&resolved));
+                    }
+                }
+            }
+        }
+    }
+
+    /// 递归遍历备份树：清理无引用的备份文件（含复刻的子目录实体，如
+    /// expect5.45.4/libexpect5.45.4.so），并剪除随之变空的子目录。
+    fn walk(
+        dir: &Path,
+        referenced: &std::collections::HashSet<String>,
+        protected: &std::collections::HashSet<PathBuf>,
+        any_removed: &mut bool,
+    ) {
+        let Ok(rd) = fs::read_dir(dir) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            let Ok(ft) = fs::symlink_metadata(&p) else { continue };
+            if ft.file_type().is_dir() {
+                walk(&p, referenced, protected, any_removed);
                 // 子目录变空（其目标文件被清理）→ 剪除
                 if fs::read_dir(&p).map(|mut r| r.next().is_none()).unwrap_or(false) {
                     let _ = fs::remove_dir(&p);
@@ -298,13 +338,21 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
             if referenced.contains(&soname) {
                 continue; // 仍有包需要旧 SONAME → 保留
             }
+            // 实体文件：自身派生 SONAME 未被引用，但仍被引用的符号链接指向它
+            // （符号链接名与实体文件名 SONAME 不一致）→ 保留，否则该 SONAME 链接 dangling。
+            if !ft.file_type().is_symlink() && protected.contains(&normalize_lexically(&p)) {
+                continue;
+            }
             if fs::remove_file(&p).is_ok() {
                 println!("{}", tr!("build.backup_clean", p.display()));
                 *any_removed = true;
             }
         }
     }
-    walk(&backups, &referenced, &mut any_removed);
+
+    let mut protected: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
+    collect_referenced_link_targets(&backups, &backups, &referenced, &mut protected);
+    walk(&backups, &referenced, &protected, &mut any_removed);
 
     // 根目录变空 → 一并清掉（下次 build 有新备份时重建）
     if any_removed || fs::read_dir(&backups).map(|mut r| r.next().is_none()).unwrap_or(false) {
@@ -326,6 +374,34 @@ fn soname_of(filename: &str) -> Option<&str> {
     }
     let len = a.len() + 1 + 2 + 1 + c.len();
     filename.get(..len)
+}
+
+/// 词法规范化路径（不触碰文件系统）：消解 `.`/`..` 段。仅用于清理阶段的集合比对。
+fn normalize_lexically(p: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
+/// 绝对符号链接目标 → 备份树内相对路径（备份树根对应 /usr/lib）。
+/// 本代码创建的备份符号链接一律相对路径，绝对目标仅兜底历史备份。
+fn abs_target_rel(target: &Path) -> PathBuf {
+    let abs = target.strip_prefix("/").unwrap_or(target);
+    for prefix in ["usr/lib/", "usr/lib64/", "lib/", "lib64/"] {
+        if let Ok(rest) = abs.strip_prefix(prefix) {
+            return rest.to_path_buf();
+        }
+    }
+    abs.to_path_buf()
 }
 
 /// 更新本地 repo index.txt：替换该包的版本块（保留旧 deps；新 version/hash/provides）。
