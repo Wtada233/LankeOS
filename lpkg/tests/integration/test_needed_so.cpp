@@ -528,6 +528,142 @@ TEST_F(NeededSoTest, AutoremoveKeepsNeededSoDep)
 }
 
 // =========================================================================
+// 核心修复回归测试：needed_so 与 deps 同一处理路径
+//
+// 修复前 resolve_package_dependencies 只递归解析 deps，needed_so 只被
+// check_forward_soname_integrity 做"检查"——仓库里有提供者就算通过，但提供者
+// 包从不被加入安装计划 → 依赖者装上了、运行时库没装（真实场景：xcb-util-cursor
+// 的 needed_so 引用 xcb-util-image 的 libxcb-image.so.0，但 xcb-util-image
+// 不会被自动安装）。
+//
+// 以下用例全部是：app **无声明 deps**，仅靠 needed_so 引用一个**未安装**的
+// 提供者包 → 提供者必须被当作依赖自动安装。
+// =========================================================================
+
+// -----------------------------------------------------------------------
+// 20. needed_so 拉取未安装的提供者（核心修复）
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, NeededSoPullsUninstalledProvider)
+{
+    create_pkg("libZ", "1.0", {}, {"libZ.so.1"});
+    create_pkg("app", "1.0", {}, {}, {"libZ.so.1"});
+    update_index({
+        {"app", "1.0", "", "", "libZ.so.1"},
+        {"libZ", "1.0", "", "libZ.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().is_installed("libZ"));
+
+    // 逆向依赖记录在案 → 非 force 移除 libZ 被阻止（如同声明 deps 一样）
+    EXPECT_TRUE(Cache::instance().get_reverse_deps("libZ").contains("app"));
+    remove_package("libZ", /*force=*/false);
+    EXPECT_TRUE(Cache::instance().is_installed("libZ"));
+}
+
+// -----------------------------------------------------------------------
+// 21. 传递 needed_so：app → libA.so.1（libA 提供），libA → libB.so.1
+//     （libB 提供，且 libB 未安装）→ 两者都被自动拉取
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, NeededSoTransitivePullsProviders)
+{
+    create_pkg("libA", "1.0", {}, {"libA.so.1"}, {"libB.so.1"});
+    create_pkg("libB", "1.0", {}, {"libB.so.1"});
+    create_pkg("app", "1.0", {}, {}, {"libA.so.1"});
+    update_index({
+        {"app", "1.0", "", "", "libA.so.1"},
+        {"libA", "1.0", "", "libA.so.1", "libB.so.1"},
+        {"libB", "1.0", "", "libB.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().is_installed("libA"));
+    EXPECT_TRUE(Cache::instance().is_installed("libB"));
+    EXPECT_TRUE(Cache::instance().get_reverse_deps("libA").contains("app"));
+    EXPECT_TRUE(Cache::instance().get_reverse_deps("libB").contains("libA"));
+}
+
+// -----------------------------------------------------------------------
+// 22. autoremove 保留 needed_so 自动拉取的提供者
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, AutoremoveKeepsAutoPulledNeededSoProvider)
+{
+    create_pkg("libY", "1.0", {}, {"libY.so.1"});
+    create_pkg("app", "1.0", {}, {}, {"libY.so.1"});
+    update_index({
+        {"app", "1.0", "", "", "libY.so.1"},
+        {"libY", "1.0", "", "libY.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    EXPECT_TRUE(Cache::instance().is_installed("libY"));
+
+    EXPECT_NO_THROW(autoremove());
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("libY"));
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+}
+
+// -----------------------------------------------------------------------
+// 23. --use-system-soname：系统 .so 优先，提供者包不被安装
+//     默认路径仍会安装提供者包（对比见下一用例）
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, UseSystemSonamePrefersSystemSo)
+{
+    fs::create_directories(test_root / fs::path(constants::USR_LIB));
+    std::ofstream(test_root / fs::path(constants::USR_LIB) / "libsys.so.1");
+
+    create_pkg("pkg-sys", "1.0", {}, {"libsys.so.1"});
+    create_pkg("app", "1.0", {}, {}, {"libsys.so.1"});
+    update_index({
+        {"app", "1.0", "", "", "libsys.so.1"},
+        {"pkg-sys", "1.0", "", "libsys.so.1", ""},
+    });
+
+    Config::instance().set_use_system_soname_mode(true);
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Config::instance().set_use_system_soname_mode(false);
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    // 系统 .so 优先 → 不引入包依赖
+    EXPECT_FALSE(Cache::instance().is_installed("pkg-sys"));
+}
+
+// -----------------------------------------------------------------------
+// 24. 未开启 --use-system-soname 时，即使系统有同名 .so，
+//     默认路径仍解析到提供者包并安装
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, DefaultPathStillPullsProviderEvenWithSystemSo)
+{
+    fs::create_directories(test_root / fs::path(constants::USR_LIB));
+    std::ofstream(test_root / fs::path(constants::USR_LIB) / "libsys.so.1");
+
+    create_pkg("pkg-sys", "1.0", {}, {"libsys.so.1"});
+    create_pkg("app", "1.0", {}, {}, {"libsys.so.1"});
+    update_index({
+        {"app", "1.0", "", "", "libsys.so.1"},
+        {"pkg-sys", "1.0", "", "libsys.so.1", ""},
+    });
+
+    Config::instance().set_use_system_soname_mode(false);
+    EXPECT_NO_THROW(install_packages({"app"}));
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+    // 默认路径：解析到包名，作为依赖安装
+    EXPECT_TRUE(Cache::instance().is_installed("pkg-sys"));
+}
+
+// =========================================================================
 // 多版本决策测试套件
 //
 // 测试仓库中存在某个包的多个版本且各版本提供不同的 SONAME 集时，

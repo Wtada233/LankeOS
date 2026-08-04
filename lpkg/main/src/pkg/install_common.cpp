@@ -276,6 +276,68 @@ void resolve_package_dependencies(const std::string& pkg_name, const std::string
                                   cons_str));
             }
         }
+
+        // ── needed_so：与 deps 同一处理路径，只是来源不同 ─────────────────────
+        // deps 和 needed_so 都是依赖，但存储在包的 metadata 的不同字段里；这里把
+        // 每个 SONAME 解析到提供者包并加入安装计划（与 deps 一样递归安装）。
+        // 与 check_forward_soname_integrity（计划完成后统一校验）的分工：
+        //   - 这里负责"把提供者装进来"（default：SONAME → 提供者包 → 加入计划）
+        //   - 那里的 step 1（plan）因此必然命中，找不到提供者时由那里报错
+        //     （--missing-so-no-error 容忍）。
+        // 两点不同：
+        //   1. 不一定解析为依赖——开启 --use-system-soname 时系统 .so 优先视为满足；
+        //   2. 存储位置不同——needed_so 写在 needed_so/ 目录，deps 写在 deps/ 目录。
+        for (const auto& soname : needed_so) {
+            // 包自身提供的 SONAME（库包对自身的运行时依赖）不算依赖
+            if (std::find(provides.begin(), provides.end(), soname) != provides.end()) continue;
+
+            // --use-system-soname：系统 /usr/lib 已有该 .so（如 ABI 过渡备份的旧
+            // SONAME）→ 优先视为满足，不引入包依赖
+            if (Config::instance().use_system_soname_mode() &&
+                Config::instance().has_system_soname(soname))
+                continue;
+
+            // 计划中已有包提供该 SONAME → 已满足
+            bool in_plan = false;
+            for (const auto& [pn, pp] : ctx.plan) {
+                if (std::find(pp.provides.begin(), pp.provides.end(), soname) !=
+                    pp.provides.end()) {
+                    in_plan = true;
+                    break;
+                }
+            }
+            if (in_plan) continue;
+
+            // 已安装包提供（且不在本批次计划中替换）→ 已满足
+            bool installed_provides = false;
+            for (const auto& prov_pkg : Cache::instance().get_providers(soname)) {
+                if (Cache::instance().is_installed(prov_pkg) && !ctx.plan.contains(prov_pkg)) {
+                    installed_provides = true;
+                    break;
+                }
+            }
+            if (installed_provides) continue;
+
+            // 仓库提供者（未被"认领"，且该版本确实提供此 SONAME）→ 加入计划
+            if (auto prov_pkg = ctx.repo.find_provider(soname)) {
+                const bool claimed =
+                    ctx.plan.contains(prov_pkg->name) ||
+                    Cache::instance().is_installed(prov_pkg->name);
+                if (!claimed) {
+                    const bool provides_it =
+                        std::find(prov_pkg->provides.begin(), prov_pkg->provides.end(), soname) !=
+                        prov_pkg->provides.end();
+                    if (provides_it) {
+                        log_info(string_format("info.installing_discovered_dep", prov_pkg->name));
+                        resolve_package_dependencies(prov_pkg->name, prov_pkg->version, false, ctx,
+                                                     visited_stack, depth + 1);
+                    }
+                }
+            }
+
+            // 仍无提供者 → 此处不立即报错：计划尚未完成，其他分支可能引入提供者；
+            // 交由 check_forward_soname_integrity（计划完成后）统一判定。
+        }
     }
     ctx.plan[pkg_name] = std::move(p);
     ctx.install_order.push_back(pkg_name);
