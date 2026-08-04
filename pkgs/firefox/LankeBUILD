@@ -1,5 +1,3 @@
-# Firefox 152 构建脚本
-
 lankebuild_prepare() {
     # ------------------------------------------------------------
     # 1. 创建 mozconfig (核心构建配置)
@@ -18,7 +16,14 @@ ac_add_options --enable-system-ffi
 ac_add_options --enable-system-pixman
 ac_add_options --with-system-jpeg
 ac_add_options --with-system-zlib
-ac_add_options --enable-audio-backends=alsa
+ac_add_options --enable-audio-backends=alsa,jack
+ac_add_options --with-system-nspr
+ac_add_options --with-system-nss
+ac_add_options --with-system-jack
+ac_add_options --with-system-av1
+ac_add_options --with-system-icu
+ac_add_options --with-system-libevent
+ac_add_options --with-system-libvpx
 ac_add_options --enable-default-toolkit=cairo-gtk3-wayland-only
 
 # ---------- 使用系统库 (若未装则自动回退到内部副本) ----------
@@ -36,19 +41,12 @@ MOZ_APP_REMOTINGNAME=firefox
 # ---------- 构建输出目录 ----------
 mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/firefox-build-dir
 EOF
-
-    # 关闭遥测
-    unset MOZ_TELEMETRY_REPORTING
-
-    # 设置 mach 环境变量 (避免下载 Python 包)
-    export MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE=none
-    export MOZBUILD_STATE_PATH="${PWD}/mozbuild"
-
-    # 若在 chroot 中，确保 /dev/shm 已挂载 (否则 Python 多进程会失败)
-    # mountpoint -q /dev/shm || mount -t tmpfs devshm /dev/shm
 }
 
 lankebuild_build() {
+    # 关闭遥测
+    unset MOZ_TELEMETRY_REPORTING
+
     # 再次设置环境变量 (因为函数可能独立执行)
     export MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE=none
     export MOZBUILD_STATE_PATH="${PWD}/mozbuild"
@@ -68,6 +66,20 @@ lankebuild_package() {
     mkdir -p "{STAGING_ROOT}{DATADIR}/applications"
     mkdir -p "{STAGING_ROOT}{DATADIR}/pixmaps"
 
+    # Arch 式 vendor name (distribution.ini)
+    mkdir -p "{STAGING_ROOT}{LIBDIR}/firefox/distribution"
+    cat > "{STAGING_ROOT}{LIBDIR}/firefox/distribution/distribution.ini" << "EOF"
+[Global]
+id=lankeos
+version=1.0
+about=Mozilla Firefox for LankeOS
+
+[Preferences]
+app.distributor=lankeos
+app.distributor.channel=lankeos
+app.partner.lankeos=lankeos
+EOF
+
     cat > "{STAGING_ROOT}{DATADIR}/applications/firefox.desktop" << "EOF"
 [Desktop Entry]
 Encoding=UTF-8
@@ -84,8 +96,9 @@ StartupNotify=true
 StartupWMClass=firefox
 EOF
 
-    # 图标链接 (注意：实际图标在安装后的 {LIBDIR}/firefox/ 下)
-    ln -sfv {LIBDIR}/firefox/browser/chrome/icons/default/default128.png \
+    # 图标链接 (相对路径：从 /usr/share/pixmaps → ../../lib/firefox/...，
+    # 绝对路径符号链接曾被 lpkg 打包吞掉，相对可重定位、不依赖安装根)
+    ln -sfv ../../lib/firefox/browser/chrome/icons/default/default128.png \
             "{STAGING_ROOT}{DATADIR}/pixmaps/firefox.png"
     ln -sfv ../lib/firefox/firefox "{STAGING_ROOT}{BINDIR}/firefox"
 }

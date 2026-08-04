@@ -69,7 +69,7 @@ mod seed;
 
 #[derive(Default)]
 pub(crate) struct Args {
-    pkg: Option<String>,
+    pkg: Vec<String>,
     pkgs: Option<String>,
     out: Option<PathBuf>,
     data: Option<String>,
@@ -115,9 +115,9 @@ enum Command {
         /// 构建全部需重建的包（版本与本地 repo 不一致者，含 ABI 传播受害者）
         #[arg(long)]
         all: bool,
-        /// 目标包名（--all 时省略；指定则强制重建该包）
-        #[arg(required_unless_present = "all", conflicts_with = "all")]
-        pkg: Option<String>,
+        /// 目标包名，可多个（--all 时省略；指定则强制重建这些包）
+        #[arg(required_unless_present = "all", conflicts_with = "all", num_args = 1..)]
+        pkg: Vec<String>,
         /// pkgs 目录（LankeBUILD 体系）
         #[arg(long, default_value = "pkgs")]
         pkgs: PathBuf,
@@ -435,7 +435,7 @@ fn cmd_track_run(args: &Args, apply: bool) -> ExitCode {
         .data
         .clone()
         .unwrap_or_else(|| "data/trackers".to_string());
-    let pkg = match &args.pkg {
+    let pkg = match args.pkg.first() {
         Some(p) => p.clone(),
         None => {
             eprintln!("farm track <pkg> --run --pkgs <dir> --data <dir>");
@@ -1210,7 +1210,7 @@ pub fn run() -> ExitCode {
         }
         Command::Track { pkg, all, run, pkgs, data, jobs, token, gitlab_token } => {
             let args = Args {
-                pkg,
+                pkg: pkg.map(|p| vec![p]).unwrap_or_default(),
                 all,
                 run,
                 pkgs: Some(pkgs.to_string_lossy().into_owned()),

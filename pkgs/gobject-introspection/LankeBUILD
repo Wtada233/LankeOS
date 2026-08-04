@@ -15,5 +15,11 @@ lankebuild_build() {
 
 lankebuild_package() {
     # 所有安装已在 build 阶段完成
-    :
+    # postinst hook：g-ir-scanner 在 Python 3.13 下需要 distutils（已从标准库移除），
+    # 装 setuptools 提供 distutils shim。安装 GI 的容器/主机都会执行。
+    install -Dm644 /dev/null "{STAGING_HOOKS}"/postinst.sh
+    cat > "{STAGING_HOOKS}"/postinst.sh << 'EOF'
+python -m ensurepip
+pip3 install setuptools
+EOF
 }

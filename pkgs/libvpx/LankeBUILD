@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --enable-shared --disable-static \
+                --disable-examples --disable-docs
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

@@ -3,7 +3,11 @@
   "version": "4.10",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libacl.so.1",
+    "libattr.so.1",
+    "libc.so.6"
+  ],
   "provides": [],
   "build_deps": [
     "acl",

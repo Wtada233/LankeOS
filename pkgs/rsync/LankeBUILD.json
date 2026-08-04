@@ -5,7 +5,15 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
+  "needed_so": [
+    "libacl.so.1",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "liblz4.so.1",
+    "libpopt.so.0",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
   "provides": [],
   "build_deps": [
     "acl",

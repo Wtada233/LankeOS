@@ -1,5 +1,3 @@
-set -e
-
 lankebuild_prepare() {
     mkdir -p build
 }

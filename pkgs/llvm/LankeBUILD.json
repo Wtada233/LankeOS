@@ -1,13 +1,36 @@
 {
   "name": "llvm",
   "version": "22.1.8",
-  "release": 2,
+  "release": 3,
   "deps": [
     "perl",
     "python"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcurl.so.4",
+    "libedit.so.0",
+    "libffi.so.8",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libxml2.so.16",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libLLVM-22.so",
+    "libLLVM.so",
+    "libLLVM.so.22.1",
+    "libLTO.so",
+    "libLTO.so.22.1",
+    "libRemarks.so",
+    "libRemarks.so.22.1",
+    "libclang-cpp.so",
+    "libclang-cpp.so.22.1",
+    "libclang.so",
+    "libclang.so.22.1"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",

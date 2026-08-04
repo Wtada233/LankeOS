@@ -2,7 +2,6 @@ lankebuild_prepare() {
     cd "{SRC_DIR}"
     meson setup build . --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --default-library=shared --buildtype=release \
         -Db_ndebug=true \
-        -Damdgpu-virtio=true \
         -Dandroid-libbacktrace=disabled \
         -Dgallium-drivers=iris,nouveau,radeonsi,llvmpipe,zink,virgl,svga \
         -Dgallium-extra-hud=true \
@@ -11,12 +10,13 @@ lankebuild_prepare() {
         -Dgallium-rusticl-enable-drivers=radeonsi \
         -Dgles1=disabled \
         -Dintel-rt=enabled \
-        -Dintel-virtio-experimental=true \
-        -Dlibunwind=disabled \
+        -Dlibunwind=enabled \
         -Dmicrosoft-clc=disabled \
         -Dvalgrind=disabled \
         -Dvideo-codecs=all \
-        -Dvulkan-drivers=intel,amd,swrast \
+        -Dvulkan-drivers=intel,amd,swrast,nouveau,virtio \
+        -Dplatforms=x11,wayland \
+        -Dexpat=enabled \
         -Dvulkan-layers=device-select,intel-nullhw,overlay,screenshot,anti-lag,vram-report-limit \
         -Dvulkan-manifest-per-architecture=false
 }

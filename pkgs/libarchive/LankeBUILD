@@ -2,12 +2,10 @@
 # libarchive — 多格式归档库
 
 lankebuild_prepare() {
-    set -e
+    :
 }
 
 lankebuild_build() {
-    set -e
-
     ./configure \
         --prefix=/usr \
         --disable-static \

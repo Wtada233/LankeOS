@@ -1,14 +1,8 @@
-#
-# krb5 — MIT Kerberos 认证库
-# 共享库 + 开发头文件
-
 lankebuild_prepare() {
-    set -e
+    :
 }
 
 lankebuild_build() {
-    set -e
-
     cd src
 
     ./configure \

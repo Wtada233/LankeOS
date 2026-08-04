@@ -3,7 +3,13 @@
   "version": "5.44.0",
   "release": 1,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libgdbm.so.6",
+    "libgdbm_compat.so.4",
+    "libm.so.6"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",

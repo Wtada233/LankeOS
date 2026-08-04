@@ -1,12 +1,18 @@
 {
   "name": "xcb-util-image",
   "version": "0.4.1",
-  "release": 2,
-  "deps": [
-    "xwayland"
+  "release": 3,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libxcb-shm.so.0",
+    "libxcb-util.so.1",
+    "libxcb.so.1"
   ],
-  "needed_so": [],
-  "provides": [],
+  "provides": [
+    "libxcb-image.so",
+    "libxcb-image.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "libxcb",

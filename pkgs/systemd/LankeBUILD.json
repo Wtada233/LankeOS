@@ -6,8 +6,21 @@
     "bash",
     "python"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libnss_myhostname.so.2",
+    "libnss_mymachines.so.2",
+    "libnss_resolve.so.2",
+    "libnss_systemd.so.2",
+    "libsystemd.so",
+    "libsystemd.so.0",
+    "libudev.so",
+    "libudev.so.1"
+  ],
   "build_deps": [
     "linux-pam",
     "acl",

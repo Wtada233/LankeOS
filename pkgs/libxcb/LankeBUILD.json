@@ -2,7 +2,9 @@
   "name": "libxcb",
   "version": "1.17.0",
   "release": 2,
-  "deps": [],
+  "deps": [
+    "xcb-proto"
+  ],
   "needed_so": [],
   "provides": [],
   "build_deps": [
@@ -10,8 +12,7 @@
     "libxau",
     "libxdmcp",
     "python",
-    "util-macros",
-    "xorgproto"
+    "util-macros"
   ],
   "sources": [
     "https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.17.0.tar.xz"

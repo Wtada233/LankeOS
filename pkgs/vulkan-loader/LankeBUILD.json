@@ -3,8 +3,14 @@
   "version": "1.4.357.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libvulkan.so",
+    "libvulkan.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",
@@ -16,8 +22,7 @@
     "libxrandr",
     "ninja",
     "vulkan-headers",
-    "wayland",
-    "xorgproto"
+    "wayland"
   ],
   "sources": [
     "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz"

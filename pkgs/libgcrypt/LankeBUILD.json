@@ -3,8 +3,15 @@
   "version": "1.12.2",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgpg-error.so.0"
+  ],
+  "provides": [
+    "libgcrypt.so",
+    "libgcrypt.so.20"
+  ],
   "build_deps": [
     "base-devel",
     "libgpg-error"

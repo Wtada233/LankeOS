@@ -1,12 +1,23 @@
 {
   "name": "libxkbcommon",
   "version": "1.13.2",
-  "release": 3,
-  "deps": [
-    "xwayland"
+  "release": 5,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libwayland-client.so.0",
+    "libxcb-xkb.so.1",
+    "libxcb.so.1",
+    "libxml2.so.16"
   ],
-  "needed_so": [],
-  "provides": [],
+  "provides": [
+    "libxkbcommon-x11.so",
+    "libxkbcommon-x11.so.0",
+    "libxkbcommon.so",
+    "libxkbcommon.so.0",
+    "libxkbregistry.so",
+    "libxkbregistry.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "libxcb",

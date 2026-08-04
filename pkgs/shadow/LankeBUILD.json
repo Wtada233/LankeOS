@@ -3,8 +3,18 @@
   "version": "4.20.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libacl.so.1",
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libpam.so.0",
+    "libpam_misc.so.0",
+    "libsystemd.so.0"
+  ],
+  "provides": [
+    "libsubid.so",
+    "libsubid.so.6"
+  ],
   "build_deps": [
     "linux-pam",
     "acl",

@@ -5,8 +5,13 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libltdl.so",
+    "libltdl.so.7"
+  ],
   "build_deps": [
     "base-devel"
   ],

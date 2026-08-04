@@ -1,5 +1,3 @@
-set -e
-
 lankebuild_prepare() {
     echo "Preparing unifdef-{ORIG_PKG_VER}"
     # C23 将 constexpr 设为关键字，老代码用了同名标识符

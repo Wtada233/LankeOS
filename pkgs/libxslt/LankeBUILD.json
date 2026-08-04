@@ -1,12 +1,21 @@
 {
   "name": "libxslt",
   "version": "1.1.45",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "libexslt.so",
+    "libexslt.so.0",
+    "libxslt.so",
+    "libxslt.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "libxml2"

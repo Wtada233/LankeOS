@@ -1,10 +1,24 @@
 {
   "name": "wayland",
   "version": "1.26.0",
-  "release": 2,
+  "release": 3,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libexpat.so.1",
+    "libffi.so.8",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "libwayland-client.so",
+    "libwayland-client.so.0",
+    "libwayland-cursor.so",
+    "libwayland-cursor.so.0",
+    "libwayland-egl.so",
+    "libwayland-egl.so.1",
+    "libwayland-server.so",
+    "libwayland-server.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "expat",

@@ -5,8 +5,19 @@
   "deps": [
     "python"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6",
+    "libpopt.so.0",
+    "libpython3.13.so.1.0",
+    "libslang.so.2",
+    "libtcl8.6.so"
+  ],
+  "provides": [
+    "libnewt.so",
+    "libnewt.so.0.52",
+    "whiptcl.so"
+  ],
   "build_deps": [
     "base-devel",
     "popt",

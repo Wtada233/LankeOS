@@ -2,9 +2,24 @@
   "name": "gdk-pixbuf",
   "version": "2.44.7",
   "release": 2,
-  "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "deps": [
+    "shared-mime-info"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libjpeg.so.62",
+    "libm.so.6",
+    "libpng16.so.16",
+    "libtiff.so.6"
+  ],
+  "provides": [
+    "libgdk_pixbuf-2.0.so",
+    "libgdk_pixbuf-2.0.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "glib",
@@ -13,7 +28,8 @@
     "libpng",
     "libtiff",
     "meson",
-    "ninja"
+    "ninja",
+    "shared-mime-info"
   ],
   "sources": [
     "https://download.gnome.org/sources/gdk-pixbuf/2.44/gdk-pixbuf-2.44.7.tar.xz"

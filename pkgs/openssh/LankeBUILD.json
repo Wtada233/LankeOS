@@ -3,7 +3,12 @@
   "version": "10.4p1",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libcrypto.so.3",
+    "libz.so.1"
+  ],
   "provides": [],
   "build_deps": [
     "linux-pam",

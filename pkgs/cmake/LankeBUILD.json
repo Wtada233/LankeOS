@@ -9,13 +9,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel",
-    "fontconfig",
-    "freetype",
-    "git",
-    "libxcb",
-    "nlohmann-json",
-    "qt6-base"
+    "coreutils"
   ],
   "sources": [
     "https://github.com/Kitware/CMake/releases/download/v4.4.2/cmake-4.4.2-linux-x86_64.tar.gz"

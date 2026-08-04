@@ -3,8 +3,16 @@
   "version": "1.5.5",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libX11.so.6",
+    "libXext.so.6",
+    "libXrender.so.1",
+    "libc.so.6"
+  ],
+  "provides": [
+    "libXrandr.so",
+    "libXrandr.so.2"
+  ],
   "build_deps": [
     "base-devel",
     "libx11",

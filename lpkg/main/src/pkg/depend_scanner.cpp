@@ -36,27 +36,6 @@ std::string version_or_missing(const std::string& pkg)
     return ver.empty() ? "(not installed)" : ver;
 }
 
-/**
- * 从本地缓存收集传递反向依赖集 (BFS)
- * 从 root_pkg 出发，沿 reverse_deps 链遍历所有已安装的依赖者
- * @param result  输出：收集到的受影响包集合
- * @param visited 已访问节点集合，防止循环依赖和重复访问
- */
-void collect_transitive_rdeps(const std::string& root_pkg, std::unordered_set<std::string>& result,
-                              std::unordered_set<std::string>& visited)
-{
-    if (!visited.insert(root_pkg).second) return;
-    auto rdeps = Cache::instance().get_reverse_deps(root_pkg);
-    // 同时检查虚拟包（provides）的反向依赖
-    for (const auto& cap : Cache::instance().get_package_provides(root_pkg)) {
-        auto cap_rdeps = Cache::instance().get_reverse_deps(cap);
-        rdeps.insert(cap_rdeps.begin(), cap_rdeps.end());
-    }
-    for (const auto& rdep : rdeps) {
-        if (rdep == root_pkg) continue;
-        if (result.insert(rdep).second) collect_transitive_rdeps(rdep, result, visited);
-    }
-}
 
 /**
  * 前向依赖解析（用于 install 扫描）
@@ -79,12 +58,6 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
 {
     if (visited.contains(pkg_name) || plan.contains(pkg_name)) return;
 
-    std::string installed_ver = Cache::instance().get_installed_version(pkg_name);
-    if (!installed_ver.empty() && (version_spec.empty() || version_spec == constants::VER_LATEST)) {
-        plan[pkg_name] = {pkg_name, installed_ver, true, {}};
-        return;
-    }
-
     visited.insert(pkg_name);
 
     auto pkg_info = (version_spec == constants::VER_LATEST || version_spec.empty())
@@ -101,10 +74,26 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
         }
     }
 
-    bool already = !Cache::instance().get_installed_version(pkg_name).empty();
-    plan[pkg_info->name] = {pkg_info->name, pkg_info->version, already, pkg_info->dependencies};
+    bool already = !Cache::instance().get_installed_version(pkg_info->name).empty();
 
-    for (const auto& dep : pkg_info->dependencies) {
+    // 合并依赖来源：声明 deps + needed_so 推导的提供者。
+    // index 的 deps 字段常为空（farm 只回填 needed_so），needed_so 才是完整真源；
+    // 对齐真实 install 解析（install_common 同样走 needed_so → find_provider → 递归）。
+    std::vector<DependencyInfo> deps = pkg_info->dependencies;
+    if (!Config::instance().no_deps_mode()) {
+        for (const auto& soname : pkg_info->needed_so) {
+            if (auto prov = repo.find_provider(soname)) {
+                if (prov->name == pkg_info->name) continue;
+                bool dup = false;
+                for (const auto& d : deps)
+                    if (d.name == prov->name) { dup = true; break; }
+                if (!dup) deps.push_back({prov->name, {}});
+            }
+        }
+    }
+    plan[pkg_info->name] = {pkg_info->name, pkg_info->version, already, deps};
+
+    for (const auto& dep : deps) {
         if (!Config::instance().no_deps_mode()) {
             std::string dv(constants::VER_LATEST);
             if (!dep.constraints.empty()) {
@@ -150,10 +139,11 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
     }
     if (!fs::exists(idx)) return rev;
 
+    // 第一遍：读入行 + 建 SONAME → 提供者 反图（needed_so 反查依赖需要它）
+    std::vector<std::pair<std::string, std::string>> name_needed;  // (包名, needed_so 字段)
+    std::unordered_map<std::string, std::string> soname_provider;
     std::ifstream f(idx);
     std::string line;
-    static const std::vector<std::string_view> ops = {">=", "<=", "!=", "==", ">", "<", "="};
-
     while (std::getline(f, line)) {
         if (line.empty() || line[0] == '#') continue;
         if (line.back() == '\r') line.pop_back();
@@ -165,17 +155,24 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
         if (blocks.empty()) continue;
         // 取最后一个版本块（最新版本）作为依赖分析的依据
         auto vh = split_string_view(blocks.back(), constants::COLON_CHAR);
-        if (vh.size() < 3) continue;
+        if (vh.size() < 5) continue;  // 需要 provides(vh[3]) 和 needed_so(vh[4])
 
-        for (auto ds : split_string_view(vh[2], constants::COMMA_CHAR)) {
-            std::string_view dn = ds;
-            for (const auto& op : ops) {
-                if (auto p = ds.find(op); p != std::string_view::npos) {
-                    dn = ds.substr(0, p);
-                    break;
-                }
-            }
-            if (!dn.empty()) rev[std::string(dn)].insert(name);
+        name_needed.emplace_back(name, std::string(vh[4]));
+        for (auto s : split_string_view(vh[3], constants::COMMA_CHAR)) {
+            if (s.empty()) continue;
+            std::string key(s);
+            if (soname_provider.find(key) == soname_provider.end())
+                soname_provider[key] = name;
+        }
+    }
+
+    // 第二遍：needed_so → 提供者 → 反向依赖图
+    for (const auto& [name, needed] : name_needed) {
+        for (auto s : split_string_view(needed, constants::COMMA_CHAR)) {
+            if (s.empty()) continue;
+            auto it = soname_provider.find(std::string(s));
+            if (it != soname_provider.end() && it->second != name)
+                rev[it->second].insert(name);
         }
     }
     return rev;
@@ -208,62 +205,10 @@ auto load_repo_revdep() -> std::unordered_map<std::string, std::unordered_set<st
     return build_repo_revdep_map();
 }
 
-/**
- * 递归构建"移除"依赖树（本地缓存路径）
- * @param affected 待处理节点池：函数从池中取出节点放入树中，
- *                 确保每个受影响节点只在结果树中出现一次。
- * @param show_all 为 true 时连带显示不受影响的共享依赖
- */
-void build_remove_tree_local(ScanNode& node, const std::string& node_name,
-                             std::unordered_set<std::string>& affected, bool show_all)
-{
-    auto rdeps = Cache::instance().get_reverse_deps(node_name);
-    for (const auto& cap : Cache::instance().get_package_provides(node_name)) {
-        auto cr = Cache::instance().get_reverse_deps(cap);
-        rdeps.insert(cr.begin(), cr.end());
-    }
-
-    for (const auto& rdep : rdeps) {
-        if (rdep == node_name || !affected.contains(rdep)) continue;
-        affected.erase(rdep);
-
-        ScanNode child;
-        child.name = rdep;
-        child.version = version_or_missing(rdep);
-        child.status = ScanStatus::REMOVED;
-        child.reason = "depends on " + node_name;
-
-        build_remove_tree_local(child, rdep, affected, show_all);
-
-        // --all 模式下附带显示共享依赖（这些依赖不会被移除）
-        if (show_all) {
-            fs::path df = Config::instance().dep_dir() / rdep;
-            if (fs::exists(df)) {
-                std::ifstream f(df);
-                std::string l;
-                std::set<std::string> seen;
-                while (std::getline(f, l)) {
-                    std::string dn;
-                    std::istringstream(l) >> dn;
-                    if (dn.empty() || !seen.insert(dn).second) continue;
-                    ScanNode k;
-                    k.name = dn;
-                    k.version = version_or_missing(dn);
-                    k.status = ScanStatus::KEEP;
-                    k.reason = "shared dependency, unchanged";
-                    child.children.push_back(std::move(k));
-                }
-            }
-        }
-
-        node.children.push_back(std::move(child));
-    }
-}
 
 /**
- * 递归构建"移除"依赖树（仓库回退路径）
- * 当目标包未在本地安装时，从仓库索引构建反向依赖图，
- * 结构与 build_remove_tree_local 类似，但数据来源是仓库索引
+ * 递归构建"移除"依赖树（仓库路径）
+ * 恒用仓库反向依赖图（needed_so → 提供者推导），计算整个仓库删除该包的影响
  * @param affected 待处理节点池，用集合跟踪已处理的节点避免重复
  */
 void build_remove_tree_repo(
@@ -328,48 +273,30 @@ void build_install_tree(ScanNode* parent, const std::string& parent_name, const 
 //  若包未安装则回退到仓库分析，否则从本地缓存构建反向依赖树
 // ═══════════════════════════════════════════════════════════════════════════
 
-ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
+ScanNode scan_remove_tree(const std::string& pkg_name, bool /*show_all*/)
 {
-    auto& cache = Cache::instance();
-
-    // 未安装 → 从仓库索引查找谁依赖它
-    if (cache.get_installed_version(pkg_name).empty()) {
-        auto rev = load_repo_revdep();
-        if (rev.find(pkg_name) == rev.end()) {
-            ScanNode r;
-            r.name = pkg_name;
-            r.version = "(not installed)";
-            r.status = ScanStatus::REMOVED;
-            r.reason = "not found in repository";
-            return r;
-        }
-
-        std::unordered_set<std::string> affected, visited;
-        repo_transitive_rdeps(pkg_name, rev, affected, visited);
-        affected.insert(pkg_name);
-
-        ScanNode root;
-        root.name = pkg_name;
-        root.version = "(in repository)";
-        root.status = ScanStatus::REMOVED;
-        root.reason = "target package (repo)";
-        affected.erase(pkg_name);
-        build_remove_tree_repo(root, pkg_name, rev, affected);
-        return root;
+    // 恒用仓库反向依赖图：计算整个仓库删除该包的影响，不看本地装了啥
+    auto rev = load_repo_revdep();
+    if (rev.find(pkg_name) == rev.end()) {
+        ScanNode r;
+        r.name = pkg_name;
+        r.version = "(not found)";
+        r.status = ScanStatus::REMOVED;
+        r.reason = "not found in repository";
+        return r;
     }
 
-    // 已安装 → 从本地缓存构建
     std::unordered_set<std::string> affected, visited;
-    collect_transitive_rdeps(pkg_name, affected, visited);
+    repo_transitive_rdeps(pkg_name, rev, affected, visited);
     affected.insert(pkg_name);
 
     ScanNode root;
     root.name = pkg_name;
     root.version = version_or_missing(pkg_name);
     root.status = ScanStatus::REMOVED;
-    root.reason = "target package";
+    root.reason = "target package (repo)";
     affected.erase(pkg_name);
-    build_remove_tree_local(root, pkg_name, affected, show_all);
+    build_remove_tree_repo(root, pkg_name, rev, affected);
     return root;
 }
 
@@ -380,86 +307,41 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
 
 ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all)
 {
-    auto& cache = Cache::instance();
-
-    // 未安装 → 从仓库查找直接依赖者
-    if (cache.get_installed_version(pkg_name).empty()) {
-        auto rev = load_repo_revdep();
-        ScanNode root;
-        root.name = pkg_name;
-        root.version = "(in repository)";
-        root.status = ScanStatus::ABI_CHANGED;
-        root.reason = "ABI changed — direct dependents need rebuild";
-
-        auto it = rev.find(pkg_name);
-        if (it != rev.end()) {
-            for (const auto& dep : it->second) {
-                if (dep == pkg_name) continue;
-                ScanNode child;
-                child.name = dep;
-                child.version = "(in repository)";
-                child.status = ScanStatus::REBUILD;
-                child.reason = "direct dependency of " + pkg_name + " (repo)";
-
-                // --all 模式下显示间接依赖（标记为不变）
-                if (show_all) {
-                    auto git = rev.find(dep);
-                    if (git != rev.end()) {
-                        for (const auto& gdep : git->second) {
-                            if (gdep == dep || gdep == pkg_name) continue;
-                            ScanNode k;
-                            k.name = gdep;
-                            k.version = "(in repository)";
-                            k.status = ScanStatus::KEEP;
-                            k.reason = "indirect — ABI preserved through abstraction";
-                            child.children.push_back(std::move(k));
-                        }
-                    }
-                }
-                root.children.push_back(std::move(child));
-            }
-        }
-        return root;
-    }
-
-    // 已安装 → 从本地缓存找直接反向依赖
+    // 恒用仓库反向依赖图：计算整个仓库里需要该包 SONAME 的直接依赖者
+    auto rev = load_repo_revdep();
     ScanNode root;
     root.name = pkg_name;
     root.version = version_or_missing(pkg_name);
     root.status = ScanStatus::ABI_CHANGED;
     root.reason = "ABI changed — direct dependents need rebuild";
 
-    auto rdeps = cache.get_reverse_deps(pkg_name);
-    for (const auto& cap : cache.get_package_provides(pkg_name)) {
-        auto cr = cache.get_reverse_deps(cap);
-        rdeps.insert(cr.begin(), cr.end());
-    }
+    auto it = rev.find(pkg_name);
+    if (it != rev.end()) {
+        for (const auto& dep : it->second) {
+            if (dep == pkg_name) continue;
+            ScanNode child;
+            child.name = dep;
+            child.version = "(in repository)";
+            child.status = ScanStatus::REBUILD;
+            child.reason = "direct dependency of " + pkg_name + " (repo)";
 
-    for (const auto& rdep : rdeps) {
-        if (rdep == pkg_name) continue;
-        ScanNode child;
-        child.name = rdep;
-        child.version = version_or_missing(rdep);
-        child.status = ScanStatus::REBUILD;
-        child.reason = "direct dependency of " + pkg_name;
-
-        if (show_all) {
-            auto ind = cache.get_reverse_deps(rdep);
-            for (const auto& cap : cache.get_package_provides(rdep)) {
-                auto ci = cache.get_reverse_deps(cap);
-                ind.insert(ci.begin(), ci.end());
+            // --all 模式下显示间接依赖（标记为不变）
+            if (show_all) {
+                auto git = rev.find(dep);
+                if (git != rev.end()) {
+                    for (const auto& gdep : git->second) {
+                        if (gdep == dep || gdep == pkg_name) continue;
+                        ScanNode k;
+                        k.name = gdep;
+                        k.version = "(in repository)";
+                        k.status = ScanStatus::KEEP;
+                        k.reason = "indirect — ABI preserved through abstraction";
+                        child.children.push_back(std::move(k));
+                    }
+                }
             }
-            for (const auto& ir : ind) {
-                if (ir == rdep || ir == pkg_name) continue;
-                ScanNode k;
-                k.name = ir;
-                k.version = version_or_missing(ir);
-                k.status = ScanStatus::KEEP;
-                k.reason = "indirect — ABI preserved through abstraction";
-                child.children.push_back(std::move(k));
-            }
+            root.children.push_back(std::move(child));
         }
-        root.children.push_back(std::move(child));
     }
     return root;
 }

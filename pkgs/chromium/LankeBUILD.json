@@ -59,7 +59,7 @@
     "python",
     "rsync",
     "rust-bindgen",
-    "rust-nightly",
+    "rust",
     "zlib",
     "zstd"
   ],

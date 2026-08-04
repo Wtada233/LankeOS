@@ -1,10 +1,20 @@
 {
   "name": "libxi",
   "version": "1.8.3",
-  "release": 2,
-  "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "release": 3,
+  "deps": [
+    "libxfixes",
+    "xorgproto"
+  ],
+  "needed_so": [
+    "libX11.so.6",
+    "libXext.so.6",
+    "libc.so.6"
+  ],
+  "provides": [
+    "libXi.so",
+    "libXi.so.6"
+  ],
   "build_deps": [
     "base-devel",
     "libx11",

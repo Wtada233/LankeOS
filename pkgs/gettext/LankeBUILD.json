@@ -1,7 +1,7 @@
 {
   "name": "gettext",
   "version": "1.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash",
     "gawk",
@@ -9,8 +9,30 @@
     "ruby",
     "tcl"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libacl.so.1",
+    "libattr.so.1",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgomp.so.1",
+    "libm.so.6",
+    "libncursesw.so.6",
+    "libstdc++.so.6",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "libasprintf.so",
+    "libasprintf.so.0",
+    "libgettextlib-1.0.so",
+    "libgettextlib.so",
+    "libgettextpo.so",
+    "libgettextpo.so.0",
+    "libgettextsrc-1.0.so",
+    "libgettextsrc.so",
+    "libgnuintl.so.8",
+    "libtextstyle.so",
+    "libtextstyle.so.0"
+  ],
   "build_deps": [
     "acl",
     "attr",

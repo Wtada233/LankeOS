@@ -5,8 +5,13 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libgpg-error.so",
+    "libgpg-error.so.0"
+  ],
   "build_deps": [
     "base-devel"
   ],

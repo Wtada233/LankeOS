@@ -3,8 +3,15 @@
   "version": "4.0.6",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libncursesw.so.6"
+  ],
+  "provides": [
+    "libproc2.so",
+    "libproc2.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "dejagnu",

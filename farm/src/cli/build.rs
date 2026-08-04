@@ -12,14 +12,11 @@ pub(crate) fn cmd_build(args: &Args) -> ExitCode {
     // --all → 空 targets（run_build 内部做全量 + 版本增量跳过：effective_version 与本地 repo 一致则跳过）
     let targets: Vec<String> = if args.all {
         Vec::new()
+    } else if !args.pkg.is_empty() {
+        args.pkg.clone()
     } else {
-        match &args.pkg {
-            Some(p) => vec![p.clone()],
-            None => {
-                eprintln!("farm build <pkg> | --all");
-                return ExitCode::from(2);
-            }
-        }
+        eprintln!("farm build <pkg>... | --all");
+        return ExitCode::from(2);
     };
 
     // SQLite 状态（§11）：job 状态 + 构建历史（增量由 run_build 的版本对比驱动）

@@ -3,18 +3,20 @@
 # 参照 Arch Linux PKGBUILD 适配（完整构建，非仅 builtins）
 
 lankebuild_prepare() {
-    # 源码解压后目录名为 llvm-project-22.1.7.src/
     mkdir -p build-compiler-rt
 }
 
 lankebuild_build() {
     cd build-compiler-rt
 
+    # COMPILER_RT_INSTALL_PATH 需要 LLVM major 版本（如 22），从 {ORIG_PKG_VER} 派生不写死
+    CLANG_MAJOR=$(printf '%s' '{ORIG_PKG_VER}' | cut -d. -f1)
+
     cmake -G Ninja ../compiler-rt \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX={PREFIX} \
         -DCMAKE_SKIP_RPATH=ON \
-        -DCOMPILER_RT_INSTALL_PATH=/usr/lib/clang/22
+        -DCOMPILER_RT_INSTALL_PATH=/usr/lib/clang/${CLANG_MAJOR}
 
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install

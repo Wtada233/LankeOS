@@ -5,8 +5,25 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libblkid.so.1",
+    "libc.so.6",
+    "libcom_err.so.2",
+    "libext2fs.so.2",
+    "libudev.so.1",
+    "libuuid.so.1",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libbtrfs.so",
+    "libbtrfs.so.0",
+    "libbtrfs.so.0.1",
+    "libbtrfsutil.so",
+    "libbtrfsutil.so.1",
+    "libbtrfsutil.so.1.4"
+  ],
   "build_deps": [
     "base-devel",
     "git",

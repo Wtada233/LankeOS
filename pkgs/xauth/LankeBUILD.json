@@ -3,7 +3,13 @@
   "version": "1.1.5",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libX11.so.6",
+    "libXau.so.6",
+    "libXext.so.6",
+    "libXmuu.so.1",
+    "libc.so.6"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",
@@ -11,8 +17,7 @@
     "libxau",
     "libxext",
     "libxmu",
-    "util-macros",
-    "xorgproto"
+    "util-macros"
   ],
   "sources": [
     "https://xorg.freedesktop.org/releases/individual/app/xauth-1.1.5.tar.gz"

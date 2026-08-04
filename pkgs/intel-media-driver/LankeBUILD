@@ -9,7 +9,8 @@ lankebuild_prepare() {
         -DGEN8=OFF \
         -DGEN9=OFF \
         -DGEN11=OFF \
-        -DMEDIA_BUILD_FATAL_WARNINGS:BOOL='OFF'
+        -DMEDIA_BUILD_FATAL_WARNINGS:BOOL='OFF' \
+        -Wno-author
 }
 
 lankebuild_build() {

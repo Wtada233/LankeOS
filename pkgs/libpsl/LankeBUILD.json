@@ -1,12 +1,18 @@
 {
   "name": "libpsl",
   "version": "0.23.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "python"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libicuuc.so.78"
+  ],
+  "provides": [
+    "libpsl.so",
+    "libpsl.so.5"
+  ],
   "build_deps": [
     "base-devel",
     "gtk-doc",

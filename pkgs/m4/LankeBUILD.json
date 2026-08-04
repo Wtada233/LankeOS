@@ -3,7 +3,9 @@
   "version": "1.4.21",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",

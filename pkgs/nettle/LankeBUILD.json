@@ -3,8 +3,16 @@
   "version": "4.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgmp.so.10"
+  ],
+  "provides": [
+    "libhogweed.so",
+    "libhogweed.so.7",
+    "libnettle.so",
+    "libnettle.so.9"
+  ],
   "build_deps": [
     "base-devel",
     "gmp"

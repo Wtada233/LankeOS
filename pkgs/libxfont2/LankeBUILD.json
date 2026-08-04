@@ -2,7 +2,9 @@
   "name": "libxfont2",
   "version": "2.0.8",
   "release": 2,
-  "deps": [],
+  "deps": [
+    "xorgproto"
+  ],
   "needed_so": [],
   "provides": [],
   "build_deps": [

@@ -3,8 +3,16 @@
   "version": "4.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6",
+    "libmpg123.so.0",
+    "libncursesw.so.6"
+  ],
+  "provides": [
+    "libmp3lame.so",
+    "libmp3lame.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "libmpg123",

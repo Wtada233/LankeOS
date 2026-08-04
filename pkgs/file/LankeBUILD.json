@@ -3,8 +3,18 @@
   "version": "5.48",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "liblzma.so.5",
+    "libm.so.6",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libmagic.so",
+    "libmagic.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "bzip2",

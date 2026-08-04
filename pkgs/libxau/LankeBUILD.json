@@ -2,9 +2,16 @@
   "name": "libxau",
   "version": "1.0.12",
   "release": 2,
-  "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "deps": [
+    "xorgproto"
+  ],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libXau.so",
+    "libXau.so.6"
+  ],
   "build_deps": [
     "base-devel",
     "util-macros",

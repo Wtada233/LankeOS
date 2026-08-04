@@ -5,8 +5,17 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libffi.so.8",
+    "libtasn1.so.6"
+  ],
+  "provides": [
+    "libp11-kit.so",
+    "libp11-kit.so.0",
+    "p11-kit-proxy.so"
+  ],
   "build_deps": [
     "base-devel",
     "libffi",

@@ -1,10 +1,19 @@
 {
   "name": "libxcomposite",
   "version": "0.4.7",
-  "release": 2,
-  "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "release": 3,
+  "deps": [
+    "libxfixes",
+    "xorgproto"
+  ],
+  "needed_so": [
+    "libX11.so.6",
+    "libc.so.6"
+  ],
+  "provides": [
+    "libXcomposite.so",
+    "libXcomposite.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "libx11",

@@ -1,12 +1,17 @@
 {
   "name": "xcb-util-renderutil",
   "version": "0.3.10",
-  "release": 2,
-  "deps": [
-    "xwayland"
+  "release": 3,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libxcb-render.so.0",
+    "libxcb.so.1"
   ],
-  "needed_so": [],
-  "provides": [],
+  "provides": [
+    "libxcb-render-util.so",
+    "libxcb-render-util.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "libxcb",

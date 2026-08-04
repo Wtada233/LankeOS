@@ -9,14 +9,10 @@ lankebuild_build() {
         --buildtype=release \
         -D introspection=enabled \
         -D man=false \
-        -D docs=false
+        -D glycin=disabled
     ninja -j$(nproc)
     
     DESTDIR={STAGING_ROOT} ninja install
-    
-    # Generate loader cache as per documentation for DESTDIR installation
-    # Running from within the staging directory to ensure correct pathing
-    {STAGING_ROOT}{BINDIR}/gdk-pixbuf-query-loaders --update-cache
 }
 lankebuild_package() {
     :

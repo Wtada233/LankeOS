@@ -1,12 +1,20 @@
 lankebuild_prepare() {
     # BLFS 推荐配置，启用 GPL 和必要的编码器
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}            \
+    ./configure --prefix={PREFIX}        \
                 --enable-gpl             \
                 --enable-version3        \
                 --enable-libmp3lame      \
                 --enable-libvorbis       \
                 --enable-libx264         \
                 --enable-libx265         \
+                --enable-libopus         \
+                --enable-libass          \
+                --enable-libwebp         \
+                --enable-libvpx          \
+                --enable-librsvg         \
+                --enable-vaapi           \
+                --enable-ffnvcodec       \
+                --enable-vulkan          \
                 --enable-shared          \
                 --disable-static
 }

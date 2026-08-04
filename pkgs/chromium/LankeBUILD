@@ -25,7 +25,6 @@ _UNWANTED_DIRS="brotli dav1d flac fontconfig freetype harfbuzz
 
 
 lankebuild_prepare() {
-    set -e
     cd "$_CS"
 
     # --- 基础替换 ---
@@ -99,7 +98,6 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     # --- 构建 chromium-launcher ---
-    set -e
     make -C "{SRC_DIR}"/chromium-launcher-* -j$(nproc)
 
     # --- 构建 Chromium ---
@@ -163,7 +161,6 @@ lankebuild_build() {
 
 
 lankebuild_package() {
-    set -e
     # --- launcher ---
     cd "{SRC_DIR}"/chromium-launcher-*
     make PREFIX=/usr DESTDIR="{STAGING_ROOT}" install

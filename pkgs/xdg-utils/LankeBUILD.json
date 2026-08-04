@@ -17,6 +17,5 @@
   "sources": [
     "https://deb.debian.org/debian/pool/main/x/xdg-utils/xdg-utils_1.2.1.orig.tar.gz"
   ],
-  "work_sources": [],
-  "no_strip": true
+  "work_sources": []
 }

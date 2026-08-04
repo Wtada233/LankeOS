@@ -2,11 +2,14 @@
   "name": "docbook-xsl",
   "version": "1.79.2",
   "release": 1,
-  "deps": [],
+  "deps": [
+    "docbook-xml"
+  ],
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel"
+    "base-devel",
+    "docbook-xml"
   ],
   "sources": [
     "https://github.com/docbook/xslt10-stylesheets/releases/download/release%2F1.79.2/docbook-xsl-1.79.2.tar.gz",

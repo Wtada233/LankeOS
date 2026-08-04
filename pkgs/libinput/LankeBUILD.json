@@ -5,8 +5,18 @@
   "deps": [
     "python"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libevdev.so.2",
+    "liblua.so.5.5",
+    "libm.so.6",
+    "libmtdev.so.1",
+    "libudev.so.1"
+  ],
+  "provides": [
+    "libinput.so",
+    "libinput.so.10"
+  ],
   "build_deps": [
     "base-devel",
     "cairo",

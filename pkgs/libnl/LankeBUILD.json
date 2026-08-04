@@ -3,8 +3,25 @@
   "version": "3.12.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libnl-3.so",
+    "libnl-3.so.200",
+    "libnl-cli-3.so",
+    "libnl-cli-3.so.200",
+    "libnl-genl-3.so",
+    "libnl-genl-3.so.200",
+    "libnl-idiag-3.so",
+    "libnl-idiag-3.so.200",
+    "libnl-nf-3.so",
+    "libnl-nf-3.so.200",
+    "libnl-route-3.so",
+    "libnl-route-3.so.200",
+    "libnl-xfrm-3.so",
+    "libnl-xfrm-3.so.200"
+  ],
   "build_deps": [
     "base-devel",
     "git"

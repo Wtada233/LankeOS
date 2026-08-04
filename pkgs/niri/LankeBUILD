@@ -15,7 +15,7 @@ lankebuild_build() {
     cd $(ls -d */ | head -1)
 
     # 嵌入构建标识（用于 niri --version）
-    export NIRI_BUILD_COMMIT="{PKG_VER}"
+    export NIRI_BUILD_COMMIT="{ORIG_PKG_VER}"
 
     # 添加 LTO 兼容标志
     export CFLAGS="${CFLAGS} -ffat-lto-objects"

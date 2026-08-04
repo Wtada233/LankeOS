@@ -5,8 +5,21 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libLLVM.so.22.1",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libcurl.so.4",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libssl.so.3",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "librustc_driver-b18229fd4035e2d5.so"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",

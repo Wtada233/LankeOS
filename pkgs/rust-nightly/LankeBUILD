@@ -54,5 +54,22 @@ lankebuild_package() {
     rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/components"
     rm -rf "{STAGING_ROOT}{LIBDIR}/rustlib/etc"
     rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/rust-installer-version"
-    rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/manifest-*"
+    rm -f  "{STAGING_ROOT}{LIBDIR}"/rustlib/manifest-*
+
+    # ── .so 去重：扁平 .so 若与 staging 树内同名且内容一致 → 改为相对软链接 ──
+    for f in "{STAGING_ROOT}{LIBDIR}"/*.so*; do
+        [ -f "$f" ] && [ ! -L "$f" ] || continue
+        local name; name=$(basename "$f")
+        local dup=""
+        while IFS= read -r cand; do
+            if [ "$cand" != "$f" ] && cmp -s "$f" "$cand"; then
+                dup="$cand"; break
+            fi
+        done < <(find "{STAGING_ROOT}" -name "$name" 2>/dev/null)
+        [ -n "$dup" ] || continue
+        local rel
+        rel=$(realpath --relative-to="$(dirname "$f")" "$dup")
+        ln -sfn "$rel" "$f"
+        echo "  dedup: $name -> $rel"
+    done
 }

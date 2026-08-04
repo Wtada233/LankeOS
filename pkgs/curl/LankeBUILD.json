@@ -5,8 +5,21 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libbrotlidec.so.1",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libidn2.so.0",
+    "libnghttp2.so.14",
+    "libpsl.so.5",
+    "libssl.so.3",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libcurl.so",
+    "libcurl.so.4"
+  ],
   "build_deps": [
     "base-devel",
     "brotli",

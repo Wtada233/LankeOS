@@ -11,20 +11,10 @@ lankebuild_prepare() {
 lankebuild_build() {
     export XML_CATALOG_FILES=/etc/xml/catalog
     ./configure --prefix={PREFIX} --mandir={MANDIR}
-    make -j$(nproc) scripts
-
-    # 手动安装脚本（跳过 txt 转换失败导致的 make install 问题）
-    cd scripts
-    for _s in xdg-desktop-menu xdg-desktop-icon xdg-mime xdg-icon-resource \
-              xdg-open xdg-email xdg-screensaver xdg-settings; do
-        install -m755 "$_s" "{STAGING_ROOT}{BINDIR}/$_s"
-    done
-
-    cd ..
-    install -dm755 "{STAGING_ROOT}{DATADIR}/desktop-directories"
-    install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/xdg-utils/LICENSE"
+    make -j$(nproc)
 }
 
 lankebuild_package() {
-    :
+    make DESTDIR="{STAGING_ROOT}" install
+    install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/xdg-utils/LICENSE"
 }

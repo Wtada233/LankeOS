@@ -3,8 +3,20 @@
   "version": "2026.3",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libSPIRV-Tools-opt.so",
+    "libSPIRV-Tools.so",
+    "libSPIRV.so.16",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libglslang.so.16",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libshaderc_shared.so",
+    "libshaderc_shared.so.1"
+  ],
   "build_deps": [
     "spirv-headers",
     "spirv-tools",

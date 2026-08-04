@@ -2,9 +2,17 @@
   "name": "libxfixes",
   "version": "6.0.2",
   "release": 2,
-  "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "deps": [
+    "xorgproto"
+  ],
+  "needed_so": [
+    "libX11.so.6",
+    "libc.so.6"
+  ],
+  "provides": [
+    "libXfixes.so",
+    "libXfixes.so.3"
+  ],
   "build_deps": [
     "base-devel",
     "libx11",

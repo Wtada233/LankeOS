@@ -6,8 +6,23 @@
     "bash",
     "perl"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libblkid.so.1",
+    "libc.so.6",
+    "libfuse3.so.4",
+    "libuuid.so.1"
+  ],
+  "provides": [
+    "libcom_err.so",
+    "libcom_err.so.2",
+    "libe2p.so",
+    "libe2p.so.2",
+    "libext2fs.so",
+    "libext2fs.so.2",
+    "libss.so",
+    "libss.so.2"
+  ],
   "build_deps": [
     "base-devel",
     "fuse3",

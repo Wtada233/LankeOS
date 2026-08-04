@@ -3,8 +3,13 @@
   "version": "2.4.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libacl.so",
+    "libacl.so.1"
+  ],
   "build_deps": [
     "attr",
     "base-devel",

@@ -15,7 +15,7 @@ lankebuild_build() {
     # 编译，开启 gvisor TUN 支持
     go build -tags "with_gvisor" -trimpath \
       -buildvcs=false \
-      -ldflags '-X "github.com/metacubex/mihomo/constant.Version=v{PKG_VER}" -X "github.com/metacubex/mihomo/constant.BuildTime=2026-06-29" -w -s -buildid=' \
+      -ldflags "-X \"github.com/metacubex/mihomo/constant.Version=v{ORIG_PKG_VER}\" -X \"github.com/metacubex/mihomo/constant.BuildTime=$(date +%Y-%m-%d)\" -w -s -buildid=" \
       -o {STAGING_ROOT}{BINDIR}/mihomo .
 }
 

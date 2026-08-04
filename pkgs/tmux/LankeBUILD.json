@@ -3,7 +3,14 @@
   "version": "3.7b",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libevent_core-2.1.so.7",
+    "libm.so.6",
+    "libncursesw.so.6",
+    "libresolv.so.2",
+    "libsystemd.so.0"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",

@@ -1,16 +1,23 @@
 lankebuild_prepare() {
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}          \
+    ./configure --prefix={PREFIX}  \
+            --ninja                \
+            --enable-lto           \
             --shared-nghttp2       \
             --shared-openssl       \
             --shared-zlib          \
-            --with-intl=system-icu
+            --with-intl=system-icu \
+            --shared-brotli        \
+            --shared-ffi           \
+            --shared-nghttp2       \
+            --shared-openssl       \
+            --shared-zlib          \
+            --shared-zstd
 }
 
 lankebuild_build() {
-    make -j$(nproc)    
-    make DESTDIR={STAGING_ROOT} install
+    make -j$(nproc)
 }
 
 lankebuild_package() {
-    :
+    make DESTDIR={STAGING_ROOT} install
 }

@@ -3,7 +3,12 @@
   "version": "5.0.1",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libFLAC.so.14",
+    "libasound.so.2",
+    "libc.so.6",
+    "libresolv.so.2"
+  ],
   "provides": [],
   "build_deps": [
     "alsa-lib",

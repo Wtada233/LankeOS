@@ -2,9 +2,18 @@
   "name": "libxinerama",
   "version": "1.1.6",
   "release": 2,
-  "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "deps": [
+    "xorgproto"
+  ],
+  "needed_so": [
+    "libX11.so.6",
+    "libXext.so.6",
+    "libc.so.6"
+  ],
+  "provides": [
+    "libXinerama.so",
+    "libXinerama.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "libx11",

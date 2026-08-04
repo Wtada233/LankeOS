@@ -3,7 +3,11 @@
   "version": "1.5.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libX11.so.6",
+    "libc.so.6",
+    "libxkbfile.so.1"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",

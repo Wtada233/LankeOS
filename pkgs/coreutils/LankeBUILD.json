@@ -3,7 +3,14 @@
   "version": "9.11",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libacl.so.1",
+    "libattr.so.1",
+    "libc.so.6",
+    "libcap.so.2",
+    "libcrypto.so.3",
+    "libgmp.so.10"
+  ],
   "provides": [],
   "build_deps": [
     "acl",

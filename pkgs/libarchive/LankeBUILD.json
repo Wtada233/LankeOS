@@ -1,10 +1,23 @@
 {
   "name": "libarchive",
   "version": "3.8.9",
-  "release": 1,
+  "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libacl.so.1",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "liblz4.so.1",
+    "liblzma.so.5",
+    "libxml2.so.16",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libarchive.so",
+    "libarchive.so.13"
+  ],
   "build_deps": [
     "acl",
     "base-devel",

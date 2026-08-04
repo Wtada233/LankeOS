@@ -1,10 +1,26 @@
 {
   "name": "gnutls",
   "version": "3.8.13",
-  "release": 3,
+  "release": 4,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgmp.so.10",
+    "libhogweed.so.7",
+    "libm.so.6",
+    "libnettle.so.9",
+    "libp11-kit.so.0",
+    "libstdc++.so.6",
+    "libtasn1.so.6"
+  ],
+  "provides": [
+    "libgnutls.so",
+    "libgnutls.so.30",
+    "libgnutlsxx.so",
+    "libgnutlsxx.so.30"
+  ],
   "build_deps": [
     "base-devel",
     "gmp",

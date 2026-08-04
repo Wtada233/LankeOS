@@ -5,8 +5,29 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libm.so.6",
+    "libmagic.so.1",
+    "libncursesw.so.6",
+    "libreadline.so.8",
+    "libudev.so.1",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libblkid.so",
+    "libblkid.so.1",
+    "libfdisk.so",
+    "libfdisk.so.1",
+    "libmount.so",
+    "libmount.so.1",
+    "libsmartcols.so",
+    "libsmartcols.so.1",
+    "libuuid.so",
+    "libuuid.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "bash-completion",

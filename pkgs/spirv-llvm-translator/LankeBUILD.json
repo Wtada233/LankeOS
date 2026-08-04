@@ -3,13 +3,24 @@
   "version": "22.1.5",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libLLVM.so.22.1",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libLLVMSPIRVLib.so",
+    "libLLVMSPIRVLib.so.22.1"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",
     "llvm",
-    "ninja"
+    "ninja",
+    "spirv-headers"
   ],
   "sources": [
     "https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v22.1.5.tar.gz"

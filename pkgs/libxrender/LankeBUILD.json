@@ -2,9 +2,17 @@
   "name": "libxrender",
   "version": "0.9.12",
   "release": 2,
-  "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "deps": [
+    "xorgproto"
+  ],
+  "needed_so": [
+    "libX11.so.6",
+    "libc.so.6"
+  ],
+  "provides": [
+    "libXrender.so",
+    "libXrender.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "libx11",

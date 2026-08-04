@@ -3,8 +3,27 @@
   "version": "1.6.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgif.so.7",
+    "libjpeg.so.62",
+    "libm.so.6",
+    "libpng16.so.16",
+    "libtiff.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libsharpyuv.so",
+    "libsharpyuv.so.0",
+    "libwebp.so",
+    "libwebp.so.7",
+    "libwebpdecoder.so",
+    "libwebpdecoder.so.3",
+    "libwebpdemux.so",
+    "libwebpdemux.so.2",
+    "libwebpmux.so",
+    "libwebpmux.so.3"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",

@@ -2,9 +2,19 @@
   "name": "libx11",
   "version": "1.8.13",
   "release": 2,
-  "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "deps": [
+    "xorgproto"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libxcb.so.1"
+  ],
+  "provides": [
+    "libX11-xcb.so",
+    "libX11-xcb.so.1",
+    "libX11.so",
+    "libX11.so.6"
+  ],
   "build_deps": [
     "base-devel",
     "libxcb",

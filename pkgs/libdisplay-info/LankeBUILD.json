@@ -3,8 +3,14 @@
   "version": "0.4.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libdisplay-info.so",
+    "libdisplay-info.so.4"
+  ],
   "build_deps": [
     "base-devel",
     "hwdata",

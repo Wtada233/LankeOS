@@ -1,14 +1,8 @@
-#
-# opus — 音频编解码器（Xiph.Org）
-# 共享库构建
-
 lankebuild_prepare() {
-    set -e
+    :
 }
 
 lankebuild_build() {
-    set -e
-
     ./configure \
         --prefix=/usr \
         --disable-static \

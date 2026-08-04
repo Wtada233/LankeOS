@@ -5,8 +5,15 @@
   "deps": [
     "perl"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libcrypto.so",
+    "libcrypto.so.3",
+    "libssl.so",
+    "libssl.so.3"
+  ],
   "build_deps": [
     "base-devel",
     "perl"

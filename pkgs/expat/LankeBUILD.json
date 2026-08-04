@@ -3,8 +3,14 @@
   "version": "2.8.2",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libexpat.so",
+    "libexpat.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "git"

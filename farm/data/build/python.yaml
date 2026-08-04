@@ -2,4 +2,4 @@
 # 但靠 python 运行时/工具链运行的包（它们不产生 needed_so 链接边，不会自动成为 ABI 受害者）。
 # packages 是空格分隔的 glob（`*` 通配）；匹配 farm 配方目录里的包名。
 rebuild-on-abichange: python
-packages: python-* meson gobject-introspection blueman
+packages: python-* meson gobject-introspection blueman boost

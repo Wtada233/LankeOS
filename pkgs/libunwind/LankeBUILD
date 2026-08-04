@@ -1,22 +1,14 @@
 lankebuild_prepare() {
-    mkdir -p build-libunwind
+    cd "libunwind-{ORIG_PKG_VER}"
+    # 上游修复：test 里 malloc() 原型错误导致 GCC 16 编译失败（b67d508a）
+    patch -p1 -i ../b67d508a.patch
 }
 
 lankebuild_build() {
-    cd build-libunwind
-
-    cmake -G Ninja ../libunwind \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX={PREFIX} \
-        -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
-        -DCMAKE_SKIP_RPATH=ON \
-        -DLLVM_PATH=../llvm \
-        -DLIBUNWIND_ENABLE_STATIC=OFF
-
-    ninja -j$(nproc)
-    DESTDIR={STAGING_ROOT} ninja install
-
-    install -Dm644 ../libunwind/LICENSE.TXT {STAGING_ROOT}{DATADIR}/licenses/libunwind/LICENSE
+    cd "libunwind-{ORIG_PKG_VER}"
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --localstatedir={LOCALSTATEDIR} --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
 }
 
 lankebuild_package() {
