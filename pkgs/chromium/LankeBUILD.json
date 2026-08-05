@@ -45,7 +45,6 @@
     "libxkbcommon",
     "libxml2",
     "libxslt",
-    "llvm",
     "mesa",
     "minizip",
     "ninja",
