@@ -113,10 +113,12 @@ lankebuild_build() {
     # --- 构建 Chromium ---
     cd "$_CS"
 
-    export CC=clang
-    export CXX=clang++
-    export AR=ar
-    export NM=nm
+    # unbundle 工具链读 CC/CXX 环境变量——必须指向 bundled clang（git-LLVM-23）。
+    # 系统 clang 22 的 resource dir 缺 cfi_ignorelist，且 LLVM 版本与 rust 产物不匹配。
+    export CC="$PWD/third_party/llvm-build/Release+Asserts/bin/clang"
+    export CXX="$PWD/third_party/llvm-build/Release+Asserts/bin/clang++"
+    export AR="$PWD/third_party/llvm-build/Release+Asserts/bin/llvm-ar"
+    export NM="$PWD/third_party/llvm-build/Release+Asserts/bin/llvm-nm"
     export RUSTC_BOOTSTRAP=1
 
     # 移除与 Chromium ThinLTO 冲突的 CFLAGS
