@@ -10,7 +10,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "docbook-xsl",
     "doxygen",
     "expat",
     "git",

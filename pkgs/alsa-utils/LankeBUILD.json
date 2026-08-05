@@ -10,7 +10,6 @@
   "build_deps": [
     "alsa-lib",
     "base-devel",
-    "docbook-xsl",
     "fftw",
     "ncurses",
     "xmlto"

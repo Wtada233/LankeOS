@@ -1,7 +1,7 @@
 {
   "name": "gobject-introspection",
   "version": "1.86.0",
-  "release": 3,
+  "release": 4,
   "deps": [
     "python"
   ],

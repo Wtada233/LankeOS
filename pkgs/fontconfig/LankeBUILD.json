@@ -3,15 +3,24 @@
   "version": "2.18.2",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libfreetype.so.6",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "libfontconfig.so",
+    "libfontconfig.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "expat",
     "freetype",
     "git",
     "gperf",
-    "meson"
+    "libxml2",
+    "meson",
+    "ninja"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.18.2/fontconfig-2.18.2.tar.gz"

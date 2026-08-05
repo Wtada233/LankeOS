@@ -1,7 +1,7 @@
 {
   "name": "meson",
   "version": "1.11.2",
-  "release": 2,
+  "release": 4,
   "deps": [
     "python"
   ],

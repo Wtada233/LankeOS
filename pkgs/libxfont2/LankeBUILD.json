@@ -5,12 +5,22 @@
   "deps": [
     "xorgproto"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libfontenc.so.1",
+    "libfreetype.so.6",
+    "libm.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libXfont2.so",
+    "libXfont2.so.2"
+  ],
   "build_deps": [
     "base-devel",
     "fontenc",
     "freetype",
+    "xtrans",
     "zlib"
   ],
   "sources": [

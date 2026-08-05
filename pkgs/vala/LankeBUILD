@@ -6,7 +6,9 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     NOCONFIGURE=1 ./autogen.sh
-    ./configure --prefix=/usr --disable-valadoc
+    # glib>=2.74 的 g_get_system_data_dirs 返回 const gchar* const*，vala 预生成代码仍赋给 gchar**。
+    # gcc 16 起 incompatible-pointer-types 默认是 error（Arch 的 gcc 只告警），显式降级为 warning。
+    CFLAGS="-O2 -Wno-error=incompatible-pointer-types" ./configure --prefix=/usr --enable-valadoc
     sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
     make -j$(nproc)
 }

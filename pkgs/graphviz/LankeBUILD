@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    # 源码树未提交 configure/version.m4；autogen.sh 用 python3 从 CHANGELOG.md 生成版本后 autoreconf。
+    # NOCONFIG：跳过 autogen.sh 默认的 configure（build 阶段统一配置）
+    ./autogen.sh NOCONFIG
+}
+
+lankebuild_build() {
+    # 按容器内现有库存自动探测：cairo/pango/librsvg 在则开，gd/gts/ghostscript 不在则自动关
+    ./configure --prefix=/usr
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+}

@@ -17,7 +17,6 @@
     "base-devel",
     "gtk-doc",
     "icu",
-    "libxslt",
     "python"
   ],
   "sources": [

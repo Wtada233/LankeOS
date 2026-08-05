@@ -1,7 +1,7 @@
 {
   "name": "chromium",
-  "version": "153.0.7984.0",
-  "release": 1,
+  "version": "151.0.7922.75",
+  "release": 2,
   "deps": [
     "gtk3",
     "xwayland"
@@ -64,7 +64,7 @@
     "zstd"
   ],
   "sources": [
-    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-153.0.7984.0-lite.tar.xz",
+    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-151.0.7922.75-lite.tar.xz",
     "https://github.com/foutrelis/chromium-launcher/archive/v8/chromium-launcher-8.tar.gz"
   ],
   "work_sources": []

@@ -10,4 +10,11 @@ lankebuild_build() {
 
 lankebuild_package() {
     DESTDIR="{STAGING_ROOT}" meson install -C _build
+    # postinst hook：gtk-doc 的 python 工具（fixxref/mkhtml）依赖 lxml/pygments（非仓库包），pip 安装。
+    # 安装 gtk-doc 的容器/主机都会执行。
+    install -Dm644 /dev/null "{STAGING_HOOKS}"/postinst.sh
+    cat > "{STAGING_HOOKS}"/postinst.sh << 'EOF'
+python -m ensurepip
+pip3 install lxml pygments
+EOF
 }

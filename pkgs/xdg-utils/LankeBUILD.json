@@ -9,7 +9,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "docbook-xsl",
     "git",
     "lynx",
     "xmlto"

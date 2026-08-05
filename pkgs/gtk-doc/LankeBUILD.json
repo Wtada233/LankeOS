@@ -1,8 +1,12 @@
 {
   "name": "gtk-doc",
   "version": "1.36.1",
+  "release": 2,
   "deps": [
     "bash",
+    "docbook-xml",
+    "docbook-xsl",
+    "libxslt",
     "python"
   ],
   "needed_so": [],
@@ -11,6 +15,8 @@
     "base-devel",
     "bc",
     "gtk3",
+    "itstool",
+    "libxslt",
     "meson",
     "ninja",
     "python"

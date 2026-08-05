@@ -1,3 +1,12 @@
+# pango 稳定线是 1.5x 偶数小版本（1.56/1.58…）；dev 有两类：奇数小版本（1.57）与
+# 2.0 开发线（1.9x）。gnome 模板读 download.gnome.org 会把 1.90.0 当最新 → 用 script 过滤
+# 偶数 且 <90 的真实稳定版。gitlab archive 已验证非 Anubis（真 gzip）。
 pkg-name: pango
-tracker-template: gnome
-template: 'https://download.gnome.org/sources/{name}/{path_version}/{name}-{version}.tar.xz'
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  tags=$(git ls-remote --tags https://gitlab.gnome.org/GNOME/pango.git 2>/dev/null)
+  version=$(printf '%s\n' "$tags" | grep -oE 'refs/tags/[0-9]+\.[0-9]+\.[0-9]+$' | sed 's#refs/tags/##' | awk -F. '$2 % 2 == 0 && $2 < 90' | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "https://gitlab.gnome.org/GNOME/pango/-/archive/${version}/pango-${version}.tar.gz"

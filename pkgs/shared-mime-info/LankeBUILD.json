@@ -1,13 +1,18 @@
 {
   "name": "shared-mime-info",
   "version": "2.5.1",
-  "release": 2,
+  "release": 3,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libglib-2.0.so.0",
+    "libstdc++.so.6",
+    "libxml2.so.16"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",
-    "docbook-xsl",
     "glib",
     "libxml2",
     "meson",

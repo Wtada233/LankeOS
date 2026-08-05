@@ -13,8 +13,6 @@
   ],
   "build_deps": [
     "base-devel",
-    "docbook-xml",
-    "docbook-xsl",
     "git",
     "xmlto"
   ],

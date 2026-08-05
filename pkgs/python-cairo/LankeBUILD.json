@@ -1,11 +1,14 @@
 {
   "name": "python-cairo",
   "version": "1.29.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcairo.so.2"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",

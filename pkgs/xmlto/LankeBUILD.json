@@ -1,18 +1,22 @@
 {
   "name": "xmlto",
   "version": "0.0.29",
-  "release": 1,
+  "release": 2,
   "deps": [
     "bash",
     "docbook-xml",
-    "docbook-xsl"
+    "docbook-xsl",
+    "libxslt"
   ],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",
     "docbook-xml",
-    "docbook-xsl"
+    "docbook-xsl",
+    "libxslt"
   ],
   "sources": [
     "https://pagure.io/xmlto/archive/0.0.29/xmlto-0.0.29.tar.gz"

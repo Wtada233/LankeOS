@@ -1,6 +1,12 @@
+# vala 只发偶数小版本的稳定版（0.54→0.56→0.58…）；奇数如 0.57.0 是一次性开发 tag，
+# 预生成代码停在旧 glib 时代，配不上 glib>=2.74 的 const 返回。gitlab tags 模板无法排除
+# → 用 script + git ls-remote 过滤，只认真实稳定版（偶数小版本）。
 pkg-name: vala
-tracker-template: gitlab
-host: gitlab.gnome.org
-project: GNOME/vala
-mode: tags
-template: 'https://gitlab.gnome.org/{project}/-/archive/{tag}/vala-{tag}.tar.gz'
+tracker-template: script
+script-content: |
+  #!/bin/bash
+  tags=$(git ls-remote --tags https://gitlab.gnome.org/GNOME/vala.git 2>/dev/null)
+  version=$(printf '%s\n' "$tags" | grep -oE 'refs/tags/[0-9]+\.[0-9]+\.[0-9]+$' | sed 's#refs/tags/##' | awk -F. '$2 % 2 == 0' | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "https://gitlab.gnome.org/GNOME/vala/-/archive/${version}/vala-${version}.tar.gz"

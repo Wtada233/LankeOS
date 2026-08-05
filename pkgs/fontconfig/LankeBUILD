@@ -1,17 +1,23 @@
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    # fontconfig 2.18 起 meson 为主构建（Arch 同款），无需 autogen/configure。
+    # docs 关：fontconfig 文档是 DocBook SGML，meson 走 docbook2html=jade 栈
+    # （docbook-sgml/docbook-utils/perl-sgmls）。body 其实 98% 是 well-formed XML（仅 doctype 语法
+    # +3 个文件实体非 XML），理论上可用 docbook2html shim + xsltproc/docbook-xsl 现代链替代——
+    # 但为 HTML 文档养两条遗留链不值，维持关闭。
+    # bitmap/subpixel conf 不装（Arch 选择）；xml 后端显式 libxml2
+    meson setup build . --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --default-library=shared --buildtype=release \
+        -D bitmap-conf=noinstall \
+        -D default-sub-pixel-rendering=noinstall \
+        -D xml-backend=libxml2 \
+        -D doc-html=disabled \
+        -D doc-pdf=disabled \
+        -D doc-txt=disabled
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --localstatedir={LOCALSTATEDIR} --disable-docs --enable-libxml2=no --disable-static
-    make -j$(nproc)
-    make DESTDIR={STAGING_ROOT} install
-    cd ..
+    ninja -C build -j$(nproc)
 }
 
-
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    DESTDIR={STAGING_ROOT} ninja -C build install
 }

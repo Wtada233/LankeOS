@@ -6,7 +6,17 @@
     "bash",
     "xwayland"
   ],
-  "needed_so": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libdl.so.2",
+    "libfontconfig.so.1",
+    "libfreetype.so.6",
+    "libm.so.6",
+    "libpthread.so.0",
+    "librt.so.1",
+    "libxcb.so.1"
+  ],
   "provides": [],
   "build_deps": [
     "coreutils"
