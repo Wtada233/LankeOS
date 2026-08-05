@@ -1,6 +1,6 @@
 {
   "name": "chromium",
-  "version": "151.0.7922.75",
+  "version": "153.0.7991.2",
   "release": 2,
   "deps": [
     "gtk3",
@@ -16,6 +16,7 @@
     "cairo",
     "compiler-rt",
     "cups",
+    "curl",
     "dav1d",
     "dbus",
     "expat",
@@ -39,6 +40,7 @@
     "libffi",
     "libjpeg-turbo",
     "libpulse",
+    "libva",
     "libwebp",
     "libxcb",
     "libxkbcommon",
@@ -58,13 +60,11 @@
     "pipewire",
     "python",
     "rsync",
-    "rust-bindgen",
-    "rust",
     "zlib",
     "zstd"
   ],
   "sources": [
-    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-151.0.7922.75-lite.tar.xz",
+    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-153.0.7991.2-lite.tar.xz",
     "https://github.com/foutrelis/chromium-launcher/archive/v8/chromium-launcher-8.tar.gz"
   ],
   "work_sources": []

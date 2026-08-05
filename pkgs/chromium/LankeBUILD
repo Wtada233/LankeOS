@@ -50,19 +50,14 @@ lankebuild_prepare() {
         chromium-149-build-with-wasm-rollup.patch \
         chromium-147-rust-1.95-bytemuck.patch \
         glibc-2.42-baud-rate-fix.patch \
-        chromium-149-unbundle-minizip-undo-unicode.patch \
         chromium-149-use-of-undeclared-identifier-ERROR.patch \
-        chromium-150-fix-ar-unbundle.patch \
-        chromium-150-fix-sysroot-path-error.patch \
-        chromium-150-revert-avx-flag-change.patch \
-        chromium-151-dont-depends-on-histograms.xml-if-it-is-not-git-checkout.patch; do
+        chromium-150-revert-avx-flag-change.patch; do
         patch -Np1 -i "$_BD/$_p"
     done
 
-    # --- 链接系统工具 ---
+    # --- 链接系统工具（node/jdk/gperf；rust 用内置工具链，见下） ---
     mkdir -p third_party/node/linux/node-linux-x64/bin \
-             third_party/jdk/current/bin \
-             third_party/rust-toolchain/bin
+             third_party/jdk/current/bin
 
     ln -sf /usr/bin/node third_party/node/linux/node-linux-x64/bin/
     # 找最高版本的 JDK，jdk 默认不装 /usr/bin/java
@@ -70,7 +65,29 @@ lankebuild_prepare() {
     if [ -n "$_jdk" ]; then
         ln -sf "$_jdk/bin/java" third_party/jdk/current/bin/
     fi
-    ln -sf /usr/bin/rustc third_party/rust-toolchain/bin/
+
+    # --- 下载内置 rust-toolchain（替代 system-rust）---
+    # crubit（Rust/C++ 绑定生成器）随 rust-toolchain 捆绑发布，system-rust 缺它
+    # （skia bridge_rust_side 需要）。对象名/哈希从 DEPS 读，随 chromium 版本自动对齐。
+    _rt_bucket=$(grep -A15 "'src/third_party/rust-toolchain'" DEPS \
+        | grep -oE "'bucket': '[^']*'" | sed "s/.*'bucket': '//;s/'//" | head -1)
+    [ -n "$_rt_bucket" ] || _rt_bucket=chromium-browser-clang
+    _rt_obj=$(grep -A30 "'src/third_party/rust-toolchain'" DEPS \
+        | grep -oE "'object_name': 'Linux_x64/[^']*'" | sed "s/.*'object_name': '//;s/'//" | head -1)
+    _rt_sha=$(grep -A30 "'src/third_party/rust-toolchain'" DEPS \
+        | grep -oE "'sha256sum': '[^']*'" | sed "s/.*'sha256sum': '//;s/'//" | head -1)
+    if [ -n "$_rt_obj" ] && [ ! -f third_party/rust-toolchain/lib/third_party/crubit/support/BUILD.gn ]; then
+        echo "下载 rust-toolchain: $_rt_obj"
+        curl -fsSL "https://commondatastorage.googleapis.com/$_rt_bucket/$_rt_obj" \
+            -o rust-toolchain.tar.xz
+        if [ -n "$_rt_sha" ]; then
+            echo "$_rt_sha  rust-toolchain.tar.xz" | sha256sum -c - \
+                || { echo "rust-toolchain sha256 校验失败"; exit 1; }
+        fi
+        mkdir -p third_party/rust-toolchain
+        tar -xJf rust-toolchain.tar.xz -C third_party/rust-toolchain/
+        rm -f rust-toolchain.tar.xz
+    fi
 
     rm -f third_party/gperf/cipd/bin/gperf
     ln -sf /usr/bin/gperf third_party/gperf/cipd/bin/
@@ -111,7 +128,6 @@ lankebuild_build() {
 
     # 获取版本号
     _clang_ver=$(clang --version | grep -m1 version | sed 's/.* \([0-9]\{1,\}\)\..*/\1/')
-    _rustc_ver=$(rustc --version | awk '{print $2}')
 
     # 移除与 Chromium ThinLTO 冲突的 CFLAGS
     for _flag in "-g" "-fexceptions" "-fcf-protection" \
@@ -142,8 +158,8 @@ lankebuild_build() {
     _flags="$_flags use_qt5=false use_qt6=false use_clang_modules=false"
     _flags="$_flags clang_base_path=\"/usr\" clang_use_chrome_plugins=false"
     _flags="$_flags clang_version=\"$_clang_ver\" chrome_pgo_phase=0"
-    _flags="$_flags rust_sysroot_absolute=\"/usr\" rust_bindgen_root=\"/usr\""
-    _flags="$_flags rustc_version=\"$_rustc_ver\""
+    # rust：内置工具链（use_chromium_rust_toolchain，rust_sysroot_absolute 留空即默认），
+    # 版本/绑定由 third_party/rust-toolchain 的 VERSION 文件与 crubit 自动提供
     _flags="$_flags icu_use_data_file=false"
 
     # 使用系统 gn（需先安装 pkgs/gn）
