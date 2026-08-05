@@ -1049,7 +1049,7 @@ trim 不关心具体行内容，只跟踪 BATCH 边界。RESTORE_* 等行在已�
 - **6.5 集成测试** — 多个测试文件覆盖：批量安装/移除/升级、依赖链、provides 解析、版本约束、config 保护、SIGINT 保护、并发锁、autoremove、recursive remove。
 - **6.6 CLEANUP 阶段测试** — `test_cleanup.cpp`（22 tests）。覆盖 CLEANUP 解析与不可逆性、目录 BACKUP 恢复、随机后缀唯一性、rec CLEANUP 续传、安全检查、现有行为回归。
 - **6.7 双重回滚回归（2026-08-03）** — `test_active_rollback.cpp`。升级中途 COPY 失败 / COMMIT 后失败 → 旧文件必须保留（曾双重回滚删旧文件）；CLEANUP write-ahead 崩溃窗口 → 整批可恢复。
-- **6.8 全量** — 当前 **492 tests 全绿**（docker 容器 `make test`），覆盖上述全部章节。
+- **6.8 全量** — 当前 **500+ tests 全绿**（docker 容器 `make test`），覆盖上述全部章节。
 
 ---
 
