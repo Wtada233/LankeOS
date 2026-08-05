@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <set>
 
 #include "../../main/src/config/config.hpp"
@@ -35,6 +36,9 @@ protected:
         Config::instance().set_root_path(test_root.string());
         Config::instance().init_filesystem();
         Cache::instance().load();
+
+        index_entries_.clear();
+        index_versions_.clear();
     }
 
     void TearDown() override
@@ -48,26 +52,42 @@ protected:
     void add_pkg(const std::string& name, const std::string& version)
     {
         Cache::instance().add_installed(name, version, false);
+        index_versions_[name] = version;
     }
 
-    void add_dep(const std::string& from, const std::string& to)
+    // ---- repo index helpers ----
+    // 重构后 scan_remove/scan_abibreak 恒用 build_repo_revdep_map()：从仓库 index 的
+    // needed_so → provides 建反向依赖（不再读本地 Cache 的 reverse_dep）。故测试必须写
+    // 仓库 index（Config::get_tmp_dir()/repo_index.txt），格式 name|ver:hash::provides:needed_so:
+    struct IndexEntry { std::string provides; std::string needed_so; };
+    std::map<std::string, IndexEntry> index_entries_;
+    std::map<std::string, std::string> index_versions_;
+
+    void add_provider_so(const std::string& pkg, const std::string& soname)
     {
-        // "from depends on to" → "to" has reverse-dep "from"
-        Cache::instance().add_reverse_dep(to, from);
+        auto& e = index_entries_[pkg];
+        if (!e.provides.empty()) e.provides += ",";
+        e.provides += soname;
     }
 
-    void add_provides(const std::string& pkg, const std::string& cap)
+    void add_needed_so(const std::string& pkg, const std::string& soname)
     {
-        Cache::instance().add_provider(cap, pkg);
+        auto& e = index_entries_[pkg];
+        if (!e.needed_so.empty()) e.needed_so += ",";
+        e.needed_so += soname;
     }
 
-    // Write dep file so --all and remove_package can read deps
-    void write_dep_file(const std::string& pkg, const std::vector<std::string>& deps)
+    // 把累积的条目写入 build_repo_revdep_map() 读取的位置
+    void write_index()
     {
-        fs::path dep_file = Config::instance().dep_dir() / pkg;
-        fs::create_directories(dep_file.parent_path());
-        std::ofstream f(dep_file);
-        for (const auto& d : deps) f << d << "\n";
+        fs::path idx = Config::get_tmp_dir() / "repo_index.txt";
+        fs::create_directories(idx.parent_path());
+        std::ofstream f(idx);
+        for (const auto& [name, e] : index_entries_) {
+            auto it = index_versions_.find(name);
+            std::string ver = (it != index_versions_.end()) ? it->second : "1.0";
+            f << name << "|" << ver << ":hash::" << e.provides << ":" << e.needed_so << ":\n";
+        }
     }
 
     // Count nodes with a given status in the tree
@@ -106,10 +126,12 @@ protected:
 
 TEST_F(DependScannerTest, RemoveSimple)
 {
-    // A ← B(dep:A)
+    // A ← B(needed_so:liba)
     add_pkg("libA", "1.0");
     add_pkg("appB", "2.0");
-    add_dep("appB", "libA");
+    add_provider_so("libA", "liba.so.1");
+    add_needed_so("appB", "liba.so.1");
+    write_index();
 
     auto tree = depscan::scan_remove_tree("libA");
 
@@ -124,12 +146,15 @@ TEST_F(DependScannerTest, RemoveSimple)
 
 TEST_F(DependScannerTest, RemoveTransitiveChain)
 {
-    // A ← B(dep:A) ← C(dep:B)
+    // A ← B(needed_so:liba) ← C(needed_so:libb)
     add_pkg("libA", "1.0");
     add_pkg("libB", "1.0");
     add_pkg("appC", "1.0");
-    add_dep("libB", "libA");
-    add_dep("appC", "libB");
+    add_provider_so("libA", "liba.so.1");
+    add_needed_so("libB", "liba.so.1");
+    add_provider_so("libB", "libb.so.1");
+    add_needed_so("appC", "libb.so.1");
+    write_index();
 
     auto tree = depscan::scan_remove_tree("libA");
 
@@ -152,11 +177,14 @@ TEST_F(DependScannerTest, RemoveIndependent)
 
 TEST_F(DependScannerTest, RemoveCircular)
 {
-    // A ←→ B  (A depends on B, B depends on A)
+    // A ←→ B  (A needed_so:b, B needed_so:a)
     add_pkg("pkgA", "1.0");
     add_pkg("pkgB", "1.0");
-    add_dep("pkgA", "pkgB");
-    add_dep("pkgB", "pkgA");
+    add_provider_so("pkgA", "a.so.1");
+    add_needed_so("pkgB", "a.so.1");
+    add_provider_so("pkgB", "b.so.1");
+    add_needed_so("pkgA", "b.so.1");
+    write_index();
 
     auto tree = depscan::scan_remove_tree("pkgA");
 
@@ -166,11 +194,12 @@ TEST_F(DependScannerTest, RemoveCircular)
 
 TEST_F(DependScannerTest, RemoveViaProvider)
 {
-    // A(prov:libx) ← B(dep:libx)
+    // A(prov:libx) ← B(needed_so:libx)
     add_pkg("pkgA", "1.0");
     add_pkg("pkgB", "1.0");
-    add_provides("pkgA", "libx");
-    add_dep("pkgB", "libx");  // B depends on virtual capability "libx"
+    add_provider_so("pkgA", "libx");
+    add_needed_so("pkgB", "libx");
+    write_index();
 
     auto tree = depscan::scan_remove_tree("pkgA");
 
@@ -184,12 +213,15 @@ TEST_F(DependScannerTest, RemoveViaProvider)
 
 TEST_F(DependScannerTest, AbibreakDirectOnly)
 {
-    // A ← B(dep:A) ← C(dep:B)
+    // A ← B(needed_so:liba) ← C(needed_so:libb)
     add_pkg("libA", "1.0");
     add_pkg("libB", "1.0");
     add_pkg("appC", "1.0");
-    add_dep("libB", "libA");
-    add_dep("appC", "libB");
+    add_provider_so("libA", "liba.so.1");
+    add_needed_so("libB", "liba.so.1");
+    add_provider_so("libB", "libb.so.1");
+    add_needed_so("appC", "libb.so.1");
+    write_index();
 
     auto tree = depscan::scan_abibreak_tree("libA");
 
@@ -207,12 +239,15 @@ TEST_F(DependScannerTest, AbibreakDirectOnly)
 
 TEST_F(DependScannerTest, AbibreakAllFlagShowsIndirect)
 {
-    // A ← B(dep:A) ← C(dep:B)
+    // A ← B(needed_so:liba) ← C(needed_so:libb)
     add_pkg("libA", "1.0");
     add_pkg("libB", "1.0");
     add_pkg("appC", "1.0");
-    add_dep("libB", "libA");
-    add_dep("appC", "libB");
+    add_provider_so("libA", "liba.so.1");
+    add_needed_so("libB", "liba.so.1");
+    add_provider_so("libB", "libb.so.1");
+    add_needed_so("appC", "libb.so.1");
+    write_index();
 
     auto tree = depscan::scan_abibreak_tree("libA", /*show_all=*/true);
 
@@ -235,12 +270,14 @@ TEST_F(DependScannerTest, AbibreakAllFlagShowsIndirect)
 
 TEST_F(DependScannerTest, AbibreakMultiple)
 {
-    // A ← B(dep:A), A ← C(dep:A)
+    // A ← B(needed_so:base.so), A ← C(needed_so:base.so)
     add_pkg("base", "1.0");
     add_pkg("depB", "1.0");
     add_pkg("depC", "1.0");
-    add_dep("depB", "base");
-    add_dep("depC", "base");
+    add_provider_so("base", "base.so.1");
+    add_needed_so("depB", "base.so.1");
+    add_needed_so("depC", "base.so.1");
+    write_index();
 
     auto tree = depscan::scan_abibreak_tree("base");
 
@@ -252,11 +289,12 @@ TEST_F(DependScannerTest, AbibreakMultiple)
 
 TEST_F(DependScannerTest, AbibreakViaProvider)
 {
-    // A(prov:libssl) ← B(dep:libssl)
+    // A(prov:libssl) ← B(needed_so:libssl)
     add_pkg("openssl", "1.0");
     add_pkg("curl", "1.0");
-    add_provides("openssl", "libssl");
-    add_dep("curl", "libssl");
+    add_provider_so("openssl", "libssl");
+    add_needed_so("curl", "libssl");
+    write_index();
 
     auto tree = depscan::scan_abibreak_tree("openssl");
 
@@ -293,20 +331,23 @@ TEST_F(DependScannerTest, AbibreakNonexistent)
 TEST_F(DependScannerTest, ComplexGraph)
 {
     // base(prov:core)
-    //   ├─ midA(dep:core)
-    //   │   └─ topAA(dep:midA)
-    //   └─ midB(dep:core)
-    //       └─ topBB(dep:midB)
+    //   ├─ midA(needed_so:core)
+    //   │   └─ topAA(needed_so:mida)
+    //   └─ midB(needed_so:core)
+    //       └─ topBB(needed_so:midb)
     add_pkg("base", "1.0");
     add_pkg("midA", "1.0");
     add_pkg("midB", "1.0");
     add_pkg("topAA", "1.0");
     add_pkg("topBB", "1.0");
-    add_provides("base", "core");
-    add_dep("midA", "core");
-    add_dep("midB", "core");
-    add_dep("topAA", "midA");
-    add_dep("topBB", "midB");
+    add_provider_so("base", "core.so.1");
+    add_needed_so("midA", "core.so.1");
+    add_needed_so("midB", "core.so.1");
+    add_provider_so("midA", "mida.so.1");
+    add_needed_so("topAA", "mida.so.1");
+    add_provider_so("midB", "midb.so.1");
+    add_needed_so("topBB", "midb.so.1");
+    write_index();
 
     // Remove scan: all 5 affected
     auto tree = depscan::scan_remove_tree("base");
