@@ -14,7 +14,6 @@
     "base-devel",
     "brotli",
     "cairo",
-    "compiler-rt",
     "cups",
     "curl",
     "dav1d",
