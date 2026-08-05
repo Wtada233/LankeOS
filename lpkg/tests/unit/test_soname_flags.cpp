@@ -12,6 +12,7 @@
 #include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/install_common.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
+#include "../../main/src/pkg/solver.hpp"
 #include "../../main/src/repo/repository.hpp"
 
 namespace fs = std::filesystem;
@@ -79,17 +80,17 @@ TEST_F(SonameFlagTest, HasSystemSonameInUsrLib64)
 
 TEST_F(SonameFlagTest, ForwardCheckToleratedUnderMissingSoNoError)
 {
-    // 回归：删除容器 rm -rf hack 后，前向 needed_so 检查（check_forward_soname_integrity）
-    // 必须纳入 flag 容忍——过渡期缺失 SONAME 不再硬抛（否则 bootstrap 死锁回归）。
-    // 无 flag 时孤儿 SONAME 仍是真实错误 → 硬抛（不变量保留在真实系统侧）。
+    // 回归：libsolv 求解时，缺失 SONAME 的容忍必须纳入 flag——过渡期缺失不再硬抛
+    // （否则 bootstrap 死锁回归）。无 flag 时孤儿 SONAME 仍是真实错误。
     init_localization();
     std::string work = "/tmp/lpkg_test_forward";
     fs::remove_all(work);
     fs::create_directories(fs::path(work) / "mirror/x86_64");
     fs::create_directories(fs::path(work) / "root/etc/lpkg");
-    // repo 只提供 libc.so.6，不提供 libfoo.so.1（孤儿 SONAME）
+    // repo 提供 glibc(libc.so.6) + orphan（需要 libfoo.so.1，无 provider）
     std::ofstream(fs::path(work) / "mirror/x86_64/index.txt")
-        << "glibc|2.39:abc::libc.so.6:|\n";
+        << "glibc|2.39:abc::libc.so.6:|\n"
+        << "orphan|1.0:abc:::libfoo.so.1:\n";
     std::ofstream(fs::path(work) / "root/etc/lpkg/mirror.conf")
         << "file://" << work << "/mirror/" << std::endl;
     Config::instance().set_root_path(work + "/root");
@@ -98,28 +99,25 @@ TEST_F(SonameFlagTest, ForwardCheckToleratedUnderMissingSoNoError)
     Repository repo;
     repo.load_index();
 
-    std::map<std::string, InstallPlan> plan;
-    InstallPlan p;
-    p.name = "orphan";
-    p.needed_so = {"libfoo.so.1"}; // plan/repo/缓存全无 provider
-    plan["orphan"] = p;
+    solv::SolveOptions opts;
 
-    // 无 flag：孤儿 SONAME 是真实错误，必须硬抛
-    Config::instance().set_missing_so_no_error_mode(false);
-    Config::instance().set_use_system_soname_mode(false);
-    EXPECT_THROW(detail::check_forward_soname_integrity(plan, repo), LpkgException);
+    // 无 flag：孤儿 SONAME 是真实错误
+    auto r1 = solv::solve_install(repo, {}, {}, {{"orphan", "latest"}}, opts);
+    EXPECT_FALSE(r1.ok());
 
-    // --missing-so-no-error：过渡期容忍，警告继续
-    Config::instance().set_missing_so_no_error_mode(true);
-    Config::instance().set_use_system_soname_mode(false);
-    EXPECT_NO_THROW(detail::check_forward_soname_integrity(plan, repo));
+    // --missing-so-no-error：过渡期容忍
+    opts.missing_so_no_error = true;
+    auto r2 = solv::solve_install(repo, {}, {}, {{"orphan", "latest"}}, opts);
+    EXPECT_TRUE(r2.ok());
 
     // --use-system-soname：系统 /usr/lib 已有该 .so（ABI 过渡 backup）→ 视为满足
-    Config::instance().set_missing_so_no_error_mode(false);
-    Config::instance().set_use_system_soname_mode(true);
+    opts.missing_so_no_error = false;
+    opts.use_system_soname = true;
+    opts.system_sonames = {"libfoo.so.1"};
     fs::create_directories(fs::path(work) / "root" / constants::USR_LIB);
     std::ofstream(fs::path(work) / "root" / constants::USR_LIB / "libfoo.so.1");
-    EXPECT_NO_THROW(detail::check_forward_soname_integrity(plan, repo));
+    auto r3 = solv::solve_install(repo, {}, {}, {{"orphan", "latest"}}, opts);
+    EXPECT_TRUE(r3.ok());
 
     fs::remove_all(work);
     Config::instance().set_root_path("/");

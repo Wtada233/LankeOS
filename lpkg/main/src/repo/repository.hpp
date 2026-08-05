@@ -58,7 +58,12 @@ public:
     std::optional<PackageInfo> find_best_matching_version(
         const std::string& name, const std::vector<Constraint>& constraints);
     /** 查找提供某能力的包 */
-    std::optional<PackageInfo> find_provider(const std::string& capability);
+    std::optional<PackageInfo> find_provider(const std::string& capability) const;
+    /** 全部包（包名 -> 版本列表；供 solver 构建 libsolv pool） */
+    const std::unordered_map<std::string, std::vector<PackageInfo>>& packages() const
+    {
+        return packages_;
+    }
 
 private:
     std::unordered_map<std::string, std::vector<PackageInfo>> packages_;  // 包名 -> 版本列表

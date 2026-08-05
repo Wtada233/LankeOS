@@ -150,7 +150,7 @@ void Repository::load_index()
  * 未解析"的假失败。因此从每个候选包的最新版本向下找第一个提供该
  * capability 的版本。
  */
-std::optional<PackageInfo> Repository::find_provider(const std::string& capability)
+std::optional<PackageInfo> Repository::find_provider(const std::string& capability) const
 {
     auto it = providers_.find(capability);
     if (it == providers_.end() || it->second.empty()) return std::nullopt;

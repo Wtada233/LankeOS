@@ -1,5 +1,7 @@
 #include "install_common.hpp"
 
+#include "solver.hpp"
+
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -148,286 +150,134 @@ std::vector<std::string> scan_content_files(const fs::path& content_dir)
 /** 解析依赖字符串列表为 DependencyInfo 结构体，支持复合约束 */
 // 实现在 vercmp/dep_parser.cpp 中，此处仅为函数声明转发
 
-/**
- * 递归解析包依赖关系，构建安装计划
- * 支持版本约束、虚拟包提供、循环依赖检测
- * 检查本地缓存、本地包文件和远程仓库中的包信息
- * depth 最大 64 层，超过则抛出异常防止栈溢出
- */
-void resolve_package_dependencies(const std::string& pkg_name, const std::string& version_spec,
-                                  bool is_explicit, InstallContext& ctx,
-                                  std::set<std::string>& visited_stack, int depth)
+// 收集已装包的 requires（deps/ + needed_so/ 文件）与 provides（provides_db）用于建模
+// installed repo。provides 必须建模：libsolv 的 dontfix 反向一致性只强制"之前有已装
+// provider"的 requires，installed 包不 provide 自己的能力（如 libc.so.6），该 requires
+// 就被视为"之前已 broken"而忽略——升级破坏它也不报冲突。
+static void collect_installed_requires(const std::string& name, solv::InstalledPkg& p)
 {
-    constexpr int MAX_DEPTH = constants::DEP_LIMIT_DEPEND_SCAN;
-    if (depth > MAX_DEPTH)
-        throw LpkgException(string_format("error.dependency_depth_exceeded", pkg_name, MAX_DEPTH));
-
-    if (visited_stack.contains(pkg_name)) {
-        log_warning(string_format("warning.circular_dependency", pkg_name, pkg_name));
-        return;
-    }
-    if (ctx.plan.contains(pkg_name)) {
-        if (is_explicit) ctx.plan.at(pkg_name).is_explicit = true;
-        return;
-    }
-
-    const std::string installed_version = Cache::instance().get_installed_version(pkg_name);
-    fs::path local_path;
-    std::string latest_version, pkg_hash;
-    std::vector<DependencyInfo> deps;
-    std::vector<std::string> provides;
-    std::vector<std::string> needed_so;
-
-    // 优先检查本地包文件候选
-    if (auto it = ctx.local_candidates.find(pkg_name); it != ctx.local_candidates.end()) {
-        local_path = it->second;
-        json meta = read_archive_metadata(local_path);
-        latest_version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
-
-        deps = parse_dep_strings(
-            meta.value(std::string(constants::J_DEPS), std::vector<std::string>{}));
-        provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
-        needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
-    } else {
-        // 从远程仓库查找
-        auto pkg_info = (version_spec == constants::VER_LATEST)
-                            ? ctx.repo.find_package(pkg_name)
-                            : ctx.repo.find_package(pkg_name, version_spec);
-        if (!pkg_info) {
-            // 检查是否有其他包提供此虚拟包名
-            if (auto prov = ctx.repo.find_provider(pkg_name)) {
-                resolve_package_dependencies(prov->name, prov->version, is_explicit, ctx,
-                                             visited_stack, depth + 1);
-                return;
-            }
-            // 包在仓库中不存在 → 跳过，安装阶段会通过 ensure_dependencies_satisfied
-            // 检查 ctx.plan 中的提供者和已安装包
-            if (installed_version.empty())
-                log_warning(string_format("warning.package_not_in_repo", pkg_name));
-            return;
-        }
-        latest_version = pkg_info->version;
-        pkg_hash = pkg_info->sha256;
-        deps = pkg_info->dependencies;
-        provides = pkg_info->provides;
-        needed_so = pkg_info->needed_so;
-    }
-
-    if (latest_version.empty()) latest_version = std::string(constants::VER_DEFAULT);
-
-    // 检查是否需要安装/升级（非强制重装时跳过已安装的包）。
-    // installed_version == "virtual" 表示该名字是某已装包提供的虚拟能力而非
-    // 真实包——不能当作"已安装"跳过，否则 version_compare("virtual", ...) 会
-    // 因版本格式非法而抛异常。
-    if (!ctx.force_reinstall || !is_explicit) {
-        if (!installed_version.empty() && installed_version != "virtual" &&
-            !version_compare(installed_version, latest_version))
-            return;
-    }
-
-    visited_stack.insert(pkg_name);
-    InstallPlan p{.name = pkg_name,
-                  .actual_version = latest_version,
-                  .sha256 = pkg_hash,
-                  .is_explicit = is_explicit,
-                  .local_path = local_path,
-                  .dependencies = deps,
-                  .provides = provides,
-                  .needed_so = needed_so,
-                  .force_reinstall = (ctx.force_reinstall && is_explicit)};
-
-    // 递归解析子依赖
-    if (!Config::instance().no_deps_mode()) {
-        for (const auto& dep : deps) {
-            const std::string idv = Cache::instance().get_installed_version(dep.name);
-            bool needs_resolution = idv.empty();
-            if (!needs_resolution && !dep.constraints.empty() && idv != "virtual" &&
-                !version_satisfies_all(idv, dep.constraints)) {
-                if (!ctx.plan.contains(dep.name)) {
-                    log_info(string_format("info.adding_upgrade_to_plan", dep.name));
-                    needs_resolution = true;
-                }
-            }
-            if (needs_resolution) {
-                std::string req_ver = std::string(constants::VER_LATEST);
-                if (!dep.constraints.empty()) {
-                    if (auto matching =
-                            ctx.repo.find_best_matching_version(dep.name, dep.constraints))
-                        req_ver = matching->version;
-                }
-                resolve_package_dependencies(dep.name, req_ver, false, ctx, visited_stack,
-                                             depth + 1);
-            }
-
-            // 验证候选版本满足依赖版本约束
-            std::string cand_v = ctx.plan.contains(dep.name)
-                                     ? ctx.plan[dep.name].actual_version
-                                     : Cache::instance().get_installed_version(dep.name);
-            if (!dep.constraints.empty() && !cand_v.empty() && cand_v != "virtual" &&
-                !version_satisfies_all(cand_v, dep.constraints)) {
-                // 复合约束（如 ">= 2.0.0 < 3.0.0"）要完整报出，不只报第一个
-                std::string cons_str;
-                for (size_t ci = 0; ci < dep.constraints.size(); ++ci) {
-                    if (ci) cons_str += " ";
-                    cons_str += dep.constraints[ci].op + " " + dep.constraints[ci].version;
-                }
-                throw LpkgException(
-                    string_format("error.candidate_dep_version_mismatch", dep.name, cand_v,
-                                  cons_str));
-            }
-        }
-
-        // ── needed_so：与 deps 同一处理路径，只是来源不同 ─────────────────────
-        // deps 和 needed_so 都是依赖，但存储在包的 metadata 的不同字段里；这里把
-        // 每个 SONAME 解析到提供者包并加入安装计划（与 deps 一样递归安装）。
-        // 与 check_forward_soname_integrity（计划完成后统一校验）的分工：
-        //   - 这里负责"把提供者装进来"（default：SONAME → 提供者包 → 加入计划）
-        //   - 那里的 step 1（plan）因此必然命中，找不到提供者时由那里报错
-        //     （--missing-so-no-error 容忍）。
-        // 两点不同：
-        //   1. 不一定解析为依赖——开启 --use-system-soname 时系统 .so 优先视为满足；
-        //   2. 存储位置不同——needed_so 写在 needed_so/ 目录，deps 写在 deps/ 目录。
-        for (const auto& soname : needed_so) {
-            // 包自身提供的 SONAME（库包对自身的运行时依赖）不算依赖
-            if (std::find(provides.begin(), provides.end(), soname) != provides.end()) continue;
-
-            // --use-system-soname：系统 /usr/lib 已有该 .so（如 ABI 过渡备份的旧
-            // SONAME）→ 优先视为满足，不引入包依赖
-            if (Config::instance().use_system_soname_mode() &&
-                Config::instance().has_system_soname(soname))
-                continue;
-
-            // 计划中已有包提供该 SONAME → 已满足
-            bool in_plan = false;
-            for (const auto& [pn, pp] : ctx.plan) {
-                if (std::find(pp.provides.begin(), pp.provides.end(), soname) !=
-                    pp.provides.end()) {
-                    in_plan = true;
-                    break;
-                }
-            }
-            if (in_plan) continue;
-
-            // 已安装包提供（且不在本批次计划中替换）→ 已满足
-            bool installed_provides = false;
-            for (const auto& prov_pkg : Cache::instance().get_providers(soname)) {
-                if (Cache::instance().is_installed(prov_pkg) && !ctx.plan.contains(prov_pkg)) {
-                    installed_provides = true;
-                    break;
-                }
-            }
-            if (installed_provides) continue;
-
-            // 仓库提供者（未被"认领"，且该版本确实提供此 SONAME）→ 加入计划
-            if (auto prov_pkg = ctx.repo.find_provider(soname)) {
-                const bool claimed =
-                    ctx.plan.contains(prov_pkg->name) ||
-                    Cache::instance().is_installed(prov_pkg->name);
-                if (!claimed) {
-                    const bool provides_it =
-                        std::find(prov_pkg->provides.begin(), prov_pkg->provides.end(), soname) !=
-                        prov_pkg->provides.end();
-                    if (provides_it) {
-                        log_info(string_format("info.installing_discovered_dep", prov_pkg->name));
-                        resolve_package_dependencies(prov_pkg->name, prov_pkg->version, false, ctx,
-                                                     visited_stack, depth + 1);
-                    }
-                }
-            }
-
-            // 仍无提供者 → 此处不立即报错：计划尚未完成，其他分支可能引入提供者；
-            // 交由 check_forward_soname_integrity（计划完成后）统一判定。
-        }
-    }
-    ctx.plan[pkg_name] = std::move(p);
-    ctx.install_order.push_back(pkg_name);
-    visited_stack.erase(pkg_name);
-}
-
-/**
- * 检查安装计划与已安装包的兼容性
- * 检测是否有已安装的包依赖于即将被升级/替换的包版本，且新版本不满足其版本约束
- * 返回被破坏的包名集合
- */
-std::set<std::string> check_plan_consistency(const std::map<std::string, InstallPlan>& plan)
-{
-    std::set<std::string> broken;
-    auto& cache = Cache::instance();
-    std::lock_guard lock(cache.get_mutex());
-    for (const auto& [pkg, ver] : cache.get_all_installed()) {
-        if (plan.contains(pkg)) continue;
-        const fs::path dep_file = Config::instance().dep_dir() / pkg;
-        if (!fs::exists(dep_file)) continue;
-        std::ifstream f(dep_file);
+    const fs::path dep_f = Config::instance().dep_dir() / name;
+    if (fs::exists(dep_f)) {
+        std::ifstream f(dep_f);
+        std::vector<std::string> lines;
         std::string line;
-        while (std::getline(f, line)) {
-            auto parsed = parse_dep_strings({line});
-            if (parsed.empty() || !plan.contains(parsed[0].name)) continue;
-            const auto& dep = parsed[0];
-            const std::string& new_v = plan.at(dep.name).actual_version;
-            if (!dep.constraints.empty() && !version_satisfies_all(new_v, dep.constraints)) {
-                log_error(string_format("error.conflict_breaks_existing", dep.name, new_v, pkg,
-                                        dep.constraints[0].op, dep.constraints[0].version));
-                broken.insert(pkg);
-            }
-        }
+        while (std::getline(f, line))
+            if (!line.empty()) lines.push_back(line);
+        p.deps = parse_dep_strings(lines);
     }
-    return broken;
+    const fs::path nso_f = Config::instance().needed_so_dir() / name;
+    if (fs::exists(nso_f)) {
+        std::ifstream f(nso_f);
+        std::string so;
+        while (std::getline(f, so))
+            if (!so.empty()) p.needed_so.push_back(so);
+    }
+    for (const auto& cap : Cache::instance().get_package_provides(name))
+        p.provides.push_back(cap);
 }
 
-/**
- * 检查计划升级是否会破坏已安装包的 needed_so
- * 当计划升级/替换某个包时，遍历已安装包的 needed_so 文件，
- * 若某个 SONAME 由被升级包提供但新版不再提供，则将该已安装包
- * 标记为 broken。
- */
-std::set<std::string> check_needed_so_consistency(const std::map<std::string, InstallPlan>& plan)
+// 枚举系统 /usr/lib（或 /usr/lib64）下的 SONAME（--use-system-soname 用）
+static std::vector<std::string> collect_system_sonames()
 {
-    std::set<std::string> broken;
-    auto& cache = Cache::instance();
-    auto& config = Config::instance();
-    const fs::path nso_dir = config.needed_so_dir();
-
-    for (const auto& [pkg, ver] : cache.get_all_installed()) {
-        if (plan.contains(pkg)) continue;
-
-        const fs::path nso_file = nso_dir / pkg;
-        if (!fs::exists(nso_file)) continue;
-
-        std::ifstream f(nso_file);
-        std::string soname;
-        while (std::getline(f, soname)) {
-            if (soname.empty()) continue;
-
-            // 查找此 SONAME 的已安装提供者
-            auto providers = cache.get_providers(soname);
-            for (const auto& prov_pkg : providers) {
-                // 若提供者在 plan 中（正在被升级），验证新版仍提供此 SONAME
-                if (!plan.contains(prov_pkg)) continue;
-
-                const auto& plan_entry = plan.at(prov_pkg);
-                bool still_provides = false;
-                for (const auto& prov : plan_entry.provides) {
-                    if (prov == soname) {
-                        still_provides = true;
-                        break;
-                    }
-                }
-                if (!still_provides) {
-                    log_warning(string_format("warning.needed_so_dropped_in_upgrade", prov_pkg,
-                                              plan_entry.actual_version, soname, pkg));
-                    broken.insert(pkg);
-                }
-            }
+    std::vector<std::string> out;
+    for (const std::string_view sub : { constants::USR_LIB, constants::USR_LIB64 }) {
+        std::error_code ec;
+        fs::path dir = Config::instance().root_dir() / sub;
+        if (!fs::is_directory(dir, ec)) continue;
+        for (const auto& e : fs::directory_iterator(dir, ec)) {
+            if (!e.is_regular_file(ec) && !e.is_symlink(ec)) continue;
+            const std::string fn = e.path().filename().string();
+            if (fn.rfind("lib", 0) == 0 && fn.find(".so") != std::string::npos)
+                out.push_back(fn);
         }
     }
-    return broken;
+    return out;
 }
 
-/**
- * 获取所有必需包的集合（被明确标记为 held 的包及其传递依赖）
- * 用于 autoremove 判断哪些包可以安全移除
- */
+static bool is_explicit_target(const std::vector<std::pair<std::string, std::string>>& targets,
+                               const std::string& name)
+{
+    for (const auto& [n, v] : targets)
+        if (n == name) return true;
+    return false;
+}
+
+/// 用 libsolv 求解安装/升级/重装计划，填充 InstallContext 的 plan + install_order。
+/// 取代旧的手动递归解析 resolve_package_dependencies 及其配套手动校验
+/// （check_plan_consistency / check_needed_so_consistency / check_forward_soname_integrity）。
+void resolve_with_solver(InstallContext& ctx)
+{
+    // 1. 已装状态（版本 + requires——使 solver 能检测升级破坏已装依赖）
+    std::map<std::string, solv::InstalledPkg> installed;
+    for (const auto& [name, ver] : Cache::instance().get_all_installed()) {
+        solv::InstalledPkg p;
+        p.version = ver;
+        collect_installed_requires(name, p);
+        installed[name] = std::move(p);
+    }
+
+    // 2. 本地候选包（读 .lpkg 元数据 → PackageInfo，记 name→path）
+    std::vector<PackageInfo> local_pkgs;
+    std::map<std::string, fs::path> local_paths;
+    for (const auto& [name, path] : ctx.local_candidates) {
+        json meta = read_archive_metadata(path);
+        PackageInfo pi;
+        pi.name = name;
+        pi.version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
+        pi.dependencies = parse_dep_strings(
+            meta.value(std::string(constants::J_DEPS), std::vector<std::string>{}));
+        pi.provides =
+            meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+        pi.needed_so =
+            meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+        local_pkgs.push_back(std::move(pi));
+        local_paths[name] = path;
+    }
+
+    // 3. 选项
+    solv::SolveOptions opts;
+    opts.force_reinstall = ctx.force_reinstall;
+    opts.missing_so_no_error = Config::instance().missing_so_no_error_mode();
+    opts.use_system_soname = Config::instance().use_system_soname_mode();
+    opts.no_deps = Config::instance().no_deps_mode();
+    if (opts.use_system_soname) opts.system_sonames = collect_system_sonames();
+
+    // 4. 求解
+    auto result = solv::solve_install(ctx.repo, local_pkgs, installed, ctx.targets, opts);
+
+    // 5. 报错
+    if (!result.ok()) {
+        std::string msg;
+        for (const auto& p : result.problems) msg += p + "\n";
+        throw LpkgException(msg);
+    }
+
+    // 6. 映射 plan + order
+    for (const auto& rp : result.order) {
+        auto lp = local_paths.find(rp.name);
+        PackageInfo info;
+        if (lp != local_paths.end()) {
+            for (const auto& pi : local_pkgs)
+                if (pi.name == rp.name) { info = pi; break; }
+        } else if (auto repo_info = ctx.repo.find_package(rp.name, rp.version)) {
+            info = *repo_info;
+        }
+
+        InstallPlan p;
+        p.name = rp.name;
+        p.actual_version = rp.version;
+        p.sha256 = info.sha256;
+        p.is_explicit = is_explicit_target(ctx.targets, rp.name);
+        if (lp != local_paths.end()) p.local_path = lp->second;
+        p.dependencies = info.dependencies;
+        p.provides = info.provides;
+        p.needed_so = info.needed_so;
+        p.force_reinstall = (ctx.force_reinstall && p.is_explicit);
+        ctx.plan[rp.name] = std::move(p);
+        ctx.install_order.push_back(rp.name);
+    }
+}
+
 std::unordered_set<std::string> get_all_required_packages()
 {
     auto& cache = Cache::instance();
@@ -440,24 +290,40 @@ std::unordered_set<std::string> get_all_required_packages()
     size_t head = 0;
     while (head < q.size()) {
         const std::string curr = q[head++];
+        auto check_and_add = [&](const std::string& name) {
+            if (cache.is_installed(name) && !req.contains(name)) {
+                req.insert(name);
+                q.push_back(name);
+            }
+        };
+
+        // 命名依赖：deps/ 文件
         const fs::path p = Config::instance().dep_dir() / curr;
-        if (!fs::exists(p)) continue;
-        std::ifstream f(p);
-        std::string line;
-        while (std::getline(f, line)) {
-            std::string d_name = line;
-            if (const auto pos = line.find_first_of(" \t<>="); pos != std::string::npos)
-                d_name = line.substr(0, pos);
-            auto check_and_add = [&](const std::string& name) {
-                if (cache.is_installed(name) && !req.contains(name)) {
-                    req.insert(name);
-                    q.push_back(name);
-                }
-            };
-            if (cache.is_installed(d_name))
-                check_and_add(d_name);
-            else
-                for (const auto& prov : cache.get_providers(d_name)) check_and_add(prov);
+        if (fs::exists(p)) {
+            std::ifstream f(p);
+            std::string line;
+            while (std::getline(f, line)) {
+                std::string d_name = line;
+                if (const auto pos = line.find_first_of(" \t<>="); pos != std::string::npos)
+                    d_name = line.substr(0, pos);
+                if (cache.is_installed(d_name))
+                    check_and_add(d_name);
+                else
+                    for (const auto& prov : cache.get_providers(d_name)) check_and_add(prov);
+            }
+        }
+
+        // SONAME 依赖：needed_so/ 文件 → 提供者包同样是"被依赖"的。
+        // 缺这段时纯 SONAME 链路拉入的包（如 gcc←libmpc.so.3→mpc）会被 autoremove
+        // 误判为孤儿而删除。
+        const fs::path nso_f = Config::instance().needed_so_dir() / curr;
+        if (fs::exists(nso_f)) {
+            std::ifstream nf(nso_f);
+            std::string so;
+            while (std::getline(nf, so)) {
+                if (so.empty()) continue;
+                for (const auto& prov : cache.get_providers(so)) check_and_add(prov);
+            }
         }
     }
     return req;
@@ -475,81 +341,4 @@ std::unordered_set<std::string> get_all_required_packages()
  *   - repo 中只取实际提供该 SONAME 的版本（find_provider 返回的版本必须提供该
  * SONAME）
  */
-void check_forward_soname_integrity(const std::map<std::string, InstallPlan>& plan,
-                                    Repository& repo)
-{
-    bool all_ok = true;
-    std::string errors;
-    for (const auto& [pname, pplan] : plan) {
-        if (pplan.needed_so.empty()) continue;
-        for (const auto& soname : pplan.needed_so) {
-            bool provided = false;
-
-            // 1) plan — 同批次升级的包以新版本 provides 为准
-            for (const auto& [pn2, pp2] : plan) {
-                for (const auto& prov : pp2.provides) {
-                    if (prov == soname) {
-                        provided = true;
-                        break;
-                    }
-                }
-                if (provided) break;
-            }
-
-            // 2) 已安装缓存
-            if (!provided) {
-                auto providers = Cache::instance().get_providers(soname);
-                for (const auto& p : providers) {
-                    if (Cache::instance().is_installed(p) && !plan.contains(p)) {
-                        provided = true;
-                        break;
-                    }
-                }
-            }
-
-            // 3) repo — 必须确认返回的版本确实提供此 SONAME
-            if (!provided) {
-                if (auto prov_pkg = repo.find_provider(soname)) {
-                    // 提供者已被"认领"（已安装或在计划中）时版本已锁定，仓库里
-                    // 其它版本（如旧版）提供此 SONAME 不能算数——否则会绕过依赖者
-                    // 的版本约束或已装版本的 ABI 事实。
-                    bool claimed = plan.contains(prov_pkg->name) ||
-                                   Cache::instance().is_installed(prov_pkg->name);
-                    if (!claimed) {
-                        for (const auto& prov : prov_pkg->provides) {
-                            if (prov == soname) {
-                                provided = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (!provided) {
-                // --use-system-soname：系统 /usr/lib 已有该 .so（如 ABI 过渡 backup 的旧
-                // SONAME）→ 视为满足。配合 farm 的备份机制：旧二进制过渡期加载旧 .so。
-                if (Config::instance().use_system_soname_mode()
-                    && Config::instance().has_system_soname(soname)) {
-                    provided = true;
-                }
-            }
-
-            if (!provided) {
-                if (Config::instance().missing_so_no_error_mode()) {
-                    // --missing-so-no-error：bootstrap/过渡期容忍缺失 SONAME，警告继续
-                    log_warning(string_format("warning.missing_so_no_error", soname, pname));
-                    continue;
-                }
-                all_ok = false;
-                errors += "  " + string_format("error.unresolved_soname", soname) + "\n";
-            }
-        }
-    }
-    if (!all_ok) {
-        log_error(errors);
-        throw LpkgException(errors);
-    }
-}
-
 }  // namespace detail

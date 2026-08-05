@@ -116,10 +116,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     ctx.successfully_installed.clear();
     ctx.installed_set.clear();
 
-    for (const auto& [n, v] : targets) {
-            std::set<std::string> vs;
-            detail::resolve_package_dependencies(n, v, true, ctx, vs);
-        }
+    detail::resolve_with_solver(ctx);
 
         if (!provided_hash.empty()) {
             if (locals.empty()) throw LpkgException(get_string("error.hash_requires_local"));
@@ -135,30 +132,9 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
             return;
         }
 
-        // 冲突包（版本约束不满足 / SONAME 缺失）→ **硬报错**，install/upgrade 不再自动卸载。
-        // 需要删除冲突包请显式运行 `lpkg force-solve-conflict`（要求输入确认短语）。
-        if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
-            log_error(get_string("error.dependency_conflict_title"));
-            std::string msg;
-            for (const auto& p : broken) msg += "  " + p + "\n";
-            log_error(msg);
-            throw LpkgException(msg);
-        }
-
-        if (auto nso_broken = detail::check_needed_so_consistency(plan); !nso_broken.empty()) {
-            if (Config::instance().missing_so_no_error_mode()) {
-                // --missing-so-no-error：bootstrap/过渡期容忍（check_needed_so_consistency
-                // 内部已逐包 log_warning），旧二进制继续靠 backup 的旧 .so 运行。
-            } else {
-                log_error(get_string("error.dependency_conflict_title"));
-                std::string msg;
-                for (const auto& p : nso_broken) msg += "  " + p + "\n";
-                log_error(msg);
-                throw LpkgException(msg);
-            }
-        }
-
-    detail::check_forward_soname_integrity(plan, repo);
+        // 冲突/ABI 一致性与依赖拉入已由 libsolv solver 原生保证
+        // （取代旧的手动 check_plan_consistency / check_needed_so_consistency /
+        //  check_forward_soname_integrity）
 
     // 用户确认
     std::string prompt;
@@ -232,10 +208,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
                         ctx.plan.clear();
                         ctx.install_order.clear();
-                        for (const auto& [tn, tv] : ctx.targets) {
-                            std::set<std::string> vs;
-                            detail::resolve_package_dependencies(tn, tv, true, ctx, vs);
-                        }
+                        detail::resolve_with_solver(ctx);
                         i = 0;
                         continue;
                     }
@@ -666,7 +639,7 @@ void autoremove()
 /**
  * 升级所有已安装的包
  *
- * 和安装流程共享依赖解析机制（resolve_package_dependencies），
+ * 和安装流程共享依赖解析机制（libsolv resolve_with_solver），
  * 确保新版本引入的新依赖被正确解析并安装。
  */
 void upgrade_packages()
@@ -722,38 +695,14 @@ void upgrade_packages()
                        /*top_level=*/true,
                        {}};
 
-    for (const auto& [n, v] : upgrade_targets) {
-        std::set<std::string> vs;
-        detail::resolve_package_dependencies(n, v, true, ctx, vs);
-    }
+    detail::resolve_with_solver(ctx);
 
     if (plan.empty()) {
         log_info(get_string("info.all_packages_latest"));
         return;
     }
 
-    // ── 一致性检查 ──────────────────────────────────────────────────
-    detail::check_forward_soname_integrity(plan, repo);
-
-    if (auto broken = detail::check_plan_consistency(plan); !broken.empty()) {
-        log_error(get_string("error.dependency_conflict_title"));
-        std::string msg;
-        for (const auto& p : broken) msg += "  " + p + "\n";
-        log_error(msg);
-        throw LpkgException(msg);
-    }
-
-    if (auto nso_broken = detail::check_needed_so_consistency(plan); !nso_broken.empty()) {
-        if (Config::instance().missing_so_no_error_mode()) {
-            // --missing-so-no-error：过渡期容忍（check_needed_so_consistency 内部已逐包警告）
-        } else {
-            log_error(get_string("error.dependency_conflict_title"));
-            std::string msg;
-            for (const auto& p : nso_broken) msg += "  " + p + "\n";
-            log_error(msg);
-            throw LpkgException(msg);
-        }
-    }
+    // 冲突/ABI 一致性已由 libsolv solver 原生保证（取代旧的手动三校验）
 
     // ── 用户确认 ────────────────────────────────────────────────────
     std::string prompt;
@@ -783,7 +732,7 @@ void upgrade_packages()
     }
 
     // ── 执行升级（WAL 2.0 批量事务） ────────────────────────────────
-    // 处理顺序由 resolve_package_dependencies 产生的 order 决定
+    // 处理顺序由 resolve_with_solver（libsolv transaction_order）产生的 order 决定
     // （依赖先处理），确保新依赖在依赖者之前安装
     ctx.successfully_installed.clear();
     ctx.installed_set.clear();
@@ -851,10 +800,7 @@ void upgrade_packages()
 
                         ctx.plan.clear();
                         ctx.install_order.clear();
-                        for (const auto& [tn, tv] : ctx.targets) {
-                            std::set<std::string> vs;
-                            detail::resolve_package_dependencies(tn, tv, true, ctx, vs);
-                        }
+                        detail::resolve_with_solver(ctx);
                         i = 0;
                         continue;
                     }

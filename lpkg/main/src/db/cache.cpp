@@ -238,6 +238,27 @@ void Cache::ensure_reverse_deps()
             }
         }
     }
+    // SONAME 依赖：needed_so/ 里的 soname → 提供者包。
+    // 缺这段时反向依赖（移除阻止、get_all_required_packages 语义）对纯 SONAME
+    // 链路失效。用 providers_ 映射直读（ensure_reverse_deps 常持锁被调用，
+    // 不能调 get_providers 再拿锁）。
+    if (fs::exists(Config::instance().needed_so_dir()) &&
+        fs::is_directory(Config::instance().needed_so_dir())) {
+        for (const auto& entry : fs::directory_iterator(Config::instance().needed_so_dir())) {
+            if (!entry.is_regular_file()) continue;
+            std::string pkg_name = entry.path().filename().string();
+            std::ifstream f(entry.path());
+            std::string so;
+            while (std::getline(f, so)) {
+                if (so.empty()) continue;
+                if (so.back() == '\r') so.pop_back();
+                auto it = providers.find(so);
+                if (it == providers.end()) continue;
+                for (const auto& prov : it->second)
+                    if (prov != pkg_name) reverse_deps[prov].insert(pkg_name);  // 不自引用
+            }
+        }
+    }
     reverse_deps_loaded = true;
 }
 

@@ -356,74 +356,26 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
 
         if (ctx.plan.contains(dep_name)) continue;
 
+        // 已是目标（libsolv 会处理该依赖）→ 跳过
+        bool is_target = false;
+        for (const auto& [tn, tv] : ctx.targets)
+            if (tn == dep_name) { is_target = true; break; }
+        if (is_target) continue;
+
+        // 实际元数据发现的新依赖 → 加入目标，交给 libsolv 重解
         std::string req_ver = std::string(constants::VER_LATEST);
         if (!dep.constraints.empty()) {
             if (auto matching = ctx.repo.find_best_matching_version(dep_name, dep.constraints))
                 req_ver = matching->version;
         }
-
         log_info(string_format("info.installing_discovered_dep", dep_name));
-
-        std::set<std::string> vs;
-        detail::resolve_package_dependencies(dep_name, req_ver, false, ctx, vs);
-
-        if (!ctx.plan.contains(dep_name)) {
-            auto providers = Cache::instance().get_providers(dep_name);
-            if (!providers.empty()) continue;
-
-            bool found_in_plan = false;
-            for (const auto& [pkg_name, pplan] : ctx.plan) {
-                for (const auto& prov : pplan.provides) {
-                    // 精确匹配：子串匹配会把依赖 foo 误判为被 libfoo-dev 满足
-                    if (prov == dep_name) {
-                        found_in_plan = true;
-                        break;
-                    }
-                }
-                if (found_in_plan) break;
-            }
-
-            if (!found_in_plan) {
-                for (const auto& [tn, tv] : ctx.targets) {
-                    if (ctx.plan.contains(tn)) continue;
-                    if (auto it = ctx.local_candidates.find(tn); it != ctx.local_candidates.end()) {
-                        try {
-                            std::string m_json = extract_file_from_archive(
-                                it->second, std::string(constants::PKG_METADATA_FILE));
-                            if (!m_json.empty()) {
-                                json meta = json::parse(m_json);
-                                for (const auto& prov :
-                                     meta.value(std::string(constants::J_PROVIDES),
-                                                std::vector<std::string>{})) {
-                                    if (prov == dep_name) {
-                                        found_in_plan = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        } catch (const std::exception& e) {
-                            log_warning(string_format("warning.dep_scan_metadata_parse_failed", tn,
-                                                      e.what()));
-                        }
-                    }
-                    if (found_in_plan) break;
-                }
-            }
-            if (found_in_plan) continue;
-
-            throw LpkgException(
-                string_format("error.unresolvable_drift", pkg_name_,
-                              string_format("error.package_not_in_repo", dep_name)));
-        }
+        ctx.targets.emplace_back(dep_name, req_ver);
         found_new = true;
     }
 
     if (found_new) {
-        if (auto broken = detail::check_plan_consistency(ctx.plan); !broken.empty()) {
-            throw LpkgException(
-                string_format("error.unresolvable_drift", pkg_name_,
-                              "Dependency conflict detected in discovered dependencies"));
-        }
+        // libsolv 重解整个计划（依赖/虚拟提供/冲突由 solver 原生处理）
+        detail::resolve_with_solver(ctx);
     }
 
     if (!needed_so_.empty()) {
@@ -741,7 +693,9 @@ void InstallationTask::register_package()
         auto providers = cache.get_providers(soname);
         for (const auto& prov_pkg : providers) {
             if (prov_pkg != pkg_name_ && cache.is_installed(prov_pkg)) {
-                dep_entries.insert(prov_pkg);
+                // 只记反向依赖（移除时阻止误删），不把 SONAME 提供者写进 deps/：
+                // deps/ 只放命名依赖。写入会污染 deps/ 且依赖安装顺序
+                // （is_installed 检查），让 autoremove 对提供者误判。
                 cache.add_reverse_dep(prov_pkg, pkg_name_);
             }
         }

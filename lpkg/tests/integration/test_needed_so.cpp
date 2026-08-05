@@ -527,6 +527,59 @@ TEST_F(NeededSoTest, AutoremoveKeepsNeededSoDep)
     EXPECT_TRUE(Cache::instance().is_installed("app"));
 }
 
+// -----------------------------------------------------------------------
+// 回归：纯 SONAME 链路（无命名 dep）的提供者不能被 autoremove 误删
+// 真实场景：gcc←libmpc.so.3→mpc，mpc 从未出现在任何 deps/ 文件
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, AutoremoveKeepsSonameOnlyProvider)
+{
+    create_pkg("libY", "1.0", {}, {"libY.so.1"});
+    create_pkg("app", "1.0", {}, {}, {"libY.so.1"});  // 只有 SONAME，无命名 dep
+    update_index({
+        {"app", "1.0", "", "", "libY.so.1"},
+        {"libY", "1.0", "", "libY.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("libY"));
+
+    EXPECT_NO_THROW(autoremove());
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("libY")) << "纯 SONAME 链路提供者不得被 autoremove";
+    EXPECT_TRUE(Cache::instance().is_installed("app"));
+}
+
+// -----------------------------------------------------------------------
+// 回归：needed_so 的提供者不得被写进 deps/ 文件（deps/ 只放命名依赖）
+// 旧代码把提供者包名塞进 deps/ → 依赖安装顺序、且让 autoremove 误判
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, DepsFileExcludesSonameProviders)
+{
+    create_pkg("libZ", "1.0", {}, {"libZ.so.1"});
+    create_pkg("app", "1.0", {}, {}, {"libZ.so.1"});
+    update_index({
+        {"app", "1.0", "", "", "libZ.so.1"},
+        {"libZ", "1.0", "", "libZ.so.1", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"app"}));
+    Cache::instance().load();
+
+    std::ifstream dep_f(Config::instance().dep_dir() / "app");
+    std::string line;
+    bool found_in_deps = false;
+    while (std::getline(dep_f, line))
+        if (line.find("libZ") != std::string::npos) found_in_deps = true;
+    EXPECT_FALSE(found_in_deps) << "deps/app 不得含 SONAME 提供者 libZ";
+
+    std::ifstream nso_f(Config::instance().needed_so_dir() / "app");
+    bool found_in_nso = false;
+    while (std::getline(nso_f, line))
+        if (line.find("libZ.so.1") != std::string::npos) found_in_nso = true;
+    EXPECT_TRUE(found_in_nso) << "needed_so/app 应记录 SONAME libZ.so.1";
+}
+
 // =========================================================================
 // 核心修复回归测试：needed_so 与 deps 同一处理路径
 //

@@ -31,6 +31,7 @@
 #include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/install_common.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
+#include "../../main/src/pkg/solver.hpp"
 #include "../../main/src/repo/repository.hpp"
 #include "nlohmann/json.hpp"
 
@@ -868,138 +869,96 @@ TEST_F(RemovalSymlinkTest, QueryFileFindsOwner)
     auto no_owners = Cache::instance().get_file_owners("/usr/bin/nonexistent");
     EXPECT_TRUE(no_owners.empty());
 }
-
 // =========================================================================
-// SECTION 17: While-true convergence loop
+// SECTION 17: libsolv 反向一致性（升级破坏已装依赖 → solver 冲突）
 // =========================================================================
 
-TEST_F(RemovalSymlinkTest, ConsistencyCheckDetectsBrokenDeps)
+TEST_F(RemovalSymlinkTest, SolverRejectsVersionDowngradeBreakingInstalled)
 {
-    // app depends on lib >= 2.0 (written in dep file)
-    Cache::instance().add_installed("app", "1.0", true);
-    Cache::instance().add_installed("lib", "2.0", true);
-    Cache::instance().add_file_owner("/usr/bin/app", "app");
-    Cache::instance().add_file_owner("/usr/lib/lib.so", "lib");
-    ensure_dir_exists(Config::instance().dep_dir());
-    {
-        std::ofstream f(Config::instance().dep_dir() / "app");
-        f << "lib >= 2.0\n";
-    }
-    write_cache();
-    Cache::instance().load();
+    // app 已装且依赖 lib >= 2.0（lib 2.0 也已装，依赖健康）；计划把 lib 降到 1.0 →
+    // solver 判冲突。注：libsolv 的 dontfix 只强制"之前健康"的已装 requires——
+    // 若 lib 未装（依赖本就 broken），降级不会报冲突。
+    Repository repo;
+    repo.update_package_info("lib", "1.0", {}, {"lib.so"}, {});
+    repo.update_package_info("lib", "2.0", {}, {"lib.so"}, {});
+    DependencyInfo dep;
+    dep.name = "lib";
+    Constraint c;
+    c.op = ">=";
+    c.version = "2.0";
+    dep.constraints.push_back(c);
+    std::map<std::string, solv::InstalledPkg> installed;
+    installed["app"] = {"1.0", {dep}, {}, {}};
+    installed["lib"] = {"2.0", {}, {}, {}};  // 已装 lib 2.0（自提供 lib=2.0 满足 app 约束）
 
-    // Plan: lib at 1.0 — too old for app
-    std::map<std::string, InstallPlan> plan;
-    InstallPlan p;
-    p.name = "lib";
-    p.actual_version = "1.0";
-    plan["lib"] = p;
-
-    // check_plan_consistency should find app is broken
-    auto broken = detail::check_plan_consistency(plan);
-    EXPECT_TRUE(broken.contains("app")) << "app should be broken by lib downgrade";
+    solv::SolveOptions opts;
+    auto r = solv::solve_install(repo, {}, installed, {{"lib", "1.0"}}, opts);
+    EXPECT_FALSE(r.ok()) << "lib 降到 1.0 必须破坏已装 app（lib>=2.0）";
 }
 
-TEST_F(RemovalSymlinkTest, ConsistencyCheckOkWhenSatisfied)
+TEST_F(RemovalSymlinkTest, SolverAllowsSatisfyingVersion)
 {
-    Cache::instance().add_installed("app", "1.0", true);
-    Cache::instance().add_installed("lib", "2.0", true);
-    Cache::instance().add_file_owner("/usr/bin/app", "app");
-    Cache::instance().add_file_owner("/usr/lib/lib.so", "lib");
-    ensure_dir_exists(Config::instance().dep_dir());
-    {
-        std::ofstream f(Config::instance().dep_dir() / "app");
-        f << "lib >= 1.0\n";
-    }
-    write_cache();
-    Cache::instance().load();
+    // lib 2.0 满足 app 约束 → 求解成功
+    Repository repo;
+    repo.update_package_info("lib", "1.0", {}, {"lib.so"}, {});
+    repo.update_package_info("lib", "2.0", {}, {"lib.so"}, {});
+    DependencyInfo dep;
+    dep.name = "lib";
+    Constraint c;
+    c.op = ">=";
+    c.version = "2.0";
+    dep.constraints.push_back(c);
+    std::map<std::string, solv::InstalledPkg> installed;
+    installed["app"] = {"1.0", {dep}, {}, {}};
 
-    // Plan: lib at 2.0 — satisfies app's constraint
-    std::map<std::string, InstallPlan> plan;
-    InstallPlan p;
-    p.name = "lib";
-    p.actual_version = "2.0";
-    plan["lib"] = p;
-
-    auto broken = detail::check_plan_consistency(plan);
-    EXPECT_FALSE(broken.contains("app")) << "app should NOT be broken by lib 2.0";
+    solv::SolveOptions opts;
+    auto r = solv::solve_install(repo, {}, installed, {{"lib", "2.0"}}, opts);
+    EXPECT_TRUE(r.ok());
 }
 
-TEST_F(RemovalSymlinkTest, ConsistencyCheckSkipsPlanPackages)
+TEST_F(RemovalSymlinkTest, SolverHandlesBothInPlan)
 {
-    Cache::instance().add_installed("app", "1.0", true);
-    Cache::instance().add_installed("lib", "1.0", true);
-    ensure_dir_exists(Config::instance().dep_dir());
-    {
-        std::ofstream f(Config::instance().dep_dir() / "app");
-        f << "lib >= 1.0\n";
-    }
-    write_cache();
-    Cache::instance().load();
+    // app 与 lib 都在计划中（lib 升级到 2.0）→ 成功
+    Repository repo;
+    repo.update_package_info("lib", "1.0", {}, {"lib.so"}, {});
+    repo.update_package_info("lib", "2.0", {}, {"lib.so"}, {});
+    repo.update_package_info("app", "1.0", {}, {}, {});
+    std::map<std::string, solv::InstalledPkg> installed;
+    installed["app"] = {"1.0", {}, {}, {}};
+    installed["lib"] = {"1.0", {}, {}, {}};
 
-    // Both app and lib are in plan → consistency check should skip app
-    std::map<std::string, InstallPlan> plan;
-    InstallPlan p1, p2;
-    p1.name = "app";
-    p1.actual_version = "1.0";
-    p2.name = "lib";
-    p2.actual_version = "2.0";
-    plan["app"] = p1;
-    plan["lib"] = p2;
-
-    auto broken = detail::check_plan_consistency(plan);
-    EXPECT_TRUE(broken.empty()) << "packages in plan should not be reported as broken";
+    solv::SolveOptions opts;
+    auto r = solv::solve_install(repo, {}, installed, {{"app", "1.0"}, {"lib", "2.0"}}, opts);
+    EXPECT_TRUE(r.ok());
 }
 
-TEST_F(RemovalSymlinkTest, NeededSoConsistencyDetectsDroppedSoname)
+TEST_F(RemovalSymlinkTest, SolverDetectsDroppedSoname)
 {
-    // app needs libc.so.6 provided by glibc
-    Cache::instance().add_installed("app", "1.0", false);
-    Cache::instance().add_installed("glibc", "2.35", true);
-    ensure_dir_exists(Config::instance().needed_so_dir());
-    {
-        std::ofstream f(Config::instance().needed_so_dir() / "app");
-        f << "libc.so.6\n";
-    }
-    Cache::instance().add_provider("libc.so.6", "glibc");
-    write_cache();
-    Cache::instance().load();
+    // app 需要 libc.so.6，由已装 glibc 2.0 提供（健康）；glibc 升级到 3.0 不再提供 → 冲突。
+    // 注：installed glibc 必须显式 provide libc.so.6——libsolv dontfix 靠"已装 provider"
+    // 判定依赖健康；app 自己不带 libc.so.6 provider 时升级本就不会报冲突。
+    Repository repo;
+    repo.update_package_info("glibc", "3.0", {}, {}, {});
+    std::map<std::string, solv::InstalledPkg> installed;
+    installed["app"] = {"1.0", {}, {"libc.so.6"}, {}};
+    installed["glibc"] = {"2.0", {}, {"libc.so.6"}, {"libc.so.6"}};
 
-    // Plan: new glibc at 3.0 that does NOT provide libc.so.6
-    std::map<std::string, InstallPlan> plan;
-    InstallPlan p;
-    p.name = "glibc";
-    p.actual_version = "3.0";
-    p.provides = {};  // no libc.so.6
-    plan["glibc"] = p;
-
-    auto broken = detail::check_needed_so_consistency(plan);
-    EXPECT_TRUE(broken.contains("app")) << "app should be broken if glibc drops libc.so.6";
+    solv::SolveOptions opts;
+    auto r = solv::solve_install(repo, {}, installed, {{"glibc", "3.0"}}, opts);
+    EXPECT_FALSE(r.ok()) << "glibc 3.0 丢掉 libc.so.6 必须破坏已装 app";
 }
 
-TEST_F(RemovalSymlinkTest, NeededSoConsistencyOkWhenSonameKept)
+TEST_F(RemovalSymlinkTest, SolverOkWhenSonameKept)
 {
-    Cache::instance().add_installed("app", "1.0", false);
-    Cache::instance().add_installed("glibc", "2.35", true);
-    ensure_dir_exists(Config::instance().needed_so_dir());
-    {
-        std::ofstream f(Config::instance().needed_so_dir() / "app");
-        f << "libc.so.6\n";
-    }
-    Cache::instance().add_provider("libc.so.6", "glibc");
-    write_cache();
-    Cache::instance().load();
+    // glibc 3.0 仍提供 libc.so.6 → 满足
+    Repository repo;
+    repo.update_package_info("glibc", "3.0", {}, {"libc.so.6"}, {});
+    std::map<std::string, solv::InstalledPkg> installed;
+    installed["app"] = {"1.0", {}, {"libc.so.6"}, {}};
 
-    // Plan: new glibc at 3.0 that STILL provides libc.so.6
-    std::map<std::string, InstallPlan> plan;
-    InstallPlan p;
-    p.name = "glibc";
-    p.actual_version = "3.0";
-    p.provides = {"libc.so.6"};
-    plan["glibc"] = p;
-
-    auto broken = detail::check_needed_so_consistency(plan);
-    EXPECT_FALSE(broken.contains("app")) << "app should NOT be broken if soname is kept";
+    solv::SolveOptions opts;
+    auto r = solv::solve_install(repo, {}, installed, {{"glibc", "3.0"}}, opts);
+    EXPECT_TRUE(r.ok());
 }
 
 // =========================================================================

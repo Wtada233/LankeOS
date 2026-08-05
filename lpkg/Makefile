@@ -6,7 +6,7 @@ CXX ?= g++
 # libgit2 是静态库，其 openssl.c 引用 SSL_set_bio（在 libssl）。静态库依赖的共享库必须排在
 # 它**之后**（--as-needed 下前置的 -lssl 无符号引用会被丢弃 → "DSO missing from command line"）。
 # 故 openssl 放最后，保证 -lssl -lcrypto 紧跟 -lgit2。
-PKGS = libcurl libarchive libelf libgit2 openssl
+PKGS = libcurl libarchive libelf libgit2 libsolv openssl
 PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS))
 LIBS = $(shell pkg-config --libs $(PKGS))
 # 动态链接（测试二进制必须动态——全静态链接会改变运行时行为，导致 Tar/pack 等异常）。
@@ -25,7 +25,7 @@ PKGS_LIST = $(PKGS)
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 5.4.6
+VERSION ?= 6.0.0
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -48,7 +48,7 @@ INSTALL_DOCS_DIR = $(INSTALL_SHARE_DIR)/docs
 INSTALL_LOCK_DIR = $(DESTDIR)$(LOCALSTATEDIR)/lpkg
 
 # Common flags shared between production and test builds
-COMMON_CXXFLAGS = -std=c++20 -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \
+COMMON_CXXFLAGS = -std=c++20 -fPIC -Wall -Wextra -I$(MAIN_DIR)/third_party/include -I$(APP_SRC_DIR) \
 	-I$(APP_SRC_DIR)/base -I$(APP_SRC_DIR)/vercmp -I$(APP_SRC_DIR)/crypto \
 	-I$(APP_SRC_DIR)/config -I$(APP_SRC_DIR)/i18n -I$(APP_SRC_DIR)/db \
 	-I$(APP_SRC_DIR)/repo -I$(APP_SRC_DIR)/trigger \
@@ -184,6 +184,8 @@ docker-env:
 	# 从源码构建 libgit2-static（bundled http-parser、USE_SSH=OFF）：alpine 的 libgit2-static 依赖系统
 	# http-parser/ssh2，而 http-parser 无静态库，全静态链接会失败。
 	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "if [ ! -f /usr/lib/libgit2.a ]; then rm -rf /tmp/libgit2 && git clone -q --depth 1 --branch v1.7.2 https://github.com/libgit2/libgit2.git /tmp/libgit2 && cd /tmp/libgit2 && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=OFF -DBUILD_CLI=OFF -DBUILD_TESTS=OFF -DUSE_SSH=OFF -DUSE_HTTPS=OpenSSL >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null; fi"
+	# 从源码构建 libsolv（Alpine 无此包——apk 自家 resolver 不用 libsolv，故未打包）。
+	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "if [ ! -f /usr/lib/libsolv.so ]; then rm -rf /tmp/libsolv && git clone -q --depth 1 https://github.com/openSUSE/libsolv.git /tmp/libsolv && cd /tmp/libsolv && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_SHARED=ON -DENABLE_STATIC=ON -DENABLE_TESTS=OFF >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null; fi"
 
 docker-sync:
 	@echo "Syncing source code to container..."
