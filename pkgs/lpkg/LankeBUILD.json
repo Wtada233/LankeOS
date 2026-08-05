@@ -1,6 +1,6 @@
 {
   "name": "lpkg",
-  "version": "5.4.6",
+  "version": "6.0.0",
   "deps": [],
   "needed_so": [],
   "provides": [],
@@ -9,7 +9,7 @@
     "docker"
   ],
   "sources": [
-    "https://github.com/Wtada233/LankeOS/archive/aa0b6aa7db1110950f92a3633c2f1f17f6d28ed7.zip"
+    "https://github.com/Wtada233/LankeOS/archive/714a1623e1ad1653387e12965605dbb558d9adb2.zip"
   ],
   "work_sources": [],
   "no_strip": true
