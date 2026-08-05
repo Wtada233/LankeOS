@@ -66,6 +66,9 @@ lankebuild_prepare() {
     if [ -n "$_jdk" ]; then
         ln -sf "$_jdk/bin/java" third_party/jdk/current/bin/
     fi
+    # dawn/tint 源码生成需要 go（build() 里 export GOROOT=/usr/lib/go）
+    mkdir -p third_party/dawn/tools/golang/linux-amd64/bin
+    ln -sf /usr/bin/go third_party/dawn/tools/golang/linux-amd64/bin/
 
     # --- 下载内置 rust-toolchain（替代 system-rust）---
     # crubit（Rust/C++ 绑定生成器）随 rust-toolchain 捆绑发布，system-rust 缺它
@@ -95,6 +98,12 @@ lankebuild_prepare() {
             -delete 2>/dev/null || true
     done
 
+    # iamf_tools 要 opus 源码树的 include/opus.h（bundled 已删），用系统 opus 头补齐
+    mkdir -p third_party/opus/src/include
+    for _oph in opus.h opus_defines.h opus_types.h opus_custom.h opus_multistream.h opus_projection.h; do
+        ln -sf "/usr/include/opus/$_oph" "third_party/opus/src/include/$_oph"
+    done
+
     ./build/linux/unbundle/replace_gn_files.py --system-libraries $_SYSTEM_LIBS
 
     # 生成 dawn commit hash（tarball 已自带，仅在有必要时覆盖）
@@ -120,6 +129,8 @@ lankebuild_build() {
     export AR="$PWD/third_party/llvm-build/Release+Asserts/bin/llvm-ar"
     export NM="$PWD/third_party/llvm-build/Release+Asserts/bin/llvm-nm"
     export RUSTC_BOOTSTRAP=1
+    # dawn/tint 生成器调 third_party/dawn/tools/golang/.../bin/go（symlink 到系统 go）
+    export GOROOT=/usr/lib/go
 
     # 移除与 Chromium ThinLTO 冲突的 CFLAGS
     for _flag in "-g" "-fexceptions" "-fcf-protection" \
