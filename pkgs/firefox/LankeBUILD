@@ -6,12 +6,20 @@ lankebuild_prepare() {
 # ---------- 安装前缀 ----------
 ac_add_options --prefix={PREFIX}
 
-# ---------- 标准配置选项 ----------
-ac_add_options --enable-application=browser
-ac_add_options --disable-crashreporter
+# ---------- 构建配置 ----------
+ac_add_options --enable-release
+ac_add_options --enable-hardening
+ac_add_options --enable-optimize
+ac_add_options --enable-rust-simd
+ac_add_options --enable-linker=lld
+ac_add_options --disable-debug-symbols
 ac_add_options --disable-updater
 ac_add_options --disable-tests
-ac_add_options --enable-rust-simd
+ac_add_options --disable-crashreporter
+ac_add_options --enable-application=browser
+ac_add_options --enable-default-toolkit=cairo-gtk3-wayland-only
+
+# ---------- 功能配置 ----------
 ac_add_options --enable-system-ffi
 ac_add_options --enable-system-pixman
 ac_add_options --with-system-jpeg
@@ -19,22 +27,26 @@ ac_add_options --with-system-zlib
 ac_add_options --enable-audio-backends=alsa,jack
 ac_add_options --with-system-nspr
 ac_add_options --with-system-nss
-ac_add_options --with-system-jack
-ac_add_options --with-system-av1
+ac_add_options --enable-jack
 ac_add_options --with-system-icu
 ac_add_options --with-system-libevent
 ac_add_options --with-system-libvpx
 ac_add_options --with-system-webp
-ac_add_options --enable-default-toolkit=cairo-gtk3-wayland-only
-
-# ---------- 地理定位 (禁用 WiFi 扫描) ----------
+ac_add_options --without-wasm-sandboxed-libraries
 ac_add_options --disable-necko-wifi
-
-# ---------- Wayland 兼容 (修正启动类名) ----------
-MOZ_APP_REMOTINGNAME=firefox
 
 # ---------- 构建输出目录 ----------
 mk_add_options MOZ_OBJDIR=@TOPSRCDIR@/firefox-build-dir
+
+# ---------- 发行信息 ----------
+ac_add_options --enable-official-branding
+ac_add_options --enable-update-channel=release
+ac_add_options --with-distribution-id=top.wtada233.lankeos
+ac_add_options --with-unsigned-addon-scopes=app,system
+ac_add_options --allow-addon-sideload
+export MOZILLA_OFFICIAL=1
+export MOZ_APP_REMOTINGNAME={PKG_NAME}
+
 EOF
 }
 
