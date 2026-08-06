@@ -9,6 +9,6 @@
     "base-devel"
   ],
   "work_sources": [
-    "https://github.com/notofonts/noto-cjk/raw/refs/tags/Sans2.004/Sans/Mono/NotoSansMonoCJKsc-Regular.otf"
+    "https://github.com/googlefonts/noto-cjk/raw/refs/tags/Sans2.004/Sans/Mono/NotoSansMonoCJKsc-Regular.otf"
   ]
 }

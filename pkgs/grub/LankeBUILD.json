@@ -9,6 +9,7 @@
   "needed_so": [
     "libc.so.6",
     "libfreetype.so.6",
+    "libfuse3.so.4",
     "liblzma.so.5",
     "libtasn1.so.6"
   ],

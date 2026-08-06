@@ -1,8 +1,10 @@
 {
-  "name": "xml-parser",
+  "name": "perl-xml-parser",
   "version": "2.59",
   "release": 3,
-  "deps": [],
+  "deps": [
+    "perl-file-sharedir"
+  ],
   "needed_so": [
     "libc.so.6",
     "libexpat.so.1"
@@ -11,7 +13,9 @@
   "build_deps": [
     "base-devel",
     "expat",
-    "perl"
+    "perl",
+    "perl-file-sharedir",
+    "perl-file-sharedir-install"
   ],
   "sources": [
     "https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-2.59.tar.gz"

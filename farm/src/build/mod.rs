@@ -364,19 +364,35 @@ pub fn run_build(
         // 额外重建"不链但 ABI/运行时敏感"的包。变化的 SONAME 无包直接 need → 改好元数据进仓库。
         //
         // 触发语义（用户规则）：
-        //   - 有版本化 SONAME 的包（python…）：只在 SONAME 断裂时触发（removed 非空）
-        //   - 无版本化 SONAME 的纯脚本解释器（perl…）：**任何重建**都算运行时变化 → 触发
+        //   - abichange 组（python…）：只在 SONAME 断裂时触发（removed 非空）
+        //   - version-change 组（perl 等纯解释器，无 libperl.so 可断）：on 包本轮重建且有效版本
+        //     与旧索引不同时，按 version-change-script 判定（OLD_VER/NEW_VER，如 minor 变才重建），
+        //     独立于 ABI 断裂——不再有"任何重建都触发"的 script_interpreter 回退（patch 升级会
+        //     无谓拖垮整个组，已删）。
         let removed = abi::removed_sonames(&old, &pkg, &outcome.provides);
-        let script_interpreter = !outcome.provides.iter().any(|p| crate::graph::is_soname_versioned(p));
-        let group_trigger = !removed.is_empty() || script_interpreter;
+        let group_trigger = !removed.is_empty();
         if !removed.is_empty() {
             report.abi_broken.push(pkg.clone());
         }
-        // 直连受害者（链接被移除 SONAME 的包，只在真 ABI 断裂时）∪ 声明式重建组受害者
+        // 直连受害者（链接被移除 SONAME 的包，只在真 ABI 断裂时）∪ 声明式重建组受害者 ∪ version-change 受害者
         let mut victims = abi::direct_victims(&revmap, &removed);
         if group_trigger {
             victims.extend(groups.victims_for(&pkg, &all_pkgs));
         }
+        // version-change：on 包版本变化（旧索引 vs 本轮有效版本）→ 脚本判定 exit 0 才重建组受害者
+        let version_victims: Vec<String> = match old.packages.get(&pkg) {
+            Some(ov) if ov.version != version => match groups
+                .version_victims_if(&pkg, &ov.version, &version, &all_pkgs)
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("[!] {} version-change 脚本失败: {}", pkg, e);
+                    Vec::new()
+                }
+            },
+            _ => Vec::new(),
+        };
+        victims.extend(version_victims.iter().cloned());
         if !victims.is_empty() {
             victims.sort();
             victims.dedup();
@@ -386,6 +402,11 @@ pub fn run_build(
                         println!(
                             "  {}",
                             ux::yellow(&tr!("build.abi", pkg, removed.join(", "), v))
+                        );
+                    } else if version_victims.contains(&v) {
+                        println!(
+                            "  {}",
+                            ux::yellow(&tr!("build.version_rebuild", pkg, v))
                         );
                     } else {
                         println!(
@@ -430,11 +451,16 @@ mod tests {
     use std::collections::HashMap;
 
     fn write_pkg(pkgs: &Path, name: &str, provides: &[&str], needed: &[&str], build_deps: &[&str]) {
+        write_pkg_ver(pkgs, name, "1.0", provides, needed, build_deps);
+    }
+
+    /// 同 `write_pkg`，但版本可指定（version-change 传播测试用：old 索引 vs 配方版本对比）。
+    fn write_pkg_ver(pkgs: &Path, name: &str, version: &str, provides: &[&str], needed: &[&str], build_deps: &[&str]) {
         let dir = pkgs.join(name);
         fs::create_dir_all(&dir).unwrap();
         let json = serde_json::json!({
             "name": name,
-            "version": "1.0",
+            "version": version,
             "provides": provides,
             "needed_so": needed,
             "build_deps": build_deps,
@@ -1262,30 +1288,36 @@ mod tests {
     }
 
     #[test]
-    fn script_interpreter_rebuild_triggers_group_without_soname() {
-        // perl 是纯脚本解释器：**无版本化 SONAME**（provides 空）→ removed_sonames 永远为空，
-        // ABI 断裂信号不存在。声明式重建组必须对这类包"任何重建都触发"（用户规则：xml-parser
-        // rebuild-on perl）。
-        let dir = temp_dir("farm-group-perl");
-        let out = temp_dir("farm-group-perl-out");
-        let gdir = temp_dir("farm-group-perl-data");
+    fn version_change_group_rebuilds_on_minor_bump() {
+        // perl 纯解释器（无 libperl.so，只有 libperl.a）→ SONAME 断裂信号不存在，abichange 组永不触发。
+        // 改用 version-change 组：on 包（perl）minor 变化（5.44→5.45）→ 脚本判定 exit 0 → 重建 perl-* 组。
+        // （曾有的 script_interpreter 回退会"任何重建都触发"，patch 升级也拖垮全组，已删）
+        let dir = temp_dir("farm-group-perl-vc");
+        let out = temp_dir("farm-group-perl-vc-out");
+        let gdir = temp_dir("farm-group-perl-vc-data");
         fs::create_dir_all(&gdir).unwrap();
         fs::write(
             gdir.join("perl.yaml"),
-            "rebuild-on-abichange: perl\npackages: xml-parser\n",
+            r#"rebuild-on-version-change: perl
+version-change-script: |
+  #!/bin/bash
+  [ "$(printf '%s' "$OLD_VER" | cut -d. -f1-2)" != "$(printf '%s' "$NEW_VER" | cut -d. -f1-2)" ]
+packages: perl-*
+"#,
         )
         .unwrap();
-        // perl 不提供任何 SONAME（provides 空，4 个冒号）；xml-parser 只链 expat，不链 libperl
+        // perl 提供空（无 SONAME）；perl-xml-parser 只链 expat，不链 libperl
         write_baseline(
             &out,
-            "perl|5.42:h:::libc.so.6|\n\
-             xml-parser|2.47:h:::libc.so.6,libexpat.so.1|\n",
+            "perl|5.44:h:::libc.so.6|\n\
+             perl-xml-parser|2.47:h:::libc.so.6,libexpat.so.1|\n",
         );
-        write_pkg(&dir, "perl", &[], &["libc.so.6"], &[]);
-        write_pkg(&dir, "xml-parser", &[], &["libc.so.6", "libexpat.so.1"], &[]);
+        // perl 配方版本 5.45（minor 5.44→5.45 变化；write_pkg 写死 1.0，用 write_pkg_ver 指定）
+        write_pkg_ver(&dir, "perl", "5.45", &[], &["libc.so.6"], &[]);
+        write_pkg(&dir, "perl-xml-parser", &[], &["libc.so.6", "libexpat.so.1"], &[]);
 
-        let perl_lpkg = stage_lpkg(&out, "perl", "1.0", &["libc.so.6"], &[]);
-        let xp_lpkg = stage_lpkg(&out, "xml-parser", "1.0", &["libc.so.6", "libexpat.so.1"], &[]);
+        let perl_lpkg = stage_lpkg(&out, "perl", "5.45", &["libc.so.6"], &[]);
+        let xp_lpkg = stage_lpkg(&out, "perl-xml-parser", "1.0", &["libc.so.6", "libexpat.so.1"], &[]);
         let mut outcomes = HashMap::new();
         outcomes.insert(
             "perl".into(),
@@ -1299,7 +1331,7 @@ mod tests {
             },
         );
         outcomes.insert(
-            "xml-parser".into(),
+            "perl-xml-parser".into(),
             BuildOutcome {
                 ok: true,
                 needed_so: vec!["libc.so.6".into(), "libexpat.so.1".into()],
@@ -1329,8 +1361,89 @@ mod tests {
             report.abi_broken
         );
         assert!(
-            report.built.contains(&"xml-parser".to_string()),
-            "无 SONAME 的 perl 被重建 → 声明式组应强制重建 xml-parser: {:?}",
+            report.built.contains(&"perl".to_string()),
+            "perl 应被构建: {:?}",
+            report.built
+        );
+        assert!(
+            report.built.contains(&"perl-xml-parser".to_string()),
+            "perl minor 变化 → version-change 组应重建 perl-xml-parser: {:?}",
+            report.built
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+        fs::remove_dir_all(&gdir).ok();
+    }
+
+    #[test]
+    fn version_change_group_skips_on_patch_bump() {
+        // patch（5.44.0→5.44.1）minor 未变 → 脚本 exit 1 → perl-* 组**不**重建。
+        // 旧 script_interpreter 回退会对 patch 升级也重建全组——正是被删掉的不合理行为。
+        let dir = temp_dir("farm-group-perl-vcpatch");
+        let out = temp_dir("farm-group-perl-vcpatch-out");
+        let gdir = temp_dir("farm-group-perl-vcpatch-data");
+        fs::create_dir_all(&gdir).unwrap();
+        fs::write(
+            gdir.join("perl.yaml"),
+            r#"rebuild-on-version-change: perl
+version-change-script: |
+  #!/bin/bash
+  [ "$(printf '%s' "$OLD_VER" | cut -d. -f1-2)" != "$(printf '%s' "$NEW_VER" | cut -d. -f1-2)" ]
+packages: perl-*
+"#,
+        )
+        .unwrap();
+        write_baseline(
+            &out,
+            "perl|5.44.0:h:::libc.so.6|\n\
+             perl-xml-parser|2.47:h:::libc.so.6,libexpat.so.1|\n",
+        );
+        write_pkg_ver(&dir, "perl", "5.44.1", &[], &["libc.so.6"], &[]);
+        write_pkg(&dir, "perl-xml-parser", &[], &["libc.so.6", "libexpat.so.1"], &[]);
+
+        let perl_lpkg = stage_lpkg(&out, "perl", "5.44.1", &["libc.so.6"], &[]);
+        let xp_lpkg = stage_lpkg(&out, "perl-xml-parser", "1.0", &["libc.so.6", "libexpat.so.1"], &[]);
+        let mut outcomes = HashMap::new();
+        outcomes.insert(
+            "perl".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libc.so.6".into()],
+                provides: vec![],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(perl_lpkg),
+            },
+        );
+        outcomes.insert(
+            "perl-xml-parser".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: vec!["libc.so.6".into(), "libexpat.so.1".into()],
+                provides: vec![],
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(xp_lpkg),
+            },
+        );
+        let mut binding = StubBinding::new(outcomes);
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["perl".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: gdir.clone(),
+            validate: false,
+            manual_sort: false,
+        };
+        let report = run_build(&opts, &mut binding, None).unwrap();
+        assert!(report.built.contains(&"perl".to_string()));
+        assert!(
+            !report.built.contains(&"perl-xml-parser".to_string()),
+            "perl patch 升级不应触发 perl-* 重建: {:?}",
             report.built
         );
         fs::remove_dir_all(&dir).ok();

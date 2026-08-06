@@ -9,7 +9,8 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "python"
+    "python",
+    "python-setuptools"
   ],
   "sources": [
     "https://chromium.googlesource.com/external/gyp/+archive/1615ec326858f8c2bd8f30b3a86ea71830409ce4.tar.gz"

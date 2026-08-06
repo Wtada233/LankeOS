@@ -8,8 +8,7 @@
   "build_deps": [
     "base-devel"
   ],
-  "sources": [
+  "work_sources": [
     "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTC/NotoSansCJK-Regular.ttc"
-  ],
-  "work_sources": []
+  ]
 }

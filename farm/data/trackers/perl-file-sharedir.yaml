@@ -1,0 +1,7 @@
+# File::ShareDir 构建自举需 File::ShareDir::Install（perl-file-sharedir-install，同 CPAN 发行），
+# 运行时需 Class::Inspector（perl-class-inspector）——都在 LankeBUILD.json 里声明了。
+pkg-name: perl-file-sharedir
+tracker-template: html-index
+url: https://cpan.metacpan.org/authors/id/R/RE/REHSACK/
+pattern: 'File-ShareDir-(\d[\d.]*)\.tar\.gz'
+template: https://cpan.metacpan.org/authors/id/R/RE/REHSACK/File-ShareDir-{version}.tar.gz

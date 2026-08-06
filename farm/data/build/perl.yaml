@@ -1,4 +1,12 @@
-# 声明式 ABI 重建组：perl 的 libperl SONAME 断裂时，强制重建 perl 模块（XML::Parser 链 libperl，
-# 但以 perl 运行时/工具链为准）。packages 是空格分隔的 glob（`*` 通配）。
-rebuild-on-abichange: perl
-packages: xml-parser
+# perl 是纯脚本解释器：只提供 libperl.a（静态），无 libperl.so 动态库 → SONAME 检测无从谈起，
+# rebuild-on-abichange 永不触发。改用 rebuild-on-version-change：on 包（perl）版本变化时跑
+# version-change-script（OLD_VER/NEW_VER 环境变量，exit 0 = 重建），脚本只认 minor 变化——
+# 5.44→5.45 才重建全部 perl-* 模块，patch（5.44.0→5.44.1）或 release 修订不重建。
+# packages 是空格分隔的 glob（`*` 通配）。
+rebuild-on-version-change: perl
+version-change-script: |
+  #!/bin/bash
+  old_minor=$(printf '%s' "$OLD_VER" | cut -d. -f1-2)
+  new_minor=$(printf '%s' "$NEW_VER" | cut -d. -f1-2)
+  [ "$old_minor" != "$new_minor" ]
+packages: perl-*

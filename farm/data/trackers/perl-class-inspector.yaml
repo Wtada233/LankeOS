@@ -1,0 +1,5 @@
+pkg-name: perl-class-inspector
+tracker-template: html-index
+url: https://cpan.metacpan.org/authors/id/P/PL/PLICEASE/
+pattern: 'Class-Inspector-(\d[\d.]*)\.tar\.gz'
+template: https://cpan.metacpan.org/authors/id/P/PL/PLICEASE/Class-Inspector-{version}.tar.gz
