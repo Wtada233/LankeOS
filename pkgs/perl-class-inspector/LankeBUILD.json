@@ -1,7 +1,7 @@
 {
   "name": "perl-class-inspector",
   "version": "1.36",
-  "release": 1,
+  "release": 2,
   "deps": [
     "perl"
   ],

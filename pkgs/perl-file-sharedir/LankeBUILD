@@ -7,6 +7,9 @@ lankebuild_build() {
     perl Makefile.PL
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
+    # perllocal.pod 是各 perl 模块 `make install` 共享追加的安装记录，每包都 own → 打包冲突。
+    # 运行时无用途，从 staging 删掉（Debian dh_perl 同款；* 匹配 perl 版本目录 5.44）。
+    rm -f {STAGING_ROOT}/usr/lib/perl5/*/core_perl/perllocal.pod
 }
 
 

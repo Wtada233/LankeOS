@@ -1,7 +1,7 @@
 {
   "name": "perl-file-sharedir-install",
   "version": "0.14",
-  "release": 1,
+  "release": 2,
   "deps": [
     "perl"
   ],
