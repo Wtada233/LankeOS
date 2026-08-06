@@ -5,8 +5,24 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libnspr4.so",
+    "libplc4.so",
+    "libplds4.so",
+    "libsqlite3.so",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libfreebl3.so",
+    "libfreeblpriv3.so",
+    "libnss3.so",
+    "libnsssysinit.so",
+    "libnssutil3.so",
+    "libsmime3.so",
+    "libsoftokn3.so",
+    "libssl3.so"
+  ],
   "build_deps": [
     "base-devel",
     "nspr",

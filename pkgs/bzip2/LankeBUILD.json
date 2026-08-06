@@ -5,8 +5,14 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libbz2.so",
+    "libbz2.so.1",
+    "libbz2.so.1.0"
+  ],
   "build_deps": [
     "base-devel"
   ],

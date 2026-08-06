@@ -2,7 +2,21 @@
   "name": "qt6-imageformats",
   "version": "6.11.1",
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libGLX.so.0",
+    "libOpenGL.so.0",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libsharpyuv.so.0",
+    "libstdc++.so.6",
+    "libtiff.so.6",
+    "libwebp.so.7",
+    "libwebpdemux.so.2",
+    "libwebpmux.so.3"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",

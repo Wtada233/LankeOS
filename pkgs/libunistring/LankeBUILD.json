@@ -3,8 +3,13 @@
   "version": "1.4.2",
   "release": 1,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libunistring.so",
+    "libunistring.so.5"
+  ],
   "build_deps": [
     "base-devel"
   ],

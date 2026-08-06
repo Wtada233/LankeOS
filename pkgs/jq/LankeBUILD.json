@@ -3,8 +3,16 @@
   "version": "1.8.2",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6",
+    "libonig.so.5"
+  ],
+  "provides": [
+    "libjq.so",
+    "libjq.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "oniguruma"

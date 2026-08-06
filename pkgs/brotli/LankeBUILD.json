@@ -3,8 +3,18 @@
   "version": "1.2.0",
   "release": 1,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libbrotlicommon.so",
+    "libbrotlicommon.so.1",
+    "libbrotlidec.so",
+    "libbrotlidec.so.1",
+    "libbrotlienc.so",
+    "libbrotlienc.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",

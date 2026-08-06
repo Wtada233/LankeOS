@@ -3,8 +3,16 @@
   "version": "8.3",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libncursesw.so.6"
+  ],
+  "provides": [
+    "libhistory.so",
+    "libhistory.so.8",
+    "libreadline.so",
+    "libreadline.so.8"
+  ],
   "build_deps": [
     "base-devel",
     "ncurses"

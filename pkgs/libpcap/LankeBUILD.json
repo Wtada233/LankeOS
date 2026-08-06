@@ -4,8 +4,17 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libdbus-1.so.3",
+    "libnl-3.so.200",
+    "libnl-genl-3.so.200"
+  ],
+  "provides": [
+    "libpcap.so",
+    "libpcap.so.1"
+  ],
   "build_deps": [
     "base-devel"
   ],

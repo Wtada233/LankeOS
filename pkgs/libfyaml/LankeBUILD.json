@@ -3,8 +3,16 @@
   "version": "0.9.6",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libLLVM.so.22.1",
+    "libc.so.6",
+    "libclang.so.22.1",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libfyaml.so",
+    "libfyaml.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "llvm"

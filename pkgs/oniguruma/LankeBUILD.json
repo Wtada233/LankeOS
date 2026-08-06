@@ -5,8 +5,13 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libonig.so",
+    "libonig.so.5"
+  ],
   "build_deps": [
     "base-devel"
   ],

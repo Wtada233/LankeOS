@@ -2,8 +2,18 @@
   "name": "qrcodegen-cmake",
   "version": "1.8.0",
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libqrcodegen.so",
+    "libqrcodegen.so.1",
+    "libqrcodegencpp.so",
+    "libqrcodegencpp.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",

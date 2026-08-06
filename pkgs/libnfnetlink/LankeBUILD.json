@@ -2,8 +2,13 @@
   "name": "libnfnetlink",
   "version": "1.0.2",
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libnfnetlink.so",
+    "libnfnetlink.so.0"
+  ],
   "build_deps": [
     "base-devel"
   ],

@@ -3,7 +3,11 @@
   "version": "0.29.4",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",

@@ -3,8 +3,13 @@
   "version": "0.2.5",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libyaml-0.so.2",
+    "libyaml.so"
+  ],
   "build_deps": [
     "base-devel"
   ],

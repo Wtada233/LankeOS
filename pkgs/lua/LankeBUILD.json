@@ -3,8 +3,20 @@
   "version": "5.5.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "liblua++.so",
+    "liblua++.so.5.5",
+    "liblua++5.5.so",
+    "liblua.so",
+    "liblua.so.5.5",
+    "liblua5.5.so"
+  ],
   "build_deps": [
     "base-devel"
   ],

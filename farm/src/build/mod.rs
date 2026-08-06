@@ -47,6 +47,9 @@ pub struct BuildOptions {
     pub interactive: bool,
     /// 声明式重建组目录（`data/build/*.yaml`，与 data/trackers 同模式）。
     pub build_data_dir: PathBuf,
+    /// validate 模式：初始选择改为"所有没有 `.build_ok` 标记的包"（而非版本增量 skip）。
+    /// 成功构建写 `.build_ok`；跳过/blocked 不写（下次 validate 会重试）。
+    pub validate: bool,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -118,6 +121,24 @@ fn source_gate(pkg: &str, opts: &BuildOptions, is_victim: bool) -> Result<(), St
     }
 }
 
+/// validate 标记：`.build_ok` **存在且内容 == 当前 LankeBUILD+LankeBUILD.json 的 sha256**
+/// （recipe_hash）才算"已成功构建且配方未变"。配方变了 → 标记失效 → validate 会重建。
+pub(crate) fn has_build_ok(pkgs_dir: &Path, pkg: &str) -> bool {
+    let Some(expected) = recipe_hash(pkgs_dir, pkg) else {
+        return false;
+    };
+    let Ok(stored) = std::fs::read_to_string(pkgs_dir.join(pkg).join(".build_ok")) else {
+        return false;
+    };
+    stored.trim() == expected
+}
+
+/// validate 标记：成功构建后写 `.build_ok`（内容 = 当前 recipe_hash；跳过/blocked 不写）。
+pub(crate) fn mark_build_ok(pkgs_dir: &Path, pkg: &str) -> std::io::Result<()> {
+    let h = recipe_hash(pkgs_dir, pkg).unwrap_or_default();
+    std::fs::write(pkgs_dir.join(pkg).join(".build_ok"), h.as_bytes())
+}
+
 /// 进程内交互接管（§8.5）：BLOCKED 时提示 operator 选择，不退出进程。
 /// 主调度：返回构建报告（built/repacked/abi_broken/blocked）。
 /// `state` 非空时记录 job 状态 + 配方 hash（§11 持久化；读端/差分 requeue 尚未实现，
@@ -136,11 +157,19 @@ pub fn run_build(
 
     // 2. 增量选择（用户规则）：effective_version 与本地 repo 旧索引一致的包跳过构建。
     //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version+release（如 1.1+2）。
+    //    validate 模式：选择改为"所有没有 `.build_ok` 标记的包"（成功构建才会写标记，
+    //    跳过/blocked 不写 → 下次 validate 重试）。排序仍走同一 topo_order。
     let all_pkgs = sorted_pkg_names(&opts.pkgs_dir);
     let initial: Vec<String> = if opts.targets.is_empty() {
         let v: Vec<String> = all_pkgs
             .iter()
-            .filter(|p| needs_build(&opts.pkgs_dir, p, &old))
+            .filter(|p| {
+                if opts.validate {
+                    !has_build_ok(&opts.pkgs_dir, p)
+                } else {
+                    needs_build(&opts.pkgs_dir, p, &old)
+                }
+            })
             .cloned()
             .collect();
         let skipped = all_pkgs.len() - v.len();
@@ -314,6 +343,10 @@ pub fn run_build(
             ux::green(&tr!("build.repo", pkg, final_lpkg.display()))
         );
 
+        // validate 标记：构建 + repack + 进 repo + index 全部成功后，在包目录写 `.build_ok`。
+        // farm validate 据此只重建没有标记的包；跳过/blocked 不进此分支（不写标记 → 下次重试）。
+        let _ = mark_build_ok(&opts.pkgs_dir, &pkg);
+
         // 临时目录清理：解包目录（scan/repack 共用，已用完）与 staging（产物已 rename 进 repo）。
         // 只清成功路径——构建失败时保留，供 operator 排查/重试（下次 scan 会先清空解包目录）。
         let _ = fs::remove_dir_all(opts.out_dir.join("extract").join(&pkg));
@@ -396,6 +429,42 @@ mod tests {
             "build_deps": build_deps,
         });
         fs::write(dir.join("LankeBUILD.json"), serde_json::to_string_pretty(&json).unwrap()).unwrap();
+        // 真实包两者都有：recipe_hash 读 LankeBUILD + LankeBUILD.json 两个文件
+        fs::write(dir.join("LankeBUILD"), "lankebuild_build() { : }\n").unwrap();
+    }
+
+    // validate 标记：成功构建写 `.build_ok`，has_build_ok 据此判定；未写的包 validate 会重试。
+    #[test]
+    fn build_ok_marker_lifecycle() {
+        let tmp = std::env::temp_dir().join(format!("farm-buildok-test-{}", std::process::id()));
+        let pkgs = tmp.join("pkgs");
+        let _ = fs::remove_dir_all(&pkgs);
+        fs::create_dir_all(&pkgs).unwrap();
+        write_pkg(&pkgs, "alpha", &[], &[], &[]);
+        write_pkg(&pkgs, "beta", &[], &[], &[]);
+
+        // 初始都没有标记
+        assert!(!has_build_ok(&pkgs, "alpha"));
+        assert!(!has_build_ok(&pkgs, "beta"));
+
+        // 只有 alpha 构建成功 → 写标记；beta 跳过/blocked → 不写
+        mark_build_ok(&pkgs, "alpha").unwrap();
+        assert!(has_build_ok(&pkgs, "alpha"));
+        assert!(!has_build_ok(&pkgs, "beta"));
+
+        // 配方内容不变 → 标记仍有效（hash 匹配）
+        write_pkg(&pkgs, "alpha", &[], &[], &[]);
+        assert!(has_build_ok(&pkgs, "alpha"), "配方未变标记应仍有效");
+
+        // 配方变了（version 1.0 → 2.0）→ hash 不匹配 → 标记失效 → validate 重建
+        let j = serde_json::json!({
+            "name": "alpha", "version": "2.0",
+            "provides": [], "needed_so": [], "build_deps": [],
+        });
+        fs::write(pkgs.join("alpha").join("LankeBUILD.json"), serde_json::to_string_pretty(&j).unwrap()).unwrap();
+        assert!(!has_build_ok(&pkgs, "alpha"), "配方变化后 .build_ok 应失效");
+
+        let _ = fs::remove_dir_all(&tmp);
     }
 
     /// 合成一个真实可解包的 .lpkg（metadata.json + content/libfoo.so.1 假 ELF）。
@@ -572,6 +641,7 @@ mod tests {
             download_retries: 1,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let err = run_build(&opts, &mut binding, None).unwrap_err();
         assert!(err.contains("source-missing"), "非交互源缺失应硬终止：{err}");
@@ -946,6 +1016,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.built.contains(&"libfoo".to_string()));
@@ -1043,6 +1114,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.abi_broken.contains(&"a".to_string()));
@@ -1158,6 +1230,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: gdir.clone(),
+            validate: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.abi_broken.contains(&"python".to_string()));
@@ -1231,6 +1304,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: gdir.clone(),
+            validate: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(
@@ -1264,6 +1338,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let err = run_build(&opts, &mut binding, None).unwrap_err();
         assert!(
@@ -1341,6 +1416,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
 
@@ -1394,6 +1470,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
         assert!(
@@ -1426,6 +1503,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
         assert!(
@@ -1464,6 +1542,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
 
@@ -1508,6 +1587,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
 
@@ -1549,6 +1629,7 @@ mod tests {
             download_retries: 3,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
 

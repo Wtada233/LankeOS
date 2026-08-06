@@ -6,8 +6,16 @@
     "python",
     "xwayland"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libX11.so.6",
+    "libc.so.6",
+    "libexpat.so.1",
+    "libsystemd.so.0"
+  ],
+  "provides": [
+    "libdbus-1.so",
+    "libdbus-1.so.3"
+  ],
   "build_deps": [
     "base-devel",
     "doxygen",

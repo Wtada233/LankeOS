@@ -2,8 +2,19 @@
   "name": "libxmlb",
   "version": "0.3.29",
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "liblzma.so.5",
+    "libstemmer.so.0",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libxmlb.so",
+    "libxmlb.so.2"
+  ],
   "build_deps": [
     "base-devel",
     "git",

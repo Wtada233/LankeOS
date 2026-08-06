@@ -3,8 +3,16 @@
   "version": "22.10.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libigdgmm.so",
+    "libigdgmm.so.12"
+  ],
   "build_deps": [
     "base-devel",
     "cmake"

@@ -3,8 +3,14 @@
   "version": "0.4.1",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libxcb.so.1"
+  ],
+  "provides": [
+    "libxcb-keysyms.so",
+    "libxcb-keysyms.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "libxcb",

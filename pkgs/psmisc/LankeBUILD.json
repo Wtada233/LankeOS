@@ -3,7 +3,10 @@
   "version": "23.7",
   "release": 2,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libncursesw.so.6"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",

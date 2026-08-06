@@ -3,8 +3,18 @@
   "version": "0.17.5",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libfontconfig.so.1",
+    "libfreetype.so.6",
+    "libfribidi.so.0",
+    "libharfbuzz.so.0",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libass.so",
+    "libass.so.9"
+  ],
   "build_deps": [
     "base-devel",
     "fontconfig",

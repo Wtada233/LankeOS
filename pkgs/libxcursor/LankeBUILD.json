@@ -5,8 +5,16 @@
   "deps": [
     "xorgproto"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libX11.so.6",
+    "libXfixes.so.3",
+    "libXrender.so.1",
+    "libc.so.6"
+  ],
+  "provides": [
+    "libXcursor.so",
+    "libXcursor.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "libx11",

@@ -3,8 +3,20 @@
   "version": "7.360.1",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libglslang-default-resource-limits.so.16",
+    "libglslang.so.16",
+    "liblcms2.so.2",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libvulkan.so.1"
+  ],
+  "provides": [
+    "libplacebo.so",
+    "libplacebo.so.360"
+  ],
   "build_deps": [
     "base-devel",
     "glslang",

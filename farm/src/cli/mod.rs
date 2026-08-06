@@ -141,6 +141,31 @@ enum Command {
         #[arg(long, default_value_t = 3)]
         download_retries: u32,
     },
+    /// 重建所有没有 `.build_ok` 标记的包（成功构建才会写标记；跳过/blocked 不写）。
+    /// 排序与增量构建一致（topo_order + ABI 传播）；`--all` 等价物：自动选择缺标记的包。
+    Validate {
+        /// pkgs 目录（LankeBUILD 体系）
+        #[arg(long, default_value = "pkgs")]
+        pkgs: PathBuf,
+        /// 产物/解包/发布目录
+        #[arg(long, default_value = "out")]
+        out: PathBuf,
+        /// SQLite 状态库（job 状态记录，供 operator 排查）
+        #[arg(long)]
+        state: Option<PathBuf>,
+        /// 架构（发布到 out/<arch>/<pkg>/）
+        #[arg(long, default_value = "x86_64")]
+        arch: String,
+        /// fresh container 基础镜像（wtada233/lankeos:latest）。必填——仅容器构建。
+        #[arg(long)]
+        image: Option<String>,
+        /// docker 模式内嵌本地 repo 服务器端口（容器 lpkg upgrade 从这拉依赖）
+        #[arg(long, default_value_t = 80)]
+        repo_port: u16,
+        /// 源预下载网络重试次数（§8.6）
+        #[arg(long, default_value_t = 3)]
+        download_retries: u32,
+    },
     /// 探测上游版本
     Track {
         /// 目标包名（缺省需 --all）
@@ -1207,6 +1232,19 @@ pub fn run() -> ExitCode {
                 ..Default::default()
             };
             build::cmd_build(&args)
+        }
+        Command::Validate { pkgs, out, state, arch, image, repo_port, download_retries } => {
+            let args = Args {
+                pkgs: Some(pkgs.to_string_lossy().into_owned()),
+                out: Some(out),
+                state: state.map(|p| p.to_path_buf()),
+                arch: Some(arch),
+                image,
+                repo_port: Some(repo_port),
+                download_retries: Some(download_retries),
+                ..Default::default()
+            };
+            build::cmd_validate(&args)
         }
         Command::Track { pkg, all, run, pkgs, data, jobs, token, gitlab_token } => {
             let args = Args {

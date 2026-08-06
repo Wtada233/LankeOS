@@ -3,8 +3,19 @@
   "version": "1.5.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libogg.so.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libFLAC++.so",
+    "libFLAC++.so.11",
+    "libFLAC.so",
+    "libFLAC.so.14"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",

@@ -4,8 +4,17 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libmbedcrypto.so.16",
+    "libmbedcrypto.so.3.6.7",
+    "libmbedtls.so.21",
+    "libmbedtls.so.3.6.7",
+    "libmbedx509.so.3.6.7",
+    "libmbedx509.so.7"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",

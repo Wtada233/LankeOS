@@ -5,7 +5,10 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libtextstyle.so.0"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel"

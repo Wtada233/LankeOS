@@ -3,8 +3,19 @@
   "version": "2.5.4",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "liblcms2.so.2",
+    "libm.so.6",
+    "libmvec.so.1",
+    "libpng16.so.16",
+    "libtiff.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libopenjp2.so",
+    "libopenjp2.so.7"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",

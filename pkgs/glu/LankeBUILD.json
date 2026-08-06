@@ -3,8 +3,17 @@
   "version": "9.0.3",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libOpenGL.so.0",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libGLU.so",
+    "libGLU.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "libglvnd",

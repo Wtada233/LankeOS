@@ -2,8 +2,13 @@
   "name": "fuse3",
   "version": "3.18.2",
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libfuse3.so",
+    "libfuse3.so.4"
+  ],
   "build_deps": [
     "base-devel",
     "meson",

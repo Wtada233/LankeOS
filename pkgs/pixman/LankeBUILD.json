@@ -3,8 +3,15 @@
   "version": "0.46.4",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libpixman-1.so",
+    "libpixman-1.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "libpng",

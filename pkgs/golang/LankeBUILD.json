@@ -7,7 +7,11 @@
     "perl",
     "python"
   ],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libstdc++.so.6",
+    "libtiff.so.6"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel"

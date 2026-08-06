@@ -5,8 +5,21 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libgdbm.so.6",
+    "libsystemd.so.0"
+  ],
+  "provides": [
+    "libpam.so",
+    "libpam.so.0",
+    "libpam_misc.so",
+    "libpam_misc.so.0",
+    "libpamc.so",
+    "libpamc.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "gdbm",

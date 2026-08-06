@@ -5,8 +5,14 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libyaml-0.so.2"
+  ],
+  "provides": [
+    "libfdt.so",
+    "libfdt.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "git",

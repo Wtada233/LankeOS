@@ -3,8 +3,15 @@
   "version": "1.2.6",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libICE.so.6",
+    "libc.so.6",
+    "libuuid.so.1"
+  ],
+  "provides": [
+    "libSM.so",
+    "libSM.so.6"
+  ],
   "build_deps": [
     "base-devel",
     "libice",

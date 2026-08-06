@@ -3,8 +3,13 @@
   "version": "1.10.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "liblz4.so",
+    "liblz4.so.1"
+  ],
   "build_deps": [
     "base-devel",
     "git",

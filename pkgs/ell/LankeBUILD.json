@@ -3,8 +3,13 @@
   "version": "0.83",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libell.so",
+    "libell.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "dbus"

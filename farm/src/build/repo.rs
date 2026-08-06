@@ -592,6 +592,7 @@ mod tests {
             download_retries: 1,
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
         };
         let outcome = BuildOutcome {
             ok: true,

@@ -3,8 +3,14 @@
   "version": "2.3.8",
   "release": 1,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libunistring.so.5"
+  ],
+  "provides": [
+    "libidn2.so",
+    "libidn2.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "libunistring"

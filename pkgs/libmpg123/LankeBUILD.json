@@ -3,8 +3,22 @@
   "version": "1.33.6",
   "release": 1,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libasound.so.2",
+    "libc.so.6",
+    "libjack.so.0",
+    "libm.so.6",
+    "libpulse-simple.so.0",
+    "libpulse.so.0"
+  ],
+  "provides": [
+    "libmpg123.so",
+    "libmpg123.so.0",
+    "libout123.so",
+    "libout123.so.0",
+    "libsyn123.so",
+    "libsyn123.so.0"
+  ],
   "build_deps": [
     "alsa-lib",
     "base-devel",

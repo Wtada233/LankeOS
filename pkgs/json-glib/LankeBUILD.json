@@ -2,8 +2,16 @@
   "name": "json-glib",
   "version": "1.10.8",
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libjson-glib-1.0.so",
+    "libjson-glib-1.0.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "glib",

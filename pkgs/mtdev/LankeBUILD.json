@@ -3,8 +3,13 @@
   "version": "1.1.7",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libmtdev.so",
+    "libmtdev.so.1"
+  ],
   "build_deps": [
     "base-devel"
   ],

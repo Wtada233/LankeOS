@@ -5,8 +5,17 @@
   "deps": [
     "bash"
   ],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libkmod.so.2",
+    "libresolv.so.2",
+    "libudev.so.1",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libpci.so",
+    "libpci.so.3"
+  ],
   "build_deps": [
     "base-devel",
     "kmod",

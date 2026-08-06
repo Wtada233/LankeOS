@@ -3,8 +3,18 @@
   "version": "6.3.0",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libgmp.so",
+    "libgmp.so.10",
+    "libgmpxx.so",
+    "libgmpxx.so.4"
+  ],
   "build_deps": [
     "base-devel"
   ],

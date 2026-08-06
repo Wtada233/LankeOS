@@ -3,7 +3,13 @@
   "version": "5.3",
   "release": 3,
   "deps": [],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libhistory.so.8",
+    "libm.so.6",
+    "libncursesw.so.6",
+    "libreadline.so.8"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",

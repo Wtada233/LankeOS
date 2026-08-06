@@ -3,8 +3,18 @@
   "version": "2.3.1",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libsystemd.so.0"
+  ],
+  "provides": [
+    "libsdbus-c++.so",
+    "libsdbus-c++.so.2"
+  ],
   "build_deps": [
     "base-devel",
     "cmake",

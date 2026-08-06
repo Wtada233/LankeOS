@@ -18,7 +18,25 @@ pub(crate) fn cmd_build(args: &Args) -> ExitCode {
         eprintln!("farm build <pkg>... | --all");
         return ExitCode::from(2);
     };
+    run_build_flow(args, pkgs_dir, out_dir, targets, /*validate=*/false)
+}
 
+/// validate：自动重建所有没有 `.build_ok` 标记的包（成功构建才写标记；跳过/blocked 不写）。
+/// 排序与增量构建一致（run_build 内部同一 topo_order + ABI 传播）。
+pub(crate) fn cmd_validate(args: &Args) -> ExitCode {
+    let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
+    let out_dir = args.out.clone().unwrap_or_else(|| PathBuf::from("out"));
+    run_build_flow(args, pkgs_dir, out_dir, Vec::new(), /*validate=*/true)
+}
+
+/// build / validate 共用完整流程：state → image 校验 → 内嵌 serve → RealBinding → run_build → 汇总。
+fn run_build_flow(
+    args: &Args,
+    pkgs_dir: String,
+    out_dir: PathBuf,
+    targets: Vec<String>,
+    validate: bool,
+) -> ExitCode {
     // SQLite 状态（§11）：job 状态 + 构建历史（增量由 run_build 的版本对比驱动）
     let state_path = args
         .state
@@ -93,6 +111,7 @@ pub(crate) fn cmd_build(args: &Args) -> ExitCode {
         download_retries: args.download_retries.unwrap_or(3),
         interactive: std::io::stdin().is_terminal(),
         build_data_dir: PathBuf::from("data/build"),
+        validate,
     };
     let report = match build::run_build(&opts, &mut binding, state.as_ref()) {
         Ok(r) => r,

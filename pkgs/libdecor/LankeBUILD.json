@@ -3,8 +3,24 @@
   "version": "0.2.5",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcairo.so.2",
+    "libdbus-1.so.3",
+    "libgdk-3.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgtk-3.so.0",
+    "libm.so.6",
+    "libpango-1.0.so.0",
+    "libpangocairo-1.0.so.0",
+    "libwayland-client.so.0",
+    "libwayland-cursor.so.0"
+  ],
+  "provides": [
+    "libdecor-0.so",
+    "libdecor-0.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "cairo",
