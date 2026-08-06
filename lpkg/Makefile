@@ -25,7 +25,7 @@ PKGS_LIST = $(PKGS)
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 6.0.0
+VERSION ?= 6.0.1
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -170,6 +170,12 @@ uninstall:
 	rm -rf $(INSTALL_LOCK_DIR)
 
 DOCKER_ENV_CONTAINER = lpkg-builder
+# libsolv 锁定版本（tag，稳定发布版，非浮动 HEAD）：git clone --branch 拉取发布 tag。
+# /usr/lib/libsolv.tag 版本戳记录已装版本，改 tag 后 docker-env 自动重编（见下），无需手动删容器。
+LIBSOLV_TAG = 0.7.39
+# libgit2 锁定版本（tag，用于 git clone --branch）：与 libsolv 同策略，改此变量后
+# docker-env 通过 /usr/lib/libgit2.tag 版本戳自动重编（见下），无需手动删容器。
+LIBGIT2_TAG = v1.7.2
 
 docker-env:
 	@mkdir -p $(BUILD_DIR)
@@ -183,9 +189,14 @@ docker-env:
 	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base bash pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx gtest-dev tar sudo git cmake
 	# 从源码构建 libgit2-static（bundled http-parser、USE_SSH=OFF）：alpine 的 libgit2-static 依赖系统
 	# http-parser/ssh2，而 http-parser 无静态库，全静态链接会失败。
-	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "if [ ! -f /usr/lib/libgit2.a ]; then rm -rf /tmp/libgit2 && git clone -q --depth 1 --branch v1.7.2 https://github.com/libgit2/libgit2.git /tmp/libgit2 && cd /tmp/libgit2 && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=OFF -DBUILD_CLI=OFF -DBUILD_TESTS=OFF -DUSE_SSH=OFF -DUSE_HTTPS=OpenSSL >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null; fi"
+	# 锁定 LIBGIT2_TAG（见上）；/usr/lib/libgit2.tag 记录已装版本，与 pin 不符或 .a 缺失时重编。
+	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "LIBGIT2_TAG=$(LIBGIT2_TAG); if [ ! -f /usr/lib/libgit2.a ] || [ \"\$$(cat /usr/lib/libgit2.tag 2>/dev/null)\" != \"\$$LIBGIT2_TAG\" ]; then rm -rf /tmp/libgit2 && git clone -q --depth 1 --branch \$$LIBGIT2_TAG https://github.com/libgit2/libgit2.git /tmp/libgit2 && cd /tmp/libgit2 && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=OFF -DBUILD_CLI=OFF -DBUILD_TESTS=OFF -DUSE_SSH=OFF -DUSE_HTTPS=OpenSSL >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null && echo \$$LIBGIT2_TAG > /usr/lib/libgit2.tag; fi"
 	# 从源码构建 libsolv（Alpine 无此包——apk 自家 resolver 不用 libsolv，故未打包）。
-	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "if [ ! -f /usr/lib/libsolv.so ]; then rm -rf /tmp/libsolv && git clone -q --depth 1 https://github.com/openSUSE/libsolv.git /tmp/libsolv && cd /tmp/libsolv && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_SHARED=ON -DENABLE_STATIC=ON -DENABLE_TESTS=OFF >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null; fi"
+	# 锁定 LIBSOLV_TAG（见上，稳定发布 tag）；/usr/lib/libsolv.tag 记录已装版本，与 pin 不符
+	# 或 lib 缺失时重编——防止现有容器静默沿用旧版 libsolv（版本漂移的来源）。
+	# cmake：共享库 libsolv.so 默认无条件构建（无需 ENABLE_SHARED）；ENABLE_STATIC=ON
+	# 额外构建静态库 libsolv.a（供静态链接的 lpkg 二进制）。libsolv 无 ENABLE_TESTS 选项。
+	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "LIBSOLV_TAG=$(LIBSOLV_TAG); if [ ! -f /usr/lib/libsolv.so ] || [ \"\$$(cat /usr/lib/libsolv.tag 2>/dev/null)\" != \"\$$LIBSOLV_TAG\" ]; then rm -rf /tmp/libsolv && git clone -q --depth 1 --branch \$$LIBSOLV_TAG https://github.com/openSUSE/libsolv.git /tmp/libsolv && cd /tmp/libsolv && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_STATIC=ON >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null && echo \$$LIBSOLV_TAG > /usr/lib/libsolv.tag; fi"
 
 docker-sync:
 	@echo "Syncing source code to container..."

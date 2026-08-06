@@ -128,6 +128,8 @@ error.local_pkg_not_found=Local package file not found: {}
 error.candidate_dep_version_mismatch=Candidate dependency {} version {} does not satisfy constraint {}
 error.unresolvable_drift=Unresolvable metadata drift for package '{}': {}
 error.unresolved_soname=Required SONAME '{}' has no provider in repository or install plan
+error.unresolved_dependency=Dependency '{}' has no provider in repository
+error.package_version_not_found=Version {} of {} not found in repository, available versions: {}
 info.installing_discovered_dep=Discovered missing dependency '{}', adding to install queue...
 info.log_prefix==> 
 info.upgrade_old_files_check=Replacing: {} → {}, {} old files to check

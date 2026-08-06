@@ -16,10 +16,9 @@ TEST(VersionCompare, SimpleNumeric)
 TEST(VersionCompare, MultiSegment)
 {
     EXPECT_TRUE(version_compare("1.0", "1.0.1"));  // 1.0 < 1.0.1 → true
-    // 缺失段视为 0，所以 1.0.1 == 1.0.1.0 → false（less-than 不成立）
-    EXPECT_FALSE(version_compare("1.0.1", "1.0.1.0"));
-    // 1.0.1.0 == 1.0.1 → false（less-than 不成立）
-    EXPECT_FALSE(version_compare("1.0.1.0", "1.0.1"));
+    // rpm 不补段：1.0.1 < 1.0.1.0（段数不同即不等，曾自研补 0 视为相等，已删除）
+    EXPECT_TRUE(version_compare("1.0.1", "1.0.1.0"));
+    EXPECT_FALSE(version_compare("1.0.1.0", "1.0.1"));  // 1.0.1.0 < 1.0.1 → false
     EXPECT_FALSE(version_compare("1.0.1", "1.0"));       // 1.0.1 < 1.0 → false
     EXPECT_TRUE(version_compare("1.0.0.0", "1.0.0.1"));  // 1.0.0.0 < 1.0.0.1 → true
 }
@@ -38,9 +37,9 @@ TEST(VersionCompare, DifferentLength)
 {
     EXPECT_TRUE(version_compare("1.0", "1.0.1"));   // 1.0 < 1.0.1 → true
     EXPECT_FALSE(version_compare("1.0.1", "1.0"));  // 1.0.1 < 1.0 → false
-    // 缺失段视为 0，因此 1.0.0 == 1.0 → false
-    EXPECT_FALSE(version_compare("1.0.0", "1.0"));          // equal → false
-    EXPECT_FALSE(version_compare("1.0", "1.0.0"));          // equal → false
+    // rpm 不补段：1.0.0 > 1.0
+    EXPECT_FALSE(version_compare("1.0.0", "1.0"));          // 1.0.0 < 1.0 → false
+    EXPECT_TRUE(version_compare("1.0", "1.0.0"));           // 1.0 < 1.0.0 → true
     EXPECT_FALSE(version_compare("2.0.0", "1.0.0.0.0.1"));  // 2.0.0 < 1.x → false
 }
 
@@ -70,21 +69,16 @@ TEST(VersionCompare, PreReleaseMultipleIdentifiers)
     EXPECT_TRUE(version_compare("1.0-rc.2", "1.0-rc.3"));
 }
 
-TEST(VersionCompare, InvalidVersionThrows)
+// 不再自研格式校验：比较完全委托 libsolv EVRCMP，异常/哨兵格式不抛异常（宽容比较）。
+// 版本合法性由打包/仓库构建阶段保证，比较期不校验。
+TEST(VersionCompare, LenientOnUnexpectedFormats)
 {
-    // 空字符串无法通过版本格式验证
-    EXPECT_THROW(version_compare("", "1.0"), LpkgException);
-    EXPECT_THROW(version_compare("1.0", ""), LpkgException);
-    EXPECT_THROW(version_compare("", ""), LpkgException);
-    // 非法版本字符串
-    EXPECT_THROW(version_compare("abc", "1.0"), LpkgException);
-    EXPECT_THROW(version_compare("1.0", "abc"), LpkgException);
-    // +后缀中不允许含连字符
-    EXPECT_THROW(version_compare("1.0+2-rc1", "1.0"), LpkgException);
-    EXPECT_THROW(version_compare("1.0+2.1-beta", "1.0"), LpkgException);
-    // 空后缀
-    EXPECT_THROW(version_compare("1.0-", "1.0"), LpkgException);
-    EXPECT_THROW(version_compare("1.0+", "1.0"), LpkgException);
+    EXPECT_NO_THROW(version_compare("", "1.0"));
+    EXPECT_NO_THROW(version_compare("1.0", ""));
+    EXPECT_NO_THROW(version_compare("abc", "1.0"));
+    EXPECT_NO_THROW(version_compare("1.0+2-rc1", "1.0"));
+    EXPECT_NO_THROW(version_compare("1.0-", "1.0"));
+    EXPECT_NO_THROW(version_compare("virtual", "1.0"));  // 哨兵值不再触发 invalid_version_format
 }
 
 // ===== version_satisfies 测试 =====
@@ -216,19 +210,21 @@ TEST(VersionCompare, PatchSuffix)
     EXPECT_TRUE(version_compare("1.0p", "1.0p2"));  // p < p2（无数字视为 0）
     EXPECT_FALSE(version_compare("1.0p2", "1.0p"));
 
-    // pN > +N（补丁优先级最高）
-    EXPECT_FALSE(version_compare("1.0p1", "1.0+1"));  // p1 < +1 → false
-    EXPECT_TRUE(version_compare("1.0+1", "1.0p1"));   // +1 < p1 → true
+    // pN 与 +N 相对顺序（rpm 语义）：base < pN < +N。
+    // 注：rpm 按段比较，字母段 pN 排在数字段 +N 之前——与旧 lpkg"补丁优先级最高(p1>+1)"
+    // 相反。这是 rpm 段比较模型的固有差异，非 `-`→`~` 可覆盖；随"完全使用 libsolv"采纳。
+    EXPECT_TRUE(version_compare("1.0p1", "1.0+1"));   // p1 < +1 → true
+    EXPECT_FALSE(version_compare("1.0+1", "1.0p1"));  // +1 < p1 → false
 
     // pN > -pre-release
     EXPECT_FALSE(version_compare("1.0p1", "1.0-rc1"));  // p1 < -rc1 → false
     EXPECT_TRUE(version_compare("1.0-rc1", "1.0p1"));
 
-    // 完整排序链：-pre < base < +1 < p1 < p2
+    // 完整排序链：-pre < base < pN < +N
     EXPECT_TRUE(version_compare("1.0-rc1", "1.0"));
-    EXPECT_TRUE(version_compare("1.0", "1.0+1"));
-    EXPECT_TRUE(version_compare("1.0+1", "1.0p1"));
-    EXPECT_TRUE(version_compare("1.0p1", "1.0p2"));
+    EXPECT_TRUE(version_compare("1.0", "1.0p1"));
+    EXPECT_TRUE(version_compare("1.0p1", "1.0+1"));
+    EXPECT_TRUE(version_compare("1.0+1", "1.0+2"));
 }
 
 // 回归测试：git hash 版本号（gn: 0.2385.9ece3f52+1）
@@ -265,20 +261,34 @@ TEST(VersionCompare, GitHashAlphaSuffixDistinctness)
 
 #include "../../main/src/vercmp/dep_parser.hpp"
 
-// 回归：= / == / != 必须按版本语义比较，不能做原始字符串比较。
-// 1.0 与 1.0.0 语义相等（version_compare 对缺失段补 0），字符串比较则误判。
+// 语义：= / == / != 按 libsolv EVRCMP 比较（归一化后）。
+// 注意：与 rpm 一致不再补段——1.0 与 1.0.0 是**不同**版本（曾自研补 0 视为相等，已删除）。
 TEST(VersionCompare, EqualConstraintUsesSemanticComparison)
 {
-    EXPECT_TRUE(version_satisfies("1.0.0", "=", "1.0"));
-    EXPECT_TRUE(version_satisfies("1.0", "==", "1.0.0"));
     EXPECT_TRUE(version_satisfies("1.0", "=", "1.0"));
     EXPECT_FALSE(version_satisfies("2.0", "=", "1.0"));
-    // != 语义：1.0 与 1.0.0 不视为不同
-    EXPECT_FALSE(version_satisfies("1.0", "!=", "1.0.0"));
+    EXPECT_TRUE(version_satisfies("1.0.0", "==", "1.0.0"));
+    // 段数不同不等价（不再补 0）：
+    EXPECT_FALSE(version_satisfies("1.0.0", "=", "1.0"));
+    EXPECT_FALSE(version_satisfies("1.0", "==", "1.0.0"));
+    EXPECT_TRUE(version_satisfies("1.0", "!=", "1.0.0"));  // 不同版本 → != 为真
     EXPECT_TRUE(version_satisfies("2.0", "!=", "1.0"));
-    // 其它运算符不受影响
+    // 其它运算符：1.0 < 1.0.0
     EXPECT_TRUE(version_satisfies("1.0", "<=", "1.0.0"));
     EXPECT_TRUE(version_satisfies("1.0.0", ">=", "1.0"));
+}
+
+// to_libsolv_evr / from_libsolv_evr 往返 + 归一化使 EVRCMP 与 lpkg 语义一致
+TEST(VersionCompare, LibsolvEvrRoundTrip)
+{
+    EXPECT_EQ(to_libsolv_evr("1.0-rc1"), "1.0~rc1");
+    EXPECT_EQ(to_libsolv_evr("1.0"), "1.0");
+    EXPECT_EQ(to_libsolv_evr("6.0.0+3.lpkg"), "6.0.0+3.lpkg");  // 无 `-` 不变
+    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("1.0-rc1")), "1.0-rc1");
+    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("22.1.7+2")), "22.1.7+2");
+    // 归一化后：rc 旧于基础版
+    EXPECT_TRUE(version_compare("1.0-rc1", "1.0"));
+    EXPECT_FALSE(version_compare("1.0", "1.0-rc1"));
 }
 
 // 回归测试：parse_dep_strings 应当按字符串中出现的物理顺序匹配操作符，而非 ops 数组索引顺序

@@ -105,6 +105,28 @@ TEST_F(SolverTest, MissingProviderTolerated)
     EXPECT_TRUE(order_has(r, "appB"));
 }
 
+// M1 回归：缺失**命名依赖**（非 SONAME）默认即报错
+TEST_F(SolverTest, MissingNamedDepErrorsByDefault)
+{
+    add("appB", "2.0", {"libgone"}, {}, {});
+
+    auto r = solve({{"appB", "latest"}});
+    EXPECT_FALSE(r.ok()) << "缺失命名依赖应报错，而非静默装上";
+    EXPECT_FALSE(r.problems.empty());
+}
+
+// M1 回归：--missing-so-no-error **只**容忍缺失 needed_so（SONAME），缺失命名依赖仍报错
+TEST_F(SolverTest, MissingNamedDepNotToleratedBySoFlag)
+{
+    add("appB", "2.0", {"libgone"}, {}, {});
+
+    SolveOptions opts;
+    opts.missing_so_no_error = true;
+    auto r = solve_install(repo, {}, installed, {{"appB", "latest"}}, opts);
+    EXPECT_FALSE(r.ok())
+        << "--missing-so-no-error 只允许 needed_so 缺失，缺失命名依赖不能靠伪提供者吞掉（回归 M1）";
+}
+
 // 传递闭包：C → B → A，装 C 全部拉入
 TEST_F(SolverTest, TransitiveClosure)
 {
@@ -221,5 +243,96 @@ TEST_F(SolverTest, RepoRevRequiresExcludesSelf)
     auto rev = repo_revrequires(repo, "glibc");
     EXPECT_TRUE(rev.contains("appZ"));
     EXPECT_FALSE(rev.contains("glibc")) << "repo_revrequires 不应把 glibc 自身记为自己的反向依赖";
+}
+
+// S1 回归：裸名 install 已装最新版 → no-op（既有语义，防回归）
+TEST_F(SolverTest, InstallLatestAlreadyInstalledIsNoop)
+{
+    add("pkgA", "1.0", {}, {}, {});
+    installed["pkgA"] = {"1.0", {}, {}, {}};
+
+    auto r = solve({{"pkgA", "latest"}});
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(r.order.empty()) << "已装最新版 install pkg 应为空计划（报'已安装'）";
+}
+
+// S1 回归：指定版本（本地文件/`pkg:ver`）已装同版本 → no-op，而非 REINSTALL 重装计划
+TEST_F(SolverTest, InstallSpecifiedVersionAlreadyInstalledIsNoop)
+{
+    add("pkgA", "1.0", {}, {}, {});
+    installed["pkgA"] = {"1.0", {}, {}, {}};
+
+    auto r = solve({{"pkgA", "1.0"}});
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(r.order.empty())
+        << "已装同版本时 install pkg:ver / 本地 .lpkg 不应再产出重装计划（回归 S1）";
+}
+
+// S1 变体：--force 时同版本仍要重装（reinstall 语义保留）
+TEST_F(SolverTest, ForceReinstallSameVersionProducesPlan)
+{
+    add("pkgA", "1.0", {}, {}, {});
+    installed["pkgA"] = {"1.0", {}, {}, {}};
+
+    SolveOptions opts;
+    opts.force_reinstall = true;
+    auto r = solve_install(repo, {}, installed, {{"pkgA", "1.0"}}, opts);
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(order_has(r, "pkgA")) << "--force 重装应保留计划";
+}
+
+// S2 回归：latest 必须用 lpkg 版本语义（预发布 -rc 比稳定版旧），已装 rc 应升到稳定版
+TEST_F(SolverTest, LatestPrefersStableOverPrerelease)
+{
+    add("pkgB", "1.0", {}, {}, {});
+    add("pkgB", "1.0-rc1", {}, {}, {});
+    installed["pkgB"] = {"1.0-rc1", {}, {}, {}};
+
+    auto r = solve({{"pkgB", "latest"}});
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    ASSERT_EQ(r.order.size(), 1u);
+    EXPECT_EQ(r.order[0].name, "pkgB");
+    EXPECT_EQ(r.order[0].version, "1.0")
+        << "lpkg 语义下 1.0 > 1.0-rc1，latest 应选稳定版（回归 S2，EVRCMP 会选错 rc）";
+}
+
+// S2 变体：已装稳定版，仓库只有预发布 → 不应降级到 rc
+TEST_F(SolverTest, LatestDoesNotDowngradeToPrerelease)
+{
+    add("pkgB", "1.0-rc1", {}, {}, {});
+    installed["pkgB"] = {"1.0", {}, {}, {}};
+
+    auto r = solve({{"pkgB", "latest"}});
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(r.order.empty()) << "已装 1.0 而仓库只有 1.0-rc1，不得降级到预发布";
+}
+
+// S3 回归：真包但指定版本不存在 → 明确报错（不再静默"已安装"）
+TEST_F(SolverTest, InstallNonexistentVersionErrors)
+{
+    add("pkgC", "1.0", {}, {}, {});
+    add("pkgC", "2.0", {}, {}, {});
+
+    auto r = solve({{"pkgC", "9.9.9"}});
+    EXPECT_FALSE(r.ok()) << "真包版本不存在应报错，而非静默'已安装'（回归 S3）";
+    EXPECT_FALSE(r.problems.empty());
+}
+
+// S3 回归：能力名 + 指定版本 → 回退 capability 装提供者（不再静默"已安装"）
+TEST_F(SolverTest, InstallCapabilityWithVersionFallsBackToProvider)
+{
+    add("provPkg", "1.0", {}, {"somecap"}, {});
+
+    auto r = solve({{"somecap", "1.0"}});
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(order_has(r, "provPkg"))
+        << "无同名包的能力名+版本应回退装提供者（回归 S3）";
+}
+
+// S3 回归：包不存在且无 capability → 报错（而非静默"已安装"）
+TEST_F(SolverTest, InstallNonexistentPackageWithVersionErrors)
+{
+    auto r = solve({{"nosuchpkg", "1.0"}});
+    EXPECT_FALSE(r.ok()) << "不存在的包+版本应报错（回归 S3）";
 }
 

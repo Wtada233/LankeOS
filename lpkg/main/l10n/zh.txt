@@ -132,6 +132,8 @@ error.local_pkg_not_found=找不到本地包文件: {}
 error.candidate_dep_version_mismatch=候选依赖 {} 版本 {} 不满足约束 {}
 error.unresolvable_drift=无法解决的元数据漂移，包 '{}': {}
 error.unresolved_soname=所需的 SONAME '{}' 在仓库和安装计划中均无提供者
+error.unresolved_dependency=依赖 '{}' 在仓库中无提供者
+error.package_version_not_found=仓库中不存在 {} 的版本 {}，可用版本: {}
 info.installing_discovered_dep=发现缺失的依赖 '{}'，正在加入安装队列...
 info.log_prefix==> 
 info.upgrade_old_files_check=正在替换: {} → {}, {} 个旧文件待处理
