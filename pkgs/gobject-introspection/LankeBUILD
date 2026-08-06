@@ -14,7 +14,5 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    # 所有安装已在 build 阶段完成
-    # g-ir-scanner 在 Python 3.13+ 需要 distutils（已从 stdlib 移除）：setuptools 提供 shim，
-    # 由 deps: python-setuptools 保证（不再用 postinst pip 装）。
+    :
 }
