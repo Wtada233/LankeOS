@@ -46,7 +46,8 @@
     "ninja",
     "rtkit",
     "sbc",
-    "speexdsp"
+    "speexdsp",
+    "perl-xml-parser"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/archive/v17.0/pulseaudio-v17.0.tar.gz"

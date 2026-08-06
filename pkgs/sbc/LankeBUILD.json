@@ -11,7 +11,8 @@
     "libsbc.so.1"
   ],
   "build_deps": [
-    "base-devel"
+    "base-devel",
+    "libsndfile"
   ],
   "sources": [
     "https://www.kernel.org/pub/linux/bluetooth/sbc-2.2.tar.xz"

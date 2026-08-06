@@ -11,6 +11,7 @@
     "libelf",
     "perl",
     "python",
+    "rsync",
     "rust",
     "rust-bindgen",
     "xz",

@@ -1,7 +1,7 @@
 {
   "name": "ncurses",
   "version": "6.5-20250809",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],
@@ -12,15 +12,18 @@
     "libstdc++.so.6"
   ],
   "provides": [
-    "libcurses.so",
+    "libform.so",
     "libformw.so",
     "libformw.so.6",
+    "libmenu.so",
     "libmenuw.so",
     "libmenuw.so.6",
     "libncurses++w.so",
     "libncurses++w.so.6",
+    "libncurses.so",
     "libncursesw.so",
     "libncursesw.so.6",
+    "libpanel.so",
     "libpanelw.so",
     "libpanelw.so.6",
     "libtinfo.so",

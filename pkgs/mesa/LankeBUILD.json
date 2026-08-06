@@ -96,6 +96,7 @@
     "rust-bindgen",
     "spirv-llvm-translator",
     "spirv-tools",
+    "vulkan-loader",
     "wayland",
     "wayland-protocols",
     "xcb-util-keysyms",

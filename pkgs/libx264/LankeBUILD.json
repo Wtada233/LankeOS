@@ -9,7 +9,6 @@
     "libavutil.so.60",
     "libc.so.6",
     "libm.so.6",
-    "libmvec.so.1",
     "libswscale.so.9"
   ],
   "provides": [

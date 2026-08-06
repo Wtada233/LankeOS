@@ -14,7 +14,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "cargo"
+    "rust"
   ],
   "sources": [
     "https://github.com/cyphar/libpathrs/releases/download/v0.2.5/libpathrs-0.2.5.tar.xz"

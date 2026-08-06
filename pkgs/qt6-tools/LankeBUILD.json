@@ -13,6 +13,7 @@
     "libQt6OpenGL.so.6",
     "libQt6OpenGLWidgets.so.6",
     "libQt6PrintSupport.so.6",
+    "libQt6Qml.so.6",
     "libQt6Sql.so.6",
     "libQt6Widgets.so.6",
     "libQt6Xml.so.6",

@@ -1,8 +1,4 @@
 lankebuild_prepare() {
-    mv *.patch fix.patch
-    cd {WORK_DIR}/wpa_supplicant*
-    patch -Np1 -i {WORK_DIR}/fix.patch
-
     cat > wpa_supplicant/.config << "EOF"
 CONFIG_BACKEND=file
 CONFIG_CTRL_IFACE=y
@@ -29,21 +25,14 @@ CONFIG_READLINE=y
 CONFIG_SMARTCARD=y
 CONFIG_WPS=y
 CFLAGS += -I{INCLUDEDIR}/libnl3
-EOF
-
-    if pkg-config --exists dbus-1 2>/dev/null; then
-        cat >> wpa_supplicant/.config << "EOF"
 CONFIG_CTRL_IFACE_DBUS=y
 CONFIG_CTRL_IFACE_DBUS_NEW=y
 CONFIG_CTRL_IFACE_DBUS_INTRO=y
 EOF
-    fi
 }
 
 lankebuild_build() {
-    cd {WORK_DIR}/wpa_supplicant*/wpa_supplicant
-
-    # 编译
+    cd wpa_supplicant
     make BINDIR={SBINDIR} LIBDIR={LIBDIR} -j$(nproc)
 
     install -v -d {STAGING_ROOT}{SBINDIR}

@@ -8,9 +8,12 @@
     "libc.so.6",
     "libfftw3.so.3",
     "libiniparser.so.4",
+    "libjack.so.0",
     "libm.so.6",
     "libncursesw.so.6",
-    "libpipewire-0.3.so.0"
+    "libpipewire-0.3.so.0",
+    "libpulse-simple.so.0",
+    "libpulse.so.0"
   ],
   "provides": [],
   "build_deps": [

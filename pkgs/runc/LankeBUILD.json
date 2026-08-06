@@ -15,6 +15,7 @@
     "base-devel",
     "git",
     "golang",
+    "libpathrs",
     "libseccomp"
   ],
   "sources": [

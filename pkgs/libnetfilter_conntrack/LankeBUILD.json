@@ -13,7 +13,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "libnfnetlink"
+    "libnfnetlink",
+    "libmnl"
   ],
   "sources": [
     "https://www.netfilter.org/projects/libnetfilter_conntrack/files/libnetfilter_conntrack-1.1.1.tar.xz"

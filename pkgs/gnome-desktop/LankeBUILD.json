@@ -1,7 +1,11 @@
 {
   "name": "gnome-desktop",
   "version": "44.5",
-  "deps": [],
+  "deps": [
+    "gsettings-desktop-schemas",
+    "iso-codes",
+    "xkeyboard-config"
+  ],
   "needed_so": [
     "libc.so.6",
     "libcairo.so.2",
@@ -35,12 +39,15 @@
     "git",
     "glib",
     "gobject-introspection",
+    "gsettings-desktop-schemas",
     "gtk3",
     "gtk4",
+    "iso-codes",
     "libseccomp",
     "libxkbcommon",
     "meson",
-    "ninja"
+    "ninja",
+    "xkeyboard-config"
   ],
   "sources": [
     "https://download.gnome.org/sources/gnome-desktop/44/gnome-desktop-44.5.tar.xz"

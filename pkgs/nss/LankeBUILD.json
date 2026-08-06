@@ -10,7 +10,7 @@
     "libnspr4.so",
     "libplc4.so",
     "libplds4.so",
-    "libsqlite3.so",
+    "libsqlite3.so.0",
     "libz.so.1"
   ],
   "provides": [
@@ -25,6 +25,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "gyp",
     "nspr",
     "perl",
     "python",

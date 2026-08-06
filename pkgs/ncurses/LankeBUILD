@@ -9,10 +9,10 @@ lankebuild_build() {
     make DESTDIR={STAGING_ROOT} install
     # LFS 兼容性链接
     for lib in ncurses form panel menu; do
-        ln -sfv lib$libw.so {STAGING_ROOT}{LIBDIR}/lib$lib.so
-        ln -sfv $libw.pc {STAGING_ROOT}{LIBDIR}/pkgconfig/$lib.pc
+        ln -sfv lib${lib}w.so {STAGING_ROOT}{LIBDIR}/lib${lib}.so
+        ln -sfv ${lib}w.pc {STAGING_ROOT}{LIBDIR}/pkgconfig/${lib}.pc
     done
-    ln -sfv libncursesw.so {STAGING_ROOT}{LIBDIR}/libcurses.so
+
     # 终端工具链接
     ln -sfv tic {STAGING_ROOT}{BINDIR}/infotocap
     ln -sfv tic {STAGING_ROOT}{BINDIR}/captoinfo

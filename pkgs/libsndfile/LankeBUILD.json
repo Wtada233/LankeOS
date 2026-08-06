@@ -7,7 +7,8 @@
     "libasound.so.2",
     "libc.so.6",
     "libm.so.6",
-    "libmp3lame.so.0"
+    "libmp3lame.so.0",
+    "libmpg123.so.0"
   ],
   "provides": [
     "libsndfile.so",
@@ -16,7 +17,8 @@
   "build_deps": [
     "alsa-lib",
     "base-devel",
-    "libmp3lame"
+    "libmp3lame",
+    "libmpg123"
   ],
   "sources": [
     "https://github.com/libsndfile/libsndfile/releases/download/1.2.2/libsndfile-1.2.2.tar.xz"

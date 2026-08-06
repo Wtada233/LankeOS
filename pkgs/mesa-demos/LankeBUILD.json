@@ -19,6 +19,8 @@
     "libvulkan.so.1",
     "libwayland-client.so.0",
     "libwayland-egl.so.1",
+    "libxcb.so.1",
+    "libxkbcommon-x11.so.0",
     "libxkbcommon.so.0"
   ],
   "provides": [],

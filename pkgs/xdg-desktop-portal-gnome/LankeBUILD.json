@@ -2,6 +2,7 @@
   "name": "xdg-desktop-portal-gnome",
   "version": "50.0",
   "deps": [
+    "gsettings-desktop-schemas",
     "xwayland"
   ],
   "needed_so": [
@@ -27,16 +28,19 @@
     "cairo",
     "fontconfig",
     "gdk-pixbuf",
+    "git",
     "glib",
     "gnome-desktop",
     "graphene",
+    "gsettings-desktop-schemas",
     "gtk4",
     "libx11",
     "libadwaita",
     "meson",
     "ninja",
     "python",
-    "wayland"
+    "wayland",
+    "xdg-desktop-portal"
   ],
   "sources": [
     "https://gitlab.gnome.org/GNOME/xdg-desktop-portal-gnome/-/archive/50.0/xdg-desktop-portal-gnome-50.0.tar.gz"
