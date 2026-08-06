@@ -40,7 +40,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "perl"
+    "perl",
+    "tcl"
   ],
   "sources": [
     "https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz"

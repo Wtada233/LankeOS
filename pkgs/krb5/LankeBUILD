@@ -4,6 +4,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     cd src
+    export WARN_CFLAGS=""
 
     ./configure \
         --prefix=/usr \
@@ -14,7 +15,6 @@ lankebuild_build() {
         --with-system-et \
         --with-system-ss \
         --disable-rpath \
-        --without-tcl \
         --enable-dns-for-realm
 
     make -j$(nproc)
