@@ -88,6 +88,8 @@ pub struct RealBinding {
     /// 内嵌 repo 服务器端口：写进容器 `/etc/lpkg/mirror.conf`，容器内 `lpkg upgrade`
     /// 经 host 网络从 `127.0.0.1:{repo_port}` 拉本地最新依赖（增量语义的关键）。
     pub repo_port: u16,
+    /// Ctrl+C 中断清理共享状态：当前在途容器/包（信号处理器据此删容器、删 DB 条目）。
+    pub cleanup: std::sync::Arc<std::sync::Mutex<CleanupState>>,
 }
 
 /// docker 容器 RAII：作用域结束自动 `docker rm -f`，覆盖所有 `?` 提前返回与失败路径，
@@ -99,6 +101,82 @@ impl Drop for ContainerGuard {
             .args(["rm", "-f", &self.0])
             .status();
     }
+}
+
+/// 滚动基础镜像：每 `ROLL_LIMIT` 个 commit 后 export+import 扁平化一次（commit 叠加 overlay
+/// 有性能损耗，需要周期性压平）。计数存 `<out_dir>/.build-roll`。
+const ROLL_LIMIT: u32 = 25;
+
+fn roll_counter_path(out_dir: &Path) -> PathBuf {
+    out_dir.join(".build-roll")
+}
+
+/// 当前滚动 commit 计数（0..=ROLL_LIMIT；0 = 从原始 base 开始）。
+fn read_roll_counter(out_dir: &Path) -> u32 {
+    std::fs::read_to_string(roll_counter_path(out_dir))
+        .ok()
+        .and_then(|s| s.trim().parse().ok())
+        .unwrap_or(0)
+        .min(ROLL_LIMIT)
+}
+
+fn write_roll_counter(out_dir: &Path, c: u32) {
+    let _ = std::fs::write(roll_counter_path(out_dir), c.to_string());
+}
+
+/// `docker export <cid> | docker import - <base>`：把容器文件系统**扁平化**为单层镜像覆盖 base，
+/// 再删掉 roll1..ROLL_LIMIT 编号镜像。gc_roll 与 finalize_roll 共用。
+fn flatten_to_base(cid: &str, base_image: &str) -> Result<(), String> {
+    let export = std::process::Command::new("docker")
+        .args(["export", cid])
+        .stdout(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("docker export 失败: {e}"))?;
+    let import = std::process::Command::new("docker")
+        .args(["import", "-", base_image])
+        .stdin(Stdio::from(export.stdout.unwrap()))
+        .output()
+        .map_err(|e| format!("docker import 失败: {e}"))?;
+    if !import.status.success() {
+        return Err(format!(
+            "docker import 失败: {}",
+            String::from_utf8_lossy(&import.stderr)
+        ));
+    }
+    for i in 1..=ROLL_LIMIT {
+        let _ = std::process::Command::new("docker")
+            .args(["rmi", "-f", &format!("{base_image}:roll{i}")])
+            .status();
+    }
+    Ok(())
+}
+
+/// 滚动收尾（**正常构建结束 / Ctrl+C 共用**）：用最新 commit 起临时容器 → export+import
+/// 扁平化覆盖 base → 删全部 roll 镜像 → 计数归零。roll==0（无 commit 链）为 no-op。
+pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), String> {
+    let roll = read_roll_counter(out_dir);
+    if roll == 0 {
+        return Ok(());
+    }
+    let source = format!("{base_image}:roll{roll}");
+    let tmp_name = format!("lankefarm-finalize-{}", std::process::id());
+    let create = std::process::Command::new("docker")
+        .args(["create", "--name", &tmp_name, &source, "sh", "-c", "tail -f /dev/null"])
+        .output()
+        .map_err(|e| format!("docker create（finalize）失败: {e}"))?;
+    if !create.status.success() {
+        return Err(format!(
+            "docker create（finalize）失败: {}",
+            String::from_utf8_lossy(&create.stderr)
+        ));
+    }
+    let cid = String::from_utf8_lossy(&create.stdout).trim().to_string();
+    let _ = std::process::Command::new("docker").args(["start", &cid]).status();
+    let res = flatten_to_base(&cid, base_image);
+    let _ = std::process::Command::new("docker").args(["rm", "-f", &cid]).status();
+    res?;
+    write_roll_counter(out_dir, 0);
+    Ok(())
 }
 
 /// 容器名只保留 `[a-zA-Z0-9._-]`（docker create --name 的合法字符集），其余转 `-`。
@@ -146,6 +224,16 @@ fn cleanup_stale_build_containers(
     }
 }
 
+/// Ctrl+C 中断清理共享状态：当前在途容器/包（给信号处理器删），out_dir/base_image/state_path（finalize 用）。
+#[derive(Default)]
+pub struct CleanupState {
+    pub current_cid: Option<String>,
+    pub current_pkg: Option<String>,
+    pub out_dir: PathBuf,
+    pub base_image: String,
+    pub state_path: PathBuf,
+}
+
 impl RealBinding {
     pub fn new(
         base_image: impl Into<String>,
@@ -153,6 +241,7 @@ impl RealBinding {
         out_dir: impl Into<PathBuf>,
         arch: impl Into<String>,
         repo_port: u16,
+        cleanup: std::sync::Arc<std::sync::Mutex<CleanupState>>,
     ) -> Self {
         RealBinding {
             base_image: base_image.into(),
@@ -160,6 +249,7 @@ impl RealBinding {
             out_dir: out_dir.into(),
             arch: arch.into(),
             repo_port,
+            cleanup,
         }
     }
 
@@ -181,22 +271,50 @@ impl RealBinding {
         cleanup_stale_build_containers(&run_quiet);
         let name = format!("lankefarm-build-{}-{}", std::process::id(), sanitize_name(pkg));
 
+        // 滚动基础镜像：commit 链（<base>:roll<1..25>）或原始 base。
+        // `lpkg upgrade` 会把容器里所有"版本落后于当前仓库"的包全量更新——不滚动的话，仓库越攒
+        // 越多，每次 upgrade 越慢（滚雪球）。每构建一次、upgrade 成功后 commit 快照，下次从最新
+        // commit 起只升增量；达到 ROLL_LIMIT 个 commit 后扁平化（见 4.5）。
+        let roll = read_roll_counter(&self.out_dir);
+        let mut create_image = if roll == 0 {
+            self.base_image.clone()
+        } else {
+            format!("{}:roll{}", self.base_image, roll)
+        };
+
         // 1. create + start 常驻容器。`sh -c "mkdir -p /work && tail -f /dev/null"`：
         //    mkdir 必须在 docker cp 前就位——对不存在的 /work，docker cp <dir> :/work/ 会把
         //    配方内容直接铺进 /work，而不是建 /work/<pkg>（实测）。tail -f 保活，busybox/coreutils 都支持。
-        let create = std::process::Command::new("docker")
+        let mut create = std::process::Command::new("docker")
             // DooD：挂宿主 docker socket，容器内可 docker run（docker 包 build tini 静态需要）。
             .args(["create", "--network=host", "--name", &name,
                    "-v", "/var/run/docker.sock:/var/run/docker.sock",
-                   &self.base_image,
+                   &create_image,
                    "sh", "-c", "mkdir -p /work && tail -f /dev/null"])
             .output()
             .map_err(|e| format!("docker create 失败: {e}"))?;
+        // 健壮性：roll 镜像缺失/已删（如 GC 后计数未及时归零的崩溃窗口）→ 回退原始 base 并重置计数。
+        if !create.status.success() && roll > 0 {
+            eprintln!(
+                "  [warn] 从 {create_image} 创建失败，回退原始 base 并重置滚动计数"
+            );
+            create_image = self.base_image.clone();
+            write_roll_counter(&self.out_dir, 0);
+            create = std::process::Command::new("docker")
+                .args(["create", "--network=host", "--name", &name,
+                       "-v", "/var/run/docker.sock:/var/run/docker.sock",
+                       &create_image,
+                       "sh", "-c", "mkdir -p /work && tail -f /dev/null"])
+                .output()
+                .map_err(|e| format!("docker create 失败: {e}"))?;
+        }
         if !create.status.success() {
             return Err(format!("docker create 失败: {}", String::from_utf8_lossy(&create.stderr)));
         }
         let cid = String::from_utf8_lossy(&create.stdout).trim().to_string();
         let _guard = ContainerGuard(cid.clone());
+        // 记录在途容器 cid（Ctrl+C 清理用）；成功路径末尾清空，提前返回时 rm -f 幂等无害。
+        self.cleanup.lock().unwrap().current_cid = Some(cid.clone());
         let ok = run_quiet(&["start", &cid]).map(|s| s.success()).unwrap_or(false);
         if !ok {
             return Err(format!("docker start 失败（{pkg}）"));
@@ -244,15 +362,45 @@ impl RealBinding {
         // force-solve-conflict 是显式破坏性操作，lpkg 在非交互（-y）下直接拒绝执行——
         // 它的确认短语从 stdin 读取，正确姿势是 `echo '...' | lpkg force-solve-conflict`
         // （不带 -y）。带 -y 会把短语机制废掉，兜底永远失败 → 构建被 BLOCKED。
-        let script = format!(
+        // 拆成两步：upgrade（成功后 commit 滚动快照）→ build。upgrade 失败时容器状态不可信，
+        // 不 commit、不滚动，直接报错。
+        let upgrade_script = format!(
             "cd /work/{pkg} && \
              lpkg install lpkg -y && \
              ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; }} ) || exit 1 ; \
-             [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig ; \
-             lpkg build -y --use-system-soname"
+             [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig"
         );
         let status = std::process::Command::new("docker")
-            .args(["exec", &cid, "sh", "-c", &script])
+            .args(["exec", &cid, "sh", "-c", &upgrade_script])
+            .status()
+            .map_err(|e| format!("docker exec 失败: {e}"))?;
+        if !status.success() {
+            return Err(format!("容器内 lpkg upgrade 失败（{pkg}）"));
+        }
+
+        // 4.5 滚动 commit / GC（仅 upgrade 成功）：commit → <base>:roll<N+1>；
+        //     达到 ROLL_LIMIT 个 commit 后 export+import 扁平化覆盖 base、删编号镜像、计数归零。
+        //     失败不致命（构建照常），计数不动，下次重试。
+        if roll < ROLL_LIMIT {
+            let next = roll + 1;
+            let tag = format!("{}:roll{}", self.base_image, next);
+            match std::process::Command::new("docker")
+                .args(["commit", &cid, &tag])
+                .status()
+            {
+                Ok(s) if s.success() => write_roll_counter(&self.out_dir, next),
+                _ => eprintln!("  [warn] docker commit {tag} 失败（跳过滚动，下个构建重试）"),
+            }
+        } else if let Err(e) = self.gc_roll(&cid) {
+            eprintln!("  [warn] 滚动 GC 失败（计数保持 {ROLL_LIMIT}，下次重试）: {e}");
+        } else {
+            write_roll_counter(&self.out_dir, 0);
+        }
+
+        // 5. 构建
+        let build_script = format!("cd /work/{pkg} && lpkg build -y --use-system-soname");
+        let status = std::process::Command::new("docker")
+            .args(["exec", &cid, "sh", "-c", &build_script])
             .status()
             .map_err(|e| format!("docker exec 失败: {e}"))?;
         if !status.success() {
@@ -277,7 +425,14 @@ impl RealBinding {
         if !ok {
             return Err(format!("docker cp {pkg} .lpkg 回宿主失败"));
         }
+        self.cleanup.lock().unwrap().current_cid = None;
         Ok(staging.join(&lpkg_name))
+    }
+
+    /// 滚动 GC：把当前容器**扁平化**为单层镜像并覆盖原始 base（commit 叠加 overlay 有性能损耗），
+    /// 再删掉 roll1..ROLL_LIMIT 编号镜像。计数归零由调用方负责。
+    fn gc_roll(&self, cid: &str) -> Result<(), String> {
+        flatten_to_base(cid, &self.base_image)
     }
 }
 
@@ -293,11 +448,18 @@ impl LpkgBinding for RealBinding {
             return BuildOutcome::failure("create_staging");
         }
 
+        // 记录当前在途包（Ctrl+C 清理 DB 条目用）；docker_build 内同步记录在途容器 cid。
+        self.cleanup.lock().unwrap().current_pkg = Some(pkg.to_string());
+
         // docker cp 编排
         let lpkg = match self.docker_build(pkg, &staging) {
             Ok(dest) => dest,
-            Err(e) => return BuildOutcome::failure(&format!("docker build 失败: {e}")),
+            Err(e) => {
+                self.cleanup.lock().unwrap().current_pkg = None;
+                return BuildOutcome::failure(&format!("docker build 失败: {e}"));
+            }
         };
+        self.cleanup.lock().unwrap().current_pkg = None;
 
         // scan（staging 的 .lpkg；解包目录供后续 repack 复用）
         let extract_dir = self.out_dir.join("extract").join(pkg);
@@ -321,6 +483,26 @@ impl LpkgBinding for RealBinding {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn roll_counter_roundtrip_and_clamp() {
+        let tmp = std::env::temp_dir().join(format!("farm-roll-test-{}", std::process::id()));
+        std::fs::create_dir_all(&tmp).unwrap();
+
+        // 缺文件 → 0
+        assert_eq!(read_roll_counter(&tmp), 0);
+        // 写入/读回
+        write_roll_counter(&tmp, 7);
+        assert_eq!(read_roll_counter(&tmp), 7);
+        // 超过 ROLL_LIMIT 钳制（坏状态防御）
+        write_roll_counter(&tmp, 999);
+        assert_eq!(read_roll_counter(&tmp), ROLL_LIMIT);
+        // ROLL_LIMIT 本身合法（触发 GC 的边界）
+        write_roll_counter(&tmp, ROLL_LIMIT);
+        assert_eq!(read_roll_counter(&tmp), ROLL_LIMIT);
+
+        std::fs::remove_dir_all(&tmp).ok();
+    }
 
     #[test]
     fn stub_returns_preset_and_default_success() {

@@ -1,8 +1,9 @@
 use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::{Arc, Mutex};
 use lankefarm::build::{self, BuildOptions};
-use lankefarm::lpkg_binding::RealBinding;
+use lankefarm::lpkg_binding::{CleanupState, RealBinding};
 use super::Args;
 
 pub(crate) fn cmd_build(args: &Args) -> ExitCode {
@@ -63,6 +64,36 @@ fn run_build_flow(
     };
     let arch = args.arch.clone().unwrap_or_else(|| "x86_64".to_string());
     let repo_port = args.repo_port.unwrap_or(80);
+
+    // Ctrl+C 中断清理：rm 当前容器 → 删 DB 当前条目 → finalize（最新 commit 覆盖 base + 删 roll 镜像）。
+    let cleanup = Arc::new(Mutex::new(CleanupState {
+        current_cid: None,
+        current_pkg: None,
+        out_dir: out_dir.clone(),
+        base_image: base_image.clone(),
+        state_path: state_path.clone(),
+    }));
+    {
+        let c = cleanup.clone();
+        if let Err(e) = ctrlc::set_handler(move || {
+            let s = c.lock().unwrap();
+            if let Some(cid) = &s.current_cid {
+                let _ = std::process::Command::new("docker")
+                    .args(["rm", "-f", cid])
+                    .status();
+            }
+            if let Some(pkg) = &s.current_pkg {
+                if let Ok(st) = lankefarm::state::State::open(&s.state_path) {
+                    let _ = st.delete_job(pkg);
+                }
+            }
+            let _ = lankefarm::lpkg_binding::finalize_roll(&s.out_dir, &s.base_image);
+            eprintln!("\n[ctrl-c] 已清理：容器 / DB 条目 / 滚动镜像，baseline 已用最新 commit 覆盖");
+            std::process::exit(130);
+        }) {
+            eprintln!("  [warn] 安装 Ctrl+C 处理器失败（中断将不自动清理）: {e}");
+        }
+    }
     // 内嵌本地 repo 服务器（容器 lpkg upgrade 从这拉依赖，§8）。
     // serve_ready 绑定成功后经 channel 确认就绪；绑定失败（如非 root 绑默认端口 80）
     // 立即暴露并退出，不再静默吞掉 + 盲等 300ms。
@@ -101,13 +132,20 @@ fn run_build_flow(
     }
 
     // RealBinding：--image 走 fresh container 编排（§8），否则宿主 lpkg build
-    let mut binding = RealBinding::new(base_image.clone(), pkgs_dir.clone(), out_dir.clone(), arch.clone(), repo_port);
+    let mut binding = RealBinding::new(
+        base_image.clone(),
+        pkgs_dir.clone(),
+        out_dir.clone(),
+        arch.clone(),
+        repo_port,
+        cleanup.clone(),
+    );
     let opts = BuildOptions {
         pkgs_dir: PathBuf::from(&pkgs_dir),
-        out_dir,
+        out_dir: out_dir.clone(),
         targets,
         arch,
-        image: base_image,
+        image: base_image.clone(),
         download_retries: args.download_retries.unwrap_or(3),
         interactive: std::io::stdin().is_terminal(),
         build_data_dir: PathBuf::from("data/build"),
@@ -120,6 +158,12 @@ fn run_build_flow(
             return ExitCode::from(2);
         }
     };
+
+    // 整个 build 流程完毕后收尾：最新 commit 扁平化覆盖 base、删全部 roll 镜像、计数归零。
+    // （Ctrl+C 时由信号处理器做同样的事）
+    if let Err(e) = lankefarm::lpkg_binding::finalize_roll(&out_dir, &base_image) {
+        eprintln!("  [warn] build 收尾 finalize 失败（滚动镜像残留，下次构建会重试）: {e}");
+    }
 
     // 进程退出即关停内嵌 serve（无状态静态服务器，无需优雅关闭）
     drop(serve_handle);

@@ -123,6 +123,14 @@ impl State {
         stmt.query_row(rusqlite::params![pkg], |r| r.get(0)).ok()
     }
 
+    /// 删除某包的 job 条目（Ctrl+C 中断时清理当前在途条目）。
+    pub fn delete_job(&self, pkg: &str) -> Result<(), String> {
+        self.conn
+            .execute("DELETE FROM jobs WHERE pkg=?1", rusqlite::params![pkg])
+            .map(|_| ())
+            .map_err(|e| format!("删除 job 条目失败: {e}"))
+    }
+
     /// 指定状态的包列表。
     pub fn list_by_status(&self, status: JobStatus) -> Vec<String> {
         let mut stmt = match self.conn.prepare("SELECT pkg FROM jobs WHERE status=?1") {
@@ -163,6 +171,19 @@ mod tests {
         assert_eq!(st.list_by_status(JobStatus::Blocked), vec!["llvm".to_string()]);
         assert!(st.list_by_status(JobStatus::Done).is_empty());
         st.record_build("llvm", "18.1.0", true).unwrap();
+        std::fs::remove_file(&path).ok();
+    }
+
+    #[test]
+    fn delete_job_removes_entry() {
+        let path = std::env::temp_dir().join("farm-state-del-test.db");
+        let _ = std::fs::remove_file(&path);
+        let st = State::open(&path).unwrap();
+        st.set_job("alpha", JobStatus::Building, None, Some("h1")).unwrap();
+        st.set_job("beta", JobStatus::Blocked, Some("x"), Some("h2")).unwrap();
+        st.delete_job("alpha").unwrap();
+        assert_eq!(st.job_status("alpha"), None);
+        assert_eq!(st.job_status("beta"), Some(JobStatus::Blocked));
         std::fs::remove_file(&path).ok();
     }
 
