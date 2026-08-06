@@ -16,13 +16,17 @@
     "gdk-pixbuf",
     "git",
     "glib",
+    "iso-codes",
     "json-c",
     "libxkbcommon",
     "ninja",
     "nlohmann-json",
     "pango",
+    "plasma-wayland-protocol",
     "wayland",
     "wayland-protocols",
+    "xkeyboard-config",
+    "yoga",
     "zlib"
   ],
   "sources": [

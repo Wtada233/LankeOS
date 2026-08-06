@@ -93,6 +93,12 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
     }
     plan[pkg_info->name] = {pkg_info->name, pkg_info->version, already, deps};
 
+    // 已安装的传递依赖包直接记录并跳过进一步递归展开（与函数注释规范对齐）
+    if (already && visited.size() > 1) {
+        visited.erase(pkg_name);
+        return;
+    }
+
     for (const auto& dep : deps) {
         if (!Config::instance().no_deps_mode()) {
             std::string dv(constants::VER_LATEST);

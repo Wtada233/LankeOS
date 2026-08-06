@@ -1,0 +1,7 @@
+# facebook/yoga 已迁移至 react/yoga；上游 tag 带 v 前缀（v3.2.1）
+pkg-name: yoga
+tracker-template: github
+repo: react/yoga
+mode: tags
+tag-prefix: v
+template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'

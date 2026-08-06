@@ -19,49 +19,62 @@ std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& de
         DependencyInfo dep;
         const std::string& d = d_str;
 
-        // 找到第一个操作符，分割包名和约束序列
+        // 找到在字符串中最早出现的合法操作符，分割包名和约束序列
         size_t op_pos = std::string::npos;
-        for (const auto& op : ops) {
-            if ((op_pos = d.find(op)) != std::string::npos) {
-                std::string name = d.substr(0, op_pos);
-                while (!name.empty() && name.back() == ' ') name.pop_back();
-                dep.name = name;
+        for (size_t pos = 0; pos < d.size(); ++pos) {
+            for (const auto& op : ops) {
+                if (d.compare(pos, op.size(), op) == 0) {
+                    op_pos = pos;
+                    break;
+                }
+            }
+            if (op_pos != std::string::npos) break;
+        }
 
-                // 解析后续所有 (op, version) 对
-                std::string remaining = d.substr(op_pos);
-                size_t pos = 0;
-                while (pos < remaining.size()) {
-                    while (pos < remaining.size() && remaining[pos] == ' ') ++pos;
-                    if (pos >= remaining.size()) break;
+        if (op_pos != std::string::npos) {
+            std::string name = d.substr(0, op_pos);
+            while (!name.empty() && name.back() == ' ') name.pop_back();
+            dep.name = name;
 
-                    std::string cur_op;
+            // 解析后续所有 (op, version) 对
+            std::string remaining = d.substr(op_pos);
+            size_t pos = 0;
+            while (pos < remaining.size()) {
+                while (pos < remaining.size() && remaining[pos] == ' ') ++pos;
+                if (pos >= remaining.size()) break;
+
+                std::string cur_op;
+                for (const auto& o : ops) {
+                    if (remaining.compare(pos, o.size(), o) == 0) {
+                        cur_op = o;
+                        pos += o.size();
+                        break;
+                    }
+                }
+                if (cur_op.empty()) break;
+
+                while (pos < remaining.size() && remaining[pos] == ' ') ++pos;
+
+                size_t ver_end = remaining.size();
+                for (size_t p = pos; p < remaining.size(); ++p) {
+                    bool hit = false;
                     for (const auto& o : ops) {
-                        if (remaining.substr(pos, o.size()) == o) {
-                            cur_op = o;
-                            pos += o.size();
+                        if (remaining.compare(p, o.size(), o) == 0) {
+                            ver_end = p;
+                            hit = true;
                             break;
                         }
                     }
-                    if (cur_op.empty()) break;
-
-                    while (pos < remaining.size() && remaining[pos] == ' ') ++pos;
-
-                    size_t ver_end = remaining.size();
-                    for (const auto& o : ops) {
-                        size_t np = remaining.find(o, pos);
-                        if (np < ver_end) ver_end = np;
-                    }
-
-                    std::string ver_str = remaining.substr(pos, ver_end - pos);
-                    while (!ver_str.empty() && ver_str.back() == ' ') ver_str.pop_back();
-
-                    dep.constraints.push_back({cur_op, ver_str});
-                    pos = ver_end;
+                    if (hit) break;
                 }
-                break;
+
+                std::string ver_str = remaining.substr(pos, ver_end - pos);
+                while (!ver_str.empty() && ver_str.back() == ' ') ver_str.pop_back();
+
+                dep.constraints.push_back({cur_op, ver_str});
+                pos = ver_end;
             }
-        }
-        if (op_pos == std::string::npos) {
+        } else {
             dep.name = d_str;
         }
         deps.push_back(std::move(dep));

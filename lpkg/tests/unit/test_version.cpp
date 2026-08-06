@@ -263,6 +263,8 @@ TEST(VersionCompare, GitHashAlphaSuffixDistinctness)
     EXPECT_FALSE(version_compare("0.2385.9ece3f52", "0.2385"));
 }
 
+#include "../../main/src/vercmp/dep_parser.hpp"
+
 // 回归：= / == / != 必须按版本语义比较，不能做原始字符串比较。
 // 1.0 与 1.0.0 语义相等（version_compare 对缺失段补 0），字符串比较则误判。
 TEST(VersionCompare, EqualConstraintUsesSemanticComparison)
@@ -278,3 +280,17 @@ TEST(VersionCompare, EqualConstraintUsesSemanticComparison)
     EXPECT_TRUE(version_satisfies("1.0", "<=", "1.0.0"));
     EXPECT_TRUE(version_satisfies("1.0.0", ">=", "1.0"));
 }
+
+// 回归测试：parse_dep_strings 应当按字符串中出现的物理顺序匹配操作符，而非 ops 数组索引顺序
+TEST(DepParser, OperatorAppearanceOrder)
+{
+    auto deps = detail::parse_dep_strings({"libfoo <= 2.0 >= 1.0"});
+    ASSERT_EQ(deps.size(), 1u);
+    EXPECT_EQ(deps[0].name, "libfoo");
+    ASSERT_EQ(deps[0].constraints.size(), 2u);
+    EXPECT_EQ(deps[0].constraints[0].op, "<=");
+    EXPECT_EQ(deps[0].constraints[0].version, "2.0");
+    EXPECT_EQ(deps[0].constraints[1].op, ">=");
+    EXPECT_EQ(deps[0].constraints[1].version, "1.0");
+}
+

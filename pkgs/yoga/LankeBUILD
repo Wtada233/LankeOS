@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    # 不跑测试：剔除 tests 子目录，避免配置期 FetchContent 联网拉 gtest
+    sed -i '/add_subdirectory(tests)/d' CMakeLists.txt
+    # 构建共享库：fcitx5 等消费者需要链接 libyogacore.so（Arch 同款处理）
+    sed -i 's/add_library(yogacore STATIC/add_library(yogacore SHARED/' yoga/CMakeLists.txt
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    cmake -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} -G Ninja .. -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_BUILD_TYPE=Release -DBUILD_FUZZ_TESTS=OFF -Wno-dev
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    :
+}

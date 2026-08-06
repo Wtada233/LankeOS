@@ -15,22 +15,24 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-/// 扫描结果：needed_so / provides（deps 不扫，由 gen_deps/deprules 生成）。
+/// 扫描结果：needed_so / provides / deps（needed_so/provides 由扫描得出；deps 由 metadata.json 转述）。
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ScanResult {
     pub name: String,
     pub version: String,
     pub needed_so: Vec<String>,
     pub provides: Vec<String>,
+    pub deps: Vec<String>,
 }
 
 impl ScanResult {
-    pub fn new(name: &str, version: &str, needed_so: &[&str], provides: &[&str]) -> Self {
+    pub fn new(name: &str, version: &str, needed_so: &[&str], provides: &[&str], deps: &[&str]) -> Self {
         ScanResult {
             name: name.to_string(),
             version: version.to_string(),
             needed_so: needed_so.iter().map(|s| s.to_string()).collect(),
             provides: provides.iter().map(|s| s.to_string()).collect(),
+            deps: deps.iter().map(|s| s.to_string()).collect(),
         }
     }
 }
@@ -42,12 +44,17 @@ pub fn scan_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<ScanResult, Str
     let meta = read_metadata_json(&extract_dir.join("metadata.json"))?;
     let name = meta["name"].as_str().unwrap_or("").to_string();
     let version = meta["version"].as_str().unwrap_or("").to_string();
+    let deps = meta["deps"]
+        .as_array()
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default();
     let (needed_so, provides) = scan_content(&extract_dir.join("content"));
     Ok(ScanResult {
         name,
         version,
         needed_so,
         provides,
+        deps,
     })
 }
 

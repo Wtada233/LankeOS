@@ -41,8 +41,8 @@ int rel_op(const std::string& op)
     if (op == ">") return REL_GT;
     if (op == "<") return REL_LT;
     if (op == "==" || op == "=") return REL_EQ;
-    // "!="：不等于 = 大于或小于（libsolv 无独立 REL_NE）。未知 op 兜底同此——
-    // 宽松处理避免误判冲突，比卡死更安全。
+    if (op == "!=") return REL_GT | REL_LT;
+    // 未知 op 兜底——宽松处理避免误判冲突，比卡死更安全。
     return REL_EQ | REL_GT | REL_LT;
 }
 
@@ -370,11 +370,14 @@ SolveResult solve_install(const Repository& repo,
             } else {
                 // 指定版本：找 name+evr 精确匹配的 solvable
                 Id evr = pool_str2id(ps.pool, vspec.c_str(), 1);
-                Id off = pool_whatprovides(ps.pool, nid);
                 Id target_sid = 0;
-                for (Id vp = off; vp && (target_sid = ps.pool->whatprovidesdata[vp++]) != 0;) {
-                    if (pool_id2solvable(ps.pool, target_sid)->evr == evr) break;
-                    target_sid = 0;
+                int pi;
+                Solvable* sa;
+                FOR_REPO_SOLVABLES(ps.avail, pi, sa) {
+                    if (sa->name == nid && sa->evr == evr) {
+                        target_sid = pi;
+                        break;
+                    }
                 }
                 if (target_sid) queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, target_sid);
             }
@@ -446,6 +449,7 @@ std::set<std::string> repo_revrequires(const Repository& repo, const std::string
     std::set<std::string> result;
     // target 被谁依赖：deps 指名 target，或 needed_so 由 target 提供（repo 权威 provider 源）
     for (const auto& [name, versions] : repo.packages()) {
+        if (name == target) continue;
         bool hit = false;
         for (const auto& pkg : versions) {
             for (const auto& dep : pkg.dependencies)

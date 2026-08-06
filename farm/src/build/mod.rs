@@ -300,7 +300,7 @@ pub fn run_build(
         // 不再剥 needed_so、不再维护第二份 .abi.json；构建顺序/传播/备份清理都从这里读。
         // 容器的 SONAME 检查由 --missing-so-no-error / --use-system-soname 在过渡期容忍。
         if let Err(e) = update_repo_index(&opts.out_dir, &opts.arch, &pkg, &version, &hash,
-                                          &outcome.provides, &outcome.needed_so) {
+                                          &outcome.deps, &outcome.provides, &outcome.needed_so) {
             eprintln!("{}", tr!("build.index_fail", pkg, e));
             report.blocked.push(pkg.clone());
             if let Some(st) = state {

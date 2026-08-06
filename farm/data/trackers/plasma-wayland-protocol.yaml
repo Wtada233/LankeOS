@@ -1,0 +1,10 @@
+# KDE download 服务器直接列出所有版本 tarball，取版本号最大者
+pkg-name: plasma-wayland-protocol
+tracker-template: script
+script-content: |
+  base=https://download.kde.org/stable/plasma-wayland-protocols
+  listing=$(curl -fsSL "$base/")
+  version=$(printf '%s\n' "$listing" | grep -oE 'plasma-wayland-protocols-[0-9][0-9.]*\.tar\.xz' | sed 's/.*plasma-wayland-protocols-//; s/\.tar\.xz//' | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "$base/plasma-wayland-protocols-$version.tar.xz"

@@ -175,3 +175,51 @@ TEST_F(SolverTest, NoDepsSkipsDependencyPulling)
     EXPECT_TRUE(order_has(r, "appB"));
     EXPECT_FALSE(order_has(r, "libA")) << "no_deps 时不得拉入依赖 libA";
 }
+
+// 回归测试：指定特定版本安装（lpkg install pkg:1.0）
+TEST_F(SolverTest, InstallSpecifiedVersion)
+{
+    add("appX", "1.0", {}, {}, {});
+    add("appX", "2.0", {}, {}, {});
+
+    auto r = solve({{"appX", "1.0"}});
+    ASSERT_TRUE(r.ok());
+    ASSERT_EQ(r.order.size(), 1u);
+    EXPECT_EQ(r.order[0].name, "appX");
+    EXPECT_EQ(r.order[0].version, "1.0");
+}
+
+// 回归测试：!= 约束排除相同版本
+TEST_F(SolverTest, NotEqualOperatorMapping)
+{
+    // appY 依赖 libK != 1.0
+    DependencyInfo dep;
+    dep.name = "libK";
+    dep.constraints.push_back({"!=", "1.0"});
+    repo.update_package_info("appY", "1.0", {dep}, {}, {});
+
+    add("libK", "1.0", {}, {}, {});
+    add("libK", "2.0", {}, {}, {});
+
+    auto r = solve({{"appY", "latest"}});
+    ASSERT_TRUE(r.ok());
+    EXPECT_TRUE(order_has(r, "appY"));
+    // 应选 2.0 而非 1.0
+    for (const auto& p : r.order) {
+        if (p.name == "libK") {
+            EXPECT_EQ(p.version, "2.0");
+        }
+    }
+}
+
+// 回归测试：repo_revrequires 不包含自身
+TEST_F(SolverTest, RepoRevRequiresExcludesSelf)
+{
+    add("glibc", "2.34", {}, {"libc.so.6"}, {"libc.so.6"});
+    add("appZ", "1.0", {}, {}, {"libc.so.6"});
+
+    auto rev = repo_revrequires(repo, "glibc");
+    EXPECT_TRUE(rev.contains("appZ"));
+    EXPECT_FALSE(rev.contains("glibc")) << "repo_revrequires 不应把 glibc 自身记为自己的反向依赖";
+}
+

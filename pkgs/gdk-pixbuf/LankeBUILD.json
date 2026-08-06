@@ -1,7 +1,7 @@
 {
   "name": "gdk-pixbuf",
   "version": "2.44.7",
-  "release": 2,
+  "release": 3,
   "deps": [
     "shared-mime-info"
   ],

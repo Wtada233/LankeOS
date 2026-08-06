@@ -404,11 +404,11 @@ fn abs_target_rel(target: &Path) -> PathBuf {
     abs.to_path_buf()
 }
 
-/// 更新本地 repo index.txt：替换该包的版本块（保留旧 deps；新 version/hash/provides）。
+/// 更新本地 repo index.txt：替换该包的版本块（写入 metadata.json 转述的 deps；新 version/hash/provides）。
 /// **写回完整 needed_so**——index.txt 是唯一真源（容器可见索引与 farm 的 ABI 传播共用，
 /// 不再剥 needed_so、不再有第二份 .abi.json）。
 pub(crate) fn update_repo_index(out_dir: &Path, arch: &str, pkg: &str, version: &str, hash: &str,
-                     provides: &[String], needed_so: &[String]) -> Result<(), String> {
+                     deps: &[String], provides: &[String], needed_so: &[String]) -> Result<(), String> {
     let path = out_dir.join(arch).join("index.txt");
     let content = fs::read_to_string(&path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
     let mut found = false;
@@ -423,16 +423,14 @@ pub(crate) fn update_repo_index(out_dir: &Path, arch: &str, pkg: &str, version: 
             lines.push(line.to_string());
             continue;
         }
-        // 替换该包的行：保留旧 deps（farm 不扫 deps）
+        // 替换该包的行：写入转述的 deps
         let mut parts = line.splitn(3, '|');
         let _ = parts.next();
-        let rest = parts.next().unwrap_or("");
+        let _rest = parts.next().unwrap_or("");
         let pkg_level = parts.next().unwrap_or("").to_string();
-        let last_block = rest.split(';').next_back().unwrap_or("");
-        let vparts: Vec<&str> = last_block.splitn(6, ':').collect();
-        let old_deps = vparts.get(2).copied().unwrap_or("");
         let new_line = format!(
-            "{pkg}|{version}:{hash}:{old_deps}:{}:{}|{pkg_level}",
+            "{pkg}|{version}:{hash}:{}:{}:{}|{pkg_level}",
+            deps.join(","),
             provides.join(","),
             needed_so.join(",")
         );
@@ -440,9 +438,10 @@ pub(crate) fn update_repo_index(out_dir: &Path, arch: &str, pkg: &str, version: 
         found = true;
     }
     if !found {
-        // 新包：追加一行（deps 空，写完整 provides + needed_so）
+        // 新包：追加一行（写转述的 deps + 完整 provides + needed_so）
         lines.push(format!(
-            "{pkg}|{version}:{hash}::{provides}:{needed_so}|",
+            "{pkg}|{version}:{hash}:{deps}:{provides}:{needed_so}|",
+            deps = deps.join(","),
             provides = provides.join(","),
             needed_so = needed_so.join(",")
         ));
@@ -605,6 +604,34 @@ mod tests {
 
         let res = repack_if_drift(&outcome, &opts, "p");
         assert!(res.is_err(), "metadata.json 缺失必须报错而非静默当无漂移");
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn update_repo_index_writes_deps() {
+        let out = std::env::temp_dir().join(format!("farm-repo-deps-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&out);
+        let arch_dir = out.join("x86_64");
+        fs::create_dir_all(&arch_dir).unwrap();
+        fs::write(arch_dir.join("index.txt"), "# index\n").unwrap();
+
+        update_repo_index(
+            &out,
+            "x86_64",
+            "mypkg",
+            "1.0",
+            "hash123",
+            &["glibc>=2.34".to_string(), "bash".to_string()],
+            &["libmypkg.so.1".to_string()],
+            &["libc.so.6".to_string()],
+        )
+        .unwrap();
+
+        let content = fs::read_to_string(arch_dir.join("index.txt")).unwrap();
+        assert!(
+            content.contains("mypkg|1.0:hash123:glibc>=2.34,bash:libmypkg.so.1:libc.so.6|"),
+            "index.txt 应包含转述的 deps: {content}"
+        );
         fs::remove_dir_all(&out).ok();
     }
 }
