@@ -64,6 +64,7 @@ use lankefarm::track::{dep_edges, TrackerConfig};
 
 /// 命令解析结果：clap 子命令 → 扁平结构，供各 cmd_* 使用（保持逻辑层签名不变）。
 mod build;
+mod export;
 mod serve;
 mod seed;
 
@@ -72,6 +73,7 @@ pub(crate) struct Args {
     pkg: Vec<String>,
     pkgs: Option<String>,
     out: Option<PathBuf>,
+    input: Option<PathBuf>,
     data: Option<String>,
     packages: Option<String>,
     api_endpoint: Option<String>,
@@ -165,6 +167,19 @@ enum Command {
         /// 源预下载网络重试次数（§8.6）
         #[arg(long, default_value_t = 3)]
         download_retries: u32,
+    },
+    /// 把构建仓库扁平化重打包为发行格式 `<pkg>-<ver>.lpkg`（zstd level 22 ultra）。
+    /// 遍历 `input/<arch>/<pkg>/*.lpkg`，逐个解包→重打→输出到 output 目录。
+    Export {
+        /// 构建仓库根目录（含 `<arch>/` 子目录）[default: out]
+        #[arg(long, default_value = "out")]
+        input: PathBuf,
+        /// 输出目录（扁平 `<pkg>-<ver>.lpkg`）
+        #[arg(long)]
+        output: PathBuf,
+        /// 架构（读取 input/<arch>/ 下每个包）
+        #[arg(long, default_value = "x86_64")]
+        arch: String,
     },
     /// 探测上游版本
     Track {
@@ -1245,6 +1260,15 @@ pub fn run() -> ExitCode {
                 ..Default::default()
             };
             build::cmd_validate(&args)
+        }
+        Command::Export { input, output, arch } => {
+            let args = Args {
+                input: Some(input),
+                out: Some(output),
+                arch: Some(arch),
+                ..Default::default()
+            };
+            export::cmd_export(&args)
         }
         Command::Track { pkg, all, run, pkgs, data, jobs, token, gitlab_token } => {
             let args = Args {

@@ -53,9 +53,19 @@ pub fn repack_with_metadata(
 /// 损坏 symlink（如 dbus 的 `var/lib/dbus/machine-id` → 包内不存在的目标）会炸
 /// `No such file or directory`。关闭后 symlink 按 symlink 存，不 follow。
 fn repack_lpkg(extract_dir: &Path, out_path: &Path) -> Result<(), String> {
+    // 构建仓库 repack：快速（level 3）。仓库会被频繁重打包，不需要高压缩。
+    repack_lpkg_at(extract_dir, out_path, 3)
+}
+
+/// export 用途：zstd level 22（ultra 档，最高压缩）重打包，用于发行/分发。
+pub fn export_lpkg(extract_dir: &Path, out_path: &Path) -> Result<(), String> {
+    repack_lpkg_at(extract_dir, out_path, 22)
+}
+
+fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(), String> {
     let tmp = out_path.with_extension("lpkg.tmp");
     let f = fs::File::create(&tmp).map_err(|e| format!("创建 {tmp:?} 失败: {e}"))?;
-    let enc = zstd::stream::write::Encoder::new(f, 19)
+    let enc = zstd::stream::write::Encoder::new(f, level)
         .map_err(|e| format!("zstd 初始化失败: {e}"))?;
     let mut builder = tar::Builder::new(enc);
     builder.follow_symlinks(false);

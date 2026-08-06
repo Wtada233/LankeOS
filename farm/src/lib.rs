@@ -6,6 +6,7 @@
 
 pub mod abi;
 pub mod build;
+pub mod export;
 pub mod graph;
 pub mod i18n;
 pub mod llm;

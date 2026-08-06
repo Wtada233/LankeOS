@@ -123,6 +123,11 @@ static ZH: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         // ── seed ──
         ("seed.progress", "  [seed] {} {}"),
         ("seed.summary", "[seed 汇总] 包 {}：成功 {}，失败 {}"),
+        // ── export ──
+        ("export.summary", "[export 汇总] {}，{}（zstd level 22 ultra 重打包）"),
+        ("export.exported", "导出 {}"),
+        ("export.failed", "失败 {}"),
+        ("export.failed_item", "{}"),
         // ── state / track / gen-trackers ──
         ("state.open", "[state] 状态库 {}"),
         ("state.open_fail", "  [warn] 打开状态库失败（本次不记录）: {}"),
@@ -257,6 +262,10 @@ static EN: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("summary.blocked_cnt", "BLOCKED {}"),
         ("seed.progress", "  [seed] {} {}"),
         ("seed.summary", "[seed summary] packages {}: ok {}, failed {}"),
+        ("export.summary", "[export summary] {}, {} (zstd level 22 ultra repack)"),
+        ("export.exported", "exported {}"),
+        ("export.failed", "failed {}"),
+        ("export.failed_item", "{}"),
         ("state.open", "[state] state DB {}"),
         ("state.open_fail", "  [warn] failed to open state DB (not recording this run): {}"),
         ("build.need_image", "farm build requires --image <image>: container builds only, host builds would pollute the environment"),
