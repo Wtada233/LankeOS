@@ -1,0 +1,3 @@
+pkg-name: python-wheel
+tracker-template: pypi
+project: wheel

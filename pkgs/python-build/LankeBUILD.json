@@ -1,0 +1,22 @@
+{
+  "name": "python-build",
+  "version": "1.5.0",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-packaging",
+    "python-pyproject-hooks"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-flit-core",
+    "python-packaging",
+    "python-pyproject-hooks"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/78/e0/df5e171f685f82f37b12e1f208064e24244911079d7b767447d1af7e0d70/build-1.5.0.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -593,6 +593,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let outcome = BuildOutcome {
             ok: true,

@@ -1,0 +1,24 @@
+{
+  "name": "python-markupsafe",
+  "version": "3.0.3",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/7e/99/7690b6d4034fffd95959cbe0c02de8deb3098cc577c67bb6a24fe5d7caa7/markupsafe-3.0.3.tar.gz"
+  ],
+  "work_sources": []
+}

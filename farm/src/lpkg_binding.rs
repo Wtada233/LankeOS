@@ -143,12 +143,30 @@ fn flatten_to_base(cid: &str, base_image: &str) -> Result<(), String> {
             String::from_utf8_lossy(&import.stderr)
         ));
     }
+    // 只删存在的 roll 镜像：不存在的一律跳过（`docker rmi` 对 No such image 会报错刷屏）。
     for i in 1..=ROLL_LIMIT {
-        let _ = std::process::Command::new("docker")
-            .args(["rmi", "-f", &format!("{base_image}:roll{i}")])
-            .status();
+        let img = roll_image(base_image, i);
+        let exists = std::process::Command::new("docker")
+            .args(["images", "-q", &img])
+            .output()
+            .map(|o| o.status.success() && !o.stdout.is_empty())
+            .unwrap_or(false);
+        if exists {
+            let _ = std::process::Command::new("docker")
+                .args(["rmi", "-f", &img])
+                .status();
+        }
     }
     Ok(())
+}
+
+/// roll 镜像 tag：`wtada233/lankeos:latest` → `wtada233/lankeos:roll{N}`（替换 tag 部分，
+/// 不能拼成 `:latest:rollN`——docker 引用只允许一个 tag，两个冒号 = invalid reference format）。
+fn roll_image(base_image: &str, n: u32) -> String {
+    match base_image.rsplit_once(':') {
+        Some((repo, _tag)) => format!("{repo}:roll{n}"),
+        None => format!("{base_image}:roll{n}"),
+    }
 }
 
 /// 滚动收尾（**正常构建结束 / Ctrl+C 共用**）：用最新 commit 起临时容器 → export+import
@@ -158,7 +176,7 @@ pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), String> {
     if roll == 0 {
         return Ok(());
     }
-    let source = format!("{base_image}:roll{roll}");
+    let source = roll_image(base_image, roll);
     let tmp_name = format!("lankefarm-finalize-{}", std::process::id());
     let create = std::process::Command::new("docker")
         .args(["create", "--name", &tmp_name, &source, "sh", "-c", "tail -f /dev/null"])
@@ -279,7 +297,7 @@ impl RealBinding {
         let mut create_image = if roll == 0 {
             self.base_image.clone()
         } else {
-            format!("{}:roll{}", self.base_image, roll)
+            roll_image(&self.base_image, roll)
         };
 
         // 1. create + start 常驻容器。`sh -c "mkdir -p /work && tail -f /dev/null"`：
@@ -368,7 +386,8 @@ impl RealBinding {
             "cd /work/{pkg} && \
              lpkg install lpkg -y && \
              ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; }} ) || exit 1 ; \
-             [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig"
+             [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig ; \
+             exit 0"
         );
         let status = std::process::Command::new("docker")
             .args(["exec", &cid, "sh", "-c", &upgrade_script])
@@ -380,20 +399,22 @@ impl RealBinding {
 
         // 4.5 滚动 commit / GC（仅 upgrade 成功）：commit → <base>:roll<N+1>；
         //     达到 ROLL_LIMIT 个 commit 后 export+import 扁平化覆盖 base、删编号镜像、计数归零。
-        //     失败不致命（构建照常），计数不动，下次重试。
+        //     commit/GC 失败 → **硬报错**（滚动快照是性能核心，静默跳过会让下次 upgrade 重新滚雪球；
+        //     且容器随后会被 rm，未 commit 的状态就丢了）。
         if roll < ROLL_LIMIT {
             let next = roll + 1;
-            let tag = format!("{}:roll{}", self.base_image, next);
-            match std::process::Command::new("docker")
+            let tag = roll_image(&self.base_image, next);
+            let ok = std::process::Command::new("docker")
                 .args(["commit", &cid, &tag])
                 .status()
-            {
-                Ok(s) if s.success() => write_roll_counter(&self.out_dir, next),
-                _ => eprintln!("  [warn] docker commit {tag} 失败（跳过滚动，下个构建重试）"),
+                .map(|s| s.success())
+                .unwrap_or(false);
+            if !ok {
+                return Err(format!("docker commit {tag} 失败（滚动快照未保存）"));
             }
-        } else if let Err(e) = self.gc_roll(&cid) {
-            eprintln!("  [warn] 滚动 GC 失败（计数保持 {ROLL_LIMIT}，下次重试）: {e}");
+            write_roll_counter(&self.out_dir, next);
         } else {
+            self.gc_roll(&cid)?;
             write_roll_counter(&self.out_dir, 0);
         }
 
@@ -468,7 +489,9 @@ impl LpkgBinding for RealBinding {
                 ok: true,
                 needed_so: scan.needed_so,
                 provides: scan.provides,
-                deps: Vec::new(), // farm 不扫 deps（gen_deps/deprules 生成）
+                // scan_lpkg 从 .lpkg 的 metadata.json 转述真实运行时依赖；之前丢成空 Vec
+                // 导致 index.txt deps 恒空，容器 lpkg 无法解析运行时依赖（如 build→pyproject-hooks）。
+                deps: scan.deps,
                 failure_stage: None,
                 lpkg_path: Some(lpkg),
             },
@@ -483,6 +506,15 @@ impl LpkgBinding for RealBinding {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // 回归：roll tag 必须是 `<repo>:roll{N}`，不能拼成 `...:latest:roll{N}`（invalid reference format）。
+    #[test]
+    fn roll_image_replaces_tag() {
+        assert_eq!(roll_image("wtada233/lankeos:latest", 1), "wtada233/lankeos:roll1");
+        assert_eq!(roll_image("wtada233/lankeos:latest", 25), "wtada233/lankeos:roll25");
+        // 无 tag 的 base
+        assert_eq!(roll_image("wtada233/lankeos", 3), "wtada233/lankeos:roll3");
+    }
 
     #[test]
     fn roll_counter_roundtrip_and_clamp() {

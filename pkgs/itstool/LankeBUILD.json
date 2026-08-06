@@ -3,13 +3,15 @@
   "version": "2.0.7",
   "release": 1,
   "deps": [
-    "python"
+    "python",
+    "python-lxml"
   ],
   "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
-    "python"
+    "python",
+    "python-lxml"
   ],
   "sources": [
     "https://github.com/itstool/itstool/archive/2.0.7/itstool-2.0.7.tar.gz"

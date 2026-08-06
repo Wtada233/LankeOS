@@ -1,0 +1,26 @@
+{
+  "name": "python-pyyaml",
+  "version": "6.0.3",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libyaml-0.so.2"
+  ],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-cython",
+    "python-flit-core",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/05/8e/961c0007c59b8dd7729d542c61a4d537767a59645b82a0b521206e1e25c2/pyyaml-6.0.3.tar.gz"
+  ],
+  "work_sources": []
+}

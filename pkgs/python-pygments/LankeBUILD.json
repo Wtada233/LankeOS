@@ -1,0 +1,23 @@
+{
+  "name": "python-pygments",
+  "version": "2.20.0",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-hatchling",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz"
+  ],
+  "work_sources": []
+}

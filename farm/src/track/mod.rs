@@ -178,6 +178,7 @@ impl TrackerConfig {
             "gnome" => templates::gnome::probe(fetcher, self, major.as_deref()),
             "gcs" => templates::gcs::probe(fetcher, self, major.as_deref()),
             "html-index" => templates::html_index::probe(fetcher, self, major.as_deref()),
+            "pypi" => templates::pypi::probe(fetcher, self, major.as_deref()),
             "script" => templates::script::probe(fetcher, self, major.as_deref()),
             other => Err(format!("未知 tracker_template: {other}")),
         }?;

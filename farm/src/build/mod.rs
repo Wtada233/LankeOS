@@ -50,6 +50,8 @@ pub struct BuildOptions {
     /// validate 模式：初始选择改为"所有没有 `.build_ok` 标记的包"（而非版本增量 skip）。
     /// 成功构建写 `.build_ok`；跳过/blocked 不写（下次 validate 会重试）。
     pub validate: bool,
+    /// --manual-sort：严格按命令行传入的包名顺序构建（引导链/手工编排），不做 topo 重排。
+    pub manual_sort: bool,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -183,10 +185,16 @@ pub fn run_build(
     // 组边参与初始排序：声明式组受害者（python-* 等）排在触发包之后——
     // `--all` 时它们已在初始队列，没有 needed_so 链接边，须靠组边强制 python 先建。
     let group_edges = groups.trigger_edges_in(&initial);
-    let mut queue: VecDeque<(String, bool)> = topo_order(&opts.pkgs_dir, &initial, &old, &group_edges)
-        .into_iter()
-        .map(|p| (p, false))
-        .collect();
+    // --manual-sort：严格按命令行传入的包名顺序构建（引导链/手工编排用），不做 topo 重排。
+    // 否则纯 python 包（无 needed_so 边）会按字母序建，bootstrap（setuptools→flit-core→build）会断。
+    let mut queue: VecDeque<(String, bool)> = if opts.manual_sort && !opts.targets.is_empty() {
+        opts.targets.iter().cloned().map(|p| (p, false)).collect()
+    } else {
+        topo_order(&opts.pkgs_dir, &initial, &old, &group_edges)
+            .into_iter()
+            .map(|p| (p, false))
+            .collect()
+    };
 
     // 2.5 构建计划预览：topo 顺序（仅"最开始能确认需要 build"的包；ABI 受害者随后动态入队）。
     // 交互模式 → 列出顺序并让 operator 确认才开始；确认后**只为确认集**预下载全部源。
@@ -391,7 +399,10 @@ pub fn run_build(
             // 受害者按**依赖算法**重排：被依赖的受害者先建，依赖它们的后建。
             // 否则按字母序先建 appstream 时，其构建依赖树里的 librsvg（同样是 libxml2 受害者，
             // 还引用旧 libxml2.so.2）未重建 → 装构建依赖时 SONAME 无 provider 硬报错。
-            reorder_queue(&mut queue, &opts.pkgs_dir, &old, &groups);
+            // --manual-sort 时跳过：严格保持手工传入顺序（引导链场景无 ABI 受害者）。
+            if !opts.manual_sort {
+                reorder_queue(&mut queue, &opts.pkgs_dir, &old, &groups);
+            }
         }
 
         if let Some(st) = state {
@@ -642,6 +653,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let err = run_build(&opts, &mut binding, None).unwrap_err();
         assert!(err.contains("source-missing"), "非交互源缺失应硬终止：{err}");
@@ -1017,6 +1029,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.built.contains(&"libfoo".to_string()));
@@ -1115,6 +1128,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.abi_broken.contains(&"a".to_string()));
@@ -1231,6 +1245,7 @@ mod tests {
             interactive: false,
             build_data_dir: gdir.clone(),
             validate: false,
+            manual_sort: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(report.abi_broken.contains(&"python".to_string()));
@@ -1305,6 +1320,7 @@ mod tests {
             interactive: false,
             build_data_dir: gdir.clone(),
             validate: false,
+            manual_sort: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
         assert!(
@@ -1339,6 +1355,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let err = run_build(&opts, &mut binding, None).unwrap_err();
         assert!(
@@ -1417,6 +1434,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let report = run_build(&opts, &mut binding, None).unwrap();
 
@@ -1471,6 +1489,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
         assert!(
@@ -1504,6 +1523,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
         assert!(
@@ -1543,6 +1563,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
 
@@ -1588,6 +1609,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
 
@@ -1630,6 +1652,7 @@ mod tests {
             interactive: false,
             build_data_dir: std::path::PathBuf::from("data/build"),
             validate: false,
+            manual_sort: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
 

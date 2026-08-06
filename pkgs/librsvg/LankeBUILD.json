@@ -27,6 +27,7 @@
   "build_deps": [
     "base-devel",
     "cairo",
+    "cargo-c",
     "gdk-pixbuf",
     "git",
     "glib",

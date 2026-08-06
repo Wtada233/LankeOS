@@ -22,7 +22,6 @@
     "libudev.so.1"
   ],
   "build_deps": [
-    "linux-pam",
     "acl",
     "base-devel",
     "curl",
@@ -40,6 +39,7 @@
     "libxcrypt",
     "libxkbcommon",
     "libxslt",
+    "linux-pam",
     "llvm",
     "lz4",
     "meson",
@@ -47,6 +47,8 @@
     "p11-kit",
     "pcre2",
     "python",
+    "python-jinja",
+    "python-pefile",
     "rsync",
     "xz"
   ],

@@ -1,0 +1,20 @@
+{
+  "name": "python-wheel",
+  "version": "0.47.0",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-packaging"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-flit-core",
+    "python-packaging"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/39/62/75f18a0f03b4219c456652c7780e4d749b929eb605c098ce3a5b6b6bc081/wheel-0.47.0.tar.gz"
+  ],
+  "work_sources": []
+}

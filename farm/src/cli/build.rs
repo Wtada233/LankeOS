@@ -150,6 +150,7 @@ fn run_build_flow(
         interactive: std::io::stdin().is_terminal(),
         build_data_dir: PathBuf::from("data/build"),
         validate,
+        manual_sort: args.manual_sort,
     };
     let report = match build::run_build(&opts, &mut binding, state.as_ref()) {
         Ok(r) => r,

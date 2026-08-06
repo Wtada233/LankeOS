@@ -1,0 +1,24 @@
+{
+  "name": "python-mako",
+  "version": "1.4.1",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-markupsafe"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-markupsafe",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/2a/12/b5fa2353e2754cd67fb9f83793fa48ff42c213a5da7e719869d2301f6ab8/mako-1.4.1.tar.gz"
+  ],
+  "work_sources": []
+}

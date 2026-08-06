@@ -1,0 +1,22 @@
+{
+  "name": "python-pefile",
+  "version": "2024.8.26",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/03/4f/2750f7f6f025a1507cd3b7218691671eecfd0bbebebe8b39aa0fe1d360b8/pefile-2024.8.26.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # flit_core 自举：源码里的 flit_core 模块可直接构建自己的 wheel（后端即自身）
+    python -m flit_core.wheel
+}
+
+lankebuild_package() {
+    python -m pip install --no-deps --root={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

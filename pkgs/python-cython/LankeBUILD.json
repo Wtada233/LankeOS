@@ -1,0 +1,27 @@
+{
+  "name": "python-cython",
+  "version": "3.2.9",
+  "release": 2,
+  "deps": [
+    "python",
+    "python-pygments",
+    "python-setuptools"
+  ],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://github.com/cython/cython/archive/refs/tags/3.2.9.tar.gz"
+  ],
+  "work_sources": [
+    "file://./0001-no-absolute-source-paths.patch"
+  ]
+}

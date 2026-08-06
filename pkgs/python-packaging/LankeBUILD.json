@@ -1,0 +1,18 @@
+{
+  "name": "python-packaging",
+  "version": "26.3",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-flit-core"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz"
+  ],
+  "work_sources": []
+}

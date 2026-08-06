@@ -9,6 +9,7 @@ pub mod github;
 pub mod gitlab;
 pub mod gnome;
 pub mod html_index;
+pub mod pypi;
 pub mod script;
 pub mod sourceforge;
 

@@ -1,0 +1,24 @@
+{
+  "name": "python-jinja",
+  "version": "3.1.6",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-markupsafe"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-markupsafe",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://github.com/pallets/jinja/archive/refs/tags/3.1.6.tar.gz"
+  ],
+  "work_sources": []
+}

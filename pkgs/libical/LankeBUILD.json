@@ -44,6 +44,7 @@
     "libxml2",
     "ninja",
     "openjdk25",
+    "python-setuptools",
     "vala"
   ],
   "sources": [

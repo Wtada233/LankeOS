@@ -1,0 +1,22 @@
+{
+  "name": "python-calver",
+  "version": "2025.10.20",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/4a/96/0c57e3e228ffc54074867406b659b197678674f1f0bf600d114965289834/calver-2025.10.20.tar.gz"
+  ],
+  "work_sources": []
+}

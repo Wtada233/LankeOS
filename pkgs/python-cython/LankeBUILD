@@ -1,0 +1,24 @@
+lankebuild_prepare() {
+    # work_sources 让顶层有文件，detect_source_tree 不再自动 cd，需手动进入
+    cd "cython-{ORIG_PKG_VER}"
+    # 对齐 Arch PKGBUILD 的 git cherry-pick（3.2.9 的 bugfix，改为手动 patch）：
+    #   d344f9b  --embed-positions 不再内嵌源码绝对路径（破坏打包）
+    # （Arch 里的 fd84747 去掉 pkg_resources 使用，3.2.9 已内置，无需再打）
+    patch -p1 -i ../0001-no-absolute-source-paths.patch
+}
+
+lankebuild_build() {
+    cd "cython-{ORIG_PKG_VER}"
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    cd "cython-{ORIG_PKG_VER}"
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+    # 对齐 Arch：加 3 后缀 + 保留无后缀符号链接
+    for f in cygdb cython cythonize; do
+        mv "{STAGING_ROOT}/usr/bin/$f" "{STAGING_ROOT}/usr/bin/${f}3"
+        ln -s "${f}3" "{STAGING_ROOT}/usr/bin/$f"
+    done
+}

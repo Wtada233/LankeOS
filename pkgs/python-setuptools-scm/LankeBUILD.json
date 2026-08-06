@@ -1,0 +1,27 @@
+{
+  "name": "python-setuptools-scm",
+  "version": "10.2.1",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-packaging",
+    "python-setuptools",
+    "python-vcs-versioning"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-packaging",
+    "python-setuptools",
+    "python-vcs-versioning",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/5d/b1/d0b97ffd2856a7d19c63024a89fb84813cb9d2ed7fa8fdbedf9e2f13a9ab/setuptools_scm-10.2.1.tar.gz"
+  ],
+  "work_sources": []
+}

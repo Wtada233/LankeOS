@@ -28,6 +28,15 @@ lankebuild_build() {
     ln -sfv pydoc${PY_MINOR} {STAGING_ROOT}{BINDIR}/pydoc3
     ln -sfv idle${PY_MINOR} {STAGING_ROOT}{BINDIR}/idle3
 
+    # --- PEP 668：外部管理标记 ---
+    # 阻止 pip 直接装进系统 site-packages：python 升级后会留下孤儿 /usr/lib/python{旧版}
+    # （pip 装的不随版本迁移），造成污染与玄学加载问题。系统包用 lpkg，用户包用 venv / pip --user。
+    mkdir -p "{STAGING_ROOT}{LIBDIR}/python${PY_MINOR}/site-packages"
+    cat > "{STAGING_ROOT}{LIBDIR}/python${PY_MINOR}/site-packages/EXTERNALLY-MANAGED" << 'EOF'
+[externally-managed]
+Error=This Python is externally managed by LankeOS's lpkg package manager. Install system packages with lpkg, and Python packages with a virtual environment (venv) or pip --user.
+EOF
+
 }
 
 

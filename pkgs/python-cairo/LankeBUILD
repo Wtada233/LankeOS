@@ -10,6 +10,5 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
 }

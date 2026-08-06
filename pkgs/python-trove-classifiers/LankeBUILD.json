@@ -1,0 +1,23 @@
+{
+  "name": "python-trove-classifiers",
+  "version": "2026.6.1.19",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "python",
+    "python-build",
+    "python-calver",
+    "python-flit-core",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/c2/e3/7ca82ee24c82d344584abd5b8637b3bd056f2900226e8d82fc22f1184b92/trove_classifiers-2026.6.1.19.tar.gz"
+  ],
+  "work_sources": []
+}

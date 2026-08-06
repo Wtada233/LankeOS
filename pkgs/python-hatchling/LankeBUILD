@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # hatchling 用 ouroboros 自举：pyproject 声明 build-backend='hatchling.ouroboros'
+    # + backend-path=['src'] + requires=[]，pip wheel --no-build-isolation 直接从 sdist 的
+    # src/ 里 import 后端构建，无需预装 hatchling。
+    python -m pip wheel . --no-build-isolation --no-deps -w dist
+}
+
+lankebuild_package() {
+    python -m pip install --no-deps --root={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

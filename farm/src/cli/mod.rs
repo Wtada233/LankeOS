@@ -83,6 +83,7 @@ pub(crate) struct Args {
     gitlab_token: Option<String>,
     run: bool,
     all: bool,
+    manual_sort: bool,
     jobs: Option<usize>,
     root: Option<PathBuf>,
     port: Option<u16>,
@@ -120,6 +121,9 @@ enum Command {
         /// 目标包名，可多个（--all 时省略；指定则强制重建这些包）
         #[arg(required_unless_present = "all", conflicts_with = "all", num_args = 1..)]
         pkg: Vec<String>,
+        /// 严格按命令行传入的包名顺序构建（引导链/手工编排），不做 topo 重排
+        #[arg(long)]
+        manual_sort: bool,
         /// pkgs 目录（LankeBUILD 体系）
         #[arg(long, default_value = "pkgs")]
         pkgs: PathBuf,
@@ -1233,10 +1237,11 @@ pub fn run() -> ExitCode {
         return ExitCode::from(2);
     }
     match cli.command {
-        Command::Build { all, pkg, pkgs, out, state, arch, image, repo_port, download_retries } => {
+        Command::Build { all, pkg, manual_sort, pkgs, out, state, arch, image, repo_port, download_retries } => {
             let args = Args {
                 all,
                 pkg,
+                manual_sort,
                 pkgs: Some(pkgs.to_string_lossy().into_owned()),
                 out: Some(out),
                 state: state.map(|p| p.to_path_buf()),

@@ -10,7 +10,11 @@
   "build_deps": [
     "base-devel",
     "git",
-    "python"
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
   ],
   "sources": [
     "https://github.com/mesonbuild/meson/releases/download/1.11.2/meson-1.11.2.tar.gz"

@@ -33,10 +33,11 @@
     "gobject-introspection",
     "libx11",
     "libxi",
-    "libxtst",
     "libxml2",
+    "libxtst",
     "meson",
-    "ninja"
+    "ninja",
+    "python-setuptools"
   ],
   "sources": [
     "https://download.gnome.org/sources/at-spi2-core/2.60/at-spi2-core-2.60.6.tar.xz"

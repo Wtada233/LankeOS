@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # PEP 517 wheel 构建（build/installer 已成包，走标准模板）
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

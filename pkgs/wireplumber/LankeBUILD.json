@@ -27,7 +27,8 @@
     "lua",
     "meson",
     "ninja",
-    "pipewire"
+    "pipewire",
+    "python-lxml"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/pipewire/wireplumber/-/archive/0.5.15/wireplumber-0.5.15.tar.gz"

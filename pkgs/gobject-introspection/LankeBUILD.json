@@ -3,7 +3,8 @@
   "version": "1.86.0",
   "release": 4,
   "deps": [
-    "python"
+    "python",
+    "python-setuptools"
   ],
   "needed_so": [
     "libc.so.6",
@@ -25,7 +26,8 @@
     "libffi",
     "meson",
     "ninja",
-    "python"
+    "python",
+    "python-setuptools"
   ],
   "sources": [
     "https://download.gnome.org/sources/gobject-introspection/1.86/gobject-introspection-1.86.0.tar.xz"

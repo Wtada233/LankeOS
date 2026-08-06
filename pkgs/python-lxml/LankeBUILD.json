@@ -1,0 +1,32 @@
+{
+  "name": "python-lxml",
+  "version": "6.1.1",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libexslt.so.0",
+    "libm.so.6",
+    "libxml2.so.16",
+    "libxslt.so.1",
+    "libz.so.1"
+  ],
+  "provides": [],
+  "build_deps": [
+    "libxml2",
+    "libxslt",
+    "python",
+    "python-build",
+    "python-cython",
+    "python-flit-core",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/05/3b/aab6728cae887456f409b4d75e8a01856e4f04bd510de38052a47768b680/lxml-6.1.1.tar.gz"
+  ],
+  "work_sources": []
+}

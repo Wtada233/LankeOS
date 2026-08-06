@@ -14,11 +14,5 @@ lankebuild_build() {
 lankebuild_package() {
     cd itstool-*/
     make DESTDIR="{STAGING_ROOT}" install
-    # postinst hook：itstool 依赖 Python lxml 模块（非仓库包），pip 安装。
-    # 安装 itstool 的容器/主机都会执行。
-    install -Dm644 /dev/null "{STAGING_HOOKS}"/postinst.sh
-    cat > "{STAGING_HOOKS}"/postinst.sh << 'EOF'
-python -m ensurepip
-pip3 install lxml
-EOF
+    # itstool 运行时依赖 Python lxml 模块：由 deps: python-lxml 保证（不再用 postinst pip 装）。
 }

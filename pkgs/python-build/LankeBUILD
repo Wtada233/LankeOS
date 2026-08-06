@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    # 引导期 ensurepip 提供 pip/setuptools/wheel；build/installer 尚未成包，用 pip 自建 wheel
+    python -m ensurepip
+}
+
+lankebuild_build() {
+    python -m pip wheel . --no-build-isolation --no-deps -w dist
+}
+
+lankebuild_package() {
+    python -m pip install --no-deps --root={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

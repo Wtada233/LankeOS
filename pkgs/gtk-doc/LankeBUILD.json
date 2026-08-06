@@ -7,7 +7,9 @@
     "docbook-xml",
     "docbook-xsl",
     "libxslt",
-    "python"
+    "python",
+    "python-lxml",
+    "python-pygments"
   ],
   "needed_so": [],
   "provides": [],
@@ -19,7 +21,9 @@
     "libxslt",
     "meson",
     "ninja",
-    "python"
+    "python",
+    "python-parameterized",
+    "python-pygments"
   ],
   "sources": [
     "https://gitlab.gnome.org/GNOME/gtk-doc/-/archive/1.36.1/gtk-doc-1.36.1.tar.gz"

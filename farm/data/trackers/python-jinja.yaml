@@ -1,0 +1,6 @@
+pkg-name: python-jinja
+tracker-template: github
+repo: pallets/jinja
+mode: tags
+tag-prefix: ""
+template: https://github.com/pallets/jinja/archive/refs/tags/{tag}.tar.gz
