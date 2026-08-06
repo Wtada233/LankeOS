@@ -1,10 +1,24 @@
 {
   "name": "libime",
   "version": "1.1.15",
-  "release": 2,
+  "release": 3,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libFcitx5Utils.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libIMECore.so",
+    "libIMECore.so.0",
+    "libIMEPinyin.so",
+    "libIMEPinyin.so.0",
+    "libIMETable.so",
+    "libIMETable.so.0"
+  ],
   "build_deps": [
     "base-devel",
     "boost",

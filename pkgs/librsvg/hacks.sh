@@ -1,3 +1,3 @@
 #!/bin/bash
 # Run as root
-cargo install cargo-c
+cargo install --root /usr cargo-c

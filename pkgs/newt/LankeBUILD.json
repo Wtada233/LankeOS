@@ -9,7 +9,7 @@
     "libc.so.6",
     "libm.so.6",
     "libpopt.so.0",
-    "libpython3.13.so.1.0",
+    "libpython3.14.so.1.0",
     "libslang.so.2",
     "libtcl8.6.so"
   ],

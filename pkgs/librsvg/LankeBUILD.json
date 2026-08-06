@@ -1,10 +1,29 @@
 {
   "name": "librsvg",
   "version": "2.62.90",
-  "release": 2,
+  "release": 3,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcairo-gobject.so.2",
+    "libcairo.so.2",
+    "libfontconfig.so.1",
+    "libgcc_s.so.1",
+    "libgdk_pixbuf-2.0.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libharfbuzz.so.0",
+    "libm.so.6",
+    "libpango-1.0.so.0",
+    "libpangocairo-1.0.so.0",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "librsvg-2.so",
+    "librsvg-2.so.2"
+  ],
   "build_deps": [
     "base-devel",
     "cairo",
@@ -17,7 +36,8 @@
     "meson",
     "ninja",
     "pango",
-    "rust"
+    "rust",
+    "vala"
   ],
   "sources": [
     "https://download.gnome.org/sources/librsvg/2.62/librsvg-2.62.90.tar.xz"

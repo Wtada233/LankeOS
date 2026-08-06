@@ -5,6 +5,15 @@ lankebuild_prepare() {
     cargo fetch --locked --target host-tuple
     patch -p1 < {WORK_DIR}/allow-software-rendering.patch
 
+    # 放宽 libdisplay-info-sys 0.3.0 对 libdisplay-info 的 <0.4.0 门禁：
+    # libdisplay-info 0.4 与 0.3 的公共 API 逐字节相同（crate 的 auto_detect 本就按 >=0.3
+    # 归 v0_3），放宽后 niri 可对 LankeOS 的 libdisplay-info 0.4.0 构建。
+    # patch 生成自 crates.io 发布的规范化 Cargo.toml（容器 cargo registry 解压的就是它）。
+    CRATE=$(ls -d /root/.cargo/registry/src/*/libdisplay-info-sys-0.3.0 2>/dev/null | head -1)
+    if [ -n "$CRATE" ] && grep -q 'version = ">= 0.1.0, < 0.4.0"' "$CRATE/Cargo.toml"; then
+        patch -d "$CRATE" -p1 < {WORK_DIR}/libdisplay-info-sys-relax.patch
+    fi
+
     # Portal: 文件选择器用 GTK + 删除不存在 gnome-keyring
     sed -i '/^org.freedesktop.impl.portal.Notification/a\
 org.freedesktop.impl.portal.FileChooser=gtk;' resources/niri-portals.conf

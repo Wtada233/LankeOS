@@ -12,7 +12,7 @@ lankebuild_build() {
         -Dtests=false \
         -Ddocs=disabled \
         -Dintrospection=enabled \
-        -Dvala=disabled
+        -Dvala=enabled
     ninja -C build
     DESTDIR={STAGING_ROOT} ninja -C build install
 }

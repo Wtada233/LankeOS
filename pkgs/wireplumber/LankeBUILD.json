@@ -3,10 +3,24 @@
   "version": "0.5.15",
   "release": 2,
   "deps": [],
-  "needed_so": [],
-  "provides": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "liblua.so.5.5",
+    "libm.so.6",
+    "libpipewire-0.3.so.0",
+    "libsystemd.so.0"
+  ],
+  "provides": [
+    "libwireplumber-0.5.so",
+    "libwireplumber-0.5.so.0"
+  ],
   "build_deps": [
     "base-devel",
+    "doxygen",
     "git",
     "glib",
     "gobject-introspection",

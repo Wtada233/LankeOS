@@ -1,0 +1,36 @@
+name: Farm Build & Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'farm/**'
+      - '.github/workflows/farm-build.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'farm/**'
+      - '.github/workflows/farm-build.yml'
+  workflow_dispatch:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: farm
+
+      - name: Build
+        run: cargo build
+        working-directory: farm
+
+      - name: Test
+        run: cargo test
+        working-directory: farm
