@@ -46,9 +46,10 @@ fs::path setup_build_directories(const fs::path& build_dir)
     ensure_dir_exists(staging_root);
 
     // 路径规范化（UsrMerge 合并）
+    // 注意：不预创建 usr/local/* — /usr/local 已被排除出 PATH 和 ld 搜索路径，
+    //       发行版打包中不应出现该路径。
     log_info(get_string("info.path_normalization"));
-    for (const auto& d : {constants::BIN, constants::LIB, constants::INCLUDE, constants::SHARE_MAN,
-                          constants::LOCAL_BIN}) {
+    for (const auto& d : {constants::BIN, constants::LIB, constants::INCLUDE, constants::SHARE_MAN}) {
         ensure_dir_exists(staging_root / constants::USR / d);
     }
     fs::create_directory_symlink(constants::USR_BIN, staging_root / constants::BIN);
@@ -325,19 +326,23 @@ void run_build(const fs::path& build_dir)
     // 6. 后处理
     finalize_staging(staging_root, cfg.no_strip);
 
-    // 6.5. 移除 USR-Merge
-    // 兼容符号链接（它们是构建阶段的辅助设施，不应打包入包）。
+    // 6.5. 移除 USR-Merge 兼容符号链接（除非 keep_fs_layout=true）
+    // 默认情况下，这些链接是构建阶段的辅助设施，不应打包入包：
     //       Builder 在 setup_build_directories() 中创建这些链接使构建脚本能够
     //       向 bin/、lib/ 等路径安装文件（实际写入 usr/bin/、usr/lib/）。
     //       现在打包前清理它们，避免每个包都声称"拥有"这些系统级符号链接，
     //       从而导致卸载时因"文件被其他包共享"而拒绝移除。
-    for (const auto& link :
-         {staging_root / constants::BIN, staging_root / constants::SBIN,
-          staging_root / constants::LIB, staging_root / constants::LIB64,
-          staging_root / constants::USR_SBIN, staging_root / constants::USR_LIB64}) {
-        std::error_code ec;
-        if (fs::is_symlink(link, ec) || (!ec && fs::exists(link))) {
-            fs::remove(link, ec);
+    //       若 LankeBUILD.json 中 keep_fs_layout=true，则保留这些符号链接
+    //       并将其一并打包（用于需要真正声明该文件布局的包）。
+    if (!cfg.keep_fs_layout) {
+        for (const auto& link :
+             {staging_root / constants::BIN, staging_root / constants::SBIN,
+              staging_root / constants::LIB, staging_root / constants::LIB64,
+              staging_root / constants::USR_SBIN, staging_root / constants::USR_LIB64}) {
+            std::error_code ec;
+            if (fs::is_symlink(link, ec) || (!ec && fs::exists(link))) {
+                fs::remove(link, ec);
+            }
         }
     }
 

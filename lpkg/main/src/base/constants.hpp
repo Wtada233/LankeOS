@@ -31,6 +31,7 @@ inline constexpr std::string_view J_NO_STRIP = "no_strip";
 inline constexpr std::string_view J_SOURCES = "sources";
 inline constexpr std::string_view J_WORK_SOURCES = "work_sources";
 inline constexpr std::string_view J_BUILD_DEPS = "build_deps";
+inline constexpr std::string_view J_KEEP_FS_LAYOUT = "keep_fs_layout";
 
 // 构建文件与脚本名
 inline constexpr std::string_view LANK_BUILD_JSON = "LankeBUILD.json";
@@ -65,7 +66,6 @@ inline constexpr std::string_view LIB = "lib";
 inline constexpr std::string_view LIB64 = "lib64";
 inline constexpr std::string_view INCLUDE = "include";
 inline constexpr std::string_view SHARE_MAN = "share/man";
-inline constexpr std::string_view LOCAL_BIN = "local/bin";
 inline constexpr std::string_view LIBEXEC = "libexec";
 inline constexpr std::string_view DIR_ETC = "etc/";
 inline constexpr std::string_view DIR_ETC_PREFIX = "/etc/";
