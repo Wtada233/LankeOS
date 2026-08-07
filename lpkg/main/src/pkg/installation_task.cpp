@@ -728,9 +728,13 @@ void InstallationTask::register_package()
 
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
     for (const auto& f : detail::scan_content_files(content_dir)) {
-        // 目录不注册所有者——多个包共享目录是正常的
-        if (f.ends_with('/')) continue;
-        cache.add_file_owner((fs::path("/") / f).string(), pkg_name_);
+        // 目录允许共享所有权（多个包安装到同一目录是正常的，如 /usr/bin/），
+        // 走 add_dir_owner 累加所有者；普通文件强制单一所有者，冲突由
+        // add_file_owner 的 error.file_already_owned 检测。
+        if (f.ends_with('/'))
+            cache.add_dir_owner((fs::path("/") / f).string(), pkg_name_);
+        else
+            cache.add_file_owner((fs::path("/") / f).string(), pkg_name_);
     }
 
     const fs::path man_path =

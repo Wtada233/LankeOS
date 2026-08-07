@@ -44,8 +44,10 @@ public:
     /** 移除已安装包 */
     void remove_installed(std::string_view name);
 
-    /** 记录文件归属 */
+    /** 记录文件归属（普通文件强制单一所有者，已归属他人时抛 error.file_already_owned） */
     void add_file_owner(std::string_view path, std::string_view pkg);
+    /** 记录目录归属（允许共享——多个包可拥有同一目录） */
+    void add_dir_owner(std::string_view path, std::string_view pkg);
     /** 移除文件归属 */
     void remove_file_owner(std::string_view path, std::string_view pkg);
     /** 查询文件归属的包集合 */

@@ -82,6 +82,15 @@ void Cache::add_file_owner(std::string_view path, std::string_view pkg)
     dirty = true;
 }
 
+void Cache::add_dir_owner(std::string_view path, std::string_view pkg)
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    // 目录允许多所有者共享（add_file_owner 的单一所有权检查不适用），
+    // 共享目录靠移除端的引用计数管理（最后持有者离开时删除目录）。
+    file_db[std::string(path)].insert(std::string(pkg));
+    dirty = true;
+}
+
 void Cache::remove_file_owner(std::string_view path, std::string_view pkg)
 {
     std::lock_guard<std::mutex> lock(mtx);
