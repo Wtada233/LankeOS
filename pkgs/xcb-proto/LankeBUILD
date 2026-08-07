@@ -10,4 +10,6 @@ lankebuild_build() {
 lankebuild_package() {
     cd "{SRC_DIR}"
     make DESTDIR="{STAGING_ROOT}" install
+    # 清理 __pycache__（与 python 配方一致，.pyc 冗余）
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
 }
