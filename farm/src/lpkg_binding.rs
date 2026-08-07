@@ -351,15 +351,7 @@ impl RealBinding {
             return Err(format!("容器内写入 mirror.conf 失败（{pkg}）"));
         }
 
-        // 3. docker cp 配方进容器（/work/<pkg>）
-        let src = self.repo_dir.join(pkg);
-        let ok = run_quiet(&["cp", src.to_string_lossy().as_ref(), &format!("{cid}:/work/")])
-            .map(|s| s.success()).unwrap_or(false);
-        if !ok {
-            return Err(format!("docker cp {pkg} 配方进容器失败"));
-        }
-
-        // 3.5 ABI 过渡：把备份的旧 SONAME .so 注入容器（/backups，构建脚本里 cp 到 /usr/lib）。
+        // 3. ABI 过渡：把备份的旧 SONAME .so 注入容器（/backups，构建脚本里 cp 到 /usr/lib）。
         //    旧二进制（如链旧 libxml2.so.2 的 gettext）靠它继续运行，新构建用新 .so。
         let backups = self.out_dir.join("backups");
         if backups.is_dir() {
@@ -382,9 +374,11 @@ impl RealBinding {
         // （不带 -y）。带 -y 会把短语机制废掉，兜底永远失败 → 构建被 BLOCKED。
         // 拆成两步：upgrade（成功后 commit 滚动快照）→ build。upgrade 失败时容器状态不可信，
         // 不 commit、不滚动，直接报错。
+        // 顺序约束：配方（/work/<pkg>）在 commit 之后才拷入（见 4.6）。docker commit/export
+        // 会把 /work 整个快照进镜像——若此时配方已就位，每包源码都会滚进 roll 镜像（滚雪球）。
+        // 因此 upgrade 阶段不依赖配方目录，直接以容器默认 cwd 运行 lpkg 命令即可。
         let upgrade_script = format!(
-            "cd /work/{pkg} && \
-             lpkg install lpkg -y && \
+            "lpkg install lpkg -y && \
              ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; }} ) || exit 1 ; \
              [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig ; \
              exit 0"
@@ -416,6 +410,15 @@ impl RealBinding {
         } else {
             self.gc_roll(&cid)?;
             write_roll_counter(&self.out_dir, 0);
+        }
+
+        // 4.6 docker cp 配方进容器（/work/<pkg>）——必须放在 commit/GC 之后：
+        //     快照时 /work 为空（见 4 的顺序约束），否则配方/源码会随 commit 滚进镜像。
+        let src = self.repo_dir.join(pkg);
+        let ok = run_quiet(&["cp", src.to_string_lossy().as_ref(), &format!("{cid}:/work/")])
+            .map(|s| s.success()).unwrap_or(false);
+        if !ok {
+            return Err(format!("docker cp {pkg} 配方进容器失败"));
         }
 
         // 5. 构建
