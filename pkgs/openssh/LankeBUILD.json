@@ -12,7 +12,18 @@
     "krb5",
     "xauth"
   ],
-  "needed_so": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcom_err.so.2",
+    "libcrypt.so.2",
+    "libcrypto.so.3",
+    "libedit.so.0",
+    "libgssapi_krb5.so.2",
+    "libk5crypto.so.3",
+    "libkrb5.so.3",
+    "libpam.so.0",
+    "libz.so.1"
+  ],
   "provides": [],
   "build_deps": [
     "base-devel",
