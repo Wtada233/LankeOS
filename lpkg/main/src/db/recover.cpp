@@ -272,17 +272,22 @@ void trim_completed()
 
 void cleanup_db_backups()
 {
-    const fs::path state_dir = Config::instance().state_dir();
-    if (!fs::exists(state_dir) || !fs::is_directory(state_dir)) return;
-
     std::error_code ec;
-    // 递归扫描：DBRM 创建的备份在 deps/、needed_so/ 等子目录中
-    for (const auto& entry : fs::recursive_directory_iterator(state_dir, ec)) {
-        if (ec) break;
+    // 递归扫描 DBRM 创建的备份。除 state_dir（deps/、needed_so/ 等子目录）外，
+    // man 备份由 write_string_file_wal 写在 docs/ 目录（state_dir 之外），
+    // 漏扫会导致每次安装/升级都残留 *.man.lpkg_db_bak_before:* 文件。
+    for (const fs::path base : { Config::instance().state_dir(),
+                                 Config::instance().docs_dir() }) {
+        if (!fs::exists(base) || !fs::is_directory(base)) continue;
 
-        const std::string fname = entry.path().filename().string();
-        if (fname.find(".lpkg_db_bak_before:") != std::string::npos) {
-            fs::remove(entry.path(), ec);
+        for (const auto& entry : fs::recursive_directory_iterator(base, ec)) {
+            if (ec) break;
+
+            const std::string fname = entry.path().filename().string();
+            if (fname.find(".lpkg_db_bak_before:") != std::string::npos) {
+                fs::remove(entry.path(), ec);
+            }
         }
+        ec.clear();
     }
 }
