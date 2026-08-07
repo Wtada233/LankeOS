@@ -246,8 +246,7 @@ TEST_F(AggregatedIndexTest, VersionSortingAcrossAggregatedLine)
 // capability 会被误判为"无提供者"，导致假"未解析 SONAME"失败。
 TEST_F(AggregatedIndexTest, FindProviderReturnsVersionThatActuallyProvides)
 {
-    write_index(
-        "libfoo|1.0:aaa::libold.so.1:libc.so.6;2.0:bbb::libnew.so.1:libc.so.6|\n");
+    write_index("libfoo|1.0:aaa::libold.so.1:libc.so.6;2.0:bbb::libnew.so.1:libc.so.6|\n");
 
     Repository repo;
     repo.load_index();

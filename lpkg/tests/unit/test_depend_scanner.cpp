@@ -59,7 +59,10 @@ protected:
     // 重构后 scan_remove/scan_abibreak 恒用 build_repo_revdep_map()：从仓库 index 的
     // needed_so → provides 建反向依赖（不再读本地 Cache 的 reverse_dep）。故测试必须写
     // 仓库 index（Config::get_tmp_dir()/repo_index.txt），格式 name|ver:hash::provides:needed_so:
-    struct IndexEntry { std::string provides; std::string needed_so; };
+    struct IndexEntry {
+        std::string provides;
+        std::string needed_so;
+    };
     std::map<std::string, IndexEntry> index_entries_;
     std::map<std::string, std::string> index_versions_;
 

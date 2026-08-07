@@ -134,8 +134,8 @@ TEST_F(NewFeaturesTest, QueryFileAndPackage)
 /** 回归测试：安装应把包内容中的目录注册为所有者（query 目录能查到所属包） */
 TEST_F(NewFeaturesTest, DirectoryOwnersRecordedOnInstall)
 {
-    std::string pkg = create_pkg("dir_owner_test", "1.0",
-                                 {{"usr/share/dir_owner_app/data.txt", "/"}});
+    std::string pkg =
+        create_pkg("dir_owner_test", "1.0", {{"usr/share/dir_owner_app/data.txt", "/"}});
     install_packages({pkg}, "", false);
 
     // 包内容里的目录（含中间层级）都应注册所有者
@@ -143,8 +143,8 @@ TEST_F(NewFeaturesTest, DirectoryOwnersRecordedOnInstall)
     EXPECT_TRUE(Cache::instance().is_file_owned_by("/usr/share/", "dir_owner_test"));
     EXPECT_TRUE(Cache::instance().is_file_owned_by("/usr/share/dir_owner_app/", "dir_owner_test"));
     // 普通文件仍由 add_file_owner 注册
-    EXPECT_TRUE(Cache::instance().is_file_owned_by("/usr/share/dir_owner_app/data.txt",
-                                                   "dir_owner_test"));
+    EXPECT_TRUE(
+        Cache::instance().is_file_owned_by("/usr/share/dir_owner_app/data.txt", "dir_owner_test"));
 
     // query 目录应解析到所属包
     testing::internal::CaptureStdout();
@@ -162,10 +162,8 @@ TEST_F(NewFeaturesTest, DirectoryOwnersRecordedOnInstall)
 /** 回归测试：多个包共享同一目录不应抛冲突，且都记为所有者 */
 TEST_F(NewFeaturesTest, SharedDirectoryRecordsAllOwners)
 {
-    std::string pkg_a = create_pkg("dir_shared_a", "1.0",
-                                   {{"usr/share/shared_dir/a.txt", "/"}});
-    std::string pkg_b = create_pkg("dir_shared_b", "1.0",
-                                   {{"usr/share/shared_dir/b.txt", "/"}});
+    std::string pkg_a = create_pkg("dir_shared_a", "1.0", {{"usr/share/shared_dir/a.txt", "/"}});
+    std::string pkg_b = create_pkg("dir_shared_b", "1.0", {{"usr/share/shared_dir/b.txt", "/"}});
 
     // 两个包都安装到 /usr/share/shared_dir/ —— 目录可共享，不得报 file_already_owned
     EXPECT_NO_THROW(install_packages({pkg_a}, "", false));

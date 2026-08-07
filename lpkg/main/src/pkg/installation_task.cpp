@@ -359,7 +359,10 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
         // 已是目标（libsolv 会处理该依赖）→ 跳过
         bool is_target = false;
         for (const auto& [tn, tv] : ctx.targets)
-            if (tn == dep_name) { is_target = true; break; }
+            if (tn == dep_name) {
+                is_target = true;
+                break;
+            }
         if (is_target) continue;
 
         // 实际元数据发现的新依赖 → 加入目标，交给 libsolv 重解
@@ -424,8 +427,8 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
 
             // --use-system-soname：系统 /usr/lib 已有该 .so（如 backup 的旧 SONAME）→ 视为满足。
             // 配合 farm 的 ABI 过渡机制：旧二进制在过渡期加载旧 .so，新构建用新 .so。
-            if (!provided && Config::instance().use_system_soname_mode()
-                && Config::instance().has_system_soname(soname)) {
+            if (!provided && Config::instance().use_system_soname_mode() &&
+                Config::instance().has_system_soname(soname)) {
                 provided = true;
             }
 
@@ -564,9 +567,9 @@ void InstallationTask::copy_package_files()
             // 目录无法被符号链接替换：backup_existing_files 不备份目录，若静默
             // remove 会留下无 WAL 记录的破坏且回滚无法恢复——作为文件冲突拒绝。
             if (fs::is_directory(dest) && !fs::is_symlink(dest)) {
-                throw LpkgException(string_format(
-                    "error.copy_failed_rollback", f, physical_path.string(),
-                    get_string("error.dir_replaced_by_symlink")));
+                throw LpkgException(string_format("error.copy_failed_rollback", f,
+                                                  physical_path.string(),
+                                                  get_string("error.dir_replaced_by_symlink")));
             }
 
             if (fs::exists(dest) || fs::is_symlink(dest)) fs::remove(dest);

@@ -18,7 +18,7 @@ TEST(VersionCompare, MultiSegment)
     EXPECT_TRUE(version_compare("1.0", "1.0.1"));  // 1.0 < 1.0.1 → true
     // rpm 不补段：1.0.1 < 1.0.1.0（段数不同即不等，曾自研补 0 视为相等，已删除）
     EXPECT_TRUE(version_compare("1.0.1", "1.0.1.0"));
-    EXPECT_FALSE(version_compare("1.0.1.0", "1.0.1"));  // 1.0.1.0 < 1.0.1 → false
+    EXPECT_FALSE(version_compare("1.0.1.0", "1.0.1"));   // 1.0.1.0 < 1.0.1 → false
     EXPECT_FALSE(version_compare("1.0.1", "1.0"));       // 1.0.1 < 1.0 → false
     EXPECT_TRUE(version_compare("1.0.0.0", "1.0.0.1"));  // 1.0.0.0 < 1.0.0.1 → true
 }
@@ -303,4 +303,3 @@ TEST(DepParser, OperatorAppearanceOrder)
     EXPECT_EQ(deps[0].constraints[1].op, ">=");
     EXPECT_EQ(deps[0].constraints[1].version, "1.0");
 }
-

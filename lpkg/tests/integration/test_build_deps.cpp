@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+
 #include <string>
 #include <vector>
+
 #include "vercmp/dep_parser.hpp"
 
 // =========================================================================

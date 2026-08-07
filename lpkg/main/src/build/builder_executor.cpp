@@ -1,9 +1,11 @@
 #include "builder_executor.hpp"
 
+#include <git2.h>
+#include <unistd.h>
+
 #include <array>
 #include <fstream>
 #include <iostream>
-#include <unistd.h>
 
 #include "archive.hpp"
 #include "base/constants.hpp"
@@ -11,8 +13,6 @@
 #include "base/utils.hpp"
 #include "downloader.hpp"
 #include "i18n/localization.hpp"
-
-#include <git2.h>
 
 namespace fs = std::filesystem;
 
@@ -48,8 +48,8 @@ void parse_git_url(const std::string& url, std::string& git_url, std::string& re
 
 // git 传输进度状态（shallow clone + 下载进度）
 struct GitProgress {
-    bool is_tty;            // 输出是否为终端
-    std::string current;    // 正在下载的仓库名（主仓库名 / submodule 名），进度行显示
+    bool is_tty;             // 输出是否为终端
+    std::string current;     // 正在下载的仓库名（主仓库名 / submodule 名），进度行显示
     uint64_t last_received;  // 当前 fetch 已接收字节
     uint64_t cumulative;     // 已完成的 fetch 累计（主 clone + tag fetch + 各 submodule）
     size_t last_line_len;    // 上一条进度行长度（\r 刷新时补空格清残留，避免叠字）
@@ -126,9 +126,8 @@ bool any_rev_exists(git_repository* repo, const std::vector<std::string>& revs)
  * 返回 0=目标存在；GIT_ENOTFOUND=fetch 成功但目标缺失；其他=真实 fetch 错误（prog->err 已记录）。
  */
 int prepare_repo(const fs::path& dest, const std::string& url,
-                 const std::vector<std::string>& refspec_strs,
-                 const std::vector<std::string>& revs, GitProgress* prog,
-                 git_repository** out)
+                 const std::vector<std::string>& refspec_strs, const std::vector<std::string>& revs,
+                 GitProgress* prog, git_repository** out)
 {
     int last_err = GIT_ENOTFOUND;
     for (int depth : {1, 0}) {  // 先浅拉，再完整拉
@@ -146,7 +145,7 @@ int prepare_repo(const fs::path& dest, const std::string& url,
             for (auto& s : storage) {
                 rp.push_back(s.data());
             }
-            git_strarray refspecs{ rp.data(), rp.size() };
+            git_strarray refspecs{rp.data(), rp.size()};
             err = fetch_refspecs(remote, &refspecs, depth, prog);
         }
         if (remote != nullptr) {
@@ -167,7 +166,8 @@ int prepare_repo(const fs::path& dest, const std::string& url,
 /** 前向声明：update_one_submodule 递归子模块时调用（--recursive 的等价）。定义在下方。 */
 int update_submodules(git_repository* repo, GitProgress* prog);
 
-/** 更新单个 submodule：手动建仓库 → 浅拉默认分支 → 锁定 commit 不在浅层则完整拉兜底 → checkout 到锁定 commit。 */
+/** 更新单个 submodule：手动建仓库 → 浅拉默认分支 → 锁定 commit 不在浅层则完整拉兜底 → checkout
+ * 到锁定 commit。 */
 int update_one_submodule(git_repository* parent, const std::string& name, GitProgress* prog)
 {
     git_submodule* sm = nullptr;
@@ -201,9 +201,9 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
 
     prog->current = name;
     git_repository* sub = nullptr;
-    std::vector<std::string> refspecs = { "+refs/heads/*:refs/remotes/origin/*",
-                                          "+refs/tags/*:refs/tags/*" };
-    err = prepare_repo(sub_dir, final_url, refspecs, { oid_hex }, prog, &sub);
+    std::vector<std::string> refspecs = {"+refs/heads/*:refs/remotes/origin/*",
+                                         "+refs/tags/*:refs/tags/*"};
+    err = prepare_repo(sub_dir, final_url, refspecs, {oid_hex}, prog, &sub);
     if (err != 0) {
         git_submodule_free(sm);
         git_buf_dispose(&resolved);
@@ -226,8 +226,9 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
     } else {
         err = -1;
     }
-    // 递归：该 submodule 自身可能还有 submodule（--recursive 等价，如 mbedtls→tf-psa-crypto→framework）。
-    // 必须在 free(sub) 之前调用；git submodule 结构是 DAG（无环），递归天然终止。
+    // 递归：该 submodule 自身可能还有 submodule（--recursive 等价，如
+    // mbedtls→tf-psa-crypto→framework）。 必须在 free(sub) 之前调用；git submodule 结构是
+    // DAG（无环），递归天然终止。
     if (err == 0) {
         err = update_submodules(sub, prog);
     }
@@ -290,7 +291,7 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
 
     GitProgress prog{};
     prog.is_tty = isatty(STDOUT_FILENO) == 1;  // 进度刷在 stdout，与 downloader 一致
-    prog.current = name;                        // 主仓库下载时进度行显示仓库名
+    prog.current = name;                       // 主仓库下载时进度行显示仓库名
 
     git_libgit2_init();
     git_repository* repo = nullptr;
@@ -312,21 +313,23 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
         }
     } else {
         // 指定 ref（tag/branch）：fresh repo + 只拉该 ref（浅拉，失败完整兜底）
-        std::vector<std::string> rs = { "+refs/tags/" + ref + ":refs/tags/" + ref,
-                                        "+refs/heads/" + ref + ":refs/remotes/origin/" + ref };
-        std::vector<std::string> revs = { ref, "refs/tags/" + ref, "refs/remotes/origin/" + ref };
+        std::vector<std::string> rs = {"+refs/tags/" + ref + ":refs/tags/" + ref,
+                                       "+refs/heads/" + ref + ":refs/remotes/origin/" + ref};
+        std::vector<std::string> revs = {ref, "refs/tags/" + ref, "refs/remotes/origin/" + ref};
         err = prepare_repo(dest, git_url, rs, revs, &prog, &repo);
         if (err != 0) {
             clear_progress_line(&prog);
             git_libgit2_shutdown();
             if (err == GIT_ENOTFOUND) {
                 // ref 真不存在
-                throw LpkgException(string_format("error.git_ref_not_found", ref, git_url,
-                                                  prog.err.empty() ? get_string("error.unknown") : prog.err));
+                throw LpkgException(
+                    string_format("error.git_ref_not_found", ref, git_url,
+                                  prog.err.empty() ? get_string("error.unknown") : prog.err));
             }
             // fetch 失败：上报真实错误
-            throw LpkgException(string_format("error.git_clone_failed", git_url,
-                                              prog.err.empty() ? get_string("error.unknown") : prog.err));
+            throw LpkgException(
+                string_format("error.git_clone_failed", git_url,
+                              prog.err.empty() ? get_string("error.unknown") : prog.err));
         }
         if (err == 0) {
             // checkout 到目标 ref（annotated tag → 剥到 commit）
@@ -378,8 +381,9 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
             git_repository_free(repo);
         }
         git_libgit2_shutdown();
-        throw LpkgException(string_format("error.git_clone_failed", git_url,
-                                          prog.err.empty() ? get_string("error.unknown") : prog.err));
+        throw LpkgException(
+            string_format("error.git_clone_failed", git_url,
+                          prog.err.empty() ? get_string("error.unknown") : prog.err));
     }
 
     // 更新 submodule（--recurse-submodules 的等价）
@@ -388,8 +392,9 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
         clear_progress_line(&prog);
         git_repository_free(repo);
         git_libgit2_shutdown();
-        throw LpkgException(string_format("error.git_submodule_failed", git_url,
-                                          prog.err.empty() ? get_string("error.unknown") : prog.err));
+        throw LpkgException(
+            string_format("error.git_submodule_failed", git_url,
+                          prog.err.empty() ? get_string("error.unknown") : prog.err));
     }
 
     git_repository_free(repo);
@@ -525,7 +530,8 @@ void execute_build_phase(const std::string& phase_name, const fs::path& work_dir
                          const fs::path& processed_script_path)
 {
     log_info(string_format("info.executing_phase", phase_name));
-    std::string cmd = "set -e; . " + fs::absolute(processed_script_path).string() + " && " + phase_name;
+    std::string cmd =
+        "set -e; . " + fs::absolute(processed_script_path).string() + " && " + phase_name;
     int ret = run_shell(cmd, work_dir);
     if (ret != 0) {
         fs::remove(processed_script_path);

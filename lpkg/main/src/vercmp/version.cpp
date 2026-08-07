@@ -1,10 +1,10 @@
 #include "version.hpp"
 
+#include <solv/evr.h>
+
 #include <algorithm>
 #include <string>
 #include <vector>
-
-#include <solv/evr.h>
 
 #include "../base/exception.hpp"
 #include "../i18n/localization.hpp"

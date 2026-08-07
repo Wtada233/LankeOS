@@ -101,17 +101,17 @@ std::vector<std::string> run_ordered_batch(const std::vector<std::string>& insta
                                            PlanMap& plan, PerPkgFn&& per_pkg_fn)
 {
     return run_batch_transaction([&](wal::WalWriter& w, std::vector<std::string>& success) {
-                                     auto& cache = Cache::instance();
+        auto& cache = Cache::instance();
 
-                                     for (const auto& name : install_order) {
-                                         auto& p = plan.at(name);
+        for (const auto& name : install_order) {
+            auto& p = plan.at(name);
 
-                                         // 执行包级操作
-                                         std::forward<PerPkgFn>(per_pkg_fn)(w, p, success);
+            // 执行包级操作
+            std::forward<PerPkgFn>(per_pkg_fn)(w, p, success);
 
-                                         // 包完成后 DB 里程碑
-                                         cache.write(name + ":installed");
-                                         success.push_back(name);
-                                     }
-                                 });
+            // 包完成后 DB 里程碑
+            cache.write(name + ":installed");
+            success.push_back(name);
+        }
+    });
 }

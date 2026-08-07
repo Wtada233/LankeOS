@@ -1,7 +1,5 @@
 #include "install_common.hpp"
 
-#include "solver.hpp"
-
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -14,6 +12,7 @@
 #include "base/exception.hpp"
 #include "base/utils.hpp"
 #include "i18n/localization.hpp"
+#include "solver.hpp"
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
@@ -172,23 +171,21 @@ static void collect_installed_requires(const std::string& name, solv::InstalledP
         while (std::getline(f, so))
             if (!so.empty()) p.needed_so.push_back(so);
     }
-    for (const auto& cap : Cache::instance().get_package_provides(name))
-        p.provides.push_back(cap);
+    for (const auto& cap : Cache::instance().get_package_provides(name)) p.provides.push_back(cap);
 }
 
 // 枚举系统 /usr/lib（或 /usr/lib64）下的 SONAME（--use-system-soname 用）
 static std::vector<std::string> collect_system_sonames()
 {
     std::vector<std::string> out;
-    for (const std::string_view sub : { constants::USR_LIB, constants::USR_LIB64 }) {
+    for (const std::string_view sub : {constants::USR_LIB, constants::USR_LIB64}) {
         std::error_code ec;
         fs::path dir = Config::instance().root_dir() / sub;
         if (!fs::is_directory(dir, ec)) continue;
         for (const auto& e : fs::directory_iterator(dir, ec)) {
             if (!e.is_regular_file(ec) && !e.is_symlink(ec)) continue;
             const std::string fn = e.path().filename().string();
-            if (fn.rfind("lib", 0) == 0 && fn.find(".so") != std::string::npos)
-                out.push_back(fn);
+            if (fn.rfind("lib", 0) == 0 && fn.find(".so") != std::string::npos) out.push_back(fn);
         }
     }
     return out;
@@ -226,10 +223,8 @@ void resolve_with_solver(InstallContext& ctx)
         pi.version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
         pi.dependencies = parse_dep_strings(
             meta.value(std::string(constants::J_DEPS), std::vector<std::string>{}));
-        pi.provides =
-            meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
-        pi.needed_so =
-            meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+        pi.provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+        pi.needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
         local_pkgs.push_back(std::move(pi));
         local_paths[name] = path;
     }
@@ -258,7 +253,10 @@ void resolve_with_solver(InstallContext& ctx)
         PackageInfo info;
         if (lp != local_paths.end()) {
             for (const auto& pi : local_pkgs)
-                if (pi.name == rp.name) { info = pi; break; }
+                if (pi.name == rp.name) {
+                    info = pi;
+                    break;
+                }
         } else if (auto repo_info = ctx.repo.find_package(rp.name, rp.version)) {
             info = *repo_info;
         }

@@ -335,7 +335,8 @@ int main(int argc, char* argv[])
         if (result.count("no-deps"))
             Config::instance().set_no_deps_mode(result["no-deps"].as<bool>());
         if (result.count("missing-so-no-error"))
-            Config::instance().set_missing_so_no_error_mode(result["missing-so-no-error"].as<bool>());
+            Config::instance().set_missing_so_no_error_mode(
+                result["missing-so-no-error"].as<bool>());
         if (result.count("use-system-soname"))
             Config::instance().set_use_system_soname_mode(result["use-system-soname"].as<bool>());
         if (result.count("root"))

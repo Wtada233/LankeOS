@@ -8,9 +8,9 @@
 // libsolv 的 Solvable 结构有 `requires` 字段，是 C++20 关键字 → 宏改名绕开。
 // 我们只用 pool_id2solvable/solvable_add_deparray 等 API，不直接访问 s->requires，改名安全。
 #define requires solv_requires
+#include <solv/evr.h>
 #include <solv/pool.h>
 #include <solv/pooltypes.h>
-#include <solv/evr.h>
 #include <solv/problems.h>
 #include <solv/repo.h>
 #include <solv/rules.h>
@@ -28,9 +28,11 @@
 // 用一把全局锁兜底（未来可拆成 per-pool 独立状态）。
 static std::mutex g_solv_mutex;
 
-namespace solv {
+namespace solv
+{
 
-namespace {
+namespace
+{
 
 // lpkg 约束 op → libsolv REL 标志（REL_GT=1, REL_EQ=2, REL_LT=4；GE=EQ|GT, LE=EQ|LT）
 // 注：dep_parser 原样保留 "=="（lpkg 的 == 即精确等于），必须与 "=" 同样映射 REL_EQ，
@@ -132,9 +134,8 @@ struct PoolState {
 // 三色 DFS：在剩余子图（未 done 且 indeg>0）中找一条构成环的后向边 (u→v)。
 // u 依赖 v（v 在 DFS 栈上同栈即成环）。子图无环返回 false。确定性（节点按名序）。
 bool find_cycle_edge(const std::vector<ResolvedPkg>& order,
-                     const std::vector<std::vector<size_t>>& edges,
-                     const std::vector<int>& indeg, const std::vector<bool>& done,
-                     size_t& out_u, size_t& out_v)
+                     const std::vector<std::vector<size_t>>& edges, const std::vector<int>& indeg,
+                     const std::vector<bool>& done, size_t& out_u, size_t& out_v)
 {
     const size_t n = order.size();
     std::vector<size_t> nodes;
@@ -155,8 +156,15 @@ bool find_cycle_edge(const std::vector<ResolvedPkg>& order,
             if (top.second < edges[u].size()) {
                 const size_t v = edges[u][top.second++];
                 if (done[v] || indeg[v] == 0) continue;  // 不在剩余子图
-                if (color[v] == 1) { out_u = u; out_v = v; return true; }
-                if (color[v] == 0) { color[v] = 1; st.emplace_back(v, 0); }
+                if (color[v] == 1) {
+                    out_u = u;
+                    out_v = v;
+                    return true;
+                }
+                if (color[v] == 0) {
+                    color[v] = 1;
+                    st.emplace_back(v, 0);
+                }
             } else {
                 color[u] = 2;
                 st.pop_back();
@@ -178,8 +186,7 @@ bool find_cycle_edge(const std::vector<ResolvedPkg>& order,
 // - 环用三色 DFS 找一条环边逐条切断（u 依赖 v → 断 u→v），而非任选节点兜底
 //   （naive 兜底会把被环阻塞的 bash 这类依赖者提前装掉）。
 // sids[i] 与 order[i] 一一对应（sids 是 order[i] 在 pool 里的 solvable id）。
-void order_by_dependencies(Pool* pool, const std::vector<Id>& sids,
-                           std::vector<ResolvedPkg>& order)
+void order_by_dependencies(Pool* pool, const std::vector<Id>& sids, std::vector<ResolvedPkg>& order)
 {
     const size_t n = order.size();
     if (n < 2) return;
@@ -196,7 +203,7 @@ void order_by_dependencies(Pool* pool, const std::vector<Id>& sids,
         if (!data) continue;
         for (Offset o = s->solv_requires; data[o]; ++o) {
             Id req = data[o];
-            if (ISRELDEP(req)) continue;              // 带版本约束的命名依赖，不用于 ABI 排序
+            if (ISRELDEP(req)) continue;  // 带版本约束的命名依赖，不用于 ABI 排序
             const char* rn = pool_id2str(pool, req);
             if (!rn || strstr(rn, ".so") == nullptr) continue;  // 只保留 needed_so（SONAME）
             Id* dp = pool_whatprovides_ptr(pool, req);
@@ -248,10 +255,8 @@ void order_by_dependencies(Pool* pool, const std::vector<Id>& sids,
     order = std::move(ordered);
 }
 
-PoolState build_pool(const Repository& repo,
-                     const std::vector<PackageInfo>& local,
-                     const std::map<std::string, InstalledPkg>& installed,
-                     const SolveOptions& opts,
+PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& local,
+                     const std::map<std::string, InstalledPkg>& installed, const SolveOptions& opts,
                      const std::vector<std::string>& extra_provides)
 {
     PoolState ps;
@@ -327,8 +332,7 @@ PoolState build_pool(const Repository& repo,
 
 }  // namespace
 
-SolveResult solve_install(const Repository& repo,
-                          const std::vector<PackageInfo>& local,
+SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>& local,
                           const std::map<std::string, InstalledPkg>& installed,
                           const std::vector<std::pair<std::string, std::string>>& targets,
                           const SolveOptions& opts)
@@ -358,7 +362,8 @@ SolveResult solve_install(const Repository& repo,
                 Id best = 0;
                 int pi;
                 Solvable* sa;
-                FOR_REPO_SOLVABLES(ps.avail, pi, sa) {
+                FOR_REPO_SOLVABLES(ps.avail, pi, sa)
+                {
                     if (sa->name != nid) continue;
                     if (!best ||
                         version_compare(pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr),
@@ -371,16 +376,21 @@ SolveResult solve_install(const Repository& repo,
                     int ip;
                     Solvable* is;
                     FOR_REPO_SOLVABLES(ir, ip, is)
-                        if (is->name == nid) { installed_ver = pool_id2str(ps.pool, is->evr); break; }
+                    if (is->name == nid) {
+                        installed_ver = pool_id2str(ps.pool, is->evr);
+                        break;
+                    }
                 }
                 const char* best_ver =
                     best ? pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr) : nullptr;
                 if (best && (!installed_ver || version_compare(installed_ver, best_ver)))
                     queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, best);  // 新装 / 升级
                 else if (best)
-                    queue_push2(&jobs, SOLVER_SOLVABLE_NAME | SOLVER_INSTALL, nid);  // 已装同版/更高 → no-op
+                    queue_push2(&jobs, SOLVER_SOLVABLE_NAME | SOLVER_INSTALL,
+                                nid);  // 已装同版/更高 → no-op
                 else
-                    queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL, nid);  // capability
+                    queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL,
+                                nid);  // capability
             } else {
                 // 指定版本（`pkg:版本` / 本地 .lpkg）。libsolv 对"已装 identical"的
                 // SOLVER_SOLVABLE|INSTALL 会产出 REINSTALL 步骤，导致非 --force 的
@@ -395,7 +405,8 @@ SolveResult solve_install(const Repository& repo,
                 {
                     int pi2;
                     Solvable* sa2;
-                    FOR_REPO_SOLVABLES(ps.avail, pi2, sa2) {
+                    FOR_REPO_SOLVABLES(ps.avail, pi2, sa2)
+                    {
                         if (sa2->name != nid) continue;
                         name_exists = true;
                         if (!avail_versions.empty()) avail_versions += ", ";
@@ -409,7 +420,10 @@ SolveResult solve_install(const Repository& repo,
                         int ip;
                         Solvable* is;
                         FOR_REPO_SOLVABLES(ir, ip, is)
-                            if (is->name == nid && is->evr == evr) { same_installed = true; break; }
+                        if (is->name == nid && is->evr == evr) {
+                            same_installed = true;
+                            break;
+                        }
                     }
                     if (!same_installed || opts.force_reinstall)
                         queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, target_sid);
@@ -489,8 +503,8 @@ SolveResult solve_install(const Repository& repo,
         for (const auto& [name, vspec] : targets) {
             auto it = installed.find(name);
             if (it != installed.end()) {
-                result.order.push_back(
-                    ResolvedPkg{name, it->second.version, /*is_install=*/false, /*is_explicit=*/true});
+                result.order.push_back(ResolvedPkg{name, it->second.version, /*is_install=*/false,
+                                                   /*is_explicit=*/true});
             }
         }
     }
@@ -506,11 +520,17 @@ std::set<std::string> repo_revrequires(const Repository& repo, const std::string
         bool hit = false;
         for (const auto& pkg : versions) {
             for (const auto& dep : pkg.dependencies)
-                if (dep.name == target) { hit = true; break; }
+                if (dep.name == target) {
+                    hit = true;
+                    break;
+                }
             if (hit) break;
             for (const auto& so : pkg.needed_so) {
                 auto prov = repo.find_provider(so);
-                if (prov && prov->name == target) { hit = true; break; }
+                if (prov && prov->name == target) {
+                    hit = true;
+                    break;
+                }
             }
             if (hit) break;
         }

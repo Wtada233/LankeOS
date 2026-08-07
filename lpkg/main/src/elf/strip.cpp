@@ -546,7 +546,8 @@ bool process_archive(const fs::path& path, [[maybe_unused]] std::string& error_m
                     fs::remove(temp_path);
                     return false;
                 }
-                ssize_t written = archive_write_data(out, stripped_data.data(), stripped_data.size());
+                ssize_t written =
+                    archive_write_data(out, stripped_data.data(), stripped_data.size());
                 if (written < 0 || static_cast<size_t>(written) != stripped_data.size()) {
                     archive_read_free(a);
                     archive_write_close(out);

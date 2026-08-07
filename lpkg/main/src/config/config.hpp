@@ -227,9 +227,9 @@ private:
     bool force_overwrite_mode_ = false;                                         // 强制覆盖
     bool no_hooks_mode_ = false;                                                // 禁用钩子
     bool no_deps_mode_ = false;                                                 // 跳过依赖
-    bool missing_so_no_error_mode_ = false;                                     // 缺失 SONAME 不报错
-    bool use_system_soname_mode_ = false;                                       // 优先用系统 .so 满足 needed_so
-    bool testing_mode_ = false;                                                 // 测试模式
+    bool missing_so_no_error_mode_ = false;  // 缺失 SONAME 不报错
+    bool use_system_soname_mode_ = false;    // 优先用系统 .so 满足 needed_so
+    bool testing_mode_ = false;              // 测试模式
 
     // --- 架构覆盖 ---------------------------------------------------------
     std::string architecture_override_;  // 架构覆盖值（可选）

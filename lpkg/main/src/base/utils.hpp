@@ -130,8 +130,7 @@ std::string random_suffix(size_t len = constants::RANDOM_SUFFIX_LEN);
  * 生成不冲突的 .lpkg_bak 路径（随机后缀，最多尝试 UNIQUE_BAK_MAX_ATTEMPTS 次）。
  * 冲突超过上限时抛异常，避免无限循环。
  */
-std::filesystem::path unique_bak_path(const std::filesystem::path& phys,
-                                      const std::string& pkg);
+std::filesystem::path unique_bak_path(const std::filesystem::path& phys, const std::string& pkg);
 
 // ============ 字符串工具 ============
 

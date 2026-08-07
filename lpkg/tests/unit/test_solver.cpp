@@ -46,8 +46,11 @@ TEST_F(SolverTest, PullsProviderViaNeededSo)
     add("appB", "2.0", {}, {}, {"liba.so.1"});
 
     auto r = solve({{"appB", "latest"}});
-    ASSERT_TRUE(r.ok())
-        << "problems: " << [&r] { std::string s; for (auto& p : r.problems) s += p + "; "; return s; }();
+    ASSERT_TRUE(r.ok()) << "problems: " << [&r] {
+        std::string s;
+        for (auto& p : r.problems) s += p + "; ";
+        return s;
+    }();
     EXPECT_TRUE(order_has(r, "appB"));
     EXPECT_TRUE(order_has(r, "libA"));
     // 依赖先装：libA 在 appB 之前
@@ -75,7 +78,8 @@ TEST_F(SolverTest, InstalledProviderSatisfiesSoname)
 {
     add("sqlite", "3.53.4", {}, {"libsqlite3.so"}, {});
     add("qt6-base", "6.11.1", {}, {}, {"libsqlite3.so"});
-    installed["sqlite"] = {"3.53.4", {}, {}, {}};  // 已装（即使无 Cache provider 记录，available repo 兜底）
+    installed["sqlite"] = {
+        "3.53.4", {}, {}, {}};  // 已装（即使无 Cache provider 记录，available repo 兜底）
 
     auto r = solve({{"qt6-base", "latest"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
@@ -146,17 +150,17 @@ TEST_F(SolverTest, TransitiveClosure)
 TEST_F(SolverTest, AutoUpgradesReverseDepsForSoname)
 {
     add("libxml2", "2.0", {}, {"libxml2.so.2"}, {});
-    add("libxml2", "3.0", {}, {"libxml2.so.16"}, {});   // 新版丢 libxml2.so.2
-    add("app", "1.0", {}, {}, {"libxml2.so.2"});         // 旧 app 依赖旧 soname
-    add("app", "2.0", {}, {}, {"libxml2.so.16"});        // 新 app 依赖新 soname
+    add("libxml2", "3.0", {}, {"libxml2.so.16"}, {});  // 新版丢 libxml2.so.2
+    add("app", "1.0", {}, {}, {"libxml2.so.2"});       // 旧 app 依赖旧 soname
+    add("app", "2.0", {}, {}, {"libxml2.so.16"});      // 新 app 依赖新 soname
     add("chromium", "1.0", {}, {}, {"libxml2.so.16"});
     installed["libxml2"] = {"2.0", {}, {}, {"libxml2.so.2"}};  // 已装旧版提供旧 soname
     installed["app"] = {"1.0", {}, {"libxml2.so.2"}, {}};      // 已装 app 依赖旧 soname
 
     auto r = solve({{"chromium", "latest"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
-    EXPECT_TRUE(order_has(r, "libxml2"));   // 升级 libxml2
-    EXPECT_TRUE(order_has(r, "app"));       // 连带升级 app
+    EXPECT_TRUE(order_has(r, "libxml2"));  // 升级 libxml2
+    EXPECT_TRUE(order_has(r, "app"));      // 连带升级 app
     EXPECT_TRUE(order_has(r, "chromium"));
     // 依赖序：libxml2 在 app 与 chromium 之前（两者都依赖新 libxml2.so.16；
     // app 与 chromium 是兄弟节点，彼此相对顺序不保证）
@@ -175,7 +179,7 @@ TEST_F(SolverTest, ReverseDepWithoutNewVersionConflicts)
 {
     add("libxml2", "2.0", {}, {"libxml2.so.2"}, {});
     add("libxml2", "3.0", {}, {"libxml2.so.16"}, {});
-    add("app", "1.0", {}, {}, {"libxml2.so.2"});   // 只有旧版，无新版可升
+    add("app", "1.0", {}, {}, {"libxml2.so.2"});  // 只有旧版，无新版可升
     add("chromium", "1.0", {}, {}, {"libxml2.so.16"});
     installed["libxml2"] = {"2.0", {}, {}, {"libxml2.so.2"}};
     installed["app"] = {"1.0", {}, {"libxml2.so.2"}, {}};
@@ -325,8 +329,7 @@ TEST_F(SolverTest, InstallCapabilityWithVersionFallsBackToProvider)
 
     auto r = solve({{"somecap", "1.0"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
-    EXPECT_TRUE(order_has(r, "provPkg"))
-        << "无同名包的能力名+版本应回退装提供者（回归 S3）";
+    EXPECT_TRUE(order_has(r, "provPkg")) << "无同名包的能力名+版本应回退装提供者（回归 S3）";
 }
 
 // S3 回归：包不存在且无 capability → 报错（而非静默"已安装"）
@@ -335,4 +338,3 @@ TEST_F(SolverTest, InstallNonexistentPackageWithVersionErrors)
     auto r = solve({{"nosuchpkg", "1.0"}});
     EXPECT_FALSE(r.ok()) << "不存在的包+版本应报错（回归 S3）";
 }
-

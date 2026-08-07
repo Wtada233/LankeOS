@@ -88,9 +88,8 @@ TEST_F(SonameFlagTest, ForwardCheckToleratedUnderMissingSoNoError)
     fs::create_directories(fs::path(work) / "mirror/x86_64");
     fs::create_directories(fs::path(work) / "root/etc/lpkg");
     // repo 提供 glibc(libc.so.6) + orphan（需要 libfoo.so.1，无 provider）
-    std::ofstream(fs::path(work) / "mirror/x86_64/index.txt")
-        << "glibc|2.39:abc::libc.so.6:|\n"
-        << "orphan|1.0:abc:::libfoo.so.1:\n";
+    std::ofstream(fs::path(work) / "mirror/x86_64/index.txt") << "glibc|2.39:abc::libc.so.6:|\n"
+                                                              << "orphan|1.0:abc:::libfoo.so.1:\n";
     std::ofstream(fs::path(work) / "root/etc/lpkg/mirror.conf")
         << "file://" << work << "/mirror/" << std::endl;
     Config::instance().set_root_path(work + "/root");

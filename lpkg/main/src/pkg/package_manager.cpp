@@ -118,23 +118,22 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
     detail::resolve_with_solver(ctx);
 
-        if (!provided_hash.empty()) {
-            if (locals.empty()) throw LpkgException(get_string("error.hash_requires_local"));
-            // 单个 --hash 无法校验多个本地包（至多一个能通过哈希校验）
-            if (locals.size() > 1)
-                throw LpkgException(get_string("error.hash_requires_single_local"));
-            for (auto& [n, p] : plan)
-                if (!p.local_path.empty()) p.sha256 = provided_hash;
-        }
+    if (!provided_hash.empty()) {
+        if (locals.empty()) throw LpkgException(get_string("error.hash_requires_local"));
+        // 单个 --hash 无法校验多个本地包（至多一个能通过哈希校验）
+        if (locals.size() > 1) throw LpkgException(get_string("error.hash_requires_single_local"));
+        for (auto& [n, p] : plan)
+            if (!p.local_path.empty()) p.sha256 = provided_hash;
+    }
 
-        if (plan.empty()) {
-            log_info(get_string("info.all_packages_already_installed"));
-            return;
-        }
+    if (plan.empty()) {
+        log_info(get_string("info.all_packages_already_installed"));
+        return;
+    }
 
-        // 冲突/ABI 一致性与依赖拉入已由 libsolv solver 原生保证
-        // （取代旧的手动 check_plan_consistency / check_needed_so_consistency /
-        //  check_forward_soname_integrity）
+    // 冲突/ABI 一致性与依赖拉入已由 libsolv solver 原生保证
+    // （取代旧的手动 check_plan_consistency / check_needed_so_consistency /
+    //  check_forward_soname_integrity）
 
     // 用户确认
     std::string prompt;
@@ -156,80 +155,79 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
     // 执行安装（WAL 2.0 批量事务）
     std::vector<std::pair<fs::path, fs::path>> all_backups;
-    run_batch_transaction(
-        [&](wal::WalWriter& /*batch_writer*/, std::vector<std::string>& success) {
-            auto& cache = Cache::instance();
+    run_batch_transaction([&](wal::WalWriter& /*batch_writer*/, std::vector<std::string>& success) {
+        auto& cache = Cache::instance();
 
-            size_t i = 0;
-            while (i < order.size()) {
-                if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+        size_t i = 0;
+        while (i < order.size()) {
+            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
-                const std::string& n = order[i];
-                ++i;
+            const std::string& n = order[i];
+            ++i;
 
-                if (ctx.installed_set.contains(n)) continue;
+            if (ctx.installed_set.contains(n)) continue;
 
-                auto& p = plan.at(n);
+            auto& p = plan.at(n);
 
-                if (!p.metadata_verified) {
-                    InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
-                                                Cache::instance().get_installed_version(p.name),
-                                                p.local_path, p.sha256, p.force_reinstall);
-                    ensure_dir_exists(check_task.tmp_pkg_dir());
-                    check_task.download_and_verify_package();
+            if (!p.metadata_verified) {
+                InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
+                                            Cache::instance().get_installed_version(p.name),
+                                            p.local_path, p.sha256, p.force_reinstall);
+                ensure_dir_exists(check_task.tmp_pkg_dir());
+                check_task.download_and_verify_package();
 
-                    json meta = detail::read_archive_metadata(check_task.archive_path());
-                    std::vector<std::string> dep_strs =
-                        meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
-                    auto actual_deps = detail::parse_dep_strings(dep_strs);
-                    std::vector<std::string> actual_provides =
-                        meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
-                    std::vector<std::string> actual_needed_so =
-                        meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+                json meta = detail::read_archive_metadata(check_task.archive_path());
+                std::vector<std::string> dep_strs =
+                    meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
+                auto actual_deps = detail::parse_dep_strings(dep_strs);
+                std::vector<std::string> actual_provides =
+                    meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+                std::vector<std::string> actual_needed_so =
+                    meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
 
-                    bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
-                                            (actual_provides != p.provides) ||
-                                            (actual_needed_so != p.needed_so);
-                    if (!metadata_differs) {
-                        for (size_t di = 0; di < actual_deps.size(); ++di) {
-                            if (actual_deps[di].name != p.dependencies[di].name ||
-                                actual_deps[di].constraints != p.dependencies[di].constraints) {
-                                metadata_differs = true;
-                                break;
-                            }
+                bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
+                                        (actual_provides != p.provides) ||
+                                        (actual_needed_so != p.needed_so);
+                if (!metadata_differs) {
+                    for (size_t di = 0; di < actual_deps.size(); ++di) {
+                        if (actual_deps[di].name != p.dependencies[di].name ||
+                            actual_deps[di].constraints != p.dependencies[di].constraints) {
+                            metadata_differs = true;
+                            break;
                         }
                     }
-
-                    if (metadata_differs) {
-                        log_info(string_format("info.resolving_metadata", p.name));
-                        ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
-                                                     actual_provides, actual_needed_so);
-                        ctx.local_candidates[p.name] = check_task.archive_path();
-
-                        ctx.plan.clear();
-                        ctx.install_order.clear();
-                        detail::resolve_with_solver(ctx);
-                        i = 0;
-                        continue;
-                    }
-
-                    p.local_path = check_task.archive_path();
-                    p.metadata_verified = true;
                 }
 
-                InstallationTask task(p.name, p.actual_version, p.is_explicit,
-                                      Cache::instance().get_installed_version(p.name), p.local_path,
-                                      p.sha256, p.force_reinstall);
-                task.run(&ctx);
+                if (metadata_differs) {
+                    log_info(string_format("info.resolving_metadata", p.name));
+                    ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
+                                                 actual_provides, actual_needed_so);
+                    ctx.local_candidates[p.name] = check_task.archive_path();
 
-                // 收集 .lpkg_bak 路径供批次成功后统一清理（升级/重装时产生）
-                for (const auto& b : task.get_backups()) all_backups.emplace_back(b);
+                    ctx.plan.clear();
+                    ctx.install_order.clear();
+                    detail::resolve_with_solver(ctx);
+                    i = 0;
+                    continue;
+                }
 
-                cache.write(p.name + ":installed");
-                success.push_back(p.name);
-                ctx.installed_set.insert(p.name);
+                p.local_path = check_task.archive_path();
+                p.metadata_verified = true;
             }
-        });
+
+            InstallationTask task(p.name, p.actual_version, p.is_explicit,
+                                  Cache::instance().get_installed_version(p.name), p.local_path,
+                                  p.sha256, p.force_reinstall);
+            task.run(&ctx);
+
+            // 收集 .lpkg_bak 路径供批次成功后统一清理（升级/重装时产生）
+            for (const auto& b : task.get_backups()) all_backups.emplace_back(b);
+
+            cache.write(p.name + ":installed");
+            success.push_back(p.name);
+            ctx.installed_set.insert(p.name);
+        }
+    });
 
     // 清理批次产生的 .lpkg_bak 文件
     for (const auto& [orig, bak] : all_backups) {
@@ -280,7 +278,7 @@ void cleanup_baks(std::vector<std::pair<fs::path, fs::path>>& backups)
         wal::log_wal_line("CLEANUP " + p.string());
 
         // 断点：CLEANUP 日志写入后、物理删除前 —— 测试 write-ahead 崩溃窗口
-        //（此刻 .bak 仍在磁盘，异常/崩溃可由 batch_rollback/rec 完整恢复）
+        // （此刻 .bak 仍在磁盘，异常/崩溃可由 batch_rollback/rec 完整恢复）
         BreakpointManager::instance().hit("cleanup_after_wal");
 
         std::error_code ec2;
@@ -364,9 +362,9 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
             std::string path_str = p.string();
             if (path_str.ends_with('/')) continue;
             if (!force && path_str.starts_with(constants::DIR_ETC_PREFIX)) continue;
-            const fs::path phys =
-                p.is_absolute() ? Config::instance().root_dir() / fs::path(p).relative_path()
-                                : Config::instance().root_dir() / p;
+            const fs::path phys = p.is_absolute()
+                                      ? Config::instance().root_dir() / fs::path(p).relative_path()
+                                      : Config::instance().root_dir() / p;
 
             if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
@@ -432,8 +430,8 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
     auto cleanup_with_dbr = [&](const fs::path& fpath, const std::string& /*desc*/) {
         if (fs::exists(fpath)) {
             wal::log_wal_line("DBRM " + fpath.string() + " " + pkg_name + ":removed");
-            safe_rename(fpath, fs::path(fpath.string() + ".lpkg_db_bak_before:" + pkg_name +
-                                        ":removed"));
+            safe_rename(fpath,
+                        fs::path(fpath.string() + ".lpkg_db_bak_before:" + pkg_name + ":removed"));
         }
     };
 
@@ -739,97 +737,96 @@ void upgrade_packages()
 
     std::vector<std::pair<fs::path, fs::path>> upgrade_backups;
     size_t upgraded_count = 0;
-    run_batch_transaction(
-        [&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
-            auto& cache = Cache::instance();
+    run_batch_transaction([&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
+        auto& cache = Cache::instance();
 
-            size_t i = 0;
-            while (i < order.size()) {
-                if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+        size_t i = 0;
+        while (i < order.size()) {
+            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
-                const std::string& n = order[i];
-                ++i;
+            const std::string& n = order[i];
+            ++i;
 
-                if (ctx.installed_set.contains(n)) continue;
+            if (ctx.installed_set.contains(n)) continue;
 
-                auto& p = plan.at(n);
-                const std::string old_ver = cache.get_installed_version(n);
+            auto& p = plan.at(n);
+            const std::string old_ver = cache.get_installed_version(n);
 
-                // 跳过已是最新版本的包（如依赖已满足的情况）
-                if (!p.force_reinstall && !old_ver.empty() && old_ver == p.actual_version) {
-                    ctx.installed_set.insert(n);
+            // 跳过已是最新版本的包（如依赖已满足的情况）
+            if (!p.force_reinstall && !old_ver.empty() && old_ver == p.actual_version) {
+                ctx.installed_set.insert(n);
+                continue;
+            }
+
+            // ── 元数据验证：下载后比对真实 metadata 和索引是否一致 ──
+            // （和 install_packages 中的逻辑一致）
+            if (!p.metadata_verified) {
+                InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
+                                            cache.get_installed_version(p.name), p.local_path,
+                                            p.sha256, p.force_reinstall);
+                ensure_dir_exists(check_task.tmp_pkg_dir());
+                check_task.download_and_verify_package();
+
+                json meta = detail::read_archive_metadata(check_task.archive_path());
+                std::vector<std::string> dep_strs =
+                    meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
+                auto actual_deps = detail::parse_dep_strings(dep_strs);
+                std::vector<std::string> actual_provides =
+                    meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+                std::vector<std::string> actual_needed_so =
+                    meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+
+                bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
+                                        (actual_provides != p.provides) ||
+                                        (actual_needed_so != p.needed_so);
+                if (!metadata_differs) {
+                    for (size_t di = 0; di < actual_deps.size(); ++di) {
+                        if (actual_deps[di].name != p.dependencies[di].name ||
+                            actual_deps[di].constraints != p.dependencies[di].constraints) {
+                            metadata_differs = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (metadata_differs) {
+                    log_info(string_format("info.resolving_metadata", p.name));
+                    ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
+                                                 actual_provides, actual_needed_so);
+                    ctx.local_candidates[p.name] = check_task.archive_path();
+
+                    ctx.plan.clear();
+                    ctx.install_order.clear();
+                    detail::resolve_with_solver(ctx);
+                    i = 0;
                     continue;
                 }
 
-                // ── 元数据验证：下载后比对真实 metadata 和索引是否一致 ──
-                // （和 install_packages 中的逻辑一致）
-                if (!p.metadata_verified) {
-                    InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
-                                                cache.get_installed_version(p.name), p.local_path,
-                                                p.sha256, p.force_reinstall);
-                    ensure_dir_exists(check_task.tmp_pkg_dir());
-                    check_task.download_and_verify_package();
-
-                    json meta = detail::read_archive_metadata(check_task.archive_path());
-                    std::vector<std::string> dep_strs =
-                        meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
-                    auto actual_deps = detail::parse_dep_strings(dep_strs);
-                    std::vector<std::string> actual_provides =
-                        meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
-                    std::vector<std::string> actual_needed_so =
-                        meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
-
-                    bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
-                                            (actual_provides != p.provides) ||
-                                            (actual_needed_so != p.needed_so);
-                    if (!metadata_differs) {
-                        for (size_t di = 0; di < actual_deps.size(); ++di) {
-                            if (actual_deps[di].name != p.dependencies[di].name ||
-                                actual_deps[di].constraints != p.dependencies[di].constraints) {
-                                metadata_differs = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (metadata_differs) {
-                        log_info(string_format("info.resolving_metadata", p.name));
-                        ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
-                                                     actual_provides, actual_needed_so);
-                        ctx.local_candidates[p.name] = check_task.archive_path();
-
-                        ctx.plan.clear();
-                        ctx.install_order.clear();
-                        detail::resolve_with_solver(ctx);
-                        i = 0;
-                        continue;
-                    }
-
-                    p.local_path = check_task.archive_path();
-                    p.metadata_verified = true;
-                }
-
-                // 确定 hold 标志：保留当前 hold 状态，新增依赖不 hold
-                const bool hold_pkg = cache.is_held(n);
-
-                if (!old_ver.empty()) {
-                    log_info(string_format("info.upgrading_package", n, old_ver, p.actual_version));
-                } else {
-                    log_info(string_format("info.installing_package", n, p.actual_version));
-                }
-
-                InstallationTask task(p.name, p.actual_version, hold_pkg, old_ver, p.local_path,
-                                      p.sha256, p.force_reinstall);
-                task.run(&ctx);
-
-                for (const auto& b : task.get_backups()) upgrade_backups.emplace_back(b);
-
-                cache.write(n + ":installed");
-                success.push_back(n);
-                ctx.installed_set.insert(n);
-                if (!old_ver.empty()) ++upgraded_count;
+                p.local_path = check_task.archive_path();
+                p.metadata_verified = true;
             }
-        });
+
+            // 确定 hold 标志：保留当前 hold 状态，新增依赖不 hold
+            const bool hold_pkg = cache.is_held(n);
+
+            if (!old_ver.empty()) {
+                log_info(string_format("info.upgrading_package", n, old_ver, p.actual_version));
+            } else {
+                log_info(string_format("info.installing_package", n, p.actual_version));
+            }
+
+            InstallationTask task(p.name, p.actual_version, hold_pkg, old_ver, p.local_path,
+                                  p.sha256, p.force_reinstall);
+            task.run(&ctx);
+
+            for (const auto& b : task.get_backups()) upgrade_backups.emplace_back(b);
+
+            cache.write(n + ":installed");
+            success.push_back(n);
+            ctx.installed_set.insert(n);
+            if (!old_ver.empty()) ++upgraded_count;
+        }
+    });
 
     for (const auto& [orig, bak] : upgrade_backups) {
         std::error_code ec;

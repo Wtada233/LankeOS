@@ -36,7 +36,6 @@ std::string version_or_missing(const std::string& pkg)
     return ver.empty() ? "(not installed)" : ver;
 }
 
-
 /**
  * 前向依赖解析（用于 install 扫描）
  * 记录每个解析到的包及其是否已安装
@@ -86,7 +85,10 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
                 if (prov->name == pkg_info->name) continue;
                 bool dup = false;
                 for (const auto& d : deps)
-                    if (d.name == prov->name) { dup = true; break; }
+                    if (d.name == prov->name) {
+                        dup = true;
+                        break;
+                    }
                 if (!dup) deps.push_back({prov->name, {}});
             }
         }
@@ -167,8 +169,7 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
         for (auto s : split_string_view(vh[3], constants::COMMA_CHAR)) {
             if (s.empty()) continue;
             std::string key(s);
-            if (soname_provider.find(key) == soname_provider.end())
-                soname_provider[key] = name;
+            if (soname_provider.find(key) == soname_provider.end()) soname_provider[key] = name;
         }
     }
 
@@ -177,8 +178,7 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
         for (auto s : split_string_view(needed, constants::COMMA_CHAR)) {
             if (s.empty()) continue;
             auto it = soname_provider.find(std::string(s));
-            if (it != soname_provider.end() && it->second != name)
-                rev[it->second].insert(name);
+            if (it != soname_provider.end() && it->second != name) rev[it->second].insert(name);
         }
     }
     return rev;
@@ -210,7 +210,6 @@ auto load_repo_revdep() -> std::unordered_map<std::string, std::unordered_set<st
     }
     return build_repo_revdep_map();
 }
-
 
 /**
  * 递归构建"移除"依赖树（仓库路径）

@@ -380,7 +380,7 @@ TEST_F(ActiveRollbackTest, UpgradeCopyFailPreservesOldFile)
     }
 
     // 断点：COPY WAL 写入后、rename 前抛异常 —— 此时文件 du 已被 BACKUP
-    //（旧内容在 .bak），且 COPY WAL 行已写。这是升级中途失败的精确触发点。
+    // （旧内容在 .bak），且 COPY WAL 行已写。这是升级中途失败的精确触发点。
     BreakpointManager::instance().set("copy_after_wal_du",
                                       [] { throw LpkgException("injected copy failure"); });
 
@@ -389,8 +389,7 @@ TEST_F(ActiveRollbackTest, UpgradeCopyFailPreservesOldFile)
     // 回滚后应保持在 v1，且 /usr/bin/du 必须仍是旧内容
     Cache::instance().load();
     EXPECT_EQ(Cache::instance().get_installed_version("du"), "1.0");
-    ASSERT_TRUE(fs::exists(test_root / "usr/bin/du"))
-        << "BUG: 升级失败回滚后旧文件被二次删除";
+    ASSERT_TRUE(fs::exists(test_root / "usr/bin/du")) << "BUG: 升级失败回滚后旧文件被二次删除";
     std::ifstream f(test_root / "usr/bin/du");
     std::string c((std::istreambuf_iterator<char>(f)), {});
     EXPECT_EQ(c, "#!/bin/sh\necho du\n") << "旧文件内容应保持 v1";
@@ -403,7 +402,7 @@ TEST_F(ActiveRollbackTest, UpgradeCopyFailPreservesOldFile)
 
 // ============================================================================
 // 回归：升级在 COMMIT 后、END 前失败 → 旧文件保留 + register 的 DB 写入被撤销
-//（覆盖 register_package 的 DBNEW/DBRM 元数据行在包级回滚后仍需逆序执行的路径）
+// （覆盖 register_package 的 DBNEW/DBRM 元数据行在包级回滚后仍需逆序执行的路径）
 // ============================================================================
 
 TEST_F(ActiveRollbackTest, UpgradeCommitFailPreservesOldFilesAndDb)

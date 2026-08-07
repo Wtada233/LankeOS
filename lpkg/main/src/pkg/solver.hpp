@@ -7,7 +7,8 @@
 
 #include "../repo/repository.hpp"
 
-namespace solv {
+namespace solv
+{
 
 /// 一次求解产出的单个包操作（按依赖先装的执行序）
 struct ResolvedPkg {
@@ -20,14 +21,17 @@ struct ResolvedPkg {
 struct SolveResult {
     std::vector<ResolvedPkg> order;     ///< 依赖先装的执行序
     std::vector<std::string> problems;  ///< 致命错误（非容忍类）；空 = 求解成功
-    bool ok() const { return problems.empty(); }
+    bool ok() const
+    {
+        return problems.empty();
+    }
 };
 
 struct SolveOptions {
-    bool force_reinstall = false;    ///< 强制重装（已装同版本也要进计划）
-    bool missing_so_no_error = false;  ///< --missing-so-no-error：缺 provider 的 SONAME 容忍
-    bool use_system_soname = false;  ///< --use-system-soname：系统 .so 视为已满足
-    bool no_deps = false;            ///< 不解析依赖（仅目标包自身）
+    bool force_reinstall = false;             ///< 强制重装（已装同版本也要进计划）
+    bool missing_so_no_error = false;         ///< --missing-so-no-error：缺 provider 的 SONAME 容忍
+    bool use_system_soname = false;           ///< --use-system-soname：系统 .so 视为已满足
+    bool no_deps = false;                     ///< 不解析依赖（仅目标包自身）
     std::vector<std::string> system_sonames;  ///< use_system_soname 时的系统 SONAME 集合
 };
 
@@ -47,15 +51,12 @@ struct InstalledPkg {
 /// 用 libsolv 求解安装/升级/重装计划。
 /// repo：可用仓库（权威 provider 源）；local：本地 .lpkg 候选包（也进 available repo）；
 /// installed：已装包名 -> 版本+requires；targets：(包名, 版本说明)；"latest"=选最佳版本。
-SolveResult solve_install(
-    const class Repository& repo,
-    const std::vector<class PackageInfo>& local,
-    const std::map<std::string, InstalledPkg>& installed,
-    const std::vector<std::pair<std::string, std::string>>& targets,
-    const SolveOptions& opts);
+SolveResult solve_install(const class Repository& repo, const std::vector<class PackageInfo>& local,
+                          const std::map<std::string, InstalledPkg>& installed,
+                          const std::vector<std::pair<std::string, std::string>>& targets,
+                          const SolveOptions& opts);
 
 /// 用 libsolv 求整仓反向依赖：谁 requires target 提供的 capability（soname/包名）。
-std::set<std::string> repo_revrequires(const class Repository& repo,
-                                       const std::string& target);
+std::set<std::string> repo_revrequires(const class Repository& repo, const std::string& target);
 
 }  // namespace solv

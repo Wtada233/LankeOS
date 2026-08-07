@@ -80,7 +80,8 @@ protected:
                  "    return add<int>(x, y) + add<long>(x, y) + mul<int>(x, y);\n"
                  "}\n";
         }
-        std::string cmd = "g++ -c -O2 -o " + test_file.string() + " " + src.string() + " 2>/dev/null";
+        std::string cmd =
+            "g++ -c -O2 -o " + test_file.string() + " " + src.string() + " 2>/dev/null";
         int ret = std::system(cmd.c_str());
         fs::remove(src);
         // 返回 .o 中存在 .group 节区才算成功
@@ -559,8 +560,8 @@ TEST_F(StripTest, ArchiveWithGroupObjects)
     ASSERT_TRUE(verify_group_integrity()) << "Pre-strip group integrity check failed";
 
     fs::path archive_file = test_file.string() + "_groups.a";
-    std::string ar_cmd = "ar rcs " + archive_file.string() + " " + test_file.string() +
-                         " 2>/dev/null";
+    std::string ar_cmd =
+        "ar rcs " + archive_file.string() + " " + test_file.string() + " 2>/dev/null";
     int ar_ret = std::system(ar_cmd.c_str());
     if (ar_ret != 0 || !fs::exists(archive_file)) {
         GTEST_SKIP() << "ar not available";
@@ -609,9 +610,8 @@ TEST_F(StripTest, ArchiveWithGroupObjects)
                          "    return call(5, 7) - 59;\n"
                          "}\n";
                 }
-                std::string link_cmd =
-                    "g++ -o " + exe.string() + " " + main_src.string() + " " + extracted.string() +
-                    " 2>/dev/null";
+                std::string link_cmd = "g++ -o " + exe.string() + " " + main_src.string() + " " +
+                                       extracted.string() + " 2>/dev/null";
                 int link_ret = std::system(link_cmd.c_str());
                 EXPECT_EQ(link_ret, 0) << "Linking extracted object from stripped archive failed";
 

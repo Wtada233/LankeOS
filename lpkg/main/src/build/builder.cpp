@@ -11,12 +11,12 @@
 #include "base/utils.hpp"
 #include "builder_config.hpp"
 #include "builder_executor.hpp"
-#include "pkg/package_manager.hpp"
-#include "vercmp/dep_parser.hpp"
-#include "repo/repository.hpp"
 #include "i18n/localization.hpp"
 #include "lib_utils.hpp"
 #include "packer.hpp"
+#include "pkg/package_manager.hpp"
+#include "repo/repository.hpp"
+#include "vercmp/dep_parser.hpp"
 
 namespace fs = std::filesystem;
 
@@ -49,7 +49,8 @@ fs::path setup_build_directories(const fs::path& build_dir)
     // 注意：不预创建 usr/local/* — /usr/local 已被排除出 PATH 和 ld 搜索路径，
     //       发行版打包中不应出现该路径。
     log_info(get_string("info.path_normalization"));
-    for (const auto& d : {constants::BIN, constants::LIB, constants::INCLUDE, constants::SHARE_MAN}) {
+    for (const auto& d :
+         {constants::BIN, constants::LIB, constants::INCLUDE, constants::SHARE_MAN}) {
         ensure_dir_exists(staging_root / constants::USR / d);
     }
     fs::create_directory_symlink(constants::USR_BIN, staging_root / constants::BIN);
@@ -243,8 +244,7 @@ void run_build(const fs::path& build_dir)
         for (const auto& dep : parsed) {
             std::string arg = dep.name;
             if (!dep.constraints.empty()) {
-                if (auto match = repo.find_best_matching_version(
-                        dep.name, dep.constraints)) {
+                if (auto match = repo.find_best_matching_version(dep.name, dep.constraints)) {
                     arg += ":" + match->version;
                 } else {
                     arg += ":" + dep.constraints[0].version;
@@ -268,7 +268,7 @@ void run_build(const fs::path& build_dir)
             // 读取并显示脚本内容
             std::ifstream hacks_file(hacks_path);
             std::string hacks_content((std::istreambuf_iterator<char>(hacks_file)),
-                                       std::istreambuf_iterator<char>());
+                                      std::istreambuf_iterator<char>());
             std::cout << "─────────────────────────────────────────\n";
             std::cout << hacks_content << "\n";
             std::cout << "─────────────────────────────────────────\n";

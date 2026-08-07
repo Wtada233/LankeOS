@@ -107,8 +107,7 @@ TEST_F(RegressionFixTest, SymlinkOverDirectoryRejected)
     fs::create_directories(work / "content" / "usr" / "lib");
     fs::create_symlink("/usr/lib/sometarget", work / "content" / "usr" / "lib" / "fxsym");
     std::string pkg_path = (pkg_dir / "fxsym-1.0.lpkg").string();
-    pack_package(pkg_path, work.string(), "fxsym", "1.0", {}, {"fxsym"},
-                 "Man page for fxsym", {});
+    pack_package(pkg_path, work.string(), "fxsym", "1.0", {}, {"fxsym"}, "Man page for fxsym", {});
 
     // 必须作为文件冲突拒绝，而不是静默删除目录
     EXPECT_THROW(install_packages({pkg_path}), LpkgException);
