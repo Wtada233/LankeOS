@@ -1,15 +1,15 @@
 {
   "name": "filesystem",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "release": 2,
-  "deps": [
-    "bash"
-  ],
+  "deps": [],
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel"
+    "base-devel",
+    "rsync"
   ],
   "sources": [],
-  "work_sources": []
+  "work_sources": [],
+  "keep_fs_layout": true
 }

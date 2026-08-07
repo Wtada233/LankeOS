@@ -3,8 +3,10 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    rm -rf "{STAGING_ROOT}"
-    cp -a "{SRC_DIR}/../src" "{STAGING_ROOT}"
+    # 合并 src 树到 STAGING_ROOT（staging 已由 builder 预建好 usr-merge 符号链接与基础目录）。
+    # 源/目标都带尾斜杠：rsync 把 src/ 的*内容*并入已存在的 staging，而不是建 staging/src。
+    # 不用 cp -a：cp 遇到已存在的目标目录默认复制成其子目录，不做合并。
+    rsync -a "{SRC_DIR}/../src/" "{STAGING_ROOT}/"
 }
 
 lankebuild_package() {
