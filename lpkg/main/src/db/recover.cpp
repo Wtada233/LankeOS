@@ -276,8 +276,8 @@ void cleanup_db_backups()
     // 递归扫描 DBRM 创建的备份。除 state_dir（deps/、needed_so/ 等子目录）外，
     // man 备份由 write_string_file_wal 写在 docs/ 目录（state_dir 之外），
     // 漏扫会导致每次安装/升级都残留 *.man.lpkg_db_bak_before:* 文件。
-    for (const fs::path base : { Config::instance().state_dir(),
-                                 Config::instance().docs_dir() }) {
+    for (const fs::path& base : { Config::instance().state_dir(),
+                                  Config::instance().docs_dir() }) {
         if (!fs::exists(base) || !fs::is_directory(base)) continue;
 
         for (const auto& entry : fs::recursive_directory_iterator(base, ec)) {
