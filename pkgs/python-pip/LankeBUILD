@@ -1,0 +1,41 @@
+lankebuild_prepare() {
+    # work_sources 使自动检测退回工作根目录 → 手动进源码目录
+    for dir in */; do
+        if [ -d "$dir" ] && [ -f "$dir/pyproject.toml" ]; then
+            cd "$dir"
+            break
+        fi
+    done
+    # 放宽 flit-core 版本约束：pip 要求 <4，LankeOS 的 flit-core 是 4.x（Arch 同款补丁）
+    patch -Np1 -i {WORK_DIR}/remove-version-constraint.patch
+}
+
+lankebuild_build() {
+    for dir in */; do
+        if [ -d "$dir" ] && [ -f "$dir/pyproject.toml" ]; then
+            cd "$dir"
+            break
+        fi
+    done
+    # --no-isolation：用已装后端（flit-core/build），不联网拉构建依赖
+    python -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    for dir in */; do
+        if [ -d "$dir" ] && [ -f "$dir/pyproject.toml" ]; then
+            cd "$dir"
+            break
+        fi
+    done
+    python -m installer --destdir="{STAGING_ROOT}" dist/*.whl
+
+    # bash 补全（best-effort：pyexpat 未修复时 pip 可能跑不起来，失败不影响打包）
+    PY=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+    PYTHONPATH="{STAGING_ROOT}/usr/lib/python${PY}/site-packages" \
+        python3 -m pip completion --bash 2>/dev/null \
+        | install -Dm644 /dev/stdin "{STAGING_ROOT}/usr/share/bash-completion/completions/pip" 2>/dev/null || true
+
+    # 清理字节码缓存（上面的 pip completion 运行会在 staging 生成 __pycache__）
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

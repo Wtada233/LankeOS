@@ -1,13 +1,23 @@
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    # 确保用系统副本而非 tarball 自带的 expat（Arch 同款；配合 --with-system-expat 双保险）
+    rm -r Modules/expat
+    # 注意：不删 Modules/_decimal/libmpdec —— LankeOS 暂无 mpdecimal 包、未开
+    #       --with-system-libmpdec，删了 bundled 会让 _decimal/decimal 构建挂掉。
 }
 
 lankebuild_build() {
     # PY_MINOR 从 {ORIG_PKG_VER}（如 3.14.6）派生 → 3.14，版本目录/命令后缀都按它
     PY_MINOR=$(printf '%s' '{ORIG_PKG_VER}' | cut -d. -f1-2)
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --enable-shared --with-system-expat --with-system-ffi --enable-optimizations --enable-loadable-sqlite-extensions --without-static-libpython
-    make -j$(nproc)
+
+    # PGO 应使用 -O3（Arch 同款）；LTO 加 -ffat-lto-objects 保留普通目标码，兼容非 LTO 链接。
+    # 构建环境 CFLAGS 为空时兜底 -O3，避免出现无优化构建。
+    CFLAGS="${CFLAGS:--O3}"
+    CFLAGS="${CFLAGS/-O2/-O3} -ffat-lto-objects"
+
+    # 对齐 Arch python 打包参数：启用 LTO / computed-gotos / dbm(gdbm) / ipv6 / tzpath。
+    # pip 拆独立包（python-pip），禁用 ensurepip（Arch 同款）；未开 --with-system-libmpdec（仓库暂无 mpdecimal 包）。
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --enable-shared --with-system-expat --with-system-ffi --enable-optimizations --with-lto --with-computed-gotos --with-dbmliborder=gdbm:ndbm --enable-ipv6 --enable-loadable-sqlite-extensions --without-static-libpython --with-tzpath=/usr/share/zoneinfo --without-ensurepip
+    make -j$(nproc) EXTRA_CFLAGS="$CFLAGS"
     make DESTDIR={STAGING_ROOT} install
 
     # --- 新增：清理冗余文件 ---
@@ -31,8 +41,10 @@ lankebuild_build() {
     # --- PEP 668：外部管理标记 ---
     # 阻止 pip 直接装进系统 site-packages：python 升级后会留下孤儿 /usr/lib/python{旧版}
     # （pip 装的不随版本迁移），造成污染与玄学加载问题。系统包用 lpkg，用户包用 venv / pip --user。
-    mkdir -p "{STAGING_ROOT}{LIBDIR}/python${PY_MINOR}/site-packages"
-    cat > "{STAGING_ROOT}{LIBDIR}/python${PY_MINOR}/site-packages/EXTERNALLY-MANAGED" << 'EOF'
+    # 注意：标记必须放在 sysconfig stdlib 根（/usr/lib/python{MINOR}/EXTERNALLY-MANAGED）——
+    #       pip 只查 stdlib 根；放 site-packages 下 pip 不检测，PEP 668 形同虚设（实测）。
+    mkdir -p "{STAGING_ROOT}{LIBDIR}/python${PY_MINOR}"
+    cat > "{STAGING_ROOT}{LIBDIR}/python${PY_MINOR}/EXTERNALLY-MANAGED" << 'EOF'
 [externally-managed]
 Error=This Python is externally managed by LankeOS's lpkg package manager. Install system packages with lpkg, and Python packages with a virtual environment (venv) or pip --user.
 EOF
