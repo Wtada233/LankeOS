@@ -9,19 +9,106 @@ lankebuild_build() {
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 
-    # 建立基础 PAM 配置文件
+    # 基础 PAM 栈配置（对齐 Arch pambase）
+    # 说明：pam_systemd_home / pam_lastlog2 在 LankeOS 尚未构建，配置中对应行
+    #       均为 optional 或 `-` 前缀（缺失模块不致命），可直接沿用 Arch 内容。
     mkdir -pv {STAGING_ROOT}/etc/pam.d
     cat > {STAGING_ROOT}/etc/pam.d/system-auth << "EOF"
-auth      required    pam_unix.so
-account   required    pam_unix.so
-session   required    pam_unix.so
-password  required    pam_unix.so
+#%PAM-1.0
+
+auth       required                    pam_faillock.so      preauth
+# Optionally use requisite above if you do not want to prompt for the password
+# on locked accounts.
+-auth      [success=2 default=ignore]  pam_systemd_home.so
+auth       [success=1 default=bad]     pam_unix.so          try_first_pass nullok
+auth       [default=die]               pam_faillock.so      authfail
+auth       optional                    pam_permit.so
+auth       required                    pam_env.so
+auth       required                    pam_faillock.so      authsucc
+# If you drop the above call to pam_faillock.so the lock will be done also
+# on non-consecutive authentication failures.
+
+-account   [success=1 default=ignore]  pam_systemd_home.so
+account    required                    pam_unix.so
+account    optional                    pam_permit.so
+account    required                    pam_time.so
+
+-password  [success=1 default=ignore]  pam_systemd_home.so
+password   required                    pam_unix.so          try_first_pass nullok shadow
+password   optional                    pam_permit.so
+
+-session   optional                    pam_systemd_home.so
+session    required                    pam_limits.so
+session    required                    pam_unix.so
+session    optional                    pam_permit.so
 EOF
+
+    cat > {STAGING_ROOT}/etc/pam.d/system-login << "EOF"
+#%PAM-1.0
+
+auth       required   pam_shells.so
+auth       requisite  pam_nologin.so
+auth       include    system-auth
+
+account    required   pam_access.so
+account    required   pam_nologin.so
+account    include    system-auth
+
+password   include    system-auth
+
+session    optional   pam_loginuid.so
+session    optional   pam_keyinit.so       force revoke
+session    include    system-auth
+session    optional   pam_lastlog2.so      silent
+session    optional   pam_motd.so
+session    optional   pam_mail.so          dir=/var/spool/mail standard quiet
+session    optional   pam_umask.so
+-session   optional   pam_systemd.so
+session    required   pam_env.so
+EOF
+
+    cat > {STAGING_ROOT}/etc/pam.d/system-remote-login << "EOF"
+#%PAM-1.0
+
+auth      include   system-login
+account   include   system-login
+password  include   system-login
+session   include   system-login
+EOF
+
+    cat > {STAGING_ROOT}/etc/pam.d/system-local-login << "EOF"
+#%PAM-1.0
+
+auth      include   system-login
+account   include   system-login
+password  include   system-login
+session   include   system-login
+EOF
+
+    cat > {STAGING_ROOT}/etc/pam.d/system-services << "EOF"
+#%PAM-1.0
+
+auth      sufficient  pam_permit.so
+
+account   include     system-auth
+
+session   optional    pam_loginuid.so
+session   required    pam_limits.so
+session   required    pam_unix.so
+session   optional    pam_permit.so
+session   required    pam_env.so
+EOF
+
     cat > {STAGING_ROOT}/etc/pam.d/other << "EOF"
-auth      required    pam_deny.so
-account   required    pam_deny.so
-password  required    pam_deny.so
-session   required    pam_deny.so
+#%PAM-1.0
+auth      required   pam_deny.so
+auth      required   pam_warn.so
+account   required   pam_deny.so
+account   required   pam_warn.so
+password  required   pam_deny.so
+password  required   pam_warn.so
+session   required   pam_deny.so
+session   required   pam_warn.so
 EOF
 }
 

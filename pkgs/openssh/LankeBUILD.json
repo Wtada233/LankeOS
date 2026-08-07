@@ -1,25 +1,33 @@
 {
   "name": "openssh",
   "version": "10.4p1",
-  "release": 2,
-  "deps": [],
-  "needed_so": [
-    "libc.so.6",
-    "libcrypt.so.2",
-    "libcrypto.so.3",
-    "libz.so.1"
+  "release": 3,
+  "deps": [
+    "glibc",
+    "linux-pam",
+    "libxcrypt",
+    "openssl",
+    "zlib",
+    "libedit",
+    "krb5",
+    "xauth"
   ],
+  "needed_so": [],
   "provides": [],
   "build_deps": [
-    "linux-pam",
     "base-devel",
+    "linux-pam",
     "krb5",
     "libedit",
     "libxcrypt",
-    "zlib"
+    "openssl",
+    "zlib",
+    "xauth"
   ],
   "sources": [
     "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.4p1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [
+    "file://./0001-fix-GSSAPI-option-names.patch"
+  ]
 }

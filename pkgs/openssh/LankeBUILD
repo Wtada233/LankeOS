@@ -1,21 +1,170 @@
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    # work_sources 使顶层含补丁文件，自动检测会退回工作根目录 → 手动进入源码目录
+    for dir in */; do
+        if [ -d "$dir" ] && [ -x "$dir/configure" ]; then
+            cd "$dir"
+            break
+        fi
+    done
+
+    # 对齐 Arch packaging：去掉无用的 VCS 首行，并在默认配置头部插入 drop-in Include 段。
+    # 上游 10.4 的 sshd_config 未自带 Include，systemd 提供的 drop-in 因此不会生效。
+    sed '/^#.*\$.*\$$/d' -i ssh{,d}_config
+    printf "# Include drop-in configurations\nInclude /etc/ssh/sshd_config.d/*.conf\n" | cat - sshd_config > sshd_config.tmp
+    mv -v sshd_config.tmp sshd_config
+    printf "# Include drop-in configurations\nInclude /etc/ssh/ssh_config.d/*.conf\n" | cat - ssh_config > ssh_config.tmp
+    mv -v ssh_config.tmp ssh_config
+
+    # 修复 10.4 的 GSSAPI 配置项命名回归（bz3974）
+    patch -Np1 -i {WORK_DIR}/0001-fix-GSSAPI-option-names.patch
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}/ssh --with-privsep-path=/var/lib/sshd --without-pam --disable-static
+    # 同 prepare：手动进入源码目录
+    for dir in */; do
+        if [ -d "$dir" ] && [ -x "$dir/configure" ]; then
+            cd "$dir"
+            break
+        fi
+    done
+
+    # 对齐 Arch 打包参数。差异：
+    #   - 无 libfido2 包 → 去掉 --with-security-key-builtin
+    #   - 默认 PATH 遵循 LankeOS login.defs（/usr/bin，不含 /usr/local）
+    #   - 不传 --disable-strip（lpkg finalize 自行 strip）
+    ./configure \
+        --disable-lastlog \
+        --libexecdir=/usr/lib/ssh \
+        --prefix={PREFIX} \
+        --sbindir={SBINDIR} \
+        --sysconfdir={SYSCONFDIR}/ssh \
+        --with-default-path='/usr/sbin:/usr/bin' \
+        --with-kerberos5={PREFIX} \
+        --with-libedit \
+        --with-pam \
+        --with-pid-dir=/run \
+        --with-privsep-path=/usr/share/empty.sshd \
+        --with-privsep-user=nobody \
+        --with-ssl-engine \
+        --with-xauth=/usr/bin/xauth \
+        --without-zlib-version-check
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
-    cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
-getent group sshd >/dev/null || groupadd -g 22 sshd
-getent passwd sshd >/dev/null || useradd -c 'sshd Privilege Separation' -d /var/lib/sshd -g sshd -s /bin/false -u 22 sshd
-systemctl enable sshd
-EOF
 }
 
-
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    # systemd 单元：上游 make install 不安装，Arch 同样在打包阶段手动安装
+    mkdir -pv {STAGING_ROOT}{LIBDIR}/systemd/system
+    mkdir -pv {STAGING_ROOT}{LIBDIR}/systemd/user
+
+    cat > {STAGING_ROOT}{LIBDIR}/systemd/system/sshd.service << 'EOF'
+[Unit]
+After=network.target sshdgenkeys.service
+Before=ssh-access.target
+Description=OpenSSH Daemon
+Documentation=man:sshd(8) man:sshd_config(5)
+Wants=sshdgenkeys.service ssh-access.target
+
+[Service]
+Type=notify-reload
+ExecStart=/usr/bin/sshd -D
+KillMode=process
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    cat > {STAGING_ROOT}{LIBDIR}/systemd/system/sshdgenkeys.service << 'EOF'
+[Unit]
+ConditionPathExists=|!/etc/ssh/ssh_host_ecdsa_key
+ConditionPathExists=|!/etc/ssh/ssh_host_ecdsa_key.pub
+ConditionPathExists=|!/etc/ssh/ssh_host_ed25519_key
+ConditionPathExists=|!/etc/ssh/ssh_host_ed25519_key.pub
+ConditionPathExists=|!/etc/ssh/ssh_host_rsa_key
+ConditionPathExists=|!/etc/ssh/ssh_host_rsa_key.pub
+Description=SSH Key Generation
+
+[Service]
+ExecStart=/usr/bin/ssh-keygen -A
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # 阻止 systemd-ssh-generator 生成默认单元，并为主服务配套生成主机密钥
+    cat > {STAGING_ROOT}{LIBDIR}/systemd/system/sshd@.service << 'EOF'
+# This is required to prevent systemd-ssh-generator from creating a default
+# file in its place.  The main change vs. upstream is the addition of Wants=
+# for our sshgenkeys.service, which systemd otherwise doesn't know about.
+
+[Unit]
+After=network.target sshdgenkeys.service
+Before=ssh-access.target
+Description=OpenSSH Per-Connection Server Daemon
+Documentation=man:sshd(8) man:sshd_config(5)
+Wants=sshdgenkeys.service ssh-access.target
+
+[Service]
+ExecStart=-/usr/bin/sshd -i -o "AuthorizedKeysFile ${CREDENTIALS_DIRECTORY}/ssh.ephemeral-authorized_keys-all .ssh/authorized_keys"
+ImportCredential=ssh.ephemeral-authorized_keys-all
+StandardInput=socket
+EOF
+
+    cat > {STAGING_ROOT}{LIBDIR}/systemd/user/ssh-agent.service << 'EOF'
+# Requires SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket" to be set in environment
+[Unit]
+ConditionEnvironment=!SSH_AGENT_PID
+Description=OpenSSH key agent
+Documentation=man:ssh-agent(1) man:ssh-add(1) man:ssh(1)
+Requires=ssh-agent.socket
+
+[Service]
+ExecStart=/usr/bin/ssh-agent -D
+SuccessExitStatus=2
+Type=simple
+
+[Install]
+Also=ssh-agent.socket
+EOF
+
+    cat > {STAGING_ROOT}{LIBDIR}/systemd/user/ssh-agent.socket << 'EOF'
+[Unit]
+ConditionEnvironment=!SSH_AGENT_PID
+Description=Socket for the OpenSSH key agent
+Documentation=man:ssh-agent(1)
+
+[Socket]
+ListenStream=%t/ssh-agent.socket
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target
+EOF
+
+    # PAM 配置（使用 linux-pam 提供的 system-remote-login 栈）
+    mkdir -pv {STAGING_ROOT}/etc/pam.d
+    cat > {STAGING_ROOT}/etc/pam.d/sshd << 'EOF'
+#%PAM-1.0
+
+auth      include   system-remote-login
+account   include   system-remote-login
+password  include   system-remote-login
+session   include   system-remote-login
+EOF
+
+    # LankeOS 默认 sshd 策略（对齐 Arch 的 99-archlinux.conf）
+    mkdir -pv {STAGING_ROOT}/etc/ssh/sshd_config.d
+    cat > {STAGING_ROOT}/etc/ssh/sshd_config.d/99-lankeos.conf << 'EOF'
+# sshd_config defaults on LankeOS
+KbdInteractiveAuthentication no
+UsePAM yes
+PrintMotd no
+EOF
+    mkdir -pv {STAGING_ROOT}/etc/ssh/ssh_config.d
+
+    cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+systemctl enable sshd
+EOF
 }

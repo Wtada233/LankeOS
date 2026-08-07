@@ -1,7 +1,7 @@
 {
   "name": "linux-pam",
   "version": "1.7.2",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],
