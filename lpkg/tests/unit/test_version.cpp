@@ -186,6 +186,26 @@ TEST(VersionCompare, ReleaseSuffix)
     EXPECT_TRUE(version_compare("1.0+2.0", "1.0+2.1"));
 }
 
+// 回归：版本升级必须主导 release（systemd 261+3 → 261.2+3、tmux 3.7+2 → 3.7b+2）。
+// 此前整串丢给 rpm 段比较，release 数字被压进版本段与版本竞争：
+//   `261.2+3` → [261,2,3] vs `261+3` → [261,3]，第二段 2 < 3 → 判 261.2+3 < 261+3，
+// 导致 `lpkg upgrade` 误报"已是最新"。evr_cmp 分离 release 后版本优先比较。
+TEST(VersionCompare, VersionBumpDominatesRelease)
+{
+    // systemd：261（release 3）应升级到 261.2（release 3）
+    EXPECT_TRUE(version_compare("261+3", "261.2+3"));
+    EXPECT_FALSE(version_compare("261.2+3", "261+3"));
+    // tmux：3.7（release 2）应升级到 3.7b（release 2）
+    EXPECT_TRUE(version_compare("3.7+2", "3.7b+2"));
+    EXPECT_FALSE(version_compare("3.7b+2", "3.7+2"));
+    // 版本升级主导任何 release 数：1.0+9 < 1.0.1
+    EXPECT_TRUE(version_compare("1.0+9", "1.0.1"));
+    EXPECT_FALSE(version_compare("1.0.1", "1.0+9"));
+    // release 比较在版本相等时才生效（不变）
+    EXPECT_TRUE(version_compare("261.2+1", "261.2+3"));
+    EXPECT_FALSE(version_compare("261.2+3", "261.2+1"));
+}
+
 // ===== 补丁后缀 (pN) 测试 =====
 // pN 作为补丁后缀，有补丁 > 无补丁，优先级最高
 
@@ -210,21 +230,22 @@ TEST(VersionCompare, PatchSuffix)
     EXPECT_TRUE(version_compare("1.0p", "1.0p2"));  // p < p2（无数字视为 0）
     EXPECT_FALSE(version_compare("1.0p2", "1.0p"));
 
-    // pN 与 +N 相对顺序（rpm 语义）：base < pN < +N。
-    // 注：rpm 按段比较，字母段 pN 排在数字段 +N 之前——与旧 lpkg"补丁优先级最高(p1>+1)"
-    // 相反。这是 rpm 段比较模型的固有差异，非 `-`→`~` 可覆盖；随"完全使用 libsolv"采纳。
-    EXPECT_TRUE(version_compare("1.0p1", "1.0+1"));   // p1 < +1 → true
-    EXPECT_FALSE(version_compare("1.0+1", "1.0p1"));  // +1 < p1 → false
+    // pN 与 +N 相对顺序：base < +N < pN。
+    // `+N` 是发行修订号，evr_cmp 先拆出 release 再比版本（见下 regression）——版本
+    // 1.0p1（补丁版本）高于基础版 1.0，故 1.0p1 > 1.0+1。此前的 rpm 平铺段比较
+    // 给出 p1 < +1，但那正是让 `261.2+3 < 261+3` 错排的根源，已随分离模型修正。
+    EXPECT_FALSE(version_compare("1.0p1", "1.0+1"));  // p1 < +1 → false
+    EXPECT_TRUE(version_compare("1.0+1", "1.0p1"));   // +1 < p1 → true
 
     // pN > -pre-release
     EXPECT_FALSE(version_compare("1.0p1", "1.0-rc1"));  // p1 < -rc1 → false
     EXPECT_TRUE(version_compare("1.0-rc1", "1.0p1"));
 
-    // 完整排序链：-pre < base < pN < +N
+    // 完整排序链：-pre < base < +N < pN
     EXPECT_TRUE(version_compare("1.0-rc1", "1.0"));
-    EXPECT_TRUE(version_compare("1.0", "1.0p1"));
-    EXPECT_TRUE(version_compare("1.0p1", "1.0+1"));
+    EXPECT_TRUE(version_compare("1.0", "1.0+1"));
     EXPECT_TRUE(version_compare("1.0+1", "1.0+2"));
+    EXPECT_TRUE(version_compare("1.0+2", "1.0p1"));
 }
 
 // 回归测试：git hash 版本号（gn: 0.2385.9ece3f52+1）
@@ -283,9 +304,13 @@ TEST(VersionCompare, LibsolvEvrRoundTrip)
 {
     EXPECT_EQ(to_libsolv_evr("1.0-rc1"), "1.0~rc1");
     EXPECT_EQ(to_libsolv_evr("1.0"), "1.0");
-    EXPECT_EQ(to_libsolv_evr("6.0.0+3.lpkg"), "6.0.0+3.lpkg");  // 无 `-` 不变
+    // `+release` → `-`：libsolv 按最后一个 `-` 切 version/release
+    EXPECT_EQ(to_libsolv_evr("6.0.0+3.lpkg"), "6.0.0-3.lpkg");
+    EXPECT_EQ(to_libsolv_evr("261.2+3"), "261.2-3");
     EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("1.0-rc1")), "1.0-rc1");
     EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("22.1.7+2")), "22.1.7+2");
+    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("261.2+3")), "261.2+3");
+    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("0.2385.9ece3f52+1")), "0.2385.9ece3f52+1");
     // 归一化后：rc 旧于基础版
     EXPECT_TRUE(version_compare("1.0-rc1", "1.0"));
     EXPECT_FALSE(version_compare("1.0", "1.0-rc1"));

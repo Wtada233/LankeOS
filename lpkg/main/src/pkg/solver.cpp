@@ -365,25 +365,30 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                 FOR_REPO_SOLVABLES(ps.avail, pi, sa)
                 {
                     if (sa->name != nid) continue;
+                    // pool 内 evr 是归一化后的 libsolv EVR（`+release`→`-`、`-预发布`→`~`），
+                    // 用 version_compare 前须 from_libsolv_evr 还原回 lpkg 版本域。
                     if (!best ||
-                        version_compare(pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr),
-                                        pool_id2str(ps.pool, sa->evr)))
+                        version_compare(from_libsolv_evr(
+                                            pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr)),
+                                        from_libsolv_evr(pool_id2str(ps.pool, sa->evr))))
                         best = pi;  // 当前 best 版本 < sa 版本 → sa 更新为 best
                 }
                 // 已装版本 >= available 最高版本时不降级（仓库暂缺该新版本 / 已最新）
-                const char* installed_ver = nullptr;
+                std::string installed_ver;
                 if (Repo* ir = ps.pool->installed) {
                     int ip;
                     Solvable* is;
                     FOR_REPO_SOLVABLES(ir, ip, is)
                     if (is->name == nid) {
-                        installed_ver = pool_id2str(ps.pool, is->evr);
+                        installed_ver = from_libsolv_evr(pool_id2str(ps.pool, is->evr));
                         break;
                     }
                 }
-                const char* best_ver =
-                    best ? pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr) : nullptr;
-                if (best && (!installed_ver || version_compare(installed_ver, best_ver)))
+                const std::string best_ver =
+                    best ? from_libsolv_evr(
+                               pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr))
+                         : std::string{};
+                if (best && (installed_ver.empty() || version_compare(installed_ver, best_ver)))
                     queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, best);  // 新装 / 升级
                 else if (best)
                     queue_push2(&jobs, SOLVER_SOLVABLE_NAME | SOLVER_INSTALL,

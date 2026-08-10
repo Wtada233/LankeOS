@@ -24,7 +24,9 @@ struct Constraint {
  * 语义（与 rpm 一致，lpkg 不再自研补段）：
  *   - 段按数值比较（6.16.1 > 6.6.1）；
  *   - `1.0` 与 `1.0.0` 视为**不同版本**（段数不同即不等，不做缺失段补 0）；
- *   - 预发布 `1.0-rc1` 归一化为 `1.0~rc1` 后，**旧于** `1.0`（rpm 的 `~` = 预发布）。
+ *   - 预发布 `1.0-rc1` 归一化为 `1.0~rc1` 后，**旧于** `1.0`（rpm 的 `~` = 预发布）；
+ *   - `+N` 是发行修订号，**先拆出版本比较、版本相同再比 release**（261.2+3 > 261+3；
+ *     若整串丢给 rpm 段比较，release 会与版本段混比导致错排）。
  */
 bool version_compare(const std::string& v1_str, const std::string& v2_str);
 
@@ -46,12 +48,14 @@ bool version_satisfies_all(const std::string& current_version,
 /**
  * lpkg 版本 → libsolv EVR 字符串（供 pool 边界使用）。
  *
- * 为什么需要归一化：`pool_evrcmp`（libsolv）会把版本串**最后一个 `-` 之后当 release**，
- * release 非空即更大 → `1.0-rc1` 被判成 `> 1.0`；而 lpkg 语义里 `-预发布` 旧于基础版。
- * rpm 恰好用 `~` 表达"预发布（小于一切含基础版）"。lpkg 格式里 `-` 只出现在预发布位置，
- * 所以把 `-` 全部替换为 `~` 即可让 libsolv 的比较与 lpkg 语义一致。
+ * 归一化：`pool_evrcmp`（libsolv）把版本串**最后一个 `-` 之后当 release**、且 `~` 当预发布。
+ *   - `-预发布` → `~`：lpkg 的 `-` 只出现在预发布位置，rpm 用 `~` 表达"预发布（旧于基础版）"，
+ *     避免 `1.0-rc1` 被 libsolv 当成 release 而判成 `> 1.0`；
+ *   - `+release` → `-`：让 `261.2+3` 的 release 被 libsolv 正确切出，避免整串平铺比较把
+ *     `261.2+3` 判成 `< 261+3`（依赖要求新版本时误判为降级 → 事务无解）。
  */
 std::string to_libsolv_evr(const std::string& v);
 
-/** libsolv EVR 字符串 → lpkg 版本（`~` 还原为 `-`）。lpkg 版本不含 `~`，可安全往返。 */
+/** libsolv EVR 字符串 → lpkg 版本：`~` 还原为 `-`（预发布），最后一个 `-`（release 分隔符）
+ *  还原为 `+`。lpkg 版本不含 `~`，可安全往返。 */
 std::string from_libsolv_evr(const std::string& v);
