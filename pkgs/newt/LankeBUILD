@@ -8,5 +8,6 @@ lankebuild_build() {
     rm -f {STAGING_ROOT}{LIBDIR}/libnewt.a
 }
 lankebuild_package() {
-    :
+    # 清理 __pycache__（与 python 配方一致，.pyc 冗余）
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
 }
