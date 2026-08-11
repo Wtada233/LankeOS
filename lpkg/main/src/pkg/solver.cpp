@@ -20,6 +20,7 @@
 #undef requires
 
 #include "../base/constants.hpp"
+#include "../base/utils.hpp"
 #include "../i18n/localization.hpp"
 #include "../repo/repository.hpp"
 #include "../vercmp/version.hpp"
@@ -47,6 +48,19 @@ int rel_op(const std::string& op)
     if (op == "!=") return REL_GT | REL_LT;
     // 未知 op 兜底——宽松处理避免误判冲突，比卡死更安全。
     return REL_EQ | REL_GT | REL_LT;
+}
+
+// 判定依赖名是否为 SONAME（needed_so）：".so" 后紧跟数字/点或结尾。
+// 曾用 strstr(name, ".so") 的宽松判定——包名中间含 ".so" 子串（如 libfoo.so-dev）
+// 会被误判为 SONAME：collect_problems 会把缺失的该**命名依赖**送进 missing_so
+// （--missing-so-no-error 会静默容忍本应报错的依赖），order_by_dependencies 也会
+// 给它造一条 ABI 排序边。
+bool looks_like_soname(const char* name)
+{
+    const char* so = name ? strstr(name, ".so") : nullptr;
+    if (!so) return false;
+    const char after = so[3];
+    return after == '\0' || after == '.' || (after >= '0' && after <= '9');
 }
 
 void add_provides(Solvable* s, Pool* pool, const std::vector<std::string>& provides)
@@ -108,7 +122,7 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                 info == SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP) {
                 const char* dep_name = dep ? pool_id2str(pool, dep) : "";
                 if (dep_name && *dep_name) {
-                    if (strstr(dep_name, ".so") != nullptr)
+                    if (looks_like_soname(dep_name))
                         missing_so.emplace_back(dep_name);
                     else if (info == SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP)
                         missing_target.emplace_back(dep_name);  // 直接请求的包/能力
@@ -116,8 +130,8 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                         missing_dep.emplace_back(dep_name);  // 传递依赖
                 }
             } else if (info == SOLVER_RULE_JOB_UNKNOWN_PACKAGE) {
-                // 请求的包不存在 → 真错误
-                fatal.emplace_back("requested package does not exist");
+                // 请求的包不存在 → 真错误（走 l10n）
+                fatal.emplace_back(get_string("error.requested_package_not_exist"));
             } else if (info >= SOLVER_RULE_PKG && info < SOLVER_RULE_JOB) {
                 // 真实包级冲突（REQUIRES 版本不符/CONFLICTS/SAME_NAME/OBSOLETES...）
                 const char* desc = solver_ruleinfo2str(solv, info, from, to, dep);
@@ -212,7 +226,7 @@ void order_by_dependencies(Pool* pool, const std::vector<Id>& sids, std::vector<
             Id req = data[o];
             if (ISRELDEP(req)) continue;  // 带版本约束的命名依赖，不用于 ABI 排序
             const char* rn = pool_id2str(pool, req);
-            if (!rn || strstr(rn, ".so") == nullptr) continue;  // 只保留 needed_so（SONAME）
+            if (!rn || !looks_like_soname(rn)) continue;  // 只保留 needed_so（SONAME）
             Id* dp = pool_whatprovides_ptr(pool, req);
             for (; *dp; dp++) {
                 Solvable* prov = pool_id2solvable(pool, *dp);
@@ -446,6 +460,8 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                 } else {
                     // 无同名真实包 → capability 回退：提供者由 libsolv 选（同 latest 分支），
                     // 无提供者时产生 SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP → collect_problems 报错。
+                    // 指定版本对能力无意义——提示找不到同名包、忽略版本约束，仍装提供者。
+                    log_warning(string_format("warning.capability_version_ignored", name, vspec));
                     queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL, nid);
                 }
             }

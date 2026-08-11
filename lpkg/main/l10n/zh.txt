@@ -124,18 +124,20 @@ info.installation_aborted=安装被用户中止。
 info.all_packages_already_installed=所有请求的包都已安装。
 error.pack_no_output=请使用 -o 指定输出文件名。
 error.package_not_in_repo=仓库中未找到软件包: {}
+error.requested_package_not_exist=请求的软件包不存在
 error.installation_failed_rolling_back=安装失败。正在回滚在此事务中已成功安装的软件包...
 warning.repo_index_load_failed=加载仓库索引失败: {}。远程解析可能会失败。
 warning.package_not_in_repo=仓库中未找到包: {}
+warning.capability_version_ignored=仓库中无名为 '{}' 的软件包；'{}' 按能力名处理并忽略版本约束，将安装其提供者
 warning.skip_invalid_local_pkg=跳过无效的本地包文件: {} - {}
 error.local_pkg_not_found=找不到本地包文件: {}
 error.candidate_dep_version_mismatch=候选依赖 {} 版本 {} 不满足约束 {}
 error.unresolvable_drift=无法解决的元数据漂移，包 '{}': {}
 error.unresolved_soname=所需的 SONAME '{}' 在仓库和安装计划中均无提供者
 error.unresolved_dependency=依赖 '{}' 在仓库中无提供者
+error.dep_missing_from_plan=依赖 '{}' 不在包 '{}' 的解析计划中（元数据验证后不应发生），已中止并整批回滚
 error.package_version_not_found=仓库中不存在 {} 的版本 {}，可用版本: {}
-info.installing_discovered_dep=发现缺失的依赖 '{}'，正在加入安装队列...
-info.log_prefix==> 
+info.log_prefix==>
 info.upgrade_old_files_check=正在替换: {} → {}, {} 个旧文件待处理
 info.rollback_debug_files=回滚: new_files_ 共 {} 条
 info.rollback_debug_dirs=回滚: {} 个目录待删除

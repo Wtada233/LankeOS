@@ -345,22 +345,51 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
     if (actual_deps.empty()) return;
 
     log_info(string_format("info.checking_deps"));
-    bool found_new = false;
 
     for (const auto& dep : actual_deps) {
         const std::string& dep_name = dep.name;
         const std::string installed_ver = Cache::instance().get_installed_version(dep_name);
 
         if (!installed_ver.empty()) {
-            if (dep.constraints.empty() || installed_ver == "virtual" ||
-                version_satisfies_all(installed_ver, dep.constraints)) {
-                continue;
+            if (dep.constraints.empty() || version_satisfies_all(installed_ver, dep.constraints)) {
+                continue;  // 真实包已安装且满足
             }
+        } else if (!Cache::instance().get_providers(dep_name).empty()) {
+            // 名称是能力（无同名真实包，但已有包注册提供该能力）→ 视为满足。
+            // 能力（多为无版本 SONAME）不带版本，约束对之无意义。
+            continue;
         }
 
-        if (ctx.plan.contains(dep_name)) continue;
+        if (ctx.plan.contains(dep_name)) continue;  // 计划中已有同名真实包
 
-        // 已是目标（libsolv 会处理该依赖）→ 跳过
+        // 命名能力：由计划中某包提供（能力名≠包名，libsolv 已按能力解析）。
+        // 提供者的**真实元数据可能与本索引不一致**（如 DynamicProviderChange 场景）——
+        // 把该能力记入 ctx.targets，供元数据验证触发的重解（i=0 重启）重新拉取正确
+        // 提供者。**绝不在此重解**：中途改写 order 且不重置批次游标会导致依赖者先于
+        // 提供者安装、产生重复计划项（曾因此乱序）。
+        bool provided_by_plan = false;
+        for (const auto& [pn, plan_pkg] : ctx.plan) {
+            for (const auto& prov : plan_pkg.provides) {
+                if (prov == dep_name) {
+                    provided_by_plan = true;
+                    break;
+                }
+            }
+            if (provided_by_plan) break;
+        }
+        if (provided_by_plan) {
+            bool already_target = false;
+            for (const auto& [tn, tv] : ctx.targets)
+                if (tn == dep_name) {
+                    already_target = true;
+                    break;
+                }
+            if (!already_target)
+                ctx.targets.emplace_back(dep_name, std::string(constants::VER_LATEST));
+            continue;
+        }
+
+        // 已是目标（libsolv 会处理）
         bool is_target = false;
         for (const auto& [tn, tv] : ctx.targets)
             if (tn == dep_name) {
@@ -369,20 +398,11 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
             }
         if (is_target) continue;
 
-        // 实际元数据发现的新依赖 → 加入目标，交给 libsolv 重解
-        std::string req_ver = std::string(constants::VER_LATEST);
-        if (!dep.constraints.empty()) {
-            if (auto matching = ctx.repo.find_best_matching_version(dep_name, dep.constraints))
-                req_ver = matching->version;
-        }
-        log_info(string_format("info.installing_discovered_dep", dep_name));
-        ctx.targets.emplace_back(dep_name, req_ver);
-        found_new = true;
-    }
-
-    if (found_new) {
-        // libsolv 重解整个计划（依赖/虚拟提供/冲突由 solver 原生处理）
-        detail::resolve_with_solver(ctx);
+        // 走到这里 = solver/plan 不一致：依赖未安装、不在计划、也不由计划包提供。
+        // 元数据验证（install_packages/upgrade_packages）在批次开始前已按真实元数据
+        // 重解并 i=0 重启，这里不应再发现新依赖。**绝不在此重解**（中途改写 order 且
+        // 不重置游标 → 乱序安装），改为显式报错，整批回滚。
+        throw LpkgException(string_format("error.dep_missing_from_plan", dep_name, pkg_name_));
     }
 
     if (!needed_so_.empty()) {

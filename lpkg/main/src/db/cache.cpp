@@ -37,7 +37,10 @@ std::string Cache::get_installed_version(std::string_view name)
     std::lock_guard<std::mutex> lock(mtx);
     auto it = installed_pkgs.find(name);
     if (it != installed_pkgs.end()) return it->second;
-    if (providers.count(name)) return "virtual";
+    // 不再对能力名返回 "virtual"：调用方用本函数判断"真实包是否已装"，能力提供
+    // 与否应显式用 get_providers 判断。曾返回 "virtual" 使 remove/upgrade/reinstall
+    // 把能力名误当成已装包处理（如 `remove foo` 对能力 foo 跑空批次、`install foo`
+    // 把能力名当旧版本做升级语义）。
     return "";
 }
 
