@@ -227,7 +227,11 @@ void InstallationTask::backup_existing_files()
 
         fs::create_directories(phys_dir, ec);
         if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
-            if (!fs::is_directory(physical_path)) {
+            // is_directory 会跟随符号链接：symlink→目录 会被误判为"目录"而跳过备份。
+            // 但 copy_package_files 的 symlink/普通文件分支都会直接替换该路径（且无 WAL
+            // 记录），回滚时没有 BACKUP 可恢复 → 旧符号链接永久丢失。故符号链接（含指向
+            // 目录的）一律备份；仅真正的目录（非 symlink）由目录逻辑处理、跳过。
+            if (fs::is_symlink(physical_path) || !fs::is_directory(physical_path)) {
                 // check_for_file_conflicts 已处理文件冲突，此处无需重复检测
                 fs::path bak = unique_bak_path(physical_path, pkg_name_);
                 wal::log_wal_line("BACKUP " + physical_path.string() + " \xe2\x86\x92 " +
@@ -499,6 +503,11 @@ void InstallationTask::check_for_file_conflicts(InstallContext* ctx)
             if (!Config::instance().force_overwrite_mode()) {
                 conflicts[path_str] = *owners.begin();
             } else {
+                // 不变量：force-overwrite 在此**仅改内存** Cache 的所有权（此处尚未写
+                // BEGIN WAL 行）。批次成功 → cache.write(pkg:installed) 落盘；批次失败
+                // → batch_rollback 的 reverse_execute 恢复磁盘 DB 后必然 cache.load()，
+                // 内存所有权随磁盘一起回到旧值（ARCH.md §4.5 OWNER_OVERRIDE 修复）。
+                // 改动任何回滚路径时须保持"每次都 cache.load()"。
                 for (const auto& owner : owners) {
                     cache.remove_file_owner(path_str, owner);
                 }

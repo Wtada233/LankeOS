@@ -259,6 +259,7 @@ warning.query_path_resolve_failed=查询路径解析失败: {}
 warning.dep_scan_metadata_parse_failed=解析 {} 的元数据失败: {}
 warning.scan_file_error=扫描期间访问 {} 出错: {}
 warning.cleanup_failed=无法删除备份文件/目录: {}。可能正在使用或权限不足。
+warning.cleanup_deferred=安装/升级已提交，但清理残留备份失败（{}）。残留备份由下次 lpkg 续传清理。
 warning.cleanup_dir_remove_failed=无法删除目录备份: {}。目录可能非空或权限不足。
 warning.wal_rename_fallback=跨设备重命名失败 '{}' → '{}'，回退到复制+删除（overlayfs 兼容，安全但非原子操作）
 

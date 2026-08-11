@@ -18,7 +18,7 @@
  * 事务协议：
  *
  *   正向路径：
- *     BEGIN_PKGS → Cache::write(":batch-start") → execute(batch_writer)
+ *     BEGIN_PKGS → Cache::write(":batch-start") → execute()
  *     → 逐包 Cache::write(pkg + ":installed") → COMMIT_PKGS
  *
  *   异常路径（catch）：
@@ -36,8 +36,10 @@
  *   - BEGIN_PKGS 写入 + fsync 后，异常路径保证 COMMIT_PKGS 被写入
  *   - COMMIT_PKGS 是批次完结的唯一标记
  *
- * 模板参数 OpT 是一个可调用对象 OpT(WalWriter&)，负责执行包级操作。
- * 它接收 WalWriter 引用用于写入 WAL 行。
+ * 模板参数 OpT 是一个可调用对象 OpT(std::vector<std::string>& success)，
+ * 负责执行包级操作；包级 WAL 写入统一走 wal::log_wal_line()。
+ * （曾向 OpT 传 WalWriter& 但调用方从未使用——所有写都走 log_wal_line，
+ *   持有无用 fd 反而迷惑，故移除。）
  *
  * @param op          包级操作的可调用对象
  * @return            成功安装的包名列表
@@ -54,15 +56,15 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
 
     try {
         // 批次开始（BEGIN_PKGS 不带包数——批次开启时无法预知最终包数，
-        // 且恢复逻辑不读取该数）
-        wal::WalWriter batch_writer = wal::begin_batch();
+        // 且恢复逻辑不读取该数）。直接写 WAL 行，无需持有 WalWriter。
+        wal::log_wal_line("BEGIN_PKGS");
 
         // 保存批次开始前的 DB 状态
         // 注意：write() 内部执行 WAL→备份→.tmp→rename→fsync 序列
         cache.write(":batch-start");
 
         // 执行包级操作
-        std::forward<OpT>(op)(batch_writer, successfully_installed);
+        std::forward<OpT>(op)(successfully_installed);
 
         // 批次提交
         wal::commit_batch();
@@ -72,7 +74,25 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
         // LpkgException 是 std::runtime_error 的子类，一并覆盖。
         // 批次回滚 → 回滚完成（COMMIT_PKGS 已写）→ 清理 DB 备份 → 重抛原异常。
         try {
-            wal::batch_rollback(successfully_installed);
+            // CLEANUP 感知：一旦批次已进入 CLEANUP 阶段（remove 的 .lpkg_bak 清理开始，
+            // 即该批次包含的所有 remove 都已 RM_COMMIT、DB 已落盘），系统状态稳定，
+            // 只剩 .lpkg_bak 临时文件待清——**不回滚**，走 continue_cleanup 续删+提交
+            // （移除保持最终）。回滚会恢复 DB 但被删的 bak 回不来 → 不一致；且
+            // "bak 是否被删"无法可靠判定（父目录被删/dangling 路径都会让 exists 误判）。
+            // 崩溃路径的 recover_packages 已有同一判断；这里补上异常路径的同一判断。
+            const auto ops = wal::extract_current_batch_ops(wal::wal_log_path());
+            bool has_cleanup = false;
+            for (const auto& op : ops) {
+                if (op.type == wal::WALOpType::CLEANUP) {
+                    has_cleanup = true;
+                    break;
+                }
+            }
+            if (has_cleanup) {
+                wal::continue_cleanup(ops);
+            } else {
+                wal::batch_rollback(successfully_installed);
+            }
             cleanup_db_backups();
             trim_completed();
         } catch (...) {
@@ -86,32 +106,5 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
     }
 }
 
-/**
- * 便捷包装：对已构建的 target 列表执行单一类型的包操作
- *
- * @param targets         要处理的目标列表
- * @param per_pkg_fn      每个包的处理函数 (ctx, pkg_name, pkg_version,
- * wal_writer)
- * @param install_order   安装顺序（依赖拓扑序）
- * @param get_plan_fn     获取包的 InstallPlan 的函数
- * @return                成功处理的包名列表
- */
-template <typename PlanMap, typename PerPkgFn>
-std::vector<std::string> run_ordered_batch(const std::vector<std::string>& install_order,
-                                           PlanMap& plan, PerPkgFn&& per_pkg_fn)
-{
-    return run_batch_transaction([&](wal::WalWriter& w, std::vector<std::string>& success) {
-        auto& cache = Cache::instance();
+// （曾提供 run_ordered_batch 便捷包装，但从未被任何调用点使用，已移除。）
 
-        for (const auto& name : install_order) {
-            auto& p = plan.at(name);
-
-            // 执行包级操作
-            std::forward<PerPkgFn>(per_pkg_fn)(w, p, success);
-
-            // 包完成后 DB 里程碑
-            cache.write(name + ":installed");
-            success.push_back(name);
-        }
-    });
-}

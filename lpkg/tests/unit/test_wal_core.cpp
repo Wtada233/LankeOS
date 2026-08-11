@@ -469,6 +469,22 @@ TEST_F(WalCoreTest, ReverseExecuteCopyNoTarget)
     EXPECT_EQ(stats.files_cleaned, 0);
 }
 
+TEST_F(WalCoreTest, ReverseExecuteCopyRemovesLeftoverTmp)
+{
+    // COPY 中断在 rename 前：dst 不存在，但 .lpkgtmp（arg1）残留 → 逆向应一并清理
+    create_file("usr/bin/newtool.lpkgtmp");
+    fs::path tmp = test_root / "usr/bin/newtool.lpkgtmp";
+    fs::path dst = test_root / "usr/bin/newtool";
+
+    std::vector<wal::WALOp> ops;
+    ops.push_back(wal::parse_op("COPY " + tmp.string() + " \xe2\x86\x92 " + dst.string()));
+
+    wal::RollbackStats stats = wal::reverse_execute(ops, false);
+    EXPECT_FALSE(fs::exists(tmp)) << ".lpkgtmp 残留应被逆向清理";
+    EXPECT_FALSE(fs::exists(dst));
+    EXPECT_EQ(stats.files_cleaned, 1);
+}
+
 // ============================================================================
 // reverse_execute 测试 — NEW / NEW_DIR 逆向
 // ============================================================================

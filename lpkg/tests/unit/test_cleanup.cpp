@@ -425,6 +425,80 @@ TEST_F(CleanupTest, RecWithPartialCleanupContinues)
 }
 
 // ============================================================================
+// post-commit 清理续传（install/upgrade 崩溃窗口：#5）
+//   已提交批次（COMMIT_PKGS 已写）+ post-commit CLEANUP 记录残留 bak →
+//   recover 应续删，而非让 bak 孤儿化
+// ============================================================================
+
+TEST_F(CleanupTest, RecoverContinuesPostCommitCleanup)
+{
+    // 升级成功（批次已提交），post-commit 清理崩溃中断：
+    //   bak1 已写 CLEANUP（但删除未做即崩溃），bak2 连 CLEANUP 都没写。
+    create_file("usr/bin/foo");
+    fs::path orig1 = test_root / "usr/bin/foo";
+    fs::path bak1 = test_root / "usr/bin/foo.lpkg_bak_pkg_pc1";
+    fs::rename(orig1, bak1);
+
+    create_file("usr/share/doc/pkg/README");
+    fs::path orig2 = test_root / "usr/share/doc/pkg/README";
+    fs::path bak2 = test_root / "usr/share/doc/pkg/README.lpkg_bak_pkg_pc2";
+    fs::rename(orig2, bak2);
+
+    {
+        std::ofstream f(wal::wal_log_path());
+        f << "BEGIN_PKGS 1\n"
+          << "BEGIN pkg 2.0\n"
+          << "BACKUP " << orig1.string() << " \xe2\x86\x92 " << bak1.string() << "\n"
+          << "BACKUP " << orig2.string() << " \xe2\x86\x92 " << bak2.string() << "\n"
+          << "COMMIT pkg 2.0\n"
+          << "END pkg 2.0\n"
+          << "COMMIT_PKGS\n"
+          // post-commit 清理：只处理到 bak1（CLEANUP 已写但删除未做即崩溃）
+          << "CLEANUP " << bak1.string() << "\n";
+    }
+
+    EXPECT_TRUE(fs::exists(bak1));
+    EXPECT_TRUE(fs::exists(bak2));
+
+    recover_packages();
+
+    // recover 应续传：两个 bak 都删掉（bak1 有 CLEANUP 记录、bak2 有 BACKUP 记录）
+    EXPECT_FALSE(fs::exists(bak1));
+    EXPECT_FALSE(fs::exists(bak2));
+    // 原始文件保持"已删除"（新版本已装，不回滚）
+    EXPECT_FALSE(fs::exists(orig1));
+    EXPECT_FALSE(fs::exists(orig2));
+}
+
+TEST_F(CleanupTest, TrimPreservesPendingPostCommitCleanup)
+{
+    // 清理未完成时 trim 不得清空 WAL（否则残留 bak 的来源记录丢失 → 孤儿化）。
+    create_file("usr/bin/foo");
+    fs::path orig1 = test_root / "usr/bin/foo";
+    fs::path bak1 = test_root / "usr/bin/foo.lpkg_bak_pkg_pt1";
+    fs::rename(orig1, bak1);
+
+    {
+        std::ofstream f(wal::wal_log_path());
+        f << "BEGIN_PKGS 1\n"
+          << "BEGIN pkg 2.0\n"
+          << "BACKUP " << orig1.string() << " \xe2\x86\x92 " << bak1.string() << "\n"
+          << "COMMIT pkg 2.0\n"
+          << "END pkg 2.0\n"
+          << "COMMIT_PKGS\n"
+          << "CLEANUP " << bak1.string() << "\n";  // 已写但未删
+    }
+    EXPECT_TRUE(fs::exists(bak1));
+
+    trim_completed();
+
+    // bak 仍残留 → trim 应保留记录（BACKUP/CLEANUP 行），而非清空
+    EXPECT_TRUE(fs::exists(bak1));
+    std::string wal = read_wal();
+    EXPECT_NE(wal.find("CLEANUP"), std::string::npos) << "清理未完成，trim 不应删掉记录";
+}
+
+// ============================================================================
 // CLEANUP + 目录续传
 // ============================================================================
 

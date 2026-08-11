@@ -446,12 +446,14 @@ TEST_F(ActiveRollbackTest, UpgradeCommitFailPreservesOldFilesAndDb)
 }
 
 // ============================================================================
-// 回归：CLEANUP 阶段 write-ahead —— CLEANUP WAL 行写入后、物理删除前崩溃，
-// .bak 仍在磁盘 → 整批可被 batch_rollback 恢复（旧的"先删后记"顺序下，
-// 该崩溃窗口会导致 .bak 已删但无日志 → DB 恢复为 installed 而文件丢失）
+// 回归：CLEANUP 阶段 write-ahead —— CLEANUP WAL 行写入后、物理删除前异常，
+// 一律走 continue_cleanup 续删+提交（**移除保持最终，不回滚**）。
+// 原因：cleanup 阶段 remove 已 RM_COMMIT、DB 已落盘，系统状态稳定，只剩 .lpkg_bak
+// 临时文件待清；回滚要恢复 DB 但被删的 bak 回不来 → 不一致，且"bak 是否被删"无法
+// 可靠判定（父目录被删/dangling 路径会让 exists 误判）。
 // ============================================================================
 
-TEST_F(ActiveRollbackTest, CleanupAfterWalBreakpointRestoresPackage)
+TEST_F(ActiveRollbackTest, CleanupAfterWalBreakpointKeepsRemoval)
 {
     std::string p = create_pkg("bp_cleanup_wa", "1.0");
     install_packages({p});
@@ -462,15 +464,16 @@ TEST_F(ActiveRollbackTest, CleanupAfterWalBreakpointRestoresPackage)
                                       [] { throw LpkgException("injected cleanup crash"); });
 
     EXPECT_THROW(remove_package("bp_cleanup_wa", false), LpkgException);
+    BreakpointManager::instance().clear_all();
 
-    // write-ahead 保证此刻 .bak 未删 → 回滚后包应完整恢复
+    // cleanup 阶段不可回滚 → 续删+提交：包保持已移除、文件已删
     Cache::instance().load();
-    EXPECT_FALSE(Cache::instance().get_installed_version("bp_cleanup_wa").empty())
-        << "package should be restored after cleanup-stage rollback";
-    EXPECT_TRUE(fs::exists(test_root / "usr/bin/bp_cleanup_wa"))
-        << "binary should be restored (bak not yet deleted at crash point)";
+    EXPECT_TRUE(Cache::instance().get_installed_version("bp_cleanup_wa").empty())
+        << "cleanup 阶段异常应继续清理而非回滚：包保持已移除";
+    EXPECT_FALSE(fs::exists(test_root / "usr/bin/bp_cleanup_wa"))
+        << "binary should be removed (continue_cleanup finished the cleanup)";
 
-    // 回滚后 WAL 应已 trim
+    // 收尾后 WAL 应已 trim
     std::ifstream wf(wal::wal_log_path());
     std::string wc((std::istreambuf_iterator<char>(wf)), {});
     EXPECT_EQ(wc.find("BEGIN_PKGS"), std::string::npos);

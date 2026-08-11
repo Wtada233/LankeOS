@@ -245,6 +245,12 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
                         wal_append_raw("RESTORE_FILE_RM " + op.arg2);
                     }
                 }
+                // 清理中断安装残留的 .lpkgtmp（COPY 只删 dst，arg1 的临时文件仍可能残留）
+                const fs::path tmp = op.arg1;
+                if (fs::exists(tmp) || fs::is_symlink(tmp)) {
+                    safe_remove(tmp);
+                    stats.files_cleaned++;
+                }
                 break;
             }
 

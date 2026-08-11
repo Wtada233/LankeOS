@@ -182,6 +182,22 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path);
 void batch_rollback(const std::vector<std::string>& successfully_installed);
 
 // ============================================================================
+// 崩溃续传清理（recover.cpp 实现）
+// ============================================================================
+
+/**
+ * 继续清理未完成的 .lpkg_bak 清理操作（批次已进入 CLEANUP 阶段，不可回滚）。
+ *
+ * 只清理文件/目录，不做 reverse_execute 回滚；完成后重载 Cache 并写 COMMIT_PKGS。
+ * 语义：一旦某个批次出现 CLEANUP 行，其包含的 remove 均已 RM_COMMIT、DB 已落盘，
+ * 系统状态稳定，只剩 .lpkg_bak 临时文件待清——**异常/崩溃一律续删+提交（移除保持
+ * 最终），不回滚**。回滚需要恢复 DB 但被删的 bak 回不来 → 不一致；且"bak 是否被删"
+ * 无法可靠判定（父目录被删、dangling 路径都会让 exists() 误判）。崩溃恢复
+ * （recover_packages）与正常异常路径（run_batch_transaction catch）共用本函数。
+ */
+void continue_cleanup(const std::vector<WALOp>& ops);
+
+// ============================================================================
 // WAL 保护的原始文本文件写入
 // ============================================================================
 

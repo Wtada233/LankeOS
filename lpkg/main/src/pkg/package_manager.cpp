@@ -45,6 +45,70 @@ extern std::atomic<bool> sigint_graceful;
 // 公开 API
 // =====================================================================
 
+/**
+ * 清理一批 .lpkg_bak 文件/目录（CLEANUP 阶段，不可回滚）。
+ *
+ * **write-ahead 顺序：先写 CLEANUP WAL 行，再物理删除。**
+ * 原实现是"先删后记"：若在删除后、日志写入前崩溃，且批次中尚无任何 CLEANUP 行，
+ * 恢复走 reverse_execute → DB 恢复到 pkg:installed 但 .bak 已删 → 磁盘与 DB 不一致。
+ * 改为先记日志后：
+ *   - 崩溃在"日志后、删除前"→ 恢复看到 CLEANUP → continue_cleanup 续删 → 一致
+ *   - 崩溃在"删除后、下一条日志前"→ 已有 CLEANUP 行 → continue_cleanup 续删 → 一致
+ *   - 崩溃在首条 CLEANUP 前 → 无 CLEANUP 行 → reverse_execute 整体恢复 → 一致
+ * 删除失败仅告警（残留 .bak 由下次 rec/cleanup 续删），不中断事务。
+ *
+ * **调用时机**：
+ *   - remove：批次内（COMMIT_PKGS 前，RM_COMMIT 后）。
+ *   - install/upgrade：批次提交后（COMMIT_PKGS 之后，I-BAK-2 要求 bak 存活到提交）。
+ *     此时写出的 CLEANUP 行位于事务之外（trailing 记录），由 trim_completed 保留
+ *     （清理未完成时）+ recover_packages 续传，完成后随下一次 trim 一并清掉。
+ */
+void cleanup_baks(std::vector<std::pair<fs::path, fs::path>>& backups)
+{
+    if (backups.empty()) return;
+
+    std::vector<fs::path> cleanup_paths;
+    for (const auto& [orig, bak] : backups) cleanup_paths.push_back(bak);
+
+    // 最深层优先（文件先于目录，子目录先于父目录）
+    std::ranges::sort(cleanup_paths, [](const fs::path& a, const fs::path& b) {
+        return a.string().size() > b.string().size();
+    });
+    auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
+    cleanup_paths.erase(last, cleanup_paths.end());
+
+    for (const auto& p : cleanup_paths) {
+        if (!fs::exists(p) && !fs::is_symlink(p)) continue;
+
+        // write-ahead：先记日志再删除（见函数注释）
+        wal::log_wal_line("CLEANUP " + p.string());
+
+        // 断点：CLEANUP 日志写入后、物理删除前 —— 测试 write-ahead 崩溃窗口
+        // （此刻 .bak 仍在磁盘，异常/崩溃可由 batch_rollback/rec 完整恢复）
+        BreakpointManager::instance().hit("cleanup_after_wal");
+
+        std::error_code ec2;
+        bool ok = true;
+        if (fs::is_directory(p)) {
+            // 从里到外删除目录内容
+            std::vector<fs::path> entries;
+            for (const auto& entry : fs::recursive_directory_iterator(p, ec2))
+                if (!ec2) entries.push_back(entry.path());
+            if (!ec2) {
+                std::ranges::reverse(entries);
+                for (const auto& e : entries) {
+                    if (!fs::remove(e, ec2)) ok = false;
+                }
+            }
+            if (!fs::remove(p, ec2)) ok = false;
+        } else {
+            if (!fs::remove(p, ec2)) ok = false;
+        }
+
+        if (!ok) log_warning(string_format("warning.cleanup_failed", p.string()));
+    }
+}
+
 /** 将缓存数据写回磁盘 */
 void write_cache()
 {
@@ -155,7 +219,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
     // 执行安装（WAL 2.0 批量事务）
     std::vector<std::pair<fs::path, fs::path>> all_backups;
-    run_batch_transaction([&](wal::WalWriter& /*batch_writer*/, std::vector<std::string>& success) {
+    run_batch_transaction([&](std::vector<std::string>& success) {
         auto& cache = Cache::instance();
 
         size_t i = 0;
@@ -229,10 +293,13 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
         }
     });
 
-    // 清理批次产生的 .lpkg_bak 文件
-    for (const auto& [orig, bak] : all_backups) {
-        std::error_code ec;
-        fs::remove(bak, ec);
+    // 清理批次产生的 .lpkg_bak 文件（post-commit：写 CLEANUP WAL，崩溃可续传）。
+    // 清理失败（磁盘满等）不视为安装失败——批次已提交、DB 一致，残留 bak 的
+    // CLEANUP 记录留在 WAL，由下次 recover 续传。
+    try {
+        cleanup_baks(all_backups);
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.cleanup_deferred", e.what()));
     }
 
     trim_completed();
@@ -244,64 +311,6 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
 namespace
 {
-
-/**
- * 清理一批 .lpkg_bak 文件/目录（CLEANUP 阶段，不可回滚）。
- *
- * **write-ahead 顺序：先写 CLEANUP WAL 行，再物理删除。**
- * 原实现是"先删后记"：若在删除后、日志写入前崩溃，且批次中尚无任何 CLEANUP 行，
- * 恢复走 reverse_execute → DB 恢复到 pkg:installed 但 .bak 已删 → 磁盘与 DB 不一致。
- * 改为先记日志后：
- *   - 崩溃在"日志后、删除前"→ 恢复看到 CLEANUP → continue_cleanup 续删 → 一致
- *   - 崩溃在"删除后、下一条日志前"→ 已有 CLEANUP 行 → continue_cleanup 续删 → 一致
- *   - 崩溃在首条 CLEANUP 前 → 无 CLEANUP 行 → reverse_execute 整体恢复 → 一致
- * 删除失败仅告警（残留 .bak 由下次 rec/cleanup 续删），不中断事务。
- */
-void cleanup_baks(std::vector<std::pair<fs::path, fs::path>>& backups)
-{
-    if (backups.empty()) return;
-
-    std::vector<fs::path> cleanup_paths;
-    for (const auto& [orig, bak] : backups) cleanup_paths.push_back(bak);
-
-    // 最深层优先（文件先于目录，子目录先于父目录）
-    std::ranges::sort(cleanup_paths, [](const fs::path& a, const fs::path& b) {
-        return a.string().size() > b.string().size();
-    });
-    auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
-    cleanup_paths.erase(last, cleanup_paths.end());
-
-    for (const auto& p : cleanup_paths) {
-        if (!fs::exists(p) && !fs::is_symlink(p)) continue;
-
-        // write-ahead：先记日志再删除（见函数注释）
-        wal::log_wal_line("CLEANUP " + p.string());
-
-        // 断点：CLEANUP 日志写入后、物理删除前 —— 测试 write-ahead 崩溃窗口
-        // （此刻 .bak 仍在磁盘，异常/崩溃可由 batch_rollback/rec 完整恢复）
-        BreakpointManager::instance().hit("cleanup_after_wal");
-
-        std::error_code ec2;
-        bool ok = true;
-        if (fs::is_directory(p)) {
-            // 从里到外删除目录内容
-            std::vector<fs::path> entries;
-            for (const auto& entry : fs::recursive_directory_iterator(p, ec2))
-                if (!ec2) entries.push_back(entry.path());
-            if (!ec2) {
-                std::ranges::reverse(entries);
-                for (const auto& e : entries) {
-                    if (!fs::remove(e, ec2)) ok = false;
-                }
-            }
-            if (!fs::remove(p, ec2)) ok = false;
-        } else {
-            if (!fs::remove(p, ec2)) ok = false;
-        }
-
-        if (!ok) log_warning(string_format("warning.cleanup_failed", p.string()));
-    }
-}
 
 /**
  * 单包移除核心（须在 run_batch_transaction 内调用）。
@@ -518,7 +527,7 @@ void remove_package(const std::string& pkg_name, bool force, bool /*wrap_in_txn*
     log_info(string_format("info.removing_package", pkg_name));
 
     // WAL 2.0 批量事务：单个包移除 = 一批一包
-    run_batch_transaction([&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
+    run_batch_transaction([&](std::vector<std::string>& success) {
         std::vector<std::pair<fs::path, fs::path>> backups;
         do_remove_package(pkg_name, force, ver, backups);
 
@@ -737,7 +746,7 @@ void upgrade_packages()
 
     std::vector<std::pair<fs::path, fs::path>> upgrade_backups;
     size_t upgraded_count = 0;
-    run_batch_transaction([&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
+    run_batch_transaction([&](std::vector<std::string>& success) {
         auto& cache = Cache::instance();
 
         size_t i = 0;
@@ -828,9 +837,12 @@ void upgrade_packages()
         }
     });
 
-    for (const auto& [orig, bak] : upgrade_backups) {
-        std::error_code ec;
-        fs::remove(bak, ec);
+    // 清理批次产生的 .lpkg_bak 文件（post-commit：写 CLEANUP WAL，崩溃可续传）。
+    // 清理失败不视为升级失败——批次已提交、DB 一致，残留 bak 由下次 recover 续传。
+    try {
+        cleanup_baks(upgrade_backups);
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.cleanup_deferred", e.what()));
     }
 
     trim_completed();
@@ -1139,7 +1151,7 @@ void remove_package_recursive(const std::string& pkg_name, bool force)
 
     // WAL 2.0: 整批原子移除
     // 目录通过 BACKUP WAL 原子化移除，.lpkg_bak 通过 CLEANUP WAL 在事务内清理
-    run_batch_transaction([&](wal::WalWriter& /*w*/, std::vector<std::string>& success) {
+    run_batch_transaction([&](std::vector<std::string>& success) {
         auto& cache = Cache::instance();
         std::vector<std::pair<fs::path, fs::path>> all_backups;
 

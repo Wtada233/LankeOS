@@ -7,6 +7,7 @@
  */
 
 #include "../../main/src/db/cache.hpp"
+#include "../../main/src/db/test_breakpoints.hpp"
 #include "../../main/src/db/wal_op.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
 #include "../test_base.hpp"
@@ -686,4 +687,46 @@ TEST_F(BreakpointTest, BatchRemoveCrashMidwayRestoresAllPackages)
 
     // ── 验证 COMMIT_PKGS ──
     EXPECT_NE(read_wal().find("COMMIT_PKGS"), std::string::npos) << "COMMIT_PKGS should be written";
+}
+
+// ============================================================================
+// §8 CLEANUP 阶段异常 → 一律 continue_cleanup（保持移除），不回滚
+//   （ActiveRollbackTest.CleanupAfterWalBreakpointKeepsRemoval 覆盖）
+// ============================================================================
+
+// ============================================================================
+// §9 符号链接→目录 必须被备份：覆盖安装后回滚应恢复原符号链接
+// ============================================================================
+// is_directory 跟随符号链接，会把 symlink→dir 误判为"目录"而跳过备份；
+// copy 阶段回滚时无 BACKUP 可恢复 → 旧符号链接永久丢失。修复后应恢复。
+
+TEST_F(BreakpointTest, SymlinkToDirIsBackedUpAndRestoredOnRollback)
+{
+    // 目标路径预先存在 符号链接→真实目录（USR-Merge 类似），未登记所有权
+    fs::create_directories(test_root / "usr" / "lib");
+    fs::create_directories(test_root / "real_target");
+    fs::create_directory_symlink((test_root / "real_target").string(),
+                                 test_root / "usr" / "lib" / "foo");
+    Config::instance().set_force_overwrite_mode(true);
+
+    // A 用普通文件覆盖 usr/lib/foo；copy 阶段注入异常 → 批次回滚
+    fs::path work = suite_work_dir / "_pkg_sl_a";
+    fs::create_directories(work / "content" / "usr" / "lib");
+    {
+        std::ofstream f(work / "content" / "usr" / "lib" / "foo");
+        f << "new file\n";
+    }
+    std::string pA = (pkg_dir / "sl_a-1.0.lpkg").string();
+    pack_package(pA, work.string(), "sl_a", "1.0", {}, {}, "", {});
+
+    BreakpointManager::instance().set("copy_after_wal_sl_a",
+                                      [] { throw LpkgException("injected copy failure"); });
+    EXPECT_THROW(install_packages({pA}), LpkgException);
+    BreakpointManager::instance().clear_all();
+    Config::instance().set_force_overwrite_mode(false);
+
+    // 回滚后 usr/lib/foo 必须恢复为原符号链接（修复前：被 reverse COPY 删除，链接丢失）
+    EXPECT_TRUE(fs::is_symlink(test_root / "usr" / "lib" / "foo")) << "旧符号链接应被恢复";
+    EXPECT_EQ(fs::read_symlink(test_root / "usr" / "lib" / "foo"),
+              (test_root / "real_target").string());
 }
