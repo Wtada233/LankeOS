@@ -1,11 +1,13 @@
 #include "utils.hpp"
 
 #include <fcntl.h>
+#include <poll.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -21,6 +23,9 @@
 namespace fs = std::filesystem;
 
 #include <mutex>
+
+/** 在 main.cpp 中定义，由 SIGINT 信号处理函数设置（SigIntGuard 生命周期内生效） */
+extern std::atomic<bool> sigint_graceful;
 
 namespace
 {
@@ -160,6 +165,10 @@ int run_shell(const std::string& cmd, const fs::path& work_dir)
 /**
  * 向用户请求确认（y/n）
  * 根据非交互模式配置自动返回 yes/no
+ *
+ * 交互模式用轮询读 stdin：安装/移除等事务中的 SIGINT（Ctrl+C）会由 main.cpp 的
+ * SigIntGuard 设置 sigint_graceful 并打印提示——轮询循环检测到即视为用户取消
+ * （返回 false），而不是卡在 std::cin 上对 Ctrl+C 无响应。
  */
 bool user_confirms(const std::string& prompt)
 {
@@ -169,11 +178,40 @@ bool user_confirms(const std::string& prompt)
         case NonInteractiveMode::NO:
             return false;
         case NonInteractiveMode::INTERACTIVE:
-        default:
+        default: {
             std::cout << prompt << " " << get_string("prompt.yes_no") << " ";
+            std::cout.flush();
+
             std::string response;
-            std::cin >> response;
+            char ch;
+            while (!sigint_graceful.load()) {
+                struct pollfd pfd{STDIN_FILENO, POLLIN, 0};
+                const int r = ::poll(&pfd, 1, 100);  // 100ms 轮询，期间可响应信号
+                if (r < 0) {
+                    if (errno == EINTR) continue;  // 信号打断 poll → 重新检查 flag
+                    return false;
+                }
+                if (r == 0) continue;  // 超时 → 继续轮询（保持响应 Ctrl+C）
+                if (pfd.revents & (POLLIN | POLLHUP)) {
+                    const ssize_t n = ::read(STDIN_FILENO, &ch, 1);
+                    if (n == 0) return false;  // EOF
+                    if (n < 0) {
+                        if (errno == EINTR) continue;
+                        return false;
+                    }
+                    if (ch == '\n' || ch == '\r') break;
+                    response.push_back(ch);
+                }
+            }
+            if (sigint_graceful.load()) return false;  // Ctrl+C → 视为取消
+
+            // 与旧的 std::cin >> 语义一致：忽略首尾空白后匹配 y/Y
+            while (!response.empty() && (response.front() == ' ' || response.front() == '\t'))
+                response.erase(response.begin());
+            while (!response.empty() && (response.back() == ' ' || response.back() == '\t'))
+                response.pop_back();
             return (response == "y" || response == "Y");
+        }
     }
 }
 

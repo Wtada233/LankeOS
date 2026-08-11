@@ -125,7 +125,9 @@ WALOp parse_op(const std::string& line)
     try {
         op.type = walop_type_from_name(parts[0]);
     } catch (const LpkgException&) {
-        // 未知类型 — 返回空 op（调用者跳过）
+        // 未知类型 — 返回空 op（调用者跳过），但记警告：损坏/半写/未来格式的 WAL 行
+        // 会静默丢失对应操作，值得让用户知道（行为不变，仍跳过）。
+        log_warning(string_format("warning.wal_invalid_line", line));
         op.type = WALOpType::BEGIN_PKGS;  // 哨兵，由 skip 逻辑处理
         op.arg1 = "__INVALID__";
         return op;
@@ -463,11 +465,11 @@ void batch_rollback(const std::vector<std::string>& successfully_installed)
     auto ops = extract_current_batch_ops(wpath);
     if (ops.empty()) return;
 
-    // 1. 清理内存 cache 状态（remove_installed 内部已有锁，不要外层加锁！）
+    // 1. 无需在此手动清理内存 cache：下方 reverse_execute 恢复磁盘 DB 后，
+    //    步骤 3 的 cache.load() 会从磁盘整体重载（曾对 successfully_installed 逐包
+    //    remove_installed——install 失败时这些包本就不该在内存、remove 失败时更是
+    //    no-op，且随后被 load() 覆盖，纯死代码）。
     auto& cache = Cache::instance();
-    for (const auto& pkg : successfully_installed) {
-        cache.remove_installed(pkg);
-    }
 
     // 2. 逆向执行操作
     reverse_execute(ops, true);

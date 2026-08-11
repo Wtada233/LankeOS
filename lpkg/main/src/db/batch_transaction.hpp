@@ -48,7 +48,8 @@
 template <typename OpT>
 std::vector<std::string> run_batch_transaction(OpT&& op)
 {
-    // 前提：进入前 trim_completed（在顶层调用者如 install_packages 中执行）
+    // 前提：进入前 WAL 无未完成事务（顶层调用者已在 main.cpp 先 recover_packages）。
+    // 这里再 trim 一次已完成的批次，保证新批次从干净的日志开始。
     trim_completed();
 
     auto& cache = Cache::instance();

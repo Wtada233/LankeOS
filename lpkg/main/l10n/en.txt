@@ -248,6 +248,7 @@ error.dependency_depth_exceeded=Dependency depth exceeded for {} (max {}). Possi
 error.wal_open_failed=Failed to open WAL transaction log: {}
 error.wal_write_failed=Failed to write to WAL transaction log: {}
 error.wal_fsync_failed=Failed to fsync WAL transaction log: {}
+warning.wal_invalid_line=Unparseable WAL line, skipped: {}
 warning.needed_so_dropped_in_upgrade={} upgraded to {} no longer provides {}, breaking installed {}
 warning.soname_link_failed=Failed to create SONAME symlink {} -> {}: {}
 warning.cleanup_old_tmp_failed=Failed to clean up old temporary directory: {}
