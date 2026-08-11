@@ -148,6 +148,7 @@ define do_install
 	install -Dm755 $(1) $(INSTALL_BIN_DIR)/$(TARGET)
 	install -Dm644 $(MAIN_DIR)/conf/mirror.conf $(INSTALL_CONF_DIR)/mirror.conf
 	install -Dm644 $(MAIN_DIR)/conf/triggers.conf $(INSTALL_CONF_DIR)/triggers.conf
+	install -Dm644 $(MAIN_DIR)/conf/build.conf $(INSTALL_CONF_DIR)/build.conf
 	install -d -m755 $(INSTALL_L10N_DIR)
 	install -m644 $(MAIN_DIR)/l10n/*.txt $(INSTALL_L10N_DIR)/
 	install -d -m755 $(INSTALL_LOCK_DIR)

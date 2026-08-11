@@ -136,6 +136,42 @@ hooks/                # 钩子脚本（可选）
 
 `content/` 目录下的文件布局直接对应目标根目录（`/`）。
 
+## 构建标志配置（build.conf）
+
+`lpkg build` 默认使用 **Arch Linux 编译/链接标志，ISA 基线 x86-64-v3**（绝不用
+`-march=native`，避免把构建宿主超出 v3 的 CPU 特性烙进发行版包；v3 = AVX2/FMA 等，
+覆盖 2013 年后绝大多数主流 x86-64 机器）。默认值见
+`main/src/base/build_defaults.hpp`（fallback），系统级配置见
+`/etc/lpkg/build.conf`（makepkg.conf 风格，由 `make install` 从
+`main/conf/build.conf` 安装）：
+
+```text
+CFLAGS="-march=x86-64-v3 -mtune=generic -O2 -pipe -fno-plt -fexceptions ..."
+CXXFLAGS="$CFLAGS -Wp,-D_GLIBCXX_ASSERTIONS"   # 写法上为完整展开
+LDFLAGS="-Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now ..."
+LTOFLAGS="-flto=auto"
+MAKEFLAGS="-j$(nproc)"                          # $(nproc) 自动展开为逻辑核心数
+```
+
+`build` 的每个阶段（`lankebuild_prepare/build/package`）执行前会把上述标志
+`export` 到构建环境，configure/make/cmake 自动继承；LankeBUILD 脚本也可引用
+模板变量 `{CFLAGS}`、`{CXXFLAGS}`、`{LDFLAGS}`、`{MAKEFLAGS}`。
+
+**逐包覆盖**（优先级最高）：`LankeBUILD.json` 增加可选字段，留空 = 用配置默认：
+
+```json
+{
+  "name": "foo",
+  "version": "1.0",
+  "cflags": "-O2 -march=x86-64-v3",
+  "ldflags": "-Wl,--as-needed",
+  "makeflags": "-j2",
+  "lto": true
+}
+```
+
+`"lto": true` 会把 `LTOFLAGS`（默认 `-flto=auto`）追加到编译与链接标志。
+
 ## 仓库规范
 
 ### 目录结构

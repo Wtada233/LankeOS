@@ -32,7 +32,8 @@ fs::path get_executable_dir()
         result[count] = '\0';
         return fs::path(result.data()).parent_path();
     } else {
-        log_warning(get_string("warning.exe_path_determination_failed"));
+        // 注意：不能在此 log_warning——init_localization 尚未加载翻译，
+        // get_string 只会返回 [MISSING_STRING: ...]，毫无意义。
         return fs::current_path();  // 回退方案：使用当前工作目录，虽不够可靠
     }
 }
@@ -49,7 +50,8 @@ void load_strings(const std::string& lang, const fs::path& base_dir)
     std::ifstream file(file_path);
     if (!file.is_open()) {
         if (lang != "en") {  // 防止无限递归
-            log_warning(string_format("warning.l10n_load_failed", lang.c_str()));
+            // 注意：不能在此 log_warning——init_localization 阶段翻译尚未加载，
+            // get_string 只会返回 [MISSING_STRING: ...]，毫无意义。
             load_strings("en", base_dir);  // 回退到英文语言包
         }
         return;

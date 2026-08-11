@@ -103,6 +103,11 @@ public:
     {
         return triggers_conf_;
     }
+    /** 构建默认标志配置文件（build.conf，缺失时用 build_defaults.hpp 内置默认） */
+    const std::filesystem::path& build_conf() const noexcept
+    {
+        return build_conf_;
+    }
     /** 文件归属数据库 */
     const std::filesystem::path& files_db() const noexcept
     {
@@ -218,6 +223,7 @@ private:
     std::filesystem::path essential_file_;  // 核心包列表文件
     std::filesystem::path mirror_conf_;     // 镜像配置文件
     std::filesystem::path triggers_conf_;   // 触发器配置文件
+    std::filesystem::path build_conf_;      // 构建默认标志配置文件
     std::filesystem::path files_db_;        // 文件归属数据库
     std::filesystem::path provides_db_;     // providers 数据库
     std::filesystem::path lock_file_;       // 互斥锁文件

@@ -81,13 +81,18 @@ void add_requires(Solvable* s, Pool* pool, const std::vector<DependencyInfo>& de
 }
 
 // 收集 solve 失败的问题：
-//   missing_so  — 缺失的 needed_so（SONAME，`--missing-so-no-error` 才可容忍）；
-//   missing_dep — 缺失的命名依赖（**不可容忍**，即使开 missing-so-no-error 也报错）；
-//   fatal       — 真冲突/包不存在。
+//   missing_so     — 缺失的 needed_so（SONAME，`--missing-so-no-error` 才可容忍）；
+//   missing_dep    — 缺失的命名依赖（**不可容忍**，即使开 missing-so-no-error 也报错）；
+//   missing_target — **用户直接请求**的包/能力无提供者（JOB 规则，报"包未找到"而非"依赖"）；
+//   fatal          — 真冲突。
 // 判定约定：与 order_by_dependencies 相同——requires 名含 ".so" 视为 needed_so（SONAME），
 // 否则视为命名依赖。防止 --missing-so-no-error 把缺失命名依赖一起"伪提供"吞掉。
+// 区分 JOB vs PKG 规则：JOB_NOTHING_PROVIDES_DEP = 顶层请求无提供者（如 `install foo`
+// 而 foo 不在仓库，报"仓库中未找到软件包"）；PKG_NOTHING_PROVIDES_DEP = 传递依赖缺失
+// （报"依赖无提供者"）。曾把两者都当依赖报，`install foo` 缺包时错报"依赖 'foo' 无提供者"。
 void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missing_so,
-                      std::vector<std::string>& missing_dep, std::vector<std::string>& fatal)
+                      std::vector<std::string>& missing_dep,
+                      std::vector<std::string>& missing_target, std::vector<std::string>& fatal)
 {
     unsigned int count = solver_problem_count(solv);
     Id problem = 0;
@@ -105,8 +110,10 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                 if (dep_name && *dep_name) {
                     if (strstr(dep_name, ".so") != nullptr)
                         missing_so.emplace_back(dep_name);
+                    else if (info == SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP)
+                        missing_target.emplace_back(dep_name);  // 直接请求的包/能力
                     else
-                        missing_dep.emplace_back(dep_name);
+                        missing_dep.emplace_back(dep_name);  // 传递依赖
                 }
             } else if (info == SOLVER_RULE_JOB_UNKNOWN_PACKAGE) {
                 // 请求的包不存在 → 真错误
@@ -454,19 +461,23 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
         queue_free(&jobs);
 
         if (res != 0) {
-            std::vector<std::string> missing_so, missing_dep, fatal;
-            collect_problems(solv, ps.pool, missing_so, missing_dep, fatal);
+            std::vector<std::string> missing_so, missing_dep, missing_target, fatal;
+            collect_problems(solv, ps.pool, missing_so, missing_dep, missing_target, fatal);
 
             if (round == 0 && opts.missing_so_no_error && !missing_so.empty() &&
-                missing_dep.empty() && fatal.empty()) {
+                missing_dep.empty() && missing_target.empty() && fatal.empty()) {
                 // 纯缺 SONAME 且容忍 → 注入伪提供者重解。
-                // 有任何缺失命名依赖（missing_dep）就不走容忍：--missing-so-no-error
-                // 只允许 needed_so 缺失，命名依赖缺失始终报错（回归 M1）。
+                // 有任何缺失命名依赖（missing_dep）或顶层目标缺失（missing_target）
+                // 就不走容忍：--missing-so-no-error 只允许 needed_so 缺失，
+                // 命名依赖/请求包缺失始终报错（回归 M1）。
                 injected = std::move(missing_so);
                 solver_free(solv);
                 continue;
             }
             for (const auto& p : fatal) result.problems.push_back(p);
+            // 顶层请求的包/能力无提供者 → "仓库中未找到软件包"，不是"依赖"
+            for (const auto& t : missing_target)
+                result.problems.push_back(string_format("error.package_not_in_repo", t));
             for (const auto& d : missing_dep)
                 result.problems.push_back(string_format("error.unresolved_dependency", d));
             for (const auto& c : missing_so)

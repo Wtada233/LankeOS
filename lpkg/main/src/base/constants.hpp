@@ -33,6 +33,13 @@ inline constexpr std::string_view J_WORK_SOURCES = "work_sources";
 inline constexpr std::string_view J_BUILD_DEPS = "build_deps";
 inline constexpr std::string_view J_KEEP_FS_LAYOUT = "keep_fs_layout";
 
+// 构建标志 JSON 键名（覆盖 build_defaults.hpp 的默认值，空串 = 用默认）
+inline constexpr std::string_view J_CFLAGS = "cflags";
+inline constexpr std::string_view J_CXXFLAGS = "cxxflags";
+inline constexpr std::string_view J_LDFLAGS = "ldflags";
+inline constexpr std::string_view J_MAKEFLAGS = "makeflags";
+inline constexpr std::string_view J_LTO = "lto";
+
 // 构建文件与脚本名
 inline constexpr std::string_view LANK_BUILD_JSON = "LankeBUILD.json";
 inline constexpr std::string_view LANK_BUILD_SCRIPT = "LankeBUILD";

@@ -78,7 +78,8 @@ std::map<std::string, std::string> build_variable_map(const BuildConfig& cfg,
                                                       const fs::path& actual_work_dir,
                                                       const fs::path& staging_root,
                                                       const fs::path& staging_hooks,
-                                                      const std::string& effective_version)
+                                                      const std::string& effective_version,
+                                                      const build_defaults::BuildFlags& flags)
 {
     return {
         {"{PKG_NAME}", cfg.name},
@@ -98,6 +99,12 @@ std::map<std::string, std::string> build_variable_map(const BuildConfig& cfg,
         {"{SYSCONFDIR}", "/etc"},
         {"{ORIG_PKG_VER}", cfg.version},
         {"{NO_STRIP}", cfg.no_strip ? "1" : "0"},
+        // 编译/链接标志（与 execute_build_phase 注入的环境变量一致，
+        // 供 LankeBUILD 脚本显式引用，如 export CFLAGS="{CFLAGS}"）
+        {"{CFLAGS}", flags.cflags},
+        {"{CXXFLAGS}", flags.cxxflags},
+        {"{LDFLAGS}", flags.ldflags},
+        {"{MAKEFLAGS}", flags.makeflags},
     };
 }
 
@@ -211,6 +218,10 @@ void run_build(const fs::path& build_dir)
     }
     log_info(string_format("info.building_package", cfg.name, effective_version));
 
+    // 构建标志：默认 = build_defaults（Arch x86-64 generic），可被 LankeBUILD.json 覆盖
+    auto flags = resolve_build_flags(cfg);
+    log_info(string_format("info.build_flags", flags.cflags));
+
     // 如果 LankeBUILD.json 中未指定 man 页面内容，则自动生成
     if (cfg.man_content.empty()) {
         std::time_t t = std::time(nullptr);
@@ -305,7 +316,7 @@ void run_build(const fs::path& build_dir)
 
     // 5. 处理脚本并执行构建阶段
     auto vars = build_variable_map(cfg, work_root, actual_work_dir, staging_root, staging_hooks,
-                                   effective_version);
+                                   effective_version, flags);
     fs::path processed_script = build_dir / constants::LANK_BUILD_PROCESSED;
     {
         std::string content = process_build_script(script_path, vars);
@@ -314,9 +325,9 @@ void run_build(const fs::path& build_dir)
     }
 
     try {
-        execute_build_phase("lankebuild_prepare", actual_work_dir, processed_script);
-        execute_build_phase("lankebuild_build", actual_work_dir, processed_script);
-        execute_build_phase("lankebuild_package", actual_work_dir, processed_script);
+        execute_build_phase("lankebuild_prepare", actual_work_dir, processed_script, flags);
+        execute_build_phase("lankebuild_build", actual_work_dir, processed_script, flags);
+        execute_build_phase("lankebuild_package", actual_work_dir, processed_script, flags);
     } catch (...) {
         fs::remove(processed_script);
         throw;

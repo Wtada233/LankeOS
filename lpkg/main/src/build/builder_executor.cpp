@@ -525,13 +525,46 @@ std::string process_build_script(const fs::path& script_path,
  * 执行构建阶段的 shell 脚本
  * source 处理后的构建脚本，然后调用指定的 phase_name 函数
  * 构建失败时清理临时脚本并抛出异常
+ *
+ * 执行前 export CFLAGS/CXXFLAGS/LDFLAGS/MAKEFLAGS：保证默认不出现
+ * -march=native（见 build_defaults.hpp），configure/make/cmake 自动继承；
+ * 脚本也可引用 {CFLAGS} 等模板变量获得同一组值。
  */
 void execute_build_phase(const std::string& phase_name, const fs::path& work_dir,
-                         const fs::path& processed_script_path)
+                         const fs::path& processed_script_path,
+                         const build_defaults::BuildFlags& flags)
 {
     log_info(string_format("info.executing_phase", phase_name));
-    std::string cmd =
-        "set -e; . " + fs::absolute(processed_script_path).string() + " && " + phase_name;
+
+    // 空字段回退到 build_defaults 默认值（直接调用方如测试可不传 flags）
+    auto eff = [](const std::string& s, std::string_view dflt) {
+        return s.empty() ? std::string(dflt) : s;
+    };
+    const std::string cflags = eff(flags.cflags, build_defaults::CFLAGS);
+    const std::string cxxflags = eff(flags.cxxflags, build_defaults::CXXFLAGS);
+    const std::string ldflags = eff(flags.ldflags, build_defaults::LDFLAGS);
+    const std::string makeflags =
+        flags.makeflags.empty() ? build_defaults::default_makeflags() : flags.makeflags;
+
+    // 单引号包裹 export 值；标志串内若含单引号则按 POSIX 转义（防御）
+    auto shell_quote = [](const std::string& s) {
+        std::string out;
+        out.reserve(s.size() + 2);
+        out += '\'';
+        for (char c : s) {
+            if (c == '\'')
+                out += "'\\''";
+            else
+                out += c;
+        }
+        out += '\'';
+        return out;
+    };
+
+    std::string cmd = "export CFLAGS=" + shell_quote(cflags) + " CXXFLAGS=" + shell_quote(cxxflags) +
+                      " LDFLAGS=" + shell_quote(ldflags) + " MAKEFLAGS=" + shell_quote(makeflags) +
+                      "; set -e; . " + fs::absolute(processed_script_path).string() + " && " +
+                      phase_name;
     int ret = run_shell(cmd, work_dir);
     if (ret != 0) {
         fs::remove(processed_script_path);

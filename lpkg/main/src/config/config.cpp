@@ -70,6 +70,7 @@ void Config::rebase_paths()
     essential_file_ = config_dir_ / "essential";
     mirror_conf_ = config_dir_ / "mirror.conf";
     triggers_conf_ = config_dir_ / "triggers.conf";
+    build_conf_ = config_dir_ / "build.conf";
     files_db_ = state_dir_ / "files.db";
     provides_db_ = state_dir_ / "provides.db";
     lock_file_ = lock_dir_ / "db.lck";

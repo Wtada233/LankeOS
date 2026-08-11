@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/solver.hpp"
 
 using namespace solv;
@@ -337,4 +338,25 @@ TEST_F(SolverTest, InstallNonexistentPackageWithVersionErrors)
 {
     auto r = solve({{"nosuchpkg", "1.0"}});
     EXPECT_FALSE(r.ok()) << "不存在的包+版本应报错（回归 S3）";
+}
+
+// 回归：`install ghost`（仓库无此包）→ 报"仓库中未找到软件包"，而非"依赖 ... 无提供者"
+// （曾把顶层请求缺失也归类为依赖，措辞误导用户）
+TEST_F(SolverTest, InstallNonexistentPackageReportsNotFound)
+{
+    auto r = solve({{"ghost", "latest"}});
+    ASSERT_FALSE(r.ok());
+    ASSERT_FALSE(r.problems.empty());
+    // 与 solve_install 内部同一调用点产出同一字符串，对 l10n 加载与否均健壮
+    EXPECT_EQ(r.problems[0], string_format("error.package_not_in_repo", "ghost"));
+}
+
+// 回归：传递**命名依赖**缺失 → 仍报"依赖无提供者"（不被误判为包未找到）
+TEST_F(SolverTest, MissingTransitiveNamedDepReportsDependency)
+{
+    add("appB", "2.0", {"libgone"}, {}, {});
+    auto r = solve({{"appB", "latest"}});
+    ASSERT_FALSE(r.ok());
+    ASSERT_FALSE(r.problems.empty());
+    EXPECT_EQ(r.problems[0], string_format("error.unresolved_dependency", "libgone"));
 }
