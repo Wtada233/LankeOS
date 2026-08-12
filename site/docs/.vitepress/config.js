@@ -24,7 +24,7 @@ export default defineConfig({
     ['meta', { name: 'theme-color', content: '#2d8cf0' }],
     ['meta', {
       name: 'keywords',
-      content: 'LankeOS, Linux, LFS, Linux From Scratch, 发行版, 操作系统, lpkg, Sway, Wayland, C++20, 包管理器',
+      content: 'LankeOS, Linux, LFS, Linux From Scratch, 发行版, 操作系统, lpkg, Wayland, C++20, 包管理器',
     }],
     ['meta', { name: 'author', content: 'Wtada233' }],
 

@@ -7,9 +7,9 @@ editLink: false
 
 ## 桌面
 
-<img src="/assets/screenshots/desktop.png" alt="LankeOS 桌面截图：Sway 平铺窗口管理器上运行 Alacritty 终端、系统信息和桌面应用" loading="lazy" width="3840" height="2160">
+<img src="/assets/screenshots/desktop.png" alt="LankeOS 桌面截图：Wayland 桌面上运行 Alacritty 终端、系统信息和桌面应用" loading="lazy" width="3840" height="2160">
 
-LankeOS 运行 Sway 平铺式窗口管理器 + Wayland。截图显示了 Sway 桌面、Alacritty 终端、系统信息和部分程序（音乐播放器，Claude Code）。
+LankeOS 运行 Wayland 桌面。截图显示了桌面、Alacritty 终端、系统信息和部分程序（音乐播放器，Claude Code）。
 
 ## 系统工具链
 

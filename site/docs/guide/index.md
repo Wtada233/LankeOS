@@ -11,7 +11,7 @@ title: 快速开始
 它的核心特色：
 
 - **自研包管理器** `lpkg`（C++20）
-- **原生 Wayland 桌面**（Sway 平铺窗口管理器）
+- **原生 Wayland 桌面**
 - **快速启动**（约 4 秒进桌面）
 - **中文优先**（Fcitx5 + Noto CJK 开箱即用）
 - **从源码构建**的完整工具链
@@ -40,7 +40,7 @@ sudo dd if=lankeos-live.iso of=/dev/sdX bs=4M status=progress
 [    1.5] initramfs: 挂载 rootfs.sfs
 [    1.8] initramfs: 设置 OverlayFS
 [    2.1] 切换到 systemd
-[    2.8] Sway 桌面就绪
+[    2.8] 桌面就绪
 ```
 
 ### 4. 登录

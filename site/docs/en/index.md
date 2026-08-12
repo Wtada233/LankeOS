@@ -4,10 +4,10 @@ layout: home
 hero:
   name: LankeOS
   text: A Linux Distribution Built from Scratch
-  tagline: Built on Linux From Scratch, featuring a custom C++20 package manager lpkg and an ABI-driven build farm lankefarm, Sway on Wayland desktop — build and maintenance pipeline fully automated.
+  tagline: Built on Linux From Scratch, featuring a custom C++20 package manager lpkg and an ABI-driven build farm lankefarm, Wayland desktop — build and maintenance pipeline fully automated.
   image:
     src: /assets/preview.webp
-    alt: LankeOS desktop screenshot — full desktop environment running on Sway tiling window manager
+    alt: LankeOS desktop screenshot — full desktop environment running on Wayland
   actions:
     - theme: brand
       text: Download LankeOS
@@ -23,7 +23,7 @@ features:
   - title: ⚡ Fast Boot
     details: The optimized initramfs takes about 4 seconds from power-on to desktop, achieved by disabling non-essential startup services like ldconfig.service.
   - title: 🖥 Pure Wayland Desktop
-    details: Powered by Sway tiling window manager + Mesa graphics stack — no X11 baggage. Full GPU hardware acceleration for a smooth native Wayland experience.
+    details: Powered by Wayland + Mesa graphics stack — no X11 baggage. Full GPU hardware acceleration for a smooth native Wayland experience.
   - title: 📦 Custom Package Manager lpkg
     details: Written in C++20 with atomic transaction rollback, inline metadata validation, aggregate indexes, ELF self-stripping, and multi-segment version comparison. Supports static compilation.
   - title: 🌐 Full Toolchain Coverage

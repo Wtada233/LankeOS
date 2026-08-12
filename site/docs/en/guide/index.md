@@ -11,7 +11,7 @@ title: Quick Start
 Core features:
 
 - **Custom package manager** `lpkg` (C++20)
-- **Native Wayland desktop** (Sway tiling window manager)
+- **Native Wayland desktop**
 - **Fast boot** (~4 seconds to desktop)
 - **Built from source** complete toolchain
 - **Chinese-first support** (Fcitx5 + Noto CJK out of the box)
@@ -40,7 +40,7 @@ On first boot you'll see:
 [    1.5] initramfs: mounting rootfs.sfs
 [    1.8] initramfs: setting up OverlayFS
 [    2.1] switching to systemd
-[    2.8] Sway desktop ready
+[    2.8] desktop ready
 ```
 
 ### 4. Login

@@ -7,9 +7,9 @@ editLink: false
 
 ## Desktop
 
-<img src="/assets/screenshots/desktop.png" alt="LankeOS desktop screenshot: Sway tiling window manager running Alacritty terminal, system info, and desktop applications" loading="lazy" width="3840" height="2160">
+<img src="/assets/screenshots/desktop.png" alt="LankeOS desktop screenshot: Wayland desktop running Alacritty terminal, system info, and desktop applications" loading="lazy" width="3840" height="2160">
 
-LankeOS running Sway tiling window manager on Wayland. The screenshot shows the Sway desktop, Alacritty terminal, system information, and some applications (music player, Claude Code).
+LankeOS running a Wayland desktop. The screenshot shows the desktop, Alacritty terminal, system information, and some applications (music player, Claude Code).
 
 ## System Toolchain
 

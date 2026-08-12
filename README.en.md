@@ -5,7 +5,7 @@ English | [中文](README.md)
 <p align="center">
   <strong>A Linux distribution focused on automating and simplifying distribution maintenance, with a custom package manager and ABI-driven build farm.</strong>
   <br />
-  <em>Linux From Scratch · lpkg (C++20) · lankefarm (Rust) · Sway on Wayland · Live ISO</em>
+  <em>Linux From Scratch · lpkg (C++20) · lankefarm (Rust) · Wayland · Live ISO</em>
 </p>
 
 <p align="center">

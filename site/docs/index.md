@@ -4,10 +4,10 @@ layout: home
 hero:
   name: LankeOS
   text: 从零构建的 Linux 发行版
-  tagline: 基于 Linux From Scratch，配备自研 C++20 包管理器 lpkg 与 ABI 驱动构建农场 lankefarm，Sway on Wayland 桌面，构建与维护流程高度自动化。
+  tagline: 基于 Linux From Scratch，配备自研 C++20 包管理器 lpkg 与 ABI 驱动构建农场 lankefarm，Wayland 桌面，构建与维护流程高度自动化。
   image:
     src: /assets/preview.webp
-    alt: LankeOS 桌面截图 — Sway 平铺窗口管理器上运行的完整桌面环境
+    alt: LankeOS 桌面截图 — Wayland 桌面上运行的完整桌面环境
   actions:
     - theme: brand
       text: 下载 LankeOS
@@ -23,7 +23,7 @@ features:
   - title: ⚡ 快速启动
     details: 优化的 initramfs 从按下电源键到桌面就绪仅需约 4 秒。通过屏蔽 ldconfig.service 等非关键启动项实现快速启动。
   - title: 🖥 纯 Wayland 桌面
-    details: 基于 Sway 平铺式窗口管理器 + Mesa 图形栈，无 X11 包袱。完整 GPU 硬件加速，流畅的 Wayland 原生体验。
+    details: 基于 Wayland + Mesa 图形栈，无 X11 包袱。完整 GPU 硬件加速，流畅的 Wayland 原生体验。
   - title: 📦 自研包管理器 lpkg
     details: C++20 编写，支持原子事务回滚、内联元数据验证、聚合索引、ELF 自剥离、多段版本比较。可静态编译。
   - title: 🌐 中文原生支持

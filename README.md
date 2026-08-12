@@ -5,7 +5,7 @@
 <p align="center">
   <strong>专注于自动化与简化发行版维护的 Linux 发行版，配备自研包管理器与 ABI 驱动构建农场。</strong>
   <br />
-  <em>Linux From Scratch · lpkg (C++20) · lankefarm (Rust) · Sway on Wayland · Live ISO</em>
+  <em>Linux From Scratch · lpkg (C++20) · lankefarm (Rust) · Wayland · Live ISO</em>
 </p>
 
 <p align="center">
