@@ -1,15 +1,15 @@
-[English](README.en.md) | 中文
+English | [中文](README.md)
 
 <h1 align="center">LankeOS</h1>
 
 <p align="center">
-  <strong>专注于自动化与简化发行版维护的 Linux 发行版，配备自研包管理器与 ABI 驱动构建农场。</strong>
+  <strong>A Linux distribution focused on automating and simplifying distribution maintenance, with a custom package manager and ABI-driven build farm.</strong>
   <br />
   <em>Linux From Scratch · lpkg (C++20) · lankefarm (Rust) · Sway on Wayland · Live ISO</em>
 </p>
 
 <p align="center">
-  <a href="#快速上手"><img src="https://img.shields.io/badge/Quick_Start-4CAF50?style=for-the-badge" alt="Quick Start" /></a>
+  <a href="#quick-start"><img src="https://img.shields.io/badge/Quick_Start-4CAF50?style=for-the-badge" alt="Quick Start" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-2d8cf0?style=for-the-badge" alt="License" /></a>
   <a href="https://lankeos.wtada233.top"><img src="https://img.shields.io/badge/Documentation-lankeos.wtada233.top-1557a0?style=for-the-badge" alt="Documentation" /></a>
 </p>
@@ -34,32 +34,32 @@
   <img src="https://img.shields.io/badge/Claude_Code-D97757?style=flat&logo=claude&logoColor=white" alt="Claude Code" />
 </p>
 
-LankeOS 是一套基于 Linux From Scratch 方法论构建的 Linux 发行版。其核心特色在于把发行版的构建与维护流程自动化：从上游版本追踪、ABI 断裂检测，到增量重建、打包与仓库发布，均由自研工具链完成。本仓库是其公开 monorepo，由以下子项目组成，每个子项目都带有独立的 README：
+LankeOS is a Linux distribution built using the Linux From Scratch methodology. Its core characteristic is automating and simplifying the build and maintenance pipeline — from upstream version tracking and ABI break detection to incremental rebuilds, packaging, and repository publishing. This repository is the public monorepo of the distribution, made up of the following sub-projects, each with its own README:
 
-## 项目组成
+## Components
 
-| 子项目 | 说明 | 文档 |
+| Sub-project | Description | Docs |
 |---|---|---|
-| [lpkg](lpkg/) | C++20 编写的包管理器：原子 WAL 事务回滚、`needed_so` ABI 校验、聚合索引、静态构建 | [README](lpkg/README.md) |
-| [farm](farm/) | Rust 编写的 ABI 驱动增量构建农场，容器隔离构建 | [README](farm/README.md) |
-| [pkgs](pkgs/) | 数百个软件包的构建配方（`LankeBUILD` + `LankeBUILD.json`） | — |
-| [live](live/) | Live ISO / initramfs 工具链与三种启动模式 | — |
-| [site](site/) | VitePress 文档网站（中英双语） | [lankeos.wtada233.top](https://lankeos.wtada233.top) |
+| [lpkg](lpkg/) | C++20 package manager: atomic WAL transactions with rollback, `needed_so` ABI validation, aggregate index, static builds | [README](lpkg/README.en.md) |
+| [farm](farm/) | Rust ABI-driven incremental build farm with container-isolated builds | [README](farm/README.en.md) |
+| [pkgs](pkgs/) | Hundreds of package build recipes (`LankeBUILD` + `LankeBUILD.json`) | — |
+| [live](live/) | Live ISO / initramfs tooling with three boot modes | — |
+| [site](site/) | VitePress documentation site (zh + en) | [lankeos.wtada233.top](https://lankeos.wtada233.top) |
 
-## 快速上手
+## Quick Start
 
-- 编译与使用包管理器 → [lpkg README](lpkg/README.md)
-- 驱动 ABI 感知的增量构建 → [farm README](farm/README.md)
-- 安装指南、系统要求与下载 → [文档网站](https://lankeos.wtada233.top)
+- Build and use the package manager → [lpkg README](lpkg/README.en.md)
+- Drive ABI-aware incremental builds → [farm README](farm/README.en.md)
+- Install guide, system requirements, and downloads → [documentation site](https://lankeos.wtada233.top)
 
-## 贡献
+## Contributing
 
-1. Fork 本仓库。
-2. 创建特性分支（`git checkout -b feature/my-change`）。
-3. 提交更改，写明清晰的提交信息。
-4. 推送到你的 fork 并开启 Pull Request。
+1. Fork the repository.
+2. Create a feature branch (`git checkout -b feature/my-change`).
+3. Commit your changes with a clear message.
+4. Push to your fork and open a Pull Request.
 
-## 许可证
+## License
 
 [GPL-3.0](LICENSE)
 

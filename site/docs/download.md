@@ -17,7 +17,7 @@ editLink: false
 
 ```bash
 # 将 ISO 写入 U 盘（/dev/sdX 为你的 U 盘设备）
-sudo dd if=lankeos-0.09-live.iso of=/dev/sdX bs=4M status=progress
+sudo dd if=lankeos-live.iso of=/dev/sdX bs=4M status=progress
 sync
 ```
 

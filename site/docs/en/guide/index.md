@@ -12,7 +12,7 @@ Core features:
 
 - **Custom package manager** `lpkg` (C++20)
 - **Native Wayland desktop** (Sway tiling window manager)
-- **Extremely fast boot** (~4 seconds to desktop as of v0.12)
+- **Fast boot** (~4 seconds to desktop)
 - **Built from source** complete toolchain
 - **Chinese-first support** (Fcitx5 + Noto CJK out of the box)
 
@@ -25,7 +25,7 @@ Get the latest Live ISO image from the [Download page](/en/download).
 ### 2. Write to USB Drive
 
 ```bash
-sudo dd if=lankeos-0.09-live.iso of=/dev/sdX bs=4M status=progress
+sudo dd if=lankeos-live.iso of=/dev/sdX bs=4M status=progress
 ```
 
 ### 3. Boot
@@ -35,7 +35,7 @@ Insert the USB drive, restart, and boot from it (select the USB drive in the BIO
 On first boot you'll see:
 
 ```
-[    0.0] LankeOS 7.1.1-lanke kernel booting
+[    0.0] LankeOS x.x.x-lanke kernel booting
 [    1.2] initramfs: found LankeOS boot media
 [    1.5] initramfs: mounting rootfs.sfs
 [    1.8] initramfs: setting up OverlayFS

@@ -17,7 +17,7 @@ editLink: false
 
 ```bash
 # Write the ISO to a USB drive (/dev/sdX is your USB device)
-sudo dd if=lankeos-0.09-live.iso of=/dev/sdX bs=4M status=progress
+sudo dd if=lankeos-live.iso of=/dev/sdX bs=4M status=progress
 sync
 ```
 

@@ -1,8 +1,36 @@
 English | [中文](README.md)
 
-# lpkg - A Simple C++ Package Manager
+<h1 align="center">lpkg</h1>
 
-`lpkg` is a lightweight, high-performance, command-line package manager designed for LankeOS. Written in C++20, it provides atomic, traceable package management for LFS (Linux From Scratch) environments.
+<p align="center">
+  <strong>A lightweight, command-line C++20 package manager for LankeOS.</strong>
+  <br />
+  <em>Atomic WAL transactions with rollback · needed_so ABI validation · aggregate index · static builds</em>
+</p>
+
+<p align="center">
+  <a href="#usage"><img src="https://img.shields.io/badge/Quick_Start-4CAF50?style=for-the-badge" alt="Quick Start" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-2d8cf0?style=for-the-badge" alt="License" /></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/actions/workflow/status/Wtada233/LankeOS/lpkg-build.yml?style=flat&logo=github-actions&logoColor=white" alt="Build status" />
+  <img src="https://img.shields.io/badge/C++20-00599C?style=flat&logo=cplusplus&logoColor=white" alt="C++20" />
+  <img src="https://img.shields.io/github/license/Wtada233/LankeOS?style=flat" alt="License" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnubash&logoColor=white" alt="Bash" />
+  <img src="https://img.shields.io/badge/zstd-1E5B8C?style=flat&logo=zstandard&logoColor=white" alt="zstd" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Claude_Code-D97757?style=flat&logo=claude&logoColor=white" alt="Claude Code" />
+</p>
+
+`lpkg` is a lightweight, command-line package manager designed for LankeOS. Written in C++20, it provides atomic, traceable package management for LFS (Linux From Scratch) environments.
 
 ## Features
 
@@ -14,16 +42,36 @@ English | [中文](README.md)
 -   **Embedded metadata**: All metadata (name, version, dependencies, needed_so, virtual provides, man page) is stored in a `metadata.json` inside each package.
 -   **Auto dependency generation**: Includes `gen_deps.py` that scans ELF files to auto-generate both `needed_so` (DT_NEEDED SONAME list) and `deps` (provider package names), eliminating manual version constraint maintenance.
 -   **Layout-as-content**: The `content/` directory layout maps directly to the root filesystem.
--   **Automated operations**: Includes `lrepo-mgr.py` for seamless publishing to Tencent Cloud COS (S3) or SCP remote servers. New `--path` flag enables local filesystem repositories for offline testing.
+-   **Automated operations**: Includes `lrepo-mgr.py` for publishing to Tencent Cloud COS (S3) or SCP remote servers. The `--path` flag enables local filesystem repositories for offline testing.
 -   **Highly compatible static builds**: Built-in automatic detection of system CA certificate paths ensures statically compiled binaries work across different Linux distributions.
 -   **Security**: Mandatory SHA256 hash verification, file conflict detection, and malicious path filtering.
 -   **System hooks and triggers**: Supports per-package `postinst`/`prerm` scripts and system-level triggers (e.g. `ldconfig`).
 
-## User Guide
+## Usage
+
+Most `lpkg` operations require `root` privileges.
+
+**General syntax:**
+```bash
+lpkg [options] <command> [arguments]
+```
+
+### Common Commands
+
+-   **`install <package>[:version]`**: Install a package. Defaults to the latest version if none is specified.
+-   **`upgrade`**: Automatically check the index for updates to all installed packages.
+-   **`remove <package> [--force]`**: Remove a package. Use `--force` to remove packages that others depend on.
+-   **`query [-p] <package|filename>`**: Query which package owns a file, or list files in a package.
+-   **`scan [directory]`**: Scan for orphaned files not owned by any package.
+-   **`pack -o <output> -d <directory>`**: Build a `.lpkg` package from a directory. Reads package metadata from `<directory>/metadata.json`.
+-   **`build [directory]`**: Automatically build and pack a package from a specific directory.
+
+## Quick Start
 
 ### Dependencies
 
-Building `lpkg` requires the following libraries:
+The following libraries are only needed when building `lpkg` directly on the host (dynamic or static linking); the recommended Docker build needs none of them:
+
 - `libcurl`: For file downloads.
 - `libarchive`: For extracting package files.
 - `libcrypto` (OpenSSL): For hash computation.
@@ -36,35 +84,16 @@ sudo pacman -S curl libarchive openssl fmt
 
 ### Building and Installing
 
-1.  **Dynamic build**:
+1.  **Docker build (recommended)**: Building and testing requires nothing but Docker. All dependencies (including the libgit2 and libsolv static libraries) are installed automatically inside an `alpine:3.19` container, producing a pure static binary:
+    ```bash
+    make docker          # pure static binary: build/lpkg-docker
+    sudo make docker-install
+    make test            # run the full test suite in the same container
+    ```
+2.  **Dynamic build (host)**: Requires `libcurl`, `libarchive`, `libelf`, `libgit2`, `libsolv`, and `libopenssl` on the host:
     ```bash
     make && sudo make install
     ```
-2.  **Static build (recommended for LFS)**:
-    The project includes a `Dockerfile.build` that produces a fully statically linked binary:
-    ```bash
-    sudo docker build -t lpkg-builder -f Dockerfile.build .
-    sudo docker run -it --rm -v $(pwd):/app lpkg-builder
-    ```
-
-### Usage
-
-Most `lpkg` operations require `root` privileges.
-
-**General syntax:**
-```bash
-lpkg [options] <command> [arguments]
-```
-
-#### Common Commands
-
--   **`install <package>[:version]`**: Install a package. Defaults to the latest version if none is specified.
--   **`upgrade`**: Automatically check the index for updates to all installed packages.
--   **`remove <package> [--force]`**: Remove a package. Use `--force` to remove packages that others depend on.
--   **`query [-p] <package|filename>`**: Query which package owns a file, or list files in a package.
--   **`scan [directory]`**: Scan for orphaned files not owned by any package.
--   **`pack -o <output> -d <directory>`**: Build a `.lpkg` package from a directory. Reads package metadata from `<directory>/metadata.json`.
--   **`build [directory]`**: Automatically build and pack a package from a specific directory.
 
 ## Repository Management (Operations Guide)
 

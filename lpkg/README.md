@@ -1,8 +1,36 @@
 [English](README.en.md) | 中文
 
-# lpkg - 一个简单的 C++ 包管理器
+<h1 align="center">lpkg</h1>
 
-`lpkg` 是一个为 LankeOS 设计的轻量级、高性能、基于命令行的包管理器。它使用 C++20 编写，旨在为 LFS (Linux From Scratch) 环境提供原子化、可追溯的软件包管理方案。
+<p align="center">
+  <strong>为 LankeOS 设计的轻量级、基于命令行的 C++20 包管理器。</strong>
+  <br />
+  <em>原子 WAL 事务回滚 · needed_so ABI 校验 · 聚合索引 · 静态构建</em>
+</p>
+
+<p align="center">
+  <a href="#使用方法"><img src="https://img.shields.io/badge/Quick_Start-4CAF50?style=for-the-badge" alt="Quick Start" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-2d8cf0?style=for-the-badge" alt="License" /></a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/actions/workflow/status/Wtada233/LankeOS/lpkg-build.yml?style=flat&logo=github-actions&logoColor=white" alt="Build status" />
+  <img src="https://img.shields.io/badge/C++20-00599C?style=flat&logo=cplusplus&logoColor=white" alt="C++20" />
+  <img src="https://img.shields.io/github/license/Wtada233/LankeOS?style=flat" alt="License" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker" />
+  <img src="https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnubash&logoColor=white" alt="Bash" />
+  <img src="https://img.shields.io/badge/zstd-1E5B8C?style=flat&logo=zstandard&logoColor=white" alt="zstd" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Claude_Code-D97757?style=flat&logo=claude&logoColor=white" alt="Claude Code" />
+</p>
+
+`lpkg` 是一个为 LankeOS 设计的轻量级、基于命令行的包管理器。它使用 C++20 编写，旨在为 LFS (Linux From Scratch) 环境提供原子化、可追溯的软件包管理方案。
 
 ## 功能特性
 
@@ -19,11 +47,30 @@
 -   **安全性**：强制 SHA256 哈希校验、文件冲突检测、恶意路径过滤。
 -   **系统钩子与触发器**：支持包级 `postinst/prerm` 脚本及系统级触发器（如 `ldconfig`）。
 
-## 用户指南
+## 使用方法
+
+`lpkg` 的大部分操作需要 `root` 权限。
+
+**通用语法:**
+```bash
+lpkg [选项] <命令> [参数]
+```
+
+### 常用命令
+
+-   **`install <包名>[:版本]`**: 安装包。缺省版本时自动安装最新版。
+-   **`upgrade`**: 自动从索引中查找所有已安装包的更新。
+-   **`remove <包名> [--force]`**: 移除包。使用 `--force` 可强制删除被依赖的包。
+-   **`query [-p] <包名|文件名>`**: 查询文件归属或列出包内文件。
+-   **`scan [目录]`**: 扫描系统中不属于任何包的"孤儿"文件。
+-   **`pack -o <输出文件> -d <目录>`**: 构建 `.lpkg` 格式的软件包，从 `<目录>/metadata.json` 读取包元数据。
+-   **`build [目录]`**: 自动编译并打包软件包。
+
+## 快速开始
 
 ### 依赖
 
-编译 `lpkg` 需要以下库:
+以下库仅在主机上直接编译（动态/静态链接）时需要；推荐用 Docker 构建，主机无需安装任何依赖:
 - `libcurl`: 用于文件下载。
 - `libarchive`: 用于解压包文件。
 - `libcrypto` (OpenSSL): 用于计算哈希。
@@ -36,39 +83,20 @@ sudo pacman -S curl libarchive openssl fmt
 
 ### 编译与安装
 
-1.  **动态编译**:
+1.  **Docker 构建 (推荐)**: 完整构建与测试只需要 Docker。所有依赖（含 libgit2、libsolv 等静态库）都会在 `alpine:3.19` 容器内自动安装，产出纯静态二进制:
+    ```bash
+    make docker          # 纯静态二进制: build/lpkg-docker
+    sudo make docker-install
+    make test            # 在同一容器内运行完整测试套件
+    ```
+2.  **动态编译 (主机)**: 需要主机上的 `libcurl`、`libarchive`、`libelf`、`libgit2`、`libsolv`、`libopenssl`:
     ```bash
     make && sudo make install
     ```
-2.  **静态编译 (推荐用于 LFS)**:
-    项目中包含 `Dockerfile.build`,可生成完全静态链接的二进制文件:
-    ```bash
-    sudo docker build -t lpkg-builder -f Dockerfile.build .
-    sudo docker run -it --rm -v $(pwd):/app lpkg-builder
-    ```
-
-### 使用方法
-
-`lpkg` 的大部分操作需要 `root` 权限。
-
-**通用语法:**
-```bash
-lpkg [选项] <命令> [参数]
-```
-
-#### 常用命令
-
--   **`install <包名>[:版本]`**: 安装包。缺省版本时自动安装最新版。
--   **`upgrade`**: 自动从索引中查找所有已安装包的更新。
--   **`remove <包名> [--force]`**: 移除包。使用 `--force` 可强制删除被依赖的包。
--   **`query [-p] <包名|文件名>`**: 查询文件归属或列出包内文件。
--   **`scan [目录]`**: 扫描系统中不属于任何包的"孤儿"文件。
--   **`pack -o <输出文件> -d <目录>`**: 构建 `.lpkg` 格式的软件包，从 `<目录>/metadata.json` 读取包元数据。
--   **`build [目录]`**: 自动编译并打包软件包。
 
 ## 仓库管理 (运维指南)
 
-项目在 `main/scripts/lrepo-mgr.py` 提供了一个强大的运维脚本。
+项目在 `main/scripts/lrepo-mgr.py` 提供了自动化运维脚本。
 
 ### 1. 配置仓库连接
 支持 S3 (腾讯云 COS, AWS) 或 SCP:

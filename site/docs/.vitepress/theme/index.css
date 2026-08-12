@@ -1,0 +1,34 @@
+/* GNU Unifont —— LankeOS 基础字体（底层 Linux 项目的 bitmap 质感）
+   字体来源：AUR ttf-unifont（/usr/share/fonts/Unifont/），仅 Regular */
+
+@font-face {
+  font-family: 'Unifont';
+  src: url('/fonts/Unifont.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  /* BMP（基本多文种平面），含 CJK 与常用符号 */
+  unicode-range: U+0000-FFFF;
+}
+
+@font-face {
+  font-family: 'Unifont';
+  src: url('/fonts/Unifont_Upper.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+  /* SMP（增补多文种平面），含 emoji 符号 */
+  unicode-range: U+10000-10FFFF;
+}
+
+:root {
+  --vp-font-family-base: 'Unifont', Inter, ui-sans-serif, system-ui, sans-serif;
+  /* 代码块保持等宽栈，Unifont 不做正文代码 */
+  --vp-font-family-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
+}
+
+/* 首页功能卡的 emoji 以文本形式呈现 → 走 Unifont 单色字形，
+   避免各平台彩色 emoji 渲染不一致；不支持 font-variant-emoji 的浏览器自动回退彩色 emoji */
+.VPFeature .title {
+  font-variant-emoji: text;
+}

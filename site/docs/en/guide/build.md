@@ -4,7 +4,7 @@ title: Build from Source
 
 # Build LankeOS from Source
 
-> Building LankeOS requires a Linux host with a high-performance CPU (8+ cores recommended) and at least 64 GB of free disk space.
+> Building LankeOS requires a Linux host (8+ cores recommended) and at least 64 GB of free disk space.
 
 ## Build Environment Requirements
 

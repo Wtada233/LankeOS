@@ -12,7 +12,7 @@ title: 快速开始
 
 - **自研包管理器** `lpkg`（C++20）
 - **原生 Wayland 桌面**（Sway 平铺窗口管理器）
-- **极致启动速度**（截至0.12 ~4 秒进桌面）
+- **快速启动**（约 4 秒进桌面）
 - **中文优先**（Fcitx5 + Noto CJK 开箱即用）
 - **从源码构建**的完整工具链
 
@@ -25,7 +25,7 @@ title: 快速开始
 ### 2. 写入 U 盘
 
 ```bash
-sudo dd if=lankeos-0.09-live.iso of=/dev/sdX bs=4M status=progress
+sudo dd if=lankeos-live.iso of=/dev/sdX bs=4M status=progress
 ```
 
 ### 3. 启动
@@ -35,7 +35,7 @@ sudo dd if=lankeos-0.09-live.iso of=/dev/sdX bs=4M status=progress
 首次启动你会看到：
 
 ```
-[    0.0] LankeOS 7.1.1-lanke 内核启动
+[    0.0] LankeOS x.x.x-lanke 内核启动
 [    1.2] initramfs: 找到 LankeOS 启动介质
 [    1.5] initramfs: 挂载 rootfs.sfs
 [    1.8] initramfs: 设置 OverlayFS
