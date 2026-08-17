@@ -66,13 +66,25 @@ grub-install \
   --target=x86_64-efi \
   --efi-directory="$MOUNT" \
   --boot-directory="$MOUNT/boot" \
-  --modules="iso9660 udf fat part_gpt part_msdos ext2 search search_fs_uuid search_fs_file linux normal configfile echo cat all_video video_bochs video_cirrus gfxterm font serial terminal reboot halt" \
   --install-modules= \
   --fonts= \
   --locales= \
   --themes= \
   --no-nvram \
   --removable
+
+cat << 'EOF' > /tmp/early-boot.cfg
+search --no-floppy --label --set=root LANKE_BASE
+set prefix=($root)/boot/grub
+configfile ($root)/boot/grub/grub.cfg
+EOF
+
+grub-mkimage \
+  -O x86_64-efi \
+  -o "$MOUNT/EFI/BOOT/BOOTX64.EFI" \
+  -c /tmp/early-boot.cfg \
+  -p "()/boot/grub" \
+  iso9660 udf fat part_gpt part_msdos ext2 search search_fs_uuid search_fs_file linux normal configfile echo cat all_video video_bochs video_cirrus gfxterm font serial terminal reboot halt
 
 # 2) loopback 全量内容 -> temp/，再合入 live 内容
 mkdir -p temp
