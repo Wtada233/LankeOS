@@ -1,0 +1,14 @@
+================================================================
+ LankeOS system update detected.
+ The current system image version is different from the previous
+ persistent installation.
+ The system is running in LIVE upgrade mode.
+ You can:
+ 1. Remove:
+       LANKE_DATA/upper/etc/lanke-release-curr
+    Then reboot to accept the new base system.
+ 2. Reset your modifications under /usr if required.
+ 3. Keep your personal data under /home.
+ A future upgrade mechanism can migrate system files while
+ preserving user data.
+================================================================

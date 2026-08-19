@@ -1,0 +1,110 @@
+#!/bin/sh
+# ============================================================================
+# LankeOS 通用注入脚本
+#
+# 把 modules/{name}/ 里的"信息"按信息文件描述注入到目标系统(/newroot)。
+# 主 init 脚本只负责调用本脚本，具体"注入什么、注入到哪里、怎么注入"
+# 全部由各模块的信息文件(info) + 内容文件(content)描述，避免 init 越来越
+# 大。注入内容一律只保留一份纯文本，由本脚本统一转成对 bash 和 fish
+# 都有效的代码，不再维护 content.bash / content.fish 两套。
+#
+# 用法:
+#   inject <信息文件> <配置文件> [配置文件 ...]
+#     <信息文件>   模块 info 文件路径，如 /modules/live-notice/info
+#     <配置文件>   注入目标，相对 /newroot；可传多个（同一内容注入多处）。
+#                  rc 类注入时直接传配置文件路径（如 home/LankeOS/.bashrc
+#                  或 home/LankeOS/.config/fish/config.fish）。
+#                  脚本按配置文件后缀推断 shell：*.fish 视为 fish，
+#                  其余视为 bash（仅影响 GUARD 的语法）。
+#
+# 信息文件格式（可被 sh source 的键值对）:
+#   MODE    echo | write（默认 echo）
+#             echo  : 逐行读取内容文件，每行拼接成 `echo '<行>'` 追加到
+#                     配置文件（这是生成输出代码，不是普通追加）。
+#                     echo '...' 对 bash/fish 都有效，同一份纯文本内容
+#                     无需按 shell 分文件。
+#             write : 把内容文件原样写入目标（安装脚本、systemd drop-in）。
+#   EXEC    write 模式有效：yes 则 chmod +x（默认 no）
+#   CONTENT 内容文件名（默认 content，位于信息文件同目录）
+#   GUARD   可选：目标系统内存在该文件才注入（如 /.updated），
+#           脚本按目标 shell 生成对应条件（bash: if [ -f .. ]; fish: if test -f ..）
+#
+# 环境变量:
+#   INJECT_ROOT   注入根目录（默认 /newroot，便于调试/测试）
+# ============================================================================
+set -e
+
+INJECT_ROOT="${INJECT_ROOT:-/newroot}"
+INFO_FILE="${1:-}"
+[ -n "$INFO_FILE" ] || { echo "inject: 缺少信息文件参数" >&2; exit 1; }
+[ -f "$INFO_FILE" ] || { echo "inject: 找不到信息文件: $INFO_FILE" >&2; exit 1; }
+shift
+[ $# -ge 1 ] || { echo "inject: 缺少配置文件参数" >&2; exit 1; }
+
+# 默认值（被 info 覆盖）
+MODE="${MODE:-echo}"
+EXEC="${EXEC:-no}"
+CONTENT="${CONTENT:-content}"
+GUARD="${GUARD:-}"
+
+# 载入信息文件
+. "$INFO_FILE"
+
+MODULE_DIR=$(dirname "$INFO_FILE")
+[ -f "$MODULE_DIR/$CONTENT" ] || {
+    echo "inject: 找不到内容文件: $MODULE_DIR/$CONTENT" >&2
+    exit 1
+}
+
+# 逐行把内容文件拼成 echo '<行>' 追加到目标
+# 单引号用 sh 标准转义 '\'' 包裹，保证任意行内容都安全
+inject_echo()
+{
+    abs="$1"
+    case "$tgt" in
+        *.fish) sh_cur="fish" ;;
+        *)      sh_cur="bash" ;;
+    esac
+    if [ -n "$GUARD" ]; then
+        case "$sh_cur" in
+            fish) printf 'if test -f %s\n' "$GUARD" >> "$abs" ;;
+            *)    printf 'if [ -f %s ]; then\n' "$GUARD" >> "$abs" ;;
+        esac
+    fi
+    while IFS= read -r line || [ -n "$line" ]; do
+        esc=$(printf '%s' "$line" | sed "s/'/'\\\\''/g")
+        printf "echo '%s'\n" "$esc" >> "$abs"
+    done < "$MODULE_DIR/$CONTENT"
+    if [ -n "$GUARD" ]; then
+        case "$sh_cur" in
+            fish) printf 'end\n' >> "$abs" ;;
+            *)    printf 'fi\n' >> "$abs" ;;
+        esac
+    fi
+}
+
+inject_one()
+{
+    tgt="$1"
+    abs="$INJECT_ROOT/$tgt"
+    mkdir -p "$(dirname "$abs")"
+    case "$MODE" in
+        echo)
+            inject_echo "$abs"
+            ;;
+        write)
+            cat "$MODULE_DIR/$CONTENT" > "$abs"
+            [ "$EXEC" = "yes" ] && chmod +x "$abs"
+            ;;
+        *)
+            echo "inject: 未知 MODE: $MODE" >&2
+            exit 1
+            ;;
+    esac
+    echo "inject: [$MODE] -> $tgt"
+}
+
+# 逐目标注入（配置文件名来自命令行参数）
+for tgt in "$@"; do
+    inject_one "$tgt"
+done
