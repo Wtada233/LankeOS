@@ -105,6 +105,26 @@ fi
 EBASH
 }
 ###############################################################################
+# Live环境默认密码提示
+###############################################################################
+inject_live_notice()
+{
+    TARGET="/newroot/home/LankeOS/.bashrc"
+    mkdir -p /newroot/home/LankeOS
+    if [ ! -f "$TARGET" ]; then
+        touch "$TARGET"
+    fi
+    cat >> "$TARGET" <<'EBASH'
+cat <<'EOF'
+================================================================
+ LankeOS Live mode.
+ Default Password is LankeOS
+================================================================
+EOF
+EBASH
+}
+
+###############################################################################
 # Live模式
 ###############################################################################
 setup_live()
@@ -143,9 +163,6 @@ setup_live()
         sed -i \
         's/^root:[^:]*:/root::/' \
         /newroot/etc/shadow
-        sed -i \
-        's/^LankeOS:[^:]*:/LankeOS::/' \
-        /newroot/etc/shadow
     fi
     for tty_dir in \
         "getty@tty1.service.d" \
@@ -161,6 +178,8 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin LankeOS --noclear %I $TERM
 EOF
     done
+    inject_live_notice
+
     if [ "$UPDATED_MODE" = "1" ]; then
         inject_update_notice
     fi
