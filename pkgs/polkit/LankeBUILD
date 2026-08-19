@@ -10,7 +10,6 @@ lankebuild_build() {
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
     chmod 4755 {STAGING_ROOT}{BINDIR}/pkexec
-    chmod 4755 {STAGING_ROOT}{LIBDIR}/polkit-1/polkit-agent-helper-1
 
     # 安装 PAM 配置文件 (pkexec 和 polkit-1 共用)
     install -Dm644 /dev/stdin {STAGING_ROOT}/etc/pam.d/polkit-1 << 'PAM_EOF'
