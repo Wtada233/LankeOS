@@ -3,6 +3,7 @@
 //!   farm build <pkg>|--all               构建当前配方（预下载→构建→verify 三分支→repack/ABI 传播）
 //!   farm track <pkg> --run                探测上游 → 新版自动更新 LankeBUILD.json（生成新版）
 //!   farm gen-trackers                      batch 调 LLM 生成 tracker yaml（12 个/批）
+//!   farm repack <pkg>                      zstd -22 --ultra 重打包仓库包并更新 index.txt
 //!   farm seed / serve                    冷启动播种 / 本地 repo 静态服务器
 
 use std::cmp::Ordering as CmpOrdering;
@@ -65,6 +66,7 @@ use lankefarm::track::{dep_edges, TrackerConfig};
 /// 命令解析结果：clap 子命令 → 扁平结构，供各 cmd_* 使用（保持逻辑层签名不变）。
 mod build;
 mod export;
+mod repack;
 mod serve;
 mod seed;
 
@@ -182,6 +184,18 @@ enum Command {
         #[arg(long)]
         output: PathBuf,
         /// 架构（读取 input/<arch>/ 下每个包）
+        #[arg(long, default_value = "x86_64")]
+        arch: String,
+    },
+    /// 用 zstd level 22（`-22 --ultra` 最高压缩档）重打包仓库中目标包的 .lpkg（原位替换），
+    /// 并把新 SHA256 写回 index.txt。与 build 的快速 repack（level 3）不同：发行前对仓库终极压缩。
+    Repack {
+        /// 目标包名（对应 input/<arch>/<pkg>/）
+        pkg: String,
+        /// 构建仓库根目录（含 `<arch>/` 子目录）[default: out]
+        #[arg(long, default_value = "out")]
+        input: PathBuf,
+        /// 架构（读取 input/<arch>/ 下该包）
         #[arg(long, default_value = "x86_64")]
         arch: String,
     },
@@ -1213,6 +1227,11 @@ fn localize_help(cmd: clap::Command) -> clap::Command {
             .mut_arg("api_key", |a| a.help("LLM API key"))
             .mut_arg("model", |a| a.help("LLM model name"))
             .mut_arg("packages", |a| a.help("Only process these packages (comma-separated)")))
+        .mut_subcommand("repack", |c| c
+            .about("Repack a repo package with zstd -22 --ultra (in place) and update index.txt SHA256")
+            .mut_arg("pkg", |a| a.help("Target package name (input/<arch>/<pkg>/)"))
+            .mut_arg("input", |a| a.help("Build repo root (contains <arch>/ subdirs)"))
+            .mut_arg("arch", |a| a.help("Architecture (read the package under input/<arch>/)")))
         .mut_subcommand("serve", |c| c
             .about("Serve the local repo over HTTP")
             .mut_arg("root", |a| a.help("Repo root (contains <arch>/index.txt and package .lpkg)"))
@@ -1274,6 +1293,15 @@ pub fn run() -> ExitCode {
                 ..Default::default()
             };
             export::cmd_export(&args)
+        }
+        Command::Repack { pkg, input, arch } => {
+            let args = Args {
+                pkg: vec![pkg],
+                input: Some(input),
+                arch: Some(arch),
+                ..Default::default()
+            };
+            repack::cmd_repack(&args)
         }
         Command::Track { pkg, all, run, pkgs, data, jobs, token, gitlab_token } => {
             let args = Args {

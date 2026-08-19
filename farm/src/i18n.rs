@@ -129,6 +129,11 @@ static ZH: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("export.exported", "导出 {}"),
         ("export.failed", "失败 {}"),
         ("export.failed_item", "{}"),
+        // ── repack ──
+        ("repack.done", "[repack] {} 已重打包（zstd -22 --ultra），sha256 {}"),
+        ("repack.ok", "重打包 {} 个"),
+        ("repack.summary", "[repack 汇总] 包 {}：{}，index 已更新（{}）"),
+        ("repack.no_pkg", "用法：farm repack <pkg> [--input <dir>] [--arch <arch>]"),
         // ── state / track / gen-trackers ──
         ("state.open", "[state] 状态库 {}"),
         ("state.open_fail", "  [warn] 打开状态库失败（本次不记录）: {}"),
@@ -268,6 +273,10 @@ static EN: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("export.exported", "exported {}"),
         ("export.failed", "failed {}"),
         ("export.failed_item", "{}"),
+        ("repack.done", "[repack] {} repacked (zstd -22 --ultra), sha256 {}"),
+        ("repack.ok", "repacked {}"),
+        ("repack.summary", "[repack summary] package {}: {}, index updated ({})"),
+        ("repack.no_pkg", "Usage: farm repack <pkg> [--input <dir>] [--arch <arch>]"),
         ("state.open", "[state] state DB {}"),
         ("state.open_fail", "  [warn] failed to open state DB (not recording this run): {}"),
         ("build.need_image", "farm build requires --image <image>: container builds only, host builds would pollute the environment"),

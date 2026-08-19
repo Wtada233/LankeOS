@@ -17,7 +17,7 @@
 
 use std::fs;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::scan;
 
@@ -77,6 +77,115 @@ fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(),
     f.flush().map_err(|e| format!("flush 失败: {e}"))?;
     fs::rename(&tmp, out_path).map_err(|e| format!("替换 {out_path:?} 失败: {e}"))?;
     Ok(())
+}
+
+/// `farm repack <pkg>` 单个包的重打包结果。
+#[derive(Debug)]
+pub struct RepackedItem {
+    /// 版本（= 仓库文件名 `<version>.lpkg`）
+    pub version: String,
+    /// 重打包后的 .lpkg 路径
+    pub lpkg: PathBuf,
+    /// 重打包后的 SHA256（已写回 index.txt）
+    pub sha256: String,
+}
+
+/// `farm repack <pkg>`：把 `<input>/<arch>/<pkg>/*.lpkg` 用 zstd level 22（`-22 --ultra`，
+/// 最高压缩档）重打包，**原位替换**，并把新 SHA256 写回 `<input>/<arch>/index.txt` 对应版本块。
+///
+/// 只换压缩档与 hash，不碰包内容/metadata。与 build 的快速 repack（level 3）不同：这是
+/// 发行前对仓库的终极压缩（与 export 同档），但留在仓库内并同步索引。
+pub fn repack_in_repo(input: &Path, arch: &str, pkg: &str) -> Result<Vec<RepackedItem>, String> {
+    let pkg_dir = input.join(arch).join(pkg);
+    if !pkg_dir.is_dir() {
+        return Err(format!("包目录不存在: {}", pkg_dir.display()));
+    }
+    let mut lpkg_files: Vec<PathBuf> = fs::read_dir(&pkg_dir)
+        .map_err(|e| format!("读取 {pkg_dir:?} 失败: {e}"))?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().map_or(false, |x| x == "lpkg"))
+        .collect();
+    lpkg_files.sort();
+    if lpkg_files.is_empty() {
+        return Err(format!("{} 下无 .lpkg", pkg_dir.display()));
+    }
+
+    let extract_dir = input.join(".repack-extract").join(pkg);
+    let _ = fs::remove_dir_all(&extract_dir);
+    fs::create_dir_all(&extract_dir).map_err(|e| format!("创建 {extract_dir:?} 失败: {e}"))?;
+
+    let mut items = Vec::new();
+    for lpkg in &lpkg_files {
+        let version = lpkg
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("?")
+            .to_string();
+        // 解包 → level 22 重打包（原位原子替换）→ hash → 更新 index
+        scan::extract_lpkg(lpkg, &extract_dir)?;
+        repack_lpkg_at(&extract_dir, lpkg, 22)?;
+        let sha256 = crate::build::sha256_file(lpkg)?;
+        update_index_sha256(input, arch, pkg, &version, &sha256)?;
+        items.push(RepackedItem {
+            version,
+            lpkg: lpkg.to_path_buf(),
+            sha256,
+        });
+    }
+    let _ = fs::remove_dir_all(&extract_dir);
+    Ok(items)
+}
+
+/// 更新 index.txt：把 `<pkg>` 行中 version 匹配的版本块的 SHA256 替换为新值；
+/// 无匹配版本块则追加一块；index.txt / 包行不存在则创建。其余字段（deps/provides/needed_so）原样保留。
+fn update_index_sha256(
+    input: &Path,
+    arch: &str,
+    pkg: &str,
+    version: &str,
+    sha256: &str,
+) -> Result<(), String> {
+    let path = input.join(arch).join("index.txt");
+    let content = if path.exists() {
+        fs::read_to_string(&path).map_err(|e| format!("读 {path:?} 失败: {e}"))?
+    } else {
+        "# index\n".to_string()
+    };
+    let prefix = format!("{pkg}|");
+    let mut found_pkg = false;
+    let mut lines: Vec<String> = Vec::new();
+    for line in content.lines() {
+        if line.trim().is_empty() || line.starts_with('#') || !line.starts_with(&prefix) {
+            lines.push(line.to_string());
+            continue;
+        }
+        found_pkg = true;
+        // `name|块1;块2|pkg_level`，块 = `version:hash:deps:provides:needed_so`
+        let mut parts = line.splitn(3, '|');
+        let name = parts.next().unwrap_or("");
+        let blocks = parts.next().unwrap_or("");
+        let pkg_level = parts.next().unwrap_or("");
+        let mut found_ver = false;
+        let mut new_blocks: Vec<String> = Vec::new();
+        for block in blocks.split(';') {
+            let mut vparts: Vec<&str> = block.splitn(6, ':').collect();
+            if vparts.len() >= 2 && vparts[0] == version {
+                vparts[1] = sha256;
+                new_blocks.push(vparts.join(":"));
+                found_ver = true;
+            } else {
+                new_blocks.push(block.to_string());
+            }
+        }
+        if !found_ver {
+            new_blocks.push(format!("{version}:{sha256}:::"));
+        }
+        lines.push(format!("{name}|{}|{pkg_level}", new_blocks.join(";")));
+    }
+    if !found_pkg {
+        lines.push(format!("{pkg}|{version}:{sha256}:::|"));
+    }
+    fs::write(&path, lines.join("\n") + "\n").map_err(|e| format!("写 {path:?} 失败: {e}"))
 }
 
 #[cfg(test)]
@@ -156,5 +265,79 @@ mod tests {
         fs::remove_file(&lpkg).ok();
         let dir = std::env::temp_dir().join("farm-repack-test");
         fs::remove_dir_all(&dir).ok();
+    }
+
+    /// 把 make_fake_lpkg 的产物摆进仓库布局 `out/<arch>/<pkg>/<ver>.lpkg` + index.txt。
+    fn make_repo_lpkg(tmp: &Path) -> PathBuf {
+        let (lpkg, src) = make_fake_lpkg();
+        let pkgdir = tmp.join("out/x86_64/fake");
+        fs::create_dir_all(&pkgdir).unwrap();
+        let dest = pkgdir.join("1.0.lpkg");
+        fs::rename(&lpkg, &dest).unwrap();
+        fs::write(
+            tmp.join("out/x86_64/index.txt"),
+            "fake|1.0:oldhash:libc.so.6:libfoo.so,libfoo.so.1:libc.so.6|\n",
+        )
+        .unwrap();
+        let _ = fs::remove_dir_all(&src);
+        dest
+    }
+
+    #[test]
+    fn repack_in_repo_recompresses_and_updates_index_hash() {
+        let tmp = std::env::temp_dir().join(format!("farm-repackcmd-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let lpkg = make_repo_lpkg(&tmp);
+
+        let items = repack_in_repo(&tmp.join("out"), "x86_64", "fake").unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].version, "1.0");
+        assert_ne!(items[0].sha256, "oldhash", "重打包后 hash 应变化");
+
+        // index.txt 只换 hash，deps/provides/needed_so/pkg_level 原样保留
+        let idx = fs::read_to_string(tmp.join("out/x86_64/index.txt")).unwrap();
+        let line = idx.lines().find(|l| l.starts_with("fake|")).expect("index 应有 fake 行");
+        assert!(line.contains(&items[0].sha256), "index 应含新 hash: {line}");
+        assert!(!line.contains("oldhash"), "旧 hash 应被替换: {line}");
+        assert!(
+            line.contains("libc.so.6") && line.contains("libfoo.so,libfoo.so.1"),
+            "deps/provides/needed_so 应保留: {line}"
+        );
+
+        // round-trip：level 22 重打包后可正常解包
+        let extract = tmp.join("extract");
+        crate::scan::extract_lpkg(&lpkg, &extract).unwrap();
+        assert!(extract.join("content/libfoo.so.1").exists());
+        assert!(std::fs::symlink_metadata(extract.join("content/broken-link")).is_ok());
+
+        fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn repack_in_repo_creates_index_when_missing() {
+        let tmp = std::env::temp_dir().join(format!("farm-repackcmd-noidx-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let _lpkg = make_repo_lpkg(&tmp);
+        fs::remove_file(tmp.join("out/x86_64/index.txt")).unwrap();
+
+        let items = repack_in_repo(&tmp.join("out"), "x86_64", "fake").unwrap();
+        assert_eq!(items.len(), 1);
+        let idx = fs::read_to_string(tmp.join("out/x86_64/index.txt")).unwrap();
+        assert!(
+            idx.contains(&format!("fake|1.0:{}", items[0].sha256)),
+            "index 缺失时应新建并写入 hash: {idx}"
+        );
+
+        fs::remove_dir_all(&tmp).ok();
+    }
+
+    #[test]
+    fn repack_in_repo_missing_pkg_dir_errors() {
+        let tmp = std::env::temp_dir().join(format!("farm-repackcmd-nopkg-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("out/x86_64")).unwrap();
+        let err = repack_in_repo(&tmp.join("out"), "x86_64", "ghost").unwrap_err();
+        assert!(err.contains("包目录不存在"), "{err}");
+        fs::remove_dir_all(&tmp).ok();
     }
 }
