@@ -1,8 +1,11 @@
 {
   "name": "kf-solid",
   "version": "6.29.0",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "udisks2",
+    "upower"
+  ],
   "needed_so": [
     "libQt6Core.so.6",
     "libQt6DBus.so.6",
