@@ -11,6 +11,9 @@ lankebuild_build() {
     # 使 D-Bus 和 systemd 使用同一个 machine-id
     mkdir -pv {STAGING_ROOT}/var/lib/dbus
     ln -sfv ../../../etc/machine-id {STAGING_ROOT}/var/lib/dbus/machine-id
+    # system bus 启动 root 服务需要 setuid helper（提权执行 system-services）
+    # 缺失/非 SUID 会导致 "Failed to execute program ... Permission denied"
+    chmod 4755 {STAGING_ROOT}/usr/libexec/dbus-daemon-launch-helper
 }
 
 

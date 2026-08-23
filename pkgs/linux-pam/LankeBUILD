@@ -9,6 +9,10 @@ lankebuild_build() {
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 
+    # pam_unix 认证需要 setuid helper 读取 shadow（BLFS: chmod 4755 unix_chkpwd）
+    # 缺失/非 SUID 导致 pam_authenticate 返回 "Authentication service cannot retrieve authentication info"
+    chmod 4755 {STAGING_ROOT}/usr/bin/unix_chkpwd
+
     # 基础 PAM 栈配置（对齐 Arch pambase）
     # 说明：pam_systemd_home / pam_lastlog2 在 LankeOS 尚未构建，配置中对应行
     #       均为 optional 或 `-` 前缀（缺失模块不致命），可直接沿用 Arch 内容。

@@ -21,6 +21,9 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    # PAM 配置（Arch 同款命名，锁屏认证必需——kscreenlocker 用 /usr/lib/pam.d/kde 服务）
+    install -dm755 {STAGING_ROOT}/usr/lib/pam.d
+    install -m644 {WORK_DIR}/../kde.pam {STAGING_ROOT}/usr/lib/pam.d/kde
+    install -m644 {WORK_DIR}/../kde-fingerprint.pam {STAGING_ROOT}/usr/lib/pam.d/kde-fingerprint
+    install -m644 {WORK_DIR}/../kde-smartcard.pam {STAGING_ROOT}/usr/lib/pam.d/kde-smartcard
 }

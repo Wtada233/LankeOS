@@ -10,6 +10,8 @@
     "libQt6Core.so.6",
     "libQt6Gui.so.6",
     "libQt6Network.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
     "libQt6Widgets.so.6",
     "libc.so.6",
     "libm.so.6",
@@ -18,6 +20,8 @@
   "provides": [
     "libQt6Multimedia.so",
     "libQt6Multimedia.so.6",
+    "libQt6MultimediaQuick.so",
+    "libQt6MultimediaQuick.so.6",
     "libQt6MultimediaWidgets.so",
     "libQt6MultimediaWidgets.so.6",
     "libQt6SpatialAudio.so",
@@ -29,6 +33,7 @@
     "ninja",
     "python",
     "qt6-base",
+    "qt6-declarative",
     "qt6-shadertools",
     "vulkan-headers"
   ],
