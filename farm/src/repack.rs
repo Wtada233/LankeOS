@@ -142,11 +142,11 @@ pub fn repack_in_repo(input: &Path, arch: &str, pkg: &str) -> Result<Vec<Repacke
             .and_then(|s| s.to_str())
             .unwrap_or("?")
             .to_string();
-        // 解包 → level 22 重打包（原位原子替换）→ hash → 更新 index
+        // 解包 → level 22 重打包（原位原子替换）→ hash → 全量重建 index 行
         scan::extract_lpkg(lpkg, &extract_dir)?;
         repack_lpkg_at(&extract_dir, lpkg, 22)?;
         let sha256 = crate::build::sha256_file(lpkg)?;
-        update_index_sha256(input, arch, pkg, &version, &sha256)?;
+        write_index_full(input, arch, pkg, &extract_dir, &version, &sha256)?;
         items.push(RepackedItem {
             version,
             lpkg: lpkg.to_path_buf(),
@@ -157,12 +157,14 @@ pub fn repack_in_repo(input: &Path, arch: &str, pkg: &str) -> Result<Vec<Repacke
     Ok(items)
 }
 
-/// 更新 index.txt：把 `<pkg>` 行中 version 匹配的版本块的 SHA256 替换为新值；
-/// 无匹配版本块则追加一块；index.txt / 包行不存在则创建。其余字段（deps/provides/needed_so）原样保留。
-fn update_index_sha256(
+/// 全量重建 index.txt 的 `<pkg>` 行：从解包后的 metadata.json 读 deps/provides/needed_so，
+/// 连同版本号与 SHA256 一起重写该包整行（不保留旧字段、不追加版本块）。
+/// index.txt / 包行不存在则创建。
+fn write_index_full(
     input: &Path,
     arch: &str,
     pkg: &str,
+    extract_dir: &Path,
     version: &str,
     sha256: &str,
 ) -> Result<(), String> {
@@ -172,6 +174,24 @@ fn update_index_sha256(
     } else {
         "# index\n".to_string()
     };
+
+    let meta = scan::read_metadata_json(&extract_dir.join("metadata.json"))?;
+    let join = |k: &str| -> String {
+        meta.get(k)
+            .and_then(|v| v.as_array())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_default()
+    };
+    let deps = join("deps");
+    let provides = join("provides");
+    let needed = join("needed_so");
+    let new_line = format!("{pkg}|{version}:{sha256}:{deps}:{provides}:{needed}|");
+
     let prefix = format!("{pkg}|");
     let mut found_pkg = false;
     let mut lines: Vec<String> = Vec::new();
@@ -181,30 +201,10 @@ fn update_index_sha256(
             continue;
         }
         found_pkg = true;
-        // `name|块1;块2|pkg_level`，块 = `version:hash:deps:provides:needed_so`
-        let mut parts = line.splitn(3, '|');
-        let name = parts.next().unwrap_or("");
-        let blocks = parts.next().unwrap_or("");
-        let pkg_level = parts.next().unwrap_or("");
-        let mut found_ver = false;
-        let mut new_blocks: Vec<String> = Vec::new();
-        for block in blocks.split(';') {
-            let mut vparts: Vec<&str> = block.splitn(6, ':').collect();
-            if vparts.len() >= 2 && vparts[0] == version {
-                vparts[1] = sha256;
-                new_blocks.push(vparts.join(":"));
-                found_ver = true;
-            } else {
-                new_blocks.push(block.to_string());
-            }
-        }
-        if !found_ver {
-            new_blocks.push(format!("{version}:{sha256}:::"));
-        }
-        lines.push(format!("{name}|{}|{pkg_level}", new_blocks.join(";")));
+        lines.push(new_line.clone());
     }
     if !found_pkg {
-        lines.push(format!("{pkg}|{version}:{sha256}:::|"));
+        lines.push(new_line);
     }
     fs::write(&path, lines.join("\n") + "\n").map_err(|e| format!("写 {path:?} 失败: {e}"))
 }
