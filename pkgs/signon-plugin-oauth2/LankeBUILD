@@ -1,0 +1,21 @@
+lankebuild_prepare() {
+    # Qt6 兼容补丁：VERSION_0.25 → fab6988 的 18 个上游修复（toAscii/qrand/toTime_t/QUrl 等 Qt6 移除 API）
+    # 容错：已应用则跳过（同 signond 模式）
+    if patch -Np1 --dry-run -i "{WORK_DIR}/../signon-plugin-oauth2-qt6-fixes.patch" >/dev/null 2>&1; then
+        patch -Np1 -i "{WORK_DIR}/../signon-plugin-oauth2-qt6-fixes.patch"
+    elif patch -R -p1 --dry-run -i "{WORK_DIR}/../signon-plugin-oauth2-qt6-fixes.patch" >/dev/null 2>&1; then
+        echo "signon-plugin-oauth2-qt6-fixes.patch 已应用，跳过"
+    else
+        echo "signon-plugin-oauth2-qt6-fixes.patch 应用失败" >&2
+        exit 1
+    fi
+}
+
+lankebuild_build() {
+    qmake6 PREFIX={PREFIX} LIBDIR={LIBDIR}
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make INSTALL_ROOT={STAGING_ROOT} install
+}

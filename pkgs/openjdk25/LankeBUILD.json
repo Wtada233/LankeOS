@@ -33,13 +33,13 @@
     "giflib",
     "harfbuzz",
     "lcms2",
+    "libjpeg-turbo",
+    "libpng",
     "libx11",
     "libxext",
     "libxi",
     "libxrender",
     "libxtst",
-    "libjpeg-turbo",
-    "libpng",
     "zlib"
   ],
   "sources": [

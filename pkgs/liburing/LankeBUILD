@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+    find {STAGING_ROOT} -name "*.a" -delete
+
+}

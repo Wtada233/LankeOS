@@ -1,0 +1,31 @@
+{
+  "name": "libnvme",
+  "version": "1.16.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libdbus-1.so.3",
+    "libgcc_s.so.1"
+  ],
+  "provides": [
+    "libnvme-mi.so",
+    "libnvme-mi.so.1",
+    "libnvme.so",
+    "libnvme.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "dbus",
+    "json-c",
+    "keyutils",
+    "liburing",
+    "meson",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/linux-nvme/libnvme/archive/refs/tags/v1.16.2.tar.gz"
+  ],
+  "work_sources": []
+}

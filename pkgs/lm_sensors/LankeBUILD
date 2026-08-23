@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    # 不装 sensord（依赖 rrdtool，不必要）
+    sed -i 's|/etc/sysconfig|/etc/conf.d|' prog/detect/sensors-detect
+}
+
+lankebuild_build() {
+    make PREFIX={PREFIX} -j$(nproc)
+    make PROG_EXTRA= BUILD_STATIC_LIB=0 \
+        PREFIX={PREFIX} SBINDIR={BINDIR} MANDIR=/usr/share/man \
+        DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,31 @@
+{
+  "name": "plasma-activities-stats",
+  "version": "6.7.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libPlasmaActivities.so.7",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Sql.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libPlasmaActivitiesStats.so",
+    "libPlasmaActivitiesStats.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "plasma-activities",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.7.4/plasma-activities-stats-6.7.4.tar.xz"
+  ],
+  "work_sources": []
+}

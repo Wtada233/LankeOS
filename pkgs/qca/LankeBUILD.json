@@ -1,0 +1,30 @@
+{
+  "name": "qca",
+  "version": "2.3.10",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Core5Compat.so.6",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libgcc_s.so.1",
+    "libssl.so.3",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libqca-qt6.so",
+    "libqca-qt6.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "qt5compat",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/Attic/qca/2.3.10/qca-2.3.10.tar.xz"
+  ],
+  "work_sources": []
+}

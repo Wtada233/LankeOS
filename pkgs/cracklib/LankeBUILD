@@ -1,0 +1,24 @@
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    ./configure \
+        --prefix={PREFIX} \
+        --sbindir=/usr/bin \
+        --without-python \
+        --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    # symlink cracklib-small
+    mkdir -p {STAGING_ROOT}/usr/share/dict
+    ln -sf /usr/share/cracklib/cracklib-small {STAGING_ROOT}/usr/share/dict/cracklib-small
+    sh ./util/cracklib-format dicts/cracklib-small \
+        | sh ./util/cracklib-packer {STAGING_ROOT}/usr/share/cracklib/pw_dict
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

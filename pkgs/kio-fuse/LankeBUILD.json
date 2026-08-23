@@ -1,0 +1,28 @@
+{
+  "name": "kio-fuse",
+  "version": "5.1.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6CoreAddons.so.6",
+    "libKF6KIOCore.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libc.so.6",
+    "libfuse3.so.4",
+    "libstdc++.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "fuse3",
+    "kf-kcoreaddons",
+    "kf-kio",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/kio-fuse/kio-fuse-5.1.1.tar.xz"
+  ],
+  "work_sources": []
+}

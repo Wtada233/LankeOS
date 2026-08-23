@@ -1,0 +1,5 @@
+pkg-name: polkit-qt
+tracker-template: html-index
+url: https://download.kde.org/stable/polkit-qt-1/
+pattern: 'polkit-qt-1-(\d[\d.]*)\.tar\.xz'
+template: https://download.kde.org/stable/polkit-qt-1/polkit-qt-1-{version}.tar.xz

@@ -22,7 +22,6 @@
     "libasound.so.2",
     "libavcodec.so.62",
     "libavdevice.so.62",
-    "libavfilter.so.11",
     "libavformat.so.62",
     "libavutil.so.60",
     "libc.so.6",
@@ -60,8 +59,6 @@
     "libx264.so.165",
     "libxcb-composite.so.0",
     "libxcb-randr.so.0",
-    "libxcb-render.so.0",
-    "libxcb-shape.so.0",
     "libxcb-shm.so.0",
     "libxcb-xfixes.so.0",
     "libxcb-xinerama.so.0",
@@ -95,13 +92,13 @@
     "git",
     "glib",
     "jansson",
-    "libx11",
     "libdatachannel",
     "libdrm",
     "libglvnd",
     "libpulse",
     "libva",
     "libvpl",
+    "libx11",
     "libx264",
     "libxcb",
     "libxkbcommon",
@@ -128,5 +125,5 @@
     "git+https://github.com/obsproject/obs-studio@32.2.1"
   ],
   "work_sources": [],
-  "release": 2
+  "release": 4
 }

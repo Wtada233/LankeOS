@@ -1,0 +1,31 @@
+{
+  "name": "kwayland",
+  "version": "6.7.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6WaylandClient.so.6",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libwayland-client.so.0"
+  ],
+  "provides": [
+    "libKWaylandClient.so",
+    "libKWaylandClient.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "plasma-wayland-protocol",
+    "qt6-base",
+    "wayland",
+    "wayland-protocols"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.7.4/kwayland-6.7.4.tar.xz"
+  ],
+  "work_sources": []
+}

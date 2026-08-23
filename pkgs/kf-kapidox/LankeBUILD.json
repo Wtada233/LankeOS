@@ -1,0 +1,26 @@
+{
+  "name": "kf-kapidox",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-jinja",
+    "python-pyyaml"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-installer",
+    "python-jinja",
+    "python-pyyaml",
+    "python-setuptools",
+    "python-wheel",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kapidox-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

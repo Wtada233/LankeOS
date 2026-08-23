@@ -1,7 +1,7 @@
 {
   "name": "libx264",
   "version": "20250815",
-  "release": 2,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libavcodec.so.62",

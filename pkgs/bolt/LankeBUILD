@@ -1,0 +1,18 @@
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix={PREFIX} \
+        --libexecdir=lib \
+        -Dman=false
+    meson compile -C build
+    DESTDIR={STAGING_ROOT} meson install -C build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

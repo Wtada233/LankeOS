@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # tarball 源无 .git，hatch-vcs 无法从 git 探测版本；
+    # Arch 用全局 SETUPTOOLS_SCM_PRETEND_VERSION 注入（必须在 build 函数内联，
+    # prepare 的 export 不会跨阶段保留——每阶段是独立 bash）
+    export SETUPTOOLS_SCM_PRETEND_VERSION={ORIG_PKG_VER}
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

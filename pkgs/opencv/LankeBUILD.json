@@ -1,0 +1,44 @@
+{
+  "name": "opencv",
+  "version": "5.0.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libopencv_core.so",
+    "libopencv_core.so.500",
+    "libopencv_flann.so",
+    "libopencv_flann.so.500",
+    "libopencv_geometry.so",
+    "libopencv_geometry.so.500",
+    "libopencv_imgproc.so",
+    "libopencv_imgproc.so.500"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ffmpeg",
+    "freetype",
+    "glib",
+    "harfbuzz",
+    "libjpeg-turbo",
+    "libjxl",
+    "libpng",
+    "libtiff",
+    "libwebp",
+    "ninja",
+    "openjpeg",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/opencv/opencv/archive/refs/tags/5.0.0.tar.gz"
+  ],
+  "work_sources": []
+}

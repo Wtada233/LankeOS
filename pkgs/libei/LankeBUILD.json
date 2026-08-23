@@ -1,0 +1,32 @@
+{
+  "name": "libei",
+  "version": "1.6.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libevdev.so.2",
+    "libgcc_s.so.1",
+    "libsystemd.so.0",
+    "libxkbcommon.so.0"
+  ],
+  "provides": [
+    "libei.so",
+    "libei.so.1",
+    "libeis.so",
+    "libeis.so.1",
+    "liboeffis.so",
+    "liboeffis.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "libevdev",
+    "libxkbcommon",
+    "meson",
+    "python-jinja"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/libinput/libei/-/archive/1.6.0/libei-1.6.0.tar.gz"
+  ],
+  "work_sources": []
+}

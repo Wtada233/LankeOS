@@ -1,0 +1,6 @@
+pkg-name: libpwquality
+tracker-template: github
+repo: libpwquality/libpwquality
+mode: tags
+tag-prefix: libpwquality-
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

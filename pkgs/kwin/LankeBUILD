@@ -1,0 +1,26 @@
+lankebuild_prepare() {
+    # Arch 为 mesa 26.2 打的兼容补丁（Backport fix）
+    patch -Np1 -i "{WORK_DIR}/../2d0613ac.patch"
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    cmake -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBEXECDIR=libexec \
+        -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
+        -DCMAKE_SKIP_INSTALL_RPATH=ON \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DKDE_INSTALL_USE_QT_SYS_PATHS=ON \
+        -DBUILD_QT5=OFF \
+        -DBUILD_TESTING=OFF \
+        -DBUILD_PYTHON_BINDINGS=OFF \
+        -W no-author ..
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

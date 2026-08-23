@@ -1,0 +1,27 @@
+{
+  "name": "gpgmepp",
+  "version": "2.1.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgpgme.so.45",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libgpgmepp.so",
+    "libgpgmepp.so.7"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "gpgme",
+    "libgpg-error",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/gpg/gpgmepp/archive/refs/tags/gpgmepp-2.1.0.tar.gz"
+  ],
+  "work_sources": []
+}

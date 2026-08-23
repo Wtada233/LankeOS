@@ -1,0 +1,42 @@
+{
+  "name": "kf-prison",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Multimedia.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libZXing.so.4",
+    "libc.so.6",
+    "libdmtx.so.0",
+    "libgcc_s.so.1",
+    "libqrencode.so.4",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6Prison.so",
+    "libKF6Prison.so.6",
+    "libKF6PrisonScanner.so",
+    "libKF6PrisonScanner.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "libdmtx",
+    "qrencode",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-multimedia",
+    "qt6-tools",
+    "vulkan-headers",
+    "zxing-cpp"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/prison-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

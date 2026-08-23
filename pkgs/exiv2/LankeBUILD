@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    cmake -G Ninja -DCMAKE_INSTALL_PREFIX={PREFIX} -DEXIV2_BUILD_SAMPLES=OFF -DEXIV2_BUILD_UNIT_TESTS=OFF -DEXIV2_ENABLE_VIDEO=OFF -DEXIV2_ENABLE_NLS=ON -DEXIV2_ENABLE_XMP=ON -DEXIV2_ENABLE_CURL=ON -DEXIV2_ENABLE_WEBREADY=ON -DEXIV2_ENABLE_BMFF=ON ..
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

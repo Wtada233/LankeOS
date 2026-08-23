@@ -1,0 +1,51 @@
+{
+  "name": "kf-baloo",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6Crash.so.6",
+    "libKF6DBusAddons.so.6",
+    "libKF6FileMetaData.so.3",
+    "libKF6I18n.so.6",
+    "libKF6IdleTime.so.6",
+    "libKF6KIOCore.so.6",
+    "libKF6Solid.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libc.so.6",
+    "liblmdb.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6Baloo.so",
+    "libKF6Baloo.so.6",
+    "libKF6BalooEngine.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kcrash",
+    "kf-kdbusaddons",
+    "kf-kdoctools",
+    "kf-kfilemetadata",
+    "kf-ki18n",
+    "kf-kidletime",
+    "kf-kio",
+    "kf-solid",
+    "lmdb",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/baloo-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

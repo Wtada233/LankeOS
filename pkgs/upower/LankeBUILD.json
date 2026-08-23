@@ -1,0 +1,36 @@
+{
+  "name": "upower",
+  "version": "1.91.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgudev-1.0.so.0",
+    "libpolkit-gobject-1.so.0"
+  ],
+  "provides": [
+    "libupower-glib.so",
+    "libupower-glib.so.3"
+  ],
+  "build_deps": [
+    "base-devel",
+    "docbook-xsl",
+    "glib",
+    "gobject-introspection",
+    "gtk-doc",
+    "libgudev",
+    "libxslt",
+    "meson",
+    "ninja",
+    "polkit",
+    "python"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/upower/upower/-/archive/v1.91.3/upower-v1.91.3.tar.gz"
+  ],
+  "work_sources": []
+}

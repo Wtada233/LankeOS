@@ -1,0 +1,27 @@
+{
+  "name": "libbytesize",
+  "version": "2.12",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgmp.so.10",
+    "libmpfr.so.6",
+    "libpcre2-8.so.0"
+  ],
+  "provides": [
+    "libbytesize.so",
+    "libbytesize.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "gmp",
+    "mpfr",
+    "pcre2",
+    "python"
+  ],
+  "sources": [
+    "https://github.com/rhinstaller/libbytesize/archive/2.12.tar.gz"
+  ],
+  "work_sources": []
+}

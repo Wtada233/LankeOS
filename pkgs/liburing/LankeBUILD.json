@@ -1,0 +1,20 @@
+{
+  "name": "liburing",
+  "version": "2.15",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [
+    "liburing-ffi.so",
+    "liburing-ffi.so.2",
+    "liburing.so",
+    "liburing.so.2"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/axboe/liburing/archive/refs/tags/liburing-2.15.tar.gz"
+  ],
+  "work_sources": []
+}

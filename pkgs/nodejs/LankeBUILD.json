@@ -26,15 +26,13 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "python",
-    "ninja",
-    "procps-ng",
-    "git",
     "brotli",
+    "git",
     "icu",
     "libffi",
     "nghttp2",
-    "openssl",
+    "ninja",
+    "python",
     "zlib",
     "zstd"
   ],

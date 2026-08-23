@@ -3,6 +3,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    unset {C,CPP,CXX,LD}FLAGS
     # Apply custom configuration
     cp {WORK_DIR}/../linux.cfg .config
     make oldconfig -j$(nproc)

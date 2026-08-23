@@ -1,0 +1,6 @@
+pkg-name: qtkeychain
+tracker-template: github
+repo: frankosterfeld/qtkeychain
+mode: tags
+tag-prefix: ""
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

@@ -1,0 +1,13 @@
+pkg-name: kf-kdesu
+tracker-template: script
+script-content: |
+  up=${PKG_NAME#kf-}
+  base=https://download.kde.org/stable/frameworks
+  listing=$(curl -fsSL "$base/")
+  dir=$(printf '%s\n' "$listing" | grep -o 'href="[0-9][0-9.]*/"' | sed 's/href="//; s/"//; s/\/$//' | sort -V | tail -n1)
+  test -n "$dir" || exit 1
+  page=$(curl -fsSL "$base/$dir/")
+  version=$(printf '%s\n' "$page" | grep -o "${up}-[0-9][0-9.]*\.tar\.xz" | sed "s|^${up}-||; s|\.tar\.xz$||" | head -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "$base/$dir/${up}-$version.tar.xz"

@@ -1,0 +1,60 @@
+{
+  "name": "kinfocenter",
+  "version": "6.7.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6AuthCore.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6KCMUtilsCore.so.6",
+    "libKF6KCMUtilsQuick.so.6",
+    "libKF6KIOCore.so.6",
+    "libKF6KIOGui.so.6",
+    "libKF6KIOWidgets.so.6",
+    "libKF6Service.so.6",
+    "libKF6Solid.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libdrm.so.2",
+    "libstdc++.so.6",
+    "libudev.so.1"
+  ],
+  "provides": [
+    "libKInfoCenterInternal.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "glu",
+    "iproute2",
+    "kf-kauth",
+    "kf-kcmutils",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kdeclarative",
+    "kf-kdoctools",
+    "kf-ki18n",
+    "kf-kio",
+    "kf-kirigami",
+    "kf-kservice",
+    "kf-solid",
+    "libdisplay-info",
+    "libdrm",
+    "libpulse",
+    "lm_sensors",
+    "qt6-base",
+    "qt6-declarative",
+    "systemsettings",
+    "vulkan-headers"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.7.4/kinfocenter-6.7.4.tar.xz"
+  ],
+  "work_sources": []
+}

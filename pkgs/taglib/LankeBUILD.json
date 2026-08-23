@@ -1,0 +1,31 @@
+{
+  "name": "taglib",
+  "version": "2.3.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libtag.so",
+    "libtag.so.2",
+    "libtag_c.so",
+    "libtag_c.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "utf8cpp",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/taglib/taglib/releases/download/v2.3.1/taglib-2.3.1.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,5 +1,0 @@
-pkg-name: libelf
-tracker-template: html-index
-url: https://sourceware.org/ftp/elfutils/
-pattern: '(\d+\.\d+)/'
-template: https://sourceware.org/ftp/elfutils/{version}/elfutils-{version}.tar.bz2

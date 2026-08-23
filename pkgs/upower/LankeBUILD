@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -Dsystemdsystemunitdir={PREFIX}/lib/systemd/system .
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

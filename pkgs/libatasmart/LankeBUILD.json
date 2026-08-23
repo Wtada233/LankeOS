@@ -1,0 +1,21 @@
+{
+  "name": "libatasmart",
+  "version": "0.19",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libudev.so.1"
+  ],
+  "provides": [
+    "libatasmart.so",
+    "libatasmart.so.4"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://salsa.debian.org/utopia-team/libatasmart/-/archive/upstream/0.19/libatasmart-upstream-0.19.tar.gz"
+  ],
+  "work_sources": []
+}

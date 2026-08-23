@@ -1,0 +1,6 @@
+pkg-name: openxr
+tracker-template: github
+repo: KhronosGroup/OpenXR-SDK-Source
+mode: releases
+tag-prefix: release-
+template: https://github.com/{repo}/releases/download/{tag}/OpenXR-SDK-Source-{tag}.tar.gz

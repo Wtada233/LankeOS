@@ -1,0 +1,5 @@
+pkg-name: tdb
+tracker-template: html-index
+url: https://www.samba.org/ftp/tdb/
+pattern: 'tdb-(\d[\d.]*)\.tar\.gz'
+template: https://www.samba.org/ftp/tdb/tdb-{version}.tar.gz

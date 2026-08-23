@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # gitlab 归档不含生成的 autotools 文件（git 树），先 autoreconf 再 configure
+    autoreconf -fiv
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

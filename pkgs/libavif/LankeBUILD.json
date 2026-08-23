@@ -1,0 +1,32 @@
+{
+  "name": "libavif",
+  "version": "1.4.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libaom.so.3",
+    "libc.so.6",
+    "libdav1d.so.7",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libavif.so",
+    "libavif.so.16"
+  ],
+  "build_deps": [
+    "aom",
+    "base-devel",
+    "cmake",
+    "dav1d",
+    "libjpeg-turbo",
+    "libpng",
+    "libwebp",
+    "libxml2",
+    "nasm",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/AOMediaCodec/libavif/archive/refs/tags/v1.4.2.tar.gz"
+  ],
+  "work_sources": []
+}

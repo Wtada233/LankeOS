@@ -1,8 +1,9 @@
 {
   "name": "appstream",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "deps": [],
   "needed_so": [
+    "libQt6Core.so.6",
     "libblake3.so.0",
     "libc.so.6",
     "libcairo.so.2",
@@ -10,6 +11,7 @@
     "libfontconfig.so.1",
     "libfreetype.so.6",
     "libfyaml.so.0",
+    "libgcc_s.so.1",
     "libgdk_pixbuf-2.0.so.0",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
@@ -18,6 +20,7 @@
     "libm.so.6",
     "libpango-1.0.so.0",
     "librsvg-2.so.2",
+    "libstdc++.so.6",
     "libstemmer.so.0",
     "libsystemd.so.0",
     "libxml2.so.16",
@@ -25,6 +28,8 @@
     "libzstd.so.1"
   ],
   "provides": [
+    "libAppStreamQt.so",
+    "libAppStreamQt.so.3",
     "libappstream-compose.so",
     "libappstream-compose.so.0",
     "libappstream.so",
@@ -52,13 +57,14 @@
     "meson",
     "ninja",
     "pango",
+    "qt6-base",
     "qt6-tools",
     "vala",
     "zstd"
   ],
   "sources": [
-    "https://github.com/ximion/appstream/archive/refs/tags/v1.1.5.tar.gz"
+    "https://github.com/ximion/appstream/archive/refs/tags/v1.1.6.tar.gz"
   ],
   "work_sources": [],
-  "release": 3
+  "release": 4
 }

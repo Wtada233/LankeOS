@@ -1,0 +1,57 @@
+{
+  "name": "kirigami-addons",
+  "version": "1.13.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ColorScheme.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKF6ConfigGui.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6Crash.so.6",
+    "libKF6GlobalAccel.so.6",
+    "libKF6GuiAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6IconThemes.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6QuickControls2.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKirigamiAddonsComponents.so",
+    "libKirigamiAddonsComponents.so.6",
+    "libKirigamiAddonsStatefulApp.so",
+    "libKirigamiAddonsStatefulApp.so.6",
+    "libKirigamiApp.so",
+    "libKirigamiApp.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "kf-kcolorscheme",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kcrash",
+    "kf-kglobalaccel",
+    "kf-kguiaddons",
+    "kf-ki18n",
+    "kf-kiconthemes",
+    "kf-kirigami",
+    "kf-kitemmodels",
+    "kf-ksvg",
+    "kf-sonnet",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-multimedia"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/kirigami-addons/kirigami-addons-1.13.1.tar.xz"
+  ],
+  "work_sources": []
+}

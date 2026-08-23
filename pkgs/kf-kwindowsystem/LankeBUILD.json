@@ -1,0 +1,44 @@
+{
+  "name": "kf-kwindowsystem",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6WaylandClient.so.6",
+    "libX11.so.6",
+    "libXfixes.so.3",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libwayland-client.so.0",
+    "libxcb-keysyms.so.1",
+    "libxcb-res.so.0",
+    "libxcb.so.1"
+  ],
+  "provides": [
+    "libKF6WindowSystem.so",
+    "libKF6WindowSystem.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "libx11",
+    "libxcb",
+    "libxfixes",
+    "plasma-wayland-protocol",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools",
+    "wayland",
+    "wayland-protocols",
+    "xcb-util-keysyms"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kwindowsystem-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

@@ -11,8 +11,8 @@
     "base-devel",
     "python",
     "python-build",
-    "python-installer",
-    "python-flit-core"
+    "python-flit-core",
+    "python-installer"
   ],
   "sources": [
     "https://github.com/pypa/pip/archive/26.2.1/pip-26.2.1.tar.gz"

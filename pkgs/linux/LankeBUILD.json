@@ -8,7 +8,7 @@
   "build_deps": [
     "base-devel",
     "bc",
-    "libelf",
+    "elfutils",
     "perl",
     "python",
     "rsync",

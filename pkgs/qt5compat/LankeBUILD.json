@@ -4,10 +4,11 @@
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6ShaderTools.so.6",
     "libc.so.6",
-    "libgcc_s.so.1",
-    "libicudata.so.78",
-    "libicui18n.so.78",
     "libicuuc.so.78",
     "libm.so.6",
     "libstdc++.so.6"
@@ -21,11 +22,13 @@
     "cmake",
     "icu",
     "ninja",
-    "qt6-base"
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-shadertools"
   ],
   "sources": [
     "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qt5compat-everywhere-src-6.11.1.tar.xz"
   ],
   "work_sources": [],
-  "release": 3
+  "release": 4
 }

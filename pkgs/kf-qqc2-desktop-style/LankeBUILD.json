@@ -1,0 +1,38 @@
+{
+  "name": "kf-qqc2-desktop-style",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ColorScheme.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKF6IconThemes.so.6",
+    "libKirigamiPlatform.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "kf-kcolorscheme",
+    "kf-kconfig",
+    "kf-kiconthemes",
+    "kf-kirigami",
+    "kf-sonnet",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/qqc2-desktop-style-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

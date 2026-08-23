@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    make -j$(nproc) prefix=/usr EXTRA_CFLAGS="$CFLAGS"
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} prefix=/usr install
+    find {STAGING_ROOT} -name "*.a" -delete
+
+}

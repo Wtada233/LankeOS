@@ -21,9 +21,9 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "libx11",
     "libdrm",
     "libva",
+    "libx11",
     "mesa",
     "wayland"
   ],

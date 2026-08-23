@@ -15,6 +15,7 @@
   ],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "libxml2",
     "libxslt",
     "python",

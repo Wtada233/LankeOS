@@ -1,0 +1,35 @@
+{
+  "name": "kf-sonnet",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libhunspell-1.7.so.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6SonnetCore.so",
+    "libKF6SonnetCore.so.6",
+    "libKF6SonnetUi.so",
+    "libKF6SonnetUi.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "hunspell",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/sonnet-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

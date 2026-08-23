@@ -1,0 +1,6 @@
+pkg-name: zxing-cpp
+tracker-template: github
+repo: zxing-cpp/zxing-cpp
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

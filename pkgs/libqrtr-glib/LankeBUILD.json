@@ -1,0 +1,28 @@
+{
+  "name": "libqrtr-glib",
+  "version": "1.4.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libqrtr-glib.so",
+    "libqrtr-glib.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "meson",
+    "ninja"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/mobile-broadband/libqrtr-glib/-/archive/1.4.0/libqrtr-glib-1.4.0.tar.gz"
+  ],
+  "work_sources": []
+}

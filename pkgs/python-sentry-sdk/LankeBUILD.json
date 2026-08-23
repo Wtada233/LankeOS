@@ -1,0 +1,26 @@
+{
+  "name": "python-sentry-sdk",
+  "version": "2.68.0",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-certifi",
+    "python-urllib3"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-certifi",
+    "python-installer",
+    "python-setuptools",
+    "python-urllib3",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://github.com/getsentry/sentry-python/archive/refs/tags/2.68.0.tar.gz"
+  ],
+  "work_sources": []
+}

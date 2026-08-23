@@ -1,0 +1,8 @@
+pkg-name: lm_sensors
+tracker-template: script
+script-content: |
+  tags=$(git ls-remote --tags https://github.com/hramrach/lm-sensors 2>/dev/null)
+  version=$(printf '%s\n' "$tags" | grep 'refs/tags/V[0-9-]*$' | sed 's#.*refs/tags/V##' | tr '-' '.' | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "https://github.com/hramrach/lm-sensors/archive/refs/tags/V$(echo "$version" | tr '.' '-').tar.gz"

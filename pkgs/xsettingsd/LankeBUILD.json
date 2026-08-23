@@ -1,0 +1,22 @@
+{
+  "name": "xsettingsd",
+  "version": "1.0.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libX11.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "libx11"
+  ],
+  "sources": [
+    "https://codeberg.org/derat/xsettingsd/archive/v1.0.4.tar.gz"
+  ],
+  "work_sources": []
+}

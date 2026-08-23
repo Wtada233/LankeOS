@@ -1,0 +1,37 @@
+{
+  "name": "kf-kconfig",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6Xml.so.6",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6ConfigCore.so",
+    "libKF6ConfigCore.so.6",
+    "libKF6ConfigGui.so",
+    "libKF6ConfigGui.so.6",
+    "libKF6ConfigQml.so",
+    "libKF6ConfigQml.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kconfig-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

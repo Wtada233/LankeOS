@@ -1,0 +1,6 @@
+pkg-name: jsoncpp
+tracker-template: github
+repo: open-source-parsers/jsoncpp
+mode: tags
+tag-prefix: ""
+template: https://github.com/{repo}/archive/{tag}/{name}-{tag}.tar.gz

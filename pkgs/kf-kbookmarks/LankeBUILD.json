@@ -1,0 +1,38 @@
+{
+  "name": "kf-kbookmarks",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6ConfigGui.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6WidgetsAddons.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Widgets.so.6",
+    "libQt6Xml.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6Bookmarks.so",
+    "libKF6Bookmarks.so.6",
+    "libKF6BookmarksWidgets.so",
+    "libKF6BookmarksWidgets.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kwidgetsaddons",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kbookmarks-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

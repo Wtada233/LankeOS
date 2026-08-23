@@ -1,0 +1,24 @@
+{
+  "name": "libpwquality",
+  "version": "1.4.5",
+  "release": 7,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcrack.so.2",
+    "libpam.so.0"
+  ],
+  "provides": [
+    "libpwquality.so",
+    "libpwquality.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cracklib",
+    "linux-pam"
+  ],
+  "sources": [
+    "https://github.com/libpwquality/libpwquality/archive/refs/tags/libpwquality-1.4.5.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,9 @@
+pkg-name: lmdb
+tracker-template: script
+script-content: |
+  # github 镜像无 LMDB tag，直查 openldap 官方 git
+  refs=$(git ls-remote --tags https://git.openldap.org/openldap/openldap.git 2>/dev/null)
+  version=$(printf '%s\n' "$refs" | grep -oE 'refs/tags/LMDB_[0-9][0-9.]*$' | sed 's/.*LMDB_//' | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "git+https://git.openldap.org/openldap/openldap.git@LMDB_$version"

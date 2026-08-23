@@ -1,0 +1,45 @@
+{
+  "name": "kf-frameworkintegration",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libAppStreamQt.so.3",
+    "libKF6ColorScheme.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKF6I18n.so.6",
+    "libKF6IconThemes.so.6",
+    "libKF6NewStuffCore.so.6",
+    "libKF6Notifications.so.6",
+    "libKF6WidgetsAddons.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libpackagekitqt6.so.2",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6Style.so",
+    "libKF6Style.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "appstream",
+    "extra-cmake-modules",
+    "kf-kcolorscheme",
+    "kf-kconfig",
+    "kf-ki18n",
+    "kf-kiconthemes",
+    "kf-knewstuff",
+    "kf-knotifications",
+    "kf-kwidgetsaddons",
+    "packagekit-qt6",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/frameworkintegration-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

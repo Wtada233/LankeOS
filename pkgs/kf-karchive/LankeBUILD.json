@@ -1,0 +1,35 @@
+{
+  "name": "kf-karchive",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "liblzma.so.5",
+    "libstdc++.so.6",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libKF6Archive.so",
+    "libKF6Archive.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "bzip2",
+    "doxygen",
+    "extra-cmake-modules",
+    "qt6-base",
+    "qt6-tools",
+    "xz",
+    "zlib",
+    "zstd"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/karchive-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

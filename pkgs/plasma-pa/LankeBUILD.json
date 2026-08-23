@@ -1,0 +1,68 @@
+{
+  "name": "plasma-pa",
+  "version": "6.7.4",
+  "release": 1,
+  "deps": [
+    "kirigami-addons",
+    "sound-theme-freedesktop"
+  ],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6ConfigGui.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6DBusAddons.so.6",
+    "libKF6GlobalAccel.so.6",
+    "libKF6I18n.so.6",
+    "libKF6KCMUtilsCore.so.6",
+    "libKF6KCMUtilsQuick.so.6",
+    "libKF6PulseAudioQt.so.5",
+    "libKF6StatusNotifierItem.so.6",
+    "libPlasma.so.7",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libcanberra.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libm.so.6",
+    "libpulse.so.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libplasma-volume.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "glib",
+    "kf-kcmutils",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kdbusaddons",
+    "kf-kdeclarative",
+    "kf-kdoctools",
+    "kf-kglobalaccel",
+    "kf-ki18n",
+    "kf-kirigami",
+    "kf-kitemmodels",
+    "kf-kstatusnotifieritem",
+    "kf-ksvg",
+    "kirigami-addons",
+    "libcanberra",
+    "libplasma",
+    "libpulse",
+    "plasma-workspace",
+    "pulseaudio-qt",
+    "qt6-base",
+    "qt6-declarative"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.7.4/plasma-pa-6.7.4.tar.xz"
+  ],
+  "work_sources": []
+}

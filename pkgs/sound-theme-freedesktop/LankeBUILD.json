@@ -1,0 +1,16 @@
+{
+  "name": "sound-theme-freedesktop",
+  "version": "0.8",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "intltool"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/xdg/xdg-sound-theme/-/archive/0.8/xdg-sound-theme-0.8.tar.gz"
+  ],
+  "work_sources": []
+}

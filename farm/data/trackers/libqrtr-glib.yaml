@@ -1,0 +1,7 @@
+pkg-name: libqrtr-glib
+tracker-template: gitlab
+host: gitlab.freedesktop.org
+project: mobile-broadband/libqrtr-glib
+mode: tags
+tag-prefix: ''
+template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

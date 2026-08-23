@@ -1,0 +1,39 @@
+{
+  "name": "polkit-qt",
+  "version": "0.201.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libpolkit-agent-1.so.0",
+    "libpolkit-gobject-1.so.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libpolkit-qt6-agent-1.so",
+    "libpolkit-qt6-agent-1.so.1",
+    "libpolkit-qt6-core-1.so",
+    "libpolkit-qt6-core-1.so.1",
+    "libpolkit-qt6-gui-1.so",
+    "libpolkit-qt6-gui-1.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "polkit",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/polkit-qt-1/polkit-qt-1-0.201.1.tar.xz"
+  ],
+  "work_sources": []
+}

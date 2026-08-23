@@ -1,0 +1,24 @@
+lankebuild_prepare() {
+    # Qt6 兼容补丁：VERSION_8.61 → c8ad982 的 12 个上游修复
+    # （8.61 的 class QStringList 前置声明在 Qt6 下编译失败，见 authpluginif.h）
+    # 容错：patch -N 对"已应用"返回 1，用 reverse-dry-run 判别——已应用则跳过，
+    #       仅真正的应用失败才报错（未来上游纳入修复后此补丁自动变 no-op）。
+    # patch 在包目录（{WORK_DIR}/..），构建时 cwd 是源码目录。
+    if patch -Np1 --dry-run -i "{WORK_DIR}/../signond-qt6-fixes.patch" >/dev/null 2>&1; then
+        patch -Np1 -i "{WORK_DIR}/../signond-qt6-fixes.patch"
+    elif patch -R -p1 --dry-run -i "{WORK_DIR}/../signond-qt6-fixes.patch" >/dev/null 2>&1; then
+        echo "signond-qt6-fixes.patch 已应用，跳过"
+    else
+        echo "signond-qt6-fixes.patch 应用失败" >&2
+        exit 1
+    fi
+}
+
+lankebuild_build() {
+    qmake6 PREFIX={PREFIX} LIBDIR={LIBDIR} 
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make INSTALL_ROOT={STAGING_ROOT} install
+}

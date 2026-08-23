@@ -1,0 +1,27 @@
+{
+  "name": "gpgme",
+  "version": "2.1.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libassuan.so.9",
+    "libc.so.6",
+    "libgpg-error.so.0",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libgpgme.so",
+    "libgpgme.so.45"
+  ],
+  "build_deps": [
+    "base-devel",
+    "gnupg",
+    "libassuan",
+    "libgpg-error"
+  ],
+  "sources": [
+    "https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-2.1.2.tar.bz2"
+  ],
+  "work_sources": []
+}

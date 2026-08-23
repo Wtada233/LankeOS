@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    # 仅核心 C 库（zxing-cpp 需要）；Qt6 绑定（ZINT_QT6）不需要，省 qt6-svg/tools
+    cmake -G Ninja -DCMAKE_INSTALL_PREFIX={PREFIX} ..
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

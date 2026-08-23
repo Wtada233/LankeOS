@@ -1,0 +1,39 @@
+{
+  "name": "kf-kidletime",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6WaylandClient.so.6",
+    "libX11-xcb.so.1",
+    "libX11.so.6",
+    "libXext.so.6",
+    "libXss.so.1",
+    "libc.so.6",
+    "libstdc++.so.6",
+    "libwayland-client.so.0",
+    "libxcb-sync.so.1",
+    "libxcb.so.1"
+  ],
+  "provides": [
+    "libKF6IdleTime.so",
+    "libKF6IdleTime.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "libxscrnsaver",
+    "plasma-wayland-protocol",
+    "qt6-base",
+    "qt6-tools",
+    "wayland-protocols"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kidletime-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

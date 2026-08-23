@@ -1,0 +1,7 @@
+pkg-name: libmbim
+tracker-template: gitlab
+host: gitlab.freedesktop.org
+project: mobile-broadband/libmbim
+mode: tags
+tag-prefix: ''
+template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

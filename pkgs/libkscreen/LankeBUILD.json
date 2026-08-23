@@ -1,0 +1,39 @@
+{
+  "name": "libkscreen",
+  "version": "6.7.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6WaylandClient.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libwayland-client.so.0",
+    "libxcb-dpms.so.0",
+    "libxcb-randr.so.0",
+    "libxcb.so.1"
+  ],
+  "provides": [
+    "libKF6Screen.so",
+    "libKF6Screen.so.8",
+    "libKF6ScreenDpms.so",
+    "libKF6ScreenDpms.so.8"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "libxcb",
+    "plasma-wayland-protocol",
+    "qt6-base",
+    "qt6-tools",
+    "wayland"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.7.4/libkscreen-6.7.4.tar.xz"
+  ],
+  "work_sources": []
+}

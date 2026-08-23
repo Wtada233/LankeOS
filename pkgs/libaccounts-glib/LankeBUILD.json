@@ -1,0 +1,36 @@
+{
+  "name": "libaccounts-glib",
+  "version": "1.27",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libsqlite3.so.0",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "libaccounts-glib.so",
+    "libaccounts-glib.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "check",
+    "glib",
+    "gobject-introspection",
+    "gtk-doc",
+    "libxml2",
+    "meson",
+    "ninja",
+    "python-gobject",
+    "python-packaging",
+    "sqlite",
+    "vala"
+  ],
+  "sources": [
+    "https://gitlab.com/accounts-sso/libaccounts-glib/-/archive/VERSION_1.27/libaccounts-glib-VERSION_1.27.tar.gz"
+  ],
+  "work_sources": []
+}

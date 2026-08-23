@@ -1,0 +1,24 @@
+{
+  "name": "highway",
+  "version": "1.4.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libhwy.so",
+    "libhwy.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/google/highway/archive/refs/tags/1.4.0.tar.gz"
+  ],
+  "work_sources": []
+}

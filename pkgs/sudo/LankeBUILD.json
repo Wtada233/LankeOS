@@ -12,8 +12,8 @@
   ],
   "provides": [],
   "build_deps": [
-    "linux-pam",
     "base-devel",
+    "linux-pam",
     "zlib"
   ],
   "sources": [

@@ -1,0 +1,17 @@
+{
+  "name": "hicolor-icon-theme",
+  "version": "0.18",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "meson",
+    "ninja"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/xdg/default-icon-theme/-/archive/v0.18/default-icon-theme-v0.18.tar.gz"
+  ],
+  "work_sources": []
+}

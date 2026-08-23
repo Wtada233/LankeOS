@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    autoreconf -fiv #可能bug是上游源码包configure导致的，试试autoreconf
+    export CFLAGS+=" $(python3-config --includes)"
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

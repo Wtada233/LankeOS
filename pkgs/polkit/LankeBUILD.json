@@ -20,7 +20,6 @@
     "libpolkit-gobject-1.so.0"
   ],
   "build_deps": [
-    "linux-pam",
     "base-devel",
     "dbus",
     "duktape",
@@ -28,6 +27,7 @@
     "glib",
     "gobject-introspection",
     "gtk-doc",
+    "linux-pam",
     "meson",
     "ninja"
   ],

@@ -1,0 +1,35 @@
+{
+  "name": "gnupg",
+  "version": "2.5.21",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libassuan.so.9",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libgcrypt.so.20",
+    "libgnutls.so.30",
+    "libgpg-error.so.0",
+    "libksba.so.8",
+    "libnpth.so.0",
+    "libreadline.so.8",
+    "libsqlite3.so.0",
+    "libz.so.1"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "gnutls",
+    "libassuan",
+    "libgcrypt",
+    "libgpg-error",
+    "libksba",
+    "npth",
+    "sqlite",
+    "zlib"
+  ],
+  "sources": [
+    "https://www.gnupg.org/ftp/gcrypt/gnupg/gnupg-2.5.21.tar.bz2"
+  ],
+  "work_sources": []
+}

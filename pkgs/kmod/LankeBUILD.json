@@ -16,7 +16,7 @@
   ],
   "build_deps": [
     "base-devel",
-    "libelf",
+    "elfutils",
     "xz",
     "zlib",
     "zstd"

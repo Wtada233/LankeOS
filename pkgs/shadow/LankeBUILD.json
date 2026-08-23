@@ -16,7 +16,6 @@
     "libsubid.so.6"
   ],
   "build_deps": [
-    "linux-pam",
     "acl",
     "attr",
     "base-devel",
@@ -25,7 +24,8 @@
     "itstool",
     "libcap",
     "libxcrypt",
-    "libxslt"
+    "libxslt",
+    "linux-pam"
   ],
   "sources": [
     "https://github.com/shadow-maint/shadow/releases/download/4.20.0/shadow-4.20.0.tar.xz"

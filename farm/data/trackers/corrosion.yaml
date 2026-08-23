@@ -1,0 +1,6 @@
+pkg-name: corrosion
+tracker-template: github
+repo: corrosion-rs/corrosion
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

@@ -1,0 +1,35 @@
+lankebuild_prepare() {
+    # libdisplay-info 0.4.0 无 breaking（Yocto 上游确认），weston 的 '< 0.4.0' 约束过紧；
+    # 放宽到 '< 0.5.0'（防未来 0.5.0 真 breaking）。容错：reverse-dry-run 判别已应用。
+    if patch -Np1 --dry-run -i "{WORK_DIR}/../libdisplay-info-0.5.patch" >/dev/null 2>&1; then
+        patch -Np1 -i "{WORK_DIR}/../libdisplay-info-0.5.patch"
+    elif patch -R -p1 --dry-run -i "{WORK_DIR}/../libdisplay-info-0.5.patch" >/dev/null 2>&1; then
+        echo "libdisplay-info-0.5.patch 已应用，跳过"
+    else
+        echo "libdisplay-info-0.5.patch 应用失败" >&2
+        exit 1
+    fi
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix={PREFIX} \
+        -Dcolor-management-lcms=false \
+        -Dbackend-rdp=false \
+        -Dbackend-vnc=false \
+        -Dbackend-x11=false \
+        -Dshell-ivi=false \
+        -Dshell-lua=false \
+        -Ddemo-clients=false \
+        -Dsimple-clients= \
+        -Dtools= \
+        -Dtests=false \
+        -Ddoc=false
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} meson install -C build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,7 @@
+pkg-name: libatasmart
+tracker-template: gitlab
+host: salsa.debian.org
+project: utopia-team/libatasmart
+mode: tags
+tag-prefix: 'upstream/'
+template: https://salsa.debian.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

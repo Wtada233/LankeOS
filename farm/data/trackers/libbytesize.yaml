@@ -1,0 +1,6 @@
+pkg-name: libbytesize
+tracker-template: github
+repo: rhinstaller/libbytesize
+mode: tags
+tag-prefix: ''
+template: https://github.com/{repo}/archive/{tag}.tar.gz

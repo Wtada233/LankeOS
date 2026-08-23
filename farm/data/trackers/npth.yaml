@@ -1,0 +1,5 @@
+pkg-name: npth
+tracker-template: html-index
+url: https://www.gnupg.org/ftp/gcrypt/npth/
+pattern: 'npth-(\d[\d.]*)\.tar\.bz2'
+template: https://www.gnupg.org/ftp/gcrypt/npth/npth-{version}.tar.bz2

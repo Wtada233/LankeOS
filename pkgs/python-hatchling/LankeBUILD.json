@@ -12,6 +12,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
+    "base-devel",
     "python",
     "python-packaging",
     "python-pathspec",

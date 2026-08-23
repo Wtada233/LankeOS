@@ -1,0 +1,33 @@
+{
+  "name": "kf-networkmanager-qt",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [
+    "networkmanager"
+  ],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Network.so.6",
+    "libQt6Qml.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6NetworkManagerQt.so",
+    "libKF6NetworkManagerQt.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "networkmanager",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/networkmanager-qt-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,28 @@
+{
+  "name": "power-profiles-daemon",
+  "version": "0.30",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgudev-1.0.so.0",
+    "libpolkit-gobject-1.so.0"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "libgudev",
+    "meson",
+    "polkit",
+    "upower"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/upower/power-profiles-daemon/-/archive/0.30/power-profiles-daemon-0.30.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,6 @@
+pkg-name: opencv
+tracker-template: github
+repo: opencv/opencv
+mode: tags
+tag-prefix: ""
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

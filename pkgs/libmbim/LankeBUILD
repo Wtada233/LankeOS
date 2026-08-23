@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # -Dman=false：仓库无 help2man，跳过 man 页生成
+    meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -Dman=false .
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

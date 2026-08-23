@@ -1,0 +1,41 @@
+{
+  "name": "qt6-virtualkeyboard",
+  "version": "6.11.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6Svg.so.6",
+    "libc.so.6",
+    "libhunspell-1.7.so.0",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libQt6HunspellInputMethod.so",
+    "libQt6HunspellInputMethod.so.6",
+    "libQt6VirtualKeyboard.so",
+    "libQt6VirtualKeyboard.so.6",
+    "libQt6VirtualKeyboardQml.so",
+    "libQt6VirtualKeyboardQml.so.6",
+    "libQt6VirtualKeyboardSettings.so",
+    "libQt6VirtualKeyboardSettings.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "hunspell",
+    "ninja",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-multimedia",
+    "qt6-svg"
+  ],
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtvirtualkeyboard-everywhere-src-6.11.1.tar.xz"
+  ],
+  "work_sources": []
+}

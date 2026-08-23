@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 插件按依赖自动探测（SOFT_FAILURE 跳过缺依赖的插件），仓库有的后端尽量开
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

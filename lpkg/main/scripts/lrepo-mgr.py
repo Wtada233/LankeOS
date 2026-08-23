@@ -22,7 +22,7 @@ def extract_metadata(archive_path):
     provides = ""
     needed_so = ""
     try:
-        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*metadata.json', '-O'],
+        result = subprocess.run(['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*metadata.json', '--exclude', 'content/*', '-O'],
                                 capture_output=True, text=True)
         if result.returncode == 0 and result.stdout.strip():
             meta = json.loads(result.stdout)
@@ -38,7 +38,7 @@ def read_metadata_from_archive(archive_path):
     """Extracts metadata.json from the lpkg archive and returns name, version."""
     try:
         result = subprocess.run(
-            ['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*metadata.json', '-O'],
+            ['tar', '--use-compress-program=zstd', '-xf', archive_path, '--wildcards', '*metadata.json', '--exclude', 'content/*', '-O'],
             capture_output=True, text=True
         )
         if result.returncode == 0 and result.stdout.strip():

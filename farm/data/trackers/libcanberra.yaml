@@ -1,0 +1,10 @@
+pkg-name: libcanberra
+tracker-template: script
+script-content: |
+  # 上游 0pointer 已死，Debian GNOME 团队在 salsa 维护（补丁版 0.30-N）。
+  # vercmp 视 "-" 为 prerelease（0.30-20 < 0.30），故把 debian/0.30-N 映射为 0.30.N。
+  ver=$(curl -fsSL "https://salsa.debian.org/api/v4/projects/gnome-team%2Flibcanberra/repository/tags?per_page=50" 2>/dev/null \
+        | grep -oE '"name":"debian/0\.30-[0-9]+"' | sed 's/.*debian\/0\.30-//; s/"//' | sort -n | tail -n1)
+  test -n "$ver" || exit 1
+  echo "0.30.$ver"
+  echo "https://salsa.debian.org/gnome-team/libcanberra/-/archive/debian/0.30-$ver/libcanberra-0.30-$ver.tar.gz"

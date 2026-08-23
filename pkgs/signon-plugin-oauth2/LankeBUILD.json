@@ -1,0 +1,27 @@
+{
+  "name": "signon-plugin-oauth2",
+  "version": "0.25",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Network.so.6",
+    "libQt6Test.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libsignon-plugins.so.1",
+    "libsignon-qt6.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "qt6-base",
+    "signond"
+  ],
+  "sources": [
+    "https://gitlab.com/nicolasfella/signon-plugin-oauth2/-/archive/VERSION_0.25/signon-plugin-oauth2-VERSION_0.25.tar.gz"
+  ],
+  "work_sources": []
+}

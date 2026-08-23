@@ -1,0 +1,6 @@
+pkg-name: taglib
+tracker-template: github
+repo: taglib/taglib
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/{repo}/releases/download/{tag}/taglib-{version}.tar.gz

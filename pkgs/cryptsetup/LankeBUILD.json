@@ -1,0 +1,29 @@
+{
+  "name": "cryptsetup",
+  "version": "2.8.7",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libblkid.so.1",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libdevmapper.so.1.02",
+    "libjson-c.so.5",
+    "libpopt.so.0",
+    "libuuid.so.1"
+  ],
+  "provides": [
+    "libcryptsetup.so",
+    "libcryptsetup.so.12"
+  ],
+  "build_deps": [
+    "base-devel",
+    "device-mapper",
+    "json-c",
+    "popt"
+  ],
+  "sources": [
+    "https://www.kernel.org/pub/linux/utils/cryptsetup/v2.8/cryptsetup-2.8.7.tar.xz"
+  ],
+  "work_sources": []
+}

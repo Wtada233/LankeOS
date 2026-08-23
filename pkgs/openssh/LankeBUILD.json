@@ -4,13 +4,13 @@
   "release": 3,
   "deps": [
     "glibc",
-    "linux-pam",
-    "libxcrypt",
-    "openssl",
-    "zlib",
-    "libedit",
     "krb5",
-    "xauth"
+    "libedit",
+    "libxcrypt",
+    "linux-pam",
+    "openssl",
+    "xauth",
+    "zlib"
   ],
   "needed_so": [
     "libc.so.6",
@@ -27,13 +27,12 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "linux-pam",
     "krb5",
     "libedit",
     "libxcrypt",
-    "openssl",
-    "zlib",
-    "xauth"
+    "linux-pam",
+    "xauth",
+    "zlib"
   ],
   "sources": [
     "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.4p1.tar.gz"

@@ -35,19 +35,19 @@
     "gst-plugins-base",
     "gstreamer",
     "gtk3",
-    "libx11",
-    "libxtst",
     "libcap",
     "libice",
     "libsm",
     "libsndfile",
+    "libx11",
     "libxcb",
+    "libxtst",
     "meson",
     "ninja",
+    "perl-xml-parser",
     "rtkit",
     "sbc",
-    "speexdsp",
-    "perl-xml-parser"
+    "speexdsp"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/archive/v17.0/pulseaudio-v17.0.tar.gz"

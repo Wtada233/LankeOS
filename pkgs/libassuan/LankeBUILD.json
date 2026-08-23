@@ -1,0 +1,22 @@
+{
+  "name": "libassuan",
+  "version": "3.0.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgpg-error.so.0"
+  ],
+  "provides": [
+    "libassuan.so",
+    "libassuan.so.9"
+  ],
+  "build_deps": [
+    "base-devel",
+    "libgpg-error"
+  ],
+  "sources": [
+    "https://www.gnupg.org/ftp/gcrypt/libassuan/libassuan-3.0.2.tar.bz2"
+  ],
+  "work_sources": []
+}

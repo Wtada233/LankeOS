@@ -1,0 +1,29 @@
+{
+  "name": "kf-kglobalaccel",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6GlobalAccel.so",
+    "libKF6GlobalAccel.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kglobalaccel-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

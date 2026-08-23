@@ -1,0 +1,11 @@
+--- weston-orig/weston-16.0.0/meson.build	2026-07-14 15:34:50.000000000 +0800
++++ weston-16.0.0/meson.build	2026-08-22 20:42:49.910059517 +0800
+@@ -179,7 +179,7 @@
+ 
+ dep_libdisplay_info = dependency(
+ 	'libdisplay-info',
+-	version: ['>= 0.2.0', '< 0.4.0'],
++	version: ['>= 0.2.0', '< 0.5.0'],
+ 	fallback: ['display-info', 'di_dep'],
+ 	default_options: [
+ 		'werror=false',

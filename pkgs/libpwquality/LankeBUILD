@@ -1,0 +1,22 @@
+lankebuild_prepare() {
+    # github 归档缺生成的 configure，autotools 需要 autoreconf
+    autoreconf -fiv
+}
+
+lankebuild_build() {
+    ./configure \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --localstatedir=/var \
+        --disable-python-bindings \
+        --enable-pam \
+        --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    install -dm755 {STAGING_ROOT}/etc/security/pwquality.conf.d
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

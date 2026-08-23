@@ -31,8 +31,8 @@
   ],
   "build_deps": [
     "base-devel",
+    "elfutils",
     "gobject-introspection",
-    "libelf",
     "libffi",
     "meson",
     "ninja",

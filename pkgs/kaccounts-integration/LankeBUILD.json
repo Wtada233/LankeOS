@@ -1,0 +1,46 @@
+{
+  "name": "kaccounts-integration",
+  "version": "26.08.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6DBusAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6KCMUtilsCore.so.6",
+    "libKF6KCMUtilsQuick.so.6",
+    "libKF6KIOCore.so.6",
+    "libKF6Wallet.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Widgets.so.6",
+    "libaccounts-qt6.so.1",
+    "libc.so.6",
+    "libsignon-qt6.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libkaccounts6.so",
+    "libkaccounts6.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "extra-cmake-modules",
+    "kf-kcmutils",
+    "kf-kdoctools",
+    "kf-kio",
+    "libaccounts-qt",
+    "ninja",
+    "qcoro",
+    "signon-kwallet-extension",
+    "signon-plugin-oauth2",
+    "signond"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/release-service/26.08.0/src/kaccounts-integration-26.08.0.tar.xz"
+  ],
+  "work_sources": []
+}

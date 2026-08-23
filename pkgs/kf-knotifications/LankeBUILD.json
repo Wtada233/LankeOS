@@ -1,0 +1,35 @@
+{
+  "name": "kf-knotifications",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libc.so.6",
+    "libcanberra.so.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6Notifications.so",
+    "libKF6Notifications.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "libcanberra",
+    "python-build",
+    "python-setuptools",
+    "qt6-base",
+    "qt6-declarative"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/knotifications-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

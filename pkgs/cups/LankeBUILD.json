@@ -26,12 +26,12 @@
     "libcupsimage.so.2"
   ],
   "build_deps": [
-    "linux-pam",
     "acl",
     "base-devel",
     "dbus",
     "gnutls",
     "libxcrypt",
+    "linux-pam",
     "zlib"
   ],
   "sources": [

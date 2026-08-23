@@ -1,0 +1,56 @@
+{
+  "name": "kpipewire",
+  "version": "6.7.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libKF6CoreAddons.so.6",
+    "libKF6I18n.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6OpenGL.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libavcodec.so.62",
+    "libavfilter.so.11",
+    "libavformat.so.62",
+    "libavutil.so.60",
+    "libc.so.6",
+    "libdrm.so.2",
+    "libepoxy.so.0",
+    "libgbm.so.1",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libpipewire-0.3.so.0",
+    "libstdc++.so.6",
+    "libva-drm.so.2",
+    "libva.so.2"
+  ],
+  "provides": [
+    "libKPipeWire.so",
+    "libKPipeWire.so.6",
+    "libKPipeWireDmaBuf.so",
+    "libKPipeWireDmaBuf.so.6",
+    "libKPipeWireRecord.so",
+    "libKPipeWireRecord.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "ffmpeg",
+    "kf-kcoreaddons",
+    "kf-ki18n",
+    "libdrm",
+    "libepoxy",
+    "libva",
+    "mesa",
+    "pipewire",
+    "qt6-base",
+    "qt6-declarative"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.7.4/kpipewire-6.7.4.tar.xz"
+  ],
+  "work_sources": []
+}

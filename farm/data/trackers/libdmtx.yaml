@@ -1,0 +1,6 @@
+pkg-name: libdmtx
+tracker-template: github
+repo: dmtx/libdmtx
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/dmtx/libdmtx/archive/refs/tags/{tag}.tar.gz

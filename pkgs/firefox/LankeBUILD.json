@@ -1,7 +1,7 @@
 {
   "name": "firefox",
   "version": "153.0.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "ffmpeg"
   ],
@@ -77,13 +77,11 @@
     "nspr",
     "nss",
     "pango",
-    "pixman",
     "pipewire",
+    "pixman",
     "python",
     "rust",
-    "unzip",
     "yasm",
-    "zip",
     "zlib"
   ],
   "sources": [

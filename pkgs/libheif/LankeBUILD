@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    cmake -G Ninja -DCMAKE_INSTALL_PREFIX={PREFIX} -DWITH_AOM_DECODER=ON -DWITH_AOM_ENCODER=ON -DWITH_DAV1D=ON -DWITH_OPENJPEG_DECODER=ON -DWITH_OPENJPEG_ENCODER=ON -DWITH_X265=ON -DWITH_X264=ON -DWITH_GDK_PIXBUF=OFF -DWITH_FFMPEG_DECODER=OFF -DWITH_RAV1E=OFF -DWITH_SvtEnc=OFF ..
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

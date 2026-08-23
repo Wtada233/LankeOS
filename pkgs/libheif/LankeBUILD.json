@@ -1,0 +1,46 @@
+{
+  "name": "libheif",
+  "version": "1.23.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libaom.so.3",
+    "libc.so.6",
+    "libdav1d.so.7",
+    "libde265.so.0",
+    "libgcc_s.so.1",
+    "libjpeg.so.62",
+    "libm.so.6",
+    "libpng16.so.16",
+    "libsharpyuv.so.0",
+    "libstdc++.so.6",
+    "libtiff.so.6",
+    "libwebp.so.7",
+    "libwebpmux.so.3",
+    "libx264.so.165",
+    "libx265.so.216"
+  ],
+  "provides": [
+    "libheif.so",
+    "libheif.so.1"
+  ],
+  "build_deps": [
+    "aom",
+    "base-devel",
+    "cmake",
+    "dav1d",
+    "libde265",
+    "libjpeg-turbo",
+    "libpng",
+    "libtiff",
+    "libx264",
+    "libx265",
+    "ninja",
+    "openjpeg"
+  ],
+  "sources": [
+    "https://github.com/strukturag/libheif/archive/refs/tags/v1.23.1.tar.gz"
+  ],
+  "work_sources": []
+}

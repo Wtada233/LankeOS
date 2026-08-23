@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # Makefile 在 libutempter/ 子目录（顶层无 Makefile，无需 configure）
+    cd libutempter
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    cd libutempter
+    make DESTDIR={STAGING_ROOT} install
+}

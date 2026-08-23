@@ -1,0 +1,5 @@
+pkg-name: aom
+tracker-template: html-index
+url: https://storage.googleapis.com/aom-releases/
+pattern: 'libaom-(\d[\d.]*)\.tar\.gz'
+template: https://storage.googleapis.com/aom-releases/libaom-{version}.tar.gz

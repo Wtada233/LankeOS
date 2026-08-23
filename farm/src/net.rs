@@ -6,8 +6,9 @@
 
 use std::collections::HashMap;
 
-/// 正常浏览器 UA——站点对自定义 UA 一律 403（反爬），必须冒充常规浏览器。
-pub const BROWSER_UA: &str = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+/// curl UA——镜像站/托管站对 curl 放行，对自定义或浏览器 UA 反而限流/挑战。
+/// 版本与系统 curl 一致，保证与 script 模板里 curl 发出的 UA 相同。
+pub const CURL_UA: &str = "curl/8.21.0";
 
 pub trait Fetcher {
     fn get(&self, url: &str) -> Result<String, String>;
@@ -65,7 +66,7 @@ impl Default for RealFetcher {
 
 impl Fetcher for RealFetcher {
     fn get(&self, url: &str) -> Result<String, String> {
-        let mut req = ureq::get(url).set("User-Agent", BROWSER_UA);
+        let mut req = ureq::get(url).set("User-Agent", CURL_UA);
         if let Some(tok) = bearer_token_for(url, &self.github_token, &self.gitlab_token) {
             req = req.set("Authorization", &format!("Bearer {tok}"));
         }
@@ -88,7 +89,7 @@ impl Fetcher for RealFetcher {
 /// 抓取文本（如 index.txt）。失败返回错误信息。
 pub fn fetch_text(url: &str) -> Result<String, String> {
     let body = ureq::get(url)
-        .set("User-Agent", BROWSER_UA)
+        .set("User-Agent", CURL_UA)
         .call()
         .map_err(|e| format!("GET {url}: {e}"))?;
     body.into_string().map_err(|e| format!("读 {url}: {e}"))
@@ -112,7 +113,7 @@ pub fn download_to_file(url: &str, dest: &std::path::Path, retries: u32) -> Resu
 
 fn download_once(url: &str, dest: &std::path::Path) -> Result<(), String> {
     let resp = ureq::get(url)
-        .set("User-Agent", BROWSER_UA)
+        .set("User-Agent", CURL_UA)
         .call()
         .map_err(|e| format!("GET {url}: {e}"))?;
     let mut f =

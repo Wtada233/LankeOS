@@ -1,0 +1,15 @@
+{
+  "name": "stb",
+  "version": "20260801",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/nothings/stb/archive/2c980bb59875b0d32144a71867fbdebb2f77cd20.tar.gz"
+  ],
+  "work_sources": []
+}

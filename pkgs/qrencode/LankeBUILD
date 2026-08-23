@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # github 归档是 git 树，不含生成的 configure，先 autoreconf
+    autoreconf -fiv
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-tests
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

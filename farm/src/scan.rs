@@ -59,17 +59,40 @@ pub fn scan_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<ScanResult, Str
 }
 
 /// 解包 .lpkg（zstd 压缩 tar），保留 mode。
+///
+/// 必须 root：普通用户解压无法 chown 到 root owner、无法设置 SUID/SGID、无法写 root-only
+/// 文件（如 /etc/shadow 0600）。`sudo tar` 由 root 解压，`--numeric-owner` 保留数字 uid/gid，
+/// mode 完整（含 SUID）。
 pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), String> {
     if extract_dir.exists() {
         fs::remove_dir_all(extract_dir).map_err(|e| format!("清空 {extract_dir:?} 失败: {e}"))?;
     }
     fs::create_dir_all(extract_dir).map_err(|e| format!("创建 {extract_dir:?} 失败: {e}"))?;
-    let f = fs::File::open(lpkg_path).map_err(|e| format!("打开 {lpkg_path:?} 失败: {e}"))?;
-    let dec = zstd::stream::read::Decoder::new(f)
-        .map_err(|e| format!("zstd 解压 {lpkg_path:?} 失败: {e}"))?;
-    let mut ar = tar::Archive::new(dec);
-    ar.set_preserve_permissions(true);
-    ar.unpack(extract_dir).map_err(|e| format!("tar 解包 {lpkg_path:?} 失败: {e}"))?;
+    // 解压：zstd -dc | sudo tar --numeric-owner -xf - -C extract_dir
+    let dec = std::process::Command::new("zstd")
+        .args(["-dc", lpkg_path.to_string_lossy().as_ref()])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| format!("spawn zstd 解压失败: {e}"))?;
+    let dec_out = dec.stdout
+        .ok_or_else(|| "zstd stdout 不可用".to_string())?;
+    let status = std::process::Command::new("sudo")
+        .args([
+            "-n",
+            "tar",
+            "--numeric-owner",
+            "-xf",
+            "-",
+            "-C",
+            extract_dir.to_string_lossy().as_ref(),
+        ])
+        .stdin(std::process::Stdio::from(dec_out))
+        .status()
+        .map_err(|e| format!("sudo tar 解包失败: {e}"))?;
+    if !status.success() {
+        return Err(format!("sudo tar 解包失败（exit {:?}）", status.code()));
+    }
     Ok(())
 }
 

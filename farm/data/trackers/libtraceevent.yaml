@@ -1,0 +1,9 @@
+pkg-name: libtraceevent
+tracker-template: script
+script-content: |
+  # git.kernel.org snapshot，tag 前缀 libtraceevent-
+  refs=$(git ls-remote --tags https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git 2>/dev/null)
+  version=$(printf '%s\n' "$refs" | grep -oE 'refs/tags/libtraceevent-[0-9][0-9.]*$' | sed 's|refs/tags/libtraceevent-||' | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git/snapshot/libtraceevent-$version.tar.gz"

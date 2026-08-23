@@ -1,0 +1,6 @@
+pkg-name: xxhash
+tracker-template: github
+repo: Cyan4973/xxHash
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

@@ -1,0 +1,7 @@
+pkg-name: mobile-broadband-provider-info
+tracker-template: gitlab
+host: gitlab.gnome.org
+project: GNOME/mobile-broadband-provider-info
+mode: tags
+tag-prefix: ''
+template: https://gitlab.gnome.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

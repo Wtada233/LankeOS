@@ -149,7 +149,7 @@ fn seed_one_pkg(
 /// 下载文本（index.txt）。
 fn fetch(url: &str) -> Result<String, String> {
     let body = ureq::get(url)
-        .set("User-Agent", crate::net::BROWSER_UA)
+        .set("User-Agent", crate::net::CURL_UA)
         .call()
         .map_err(|e| format!("GET {url}: {e}"))?;
     body.into_string().map_err(|e| format!("读 {url}: {e}"))
@@ -158,7 +158,7 @@ fn fetch(url: &str) -> Result<String, String> {
 /// 流式下载到文件。
 fn download(url: &str, dest: &Path) -> Result<(), String> {
     let resp = ureq::get(url)
-        .set("User-Agent", crate::net::BROWSER_UA)
+        .set("User-Agent", crate::net::CURL_UA)
         .call()
         .map_err(|e| format!("GET {url}: {e}"))?;
     let mut f = fs::File::create(dest).map_err(|e| format!("创建 {dest:?} 失败: {e}"))?;

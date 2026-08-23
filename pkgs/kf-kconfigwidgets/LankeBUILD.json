@@ -1,0 +1,42 @@
+{
+  "name": "kf-kconfigwidgets",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6Codecs.so.6",
+    "libKF6ColorScheme.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKF6ConfigGui.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6WidgetsAddons.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6ConfigWidgets.so",
+    "libKF6ConfigWidgets.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kcodecs",
+    "kf-kcolorscheme",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-ki18n",
+    "kf-kwidgetsaddons",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kconfigwidgets-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

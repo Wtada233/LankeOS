@@ -1,0 +1,20 @@
+{
+  "name": "libtraceevent",
+  "version": "1.9.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libtraceevent.so",
+    "libtraceevent.so.1"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://git.kernel.org/pub/scm/libs/libtrace/libtraceevent.git/snapshot/libtraceevent-1.9.0.tar.gz"
+  ],
+  "work_sources": []
+}

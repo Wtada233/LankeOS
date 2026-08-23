@@ -1,0 +1,22 @@
+{
+  "name": "check",
+  "version": "0.15.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libcheck.so",
+    "libcheck.so.0"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/libcheck/check/releases/download/0.15.2/check-0.15.2.tar.gz"
+  ],
+  "work_sources": []
+}

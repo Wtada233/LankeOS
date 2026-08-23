@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    qmake6 PREFIX={PREFIX} LIBDIR={LIBDIR} 
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make INSTALL_ROOT={STAGING_ROOT} install
+}

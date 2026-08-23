@@ -1,0 +1,40 @@
+{
+  "name": "ndctl",
+  "version": "85",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libiniparser.so.4",
+    "libjson-c.so.5",
+    "libkeyutils.so.1",
+    "libkmod.so.2",
+    "libtraceevent.so.1",
+    "libtracefs.so.1",
+    "libudev.so.1",
+    "libuuid.so.1"
+  ],
+  "provides": [
+    "libcxl.so",
+    "libcxl.so.1",
+    "libdaxctl.so",
+    "libdaxctl.so.1",
+    "libndctl.so",
+    "libndctl.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "iniparser",
+    "json-c",
+    "keyutils",
+    "kmod",
+    "libtraceevent",
+    "libtracefs",
+    "meson",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/pmem/ndctl/archive/refs/tags/v85.tar.gz"
+  ],
+  "work_sources": []
+}

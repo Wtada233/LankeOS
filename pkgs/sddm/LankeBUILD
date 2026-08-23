@@ -1,0 +1,38 @@
+lankebuild_prepare() {
+    # cmake 4 移除了 <3.5 兼容（Arch cherry-pick 同款，上游 commit 228778c2）
+    # 容错：reverse-dry-run 判别已应用，上游纳入后自动 no-op
+    if patch -Np1 --dry-run -i "{WORK_DIR}/../sddm-cmake4-fixes.patch" >/dev/null 2>&1; then
+        patch -Np1 -i "{WORK_DIR}/../sddm-cmake4-fixes.patch"
+    elif patch -R -p1 --dry-run -i "{WORK_DIR}/../sddm-cmake4-fixes.patch" >/dev/null 2>&1; then
+        echo "sddm-cmake4-fixes.patch 已应用，跳过"
+    else
+        echo "sddm-cmake4-fixes.patch 应用失败" >&2
+        exit 1
+    fi
+}
+
+lankebuild_build() {
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBEXECDIR=/usr/lib/sddm \
+        -DBUILD_WITH_QT6=ON \
+        -DDBUS_CONFIG_DIR=/usr/share/dbus-1/system.d \
+        -DDBUS_CONFIG_FILENAME=sddm_org.freedesktop.DisplayManager.conf \
+        -DBUILD_MAN_PAGES=OFF \
+        -DBUILD_TESTING=OFF \
+        -DUID_MAX=60513
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # 生成默认配置（install 后 sddm 已就位）
+    install -dm755 {STAGING_ROOT}/usr/lib/sddm/sddm.conf.d
+    {STAGING_ROOT}/usr/bin/sddm --example-config > {STAGING_ROOT}/usr/lib/sddm/sddm.conf.d/default.conf
+    sed -r 's|DefaultPath=.*|DefaultPath=/usr/local/sbin:/usr/local/bin:/usr/bin|g' -i {STAGING_ROOT}/usr/lib/sddm/sddm.conf.d/default.conf
+    # LankeOS 是 Wayland-only：greeter 用 weston kiosk（sddm 内建 WaylandDisplayServer），不跑 X
+    sed -i 's|^DisplayServer=x11$|DisplayServer=wayland|' {STAGING_ROOT}/usr/lib/sddm/sddm.conf.d/default.conf
+    # Wayland 下 Qt greeter 光标靠 XCURSOR_THEME；不设则默认无光标（sddm 界面看不到鼠标）。
+    # breeze_cursors 是 KDE 默认光标主题（breeze 包提供），显式指定。
+    sed -i 's|^CursorTheme=$|CursorTheme=breeze_cursors|' {STAGING_ROOT}/usr/lib/sddm/sddm.conf.d/default.conf
+}

@@ -1,0 +1,6 @@
+pkg-name: packagekit
+tracker-template: github
+repo: PackageKit/PackageKit
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

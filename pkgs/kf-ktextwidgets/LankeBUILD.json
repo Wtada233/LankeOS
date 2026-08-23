@@ -1,0 +1,41 @@
+{
+  "name": "kf-ktextwidgets",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6Completion.so.6",
+    "libKF6ConfigGui.so.6",
+    "libKF6I18n.so.6",
+    "libKF6SonnetCore.so.6",
+    "libKF6SonnetUi.so.6",
+    "libKF6WidgetsAddons.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6TextToSpeech.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6TextWidgets.so",
+    "libKF6TextWidgets.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kcompletion",
+    "kf-kconfig",
+    "kf-ki18n",
+    "kf-kwidgetsaddons",
+    "kf-sonnet",
+    "qt6-base",
+    "qt6-speech",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/ktextwidgets-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

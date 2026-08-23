@@ -1,0 +1,58 @@
+{
+  "name": "kf-purpose",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6I18nQml.so.6",
+    "libKF6KIOCore.so.6",
+    "libKF6KIOGui.so.6",
+    "libKF6KIOWidgets.so.6",
+    "libKF6Notifications.so.6",
+    "libKF6Service.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Network.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Widgets.so.6",
+    "libaccounts-qt6.so.1",
+    "libc.so.6",
+    "libkaccounts6.so.2",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6Purpose.so",
+    "libKF6Purpose.so.6",
+    "libKF6PurposeWidgets.so",
+    "libKF6PurposeWidgets.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "hicolor-icon-theme",
+    "intltool",
+    "kaccounts-integration",
+    "kf-kcmutils",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-ki18n",
+    "kf-kio",
+    "kf-kirigami",
+    "kf-kitemmodels",
+    "kf-knotifications",
+    "kf-kservice",
+    "kf-prison",
+    "libaccounts-qt",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/purpose-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

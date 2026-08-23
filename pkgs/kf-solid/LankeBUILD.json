@@ -1,0 +1,34 @@
+{
+  "name": "kf-solid",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Xml.so.6",
+    "libc.so.6",
+    "libmount.so.1",
+    "libstdc++.so.6",
+    "libudev.so.1"
+  ],
+  "provides": [
+    "libKF6Solid.so",
+    "libKF6Solid.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools",
+    "udisks2",
+    "upower"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/solid-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

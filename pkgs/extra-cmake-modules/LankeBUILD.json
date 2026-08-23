@@ -1,7 +1,7 @@
 {
   "name": "extra-cmake-modules",
-  "version": "6.28.0",
-  "release": 2,
+  "version": "6.29.0",
+  "release": 3,
   "deps": [
     "bash",
     "python"
@@ -16,7 +16,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.28/extra-cmake-modules-6.28.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.29/extra-cmake-modules-6.29.0.tar.xz"
   ],
   "work_sources": []
 }

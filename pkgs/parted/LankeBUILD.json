@@ -1,0 +1,28 @@
+{
+  "name": "parted",
+  "version": "3.7",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libblkid.so.1",
+    "libc.so.6",
+    "libdevmapper.so.1.02",
+    "libncursesw.so.6",
+    "libreadline.so.8",
+    "libuuid.so.1"
+  ],
+  "provides": [
+    "libparted-fs-resize.so",
+    "libparted-fs-resize.so.0",
+    "libparted.so",
+    "libparted.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "device-mapper"
+  ],
+  "sources": [
+    "https://ftp.gnu.org/gnu/parted/parted-3.7.tar.xz"
+  ],
+  "work_sources": []
+}

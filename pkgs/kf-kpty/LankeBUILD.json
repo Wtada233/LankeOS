@@ -1,0 +1,31 @@
+{
+  "name": "kf-kpty",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6CoreAddons.so.6",
+    "libKF6I18n.so.6",
+    "libQt6Core.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6Pty.so",
+    "libKF6Pty.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kcoreaddons",
+    "kf-ki18n",
+    "libutempter",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kpty-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

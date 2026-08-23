@@ -1,0 +1,29 @@
+{
+  "name": "kdecoration",
+  "version": "6.7.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6I18n.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libkdecorations3.so",
+    "libkdecorations3.so.6",
+    "libkdecorations3private.so",
+    "libkdecorations3private.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "kf-ki18n",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.7.4/kdecoration-6.7.4.tar.xz"
+  ],
+  "work_sources": []
+}

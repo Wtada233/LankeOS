@@ -40,7 +40,6 @@
   ],
   "provides": [],
   "build_deps": [
-    "linux-pam",
     "base-devel",
     "cairo",
     "curl",
@@ -54,6 +53,7 @@
     "libwebp",
     "libxkbcommon",
     "libxml2",
+    "linux-pam",
     "meson",
     "ninja",
     "pango",

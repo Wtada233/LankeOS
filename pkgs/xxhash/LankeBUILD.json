@@ -1,0 +1,20 @@
+{
+  "name": "xxhash",
+  "version": "0.8.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libxxhash.so",
+    "libxxhash.so.0"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/Cyan4973/xxHash/archive/refs/tags/v0.8.3.tar.gz"
+  ],
+  "work_sources": []
+}

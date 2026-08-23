@@ -17,9 +17,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "libx11",
     "libice",
     "libsm",
+    "libx11",
     "util-macros"
   ],
   "sources": [

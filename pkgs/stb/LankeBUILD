@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 纯头文件库，无需编译
+    :
+}
+
+lankebuild_package() {
+    mkdir -p {STAGING_ROOT}/usr/include/stb
+    install -m644 *.h -t {STAGING_ROOT}/usr/include/stb/
+    install -Dm644 LICENSE -t {STAGING_ROOT}/usr/share/licenses/stb/
+}

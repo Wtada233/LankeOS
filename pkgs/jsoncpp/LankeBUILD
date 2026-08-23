@@ -1,0 +1,17 @@
+lankebuild_prepare() {
+    echo "{ORIG_PKG_VER}" > version
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix={PREFIX} \
+        --default-library shared
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} meson install -C build
+}
+
+lankebuild_package() {
+    # 删掉坏的 cmake config（上游 issue 1568，Arch 同样处理）
+    # openxr 等下游用 pkg-config 找 jsoncpp
+    rm -rf {STAGING_ROOT}/usr/lib/cmake/jsoncpp
+}

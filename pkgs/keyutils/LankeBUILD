@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    make CFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" SBINDIR=/usr/bin BINDIR=/usr/bin
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} SBINDIR=/usr/bin BINDIR=/usr/bin install
+    find {STAGING_ROOT} -name "*.a" -delete
+
+}

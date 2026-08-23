@@ -1,0 +1,22 @@
+{
+  "name": "qrencode",
+  "version": "4.1.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libpng16.so.16"
+  ],
+  "provides": [
+    "libqrencode.so",
+    "libqrencode.so.4"
+  ],
+  "build_deps": [
+    "base-devel",
+    "libpng"
+  ],
+  "sources": [
+    "https://github.com/fukuchi/libqrencode/archive/refs/tags/v4.1.1.tar.gz"
+  ],
+  "work_sources": []
+}

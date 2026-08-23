@@ -18,13 +18,13 @@
     "libshaderc_shared.so.1"
   ],
   "build_deps": [
-    "spirv-headers",
-    "spirv-tools",
     "base-devel",
     "cmake",
     "glslang",
     "ninja",
-    "python"
+    "python",
+    "spirv-headers",
+    "spirv-tools"
   ],
   "sources": [
     "https://github.com/google/shaderc/archive/refs/tags/v2026.3.tar.gz"

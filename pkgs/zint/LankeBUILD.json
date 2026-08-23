@@ -1,0 +1,24 @@
+{
+  "name": "zint",
+  "version": "2.16.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6",
+    "libpng16.so.16"
+  ],
+  "provides": [
+    "libzint.so",
+    "libzint.so.2.16"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/zint/zint/archive/refs/tags/2.16.0.tar.gz"
+  ],
+  "work_sources": []
+}

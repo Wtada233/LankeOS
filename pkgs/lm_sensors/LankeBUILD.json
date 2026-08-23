@@ -1,0 +1,21 @@
+{
+  "name": "lm_sensors",
+  "version": "3.6.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libsensors.so",
+    "libsensors.so.5"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/hramrach/lm-sensors/archive/refs/tags/V3-6-2.tar.gz"
+  ],
+  "work_sources": []
+}

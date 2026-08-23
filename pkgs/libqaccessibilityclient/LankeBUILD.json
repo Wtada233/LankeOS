@@ -1,0 +1,27 @@
+{
+  "name": "libqaccessibilityclient",
+  "version": "0.6.0",
+  "release": 4,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libqaccessibilityclient-qt6.so",
+    "libqaccessibilityclient-qt6.so.0"
+  ],
+  "build_deps": [
+    "at-spi2-core",
+    "base-devel",
+    "extra-cmake-modules",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/libqaccessibilityclient/libqaccessibilityclient-0.6.0.tar.xz"
+  ],
+  "work_sources": []
+}

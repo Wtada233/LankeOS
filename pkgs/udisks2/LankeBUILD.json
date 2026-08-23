@@ -1,0 +1,44 @@
+{
+  "name": "udisks2",
+  "version": "2.11.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libacl.so.1",
+    "libbd_utils.so.3",
+    "libblkid.so.1",
+    "libblockdev.so.3",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgudev-1.0.so.0",
+    "libmount.so.1",
+    "libpolkit-agent-1.so.0",
+    "libpolkit-gobject-1.so.0",
+    "libsystemd.so.0",
+    "libuuid.so.1"
+  ],
+  "provides": [
+    "libudisks2.so",
+    "libudisks2.so.0"
+  ],
+  "build_deps": [
+    "acl",
+    "autoconf-archive",
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "gtk-doc",
+    "libblockdev",
+    "libgudev",
+    "polkit"
+  ],
+  "sources": [
+    "https://github.com/storaged-project/udisks/releases/download/udisks-2.11.2/udisks-2.11.2.tar.bz2"
+  ],
+  "work_sources": []
+}

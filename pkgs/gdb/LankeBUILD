@@ -1,0 +1,28 @@
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir -p build && cd build
+    ../configure \
+        --prefix={PREFIX} \
+        --disable-nls \
+        --enable-tui \
+        --enable-targets=all \
+        --with-system-readline \
+        --with-python={PREFIX}/bin/python \
+        --with-system-gdbinit={SYSCONFDIR}/gdb/gdbinit \
+        --without-guile \
+        --without-source-highlight
+    make -j$(nproc)
+    make -C gdb/data-directory DESTDIR={STAGING_ROOT} install
+    make -C gdb DESTDIR={STAGING_ROOT} install
+    make -C gdbserver DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # 系统 gdbinit
+    mkdir -p {STAGING_ROOT}/etc/gdb
+    touch {STAGING_ROOT}/etc/gdb/gdbinit
+}

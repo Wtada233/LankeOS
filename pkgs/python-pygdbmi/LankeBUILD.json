@@ -1,0 +1,23 @@
+{
+  "name": "python-pygdbmi",
+  "version": "0.11.0.0",
+  "release": 6,
+  "deps": [
+    "gdb",
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://github.com/cs01/pygdbmi/archive/v0.11.0.0/python-pygdbmi-0.11.0.0.tar.gz"
+  ],
+  "work_sources": []
+}

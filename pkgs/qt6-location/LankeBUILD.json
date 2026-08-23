@@ -1,0 +1,36 @@
+{
+  "name": "qt6-location",
+  "version": "6.11.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Network.so.6",
+    "libQt6Positioning.so.6",
+    "libQt6PositioningQuick.so.6",
+    "libQt6Qml.so.6",
+    "libQt6QmlModels.so.6",
+    "libQt6Quick.so.6",
+    "libQt6QuickShapes.so.6",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libQt6Location.so",
+    "libQt6Location.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-positioning"
+  ],
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtlocation-everywhere-src-6.11.1.tar.xz"
+  ],
+  "work_sources": []
+}

@@ -14,8 +14,7 @@
     "libplds4.so"
   ],
   "build_deps": [
-    "base-devel",
-    "zip"
+    "base-devel"
   ],
   "sources": [
     "https://archive.mozilla.org/pub/nspr/releases/v4.39/src/nspr-4.39.tar.gz"

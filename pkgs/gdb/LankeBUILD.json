@@ -1,0 +1,45 @@
+{
+  "name": "gdb",
+  "version": "17.2",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libexpat.so.1",
+    "libgcc_s.so.1",
+    "libgmp.so.10",
+    "liblzma.so.5",
+    "libm.so.6",
+    "libmpfr.so.6",
+    "libncursesw.so.6",
+    "libpython3.14.so.1.0",
+    "libreadline.so.8",
+    "libstdc++.so.6",
+    "libxxhash.so.0",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libinproctrace.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "boost",
+    "expat",
+    "gmp",
+    "mpfr",
+    "ncurses",
+    "python",
+    "readline",
+    "texinfo",
+    "xxhash",
+    "xz",
+    "zstd"
+  ],
+  "sources": [
+    "https://ftp.gnu.org/gnu/gdb/gdb-17.2.tar.xz"
+  ],
+  "work_sources": []
+}

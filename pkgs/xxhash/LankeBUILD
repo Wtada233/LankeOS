@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    make PREFIX={PREFIX} DISPATCH=1 -j$(nproc)
+    make PREFIX={PREFIX} DISPATCH=1 DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Makefile 硬编安装静态库（无 --disable-static 选项），删掉（.pc 引用共享库）
+    find {STAGING_ROOT} -name '*.a' -delete
+}

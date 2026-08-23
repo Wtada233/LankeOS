@@ -1,0 +1,36 @@
+{
+  "name": "openxr",
+  "version": "1.1.62",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libjsoncpp.so.27",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libXrApiLayer_api_dump.so",
+    "libXrApiLayer_best_practices_validation.so",
+    "libXrApiLayer_core_validation.so",
+    "libopenxr_loader.so",
+    "libopenxr_loader.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "jsoncpp",
+    "libglvnd",
+    "libx11",
+    "libxrandr",
+    "libxxf86vm",
+    "mesa",
+    "ninja",
+    "vulkan-headers",
+    "wayland"
+  ],
+  "sources": [
+    "https://github.com/KhronosGroup/OpenXR-SDK-Source/releases/download/release-1.1.62/OpenXR-SDK-Source-release-1.1.62.tar.gz"
+  ],
+  "work_sources": []
+}

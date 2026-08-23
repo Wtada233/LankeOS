@@ -1,0 +1,24 @@
+{
+  "name": "editorconfig-core-c",
+  "version": "0.12.11",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libpcre2-8.so.0"
+  ],
+  "provides": [
+    "libeditorconfig.so",
+    "libeditorconfig.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "pcre2"
+  ],
+  "sources": [
+    "https://github.com/editorconfig/editorconfig-core-c/archive/refs/tags/v0.12.11.tar.gz"
+  ],
+  "work_sources": []
+}

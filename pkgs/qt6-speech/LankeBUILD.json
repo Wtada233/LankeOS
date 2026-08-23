@@ -1,0 +1,32 @@
+{
+  "name": "qt6-speech",
+  "version": "6.11.1",
+  "release": 1,
+  "deps": [
+    "qt6-base"
+  ],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Multimedia.so.6",
+    "libQt6Qml.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libQt6TextToSpeech.so",
+    "libQt6TextToSpeech.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "python",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-multimedia"
+  ],
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtspeech-everywhere-src-6.11.1.tar.xz"
+  ],
+  "work_sources": []
+}

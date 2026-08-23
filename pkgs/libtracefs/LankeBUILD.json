@@ -1,0 +1,22 @@
+{
+  "name": "libtracefs",
+  "version": "1.8.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libtraceevent.so.1"
+  ],
+  "provides": [
+    "libtracefs.so",
+    "libtracefs.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "libtraceevent"
+  ],
+  "sources": [
+    "https://git.kernel.org/pub/scm/libs/libtrace/libtracefs.git/snapshot/libtracefs-1.8.3.tar.gz"
+  ],
+  "work_sources": []
+}

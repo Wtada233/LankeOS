@@ -19,7 +19,7 @@
   ],
   "provides": [],
   "build_deps": [
-    "coreutils"
+    "base-devel"
   ],
   "sources": [
     "https://github.com/Kitware/CMake/releases/download/v4.4.2/cmake-4.4.2-linux-x86_64.tar.gz"

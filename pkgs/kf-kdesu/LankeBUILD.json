@@ -1,0 +1,36 @@
+{
+  "name": "kf-kdesu",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6Pty.so.6",
+    "libQt6Core.so.6",
+    "libX11.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6Su.so",
+    "libKF6Su.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-ki18n",
+    "kf-kpty",
+    "libx11",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kdesu-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

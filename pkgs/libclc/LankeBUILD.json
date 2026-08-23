@@ -6,12 +6,12 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "spirv-llvm-translator",
     "base-devel",
     "cmake",
     "llvm",
     "ninja",
-    "python"
+    "python",
+    "spirv-llvm-translator"
   ],
   "sources": [
     "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/llvm-project-22.1.8.src.tar.xz"

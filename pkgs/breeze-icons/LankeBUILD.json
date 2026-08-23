@@ -1,0 +1,25 @@
+{
+  "name": "breeze-icons",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libc.so.6"
+  ],
+  "provides": [
+    "libKF6BreezeIcons.so",
+    "libKF6BreezeIcons.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "python-lxml",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/breeze-icons-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

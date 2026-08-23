@@ -351,36 +351,31 @@ impl RealBinding {
             return Err(format!("容器内写入 mirror.conf 失败（{pkg}）"));
         }
 
-        // 3. ABI 过渡：把备份的旧 SONAME .so 注入容器（/backups，构建脚本里 cp 到 /usr/lib）。
-        //    旧二进制（如链旧 libxml2.so.2 的 gettext）靠它继续运行，新构建用新 .so。
-        let backups = self.out_dir.join("backups");
-        if backups.is_dir() {
-            let _ = run_quiet(&["cp", backups.to_string_lossy().as_ref(), &format!("{cid}:/backups")]);
-        }
-
         // 4. 容器内构建——**实时流式日志**，不捕获（捕获 = 黑盒，构建完成才输出；
-        //    且 stdout 末尾混入 ls 结果会污染文件名提取）。
+        //    stdout 末尾混入 ls 结果会污染文件名提取）。
         //    index.txt 现含**完整 needed_so**（单一真源），lpkg 的 SONAME 检查（前向/后向）在
         //    容器里真实运行——过渡期的缺失 SONAME 由 `--missing-so-no-error`（upgrade）与
         //    `--use-system-soname`（build，配合备份恢复的旧 .so）显式容忍，不再靠剥索引/清状态
         //    压制检查（那些 hack 已删）。
         //    流程：`lpkg install lpkg`（基础镜像里旧版无 force-solve-conflict）→ `lpkg upgrade`
         //    拉 127.0.0.1 内嵌 repo 最新依赖；upgrade 若仍报错，用确认短语喂 force-solve-conflict
-        //    清理后重试（仅依赖环触发）。升级完成后把备份的旧 .so 恢复进 /usr/lib——新构建链新
-        //    SO（dev symlink），旧二进制链旧 SONAME 在过渡期能加载；恢复后 ldconfig 刷新缓存，
-        //    旧二进制运行时能按 SONAME 命中 ld.so.cache。
+        //    清理后重试（仅依赖环触发）。
         // force-solve-conflict 是显式破坏性操作，lpkg 在非交互（-y）下直接拒绝执行——
         // 它的确认短语从 stdin 读取，正确姿势是 `echo '...' | lpkg force-solve-conflict`
         // （不带 -y）。带 -y 会把短语机制废掉，兜底永远失败 → 构建被 BLOCKED。
         // 拆成两步：upgrade（成功后 commit 滚动快照）→ build。upgrade 失败时容器状态不可信，
         // 不 commit、不滚动，直接报错。
-        // 顺序约束：配方（/work/<pkg>）在 commit 之后才拷入（见 4.6）。docker commit/export
-        // 会把 /work 整个快照进镜像——若此时配方已就位，每包源码都会滚进 roll 镜像（滚雪球）。
-        // 因此 upgrade 阶段不依赖配方目录，直接以容器默认 cwd 运行 lpkg 命令即可。
+        // 顺序约束（**关键**）：docker commit/export 会把整个容器文件系统快照进镜像。备份的
+        // 旧 .so 恢复、配方拷入都必须发生在 commit 之后，否则会滚进 roll 镜像、最终扁平化进
+        // base——过渡期结束后 `cleanup_backups` 只清宿主 out/backups，镜像里残留的旧 lib 就
+        // 永久留在 base（此前 base 被污染即由此而来）。因此 upgrade 脚本末尾 `rm -rf /backups`
+        // 先把 /backups 白洞化（顺带清掉历史污染镜像里残留的 /backups），commit 之后（见 4.6）
+        // 再重新注入并恢复——旧 .so 只活在本次临时容器，随容器销毁。配方同样在 commit 之后
+        // 才拷入（见 4.7），否则每包源码会滚进镜像（滚雪球）。
         let upgrade_script = format!(
             "lpkg install lpkg -y && \
              ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; }} ) || exit 1 ; \
-             [ -d /backups ] && cp -a /backups/. /usr/lib/ && ldconfig ; \
+             rm -rf /backups ; \
              exit 0"
         );
         let status = std::process::Command::new("docker")
@@ -412,7 +407,24 @@ impl RealBinding {
             write_roll_counter(&self.out_dir, 0);
         }
 
-        // 4.6 docker cp 配方进容器（/work/<pkg>）——必须放在 commit/GC 之后：
+        // 4.6 旧 .so 恢复（**commit/GC 之后**）：重新注入备份 → cp 进 /usr/lib → ldconfig。
+        //     旧二进制（如链旧 libxml2.so.2 的 gettext）靠它继续运行，新构建用新 .so。
+        //     放 commit 后 ⇒ 恢复的旧 .so 只存在于本次临时容器，绝不进 roll/base 镜像
+        //     （commit/GC/finalize 的快照都是干净的，见 4 的顺序约束）。
+        let backups = self.out_dir.join("backups");
+        if backups.is_dir() {
+            let _ = run_quiet(&["cp", backups.to_string_lossy().as_ref(), &format!("{cid}:/backups")]);
+        }
+        let restore_script = "if [ -d /backups ]; then cp -a /backups/. /usr/lib/ && ldconfig; fi; true";
+        let status = std::process::Command::new("docker")
+            .args(["exec", &cid, "sh", "-c", restore_script])
+            .status()
+            .map_err(|e| format!("docker exec 恢复旧 .so 失败: {e}"))?;
+        if !status.success() {
+            return Err(format!("容器内恢复备份旧 .so 失败（{pkg}）"));
+        }
+
+        // 4.7 docker cp 配方进容器（/work/<pkg>）——必须放在 commit/GC 之后：
         //     快照时 /work 为空（见 4 的顺序约束），否则配方/源码会随 commit 滚进镜像。
         let src = self.repo_dir.join(pkg);
         let ok = run_quiet(&["cp", src.to_string_lossy().as_ref(), &format!("{cid}:/work/")])

@@ -1,0 +1,39 @@
+{
+  "name": "qt6-multimedia",
+  "version": "6.11.1",
+  "release": 1,
+  "deps": [
+    "qt6-base"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Network.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libQt6Multimedia.so",
+    "libQt6Multimedia.so.6",
+    "libQt6MultimediaWidgets.so",
+    "libQt6MultimediaWidgets.so.6",
+    "libQt6SpatialAudio.so",
+    "libQt6SpatialAudio.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "python",
+    "qt6-base",
+    "qt6-shadertools",
+    "vulkan-headers"
+  ],
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtmultimedia-everywhere-src-6.11.1.tar.xz"
+  ],
+  "work_sources": []
+}

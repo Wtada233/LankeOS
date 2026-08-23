@@ -65,14 +65,35 @@ pub fn export_lpkg(extract_dir: &Path, out_path: &Path) -> Result<(), String> {
 fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(), String> {
     let tmp = out_path.with_extension("lpkg.tmp");
     let f = fs::File::create(&tmp).map_err(|e| format!("创建 {tmp:?} 失败: {e}"))?;
-    let enc = zstd::stream::write::Encoder::new(f, level)
+    let mut enc = zstd::stream::write::Encoder::new(f, level)
         .map_err(|e| format!("zstd 初始化失败: {e}"))?;
-    let mut builder = tar::Builder::new(enc);
-    builder.follow_symlinks(false);
-    builder
-        .append_dir_all(".", extract_dir)
-        .map_err(|e| format!("tar 打包失败: {e}"))?;
-    let enc = builder.into_inner().map_err(|e| format!("tar 收尾失败: {e}"))?;
+
+    // 打包必须 root：普通用户 `fs::metadata` 读不到完整 mode（SUID/SGID 被内核剥掉），
+    // 也无法读 root-only 文件（如 /etc/shadow 0600）。`sudo tar --numeric-owner` 由 root
+    // stat/读文件，写入的 uid/gid 固定为数字 0，mode 完整（含 SUID）。
+    // symlink 按 symlink 存（不 follow，content 里可能有损坏 symlink）。
+    let mut status = std::process::Command::new("sudo")
+        .args([
+            "-n",
+            "tar",
+            "--numeric-owner",
+            "-cf",
+            "-",
+            "-C",
+            extract_dir.to_string_lossy().as_ref(),
+            ".",
+        ])
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("spawn sudo tar 失败: {e}"))?;
+    let mut child_out = status.stdout.take()
+        .ok_or_else(|| "sudo tar stdout 不可用".to_string())?;
+    // 流式拷贝：tar 输出 → zstd
+    std::io::copy(&mut child_out, &mut enc).map_err(|e| format!("tar→zstd 拷贝失败: {e}"))?;
+    let out_status = status.wait().map_err(|e| format!("wait sudo tar 失败: {e}"))?;
+    if !out_status.success() {
+        return Err(format!("sudo tar 打包失败（exit {:?}）", out_status.code()));
+    }
     let mut f = enc.finish().map_err(|e| format!("zstd 收尾失败: {e}"))?;
     f.flush().map_err(|e| format!("flush 失败: {e}"))?;
     fs::rename(&tmp, out_path).map_err(|e| format!("替换 {out_path:?} 失败: {e}"))?;

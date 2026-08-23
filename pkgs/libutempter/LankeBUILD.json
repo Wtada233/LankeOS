@@ -1,0 +1,20 @@
+{
+  "name": "libutempter",
+  "version": "1.2.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libutempter.so",
+    "libutempter.so.0"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "git+https://github.com/altlinux/libutempter.git@1.2.3-alt1"
+  ],
+  "work_sources": []
+}

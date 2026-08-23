@@ -21,11 +21,11 @@
     "libglslang.so.16"
   ],
   "build_deps": [
-    "spirv-headers",
-    "spirv-tools",
     "base-devel",
     "cmake",
-    "ninja"
+    "ninja",
+    "spirv-headers",
+    "spirv-tools"
   ],
   "sources": [
     "https://github.com/KhronosGroup/glslang/archive/refs/tags/16.4.0.tar.gz"

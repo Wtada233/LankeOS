@@ -1,0 +1,49 @@
+{
+  "name": "kf-kiconthemes",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libKF6Archive.so.6",
+    "libKF6BreezeIcons.so.6",
+    "libKF6ColorScheme.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKF6ConfigGui.so.6",
+    "libKF6I18n.so.6",
+    "libKF6WidgetsAddons.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6IconThemes.so",
+    "libKF6IconThemes.so.6",
+    "libKF6IconWidgets.so",
+    "libKF6IconWidgets.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "breeze-icons",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-karchive",
+    "kf-kcolorscheme",
+    "kf-kconfig",
+    "kf-ki18n",
+    "kf-kwidgetsaddons",
+    "qt6-base",
+    "qt6-svg",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kiconthemes-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

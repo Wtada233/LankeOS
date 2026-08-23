@@ -1,0 +1,59 @@
+{
+  "name": "kf-kcmutils",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6ConfigWidgets.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6GuiAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6I18nQml.so.6",
+    "libKF6ItemViews.so.6",
+    "libKF6KIOGui.so.6",
+    "libKF6Service.so.6",
+    "libKF6WidgetsAddons.so.6",
+    "libKF6XmlGui.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6QuickWidgets.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6KCMUtils.so",
+    "libKF6KCMUtils.so.6",
+    "libKF6KCMUtilsCore.so",
+    "libKF6KCMUtilsCore.so.6",
+    "libKF6KCMUtilsQuick.so",
+    "libKF6KCMUtilsQuick.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kconfigwidgets",
+    "kf-kcoreaddons",
+    "kf-kguiaddons",
+    "kf-ki18n",
+    "kf-kio",
+    "kf-kirigami",
+    "kf-kitemviews",
+    "kf-kservice",
+    "kf-kwidgetsaddons",
+    "kf-kxmlgui",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kcmutils-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

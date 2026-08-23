@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 仓库无 asciidoctor/asciidoc，docs 整体关闭（否则 docs 分支强制要求这两个工具）
+    meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -Ddocs=disabled -Dasciidoctor=disabled .
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

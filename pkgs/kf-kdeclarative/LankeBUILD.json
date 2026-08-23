@@ -1,0 +1,44 @@
+{
+  "name": "kf-kdeclarative",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigGui.so.6",
+    "libKF6GlobalAccel.so.6",
+    "libKF6GuiAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6WidgetsAddons.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6CalendarEvents.so",
+    "libKF6CalendarEvents.so.6",
+    "libkquickcontrolsprivate.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kglobalaccel",
+    "kf-kguiaddons",
+    "kf-ki18n",
+    "kf-kwidgetsaddons",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-shadertools",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kdeclarative-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

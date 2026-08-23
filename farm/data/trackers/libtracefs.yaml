@@ -1,0 +1,9 @@
+pkg-name: libtracefs
+tracker-template: script
+script-content: |
+  # git.kernel.org snapshot，tag 前缀 libtracefs-
+  refs=$(git ls-remote --tags https://git.kernel.org/pub/scm/libs/libtrace/libtracefs.git 2>/dev/null)
+  version=$(printf '%s\n' "$refs" | grep -oE 'refs/tags/libtracefs-[0-9][0-9.]*$' | sed 's|refs/tags/libtracefs-||' | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "https://git.kernel.org/pub/scm/libs/libtrace/libtracefs.git/snapshot/libtracefs-$version.tar.gz"

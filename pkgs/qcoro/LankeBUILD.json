@@ -1,0 +1,44 @@
+{
+  "name": "qcoro",
+  "version": "0.13.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Network.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6WebSockets.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libQCoro6Core.so",
+    "libQCoro6Core.so.0",
+    "libQCoro6DBus.so",
+    "libQCoro6DBus.so.0",
+    "libQCoro6Network.so",
+    "libQCoro6Network.so.0",
+    "libQCoro6Qml.so",
+    "libQCoro6Qml.so.0",
+    "libQCoro6Quick.so",
+    "libQCoro6Quick.so.0",
+    "libQCoro6WebSockets.so",
+    "libQCoro6WebSockets.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-websockets"
+  ],
+  "sources": [
+    "https://github.com/danvratil/qcoro/archive/refs/tags/v0.13.0.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,53 @@
+{
+  "name": "kf-kxmlgui",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6ConfigGui.so.6",
+    "libKF6ConfigWidgets.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6GlobalAccel.so.6",
+    "libKF6GuiAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6IconThemes.so.6",
+    "libKF6IconWidgets.so.6",
+    "libKF6ItemViews.so.6",
+    "libKF6WidgetsAddons.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6PrintSupport.so.6",
+    "libQt6Widgets.so.6",
+    "libQt6Xml.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6XmlGui.so",
+    "libKF6XmlGui.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kconfigwidgets",
+    "kf-kcoreaddons",
+    "kf-kglobalaccel",
+    "kf-kguiaddons",
+    "kf-ki18n",
+    "kf-kiconthemes",
+    "kf-kitemviews",
+    "kf-kwidgetsaddons",
+    "python-build",
+    "python-setuptools",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kxmlgui-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

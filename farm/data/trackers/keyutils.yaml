@@ -1,0 +1,9 @@
+pkg-name: keyutils
+tracker-template: script
+script-content: |
+  # keyutils 无 release tarball，git.kernel.org tag vX.Y
+  refs=$(git ls-remote --tags https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.git 2>/dev/null)
+  version=$(printf '%s\n' "$refs" | grep -oE 'refs/tags/v[0-9][0-9.]*$' | sed 's|refs/tags/v||' | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "git+https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.git@v$version"

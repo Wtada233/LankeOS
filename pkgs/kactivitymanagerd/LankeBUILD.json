@@ -1,0 +1,44 @@
+{
+  "name": "kactivitymanagerd",
+  "version": "6.7.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6Crash.so.6",
+    "libKF6GlobalAccel.so.6",
+    "libKF6I18n.so.6",
+    "libKF6KIOCore.so.6",
+    "libKF6Service.so.6",
+    "libKF6XmlGui.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Sql.so.6",
+    "libc.so.6",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libkactivitymanagerd_plugin.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "boost",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kcrash",
+    "kf-kglobalaccel",
+    "kf-ki18n",
+    "kf-kio",
+    "kf-kservice",
+    "kf-kxmlgui",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.7.4/kactivitymanagerd-6.7.4.tar.xz"
+  ],
+  "work_sources": []
+}

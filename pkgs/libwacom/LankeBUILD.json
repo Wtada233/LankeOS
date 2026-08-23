@@ -1,0 +1,30 @@
+{
+  "name": "libwacom",
+  "version": "2.19.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libevdev.so.2",
+    "libgcc_s.so.1",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgudev-1.0.so.0"
+  ],
+  "provides": [
+    "libwacom.so",
+    "libwacom.so.9"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "libevdev",
+    "libgudev",
+    "libxml2",
+    "meson"
+  ],
+  "sources": [
+    "https://github.com/linuxwacom/libwacom/releases/download/libwacom-2.19.1/libwacom-2.19.1.tar.xz"
+  ],
+  "work_sources": []
+}

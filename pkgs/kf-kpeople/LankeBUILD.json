@@ -1,0 +1,47 @@
+{
+  "name": "kf-kpeople",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6Contacts.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6I18n.so.6",
+    "libKF6ItemViews.so.6",
+    "libKF6WidgetsAddons.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6Sql.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6People.so",
+    "libKF6People.so.6",
+    "libKF6PeopleBackend.so",
+    "libKF6PeopleBackend.so.6",
+    "libKF6PeopleWidgets.so",
+    "libKF6PeopleWidgets.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kcontacts",
+    "kf-kcoreaddons",
+    "kf-ki18n",
+    "kf-kitemviews",
+    "kf-kwidgetsaddons",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kpeople-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

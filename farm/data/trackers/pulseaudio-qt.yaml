@@ -1,0 +1,10 @@
+pkg-name: pulseaudio-qt
+tracker-template: script
+script-content: |
+  pkg=pulseaudio-qt
+  base=https://download.kde.org/stable/$pkg
+  page=$(curl -fsSL "$base/")
+  version=$(printf '%s\n' "$page" | grep -o "$pkg-[0-9][0-9.]*\.tar\.xz" | sed "s/^$pkg-//; s/\.tar\.xz$//" | sort -V | tail -n1)
+  test -n "$version" || exit 1
+  echo "$version"
+  echo "$base/$pkg-$version.tar.xz"

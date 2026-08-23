@@ -1,0 +1,6 @@
+pkg-name: qrencode
+tracker-template: github
+repo: fukuchi/libqrencode
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

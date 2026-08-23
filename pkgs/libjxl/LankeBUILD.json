@@ -1,0 +1,38 @@
+{
+  "name": "libjxl",
+  "version": "0.12.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libbrotlidec.so.1",
+    "libbrotlienc.so.1",
+    "libc.so.6",
+    "liblcms2.so.2",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libjxl.so",
+    "libjxl.so.0.12",
+    "libjxl_cms.so",
+    "libjxl_cms.so.0.12",
+    "libjxl_threads.so",
+    "libjxl_threads.so.0.12"
+  ],
+  "build_deps": [
+    "base-devel",
+    "brotli",
+    "cmake",
+    "giflib",
+    "highway",
+    "lcms2",
+    "libjpeg-turbo",
+    "libpng",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/libjxl/libjxl/archive/refs/tags/v0.12.0.tar.gz"
+  ],
+  "work_sources": []
+}

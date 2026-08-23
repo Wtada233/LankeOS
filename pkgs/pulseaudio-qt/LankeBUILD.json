@@ -1,0 +1,29 @@
+{
+  "name": "pulseaudio-qt",
+  "version": "1.8.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libc.so.6",
+    "libpulse-mainloop-glib.so.0",
+    "libpulse.so.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6PulseAudioQt.so",
+    "libKF6PulseAudioQt.so.5"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "libpulse",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/pulseaudio-qt/pulseaudio-qt-1.8.1.tar.xz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,35 @@
+{
+  "name": "kf-kded",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6Crash.so.6",
+    "libKF6DBusAddons.so.6",
+    "libKF6Service.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kcrash",
+    "kf-kdbusaddons",
+    "kf-kdoctools",
+    "kf-kservice",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kded-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    # STB_IMAGE_INCLUDE_DIR：用系统 stb（避免 FetchContent 需要 git）
+    cmake -G Ninja -DCMAKE_INSTALL_PREFIX={PREFIX} -DZXING_EXAMPLES=OFF -DZXING_UNIT_TESTS=OFF -DZXING_C_API=ON -DZXING_USE_BUNDLED_ZINT=OFF -DSTB_IMAGE_INCLUDE_DIR=/usr/include/stb ..
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

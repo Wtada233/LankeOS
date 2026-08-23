@@ -1,0 +1,33 @@
+{
+  "name": "kf-kimageformats",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6Archive.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6PrintSupport.so.6",
+    "libavif.so.16",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libopenjp2.so.7",
+    "libstdc++.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "kf-karchive",
+    "libavif",
+    "libheif",
+    "libjxl",
+    "openjpeg",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kimageformats-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,34 @@
+{
+  "name": "kf-kauth",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6CoreAddons.so.6",
+    "libKF6WindowSystem.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libc.so.6",
+    "libpolkit-qt6-core-1.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKF6AuthCore.so",
+    "libKF6AuthCore.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-kcoreaddons",
+    "kf-kwindowsystem",
+    "polkit-qt",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kauth-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

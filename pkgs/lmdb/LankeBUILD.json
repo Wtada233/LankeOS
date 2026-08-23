@@ -1,0 +1,20 @@
+{
+  "name": "lmdb",
+  "version": "1.0.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "liblmdb.so",
+    "liblmdb.so.1"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "git+https://git.openldap.org/openldap/openldap.git@LMDB_1.0.1"
+  ],
+  "work_sources": []
+}

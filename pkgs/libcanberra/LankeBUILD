@@ -1,0 +1,21 @@
+lankebuild_prepare() {
+    # 应用 Debian 维护补丁（源码即 salsa 树，debian/patches 随树携带）。
+    # 跳过 03_onlyshowin_unity.patch——Unity OnlyShowIn 是 Debian/Ubuntu 特有，LankeOS 不需要。
+    for _p in undefined_reference.diff gtk_dont_assume_x11.patch \
+              gtk-module-Handle-display-closing-gracefully.patch; do
+        patch -Np1 -i "debian/patches/$_p"
+    done
+}
+
+lankebuild_build() {
+    # undefined_reference.diff 改了 src/Makefile.am，需重新生成 autotools 产物
+    autoreconf -fiv
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --disable-oss --enable-alsa --enable-pulse --with-builtin=dso
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

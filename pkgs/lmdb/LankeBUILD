@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # openldap 树里 LMDB 在 libraries/liblmdb（非 mdb/libraries/）
+    cd libraries/liblmdb
+    make -j$(nproc) prefix=/usr OPT="$CFLAGS" CPPFLAGS="$CPPFLAGS" LDFLAGS="$LDFLAGS -pthread"
+}
+lankebuild_package() {
+    cd libraries/liblmdb
+    make DESTDIR={STAGING_ROOT} prefix=/usr install
+    find {STAGING_ROOT} -name "*.a" -delete
+
+}

@@ -1,0 +1,28 @@
+{
+  "name": "hunspell",
+  "version": "1.7.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libncursesw.so.6",
+    "libreadline.so.8",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libhunspell-1.7.so",
+    "libhunspell-1.7.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "ncurses",
+    "readline"
+  ],
+  "sources": [
+    "https://github.com/hunspell/hunspell/releases/download/v1.7.3/hunspell-1.7.3.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,20 @@
+{
+  "name": "keyutils",
+  "version": "1.6.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libresolv.so.2"
+  ],
+  "provides": [
+    "libkeyutils.so.1"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "git+https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.git@v1.6.3"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,39 @@
+{
+  "name": "kf-kdoctools",
+  "version": "6.29.0",
+  "release": 1,
+  "deps": [
+    "libxslt",
+    "docbook-xsl"
+  ],
+  "needed_so": [
+    "libKF6Archive.so.6",
+    "libQt6Core.so.6",
+    "libc.so.6",
+    "libexslt.so.0",
+    "libstdc++.so.6",
+    "libxml2.so.16",
+    "libxslt.so.1"
+  ],
+  "provides": [
+    "libKF6DocTools.so",
+    "libKF6DocTools.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "docbook-xsl",
+    "doxygen",
+    "extra-cmake-modules",
+    "kf-karchive",
+    "kf-ki18n",
+    "libxml2",
+    "libxslt",
+    "perl-uri",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/frameworks/6.29/kdoctools-6.29.0.tar.xz"
+  ],
+  "work_sources": []
+}

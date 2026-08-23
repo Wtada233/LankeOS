@@ -1,0 +1,6 @@
+pkg-name: highway
+tracker-template: github
+repo: google/highway
+mode: tags
+tag-prefix: ''
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

@@ -1,0 +1,6 @@
+pkg-name: libwacom
+tracker-template: github
+repo: linuxwacom/libwacom
+mode: releases
+tag-prefix: libwacom-
+template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.xz

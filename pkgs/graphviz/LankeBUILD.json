@@ -47,7 +47,6 @@
     "fontconfig",
     "freetype",
     "librsvg",
-    "libtool",
     "pango",
     "python",
     "zlib"

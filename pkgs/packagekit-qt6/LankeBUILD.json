@@ -1,0 +1,28 @@
+{
+  "name": "packagekit-qt6",
+  "version": "1.1.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libpackagekitqt6.so",
+    "libpackagekitqt6.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "packagekit",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://github.com/PackageKit/PackageKit-Qt/archive/refs/tags/v1.1.4.tar.gz"
+  ],
+  "work_sources": []
+}

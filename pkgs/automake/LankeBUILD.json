@@ -14,8 +14,7 @@
     "git",
     "perl",
     "python",
-    "vala",
-    "zip"
+    "vala"
   ],
   "sources": [
     "https://ftpmirror.gnu.org/automake/automake-1.18.1.tar.xz"

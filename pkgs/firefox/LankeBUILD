@@ -1,4 +1,5 @@
 lankebuild_prepare() {
+    unset {C,CPP,CXX,LD}FLAGS
     # ------------------------------------------------------------
     # 1. 创建 mozconfig (核心构建配置)
     # ------------------------------------------------------------
@@ -51,8 +52,8 @@ EOF
 }
 
 lankebuild_build() {
-    # 关闭遥测
     unset MOZ_TELEMETRY_REPORTING
+    unset {C,CPP,CXX,LD}FLAGS
 
     # 再次设置环境变量 (因为函数可能独立执行)
     export MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE=none

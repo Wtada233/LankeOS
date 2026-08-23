@@ -1,0 +1,42 @@
+{
+  "name": "sddm",
+  "version": "0.21.0",
+  "release": 7,
+  "deps": [
+    "breeze",
+    "weston"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Network.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libXau.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libpam.so.0",
+    "libstdc++.so.6",
+    "libsystemd.so.0",
+    "libxcb-xkb.so.1",
+    "libxcb.so.1"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "libxau",
+    "libxcb",
+    "linux-pam",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-tools",
+    "weston"
+  ],
+  "sources": [
+    "https://github.com/sddm/sddm/archive/refs/tags/v0.21.0.tar.gz"
+  ],
+  "work_sources": []
+}

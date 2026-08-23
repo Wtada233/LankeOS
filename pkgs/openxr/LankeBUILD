@@ -1,0 +1,20 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_TESTS=OFF \
+        -DPRESENTATION_BACKEND=xlib \
+        -DDYNAMIC_LOADER=ON
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

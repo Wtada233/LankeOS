@@ -1,0 +1,42 @@
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_LIST=core,imgproc \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBUILD_TESTS=OFF \
+        -DBUILD_PERF_TESTS=OFF \
+        -DBUILD_EXAMPLES=OFF \
+        -DBUILD_opencv_python3=OFF \
+        -DBUILD_opencv_java=OFF \
+        -DBUILD_opencv_js=OFF \
+        -DBUILD_opencv_world=OFF \
+        -DWITH_FFMPEG=ON \
+        -DWITH_OPENCL=OFF \
+        -DWITH_OPENGL=OFF \
+        -DWITH_QT=OFF \
+        -DWITH_TBB=OFF \
+        -DWITH_EIGEN=OFF \
+        -DWITH_LAPACK=OFF \
+        -DWITH_VTK=OFF \
+        -DWITH_GSTREAMER=OFF \
+        -DWITH_GTK=OFF \
+        -DWITH_1394=OFF \
+        -DWITH_V4L=OFF \
+        -DWITH_UNIFONT=OFF \
+        -DWITH_IPP=OFF \
+        -DOPENCV_GENERATE_PKGCONFIG=ON
+    cmake --build build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # 精简构建只产出共享库
+    find {STAGING_ROOT} -name '*.a' -delete
+}

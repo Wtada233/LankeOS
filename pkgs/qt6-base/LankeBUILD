@@ -24,10 +24,10 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ninja -C build -j$(nproc)
+    cmake --build build --parallel
 }
 
 
 lankebuild_package() {
-    DESTDIR="{STAGING_ROOT}" ninja -C build install
+    DESTDIR="{STAGING_ROOT}" cmake --install build
 }

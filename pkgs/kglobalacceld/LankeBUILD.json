@@ -1,0 +1,53 @@
+{
+  "name": "kglobalacceld",
+  "version": "6.7.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6Crash.so.6",
+    "libKF6DBusAddons.so.6",
+    "libKF6GlobalAccel.so.6",
+    "libKF6JobWidgets.so.6",
+    "libKF6KIOCore.so.6",
+    "libKF6KIOGui.so.6",
+    "libKF6Service.so.6",
+    "libKF6WindowSystem.so.6",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Widgets.so.6",
+    "libX11.so.6",
+    "libc.so.6",
+    "libstdc++.so.6",
+    "libxcb-keysyms.so.1",
+    "libxcb-record.so.0",
+    "libxcb-xkb.so.1",
+    "libxcb.so.1"
+  ],
+  "provides": [
+    "libKGlobalAccelD.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kcrash",
+    "kf-kdbusaddons",
+    "kf-kglobalaccel",
+    "kf-kio",
+    "kf-kjobwidgets",
+    "kf-kservice",
+    "kf-kwindowsystem",
+    "libx11",
+    "libxcb",
+    "qt6-base",
+    "xcb-util-keysyms"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.7.4/kglobalacceld-6.7.4.tar.xz"
+  ],
+  "work_sources": []
+}

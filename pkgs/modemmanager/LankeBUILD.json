@@ -1,0 +1,45 @@
+{
+  "name": "modemmanager",
+  "version": "1.24.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgudev-1.0.so.0",
+    "libmbim-glib.so.4",
+    "libpolkit-gobject-1.so.0",
+    "libqmi-glib.so.5",
+    "libqrtr-glib.so.0",
+    "libsystemd.so.0"
+  ],
+  "provides": [
+    "libmm-glib.so",
+    "libmm-glib.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "dbus",
+    "glib",
+    "gobject-introspection",
+    "libgudev",
+    "libmbim",
+    "libqmi",
+    "libqrtr-glib",
+    "libxslt",
+    "meson",
+    "mobile-broadband-provider-info",
+    "ninja",
+    "polkit",
+    "ppp",
+    "vala"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/mobile-broadband/ModemManager/-/archive/1.24.2/ModemManager-1.24.2.tar.gz"
+  ],
+  "work_sources": []
+}

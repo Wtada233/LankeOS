@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # man 页是静态文件（install_man），无需 help2man
+    meson setup build --prefix={PREFIX} --sysconfdir={SYSCONFDIR} -Ddist_version=\"1.24.2\" -Dgtk_doc=false -Dpolkit=permissive .
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

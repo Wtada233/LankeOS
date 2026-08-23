@@ -1,0 +1,5 @@
+pkg-name: qca
+tracker-template: html-index
+url: https://download.kde.org/Attic/qca/
+pattern: 'href="(\d[\d.]*)/"'
+template: https://download.kde.org/Attic/qca/{version}/qca-{version}.tar.xz
