@@ -1,0 +1,31 @@
+lankebuild_prepare() {
+    # autoconf 2.7x 下 IT_PROG_INTLTOOL 在 if 块内缩进 → intltoolize 宏检查失败
+    # 上游 a6bac15 修复（去缩进，Arch 同款 libmypaint-autoconf-2.7.patch）
+    # 容错：patch -N 对"已应用"返回 1，用 reverse-dry-run 判别（同 signond）
+    if patch -Np1 --dry-run -i "{WORK_DIR}/../libmypaint-autoconf-2.7.patch" >/dev/null 2>&1; then
+        patch -Np1 -i "{WORK_DIR}/../libmypaint-autoconf-2.7.patch"
+    elif patch -R -p1 --dry-run -i "{WORK_DIR}/../libmypaint-autoconf-2.7.patch" >/dev/null 2>&1; then
+        echo "libmypaint-autoconf-2.7.patch 已应用，跳过"
+    else
+        echo "libmypaint-autoconf-2.7.patch 应用失败" >&2
+        exit 1
+    fi
+}
+
+lankebuild_build() {
+    # github 归档是 git 树，不含生成的 configure，先 autoreconf
+    autoreconf -fiv
+    ./configure \
+        --prefix={PREFIX} \
+        --enable-gegl \
+        --disable-docs
+    # *gen.h 是发布时预生成、git 树（github 归档）没有；autogen.sh 同款调用（注意参数顺序）
+    python3 generate.py mypaint-brush-settings-gen.h brushsettings-gen.h
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

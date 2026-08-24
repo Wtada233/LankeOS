@@ -1,0 +1,18 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # header-only，只装头文件 + cmake 配置
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # 删静态库：eigen 的 blas/lapack 总编 .a，但 Eigen3Targets.cmake 只有 Eigen3::Eigen
+    # INTERFACE 目标（头文件），不引用任何静态库 → 删除无害（共享 blas/lapack 保留）
+    find {STAGING_ROOT} -name '*.a' -delete
+}

@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    # QUAZIP_QT_MAJOR_VERSION=6（Arch 只出 qt6 变体）
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DQUAZIP_QT_MAJOR_VERSION=6
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+lankebuild_package() {
+    :
+}

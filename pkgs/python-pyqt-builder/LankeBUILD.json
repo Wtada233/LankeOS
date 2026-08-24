@@ -1,0 +1,27 @@
+{
+  "name": "python-pyqt-builder",
+  "version": "1.19.1",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-packaging",
+    "python-sip"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-packaging",
+    "python-setuptools",
+    "python-setuptools-scm",
+    "python-wheel",
+    "python-sip"
+  ],
+  "sources": [
+    "https://github.com/Python-PyQt/PyQt-builder/archive/refs/tags/1.19.1.tar.gz"
+  ],
+  "work_sources": []
+}

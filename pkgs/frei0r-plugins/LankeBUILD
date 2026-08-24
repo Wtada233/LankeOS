@@ -1,0 +1,21 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # facebl0r/facedetect 需要 opencv2/xobjdetect.hpp（opencv-contrib 模块，仓库 opencv 未装）→ 关掉
+    # rgbparade/vectorscope/scale0tilt 依赖 gavl（仓库无此包）→ 关掉
+    # Arch 因 OpenCV 5 为此打了 opencv-5.patch；跳过这两个插件后无需补丁
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DWITHOUT_OPENCV=ON \
+        -DWITHOUT_GAVL=ON
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

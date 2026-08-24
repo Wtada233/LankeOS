@@ -1,0 +1,6 @@
+pkg-name: spdlog
+tracker-template: github
+repo: gabime/spdlog
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

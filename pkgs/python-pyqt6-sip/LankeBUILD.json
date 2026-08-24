@@ -1,0 +1,24 @@
+{
+  "name": "python-pyqt6-sip",
+  "version": "13.12.0",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/d1/23/16c583dbb6b53e0494dfcf7d1a44778c82e324edda62326727b37f1a5b34/pyqt6_sip-13.12.0.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,6 @@
+pkg-name: lager
+tracker-template: github
+repo: arximboldi/lager
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/{tag}/{name}-{version}.tar.gz

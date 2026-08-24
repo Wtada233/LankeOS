@@ -1,0 +1,4 @@
+pkg-name: python-pyqt6-sip
+tracker-template: script
+script-content: |
+  curl -fsSL 'https://pypi.org/pypi/PyQt6-sip/json' | python3 -c "import json,sys;d=json.load(sys.stdin);print(d['info']['version']);print([u['url'] for u in d['urls'] if u['packagetype']=='sdist'][0])"

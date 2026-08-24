@@ -1,0 +1,5 @@
+pkg-name: babl
+tracker-template: html-index
+url: https://download.gimp.org/pub/babl/0.1/
+pattern: babl-(\d[\d.]*)\.tar\.xz
+template: https://download.gimp.org/pub/babl/0.1/babl-{version}.tar.xz

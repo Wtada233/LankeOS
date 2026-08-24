@@ -4,7 +4,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    cmake -G Ninja -DCMAKE_INSTALL_PREFIX={PREFIX} -DENABLE_ENCODER=ON -DENABLE_SDL=OFF ..
+    cmake -G Ninja -DCMAKE_INSTALL_PREFIX={PREFIX} -DENABLE_ENCODER=ON -DENABLE_SDL=ON ..
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 }

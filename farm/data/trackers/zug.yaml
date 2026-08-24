@@ -1,0 +1,6 @@
+pkg-name: zug
+tracker-template: github
+repo: arximboldi/zug
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

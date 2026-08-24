@@ -1,0 +1,24 @@
+{
+  "name": "imath",
+  "version": "3.2.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libImath-3_2.so",
+    "libImath-3_2.so.30",
+    "libImath.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/AcademySoftwareFoundation/Imath/archive/refs/tags/v3.2.3.tar.gz"
+  ],
+  "work_sources": []
+}

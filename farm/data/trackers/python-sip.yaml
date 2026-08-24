@@ -1,0 +1,6 @@
+pkg-name: python-sip
+tracker-template: github
+repo: Python-SIP/sip
+mode: tags
+tag-prefix: ''
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

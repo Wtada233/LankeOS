@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # github 归档是 git 树，不含生成的 configure，用项目 autogen.sh（不钉版本、无 config.h 需求，容器实测可跑）
+    ./autogen.sh
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

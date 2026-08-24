@@ -1,0 +1,32 @@
+{
+  "name": "quazip-qt6",
+  "version": "1.7.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Core5Compat.so.6",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libquazip1-qt6.so",
+    "libquazip1-qt6.so.1.7"
+  ],
+  "build_deps": [
+    "base-devel",
+    "bzip2",
+    "cmake",
+    "ninja",
+    "qt5compat",
+    "qt6-base",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/stachenov/quazip/archive/refs/tags/v1.7.2.tar.gz"
+  ],
+  "work_sources": []
+}

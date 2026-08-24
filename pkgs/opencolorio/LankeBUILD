@@ -1,0 +1,17 @@
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    # 关 python 绑定（krita 用 C++ 库）；各依赖 find_package 自动启用
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DOCIO_BUILD_PYTHON=OFF \
+        -DOCIO_BUILD_APPS=OFF \
+        -DOCIO_BUILD_TESTS=OFF
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+lankebuild_package() {
+    :
+}

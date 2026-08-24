@@ -1,0 +1,25 @@
+{
+  "name": "eigen",
+  "version": "5.0.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libeigen_blas.so",
+    "libeigen_lapack.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://gitlab.com/libeigen/eigen/-/archive/5.0.1/eigen-5.0.1.tar.gz"
+  ],
+  "work_sources": []
+}

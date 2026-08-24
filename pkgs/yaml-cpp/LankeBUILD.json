@@ -1,0 +1,24 @@
+{
+  "name": "yaml-cpp",
+  "version": "0.9.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libyaml-cpp.so",
+    "libyaml-cpp.so.0.9"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/jbeder/yaml-cpp/archive/refs/tags/yaml-cpp-0.9.0.tar.gz"
+  ],
+  "work_sources": []
+}

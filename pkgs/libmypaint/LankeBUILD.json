@@ -1,0 +1,35 @@
+{
+  "name": "libmypaint",
+  "version": "1.6.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libbabl-0.1.so.0",
+    "libc.so.6",
+    "libgegl-0.4.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libjson-c.so.5",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libmypaint-gegl.so",
+    "libmypaint-gegl.so.0",
+    "libmypaint.so",
+    "libmypaint.so.0"
+  ],
+  "build_deps": [
+    "babl",
+    "base-devel",
+    "gegl",
+    "glib",
+    "intltool",
+    "json-c",
+    "json-glib",
+    "python"
+  ],
+  "sources": [
+    "https://github.com/mypaint/libmypaint/archive/refs/tags/v1.6.1.tar.gz"
+  ],
+  "work_sources": []
+}

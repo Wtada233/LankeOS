@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    # PyQt6 的构建工具（提供 pyqtbuild 模块）
+    # github tarball 无 .git，setuptools-scm 检测不到版本 → 显式伪造
+    export SETUPTOOLS_SCM_PRETEND_VERSION_FOR_PYQT_BUILDER={ORIG_PKG_VER}
+    python -m build --wheel --no-isolation
+    python -m installer --destdir={STAGING_ROOT} dist/*.whl
+}
+lankebuild_package() {
+    # 清理 __pycache__（与其他 python 配方一致）
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

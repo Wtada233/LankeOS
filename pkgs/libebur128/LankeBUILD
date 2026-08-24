@@ -1,0 +1,19 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 上游 cmake_minimum_required 过老（CMake 4 移除了 <3.5 兼容），Arch 同款 flag
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DBUILD_STATIC_LIBS=OFF
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

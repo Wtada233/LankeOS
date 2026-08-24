@@ -1,0 +1,31 @@
+{
+  "name": "libkdcraw",
+  "version": "26.08.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libraw.so.25",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKDcrawQt6.so",
+    "libKDcrawQt6.so.5"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "extra-cmake-modules",
+    "libraw",
+    "ninja",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/release-service/26.08.0/src/libkdcraw-26.08.0.tar.xz"
+  ],
+  "work_sources": []
+}

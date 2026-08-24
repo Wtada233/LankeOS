@@ -1,0 +1,6 @@
+pkg-name: frei0r-plugins
+tracker-template: github
+repo: dyne/frei0r
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

@@ -1,0 +1,22 @@
+{
+  "name": "libdeflate",
+  "version": "1.26",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libdeflate.so",
+    "libdeflate.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/ebiggers/libdeflate/archive/refs/tags/v1.26.tar.gz"
+  ],
+  "work_sources": []
+}

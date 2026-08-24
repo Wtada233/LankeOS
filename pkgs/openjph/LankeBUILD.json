@@ -1,0 +1,26 @@
+{
+  "name": "openjph",
+  "version": "0.31.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libopenjph.so",
+    "libopenjph.so.0.31"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/aous72/OpenJPH/archive/refs/tags/0.31.0.tar.gz"
+  ],
+  "work_sources": []
+}

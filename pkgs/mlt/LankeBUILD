@@ -1,0 +1,40 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 注意：注释不能放在 \ 续行内（会吞掉后续所有参数）！
+    # opencv 模块要 OpenCV 的 tracking 组件（opencv-contrib），仓库 opencv 5.0.0 只有
+    # core/flann/geometry/imgproc → 关掉（Arch 能开是因为它的 opencv 带 contrib）
+    # resample 模块要 libsamplerate（Arch 里是 optdepends，仓库无此包；ffmpeg swresample 可替代）
+    # SDL2 音频输出：kdenlive 播放预览必需（mlt 缺 sdl/rtaudio 音频输出模块就报错）
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DMOD_OPENCV=OFF \
+        -DMOD_QT6=ON \
+        -DMOD_AVFORMAT=ON \
+        -DMOD_FREI0R=ON \
+        -DMOD_GDK=ON \
+        -DMOD_XML=ON \
+        -DMOD_RESAMPLE=OFF \
+        -DMOD_GLAXNIMATE_QT6=OFF \
+        -DMOD_DECKLINK=OFF \
+        -DMOD_JACKRACK=OFF \
+        -DMOD_MOVIT=OFF \
+        -DMOD_RTAUDIO=OFF \
+        -DMOD_RUBBERBAND=OFF \
+        -DMOD_SOX=OFF \
+        -DMOD_VIDSTAB=OFF \
+        -DMOD_XINE=OFF \
+        -DMOD_SDL2=ON \
+        -DMOD_PLUS=OFF \
+        -DMOD_PLUSGPL=OFF
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

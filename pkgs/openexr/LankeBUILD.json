@@ -1,0 +1,44 @@
+{
+  "name": "openexr",
+  "version": "3.4.15",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libdeflate.so.0",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libopenjph.so.0.31",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libIex-3_4.so",
+    "libIex-3_4.so.33",
+    "libIex.so",
+    "libIlmThread-3_4.so",
+    "libIlmThread-3_4.so.33",
+    "libIlmThread.so",
+    "libOpenEXR-3_4.so",
+    "libOpenEXR-3_4.so.33",
+    "libOpenEXR.so",
+    "libOpenEXRCore-3_4.so",
+    "libOpenEXRCore-3_4.so.33",
+    "libOpenEXRCore.so",
+    "libOpenEXRUtil-3_4.so",
+    "libOpenEXRUtil-3_4.so.33",
+    "libOpenEXRUtil.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "imath",
+    "libdeflate",
+    "ninja",
+    "openjph",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/openexr/openexr/archive/refs/tags/v3.4.15.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,37 @@
+lankebuild_prepare() {
+    # Arch 同款 cherry-pick 补丁（tarball 是 tag 快照缺此修复）：
+    #   6b38616 画布旋转棋盘格性能修复（1685c86 调色板修复 tarball 已含，不重复带）
+    # 容错：patch -N 对"已应用"返回 1，用 reverse-dry-run 判别（同 signond）
+    for _p in gimp-6b38616.patch; do
+        if patch -Np1 --dry-run -i "{WORK_DIR}/../$_p" >/dev/null 2>&1; then
+            patch -Np1 -i "{WORK_DIR}/../$_p"
+        elif patch -R -p1 --dry-run -i "{WORK_DIR}/../$_p" >/dev/null 2>&1; then
+            echo "$_p 已应用，跳过"
+        else
+            echo "$_p 应用失败" >&2
+            exit 1
+        fi
+    done
+    # appstreamcli 校验会因 anubis 网络失败（Arch 同款）
+    sed -i '/appstreamcli.found/,$d' desktop/meson.build
+}
+
+lankebuild_build() {
+    # 可选插件（aalib/mng/wmf/xpm/openexr/poppler/cfitsio/ghostscript/gjs/gvfs/qoi）缺库时
+    # meson auto 自动跳过，不显式禁用；openmp 由 gcc 的 libgomp 提供
+    meson setup build \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --libexecdir=/usr/bin \
+        --buildtype=release \
+        -Dopenmp=enabled \
+        -Dcheck-update=no \
+        -Dheadless-tests=disabled
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} meson install -C build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

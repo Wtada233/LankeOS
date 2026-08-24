@@ -1,0 +1,23 @@
+{
+  "name": "libebur128",
+  "version": "1.2.6",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libebur128.so",
+    "libebur128.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/jiixyj/libebur128/archive/refs/tags/v1.2.6.tar.gz"
+  ],
+  "work_sources": []
+}

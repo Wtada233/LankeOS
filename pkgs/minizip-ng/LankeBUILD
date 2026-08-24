@@ -1,0 +1,21 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # -DMZ_LIB_SUFFIX=-ng → libminizip-ng（Arch 同款，opencolorio 找 minizip-ng）
+    # MZ_PPMD=ON 时配置会 FetchContent 拉 7zip ppmd（需 git+网络）→ 关掉（PPMd 小众，opencolorio 不用）
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=ON \
+        -DMZ_LIB_SUFFIX="-ng" \
+        -DMZ_PPMD=OFF
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

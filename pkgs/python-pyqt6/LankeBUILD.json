@@ -1,0 +1,59 @@
+{
+  "name": "python-pyqt6",
+  "version": "6.11.0",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-pyqt6-sip"
+  ],
+  "needed_so": [
+    "libGLX.so.0",
+    "libOpenGL.so.0",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Designer.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Help.so.6",
+    "libQt6Multimedia.so.6",
+    "libQt6MultimediaWidgets.so.6",
+    "libQt6Network.so.6",
+    "libQt6OpenGL.so.6",
+    "libQt6OpenGLWidgets.so.6",
+    "libQt6PrintSupport.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libQt6QuickWidgets.so.6",
+    "libQt6SpatialAudio.so.6",
+    "libQt6Sql.so.6",
+    "libQt6Svg.so.6",
+    "libQt6SvgWidgets.so.6",
+    "libQt6Test.so.6",
+    "libQt6Widgets.so.6",
+    "libQt6Xml.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libpython3.14.so.1.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "python-pyqt-builder",
+    "python-pyqt6-sip",
+    "base-devel",
+    "python",
+    "python-packaging",
+    "python-setuptools",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-networkauth",
+    "qt6-tools",
+    "qt6-multimedia",
+    "qt6-svg",
+    "python-sip"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/8b/47/b25c13eca5bebc6505394d0223e46d7ebf0c57dcac2ed908d7d19b18ab6b/pyqt6-6.11.0.tar.gz"
+  ],
+  "work_sources": []
+}

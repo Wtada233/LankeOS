@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=ON
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+lankebuild_package() {
+    :
+}

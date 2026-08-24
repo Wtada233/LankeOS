@@ -1,0 +1,22 @@
+{
+  "name": "lager",
+  "version": "0.1.3",
+  "release": 1,
+  "deps": [
+    "boost",
+    "zug"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "immer",
+    "ninja",
+    "zug"
+  ],
+  "sources": [
+    "https://github.com/arximboldi/lager/archive/v0.1.3/lager-0.1.3.tar.gz"
+  ],
+  "work_sources": []
+}

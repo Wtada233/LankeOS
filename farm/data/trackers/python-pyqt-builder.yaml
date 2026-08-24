@@ -1,0 +1,6 @@
+pkg-name: python-pyqt-builder
+tracker-template: github
+repo: Python-PyQt/PyQt-builder
+mode: tags
+tag-prefix: ''
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

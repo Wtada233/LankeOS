@@ -1,0 +1,17 @@
+{
+  "name": "xsimd",
+  "version": "14.3.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/QuantStack/xsimd/archive/refs/tags/14.3.0.tar.gz"
+  ],
+  "work_sources": []
+}

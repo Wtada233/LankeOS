@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    # github 归档缺 configure，先 bootstrap（autoreconf 等价）
+    ./bootstrap
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+lankebuild_package() {
+    # 删静态库
+    find {STAGING_ROOT} -name '*.a' -delete
+}

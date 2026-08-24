@@ -1,0 +1,6 @@
+pkg-name: xsimd
+tracker-template: github
+repo: QuantStack/xsimd
+mode: tags
+tag-prefix: ''
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

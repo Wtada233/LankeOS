@@ -1,0 +1,17 @@
+{
+  "name": "immer",
+  "version": "0.9.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/arximboldi/immer/archive/refs/tags/v0.9.1.tar.gz"
+  ],
+  "work_sources": []
+}

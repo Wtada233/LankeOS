@@ -1,0 +1,20 @@
+{
+  "name": "libunibreak",
+  "version": "7.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libunibreak.so",
+    "libunibreak.so.7"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/adah1972/libunibreak/archive/libunibreak_7_0.tar.gz"
+  ],
+  "work_sources": []
+}

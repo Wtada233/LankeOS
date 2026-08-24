@@ -1,0 +1,6 @@
+pkg-name: opentimelineio
+tracker-template: github
+repo: AcademySoftwareFoundation/OpenTimelineIO
+mode: tags
+tag-prefix: v
+template: git+https://github.com/{repo}.git@{tag}

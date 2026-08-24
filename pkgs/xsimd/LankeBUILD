@@ -1,0 +1,17 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # header-only，只装头文件 + cmake 配置
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,0 +1,24 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # Arch 拆分 poppler/glib/qt5/qt6 → 合并单包：core + glib + qt6（gimp 要 poppler-glib，krita 要 poppler-qt6）
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DENABLE_UNSTABLE_API_ABI_HEADERS=ON \
+        -DENABLE_CPP=ON \
+        -DENABLE_GLIB=ON \
+        -DENABLE_GTK_DOC=OFF \
+        -DENABLE_QT5=OFF \
+        -DENABLE_QT6=ON \
+        -DBUILD_SHARED_LIBS=ON
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

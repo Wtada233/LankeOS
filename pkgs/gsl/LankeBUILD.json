@@ -1,0 +1,23 @@
+{
+  "name": "gsl",
+  "version": "2.8",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libgsl.so",
+    "libgsl.so.28",
+    "libgslcblas.so",
+    "libgslcblas.so.0"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://ftp.gnu.org/gnu/gsl/gsl-2.8.tar.gz"
+  ],
+  "work_sources": []
+}

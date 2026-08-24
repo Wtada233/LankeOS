@@ -1,0 +1,26 @@
+{
+  "name": "opentimelineio",
+  "version": "0.18.1",
+  "release": 3,
+  "deps": [
+    "python",
+    "python-aaf2"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "imath",
+    "ninja",
+    "pybind11",
+    "python",
+    "python-aaf2",
+    "python-build",
+    "python-installer"
+  ],
+  "sources": [
+    "git+https://github.com/AcademySoftwareFoundation/OpenTimelineIO.git@v0.18.1"
+  ],
+  "work_sources": []
+}

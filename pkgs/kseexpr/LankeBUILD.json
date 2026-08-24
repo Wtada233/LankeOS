@@ -1,0 +1,35 @@
+{
+  "name": "kseexpr",
+  "version": "6.0.0.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6I18n.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKSeExpr.so",
+    "libKSeExpr.so.6",
+    "libKSeExprUI.so",
+    "libKSeExprUI.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "extra-cmake-modules",
+    "kf-ki18n",
+    "ninja",
+    "qt6-base",
+    "qt6-tools"
+  ],
+  "sources": [
+    "https://invent.kde.org/graphics/kseexpr/-/archive/v6.0.0.0/kseexpr-v6.0.0.0.tar.gz"
+  ],
+  "work_sources": []
+}

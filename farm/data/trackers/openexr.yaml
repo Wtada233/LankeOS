@@ -1,0 +1,6 @@
+pkg-name: openexr
+tracker-template: github
+repo: openexr/openexr
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

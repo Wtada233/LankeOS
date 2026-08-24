@@ -1,0 +1,32 @@
+lankebuild_prepare() {
+    # SIP ABI 版本 13.0→13.8（Arch 同款，PyQt6 兼容）
+    sed -e 's|13.0|13.8|' -i cmake/modules/SIPMacros.cmake
+    # 改字体修复（Arch 同款 986ae3c0）
+    if patch -Np1 --dry-run -i "{WORK_DIR}/../krita-986ae3c0.patch" >/dev/null 2>&1; then
+        patch -Np1 -i "{WORK_DIR}/../krita-986ae3c0.patch"
+    elif patch -R -p1 --dry-run -i "{WORK_DIR}/../krita-986ae3c0.patch" >/dev/null 2>&1; then
+        echo "krita-986ae3c0.patch 已应用，跳过"
+    else
+        echo "krita-986ae3c0.patch 应用失败" >&2
+        exit 1
+    fi
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    cmake -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_KRITA_QT_DESIGNER_PLUGINS=ON \
+        -DBUILD_TESTING=OFF \
+        -DBUILD_WITH_QT6=ON \
+        -DALLOW_UNSTABLE=QT6 \
+        -W no-author ..
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

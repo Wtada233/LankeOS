@@ -1,11 +1,12 @@
 {
   "name": "ffmpeg",
   "version": "8.1.2",
-  "release": 5,
+  "release": 6,
   "deps": [
     "xwayland"
   ],
   "needed_so": [
+    "libSDL2-2.0.so.0",
     "libX11.so.6",
     "libXext.so.6",
     "libXv.so.1",
@@ -78,6 +79,7 @@
     "mesa",
     "nasm",
     "opus",
+    "sdl2",
     "spirv-headers",
     "vulkan-headers",
     "xz",

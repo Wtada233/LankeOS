@@ -1,0 +1,6 @@
+pkg-name: freeglut
+tracker-template: github
+repo: FreeGLUTProject/freeglut
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

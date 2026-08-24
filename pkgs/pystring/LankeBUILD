@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 纯 make（pystring 是小型字符串库）
+    make -j$(nproc)
+    DESTDIR={STAGING_ROOT} make install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

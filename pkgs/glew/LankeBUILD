@@ -1,0 +1,10 @@
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    make -j$(nproc) STRIP=
+    DESTDIR={STAGING_ROOT} make install.all STRIP=
+}
+lankebuild_package() {
+    :
+}

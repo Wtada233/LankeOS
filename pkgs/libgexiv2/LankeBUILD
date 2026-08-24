@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix={PREFIX} \
+        --buildtype=release
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} meson install -C build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

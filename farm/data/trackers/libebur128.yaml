@@ -1,0 +1,6 @@
+pkg-name: libebur128
+tracker-template: github
+repo: jiixyj/libebur128
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

@@ -1,0 +1,23 @@
+{
+  "name": "pystring",
+  "version": "1.2.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libpystring.so",
+    "libpystring.so.0"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/imageworks/pystring/archive/v1.2.0.tar.gz"
+  ],
+  "work_sources": []
+}

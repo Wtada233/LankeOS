@@ -1,0 +1,27 @@
+{
+  "name": "babl",
+  "version": "0.1.128",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "liblcms2.so.2",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libbabl-0.1.so",
+    "libbabl-0.1.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "gobject-introspection",
+    "lcms2",
+    "meson",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gimp.org/pub/babl/0.1/babl-0.1.128.tar.xz"
+  ],
+  "work_sources": []
+}

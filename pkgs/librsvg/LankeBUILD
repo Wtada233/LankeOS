@@ -12,11 +12,17 @@ lankebuild_build() {
         -Dtests=false \
         -Ddocs=disabled \
         -Dintrospection=enabled \
-        -Dvala=enabled
+        -Dvala=enabled \
+        -Dpixbuf-loader=enabled
     ninja -C build
     DESTDIR={STAGING_ROOT} ninja -C build install
 }
 
 lankebuild_package() {
-    :
+    # 装完 SVG loader 后重建 gdk-pixbuf loaders.cache，否则 gimp 等加载 SVG 图标报格式不识别
+    cat > "{STAGING_HOOKS}/postinst.sh" << 'HOOK'
+#!/bin/sh
+gdk-pixbuf-query-loaders --update-cache
+HOOK
+    chmod +x "{STAGING_HOOKS}/postinst.sh"
 }

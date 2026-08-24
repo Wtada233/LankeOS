@@ -1,0 +1,84 @@
+From 9765915b6e7bd8f07f3a0885fb322f9fbb596a58 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?M=C3=A9ven=20Car?= <meven@kde.org>
+Date: Sat, 22 Aug 2026 09:56:28 +0000
+Subject: [PATCH] Close a tab on middle click whether or not it shows a close
+ button
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+98c7ec7e dropped our own middle click handling in favour of what Qt 6.11
+brought, but the two are not the same. Qt asks for close buttons first:
+
+    if (d->closeButtonOnTabs && event->button() == Qt::MiddleButton) {
+
+Dolphin hands that property the "Show close button on tabs" setting, so with
+close buttons turned off, middle click stopped closing tabs on Qt 6.11. The
+setting is about showing a button and says nothing about the middle button,
+and there is no other setting a user could look for.
+
+Keep our own handlers on every Qt version again. They emit tabCloseRequested
+and return before QTabBar sees the release, so the tab is closed once.
+
+
+(cherry picked from commit c591e6d41304592106ece57a22e2838931c5acb8)
+
+Co-authored-by: Méven Car <meven@kde.org>
+---
+ src/dolphintabbar.cpp | 3 ---
+ src/dolphintabbar.h   | 9 ++-------
+ 2 files changed, 2 insertions(+), 10 deletions(-)
+
+diff --git a/src/dolphintabbar.cpp b/src/dolphintabbar.cpp
+index 467d0e56fa..af08d25b4b 100644
+--- a/src/dolphintabbar.cpp
++++ b/src/dolphintabbar.cpp
+@@ -130,8 +130,6 @@ void DolphinTabBar::dropEvent(QDropEvent *event)
+     QTabBar::dropEvent(event);
+ }
+ 
+-// Qt 6.11 added its own middle click tab closing
+-#if QT_VERSION < QT_VERSION_CHECK(6, 11, 0)
+ void DolphinTabBar::mousePressEvent(QMouseEvent *event)
+ {
+     const int index = tabAt(event->pos());
+@@ -156,7 +154,6 @@ void DolphinTabBar::mouseReleaseEvent(QMouseEvent *event)
+ 
+     QTabBar::mouseReleaseEvent(event);
+ }
+-#endif
+ 
+ void DolphinTabBar::mouseDoubleClickEvent(QMouseEvent *event)
+ {
+diff --git a/src/dolphintabbar.h b/src/dolphintabbar.h
+index 1bc8c6ff22..8faccdd507 100644
+--- a/src/dolphintabbar.h
++++ b/src/dolphintabbar.h
+@@ -30,12 +30,9 @@ protected:
+     void dragLeaveEvent(QDragLeaveEvent *event) override;
+     void dragMoveEvent(QDragMoveEvent *event) override;
+     void dropEvent(QDropEvent *event) override;
+-    void mouseDoubleClickEvent(QMouseEvent *event) override;
+-
+-#if QT_VERSION < QT_VERSION_CHECK(6, 11, 0)
+-    void mouseReleaseEvent(QMouseEvent *event) override;
+     void mousePressEvent(QMouseEvent *event) override;
+-#endif
++    void mouseReleaseEvent(QMouseEvent *event) override;
++    void mouseDoubleClickEvent(QMouseEvent *event) override;
+ 
+     /**
+      * Opens a context menu for the tab on the \a event position.
+@@ -56,9 +53,7 @@ private:
+ private:
+     QTimer *m_autoActivationTimer;
+     int m_autoActivationIndex;
+-#if QT_VERSION < QT_VERSION_CHECK(6, 11, 0)
+     int m_tabToBeClosedOnMiddleMouseButtonRelease = -1;
+-#endif
+ };
+ 
+ #endif // DOLPHIN_TAB_BAR_H
+-- 
+GitLab
+

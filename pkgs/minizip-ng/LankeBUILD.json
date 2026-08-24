@@ -1,0 +1,27 @@
+{
+  "name": "minizip-ng",
+  "version": "4.2.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "liblzma.so.5",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libminizip-ng.so",
+    "libminizip-ng.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/zlib-ng/minizip-ng/archive/refs/tags/4.2.2.tar.gz"
+  ],
+  "work_sources": []
+}

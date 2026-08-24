@@ -1,0 +1,21 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # SDL_STATIC=OFF 不编 .a（省掉 Arch 的 libSDL2main.a rename 修复）
+    # 音频驱动走仓库有的 alsa/pulse/pipewire；缺 hidapi/libusb 只影响手柄，jack 音频可不用
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DSDL_STATIC=OFF \
+        -DSDL_RPATH=OFF \
+        -DBUILD_SHARED_LIBS=ON
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

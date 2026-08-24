@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # PDF 编码数据包（cMaps/i18n），纯 make install
+    make prefix={PREFIX} DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

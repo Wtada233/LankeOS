@@ -1,0 +1,31 @@
+{
+  "name": "libraw",
+  "version": "0.22.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgomp.so.1",
+    "libjpeg.so.62",
+    "liblcms2.so.2",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libraw.so",
+    "libraw.so.25",
+    "libraw_r.so",
+    "libraw_r.so.25"
+  ],
+  "build_deps": [
+    "base-devel",
+    "libjpeg-turbo",
+    "lcms2"
+  ],
+  "sources": [
+    "https://github.com/LibRaw/LibRaw/archive/refs/tags/0.22.2.tar.gz"
+  ],
+  "work_sources": []
+}

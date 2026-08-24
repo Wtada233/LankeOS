@@ -1,0 +1,9 @@
+pkg-name: glew
+tracker-template: script
+script-content: |
+  tags=$(git ls-remote --tags https://github.com/nigels-com/glew "refs/tags/glew-*")
+  tag=$(printf "%s\n" "$tags" | sed "s/.*refs\\/tags\\///; s/\\^{}//" | sort -V | tail -n1)
+  test -n "$tag" || exit 1
+  version=${tag#glew-}
+  echo "$version"
+  echo "https://downloads.sourceforge.net/glew/glew-$version.tgz"

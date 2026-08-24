@@ -1,0 +1,17 @@
+{
+  "name": "mypaint-brushes",
+  "version": "2.0.2",
+  "release": 1,
+  "deps": [
+    "libmypaint"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/mypaint/mypaint-brushes/archive/refs/tags/v2.0.2.tar.gz"
+  ],
+  "work_sources": []
+}

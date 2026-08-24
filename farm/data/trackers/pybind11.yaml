@@ -1,0 +1,6 @@
+pkg-name: pybind11
+tracker-template: github
+repo: pybind/pybind11
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

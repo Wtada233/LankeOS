@@ -1,0 +1,7 @@
+pkg-name: libgexiv2
+tracker-template: gitlab
+host: gitlab.gnome.org
+project: GNOME/gexiv2
+mode: tags
+tag-prefix: gexiv2-
+template: https://gitlab.gnome.org/{project}/-/archive/{tag}/gexiv2-{tag}.tar.gz

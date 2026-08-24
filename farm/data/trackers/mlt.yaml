@@ -1,0 +1,6 @@
+pkg-name: mlt
+tracker-template: github
+repo: mltframework/mlt
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

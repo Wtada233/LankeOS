@@ -1,0 +1,20 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # header-only，只装头文件 + cmake 配置；测试/示例/docs 默认 ON（测试要 Catch2）→ 全关
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -Dzug_BUILD_TESTS=OFF \
+        -Dzug_BUILD_EXAMPLES=OFF \
+        -Dzug_BUILD_DOCS=OFF
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

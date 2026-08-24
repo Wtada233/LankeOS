@@ -1,0 +1,45 @@
+From 27696ee699737b7d51b3482870004ff62c38d7fa Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?M=C3=A9ven=20Car?= <meven@kde.org>
+Date: Fri, 21 Aug 2026 13:43:14 +0000
+Subject: [PATCH] dolphinview: Base the default zoom level on the preview state
+
+updateDefaultZoomLevel() always derived the default zoom level from
+IconSize, even when previews were shown. When using per-folder view
+properties, folders without a stored zoom level fall back to that
+default, so their previews were rendered at the icon size instead of
+the size configured by the preview slider, which appeared to have no
+effect on them.
+
+This slipped through commit 0f7a9c681 ("viewproperties: Add
+per-folder zoom"), which introduced the fallback path.
+
+Choose the size source depending on the preview state, consistent
+with what updateGridSize() applies when global view properties are
+used.
+
+Signed-off-by: Tomori Takamatsu <DeepChirp@outlook.com>
+
+
+(cherry picked from commit 74f644c7c932a41faf8058abf52c0e0eec54b3d2)
+
+Co-authored-by: Tomori Takamatsu <DeepChirp@outlook.com>
+---
+ src/views/dolphinview.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/views/dolphinview.cpp b/src/views/dolphinview.cpp
+index b2f3c44afc..9a91c0e2c6 100644
+--- a/src/views/dolphinview.cpp
++++ b/src/views/dolphinview.cpp
+@@ -2537,7 +2537,7 @@ void DolphinView::applyViewProperties(const ViewProperties &props)
+ void DolphinView::updateDefaultZoomLevel()
+ {
+     ViewModeSettings settings{m_mode};
+-    const int userDefaultIconSize = settings.iconSize();
++    const int userDefaultIconSize = previewsShown() ? settings.previewSize() : settings.iconSize();
+ 
+     m_defaultZoomLevel = ZoomLevelInfo::zoomLevelForIconSize(QSize(userDefaultIconSize, userDefaultIconSize));
+ }
+-- 
+GitLab
+

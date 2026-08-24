@@ -1,0 +1,35 @@
+{
+  "name": "freeglut",
+  "version": "3.8.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libGLX.so.0",
+    "libOpenGL.so.0",
+    "libX11.so.6",
+    "libXi.so.6",
+    "libXrandr.so.2",
+    "libXxf86vm.so.1",
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libglut.so",
+    "libglut.so.3"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "glu",
+    "libglvnd",
+    "libx11",
+    "libxi",
+    "libxrandr",
+    "mesa",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/FreeGLUTProject/freeglut/archive/refs/tags/v3.8.0.tar.gz"
+  ],
+  "work_sources": []
+}

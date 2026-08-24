@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    # 不编 python 绑定（krita 只用于 EXR 读写）；libdeflate/openjph 由 find_package 自动启用
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DOPENEXR_BUILD_PYTHON=OFF \
+        -DBUILD_TESTING=OFF
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+lankebuild_package() {
+    :
+}

@@ -1,0 +1,22 @@
+{
+  "name": "python-aaf2",
+  "version": "1.7.1",
+  "release": 4,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://pypi.python.org/packages/source/p/pyaaf2/pyaaf2-1.7.1.tar.gz"
+  ],
+  "work_sources": []
+}

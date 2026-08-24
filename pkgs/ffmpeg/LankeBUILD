@@ -15,6 +15,7 @@ lankebuild_prepare() {
                 --enable-vaapi           \
                 --enable-ffnvcodec       \
                 --enable-vulkan          \
+                --enable-sdl2            \
                 --enable-shared          \
                 --disable-static
 }

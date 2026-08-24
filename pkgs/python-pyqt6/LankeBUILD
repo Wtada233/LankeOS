@@ -1,0 +1,23 @@
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    # sip-install 生成 PyQt6 全量绑定（需 sip + PyQt6-sip + qt6 全套模块）
+    # qt6-base 只装 qmake6（无 qmake），sip-install 默认找 qmake → 显式指 --qmake
+    # --confirm-license 自动接受 Qt license 提示（不传会卡死循环，Arch 同款）
+    # --no-make 只生成 Makefile；qt6-base 只装 qmake6 → 显式 --qmake
+    CXXFLAGS+=" -std=c++17"
+    sip-build \
+        --confirm-license \
+        --no-make \
+        --qmake={BINDIR}/qmake6 \
+        --pep484-pyi
+    cd build
+    make -j$(nproc)
+}
+lankebuild_package() {
+    cd build
+    make INSTALL_ROOT={STAGING_ROOT} install
+    # 清理 __pycache__（.pyc 冗余，首次导入时生成，与其他 python 配方一致）
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

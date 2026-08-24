@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    :
+}
+lankebuild_build() {
+    # PyQt6 的 sip 模块（pyproject 打包）
+    python -m build --wheel --no-isolation
+    python -m installer --destdir={STAGING_ROOT} dist/*.whl
+}
+lankebuild_package() {
+    # 清理 __pycache__（与其他 python 配方一致）
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

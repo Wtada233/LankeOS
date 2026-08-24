@@ -1,0 +1,44 @@
+From 6b386160a1ce0a307ab89731473a36183216b0af Mon Sep 17 00:00:00 2001
+From: woot000 <woot000@woot000.com>
+Date: Tue, 12 May 2026 04:38:00 -0500
+Subject: [PATCH] display: Don't rotate checkerboard when rotating canvas view
+
+A rotated checkerboard causes poor performance likely due to hitting
+slow paths in cairo and pixman. This was especially noticeable when
+highly zoomed in. To also make the checkerboard look more natural, it is
+no longer panned around. With these changes the checkerboard now remains
+completely static when scrolling, zooming, or rotating the canvas view.
+
+Fixes https://gitlab.gnome.org/GNOME/gimp/-/work_items/7182
+---
+ app/display/gimpdisplayshell-draw.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/app/display/gimpdisplayshell-draw.c b/app/display/gimpdisplayshell-draw.c
+index f851f4ab33b..765c9f12161 100644
+--- a/app/display/gimpdisplayshell-draw.c
++++ b/app/display/gimpdisplayshell-draw.c
+@@ -109,6 +109,11 @@ gimp_display_shell_draw_checkerboard (GimpDisplayShell *shell,
+   g_return_if_fail (GIMP_IS_DISPLAY_SHELL (shell));
+   g_return_if_fail (cr != NULL);
+ 
++  /* Reversing the rotate transform keeping the checkeboard horizontal
++   * significantly improves rasterization performance with Cairo. */
++  if (shell->rotate_transform)
++    cairo_transform (cr, shell->rotate_untransform);
++
+   image = gimp_display_get_image (shell->display);
+ 
+   if (G_UNLIKELY (! shell->checkerboard))
+@@ -128,8 +133,6 @@ gimp_display_shell_draw_checkerboard (GimpDisplayShell *shell,
+         gimp_cairo_checkerboard_create (cr, 1 << (check_size + 2), rgb1, rgb2);
+     }
+ 
+-  cairo_translate (cr, - shell->offset_x, - shell->offset_y);
+-
+   if (gimp_image_get_component_visible (image, GIMP_CHANNEL_ALPHA))
+     cairo_set_source (cr, shell->checkerboard);
+   else
+-- 
+GitLab
+

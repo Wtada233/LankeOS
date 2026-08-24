@@ -1,0 +1,27 @@
+{
+  "name": "spdlog",
+  "version": "1.17.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libfmt.so.12",
+    "libgcc_s.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libspdlog.so",
+    "libspdlog.so.1.17"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "fmt",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/gabime/spdlog/archive/refs/tags/v1.17.0.tar.gz"
+  ],
+  "work_sources": []
+}

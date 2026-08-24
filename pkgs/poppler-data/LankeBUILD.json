@@ -1,0 +1,15 @@
+{
+  "name": "poppler-data",
+  "version": "0.4.12",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://poppler.freedesktop.org/poppler-data-0.4.12.tar.gz"
+  ],
+  "work_sources": []
+}

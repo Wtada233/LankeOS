@@ -1,0 +1,40 @@
+{
+  "name": "opencolorio",
+  "version": "2.5.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libexpat.so.1",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libminizip-ng.so.1",
+    "libpystring.so.0",
+    "libstdc++.so.6",
+    "libyaml-cpp.so.0.9"
+  ],
+  "provides": [
+    "libOpenColorIO.so",
+    "libOpenColorIO.so.2.5"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "expat",
+    "freeglut",
+    "glew",
+    "imath",
+    "lcms2",
+    "minizip-ng",
+    "ninja",
+    "openexr",
+    "pybind11",
+    "pystring",
+    "yaml-cpp"
+  ],
+  "sources": [
+    "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/refs/tags/v2.5.2.tar.gz"
+  ],
+  "work_sources": []
+}

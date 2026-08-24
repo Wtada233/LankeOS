@@ -1,0 +1,6 @@
+pkg-name: libdeflate
+tracker-template: github
+repo: ebiggers/libdeflate
+mode: tags
+tag-prefix: v
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
