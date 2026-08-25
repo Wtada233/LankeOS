@@ -1,7 +1,7 @@
 <template>
   <div class="distrowatch-bar">
     <a
-      href="https://distrowatch.com/dwres.php?waitingdistro=1104&amp;resource=links"
+      href="https://distrowatch.com/table.php?distribution=LankeOS"
       target="_blank"
       rel="noopener noreferrer"
       class="distrowatch-link"
@@ -21,8 +21,8 @@ const { lang } = useData()
 
 const text = computed(() =>
   lang.value === 'en'
-    ? 'Click to vote for LankeOS on DistroWatch!'
-    : '点击链接为 LankeOS 加入 DistroWatch 投一票！'
+    ? 'Click to go to LankeOS\'s DistroWatch page'
+    : '点击前往 LankeOS 的 DistroWatch 页面'
 )
 </script>
 
