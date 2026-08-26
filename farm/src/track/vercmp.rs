@@ -253,7 +253,7 @@ mod tests {
         assert_eq!(cmp_version("1.0beta", "1.0"), Ordering::Greater);
         assert_eq!(cmp_version("1.0", "1.0beta"), Ordering::Less);
         assert_eq!(cmp_version("1.0beta", "1.0alpha"), Ordering::Greater); // 字典序
-        // 补丁后缀（pN）仍优先于 alpha 后缀（与 lpkg 一致）
+                                                                           // 补丁后缀（pN）仍优先于 alpha 后缀（与 lpkg 一致）
         assert_eq!(cmp_version("1.0p2", "1.0beta"), Ordering::Greater);
         // git 修订式 alpha（0a1b2）不相等
         assert_eq!(cmp_version("0.1a1b2", "0.1"), Ordering::Greater);

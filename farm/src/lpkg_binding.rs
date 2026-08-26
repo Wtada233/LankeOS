@@ -186,7 +186,15 @@ pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), String> {
     let source = roll_image(base_image, roll);
     let tmp_name = format!("lankefarm-finalize-{}", std::process::id());
     let create = std::process::Command::new("docker")
-        .args(["create", "--name", &tmp_name, &source, "sh", "-c", "tail -f /dev/null"])
+        .args([
+            "create",
+            "--name",
+            &tmp_name,
+            &source,
+            "sh",
+            "-c",
+            "tail -f /dev/null",
+        ])
         .output()
         .map_err(|e| format!("docker create（finalize）失败: {e}"))?;
     if !create.status.success() {
@@ -196,9 +204,13 @@ pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), String> {
         ));
     }
     let cid = String::from_utf8_lossy(&create.stdout).trim().to_string();
-    let _ = std::process::Command::new("docker").args(["start", &cid]).status();
+    let _ = std::process::Command::new("docker")
+        .args(["start", &cid])
+        .status();
     let res = flatten_to_base(&cid, base_image);
-    let _ = std::process::Command::new("docker").args(["rm", "-f", &cid]).status();
+    let _ = std::process::Command::new("docker")
+        .args(["rm", "-f", &cid])
+        .status();
     res?;
     write_roll_counter(out_dir, 0);
     Ok(())
@@ -237,7 +249,10 @@ fn cleanup_stale_build_containers(
         if name.is_empty() {
             continue;
         }
-        let Some(pid_part) = name.strip_prefix("lankefarm-build-").and_then(|s| s.split('-').next()) else {
+        let Some(pid_part) = name
+            .strip_prefix("lankefarm-build-")
+            .and_then(|s| s.split('-').next())
+        else {
             continue;
         };
         let Ok(pid) = pid_part.parse::<u32>() else {
@@ -295,7 +310,11 @@ impl RealBinding {
         // 只清理"创建者 PID 已死"的孤儿容器（SIGKILL/断电，RAII 未执行）；活容器不动——
         // 否则并发进程的构建会被误杀。
         cleanup_stale_build_containers(&run_quiet);
-        let name = format!("lankefarm-build-{}-{}", std::process::id(), sanitize_name(pkg));
+        let name = format!(
+            "lankefarm-build-{}-{}",
+            std::process::id(),
+            sanitize_name(pkg)
+        );
 
         // 滚动基础镜像：commit 链（<base>:roll<1..25>）或原始 base。
         // `lpkg upgrade` 会把容器里所有"版本落后于当前仓库"的包全量更新——不滚动的话，仓库越攒
@@ -313,35 +332,54 @@ impl RealBinding {
         //    配方内容直接铺进 /work，而不是建 /work/<pkg>（实测）。tail -f 保活，busybox/coreutils 都支持。
         let mut create = std::process::Command::new("docker")
             // DooD：挂宿主 docker socket，容器内可 docker run（docker 包 build tini 静态需要）。
-            .args(["create", "--network=host", "--name", &name,
-                   "-v", "/var/run/docker.sock:/var/run/docker.sock",
-                   &create_image,
-                   "sh", "-c", "mkdir -p /work && tail -f /dev/null"])
+            .args([
+                "create",
+                "--network=host",
+                "--name",
+                &name,
+                "-v",
+                "/var/run/docker.sock:/var/run/docker.sock",
+                &create_image,
+                "sh",
+                "-c",
+                "mkdir -p /work && tail -f /dev/null",
+            ])
             .output()
             .map_err(|e| format!("docker create 失败: {e}"))?;
         // 健壮性：roll 镜像缺失/已删（如 GC 后计数未及时归零的崩溃窗口）→ 回退原始 base 并重置计数。
         if !create.status.success() && roll > 0 {
-            eprintln!(
-                "  [warn] 从 {create_image} 创建失败，回退原始 base 并重置滚动计数"
-            );
+            eprintln!("  [warn] 从 {create_image} 创建失败，回退原始 base 并重置滚动计数");
             create_image = self.base_image.clone();
             write_roll_counter(&self.out_dir, 0);
             create = std::process::Command::new("docker")
-                .args(["create", "--network=host", "--name", &name,
-                       "-v", "/var/run/docker.sock:/var/run/docker.sock",
-                       &create_image,
-                       "sh", "-c", "mkdir -p /work && tail -f /dev/null"])
+                .args([
+                    "create",
+                    "--network=host",
+                    "--name",
+                    &name,
+                    "-v",
+                    "/var/run/docker.sock:/var/run/docker.sock",
+                    &create_image,
+                    "sh",
+                    "-c",
+                    "mkdir -p /work && tail -f /dev/null",
+                ])
                 .output()
                 .map_err(|e| format!("docker create 失败: {e}"))?;
         }
         if !create.status.success() {
-            return Err(format!("docker create 失败: {}", String::from_utf8_lossy(&create.stderr)));
+            return Err(format!(
+                "docker create 失败: {}",
+                String::from_utf8_lossy(&create.stderr)
+            ));
         }
         let cid = String::from_utf8_lossy(&create.stdout).trim().to_string();
         let _guard = ContainerGuard(cid.clone());
         // 记录在途容器 cid（Ctrl+C 清理用）；成功路径末尾清空，提前返回时 rm -f 幂等无害。
         self.cleanup.lock().unwrap().current_cid = Some(cid.clone());
-        let ok = run_quiet(&["start", &cid]).map(|s| s.success()).unwrap_or(false);
+        let ok = run_quiet(&["start", &cid])
+            .map(|s| s.success())
+            .unwrap_or(false);
         if !ok {
             return Err(format!("docker start 失败（{pkg}）"));
         }
@@ -354,7 +392,8 @@ impl RealBinding {
             self.repo_port
         );
         let ok = run_quiet(&["exec", &cid, "sh", "-c", &conf])
-            .map(|s| s.success()).unwrap_or(false);
+            .map(|s| s.success())
+            .unwrap_or(false);
         if !ok {
             return Err(format!("容器内写入 mirror.conf 失败（{pkg}）"));
         }
@@ -380,14 +419,12 @@ impl RealBinding {
         // 先把 /backups 白洞化（顺带清掉历史污染镜像里残留的 /backups），commit 之后（见 4.6）
         // 再重新注入并恢复——旧 .so 只活在本次临时容器，随容器销毁。配方同样在 commit 之后
         // 才拷入（见 4.7），否则每包源码会滚进镜像（滚雪球）。
-        let upgrade_script = format!(
-            "lpkg install lpkg -y && \
-             ( lpkg upgrade -y --missing-so-no-error || {{ echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; }} ) || exit 1 ; \
+        let upgrade_script = "lpkg install lpkg -y && \
+             ( lpkg upgrade -y --missing-so-no-error || { echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; } ) || exit 1 ; \
              rm -rf /backups ; \
-             exit 0"
-        );
+             exit 0";
         let status = std::process::Command::new("docker")
-            .args(["exec", &cid, "sh", "-c", &upgrade_script])
+            .args(["exec", &cid, "sh", "-c", upgrade_script])
             .status()
             .map_err(|e| format!("docker exec 失败: {e}"))?;
         if !status.success() {
@@ -421,9 +458,14 @@ impl RealBinding {
         //     （commit/GC/finalize 的快照都是干净的，见 4 的顺序约束）。
         let backups = self.out_dir.join("backups");
         if backups.is_dir() {
-            let _ = run_quiet(&["cp", backups.to_string_lossy().as_ref(), &format!("{cid}:/backups")]);
+            let _ = run_quiet(&[
+                "cp",
+                backups.to_string_lossy().as_ref(),
+                &format!("{cid}:/backups"),
+            ]);
         }
-        let restore_script = "if [ -d /backups ]; then cp -a /backups/. /usr/lib/ && ldconfig; fi; true";
+        let restore_script =
+            "if [ -d /backups ]; then cp -a /backups/. /usr/lib/ && ldconfig; fi; true";
         let status = std::process::Command::new("docker")
             .args(["exec", &cid, "sh", "-c", restore_script])
             .status()
@@ -435,8 +477,13 @@ impl RealBinding {
         // 4.7 docker cp 配方进容器（/work/<pkg>）——必须放在 commit/GC 之后：
         //     快照时 /work 为空（见 4 的顺序约束），否则配方/源码会随 commit 滚进镜像。
         let src = self.repo_dir.join(pkg);
-        let ok = run_quiet(&["cp", src.to_string_lossy().as_ref(), &format!("{cid}:/work/")])
-            .map(|s| s.success()).unwrap_or(false);
+        let ok = run_quiet(&[
+            "cp",
+            src.to_string_lossy().as_ref(),
+            &format!("{cid}:/work/"),
+        ])
+        .map(|s| s.success())
+        .unwrap_or(false);
         if !ok {
             return Err(format!("docker cp {pkg} 配方进容器失败"));
         }
@@ -454,7 +501,13 @@ impl RealBinding {
         // 5. 取精确产物名（独立干净的小命令；docker cp **不支持 glob**）。
         //    注意 cd 进目录再 `ls *.lpkg` → 输出 basename（用绝对路径 glob 会输出完整路径，拼 remote 时重复）。
         let out = std::process::Command::new("docker")
-            .args(["exec", &cid, "sh", "-c", &format!("cd /work/{pkg} && ls -1 *.lpkg 2>/dev/null | tail -1")])
+            .args([
+                "exec",
+                &cid,
+                "sh",
+                "-c",
+                &format!("cd /work/{pkg} && ls -1 *.lpkg 2>/dev/null | tail -1"),
+            ])
             .output()
             .map_err(|e| format!("docker exec 取产物名失败: {e}"))?;
         let lpkg_name = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -465,7 +518,8 @@ impl RealBinding {
         // 6. docker cp 回宿主 staging（精确文件名）
         let remote = format!("{cid}:/work/{pkg}/{lpkg_name}");
         let ok = run_quiet(&["cp", &remote, staging.to_string_lossy().as_ref()])
-            .map(|s| s.success()).unwrap_or(false);
+            .map(|s| s.success())
+            .unwrap_or(false);
         if !ok {
             return Err(format!("docker cp {pkg} .lpkg 回宿主失败"));
         }
@@ -537,8 +591,14 @@ mod tests {
     // 回归：roll tag 必须是 `<repo>:roll{N}`，不能拼成 `...:latest:roll{N}`（invalid reference format）。
     #[test]
     fn roll_image_replaces_tag() {
-        assert_eq!(roll_image("wtada233/lankeos:latest", 1), "wtada233/lankeos:roll1");
-        assert_eq!(roll_image("wtada233/lankeos:latest", 25), "wtada233/lankeos:roll25");
+        assert_eq!(
+            roll_image("wtada233/lankeos:latest", 1),
+            "wtada233/lankeos:roll1"
+        );
+        assert_eq!(
+            roll_image("wtada233/lankeos:latest", 25),
+            "wtada233/lankeos:roll25"
+        );
         // 无 tag 的 base
         assert_eq!(roll_image("wtada233/lankeos", 3), "wtada233/lankeos:roll3");
     }

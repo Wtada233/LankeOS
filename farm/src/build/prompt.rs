@@ -3,9 +3,9 @@
 use std::collections::VecDeque;
 use std::io::Write;
 
+use super::{effective_version, BuildOptions};
 use crate::tr;
 use crate::ux;
-use super::{effective_version, BuildOptions};
 
 pub(crate) enum PromptChoice {
     Retry,
@@ -35,7 +35,6 @@ pub(crate) fn confirm_plan() -> bool {
         Err(_) => true,
     }
 }
-
 
 pub(crate) fn prompt_blocked(pkg: &str, opts: &BuildOptions, stage: &str) -> PromptChoice {
     loop {
@@ -67,7 +66,8 @@ pub(crate) fn prompt_blocked(pkg: &str, opts: &BuildOptions, stage: &str) -> Pro
 pub(crate) fn open_shell(pkg: &str, opts: &BuildOptions) {
     let workdir = opts.pkgs_dir.join(pkg);
     eprintln!("{}", tr!("build.fix_shell", workdir.display()));
-    let _ = std::process::Command::new("bash").current_dir(&workdir).status();
+    let _ = std::process::Command::new("bash")
+        .current_dir(&workdir)
+        .status();
     println!("{}", tr!("build.fix_shell_exit", pkg));
 }
-

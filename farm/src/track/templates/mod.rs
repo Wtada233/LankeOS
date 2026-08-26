@@ -1,8 +1,11 @@
 //! track 内置模板：**一个模板一个文件一个探测后端**（§9）。
 //!
-//! 每个模板文件只含 `probe(fetcher, cfg) -> Result<ProbeResult>`：联网抓最新版本。
-//! 模板**被动触发**——由包的 tracker yaml 的 `tracker_template` 字段指定，
-//! 模板不主动从 URI 猜格式（yaml 由人工/AI 编写，模板只是探测执行器）。
+//! 每个模板文件只含 `probe(fetcher, cfg, major, pkg_name) -> Result<EntryProbe>`：
+//! 联网抓最新版本，返回该 source 槽位的版本 + URL。模板**被动触发**——由 source 条目的
+//! `tracker_template` 字段指定，模板不主动从 URI 猜格式（yaml 由人工/AI 编写，模板只是探测执行器）。
+//!
+//! `script` 是**包级类型**（不是模板）：`type: script` 时整包走脚本，返回完整清单
+//! （`ProbeResult`，stdout 第一行=版本，后续行=URL，`# work_sources` 后归 work_sources）。
 
 pub mod gcs;
 pub mod github;
@@ -10,6 +13,7 @@ pub mod gitlab;
 pub mod gnome;
 pub mod html_index;
 pub mod pypi;
+pub mod same_version;
 pub mod script;
 pub mod sourceforge;
 
@@ -40,7 +44,11 @@ pub(crate) fn max_match(
 
 /// 稳定版优先取最大版本；`major` 非空时先按主版本过滤，`cap` 封顶（超过则排除，
 /// 如 tcl 锁 8.6.x：max-version 8.6.16 时 9.0.1 被过滤掉）。
-fn max_version_stable_first(versions: Vec<String>, major: Option<&str>, cap: Option<&str>) -> Option<String> {
+fn max_version_stable_first(
+    versions: Vec<String>,
+    major: Option<&str>,
+    cap: Option<&str>,
+) -> Option<String> {
     let filtered: Vec<String> = versions
         .into_iter()
         .filter(|v| matches_major(v, major))
@@ -162,7 +170,8 @@ mod tests {
     fn max_match_respects_cap() {
         // tcl 锁定场景：max-version 8.6.16 → 9.x 被过滤，取 8.6.16
         let re = Regex::new(r"tcl([\d.]+)-src\.tar\.gz").unwrap();
-        let rss = "tcl8.6.14-src.tar.gz tcl8.6.16-src.tar.gz tcl9.0.1-src.tar.gz tcl9.0.4-src.tar.gz";
+        let rss =
+            "tcl8.6.14-src.tar.gz tcl8.6.16-src.tar.gz tcl9.0.1-src.tar.gz tcl9.0.4-src.tar.gz";
         assert_eq!(max_match(&re, rss, None, None).as_deref(), Some("9.0.4"));
         assert_eq!(
             max_match(&re, rss, None, Some("8.6.16")).as_deref(),

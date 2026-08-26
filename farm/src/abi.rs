@@ -221,13 +221,21 @@ glibc|2.39:hash::libc.so,libc.so.6,ld-linux.so.2:|
              tcl|8.6.16:hash::libtcl8.6.so:libc.so.6,libtcl8.6.so|\n",
         );
         // 检测端
-        let det = removed_sonames(&old, "libfoo", &["libfoo.so".to_string(), "libfoo.so.2".to_string()]);
+        let det = removed_sonames(
+            &old,
+            "libfoo",
+            &["libfoo.so".to_string(), "libfoo.so.2".to_string()],
+        );
         // 备份端（同一计算：ABI(old) − ABI(new)）
         let old_s = soname_provides_of(&old.packages["libfoo"].provides);
         let new_s = soname_provides_of(&["libfoo.so".to_string(), "libfoo.so.2".to_string()]);
         let bak: Vec<String> = old_s.difference(&new_s).cloned().collect();
         assert_eq!(det, bak, "dev symlink 场景：检测与备份必须一致");
-        assert_eq!(det, vec!["libfoo.so.1"], "libfoo.so（dev symlink）不应是 ABI 面");
+        assert_eq!(
+            det,
+            vec!["libfoo.so.1"],
+            "libfoo.so（dev symlink）不应是 ABI 面"
+        );
 
         // tcl 无 SONAME 实体库：两端都识别 libtcl8.6.so 为 ABI 面
         let det2 = removed_sonames(&old, "tcl", &["libtcl9.0.so".to_string()]);

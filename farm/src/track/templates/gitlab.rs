@@ -1,17 +1,18 @@
 //! gitlab 模板：releases / tags 探测（GitLab API v4）。
 //!
-//! **被动触发**：yaml 里 `tracker-template: gitlab` + `host` + `project` + `mode`(tags|releases) + `tag-prefix` + `template`。
+//! **被动触发**：source 条目里 `tracker-template: gitlab` + `host` + `project` + `mode`(tags|releases) + `tag-prefix` + `template`。
 
 use crate::net::Fetcher;
 use crate::track::templates::{self, max_tag_version, urlencode};
-use crate::track::{need, ProbeResult, TrackerConfig};
+use crate::track::{need, EntryProbe, SourceConfig};
 
-/// 探测最新稳定版本（GitLab API v4）。`major` 非空时只匹配该主版本的 tag。
+/// 探测最新稳定版本（GitLab API v4），返回该槽位版本 + URL。`major` 非空时只匹配该主版本的 tag。
 pub fn probe(
     fetcher: &dyn Fetcher,
-    cfg: &TrackerConfig,
+    cfg: &SourceConfig,
     major: Option<&str>,
-) -> Result<ProbeResult, String> {
+    _pkg_name: &str,
+) -> Result<EntryProbe, String> {
     let host = need(&cfg.host, "host")?;
     let project = need(&cfg.project, "project")?;
     let tag_prefix = cfg.tag_prefix.as_deref().unwrap_or("");
@@ -36,7 +37,7 @@ pub fn probe(
     };
     let tag = format!("{tag_prefix}{version}");
     let name = project.split('/').next_back().unwrap_or(project);
-    let src = templates::substitute(
+    let url = templates::substitute(
         template,
         &[
             ("tag", &tag),
@@ -45,11 +46,7 @@ pub fn probe(
             ("project", project), // gitlab 模板常引用 {project}（如 {project}/-/archive/...）
         ],
     );
-    Ok(ProbeResult {
-        version,
-        sources: vec![src],
-        work_sources: vec![],
-    })
+    Ok(EntryProbe { version, url })
 }
 
 #[cfg(test)]
@@ -65,8 +62,7 @@ mod tests {
             "https://gitlab.com/api/v4/projects/NetworkManager%2FNetworkManager/releases?per_page=50",
             r#"[{"tag_name":"1.59.1-dev"},{"tag_name":"1.54.0"},{"tag_name":"1.52.0"}]"#,
         );
-        let cfg = TrackerConfig {
-            pkg_name: "NetworkManager".into(),
+        let cfg = SourceConfig {
             tracker_template: "gitlab".into(),
             host: Some("gitlab.com".into()),
             project: Some("NetworkManager/NetworkManager".into()),
@@ -75,11 +71,11 @@ mod tests {
             template: Some("https://gitlab.com/{name}/-/archive/{tag}/x.tar.gz".into()),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "NetworkManager").unwrap();
         assert_eq!(r.version, "1.54.0");
         assert_eq!(
-            r.sources,
-            vec!["https://gitlab.com/NetworkManager/-/archive/1.54.0/x.tar.gz"]
+            r.url,
+            "https://gitlab.com/NetworkManager/-/archive/1.54.0/x.tar.gz"
         );
     }
 }

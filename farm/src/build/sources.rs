@@ -1,8 +1,8 @@
 //! sources.rs — 源预下载（§8.6）：宿主侧预取网络源，源就绪才入队构建。
 
-use std::path::Path;
-use crate::tr;
 use super::read_lankebuild;
+use crate::tr;
+use std::path::Path;
 
 pub fn pre_download_sources(pkgs_dir: &Path, pkg: &str, retries: u32) -> Result<(), String> {
     let Some(b) = read_lankebuild(pkgs_dir, pkg) else {
@@ -28,9 +28,8 @@ pub fn pre_download_sources(pkgs_dir: &Path, pkg: &str, retries: u32) -> Result<
         if dest.exists() {
             continue; // 已就绪（或 operator 已放置）
         }
-        crate::net::download_to_file(url, &dest, retries).map_err(|e| {
-            format!("{filename}: {e}")
-        })?;
+        crate::net::download_to_file(url, &dest, retries)
+            .map_err(|e| format!("{filename}: {e}"))?;
         println!("{}", tr!("build.source_prefetched", pkg, filename));
     }
     Ok(())
@@ -41,7 +40,10 @@ pub fn pre_download_sources(pkgs_dir: &Path, pkg: &str, retries: u32) -> Result<
 /// 落盘的文件名错误，且与真实下载目标不一致。
 fn source_filename(url: &str) -> &str {
     let base = url.rsplit('/').next().unwrap_or(url);
-    let end = base.find('?').or_else(|| base.find('#')).unwrap_or(base.len());
+    let end = base
+        .find('?')
+        .or_else(|| base.find('#'))
+        .unwrap_or(base.len());
     &base[..end]
 }
 
@@ -56,14 +58,11 @@ pub fn sources_ready(pkgs_dir: &Path, pkg: &str) -> bool {
     let Some(b) = read_lankebuild(pkgs_dir, pkg) else {
         return false;
     };
-    b.sources
-        .iter()
-        .chain(b.work_sources.iter())
-        .all(|url| {
-            if is_skip_source(url) {
-                return true;
-            }
-            let filename = source_filename(url);
-            !filename.is_empty() && pkgs_dir.join(pkg).join(filename).exists()
-        })
+    b.sources.iter().chain(b.work_sources.iter()).all(|url| {
+        if is_skip_source(url) {
+            return true;
+        }
+        let filename = source_filename(url);
+        !filename.is_empty() && pkgs_dir.join(pkg).join(filename).exists()
+    })
 }

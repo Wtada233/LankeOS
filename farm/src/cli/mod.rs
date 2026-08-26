@@ -48,16 +48,6 @@ macro_rules! error_log {
     }};
 }
 
-/// 输出到 stdout 并记日志（警告类诊断）。
-macro_rules! warn_log {
-    ($($arg:tt)*) => {{
-        let msg = format!($($arg)*);
-        println!("{msg}");
-        log(&msg);
-    }};
-}
-
-
 use lankefarm::llm::LlmClient;
 use lankefarm::net::{Fetcher, RealFetcher};
 use lankefarm::track::vercmp;
@@ -67,8 +57,8 @@ use lankefarm::track::{dep_edges, TrackerConfig};
 mod build;
 mod export;
 mod repack;
-mod serve;
 mod seed;
+mod serve;
 
 #[derive(Default)]
 pub(crate) struct Args {
@@ -299,59 +289,28 @@ fn first_remote_source(sources: &[String]) -> Option<&str> {
         .map(String::as_str)
 }
 
-
-/// tracker 生成新版：把 proposal 应用到 LankeBUILD.json（version + sources[0] 主源 + work_sources 版本替换）。
-/// 返回是否多源（sources 多于一个）。
-/// 把提案应用到 LankeBUILD.json 的 value 上：更新 `version` 和 `sources[0]`。
-/// `sources[1..]`：script 多源（prop.sources[1..]）直接落位；否则保留原值（由 cmd_track_run 的
-/// `sources:`/`work_sources:` 条目按 url-match 正则匹配后升级）。
-/// **work_sources 不做任何自动替换**：LFS patch 等是版本专用文件，盲替换版本只会指向不存在的 URL。
+/// tracker 探测成功且版本变新 → **原子全量替换**：version + sources + work_sources 全部
+/// 用探测出的清单覆盖（旧值丢弃，空列表也写键——lpkg 默认形态，noto 等 work_sources-only
+/// 包规范化为 `"sources": []`）。调用方保证只在 vercmp Greater 时应用。
 fn apply_version_update(value: &mut serde_json::Value, prop: &lankefarm::track::Proposal) {
     value["version"] = serde_json::Value::String(prop.new_version.clone());
-    // 只有包**有 sources 数组**才更新 sources[0]（work_sources-only 包如 noto 字体不得凭空创建 sources 字段，
-    // 否则 lpkg 会把 .otf 当 archive 处理；其 URL 由 cmd_track_run 的 work_sources: 配置按正则升级）。
-    if let Some(arr) = value.get("sources").and_then(|s| s.as_array()) {
-        let mut new_sources = Vec::new();
-        if let Some(first) = prop.sources.first() {
-            new_sources.push(serde_json::Value::String(first.clone()));
-        }
-        for (i, s) in arr.iter().skip(1).enumerate() {
-            if let Some(ps) = prop.sources.get(i + 1) {
-                new_sources.push(serde_json::Value::String(ps.clone()));
-            } else {
-                new_sources.push(s.clone());
-            }
-        }
-        value["sources"] = serde_json::Value::Array(new_sources);
-    }
-    // work_sources：script 多源直接落位（覆盖已有槽位，不凭空创建——缺槽位由占位补）。
-    // 非 script 多源（prop.work_sources 为空）不动 work_sources，交由 upgrade_list_by_regex
-    // 按 url-match 正则升级（glibc/tzdata 模式）。
-    if !prop.work_sources.is_empty() {
-        if let Some(arr) = value.get("work_sources").and_then(|s| s.as_array()) {
-            let mut new_ws = Vec::new();
-            for (i, s) in arr.iter().enumerate() {
-                if let Some(ps) = prop.work_sources.get(i) {
-                    new_ws.push(serde_json::Value::String(ps.clone()));
-                } else {
-                    new_ws.push(s.clone());
-                }
-            }
-            value["work_sources"] = serde_json::Value::Array(new_ws);
-        }
-    }
+    value["sources"] = serde_json::Value::Array(
+        prop.sources
+            .iter()
+            .map(|s| serde_json::Value::String(s.clone()))
+            .collect(),
+    );
+    value["work_sources"] = serde_json::Value::Array(
+        prop.work_sources
+            .iter()
+            .map(|s| serde_json::Value::String(s.clone()))
+            .collect(),
+    );
 }
 
-/// 应用提案到 LankeBUILD.json：version + sources[0] 主源 + 多源正则升级。返回是否成功写入。
+/// 应用提案到 LankeBUILD.json：原子全量替换 version + sources + work_sources。返回是否成功写入。
 /// `cmd_track_run`（单包 --run）与 `cmd_track_all --run`（批量）共用。
-fn apply_proposal(
-    pkg: &str,
-    pkgs_dir: &Path,
-    cfg: &TrackerConfig,
-    p: &lankefarm::track::Proposal,
-    fetcher: &dyn Fetcher,
-    lookup: &dyn Fn(&str) -> Option<String>,
-) -> bool {
+fn apply_proposal(pkg: &str, pkgs_dir: &Path, p: &lankefarm::track::Proposal) -> bool {
     let json_path = pkgs_dir.join(pkg).join("LankeBUILD.json");
     let Ok(content) = std::fs::read_to_string(&json_path) else {
         return false;
@@ -360,112 +319,14 @@ fn apply_proposal(
         return false;
     };
     apply_version_update(&mut value, p);
-    // 多源追踪：每个 cfg.sources 条目用 url-match 正则匹配 LankeBUILD.json 里的实际 source URL，
-    // 匹配到就探测并替换；work_sources 同理。不依赖索引——删 URL/改顺序不炸。
-    let total_sources = value["sources"].as_array().map(|a| a.len()).unwrap_or(0);
-    // 已被覆盖的 sources 索引：script 多源（prop.sources[1..]）已直接落位
-    let mut upgraded: HashSet<usize> = (1..p.sources.len()).collect();
-    // sources[1..] 与 work_sources 是同一机制（正则匹配+探测+替换），仅字段名不同，用同一实现
-    upgrade_list_by_regex(
-        &mut value,
-        "sources",
-        &cfg.sources,
-        1,
-        fetcher,
-        lookup,
-        pkg,
-        Some(&mut upgraded),
-    );
-    upgrade_list_by_regex(
-        &mut value,
-        "work_sources",
-        &cfg.work_sources,
-        0,
-        fetcher,
-        lookup,
-        pkg,
-        None,
-    );
     match std::fs::write(&json_path, serde_json::to_string_pretty(&value).unwrap()) {
         Err(e) => {
-            error_log!("  [!] 写入 LankeBUILD.json 失败 {e}");
+            error_log!("{}", lankefarm::tr!("track.apply_fail", e));
             false
         }
         Ok(()) => {
             println!("{}", lankefarm::tr!("track.applied", pkg, p.new_version));
-            // 警告未被覆盖的 sources[1..]：无 script 多源、也无 sources 配置匹配到
-            let untracked: Vec<usize> =
-                (1..total_sources).filter(|i| !upgraded.contains(i)).collect();
-            if !untracked.is_empty() {
-                warn_log!(
-                    "  ⚠ {pkg} 的 sources{untracked:?} 未被追踪配置覆盖（vendored 依赖写死在 LankeBUILD 属预期；否则补 sources: 条目）"
-                );
-            }
             true
-        }
-    }
-}
-
-/// 统一的多源升级：在 value[field]（"sources"/"work_sources"）里按 url-match 正则匹配实际 URL，
-/// 匹配到就探测并替换。`start_idx`：sources 从 1 开始（[0] 是主源，由 apply_version_update 处理），
-/// work_sources 从 0 开始。**sources 与 work_sources 对下载器只是字段名不同，用同一实现。**
-#[allow(clippy::too_many_arguments)]
-fn upgrade_list_by_regex(
-    value: &mut serde_json::Value,
-    field: &str,
-    configs: &[TrackerConfig],
-    start_idx: usize,
-    fetcher: &dyn Fetcher,
-    lookup: &dyn Fn(&str) -> Option<String>,
-    pkg: &str,
-    mut upgraded: Option<&mut HashSet<usize>>,
-) {
-    for (i, cfg) in configs.iter().enumerate() {
-        let re = match cfg.url_match_regex() {
-            Ok(Some(re)) => re,
-            Ok(None) => {
-                error_log!("  [!] {pkg} 的 {field}[{i}] 缺 url-match，忽略");
-                continue;
-            }
-            Err(e) => {
-                error_log!("  [!] {pkg}: {e}，忽略");
-                continue;
-            }
-        };
-        let idx = value[field]
-            .as_array()
-            .and_then(|a| {
-                a.iter()
-                    .enumerate()
-                    .skip(start_idx)
-                    .find(|(_, u)| u.as_str().is_some_and(|s| re.is_match(s)))
-                    .map(|(idx, _)| idx)
-            });
-        let Some(idx) = idx else {
-            warn_log!(
-                "  ⚠ {pkg} 的 {field}[{i}] url-match '{}' 未匹配到任何 {field}（可能已删除/改名）",
-                cfg.url_match.as_deref().unwrap_or("")
-            );
-            continue;
-        };
-        match cfg.probe_with(fetcher, lookup) {
-            Ok(er) => {
-                if let Some(new_src) = er.sources.first() {
-                    if let Some(arr) = value[field].as_array_mut() {
-                        if let Some(slot) = arr.get_mut(idx) {
-                            *slot = serde_json::Value::String(new_src.clone());
-                            println!(
-                                "  [{field}升级] {field}[{idx}] → {new_src}（{}）",
-                                cfg.tracker_template
-                            );
-                            if let Some(set) = upgraded.as_deref_mut() {
-                                set.insert(idx);
-                            }
-                        }
-                    }
-                }
-            }
-            Err(e) => error_log!("  [{field}探测失败] {field}[{idx}]（{}）: {e}", cfg.tracker_template),
         }
     }
 }
@@ -512,7 +373,7 @@ fn cmd_track_run(args: &Args, apply: bool) -> ExitCode {
     let pkg = match args.pkg.first() {
         Some(p) => p.clone(),
         None => {
-            eprintln!("farm track <pkg> --run --pkgs <dir> --data <dir>");
+            eprintln!("{}", lankefarm::tr!("track.usage"));
             return ExitCode::from(2);
         }
     };
@@ -529,7 +390,7 @@ fn cmd_track_run(args: &Args, apply: bool) -> ExitCode {
     let has_remote = first_remote_source(&build.sources).is_some()
         || first_remote_source(&build.work_sources).is_some();
     if !has_remote {
-        println!("[skip] {pkg}: 仅 file:// 或无远程源，无需 track");
+        println!("{}", lankefarm::tr!("track.skip_no_remote", pkg));
         return ExitCode::SUCCESS;
     }
     // 按 name 字段匹配 tracker（文件名无关）
@@ -537,10 +398,7 @@ fn cmd_track_run(args: &Args, apply: bool) -> ExitCode {
     let cfg = match trackers.get(&build.name) {
         Some(c) => c,
         None => {
-            eprintln!(
-                "{} 无对应 tracker（data/trackers 中无 pkg-name 匹配的 yaml，用 farm gen-trackers 生成或手动写）",
-                build.name
-            );
+            eprintln!("{}", lankefarm::tr!("track.no_tracker_pkg", build.name));
             return ExitCode::from(2);
         }
     };
@@ -564,30 +422,47 @@ fn cmd_track_run(args: &Args, apply: bool) -> ExitCode {
         Ok(p) => match vercmp::cmp_version(&p.new_version, &p.current_version) {
             CmpOrdering::Greater => {
                 println!(
-                    "[track] {}: {} → {}（模板 {}）",
-                    p.pkg_name, p.current_version, p.new_version, p.tracker_template
+                    "{}",
+                    lankefarm::tr!(
+                        "track.proposal",
+                        p.pkg_name,
+                        p.current_version,
+                        p.new_version,
+                        p.kind
+                    )
                 );
                 for s in &p.sources {
                     println!("  {s}");
                 }
+                for s in &p.work_sources {
+                    println!("{}", lankefarm::tr!("track.work_sources", s));
+                }
                 // 记录本轮新版本：同包 same-version 额外源（docker→moby）据此生成对应 tag
                 *pending_new.borrow_mut() = Some(p.new_version.clone());
                 if apply {
-                    apply_proposal(&pkg, Path::new(&pkgs_dir), cfg, &p, &fetcher, &lookup);
+                    apply_proposal(&pkg, Path::new(&pkgs_dir), &p);
                 }
             }
             CmpOrdering::Equal => {
-                println!("{}", lankefarm::tr!("track.latest", p.pkg_name, p.current_version));
+                println!(
+                    "{}",
+                    lankefarm::tr!("track.latest", p.pkg_name, p.current_version)
+                );
             }
             CmpOrdering::Less => {
                 error_log!(
-                    "[!] {}: 探测到倒退版本 {} → {}（tracker 配置/模板疑似错误，忽略）",
-                    p.pkg_name, p.current_version, p.new_version
+                    "{}",
+                    lankefarm::tr!(
+                        "track.regress",
+                        p.pkg_name,
+                        p.current_version,
+                        p.new_version
+                    )
                 );
             }
         },
         Err(e) => {
-            error_log!("  [probe 失败] {}: {e}", build.name);
+            error_log!("{}", lankefarm::tr!("track.probe_fail", build.name, e));
             return ExitCode::from(2);
         }
     }
@@ -639,13 +514,19 @@ fn track_worker(
         let cfg = &configs[&name];
         let current = &versions[&name];
         // pkg-name → 目录：same-version/major-of/after 引用的都是 pkg-name，目录名可能不同
-        let dir_of =
-            |pkg: &str| pkg_to_dir.get(pkg).cloned().unwrap_or_else(|| pkg.to_string());
+        let dir_of = |pkg: &str| {
+            pkg_to_dir
+                .get(pkg)
+                .cloned()
+                .unwrap_or_else(|| pkg.to_string())
+        };
         let lookup = |pkg: &str| {
             if let Some(v) = sched.0.lock().unwrap().resolved.get(pkg) {
                 return Some(v.clone());
             }
-            load_build_json(&pkgs_dir.join(dir_of(pkg))).ok().map(|b| b.version)
+            load_build_json(&pkgs_dir.join(dir_of(pkg)))
+                .ok()
+                .map(|b| b.version)
         };
         let result = cfg.propose_with(fetcher, &lookup, current);
 
@@ -657,26 +538,34 @@ fn track_worker(
                 CmpOrdering::Greater => {
                     println!(
                         "[track] {}: {} → {}（{}）",
-                        p.pkg_name, p.current_version, p.new_version, p.tracker_template
+                        p.pkg_name, p.current_version, p.new_version, p.kind
                     );
                     // 只有更新的版本才参与后续 same-version / major-of 约束
                     guard.resolved.insert(name.clone(), p.new_version.clone());
                     proposals.fetch_add(1, Ordering::Relaxed);
-                    pending_apply = Some(p);  // 移到 apply 候选（apply 模式才写）
+                    pending_apply = Some(p); // 移到 apply 候选（apply 模式才写）
                 }
                 CmpOrdering::Equal => {
-                    println!("{}", lankefarm::tr!("track.latest", p.pkg_name, p.current_version));
+                    println!(
+                        "{}",
+                        lankefarm::tr!("track.latest", p.pkg_name, p.current_version)
+                    );
                 }
                 CmpOrdering::Less => {
                     error_log!(
                         "  [!] {}: 探测到倒退版本 {} → {}（tracker 配置/模板疑似错误，忽略）",
-                        p.pkg_name, p.current_version, p.new_version
+                        p.pkg_name,
+                        p.current_version,
+                        p.new_version
                     );
                     errors.fetch_add(1, Ordering::Relaxed);
                 }
             },
             Err(e) => {
-                error_log!("  [!] {}: {e}", cfg.pkg_name);
+                error_log!(
+                    "{}",
+                    lankefarm::tr!("track.probe_fail_all", cfg.pkg_name, e)
+                );
                 errors.fetch_add(1, Ordering::Relaxed);
             }
         }
@@ -702,7 +591,7 @@ fn track_worker(
         if apply {
             if let Some(p) = pending_apply {
                 // 写回目标目录 = pkg-name 对应的目录（目录名可能与 pkg-name 不同）
-                apply_proposal(&dir_of(&p.pkg_name), pkgs_dir, cfg, &p, fetcher, &lookup);
+                apply_proposal(&dir_of(&p.pkg_name), pkgs_dir, &p);
             }
         }
     }
@@ -869,10 +758,14 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
         .cloned()
         .collect();
     println!();
-    let summary = format!(
-        "[汇总] 包 {} 个：{} {}，探测失败 {}，无 tracker {}，孤儿 yaml {}",
+    let summary = lankefarm::tr!(
+        "track.summary",
         entries.len(),
-        if apply { "已应用" } else { "提案" },
+        if apply {
+            lankefarm::tr!("track.summary_applied")
+        } else {
+            lankefarm::tr!("track.summary_proposals")
+        },
         proposals,
         errors,
         no_tracker.len(),
@@ -881,13 +774,13 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
     println!("{summary}");
     log(&summary);
     if !no_tracker.is_empty() {
-        println!("{}", lankefarm::tr!("track.no_tracker", no_tracker.join(", ")));
+        println!(
+            "{}",
+            lankefarm::tr!("track.no_tracker", no_tracker.join(", "))
+        );
     }
     if !orphans.is_empty() {
-        println!(
-            "  [忽略] 孤儿 tracker yaml（无对应 LankeBUILD.json）: {}",
-            orphans.join(", ")
-        );
+        println!("{}", lankefarm::tr!("track.orphans", orphans.join(", ")));
     }
     ExitCode::SUCCESS
 }
@@ -930,7 +823,7 @@ fn collect_targets(
                     Err(_) => false,
                 };
                 if !has_remote {
-                    eprintln!("  [skip] {s}: 仅 file:// 或无远程源");
+                    eprintln!("{}", lankefarm::tr!("track.skip_no_remote_short", s));
                 }
                 has_remote
             })
@@ -960,35 +853,56 @@ fn collect_targets(
 
 const SYSTEM_PROMPT: &str = r#"你是 LankeOS 发行版的 tracker 配置生成器。根据给定包的源 URL 和探测输出（真实抓取），生成正确的 tracker yaml。
 
-可用 tracker-template 及字段：
+tracker yaml 是 sources/work_sources 的完整清单，结构：
+- pkg-name（顶层必填，=包名）
+- version-source：版本来源选择器（sources[i] 或 work_sources[i]，默认 sources[0]，空则 work_sources[0]）
+- type：template（默认，逐条目声明式探测）| script（整包走内嵌 bash）
+- sources: / work_sources:：逐条 source 槽位的探测配置（**位置对应 LankeBUILD.json 的 sources/work_sources 数组**，不要 url-match、不要写 pkg-name）
+
+source 条目可用 tracker-template 及字段：
 - github: repo, mode(tags|releases), tag-prefix, template
 - gitlab: host, project, mode(tags|releases), tag-prefix, template
 - sourceforge: project, path, pattern, template
 - gnome: template
 - gcs: url(GCS/S3 桶目录), pattern, template
 - html-index: url(HTML 目录列表页), pattern, template
-- script: script-content(bash，stdout 第一行=版本，后续行=具体下载 URL)
+- same-version: same-version-of(锁定为指定包版本，直接确定版本不经探测), tag-prefix, repo, template
 
-通用字段：pkg-name（必填，=包名）、tracker-template（必填）。
-多源包用 sources:/work_sources: 列表给每个额外源声明独立追踪配置：每条用 url-match 正则匹配 LankeBUILD.json 里实际 URL（非索引），可单独配 template/script/same-version 等。
+条目级版本约束（只作用于本条目，探测模板适用）：major-of、major-version-lock、max-version、source-name。
 template 是**完整下载 URL**（含 https:// 和主机名，占位符替换后可直接下载），不要把 URL 拆开只留文件名/相对路径。
 template 占位符：{name} {version} {tag} {repo} {project} {path_version}。
 pattern 是提取版本的正则，必须含一个捕获组，如 (\d[\d.]*)。
 
+无法用现成模板覆盖的（独特 API、版本在路径里等）用 script 类型：
+type: script
+script-content: |
+  #!/bin/bash
+  # stdout 第一行=版本，后续行=具体下载 URL；`# work_sources` 标记行之后归 work_sources
+  echo "1.2.3"
+  echo "https://.../pkg-1.2.3.tar.gz"
+
 规则：
 - 根据探测输出的真实格式选模板，不要猜；探测失败时按源 URL 域名/结构选最合理的。
 - github 用 tags/releases API，gitlab 用其 API，GCS/S3 桶用 XML listing（?delimiter=/），纯 HTML 目录列表用 html-index。
-- 无法用现成模板覆盖的（独特 API、版本在路径里等）用 script 写 bash 抓版本。
 - 稳定版优先（tracker 自动过滤 rc/beta/alpha）。
+- sources:/work_sources: 条目必须覆盖 LankeBUILD.json 里的全部源（探测成功时整包全量替换），顺序与 json 一致。
 
 输出格式：直接输出 N 个 YAML 文档，每个文档前用一行 `===` 分隔。不要 JSON、不要 markdown 代码围栏、不要任何解释。示例：
 ===
 pkg-name: acl
-tracker-template: github
-repo: ...
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: ...
+    mode: tags
+    tag-prefix: v
+    template: ...
 ===
 pkg-name: alacritty
-...
+type: script
+script-content: |
+  ...
+===
 
 容错规则：
 - pkg-name 必须是给定批次中的包名，不要发明、不要拼错、不要改名。
@@ -1111,8 +1025,8 @@ fn cmd_gen_trackers(args: &Args) -> ExitCode {
         return ExitCode::SUCCESS;
     }
     println!(
-        "[gen-trackers] 目标 {} 个包，API {endpoint}，模型 {model}，每批 12 个",
-        targets.len()
+        "{}",
+        lankefarm::tr!("gen.targets", targets.len(), endpoint, model)
     );
 
     std::fs::create_dir_all(&data_dir)
@@ -1129,11 +1043,12 @@ fn cmd_gen_trackers(args: &Args) -> ExitCode {
             let build = match load_build_json(&root.join(name)) {
                 Ok(b) => b,
                 Err(e) => {
-                    eprintln!("  [!] {name}: {e}");
+                    eprintln!("{}", lankefarm::tr!("gen.load_fail", name, e));
                     continue;
                 }
             };
-            let src = first_remote_source(&build.sources).unwrap_or("(无远程源)");
+            let src =
+                first_remote_source(&build.sources).unwrap_or(lankefarm::tr!("gen.no_remote_src"));
             println!("{}", lankefarm::tr!("gen.fetch", name, src));
             let (url, listing) = fetch_listing(src, &fetcher);
             sections.push(format!(
@@ -1150,9 +1065,8 @@ fn cmd_gen_trackers(args: &Args) -> ExitCode {
         loop {
             attempts += 1;
             println!(
-                "  [LLM] 抓取完毕（{} 个包，prompt ~{} 字符），调用 API...",
-                sections.len(),
-                user.len()
+                "{}",
+                lankefarm::tr!("gen.llm_calling", sections.len(), user.len())
             );
             match llm.chat(SYSTEM_PROMPT, &user) {
                 Ok(resp) => {
@@ -1181,16 +1095,24 @@ fn cmd_gen_trackers(args: &Args) -> ExitCode {
                     }
                     if attempts >= 3 {
                         eprintln!(
-                            "  [!] 批次重试 {attempts} 次仍不完整——缺 {}，多 {}",
-                            missing.join(", "),
-                            res.hallucinations.join(", ")
+                            "{}",
+                            lankefarm::tr!(
+                                "gen.retry_exhausted",
+                                attempts,
+                                missing.join(", "),
+                                res.hallucinations.join(", ")
+                            )
                         );
                         break;
                     }
                     eprintln!(
-                        "  [重试 {attempts}] 缺 {}, 多 {}，带反馈重新调用...",
-                        missing.join(","),
-                        res.hallucinations.join(",")
+                        "{}",
+                        lankefarm::tr!(
+                            "gen.retry_feedback",
+                            attempts,
+                            missing.join(","),
+                            res.hallucinations.join(",")
+                        )
                     );
                     user = format!(
                         "{} 上次输出有误：缺 {}，多 {}. 请补全；对无法生成的包输出 `none: <pkg-name>`. 重新输出。",
@@ -1272,7 +1194,18 @@ pub fn run() -> ExitCode {
         return ExitCode::from(2);
     }
     match cli.command {
-        Command::Build { all, pkg, manual_sort, pkgs, out, state, arch, image, repo_port, download_retries } => {
+        Command::Build {
+            all,
+            pkg,
+            manual_sort,
+            pkgs,
+            out,
+            state,
+            arch,
+            image,
+            repo_port,
+            download_retries,
+        } => {
             let args = Args {
                 all,
                 pkg,
@@ -1288,7 +1221,15 @@ pub fn run() -> ExitCode {
             };
             build::cmd_build(&args)
         }
-        Command::Validate { pkgs, out, state, arch, image, repo_port, download_retries } => {
+        Command::Validate {
+            pkgs,
+            out,
+            state,
+            arch,
+            image,
+            repo_port,
+            download_retries,
+        } => {
             let args = Args {
                 pkgs: Some(pkgs.to_string_lossy().into_owned()),
                 out: Some(out),
@@ -1301,7 +1242,11 @@ pub fn run() -> ExitCode {
             };
             build::cmd_validate(&args)
         }
-        Command::Export { input, output, arch } => {
+        Command::Export {
+            input,
+            output,
+            arch,
+        } => {
             let args = Args {
                 input: Some(input),
                 out: Some(output),
@@ -1319,7 +1264,16 @@ pub fn run() -> ExitCode {
             };
             repack::cmd_repack(&args)
         }
-        Command::Track { pkg, all, run, pkgs, data, jobs, token, gitlab_token } => {
+        Command::Track {
+            pkg,
+            all,
+            run,
+            pkgs,
+            data,
+            jobs,
+            token,
+            gitlab_token,
+        } => {
             let args = Args {
                 pkg: pkg.map(|p| vec![p]).unwrap_or_default(),
                 all,
@@ -1339,7 +1293,14 @@ pub fn run() -> ExitCode {
                 cmd_track_run(&args, args.run)
             }
         }
-        Command::GenTrackers { pkgs, data, api_endpoint, api_key, model, packages } => {
+        Command::GenTrackers {
+            pkgs,
+            data,
+            api_endpoint,
+            api_key,
+            model,
+            packages,
+        } => {
             let args = Args {
                 pkgs: Some(pkgs.to_string_lossy().into_owned()),
                 data: Some(data.to_string_lossy().into_owned()),
@@ -1359,7 +1320,12 @@ pub fn run() -> ExitCode {
             };
             serve::cmd_serve(&args)
         }
-        Command::Seed { remote, arch, out, jobs } => {
+        Command::Seed {
+            remote,
+            arch,
+            out,
+            jobs,
+        } => {
             let args = Args {
                 remote: Some(remote),
                 arch: Some(arch),
@@ -1384,7 +1350,7 @@ mod tests {
             "alacritty".to_string(),
             "alsa-lib".to_string(),
         ];
-        let resp = "===\npkg-name: acl\ntracker-template: github\nrepo: a/b\n===\nnone: alacritty\n===\npkg-name: fake\n";
+        let resp = "===\npkg-name: acl\nsources:\n  - tracker-template: github\n    repo: a/b\n    mode: tags\n    tag-prefix: v\n    template: https://example.com/acl-{version}.tar.gz\n===\nnone: alacritty\n===\npkg-name: fake\n";
         let r = parse_batch_blocks(resp, &batch);
         assert_eq!(r.yamls.len(), 1);
         assert_eq!(r.yamls[0].0, "acl");
@@ -1408,29 +1374,37 @@ mod tests {
     }
 
     #[test]
-    fn apply_version_update_skips_sources_for_work_only_pkg() {
+    fn apply_version_update_atomic_full_replace() {
         use lankefarm::track::Proposal;
-        // 无 sources 字段（如 noto 字体，字体在 work_sources）→ 只更新 version，不得凭空创建 sources
+        // 探测成功且版本变新 → **原子全量替换**：sources/work_sources 全部按清单覆盖，
+        // 空列表也写键（noto 等 work_sources-only 包规范化为 "sources": []）。
         let mut value = serde_json::json!({
             "name": "noto",
             "version": "2.004",
+            "sources": ["https://old.example.com/stale.tar.gz"],
             "work_sources": ["https://github.com/notofonts/noto-cjk/raw/refs/tags/Sans2.004/Sans/Mono/font.otf"]
         });
+        // noto 场景：version-source 指向 work_sources[0]，sources 为空清单
         let prop = Proposal {
             pkg_name: "noto".into(),
             current_version: "2.004".into(),
             new_version: "2.005".into(),
-            sources: vec!["https://github.com/notofonts/noto-cjk/raw/refs/tags/Sans2.005/Sans/Mono/font.otf".into()],
-            work_sources: vec![],
-            tracker_template: "github".into(),
+            sources: vec![],
+            work_sources: vec![
+                "https://github.com/notofonts/noto-cjk/raw/refs/tags/Sans2.005/Sans/Mono/font.otf"
+                    .into(),
+            ],
+            kind: "template".into(),
         };
         apply_version_update(&mut value, &prop);
         assert_eq!(value["version"], "2.005");
-        assert!(value.get("sources").is_none(), "不得为 work_sources-only 包凭空创建 sources");
-        // work_sources 保持原样（由 cmd_track_run 的 work_sources: 配置按正则升级）
+        // 空 sources 也写键（lpkg 默认形态），旧值被清空
+        assert_eq!(value["sources"], serde_json::json!([]));
         assert_eq!(
-            value["work_sources"][0],
-            "https://github.com/notofonts/noto-cjk/raw/refs/tags/Sans2.004/Sans/Mono/font.otf"
+            value["work_sources"],
+            serde_json::json!([
+                "https://github.com/notofonts/noto-cjk/raw/refs/tags/Sans2.005/Sans/Mono/font.otf"
+            ])
         );
     }
 
@@ -1459,7 +1433,11 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Command::Track { token, gitlab_token, .. } => {
+            Command::Track {
+                token,
+                gitlab_token,
+                ..
+            } => {
                 assert_eq!(token.as_deref(), Some("ghp_xxx"));
                 assert_eq!(gitlab_token.as_deref(), Some("glpat_yyy"));
             }

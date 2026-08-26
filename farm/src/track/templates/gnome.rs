@@ -1,6 +1,6 @@
 //! gnome 模板：两级版本目录探测（download.gnome.org/sources/{name}/{x.y}/）。
 //!
-//! **被动触发**：yaml 里 `tracker-template: gnome` + `template`。
+//! **被动触发**：source 条目里 `tracker-template: gnome` + `template`。
 //! 稳定分支惯例：偶 minor 为稳定版（2.88 稳定，2.89 开发），优先取最大偶 minor 目录。
 
 use regex::Regex;
@@ -8,15 +8,16 @@ use regex::Regex;
 use crate::net::Fetcher;
 use crate::track::templates::{self, minor_is_even};
 use crate::track::vercmp;
-use crate::track::{need, ProbeResult, TrackerConfig};
+use crate::track::{need, EntryProbe, SourceConfig};
 
 /// 探测最新稳定版本：第一级版本目录（偶 minor 优先）→ 第二级文件。
 pub fn probe(
     fetcher: &dyn Fetcher,
-    cfg: &TrackerConfig,
+    cfg: &SourceConfig,
     major: Option<&str>,
-) -> Result<ProbeResult, String> {
-    let name = cfg.source_name(); // source-name 覆盖上游目录名（gtk3 → gtk）
+    pkg_name: &str,
+) -> Result<EntryProbe, String> {
+    let name = cfg.effective_name(pkg_name); // source-name 覆盖上游目录名（gtk3 → gtk）
     let template = need(&cfg.template, "template")?;
 
     // 第一级：sources/{name}/ → 版本目录 x.y/
@@ -74,7 +75,7 @@ pub fn probe(
         }
     }
     let (dir, version) = found.ok_or("gnome 目录无匹配稳定版本文件")?;
-    let src = templates::substitute(
+    let url = templates::substitute(
         template,
         &[
             ("name", name),
@@ -82,11 +83,7 @@ pub fn probe(
             ("version", &version),
         ],
     );
-    Ok(ProbeResult {
-        version,
-        sources: vec![src],
-        work_sources: vec![],
-    })
+    Ok(EntryProbe { version, url })
 }
 
 #[cfg(test)]
@@ -106,8 +103,7 @@ mod tests {
                 "https://download.gnome.org/sources/glib/2.84/",
                 "glib-2.84.0.tar.xz\nglib-2.83.0.tar.xz\n",
             );
-        let cfg = TrackerConfig {
-            pkg_name: "glib".into(),
+        let cfg = SourceConfig {
             tracker_template: "gnome".into(),
             template: Some(
                 "https://download.gnome.org/sources/{name}/{path_version}/{name}-{version}.tar.xz"
@@ -115,11 +111,11 @@ mod tests {
             ),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "glib").unwrap();
         assert_eq!(r.version, "2.84.0");
         assert_eq!(
-            r.sources,
-            vec!["https://download.gnome.org/sources/glib/2.84/glib-2.84.0.tar.xz"]
+            r.url,
+            "https://download.gnome.org/sources/glib/2.84/glib-2.84.0.tar.xz"
         );
     }
 
@@ -135,8 +131,7 @@ mod tests {
                 "https://download.gnome.org/sources/glib/2.88/",
                 "glib-2.88.3.tar.xz\nglib-2.88.0.tar.xz\n",
             );
-        let cfg = TrackerConfig {
-            pkg_name: "glib".into(),
+        let cfg = SourceConfig {
             tracker_template: "gnome".into(),
             template: Some(
                 "https://download.gnome.org/sources/{name}/{path_version}/{name}-{version}.tar.xz"
@@ -144,7 +139,7 @@ mod tests {
             ),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "glib").unwrap();
         assert_eq!(r.version, "2.88.3");
     }
 
@@ -160,22 +155,20 @@ mod tests {
                 "https://download.gnome.org/sources/gtk/3.24/",
                 "gtk-3.24.50.tar.xz\n",
             );
-        let cfg = TrackerConfig {
-            pkg_name: "gtk3".into(),
+        let cfg = SourceConfig {
             tracker_template: "gnome".into(),
             source_name: Some("gtk".into()),
             major_version_lock: Some("3".into()),
             template: Some(
-                "https://download.gnome.org/sources/gtk/{path_version}/gtk-{version}.tar.xz"
-                    .into(),
+                "https://download.gnome.org/sources/gtk/{path_version}/gtk-{version}.tar.xz".into(),
             ),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "gtk3").unwrap();
         assert_eq!(r.version, "3.24.50");
         assert_eq!(
-            r.sources,
-            vec!["https://download.gnome.org/sources/gtk/3.24/gtk-3.24.50.tar.xz"]
+            r.url,
+            "https://download.gnome.org/sources/gtk/3.24/gtk-3.24.50.tar.xz"
         );
     }
 
@@ -195,8 +188,7 @@ mod tests {
                 "https://download.gnome.org/sources/glib-networking/2.80/",
                 "glib-networking-2.80.1.tar.xz\n",
             );
-        let cfg = TrackerConfig {
-            pkg_name: "glib-networking".into(),
+        let cfg = SourceConfig {
             tracker_template: "gnome".into(),
             template: Some(
                 "https://download.gnome.org/sources/{name}/{path_version}/{name}-{version}.tar.xz"
@@ -204,11 +196,11 @@ mod tests {
             ),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "glib-networking").unwrap();
         assert_eq!(r.version, "2.80.1");
         assert_eq!(
-            r.sources,
-            vec!["https://download.gnome.org/sources/glib-networking/2.80/glib-networking-2.80.1.tar.xz"]
+            r.url,
+            "https://download.gnome.org/sources/glib-networking/2.80/glib-networking-2.80.1.tar.xz"
         );
     }
 
@@ -229,8 +221,7 @@ mod tests {
                 "https://download.gnome.org/sources/gnome-desktop/51/",
                 "gnome-desktop-51.alpha.tar.xz\n",
             );
-        let cfg = TrackerConfig {
-            pkg_name: "gnome-desktop".into(),
+        let cfg = SourceConfig {
             tracker_template: "gnome".into(),
             template: Some(
                 "https://download.gnome.org/sources/{name}/{path_version}/{name}-{version}.tar.xz"
@@ -238,11 +229,11 @@ mod tests {
             ),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "gnome-desktop").unwrap();
         assert_eq!(r.version, "45.1");
         assert_eq!(
-            r.sources,
-            vec!["https://download.gnome.org/sources/gnome-desktop/45/gnome-desktop-45.1.tar.xz"]
+            r.url,
+            "https://download.gnome.org/sources/gnome-desktop/45/gnome-desktop-45.1.tar.xz"
         );
     }
 
@@ -258,8 +249,7 @@ mod tests {
                 "https://download.gnome.org/sources/gnome-desktop/44/",
                 "gnome-desktop-44.5.tar.xz\n",
             );
-        let cfg = TrackerConfig {
-            pkg_name: "gnome-desktop".into(),
+        let cfg = SourceConfig {
             tracker_template: "gnome".into(),
             template: Some(
                 "https://download.gnome.org/sources/{name}/{path_version}/{name}-{version}.tar.xz"
@@ -267,7 +257,7 @@ mod tests {
             ),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "gnome-desktop").unwrap();
         assert_eq!(r.version, "44.5");
     }
 
@@ -283,8 +273,7 @@ mod tests {
                 "https://download.gnome.org/sources/libepoxy/1.5/",
                 "libepoxy-1.5.10.tar.xz\n",
             );
-        let cfg = TrackerConfig {
-            pkg_name: "libepoxy".into(),
+        let cfg = SourceConfig {
             tracker_template: "gnome".into(),
             stable_minor: Some("all".into()),
             template: Some(
@@ -293,7 +282,7 @@ mod tests {
             ),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "libepoxy").unwrap();
         assert_eq!(r.version, "1.5.10");
     }
 }

@@ -50,6 +50,7 @@ pub fn is_soname_versioned(s: &str) -> bool {
 /// - 无版本化但**同包无版本化兄弟项**的裸 `.so`——即**无 SONAME 的实体库**
 ///   （tcl 的 libtcl8.6.so、expect 的 libexpect5.45.4.so），运行时 DT_NEEDED 目标，
 ///   其提供面变化同样是 ABI 断裂
+///
 /// 排除：
 /// - dev symlink（libfoo.so 指向 libfoo.so.1，同包必有版本化兄弟项）
 /// - 虚拟提供 / 非库名（rustc、golang）

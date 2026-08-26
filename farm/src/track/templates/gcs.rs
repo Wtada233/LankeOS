@@ -1,20 +1,22 @@
 //! gcs 模板：GCS/S3 存储桶探测（chromium 等）。
 //!
-//! **被动触发**：yaml 里 `tracker-template: gcs` + `url`（桶目录）+ `pattern`（文件名版本正则）+ `template`。
+//! **被动触发**：source 条目里 `tracker-template: gcs` + `url`（桶目录）+ `pattern`（文件名版本正则）+ `template`。
 //! probe 用 GCS **XML listing API**（`{url}?delimiter=/`，分页遍历）拉文件名列表，正则取最大稳定版本。
 
 use regex::Regex;
 
 use crate::net::Fetcher;
 use crate::track::templates;
-use crate::track::{need, ProbeResult, TrackerConfig};
+use crate::track::{need, EntryProbe, SourceConfig};
 
 /// 探测最新稳定版本：GCS XML listing（`?delimiter=/`，**分页遍历**）→ 文件名 → 正则取最大版本。
+/// `max-version` 生效（超过封顶的版本被过滤）。
 pub fn probe(
     fetcher: &dyn Fetcher,
-    cfg: &TrackerConfig,
+    cfg: &SourceConfig,
     major: Option<&str>,
-) -> Result<ProbeResult, String> {
+    pkg_name: &str,
+) -> Result<EntryProbe, String> {
     let url = need(&cfg.url, "url")?;
     let pattern = need(&cfg.pattern, "pattern")?;
     let template = need(&cfg.template, "template")?;
@@ -40,15 +42,11 @@ pub fn probe(
     }
 
     let re = Regex::new(pattern).map_err(|e| format!("正则无效 {}: {e}", pattern))?;
-    let version = templates::max_match(&re, &all_xml, major, None)
+    let version = templates::max_match(&re, &all_xml, major, cfg.max_version.as_deref())
         .ok_or_else(|| format!("{url} GCS 列表未匹配到版本"))?;
-    let name = cfg.source_name().to_string();
-    let src = templates::substitute(template, &[("name", &name), ("version", &version)]);
-    Ok(ProbeResult {
-        version,
-        sources: vec![src],
-        work_sources: vec![],
-    })
+    let name = cfg.effective_name(pkg_name);
+    let url = templates::substitute(template, &[("name", name), ("version", &version)]);
+    Ok(EntryProbe { version, url })
 }
 
 /// 提取 `<NextMarker>...</NextMarker>` 分页续传标记。
@@ -71,8 +69,7 @@ mod tests {
             "https://commondatastorage.googleapis.com/chromium-browser-official/?delimiter=/",
             r#"<ListBucketResult><Contents><Key>chromium-149.0.0.0-lite.tar.xz</Key></Contents><Contents><Key>chromium-150.0.7871.186-lite.tar.xz</Key></Contents></ListBucketResult>"#,
         );
-        let cfg = TrackerConfig {
-            pkg_name: "chromium".into(),
+        let cfg = SourceConfig {
             tracker_template: "gcs".into(),
             url: Some("https://commondatastorage.googleapis.com/chromium-browser-official/".into()),
             pattern: Some(r"chromium[-_]?(\d[\d.]*)[a-z0-9-]*\.tar\.(?:xz|gz|bz2)".into()),
@@ -82,11 +79,11 @@ mod tests {
             ),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "chromium").unwrap();
         assert_eq!(r.version, "150.0.7871.186");
         assert_eq!(
-            r.sources,
-            vec!["https://commondatastorage.googleapis.com/chromium-browser-official/chromium-150.0.7871.186-lite.tar.xz"]
+            r.url,
+            "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-150.0.7871.186-lite.tar.xz"
         );
     }
 }

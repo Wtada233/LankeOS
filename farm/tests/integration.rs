@@ -159,9 +159,9 @@ fn real_index_smoke() {
 }
 
 /// 端到端：`farm track --all -j N` 并行探测必须保序——
-/// `beta`（same-version: alpha + order: after(alpha)）必须读到 alpha **本轮解析出的新版本** 2.0，
+/// `beta`（after: alpha + 条目级 same-version: alpha）必须读到 alpha **本轮解析出的新版本** 2.0，
 /// 而非 LankeBUILD.json 的旧版本 1.0（保序 + resolved 传播）。
-/// 用 `script` 模板，bash 直接 echo 版本，无需网络。
+/// alpha 用 `type: script`，bash 直接 echo 版本，无需网络。
 #[test]
 fn track_all_parallel_respects_after_ordering() {
     let tmp = std::env::temp_dir().join(format!("lankefarm-track-j-{}", std::process::id()));
@@ -179,15 +179,15 @@ fn track_all_parallel_respects_after_ordering() {
         &pkgs.join("beta/LankeBUILD.json"),
         r#"{"name":"beta","version":"1.0","sources":["https://example.com/b-1.0.tar.gz"]}"#,
     );
-    // alpha：script 模板，echo 出 2.0
+    // alpha：type: script，echo 出 2.0
     write(
         &data.join("alpha.yaml"),
-        "pkg-name: alpha\ntracker-template: script\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/a-2.0.tar.gz\"\n",
+        "pkg-name: alpha\ntype: script\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/a-2.0.tar.gz\"\n",
     );
-    // beta：same-version 锁定 alpha，忽略 script 匹配（echo 9.9 也不生效）
+    // beta：after: alpha + same-version 模板锁定 alpha 版本，构建 URL（无网络）
     write(
         &data.join("beta.yaml"),
-        "pkg-name: beta\ntracker-template: script\nsame-version: alpha\norder: after(alpha)\ntemplate: https://example.com/b-{version}.tar.gz\nscript-content: |\n  #!/bin/bash\n  echo \"9.9\"\n  echo \"https://example.com/b-9.9.tar.gz\"\n",
+        "pkg-name: beta\nafter: alpha\nsources:\n  - tracker-template: same-version\n    same-version-of: alpha\n    template: https://example.com/b-{version}.tar.gz\n",
     );
 
     let bin = env!("CARGO_BIN_EXE_lankefarm");
@@ -233,11 +233,11 @@ fn track_all_cycle_does_not_crash_or_hang() {
     // 互指 after → 依赖环
     write(
         &data.join("alpha.yaml"),
-        "pkg-name: alpha\ntracker-template: script\norder: after(beta)\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/a-2.0.tar.gz\"\n",
+        "pkg-name: alpha\ntype: script\nafter: beta\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/a-2.0.tar.gz\"\n",
     );
     write(
         &data.join("beta.yaml"),
-        "pkg-name: beta\ntracker-template: script\norder: after(alpha)\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/b-2.0.tar.gz\"\n",
+        "pkg-name: beta\ntype: script\nafter: alpha\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/b-2.0.tar.gz\"\n",
     );
 
     let bin = env!("CARGO_BIN_EXE_lankefarm");
@@ -251,49 +251,52 @@ fn track_all_cycle_does_not_crash_or_hang() {
         .unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout);
     let _ = std::fs::remove_dir_all(&tmp);
-    assert!(out.status.success(), "退出码非零（环处理崩溃/下溢？），stdout: {stdout}");
+    assert!(
+        out.status.success(),
+        "退出码非零（环处理崩溃/下溢？），stdout: {stdout}"
+    );
     assert!(stdout.contains("alpha: 1.0 → 2.0"), "stdout: {stdout}");
     assert!(stdout.contains("beta: 1.0 → 2.0"), "stdout: {stdout}");
     assert!(stdout.contains("提案 2"), "stdout: {stdout}");
 }
 
-/// 多源包按 `url-match` 正则匹配实际 URL（非索引）：sources[1] 与 work_sources[0] 都被正确升级。
+/// 多源包：声明式 sources/work_sources 条目各探测一个槽位 → 探测成功且版本变新时
+/// **原子全量替换** json 的 sources/work_sources（旧值丢弃）。
+/// 用 same-version 锁定 base 包的版本（无网络），确定性探测。
 #[test]
-fn track_run_regex_matches_sources_and_work_sources() {
+fn track_run_declarative_multi_source_atomic_replace() {
     let tmp = std::env::temp_dir().join(format!("lankefarm-multi-{}", std::process::id()));
     let pkgs = tmp.join("pkgs");
     let data = tmp.join("data/trackers");
+    std::fs::create_dir_all(pkgs.join("base")).unwrap();
     std::fs::create_dir_all(pkgs.join("multi")).unwrap();
     std::fs::create_dir_all(&data).unwrap();
     let write = |p: &std::path::Path, c: &str| std::fs::write(p, c).unwrap();
+    // base：same-version 的 lookup 目标（读 LankeBUILD.json 版本）
+    write(
+        &pkgs.join("base/LankeBUILD.json"),
+        r#"{"name":"base","version":"2.0","sources":["https://example.com/base-2.0.tar.gz"]}"#,
+    );
     write(
         &pkgs.join("multi/LankeBUILD.json"),
-        r#"{"name":"multi","version":"1.0","sources":["https://example.com/multi-1.0.tar.gz","https://github.com/foo/bar/archive/refs/tags/v2.0.tar.gz"],"work_sources":["https://patches.example.com/multi-work.patch"]}"#,
+        r#"{"name":"multi","version":"1.0","sources":["https://example.com/multi-1.0.tar.gz","https://github.com/foo/bar/archive/refs/tags/v1.0.tar.gz"],"work_sources":["https://patches.example.com/multi-work-1.0.patch"]}"#,
     );
+    // 声明式多源：三条条目各自 same-version 模板锁 base 版本，构建 URL（无网络）
     write(
         &data.join("multi.yaml"),
         r#"pkg-name: multi
-tracker-template: script
-script-content: |
-  #!/bin/bash
-  echo "2.0"
-  echo "https://example.com/multi-2.0.tar.gz"
+version-source: sources[0]
 sources:
-  - pkg-name: vendored
-    url-match: "github.com/foo/bar"
-    tracker-template: script
-    script-content: |
-      #!/bin/bash
-      echo "2.1"
-      echo "https://github.com/foo/bar/archive/refs/tags/v2.1.tar.gz"
+  - tracker-template: same-version
+    same-version-of: base
+    template: https://example.com/multi-{version}.tar.gz
+  - tracker-template: same-version
+    same-version-of: base
+    template: https://github.com/foo/bar/archive/refs/tags/v{version}.tar.gz
 work_sources:
-  - pkg-name: workpatch
-    url-match: "multi-work"
-    tracker-template: script
-    script-content: |
-      #!/bin/bash
-      echo "1.1"
-      echo "https://patches.example.com/multi-work-1.1.patch"
+  - tracker-template: same-version
+    same-version-of: base
+    template: https://patches.example.com/multi-work-{version}.patch
 "#,
     );
 
@@ -307,16 +310,32 @@ work_sources:
         .unwrap();
     let stdout = String::from_utf8_lossy(&out.stdout);
     assert!(out.status.success(), "退出码非零，stdout: {stdout}");
-    assert!(
-        stdout.contains("sources[1] → https://github.com/foo/bar/archive/refs/tags/v2.1.tar.gz"),
-        "sources[1] 未被正则匹配升级，stdout: {stdout}"
-    );
-    assert!(
-        stdout.contains("work_sources[0] → https://patches.example.com/multi-work-1.1.patch"),
-        "work_sources[0] 未被正则匹配升级，stdout: {stdout}"
-    );
+    assert!(stdout.contains("multi: 1.0 → 2.0"), "stdout: {stdout}");
     let json = std::fs::read_to_string(pkgs.join("multi/LankeBUILD.json")).unwrap();
-    assert!(json.contains("https://github.com/foo/bar/archive/refs/tags/v2.1.tar.gz"));
-    assert!(json.contains("https://patches.example.com/multi-work-1.1.patch"));
+    assert!(
+        json.contains("https://example.com/multi-2.0.tar.gz"),
+        "json: {json}"
+    );
+    assert!(
+        json.contains("https://github.com/foo/bar/archive/refs/tags/v2.0.tar.gz"),
+        "json: {json}"
+    );
+    assert!(
+        json.contains("https://patches.example.com/multi-work-2.0.patch"),
+        "json: {json}"
+    );
+    // 原子替换：旧值全部丢弃
+    assert!(
+        !json.contains("multi-1.0"),
+        "旧 sources 未丢弃，json: {json}"
+    );
+    assert!(
+        !json.contains("v1.0.tar.gz"),
+        "旧 sources[1] 未丢弃，json: {json}"
+    );
+    assert!(
+        !json.contains("multi-work-1.0"),
+        "旧 work_sources 未丢弃，json: {json}"
+    );
     let _ = std::fs::remove_dir_all(&tmp);
 }

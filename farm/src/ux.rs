@@ -22,7 +22,10 @@ pub fn paint(code: &str, s: &str, on: bool) -> String {
 }
 
 fn enabled() -> bool {
-    enabled_on(std::io::stdout().is_terminal(), std::env::var("NO_COLOR").is_ok())
+    enabled_on(
+        std::io::stdout().is_terminal(),
+        std::env::var("NO_COLOR").is_ok(),
+    )
 }
 
 macro_rules! paint {
@@ -68,7 +71,14 @@ mod tests {
     fn helpers_never_leak_unescaped_color() {
         // 无论 TTY 与否：要么纯文本（非 TTY 降级），要么 ANSI 以 \x1b[0m 收尾——
         // 绝不以未闭合的色码结尾（防配色泄漏到后续输出）。
-        for out in [green("x"), yellow("x"), red("x"), cyan("x"), bold("x"), dim("x")] {
+        for out in [
+            green("x"),
+            yellow("x"),
+            red("x"),
+            cyan("x"),
+            bold("x"),
+            dim("x"),
+        ] {
             if out.starts_with("\x1b[") {
                 assert!(out.ends_with("\x1b[0m"), "缺 reset: {out:?}");
             }

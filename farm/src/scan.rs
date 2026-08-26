@@ -26,7 +26,13 @@ pub struct ScanResult {
 }
 
 impl ScanResult {
-    pub fn new(name: &str, version: &str, needed_so: &[&str], provides: &[&str], deps: &[&str]) -> Self {
+    pub fn new(
+        name: &str,
+        version: &str,
+        needed_so: &[&str],
+        provides: &[&str],
+        deps: &[&str],
+    ) -> Self {
         ScanResult {
             name: name.to_string(),
             version: version.to_string(),
@@ -53,7 +59,11 @@ pub fn scan_lpkg(
     let version = meta["version"].as_str().unwrap_or("").to_string();
     let deps = meta["deps"]
         .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     let (needed_so, provides) = scan_content(&extract_dir.join("content"), repo_provides);
     Ok(ScanResult {
@@ -82,8 +92,7 @@ pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), String> 
         .stderr(std::process::Stdio::null())
         .spawn()
         .map_err(|e| format!("spawn zstd 解压失败: {e}"))?;
-    let dec_out = dec.stdout
-        .ok_or_else(|| "zstd stdout 不可用".to_string())?;
+    let dec_out = dec.stdout.ok_or_else(|| "zstd stdout 不可用".to_string())?;
     let status = std::process::Command::new("sudo")
         .args([
             "-n",
@@ -105,8 +114,7 @@ pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), String> 
 
 /// 读 metadata.json（返回 serde Value 供 name/version 与后续 repack 复用）。
 pub(crate) fn read_metadata_json(path: &Path) -> Result<serde_json::Value, String> {
-    let content =
-        fs::read_to_string(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
+    let content = fs::read_to_string(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
     serde_json::from_str(&content).map_err(|e| format!("解析 {path:?} 失败: {e}"))
 }
 
@@ -117,7 +125,10 @@ pub fn read_lpkg_metadata(lpkg_path: &Path) -> Result<serde_json::Value, String>
     let dec = zstd::stream::read::Decoder::new(f)
         .map_err(|e| format!("zstd 解压 {lpkg_path:?} 失败: {e}"))?;
     let mut ar = tar::Archive::new(dec);
-    for entry in ar.entries().map_err(|e| format!("tar 读 {lpkg_path:?} 失败: {e}"))? {
+    for entry in ar
+        .entries()
+        .map_err(|e| format!("tar 读 {lpkg_path:?} 失败: {e}"))?
+    {
         let mut e = entry.map_err(|e| format!("tar 项读失败: {e}"))?;
         let name = e
             .path()
@@ -126,7 +137,8 @@ pub fn read_lpkg_metadata(lpkg_path: &Path) -> Result<serde_json::Value, String>
         if name == "metadata.json" || name.ends_with("/metadata.json") {
             let mut s = String::new();
             use std::io::Read;
-            e.read_to_string(&mut s).map_err(|e| format!("读 metadata.json 失败: {e}"))?;
+            e.read_to_string(&mut s)
+                .map_err(|e| format!("读 metadata.json 失败: {e}"))?;
             return serde_json::from_str(&s).map_err(|e| format!("解析 metadata.json 失败: {e}"));
         }
     }
@@ -207,9 +219,9 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
     // 不做 RPATH/RUNPATH 解析——扫描器没有完整运行时系统状态，RPATH 指向他包库会误判，本质无解。
     let mut needed_so: Vec<String> = needs
         .difference(&all_sonames)
+        .filter(|&s| !all_so_basenames.contains(s))
+        .filter(|&s| repo_provides.contains(s))
         .cloned()
-        .filter(|s| !all_so_basenames.contains(s))
-        .filter(|s| repo_provides.contains(s))
         .collect();
     needed_so.sort();
     let mut provides: Vec<String> = provides.into_iter().collect();
@@ -238,9 +250,13 @@ fn basename(s: &str) -> String {
 }
 
 fn is_elf(path: &Path) -> bool {
-    let Ok(f) = fs::File::open(path) else { return false };
+    let Ok(f) = fs::File::open(path) else {
+        return false;
+    };
     let mut magic = [0u8; 4];
-    let Ok(n) = (&f).take(4).read(&mut magic) else { return false };
+    let Ok(n) = (&f).take(4).read(&mut magic) else {
+        return false;
+    };
     n == 4 && magic == [0x7f, b'E', b'L', b'F']
 }
 
@@ -250,7 +266,9 @@ fn in_system_lib_dir(fpath: &Path, content_dir: &Path) -> bool {
     let Ok(rel) = fpath.strip_prefix(content_dir) else {
         return false;
     };
-    let Some(parent) = rel.parent() else { return false };
+    let Some(parent) = rel.parent() else {
+        return false;
+    };
     matches!(
         parent.to_string_lossy().as_ref(),
         "usr/lib" | "lib" | "usr/lib64" | "lib64"
@@ -298,11 +316,20 @@ mod tests {
     #[test]
     fn in_system_lib_dir_matches_standard_paths() {
         let c = Path::new("/x/content");
-        assert!(in_system_lib_dir(Path::new("/x/content/usr/lib/libc.so.6"), c));
+        assert!(in_system_lib_dir(
+            Path::new("/x/content/usr/lib/libc.so.6"),
+            c
+        ));
         assert!(in_system_lib_dir(Path::new("/x/content/lib/libz.so.1"), c));
-        assert!(in_system_lib_dir(Path::new("/x/content/usr/lib64/libm.so"), c));
+        assert!(in_system_lib_dir(
+            Path::new("/x/content/usr/lib64/libm.so"),
+            c
+        ));
         // 捆绑路径排除
-        assert!(!in_system_lib_dir(Path::new("/x/content/usr/lib/chromium/libnss3.so"), c));
+        assert!(!in_system_lib_dir(
+            Path::new("/x/content/usr/lib/chromium/libnss3.so"),
+            c
+        ));
         assert!(!in_system_lib_dir(Path::new("/x/content/usr/bin/lpkg"), c));
     }
 
@@ -409,7 +436,10 @@ mod tests {
 
         // 空 repo_provides → 全部 not-found → needed_so 空
         let (needed, _) = scan_content(&content, &Default::default());
-        assert!(needed.is_empty(), "空 provider map 应全部 not-found: {needed:?}");
+        assert!(
+            needed.is_empty(),
+            "空 provider map 应全部 not-found: {needed:?}"
+        );
 
         // repo_provides = 二进制实际 NEEDED → 保留
         let bytes = std::fs::read(content.join("usr/bin/testbin")).unwrap();
@@ -421,7 +451,4 @@ mod tests {
 
         let _ = std::fs::remove_dir_all(&tmp);
     }
-
 }
-
-

@@ -36,10 +36,16 @@ pub fn repack_with_metadata(
     let meta_path = extract_dir.join("metadata.json");
     let mut meta = scan::read_metadata_json(&meta_path)?;
     meta["needed_so"] = serde_json::Value::Array(
-        new_needed_so.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+        new_needed_so
+            .iter()
+            .map(|s| serde_json::Value::String(s.clone()))
+            .collect(),
     );
     meta["provides"] = serde_json::Value::Array(
-        new_provides.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+        new_provides
+            .iter()
+            .map(|s| serde_json::Value::String(s.clone()))
+            .collect(),
     );
     fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap())
         .map_err(|e| format!("写 {meta_path:?} 失败: {e}"))?;
@@ -65,8 +71,8 @@ pub fn export_lpkg(extract_dir: &Path, out_path: &Path) -> Result<(), String> {
 fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(), String> {
     let tmp = out_path.with_extension("lpkg.tmp");
     let f = fs::File::create(&tmp).map_err(|e| format!("创建 {tmp:?} 失败: {e}"))?;
-    let mut enc = zstd::stream::write::Encoder::new(f, level)
-        .map_err(|e| format!("zstd 初始化失败: {e}"))?;
+    let mut enc =
+        zstd::stream::write::Encoder::new(f, level).map_err(|e| format!("zstd 初始化失败: {e}"))?;
 
     // 打包必须 root：普通用户 `fs::metadata` 读不到完整 mode（SUID/SGID 被内核剥掉），
     // 也无法读 root-only 文件（如 /etc/shadow 0600）。`sudo tar --numeric-owner` 由 root
@@ -86,11 +92,15 @@ fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(),
         .stdout(std::process::Stdio::piped())
         .spawn()
         .map_err(|e| format!("spawn sudo tar 失败: {e}"))?;
-    let mut child_out = status.stdout.take()
+    let mut child_out = status
+        .stdout
+        .take()
         .ok_or_else(|| "sudo tar stdout 不可用".to_string())?;
     // 流式拷贝：tar 输出 → zstd
     std::io::copy(&mut child_out, &mut enc).map_err(|e| format!("tar→zstd 拷贝失败: {e}"))?;
-    let out_status = status.wait().map_err(|e| format!("wait sudo tar 失败: {e}"))?;
+    let out_status = status
+        .wait()
+        .map_err(|e| format!("wait sudo tar 失败: {e}"))?;
     if !out_status.success() {
         return Err(format!("sudo tar 打包失败（exit {:?}）", out_status.code()));
     }
@@ -124,7 +134,7 @@ pub fn repack_in_repo(input: &Path, arch: &str, pkg: &str) -> Result<Vec<Repacke
     let mut lpkg_files: Vec<PathBuf> = fs::read_dir(&pkg_dir)
         .map_err(|e| format!("读取 {pkg_dir:?} 失败: {e}"))?
         .filter_map(|e| e.ok().map(|e| e.path()))
-        .filter(|p| p.extension().map_or(false, |x| x == "lpkg"))
+        .filter(|p| p.extension().is_some_and(|x| x == "lpkg"))
         .collect();
     lpkg_files.sort();
     if lpkg_files.is_empty() {
@@ -219,7 +229,8 @@ mod tests {
     fn make_fake_lpkg() -> (PathBuf, PathBuf) {
         static COUNTER: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
         let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!("farm-repack-test-{}-{}", std::process::id(), id));
+        let dir =
+            std::env::temp_dir().join(format!("farm-repack-test-{}-{}", std::process::id(), id));
         let _ = fs::remove_dir_all(&dir);
         let src = dir.join("src");
         fs::create_dir_all(src.join("content")).unwrap();
@@ -228,7 +239,11 @@ mod tests {
             r#"{"name":"fake","version":"1.0","needed_so":["libc.so.6"],"provides":["libfoo.so","libfoo.so.1"]}"#,
         )
         .unwrap();
-        fs::write(src.join("content/libfoo.so.1"), [0x7f, b'E', b'L', b'F', 2, 1, 1]).unwrap();
+        fs::write(
+            src.join("content/libfoo.so.1"),
+            [0x7f, b'E', b'L', b'F', 2, 1, 1],
+        )
+        .unwrap();
         // 损坏 symlink（指向包内不存在的目标，如 dbus 的 var/lib/dbus/machine-id）——
         // append_dir_all 默认 follow 会炸 NotFound；必须 follow_symlinks(false) 按 symlink 存。
         std::os::unix::fs::symlink("nonexistent-target", src.join("content/broken-link")).unwrap();
@@ -260,8 +275,7 @@ mod tests {
         assert_eq!(meta["provides"][1], "libfoo.so.1");
 
         // 重打的 .lpkg 仍可解包（round-trip 完整），扫描出的 name/version 正确
-        let scan =
-            crate::scan::scan_lpkg(&lpkg, &extract, &Default::default()).unwrap();
+        let scan = crate::scan::scan_lpkg(&lpkg, &extract, &Default::default()).unwrap();
         assert_eq!(scan.name, "fake");
         assert_eq!(scan.version, "1.0");
 
@@ -318,7 +332,10 @@ mod tests {
 
         // index.txt 只换 hash，deps/provides/needed_so/pkg_level 原样保留
         let idx = fs::read_to_string(tmp.join("out/x86_64/index.txt")).unwrap();
-        let line = idx.lines().find(|l| l.starts_with("fake|")).expect("index 应有 fake 行");
+        let line = idx
+            .lines()
+            .find(|l| l.starts_with("fake|"))
+            .expect("index 应有 fake 行");
         assert!(line.contains(&items[0].sha256), "index 应含新 hash: {line}");
         assert!(!line.contains("oldhash"), "旧 hash 应被替换: {line}");
         assert!(

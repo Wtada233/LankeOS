@@ -14,22 +14,26 @@ use std::collections::{HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::tr;
 use crate::abi;
 use crate::graph::RevMap;
 use crate::lpkg_binding::{BuildOutcome, LpkgBinding};
 use crate::state::{JobStatus, State};
+use crate::tr;
 use crate::ux;
-mod sched;
 mod repo;
-pub(crate) use repo::{effective_version, needs_build, repack_if_drift, place_in_repo, update_repo_index, bump_release, update_lankebuild_metadata, load_old_index, sorted_pkg_names, sha256_file, recipe_hash, cleanup_backups};
+mod sched;
+pub(crate) use repo::{
+    bump_release, cleanup_backups, effective_version, load_old_index, needs_build, place_in_repo,
+    recipe_hash, repack_if_drift, sha256_file, sorted_pkg_names, update_lankebuild_metadata,
+    update_repo_index,
+};
+mod groups;
 mod prompt;
 mod sources;
-mod groups;
-pub(crate) use sources::pre_download_sources;
-pub(crate) use prompt::{prompt_blocked, PromptChoice};
 pub(crate) use groups::RebuildGroups;
-pub(crate) use sched::{topo_order, reorder_queue};
+pub(crate) use prompt::{prompt_blocked, PromptChoice};
+pub(crate) use sched::{reorder_queue, topo_order};
+pub(crate) use sources::pre_download_sources;
 
 /// farm build 输入。
 pub struct BuildOptions {
@@ -248,10 +252,8 @@ pub fn run_build(
         let (done, end_build) = 'pkg: loop {
             // §8.6 源预下载：宿主侧预取，源就绪才构建。
             // ABI 受害者不在第一次安装计划内，不预下载（构建时由 lpkg build 自己下载）。
-            if let Err(e) = source_gate(&pkg, opts, is_victim) {
-                // 非交互下源无法下载 → 构建终止（不允许 source-missing 状态继续）
-                return Err(e);
-            }
+            // 非交互下源无法下载 → 构建终止（不允许 source-missing 状态继续）
+            source_gate(&pkg, opts, is_victim)?;
 
             // 构建失败 → 交互接管
             let outcome = binding.build(&pkg);
@@ -273,7 +275,12 @@ pub fn run_build(
                 PromptChoice::Retry => {} // shell 修复后重试（继续内层 loop）
                 PromptChoice::Skip => {
                     if let Some(st) = state {
-                        let _ = st.set_job(&pkg, JobStatus::Skipped, Some("operator skip"), rhash.as_deref());
+                        let _ = st.set_job(
+                            &pkg,
+                            JobStatus::Skipped,
+                            Some("operator skip"),
+                            rhash.as_deref(),
+                        );
                     }
                     break 'pkg (BuildDone::Skipped, false);
                 }
@@ -314,10 +321,7 @@ pub fn run_build(
         if drifted {
             update_lankebuild_metadata(&opts.pkgs_dir, &pkg, &outcome);
             report.repacked.push(pkg.clone());
-            println!(
-                "  {}",
-                ux::yellow(&tr!("build.repack", pkg))
-            );
+            println!("  {}", ux::yellow(&tr!("build.repack", pkg)));
         }
 
         // 上传本地仓库（取代旧版本）+ 更新 index.txt —— **breaking 包必须先进仓库**，
@@ -338,8 +342,16 @@ pub fn run_build(
         // index.txt：**写回完整 needed_so**（单一真源）。容器可见索引与 farm 的 ABI 传播共用，
         // 不再剥 needed_so、不再维护第二份 .abi.json；构建顺序/传播/备份清理都从这里读。
         // 容器的 SONAME 检查由 --missing-so-no-error / --use-system-soname 在过渡期容忍。
-        if let Err(e) = update_repo_index(&opts.out_dir, &opts.arch, &pkg, &version, &hash,
-                                          &outcome.deps, &outcome.provides, &outcome.needed_so) {
+        if let Err(e) = update_repo_index(
+            &opts.out_dir,
+            &opts.arch,
+            &pkg,
+            &version,
+            &hash,
+            &outcome.deps,
+            &outcome.provides,
+            &outcome.needed_so,
+        ) {
             eprintln!("{}", tr!("build.index_fail", pkg, e));
             report.blocked.push(pkg.clone());
             if let Some(st) = state {
@@ -383,15 +395,15 @@ pub fn run_build(
         }
         // version-change：on 包版本变化（旧索引 vs 本轮有效版本）→ 脚本判定 exit 0 才重建组受害者
         let version_victims: Vec<String> = match old.packages.get(&pkg) {
-            Some(ov) if ov.version != version => match groups
-                .version_victims_if(&pkg, &ov.version, &version, &all_pkgs)
-            {
-                Ok(v) => v,
-                Err(e) => {
-                    eprintln!("[!] {} version-change 脚本失败: {}", pkg, e);
-                    Vec::new()
+            Some(ov) if ov.version != version => {
+                match groups.version_victims_if(&pkg, &ov.version, &version, &all_pkgs) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        eprintln!("{}", tr!("build.version_change_fail", pkg, e));
+                        Vec::new()
+                    }
                 }
-            },
+            }
             _ => Vec::new(),
         };
         victims.extend(version_victims.iter().cloned());
@@ -406,15 +418,9 @@ pub fn run_build(
                             ux::yellow(&tr!("build.abi", pkg, removed.join(", "), v))
                         );
                     } else if version_victims.contains(&v) {
-                        println!(
-                            "  {}",
-                            ux::yellow(&tr!("build.version_rebuild", pkg, v))
-                        );
+                        println!("  {}", ux::yellow(&tr!("build.version_rebuild", pkg, v)));
                     } else {
-                        println!(
-                            "  {}",
-                            ux::yellow(&tr!("build.group_rebuild", pkg, v))
-                        );
+                        println!("  {}", ux::yellow(&tr!("build.group_rebuild", pkg, v)));
                     }
                     queue.push_back((v, true)); // 传播重建 → 触发 release bump
                 }
@@ -446,8 +452,8 @@ pub fn run_build(
 /// 有效版本：LankeBUILD.json 的 version 是 raw；有 release 字段拼 version+release（如 1.1+2）。
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::sources::sources_ready;
+    use super::*;
     use crate::graph::Index;
     use crate::lpkg_binding::{BuildOutcome, StubBinding};
     use std::collections::HashMap;
@@ -457,7 +463,14 @@ mod tests {
     }
 
     /// 同 `write_pkg`，但版本可指定（version-change 传播测试用：old 索引 vs 配方版本对比）。
-    fn write_pkg_ver(pkgs: &Path, name: &str, version: &str, provides: &[&str], needed: &[&str], build_deps: &[&str]) {
+    fn write_pkg_ver(
+        pkgs: &Path,
+        name: &str,
+        version: &str,
+        provides: &[&str],
+        needed: &[&str],
+        build_deps: &[&str],
+    ) {
         let dir = pkgs.join(name);
         fs::create_dir_all(&dir).unwrap();
         let json = serde_json::json!({
@@ -467,7 +480,11 @@ mod tests {
             "needed_so": needed,
             "build_deps": build_deps,
         });
-        fs::write(dir.join("LankeBUILD.json"), serde_json::to_string_pretty(&json).unwrap()).unwrap();
+        fs::write(
+            dir.join("LankeBUILD.json"),
+            serde_json::to_string_pretty(&json).unwrap(),
+        )
+        .unwrap();
         // 真实包两者都有：recipe_hash 读 LankeBUILD + LankeBUILD.json 两个文件
         fs::write(dir.join("LankeBUILD"), "lankebuild_build() { : }\n").unwrap();
     }
@@ -500,7 +517,11 @@ mod tests {
             "name": "alpha", "version": "2.0",
             "provides": [], "needed_so": [], "build_deps": [],
         });
-        fs::write(pkgs.join("alpha").join("LankeBUILD.json"), serde_json::to_string_pretty(&j).unwrap()).unwrap();
+        fs::write(
+            pkgs.join("alpha").join("LankeBUILD.json"),
+            serde_json::to_string_pretty(&j).unwrap(),
+        )
+        .unwrap();
         assert!(!has_build_ok(&pkgs, "alpha"), "配方变化后 .build_ok 应失效");
 
         let _ = fs::remove_dir_all(&tmp);
@@ -511,7 +532,11 @@ mod tests {
         let src = path.parent().unwrap().join("lpkg-src");
         let _ = fs::remove_dir_all(&src);
         fs::create_dir_all(src.join("content")).unwrap();
-        fs::write(src.join("content/libfoo.so.1"), [0x7f, b'E', b'L', b'F', 2, 1, 1]).unwrap();
+        fs::write(
+            src.join("content/libfoo.so.1"),
+            [0x7f, b'E', b'L', b'F', 2, 1, 1],
+        )
+        .unwrap();
         let meta = serde_json::json!({
             "name": name,
             "version": version,
@@ -519,7 +544,11 @@ mod tests {
             "provides": provides,
             "deps": [],
         });
-        fs::write(src.join("metadata.json"), serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        fs::write(
+            src.join("metadata.json"),
+            serde_json::to_string_pretty(&meta).unwrap(),
+        )
+        .unwrap();
         let f = fs::File::create(path).unwrap();
         let enc = zstd::stream::write::Encoder::new(f, 3).unwrap();
         let mut b = tar::Builder::new(enc);
@@ -530,7 +559,13 @@ mod tests {
     }
 
     /// 为包准备 staging .lpkg + 解包目录（模拟 RealBinding 产物），返回 lpkg 路径。
-    fn stage_lpkg(out: &Path, pkg: &str, version: &str, needed: &[&str], provides: &[&str]) -> PathBuf {
+    fn stage_lpkg(
+        out: &Path,
+        pkg: &str,
+        version: &str,
+        needed: &[&str],
+        provides: &[&str],
+    ) -> PathBuf {
         let staging = out.join(".staging").join(pkg);
         fs::create_dir_all(&staging).unwrap();
         let lpkg = staging.join(format!("{pkg}-{version}.lpkg"));
@@ -550,7 +585,11 @@ mod tests {
             "sources": sources,
             "work_sources": work_sources,
         });
-        fs::write(dir.join("LankeBUILD.json"), serde_json::to_string_pretty(&json).unwrap()).unwrap();
+        fs::write(
+            dir.join("LankeBUILD.json"),
+            serde_json::to_string_pretty(&json).unwrap(),
+        )
+        .unwrap();
     }
 
     /// 写带 sources + provides + needed_so 的包（victim 跳过预下载集成测试用）。
@@ -570,7 +609,11 @@ mod tests {
             "needed_so": needed,
             "sources": sources,
         });
-        fs::write(dir.join("LankeBUILD.json"), serde_json::to_string_pretty(&json).unwrap()).unwrap();
+        fs::write(
+            dir.join("LankeBUILD.json"),
+            serde_json::to_string_pretty(&json).unwrap(),
+        )
+        .unwrap();
     }
 
     /// 起一个本地 HTTP 服务器 fixture（serve.rs），serve 临时目录。返回 (handle, port, root)。
@@ -581,7 +624,8 @@ mod tests {
         use std::sync::atomic::{AtomicU16, Ordering};
         static NEXT_PORT: AtomicU16 = AtomicU16::new(18100);
         let port = NEXT_PORT.fetch_add(1, Ordering::Relaxed);
-        let root = std::env::temp_dir().join(format!("farm-serve-test-{}-{port}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("farm-serve-test-{}-{port}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
         let r = root.clone();
@@ -669,7 +713,13 @@ mod tests {
         let dir = temp_dir("farm-src-missing-abort");
         let out = temp_dir("farm-src-missing-abort-out");
         write_baseline(&out, "a|1.0:h::liba.so.1:|\n");
-        write_pkg_full(&dir, "a", &["liba.so.1"], &[], &["http://127.0.0.1:1/nope.tar.gz"]);
+        write_pkg_full(
+            &dir,
+            "a",
+            &["liba.so.1"],
+            &[],
+            &["http://127.0.0.1:1/nope.tar.gz"],
+        );
         let mut binding = StubBinding::new(HashMap::new());
         let opts = BuildOptions {
             pkgs_dir: dir.clone(),
@@ -684,7 +734,10 @@ mod tests {
             manual_sort: false,
         };
         let err = run_build(&opts, &mut binding, None).unwrap_err();
-        assert!(err.contains("source-missing"), "非交互源缺失应硬终止：{err}");
+        assert!(
+            err.contains("source-missing"),
+            "非交互源缺失应硬终止：{err}"
+        );
         assert!(!dir.join("a/nope.tar.gz").exists());
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&out).ok();
@@ -696,7 +749,11 @@ mod tests {
         write_pkg_sources(
             &pkgs,
             "p",
-            &["file:///x", "git+https://github.com/a/b@v1", "http://127.0.0.1:1/a.tar.gz"],
+            &[
+                "file:///x",
+                "git+https://github.com/a/b@v1",
+                "http://127.0.0.1:1/a.tar.gz",
+            ],
             &[],
         );
         // a.tar.gz 不存在 → 未就绪
@@ -754,7 +811,13 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         write_pkg(&dir, "glibc", &["libc.so.6"], &[], &[]);
         write_pkg(&dir, "zlib", &["libz.so.1"], &["libc.so.6"], &["glibc"]);
-        write_pkg(&dir, "curl", &["libcurl.so.4"], &["libc.so.6", "libz.so.1"], &["glibc", "zlib"]);
+        write_pkg(
+            &dir,
+            "curl",
+            &["libcurl.so.4"],
+            &["libc.so.6", "libz.so.1"],
+            &["glibc", "zlib"],
+        );
         write_pkg(
             &dir,
             "chromium",
@@ -766,7 +829,11 @@ mod tests {
             ("glibc", vec!["libc.so.6"], vec![]),
             ("zlib", vec!["libz.so.1"], vec!["libc.so.6"]),
             ("curl", vec!["libcurl.so.4"], vec!["libc.so.6", "libz.so.1"]),
-            ("chromium", vec![], vec!["libc.so.6", "libz.so.1", "libcurl.so.4"]),
+            (
+                "chromium",
+                vec![],
+                vec!["libc.so.6", "libz.so.1", "libcurl.so.4"],
+            ),
         ]);
         let targets: Vec<String> = ["glibc", "zlib", "curl", "chromium"]
             .iter()
@@ -776,7 +843,10 @@ mod tests {
         let pos = |s: &str| order.iter().position(|n| n == s).unwrap();
         assert!(pos("glibc") < pos("zlib"), "链接链应自底向上: {order:?}");
         assert!(pos("zlib") < pos("curl"));
-        assert!(pos("curl") < pos("chromium"), "chromium 的依赖库应全在其前: {order:?}");
+        assert!(
+            pos("curl") < pos("chromium"),
+            "chromium 的依赖库应全在其前: {order:?}"
+        );
         fs::remove_dir_all(&dir).ok();
     }
 
@@ -814,7 +884,13 @@ mod tests {
         let dir = std::env::temp_dir().join("farm-build-topo-group");
         let _ = std::fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        write_pkg(&dir, "python", &["libpython3.14.so", "libpython3.14.so.1"], &["libc.so.6"], &[]);
+        write_pkg(
+            &dir,
+            "python",
+            &["libpython3.14.so", "libpython3.14.so.1"],
+            &["libc.so.6"],
+            &[],
+        );
         // python-cairo 只链 libcairo/libc，**不链 libpython**（组依赖的由来）
         write_pkg(
             &dir,
@@ -825,11 +901,20 @@ mod tests {
         );
         write_pkg(&dir, "blueman", &[], &["libc.so.6"], &[]);
         let old = index_of(&[
-            ("python", vec!["libpython3.14.so", "libpython3.14.so.1"], vec!["libc.so.6"]),
-            ("python-cairo", vec!["libpycairo.so"], vec!["libcairo.so.2", "libc.so.6"]),
+            (
+                "python",
+                vec!["libpython3.14.so", "libpython3.14.so.1"],
+                vec!["libc.so.6"],
+            ),
+            (
+                "python-cairo",
+                vec!["libpycairo.so"],
+                vec!["libcairo.so.2", "libc.so.6"],
+            ),
             ("blueman", vec![], vec!["libc.so.6"]),
         ]);
-        let gdir = std::env::temp_dir().join(format!("farm-topo-group-data-{}", std::process::id()));
+        let gdir =
+            std::env::temp_dir().join(format!("farm-topo-group-data-{}", std::process::id()));
         let _ = fs::remove_dir_all(&gdir);
         fs::create_dir_all(&gdir).unwrap();
         fs::write(
@@ -838,7 +923,10 @@ mod tests {
         )
         .unwrap();
         let groups = RebuildGroups::load(&gdir);
-        let targets: Vec<String> = ["python", "python-cairo", "blueman"].iter().map(|s| s.to_string()).collect();
+        let targets: Vec<String> = ["python", "python-cairo", "blueman"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         let edges = groups.trigger_edges_in(&targets);
         let order = topo_order(&dir, &targets, &old, &edges);
         let pos = |x: &str| order.iter().position(|n| n == x).unwrap();
@@ -846,12 +934,21 @@ mod tests {
             pos("python") < pos("python-cairo"),
             "组受害者 python-cairo 必须在 python 之后: {order:?}"
         );
-        assert!(pos("python") < pos("blueman"), "blueman 也应在 python 之后: {order:?}");
+        assert!(
+            pos("python") < pos("blueman"),
+            "blueman 也应在 python 之后: {order:?}"
+        );
 
         // python 不在 targets（不重建）→ 无组边约束，python-cairo 可独立排
-        let targets2: Vec<String> = ["python-cairo", "blueman"].iter().map(|s| s.to_string()).collect();
+        let targets2: Vec<String> = ["python-cairo", "blueman"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         let edges2 = groups.trigger_edges_in(&targets2);
-        assert!(edges2.is_empty(), "python 不在 targets 时不应有组边: {edges2:?}");
+        assert!(
+            edges2.is_empty(),
+            "python 不在 targets 时不应有组边: {edges2:?}"
+        );
         let order2 = topo_order(&dir, &targets2, &old, &edges2);
         assert_eq!(order2.len(), 2, "排序仍覆盖全部包: {order2:?}");
         fs::remove_dir_all(&dir).ok();
@@ -893,20 +990,41 @@ mod tests {
         let dir = std::env::temp_dir().join("farm-reorder-queue");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        write_pkg(&dir, "appstream", &[], &["libxml2.so.2", "librsvg-2.so.2"], &["librsvg"]);
-        write_pkg(&dir, "librsvg", &["librsvg-2.so.2"], &["libxml2.so.2"], &["libxml2"]);
+        write_pkg(
+            &dir,
+            "appstream",
+            &[],
+            &["libxml2.so.2", "librsvg-2.so.2"],
+            &["librsvg"],
+        );
+        write_pkg(
+            &dir,
+            "librsvg",
+            &["librsvg-2.so.2"],
+            &["libxml2.so.2"],
+            &["libxml2"],
+        );
         let old = index_of(&[
             ("libxml2", vec!["libxml2.so.2"], vec![]),
             ("librsvg", vec!["librsvg-2.so.2"], vec!["libxml2.so.2"]),
             ("appstream", vec![], vec!["libxml2.so.2", "librsvg-2.so.2"]),
         ]);
-        let mut queue: VecDeque<(String, bool)> =
-            vec![("appstream".to_string(), true), ("librsvg".to_string(), true)].into();
+        let mut queue: VecDeque<(String, bool)> = vec![
+            ("appstream".to_string(), true),
+            ("librsvg".to_string(), true),
+        ]
+        .into();
         reorder_queue(&mut queue, &dir, &old, &RebuildGroups::default());
         let names: Vec<&str> = queue.iter().map(|(n, _)| n.as_str()).collect();
         let pos = |s: &str| names.iter().position(|n| *n == s).unwrap();
-        assert!(pos("librsvg") < pos("appstream"), "被依赖的受害者应先建: {names:?}");
-        assert!(queue.iter().all(|(_, v)| *v), "全部应保持 victim: {queue:?}");
+        assert!(
+            pos("librsvg") < pos("appstream"),
+            "被依赖的受害者应先建: {names:?}"
+        );
+        assert!(
+            queue.iter().all(|(_, v)| *v),
+            "全部应保持 victim: {queue:?}"
+        );
         fs::remove_dir_all(&dir).ok();
     }
 
@@ -918,12 +1036,22 @@ mod tests {
         let dir = std::env::temp_dir().join("farm-reorder-dedup");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        write_pkg(&dir, "chromium", &[], &["liba.so.1", "libb.so.1", "libc.so.1"], &[]);
+        write_pkg(
+            &dir,
+            "chromium",
+            &[],
+            &["liba.so.1", "libb.so.1", "libc.so.1"],
+            &[],
+        );
         let old = index_of(&[
             ("libA", vec!["liba.so.1"], vec![]),
             ("libB", vec!["libb.so.1"], vec![]),
             ("libC", vec!["libc.so.1"], vec![]),
-            ("chromium", vec![], vec!["liba.so.1", "libb.so.1", "libc.so.1"]),
+            (
+                "chromium",
+                vec![],
+                vec!["liba.so.1", "libb.so.1", "libc.so.1"],
+            ),
         ]);
         let mut queue: VecDeque<(String, bool)> = vec![
             ("chromium".to_string(), false), // 初始（版本变更要重建）
@@ -939,7 +1067,10 @@ mod tests {
         let chromium_count = queue.iter().filter(|(n, _)| n == "chromium").count();
         assert_eq!(chromium_count, 1, "chromium 应只出现一次: {queue:?}");
         let chromium_flag = queue.iter().find(|(n, _)| n == "chromium").unwrap().1;
-        assert!(chromium_flag, "chromium 应保持 victim（任一断裂入队）: {queue:?}");
+        assert!(
+            chromium_flag,
+            "chromium 应保持 victim（任一断裂入队）: {queue:?}"
+        );
         let pos = |s: &str| queue.iter().position(|(n, _)| n == s).unwrap();
         assert!(
             pos("libA") < pos("chromium")
@@ -995,26 +1126,47 @@ mod tests {
         let dir = std::env::temp_dir().join("farm-leaf-stays-last");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
-        write_pkg(&dir, "chromium", &[], &["liba.so.1", "libb.so.1", "libc.so.1"], &[]);
+        write_pkg(
+            &dir,
+            "chromium",
+            &[],
+            &["liba.so.1", "libb.so.1", "libc.so.1"],
+            &[],
+        );
         let old = index_of(&[
             ("libA", vec!["liba.so.1"], vec![]),
             ("libB", vec!["libb.so.1"], vec![]),
             ("libC", vec!["libc.so.1"], vec![]),
-            ("chromium", vec![], vec!["liba.so.1", "libb.so.1", "libc.so.1"]),
+            (
+                "chromium",
+                vec![],
+                vec!["liba.so.1", "libb.so.1", "libc.so.1"],
+            ),
         ]);
         // libA 断裂后：队列 = [libB, libC, chromium(victim)]
-        let mut q1: VecDeque<(String, bool)> =
-            vec![("libB".to_string(), false), ("libC".to_string(), false), ("chromium".to_string(), true)].into();
+        let mut q1: VecDeque<(String, bool)> = vec![
+            ("libB".to_string(), false),
+            ("libC".to_string(), false),
+            ("chromium".to_string(), true),
+        ]
+        .into();
         reorder_queue(&mut q1, &dir, &old, &RebuildGroups::default());
-        assert_eq!(q1.back().map(|(n, _)| n.as_str()), Some("chromium"), "libA 断裂后 chromium 应仍在队尾: {q1:?}");
+        assert_eq!(
+            q1.back().map(|(n, _)| n.as_str()),
+            Some("chromium"),
+            "libA 断裂后 chromium 应仍在队尾: {q1:?}"
+        );
         // libB 断裂后：队列 = [libC, chromium]
         let mut q2: VecDeque<(String, bool)> =
             vec![("libC".to_string(), false), ("chromium".to_string(), true)].into();
         reorder_queue(&mut q2, &dir, &old, &RebuildGroups::default());
-        assert_eq!(q2.back().map(|(n, _)| n.as_str()), Some("chromium"), "libB 断裂后 chromium 应仍在队尾: {q2:?}");
+        assert_eq!(
+            q2.back().map(|(n, _)| n.as_str()),
+            Some("chromium"),
+            "libB 断裂后 chromium 应仍在队尾: {q2:?}"
+        );
         // libC 断裂后：队列 = [chromium]（依赖全建完）
-        let mut q3: VecDeque<(String, bool)> =
-            vec![("chromium".to_string(), true)].into();
+        let mut q3: VecDeque<(String, bool)> = vec![("chromium".to_string(), true)].into();
         reorder_queue(&mut q3, &dir, &old, &RebuildGroups::default());
         assert_eq!(q3.len(), 1, "chromium 只应出现一次: {q3:?}");
         fs::remove_dir_all(&dir).ok();
@@ -1027,12 +1179,21 @@ mod tests {
         let out = temp_dir("farm-build-out");
         // seed 过的旧索引（§7.2 基线）：index.txt（完整 needed_so，单一真源）
         write_baseline(&out, "libfoo|1.0:oldhash::libfoo.so,libfoo.so.1:|\n");
-        write_pkg(&dir, "libfoo", &["libfoo.so", "libfoo.so.1"], &["libc.so.6"], &[]);
+        write_pkg(
+            &dir,
+            "libfoo",
+            &["libfoo.so", "libfoo.so.1"],
+            &["libc.so.6"],
+            &[],
+        );
 
         // staging .lpkg：metadata 缺 libm（陈旧）→ 扫描实际有 libm → 漂移
         let lpkg_path = stage_lpkg(
-            &out, "libfoo", "1.0",
-            &["libc.so.6"], &["libfoo.so", "libfoo.so.1"],
+            &out,
+            "libfoo",
+            "1.0",
+            &["libc.so.6"],
+            &["libfoo.so", "libfoo.so.1"],
         );
         let mut outcomes = HashMap::new();
         outcomes.insert(
@@ -1076,7 +1237,10 @@ mod tests {
         let idx = fs::read_to_string(out.join("x86_64/index.txt")).unwrap();
         assert!(idx.starts_with("libfoo|1.0:"), "index 版本保留: {idx}");
         assert!(idx.contains("libm.so.6"), "index 应含完整 needed_so: {idx}");
-        assert!(idx.contains("libfoo.so,libfoo.so.1"), "index 保留 provides: {idx}");
+        assert!(
+            idx.contains("libfoo.so,libfoo.so.1"),
+            "index 保留 provides: {idx}"
+        );
 
         // 仓库 .lpkg 的 metadata.json 已修正（repack 重打包，不 rebuild）
         let extract2 = out.join("extract").join("libfoo-check");
@@ -1088,7 +1252,10 @@ mod tests {
             .iter()
             .filter_map(|v| v.as_str())
             .collect();
-        assert!(n.contains(&"libm.so.6"), "repack 后 metadata.json 应有 libm: {n:?}");
+        assert!(
+            n.contains(&"libm.so.6"),
+            "repack 后 metadata.json 应有 libm: {n:?}"
+        );
 
         // LankeBUILD.json 同步（双写）
         let b = read_lankebuild(&dir, "libfoo").unwrap();
@@ -1110,16 +1277,28 @@ mod tests {
             "a|1.0:h::libfoo.so,libfoo.so.1:|\nb|1.0:h::libb.so:libfoo.so.1,libc.so.6|\n",
         );
         write_pkg(&dir, "a", &["libfoo.so", "libfoo.so.1"], &[], &[]);
-        write_pkg(&dir, "b", &["libb.so"], &["libfoo.so.1", "libc.so.6"], &["a"]);
+        write_pkg(
+            &dir,
+            "b",
+            &["libb.so"],
+            &["libfoo.so.1", "libc.so.6"],
+            &["a"],
+        );
 
         // a 重建后 SONAME bump → libfoo.so.2（metadata 也变，repack 触发）
         let a_lpkg = stage_lpkg(
-            &out, "a", "1.0", &["libc.so.6"],
+            &out,
+            "a",
+            "1.0",
+            &["libc.so.6"],
             &["libfoo.so", "libfoo.so.1"],
         );
         // b 的 staging 产物：metadata 需要 libfoo.so.2（重建后按新 ABI）
         let b_lpkg = stage_lpkg(
-            &out, "b", "1.0+1", &["libfoo.so.2", "libc.so.6"],
+            &out,
+            "b",
+            "1.0+1",
+            &["libfoo.so.2", "libc.so.6"],
             &["libb.so"],
         );
         let mut outcomes = HashMap::new();
@@ -1170,10 +1349,19 @@ mod tests {
         // 反哺仓库：a 和 b 都已进本地仓库 + index 更新（a 的 SONAME 已变 .2）。
         // 文件名按 lpkg 的 `<version>.lpkg` URL 约定（不是 `<pkg>-<version>.lpkg`）。
         assert!(out.join("x86_64/a/1.0.lpkg").exists(), "a 应进仓库");
-        assert!(out.join("x86_64/b/1.0+1.lpkg").exists(), "b 应进仓库（version+release）");
+        assert!(
+            out.join("x86_64/b/1.0+1.lpkg").exists(),
+            "b 应进仓库（version+release）"
+        );
         let idx = fs::read_to_string(out.join("x86_64/index.txt")).unwrap();
-        assert!(idx.contains("libfoo.so.2"), "index 应反映 a 的新 SONAME: {idx}");
-        assert!(idx.contains("b|1.0+1"), "index 应反映 b 的 release bump: {idx}");
+        assert!(
+            idx.contains("libfoo.so.2"),
+            "index 应反映 a 的新 SONAME: {idx}"
+        );
+        assert!(
+            idx.contains("b|1.0+1"),
+            "index 应反映 b 的 release bump: {idx}"
+        );
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&out).ok();
     }
@@ -1200,18 +1388,51 @@ mod tests {
              python-gobject|1.0:h::libpygobject.so:libgobject-2.0.so.0,libc.so.6|\n\
              blueman|2.4:h:::libc.so.6|\n",
         );
-        write_pkg(&dir, "python", &["libpython3.14.so", "libpython3.14.so.1"], &["libc.so.6"], &[]);
-        write_pkg(&dir, "python-cairo", &["libpycairo.so"], &["libcairo.so.2", "libc.so.6"], &[]);
-        write_pkg(&dir, "python-gobject", &["libpygobject.so"], &["libgobject-2.0.so.0", "libc.so.6"], &[]);
+        write_pkg(
+            &dir,
+            "python",
+            &["libpython3.14.so", "libpython3.14.so.1"],
+            &["libc.so.6"],
+            &[],
+        );
+        write_pkg(
+            &dir,
+            "python-cairo",
+            &["libpycairo.so"],
+            &["libcairo.so.2", "libc.so.6"],
+            &[],
+        );
+        write_pkg(
+            &dir,
+            "python-gobject",
+            &["libpygobject.so"],
+            &["libgobject-2.0.so.0", "libc.so.6"],
+            &[],
+        );
         write_pkg(&dir, "blueman", &[], &["libc.so.6"], &[]);
 
         // python 重建 → SONAME .14→.15 断裂（removed libpython3.14.so.1），直连受害者为空
         let python_lpkg = stage_lpkg(
-            &out, "python", "1.0", &["libc.so.6"],
+            &out,
+            "python",
+            "1.0",
+            &["libc.so.6"],
             &["libpython3.14.so", "libpython3.15.so", "libpython3.15.so.1"],
         );
-        let pc = stage_lpkg(&out, "python-cairo", "1.0", &["libcairo.so.2", "libc.so.6"], &["libpycairo.so"]);
-        let pg = stage_lpkg(&out, "python-gobject", "1.0", &["libgobject-2.0.so.0", "libc.so.6"], &["libpygobject.so"]);
+        let pc = stage_lpkg(
+            &out,
+            "python-cairo",
+            "1.0",
+            &["libcairo.so.2", "libc.so.6"],
+            &["libpycairo.so"],
+        );
+        let pg = stage_lpkg(
+            &out,
+            "python-gobject",
+            "1.0",
+            &["libgobject-2.0.so.0", "libc.so.6"],
+            &["libpygobject.so"],
+        );
         let bl = stage_lpkg(&out, "blueman", "1.0", &["libc.so.6"], &[]);
         let mut outcomes = HashMap::new();
         outcomes.insert(
@@ -1316,10 +1537,22 @@ packages: perl-*
         );
         // perl 配方版本 5.45（minor 5.44→5.45 变化；write_pkg 写死 1.0，用 write_pkg_ver 指定）
         write_pkg_ver(&dir, "perl", "5.45", &[], &["libc.so.6"], &[]);
-        write_pkg(&dir, "perl-xml-parser", &[], &["libc.so.6", "libexpat.so.1"], &[]);
+        write_pkg(
+            &dir,
+            "perl-xml-parser",
+            &[],
+            &["libc.so.6", "libexpat.so.1"],
+            &[],
+        );
 
         let perl_lpkg = stage_lpkg(&out, "perl", "5.45", &["libc.so.6"], &[]);
-        let xp_lpkg = stage_lpkg(&out, "perl-xml-parser", "1.0", &["libc.so.6", "libexpat.so.1"], &[]);
+        let xp_lpkg = stage_lpkg(
+            &out,
+            "perl-xml-parser",
+            "1.0",
+            &["libc.so.6", "libexpat.so.1"],
+            &[],
+        );
         let mut outcomes = HashMap::new();
         outcomes.insert(
             "perl".into(),
@@ -1401,10 +1634,22 @@ packages: perl-*
              perl-xml-parser|2.47:h:::libc.so.6,libexpat.so.1|\n",
         );
         write_pkg_ver(&dir, "perl", "5.44.1", &[], &["libc.so.6"], &[]);
-        write_pkg(&dir, "perl-xml-parser", &[], &["libc.so.6", "libexpat.so.1"], &[]);
+        write_pkg(
+            &dir,
+            "perl-xml-parser",
+            &[],
+            &["libc.so.6", "libexpat.so.1"],
+            &[],
+        );
 
         let perl_lpkg = stage_lpkg(&out, "perl", "5.44.1", &["libc.so.6"], &[]);
-        let xp_lpkg = stage_lpkg(&out, "perl-xml-parser", "1.0", &["libc.so.6", "libexpat.so.1"], &[]);
+        let xp_lpkg = stage_lpkg(
+            &out,
+            "perl-xml-parser",
+            "1.0",
+            &["libc.so.6", "libexpat.so.1"],
+            &[],
+        );
         let mut outcomes = HashMap::new();
         outcomes.insert(
             "perl".into(),
@@ -1508,11 +1753,17 @@ packages: perl-*
 
         // a 重建 → SONAME .1→.2（ABI 断裂）→ b 直连受害者
         let a_lpkg = stage_lpkg(
-            &out, "a", "1.0", &["libc.so.6"],
+            &out,
+            "a",
+            "1.0",
+            &["libc.so.6"],
             &["libfoo.so", "libfoo.so.2"],
         );
         let b_lpkg = stage_lpkg(
-            &out, "b", "1.0+1", &["libfoo.so.2", "libc.so.6"],
+            &out,
+            "b",
+            "1.0+1",
+            &["libfoo.so.2", "libc.so.6"],
             &["libb.so"],
         );
         let mut outcomes = HashMap::new();
@@ -1587,7 +1838,13 @@ packages: perl-*
         let out = temp_dir("farm-backup-clean-out");
         // libfoo 需 libc.so.6（index.txt 要有 needed_so，cleanup 的"剥离时代遗留"守卫才放行）
         write_baseline(&out, "libfoo|1.0:h::libfoo.so,libfoo.so.1:libc.so.6|\n");
-        write_pkg(&dir, "libfoo", &["libfoo.so", "libfoo.so.1"], &["libc.so.6"], &[]);
+        write_pkg(
+            &dir,
+            "libfoo",
+            &["libfoo.so", "libfoo.so.1"],
+            &["libc.so.6"],
+            &[],
+        );
         // 预置一个"已无引用"的备份（libz.so.1 不在 index.txt 任何 needed_so 里）
         fs::create_dir_all(out.join("backups")).unwrap();
         fs::write(out.join("backups/libz.so.1"), b"").unwrap();
@@ -1607,10 +1864,7 @@ packages: perl-*
             manual_sort: false,
         };
         let _ = run_build(&opts, &mut binding, None).unwrap();
-        assert!(
-            !out.join("backups").exists(),
-            "无引用的备份目录应整体清理"
-        );
+        assert!(!out.join("backups").exists(), "无引用的备份目录应整体清理");
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&out).ok();
     }
@@ -1621,8 +1875,17 @@ packages: perl-*
         // 等下次 build 完成后再清。本用例 gettext 需要 libxml2.so.2 → libxml2 备份保留。
         let dir = temp_dir("farm-backup-keep");
         let out = temp_dir("farm-backup-keep-out");
-        write_baseline(&out, "gettext|1.0:h::libgettext.so:libxml2.so.2,libc.so.6|\n");
-        write_pkg(&dir, "gettext", &["libgettext.so"], &["libxml2.so.2", "libc.so.6"], &[]);
+        write_baseline(
+            &out,
+            "gettext|1.0:h::libgettext.so:libxml2.so.2,libc.so.6|\n",
+        );
+        write_pkg(
+            &dir,
+            "gettext",
+            &["libgettext.so"],
+            &["libxml2.so.2", "libc.so.6"],
+            &[],
+        );
         fs::create_dir_all(out.join("backups")).unwrap();
         fs::write(out.join("backups/libxml2.so.2"), b"").unwrap();
         fs::write(out.join("backups/libxml2.so.2.9.14"), b"").unwrap();
@@ -1657,8 +1920,17 @@ packages: perl-*
         // 回归：实体不得被删，否则仍被使用的 SONAME 链接 dangling。
         let dir = temp_dir("farm-backup-name-mismatch");
         let out = temp_dir("farm-backup-name-mismatch-out");
-        write_pkg(&dir, "wlroots", &["libwlroots.so"], &["libdisplay-info.so.3", "libc.so.6"], &[]);
-        write_baseline(&out, "wlroots|1.0:h::libwlroots.so:libdisplay-info.so.3,libc.so.6|\n");
+        write_pkg(
+            &dir,
+            "wlroots",
+            &["libwlroots.so"],
+            &["libdisplay-info.so.3", "libc.so.6"],
+            &[],
+        );
+        write_baseline(
+            &out,
+            "wlroots|1.0:h::libwlroots.so:libdisplay-info.so.3,libc.so.6|\n",
+        );
         fs::create_dir_all(out.join("backups")).unwrap();
         fs::write(out.join("backups/libdisplay-info.so.0.3.0"), b"ELF").unwrap();
         std::os::unix::fs::symlink(
@@ -1746,15 +2018,20 @@ packages: perl-*
         // 子目录内实体自身 SONAME（libfoo.so.0）未被引用，但顶层符号链接仍被引用 → 实体保留。
         let dir = temp_dir("farm-backup-subdir-target");
         let out = temp_dir("farm-backup-subdir-target-out");
-        write_pkg(&dir, "wlroots", &["libwlroots.so"], &["libfoo.so.3", "libc.so.6"], &[]);
-        write_baseline(&out, "wlroots|1.0:h::libwlroots.so:libfoo.so.3,libc.so.6|\n");
+        write_pkg(
+            &dir,
+            "wlroots",
+            &["libwlroots.so"],
+            &["libfoo.so.3", "libc.so.6"],
+            &[],
+        );
+        write_baseline(
+            &out,
+            "wlroots|1.0:h::libwlroots.so:libfoo.so.3,libc.so.6|\n",
+        );
         fs::create_dir_all(out.join("backups/sub")).unwrap();
         fs::write(out.join("backups/sub/libfoo.so.0.3.0"), b"ELF").unwrap();
-        std::os::unix::fs::symlink(
-            "sub/libfoo.so.0.3.0",
-            out.join("backups/libfoo.so.3"),
-        )
-        .unwrap();
+        std::os::unix::fs::symlink("sub/libfoo.so.0.3.0", out.join("backups/libfoo.so.3")).unwrap();
 
         let mut binding = StubBinding::new(HashMap::new());
         let opts = BuildOptions {
@@ -1794,8 +2071,11 @@ packages: perl-*
         let dir = temp_dir("farm-backup-files");
         let out = temp_dir("farm-backup-files-out");
         fs::create_dir_all(dir.join("content/usr/lib")).unwrap();
-        fs::write(dir.join("content/usr/lib/libfoo.so.1.2.3"), [0x7f, b'E', b'L', b'F', 2, 1, 1])
-            .unwrap();
+        fs::write(
+            dir.join("content/usr/lib/libfoo.so.1.2.3"),
+            [0x7f, b'E', b'L', b'F', 2, 1, 1],
+        )
+        .unwrap();
         std::os::unix::fs::symlink("libfoo.so.1.2.3", dir.join("content/usr/lib/libfoo.so.1"))
             .unwrap();
         std::os::unix::fs::symlink("libfoo.so.1", dir.join("content/usr/lib/libfoo.so")).unwrap();
@@ -1806,7 +2086,11 @@ packages: perl-*
             "provides": ["libfoo.so", "libfoo.so.1"],
             "needed_so": [],
         });
-        fs::write(dir.join("metadata.json"), serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        fs::write(
+            dir.join("metadata.json"),
+            serde_json::to_string_pretty(&meta).unwrap(),
+        )
+        .unwrap();
         let lpkg = out.join("old-libfoo.lpkg");
         {
             let f = fs::File::create(&lpkg).unwrap();
@@ -1883,7 +2167,11 @@ packages: perl-*
             "provides": ["libexpect5.45.4.so", "libexpect.so.5"],
             "needed_so": [],
         });
-        fs::write(dir.join("metadata.json"), serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        fs::write(
+            dir.join("metadata.json"),
+            serde_json::to_string_pretty(&meta).unwrap(),
+        )
+        .unwrap();
         let lpkg = out.join("old-expect.lpkg");
         {
             let f = fs::File::create(&lpkg).unwrap();
@@ -1895,8 +2183,13 @@ packages: perl-*
             enc.finish().unwrap();
         }
 
-        super::repo::backup_removed_sonames(&out, &lpkg, "expect", &["libexpect6.0.so".to_string()])
-            .unwrap();
+        super::repo::backup_removed_sonames(
+            &out,
+            &lpkg,
+            "expect",
+            &["libexpect6.0.so".to_string()],
+        )
+        .unwrap();
 
         // 符号链接保留本身 + 目标实体复刻进子目录 → 不 dangling
         for (name, real) in [
@@ -1905,7 +2198,10 @@ packages: perl-*
         ] {
             let link = out.join("backups").join(name);
             assert!(
-                fs::symlink_metadata(&link).unwrap().file_type().is_symlink(),
+                fs::symlink_metadata(&link)
+                    .unwrap()
+                    .file_type()
+                    .is_symlink(),
                 "{name} 应保留为符号链接（ldconfig 要求）"
             );
             assert_eq!(
@@ -1913,7 +2209,10 @@ packages: perl-*
                 std::path::PathBuf::from(format!("expect5.45.4/{name}")),
                 "{name} 符号链接目标应原样保留"
             );
-            assert!(fs::exists(&link).unwrap_or(false), "{name} 的目标实体应复刻进备份 → 不 dangling");
+            assert!(
+                fs::exists(&link).unwrap_or(false),
+                "{name} 的目标实体应复刻进备份 → 不 dangling"
+            );
             let target = out.join("backups/expect5.45.4").join(name);
             assert!(target.is_file(), "子目录实体 {target:?} 应被备份");
             assert_eq!(fs::read(&target).unwrap(), fs::read(real).unwrap());
@@ -1944,7 +2243,11 @@ packages: perl-*
             "provides": ["libfoo.so.1"],
             "needed_so": [],
         });
-        fs::write(dir.join("metadata.json"), serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        fs::write(
+            dir.join("metadata.json"),
+            serde_json::to_string_pretty(&meta).unwrap(),
+        )
+        .unwrap();
         let lpkg = out.join("old-foo.lpkg");
         {
             let f = fs::File::create(&lpkg).unwrap();
@@ -1960,13 +2263,19 @@ packages: perl-*
             .unwrap();
 
         let link = out.join("backups/libfoo.so.1");
-        assert!(fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
+        assert!(fs::symlink_metadata(&link)
+            .unwrap()
+            .file_type()
+            .is_symlink());
         assert_eq!(
             fs::read_link(&link).unwrap(),
             std::path::PathBuf::from("expect5.45.4/libexpect5.45.4.so"),
             "绝对目标应转为相对路径"
         );
-        assert!(fs::exists(&link).unwrap_or(false), "目标应复刻 → 不 dangling");
+        assert!(
+            fs::exists(&link).unwrap_or(false),
+            "目标应复刻 → 不 dangling"
+        );
         let target = out.join("backups/expect5.45.4/libexpect5.45.4.so");
         assert!(target.is_file());
         assert_eq!(fs::read(&target).unwrap(), fs::read(&real).unwrap());
@@ -1990,7 +2299,10 @@ packages: perl-*
 
         super::repo::cleanup_backups(&out, "x86_64");
 
-        assert!(!out.join("backups").exists(), "无引用的复刻树（含子目录）应整体清理");
+        assert!(
+            !out.join("backups").exists(),
+            "无引用的复刻树（含子目录）应整体清理"
+        );
         fs::remove_dir_all(&out).ok();
     }
 
@@ -2001,8 +2313,11 @@ packages: perl-*
         let dir = temp_dir("farm-backup-nosoname");
         let out = temp_dir("farm-backup-nosoname-out");
         fs::create_dir_all(dir.join("content/usr/lib")).unwrap();
-        fs::write(dir.join("content/usr/lib/libtcl8.6.so"), [0x7f, b'E', b'L', b'F', 2, 1, 1])
-            .unwrap();
+        fs::write(
+            dir.join("content/usr/lib/libtcl8.6.so"),
+            [0x7f, b'E', b'L', b'F', 2, 1, 1],
+        )
+        .unwrap();
         let meta = serde_json::json!({
             "name": "tcl",
             "version": "8.6.16",
@@ -2010,7 +2325,11 @@ packages: perl-*
             "provides": ["libtcl8.6.so"],
             "needed_so": [],
         });
-        fs::write(dir.join("metadata.json"), serde_json::to_string_pretty(&meta).unwrap()).unwrap();
+        fs::write(
+            dir.join("metadata.json"),
+            serde_json::to_string_pretty(&meta).unwrap(),
+        )
+        .unwrap();
         let lpkg = out.join("old-tcl.lpkg");
         {
             let f = fs::File::create(&lpkg).unwrap();
@@ -2026,7 +2345,10 @@ packages: perl-*
             .unwrap();
 
         let bak = out.join("backups/libtcl8.6.so");
-        assert!(bak.is_file(), "无 SONAME 的实体库 libtcl8.6.so 应被直接备份（文件）");
+        assert!(
+            bak.is_file(),
+            "无 SONAME 的实体库 libtcl8.6.so 应被直接备份（文件）"
+        );
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&out).ok();
     }

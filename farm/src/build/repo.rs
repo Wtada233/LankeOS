@@ -1,13 +1,13 @@
 //! repo.rs — 仓库侧操作：版本判定 / 漂移 repack / 上传 / index 更新 / 配方读写。
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use super::{read_lankebuild, BuildOptions};
 use crate::graph::Index;
 use crate::lpkg_binding::BuildOutcome;
 use crate::repack;
 use crate::tr;
-use super::{read_lankebuild, BuildOptions};
 use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 pub(crate) fn effective_version(pkgs_dir: &Path, pkg: &str) -> Option<String> {
     let b = read_lankebuild(pkgs_dir, pkg)?;
@@ -39,18 +39,32 @@ pub(crate) fn repack_if_drift(
     opts: &BuildOptions,
     pkg: &str,
 ) -> Result<bool, String> {
-    let Some(lpkg) = &outcome.lpkg_path else { return Ok(false) };
+    let Some(lpkg) = &outcome.lpkg_path else {
+        return Ok(false);
+    };
     let extract = opts.out_dir.join("extract").join(pkg);
     // 期望值 = .lpkg 内 metadata.json（由 lpkg build 从 LankeBUILD.json 写入）
-    let meta = crate::scan::read_metadata_json(&extract.join("metadata.json"))
-        .map_err(|e| format!("读 {} 的 metadata.json 失败: {e}", extract.join("metadata.json").display()))?;
+    let meta = crate::scan::read_metadata_json(&extract.join("metadata.json")).map_err(|e| {
+        format!(
+            "读 {} 的 metadata.json 失败: {e}",
+            extract.join("metadata.json").display()
+        )
+    })?;
     let meta_needed: Vec<String> = meta["needed_so"]
         .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     let meta_provides: Vec<String> = meta["provides"]
         .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     let actual = crate::verify::ScanResult {
         needed_so: outcome.needed_so.clone(),
@@ -77,7 +91,11 @@ pub(crate) fn repack_if_drift(
 /// 文件名必须精确匹配 lpkg 的下载 URL `<mirror>/<arch>/<pkg>/<version>.lpkg`
 /// （lpkg installation_task.cpp:380 硬编码拼 `<version>.lpkg`）——**不能用构建产物名
 /// `<pkg>-<version>.lpkg`**，否则 lpkg 拉依赖时 404（"文件名不对"）。
-pub(crate) fn place_in_repo(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &str) -> Result<PathBuf, String> {
+pub(crate) fn place_in_repo(
+    outcome: &BuildOutcome,
+    opts: &BuildOptions,
+    pkg: &str,
+) -> Result<PathBuf, String> {
     let Some(lpkg) = &outcome.lpkg_path else {
         return Err("无构建产物".to_string());
     };
@@ -94,7 +112,10 @@ pub(crate) fn place_in_repo(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &s
             let p = e.path();
             if p.extension().and_then(|x| x.to_str()) == Some("lpkg") && p != dest {
                 backup_removed_sonames(&opts.out_dir, &p, pkg, &outcome.provides).map_err(|e| {
-                    format!("备份 {} 的旧 SONAME 失败（{e}），保留旧版本不删除", p.display())
+                    format!(
+                        "备份 {} 的旧 SONAME 失败（{e}），保留旧版本不删除",
+                        p.display()
+                    )
                 })?;
                 fs::remove_file(&p).map_err(|e| format!("删除旧版本 {:?} 失败: {e}", p))?;
             }
@@ -118,6 +139,7 @@ pub(crate) fn place_in_repo(outcome: &BuildOutcome, opts: &BuildOptions, pkg: &s
 /// - **绝对目标容错**：指向 /usr/lib/xxx（或 lib/usr/lib64/lib64）时在 archive 里定位（content/ → /），
 ///   符号链接转为相对路径（相对备份树根 /usr/lib），目标文件放在对应位置
 /// - 排除裸 `.so` dev 符号链接（指向版本化文件的 xxx.so，那归新包）
+///
 /// 扫全部系统库目录（usr/lib、lib、usr/lib64、lib64）——lib64 是 lib 的合并符号链接时
 /// 内容重复，但备份目录扁平去重（同名覆盖，无害）。
 pub(crate) fn backup_removed_sonames(
@@ -131,7 +153,11 @@ pub(crate) fn backup_removed_sonames(
     };
     let old_provides: Vec<String> = meta["provides"]
         .as_array()
-        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
         .unwrap_or_default();
     // ABI 面 SONAME 差集（与检测端 removed_sonames 共用 soname_provides_of，保证对称）：
     // 版本化 .so.* + 无 SONAME 实体库；dev symlink / 虚拟提供不算 ABI 面，不进入备份。
@@ -157,8 +183,14 @@ pub(crate) fn backup_removed_sonames(
         if let Ok(rd) = fs::read_dir(&lib_dir) {
             for e in rd.flatten() {
                 let p = e.path();
-                let fname = p.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-                let Ok(ft) = fs::symlink_metadata(&p) else { continue };
+                let fname = p
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                let Ok(ft) = fs::symlink_metadata(&p) else {
+                    continue;
+                };
 
                 if fname.contains(".so.") {
                     // 版本化 .so.*：SONAME 本体 + 实体（libfoo.so.1 / libfoo.so.1.2.3），
@@ -192,7 +224,8 @@ pub(crate) fn backup_removed_sonames(
                     // 目标可能已被同目录实体/中间链接备份过（版本化链）→ 不覆盖（保留符号链接）。
                     if let Ok(target) = fs::read_link(&p) {
                         // 绝对目标在 archive 里定位（content/ → /），符号链接一律转相对（相对备份树根 /usr/lib）
-                        let (src, rel) = resolve_link_target(&target, &lib_dir, &tmp.join("content"));
+                        let (src, rel) =
+                            resolve_link_target(&target, &lib_dir, &tmp.join("content"));
                         if fs::symlink_metadata(&src).is_ok() {
                             if let Some(parent) = rel.parent() {
                                 if !parent.as_os_str().is_empty() {
@@ -221,7 +254,10 @@ pub(crate) fn backup_removed_sonames(
 /// 用精确前缀（`r.` 而非 `starts_with(r)`）避免 `libfoo.so.2` 误匹配 `libfoo.so.20`。
 fn is_removed_soname_file(fname: &str, removed: &[&str]) -> bool {
     removed.iter().any(|r| {
-        fname == *r || fname.strip_prefix(r).is_some_and(|rest| rest.starts_with('.'))
+        fname == *r
+            || fname
+                .strip_prefix(r)
+                .is_some_and(|rest| rest.starts_with('.'))
     })
 }
 
@@ -292,7 +328,9 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
         let Ok(rd) = fs::read_dir(dir) else { return };
         for e in rd.flatten() {
             let p = e.path();
-            let Ok(ft) = fs::symlink_metadata(&p) else { continue };
+            let Ok(ft) = fs::symlink_metadata(&p) else {
+                continue;
+            };
             if ft.file_type().is_dir() {
                 collect_referenced_link_targets(&p, backups_root, referenced, protected);
             } else if ft.file_type().is_symlink() {
@@ -323,11 +361,16 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
         let Ok(rd) = fs::read_dir(dir) else { return };
         for e in rd.flatten() {
             let p = e.path();
-            let Ok(ft) = fs::symlink_metadata(&p) else { continue };
+            let Ok(ft) = fs::symlink_metadata(&p) else {
+                continue;
+            };
             if ft.file_type().is_dir() {
                 walk(&p, referenced, protected, any_removed);
                 // 子目录变空（其目标文件被清理）→ 剪除
-                if fs::read_dir(&p).map(|mut r| r.next().is_none()).unwrap_or(false) {
+                if fs::read_dir(&p)
+                    .map(|mut r| r.next().is_none())
+                    .unwrap_or(false)
+                {
                     let _ = fs::remove_dir(&p);
                 }
                 continue;
@@ -355,7 +398,11 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
     walk(&backups, &referenced, &protected, &mut any_removed);
 
     // 根目录变空 → 一并清掉（下次 build 有新备份时重建）
-    if any_removed || fs::read_dir(&backups).map(|mut r| r.next().is_none()).unwrap_or(false) {
+    if any_removed
+        || fs::read_dir(&backups)
+            .map(|mut r| r.next().is_none())
+            .unwrap_or(false)
+    {
         let _ = fs::remove_dir(&backups);
     }
 }
@@ -407,8 +454,17 @@ fn abs_target_rel(target: &Path) -> PathBuf {
 /// 更新本地 repo index.txt：替换该包的版本块（写入 metadata.json 转述的 deps；新 version/hash/provides）。
 /// **写回完整 needed_so**——index.txt 是唯一真源（容器可见索引与 farm 的 ABI 传播共用，
 /// 不再剥 needed_so、不再有第二份 .abi.json）。
-pub(crate) fn update_repo_index(out_dir: &Path, arch: &str, pkg: &str, version: &str, hash: &str,
-                     deps: &[String], provides: &[String], needed_so: &[String]) -> Result<(), String> {
+#[allow(clippy::too_many_arguments)] // 8 个异构参数（路径/名/版本/哈希/三个依赖切片），分组结构体反而绕
+pub(crate) fn update_repo_index(
+    out_dir: &Path,
+    arch: &str,
+    pkg: &str,
+    version: &str,
+    hash: &str,
+    deps: &[String],
+    provides: &[String],
+    needed_so: &[String],
+) -> Result<(), String> {
     let path = out_dir.join(arch).join("index.txt");
     let content = fs::read_to_string(&path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
     let mut found = false;
@@ -459,8 +515,12 @@ pub(crate) fn sha256_file(path: &Path) -> Result<String, String> {
 /// 传播重建前 bump release（规则 1）。
 pub(crate) fn bump_release(pkgs_dir: &Path, pkg: &str) {
     let path = pkgs_dir.join(pkg).join("LankeBUILD.json");
-    let Ok(content) = fs::read_to_string(&path) else { return };
-    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&content) else { return };
+    let Ok(content) = fs::read_to_string(&path) else {
+        return;
+    };
+    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return;
+    };
     let rel = v["release"].as_u64().unwrap_or(0) + 1;
     v["release"] = serde_json::json!(rel);
     if fs::write(&path, serde_json::to_string_pretty(&v).unwrap()).is_ok() {
@@ -471,13 +531,25 @@ pub(crate) fn bump_release(pkgs_dir: &Path, pkg: &str) {
 /// 元数据漂移双写：LankeBUILD.json 的 needed_so/provides 同步为扫描实际值（规则 2）。
 pub(crate) fn update_lankebuild_metadata(pkgs_dir: &Path, pkg: &str, outcome: &BuildOutcome) {
     let path = pkgs_dir.join(pkg).join("LankeBUILD.json");
-    let Ok(content) = fs::read_to_string(&path) else { return };
-    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&content) else { return };
+    let Ok(content) = fs::read_to_string(&path) else {
+        return;
+    };
+    let Ok(mut v) = serde_json::from_str::<serde_json::Value>(&content) else {
+        return;
+    };
     v["needed_so"] = serde_json::Value::Array(
-        outcome.needed_so.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+        outcome
+            .needed_so
+            .iter()
+            .map(|s| serde_json::Value::String(s.clone()))
+            .collect(),
     );
     v["provides"] = serde_json::Value::Array(
-        outcome.provides.iter().map(|s| serde_json::Value::String(s.clone())).collect(),
+        outcome
+            .provides
+            .iter()
+            .map(|s| serde_json::Value::String(s.clone()))
+            .collect(),
     );
     if fs::write(&path, serde_json::to_string_pretty(&v).unwrap()).is_ok() {
         println!("{}", tr!("build.meta_sync", pkg));
@@ -552,7 +624,10 @@ mod tests {
         assert!(is_removed_soname_file("libfoo.so.2", &removed));
         assert!(is_removed_soname_file("libfoo.so.2.1.3", &removed));
         // 精确前缀（`r.`），绝不误匹配别的 major：libfoo.so.2 不该吞掉 libfoo.so.20
-        assert!(!is_removed_soname_file("libfoo.so.20", &removed), "不应误匹配 libfoo.so.20");
+        assert!(
+            !is_removed_soname_file("libfoo.so.20", &removed),
+            "不应误匹配 libfoo.so.20"
+        );
         assert!(!is_removed_soname_file("libfoo.so.1", &removed));
         // 裸 .so dev 符号链接（归新包）→ 不匹配
         assert!(!is_removed_soname_file("libfoo.so", &removed));
@@ -637,4 +712,3 @@ mod tests {
         fs::remove_dir_all(&out).ok();
     }
 }
-

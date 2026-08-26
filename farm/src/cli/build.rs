@@ -1,10 +1,10 @@
+use super::Args;
+use lankefarm::build::{self, BuildOptions};
+use lankefarm::lpkg_binding::{CleanupState, RealBinding};
 use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
-use lankefarm::build::{self, BuildOptions};
-use lankefarm::lpkg_binding::{CleanupState, RealBinding};
-use super::Args;
 
 pub(crate) fn cmd_build(args: &Args) -> ExitCode {
     let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
@@ -16,10 +16,10 @@ pub(crate) fn cmd_build(args: &Args) -> ExitCode {
     } else if !args.pkg.is_empty() {
         args.pkg.clone()
     } else {
-        eprintln!("farm build <pkg>... | --all");
+        eprintln!("{}", lankefarm::tr!("build.usage"));
         return ExitCode::from(2);
     };
-    run_build_flow(args, pkgs_dir, out_dir, targets, /*validate=*/false)
+    run_build_flow(args, pkgs_dir, out_dir, targets, /*validate=*/ false)
 }
 
 /// validate：自动重建所有没有 `.build_ok` 标记的包（成功构建才写标记；跳过/blocked 不写）。
@@ -27,7 +27,7 @@ pub(crate) fn cmd_build(args: &Args) -> ExitCode {
 pub(crate) fn cmd_validate(args: &Args) -> ExitCode {
     let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
     let out_dir = args.out.clone().unwrap_or_else(|| PathBuf::from("out"));
-    run_build_flow(args, pkgs_dir, out_dir, Vec::new(), /*validate=*/true)
+    run_build_flow(args, pkgs_dir, out_dir, Vec::new(), /*validate=*/ true)
 }
 
 /// build / validate 共用完整流程：state → image 校验 → 内嵌 serve → RealBinding → run_build → 汇总。
@@ -88,16 +88,16 @@ fn run_build_flow(
                 }
             }
             let _ = lankefarm::lpkg_binding::finalize_roll(&s.out_dir, &s.base_image);
-            eprintln!("\n[ctrl-c] 已清理：容器 / DB 条目 / 滚动镜像，baseline 已用最新 commit 覆盖");
+            eprintln!("{}", lankefarm::tr!("build.ctrl_c_clean"));
             std::process::exit(130);
         }) {
-            eprintln!("  [warn] 安装 Ctrl+C 处理器失败（中断将不自动清理）: {e}");
+            eprintln!("{}", lankefarm::tr!("build.ctrl_c_install_fail", e));
         }
     }
     // 内嵌本地 repo 服务器（容器 lpkg upgrade 从这拉依赖，§8）。
     // serve_ready 绑定成功后经 channel 确认就绪；绑定失败（如非 root 绑默认端口 80）
     // 立即暴露并退出，不再静默吞掉 + 盲等 300ms。
-    println!("[serve] 内嵌本地 repo 服务器 http://127.0.0.1:{repo_port}（docker 模式）");
+    println!("{}", lankefarm::tr!("build.serve_start", repo_port));
     let (serve_tx, serve_rx) = std::sync::mpsc::channel::<Result<(), String>>();
     let serve_handle = {
         let repo_root = out_dir.clone();
@@ -163,7 +163,7 @@ fn run_build_flow(
     // 整个 build 流程完毕后收尾：最新 commit 扁平化覆盖 base、删全部 roll 镜像、计数归零。
     // （Ctrl+C 时由信号处理器做同样的事）
     if let Err(e) = lankefarm::lpkg_binding::finalize_roll(&out_dir, &base_image) {
-        eprintln!("  [warn] build 收尾 finalize 失败（滚动镜像残留，下次构建会重试）: {e}");
+        eprintln!("{}", lankefarm::tr!("build.finalize_fail", e));
     }
 
     // 进程退出即关停内嵌 serve（无状态静态服务器，无需优雅关闭）
@@ -176,20 +176,41 @@ fn run_build_flow(
             "summary.title",
             lankefarm::ux::green(&lankefarm::tr!("summary.built", report.built.len())),
             lankefarm::ux::dim(&lankefarm::tr!("summary.repacked", report.repacked.len())),
-            lankefarm::ux::dim(&lankefarm::tr!("summary.abi_broken", report.abi_broken.len())),
+            lankefarm::ux::dim(&lankefarm::tr!(
+                "summary.abi_broken",
+                report.abi_broken.len()
+            )),
             lankefarm::ux::dim(&lankefarm::tr!("summary.skipped_cnt", report.skipped.len())),
-            lankefarm::ux::dim(&lankefarm::tr!("summary.source_missing", report.source_missing.len())),
+            lankefarm::ux::dim(&lankefarm::tr!(
+                "summary.source_missing",
+                report.source_missing.len()
+            )),
             lankefarm::ux::red(&lankefarm::tr!("summary.blocked_cnt", report.blocked.len()))
         )
     );
     if !report.source_missing.is_empty() {
-        println!("  {}", lankefarm::ux::yellow(&lankefarm::tr!("summary.source_missing", report.source_missing.join(", "))));
+        println!(
+            "  {}",
+            lankefarm::ux::yellow(&lankefarm::tr!(
+                "summary.source_missing",
+                report.source_missing.join(", ")
+            ))
+        );
     }
     if !report.blocked.is_empty() {
-        println!("  {}", lankefarm::ux::red(&lankefarm::tr!("summary.blocked", report.blocked.join(", "))));
+        println!(
+            "  {}",
+            lankefarm::ux::red(&lankefarm::tr!(
+                "summary.blocked",
+                report.blocked.join(", ")
+            ))
+        );
     }
     if !report.skipped.is_empty() {
-        println!("  {}", lankefarm::tr!("summary.skipped", report.skipped.join(", ")));
+        println!(
+            "  {}",
+            lankefarm::tr!("summary.skipped", report.skipped.join(", "))
+        );
     }
     ExitCode::SUCCESS
 }

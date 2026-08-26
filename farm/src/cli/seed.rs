@@ -1,12 +1,12 @@
+use super::Args;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use super::Args;
 
 pub(crate) fn cmd_seed(args: &Args) -> ExitCode {
     let remote = match &args.remote {
         Some(r) => r.clone(),
         None => {
-            eprintln!("farm seed --remote <url> [--arch x86_64] [--out <dir>]");
+            eprintln!("{}", lankefarm::tr!("seed.usage"));
             return ExitCode::from(2);
         }
     };
@@ -19,9 +19,12 @@ pub(crate) fn cmd_seed(args: &Args) -> ExitCode {
     match lankefarm::seed::seed(&remote, &arch, &out, jobs) {
         Ok(report) => {
             println!();
-            println!("{}", lankefarm::tr!("seed.summary", report.total, report.ok, report.failed.len()));
+            println!(
+                "{}",
+                lankefarm::tr!("seed.summary", report.total, report.ok, report.failed.len())
+            );
             for (p, why) in &report.failed {
-                eprintln!("  [!] {p}: {why}");
+                eprintln!("{}", lankefarm::tr!("seed.failed_item", p, why));
             }
             if report.failed.is_empty() {
                 ExitCode::SUCCESS

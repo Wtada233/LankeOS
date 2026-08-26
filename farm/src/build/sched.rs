@@ -32,7 +32,10 @@ pub(crate) fn topo_order(
         if victim == on || !names.contains(victim.as_str()) || !names.contains(on.as_str()) {
             continue;
         }
-        group_deps.entry(victim.clone()).or_default().push(on.clone());
+        group_deps
+            .entry(victim.clone())
+            .or_default()
+            .push(on.clone());
     }
 
     let mut graph: HashMap<String, Vec<String>> = HashMap::new();

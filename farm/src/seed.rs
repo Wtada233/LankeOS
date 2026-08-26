@@ -47,7 +47,11 @@ pub fn seed(remote: &str, arch: &str, out: &Path, jobs: usize) -> Result<SeedRep
     // 2. 并行处理：下载（如缺）→ SHA256 校验 → 清旧版。每包目录独立，线程间无共享写。
     let jobs = jobs.clamp(1, 64);
     let chunk_size = names.len().div_ceil(jobs);
-    let mut report = SeedReport { total, ok: 0, failed: Vec::new() };
+    let mut report = SeedReport {
+        total,
+        ok: 0,
+        failed: Vec::new(),
+    };
     let results: Vec<SeedReport> = std::thread::scope(|s| {
         let mut handles = Vec::new();
         for chunk in names.chunks(chunk_size) {
@@ -56,7 +60,10 @@ pub fn seed(remote: &str, arch: &str, out: &Path, jobs: usize) -> Result<SeedRep
             let dest_arch = dest_arch.clone();
             handles.push(s.spawn(move || seed_chunk(&remote, arch, &dest_arch, index, &names)));
         }
-        handles.into_iter().map(|h| h.join().unwrap_or_default()).collect()
+        handles
+            .into_iter()
+            .map(|h| h.join().unwrap_or_default())
+            .collect()
     });
     for r in results {
         report.ok += r.ok;
@@ -78,7 +85,11 @@ fn seed_chunk(
     index: &Index,
     names: &[String],
 ) -> SeedReport {
-    let mut report = SeedReport { total: names.len(), ok: 0, failed: Vec::new() };
+    let mut report = SeedReport {
+        total: names.len(),
+        ok: 0,
+        failed: Vec::new(),
+    };
     for name in names {
         let info = &index.packages[name];
         let url = format!("{remote}/{arch}/{name}/{}.lpkg", info.version);
@@ -177,7 +188,9 @@ fn sha256_file(path: &Path) -> Result<String, String> {
 
 /// 清理 `pkg_dir` 下除 `keep` 外的所有 `*.lpkg`（seed 覆盖 index 后，旧版本 .lpkg 失去作用）。
 fn keep_only_current_lpkg(pkg_dir: &Path, keep: &Path) {
-    let Ok(rd) = fs::read_dir(pkg_dir) else { return };
+    let Ok(rd) = fs::read_dir(pkg_dir) else {
+        return;
+    };
     for e in rd.flatten() {
         let p = e.path();
         if p != keep && p.extension().and_then(|x| x.to_str()) == Some("lpkg") {
@@ -273,7 +286,13 @@ mod tests {
         fs::write(&dest, b"hello").unwrap();
         let sha = format!("{:x}", Sha256::digest(b"hello"));
 
-        let res = seed_one_pkg("http://127.0.0.1:1/unreachable.lpkg", &dest, &dir, "p", &pkg_info(&sha));
+        let res = seed_one_pkg(
+            "http://127.0.0.1:1/unreachable.lpkg",
+            &dest,
+            &dir,
+            "p",
+            &pkg_info(&sha),
+        );
         assert!(res.is_ok());
         assert_eq!(fs::read(&dest).unwrap(), b"hello", "有效已有文件不得被重写");
         fs::remove_dir_all(&dir).ok();
@@ -290,7 +309,13 @@ mod tests {
         fs::write(&dest, b"partial-garbage").unwrap();
         let sha = format!("{:x}", Sha256::digest(b"hello"));
 
-        let res = seed_one_pkg("http://127.0.0.1:1/unreachable.lpkg", &dest, &dir, "p", &pkg_info(&sha));
+        let res = seed_one_pkg(
+            "http://127.0.0.1:1/unreachable.lpkg",
+            &dest,
+            &dir,
+            "p",
+            &pkg_info(&sha),
+        );
         assert!(res.is_err(), "损坏文件 + 远端不可达 → 必须失败");
         assert!(!dest.exists(), "损坏文件不得被接受，下载失败也不得留半文件");
         fs::remove_dir_all(&dir).ok();

@@ -1,7 +1,7 @@
+use super::Args;
+use lankefarm::export;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use lankefarm::export;
-use super::Args;
 
 /// export：input（构建仓库，默认 out）→ 扁平化 `<pkg>-<ver>.lpkg`（zstd level 22）到 output。
 pub(crate) fn cmd_export(args: &Args) -> ExitCode {
@@ -20,7 +20,10 @@ pub(crate) fn cmd_export(args: &Args) -> ExitCode {
                 )
             );
             for f in &report.failed {
-                eprintln!("  {}", lankefarm::ux::red(&lankefarm::tr!("export.failed_item", f)));
+                eprintln!(
+                    "  {}",
+                    lankefarm::ux::red(&lankefarm::tr!("export.failed_item", f))
+                );
             }
             ExitCode::SUCCESS
         }

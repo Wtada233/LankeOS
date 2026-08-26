@@ -8,6 +8,8 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
+
+use crate::tr;
 use std::thread;
 
 /// 启动静态文件服务器（阻塞直到被关停）。
@@ -33,10 +35,10 @@ where
     let root_abs = root
         .canonicalize()
         .map_err(|e| format!("root {root:?} 不可访问: {e}"))?;
-    let listener = TcpListener::bind((bind, port))
-        .map_err(|e| format!("绑定 {bind}:{port} 失败: {e}"))?;
+    let listener =
+        TcpListener::bind((bind, port)).map_err(|e| format!("绑定 {bind}:{port} 失败: {e}"))?;
     let actual = listener.local_addr().map(|a| a.port()).unwrap_or(port);
-    println!("[serve] 本地 repo 服务器 http://{bind}:{actual}（root={root_abs:?}）");
+    println!("{}", tr!("serve.started", bind, actual, root_abs.display()));
     if let Some(cb) = on_bound {
         cb(actual)?;
     }

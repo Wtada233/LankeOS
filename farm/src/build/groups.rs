@@ -73,19 +73,24 @@ impl RebuildGroups {
                 if path.extension().and_then(|e| e.to_str()) != Some("yaml") {
                     continue;
                 }
-                let Ok(content) = std::fs::read_to_string(&path) else { continue };
+                let Ok(content) = std::fs::read_to_string(&path) else {
+                    continue;
+                };
                 let Ok(cfg) = serde_yaml::from_str::<RebuildGroupRaw>(&content) else {
                     eprintln!("{}", tr!("build.group_parse_fail", path.display()));
                     continue;
                 };
-                let globs: Vec<String> = cfg.packages.split_whitespace().map(String::from).collect();
+                let globs: Vec<String> =
+                    cfg.packages.split_whitespace().map(String::from).collect();
                 if let Some(on) = cfg.on_abi {
                     groups.abi.entry(on).or_default().extend(globs.clone());
                 }
                 if let Some(on) = cfg.on_version {
                     match cfg.version_script {
                         Some(script) => {
-                            groups.version.insert(on, VersionChangeGroup { script, globs });
+                            groups
+                                .version
+                                .insert(on, VersionChangeGroup { script, globs });
                         }
                         None => {
                             eprintln!("{}", tr!("build.group_parse_fail", path.display()));
@@ -208,7 +213,15 @@ fn script_decides_rebuild(script: &str, old_ver: &str, new_ver: &str) -> Result<
         // 非零 = 明确"不重建"（如 minor 未变）；stderr 非空时打印，辅助排查脚本错误
         let stderr = String::from_utf8_lossy(&out.stderr);
         if !stderr.trim().is_empty() {
-            eprintln!("  [version-change] {}→{} 判定脚本 stderr: {}", old_ver, new_ver, stderr.trim());
+            eprintln!(
+                "{}",
+                tr!(
+                    "build.version_change_stderr",
+                    old_ver,
+                    new_ver,
+                    stderr.trim()
+                )
+            );
         }
         return Ok(false);
     }
@@ -306,10 +319,9 @@ mod tests {
     #[test]
     fn trigger_edges_only_when_on_in_names() {
         let mut groups = RebuildGroups::default();
-        groups.abi.insert(
-            "python".into(),
-            vec!["python-*".into(), "meson".into()],
-        );
+        groups
+            .abi
+            .insert("python".into(), vec!["python-*".into(), "meson".into()]);
         // 两边都在 names → 产出边
         let all: Vec<String> = ["python", "python-cairo", "python-gobject", "meson"]
             .iter()
@@ -325,7 +337,10 @@ mod tests {
             ]
         );
         // on 不在 names → 无约束（python 不重建，组受害者不强制排序）
-        let without_on: Vec<String> = ["python-cairo", "meson"].iter().map(|s| s.to_string()).collect();
+        let without_on: Vec<String> = ["python-cairo", "meson"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         assert!(groups.trigger_edges_in(&without_on).is_empty());
         // 去重：同一 (victim,on) 不会被重复产出
         let dup: Vec<String> = ["python", "python-cairo", "python-cairo", "meson"]
@@ -343,12 +358,22 @@ mod tests {
             "python".into(),
             vec!["python-*".into(), "meson".into(), "blueman".into()],
         );
-        let all: Vec<String> = ["python", "python-cairo", "python-gobject", "meson", "blueman", "glib"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let all: Vec<String> = [
+            "python",
+            "python-cairo",
+            "python-gobject",
+            "meson",
+            "blueman",
+            "glib",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
         let v = groups.victims_for("python", &all);
-        assert_eq!(v, vec!["blueman", "meson", "python-cairo", "python-gobject"]);
+        assert_eq!(
+            v,
+            vec!["blueman", "meson", "python-cairo", "python-gobject"]
+        );
         assert!(groups.victims_for("unlisted", &all).is_empty());
     }
 
@@ -369,18 +394,30 @@ mod tests {
         let mut g = RebuildGroups::default();
         g.version.insert(
             "perl".into(),
-            VersionChangeGroup { script: script.into(), globs: vec!["perl-*".into()] },
+            VersionChangeGroup {
+                script: script.into(),
+                globs: vec!["perl-*".into()],
+            },
         );
-        let v = g.version_victims_if("perl", "5.44.0", "5.45.0", &all).unwrap();
+        let v = g
+            .version_victims_if("perl", "5.44.0", "5.45.0", &all)
+            .unwrap();
         assert_eq!(v, vec!["perl-file-sharedir", "perl-xml-parser"]);
         // patch 变 → 脚本 exit 1 → 空（perl 模块无需重建）
-        let v = g.version_victims_if("perl", "5.44.0", "5.44.1", &all).unwrap();
+        let v = g
+            .version_victims_if("perl", "5.44.0", "5.44.1", &all)
+            .unwrap();
         assert!(v.is_empty(), "patch 升级不应触发 perl-* 重建: {v:?}");
         // release 修订（5.44.0+1→5.44.0+2）也不算 minor 变化
-        let v = g.version_victims_if("perl", "5.44.0+1", "5.44.0+2", &all).unwrap();
+        let v = g
+            .version_victims_if("perl", "5.44.0+1", "5.44.0+2", &all)
+            .unwrap();
         assert!(v.is_empty());
         // 未注册的 on 包 → 空
-        assert!(g.version_victims_if("python", "3.14", "3.15", &all).unwrap().is_empty());
+        assert!(g
+            .version_victims_if("python", "3.14", "3.15", &all)
+            .unwrap()
+            .is_empty());
     }
 
     #[test]
@@ -401,12 +438,21 @@ packages: perl-*
         .unwrap();
         let g = RebuildGroups::load(&dir);
         // version_victims_if 走真实脚本：版本不同 → 重建
-        let all: Vec<String> = ["perl", "perl-xml-parser"].iter().map(|s| s.to_string()).collect();
+        let all: Vec<String> = ["perl", "perl-xml-parser"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         let v = g.version_victims_if("perl", "5.44", "5.45", &all).unwrap();
         assert_eq!(v, vec!["perl-xml-parser"]);
         // trigger_edges_in：on 在 names 里 → (victim, on) 边（perl-* 组受害者排在 perl 之后）
-        let names: Vec<String> = ["perl", "perl-xml-parser"].iter().map(|s| s.to_string()).collect();
-        assert_eq!(g.trigger_edges_in(&names), vec![("perl-xml-parser".to_string(), "perl".to_string())]);
+        let names: Vec<String> = ["perl", "perl-xml-parser"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert_eq!(
+            g.trigger_edges_in(&names),
+            vec![("perl-xml-parser".to_string(), "perl".to_string())]
+        );
         std::fs::remove_dir_all(&dir).ok();
     }
 
@@ -414,13 +460,24 @@ packages: perl-*
     fn version_change_without_script_is_skipped() {
         // rebuild-on-version-change 声明了但缺 version-change-script → 组不注册（load 告警跳过），
         // version_victims_if 返回空而非 panic。
-        let dir = std::env::temp_dir().join(format!("farm-groups-vnoscript-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("farm-groups-vnoscript-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(dir.join("perl.yaml"), "rebuild-on-version-change: perl\npackages: perl-*\n").unwrap();
+        std::fs::write(
+            dir.join("perl.yaml"),
+            "rebuild-on-version-change: perl\npackages: perl-*\n",
+        )
+        .unwrap();
         let g = RebuildGroups::load(&dir);
-        let all: Vec<String> = ["perl", "perl-xml-parser"].iter().map(|s| s.to_string()).collect();
-        assert!(g.version_victims_if("perl", "5.44", "5.45", &all).unwrap().is_empty());
+        let all: Vec<String> = ["perl", "perl-xml-parser"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert!(g
+            .version_victims_if("perl", "5.44", "5.45", &all)
+            .unwrap()
+            .is_empty());
         assert!(g.trigger_edges_in(&all).is_empty());
         std::fs::remove_dir_all(&dir).ok();
     }

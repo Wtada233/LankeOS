@@ -1,4 +1,4 @@
-//! export.rs — 把构建仓库（out/<arch>/<pkg>/<ver>.lpkg）扁平化重打包为发行格式
+//! export.rs — 把构建仓库（`out/<arch>/<pkg>/<ver>.lpkg`）扁平化重打包为发行格式
 //! `<pkg>-<ver>.lpkg`（zstd level 22，ultra 最高压缩档），输出到指定目录。
 //!
 //! 用途：构建仓库（out/）内部用 level 3 快速压缩、频繁重打包；发行/分发用 level 22
@@ -30,14 +30,18 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, S
     pkgs.sort();
 
     for pkgdir in pkgs {
-        let Some(pkg) = pkgdir.file_name().and_then(|n| n.to_str()).map(String::from) else {
+        let Some(pkg) = pkgdir
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(String::from)
+        else {
             continue;
         };
         let mut lpkg_files: Vec<PathBuf> = fs::read_dir(&pkgdir)
             .ok()
             .map(|it| {
                 it.filter_map(|e| e.ok().map(|e| e.path()))
-                    .filter(|p| p.extension().map_or(false, |x| x == "lpkg"))
+                    .filter(|p| p.extension().is_some_and(|x| x == "lpkg"))
                     .collect()
             })
             .unwrap_or_default();
@@ -49,7 +53,9 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, S
 
         for lpkg in lpkg_files {
             let Some(ver) = lpkg.file_stem().and_then(|s| s.to_str()).map(String::from) else {
-                report.failed.push(format!("{pkg}: 无法解析 .lpkg 文件名版本"));
+                report
+                    .failed
+                    .push(format!("{pkg}: 无法解析 .lpkg 文件名版本"));
                 continue;
             };
             let out_path = output.join(format!("{pkg}-{ver}.lpkg"));
@@ -58,8 +64,7 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, S
             let extract_dir = output.join(".export-extract").join(&pkg);
             let res = (|| {
                 let _ = fs::remove_dir_all(&extract_dir);
-                fs::create_dir_all(&extract_dir)
-                    .map_err(|e| format!("创建解包目录失败: {e}"))?;
+                fs::create_dir_all(&extract_dir).map_err(|e| format!("创建解包目录失败: {e}"))?;
                 scan::extract_lpkg(&lpkg, &extract_dir)?;
                 repack::export_lpkg(&extract_dir, &out_path)
             })();
@@ -84,12 +89,20 @@ mod tests {
         let src = out_path.with_extension("src");
         let _ = fs::remove_dir_all(&src);
         fs::create_dir_all(src.join("content")).unwrap();
-        fs::write(src.join("content/libfoo.so"), [0x7f, b'E', b'L', b'F', 2, 1, 1]).unwrap();
+        fs::write(
+            src.join("content/libfoo.so"),
+            [0x7f, b'E', b'L', b'F', 2, 1, 1],
+        )
+        .unwrap();
         let meta = serde_json::json!({
             "name": name, "version": version,
             "deps": [], "provides": [], "needed_so": [],
         });
-        fs::write(src.join("metadata.json"), serde_json::to_string(&meta).unwrap()).unwrap();
+        fs::write(
+            src.join("metadata.json"),
+            serde_json::to_string(&meta).unwrap(),
+        )
+        .unwrap();
         let f = fs::File::create(out_path).unwrap();
         let enc = zstd::stream::write::Encoder::new(f, 3).unwrap();
         let mut b = tar::Builder::new(enc);

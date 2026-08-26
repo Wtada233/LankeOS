@@ -1,6 +1,6 @@
 //! pypi 模板：PyPI JSON API 探测最新稳定版 + sdist 源 URL。
 //!
-//! yaml 里 `tracker-template: pypi` + `project: <PyPI 项目名>`（可与 pkg-name 不同，
+//! source 条目里 `tracker-template: pypi` + `project: <PyPI 项目名>`（可与 pkg-name 不同，
 //! 如 `pkg-name: python-setuptools` / `project: setuptools`）。
 //! probe 抓 `https://pypi.org/pypi/{project}/json`：
 //! - 默认取 `info.version`（PyPI 最新版）与最新版 `urls` 里的 sdist URL；
@@ -8,18 +8,19 @@
 
 use crate::net::Fetcher;
 use crate::track::templates;
-use crate::track::{need, ProbeResult, TrackerConfig};
+use crate::track::{need, EntryProbe, SourceConfig};
 
 pub fn probe(
     fetcher: &dyn Fetcher,
-    cfg: &TrackerConfig,
+    cfg: &SourceConfig,
     major: Option<&str>,
-) -> Result<ProbeResult, String> {
+    _pkg_name: &str,
+) -> Result<EntryProbe, String> {
     let project = need(&cfg.project, "project")?;
     let url = format!("https://pypi.org/pypi/{project}/json");
     let body = fetcher.get(&url)?;
-    let json: serde_json::Value = serde_json::from_str(&body)
-        .map_err(|e| format!("PyPI JSON 解析失败（{url}）: {e}"))?;
+    let json: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| format!("PyPI JSON 解析失败（{url}）: {e}"))?;
 
     let (version, sdist_url) = match major {
         Some(m) => {
@@ -58,10 +59,9 @@ pub fn probe(
             (v, sdist)
         }
     };
-    Ok(ProbeResult {
+    Ok(EntryProbe {
         version,
-        sources: vec![sdist_url],
-        work_sources: vec![],
+        url: sdist_url,
     })
 }
 
@@ -81,16 +81,15 @@ mod tests {
             ],
             "releases": {}
         }"#;
-        let f = MockFetcher::new(HashMap::new())
-            .entry("https://pypi.org/pypi/setuptools/json", json);
-        let cfg = TrackerConfig {
-            pkg_name: "python-setuptools".into(),
+        let f =
+            MockFetcher::new(HashMap::new()).entry("https://pypi.org/pypi/setuptools/json", json);
+        let cfg = SourceConfig {
             tracker_template: "pypi".into(),
             project: Some("setuptools".into()),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "python-setuptools").unwrap();
         assert_eq!(r.version, "83.0.0");
-        assert_eq!(r.sources, vec!["https://files/setuptools-83.0.0.tar.gz"]);
+        assert_eq!(r.url, "https://files/setuptools-83.0.0.tar.gz");
     }
 }

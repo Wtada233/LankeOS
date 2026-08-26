@@ -1,18 +1,19 @@
 //! github 模板：releases / tags 探测（一个模板一个文件）。
 //!
-//! **被动触发**：yaml 里 `tracker-template: github` + `repo` + `mode`(tags|releases) + `tag-prefix` + `template`。
+//! **被动触发**：source 条目里 `tracker-template: github` + `repo` + `mode`(tags|releases) + `tag-prefix` + `template`。
 //! 探测用 GitHub API（tags 列表或 releases/latest），稳定版优先。
 
 use crate::net::Fetcher;
 use crate::track::templates::{self, matches_major, max_tag_version, strip_version};
-use crate::track::{need, ProbeResult, TrackerConfig};
+use crate::track::{need, EntryProbe, SourceConfig};
 
-/// 探测最新稳定版本（GitHub API）。`major` 非空时只匹配该主版本的 tag。
+/// 探测最新稳定版本（GitHub API），返回该槽位版本 + URL。`major` 非空时只匹配该主版本的 tag。
 pub fn probe(
     fetcher: &dyn Fetcher,
-    cfg: &TrackerConfig,
+    cfg: &SourceConfig,
     major: Option<&str>,
-) -> Result<ProbeResult, String> {
+    _pkg_name: &str,
+) -> Result<EntryProbe, String> {
     let repo = need(&cfg.repo, "repo")?;
     let tag_prefix = cfg.tag_prefix.as_deref().unwrap_or("");
     let template = need(&cfg.template, "template")?;
@@ -36,7 +37,7 @@ pub fn probe(
     };
     let tag = format!("{tag_prefix}{version}");
     let name = repo.split('/').next_back().unwrap_or(repo);
-    let src = templates::substitute(
+    let url = templates::substitute(
         template,
         &[
             ("repo", repo),
@@ -45,11 +46,7 @@ pub fn probe(
             ("version", &version),
         ],
     );
-    Ok(ProbeResult {
-        version,
-        sources: vec![src],
-        work_sources: vec![],
-    })
+    Ok(EntryProbe { version, url })
 }
 
 #[cfg(test)]
@@ -63,8 +60,7 @@ mod tests {
             "https://api.github.com/repos/systemd/systemd/tags",
             r#"[{"name":"v254"},{"name":"v256"},{"name":"v255"},{"name":"v261"}]"#,
         );
-        let cfg = TrackerConfig {
-            pkg_name: "systemd".into(),
+        let cfg = SourceConfig {
             tracker_template: "github".into(),
             repo: Some("systemd/systemd".into()),
             mode: Some("tags".into()),
@@ -72,11 +68,11 @@ mod tests {
             template: Some("https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz".into()),
             ..Default::default()
         };
-        let r = cfg.probe(&f).unwrap();
+        let r = probe(&f, &cfg, None, "systemd").unwrap();
         assert_eq!(r.version, "261");
         assert_eq!(
-            r.sources,
-            vec!["https://github.com/systemd/systemd/archive/refs/tags/v261.tar.gz"]
+            r.url,
+            "https://github.com/systemd/systemd/archive/refs/tags/v261.tar.gz"
         );
     }
 }

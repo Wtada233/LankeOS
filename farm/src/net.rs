@@ -116,10 +116,8 @@ fn download_once(url: &str, dest: &std::path::Path) -> Result<(), String> {
         .set("User-Agent", CURL_UA)
         .call()
         .map_err(|e| format!("GET {url}: {e}"))?;
-    let mut f =
-        std::fs::File::create(dest).map_err(|e| format!("创建 {dest:?} 失败: {e}"))?;
-    std::io::copy(&mut resp.into_reader(), &mut f)
-        .map_err(|e| format!("写 {dest:?} 失败: {e}"))?;
+    let mut f = std::fs::File::create(dest).map_err(|e| format!("创建 {dest:?} 失败: {e}"))?;
+    std::io::copy(&mut resp.into_reader(), &mut f).map_err(|e| format!("写 {dest:?} 失败: {e}"))?;
     Ok(())
 }
 
@@ -163,8 +161,7 @@ mod tests {
     #[test]
     fn download_to_file_fetches_and_404() {
         // 用本地 serve.rs 起 HTTP 服务器：成功下载 + 404 报错
-        let root =
-            std::env::temp_dir().join(format!("farm-net-serve-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("farm-net-serve-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
         std::fs::write(root.join("ok.bin"), b"data").unwrap();

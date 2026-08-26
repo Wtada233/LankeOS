@@ -102,7 +102,10 @@ impl State {
     }
 
     pub fn job_status(&self, pkg: &str) -> Option<JobStatus> {
-        let mut stmt = self.conn.prepare("SELECT status FROM jobs WHERE pkg=?1").ok()?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT status FROM jobs WHERE pkg=?1")
+            .ok()?;
         let s: String = stmt.query_row(rusqlite::params![pkg], |r| r.get(0)).ok()?;
         JobStatus::from_str(&s)
     }
@@ -163,12 +166,23 @@ mod tests {
         let path = std::env::temp_dir().join("farm-state-test.db");
         let _ = std::fs::remove_file(&path);
         let st = State::open(&path).unwrap();
-        st.set_job("llvm", JobStatus::Blocked, Some("lankebuild_build"), Some("abc123"))
-            .unwrap();
+        st.set_job(
+            "llvm",
+            JobStatus::Blocked,
+            Some("lankebuild_build"),
+            Some("abc123"),
+        )
+        .unwrap();
         assert_eq!(st.job_status("llvm"), Some(JobStatus::Blocked));
-        assert_eq!(st.job_failure_stage("llvm").as_deref(), Some("lankebuild_build"));
+        assert_eq!(
+            st.job_failure_stage("llvm").as_deref(),
+            Some("lankebuild_build")
+        );
         assert_eq!(st.job_recipe_hash("llvm").as_deref(), Some("abc123"));
-        assert_eq!(st.list_by_status(JobStatus::Blocked), vec!["llvm".to_string()]);
+        assert_eq!(
+            st.list_by_status(JobStatus::Blocked),
+            vec!["llvm".to_string()]
+        );
         assert!(st.list_by_status(JobStatus::Done).is_empty());
         st.record_build("llvm", "18.1.0", true).unwrap();
         std::fs::remove_file(&path).ok();
@@ -179,8 +193,10 @@ mod tests {
         let path = std::env::temp_dir().join("farm-state-del-test.db");
         let _ = std::fs::remove_file(&path);
         let st = State::open(&path).unwrap();
-        st.set_job("alpha", JobStatus::Building, None, Some("h1")).unwrap();
-        st.set_job("beta", JobStatus::Blocked, Some("x"), Some("h2")).unwrap();
+        st.set_job("alpha", JobStatus::Building, None, Some("h1"))
+            .unwrap();
+        st.set_job("beta", JobStatus::Blocked, Some("x"), Some("h2"))
+            .unwrap();
         st.delete_job("alpha").unwrap();
         assert_eq!(st.job_status("alpha"), None);
         assert_eq!(st.job_status("beta"), Some(JobStatus::Blocked));
