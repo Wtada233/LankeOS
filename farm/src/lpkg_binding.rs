@@ -131,6 +131,19 @@ fn write_roll_counter(out_dir: &Path, c: u32) {
     let _ = std::fs::write(roll_counter_path(out_dir), c.to_string());
 }
 
+/// 清理悬空镜像（`<none>`）。来源：
+/// - `docker import - <base>`（flatten_to_base）重新打 tag → 旧 base 镜像失去 tag 变 `<none>`
+///   （每 ROLL_LIMIT 个 commit 扁平化一次，长期积累的主源）；
+/// - 崩溃/重跑窗口：`docker commit` 覆盖已存在的 roll tag → 旧镜像变 `<none>`。
+///
+/// `docker image prune -f --filter dangling=true` 只删**悬空**（无 tag 且无子镜像引用），
+/// 不碰在用镜像——安全、幂等。扁平化后与每次构建开头调用。
+fn prune_dangling_images() {
+    let _ = std::process::Command::new("docker")
+        .args(["image", "prune", "-f", "--filter", "dangling=true"])
+        .status();
+}
+
 /// `docker export <cid> | docker import - <base>`：把容器文件系统**扁平化**为单层镜像覆盖 base，
 /// 再删掉 roll1..ROLL_LIMIT 编号镜像。gc_roll 与 finalize_roll 共用。
 fn flatten_to_base(cid: &str, base_image: &str) -> Result<(), String> {
@@ -164,6 +177,8 @@ fn flatten_to_base(cid: &str, base_image: &str) -> Result<(), String> {
                 .status();
         }
     }
+    // import 重新打 tag → 旧 base 变悬空；此刻清掉（gc_roll 与 finalize_roll 共用路径）
+    prune_dangling_images();
     Ok(())
 }
 
@@ -310,6 +325,8 @@ impl RealBinding {
         // 只清理"创建者 PID 已死"的孤儿容器（SIGKILL/断电，RAII 未执行）；活容器不动——
         // 否则并发进程的构建会被误杀。
         cleanup_stale_build_containers(&run_quiet);
+        // 清上次崩溃/重跑遗留的悬空镜像（commit 覆盖 roll tag 的孤儿），保持长期不积累。
+        prune_dangling_images();
         let name = format!(
             "lankefarm-build-{}-{}",
             std::process::id(),
