@@ -371,8 +371,9 @@ pub fn run_build(
 
         // 临时目录清理：解包目录（scan/repack 共用，已用完）与 staging（产物已 rename 进 repo）。
         // 只清成功路径——构建失败时保留，供 operator 排查/重试（下次 scan 会先清空解包目录）。
-        let _ = fs::remove_dir_all(opts.out_dir.join("extract").join(&pkg));
-        let _ = fs::remove_dir_all(opts.out_dir.join(".staging").join(&pkg));
+        // 解包目录含 root 属主树（sudo tar 保留所有权）→ 用 sudo 感知删除。
+        let _ = crate::scan::remove_dir_tree(&opts.out_dir.join("extract").join(&pkg));
+        let _ = crate::scan::remove_dir_tree(&opts.out_dir.join(".staging").join(&pkg));
 
         // ABI 传播（§7.2）：removed SONAME → 直连受害者重建；声明式重建组（data/build/*.yaml）
         // 额外重建"不链但 ABI/运行时敏感"的包。变化的 SONAME 无包直接 need → 改好元数据进仓库。

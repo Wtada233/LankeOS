@@ -142,7 +142,7 @@ pub fn repack_in_repo(input: &Path, arch: &str, pkg: &str) -> Result<Vec<Repacke
     }
 
     let extract_dir = input.join(".repack-extract").join(pkg);
-    let _ = fs::remove_dir_all(&extract_dir);
+    let _ = scan::remove_dir_tree(&extract_dir); // 解出 root 属主树，普通 remove_dir_all 删不掉
     fs::create_dir_all(&extract_dir).map_err(|e| format!("创建 {extract_dir:?} 失败: {e}"))?;
 
     let mut items = Vec::new();
@@ -163,7 +163,7 @@ pub fn repack_in_repo(input: &Path, arch: &str, pkg: &str) -> Result<Vec<Repacke
             sha256,
         });
     }
-    let _ = fs::remove_dir_all(&extract_dir);
+    let _ = scan::remove_dir_tree(&extract_dir);
     Ok(items)
 }
 

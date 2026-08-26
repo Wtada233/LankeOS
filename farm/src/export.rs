@@ -60,15 +60,16 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, S
             };
             let out_path = output.join(format!("{pkg}-{ver}.lpkg"));
 
-            // 解包到临时目录 → 重打 level 22；无论成败都清掉临时目录
+            // 解包到临时目录 → 重打 level 22；无论成败都清掉临时目录（解出的是 root 属主树，
+            // 必须用 sudo 感知的删除，否则 /etc、/var 等目录残留——曾留下 14G 的 .export-extract）
             let extract_dir = output.join(".export-extract").join(&pkg);
             let res = (|| {
-                let _ = fs::remove_dir_all(&extract_dir);
+                let _ = scan::remove_dir_tree(&extract_dir);
                 fs::create_dir_all(&extract_dir).map_err(|e| format!("创建解包目录失败: {e}"))?;
                 scan::extract_lpkg(&lpkg, &extract_dir)?;
                 repack::export_lpkg(&extract_dir, &out_path)
             })();
-            let _ = fs::remove_dir_all(&extract_dir);
+            let _ = scan::remove_dir_tree(&extract_dir);
 
             match res {
                 Ok(()) => report.exported.push(format!("{pkg}-{ver}")),

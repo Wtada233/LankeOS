@@ -80,9 +80,31 @@ pub fn scan_lpkg(
 /// 必须 root：普通用户解压无法 chown 到 root owner、无法设置 SUID/SGID、无法写 root-only
 /// 文件（如 /etc/shadow 0600）。`sudo tar` 由 root 解压，`--numeric-owner` 保留数字 uid/gid，
 /// mode 完整（含 SUID）。
+/// 删除目录树（**兼容 root 属主文件**）。解包/重打包用 `sudo tar --numeric-owner` 保留 root
+/// 所有权，普通 `fs::remove_dir_all` 删不掉 content/etc、content/var 等 root 目录——
+/// export 的 `.export-extract` 清理曾因此残留 14G。先试直接删（root 运行 / 空目录快路径），
+/// 权限失败再 `sudo -n rm -rf` 兜底。
+pub(crate) fn remove_dir_tree(path: &Path) -> Result<(), String> {
+    if fs::remove_dir_all(path).is_ok() {
+        return Ok(());
+    }
+    let status = std::process::Command::new("sudo")
+        .args(["-n", "rm", "-rf", path.to_string_lossy().as_ref()])
+        .status()
+        .map_err(|e| format!("sudo rm -rf 删除 {path:?} 失败: {e}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "sudo rm -rf 删除 {path:?} 失败（exit {:?}）",
+            status.code()
+        ))
+    }
+}
+
 pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), String> {
     if extract_dir.exists() {
-        fs::remove_dir_all(extract_dir).map_err(|e| format!("清空 {extract_dir:?} 失败: {e}"))?;
+        remove_dir_tree(extract_dir)?;
     }
     fs::create_dir_all(extract_dir).map_err(|e| format!("创建 {extract_dir:?} 失败: {e}"))?;
     // 解压：zstd -dc | sudo tar --numeric-owner -xf - -C extract_dir
