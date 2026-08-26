@@ -6,4 +6,4 @@ sources:
   project: tcl
   path: Tcl
   template: https://downloads.sourceforge.net/sourceforge/tcl/tcl{version}-src.tar.gz
-  max-version: 8.6.16
+  major-version-lock: 8

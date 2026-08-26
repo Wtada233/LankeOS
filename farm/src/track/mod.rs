@@ -326,10 +326,7 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), String> {
     let (template, mut supported): (&str, Vec<&str>) = match cfg.tracker_template.as_str() {
         // same-version：直接锁版本，只认 same-version-of + template，占位符仅 {version}/{major_minor}
         // （URL 全写在 template：tag 前缀/仓库路径/上游名都烘进去，不支持 tag-prefix/repo/source-name）
-        "same-version" => (
-            "same-version",
-            vec!["same-version-of", "template"],
-        ),
+        "same-version" => ("same-version", vec!["same-version-of", "template"]),
         "github" => ("github", vec!["repo", "mode", "tag-prefix", "template"]),
         "gitlab" => (
             "gitlab",

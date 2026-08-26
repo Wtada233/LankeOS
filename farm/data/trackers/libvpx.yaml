@@ -3,6 +3,6 @@ version-source: sources[0]
 sources:
 - tracker-template: github
   repo: webmproject/libvpx
-  mode: releases
+  mode: tags
   tag-prefix: v
   template: https://github.com/webmproject/libvpx/archive/refs/tags/v{version}.tar.gz

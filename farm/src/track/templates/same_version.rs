@@ -25,7 +25,10 @@ pub fn probe(
     let template = need(&cfg.template, "template")?;
     // {major_minor} = 版本前两段（qt6 等目录结构 qt/<6.11>/<6.11.1>/，不能锁死 minor）。
     let major_minor: String = v.split('.').take(2).collect::<Vec<_>>().join(".");
-    let vars = vec![("version", v.as_str()), ("major_minor", major_minor.as_str())];
+    let vars = vec![
+        ("version", v.as_str()),
+        ("major_minor", major_minor.as_str()),
+    ];
     let url = templates::substitute(template, &vars);
     validate_url(&url)?;
     Ok(EntryProbe { version: v, url })
