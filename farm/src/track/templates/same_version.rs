@@ -4,6 +4,9 @@
 //! （本轮 `--all` 解析出的新版本优先，否则 LankeBUILD.json 版本），用它构建下载 URL。
 //! 因此它**直接确定版本号**，是一个独立探测来源，而不是其它模板的"约束"——所以它
 //! 是独立模板，`same-version-of` 只能在这里用，其它模板写 `same-version`/`same-version-of` 都报错。
+//!
+//! 字段收得最简：只认 `same-version-of` + `template`，占位符仅 `{version}` 与 `{major_minor}`
+//! （tag 前缀 / 仓库路径 / 上游名都烘进 template，不支持 tag-prefix/repo/source-name/{tag}/{name}）。
 
 use crate::track::templates;
 use crate::track::{need, validate_url, EntryProbe, SourceConfig};
@@ -13,27 +16,16 @@ use crate::track::{need, validate_url, EntryProbe, SourceConfig};
 pub fn probe(
     cfg: &SourceConfig,
     lookup: &dyn Fn(&str) -> Option<String>,
-    pkg_name: &str,
+    _pkg_name: &str,
 ) -> Result<EntryProbe, String> {
     let target = need(&cfg.same_version_of, "same-version-of")?;
     let v = lookup(target).ok_or_else(|| {
         format!("same-version-of 依赖 {target} 无版本（读 LankeBUILD.json/已解析版本失败）")
     })?;
     let template = need(&cfg.template, "template")?;
-    // tag = tag_prefix + 版本（如 vulkan-sdk-1.4.350.1）；{major_minor} = 版本前两段
-    // （qt6 等目录结构 qt/<6.11>/<6.11.1>/，不能锁死 minor）。
-    let tag = format!("{}{v}", cfg.tag_prefix.as_deref().unwrap_or(""));
+    // {major_minor} = 版本前两段（qt6 等目录结构 qt/<6.11>/<6.11.1>/，不能锁死 minor）。
     let major_minor: String = v.split('.').take(2).collect::<Vec<_>>().join(".");
-    let name = cfg.effective_name(pkg_name).to_string();
-    let mut vars = vec![
-        ("name", name.as_str()),
-        ("version", v.as_str()),
-        ("tag", tag.as_str()),
-        ("major_minor", major_minor.as_str()),
-    ];
-    if let Some(repo) = &cfg.repo {
-        vars.push(("repo", repo.as_str()));
-    }
+    let vars = vec![("version", v.as_str()), ("major_minor", major_minor.as_str())];
     let url = templates::substitute(template, &vars);
     validate_url(&url)?;
     Ok(EntryProbe { version: v, url })
@@ -47,10 +39,11 @@ mod tests {
     fn locks_version_and_builds_url() {
         let cfg = SourceConfig {
             tracker_template: "same-version".into(),
-            repo: Some("KhronosGroup/SPIRV-Headers".into()),
-            tag_prefix: Some("vulkan-sdk-".into()),
             same_version_of: Some("vulkan-headers".into()),
-            template: Some("https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz".into()),
+            template: Some(
+                "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/vulkan-sdk-{version}.tar.gz"
+                    .into(),
+            ),
             ..Default::default()
         };
         let r = probe(
@@ -63,6 +56,29 @@ mod tests {
         assert_eq!(
             r.url,
             "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/vulkan-sdk-1.4.350.1.tar.gz"
+        );
+    }
+
+    #[test]
+    fn major_minor_placeholder() {
+        let cfg = SourceConfig {
+            tracker_template: "same-version".into(),
+            same_version_of: Some("qt6-base".into()),
+            template: Some(
+                "https://download.qt.io/official_releases/qt/{major_minor}/{version}/submodules/qtdeclarative-everywhere-src-{version}.tar.xz"
+                    .into(),
+            ),
+            ..Default::default()
+        };
+        let r = probe(
+            &cfg,
+            &|pkg| (pkg == "qt6-base").then(|| "6.12.1".to_string()),
+            "qt6-declarative",
+        )
+        .unwrap();
+        assert_eq!(
+            r.url,
+            "https://download.qt.io/official_releases/qt/6.12/6.12.1/submodules/qtdeclarative-everywhere-src-6.12.1.tar.xz"
         );
     }
 }

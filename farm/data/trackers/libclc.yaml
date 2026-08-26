@@ -3,8 +3,5 @@ version-source: sources[0]
 after: llvm
 sources:
 - tracker-template: same-version
-  repo: llvm/llvm-project
-  mode: releases
-  tag-prefix: llvmorg-
   template: https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-project-{version}.src.tar.xz
   same-version-of: llvm

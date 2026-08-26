@@ -324,15 +324,11 @@ impl SourceConfig {
 fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), String> {
     const CORE: &[&str] = &["major-of", "major-version-lock"];
     let (template, mut supported): (&str, Vec<&str>) = match cfg.tracker_template.as_str() {
+        // same-version：直接锁版本，只认 same-version-of + template，占位符仅 {version}/{major_minor}
+        // （URL 全写在 template：tag 前缀/仓库路径/上游名都烘进去，不支持 tag-prefix/repo/source-name）
         "same-version" => (
             "same-version",
-            vec![
-                "same-version-of",
-                "template",
-                "tag-prefix",
-                "repo",
-                "source-name",
-            ],
+            vec!["same-version-of", "template"],
         ),
         "github" => ("github", vec!["repo", "mode", "tag-prefix", "template"]),
         "gitlab" => (
@@ -763,14 +759,15 @@ script-content: |
 
     #[test]
     fn entry_same_version_locks_version_and_builds_url() {
-        // 条目级 same-version：锁定另一包版本，模板 {tag}/{major_minor} 替换，无网络
+        // 条目级 same-version：锁定另一包版本，URL 全写在 template（tag 前缀/仓库路径烘进），无网络
         let cfg = TrackerConfig {
             pkg_name: "SPIRV-Headers".into(),
             sources: vec![SourceConfig {
                 tracker_template: "same-version".into(),
-                repo: Some("KhronosGroup/SPIRV-Headers".into()),
-                tag_prefix: Some("vulkan-sdk-".into()),
-                template: Some("https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz".into()),
+                template: Some(
+                    "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/vulkan-sdk-{version}.tar.gz"
+                        .into(),
+                ),
                 same_version_of: Some("vulkan-headers".into()),
                 ..Default::default()
             }],

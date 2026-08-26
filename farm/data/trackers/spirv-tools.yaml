@@ -3,8 +3,5 @@ version-source: sources[0]
 after: vulkan-headers
 sources:
 - tracker-template: same-version
-  repo: KhronosGroup/SPIRV-Tools
-  mode: tags
-  tag-prefix: vulkan-sdk-
-  template: https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/{tag}.tar.gz
+  template: https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/vulkan-sdk-{version}.tar.gz
   same-version-of: vulkan-headers

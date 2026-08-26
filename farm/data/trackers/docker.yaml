@@ -7,10 +7,7 @@ sources:
   tag-prefix: v
   template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
 - tracker-template: same-version
-  repo: moby/moby
-  mode: tags
-  tag-prefix: docker-v
-  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+  template: https://github.com/moby/moby/archive/refs/tags/docker-v{version}.tar.gz
   same-version-of: docker
 - tracker-template: github
   repo: krallin/tini

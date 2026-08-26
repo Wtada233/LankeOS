@@ -83,6 +83,39 @@ lankefarm seed --remote https://lankerepo.wtada233.top
 lankefarm serve --root out --port 8000
 ```
 
+## Tracker 配置（data/trackers/\<pkg\>.yaml）
+
+`farm track` 用 `data/trackers/<pkg>.yaml` 定义包的上游版本来源。tracker 是 **sources / work_sources 的完整清单**：逐条声明式探测，探测成功且版本变新时，LankeBUILD.json 的 `sources`/`work_sources` 被**原子全量替换**（空列表也写键；任一条失败整包不更新）。
+
+```yaml
+# 单源包：github tags 探测
+pkg-name: systemd
+version-source: sources[0]        # 显式声明版本来自哪条
+sources:
+  - tracker-template: github
+    repo: systemd/systemd
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+```
+
+模板：`github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version`（直接锁定另一包版本）。每模板只接受自己的字段——设置不支持的（如 github + `max-version`）或拼错字段名（如 `tag-prefx`）都报错，不静默忽略。
+
+`type: script` 是包级逃生舱——脚本返回完整清单（stdout 第一行=版本，后续行=URL，`# work_sources` 标记行后归 work_sources）：
+
+```yaml
+pkg-name: libreoffice
+type: script
+script-content: |
+  #!/bin/bash
+  echo "25.2.0"
+  echo "https://x/lo-25.2.0.tar.xz"
+  echo "# work_sources"
+  echo "https://x/vendor-25.2.0.tar.gz"
+```
+
+work_sources-only 包（字体、jar 等非归档源必须放 work_sources）只写 work_sources 列表 + `version-source: work_sources[0]`，无 sources 条目。
+
 ## 快速开始
 
 ### 环境要求

@@ -83,6 +83,39 @@ lankefarm seed --remote https://lankerepo.wtada233.top
 lankefarm serve --root out --port 8000
 ```
 
+## Tracker Configuration (data/trackers/\<pkg\>.yaml)
+
+`farm track` resolves a package's upstream version from `data/trackers/<pkg>.yaml`. A tracker is the **complete manifest of sources / work_sources**: each entry declaratively probes one slot. When a probe succeeds and the version moved forward, the package's `sources`/`work_sources` in LankeBUILD.json are **atomically replaced** (empty lists are written as keys; any entry failure skips the package).
+
+```yaml
+# Single-source package: GitHub tags probing
+pkg-name: systemd
+version-source: sources[0]        # explicitly declares which entry provides the version
+sources:
+  - tracker-template: github
+    repo: systemd/systemd
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+```
+
+Templates: `github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version` (directly locks another package's version). Each template accepts only its own fields — setting an unsupported field (e.g. `max-version` on github) or misspelling a field name (e.g. `tag-prefx`) errors out instead of being silently ignored.
+
+`type: script` is a package-level escape hatch — the script returns the full manifest (stdout line 1 = version, following lines = URLs, after a `# work_sources` marker line they count as work_sources):
+
+```yaml
+pkg-name: libreoffice
+type: script
+script-content: |
+  #!/bin/bash
+  echo "25.2.0"
+  echo "https://x/lo-25.2.0.tar.xz"
+  echo "# work_sources"
+  echo "https://x/vendor-25.2.0.tar.gz"
+```
+
+work_sources-only packages (fonts, jars — non-archive files must live in work_sources) carry only a work_sources list plus `version-source: work_sources[0]`, with no `sources` entry.
+
 ## Quick Start
 
 ### Prerequisites
