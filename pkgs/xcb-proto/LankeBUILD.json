@@ -9,8 +9,7 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "libxml2",
-    "python"
+    "libxml2"
   ],
   "sources": [
     "https://xorg.freedesktop.org/archive/individual/proto/xcb-proto-1.17.0.tar.xz"

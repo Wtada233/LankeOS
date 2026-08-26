@@ -1,0 +1,26 @@
+{
+  "name": "openldap",
+  "version": "2.7.0",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libsasl2.so.3",
+    "libssl.so.3"
+  ],
+  "provides": [
+    "liblber.so",
+    "liblber.so.2",
+    "libldap.so",
+    "libldap.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cyrus-sasl"
+  ],
+  "sources": [
+    "https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-2.7.0.tgz"
+  ],
+  "work_sources": []
+}

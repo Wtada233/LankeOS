@@ -18,7 +18,6 @@
     "base-devel",
     "gmp",
     "mpfr",
-    "perl",
     "readline"
   ],
   "sources": [

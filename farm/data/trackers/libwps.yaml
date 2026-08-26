@@ -1,0 +1,6 @@
+pkg-name: libwps
+tracker-template: sourceforge
+project: libwps
+path: libwps
+pattern: 'libwps-([0-9.]+)\.tar\.(xz|gz|bz2)'
+template: https://sourceforge.net/projects/libwps/files/libwps/libwps-{version}.tar.xz

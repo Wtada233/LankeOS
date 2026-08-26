@@ -18,7 +18,9 @@
     "base-devel",
     "cmake",
     "ninja",
-    "zlib"
+    "zlib",
+    "bzip2",
+    "xz"
   ],
   "sources": [
     "https://github.com/zlib-ng/minizip-ng/archive/refs/tags/4.2.2.tar.gz"

@@ -11,8 +11,7 @@
     "base-devel",
     "cmake",
     "git",
-    "ninja",
-    "python"
+    "ninja"
   ],
   "sources": [
     "https://github.com/KhronosGroup/Vulkan-Headers/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz"

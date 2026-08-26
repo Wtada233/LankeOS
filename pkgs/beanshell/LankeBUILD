@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    :
+}
+
+lankebuild_package() {
+    # 预编译 jar：lpkg 把源直接放 work 根（非归档不解压）
+    install -Dm 644 {WORK_DIR}/bsh-{ORIG_PKG_VER}.jar {STAGING_ROOT}/usr/share/java/bsh.jar
+}

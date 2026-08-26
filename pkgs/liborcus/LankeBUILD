@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # liborcus 强制 C++17（AX_CXX_COMPILE_STDCXX_17），但后面 C++11 检测把 CXX 覆盖成 gnu++11
+    # （CXX='... -std=gnu++17 -std=gnu++11'，最后生效）→ CXXFLAGS 显式加回，编译命令以 gnu++17 结尾
+    export CXXFLAGS="$CXXFLAGS -std=gnu++17"
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

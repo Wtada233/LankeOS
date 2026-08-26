@@ -38,7 +38,9 @@
     "ninja",
     "polkit",
     "sqlite",
-    "vala"
+    "vala",
+    "fontconfig",
+    "pango"
   ],
   "sources": [
     "https://github.com/PackageKit/PackageKit/archive/refs/tags/v1.3.6.tar.gz"

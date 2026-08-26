@@ -31,9 +31,7 @@
     "gmp",
     "mpfr",
     "ncurses",
-    "python",
     "readline",
-    "texinfo",
     "xxhash",
     "xz",
     "zstd"

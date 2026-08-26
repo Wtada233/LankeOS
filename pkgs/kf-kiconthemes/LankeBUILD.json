@@ -40,7 +40,8 @@
     "kf-kwidgetsaddons",
     "qt6-base",
     "qt6-svg",
-    "qt6-tools"
+    "qt6-tools",
+    "qt6-declarative"
   ],
   "sources": [
     "https://download.kde.org/stable/frameworks/6.29/kiconthemes-6.29.0.tar.xz"

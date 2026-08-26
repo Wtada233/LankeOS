@@ -10,8 +10,7 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "ninja",
-    "python"
+    "ninja"
   ],
   "sources": [
     "https://github.com/KhronosGroup/SPIRV-Headers/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz"

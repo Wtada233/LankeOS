@@ -153,6 +153,8 @@ pub fn run_build(
     // 1. 旧索引（§7.2 传播反图的锚）——必须由 seed 落地的本地 repo index.txt，缺失/为空直接报错
     //    （禁止无基线构建：needed_so provider 校验、ABI diff 都需要它）。
     let old = load_old_index(&opts.out_dir, &opts.arch)?;
+    // 仓库全部提供能力 → binding 扫描 not-found 判定（needed_so 无 provider → 不进 needed_so）
+    binding.set_repo_provides(old.all_provided_capabilities());
     let revmap = RevMap::build(&old);
     // 声明式重建组（data/build/*.yaml）：不链但 ABI 敏感的包（python 生态等）。
     let groups = RebuildGroups::load(&opts.build_data_dir);

@@ -1,0 +1,48 @@
+lankebuild_prepare() {
+    # Arch 同款 9 个 patch（Fedora/上游/LibreOffice 移植）：DateTools 缺 <time.h>、zlib 检测
+    # ELSE 修正、gcc atomics 版本判断、narrowing 转换、contribs-lib 安装等。
+    # -p 因归档路径前缀不同而混用 1/0（前 4 个带 clucene-core-2.3.3.4/ 或 a/ 前缀 → -p1，
+    # 后 5 个直接 src/... → -p0）。
+    # 容错：patch -N 已应用时返回非 0，用 reverse dry-run 判别（成功=已应用，跳过）。
+    local spec f lvl
+    for spec in \
+        "clucene-core-2.3.3.4-pkgconfig.patch:1" \
+        "clucene-core-2.3.3.4-install_contribs_lib.patch:1" \
+        "0001-Fix-missing-include-time.h.patch:1" \
+        "fix_zlib_detections.diff:1" \
+        "clucene-warnings.patch:0" \
+        "clucene-gcc-atomics.patch:0" \
+        "clucene-debug.patch:0" \
+        "clucene-narrowing-conversions.patch:0" \
+        "clucene-multimap-put.patch:0"; do
+        f="${spec%%:*}"
+        lvl="${spec##*:}"
+        if ! patch -p"$lvl" -N -i "{WORK_DIR}/../$f" >/dev/null 2>&1; then
+            patch -p"$lvl" -R --dry-run -i "{WORK_DIR}/../$f" >/dev/null 2>&1 \
+                || { echo "apply $f 失败" >&2; exit 1; }
+        fi
+    done
+}
+
+lankebuild_build() {
+    # clucene 是 CMake 项目（非 autotools/make）
+    cmake -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DENABLE_ASCII_MODE=OFF \
+        -DENABLE_PACKAGING=OFF \
+        -DBUILD_CONTRIBS_LIB:BOOL=ON \
+        -DLIB_DESTINATION:PATH={LIBDIR} \
+        -DLUCENE_SYS_INCLUDES:PATH={LIBDIR} \
+        -DDISABLE_MULTITHREADING=OFF \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+    # Arch 同款修正：删掉 CMake 配置目录（安装成目录）；config 头在 /usr/lib/CLucene，include 下补软链
+    rm -rf {STAGING_ROOT}{LIBDIR}/CLuceneConfig.cmake
+    ln -sf /usr/lib/CLucene/clucene-config.h {STAGING_ROOT}/usr/include/CLucene/clucene-config.h
+}
+
+lankebuild_package() {
+    :
+}

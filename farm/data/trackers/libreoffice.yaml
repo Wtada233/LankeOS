@@ -1,0 +1,48 @@
+pkg-name: libreoffice
+# LibreOffice 主版本 + 20 个 vendor tarball（Arch 路线 --without-system-* 保留内置的那些）
+# download.lst 是唯一可信来源（从主 tarball 流式提取，不依赖本地缓存）
+# 注：ucpp/dtoa 在 Arch PKGBUILD source 里但当前版本 download.lst/Makefile.fetch 均不引用
+#     （external/ 无对应模块）→ 历史遗留，不需要
+tracker-template: script
+script-content: |
+  set -e
+  base=https://download.documentfoundation.org/libreoffice/src
+
+  # 1. 最新版本：3 段目录（26.8.0/）→ 目录内 4 段 tarball（libreoffice-26.8.0.3.tar.xz）
+  listing=$(curl -fsSL "$base/")
+  dir=$(printf '%s\n' "$listing" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+/' | tr -d '/' | sort -V | tail -n1)
+  test -n "$dir" || exit 1
+  page=$(curl -fsSL "$base/$dir/")
+  ver=$(printf '%s\n' "$page" | grep -oE 'libreoffice-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.tar\.xz' | head -n1 | sed 's/libreoffice-//; s/\.tar\.xz$//')
+  test -n "$ver" || exit 1
+
+  # 2. 下载主 tarball，流式提取 download.lst（不落盘）
+  main="$base/$dir/libreoffice-$ver.tar.xz"
+  dl=$(curl -fsSL "$main" | tar -xJOf - "libreoffice-$ver/download.lst" 2>/dev/null)
+  test -n "$dl" || exit 1
+
+  # 3. 输出：版本 + 3 个主源（main/help/translations，上游 URL；TUNA 仅本地临时下载用）
+  echo "$ver"
+  echo "$base/$dir/libreoffice-$ver.tar.xz"
+  echo "$base/$dir/libreoffice-help-$ver.tar.xz"
+  echo "$base/$dir/libreoffice-translations-$ver.tar.xz"
+  # 4. vendor tarball 归 work_sources（Arch noextract 对应，lpkg 只下载不解压）
+  echo "# work_sources"
+  # 5. download.lst 里的 vendor 变量（src）
+  for v in XSLTML_TARBALL JFREEREPORT_FLUTE_TARBALL JFREEREPORT_FLOW_ENGINE_TARBALL \
+           LANGTAGREG_TARBALL HSQLDB_TARBALL PDFIUM_TARBALL AFDKO_TARBALL \
+           ANTLR4CPPRUNTIME_TARBALL LXML_TARBALL FIREBIRD_TARBALL SKIA_TARBALL \
+           BOX2D_TARBALL DRAGONBOX_TARBALL FROZEN_TARBALL ZXCVBN_C_TARBALL \
+           JAVA_WEBSOCKET_TARBALL LIBEOT_TARBALL; do
+    name=$(printf '%s\n' "$dl" | grep -E "^${v} := " | sed 's/.*:= *//')
+    test -n "$name" || exit 1
+    echo "https://dev-www.libreoffice.org/src/$name"
+  done
+
+  # 6. extern（3 个）
+  for v in OPENSYMBOL_TTF ODFVALIDATOR_JAR OFFICEOTRON_JAR; do
+    name=$(printf '%s\n' "$dl" | grep -E "^${v} := " | sed 's/.*:= *//')
+    test -n "$name" || exit 1
+    echo "https://dev-www.libreoffice.org/extern/$name"
+  done
+

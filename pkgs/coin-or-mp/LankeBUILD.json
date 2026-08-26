@@ -1,0 +1,26 @@
+{
+  "name": "coin-or-mp",
+  "version": "1.8.4",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "libCbc.so.3",
+    "libCbcSolver.so.3",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libCoinMP.so",
+    "libCoinMP.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "coin-or-cbc"
+  ],
+  "sources": [
+    "https://github.com/coin-or/CoinMP/archive/refs/tags/releases/1.8.4.tar.gz"
+  ],
+  "work_sources": []
+}

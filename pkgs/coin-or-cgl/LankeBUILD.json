@@ -1,0 +1,45 @@
+{
+  "name": "coin-or-cgl",
+  "version": "0.60.10",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libClp.so.1",
+    "libClpSolver.so.1",
+    "libCoinUtils.so.3",
+    "libOsi.so.1",
+    "libOsiClp.so.1",
+    "libamd.so.3",
+    "libblas.so.3",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libcholmod.so.5",
+    "libcoinasl.so.2",
+    "libgcc_s.so.1",
+    "libglpk.so.40",
+    "liblapack.so.3",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libCgl.so",
+    "libCgl.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "coin-or-clp",
+    "coin-or-coinutils",
+    "coin-or-osi",
+    "bzip2",
+    "coin-or-asl",
+    "glpk",
+    "lapack",
+    "suitesparse",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/coin-or/Cgl/archive/refs/tags/releases/0.60.10.tar.gz"
+  ],
+  "work_sources": []
+}

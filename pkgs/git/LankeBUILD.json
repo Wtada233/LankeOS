@@ -22,8 +22,6 @@
     "expat",
     "git",
     "openssh",
-    "perl",
-    "python",
     "rust",
     "xmlto",
     "zlib"

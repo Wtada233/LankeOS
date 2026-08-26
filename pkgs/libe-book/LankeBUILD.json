@@ -1,0 +1,38 @@
+{
+  "name": "libe-book",
+  "version": "0.1.4",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libicui18n.so.78",
+    "liblangtag.so.1",
+    "libm.so.6",
+    "librevenge-0.0.so.0",
+    "librevenge-generators-0.0.so.0",
+    "librevenge-stream-0.0.so.0",
+    "libstdc++.so.6",
+    "libxml2.so.16",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libe-book-0.1.so",
+    "libe-book-0.1.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "gperf",
+    "boost",
+    "librevenge",
+    "liblangtag",
+    "zlib",
+    "libxml2",
+    "cppunit",
+    "icu"
+  ],
+  "sources": [
+    "https://sourceforge.net/projects/libebook/files/libe-book-0.1.4/libe-book-0.1.4.tar.xz"
+  ],
+  "work_sources": []
+}

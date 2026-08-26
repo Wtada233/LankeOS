@@ -11,7 +11,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "python",
     "python-flit-core",
     "python-packaging",
     "python-pyproject-hooks"

@@ -16,8 +16,7 @@
   "build_deps": [
     "base-devel",
     "gtk-doc",
-    "icu",
-    "python"
+    "icu"
   ],
   "sources": [
     "https://github.com/rockdaboot/libpsl/releases/download/0.23.1/libpsl-0.23.1.tar.gz"

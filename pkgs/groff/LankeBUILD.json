@@ -15,8 +15,7 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "git",
-    "perl"
+    "git"
   ],
   "sources": [
     "https://ftpmirror.gnu.org/groff/groff-1.24.1.tar.gz"

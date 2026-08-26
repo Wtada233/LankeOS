@@ -1,0 +1,6 @@
+pkg-name: hyphen
+tracker-template: github
+repo: hunspell/hyphen
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

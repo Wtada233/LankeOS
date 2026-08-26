@@ -32,7 +32,6 @@
     "libffi",
     "nghttp2",
     "ninja",
-    "python",
     "zlib",
     "zstd"
   ],

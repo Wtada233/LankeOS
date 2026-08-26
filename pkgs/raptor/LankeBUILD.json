@@ -1,0 +1,30 @@
+{
+  "name": "raptor",
+  "version": "2.0.16",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcurl.so.4",
+    "libicuuc.so.78",
+    "libm.so.6",
+    "libxml2.so.16",
+    "libxslt.so.1"
+  ],
+  "provides": [
+    "libraptor2.so",
+    "libraptor2.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "curl",
+    "gtk-doc",
+    "icu",
+    "libxml2",
+    "libxslt"
+  ],
+  "sources": [
+    "https://librdf.org/dist/source/raptor2-2.0.16.tar.gz"
+  ],
+  "work_sources": []
+}

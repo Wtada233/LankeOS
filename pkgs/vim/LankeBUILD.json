@@ -46,10 +46,6 @@
     "lua",
     "ncurses",
     "pango",
-    "perl",
-    "python",
-    "ruby",
-    "tcl",
     "wayland",
     "zlib"
   ],

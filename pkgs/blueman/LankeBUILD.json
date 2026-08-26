@@ -19,7 +19,6 @@
     "glib",
     "intltool",
     "iproute2",
-    "python",
     "python-cairo",
     "python-cython",
     "python-gobject"

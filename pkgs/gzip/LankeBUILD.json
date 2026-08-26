@@ -10,8 +10,7 @@
   ],
   "provides": [],
   "build_deps": [
-    "base-devel",
-    "python"
+    "base-devel"
   ],
   "sources": [
     "https://ftpmirror.gnu.org/gzip/gzip-1.14.tar.xz"

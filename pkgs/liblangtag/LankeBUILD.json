@@ -1,0 +1,28 @@
+{
+  "name": "liblangtag",
+  "version": "0.6.8",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "liblangtag-gobject.so",
+    "liblangtag-gobject.so.0",
+    "liblangtag.so",
+    "liblangtag.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "gobject-introspection",
+    "glib",
+    "libxml2"
+  ],
+  "sources": [
+    "https://gitlab.com/-/project/74684761/uploads/9f74bd278e6edfbf1093605d38fb7a97/liblangtag-0.6.8.tar.bz2"
+  ],
+  "work_sources": []
+}

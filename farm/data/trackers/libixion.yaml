@@ -1,0 +1,8 @@
+# libixion：gitlab generic 源包（ixion/ixion），tag 无前缀
+pkg-name: libixion
+tracker-template: gitlab
+host: gitlab.com
+project: ixion/ixion
+mode: tags
+tag-prefix: ''
+template: https://gitlab.com/api/v4/projects/ixion%2Fixion/packages/generic/source/{version}/libixion-{version}.tar.xz

@@ -1,0 +1,19 @@
+lankebuild_prepare() {
+    # freedesktop 归档缺 configure，作者入口 autogen.sh（标准引导）
+    ./autogen.sh
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --localstatedir=/var \
+        --libexecdir={LIBDIR} \
+        --enable-gtk-doc \
+        --enable-tests
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

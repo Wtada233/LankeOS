@@ -10,7 +10,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "perl",
     "perl-class-inspector",
     "perl-file-sharedir-install"
   ],

@@ -13,7 +13,6 @@
   "build_deps": [
     "base-devel",
     "expat",
-    "perl",
     "perl-file-sharedir",
     "perl-file-sharedir-install"
   ],

@@ -1,0 +1,196 @@
+lankebuild_prepare() {
+    # Arch noextract 同款：把 work_sources 的 20 个 vendor tarball 软链进 ext_sources
+    # （--with-external-tar 指向这里；不 cp 留软链，节省空间）
+    mkdir -p "{WORK_DIR}/ext_sources"
+    cd "{WORK_DIR}/ext_sources"
+    for f in {WORK_DIR}/*.tar.* {WORK_DIR}/*.zip {WORK_DIR}/*.tgz {WORK_DIR}/*.jar {WORK_DIR}/*.ttf; do
+        [ -f "$f" ] && ln -sf "$f" .
+    done
+}
+
+lankebuild_build() {
+    # 多 source：主源解压出 libreoffice-26.8.0.2/，20 个 work_sources 平铺在 work_root
+    # → detect_source_tree 返回 work_root，必须 cd 进解压目录
+    cd libreoffice-{ORIG_PKG_VER}
+
+    # Arch 同款 CFLAGS hacks：
+    # 1) 去掉 LibO 覆盖的 flag（-pipe/-Wall/-Werror/-fexceptions），保留其余
+    for i in $CFLAGS; do
+        case "$i" in
+            -pipe|-Wall|-Werror*|-fexceptions) continue;;
+        esac
+        ARCH_FLAGS="$ARCH_FLAGS $i"
+    done
+    export ARCH_FLAGS
+    export CFLAGS="$ARCH_FLAGS"
+    export CXXFLAGS="$ARCH_FLAGS"
+    # 2) LankeOS 不需要调试符号 → 最低级别 -g0（Arch 留 -g1，我们全去掉）
+    CFLAGS=${CFLAGS/-g /-g0 }
+    CXXFLAGS=${CXXFLAGS/-g /-g0 }
+    # 3) malloc_usable_size 与 fortify level 3 不兼容（skia 的 libskialo.so 用到）
+    export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+
+    # JDK home：chromium 同款 probe（LankeOS 无 /usr/lib/jvm/default，装 java-25-openjdk）
+    _jdk=$(ls -d /usr/lib/jvm/java-*-openjdk 2>/dev/null | sort -V | tail -1)
+    test -n "$_jdk" || { echo "找不到 JDK（/usr/lib/jvm/java-*-openjdk）" >&2; exit 1; }
+
+    ./autogen.sh \
+        --with-extra-buildid="LankeOS" \
+        --with-vendor="LankeOS" \
+        --enable-split-app-modules \
+        --with-parallelism=$(nproc) \
+        --with-external-tar="{WORK_DIR}/ext_sources" \
+        --disable-fetch-external \
+        --enable-release-build \
+        --prefix={PREFIX} \
+        --exec-prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --libdir={LIBDIR} \
+        --mandir={DATADIR}/man \
+        --with-help=html \
+        --disable-avahi \
+        --enable-ldap \
+        --enable-dbus \
+        --enable-evolution2 \
+        --enable-gio \
+        --with-system-openldap \
+        --with-system-sane \
+        --disable-gtk3-kde5 \
+        --disable-kf5 \
+        --disable-qt5 \
+        --enable-kf6 \
+        --enable-qt6 \
+        --enable-gtk3 \
+        --enable-gtk4 \
+        --enable-introspection \
+        --disable-lto \
+        --enable-openssl \
+        --enable-odk \
+        --enable-python=system \
+        --enable-scripting-beanshell \
+        --enable-scripting-javascript \
+        --disable-dconf \
+        --disable-report-builder \
+        --disable-mariadb-sdbc \
+        --enable-ext-wiki-publisher \
+        --enable-ext-nlpsolver \
+        --without-fonts \
+        --with-system-libxml \
+        --with-system-libcdr \
+        --with-system-mdds \
+        --without-myspell-dicts \
+        --with-system-libvisio \
+        --with-system-libcmis \
+        --with-system-libmspub \
+        --with-system-libexttextcat \
+        --with-system-orcus \
+        --with-system-liblangtag \
+        --with-system-libodfgen \
+        --with-system-libmwaw \
+        --with-system-libetonyek \
+        --with-system-libfreehand \
+        --without-system-firebird \
+        --with-system-zxing \
+        --with-system-libtommath \
+        --with-system-libatomic-ops \
+        --with-system-libebook \
+        --with-system-libabw \
+        --with-system-coinmp \
+        --with-system-fast-float \
+        --with-system-dicts \
+        --with-external-dict-dir=/usr/share/hunspell \
+        --with-external-hyph-dir=/usr/share/hyphen \
+        --with-external-thes-dir=/usr/share/mythes \
+        --with-system-beanshell \
+        --with-system-cppunit \
+        --with-system-graphite \
+        --with-system-glm \
+        --with-system-libnumbertext \
+        --with-system-libwpg \
+        --with-system-libwps \
+        --with-system-redland \
+        --with-system-libzmf \
+        --with-system-gpgmepp \
+        --with-system-libstaroffice \
+        --with-jdk-home="$_jdk" \
+        --with-ant-home="/usr/share/ant" \
+        --with-system-boost \
+        --with-system-icu \
+        --with-system-cairo \
+        --with-system-libs \
+        --with-system-mythes \
+        --with-system-headers \
+        --without-system-hsqldb \
+        --without-junit \
+        --with-system-clucene \
+        --without-system-box2d \
+        --without-system-dragonbox \
+        --without-system-libfixmath \
+        --without-system-frozen \
+        --without-system-zxcvbn \
+        --without-system-java-websocket \
+        --with-system-rhino \
+        --without-system-libeot \
+        --without-system-afdko \
+        --disable-dependency-tracking
+
+    touch src.downloaded
+    make build
+}
+
+lankebuild_package() {
+    cd libreoffice-{ORIG_PKG_VER}
+    make DESTDIR={STAGING_ROOT} distro-pack-install
+
+    # Arch package_libreoffice-fresh 同款：/etc/libreoffice 配置 + 软链
+    install -dm755 {STAGING_ROOT}/etc/libreoffice
+    install -m644 {STAGING_ROOT}/usr/lib/libreoffice/program/{bootstraprc,sofficerc} \
+        {STAGING_ROOT}/etc/libreoffice/
+    install -m644 {STAGING_ROOT}/usr/lib/libreoffice/share/psprint/psprint.conf \
+        {STAGING_ROOT}/etc/libreoffice/
+    cd {STAGING_ROOT}/usr/lib/libreoffice/program/
+    ln -sf /etc/libreoffice/{bootstraprc,sofficerc} .
+    cd {STAGING_ROOT}/usr/lib/libreoffice/share/psprint/
+    ln -sf /etc/libreoffice/psprint.conf .
+
+    # python uno.py 归位到 site-packages（Arch 同款）
+    local site_packages=$(python -c "import site; print(site.getsitepackages()[0])")
+    install -dm755 {STAGING_ROOT}/$site_packages
+    cd {STAGING_ROOT}/$site_packages
+    echo "import sys, os" > uno.py
+    echo "sys.path.append('/usr/lib/libreoffice/program/')" >> uno.py
+    echo "os.putenv('URE_BOOTSTRAP', 'vnd.sun.star.pathname:/usr/lib/libreoffice/program/fundamentalrc')" >> uno.py
+    cat {STAGING_ROOT}/usr/lib/libreoffice/program/uno.py >> uno.py
+    rm -f {STAGING_ROOT}/usr/lib/libreoffice/program/uno.py*
+    mv -f {STAGING_ROOT}/usr/lib/libreoffice/program/unohelper.py* .
+    mv -f {STAGING_ROOT}/usr/lib/libreoffice/program/officehelper.py* .
+
+    # gnome-documents 需要（FS#51887）
+    ln -sf /usr/lib/libreoffice/program/liblibreofficekitgtk.so \
+        {STAGING_ROOT}/usr/lib/liblibreofficekitgtk.so
+
+    # appstream metainfo（Arch 同款，源在 LO 树内；用绝对路径——前面 cd 进过 STAGING_ROOT）
+    install -dm755 {STAGING_ROOT}/usr/share/metainfo
+    install -m644 {WORK_DIR}/libreoffice-{ORIG_PKG_VER}/sysui/desktop/appstream-appdata/*.xml \
+        {STAGING_ROOT}/usr/share/metainfo/
+
+    # KDE 文件管理器新建模板（Arch 同款，FS#61662）
+    install -dm755 {STAGING_ROOT}/usr/share/templates/.source
+    install -m644 {WORK_DIR}/libreoffice-{ORIG_PKG_VER}/extras/source/shellnew/soffice.* \
+        {STAGING_ROOT}/usr/share/templates/.source/
+    for spec in "odt Writer text" "ods Calc spreadsheet" "odp Impress presentation" "odg Draw drawing"; do
+        set -- $spec
+        sed -e "s/@APP@/$2/" -e "s/@EXT@/$1/" -e "s/@TYPE@/$3/" \
+            {WORK_DIR}/../soffice-template.desktop.in \
+            > {STAGING_ROOT}/usr/share/templates/soffice.$1.desktop
+    done
+
+    # postinst hook：刷新桌面数据库（.desktop 安装后）
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database
+fi
+EOF
+}

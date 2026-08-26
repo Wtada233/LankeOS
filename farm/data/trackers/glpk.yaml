@@ -1,0 +1,6 @@
+# glpk：ftp.gnu.org 目录索引（锚定 href= 避免匹配页内其他数字）
+pkg-name: glpk
+tracker-template: html-index
+url: https://ftp.gnu.org/gnu/glpk/
+pattern: 'href="glpk-([0-9.]+)\.tar\.gz"'
+template: https://ftp.gnu.org/gnu/glpk/glpk-{version}.tar.gz

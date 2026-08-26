@@ -25,7 +25,6 @@
     "gpgme",
     "nspr",
     "nss",
-    "python",
     "python-setuptools"
   ],
   "sources": [

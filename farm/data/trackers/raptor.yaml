@@ -1,0 +1,6 @@
+pkg-name: raptor
+# 上游用 raptor2-<ver> 命名（_name=raptor2）
+tracker-template: html-index
+url: https://librdf.org/dist/source/
+pattern: 'raptor2-([0-9.]+)\.tar\.gz'
+template: 'https://librdf.org/dist/source/raptor2-{version}.tar.gz'

@@ -1,0 +1,5 @@
+pkg-name: postgresql
+tracker-template: html-index
+url: https://ftp.postgresql.org/pub/source/
+pattern: 'v(\d+\.\d+)/'
+template: 'https://ftp.postgresql.org/pub/source/v{version}/postgresql-{version}.tar.bz2'

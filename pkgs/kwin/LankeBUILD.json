@@ -141,7 +141,6 @@
     "pipewire",
     "plasma-activities",
     "plasma-wayland-protocol",
-    "python",
     "qt5compat",
     "qt6-base",
     "qt6-declarative",

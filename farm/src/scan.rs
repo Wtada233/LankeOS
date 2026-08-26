@@ -39,7 +39,14 @@ impl ScanResult {
 
 /// 解包 .lpkg（zstd 压缩 PAX tar）到 `extract_dir`，然后扫描 content/。
 /// `extract_dir` 由调用方给出（确定性路径，非 /tmp——NOSUID，见 §6）。
-pub fn scan_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<ScanResult, String> {
+/// `repo_provides` = 仓库全部提供能力（SONAME/虚拟提供）：needed_so 条目不在其中 → 无 provider
+/// → 判 not found → 不进 needed_so（如 perl 不提供 libperl.so，postgresql 的 plperl.so 链接它
+/// 但标准搜索无提供者，运行期靠 RPATH → 扫描无完整系统状态，不猜，直接 not-found 忽略）。
+pub fn scan_lpkg(
+    lpkg_path: &Path,
+    extract_dir: &Path,
+    repo_provides: &HashSet<String>,
+) -> Result<ScanResult, String> {
     extract_lpkg(lpkg_path, extract_dir)?;
     let meta = read_metadata_json(&extract_dir.join("metadata.json"))?;
     let name = meta["name"].as_str().unwrap_or("").to_string();
@@ -48,7 +55,7 @@ pub fn scan_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<ScanResult, Str
         .as_array()
         .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
         .unwrap_or_default();
-    let (needed_so, provides) = scan_content(&extract_dir.join("content"));
+    let (needed_so, provides) = scan_content(&extract_dir.join("content"), repo_provides);
     Ok(ScanResult {
         name,
         version,
@@ -127,17 +134,25 @@ pub fn read_lpkg_metadata(lpkg_path: &Path) -> Result<serde_json::Value, String>
 }
 
 /// 遍历 content/，扫 ELF → (needed_so, provides)。
-fn scan_content(content_dir: &Path) -> (Vec<String>, Vec<String>) {
+fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<String>, Vec<String>) {
     let mut files: Vec<PathBuf> = Vec::new();
     collect_files(content_dir, content_dir, &mut files);
 
     let mut all_sonames: HashSet<String> = HashSet::new();
     let mut needs: HashSet<String> = HashSet::new();
+    // 包内所有 .so* 文件 basename（任何路径）——not-found 判定用：包内同名 .so → 二进制经
+    // RPATH 用自带库（标准搜索视为 not found）→ 该 NEEDED 不进 needed_so。
+    let mut all_so_basenames: HashSet<String> = HashSet::new();
     // HashSet 去重：同一 SONAME 常被符号链接分支（文件名）和 ELF 分支（SONAME）各贡献一次，
     // 如 libmagic 的 usr/lib/libmagic.so.1 符号链接 + libmagic.so.1.0.0 的 SONAME。
     let mut provides: HashSet<String> = HashSet::new();
 
     for fpath in &files {
+        if let Some(n) = fpath.file_name().and_then(|n| n.to_str()) {
+            if n.contains(".so") {
+                all_so_basenames.insert(n.to_string());
+            }
+        }
         // 符号链接：系统库路径下 `.so` 且指向 ELF → 注册文件名作提供者
         if let Ok(target) = fs::read_link(fpath) {
             let is_so = fpath
@@ -183,9 +198,19 @@ fn scan_content(content_dir: &Path) -> (Vec<String>, Vec<String>) {
         }
     }
 
-    // 自提供跳过：needed_so = DT_NEEDED − 包内 SONAME。输出排序保证确定性
-    // （HashSet 迭代序随机，乱序写回 LankeBUILD.json 会造成无谓 diff）。
-    let mut needed_so: Vec<String> = needs.difference(&all_sonames).cloned().collect();
+    // 不进 needed_so 的三类（语义不同，效果都是忽略）：
+    //  1) SONAME 自提供（all_sonames）→ 包自身提供，自引用 → 忽略；
+    //  2) 包内同名 .so 文件（all_so_basenames，任何路径）→ 二进制经 RPATH 用自带库，
+    //     标准搜索视为 not found → 忽略（perl 的 CORE/libperl.so 即此例）；
+    //  3) 仓库无 provider（repo_provides 不含该 SONAME）→ not found → 忽略
+    //     （postgresql 的 plperl.so 链接 libperl.so，perl 不提供 → 无 provider → 不进 needed）。
+    // 不做 RPATH/RUNPATH 解析——扫描器没有完整运行时系统状态，RPATH 指向他包库会误判，本质无解。
+    let mut needed_so: Vec<String> = needs
+        .difference(&all_sonames)
+        .cloned()
+        .filter(|s| !all_so_basenames.contains(s))
+        .filter(|s| repo_provides.contains(s))
+        .collect();
     needed_so.sort();
     let mut provides: Vec<String> = provides.into_iter().collect();
     provides.sort();
@@ -318,9 +343,85 @@ mod tests {
         std::os::unix::fs::symlink("../usr/lib/libc.so.6", content.join("lib/libc.so.6")).unwrap();
         std::os::unix::fs::symlink("libc.so.6", content.join("usr/lib/libc.so")).unwrap();
 
-        let (_, provides) = scan_content(&content);
+        let (_, provides) = scan_content(&content, &Default::default());
         assert_eq!(provides, vec!["libc.so", "libc.so.6"]); // libc.so.6 只出现一次
 
         let _ = std::fs::remove_dir_all(&tmp);
     }
+
+    /// perl 的 RPATH → /usr/lib/perl5/.../CORE（绝对），libperl.so 随包安装在该目录（无 SONAME）。
+    /// 扫描应判定"自提供"→ 从 needed_so 忽略 libperl.so（否则 lpkg 装 perl 都报无提供者）。
+    #[test]
+    fn scan_content_ignores_self_provided_via_abs_rpath() {
+        let host_lib = [
+            "/usr/lib/libc.so.6",
+            "/lib/x86_64-linux-gnu/libc.so.6",
+            "/usr/lib/x86_64-linux-gnu/libc.so.6",
+            "/lib/libc.so.6",
+        ]
+        .iter()
+        .find_map(|p| std::fs::canonicalize(p).ok());
+        let Some(src) = host_lib else {
+            eprintln!("{}", crate::tr!("test.skip_host_libc"));
+            return;
+        };
+        let tmp = std::env::temp_dir().join(format!("farm-scan-rpath-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let content = tmp.join("content");
+        let core = content.join("usr/lib/perl5/5.44/core_perl/CORE");
+        std::fs::create_dir_all(&core).unwrap();
+        std::fs::create_dir_all(content.join("usr/bin")).unwrap();
+        // 用宿主 libc 充当"libperl.so"（ELF、无 SONAME）与"perl"（含 RPATH 的 ELF）
+        std::fs::copy(&src, core.join("libperl.so")).unwrap();
+        std::fs::copy(&src, content.join("usr/bin/perl")).unwrap();
+
+        let (needed, provides) = scan_content(&content, &Default::default());
+        // 非标准目录的 ELF .so（子目录）不加入 provides（回归原逻辑：只提供搜索路径 .so）
+        assert!(!provides.contains(&"/usr/lib/perl5/5.44/core_perl/CORE/libperl.so".to_string()));
+        // 包内同名 .so（任何路径）→ needed_so 排除（not-found/自提供）
+        assert!(!needed.contains(&"libperl.so".to_string()));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// 仓库 provider map 的 not-found 过滤：needed_so 条目不在 repo_provides → 判 not found → 不进
+    /// needed_so（postgresql plperl.so 链接 libperl.so，perl 不提供 → 剔除，否则 redland 构建
+    /// 装 postgresql 时报 "libperl.so 无提供者"）。
+    #[test]
+    fn scan_content_filters_needed_by_repo_provides() {
+        let host_lib = [
+            "/usr/lib/libc.so.6",
+            "/lib/x86_64-linux-gnu/libc.so.6",
+            "/usr/lib/x86_64-linux-gnu/libc.so.6",
+            "/lib/libc.so.6",
+        ]
+        .iter()
+        .find_map(|p| std::fs::canonicalize(p).ok());
+        let Some(src) = host_lib else {
+            eprintln!("{}", crate::tr!("test.skip_host_libc"));
+            return;
+        };
+        let tmp = std::env::temp_dir().join(format!("farm-scan-notfound-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let content = tmp.join("content");
+        std::fs::create_dir_all(content.join("usr/bin")).unwrap();
+        std::fs::copy(&src, content.join("usr/bin/testbin")).unwrap();
+
+        // 空 repo_provides → 全部 not-found → needed_so 空
+        let (needed, _) = scan_content(&content, &Default::default());
+        assert!(needed.is_empty(), "空 provider map 应全部 not-found: {needed:?}");
+
+        // repo_provides = 二进制实际 NEEDED → 保留
+        let bytes = std::fs::read(content.join("usr/bin/testbin")).unwrap();
+        let (_, bin_needed) = parse_elf_dynamic(&bytes);
+        let rp: HashSet<String> = bin_needed.iter().map(|n| basename(n)).collect();
+        let (needed2, _) = scan_content(&content, &rp);
+        assert!(!needed2.is_empty(), "provider 齐全时 needed_so 不应为空");
+        assert!(needed2.iter().all(|n| rp.contains(n)));
+
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
 }
+
+

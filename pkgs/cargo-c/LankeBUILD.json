@@ -16,7 +16,9 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "rust"
+    "rust",
+    "curl",
+    "zlib"
   ],
   "sources": [
     "https://github.com/lu-zero/cargo-c/archive/refs/tags/v0.10.24.tar.gz"

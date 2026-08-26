@@ -17,8 +17,7 @@
     "base-devel",
     "gmp",
     "mpfr",
-    "pcre2",
-    "python"
+    "pcre2"
   ],
   "sources": [
     "https://github.com/rhinstaller/libbytesize/archive/2.12.tar.gz"

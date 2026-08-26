@@ -30,7 +30,11 @@
     "plasma-wayland-protocol",
     "qt6-base",
     "qt6-tools",
-    "wayland-protocols"
+    "wayland-protocols",
+    "libx11",
+    "libxcb",
+    "libxext",
+    "wayland"
   ],
   "sources": [
     "https://download.kde.org/stable/frameworks/6.29/kidletime-6.29.0.tar.xz"

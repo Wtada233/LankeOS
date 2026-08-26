@@ -1,0 +1,26 @@
+{
+  "name": "rasqal",
+  "version": "0.9.33",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6",
+    "libmpfr.so.6",
+    "libraptor2.so.0"
+  ],
+  "provides": [
+    "librasqal.so",
+    "librasqal.so.3"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "raptor",
+    "mpfr"
+  ],
+  "sources": [
+    "https://download.librdf.org/source/rasqal-0.9.33.tar.gz"
+  ],
+  "work_sources": []
+}

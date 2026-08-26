@@ -22,7 +22,8 @@
   "build_deps": [
     "base-devel",
     "libjpeg-turbo",
-    "lcms2"
+    "lcms2",
+    "zlib"
   ],
   "sources": [
     "https://github.com/LibRaw/LibRaw/archive/refs/tags/0.22.2.tar.gz"

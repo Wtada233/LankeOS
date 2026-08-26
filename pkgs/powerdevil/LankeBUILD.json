@@ -74,7 +74,8 @@
     "qcoro",
     "qt6-base",
     "qt6-declarative",
-    "wayland"
+    "wayland",
+    "kf-krunner"
   ],
   "sources": [
     "https://download.kde.org/stable/plasma/6.7.4/powerdevil-6.7.4.tar.xz"

@@ -22,9 +22,9 @@
     "gperf",
     "libpsl",
     "pcre2",
-    "perl",
-    "python",
-    "zlib"
+    "zlib",
+    "libidn2",
+    "libunistring"
   ],
   "sources": [
     "https://ftpmirror.gnu.org/wget/wget-1.25.0.tar.gz"

@@ -1,0 +1,27 @@
+{
+  "name": "libwps",
+  "version": "0.4.14",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "librevenge-0.0.so.0",
+    "librevenge-generators-0.0.so.0",
+    "librevenge-stream-0.0.so.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libwps-0.4.so",
+    "libwps-0.4.so.4"
+  ],
+  "build_deps": [
+    "base-devel",
+    "librevenge"
+  ],
+  "sources": [
+    "https://downloads.sourceforge.net/project/libwps/libwps/libwps-0.4.14/libwps-0.4.14.tar.xz"
+  ],
+  "work_sources": []
+}

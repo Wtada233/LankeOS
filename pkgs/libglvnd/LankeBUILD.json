@@ -29,7 +29,6 @@
     "libxext",
     "meson",
     "ninja",
-    "python",
     "xorgproto"
   ],
   "sources": [

@@ -1,0 +1,22 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # Arch 同款：顶层 make 用 CMAKE_OPTIONS 驱动各组件 cmake（BLA_VENDOR=Generic 用系统 blas/lapack）
+    CMAKE_OPTIONS="-DBLA_VENDOR=Generic \
+                   -DCMAKE_INSTALL_PREFIX={PREFIX} \
+                   -DCMAKE_BUILD_TYPE=None \
+                   -DNSTATIC=ON" \
+    make -j$(nproc)
+    DESTDIR={STAGING_ROOT} make install
+    # 去掉 graphblas（Arch 拆分到 suitesparse-graphblas，LankeOS 不建）
+    rm -rf {STAGING_ROOT}{LIBDIR}/lib{graphblas,lagraph,lagraphx}.so* \
+           {STAGING_ROOT}{PREFIX}/include/suitesparse/{GraphBLAS,LAGraph,LAGraphX}.h \
+           {STAGING_ROOT}{LIBDIR}/cmake/{GraphBLAS,LAGraph} \
+           {STAGING_ROOT}{LIBDIR}/pkgconfig/{GraphBLAS,LAGraph}.pc
+}
+
+lankebuild_package() {
+    :
+}

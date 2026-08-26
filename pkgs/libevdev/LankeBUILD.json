@@ -14,8 +14,7 @@
   "build_deps": [
     "base-devel",
     "meson",
-    "ninja",
-    "python"
+    "ninja"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-1.13.6/libevdev-libevdev-1.13.6.tar.gz"

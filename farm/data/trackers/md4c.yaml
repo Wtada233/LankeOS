@@ -1,0 +1,6 @@
+pkg-name: md4c
+tracker-template: github
+repo: mity/md4c
+mode: tags
+tag-prefix: 'release-'
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

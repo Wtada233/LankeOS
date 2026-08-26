@@ -42,7 +42,8 @@
     "kf-solid",
     "lmdb",
     "qt6-base",
-    "qt6-tools"
+    "qt6-tools",
+    "qt6-declarative"
   ],
   "sources": [
     "https://download.kde.org/stable/frameworks/6.29/baloo-6.29.0.tar.xz"

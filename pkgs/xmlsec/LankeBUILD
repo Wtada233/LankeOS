@@ -1,0 +1,20 @@
+lankebuild_build() {
+    # Arch 同款 configure：自动探测可用 crypto 后端（容器有 openssl+nss → 出 openssl/nss 两后端，
+    # LibreOffice 需要 xmlsec1-nss）
+    ./configure --prefix={PREFIX} \
+        --disable-static \
+        --enable-files \
+        --disable-ripemd160
+    # 减少未使用共享库链接（Arch 同款）
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_package() {
+    :
+}

@@ -1,0 +1,15 @@
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --enable-dependency-linking \
+        --with-coinutils-lib="$(pkg-config --libs coinutils)" \
+        --with-coinutils-incdir="{PREFIX}/include/coin/"
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_package() {
+    :
+}

@@ -1,0 +1,14 @@
+lankebuild_build() {
+    # autotools（release tarball 自带 configure）
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_package() {
+    :
+}

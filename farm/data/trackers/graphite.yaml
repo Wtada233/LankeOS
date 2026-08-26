@@ -1,0 +1,6 @@
+pkg-name: graphite
+tracker-template: github
+repo: silnrsi/graphite
+mode: releases
+tag-prefix: ''
+template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.gz

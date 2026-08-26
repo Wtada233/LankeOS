@@ -1,0 +1,7 @@
+# cyrus-sasl：release tarball（cyrus-sasl- 前缀 tag）
+pkg-name: cyrus-sasl
+tracker-template: github
+repo: cyrusimap/cyrus-sasl
+mode: tags
+tag-prefix: 'cyrus-sasl-'
+template: https://github.com/cyrusimap/cyrus-sasl/releases/download/{tag}/cyrus-sasl-{version}.tar.gz

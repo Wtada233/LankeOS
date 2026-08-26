@@ -1,0 +1,20 @@
+{
+  "name": "libexttextcat",
+  "version": "3.4.8",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libexttextcat-2.0.so",
+    "libexttextcat-2.0.so.1"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://dev-www.libreoffice.org/src/libexttextcat-3.4.8.tar.xz"
+  ],
+  "work_sources": []
+}

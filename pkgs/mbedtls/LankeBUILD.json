@@ -19,8 +19,7 @@
     "base-devel",
     "cmake",
     "git",
-    "ninja",
-    "python"
+    "ninja"
   ],
   "sources": [
     "git+https://github.com/Mbed-TLS/mbedtls@v3.6.7"

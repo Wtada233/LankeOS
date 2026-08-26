@@ -1,0 +1,7 @@
+pkg-name: liborcus
+tracker-template: gitlab
+host: gitlab.com
+project: orcus/orcus
+mode: tags
+tag-prefix: ''
+template: https://gitlab.com/orcus/orcus/-/archive/{tag}/orcus-{tag}.tar.gz

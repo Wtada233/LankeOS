@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    # gcc 15+ 去掉 minisat 的 typedef int bool（与内建 bool 冲突）；patch 只动头文件，无需 autoreconf
+    patch -N -p1 -i {WORK_DIR}/../gcc-15.patch || patch -R --dry-run -p1 -i {WORK_DIR}/../gcc-15.patch >/dev/null 2>&1 || exit 1
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --with-gmp
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

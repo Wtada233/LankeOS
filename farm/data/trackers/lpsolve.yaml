@@ -1,0 +1,6 @@
+pkg-name: lpsolve
+tracker-template: github
+repo: lp-solve/lp_solve
+mode: releases
+tag-prefix: ''
+template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.gz

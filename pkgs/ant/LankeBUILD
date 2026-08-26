@@ -1,0 +1,31 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # ant 是 java 包（非 autotools）：bootstrap + fetch 可选库 + dist
+    # JDK probe（LankeOS 无 /usr/lib/jvm/default，chromium 同款）
+    _jdk=$(ls -d /usr/lib/jvm/java-*-openjdk 2>/dev/null | sort -V | tail -1)
+    test -n "$_jdk" || { echo "找不到 JDK（/usr/lib/jvm/java-*-openjdk）" >&2; exit 1; }
+    export JAVA_HOME="$_jdk"
+    ./bootstrap.sh
+    bootstrap/bin/ant -Ddest=optional -f fetch.xml
+    bootstrap/bin/ant dist
+}
+
+lankebuild_package() {
+    # ant dist 输出在嵌套的 apache-ant-<ver>/ 目录（Arch package 同款 cd）
+    cd apache-ant-{ORIG_PKG_VER}
+    # Arch 同款：安装到 /usr/share/ant + /usr/bin/ant 软链
+    local _ant_home=/usr/share/ant
+    install -d {STAGING_ROOT}$_ant_home
+    cp -Rp etc {STAGING_ROOT}$_ant_home
+    find bin -type f -a ! -name '*.bat' -a ! -name '*.cmd' \
+        -exec install -Dm 755 {} -t {STAGING_ROOT}$_ant_home/bin \;
+    install -d {STAGING_ROOT}/usr/bin
+    ln -s /usr/share/ant/bin/ant {STAGING_ROOT}/usr/bin/ant
+    install -Dm 644 lib/*.jar -t {STAGING_ROOT}/usr/share/java/ant
+    ln -s /usr/share/java/ant {STAGING_ROOT}$_ant_home/lib
+    # ant.conf 系统配置（Arch 同款，放 /etc/ant.conf）
+    install -Dm 644 {WORK_DIR}/../ant.conf -t {STAGING_ROOT}/etc
+}

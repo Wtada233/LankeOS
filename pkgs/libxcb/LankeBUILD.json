@@ -66,7 +66,6 @@
     "base-devel",
     "libxau",
     "libxdmcp",
-    "python",
     "util-macros"
   ],
   "sources": [

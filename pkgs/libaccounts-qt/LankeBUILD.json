@@ -25,7 +25,8 @@
     "base-devel",
     "doxygen",
     "libaccounts-glib",
-    "qt6-base"
+    "qt6-base",
+    "glib"
   ],
   "sources": [
     "https://gitlab.com/accounts-sso/libaccounts-qt/-/archive/VERSION_1.17/libaccounts-qt-VERSION_1.17.tar.gz"

@@ -48,8 +48,12 @@
     "freetype",
     "librsvg",
     "pango",
-    "python",
-    "zlib"
+    "zlib",
+    "gdk-pixbuf",
+    "glib",
+    "harfbuzz",
+    "libx11",
+    "libxrender"
   ],
   "sources": [
     "https://gitlab.com/graphviz/graphviz/-/archive/15.1.0/graphviz-15.1.0.tar.gz"

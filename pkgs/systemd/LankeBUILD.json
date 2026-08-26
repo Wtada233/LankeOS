@@ -46,7 +46,6 @@
     "ninja",
     "p11-kit",
     "pcre2",
-    "python",
     "python-jinja",
     "python-pefile",
     "rsync",

@@ -9,8 +9,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel",
-    "perl"
+    "base-devel"
   ],
   "sources": [
     "https://ftpmirror.gnu.org/parallel/parallel-20260722.tar.bz2"

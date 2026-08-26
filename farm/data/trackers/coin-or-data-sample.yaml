@@ -1,0 +1,7 @@
+# coin-or 家族 tag 形如 releases/1.2.13 → tag-prefix 'releases/'
+pkg-name: coin-or-data-sample
+tracker-template: github
+repo: coin-or-tools/Data-Sample
+mode: tags
+tag-prefix: 'releases/'
+template: https://github.com/coin-or-tools/Data-Sample/archive/refs/tags/{tag}.tar.gz

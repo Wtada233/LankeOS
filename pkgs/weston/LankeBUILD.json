@@ -73,7 +73,9 @@
     "vulkan-headers",
     "vulkan-loader",
     "wayland",
-    "wayland-protocols"
+    "wayland-protocols",
+    "libdisplay-info",
+    "libglvnd"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/wayland/weston/-/releases/16.0.0/downloads/weston-16.0.0.tar.xz"

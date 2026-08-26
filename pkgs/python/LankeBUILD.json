@@ -42,7 +42,8 @@
     "readline",
     "sqlite",
     "xz",
-    "zlib"
+    "zlib",
+    "zstd"
   ],
   "sources": [
     "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz"

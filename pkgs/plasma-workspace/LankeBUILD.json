@@ -231,7 +231,8 @@
     "xcb-util-cursor",
     "xcb-util-image",
     "xcb-util-wm",
-    "zlib"
+    "zlib",
+    "polkit-qt"
   ],
   "sources": [
     "https://download.kde.org/stable/plasma/6.7.4/plasma-workspace-6.7.4.tar.xz"

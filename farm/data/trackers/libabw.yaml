@@ -1,0 +1,9 @@
+pkg-name: libabw
+# release 托管在 dev-www.libreoffice.org（download.gnome.org 没有）→ script 探测 LO 镜像
+tracker-template: script
+script-content: |
+  page=$(curl -fsSL "https://dev-www.libreoffice.org/src/libabw/")
+  ver=$(printf '%s\n' "$page" | grep -oE "libabw-[0-9.]+\.tar\.xz" | sed "s/^libabw-//; s/\.tar\.xz$//" | sort -V | tail -n1)
+  test -n "$ver" || exit 1
+  echo "$ver"
+  echo "https://dev-www.libreoffice.org/src/libabw/libabw-$ver.tar.xz"

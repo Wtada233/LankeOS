@@ -15,7 +15,8 @@
   "build_deps": [
     "base-devel",
     "cmake",
-    "ninja"
+    "ninja",
+    "libpng"
   ],
   "sources": [
     "https://github.com/zint/zint/archive/refs/tags/2.16.0.tar.gz"

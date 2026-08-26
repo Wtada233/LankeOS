@@ -1,0 +1,6 @@
+pkg-name: fast_float
+tracker-template: github
+repo: fastfloat/fast_float
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

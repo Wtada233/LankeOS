@@ -32,7 +32,10 @@
     "libpulse",
     "libvorbis",
     "sound-theme-freedesktop",
-    "tdb"
+    "tdb",
+    "glib",
+    "gstreamer",
+    "libx11"
   ],
   "sources": [
     "https://salsa.debian.org/gnome-team/libcanberra/-/archive/debian/0.30-20/libcanberra-0.30-20.tar.gz"

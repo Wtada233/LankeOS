@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    # 新 libstdc++ 不再传递包含 <cstdint>，OdfGenerator.cxx 补上（Arch 同款 includes.patch，-p1）
+    patch -N -p1 -i {WORK_DIR}/../includes.patch || patch -R --dry-run -p1 -i {WORK_DIR}/../includes.patch >/dev/null 2>&1 || exit 1
+}
+
+lankebuild_build() {
+    # release tarball 自带 configure
+    ./configure --prefix={PREFIX} --disable-werror
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

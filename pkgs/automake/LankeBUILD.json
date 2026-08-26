@@ -12,8 +12,6 @@
     "base-devel",
     "dejagnu",
     "git",
-    "perl",
-    "python",
     "vala"
   ],
   "sources": [

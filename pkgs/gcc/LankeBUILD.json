@@ -1,7 +1,7 @@
 {
   "name": "gcc",
   "version": "16.1.0",
-  "release": 3,
+  "release": 5,
   "deps": [
     "bash",
     "python"
@@ -24,6 +24,8 @@
     "libcc1.so",
     "libcc1.so.0",
     "libgcc_s.so.1",
+    "libgfortran.so",
+    "libgfortran.so.5",
     "libgomp.so",
     "libgomp.so.1",
     "libhwasan.so",
@@ -53,8 +55,6 @@
     "inetutils",
     "mpc",
     "mpfr",
-    "python",
-    "tcl",
     "zlib",
     "zstd"
   ],

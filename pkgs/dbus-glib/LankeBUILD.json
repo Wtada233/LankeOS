@@ -1,0 +1,29 @@
+{
+  "name": "dbus-glib",
+  "version": "0.114",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libdbus-1.so.3",
+    "libexpat.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libdbus-glib-1.so",
+    "libdbus-glib-1.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "dbus",
+    "glib",
+    "gtk-doc",
+    "expat"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/dbus/dbus-glib/-/archive/dbus-glib-0.114/dbus-glib-dbus-glib-0.114.tar.gz"
+  ],
+  "work_sources": []
+}

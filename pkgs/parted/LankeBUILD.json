@@ -19,7 +19,9 @@
   ],
   "build_deps": [
     "base-devel",
-    "device-mapper"
+    "device-mapper",
+    "ncurses",
+    "readline"
   ],
   "sources": [
     "https://ftp.gnu.org/gnu/parted/parted-3.7.tar.xz"

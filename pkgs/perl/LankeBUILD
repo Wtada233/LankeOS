@@ -15,7 +15,8 @@ lankebuild_build() {
         -Dsitelib={LIBDIR}/${PERL_LIBDIR}/site_perl \
         -Dsitearch={LIBDIR}/${PERL_LIBDIR}/site_perl \
         -Dvendorlib={LIBDIR}/${PERL_LIBDIR}/vendor_perl \
-        -Dvendorarch={LIBDIR}/${PERL_LIBDIR}/vendor_perl
+        -Dvendorarch={LIBDIR}/${PERL_LIBDIR}/vendor_perl \
+        -Duseshrplib
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 

@@ -1,0 +1,7 @@
+# libusb：release tarball（v 前缀 tag）
+pkg-name: libusb
+tracker-template: github
+repo: libusb/libusb
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/libusb/libusb/releases/download/{tag}/libusb-{version}.tar.bz2

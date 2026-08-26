@@ -10,7 +10,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "python",
     "python-flit-core",
     "python-packaging"
   ],

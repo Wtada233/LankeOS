@@ -108,7 +108,6 @@
     "nlohmann-json",
     "pciutils",
     "pipewire",
-    "python",
     "qt6-base",
     "qt6-svg",
     "rnnoise",

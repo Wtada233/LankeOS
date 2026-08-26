@@ -1,0 +1,28 @@
+{
+  "name": "libepubgen",
+  "version": "0.1.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "librevenge-0.0.so.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libepubgen-0.1.so",
+    "libepubgen-0.1.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "boost",
+    "libxml2",
+    "librevenge",
+    "cppunit"
+  ],
+  "sources": [
+    "https://sourceforge.net/projects/libepubgen/files/libepubgen-0.1.1/libepubgen-0.1.1.tar.xz"
+  ],
+  "work_sources": []
+}

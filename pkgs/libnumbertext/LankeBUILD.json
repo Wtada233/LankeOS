@@ -1,0 +1,22 @@
+{
+  "name": "libnumbertext",
+  "version": "1.0.11",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libnumbertext-1.0.so",
+    "libnumbertext-1.0.so.0"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/Numbertext/libnumbertext/archive/1.0.11.tar.gz"
+  ],
+  "work_sources": []
+}

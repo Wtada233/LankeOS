@@ -22,7 +22,6 @@
     "doxygen",
     "extra-cmake-modules",
     "iso-codes",
-    "python",
     "qt6-base",
     "qt6-declarative",
     "qt6-tools"

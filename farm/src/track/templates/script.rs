@@ -52,11 +52,31 @@ pub fn probe(
     if version.is_empty() {
         return Err("track 脚本未输出版本（stdout 第一行）".to_string());
     }
-    let sources: Vec<String> = lines
-        .map(|l| l.trim().to_string())
-        .filter(|l| !l.is_empty())
-        .collect();
-    Ok(ProbeResult { version, sources })
+    // 契约：首行版本，随后行为 sources URL；出现标记行 `# work_sources` 后归为 work_sources
+    // （Arch noextract 对应——lpkg 只下载不解压，如 LibreOffice vendor tarball）
+    let mut sources = Vec::new();
+    let mut work_sources = Vec::new();
+    let mut in_work = false;
+    for l in lines {
+        let l = l.trim().to_string();
+        if l.is_empty() {
+            continue;
+        }
+        if l.starts_with("# work_sources") {
+            in_work = true;
+            continue;
+        }
+        if in_work {
+            work_sources.push(l);
+        } else {
+            sources.push(l);
+        }
+    }
+    Ok(ProbeResult {
+        version,
+        sources,
+        work_sources,
+    })
 }
 
 #[cfg(test)]

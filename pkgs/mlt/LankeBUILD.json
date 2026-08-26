@@ -56,7 +56,10 @@
     "qt6-declarative",
     "qt6-svg",
     "rnnoise",
-    "sdl2"
+    "sdl2",
+    "fontconfig",
+    "glib",
+    "libxml2"
   ],
   "sources": [
     "https://github.com/mltframework/mlt/archive/refs/tags/v7.40.0.tar.gz"

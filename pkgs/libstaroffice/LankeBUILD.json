@@ -1,0 +1,29 @@
+{
+  "name": "libstaroffice",
+  "version": "0.0.8",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "librevenge-0.0.so.0",
+    "librevenge-generators-0.0.so.0",
+    "librevenge-stream-0.0.so.0",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libstaroffice-0.0.so",
+    "libstaroffice-0.0.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "librevenge",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/fosnola/libstaroffice/releases/download/0.0.8/libstaroffice-0.0.8.tar.xz"
+  ],
+  "work_sources": []
+}

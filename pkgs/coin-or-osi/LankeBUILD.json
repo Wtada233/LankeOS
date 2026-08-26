@@ -1,0 +1,36 @@
+{
+  "name": "coin-or-osi",
+  "version": "0.108.12",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libCoinUtils.so.3",
+    "libblas.so.3",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libglpk.so.40",
+    "liblapack.so.3",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libOsi.so",
+    "libOsi.so.1",
+    "libOsiCommonTests.so",
+    "libOsiCommonTests.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "coin-or-coinutils",
+    "bzip2",
+    "glpk",
+    "lapack",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/coin-or/Osi/archive/refs/tags/releases/0.108.12.tar.gz"
+  ],
+  "work_sources": []
+}

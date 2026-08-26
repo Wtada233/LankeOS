@@ -29,7 +29,6 @@
     "meson",
     "mtdev",
     "ninja",
-    "python",
     "wayland",
     "wayland-protocols"
   ],

@@ -1,0 +1,20 @@
+{
+  "name": "lpsolve",
+  "version": "5.5.2.14",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "liblpsolve55.so"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/lp-solve/lp_solve/releases/download/5.5.2.14/lp_solve_5.5.2.14_source.tar.gz"
+  ],
+  "work_sources": []
+}

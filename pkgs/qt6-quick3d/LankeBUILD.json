@@ -60,7 +60,9 @@
     "qt6-declarative",
     "qt6-quicktimeline",
     "qt6-shadertools",
-    "vulkan-headers"
+    "vulkan-headers",
+    "libglvnd",
+    "zlib"
   ],
   "sources": [
     "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtquick3d-everywhere-src-6.11.1.tar.xz"

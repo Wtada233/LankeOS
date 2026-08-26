@@ -1,0 +1,23 @@
+{
+  "name": "md4c",
+  "version": "0.5.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libmd4c-html.so",
+    "libmd4c-html.so.0",
+    "libmd4c.so",
+    "libmd4c.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake"
+  ],
+  "sources": [
+    "https://github.com/mity/md4c/archive/release-0.5.3.tar.gz"
+  ],
+  "work_sources": []
+}

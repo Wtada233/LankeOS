@@ -44,7 +44,9 @@
     "librsvg",
     "libwebp",
     "meson",
-    "vala"
+    "vala",
+    "libtiff",
+    "pango"
   ],
   "sources": [
     "https://download.gimp.org/pub/gegl/0.4/gegl-0.4.70.tar.xz"

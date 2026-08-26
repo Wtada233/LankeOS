@@ -129,7 +129,8 @@
     "python-gobject",
     "vala",
     "xz",
-    "zlib"
+    "zlib",
+    "libunwind"
   ],
   "sources": [
     "https://download.gimp.org/pub/gimp/v3.2/gimp-3.2.4.tar.xz"

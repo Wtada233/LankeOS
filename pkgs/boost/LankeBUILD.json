@@ -114,7 +114,6 @@
     "base-devel",
     "bzip2",
     "icu",
-    "python",
     "xz",
     "zlib",
     "zstd"

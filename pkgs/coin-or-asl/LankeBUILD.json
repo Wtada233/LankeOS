@@ -1,0 +1,22 @@
+{
+  "name": "coin-or-asl",
+  "version": "2.1.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libcoinasl.so",
+    "libcoinasl.so.2"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/coin-or-tools/ThirdParty-ASL/archive/refs/tags/releases/2.1.0.tar.gz",
+    "https://coin-or-tools.github.io/ThirdParty-ASL/solvers-64919f75f.tgz"
+  ],
+  "work_sources": []
+}

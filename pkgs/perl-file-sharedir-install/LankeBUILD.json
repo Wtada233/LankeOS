@@ -8,8 +8,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel",
-    "perl"
+    "base-devel"
   ],
   "sources": [
     "https://cpan.metacpan.org/authors/id/E/ET/ETHER/File-ShareDir-Install-0.14.tar.gz"

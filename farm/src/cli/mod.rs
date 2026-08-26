@@ -324,6 +324,22 @@ fn apply_version_update(value: &mut serde_json::Value, prop: &lankefarm::track::
         }
         value["sources"] = serde_json::Value::Array(new_sources);
     }
+    // work_sources：script 多源直接落位（覆盖已有槽位，不凭空创建——缺槽位由占位补）。
+    // 非 script 多源（prop.work_sources 为空）不动 work_sources，交由 upgrade_list_by_regex
+    // 按 url-match 正则升级（glibc/tzdata 模式）。
+    if !prop.work_sources.is_empty() {
+        if let Some(arr) = value.get("work_sources").and_then(|s| s.as_array()) {
+            let mut new_ws = Vec::new();
+            for (i, s) in arr.iter().enumerate() {
+                if let Some(ps) = prop.work_sources.get(i) {
+                    new_ws.push(serde_json::Value::String(ps.clone()));
+                } else {
+                    new_ws.push(s.clone());
+                }
+            }
+            value["work_sources"] = serde_json::Value::Array(new_ws);
+        }
+    }
 }
 
 /// 应用提案到 LankeBUILD.json：version + sources[0] 主源 + 多源正则升级。返回是否成功写入。
@@ -1405,6 +1421,7 @@ mod tests {
             current_version: "2.004".into(),
             new_version: "2.005".into(),
             sources: vec!["https://github.com/notofonts/noto-cjk/raw/refs/tags/Sans2.005/Sans/Mono/font.otf".into()],
+            work_sources: vec![],
             tracker_template: "github".into(),
         };
         apply_version_update(&mut value, &prop);

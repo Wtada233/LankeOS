@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    # libxml2 2.11+ 移除了 xmlEntity->checked 私有字段（Arch 同款 patch，只改源文件无需 autoreconf）
+    patch -N -p1 -i {WORK_DIR}/../raptor-2.0.15-libxml2-2.11.patch \
+        || patch -R --dry-run -p1 -i {WORK_DIR}/../raptor-2.0.15-libxml2-2.11.patch >/dev/null 2>&1 \
+        || exit 1
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

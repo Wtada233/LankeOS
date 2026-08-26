@@ -119,7 +119,6 @@
     "git",
     "libglvnd",
     "ninja",
-    "python",
     "qt6-base",
     "qt6-shadertools",
     "qt6-svg",

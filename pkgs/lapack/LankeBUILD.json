@@ -1,0 +1,33 @@
+{
+  "name": "lapack",
+  "version": "3.12.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgfortran.so.5",
+    "libm.so.6",
+    "libmvec.so.1"
+  ],
+  "provides": [
+    "libblas.so",
+    "libblas.so.3",
+    "libcblas.so",
+    "libcblas.so.3",
+    "liblapack.so",
+    "liblapack.so.3",
+    "liblapacke.so",
+    "liblapacke.so.3",
+    "libtmglib.so",
+    "libtmglib.so.3"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake"
+  ],
+  "sources": [
+    "https://github.com/Reference-LAPACK/lapack/archive/refs/tags/v3.12.1.tar.gz"
+  ],
+  "work_sources": []
+}

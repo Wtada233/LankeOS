@@ -12,7 +12,6 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "python",
     "python-build",
     "python-flit-core",
     "python-installer",

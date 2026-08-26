@@ -22,7 +22,6 @@
     "base-devel",
     "cmake",
     "ninja",
-    "python",
     "qt6-base",
     "vulkan-headers"
   ],

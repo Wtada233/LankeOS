@@ -1,0 +1,62 @@
+{
+  "name": "postgresql",
+  "version": "18.6",
+  "release": 2,
+  "deps": [
+    "perl"
+  ],
+  "needed_so": [
+    "libLLVM.so.22.1",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libcurl.so.4",
+    "libgcc_s.so.1",
+    "libgssapi_krb5.so.2",
+    "libicui18n.so.78",
+    "libicuuc.so.78",
+    "liblz4.so.1",
+    "libm.so.6",
+    "libpam.so.0",
+    "libpython3.14.so.1.0",
+    "libreadline.so.8",
+    "libssl.so.3",
+    "libstdc++.so.6",
+    "libsystemd.so.0",
+    "libtcl8.6.so",
+    "liburing.so.2",
+    "libxml2.so.16",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libecpg.so",
+    "libecpg.so.6",
+    "libecpg_compat.so",
+    "libecpg_compat.so.3",
+    "libpgtypes.so",
+    "libpgtypes.so.3",
+    "libpq-oauth-18.so",
+    "libpq.so",
+    "libpq.so.5"
+  ],
+  "build_deps": [
+    "base-devel",
+    "curl",
+    "icu",
+    "krb5",
+    "liburing",
+    "libxml2",
+    "libxslt",
+    "llvm",
+    "lz4",
+    "linux-pam",
+    "perl-ipc-run",
+    "readline",
+    "zlib",
+    "zstd"
+  ],
+  "sources": [
+    "https://ftp.postgresql.org/pub/source/v18.6/postgresql-18.6.tar.bz2"
+  ],
+  "work_sources": []
+}

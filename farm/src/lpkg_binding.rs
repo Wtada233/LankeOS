@@ -54,6 +54,10 @@ pub trait LpkgBinding {
     /// 在 fresh container 中构建 pkg，返回实际扫描结果。
     /// `ok == false` → 确定性构建失败，job 进入 BLOCKED（§8.5 零自动重试）。
     fn build(&mut self, pkg: &str) -> BuildOutcome;
+
+    /// 设置仓库全部提供能力（扫描 not-found 判定用：needed_so 无 provider → 不进 needed_so）。
+    /// 默认 no-op；RealBinding 覆盖以填充其 repo_provides 字段。
+    fn set_repo_provides(&mut self, _provides: std::collections::HashSet<String>) {}
 }
 
 /// Stub：按预设 outcome 返回，不进行任何实际操作。
@@ -90,6 +94,9 @@ pub struct RealBinding {
     pub repo_port: u16,
     /// Ctrl+C 中断清理共享状态：当前在途容器/包（信号处理器据此删容器、删 DB 条目）。
     pub cleanup: std::sync::Arc<std::sync::Mutex<CleanupState>>,
+    /// 仓库全部提供能力（SONAME/虚拟提供）：扫描 not-found 判定用——
+    /// needed_so 条目无 provider → not found → 不进 needed_so。构建开始前从旧索引填充。
+    pub repo_provides: std::collections::HashSet<String>,
 }
 
 /// docker 容器 RAII：作用域结束自动 `docker rm -f`，覆盖所有 `?` 提前返回与失败路径，
@@ -268,6 +275,7 @@ impl RealBinding {
             arch: arch.into(),
             repo_port,
             cleanup,
+            repo_provides: std::collections::HashSet::new(),
         }
     }
 
@@ -473,6 +481,10 @@ impl RealBinding {
 }
 
 impl LpkgBinding for RealBinding {
+    fn set_repo_provides(&mut self, provides: std::collections::HashSet<String>) {
+        self.repo_provides = provides;
+    }
+
     fn build(&mut self, pkg: &str) -> BuildOutcome {
         // 仅容器构建：禁止主机 lpkg build（会污染宿主环境——装依赖、留产物）。
         if self.base_image.is_empty() {
@@ -499,7 +511,7 @@ impl LpkgBinding for RealBinding {
 
         // scan（staging 的 .lpkg；解包目录供后续 repack 复用）
         let extract_dir = self.out_dir.join("extract").join(pkg);
-        match crate::scan::scan_lpkg(&lpkg, &extract_dir) {
+        match crate::scan::scan_lpkg(&lpkg, &extract_dir, &self.repo_provides) {
             Ok(scan) => BuildOutcome {
                 ok: true,
                 needed_so: scan.needed_so,

@@ -1,0 +1,6 @@
+# openldap：官方下载站，版本目录
+pkg-name: openldap
+tracker-template: html-index
+url: https://www.openldap.org/software/download/OpenLDAP/openldap-release/
+pattern: 'href="openldap-([0-9.]+)\.tgz"'
+template: https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-{version}.tgz

@@ -1,0 +1,5 @@
+pkg-name: perl-ipc-run
+tracker-template: html-index
+url: https://cpan.metacpan.org/authors/id/T/TO/TODDR/
+pattern: 'IPC-Run-([0-9.]+)\.tar\.gz'
+template: 'https://cpan.metacpan.org/authors/id/T/TO/TODDR/IPC-Run-{version}.tar.gz'

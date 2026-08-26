@@ -79,7 +79,8 @@
     "qcoro",
     "qt6-base",
     "qt6-declarative",
-    "qtkeychain"
+    "qtkeychain",
+    "networkmanager"
   ],
   "sources": [
     "https://download.kde.org/stable/plasma/6.7.4/plasma-nm-6.7.4.tar.xz"

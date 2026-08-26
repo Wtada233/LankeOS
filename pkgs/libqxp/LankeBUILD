@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # boost/math 要求 C++14+，configure 在 gnu++11 下判定 boost 头缺失 → 显式 C++17
+    export CXXFLAGS="$CXXFLAGS -std=gnu++17"
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

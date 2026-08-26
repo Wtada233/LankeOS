@@ -1,0 +1,21 @@
+{
+  "name": "glm",
+  "version": "1.0.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libm.so.6"
+  ],
+  "provides": [
+    "libglm.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/g-truc/glm/archive/refs/tags/1.0.3.tar.gz"
+  ],
+  "work_sources": []
+}

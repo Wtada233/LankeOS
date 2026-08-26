@@ -21,7 +21,6 @@
     "libxslt",
     "meson",
     "ninja",
-    "python",
     "python-parameterized",
     "python-pygments"
   ],

@@ -1,0 +1,16 @@
+{
+  "name": "ant",
+  "version": "1.10.17",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "openjdk25"
+  ],
+  "sources": [
+    "https://www.apache.org/dist/ant/source/apache-ant-1.10.17-src.tar.bz2"
+  ],
+  "work_sources": []
+}

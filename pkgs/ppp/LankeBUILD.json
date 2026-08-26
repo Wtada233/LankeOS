@@ -17,7 +17,8 @@
   "build_deps": [
     "base-devel",
     "libpcap",
-    "libxcrypt"
+    "libxcrypt",
+    "linux-pam"
   ],
   "sources": [
     "https://download.samba.org/pub/ppp/ppp-2.5.3.tar.gz"

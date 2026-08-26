@@ -31,7 +31,6 @@
     "base-devel",
     "cmake",
     "ninja",
-    "python",
     "qt6-base",
     "qt6-declarative",
     "qt6-shadertools",

@@ -1,0 +1,63 @@
+From dfaa62392e7caecc6ecf0097b4d73738ec4fc0a8 Mon Sep 17 00:00:00 2001
+From: Simo Sorce <simo@redhat.com>
+Date: Wed, 21 Jul 2021 06:05:45 -0400
+Subject: [PATCH] Catch errors from EVP_Digest* functions
+
+In OpenSSL 3.0 digest init can fail simply because a legacy provider is
+not loaded of FIPS mode is active and the digest is not allowed.
+If the errors are not handled the application may crash later trying to
+access uninitialized contexts.
+
+Signed-off-by: Simo Sorce <simo@redhat.com>
+---
+ saslauthd/lak.c | 32 +++++++++++++++++++++++++-------
+ 1 file changed, 25 insertions(+), 7 deletions(-)
+
+diff --git a/saslauthd/lak.c b/saslauthd/lak.c
+index 1018a892..1b80f555 100644
+--- a/saslauthd/lak.c
++++ b/saslauthd/lak.c
+@@ -1806,18 +1806,36 @@ static int lak_check_hashed(
+ 		return rc;
+ 	}
+ 
+-	EVP_DigestInit(mdctx, md);
+-	EVP_DigestUpdate(mdctx, passwd, strlen(passwd));
++	rc = EVP_DigestInit(mdctx, md);
++	if (rc != 1) {
++		rc = LAK_FAIL;
++		goto done;
++	}
++	rc = EVP_DigestUpdate(mdctx, passwd, strlen(passwd));
++	if (rc != 1) {
++		rc = LAK_FAIL;
++		goto done;
++	}
+ 	if (hrock->salted) {
+-		EVP_DigestUpdate(mdctx, &cred[EVP_MD_size(md)],
+-				 clen - EVP_MD_size(md));
++		rc = EVP_DigestUpdate(mdctx, &cred[EVP_MD_size(md)],
++				      clen - EVP_MD_size(md));
++		if (rc != 1) {
++		    rc = LAK_FAIL;
++		    goto done;
++		}
++	}
++	rc = EVP_DigestFinal(mdctx, digest, NULL);
++	if (rc != 1) {
++		rc = LAK_FAIL;
++		goto done;
+ 	}
+-	EVP_DigestFinal(mdctx, digest, NULL);
+-	EVP_MD_CTX_free(mdctx);
+ 
+ 	rc = memcmp((char *)cred, (char *)digest, EVP_MD_size(md));
++	rc = rc ? LAK_INVALID_PASSWORD : LAK_OK;
++done:
++	EVP_MD_CTX_free(mdctx);
+ 	free(cred);
+-	return rc ? LAK_INVALID_PASSWORD : LAK_OK;
++	return rc;
+ }
+ 
+ #endif /* HAVE_OPENSSL */

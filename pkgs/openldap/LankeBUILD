@@ -1,0 +1,37 @@
+lankebuild_prepare() {
+    # Arch 同款：库文件权限 644 → 755
+    sed -i 's|-m 644 $(LIBRARY)|-m 755 $(LIBRARY)|' libraries/{liblber,libldap}/Makefile.in
+    autoconf
+}
+
+lankebuild_build() {
+    # LibreOffice 只需 LDAP 客户端 libldap。Arch 选项（服务器后端/argon2 等需 libsodium，跳过）
+    ./configure --prefix={PREFIX} \
+        --libexecdir={LIBDIR} \
+        --sysconfdir={SYSCONFDIR} \
+        --localstatedir=/var/lib/openldap \
+        --sbindir={BINDIR} \
+        --enable-dynamic \
+        --enable-syslog \
+        --enable-ipv6 \
+        --enable-local \
+        --enable-crypt \
+        --enable-spasswd \
+        --with-cyrus-sasl \
+        --with-threads
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    # Arch package_libldap 同款：include/libraries/man 分目录 install——
+    # include/ 的 install-local 生成并安装 ldap_config.h（LDAP_DEPRECATED 定义在这，
+    # LibreOffice configure 的 ldap_simple_bind_s 检查需要它）；顶层 make install 漏装
+    for dir in include libraries doc/man/man3; do
+        make -C "$dir" DESTDIR={STAGING_ROOT} install
+    done
+    # 共享库版本软链（Arch 同款）
+    ln -sf liblber.so {STAGING_ROOT}{LIBDIR}/liblber.so.2
+    ln -sf libldap.so {STAGING_ROOT}{LIBDIR}/libldap.so.2
+    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/openldap
+}

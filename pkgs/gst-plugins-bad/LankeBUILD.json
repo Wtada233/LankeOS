@@ -165,7 +165,6 @@
     "openjpeg",
     "opus",
     "pango",
-    "python",
     "rust",
     "sbc",
     "shaderc",
@@ -173,7 +172,8 @@
     "vulkan-headers",
     "vulkan-loader",
     "wayland",
-    "zlib"
+    "zlib",
+    "librsvg"
   ],
   "sources": [
     "https://gstreamer.freedesktop.org/src/gst-plugins-bad/gst-plugins-bad-1.29.2.tar.xz"

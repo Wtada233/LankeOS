@@ -9,8 +9,6 @@
     "base-devel",
     "bc",
     "elfutils",
-    "perl",
-    "python",
     "rsync",
     "rust",
     "rust-bindgen",

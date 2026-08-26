@@ -1,0 +1,5 @@
+pkg-name: rasqal
+tracker-template: html-index
+url: https://download.librdf.org/source/
+pattern: 'rasqal-([0-9.]+)\.tar\.(xz|gz|bz2)'
+template: https://download.librdf.org/source/{name}-{version}.tar.xz

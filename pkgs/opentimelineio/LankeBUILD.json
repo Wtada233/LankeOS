@@ -14,7 +14,6 @@
     "imath",
     "ninja",
     "pybind11",
-    "python",
     "python-aaf2",
     "python-build",
     "python-installer"

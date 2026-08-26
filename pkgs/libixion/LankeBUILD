@@ -1,0 +1,19 @@
+lankebuild_prepare() {
+    # boost 1.89 修复（Arch 同款，patch m4/boost.m4 → 需 autoreconf）
+    patch -N -p1 -i {WORK_DIR}/../bfe5ab6adadda265d575fec9c192e6f53f2ef9f5.patch \
+        || patch -R --dry-run -p1 -i {WORK_DIR}/../bfe5ab6adadda265d575fec9c192e6f53f2ef9f5.patch >/dev/null 2>&1 \
+        || exit 1
+    autoreconf -fiv
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --disable-static
+    # 减少未使用共享库链接（Arch 同款）
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

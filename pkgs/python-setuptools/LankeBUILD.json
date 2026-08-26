@@ -8,8 +8,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel",
-    "python"
+    "base-devel"
   ],
   "sources": [
     "https://files.pythonhosted.org/packages/34/26/f5d29e25ffdb535afef2d35cdb55b325298f96debd670da4c325e08d70f4/setuptools-83.0.0.tar.gz"

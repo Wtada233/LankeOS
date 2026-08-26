@@ -1,0 +1,31 @@
+{
+  "name": "librevenge",
+  "version": "0.0.6",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "librevenge-0.0.so",
+    "librevenge-0.0.so.0",
+    "librevenge-generators-0.0.so",
+    "librevenge-generators-0.0.so.0",
+    "librevenge-stream-0.0.so",
+    "librevenge-stream-0.0.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "boost",
+    "cppunit",
+    "zlib"
+  ],
+  "sources": [
+    "https://sourceforge.net/projects/libwpd/files/librevenge/librevenge-0.0.6/librevenge-0.0.6.tar.xz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,6 @@
+pkg-name: coin-or-clp
+tracker-template: github
+repo: coin-or/Clp
+mode: tags
+tag-prefix: 'releases/'
+template: https://github.com/coin-or/Clp/archive/refs/tags/{tag}.tar.gz

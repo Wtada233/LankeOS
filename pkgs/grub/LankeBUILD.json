@@ -19,7 +19,6 @@
     "freetype",
     "fuse3",
     "libtasn1",
-    "python",
     "xz"
   ],
   "sources": [

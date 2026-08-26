@@ -79,7 +79,8 @@
     "vulkan-loader",
     "wayland",
     "wayland-protocols",
-    "zlib"
+    "zlib",
+    "libpulse"
   ],
   "sources": [
     "https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz"

@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    # solvers.tgz 解压到 work_root/solvers，链进 ThirdParty-ASL（Arch 同款）
+    cd ThirdParty-ASL-*
+    ln -sf ../solvers .
+}
+
+lankebuild_build() {
+    cd ThirdParty-ASL-*
+    ./configure --prefix={PREFIX} --srcdir="$PWD"
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

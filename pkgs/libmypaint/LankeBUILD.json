@@ -25,8 +25,7 @@
     "glib",
     "intltool",
     "json-c",
-    "json-glib",
-    "python"
+    "json-glib"
   ],
   "sources": [
     "https://github.com/mypaint/libmypaint/archive/refs/tags/v1.6.1.tar.gz"

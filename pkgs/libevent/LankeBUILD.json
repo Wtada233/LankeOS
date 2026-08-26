@@ -22,8 +22,7 @@
     "libevent_pthreads.so"
   ],
   "build_deps": [
-    "base-devel",
-    "python"
+    "base-devel"
   ],
   "sources": [
     "https://github.com/libevent/libevent/releases/download/release-2.1.13-stable/libevent-2.1.13-stable.tar.gz"

@@ -1,0 +1,19 @@
+lankebuild_build() {
+    # Arch 同款：CoinMP 子目录构建，接 cbc；CXXFLAGS 去掉 _GLIBCXX_ASSERTIONS（gcc 15+ 兼容）
+    cd CoinMP
+    export CXXFLAGS+=" -Wp,-U_GLIBCXX_ASSERTIONS"
+    ./configure --prefix={PREFIX} \
+        --with-cbc-lib="-lCbcSolver -lCbc" \
+        --with-cbc-incdir="{PREFIX}/include/coin/"
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    rm -rf {STAGING_ROOT}/build
+}
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_package() {
+    :
+}

@@ -12,8 +12,7 @@
     "base-devel",
     "git",
     "llvm",
-    "ninja",
-    "python"
+    "ninja"
   ],
   "sources": [
     "https://gn.googlesource.com/gn/+archive/3fd3b0624d8cba16927853600130b2c33d4e7928.tar.gz"

@@ -1,0 +1,35 @@
+{
+  "name": "coin-or-coinutils",
+  "version": "2.11.13",
+  "release": 1,
+  "deps": [
+    "coin-or-data-sample"
+  ],
+  "needed_so": [
+    "libblas.so.3",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libglpk.so.40",
+    "liblapack.so.3",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libCoinUtils.so",
+    "libCoinUtils.so.3"
+  ],
+  "build_deps": [
+    "base-devel",
+    "bzip2",
+    "coin-or-data-sample",
+    "glpk",
+    "lapack",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/coin-or/CoinUtils/archive/refs/tags/releases/2.11.13.tar.gz"
+  ],
+  "work_sources": []
+}

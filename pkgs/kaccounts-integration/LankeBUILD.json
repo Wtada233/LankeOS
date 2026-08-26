@@ -37,7 +37,14 @@
     "qcoro",
     "signon-kwallet-extension",
     "signon-plugin-oauth2",
-    "signond"
+    "signond",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kdbusaddons",
+    "kf-ki18n",
+    "kf-kwallet",
+    "qt6-base",
+    "qt6-declarative"
   ],
   "sources": [
     "https://download.kde.org/stable/release-service/26.08.0/src/kaccounts-integration-26.08.0.tar.xz"

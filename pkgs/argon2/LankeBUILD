@@ -1,0 +1,17 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # Arch 同款：LIBRARY_REL='lib' 装 /usr/lib（argon2 Makefile 默认 multiarch 路径
+    # /usr/lib/x86_64-linux-gnu——pkg-config 和加载器都找不到）
+    make ARGON2_VERSION={ORIG_PKG_VER} OPTTARGET='none' LIBRARY_REL='lib' -j$(nproc)
+    make ARGON2_VERSION={ORIG_PKG_VER} OPTTARGET='none' LIBRARY_REL='lib' DESTDIR={STAGING_ROOT} install
+    # Makefile 无开关，装后关静态库（Arch 也带 .a，我们按惯例删）
+    rm -f {STAGING_ROOT}{LIBDIR}/libargon2.a
+    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/argon2/LICENSE
+}
+
+lankebuild_package() {
+    :
+}

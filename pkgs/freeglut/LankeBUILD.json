@@ -26,7 +26,8 @@
     "libxi",
     "libxrandr",
     "mesa",
-    "ninja"
+    "ninja",
+    "libxxf86vm"
   ],
   "sources": [
     "https://github.com/FreeGLUTProject/freeglut/archive/refs/tags/v3.8.0.tar.gz"

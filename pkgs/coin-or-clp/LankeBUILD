@@ -1,0 +1,19 @@
+lankebuild_prepare() {
+    # 现代 cholmod.h 自带 C++ guard，去掉 extern "C" 包裹（Arch 同款 fix-build.patch）
+    patch -N -p1 -i {WORK_DIR}/../fix-build.patch || patch -R --dry-run -p1 -i {WORK_DIR}/../fix-build.patch >/dev/null 2>&1 || exit 1
+}
+
+lankebuild_build() {
+    CFLAGS+=" -Wno-implicit-function-declaration"
+    ./configure --prefix={PREFIX} \
+        --with-cholmod-lib='-lcholmod' \
+        --with-cholmod-incdir={PREFIX}/include/suitesparse \
+        --with-amd-lib='-lamd' \
+        --with-amd-incdir={PREFIX}/include/suitesparse
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

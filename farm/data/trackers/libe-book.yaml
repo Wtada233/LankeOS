@@ -1,0 +1,8 @@
+pkg-name: libe-book
+tracker-template: script
+script-content: |
+  page=$(curl -fsSL "https://sourceforge.net/projects/libebook/files/")
+  ver=$(printf '%s\n' "$page" | grep -oE 'libe-book-[0-9.]+/' | sed 's/libe-book-//; s/\/$//' | sort -V | tail -n1)
+  test -n "$ver" || exit 1
+  echo "$ver"
+  echo "https://sourceforge.net/projects/libebook/files/libe-book-$ver/libe-book-$ver.tar.xz"

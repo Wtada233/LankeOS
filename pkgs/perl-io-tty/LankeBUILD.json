@@ -1,0 +1,19 @@
+{
+  "name": "perl-io-tty",
+  "version": "1.31",
+  "release": 1,
+  "deps": [
+    "perl"
+  ],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://search.cpan.org/CPAN/authors/id/T/TO/TODDR/IO-Tty-1.31.tar.gz"
+  ],
+  "work_sources": []
+}

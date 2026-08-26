@@ -20,7 +20,6 @@
     "jansson",
     "libmnl",
     "libnftnl",
-    "python",
     "readline"
   ],
   "sources": [

@@ -13,8 +13,7 @@
     "libnghttp2.so.14"
   ],
   "build_deps": [
-    "base-devel",
-    "python"
+    "base-devel"
   ],
   "sources": [
     "https://github.com/nghttp2/nghttp2/releases/download/v1.70.0/nghttp2-1.70.0.tar.xz"

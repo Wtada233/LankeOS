@@ -59,7 +59,6 @@
     "pango",
     "pipewire",
     "polkit",
-    "python",
     "sdbus-cpp",
     "wayland",
     "wayland-protocols",

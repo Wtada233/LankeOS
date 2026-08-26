@@ -12,8 +12,7 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "cmake",
-    "python"
+    "cmake"
   ],
   "sources": [
     "https://github.com/ninja-build/ninja/archive/refs/tags/v1.13.2.tar.gz"

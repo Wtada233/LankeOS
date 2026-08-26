@@ -1,0 +1,6 @@
+pkg-name: unixodbc
+tracker-template: github
+repo: lurcher/unixODBC
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

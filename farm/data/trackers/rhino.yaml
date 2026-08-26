@@ -1,0 +1,18 @@
+pkg-name: rhino
+# rhino 最新 release（Rhino1_9_1_Release，1.9.1）无预编译 zip 资产（Arch 因此钉 1.7.15）。
+# 遍历 tag（新→旧），取第一个带 rhino-<ver>.zip 的版本；zip 是预编译 release 归档，进 sources。
+tracker-template: script
+script-content: |
+  set -e
+  tags=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} "https://api.github.com/repos/mozilla/rhino/tags?per_page=30" | python3 -c "import json,sys;print(' '.join(t['name'] for t in json.load(sys.stdin)))")
+  for tag in $(printf '%s\n' "$tags" | tr ' ' '\n' | grep -oE 'Rhino[0-9]+_[0-9]+_[0-9]+_Release' | sort -Vr); do
+    v=$(printf '%s' "$tag" | sed 's/Rhino//; s/_Release//; s/_/./g')
+    url="https://github.com/mozilla/rhino/releases/download/$tag/rhino-$v.zip"
+    if curl -fsSI -o /dev/null "$url"; then
+      echo "$v"
+      echo "$url"
+      exit 0
+    fi
+  done
+  echo "未找到带 zip 资产的 release" >&2
+  exit 1

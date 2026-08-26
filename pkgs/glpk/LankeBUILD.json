@@ -1,0 +1,24 @@
+{
+  "name": "glpk",
+  "version": "5.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgmp.so.10",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libglpk.so",
+    "libglpk.so.40"
+  ],
+  "build_deps": [
+    "base-devel",
+    "gmp"
+  ],
+  "sources": [
+    "https://ftp.gnu.org/gnu/glpk/glpk-5.0.tar.gz"
+  ],
+  "work_sources": []
+}

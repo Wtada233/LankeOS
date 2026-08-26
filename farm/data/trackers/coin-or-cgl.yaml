@@ -1,0 +1,6 @@
+pkg-name: coin-or-cgl
+tracker-template: github
+repo: coin-or/Cgl
+mode: tags
+tag-prefix: 'releases/'
+template: https://github.com/coin-or/Cgl/archive/refs/tags/{tag}.tar.gz

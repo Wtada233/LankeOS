@@ -1,0 +1,7 @@
+# lapack（blas/cblas/lapack/lapacke 合并）：Reference-LAPACK 上游 tag 带 v 前缀
+pkg-name: lapack
+tracker-template: github
+repo: Reference-LAPACK/lapack
+mode: tags
+tag-prefix: 'v'
+template: https://github.com/Reference-LAPACK/lapack/archive/refs/tags/{tag}.tar.gz

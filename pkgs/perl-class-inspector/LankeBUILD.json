@@ -8,8 +8,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel",
-    "perl"
+    "base-devel"
   ],
   "sources": [
     "https://cpan.metacpan.org/authors/id/P/PL/PLICEASE/Class-Inspector-1.36.tar.gz"

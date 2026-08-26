@@ -39,9 +39,7 @@
     "libverto.so.0"
   ],
   "build_deps": [
-    "base-devel",
-    "perl",
-    "tcl"
+    "base-devel"
   ],
   "sources": [
     "https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz"

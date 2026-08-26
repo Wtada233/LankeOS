@@ -1,0 +1,18 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # release tarball 自带 configure（autotools）
+    ./configure \
+        --prefix={PREFIX} \
+        --disable-static \
+        --enable-introspection \
+        --disable-gtk-doc
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

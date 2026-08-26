@@ -1,0 +1,31 @@
+{
+  "name": "clucene",
+  "version": "2.3.3.4",
+  "release": 4,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libclucene-contribs-lib.so",
+    "libclucene-contribs-lib.so.1",
+    "libclucene-core.so",
+    "libclucene-core.so.1",
+    "libclucene-shared.so",
+    "libclucene-shared.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "boost",
+    "zlib"
+  ],
+  "sources": [
+    "https://downloads.sourceforge.net/clucene/clucene-core-2.3.3.4.tar.gz"
+  ],
+  "work_sources": []
+}

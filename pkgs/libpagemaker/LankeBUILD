@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # libpagemaker 的 --enable-werror 默认开（加 -Werror），gcc16 的 -Wcatch-value 炸 → 关掉
+    ./configure --prefix={PREFIX} --disable-werror
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

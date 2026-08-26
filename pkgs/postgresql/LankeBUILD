@@ -1,0 +1,70 @@
+lankebuild_prepare() {
+    # Arch 同款两个 patch：
+    # 0001：socket 默认目录 /tmp → /run/postgresql（FHS 标准）
+    # 0002：--disable-rpath 会剥掉 perl_embed_ldflags 的 rpath，plperl.so 的 libperl.so
+    #      在非标准目录（perl5/5.44/core_perl/CORE）运行期找不到 → 给 plperl.so 强制加回 $(rpath)
+    for p in \
+        0001-Set-DEFAULT_PGSOCKET_DIR-to-run-postgresql.patch \
+        0002-Force-RPATH-to-be-used-for-the-PL-Perl-plugin.patch; do
+        patch -N -p1 -i "{WORK_DIR}/../$p" \
+            || patch -R --dry-run -p1 -i "{WORK_DIR}/../$p" >/dev/null 2>&1 \
+            || exit 1
+    done
+}
+
+lankebuild_build() {
+    # autotools：configure + make（提供 libpq 给 LibreOffice Base 的 PostgreSQL 连接器）
+    # 按 LankeOS 适配：drop --with-ldap（无 openldap）和 --with-libnuma（无 numactl）
+    ./configure \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --mandir={DATADIR}/man \
+        --datadir={DATADIR}/postgresql \
+        --disable-rpath \
+        --enable-nls \
+        --enable-tap-tests \
+        --with-gssapi \
+        --with-icu \
+        --with-libcurl \
+        --with-liburing \
+        --with-libxml \
+        --with-libxslt \
+        --with-llvm \
+        --with-lz4 \
+        --with-openssl \
+        --with-pam \
+        --with-perl \
+        --with-python \
+        --with-readline \
+        --with-system-tzdata=/usr/share/zoneinfo \
+        --with-systemd \
+        --with-tcl \
+        --with-uuid=e2fs \
+        --with-zlib \
+        --with-zstd
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+    # ── Arch 同款系统文件 ──
+    # check-db-dir（.in 模板 sed 版本号）
+    PG_MAJOR=$(printf '%s' '{ORIG_PKG_VER}' | cut -d. -f1)
+    PG_PREV=$((PG_MAJOR - 1))
+    sed -e "s/%PGMAJORVERSION%/${PG_MAJOR}/g" \
+        -e "s/%PREVMAJORVERSION%/${PG_PREV}/g" \
+        {WORK_DIR}/../postgresql-check-db-dir.in |
+        install -Dm755 /dev/stdin {STAGING_ROOT}{BINDIR}/postgresql-check-db-dir
+    install -Dm644 {WORK_DIR}/../postgresql.pam {STAGING_ROOT}/etc/pam.d/postgresql
+    install -Dm644 {WORK_DIR}/../postgresql.logrotate {STAGING_ROOT}/etc/logrotate.d/postgresql
+    install -Dm644 {WORK_DIR}/../postgresql.service {STAGING_ROOT}/usr/lib/systemd/system/postgresql.service
+    install -Dm644 {WORK_DIR}/../postgresql.sysusers {STAGING_ROOT}/usr/lib/sysusers.d/postgresql.conf
+    install -Dm644 {WORK_DIR}/../postgresql.tmpfiles {STAGING_ROOT}/usr/lib/tmpfiles.d/postgresql.conf
+    # postinst hook：数据目录存在时校验版本（Arch post_upgrade 同款）
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+if [ -d /var/lib/postgres/data ]; then
+    /usr/bin/postgresql-check-db-dir /var/lib/postgres/data || :
+fi
+EOF
+}

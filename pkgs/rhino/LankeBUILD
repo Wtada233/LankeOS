@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    :
+}
+
+lankebuild_package() {
+    # 预编译 release zip（Arch 同款）：jar 安装为 js-<ver>.jar + js.jar 软链，man 页随带
+    install -Dm 644 lib/rhino-{ORIG_PKG_VER}.jar {STAGING_ROOT}/usr/share/java/js-{ORIG_PKG_VER}.jar
+    ln -s js-{ORIG_PKG_VER}.jar {STAGING_ROOT}/usr/share/java/js.jar
+    install -Dm 644 man/rhino.1 {STAGING_ROOT}/usr/share/man/man1/rhino.1
+}

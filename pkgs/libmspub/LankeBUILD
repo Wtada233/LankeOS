@@ -1,0 +1,18 @@
+lankebuild_prepare() {
+    # Arch 同款两个 patch：cstdint 补头（MSPUBMetaData.h / Coordinate.h），-p1
+    for p in libmspub-buildfix.diff libmspub-includes.patch; do
+        patch -N -p1 -i "{WORK_DIR}/../$p" || patch -R --dry-run -p1 -i "{WORK_DIR}/../$p" >/dev/null 2>&1 || exit 1
+    done
+}
+
+lankebuild_build() {
+    # ICU 头（localpointer.h 的 auto 模板）需要 C++17，configure 却强制 gnu++11 → 覆盖
+    export CXXFLAGS="$CXXFLAGS -std=gnu++17"
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

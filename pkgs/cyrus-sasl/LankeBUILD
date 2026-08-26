@@ -1,0 +1,60 @@
+lankebuild_prepare() {
+    # Arch 同款 cherry-pick 转 patch（含 CVE-2022-24407 sql 注入——即使现在 --disable-sql，
+    # 将来有 mariadb 若误开也有补丁保护；time.h 检测、openssl 3.0 支持）
+    for p in \
+        2d2e97b0eb53fa7f87a3bf1529d8f712dd954480.patch \
+        266f0acf7f5e029afbb3e263437039e50cd6c262.patch \
+        887dbc0435056ec58ee48c4d803f110ade1e4c39.patch \
+        dfaa62392e7caecc6ecf0097b4d73738ec4fc0a8.patch \
+        c2bd3afbca57f176d8c650670ce371444bb7fcc0.patch; do
+        patch -N -p1 -i "{WORK_DIR}/../$p" \
+            || patch -R --dry-run -p1 -i "{WORK_DIR}/../$p" >/dev/null 2>&1 \
+            || exit 1
+    done
+    autoreconf -fiv
+}
+
+lankebuild_build() {
+    # md5.c 的 PROTO_LIST/K&R 定义冲突 → 显式 gnu17
+    export CFLAGS="$CFLAGS -std=gnu17"
+    export CXXFLAGS="$CXXFLAGS -std=gnu17"
+    # openldap configure 硬要求 SASL。Arch 选项减去 LankeOS 无/循环的 DB 模块
+    # （--enable-sql/--with-mysql/--with-pgsql/--with-sqlite3 无 DB；--enable-ldapdb 需 openldap，循环）
+    ./configure --prefix={PREFIX} \
+        --disable-krb4 \
+        --disable-macos-framework \
+        --disable-otp \
+        --disable-passdss \
+        --disable-srp \
+        --disable-srp-setpass \
+        --disable-static \
+        --enable-alwaystrue \
+        --enable-anon \
+        --enable-auth-sasldb \
+        --enable-checkapop \
+        --enable-cram \
+        --enable-digest \
+        --enable-gssapi \
+        --enable-login \
+        --enable-ntlm \
+        --enable-plain \
+        --enable-shared \
+        --disable-sql \
+        --infodir={DATADIR}/info \
+        --mandir={DATADIR}/man \
+        --sbin=/usr/bin \
+        --sysconfdir={SYSCONFDIR} \
+        --with-dblib=gdbm \
+        --with-devrandom=/dev/urandom \
+        --with-configdir=/etc/sasl2:/etc/sasl:/usr/lib/sasl2 \
+        --with-pam \
+        --with-saslauthd=/run/saslauthd
+    # 减少未使用共享库链接（Arch 同款）
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

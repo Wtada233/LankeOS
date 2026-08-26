@@ -1,0 +1,28 @@
+{
+  "name": "neon",
+  "version": "0.37.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libexpat.so.1",
+    "libssl.so.3",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libneon.so",
+    "libneon.so.27"
+  ],
+  "build_deps": [
+    "base-devel",
+    "expat",
+    "libxml2",
+    "xmlto",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/notroj/neon/archive/refs/tags/0.37.1.tar.gz"
+  ],
+  "work_sources": []
+}

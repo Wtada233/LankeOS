@@ -1,15 +1,19 @@
-lankebuild_prepare() {
-    # Prepare environment
-    :
-}
-
 lankebuild_build() {
+    # Harfbuzz 不要异常（Arch 同款）：去掉 -fexceptions，否则 C++ 后端（graphite2）链接
+    # 引用 __gxx_personality_v0，cc 链接缺 libstdc++ → undefined reference
+    export CFLAGS="${CFLAGS/-fexceptions/}"
+    export CXXFLAGS="${CXXFLAGS/-fexceptions/}"
     mkdir build && cd build
-    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Dgraphite2=disabled
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release \
+        -Dcpp_std=c++17 \
+        -Dgraphite2=enabled
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
 }
 
+lankebuild_prepare() {
+    :
+}
 
 lankebuild_package() {
     # Installation handled by builder

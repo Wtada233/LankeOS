@@ -38,7 +38,9 @@
     "ninja",
     "pango",
     "rust",
-    "vala"
+    "vala",
+    "fontconfig",
+    "harfbuzz"
   ],
   "sources": [
     "https://download.gnome.org/sources/librsvg/2.62/librsvg-2.62.90.tar.xz"

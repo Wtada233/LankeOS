@@ -19,8 +19,7 @@
     "git",
     "gmp",
     "gperf",
-    "libcap",
-    "python"
+    "libcap"
   ],
   "sources": [
     "https://ftpmirror.gnu.org/coreutils/coreutils-9.11.tar.xz"

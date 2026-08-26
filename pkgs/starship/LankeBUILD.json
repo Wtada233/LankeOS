@@ -13,7 +13,6 @@
     "base-devel",
     "cmake",
     "git",
-    "python",
     "rust"
   ],
   "sources": [

@@ -6,8 +6,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel",
-    "perl"
+    "base-devel"
   ],
   "sources": [
     "https://cpan.metacpan.org/authors/id/O/OA/OALDERS/URI-5.36.tar.gz"

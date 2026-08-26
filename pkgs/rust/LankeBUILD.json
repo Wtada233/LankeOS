@@ -27,8 +27,6 @@
     "libffi",
     "llvm",
     "ninja",
-    "perl",
-    "python",
     "rust",
     "zlib"
   ],

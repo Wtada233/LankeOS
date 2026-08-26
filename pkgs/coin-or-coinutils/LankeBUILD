@@ -1,0 +1,17 @@
+lankebuild_build() {
+    ./configure --prefix={PREFIX} \
+        --with-blas-lib='-lblas' \
+        --with-lapack-lib='-llapack' \
+        --with-glpk-lib='-lglpk' \
+        --enable-dependency-linking
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_package() {
+    :
+}

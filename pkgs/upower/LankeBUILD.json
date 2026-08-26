@@ -26,8 +26,7 @@
     "libxslt",
     "meson",
     "ninja",
-    "polkit",
-    "python"
+    "polkit"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/upower/upower/-/archive/v1.91.3/upower-v1.91.3.tar.gz"

@@ -83,7 +83,9 @@
     "spirv-headers",
     "vulkan-headers",
     "xz",
-    "zlib"
+    "zlib",
+    "cairo",
+    "glib"
   ],
   "sources": [
     "https://ffmpeg.org/releases/ffmpeg-8.1.2.tar.xz"

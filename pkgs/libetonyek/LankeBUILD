@@ -1,0 +1,17 @@
+lankebuild_prepare() {
+    # mdds 3.x API（is_tree_valid → valid_tree），Arch 同款 mdds3.patch（-p0）
+    patch -N -p0 -i {WORK_DIR}/../mdds3.patch || patch -R --dry-run -p0 -i {WORK_DIR}/../mdds3.patch >/dev/null 2>&1 || exit 1
+}
+
+lankebuild_build() {
+    # openSUSE 同款：gcc>=16 + mdds 3.x 需要 C++17（configure 的 C++11 探测首个空参通过，不覆盖）
+    export CXXFLAGS="$CXXFLAGS -std=gnu++17"
+    # 我们 mdds 是 3.x，显式 --with-mdds=3.0（默认 2.1 会找不到）
+    ./configure --prefix={PREFIX} --with-mdds=3.0
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

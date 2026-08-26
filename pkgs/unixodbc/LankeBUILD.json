@@ -1,0 +1,27 @@
+{
+  "name": "unixodbc",
+  "version": "2.3.14",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libltdl.so.7",
+    "libreadline.so.8"
+  ],
+  "provides": [
+    "libodbc.so",
+    "libodbc.so.2",
+    "libodbccr.so",
+    "libodbccr.so.2",
+    "libodbcinst.so",
+    "libodbcinst.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "readline"
+  ],
+  "sources": [
+    "https://github.com/lurcher/unixODBC/releases/download/v2.3.14/unixODBC-2.3.14.tar.gz"
+  ],
+  "work_sources": []
+}

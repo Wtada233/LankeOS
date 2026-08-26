@@ -10,7 +10,6 @@
     "cmake",
     "llvm",
     "ninja",
-    "python",
     "spirv-llvm-translator"
   ],
   "sources": [

@@ -1,0 +1,22 @@
+{
+  "name": "libusb",
+  "version": "1.0.30",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libudev.so.1"
+  ],
+  "provides": [
+    "libusb-1.0.so",
+    "libusb-1.0.so.0"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/libusb/libusb/releases/download/v1.0.30/libusb-1.0.30.tar.bz2"
+  ],
+  "work_sources": []
+}

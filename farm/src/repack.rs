@@ -260,7 +260,8 @@ mod tests {
         assert_eq!(meta["provides"][1], "libfoo.so.1");
 
         // 重打的 .lpkg 仍可解包（round-trip 完整），扫描出的 name/version 正确
-        let scan = crate::scan::scan_lpkg(&lpkg, &extract).unwrap();
+        let scan =
+            crate::scan::scan_lpkg(&lpkg, &extract, &Default::default()).unwrap();
         assert_eq!(scan.name, "fake");
         assert_eq!(scan.version, "1.0");
 

@@ -19,7 +19,6 @@
     "base-devel",
     "ncurses",
     "readline",
-    "tcl",
     "zlib"
   ],
   "sources": [

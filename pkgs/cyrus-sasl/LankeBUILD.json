@@ -1,0 +1,30 @@
+{
+  "name": "cyrus-sasl",
+  "version": "2.1.28",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcrypt.so.2",
+    "libcrypto.so.3",
+    "libgdbm.so.6",
+    "libgssapi_krb5.so.2",
+    "libkrb5.so.3",
+    "libpam.so.0"
+  ],
+  "provides": [
+    "libsasl2.so",
+    "libsasl2.so.3"
+  ],
+  "build_deps": [
+    "base-devel",
+    "gdbm",
+    "krb5",
+    "linux-pam",
+    "libxcrypt"
+  ],
+  "sources": [
+    "https://github.com/cyrusimap/cyrus-sasl/releases/download/cyrus-sasl-2.1.28/cyrus-sasl-2.1.28.tar.gz"
+  ],
+  "work_sources": []
+}

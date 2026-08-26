@@ -1,0 +1,15 @@
+{
+  "name": "rhino",
+  "version": "1.7.15",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/mozilla/rhino/releases/download/Rhino1_7_15_Release/rhino-1.7.15.zip"
+  ],
+  "work_sources": []
+}

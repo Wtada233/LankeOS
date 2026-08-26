@@ -1,0 +1,18 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # nauty 构建系统丢 LDFLAGS，Arch 同款：把 LDFLAGS 并入 CFLAGS
+    CFLAGS="$CFLAGS $LDFLAGS" ./configure \
+        --prefix={PREFIX} \
+        --includedir={PREFIX}/include/nauty \
+        --enable-generic
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    install -Dm 644 COPYRIGHT {STAGING_ROOT}/usr/share/licenses/nauty/LICENSE
+}
+
+lankebuild_package() {
+    :
+}

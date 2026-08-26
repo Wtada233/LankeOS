@@ -1,0 +1,39 @@
+{
+  "name": "nauty",
+  "version": "2.9.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libnauty-2.9.3.so",
+    "libnauty.so",
+    "libnauty1-2.9.3.so",
+    "libnauty1.so",
+    "libnautyL-2.9.3.so",
+    "libnautyL.so",
+    "libnautyL1-2.9.3.so",
+    "libnautyL1.so",
+    "libnautyQ-2.9.3.so",
+    "libnautyQ.so",
+    "libnautyQ1-2.9.3.so",
+    "libnautyQ1.so",
+    "libnautyS-2.9.3.so",
+    "libnautyS.so",
+    "libnautyS1-2.9.3.so",
+    "libnautyS1.so",
+    "libnautyW-2.9.3.so",
+    "libnautyW.so",
+    "libnautyW1-2.9.3.so",
+    "libnautyW1.so"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://pallini.di.uniroma1.it/nauty2_9_3.tar.gz"
+  ],
+  "work_sources": []
+}

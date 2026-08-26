@@ -38,10 +38,7 @@
     "attr",
     "base-devel",
     "libxml2",
-    "ncurses",
-    "perl",
-    "ruby",
-    "tcl"
+    "ncurses"
   ],
   "sources": [
     "https://ftpmirror.gnu.org/gettext/gettext-1.0.tar.xz"

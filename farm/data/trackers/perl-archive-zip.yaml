@@ -1,0 +1,10 @@
+pkg-name: perl-archive-zip
+tracker-template: script
+script-content: |
+  curl -fsSL 'https://pypi.org/pypi/Archive-Zip/json' >/dev/null 2>&1 || true
+  page=$(curl -fsSL 'https://www.cpan.org/modules/by-module/Archive/')
+  file=$(printf '%s\n' "$page" | grep -oE 'Archive-Zip-[0-9.]+\.tar\.gz' | sort -V | tail -n1)
+  test -n "$file" || exit 1
+  ver=$(echo "$file" | sed 's/Archive-Zip-//; s/\.tar\.gz//')
+  echo "$ver"
+  echo "https://www.cpan.org/modules/by-module/Archive/$file"

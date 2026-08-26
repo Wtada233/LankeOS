@@ -1,0 +1,24 @@
+{
+  "name": "libmythes",
+  "version": "1.2.6",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libmythes-1.2.so",
+    "libmythes-1.2.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "hunspell"
+  ],
+  "sources": [
+    "https://github.com/hunspell/mythes/releases/download/v1.2.6/mythes-1.2.6.tar.xz"
+  ],
+  "work_sources": []
+}

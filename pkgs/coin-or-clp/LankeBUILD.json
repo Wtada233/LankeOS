@@ -1,0 +1,45 @@
+{
+  "name": "coin-or-clp",
+  "version": "1.17.11",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libCoinUtils.so.3",
+    "libOsi.so.1",
+    "libamd.so.3",
+    "libblas.so.3",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libcholmod.so.5",
+    "libcoinasl.so.2",
+    "libgcc_s.so.1",
+    "libglpk.so.40",
+    "liblapack.so.3",
+    "libm.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libClp.so",
+    "libClp.so.1",
+    "libClpSolver.so",
+    "libClpSolver.so.1",
+    "libOsiClp.so",
+    "libOsiClp.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "coin-or-asl",
+    "coin-or-coinutils",
+    "coin-or-osi",
+    "suitesparse",
+    "bzip2",
+    "glpk",
+    "lapack",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/coin-or/Clp/archive/refs/tags/releases/1.17.11.tar.gz"
+  ],
+  "work_sources": []
+}

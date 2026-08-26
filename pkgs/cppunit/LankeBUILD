@@ -1,0 +1,15 @@
+lankebuild_build() {
+    # Arch 同款：--disable-static + libtool overlinking 修正
+    ./configure --prefix={PREFIX} --disable-static
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_package() {
+    :
+}

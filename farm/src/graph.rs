@@ -155,6 +155,12 @@ impl Index {
             .unwrap_or(&[])
     }
 
+    /// 仓库提供的全部能力（provides_index 的 key，含 SONAME 与虚拟提供）。
+    /// 扫描 not-found 判定用：needed_so 条目不在其中 → 无 provider → 不进 needed_so。
+    pub fn all_provided_capabilities(&self) -> std::collections::HashSet<String> {
+        self.provides_index.keys().cloned().collect()
+    }
+
     /// 排序的包名列表（确定性输出用）。
     pub fn sorted_names(&self) -> Vec<String> {
         let mut v: Vec<String> = self.packages.keys().cloned().collect();

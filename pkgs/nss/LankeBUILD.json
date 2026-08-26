@@ -27,8 +27,6 @@
     "base-devel",
     "gyp",
     "nspr",
-    "perl",
-    "python",
     "sqlite",
     "zlib"
   ],

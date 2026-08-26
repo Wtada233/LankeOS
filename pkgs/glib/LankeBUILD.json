@@ -37,7 +37,6 @@
     "meson",
     "ninja",
     "pcre2",
-    "python",
     "zlib"
   ],
   "sources": [

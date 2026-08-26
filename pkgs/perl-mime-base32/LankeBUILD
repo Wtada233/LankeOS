@@ -9,5 +9,7 @@ lankebuild_build() {
 
 lankebuild_package() {
     make DESTDIR={STAGING_ROOT} install
+    # perllocal.pod 是各 perl 模块共享追加的安装记录，每包都 own → 打包冲突，删掉（perl-xml-parser 同款）
+    rm -f {STAGING_ROOT}/usr/lib/perl5/*/core_perl/perllocal.pod
     find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
 }

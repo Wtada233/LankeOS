@@ -15,8 +15,7 @@
     "libssl.so.3"
   ],
   "build_deps": [
-    "base-devel",
-    "perl"
+    "base-devel"
   ],
   "sources": [
     "https://github.com/openssl/openssl/releases/download/openssl-3.6.3/openssl-3.6.3.tar.gz"

@@ -1,0 +1,6 @@
+pkg-name: argon2
+tracker-template: github
+repo: P-H-C/phc-winner-argon2
+mode: tags
+tag-prefix: ''
+template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

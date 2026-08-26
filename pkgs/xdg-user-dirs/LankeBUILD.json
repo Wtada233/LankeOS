@@ -9,8 +9,7 @@
   "build_deps": [
     "base-devel",
     "meson",
-    "ninja",
-    "python"
+    "ninja"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/xdg/xdg-user-dirs/-/archive/v0.20/xdg-user-dirs-v0.20.tar.gz"

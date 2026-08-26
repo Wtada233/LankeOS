@@ -34,7 +34,6 @@
     "bc",
     "dejagnu",
     "git",
-    "perl",
     "zlib",
     "zstd"
   ],

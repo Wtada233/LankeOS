@@ -63,7 +63,6 @@
     "nss",
     "nspr",
     "openjpeg",
-    "python",
     "qt6-base",
     "zlib"
   ],

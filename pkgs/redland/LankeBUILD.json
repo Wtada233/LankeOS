@@ -1,0 +1,31 @@
+{
+  "name": "redland",
+  "version": "1.0.17",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libltdl.so.7",
+    "libodbc.so.2",
+    "libpq.so.5",
+    "libraptor2.so.0",
+    "librasqal.so.3",
+    "libsqlite3.so.0"
+  ],
+  "provides": [
+    "librdf.so",
+    "librdf.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "rasqal",
+    "raptor",
+    "postgresql",
+    "unixodbc",
+    "sqlite"
+  ],
+  "sources": [
+    "http://download.librdf.org/source/redland-1.0.17.tar.gz"
+  ],
+  "work_sources": []
+}

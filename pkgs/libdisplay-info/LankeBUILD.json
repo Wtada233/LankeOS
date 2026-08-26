@@ -15,8 +15,7 @@
     "base-devel",
     "hwdata",
     "meson",
-    "ninja",
-    "python"
+    "ninja"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/0.4.0/libdisplay-info-0.4.0.tar.gz"

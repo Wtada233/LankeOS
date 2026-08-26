@@ -35,7 +35,8 @@
     "base-devel",
     "doxygen",
     "qt6-base",
-    "qt6-tools"
+    "qt6-tools",
+    "libglvnd"
   ],
   "sources": [
     "https://gitlab.com/nicolasfella/signond/-/archive/VERSION_8.61/signond-VERSION_8.61.tar.gz"

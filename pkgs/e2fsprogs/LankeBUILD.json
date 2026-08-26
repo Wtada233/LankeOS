@@ -26,8 +26,7 @@
   "build_deps": [
     "base-devel",
     "fuse3",
-    "git",
-    "perl"
+    "git"
   ],
   "sources": [
     "https://downloads.sourceforge.net/project/e2fsprogs/e2fsprogs/v1.47.4/e2fsprogs-1.47.4.tar.gz"

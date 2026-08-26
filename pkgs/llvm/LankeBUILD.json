@@ -39,8 +39,6 @@
     "libffi",
     "libxml2",
     "ninja",
-    "perl",
-    "python",
     "zlib",
     "zstd"
   ],

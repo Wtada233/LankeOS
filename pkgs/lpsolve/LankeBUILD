@@ -1,0 +1,24 @@
+lankebuild_prepare() {
+    # Fedora patch：ccc 脚本尊重 CC/CFLAGS/LDFLAGS（Arch 同款）
+    patch -N -p1 -i {WORK_DIR}/../lp_solve-5.5.2.14-Respect-CC-CFLAGS-and-LDFLAGS.patch \
+        || patch -R --dry-run -p1 -i {WORK_DIR}/../lp_solve-5.5.2.14-Respect-CC-CFLAGS-and-LDFLAGS.patch >/dev/null 2>&1 \
+        || exit 1
+}
+
+lankebuild_build() {
+    # lp_solve 用自定义 ccc 脚本（非 autotools）：先核心库 lpsolve55，后可执行 lp_solve
+    cd lpsolve55
+    sh ccc
+    rm -f bin/ux*/liblpsolve55.a
+    cd ../lp_solve
+    sh ccc
+}
+
+lankebuild_package() {
+    # Arch 同款安装
+    install -dm755 {STAGING_ROOT}/usr/{bin,lib,include/lpsolve}
+    install -m755 lp_solve/bin/ux*/lp_solve {STAGING_ROOT}/usr/bin/
+    install -m755 lpsolve55/bin/ux*/liblpsolve55.so {STAGING_ROOT}/usr/lib/
+    install -m644 lp*.h {STAGING_ROOT}/usr/include/lpsolve/
+    install -D -m644 README.txt {STAGING_ROOT}/usr/share/licenses/lpsolve/README.txt
+}

@@ -61,6 +61,7 @@ pub fn probe(
     Ok(ProbeResult {
         version,
         sources: vec![sdist_url],
+        work_sources: vec![],
     })
 }
 

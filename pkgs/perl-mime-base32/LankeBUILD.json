@@ -6,8 +6,7 @@
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel",
-    "perl"
+    "base-devel"
   ],
   "sources": [
     "https://search.cpan.org/CPAN/authors/id/R/RE/REHSACK/MIME-Base32-1.303.tar.gz"

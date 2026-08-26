@@ -37,7 +37,8 @@
     "libx264",
     "libx265",
     "ninja",
-    "openjpeg"
+    "openjpeg",
+    "libwebp"
   ],
   "sources": [
     "https://github.com/strukturag/libheif/archive/refs/tags/v1.23.1.tar.gz"

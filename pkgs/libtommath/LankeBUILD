@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # makefile.shared 建共享库（-fPIC，能链进共享对象）；默认 makefile 建非 PIC 静态库，
+    # 且默认 PREFIX=/usr/local —— firebird 链接它报 relocation 错误
+    make -f makefile.shared -j$(nproc) PREFIX={PREFIX}
+    make -f makefile.shared DESTDIR={STAGING_ROOT} install PREFIX={PREFIX}
+    # 关静态库（默认 makefile 的产物）
+    rm -f {STAGING_ROOT}{LIBDIR}/libtommath.a
+}
+
+lankebuild_package() {
+    :
+}

@@ -21,9 +21,7 @@
   "build_deps": [
     "base-devel",
     "popt",
-    "python",
-    "slang",
-    "tcl"
+    "slang"
   ],
   "sources": [
     "https://releases.pagure.org/newt/newt-0.52.25.tar.gz"

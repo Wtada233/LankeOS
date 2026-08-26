@@ -48,6 +48,7 @@ pub fn probe(
     Ok(ProbeResult {
         version,
         sources: vec![src],
+        work_sources: vec![],
     })
 }
 

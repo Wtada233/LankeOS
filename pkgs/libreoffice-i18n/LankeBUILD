@@ -1,0 +1,32 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 官方 i18n langpack（Arch libreoffice-fresh-i18n 同款）：
+    # 123 个 tar.gz 各自解压出 LibreOffice_26.8.0.2_Linux_x86-64_rpm_langpack_<lang>/
+    # （多源平铺，cwd = work_root，与主 libreoffice 包同款）
+    # 每个归档含 2~3 个 RPM（libobasis26.8-<lang> + libreoffice26.8-<lang> [+ libreoffice26.8-dict-<lang>]）。
+    # dict RPM 删掉（Arch 同款 "we ship them now in separate packages"）：
+    #   - 它装的 share/wordbook（en-US/en-GB）与主包冲突（lpkg 文件冲突）
+    #   - 主包 --without-myspell-dicts + 系统 /usr/share/hunspell 词典，dict 扩展多余
+    # bsdtar 解出 opt/libreoffice26.8/ → 拷进主包目录 /usr/lib/libreoffice
+    # （build_deps 里的 libarchive 提供 bsdtar；base/base-devel 都没有）
+    install -dm755 {STAGING_ROOT}/usr/lib/libreoffice
+    for d in LibreOffice_{ORIG_PKG_VER}_Linux_x86-64_rpm_langpack_*; do
+        [ -d "$d" ] || continue
+        cd "$d/RPMS"
+        rm -rf opt
+        rm -f *-dict-*.rpm
+        for rpm in *.rpm; do
+            bsdtar -xf "$rpm"
+        done
+        cp -R opt/libreoffice26.8/* {STAGING_ROOT}/usr/lib/libreoffice/
+        rm -rf opt
+        cd - >/dev/null
+    done
+}
+
+lankebuild_package() {
+    :
+}

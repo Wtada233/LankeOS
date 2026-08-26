@@ -29,8 +29,7 @@
     "libgudev",
     "meson",
     "ninja",
-    "pipewire",
-    "python"
+    "pipewire"
   ],
   "sources": [
     "https://github.com/flatpak/xdg-desktop-portal/releases/download/1.22.1/xdg-desktop-portal-1.22.1.tar.xz"

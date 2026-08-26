@@ -1,0 +1,14 @@
+lankebuild_build() {
+    PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor
+    make -j$(nproc)
+}
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_package() {
+    make install DESTDIR={STAGING_ROOT}
+    # perllocal.pod 是各 perl 模块共享追加的安装记录，每包都 own → 打包冲突，删掉（perl-xml-parser 同款）
+    rm -f {STAGING_ROOT}/usr/lib/perl5/*/core_perl/perllocal.pod
+}

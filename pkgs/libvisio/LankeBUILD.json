@@ -1,0 +1,34 @@
+{
+  "name": "libvisio",
+  "version": "0.1.11",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libicuuc.so.78",
+    "libm.so.6",
+    "librevenge-0.0.so.0",
+    "librevenge-generators-0.0.so.0",
+    "librevenge-stream-0.0.so.0",
+    "libstdc++.so.6",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "libvisio-0.1.so",
+    "libvisio-0.1.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "boost",
+    "gperf",
+    "librevenge",
+    "libxml2",
+    "cppunit",
+    "icu"
+  ],
+  "sources": [
+    "https://dev-www.libreoffice.org/src/libvisio/libvisio-0.1.11.tar.xz"
+  ],
+  "work_sources": []
+}

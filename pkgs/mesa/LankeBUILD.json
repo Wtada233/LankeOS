@@ -88,7 +88,6 @@
     "lua",
     "meson",
     "ninja",
-    "python",
     "python-mako",
     "python-packaging",
     "python-pyyaml",

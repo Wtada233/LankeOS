@@ -65,7 +65,9 @@
     "python-distlib",
     "xkeyboard-config",
     "zlib",
-    "zstd"
+    "zstd",
+    "fuse3",
+    "libpulse"
   ],
   "sources": [
     "https://download.qemu.org/qemu-11.0.3.tar.xz"

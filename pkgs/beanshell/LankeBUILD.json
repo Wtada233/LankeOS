@@ -1,0 +1,14 @@
+{
+  "name": "beanshell",
+  "version": "2.1.1",
+  "release": 2,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "work_sources": [
+    "https://github.com/beanshell/beanshell/releases/download/2.1.1/bsh-2.1.1.jar"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "cppunit",
+  "version": "1.15.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libcppunit-1.15.so.1",
+    "libcppunit.so"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://dev-www.libreoffice.org/src/cppunit-1.15.1.tar.gz"
+  ],
+  "work_sources": []
+}

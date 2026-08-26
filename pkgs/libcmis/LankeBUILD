@@ -1,0 +1,18 @@
+lankebuild_prepare() {
+    # buildfix.patch：避免 -isystem /usr/include 破坏 #include_next <stdlib.h>（改 configure.ac → 需 autoreconf）
+    patch -N -p1 -i {WORK_DIR}/../buildfix.patch || patch -R --dry-run -p1 -i {WORK_DIR}/../buildfix.patch >/dev/null 2>&1 || exit 1
+    autoreconf -fiv
+}
+
+lankebuild_build() {
+    # --disable-werror：libcmis 默认开 werror，gcc16 -Werror 炸
+    ./configure --prefix={PREFIX} --disable-werror
+    # 减少未使用共享库链接（Arch 同款）
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

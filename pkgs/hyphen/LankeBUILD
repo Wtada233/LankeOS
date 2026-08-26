@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    # github 归档是 git 树缺 configure，先引导（Arch 同款 autoreconf）
+    autoreconf -fiv
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

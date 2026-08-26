@@ -24,10 +24,13 @@ use serde::{Deserialize, Serialize};
 use crate::net::Fetcher;
 
 /// 探测结果：最新版本 + 具体下载 URL（提案的基础）。
+/// `sources`：主源（lpkg 解压）；`work_sources`：只下载不解压（Arch noextract 对应，
+/// 如 LibreOffice 的 vendor tarball 走 --with-external-tar）。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProbeResult {
     pub version: String,
     pub sources: Vec<String>,
+    pub work_sources: Vec<String>,
 }
 
 /// 更新提案：`pkg` 当前版本 → 上游最新版本 + 具体源 URL。
@@ -37,6 +40,7 @@ pub struct Proposal {
     pub current_version: String,
     pub new_version: String,
     pub sources: Vec<String>,
+    pub work_sources: Vec<String>,
     pub tracker_template: String,
 }
 
@@ -155,6 +159,7 @@ impl TrackerConfig {
             return validate_probe_result(ProbeResult {
                 version: v,
                 sources: vec![src],
+                work_sources: vec![],
             });
         }
         // 约束 2：主版本约束 —— major-version-lock（常量）优先，否则 major-of（取指定包主版本）
@@ -203,6 +208,7 @@ impl TrackerConfig {
             current_version: current_version.to_string(),
             new_version: result.version,
             sources: result.sources,
+            work_sources: result.work_sources,
             tracker_template: self.tracker_template.clone(),
         })
     }

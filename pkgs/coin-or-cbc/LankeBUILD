@@ -1,0 +1,19 @@
+lankebuild_build() {
+    CFLAGS+=" -Wno-implicit-function-declaration"
+    ./configure --prefix={PREFIX} \
+        --enable-cbc-parallel \
+        --with-nauty-lib=-lnauty \
+        --with-nauty-incdir={PREFIX}/include/nauty
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+    # nauty 是静态库，从 .pc 的 Libs 去掉（Arch 同款）
+    sed -e 's|/usr/lib/libnauty.a||' -i {STAGING_ROOT}/usr/lib/pkgconfig/cbc.pc
+}
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_package() {
+    :
+}

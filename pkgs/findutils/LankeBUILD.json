@@ -13,8 +13,7 @@
   "build_deps": [
     "base-devel",
     "git",
-    "gperf",
-    "python"
+    "gperf"
   ],
   "sources": [
     "https://ftpmirror.gnu.org/findutils/findutils-4.11.0.tar.xz"

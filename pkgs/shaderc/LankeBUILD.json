@@ -22,7 +22,6 @@
     "cmake",
     "glslang",
     "ninja",
-    "python",
     "spirv-headers",
     "spirv-tools"
   ],

@@ -1,0 +1,6 @@
+pkg-name: coin-or-coinutils
+tracker-template: github
+repo: coin-or/CoinUtils
+mode: tags
+tag-prefix: 'releases/'
+template: https://github.com/coin-or/CoinUtils/archive/refs/tags/{tag}.tar.gz

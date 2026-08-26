@@ -79,7 +79,6 @@
     "pango",
     "pipewire",
     "pixman",
-    "python",
     "rust",
     "yasm",
     "zlib"

@@ -21,9 +21,6 @@
     "lua",
     "openjdk25",
     "pcre2",
-    "python",
-    "ruby",
-    "tcl",
     "zlib"
   ],
   "sources": [

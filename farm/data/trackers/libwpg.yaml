@@ -1,0 +1,6 @@
+pkg-name: libwpg
+tracker-template: sourceforge
+project: libwpg
+path: libwpg
+pattern: 'libwpg-([0-9.]+)\.tar\.(xz|gz|bz2)'
+template: https://downloads.sourceforge.net/project/libwpg/libwpg-{version}.tar.xz

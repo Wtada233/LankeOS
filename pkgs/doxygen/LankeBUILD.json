@@ -15,7 +15,6 @@
     "cmake",
     "fmt",
     "llvm",
-    "python",
     "qt6-base",
     "qt6-svg",
     "sqlite"

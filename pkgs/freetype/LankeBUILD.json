@@ -22,7 +22,8 @@
     "bzip2",
     "harfbuzz",
     "libpng",
-    "zlib"
+    "zlib",
+    "brotli"
   ],
   "sources": [
     "https://downloads.sourceforge.net/project/freetype/freetype2/2.14.3/freetype-2.14.3.tar.xz"

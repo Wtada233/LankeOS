@@ -1,0 +1,16 @@
+{
+  "name": "fast_float",
+  "version": "8.2.10",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "cmake"
+  ],
+  "sources": [
+    "https://github.com/fastfloat/fast_float/archive/refs/tags/v8.2.10.tar.gz"
+  ],
+  "work_sources": []
+}

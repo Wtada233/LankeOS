@@ -1,0 +1,22 @@
+lankebuild_build() {
+    # LibreOffice 只需 sane API（sane/sane.h + libsane.so）。本地 USB 扫描用 libusb 后端；
+    # avahi（网络扫描）LankeOS 无，跳过
+    ./configure --prefix={PREFIX} \
+        --disable-locking \
+        --disable-rpath \
+        --enable-pthread \
+        --with-usb
+    # 减少未使用共享库链接（Arch 同款）
+    sed -e 's/ -shared / -Wl,-O1,--as-needed\0/g' -i libtool
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_prepare() {
+    # gitlab 归档是 git 树缺 configure，作者入口 autogen.sh 引导
+    ./autogen.sh
+}
+
+lankebuild_package() {
+    :
+}

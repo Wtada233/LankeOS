@@ -40,7 +40,8 @@
     "vulkan-headers",
     "vulkan-loader",
     "wayland",
-    "wayland-protocols"
+    "wayland-protocols",
+    "libxcb"
   ],
   "sources": [
     "https://archive.mesa3d.org/demos/mesa-demos-9.0.0.tar.xz"

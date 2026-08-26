@@ -1,0 +1,29 @@
+{
+  "name": "libmwaw",
+  "version": "0.3.23",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "librevenge-0.0.so.0",
+    "librevenge-generators-0.0.so.0",
+    "librevenge-stream-0.0.so.0",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libmwaw-0.3.so",
+    "libmwaw-0.3.so.3"
+  ],
+  "build_deps": [
+    "base-devel",
+    "librevenge",
+    "zlib"
+  ],
+  "sources": [
+    "https://sourceforge.net/projects/libmwaw/files/libmwaw/libmwaw-0.3.23/libmwaw-0.3.23.tar.xz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,6 @@
+# cppunit：dev-www.libreoffice.org/src/ 目录索引（LibreOffice 镜像）
+pkg-name: cppunit
+tracker-template: html-index
+url: https://dev-www.libreoffice.org/src/
+pattern: 'href="cppunit-([0-9.]+)\.tar\.gz"'
+template: https://dev-www.libreoffice.org/src/cppunit-{version}.tar.gz

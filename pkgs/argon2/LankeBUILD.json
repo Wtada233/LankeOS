@@ -1,0 +1,20 @@
+{
+  "name": "argon2",
+  "version": "20190702",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libargon2.so",
+    "libargon2.so.1"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/P-H-C/phc-winner-argon2/archive/20190702/argon2-20190702.tar.gz"
+  ],
+  "work_sources": []
+}

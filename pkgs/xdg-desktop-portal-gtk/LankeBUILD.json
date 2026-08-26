@@ -24,7 +24,6 @@
     "gtk3",
     "meson",
     "ninja",
-    "python",
     "xdg-desktop-portal"
   ],
   "sources": [

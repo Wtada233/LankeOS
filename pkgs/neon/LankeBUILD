@@ -1,0 +1,22 @@
+lankebuild_prepare() {
+    # github 归档缺 configure，作者入口 autogen.sh 优先（Arch 用 autoreconf，autogen 做完整引导）
+    ./autogen.sh
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --localstatedir=/var \
+        --enable-shared \
+        --disable-static \
+        --with-ssl=openssl \
+        --with-ca-bundle=/etc/pki/tls/certs/ca-bundle.crt
+    make -j$(nproc)
+    # install-html/man 需要 doc 产物；.gmo 翻译默认不随 make 生成（Arch 同款 docs compile-gmo）
+    make docs compile-gmo
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

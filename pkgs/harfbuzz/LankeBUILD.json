@@ -1,7 +1,7 @@
 {
   "name": "harfbuzz",
   "version": "14.3.0",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6",
@@ -9,6 +9,7 @@
     "libfreetype.so.6",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
+    "libgraphite2.so.3",
     "libicuuc.so.78",
     "libm.so.6",
     "libpng16.so.16",
@@ -44,8 +45,8 @@
     "libpng",
     "meson",
     "ninja",
-    "python",
-    "zlib"
+    "zlib",
+    "graphite"
   ],
   "sources": [
     "https://github.com/harfbuzz/harfbuzz/releases/download/14.3.0/harfbuzz-14.3.0.tar.xz"

@@ -41,7 +41,8 @@
     "ninja",
     "polkit",
     "python-gobject",
-    "readline"
+    "readline",
+    "slang"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/releases/1.58.0/downloads/NetworkManager-1.58.0.tar.xz"

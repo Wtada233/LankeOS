@@ -55,7 +55,6 @@
     "kf-kwindowsystem",
     "kf-syntax-highlighting",
     "polkit-qt",
-    "python",
     "python-psutil",
     "python-pygdbmi",
     "python-sentry-sdk",

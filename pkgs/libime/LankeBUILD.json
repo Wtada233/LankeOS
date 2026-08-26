@@ -27,7 +27,6 @@
     "fcitx5",
     "git",
     "ninja",
-    "python",
     "zstd"
   ],
   "sources": [

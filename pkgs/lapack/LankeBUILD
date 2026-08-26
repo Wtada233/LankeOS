@@ -1,0 +1,22 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # Arch 同款：blas/cblas/lapack/lapacke 一锅出（LankeOS 合并拆包），gfortran 来自 gcc(fortran)
+    cmake -B build \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBUILD_TESTING=OFF \
+        -DCMAKE_Fortran_COMPILER=gfortran \
+        -DLAPACKE_WITH_TMG=ON \
+        -DCBLAS=ON \
+        -DBUILD_MAN_DOCUMENTATION=OFF
+    cmake --build build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    :
+}

@@ -1,0 +1,15 @@
+{
+  "name": "mdds",
+  "version": "3.2.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://gitlab.com/mdds/mdds/-/archive/3.2.1/mdds-3.2.1.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -26,7 +26,6 @@
     "libffi",
     "meson",
     "ninja",
-    "python",
     "python-cairo",
     "xorgproto"
   ],

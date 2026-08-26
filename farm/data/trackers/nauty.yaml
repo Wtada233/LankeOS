@@ -1,0 +1,11 @@
+# nauty：站点直接列 nauty2_9_3.tar.gz（版本下划线），script 探测页面
+pkg-name: nauty
+tracker-template: script
+script-content: |
+  set -e
+  listing=$(curl -fsSLk "https://pallini.di.uniroma1.it/")
+  f=$(printf '%s\n' "$listing" | grep -oE 'nauty[0-9]+_[0-9]+_[0-9]+\.tar\.gz' | sort -V | tail -n1)
+  test -n "$f" || exit 1
+  v=$(printf '%s' "$f" | sed 's/nauty//; s/\.tar\.gz$//; s/_/./g')
+  echo "$v"
+  echo "https://pallini.di.uniroma1.it/$f"

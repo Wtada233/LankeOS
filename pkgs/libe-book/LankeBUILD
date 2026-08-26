@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # ICU 头（localpointer.h 的 auto 模板）需要 C++17，configure 强制 gnu++11 → 覆盖
+    export CXXFLAGS="$CXXFLAGS -std=gnu++17"
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

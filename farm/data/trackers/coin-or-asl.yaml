@@ -1,0 +1,8 @@
+# coin-or-asl：tag 形如 releases/2.1.0 → tag-prefix 'releases/'（github tags 剥前缀后版本纯数字）
+# solvers.tgz 是哈希钉住快照，不随版本变，保持静态（apply 只覆盖 sources[0]）
+pkg-name: coin-or-asl
+tracker-template: github
+repo: coin-or-tools/ThirdParty-ASL
+mode: tags
+tag-prefix: 'releases/'
+template: https://github.com/coin-or-tools/ThirdParty-ASL/archive/refs/tags/{tag}.tar.gz
