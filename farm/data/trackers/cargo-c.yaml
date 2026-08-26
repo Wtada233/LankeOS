@@ -1,6 +1,8 @@
 pkg-name: cargo-c
-tracker-template: github
-repo: lu-zero/cargo-c
-mode: tags
-tag-prefix: v
-template: https://github.com/lu-zero/cargo-c/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: lu-zero/cargo-c
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/lu-zero/cargo-c/archive/refs/tags/{tag}.tar.gz

@@ -1,5 +1,7 @@
 pkg-name: glslang
-tracker-template: github
-repo: KhronosGroup/glslang
-mode: releases
-template: https://github.com/KhronosGroup/glslang/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: KhronosGroup/glslang
+  mode: releases
+  template: https://github.com/KhronosGroup/glslang/archive/refs/tags/{tag}.tar.gz

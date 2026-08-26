@@ -1,5 +1,5 @@
 pkg-name: cryptsetup
-tracker-template: script
+type: script
 script-content: |
   base=https://www.kernel.org/pub/linux/utils/cryptsetup
   dir=$(curl -fsSL "$base/" | grep -oE 'v[0-9]+\.[0-9]+/' | sed 's|/||' | sort -V | tail -n1)

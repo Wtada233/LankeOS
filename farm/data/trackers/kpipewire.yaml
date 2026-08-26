@@ -1,5 +1,5 @@
 pkg-name: kpipewire
-tracker-template: script
+type: script
 script-content: |
   pkg=kpipewire
   base=https://download.kde.org/stable/plasma

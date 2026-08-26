@@ -1,5 +1,5 @@
 pkg-name: libcanberra
-tracker-template: script
+type: script
 script-content: |
   # 上游 0pointer 已死，Debian GNOME 团队在 salsa 维护（补丁版 0.30-N）。
   # vercmp 视 "-" 为 prerelease（0.30-20 < 0.30），故把 debian/0.30-N 映射为 0.30.N。

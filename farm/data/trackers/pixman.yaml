@@ -1,5 +1,7 @@
 pkg-name: pixman
-tracker-template: html-index
-url: 'https://cairographics.org/releases/'
-pattern: 'pixman-([0-9.]+)\.tar\.gz'
-template: 'https://cairographics.org/releases/pixman-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://cairographics.org/releases/
+  pattern: pixman-([0-9.]+)\.tar\.gz
+  template: https://cairographics.org/releases/pixman-{version}.tar.gz

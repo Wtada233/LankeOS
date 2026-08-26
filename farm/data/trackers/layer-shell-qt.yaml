@@ -1,5 +1,5 @@
 pkg-name: layer-shell-qt
-tracker-template: script
+type: script
 script-content: |
   pkg=layer-shell-qt
   base=https://download.kde.org/stable/plasma

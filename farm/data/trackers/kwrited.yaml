@@ -1,5 +1,5 @@
 pkg-name: kwrited
-tracker-template: script
+type: script
 script-content: |
   pkg=kwrited
   base=https://download.kde.org/stable/plasma

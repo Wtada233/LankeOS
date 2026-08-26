@@ -1,5 +1,5 @@
 pkg-name: kate
-tracker-template: script
+type: script
 script-content: |
   pkg=kate
   base=https://download.kde.org/stable/release-service

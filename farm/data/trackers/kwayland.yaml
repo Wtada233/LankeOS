@@ -1,5 +1,5 @@
 pkg-name: kwayland
-tracker-template: script
+type: script
 script-content: |
   pkg=kwayland
   base=https://download.kde.org/stable/plasma

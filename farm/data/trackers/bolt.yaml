@@ -1,7 +1,9 @@
 pkg-name: bolt
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: bolt/bolt
-mode: tags
-tag-prefix: ""
-template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/bolt-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: ''
+  project: bolt/bolt
+  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/bolt-{tag}.tar.gz

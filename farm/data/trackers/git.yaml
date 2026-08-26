@@ -1,5 +1,7 @@
 pkg-name: git
-tracker-template: html-index
-url: https://www.kernel.org/pub/software/scm/git/
-pattern: 'git-(\d[\d.]*)\.tar\.xz'
-template: https://www.kernel.org/pub/software/scm/git/{name}-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.kernel.org/pub/software/scm/git/
+  pattern: git-(\d[\d.]*)\.tar\.xz
+  template: https://www.kernel.org/pub/software/scm/git/{name}-{version}.tar.xz

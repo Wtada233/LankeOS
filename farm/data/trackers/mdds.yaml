@@ -1,7 +1,9 @@
 pkg-name: mdds
-tracker-template: gitlab
-host: gitlab.com
-project: mdds/mdds
-mode: tags
-tag-prefix: ''
-template: https://gitlab.com/mdds/mdds/-/archive/{tag}/mdds-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.com
+  mode: tags
+  tag-prefix: ''
+  project: mdds/mdds
+  template: https://gitlab.com/mdds/mdds/-/archive/{tag}/mdds-{tag}.tar.gz

@@ -1,7 +1,5 @@
-# python.org 版本目录含开发版占位（如 3.15.0 只有 alpha/beta，无正式 Python-3.15.0.tar.xz）。
-# 用 script 模板从高到低逐个探测正式 tarball，只接受真实存在的版本（稳定线）。
 pkg-name: python
-tracker-template: script
+type: script
 script-content: |
   #!/bin/bash
   html=$(curl -fsSL https://www.python.org/ftp/python/) || exit 1

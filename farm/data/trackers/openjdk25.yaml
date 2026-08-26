@@ -1,7 +1,5 @@
 pkg-name: openjdk25
-tracker-template: script
-# jdk25u 有海量 build 号 tag（jdk-25+36），GA tag 是 jdk-25.0.4+7 形式；
-# github tags API 前 50 全被 build 号刷屏，故用 script 经 git ls-remote 过滤出 GA 版本。
+type: script
 script-content: |
   #!/bin/bash
   TAGS=$(git ls-remote --tags https://github.com/openjdk/jdk25u.git 2>/dev/null \

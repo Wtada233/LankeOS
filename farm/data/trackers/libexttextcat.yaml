@@ -1,6 +1,5 @@
 pkg-name: libexttextcat
-# release 托管在 dev-www.libreoffice.org（download.gnome.org 没有）→ script 探测 LO 镜像
-tracker-template: script
+type: script
 script-content: |
   page=$(curl -fsSL "https://dev-www.libreoffice.org/src/libexttextcat/")
   ver=$(printf '%s\n' "$page" | grep -oE "libexttextcat-[0-9.]+\.tar\.xz" | sed "s/^libexttextcat-//; s/\.tar\.xz$//" | sort -V | tail -n1)

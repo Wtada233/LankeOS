@@ -1,5 +1,5 @@
 pkg-name: extra-cmake-modules
-tracker-template: script
+type: script
 script-content: |
   base=https://download.kde.org/stable/frameworks
   listing=$(curl -fsSL "$base/")

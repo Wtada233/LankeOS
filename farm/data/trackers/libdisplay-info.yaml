@@ -1,7 +1,9 @@
 pkg-name: libdisplay-info
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: emersion/libdisplay-info
-mode: tags
-tag-prefix: ""
-template: https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/{tag}/libdisplay-info-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: ''
+  project: emersion/libdisplay-info
+  template: https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/{tag}/libdisplay-info-{tag}.tar.gz

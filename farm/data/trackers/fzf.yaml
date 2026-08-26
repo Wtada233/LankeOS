@@ -1,6 +1,8 @@
 pkg-name: fzf
-tracker-template: github
-repo: junegunn/fzf
-mode: tags
-tag-prefix: v
-template: https://github.com/junegunn/fzf/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: junegunn/fzf
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/junegunn/fzf/archive/refs/tags/{tag}.tar.gz

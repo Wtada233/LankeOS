@@ -1,6 +1,8 @@
 pkg-name: libjuice
-tracker-template: github
-repo: paullouisageneau/libjuice
-mode: tags
-tag-prefix: v
-template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: paullouisageneau/libjuice
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

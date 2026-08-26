@@ -1,7 +1,9 @@
 pkg-name: eigen
-tracker-template: gitlab
-host: gitlab.com
-project: libeigen/eigen
-mode: tags
-tag-prefix: ''
-template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.com
+  mode: tags
+  tag-prefix: ''
+  project: libeigen/eigen
+  template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

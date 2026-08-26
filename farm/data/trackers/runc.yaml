@@ -1,6 +1,8 @@
 pkg-name: runc
-tracker-template: github
-repo: opencontainers/runc
-mode: releases
-tag-prefix: v
-template: "https://github.com/{repo}/releases/download/{tag}/runc-{version}.tar.xz"
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: opencontainers/runc
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/{repo}/releases/download/{tag}/runc-{version}.tar.xz

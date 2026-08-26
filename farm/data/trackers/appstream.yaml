@@ -1,6 +1,8 @@
 pkg-name: appstream
-tracker-template: github
-repo: ximion/appstream
-mode: tags
-tag-prefix: v
-template: https://github.com/ximion/appstream/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: ximion/appstream
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/ximion/appstream/archive/refs/tags/{tag}.tar.gz

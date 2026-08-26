@@ -1,6 +1,5 @@
-# nauty：站点直接列 nauty2_9_3.tar.gz（版本下划线），script 探测页面
 pkg-name: nauty
-tracker-template: script
+type: script
 script-content: |
   set -e
   listing=$(curl -fsSLk "https://pallini.di.uniroma1.it/")

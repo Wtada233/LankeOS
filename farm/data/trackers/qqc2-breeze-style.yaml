@@ -1,5 +1,5 @@
 pkg-name: qqc2-breeze-style
-tracker-template: script
+type: script
 script-content: |
   pkg=qqc2-breeze-style
   base=https://download.kde.org/stable/plasma

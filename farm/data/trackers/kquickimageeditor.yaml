@@ -1,5 +1,5 @@
 pkg-name: kquickimageeditor
-tracker-template: script
+type: script
 script-content: |
   pkg=kquickimageeditor
   base=https://download.kde.org/stable/$pkg

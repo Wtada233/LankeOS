@@ -1,5 +1,5 @@
 pkg-name: libtracefs
-tracker-template: script
+type: script
 script-content: |
   # git.kernel.org snapshot，tag 前缀 libtracefs-
   refs=$(git ls-remote --tags https://git.kernel.org/pub/scm/libs/libtrace/libtracefs.git 2>/dev/null)

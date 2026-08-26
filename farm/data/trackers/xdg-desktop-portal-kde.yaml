@@ -1,5 +1,5 @@
 pkg-name: xdg-desktop-portal-kde
-tracker-template: script
+type: script
 script-content: |
   pkg=xdg-desktop-portal-kde
   base=https://download.kde.org/stable/plasma

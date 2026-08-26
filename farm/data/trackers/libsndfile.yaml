@@ -1,5 +1,7 @@
 pkg-name: libsndfile
-tracker-template: github
-repo: libsndfile/libsndfile
-mode: releases
-template: https://github.com/libsndfile/libsndfile/releases/download/{version}/libsndfile-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: libsndfile/libsndfile
+  mode: releases
+  template: https://github.com/libsndfile/libsndfile/releases/download/{version}/libsndfile-{version}.tar.xz

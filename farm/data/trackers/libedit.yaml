@@ -1,5 +1,7 @@
 pkg-name: libedit
-tracker-template: html-index
-url: https://thrysoee.dk/editline/
-pattern: 'libedit-(\d+)-3\.1\.tar\.gz'
-template: https://thrysoee.dk/editline/libedit-{version}-3.1.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://thrysoee.dk/editline/
+  pattern: libedit-(\d+)-3\.1\.tar\.gz
+  template: https://thrysoee.dk/editline/libedit-{version}-3.1.tar.gz

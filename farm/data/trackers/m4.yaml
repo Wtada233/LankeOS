@@ -1,5 +1,7 @@
 pkg-name: m4
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/m4/
-pattern: m4-([0-9.]+)\.tar\.
-template: https://ftp.gnu.org/gnu/m4/m4-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/m4/
+  pattern: m4-([0-9.]+)\.tar\.
+  template: https://ftp.gnu.org/gnu/m4/m4-{version}.tar.xz

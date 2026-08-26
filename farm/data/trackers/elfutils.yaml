@@ -1,5 +1,7 @@
 pkg-name: elfutils
-tracker-template: html-index
-url: https://sourceware.org/ftp/elfutils/
-pattern: '(\d+\.\d+)/'
-template: https://sourceware.org/ftp/elfutils/{version}/elfutils-{version}.tar.bz2
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://sourceware.org/ftp/elfutils/
+  pattern: (\d+\.\d+)/
+  template: https://sourceware.org/ftp/elfutils/{version}/elfutils-{version}.tar.bz2

@@ -1,3 +1,5 @@
 pkg-name: at-spi2-core
-tracker-template: gnome
-template: https://download.gnome.org/sources/at-spi2-core/{path_version}/at-spi2-core-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/at-spi2-core/{path_version}/at-spi2-core-{version}.tar.xz

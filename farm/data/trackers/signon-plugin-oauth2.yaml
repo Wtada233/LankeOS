@@ -1,7 +1,9 @@
 pkg-name: signon-plugin-oauth2
-tracker-template: gitlab
-host: gitlab.com
-project: nicolasfella/signon-plugin-oauth2
-mode: tags
-tag-prefix: 'VERSION_'
-template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.com
+  mode: tags
+  tag-prefix: VERSION_
+  project: nicolasfella/signon-plugin-oauth2
+  template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

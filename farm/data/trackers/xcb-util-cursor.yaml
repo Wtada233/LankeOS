@@ -1,5 +1,7 @@
 pkg-name: xcb-util-cursor
-tracker-template: html-index
-url: "https://xorg.freedesktop.org/archive/individual/xcb/"
-pattern: 'xcb-util-cursor-(\d[\d.]*)\.tar\.(?:gz|xz|bz2)'
-template: "https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-cursor-{version}.tar.xz"
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://xorg.freedesktop.org/archive/individual/xcb/
+  pattern: xcb-util-cursor-(\d[\d.]*)\.tar\.(?:gz|xz|bz2)
+  template: https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-cursor-{version}.tar.xz

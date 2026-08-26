@@ -1,13 +1,12 @@
 pkg-name: chromium
-tracker-template: gcs
-url: https://commondatastorage.googleapis.com/chromium-browser-official/
-pattern: 'chromium-([\d.]+)-lite\.tar\.xz'
-template: https://commondatastorage.googleapis.com/chromium-browser-official/chromium-{version}-lite.tar.xz
+version-source: sources[0]
 sources:
-  - pkg-name: chromium-launcher
-    url-match: "foutrelis/chromium-launcher"
-    tracker-template: github
-    repo: foutrelis/chromium-launcher
-    mode: tags
-    tag-prefix: v
-    template: 'https://github.com/{repo}/archive/{tag}/chromium-launcher-{version}.tar.gz'
+- tracker-template: gcs
+  url: https://commondatastorage.googleapis.com/chromium-browser-official/
+  pattern: chromium-([\d.]+)-lite\.tar\.xz
+  template: https://commondatastorage.googleapis.com/chromium-browser-official/chromium-{version}-lite.tar.xz
+- tracker-template: github
+  repo: foutrelis/chromium-launcher
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/archive/{tag}/chromium-launcher-{version}.tar.gz

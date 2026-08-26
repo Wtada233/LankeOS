@@ -1,3 +1,5 @@
 pkg-name: python-hatch-vcs
-tracker-template: pypi
-project: hatch-vcs
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: hatch-vcs

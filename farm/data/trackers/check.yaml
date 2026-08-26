@@ -1,6 +1,8 @@
 pkg-name: check
-tracker-template: github
-repo: libcheck/check
-mode: releases
-tag-prefix: ''
-template: https://github.com/{repo}/releases/download/{tag}/check-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: libcheck/check
+  mode: releases
+  tag-prefix: ''
+  template: https://github.com/{repo}/releases/download/{tag}/check-{version}.tar.gz

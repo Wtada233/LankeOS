@@ -1,5 +1,7 @@
 pkg-name: nspr
-tracker-template: html-index
-url: 'https://archive.mozilla.org/pub/nspr/releases/'
-pattern: 'v([\d.]+)/'
-template: 'https://archive.mozilla.org/pub/nspr/releases/v{version}/src/nspr-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://archive.mozilla.org/pub/nspr/releases/
+  pattern: v([\d.]+)/
+  template: https://archive.mozilla.org/pub/nspr/releases/v{version}/src/nspr-{version}.tar.gz

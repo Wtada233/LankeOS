@@ -1,6 +1,8 @@
 pkg-name: libunibreak
-tracker-template: github
-repo: adah1972/libunibreak
-mode: tags
-tag-prefix: libunibreak_
-template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: adah1972/libunibreak
+  mode: tags
+  tag-prefix: libunibreak_
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

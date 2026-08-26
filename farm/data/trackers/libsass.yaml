@@ -1,5 +1,7 @@
 pkg-name: libsass
-tracker-template: github
-repo: sass/libsass
-mode: tags
-template: 'https://github.com/sass/libsass/archive/refs/tags/{tag}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: sass/libsass
+  mode: tags
+  template: https://github.com/sass/libsass/archive/refs/tags/{tag}.tar.gz

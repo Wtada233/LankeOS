@@ -1,5 +1,5 @@
 pkg-name: less
-tracker-template: script
+type: script
 script-content: |
   HTML=$(curl -s https://www.greenwoodsoftware.com/less/)
   ver=$(echo "$HTML" | grep -o 'current released version is less-[0-9]*' | sed 's/.*less-//' | head -1)

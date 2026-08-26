@@ -1,5 +1,7 @@
 pkg-name: xcb-util-keysyms
-tracker-template: html-index
-url: https://xorg.freedesktop.org/archive/individual/xcb/
-pattern: 'xcb-util-keysyms-(\d[\d.]*)\.tar\.xz'
-template: https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-keysyms-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://xorg.freedesktop.org/archive/individual/xcb/
+  pattern: xcb-util-keysyms-(\d[\d.]*)\.tar\.xz
+  template: https://xorg.freedesktop.org/archive/individual/xcb/xcb-util-keysyms-{version}.tar.xz

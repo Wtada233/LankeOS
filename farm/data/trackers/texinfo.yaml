@@ -1,5 +1,7 @@
 pkg-name: texinfo
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/texinfo/
-pattern: 'texinfo-(\d[\d.]*)\.tar\.xz'
-template: 'https://ftp.gnu.org/gnu/texinfo/texinfo-{version}.tar.xz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/texinfo/
+  pattern: texinfo-(\d[\d.]*)\.tar\.xz
+  template: https://ftp.gnu.org/gnu/texinfo/texinfo-{version}.tar.xz

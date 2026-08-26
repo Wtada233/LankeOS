@@ -1,5 +1,7 @@
 pkg-name: iana-etc
-tracker-template: github
-repo: Mic92/iana-etc
-mode: releases
-template: 'https://github.com/{repo}/releases/download/{tag}/iana-etc-{tag}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: Mic92/iana-etc
+  mode: releases
+  template: https://github.com/{repo}/releases/download/{tag}/iana-etc-{tag}.tar.gz

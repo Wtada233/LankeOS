@@ -1,5 +1,5 @@
 pkg-name: kinfocenter
-tracker-template: script
+type: script
 script-content: |
   pkg=kinfocenter
   base=https://download.kde.org/stable/plasma

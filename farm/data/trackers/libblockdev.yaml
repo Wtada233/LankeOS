@@ -1,6 +1,8 @@
 pkg-name: libblockdev
-tracker-template: github
-repo: storaged-project/libblockdev
-mode: releases
-tag-prefix: ''
-template: https://github.com/{repo}/releases/download/{tag}/libblockdev-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: storaged-project/libblockdev
+  mode: releases
+  tag-prefix: ''
+  template: https://github.com/{repo}/releases/download/{tag}/libblockdev-{version}.tar.gz

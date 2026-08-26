@@ -1,7 +1,5 @@
-# stb 无 tag/release，滚动 master。版本取最新 commit 日期（YYYYMMDD），源为 GitHub archive tarball。
-# 参考 luajit tracker（同样 rolling release，git ls-remote + 浅克隆取时间戳）。
 pkg-name: stb
-tracker-template: script
+type: script
 script-content: |
   hash=$(git ls-remote https://github.com/nothings/stb HEAD | awk '$2=="HEAD"{print $1; exit}')
   test -n "$hash" || exit 1

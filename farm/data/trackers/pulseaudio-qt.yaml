@@ -1,5 +1,5 @@
 pkg-name: pulseaudio-qt
-tracker-template: script
+type: script
 script-content: |
   pkg=pulseaudio-qt
   base=https://download.kde.org/stable/$pkg

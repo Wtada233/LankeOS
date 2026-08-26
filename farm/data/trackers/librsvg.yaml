@@ -1,3 +1,5 @@
 pkg-name: librsvg
-tracker-template: gnome
-template: 'https://download.gnome.org/sources/librsvg/{path_version}/librsvg-{version}.tar.xz'
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/librsvg/{path_version}/librsvg-{version}.tar.xz

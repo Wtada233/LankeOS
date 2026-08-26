@@ -1,5 +1,5 @@
 pkg-name: font-noto-sans-cjk
-tracker-template: script
+type: script
 script-content: |
   #!/bin/bash
   tags=$(curl -sL "https://api.github.com/repos/googlefonts/noto-cjk/tags?per_page=100" | grep '"name"' | sed 's/.*"name": "\(.*\)",/\1/')

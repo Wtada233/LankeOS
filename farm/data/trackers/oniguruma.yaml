@@ -1,6 +1,8 @@
 pkg-name: oniguruma
-tracker-template: github
-repo: kkos/oniguruma
-mode: releases
-tag-prefix: v
-template: 'https://github.com/{repo}/releases/download/{tag}/onig-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: kkos/oniguruma
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/{repo}/releases/download/{tag}/onig-{version}.tar.gz

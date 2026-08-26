@@ -1,5 +1,5 @@
 pkg-name: gn
-tracker-template: script
+type: script
 script-content: |
   #!/bin/bash
   set -e

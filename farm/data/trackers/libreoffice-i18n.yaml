@@ -1,11 +1,5 @@
 pkg-name: libreoffice-i18n
-# 官方 i18n langpack（rpm 格式，123 语言）。UI 翻译 .mo 装进
-# /usr/lib/libreoffice/program/resource/<lang>/，后装在任何语言构建上，无需重编主包
-# （Arch libreoffice-fresh-i18n 同款机制）。
-# 枚举/输出一律用上游官方链接（download.documentfoundation.org）。
-# 注意：上游 testing/<ver>/ 只保留最新点版本；旧点版本（如 26.8.0.2）只在 TUNA 等镜像，
-# 那是 json 里的本地临时下载源（镜像加速），不进 tracker。
-tracker-template: script
+type: script
 script-content: |
   set -e
   srcbase=https://download.documentfoundation.org/libreoffice/src

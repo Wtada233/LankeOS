@@ -1,5 +1,7 @@
 pkg-name: gegl
-tracker-template: html-index
-url: https://download.gimp.org/pub/gegl/0.4/
-pattern: gegl-(\d[\d.]*)\.tar\.xz
-template: https://download.gimp.org/pub/gegl/0.4/gegl-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://download.gimp.org/pub/gegl/0.4/
+  pattern: gegl-(\d[\d.]*)\.tar\.xz
+  template: https://download.gimp.org/pub/gegl/0.4/gegl-{version}.tar.xz

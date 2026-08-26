@@ -1,5 +1,7 @@
 pkg-name: openssh
-tracker-template: html-index
-url: 'https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/'
-pattern: 'openssh-([0-9.]+(?:p[0-9]+)?)\.tar\.gz'
-template: 'https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/
+  pattern: openssh-([0-9.]+(?:p[0-9]+)?)\.tar\.gz
+  template: https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-{version}.tar.gz

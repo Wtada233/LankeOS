@@ -1,5 +1,5 @@
 pkg-name: kdeplasma-addons
-tracker-template: script
+type: script
 script-content: |
   pkg=kdeplasma-addons
   base=https://download.kde.org/stable/plasma

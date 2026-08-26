@@ -1,3 +1,5 @@
 pkg-name: python-psutil
-tracker-template: pypi
-project: psutil
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: psutil

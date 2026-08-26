@@ -1,7 +1,9 @@
 pkg-name: hicolor-icon-theme
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: xdg/default-icon-theme
-mode: tags
-tag-prefix: 'v'
-template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: v
+  project: xdg/default-icon-theme
+  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

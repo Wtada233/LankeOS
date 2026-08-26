@@ -1,3 +1,5 @@
 pkg-name: python-pefile
-tracker-template: pypi
-project: pefile
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: pefile

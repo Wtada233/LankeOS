@@ -1,6 +1,8 @@
 pkg-name: udisks2
-tracker-template: github
-repo: storaged-project/udisks
-mode: tags
-tag-prefix: 'udisks-'
-template: https://github.com/{repo}/releases/download/{tag}/udisks-{version}.tar.bz2
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: storaged-project/udisks
+  mode: tags
+  tag-prefix: udisks-
+  template: https://github.com/{repo}/releases/download/{tag}/udisks-{version}.tar.bz2

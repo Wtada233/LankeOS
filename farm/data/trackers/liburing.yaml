@@ -1,6 +1,8 @@
 pkg-name: liburing
-tracker-template: github
-repo: axboe/liburing
-mode: tags
-tag-prefix: 'liburing-'
-template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: axboe/liburing
+  mode: tags
+  tag-prefix: liburing-
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

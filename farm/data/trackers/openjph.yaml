@@ -1,6 +1,8 @@
 pkg-name: openjph
-tracker-template: github
-repo: aous72/OpenJPH
-mode: tags
-tag-prefix: ""
-template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: aous72/OpenJPH
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

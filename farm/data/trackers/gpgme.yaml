@@ -1,5 +1,7 @@
 pkg-name: gpgme
-tracker-template: html-index
-url: https://www.gnupg.org/ftp/gcrypt/gpgme/
-pattern: 'gpgme-(\d[\d.]*)\.tar\.bz2'
-template: https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-{version}.tar.bz2
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.gnupg.org/ftp/gcrypt/gpgme/
+  pattern: gpgme-(\d[\d.]*)\.tar\.bz2
+  template: https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-{version}.tar.bz2

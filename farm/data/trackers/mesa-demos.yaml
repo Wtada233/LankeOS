@@ -1,5 +1,7 @@
 pkg-name: mesa-demos
-tracker-template: html-index
-url: https://archive.mesa3d.org/demos/
-pattern: mesa-demos-([0-9.]+)\.tar\.
-template: https://archive.mesa3d.org/demos/mesa-demos-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://archive.mesa3d.org/demos/
+  pattern: mesa-demos-([0-9.]+)\.tar\.
+  template: https://archive.mesa3d.org/demos/mesa-demos-{version}.tar.xz

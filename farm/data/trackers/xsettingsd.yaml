@@ -1,5 +1,5 @@
 pkg-name: xsettingsd
-tracker-template: script
+type: script
 script-content: |
   tags=$(git ls-remote --tags https://codeberg.org/derat/xsettingsd 2>/dev/null)
   version=$(printf '%s\n' "$tags" | grep 'refs/tags/v[0-9][0-9.]*$' | sed 's#.*refs/tags/v##' | sort -V | tail -n1)

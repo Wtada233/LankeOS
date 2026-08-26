@@ -1,5 +1,5 @@
 pkg-name: kde-gtk-config
-tracker-template: script
+type: script
 script-content: |
   pkg=kde-gtk-config
   base=https://download.kde.org/stable/plasma

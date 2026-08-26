@@ -1,5 +1,7 @@
 pkg-name: libnfnetlink
-tracker-template: html-index
-url: https://www.netfilter.org/projects/libnfnetlink/downloads.html
-pattern: 'libnfnetlink-(\d[\d.]*)\.tar\.bz2'
-template: https://www.netfilter.org/projects/libnfnetlink/files/libnfnetlink-{version}.tar.bz2
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.netfilter.org/projects/libnfnetlink/downloads.html
+  pattern: libnfnetlink-(\d[\d.]*)\.tar\.bz2
+  template: https://www.netfilter.org/projects/libnfnetlink/files/libnfnetlink-{version}.tar.bz2

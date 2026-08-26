@@ -1,5 +1,7 @@
 pkg-name: desktop-file-utils
-tracker-template: html-index
-url: https://deb.debian.org/debian/pool/main/d/desktop-file-utils/
-pattern: 'desktop-file-utils_([\d.]+)\.orig\.tar\.xz'
-template: https://deb.debian.org/debian/pool/main/d/desktop-file-utils/desktop-file-utils_{version}.orig.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://deb.debian.org/debian/pool/main/d/desktop-file-utils/
+  pattern: desktop-file-utils_([\d.]+)\.orig\.tar\.xz
+  template: https://deb.debian.org/debian/pool/main/d/desktop-file-utils/desktop-file-utils_{version}.orig.tar.xz

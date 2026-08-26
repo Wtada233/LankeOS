@@ -1,6 +1,8 @@
 pkg-name: pcre2
-tracker-template: github
-repo: PCRE2Project/pcre2
-mode: releases
-tag-prefix: pcre2-
-template: 'https://github.com/PCRE2Project/pcre2/releases/download/{tag}/{name}-{version}.tar.bz2'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: PCRE2Project/pcre2
+  mode: releases
+  tag-prefix: pcre2-
+  template: https://github.com/PCRE2Project/pcre2/releases/download/{tag}/{name}-{version}.tar.bz2

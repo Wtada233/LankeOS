@@ -1,5 +1,5 @@
 pkg-name: libplasma
-tracker-template: script
+type: script
 script-content: |
   pkg=libplasma
   base=https://download.kde.org/stable/plasma

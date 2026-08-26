@@ -1,5 +1,7 @@
 pkg-name: volume_key
-tracker-template: html-index
-url: https://releases.pagure.org/volume_key/
-pattern: 'volume_key-(\d[\d.]*)\.tar\.xz'
-template: https://releases.pagure.org/volume_key/volume_key-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://releases.pagure.org/volume_key/
+  pattern: volume_key-(\d[\d.]*)\.tar\.xz
+  template: https://releases.pagure.org/volume_key/volume_key-{version}.tar.xz

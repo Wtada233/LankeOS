@@ -1,5 +1,7 @@
 pkg-name: libgpg-error
-tracker-template: html-index
-url: https://www.gnupg.org/ftp/gcrypt/libgpg-error/
-pattern: 'libgpg-error-(\d[\d.]*)\.tar\.(?:gz|bz2|xz)'
-template: https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-{version}.tar.bz2
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.gnupg.org/ftp/gcrypt/libgpg-error/
+  pattern: libgpg-error-(\d[\d.]*)\.tar\.(?:gz|bz2|xz)
+  template: https://www.gnupg.org/ftp/gcrypt/libgpg-error/libgpg-error-{version}.tar.bz2

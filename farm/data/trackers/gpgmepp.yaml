@@ -1,6 +1,8 @@
 pkg-name: gpgmepp
-tracker-template: github
-repo: gpg/gpgmepp
-mode: tags
-tag-prefix: 'gpgmepp-'
-template: https://github.com/gpg/gpgmepp/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: gpg/gpgmepp
+  mode: tags
+  tag-prefix: gpgmepp-
+  template: https://github.com/gpg/gpgmepp/archive/refs/tags/{tag}.tar.gz

@@ -1,5 +1,5 @@
 pkg-name: ark
-tracker-template: script
+type: script
 script-content: |
   pkg=ark
   base=https://download.kde.org/stable/release-service

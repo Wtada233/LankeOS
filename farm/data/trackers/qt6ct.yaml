@@ -1,6 +1,8 @@
 pkg-name: qt6ct
-tracker-template: gitlab
-host: www.opencode.net
-project: trialuser/qt6ct
-mode: tags
-template: "https://www.opencode.net/{project}/-/archive/{tag}/{name}-{tag}.tar.gz"
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: www.opencode.net
+  mode: tags
+  project: trialuser/qt6ct
+  template: https://www.opencode.net/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

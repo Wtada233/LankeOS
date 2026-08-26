@@ -1,6 +1,8 @@
 pkg-name: libinih
-tracker-template: github
-repo: benhoyt/inih
-mode: tags
-tag-prefix: 'r'
-template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: benhoyt/inih
+  mode: tags
+  tag-prefix: r
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

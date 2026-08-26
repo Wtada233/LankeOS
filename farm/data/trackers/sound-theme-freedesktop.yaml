@@ -1,7 +1,9 @@
 pkg-name: sound-theme-freedesktop
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: xdg/xdg-sound-theme
-mode: tags
-tag-prefix: ''
-template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: ''
+  project: xdg/xdg-sound-theme
+  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

@@ -1,6 +1,8 @@
 pkg-name: networkmanager
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: NetworkManager/NetworkManager
-mode: releases
-template: https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/releases/{tag}/downloads/NetworkManager-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: releases
+  project: NetworkManager/NetworkManager
+  template: https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/releases/{tag}/downloads/NetworkManager-{version}.tar.xz

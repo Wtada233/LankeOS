@@ -1,7 +1,9 @@
 pkg-name: signond
-tracker-template: gitlab
-host: gitlab.com
-project: nicolasfella/signond
-mode: tags
-tag-prefix: 'VERSION_'
-template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.com
+  mode: tags
+  tag-prefix: VERSION_
+  project: nicolasfella/signond
+  template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

@@ -1,5 +1,5 @@
 pkg-name: powerdevil
-tracker-template: script
+type: script
 script-content: |
   pkg=powerdevil
   base=https://download.kde.org/stable/plasma

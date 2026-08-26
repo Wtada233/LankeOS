@@ -1,4 +1,6 @@
 pkg-name: libepoxy
-tracker-template: gnome
-stable-minor: all
-template: https://download.gnome.org/sources/libepoxy/{path_version}/libepoxy-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/libepoxy/{path_version}/libepoxy-{version}.tar.xz
+  stable-minor: all

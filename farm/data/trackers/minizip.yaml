@@ -1,6 +1,8 @@
 pkg-name: minizip
-tracker-template: github
-repo: madler/zlib
-mode: releases
-tag-prefix: v
-template: https://github.com/madler/zlib/releases/download/{tag}/zlib-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: madler/zlib
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/madler/zlib/releases/download/{tag}/zlib-{version}.tar.gz

@@ -1,8 +1,5 @@
-# LuaJIT 无 release tag，用 rolling release：VERSION = 2.1.<最新 commit 时间戳>（src/Makefile 的
-# RELVER = git show -s --format=%ct，构建时生成 luajit_relver.txt）。LankeBUILD 版本格式 <版本>.<hash>。
-# 脚本浅克隆最新 HEAD → %ct 时间戳 → 版本 2.1.<ct>.<hash7>，源为 GitHub archive tarball。
 pkg-name: luajit
-tracker-template: script
+type: script
 script-content: |
   hash=$(git ls-remote https://github.com/LuaJIT/LuaJIT HEAD | awk '$2=="HEAD"{print $1; exit}')
   test -n "$hash" || exit 1

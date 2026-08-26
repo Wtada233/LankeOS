@@ -1,7 +1,9 @@
 pkg-name: libglvnd
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: glvnd/libglvnd
-mode: tags
-tag-prefix: v
-template: https://gitlab.freedesktop.org/glvnd/libglvnd/-/archive/{tag}/libglvnd-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: v
+  project: glvnd/libglvnd
+  template: https://gitlab.freedesktop.org/glvnd/libglvnd/-/archive/{tag}/libglvnd-{tag}.tar.gz

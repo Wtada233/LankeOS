@@ -1,8 +1,5 @@
-# vala 只发偶数小版本的稳定版（0.54→0.56→0.58…）；奇数如 0.57.0 是一次性开发 tag，
-# 预生成代码停在旧 glib 时代，配不上 glib>=2.74 的 const 返回。gitlab tags 模板无法排除
-# → 用 script + git ls-remote 过滤，只认真实稳定版（偶数小版本）。
 pkg-name: vala
-tracker-template: script
+type: script
 script-content: |
   #!/bin/bash
   tags=$(git ls-remote --tags https://gitlab.gnome.org/GNOME/vala.git 2>/dev/null)

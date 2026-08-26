@@ -1,5 +1,5 @@
 pkg-name: libkdcraw
-tracker-template: script
+type: script
 script-content: |
   pkg=libkdcraw
   base=https://download.kde.org/stable/release-service

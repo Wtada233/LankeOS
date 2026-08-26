@@ -1,7 +1,9 @@
 pkg-name: rtkit
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: pipewire/rtkit
-mode: tags
-tag-prefix: v
-template: "https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz"
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: v
+  project: pipewire/rtkit
+  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

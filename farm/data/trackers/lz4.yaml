@@ -1,6 +1,8 @@
 pkg-name: lz4
-tracker-template: github
-repo: lz4/lz4
-mode: releases
-tag-prefix: v
-template: https://github.com/lz4/lz4/releases/download/{tag}/lz4-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: lz4/lz4
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/lz4/lz4/releases/download/{tag}/lz4-{version}.tar.gz

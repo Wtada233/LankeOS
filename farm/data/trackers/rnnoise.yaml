@@ -1,7 +1,9 @@
 pkg-name: rnnoise
-tracker-template: gitlab
-host: gitlab.xiph.org
-project: xiph/rnnoise
-mode: tags
-tag-prefix: v
-template: "https://gitlab.xiph.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz"
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.xiph.org
+  mode: tags
+  tag-prefix: v
+  project: xiph/rnnoise
+  template: https://gitlab.xiph.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

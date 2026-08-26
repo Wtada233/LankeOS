@@ -1,7 +1,9 @@
 pkg-name: util-macros
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: xorg/util/macros
-mode: tags
-tag-prefix: util-macros-
-template: 'https://gitlab.freedesktop.org/{project}/-/archive/{tag}/macros-{tag}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: util-macros-
+  project: xorg/util/macros
+  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/macros-{tag}.tar.gz

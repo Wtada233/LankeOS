@@ -1,7 +1,9 @@
 pkg-name: wayland-protocols
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: wayland/wayland-protocols
-mode: tags
-tag-prefix: ""
-template: "https://gitlab.freedesktop.org/wayland/wayland-protocols/-/archive/{tag}/wayland-protocols-{tag}.tar.gz"
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: ''
+  project: wayland/wayland-protocols
+  template: https://gitlab.freedesktop.org/wayland/wayland-protocols/-/archive/{tag}/wayland-protocols-{tag}.tar.gz

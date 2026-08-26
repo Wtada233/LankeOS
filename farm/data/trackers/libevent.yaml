@@ -1,7 +1,5 @@
-# libevent 的 release tag 形如 release-2.1.13-stable（-stable 是发布标记不是预发布），
-# github 模板会把 2.1.13-stable 判成比 2.1.13 低 → 假"倒退"。改用脚本剥掉后缀。
 pkg-name: libevent
-tracker-template: script
+type: script
 script-content: |
   data=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} https://api.github.com/repos/libevent/libevent/releases/latest)
   tag=$(printf '%s\n' "$data" | grep -o '"tag_name": *"release-[0-9.]*-stable"' | head -n1 | sed 's/.*"tag_name": *"//; s/"//')

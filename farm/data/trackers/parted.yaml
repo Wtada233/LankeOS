@@ -1,5 +1,7 @@
 pkg-name: parted
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/parted/
-pattern: 'parted-(\d[\d.]*)\.tar\.xz'
-template: https://ftp.gnu.org/gnu/parted/parted-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/parted/
+  pattern: parted-(\d[\d.]*)\.tar\.xz
+  template: https://ftp.gnu.org/gnu/parted/parted-{version}.tar.xz

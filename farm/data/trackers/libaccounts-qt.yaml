@@ -1,7 +1,9 @@
 pkg-name: libaccounts-qt
-tracker-template: gitlab
-host: gitlab.com
-project: accounts-sso/libaccounts-qt
-mode: tags
-tag-prefix: 'VERSION_'
-template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.com
+  mode: tags
+  tag-prefix: VERSION_
+  project: accounts-sso/libaccounts-qt
+  template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

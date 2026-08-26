@@ -1,7 +1,5 @@
-# perl 稳定版 = 偶数 minor（5.44/5.42/...），奇数 minor（5.45）是开发版（ABI 不稳定）。
-# 用 script 模板从高到低找第一个偶数 minor（最新稳定版）。
 pkg-name: perl
-tracker-template: script
+type: script
 script-content: |
   #!/bin/bash
   html=$(curl -fsSL https://www.cpan.org/src/5.0/) || exit 1

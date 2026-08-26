@@ -1,7 +1,9 @@
 pkg-name: libevdev
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: libevdev/libevdev
-mode: tags
-tag-prefix: libevdev-
-template: https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/{tag}/libevdev-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: libevdev-
+  project: libevdev/libevdev
+  template: https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/{tag}/libevdev-{tag}.tar.gz

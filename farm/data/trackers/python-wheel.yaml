@@ -1,3 +1,5 @@
 pkg-name: python-wheel
-tracker-template: pypi
-project: wheel
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: wheel

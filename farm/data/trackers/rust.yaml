@@ -1,6 +1,5 @@
 pkg-name: rust
-tracker-template: script
-# static.rust-lang.org/dist/ 不是 GCS 桶（?delimiter=/ 返回 416），稳定版从 channel-rust-stable.toml 的 [pkg.rust] 段取
+type: script
 script-content: |
   #!/bin/bash
   set -e

@@ -1,7 +1,5 @@
-# tarball 源（CI 可预下载校验）；600 开头的 tag 是垃圾污染（intel-media-600.xxxx 旧版误标，
-# vercmp 里 600>26 会抢"最新"），github tags 模板无法排除 → 用 script + git ls-remote 过滤，只认真实稳定版。
 pkg-name: intel-media-driver
-tracker-template: script
+type: script
 script-content: |
   #!/bin/bash
   tags=$(git ls-remote --tags https://github.com/intel/media-driver.git 2>/dev/null)

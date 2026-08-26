@@ -1,5 +1,7 @@
 pkg-name: autoconf
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/autoconf/
-pattern: autoconf-(\d[\d.]*)\.tar\.(?:gz|xz)
-template: https://ftp.gnu.org/gnu/autoconf/{name}-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/autoconf/
+  pattern: autoconf-(\d[\d.]*)\.tar\.(?:gz|xz)
+  template: https://ftp.gnu.org/gnu/autoconf/{name}-{version}.tar.xz

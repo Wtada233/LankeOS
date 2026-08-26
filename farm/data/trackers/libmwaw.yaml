@@ -1,6 +1,8 @@
 pkg-name: libmwaw
-tracker-template: sourceforge
-project: libmwaw
-path: libmwaw
-pattern: 'libmwaw-([0-9.]+)\.tar\.(xz|gz|bz2)'
-template: https://sourceforge.net/projects/libmwaw/files/libmwaw/libmwaw-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: sourceforge
+  pattern: libmwaw-([0-9.]+)\.tar\.(xz|gz|bz2)
+  project: libmwaw
+  path: libmwaw
+  template: https://sourceforge.net/projects/libmwaw/files/libmwaw/libmwaw-{version}.tar.xz

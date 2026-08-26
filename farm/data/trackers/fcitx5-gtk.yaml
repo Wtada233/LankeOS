@@ -1,6 +1,8 @@
 pkg-name: fcitx5-gtk
-tracker-template: github
-repo: fcitx/fcitx5-gtk
-mode: tags
-tag-prefix: ""
-template: https://github.com/fcitx/fcitx5-gtk/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: fcitx/fcitx5-gtk
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/fcitx/fcitx5-gtk/archive/refs/tags/{tag}.tar.gz

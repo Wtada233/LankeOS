@@ -1,6 +1,8 @@
 pkg-name: fribidi
-tracker-template: github
-repo: fribidi/fribidi
-mode: releases
-tag-prefix: v
-template: https://github.com/fribidi/fribidi/releases/download/{tag}/fribidi-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: fribidi/fribidi
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/fribidi/fribidi/releases/download/{tag}/fribidi-{version}.tar.xz

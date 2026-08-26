@@ -1,6 +1,8 @@
 pkg-name: lsb
-tracker-template: github
-repo: lfs-book/LSB-Tools
-mode: releases
-tag-prefix: v
-template: https://github.com/lfs-book/LSB-Tools/releases/download/{tag}/LSB-Tools-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: lfs-book/LSB-Tools
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/lfs-book/LSB-Tools/releases/download/{tag}/LSB-Tools-{version}.tar.gz

@@ -1,6 +1,8 @@
 pkg-name: libfyaml
-tracker-template: github
-repo: pantoniou/libfyaml
-mode: releases
-tag-prefix: v
-template: https://github.com/pantoniou/libfyaml/releases/download/{tag}/libfyaml-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: pantoniou/libfyaml
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/pantoniou/libfyaml/releases/download/{tag}/libfyaml-{version}.tar.gz

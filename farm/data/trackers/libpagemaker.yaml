@@ -1,6 +1,5 @@
 pkg-name: libpagemaker
-# release 托管在 dev-www.libreoffice.org（download.gnome.org 没有）→ script 探测 LO 镜像
-tracker-template: script
+type: script
 script-content: |
   page=$(curl -fsSL "https://dev-www.libreoffice.org/src/libpagemaker/")
   ver=$(printf '%s\n' "$page" | grep -oE "libpagemaker-[0-9.]+\.tar\.xz" | sed "s/^libpagemaker-//; s/\.tar\.xz$//" | sort -V | tail -n1)

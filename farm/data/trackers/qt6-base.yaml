@@ -1,7 +1,5 @@
-# Qt6 滚动追踪：顶层先找最新 6.<minor>/，再找其中最新 <patch>/——不锁死 6.11（6.12 发布自动跟进）。
-# 其余 qt6 模块经 same-version: qt6-base 跟随，模板用 {major_minor} 拼目录。
 pkg-name: qt6-base
-tracker-template: script
+type: script
 script-content: |
   base="https://download.qt.io/official_releases/qt/"
   minor=$(curl -fsSL "$base" | grep -oE '>[0-9]+\.[0-9]+/<' | tr -d '>/<' | sort -V | grep '^6\.' | tail -1)

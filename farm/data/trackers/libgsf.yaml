@@ -1,5 +1,7 @@
 pkg-name: libgsf
-tracker-template: html-index
-url: https://download.gnome.org/sources/libgsf/1.14/
-pattern: 'libgsf-([0-9.]+)\.tar\.(xz|gz|bz2)'
-template: https://download.gnome.org/sources/libgsf/1.14/{name}-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://download.gnome.org/sources/libgsf/1.14/
+  pattern: libgsf-([0-9.]+)\.tar\.(xz|gz|bz2)
+  template: https://download.gnome.org/sources/libgsf/1.14/{name}-{version}.tar.xz

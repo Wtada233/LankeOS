@@ -1,5 +1,5 @@
 pkg-name: kio-fuse
-tracker-template: script
+type: script
 script-content: |
   pkg=kio-fuse
   base=https://download.kde.org/stable/$pkg

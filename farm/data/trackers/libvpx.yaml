@@ -1,6 +1,8 @@
 pkg-name: libvpx
-tracker-template: github
-repo: webmproject/libvpx
-tag-prefix: v
-mode: releases
-template: https://github.com/webmproject/libvpx/archive/refs/tags/v{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: webmproject/libvpx
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/webmproject/libvpx/archive/refs/tags/v{version}.tar.gz

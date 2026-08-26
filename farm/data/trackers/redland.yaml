@@ -1,5 +1,7 @@
 pkg-name: redland
-tracker-template: html-index
-url: http://download.librdf.org/source/
-pattern: 'redland-([0-9.]+)\.tar\.(xz|gz|bz2)'
-template: http://download.librdf.org/source/{name}-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: http://download.librdf.org/source/
+  pattern: redland-([0-9.]+)\.tar\.(xz|gz|bz2)
+  template: http://download.librdf.org/source/{name}-{version}.tar.xz

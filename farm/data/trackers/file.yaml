@@ -1,5 +1,7 @@
 pkg-name: file
-tracker-template: html-index
-url: https://astron.com/pub/file/
-pattern: 'file-(\d[\d.]*)\.tar\.gz'
-template: https://astron.com/pub/file/file-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://astron.com/pub/file/
+  pattern: file-(\d[\d.]*)\.tar\.gz
+  template: https://astron.com/pub/file/file-{version}.tar.gz

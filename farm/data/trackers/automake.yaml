@@ -1,5 +1,7 @@
 pkg-name: automake
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/automake/
-pattern: automake-(\d[\d.]*)\.tar\.(?:gz|xz)
-template: https://ftp.gnu.org/gnu/automake/{name}-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/automake/
+  pattern: automake-(\d[\d.]*)\.tar\.(?:gz|xz)
+  template: https://ftp.gnu.org/gnu/automake/{name}-{version}.tar.xz

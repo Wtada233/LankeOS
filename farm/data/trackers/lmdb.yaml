@@ -1,5 +1,5 @@
 pkg-name: lmdb
-tracker-template: script
+type: script
 script-content: |
   # github 镜像无 LMDB tag，直查 openldap 官方 git
   refs=$(git ls-remote --tags https://git.openldap.org/openldap/openldap.git 2>/dev/null)

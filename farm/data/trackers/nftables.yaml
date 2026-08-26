@@ -1,5 +1,7 @@
 pkg-name: nftables
-tracker-template: html-index
-url: https://www.netfilter.org/projects/nftables/downloads.html
-pattern: 'nftables-([0-9.]+)\.tar\.xz'
-template: https://www.netfilter.org/projects/nftables/files/nftables-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.netfilter.org/projects/nftables/downloads.html
+  pattern: nftables-([0-9.]+)\.tar\.xz
+  template: https://www.netfilter.org/projects/nftables/files/nftables-{version}.tar.xz

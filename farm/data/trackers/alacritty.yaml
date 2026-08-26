@@ -1,6 +1,8 @@
 pkg-name: alacritty
-tracker-template: github
-repo: alacritty/alacritty
-mode: tags
-tag-prefix: v
-template: https://github.com/alacritty/alacritty/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: alacritty/alacritty
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/alacritty/alacritty/archive/refs/tags/{tag}.tar.gz

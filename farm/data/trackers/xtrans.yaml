@@ -1,5 +1,7 @@
 pkg-name: xtrans
-tracker-template: html-index
-url: https://xorg.freedesktop.org/archive/individual/lib/
-pattern: xtrans-([\d.]+)\.tar\.xz
-template: https://xorg.freedesktop.org/archive/individual/lib/xtrans-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://xorg.freedesktop.org/archive/individual/lib/
+  pattern: xtrans-([\d.]+)\.tar\.xz
+  template: https://xorg.freedesktop.org/archive/individual/lib/xtrans-{version}.tar.xz

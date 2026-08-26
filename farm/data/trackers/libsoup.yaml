@@ -1,3 +1,5 @@
 pkg-name: libsoup
-tracker-template: gnome
-template: https://download.gnome.org/sources/libsoup/{path_version}/libsoup-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/libsoup/{path_version}/libsoup-{version}.tar.xz

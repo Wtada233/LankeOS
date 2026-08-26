@@ -1,5 +1,5 @@
 pkg-name: kwin
-tracker-template: script
+type: script
 script-content: |
   pkg=kwin
   base=https://download.kde.org/stable/plasma

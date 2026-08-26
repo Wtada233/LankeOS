@@ -1,5 +1,7 @@
 pkg-name: libsm
-tracker-template: html-index
-url: https://www.x.org/releases/individual/lib/
-pattern: 'libSM-(\d[\d.]*)\.tar\.xz'
-template: https://www.x.org/releases/individual/lib/libSM-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.x.org/releases/individual/lib/
+  pattern: libSM-(\d[\d.]*)\.tar\.xz
+  template: https://www.x.org/releases/individual/lib/libSM-{version}.tar.xz

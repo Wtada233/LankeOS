@@ -1,5 +1,7 @@
 pkg-name: alsa-utils
-tracker-template: html-index
-url: https://www.alsa-project.org/files/pub/utils/
-pattern: 'alsa-utils-([\d.]+)\.tar\.'
-template: https://www.alsa-project.org/files/pub/utils/alsa-utils-{version}.tar.bz2
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.alsa-project.org/files/pub/utils/
+  pattern: alsa-utils-([\d.]+)\.tar\.
+  template: https://www.alsa-project.org/files/pub/utils/alsa-utils-{version}.tar.bz2

@@ -1,6 +1,8 @@
 pkg-name: freetype
-tracker-template: sourceforge
-project: freetype
-path: freetype2
-pattern: 'freetype-(\d[\d.]*)\.tar\.xz'
-template: https://downloads.sourceforge.net/project/freetype/freetype2/{path_version}/freetype-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: sourceforge
+  pattern: freetype-(\d[\d.]*)\.tar\.xz
+  project: freetype
+  path: freetype2
+  template: https://downloads.sourceforge.net/project/freetype/freetype2/{path_version}/freetype-{version}.tar.xz

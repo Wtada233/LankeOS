@@ -1,6 +1,8 @@
 pkg-name: coin-or-osi
-tracker-template: github
-repo: coin-or/Osi
-mode: tags
-tag-prefix: 'releases/'
-template: https://github.com/coin-or/Osi/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: coin-or/Osi
+  mode: tags
+  tag-prefix: releases/
+  template: https://github.com/coin-or/Osi/archive/refs/tags/{tag}.tar.gz

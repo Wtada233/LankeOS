@@ -1,6 +1,8 @@
 pkg-name: libwpd
-tracker-template: sourceforge
-project: libwpd
-path: libwpd
-pattern: 'libwpd-([0-9.]+)\.tar\.(xz|gz|bz2)'
-template: https://downloads.sourceforge.net/project/libwpd/libwpd-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: sourceforge
+  pattern: libwpd-([0-9.]+)\.tar\.(xz|gz|bz2)
+  project: libwpd
+  path: libwpd
+  template: https://downloads.sourceforge.net/project/libwpd/libwpd-{version}.tar.xz

@@ -1,5 +1,7 @@
 pkg-name: grub
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/grub/
-pattern: 'grub-([\d.]+)\.tar\.(?:xz|gz)'
-template: https://ftp.gnu.org/gnu/grub/grub-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/grub/
+  pattern: grub-([\d.]+)\.tar\.(?:xz|gz)
+  template: https://ftp.gnu.org/gnu/grub/grub-{version}.tar.xz

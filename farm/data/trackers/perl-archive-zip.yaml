@@ -1,5 +1,5 @@
 pkg-name: perl-archive-zip
-tracker-template: script
+type: script
 script-content: |
   curl -fsSL 'https://pypi.org/pypi/Archive-Zip/json' >/dev/null 2>&1 || true
   page=$(curl -fsSL 'https://www.cpan.org/modules/by-module/Archive/')

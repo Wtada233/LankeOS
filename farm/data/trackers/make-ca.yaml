@@ -1,6 +1,8 @@
 pkg-name: make-ca
-tracker-template: github
-repo: lfs-book/make-ca
-mode: tags
-tag-prefix: v
-template: https://github.com/lfs-book/make-ca/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: lfs-book/make-ca
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/lfs-book/make-ca/archive/refs/tags/{tag}.tar.gz

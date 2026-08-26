@@ -1,5 +1,5 @@
 pkg-name: kdenlive
-tracker-template: script
+type: script
 script-content: |
   pkg=kdenlive
   base=https://download.kde.org/stable/release-service

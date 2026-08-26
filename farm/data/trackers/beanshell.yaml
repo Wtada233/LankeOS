@@ -1,17 +1,8 @@
-# beanshell 是预编译 jar（无源码树）：源放 work_sources（Arch noextract 同款，lpkg 只下载复制到 work_root 不解压）。
-# 包无 sources 字段：顶层 tracker 只负责探测版本（releases tag），apply 时不写 sources，
-# work_sources URL 由下方 work_sources: 配置按 url-match 正则升级。
 pkg-name: beanshell
-tracker-template: github
-repo: beanshell/beanshell
-mode: releases
-tag-prefix: ''
-template: https://github.com/beanshell/beanshell/releases/download/{tag}/bsh-{version}.jar
+version-source: work_sources[0]
 work_sources:
-  - pkg-name: beanshell
-    url-match: "beanshell/releases/download/"
-    tracker-template: github
-    repo: beanshell/beanshell
-    mode: releases
-    tag-prefix: ''
-    template: https://github.com/beanshell/beanshell/releases/download/{tag}/bsh-{version}.jar
+- tracker-template: github
+  repo: beanshell/beanshell
+  mode: releases
+  tag-prefix: ''
+  template: https://github.com/beanshell/beanshell/releases/download/{tag}/bsh-{version}.jar

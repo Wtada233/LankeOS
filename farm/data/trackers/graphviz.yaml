@@ -1,6 +1,8 @@
 pkg-name: graphviz
-tracker-template: gitlab
-host: gitlab.com
-project: graphviz/graphviz
-mode: tags
-template: https://gitlab.com/graphviz/graphviz/-/archive/{tag}/graphviz-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.com
+  mode: tags
+  project: graphviz/graphviz
+  template: https://gitlab.com/graphviz/graphviz/-/archive/{tag}/graphviz-{tag}.tar.gz

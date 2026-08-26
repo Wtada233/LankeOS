@@ -1,5 +1,7 @@
 pkg-name: man-db
-tracker-template: html-index
-url: https://download-mirror.savannah.gnu.org/releases/man-db/
-pattern: man-db-([0-9.]+)\.tar\.
-template: https://download-mirror.savannah.gnu.org/releases/man-db/man-db-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://download-mirror.savannah.gnu.org/releases/man-db/
+  pattern: man-db-([0-9.]+)\.tar\.
+  template: https://download-mirror.savannah.gnu.org/releases/man-db/man-db-{version}.tar.xz

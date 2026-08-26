@@ -1,6 +1,5 @@
-# KDE download 服务器直接列出所有版本 tarball，取版本号最大者
 pkg-name: plasma-wayland-protocol
-tracker-template: script
+type: script
 script-content: |
   base=https://download.kde.org/stable/plasma-wayland-protocols
   listing=$(curl -fsSL "$base/")

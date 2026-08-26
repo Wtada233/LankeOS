@@ -1,6 +1,8 @@
 pkg-name: cracklib
-tracker-template: github
-repo: cracklib/cracklib
-mode: tags
-tag-prefix: v
-template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: cracklib/cracklib
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.gz

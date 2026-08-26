@@ -1,9 +1,5 @@
 pkg-name: libreoffice
-# LibreOffice 主版本 + 20 个 vendor tarball（Arch 路线 --without-system-* 保留内置的那些）
-# download.lst 是唯一可信来源（从主 tarball 流式提取，不依赖本地缓存）
-# 注：ucpp/dtoa 在 Arch PKGBUILD source 里但当前版本 download.lst/Makefile.fetch 均不引用
-#     （external/ 无对应模块）→ 历史遗留，不需要
-tracker-template: script
+type: script
 script-content: |
   set -e
   base=https://download.documentfoundation.org/libreoffice/src
@@ -45,4 +41,3 @@ script-content: |
     test -n "$name" || exit 1
     echo "https://dev-www.libreoffice.org/extern/$name"
   done
-

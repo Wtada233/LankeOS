@@ -1,5 +1,7 @@
 pkg-name: perl-uri
-tracker-template: html-index
-url: https://cpan.metacpan.org/authors/id/O/OA/OALDERS/
-pattern: 'URI-(\d[\d.]*)\.tar\.gz'
-template: https://cpan.metacpan.org/authors/id/O/OA/OALDERS/URI-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://cpan.metacpan.org/authors/id/O/OA/OALDERS/
+  pattern: URI-(\d[\d.]*)\.tar\.gz
+  template: https://cpan.metacpan.org/authors/id/O/OA/OALDERS/URI-{version}.tar.gz

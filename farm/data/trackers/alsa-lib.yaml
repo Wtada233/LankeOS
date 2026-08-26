@@ -1,6 +1,8 @@
 pkg-name: alsa-lib
-tracker-template: github
-repo: alsa-project/alsa-lib
-mode: tags
-tag-prefix: v
-template: https://github.com/alsa-project/alsa-lib/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: alsa-project/alsa-lib
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/alsa-project/alsa-lib/archive/refs/tags/{tag}.tar.gz

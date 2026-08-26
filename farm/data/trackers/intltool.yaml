@@ -1,5 +1,5 @@
 pkg-name: intltool
-tracker-template: script
+type: script
 script-content: |
   #!/bin/bash
   url="https://launchpad.net/intltool/+download"

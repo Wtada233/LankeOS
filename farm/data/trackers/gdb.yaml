@@ -1,5 +1,7 @@
 pkg-name: gdb
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/gdb/
-pattern: gdb-(\d[\d.]*)\.tar\.(?:gz|xz)
-template: https://ftp.gnu.org/gnu/gdb/{name}-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/gdb/
+  pattern: gdb-(\d[\d.]*)\.tar\.(?:gz|xz)
+  template: https://ftp.gnu.org/gnu/gdb/{name}-{version}.tar.xz

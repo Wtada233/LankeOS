@@ -1,5 +1,5 @@
 pkg-name: kf-kcmutils
-tracker-template: script
+type: script
 script-content: |
   up=${PKG_NAME#kf-}
   base=https://download.kde.org/stable/frameworks

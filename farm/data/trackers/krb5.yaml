@@ -1,5 +1,5 @@
 pkg-name: krb5
-tracker-template: script
+type: script
 script-content: |
   BASE="https://web.mit.edu/kerberos/dist/krb5"
   html=$(curl -s "$BASE/")

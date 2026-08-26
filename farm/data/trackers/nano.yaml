@@ -1,5 +1,5 @@
 pkg-name: nano
-tracker-template: script
+type: script
 script-content: |
   base="https://www.nano-editor.org/dist"
   main_html=$(curl -sL "$base/")

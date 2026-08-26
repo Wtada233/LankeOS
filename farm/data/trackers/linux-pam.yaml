@@ -1,6 +1,8 @@
 pkg-name: linux-pam
-tracker-template: github
-repo: linux-pam/linux-pam
-mode: tags
-tag-prefix: v
-template: https://github.com/linux-pam/linux-pam/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: linux-pam/linux-pam
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/linux-pam/linux-pam/archive/refs/tags/{tag}.tar.gz

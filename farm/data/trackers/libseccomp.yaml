@@ -1,6 +1,8 @@
 pkg-name: libseccomp
-tracker-template: github
-repo: seccomp/libseccomp
-mode: releases
-tag-prefix: v
-template: 'https://github.com/seccomp/libseccomp/releases/download/{tag}/libseccomp-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: seccomp/libseccomp
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/seccomp/libseccomp/releases/download/{tag}/libseccomp-{version}.tar.gz

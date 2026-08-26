@@ -1,7 +1,8 @@
-# libatomic_ops：源是 release tarball（archive 是 git 树缺 configure + 下载易截断）
 pkg-name: libatomic_ops
-tracker-template: github
-repo: ivmai/libatomic_ops
-mode: tags
-tag-prefix: 'v'
-template: https://github.com/ivmai/libatomic_ops/releases/download/{tag}/libatomic_ops-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: ivmai/libatomic_ops
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/ivmai/libatomic_ops/releases/download/{tag}/libatomic_ops-{version}.tar.gz

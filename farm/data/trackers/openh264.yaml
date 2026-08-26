@@ -1,6 +1,8 @@
 pkg-name: openh264
-tracker-template: github
-repo: cisco/openh264
-mode: tags
-tag-prefix: v
-template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: cisco/openh264
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

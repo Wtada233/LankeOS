@@ -1,5 +1,6 @@
 pkg-name: libxml2
-tracker-template: gnome
-# libxml2 不遵循 GNOME 偶/奇 stable 约定（2.15 是正常稳定版）→ 取最大版本，不只偶 minor
-stable-minor: all
-template: https://download.gnome.org/sources/libxml2/{path_version}/libxml2-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/libxml2/{path_version}/libxml2-{version}.tar.xz
+  stable-minor: all

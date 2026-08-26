@@ -1,6 +1,5 @@
 pkg-name: liblangtag
-# release tarball 直接位于 dev-www.libreoffice.org/src/ 根（非子目录）→ 探测根页面
-tracker-template: script
+type: script
 script-content: |
   page=$(curl -fsSL "https://dev-www.libreoffice.org/src/")
   ver=$(printf '%s\n' "$page" | grep -oE "liblangtag-[0-9.]+\.tar\." | sed "s/^liblangtag-//; s/\.tar\..*$//" | sort -V | tail -n1)

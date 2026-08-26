@@ -1,5 +1,5 @@
 pkg-name: libkscreen
-tracker-template: script
+type: script
 script-content: |
   pkg=libkscreen
   base=https://download.kde.org/stable/plasma

@@ -1,6 +1,8 @@
 pkg-name: yaml-cpp
-tracker-template: github
-repo: jbeder/yaml-cpp
-mode: tags
-tag-prefix: yaml-cpp-
-template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: jbeder/yaml-cpp
+  mode: tags
+  tag-prefix: yaml-cpp-
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

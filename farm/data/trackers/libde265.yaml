@@ -1,6 +1,8 @@
 pkg-name: libde265
-tracker-template: github
-repo: strukturag/libde265
-mode: tags
-tag-prefix: 'v'
-template: git+https://github.com/{repo}.git@{tag}
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: strukturag/libde265
+  mode: tags
+  tag-prefix: v
+  template: git+https://github.com/{repo}.git@{tag}

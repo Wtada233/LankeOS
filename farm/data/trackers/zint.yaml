@@ -1,6 +1,8 @@
 pkg-name: zint
-tracker-template: github
-repo: zint/zint
-mode: tags
-tag-prefix: ''
-template: https://github.com/zint/zint/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: zint/zint
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/zint/zint/archive/refs/tags/{tag}.tar.gz

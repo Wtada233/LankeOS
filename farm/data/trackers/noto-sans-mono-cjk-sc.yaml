@@ -1,17 +1,8 @@
-# noto-cjk 仓库用 Git LFS，GitHub archive 解出来是空目录 → 字体必须走 raw（raw 解析 LFS 指针到真实文件）。
-# 包无 sources 字段（字体在 work_sources）：顶层 tracker 只负责探测版本（Sans 系列 tag），
-# apply 时不写 sources（apply_version_update 已处理 work_sources-only 包），URL 由下方 work_sources: 配置按正则升级。
 pkg-name: noto-sans-mono-cjk-sc
-tracker-template: github
-repo: notofonts/noto-cjk
-mode: tags
-tag-prefix: Sans
-template: https://github.com/notofonts/noto-cjk/raw/refs/tags/{tag}/Sans/Mono/NotoSansMonoCJKsc-Regular.otf
+version-source: work_sources[0]
 work_sources:
-  - pkg-name: noto-font
-    url-match: "noto-cjk/raw/refs/tags/"
-    tracker-template: github
-    repo: notofonts/noto-cjk
-    mode: tags
-    tag-prefix: Sans
-    template: https://github.com/notofonts/noto-cjk/raw/refs/tags/{tag}/Sans/Mono/NotoSansMonoCJKsc-Regular.otf
+- tracker-template: github
+  repo: notofonts/noto-cjk
+  mode: tags
+  tag-prefix: Sans
+  template: https://github.com/notofonts/noto-cjk/raw/refs/tags/{tag}/Sans/Mono/NotoSansMonoCJKsc-Regular.otf

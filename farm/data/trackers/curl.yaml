@@ -1,5 +1,7 @@
 pkg-name: curl
-tracker-template: html-index
-url: https://curl.se/download/
-pattern: 'curl-(\d[\d.]*)\.tar\.xz'
-template: https://curl.se/download/curl-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://curl.se/download/
+  pattern: curl-(\d[\d.]*)\.tar\.xz
+  template: https://curl.se/download/curl-{version}.tar.xz

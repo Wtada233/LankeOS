@@ -1,5 +1,7 @@
 pkg-name: qt6-wayland
-tracker-template: html-index
-template: "https://download.qt.io/official_releases/qt/{major_minor}/{version}/submodules/qtwayland-everywhere-src-{version}.tar.xz"
-order: after(qt6-base)
-same-version: qt6-base
+version-source: sources[0]
+after: qt6-base
+sources:
+- tracker-template: same-version
+  template: https://download.qt.io/official_releases/qt/{major_minor}/{version}/submodules/qtwayland-everywhere-src-{version}.tar.xz
+  same-version-of: qt6-base

@@ -1,6 +1,8 @@
 pkg-name: librevenge
-tracker-template: sourceforge
-project: libwpd
-path: /librevenge
-pattern: 'librevenge-([0-9.]+)\.tar\.xz'
-template: 'https://sourceforge.net/projects/libwpd/files/librevenge/librevenge-{version}/librevenge-{version}.tar.xz'
+version-source: sources[0]
+sources:
+- tracker-template: sourceforge
+  pattern: librevenge-([0-9.]+)\.tar\.xz
+  project: libwpd
+  path: /librevenge
+  template: https://sourceforge.net/projects/libwpd/files/librevenge/librevenge-{version}/librevenge-{version}.tar.xz

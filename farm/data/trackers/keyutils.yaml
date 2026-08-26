@@ -1,5 +1,5 @@
 pkg-name: keyutils
-tracker-template: script
+type: script
 script-content: |
   # keyutils 无 release tarball，git.kernel.org tag vX.Y
   refs=$(git ls-remote --tags https://git.kernel.org/pub/scm/linux/kernel/git/dhowells/keyutils.git 2>/dev/null)

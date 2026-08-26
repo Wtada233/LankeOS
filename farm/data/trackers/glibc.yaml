@@ -1,13 +1,12 @@
 pkg-name: glibc
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/glibc/
-pattern: 'glibc-(\d[\d.]*)\.tar\.xz'
-template: https://ftp.gnu.org/gnu/glibc/{name}-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/glibc/
+  pattern: glibc-(\d[\d.]*)\.tar\.xz
+  template: https://ftp.gnu.org/gnu/glibc/{name}-{version}.tar.xz
 work_sources:
-  # tzdata 有 IANA 索引，可自动追踪最新时区数据
-  - pkg-name: tzdata
-    url-match: "iana.org/time-zones/repository/releases/tzdata"
-    tracker-template: html-index
-    url: https://www.iana.org/time-zones/repository/releases/
-    pattern: 'tzdata(\d{4}[a-z])\.tar\.gz'
-    template: https://www.iana.org/time-zones/repository/releases/tzdata{version}.tar.gz
+- tracker-template: html-index
+  url: https://www.iana.org/time-zones/repository/releases/
+  pattern: tzdata(\d{4}[a-z])\.tar\.gz
+  template: https://www.iana.org/time-zones/repository/releases/tzdata{version}.tar.gz

@@ -1,6 +1,7 @@
-# git src：obs-browser/obs-websocket 子模块随 obs-studio tag 对齐（此前用 git clone 默认分支，浮动不可复现）
 pkg-name: obs-studio
-tracker-template: github
-repo: obsproject/obs-studio
-mode: tags
-template: git+https://github.com/{repo}@{tag}
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: obsproject/obs-studio
+  mode: tags
+  template: git+https://github.com/{repo}@{tag}

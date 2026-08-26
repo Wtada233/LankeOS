@@ -1,6 +1,8 @@
 pkg-name: fontconfig
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: fontconfig/fontconfig
-mode: tags
-template: https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/{tag}/fontconfig-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  project: fontconfig/fontconfig
+  template: https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/{tag}/fontconfig-{tag}.tar.gz

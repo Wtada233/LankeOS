@@ -1,5 +1,7 @@
 pkg-name: libdrm
-tracker-template: html-index
-url: https://dri.freedesktop.org/libdrm/
-pattern: 'libdrm-(\d[\d.]*)\.tar\.'
-template: https://dri.freedesktop.org/libdrm/libdrm-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://dri.freedesktop.org/libdrm/
+  pattern: libdrm-(\d[\d.]*)\.tar\.
+  template: https://dri.freedesktop.org/libdrm/libdrm-{version}.tar.xz

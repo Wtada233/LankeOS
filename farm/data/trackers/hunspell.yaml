@@ -1,6 +1,8 @@
 pkg-name: hunspell
-tracker-template: github
-repo: hunspell/hunspell
-mode: tags
-tag-prefix: 'v'
-template: https://github.com/{repo}/releases/download/{tag}/hunspell-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: hunspell/hunspell
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/releases/download/{tag}/hunspell-{version}.tar.gz

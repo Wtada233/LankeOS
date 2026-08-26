@@ -1,6 +1,8 @@
 pkg-name: libqalculate
-tracker-template: github
-repo: Qalculate/libqalculate
-mode: releases
-tag-prefix: v
-template: 'https://github.com/Qalculate/libqalculate/releases/download/{tag}/libqalculate-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: Qalculate/libqalculate
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/Qalculate/libqalculate/releases/download/{tag}/libqalculate-{version}.tar.gz

@@ -1,5 +1,7 @@
 pkg-name: nasm
-tracker-template: html-index
-url: https://www.nasm.us/pub/nasm/releasebuilds/
-pattern: 'href="([0-9.]+)/"'
-template: https://www.nasm.us/pub/nasm/releasebuilds/{version}/nasm-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.nasm.us/pub/nasm/releasebuilds/
+  pattern: href="([0-9.]+)/"
+  template: https://www.nasm.us/pub/nasm/releasebuilds/{version}/nasm-{version}.tar.xz

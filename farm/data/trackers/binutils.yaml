@@ -1,5 +1,7 @@
 pkg-name: binutils
-tracker-template: html-index
-url: https://sourceware.org/pub/binutils/releases/
-pattern: binutils-(\d[\d.]*)\.tar\.(?:gz|xz|bz2)
-template: https://sourceware.org/pub/binutils/releases/{name}-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://sourceware.org/pub/binutils/releases/
+  pattern: binutils-(\d[\d.]*)\.tar\.(?:gz|xz|bz2)
+  template: https://sourceware.org/pub/binutils/releases/{name}-{version}.tar.xz

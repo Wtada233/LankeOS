@@ -1,3 +1,5 @@
 pkg-name: python-aaf2
-tracker-template: pypi
-project: pyaaf2
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: pyaaf2

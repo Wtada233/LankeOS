@@ -1,5 +1,7 @@
 pkg-name: ruby
-tracker-template: html-index
-url: "https://cache.ruby-lang.org/pub/ruby/4.0/"
-pattern: 'ruby-(\d+\.\d+\.\d+)\.tar\.xz'
-template: "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-{version}.tar.xz"
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://cache.ruby-lang.org/pub/ruby/4.0/
+  pattern: ruby-(\d+\.\d+\.\d+)\.tar\.xz
+  template: https://cache.ruby-lang.org/pub/ruby/4.0/ruby-{version}.tar.xz

@@ -1,7 +1,5 @@
 pkg-name: gimp
-# tag 是 GIMP_3_2_4（下划线），gitlab 模板版本号会带下划线 → script 转点号
-# 仓库有 GIMP_19990910 / GIMP_BEFORE_GTK_2_0 等历史 tag，必须过滤成 GIMP_x_y_z 纯数字三段
-tracker-template: script
+type: script
 script-content: |
   tags=$(git ls-remote --tags https://gitlab.gnome.org/GNOME/gimp.git 'refs/tags/GIMP_*')
   tag=$(printf '%s\n' "$tags" | sed 's/.*refs\/tags\///; s/\^{}//' | grep -E '^GIMP_[0-9]+_[0-9]+_[0-9]+$' | sort -V | tail -n1)

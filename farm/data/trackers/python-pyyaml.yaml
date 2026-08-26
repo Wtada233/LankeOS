@@ -1,3 +1,5 @@
 pkg-name: python-pyyaml
-tracker-template: pypi
-project: pyyaml
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: pyyaml

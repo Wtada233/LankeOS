@@ -1,7 +1,9 @@
 pkg-name: upower
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: upower/upower
-mode: tags
-tag-prefix: 'v'
-template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: v
+  project: upower/upower
+  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

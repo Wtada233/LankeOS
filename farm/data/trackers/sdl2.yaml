@@ -1,7 +1,5 @@
 pkg-name: sdl2
-# 仓库同时发 SDL2（release-2.x）和 SDL3（release-3.x）；本包是 SDL2（mlt 的 MOD_SDL2 用 SDL2 API）
-# 只匹配 release-2.*，避免误追到 SDL3
-tracker-template: script
+type: script
 script-content: |
   tags=$(git ls-remote --tags https://github.com/libsdl-org/SDL 'refs/tags/release-2.*')
   tag=$(printf '%s\n' "$tags" | sed 's/.*refs\/tags\///; s/\^{}//' | sort -V | tail -n1)

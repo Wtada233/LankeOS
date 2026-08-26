@@ -1,6 +1,8 @@
 pkg-name: libunwind
-tracker-template: github
-repo: libunwind/libunwind
-tag-prefix: v
-mode: releases
-template: https://github.com/libunwind/libunwind/releases/download/v{version}/libunwind-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: libunwind/libunwind
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/libunwind/libunwind/releases/download/v{version}/libunwind-{version}.tar.gz

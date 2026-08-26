@@ -1,5 +1,5 @@
 pkg-name: libqaccessibilityclient
-tracker-template: script
+type: script
 script-content: |
   pkg=libqaccessibilityclient
   base=https://download.kde.org/stable/$pkg

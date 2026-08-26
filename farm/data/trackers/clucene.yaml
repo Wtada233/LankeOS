@@ -1,6 +1,5 @@
 pkg-name: clucene
-# clucene 已死（2.3.3.4，2011 年后无更新），锁定当前版本
-tracker-template: script
+type: script
 script-content: |
   echo "2.3.3.4"
   echo "https://downloads.sourceforge.net/clucene/clucene-core-2.3.3.4.tar.gz"

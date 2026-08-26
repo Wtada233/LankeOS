@@ -1,5 +1,7 @@
 pkg-name: libpipeline
-tracker-template: html-index
-url: 'https://download.savannah.gnu.org/releases/libpipeline/'
-pattern: 'libpipeline-(\d[\d.]*)\.tar\.gz'
-template: 'https://download.savannah.gnu.org/releases/libpipeline/libpipeline-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://download.savannah.gnu.org/releases/libpipeline/
+  pattern: libpipeline-(\d[\d.]*)\.tar\.gz
+  template: https://download.savannah.gnu.org/releases/libpipeline/libpipeline-{version}.tar.gz

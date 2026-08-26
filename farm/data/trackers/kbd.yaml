@@ -1,5 +1,7 @@
 pkg-name: kbd
-tracker-template: html-index
-url: https://www.kernel.org/pub/linux/utils/kbd/
-pattern: 'kbd-([\d.]+)\.tar\.xz'
-template: https://www.kernel.org/pub/linux/utils/kbd/kbd-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.kernel.org/pub/linux/utils/kbd/
+  pattern: kbd-([\d.]+)\.tar\.xz
+  template: https://www.kernel.org/pub/linux/utils/kbd/kbd-{version}.tar.xz

@@ -1,5 +1,7 @@
 pkg-name: bash
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/bash/
-pattern: bash-(\d[\d.]*)\.tar\.(?:gz|xz)
-template: https://ftp.gnu.org/gnu/bash/{name}-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/bash/
+  pattern: bash-(\d[\d.]*)\.tar\.(?:gz|xz)
+  template: https://ftp.gnu.org/gnu/bash/{name}-{version}.tar.gz

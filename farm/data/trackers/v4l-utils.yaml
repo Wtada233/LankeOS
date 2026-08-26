@@ -1,5 +1,7 @@
 pkg-name: v4l-utils
-tracker-template: html-index
-url: https://linuxtv.org/downloads/v4l-utils/
-pattern: 'v4l-utils-(\d[\d.]*)\.tar\.xz'
-template: 'https://linuxtv.org/downloads/v4l-utils/v4l-utils-{version}.tar.xz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://linuxtv.org/downloads/v4l-utils/
+  pattern: v4l-utils-(\d[\d.]*)\.tar\.xz
+  template: https://linuxtv.org/downloads/v4l-utils/v4l-utils-{version}.tar.xz

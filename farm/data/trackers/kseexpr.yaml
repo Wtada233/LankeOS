@@ -1,7 +1,9 @@
 pkg-name: kseexpr
-tracker-template: gitlab
-host: invent.kde.org
-project: graphics/kseexpr
-mode: tags
-tag-prefix: v
-template: https://invent.kde.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: invent.kde.org
+  mode: tags
+  tag-prefix: v
+  project: graphics/kseexpr
+  template: https://invent.kde.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

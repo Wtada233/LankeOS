@@ -1,6 +1,8 @@
 pkg-name: btrfs-progs
-tracker-template: github
-repo: kdave/btrfs-progs
-mode: tags
-tag-prefix: v
-template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: kdave/btrfs-progs
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

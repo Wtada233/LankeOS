@@ -1,3 +1,5 @@
 pkg-name: python-pluggy
-tracker-template: pypi
-project: pluggy
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: pluggy

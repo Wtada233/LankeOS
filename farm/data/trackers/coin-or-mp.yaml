@@ -1,6 +1,8 @@
 pkg-name: coin-or-mp
-tracker-template: github
-repo: coin-or/CoinMP
-mode: tags
-tag-prefix: 'releases/'
-template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: coin-or/CoinMP
+  mode: tags
+  tag-prefix: releases/
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

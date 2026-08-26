@@ -1,6 +1,5 @@
 pkg-name: xmlto
-tracker-template: script
-# legacy 包，pagure tags API 返回异常数据；最后版本 0.0.29 已确定、不再更新
+type: script
 script-content: |
   #!/bin/bash
   echo "0.0.29"

@@ -1,6 +1,8 @@
 pkg-name: libnumbertext
-tracker-template: github
-repo: Numbertext/libnumbertext
-mode: tags
-tag-prefix: ''
-template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: Numbertext/libnumbertext
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

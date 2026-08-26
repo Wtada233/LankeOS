@@ -1,5 +1,5 @@
 pkg-name: plasma-desktop
-tracker-template: script
+type: script
 script-content: |
   pkg=plasma-desktop
   base=https://download.kde.org/stable/plasma

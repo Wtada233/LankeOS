@@ -1,5 +1,7 @@
 pkg-name: make
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/make/
-pattern: make-([0-9.]+)\.tar\.
-template: https://ftp.gnu.org/gnu/make/make-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/make/
+  pattern: make-([0-9.]+)\.tar\.
+  template: https://ftp.gnu.org/gnu/make/make-{version}.tar.gz

@@ -1,5 +1,5 @@
 pkg-name: kactivitymanagerd
-tracker-template: script
+type: script
 script-content: |
   pkg=kactivitymanagerd
   base=https://download.kde.org/stable/plasma

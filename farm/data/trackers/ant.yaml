@@ -1,5 +1,5 @@
 pkg-name: ant
-tracker-template: script
+type: script
 script-content: |
   page=$(curl -fsSL "https://www.apache.org/dist/ant/source/")
   ver=$(printf '%s\n' "$page" | grep -oE 'apache-ant-[0-9.]+-src\.tar\.bz2' | sed 's/apache-ant-//; s/-src.tar.bz2//' | sort -V | tail -n1)

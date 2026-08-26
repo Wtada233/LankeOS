@@ -1,5 +1,5 @@
 pkg-name: milou
-tracker-template: script
+type: script
 script-content: |
   pkg=milou
   base=https://download.kde.org/stable/plasma

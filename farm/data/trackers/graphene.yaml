@@ -1,3 +1,5 @@
 pkg-name: graphene
-tracker-template: gnome
-template: https://download.gnome.org/sources/graphene/{path_version}/graphene-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/graphene/{path_version}/graphene-{version}.tar.xz

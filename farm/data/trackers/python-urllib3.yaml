@@ -1,3 +1,5 @@
 pkg-name: python-urllib3
-tracker-template: pypi
-project: urllib3
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: urllib3

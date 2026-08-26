@@ -1,3 +1,5 @@
 pkg-name: python-installer
-tracker-template: pypi
-project: installer
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: installer

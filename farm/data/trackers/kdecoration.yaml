@@ -1,5 +1,5 @@
 pkg-name: kdecoration
-tracker-template: script
+type: script
 script-content: |
   pkg=kdecoration
   base=https://download.kde.org/stable/plasma

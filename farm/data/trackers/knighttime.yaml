@@ -1,5 +1,5 @@
 pkg-name: knighttime
-tracker-template: script
+type: script
 script-content: |
   pkg=knighttime
   base=https://download.kde.org/stable/plasma

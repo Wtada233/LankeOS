@@ -1,6 +1,8 @@
 pkg-name: lcms2
-tracker-template: sourceforge
-project: lcms
-path: lcms
-pattern: 'lcms2-([0-9][0-9.]*)\.tar\.gz'
-template: 'https://downloads.sourceforge.net/lcms/lcms2-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: sourceforge
+  pattern: lcms2-([0-9][0-9.]*)\.tar\.gz
+  project: lcms
+  path: lcms
+  template: https://downloads.sourceforge.net/lcms/lcms2-{version}.tar.gz

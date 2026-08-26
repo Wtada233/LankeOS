@@ -1,5 +1,5 @@
 pkg-name: plasma5support
-tracker-template: script
+type: script
 script-content: |
   pkg=plasma5support
   base=https://download.kde.org/stable/plasma

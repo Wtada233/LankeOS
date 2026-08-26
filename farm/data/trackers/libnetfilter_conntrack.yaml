@@ -1,5 +1,7 @@
 pkg-name: libnetfilter_conntrack
-tracker-template: html-index
-url: https://www.netfilter.org/projects/libnetfilter_conntrack/downloads.html
-pattern: 'libnetfilter_conntrack-(\d[\d.]*)\.tar\.xz'
-template: https://www.netfilter.org/projects/libnetfilter_conntrack/files/libnetfilter_conntrack-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.netfilter.org/projects/libnetfilter_conntrack/downloads.html
+  pattern: libnetfilter_conntrack-(\d[\d.]*)\.tar\.xz
+  template: https://www.netfilter.org/projects/libnetfilter_conntrack/files/libnetfilter_conntrack-{version}.tar.xz

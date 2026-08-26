@@ -1,5 +1,7 @@
 pkg-name: libpsl
-tracker-template: github
-repo: rockdaboot/libpsl
-mode: releases
-template: 'https://github.com/rockdaboot/libpsl/releases/download/{tag}/libpsl-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: rockdaboot/libpsl
+  mode: releases
+  template: https://github.com/rockdaboot/libpsl/releases/download/{tag}/libpsl-{version}.tar.gz

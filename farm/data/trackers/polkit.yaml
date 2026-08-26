@@ -1,5 +1,7 @@
 pkg-name: polkit
-tracker-template: github
-repo: polkit-org/polkit
-mode: tags
-template: 'https://github.com/polkit-org/polkit/archive/refs/tags/{tag}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: polkit-org/polkit
+  mode: tags
+  template: https://github.com/polkit-org/polkit/archive/refs/tags/{tag}.tar.gz

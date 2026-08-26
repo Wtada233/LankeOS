@@ -1,5 +1,5 @@
 pkg-name: krita
-tracker-template: script
+type: script
 script-content: |
   pkg=krita
   base=https://download.kde.org/stable/krita

@@ -1,5 +1,5 @@
 pkg-name: ocean-sound-theme
-tracker-template: script
+type: script
 script-content: |
   pkg=ocean-sound-theme
   base=https://download.kde.org/stable/plasma

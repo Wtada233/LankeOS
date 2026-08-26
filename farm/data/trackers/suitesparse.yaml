@@ -1,7 +1,8 @@
-# suitesparse：v 前缀 tag；graphblas 已拆分不建，tracker 只管主版本
 pkg-name: suitesparse
-tracker-template: github
-repo: DrTimothyAldenDavis/SuiteSparse
-mode: tags
-tag-prefix: 'v'
-template: https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: DrTimothyAldenDavis/SuiteSparse
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/{tag}.tar.gz

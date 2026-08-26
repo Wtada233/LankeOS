@@ -1,5 +1,7 @@
 pkg-name: gmp
-tracker-template: html-index
-url: https://ftp.gnu.org/gnu/gmp/
-pattern: 'gmp-(\d[\d.]*)\.tar\.xz'
-template: https://ftp.gnu.org/gnu/gmp/{name}-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/gmp/
+  pattern: gmp-(\d[\d.]*)\.tar\.xz
+  template: https://ftp.gnu.org/gnu/gmp/{name}-{version}.tar.xz

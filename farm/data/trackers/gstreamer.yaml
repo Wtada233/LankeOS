@@ -1,5 +1,7 @@
 pkg-name: gstreamer
-tracker-template: html-index
-url: https://gstreamer.freedesktop.org/src/gstreamer/
-pattern: 'gstreamer-([\d.]+)\.tar\.(?:xz|gz)'
-template: https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://gstreamer.freedesktop.org/src/gstreamer/
+  pattern: gstreamer-([\d.]+)\.tar\.(?:xz|gz)
+  template: https://gstreamer.freedesktop.org/src/gstreamer/gstreamer-{version}.tar.xz

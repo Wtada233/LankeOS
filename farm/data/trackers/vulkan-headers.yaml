@@ -1,6 +1,8 @@
 pkg-name: vulkan-headers
-tracker-template: github
-repo: KhronosGroup/Vulkan-Headers
-mode: tags
-tag-prefix: vulkan-sdk-
-template: 'https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: KhronosGroup/Vulkan-Headers
+  mode: tags
+  tag-prefix: vulkan-sdk-
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

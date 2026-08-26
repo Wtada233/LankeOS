@@ -1,5 +1,5 @@
 pkg-name: kscreenlocker
-tracker-template: script
+type: script
 script-content: |
   pkg=kscreenlocker
   base=https://download.kde.org/stable/plasma

@@ -1,5 +1,7 @@
 pkg-name: fmt
-tracker-template: github
-repo: fmtlib/fmt
-mode: tags
-template: https://github.com/fmtlib/fmt/archive/refs/tags/{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: fmtlib/fmt
+  mode: tags
+  template: https://github.com/fmtlib/fmt/archive/refs/tags/{tag}.tar.gz

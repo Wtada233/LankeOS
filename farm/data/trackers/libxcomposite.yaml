@@ -1,5 +1,7 @@
 pkg-name: libxcomposite
-tracker-template: html-index
-url: https://xorg.freedesktop.org/archive/individual/lib/
-pattern: 'libXcomposite-([0-9][0-9.]*)\.tar\.xz'
-template: 'https://xorg.freedesktop.org/archive/individual/lib/libXcomposite-{version}.tar.xz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://xorg.freedesktop.org/archive/individual/lib/
+  pattern: libXcomposite-([0-9][0-9.]*)\.tar\.xz
+  template: https://xorg.freedesktop.org/archive/individual/lib/libXcomposite-{version}.tar.xz

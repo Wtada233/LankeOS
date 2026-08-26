@@ -1,5 +1,7 @@
 pkg-name: xdg-desktop-portal
-tracker-template: github
-repo: flatpak/xdg-desktop-portal
-mode: releases
-template: https://github.com/flatpak/xdg-desktop-portal/releases/download/{tag}/xdg-desktop-portal-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: flatpak/xdg-desktop-portal
+  mode: releases
+  template: https://github.com/flatpak/xdg-desktop-portal/releases/download/{tag}/xdg-desktop-portal-{version}.tar.xz

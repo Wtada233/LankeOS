@@ -1,5 +1,5 @@
 pkg-name: kde-cli-tools
-tracker-template: script
+type: script
 script-content: |
   pkg=kde-cli-tools
   base=https://download.kde.org/stable/plasma

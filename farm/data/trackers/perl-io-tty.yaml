@@ -1,5 +1,7 @@
 pkg-name: perl-io-tty
-tracker-template: html-index
-url: https://search.cpan.org/CPAN/authors/id/T/TO/TODDR/
-pattern: 'IO-Tty-([0-9.]+)\.tar\.gz'
-template: 'https://search.cpan.org/CPAN/authors/id/T/TO/TODDR/IO-Tty-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://search.cpan.org/CPAN/authors/id/T/TO/TODDR/
+  pattern: IO-Tty-([0-9.]+)\.tar\.gz
+  template: https://search.cpan.org/CPAN/authors/id/T/TO/TODDR/IO-Tty-{version}.tar.gz

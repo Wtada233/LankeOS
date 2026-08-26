@@ -1,6 +1,8 @@
 pkg-name: libstemmer
-tracker-template: github
-repo: snowballstem/snowball
-mode: tags
-tag-prefix: v
-template: https://github.com/snowballstem/snowball/archive/refs/tags/v{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: snowballstem/snowball
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/snowballstem/snowball/archive/refs/tags/v{version}.tar.gz

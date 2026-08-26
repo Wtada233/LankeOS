@@ -1,5 +1,7 @@
 pkg-name: patch
-tracker-template: html-index
-url: 'https://ftp.gnu.org/gnu/patch/'
-pattern: 'patch-([0-9.]+)\.tar\.xz'
-template: 'https://ftp.gnu.org/gnu/patch/patch-{version}.tar.xz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://ftp.gnu.org/gnu/patch/
+  pattern: patch-([0-9.]+)\.tar\.xz
+  template: https://ftp.gnu.org/gnu/patch/patch-{version}.tar.xz

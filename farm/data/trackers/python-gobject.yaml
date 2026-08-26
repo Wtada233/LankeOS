@@ -1,4 +1,6 @@
 pkg-name: python-gobject
-tracker-template: gnome
-source-name: pygobject
-template: 'https://download.gnome.org/sources/pygobject/{path_version}/pygobject-{version}.tar.gz'
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/pygobject/{path_version}/pygobject-{version}.tar.gz
+  source-name: pygobject

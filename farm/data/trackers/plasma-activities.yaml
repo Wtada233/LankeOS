@@ -1,5 +1,5 @@
 pkg-name: plasma-activities
-tracker-template: script
+type: script
 script-content: |
   pkg=plasma-activities
   base=https://download.kde.org/stable/plasma

@@ -1,5 +1,7 @@
 pkg-name: rsync
-tracker-template: html-index
-url: "https://rsync.samba.org/ftp/rsync/src/"
-pattern: 'rsync-(\d+(?:\.\d+)*)\.tar\.gz'
-template: "https://rsync.samba.org/ftp/rsync/src/rsync-{version}.tar.gz"
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://rsync.samba.org/ftp/rsync/src/
+  pattern: rsync-(\d+(?:\.\d+)*)\.tar\.gz
+  template: https://rsync.samba.org/ftp/rsync/src/rsync-{version}.tar.gz

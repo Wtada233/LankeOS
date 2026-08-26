@@ -1,6 +1,8 @@
 pkg-name: libarchive
-tracker-template: github
-repo: libarchive/libarchive
-mode: releases
-tag-prefix: v
-template: 'https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.xz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: libarchive/libarchive
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.xz

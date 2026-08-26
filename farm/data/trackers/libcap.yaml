@@ -1,5 +1,7 @@
 pkg-name: libcap
-tracker-template: html-index
-url: https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/
-pattern: 'libcap-(\d[\d.]*)\.tar\.'
-template: https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/
+  pattern: libcap-(\d[\d.]*)\.tar\.
+  template: https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-{version}.tar.xz

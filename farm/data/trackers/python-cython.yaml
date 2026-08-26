@@ -1,8 +1,5 @@
-# Cython 只用 stable release tag（过滤 alpha/beta/rc，如 3.3.0a1）。
-# github 模板对 tags 做语义排序会纳入预发布，这里改用 script 硬过滤：
-# git ls-remote --tags → 只留 ^x.y.z$（同时天然排除 ^{} peeled ref 和 a/b/rc）→ sort -V 取最高。
 pkg-name: python-cython
-tracker-template: script
+type: script
 script-content: |
   tags=$(git ls-remote --tags https://github.com/cython/cython 2>/dev/null \
     | awk -F/ '$NF ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' \

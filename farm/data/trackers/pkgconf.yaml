@@ -1,5 +1,7 @@
 pkg-name: pkgconf
-tracker-template: html-index
-url: 'https://distfiles.ariadne.space/pkgconf/'
-pattern: 'pkgconf-(\d[\d.]*)\.tar\.'
-template: 'https://distfiles.ariadne.space/pkgconf/pkgconf-{version}.tar.xz'
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://distfiles.ariadne.space/pkgconf/
+  pattern: pkgconf-(\d[\d.]*)\.tar\.
+  template: https://distfiles.ariadne.space/pkgconf/pkgconf-{version}.tar.xz

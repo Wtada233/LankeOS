@@ -1,6 +1,8 @@
 pkg-name: e2fsprogs
-tracker-template: sourceforge
-project: e2fsprogs
-path: e2fsprogs
-pattern: v(\d[\d.]*)
-template: https://downloads.sourceforge.net/project/{project}/e2fsprogs/v{path_version}/e2fsprogs-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: sourceforge
+  pattern: v(\d[\d.]*)
+  project: e2fsprogs
+  path: e2fsprogs
+  template: https://downloads.sourceforge.net/project/{project}/e2fsprogs/v{path_version}/e2fsprogs-{version}.tar.gz

@@ -1,5 +1,5 @@
 pkg-name: json-c
-tracker-template: script
+type: script
 script-content: |
   #!/bin/bash
   json=$(curl -sL "https://api.github.com/repos/json-c/json-c/tags")

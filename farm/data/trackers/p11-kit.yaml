@@ -1,5 +1,7 @@
 pkg-name: p11-kit
-tracker-template: github
-repo: p11-glue/p11-kit
-mode: releases
-template: 'https://github.com/p11-glue/p11-kit/releases/download/{tag}/{name}-{version}.tar.xz'
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: p11-glue/p11-kit
+  mode: releases
+  template: https://github.com/p11-glue/p11-kit/releases/download/{tag}/{name}-{version}.tar.xz

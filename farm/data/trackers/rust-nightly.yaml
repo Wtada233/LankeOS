@@ -1,5 +1,5 @@
 pkg-name: rust-nightly
-tracker-template: script
+type: script
 script-content: |
   #!/bin/bash
   set -e

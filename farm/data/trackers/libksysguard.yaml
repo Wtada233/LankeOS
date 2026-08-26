@@ -1,5 +1,5 @@
 pkg-name: libksysguard
-tracker-template: script
+type: script
 script-content: |
   pkg=libksysguard
   base=https://download.kde.org/stable/plasma

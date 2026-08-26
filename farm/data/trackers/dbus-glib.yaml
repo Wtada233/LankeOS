@@ -1,7 +1,9 @@
 pkg-name: dbus-glib
-tracker-template: gitlab
-host: gitlab.freedesktop.org
-project: dbus/dbus-glib
-mode: tags
-tag-prefix: 'dbus-glib-'
-template: https://gitlab.freedesktop.org/dbus/dbus-glib/-/archive/{tag}/dbus-glib-{tag}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  tag-prefix: dbus-glib-
+  project: dbus/dbus-glib
+  template: https://gitlab.freedesktop.org/dbus/dbus-glib/-/archive/{tag}/dbus-glib-{tag}.tar.gz

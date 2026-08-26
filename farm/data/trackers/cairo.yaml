@@ -1,5 +1,7 @@
 pkg-name: cairo
-tracker-template: html-index
-url: https://cairographics.org/releases/
-pattern: 'cairo-(\d[\d.]*)\.tar\.xz'
-template: https://cairographics.org/releases/cairo-{version}.tar.xz
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://cairographics.org/releases/
+  pattern: cairo-(\d[\d.]*)\.tar\.xz
+  template: https://cairographics.org/releases/cairo-{version}.tar.xz

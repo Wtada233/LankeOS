@@ -1,6 +1,8 @@
 pkg-name: libwebp
-tracker-template: github
-repo: webmproject/libwebp
-mode: tags
-tag-prefix: v
-template: https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: webmproject/libwebp
+  mode: tags
+  tag-prefix: v
+  template: https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-{version}.tar.gz

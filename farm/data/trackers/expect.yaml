@@ -1,6 +1,8 @@
 pkg-name: expect
-tracker-template: sourceforge
-project: expect
-path: ""
-pattern: expect(\d[\d.]*)\.tar\.gz
-template: https://downloads.sourceforge.net/project/{project}/expect{version}.tar.gz
+version-source: sources[0]
+sources:
+- tracker-template: sourceforge
+  pattern: expect(\d[\d.]*)\.tar\.gz
+  project: expect
+  path: ''
+  template: https://downloads.sourceforge.net/project/{project}/expect{version}.tar.gz
