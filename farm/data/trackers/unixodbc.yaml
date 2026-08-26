@@ -3,6 +3,6 @@ version-source: sources[0]
 sources:
 - tracker-template: github
   repo: lurcher/unixODBC
-  mode: tags
+  mode: releases
   tag-prefix: v
-  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+  template: https://github.com/{repo}/releases/download/{tag}/unixODBC-{version}.tar.gz

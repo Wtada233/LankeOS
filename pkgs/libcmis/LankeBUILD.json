@@ -29,7 +29,7 @@
     "libxml2"
   ],
   "sources": [
-    "https://github.com/tdf/libcmis/releases/download/v0.6.3/libcmis-0.6.3.tar.xz"
+    "https://github.com/tdf/libcmis/archive/refs/tags/v0.6.3.tar.gz"
   ],
   "work_sources": []
 }
