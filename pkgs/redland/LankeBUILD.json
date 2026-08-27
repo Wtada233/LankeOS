@@ -1,7 +1,7 @@
 {
   "name": "redland",
   "version": "1.0.17",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libc.so.6",

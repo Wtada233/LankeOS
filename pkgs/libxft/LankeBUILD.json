@@ -1,7 +1,7 @@
 {
   "name": "libxft",
   "version": "2.3.9",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libX11.so.6",

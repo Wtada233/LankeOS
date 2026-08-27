@@ -4,7 +4,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX} --with-gmp
+    ./configure --prefix={PREFIX} --with-gmp --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

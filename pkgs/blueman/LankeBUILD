@@ -12,4 +12,6 @@ lankebuild_build() {
 
 lankebuild_package() {
     find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+    # 删静态库：_blueman.a 是 Cython 扩展的 libtool 副产品，运行期模块是 _blueman.so（Debian 同款删法）
+    find {STAGING_ROOT} -name '*.a' -delete
 }

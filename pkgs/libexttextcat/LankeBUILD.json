@@ -1,7 +1,7 @@
 {
   "name": "libexttextcat",
   "version": "3.4.8",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libc.so.6"

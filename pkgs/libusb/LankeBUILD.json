@@ -1,7 +1,7 @@
 {
   "name": "libusb",
   "version": "1.0.30",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",

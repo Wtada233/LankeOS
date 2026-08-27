@@ -4,7 +4,7 @@ lankebuild_prepare() {
 lankebuild_build() {
     # LibRaw 归档缺 configure，先 autoreconf
     autoreconf -fiv
-    ./configure --prefix={PREFIX}
+    ./configure --prefix={PREFIX} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

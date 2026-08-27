@@ -4,10 +4,13 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     # nauty 构建系统丢 LDFLAGS，Arch 同款：把 LDFLAGS 并入 CFLAGS
+    # --disable-static：nauty 的 makefile 用 `if [ -e .libs/libnauty.a ]` 守卫，
+    # 关静态后 .a 不生成也不报错；二进制（dreadnaut/geng 等）链的是 .o/.lo 对象，不走 .a
     CFLAGS="$CFLAGS $LDFLAGS" ./configure \
         --prefix={PREFIX} \
         --includedir={PREFIX}/include/nauty \
-        --enable-generic
+        --enable-generic \
+        --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     install -Dm 644 COPYRIGHT {STAGING_ROOT}/usr/share/licenses/nauty/LICENSE

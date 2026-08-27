@@ -6,7 +6,8 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     # --disable-werror：libcmis 默认开 werror，gcc16 -Werror 炸
-    ./configure --prefix={PREFIX} --disable-werror
+    # --disable-static：configure.ac 的 LT_INIT 已带 disable-static，但实测仍产 .a，显式关掉
+    ./configure --prefix={PREFIX} --disable-werror --disable-static
     # 减少未使用共享库链接（Arch 同款）
     sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
     make -j$(nproc)

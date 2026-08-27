@@ -1,7 +1,7 @@
 {
   "name": "raptor",
   "version": "2.0.16",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libc.so.6",

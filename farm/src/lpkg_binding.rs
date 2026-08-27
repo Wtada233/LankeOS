@@ -137,7 +137,9 @@ fn write_roll_counter(out_dir: &Path, c: u32) {
 /// - 崩溃/重跑窗口：`docker commit` 覆盖已存在的 roll tag → 旧镜像变 `<none>`。
 ///
 /// `docker image prune -f --filter dangling=true` 只删**悬空**（无 tag 且无子镜像引用），
-/// 不碰在用镜像——安全、幂等。扁平化后与每次构建开头调用。
+/// 不碰在用镜像——安全、幂等。**时机是关键**：悬空镜像的层往往仍被活容器引用，prune 必须等
+/// 相关容器删除**之后**才有效（finalize_roll 删临时容器后显式补；每次构建开头在清完孤儿容器后补），
+/// 容器存活时调用恒 0B。
 fn prune_dangling_images() {
     let _ = std::process::Command::new("docker")
         .args(["image", "prune", "-f", "--filter", "dangling=true"])
@@ -177,8 +179,9 @@ fn flatten_to_base(cid: &str, base_image: &str) -> Result<(), String> {
                 .status();
         }
     }
-    // import 重新打 tag → 旧 base 变悬空；此刻清掉（gc_roll 与 finalize_roll 共用路径）
-    prune_dangling_images();
+    // 注意：此处**不** prune 悬空镜像——旧 base/roll 层仍被调用方未删的容器引用
+    //（gc_roll 的构建容器、finalize_roll 的临时容器），此刻 prune 恒 0B；容器删除后的
+    // prune 由调用方负责（finalize_roll 删临时容器后显式补，gc_roll 由下次构建开头的 prune 兜底）。
     Ok(())
 }
 
@@ -226,6 +229,9 @@ pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), String> {
     let _ = std::process::Command::new("docker")
         .args(["rm", "-f", &cid])
         .status();
+    // 临时容器已删，roll/旧 base 层引用才释放、此刻才真正悬空——补一次 prune。
+    // 时序很关键：flatten_to_base 内（容器存活时）prune 恒 0B，见该函数注释。
+    prune_dangling_images();
     res?;
     write_roll_counter(out_dir, 0);
     Ok(())

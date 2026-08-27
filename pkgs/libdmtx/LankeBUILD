@@ -4,7 +4,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     autoreconf -fiv
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

@@ -3,7 +3,7 @@ lankebuild_prepare() {
 }
 lankebuild_build() {
     # 用 gsl 自带 cblas（不换系统 cblas，Arch 的 LDFLAGS=-lcblas 跳过）
-    ./configure --prefix={PREFIX}
+    ./configure --prefix={PREFIX} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

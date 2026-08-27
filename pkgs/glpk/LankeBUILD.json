@@ -1,7 +1,7 @@
 {
   "name": "glpk",
   "version": "5.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",

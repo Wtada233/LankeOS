@@ -1,7 +1,11 @@
 pkg-name: yasm
-version-source: sources[0]
-sources:
-- tracker-template: html-index
-  url: https://www.tortall.net/projects/yasm/releases/
-  pattern: yasm-([\d.]+)\.tar\.gz
-  template: https://www.tortall.net/projects/yasm/releases/yasm-{version}.tar.gz
+type: script
+script-content: |
+  # 版本锚定最后一个 tag（v1.3.0）：master 有提交但没发 tag → 版本不变 → 不触发重编。
+  # 源用 master 归档：release tarball 无 cmake 构建（共享 libyasm.so 只在 git 仓库）。
+  ver=$(git ls-remote --tags https://github.com/yasm/yasm | sed 's|.*refs/tags/||; s|\^{}$||' | sort -V | tail -1)
+  test -n "$ver" || exit 1
+  echo "${ver#v}"
+  hash=$(git ls-remote https://github.com/yasm/yasm HEAD | awk '$2=="HEAD"{print $1; exit}')
+  test -n "$hash" || exit 1
+  echo "https://github.com/yasm/yasm/archive/${hash}.tar.gz"

@@ -1,10 +1,12 @@
 pkg-name: luajit
 type: script
 script-content: |
-  hash=$(git ls-remote https://github.com/LuaJIT/LuaJIT HEAD | awk '$2=="HEAD"{print $1; exit}')
+  # 版本锚定 v2.1 发布分支（不是 master——master 有 v3 实验性开发，会误触发更新）。
+  # LuaJIT 无 git tag，v2.1 分支的最新 commit 即其"最后一个发布"。
+  hash=$(git ls-remote https://github.com/LuaJIT/LuaJIT refs/heads/v2.1 | awk '{print $1; exit}')
   test -n "$hash" || exit 1
   tmp=$(mktemp -d)
-  git clone -q --depth 1 https://github.com/LuaJIT/LuaJIT "$tmp/lj" 2>/dev/null
+  git clone -q --depth 1 --branch v2.1 https://github.com/LuaJIT/LuaJIT "$tmp/lj" 2>/dev/null
   relver=$(git -C "$tmp/lj" show -s --format=%ct 2>/dev/null)
   rm -rf "$tmp"
   test -n "$relver" || exit 1

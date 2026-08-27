@@ -5,7 +5,8 @@ lankebuild_build() {
     cmake -B build -G Ninja \
         -DCMAKE_INSTALL_PREFIX={PREFIX} \
         -DCMAKE_BUILD_TYPE=Release \
-        -DBUILD_SHARED_LIBS=ON
+        -DBUILD_SHARED_LIBS=ON \
+        -DFREEGLUT_BUILD_STATIC_LIBS=OFF
     ninja -C build -j$(nproc)
     DESTDIR={STAGING_ROOT} cmake --install build
 }

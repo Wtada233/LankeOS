@@ -1,10 +1,19 @@
 lankebuild_prepare() {
-    CFLAGS="-std=gnu99" ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
+    # 用 cmake 构建：release tarball（v1.3.0）没有 cmake 构建，只有 master 分支有。
+    # cmake 构建产出共享 libyasm.so（autotools 构建只产静态 libyasm.a），顺便达成"关静态库"目标
+    :
 }
 
 lankebuild_build() {
-    make -j$(nproc)
-    make DESTDIR={STAGING_ROOT} install
+    mkdir build && cd build
+    cmake -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=ON \
+        -DYASM_BUILD_TESTS=OFF \
+        ..
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
 }
 
 lankebuild_package() {

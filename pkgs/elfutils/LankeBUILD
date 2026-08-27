@@ -16,6 +16,7 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    # 关静态库：elfutils configure 无 --disable-static（非 libtool），libelf/libdw/libasm 的 .a 固定安装——
+    # 下游用 .so/.pc，删掉安全
+    find {STAGING_ROOT} -name '*.a' -delete
 }

@@ -1,19 +1,22 @@
 {
   "name": "yasm",
   "version": "1.3.0",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libc.so.6"
   ],
-  "provides": [],
+  "provides": [
+    "libyasm.so",
+    "libyasmstd.so"
+  ],
   "build_deps": [
     "base-devel",
-    "git",
-    "xmlto"
+    "cmake",
+    "ninja"
   ],
   "sources": [
-    "https://www.tortall.net/projects/yasm/releases/yasm-1.3.0.tar.gz"
+    "https://github.com/yasm/yasm/archive/09d1bc90ed53d0ec3e9b074f111058cbf262ed56.tar.gz"
   ],
   "work_sources": []
 }

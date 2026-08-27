@@ -18,7 +18,8 @@ lankebuild_build() {
         --enable-crypt \
         --enable-spasswd \
         --with-cyrus-sasl \
-        --with-threads
+        --with-threads \
+        --disable-static
     sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
     make -j$(nproc)
 }

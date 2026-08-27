@@ -9,7 +9,8 @@ lankebuild_build() {
         --localstatedir=/var \
         --libexecdir={LIBDIR} \
         --enable-gtk-doc \
-        --enable-tests
+        --enable-tests \
+        --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

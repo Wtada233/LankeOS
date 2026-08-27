@@ -1,7 +1,7 @@
 {
   "name": "freeglut",
   "version": "3.8.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libGLX.so.0",

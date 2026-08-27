@@ -4,7 +4,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     # release tarball 自带 configure
-    ./configure --prefix={PREFIX}
+    ./configure --prefix={PREFIX} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

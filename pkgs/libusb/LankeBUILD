@@ -1,6 +1,8 @@
 lankebuild_build() {
     # autotools（release tarball 自带 configure）
-    ./configure --prefix={PREFIX}
+    # --disable-static：上游 issue 提到某测试在启用 static 时反而无法通过（需关静态），
+    # 即便本机测试通过了，也说明关掉 static 是可行路径——由用户验证构建
+    ./configure --prefix={PREFIX} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

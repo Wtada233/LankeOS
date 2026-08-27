@@ -13,7 +13,6 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    # autotools：configure + make（提供 libpq 给 LibreOffice Base 的 PostgreSQL 连接器）
     # 按 LankeOS 适配：drop --with-ldap（无 openldap）和 --with-libnuma（无 numactl）
     ./configure \
         --prefix={PREFIX} \
@@ -47,6 +46,9 @@ lankebuild_build() {
 
 lankebuild_package() {
     make DESTDIR={STAGING_ROOT} install
+    # 关静态库：postgresql 的 configure 无 --disable-static（非 libtool），.a 固定构建并安装——
+    # 内部静态档（libpgport/libpgcommon/libpgfeutils）仅构建期用，libpq.pc 引用共享库，删掉安全
+    find {STAGING_ROOT} -name '*.a' -delete
     # ── Arch 同款系统文件 ──
     # check-db-dir（.in 模板 sed 版本号）
     PG_MAJOR=$(printf '%s' '{ORIG_PKG_VER}' | cut -d. -f1)

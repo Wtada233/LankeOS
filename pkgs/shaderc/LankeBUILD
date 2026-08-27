@@ -17,5 +17,6 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    :
+    # 删静态库：libshaderc.a/libshaderc_combined.a 无 .cmake 引用，共享版 libshaderc_shared.so 已装
+    find {STAGING_ROOT} -name '*.a' -delete
 }
