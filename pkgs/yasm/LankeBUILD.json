@@ -1,6 +1,6 @@
 {
   "name": "yasm",
-  "version": "1.3.0",
+  "version": "1.3.0.1785537982.09d1bc9",
   "release": 3,
   "deps": [],
   "needed_so": [
