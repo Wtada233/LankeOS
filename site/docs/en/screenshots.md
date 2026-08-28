@@ -5,12 +5,6 @@ editLink: false
 
 # Screenshots
 
-## Desktop
-
-<img src="/assets/screenshots/desktop.png" alt="LankeOS desktop screenshot: Wayland desktop running Alacritty terminal, system info, and desktop applications" loading="lazy" width="3840" height="2160">
-
-LankeOS running a Wayland desktop. The screenshot shows the desktop, Alacritty terminal, system information, and some applications (music player, Claude Code).
-
 ## System Toolchain
 
 <img src="/assets/screenshots/lankeos_demo.gif" alt="LankeOS system toolchain demo animation" loading="lazy" width="1171" height="649">
@@ -22,12 +16,6 @@ Terminal recording of the system toolchain.
 <img src="/assets/screenshots/lankeos_tests.gif" alt="lpkg package manager feature demonstration" loading="lazy" width="1094" height="784">
 
 Terminal recording of lpkg package manager features.
-
-## Running on Physical Hardware
-
-<img src="/assets/screenshots/realmachine.png" alt="LankeOS desktop on a Dell OptiPlex 5000 Micro physical machine" loading="lazy" width="3840" height="2160">
-
-LankeOS running on a Dell OptiPlex 5000 Micro (Intel i5-12500T), showing Firefox build information and Claude Code.
 
 ## Running Minecraft
 
