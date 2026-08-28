@@ -236,7 +236,7 @@ export default defineConfig({
 
   /* ─── 共享主题配置 ──────────────────────────────────── */
   themeConfig: {
-    logo: '/logo.svg',
+    logo: '/favicon.svg',
     socialLinks: [
       { icon: 'github', link: 'https://github.com/Wtada233/LankeOS' },
     ],
