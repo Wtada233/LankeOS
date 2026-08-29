@@ -77,7 +77,10 @@ void continue_cleanup(const std::vector<WALOp>& ops)
         std::error_code ec;
         bool ok = true;
 
-        if (fs::is_directory(bak)) {
+        // fs::is_directory 跟随符号链接：bak 若是指向目录的 symlink（如 filesystem
+        // 包的 /usr/lib64 → lib 的备份），误判为目录会递归删除其指向目录的内容。
+        // symlink 必须只删自身。
+        if (fs::is_directory(bak) && !fs::is_symlink(bak)) {
             std::vector<fs::path> entries;
             for (const auto& entry : fs::recursive_directory_iterator(bak, ec))
                 if (!ec) entries.push_back(entry.path());
@@ -180,7 +183,8 @@ static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
 
         std::error_code ec;
         bool ok = true;
-        if (fs::is_directory(bak)) {
+        // 同 continue_cleanup：symlink 备份必须只删自身，不能跟随成目录递归删除。
+        if (fs::is_directory(bak) && !fs::is_symlink(bak)) {
             std::vector<fs::path> entries;
             for (const auto& e : fs::recursive_directory_iterator(bak, ec))
                 if (!ec) entries.push_back(e.path());

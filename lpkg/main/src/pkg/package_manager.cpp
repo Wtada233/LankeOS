@@ -89,7 +89,10 @@ void cleanup_baks(std::vector<std::pair<fs::path, fs::path>>& backups)
 
         std::error_code ec2;
         bool ok = true;
-        if (fs::is_directory(p)) {
+        // 注意：fs::is_directory 会跟随符号链接。备份的 .lpkg_bak 若本身是符号链接
+        // （如 filesystem 包的 /usr/lib64 → lib 被 rename 成 .lpkg_bak），跟随它判断
+        // 成目录会递归删除其指向的目录（/usr/lib 全树被删）。symlink 必须只删自身。
+        if (fs::is_directory(p) && !fs::is_symlink(p)) {
             // 从里到外删除目录内容
             std::vector<fs::path> entries;
             for (const auto& entry : fs::recursive_directory_iterator(p, ec2))

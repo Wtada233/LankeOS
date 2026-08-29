@@ -105,19 +105,16 @@ void cleanup_tmp_dirs();
 void fsync_parent_dir(const std::filesystem::path& child_path);
 
 /**
- * 安全重命名（overlayfs 兼容）。
+ * 安全重命名。
  *
- * 优先尝试 rename(2)。如果返回 EXDEV（跨设备/跨层，如 overlayfs
- * 尝试重命名 lower 层目录时），退回到 copy + remove_all——
- * 与 GNU coreutils `mv` 的 fallback 行为一致。
- *
- * 注意：copy+remove 不是原子操作。在普通文件系统上 rename 是原子的；
- * 在 overlayfs lower 层退化为"逐文件 copy 原子的非目录级原子"。
- * 但对于包管理器的 BACKUP/RESTORE 语义，结合 WAL 的幂等恢复，此折衷安全。
+ * 仅做 rename(2)，失败一律抛异常。曾对 overlayfs 的 EXDEV 做 copy+remove_all
+ * 回退，但 copy_recursive 对"指向目录的符号链接"会跟随链接误判为目录，
+ * 递归删除整棵被 rename 的目录树（升级 filesystem 包时 /usr/lib 全树被删）。
+ * 开 redirect_dir 的 overlay 目录 rename 本就不返回 EXDEV；宁可失败也不破坏数据。
  *
  * @param from  源路径
  * @param to    目标路径
- * @throw       LpkgException  rename 和 fallback 都失败时
+ * @throw       std::filesystem::filesystem_error  rename 失败时
  */
 void safe_rename(const std::filesystem::path& from, const std::filesystem::path& to);
 

@@ -433,94 +433,30 @@ std::filesystem::path unique_bak_path(const std::filesystem::path& phys, const s
 // ============================================================================
 
 /**
- * 递归 copy 目录或文件（EXDEV fallback 用）。
+ * 安全重命名。
  *
- * overlayfs 上 fs::copy 可能因 lowe r层特殊属性失败，所以手搓逐条目 copy。
- *   目录：create_directory → 逐条目递归
- *   文件：copy_file（保留权限）
- *   符号链接：read_symlink + create_symlink
+ * 仅做 rename(2)，失败一律抛异常，**不做 EXDEV copy+remove 回退**。
  *
- * 成功后才 remove_all 源。
- */
-static void copy_recursive(const fs::path& from, const fs::path& to)
-{
-    std::error_code ec;
-
-    if (fs::is_directory(from)) {
-        // 创建目标目录（继承源权限）
-        fs::create_directory(to, from, ec);
-        if (ec) {
-            fs::remove_all(to, ec);
-            throw LpkgException(string_format("error.copy_failed", from.string(), to.string()));
-        }
-        // 逐条目遍历
-        for (const auto& entry : fs::directory_iterator(from, ec)) {
-            if (ec) break;
-            auto rel = entry.path().filename();
-            copy_recursive(from / rel, to / rel);
-        }
-        if (ec) {
-            fs::remove_all(to, ec);
-            throw LpkgException(string_format("error.copy_failed", from.string(), to.string()));
-        }
-    } else if (fs::is_symlink(from)) {
-        // 符号链接：原样重建
-        auto target = fs::read_symlink(from, ec);
-        if (ec) {
-            throw LpkgException(string_format("error.copy_failed", from.string(), to.string()));
-        }
-        fs::create_symlink(target, to, ec);
-        if (ec) {
-            throw LpkgException(string_format("error.copy_failed", from.string(), to.string()));
-        }
-    } else {
-        // 普通文件
-        fs::copy_file(from, to, fs::copy_options::none, ec);
-        if (ec) {
-            throw LpkgException(string_format("error.copy_failed", from.string(), to.string()));
-        }
-    }
-
-    // 成功后删除源
-    if (fs::is_directory(from))
-        fs::remove_all(from, ec);
-    else
-        fs::remove(from, ec);
-}
-
-/**
- * 安全重命名（overlayfs 兼容）。
+ * 历史：曾对 overlayfs 的 EXDEV（跨设备/跨层 rename）退回到 copy_recursive
+ * （逐条目复制后 remove_all 源）。但 copy_recursive 用 fs::is_directory(from)
+ * 判断源类型——对"指向目录的符号链接"会跟随链接判成目录，进而**递归删除整棵
+ * 被 rename 的目录树**。升级 filesystem 包（usr-merge 布局，/lib → usr/lib 等
+ * 根级目录符号链接）时，backup 阶段对这类符号链接的 safe_rename 一旦落到
+ * fallback，/usr/lib 全树被删（overlayFS 下表现为整目录 whiteout）。
  *
- * overlayfs 在尝试 rename 一个位于 lower 层（只读）的目录时会返回 EXDEV。
- * 此时退回到 copy + remove_all，行为与 GNU coreutils `mv` 一致。
- *
- * 文件系统类型	rename 原子性
- *   ext4/xfs/btrfs	✅ 原子（同设备 rename）
- *   overlayfs 文件	✅ 内核透明 copy-up
- *   overlayfs 目录	⚠️ 降级为逐文件 copy（但 lower 层只读，数据天然安全）
- *
- * 关于折衷：copy+remove 不是原子的。但此函数用于 package manager 的
- * BACKUP/RESTORE 路径，结合 WAL 的幂等恢复，覆盖了所有故障场景。
+ * 且该 fallback 仅对"未开 redirect_dir 的 overlayfs"有意义；开 redirect 的
+ * overlay 目录 rename 本就不返回 EXDEV。宁可 rename 失败抛错，也不静默破坏
+ * 数据——失败可由 WAL 回滚安全处理。
  */
 void safe_rename(const fs::path& from, const fs::path& to)
 {
     std::error_code ec;
     fs::rename(from, to, ec);
-    if (!ec) {
-        fsync_parent_dir(to);
-        return;
+    if (ec) {
+        throw std::filesystem::filesystem_error(std::string("safe_rename failed: ") + ec.message(),
+                                                from, to, ec);
     }
-
-    if (ec.value() == EXDEV) {
-        log_warning(string_format("warning.wal_rename_fallback", from.string(), to.string()));
-        copy_recursive(from, to);
-        fsync_parent_dir(to);
-        return;
-    }
-
-    // 非 EXDEV 的错误 → 原样抛出
-    throw std::filesystem::filesystem_error(std::string("safe_rename failed: ") + ec.message(),
-                                            from, to, ec);
+    fsync_parent_dir(to);
 }
 
 /**
