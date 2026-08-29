@@ -1,0 +1,8 @@
+pkg-name: nginx
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: nginx/nginx
+  mode: releases
+  tag-prefix: release-
+  template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.gz

@@ -1,0 +1,32 @@
+lankebuild_prepare() {
+    apply_patch() {
+        patch -N -p1 -i "$1" || patch -R --dry-run -p1 -i "$1" >/dev/null 2>&1 || exit 1
+    }
+    apply_patch "{WORK_DIR}/../redis.conf-sane-defaults.patch"
+    apply_patch "{WORK_DIR}/../redis-5.0-use-system-jemalloc.patch"
+}
+
+lankebuild_build() {
+    make BUILD_TLS=yes USE_SYSTEMD=yes -j$(nproc)
+}
+
+lankebuild_package() {
+    make PREFIX="{STAGING_ROOT}{PREFIX}" install
+    install -Dm644 LICENSE.txt "{STAGING_ROOT}{PREFIX}/share/licenses/redis/LICENSE"
+    install -Dm644 redis.conf "{STAGING_ROOT}{SYSCONFDIR}/redis/redis.conf"
+    install -Dm644 sentinel.conf "{STAGING_ROOT}{SYSCONFDIR}/redis/sentinel.conf"
+
+    install -Dm644 "{WORK_DIR}/../redis.service" "{STAGING_ROOT}{PREFIX}/lib/systemd/system/redis.service"
+    install -Dm644 "{WORK_DIR}/../redis-sentinel.service" "{STAGING_ROOT}{PREFIX}/lib/systemd/system/redis-sentinel.service"
+    install -Dm644 "{WORK_DIR}/../redis.sysusers" "{STAGING_ROOT}{PREFIX}/lib/sysusers.d/redis.conf"
+    install -Dm644 "{WORK_DIR}/../redis.tmpfiles" "{STAGING_ROOT}{PREFIX}/lib/tmpfiles.d/redis.conf"
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+set -e
+
+echo ":: Creating Redis system user..."
+systemd-sysusers
+echo ":: Creating Redis tmpfiles dir..."
+systemd-tmpfiles --create
+EOF
+}
