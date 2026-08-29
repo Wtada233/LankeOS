@@ -1,6 +1,7 @@
 {
   "name": "base-devel",
   "version": "1",
+  "release": 2,
   "deps": [
     "autoconf",
     "automake",
@@ -14,7 +15,11 @@
     "m4",
     "make",
     "patch",
+    "perl",
     "pkgconf",
+    "python",
+    "ruby",
+    "tcl",
     "texinfo",
     "unzip",
     "zip"

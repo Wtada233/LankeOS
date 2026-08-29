@@ -1,7 +1,7 @@
 {
   "name": "filesystem",
   "version": "1.5.1",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [],
   "provides": [],
