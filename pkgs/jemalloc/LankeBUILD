@@ -1,0 +1,28 @@
+lankebuild_prepare() {
+    # Arch 钉的两个 C++ 修复（5.3.1 tag 之后的 commit）：GCC 16 起 <new> 不再
+    # 导出 std::__throw_bad_alloc / std::set_new_handler，不修编不过。
+    # 只打源码不打 configure.ac 重新引导：JEMALLOC_HAVE_CXX_EXCEPTIONS 保持
+    # #undef，OOM 走 std::terminate() 分支（等价 -fno-exceptions），编译不受影响。
+    for p in \
+        0001-Use-standard-bad_alloc.patch \
+        0002-Use-get_new_handler.patch; do
+        patch -N -p1 -i "{WORK_DIR}/../$p" \
+            || patch -R --dry-run -p1 -i "{WORK_DIR}/../$p" >/dev/null 2>&1 \
+            || exit 1
+    done
+}
+
+lankebuild_build() {
+    # release tarball 自带 configure，不打 autoreconf
+    ./configure \
+        --prefix={PREFIX} \
+        --enable-prof \
+        --disable-static \
+        --disable-doc
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+    install -Dm644 COPYING {STAGING_ROOT}/usr/share/licenses/jemalloc/COPYING
+}

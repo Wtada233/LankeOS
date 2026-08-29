@@ -1,0 +1,8 @@
+pkg-name: judy
+version-source: sources[0]
+sources:
+- tracker-template: sourceforge
+  pattern: Judy-(\d[\d.]*)\.tar\.gz
+  project: judy
+  path: ''
+  template: https://downloads.sourceforge.net/judy/Judy-{version}.tar.gz

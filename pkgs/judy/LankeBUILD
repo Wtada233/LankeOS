@@ -1,0 +1,21 @@
+lankebuild_prepare() {
+    # Arch 同款 source-date 补丁：去掉 man 生成器里的 ctime() 时间戳（可复现性）
+    patch -N -p1 -i "{WORK_DIR}/../judy-fix-source-date.patch" \
+        || patch -R --dry-run -p1 -i "{WORK_DIR}/../judy-fix-source-date.patch" >/dev/null 2>&1 \
+        || exit 1
+}
+
+lankebuild_build() {
+    # 2013 年 tarball，configure 是 autoconf 2.61 生成的，Arch 同款 autoreconf 重新引导
+    autoreconf -fiv
+    ./configure \
+        --prefix={PREFIX}
+    # judy 构建有并行问题，Arch 同款 -j1
+    make -j1
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+    # libtool 同时出 .a；MariaDB（OQGRAPH）链的是 libJudy.so.1，删静态库
+    find {STAGING_ROOT} -name '*.a' -delete
+}

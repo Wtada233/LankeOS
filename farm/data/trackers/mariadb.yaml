@@ -1,0 +1,13 @@
+pkg-name: mariadb
+type: script
+script-content: |
+  # 跟最新 GA：GitHub releases/latest 只返回最新非 prerelease。
+  # mariadb-13.0.1 是 prerelease（archive.mariadb.org 里 13.0.0/13.1.0 是未打 tag 的预览
+  # 构建），git tags 全量会把 prerelease 当最新，不能用。
+  data=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} \
+    "https://api.github.com/repos/MariaDB/server/releases/latest")
+  tag=$(printf '%s' "$data" | grep -o '"tag_name": *"[^"]*"' | head -n1 | cut -d'"' -f4)
+  test -n "$tag" || exit 1
+  version=${tag#mariadb-}
+  echo "$version"
+  echo "git+https://github.com/MariaDB/server.git@$tag"

@@ -1,0 +1,8 @@
+pkg-name: jemalloc
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: jemalloc/jemalloc
+  mode: releases
+  tag-prefix: ''
+  template: https://github.com/{repo}/releases/download/{tag}/jemalloc-{version}.tar.bz2

@@ -1,0 +1,117 @@
+lankebuild_prepare() {
+    # Arch 同款 0001-arch-specific.patch（五连击，源码是 git+ tag 完整树，直接 apply）：
+    # 1. systemd 单元 PrivateTmp=true（安全加固）
+    # 2. 单元 LD_PRELOAD=/usr/lib/libjemalloc.so（内存管理）
+    # 3. tmpfiles 创建 MYSQL_DATADIR（/var/lib/mysql，0700 mysql:mysql + No_COW）
+    # 4. sysusers 用 `u!` 创建完全锁定的 mysql 系统账号
+    # 5. mysql_install_db 感知打包环境（in_rpm=1，不做 rpm 相关探测）
+    patch -N -p1 -i "{WORK_DIR}/../0001-arch-specific.patch" \
+        || patch -R --dry-run -p1 -i "{WORK_DIR}/../0001-arch-specific.patch" >/dev/null 2>&1 \
+        || exit 1
+}
+
+lankebuild_build() {
+    # jemalloc 用 malloc_usable_size，与 fortification level 3 不兼容（Arch 同款降级）
+    export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+
+    # 装路径/默认值全部对齐 Arch PKGBUILD；cracklib/judy（cracklib 插件、OQGRAPH
+    # 引擎）为可选，LankeOS 无对应包 → 不写进 build_deps，cmake 自动跳过
+    cmake -B build \
+        -DCOMPILATION_COMMENT="LankeOS" \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -Wno-dev \
+        -DINSTALL_SYSCONFDIR={SYSCONFDIR} \
+        -DINSTALL_SYSCONF2DIR={SYSCONFDIR}/my.cnf.d \
+        -DINSTALL_RUNDIR=/run \
+        -DINSTALL_UNIX_ADDRDIR=/run/mysqld/mysqld.sock \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DINSTALL_SCRIPTDIR=bin \
+        -DINSTALL_INCLUDEDIR=include/mysql \
+        -DINSTALL_PLUGINDIR=lib/mysql/plugin \
+        -DINSTALL_SYSTEMD_UNITDIR=lib/systemd/system/ \
+        -DINSTALL_SYSTEMD_SYSUSERSDIR=lib/sysusers.d/ \
+        -DINSTALL_SYSTEMD_TMPFILESDIR=lib/tmpfiles.d/ \
+        -DINSTALL_SHAREDIR=share \
+        -DINSTALL_SUPPORTFILESDIR=share/mysql \
+        -DINSTALL_MYSQLSHAREDIR=share/mysql \
+        -DINSTALL_DOCREADMEDIR=share/doc/mariadb \
+        -DINSTALL_DOCDIR=share/doc/mariadb \
+        -DINSTALL_MANDIR=share/man \
+        -DMYSQL_DATADIR=/var/lib/mysql \
+        -DDEFAULT_CHARSET=utf8mb4 \
+        -DDEFAULT_COLLATION=utf8mb4_unicode_ci \
+        -DENABLED_LOCAL_INFILE=OFF \
+        -DPLUGIN_EXAMPLE=NO \
+        -DPLUGIN_FEDERATED=NO \
+        -DPLUGIN_FEEDBACK=NO \
+        -DWITH_EMBEDDED_SERVER=ON \
+        -DWITH_EXTRA_CHARSETS=complex \
+        -DWITH_JEMALLOC=ON \
+        -DWITH_LIBWRAP=OFF \
+        -DWITH_PCRE2=system \
+        -DWITH_READLINE=ON \
+        -DWITH_SSL=system \
+        -DWITH_SYSTEMD=yes \
+        -DWITH_UNIT_TESTS=OFF \
+        -DWITH_ZLIB=system
+    make -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    make -C build DESTDIR={STAGING_ROOT} install
+    cd {STAGING_ROOT}
+    # ── 合并 Arch 拆分包（mariadb-libs / mariadb-clients / mariadb-pam 全并入）──
+    # mytop 需 perl-dbd-mariadb，LankeOS 无 → 不装
+    rm -f usr/bin/mytop usr/share/man/man1/mytop.1
+    # 无 SysV init
+    rm -rf etc/logrotate.d
+    rm -f usr/bin/rcmysql
+    rm -f usr/share/mysql/{binary-configure,mysql.server,mysqld_multi.server}
+    # 许可证挪到规范目录
+    install -d usr/share/licenses/mariadb
+    mv usr/share/doc/mariadb/COPYING* usr/share/licenses/mariadb/ || true
+    # groonga 文档挪进 doc 目录
+    mv usr/share/groonga usr/share/groonga-normalizer-mysql usr/share/doc/mariadb/ 2>/dev/null || true
+    # 已装进真实 systemd 目录，删 share 里的副本 / bootstrap 覆盖目录
+    rm -rf usr/share/mysql/systemd
+    rm -rf usr/lib/systemd/system/mariadb@bootstrap.service.d
+    # 测试套件（删掉省 ~270MB / 总 778MB，BLFS 同款建议）。STANDALONE 布局下
+    # INSTALL_MYSQLTESTDIR=mariadb-test → /usr/mariadb-test；BLFS 的
+    # /usr/share/mariadb/test 是它的布局，不适用本配方（Arch 同款路径）
+    rm -rf usr/mariadb-test usr/sql-bench
+    rm -f usr/share/man/man1/mysql-test-run.pl.1
+    # 静态库
+    find . -name '*.a' -delete
+    # SUID：PAM auth 助手（明文 SUID，包配方里显式做）
+    chmod 4755 usr/lib/mysql/plugin/auth_pam_tool_dir/auth_pam_tool
+    # postinst：两条路径都先建 mysql 系统账号（sysusers），再按数据目录存在与否
+    # 走初始化（mariadb-install-db）或升级（mariadb-upgrade）；打印英文操作说明
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+set -e
+
+DATADIR=/var/lib/mysql
+
+echo ":: Creating MariaDB system user..."
+systemd-sysusers
+
+if [ -d "$DATADIR/mysql" ]; then
+    echo ":: MariaDB data directory found at $DATADIR, running mariadb-upgrade..."
+    if mariadb-upgrade; then
+        echo ":: mariadb-upgrade completed successfully."
+    else
+        echo ":: WARNING: mariadb-upgrade failed (mariadb service may not be running yet)."
+        echo "   Start it and retry manually:"
+        echo "   systemctl start mariadb && mariadb-upgrade"
+    fi
+else
+    echo ":: MariaDB data directory not found at $DATADIR, initializing..."
+    mkdir -p /run/mysqld
+    chown mysql:root /run/mysqld
+    chmod 0755 /run/mysqld
+    mariadb-install-db --user=mysql --basedir=/usr --datadir="$DATADIR"
+    echo ":: MariaDB data directory initialized at $DATADIR."
+fi
+EOF
+}

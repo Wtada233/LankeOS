@@ -1,0 +1,71 @@
+{
+  "name": "mariadb",
+  "version": "12.3.3",
+  "release": 1,
+  "deps": [
+    "jemalloc"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libJudy.so.1",
+    "libatomic.so.1",
+    "libbz2.so.1.0",
+    "libc.so.6",
+    "libcrack.so.2",
+    "libcrypt.so.2",
+    "libcrypto.so.3",
+    "libcurl.so.4",
+    "libgcc_s.so.1",
+    "libgssapi_krb5.so.2",
+    "libkrb5.so.3",
+    "liblz4.so.1",
+    "liblzma.so.5",
+    "libm.so.6",
+    "libncursesw.so.6",
+    "libodbc.so.2",
+    "libpam.so.0",
+    "libpcre2-8.so.0",
+    "libpcre2-posix.so.3",
+    "libssl.so.3",
+    "libstdc++.so.6",
+    "libsystemd.so.0",
+    "liburing.so.2",
+    "libxml2.so.16",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libmariadb.so",
+    "libmariadb.so.3",
+    "libmariadbd.so",
+    "libmariadbd.so.19",
+    "libmysqlclient.so",
+    "libmysqlclient_r.so",
+    "libmysqld.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "boost",
+    "bzip2",
+    "cmake",
+    "cracklib",
+    "curl",
+    "git",
+    "jemalloc",
+    "judy",
+    "krb5",
+    "liburing",
+    "libxcrypt",
+    "libxml2",
+    "lz4",
+    "ncurses",
+    "pcre2",
+    "xz",
+    "zlib",
+    "zstd"
+  ],
+  "sources": [
+    "git+https://github.com/MariaDB/server.git@mariadb-12.3.3"
+  ],
+  "work_sources": []
+}
