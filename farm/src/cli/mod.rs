@@ -74,6 +74,7 @@ pub(crate) struct Args {
     token: Option<String>,
     gitlab_token: Option<String>,
     run: bool,
+    probe_fail_continue: bool,
     all: bool,
     manual_sort: bool,
     jobs: Option<usize>,
@@ -191,15 +192,18 @@ enum Command {
     },
     /// 探测上游版本
     Track {
-        /// 目标包名（缺省需 --all）
-        #[arg(required_unless_present = "all", conflicts_with = "all")]
-        pkg: Option<String>,
+        /// 目标包名，可多个（缺省需 --all）
+        #[arg(required_unless_present = "all", conflicts_with = "all", num_args = 1..)]
+        pkg: Vec<String>,
         /// 遍历 pkgs/ 为所有有 tracker 的包出提案（只读）
         #[arg(long)]
         all: bool,
         /// 应用新版到 LankeBUILD.json（默认只出提案，只读；配合 --all 批量应用）
         #[arg(long)]
         run: bool,
+        /// 源 URL 探测失败时仍继续写入（需同时 --run；否则探测失败跳过写入并告警）
+        #[arg(long)]
+        probe_fail_continue: bool,
         /// pkgs 目录（LankeBUILD 体系）
         #[arg(long, default_value = "pkgs")]
         pkgs: PathBuf,
@@ -363,110 +367,128 @@ fn build_fetcher(args: &Args) -> RealFetcher {
     )
 }
 
-/// 单个包：LankeBUILD.json（包来源）→ 按 name 字段找 tracker → 探测 → 生成新版（全部源升级）。
-fn cmd_track_run(args: &Args, apply: bool) -> ExitCode {
+/// 单/多包：LankeBUILD.json（包来源）→ 按 name 字段找 tracker → 探测 → 生成新版（全部源升级）。
+/// 支持多个包名（按传入顺序逐个探测），tracker 集与 fetcher 复用。
+fn cmd_track_run(args: &Args, apply: bool, probe_fail_continue: bool) -> ExitCode {
     let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
     let data_dir = args
         .data
         .clone()
         .unwrap_or_else(|| "data/trackers".to_string());
-    let pkg = match args.pkg.first() {
-        Some(p) => p.clone(),
-        None => {
-            eprintln!("{}", lankefarm::tr!("track.usage"));
-            return ExitCode::from(2);
-        }
-    };
-    // 包来源是 LankeBUILD 体系
-    let build = match load_build_json(&PathBuf::from(&pkgs_dir).join(&pkg)) {
-        Ok(b) => b,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::from(2);
-        }
-    };
-    // file:// 或无远程源：无需 track（本地产物，无上游可追踪）。
-    // sources 和 work_sources 都是下载器字段，任一有远程 URL 就可追踪（work_sources-only 包如 noto 字体）。
-    let has_remote = first_remote_source(&build.sources).is_some()
-        || first_remote_source(&build.work_sources).is_some();
-    if !has_remote {
-        println!("{}", lankefarm::tr!("track.skip_no_remote", pkg));
-        return ExitCode::SUCCESS;
-    }
-    // 按 name 字段匹配 tracker（文件名无关）
     let trackers = load_trackers(&data_dir);
-    let cfg = match trackers.get(&build.name) {
-        Some(c) => c,
-        None => {
-            eprintln!("{}", lankefarm::tr!("track.no_tracker_pkg", build.name));
-            return ExitCode::from(2);
-        }
-    };
     let fetcher = build_fetcher(args);
-    let pkg_name = build.name.clone();
-    // 本轮解析出的新版本：同包的 same-version 额外源（如 docker 的 moby）必须读到新版本，
-    // 否则会锁到 LankeBUILD.json 里的旧版本（应用前的值）。
-    let pending_new = std::cell::RefCell::new(None::<String>);
-    // 版本约束解析：优先本轮新版本，其次读其他包的 LankeBUILD.json 版本（same-version / major-of）
-    let lookup = |pkg: &str| -> Option<String> {
-        if pkg == pkg_name {
-            if let Some(v) = pending_new.borrow().as_ref() {
-                return Some(v.clone());
+    let mut errored = false;
+    for pkg in &args.pkg {
+        // 包来源是 LankeBUILD 体系
+        let build = match load_build_json(&PathBuf::from(&pkgs_dir).join(pkg)) {
+            Ok(b) => b,
+            Err(e) => {
+                eprintln!("{e}");
+                errored = true;
+                continue;
             }
+        };
+        // file:// 或无远程源：无需 track（本地产物，无上游可追踪）。
+        // sources 和 work_sources 都是下载器字段，任一有远程 URL 就可追踪（work_sources-only 包如 noto 字体）。
+        let has_remote = first_remote_source(&build.sources).is_some()
+            || first_remote_source(&build.work_sources).is_some();
+        if !has_remote {
+            println!("{}", lankefarm::tr!("track.skip_no_remote", pkg));
+            continue;
         }
-        load_build_json(&PathBuf::from(&pkgs_dir).join(pkg))
-            .ok()
-            .map(|b| b.version)
-    };
-    match cfg.propose_with(&fetcher, &lookup, &build.version) {
-        Ok(p) => match vercmp::cmp_version(&p.new_version, &p.current_version) {
-            CmpOrdering::Greater => {
-                println!(
-                    "{}",
-                    lankefarm::tr!(
-                        "track.proposal",
-                        p.pkg_name,
-                        p.current_version,
-                        p.new_version,
-                        p.kind
-                    )
-                );
-                for s in &p.sources {
-                    println!("  {s}");
-                }
-                for s in &p.work_sources {
-                    println!("{}", lankefarm::tr!("track.work_sources", s));
-                }
-                // 记录本轮新版本：同包 same-version 额外源（docker→moby）据此生成对应 tag
-                *pending_new.borrow_mut() = Some(p.new_version.clone());
-                if apply {
-                    apply_proposal(&pkg, Path::new(&pkgs_dir), &p);
+        // 按 name 字段匹配 tracker（文件名无关）
+        let cfg = match trackers.get(&build.name) {
+            Some(c) => c,
+            None => {
+                eprintln!("{}", lankefarm::tr!("track.no_tracker_pkg", build.name));
+                errored = true;
+                continue;
+            }
+        };
+        let pkg_name = build.name.clone();
+        // 本轮解析出的新版本：同包的 same-version 额外源（如 docker 的 moby）必须读到新版本，
+        // 否则会锁到 LankeBUILD.json 里的旧版本（应用前的值）。
+        let pending_new = std::cell::RefCell::new(None::<String>);
+        // 版本约束解析：优先本轮新版本，其次读其他包的 LankeBUILD.json 版本（same-version / major-of）
+        let lookup = |pkg: &str| -> Option<String> {
+            if pkg == pkg_name {
+                if let Some(v) = pending_new.borrow().as_ref() {
+                    return Some(v.clone());
                 }
             }
-            CmpOrdering::Equal => {
-                println!(
-                    "{}",
-                    lankefarm::tr!("track.latest", p.pkg_name, p.current_version)
-                );
+            load_build_json(&PathBuf::from(&pkgs_dir).join(pkg))
+                .ok()
+                .map(|b| b.version)
+        };
+        match cfg.propose_with(&fetcher, &lookup, &build.version) {
+            Ok(p) => match vercmp::cmp_version(&p.new_version, &p.current_version) {
+                CmpOrdering::Greater => {
+                    println!(
+                        "{}",
+                        lankefarm::tr!(
+                            "track.proposal",
+                            p.pkg_name,
+                            p.current_version,
+                            p.new_version,
+                            p.kind
+                        )
+                    );
+                    for s in &p.sources {
+                        println!("  {s}");
+                    }
+                    for s in &p.work_sources {
+                        println!("{}", lankefarm::tr!("track.work_sources", s));
+                    }
+                    // 记录本轮新版本：同包 same-version 额外源（docker→moby）据此生成对应 tag
+                    *pending_new.borrow_mut() = Some(p.new_version.clone());
+                    // 源 URL 可达性探测：任一失败 → 告警；写入需 `--probe-fail-continue` 才豁免
+                    let mut probe_failed = false;
+                    for s in p.sources.iter().chain(&p.work_sources) {
+                        if let Err(e) = lankefarm::net::probe_source(s) {
+                            eprintln!(
+                                "{}",
+                                lankefarm::tr!("track.probe_source_fail", p.pkg_name, e)
+                            );
+                            probe_failed = true;
+                        }
+                    }
+                    if apply {
+                        if probe_failed && !probe_fail_continue {
+                            println!("{}", lankefarm::tr!("track.probe_fail_skip", p.pkg_name));
+                        } else {
+                            apply_proposal(pkg, Path::new(&pkgs_dir), &p);
+                        }
+                    }
+                }
+                CmpOrdering::Equal => {
+                    println!(
+                        "{}",
+                        lankefarm::tr!("track.latest", p.pkg_name, p.current_version)
+                    );
+                }
+                CmpOrdering::Less => {
+                    error_log!(
+                        "{}",
+                        lankefarm::tr!(
+                            "track.regress",
+                            p.pkg_name,
+                            p.current_version,
+                            p.new_version
+                        )
+                    );
+                }
+            },
+            Err(e) => {
+                error_log!("{}", lankefarm::tr!("track.probe_fail", build.name, e));
+                errored = true;
             }
-            CmpOrdering::Less => {
-                error_log!(
-                    "{}",
-                    lankefarm::tr!(
-                        "track.regress",
-                        p.pkg_name,
-                        p.current_version,
-                        p.new_version
-                    )
-                );
-            }
-        },
-        Err(e) => {
-            error_log!("{}", lankefarm::tr!("track.probe_fail", build.name, e));
-            return ExitCode::from(2);
         }
     }
-    ExitCode::SUCCESS
+    if errored {
+        ExitCode::from(2)
+    } else {
+        ExitCode::SUCCESS
+    }
 }
 
 /// track --all 并行调度器状态（worker 共享，单 Mutex 防死锁）。
@@ -498,6 +520,7 @@ fn track_worker(
     proposals: &AtomicUsize,
     errors: &AtomicUsize,
     apply: bool,
+    probe_fail_continue: bool,
 ) {
     loop {
         // 取一个就绪包；队列空但未完成则等待
@@ -529,6 +552,26 @@ fn track_worker(
                 .map(|b| b.version)
         };
         let result = cfg.propose_with(fetcher, &lookup, current);
+
+        // 源 URL 可达性探测（网络 I/O，锁外）：仅新版提案才探（Equal/Less 无写入，不浪费）
+        let mut probe_failed = false;
+        let is_newer = matches!(
+            &result,
+            Ok(p) if vercmp::cmp_version(&p.new_version, &p.current_version) == CmpOrdering::Greater
+        );
+        if is_newer {
+            if let Ok(p) = &result {
+                for s in p.sources.iter().chain(&p.work_sources) {
+                    if let Err(e) = lankefarm::net::probe_source(s) {
+                        eprintln!(
+                            "{}",
+                            lankefarm::tr!("track.probe_source_fail", p.pkg_name, e)
+                        );
+                        probe_failed = true;
+                    }
+                }
+            }
+        }
 
         // 完成簿记：先写 resolved，再释放依赖者（同一临界区，顺序保证）
         let mut guard = sched.0.lock().unwrap();
@@ -587,11 +630,16 @@ fn track_worker(
         drop(guard);
         sched.1.notify_all();
 
-        // 批量应用（--all --run）：释放锁后再写 LankeBUILD.json，避免持锁做 I/O/网络探测
+        // 批量应用（--all --run）：释放锁后再写 LankeBUILD.json，避免持锁做 I/O/网络探测。
+        // 源探测失败时：需 --probe-fail-continue 才继续写（否则跳过并已在上方告警）。
         if apply {
             if let Some(p) = pending_apply {
-                // 写回目标目录 = pkg-name 对应的目录（目录名可能与 pkg-name 不同）
-                apply_proposal(&dir_of(&p.pkg_name), pkgs_dir, &p);
+                if probe_failed && !probe_fail_continue {
+                    println!("{}", lankefarm::tr!("track.probe_fail_skip", p.pkg_name));
+                } else {
+                    // 写回目标目录 = pkg-name 对应的目录（目录名可能与 pkg-name 不同）
+                    apply_proposal(&dir_of(&p.pkg_name), pkgs_dir, &p);
+                }
             }
         }
     }
@@ -600,7 +648,15 @@ fn track_worker(
 /// 遍历 pkgs/（LankeBUILD 体系是来源）为每个有 tracker 的包探测 → 提案汇总。
 /// `-j N` 并行探测：与串行 `order_entries` 同一套 `dep_edges` 做入度门控——
 /// `after(<pkg>)` / `last` / same-version / major-of 的前置先解析，并行不破坏顺序。
-fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
+/// `--all` 全量 / 多包名（-j 并行）共用：遍历目标包 → 依赖图门控 worker 池 → 探测 → 汇总。
+/// `restrict` 为 Some(包目录名列表) 时只处理指定包（多包名 track 走这里，-j 生效）；
+/// None 时处理 pkgs/ 下全部有 tracker 的包（--all）。
+fn cmd_track_all(
+    args: &Args,
+    apply: bool,
+    probe_fail_continue: bool,
+    restrict: Option<&[String]>,
+) -> ExitCode {
     let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
     let data_dir = args
         .data
@@ -613,16 +669,19 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
     }
     let jobs = args.jobs.unwrap_or(1).max(1);
     let trackers = load_trackers(&data_dir);
-    let entries: Vec<String> = match std::fs::read_dir(&root) {
-        Ok(rd) => rd
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_dir())
-            .map(|e| e.file_name().to_string_lossy().into_owned())
-            .collect(),
-        Err(e) => {
-            eprintln!("{}", lankefarm::tr!("pkgs.read_fail", pkgs_dir, e));
-            return ExitCode::from(2);
-        }
+    let entries: Vec<String> = match &restrict {
+        Some(names) => names.to_vec(),
+        None => match std::fs::read_dir(&root) {
+            Ok(rd) => rd
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().is_dir())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect(),
+            Err(e) => {
+                eprintln!("{}", lankefarm::tr!("pkgs.read_fail", pkgs_dir, e));
+                return ExitCode::from(2);
+            }
+        },
     };
 
     // 探测集：有 tracker 且有有效 LankeBUILD.json 的包；无 tracker 的走 no_tracker 计数。
@@ -741,6 +800,7 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
                 &proposals,
                 &errors,
                 apply,
+                probe_fail_continue,
             );
         }));
     }
@@ -752,11 +812,16 @@ fn cmd_track_all(args: &Args, apply: bool) -> ExitCode {
     let errors = errors.load(Ordering::Relaxed);
     // 孤儿 tracker = 无对应包（pkg-name 不在 pkg_to_dir 里）。曾按目录名比较，
     // 目录名 ≠ pkg-name 时会把有效 tracker 误报为孤儿。
-    let orphans: Vec<String> = trackers
-        .keys()
-        .filter(|n| !pkg_to_dir.contains_key(n.as_str()))
-        .cloned()
-        .collect();
+    // restrict（多包名）模式下不算 orphans：restrict 集外的 tracker 天然不在 pkg_to_dir，误报。
+    let orphans: Vec<String> = if restrict.is_some() {
+        Vec::new()
+    } else {
+        trackers
+            .keys()
+            .filter(|n| !pkg_to_dir.contains_key(n.as_str()))
+            .cloned()
+            .collect()
+    };
     println!();
     let summary = lankefarm::tr!(
         "track.summary",
@@ -1268,6 +1333,7 @@ pub fn run() -> ExitCode {
             pkg,
             all,
             run,
+            probe_fail_continue,
             pkgs,
             data,
             jobs,
@@ -1275,9 +1341,10 @@ pub fn run() -> ExitCode {
             gitlab_token,
         } => {
             let args = Args {
-                pkg: pkg.map(|p| vec![p]).unwrap_or_default(),
+                pkg,
                 all,
                 run,
+                probe_fail_continue,
                 pkgs: Some(pkgs.to_string_lossy().into_owned()),
                 data: Some(data.to_string_lossy().into_owned()),
                 jobs,
@@ -1287,10 +1354,13 @@ pub fn run() -> ExitCode {
             };
             if args.all {
                 // --all：只出提案；--all --run：批量应用
-                cmd_track_all(&args, args.run)
+                cmd_track_all(&args, args.run, args.probe_fail_continue, None)
+            } else if args.pkg.len() > 1 {
+                // 多包名：走并行 worker 池（-j 生效），restrict 到指定包
+                cmd_track_all(&args, args.run, args.probe_fail_continue, Some(&args.pkg))
             } else {
                 // 单包：--run 应用新版；缺省只读出提案（不写 LankeBUILD.json）
-                cmd_track_run(&args, args.run)
+                cmd_track_run(&args, args.run, args.probe_fail_continue)
             }
         }
         Command::GenTrackers {
@@ -1451,7 +1521,7 @@ mod tests {
         let cli = Cli::try_parse_from(["farm", "track", "gtk3", "--pkgs", "../pkgs"]).unwrap();
         match cli.command {
             Command::Track { pkg, run, all, .. } => {
-                assert_eq!(pkg.as_deref(), Some("gtk3"));
+                assert_eq!(pkg, vec!["gtk3".to_string()]);
                 assert!(!run);
                 assert!(!all);
             }
@@ -1461,7 +1531,7 @@ mod tests {
         let cli = Cli::try_parse_from(["farm", "track", "gtk3", "--run"]).unwrap();
         match cli.command {
             Command::Track { pkg, run, all, .. } => {
-                assert_eq!(pkg.as_deref(), Some("gtk3"));
+                assert_eq!(pkg, vec!["gtk3".to_string()]);
                 assert!(run);
                 assert!(!all);
             }

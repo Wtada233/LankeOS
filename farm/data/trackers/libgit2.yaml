@@ -1,0 +1,8 @@
+pkg-name: libgit2
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: libgit2/libgit2
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

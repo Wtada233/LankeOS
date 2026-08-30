@@ -3,7 +3,8 @@ type: script
 script-content: |
   #!/bin/bash
   url="https://launchpad.net/intltool/+download"
-  html=$(curl -sL "$url")
+  html=$(curl -sL --max-time 15 "$url")
   version=$(echo "$html" | grep -oE 'intltool-[0-9]+(\.[0-9]+)+\.tar\.gz' | sed -E 's/intltool-([0-9.]+)\.tar\.gz/\1/' | sort -V | tail -n1)
+  test -n "$version" || exit 1
   echo "$version"
   echo "https://launchpad.net/intltool/trunk/$version/+download/intltool-$version.tar.gz"

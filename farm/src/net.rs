@@ -121,6 +121,31 @@ fn download_once(url: &str, dest: &std::path::Path) -> Result<(), String> {
     Ok(())
 }
 
+/// 探测 source URL 是否可达：GET 并读第一个字节，确认响应正常。
+/// 状态非 2xx/3xx → Err（如 404/403/5xx；redirect 由 ureq 自动跟随，最终状态为准）。
+/// track 写入前用它校验新源 URL，失败时打印警告并跳过 --run（除非 --probe-fail-continue）。
+/// `git+`/`file://` 源由 lpkg（libgit2）处理，非 HTTP 下载，跳过探测（不误报）。
+pub fn probe_source(url: &str) -> Result<(), String> {
+    if url.starts_with("git+") || url.starts_with("file://") {
+        return Ok(());
+    }
+    let resp = match ureq::get(url).set("User-Agent", CURL_UA).call() {
+        Ok(r) => r,
+        Err(ureq::Error::Status(code, _)) => return Err(format!("{url} HTTP {code}")),
+        Err(e) => return Err(format!("{url} 请求失败: {e}")),
+    };
+    let status = resp.status();
+    if !(200..400).contains(&status) {
+        return Err(format!("{url} HTTP {status}"));
+    }
+    // 读第一个字节确认 body 可流式读取（不只是 header 响应）
+    let mut reader = resp.into_reader();
+    let mut buf = [0u8; 1];
+    let _ = std::io::Read::read(&mut reader, &mut buf)
+        .map_err(|e| format!("读 {url} 响应失败: {e}"))?;
+    Ok(())
+}
+
 /// Mock：预设响应，测试用（无网络）。
 #[derive(Debug, Default)]
 pub struct MockFetcher {

@@ -1,0 +1,8 @@
+pkg-name: xdg-dbus-proxy
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: flatpak/xdg-dbus-proxy
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

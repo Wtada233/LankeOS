@@ -1,0 +1,8 @@
+pkg-name: ostree
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: ostreedev/ostree
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

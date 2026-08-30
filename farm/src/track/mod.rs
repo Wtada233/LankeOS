@@ -118,6 +118,13 @@ pub struct SourceConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern: Option<String>,
 
+    // ── multi-level-html-index（N 级：每级一个 {url, pattern}）──
+    /// N 级探测列表：`levels[i]` = 第 i+1 级页面 + 版本正则。
+    /// `levels[i].url` 可引用已解出的前级版本 `{v1}..{vi}`；`levels[i].pattern` 提取该级版本。
+    /// 最后一个 pattern 的捕获 = 最终版本（`{version}`），`template` 用 `{v1}..{vN}`/`{version}`/`{name}`。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub levels: Vec<LevelConfig>,
+
     // ── sourceforge ──
     #[serde(skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
@@ -142,6 +149,18 @@ pub struct SourceConfig {
     pub stable_minor: Option<String>, // gnome 模板：even(默认) 偶 minor 稳定分支；all 取最大版本
     #[serde(rename = "source-name", skip_serializing_if = "Option::is_none")]
     pub source_name: Option<String>, // 上游源目录/文件名覆盖（gtk3 的上游目录叫 gtk）
+}
+
+/// multi-level-html-index 的一级：页面 URL + 版本正则（同一条目配对，无并行数组错位）。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LevelConfig {
+    /// 该级页面 URL。可引用已解出的前级版本 `{v1}..{vN}`。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// 该级版本正则（含一个捕获组），提取该级版本。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pattern: Option<String>,
 }
 
 fn is_template(t: &str) -> bool {
@@ -309,6 +328,9 @@ impl SourceConfig {
             "gnome" => templates::gnome::probe(fetcher, self, major.as_deref(), pkg_name),
             "gcs" => templates::gcs::probe(fetcher, self, major.as_deref(), pkg_name),
             "html-index" => templates::html_index::probe(fetcher, self, major.as_deref(), pkg_name),
+            "multi-level-html-index" => {
+                templates::multi_level_html_index::probe(fetcher, self, major.as_deref(), pkg_name)
+            }
             "pypi" => templates::pypi::probe(fetcher, self, major.as_deref(), pkg_name),
             other => Err(format!("未知 tracker_template: {other}")),
         }?;
@@ -335,6 +357,10 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), String> {
         "html-index" => (
             "html-index",
             vec!["url", "pattern", "template", "max-version", "source-name"],
+        ),
+        "multi-level-html-index" => (
+            "multi-level-html-index",
+            vec!["levels", "template", "max-version", "source-name"],
         ),
         "gcs" => (
             "gcs",
@@ -369,6 +395,7 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), String> {
         ("tag-prefix", cfg.tag_prefix.is_some()),
         ("url", cfg.url.is_some()),
         ("pattern", cfg.pattern.is_some()),
+        ("levels", !cfg.levels.is_empty()),
         ("project", cfg.project.is_some()),
         ("path", cfg.path.is_some()),
         ("template", cfg.template.is_some()),

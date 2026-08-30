@@ -1,10 +1,7 @@
 pkg-name: krita
-type: script
-script-content: |
-  pkg=krita
-  base=https://download.kde.org/stable/krita
-  listing=$(curl -fsSL "$base/")
-  dir=$(printf '%s\n' "$listing" | grep -o 'href="[0-9][0-9.]*/"' | sed 's/href="//; s/"//; s/\/$//' | sort -V | tail -n1)
-  test -n "$dir" || exit 1
-  echo "$dir"
-  echo "$base/$dir/$pkg-$dir.tar.xz"
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://download.kde.org/stable/krita/
+  pattern: href="([0-9][0-9.]*)/"
+  template: https://download.kde.org/stable/krita/{version}/krita-{version}.tar.xz

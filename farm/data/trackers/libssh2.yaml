@@ -1,0 +1,8 @@
+pkg-name: libssh2
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: libssh2/libssh2
+  mode: tags
+  tag-prefix: libssh2-
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

@@ -1,10 +1,11 @@
 pkg-name: qt6-base
-type: script
-script-content: |
-  base="https://download.qt.io/official_releases/qt/"
-  minor=$(curl -fsSL "$base" | grep -oE '>[0-9]+\.[0-9]+/<' | tr -d '>/<' | sort -V | grep '^6\.' | tail -1)
-  test -n "$minor" || exit 1
-  patch=$(curl -fsSL "${base}${minor}/" | grep -oE '>[0-9]+\.[0-9]+\.[0-9]+/<' | tr -d '>/<' | sort -V | tail -1)
-  test -n "$patch" || exit 1
-  echo "$patch"
-  echo "https://download.qt.io/official_releases/qt/$minor/$patch/submodules/qtbase-everywhere-src-$patch.tar.xz"
+version-source: sources[0]
+sources:
+- tracker-template: multi-level-html-index
+  levels:
+  - url: https://download.qt.io/official_releases/qt/
+    pattern: '>([0-9]+\.[0-9]+)/<'
+  - url: https://download.qt.io/official_releases/qt/{v1}/
+    pattern: '>([0-9]+\.[0-9]+\.[0-9]+)/<'
+  major-version-lock: 6
+  template: https://download.qt.io/official_releases/qt/{v1}/{version}/submodules/qtbase-everywhere-src-{version}.tar.xz

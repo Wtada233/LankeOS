@@ -1,0 +1,7 @@
+pkg-name: libsodium
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://download.libsodium.org/libsodium/releases/
+  pattern: libsodium-(\d[\d.]*)-stable\.tar\.gz
+  template: https://download.libsodium.org/libsodium/releases/libsodium-{version}-stable.tar.gz

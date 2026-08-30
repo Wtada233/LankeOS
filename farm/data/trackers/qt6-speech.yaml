@@ -3,5 +3,5 @@ version-source: sources[0]
 after: qt6-base
 sources:
 - tracker-template: same-version
-  template: https://download.qt.io/official_releases/qt/{major_minor}/{version}/submodules/qttexttospeech-everywhere-src-{version}.tar.xz
+  template: https://download.qt.io/official_releases/qt/{major_minor}/{version}/submodules/qtspeech-everywhere-src-{version}.tar.xz
   same-version-of: qt6-base

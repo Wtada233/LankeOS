@@ -1,10 +1,7 @@
 pkg-name: kirigami-addons
-type: script
-script-content: |
-  pkg=kirigami-addons
-  base=https://download.kde.org/stable/$pkg
-  page=$(curl -fsSL "$base/")
-  version=$(printf '%s\n' "$page" | grep -o "$pkg-[0-9][0-9.]*\.tar\.xz" | sed "s/^$pkg-//; s/\.tar\.xz$//" | sort -V | tail -n1)
-  test -n "$version" || exit 1
-  echo "$version"
-  echo "$base/$pkg-$version.tar.xz"
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://download.kde.org/stable/kirigami-addons/
+  pattern: kirigami\-addons-([0-9][0-9.]*)\.tar\.xz
+  template: https://download.kde.org/stable/kirigami-addons/kirigami-addons-{version}.tar.xz

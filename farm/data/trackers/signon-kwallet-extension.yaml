@@ -1,13 +1,7 @@
 pkg-name: signon-kwallet-extension
-type: script
-script-content: |
-  up=$PKG_NAME
-  base=https://download.kde.org/stable/release-service
-  listing=$(curl -fsSL "$base/")
-  dir=$(printf '%s\n' "$listing" | grep -o 'href="[0-9][0-9.]*/"' | sed 's/href="//; s/"//; s/\/$//' | sort -V | tail -n1)
-  test -n "$dir" || exit 1
-  page=$(curl -fsSL "$base/$dir/src/")
-  version=$(printf '%s\n' "$page" | grep -o "${up}-[0-9][0-9.]*\.tar\.xz" | sed "s|^${up}-||; s|\.tar\.xz$||" | head -n1)
-  test -n "$version" || exit 1
-  echo "$version"
-  echo "$base/$dir/src/${up}-$version.tar.xz"
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://download.kde.org/stable/release-service/
+  pattern: href="([0-9][0-9.]*)/"
+  template: https://download.kde.org/stable/release-service/{version}/src/signon-kwallet-extension-{version}.tar.xz

@@ -4,4 +4,4 @@ sources:
 - tracker-template: html-index
   url: https://xorg.freedesktop.org/archive/individual/lib/
   pattern: libXfont2-(\d[\d.]*)\.tar\.(?:xz|bz2|gz)
-  template: https://xorg.freedesktop.org/archive/individual/lib/{name}-{version}.tar.xz
+  template: https://xorg.freedesktop.org/archive/individual/lib/libXfont2-{version}.tar.xz

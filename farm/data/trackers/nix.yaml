@@ -1,0 +1,8 @@
+pkg-name: nix
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: NixOS/nix
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

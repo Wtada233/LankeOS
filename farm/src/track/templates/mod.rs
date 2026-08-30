@@ -12,6 +12,7 @@ pub mod github;
 pub mod gitlab;
 pub mod gnome;
 pub mod html_index;
+pub mod multi_level_html_index;
 pub mod pypi;
 pub mod same_version;
 pub mod script;

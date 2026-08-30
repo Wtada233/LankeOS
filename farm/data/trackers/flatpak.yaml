@@ -1,0 +1,8 @@
+pkg-name: flatpak
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: flatpak/flatpak
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

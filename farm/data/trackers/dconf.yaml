@@ -1,0 +1,6 @@
+pkg-name: dconf
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  stable-minor: all
+  template: https://download.gnome.org/sources/{name}/{path_version}/{name}-{version}.tar.xz
