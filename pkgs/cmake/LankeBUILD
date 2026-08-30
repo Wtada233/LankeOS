@@ -4,13 +4,19 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    mkdir -p {STAGING_ROOT}{PREFIX}
-    cp -rv bin share {STAGING_ROOT}/usr/
-    cd ..
+    ./bootstrap --prefix=/usr \
+        --mandir=/share/man \
+        --docdir=/share/doc/cmake \
+        --datadir=/share/cmake \
+        --system-libs \
+        --no-system-cppdap \
+        --no-system-libuv \
+        --no-system-librhash \
+        --parallel="$(nproc)"
+    make -j$(nproc)
 }
 
-
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    make DESTDIR={STAGING_ROOT} install
+    find {STAGING_ROOT} -name '*.a' -delete
 }
