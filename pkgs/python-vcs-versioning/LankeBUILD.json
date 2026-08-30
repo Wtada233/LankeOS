@@ -17,6 +17,9 @@
     "python-setuptools",
     "python-wheel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://files.pythonhosted.org/packages/e9/bb/5270e8ffd3123051ac4fbbaabf61afb8f27819ac8ced0f0cc4b24137d30e/vcs_versioning-2.2.3.tar.gz"
   ],

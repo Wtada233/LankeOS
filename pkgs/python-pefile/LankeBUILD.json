@@ -15,6 +15,9 @@
     "python-setuptools",
     "python-wheel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://files.pythonhosted.org/packages/03/4f/2750f7f6f025a1507cd3b7218691671eecfd0bbebebe8b39aa0fe1d360b8/pefile-2024.8.26.tar.gz"
   ],

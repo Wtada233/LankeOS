@@ -1,0 +1,36 @@
+lankebuild_prepare() {
+    # fuse3 patch：docs/man/tests 里 fusermount→fusermount3（文档内容随 fuse3 正确化）
+    patch -N -p1 -i "{WORK_DIR}/../ostree-2026.4-use_fuse3.patch" \
+        || patch -R --dry-run -p1 -i "{WORK_DIR}/../ostree-2026.4-use_fuse3.patch" >/dev/null 2>&1 \
+        || exit 1
+    # 子模块 bsdiff/libglnx 由 git+ 源 --recurse-submodules 自动拉
+    NOCONFIGURE=1 ./autogen.sh
+}
+
+lankebuild_build() {
+    # Arch 同款 configure；LankeOS 无 mkinitcpio/dracut → 去掉这两个 initramfs 选项；
+    # avahi/composefs 默认 maybe，LankeOS 无 → 自动禁用；libsoup3 已有（libsoup 包）→ --with-curl 可用
+    ./configure \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --libexecdir={LIBDIR} \
+        --localstatedir=/var \
+        --sbindir={BINDIR} \
+        --disable-static \
+        --enable-experimental-api \
+        --enable-gtk-doc \
+        --with-curl \
+        --with-ed25519-libsodium \
+        --with-grub2-mkconfig-path=/usr/bin/grub-mkconfig \
+        --with-modern-grub \
+        --with-openssl
+    # 防止 libtool 过度链接（Arch 同款）
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+    # --disable-static 已关，保险再清一遍
+    find {STAGING_ROOT} -name '*.a' -delete
+}

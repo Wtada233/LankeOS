@@ -1,0 +1,21 @@
+{
+  "name": "libsodium",
+  "version": "1.0.22",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6"
+  ],
+  "provides": [
+    "libsodium.so",
+    "libsodium.so.26"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://download.libsodium.org/libsodium/releases/libsodium-1.0.22-stable.tar.gz"
+  ],
+  "work_sources": []
+}

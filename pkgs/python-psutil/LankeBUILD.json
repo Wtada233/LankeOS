@@ -16,6 +16,9 @@
     "python-setuptools",
     "python-wheel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://github.com/giampaolo/psutil/archive/release-7.2.2/python-psutil-7.2.2.tar.gz"
   ],

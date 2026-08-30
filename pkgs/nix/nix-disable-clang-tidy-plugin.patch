@@ -1,0 +1,14 @@
+--- a/meson.build
++++ b/meson.build
+@@ -63,7 +63,7 @@
+ endif
+
+ # Static Analysis
+-# Build the custom clang-tidy plugin if LLVM is available.
+-# required: false → gracefully skipped if dependency('LLVM') fails.
+-clang_tidy_plugin_sp = subproject('clang-tidy-plugin', required : false)
+-subdir('nix-meson-build-support/common/clang-tidy')
++# clang-tidy 插件仅 nix 开发者静态分析用，需 clang-tidy 头（LankeOS llvm 包不提供）
++# → 整体跳过；下游 clang-tidy/meson.build 用 is_variable() 守卫，无副作用
++# clang_tidy_plugin_sp = subproject('clang-tidy-plugin', required : false)
++# subdir('nix-meson-build-support/common/clang-tidy')

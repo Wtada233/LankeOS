@@ -19,6 +19,9 @@
     "python-wheel",
     "python-sip"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://github.com/Python-PyQt/PyQt-builder/archive/refs/tags/1.19.1.tar.gz"
   ],

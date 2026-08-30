@@ -1,7 +1,7 @@
 {
   "name": "coin-or-mp",
   "version": "1.8.4",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libCbc.so.3",

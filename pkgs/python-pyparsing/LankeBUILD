@@ -1,0 +1,22 @@
+lankebuild_prepare() {
+    # 标准 python 包模板：build/installer 已成包，无需 ensurepip
+    # （ensurepip 会撞 PEP 668 externally-managed）
+    # 放宽 pyproject 的 flit_core 约束（>=3.12,<4 → >=3.12）：
+    # LankeOS 的 python-flit-core 是 4.x，flit 3→4 无 breaking，python -m build
+    # --no-isolation 的依赖检查才会认
+    patch -N -p1 -i "{WORK_DIR}/../relax-flit-core-version.patch" \
+        || patch -R --dry-run -p1 -i "{WORK_DIR}/../relax-flit-core-version.patch" >/dev/null 2>&1 \
+        || exit 1
+}
+
+lankebuild_build() {
+    # PEP 517 wheel 构建；pyparsing 的 build backend 是 flit_core（python-flit-core）
+    # --no-isolation：用系统环境，不建隔离 venv 去 pip 拉依赖（flit_core 由 build_deps 提供）
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/python-pyparsing/LICENSE
+}

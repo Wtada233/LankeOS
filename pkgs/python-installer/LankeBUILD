@@ -1,13 +1,24 @@
 lankebuild_prepare() {
-    # 引导期 ensurepip 提供 pip/setuptools/wheel；build/installer 尚未成包，用 pip 自建 wheel
-    python -m ensurepip
+    # GCC 式二段自举：不依赖已装的 python 构建工具（Python 大版本升级后旧 site-packages
+    # 里的 build/installer 等全没了，--isolation 也得有 python -m build 才跑得了）
+    :
 }
 
 lankebuild_build() {
-    python -m pip wheel . --no-build-isolation --no-deps -w dist
+    # 段1：python-bootstrap 从源码构建 7 个工具 wheel（旧版本只当工具用），装进 venv
+    # （venv 的 pip 由 ensurepip 引导，PEP 668 只管系统 site-packages，不拦 venv）
+    cd {SRC_DIR}/python-bootstrap
+    python -m bootstrap.build
+    python -m venv {WORK_DIR}/.boot
+    {WORK_DIR}/.boot/bin/pip install --no-index --find-links dist/ \
+        build installer flit_core wheel packaging pyproject_hooks setuptools
+    # 段2：用 venv 工具单独构建目标包（LankeOS 钉扎版本，不降级）
+    # 输出到 {WORK_DIR}/dist（package 阶段 cwd 会重置）
+    cd {SRC_DIR}/installer-{ORIG_PKG_VER}
+    {WORK_DIR}/.boot/bin/python -m build --no-isolation --skip-dependency-check --wheel -o {WORK_DIR}/dist
 }
 
 lankebuild_package() {
-    python -m pip install --no-deps --root={STAGING_ROOT} dist/*.whl
+    {WORK_DIR}/.boot/bin/python -m installer --prefix={PREFIX} --destdir={STAGING_ROOT} {WORK_DIR}/dist/*.whl
     find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
 }

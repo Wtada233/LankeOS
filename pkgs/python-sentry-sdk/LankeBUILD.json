@@ -18,6 +18,9 @@
     "python-urllib3",
     "python-wheel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://github.com/getsentry/sentry-python/archive/refs/tags/2.68.0.tar.gz"
   ],

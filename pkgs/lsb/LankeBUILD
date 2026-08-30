@@ -1,6 +1,7 @@
 lankebuild_prepare() {
     :
 }
+
 lankebuild_build() {
     # LSB-Tools 没有 configure 脚本，直接 make
     make -j$(nproc)
@@ -11,7 +12,10 @@ lankebuild_build() {
     ln -sfv ../lib/lsb/remove_initd {STAGING_ROOT}{BINDIR}/remove_initd
     ln -sfv ../lib/lsb/lsbinstall {STAGING_ROOT}{BINDIR}/lsbinstall
 }
+
 lankebuild_package() {
     # 清理 __pycache__（与 python 配方一致，.pyc 冗余）
     find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+    sed -i 's/basename(/os.path.basename(/g' \
+        {STAGING_ROOT}/usr/lib/python3.14/site-packages/lsbtools/lsb_release.py
 }

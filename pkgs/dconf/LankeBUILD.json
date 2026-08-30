@@ -1,0 +1,30 @@
+{
+  "name": "dconf",
+  "version": "0.49.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libdconf.so",
+    "libdconf.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "bash-completion",
+    "dbus",
+    "glib",
+    "gtk-doc",
+    "meson",
+    "vala"
+  ],
+  "sources": [
+    "git+https://gitlab.gnome.org/GNOME/dconf.git@0.49.0"
+  ],
+  "work_sources": []
+}

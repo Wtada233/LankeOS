@@ -13,6 +13,9 @@
     "python-flit-core",
     "python-installer"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://github.com/pypa/pip/archive/26.2.1/pip-26.2.1.tar.gz"
   ],

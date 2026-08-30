@@ -1,17 +1,22 @@
 {
   "name": "python-setuptools",
-  "version": "83.0.0",
-  "release": 1,
+  "version": "84.0.0",
+  "release": 3,
   "deps": [
     "python"
   ],
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel"
+    "base-devel",
+    "git"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/34/26/f5d29e25ffdb535afef2d35cdb55b325298f96debd670da4c325e08d70f4/setuptools-83.0.0.tar.gz"
+    "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
+    "https://files.pythonhosted.org/packages/6d/44/f5da03a8ef95d369145c5bb53050e7877c9f3d312e128605fd9504829143/setuptools-84.0.0.tar.gz"
   ],
   "work_sources": []
 }

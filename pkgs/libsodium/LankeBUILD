@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    # 官方 stable tarball 自带 configure，非 github 归档 → 无需 autoreconf
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX}
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+    # 静态库（.pc 引用共享库，删掉安全）
+    find {STAGING_ROOT} -name '*.a' -delete
+    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/libsodium/LICENSE
+}

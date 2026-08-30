@@ -1,0 +1,18 @@
+lankebuild_prepare() {
+    # 纯头文件库，cmake 项目无需 prepare
+    :
+}
+
+lankebuild_build() {
+    cmake -B build \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR={LIBDIR} \
+        -Wno-dev
+    cmake --build build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR={STAGING_ROOT} cmake --install build
+    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/toml11/LICENSE
+}

@@ -1,0 +1,49 @@
+{
+  "name": "ostree",
+  "version": "2026.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libarchive.so.13",
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libcurl.so.4",
+    "libfuse3.so.4",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgpg-error.so.0",
+    "libgpgme.so.45",
+    "liblzma.so.5",
+    "libsodium.so.26",
+    "libsystemd.so.0",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libostree-1.so",
+    "libostree-1.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "curl",
+    "docbook-xsl",
+    "fuse3",
+    "glib",
+    "gobject-introspection",
+    "gpgme",
+    "gtk-doc",
+    "libarchive",
+    "libgpg-error",
+    "libsoup",
+    "libsodium",
+    "libxslt",
+    "xmlto",
+    "xz",
+    "zlib"
+  ],
+  "sources": [
+    "git+https://github.com/ostreedev/ostree.git@v2026.4"
+  ],
+  "work_sources": []
+}

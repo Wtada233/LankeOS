@@ -15,6 +15,9 @@
     "python-setuptools",
     "python-wheel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://github.com/certifi/python-certifi/archive/refs/tags/2026.07.22.tar.gz"
   ],

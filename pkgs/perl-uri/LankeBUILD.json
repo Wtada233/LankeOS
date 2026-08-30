@@ -8,6 +8,9 @@
   "build_deps": [
     "base-devel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://cpan.metacpan.org/authors/id/O/OA/OALDERS/URI-5.36.tar.gz"
   ],

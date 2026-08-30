@@ -1,0 +1,23 @@
+{
+  "name": "libssh2",
+  "version": "1.11.1",
+  "release": 7,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcrypto.so.3",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libssh2.so",
+    "libssh2.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/libssh2/libssh2/archive/refs/tags/libssh2-1.11.1.tar.gz"
+  ],
+  "work_sources": []
+}

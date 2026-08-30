@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    # github 归档（tag 0.1.8），meson 项目无需 prepare
+    :
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix={PREFIX} \
+        --libexecdir={LIBDIR}
+    meson compile -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR={STAGING_ROOT} meson install -C build
+}

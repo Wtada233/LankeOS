@@ -1,0 +1,25 @@
+{
+  "name": "python-pyparsing",
+  "version": "3.3.2",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-flit-core",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
+  "sources": [
+    "https://github.com/pyparsing/pyparsing/archive/refs/tags/3.3.2.tar.gz"
+  ],
+  "work_sources": []
+}

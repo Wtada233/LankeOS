@@ -1,0 +1,23 @@
+lankebuild_prepare() {
+    # github 归档（tag v1.9.7），cmake 项目无需 prepare
+    :
+}
+
+lankebuild_build() {
+    # Arch 用 USE_HTTP_PARSER=llhttp，LankeOS 无 llhttp → 用 libgit2 自带 bundled
+    # http-parser（USE_HTTP_PARSER 默认值，功能等价）；USE_SSH=ON 需要 libssh2
+    cmake -B build \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR={LIBDIR} \
+        -DREGEX_BACKEND=pcre2 \
+        -DUSE_SSH=ON \
+        -Wno-dev
+    cmake --build build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR={STAGING_ROOT} cmake --install build
+    find {STAGING_ROOT} -name '*.a' -delete
+    install -Dm644 COPYING {STAGING_ROOT}/usr/share/licenses/libgit2/COPYING
+}

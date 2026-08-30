@@ -1,0 +1,60 @@
+lankebuild_prepare() {
+    # 1) Arch 同款：不装 nix-profile.sh/.fish（只留 -daemon 变体，/etc/profile.d 由
+    #    nix:profile-dir 指过去）
+    # 2) 关 clang-tidy 插件：仅 nix 开发者静态分析用，需 clang-tidy 头（LankeOS llvm
+    #    包不提供），发行版构建跳过（下游 is_variable() 守卫，无副作用）
+    for p in \
+        remove-unused-sh-files.patch \
+        nix-disable-clang-tidy-plugin.patch; do
+        patch -N -p1 -i "{WORK_DIR}/../$p" \
+            || patch -R --dry-run -p1 -i "{WORK_DIR}/../$p" >/dev/null 2>&1 \
+            || exit 1
+    done
+}
+
+lankebuild_build() {
+    # 对齐 Arch meson_opts：
+    #   - LankeOS 无 editline → readline-flavor=readline（nix 原生两种都支持）
+    #   - lowdown（nix help 的 markdown 渲染）、gc（求值器 Boehm GC）、libcpuid、
+    #     aws-crt-cpp（S3 AWS auth）都是 auto 特性，LankeOS 无对应包 → 自动禁用
+    #   - sandbox-shell=/usr/lib/nix/busybox：Arch nix-busybox 的路径，LankeOS 暂无
+    #     该包 → nix 本体/daemon 不受影响，仅沙箱构建需要它
+    #   - 测试/文档/json-schema 全关；版本来自 .version 文件（git 树自带），
+    #     archive 源不影响
+    meson setup build \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --bindir={BINDIR} \
+        --sbindir={BINDIR} \
+        --libdir={LIBDIR} \
+        --libexecdir={LIBDIR} \
+        --localstatedir=/var \
+        -Dlibstore:sandbox-shell=/usr/lib/nix/busybox \
+        -Dnix:profile-dir=/etc/profile.d \
+        -Dnix:mimalloc=disabled \
+        -Dlibcmd:readline-flavor=readline \
+        -Ddoc-gen=false \
+        -Dunit-tests=false \
+        -Dfunctional-tests=false \
+        -Djson-schema-checks=false
+    meson compile -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR={STAGING_ROOT} meson install -C build
+    # meson 已装 nix-daemon.service/.socket + tmpfiles.d/nix-daemon.conf（建 /nix 等）；
+    # 这里补装 sysusers（nixbld 组 + 10 个构建用户）和默认配置
+    install -Dm644 {WORK_DIR}/../sysusers.conf {STAGING_ROOT}/usr/lib/sysusers.d/nix-daemon.conf
+    install -Dm644 {WORK_DIR}/../nix.conf {STAGING_ROOT}/etc/nix/nix.conf
+    install -Dm644 COPYING {STAGING_ROOT}/usr/share/licenses/nix/COPYING
+    # postinst：先建 nixbld 系统账号（sysusers），再按 tmpfiles.d/nix-daemon.conf
+    # （meson 装的）建 /nix/store、/var/nix 等目录
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+set -e
+echo ":: Creating Nix build users (nixbld)..."
+systemd-sysusers
+echo ":: Creating Nix store dirs..."
+systemd-tmpfiles --create
+EOF
+}

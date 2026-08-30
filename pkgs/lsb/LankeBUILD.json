@@ -1,7 +1,7 @@
 {
   "name": "lsb",
   "version": "0.12",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

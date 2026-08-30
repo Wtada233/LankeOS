@@ -1,16 +1,21 @@
 {
   "name": "python-flit-core",
   "version": "4.0.2",
-  "release": 1,
+  "release": 2,
   "deps": [
     "python"
   ],
   "needed_so": [],
   "provides": [],
   "build_deps": [
-    "base-devel"
+    "base-devel",
+    "git"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
+    "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
     "https://files.pythonhosted.org/packages/46/ef/34533186e76c526d9ec17a1ad9a10c7354cbfb20f51583cc36dfe4bdccd0/flit_core-4.0.2.tar.gz"
   ],
   "work_sources": []

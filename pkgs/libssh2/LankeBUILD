@@ -1,0 +1,40 @@
+lankebuild_prepare() {
+    # libssh2-1.11.1 是上游最新 release，其后修了一批 CVE。Arch 用「6 patch + 4 git
+    # cherry-pick」维护；lpkg 的 git+ 源只能按 tag 拉、archive 源无 .git，这里把
+    # cherry-pick 的 commit 也从 GitHub 转成 patch，全部 patch 应用（顺序对齐 Arch
+    # PKGBUILD 的 prepare，后补丁可能依赖前补丁的上下文）：
+    #   CVE-2025-15661 / 2026-7598 / 2026-55199 / 2026-55200 / 2026-58051 /
+    #   2026-58050 / 2026-66032 / 2026-66033 / 2026-66034 / 2026-66035
+    for p in \
+        libssh2-1.11.1-CVE-2025-15661.patch \
+        libssh2-256d04b60d80bf1190e96b0ad1e91b2174d744b1.patch \
+        libssh2-17626857d20b3c9a1addfa45979dadcee1cd84a4.patch \
+        libssh2-1.11.1-CVE-2026-55200.patch \
+        libssh2-a9758da45a52bc8c630ec9493804d0c6ea30b24a.patch \
+        libssh2-1.11.1-CVE-2026-58050.patch \
+        libssh2-1.11.1-CVE-2026-66032.patch \
+        libssh2-a2ed82d40964bbc0d64cd717aa0a5a892117d2e6.patch \
+        libssh2-1.11.1-CVE-2026-66034.patch \
+        libssh2-1.11.1-CVE-2026-66035.patch; do
+        patch -N -p1 -i "{WORK_DIR}/../$p" \
+            || patch -R --dry-run -p1 -i "{WORK_DIR}/../$p" >/dev/null 2>&1 \
+            || exit 1
+    done
+    # git 树里的 LIBSSH2_VERSION 带 _DEV 后缀（dist tarball 才去掉），Arch 同款处理
+    sed 's/_DEV//' --in-place include/libssh2.h
+    # github 归档缺 configure 且无 autogen.sh → autoreconf 兜底（--disable-docker-tests
+    # 是 configure.ac 真选项，保留）
+    autoreconf -fiv
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --disable-docker-tests
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+    # 静态库（.pc 引用共享库，删掉安全）
+    find {STAGING_ROOT} -name '*.a' -delete
+    install -Dm644 COPYING {STAGING_ROOT}/usr/share/licenses/libssh2/COPYING
+}

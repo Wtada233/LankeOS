@@ -1,3 +1,14 @@
+lankebuild_prepare() {
+    # 修 CoinMP 上游 addlibsdir 双重 DESTDIR bug：addlibsdir 定义里带了 $(DESTDIR)，
+    # install-addlibsDATA 规则又套一层 → example.c/Makefile 以
+    # $DESTDIR$DESTDIR/usr/share/coin/doc/CoinMP 泄漏进包（AUTHORS/LICENSE 走
+    # install-doc 单层不受影响）。修法：定义去掉 DESTDIR + install/uninstall-hook
+    # 补上 $(DESTDIR)，全部用法对齐 automake 惯例
+    patch -N -p1 -d CoinMP -i "{WORK_DIR}/../coin-or-mp-addlibsdir-double-DESTDIR.patch" \
+        || patch -R --dry-run -p1 -d CoinMP -i "{WORK_DIR}/../coin-or-mp-addlibsdir-double-DESTDIR.patch" >/dev/null 2>&1 \
+        || exit 1
+}
+
 lankebuild_build() {
     # Arch 同款：CoinMP 子目录构建，接 cbc；CXXFLAGS 去掉 _GLIBCXX_ASSERTIONS（gcc 15+ 兼容）
     cd CoinMP
@@ -8,10 +19,6 @@ lankebuild_build() {
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     rm -rf {STAGING_ROOT}/build
-}
-
-lankebuild_prepare() {
-    :
 }
 
 lankebuild_package() {

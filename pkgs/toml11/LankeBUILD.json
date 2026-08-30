@@ -1,0 +1,16 @@
+{
+  "name": "toml11",
+  "version": "4.4.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "cmake"
+  ],
+  "sources": [
+    "https://github.com/ToruNiina/toml11/archive/refs/tags/v4.4.0.tar.gz"
+  ],
+  "work_sources": []
+}

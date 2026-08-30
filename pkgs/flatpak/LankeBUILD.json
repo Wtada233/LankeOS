@@ -1,0 +1,73 @@
+{
+  "name": "flatpak",
+  "version": "1.18.2",
+  "release": 1,
+  "deps": [
+    "bubblewrap",
+    "dconf",
+    "xdg-dbus-proxy"
+  ],
+  "needed_so": [
+    "libXau.so.6",
+    "libappstream.so.5",
+    "libarchive.so.13",
+    "libc.so.6",
+    "libcurl.so.4",
+    "libdconf.so.1",
+    "libfuse3.so.4",
+    "libgcc_s.so.1",
+    "libgdk_pixbuf-2.0.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgpgme.so.45",
+    "libjson-glib-1.0.so.0",
+    "libostree-1.so.1",
+    "libpolkit-agent-1.so.0",
+    "libpolkit-gobject-1.so.0",
+    "libseccomp.so.2",
+    "libsystemd.so.0",
+    "libwayland-client.so.0",
+    "libxml2.so.16",
+    "libzstd.so.1"
+  ],
+  "provides": [
+    "libflatpak.so",
+    "libflatpak.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "appstream",
+    "bubblewrap",
+    "curl",
+    "dbus",
+    "dconf",
+    "docbook-xsl",
+    "fuse3",
+    "gdk-pixbuf",
+    "glib",
+    "gobject-introspection",
+    "gpgme",
+    "gtk-doc",
+    "json-glib",
+    "libarchive",
+    "libseccomp",
+    "libxau",
+    "libxml2",
+    "meson",
+    "ostree",
+    "polkit",
+    "python-gobject",
+    "python-packaging",
+    "python-pyparsing",
+    "wayland",
+    "wayland-protocols",
+    "xdg-dbus-proxy",
+    "xmlto",
+    "zstd"
+  ],
+  "sources": [
+    "https://github.com/flatpak/flatpak/archive/refs/tags/1.18.2.tar.gz"
+  ],
+  "work_sources": []
+}

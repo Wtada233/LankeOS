@@ -20,6 +20,10 @@ lankebuild_build() {
     # LLVM 经常会死磕 libtinfo，给它一个交待
     ln -sfv libncursesw.so {STAGING_ROOT}{LIBDIR}/libtinfo.so
     ln -sfv libncursesw.so.6 {STAGING_ROOT}{LIBDIR}/libtinfo.so.6
+    # tinfo/tic 功能内建进 libncursesw，ncurses 不生成其 .pc —— Arch 同款软链
+    # ncursesw.pc（readline.pc Requires: tinfo，缺了 tinfo.pc 时 pkg-config 解析失败）
+    ln -sfv ncursesw.pc {STAGING_ROOT}{LIBDIR}/pkgconfig/tinfo.pc
+    ln -sfv ncursesw.pc {STAGING_ROOT}{LIBDIR}/pkgconfig/tic.pc
 }
 
 

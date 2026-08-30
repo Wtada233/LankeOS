@@ -1,5 +1,9 @@
 pkg-name: python-installer
-version-source: sources[0]
+version-source: sources[1]
+after: python
 sources:
+- tracker-template: same-version
+  template: git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@{major_minor}.0
+  same-version-of: python
 - tracker-template: pypi
   project: installer

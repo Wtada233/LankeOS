@@ -1,0 +1,27 @@
+lankebuild_prepare() {
+    # github 归档（tag 1.18.2），meson 项目无需 prepare
+    :
+}
+
+lankebuild_build() {
+    # Arch 同款 meson_opts；LankeOS 无 malcontent（家长控制，纯可选）→ 关掉；
+    # dconf 已打包 → 用默认（沙箱 GSettings 同步）；tests 关掉（socat/pkcheck 是测试依赖）
+    meson setup build \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --libexecdir={LIBDIR} \
+        --localstatedir=/var \
+        -Dselinux_module=disabled \
+        -Dsystem_bubblewrap=bwrap \
+        -Dsystem_dbus_proxy=xdg-dbus-proxy \
+        -Dmalcontent=disabled \
+        -Dtests=false
+    meson compile -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR={STAGING_ROOT} meson install -C build
+    # Arch 同款：/etc/profile.d 补 flatpak 导出目录进 PATH + 预置 flathub remote
+    install -Dt {STAGING_ROOT}/etc/profile.d -m644 {WORK_DIR}/../flatpak-bindir.sh
+    install -Dt {STAGING_ROOT}/usr/share/flatpak/remotes.d {WORK_DIR}/../flathub.flatpakrepo
+}

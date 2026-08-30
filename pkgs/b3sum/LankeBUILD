@@ -5,7 +5,11 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    cmake -B build -S c -W no-dev -D CMAKE_BUILD_TYPE=None -D CMAKE_INSTALL_PREFIX=/usr -D BUILD_SHARED_LIBS=ON -D BLAKE3_USE_TBB=1
+    # LankeOS 无 onetbb → 不设 BLAKE3_USE_TBB（默认 OFF）。若设 1 而 TBB 缺失，BLAKE3
+    # 上游 cmake 的 PKG_CONFIG_CFLAGS/REQUIRES 在 else() 外无条件执行 → libblake3.pc
+    # 宣称 -DBLAKE3_USE_TBB + Requires: tbb，但 .so 无 blake3_hasher_update_tbb 符号 →
+    # nix 等消费者按 pc 编进 TBB 分支后链接失败（undefined reference）
+    cmake -B build -S c -W no-dev -D CMAKE_BUILD_TYPE=None -D CMAKE_INSTALL_PREFIX=/usr -D BUILD_SHARED_LIBS=ON
     cmake --build build -j $(nproc)
     cd b3sum
     cargo build --release --locked --offline

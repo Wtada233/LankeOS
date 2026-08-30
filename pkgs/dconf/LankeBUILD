@@ -1,0 +1,24 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        -Dgtk_doc=true
+    meson compile -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR={STAGING_ROOT} meson install -C build
+    # 防其他包卸载时删掉 /etc/dconf/db/（Arch 同款 placeholder）
+    install -Dm644 /dev/null {STAGING_ROOT}/etc/dconf/db/.placeholder
+    # postinst：重新生成系统 dconf 数据库（Arch 的 dconf-update hook 核心）
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+set -e
+echo ":: Updating system dconf databases..."
+dconf update
+EOF
+}

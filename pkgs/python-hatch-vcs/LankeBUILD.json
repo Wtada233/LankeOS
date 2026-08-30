@@ -17,6 +17,9 @@
     "python-setuptools-scm",
     "python-wheel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://github.com/ofek/hatch-vcs/archive/refs/tags/v0.5.0.tar.gz"
   ],

@@ -16,6 +16,9 @@
     "perl-file-sharedir",
     "perl-file-sharedir-install"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://cpan.metacpan.org/authors/id/T/TO/TODDR/XML-Parser-2.59.tar.gz"
   ],

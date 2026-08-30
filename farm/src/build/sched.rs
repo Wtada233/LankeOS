@@ -9,16 +9,22 @@ use crate::graph::Index;
 use crate::tr;
 use crate::ux;
 
-/// Kahn 拓扑排序，**按 needed_so 链接边 + 声明式重建组边**＋环切割。`_pkgs_dir` 保留签名兼容。
+/// Kahn 拓扑排序，**按 needed_so 链接边 + 声明式重建组边 + farm_flags 边**＋环切割。
 ///
 /// 设计：构建序只看**链接依赖**——需要重建的链接库必须先建，依赖者才能按新 ABI 链接。
-/// `deps`/`build_deps` **不参与排序**：build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，
+/// `deps`/`build_deps` **默认不参与排序**：build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，
 /// 无需排队。"不链 libpython 但 ABI 敏感"的包（python-cairo/gobject/blueman/meson…）由
 /// `data/build/*.yaml` 声明式重建组处理（`build/groups.rs`）——这些组受害者没有 needed_so 链接边，
 /// 必须靠 `extra_edges`（victim → on）强制排在触发包 `on` 之后，否则 `--all` 模式下 python-cairo
 /// 会在 python 重建前构建（容器升级时 repo 还是旧 python，构建基于旧 ABI 白跑）。
+///
+/// `pkgs_dir` 用来读配方（LankeBUILD.json）：声明了 `BUILD_AFTER_BUILD_DEPS`（farm_flags）
+/// 的包，其 `build_deps` **也作为依赖边**参与排序（见 `build/farm_flags.rs`）——构建期
+/// 需要另一个也在本轮重建的包先产出时（如 python-bar 构建要 python-foo），必须等它先建。
+/// 与链接边/组边同样**只对 targets 内的包生效**：build_deps 指向本轮不重建的包 → 边丢弃，
+/// 该包直接构建不等待。
 pub(crate) fn topo_order(
-    _pkgs_dir: &Path,
+    pkgs_dir: &Path,
     targets: &[String],
     old: &Index,
     extra_edges: &[(String, String)],
@@ -48,6 +54,19 @@ pub(crate) fn topo_order(
             .collect();
         if let Some(gd) = group_deps.get(n) {
             deps.extend(gd.iter().cloned());
+        }
+        // farm_flags：BUILD_AFTER_BUILD_DEPS → 该包 build_deps 也进依赖边（仅限 targets 内）。
+        // 目标依赖不重建 → 边丢弃，不等待（与链接/组边同规则）。
+        let flags = crate::build::farm_flags::flags_of(pkgs_dir, n);
+        if flags.contains(&crate::build::farm_flags::FarmFlag::BuildAfterBuildDeps) {
+            if let Some(lb) = crate::build::read_lankebuild(pkgs_dir, n) {
+                deps.extend(
+                    lb.build_deps
+                        .iter()
+                        .filter(|d| d.as_str() != n.as_str() && names.contains(d.as_str()))
+                        .cloned(),
+                );
+            }
         }
         deps.sort();
         deps.dedup();

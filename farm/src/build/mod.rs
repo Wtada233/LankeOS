@@ -27,6 +27,7 @@ pub(crate) use repo::{
     recipe_hash, repack_if_drift, sha256_file, sorted_pkg_names, update_lankebuild_metadata,
     update_repo_index,
 };
+mod farm_flags;
 mod groups;
 mod prompt;
 mod sources;
@@ -91,6 +92,10 @@ pub struct LankeBuild {
     pub needed_so: Vec<String>,
     #[serde(default)]
     pub build_deps: Vec<String>,
+    /// farm metadata：给 build/validate 看的声明式标志（lpkg 构建不消费）。
+    /// 格式见 `build/farm_flags.rs`（目前支持 `BUILD_AFTER_BUILD_DEPS`）。
+    #[serde(default)]
+    pub farm_flags: Vec<String>,
     #[serde(default)]
     pub sources: Vec<String>,
     #[serde(default)]
@@ -472,6 +477,19 @@ mod tests {
         needed: &[&str],
         build_deps: &[&str],
     ) {
+        write_pkg_flags(pkgs, name, version, provides, needed, build_deps, &[]);
+    }
+
+    /// 同 `write_pkg_ver`，可额外写 `farm_flags`（farm metadata 排序测试用）。
+    fn write_pkg_flags(
+        pkgs: &Path,
+        name: &str,
+        version: &str,
+        provides: &[&str],
+        needed: &[&str],
+        build_deps: &[&str],
+        farm_flags: &[&str],
+    ) {
         let dir = pkgs.join(name);
         fs::create_dir_all(&dir).unwrap();
         let json = serde_json::json!({
@@ -480,6 +498,7 @@ mod tests {
             "provides": provides,
             "needed_so": needed,
             "build_deps": build_deps,
+            "farm_flags": farm_flags,
         });
         fs::write(
             dir.join("LankeBUILD.json"),
@@ -954,6 +973,166 @@ mod tests {
         assert_eq!(order2.len(), 2, "排序仍覆盖全部包: {order2:?}");
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&gdir).ok();
+    }
+
+    #[test]
+    fn build_after_build_deps_orders_foo_before_bar_in_python_group() {
+        // python 重建组（rebuild-on-abichange: python，packages: python-*）：python ABI 变化时
+        // python-foo / python-bar 都会重建。python-bar 构建依赖 python-foo 且声明
+        // BUILD_AFTER_BUILD_DEPS → Kahn 排序必须把 python-foo 排在 python-bar 前。
+        // 没有该 flag 时两者是同级（无 bar→foo 边），名字升序会是 python-bar 先建——构建时
+        // 容器里还没有 python-foo 刚产出的产物，基于旧 foo 构建白跑。
+        let dir = std::env::temp_dir().join("farm-build-after-builddeps");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        write_pkg(&dir, "python", &["libpython3.14.so.1"], &["libc.so.6"], &[]);
+        write_pkg(
+            &dir,
+            "python-foo",
+            &["libpyfoo.so"],
+            &["libpython3.14.so.1", "libc.so.6"],
+            &["python"],
+        );
+        write_pkg_flags(
+            &dir,
+            "python-bar",
+            "1.0",
+            &["libpybar.so"],
+            &["libpython3.14.so.1", "libc.so.6"],
+            &["python-foo"],
+            &["BUILD_AFTER_BUILD_DEPS"],
+        );
+        let old = index_of(&[
+            ("python", vec!["libpython3.14.so.1"], vec!["libc.so.6"]),
+            (
+                "python-foo",
+                vec!["libpyfoo.so"],
+                vec!["libpython3.14.so.1", "libc.so.6"],
+            ),
+            (
+                "python-bar",
+                vec!["libpybar.so"],
+                vec!["libpython3.14.so.1", "libc.so.6"],
+            ),
+        ]);
+        let gdir =
+            std::env::temp_dir().join(format!("farm-after-builddeps-group-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&gdir);
+        fs::create_dir_all(&gdir).unwrap();
+        fs::write(
+            gdir.join("python.yaml"),
+            "rebuild-on-abichange: python\npackages: python-*\n",
+        )
+        .unwrap();
+        let groups = RebuildGroups::load(&gdir);
+
+        // --all 模式：python + 两个组受害者都在 targets。边 = 组边（foo/bar → python）+
+        // 链接边（foo/bar 链 libpython）+ BUILD_AFTER_BUILD_DEPS 边（bar → foo）。
+        let targets: Vec<String> = ["python", "python-foo", "python-bar"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let edges = groups.trigger_edges_in(&targets);
+        let order = topo_order(&dir, &targets, &old, &edges);
+        let pos = |x: &str| order.iter().position(|n| n == x).unwrap();
+        assert!(
+            pos("python") < pos("python-foo"),
+            "组受害者 foo 应在 python 后: {order:?}"
+        );
+        assert!(
+            pos("python-foo") < pos("python-bar"),
+            "python-bar 声明 BUILD_AFTER_BUILD_DEPS，必须先建构建依赖 python-foo: {order:?}"
+        );
+
+        // ABI 受害者重排路径（reorder_queue）：python 已建完，foo/bar 作为组受害者动态入队 →
+        // 同一 topo_order，bar 的 build_deps 边仍让 foo 先建（且受害者标记保留）。
+        let mut queue: VecDeque<(String, bool)> = vec![
+            ("python-bar".to_string(), true),
+            ("python-foo".to_string(), true),
+        ]
+        .into();
+        reorder_queue(&mut queue, &dir, &old, &groups);
+        let names: Vec<&str> = queue.iter().map(|(n, _)| n.as_str()).collect();
+        let posq = |s: &str| names.iter().position(|n| *n == s).unwrap();
+        assert!(
+            posq("python-foo") < posq("python-bar"),
+            "受害者重排也必须 foo 先建: {names:?}"
+        );
+        assert!(queue.iter().all(|(_, v)| *v), "受害者标记应保留: {queue:?}");
+
+        // 对照：去掉 BUILD_AFTER_BUILD_DEPS → bar/foo 同级（无 bar→foo 边），名字升序
+        // python-bar 在 python-foo 前——证明 flag 才是 foo 先建的唯一原因。
+        write_pkg_flags(
+            &dir,
+            "python-bar",
+            "1.0",
+            &["libpybar.so"],
+            &["libpython3.14.so.1", "libc.so.6"],
+            &["python-foo"],
+            &[],
+        );
+        let order_noflag = topo_order(&dir, &targets, &old, &edges);
+        let pos2 = |x: &str| order_noflag.iter().position(|n| n == x).unwrap();
+        assert!(
+            pos2("python-bar") < pos2("python-foo"),
+            "无 flag 时同级按名字升序（python-bar 在前），flag 是 foo 先建的唯一原因: {order_noflag:?}"
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&gdir).ok();
+    }
+
+    #[test]
+    fn build_after_build_deps_skips_dep_not_in_targets() {
+        // python-bar 构建依赖 python-foo，但本轮 python-foo **不会被 rebuild**（不在 targets）。
+        // BUILD_AFTER_BUILD_DEPS 只对 targets 内的包生效 → bar→foo 边丢弃，python-bar 直接
+        // 构建不等待 foo（与无关包 zlib 同级，按名字升序排在其前）。
+        let dir = std::env::temp_dir().join("farm-build-after-builddeps-skip");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        write_pkg(&dir, "python", &["libpython3.14.so.1"], &["libc.so.6"], &[]);
+        write_pkg(
+            &dir,
+            "python-foo",
+            &["libpyfoo.so"],
+            &["libpython3.14.so.1", "libc.so.6"],
+            &["python"],
+        );
+        write_pkg_flags(
+            &dir,
+            "python-bar",
+            "1.0",
+            &["libpybar.so"],
+            &["libpython3.14.so.1", "libc.so.6"],
+            &["python-foo"],
+            &["BUILD_AFTER_BUILD_DEPS"],
+        );
+        // zlib：本轮要重建、但与 python-bar 无任何依赖的无关包（名字升序锚点）。
+        write_pkg(&dir, "zlib", &["libz.so.1"], &["libc.so.6"], &[]);
+        let old = index_of(&[
+            ("python", vec!["libpython3.14.so.1"], vec!["libc.so.6"]),
+            (
+                "python-foo",
+                vec!["libpyfoo.so"],
+                vec!["libpython3.14.so.1", "libc.so.6"],
+            ),
+            (
+                "python-bar",
+                vec!["libpybar.so"],
+                vec!["libpython3.14.so.1", "libc.so.6"],
+            ),
+            ("zlib", vec!["libz.so.1"], vec!["libc.so.6"]),
+        ]);
+        // 本轮只重建 python-bar + zlib：python-foo 不在 targets。若 build_deps 边没被过滤，
+        // bar 会挂一个无人解析的依赖 → 兜底路径顺序变 zlib, bar；过滤正确 → bar 与 zlib 同级
+        // 名字升序：bar, zlib。
+        let targets: Vec<String> = vec!["python-bar".to_string(), "zlib".to_string()];
+        let order = topo_order(&dir, &targets, &old, &[]);
+        assert_eq!(
+            order,
+            vec!["python-bar".to_string(), "zlib".to_string()],
+            "python-foo 不重建 → bar→foo 边丢弃，bar 直接构建（名字升序）: {order:?}"
+        );
+        fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

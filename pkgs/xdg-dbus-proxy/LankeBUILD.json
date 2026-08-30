@@ -1,0 +1,24 @@
+{
+  "name": "xdg-dbus-proxy",
+  "version": "0.1.8",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "docbook-xsl",
+    "glib",
+    "meson"
+  ],
+  "sources": [
+    "https://github.com/flatpak/xdg-dbus-proxy/archive/refs/tags/0.1.8.tar.gz"
+  ],
+  "work_sources": []
+}

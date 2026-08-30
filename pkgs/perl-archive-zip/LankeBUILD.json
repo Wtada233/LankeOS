@@ -10,6 +10,9 @@
   "build_deps": [
     "base-devel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://search.cpan.org/CPAN/authors/id/P/PH/PHRED/Archive-Zip-1.68.tar.gz"
   ],

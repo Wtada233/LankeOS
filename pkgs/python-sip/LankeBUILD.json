@@ -18,6 +18,9 @@
     "python-setuptools-scm",
     "python-wheel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://github.com/Python-SIP/sip/archive/refs/tags/6.16.1.tar.gz"
   ],

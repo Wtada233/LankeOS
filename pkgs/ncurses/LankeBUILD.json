@@ -1,14 +1,13 @@
 {
   "name": "ncurses",
   "version": "6.5-20250809",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",
-    "libm.so.6",
     "libstdc++.so.6"
   ],
   "provides": [

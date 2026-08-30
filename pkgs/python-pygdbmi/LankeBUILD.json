@@ -15,6 +15,9 @@
     "python-setuptools",
     "python-wheel"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://github.com/cs01/pygdbmi/archive/v0.11.0.0/python-pygdbmi-0.11.0.0.tar.gz"
   ],
