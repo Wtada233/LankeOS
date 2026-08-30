@@ -3,20 +3,32 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    # Go 预编译二进制包，{SRC_DIR} 就是解压后的 go/ 目录
-    mkdir -p {STAGING_ROOT}{LIBDIR}
-    cp -a {SRC_DIR} {STAGING_ROOT}{LIBDIR}/go
-
-    # 删除预编译包中的冗余文件（对照 Arch 精简）
-    rm -f {STAGING_ROOT}{LIBDIR}/go/{codereview.cfg,CONTRIBUTING.md,LICENSE,PATENTS,README.md,SECURITY.md}
-
-    # 创建符号链接
-    mkdir -p {STAGING_ROOT}{BINDIR}
-    for bin in go gofmt; do
-        ln -sf ../lib/go/bin/$bin {STAGING_ROOT}{BINDIR}/$bin
-    done
+    # Go 自举：用容器里已装的 golang（build_dep，GOROOT=/usr/lib/go）编译源码（Arch 同款）
+    export GOARCH=amd64
+    export GOAMD64=v1
+    export GOROOT_FINAL=/usr/lib/go
+    export GOROOT_BOOTSTRAP=/usr/lib/go
+    export GOEXPERIMENT=nodwarf5
+    cd src
+    ./make.bash -v
 }
 
 lankebuild_package() {
-    :
+    install -d {STAGING_ROOT}/usr/bin {STAGING_ROOT}/usr/lib/go \
+        {STAGING_ROOT}/usr/share/doc/go \
+        {STAGING_ROOT}/usr/lib/go/pkg/linux_amd64_dynlink \
+        {STAGING_ROOT}/usr/lib/go/pkg/linux_amd64_race
+    cp -a bin pkg src lib misc api test {STAGING_ROOT}/usr/lib/go/
+    # 只 strip 交付的二进制与 toolchain（testdata 等保留，否则 go test 会坏）——Arch 同款
+    strip {STAGING_ROOT}/usr/lib/go/bin/*
+    strip {STAGING_ROOT}/usr/lib/go/pkg/tool/*/*
+    cp -r doc/* {STAGING_ROOT}/usr/share/doc/go/
+    ln -sf /usr/lib/go/bin/go {STAGING_ROOT}/usr/bin/go
+    ln -sf /usr/lib/go/bin/gofmt {STAGING_ROOT}/usr/bin/gofmt
+    ln -sf /usr/share/doc/go {STAGING_ROOT}/usr/lib/go/doc
+    install -Dm644 VERSION {STAGING_ROOT}/usr/lib/go/VERSION
+    rm -rf {STAGING_ROOT}/usr/lib/go/pkg/bootstrap
+    rm -rf {STAGING_ROOT}/usr/lib/go/pkg/obj/go-build
+    install -Dm644 go.env {STAGING_ROOT}/usr/lib/go/go.env
+    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/golang/LICENSE
 }

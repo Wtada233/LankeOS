@@ -1,12 +1,8 @@
 {
   "name": "golang",
-  "version": "1.26.5",
-  "release": 2,
-  "deps": [
-    "bash",
-    "perl",
-    "python"
-  ],
+  "version": "1.27.0",
+  "release": 1,
+  "deps": [],
   "needed_so": [
     "libc.so.6",
     "libstdc++.so.6",
@@ -15,11 +11,11 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "libtiff"
+    "golang"
   ],
   "sources": [
-    "https://go.dev/dl/go1.26.5.linux-amd64.tar.gz"
+    "https://go.dev/dl/go1.27.0.src.tar.gz"
   ],
   "work_sources": [],
-  "no_strip": false
+  "no_strip": true
 }
