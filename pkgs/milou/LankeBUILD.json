@@ -1,8 +1,12 @@
 {
   "name": "milou",
   "version": "6.7.4",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "kf-kirigami",
+    "kf-ksvg",
+    "libplasma"
+  ],
   "needed_so": [
     "libKF6ConfigCore.so.6",
     "libKF6CoreAddons.so.6",

@@ -1,8 +1,10 @@
 {
   "name": "qt6-virtualkeyboard",
   "version": "6.11.1",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "qt6-multimedia"
+  ],
   "needed_so": [
     "libQt6Core.so.6",
     "libQt6Gui.so.6",

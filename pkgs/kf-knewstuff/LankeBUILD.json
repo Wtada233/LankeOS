@@ -1,8 +1,11 @@
 {
   "name": "kf-knewstuff",
   "version": "6.29.0",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "kf-kcmutils",
+    "kf-kirigami"
+  ],
   "needed_so": [
     "libKF6Archive.so.6",
     "libKF6Attica.so.6",

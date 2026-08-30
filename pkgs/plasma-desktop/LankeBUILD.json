@@ -1,8 +1,19 @@
 {
   "name": "plasma-desktop",
   "version": "6.7.4",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "qt5compat",
+    "kf-kdeclarative",
+    "kf-kirigami",
+    "kf-kitemmodels",
+    "plasma-workspace",
+    "kf-kiconthemes",
+    "kf-ksvg",
+    "kf-kwindowsystem",
+    "libplasma",
+    "kf-kconfig"
+  ],
   "needed_so": [
     "libKF6Attica.so.6",
     "libKF6Baloo.so.6",

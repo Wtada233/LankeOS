@@ -1,8 +1,13 @@
 {
   "name": "libksysguard",
   "version": "6.7.4",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "qt5compat",
+    "kf-kirigami",
+    "kf-kitemmodels",
+    "kf-kquickcharts"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libKF6AuthCore.so.6",

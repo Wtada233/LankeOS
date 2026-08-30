@@ -1,8 +1,10 @@
 {
   "name": "kf-kirigami",
   "version": "6.29.0",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "kf-kitemmodels"
+  ],
   "needed_so": [
     "libQt6Core.so.6",
     "libQt6DBus.so.6",

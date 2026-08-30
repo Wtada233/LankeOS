@@ -1,8 +1,11 @@
 {
   "name": "kinfocenter",
   "version": "6.7.4",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "kf-kirigami",
+    "kf-kdeclarative"
+  ],
   "needed_so": [
     "libKF6AuthCore.so.6",
     "libKF6ConfigCore.so.6",

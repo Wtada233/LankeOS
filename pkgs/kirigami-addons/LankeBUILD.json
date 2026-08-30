@@ -1,8 +1,17 @@
 {
   "name": "kirigami-addons",
   "version": "1.13.1",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "qt6-multimedia",
+    "kf-kirigami",
+    "kf-kitemmodels",
+    "kf-qqc2-desktop-style",
+    "kf-sonnet",
+    "kf-kcoreaddons",
+    "kf-kconfig",
+    "kf-kiconthemes"
+  ],
   "needed_so": [
     "libKF6ColorScheme.so.6",
     "libKF6ConfigCore.so.6",

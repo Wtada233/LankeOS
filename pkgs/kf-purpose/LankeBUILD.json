@@ -1,8 +1,13 @@
 {
   "name": "kf-purpose",
   "version": "6.29.0",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "kf-bluez-qt",
+    "kf-kirigami",
+    "kf-kitemmodels",
+    "kf-prison"
+  ],
   "needed_so": [
     "libKF6ConfigCore.so.6",
     "libKF6CoreAddons.so.6",

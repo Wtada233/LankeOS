@@ -1,8 +1,10 @@
 {
   "name": "kf-qqc2-desktop-style",
   "version": "6.29.0",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "kf-sonnet"
+  ],
   "needed_so": [
     "libKF6ColorScheme.so.6",
     "libKF6ConfigCore.so.6",

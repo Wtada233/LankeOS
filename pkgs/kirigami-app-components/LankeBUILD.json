@@ -1,0 +1,42 @@
+{
+  "name": "kirigami-app-components",
+  "version": "1.0.2",
+  "release": 2,
+  "deps": [
+    "kf-kcoreaddons",
+    "kf-kirigami",
+    "kf-kitemmodels",
+    "kf-ki18n"
+  ],
+  "needed_so": [
+    "libKF6ConfigCore.so.6",
+    "libKF6ConfigGui.so.6",
+    "libKF6GuiAddons.so.6",
+    "libKF6I18n.so.6",
+    "libQt6Core.so.6",
+    "libQt6Gui.so.6",
+    "libQt6Qml.so.6",
+    "libQt6Quick.so.6",
+    "libc.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libKirigamiActionCollection.so",
+    "libKirigamiActionCollection.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "kf-kconfig",
+    "kf-kguiaddons",
+    "kf-ki18n",
+    "kf-kirigami",
+    "kf-kitemmodels",
+    "qt6-base",
+    "qt6-declarative"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/kirigami-app-components/kirigami-app-components-1.0.2.tar.xz"
+  ],
+  "work_sources": []
+}

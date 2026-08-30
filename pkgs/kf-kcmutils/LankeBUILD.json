@@ -1,8 +1,10 @@
 {
   "name": "kf-kcmutils",
   "version": "6.29.0",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "kf-kirigami"
+  ],
   "needed_so": [
     "libKF6ConfigCore.so.6",
     "libKF6ConfigWidgets.so.6",

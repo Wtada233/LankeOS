@@ -1,10 +1,11 @@
 {
   "name": "plasma-pa",
   "version": "6.7.4",
-  "release": 1,
+  "release": 2,
   "deps": [
     "kirigami-addons",
-    "sound-theme-freedesktop"
+    "sound-theme-freedesktop",
+    "kf-kitemmodels"
   ],
   "needed_so": [
     "libKF6ConfigCore.so.6",

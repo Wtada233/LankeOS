@@ -1,10 +1,26 @@
 {
   "name": "plasma-workspace",
   "version": "6.7.4",
-  "release": 2,
+  "release": 3,
   "deps": [
     "kf-kded",
-    "kio-fuse"
+    "kio-fuse",
+    "qt6-location",
+    "qt6-virtualkeyboard",
+    "kirigami-addons",
+    "kf-prison",
+    "qt5compat",
+    "kf-kirigami",
+    "kf-kholidays",
+    "kf-kdeclarative",
+    "kf-ksvg",
+    "libksysguard",
+    "libplasma",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kitemmodels",
+    "kf-kwindowsystem",
+    "qt6-positioning"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2",

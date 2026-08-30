@@ -1,8 +1,10 @@
 {
   "name": "kquickimageeditor",
   "version": "0.6.2.1",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "kf-kirigami"
+  ],
   "needed_so": [
     "libKF6ConfigCore.so.6",
     "libKF6ConfigGui.so.6",

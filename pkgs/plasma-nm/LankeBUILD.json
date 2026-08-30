@@ -1,9 +1,14 @@
 {
   "name": "plasma-nm",
   "version": "6.7.4",
-  "release": 1,
+  "release": 2,
   "deps": [
-    "kf-kquickcharts"
+    "kf-kquickcharts",
+    "kirigami-addons",
+    "kf-kirigami",
+    "kf-ksvg",
+    "libplasma",
+    "kf-kcoreaddons"
   ],
   "needed_so": [
     "libKF6ColorScheme.so.6",
