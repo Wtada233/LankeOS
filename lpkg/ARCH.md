@@ -345,7 +345,32 @@ WAL: BACKUP /usr/share/doc/foo/ → /usr/share/doc/foo.lpkg_bak_foo_a1b2c3
   → 不存在则跳过（幂等）
 ```
 
-**目录 BACKUP 的安全检查**：rename 前遍历目录内容，确认其中只包含本包产生的 `.lpkg_bak` 文件。若有其他包的文件在目录中，则跳过 BACKUP（目录保留在磁盘上，其内的 .bak 文件通过 CLEANUP 逐文件清理）。
+**目录 BACKUP 的安全检查（remove 与 upgrade 共用同一实现
+`detail::backup_dir_tree_whole`，见 `pkg/install_common.{hpp,cpp}`）**：
+rename 整个目录之前，确认目录此刻已是"**纯本包残留**"——其**每个直接子项**的文件名
+都带本包的 `.lpkg_bak_<pkg>_` 标记（本包废弃文件 rename 成的 bak，或更深、已先被
+整树 rename 的本包目录 bak）。**任何非本包残留**的直接子项都会让整棵树保留：
+  - 其他包的文件、保留的 conffile（移除时只摘所有权、不删文件）
+  - lpkg 自身的状态目录（`usr/share/lpkg/docs` 等，非包所有但绝不可删）
+  - 任何**无主**文件/目录（不属于任何包的东西一律不删）
+**嵌套层数靠调用方"最深优先"处理获得**：子目录先被整树 rename 成 bak，父目录的
+直接子项此时就只剩 bak，检查通过即可整树删——**不要**递归下探去删"无主/空壳"内容。
+（曾误用"子树里没有其他包登记内容即可删"的递归规则：会把共享祖先下、包只作普通
+目录持有者的 `usr/share/lpkg/docs` 等 lpkg 自身状态目录一起删掉，`make test` 多处
+回归。宁可在叶目录里留一个无主空壳，也绝不碰不属于本包的东西。）
+若遇到"单层 `is_empty` + 有内容就跳过"的目录删除点，立刻改成**最深优先逐目录整树
+`rename` 到单个 `.lpkg_bak`**——那是 remove 的既有算法（`do_remove_package`）。它之
+前删不掉**升级**遗留的嵌套 owned 目录，是因为升级旧文件移除那段把目录删除混进了
+文件循环 + 单层判空（新目录的文件先 rename 成 bak 占着目录，判"非空"被跳过），
+**不是检查本身错**。
+
+**升级（旧版本废弃文件移除）的目录删除 = remove 的同一算法（最深的统一）**：
+升级时新版不再包含的旧文件（含符号链接）先逐个 rename 成 `.lpkg_bak`（`REMOVE_OLD`
+WAL），随后旧目录走**独立阶段、最深优先**，逐目录调同一
+`detail::backup_dir_tree_whole(dir, pkg, "REMOVE_OLD", backups)` 整树 rename 成单个
+`.lpkg_bak`（WAL `REMOVE_OLD`，reverse_execute 与 BACKUP 同路径恢复）。嵌套第 2 层
+owned 目录（如 `dist-info/licenses/`）因子目录先被 rename 成 bak、父目录直接子项只剩
+bak 而被逐层清光，不再残留空壳。
 
 ### 3.7 DBRM 操作
 
@@ -667,11 +692,12 @@ do_remove_package(pkg_name, force)
 ├── remove_package_files()               ← 从 DB 移除文件记录
 │
 ├── 目录 BACKUP（取代旧 RM_DIR）
-│   for each dir（逆序，仅最后持有者）:
-│     安全检查：目录中只能有本包的 .bak
-│     if 安全:
+│   for each dir（最深优先，仅最后持有者）:
+│     安全检查（§3.6，共享 detail::backup_dir_tree_whole）：目录须是"纯本包残留"
+│     （每个直接子项都是本包 .lpkg_bak）；含任何非本包残留 → 整树保留
+│     if 可删:
 │       WAL: BACKUP <dir> → <dir.lpkg_bak>  ← fsync
-│       rename dir → .lpkg_bak
+│       rename 整目录 → .lpkg_bak
 │       fsync 父目录
 │
 ├── 清理 dep/needed_so/man/hooks

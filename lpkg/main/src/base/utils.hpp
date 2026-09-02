@@ -96,6 +96,14 @@ void write_string_to_file(const std::filesystem::path& path, std::string_view co
 void cleanup_tmp_dirs();
 
 /**
+ * 回收孤儿备份 stash（TODO.md §5）：删除各文件系统根下、pid 已死的
+ * `.lpkg_bak_<pkg>_<pid>` 目录（崩溃/续传未覆盖的残留）。范围：root_dir 顶层 +
+ * 顶层子目录中 st_dev 与 root_dir 不同（= 子挂载点）的直接子目录，扫描有界；
+ * 只认"存活进程已消失"（kill(pid,0) 返回 ESRCH）的，绝不碰正在运行/自 pid 的 stash。
+ */
+void cleanup_orphan_stashes();
+
+/**
  * fsync 目标文件所在父目录，确保 rename 后的 dentry 落盘。
  *
  * rename(2) 在同文件系统内是原子的，但如果父目录的 dentry 未落盘，
@@ -120,14 +128,8 @@ void safe_rename(const std::filesystem::path& from, const std::filesystem::path&
 
 // ============ 包路径 / 备份路径工具 ============
 
-/** 生成随机小写字母+数字后缀（用于 .lpkg_bak 防冲突） */
+/** 生成随机小写字母+数字后缀（用于 .lpkg_bak / stash 文件名防冲突） */
 std::string random_suffix(size_t len = constants::RANDOM_SUFFIX_LEN);
-
-/**
- * 生成不冲突的 .lpkg_bak 路径（随机后缀，最多尝试 UNIQUE_BAK_MAX_ATTEMPTS 次）。
- * 冲突超过上限时抛异常，避免无限循环。
- */
-std::filesystem::path unique_bak_path(const std::filesystem::path& phys, const std::string& pkg);
 
 // ============ 字符串工具 ============
 

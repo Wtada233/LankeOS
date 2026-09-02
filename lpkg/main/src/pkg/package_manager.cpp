@@ -46,16 +46,16 @@ extern std::atomic<bool> sigint_graceful;
 // =====================================================================
 
 /**
- * 清理一批 .lpkg_bak 文件/目录（CLEANUP 阶段，不可回滚）。
+ * 清理一批 stash 目录（CLEANUP 阶段，不可回滚）。TODO：备份现存放于每文件系统的
+ * 隔离 stash（<fsroot>/.lpkg_bak_<pkg>_<pid>），清理 = 对每个 stash 根 remove_all。
  *
- * **write-ahead 顺序：先写 CLEANUP WAL 行，再物理删除。**
- * 原实现是"先删后记"：若在删除后、日志写入前崩溃，且批次中尚无任何 CLEANUP 行，
- * 恢复走 reverse_execute → DB 恢复到 pkg:installed 但 .bak 已删 → 磁盘与 DB 不一致。
- * 改为先记日志后：
+ * **write-ahead 顺序：先写 CLEANUP WAL 行（一行 = 一个 stash 根），再物理删除。**
+ * 崩溃语义与旧 cleanup_baks 相同：
  *   - 崩溃在"日志后、删除前"→ 恢复看到 CLEANUP → continue_cleanup 续删 → 一致
  *   - 崩溃在"删除后、下一条日志前"→ 已有 CLEANUP 行 → continue_cleanup 续删 → 一致
  *   - 崩溃在首条 CLEANUP 前 → 无 CLEANUP 行 → reverse_execute 整体恢复 → 一致
- * 删除失败仅告警（残留 .bak 由下次 rec/cleanup 续删），不中断事务。
+ * stash 是隔离根（只装本批次的备份），remove_all 不会碰到任何活文件/其他包内容，
+ * 因此不再需要"逐 bak 递归删除/按路径长度排序/symlink 守卫"。
  *
  * **调用时机**：
  *   - remove：批次内（COMMIT_PKGS 前，RM_COMMIT 后）。
@@ -63,52 +63,27 @@ extern std::atomic<bool> sigint_graceful;
  *     此时写出的 CLEANUP 行位于事务之外（trailing 记录），由 trim_completed 保留
  *     （清理未完成时）+ recover_packages 续传，完成后随下一次 trim 一并清掉。
  */
-void cleanup_baks(std::vector<std::pair<fs::path, fs::path>>& backups)
+void cleanup_stashes(std::vector<fs::path>& stashes)
 {
-    if (backups.empty()) return;
+    if (stashes.empty()) return;
 
-    std::vector<fs::path> cleanup_paths;
-    for (const auto& [orig, bak] : backups) cleanup_paths.push_back(bak);
+    std::vector<fs::path> paths;
+    for (auto& s : stashes) paths.push_back(std::move(s));
+    std::ranges::sort(paths);
+    auto last = std::unique(paths.begin(), paths.end());
+    paths.erase(last, paths.end());
 
-    // 最深层优先（文件先于目录，子目录先于父目录）
-    std::ranges::sort(cleanup_paths, [](const fs::path& a, const fs::path& b) {
-        return a.string().size() > b.string().size();
-    });
-    auto last = std::unique(cleanup_paths.begin(), cleanup_paths.end());
-    cleanup_paths.erase(last, cleanup_paths.end());
-
-    for (const auto& p : cleanup_paths) {
+    for (const auto& p : paths) {
         if (!fs::exists(p) && !fs::is_symlink(p)) continue;
 
         // write-ahead：先记日志再删除（见函数注释）
         wal::log_wal_line("CLEANUP " + p.string());
 
         // 断点：CLEANUP 日志写入后、物理删除前 —— 测试 write-ahead 崩溃窗口
-        // （此刻 .bak 仍在磁盘，异常/崩溃可由 batch_rollback/rec 完整恢复）
+        // （此刻 stash 仍在磁盘，异常/崩溃可由 batch_rollback/rec 完整恢复）
         BreakpointManager::instance().hit("cleanup_after_wal");
 
-        std::error_code ec2;
-        bool ok = true;
-        // 注意：fs::is_directory 会跟随符号链接。备份的 .lpkg_bak 若本身是符号链接
-        // （如 filesystem 包的 /usr/lib64 → lib 被 rename 成 .lpkg_bak），跟随它判断
-        // 成目录会递归删除其指向的目录（/usr/lib 全树被删）。symlink 必须只删自身。
-        if (fs::is_directory(p) && !fs::is_symlink(p)) {
-            // 从里到外删除目录内容
-            std::vector<fs::path> entries;
-            for (const auto& entry : fs::recursive_directory_iterator(p, ec2))
-                if (!ec2) entries.push_back(entry.path());
-            if (!ec2) {
-                std::ranges::reverse(entries);
-                for (const auto& e : entries) {
-                    if (!fs::remove(e, ec2)) ok = false;
-                }
-            }
-            if (!fs::remove(p, ec2)) ok = false;
-        } else {
-            if (!fs::remove(p, ec2)) ok = false;
-        }
-
-        if (!ok) log_warning(string_format("warning.cleanup_failed", p.string()));
+        detail::remove_stash_dir(p);  // 隔离根 remove_all（失败仅告警语义在上层？此处静默）
     }
 }
 
@@ -221,7 +196,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     ctx.installed_set.clear();
 
     // 执行安装（WAL 2.0 批量事务）
-    std::vector<std::pair<fs::path, fs::path>> all_backups;
+    std::vector<fs::path> all_stashes;
     run_batch_transaction([&](std::vector<std::string>& success) {
         auto& cache = Cache::instance();
 
@@ -287,8 +262,8 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
                                   p.sha256, p.force_reinstall);
             task.run(&ctx);
 
-            // 收集 .lpkg_bak 路径供批次成功后统一清理（升级/重装时产生）
-            for (const auto& b : task.get_backups()) all_backups.emplace_back(b);
+            // 收集备份 stash 供批次成功后统一清理（升级/重装时产生）
+            for (const auto& s : task.get_stashes()) all_stashes.emplace_back(s);
 
             cache.write(p.name + ":installed");
             success.push_back(p.name);
@@ -296,11 +271,11 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
         }
     });
 
-    // 清理批次产生的 .lpkg_bak 文件（post-commit：写 CLEANUP WAL，崩溃可续传）。
-    // 清理失败（磁盘满等）不视为安装失败——批次已提交、DB 一致，残留 bak 的
+    // 清理批次产生的备份 stash（post-commit：写 CLEANUP WAL，崩溃可续传）。
+    // 清理失败（磁盘满等）不视为安装失败——批次已提交、DB 一致，残留 stash 的
     // CLEANUP 记录留在 WAL，由下次 recover 续传。
     try {
-        cleanup_baks(all_backups);
+        cleanup_stashes(all_stashes);
     } catch (const std::exception& e) {
         log_warning(string_format("warning.cleanup_deferred", e.what()));
     }
@@ -321,11 +296,12 @@ namespace
  * remove_package 与 remove_package_recursive 共用此实现（原先是两处近乎逐字
  * 重复的移除逻辑，去重后差异只剩"单包 vs 多包"与是否做共享文件检查）。
  *
- * 文件备份（BACKUP + rename 到 .lpkg_bak）产出进入 backups，由调用方在合适时机
- * 统一走 cleanup_baks() 清理（CLEANUP 阶段，事务内、COMMIT_PKGS 前）。
+ * 文件备份（BACKUP + rename 到每文件系统 stash）产出进入 stashes；目录删除走
+ * DIR_RM（rmdir + 元数据记录，不再整目录实体备份）。stashes 由调用方在合适时机
+ * 统一走 cleanup_stashes() 清理（CLEANUP 阶段，事务内、COMMIT_PKGS 前）。
  */
 void do_remove_package(const std::string& pkg_name, bool force, const std::string& ver,
-                       std::vector<std::pair<fs::path, fs::path>>& backups)
+                       std::vector<fs::path>& stashes)
 {
     auto& cache = Cache::instance();
 
@@ -335,8 +311,6 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
 
     // WAL: RM_BEGIN
     wal::log_wal_line("RM_BEGIN " + pkg_name + " " + ver);
-
-    std::error_code ec;
 
     auto owned_entries = cache.get_package_files(pkg_name);
 
@@ -363,31 +337,23 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
         }
     }
 
-    // 备份阶段
+    // 阶段 A：owned 文件（含符号链接）→ rename 进每文件系统 stash（BACKUP WAL）。
+    //   /etc conffile 默认只摘所有权、不删文件；force 下与普通文件一样搬走（旧语义不变）。
     int file_count = 0;
-    if (!owned_entries.empty()) {
-        std::vector<fs::path> paths;
-        for (const auto& e : owned_entries) paths.emplace_back(e);
-        std::ranges::sort(paths, std::greater<>{});
+    for (const auto& path_str : owned_entries) {
+        if (path_str.ends_with('/')) continue;  // 目录 → 阶段 B
+        if (!force && path_str.starts_with(std::string(constants::DIR_ETC_PREFIX))) continue;
+        const fs::path phys = Config::instance().root_dir() / fs::path(path_str).relative_path();
 
-        for (const auto& p : paths) {
-            std::string path_str = p.string();
-            if (path_str.ends_with('/')) continue;
-            if (!force && path_str.starts_with(constants::DIR_ETC_PREFIX)) continue;
-            const fs::path phys = p.is_absolute()
-                                      ? Config::instance().root_dir() / fs::path(p).relative_path()
-                                      : Config::instance().root_dir() / p;
+        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
-            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-            if (fs::exists(phys) || fs::is_symlink(phys)) {
-                fs::path bak = unique_bak_path(phys, pkg_name);
-                wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
-                BreakpointManager::instance().hit("rm_backup_after_wal_" + pkg_name);
-                safe_rename(phys, bak);
-                backups.emplace_back(phys, bak);
-                ++file_count;
-            }
+        if (fs::exists(phys) || fs::is_symlink(phys)) {
+            fs::path bak = detail::stash_bak_target(phys, pkg_name);
+            wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
+            BreakpointManager::instance().hit("rm_backup_after_wal_" + pkg_name);
+            safe_rename(phys, bak);
+            stashes.emplace_back(bak.parent_path());
+            ++file_count;
         }
     }
 
@@ -402,7 +368,9 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
 
     if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
-    // 目录处理：BACKUP 目录（仅最后持有者 + 安全检查）
+    // 阶段 B：owned 目录（最深优先，仅最后持有者）→ 空则 DIR_RM（rmdir + 元数据记录）。
+    //   文件已全部搬进 stash，目录此刻只剩"无主内容"才会非空 → 非空即保留（安全边界：
+    //   无主文件/状态目录/conffile/其他包内容一律不碰）。
     {
         std::vector<fs::path> dir_paths;
         for (const auto& e : owned_entries)
@@ -416,25 +384,10 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
             const fs::path phys = p.is_absolute()
                                       ? Config::instance().root_dir() / p.relative_path()
                                       : Config::instance().root_dir() / p;
-            if (!fs::exists(phys) || !fs::is_directory(phys)) continue;
-
-            // 安全检查：目录中只能有本包的 .lpkg_bak 文件
-            bool can_backup = true;
-            std::error_code ec2;
-            for (const auto& entry : fs::directory_iterator(phys, ec2)) {
-                auto fname = entry.path().filename().string();
-                if (fname.find(std::string(constants::SUFFIX_LPKG_BAK) + pkg_name + "_") !=
-                    std::string::npos)
-                    continue;
-                can_backup = false;
-                break;
-            }
-            if (!can_backup) continue;
-
-            fs::path bak = unique_bak_path(phys, pkg_name);
-            wal::log_wal_line("BACKUP " + phys.string() + " \xe2\x86\x92 " + bak.string());
-            safe_rename(phys, bak);
-            backups.emplace_back(phys, bak);
+            std::error_code ec;
+            if (!fs::is_directory(phys, ec) || fs::is_symlink(phys)) continue;
+            if (!fs::is_empty(phys, ec)) continue;  // 含无主内容 → 整树保留
+            detail::remove_empty_dir_with_meta(phys);
         }
     }
 
@@ -476,6 +429,7 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
     cleanup_with_dbr(
         Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), "man");
 
+    std::error_code ec;
     fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
     cache.remove_installed(pkg_name);
 
@@ -531,11 +485,11 @@ void remove_package(const std::string& pkg_name, bool force, bool /*wrap_in_txn*
 
     // WAL 2.0 批量事务：单个包移除 = 一批一包
     run_batch_transaction([&](std::vector<std::string>& success) {
-        std::vector<std::pair<fs::path, fs::path>> backups;
-        do_remove_package(pkg_name, force, ver, backups);
+        std::vector<fs::path> stashes;
+        do_remove_package(pkg_name, force, ver, stashes);
 
         // ── CLEANUP 阶段（事务内、COMMIT_PKGS 前；write-ahead：先记日志再删）──
-        cleanup_baks(backups);
+        cleanup_stashes(stashes);
 
         success.push_back(pkg_name);
     });
@@ -576,38 +530,12 @@ void remove_package_files(const std::string& pkg_name, bool force)
         }
     }
 
-    std::vector<fs::path> paths;
-    for (const auto& e : owned_entries) paths.emplace_back(e);
-    std::ranges::sort(paths, std::greater<>{});
-
-    int file_count = 0;
-    for (const auto& p : paths) {
+    // 文件本体已在 do_remove_package 阶段 A 搬进 stash（/etc conffile 只摘所有权），
+    // 此处只做 DB 收尾：清文件归属 + 清 provides。目录归属由阶段 B 的目录循环清。
+    for (const auto& path_str : owned_entries) {
         if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-        std::string path_str = p.string();
-        const fs::path phys = p.is_absolute()
-                                  ? Config::instance().root_dir() / fs::path(p).relative_path()
-                                  : Config::instance().root_dir() / p;
-
-        if (path_str.ends_with('/')) {
-            continue;
-        }
-        if (!force && path_str.starts_with(constants::DIR_ETC_PREFIX)) {
-            cache.remove_file_owner(path_str, pkg_name);
-            continue;
-        }
-        {
-            if (fs::exists(phys) || fs::is_symlink(phys)) {
-                std::error_code ec;
-                fs::remove(phys, ec);
-                if (!ec) ++file_count;
-            }
-            cache.remove_file_owner(path_str, pkg_name);
-        }
-    }
-
-    if (file_count > 0) {
-        log_info(string_format("info.files_removed", file_count));
+        if (path_str.ends_with('/')) continue;
+        cache.remove_file_owner(path_str, pkg_name);
     }
 
     for (const auto& cap : cache.get_package_provides(pkg_name)) {
@@ -747,7 +675,7 @@ void upgrade_packages()
     ctx.successfully_installed.clear();
     ctx.installed_set.clear();
 
-    std::vector<std::pair<fs::path, fs::path>> upgrade_backups;
+    std::vector<fs::path> upgrade_stashes;
     size_t upgraded_count = 0;
     run_batch_transaction([&](std::vector<std::string>& success) {
         auto& cache = Cache::instance();
@@ -831,7 +759,7 @@ void upgrade_packages()
                                   p.sha256, p.force_reinstall);
             task.run(&ctx);
 
-            for (const auto& b : task.get_backups()) upgrade_backups.emplace_back(b);
+            for (const auto& s : task.get_stashes()) upgrade_stashes.emplace_back(s);
 
             cache.write(n + ":installed");
             success.push_back(n);
@@ -840,10 +768,10 @@ void upgrade_packages()
         }
     });
 
-    // 清理批次产生的 .lpkg_bak 文件（post-commit：写 CLEANUP WAL，崩溃可续传）。
-    // 清理失败不视为升级失败——批次已提交、DB 一致，残留 bak 由下次 recover 续传。
+    // 清理批次产生的备份 stash（post-commit：写 CLEANUP WAL，崩溃可续传）。
+    // 清理失败不视为升级失败——批次已提交、DB 一致，残留 stash 由下次 recover 续传。
     try {
-        cleanup_baks(upgrade_backups);
+        cleanup_stashes(upgrade_stashes);
     } catch (const std::exception& e) {
         log_warning(string_format("warning.cleanup_deferred", e.what()));
     }
@@ -1153,10 +1081,10 @@ void remove_package_recursive(const std::string& pkg_name, bool force)
     }
 
     // WAL 2.0: 整批原子移除
-    // 目录通过 BACKUP WAL 原子化移除，.lpkg_bak 通过 CLEANUP WAL 在事务内清理
+    // 文件备份进 stash、目录 DIR_RM，stash 通过 CLEANUP WAL 在事务内清理
     run_batch_transaction([&](std::vector<std::string>& success) {
         auto& cache = Cache::instance();
-        std::vector<std::pair<fs::path, fs::path>> all_backups;
+        std::vector<fs::path> all_stashes;
 
         for (const auto& p : to_remove) {
             log_info(string_format("info.recursive_removing", p));
@@ -1164,12 +1092,12 @@ void remove_package_recursive(const std::string& pkg_name, bool force)
             if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
             std::string ver = cache.get_installed_version(p);
-            do_remove_package(p, true, ver, all_backups);
+            do_remove_package(p, true, ver, all_stashes);
             success.push_back(p);
         }
 
         // ── CLEANUP 阶段（事务内、COMMIT_PKGS 前；write-ahead：先记日志再删）──
-        cleanup_baks(all_backups);
+        cleanup_stashes(all_stashes);
     });
 
     trim_completed();

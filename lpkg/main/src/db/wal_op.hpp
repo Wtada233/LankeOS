@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -56,6 +57,7 @@ enum class WALOpType {
     NEW_DIR,     // NEW_DIR <path>
     COPY,        // COPY <src> → <dst>
     REMOVE_OLD,  // REMOVE_OLD <src> → <dst>
+    DIR_RM,      // DIR_RM <path> <mode> <uid> <gid>  (删除空目录；回滚按元数据重建)
 
     // 移除操作
     RM_BEGIN,   // RM_BEGIN <pkg> <ver>
@@ -137,6 +139,7 @@ WALOp parse_op(const std::string& line);
 struct RollbackStats {
     int files_restored = 0;
     int files_cleaned = 0;
+    int dirs_recreated = 0;
     int db_restored = 0;
 };
 
@@ -196,6 +199,25 @@ void batch_rollback(const std::vector<std::string>& successfully_installed);
  * （recover_packages）与正常异常路径（run_batch_transaction catch）共用本函数。
  */
 void continue_cleanup(const std::vector<WALOp>& ops);
+
+/**
+ * 备份目标 → 其所在 stash 根：父目录名以 `.lpkg_bak_` 开头（= stash 目录）则取父目录，
+ * 否则原样返回（兼容非 stash 的兜底路径）。recover 续传与 purge 统一走这里，避免各自
+ * 再写一遍"父目录即 stash"的判定。
+ */
+std::filesystem::path stash_root_of_bak(const std::filesystem::path& bak);
+
+// ============================================================================
+// stash 收尸（TODO：备份移到每文件系统隔离 stash 后）
+// ============================================================================
+
+/**
+ * 清理"已全部还原消费"的 stash 目录。reverse_execute 把每个 BACKUP/REMOVE_OLD 的
+ * 文件从 stash 还原后，stash 应已空；本函数把 ops 中所有指向 stash（父目录名为
+ * `.lpkg_bak_*`）的备份目标父目录 remove_all 掉，避免空 stash 残留。
+ * 只应在完整 reverse（未抛异常）后调用——若还有未还原的 bak 在里面绝不能删。
+ */
+void purge_consumed_stashes(const std::vector<WALOp>& ops);
 
 // ============================================================================
 // WAL 保护的原始文本文件写入

@@ -60,10 +60,10 @@ public:
     // --- 测试用（公开） ---
     void copy_package_files();
     void rollback_files();  ///< 包级文件回滚（含 RESTORE_* WAL 审计）
-    /// 获取备份列表（供批次成功后清理 .lpkg_bak）
-    const std::vector<std::pair<std::filesystem::path, std::filesystem::path>>& get_backups() const
+    /// 获取备份 stash 目录列表（供批次成功后 remove_all 清理）
+    const std::vector<std::filesystem::path>& get_stashes() const
     {
-        return backups_;
+        return stashes_;
     }
 
     // 元数据验证调用者的访问器
@@ -121,7 +121,7 @@ private:
     std::vector<DependencyInfo> parse_deps() const;
 
     // 事务状态（仅供文件级备份/清理使用，不含事务保护语义）
-    std::vector<std::pair<std::filesystem::path, std::filesystem::path>> backups_;
+    std::vector<std::filesystem::path> stashes_;  // 本次产生的备份 stash 目录（提交后清理）
     std::vector<std::filesystem::path> new_files_;
     std::vector<std::filesystem::path> new_dirs_;
 };

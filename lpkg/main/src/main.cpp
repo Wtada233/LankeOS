@@ -368,6 +368,8 @@ int main(int argc, char* argv[])
             // WAL 2.0: 先从未完成事务中恢复，再清理已完成批次
             recover_packages();
             trim_completed();
+            // 兜底回收孤儿备份 stash（pid 已死才删）
+            cleanup_orphan_stashes();
         }
 
         // 安装/移除/升级等写操作启用 SIGINT 防护

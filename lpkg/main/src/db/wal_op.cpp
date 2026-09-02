@@ -2,11 +2,13 @@
 
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
 #include <map>
+#include <set>
 #include <sstream>
 
 #include "base/constants.hpp"
@@ -37,6 +39,7 @@ static constexpr std::pair<std::string_view, WALOpType> TYPE_MAP[] = {
     {"NEW_DIR", WALOpType::NEW_DIR},
     {"COPY", WALOpType::COPY},
     {"REMOVE_OLD", WALOpType::REMOVE_OLD},
+    {"DIR_RM", WALOpType::DIR_RM},
     {"RM_BEGIN", WALOpType::RM_BEGIN},
     {"RM_COMMIT", WALOpType::RM_COMMIT},
     {"RM_END", WALOpType::RM_END},
@@ -230,6 +233,37 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
                     }
                 }
                 // bak 不存在 → 已被消费，跳过（幂等）
+                break;
+            }
+
+            // ── DIR_RM（删除空目录；回滚按元数据重建）───────────────────────
+            case WALOpType::DIR_RM: {
+                // arg1 = 目录路径, arg2 = mode(十进制), arg3 = uid, arg4 = gid
+                fs::path p = op.arg1;
+                if (p.empty()) break;
+                std::error_code ec;
+                if (!(fs::exists(p, ec) || fs::is_symlink(p))) {
+                    fs::create_directories(p, ec);  // 逆序保证父目录已重建
+                }
+                if (!ec && fs::is_directory(p) && !fs::is_symlink(p)) {
+                    uid_t uid = static_cast<uid_t>(-1);
+                    gid_t gid = static_cast<gid_t>(-1);
+                    mode_t mode = static_cast<mode_t>(-1);
+                    try {
+                        if (!op.arg2.empty())
+                            mode = static_cast<mode_t>(std::stoul(op.arg2)) & 07777;
+                        if (!op.arg3.empty()) uid = static_cast<uid_t>(std::stoul(op.arg3));
+                        if (!op.arg4.empty()) gid = static_cast<gid_t>(std::stoul(op.arg4));
+                    } catch (const std::exception&) {
+                    }
+                    if (uid != static_cast<uid_t>(-1) && gid != static_cast<gid_t>(-1))
+                        (void)::lchown(p.c_str(), uid, gid);
+                    if (mode != static_cast<mode_t>(-1)) (void)::chmod(p.c_str(), mode);
+                    stats.dirs_recreated++;
+                    if (write_audit) {
+                        wal_append_raw("RESTORE_DIR " + p.string());
+                    }
+                }
                 break;
             }
 
@@ -455,6 +489,29 @@ void write_string_file_wal(const std::string& path, const std::string& content,
     fsync_parent_dir(p);
 }
 
+fs::path stash_root_of_bak(const fs::path& bak)
+{
+    const fs::path par = bak.parent_path();
+    return par.filename().string().rfind(".lpkg_bak_", 0) == 0 ? par : bak;
+}
+
+void purge_consumed_stashes(const std::vector<WALOp>& ops)
+{
+    // stash 目录 = 每个备份目标(dst) 的 stash 根（统一 stash_root_of_bak 判定）
+    std::set<fs::path> stashes;
+    for (const auto& op : ops) {
+        if ((op.type == WALOpType::BACKUP || op.type == WALOpType::REMOVE_OLD) &&
+            !op.arg2.empty()) {
+            stashes.insert(stash_root_of_bak(op.arg2));
+        }
+    }
+    for (const auto& s : stashes) {
+        std::error_code ec;
+        fs::remove_all(s, ec);  // reverse 已完成 → stash 已还原干净，只剩空壳/已删
+        if (ec) log_warning(string_format("warning.cleanup_failed", s.string()));
+    }
+}
+
 // ============================================================================
 // 批次回滚
 // ============================================================================
@@ -473,6 +530,10 @@ void batch_rollback(const std::vector<std::string>& successfully_installed)
 
     // 2. 逆向执行操作
     reverse_execute(ops, true);
+
+    // 2.5 stash 收尸：reverse 已把每个文件从 stash 还原，清掉空 stash（绝不能在
+    //     reverse 完成前删——残留的 bak 是"还没还原"的数据）
+    purge_consumed_stashes(ops);
 
     // 3. 重载 Cache（从磁盘恢复的 DB 文件）
     cache.load();

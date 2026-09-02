@@ -2,6 +2,7 @@
 
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -409,25 +410,6 @@ std::string random_suffix(size_t len)
     return s;
 }
 
-/**
- * 生成不冲突的 .lpkg_bak 路径。随机后缀空间 36^6 足够大，正常不会冲突；
- * 若超过 UNIQUE_BAK_MAX_ATTEMPTS 次仍冲突（几乎不可能），抛异常而非无限循环。
- */
-std::filesystem::path unique_bak_path(const std::filesystem::path& phys, const std::string& pkg)
-{
-    // 去除尾部 '/'，防止 operator+= 追加到文件名中间（目录路径导致）
-    std::string clean_str = phys.string();
-    while (clean_str.size() > 1 && clean_str.back() == '/') clean_str.pop_back();
-    const fs::path clean(clean_str);
-
-    for (int attempt = 0; attempt < constants::UNIQUE_BAK_MAX_ATTEMPTS; ++attempt) {
-        fs::path bak = clean;
-        bak += std::string(constants::SUFFIX_LPKG_BAK) + pkg + "_" + random_suffix();
-        if (!fs::exists(bak)) return bak;
-    }
-    throw LpkgException(string_format("error.bak_collision", phys.string(), pkg));
-}
-
 // ============================================================================
 // overlayfs 安全重命名
 // ============================================================================
@@ -492,6 +474,63 @@ void cleanup_tmp_dirs()
             log_warning(string_format("warning.cleanup_old_tmp_failed", entry.path().string()) +
                         ": " + e.what());
         }
+    }
+}
+
+/**
+ * 回收孤儿备份 stash（TODO.md §5）：崩溃/续传没清掉的
+ * `<fsroot>/.lpkg_bak_<pkg>_<pid>`。扫描范围有界：root_dir 顶层 + 顶层子目录里
+ * st_dev 与 root_dir 不同的（= 子挂载点）的直接子目录。pid 已死（kill ESRCH）才删，
+ * 绝不碰自己/存活进程的 stash。stash 正常由 CLEANUP 清除，本函数只是兜底安全网。
+ */
+void cleanup_orphan_stashes()
+{
+    const fs::path root = Config::instance().root_dir();
+    std::error_code ec;
+    if (!fs::is_directory(root, ec)) return;
+    ec.clear();
+    struct stat root_st{};
+    if (::lstat(root.c_str(), &root_st) != 0) return;
+
+    auto reap_dir = [&](const fs::path& d) {
+        for (auto it = fs::directory_iterator(d, ec); it != fs::directory_iterator{};
+             it.increment(ec)) {
+            if (ec) {
+                ec.clear();
+                break;
+            }
+            const fs::path p = it->path();
+            const std::string name = p.filename().string();
+            if (name.rfind(".lpkg_bak_", 0) != 0) continue;
+            if (!it->is_directory() || fs::is_symlink(p)) continue;
+            const auto sep = name.rfind('_');
+            if (sep == std::string::npos || sep + 1 >= name.size()) continue;
+            int pid = 0;
+            try {
+                pid = std::stoi(name.substr(sep + 1));
+            } catch (...) {
+                continue;
+            }
+            if (pid <= 0 || pid == ::getpid()) continue;
+            if (::kill(pid, 0) != 0 && errno == ESRCH) {
+                std::error_code ec2;
+                fs::remove_all(p, ec2);
+            }
+        }
+    };
+
+    reap_dir(root);
+    for (auto it = fs::directory_iterator(root, ec); it != fs::directory_iterator{};
+         it.increment(ec)) {
+        if (ec) {
+            ec.clear();
+            break;
+        }
+        const fs::path p = it->path();
+        if (fs::is_symlink(p) || !it->is_directory()) continue;
+        struct stat st{};
+        if (::lstat(p.c_str(), &st) != 0) continue;
+        if (st.st_dev != root_st.st_dev) reap_dir(p);  // 顶层子挂载点根
     }
 }
 

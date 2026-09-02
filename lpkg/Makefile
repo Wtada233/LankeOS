@@ -25,7 +25,7 @@ PKGS_LIST = $(PKGS)
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 6.1.0
+VERSION ?= 6.2.0
 
 BUILD_DIR = build
 MAIN_DIR = main

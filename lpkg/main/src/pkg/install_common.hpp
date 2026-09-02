@@ -5,7 +5,9 @@
 #include <set>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "archive.hpp"
@@ -55,5 +57,42 @@ void resolve_with_solver(InstallContext& ctx);
 
 /// 从已持有的包开始 BFS 遍历依赖图，获取所有必需的包（供 autoremove）
 std::unordered_set<std::string> get_all_required_packages();
+
+// ============================================================================
+// 目录整树删除（remove 与 upgrade 共用，见 ARCH.md §3.6）
+// ============================================================================
+
+// ============================================================================
+// 每文件系统 sidecar stash + 目录元数据化删除（TODO.md 第 2 节）
+// ============================================================================
+
+/**
+ * phys 所在文件系统的"顶层同设备祖先"（= 可安全放 stash 的目录）。沿 phys 所在目录
+ * 向上走到 `st_dev` 变化处（设备/挂载边界）或 `Config::root_dir()` 边界为止，
+ * **恒 clamp 在 root_dir() 内**（chroot 运行）。stash 放这里保证与 phys 同设备
+ * → rename(2) 永不 EXDEV、永不逃出 chroot。多设备时每个文件系统各自一个 stash 根。
+ */
+std::filesystem::path stash_parent_dir(const std::filesystem::path& phys);
+
+/// 返回并确保 phys 的 stash 目录：`<stash_parent_dir(phys)>/.lpkg_bak_<pkg>_<pid>`，
+/// mode 0700、root-only（备份残留隔离，不被普通工具/扫描看到）。
+std::filesystem::path ensure_stash_dir(const std::filesystem::path& phys, std::string_view pkg);
+
+/**
+ * 在 phys 的 stash 内分配一个唯一 bak 目标（不移动、不写 WAL）。备份文件扁平存放：
+ * `<stash>/<原名>.lpkg_bak_<pkg>_<rand>`；同 basename 由随机后缀保证唯一，
+ * 还原路径靠调用方写的 BACKUP/REMOVE_OLD WAL 记录映射。
+ */
+std::filesystem::path stash_bak_target(const std::filesystem::path& phys, std::string_view pkg);
+
+/// 删除一个 stash 目录（整体 remove_all）。
+void remove_stash_dir(const std::filesystem::path& stash);
+
+/**
+ * 删除一个空目录并记录元数据供回滚重建。write-ahead：先写
+ * `DIR_RM <path> <mode> <uid> <gid>` 再 `rmdir`。前置：phys 是真实空目录（非 symlink）；
+ * 非空目录（含无主内容/状态目录/conffile/其他包文件）绝不能走到这里。
+ */
+void remove_empty_dir_with_meta(const std::filesystem::path& phys);
 
 }  // namespace detail

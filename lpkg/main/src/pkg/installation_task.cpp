@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <random>
@@ -33,6 +34,20 @@ extern std::atomic<bool> sigint_graceful;
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+
+namespace
+{
+/**
+ * 升级/移除的目录清理追踪。设 LPKG_TRACE_REMOVE=1 时逐条打印废弃文件/目录的决策与
+ * 底层操作（与 strace 的 unlink/rmdir/rename 对照，定位"哪些目录没被删、为什么"）。
+ * 默认静默，不引入日志噪音。
+ */
+void trace_remove(const std::string& msg)
+{
+    if (const char* v = std::getenv("LPKG_TRACE_REMOVE"); v && std::string_view(v) == "1")
+        fprintf(stderr, "[lpkg-remove-trace] %s\n", msg.c_str());
+}
+}  // namespace
 
 // ===== InstallationTask 实现 =====
 
@@ -137,7 +152,13 @@ void InstallationTask::commit_without_file_ops()
 
     register_package();
 
-    // 移除新版本中不再包含的旧文件
+    // 移除新版本中不再包含的旧文件/目录（REMOVE_OLD / DIR_RM，原子、可回滚）。
+    //
+    // **备份进 stash（TODO.md）后目录删除天然成立**：旧文件搬到每文件系统 stash（不在
+    // 原目录里占位），旧目录随即**为空** → 最深优先逐个 `rmdir` + `DIR_RM`（元数据记录），
+    // 不再需要整目录实体备份，也不会再有"刚 rename 的 bak 占着目录 → 单层判空失败 →
+    // 嵌套第 2 层空壳（dist-info/licenses/）残留"的历史缺陷。
+    // 目录非空（含无主内容/状态目录/conffile/其他包文件）→ 保留，绝不误删不属于本包的东西。
     if (!old_files.empty()) {
         const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
         auto new_files = detail::scan_content_files(content_dir);
@@ -145,40 +166,65 @@ void InstallationTask::commit_without_file_ops()
         for (const auto& f : new_files) new_set.insert((fs::path("/") / f).string());
 
         auto& cache = Cache::instance();
+        const fs::path root = Config::instance().root_dir();
+        const auto to_phys = [&](const std::string& logical) -> fs::path {
+            return fs::path(logical).is_absolute() ? root / fs::path(logical).relative_path()
+                                                   : root / logical;
+        };
+
+        // ── 阶段 1：废弃的普通文件（含符号链接）→ rename 进 stash（REMOVE_OLD）──
         for (const auto& old_file : old_files) {
+            if (old_file.ends_with('/')) continue;  // 目录 → 阶段 2
             if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) {
                 if (!new_set.contains(old_file)) cache.remove_file_owner(old_file, pkg_name_);
                 continue;
             }
-            if (!new_set.contains(old_file)) {
-                auto owners = cache.get_file_owners(old_file);
-                if (owners.contains(pkg_name_)) {
-                    cache.remove_file_owner(old_file, pkg_name_);
-                    if (cache.get_file_owners(old_file).empty()) {
-                        const fs::path phys =
-                            (fs::path(old_file).is_absolute())
-                                ? Config::instance().root_dir() / fs::path(old_file).relative_path()
-                                : Config::instance().root_dir() / old_file;
-                        if (fs::exists(phys) || fs::is_symlink(phys)) {
-                            if (fs::is_directory(phys)) {
-                                std::error_code ec;
-                                if (fs::is_empty(phys, ec)) {
-                                    log_info(
-                                        string_format("info.removing_obsolete_file", old_file));
-                                    fs::remove(phys, ec);
-                                }
-                                continue;
-                            }
-                            log_info(string_format("info.removing_obsolete_file", old_file));
-                            fs::path bak = unique_bak_path(phys, pkg_name_);
-                            wal::log_wal_line("REMOVE_OLD " + phys.string() + " \xe2\x86\x92 " +
-                                              bak.string());
-                            safe_rename(phys, bak);
-                            backups_.emplace_back(phys, bak);
-                        }
-                    }
-                }
+            if (new_set.contains(old_file)) continue;
+            auto owners = cache.get_file_owners(old_file);
+            if (!owners.contains(pkg_name_)) continue;
+            cache.remove_file_owner(old_file, pkg_name_);
+            if (!cache.get_file_owners(old_file).empty()) continue;
+
+            const fs::path phys = to_phys(old_file);
+            if (!(fs::exists(phys) || fs::is_symlink(phys))) continue;
+            trace_remove("obsolete FILE " + old_file + " → rename into stash");
+            log_info(string_format("info.removing_obsolete_file", old_file));
+            fs::path bak = detail::stash_bak_target(phys, pkg_name_);
+            wal::log_wal_line("REMOVE_OLD " + phys.string() + " \xe2\x86\x92 " + bak.string());
+            safe_rename(phys, bak);
+            stashes_.emplace_back(bak.parent_path());
+        }
+
+        // ── 阶段 2：废弃的目录（最深优先，仅最后持有者）→ 空则 DIR_RM（rmdir+元数据）──
+        std::vector<fs::path> obsolete_dirs;
+        for (const auto& old_file : old_files) {
+            if (!old_file.ends_with('/')) continue;
+            if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) {
+                // 配置目录从不物理删除（与 /etc 文件一致，保留系统配置）
+                if (!new_set.contains(old_file)) cache.remove_file_owner(old_file, pkg_name_);
+                continue;
             }
+            if (new_set.contains(old_file)) continue;
+            auto owners = cache.get_file_owners(old_file);
+            if (!owners.contains(pkg_name_)) continue;
+            cache.remove_file_owner(old_file, pkg_name_);
+            if (cache.get_file_owners(old_file).empty()) obsolete_dirs.push_back(to_phys(old_file));
+        }
+        // 子目录先于父目录处理（父目录只有在子目录被 rmdir 后才为空）
+        std::ranges::sort(obsolete_dirs, [](const fs::path& a, const fs::path& b) {
+            return a.string().size() > b.string().size();
+        });
+
+        for (const auto& phys : obsolete_dirs) {
+            std::error_code ec;
+            if (!fs::is_directory(phys, ec) || fs::is_symlink(phys)) continue;
+            if (!fs::is_empty(phys, ec)) {
+                trace_remove("obsolete DIR  " + phys.string() + " → SKIP（含无主内容，整树保留）");
+                continue;
+            }
+            trace_remove("obsolete DIR  " + phys.string() + " → rmdir + DIR_RM");
+            log_info(string_format("info.removing_obsolete_file", phys.string()));
+            detail::remove_empty_dir_with_meta(phys);
         }
     }
 
@@ -233,12 +279,13 @@ void InstallationTask::backup_existing_files()
             // 目录的）一律备份；仅真正的目录（非 symlink）由目录逻辑处理、跳过。
             if (fs::is_symlink(physical_path) || !fs::is_directory(physical_path)) {
                 // check_for_file_conflicts 已处理文件冲突，此处无需重复检测
-                fs::path bak = unique_bak_path(physical_path, pkg_name_);
+                // 备份进每文件系统 stash（不再原位占目录，避免父目录删除时 bak 被包进去）
+                fs::path bak = detail::stash_bak_target(physical_path, pkg_name_);
                 wal::log_wal_line("BACKUP " + physical_path.string() + " \xe2\x86\x92 " +
                                   bak.string());
                 BreakpointManager::instance().hit("backup_after_wal_" + pkg_name_);
                 safe_rename(physical_path, bak);
-                backups_.emplace_back(physical_path, bak);
+                stashes_.emplace_back(bak.parent_path());
             }
         } else {
             new_files_.push_back(physical_path);
@@ -271,7 +318,7 @@ void InstallationTask::rollback_files()
     wal::log_wal_line("END " + pkg_name_ + " " + actual_version_);
 
     // 清空内部追踪（撤销由 reverse_execute 依据 WAL 完成）
-    backups_.clear();
+    stashes_.clear();
     new_files_.clear();
     new_dirs_.clear();
 }

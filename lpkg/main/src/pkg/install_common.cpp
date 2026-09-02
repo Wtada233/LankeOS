@@ -11,6 +11,7 @@
 
 #include "base/exception.hpp"
 #include "base/utils.hpp"
+#include "db/transaction_log.hpp"
 #include "i18n/localization.hpp"
 #include "solver.hpp"
 
@@ -19,6 +20,82 @@ using json = nlohmann::json;
 
 namespace detail
 {
+
+// ============================================================================
+// 每文件系统 sidecar stash + 目录元数据化删除（TODO.md 第 2 节）
+// ============================================================================
+
+fs::path stash_parent_dir(const fs::path& phys)
+{
+    const fs::path root = Config::instance().root_dir();
+    const fs::path root_n = root.lexically_normal();
+    auto dev_of = [](const fs::path& p) -> dev_t {
+        struct stat st{};
+        return ::lstat(p.c_str(), &st) == 0 ? st.st_dev : static_cast<dev_t>(-1);
+    };
+    auto within_root = [&](const fs::path& p) -> bool {
+        const fs::path n = p.lexically_normal();
+        const std::string ps = n.string();
+        const std::string rs = root_n.string();
+        return ps == rs || ps.rfind(rs + "/", 0) == 0;
+    };
+
+    fs::path cur = phys.has_parent_path() ? phys.parent_path() : phys;
+    if (cur.empty() || !within_root(cur)) cur = root;  // 一律 clamp 回 root_dir
+    const dev_t d = dev_of(phys);
+    if (d == static_cast<dev_t>(-1)) return cur;  // phys 已消失 → 用它所在目录位置
+
+    fs::path best = cur;
+    while (true) {
+        const fs::path par = best.parent_path();
+        if (par.empty() || par == best) break;
+        if (!within_root(par)) break;  // 越过 root_dir 边界 → best 是根内最上层
+        if (dev_of(par) != d) break;   // 设备边界 → best 是该文件系统的顶层（同设备）
+        best = par;
+    }
+    return best;
+}
+
+fs::path ensure_stash_dir(const fs::path& phys, std::string_view pkg)
+{
+    const fs::path parent = stash_parent_dir(phys);
+    fs::path dir = parent / (std::string(".lpkg_bak_") + std::string(pkg) + "_" +
+                             std::to_string(static_cast<long long>(::getpid())));
+    std::error_code ec;
+    fs::create_directories(dir, ec);
+    if (!ec) (void)::chmod(dir.c_str(), 0700);  // root-only：备份残留隔离
+    return dir;
+}
+
+fs::path stash_bak_target(const fs::path& phys, std::string_view pkg)
+{
+    fs::path dir = ensure_stash_dir(phys, pkg);
+    const std::string base = phys.filename().string();
+    for (int i = 0; i < constants::UNIQUE_BAK_MAX_ATTEMPTS; ++i) {
+        fs::path bak = dir / (base + std::string(constants::SUFFIX_LPKG_BAK) + std::string(pkg) +
+                              "_" + random_suffix());
+        if (!fs::exists(bak)) return bak;
+    }
+    throw LpkgException(string_format("error.bak_collision", phys.string(), pkg));
+}
+
+void remove_stash_dir(const fs::path& stash)
+{
+    std::error_code ec;
+    fs::remove_all(stash, ec);
+}
+
+void remove_empty_dir_with_meta(const fs::path& phys)
+{
+    // 前置：phys 是真实空目录（非 symlink）。非空绝不走到这里（调用方先判空）。
+    struct stat st{};
+    if (::lstat(phys.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) return;
+    // write-ahead：先记 DIR_RM 再 rmdir（断电/崩溃可回滚重建）
+    wal::log_wal_line("DIR_RM " + phys.string() + " " + std::to_string(st.st_mode & 07777) + " " +
+                      std::to_string(st.st_uid) + " " + std::to_string(st.st_gid));
+    std::error_code ec;
+    fs::remove(phys, ec);  // rmdir（仅当为空才成功）
+}
 
 /** 从 lpkg 归档文件中读取 metadata.json 并解析为 JSON 对象 */
 json read_archive_metadata(const fs::path& archive_path)

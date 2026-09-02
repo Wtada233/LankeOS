@@ -7,13 +7,14 @@
  * trim_completed(): 清理已完成批次的 WAL 日志行，释放磁盘空间。
  */
 
-#include <algorithm>
 #include <fcntl.h>
+#include <unistd.h>
+
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <ranges>
 #include <set>
-#include <unistd.h>
 #include <vector>
 
 #include "base/constants.hpp"
@@ -60,46 +61,22 @@ void continue_cleanup(const std::vector<WALOp>& ops)
         return;
     }
 
-    // 去重
-    std::ranges::sort(all_baks);
-    auto last = std::unique(all_baks.begin(), all_baks.end());
-    all_baks.erase(last, all_baks.end());
+    // 归一为 stash 根再整目录 remove_all：备份文件在 stash 内（父目录名 `.lpkg_bak_`），
+    // CLEANUP 行本身就是 stash 根。隔离根删除 → 不需要递归/排序/symlink 守卫。
+    std::vector<fs::path> roots;
+    for (auto& bak : all_baks) {
+        roots.push_back(wal::stash_root_of_bak(bak));
+    }
+    std::ranges::sort(roots);
+    auto last = std::unique(roots.begin(), roots.end());
+    roots.erase(last, roots.end());
 
-    // 最深层优先
-    std::ranges::sort(all_baks, [](const fs::path& a, const fs::path& b) {
-        return a.string().size() > b.string().size();
-    });
-
-    for (const auto& bak : all_baks) {
-        if (!fs::exists(bak) && !fs::is_symlink(bak))
-            continue;  // 已删除（不论是否在 CLEANUP 集中）
-
+    for (const auto& root : roots) {
+        if (!fs::exists(root) && !fs::is_symlink(root)) continue;  // 已删除
+        if (!cleaned.contains(root.string())) log_wal_line("CLEANUP " + root.string());
         std::error_code ec;
-        bool ok = true;
-
-        // fs::is_directory 跟随符号链接：bak 若是指向目录的 symlink（如 filesystem
-        // 包的 /usr/lib64 → lib 的备份），误判为目录会递归删除其指向目录的内容。
-        // symlink 必须只删自身。
-        if (fs::is_directory(bak) && !fs::is_symlink(bak)) {
-            std::vector<fs::path> entries;
-            for (const auto& entry : fs::recursive_directory_iterator(bak, ec))
-                if (!ec) entries.push_back(entry.path());
-            if (!ec) {
-                std::reverse(entries.begin(), entries.end());
-                for (const auto& e : entries) {
-                    if (!fs::remove(e, ec)) ok = false;
-                }
-            }
-            if (!fs::remove(bak, ec)) ok = false;
-        } else {
-            if (!fs::remove(bak, ec)) ok = false;
-        }
-
-        if (ok) {
-            if (!cleaned.contains(bak.string())) log_wal_line("CLEANUP " + bak.string());
-        } else {
-            log_warning(string_format("warning.cleanup_failed", bak.string()));
-        }
+        fs::remove_all(root, ec);
+        if (ec) log_warning(string_format("warning.cleanup_failed", root.string()));
     }
 
     Cache::instance().load();
@@ -169,36 +146,21 @@ static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
     }
     if (baks.empty()) return;
 
-    // 3. 去重 + 最深层优先（文件先于目录，子目录先于父目录）
-    std::ranges::sort(baks);
-    auto last = std::unique(baks.begin(), baks.end());
-    baks.erase(last, baks.end());
-    std::ranges::sort(baks, [](const fs::path& a, const fs::path& b) {
-        return a.string().size() > b.string().size();
-    });
+    // 3. 归一为 stash 根再整目录 remove_all（文件备份在 stash 内；CLEANUP 行即 stash 根）
+    std::vector<fs::path> roots;
+    for (auto& bak : baks) {
+        roots.push_back(wal::stash_root_of_bak(bak));
+    }
+    std::ranges::sort(roots);
+    auto last = std::unique(roots.begin(), roots.end());
+    roots.erase(last, roots.end());
 
-    // 4. 删除仍存在的 bak（幂等：已删的跳过）
-    for (const auto& bak : baks) {
-        if (!fs::exists(bak) && !fs::is_symlink(bak)) continue;
-
+    // 4. 删除仍存在的 stash 根（幂等：已删的跳过）
+    for (const auto& root : roots) {
+        if (!fs::exists(root) && !fs::is_symlink(root)) continue;
         std::error_code ec;
-        bool ok = true;
-        // 同 continue_cleanup：symlink 备份必须只删自身，不能跟随成目录递归删除。
-        if (fs::is_directory(bak) && !fs::is_symlink(bak)) {
-            std::vector<fs::path> entries;
-            for (const auto& e : fs::recursive_directory_iterator(bak, ec))
-                if (!ec) entries.push_back(e.path());
-            if (!ec) {
-                std::reverse(entries.begin(), entries.end());
-                for (const auto& e : entries)
-                    if (!fs::remove(e, ec)) ok = false;
-            }
-            if (!fs::remove(bak, ec)) ok = false;
-        } else {
-            if (!fs::remove(bak, ec)) ok = false;
-        }
-
-        if (!ok) log_warning(string_format("warning.cleanup_failed", bak.string()));
+        fs::remove_all(root, ec);
+        if (ec) log_warning(string_format("warning.cleanup_failed", root.string()));
     }
 }
 
@@ -297,6 +259,7 @@ void recover_packages()
         } else {
             // 无 CLEANUP → 正常 reverse_execute 回滚
             wal::reverse_execute(ops, true);
+            wal::purge_consumed_stashes(ops);  // stash 里的文件已还原 → 清空 stash 根
             Cache::instance().load();
             wal::commit_batch();
         }
