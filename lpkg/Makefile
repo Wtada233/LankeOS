@@ -166,11 +166,13 @@ coverage:
 build_test_internal: $(BUILD_DIR)/$(TEST_TARGET)
 	@FILTER="$(GTEST_FILTER)"; if [ -n "$$FILTER" ]; then ./$(BUILD_DIR)/$(TEST_TARGET) --gtest_filter="$$FILTER"; else ./$(BUILD_DIR)/$(TEST_TARGET); fi
 
-$(BUILD_DIR)/$(TARGET): deps-check $(MAIN_OBJS)
+# 注意：deps-check 是 phony 前置，必须用 order-only（`|`）——普通前置会进 $^，
+# 链接 recipe 的 $^ 会把字面量 "deps-check" 当输入文件塞给 ld。
+$(BUILD_DIR)/$(TARGET): $(MAIN_OBJS) | deps-check
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
-$(BUILD_DIR)/$(TEST_TARGET): deps-check $(TEST_OBJS) $(LPKG_OBJS)
+$(BUILD_DIR)/$(TEST_TARGET): $(TEST_OBJS) $(LPKG_OBJS) | deps-check
 	@mkdir -p $(@D)
 	$(CXX) $(TEST_CXXFLAGS) -o $@ $^ $(TEST_LIBS)
 
@@ -180,11 +182,11 @@ $(BUILD_DIR)/$(TARGET)-static: $(MAIN_OBJS)
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -static -o $@ $^ $(LIBS)
 
-$(BUILD_DIR)/main/%.o: $(APP_SRC_DIR)/%.cpp
+$(BUILD_DIR)/main/%.o: $(APP_SRC_DIR)/%.cpp | deps-check
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -MMD -MP -c -o $@ $<
 
-$(BUILD_DIR)/tests/%.o: $(TESTS_DIR)/%.cpp
+$(BUILD_DIR)/tests/%.o: $(TESTS_DIR)/%.cpp | deps-check
 	@mkdir -p $(@D)
 	$(CXX) $(TEST_CXXFLAGS) -MMD -MP -c -o $@ $<
 
