@@ -23,6 +23,55 @@ endif
 
 PKGS_LIST = $(PKGS)
 
+# ---- 依赖库探测（构建必要条件）----
+# 每个 pkg-config 模块必须 >= min；可选第三段 cap = "下一个大版本边界"（排除性上界，
+# 同大版本线内的 patch/minor 放行，如 libcurl 8.x 里 8.21.0 通过；>= cap 才拦）。
+# 冒到 cap 及以后 = 大版本可能 API 破坏、未经确认 → 构建**立即**报错，而不是
+# "pkg-config 探测通过了，却在编译/链接期才因 API 破坏/缺静态库炸"。
+# cap 写 nolimit = 该库从不 breaking、无上限（如 libelf）。跑全量测试确认 API 兼容后，
+# 把对应 cap 抬到下一边界（min 只在需要新特性时抬）。
+# static 构建额外校验：各模块**自身** Libs（--libs-only-l，即 lpkg 真正链接的，
+# 不含传递私有依赖如 -lz）都能在其 libdir 找到 .a。
+LPKG_DEPS = libcurl:8.14.1:9 libarchive:3.8.3:4 libelf:0.190:nolimit \
+            libgit2:1.7.2:2 libsolv:0.7.39:0.8 openssl:3.1.8:4
+
+.PHONY: deps-check
+deps-check:
+	@# 版本窗口 +（static 时）自身库 .a，单循环按模块探测；任一失败 → 立即终止。
+	@command -v pkg-config >/dev/null 2>&1 || { echo "deps-check: error: 未找到 pkg-config（无法探测依赖库）"; exit 1; }; \
+	dirs=""; for spec in $(LPKG_DEPS); do mod="$${spec%%:*}"; dirs="$$dirs $$(pkg-config --variable=libdir "$$mod" 2>/dev/null)"; done; \
+	need_static=0; echo "$(MAKECMDGOALS)" | grep -qw static && need_static=1; \
+	for spec in $(LPKG_DEPS); do \
+	  mod="$${spec%%:*}"; rest="$${spec#*:}"; min="$${rest%%:*}"; cap="$${rest#*:}"; \
+	  [ "$$cap" = nolimit ] && cap=""; \
+	  if pkg-config --atleast-version="$$min" "$$mod" >/dev/null 2>&1; then \
+	    if [ -z "$$cap" ] || ! pkg-config --atleast-version="$$cap" "$$mod" >/dev/null 2>&1; then \
+	      if [ -n "$$cap" ]; then \
+	        echo "  dep  $$mod $$(pkg-config --modversion $$mod)  [$$min, $$cap)"; \
+	      else \
+	        echo "  dep  $$mod $$(pkg-config --modversion $$mod)  >= $$min (nolimit)"; \
+	      fi; \
+	      if [ "$$need_static" = 1 ]; then \
+	        for l in $$(pkg-config --libs-only-l "$$mod" 2>/dev/null); do \
+	          name="$${l#-l}"; [ -z "$$name" ] && continue; \
+	          found=0; for d in $$dirs; do [ -n "$$d" ] && [ -f "$$d/lib$$name.a" ] && { found=1; break; }; done; \
+	          if [ "$$found" != 1 ]; then echo "deps-check: error: 静态库 lib$$name.a 缺失（$$mod 自身链接需要，静态构建必需）"; exit 1; fi; \
+	        done; \
+	      fi; \
+	    else \
+	      echo "deps-check: error: $$mod $$(pkg-config --modversion $$mod) 已达下一个大版本边界 $$cap（API 是否破坏未确认；跑全量测试确认后把 LPKG_DEPS 的 cap 抬到下一边界）"; \
+	      exit 1; \
+	    fi; \
+	  elif pkg-config --exists "$$mod" >/dev/null 2>&1; then \
+	    echo "deps-check: error: $$mod $$(pkg-config --modversion $$mod) 过旧，需 >= $$min（可能缺 API）"; \
+	    exit 1; \
+	  else \
+	    echo "deps-check: error: 缺依赖库 pkg-config 模块 $$mod（需 >= $$min）"; \
+	    exit 1; \
+	  fi; \
+	done
+	@echo "dependency checks passed"
+
 TARGET = lpkg
 TEST_TARGET = run_tests
 VERSION ?= 6.2.0
@@ -89,9 +138,9 @@ ifeq ($(COVERAGE_MODE),1)
     TEST_LIBS += -lgcov
 endif
 
-.PHONY: all clean install uninstall static test build_test_internal docker docker-env docker-sync
+.PHONY: all clean install uninstall static test build_test_internal docker docker-env docker-sync deps-check
 
-all: $(BUILD_DIR)/$(TARGET)
+all: deps-check $(BUILD_DIR)/$(TARGET)
 
 test: docker-env
 	@$(MAKE) docker-sync
@@ -117,15 +166,15 @@ coverage:
 build_test_internal: $(BUILD_DIR)/$(TEST_TARGET)
 	@FILTER="$(GTEST_FILTER)"; if [ -n "$$FILTER" ]; then ./$(BUILD_DIR)/$(TEST_TARGET) --gtest_filter="$$FILTER"; else ./$(BUILD_DIR)/$(TEST_TARGET); fi
 
-$(BUILD_DIR)/$(TARGET): $(MAIN_OBJS)
+$(BUILD_DIR)/$(TARGET): deps-check $(MAIN_OBJS)
 	@mkdir -p $(@D)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
 
-$(BUILD_DIR)/$(TEST_TARGET): $(TEST_OBJS) $(LPKG_OBJS)
+$(BUILD_DIR)/$(TEST_TARGET): deps-check $(TEST_OBJS) $(LPKG_OBJS)
 	@mkdir -p $(@D)
 	$(CXX) $(TEST_CXXFLAGS) -o $@ $^ $(TEST_LIBS)
 
-static: $(BUILD_DIR)/$(TARGET)-static
+static: deps-check $(BUILD_DIR)/$(TARGET)-static
 
 $(BUILD_DIR)/$(TARGET)-static: $(MAIN_OBJS)
 	@mkdir -p $(@D)
