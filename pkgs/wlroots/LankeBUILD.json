@@ -1,7 +1,7 @@
 {
   "name": "wlroots",
   "version": "0.20.2",
-  "release": 3,
+  "release": 4,
   "deps": [
     "xwayland"
   ],

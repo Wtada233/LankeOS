@@ -1,0 +1,25 @@
+{
+  "name": "python-lark-parser",
+  "version": "1.3.1",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-setuptools-scm",
+    "python-wheel"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/source/l/lark/lark-1.3.1.tar.gz"
+  ],
+  "work_sources": []
+}

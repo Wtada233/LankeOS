@@ -1,7 +1,7 @@
 {
   "name": "mesa",
   "version": "26.2.1",
-  "release": 5,
+  "release": 6,
   "deps": [
     "libclc",
     "python"
@@ -19,7 +19,7 @@
     "libXxf86vm.so.1",
     "libc.so.6",
     "libclang-cpp.so.23.1",
-    "libdisplay-info.so.4",
+    "libdisplay-info.so.3",
     "libdrm.so.2",
     "libdrm_amdgpu.so.1",
     "libelf.so.1",

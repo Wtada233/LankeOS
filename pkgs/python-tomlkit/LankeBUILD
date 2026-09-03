@@ -3,15 +3,11 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    # PEP 517 wheel 构建（poetry-core backend，需系统 python-poetry-core）
     python3 -m build --wheel --no-isolation
 }
 
 lankebuild_package() {
     python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
     find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
-    # 对齐 Arch：加 3 后缀 + 保留无后缀符号链接
-    for f in cygdb cython cythonize; do
-        mv "{STAGING_ROOT}/usr/bin/$f" "{STAGING_ROOT}/usr/bin/${f}3"
-        ln -s "${f}3" "{STAGING_ROOT}/usr/bin/$f"
-    done
 }

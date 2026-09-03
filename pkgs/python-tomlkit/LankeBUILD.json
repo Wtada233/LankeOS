@@ -1,0 +1,24 @@
+{
+  "name": "python-tomlkit",
+  "version": "0.15.1",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-installer",
+    "python-poetry-core",
+    "python-wheel"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/source/t/tomlkit/tomlkit-0.15.1.tar.gz"
+  ],
+  "work_sources": []
+}

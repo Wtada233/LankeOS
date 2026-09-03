@@ -1,7 +1,7 @@
 {
   "name": "mlt",
   "version": "7.40.0",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",

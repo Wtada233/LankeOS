@@ -1,7 +1,7 @@
 {
   "name": "kf-kfilemetadata",
   "version": "6.29.0",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libKF6Archive.so.6",

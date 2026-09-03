@@ -1,0 +1,13 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index fa7164e..38d3314 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -154,7 +154,7 @@ collapsible_match = "allow"
+ [profile.release]
+ debug = "line-tables-only"
+ overflow-checks = true
+-lto = "thin"
++lto = false
+ 
+ [profile.release.package.niri-config]
+ # knuffel with chomsky generates a metric ton of debuginfo.

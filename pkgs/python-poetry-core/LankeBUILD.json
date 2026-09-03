@@ -1,0 +1,29 @@
+{
+  "name": "python-poetry-core",
+  "version": "2.4.1",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-fastjsonschema",
+    "python-lark-parser",
+    "python-packaging"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-fastjsonschema",
+    "python-installer",
+    "python-lark-parser",
+    "python-packaging",
+    "python-wheel"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/b2/f2/fa88c58efb9a737c7e0e40e470edd0973fe33f0f277d24dcf17454b50974/poetry_core-2.4.1.tar.gz"
+  ],
+  "work_sources": []
+}

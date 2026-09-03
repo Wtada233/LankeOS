@@ -1,0 +1,24 @@
+{
+  "name": "python-fastjsonschema",
+  "version": "2.22.2",
+  "release": 1,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/33/a4/9473c7c3b87009d9c1d74034e4a0f6a35ff0d42dd0f9866d0c3ec4e9217b/fastjsonschema-2.22.2.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # PEP 517 wheel 构建（setuptools + setuptools-scm backend）
+    # sdist 无 .git，setuptools-scm 拿不到版本，用 PRETEND_VERSION 显式给
+    SETUPTOOLS_SCM_PRETEND_VERSION="{ORIG_PKG_VER}" python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

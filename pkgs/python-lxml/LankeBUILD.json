@@ -8,10 +8,8 @@
   "needed_so": [
     "libc.so.6",
     "libexslt.so.0",
-    "libm.so.6",
     "libxml2.so.16",
-    "libxslt.so.1",
-    "libz.so.1"
+    "libxslt.so.1"
   ],
   "provides": [],
   "build_deps": [

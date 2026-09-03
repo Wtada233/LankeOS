@@ -1,0 +1,17 @@
+lankebuild_prepare() {
+    # devendor：移除 _vendor 的 sys.path 钩子 + 删 _vendor 目录，
+    # 让 poetry-core 用系统 fastjsonschema/lark/packaging（同 Arch）
+    sed -e "s/2.3.2/{ORIG_PKG_VER}/" "{WORK_DIR}/../python-poetry-core-devendor.patch" \
+        | patch -Np1
+    rm -rf src/poetry/core/_vendor
+}
+
+lankebuild_build() {
+    # PEP 517 wheel 构建（poetry-core backend，src/ 里 backend-path 自举）
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}
