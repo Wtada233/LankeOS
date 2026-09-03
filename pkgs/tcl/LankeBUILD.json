@@ -1,6 +1,6 @@
 {
   "name": "tcl",
-  "version": "8.6.16",
+  "version": "8.6.18",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -17,7 +17,7 @@
     "zlib"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/sourceforge/tcl/tcl8.6.16-src.tar.gz"
+    "https://downloads.sourceforge.net/sourceforge/tcl/tcl8.6.18-src.tar.gz"
   ],
   "work_sources": []
 }

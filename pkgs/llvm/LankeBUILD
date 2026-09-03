@@ -3,10 +3,18 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    # LLVM 23 的 PGO 路径有解引用空 std::optional 的回归，_GLIBCXX_ASSERTIONS 会把它变成
+    # 致命断言（rust 的 PGO 构建在 stage1 std 编译时 SIGABRT）。去掉这层硬化，
+    # 与上游 LLVM 行为一致（静默 UB）。参考 llvm/llvm-project 对 optional 迁移期的处理。
+    CXXFLAGS="${CXXFLAGS//-Wp,-D_GLIBCXX_ASSERTIONS/}"
+    CXXFLAGS="${CXXFLAGS//-D_GLIBCXX_ASSERTIONS/}"
+    export CXXFLAGS
+
     mkdir build && cd build
 
     local cmake_args=(
         -G Ninja
+        -DLLVM_BINUTILS_INCDIR=/usr/include
         -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR}
         -DLLVM_ENABLE_PROJECTS='clang;lld'
@@ -20,6 +28,7 @@ lankebuild_build() {
         -DLLVM_ENABLE_BINDINGS=OFF
         -DLLVM_ENABLE_FFI=ON
         -DLLVM_ENABLE_CURL=ON
+        -DLLVM_ENABLE_HTTPLIB=ON
         -DCLANG_DEFAULT_PIE_ON_LINUX=ON
         -DCLANG_LINK_CLANG_DYLIB=ON
         -DENABLE_LINKER_BUILD_ID=ON
@@ -34,7 +43,7 @@ lankebuild_build() {
             llvm-libraries|distribution|clang-libraries|lld-libraries)
                 continue ;;
             LLVM|LLVMgold) ;;
-            LLVMDemangle|LLVMSupport|LLVMTableGen|LLVMDebuginfod) ;;
+            LLVMDemangle|LLVMSupport|LLVMTableGen|LLVMDebuginfod|LLVMHTTP) ;;
             LLVMTestingAnnotations|LLVMTestingSupport) ;;
             LLVM*) continue ;;
             llvm-exegesis) continue ;;

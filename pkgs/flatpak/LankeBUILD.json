@@ -1,6 +1,6 @@
 {
   "name": "flatpak",
-  "version": "1.18.2",
+  "version": "1.19.0",
   "release": 1,
   "deps": [
     "bubblewrap",
@@ -67,7 +67,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/flatpak/flatpak/archive/refs/tags/1.18.2.tar.gz"
+    "https://github.com/flatpak/flatpak/archive/refs/tags/1.19.0.tar.gz"
   ],
   "work_sources": []
 }

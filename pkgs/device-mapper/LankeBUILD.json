@@ -1,11 +1,12 @@
 {
   "name": "device-mapper",
-  "version": "2.03.41",
+  "version": "2.03.42",
   "deps": [
     "bash"
   ],
   "needed_so": [
     "libc.so.6",
+    "libgcc_s.so.1",
     "libm.so.6",
     "libudev.so.1"
   ],
@@ -19,7 +20,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://sourceware.org/pub/lvm2/releases/LVM2.2.03.41.tgz"
+    "https://sourceware.org/pub/lvm2/releases/LVM2.2.03.42.tgz"
   ],
   "work_sources": []
 }

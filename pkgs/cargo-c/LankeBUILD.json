@@ -1,17 +1,16 @@
 {
   "name": "cargo-c",
-  "version": "0.10.24",
+  "version": "0.10.25",
   "release": 1,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
-    "libcrypto.so.3",
     "libcurl.so.4",
     "libgcc_s.so.1",
+    "libgit2.so.1.9",
     "libm.so.6",
-    "libssl.so.3",
-    "libz.so.1"
+    "libssl.so.3"
   ],
   "provides": [],
   "build_deps": [
@@ -21,7 +20,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/lu-zero/cargo-c/archive/refs/tags/v0.10.24.tar.gz"
+    "https://github.com/lu-zero/cargo-c/archive/refs/tags/v0.10.25.tar.gz"
   ],
   "work_sources": []
 }

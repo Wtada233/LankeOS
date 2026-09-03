@@ -1,6 +1,6 @@
 {
   "name": "qt6-positioning",
-  "version": "6.11.1",
+  "version": "6.11.2",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -28,7 +28,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtpositioning-everywhere-src-6.11.1.tar.xz"
+    "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/qtpositioning-everywhere-src-6.11.2.tar.xz"
   ],
   "work_sources": []
 }

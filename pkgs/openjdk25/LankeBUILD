@@ -16,6 +16,21 @@ lankebuild_prepare() {
         tar -xzf /tmp/boot-jdk.tar.gz -C "$BOOT_JDK_DIR" --strip-components=1
         rm -f /tmp/boot-jdk.tar.gz
     fi
+}
+
+lankebuild_build() {
+    local MAKEFLAG_J=$(echo "{MAKEFLAGS}" | sed -En 's/.*-j([0-9]+).*/\1/p')
+    export MAKEFLAGS=${MAKEFLAGS/-j${MAKEFLAG_J}/}
+
+    local _CFLAGS="${CFLAGS//-O2/-O3} ${CPPFLAGS} -fcommon"
+    local _CXXFLAGS="${CXXFLAGS//-O2/-O3} ${CPPFLAGS} -fcommon"
+    local _LDFLAGS="{LDFLAGS}"
+
+    _CFLAGS=${_CFLAGS/-fexceptions/}
+    _CXXFLAGS=${_CXXFLAGS/-fexceptions/}
+    unset CFLAGS
+    unset CXXFLAGS
+    unset LDFLAGS
 
     bash configure \
         --with-boot-jdk="$BOOT_JDK_DIR" \
@@ -33,9 +48,12 @@ lankebuild_prepare() {
         --with-freetype=system \
         --with-vendor-name="LankeOS" \
         --enable-linkable-runtime \
-        --with-extra-ldflags="-Wl,-s"
-}
-lankebuild_build() {
+        --with-extra-ldflags="-Wl,-s" \
+        --with-extra-cflags="${_CFLAGS}" \
+        --with-extra-cxxflags="${_CXXFLAGS}" \
+        --with-extra-ldflags="${_LDFLAGS}" \
+        --with-version-string="{ORIG_PKG_VER}"
+
     make images
     find "build/linux-x86_64-server-release/images/jdk" -iname '*.so' -exec chmod +x {} \;
 }

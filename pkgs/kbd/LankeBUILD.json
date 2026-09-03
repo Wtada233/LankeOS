@@ -6,7 +6,8 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6",
+    "libxkbcommon.so.0"
   ],
   "provides": [],
   "build_deps": [
@@ -15,7 +16,5 @@
   "sources": [
     "https://www.kernel.org/pub/linux/utils/kbd/kbd-2.10.0.tar.xz"
   ],
-  "work_sources": [
-    "file://./kbd-2.10.0-backspace-1.patch"
-  ]
+  "work_sources": []
 }

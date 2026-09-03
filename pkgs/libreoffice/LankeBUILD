@@ -64,7 +64,7 @@ lankebuild_build() {
         --enable-gtk3 \
         --enable-gtk4 \
         --enable-introspection \
-        --disable-lto \
+        --enable-lto \
         --enable-openssl \
         --enable-odk \
         --enable-python=system \

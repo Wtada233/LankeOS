@@ -15,7 +15,5 @@
   "sources": [
     "https://github.com/snowballstem/snowball/archive/refs/tags/v3.1.1.tar.gz"
   ],
-  "work_sources": [
-    "file://./0001-Make-libstemmer-a-shared-library.patch"
-  ]
+  "work_sources": []
 }

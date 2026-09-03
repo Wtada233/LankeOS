@@ -19,7 +19,5 @@
   "sources": [
     "https://github.com/pypa/pip/archive/26.2.1/pip-26.2.1.tar.gz"
   ],
-  "work_sources": [
-    "file://./remove-version-constraint.patch"
-  ]
+  "work_sources": []
 }

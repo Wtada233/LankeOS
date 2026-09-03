@@ -1,12 +1,4 @@
 lankebuild_prepare() {
-    # work_sources 使顶层含补丁文件，自动检测会退回工作根目录 → 手动进入源码目录
-    for dir in */; do
-        if [ -d "$dir" ] && [ -x "$dir/configure" ]; then
-            cd "$dir"
-            break
-        fi
-    done
-
     # 对齐 Arch packaging：去掉无用的 VCS 首行，并在默认配置头部插入 drop-in Include 段。
     # 上游 10.4 的 sshd_config 未自带 Include，systemd 提供的 drop-in 因此不会生效。
     sed '/^#.*\$.*\$$/d' -i ssh{,d}_config
@@ -14,24 +6,12 @@ lankebuild_prepare() {
     mv -v sshd_config.tmp sshd_config
     printf "# Include drop-in configurations\nInclude /etc/ssh/ssh_config.d/*.conf\n" | cat - ssh_config > ssh_config.tmp
     mv -v ssh_config.tmp ssh_config
-
-    # 修复 10.4 的 GSSAPI 配置项命名回归（bz3974）
-    patch -Np1 -i {WORK_DIR}/0001-fix-GSSAPI-option-names.patch
 }
 
 lankebuild_build() {
-    # 同 prepare：手动进入源码目录
-    for dir in */; do
-        if [ -d "$dir" ] && [ -x "$dir/configure" ]; then
-            cd "$dir"
-            break
-        fi
-    done
-
     # 对齐 Arch 打包参数。差异：
     #   - 无 libfido2 包 → 去掉 --with-security-key-builtin
     #   - 默认 PATH 遵循 LankeOS login.defs（/usr/bin，不含 /usr/local）
-    #   - 不传 --disable-strip（lpkg finalize 自行 strip）
     ./configure \
         --disable-lastlog \
         --libexecdir=/usr/lib/ssh \

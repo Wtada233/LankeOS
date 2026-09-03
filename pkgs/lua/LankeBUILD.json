@@ -1,6 +1,6 @@
 {
   "name": "lua",
-  "version": "5.5.0",
+  "version": "5.5.1",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -21,12 +21,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://www.lua.org/ftp/lua-5.5.0.tar.gz"
+    "https://www.lua.org/ftp/lua-5.5.1.tar.gz"
   ],
-  "work_sources": [
-    "file://./liblua.so.patch",
-    "file://./paths.patch",
-    "file://./lua.pc",
-    "file://./license-from-upstream"
-  ]
+  "work_sources": []
 }

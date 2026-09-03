@@ -1,20 +1,64 @@
 lankebuild_prepare() {
+    # 恢复 libclc.pc（Mesa 的 pkg-config 需要；上游 commit 10644a1 删了它）——在源码根应用
+    patch -Np1 < "{WORK_DIR}/../0001-libclc-restore-libclc.pc.patch"
+
+    # Mesa fork 数学补丁（karolherbst/mesa-libclc，匹配 rusticl 的 OpenCL 一致性）——在 libclc/ 子目录应用
+    cd libclc
+    for p in "{WORK_DIR}"/../000[2-9]-libclc-*.patch; do
+        [ -f "$p" ] || continue
+        echo "Applying patch: $p"
+        patch -Np1 < "$p"
+    done
+    cd ..
+
     mkdir -p build-libclc
 }
 
 lankebuild_build() {
-    cd build-libclc
+    # LLVM 23 起 libclc 不再自动探测 targets：CMake 里 LIBCLC_TARGET 取 LLVM_DEFAULT_TARGET_TRIPLE，
+    # 空值直接 FATAL_ERROR "libclc target is empty"。改为显式对每个 target 单独 build。
+    # 只建 SPIR-V：Mesa rusticl 只用 SPIR-V；且 Mesa fork 数学补丁只与 SPIR-V 兼容
+    # （03 补丁改的 generic fma.cl 引用了 SPIR-V-only 的 clc_sw_fma，建 nvptx/amdgcn 会炸）。
+    # 参考 AUR libclc-minimal-git（同样只建 spirv32/64）。
+    local targets=(
+        "spirv32-unknown-unknown"
+        "spirv64-unknown-unknown"
+    )
 
-    cmake -G Ninja ../libclc \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR}
+    local tgt
+    for tgt in "${targets[@]}"; do
+        echo "=== libclc target: $tgt ==="
+        local bdir="build-libclc/$tgt"
+        mkdir -p "$bdir"
 
-    ninja -j$(nproc)
-    DESTDIR={STAGING_ROOT} ninja install
+        cmake -G Ninja -S libclc -B "$bdir" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
+            -DCMAKE_CLC_COMPILER=/usr/bin/clang \
+            -DLLVM_DEFAULT_TARGET_TRIPLE="$tgt"
 
-    install -Dm644 ../libclc/LICENSE.TXT {STAGING_ROOT}{DATADIR}/licenses/libclc/LICENSE
+        cmake --build "$bdir" -j$(nproc)
+        DESTDIR={STAGING_ROOT} cmake --install "$bdir"
+    done
+
+    install -Dm644 libclc/LICENSE.TXT {STAGING_ROOT}{DATADIR}/licenses/libclc/LICENSE
 }
 
 lankebuild_package() {
-    :
+    # 说明：json 的 no_strip=true 别删。.a 成员是 LLVM IR bitcode 而非 ELF，
+    # strip 无收益（bitcode 不能 strip），且 farm 会重建归档（ar_svr4），可能丢 bitcode 归档符号表。保留 no_strip。
+    # Mesa 兼容：旧式 flat 名 → 新布局软链（保留上游目录布局 + Mesa 格式双兼容，参考 AUR libclc-minimal-git）
+    # target|旧式名|新文件名。只建 spirv，所以只补 spirv 的 Mesa 旧名。
+    local pairs=(
+        "spirv32-unknown-unknown|spirv-mesa3d-.spv|libclc.spv"
+        "spirv64-unknown-unknown|spirv64-mesa3d-.spv|libclc.spv"
+    )
+    local pair tgt rest old file
+    for pair in "${pairs[@]}"; do
+        tgt="${pair%%|*}"
+        rest="${pair#*|}"
+        old="${rest%%|*}"
+        file="${rest##*|}"
+        ln -sfv "$tgt/$file" "{STAGING_ROOT}{DATADIR}/clc/$old"
+    done
 }

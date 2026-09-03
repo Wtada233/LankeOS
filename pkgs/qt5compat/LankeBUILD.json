@@ -1,6 +1,6 @@
 {
   "name": "qt5compat",
-  "version": "6.11.1",
+  "version": "6.11.2",
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6",
@@ -27,7 +27,7 @@
     "qt6-shadertools"
   ],
   "sources": [
-    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qt5compat-everywhere-src-6.11.1.tar.xz"
+    "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/qt5compat-everywhere-src-6.11.2.tar.xz"
   ],
   "work_sources": [],
   "release": 4

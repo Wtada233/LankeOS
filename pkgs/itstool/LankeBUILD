@@ -1,18 +1,17 @@
 lankebuild_prepare() {
-    cd itstool-*/
-    patch -Np1 -i "{WORK_DIR}"/itstool-*-lxml-1.patch
+    for patchfile in "{WORK_DIR}"/../*.patch; do
+        patch -Np1 -i "$patchfile"
+    done
     # Prepare environment
     PYTHON=/usr/bin/python3 ./autogen.sh --prefix=/usr
 }
 
 lankebuild_build() {
-    cd itstool-*/
     make -j$(nproc)
 }
 
 
 lankebuild_package() {
-    cd itstool-*/
     make DESTDIR="{STAGING_ROOT}" install
     # itstool 运行时依赖 Python lxml 模块：由 deps: python-lxml 保证（不再用 postinst pip 装）。
 }

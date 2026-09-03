@@ -1,6 +1,6 @@
 {
   "name": "qt6-multimedia",
-  "version": "6.11.1",
+  "version": "6.11.2",
   "release": 1,
   "deps": [
     "qt6-base"
@@ -37,7 +37,7 @@
     "vulkan-headers"
   ],
   "sources": [
-    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtmultimedia-everywhere-src-6.11.1.tar.xz"
+    "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/qtmultimedia-everywhere-src-6.11.2.tar.xz"
   ],
   "work_sources": []
 }

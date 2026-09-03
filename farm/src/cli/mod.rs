@@ -165,6 +165,33 @@ enum Command {
         #[arg(long, default_value_t = 3)]
         download_retries: u32,
     },
+    /// 自动修复「LankeBUILD.json 引用仓库无 provider SONAME」的包：bump release 后重建
+    /// （重建重扫 needed_so，孤儿条目不再链接则自动消失；仍真需要则 BLOCKED 提示先更新
+    /// provider 配方）。排序与增量构建一致（topo_order + ABI 传播）。
+    #[command(name = "abifix")]
+    AbiFix {
+        /// pkgs 目录（LankeBUILD 体系）
+        #[arg(long, default_value = "pkgs")]
+        pkgs: PathBuf,
+        /// 产物/解包/发布目录
+        #[arg(long, default_value = "out")]
+        out: PathBuf,
+        /// SQLite 状态库（job 状态记录，供 operator 排查）
+        #[arg(long)]
+        state: Option<PathBuf>,
+        /// 架构（发布到 out/<arch>/<pkg>/）
+        #[arg(long, default_value = "x86_64")]
+        arch: String,
+        /// fresh container 基础镜像（wtada233/lankeos:latest）。必填——仅容器构建。
+        #[arg(long)]
+        image: Option<String>,
+        /// docker 模式内嵌本地 repo 服务器端口（容器 lpkg upgrade 从这拉依赖）
+        #[arg(long, default_value_t = 80)]
+        repo_port: u16,
+        /// 源预下载网络重试次数（§8.6）
+        #[arg(long, default_value_t = 3)]
+        download_retries: u32,
+    },
     /// 把构建仓库扁平化重打包为发行格式 `<pkg>-<ver>.lpkg`（zstd level 22 ultra）。
     /// 遍历 `input/<arch>/<pkg>/*.lpkg`，逐个解包→重打→输出到 output 目录。
     Export {
@@ -1213,6 +1240,15 @@ fn localize_help(cmd: clap::Command) -> clap::Command {
             .mut_arg("image", |a| a.help("Fresh container base image. Required - container builds only"))
             .mut_arg("repo_port", |a| a.help("Embedded local repo server port (container lpkg upgrade pulls from it)"))
             .mut_arg("download_retries", |a| a.help("Source pre-download network retries")))
+        .mut_subcommand("abifix", |c| c
+            .about("Auto-fix packages whose LankeBUILD.json references a provider-less SONAME: bump release + rebuild (rescan drops orphaned needed_so; still needed ones BLOCK with a hint to update the provider recipe)")
+            .mut_arg("pkgs", |a| a.help("pkgs directory (LankeBUILD tree)"))
+            .mut_arg("out", |a| a.help("Artifacts/extract/publish directory"))
+            .mut_arg("state", |a| a.help("SQLite state DB (job status/resume)"))
+            .mut_arg("arch", |a| a.help("Architecture (publish to out/<arch>/<pkg>/)"))
+            .mut_arg("image", |a| a.help("Fresh container base image. Required - container builds only"))
+            .mut_arg("repo_port", |a| a.help("Embedded local repo server port (container lpkg upgrade pulls from it)"))
+            .mut_arg("download_retries", |a| a.help("Source pre-download network retries")))
         .mut_subcommand("track", |c| c
             .about("Probe upstream versions")
             .mut_arg("pkg", |a| a.help("Target package name (required without --all)"))
@@ -1306,6 +1342,27 @@ pub fn run() -> ExitCode {
                 ..Default::default()
             };
             build::cmd_validate(&args)
+        }
+        Command::AbiFix {
+            pkgs,
+            out,
+            state,
+            arch,
+            image,
+            repo_port,
+            download_retries,
+        } => {
+            let args = Args {
+                pkgs: Some(pkgs.to_string_lossy().into_owned()),
+                out: Some(out),
+                state: state.map(|p| p.to_path_buf()),
+                arch: Some(arch),
+                image,
+                repo_port: Some(repo_port),
+                download_retries: Some(download_retries),
+                ..Default::default()
+            };
+            build::cmd_abifix(&args)
         }
         Command::Export {
             input,
@@ -1427,6 +1484,28 @@ mod tests {
         assert_eq!(r.skipped, vec!["alacritty"]);
         assert_eq!(r.hallucinations, vec!["fake"]);
         // alsa-lib 既无 yaml 也无 none → 会在批处理里判为"缺"
+    }
+
+    #[test]
+    fn parses_abifix_subcommand() {
+        // abifix 是独立子命令名（非 clap 默认 kebab 的 abi-fix），带 build/validate 同款容器参数
+        let cli =
+            Cli::try_parse_from(["farm", "abifix", "--image", "img", "--arch", "x86_64"]).unwrap();
+        match cli.command {
+            Command::AbiFix {
+                image,
+                arch,
+                pkgs,
+                out,
+                ..
+            } => {
+                assert_eq!(image.as_deref(), Some("img"));
+                assert_eq!(arch, "x86_64");
+                assert_eq!(pkgs, PathBuf::from("pkgs"));
+                assert_eq!(out, PathBuf::from("out"));
+            }
+            _ => panic!("应解析为 abifix 子命令"),
+        }
     }
 
     #[test]

@@ -1,4 +1,10 @@
 lankebuild_prepare() {
+    # 修复 CCM 空消息测试对新 OpenSSL 的兼容（上游 commit 7e2254fc8b）
+    patch -Np1 < "{WORK_DIR}/../0001-nodejs-test-ccm-final-behaviors.patch"
+
+    export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+
     ./configure --prefix={PREFIX}  \
             --ninja                \
             --enable-lto           \
@@ -15,7 +21,15 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    make -j$(nproc)
+    export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    _nc=$(nproc)
+    if [ "$_nc" -gt 4 ]; then
+      _jobs=$((_nc - 4))
+    else
+      _jobs=1
+    fi
+    make -j$_jobs
 }
 
 lankebuild_package() {

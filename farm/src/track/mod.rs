@@ -349,10 +349,20 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), String> {
         // same-version：直接锁版本，只认 same-version-of + template，占位符仅 {version}/{major_minor}
         // （URL 全写在 template：tag 前缀/仓库路径/上游名都烘进去，不支持 tag-prefix/repo/source-name）
         "same-version" => ("same-version", vec!["same-version-of", "template"]),
-        "github" => ("github", vec!["repo", "mode", "tag-prefix", "template"]),
+        "github" => (
+            "github",
+            vec!["repo", "mode", "tag-prefix", "template", "max-version"],
+        ),
         "gitlab" => (
             "gitlab",
-            vec!["host", "project", "mode", "tag-prefix", "template"],
+            vec![
+                "host",
+                "project",
+                "mode",
+                "tag-prefix",
+                "template",
+                "max-version",
+            ],
         ),
         "html-index" => (
             "html-index",
@@ -966,23 +976,82 @@ script-content: |
 
     #[test]
     fn entry_unsupported_field_is_explicit_error() {
-        // github 不支持 max-version：设置 → 显式报错而非静默忽略
+        // github 不支持 host（模板从 repo 拼 api.github.com URL）：设置 → 显式报错而非静默忽略
         let cfg = TrackerConfig {
             pkg_name: "x".into(),
             sources: vec![SourceConfig {
                 tracker_template: "github".into(),
                 repo: Some("a/b".into()),
+                host: Some("github.example".into()),
                 mode: Some("tags".into()),
                 tag_prefix: Some("v".into()),
-                max_version: Some("1.0".into()),
                 template: Some("https://x/{tag}".into()),
                 ..Default::default()
             }],
             ..Default::default()
         };
         let err = cfg.probe(&MockFetcher::new(HashMap::new())).unwrap_err();
-        assert!(err.contains("不支持字段: max-version"), "err: {err}");
+        assert!(err.contains("不支持字段: host"), "err: {err}");
         assert!(err.contains("github"), "err: {err}");
+    }
+
+    #[test]
+    fn github_entry_accepts_max_version_and_caps() {
+        // github 模板支持 max-version：tags 列表封顶生效（v261 被过滤取 v256）
+        let f = MockFetcher::new(HashMap::new()).entry(
+            "https://api.github.com/repos/systemd/systemd/tags",
+            r#"[{"name":"v254"},{"name":"v256"},{"name":"v255"},{"name":"v261"}]"#,
+        );
+        let cfg = TrackerConfig {
+            pkg_name: "systemd".into(),
+            sources: vec![SourceConfig {
+                tracker_template: "github".into(),
+                repo: Some("systemd/systemd".into()),
+                mode: Some("tags".into()),
+                tag_prefix: Some("v".into()),
+                max_version: Some("256".into()),
+                template: Some(
+                    "https://github.com/systemd/systemd/archive/refs/tags/{tag}.tar.gz".into(),
+                ),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let r = cfg.probe(&f).unwrap();
+        assert_eq!(r.version, "256");
+        assert_eq!(
+            r.sources,
+            vec!["https://github.com/systemd/systemd/archive/refs/tags/v256.tar.gz"]
+        );
+    }
+
+    #[test]
+    fn gitlab_entry_accepts_max_version_and_caps() {
+        // gitlab 模板支持 max-version：不报"不支持字段"，且封顶生效（v2.0.0 被过滤取 1.5.0）
+        let f = MockFetcher::new(HashMap::new()).entry(
+            "https://gitlab.com/api/v4/projects/a%2Fb/repository/tags?per_page=50",
+            r#"[{"name":"v2.0.0"},{"name":"v1.5.0"},{"name":"v1.2.0"}]"#,
+        );
+        let cfg = TrackerConfig {
+            pkg_name: "x".into(),
+            sources: vec![SourceConfig {
+                tracker_template: "gitlab".into(),
+                host: Some("gitlab.com".into()),
+                project: Some("a/b".into()),
+                mode: Some("tags".into()),
+                tag_prefix: Some("v".into()),
+                max_version: Some("1.5.0".into()),
+                template: Some("https://gitlab.com/{project}/-/archive/{tag}/x.tar.gz".into()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let r = cfg.probe(&f).unwrap();
+        assert_eq!(r.version, "1.5.0");
+        assert_eq!(
+            r.sources,
+            vec!["https://gitlab.com/a/b/-/archive/v1.5.0/x.tar.gz"]
+        );
     }
 
     #[test]

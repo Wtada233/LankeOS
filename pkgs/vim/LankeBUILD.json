@@ -1,6 +1,6 @@
 {
   "name": "vim",
-  "version": "9.2.0894",
+  "version": "9.2.1021",
   "release": 2,
   "deps": [
     "bash",
@@ -50,7 +50,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/vim/vim/archive/refs/tags/v9.2.0894.tar.gz"
+    "https://github.com/vim/vim/archive/refs/tags/v9.2.1021.tar.gz"
   ],
   "work_sources": []
 }

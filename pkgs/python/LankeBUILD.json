@@ -1,6 +1,6 @@
 {
   "name": "python",
-  "version": "3.14.6",
+  "version": "3.14.7",
   "release": 3,
   "deps": [
     "bash"
@@ -12,6 +12,7 @@
     "libcrypto.so.3",
     "libexpat.so.1",
     "libffi.so.8",
+    "libgcc_s.so.1",
     "libgdbm.so.6",
     "libgdbm_compat.so.4",
     "liblzma.so.5",
@@ -46,7 +47,7 @@
     "zstd"
   ],
   "sources": [
-    "https://www.python.org/ftp/python/3.14.6/Python-3.14.6.tar.xz"
+    "https://www.python.org/ftp/python/3.14.7/Python-3.14.7.tar.xz"
   ],
   "work_sources": []
 }

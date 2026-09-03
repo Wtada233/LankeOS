@@ -1,6 +1,6 @@
 {
   "name": "yoga",
-  "version": "3.2.1",
+  "version": "2017.02.07.00",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -18,7 +18,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/react/yoga/archive/refs/tags/v3.2.1.tar.gz"
+    "https://github.com/react/yoga/archive/refs/tags/v2017.02.07.00.tar.gz"
   ],
   "work_sources": []
 }

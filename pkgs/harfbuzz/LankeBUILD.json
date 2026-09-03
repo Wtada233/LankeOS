@@ -1,6 +1,6 @@
 {
   "name": "harfbuzz",
-  "version": "14.3.0",
+  "version": "14.4.0",
   "release": 4,
   "deps": [],
   "needed_so": [
@@ -49,7 +49,7 @@
     "graphite"
   ],
   "sources": [
-    "https://github.com/harfbuzz/harfbuzz/releases/download/14.3.0/harfbuzz-14.3.0.tar.xz"
+    "https://github.com/harfbuzz/harfbuzz/releases/download/14.4.0/harfbuzz-14.4.0.tar.xz"
   ],
   "work_sources": []
 }

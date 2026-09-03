@@ -1,6 +1,6 @@
 {
   "name": "libffi",
-  "version": "3.7.1",
+  "version": "3.8.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -15,7 +15,7 @@
     "dejagnu"
   ],
   "sources": [
-    "https://github.com/libffi/libffi/releases/download/v3.7.1/libffi-3.7.1.tar.gz"
+    "https://github.com/libffi/libffi/releases/download/v3.8.0/libffi-3.8.0.tar.gz"
   ],
   "work_sources": []
 }

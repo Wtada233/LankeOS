@@ -1,6 +1,6 @@
 {
   "name": "libical",
-  "version": "4.0.4",
+  "version": "4.0.5",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -8,10 +8,8 @@
     "libgcc_s.so.1",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libicudata.so.78",
     "libicui18n.so.78",
     "libicuuc.so.78",
-    "libm.so.6",
     "libstdc++.so.6",
     "libxml2.so.16"
   ],
@@ -48,7 +46,7 @@
     "vala"
   ],
   "sources": [
-    "https://github.com/libical/libical/releases/download/v4.0.4/libical-4.0.4.tar.gz"
+    "https://github.com/libical/libical/releases/download/v4.0.5/libical-4.0.5.tar.gz"
   ],
   "work_sources": []
 }

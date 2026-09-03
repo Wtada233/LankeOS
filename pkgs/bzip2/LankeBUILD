@@ -3,14 +3,9 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    for dir in */; do
-        if [ -d "$dir" ]; then
-            cd "$dir"
-            break
-        fi
+    for patchfile in "{WORK_DIR}"/../*.patch; do
+        patch -Np1 -i "$patchfile"
     done
-    patch -Np1 -i {WORK_DIR}/bzip2-*-install_docs-1.patch
-
     cat > bzip2.pc <<EOF
 prefix=/usr
 exec_prefix=/usr
@@ -29,8 +24,6 @@ EOF
 }
 
 lankebuild_package() {
-    cd bzip2-*/
-
     install -dm755 {STAGING_ROOT}{BINDIR} {STAGING_ROOT}{LIBDIR} {STAGING_ROOT}{INCLUDEDIR} {STAGING_ROOT}{MANDIR}/man1
 
     install -m755 bzip2-shared {STAGING_ROOT}{BINDIR}/bzip2

@@ -1,6 +1,6 @@
 {
   "name": "python-sentry-sdk",
-  "version": "2.68.0",
+  "version": "2.68.1",
   "release": 1,
   "deps": [
     "python",
@@ -22,7 +22,7 @@
     "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
-    "https://github.com/getsentry/sentry-python/archive/refs/tags/2.68.0.tar.gz"
+    "https://files.pythonhosted.org/packages/9a/e7/c504a4bd2d95df2e0ab73714a9161ff1cf6ff1486922685e5f46dfd9eba8/sentry_sdk-2.68.1.tar.gz"
   ],
   "work_sources": []
 }

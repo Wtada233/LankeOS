@@ -7,3 +7,4 @@ sources:
   tag-prefix: ''
   project: emersion/libdisplay-info
   template: https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/{tag}/libdisplay-info-{tag}.tar.gz
+  max-version: 0.3.0

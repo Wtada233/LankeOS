@@ -1,17 +1,12 @@
 lankebuild_prepare() {
     # Prepare environment
-    :
+    for patchfile in "{WORK_DIR}"/../*.patch; do
+        patch -Np1 -i "$patchfile"
+    done
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --with-tcl={LIBDIR} --enable-shared --disable-rpath --mandir={MANDIR} --with-tclinclude={INCLUDEDIR} --disable-static
 }
 
 lankebuild_build() {
-    for dir in */; do
-        if [ -d "$dir" ]; then
-            cd "$dir"
-            break
-        fi
-    done
-    patch -Np1 -i {WORK_DIR}/expect-*-gcc15-1.patch
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --with-tcl={LIBDIR} --enable-shared --disable-rpath --mandir={MANDIR} --with-tclinclude={INCLUDEDIR} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
     ln -svf expect5.45.4/libexpect5.45.4.so {STAGING_ROOT}{LIBDIR}/

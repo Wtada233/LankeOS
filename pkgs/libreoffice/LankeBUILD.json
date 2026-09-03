@@ -1,6 +1,6 @@
 {
   "name": "libreoffice",
-  "version": "26.8.0.2",
+  "version": "26.8.0.3",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -233,15 +233,15 @@
     "zstd"
   ],
   "sources": [
-    "https://download.documentfoundation.org/libreoffice/src/26.8.0/libreoffice-26.8.0.2.tar.xz",
-    "https://download.documentfoundation.org/libreoffice/src/26.8.0/libreoffice-help-26.8.0.2.tar.xz",
-    "https://download.documentfoundation.org/libreoffice/src/26.8.0/libreoffice-translations-26.8.0.2.tar.xz"
+    "https://download.documentfoundation.org/libreoffice/src/26.8.0/libreoffice-26.8.0.3.tar.xz",
+    "https://download.documentfoundation.org/libreoffice/src/26.8.0/libreoffice-help-26.8.0.3.tar.xz",
+    "https://download.documentfoundation.org/libreoffice/src/26.8.0/libreoffice-translations-26.8.0.3.tar.xz"
   ],
   "work_sources": [
     "https://dev-www.libreoffice.org/src/a7983f859eafb2677d7ff386a023bc40-xsltml_2.1.2.zip",
     "https://dev-www.libreoffice.org/src/d8bd5eed178db6e2b18eeed243f85aa8-flute-1.1.6.zip",
     "https://dev-www.libreoffice.org/src/ba2930200c9f019c2d93a8c88c651a0f-flow-engine-0.9.4.zip",
-    "https://dev-www.libreoffice.org/src/language-subtag-registry-2026-06-14.tar.bz2",
+    "https://dev-www.libreoffice.org/src/language-subtag-registry-2026-08-08.tar.bz2",
     "https://dev-www.libreoffice.org/src/17410483b5b5f267aa18b7e00b65e6e0-hsqldb_1_8_0.zip",
     "https://dev-www.libreoffice.org/src/pdfium-7681.tar.bz2",
     "https://dev-www.libreoffice.org/src/afdko-4.0.3.tar.gz",

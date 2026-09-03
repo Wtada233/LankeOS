@@ -1,6 +1,6 @@
 {
   "name": "libksba",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -16,7 +16,7 @@
     "libgpg-error"
   ],
   "sources": [
-    "https://www.gnupg.org/ftp/gcrypt/libksba/libksba-1.8.0.tar.bz2"
+    "https://www.gnupg.org/ftp/gcrypt/libksba/libksba-1.8.1.tar.bz2"
   ],
   "work_sources": []
 }

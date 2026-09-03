@@ -1,6 +1,6 @@
 {
   "name": "p11-kit",
-  "version": "0.26.4",
+  "version": "0.26.5",
   "release": 2,
   "deps": [
     "bash"
@@ -24,7 +24,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/p11-glue/p11-kit/releases/download/0.26.4/p11-kit-0.26.4.tar.xz"
+    "https://github.com/p11-glue/p11-kit/releases/download/0.26.5/p11-kit-0.26.5.tar.xz"
   ],
   "work_sources": []
 }

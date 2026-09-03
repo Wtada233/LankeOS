@@ -1,6 +1,6 @@
 {
   "name": "procps-ng",
-  "version": "4.0.6",
+  "version": "4.0.7",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -18,7 +18,7 @@
     "ncurses"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/project/procps-ng/Production/procps-ng-4.0.6.tar.xz"
+    "https://downloads.sourceforge.net/project/procps-ng/Production/procps-ng-4.0.7.tar.xz"
   ],
   "work_sources": []
 }

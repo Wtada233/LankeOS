@@ -1,6 +1,6 @@
 {
   "name": "libadwaita",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "deps": [],
   "needed_so": [
     "libappstream.so.5",
@@ -33,7 +33,7 @@
     "vala"
   ],
   "sources": [
-    "https://gitlab.gnome.org/GNOME/libadwaita/-/archive/1.9.2/libadwaita-1.9.2.tar.gz"
+    "https://gitlab.gnome.org/GNOME/libadwaita/-/archive/1.9.3/libadwaita-1.9.3.tar.gz"
   ],
   "work_sources": []
 }

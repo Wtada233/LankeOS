@@ -1,9 +1,5 @@
 lankebuild_prepare() {
-    # 进入解压后的源码目录
-    cd rustc-*-src || exit 1
-
-    # 应用所有补丁（来自 work_sources）
-    for patch in ../*.patch; do
+    for patch in "{WORK_DIR}"/../*.patch; do
         if [ -f "$patch" ]; then
             echo "Applying patch: $patch"
             patch -Np1 < "$patch"
@@ -12,20 +8,36 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    cd rustc-*-src || exit 1
+    # 不让发行版 CFLAGS/CXXFLAGS/LDFLAGS 污染 rust 内部 C/C++ 编译（compiler-builtins 等）
+    unset CFLAGS CXXFLAGS LDFLAGS
+
+    # 依赖库外部化：不编 vendored libgit2/libssh2/libsqlite3，用系统 pkg-config 版本
+    export LIBGIT2_NO_VENDOR=1
+    export LIBSSH2_SYS_USE_PKG_CONFIG=1
+    export LIBSQLITE3_SYS_USE_PKG_CONFIG=1
+
+    # compiler-rt builtins 所在目录（clang 资源目录，由 compiler-rt 包提供）
+    local clangdir
+    clangdir="$(clang -print-resource-dir)"
 
     # 生成 bootstrap.toml（适配 LankeOS x86_64）
+    # 用系统 rustc 作 stage0（rustc/cargo/rustfmt 指向 /usr/bin，配合 0003 补丁）
+    # 无 PGO/无 LTO：LLVM 23 的 PGO（value profiling）和 thin LTO（ThinLTO ValueInfo）
+    # 路径都有回归，构建会崩。Arch/Gentoo 停在 LLVM 22 所以没事。
     cat > bootstrap.toml << EOF
 [build]
 vendor = true
 target = ["x86_64-unknown-linux-gnu"]
+cargo = "/usr/bin/cargo"
+rustc = "/usr/bin/rustc"
+rustfmt = "/usr/bin/rustfmt"
 docs = false
 profiler = true
+sanitizers = true
 
 [llvm]
 download-ci-llvm = false
 static-libstdcpp = false
-ninja = true
 link-shared = true
 
 [rust]
@@ -33,16 +45,19 @@ debug = false
 debug-assertions = false
 debuginfo-level = 0
 incremental = false
+lld = false
+bootstrap-override-lld = "external"
 parallel-frontend-threads = $(nproc)
 
 [target.x86_64-unknown-linux-gnu]
 llvm-config = "{BINDIR}/llvm-config"
+optimized-compiler-builtins = "$clangdir/lib/linux/libclang_rt.builtins-x86_64.a"
 
 [install]
 prefix = "/usr"
 EOF
 
-    DESTDIR="{STAGING_ROOT}" python3 x.py install -j "$(nproc)"
+    DESTDIR="{STAGING_ROOT}" python3 ./x.py install -j "$(nproc)"
 }
 
 lankebuild_package() {
@@ -55,6 +70,14 @@ lankebuild_package() {
     rm -rf "{STAGING_ROOT}{LIBDIR}/rustlib/etc"
     rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/rust-installer-version"
     rm -f  "{STAGING_ROOT}{LIBDIR}"/rustlib/manifest-*
+
+    # ── lld 外部化：bootstrap.toml 里 lld=false 不自建 rust-lld，
+    #    把 self-contained 链接器软链到系统 lld / llvm-objcopy ──
+    local host_tuple="x86_64-unknown-linux-gnu"
+    mkdir -pv "{STAGING_ROOT}{LIBDIR}/rustlib/$host_tuple/bin/gcc-ld"
+    ln -sfv /usr/bin/lld          "{STAGING_ROOT}{LIBDIR}/rustlib/$host_tuple/bin/rust-lld"
+    ln -sfv /usr/bin/llvm-objcopy "{STAGING_ROOT}{LIBDIR}/rustlib/$host_tuple/bin/rust-objcopy"
+    ln -sfv /usr/bin/{ld.lld,ld64.lld,lld-link,wasm-ld} "{STAGING_ROOT}{LIBDIR}/rustlib/$host_tuple/bin/gcc-ld/"
 
     # ── .so 去重：扁平 .so 若与 staging 树内同名且内容一致 → 改为相对软链接 ──
     for f in "{STAGING_ROOT}{LIBDIR}"/*.so*; do

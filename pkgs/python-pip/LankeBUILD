@@ -1,33 +1,15 @@
 lankebuild_prepare() {
-    # work_sources 使自动检测退回工作根目录 → 手动进源码目录
-    for dir in */; do
-        if [ -d "$dir" ] && [ -f "$dir/pyproject.toml" ]; then
-            cd "$dir"
-            break
-        fi
+    for patchfile in "{WORK_DIR}"/../*.patch; do
+        patch -Np1 -i "$patchfile"
     done
-    # 放宽 flit-core 版本约束：pip 要求 <4，LankeOS 的 flit-core 是 4.x（Arch 同款补丁）
-    patch -Np1 -i {WORK_DIR}/remove-version-constraint.patch
 }
 
 lankebuild_build() {
-    for dir in */; do
-        if [ -d "$dir" ] && [ -f "$dir/pyproject.toml" ]; then
-            cd "$dir"
-            break
-        fi
-    done
     # --no-isolation：用已装后端（flit-core/build），不联网拉构建依赖
     python -m build --wheel --no-isolation
 }
 
 lankebuild_package() {
-    for dir in */; do
-        if [ -d "$dir" ] && [ -f "$dir/pyproject.toml" ]; then
-            cd "$dir"
-            break
-        fi
-    done
     python -m installer --destdir="{STAGING_ROOT}" dist/*.whl
 
     # bash 补全（best-effort：pyexpat 未修复时 pip 可能跑不起来，失败不影响打包）

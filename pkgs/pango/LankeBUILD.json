@@ -1,6 +1,6 @@
 {
   "name": "pango",
-  "version": "1.58.1",
+  "version": "1.58.2",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -36,7 +36,7 @@
     "ninja"
   ],
   "sources": [
-    "https://gitlab.gnome.org/GNOME/pango/-/archive/1.58.1/pango-1.58.1.tar.gz"
+    "https://gitlab.gnome.org/GNOME/pango/-/archive/1.58.2/pango-1.58.2.tar.gz"
   ],
   "work_sources": []
 }

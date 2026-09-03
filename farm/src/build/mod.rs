@@ -15,7 +15,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::abi;
-use crate::graph::RevMap;
+use crate::graph::{Index, RevMap};
 use crate::lpkg_binding::{BuildOutcome, LpkgBinding};
 use crate::state::{JobStatus, State};
 use crate::tr;
@@ -148,6 +148,59 @@ pub(crate) fn has_build_ok(pkgs_dir: &Path, pkg: &str) -> bool {
 pub(crate) fn mark_build_ok(pkgs_dir: &Path, pkg: &str) -> std::io::Result<()> {
     let h = recipe_hash(pkgs_dir, pkg).unwrap_or_default();
     std::fs::write(pkgs_dir.join(pkg).join(".build_ok"), h.as_bytes())
+}
+
+/// abifix 修复清单：扫描 pkgs/ 的 LankeBUILD.json，返回 `needed_so` 引用「仓库 index 无任何
+/// 包提供」的 SONAME 的包及其缺失清单（`(pkg, missing)`）。自提供不算缺失（scan 语义——
+/// 包自身 SONAME 已从 needed_so 扣除）。判定以旧索引 `all_provided_capabilities` 为仓库能力
+/// 真源（与 scan 的 not-found 过滤 / ABI 传播同源）。
+///
+/// 调用方（farm abifix）据此 bump release 后强制重建：重建时容器按当前仓库 provider 装依赖，
+/// 孤儿 needed_so 若不再链接则重扫后自动消失；若仍真需要则构建失败（BLOCKED）→ 提示先更新
+/// provider 配方（如 display-info 上游 soversion 变、下游还没跟上）。
+pub(crate) fn abifix_targets(pkgs_dir: &Path, old: &Index) -> Vec<(String, Vec<String>)> {
+    let provided = old.all_provided_capabilities();
+    let mut out = Vec::new();
+    for pkg in sorted_pkg_names(pkgs_dir) {
+        let Some(b) = read_lankebuild(pkgs_dir, &pkg) else {
+            continue;
+        };
+        let own: HashSet<&str> = b.provides.iter().map(String::as_str).collect();
+        let missing: Vec<String> = b
+            .needed_so
+            .iter()
+            .filter(|s| !provided.contains(s.as_str()) && !own.contains(s.as_str()))
+            .cloned()
+            .collect();
+        if !missing.is_empty() {
+            out.push((pkg, missing));
+        }
+    }
+    out
+}
+
+/// abifix 全流程（CLI 入口调用的 pub 面）：载入旧索引 → 检测孤儿 → 打印 + 逐个 bump release →
+/// 返回修复目标包名清单（cli 据此强制重建，ABI 传播在 run_build 内照常级联）。
+/// **无目标返回空 Vec**——调用方绝不能落到空目标的增量构建。
+pub fn abifix_plan(pkgs_dir: &Path, out_dir: &Path, arch: &str) -> Result<Vec<String>, String> {
+    let old = load_old_index(out_dir, arch)?;
+    let targets = abifix_targets(pkgs_dir, &old);
+    if targets.is_empty() {
+        println!("{}", tr!("abifix.none"));
+        return Ok(Vec::new());
+    }
+    println!("{}", tr!("abifix.title", targets.len()));
+    for (pkg, missing) in &targets {
+        println!(
+            "  {}",
+            ux::yellow(&tr!("abifix.target", pkg, missing.join(", ")))
+        );
+    }
+    // bump release = 重建信号（与 ABI 传播 victim 的 bump 规则一致），重建重扫 needed_so
+    for (pkg, _) in &targets {
+        bump_release(pkgs_dir, pkg);
+    }
+    Ok(targets.into_iter().map(|(p, _)| p).collect())
 }
 
 /// 进程内交互接管（§8.5）：BLOCKED 时提示 operator 选择，不退出进程。
@@ -2011,6 +2064,88 @@ packages: perl-*
     }
 
     #[test]
+    fn abifix_targets_flags_orphan_soname_only() {
+        // abifix 检测：c1 的 needed_so 引用 libfoo.so.2（index 无 provider）→ 命中；
+        // c2 引用 libfoo.so.1（index 有）→ 不命中；selfy 引用自身 provides → 不命中（scan 语义）。
+        let pkgs = temp_dir("farm-abifix-pkgs");
+        let out = temp_dir("farm-abifix-out");
+        write_baseline(&out, "libfoo|1.0:h::libfoo.so,libfoo.so.1:libc.so.6|\n");
+        write_pkg_ver(&pkgs, "c1", "1.0", &["libc1.so"], &["libfoo.so.2"], &[]);
+        write_pkg_ver(&pkgs, "c2", "1.0", &["libc2.so"], &["libfoo.so.1"], &[]);
+        write_pkg_ver(
+            &pkgs,
+            "selfy",
+            "1.0",
+            &["libself.so.1"],
+            &["libself.so.1"],
+            &[],
+        );
+        let idx = Index::parse(&fs::read_to_string(out.join("x86_64/index.txt")).unwrap());
+
+        let t = abifix_targets(&pkgs, &idx);
+        assert_eq!(
+            t,
+            vec![("c1".to_string(), vec!["libfoo.so.2".to_string()])],
+            "只有引用无 provider SONAME 的包应命中，自提供不算孤儿: {t:?}"
+        );
+        fs::remove_dir_all(&pkgs).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn abifix_targets_index_is_authoritative() {
+        // provider 判定以**仓库 index**为准（非 pkgs/ 配方）：libfoo 配方已提供 libfoo.so.2
+        // 但 index 只有 libfoo.so.1 → c1 引用 .2 仍算孤儿（重建容器拉不到 .2）。
+        let pkgs = temp_dir("farm-abifix-auth");
+        let out = temp_dir("farm-abifix-auth-out");
+        write_baseline(&out, "libfoo|1.0:h::libfoo.so,libfoo.so.1:libc.so.6|\n");
+        write_pkg_ver(
+            &pkgs,
+            "libfoo",
+            "2.0",
+            &["libfoo.so", "libfoo.so.2"],
+            &[],
+            &[],
+        );
+        write_pkg_ver(&pkgs, "c1", "1.0", &["libc1.so"], &["libfoo.so.2"], &[]);
+        let idx = Index::parse(&fs::read_to_string(out.join("x86_64/index.txt")).unwrap());
+
+        let t = abifix_targets(&pkgs, &idx);
+        assert_eq!(t, vec![("c1".to_string(), vec!["libfoo.so.2".to_string()])]);
+        fs::remove_dir_all(&pkgs).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn abifix_plan_bumps_only_orphan_packages() {
+        // abifix_plan：检测 + bump release（只 bump 命中的孤儿包）+ 返回清单；无孤儿 → 空且不 bump。
+        let pkgs = temp_dir("farm-abifix-plan");
+        let out = temp_dir("farm-abifix-plan-out");
+        write_baseline(&out, "libfoo|1.0:h::libfoo.so,libfoo.so.1:libc.so.6|\n");
+        write_pkg_ver(
+            &pkgs,
+            "libfoo",
+            "1.0",
+            &["libfoo.so", "libfoo.so.1"],
+            &[],
+            &[],
+        );
+        write_pkg_ver(&pkgs, "c1", "1.0", &["libc1.so"], &["libfoo.so.2"], &[]);
+        write_pkg_ver(&pkgs, "c2", "1.0", &["libc2.so"], &["libfoo.so.1"], &[]);
+
+        let names = abifix_plan(&pkgs, &out, "x86_64").unwrap();
+        assert_eq!(names, vec!["c1"], "只返回孤儿包: {names:?}");
+        let c1 = read_lankebuild(&pkgs, "c1").unwrap();
+        assert_eq!(c1.release, Some(1), "孤儿包应 bump release");
+        let c2 = read_lankebuild(&pkgs, "c2").unwrap();
+        assert_eq!(c2.release, None, "无孤儿包不应 bump");
+
+        // 再次 plan（仓库仍一致 / 或无新孤儿——c1 needed_so 还没重扫所以仍命中）→ 幂等性留 run_build
+        fs::remove_dir_all(&pkgs).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
     fn backup_cleaned_when_soname_unreferenced() {
         // 整个 build 完成后清理 ABI 过渡备份：备份的旧 SONAME 已不再被任何包 needed_so 引用
         // → 删除（含空根目录）。本用例：无可构建包（队列空），cleanup 仍执行。
@@ -2087,6 +2222,270 @@ packages: perl-*
         assert!(
             out.join("backups/libxml2.so.2").exists(),
             "仍有引用的备份应保留（过渡未完成）"
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn backup_kept_when_referenced_soname_is_full_versioned() {
+        // LLVM 类：SONAME 本身是完整版本化文件名（libLLVM.so.22.1，四段，而非 libLLVM.so.22）。
+        // rust 的 needed_so 引用 libLLVM.so.22.1；LLVM 22.1→23.1 升级后旧 SONAME 被备份，但
+        // rust 未重建仍引用它 → 备份必须保留到过渡完成。回归：soname_of 把 libLLVM.so.22.1
+        // 截断为 libLLVM.so.22，与 referenced 里的完整 needed_so 不匹配 → 备份被误删，
+        // 后续 rust 构建时容器里没有旧 libLLVM.so.22.1 可链接，构建必然失败。
+        let dir = temp_dir("farm-backup-llvm");
+        let out = temp_dir("farm-backup-llvm-out");
+        write_pkg(
+            &dir,
+            "rust",
+            &["librustc_driver.so"],
+            &["ld-linux-x86-64.so.2", "libLLVM.so.22.1", "libc.so.6"],
+            &[],
+        );
+        write_baseline(
+            &out,
+            "rust|1.0:h::librustc_driver.so:ld-linux-x86-64.so.2,libLLVM.so.22.1,libc.so.6|\n",
+        );
+        fs::create_dir_all(out.join("backups")).unwrap();
+        fs::write(out.join("backups/libLLVM.so.22.1"), b"").unwrap();
+
+        let mut binding = StubBinding::new(HashMap::new());
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec![],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
+            manual_sort: false,
+        };
+        let _ = run_build(&opts, &mut binding, None).unwrap();
+        assert!(
+            out.join("backups/libLLVM.so.22.1").exists(),
+            "rust 仍引用 libLLVM.so.22.1，备份必须保留（过渡未完成）"
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn llvm_upgrade_keeps_backup_while_victim_unrebuilt() {
+        // 综合真实状态端到端（复现用户报告）：LLVM 22.1→23.1 升级 + rust 等受害者未重建。
+        //
+        // 完整链路：
+        //   1. 仓库里有旧 llvm 22.1.0.lpkg（真实内容：libLLVM.so.22.1 实体 + libLLVM.so /
+        //      libLLVM-22.so 等 dev 符号链接；SONAME 是完整版本化文件名，四段）
+        //   2. 旧 index.txt：llvm 22.1 提供 libLLVM.so.22.1；rust / spirv-llvm-translator
+        //      needed_so 链 libLLVM.so.22.1
+        //   3. 构建 llvm 23.1 → place_in_repo 备份被移除的旧 SONAME（libLLVM.so.22.1 等）→
+        //      index 更新 llvm 行 → ABI 传播把 rust / spirv 入队为直连受害者
+        //   4. 受害者构建被 BLOCKED（模拟"LLVM 之后、rust 之前结束构建"：rust 未重建，
+        //      index 仍引用 libLLVM.so.22.1）→ cleanup_backups 必须保留 libLLVM.so.22.1
+        //      备份（旧 .so 全靠它过渡，删了 rust 构建/运行断链不可恢复）
+        //   5. 对照：无任何包引用的 libRemarks.so.22.1 备份仍正常清理（修复只增保守不误留）
+        let dir = temp_dir("farm-llvm-full");
+        let out = temp_dir("farm-llvm-full-out");
+
+        const OLD_PROV: &[&str] = &[
+            "LLVMgold.so",
+            "libLLVM-22.so",
+            "libLLVM.so",
+            "libLLVM.so.22.1",
+            "libLTO.so",
+            "libLTO.so.22.1",
+            "libRemarks.so",
+            "libRemarks.so.22.1",
+            "libclang-cpp.so",
+            "libclang-cpp.so.22.1",
+            "libclang.so",
+            "libclang.so.22.1",
+        ];
+        const NEW_PROV: &[&str] = &[
+            "LLVMgold.so",
+            "libLLVM-23.so",
+            "libLLVM.so",
+            "libLLVM.so.23.1",
+            "libLTO.so",
+            "libLTO.so.23.1",
+            "libRemarks.so",
+            "libRemarks.so.23.1",
+            "libclang-cpp.so",
+            "libclang-cpp.so.23.1",
+            "libclang.so",
+            "libclang.so.23.1",
+        ];
+        const NEW_NEEDED: &[&str] = &[
+            "ld-linux-x86-64.so.2",
+            "libc.so.6",
+            "libcurl.so.4",
+            "libedit.so.0",
+            "libffi.so.8",
+            "libgcc_s.so.1",
+            "libm.so.6",
+            "libstdc++.so.6",
+            "libxml2.so.16",
+            "libz.so.1",
+        ];
+        const RUST_NEEDED: &[&str] = &[
+            "ld-linux-x86-64.so.2",
+            "libLLVM.so.22.1",
+            "libc.so.6",
+            "libcrypto.so.3",
+            "libcurl.so.4",
+            "libgcc_s.so.1",
+            "libm.so.6",
+            "libssl.so.3",
+            "libstdc++.so.6",
+            "libz.so.1",
+        ];
+
+        // 1. 旧 llvm 22.1 .lpkg 进仓库（真实内容：四段 SONAME 实体 + dev 符号链接）
+        let old_src = dir.join("old-llvm-src");
+        fs::create_dir_all(old_src.join("content/usr/lib")).unwrap();
+        for f in [
+            "libLLVM.so.22.1",
+            "libLTO.so.22.1",
+            "libRemarks.so.22.1",
+            "libclang-cpp.so.22.1",
+            "libclang.so.22.1",
+        ] {
+            fs::write(
+                old_src.join("content/usr/lib").join(f),
+                [0x7f, b'E', b'L', b'F', 2, 1, 1],
+            )
+            .unwrap();
+        }
+        for (link, target) in [
+            ("libLLVM.so", "libLLVM.so.22.1"),
+            ("libLLVM-22.so", "libLLVM.so.22.1"),
+            ("libLTO.so", "libLTO.so.22.1"),
+            ("libRemarks.so", "libRemarks.so.22.1"),
+            ("libclang-cpp.so", "libclang-cpp.so.22.1"),
+            ("libclang.so", "libclang.so.22.1"),
+        ] {
+            std::os::unix::fs::symlink(target, old_src.join("content/usr/lib").join(link)).unwrap();
+        }
+        let old_meta = serde_json::json!({
+            "name": "llvm", "version": "22.1.0", "deps": [],
+            "provides": OLD_PROV, "needed_so": [],
+        });
+        fs::write(
+            old_src.join("metadata.json"),
+            serde_json::to_string_pretty(&old_meta).unwrap(),
+        )
+        .unwrap();
+        let repo_llvm = out.join("x86_64/llvm");
+        fs::create_dir_all(&repo_llvm).unwrap();
+        let old_lpkg = repo_llvm.join("22.1.0.lpkg");
+        {
+            let f = fs::File::create(&old_lpkg).unwrap();
+            let enc = zstd::stream::write::Encoder::new(f, 3).unwrap();
+            let mut b = tar::Builder::new(enc);
+            b.follow_symlinks(false);
+            b.append_dir_all(".", &old_src).unwrap();
+            let enc = b.into_inner().unwrap();
+            enc.finish().unwrap();
+        }
+
+        // 2. 旧 index.txt：llvm 22.1 + rust / spirv-llvm-translator 链 libLLVM.so.22.1
+        write_baseline(
+            &out,
+            &format!(
+                "llvm|22.1.0:h::{}:{}|\nrust|1.97.1:h::librustc_driver-b18229fd4035e2d5.so:{}|\nspirv-llvm-translator|22.1.5:h::libLLVMSPIRVLib.so,libLLVMSPIRVLib.so.22.1:ld-linux-x86-64.so.2,libLLVM.so.22.1,libc.so.6,libgcc_s.so.1,libm.so.6,libstdc++.so.6|\n",
+                OLD_PROV.join(","),
+                NEW_NEEDED.join(","),
+                RUST_NEEDED.join(","),
+            ),
+        );
+
+        // 3. 配方：llvm 23.1（新 SONAME）、rust 1.98（旧 SONAME）、spirv（旧 SONAME）
+        write_pkg_ver(&dir, "llvm", "23.1.0", NEW_PROV, NEW_NEEDED, &[]);
+        write_pkg_ver(
+            &dir,
+            "rust",
+            "1.98.0",
+            &["librustc_driver-b18229fd4035e2d5.so"],
+            RUST_NEEDED,
+            &[],
+        );
+        write_pkg_ver(
+            &dir,
+            "spirv-llvm-translator",
+            "22.1.5",
+            &["libLLVMSPIRVLib.so", "libLLVMSPIRVLib.so.22.1"],
+            &["libLLVM.so.22.1"],
+            &[],
+        );
+
+        // 4. Stub：llvm 构建成功（新 SONAME）；rust / spirv 构建失败 → BLOCKED（未重建）
+        let new_lpkg = stage_lpkg(&out, "llvm", "23.1.0", NEW_NEEDED, NEW_PROV);
+        let mut outcomes = HashMap::new();
+        outcomes.insert(
+            "llvm".into(),
+            BuildOutcome {
+                ok: true,
+                needed_so: NEW_NEEDED.iter().map(|s| s.to_string()).collect(),
+                provides: NEW_PROV.iter().map(|s| s.to_string()).collect(),
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: Some(new_lpkg),
+            },
+        );
+        outcomes.insert("rust".into(), BuildOutcome::failure("build"));
+        outcomes.insert(
+            "spirv-llvm-translator".into(),
+            BuildOutcome::failure("build"),
+        );
+        let mut binding = StubBinding::new(outcomes);
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["llvm".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
+            manual_sort: false,
+        };
+        let report = run_build(&opts, &mut binding, None).unwrap();
+        assert!(report.abi_broken.contains(&"llvm".to_string()));
+        assert!(
+            report.blocked.contains(&"rust".to_string()),
+            "rust 是 libLLVM.so.22.1 直连受害者且未重建"
+        );
+        assert!(report
+            .blocked
+            .contains(&"spirv-llvm-translator".to_string()));
+        // llvm 已进仓库并更新 index（新 SONAME）；rust/spirv 行保持旧 needed_so
+        assert!(
+            out.join("x86_64/llvm/23.1.0.lpkg").exists(),
+            "llvm 新版本应进仓库"
+        );
+        let idx = fs::read_to_string(out.join("x86_64/index.txt")).unwrap();
+        assert!(
+            idx.contains("libLLVM.so.23.1"),
+            "llvm 行应更新为新 SONAME: {idx}"
+        );
+        assert!(
+            idx.contains("libLLVM.so.22.1"),
+            "rust/spirv 未重建，index 仍引用旧 SONAME: {idx}"
+        );
+
+        // 5. cleanup 后：仍被 rust/spirv 引用的 libLLVM.so.22.1 备份必须保留
+        assert!(
+            out.join("backups/libLLVM.so.22.1").exists(),
+            "rust/spirv 仍引用 libLLVM.so.22.1，旧 .so 备份必须保留（过渡未完成）"
+        );
+        // 对照：无任何包引用的 libRemarks.so.22.1 备份仍正常清理（修复不误留）
+        assert!(
+            !out.join("backups/libRemarks.so.22.1").exists(),
+            "libRemarks.so.22.1 无引用应被清理"
         );
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&out).ok();

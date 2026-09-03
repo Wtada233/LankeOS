@@ -1,6 +1,6 @@
 {
   "name": "python-cairo",
-  "version": "1.29.0",
+  "version": "1.29.1",
   "release": 3,
   "deps": [
     "python"
@@ -21,7 +21,7 @@
     "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
-    "https://github.com/pygobject/pycairo/releases/download/v1.29.0/pycairo-1.29.0.tar.gz"
+    "https://github.com/pygobject/pycairo/releases/download/v1.29.1/pycairo-1.29.1.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "libevdev",
-  "version": "1.13.6",
+  "version": "1.13.7",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -17,7 +17,7 @@
     "ninja"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-1.13.6/libevdev-libevdev-1.13.6.tar.gz"
+    "https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-1.13.7/libevdev-libevdev-1.13.7.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "doxygen",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -20,7 +20,7 @@
     "sqlite"
   ],
   "sources": [
-    "https://doxygen.nl/files/doxygen-1.17.0.src.tar.gz"
+    "https://github.com/doxygen/doxygen/archive/refs/tags/Release_1_18_0.tar.gz"
   ],
   "work_sources": []
 }

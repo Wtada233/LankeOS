@@ -20,7 +20,5 @@
   "sources": [
     "https://prdownloads.sourceforge.net/expect/expect5.45.4.tar.gz"
   ],
-  "work_sources": [
-    "file://./expect-5.45.4-gcc15-1.patch"
-  ]
+  "work_sources": []
 }

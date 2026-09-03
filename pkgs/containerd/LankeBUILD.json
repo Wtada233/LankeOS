@@ -1,6 +1,6 @@
 {
   "name": "containerd",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "deps": [
     "bash"
   ],
@@ -15,7 +15,7 @@
     "golang"
   ],
   "sources": [
-    "https://github.com/containerd/containerd/archive/refs/tags/v2.3.3.tar.gz"
+    "https://github.com/containerd/containerd/archive/refs/tags/v2.3.4.tar.gz"
   ],
   "work_sources": []
 }

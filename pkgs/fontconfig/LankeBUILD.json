@@ -1,6 +1,6 @@
 {
   "name": "fontconfig",
-  "version": "2.18.2",
+  "version": "2.18.3",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -23,7 +23,7 @@
     "ninja"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.18.2/fontconfig-2.18.2.tar.gz"
+    "https://gitlab.freedesktop.org/fontconfig/fontconfig/-/archive/2.18.3/fontconfig-2.18.3.tar.gz"
   ],
   "work_sources": []
 }

@@ -19,7 +19,5 @@
   "sources": [
     "https://www.sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"
   ],
-  "work_sources": [
-    "file://./bzip2-1.0.8-install_docs-1.patch"
-  ]
+  "work_sources": []
 }

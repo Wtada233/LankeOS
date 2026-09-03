@@ -1,6 +1,6 @@
 {
   "name": "librsvg",
-  "version": "2.62.90",
+  "version": "2.62.91",
   "release": 4,
   "deps": [],
   "needed_so": [
@@ -43,6 +43,7 @@
     "harfbuzz"
   ],
   "sources": [
-    "https://download.gnome.org/sources/librsvg/2.62/librsvg-2.62.90.tar.xz"
-  ]
+    "https://download.gnome.org/sources/librsvg/2.62/librsvg-2.62.91.tar.xz"
+  ],
+  "work_sources": []
 }

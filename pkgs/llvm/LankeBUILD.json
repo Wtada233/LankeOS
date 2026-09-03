@@ -1,6 +1,6 @@
 {
   "name": "llvm",
-  "version": "22.1.8",
+  "version": "23.1.0",
   "release": 3,
   "deps": [
     "perl",
@@ -19,17 +19,18 @@
     "libz.so.1"
   ],
   "provides": [
-    "libLLVM-22.so",
+    "LLVMgold.so",
+    "libLLVM-23.so",
     "libLLVM.so",
-    "libLLVM.so.22.1",
+    "libLLVM.so.23.1",
     "libLTO.so",
-    "libLTO.so.22.1",
+    "libLTO.so.23.1",
     "libRemarks.so",
-    "libRemarks.so.22.1",
+    "libRemarks.so.23.1",
     "libclang-cpp.so",
-    "libclang-cpp.so.22.1",
+    "libclang-cpp.so.23.1",
     "libclang.so",
-    "libclang.so.22.1"
+    "libclang.so.23.1"
   ],
   "build_deps": [
     "base-devel",
@@ -43,7 +44,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/llvm-project-22.1.8.src.tar.xz"
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/llvm-project-23.1.0.src.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

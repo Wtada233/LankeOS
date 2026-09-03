@@ -1,6 +1,6 @@
 {
   "name": "gdk-pixbuf",
-  "version": "2.44.7",
+  "version": "2.44.8",
   "release": 3,
   "deps": [
     "shared-mime-info"
@@ -32,7 +32,7 @@
     "shared-mime-info"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gdk-pixbuf/2.44/gdk-pixbuf-2.44.7.tar.xz"
+    "https://download.gnome.org/sources/gdk-pixbuf/2.44/gdk-pixbuf-2.44.8.tar.xz"
   ],
   "work_sources": []
 }

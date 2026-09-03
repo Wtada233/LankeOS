@@ -1,25 +1,23 @@
 {
   "name": "libvpx",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "release": 1,
   "deps": [],
   "needed_so": [
     "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libm.so.6"
   ],
   "provides": [
     "libvpx.so",
     "libvpx.so.12",
-    "libvpx.so.12.0"
+    "libvpx.so.12.1"
   ],
   "build_deps": [
     "base-devel",
     "nasm"
   ],
   "sources": [
-    "https://github.com/webmproject/libvpx/archive/refs/tags/v1.16.0.tar.gz"
+    "https://github.com/webmproject/libvpx/archive/refs/tags/v1.17.0.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

@@ -1,6 +1,6 @@
 {
   "name": "frei0r-plugins",
-  "version": "3.4.3",
+  "version": "3.5.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -19,7 +19,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/dyne/frei0r/archive/refs/tags/v3.4.3.tar.gz"
+    "https://github.com/dyne/frei0r/archive/refs/tags/v3.5.0.tar.gz"
   ],
   "work_sources": []
 }

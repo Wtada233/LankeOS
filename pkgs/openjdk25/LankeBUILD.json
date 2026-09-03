@@ -1,6 +1,6 @@
 {
   "name": "openjdk25",
-  "version": "25.0.4",
+  "version": "25.0.5",
   "release": 3,
   "deps": [
     "xwayland"
@@ -39,11 +39,12 @@
     "libxext",
     "libxi",
     "libxrender",
+    "libxt",
     "libxtst",
     "zlib"
   ],
   "sources": [
-    "https://github.com/openjdk/jdk25u/archive/refs/tags/jdk-25.0.4+6.tar.gz"
+    "https://github.com/openjdk/jdk25u/archive/refs/tags/jdk-25.0.5+4.tar.gz"
   ],
   "work_sources": [],
   "no_strip": true

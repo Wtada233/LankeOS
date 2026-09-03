@@ -1,6 +1,6 @@
 {
   "name": "shadow",
-  "version": "4.20.0",
+  "version": "4.20.2",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -28,7 +28,7 @@
     "linux-pam"
   ],
   "sources": [
-    "https://github.com/shadow-maint/shadow/releases/download/4.20.0/shadow-4.20.0.tar.xz"
+    "https://github.com/shadow-maint/shadow/releases/download/4.20.2/shadow-4.20.2.tar.xz"
   ],
   "work_sources": []
 }

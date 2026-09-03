@@ -335,8 +335,12 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
                 collect_referenced_link_targets(&p, backups_root, referenced, protected);
             } else if ft.file_type().is_symlink() {
                 let fname = e.file_name().to_string_lossy().into_owned();
-                let soname = soname_of(&fname).map(str::to_string).unwrap_or(fname);
-                if referenced.contains(&soname) {
+                let soname = soname_of(&fname)
+                    .map(str::to_string)
+                    .unwrap_or_else(|| fname.clone());
+                // 引用判定同时看完整文件名与截断 SONAME：SONAME 可以是完整版本化文件名
+                // （libLLVM.so.22.1，四段），截断派生会漏判（libLLVM.so.22）→ 误删仍被引用的实体。
+                if referenced.contains(&fname) || referenced.contains(&soname) {
                     if let Ok(target) = fs::read_link(&p) {
                         let resolved = if target.is_absolute() {
                             backups_root.join(abs_target_rel(&target))
@@ -377,8 +381,14 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
             }
             let fname = e.file_name().to_string_lossy().into_owned();
             // 版本化 .so.* → SONAME 前缀；无 SONAME 的实体库（libtcl8.6.so）→ 文件名即身份
-            let soname = soname_of(&fname).map(str::to_string).unwrap_or(fname);
-            if referenced.contains(&soname) {
+            let soname = soname_of(&fname)
+                .map(str::to_string)
+                .unwrap_or_else(|| fname.clone());
+            // 引用判定同时看完整文件名与截断 SONAME：SONAME 可为完整版本化文件名
+            // （libLLVM.so.22.1 而非 libLLVM.so.22——rust 的 needed_so 链的是前者），
+            // 只按截断派生匹配会误删仍被引用的备份（升级后旧 .so 全靠备份过渡，删了
+            // 下游构建/运行断链不可恢复）。保留偏保守：仍无引用时下次 build 完成会再清。
+            if referenced.contains(&fname) || referenced.contains(&soname) {
                 continue; // 仍有包需要旧 SONAME → 保留
             }
             // 实体文件：自身派生 SONAME 未被引用，但仍被引用的符号链接指向它

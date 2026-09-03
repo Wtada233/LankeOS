@@ -1,6 +1,6 @@
 {
   "name": "nspr",
-  "version": "4.39",
+  "version": "4.40",
   "release": 2,
   "deps": [
     "bash"
@@ -17,7 +17,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://archive.mozilla.org/pub/nspr/releases/v4.39/src/nspr-4.39.tar.gz"
+    "https://archive.mozilla.org/pub/nspr/releases/v4.40/src/nspr-4.40.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

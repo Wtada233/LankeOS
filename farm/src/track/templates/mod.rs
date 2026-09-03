@@ -114,18 +114,20 @@ pub(crate) fn extract_latest_release_tag(json: &str) -> Result<String, String> {
 }
 
 /// 取 tag 列表中版本最大的（按 tag_prefix 剥离后 vercmp，稳定版优先）。
-/// `major` 非空时只匹配该主版本的 tag（约束 major-of）。
+/// `major` 非空时只匹配该主版本的 tag（约束 major-of）；`cap` 封顶（超过则排除，
+/// 同 html-index/gcs 的 max-version 语义）。cap 由支持该字段的模板传入（github 不传 None）。
 pub(crate) fn max_tag_version(
     tags: &[String],
     prefix: &str,
     major: Option<&str>,
+    cap: Option<&str>,
 ) -> Option<String> {
     let versions: Vec<String> = tags
         .iter()
         .filter_map(|t| strip_version(t, prefix))
         .filter(|v| matches_major(v, major))
         .collect();
-    max_version_stable_first(versions, major, None)
+    max_version_stable_first(versions, major, cap)
 }
 
 /// 剥离 tag 前缀并校验版本形态：`v1.2.3` + prefix=`v` → `1.2.3`。

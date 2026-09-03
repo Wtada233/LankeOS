@@ -1,6 +1,6 @@
 {
   "name": "qemu-x86-64",
-  "version": "11.0.3",
+  "version": "11.1.1",
   "release": 2,
   "deps": [
     "xwayland"
@@ -70,6 +70,7 @@
     "libpulse"
   ],
   "sources": [
-    "https://download.qemu.org/qemu-11.0.3.tar.xz"
-  ]
+    "https://download.qemu.org/qemu-11.1.1.tar.xz"
+  ],
+  "work_sources": []
 }

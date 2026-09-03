@@ -1,6 +1,6 @@
 {
   "name": "qt6-virtualkeyboard",
-  "version": "6.11.1",
+  "version": "6.11.2",
   "release": 2,
   "deps": [
     "qt6-multimedia"
@@ -37,7 +37,7 @@
     "qt6-svg"
   ],
   "sources": [
-    "https://download.qt.io/official_releases/qt/6.11/6.11.1/submodules/qtvirtualkeyboard-everywhere-src-6.11.1.tar.xz"
+    "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/qtvirtualkeyboard-everywhere-src-6.11.2.tar.xz"
   ],
   "work_sources": []
 }

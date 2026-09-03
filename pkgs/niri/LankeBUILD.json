@@ -1,7 +1,7 @@
 {
   "name": "niri",
   "version": "26.04",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash"
   ],
@@ -44,8 +44,5 @@
   "sources": [
     "https://github.com/niri-wm/niri/archive/refs/tags/v26.04.tar.gz"
   ],
-  "work_sources": [
-    "file://./allow-software-rendering.patch",
-    "file://./libdisplay-info-sys-relax.patch"
-  ]
+  "work_sources": []
 }

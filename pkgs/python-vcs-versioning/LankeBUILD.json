@@ -1,6 +1,6 @@
 {
   "name": "python-vcs-versioning",
-  "version": "2.2.3",
+  "version": "2.3.1",
   "release": 1,
   "deps": [
     "python",
@@ -21,7 +21,7 @@
     "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/e9/bb/5270e8ffd3123051ac4fbbaabf61afb8f27819ac8ced0f0cc4b24137d30e/vcs_versioning-2.2.3.tar.gz"
+    "https://files.pythonhosted.org/packages/a6/cb/6f5c4ed4da249ef5eea34ddfbb38174c5533ff3da8703b8252bf44b80396/vcs_versioning-2.3.1.tar.gz"
   ],
   "work_sources": []
 }

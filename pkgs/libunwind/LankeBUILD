@@ -1,12 +1,11 @@
 lankebuild_prepare() {
-    cd "libunwind-{ORIG_PKG_VER}"
-    # 上游修复：test 里 malloc() 原型错误导致 GCC 16 编译失败（b67d508a）
-    patch -p1 -i ../b67d508a.patch
+    for patchfile in "{WORK_DIR}"/../*.patch; do
+        patch -Np1 -i "$patchfile"
+    done
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --localstatedir={LOCALSTATEDIR} --disable-static
 }
 
 lankebuild_build() {
-    cd "libunwind-{ORIG_PKG_VER}"
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --localstatedir={LOCALSTATEDIR} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

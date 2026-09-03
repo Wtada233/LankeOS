@@ -1,6 +1,6 @@
 {
   "name": "tmux",
-  "version": "3.7b",
+  "version": "3.7c",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -19,7 +19,7 @@
     "ncurses"
   ],
   "sources": [
-    "https://github.com/tmux/tmux/releases/download/3.7b/tmux-3.7b.tar.gz"
+    "https://github.com/tmux/tmux/releases/download/3.7c/tmux-3.7c.tar.gz"
   ],
   "work_sources": []
 }

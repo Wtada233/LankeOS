@@ -1,6 +1,6 @@
 {
   "name": "pkgconf",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -14,7 +14,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://distfiles.ariadne.space/pkgconf/pkgconf-3.0.5.tar.xz"
+    "https://distfiles.ariadne.space/pkgconf/pkgconf-3.0.6.tar.xz"
   ],
   "work_sources": []
 }

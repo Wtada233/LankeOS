@@ -1,6 +1,6 @@
 {
   "name": "meson",
-  "version": "1.11.2",
+  "version": "1.12.0",
   "release": 4,
   "deps": [
     "python"
@@ -16,7 +16,7 @@
     "python-wheel"
   ],
   "sources": [
-    "https://github.com/mesonbuild/meson/releases/download/1.11.2/meson-1.11.2.tar.gz"
+    "https://github.com/mesonbuild/meson/releases/download/1.12.0/meson-1.12.0.tar.gz"
   ],
   "work_sources": []
 }

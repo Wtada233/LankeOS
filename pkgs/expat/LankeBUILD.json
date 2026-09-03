@@ -1,6 +1,6 @@
 {
   "name": "expat",
-  "version": "2.8.2",
+  "version": "2.8.3",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -16,7 +16,7 @@
     "git"
   ],
   "sources": [
-    "https://github.com/libexpat/libexpat/releases/download/R_2_8_2/expat-2.8.2.tar.gz"
+    "https://github.com/libexpat/libexpat/releases/download/R_2_8_3/expat-2.8.3.tar.gz"
   ],
   "work_sources": []
 }

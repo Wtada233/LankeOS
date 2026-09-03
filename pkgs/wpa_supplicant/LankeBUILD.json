@@ -1,6 +1,6 @@
 {
   "name": "wpa_supplicant",
-  "version": "2.11",
+  "version": "2.12",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -23,7 +23,7 @@
     "readline"
   ],
   "sources": [
-    "https://w1.fi/releases/wpa_supplicant-2.11.tar.gz"
+    "https://w1.fi/releases/wpa_supplicant-2.12.tar.gz"
   ],
   "work_sources": []
 }

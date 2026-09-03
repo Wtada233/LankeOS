@@ -30,6 +30,28 @@ pub(crate) fn cmd_validate(args: &Args) -> ExitCode {
     run_build_flow(args, pkgs_dir, out_dir, Vec::new(), /*validate=*/ true)
 }
 
+/// abifix：自动修复「LankeBUILD.json 引用仓库无 provider SONAME」的包。
+/// abifix_plan（lib）载入旧索引 → 检测孤儿 → 逐个 bump release → 返回修复目标清单；
+/// 这里以这些包为显式目标强制重建（run_build 内 topo 排序 + ABI 传播级联照常）。
+/// **plan 返回空（无目标）时直接返回**——绝不能落到空目标的增量构建。
+pub(crate) fn cmd_abifix(args: &Args) -> ExitCode {
+    let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
+    let out_dir = args.out.clone().unwrap_or_else(|| PathBuf::from("out"));
+    let arch = args.arch.clone().unwrap_or_else(|| "x86_64".to_string());
+
+    let names = match lankefarm::build::abifix_plan(&PathBuf::from(&pkgs_dir), &out_dir, &arch) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("{e}");
+            return ExitCode::from(2);
+        }
+    };
+    if names.is_empty() {
+        return ExitCode::SUCCESS;
+    }
+    run_build_flow(args, pkgs_dir, out_dir, names, /*validate=*/ false)
+}
+
 /// build / validate 共用完整流程：state → image 校验 → 内嵌 serve → RealBinding → run_build → 汇总。
 fn run_build_flow(
     args: &Args,

@@ -1,6 +1,6 @@
 {
   "name": "python-gobject",
-  "version": "3.56.3",
+  "version": "3.58.0",
   "release": 3,
   "deps": [
     "python",
@@ -33,7 +33,7 @@
     "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
-    "https://download.gnome.org/sources/pygobject/3.56/pygobject-3.56.3.tar.gz"
+    "https://download.gnome.org/sources/pygobject/3.58/pygobject-3.58.0.tar.gz"
   ],
   "work_sources": []
 }

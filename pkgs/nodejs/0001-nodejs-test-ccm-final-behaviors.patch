@@ -1,0 +1,51 @@
+From 7e2254fc8ba5ac88fe6f35715e7bb6e78597846b Mon Sep 17 00:00:00 2001
+From: Filip Skokan <panva.ip@gmail.com>
+Date: Wed, 26 Aug 2026 12:32:07 +0200
+Subject: [PATCH] test: account for varied OpenSSL CCM final behaviours
+
+Signed-off-by: Filip Skokan <panva.ip@gmail.com>
+---
+ test/parallel/test-crypto-authenticated.js | 29 ++++++++++++++++------
+ 1 file changed, 22 insertions(+), 7 deletions(-)
+
+diff --git a/test/parallel/test-crypto-authenticated.js b/test/parallel/test-crypto-authenticated.js
+index f27fcfa22dbf..1c5849b3f1d6 100644
+--- a/test/parallel/test-crypto-authenticated.js
++++ b/test/parallel/test-crypto-authenticated.js
+@@ -801,14 +801,29 @@ for (const test of TEST_CASES) {
+     const iv = Buffer.alloc(12);
+     const opts = { authTagLength: 10 };
+ 
++    const control = crypto.createCipheriv('aes-128-ccm', key, iv, opts);
++    control.update(Buffer.alloc(0));
++    control.final();
++    const expectedTag = control.getAuthTag();
++
+     const cipher = crypto.createCipheriv('aes-128-ccm', key, iv, opts);
+-    assert.throws(() => {
+-      cipher.final();
+-    }, hasOpenSSL(3) ? {
+-      code: 'ERR_OSSL_TAG_NOT_SET'
+-    } : {
+-      message: /Unsupported state/
+-    });
++    let output;
++    try {
++      output = cipher.final();
++    } catch (err) {
++      // OpenSSL without https://github.com/openssl/openssl/pull/32427
++      // cannot finalize an empty CCM message unless update() was called.
++      if (hasOpenSSL(3)) {
++        assert.strictEqual(err.code, 'ERR_OSSL_TAG_NOT_SET');
++      } else {
++        assert.match(err.message, /Unsupported state/);
++      }
++    }
++
++    if (output !== undefined) {
++      assert.deepStrictEqual(output, Buffer.alloc(0));
++      assert.deepStrictEqual(cipher.getAuthTag(), expectedTag);
++    }
+   }
+ }
+ 

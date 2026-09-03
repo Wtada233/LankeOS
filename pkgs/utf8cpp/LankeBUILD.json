@@ -1,6 +1,6 @@
 {
   "name": "utf8cpp",
-  "version": "4.1.1",
+  "version": "4.2.0",
   "release": 1,
   "deps": [],
   "needed_so": [],
@@ -11,7 +11,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/nemtrif/utfcpp/archive/refs/tags/v4.1.1.tar.gz"
+    "https://github.com/nemtrif/utfcpp/archive/refs/tags/v4.2.0.tar.gz"
   ],
   "work_sources": []
 }

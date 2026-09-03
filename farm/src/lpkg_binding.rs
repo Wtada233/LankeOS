@@ -475,10 +475,15 @@ impl RealBinding {
             write_roll_counter(&self.out_dir, 0);
         }
 
-        // 4.6 旧 .so 恢复（**commit/GC 之后**）：重新注入备份 → cp 进 /usr/lib → ldconfig。
+        // 4.6 旧 .so 恢复（**commit/GC 之后**）：重新注入备份 → cp 进 /usr/lib → ldconfig -X。
         //     旧二进制（如链旧 libxml2.so.2 的 gettext）靠它继续运行，新构建用新 .so。
         //     放 commit 后 ⇒ 恢复的旧 .so 只存在于本次临时容器，绝不进 roll/base 镜像
         //     （commit/GC/finalize 的快照都是干净的，见 4 的顺序约束）。
+        //     **ldconfig 必须加 -X（只重建缓存、不更新符号链接）**：真 ABI 断裂时被移除的
+        //     SONAME 链接本就在备份里（cp 已还原，无需 ldconfig 再造）；而伪 SONAME 备份
+        //     （libvpx.so.12.0 → libvpx.so.12.0.0，实体真 SONAME 是 libvpx.so.12）会让无 -X 的
+        //     ldconfig 在容器里**新建** /usr/lib/libvpx.so.12 —— 这个 lpkg 不追踪的文件会和
+        //     新包安装冲突（"owned by package unknown (manual file)"）。-X 消除该合成。
         let backups = self.out_dir.join("backups");
         if backups.is_dir() {
             let _ = run_quiet(&[
@@ -488,7 +493,7 @@ impl RealBinding {
             ]);
         }
         let restore_script =
-            "if [ -d /backups ]; then cp -a /backups/. /usr/lib/ && ldconfig; fi; true";
+            "if [ -d /backups ]; then cp -a /backups/. /usr/lib/ && ldconfig -X; fi; true";
         let status = std::process::Command::new("docker")
             .args(["exec", &cid, "sh", "-c", restore_script])
             .status()

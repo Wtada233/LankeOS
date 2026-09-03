@@ -1,6 +1,6 @@
 {
   "name": "xwayland",
-  "version": "24.1.13",
+  "version": "26.0.99.901",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -39,7 +39,7 @@
     "xtrans"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/xserver/xwayland-24.1.13.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/xserver/xwayland-26.0.99.901.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

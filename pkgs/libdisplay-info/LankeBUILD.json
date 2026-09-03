@@ -1,6 +1,6 @@
 {
   "name": "libdisplay-info",
-  "version": "0.4.0",
+  "version": "0.3.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -9,7 +9,7 @@
   ],
   "provides": [
     "libdisplay-info.so",
-    "libdisplay-info.so.4"
+    "libdisplay-info.so.3"
   ],
   "build_deps": [
     "base-devel",
@@ -18,7 +18,7 @@
     "ninja"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/0.4.0/libdisplay-info-0.4.0.tar.gz"
+    "https://gitlab.freedesktop.org/emersion/libdisplay-info/-/archive/0.3.0/libdisplay-info-0.3.0.tar.gz"
   ],
   "work_sources": []
 }

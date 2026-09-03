@@ -1,0 +1,231 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Wtada233 <wtada233@outlook.com>
+Date: Mon, 31 Aug 2026 12:33:42 +0800
+Subject: [PATCH] Remove AMX-TF32 support (LLVM dropped the feature)
+
+LLVM recently dropped the x86 AMX-TF32 feature (llvm/llvm-project#207673).
+Rust 1.98.0 still ships stdarch AMX-TF32 intrinsics that lower to the
+removed llvm.x86.tmmultf32ps intrinsics and request the "amx-tf32" target
+feature, which breaks building rustc against LLVM 23.
+
+Local reproduction of the upstream cleanup by Krasimir Georgiev
+<krasimir@google.com> and Gwen Mittertreiner <gmtr@google.com>, adapted
+to the 1.98.0 tree (library/ prefixed paths):
+  - rust-lang/stdarch#2184: drop _tile_mmultf32ps / __tile_mmultf32ps
+    intrinsics, their extern "llvm.x86.tmmultf32ps" decls and tests;
+    drop "amx-tf32" from the stdarch-verify skip list.
+  - rust-lang/rust#159310: drop the "amx-tf32" entry from the rustc_target
+    feature table, the std_detect CPUID detection + doc, the x86-specific
+    test line and the check-cfg UI test expectation.
+---
+ compiler/rustc_target/src/target_features.rs       |  1 -
+ library/std_detect/src/detect/arch/x86.rs          |  3 -
+ library/std_detect/src/detect/os/x86.rs            |  1 -
+ library/std_detect/tests/x86-specific.rs           |  1 -
+ library/stdarch/crates/core_arch/src/x86_64/amx.rs | 98 ----------------------
+ .../crates/stdarch-verify/tests/x86-intel.rs       |  2 +-
+ tests/ui/check-cfg/target_feature.stderr           |  1 -
+ 7 files changed, 1 insertion(+), 106 deletions(-)
+diff --git a/compiler/rustc_target/src/target_features.rs b/compiler/rustc_target/src/target_features.rs
+index 045c2b8..d8e5b3c 100644
+--- a/compiler/rustc_target/src/target_features.rs
++++ b/compiler/rustc_target/src/target_features.rs
+@@ -416,7 +416,6 @@ static X86_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+     ("amx-fp16", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
+     ("amx-int8", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
+     ("amx-movrs", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
+-    ("amx-tf32", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
+     ("amx-tile", Unstable(sym::x86_amx_intrinsics), &[]),
+     ("apxf", Unstable(sym::apx_target_feature), &[]),
+     ("avx", Stable, &["sse4.2"]),
+diff --git a/library/std_detect/src/detect/arch/x86.rs b/library/std_detect/src/detect/arch/x86.rs
+index ede4a80..e054546 100644
+--- a/library/std_detect/src/detect/arch/x86.rs
++++ b/library/std_detect/src/detect/arch/x86.rs
+@@ -91,7 +91,6 @@ features! {
+     /// * `"amx-avx512"`
+     /// * `"amx-fp8"`
+     /// * `"amx-movrs"`
+-    /// * `"amx-tf32"`
+     /// * `"f16c"`
+     /// * `"fma"`
+     /// * `"bmi1"`
+@@ -228,8 +227,6 @@ features! {
+     /// AMX-FP8 (Float8 Operations)
+     @FEATURE: #[unstable(feature = "x86_amx_intrinsics", issue = "126622")] amx_movrs: "amx-movrs";
+     /// AMX-MOVRS (Matrix MOVERS operations)
+-    @FEATURE: #[unstable(feature = "x86_amx_intrinsics", issue = "126622")] amx_tf32: "amx-tf32";
+-    /// AMX-TF32 (TensorFloat32 Operations)
+     @FEATURE: #[unstable(feature = "apx_target_feature", issue = "139284")] apxf: "apxf";
+     /// APX-F (Advanced Performance Extensions - Foundation)
+     @FEATURE: #[unstable(feature = "avx10_target_feature", issue = "138843")] avx10_1: "avx10.1";
+diff --git a/library/std_detect/src/detect/os/x86.rs b/library/std_detect/src/detect/os/x86.rs
+index 2b75cd6..4e739fb 100644
+--- a/library/std_detect/src/detect/os/x86.rs
++++ b/library/std_detect/src/detect/os/x86.rs
+@@ -216,7 +216,6 @@ pub(crate) fn detect_features() -> cache::Initializer {
+                             __cpuid_count(0x1e_u32, 1);
+ 
+                         enable(amx_feature_flags_eax, 4, Feature::amx_fp8);
+-                        enable(amx_feature_flags_eax, 6, Feature::amx_tf32);
+                         enable(amx_feature_flags_eax, 7, Feature::amx_avx512);
+                         enable(amx_feature_flags_eax, 8, Feature::amx_movrs);
+                     }
+diff --git a/library/std_detect/tests/x86-specific.rs b/library/std_detect/tests/x86-specific.rs
+index 4b02f78..1171825 100644
+--- a/library/std_detect/tests/x86-specific.rs
++++ b/library/std_detect/tests/x86-specific.rs
+@@ -83,7 +83,6 @@ fn dump() {
+     println!("widekl: {:?}", is_x86_feature_detected!("widekl"));
+     println!("movrs: {:?}", is_x86_feature_detected!("movrs"));
+     println!("amx-fp8: {:?}", is_x86_feature_detected!("amx-fp8"));
+-    println!("amx-tf32: {:?}", is_x86_feature_detected!("amx-tf32"));
+     println!("amx-avx512: {:?}", is_x86_feature_detected!("amx-avx512"));
+     println!("amx-movrs: {:?}", is_x86_feature_detected!("amx-movrs"));
+ }
+diff --git a/library/stdarch/crates/core_arch/src/x86_64/amx.rs b/library/stdarch/crates/core_arch/src/x86_64/amx.rs
+index cddae18..f97acf1 100644
+--- a/library/stdarch/crates/core_arch/src/x86_64/amx.rs
++++ b/library/stdarch/crates/core_arch/src/x86_64/amx.rs
+@@ -632,50 +632,6 @@ pub unsafe fn __tile_stream_loaddrs(dst: *mut __tile1024i, base: *const u8, stri
+     (*dst).tile = tileloaddrst164_internal((*dst).rows, (*dst).colsb, base, stride as u64);
+ }
+ 
+-/// Perform matrix multiplication of two tiles a and b, containing packed single precision (32-bit)
+-/// floating-point elements, which are converted to TF32 (tensor-float32) format, and accumulate the
+-///  results into a packed single precision tile.
+-/// For each possible combination of (row of a, column of b), it performs
+-///  - convert to TF32
+-///  - multiply the corresponding elements of a and b
+-///  - accumulate the results into the corresponding row and column of dst using round-to-nearest-even
+-/// rounding mode.
+-/// Output FP32 denormals are always flushed to zero, input single precision denormals are always
+-/// handled and *not* treated as zero.
+-#[inline]
+-#[rustc_legacy_const_generics(0, 1, 2)]
+-#[target_feature(enable = "amx-tf32")]
+-#[cfg_attr(
+-    all(test, not(target_vendor = "apple")),
+-    assert_instr(tmmultf32ps, DST = 0, A = 1, B = 2)
+-)]
+-#[unstable(feature = "x86_amx_intrinsics", issue = "126622")]
+-pub unsafe fn _tile_mmultf32ps<const DST: i32, const A: i32, const B: i32>() {
+-    static_assert_uimm_bits!(DST, 3);
+-    static_assert_uimm_bits!(A, 3);
+-    static_assert_uimm_bits!(B, 3);
+-    tmmultf32ps(DST as i8, A as i8, B as i8);
+-}
+-
+-/// Perform matrix multiplication of two tiles a and b, containing packed single precision (32-bit)
+-/// floating-point elements, which are converted to TF32 (tensor-float32) format, and accumulate the
+-///  results into a packed single precision tile.
+-/// For each possible combination of (row of a, column of b), it performs
+-///  - convert to TF32
+-///  - multiply the corresponding elements of a and b
+-///  - accumulate the results into the corresponding row and column of dst using round-to-nearest-even
+-/// rounding mode.
+-/// Output FP32 denormals are always flushed to zero, input single precision denormals are always
+-/// handled and *not* treated as zero.
+-/// The shape of the tile is specified in the struct of [`__tile1024i`]. The register of the tile is allocated by the compiler.
+-#[inline]
+-#[target_feature(enable = "amx-tf32")]
+-#[cfg_attr(all(test, not(target_vendor = "apple")), assert_instr(tmmultf32ps))]
+-#[unstable(feature = "x86_amx_intrinsics", issue = "126622")]
+-pub unsafe fn __tile_mmultf32ps(dst: *mut __tile1024i, a: __tile1024i, b: __tile1024i) {
+-    (*dst).tile = tmmultf32ps_internal(a.rows, b.colsb, a.colsb, (*dst).tile, a.tile, b.tile);
+-}
+-
+ /// Moves a row from a tile register to a zmm register, converting the packed 32-bit signed integer
+ /// elements to packed single-precision (32-bit) floating-point elements.
+ #[inline]
+@@ -1037,11 +993,6 @@ unsafe extern "unadjusted" {
+     #[link_name = "llvm.x86.tileloaddrst164.internal"]
+     fn tileloaddrst164_internal(rows: u16, colsb: u16, base: *const u8, stride: u64) -> Tile;
+ 
+-    #[link_name = "llvm.x86.tmmultf32ps"]
+-    fn tmmultf32ps(dst: i8, a: i8, b: i8);
+-    #[link_name = "llvm.x86.tmmultf32ps.internal"]
+-    fn tmmultf32ps_internal(m: u16, n: u16, k: u16, dst: Tile, a: Tile, b: Tile) -> Tile;
+-
+     #[link_name = "llvm.x86.tcvtrowd2ps"]
+     fn tcvtrowd2ps(tile: i8, row: u32) -> f32x16;
+     #[link_name = "llvm.x86.tcvtrowd2psi"]
+@@ -2368,53 +2319,4 @@ mod tests {
+             }
+         }
+     }
+-
+-    #[simd_test(enable = "amx-tf32")]
+-    fn test_tile_mmultf32ps() {
+-        unsafe {
+-            _init_amx();
+-            let a: [[f32; 16]; 16] = array::from_fn(|i| [i as _; _]);
+-            let b: [[f32; 16]; 16] = [array::from_fn(|j| j as _); _];
+-            let mut res = [[0.0; 16]; 16];
+-
+-            let mut config = __tilecfg::default();
+-            config.palette = 1;
+-            (0..=2).for_each(|i| {
+-                config.colsb[i] = 64;
+-                config.rows[i] = 16;
+-            });
+-            _tile_loadconfig(config.as_ptr());
+-            _tile_zero::<0>();
+-            _tile_loadd::<1>(a.as_ptr().cast(), 64);
+-            _tile_loadd::<2>(b.as_ptr().cast(), 64);
+-            _tile_mmultf32ps::<0, 1, 2>();
+-            _tile_stored::<0>(res.as_mut_ptr().cast(), 64);
+-            _tile_release();
+-
+-            let expected = array::from_fn(|i| array::from_fn(|j| 16.0 * i as f32 * j as f32));
+-            assert_eq!(res, expected);
+-        }
+-    }
+-
+-    #[simd_test(enable = "amx-tf32")]
+-    fn test__tile_mmultf32ps() {
+-        unsafe {
+-            _init_amx();
+-            let a: [[f32; 16]; 16] = array::from_fn(|i| [i as _; _]);
+-            let b: [[f32; 16]; 16] = [array::from_fn(|j| j as _); _];
+-            let mut res = [[0.0; 16]; 16];
+-
+-            let mut tile_a = __tile1024i::zeroed(16, 64);
+-            let mut tile_b = __tile1024i::zeroed(16, 64);
+-            let mut tile_c = __tile1024i::zeroed(16, 64);
+-
+-            __tile_loadd(&mut tile_a, a.as_ptr().cast(), 64);
+-            __tile_loadd(&mut tile_b, b.as_ptr().cast(), 64);
+-            __tile_mmultf32ps(&mut tile_c, tile_a, tile_b);
+-            __tile_stored(res.as_mut_ptr().cast(), 64, tile_c);
+-
+-            let expected = array::from_fn(|i| array::from_fn(|j| 16.0 * i as f32 * j as f32));
+-            assert_eq!(res, expected);
+-        }
+-    }
+ }
+diff --git a/library/stdarch/crates/stdarch-verify/tests/x86-intel.rs b/library/stdarch/crates/stdarch-verify/tests/x86-intel.rs
+index 32726d1..be948df 100644
+--- a/library/stdarch/crates/stdarch-verify/tests/x86-intel.rs
++++ b/library/stdarch/crates/stdarch-verify/tests/x86-intel.rs
+@@ -305,7 +305,7 @@ fn verify_all_signatures() {
+             }
+ 
+             // FIXME: these have not been added to Intrinsics Guide yet
+-            if ["amx-avx512", "amx-fp8", "amx-movrs", "amx-tf32", "movrs"]
++            if ["amx-avx512", "amx-fp8", "amx-movrs", "movrs"]
+                 .iter()
+                 .any(|f| feature.contains(f))
+             {
+diff --git a/tests/ui/check-cfg/target_feature.stderr b/tests/ui/check-cfg/target_feature.stderr
+index bcc3abf..8132017 100644
+--- a/tests/ui/check-cfg/target_feature.stderr
++++ b/tests/ui/check-cfg/target_feature.stderr
+@@ -27,7 +27,6 @@ LL |     cfg!(target_feature = "_UNEXPECTED_VALUE");
+ `amx-fp8`
+ `amx-int8`
+ `amx-movrs`
+-`amx-tf32`
+ `amx-tile`
+ `apxf`
+ `atomics`

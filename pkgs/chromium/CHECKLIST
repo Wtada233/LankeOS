@@ -1,0 +1,2 @@
+- [ ] 发布检查Vulkan是否正确启用：使用系统Vulkan-Headers然而Loader是Builtin（版本错位容易造成问题）
+  - 关联TODO：unbundle Vulkan-Loader（目前少有发行版做到，更多是一种理想情况，近期可能还是得处理版本一致性问题）

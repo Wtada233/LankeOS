@@ -1,5 +1,8 @@
 lankebuild_prepare() {
-    unset {C,CPP,CXX,LD}FLAGS
+    # 同 Arch：installdir/bin 软链用 MOZ_APP_REMOTINGNAME（release 上是 no-op，但对齐 Arch，
+    # 且 GetDBusAppName 改用 remotingName）。revert D210285。
+    patch -Np1 < "{WORK_DIR}/../0001-Install-under-remoting-name.patch"
+
     # ------------------------------------------------------------
     # 1. 创建 mozconfig (核心构建配置)
     # ------------------------------------------------------------
@@ -19,6 +22,7 @@ ac_add_options --disable-tests
 ac_add_options --disable-crashreporter
 ac_add_options --enable-application=browser
 ac_add_options --enable-default-toolkit=cairo-gtk3-wayland-only
+ac_add_options --disable-bootstrap
 
 # ---------- 功能配置 ----------
 ac_add_options --enable-system-ffi
@@ -53,18 +57,19 @@ EOF
 
 lankebuild_build() {
     unset MOZ_TELEMETRY_REPORTING
-    unset {C,CPP,CXX,LD}FLAGS
+    # 以下flags设置来自Arch Linux：
+    CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    CFLAGS="${CFLAGS/-fexceptions/}"
+    CXXFLAGS="${CXXFLAGS/-fexceptions/}"
+    unset MAKEFLAGS
 
-    # 再次设置环境变量 (因为函数可能独立执行)
     export MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE=none
     export MOZBUILD_STATE_PATH="${PWD}/mozbuild"
-    ./mach python -m pip install taskcluster
     ./mach build -j$(( $(nproc) - 4 ))
 
-    # 安装到临时根目录 (LankeBUILD 会替换 {STAGING_ROOT})
     DESTDIR="{STAGING_ROOT}" ./mach install
 
-    # 清理环境变量
     unset MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE
     unset MOZBUILD_STATE_PATH
 }
@@ -110,4 +115,3 @@ EOF
             "{STAGING_ROOT}{DATADIR}/pixmaps/firefox.png"
     ln -sfv ../lib/firefox/firefox "{STAGING_ROOT}{BINDIR}/firefox"
 }
-

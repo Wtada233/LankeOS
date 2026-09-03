@@ -4,10 +4,10 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    export CGO_LDFLAGS="${LDFLAGS}"
-    export CGO_CFLAGS="${CFLAGS}"
+    export CGO_LDFLAGS="{LDFLAGS}"
+    export CGO_CFLAGS="{CFLAGS}"
     export CGO_CPPFLAGS="${CPPFLAGS}"
-    export CGO_CXXFLAGS="${CXXFLAGS}"
+    export CGO_CXXFLAGS="{CXXFLAGS}"
     export GOFLAGS="-buildmode=pie -trimpath -mod=readonly -modcacherw"
     make FZF_VERSION={ORIG_PKG_VER} FZF_REVISION=nohash -j$(nproc)
     make bin/fzf FZF_VERSION={ORIG_PKG_VER} FZF_REVISION=nohash -j$(nproc)

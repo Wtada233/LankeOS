@@ -1,6 +1,6 @@
 {
   "name": "libclc",
-  "version": "22.1.8",
+  "version": "23.1.0",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -12,8 +12,11 @@
     "ninja",
     "spirv-llvm-translator"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
-    "https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/llvm-project-22.1.8.src.tar.xz"
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/llvm-project-23.1.0.src.tar.xz"
   ],
   "work_sources": [],
   "no_strip": true

@@ -26,6 +26,9 @@
     "ninja",
     "spirv-headers"
   ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
+  ],
   "sources": [
     "https://github.com/KhronosGroup/SPIRV-Tools/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz"
   ],

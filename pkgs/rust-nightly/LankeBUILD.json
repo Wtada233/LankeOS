@@ -1,38 +1,41 @@
 {
   "name": "rust-nightly",
-  "version": "2026-08-02",
+  "version": "2026-08-30",
   "release": 1,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
-    "libLLVM.so.22.1",
+    "libLLVM.so.23.1",
     "libc.so.6",
-    "libcrypto.so.3",
     "libcurl.so.4",
     "libgcc_s.so.1",
+    "libgit2.so.1.9",
     "libm.so.6",
+    "libsqlite3.so.0",
+    "libssh2.so.1",
     "libssl.so.3",
-    "libstdc++.so.6",
-    "libz.so.1"
+    "libstdc++.so.6"
   ],
   "provides": [
-    "librustc_driver-e243bc321b9fbeab.so"
+    "librustc_driver-47ccdb0aa9bf0818.so"
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
+    "compiler-rt",
     "curl",
+    "libffi",
+    "libgit2",
+    "libssh2",
     "llvm",
+    "ninja",
+    "sqlite",
     "zlib"
   ],
   "sources": [
-    "https://static.rust-lang.org/dist/2026-08-02/rustc-nightly-src.tar.xz"
+    "https://static.rust-lang.org/dist/2026-08-30/rustc-nightly-src.tar.xz"
   ],
-  "work_sources": [
-    "file://./0001-bootstrap-Change-libexec-dir.patch",
-    "file://./0002-bootstrap-Change-bash-completion-dir.patch",
-    "file://./0004-compiler-Change-LLVM-targets.patch",
-    "file://./0005-compiler-Use-ld.lld-by-default.patch"
-  ]
+  "work_sources": []
 }
