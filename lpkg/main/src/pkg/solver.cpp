@@ -95,16 +95,22 @@ void add_requires(Solvable* s, Pool* pool, const std::vector<DependencyInfo>& de
 }
 
 // 收集 solve 失败的问题：
-//   missing_so     — 缺失的 needed_so（SONAME，`--missing-so-no-error` 才可容忍）；
-//   missing_dep    — 缺失的命名依赖（**不可容忍**，即使开 missing-so-no-error 也报错）；
-//   missing_target — **用户直接请求**的包/能力无提供者（JOB 规则，报"包未找到"而非"依赖"）；
-//   fatal          — 真冲突。
+//   missing_so       — nothing-provides 且缺失的 needed_so（SONAME）；
+//   soname_conflicts — PKG 冲突形态的缺 SONAME（libsolv 对无提供者的 SONAME requires
+//                     有时报 PKG 冲突而非 nothing-provides，如 "qt6-base requires
+//                     libgbm.so.1"；dep 名是 SONAME 且全池确无提供者时归入本桶）；
+//   missing_dep      — 缺失的命名依赖（**不可容忍**，即使开 missing-so-no-error 也报错）；
+//   missing_target   — **用户直接请求**的包/能力无提供者（JOB 规则，报"包未找到"而非"依赖"）；
+//   fatal            — 真冲突（版本不符/CONFLICTS/同名等）。
+// missing_so 与 soname_conflicts 在 `--missing-so-no-error` 下都可容忍（同一性质：缺
+// SONAME 提供者，只是 libsolv 措辞不同）；missing_dep/missing_target/fatal 不可容忍。
 // 判定约定：与 order_by_dependencies 相同——requires 名含 ".so" 视为 needed_so（SONAME），
 // 否则视为命名依赖。防止 --missing-so-no-error 把缺失命名依赖一起"伪提供"吞掉。
 // 区分 JOB vs PKG 规则：JOB_NOTHING_PROVIDES_DEP = 顶层请求无提供者（如 `install foo`
 // 而 foo 不在仓库，报"仓库中未找到软件包"）；PKG_NOTHING_PROVIDES_DEP = 传递依赖缺失
 // （报"依赖无提供者"）。曾把两者都当依赖报，`install foo` 缺包时错报"依赖 'foo' 无提供者"。
 void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missing_so,
+                      std::vector<std::string>& soname_conflicts,
                       std::vector<std::string>& missing_dep,
                       std::vector<std::string>& missing_target, std::vector<std::string>& fatal)
 {
@@ -133,7 +139,17 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                 // 请求的包不存在 → 真错误（走 l10n）
                 fatal.emplace_back(get_string("error.requested_package_not_exist"));
             } else if (info >= SOLVER_RULE_PKG && info < SOLVER_RULE_JOB) {
-                // 真实包级冲突（REQUIRES 版本不符/CONFLICTS/SAME_NAME/OBSOLETES...）
+                // PKG 规则。若 dep 是 SONAME 且全池确无提供者 → libsolv 把它当冲突报
+                // （qt6-base requires libgbm.so.1 之类），归 soname_conflicts 供容忍；
+                // 否则才是真冲突（版本不符/CONFLICTS/SAME_NAME/OBSOLETES...）。
+                const char* dn = dep ? pool_id2str(pool, dep) : nullptr;
+                if (dn && looks_like_soname(dn)) {
+                    const Id* w = pool_whatprovides_ptr(pool, dep);
+                    if (!w || !*w) {
+                        soname_conflicts.emplace_back(dn);
+                        continue;
+                    }
+                }
                 const char* desc = solver_ruleinfo2str(solv, info, from, to, dep);
                 fatal.emplace_back(desc ? desc : "(conflict)");
             }
@@ -389,8 +405,8 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                     // pool 内 evr 是归一化后的 libsolv EVR（`+release`→`-`、`-预发布`→`~`），
                     // 用 version_compare 前须 from_libsolv_evr 还原回 lpkg 版本域。
                     if (!best ||
-                        version_compare(from_libsolv_evr(
-                                            pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr)),
+                        version_compare(from_libsolv_evr(pool_id2str(
+                                            ps.pool, pool_id2solvable(ps.pool, best)->evr)),
                                         from_libsolv_evr(pool_id2str(ps.pool, sa->evr))))
                         best = pi;  // 当前 best 版本 < sa 版本 → sa 更新为 best
                 }
@@ -477,18 +493,28 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
         queue_free(&jobs);
 
         if (res != 0) {
-            std::vector<std::string> missing_so, missing_dep, missing_target, fatal;
-            collect_problems(solv, ps.pool, missing_so, missing_dep, missing_target, fatal);
+            std::vector<std::string> missing_so, soname_conflicts, missing_dep, missing_target,
+                fatal;
+            collect_problems(solv, ps.pool, missing_so, soname_conflicts, missing_dep,
+                             missing_target, fatal);
 
-            if (round == 0 && opts.missing_so_no_error && !missing_so.empty() &&
-                missing_dep.empty() && missing_target.empty() && fatal.empty()) {
-                // 纯缺 SONAME 且容忍 → 注入伪提供者重解。
-                // 有任何缺失命名依赖（missing_dep）或顶层目标缺失（missing_target）
-                // 就不走容忍：--missing-so-no-error 只允许 needed_so 缺失，
-                // 命名依赖/请求包缺失始终报错（回归 M1）。
-                injected = std::move(missing_so);
-                solver_free(solv);
-                continue;
+            if (round == 0 && opts.missing_so_no_error && missing_dep.empty() &&
+                missing_target.empty()) {
+                // --missing-so-no-error 容忍（round0 注入一次后重解）：
+                // 注入 = nothing-provides 缺 SONAME（missing_so）∪ PKG 冲突形态的缺
+                // SONAME（soname_conflicts，libsolv 措辞不同、性质相同）。命名依赖/顶层
+                // 请求缺失仍不可容忍（回归 M1）。真冲突不进这两个桶 → 注入集空 → 落到
+                // 下方照常报错；若某 fatal 实为缺 SONAME 引起，注入后 round1 重解即消解。
+                std::vector<std::string> inject = missing_so;
+                for (const auto& c : soname_conflicts) {
+                    if (std::find(inject.begin(), inject.end(), c) == inject.end())
+                        inject.push_back(c);
+                }
+                if (!inject.empty()) {
+                    injected = std::move(inject);
+                    solver_free(solv);
+                    continue;
+                }
             }
             for (const auto& p : fatal) result.problems.push_back(p);
             // 顶层请求的包/能力无提供者 → "仓库中未找到软件包"，不是"依赖"
@@ -497,6 +523,8 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
             for (const auto& d : missing_dep)
                 result.problems.push_back(string_format("error.unresolved_dependency", d));
             for (const auto& c : missing_so)
+                result.problems.push_back(string_format("error.unresolved_soname", c));
+            for (const auto& c : soname_conflicts)
                 result.problems.push_back(string_format("error.unresolved_soname", c));
             solver_free(solv);
             return result;

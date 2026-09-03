@@ -2,6 +2,7 @@
 
 #include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/solver.hpp"
+#include "../../main/src/vercmp/dep_parser.hpp"
 
 using namespace solv;
 
@@ -359,4 +360,136 @@ TEST_F(SolverTest, MissingTransitiveNamedDepReportsDependency)
     ASSERT_FALSE(r.ok());
     ASSERT_FALSE(r.problems.empty());
     EXPECT_EQ(r.problems[0], string_format("error.unresolved_dependency", "libgone"));
+}
+
+// ============================================================================
+// --missing-so-no-error 容忍（回归锁行为）：缺 needed_so 提供者可容忍，
+// 但只限 SONAME；命名依赖/顶层缺失在 flag 下仍报错。
+// ============================================================================
+
+// flag 开：纯缺 SONAME（nothing-provides）→ 容忍，计划成功
+TEST_F(SolverTest, MissingSoToleratedWhenFlagSet)
+{
+    add("app", "1.0", {}, {}, {"libgone.so.1"});
+    SolveOptions o;
+    o.missing_so_no_error = true;
+    auto r = solve({{"app", "latest"}}, o);
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(order_has(r, "app"));
+}
+
+// flag 关：同样缺 SONAME → 报 error.unresolved_soname
+TEST_F(SolverTest, MissingSoRejectedWithoutFlag)
+{
+    add("app", "1.0", {}, {}, {"libgone.so.1"});
+    auto r = solve({{"app", "latest"}});
+    ASSERT_FALSE(r.ok());
+    ASSERT_FALSE(r.problems.empty());
+    EXPECT_EQ(r.problems[0], string_format("error.unresolved_soname", "libgone.so.1"));
+}
+
+// 深链：app needs libbar.so.1 ← bar provides，但 bar needs libmissing.so.1（叶子无提供者）。
+// flag 开 → 容忍叶子缺失，整链可解（伪提供者注入后 bar 仍先于 app）。
+TEST_F(SolverTest, MissingSoDeepChainToleratedWhenFlagSet)
+{
+    add("bar", "1.0", {}, {"libbar.so.1"}, {"libmissing.so.1"});
+    add("app", "1.0", {}, {}, {"libbar.so.1"});
+    SolveOptions o;
+    o.missing_so_no_error = true;
+    auto r = solve({{"app", "latest"}}, o);
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(order_has(r, "bar"));
+    EXPECT_TRUE(order_has(r, "app"));
+    size_t bar_pos = r.order.size(), app_pos = r.order.size();
+    for (size_t i = 0; i < r.order.size(); ++i) {
+        if (r.order[i].name == "bar") bar_pos = i;
+        if (r.order[i].name == "app") app_pos = i;
+    }
+    EXPECT_LT(bar_pos, app_pos);  // 提供者先于依赖者
+}
+
+// 3 层深链：app→p1→p2→(libgone.so.1 叶子缺失)。flag 开 → 容忍，提供者链先于依赖者
+TEST_F(SolverTest, MissingSoThreeLevelChainToleratedWhenFlagSet)
+{
+    add("p1", "1.0", {}, {"libp1.so.1"}, {"libp2.so.1"});
+    add("p2", "1.0", {}, {"libp2.so.1"}, {"libgone.so.1"});
+    add("app", "1.0", {}, {}, {"libp1.so.1"});
+    SolveOptions o;
+    o.missing_so_no_error = true;
+    auto r = solve({{"app", "latest"}}, o);
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    auto pos = [&](const std::string& n) {
+        for (size_t i = 0; i < r.order.size(); ++i)
+            if (r.order[i].name == n) return i;
+        return r.order.size();
+    };
+    EXPECT_NE(pos("app"), r.order.size());
+    EXPECT_NE(pos("p1"), r.order.size());
+    EXPECT_NE(pos("p2"), r.order.size());
+    EXPECT_LT(pos("p2"), pos("p1"));  // 最深的提供者最先装
+    EXPECT_LT(pos("p1"), pos("app"));
+}
+
+// 4 层深链：app→p1→p2→p3→(libgone.so.1 叶子缺失)。flag 开 → 容忍，全链可解
+TEST_F(SolverTest, MissingSoFourLevelChainToleratedWhenFlagSet)
+{
+    add("p1", "1.0", {}, {"libp1.so.1"}, {"libp2.so.1"});
+    add("p2", "1.0", {}, {"libp2.so.1"}, {"libp3.so.1"});
+    add("p3", "1.0", {}, {"libp3.so.1"}, {"libgone.so.1"});
+    add("app", "1.0", {}, {}, {"libp1.so.1"});
+    SolveOptions o;
+    o.missing_so_no_error = true;
+    auto r = solve({{"app", "latest"}}, o);
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    auto pos = [&](const std::string& n) {
+        for (size_t i = 0; i < r.order.size(); ++i)
+            if (r.order[i].name == n) return i;
+        return r.order.size();
+    };
+    for (const char* n : {"p1", "p2", "p3"}) EXPECT_NE(pos(n), r.order.size());
+    EXPECT_LT(pos("p3"), pos("p2"));
+    EXPECT_LT(pos("p2"), pos("p1"));
+    EXPECT_LT(pos("p1"), pos("app"));
+}
+
+// M1 回归：flag 只容忍 SONAME；缺失**命名**依赖仍报 error.unresolved_dependency
+TEST_F(SolverTest, MissingNamingDepStillRejectedUnderMissingFlag)
+{
+    add("app", "1.0", {"libfoo-pkg"}, {}, {});
+    SolveOptions o;
+    o.missing_so_no_error = true;
+    auto r = solve({{"app", "latest"}}, o);
+    ASSERT_FALSE(r.ok());
+    ASSERT_FALSE(r.problems.empty());
+    EXPECT_EQ(r.problems[0], string_format("error.unresolved_dependency", "libfoo-pkg"));
+}
+
+// 回归锁：flag 开 + 顶层请求缺失 → 仍报 error.package_not_in_repo
+TEST_F(SolverTest, MissingTopLevelTargetStillRejectedUnderMissingFlag)
+{
+    SolveOptions o;
+    o.missing_so_no_error = true;
+    auto r = solve({{"ghost", "latest"}}, o);
+    ASSERT_FALSE(r.ok());
+    ASSERT_FALSE(r.problems.empty());
+    EXPECT_EQ(r.problems[0], string_format("error.package_not_in_repo", "ghost"));
+}
+
+// 回归锁：**真冲突** + flag 开 → 仍报错（容忍只救缺 SONAME 提供者，绝不吞版本冲突）
+TEST_F(SolverTest, GenuineConflictStillRejectedUnderMissingFlag)
+{
+    add("lib", "1.0", {}, {}, {});  // 仓库里 lib 只到 1.0
+    DependencyInfo dep;
+    dep.name = "lib";
+    Constraint c;
+    c.op = ">=";
+    c.version = "2.0";
+    dep.constraints.push_back(c);
+    repo.update_package_info("app", "1.0", {dep}, {}, {});  // app 需要 lib >= 2.0
+
+    SolveOptions o;
+    o.missing_so_no_error = true;
+    auto r = solve({{"app", "latest"}}, o);
+    EXPECT_FALSE(r.ok()) << "版本冲突不是缺 SONAME，flag 下也必须报错";
+    EXPECT_FALSE(r.problems.empty());
 }
