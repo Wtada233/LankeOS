@@ -301,8 +301,11 @@ work_sources:
     );
 
     let bin = env!("CARGO_BIN_EXE_lankefarm");
+    // --probe-fail-continue：生成的 URL 是占位假地址（example.com/github 404、patches.example.com
+    // DNS 失败），探测必然失败——本测试验证的是**原子全量替换**语义，不是 URL 可达性。
+    // 无此 flag 时 --run 会因探测失败跳过写入（json 停留在 1.0），测试永远不绿。
     let out = std::process::Command::new(bin)
-        .args(["track", "multi", "--run", "--pkgs"])
+        .args(["track", "multi", "--run", "--probe-fail-continue", "--pkgs"])
         .arg(&pkgs)
         .args(["--data"])
         .arg(&data)
