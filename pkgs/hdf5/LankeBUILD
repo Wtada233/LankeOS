@@ -27,4 +27,6 @@ lankebuild_build() {
 lankebuild_package() {
     # 安装由 build 阶段完成；删静态库（导出 cmake 配置的 hdf5-static 目标暂无消费方）
     find {STAGING_ROOT} -name '*.a' -delete
+    rm -vf "{STAGING_ROOT}/usr/share/LICENSE"
+    install -vDm644 -t "{STAGING_ROOT}/usr/share/licenses/hdf5" LICENSE
 }

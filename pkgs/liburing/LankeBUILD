@@ -3,7 +3,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX}
+    ./configure --prefix={PREFIX} --mandir={MANDIR}
     make -j$(nproc)
 }
 
