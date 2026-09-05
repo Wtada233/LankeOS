@@ -1,15 +1,17 @@
 lankebuild_prepare() {
     # Prepare environment
-    for patchfile in "{WORK_DIR}"/../*.patch; do
-        patch -Np1 -i "$patchfile"
-    done
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --with-tcl={LIBDIR} --enable-shared --disable-rpath --mandir={MANDIR} --with-tclinclude={INCLUDEDIR} --disable-static
+    patch -Np0 -i "{WORK_DIR}"/../expect-5.45-format-security.patch
+    patch -Np1 -i "{WORK_DIR}"/../expect-c99.patch
+    patch -Np1 -i "{WORK_DIR}"/../expect-5.45.4-covscan-fixes.patch
+    patch -Np1 -i "{WORK_DIR}"/../expect-configure-c99.patch
+    autoreconf -fiv
 }
 
 lankebuild_build() {
+    export CFLAGS+=" -std=gnu17"
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --with-tcl={LIBDIR} --enable-shared --disable-rpath --mandir={MANDIR} --with-tclinclude={INCLUDEDIR} --disable-static
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
-    ln -svf expect5.45.4/libexpect5.45.4.so {STAGING_ROOT}{LIBDIR}/
 }
 
 

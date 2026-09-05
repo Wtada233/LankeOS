@@ -3,13 +3,14 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    # cargo-c 提供 cargo-capi / cargo-cbuild 两个子命令二进制（供 meson 构建 Rust 组件用）。
+    # cargo-c 提供 cargo-capi / cargo-cbuild / cargo-cinstall / cargo-ctest 四个子命令二进制
+    # （cbuild 供 meson 构建 Rust 组件用，cinstall 供 cargo-c 产物装库用）。
     # GitHub archive tarball 不含 Cargo.lock，不能用 --locked（会因无法生成 lock 而失败）；
     # 容器有 host 网络，cargo 解析依赖并生成 Cargo.lock。
     cargo build --release
 }
 
 lankebuild_package() {
-    install -Dm755 target/release/cargo-capi "{STAGING_ROOT}{BINDIR}/cargo-capi"
-    install -Dm755 target/release/cargo-cbuild "{STAGING_ROOT}{BINDIR}/cargo-cbuild"
+    # 全部装（Arch 同款：target/release 下所有可执行文件）
+    find target/release -maxdepth 1 -type f -executable -exec install -Dm755 -t "{STAGING_ROOT}{BINDIR}" {} +
 }

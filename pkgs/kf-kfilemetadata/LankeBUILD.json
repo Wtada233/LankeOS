@@ -1,7 +1,7 @@
 {
   "name": "kf-kfilemetadata",
   "version": "6.29.0",
-  "release": 3,
+  "release": 5,
   "deps": [],
   "needed_so": [
     "libKF6Archive.so.6",
@@ -11,9 +11,9 @@
     "libQt6Core.so.6",
     "libQt6Gui.so.6",
     "libQt6Xml.so.6",
-    "libavcodec.so.62",
-    "libavformat.so.62",
-    "libavutil.so.60",
+    "libavcodec.so.63",
+    "libavformat.so.63",
+    "libavutil.so.61",
     "libc.so.6",
     "libexiv2.so.28",
     "libgcc_s.so.1",

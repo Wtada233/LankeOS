@@ -12,17 +12,16 @@
     "libfreetype.so.6",
     "libfyaml.so.0",
     "libgcc_s.so.1",
-    "libgdk_pixbuf-2.0.so.0",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",
     "libm.so.6",
     "libpango-1.0.so.0",
-    "librsvg-2.so.2",
     "libstdc++.so.6",
     "libstemmer.so.0",
     "libsystemd.so.0",
+    "libvips.so.42",
     "libxml2.so.16",
     "libxmlb.so.2",
     "libzstd.so.1"
@@ -31,7 +30,7 @@
     "libAppStreamQt.so",
     "libAppStreamQt.so.3",
     "libappstream-compose.so",
-    "libappstream-compose.so.0",
+    "libappstream-compose.so.1",
     "libappstream.so",
     "libappstream.so.5"
   ],
@@ -52,6 +51,7 @@
     "libfyaml",
     "librsvg",
     "libstemmer",
+    "libvips",
     "libxml2",
     "libxmlb",
     "meson",
@@ -66,5 +66,5 @@
     "https://github.com/ximion/appstream/archive/refs/tags/v1.2.0.tar.gz"
   ],
   "work_sources": [],
-  "release": 4
+  "release": 5
 }

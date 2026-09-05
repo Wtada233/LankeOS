@@ -1,7 +1,7 @@
 {
   "name": "wlroots",
   "version": "0.20.2",
-  "release": 4,
+  "release": 6,
   "deps": [
     "xwayland"
   ],
@@ -9,7 +9,7 @@
     "libEGL.so.1",
     "libGLESv2.so.2",
     "libc.so.6",
-    "libdisplay-info.so.4",
+    "libdisplay-info.so.3",
     "libdrm.so.2",
     "libgbm.so.1",
     "libinput.so.10",

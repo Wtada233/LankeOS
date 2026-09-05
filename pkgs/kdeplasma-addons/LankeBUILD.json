@@ -1,7 +1,7 @@
 {
   "name": "kdeplasma-addons",
   "version": "6.7.4",
-  "release": 2,
+  "release": 3,
   "deps": [
     "qt6-quick3d",
     "kwin",
@@ -101,7 +101,8 @@
     "qt5compat",
     "qt6-base",
     "qt6-declarative",
-    "qt6-quick3d"
+    "qt6-quick3d",
+    "rust"
   ],
   "sources": [
     "https://download.kde.org/stable/plasma/6.7.4/kdeplasma-addons-6.7.4.tar.xz"

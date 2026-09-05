@@ -1,7 +1,7 @@
 {
   "name": "plasma-desktop",
   "version": "6.7.4",
-  "release": 2,
+  "release": 3,
   "deps": [
     "qt5compat",
     "kf-kdeclarative",
@@ -66,6 +66,7 @@
     "libQt6WaylandClient.so.6",
     "libQt6Widgets.so.6",
     "libQt6Xml.so.6",
+    "libSDL2-2.0.so.0",
     "libX11.so.6",
     "libXi.so.6",
     "libaccounts-qt6.so.1",
@@ -80,6 +81,7 @@
     "libprocesscore.so.11",
     "libstdc++.so.6",
     "libtaskmanager.so.6",
+    "libudev.so.1",
     "libwacom.so.9",
     "libwayland-client.so.0",
     "libxcb-xkb.so.1",

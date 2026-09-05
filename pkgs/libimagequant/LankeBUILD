@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # imagequant-sys = Rust 实现的 C ABI 封装，cargo-c 生成 libimagequant.so
+    cd imagequant-sys
+    export CARGO_PROFILE_RELEASE_LTO=true
+    export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+    cargo cbuild --release --prefix={PREFIX}
+}
+
+lankebuild_package() {
+    cd imagequant-sys
+    cargo cinstall --destdir="{STAGING_ROOT}" --prefix={PREFIX} --release
+}

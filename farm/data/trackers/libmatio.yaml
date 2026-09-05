@@ -1,0 +1,8 @@
+pkg-name: libmatio
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: tbeu/matio
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

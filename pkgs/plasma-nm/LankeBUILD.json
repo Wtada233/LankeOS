@@ -1,7 +1,7 @@
 {
   "name": "plasma-nm",
   "version": "6.7.4",
-  "release": 2,
+  "release": 3,
   "deps": [
     "kf-kquickcharts",
     "kirigami-addons",

@@ -1,7 +1,7 @@
 {
   "name": "kf-qqc2-desktop-style",
   "version": "6.29.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "kf-sonnet"
   ],

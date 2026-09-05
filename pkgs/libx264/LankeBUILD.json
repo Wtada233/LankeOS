@@ -4,8 +4,12 @@
   "release": 5,
   "deps": [],
   "needed_so": [
+    "libavcodec.so.63",
+    "libavformat.so.63",
+    "libavutil.so.61",
     "libc.so.6",
-    "libm.so.6"
+    "libm.so.6",
+    "libswscale.so.10"
   ],
   "provides": [
     "libx264.so",

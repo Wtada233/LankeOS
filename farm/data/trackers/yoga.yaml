@@ -2,7 +2,9 @@ pkg-name: yoga
 version-source: sources[0]
 sources:
 - tracker-template: github
-  repo: react/yoga
-  mode: tags
+  repo: facebook/yoga
+  mode: releases
   tag-prefix: v
+  # tags 列表混着废弃的日期版（v2017.02.07.00，vercmp 数值段 2017 > 3 会被判成最大）；
+  # 现代 yoga 只把 1.x-3.x 发成 GitHub release → mode: releases 走 /releases/latest 干净排除日期 tag。
   template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

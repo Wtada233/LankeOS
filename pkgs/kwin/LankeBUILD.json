@@ -1,7 +1,7 @@
 {
   "name": "kwin",
   "version": "6.7.4",
-  "release": 3,
+  "release": 5,
   "deps": [
     "qt5compat",
     "kf-kirigami",
@@ -51,7 +51,7 @@
     "libQt6Widgets.so.6",
     "libc.so.6",
     "libcanberra.so.0",
-    "libdisplay-info.so.4",
+    "libdisplay-info.so.3",
     "libdrm.so.2",
     "libeis.so.1",
     "libepoxy.so.0",

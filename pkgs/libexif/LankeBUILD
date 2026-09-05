@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    # github 归档缺 configure，重新引导（Arch 对 release 包也 autoreconf）
+    autoreconf -fiv
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --disable-static
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    :
+}

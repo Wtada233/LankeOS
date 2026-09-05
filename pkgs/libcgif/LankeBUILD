@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup build --prefix={PREFIX} --buildtype=release -Ddefault_library=shared
+    meson compile -C build
+    DESTDIR={STAGING_ROOT} meson install -C build
+}
+
+lankebuild_package() {
+    :
+}

@@ -1,7 +1,7 @@
 {
   "name": "kirigami-app-components",
   "version": "1.0.2",
-  "release": 2,
+  "release": 3,
   "deps": [
     "kf-kcoreaddons",
     "kf-kirigami",

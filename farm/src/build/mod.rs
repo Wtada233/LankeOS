@@ -203,6 +203,19 @@ pub fn abifix_plan(pkgs_dir: &Path, out_dir: &Path, arch: &str) -> Result<Vec<St
     Ok(targets.into_iter().map(|(p, _)| p).collect())
 }
 
+/// 刷新 binding 的 repo_provides = **当前** index.txt 的全部提供能力。index.txt 是单一真源、
+/// 随每包 `update_repo_index` 递增更新——同一次 run 里后构建的包必须看到先构建包刚加入 index 的
+/// SONAME，否则真实 DT_NEEDED 被扫描 not-found 过滤丢弃（libvips 丢 libmatio.so.14：两者同轮构建，
+/// libmatio 先建好进 index，但 repo_provides 还是 run 起点的旧快照，libvips 扫描时看不到它。
+/// 之后单独重建正常 = provider 已进基线）。读失败保守保留旧集。
+fn refresh_repo_provides(binding: &mut dyn LpkgBinding, out_dir: &Path, arch: &str) {
+    let Ok(text) = fs::read_to_string(out_dir.join(arch).join("index.txt")) else {
+        return;
+    };
+    let idx = Index::parse(&text);
+    binding.set_repo_provides(idx.all_provided_capabilities());
+}
+
 /// 进程内交互接管（§8.5）：BLOCKED 时提示 operator 选择，不退出进程。
 /// 主调度：返回构建报告（built/repacked/abi_broken/blocked）。
 /// `state` 非空时记录 job 状态 + 配方 hash（§11 持久化；读端/差分 requeue 尚未实现，
@@ -215,7 +228,9 @@ pub fn run_build(
     // 1. 旧索引（§7.2 传播反图的锚）——必须由 seed 落地的本地 repo index.txt，缺失/为空直接报错
     //    （禁止无基线构建：needed_so provider 校验、ABI diff 都需要它）。
     let old = load_old_index(&opts.out_dir, &opts.arch)?;
-    // 仓库全部提供能力 → binding 扫描 not-found 判定（needed_so 无 provider → 不进 needed_so）
+    // 仓库全部提供能力 → binding 扫描 not-found 判定（needed_so 无 provider → 不进 needed_so）。
+    // **这是活跃集，随每包 index 更新而刷新**（见 refresh_repo_provides）——否则同一次 run 里
+    // 先构建包新加入的 SONAME 对后构建包不可见。
     binding.set_repo_provides(old.all_provided_capabilities());
     let revmap = RevMap::build(&old);
     // 声明式重建组（data/build/*.yaml）：不链但 ABI 敏感的包（python 生态等）。
@@ -417,6 +432,8 @@ pub fn run_build(
             }
             continue;
         }
+        // 本包已进 index → 刷新 binding 的 repo_provides 为**当前**能力集，供下一包扫描。
+        refresh_repo_provides(binding, &opts.out_dir, &opts.arch);
         report.built.push(pkg.clone());
         println!(
             "  {}",
@@ -2142,6 +2159,138 @@ packages: perl-*
 
         // 再次 plan（仓库仍一致 / 或无新孤儿——c1 needed_so 还没重扫所以仍命中）→ 幂等性留 run_build
         fs::remove_dir_all(&pkgs).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    /// 模拟 RealBinding 的扫描 not-found 过滤（scan_content 语义）：build(pkg) 用**当时**持有的
+    /// repo_provides 把真实 DT_NEEDED（full_needed）中「自提供」与「repo 无 provider」的条目丢弃，
+    /// 返回过滤后的 needed_so。repo_provides 由调度器 set_repo_provides 驱动——正是要测的刷新点。
+    #[derive(Default)]
+    struct ScanLikeBinding {
+        repo_provides: std::collections::HashSet<String>,
+        full_needed: HashMap<String, Vec<String>>,
+        provides: HashMap<String, Vec<String>>,
+        lpkg: HashMap<String, PathBuf>,
+    }
+    impl LpkgBinding for ScanLikeBinding {
+        fn set_repo_provides(&mut self, provides: std::collections::HashSet<String>) {
+            self.repo_provides = provides;
+        }
+        fn build(&mut self, pkg: &str) -> BuildOutcome {
+            let own: std::collections::HashSet<String> = self
+                .provides
+                .get(pkg)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .collect();
+            let kept: Vec<String> = self
+                .full_needed
+                .get(pkg)
+                .cloned()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|s| !own.contains(s) && self.repo_provides.contains(s))
+                .collect();
+            BuildOutcome {
+                ok: true,
+                needed_so: kept,
+                provides: self.provides.get(pkg).cloned().unwrap_or_default(),
+                deps: vec![],
+                failure_stage: None,
+                lpkg_path: self.lpkg.get(pkg).cloned(),
+            }
+        }
+    }
+
+    #[test]
+    fn scan_sees_provider_built_earlier_in_same_run() {
+        // 回归（libvips 丢 libmatio.so.14）：同一次 run 里 libmatio 先构建、把 libmatio.so.14
+        // 加进 index；后构建的 libvips 扫描必须能看到它。曾 repo_provides 只快照 run 起点的旧
+        // index、从不刷新 → libvips 的真实 DT_NEEDED libmatio.so.14 被 not-found 丢弃（needed_so
+        // 胡扯）；单独重建正常 = provider 已在基线。
+        let dir = temp_dir("farm-scan-provider");
+        let out = temp_dir("farm-scan-provider-out");
+        write_baseline(&out, "sysroot|1.0:h::libc.so.6:|\n");
+        write_pkg_ver(
+            &dir,
+            "libmatio",
+            "1.5.30",
+            &["libmatio.so", "libmatio.so.14"],
+            &["libc.so.6"],
+            &[],
+        );
+        write_pkg_ver(
+            &dir,
+            "libvips",
+            "8.18.6",
+            &["libvips.so", "libvips.so.42"],
+            &["libc.so.6", "libmatio.so.14"],
+            &["libmatio"], // build_dep → topo 保证 libmatio 先建
+        );
+        let m = stage_lpkg(
+            &out,
+            "libmatio",
+            "1.5.30",
+            &["libc.so.6"],
+            &["libmatio.so", "libmatio.so.14"],
+        );
+        // libvips staging 的 metadata = 修复后应有的 needed_so（含 matio）；修复前扫描会丢它 →
+        // 触发 repack 把 metadata 改写成丢 matio 的版本，最终 index 也缺 → 断言失败。
+        let v = stage_lpkg(
+            &out,
+            "libvips",
+            "8.18.6",
+            &["libc.so.6", "libmatio.so.14"],
+            &["libvips.so", "libvips.so.42"],
+        );
+        let mut b = ScanLikeBinding::default();
+        b.full_needed
+            .insert("libmatio".into(), vec!["libc.so.6".into()]);
+        b.provides.insert(
+            "libmatio".into(),
+            vec!["libmatio.so".into(), "libmatio.so.14".into()],
+        );
+        b.lpkg.insert("libmatio".into(), m);
+        b.full_needed.insert(
+            "libvips".into(),
+            vec!["libc.so.6".into(), "libmatio.so.14".into()],
+        );
+        b.provides.insert(
+            "libvips".into(),
+            vec!["libvips.so".into(), "libvips.so.42".into()],
+        );
+        b.lpkg.insert("libvips".into(), v);
+
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["libmatio".into(), "libvips".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
+            manual_sort: false,
+        };
+        let report = run_build(&opts, &mut b, None).unwrap();
+        assert!(report.built.contains(&"libmatio".to_string()));
+        assert!(
+            report.built.contains(&"libvips".to_string()),
+            "libvips 应构建成功（扫描看到 libmatio.so.14）: blocked={:?}",
+            report.blocked
+        );
+        let idx = fs::read_to_string(out.join("x86_64/index.txt")).unwrap();
+        let vips_line = idx
+            .lines()
+            .find(|l| l.starts_with("libvips|"))
+            .expect("libvips 行应在 index");
+        assert!(
+            vips_line.contains("libmatio.so.14"),
+            "libvips 的真实 DT_NEEDED libmatio.so.14 不得被 not-found 丢弃: {vips_line}"
+        );
+        fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&out).ok();
     }
 

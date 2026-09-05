@@ -1,7 +1,7 @@
 {
   "name": "qt6-quicktimeline",
   "version": "6.11.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6",
@@ -23,6 +23,9 @@
     "ninja",
     "qt6-base",
     "qt6-declarative"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
     "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/qtquicktimeline-everywhere-src-6.11.2.tar.xz"

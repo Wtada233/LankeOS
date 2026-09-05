@@ -1,0 +1,19 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # BUILD_SHARED_LIBS 默认 ON；curl 支持默认 ON，按 Arch 关测试、开 pthreads
+    cmake -S . -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DUSE_PTHREADS=ON \
+        -DTESTS=OFF \
+        -DUTILS=ON
+    cmake --build build -j$(nproc)
+    DESTDIR={STAGING_ROOT} cmake --install build
+}
+
+lankebuild_package() {
+    :
+}

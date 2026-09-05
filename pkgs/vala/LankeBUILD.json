@@ -1,14 +1,13 @@
 {
   "name": "vala",
   "version": "0.56.19",
-  "release": 2,
+  "release": 4,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "libc.so.6",
-    "libcdt.so.6",
-    "libcgraph.so.8",
+    "libcgraph.so.10",
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",

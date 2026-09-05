@@ -1,6 +1,7 @@
 {
   "name": "libdatachannel",
   "version": "0.24.5",
+  "release": 1,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",

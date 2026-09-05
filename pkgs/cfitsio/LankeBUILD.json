@@ -1,0 +1,27 @@
+{
+  "name": "cfitsio",
+  "version": "4.7.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcurl.so.4",
+    "libm.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libcfitsio.so",
+    "libcfitsio.so.10"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "curl",
+    "ninja",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/HEASARC/cfitsio/archive/refs/tags/cfitsio-4.7.0.tar.gz"
+  ],
+  "work_sources": []
+}

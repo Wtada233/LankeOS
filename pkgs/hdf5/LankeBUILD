@@ -1,0 +1,30 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # 给 libmatio 用的 serial C HDF5：关 Fortran/Java/openmpi/SZIP/CPP，只留 zlib。
+    # GNU dirs 让 include 落 /usr/include、lib 落 /usr/lib（其余 cmake 包默认 lib/ 前缀）。
+    cmake -S . -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -Wno-dev \
+        -DHDF5_USE_GNU_DIRS=ON \
+        -DBUILD_SHARED_LIBS=ON \
+        -DHDF5_BUILD_CPP_LIB=OFF \
+        -DHDF5_BUILD_HL_LIB=OFF \
+        -DHDF5_BUILD_FORTRAN=OFF \
+        -DHDF5_BUILD_JAVA=OFF \
+        -DHDF5_BUILD_TOOLS=OFF \
+        -DHDF5_BUILD_EXAMPLES=OFF \
+        -DHDF5_ENABLE_ZLIB_SUPPORT=ON \
+        -DHDF5_ENABLE_SZIP_SUPPORT=OFF \
+        -DHDF5_INSTALL_CMAKE_DIR=lib/cmake/hdf5
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    # 安装由 build 阶段完成；删静态库（导出 cmake 配置的 hdf5-static 目标暂无消费方）
+    find {STAGING_ROOT} -name '*.a' -delete
+}

@@ -1,7 +1,7 @@
 {
   "name": "kddockwidgets",
   "version": "2.4.1",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6",

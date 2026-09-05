@@ -1,7 +1,7 @@
 {
   "name": "libplasma",
   "version": "6.7.4",
-  "release": 2,
+  "release": 3,
   "deps": [
     "qt5compat",
     "kf-kconfig",

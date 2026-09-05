@@ -4,7 +4,6 @@
   "deps": [],
   "needed_so": [
     "libEGL.so.1",
-    "libGLX.so.0",
     "libOpenGL.so.0",
     "libQt6Core.so.6",
     "libQt6DBus.so.6",
@@ -13,13 +12,9 @@
     "libQt6Svg.so.6",
     "libQt6WaylandClient.so.6",
     "libc.so.6",
-    "libdrm.so.2",
-    "libgcc_s.so.1",
     "libm.so.6",
     "libstdc++.so.6",
     "libwayland-client.so.0",
-    "libwayland-cursor.so.0",
-    "libwayland-egl.so.1",
     "libwayland-server.so.0",
     "libxkbcommon.so.0"
   ],
@@ -41,6 +36,9 @@
     "qt6-svg",
     "vulkan-headers",
     "wayland"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
     "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/qtwayland-everywhere-src-6.11.2.tar.xz"

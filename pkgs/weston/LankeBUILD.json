@@ -1,7 +1,7 @@
 {
   "name": "weston",
   "version": "16.0.0",
-  "release": 2,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libEGL.so.1",
@@ -9,7 +9,7 @@
     "libXcursor.so.1",
     "libc.so.6",
     "libcairo.so.2",
-    "libdisplay-info.so.4",
+    "libdisplay-info.so.3",
     "libdrm.so.2",
     "libevdev.so.2",
     "libfontconfig.so.1",

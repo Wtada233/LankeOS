@@ -1,7 +1,7 @@
 {
   "name": "plasma-pa",
   "version": "6.7.4",
-  "release": 2,
+  "release": 3,
   "deps": [
     "kirigami-addons",
     "sound-theme-freedesktop",

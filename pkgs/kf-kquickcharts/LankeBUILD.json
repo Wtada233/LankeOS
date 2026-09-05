@@ -1,7 +1,7 @@
 {
   "name": "kf-kquickcharts",
   "version": "6.29.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "kf-kirigami"
   ],

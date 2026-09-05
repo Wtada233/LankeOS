@@ -1,0 +1,8 @@
+pkg-name: libvips
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: libvips/libvips
+  mode: releases
+  tag-prefix: v
+  template: https://github.com/{repo}/releases/download/{tag}/vips-{version}.tar.xz

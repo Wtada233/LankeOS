@@ -1,7 +1,7 @@
 {
   "name": "keepsecret",
   "version": "26.08.0",
-  "release": 1,
+  "release": 2,
   "deps": [
     "kf-kirigami",
     "kf-kitemmodels",

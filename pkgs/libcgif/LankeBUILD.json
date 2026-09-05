@@ -1,0 +1,22 @@
+{
+  "name": "libcgif",
+  "version": "0.5.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [
+    "libcgif.so",
+    "libcgif.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "meson",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/dloebl/cgif/archive/refs/tags/v0.5.4.tar.gz"
+  ],
+  "work_sources": []
+}

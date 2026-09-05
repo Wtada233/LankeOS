@@ -1,0 +1,8 @@
+pkg-name: libexif
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: libexif/libexif
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

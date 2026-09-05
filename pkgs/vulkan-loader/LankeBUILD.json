@@ -4,8 +4,7 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libm.so.6"
+    "libc.so.6"
   ],
   "provides": [
     "libvulkan.so",

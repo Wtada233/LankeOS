@@ -1,7 +1,7 @@
 {
   "name": "plasma-workspace",
   "version": "6.7.4",
-  "release": 3,
+  "release": 4,
   "deps": [
     "kf-kded",
     "kio-fuse",
@@ -114,6 +114,7 @@
     "libicui18n.so.78",
     "libicuuc.so.78",
     "libm.so.6",
+    "libpackagekitqt6.so.2",
     "libpolkit-qt6-core-1.so.1",
     "libprocesscore.so.11",
     "libqalculate.so.23",

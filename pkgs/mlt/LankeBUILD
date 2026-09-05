@@ -1,5 +1,7 @@
 lankebuild_prepare() {
-    :
+    for patchfile in "{WORK_DIR}"/../*.patch; do
+        patch -Np1 -i "$patchfile"
+    done
 }
 
 lankebuild_build() {

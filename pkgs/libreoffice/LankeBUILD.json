@@ -1,7 +1,7 @@
 {
   "name": "libreoffice",
   "version": "26.8.0.3",
-  "release": 2,
+  "release": 5,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -26,7 +26,7 @@
     "libabw-0.1.so.1",
     "libargon2.so.1",
     "libatk-1.0.so.0",
-    "libboost_locale.so.1.91.0",
+    "libboost_locale.so.1.92.0",
     "libc.so.6",
     "libcairo-gobject.so.2",
     "libcairo.so.2",
@@ -101,6 +101,7 @@
     "libstaroffice-0.0.so.0",
     "libstdc++.so.6",
     "libtiff.so.6",
+    "libtommath.so.1",
     "libvisio-0.1.so.1",
     "libwebp.so.7",
     "libwpd-0.10.so.10",

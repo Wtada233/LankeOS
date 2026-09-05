@@ -1,7 +1,7 @@
 {
   "name": "qt6-location",
   "version": "6.11.2",
-  "release": 1,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6",
@@ -28,6 +28,9 @@
     "qt6-base",
     "qt6-declarative",
     "qt6-positioning"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
     "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/qtlocation-everywhere-src-6.11.2.tar.xz"

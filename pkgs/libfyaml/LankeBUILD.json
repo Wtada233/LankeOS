@@ -1,11 +1,12 @@
 {
   "name": "libfyaml",
-  "version": "1.0.0-beta1",
+  "version": "0.9.6",
   "release": 3,
   "deps": [],
   "needed_so": [
+    "libLLVM.so.23.1",
     "libc.so.6",
-    "libm.so.6"
+    "libclang.so.23.1"
   ],
   "provides": [
     "libfyaml.so",
@@ -16,7 +17,7 @@
     "llvm"
   ],
   "sources": [
-    "https://github.com/pantoniou/libfyaml/releases/download/v1.0.0-beta1/libfyaml-1.0.0-beta1.tar.gz"
+    "https://github.com/pantoniou/libfyaml/archive/refs/tags/v0.9.6.tar.gz"
   ],
   "work_sources": []
 }

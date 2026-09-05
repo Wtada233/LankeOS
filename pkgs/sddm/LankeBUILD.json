@@ -1,7 +1,7 @@
 {
   "name": "sddm",
   "version": "0.21.0",
-  "release": 7,
+  "release": 8,
   "deps": [
     "breeze",
     "weston"

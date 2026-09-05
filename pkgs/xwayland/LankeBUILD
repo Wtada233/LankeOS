@@ -3,10 +3,7 @@ lankebuild_prepare() {
     meson setup build . --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --default-library=shared \
         -Dc_args='-Wno-error=array-bounds' \
         -Dipv6=true \
-        -Dxvfb=false \
-        -Dxdmcp=false \
         -Dxcsecurity=true \
-        -Dsecure-rpc=false \
         -Ddri3=true \
         -Dglamor=true \
         -Dxkb_dir={DATADIR}/X11/xkb \

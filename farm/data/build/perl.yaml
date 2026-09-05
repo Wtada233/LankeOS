@@ -9,4 +9,4 @@ version-change-script: |
   old_minor=$(printf '%s' "$OLD_VER" | cut -d. -f1-2)
   new_minor=$(printf '%s' "$NEW_VER" | cut -d. -f1-2)
   [ "$old_minor" != "$new_minor" ]
-packages: perl-*
+packages: perl-* postgresql

@@ -1,0 +1,8 @@
+pkg-name: libimagequant
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: ImageOptim/libimagequant
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

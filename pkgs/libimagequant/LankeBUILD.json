@@ -1,0 +1,25 @@
+{
+  "name": "libimagequant",
+  "version": "4.4.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libimagequant.so",
+    "libimagequant.so.0.4"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cargo-c",
+    "rust"
+  ],
+  "sources": [
+    "https://github.com/ImageOptim/libimagequant/archive/refs/tags/4.4.1.tar.gz"
+  ],
+  "work_sources": []
+}

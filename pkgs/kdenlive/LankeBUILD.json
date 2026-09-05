@@ -1,7 +1,7 @@
 {
   "name": "kdenlive",
   "version": "26.08.0",
-  "release": 2,
+  "release": 5,
   "deps": [
     "frei0r-plugins",
     "kf-qqc2-desktop-style"
@@ -55,9 +55,9 @@
     "libQt6SvgWidgets.so.6",
     "libQt6Widgets.so.6",
     "libQt6Xml.so.6",
-    "libavcodec.so.62",
-    "libavformat.so.62",
-    "libavutil.so.60",
+    "libavcodec.so.63",
+    "libavformat.so.63",
+    "libavutil.so.61",
     "libc.so.6",
     "libkddockwidgets-qt6.so.3",
     "libm.so.6",
@@ -66,7 +66,7 @@
     "libopentime.so.18",
     "libopentimelineio.so.18",
     "libstdc++.so.6",
-    "libswresample.so.6"
+    "libswresample.so.7"
   ],
   "provides": [],
   "build_deps": [

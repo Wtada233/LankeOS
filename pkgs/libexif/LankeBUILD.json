@@ -1,0 +1,21 @@
+{
+  "name": "libexif",
+  "version": "0.6.26",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6"
+  ],
+  "provides": [
+    "libexif.so",
+    "libexif.so.12"
+  ],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/libexif/libexif/archive/refs/tags/v0.6.26.tar.gz"
+  ],
+  "work_sources": []
+}

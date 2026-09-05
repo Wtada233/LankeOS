@@ -3,14 +3,9 @@
   "version": "6.11.2",
   "deps": [],
   "needed_so": [
-    "libGLX.so.0",
-    "libOpenGL.so.0",
     "libQt6Core.so.6",
     "libQt6Gui.so.6",
     "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libsharpyuv.so.0",
     "libstdc++.so.6",
     "libtiff.so.6",
     "libwebp.so.7",
@@ -27,6 +22,9 @@
     "libwebp",
     "ninja",
     "qt6-base"
+  ],
+  "farm_flags": [
+    "BUILD_AFTER_BUILD_DEPS"
   ],
   "sources": [
     "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/qtimageformats-everywhere-src-6.11.2.tar.xz"

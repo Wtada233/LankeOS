@@ -1,5 +1,5 @@
 lankebuild_prepare() {
-    # Prepare environment
+    autoreconf -fiv
     ./configure --prefix=/usr --disable-static
 }
 
