@@ -57,12 +57,14 @@
     "ffnvcodec-headers",
     "git",
     "lcms2",
+    "libarchive",
     "libass",
     "libdisplay-info",
     "libdrm",
     "libglvnd",
     "libjpeg-turbo",
     "libplacebo",
+    "libpulse",
     "libva",
     "libx11",
     "libxext",
@@ -80,8 +82,7 @@
     "vulkan-loader",
     "wayland",
     "wayland-protocols",
-    "zlib",
-    "libpulse"
+    "zlib"
   ],
   "sources": [
     "https://github.com/mpv-player/mpv/archive/refs/tags/v0.41.0.tar.gz"

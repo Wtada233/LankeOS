@@ -36,11 +36,13 @@
     "libjpeg-turbo",
     "libpng",
     "libtiff",
+    "libwebp",
     "libx264",
     "libx265",
     "ninja",
+    "openh264",
     "openjpeg",
-    "libwebp"
+    "sdl2"
   ],
   "sources": [
     "https://github.com/strukturag/libheif/archive/refs/tags/v1.23.2.tar.gz"

@@ -45,6 +45,12 @@
   "build_deps": [
     "base-devel",
     "cmake",
+    "glib",
+    "gst-plugins-bad",
+    "gst-plugins-base",
+    "gstreamer",
+    "libglvnd",
+    "libpulse",
     "ninja",
     "qt6-base",
     "qt6-declarative",

@@ -3,7 +3,7 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --disable-gtk-doc --enable-btrfs --libexecdir=/usr/lib --sbindir=/usr/bin 
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --disable-gtk-doc --enable-btrfs --libexecdir={LIBDIR} --sbindir={SBINDIR} --localstatedir={LOCALSTATEDIR}
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

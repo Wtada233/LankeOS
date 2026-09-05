@@ -1,15 +1,17 @@
 lankebuild_prepare() {
-    :
+    # BLFS 修 CA 路径：qca 探测系统 bundle 的候选里没有 make-ca 的 /etc/pki/tls/certs/ca-bundle.crt，
+    # 全 miss 时回落自带 certs/rootcerts.pem 并 install 到 /usr/certs/、编译进 QCA_SYSTEMSTORE_PATH。
+    # 把候选中的 cert.pem 改写成 make-ca 路径，探测命中后走系统证书。
+    sed -i 's@cert.pem@certs/ca-bundle.crt@' CMakeLists.txt
 }
 
 lankebuild_build() {
     mkdir build && cd build
-    cmake -G Ninja -DCMAKE_INSTALL_PREFIX={PREFIX} -DQT6=ON -DQCA_INSTALL_IN_QT_PREFIX=ON -DBUILD_TESTS=OFF ..
-    ninja -j$(nproc)
-    DESTDIR={STAGING_ROOT} ninja install
+    cmake -G Ninja -DCMAKE_INSTALL_PREFIX={PREFIX} -DQT6=ON -DQCA_INSTALL_IN_QT_PREFIX=ON -DBUILD_TESTS=OFF -DQCA_MAN_INSTALL_DIR=/usr/share/man ..
+    cmake --build .
 }
 
 lankebuild_package() {
     # Installation handled by builder
-    :
+    DESTDIR={STAGING_ROOT} cmake --install build
 }

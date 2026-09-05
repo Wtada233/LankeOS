@@ -47,14 +47,18 @@
     "expat",
     "fontconfig",
     "freetype",
-    "librsvg",
-    "pango",
-    "zlib",
     "gdk-pixbuf",
     "glib",
+    "gtk3",
     "harfbuzz",
+    "librsvg",
+    "libwebp",
     "libx11",
-    "libxrender"
+    "libxrender",
+    "pango",
+    "poppler",
+    "qt6-base",
+    "zlib"
   ],
   "sources": [
     "https://gitlab.com/graphviz/graphviz/-/archive/16.0.0/graphviz-16.0.0.tar.gz"

@@ -5,7 +5,7 @@ lankebuild_build() {
         --disable-locking \
         --disable-rpath \
         --enable-pthread \
-        --with-usb
+        --with-usb --sysconfdir={SYSCONFDIR}
     # 减少未使用共享库链接（Arch 同款）
     sed -e 's/ -shared / -Wl,-O1,--as-needed\0/g' -i libtool
     make -j$(nproc)

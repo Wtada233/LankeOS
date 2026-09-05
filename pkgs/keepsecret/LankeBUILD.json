@@ -36,6 +36,7 @@
   "build_deps": [
     "base-devel",
     "extra-cmake-modules",
+    "glib",
     "kf-kconfig",
     "kf-kcoreaddons",
     "kf-kcrash",

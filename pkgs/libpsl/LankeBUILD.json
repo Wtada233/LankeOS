@@ -17,7 +17,9 @@
   "build_deps": [
     "base-devel",
     "gtk-doc",
-    "icu"
+    "icu",
+    "libidn2",
+    "libunistring"
   ],
   "sources": [
     "https://github.com/rockdaboot/libpsl/releases/download/0.23.3/libpsl-0.23.3.tar.gz"

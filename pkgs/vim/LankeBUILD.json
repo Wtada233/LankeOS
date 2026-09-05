@@ -39,6 +39,7 @@
     "git",
     "glib",
     "gtk3",
+    "libcanberra",
     "libgcrypt",
     "libice",
     "libsm",

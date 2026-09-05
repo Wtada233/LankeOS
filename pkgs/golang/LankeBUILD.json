@@ -11,7 +11,8 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "golang"
+    "golang",
+    "libtiff"
   ],
   "sources": [
     "https://go.dev/dl/go1.27.0.src.tar.gz"

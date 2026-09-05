@@ -57,9 +57,11 @@
     "liburing",
     "libxcrypt",
     "libxml2",
+    "linux-pam",
     "lz4",
     "ncurses",
     "pcre2",
+    "unixodbc",
     "xz",
     "zlib",
     "zstd"

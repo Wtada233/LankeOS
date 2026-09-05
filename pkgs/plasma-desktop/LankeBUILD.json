@@ -138,6 +138,7 @@
     "kpipewire",
     "kscreenlocker",
     "kwin",
+    "libaccounts-qt",
     "libcanberra",
     "libksysguard",
     "libplasma",
@@ -157,13 +158,13 @@
     "qt5compat",
     "qt6-base",
     "qt6-declarative",
+    "sdl2",
     "systemsettings",
     "wayland",
     "wayland-protocols",
     "xcb-util-keysyms",
     "xdg-user-dirs",
-    "xkeyboard-config",
-    "libaccounts-qt"
+    "xkeyboard-config"
   ],
   "sources": [
     "https://download.kde.org/stable/plasma/6.7.4/plasma-desktop-6.7.4.tar.xz"

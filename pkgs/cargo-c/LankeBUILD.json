@@ -15,8 +15,9 @@
   "provides": [],
   "build_deps": [
     "base-devel",
-    "rust",
     "curl",
+    "libgit2",
+    "rust",
     "zlib"
   ],
   "sources": [
