@@ -36,6 +36,12 @@ English | [中文](README.md)
 
 LankeOS is a Linux distribution built using the Linux From Scratch methodology. Its core characteristic is automating and simplifying the build and maintenance pipeline — from upstream version tracking and ABI break detection to incremental rebuilds, packaging, and repository publishing. This repository is the public monorepo of the distribution, made up of the following sub-projects, each with its own README:
 
+> [!WARNING]
+> The vast majority of the source code in this project is generated using AI models.
+> This does not imply that the code quality is poor—there is human review and extensive testing as a safety net—but it may leave behind some comments/documentation artifacts.
+> For example, meaningless comments like "User requested..." or "0.18 fix" may appear. These are documentation issues, not code quality problems. If you encounter any, please file an issue or submit a PR to fix them.
+> As for the "AI Slop" bias, it does not directly characterize LankeOS. The project is more about extensively using AI for writing and maintenance, rather than being a pure pile of unmanaged, neglected spaghetti code.
+
 ## Components
 
 | Sub-project | Description | Docs |
