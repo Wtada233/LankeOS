@@ -78,11 +78,14 @@ fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(),
     // 也无法读 root-only 文件（如 /etc/shadow 0600）。`sudo tar --numeric-owner` 由 root
     // stat/读文件，写入的 uid/gid 固定为数字 0，mode 完整（含 SUID）。
     // symlink 按 symlink 存（不 follow，content 里可能有损坏 symlink）。
+    // `--mtime=@0`：所有成员 mtime 归一 1970-01-01（可复现构建——tar 不泄漏构建/打包时间，
+    // 同一内容两次 repack 产出字节一致）。
     let mut status = std::process::Command::new("sudo")
         .args([
             "-n",
             "tar",
             "--numeric-owner",
+            "--mtime=@0",
             "-cf",
             "-",
             "-C",
@@ -301,6 +304,41 @@ mod tests {
         fs::remove_file(&lpkg).ok();
         let dir = std::env::temp_dir().join("farm-repack-test");
         fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn repack_normalizes_mtime_to_epoch() {
+        // 可复现构建：repack 产出的 .lpkg 所有成员 mtime = 1970-01-01（--mtime=@0），
+        // tar 不泄漏源文件/打包时间；同一内容两次 repack 字节一致。
+        let root = std::env::temp_dir().join(format!("farm-repack-mtime-{}", std::process::id()));
+        let dir = root.join("src");
+        fs::create_dir_all(dir.join("content")).unwrap();
+        let f = dir.join("content/libfoo.so");
+        fs::write(&f, [0x7f, b'E', b'L', b'F', 2, 1, 1]).unwrap();
+        // 源文件 mtime 故意设成现在 → 若不被归一，tar 里会带出当前时间戳
+        {
+            let file = fs::File::open(&f).unwrap();
+            let _ = file.set_times(fs::FileTimes::new().set_modified(std::time::SystemTime::now()));
+        }
+        let out = root.join("out.lpkg");
+        repack_lpkg_at(&dir, &out, 3).unwrap();
+
+        let fp = fs::File::open(&out).unwrap();
+        let dec = zstd::stream::read::Decoder::new(fp).unwrap();
+        let mut ar = tar::Archive::new(dec);
+        let mut entries = 0usize;
+        for e in ar.entries().unwrap() {
+            let e = e.unwrap();
+            assert_eq!(
+                e.header().mtime().unwrap(),
+                0,
+                "{} mtime 应归一 0（1970-01-01）",
+                e.path().unwrap().display()
+            );
+            entries += 1;
+        }
+        assert!(entries >= 2, "至少含目录与文件两个成员");
+        fs::remove_dir_all(&root).ok();
     }
 
     /// 把 make_fake_lpkg 的产物摆进仓库布局 `out/<arch>/<pkg>/<ver>.lpkg` + index.txt。
