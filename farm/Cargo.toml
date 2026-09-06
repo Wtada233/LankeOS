@@ -18,6 +18,7 @@ goblin = "0.9"
 rusqlite = { version = "0.31", features = ["bundled"] }
 sha2 = "0.10"
 ctrlc = "3"
+libc = "0.2"
 
 [profile.dev]
 opt-level = 0

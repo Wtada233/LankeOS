@@ -1,9 +1,8 @@
 //! LankeOS build farm — CLI 入口（§12.5）。
 //!
-//!   farm build <pkg>|--all               构建当前配方（预下载→构建→verify 三分支→repack/ABI 传播）
+//!   farm build <pkg>|--all               构建当前配方（预下载→构建→verify 三分支→无条件 level22 归一化重打→ABI 传播）
 //!   farm track <pkg> --run                探测上游 → 新版自动更新 LankeBUILD.json（生成新版）
 //!   farm gen-trackers                      batch 调 LLM 生成 tracker yaml（12 个/批）
-//!   farm repack <pkg>                      zstd -22 --ultra 重打包仓库包并更新 index.txt
 //!   farm seed / serve                    冷启动播种 / 本地 repo 静态服务器
 
 use std::cmp::Ordering as CmpOrdering;
@@ -56,7 +55,6 @@ use lankefarm::track::{dep_edges, TrackerConfig};
 /// 命令解析结果：clap 子命令 → 扁平结构，供各 cmd_* 使用（保持逻辑层签名不变）。
 mod build;
 mod export;
-mod repack;
 mod seed;
 mod serve;
 
@@ -192,8 +190,8 @@ enum Command {
         #[arg(long, default_value_t = 3)]
         download_retries: u32,
     },
-    /// 把构建仓库扁平化重打包为发行格式 `<pkg>-<ver>.lpkg`（zstd level 22 ultra）。
-    /// 遍历 `input/<arch>/<pkg>/*.lpkg`，逐个解包→重打→输出到 output 目录。
+    /// 把构建仓库扁平化为发行布局 `<pkg>-<ver>.lpkg`（纯复制，不重打包——仓库产物已归一化）。
+    /// 遍历 `input/<arch>/<pkg>/*.lpkg`，复制到 output 目录。
     Export {
         /// 构建仓库根目录（含 `<arch>/` 子目录）[default: out]
         #[arg(long, default_value = "out")]
@@ -202,18 +200,6 @@ enum Command {
         #[arg(long)]
         output: PathBuf,
         /// 架构（读取 input/<arch>/ 下每个包）
-        #[arg(long, default_value = "x86_64")]
-        arch: String,
-    },
-    /// 用 zstd level 22（`-22 --ultra` 最高压缩档）重打包仓库中目标包的 .lpkg（原位替换），
-    /// 并把新 SHA256 写回 index.txt。与 build 的快速 repack（level 3）不同：发行前对仓库终极压缩。
-    Repack {
-        /// 目标包名（对应 input/<arch>/<pkg>/）
-        pkg: String,
-        /// 构建仓库根目录（含 `<arch>/` 子目录）[default: out]
-        #[arg(long, default_value = "out")]
-        input: PathBuf,
-        /// 架构（读取 input/<arch>/ 下该包）
         #[arg(long, default_value = "x86_64")]
         arch: String,
     },
@@ -1266,11 +1252,6 @@ fn localize_help(cmd: clap::Command) -> clap::Command {
             .mut_arg("api_key", |a| a.help("LLM API key"))
             .mut_arg("model", |a| a.help("LLM model name"))
             .mut_arg("packages", |a| a.help("Only process these packages (comma-separated)")))
-        .mut_subcommand("repack", |c| c
-            .about("Repack a repo package with zstd -22 --ultra (in place) and update index.txt SHA256")
-            .mut_arg("pkg", |a| a.help("Target package name (input/<arch>/<pkg>/)"))
-            .mut_arg("input", |a| a.help("Build repo root (contains <arch>/ subdirs)"))
-            .mut_arg("arch", |a| a.help("Architecture (read the package under input/<arch>/)")))
         .mut_subcommand("serve", |c| c
             .about("Serve the local repo over HTTP")
             .mut_arg("root", |a| a.help("Repo root (contains <arch>/index.txt and package .lpkg)"))
@@ -1281,6 +1262,17 @@ fn localize_help(cmd: clap::Command) -> clap::Command {
             .mut_arg("arch", |a| a.help("Architecture"))
             .mut_arg("out", |a| a.help("Local repo root directory"))
             .mut_arg("jobs", |a| a.help("Parallel download/extract threads")))
+}
+
+/// 操作命令（会解包/重打包/写 out/ 的命令）必须以 root 运行：`.lpkg` 解包/重打包要读写 root
+/// 属主文件与 SUID/SGID（不再走 sudo 降级）。非 root → 打印 i18n 提示并返回错误码（调用方 `return`）。
+fn ensure_root() -> Option<ExitCode> {
+    if lankefarm::scan::running_as_root() {
+        None
+    } else {
+        eprintln!("{}", lankefarm::tr!("cli.need_root"));
+        Some(ExitCode::from(2))
+    }
 }
 
 pub fn run() -> ExitCode {
@@ -1376,15 +1368,6 @@ pub fn run() -> ExitCode {
                 ..Default::default()
             };
             export::cmd_export(&args)
-        }
-        Command::Repack { pkg, input, arch } => {
-            let args = Args {
-                pkg: vec![pkg],
-                input: Some(input),
-                arch: Some(arch),
-                ..Default::default()
-            };
-            repack::cmd_repack(&args)
         }
         Command::Track {
             pkg,
@@ -1648,5 +1631,15 @@ mod tests {
         assert_eq!(docs.len(), 2);
         assert!(docs[0].contains("a: 1"));
         assert!(docs[1].contains("b: 2"));
+    }
+
+    #[test]
+    fn ensure_root_matches_euid() {
+        // 与环境一致地确定：root → 放行(None)；非 root → 拒绝(Some)。CI（非 root）与本地 root 都能跑。
+        let is_root = lankefarm::scan::running_as_root();
+        match super::ensure_root() {
+            None => assert!(is_root, "非 root 不应放行"),
+            Some(_) => assert!(!is_root, "root 不应被拒"),
+        }
     }
 }

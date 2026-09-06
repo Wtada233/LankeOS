@@ -10,18 +10,21 @@
 //! { "farm_flags": ["BUILD_AFTER_BUILD_DEPS"] }
 //! ```
 //!
-//! - `BUILD_AFTER_BUILD_DEPS`：把该包的 `build_deps` 也放入依赖边，参与 Kahn
-//!   拓扑排序。默认 build_deps **不参与排序**（容器里每个构建 `lpkg upgrade`
-//!   从 repo 自取最新版构建工具，无需排队）；但某些包**构建期就依赖另一个也
-//!   在重建的包**（如 python-bar 构建时需要 python-foo 刚产出的产物），两者都
-//!   在本轮 targets 时须先建被依赖者，否则容器里还是旧版、构建基于旧 ABI 白跑。
+//! - `BUILD_AFTER_BUILD_DEPS`：把该包的 `build_deps` 无条件放入依赖边参与 Kahn
+//!   拓扑排序（**只要依赖在本轮 targets**）。
+//!
+//!   farm 的**默认语义**（无 flag）也已让 `build_deps` 进边——但**只限「本轮起点旧索引里没有的
+//!   依赖」**（从未进 repo、同轮首建/引导，如 gjs 构建依赖首建的 sysprof）：这类依赖不先建，
+//!   依赖方容器 `lpkg upgrade` 装不到它必然 BLOCKED。**已在仓库的依赖默认不建边**——容器里每个
+//!   构建 `lpkg upgrade` 从 repo 自取最新版构建工具，无需排队。
+//!
+//!   本 flag 是**更强的 opt-in**，覆盖默认不建的「依赖已在仓库但本轮也重建」场景：某些包
+//!   **构建期就依赖另一个也在重建的包**（如 python-bar 构建时需要 python-foo 刚产出的产物），
+//!   两者都在本轮 targets 时须先建被依赖者，否则容器里还是旧版、构建基于旧 ABI 白跑。
 //!   该 flag 的效果与链接边/组边一致：**只对 targets 内的包生效**（build_deps
 //!   指向本轮不重建的包 → 边被丢弃，包直接构建不等待）。
 
 use std::collections::HashSet;
-use std::path::Path;
-
-use super::read_lankebuild;
 
 /// 当前支持的 farm flag（字符串形式，即 LankeBUILD.json 里写死的字面量）。
 pub const BUILD_AFTER_BUILD_DEPS: &str = "BUILD_AFTER_BUILD_DEPS";
@@ -58,35 +61,9 @@ pub fn parse_all(flags: &[String]) -> HashSet<FarmFlag> {
     out
 }
 
-/// 读某包配方声明的 farm flags（LankeBUILD.json `farm_flags` 数组）。
-/// 配方缺失/解析失败 → 空集（无 flag 声明 = 默认行为）。
-pub fn flags_of(pkgs_dir: &Path, pkg: &str) -> HashSet<FarmFlag> {
-    match read_lankebuild(pkgs_dir, pkg) {
-        Some(lb) => parse_all(&lb.farm_flags),
-        None => HashSet::new(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn write_pkg_json(dir: &Path, name: &str, farm_flags: &[&str]) {
-        let pkg_dir = dir.join(name);
-        std::fs::create_dir_all(&pkg_dir).unwrap();
-        let json = serde_json::json!({
-            "name": name,
-            "version": "1.0",
-            "build_deps": [],
-            "farm_flags": farm_flags,
-        });
-        std::fs::write(
-            pkg_dir.join("LankeBUILD.json"),
-            serde_json::to_string(&json).unwrap(),
-        )
-        .unwrap();
-        std::fs::write(pkg_dir.join("LankeBUILD"), "").unwrap();
-    }
 
     #[test]
     fn parse_known_and_unknown() {
@@ -111,21 +88,5 @@ mod tests {
             "BUILD_AFTER_BUILD_DEPS".into(),
         ]);
         assert_eq!(set, HashSet::from([FarmFlag::BuildAfterBuildDeps]));
-    }
-
-    #[test]
-    fn flags_of_reads_recipe() {
-        let dir = std::env::temp_dir().join(format!("farm-flags-read-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir).unwrap();
-        write_pkg_json(&dir, "python-bar", &["BUILD_AFTER_BUILD_DEPS"]);
-        write_pkg_json(&dir, "python-foo", &[]);
-        assert_eq!(
-            flags_of(&dir, "python-bar"),
-            HashSet::from([FarmFlag::BuildAfterBuildDeps])
-        );
-        assert!(flags_of(&dir, "python-foo").is_empty(), "无声明 → 空集");
-        assert!(flags_of(&dir, "no-such-pkg").is_empty(), "配方缺失 → 空集");
-        std::fs::remove_dir_all(&dir).ok();
     }
 }

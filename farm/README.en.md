@@ -46,6 +46,10 @@ English | [中文](README.md)
 
 ## Usage
 
+> **Runtime requirement**: operational commands (`build`/`validate`/`abifix`/`export`/`seed`)
+> **must run as root** — `.lpkg` unpack/repack needs root-owned files and SUID/SGID (farm no longer drops
+> privileges via `sudo`). Run as the root user or via `sudo farm …`. `track`/`serve` do not need root.
+
 ### Incrementally rebuild everything pending
 
 ```bash
@@ -142,7 +146,7 @@ cargo build --release        # binary: target/release/lankefarm
 |---|---|
 | `build <pkg>...\|--all --image <img>` | Incremental, ABI-aware build with plan preview (container builds only, `--image` required) |
 | `validate --image <img>` | Rebuild every package missing its `.build_ok` marker |
-| `export --output <dir>` | Repack the build repo into distribution-format `<pkg>-<ver>.lpkg` archives |
+| `export --output <dir>` | Flatten-copy the build repo into distribution-format `<pkg>-<ver>.lpkg` files (no repack) |
 | `track <pkg>\|--all [--run]` | Probe upstream versions (read-only proposal by default, `--run` applies) |
 | `gen-trackers` | Batch-generate tracker YAML files via an LLM |
 | `seed --remote <url>` | Cold-start a remote repository (parallel download + SHA-256 verification) |
@@ -201,7 +205,7 @@ farm/
 | Rust | Implementation language (serde / clap / rusqlite / ureq / goblin / zstd / sha2) |
 | SQLite | Job state store (`out/farm-state.db`) |
 | Docker | Container-isolated builds (`--image` specifies the base image) |
-| zstd · tar | `.lpkg` extraction / repacking |
+| zstd · tar (Rust crates) | `.lpkg` extraction / repacking (pure Rust — no system `zstd`/`tar`/`sudo` needed) |
 
 ## Contributing
 

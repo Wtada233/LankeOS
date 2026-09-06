@@ -1,13 +1,11 @@
-//! export.rs — 把构建仓库（`out/<arch>/<pkg>/<ver>.lpkg`）扁平化重打包为发行格式
-//! `<pkg>-<ver>.lpkg`（zstd level 22，ultra 最高压缩档），输出到指定目录。
+//! export.rs — 把构建仓库（`out/<arch>/<pkg>/<ver>.lpkg`）扁平化为发行布局
+//! `<pkg>-<ver>.lpkg`，输出到指定目录。**纯文件复制，不重打包**。
 //!
-//! 用途：构建仓库（out/）内部用 level 3 快速压缩、频繁重打包；发行/分发用 level 22
-//! 一次重压，得到扁平、带版本号、可直传的单文件集合。
+//! build/validate 成功已把每个 .lpkg 归一化为 zstd level 22 + mtime 1970（§4 无条件归一化重打），
+//! export 只按 `<pkg>-<ver>` 重命名复制 → 得到扁平、带版本号、可直传的单文件集合。
 
 use std::fs;
 use std::path::{Path, PathBuf};
-
-use crate::{repack, scan};
 
 /// export 报告。
 #[derive(Debug, Default)]
@@ -16,7 +14,8 @@ pub struct ExportReport {
     pub failed: Vec<String>,
 }
 
-/// 遍历 `input/<arch>/<pkg>/*.lpkg`，逐个解包 → zstd level 22 重打 → `<pkg>-<ver>.lpkg` 扁平输出。
+/// 遍历 `input/<arch>/<pkg>/*.lpkg`，逐个**复制**为 `<pkg>-<ver>.lpkg` 扁平输出（字节即仓库产物，
+/// 已 level 22 + mtime 1970 归一化，无需再解压/重压）。
 pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, String> {
     fs::create_dir_all(output).map_err(|e| format!("创建输出目录 {output:?} 失败: {e}"))?;
     let repo_root = input.join(arch);
@@ -59,20 +58,8 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, S
                 continue;
             };
             let out_path = output.join(format!("{pkg}-{ver}.lpkg"));
-
-            // 解包到临时目录 → 重打 level 22；无论成败都清掉临时目录（解出的是 root 属主树，
-            // 必须用 sudo 感知的删除，否则 /etc、/var 等目录残留——曾留下 14G 的 .export-extract）
-            let extract_dir = output.join(".export-extract").join(&pkg);
-            let res = (|| {
-                let _ = scan::remove_dir_tree(&extract_dir);
-                fs::create_dir_all(&extract_dir).map_err(|e| format!("创建解包目录失败: {e}"))?;
-                scan::extract_lpkg(&lpkg, &extract_dir)?;
-                repack::export_lpkg(&extract_dir, &out_path)
-            })();
-            let _ = scan::remove_dir_tree(&extract_dir);
-
-            match res {
-                Ok(()) => report.exported.push(format!("{pkg}-{ver}")),
+            match fs::copy(&lpkg, &out_path) {
+                Ok(_) => report.exported.push(format!("{pkg}-{ver}")),
                 Err(e) => report.failed.push(format!("{pkg}-{ver}: {e}")),
             }
         }
@@ -127,12 +114,18 @@ mod tests {
         assert_eq!(report.exported, vec!["demo-1.0+1"]);
         assert!(report.failed.is_empty());
 
-        // 输出扁平化命名存在，且 level 22 重打包可解包（round-trip）
+        // 输出 = 仓库 .lpkg 的**字节副本**（只扁平化，不重打包）
         let out = output.join("demo-1.0+1.lpkg");
         assert!(out.exists());
+        assert_eq!(
+            fs::read(&out).unwrap(),
+            fs::read(pkgdir.join("1.0+1.lpkg")).unwrap(),
+            "export 应原样复制，不改字节"
+        );
+        // 仍是合法 .lpkg，可正常解包（round-trip）
         let extract = tmp.join("extract");
-        scan::extract_lpkg(&out, &extract).unwrap();
-        let meta = scan::read_metadata_json(&extract.join("metadata.json")).unwrap();
+        crate::scan::extract_lpkg(&out, &extract).unwrap();
+        let meta = crate::scan::read_metadata_json(&extract.join("metadata.json")).unwrap();
         assert_eq!(meta["name"], "demo");
         assert!(extract.join("content/libfoo.so").exists());
 

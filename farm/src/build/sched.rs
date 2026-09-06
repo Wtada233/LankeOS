@@ -9,18 +9,24 @@ use crate::graph::Index;
 use crate::tr;
 use crate::ux;
 
-/// Kahn 拓扑排序，**按 needed_so 链接边 + 声明式重建组边 + farm_flags 边**＋环切割。
+/// Kahn 拓扑排序，**按 needed_so 链接边 + build_deps 依赖边 + 声明式重建组边**＋环切割。
 ///
-/// 设计：构建序只看**链接依赖**——需要重建的链接库必须先建，依赖者才能按新 ABI 链接。
-/// `deps`/`build_deps` **默认不参与排序**：build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，
-/// 无需排队。"不链 libpython 但 ABI 敏感"的包（python-cairo/gobject/blueman/meson…）由
-/// `data/build/*.yaml` 声明式重建组处理（`build/groups.rs`）——这些组受害者没有 needed_so 链接边，
-/// 必须靠 `extra_edges`（victim → on）强制排在触发包 `on` 之后，否则 `--all` 模式下 python-cairo
-/// 会在 python 重建前构建（容器升级时 repo 还是旧 python，构建基于旧 ABI 白跑）。
+/// 设计：构建序主要看**链接依赖**——需要重建的链接库必须先建，依赖者才能按新 ABI 链接。
+/// `deps` **不参与排序**；`build_deps` **默认只对「仓库缺失」的依赖参与**：build 工具一般由每个
+/// 容器 `lpkg upgrade` 从 repo 拿最新版，无需排队——但**尚未进过仓库的构建依赖**（首建/引导，
+/// 如 gjs 依赖同轮首建的 sysprof）若不同轮先建，依赖方容器 `lpkg upgrade` 装不到它必然 BLOCKED，
+/// 所以这类 build_deps 进边、先建被依赖者。"不链 libpython 但 ABI 敏感"的包
+/// （python-cairo/gobject/blueman/meson…）由 `data/build/*.yaml` 声明式重建组处理
+/// （`build/groups.rs`）——这些组受害者没有 needed_so 链接边，必须靠 `extra_edges`（victim → on）
+/// 强制排在触发包 `on` 之后，否则 `--all` 模式下 python-cairo 会在 python 重建前构建（容器升级时
+/// repo 还是旧 python，构建基于旧 ABI 白跑）。
 ///
-/// `pkgs_dir` 用来读配方（LankeBUILD.json）：声明了 `BUILD_AFTER_BUILD_DEPS`（farm_flags）
-/// 的包，其 `build_deps` **也作为依赖边**参与排序（见 `build/farm_flags.rs`）——构建期
-/// 需要另一个也在本轮重建的包先产出时（如 python-bar 构建要 python-foo），必须等它先建。
+/// `pkgs_dir` 用来读配方（LankeBUILD.json）：
+/// - **默认**：包 P 的 `build_deps` 里某个依赖 D 当且仅当「D 在本轮 targets」且「D 不在本轮起点
+///   旧索引 `old.packages`」才作为边 P→D 参与排序——已在仓库的 D 不建边，维持 needed_so 语义。
+/// - 声明了 `BUILD_AFTER_BUILD_DEPS`（farm_flags）的包，其 `build_deps` **无条件作为依赖边**参与
+///   排序（见 `build/farm_flags.rs`）——构建期需要另一个**也已在仓库但本轮重建**的包先产出时
+///   （如 python-bar 构建要 python-foo 本轮刚重建的产物），必须等它先建。
 /// 与链接边/组边同样**只对 targets 内的包生效**：build_deps 指向本轮不重建的包 → 边丢弃，
 /// 该包直接构建不等待。
 pub(crate) fn topo_order(
@@ -55,18 +61,26 @@ pub(crate) fn topo_order(
         if let Some(gd) = group_deps.get(n) {
             deps.extend(gd.iter().cloned());
         }
-        // farm_flags：BUILD_AFTER_BUILD_DEPS → 该包 build_deps 也进依赖边（仅限 targets 内）。
-        // 目标依赖不重建 → 边丢弃，不等待（与链接/组边同规则）。
-        let flags = crate::build::farm_flags::flags_of(pkgs_dir, n);
-        if flags.contains(&crate::build::farm_flags::FarmFlag::BuildAfterBuildDeps) {
-            if let Some(lb) = crate::build::read_lankebuild(pkgs_dir, n) {
-                deps.extend(
-                    lb.build_deps
-                        .iter()
-                        .filter(|d| d.as_str() != n.as_str() && names.contains(d.as_str()))
-                        .cloned(),
-                );
-            }
+        // farm_flags + 默认：build_deps 依赖边（仅限 targets 内；目标依赖不重建 → 边丢弃，不等待，
+        // 与链接/组边同规则）。
+        // 默认语义：**只有「本轮起点旧索引里不存在」的构建依赖**（从未进 repo，首建/引导——如 gjs
+        // 构建依赖同轮首建的 sysprof）进边，先建依赖再建它，否则容器 lpkg upgrade 装不到依赖 BLOCKED。
+        // 已在仓库的依赖仍走原 needed_so 语义（容器各自 lpkg upgrade 自取最新版，无需排队）。
+        // BUILD_AFTER_BUILD_DEPS（farm_flags）：更强 opt-in——依赖无论是否已在仓库，只要在本轮
+        // targets 就进边（python-bar 构建要 python-foo 本轮刚重建的产物时用）。
+        if let Some(lb) = crate::build::read_lankebuild(pkgs_dir, n) {
+            let force = crate::build::farm_flags::parse_all(&lb.farm_flags)
+                .contains(&crate::build::farm_flags::FarmFlag::BuildAfterBuildDeps);
+            deps.extend(
+                lb.build_deps
+                    .iter()
+                    .filter(|d| {
+                        d.as_str() != n.as_str()
+                            && names.contains(d.as_str())
+                            && (force || !old.packages.contains_key(d.as_str()))
+                    })
+                    .cloned(),
+            );
         }
         deps.sort();
         deps.dedup();

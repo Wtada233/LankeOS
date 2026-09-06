@@ -62,6 +62,8 @@ pub struct BuildOptions {
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct BuildReport {
     pub built: Vec<String>,
+    /// 元数据漂移并已双写 LankeBUILD.json 的包。**重打现在无条件**（每次成功构建都 level22+mtime0
+    /// 归一化进 repo），本字段只记录"漂移修正"那一档，不代表"本轮是否重打包"。
     pub repacked: Vec<String>,
     pub abi_broken: Vec<String>,
     pub blocked: Vec<String>,
@@ -377,7 +379,8 @@ pub fn run_build(
             }
         };
 
-        // 元数据漂移检测 + repack（打包完成 → SONAME 检测 → 与 .lpkg 内 metadata.json 比对 → 漂移才 repack）。
+        // 元数据漂移检测 + **无条件归一化重打**（打包完成 → SONAME 检测 → 与 .lpkg 内 metadata.json
+        // 比对 → 漂移与否都重打 level22+mtime0；漂移才改 metadata + 双写 LankeBUILD）。
         // 只比 needed_so/provides；deps 由 gen_deps/deprules 生成，不读不改。
         // **repack 失败 → BLOCK**（曾静默降级为"无漂移"照发陈旧 metadata，.lpkg 与 index 永久失配）。
         let drifted = match repack_if_drift(&outcome, opts, &pkg) {
@@ -1206,6 +1209,158 @@ mod tests {
     }
 
     #[test]
+    fn topo_order_build_deps_default_when_dep_missing_from_repo() {
+        // gjs 引导：gjs 的 build_deps 含 sysprof，sysprof **不在仓库**（本轮起点旧索引没有）也
+        // **在本轮 targets**（同轮首建）→ 默认 build_deps 边 gjs→sysprof 让 sysprof 先建。
+        // 否则 topo 按名字升序会把 gjs 排在 sysprof 前，gjs 容器 lpkg upgrade 装不到 sysprof BLOCKED。
+        let dir = std::env::temp_dir().join("farm-build-builddeps-default");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        // gjs 不链任何库（needed_so 空）、无 provides——没有 needed_so 链接边，只有 build_deps。
+        write_pkg(&dir, "gjs", &[], &[], &["sysprof"]);
+        write_pkg(&dir, "sysprof", &[], &[], &[]);
+        // 旧索引为空：sysprof 从未进 repo（首建）。targets 两个都在。
+        let old = index_of(&[]);
+        let targets: Vec<String> = ["gjs", "sysprof"].iter().map(|s| s.to_string()).collect();
+        let order = topo_order(&dir, &targets, &old, &[]);
+        let pos = |x: &str| order.iter().position(|n| n == x).unwrap();
+        assert!(
+            pos("sysprof") < pos("gjs"),
+            "仓库缺失的构建依赖 sysprof 必须先建（默认 build_deps 边）: {order:?}"
+        );
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn topo_order_build_deps_default_no_edge_when_dep_in_repo() {
+        // 对照：sysprof **已在仓库**（旧索引有）且本轮也重建 → 默认**不加** build_deps 边
+        // （原 needed_so 语义：每个容器 lpkg upgrade 自取最新版，无需排队）→ 同级按名字升序
+        // gjs 先建。这是 BUILD_AFTER_BUILD_DEPS flag 才覆盖的更强场景。
+        let dir = std::env::temp_dir().join("farm-build-builddeps-inrepo");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        write_pkg(&dir, "gjs", &[], &[], &["sysprof"]);
+        write_pkg(&dir, "sysprof", &[], &[], &[]);
+        let old = index_of(&[("sysprof", vec![], vec![])]);
+        let targets: Vec<String> = ["gjs", "sysprof"].iter().map(|s| s.to_string()).collect();
+        let order = topo_order(&dir, &targets, &old, &[]);
+        let pos = |x: &str| order.iter().position(|n| n == x).unwrap();
+        assert!(
+            pos("gjs") < pos("sysprof"),
+            "已在仓库的依赖默认不加 build_deps 边（原语义，同级名字升序）: {order:?}"
+        );
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn run_build_orders_repo_missing_build_dep_first() {
+        // 端到端：run_build 走 topo 初始排序——gjs + sysprof 同轮构建、sysprof 不在仓库基线 →
+        // sysprof 必须先建并进 repo，gjs 后建（否则 gjs 容器装不到 sysprof）。
+        let dir = temp_dir("farm-run-builddeps-gjs");
+        let out = temp_dir("farm-run-builddeps-gjs-out");
+        // 基线非空（load_old_index 要求）但只有无关 sysroot，gjs/sysprof 都不在仓库。
+        write_baseline(&out, "sysroot|1.0:h::libc.so.6:|\n");
+        write_pkg(&dir, "gjs", &[], &[], &["sysprof"]);
+        write_pkg(&dir, "sysprof", &[], &[], &[]);
+        let gj = stage_lpkg(&out, "gjs", "1.0", &[], &[]);
+        let sp = stage_lpkg(&out, "sysprof", "1.0", &[], &[]);
+        let mut b = ScanLikeBinding::default();
+        b.full_needed.insert("gjs".into(), vec![]);
+        b.provides.insert("gjs".into(), vec![]);
+        b.lpkg.insert("gjs".into(), gj);
+        b.full_needed.insert("sysprof".into(), vec![]);
+        b.provides.insert("sysprof".into(), vec![]);
+        b.lpkg.insert("sysprof".into(), sp);
+
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["gjs".into(), "sysprof".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
+            manual_sort: false,
+        };
+        let report = run_build(&opts, &mut b, None).unwrap();
+        assert!(
+            report.blocked.is_empty(),
+            "gjs/sysprof 都应构建成功: blocked={:?}",
+            report.blocked
+        );
+        let pos = |x: &str| {
+            report
+                .built
+                .iter()
+                .position(|n| n == x)
+                .unwrap_or_else(|| panic!("{x} 应被构建: {:?}", report.built))
+        };
+        assert!(
+            pos("sysprof") < pos("gjs"),
+            "默认 build_deps 边应让 sysprof 先于 gjs 构建: {:?}",
+            report.built
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn repack_unconditional_reencodes_when_no_drift() {
+        // build 成功后**即使无元数据漂移**，.lpkg 也被归一化重打（level 22 + mtime 1970）：
+        // repack_if_drift 返回 false（无漂移、不双写 LankeBUILD），但产物字节被重编码，
+        // 且再跑一遍字节一致（幂等/可复现）。
+        let dir = temp_dir("farm-repack-uncond");
+        let out = temp_dir("farm-repack-uncond-out");
+        write_pkg(&dir, "p", &[], &[], &[]);
+        let lpkg = stage_lpkg(&out, "p", "1.0", &[], &[]);
+        let outcome = BuildOutcome {
+            ok: true,
+            needed_so: vec![],
+            provides: vec![],
+            deps: vec![],
+            failure_stage: None,
+            lpkg_path: Some(lpkg.clone()),
+        };
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["p".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
+            manual_sort: false,
+        };
+        let drifted = repack_if_drift(&outcome, &opts, "p").unwrap();
+        assert!(!drifted, "无漂移应返回 false");
+        let b1 = fs::read(&lpkg).unwrap();
+        // 再跑一遍（metadata 未变）→ 字节一致：归一化是确定/幂等的
+        let drifted2 = repack_if_drift(&outcome, &opts, "p").unwrap();
+        assert!(!drifted2);
+        let b2 = fs::read(&lpkg).unwrap();
+        assert_eq!(b1, b2, "归一化重打应幂等（字节稳定）");
+        // 归一化产物：普通文件成员 header mtime == 0（1970-01-01）
+        let f = fs::File::open(&lpkg).unwrap();
+        let dec = zstd::stream::read::Decoder::new(f).unwrap();
+        let mut ar = tar::Archive::new(dec);
+        let mut any_file = false;
+        for e in ar.entries().unwrap() {
+            let e = e.unwrap();
+            if e.header().entry_type().is_file() {
+                any_file = true;
+                assert_eq!(e.header().mtime().unwrap(), 0, "归一化后 mtime 应为 0");
+            }
+        }
+        assert!(any_file, ".lpkg 应含普通文件成员");
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
     fn topo_order_siblings_name_ordered_and_deterministic() {
         // 用户规则：构建顺序必须**确定**——同级包（无相互依赖）固定按名字升序；
         // 输入乱序不影响结果，且两次运行逐位一致（绝不允许随机）。
@@ -1236,7 +1391,8 @@ mod tests {
     fn reorder_queue_puts_dependency_victims_first() {
         // 复现 appstream 痛点：appstream 的 build_deps 含 librsvg，两者都是 libxml2 受害者。
         // 字母序入队 appstream 先，但 appstream 需要重建后的 librsvg → 重排必须把被依赖者放前。
-        // （build_deps 已不参与建图，这里用 needed_so 的 librsvg-2.so.2 → librsvg 边。）
+        // （build_deps 只对「仓库缺失 + 本轮 targets」的依赖建边、无 BUILD_AFTER_BUILD_DEPS 时
+        // librsvg 已在仓库 → 不建边；这里改用 needed_so 的 librsvg-2.so.2 → librsvg 边。）
         let dir = std::env::temp_dir().join("farm-reorder-queue");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();

@@ -60,6 +60,9 @@ fn run_build_flow(
     targets: Vec<String>,
     validate: bool,
 ) -> ExitCode {
+    if let Some(code) = super::ensure_root() {
+        return code;
+    }
     // SQLite 状态（§11）：job 状态 + 构建历史（增量由 run_build 的版本对比驱动）
     let state_path = args
         .state

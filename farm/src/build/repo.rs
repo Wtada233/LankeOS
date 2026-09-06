@@ -27,13 +27,16 @@ pub(crate) fn needs_build(pkgs_dir: &Path, pkg: &str, old: &Index) -> bool {
     old.packages.get(pkg).map(|i| i.version.as_str()) != Some(ver.as_str())
 }
 
-/// 元数据漂移检测 + repack（gen_deps 语义，§6）：解包 .lpkg，扫描实际 vs 包内 metadata.json 的
-/// needed_so/provides，**不一致才**改 metadata.json 并重打包（不 rebuild）。deps 不读不改。
-/// 判定统一走 `verify::decide`（与 ARCH §6 三分支一致）。
+/// 元数据漂移检测 + **无条件归一化重打**（gen_deps 语义，§6）：复用 scan 的解包目录，把构建出的
+/// .lpkg 重打包为发行级（zstd level 22 + mtime 1970，`repack_with_metadata` 见 repack.rs）。deps 不读不改。
 ///
-/// 返回 `Ok(true)`=已 repack，`Ok(false)`=无漂移，`Err`=repack 失败。
-/// **repack 失败绝不静默降级为"无漂移"**——否则 .lpkg 内 metadata.json（旧值）与
-/// index.txt（实际扫描值）永久失配，且每次构建重演同一失败（数据腐坏）。上层应 BLOCK。
+/// 漂移与否**都重打**（无漂移时 metadata 重写幂等、仅重新编码/归一化——容器 lpkg-build 产物带构建
+/// 时刻，进 repo 前必须 mtime=1970 保证字节可复现、hash 稳定）；漂移额外改 metadata.json。判定走
+/// `verify::decide`（与 ARCH §6 三分支一致）。
+///
+/// 返回 `Ok(true)`=漂移（已修正 metadata + 双写 LankeBUILD 的依据），`Ok(false)`=无漂移；两者都已完成
+/// 重打。`Err`=repack 失败，**绝不静默降级**——否则 .lpkg 内 metadata.json（旧值）与 index.txt 永久
+/// 失配且每次重演（数据腐坏）。上层应 BLOCK。
 pub(crate) fn repack_if_drift(
     outcome: &BuildOutcome,
     opts: &BuildOptions,
@@ -76,12 +79,12 @@ pub(crate) fn repack_if_drift(
         provides: meta_provides,
         deps: Vec::new(),
     };
-    if crate::verify::decide(&actual, &expected) == crate::verify::VerifyAction::Unchanged {
-        return Ok(false); // 无漂移
-    }
-    // 漂移 → repack（改 metadata.json + 重打包，复用 scan 的解包目录）
+    let drifted =
+        crate::verify::decide(&actual, &expected) != crate::verify::VerifyAction::Unchanged;
+    // 无条件重打（level 22 + mtime 1970；漂移时顺带修正 metadata.json），复用 scan 的解包目录。
+    // metadata 重写幂等 → 无漂移路径只是重新编码/归一化，产出字节确定。
     match repack::repack_with_metadata(lpkg, &extract, &outcome.needed_so, &outcome.provides) {
-        Ok(()) => Ok(true),
+        Ok(()) => Ok(drifted),
         Err(e) => Err(format!("repack {} 失败: {e}", pkg)),
     }
 }

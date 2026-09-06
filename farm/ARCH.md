@@ -35,7 +35,7 @@ src/
     seed.rs        cmd_seed
   build/           调度层
     mod.rs         run_build 核心（增量选择/计划预览/队列循环/ABI 传播/备份清理编排）+ 全部测试
-    sched.rs       topo_order（**needed_so + 声明式组边** 拓扑，确定性）/ find_cycle_edge / reorder_queue
+    sched.rs       topo_order（**needed_so 链接边 + build_deps 依赖边 + 声明式组边** 拓扑，确定性）/ find_cycle_edge / reorder_queue
     groups.rs      data/build/*.yaml 声明式 ABI 重建组（python 生态等不链但 ABI 敏感）
     prompt.rs      BLOCKED/源缺失的交互接管（开 shell/跳过/结束）+ 构建计划预览/确认
     sources.rs     源预下载
@@ -66,29 +66,37 @@ src/
 - **`provides`**：本包提供的 SONAME/能力（如 `libmagic.so.1`）
 - **`deps`**：包级运行时依赖（由 gen_deps/deprules 规则生成，**farm 不扫不比**）
 
-farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不读不改；`deps`/`build_deps` **不参与构建序**——见 §4）。
+farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不读不改；`deps` 不参与构建序、`build_deps` **默认只对「仓库缺失 + 本轮 targets」的构建依赖参与**——见 §4）。
 
 ## 4. build 调度（run_build）
+
+**运行要求**：操作命令（build/validate/abifix/export/seed）**必须以 root 运行**（CLI 层
+`ensure_root` 强制；非 root 直接报错）。`.lpkg` 解包/重打包需读写 root 属主文件与 SUID/SGID，
+farm **不再 spawn `sudo`/`tar`/`zstd` CLI**——解包走 `zstd`+`tar` Rust crate（`scan.rs::extract_lpkg`，
+保留 mode/uid/gid），打包走 `tar::Builder`（`repack.rs::pack_dir_tar`，uid/gid=0、mtime=0、排序遍历
+字节可复现）。库层 archive 函数对 root 可选（所有权保留仅 root 时启用），单测非 root 可跑。
 
 `build/mod.rs::run_build` 主流程：
 
 1. **旧索引基线**：`load_old_index` 读 `out/<arch>/index.txt`（**完整 needed_so**，单一真源）。缺失/为空 → 报错（**禁止无基线构建**，`farm seed` 是唯一入口）；旧索引全零 needed_so → 警告重新 seed，否则 ABI 传播失明。
 2. **增量选择**：`--all` 时用 `needs_build`（配方 effective_version vs 旧索引）跳过一致的包；指定 `pkg` 强制重建。
-3. **拓扑排序**：`sched::topo_order` 按 **needed_so 链接边 ∪ 声明式重建组边**（victim → on）做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps`/`build_deps` **不参与构建序**——build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，无需排队；混入它们反而引入伪环（把 glibc 排到 python/cmake 之后，错误）。组边保证"不链 libpython 的 python-* 包"也排在 python 之后（见 §4 声明式组）。
+3. **拓扑排序**：`sched::topo_order` 按 **needed_so 链接边 ∪ 声明式重建组边**（victim → on）做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps` 不参与排序；`build_deps` **默认只对「本轮起点旧索引里没有（从未进 repo，首建/引导）且在本轮 targets」的构建依赖进边**（否则依赖方容器 `lpkg upgrade` 装不到它必然 BLOCKED，如 gjs 依赖同轮首建的 sysprof）；已在仓库的构建依赖默认不进边——build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，无需排队；混入它们反而引入伪环（把 glibc 排到 python/cmake 之后，错误）。声明 `BUILD_AFTER_BUILD_DEPS`（farm_flags）的包其 `build_deps` **无条件进边**（依赖已在仓库也要等本轮重建产物，如 python-bar→python-foo）。组边保证"不链 libpython 的 python-* 包"也排在 python 之后（见 §4 声明式组）。
 4. **计划预览 + 确认**（2.5）：交互模式（stdin 是 tty）列出 topo 顺序（包 + 版本）并让 operator 确认（回车继续 / n 取消）；非交互（CI/测试/脚本）直接开始。
 5. **预下载拆分**：确认后**只给确认集** bulk 预下载全部源；ABI 受害者动态入队**不预下载**（构建时由 lpkg build 自己下载）。批量预下载失败不阻塞——循环里每个确认集包会再走一次源就绪门（带交互接管）。
 6. **逐包循环**（队列，受害者带 `is_victim` 标记）：
    - 受害者先 `bump_release`（release+1，用户规则 1）
    - 确认集包走源就绪门（已 bulk 预取，幂等）→ 容器构建（见 §5）
    - `scan` 产物 → `verify::decide` 三分支（见 §6）
-   - 漂移 → `repack` 双写（metadata.json + LankeBUILD.json）
+   - **无条件归一化重打**（level 22 + mtime 1970，复用 scan 解包目录）：漂移与否都重打 → 进 repo 的
+     .lpkg 一律发行级/字节可复现；漂移才额外改 metadata.json + 双写 LankeBUILD.json
    - 进 repo（`place_in_repo` 命名 `<version>.lpkg`，取代旧版本前先备份旧 so，见 §7）+ 更新 index（**写回完整 needed_so**）
    - ABI 传播（见 §7）→ 受害者入队 → `sched::reorder_queue` 去重重排
 7. **备份清理**：**整个 build 完成后**（而非单包完成）调用 `cleanup_backups`——备份的旧 SONAME 已不再被任何包 needed_so 引用 → 删除（含空根目录）；仍有包被跳过 / BLOCKED 未重建 → 保留，留待下次 build 完成后再清。
 
 ### 排序与 ABI 受害者重排（build/sched.rs）
 
-- `topo_order`：**needed_so 链接边 + 声明式组边** Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响 + 组受害者排触发包之后）**。
+- `topo_order`：**needed_so 链接边 + build_deps 依赖边 + 声明式组边** Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响 + 组受害者排触发包之后）**。
+- `build_deps` 边（`src/build/sched.rs`）：读配方 LankeBUILD.json，`build_deps` 里某依赖 D 当且仅当 **D 在本轮 targets** 且（**D 不在本轮起点旧索引 `old.packages`** —— 默认，首建/引导先建；或 声明 `BUILD_AFTER_BUILD_DEPS` —— 无条件）作为边 P→D 入图。与链接/组边同规则，只对 targets 内生效。**有回归测试锁死（仓库缺失依赖 gjs→sysprof 先建；已在仓库依赖不加边维持名字升序）**。
 
 ### 声明式 ABI 重建组（build/groups.rs，data/build/*.yaml）
 

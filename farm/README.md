@@ -46,6 +46,10 @@
 
 ## 使用方法
 
+> **运行要求**：操作命令（`build`/`validate`/`abifix`/`export`/`seed`）**必须以 root 运行**——
+> `.lpkg` 解包/重打包需读写 root 属主文件与 SUID/SGID（farm 不再经 `sudo` 降级）。用 root 用户或
+> `sudo farm …` 执行。`track`/`serve` 不需要 root。
+
 ### 增量构建全部待重建的包
 
 ```bash
@@ -142,7 +146,7 @@ cargo build --release        # 产物: target/release/lankefarm
 |---|---|
 | `build <pkg>...\|--all --image <img>` | 增量、ABI 感知的构建，带计划预览（仅容器构建，`--image` 必填） |
 | `validate --image <img>` | 重建所有缺少 `.build_ok` 标记的包 |
-| `export --output <dir>` | 将构建仓库重打包为发行格式 `<pkg>-<ver>.lpkg` |
+| `export --output <dir>` | 将构建仓库扁平化复制为发行格式 `<pkg>-<ver>.lpkg`（不重打包） |
 | `track <pkg>\|--all [--run]` | 探测上游版本（默认只读提案，`--run` 应用） |
 | `gen-trackers` | 批量调用 LLM 生成 tracker yaml |
 | `seed --remote <url>` | 冷启动播种远程仓库（并行下载 + SHA-256 校验） |
@@ -201,7 +205,7 @@ farm/
 | Rust | 实现语言（serde / clap / rusqlite / ureq / goblin / zstd / sha2） |
 | SQLite | 任务状态库（`out/farm-state.db`） |
 | Docker | 容器隔离构建（`--image` 指定基础镜像） |
-| zstd · tar | `.lpkg` 解包 / 重打 |
+| zstd · tar（Rust crate） | `.lpkg` 解包 / 重打（纯 Rust，无需系统 `zstd`/`tar`/`sudo`） |
 
 ## 贡献
 

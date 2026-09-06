@@ -3,6 +3,9 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 pub(crate) fn cmd_seed(args: &Args) -> ExitCode {
+    if let Some(code) = super::ensure_root() {
+        return code;
+    }
     let remote = match &args.remote {
         Some(r) => r.clone(),
         None => {

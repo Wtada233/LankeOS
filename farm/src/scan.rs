@@ -75,63 +75,40 @@ pub fn scan_lpkg(
     })
 }
 
-/// 解包 .lpkg（zstd 压缩 tar），保留 mode。
-///
-/// 必须 root：普通用户解压无法 chown 到 root owner、无法设置 SUID/SGID、无法写 root-only
-/// 文件（如 /etc/shadow 0600）。`sudo tar` 由 root 解压，`--numeric-owner` 保留数字 uid/gid，
-/// mode 完整（含 SUID）。
-/// 删除目录树（**兼容 root 属主文件**）。解包/重打包用 `sudo tar --numeric-owner` 保留 root
-/// 所有权，普通 `fs::remove_dir_all` 删不掉 content/etc、content/var 等 root 目录——
-/// export 的 `.export-extract` 清理曾因此残留 14G。先试直接删（root 运行 / 空目录快路径），
-/// 权限失败再 `sudo -n rm -rf` 兜底。
-pub(crate) fn remove_dir_tree(path: &Path) -> Result<(), String> {
-    if fs::remove_dir_all(path).is_ok() {
-        return Ok(());
-    }
-    let status = std::process::Command::new("sudo")
-        .args(["-n", "rm", "-rf", path.to_string_lossy().as_ref()])
-        .status()
-        .map_err(|e| format!("sudo rm -rf 删除 {path:?} 失败: {e}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "sudo rm -rf 删除 {path:?} 失败（exit {:?}）",
-            status.code()
-        ))
-    }
+/// 进程是否以 root 运行（farm 解包/重打包需读写 root 属主文件与 SUID，操作命令强制 root）。
+pub fn running_as_root() -> bool {
+    // SAFETY: geteuid 无失败路径。
+    let euid = unsafe { libc::geteuid() };
+    euid == 0
 }
 
+/// 删除目录树。解包/重打包以 root 运行后，`fs::remove_dir_all` 能删 root 属主树（含 content/etc、
+/// content/var 等只读 root 目录——export 的 `.export-extract` 曾因删不动残留 14G）。
+/// 曾用 `sudo -n rm -rf` 兜底（已去 sudo，见 ARCH §「root 运行」）。
+pub(crate) fn remove_dir_tree(path: &Path) -> Result<(), String> {
+    fs::remove_dir_all(path).map_err(|e| format!("删除目录树 {path:?} 失败: {e}"))
+}
+
+/// 解包 .lpkg（zstd 压缩 tar），保留 mode/uid/gid。纯 Rust（tar + zstd crate，无 sudo/tar/zstd CLI）。
+///
+/// 语义对齐旧 `sudo tar --numeric-owner -xf`：mode 完整（含 SUID）、按 header 数字 uid/gid chown、
+/// 保留 mtime。以 root 运行时保留所有权（`/etc/shadow` 0600、SUID 等需要特权）；非 root（单测跑
+/// 用户属主 fixture）只保留 mode、不 chown。
 pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), String> {
     if extract_dir.exists() {
         remove_dir_tree(extract_dir)?;
     }
     fs::create_dir_all(extract_dir).map_err(|e| format!("创建 {extract_dir:?} 失败: {e}"))?;
-    // 解压：zstd -dc | sudo tar --numeric-owner -xf - -C extract_dir
-    let dec = std::process::Command::new("zstd")
-        .args(["-dc", lpkg_path.to_string_lossy().as_ref()])
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .map_err(|e| format!("spawn zstd 解压失败: {e}"))?;
-    let dec_out = dec.stdout.ok_or_else(|| "zstd stdout 不可用".to_string())?;
-    let status = std::process::Command::new("sudo")
-        .args([
-            "-n",
-            "tar",
-            "--numeric-owner",
-            "-xf",
-            "-",
-            "-C",
-            extract_dir.to_string_lossy().as_ref(),
-        ])
-        .stdin(std::process::Stdio::from(dec_out))
-        .status()
-        .map_err(|e| format!("sudo tar 解包失败: {e}"))?;
-    if !status.success() {
-        return Err(format!("sudo tar 解包失败（exit {:?}）", status.code()));
-    }
-    Ok(())
+    let f = fs::File::open(lpkg_path).map_err(|e| format!("打开 {lpkg_path:?} 失败: {e}"))?;
+    // 单帧 zstd 解压（farm/lpkg 打包都是单帧；read_lpkg_metadata 同假设）。
+    let dec = zstd::stream::read::Decoder::new(f)
+        .map_err(|e| format!("zstd 解压 {lpkg_path:?} 失败: {e}"))?;
+    let mut ar = tar::Archive::new(dec);
+    ar.set_preserve_permissions(true);
+    ar.set_preserve_ownerships(running_as_root());
+    ar.set_overwrite(true);
+    ar.unpack(extract_dir)
+        .map_err(|e| format!("tar 解包 {lpkg_path:?} 失败: {e}"))
 }
 
 /// 读 metadata.json（返回 serde Value 供 name/version 与后续 repack 复用）。

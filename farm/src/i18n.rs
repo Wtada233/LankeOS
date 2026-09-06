@@ -125,15 +125,11 @@ static ZH: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("seed.progress", "  [seed] {} {}"),
         ("seed.summary", "[seed 汇总] 包 {}：成功 {}，失败 {}"),
         // ── export ──
-        ("export.summary", "[export 汇总] {}，{}（zstd level 22 ultra 重打包）"),
+        ("export.summary", "[export 汇总] {}，{}（扁平化复制，不重打包）"),
         ("export.exported", "导出 {}"),
         ("export.failed", "失败 {}"),
         ("export.failed_item", "{}"),
         // ── repack ──
-        ("repack.done", "[repack] {} 已重打包（zstd -22 --ultra），sha256 {}"),
-        ("repack.ok", "重打包 {} 个"),
-        ("repack.summary", "[repack 汇总] 包 {}：{}，index 已更新（{}）"),
-        ("repack.no_pkg", "用法：farm repack <pkg> [--input <dir>] [--arch <arch>]"),
         // ── state / track / gen-trackers ──
         ("state.open", "[state] 状态库 {}"),
         ("state.open_fail", "  [warn] 打开状态库失败（本次不记录）: {}"),
@@ -204,6 +200,7 @@ static ZH: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("seed.usage", "farm seed --remote <url> [--arch x86_64] [--out <dir>]"),
         ("seed.failed_item", "  [!] {}: {}"),
         ("test.skip_host_libc", "跳过：宿主机无 libc.so.6 可用作 ELF fixture"),
+        ("cli.need_root", "farm 操作命令（build/validate/abifix/repack/export/seed）必须以 root 运行——.lpkg 解包/重打包要读写 root 属主文件与 SUID/SGID。请用 root 用户或 `sudo farm …` 执行"),
     ])
 });
 
@@ -242,14 +239,10 @@ static EN: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("summary.blocked_cnt", "BLOCKED {}"),
         ("seed.progress", "  [seed] {} {}"),
         ("seed.summary", "[seed summary] packages {}: ok {}, failed {}"),
-        ("export.summary", "[export summary] {}, {} (zstd level 22 ultra repack)"),
+        ("export.summary", "[export summary] {}, {} (flatten-copied, not repacked)"),
         ("export.exported", "exported {}"),
         ("export.failed", "failed {}"),
         ("export.failed_item", "{}"),
-        ("repack.done", "[repack] {} repacked (zstd -22 --ultra), sha256 {}"),
-        ("repack.ok", "repacked {}"),
-        ("repack.summary", "[repack summary] package {}: {}, index updated ({})"),
-        ("repack.no_pkg", "Usage: farm repack <pkg> [--input <dir>] [--arch <arch>]"),
         ("state.open", "[state] state DB {}"),
         ("state.open_fail", "  [warn] failed to open state DB (not recording this run): {}"),
         ("build.need_image", "farm build requires --image <image>: container builds only, host builds would pollute the environment"),
@@ -321,6 +314,7 @@ static EN: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("seed.usage", "farm seed --remote <url> [--arch x86_64] [--out <dir>]"),
         ("seed.failed_item", "  [!] {}: {}"),
         ("test.skip_host_libc", "skipping: no host libc.so.6 available for ELF fixture"),
+        ("cli.need_root", "farm operation commands (build/validate/abifix/repack/export/seed) must run as root — .lpkg unpack/repack needs root-owned files and SUID/SGID. Run as root user or via `sudo farm …`"),
     ])
 });
 
