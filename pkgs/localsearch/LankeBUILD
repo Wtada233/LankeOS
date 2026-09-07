@@ -1,0 +1,24 @@
+#
+# localsearch（tracker-miners 继任）— 文件元数据索引 miner（nautilus 搜索用）。
+# 核心硬依赖 tinysparql + exempi + gexiv2。提取器按"本地有库才留"：
+#   关（库缺）：xps(libgxps) iso(libosinfo) zip(libzip) playlist(totem-plparser)
+#             iptc(libiptcdata) cue(libcue) libmediainfo abiword ps
+#   留（库有）：exif/gif/gsf/jpeg/pdf/png/raw/tiff/xml/xmp(exempi)/webp/libav(ffmpeg)/text
+# tests 关（要 dbus/python-dbusmock）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D xps=disabled -D iso=disabled -D zip=disabled -D playlist=disabled \
+        -D iptc=disabled -D cue=disabled \
+        -D abiword=false -D ps=false -D unzip_ps_gz_files=false \
+        -D man=false \
+        -D functional_tests=false -D sandbox_tests=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

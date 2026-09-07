@@ -1,0 +1,6 @@
+pkg-name: gnome-keyring
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gnome-keyring
+  template: https://download.gnome.org/sources/gnome-keyring/{path_version}/gnome-keyring-{version}.tar.xz

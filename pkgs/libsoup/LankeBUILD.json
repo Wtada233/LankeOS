@@ -1,7 +1,7 @@
 {
   "name": "libsoup",
   "version": "3.6.6",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libc.so.6",
@@ -21,6 +21,7 @@
     "base-devel",
     "glib",
     "glib-networking",
+    "gobject-introspection",
     "libpsl",
     "meson",
     "nghttp2",

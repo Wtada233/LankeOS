@@ -1,0 +1,31 @@
+{
+  "name": "xcb-imdkit",
+  "version": "1.0.9",
+  "release": 1,
+  "deps": [
+    "xcb-util",
+    "xcb-util-keysyms"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libxcb-util.so.1",
+    "libxcb.so.1"
+  ],
+  "provides": [
+    "libxcb-imdkit.so",
+    "libxcb-imdkit.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "extra-cmake-modules",
+    "libxcb",
+    "uthash",
+    "xcb-util",
+    "xcb-util-keysyms",
+    "xorgproto"
+  ],
+  "sources": [
+    "https://github.com/fcitx/xcb-imdkit/archive/refs/tags/1.0.9.tar.gz"
+  ],
+  "work_sources": []
+}

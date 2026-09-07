@@ -1,0 +1,16 @@
+#
+# gnome-bluetooth（源 = Arch gnome-bluetooth-3.0）— 蓝牙设置/状态库+UI（gtk4/libadwaita）。
+# docs(gtk-doc) 有工具 → 开同 Arch。bluez 运行时 daemon/obex（deps 已带）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D gtk_doc=true
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

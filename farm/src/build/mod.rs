@@ -10,7 +10,7 @@
 //!    确保源定义（真相）与包内元数据一致；
 //! 3. **只比 needed_so/provides**：deps 由 gen_deps/deprules 规则生成，farm 不扫不比。
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -264,14 +264,67 @@ pub fn run_build(
         opts.targets.clone()
     };
     // 组边参与初始排序：声明式组受害者（python-* 等）排在触发包之后——
-    // `--all` 时它们已在初始队列，没有 needed_so 链接边，须靠组边强制 python 先建。
-    let group_edges = groups.trigger_edges_in(&initial);
+    // `--all` 时它们已在初始队列，没有 needed_so 链接边，须靠组边强制 python 先建（见下方 `edges`）。
+
+    // ---- version-change 组受害者：开工前即定，提前算好并入初始队列 ----
+    // 与 ABI breaking 不同：ABI 断裂不可预知（要等某包重建、SONAME 变了才知道受害者），只能运行时
+    // 动态入队；version-change 在编排开始就确定——on 包旧索引版本 vs 当前配方版本一比较就知道会触发，
+    // 脚本（含动态扫 Qt private importers）立刻能算出受害者。所以把它们**加进确认集**：进概览、release
+    // bump、bulk 预下载，不再等 on 包建完才冒出（`--manual-sort` 严格手工顺序时不并入）。
+    let mut planned_version: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut version_planned_names: HashSet<String> = HashSet::new();
+    if !(opts.manual_sort && !opts.targets.is_empty()) {
+        for on in &initial {
+            if !groups.is_version_change_on(on) {
+                continue;
+            }
+            let Some(ov) = old.packages.get(on) else { continue };
+            let newv = effective_version(&opts.pkgs_dir, on).unwrap_or_default();
+            if newv.is_empty() || newv == ov.version {
+                continue; // 本轮 on 版本没变 → 组不触发
+            }
+            match groups.version_victims_ctx(
+                on,
+                &ov.version,
+                &newv,
+                &all_pkgs,
+                Some(&opts.pkgs_dir),
+                Some(&opts.out_dir),
+                Some(&opts.arch),
+            ) {
+                Ok(v) if !v.is_empty() => {
+                    for x in &v {
+                        version_planned_names.insert(x.clone());
+                    }
+                    planned_version.insert(on.clone(), v);
+                }
+                Ok(_) => {}
+                Err(e) => eprintln!("{}", tr!("build.version_change_fail", on, e)),
+            }
+        }
+    }
+    let mut selection: Vec<String> = initial.clone();
+    selection.extend(version_planned_names.iter().cloned());
+    selection.sort();
+    selection.dedup();
+    // 组边（静态 glob；动态受害者并入选集后同样参与）+ version-change 动态边 (victim → on)，
+    // 保证新并入受害者排在 on 包之后（否则按名字字母序可能在 on 前建，容器里还是旧 Qt → 白跑）。
+    let mut edges = groups.trigger_edges_in(&selection);
+    for (on, vics) in &planned_version {
+        for v in vics {
+            if v != on {
+                edges.push((v.clone(), on.clone()));
+            }
+        }
+    }
+    edges.sort();
+    edges.dedup();
     // --manual-sort：严格按命令行传入的包名顺序构建（引导链/手工编排用），不做 topo 重排。
     // 否则纯 python 包（无 needed_so 边）会按字母序建，bootstrap（setuptools→flit-core→build）会断。
     let mut queue: VecDeque<(String, bool)> = if opts.manual_sort && !opts.targets.is_empty() {
         opts.targets.iter().cloned().map(|p| (p, false)).collect()
     } else {
-        topo_order(&opts.pkgs_dir, &initial, &old, &group_edges)
+        topo_order(&opts.pkgs_dir, &selection, &old, &edges)
             .into_iter()
             .map(|p| (p, false))
             .collect()
@@ -301,8 +354,9 @@ pub fn run_build(
             continue;
         }
         let ver = effective_version(&opts.pkgs_dir, &pkg).unwrap_or_else(|| "?".into());
-        // 传播重建（被 ABI 断裂波及）→ 先 bump release（用户规则 1），再构建
-        if is_victim {
+        // 传播重建（被 ABI 断裂波及，is_victim）或 version-change 组预排受害者（开工前已定）
+        // → 先 bump release（用户规则 1），再构建
+        if is_victim || version_planned_names.contains(&pkg) {
             bump_release(&opts.pkgs_dir, &pkg);
         }
         println!(
@@ -472,35 +526,17 @@ pub fn run_build(
         if group_trigger {
             victims.extend(groups.victims_for(&pkg, &all_pkgs));
         }
-        // version-change：on 包版本变化（旧索引 vs 本轮有效版本）→ 脚本判定 exit 0 才重建组受害者
-        let version_victims: Vec<String> = match old.packages.get(&pkg) {
-            Some(ov) if ov.version != version => {
-                match groups.version_victims_if(&pkg, &ov.version, &version, &all_pkgs) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        eprintln!("{}", tr!("build.version_change_fail", pkg, e));
-                        Vec::new()
-                    }
-                }
-            }
-            _ => Vec::new(),
-        };
-        victims.extend(version_victims.iter().cloned());
+        // version-change 受害者不在此动态入队——开工前已在初始选择里算好并入队列（见上 2.5 前），
+        // release bump 在弹包时处理；这里只处理 ABI/abichange 的动态受害者。
         if !victims.is_empty() {
             victims.sort();
             victims.dedup();
             for v in victims {
                 if !seen.contains(&v) {
-                    if !removed.is_empty() {
-                        println!(
-                            "  {}",
-                            ux::yellow(&tr!("build.abi", pkg, removed.join(", "), v))
-                        );
-                    } else if version_victims.contains(&v) {
-                        println!("  {}", ux::yellow(&tr!("build.version_rebuild", pkg, v)));
-                    } else {
-                        println!("  {}", ux::yellow(&tr!("build.group_rebuild", pkg, v)));
-                    }
+                    println!(
+                        "  {}",
+                        ux::yellow(&tr!("build.abi", pkg, removed.join(", "), v))
+                    );
                     queue.push_back((v, true)); // 传播重建 → 触发 release bump
                 }
             }

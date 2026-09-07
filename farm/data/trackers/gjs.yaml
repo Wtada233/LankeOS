@@ -1,0 +1,6 @@
+pkg-name: gjs
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/gjs/{path_version}/gjs-{version}.tar.xz
+  source-name: gjs

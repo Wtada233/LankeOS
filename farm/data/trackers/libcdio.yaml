@@ -1,0 +1,9 @@
+# GitHub release asset（真 dist tarball）。若未来 tag 无资产会像 rhino 那样断——届时改探测
+pkg-name: libcdio
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: libcdio/libcdio
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/libcdio/libcdio/releases/download/{tag}/libcdio-{version}.tar.bz2

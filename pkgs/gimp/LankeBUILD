@@ -1,8 +1,11 @@
 lankebuild_prepare() {
     # Arch 同款 cherry-pick 补丁（tarball 是 tag 快照缺此修复）：
     #   6b38616 画布旋转棋盘格性能修复（1685c86 调色板修复 tarball 已含，不重复带）
+    #   gimp-gexiv2-0.16.patch：BLFS 提供（源树 build/macos/patches/ 同名，通用非 macos 专属）。
+    #     gexiv2 0.16 把 pc 改名 gexiv2-0.16 且版本越界 <0.15 上限；
+    #     此补丁把 meson 探测改成 dependency('gexiv2-0.16', >=0.16.0)。
     # 容错：patch -N 对"已应用"返回 1，用 reverse-dry-run 判别（同 signond）
-    for _p in gimp-6b38616.patch; do
+    for _p in gimp-6b38616.patch gimp-gexiv2-0.16.patch; do
         if patch -Np1 --dry-run -i "{WORK_DIR}/../$_p" >/dev/null 2>&1; then
             patch -Np1 -i "{WORK_DIR}/../$_p"
         elif patch -R -p1 --dry-run -i "{WORK_DIR}/../$_p" >/dev/null 2>&1; then

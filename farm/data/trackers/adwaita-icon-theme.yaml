@@ -1,0 +1,6 @@
+pkg-name: adwaita-icon-theme
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: adwaita-icon-theme
+  template: https://download.gnome.org/sources/adwaita-icon-theme/{path_version}/adwaita-icon-theme-{version}.tar.xz

@@ -1,0 +1,8 @@
+pkg-name: xcb-imdkit
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: fcitx/xcb-imdkit
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/fcitx/xcb-imdkit/archive/refs/tags/{tag}.tar.gz

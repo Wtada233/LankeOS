@@ -1,0 +1,21 @@
+#
+# libcdio — CD/DVD 读取库（gvfs 用）。真 dist tarball（GitHub release asset，含 configure
+# + doc/version.texi），无需 autoreconf。关 cddb/vcd-info/静态库；cpp-progs 开（Arch 同款）。
+
+lankebuild_prepare() {
+    autoreconf -fiv
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --localstatedir={LOCALSTATEDIR} \
+        --disable-cddb \
+        --disable-static \
+        --disable-vcd-info \
+        --enable-cpp-progs
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+}

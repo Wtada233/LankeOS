@@ -1,0 +1,9 @@
+# github 归档 tarball（非 git+）
+pkg-name: libportal
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: flatpak/libportal
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/flatpak/libportal/archive/refs/tags/{tag}.tar.gz

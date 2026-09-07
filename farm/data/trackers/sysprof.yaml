@@ -1,0 +1,6 @@
+pkg-name: sysprof
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/sysprof/{path_version}/sysprof-{version}.tar.xz
+  source-name: sysprof

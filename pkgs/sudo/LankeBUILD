@@ -30,4 +30,11 @@ session     optional    pam_keyinit.so revoke
 session     required    pam_limits.so
 session     optional    pam_loginuid.so
 EOF
+
+    # tmpfiles.d 建运行时目录（systemd-tmpfiles）
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+systemd-tmpfiles --create
+exit 0
+EOF
 }

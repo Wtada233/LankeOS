@@ -1,0 +1,18 @@
+#
+# geoclue — 定位服务（daemon + libgeoclue，gsd/gnome-shell 用）。
+# avahi 非必需（BLFS：Optional，仅 nmea-source 用）→ -D nmea-source=false，不建 avahi。
+# ModemManager 有 → 3g/modem-gps/cdma 默认开；libnotify 有 → demo-agent 默认开。
+# docs(gtk-doc) 有工具 → 默认留。运行时需 geoclue 用户/dbus 服务——缺则补 sysusers。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D nmea-source=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

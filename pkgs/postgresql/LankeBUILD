@@ -62,9 +62,11 @@ lankebuild_package() {
     install -Dm644 {WORK_DIR}/../postgresql.service {STAGING_ROOT}/usr/lib/systemd/system/postgresql.service
     install -Dm644 {WORK_DIR}/../postgresql.sysusers {STAGING_ROOT}/usr/lib/sysusers.d/postgresql.conf
     install -Dm644 {WORK_DIR}/../postgresql.tmpfiles {STAGING_ROOT}/usr/lib/tmpfiles.d/postgresql.conf
-    # postinst hook：数据目录存在时校验版本（Arch post_upgrade 同款）
+    # postinst hook：先建 sysusers.d/postgresql.conf 的 postgres 用户，再校验数据目录版本（Arch post_upgrade 同款）
     cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
 #!/bin/sh
+systemd-sysusers
+systemd-tmpfiles --create
 if [ -d /var/lib/postgres/data ]; then
     /usr/bin/postgresql-check-db-dir /var/lib/postgres/data || :
 fi

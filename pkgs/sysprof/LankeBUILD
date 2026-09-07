@@ -1,0 +1,17 @@
+#
+# sysprof — 全量：GTK profiler GUI + libsysprof-capture（gjs/mutter/libdex 要 capture，
+# 随本包装，不拆包）。依赖 libdex/libpanel（harfbuzz↔freetype 式自举，见 libdex 注）。
+# help/docs 关掉省 yelp-tools/gtk-doc；GUI(gtk) 默认开。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D help=false -D docs=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

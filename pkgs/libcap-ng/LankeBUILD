@@ -1,0 +1,20 @@
+lankebuild_prepare() {
+    :
+}
+
+#
+# libcap-ng — cap 库 + 工具。github 归档（git 快照，无 configure）→ autoreconf。
+# --without-python：python/swig 绑定不需要（省 swig/python）；静态库关。
+
+lankebuild_build() {
+    touch NEWS
+    autoreconf -fiv
+    ./configure --prefix=/usr --sysconfdir=/etc \
+        --enable-static=no \
+        --without-python
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+}

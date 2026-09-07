@@ -1,0 +1,8 @@
+pkg-name: libtirpc
+version-source: sources[0]
+sources:
+- tracker-template: sourceforge
+  project: libtirpc
+  pattern: '(\d[\d.]*)'
+  path: libtirpc
+  template: https://downloads.sourceforge.net/sourceforge/libtirpc/libtirpc-{version}.tar.bz2

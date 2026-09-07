@@ -1,0 +1,12 @@
+# adwaita-icon-theme — GNOME 标准图标（arch-any 数据包）。GNOME 应用按名字取图标全靠它，
+# 缺了桌面几乎全空白。release tarball 自带成品 Adwaita/（scalable/symbolic/fullcolor/cursors）
+# + index.theme，meson 一个 install 全装。icon cache 由系统机制自动更新，无需 postinst。
+# legacy 全彩包只给老 app 回退，核心已够。
+lankebuild_prepare() { :; }
+lankebuild_build() {
+    meson setup _build --prefix=/usr --buildtype=release
+    meson compile -C _build -j$(nproc)
+}
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

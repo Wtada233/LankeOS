@@ -1,0 +1,20 @@
+#
+# gnome-control-center（gcc）— 设置中心（多面板）。
+# 面板按探测到的库自动编：无 bolt/samba(smbclient)/ibus → Thunderbolt/网络共享/输入源
+# 面板自动跳过（Arch depends 才硬拉那堆）。malcontent(家长控制) 显式关。
+# documentation 走 docbook/gi-docgen → 关。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D malcontent=false \
+        -D documentation=false \
+        -D ibus=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

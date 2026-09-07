@@ -1,0 +1,28 @@
+#
+# mutter — GNOME 合成器/WM（gnome-shell 的核心）。
+# 依赖多：合成(gtk4/pipewire/gbm/mesa)、输入(libinput/libei/libwacom)、
+# 传感屏(gsd 运行时)、颜色(colord/lcms2)、沙箱图(glycin)、profiler(sysprof capture)。
+# docs 走 gi-docgen → 关；tests/installed_tests 关；egl_device 开（Arch 同款）；
+# wayland_eglstream 关（NVIDIA EGL stream 专用，开源 mesa 无意义；开了其 pc 会
+# Requires wayland-eglstream-protocols，消费方构建要额外包）。
+# CFLAGS/LDFLAGS 同 Arch（-O3 + fno-semantic-interposition / -Bsymbolic-functions）。
+# gvdb 是 meson wrap 子项目：无 MESON_PACKAGE_CACHE_DIR 时 configure 走网络拉 wrap。
+
+lankebuild_prepare() {
+    export CFLAGS="${CFLAGS/-O2/-O3} -fno-semantic-interposition"
+    export LDFLAGS="{LDFLAGS} -Wl,-Bsymbolic-functions"
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D docs=false \
+        -D egl_device=true \
+        -D installed_tests=false \
+        -D tests=disabled \
+        -D wayland_eglstream=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

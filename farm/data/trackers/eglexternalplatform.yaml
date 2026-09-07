@@ -1,0 +1,8 @@
+pkg-name: eglexternalplatform
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: NVIDIA/eglexternalplatform
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/NVIDIA/eglexternalplatform/archive/refs/tags/{tag}.tar.gz

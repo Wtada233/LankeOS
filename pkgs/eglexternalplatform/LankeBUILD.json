@@ -1,0 +1,17 @@
+{
+  "name": "eglexternalplatform",
+  "version": "1.2.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "libglvnd",
+    "meson"
+  ],
+  "sources": [
+    "https://github.com/NVIDIA/eglexternalplatform/archive/refs/tags/1.2.1.tar.gz"
+  ],
+  "work_sources": []
+}

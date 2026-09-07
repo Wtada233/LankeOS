@@ -1,0 +1,8 @@
+pkg-name: rpcsvc-proto
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: thkukuk/rpcsvc-proto
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/thkukuk/rpcsvc-proto/archive/{tag}/rpcsvc-proto-{version}.tar.gz

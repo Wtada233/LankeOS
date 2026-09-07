@@ -1,0 +1,16 @@
+#
+# libcloudproviders — 云存储 provider 协议库（nautilus 侧边栏用）。
+# documentation 关省 gi-docgen（Arch 才开 true）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D documentation=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

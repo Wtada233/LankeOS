@@ -1,0 +1,31 @@
+#
+# evolution-data-server（eDS）— 日历/联系人/邮件后端库（gnome-shell 硬依赖 libecal/edataserver）。
+# cmake。按 BLFS 瘦身：krb5/openldap/libdb/gtk_doc 关；libphonenumber 关（省 google 库）；
+# OAuth2 的 webkit4 关（ENABLE_OAUTH2_WEBKITGTK4=OFF）→ 无 webkit 可编。
+# gnome-shell 只要核心（libecal/libedataserver）；ui 库随 gtk3/gtk4 一起编。
+
+lankebuild_prepare() {
+    cmake -S . -B build -G Ninja \
+        -D CMAKE_BUILD_TYPE=None \
+        -D CMAKE_INSTALL_PREFIX=/usr \
+        -D LIBEXEC_INSTALL_DIR=/usr/lib \
+        -D SYSCONF_INSTALL_DIR=/etc \
+        -D ENABLE_GTK_DOC=OFF \
+        -D ENABLE_GI_DOCGEN=OFF \
+        -D ENABLE_INTROSPECTION=ON \
+        -D ENABLE_VALA_BINDINGS=ON \
+        -D WITH_LIBDB=OFF \
+        -D WITH_PHONENUMBER=OFF \
+        -D WITH_KRB5=ON \
+        -D WITH_OPENLDAP=ON \
+        -D ENABLE_OAUTH2_WEBKITGTK4=OFF \
+        -D ENABLE_OAUTH2_WEBKITGTK=OFF
+}
+
+lankebuild_build() {
+    cmake --build build
+}
+
+lankebuild_package() {
+    DESTDIR={STAGING_ROOT} cmake --install build
+}

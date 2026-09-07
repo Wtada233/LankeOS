@@ -1,0 +1,6 @@
+pkg-name: mutter
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: mutter
+  template: https://download.gnome.org/sources/mutter/{path_version}/mutter-{version}.tar.xz

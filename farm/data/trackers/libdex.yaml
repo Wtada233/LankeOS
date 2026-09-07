@@ -1,0 +1,8 @@
+pkg-name: libdex
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/libdex/{path_version}/libdex-{version}.tar.xz
+  source-name: libdex
+  # libdex 1.1 是奇数 minor 的稳定版（非核心 GNOME 库，不用"偶 minor 稳定"假设）
+  stable-minor: all

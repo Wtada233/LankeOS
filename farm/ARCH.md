@@ -117,6 +117,17 @@ packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` g
 目录缺失/为空 → 空组（无害）。与 data/trackers 同一套 YAML 模式。
 - `reorder_queue`：受害者入队后按依赖算法重排，**先去重**（同一受害者被多个断裂重复入队 → `rev` 被污染导致顺序错乱）+ victim 标记取 OR。保证"被依赖者先建"（如 librsvg 先于 appstream）且叶子（chromium）**维持队尾、只构建一次**。
 
+**version-change 组动态受害者（Qt 私有 API 场景）**：version-change 与 ABI breaking **不同**——ABI 断裂
+不可预知（要等某包重建、SONAME 变了才知道受害者），只能运行时动态入队；version-change 在 **run_build
+开工前即定**（on 包旧索引版本 vs 配方版本一比较就知会触发），所以受害者在**构建概览/确认阶段就算好并
+并入初始队列**：进概览、bulk 预下载、release bump，不是边建边冒（`--manual-sort` 严格手工顺序时不并入）。
+run_build 给脚本传 `pkgs_dir/out_dir/arch` 并 prepend 两个 farm 导出**纯 bash 函数**——`farm_pkg_list`
+（全部配方包名）、`farm_pkg_extract <pkg> <dir>`（解该包当前 .lpkg，用宿主 `zstd|tar`）；脚本可**自己
+扫**出受害者打到 stdout（farm 并入静态 glob 并集，排除 on 自身）。脚本运行时刻即私有 ABI 断裂时刻，
+无需时间戳。例 `data/build/qt.yaml`：`rebuild-on-version-change: qt6-base` + 脚本对每个非 qt6-* 包
+extract 后 `grep -rla "Qt_6_PRIVATE_API"` 命中即 echo 包名。这覆盖 **Qt 私有 API 不随 patch 保 ABI**
+（6.11.1 头编的 consumer 跑 6.11.2 私有布局会崩）这类 needed_so/SONAME/符号版本扫描都看不见的漂移。
+
 ## 5. 构建执行（lpkg_binding）
 
 `RealBinding::docker_build`（fresh 容器，`docker create --network=host` + DooD socket 挂载 + exec）：
@@ -245,3 +256,15 @@ build --all ──> run_build
 - **tests/integration.rs**：公共 API 集成（ABI 传播、track 排序、real index）
 
 **137 个测试全绿**（121 lib + 9 bin + 7 integration）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**。
+
+## 16. manual-abi-fullchk（全 ABI 符号/版本审计）
+
+`manual-abi-fullchk`（`src/abi_fullchk.rs`）镜像 `/tmp/scan_elf_ver.py` 的两段式审计，但原生/缓存/单趟：
+- **provider/cache 来源 = `--source`（默认 out）下全部包**：每个 .lpkg 解包一次到临时目录，逐 ELF 用
+  goblin 读 `.gnu.version_d/.gnu.version_r/.gnu.version`（verdef/verneed/versym）——每个 SONAME 导出
+  的符号@版本按**内容 sha256** 缓存到 `~/.cache/lankefarm-abi/<soname>.json`（`{sha256, versions:{ver:[sym…]}}`）。
+  sha 命中 → 该文件不重扫；不匹配 → 原生重扫并覆写。**无 readelf/objdump、无新 Cargo 依赖**。
+- **`--pkgs` 只收窄审计范围**：consumer（可执行/未命中缓存的库）引用 `name@version` 无任何 DT_NEEDED
+  候选库（provider 目录内）提供 → 按包报告。候选为空跳过（无法判断，同 python）。
+- 确定性：包/文件排序遍历；provider 冲突（同 SONAME 多份）最后一次胜。consumer 判缺失在 provider
+  目录建全后统一做。

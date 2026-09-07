@@ -1,0 +1,7 @@
+pkg-name: libgtop
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: libgtop
+  stable-minor: all
+  template: https://download.gnome.org/sources/libgtop/{path_version}/libgtop-{version}.tar.xz

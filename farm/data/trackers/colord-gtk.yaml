@@ -1,0 +1,7 @@
+pkg-name: colord-gtk
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.freedesktop.org/software/colord/releases/
+  pattern: 'colord-gtk-(\d[\d.]*)\.tar\.xz'
+  template: https://www.freedesktop.org/software/colord/releases/colord-gtk-{version}.tar.xz

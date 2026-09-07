@@ -1,0 +1,41 @@
+{
+  "name": "gjs",
+  "version": "1.88.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libX11.so.6",
+    "libc.so.6",
+    "libcairo-gobject.so.2",
+    "libcairo.so.2",
+    "libffi.so.8",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libgirepository-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libmozjs-140.so",
+    "libreadline.so.8",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libgjs.so",
+    "libgjs.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cairo",
+    "glib",
+    "gobject-introspection",
+    "libffi",
+    "libx11",
+    "meson",
+    "readline",
+    "spidermonkey",
+    "sysprof"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gjs/1.88/gjs-1.88.1.tar.xz"
+  ],
+  "work_sources": []
+}

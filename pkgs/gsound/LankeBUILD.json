@@ -1,0 +1,30 @@
+{
+  "name": "gsound",
+  "version": "1.0.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcanberra.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libgsound.so",
+    "libgsound.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "gtk-doc",
+    "libcanberra",
+    "meson",
+    "vala"
+  ],
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/gsound/-/archive/1.0.3/gsound-1.0.3.tar.gz"
+  ],
+  "work_sources": []
+}

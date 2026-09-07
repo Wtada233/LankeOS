@@ -1,0 +1,20 @@
+{
+  "name": "adwaita-icon-theme",
+  "version": "50.0",
+  "release": 1,
+  "deps": [
+    "hicolor-icon-theme"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "gtk4",
+    "meson",
+    "ninja"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/adwaita-icon-theme/50/adwaita-icon-theme-50.0.tar.xz"
+  ],
+  "work_sources": []
+}

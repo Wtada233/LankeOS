@@ -1,0 +1,11 @@
+# CPAN：用 metacpan API 取最新版 + 对应 sdist（无专用模板，用 script）
+pkg-name: perl-parse-yapp
+type: script
+script-content: |
+  set -e
+  j=$(curl -fsSL https://fastapi.metacpan.org/v1/release/Parse-Yapp)
+  v=$(printf '%s' "$j" | python3 -c "import json,sys;print(json.load(sys.stdin)['version'])")
+  test -n "$v" || exit 1
+  echo "$v"
+  f=$(printf '%s' "$j" | python3 -c "import json,sys;print(json.load(sys.stdin)['download_url'])")
+  echo "https://cpan.metacpan.org$f"

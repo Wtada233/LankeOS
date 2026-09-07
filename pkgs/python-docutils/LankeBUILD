@@ -1,0 +1,17 @@
+#
+# python-docutils — reST 处理库（提供 rst2man，mutter/… 生成 man 用）。
+# setuptools 后端，PyPI sdist（自带版本元数据）→ 标准 PEP517 wheel 构建。
+
+lankebuild_prepare() {
+    # Arch 同款：去 pyproject include 块（打包数据引用不存在文件）
+    sed -i '/^include =/,/]/d' pyproject.toml
+}
+
+lankebuild_build() {
+    python3 -m build --wheel --skip-dependency-check --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

@@ -1,0 +1,16 @@
+#
+# rpcsvc-proto — rpcgen + rpcsvc 协议头（samba 等构建要 rpcsvc_proto.h/rpcgen）。autotools。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    autoreconf -fi
+    ./configure --prefix=/usr
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+}

@@ -1,0 +1,32 @@
+{
+  "name": "spidermonkey",
+  "version": "140.15.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libm.so.6",
+    "libreadline.so.8",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "provides": [
+    "libmozjs-140.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cbindgen",
+    "compiler-rt",
+    "llvm",
+    "python-pip",
+    "readline",
+    "rust",
+    "zlib"
+  ],
+  "sources": [
+    "https://archive.mozilla.org/pub/firefox/releases/140.15.0esr/source/firefox-140.15.0esr.source.tar.xz"
+  ],
+  "work_sources": []
+}

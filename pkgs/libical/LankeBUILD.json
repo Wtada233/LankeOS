@@ -1,7 +1,7 @@
 {
   "name": "libical",
   "version": "4.0.5",
-  "release": 2,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6",

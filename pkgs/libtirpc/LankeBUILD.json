@@ -1,0 +1,25 @@
+{
+  "name": "libtirpc",
+  "version": "1.3.7",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcom_err.so.2",
+    "libgssapi_krb5.so.2",
+    "libk5crypto.so.3",
+    "libkrb5.so.3"
+  ],
+  "provides": [
+    "libtirpc.so",
+    "libtirpc.so.3"
+  ],
+  "build_deps": [
+    "base-devel",
+    "krb5"
+  ],
+  "sources": [
+    "https://downloads.sourceforge.net/sourceforge/libtirpc/libtirpc-1.3.7.tar.bz2"
+  ],
+  "work_sources": []
+}

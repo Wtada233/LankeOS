@@ -1,0 +1,7 @@
+pkg-name: libcloudproviders
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: libcloudproviders
+  stable-minor: all
+  template: https://download.gnome.org/sources/libcloudproviders/{path_version}/libcloudproviders-{version}.tar.xz

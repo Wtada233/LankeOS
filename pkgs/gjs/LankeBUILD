@@ -1,0 +1,18 @@
+#
+# gjs — GNOME JavaScript 解释器（跑 gnome-shell/扩展用）
+# 依赖 spidermonkey(mozjs-140.pc，0001 补丁补的 DXP_UNIX 正是喂它) + libsysprof-capture(sysprof)。
+# Arch 同款：meson 只需 -D installed_tests=false；dbus/xvfb/submodule(goi-tests) 是测试专用，跳过。
+
+lankebuild_prepare() {
+    # meson 默认构建（installed_tests 默认 true，gjs 自带 + gi-tests fixture 进标准
+    # installed-tests/ 布局，GNOME/Arch 惯例；不再尝试裁 subproject）
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

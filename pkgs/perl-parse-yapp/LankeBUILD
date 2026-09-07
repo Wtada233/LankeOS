@@ -1,0 +1,15 @@
+#
+# perl-parse-yapp — Parse::Yapp（perl 语法解析器生成器；samba 构建工具）。CPAN sdist。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    PERL_MM_USE_DEFAULT=1 perl Makefile.PL INSTALLDIRS=vendor
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make install DESTDIR={STAGING_ROOT}
+}

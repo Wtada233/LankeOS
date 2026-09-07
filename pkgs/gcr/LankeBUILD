@@ -1,0 +1,18 @@
+#
+# gcr 3.x（GTK3 线）— gnome-keyring 用。ssh_agent=false（Arch 同款：ssh-agent 已迁 gcr-4，
+# 由 gcr-4 装 gcr-ssh-agent unit/libexec——3.x 再开就与 gcr-4 文件冲突）。
+# openssh 仍要 build_dep（configure 无条件 find_program ssh-add）；docs(gi-docgen) 关。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D ssh_agent=false \
+        -D gtk_doc=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

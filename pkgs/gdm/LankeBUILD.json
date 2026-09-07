@@ -1,0 +1,52 @@
+{
+  "name": "gdm",
+  "version": "50.3",
+  "release": 3,
+  "deps": [
+    "accountsservice",
+    "gnome-session",
+    "gnome-shell",
+    "upower"
+  ],
+  "needed_so": [
+    "libXau.so.6",
+    "libaccountsservice.so.1",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgudev-1.0.so.0",
+    "libjson-glib-1.0.so.0",
+    "libkeyutils.so.1",
+    "libpam.so.0",
+    "libpolkit-gobject-1.so.0",
+    "libsystemd.so.0"
+  ],
+  "provides": [
+    "libgdm.so",
+    "libgdm.so.1"
+  ],
+  "build_deps": [
+    "accountsservice",
+    "base-devel",
+    "dconf",
+    "gdk-pixbuf",
+    "glib",
+    "gobject-introspection",
+    "json-glib",
+    "keyutils",
+    "libcanberra",
+    "libgudev",
+    "libxau",
+    "libxcb",
+    "linux-pam",
+    "meson",
+    "polkit",
+    "upower"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gdm/50/gdm-50.3.tar.xz"
+  ],
+  "work_sources": []
+}

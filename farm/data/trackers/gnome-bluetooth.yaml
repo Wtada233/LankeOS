@@ -1,0 +1,7 @@
+# 源 = Arch gnome-bluetooth-3.0（libgnome-bluetooth gtk4 线）
+pkg-name: gnome-bluetooth
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gnome-bluetooth
+  template: https://download.gnome.org/sources/gnome-bluetooth/{path_version}/gnome-bluetooth-{version}.tar.xz

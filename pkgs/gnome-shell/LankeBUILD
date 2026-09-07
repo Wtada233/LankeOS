@@ -1,0 +1,20 @@
+#
+# gnome-shell — GNOME 桌面 UI（Wayland 合成 + shell）。核心大件：mutter/gjs/eDS。
+# ibus/webkit/gdm 均非 meson 编译依赖（运行时 JS/D-Bus），不建。
+# gcc-16 日历 server 修复（BLFS sed，若本机 gcc≥16 需要，容错 no-op）。
+# docs/man 默认不编（避免 asciidoc/gi-docgen）；sassc 编 css。
+
+lankebuild_prepare() {
+    # gcc-16 修复（ICalProperty 需 const；未命中也无害）
+    sed -e '/(ICalProperty/s/ICalProperty/const &/' -i src/calendar-server/gnome-shell-calendar-server.c 2>/dev/null || true
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D tests=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

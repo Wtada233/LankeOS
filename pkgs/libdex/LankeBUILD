@@ -1,0 +1,23 @@
+#
+# libdex — D-Bus/异步 "Deferred Execution" 库（sysprof GUI 用）
+# 与 sysprof 自举：第一轮 sysprof=false 供 sysprof 全量(带 capture)构建后，本文件已是
+# 第二轮——sysprof=true 正式链 sysprof 的 libsysprof-capture。libdex↔sysprof 双依赖，
+# 版本变动时按同法两轮走（harfbuzz↔freetype 式）。docs=disabled 省 gi-docgen。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D docs=false \
+        -D sysprof=true
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+    # 清构建期 __pycache__/pyc
+    find {STAGING_ROOT} -type d -name __pycache__ -prune -exec rm -rf {} +
+    find {STAGING_ROOT} -type f -name '*.pyc' -delete
+
+}

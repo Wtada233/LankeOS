@@ -1,0 +1,29 @@
+#
+# samba — SMB/CIFS（gcc printers 面板要 libsmbclient/smbclient）。
+# 构建参数以 BLFS 为准（talloc/tdb/tevent/ldb 内置）；缺的 feature 关（--without-ad-dc）。
+# 不跑 selftest；perl Parse-Yapp / rpcsvc-proto 是 BLFS Required 构建工具——若 configure 报缺再补。
+# 单包含 smbclient + libsmbclient + daemon（Arch 拆分 hack 不适用，LankeOS 并一包）。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure \
+        --prefix=/usr \
+        --sysconfdir=/etc \
+        --localstatedir=/var \
+        --with-piddir=/run/samba \
+        --with-pammodulesdir=/usr/lib/security \
+        --enable-fhs \
+        --without-ad-dc \
+        --with-system-mitkrb5 \
+        --with-systemd \
+        --disable-rpath-install \
+        --systemd-install-services
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make install DESTDIR={STAGING_ROOT}
+}

@@ -1,0 +1,57 @@
+{
+  "name": "sysprof",
+  "version": "50.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libadwaita-1.so.0",
+    "libc.so.6",
+    "libcairo.so.2",
+    "libdex-1.so.1",
+    "libdw.so.1",
+    "libelf.so.1",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgraphene-1.0.so.0",
+    "libgtk-4.so.1",
+    "libjson-glib-1.0.so.0",
+    "libm.so.6",
+    "libpanel-1.so.1",
+    "libpango-1.0.so.0",
+    "libpolkit-agent-1.so.0",
+    "libpolkit-gobject-1.so.0",
+    "libstdc++.so.6",
+    "libsystemd.so.0",
+    "libunwind.so.8"
+  ],
+  "provides": [
+    "libsysprof-6.so",
+    "libsysprof-6.so.6",
+    "libsysprof-memory-6.so",
+    "libsysprof-speedtrack-6.so",
+    "libsysprof-tracer-6.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cairo",
+    "elfutils",
+    "glib",
+    "graphene",
+    "gtk4",
+    "hicolor-icon-theme",
+    "json-glib",
+    "libadwaita",
+    "libdex",
+    "libpanel",
+    "libunwind",
+    "meson",
+    "polkit"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/sysprof/50/sysprof-50.0.tar.xz"
+  ],
+  "work_sources": []
+}

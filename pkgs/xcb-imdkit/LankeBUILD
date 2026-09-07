@@ -1,0 +1,16 @@
+# xcb-imdkit — XIM 协议的 xcb 实现（fcitx5 xim frontend 硬依赖 XCBImdkit::XCBImdkit）。
+# 上游 fcitx/xcb-imdkit，github archive 自带 CMakeLists（无需重新引导）。
+# 按 Arch：cmake+ECM，装 libXCBImdkit.so + XCBImdkitConfig.cmake + 头。
+lankebuild_prepare() {
+    cmake -S . -B build -G Ninja \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_TESTING=OFF
+}
+lankebuild_build() {
+    cmake --build build -j$(nproc)
+}
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" cmake --install build
+}

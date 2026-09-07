@@ -1,0 +1,21 @@
+#
+# libdbusmenu — dbusmenu-glib/gtk3（ibus 硬依赖 dbusmenu-glib-0.4）。Debian orig tar，autotools。
+# gtk-doc 关（省 Arch 的 doc patch）；static/tests/dumper 关。单包含 glib+gtk3。
+
+lankebuild_prepare() {
+    autoreconf -fiv
+}
+
+lankebuild_build() {
+    # Arch 同款：autoconf 的 HAVE_VALGRIND conditional 引用 bug → configure 前 export 修正
+    export HAVE_VALGRIND_TRUE='#'
+    export HAVE_VALGRIND_FALSE=''
+    ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+        --disable-gtk-doc --disable-static --disable-tests --disable-dumper \
+        --with-gtk=3
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+}

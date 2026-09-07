@@ -1,0 +1,17 @@
+{
+  "name": "gweather-locations",
+  "version": "2026.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "meson",
+    "python-gobject"
+  ],
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/gweather-locations/-/archive/2026.2/gweather-locations-2026.2.tar.gz"
+  ],
+  "work_sources": []
+}

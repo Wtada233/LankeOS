@@ -1,0 +1,22 @@
+{
+  "name": "blueprint-compiler",
+  "version": "0.22.2",
+  "release": 2,
+  "deps": [
+    "glib",
+    "python",
+    "python-gobject"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "meson",
+    "python-gobject"
+  ],
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/blueprint-compiler/-/archive/v0.22.2/blueprint-compiler-v0.22.2.tar.gz"
+  ],
+  "work_sources": []
+}

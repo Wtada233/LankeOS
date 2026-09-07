@@ -19,6 +19,7 @@ lankebuild_build() {
         -DLIBICAL_CXX_BINDINGS=true \
         -DLIBICAL_JAVA_BINDINGS=true \
         -DLIBICAL_GOBJECT_INTROSPECTION=true \
+        -DLIBICAL_GLIB_VAPI=true \
         -DLIBICAL_GLIB=true \
         -DLIBICAL_BUILD_DOCS=false \
         -DLIBICAL_BUILD_EXAMPLES=false

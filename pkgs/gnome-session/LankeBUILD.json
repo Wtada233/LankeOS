@@ -1,0 +1,33 @@
+{
+  "name": "gnome-session",
+  "version": "50.1",
+  "release": 1,
+  "deps": [
+    "dconf",
+    "gsettings-desktop-schemas",
+    "xdg-desktop-portal-gnome"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgnome-desktop-4.so.2",
+    "libgobject-2.0.so.0",
+    "libsystemd.so.0"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "docbook-xsl",
+    "glib",
+    "gnome-desktop",
+    "libxslt",
+    "meson",
+    "xmlto"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gnome-session/50/gnome-session-50.1.tar.xz"
+  ],
+  "work_sources": []
+}

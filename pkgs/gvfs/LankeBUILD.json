@@ -1,0 +1,48 @@
+{
+  "name": "gvfs",
+  "version": "1.60.2",
+  "release": 2,
+  "deps": [
+    "openssh"
+  ],
+  "needed_so": [
+    "libarchive.so.13",
+    "libc.so.6",
+    "libfuse3.so.4",
+    "libgcc_s.so.1",
+    "libgcr-4.so.4",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgudev-1.0.so.0",
+    "libpolkit-gobject-1.so.0",
+    "libsecret-1.so.0",
+    "libsoup-3.0.so.0",
+    "libsystemd.so.0",
+    "libudisks2.so.0",
+    "libxml2.so.16"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "docbook-xsl",
+    "fuse3",
+    "gcr-4",
+    "glib",
+    "gsettings-desktop-schemas",
+    "libarchive",
+    "libgcrypt",
+    "libgudev",
+    "libsecret",
+    "libsoup",
+    "libusb",
+    "libxml2",
+    "meson",
+    "polkit",
+    "udisks2"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gvfs/1.60/gvfs-1.60.2.tar.xz"
+  ],
+  "work_sources": []
+}

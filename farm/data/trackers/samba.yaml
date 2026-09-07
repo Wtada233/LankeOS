@@ -1,0 +1,7 @@
+pkg-name: samba
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://download.samba.org/pub/samba/stable/
+  pattern: 'samba-(\d+\.\d+\.\d+)\.tar\.gz'
+  template: https://download.samba.org/pub/samba/stable/samba-{version}.tar.gz

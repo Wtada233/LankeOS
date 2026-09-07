@@ -1,7 +1,7 @@
 {
   "name": "polkit",
   "version": "127",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libc.so.6",

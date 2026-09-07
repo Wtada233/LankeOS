@@ -1,0 +1,7 @@
+pkg-name: colord
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.freedesktop.org/software/colord/releases/
+  pattern: 'colord-(\d[\d.]*)\.tar\.xz'
+  template: https://www.freedesktop.org/software/colord/releases/colord-{version}.tar.xz

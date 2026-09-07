@@ -1,0 +1,6 @@
+pkg-name: libpanel
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/libpanel/{path_version}/libpanel-{version}.tar.xz
+  source-name: libpanel

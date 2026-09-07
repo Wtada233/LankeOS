@@ -1,13 +1,14 @@
 {
   "name": "libjxl",
   "version": "0.12.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libbrotlidec.so.1",
     "libbrotlienc.so.1",
     "libc.so.6",
+    "libhwy.so.1",
     "liblcms2.so.2",
     "libm.so.6",
     "libstdc++.so.6"

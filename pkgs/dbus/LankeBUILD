@@ -18,6 +18,11 @@ lankebuild_build() {
 
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    # sysusers.d/dbus.conf 的 dbus 用户需 postinst 建（rtkit 同款）
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+systemd-sysusers
+systemd-tmpfiles --create
+exit 0
+EOF
 }

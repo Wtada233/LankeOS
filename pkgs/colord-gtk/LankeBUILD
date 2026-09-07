@@ -1,0 +1,16 @@
+#
+# colord-gtk — libcolord 的 GTK3/GTK4 控件库（gcc 颜色面板用）。单包合 gtk3+gtk4。
+# vapi 开；docs(gtk-doc) 默认留。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D vapi=true
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

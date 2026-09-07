@@ -95,6 +95,7 @@ DATADIR=/var/lib/mysql
 
 echo ":: Creating MariaDB system user..."
 systemd-sysusers
+systemd-tmpfiles --create
 
 if [ -d "$DATADIR/mysql" ]; then
     echo ":: MariaDB data directory found at $DATADIR, running mariadb-upgrade..."

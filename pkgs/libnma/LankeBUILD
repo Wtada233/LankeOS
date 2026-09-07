@@ -1,0 +1,16 @@
+#
+# libnma — NetworkManager 的 GTK 控件库（gcc/gsd 网络面板用）。单包合 gtk3+gtk4 变体。
+# libnma_gtk4=true 同 Arch；vapi/docs 默认留（vala/gtk-doc 在 build_deps）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D libnma_gtk4=true
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

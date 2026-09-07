@@ -1,0 +1,19 @@
+#
+# accountsservice — D-Bus 用户账户信息服务（gnome-shell/gcc 用）
+# 无 download.gnome release（上游 gitlab.freedesktop），源 = gitlab 归档 tarball（非 git+）。
+# docs 走 gtk-doc + docbook（工具本地有）→ 开，对齐 Arch；vapi 开。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D admin_group=wheel \
+        -D docbook=true \
+        -D gtk_doc=true
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

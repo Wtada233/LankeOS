@@ -1,0 +1,17 @@
+#
+# libhandy 1.x（GTK3 自适应控件）— dconf-editor 用。
+# docs 走 gi-docgen → gtk_doc 关；vapi/测试/glade_catalog 默认留（Arch 未另传参）。
+# glade 工具本地无——若默认 glade_catalog 真需要 glade 再补/关（validate 见分晓）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D gtk_doc=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

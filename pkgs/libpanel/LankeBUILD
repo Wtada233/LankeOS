@@ -1,0 +1,18 @@
+#
+# libpanel — GNOME 开发面板库（sysprof GUI 用）
+# Arch 同款 meson；install-examples 关掉省示例。
+
+lankebuild_prepare() {
+    # docs=disabled：跳过 gi-docgen 文档生成（构建期 python 工具，LankeOS 不装）
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D install-examples=false \
+        -D docs=disabled
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

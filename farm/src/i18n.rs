@@ -200,7 +200,16 @@ static ZH: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("seed.usage", "farm seed --remote <url> [--arch x86_64] [--out <dir>]"),
         ("seed.failed_item", "  [!] {}: {}"),
         ("test.skip_host_libc", "跳过：宿主机无 libc.so.6 可用作 ELF fixture"),
-        ("cli.need_root", "farm 操作命令（build/validate/abifix/repack/export/seed）必须以 root 运行——.lpkg 解包/重打包要读写 root 属主文件与 SUID/SGID。请用 root 用户或 `sudo farm …` 执行"),
+        ("cli.need_root", "farm 操作命令（build/validate/abifix/export/seed）必须以 root 运行——.lpkg 解包/重打包要读写 root 属主文件与 SUID/SGID。请用 root 用户或 `sudo farm …` 执行"),
+        ("abi_fullchk.start", "[abi-fullchk] 审计 input={} arch={} 缓存={}（范围: {}）"),
+        ("abi_fullchk.all", "全部包"),
+        ("abi_fullchk.summary", "[abi-fullchk] 完成：{} 个 .lpkg / {} 个 ELF；缓存命中 {} / 重扫 {}；provider SONAME {}"),
+        ("abi_fullchk.none", "[abi-fullchk] 无未解析符号@版本（consumer 全部可解析）"),
+        ("abi_fullchk.missing_pkg", "\n### {}: {} 个未解析版本符号"),
+        ("abi_fullchk.missing_item", "    {}\n        {} @ {}   (候选提供: {})"),
+        ("abi_fullchk.more", "    ... 共 {}"),
+        ("abi_fullchk.total", "\n[TOTAL] {} 个 not-found，分布在 {} 个包"),
+        ("abi_fullchk.failed", "  [!] {}"),
     ])
 });
 
@@ -314,7 +323,16 @@ static EN: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("seed.usage", "farm seed --remote <url> [--arch x86_64] [--out <dir>]"),
         ("seed.failed_item", "  [!] {}: {}"),
         ("test.skip_host_libc", "skipping: no host libc.so.6 available for ELF fixture"),
-        ("cli.need_root", "farm operation commands (build/validate/abifix/repack/export/seed) must run as root — .lpkg unpack/repack needs root-owned files and SUID/SGID. Run as root user or via `sudo farm …`"),
+        ("cli.need_root", "farm operation commands (build/validate/abifix/export/seed) must run as root — .lpkg unpack/repack needs root-owned files and SUID/SGID. Run as root user or via `sudo farm …`"),
+        ("abi_fullchk.start", "[abi-fullchk] auditing input={} arch={} cache={} (scope: {})"),
+        ("abi_fullchk.all", "all packages"),
+        ("abi_fullchk.summary", "[abi-fullchk] done: {} .lpkg / {} ELF; cache hits {} / rescans {}; provider SONAMEs {}"),
+        ("abi_fullchk.none", "[abi-fullchk] no unresolved symbol@version (all consumers resolve)"),
+        ("abi_fullchk.missing_pkg", "\n### {}: {} unresolved versioned symbols"),
+        ("abi_fullchk.missing_item", "    {}\n        {} @ {}   (candidates: {})"),
+        ("abi_fullchk.more", "    ... {} more"),
+        ("abi_fullchk.total", "\n[TOTAL] {} not-found across {} packages"),
+        ("abi_fullchk.failed", "  [!] {}"),
     ])
 });
 

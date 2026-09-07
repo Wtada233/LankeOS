@@ -1,0 +1,9 @@
+# gitlab.freedesktop 归档 tarball（非 git+）
+pkg-name: exempi
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  project: libopenraw/exempi
+  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

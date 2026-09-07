@@ -1,0 +1,20 @@
+{
+  "name": "python-docutils",
+  "version": "0.23",
+  "release": 3,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-flit-core",
+    "python-installer"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/39/a4/5180d9afc57e8fca05601dd652bdff19604c218814037fe90ffc7625a50a/docutils-0.23.tar.gz"
+  ],
+  "work_sources": []
+}

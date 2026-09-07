@@ -1,0 +1,7 @@
+pkg-name: dconf-editor
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: dconf-editor
+  stable-minor: all
+  template: https://download.gnome.org/sources/dconf-editor/{path_version}/dconf-editor-{version}.tar.xz

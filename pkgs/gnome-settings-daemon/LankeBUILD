@@ -1,0 +1,16 @@
+#
+# gnome-settings-daemon（gsd）— 系统设置后台（电源/声音/网络/颜色/位置/键盘…）。
+# 位置走 geoclue(D-Bus，deps 带)；pulse 用 pipewire-pulse（libpulse 链即可）。
+# docs(man) 用 xsltproc+docbook → 提供 libxslt/docbook-xsl；meson 默认无额外开关。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

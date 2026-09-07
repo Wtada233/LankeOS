@@ -1,0 +1,16 @@
+#
+# gsound — libcanberra 的 GObject 封装（gsd/gnome 声音事件用）。
+# docs 走 gtk-doc（有）→ 开，同 Arch；vapi 默认（vala 在 build_deps）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D gtk_doc=true
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

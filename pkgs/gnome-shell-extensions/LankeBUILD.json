@@ -1,0 +1,19 @@
+{
+  "name": "gnome-shell-extensions",
+  "version": "50.3",
+  "release": 1,
+  "deps": [
+    "gnome-shell"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "gnome-shell",
+    "meson"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gnome-shell-extensions/50/gnome-shell-extensions-50.3.tar.xz"
+  ],
+  "work_sources": []
+}

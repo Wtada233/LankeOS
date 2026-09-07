@@ -1,0 +1,7 @@
+pkg-name: xdg-user-dirs-gtk
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: xdg-user-dirs-gtk
+  stable-minor: all
+  template: https://download.gnome.org/sources/xdg-user-dirs-gtk/{path_version}/xdg-user-dirs-gtk-{version}.tar.xz

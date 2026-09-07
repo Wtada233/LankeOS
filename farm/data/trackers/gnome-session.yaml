@@ -1,0 +1,6 @@
+pkg-name: gnome-session
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gnome-session
+  template: https://download.gnome.org/sources/gnome-session/{path_version}/gnome-session-{version}.tar.xz

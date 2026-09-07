@@ -1,0 +1,27 @@
+{
+  "name": "startup-notification",
+  "version": "0.12",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libX11-xcb.so.1",
+    "libX11.so.6",
+    "libc.so.6",
+    "libxcb-util.so.1",
+    "libxcb.so.1"
+  ],
+  "provides": [
+    "libstartup-notification-1.so",
+    "libstartup-notification-1.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "libx11",
+    "libxcb",
+    "xcb-util"
+  ],
+  "sources": [
+    "https://www.freedesktop.org/software/startup-notification/releases/startup-notification-0.12.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,42 @@
+{
+  "name": "libhandy",
+  "version": "1.8.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libatk-1.0.so.0",
+    "libc.so.6",
+    "libcairo.so.2",
+    "libfribidi.so.0",
+    "libgcc_s.so.1",
+    "libgdk-3.so.0",
+    "libgdk_pixbuf-2.0.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgtk-3.so.0",
+    "libm.so.6",
+    "libpango-1.0.so.0"
+  ],
+  "provides": [
+    "libhandy-1.so",
+    "libhandy-1.so.0"
+  ],
+  "build_deps": [
+    "at-spi2-core",
+    "base-devel",
+    "cairo",
+    "fribidi",
+    "gdk-pixbuf",
+    "glib",
+    "gobject-introspection",
+    "gtk3",
+    "meson",
+    "pango",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/libhandy/1.8/libhandy-1.8.3.tar.xz"
+  ],
+  "work_sources": []
+}

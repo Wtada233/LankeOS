@@ -1,0 +1,43 @@
+{
+  "name": "gcr-4",
+  "version": "4.4.0.1",
+  "release": 1,
+  "deps": [
+    "openssh"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgnutls.so.30",
+    "libgobject-2.0.so.0",
+    "libgtk-4.so.1",
+    "libp11-kit.so.0",
+    "libpango-1.0.so.0",
+    "libsecret-1.so.0",
+    "libsystemd.so.0"
+  ],
+  "provides": [
+    "libgck-2.so",
+    "libgck-2.so.2",
+    "libgcr-4.so",
+    "libgcr-4.so.4"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gnupg",
+    "gnutls",
+    "gobject-introspection",
+    "gtk4",
+    "libsecret",
+    "meson",
+    "openssh",
+    "p11-kit",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gcr/4.4/gcr-4.4.0.1.tar.xz"
+  ],
+  "work_sources": []
+}

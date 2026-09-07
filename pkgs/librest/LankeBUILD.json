@@ -1,0 +1,36 @@
+{
+  "name": "librest",
+  "version": "0.10.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libjson-glib-1.0.so.0",
+    "libsoup-3.0.so.0",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "librest-1.0.so",
+    "librest-1.0.so.0",
+    "librest-extras-1.0.so",
+    "librest-extras-1.0.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "json-glib",
+    "libsoup",
+    "libxml2",
+    "meson",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/librest/0.10/librest-0.10.2.tar.xz"
+  ],
+  "work_sources": []
+}

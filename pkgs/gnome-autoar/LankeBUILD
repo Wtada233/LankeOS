@@ -1,0 +1,16 @@
+#
+# gnome-autoar — 归档自动解压库（nautilus/gnome-shell 用）。
+# docs 走 gi-docgen → docs 关；vapi/测试默认留。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D docs=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

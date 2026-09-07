@@ -1,0 +1,16 @@
+#
+# eglexternalplatform — EGL external platform 头文件包（egl-wayland 依赖，纯头）。
+# meson 装到头 /usr/include/EGL（Arch 同款 --includedir）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        --includedir /usr/include/EGL
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

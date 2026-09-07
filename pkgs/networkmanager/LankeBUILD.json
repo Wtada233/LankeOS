@@ -43,7 +43,8 @@
     "polkit",
     "python-gobject",
     "readline",
-    "slang"
+    "slang",
+    "vala"
   ],
   "sources": [
     "https://gitlab.freedesktop.org/NetworkManager/NetworkManager/-/releases/1.58.1/downloads/NetworkManager-1.58.1.tar.xz"

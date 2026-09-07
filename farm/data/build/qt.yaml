@@ -1,0 +1,24 @@
+# Qt 模块版本（patch 级）一变化即触发整批重建：**Qt 私有 API（Qt_6_PRIVATE_API）不保证 patch 级 ABI**
+# （6.11.1 头编的 lib 跑 6.11.2 的 Qt 私有布局会崩——真实事故：layer-shell-qt requestActivate SIGSEGV）。
+# needed_so/SONAME 检测看不见它（libQt6*.so.6 与 Qt_6.11 版本节点都不变），所以用 version-change 组
+# + **动态受害者**：脚本不依赖时间戳，直接用 farm 导出的工具（farm_pkg_list / farm_pkg_extract）
+# 把每个包的当前 .lpkg 解到临时目录，grep 其 ELF 里是否含 "Qt_6_PRIVATE_API" 版本字符串
+# （import Qt private 的 .dynstr 必有该字面量）；命中的包名打到 stdout → farm 并入受害者集合重建。
+# 脚本运行的时刻 = on 包（qt6-base）刚重建、仓库里其它包还挂着旧 Qt 编的二进制 = private breaking。
+# 只排除 Qt provider 模块自身（qt6-* 随版本升级本身重建，不算 consumer）。
+rebuild-on-version-change: qt6-base
+version-change-script: |
+  #!/bin/bash
+  for p in $(farm_pkg_list); do
+    case "$p" in
+      qt6-*) continue ;;          # Qt provider 模块：会随版本变化自身重建，不列 consumer
+    esac
+    d=$(mktemp -d)
+    if farm_pkg_extract "$p" "$d" >/dev/null 2>&1; then
+      if grep -rla -- "Qt_6_PRIVATE_API" "$d" >/dev/null 2>&1; then
+        echo "$p"
+      fi
+    fi
+    rm -rf "$d"
+  done
+# 受害者 = 脚本 stdout 动态输出（上面的扫描）；无需静态 packages glob（留空）

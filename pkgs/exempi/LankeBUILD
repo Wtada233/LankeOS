@@ -1,0 +1,18 @@
+#
+# exempi — Adobe XMP 库（localsearch 核心硬依赖）。gitlab 归档（无 configure）→ autoreconf。
+# --disable-unittest 同 Arch（省 boost 测试）。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    autoreconf -fiv
+    ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+        --disable-unittest
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+}

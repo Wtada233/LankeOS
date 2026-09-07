@@ -1,0 +1,33 @@
+{
+  "name": "geocode-glib",
+  "version": "3.26.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libjson-glib-1.0.so.0",
+    "libm.so.6",
+    "libsoup-3.0.so.0"
+  ],
+  "provides": [
+    "libgeocode-glib-2.so",
+    "libgeocode-glib-2.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "gtk-doc",
+    "json-glib",
+    "libsoup",
+    "meson"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/geocode-glib/3.26/geocode-glib-3.26.4.tar.xz"
+  ],
+  "work_sources": []
+}

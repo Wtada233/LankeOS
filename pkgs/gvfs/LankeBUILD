@@ -1,0 +1,29 @@
+#
+# gvfs — 虚拟文件系统（nautilus/gcc 挂载 trash/sftp/dav/http 等用）。
+# 只留依赖本地有的后端：admin/archive/fuse/http(dav)/sftp/udisks2；goa 也关（去 libgoa）。
+# 光驱 cdda/bluray 关（用户决定不做光驱）；缺库后端 afc/afp/dnssd/gphoto2/mtp/nfs/
+# onedrive/smb/wsdd 全关（对应库本地无或太重如 samba）。
+# sftp 运行时 exec openssh 的 sftp——deps 补 openssh。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D cdda=false -D bluray=false \
+        -D afc=false -D afp=false -D dnssd=false \
+        -D gphoto2=false -D mtp=false -D nfs=false \
+        -D onedrive=false -D smb=false -D wsdd=false \
+        -D goa=false -D google=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+    # tmpfiles.d/gvfsd-fuse-tmpfiles.conf（挂载点目录）postinst 建
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+systemd-tmpfiles --create
+exit 0
+EOF
+}

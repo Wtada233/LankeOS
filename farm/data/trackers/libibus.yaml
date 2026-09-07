@@ -1,0 +1,9 @@
+# libibus = ibus 拆包的库侧（Arch libibus）；上游源码仍是 ibus repo。
+pkg-name: libibus
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: ibus/ibus
+  mode: releases
+  tag-prefix: ''
+  template: https://github.com/ibus/ibus/releases/download/{tag}/ibus-{version}.tar.gz

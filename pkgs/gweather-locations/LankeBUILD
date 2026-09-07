@@ -1,0 +1,15 @@
+#
+# gweather-locations — libgweather 的城市/时区数据库（arch-any 纯数据，独立仓库）。
+# 源 = gitlab.gnome 归档 tarball（非 git+）。meson 装数据即可。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

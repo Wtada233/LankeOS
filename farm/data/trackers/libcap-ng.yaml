@@ -1,0 +1,8 @@
+pkg-name: libcap-ng
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: stevegrubb/libcap-ng
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/stevegrubb/libcap-ng/archive/{tag}/libcap-ng-{version}.tar.gz

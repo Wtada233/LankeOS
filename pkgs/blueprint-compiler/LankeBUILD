@@ -1,0 +1,19 @@
+#
+# blueprint-compiler — GNOME .blp UI 编译器（GTK4 应用构建工具，python）。
+# docs(api) 走 python-sphinx 未装 → 不传；meson 装 python 包即可。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+    # 清构建期 __pycache__/pyc
+    find {STAGING_ROOT} -type d -name __pycache__ -prune -exec rm -rf {} +
+    find {STAGING_ROOT} -type f -name '*.pyc' -delete
+
+}

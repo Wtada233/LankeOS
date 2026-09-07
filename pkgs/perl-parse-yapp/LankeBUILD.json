@@ -1,0 +1,17 @@
+{
+  "name": "perl-parse-yapp",
+  "version": "1.21",
+  "release": 1,
+  "deps": [
+    "perl"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://cpan.metacpan.org/authors/id/W/WB/WBRASWELL/Parse-Yapp-1.21.tar.gz"
+  ],
+  "work_sources": []
+}

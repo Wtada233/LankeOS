@@ -1,0 +1,29 @@
+#
+# gdm — GNOME 显示管理器（greeter = gnome-shell 会话）。libgdm 给 gnome-shell 运行时用。
+# 构建不依赖 gnome-shell（Arch 同款）；deps 运行时指 gnome-shell/session。
+# selinux/plymouth 关（gdm 有效选项就这些，docs 由 yelp-tools 自动跳过）。
+# sysusers：Arch 只建组 gdm(gid 120)；postinst systemd-sysusers。
+
+lankebuild_prepare() {
+    # docs = gnome.yelp → 需 yelp-tools+itstool（本地无，yelp 系砍）→ sed 掉 subdir('docs')
+    sed -i "/subdir('docs')/d" meson.build
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D selinux=disabled \
+        -D plymouth=disabled -D default-pam-config=arch
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+    install -Dm644 /dev/stdin {STAGING_ROOT}/usr/lib/sysusers.d/gdm.conf <<'EOF'
+g gdm 120 -
+EOF
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+systemd-sysusers
+exit 0
+EOF
+}

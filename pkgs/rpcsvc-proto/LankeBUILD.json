@@ -1,0 +1,17 @@
+{
+  "name": "rpcsvc-proto",
+  "version": "1.4.4",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/thkukuk/rpcsvc-proto/archive/v1.4.4/rpcsvc-proto-1.4.4.tar.gz"
+  ],
+  "work_sources": []
+}

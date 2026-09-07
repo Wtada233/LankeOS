@@ -24,4 +24,11 @@ lankebuild_package() {
     # Arch 同款：/etc/profile.d 补 flatpak 导出目录进 PATH + 预置 flathub remote
     install -Dt {STAGING_ROOT}/etc/profile.d -m644 {WORK_DIR}/../flatpak-bindir.sh
     install -Dt {STAGING_ROOT}/usr/share/flatpak/remotes.d {WORK_DIR}/../flathub.flatpakrepo
+    # sysusers.d/flatpak.conf 的 flatpak 用户需 postinst 建（rtkit 同款）
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+systemd-sysusers
+systemd-tmpfiles --create
+exit 0
+EOF
 }

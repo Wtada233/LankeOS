@@ -1,0 +1,33 @@
+{
+  "name": "libcdio",
+  "version": "2.4.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libncursesw.so.6",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libcdio++.so",
+    "libcdio++.so.2",
+    "libcdio.so",
+    "libcdio.so.21",
+    "libiso9660++.so",
+    "libiso9660++.so.1",
+    "libiso9660.so",
+    "libiso9660.so.13",
+    "libudf.so",
+    "libudf.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "ncurses"
+  ],
+  "sources": [
+    "https://github.com/libcdio/libcdio/releases/download/2.4.0/libcdio-2.4.0.tar.bz2"
+  ],
+  "work_sources": []
+}

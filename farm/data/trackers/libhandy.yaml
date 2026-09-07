@@ -1,0 +1,7 @@
+pkg-name: libhandy
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: libhandy
+  stable-minor: all
+  template: https://download.gnome.org/sources/libhandy/{path_version}/libhandy-{version}.tar.xz

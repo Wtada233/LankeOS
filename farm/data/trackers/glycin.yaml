@@ -1,0 +1,7 @@
+pkg-name: glycin
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: glycin
+  stable-minor: all
+  template: https://download.gnome.org/sources/glycin/{path_version}/glycin-{version}.tar.xz

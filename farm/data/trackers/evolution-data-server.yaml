@@ -1,0 +1,7 @@
+# 默认 even-minor：eDS 稳定线 3.58/3.60(偶)，3.61(奇) 是 dev，不跟
+pkg-name: evolution-data-server
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: evolution-data-server
+  template: https://download.gnome.org/sources/evolution-data-server/{path_version}/evolution-data-server-{version}.tar.xz

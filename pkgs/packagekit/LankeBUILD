@@ -11,4 +11,8 @@ lankebuild_build() {
 lankebuild_package() {
     # Installation handled by builder
     :
+    # 清构建期 __pycache__/pyc
+    find {STAGING_ROOT} -type d -name __pycache__ -prune -exec rm -rf {} +
+    find {STAGING_ROOT} -type f -name '*.pyc' -delete
+
 }

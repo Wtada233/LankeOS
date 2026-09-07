@@ -1,0 +1,40 @@
+{
+  "name": "libgweather-4",
+  "version": "4.6.0",
+  "release": 2,
+  "deps": [
+    "gweather-locations"
+  ],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgeocode-glib-2.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libjson-glib-1.0.so.0",
+    "libm.so.6",
+    "libsoup-3.0.so.0",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "libgweather-4.so",
+    "libgweather-4.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "geocode-glib",
+    "glib",
+    "gobject-introspection",
+    "gweather-locations",
+    "json-glib",
+    "libsoup",
+    "libxml2",
+    "meson",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/libgweather/4.6/libgweather-4.6.0.tar.xz"
+  ],
+  "work_sources": []
+}

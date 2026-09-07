@@ -1,0 +1,52 @@
+{
+  "name": "gnome-online-accounts",
+  "version": "3.58.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libadwaita-1.so.0",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgcr-4.so.4",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgtk-4.so.1",
+    "libjson-glib-1.0.so.0",
+    "libkeyutils.so.1",
+    "libkrb5.so.3",
+    "librest-1.0.so.0",
+    "libsecret-1.so.0",
+    "libsoup-3.0.so.0",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "libgoa-1.0.so",
+    "libgoa-1.0.so.0",
+    "libgoa-backend-1.0.so",
+    "libgoa-backend-1.0.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "docbook-xsl",
+    "gcr-4",
+    "glib",
+    "gobject-introspection",
+    "gtk4",
+    "json-glib",
+    "keyutils",
+    "krb5",
+    "libadwaita",
+    "librest",
+    "libsecret",
+    "libsoup",
+    "libxml2",
+    "libxslt",
+    "meson",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gnome-online-accounts/3.58/gnome-online-accounts-3.58.1.tar.xz"
+  ],
+  "work_sources": []
+}

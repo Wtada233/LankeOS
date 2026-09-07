@@ -1,0 +1,112 @@
+#
+# Spidermonkey（SpiderMonkey 140 ESR，JavaScript 引擎）— 喂 gjs / gnome-shell
+# 基于 Arch extra/js140 PKGBUILD 适配 LankeOS：3 段 PGO 照搬（instrument → benchmark
+# 训练 → clobber → LTO+profile-use 重编）。
+# 命名：Arch 叫 js140，LankeOS 叫 spidermonkey。产物 libmozjs-140.so + /usr/bin/js + mozjs-140.pc
+# 版本锁定 140 ESR 线（gjs 需要），tracker 用 max-version 封顶——勿放行到 144。
+
+# 单 source、无 work_sources → detect_source_tree 返回解压出的 firefox-140.15.0esr/
+# 为源码根，各 phase 的 cwd 已自动在其内，无需 cd。
+# 补丁在包目录 = work 的父级（chromium 同款）
+_BD=$(dirname {WORK_DIR})
+
+lankebuild_prepare() {
+
+    # Arch 同款 6 个补丁：
+    #  0001 mozjs-140.pc 补 DXP_UNIX（gjs 链接需要）
+    #  0002-0005 Fix Python 3.14 AST/ast.Str 弃用
+    #  0006 Handle rust 1.98 新增 oe-linux target
+    for _p in \
+        0001-Bug-1973994-mozjs-140.pc-does-not-contain-DXP_UNIX-o.patch \
+        0002-Bug-1969769-Change-uses-of-ast.Str-with-ast.Constant.patch \
+        0003-Bug-1983713-Use-non-deprecated-ast-value.-r-firefox-.patch \
+        0004-Bug-1983736-Patch-jsonschema-to-work-with-Python-3.1.patch \
+        0005-Bug-1993797-Fix-AST-parsing-in-DecoratorVisitor-for-.patch \
+        0006-Bug-2053518-Handle-the-oe-linux-rust-targets-added-i.patch; do
+        patch -Np1 -i "$_BD/$_p"
+    done
+}
+
+lankebuild_build() {
+    _abs=$PWD
+
+    # malloc_usable_size 与 fortify level 3 不兼容（libreoffice/chromium 同款）
+    export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+    export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
+
+    export MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE=pip
+    export MOZBUILD_STATE_PATH="$_abs/mozbuild"
+    export MOZ_BUILD_DATE="$(date -u${SOURCE_DATE_EPOCH:+d @$SOURCE_DATE_EPOCH} +%Y%m%d%H%M%S)"
+    export MOZ_NOSPAM=1
+
+    mkdir -p "$MOZBUILD_STATE_PATH"
+
+    # 公共 mozconfig（两遍 PGO 共用）
+    cat > mozconfig.common <<EOF
+ac_add_options --enable-application=js
+mk_add_options MOZ_OBJDIR=${_abs}/obj
+ac_add_options --prefix=/usr
+ac_add_options --enable-release
+ac_add_options --enable-hardening
+ac_add_options --enable-optimize
+ac_add_options --enable-rust-simd
+ac_add_options --enable-linker=lld
+ac_add_options --disable-bootstrap
+ac_add_options --disable-debug
+ac_add_options --disable-jemalloc
+ac_add_options --disable-strip
+ac_add_options --with-system-zlib
+ac_add_options --without-system-icu
+ac_add_options --enable-readline
+ac_add_options --enable-shared-js
+ac_add_options --with-intl-api
+EOF
+
+    # ===== pass 1：instrument 编译 =====
+    # mozconfig 不支持 source——把公共段 concat 进来（Arch 同款：cat 公共 + heredoc）
+    cat mozconfig.common > .mozconfig
+    cat >> .mozconfig <<EOF
+ac_add_options --enable-profile-generate=cross
+EOF
+    ./mach build --priority normal
+
+    # ===== benchmark 训练（octane + ARES-6 + SunSpider，产出 LLVM profile）=====
+    echo "Profiling instrumented JS..."
+    (
+        js="$_abs/obj/dist/bin/js"
+        export LLVM_PROFILE_FILE="$_abs/js-%p-%m.profraw"
+
+        cd js/src/octane
+        "$js" run.js
+
+        cd "$_abs"/third_party/webkit/PerformanceTests/ARES-6
+        "$js" cli.js
+
+        cd ../SunSpider/sunspider-0.9.1
+        "$js" sunspider-standalone-driver.js
+    )
+    llvm-profdata merge -o "$_abs/merged.profdata" "$_abs"/*.profraw
+    stat -c "Profile data found (%s bytes)" "$_abs/merged.profdata"
+    test -s "$_abs/merged.profdata"
+
+    # ===== 清掉 instrument 产物，重编 LTO + profile-use =====
+    echo "Removing instrumented JS..."
+    rm -rf "$_abs/obj"
+
+    # 不用 --enable-lto=cross：rust 在 LLVM 23 下 Clinker-plugin-lto + profile-use
+    # 崩（rustc-LLVM ERROR: __rust_no_alloc_shim... 无 associated value info），
+    # 已知 bug。profile-use 单独保留（PGO 不变），rust/C++ 都不走 LTO。
+    cat mozconfig.common > .mozconfig
+    cat >> .mozconfig <<EOF
+ac_add_options --enable-profile-use=cross
+ac_add_options --with-pgo-profile-path=${_abs}/merged.profdata
+EOF
+    ./mach build --priority normal
+}
+
+lankebuild_package() {
+    cd obj
+    make DESTDIR={STAGING_ROOT} install
+    rm -f {STAGING_ROOT}/usr/lib/*.ajs
+    find {STAGING_ROOT}/usr/{lib/pkgconfig,include} -type f -exec chmod a-x {} +
+}

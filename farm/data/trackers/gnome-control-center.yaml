@@ -1,0 +1,6 @@
+pkg-name: gnome-control-center
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gnome-control-center
+  template: https://download.gnome.org/sources/gnome-control-center/{path_version}/gnome-control-center-{version}.tar.xz

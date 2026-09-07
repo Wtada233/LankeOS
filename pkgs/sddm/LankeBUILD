@@ -35,4 +35,11 @@ lankebuild_package() {
     # Wayland 下 Qt greeter 光标靠 XCURSOR_THEME；不设则默认无光标（sddm 界面看不到鼠标）。
     # breeze_cursors 是 KDE 默认光标主题（breeze 包提供），显式指定。
     sed -i 's|^CursorTheme=$|CursorTheme=breeze_cursors|' {STAGING_ROOT}/usr/lib/sddm/sddm.conf.d/default.conf
+    # sysusers.d/sddm.conf 的 sddm 用户需 postinst 建（rtkit 同款）
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+systemd-sysusers
+systemd-tmpfiles --create
+exit 0
+EOF
 }

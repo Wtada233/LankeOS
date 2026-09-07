@@ -1,0 +1,9 @@
+# 无 download.gnome release，用 gitlab 归档 tarball（非 git+）
+pkg-name: accountsservice
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  project: accountsservice/accountsservice
+  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

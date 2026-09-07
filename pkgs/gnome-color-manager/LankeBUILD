@@ -1,0 +1,17 @@
+#
+# gnome-color-manager（gcm）— ICC 色彩配置管理 GUI。
+# 不 patch：先试 gnome.yelp(help) 是否真硬要 yelp-tools（itstool 已备）；
+# 若 configure 报 yelp-build 缺失 → 届时 sed 掉 subdir('help')（yelp 系，政策允许）。
+# man 走 docbook2man(required:false)，本地无 → 自动跳过。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

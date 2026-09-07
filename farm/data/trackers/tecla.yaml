@@ -1,0 +1,9 @@
+# gitlab.gnome 归档 tarball（非 git+）
+pkg-name: tecla
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.gnome.org
+  mode: tags
+  project: GNOME/tecla
+  template: https://gitlab.gnome.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

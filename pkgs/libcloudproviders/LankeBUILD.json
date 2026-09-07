@@ -1,0 +1,28 @@
+{
+  "name": "libcloudproviders",
+  "version": "0.4.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libcloudproviders.so",
+    "libcloudproviders.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "meson",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/libcloudproviders/0.4/libcloudproviders-0.4.1.tar.xz"
+  ],
+  "work_sources": []
+}

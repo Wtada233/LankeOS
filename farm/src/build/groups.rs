@@ -11,8 +11,9 @@
 //! ```
 //!
 //! **version-change 组**（纯脚本解释器如 perl 没有 libperl.so，SONAME 检测无从谈起 → abichange
-//! 永不触发）：`rebuild-on-version-change` + `version-change-script`，脚本接收 `OLD_VER`/`NEW_VER`
-//! 环境变量，exit 0 = 重建组受害者（如 minor 变才重建），非零 = 跳过。
+//! 永不触发；也用于 Qt 等私有 API 不随 patch 保 ABI 的场合）：`rebuild-on-version-change` +
+//! `version-change-script`，脚本接收 `OLD_VER`/`NEW_VER` 环境变量，exit 0 = 重建组受害者
+//! （如 minor 变才重建），非零 = 跳过。
 //!
 //! ```yaml
 //! # data/build/perl.yaml
@@ -21,6 +22,26 @@
 //!   #!/bin/bash
 //!   [ "$(printf '%s' "$OLD_VER" | cut -d. -f1-2)" != "$(printf '%s' "$NEW_VER" | cut -d. -f1-2)" ]
 //! packages: perl-*
+//! ```
+//!
+//! **动态受害者（可选）**：run_build 传 `pkgs_dir/out_dir/arch` 上下文后，脚本可调 farm 导出工具
+//! `farm_pkg_list`（打印全部配方包名）与 `farm_pkg_extract <pkg> <dir>`（解某包当前 .lpkg 到 dir），
+//! **自己算**受害者并打到 stdout → farm 并入受害者集（与静态 `packages:` glob 并集）。用于"扫描所有
+//! import Qt private API（`Qt_6_PRIVATE_API`）的包"，如 data/build/qt.yaml——脚本运行时刻即私有
+//! ABI 断裂时刻，无需时间戳：
+//!
+//! ```yaml
+//! # data/build/qt.yaml
+//! rebuild-on-version-change: qt6-base
+//! version-change-script: |
+//!   #!/bin/bash
+//!   for p in $(farm_pkg_list); do
+//!     case "$p" in qt6-*) continue ;; esac
+//!     d=$(mktemp -d)
+//!     if farm_pkg_extract "$p" "$d" >/dev/null 2>&1 &&
+//!        grep -rla -- "Qt_6_PRIVATE_API" "$d" >/dev/null 2>&1; then echo "$p"; fi
+//!     rm -rf "$d"
+//!   done
 //! ```
 //!
 //! 与 data/trackers 同一套模式：触发包按包名索引，`packages` 是空格分隔的 glob。
@@ -120,9 +141,9 @@ impl RebuildGroups {
         v
     }
 
-    /// `on` 包版本变化时，按 version-change 脚本判定是否重建组受害者。
-    /// 脚本接收 `OLD_VER`/`NEW_VER` 环境变量，exit 0 = 重建（返回全部 glob 匹配包），
-    /// 非零 = 跳过（返回空）。脚本运行失败（bash 不存在等）→ Err（调用方告警后跳过）。
+    /// `on` 包版本变化时，按 version-change 脚本判定是否重建组受害者（无动态工具上下文版本）。
+    /// 见 `version_victims_ctx`（多 `pkgs_dir/out_dir/arch` 供脚本用 farm 导出工具动态算受害者）。
+    #[allow(dead_code)] // 仅测试直用；run_build 走 version_victims_ctx
     pub fn version_victims_if(
         &self,
         on: &str,
@@ -130,12 +151,34 @@ impl RebuildGroups {
         new_ver: &str,
         all_pkgs: &[String],
     ) -> Result<Vec<String>, String> {
+        self.version_victims_ctx(on, old_ver, new_ver, all_pkgs, None, None, None)
+    }
+
+    /// 同上，但给脚本额外暴露 farm 导出的工具环境（`pkgs_dir`/`out_dir`/`arch` 均 Some 时才启用）：
+    /// 脚本可 `source` 注入的两个 bash 函数（在脚本前自动 prepend）：
+    /// - `farm_pkg_list`：打印全部配方包名（一行一个）
+    /// - `farm_pkg_extract <pkg> <dest>`：把该包当前 .lpkg 解到 dest
+    /// 语义：脚本 exit 0 = 重建。受害者 = 静态 `packages:` glob ∪ **脚本 stdout 里输出的合法包名**
+    /// （动态计算，如"扫所有包 ELF 里 import Qt_6_PRIVATE_API 的"，无需时间戳）。
+    /// exit 非零 = 跳过（返回空）。运行失败（bash 缺失等）→ Err。
+    pub fn version_victims_ctx(
+        &self,
+        on: &str,
+        old_ver: &str,
+        new_ver: &str,
+        all_pkgs: &[String],
+        pkgs_dir: Option<&Path>,
+        out_dir: Option<&Path>,
+        arch: Option<&str>,
+    ) -> Result<Vec<String>, String> {
         let Some(g) = self.version.get(on) else {
             return Ok(Vec::new());
         };
-        if !script_decides_rebuild(&g.script, old_ver, new_ver)? {
+        // 脚本 exit 0 → 重建（返回 stdout 供动态受害者解析）；exit≠0 → 跳过
+        let Some(stdout) = run_version_script(&g.script, old_ver, new_ver, pkgs_dir, out_dir, arch)?
+        else {
             return Ok(Vec::new());
-        }
+        };
         let mut set = HashSet::new();
         for glob in &g.globs {
             for p in all_pkgs {
@@ -144,9 +187,24 @@ impl RebuildGroups {
                 }
             }
         }
+        // 动态受害者：脚本 stdout 的合法包名（排除 on 自身，去重）
+        for line in stdout.lines() {
+            let n = line.trim();
+            if n.is_empty() || n == on {
+                continue;
+            }
+            if all_pkgs.iter().any(|p| p.as_str() == n) {
+                set.insert(n.to_string());
+            }
+        }
         let mut v: Vec<String> = set.into_iter().collect();
         v.sort();
         Ok(v)
+    }
+
+    /// `on` 是否注册为 version-change 触发包（run_build 开工前据此决定要不要预演脚本）。
+    pub fn is_version_change_on(&self, on: &str) -> bool {
+        self.version.contains_key(on)
     }
 
     /// (victim, on) 依赖边：`on` 的组受害者必须在 `on` 构建**之后**构建。
@@ -195,17 +253,59 @@ static SCRIPT_SEQ: AtomicU32 = AtomicU32::new(0);
 
 /// 运行 version-change 判定脚本：`OLD_VER`/`NEW_VER` 环境变量，exit 0 = 重建，非零 = 跳过。
 /// 脚本执行失败（bash 不存在等）→ Err；脚本自身非零退出（minor 未变）**不是错误**，返回 Ok(false)。
-fn script_decides_rebuild(script: &str, old_ver: &str, new_ver: &str) -> Result<bool, String> {
+/// 运行 version-change 脚本。`pkgs_dir`/`out_dir`/`arch` 全 Some 时给脚本 prepend **两个 farm 导出的
+/// bash 函数**（只在本脚本环境可见，不对外暴露任何子命令/进程）：
+/// - `farm_pkg_list`：打印全部配方包名（`$FARM_PKGS` 下含 LankeBUILD.json 的子目录名，排序）
+/// - `farm_pkg_extract <pkg> <dest>`：把 `$FARM_OUT/$FARM_ARCH/<pkg>/` 当前 .lpkg 解到 dest
+///
+/// 返回 `Ok(Some(stdout))` = 脚本 exit 0（重建，stdout 供动态受害者解析）；
+/// `Ok(None)` = 非零退出（跳过，如 minor 未变）；脚本执行失败（bash 缺失等）→ Err。
+fn run_version_script(
+    script: &str,
+    old_ver: &str,
+    new_ver: &str,
+    pkgs_dir: Option<&Path>,
+    out_dir: Option<&Path>,
+    arch: Option<&str>,
+) -> Result<Option<String>, String> {
     let tmp = std::env::temp_dir().join(format!(
         "lankefarm-version-change-{}-{}.sh",
         std::process::id(),
         SCRIPT_SEQ.fetch_add(1, Ordering::Relaxed),
     ));
-    std::fs::write(&tmp, script).map_err(|e| format!("写 version-change 脚本失败: {e}"))?;
-    let out = std::process::Command::new("bash")
-        .arg(&tmp)
-        .env("OLD_VER", old_ver)
-        .env("NEW_VER", new_ver)
+    let mut body = String::new();
+    // farm 导出工具 = bash 函数（纯 shell + 标准 zstd/tar，只在这个脚本进程里定义，不外泄）。
+    if pkgs_dir.is_some() && out_dir.is_some() && arch.is_some() {
+        body.push_str(
+            r#"farm_pkg_list() {
+  local e n
+  for e in "$FARM_PKGS"/*/; do
+    [ -f "$e/LankeBUILD.json" ] || continue
+    n=${e%/}; n=${n##*/}; printf '%s\n' "$n"
+  done | sort
+}
+farm_pkg_extract() {  # $1=<pkg> $2=<dest>
+  local p=$1 d=$2 f
+  [ -n "$p" ] && [ -n "$d" ] || return 1
+  f=$(ls -t "$FARM_OUT/$FARM_ARCH/$p/"*.lpkg 2>/dev/null | head -1) || return 1
+  [ -n "$f" ] || return 1
+  rm -rf "$d" && mkdir -p "$d" || return 1
+  zstd -dc "$f" | tar -xf - -C "$d"
+}
+"#,
+        );
+    }
+    body.push_str(script);
+    std::fs::write(&tmp, &body).map_err(|e| format!("写 version-change 脚本失败: {e}"))?;
+
+    let mut cmd = std::process::Command::new("bash");
+    cmd.arg(&tmp).env("OLD_VER", old_ver).env("NEW_VER", new_ver);
+    if let (Some(pkgs), Some(out), Some(a)) = (pkgs_dir, out_dir, arch) {
+        cmd.env("FARM_PKGS", pkgs)
+            .env("FARM_OUT", out)
+            .env("FARM_ARCH", a);
+    }
+    let out = cmd
         .output()
         .map_err(|e| format!("运行 version-change 脚本失败: {e}"))?;
     let _ = std::fs::remove_file(&tmp);
@@ -223,9 +323,9 @@ fn script_decides_rebuild(script: &str, old_ver: &str, new_ver: &str) -> Result<
                 )
             );
         }
-        return Ok(false);
+        return Ok(None);
     }
-    Ok(true)
+    Ok(Some(String::from_utf8_lossy(&out.stdout).into_owned()))
 }
 
 /// 简单 glob：只支持 `*`（任意字符序列）。确定性、无 panic。
@@ -479,6 +579,63 @@ packages: perl-*
             .unwrap()
             .is_empty());
         assert!(g.trigger_edges_in(&all).is_empty());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn version_change_dynamic_victims_via_stdout() {
+        // version-change 脚本 exit 0 时，stdout 里打印的**合法包名**并入受害者（动态计算，
+        // 如"扫所有包 ELF 里 import Qt_6_PRIVATE_API 的"）；glob 仍生效；on 自身、未知名被滤掉。
+        let dir =
+            std::env::temp_dir().join(format!("farm-groups-vdyn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut g = RebuildGroups::default();
+        // glob 一个都不匹配；动态脚本 echo 出 a（合法）与 q/bogus（on 自身 + 未知 → 滤掉）
+        g.version.insert(
+            "q".into(),
+            VersionChangeGroup {
+                script: "echo a; echo q; echo bogus\n".into(),
+                globs: vec!["unused-*".into()],
+            },
+        );
+        let all: Vec<String> = ["q", "a", "b"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let v = g
+            .version_victims_ctx(
+                "q",
+                "1",
+                "2",
+                &all,
+                Some(&dir),
+                Some(&dir),
+                Some("x86_64"),
+            )
+            .unwrap();
+        assert_eq!(v, vec!["a"], "stdout 动态受害者应只含合法包名 a: {v:?}");
+
+        // exit 非零（跳过）→ 空，即使脚本打印了包名
+        g.version.insert(
+            "q".into(),
+            VersionChangeGroup {
+                script: "echo a; exit 1\n".into(),
+                globs: vec![],
+            },
+        );
+        let v = g
+            .version_victims_ctx(
+                "q",
+                "1",
+                "2",
+                &all,
+                Some(&dir),
+                Some(&dir),
+                Some("x86_64"),
+            )
+            .unwrap();
+        assert!(v.is_empty(), "exit≠0 应跳过: {v:?}");
         std::fs::remove_dir_all(&dir).ok();
     }
 }

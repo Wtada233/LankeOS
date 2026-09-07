@@ -1,0 +1,19 @@
+#
+# librest — RESTful 库（goa 用）。docs 走 gi-docgen → gtk_doc 关；vapi 默认开。
+# examples(demo app，需 gtksourceview5)/tests 关：依赖本地无、也不产出运行所需件。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D vapi=true \
+        -D gtk_doc=false \
+        -D examples=false \
+        -D tests=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

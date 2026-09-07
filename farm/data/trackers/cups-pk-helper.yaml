@@ -1,0 +1,7 @@
+pkg-name: cups-pk-helper
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.freedesktop.org/software/cups-pk-helper/releases/
+  pattern: 'cups-pk-helper-(\d[\d.]*)\.tar\.xz'
+  template: https://www.freedesktop.org/software/cups-pk-helper/releases/cups-pk-helper-{version}.tar.xz

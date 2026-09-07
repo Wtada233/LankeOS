@@ -1,0 +1,19 @@
+#
+# gnome-tweaks — GNOME 高级设置（python/GTK4/libadwaita）。纯 python+数据，meson 装即可。
+# 运行时靠 python-gobject + 各 typelib；deps 已按 Arch depends 全列（needed_so 扫不到）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+    # 清构建期 __pycache__/pyc
+    find {STAGING_ROOT} -type d -name __pycache__ -prune -exec rm -rf {} +
+    find {STAGING_ROOT} -type f -name '*.pyc' -delete
+
+}

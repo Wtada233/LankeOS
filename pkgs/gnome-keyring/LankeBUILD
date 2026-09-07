@@ -1,0 +1,17 @@
+#
+# gnome-keyring — 密钥环 daemon + PAM 集成。
+# selinux=disabled 同 Arch；Cinnamon autostart patch 不适用，跳过。
+# deps 手写运行时：gcr(gtk3)/gcr-4、libcap-ng、pam 模块(linux-pam)、p11-kit。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D selinux=disabled
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

@@ -1,0 +1,15 @@
+#
+# egl-wayland — NVIDIA EGL stream/wayland 库（mutter 的 egl-wayland dlopen 用）。
+# meson 默认；依赖 eglexternalplatform 头。开源 mesa 下一般不真链，装齐供 dlopen。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

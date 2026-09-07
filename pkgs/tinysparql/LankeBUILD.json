@@ -1,0 +1,46 @@
+{
+  "name": "tinysparql",
+  "version": "3.11.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libicui18n.so.78",
+    "libicuuc.so.78",
+    "libjson-glib-1.0.so.0",
+    "libm.so.6",
+    "libsoup-3.0.so.0",
+    "libsqlite3.so.0",
+    "libstemmer.so.0",
+    "libxml2.so.16"
+  ],
+  "provides": [
+    "libtinysparql-3.0.so",
+    "libtinysparql-3.0.so.0",
+    "libtracker-sparql-3.0.so",
+    "libtracker-sparql-3.0.so.0",
+    "libtracker-sparql-3.0.so.0.1101.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "icu",
+    "json-glib",
+    "libsoup",
+    "libstemmer",
+    "libxml2",
+    "meson",
+    "sqlite",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/tinysparql/3.11/tinysparql-3.11.1.tar.xz"
+  ],
+  "work_sources": []
+}

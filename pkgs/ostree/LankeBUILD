@@ -33,4 +33,11 @@ lankebuild_package() {
     make DESTDIR={STAGING_ROOT} install
     # --disable-static 已关，保险再清一遍
     find {STAGING_ROOT} -name '*.a' -delete
+
+    # tmpfiles.d 建运行时目录（systemd-tmpfiles）
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+systemd-tmpfiles --create
+exit 0
+EOF
 }

@@ -1,0 +1,14 @@
+#
+# gnome-backgrounds — 壁纸数据包（arch 无关）。壁纸为 jxl，运行时需 libjxl（deps 已带）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

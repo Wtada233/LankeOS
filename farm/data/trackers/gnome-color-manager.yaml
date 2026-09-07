@@ -1,0 +1,7 @@
+pkg-name: gnome-color-manager
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gnome-color-manager
+  stable-minor: all
+  template: https://download.gnome.org/sources/gnome-color-manager/{path_version}/gnome-color-manager-{version}.tar.xz

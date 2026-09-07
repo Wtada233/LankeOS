@@ -53,6 +53,7 @@ use lankefarm::track::vercmp;
 use lankefarm::track::{dep_edges, TrackerConfig};
 
 /// 命令解析结果：clap 子命令 → 扁平结构，供各 cmd_* 使用（保持逻辑层签名不变）。
+mod abi_fullchk;
 mod build;
 mod export;
 mod seed;
@@ -84,6 +85,8 @@ pub(crate) struct Args {
     image: Option<String>,
     repo_port: Option<u16>,
     download_retries: Option<u32>,
+    cache: Option<PathBuf>,
+    full_rescan: bool,
 }
 
 #[derive(clap::Parser)]
@@ -202,6 +205,26 @@ enum Command {
         /// 架构（读取 input/<arch>/ 下每个包）
         #[arg(long, default_value = "x86_64")]
         arch: String,
+    },
+    /// 全 ABI 审计（manual）：对 input/<arch>/ 全部 .lpkg 解包一次到临时目录，原生 ELF 扫每个
+    /// SONAME 的符号@版本（按内容 sha256 缓存到 <cache>/<soname>.json，命中不重扫），报告 consumer
+    /// 引用但无任何 DT_NEEDED 候选库提供的符号@版本。非 root 可跑（只需读仓库）。
+    ManualAbiFullchk {
+        /// provider/cache 来源：构建仓库根（含 `<arch>/`，**所有包**都用来建 provider 目录）[default: out]
+        #[arg(long, default_value = "out")]
+        source: PathBuf,
+        /// 架构（读取 source/<arch>/）
+        #[arg(long, default_value = "x86_64")]
+        arch: String,
+        /// 缓存目录（每个 SONAME 一个 json；默认 ~/.cache/lankefarm-abi）
+        #[arg(long)]
+        cache: Option<PathBuf>,
+        /// 只审计/报告这些包（provider 仍来自 --source 全量）[默认全部]
+        #[arg(long, num_args = 1..)]
+        pkgs: Vec<String>,
+        /// 忽略缓存强制全量重扫
+        #[arg(long)]
+        full_rescan: bool,
     },
     /// 探测上游版本
     Track {
@@ -1235,6 +1258,13 @@ fn localize_help(cmd: clap::Command) -> clap::Command {
             .mut_arg("image", |a| a.help("Fresh container base image. Required - container builds only"))
             .mut_arg("repo_port", |a| a.help("Embedded local repo server port (container lpkg upgrade pulls from it)"))
             .mut_arg("download_retries", |a| a.help("Source pre-download network retries")))
+        .mut_subcommand("manual-abi-fullchk", |c| c
+            .about("Full ABI audit (manual): provider/cache source = all packages under --source; extract each .lpkg once into a tempdir, natively scan each SONAME's symbol@version (content-sha256 cached per SONAME; hits skip rescan), report audited consumers referencing a symbol@version no DT_NEEDED candidate provides")
+            .mut_arg("source", |a| a.help("Build repo root (contains <arch>/, ALL packages build the provider catalog)"))
+            .mut_arg("arch", |a| a.help("Architecture (read packages under input/<arch>/)"))
+            .mut_arg("cache", |a| a.help("Cache dir (one <soname>.json each; default ~/.cache/lankefarm-abi)"))
+            .mut_arg("pkgs", |a| a.help("Only audit these packages (default all)"))
+            .mut_arg("full_rescan", |a| a.help("Ignore cache and force a full rescan")))
         .mut_subcommand("track", |c| c
             .about("Probe upstream versions")
             .mut_arg("pkg", |a| a.help("Target package name (required without --all)"))
@@ -1368,6 +1398,23 @@ pub fn run() -> ExitCode {
                 ..Default::default()
             };
             export::cmd_export(&args)
+        }
+        Command::ManualAbiFullchk {
+            source,
+            arch,
+            cache,
+            pkgs,
+            full_rescan,
+        } => {
+            let args = Args {
+                input: Some(source),
+                arch: Some(arch),
+                cache,
+                pkg: pkgs,
+                full_rescan,
+                ..Default::default()
+            };
+            abi_fullchk::cmd_manual_abi_fullchk(&args)
         }
         Command::Track {
             pkg,

@@ -1,0 +1,30 @@
+{
+  "name": "gnome-autoar",
+  "version": "0.5.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libarchive.so.13",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libgnome-autoar-0.so",
+    "libgnome-autoar-0.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "libarchive",
+    "meson",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gnome-autoar/0.5/gnome-autoar-0.5.2.tar.xz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,6 @@
+pkg-name: gnome-settings-daemon
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gnome-settings-daemon
+  template: https://download.gnome.org/sources/gnome-settings-daemon/{path_version}/gnome-settings-daemon-{version}.tar.xz

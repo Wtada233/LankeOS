@@ -1,0 +1,38 @@
+{
+  "name": "gnome-tweaks",
+  "version": "49.0",
+  "release": 2,
+  "deps": [
+    "dconf",
+    "glib",
+    "gnome-desktop",
+    "gsettings-desktop-schemas",
+    "gtk4",
+    "hicolor-icon-theme",
+    "libadwaita",
+    "libgudev",
+    "libnotify",
+    "pango",
+    "python",
+    "python-gobject"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gnome-desktop",
+    "gobject-introspection",
+    "gtk4",
+    "libadwaita",
+    "libgudev",
+    "libnotify",
+    "meson",
+    "pango",
+    "python-gobject"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gnome-tweaks/49/gnome-tweaks-49.0.tar.xz"
+  ],
+  "work_sources": []
+}

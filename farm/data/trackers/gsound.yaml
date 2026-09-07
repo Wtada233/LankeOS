@@ -1,0 +1,9 @@
+# gitlab.gnome 归档 tarball（非 git+）；版本号 1.0.x 多年未动，跟上游 tag
+pkg-name: gsound
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.gnome.org
+  mode: tags
+  project: GNOME/gsound
+  template: https://gitlab.gnome.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

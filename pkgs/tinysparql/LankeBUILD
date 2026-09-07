@@ -1,0 +1,18 @@
+#
+# tinysparql（tracker3）— 元数据索引 daemon + libtinysparql（nautilus 搜索/文件元数据）。
+# avahi/stemmer/unicode 都是 feature auto：avahi 无→自动关；libstemmer 有→开。
+# docs/man 走 gi-docgen/asciidoc（本地无）→ 关；tests 关（要 dbus/python-tappy）。
+# vapi/introspection 默认 enabled（vala/gi 在 build_deps）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D docs=false -D man=false -D tests=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

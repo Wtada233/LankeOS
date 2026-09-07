@@ -1,0 +1,17 @@
+#
+# gnome-session — GNOME 会话管理器（gnome-shell 运行时依赖）。
+# docs 走 docbook/xmlto（工具本地有）→ 开，同 Arch；man 开。
+# xdg-desktop-portal-gnome / gsettings / dconf 为运行时 dep（deps 已手写）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D docbook=true -D man=true
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

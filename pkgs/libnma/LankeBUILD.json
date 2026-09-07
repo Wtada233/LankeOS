@@ -1,0 +1,45 @@
+{
+  "name": "libnma",
+  "version": "1.10.6",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libcairo.so.2",
+    "libgcc_s.so.1",
+    "libgck-2.so.2",
+    "libgcr-4.so.4",
+    "libgdk-3.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgtk-3.so.0",
+    "libgtk-4.so.1",
+    "libnm.so.0"
+  ],
+  "provides": [
+    "libnma-gtk4.so",
+    "libnma-gtk4.so.0",
+    "libnma.so",
+    "libnma.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "dconf",
+    "gcr-4",
+    "glib",
+    "gobject-introspection",
+    "gtk-doc",
+    "gtk3",
+    "gtk4",
+    "iso-codes",
+    "meson",
+    "mobile-broadband-provider-info",
+    "networkmanager",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/libnma/1.10/libnma-1.10.6.tar.xz"
+  ],
+  "work_sources": []
+}

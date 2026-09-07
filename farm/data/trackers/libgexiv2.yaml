@@ -1,9 +1,8 @@
+# libgexiv2 = 单一 gexiv2 包（0.16 线，pc/lib 已 API versioning 为 gexiv2-0.16）。
+# 同时喂 gimp（BLFS 补丁放宽探测）与 GNOME 侧（nautilus）；不另拆 gexiv2 包。
 pkg-name: libgexiv2
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.gnome.org
-  mode: tags
-  tag-prefix: gexiv2-
-  project: GNOME/gexiv2
-  template: https://gitlab.gnome.org/{project}/-/archive/{tag}/gexiv2-{tag}.tar.gz
+- tracker-template: gnome
+  template: https://download.gnome.org/sources/gexiv2/{path_version}/gexiv2-{version}.tar.xz
+  source-name: gexiv2

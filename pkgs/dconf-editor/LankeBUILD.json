@@ -1,0 +1,31 @@
+{
+  "name": "dconf-editor",
+  "version": "49.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libdconf.so.1",
+    "libgdk-3.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgtk-3.so.0",
+    "libhandy-1.so.0"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "dconf",
+    "glib",
+    "gobject-introspection",
+    "gtk3",
+    "libhandy",
+    "meson",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/dconf-editor/49/dconf-editor-49.0.tar.xz"
+  ],
+  "work_sources": []
+}

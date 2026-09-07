@@ -1,0 +1,29 @@
+{
+  "name": "egl-wayland",
+  "version": "1.1.22",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libdrm.so.2",
+    "libwayland-client.so.0",
+    "libwayland-server.so.0"
+  ],
+  "provides": [
+    "libnvidia-egl-wayland.so",
+    "libnvidia-egl-wayland.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "eglexternalplatform",
+    "libdrm",
+    "libglvnd",
+    "meson",
+    "wayland",
+    "wayland-protocols"
+  ],
+  "sources": [
+    "https://github.com/NVIDIA/egl-wayland/archive/refs/tags/1.1.22.tar.gz"
+  ],
+  "work_sources": []
+}

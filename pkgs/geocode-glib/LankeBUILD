@@ -1,0 +1,16 @@
+#
+# geocode-glib（geocode-glib-2）— 地理编码库（libgweather/geoclue 用）。
+# soup2=false 同 Arch（只留 libsoup3）。docs 走 gtk-doc（有）默认留。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D soup2=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

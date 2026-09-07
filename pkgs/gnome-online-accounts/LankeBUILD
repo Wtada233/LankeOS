@@ -1,0 +1,16 @@
+#
+# gnome-online-accounts（goa）— 在线账户服务/面板（gcc 用）。
+# docs 走 gi-docgen → documentation 关；man 走 docbook/xsltproc（有）留开；vapi 默认开。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D documentation=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

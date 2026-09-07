@@ -1,0 +1,17 @@
+#
+# gcr-4（GTK4 线）— goa/gvfs/gnome-shell 用（Arch gcr-4 = 同源 gcr 的 4.x tag）。
+# crypto=gnutls 同 Arch；ssh-agent 在这条线。docs 走 gi-docgen → gtk_doc 关；vapi 默认开。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D crypto=gnutls \
+        -D gtk_doc=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

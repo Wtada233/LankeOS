@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+#
+# startup-notification — X11 启动通知库（mutter 用）。freedesktop release tar（自带 configure）。
+# 极简 autotools；0.12 是多年未动的稳定版。
+
+lankebuild_build() {
+    ./configure --prefix=/usr
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+}

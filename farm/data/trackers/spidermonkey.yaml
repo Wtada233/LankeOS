@@ -1,0 +1,11 @@
+# Spidermonkey（= Arch js140）= firefox 140 ESR 线的点发布。gjs/gnome-shell 只吃 140 ESR，
+# 勿放行到下一 ESR（144）。max-version: 141.0.0 = 锁 140 整线（自动吸收 140.16+ 点发布）；
+# 若 gjs 未来跳到 ESR 144，再把 max-version 提到 145.0.0 并同步升版本。
+pkg-name: spidermonkey
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://archive.mozilla.org/pub/firefox/releases/
+  pattern: '>(\d+\.\d+(?:\.\d+)*)esr/<'
+  max-version: 141.0.0
+  template: https://archive.mozilla.org/pub/firefox/releases/{version}esr/source/firefox-{version}esr.source.tar.xz

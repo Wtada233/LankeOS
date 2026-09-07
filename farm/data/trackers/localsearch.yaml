@@ -1,0 +1,7 @@
+pkg-name: localsearch
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: localsearch
+  stable-minor: all
+  template: https://download.gnome.org/sources/localsearch/{path_version}/localsearch-{version}.tar.xz

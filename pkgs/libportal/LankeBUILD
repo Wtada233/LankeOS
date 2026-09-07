@@ -1,0 +1,17 @@
+#
+# libportal — xdg-desktop-portal 客户端库（nautilus/gcc 用）。
+# 单包合 main+gtk3+gtk4 后端（qt5/qt6 无 → meson 自动跳过）。docs 走 gi-docgen → 关；tests 关。
+# Arch 对 qt6.9 的 cherry-pick 仅 qt 后端需要，这里无 qt 不需要。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D docs=false -D tests=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

@@ -1,0 +1,19 @@
+#
+# glycin — 沙箱图像解码服务（mutter/nautilus 用，Rust + capi）。
+# capi_docs 走 gi-docgen → 关；tokio 测试关。cargo 在构建期拉 crates.io（容器需网络）。
+# loaders：系统库在的自动启用（librsvg/libheif/libjxl/lcms2），其余走内置 rust crate。
+# 运行时靠 bubblewrap 沙箱 + libseccomp（exec/链接见 needed_so，dlopen 侧另查）。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D capi_docs=false \
+        -D test_tokio=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

@@ -37,6 +37,12 @@ EOF
 
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    # sysusers.d 的 basic/systemd-* 用户需 postinst 建（rtkit 同款；安装期即建，
+    # 不依赖开机 systemd-sysusers.service）
+    cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
+#!/bin/sh
+systemd-sysusers
+systemd-tmpfiles --create
+exit 0
+EOF
 }

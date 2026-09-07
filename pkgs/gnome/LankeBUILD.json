@@ -1,0 +1,25 @@
+{
+  "name": "gnome",
+  "version": "1.0",
+  "release": 2,
+  "deps": [
+    "adwaita-icon-theme",
+    "gdm",
+    "gnome-backgrounds",
+    "gnome-color-manager",
+    "gnome-control-center",
+    "gnome-keyring",
+    "gnome-session",
+    "gnome-settings-daemon",
+    "gnome-shell",
+    "gvfs",
+    "nautilus",
+    "tecla",
+    "xdg-desktop-portal-gnome",
+    "xdg-user-dirs-gtk"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "sources": [],
+  "work_sources": []
+}

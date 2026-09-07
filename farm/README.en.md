@@ -147,6 +147,7 @@ cargo build --release        # binary: target/release/lankefarm
 | `build <pkg>...\|--all --image <img>` | Incremental, ABI-aware build with plan preview (container builds only, `--image` required) |
 | `validate --image <img>` | Rebuild every package missing its `.build_ok` marker |
 | `export --output <dir>` | Flatten-copy the build repo into distribution-format `<pkg>-<ver>.lpkg` files (no repack) |
+| `manual-abi-fullchk [--source <repo>] [--cache <dir>] [--pkgs …]` | Full ABI audit: ALL packages under `--source` build the provider catalog (native ELF scan of each SONAME's symbol@version; content-sha256 cached to `~/.cache/lankefarm-abi/`, hits skip rescan); `--pkgs` narrows the audited scope; report consumers referencing a symbol@version no provider supplies |
 | `track <pkg>\|--all [--run]` | Probe upstream versions (read-only proposal by default, `--run` applies) |
 | `gen-trackers` | Batch-generate tracker YAML files via an LLM |
 | `seed --remote <url>` | Cold-start a remote repository (parallel download + SHA-256 verification) |

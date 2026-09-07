@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    :
+}
+
+
+lankebuild_package() {
+    # 元包无需实体文件，清理 lpkg 自动创建的目录结构
+    # 安全检查：{STAGING_ROOT} 由 lpkg 直接展开，确保不会误删根
+    if [[ "{STAGING_ROOT}" != "/" && -n "{STAGING_ROOT}" ]]; then
+        rm -rf "{STAGING_ROOT}"/*
+    fi
+}

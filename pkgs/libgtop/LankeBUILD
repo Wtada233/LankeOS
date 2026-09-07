@@ -1,0 +1,19 @@
+lankebuild_prepare() {
+    :
+}
+
+#
+# libgtop — 系统监控库（gnome-system-monitor/gnome-shell 进程信息用）。
+# autotools；release tarball 自带 configure（无需 autoreconf）。gtk-doc 有 → 开。
+
+lankebuild_build() {
+    ./configure --prefix=/usr \
+        --sysconfdir=/etc --localstatedir=/var \
+        --libexecdir=/usr/lib \
+        --enable-gtk-doc
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+}

@@ -1,7 +1,7 @@
 {
   "name": "dbus",
   "version": "1.16.2",
-  "release": 3,
+  "release": 5,
   "deps": [
     "python",
     "xwayland"

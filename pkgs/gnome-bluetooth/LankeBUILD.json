@@ -1,0 +1,44 @@
+{
+  "name": "gnome-bluetooth",
+  "version": "47.2",
+  "release": 1,
+  "deps": [
+    "bluez"
+  ],
+  "needed_so": [
+    "libadwaita-1.so.0",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgsound.so.0",
+    "libgtk-4.so.1",
+    "libm.so.6",
+    "libnotify.so.4",
+    "libudev.so.1",
+    "libupower-glib.so.3"
+  ],
+  "provides": [
+    "libgnome-bluetooth-3.0.so",
+    "libgnome-bluetooth-3.0.so.13",
+    "libgnome-bluetooth-ui-3.0.so",
+    "libgnome-bluetooth-ui-3.0.so.13"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "gsound",
+    "gtk-doc",
+    "gtk4",
+    "libadwaita",
+    "libnotify",
+    "meson",
+    "upower"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/gnome-bluetooth/47/gnome-bluetooth-47.2.tar.xz"
+  ],
+  "work_sources": []
+}

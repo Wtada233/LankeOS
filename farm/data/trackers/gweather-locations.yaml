@@ -1,0 +1,9 @@
+# 独立数据仓库（非 git+），gitlab.gnome 归档 tarball
+pkg-name: gweather-locations
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.gnome.org
+  mode: tags
+  project: GNOME/gweather-locations
+  template: https://gitlab.gnome.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

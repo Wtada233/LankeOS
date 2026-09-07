@@ -1,0 +1,15 @@
+#
+# libtirpc — SunRPC 库 + tirpc 头（samba/NFS 用）。autotools，dep krb5。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix=/usr --sysconf=/etc
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+}

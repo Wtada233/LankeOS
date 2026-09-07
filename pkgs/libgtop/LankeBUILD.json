@@ -1,0 +1,27 @@
+{
+  "name": "libgtop",
+  "version": "2.41.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libXau.so.6",
+    "libc.so.6",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libgtop-2.0.so",
+    "libgtop-2.0.so.11"
+  ],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "gtk-doc",
+    "libxau"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/libgtop/2.41/libgtop-2.41.3.tar.xz"
+  ],
+  "work_sources": []
+}

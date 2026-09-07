@@ -1,0 +1,54 @@
+{
+  "name": "glycin",
+  "version": "2.1.5",
+  "release": 1,
+  "deps": [
+    "bubblewrap"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libcairo.so.2",
+    "libfontconfig.so.1",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgtk-4.so.1",
+    "libheif.so.1",
+    "libjxl.so.0.12",
+    "libjxl_threads.so.0.12",
+    "liblcms2.so.2",
+    "libm.so.6",
+    "librsvg-2.so.2",
+    "libseccomp.so.2"
+  ],
+  "provides": [
+    "libglycin-2.so",
+    "libglycin-2.so.0",
+    "libglycin-gtk4-2.so",
+    "libglycin-gtk4-2.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cairo",
+    "fontconfig",
+    "glib",
+    "gobject-introspection",
+    "gtk4",
+    "highway",
+    "lcms2",
+    "libheif",
+    "libjxl",
+    "librsvg",
+    "libseccomp",
+    "llvm",
+    "meson",
+    "rust",
+    "vala"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/glycin/2.1/glycin-2.1.5.tar.xz"
+  ],
+  "work_sources": []
+}

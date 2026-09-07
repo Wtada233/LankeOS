@@ -1,0 +1,43 @@
+# libibus — ibus 客户端库 + typelib（无 daemon/panel/immodule）。
+# gnome-shell 的 gjs 硬 import IBus-1.0 typelib，编译期不链接、运行时要 typelib —— 故只需库+头+typelib。
+# 刻意不装 daemon：ibus-daemon/systemd user unit(Xwayland-session.d 那套)会把
+# GTK_IM_MODULE/QT_IM_MODULE=ibus set-environment 进 user manager 污染 fcitx5 —— 只留 lib 物理隔离。
+# 按 Arch 拆包的 libibus 侧：src 的 lib+include+gir+typelib + pkgconfig(ibus-1.0.pc)。
+# configure 砍：gtk2/3/4 immodule、xim、wayland 支持、appindicator、dconf 配置后端、systemd services、
+# python2、setup、ui、engine、emoji/unicode dict —— 全是 daemon 生态，lib 用不到。
+# 源码上游仍叫 ibus（libibus 只是 Arch 拆包名），source 用 ibus release tarball。
+lankebuild_prepare() {
+    # 打包名 libibus 但源码包名 ibus——上游 tarball 解压目录 ibus-1.5.34 由 lpkg 自动 cd
+    :
+}
+lankebuild_build() {
+    ./configure \
+        --prefix=/usr \
+        --libexecdir=/usr/lib/ibus \
+        --sysconfdir=/etc \
+        --disable-gtk2 \
+        --disable-gtk3 \
+        --disable-gtk4 \
+        --disable-xim \
+        --disable-wayland \
+        --disable-appindicator \
+        --disable-dconf \
+        --disable-systemd-services \
+        --disable-python2 \
+        --disable-python-library \
+        --disable-setup \
+        --disable-ui \
+        --disable-engine \
+        --disable-emoji-dict \
+        --disable-unicode-dict \
+        --disable-libnotify \
+        --with-python=python3
+    # 只编 src（纯 lib+compose+typelib）。别跑顶层 make——tools/ 无条件编 ibus CLI，
+    # 其 main.c 硬编码 check_wayland_protocols 引 wayland-client 符号（--disable-wayland 管不到它）。
+    make -C src -j$(nproc)
+}
+lankebuild_package() {
+    # 仿 Arch package_libus：只装 src(库+头+gir+typelib) + 顶层 pkgconfig，不装 daemon/panel/setup。
+    make -C src DESTDIR={STAGING_ROOT} install
+    make DESTDIR={STAGING_ROOT} install-pkgconfigDATA
+}

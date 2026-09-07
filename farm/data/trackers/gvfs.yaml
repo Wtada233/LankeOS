@@ -1,0 +1,7 @@
+# 默认 even-minor：gvfs 稳定线 1.60(偶)，1.61(奇) 是 dev，不跟
+pkg-name: gvfs
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gvfs
+  template: https://download.gnome.org/sources/gvfs/{path_version}/gvfs-{version}.tar.xz

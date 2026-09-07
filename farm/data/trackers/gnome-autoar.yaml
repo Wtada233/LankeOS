@@ -1,0 +1,7 @@
+pkg-name: gnome-autoar
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gnome-autoar
+  stable-minor: all
+  template: https://download.gnome.org/sources/gnome-autoar/{path_version}/gnome-autoar-{version}.tar.xz

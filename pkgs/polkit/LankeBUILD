@@ -27,6 +27,10 @@ PAM_EOF
     cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
 systemd-sysusers
 EOF
+    # polkit-tmpfiles.conf（/var/lib/polkit-1 等）postinst 建目录
+    cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+systemd-tmpfiles --create
+EOF
 }
 
 

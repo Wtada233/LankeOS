@@ -1,0 +1,15 @@
+#
+# gnome-shell-extensions — 官方扩展集（数据/JS）。构建要 gnome-shell 的 gnome-extensions 工具。
+# deps 运行时 gnome-shell。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

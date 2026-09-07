@@ -1,0 +1,28 @@
+{
+  "name": "libibus",
+  "version": "1.5.34",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libibus-1.0.so",
+    "libibus-1.0.so.5"
+  ],
+  "build_deps": [
+    "base-devel",
+    "dbus",
+    "glib",
+    "gobject-introspection",
+    "iso-codes",
+    "xkeyboard-config"
+  ],
+  "sources": [
+    "https://github.com/ibus/ibus/releases/download/1.5.34/ibus-1.5.34.tar.gz"
+  ],
+  "work_sources": []
+}

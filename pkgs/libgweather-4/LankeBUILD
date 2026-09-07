@@ -1,0 +1,17 @@
+#
+# libgweather-4 — 天气/时区查询库（gnome-shell/gsd 用）。
+# docs 走 gi-docgen（Arch 的 -D gtk_doc=true 实为 gi-docgen）→ 关；vapi 默认开（vala 有）。
+# 核心库无 gtk；gweather-locations 数据是独立包。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D gtk_doc=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

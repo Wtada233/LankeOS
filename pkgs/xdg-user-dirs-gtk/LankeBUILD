@@ -1,0 +1,15 @@
+#
+# xdg-user-dirs-gtk — 登录时建 ~/用户目录并弹出的 GTK3 工具。
+# 无 docs/vapi；Arch 的 0001-desktop patch（多环境显示）按需，暂不带。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

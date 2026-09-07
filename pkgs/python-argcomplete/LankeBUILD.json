@@ -1,0 +1,21 @@
+{
+  "name": "python-argcomplete",
+  "version": "3.7.2",
+  "release": 4,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-hatch-vcs",
+    "python-hatchling",
+    "python-installer"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/87/6f/5a73f04007ca950701765949209f068da628bd11f9c2da287278ce91e0ee/argcomplete-3.7.2.tar.gz"
+  ],
+  "work_sources": []
+}

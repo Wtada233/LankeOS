@@ -1,0 +1,6 @@
+pkg-name: gnome-backgrounds
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gnome-backgrounds
+  template: https://download.gnome.org/sources/gnome-backgrounds/{path_version}/gnome-backgrounds-{version}.tar.xz

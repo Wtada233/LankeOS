@@ -1,0 +1,10 @@
+# gcr 3.x（GTK3 线，gnome-keyring 用）——同源还有 3.90/3.92（GTK4 过渡版号）与 4.x（另包 gcr-4）。
+# 真正 GTK3 线最后是 3.41：max-version 3.41.99 锁住，排除 3.90+ 的 GTK4 过渡版。
+pkg-name: gcr
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: gcr
+  stable-minor: all
+  max-version: 3.41.99
+  template: https://download.gnome.org/sources/gcr/{path_version}/gcr-{version}.tar.xz

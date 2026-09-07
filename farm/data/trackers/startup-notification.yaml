@@ -1,0 +1,7 @@
+pkg-name: startup-notification
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.freedesktop.org/software/startup-notification/releases/
+  pattern: 'startup-notification-(\d[\d.]*)\.tar\.gz'
+  template: https://www.freedesktop.org/software/startup-notification/releases/startup-notification-{version}.tar.gz

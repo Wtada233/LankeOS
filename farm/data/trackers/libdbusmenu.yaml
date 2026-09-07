@@ -1,0 +1,10 @@
+# 上游无新 release（已归档）；Debian pool orig。版本极少变，暂 script 取 Debian pool 最新 orig。
+pkg-name: libdbusmenu
+type: script
+script-content: |
+  set -e
+  n=$(curl -fsSL https://deb.debian.org/debian/pool/main/libd/libdbusmenu/ | grep -oE 'libdbusmenu_[0-9][^"]*\.orig\.tar\.xz' | sort -V | tail -1)
+  test -n "$n" || exit 1
+  v=$(printf '%s' "$n" | sed 's/libdbusmenu_//; s/\.orig\.tar\.xz$//; s/~bzr[0-9]*+repack1//')
+  echo "$v"
+  echo "https://deb.debian.org/debian/pool/main/libd/libdbusmenu/$n"

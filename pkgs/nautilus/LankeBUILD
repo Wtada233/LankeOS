@@ -1,0 +1,17 @@
+#
+# nautilus — 文件管理器（gtk4/libadwaita）。搜索走 tinysparql+localsearch（D-Bus，deps 带 localsearch）。
+# docs 走 gi-docgen → 关；packagekit/selinux 关（Arch 同款）。
+# thumbnail 走 glycin（链接）；gvfs(localsearch) 运行时 daemon——deps 已带。
+
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release \
+        -D docs=false -D packagekit=false -D selinux=false
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}

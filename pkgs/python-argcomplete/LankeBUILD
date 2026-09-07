@@ -1,0 +1,16 @@
+#
+# python-argcomplete — bash/zsh 补全库（mutter gdctl 用 register-python-argcomplete）。
+# PyPI sdist（带版本元数据，免 hatch-vcs git 版本坑）→ 标准 PEP517 wheel 构建。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

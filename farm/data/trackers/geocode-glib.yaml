@@ -1,0 +1,7 @@
+pkg-name: geocode-glib
+version-source: sources[0]
+sources:
+- tracker-template: gnome
+  source-name: geocode-glib
+  stable-minor: all
+  template: https://download.gnome.org/sources/geocode-glib/{path_version}/geocode-glib-{version}.tar.xz
