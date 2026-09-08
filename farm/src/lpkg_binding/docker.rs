@@ -1,85 +1,19 @@
-//! 唯一碰 lpkg 的接缝（§3.5 分层架构）。
+//! lpkg_binding::docker — `RealBinding`：docker create/exec 编排（容器内 lpkg upgrade+build）。
 //!
-//! 逻辑层只依赖 `trait LpkgBinding`：
-//! - `StubBinding`：返回 canned 结果，用于集成测试与 `--demo` 模式，绕开真实构建
-//! - `RealBinding`：docker create/exec 编排（容器内 lpkg upgrade+build）。**仅容器构建**——
-//!   宿主直接 lpkg build 会污染环境（装依赖、留产物），已禁止。
+//! 本文件是**唯一 spawn `docker` 的叶**（架构 §5）：滚动镜像、孤儿容器清理、Ctrl+C 清理、
+//! ABI 过渡备份注入全部收敛在这里。仅容器构建——宿主直接 lpkg build 会污染环境
+//! （装依赖、留产物），已禁止。
 //!
 //! 绑定优先（ADR #13）：除 lpkg 之外的低层能力（libarchive/下载/哈希/ELF）都应
-//! 直接链接进进程内，不 exec 外部程序。
+//! 直接链接进进程内，不 exec 外部程序。`mod.rs`（纯 trait/Stub）与逻辑层不依赖本文件。
 
-use std::collections::HashMap;
+use crate::error::FarmError;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::sync::{Arc, Mutex};
 
-/// 一次构建的实际产物扫描结果 + 状态。
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct BuildOutcome {
-    pub ok: bool,
-    pub needed_so: Vec<String>,
-    pub provides: Vec<String>,
-    pub deps: Vec<String>,
-    pub failure_stage: Option<String>,
-    /// 构建产物 .lpkg 的路径（RealBinding 填充；StubBinding 为 None）。
-    /// 供调度器 publish（进 repo）与 repack（元数据漂移修正）。
-    pub lpkg_path: Option<PathBuf>,
-}
-
-impl BuildOutcome {
-    pub fn success(needed_so: &[&str], provides: &[&str], deps: &[&str]) -> Self {
-        BuildOutcome {
-            ok: true,
-            needed_so: needed_so.iter().map(|s| s.to_string()).collect(),
-            provides: provides.iter().map(|s| s.to_string()).collect(),
-            deps: deps.iter().map(|s| s.to_string()).collect(),
-            failure_stage: None,
-            lpkg_path: None,
-        }
-    }
-
-    pub fn failure(stage: &str) -> Self {
-        BuildOutcome {
-            ok: false,
-            failure_stage: Some(stage.to_string()),
-            ..Default::default()
-        }
-    }
-}
-
-/// 逻辑层与 lpkg 交互的唯一接口。
-///
-/// 只暴露 `build`：依赖拉取（`lpkg upgrade -y`）是每次构建的环境前置，属实现细节，
-/// 由 RealBinding 在构建内部完成（容器模式内联在容器脚本里），不进调度器。
-pub trait LpkgBinding {
-    /// 在 fresh container 中构建 pkg，返回实际扫描结果。
-    /// `ok == false` → 确定性构建失败，job 进入 BLOCKED（§8.5 零自动重试）。
-    fn build(&mut self, pkg: &str) -> BuildOutcome;
-
-    /// 设置仓库全部提供能力（扫描 not-found 判定用：needed_so 无 provider → 不进 needed_so）。
-    /// 默认 no-op；RealBinding 覆盖以填充其 repo_provides 字段。
-    fn set_repo_provides(&mut self, _provides: std::collections::HashSet<String>) {}
-}
-
-/// Stub：按预设 outcome 返回，不进行任何实际操作。
-#[derive(Debug, Default)]
-pub struct StubBinding {
-    pub outcomes: HashMap<String, BuildOutcome>,
-}
-
-impl StubBinding {
-    pub fn new(outcomes: HashMap<String, BuildOutcome>) -> Self {
-        StubBinding { outcomes }
-    }
-}
-
-impl LpkgBinding for StubBinding {
-    fn build(&mut self, pkg: &str) -> BuildOutcome {
-        self.outcomes.get(pkg).cloned().unwrap_or(BuildOutcome {
-            ok: true,
-            ..Default::default()
-        })
-    }
-}
+use super::{BuildOutcome, LpkgBinding};
 
 /// Real：docker cp 编排（仅容器构建——主机构建会污染宿主环境，已禁止）。
 /// 构建产物先落 `out/.staging/<pkg>/`（打包完成 → SONAME 检测 → 漂移 repack → 才上传本地仓库，
@@ -93,10 +27,10 @@ pub struct RealBinding {
     /// 经 host 网络从 `127.0.0.1:{repo_port}` 拉本地最新依赖（增量语义的关键）。
     pub repo_port: u16,
     /// Ctrl+C 中断清理共享状态：当前在途容器/包（信号处理器据此删容器、删 DB 条目）。
-    pub cleanup: std::sync::Arc<std::sync::Mutex<CleanupState>>,
+    pub cleanup: Arc<Mutex<CleanupState>>,
     /// 仓库全部提供能力（SONAME/虚拟提供）：扫描 not-found 判定用——
     /// needed_so 条目无 provider → not found → 不进 needed_so。构建开始前从旧索引填充。
-    pub repo_provides: std::collections::HashSet<String>,
+    pub repo_provides: HashSet<String>,
 }
 
 /// docker 容器 RAII：作用域结束自动 `docker rm -f`，覆盖所有 `?` 提前返回与失败路径，
@@ -148,7 +82,7 @@ fn prune_dangling_images() {
 
 /// `docker export <cid> | docker import - <base>`：把容器文件系统**扁平化**为单层镜像覆盖 base，
 /// 再删掉 roll1..ROLL_LIMIT 编号镜像。gc_roll 与 finalize_roll 共用。
-fn flatten_to_base(cid: &str, base_image: &str) -> Result<(), String> {
+fn flatten_to_base(cid: &str, base_image: &str) -> Result<(), FarmError> {
     let export = std::process::Command::new("docker")
         .args(["export", cid])
         .stdout(Stdio::piped())
@@ -163,7 +97,8 @@ fn flatten_to_base(cid: &str, base_image: &str) -> Result<(), String> {
         return Err(format!(
             "docker import 失败: {}",
             String::from_utf8_lossy(&import.stderr)
-        ));
+        )
+        .into());
     }
     // 只删存在的 roll 镜像：不存在的一律跳过（`docker rmi` 对 No such image 会报错刷屏）。
     for i in 1..=ROLL_LIMIT {
@@ -196,7 +131,7 @@ fn roll_image(base_image: &str, n: u32) -> String {
 
 /// 滚动收尾（**正常构建结束 / Ctrl+C 共用**）：用最新 commit 起临时容器 → export+import
 /// 扁平化覆盖 base → 删全部 roll 镜像 → 计数归零。roll==0（无 commit 链）为 no-op。
-pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), String> {
+pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), FarmError> {
     let roll = read_roll_counter(out_dir);
     if roll == 0 {
         return Ok(());
@@ -219,7 +154,8 @@ pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), String> {
         return Err(format!(
             "docker create（finalize）失败: {}",
             String::from_utf8_lossy(&create.stderr)
-        ));
+        )
+        .into());
     }
     let cid = String::from_utf8_lossy(&create.stdout).trim().to_string();
     let _ = std::process::Command::new("docker")
@@ -311,13 +247,13 @@ impl RealBinding {
             arch: arch.into(),
             repo_port,
             cleanup,
-            repo_provides: std::collections::HashSet::new(),
+            repo_provides: HashSet::new(),
         }
     }
 
     /// docker cp 编排：配方拷进容器 → 容器内 lpkg upgrade+build → .lpkg 拷回 staging。
     /// 不 bind-mount pkgs（容器易失，残留随容器销毁）；容器经 host 网络从内嵌 repo 服务器拉依赖。
-    fn docker_build(&self, pkg: &str, staging: &Path) -> Result<PathBuf, String> {
+    fn docker_build(&self, pkg: &str, staging: &Path) -> Result<PathBuf, FarmError> {
         // 唯一容器名（进程 PID + 包名）：并发 build 进程互不踩踏——固定名 `lankefarm-build`
         // 时后启动进程的 `rm -f`/`create --name` 会杀/撞前者的在途容器。
         // 静默命令（rm/start/cp/配置）：屏蔽 docker 的 cid 回显与 cp 进度噪音；构建 exec 单独流式。
@@ -394,7 +330,8 @@ impl RealBinding {
             return Err(format!(
                 "docker create 失败: {}",
                 String::from_utf8_lossy(&create.stderr)
-            ));
+            )
+            .into());
         }
         let cid = String::from_utf8_lossy(&create.stdout).trim().to_string();
         let _guard = ContainerGuard(cid.clone());
@@ -404,7 +341,7 @@ impl RealBinding {
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {
-            return Err(format!("docker start 失败（{pkg}）"));
+            return Err(format!("docker start 失败（{pkg}）").into());
         }
 
         // 2. 容器内 lpkg mirror.conf 指向内嵌 repo 服务器（--network=host ⇒ 127.0.0.1 即宿主）。
@@ -418,7 +355,7 @@ impl RealBinding {
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {
-            return Err(format!("容器内写入 mirror.conf 失败（{pkg}）"));
+            return Err(format!("容器内写入 mirror.conf 失败（{pkg}）").into());
         }
 
         // 4. 容器内构建——**实时流式日志**，不捕获（捕获 = 黑盒，构建完成才输出；
@@ -427,7 +364,7 @@ impl RealBinding {
         //    容器里真实运行——过渡期的缺失 SONAME 由 `--missing-so-no-error`（upgrade）与
         //    `--use-system-soname`（build，配合备份恢复的旧 .so）显式容忍，不再靠剥索引/清状态
         //    压制检查（那些 hack 已删）。
-        //    流程：`lpkg install lpkg`（基础镜像里旧版无 force-solve-conflict）→ `lpkg upgrade`
+        //    流程：`lpkg install lpkg -y`（基础镜像里旧版无 force-solve-conflict）→ `lpkg upgrade`
         //    拉 127.0.0.1 内嵌 repo 最新依赖；upgrade 若仍报错，用确认短语喂 force-solve-conflict
         //    清理后重试（仅依赖环触发）。
         // force-solve-conflict 是显式破坏性操作，lpkg 在非交互（-y）下直接拒绝执行——
@@ -451,7 +388,7 @@ impl RealBinding {
             .status()
             .map_err(|e| format!("docker exec 失败: {e}"))?;
         if !status.success() {
-            return Err(format!("容器内 lpkg upgrade 失败（{pkg}）"));
+            return Err(format!("容器内 lpkg upgrade 失败（{pkg}）").into());
         }
 
         // 4.5 滚动 commit / GC（仅 upgrade 成功）：commit → <base>:roll<N+1>；
@@ -467,7 +404,7 @@ impl RealBinding {
                 .map(|s| s.success())
                 .unwrap_or(false);
             if !ok {
-                return Err(format!("docker commit {tag} 失败（滚动快照未保存）"));
+                return Err(format!("docker commit {tag} 失败（滚动快照未保存）").into());
             }
             write_roll_counter(&self.out_dir, next);
         } else {
@@ -499,7 +436,7 @@ impl RealBinding {
             .status()
             .map_err(|e| format!("docker exec 恢复旧 .so 失败: {e}"))?;
         if !status.success() {
-            return Err(format!("容器内恢复备份旧 .so 失败（{pkg}）"));
+            return Err(format!("容器内恢复备份旧 .so 失败（{pkg}）").into());
         }
 
         // 4.7 docker cp 配方进容器（/work/<pkg>）——必须放在 commit/GC 之后：
@@ -513,7 +450,7 @@ impl RealBinding {
         .map(|s| s.success())
         .unwrap_or(false);
         if !ok {
-            return Err(format!("docker cp {pkg} 配方进容器失败"));
+            return Err(format!("docker cp {pkg} 配方进容器失败").into());
         }
 
         // 5. 构建
@@ -523,7 +460,7 @@ impl RealBinding {
             .status()
             .map_err(|e| format!("docker exec 失败: {e}"))?;
         if !status.success() {
-            return Err(format!("容器内 lpkg build 失败（{pkg}）"));
+            return Err(format!("容器内 lpkg build 失败（{pkg}）").into());
         }
 
         // 5. 取精确产物名（独立干净的小命令；docker cp **不支持 glob**）。
@@ -540,7 +477,7 @@ impl RealBinding {
             .map_err(|e| format!("docker exec 取产物名失败: {e}"))?;
         let lpkg_name = String::from_utf8_lossy(&out.stdout).trim().to_string();
         if lpkg_name.is_empty() {
-            return Err(format!("容器内未产出 .lpkg（{pkg}）"));
+            return Err(format!("容器内未产出 .lpkg（{pkg}）").into());
         }
 
         // 6. docker cp 回宿主 staging（精确文件名）
@@ -549,7 +486,7 @@ impl RealBinding {
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {
-            return Err(format!("docker cp {pkg} .lpkg 回宿主失败"));
+            return Err(format!("docker cp {pkg} .lpkg 回宿主失败").into());
         }
         self.cleanup.lock().unwrap().current_cid = None;
         Ok(staging.join(&lpkg_name))
@@ -557,13 +494,13 @@ impl RealBinding {
 
     /// 滚动 GC：把当前容器**扁平化**为单层镜像并覆盖原始 base（commit 叠加 overlay 有性能损耗），
     /// 再删掉 roll1..ROLL_LIMIT 编号镜像。计数归零由调用方负责。
-    fn gc_roll(&self, cid: &str) -> Result<(), String> {
+    fn gc_roll(&self, cid: &str) -> Result<(), FarmError> {
         flatten_to_base(cid, &self.base_image)
     }
 }
 
 impl LpkgBinding for RealBinding {
-    fn set_repo_provides(&mut self, provides: std::collections::HashSet<String>) {
+    fn set_repo_provides(&mut self, provides: HashSet<String>) {
         self.repo_provides = provides;
     }
 
@@ -649,37 +586,5 @@ mod tests {
         assert_eq!(read_roll_counter(&tmp), ROLL_LIMIT);
 
         std::fs::remove_dir_all(&tmp).ok();
-    }
-
-    #[test]
-    fn stub_returns_preset_and_default_success() {
-        let mut outcomes = HashMap::new();
-        outcomes.insert(
-            "llvm".to_string(),
-            BuildOutcome::success(&["libxml2.so.3"], &["libLLVM.so", "libLLVM.so.18"], &[]),
-        );
-        outcomes.insert("bad".to_string(), BuildOutcome::failure("lankebuild_build"));
-        let mut b = StubBinding::new(outcomes);
-
-        assert!(b.build("llvm").ok);
-        assert_eq!(
-            b.build("llvm").provides,
-            vec!["libLLVM.so", "libLLVM.so.18"]
-        );
-        assert!(!b.build("bad").ok);
-        assert_eq!(
-            b.build("bad").failure_stage.as_deref(),
-            Some("lankebuild_build")
-        );
-        let d = b.build("anything");
-        assert!(d.ok);
-        assert!(d.needed_so.is_empty());
-    }
-
-    #[test]
-    fn build_outcome_failure_sets_stage() {
-        let f = BuildOutcome::failure("configure");
-        assert!(!f.ok);
-        assert_eq!(f.failure_stage.as_deref(), Some("configure"));
     }
 }

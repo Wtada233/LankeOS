@@ -18,6 +18,7 @@ pub mod same_version;
 pub mod script;
 pub mod sourceforge;
 
+use crate::error::FarmError;
 use regex::Regex;
 
 use crate::track::vercmp;
@@ -80,7 +81,7 @@ fn is_stable(v: &str) -> bool {
 }
 
 /// 从 JSON 数组 `[{"name": "v1.2"}]` 提取 tag 名列表。
-pub(crate) fn extract_tag_names(json: &str) -> Result<Vec<String>, String> {
+pub(crate) fn extract_tag_names(json: &str) -> Result<Vec<String>, FarmError> {
     let v: serde_json::Value =
         serde_json::from_str(json).map_err(|e| format!("tags API 响应解析失败: {e}"))?;
     let arr = v.as_array().ok_or("tags API 响应非数组")?;
@@ -92,7 +93,7 @@ pub(crate) fn extract_tag_names(json: &str) -> Result<Vec<String>, String> {
 }
 
 /// 从 GitLab releases 列表 JSON `[{"tag_name": "v1.2"}]` 提取 tag 名列表。
-pub(crate) fn extract_release_tag_names(json: &str) -> Result<Vec<String>, String> {
+pub(crate) fn extract_release_tag_names(json: &str) -> Result<Vec<String>, FarmError> {
     let v: serde_json::Value =
         serde_json::from_str(json).map_err(|e| format!("releases API 响应解析失败: {e}"))?;
     let arr = v.as_array().ok_or("releases API 响应非数组")?;
@@ -104,13 +105,13 @@ pub(crate) fn extract_release_tag_names(json: &str) -> Result<Vec<String>, Strin
 }
 
 /// 从 JSON `{"tag_name": "v1.2"}` 提取最新 release tag。
-pub(crate) fn extract_latest_release_tag(json: &str) -> Result<String, String> {
+pub(crate) fn extract_latest_release_tag(json: &str) -> Result<String, FarmError> {
     let v: serde_json::Value =
         serde_json::from_str(json).map_err(|e| format!("release API 响应解析失败: {e}"))?;
     v.get("tag_name")
         .and_then(|t| t.as_str())
         .map(String::from)
-        .ok_or_else(|| "release API 响应无 tag_name".to_string())
+        .ok_or_else(|| "release API 响应无 tag_name".to_string().into())
 }
 
 /// 取 tag 列表中版本最大的（按 tag_prefix 剥离后 vercmp，稳定版优先）。

@@ -3,6 +3,7 @@
 //! **被动触发**：source 条目里 `tracker-template: html-index` + `url`（目录）+ `pattern`（版本正则）+ `template`。
 //! probe 抓目录列表，正则取最大稳定版本。
 
+use crate::error::FarmError;
 use regex::Regex;
 
 use crate::net::Fetcher;
@@ -16,7 +17,7 @@ pub fn probe(
     cfg: &SourceConfig,
     major: Option<&str>,
     pkg_name: &str,
-) -> Result<EntryProbe, String> {
+) -> Result<EntryProbe, FarmError> {
     let url = need(&cfg.url, "url")?;
     let pattern = need(&cfg.pattern, "pattern")?;
     let template = need(&cfg.template, "template")?;

@@ -5,6 +5,7 @@
 //!   `IGNORE_CHK_PKGERR` 豁免确需保留静态库的包。
 
 use super::{walk_all, ChkOpts, Finding, Report, Severity};
+use crate::error::FarmError;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -14,7 +15,7 @@ fn rel_of(path: &Path, root: &Path) -> String {
         .unwrap_or_else(|_| path.display().to_string())
 }
 
-fn analyze(extract: &Path) -> Result<serde_json::Value, String> {
+fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     let content = extract.join("content");
     let mut paths: Vec<(String, String)> = Vec::new();
     for f in super::collect_files(&content) {
@@ -31,7 +32,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, String> {
 }
 
 /// 跑 pkg-errchk。
-pub fn run(opts: &ChkOpts) -> Result<Report, String> {
+pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let (analyses, hits, misses, failed) = walk_all(opts, |ext, _pkg| analyze(ext))?;
     let audit_all = opts.subset.is_empty();
     let audit: HashSet<&str> = opts.subset.iter().map(String::as_str).collect();

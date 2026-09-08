@@ -1,6 +1,6 @@
-//! custom_checks — LankeOS 策略/打包检测（qmlchk / pkgconfchk / pkg-errchk / hookchk）。
+//! custom_checks — LankeOS 维护检則工具集（qml / pkgconf / pkg-err / hook / abi）。
 //!
-//! 这些不是 farm 核心 ABI 功能，而是仓库维护策略的落地检测，参考 `manual-abi-fullchk`（abichk）的
+//! 这些不是 farm 核心 ABI 功能，而是仓库维护策略的落地检测，参考 ABI 审计（`custom_checks/abi`）的
 //! 架构：遍历 `source/<arch>` 下的 .lpkg、每包**一次解包**、按 **.lpkg 文件 sha256** 缓存逐包分析
 //! （命中即跳过解包重扫）、报告分包。
 //!
@@ -8,11 +8,13 @@
 //! `needed_so` 推导的链接依赖（`graph::link_deps`，即 abichk 已算覆盖的运行时链接）；不在仓库内任何
 //! 包提供的模块（外部模块）→ 忽略。`farm_flags` 的 `IGNORE_CHK_<KIND>` 可整包豁免某检則。
 
+pub mod abi;
 pub mod hook;
 pub mod pkg_err;
 pub mod pkgconf;
 pub mod qml;
 
+use crate::error::FarmError;
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -122,7 +124,7 @@ pub fn default_cache_dir(source: &Path, label: &str) -> PathBuf {
     }
 }
 
-pub fn sha256_file(path: &Path) -> Result<String, String> {
+pub fn sha256_file(path: &Path) -> Result<String, FarmError> {
     let data = std::fs::read(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
     let mut h = Sha256::new();
     h.update(&data);
@@ -183,14 +185,14 @@ fn write_analysis(
     pkg: &str,
     lpkg_sha: &str,
     analysis: &serde_json::Value,
-) -> Result<(), String> {
+) -> Result<(), FarmError> {
     std::fs::create_dir_all(cache).map_err(|e| format!("创建缓存目录 {:?} 失败: {e}", cache))?;
     let c = serde_json::json!({ "schema": SCHEMA, "lpkg_sha": lpkg_sha, "analysis": analysis });
     std::fs::write(
         cache_path(cache, pkg),
         serde_json::to_string_pretty(&c).map_err(|e| format!("序列化缓存失败: {e}"))?,
     )
-    .map_err(|e| format!("写缓存 {pkg} 失败: {e}"))
+    .map_err(|e| format!("写缓存 {pkg} 失败: {e}").into())
 }
 
 /// 一次遍历 source 下**全部**包：每包一个当前 .lpkg，解包一次交给 `analyze`（仅 .lpkg sha 变才解包，
@@ -198,8 +200,11 @@ fn write_analysis(
 /// 判定类检則只关心（子集）包的 analysis。
 pub fn walk_all(
     opts: &ChkOpts,
-    analyze: impl Fn(&Path /*extract_dir*/, &str /*pkg*/) -> Result<serde_json::Value, String>,
-) -> Result<(BTreeMap<String, serde_json::Value>, u64, u64, Vec<String>), String> {
+    analyze: impl Fn(
+        &Path, /*extract_dir*/
+        &str,  /*pkg*/
+    ) -> Result<serde_json::Value, FarmError>,
+) -> Result<(BTreeMap<String, serde_json::Value>, u64, u64, Vec<String>), FarmError> {
     std::fs::create_dir_all(&opts.cache).map_err(|e| format!("创建缓存目录失败: {e}"))?;
     let repo_root = opts.source.join(&opts.arch);
     let mut pkgdirs: Vec<PathBuf> = std::fs::read_dir(&repo_root)

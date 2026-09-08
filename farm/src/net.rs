@@ -4,6 +4,7 @@
 //! 真实运行用 `RealFetcher`（ureq，进程内 HTTP，符合绑定优先）。
 //! `RealFetcher` 按 URL 自动附加平台 token（GitHub/GitLab），消除 API 限流 403 噪音。
 
+use crate::error::FarmError;
 use std::collections::HashMap;
 
 /// curl UA——镜像站/托管站对 curl 放行，对自定义或浏览器 UA 反而限流/挑战。
@@ -11,7 +12,7 @@ use std::collections::HashMap;
 pub const CURL_UA: &str = "curl/8.21.0";
 
 pub trait Fetcher {
-    fn get(&self, url: &str) -> Result<String, String>;
+    fn get(&self, url: &str) -> Result<String, FarmError>;
 
     /// 平台 token 环境变量（供 script 模板内嵌 curl 继承），无则空。
     fn token_env(&self) -> Vec<(String, String)> {
@@ -65,13 +66,14 @@ impl Default for RealFetcher {
 }
 
 impl Fetcher for RealFetcher {
-    fn get(&self, url: &str) -> Result<String, String> {
+    fn get(&self, url: &str) -> Result<String, FarmError> {
         let mut req = ureq::get(url).set("User-Agent", CURL_UA);
         if let Some(tok) = bearer_token_for(url, &self.github_token, &self.gitlab_token) {
             req = req.set("Authorization", &format!("Bearer {tok}"));
         }
         let resp = req.call().map_err(|e| format!("GET {url}: {e}"))?;
-        resp.into_string().map_err(|e| format!("GET {url}: {e}"))
+        resp.into_string()
+            .map_err(|e| format!("GET {url}: {e}").into())
     }
 
     fn token_env(&self) -> Vec<(String, String)> {
@@ -87,16 +89,17 @@ impl Fetcher for RealFetcher {
 }
 
 /// 抓取文本（如 index.txt）。失败返回错误信息。
-pub fn fetch_text(url: &str) -> Result<String, String> {
+pub fn fetch_text(url: &str) -> Result<String, FarmError> {
     let body = ureq::get(url)
         .set("User-Agent", CURL_UA)
         .call()
         .map_err(|e| format!("GET {url}: {e}"))?;
-    body.into_string().map_err(|e| format!("读 {url}: {e}"))
+    body.into_string()
+        .map_err(|e| format!("读 {url}: {e}").into())
 }
 
 /// 下载到文件（§8.6 源预下载），带可配置重试。瞬时网络错误可自愈；耗尽后返回错误。
-pub fn download_to_file(url: &str, dest: &std::path::Path, retries: u32) -> Result<(), String> {
+pub fn download_to_file(url: &str, dest: &std::path::Path, retries: u32) -> Result<(), FarmError> {
     let attempts = retries.max(1);
     for i in 1..=attempts {
         match download_once(url, dest) {
@@ -111,7 +114,7 @@ pub fn download_to_file(url: &str, dest: &std::path::Path, retries: u32) -> Resu
     unreachable!("重试循环已穷尽")
 }
 
-fn download_once(url: &str, dest: &std::path::Path) -> Result<(), String> {
+fn download_once(url: &str, dest: &std::path::Path) -> Result<(), FarmError> {
     let resp = ureq::get(url)
         .set("User-Agent", CURL_UA)
         .call()
@@ -125,18 +128,18 @@ fn download_once(url: &str, dest: &std::path::Path) -> Result<(), String> {
 /// 状态非 2xx/3xx → Err（如 404/403/5xx；redirect 由 ureq 自动跟随，最终状态为准）。
 /// track 写入前用它校验新源 URL，失败时打印警告并跳过 --run（除非 --probe-fail-continue）。
 /// `git+`/`file://` 源由 lpkg（libgit2）处理，非 HTTP 下载，跳过探测（不误报）。
-pub fn probe_source(url: &str) -> Result<(), String> {
+pub fn probe_source(url: &str) -> Result<(), FarmError> {
     if url.starts_with("git+") || url.starts_with("file://") {
         return Ok(());
     }
     let resp = match ureq::get(url).set("User-Agent", CURL_UA).call() {
         Ok(r) => r,
-        Err(ureq::Error::Status(code, _)) => return Err(format!("{url} HTTP {code}")),
-        Err(e) => return Err(format!("{url} 请求失败: {e}")),
+        Err(ureq::Error::Status(code, _)) => return Err(format!("{url} HTTP {code}").into()),
+        Err(e) => return Err(format!("{url} 请求失败: {e}").into()),
     };
     let status = resp.status();
     if !(200..400).contains(&status) {
-        return Err(format!("{url} HTTP {status}"));
+        return Err(format!("{url} HTTP {status}").into());
     }
     // 读第一个字节确认 body 可流式读取（不只是 header 响应）
     let mut reader = resp.into_reader();
@@ -164,11 +167,11 @@ impl MockFetcher {
 }
 
 impl Fetcher for MockFetcher {
-    fn get(&self, url: &str) -> Result<String, String> {
+    fn get(&self, url: &str) -> Result<String, FarmError> {
         self.responses
             .get(url)
             .cloned()
-            .ok_or_else(|| format!("MockFetcher: 无预设响应 {url}"))
+            .ok_or_else(|| format!("MockFetcher: 无预设响应 {url}").into())
     }
 }
 

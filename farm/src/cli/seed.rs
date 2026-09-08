@@ -1,25 +1,15 @@
-use super::Args;
-use std::path::PathBuf;
+use super::SeedArgs;
 use std::process::ExitCode;
 
-pub(crate) fn cmd_seed(args: &Args) -> ExitCode {
+pub(crate) fn cmd_seed(args: &SeedArgs) -> ExitCode {
     if let Some(code) = super::ensure_root() {
         return code;
     }
-    let remote = match &args.remote {
-        Some(r) => r.clone(),
-        None => {
-            eprintln!("{}", lankefarm::tr!("seed.usage"));
-            return ExitCode::from(2);
-        }
-    };
-    let arch = args.arch.clone().unwrap_or_else(|| "x86_64".to_string());
-    let out = args.out.clone().unwrap_or_else(|| PathBuf::from("out"));
     let jobs = args
         .jobs
         .or_else(|| std::thread::available_parallelism().ok().map(|n| n.get()))
         .unwrap_or(4);
-    match lankefarm::seed::seed(&remote, &arch, &out, jobs) {
+    match lankefarm::seed::seed(&args.remote, &args.arch, &args.out, jobs) {
         Ok(report) => {
             println!();
             println!(

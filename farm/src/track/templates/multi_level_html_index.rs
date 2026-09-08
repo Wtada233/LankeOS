@@ -9,6 +9,7 @@
 //! - `template` 可用 `{v1}..{vN}`（各级版本）`{version}`（= 最后一级）`{name}`（上游名）；
 //! - `max-version` / `major-of` 逐级作用于版本选择（选目录/最终版本都受约束）。
 
+use crate::error::FarmError;
 use regex::Regex;
 
 use crate::net::Fetcher;
@@ -21,7 +22,7 @@ pub fn probe(
     cfg: &SourceConfig,
     major: Option<&str>,
     pkg_name: &str,
-) -> Result<EntryProbe, String> {
+) -> Result<EntryProbe, FarmError> {
     if cfg.levels.is_empty() {
         return Err("multi-level-html-index 需 levels 列表（每级 {url, pattern}）".into());
     }
@@ -58,7 +59,7 @@ fn probe_level(
     major: Option<&str>,
     max_version: Option<&str>,
     idx: usize,
-) -> Result<String, String> {
+) -> Result<String, FarmError> {
     let lvl_url = need(&lvl.url, &format!("levels[{idx}].url"))?;
     let lvl_pattern = need(&lvl.pattern, &format!("levels[{idx}].pattern"))?;
     // 前级版本代入 {v1}..{vN}
@@ -75,7 +76,7 @@ fn probe_level(
     let html = fetcher.get(&page)?;
     let re = Regex::new(lvl_pattern).map_err(|e| format!("正则无效 {lvl_pattern}: {e}"))?;
     templates::max_match(&re, &html, major, max_version)
-        .ok_or_else(|| format!("{page} 中未匹配到版本"))
+        .ok_or_else(|| format!("{page} 中未匹配到版本").into())
 }
 
 #[cfg(test)]

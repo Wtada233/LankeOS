@@ -4,6 +4,7 @@
 //! 静态服务器**无状态**直接 serve 目录——新发布包写入后无需服务器感知（lpkg 会自动
 //! 附加架构路径 `<repo>/<arch>/...`）。用 std TcpListener，不引入 axum/warp 依赖。
 
+use crate::error::FarmError;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -14,23 +15,23 @@ use std::thread;
 
 /// 启动静态文件服务器（阻塞直到被关停）。
 /// `bind`：独立 `farm serve` 用 `0.0.0.0`（局域网可访问）；build 内嵌用 `127.0.0.1`（容器经 host 网络访问）。
-pub fn serve(bind: &str, root: &Path, port: u16) -> Result<(), String> {
-    serve_inner::<fn(u16) -> Result<(), String>>(bind, root, port, None)
+pub fn serve(bind: &str, root: &Path, port: u16) -> Result<(), FarmError> {
+    serve_inner::<fn(u16) -> Result<(), FarmError>>(bind, root, port, None)
 }
 
 /// 同 `serve`，但 **bind 成功后、进入服务循环前** 回调 `on_bound`（传实际绑定端口）。
 /// 供 `farm build` 内嵌服务器确定性等待"就绪"或暴露"绑定失败"——否则默认端口 80
 /// 在非 root 下静默失败，容器内 `lpkg upgrade` 拉不到依赖且无任何提示。
-pub fn serve_ready<F>(bind: &str, root: &Path, port: u16, on_bound: F) -> Result<(), String>
+pub fn serve_ready<F>(bind: &str, root: &Path, port: u16, on_bound: F) -> Result<(), FarmError>
 where
-    F: FnOnce(u16) -> Result<(), String>,
+    F: FnOnce(u16) -> Result<(), FarmError>,
 {
     serve_inner(bind, root, port, Some(on_bound))
 }
 
-fn serve_inner<F>(bind: &str, root: &Path, port: u16, on_bound: Option<F>) -> Result<(), String>
+fn serve_inner<F>(bind: &str, root: &Path, port: u16, on_bound: Option<F>) -> Result<(), FarmError>
 where
-    F: FnOnce(u16) -> Result<(), String>,
+    F: FnOnce(u16) -> Result<(), FarmError>,
 {
     let root_abs = root
         .canonicalize()

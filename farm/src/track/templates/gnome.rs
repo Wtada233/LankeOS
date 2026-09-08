@@ -3,6 +3,7 @@
 //! **被动触发**：source 条目里 `tracker-template: gnome` + `template`。
 //! 稳定分支惯例：偶 minor 为稳定版（2.88 稳定，2.89 开发），优先取最大偶 minor 目录。
 
+use crate::error::FarmError;
 use regex::Regex;
 
 use crate::net::Fetcher;
@@ -16,7 +17,7 @@ pub fn probe(
     cfg: &SourceConfig,
     major: Option<&str>,
     pkg_name: &str,
-) -> Result<EntryProbe, String> {
+) -> Result<EntryProbe, FarmError> {
     let name = cfg.effective_name(pkg_name); // source-name 覆盖上游目录名（gtk3 → gtk）
     let template = need(&cfg.template, "template")?;
 

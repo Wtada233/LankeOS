@@ -255,11 +255,11 @@ build --all ──> run_build
 - **src 内单元测试**（`#[cfg(test)]`）：内部函数（topo/reorder/scan/i18n/ux/repack/seed/repo）
 - **tests/integration.rs**：公共 API 集成（ABI 传播、track 排序、real index）
 
-**137 个测试全绿**（121 lib + 9 bin + 7 integration）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**。
+**206 个测试全绿**（183 lib + 11 bin + 5 integration + 7 doctest——`cargo test` 实测）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**。
 
-## 16. manual-abi-fullchk（全 ABI 符号/版本审计）
+## 16. ABI 符号/版本审计（`custom_checks/abi`，`farm chk abi`）
 
-`manual-abi-fullchk`（`src/abi_fullchk.rs`）镜像 `/tmp/scan_elf_ver.py` 的两段式审计，但原生/缓存/单趟：
+`src/custom_checks/abi.rs`（原顶层 `abi_fullchk.rs` / `manual-abi-fullchk`）镜像 `/tmp/scan_elf_ver.py` 的两段式审计，但原生/缓存/单趟：
 - **provider/cache 来源 = `--source`（默认 out）下全部包**：每个 .lpkg 解包一次到临时目录，逐 ELF 用
   goblin 读 `.gnu.version_d/.gnu.version_r/.gnu.version`（verdef/verneed/versym）——每个 SONAME 导出
   的符号@版本按**内容 sha256** 缓存到 `~/.cache/lankefarm-abi/<soname>.json`（`{sha256, versions:{ver:[sym…]}}`）。
@@ -269,10 +269,10 @@ build --all ──> run_build
 - 确定性：包/文件排序遍历；provider 冲突（同 SONAME 多份）最后一次胜。consumer 判缺失在 provider
   目录建全后统一做。
 
-## 17. custom-checks：LankeOS 策略检测（qmlchk/pkgconfchk/pkg-errchk/hookchk/fullchk）
+## 17. `farm chk`：LankeOS 维护检則工具集（qml/pkgconf/pkg-err/hook/abi/full）
 
 `src/custom_checks/` 一族的策略/打包检测（非 farm 核心 ABI），参考 abichk（§16）的架构与缓存思路，
-由 `farm fullchk` 一并跑（或单跑）。逐包一次解包；**整包缓存 key = .lpkg 文件 sha256**（不是名字/版本），
+由 `farm chk full` 一并跑（或 `farm chk <kind>` 单跑；ABI 审计 §16 同属此工具集）。逐包一次解包；**整包缓存 key = .lpkg 文件 sha256**（不是名字/版本），
 命中即复用分析。判定：
 - qmlchk/pkgconfchk：`import`/`Requires` 模块的**归属包** ∈ 本包 `deps`（配方）∪ `needed_so` 推导链接
   依赖（`graph::link_deps`）即满足；仓库内无 provider 的外部模块忽略。

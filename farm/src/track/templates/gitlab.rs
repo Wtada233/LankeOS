@@ -2,6 +2,7 @@
 //!
 //! **被动触发**：source 条目里 `tracker-template: gitlab` + `host` + `project` + `mode`(tags|releases) + `tag-prefix` + `template`。
 
+use crate::error::FarmError;
 use crate::net::Fetcher;
 use crate::track::templates::{self, max_tag_version, urlencode};
 use crate::track::{need, EntryProbe, SourceConfig};
@@ -12,7 +13,7 @@ pub fn probe(
     cfg: &SourceConfig,
     major: Option<&str>,
     _pkg_name: &str,
-) -> Result<EntryProbe, String> {
+) -> Result<EntryProbe, FarmError> {
     let host = need(&cfg.host, "host")?;
     let project = need(&cfg.project, "project")?;
     let tag_prefix = cfg.tag_prefix.as_deref().unwrap_or("");

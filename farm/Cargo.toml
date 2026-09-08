@@ -7,7 +7,7 @@ description = "LankeOS build farm — ABI-driven incremental package builder (de
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
-serde_yaml = "0.9"
+serde_yaml_ng = "0.10"
 thiserror = "2"
 regex = "1"
 ureq = { version = "2", features = ["tls"] }

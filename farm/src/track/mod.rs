@@ -31,6 +31,7 @@
 pub mod templates;
 pub mod vercmp;
 
+use crate::error::FarmError;
 use serde::{Deserialize, Serialize};
 
 use crate::net::Fetcher;
@@ -173,8 +174,8 @@ fn is_false(b: &bool) -> bool {
 
 impl TrackerConfig {
     /// 序列化为 tracker yaml（提案文件内容）。
-    pub fn to_yaml(&self) -> Result<String, String> {
-        serde_yaml::to_string(self).map_err(|e| format!("序列化 tracker yaml 失败: {e}"))
+    pub fn to_yaml(&self) -> Result<String, FarmError> {
+        serde_yaml_ng::to_string(self).map_err(|e| format!("序列化 tracker yaml 失败: {e}").into())
     }
 
     /// 探测类型名（显示用）：script / template。
@@ -192,7 +193,7 @@ impl TrackerConfig {
         &self,
         fetcher: &dyn Fetcher,
         lookup: &dyn Fn(&str) -> Option<String>,
-    ) -> Result<ProbeResult, String> {
+    ) -> Result<ProbeResult, FarmError> {
         if !is_template(&self.type_) {
             let content = need(&self.script_content, "script-content")?;
             return templates::script::probe(fetcher, content, &self.pkg_name);
@@ -214,10 +215,9 @@ impl TrackerConfig {
                 } else if !self.work_sources.is_empty() {
                     (true, 0)
                 } else {
-                    return Err(format!(
-                        "tracker {} 无 sources/work_sources 条目",
-                        self.pkg_name
-                    ));
+                    return Err(
+                        format!("tracker {} 无 sources/work_sources 条目", self.pkg_name).into(),
+                    );
                 }
             }
         };
@@ -238,7 +238,7 @@ impl TrackerConfig {
     }
 
     /// 无约束探测（lookup 返回 None；same-version / major-of 会报错）。
-    pub fn probe(&self, fetcher: &dyn Fetcher) -> Result<ProbeResult, String> {
+    pub fn probe(&self, fetcher: &dyn Fetcher) -> Result<ProbeResult, FarmError> {
         self.probe_with(fetcher, &|_| None)
     }
 
@@ -248,7 +248,7 @@ impl TrackerConfig {
         fetcher: &dyn Fetcher,
         lookup: &dyn Fn(&str) -> Option<String>,
         current_version: &str,
-    ) -> Result<Proposal, String> {
+    ) -> Result<Proposal, FarmError> {
         let result = self.probe_with(fetcher, lookup)?;
         Ok(Proposal {
             pkg_name: self.pkg_name.clone(),
@@ -265,7 +265,7 @@ impl TrackerConfig {
         &self,
         fetcher: &dyn Fetcher,
         current_version: &str,
-    ) -> Result<Proposal, String> {
+    ) -> Result<Proposal, FarmError> {
         self.propose_with(fetcher, &|_| None, current_version)
     }
 }
@@ -277,7 +277,7 @@ fn probe_entry_list(
     lookup: &dyn Fn(&str) -> Option<String>,
     field: &str,
     pkg_name: &str,
-) -> Result<Vec<EntryProbe>, String> {
+) -> Result<Vec<EntryProbe>, FarmError> {
     let mut out = Vec::with_capacity(list.len());
     for (i, cfg) in list.iter().enumerate() {
         out.push(
@@ -300,7 +300,7 @@ impl SourceConfig {
         fetcher: &dyn Fetcher,
         lookup: &dyn Fn(&str) -> Option<String>,
         pkg_name: &str,
-    ) -> Result<EntryProbe, String> {
+    ) -> Result<EntryProbe, FarmError> {
         // 显式字段校验：声明的 tracker-template 只支持特定字段，设置不支持的 → 报错
         validate_supported_fields(self)?;
         // 主版本约束：major-version-lock（常量）优先，否则 major-of（取指定包主版本）
@@ -332,7 +332,7 @@ impl SourceConfig {
                 templates::multi_level_html_index::probe(fetcher, self, major.as_deref(), pkg_name)
             }
             "pypi" => templates::pypi::probe(fetcher, self, major.as_deref(), pkg_name),
-            other => Err(format!("未知 tracker_template: {other}")),
+            other => Err(format!("未知 tracker_template: {other}").into()),
         }?;
         validate_url(&probe.url)?;
         Ok(probe)
@@ -343,7 +343,7 @@ impl SourceConfig {
 /// 把"字段声明集中在 SourceConfig、但模板是否读它全隐式"的静默忽略变成显式错误
 /// （如 github 上写 max-version → 报错提示改用支持它的模板或 script 类型）。
 /// `major-of` / `major-version-lock` 是探测模板的核心约束（same-version 模板直接锁版本，无过滤）。
-fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), String> {
+fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), FarmError> {
     const CORE: &[&str] = &["major-of", "major-version-lock"];
     let (template, mut supported): (&str, Vec<&str>) = match cfg.tracker_template.as_str() {
         // same-version：直接锁版本，只认 same-version-of + template，占位符仅 {version}/{major_minor}
@@ -392,7 +392,7 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), String> {
             ],
         ),
         "pypi" => ("pypi", vec!["project"]), // URL 来自 PyPI API，不用 template
-        other => return Err(format!("未知 tracker_template: {other}")),
+        other => return Err(format!("未知 tracker_template: {other}").into()),
     };
     // 探测模板才有版本过滤约束；same-version 直接锁定版本，不参与 major 过滤
     if template != "same-version" {
@@ -425,20 +425,21 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), String> {
         return Err(format!(
             "tracker-template {template} 不支持字段: {}（需要版本封顶/稳定分支等约束时改用支持它的模板，或用 script 类型）",
             unsupported.join(", ")
-        ));
+        )
+        .into());
     }
     Ok(())
 }
 
 /// 解析 `version-source` 选择器：`sources[i]` / `work_sources[i]` → (is_work, index)。
-pub fn parse_version_source(sel: &str) -> Result<(bool, usize), String> {
+pub fn parse_version_source(sel: &str) -> Result<(bool, usize), FarmError> {
     let err = || format!("version-source 无效 '{sel}'（应为 sources[i] 或 work_sources[i]）");
     let (is_work, rest) = if let Some(r) = sel.strip_prefix("sources[") {
         (false, r)
     } else if let Some(r) = sel.strip_prefix("work_sources[") {
         (true, r)
     } else {
-        return Err(err());
+        return Err(err().into());
     };
     let idx = rest
         .strip_suffix(']')
@@ -448,16 +449,16 @@ pub fn parse_version_source(sel: &str) -> Result<(bool, usize), String> {
 }
 
 /// 需要的必填字段缺失时给出清晰错误。
-pub(crate) fn need<'a>(opt: &'a Option<String>, field: &str) -> Result<&'a str, String> {
+pub(crate) fn need<'a>(opt: &'a Option<String>, field: &str) -> Result<&'a str, FarmError> {
     opt.as_deref()
-        .ok_or_else(|| format!("tracker 配置缺 {field}"))
+        .ok_or_else(|| format!("tracker 配置缺 {field}").into())
 }
 
 /// 校验探测产出的 URL：残留 `{...}` 说明模板引用了未提供的占位符，生成的 URL 必然损坏。
 /// 报错而非静默写入坏 URL（杜绝"莫名其妙改 URL"）。
-pub(crate) fn validate_url(url: &str) -> Result<(), String> {
+pub(crate) fn validate_url(url: &str) -> Result<(), FarmError> {
     if url.contains('{') {
-        return Err(format!("探测生成的 URL 残留未替换占位符: {url}"));
+        return Err(format!("探测生成的 URL 残留未替换占位符: {url}").into());
     }
     Ok(())
 }
@@ -578,7 +579,7 @@ work_sources:
     pattern: 'tzdata(\d{4}[a-z])\.tar\.gz'
     template: https://www.iana.org/time-zones/repository/releases/tzdata{version}.tar.gz
 "#;
-        let cfg: TrackerConfig = serde_yaml::from_str(yaml).unwrap();
+        let cfg: TrackerConfig = serde_yaml_ng::from_str(yaml).unwrap();
         assert_eq!(cfg.pkg_name, "glibc");
         assert_eq!(cfg.version_source.as_deref(), Some("sources[0]"));
         assert_eq!(cfg.after.as_deref(), Some("tzdata"));
@@ -606,7 +607,7 @@ script-content: |
   echo "1.7.15"
   echo "https://github.com/mozilla/rhino/releases/download/rhino1.7.15/rhino-1.7.15.zip"
 "#;
-        let cfg: TrackerConfig = serde_yaml::from_str(yaml).unwrap();
+        let cfg: TrackerConfig = serde_yaml_ng::from_str(yaml).unwrap();
         assert_eq!(cfg.kind(), "script");
         assert_eq!(cfg.after.as_deref(), Some("base"));
         let content = cfg.script_content.unwrap();
@@ -765,7 +766,10 @@ script-content: |
             ..Default::default()
         };
         let err = cfg.probe(&f).unwrap_err();
-        assert!(err.contains("sources[0] 探测失败"), "err: {err}");
+        assert!(
+            err.to_string().contains("sources[0] 探测失败"),
+            "err: {err}"
+        );
     }
 
     #[test]
@@ -788,7 +792,7 @@ script-content: |
             ..Default::default()
         };
         let err = cfg.probe(&f).unwrap_err();
-        assert!(err.contains("越界"), "err: {err}");
+        assert!(err.to_string().contains("越界"), "err: {err}");
     }
 
     #[test]
@@ -864,14 +868,14 @@ script-content: |
         let err = cfg
             .probe_with(&crate::net::RealFetcher::default(), &|_| None)
             .unwrap_err();
-        assert!(err.contains("same-version-of"), "err: {err}");
+        assert!(err.to_string().contains("same-version-of"), "err: {err}");
     }
 
     #[test]
     fn legacy_same_version_key_is_unknown_field() {
         // 旧写法 `same-version:`（无 -of）已是未知字段 → deny_unknown_fields 解析即拒
         let yaml = "tracker-template: github\nrepo: a/b\nsame-version: other\n";
-        let err = serde_yaml::from_str::<SourceConfig>(yaml).unwrap_err();
+        let err = serde_yaml_ng::from_str::<SourceConfig>(yaml).unwrap_err();
         assert!(err.to_string().contains("same-version"), "err: {err}");
     }
 
@@ -892,7 +896,10 @@ script-content: |
             ..Default::default()
         };
         let err = cfg.probe(&MockFetcher::new(HashMap::new())).unwrap_err();
-        assert!(err.contains("不支持字段: same-version-of"), "err: {err}");
+        assert!(
+            err.to_string().contains("不支持字段: same-version-of"),
+            "err: {err}"
+        );
     }
 
     #[test]
@@ -971,7 +978,7 @@ script-content: |
             r#"[{"name":"v1.2"}]"#,
         );
         let err = cfg.probe(&f).unwrap_err();
-        assert!(err.contains("残留未替换占位符"), "err: {err}");
+        assert!(err.to_string().contains("残留未替换占位符"), "err: {err}");
     }
 
     #[test]
@@ -991,8 +998,8 @@ script-content: |
             ..Default::default()
         };
         let err = cfg.probe(&MockFetcher::new(HashMap::new())).unwrap_err();
-        assert!(err.contains("不支持字段: host"), "err: {err}");
-        assert!(err.contains("github"), "err: {err}");
+        assert!(err.to_string().contains("不支持字段: host"), "err: {err}");
+        assert!(err.to_string().contains("github"), "err: {err}");
     }
 
     #[test]
@@ -1072,14 +1079,17 @@ script-content: |
             ..Default::default()
         };
         let err = cfg.probe(&f).unwrap_err();
-        assert!(err.contains("不支持字段: template"), "err: {err}");
+        assert!(
+            err.to_string().contains("不支持字段: template"),
+            "err: {err}"
+        );
     }
 
     #[test]
     fn entry_unknown_field_in_yaml_is_rejected() {
         // deny_unknown_fields：typo 字段名（tag-prefx）解析即报错，而非静默忽略
         let yaml = "tracker-template: github\nrepo: a/b\ntag-prefx: v\n";
-        let err = serde_yaml::from_str::<SourceConfig>(yaml).unwrap_err();
+        let err = serde_yaml_ng::from_str::<SourceConfig>(yaml).unwrap_err();
         assert!(err.to_string().contains("tag-prefx"), "err: {err}");
     }
 

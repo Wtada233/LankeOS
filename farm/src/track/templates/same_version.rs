@@ -8,6 +8,7 @@
 //! 字段收得最简：只认 `same-version-of` + `template`，占位符仅 `{version}` 与 `{major_minor}`
 //! （tag 前缀 / 仓库路径 / 上游名都烘进 template，不支持 tag-prefix/repo/source-name/{tag}/{name}）。
 
+use crate::error::FarmError;
 use crate::track::templates;
 use crate::track::{need, validate_url, EntryProbe, SourceConfig};
 
@@ -17,7 +18,7 @@ pub fn probe(
     cfg: &SourceConfig,
     lookup: &dyn Fn(&str) -> Option<String>,
     _pkg_name: &str,
-) -> Result<EntryProbe, String> {
+) -> Result<EntryProbe, FarmError> {
     let target = need(&cfg.same_version_of, "same-version-of")?;
     let v = lookup(target).ok_or_else(|| {
         format!("same-version-of 依赖 {target} 无版本（读 LankeBUILD.json/已解析版本失败）")

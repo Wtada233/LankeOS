@@ -3,6 +3,7 @@
 //! 配置：CLI 参数优先，环境变量兜底（`LANKEFARM_LLM_BASE_URL` / `LANKEFARM_LLM_API_KEY` / `LANKEFARM_LLM_MODEL`）。
 //! 输出为**纯文本**（yaml 文档），不强制 `response_format: json_object`——JSON 对 LLM 不可靠。
 
+use crate::error::FarmError;
 use serde_json::{json, Value};
 
 pub struct LlmClient {
@@ -25,7 +26,7 @@ impl LlmClient {
     }
 
     /// 调 chat/completions，返回 `choices[0].message.content` 原文。
-    pub fn chat(&self, system: &str, user: &str) -> Result<String, String> {
+    pub fn chat(&self, system: &str, user: &str) -> Result<String, FarmError> {
         let url = format!("{}/chat/completions", self.base_url);
         let body = json!({
             "model": self.model,
@@ -55,6 +56,7 @@ impl LlmClient {
                     "LLM 响应无 choices[0].message.content: {}",
                     &text[..text.len().min(200)]
                 )
+                .into()
             })
     }
 }

@@ -1,20 +1,21 @@
+use lankefarm::error::FarmError;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::Args as ClapArgs;
 use lankefarm::custom_checks::{self, ChkOpts, Report};
 
-/// fullchk/qmlchk/pkgconfchk/pkg-errchk/hookchk 共用选项（与 manual-abi-fullchk 同构）。
+/// `farm chk` 各检則（qml/pkgconf/pkg-err/hook/abi/full）共用选项。
 #[derive(Debug, Clone, ClapArgs)]
 #[command(next_help_heading = "check 选项")]
 pub struct ChkArgs {
-    /// 构建仓库根（含 `<arch>/`，所有包建 provider/缓存）[default: out]
+    /// 构建仓库根（含 `<arch>/`，所有包建 provider/缓存）
     #[arg(long, default_value = "out")]
     pub source: PathBuf,
     /// 架构（读取 source/<arch>/）
     #[arg(long, default_value = "x86_64")]
     pub arch: String,
-    /// 配方根（读 LankeBUILD.json 的 deps/farm_flags）[default: pkgs]
+    /// 配方根（读 LankeBUILD.json 的 deps/farm_flags）
     #[arg(long, default_value = "pkgs")]
     pub pkgs_dir: PathBuf,
     /// 缓存根（每个检則一个子目录；默认 ~/.cache/lankefarm-<chk>）
@@ -96,7 +97,7 @@ fn print_report(label: &str, r: &Report) {
     }
 }
 
-fn finish(r: Result<Report, String>) -> ExitCode {
+fn finish(r: Result<Report, FarmError>) -> ExitCode {
     match r {
         Ok(_) => ExitCode::SUCCESS,
         Err(e) => {
@@ -106,55 +107,66 @@ fn finish(r: Result<Report, String>) -> ExitCode {
     }
 }
 
-pub(crate) fn cmd_qmlchk(a: &ChkArgs) -> ExitCode {
+/// 检則定义表：**每一项都是同一个契约**（`fn(&ChkOpts) -> Result<Report, FarmError>`）——
+/// qml / pkgconf / pkg-err / hook / abi 同级，`farm chk abi` 与 `farm chk full` 都只是查这张表。
+struct ChkDef {
+    /// 报告 label（= 子命令名）
+    label: &'static str,
+    /// 默认缓存目录键（`~/.cache/lankefarm-<cache>`；full 时作 base/<cache> 子目录）
+    cache: &'static str,
+    run: fn(&ChkOpts) -> Result<Report, FarmError>,
+}
+
+const CHECKS: [ChkDef; 5] = [
+    ChkDef {
+        label: "qml",
+        cache: "qmlchk",
+        run: lankefarm::custom_checks::qml::run,
+    },
+    ChkDef {
+        label: "pkgconf",
+        cache: "pkgconfchk",
+        run: lankefarm::custom_checks::pkgconf::run,
+    },
+    ChkDef {
+        label: "pkg-err",
+        cache: "pkg-errchk",
+        run: lankefarm::custom_checks::pkg_err::run,
+    },
+    ChkDef {
+        label: "hook",
+        cache: "hookchk",
+        run: lankefarm::custom_checks::hook::run,
+    },
+    ChkDef {
+        label: "abi",
+        cache: "abi",
+        run: lankefarm::custom_checks::abi::run,
+    },
+];
+
+fn def(label: &str) -> Option<&'static ChkDef> {
+    CHECKS.iter().find(|d| d.label == label)
+}
+
+/// 单类检則（`farm chk qml|pkgconf|pkg-err|hook|abi`）：从定义表取 runner，跑 + 打印。
+pub(crate) fn cmd_run(a: &ChkArgs, label: &str) -> ExitCode {
+    let Some(d) = def(label) else {
+        eprintln!("未知检則: {label}");
+        return ExitCode::from(2);
+    };
     let cache = a
         .cache
         .clone()
-        .unwrap_or_else(|| custom_checks::default_cache_dir(&a.source, "qmlchk"));
-    let r = lankefarm::custom_checks::qml::run(&opts_for("qmlchk", a, cache));
+        .unwrap_or_else(|| custom_checks::default_cache_dir(&a.source, d.cache));
+    let r = (d.run)(&opts_for(d.cache, a, cache));
     if let Ok(rr) = &r {
-        print_report("qmlchk", rr);
+        print_report(d.label, rr);
     }
     finish(r)
 }
 
-pub(crate) fn cmd_pkgconfchk(a: &ChkArgs) -> ExitCode {
-    let cache = a
-        .cache
-        .clone()
-        .unwrap_or_else(|| custom_checks::default_cache_dir(&a.source, "pkgconfchk"));
-    let r = lankefarm::custom_checks::pkgconf::run(&opts_for("pkgconfchk", a, cache));
-    if let Ok(rr) = &r {
-        print_report("pkgconfchk", rr);
-    }
-    finish(r)
-}
-
-pub(crate) fn cmd_pkg_errchk(a: &ChkArgs) -> ExitCode {
-    let cache = a
-        .cache
-        .clone()
-        .unwrap_or_else(|| custom_checks::default_cache_dir(&a.source, "pkg-errchk"));
-    let r = lankefarm::custom_checks::pkg_err::run(&opts_for("pkg-errchk", a, cache));
-    if let Ok(rr) = &r {
-        print_report("pkg-errchk", rr);
-    }
-    finish(r)
-}
-
-pub(crate) fn cmd_hookchk(a: &ChkArgs) -> ExitCode {
-    let cache = a
-        .cache
-        .clone()
-        .unwrap_or_else(|| custom_checks::default_cache_dir(&a.source, "hookchk"));
-    let r = lankefarm::custom_checks::hook::run(&opts_for("hookchk", a, cache));
-    if let Ok(rr) = &r {
-        print_report("hookchk", rr);
-    }
-    finish(r)
-}
-
-/// 用同一组参数跑全部 chk：abichk(manual-abi-fullchk) + qmlchk + pkgconfchk + pkg-errchk + hookchk。
+/// 一键跑全部（`farm chk full`）：同一张定义表依次跑所有检則，每类独立解包/独立缓存。
 pub(crate) fn cmd_fullchk(a: &ChkArgs) -> ExitCode {
     let base = a.cache.clone().unwrap_or_else(|| {
         std::env::var("HOME")
@@ -162,94 +174,13 @@ pub(crate) fn cmd_fullchk(a: &ChkArgs) -> ExitCode {
             .unwrap_or_else(|_| a.source.join(".abi-cache"))
     });
     let mut bad = false;
-    // 每个检則独立 cache 子目录
-    let run_one = |opts_cache: PathBuf| opts_for("", a, opts_cache);
-    let qml = lankefarm::custom_checks::qml::run(&run_one(base.join("qmlchk")));
-    if let Ok(r) = &qml {
-        print_report("qmlchk", r);
-    } else {
-        bad = true;
-    }
-    let pc = lankefarm::custom_checks::pkgconf::run(&run_one(base.join("pkgconfchk")));
-    if let Ok(r) = &pc {
-        print_report("pkgconfchk", r);
-    } else {
-        bad = true;
-    }
-    let pe = lankefarm::custom_checks::pkg_err::run(&run_one(base.join("pkg-errchk")));
-    if let Ok(r) = &pe {
-        print_report("pkg-errchk", r);
-    } else {
-        bad = true;
-    }
-    let hk = lankefarm::custom_checks::hook::run(&run_one(base.join("hookchk")));
-    if let Ok(r) = &hk {
-        print_report("hookchk", r);
-    } else {
-        bad = true;
-    }
-    let abi = lankefarm::abi_fullchk::run_fullchk(&lankefarm::abi_fullchk::FullchkOpts {
-        source: a.source.clone(),
-        arch: a.arch.clone(),
-        cache: base.join("abi"),
-        pkgs: a.pkg.clone(),
-        pkgs_dir: resolve_pkgs_dir(a),
-        full_rescan: a.full_rescan,
-    });
-    match abi {
-        Ok(r) => {
-            // abi 报告用它的字段打印
-            println!(
-                "{}",
-                lankefarm::tr!(
-                    "abi_fullchk.summary",
-                    r.lpkg_files.to_string(),
-                    r.elf_files.to_string(),
-                    r.cache_hits.to_string(),
-                    r.cache_misses.to_string(),
-                    r.provider_sonames.to_string()
-                )
-            );
-            if r.missing.is_empty() {
-                println!("{}", lankefarm::tr!("abi_fullchk.none"));
-            } else {
-                let mut total = 0usize;
-                for (pkg, items) in &r.missing {
-                    println!(
-                        "{}",
-                        lankefarm::tr!("abi_fullchk.missing_pkg", pkg, items.len().to_string())
-                    );
-                    for it in items {
-                        println!(
-                            "{}",
-                            lankefarm::tr!(
-                                "abi_fullchk.missing_item",
-                                it.elf,
-                                format!(
-                                    "{}{}",
-                                    lankefarm::custom_checks::sev_marker(it.severity),
-                                    it.name
-                                ),
-                                it.ver,
-                                it.candidates.join(",")
-                            )
-                        );
-                    }
-                    total += items.len();
-                }
-                println!(
-                    "{}",
-                    lankefarm::tr!(
-                        "abi_fullchk.total",
-                        total.to_string(),
-                        r.missing.len().to_string()
-                    )
-                );
+    for d in &CHECKS {
+        match (d.run)(&opts_for(d.cache, a, base.join(d.cache))) {
+            Ok(r) => print_report(d.label, &r),
+            Err(e) => {
+                eprintln!("{e}");
+                bad = true;
             }
-        }
-        Err(e) => {
-            eprintln!("{e}");
-            bad = true;
         }
     }
     if bad {

@@ -25,8 +25,7 @@
 //!   指向本轮不重建的包 → 边被丢弃，包直接构建不等待）。
 //!
 //! - `IGNORE_CHK_ABI` / `IGNORE_CHK_QML` / `IGNORE_CHK_PKGCONF` / `IGNORE_CHK_PKGERR` /
-//!   `IGNORE_CHK_HOOK`：包级**豁免**——`farm fullchk` 及各 chk（qmlchk/pkgconfchk/pkg-errchk/
-//!   hookchk/abichk）对带对应 flag 的包跳过该检則（承认已知/有意为之）。这些 flag 不影响构建序，
+//!   `IGNORE_CHK_HOOK`：包级**豁免**——`farm chk full` 及各 chk（qml/pkgconf/pkg-err/hook/abi）对带对应 flag 的包跳过该检則（承认已知/有意为之）。这些 flag 不影响构建序，
 //!   只被 chk 消费；在此注册以免 build 解析时误报"未知 flag"。
 
 use std::collections::HashSet;

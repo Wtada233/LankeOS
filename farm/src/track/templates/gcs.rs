@@ -3,6 +3,7 @@
 //! **被动触发**：source 条目里 `tracker-template: gcs` + `url`（桶目录）+ `pattern`（文件名版本正则）+ `template`。
 //! probe 用 GCS **XML listing API**（`{url}?delimiter=/`，分页遍历）拉文件名列表，正则取最大稳定版本。
 
+use crate::error::FarmError;
 use regex::Regex;
 
 use crate::net::Fetcher;
@@ -16,7 +17,7 @@ pub fn probe(
     cfg: &SourceConfig,
     major: Option<&str>,
     pkg_name: &str,
-) -> Result<EntryProbe, String> {
+) -> Result<EntryProbe, FarmError> {
     let url = need(&cfg.url, "url")?;
     let pattern = need(&cfg.pattern, "pattern")?;
     let template = need(&cfg.template, "template")?;

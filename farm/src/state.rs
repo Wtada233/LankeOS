@@ -8,6 +8,7 @@
 //!   注意失败路径（source 缺失 / repack / repo / index 失败）也会 `set_job(Blocked)` 落库，
 //!   避免 job 永久停在 Building。
 
+use crate::error::FarmError;
 use std::path::Path;
 
 /// farm 私有状态（SQLite 文件）。
@@ -52,7 +53,7 @@ impl JobStatus {
 
 impl State {
     /// 打开（或创建）状态库。
-    pub fn open(path: &Path) -> Result<State, String> {
+    pub fn open(path: &Path) -> Result<State, FarmError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("创建状态目录 {parent:?} 失败: {e}"))?;
@@ -87,7 +88,7 @@ impl State {
         status: JobStatus,
         failure_stage: Option<&str>,
         recipe_hash: Option<&str>,
-    ) -> Result<(), String> {
+    ) -> Result<(), FarmError> {
         self.conn
             .execute(
                 "INSERT INTO jobs (pkg, status, failure_stage, recipe_hash, updated_at)
@@ -127,11 +128,11 @@ impl State {
     }
 
     /// 删除某包的 job 条目（Ctrl+C 中断时清理当前在途条目）。
-    pub fn delete_job(&self, pkg: &str) -> Result<(), String> {
+    pub fn delete_job(&self, pkg: &str) -> Result<(), FarmError> {
         self.conn
             .execute("DELETE FROM jobs WHERE pkg=?1", rusqlite::params![pkg])
             .map(|_| ())
-            .map_err(|e| format!("删除 job 条目失败: {e}"))
+            .map_err(|e| format!("删除 job 条目失败: {e}").into())
     }
 
     /// 指定状态的包列表。
@@ -146,7 +147,7 @@ impl State {
         rows.filter_map(|r| r.ok()).collect()
     }
 
-    pub fn record_build(&self, pkg: &str, version: &str, ok: bool) -> Result<(), String> {
+    pub fn record_build(&self, pkg: &str, version: &str, ok: bool) -> Result<(), FarmError> {
         self.conn
             .execute(
                 "INSERT INTO build_history (pkg, version, outcome) VALUES (?1, ?2, ?3)",

@@ -4,6 +4,7 @@
 //! build/validate 成功已把每个 .lpkg 归一化为 zstd level 22 + mtime 1970（§4 无条件归一化重打），
 //! export 只按 `<pkg>-<ver>` 重命名复制 → 得到扁平、带版本号、可直传的单文件集合。
 
+use crate::error::FarmError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -16,7 +17,7 @@ pub struct ExportReport {
 
 /// 遍历 `input/<arch>/<pkg>/*.lpkg`，逐个**复制**为 `<pkg>-<ver>.lpkg` 扁平输出（字节即仓库产物，
 /// 已 level 22 + mtime 1970 归一化，无需再解压/重压）。
-pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, String> {
+pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, FarmError> {
     fs::create_dir_all(output).map_err(|e| format!("创建输出目录 {output:?} 失败: {e}"))?;
     let repo_root = input.join(arch);
     let mut report = ExportReport::default();

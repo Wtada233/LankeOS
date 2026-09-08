@@ -5,10 +5,11 @@
 //! 合并/去重/bump 的写法是 operator 的事。
 
 use super::{walk_all, ChkOpts, Finding, Report, Severity};
+use crate::error::FarmError;
 use std::collections::HashSet;
 use std::path::Path;
 
-fn analyze(extract: &Path) -> Result<serde_json::Value, String> {
+fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     let content = extract.join("content");
     let mut sysusers = false;
     let mut tmpfiles = false;
@@ -33,7 +34,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, String> {
 }
 
 /// 跑 hookchk。
-pub fn run(opts: &ChkOpts) -> Result<Report, String> {
+pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let (analyses, hits, misses, failed) = walk_all(opts, |ext, _pkg| analyze(ext))?;
     let audit_all = opts.subset.is_empty();
     let audit: HashSet<&str> = opts.subset.iter().map(String::as_str).collect();

@@ -414,6 +414,20 @@ mod tests {
     }
 
     #[test]
+    fn zh_and_en_placeholder_counts_match() {
+        // 每个键的 `{}` 占位符数中英必须一致：否则 tr!("key", a, b) 在一种语言里会漏参/多参
+        // 而静默拼错（fmt 是手写位置替换，不抛错）。这是"目录键一致"之外的第二层防漂移。
+        for (k, zh) in ZH.iter() {
+            let zh_n = zh.matches("{}").count();
+            let en_n = EN.get(k).expect("键缺失").matches("{}").count();
+            assert_eq!(
+                zh_n, en_n,
+                "键 {k} 的占位符数中英不一致（zh={zh_n} en={en_n}）：tr! 带参会静默拼错"
+            );
+        }
+    }
+
+    #[test]
     fn zh_and_en_catalogs_have_same_keys() {
         let zh_keys: std::collections::HashSet<_> = ZH.keys().copied().collect();
         let en_keys: std::collections::HashSet<_> = EN.keys().copied().collect();

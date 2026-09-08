@@ -46,6 +46,7 @@
 //!
 //! 与 data/trackers 同一套模式：触发包按包名索引，`packages` 是空格分隔的 glob。
 
+use crate::error::FarmError;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -97,7 +98,7 @@ impl RebuildGroups {
                 let Ok(content) = std::fs::read_to_string(&path) else {
                     continue;
                 };
-                let Ok(cfg) = serde_yaml::from_str::<RebuildGroupRaw>(&content) else {
+                let Ok(cfg) = serde_yaml_ng::from_str::<RebuildGroupRaw>(&content) else {
                     eprintln!("{}", tr!("build.group_parse_fail", path.display()));
                     continue;
                 };
@@ -150,7 +151,7 @@ impl RebuildGroups {
         old_ver: &str,
         new_ver: &str,
         all_pkgs: &[String],
-    ) -> Result<Vec<String>, String> {
+    ) -> Result<Vec<String>, FarmError> {
         self.version_victims_ctx(on, old_ver, new_ver, all_pkgs, None, None, None)
     }
 
@@ -170,7 +171,7 @@ impl RebuildGroups {
         pkgs_dir: Option<&Path>,
         out_dir: Option<&Path>,
         arch: Option<&str>,
-    ) -> Result<Vec<String>, String> {
+    ) -> Result<Vec<String>, FarmError> {
         let Some(g) = self.version.get(on) else {
             return Ok(Vec::new());
         };
@@ -268,7 +269,7 @@ fn run_version_script(
     pkgs_dir: Option<&Path>,
     out_dir: Option<&Path>,
     arch: Option<&str>,
-) -> Result<Option<String>, String> {
+) -> Result<Option<String>, FarmError> {
     let tmp = std::env::temp_dir().join(format!(
         "lankefarm-version-change-{}-{}.sh",
         std::process::id(),
@@ -380,7 +381,7 @@ mod tests {
 
     #[test]
     fn load_parses_multiple_space_separated_globs() {
-        // 回归：从真实 YAML 内容走 serde_yaml 路径（不是手动 map.insert），
+        // 回归：从真实 YAML 内容走 serde_yaml_ng 路径（不是手动 map.insert），
         // 确认 `packages: python-* meson gobject-introspection blueman` 解析出全部 4 个 glob，
         // 而不是只解析出第一个。
         let dir = std::env::temp_dir().join(format!("farm-groups-load-{}", std::process::id()));
@@ -414,7 +415,7 @@ mod tests {
                 "python-cairo",
                 "python-gobject"
             ],
-            "serde_yaml 必须解析出全部 4 个 glob: {v:?}"
+            "serde_yaml_ng 必须解析出全部 4 个 glob: {v:?}"
         );
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -525,7 +526,7 @@ mod tests {
 
     #[test]
     fn version_change_group_loads_and_edges() {
-        // 真实 YAML 走 serde_yaml 路径：rebuild-on-version-change + version-change-script + packages
+        // 真实 YAML 走 serde_yaml_ng 路径：rebuild-on-version-change + version-change-script + packages
         let dir = std::env::temp_dir().join(format!("farm-groups-vload-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();

@@ -5,6 +5,7 @@
 //!   farm gen-trackers                      batch 调 LLM 生成 tracker yaml（12 个/批）
 //!   farm seed / serve                    冷启动播种 / 本地 repo 静态服务器
 
+use lankefarm::error::FarmError;
 use std::cmp::Ordering as CmpOrdering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Write;
@@ -17,7 +18,7 @@ use std::thread;
 /// 运行期诊断日志（`--log-output <file>`）：线程安全追加写，记录所有错误/警告/额外源诊断。
 static LOG: Mutex<Option<std::fs::File>> = Mutex::new(None);
 
-fn log_init(path: Option<&str>) -> Result<(), String> {
+fn log_init(path: Option<&str>) -> Result<(), FarmError> {
     if let Some(p) = path {
         let f = std::fs::OpenOptions::new()
             .create(true)
@@ -52,42 +53,167 @@ use lankefarm::net::{Fetcher, RealFetcher};
 use lankefarm::track::vercmp;
 use lankefarm::track::{dep_edges, TrackerConfig};
 
-/// 命令解析结果：clap 子命令 → 扁平结构，供各 cmd_* 使用（保持逻辑层签名不变）。
-mod abi_fullchk;
+/// 命令实现子模块：每个子命令持自己的 `clap::Args` 结构体（见下方 BuildArgs/TrackArgs/…），
+/// `run()` 直接分发，无全局 hub/手工拷贝。
 mod build;
 mod custom_checks;
 mod export;
 mod seed;
 mod serve;
 
-#[derive(Default)]
-pub(crate) struct Args {
-    pkg: Vec<String>,
-    pkgs: Option<String>,
-    out: Option<PathBuf>,
-    input: Option<PathBuf>,
-    data: Option<String>,
-    packages: Option<String>,
-    api_endpoint: Option<String>,
-    api_key: Option<String>,
-    model: Option<String>,
-    token: Option<String>,
-    gitlab_token: Option<String>,
-    run: bool,
-    probe_fail_continue: bool,
-    all: bool,
-    manual_sort: bool,
-    jobs: Option<usize>,
-    root: Option<PathBuf>,
-    port: Option<u16>,
-    remote: Option<String>,
-    arch: Option<String>,
-    state: Option<PathBuf>,
-    image: Option<String>,
-    repo_port: Option<u16>,
-    download_retries: Option<u32>,
-    cache: Option<PathBuf>,
-    full_rescan: bool,
+/// 构建类共享参数（`Build`/`Validate`/`AbiFix` 三个子命令 `#[command(flatten)]` 复用）。
+/// 取代旧的全局 `Args` 神结构体：每个子命令持自己的 clap::Args，run() 直接分发，无手工拷贝。
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct RepoArgs {
+    /// pkgs 目录（LankeBUILD 体系）
+    #[arg(long, default_value = "pkgs")]
+    pub pkgs: PathBuf,
+    /// 产物/解包/发布目录
+    #[arg(long, default_value = "out")]
+    pub out: PathBuf,
+    /// SQLite 状态库（job 状态记录，供 operator 排查；自动 requeue 未实现）
+    #[arg(long)]
+    pub state: Option<PathBuf>,
+    /// 架构（发布到 out/<arch>/<pkg>/）
+    #[arg(long, default_value = "x86_64")]
+    pub arch: String,
+    /// fresh container 基础镜像（wtada233/lankeos:latest）。必填——仅容器构建，
+    /// 禁止主机直接 lpkg build（会污染宿主环境）。
+    #[arg(long)]
+    pub image: Option<String>,
+    /// docker 模式内嵌本地 repo 服务器端口（容器 lpkg upgrade 从这拉依赖）
+    #[arg(long, default_value_t = 80)]
+    pub repo_port: u16,
+    /// 源预下载网络重试次数（§8.6）
+    #[arg(long, default_value_t = 3)]
+    pub download_retries: u32,
+}
+
+/// `farm build`：构建目标包；--all 时按版本增量选择并依赖排序。
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct BuildArgs {
+    #[command(flatten)]
+    pub repo: RepoArgs,
+    /// 构建全部需重建的包（版本与本地 repo 不一致者，含 ABI 传播受害者）
+    #[arg(long)]
+    pub all: bool,
+    /// 目标包名，可多个（--all 时省略；指定则强制重建这些包）
+    #[arg(required_unless_present = "all", conflicts_with = "all", num_args = 1..)]
+    pub pkg: Vec<String>,
+    /// 严格按命令行传入的包名顺序构建（引导链/手工编排），不做 topo 重排
+    #[arg(long)]
+    pub manual_sort: bool,
+}
+
+/// `farm validate`：重建所有没有 `.build_ok` 标记的包。
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct ValidateArgs {
+    #[command(flatten)]
+    pub repo: RepoArgs,
+}
+
+/// `farm abifix`：修复「LankeBUILD.json 引用仓库无 provider SONAME」的包。
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct AbiFixArgs {
+    #[command(flatten)]
+    pub repo: RepoArgs,
+}
+
+/// `farm export`：把构建仓库扁平化为发行布局 `<pkg>-<ver>.lpkg`。
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct ExportArgs {
+    /// 构建仓库根目录（含 `<arch>/` 子目录）[default: out]
+    #[arg(long, default_value = "out")]
+    pub input: PathBuf,
+    /// 输出目录（扁平 `<pkg>-<ver>.lpkg`）
+    #[arg(long)]
+    pub output: PathBuf,
+    /// 架构（读取 input/<arch>/ 下每个包）
+    #[arg(long, default_value = "x86_64")]
+    pub arch: String,
+}
+
+/// `farm track`：探测上游版本（--run 应用，缺省只读提案）。
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct TrackArgs {
+    /// 目标包名，可多个（缺省需 --all）
+    #[arg(required_unless_present = "all", conflicts_with = "all", num_args = 1..)]
+    pub pkg: Vec<String>,
+    /// 遍历 pkgs/ 为所有有 tracker 的包出提案（只读）
+    #[arg(long)]
+    pub all: bool,
+    /// 应用新版到 LankeBUILD.json（默认只出提案，只读；配合 --all 批量应用）
+    #[arg(long)]
+    pub run: bool,
+    /// 源 URL 探测失败时仍继续写入（需同时 --run；否则探测失败跳过写入并告警）
+    #[arg(long)]
+    pub probe_fail_continue: bool,
+    /// pkgs 目录（LankeBUILD 体系）
+    #[arg(long, default_value = "pkgs")]
+    pub pkgs: PathBuf,
+    /// data/trackers 目录
+    #[arg(long, default_value = "data/trackers")]
+    pub data: PathBuf,
+    /// 并行探测数（仅 --all）
+    #[arg(short = 'j', long)]
+    pub jobs: Option<usize>,
+    /// GitHub token（消除 API 限流 403；也可用 GITHUB_TOKEN 环境变量）
+    #[arg(long)]
+    pub token: Option<String>,
+    /// GitLab token（同上，GITLAB_TOKEN 环境变量兜底）
+    #[arg(long)]
+    pub gitlab_token: Option<String>,
+}
+
+/// `farm gen-trackers`：batch 调 LLM 生成 tracker yaml。
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct GenTrackersArgs {
+    /// pkgs 目录（LankeBUILD 体系）
+    #[arg(long)]
+    pub pkgs: PathBuf,
+    /// data/trackers 目录
+    #[arg(long)]
+    pub data: PathBuf,
+    /// LLM API 端点
+    #[arg(long)]
+    pub api_endpoint: String,
+    /// LLM API key
+    #[arg(long)]
+    pub api_key: String,
+    /// LLM 模型名
+    #[arg(long)]
+    pub model: String,
+    /// 只处理指定包（逗号分隔）
+    #[arg(long)]
+    pub packages: Option<String>,
+}
+
+/// `farm serve`：本地 repo 静态 HTTP 服务器。
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct ServeArgs {
+    /// repo 根目录（含 <arch>/index.txt 与各包 .lpkg）
+    #[arg(long, default_value = "out")]
+    pub root: PathBuf,
+    /// 端口
+    #[arg(long, default_value_t = 8000)]
+    pub port: u16,
+}
+
+/// `farm seed`：冷启动播种远程 repo。
+#[derive(clap::Args, Debug, Clone)]
+pub(crate) struct SeedArgs {
+    /// 远程 repo URL（如 https://lankerepo.wtada233.top）
+    #[arg(long)]
+    pub remote: String,
+    /// 架构
+    #[arg(long, default_value = "x86_64")]
+    pub arch: String,
+    /// 本地 repo 根目录
+    #[arg(long, default_value = "out")]
+    pub out: PathBuf,
+    /// 并行下载/解包线程数
+    #[arg(long)]
+    pub jobs: Option<usize>,
 }
 
 #[derive(clap::Parser)]
@@ -105,229 +231,75 @@ struct Cli {
     command: Command,
 }
 
+/// `farm chk` 下的检則子命令（qml / pkgconf / pkg-err / hook / abi / full）。这些是**维护期实用工具，
+/// 非稳定接口**——可能因技术变迁（qml 归属分析 / pkgconf 解析 / ELF 符号审计 / .lpkg 布局约定变化）
+/// 而被移除或改名，别把它们当长期 API。它们共享同一组 `ChkArgs`。
 #[derive(clap::Subcommand)]
-enum Command {
-    /// 构建目标包；--all 时按版本增量选择（跳过与本地 repo 一致的包）并依赖排序。
-    /// 上游版本更新由 farm track 生成。
-    Build {
-        /// 构建全部需重建的包（版本与本地 repo 不一致者，含 ABI 传播受害者）
-        #[arg(long)]
-        all: bool,
-        /// 目标包名，可多个（--all 时省略；指定则强制重建这些包）
-        #[arg(required_unless_present = "all", conflicts_with = "all", num_args = 1..)]
-        pkg: Vec<String>,
-        /// 严格按命令行传入的包名顺序构建（引导链/手工编排），不做 topo 重排
-        #[arg(long)]
-        manual_sort: bool,
-        /// pkgs 目录（LankeBUILD 体系）
-        #[arg(long, default_value = "pkgs")]
-        pkgs: PathBuf,
-        /// 产物/解包/发布目录
-        #[arg(long, default_value = "out")]
-        out: PathBuf,
-        /// SQLite 状态库（job 状态记录，供 operator 排查；自动 requeue 未实现）
-        #[arg(long)]
-        state: Option<PathBuf>,
-        /// 架构（发布到 out/<arch>/<pkg>/）
-        #[arg(long, default_value = "x86_64")]
-        arch: String,
-        /// fresh container 基础镜像（wtada233/lankeos:latest）。必填——仅容器构建，
-        /// 禁止主机直接 lpkg build（会污染宿主环境）。
-        #[arg(long)]
-        image: Option<String>,
-        /// docker 模式内嵌本地 repo 服务器端口（容器 lpkg upgrade 从这拉依赖）
-        #[arg(long, default_value_t = 80)]
-        repo_port: u16,
-        /// 源预下载网络重试次数（§8.6）
-        #[arg(long, default_value_t = 3)]
-        download_retries: u32,
-    },
-    /// 重建所有没有 `.build_ok` 标记的包（成功构建才会写标记；跳过/blocked 不写）。
-    /// 排序与增量构建一致（topo_order + ABI 传播）；`--all` 等价物：自动选择缺标记的包。
-    Validate {
-        /// pkgs 目录（LankeBUILD 体系）
-        #[arg(long, default_value = "pkgs")]
-        pkgs: PathBuf,
-        /// 产物/解包/发布目录
-        #[arg(long, default_value = "out")]
-        out: PathBuf,
-        /// SQLite 状态库（job 状态记录，供 operator 排查）
-        #[arg(long)]
-        state: Option<PathBuf>,
-        /// 架构（发布到 out/<arch>/<pkg>/）
-        #[arg(long, default_value = "x86_64")]
-        arch: String,
-        /// fresh container 基础镜像（wtada233/lankeos:latest）。必填——仅容器构建。
-        #[arg(long)]
-        image: Option<String>,
-        /// docker 模式内嵌本地 repo 服务器端口（容器 lpkg upgrade 从这拉依赖）
-        #[arg(long, default_value_t = 80)]
-        repo_port: u16,
-        /// 源预下载网络重试次数（§8.6）
-        #[arg(long, default_value_t = 3)]
-        download_retries: u32,
-    },
-    /// 自动修复「LankeBUILD.json 引用仓库无 provider SONAME」的包：bump release 后重建
-    /// （重建重扫 needed_so，孤儿条目不再链接则自动消失；仍真需要则 BLOCKED 提示先更新
-    /// provider 配方）。排序与增量构建一致（topo_order + ABI 传播）。
-    #[command(name = "abifix")]
-    AbiFix {
-        /// pkgs 目录（LankeBUILD 体系）
-        #[arg(long, default_value = "pkgs")]
-        pkgs: PathBuf,
-        /// 产物/解包/发布目录
-        #[arg(long, default_value = "out")]
-        out: PathBuf,
-        /// SQLite 状态库（job 状态记录，供 operator 排查）
-        #[arg(long)]
-        state: Option<PathBuf>,
-        /// 架构（发布到 out/<arch>/<pkg>/）
-        #[arg(long, default_value = "x86_64")]
-        arch: String,
-        /// fresh container 基础镜像（wtada233/lankeos:latest）。必填——仅容器构建。
-        #[arg(long)]
-        image: Option<String>,
-        /// docker 模式内嵌本地 repo 服务器端口（容器 lpkg upgrade 从这拉依赖）
-        #[arg(long, default_value_t = 80)]
-        repo_port: u16,
-        /// 源预下载网络重试次数（§8.6）
-        #[arg(long, default_value_t = 3)]
-        download_retries: u32,
-    },
-    /// 把构建仓库扁平化为发行布局 `<pkg>-<ver>.lpkg`（纯复制，不重打包——仓库产物已归一化）。
-    /// 遍历 `input/<arch>/<pkg>/*.lpkg`，复制到 output 目录。
-    Export {
-        /// 构建仓库根目录（含 `<arch>/` 子目录）[default: out]
-        #[arg(long, default_value = "out")]
-        input: PathBuf,
-        /// 输出目录（扁平 `<pkg>-<ver>.lpkg`）
-        #[arg(long)]
-        output: PathBuf,
-        /// 架构（读取 input/<arch>/ 下每个包）
-        #[arg(long, default_value = "x86_64")]
-        arch: String,
-    },
-    /// 全 ABI 审计（manual）：对 input/<arch>/ 全部 .lpkg 解包一次到临时目录，原生 ELF 扫每个
-    /// SONAME 的符号@版本（按内容 sha256 缓存到 <cache>/<soname>.json，命中不重扫），报告 consumer
-    /// 引用但无任何 DT_NEEDED 候选库提供的符号@版本。非 root 可跑（只需读仓库）。
-    ManualAbiFullchk {
-        /// provider/cache 来源：构建仓库根（含 `<arch>/`，**所有包**都用来建 provider 目录）[default: out]
-        #[arg(long, default_value = "out")]
-        source: PathBuf,
-        /// 架构（读取 source/<arch>/）
-        #[arg(long, default_value = "x86_64")]
-        arch: String,
-        /// 缓存目录（每个 SONAME 一个 json；默认 ~/.cache/lankefarm-abi）
-        #[arg(long)]
-        cache: Option<PathBuf>,
-        /// 只审计/报告这些包（provider 仍来自 --source 全量）[默认全部]
-        #[arg(long, num_args = 1..)]
-        pkgs: Vec<String>,
-        /// 忽略缓存强制全量重扫
-        #[arg(long)]
-        full_rescan: bool,
-    },
+pub(crate) enum ChkCommand {
     /// QML import 依赖检查：import 模块的归属包须在本包 deps∪needed_so 内（缺则报）。
-    Qmlchk {
+    Qml {
         #[command(flatten)]
         chk: custom_checks::ChkArgs,
     },
     /// pkg-config Requires 检查：.pc Requires(/private) 模块归属包须在本包 deps∪needed_so 内。
-    Pkgconfchk {
+    Pkgconf {
         #[command(flatten)]
         chk: custom_checks::ChkArgs,
     },
     /// 打包错误检查：usr/etc|usr/var 错位、.la、.a（除非 cmake 引用 + IGNORE_CHK_PKGERR 豁免）。
-    PkgErrchk {
+    PkgErr {
         #[command(flatten)]
         chk: custom_checks::ChkArgs,
     },
     /// postinst hook 检查：建了 sysusers.d/tmpfiles.d 的包 postinst 须调 systemd-sysusers /
     /// systemd-tmpfiles --create。
-    Hookchk {
+    Hook {
         #[command(flatten)]
         chk: custom_checks::ChkArgs,
     },
-    /// 用同一组参数跑全部 chk：manual-abi-fullchk + qmlchk + pkgconfchk + pkg-errchk + hookchk。
-    Fullchk {
+    /// 全 ABI 符号/版本审计（原 `manual-abi-fullchk`）：逐包 ELF 扫每个 SONAME 的符号@版本，
+    /// 报告 consumer 引用但无任何 provider 提供的符号@版本。非 root 可跑。
+    Abi {
         #[command(flatten)]
         chk: custom_checks::ChkArgs,
+    },
+    /// 用同一组参数依次跑全部检則：qml + pkgconf + pkg-err + hook + abi。
+    Full {
+        #[command(flatten)]
+        chk: custom_checks::ChkArgs,
+    },
+}
+
+#[derive(clap::Subcommand)]
+enum Command {
+    /// 构建目标包；--all 时按版本增量选择（跳过与本地 repo 一致的包）并依赖排序。
+    /// 上游版本更新由 farm track 生成。
+    Build(BuildArgs),
+    /// 重建所有没有 `.build_ok` 标记的包（成功构建才会写标记；跳过/blocked 不写）。
+    /// 排序与增量构建一致（topo_order + ABI 传播）；`--all` 等价物：自动选择缺标记的包。
+    Validate(ValidateArgs),
+    /// 自动修复「LankeBUILD.json 引用仓库无 provider SONAME」的包：bump release 后重建
+    /// （重建重扫 needed_so，孤儿条目不再链接则自动消失；仍真需要则 BLOCKED 提示先更新
+    /// provider 配方）。排序与增量构建一致（topo_order + ABI 传播）。
+    #[command(name = "abifix")]
+    AbiFix(AbiFixArgs),
+    /// 把构建仓库扁平化为发行布局 `<pkg>-<ver>.lpkg`（纯复制，不重打包——仓库产物已归一化）。
+    /// 遍历 `input/<arch>/<pkg>/*.lpkg`，复制到 output 目录。
+    Export(ExportArgs),
+    /// 维护期实用检則工具集（qml / pkgconf / pkg-err / hook / abi / full，含全 ABI 审计）。
+    /// **非稳定接口**——可能因技术变迁移除；具体子命令见 `farm chk --help`。
+    Chk {
+        #[command(subcommand)]
+        sub: ChkCommand,
     },
     /// 探测上游版本
-    Track {
-        /// 目标包名，可多个（缺省需 --all）
-        #[arg(required_unless_present = "all", conflicts_with = "all", num_args = 1..)]
-        pkg: Vec<String>,
-        /// 遍历 pkgs/ 为所有有 tracker 的包出提案（只读）
-        #[arg(long)]
-        all: bool,
-        /// 应用新版到 LankeBUILD.json（默认只出提案，只读；配合 --all 批量应用）
-        #[arg(long)]
-        run: bool,
-        /// 源 URL 探测失败时仍继续写入（需同时 --run；否则探测失败跳过写入并告警）
-        #[arg(long)]
-        probe_fail_continue: bool,
-        /// pkgs 目录（LankeBUILD 体系）
-        #[arg(long, default_value = "pkgs")]
-        pkgs: PathBuf,
-        /// data/trackers 目录
-        #[arg(long, default_value = "data/trackers")]
-        data: PathBuf,
-        /// 并行探测数（仅 --all）
-        #[arg(short = 'j', long)]
-        jobs: Option<usize>,
-        /// GitHub token（消除 API 限流 403；也可用 GITHUB_TOKEN 环境变量）
-        #[arg(long)]
-        token: Option<String>,
-        /// GitLab token（同上，GITLAB_TOKEN 环境变量兜底）
-        #[arg(long)]
-        gitlab_token: Option<String>,
-    },
+    Track(TrackArgs),
     /// batch 调 LLM 生成 tracker yaml（12 个/批）
-    GenTrackers {
-        /// pkgs 目录（LankeBUILD 体系）
-        #[arg(long)]
-        pkgs: PathBuf,
-        /// data/trackers 目录
-        #[arg(long)]
-        data: PathBuf,
-        /// LLM API 端点
-        #[arg(long)]
-        api_endpoint: String,
-        /// LLM API key
-        #[arg(long)]
-        api_key: String,
-        /// LLM 模型名
-        #[arg(long)]
-        model: String,
-        /// 只处理指定包（逗号分隔）
-        #[arg(long)]
-        packages: Option<String>,
-    },
+    GenTrackers(GenTrackersArgs),
     /// 本地 repo 静态 HTTP 服务器（§12.5）
-    Serve {
-        /// repo 根目录（含 <arch>/index.txt 与各包 .lpkg）
-        #[arg(long, default_value = "out")]
-        root: PathBuf,
-        /// 端口
-        #[arg(long, default_value_t = 8000)]
-        port: u16,
-    },
+    Serve(ServeArgs),
     /// 冷启动播种远程 repo（§8）
-    Seed {
-        /// 远程 repo URL（如 https://lankerepo.wtada233.top）
-        #[arg(long)]
-        remote: String,
-        /// 架构
-        #[arg(long, default_value = "x86_64")]
-        arch: String,
-        /// 本地 repo 根目录
-        #[arg(long, default_value = "out")]
-        out: PathBuf,
-        /// 并行下载/解包线程数
-        #[arg(long)]
-        jobs: Option<usize>,
-    },
+    Seed(SeedArgs),
 }
 
 /// pkgs/<name>/LankeBUILD.json 的最小字段。
@@ -341,11 +313,11 @@ struct BuildJson {
     work_sources: Vec<String>,
 }
 
-fn load_build_json(pkg_dir: &std::path::Path) -> Result<BuildJson, String> {
+fn load_build_json(pkg_dir: &std::path::Path) -> Result<BuildJson, FarmError> {
     let path = pkg_dir.join("LankeBUILD.json");
     let content =
         std::fs::read_to_string(&path).map_err(|e| format!("读取 {} 失败: {e}", path.display()))?;
-    serde_json::from_str(&content).map_err(|e| format!("解析 {} 失败: {e}", path.display()))
+    serde_json::from_str(&content).map_err(|e| format!("解析 {} 失败: {e}", path.display()).into())
 }
 
 /// 第一个非 file:// 的 source URL（file:// 是包内自带，无需 track）。
@@ -408,7 +380,7 @@ fn load_trackers(data_dir: &str) -> HashMap<String, TrackerConfig> {
                 continue;
             }
             if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(cfg) = serde_yaml::from_str::<TrackerConfig>(&content) {
+                if let Ok(cfg) = serde_yaml_ng::from_str::<TrackerConfig>(&content) {
                     map.insert(cfg.pkg_name.clone(), cfg);
                 }
             }
@@ -419,7 +391,7 @@ fn load_trackers(data_dir: &str) -> HashMap<String, TrackerConfig> {
 
 /// 构建带 token 的 RealFetcher：CLI `--token`/`--gitlab-token` 优先，环境变量 `GITHUB_TOKEN`/`GITLAB_TOKEN` 兜底。
 /// 消除 GitHub/GitLab API 限流 403 噪音（未认证 GitHub API 60 次/小时，认证 5000 次/小时）。
-fn build_fetcher(args: &Args) -> RealFetcher {
+fn build_fetcher(args: &TrackArgs) -> RealFetcher {
     RealFetcher::new(
         args.token
             .clone()
@@ -432,12 +404,9 @@ fn build_fetcher(args: &Args) -> RealFetcher {
 
 /// 单/多包：LankeBUILD.json（包来源）→ 按 name 字段找 tracker → 探测 → 生成新版（全部源升级）。
 /// 支持多个包名（按传入顺序逐个探测），tracker 集与 fetcher 复用。
-fn cmd_track_run(args: &Args, apply: bool, probe_fail_continue: bool) -> ExitCode {
-    let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
-    let data_dir = args
-        .data
-        .clone()
-        .unwrap_or_else(|| "data/trackers".to_string());
+fn cmd_track_run(args: &TrackArgs, apply: bool, probe_fail_continue: bool) -> ExitCode {
+    let pkgs_dir = args.pkgs.to_string_lossy().into_owned();
+    let data_dir = args.data.to_string_lossy().into_owned();
     let trackers = load_trackers(&data_dir);
     let fetcher = build_fetcher(args);
     let mut errored = false;
@@ -715,16 +684,13 @@ fn track_worker(
 /// `restrict` 为 Some(包目录名列表) 时只处理指定包（多包名 track 走这里，-j 生效）；
 /// None 时处理 pkgs/ 下全部有 tracker 的包（--all）。
 fn cmd_track_all(
-    args: &Args,
+    args: &TrackArgs,
     apply: bool,
     probe_fail_continue: bool,
     restrict: Option<&[String]>,
 ) -> ExitCode {
-    let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
-    let data_dir = args
-        .data
-        .clone()
-        .unwrap_or_else(|| "data/trackers".to_string());
+    let pkgs_dir = args.pkgs.to_string_lossy().into_owned();
+    let data_dir = args.data.to_string_lossy().into_owned();
     let root = PathBuf::from(&pkgs_dir);
     if !root.is_dir() {
         eprintln!("{}", lankefarm::tr!("pkgs.not_dir", pkgs_dir));
@@ -1086,7 +1052,7 @@ fn parse_batch_blocks(text: &str, batch: &[String]) -> BatchResult {
             }
             continue;
         }
-        match serde_yaml::from_str::<TrackerConfig>(&doc) {
+        match serde_yaml_ng::from_str::<TrackerConfig>(&doc) {
             Ok(cfg) if batch.contains(&cfg.pkg_name) => {
                 r.yamls.push((cfg.pkg_name.clone(), doc));
             }
@@ -1113,29 +1079,27 @@ fn extract_pkg_name(doc: &str) -> Option<String> {
 }
 
 /// farm gen-trackers：batch 调 LLM 生成 tracker yaml（12 个一批）。
-fn cmd_gen_trackers(args: &Args) -> ExitCode {
-    let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
-    let data_dir = args
-        .data
-        .clone()
-        .unwrap_or_else(|| "data/trackers".to_string());
+fn cmd_gen_trackers(args: &GenTrackersArgs) -> ExitCode {
+    let pkgs_dir = args.pkgs.to_string_lossy().into_owned();
+    let data_dir = args.data.to_string_lossy().into_owned();
 
     // API 配置：CLI 参数优先，env 兜底
-    let endpoint = args
-        .api_endpoint
-        .clone()
-        .or_else(|| std::env::var("LANKEFARM_LLM_BASE_URL").ok())
-        .unwrap_or_else(|| "http://127.0.0.1:8000/v1".into());
-    let key = args
-        .api_key
-        .clone()
-        .or_else(|| std::env::var("LANKEFARM_LLM_API_KEY").ok())
-        .unwrap_or_default();
-    let model = match args
-        .model
-        .clone()
-        .or_else(|| std::env::var("LANKEFARM_LLM_MODEL").ok())
-    {
+    let endpoint = if args.api_endpoint.is_empty() {
+        std::env::var("LANKEFARM_LLM_BASE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:8000/v1".into())
+    } else {
+        args.api_endpoint.clone()
+    };
+    let key = if args.api_key.is_empty() {
+        std::env::var("LANKEFARM_LLM_API_KEY").unwrap_or_default()
+    } else {
+        args.api_key.clone()
+    };
+    let model = match if args.model.is_empty() {
+        std::env::var("LANKEFARM_LLM_MODEL").ok()
+    } else {
+        Some(args.model.clone())
+    } {
         Some(m) => m,
         None => {
             eprintln!("{}", lankefarm::tr!("gen.no_model"));
@@ -1143,7 +1107,8 @@ fn cmd_gen_trackers(args: &Args) -> ExitCode {
         }
     };
     let llm = LlmClient::new(endpoint.clone(), key, model.clone());
-    let fetcher = build_fetcher(args);
+    // gen-trackers 无平台 token 参数：裸 RealFetcher（探测 URL 可达性用）
+    let fetcher = lankefarm::net::RealFetcher::new(None, None);
 
     let trackers = load_trackers(&data_dir);
     let root = PathBuf::from(&pkgs_dir);
@@ -1285,13 +1250,6 @@ fn localize_help(cmd: clap::Command) -> clap::Command {
             .mut_arg("image", |a| a.help("Fresh container base image. Required - container builds only"))
             .mut_arg("repo_port", |a| a.help("Embedded local repo server port (container lpkg upgrade pulls from it)"))
             .mut_arg("download_retries", |a| a.help("Source pre-download network retries")))
-        .mut_subcommand("manual-abi-fullchk", |c| c
-            .about("Full ABI audit (manual): provider/cache source = all packages under --source; extract each .lpkg once into a tempdir, natively scan each SONAME's symbol@version (content-sha256 cached per SONAME; hits skip rescan), report audited consumers referencing a symbol@version no DT_NEEDED candidate provides")
-            .mut_arg("source", |a| a.help("Build repo root (contains <arch>/, ALL packages build the provider catalog)"))
-            .mut_arg("arch", |a| a.help("Architecture (read packages under input/<arch>/)"))
-            .mut_arg("cache", |a| a.help("Cache dir (one <soname>.json each; default ~/.cache/lankefarm-abi)"))
-            .mut_arg("pkgs", |a| a.help("Only audit these packages (default all)"))
-            .mut_arg("full_rescan", |a| a.help("Ignore cache and force a full rescan")))
         .mut_subcommand("track", |c| c
             .about("Probe upstream versions")
             .mut_arg("pkg", |a| a.help("Target package name (required without --all)"))
@@ -1319,6 +1277,14 @@ fn localize_help(cmd: clap::Command) -> clap::Command {
             .mut_arg("arch", |a| a.help("Architecture"))
             .mut_arg("out", |a| a.help("Local repo root directory"))
             .mut_arg("jobs", |a| a.help("Parallel download/extract threads")))
+        .mut_subcommand("chk", |c| c
+            .about("Maintainer utility checks (qml/pkgconf/pkg-err/hook/abi/full). NOT a stable interface - these tools may be removed as techniques change; see `farm chk --help`")
+            .mut_subcommand("qml", |c| c.about("Check QML imports: each imported module's owner package must be in this package's deps∪needed_so"))
+            .mut_subcommand("pkgconf", |c| c.about("Check pkg-config Requires(/private): each module's owner package must be in deps∪needed_so"))
+            .mut_subcommand("pkg-err", |c| c.about("Packaging errors: usr/etc|usr/var misplacement, leftover .la/.a"))
+            .mut_subcommand("hook", |c| c.about("postinst hook check: packages shipping sysusers.d/tmpfiles.d must call systemd-sysusers / systemd-tmpfiles --create"))
+            .mut_subcommand("abi", |c| c.about("Full ABI symbol@version audit (formerly manual-abi-fullchk)"))
+            .mut_subcommand("full", |c| c.about("Run every check with one set of args: qml + pkgconf + pkg-err + hook + abi")))
 }
 
 /// 操作命令（会解包/重打包/写 out/ 的命令）必须以 root 运行：`.lpkg` 解包/重打包要读写 root
@@ -1344,186 +1310,33 @@ pub fn run() -> ExitCode {
         return ExitCode::from(2);
     }
     match cli.command {
-        Command::Build {
-            all,
-            pkg,
-            manual_sort,
-            pkgs,
-            out,
-            state,
-            arch,
-            image,
-            repo_port,
-            download_retries,
-        } => {
-            let args = Args {
-                all,
-                pkg,
-                manual_sort,
-                pkgs: Some(pkgs.to_string_lossy().into_owned()),
-                out: Some(out),
-                state: state.map(|p| p.to_path_buf()),
-                arch: Some(arch),
-                image,
-                repo_port: Some(repo_port),
-                download_retries: Some(download_retries),
-                ..Default::default()
-            };
-            build::cmd_build(&args)
-        }
-        Command::Validate {
-            pkgs,
-            out,
-            state,
-            arch,
-            image,
-            repo_port,
-            download_retries,
-        } => {
-            let args = Args {
-                pkgs: Some(pkgs.to_string_lossy().into_owned()),
-                out: Some(out),
-                state: state.map(|p| p.to_path_buf()),
-                arch: Some(arch),
-                image,
-                repo_port: Some(repo_port),
-                download_retries: Some(download_retries),
-                ..Default::default()
-            };
-            build::cmd_validate(&args)
-        }
-        Command::AbiFix {
-            pkgs,
-            out,
-            state,
-            arch,
-            image,
-            repo_port,
-            download_retries,
-        } => {
-            let args = Args {
-                pkgs: Some(pkgs.to_string_lossy().into_owned()),
-                out: Some(out),
-                state: state.map(|p| p.to_path_buf()),
-                arch: Some(arch),
-                image,
-                repo_port: Some(repo_port),
-                download_retries: Some(download_retries),
-                ..Default::default()
-            };
-            build::cmd_abifix(&args)
-        }
-        Command::Export {
-            input,
-            output,
-            arch,
-        } => {
-            let args = Args {
-                input: Some(input),
-                out: Some(output),
-                arch: Some(arch),
-                ..Default::default()
-            };
-            export::cmd_export(&args)
-        }
-        Command::ManualAbiFullchk {
-            source,
-            arch,
-            cache,
-            pkgs,
-            full_rescan,
-        } => {
-            let args = Args {
-                input: Some(source),
-                arch: Some(arch),
-                cache,
-                pkg: pkgs,
-                full_rescan,
-                ..Default::default()
-            };
-            abi_fullchk::cmd_manual_abi_fullchk(&args)
-        }
-        Command::Qmlchk { chk } => custom_checks::cmd_qmlchk(&chk),
-        Command::Pkgconfchk { chk } => custom_checks::cmd_pkgconfchk(&chk),
-        Command::PkgErrchk { chk } => custom_checks::cmd_pkg_errchk(&chk),
-        Command::Hookchk { chk } => custom_checks::cmd_hookchk(&chk),
-        Command::Fullchk { chk } => custom_checks::cmd_fullchk(&chk),
-        Command::Track {
-            pkg,
-            all,
-            run,
-            probe_fail_continue,
-            pkgs,
-            data,
-            jobs,
-            token,
-            gitlab_token,
-        } => {
-            let args = Args {
-                pkg,
-                all,
-                run,
-                probe_fail_continue,
-                pkgs: Some(pkgs.to_string_lossy().into_owned()),
-                data: Some(data.to_string_lossy().into_owned()),
-                jobs,
-                token,
-                gitlab_token,
-                ..Default::default()
-            };
-            if args.all {
+        Command::Build(a) => build::cmd_build(&a),
+        Command::Validate(a) => build::cmd_validate(&a),
+        Command::AbiFix(a) => build::cmd_abifix(&a),
+        Command::Export(a) => export::cmd_export(&a),
+        Command::Chk { sub } => match sub {
+            ChkCommand::Qml { chk } => custom_checks::cmd_run(&chk, "qml"),
+            ChkCommand::Pkgconf { chk } => custom_checks::cmd_run(&chk, "pkgconf"),
+            ChkCommand::PkgErr { chk } => custom_checks::cmd_run(&chk, "pkg-err"),
+            ChkCommand::Hook { chk } => custom_checks::cmd_run(&chk, "hook"),
+            ChkCommand::Abi { chk } => custom_checks::cmd_run(&chk, "abi"),
+            ChkCommand::Full { chk } => custom_checks::cmd_fullchk(&chk),
+        },
+        Command::Track(a) => {
+            if a.all {
                 // --all：只出提案；--all --run：批量应用
-                cmd_track_all(&args, args.run, args.probe_fail_continue, None)
-            } else if args.pkg.len() > 1 {
+                cmd_track_all(&a, a.run, a.probe_fail_continue, None)
+            } else if a.pkg.len() > 1 {
                 // 多包名：走并行 worker 池（-j 生效），restrict 到指定包
-                cmd_track_all(&args, args.run, args.probe_fail_continue, Some(&args.pkg))
+                cmd_track_all(&a, a.run, a.probe_fail_continue, Some(&a.pkg))
             } else {
                 // 单包：--run 应用新版；缺省只读出提案（不写 LankeBUILD.json）
-                cmd_track_run(&args, args.run, args.probe_fail_continue)
+                cmd_track_run(&a, a.run, a.probe_fail_continue)
             }
         }
-        Command::GenTrackers {
-            pkgs,
-            data,
-            api_endpoint,
-            api_key,
-            model,
-            packages,
-        } => {
-            let args = Args {
-                pkgs: Some(pkgs.to_string_lossy().into_owned()),
-                data: Some(data.to_string_lossy().into_owned()),
-                api_endpoint: Some(api_endpoint),
-                api_key: Some(api_key),
-                model: Some(model),
-                packages,
-                ..Default::default()
-            };
-            cmd_gen_trackers(&args)
-        }
-        Command::Serve { root, port } => {
-            let args = Args {
-                root: Some(root),
-                port: Some(port),
-                ..Default::default()
-            };
-            serve::cmd_serve(&args)
-        }
-        Command::Seed {
-            remote,
-            arch,
-            out,
-            jobs,
-        } => {
-            let args = Args {
-                remote: Some(remote),
-                arch: Some(arch),
-                out: Some(out),
-                jobs,
-                ..Default::default()
-            };
-            seed::cmd_seed(&args)
-        }
+        Command::GenTrackers(a) => cmd_gen_trackers(&a),
+        Command::Serve(a) => serve::cmd_serve(&a),
+        Command::Seed(a) => seed::cmd_seed(&a),
     }
 }
 
@@ -1554,17 +1367,11 @@ mod tests {
         let cli =
             Cli::try_parse_from(["farm", "abifix", "--image", "img", "--arch", "x86_64"]).unwrap();
         match cli.command {
-            Command::AbiFix {
-                image,
-                arch,
-                pkgs,
-                out,
-                ..
-            } => {
-                assert_eq!(image.as_deref(), Some("img"));
-                assert_eq!(arch, "x86_64");
-                assert_eq!(pkgs, PathBuf::from("pkgs"));
-                assert_eq!(out, PathBuf::from("out"));
+            Command::AbiFix(a) => {
+                assert_eq!(a.repo.image.as_deref(), Some("img"));
+                assert_eq!(a.repo.arch, "x86_64");
+                assert_eq!(a.repo.pkgs, PathBuf::from("pkgs"));
+                assert_eq!(a.repo.out, PathBuf::from("out"));
             }
             _ => panic!("应解析为 abifix 子命令"),
         }
@@ -1574,12 +1381,12 @@ mod tests {
     fn parses_jobs_flag() {
         let cli = Cli::try_parse_from(["farm", "track", "--all", "-j", "8"]).unwrap();
         match cli.command {
-            Command::Track { jobs, .. } => assert_eq!(jobs, Some(8)),
+            Command::Track(a) => assert_eq!(a.jobs, Some(8)),
             _ => panic!("应解析为 track 子命令"),
         }
         let cli = Cli::try_parse_from(["farm", "track", "--all"]).unwrap();
         match cli.command {
-            Command::Track { jobs, .. } => assert_eq!(jobs, None),
+            Command::Track(a) => assert_eq!(a.jobs, None),
             _ => panic!("应解析为 track 子命令"),
         }
     }
@@ -1644,13 +1451,9 @@ mod tests {
         ])
         .unwrap();
         match cli.command {
-            Command::Track {
-                token,
-                gitlab_token,
-                ..
-            } => {
-                assert_eq!(token.as_deref(), Some("ghp_xxx"));
-                assert_eq!(gitlab_token.as_deref(), Some("glpat_yyy"));
+            Command::Track(a) => {
+                assert_eq!(a.token.as_deref(), Some("ghp_xxx"));
+                assert_eq!(a.gitlab_token.as_deref(), Some("glpat_yyy"));
             }
             _ => panic!("应解析为 track 子命令"),
         }
@@ -1661,20 +1464,20 @@ mod tests {
         // 只读单包探测：track <pkg>（无 --run）→ pkg 有值、run=false、all=false
         let cli = Cli::try_parse_from(["farm", "track", "gtk3", "--pkgs", "../pkgs"]).unwrap();
         match cli.command {
-            Command::Track { pkg, run, all, .. } => {
-                assert_eq!(pkg, vec!["gtk3".to_string()]);
-                assert!(!run);
-                assert!(!all);
+            Command::Track(a) => {
+                assert_eq!(a.pkg, vec!["gtk3".to_string()]);
+                assert!(!a.run);
+                assert!(!a.all);
             }
             _ => panic!("应解析为 track 子命令"),
         }
         // --run 应用新版
         let cli = Cli::try_parse_from(["farm", "track", "gtk3", "--run"]).unwrap();
         match cli.command {
-            Command::Track { pkg, run, all, .. } => {
-                assert_eq!(pkg, vec!["gtk3".to_string()]);
-                assert!(run);
-                assert!(!all);
+            Command::Track(a) => {
+                assert_eq!(a.pkg, vec!["gtk3".to_string()]);
+                assert!(a.run);
+                assert!(!a.all);
             }
             _ => panic!("应解析为 track 子命令"),
         }
@@ -1695,9 +1498,9 @@ mod tests {
         // --all --run = 批量应用（clap 不再互斥）
         let cli = Cli::try_parse_from(["farm", "track", "--all", "--run"]).unwrap();
         match cli.command {
-            Command::Track { all, run, .. } => {
-                assert!(all);
-                assert!(run);
+            Command::Track(a) => {
+                assert!(a.all);
+                assert!(a.run);
             }
             _ => panic!("应解析为 track 子命令"),
         }

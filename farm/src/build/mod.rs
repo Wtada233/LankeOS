@@ -10,6 +10,7 @@
 //!    确保源定义（真相）与包内元数据一致；
 //! 3. **只比 needed_so/provides**：deps 由 gen_deps/deprules 规则生成，farm 不扫不比。
 
+use crate::error::FarmError;
 use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -118,7 +119,7 @@ pub fn read_lankebuild(pkgs_dir: &Path, pkg: &str) -> Option<LankeBuild> {
 /// - 非交互模式：无 operator 可介入 → 返回 Err（整个构建终止，不出现 source-missing 继续）。
 /// - 唯一允许"跳过"的是 `git+`/`file://` 源（`is_skip_source`，git 构建时由 lpkg 处理）。
 /// - ABI 受害者（is_victim）不在第一次安装计划内，不预下载（构建时由 lpkg build 自己下载）。
-fn source_gate(pkg: &str, opts: &BuildOptions, is_victim: bool) -> Result<(), String> {
+fn source_gate(pkg: &str, opts: &BuildOptions, is_victim: bool) -> Result<(), FarmError> {
     if is_victim {
         return Ok(());
     }
@@ -130,7 +131,7 @@ fn source_gate(pkg: &str, opts: &BuildOptions, is_victim: bool) -> Result<(), St
                 // 开 shell 手动介入；退出后回到循环顶部重试（仍失败会再次开 shell）
                 prompt::open_shell(pkg, opts);
             }
-            Err(e) => return Err(tr!("build.source_missing_fatal", pkg, e)),
+            Err(e) => return Err(tr!("build.source_missing_fatal", pkg, e).into()),
         }
     }
 }
@@ -185,7 +186,7 @@ pub(crate) fn abifix_targets(pkgs_dir: &Path, old: &Index) -> Vec<(String, Vec<S
 /// abifix 全流程（CLI 入口调用的 pub 面）：载入旧索引 → 检测孤儿 → 打印 + 逐个 bump release →
 /// 返回修复目标包名清单（cli 据此强制重建，ABI 传播在 run_build 内照常级联）。
 /// **无目标返回空 Vec**——调用方绝不能落到空目标的增量构建。
-pub fn abifix_plan(pkgs_dir: &Path, out_dir: &Path, arch: &str) -> Result<Vec<String>, String> {
+pub fn abifix_plan(pkgs_dir: &Path, out_dir: &Path, arch: &str) -> Result<Vec<String>, FarmError> {
     let old = load_old_index(out_dir, arch)?;
     let targets = abifix_targets(pkgs_dir, &old);
     if targets.is_empty() {
@@ -219,31 +220,42 @@ fn refresh_repo_provides(binding: &mut dyn LpkgBinding, out_dir: &Path, arch: &s
     binding.set_repo_provides(idx.all_provided_capabilities());
 }
 
-/// 进程内交互接管（§8.5）：BLOCKED 时提示 operator 选择，不退出进程。
-/// 主调度：返回构建报告（built/repacked/abi_broken/blocked）。
-/// `state` 非空时记录 job 状态 + 配方 hash（§11 持久化；读端/差分 requeue 尚未实现，
-/// 仅作 operator 排查用）。失败路径（source 缺失 / repack / repo / index）也落 Blocked 库。
-pub fn run_build(
-    opts: &BuildOptions,
-    binding: &mut dyn LpkgBinding,
-    state: Option<&State>,
-) -> Result<BuildReport, String> {
-    // 1. 旧索引（§7.2 传播反图的锚）——必须由 seed 落地的本地 repo index.txt，缺失/为空直接报错
-    //    （禁止无基线构建：needed_so provider 校验、ABI diff 都需要它）。
-    let old = load_old_index(&opts.out_dir, &opts.arch)?;
-    // 仓库全部提供能力 → binding 扫描 not-found 判定（needed_so 无 provider → 不进 needed_so）。
-    // **这是活跃集，随每包 index 更新而刷新**（见 refresh_repo_provides）——否则同一次 run 里
-    // 先构建包新加入的 SONAME 对后构建包不可见。
-    binding.set_repo_provides(old.all_provided_capabilities());
-    let revmap = RevMap::build(&old);
-    // 声明式重建组（data/build/*.yaml）：不链但 ABI 敏感的包（python 生态等）。
-    let groups = RebuildGroups::load(&opts.build_data_dir);
+/// 单包事务失败归类到的构建阶段（state.failure_stage 的稳定 token；operator/读端据此排查）。
+/// 单包事务在进 repo 前各阶段失败的稳定 token（state.failure_stage 用；operator/读端据此排查）。
+/// build 本身失败 / source 门失败走更细的交互路径（诊断串 = outcome.failure_stage / 直接 Err），
+/// 不经此归类——只留真正需要稳定 token 的三个收尾阶段。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum BlockStage {
+    Repack,
+    Repo,
+    Index,
+}
 
+impl BlockStage {
+    pub(crate) fn as_str(self) -> &'static str {
+        match self {
+            BlockStage::Repack => "repack",
+            BlockStage::Repo => "repo",
+            BlockStage::Index => "index",
+        }
+    }
+}
+
+/// 构建计划（增量选择 → version-change 受害者并入 → 确定性 topo 排序）→ 就绪队列。
+///
+/// 从 run_build 抽出（纯计算，可单测，不含交互/副作用）：返回 `(就绪队列, version-change
+/// 预排受害者名集)`。`version_planned_names` 供弹包时决定是否 release bump；`all_pkgs`
+/// 由调用方保留（loop 里 groups.victims_for 需要）。
+fn build_plan(
+    opts: &BuildOptions,
+    old: &Index,
+    groups: &RebuildGroups,
+    all_pkgs: &[String],
+) -> (VecDeque<(String, bool)>, HashSet<String>) {
     // 2. 增量选择（用户规则）：effective_version 与本地 repo 旧索引一致的包跳过构建。
     //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version+release（如 1.1+2）。
     //    validate 模式：选择改为"所有没有 `.build_ok` 标记的包"（成功构建才会写标记，
     //    跳过/blocked 不写 → 下次 validate 重试）。排序仍走同一 topo_order。
-    let all_pkgs = sorted_pkg_names(&opts.pkgs_dir);
     let initial: Vec<String> = if opts.targets.is_empty() {
         let v: Vec<String> = all_pkgs
             .iter()
@@ -251,7 +263,7 @@ pub fn run_build(
                 if opts.validate {
                     !has_build_ok(&opts.pkgs_dir, p)
                 } else {
-                    needs_build(&opts.pkgs_dir, p, &old)
+                    needs_build(&opts.pkgs_dir, p, old)
                 }
             })
             .cloned()
@@ -290,7 +302,7 @@ pub fn run_build(
                 on,
                 &ov.version,
                 &newv,
-                &all_pkgs,
+                all_pkgs,
                 Some(&opts.pkgs_dir),
                 Some(&opts.out_dir),
                 Some(&opts.arch),
@@ -324,14 +336,43 @@ pub fn run_build(
     edges.dedup();
     // --manual-sort：严格按命令行传入的包名顺序构建（引导链/手工编排用），不做 topo 重排。
     // 否则纯 python 包（无 needed_so 边）会按字母序建，bootstrap（setuptools→flit-core→build）会断。
-    let mut queue: VecDeque<(String, bool)> = if opts.manual_sort && !opts.targets.is_empty() {
+    let queue: VecDeque<(String, bool)> = if opts.manual_sort && !opts.targets.is_empty() {
         opts.targets.iter().cloned().map(|p| (p, false)).collect()
     } else {
-        topo_order(&opts.pkgs_dir, &selection, &old, &edges)
+        topo_order(&opts.pkgs_dir, &selection, old, &edges)
             .into_iter()
             .map(|p| (p, false))
             .collect()
     };
+    (queue, version_planned_names)
+}
+
+/// 进程内交互接管（§8.5）：BLOCKED 时提示 operator 选择，不退出进程。
+/// 主调度：返回构建报告（built/repacked/abi_broken/blocked）。
+/// `state` 非空时记录 job 状态 + 配方 hash（§11 持久化；读端/差分 requeue 尚未实现，
+/// 仅作 operator 排查用）。失败路径（source 缺失 / repack / repo / index）也落 Blocked 库。
+pub fn run_build(
+    opts: &BuildOptions,
+    binding: &mut dyn LpkgBinding,
+    state: Option<&State>,
+) -> Result<BuildReport, FarmError> {
+    // 1. 旧索引（§7.2 传播反图的锚）——必须由 seed 落地的本地 repo index.txt，缺失/为空直接报错
+    //    （禁止无基线构建：needed_so provider 校验、ABI diff 都需要它）。
+    let old = load_old_index(&opts.out_dir, &opts.arch)?;
+    // 仓库全部提供能力 → binding 扫描 not-found 判定（needed_so 无 provider → 不进 needed_so）。
+    // **这是活跃集，随每包 index 更新而刷新**（见 refresh_repo_provides）——否则同一次 run 里
+    // 先构建包新加入的 SONAME 对后构建包不可见。
+    binding.set_repo_provides(old.all_provided_capabilities());
+    let revmap = RevMap::build(&old);
+    // 声明式重建组（data/build/*.yaml）：不链但 ABI 敏感的包（python 生态等）。
+    let groups = RebuildGroups::load(&opts.build_data_dir);
+
+    // 2. 增量选择（用户规则）：effective_version 与本地 repo 旧索引一致的包跳过构建。
+    //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version+release（如 1.1+2）。
+    //    validate 模式：选择改为"所有没有 `.build_ok` 标记的包"（成功构建才会写标记，
+    //    跳过/blocked 不写 → 下次 validate 重试）。排序仍走同一 topo_order。
+    let all_pkgs = sorted_pkg_names(&opts.pkgs_dir);
+    let (mut queue, version_planned_names) = build_plan(opts, &old, &groups, &all_pkgs);
 
     // 2.5 构建计划预览：topo 顺序（仅"最开始能确认需要 build"的包；ABI 受害者随后动态入队）。
     // 交互模式 → 列出顺序并让 operator 确认才开始；确认后**只为确认集**预下载全部源。
@@ -446,7 +487,12 @@ pub fn run_build(
                 eprintln!("{}", tr!("build.repack_fail", pkg, e));
                 report.blocked.push(pkg.clone());
                 if let Some(st) = state {
-                    let _ = st.set_job(&pkg, JobStatus::Blocked, Some("repack"), rhash.as_deref());
+                    let _ = st.set_job(
+                        &pkg,
+                        JobStatus::Blocked,
+                        Some(BlockStage::Repack.as_str()),
+                        rhash.as_deref(),
+                    );
                 }
                 continue;
             }
@@ -465,7 +511,12 @@ pub fn run_build(
                 eprintln!("{}", tr!("build.repo_fail", pkg, e));
                 report.blocked.push(pkg.clone());
                 if let Some(st) = state {
-                    let _ = st.set_job(&pkg, JobStatus::Blocked, Some("repo"), rhash.as_deref());
+                    let _ = st.set_job(
+                        &pkg,
+                        JobStatus::Blocked,
+                        Some(BlockStage::Repo.as_str()),
+                        rhash.as_deref(),
+                    );
                 }
                 continue;
             }
@@ -488,7 +539,12 @@ pub fn run_build(
             eprintln!("{}", tr!("build.index_fail", pkg, e));
             report.blocked.push(pkg.clone());
             if let Some(st) = state {
-                let _ = st.set_job(&pkg, JobStatus::Blocked, Some("index"), rhash.as_deref());
+                let _ = st.set_job(
+                    &pkg,
+                    JobStatus::Blocked,
+                    Some(BlockStage::Index.as_str()),
+                    rhash.as_deref(),
+                );
             }
             continue;
         }
@@ -833,7 +889,7 @@ mod tests {
         let pkgs = temp_dir("farm-predl-miss");
         write_pkg_sources(&pkgs, "p", &["http://127.0.0.1:1/nope.tar.gz"], &[]);
         let err = pre_download_sources(&pkgs, "p", 1).unwrap_err();
-        assert!(!err.is_empty(), "应返回 source-missing 错误");
+        assert!(!err.to_string().is_empty(), "应返回 source-missing 错误");
         assert!(!pkgs.join("p/nope.tar.gz").exists());
         fs::remove_dir_all(&pkgs).ok();
     }
@@ -867,7 +923,7 @@ mod tests {
         };
         let err = run_build(&opts, &mut binding, None).unwrap_err();
         assert!(
-            err.contains("source-missing"),
+            err.to_string().contains("source-missing"),
             "非交互源缺失应硬终止：{err}"
         );
         assert!(!dir.join("a/nope.tar.gz").exists());
@@ -2164,7 +2220,7 @@ packages: perl-*
         };
         let err = run_build(&opts, &mut binding, None).unwrap_err();
         assert!(
-            err.contains("farm seed"),
+            err.to_string().contains("farm seed"),
             "应明确提示先 seed（{err}），而非静默当首次构建"
         );
         fs::remove_dir_all(&dir).ok();

@@ -1,15 +1,13 @@
-use super::Args;
+use super::{AbiFixArgs, BuildArgs, RepoArgs, ValidateArgs};
 use lankefarm::build::{self, BuildOptions};
-use lankefarm::lpkg_binding::{CleanupState, RealBinding};
+use lankefarm::error::FarmError;
+use lankefarm::lpkg_binding::docker::{CleanupState, RealBinding};
 use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 
-pub(crate) fn cmd_build(args: &Args) -> ExitCode {
-    let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
-    let out_dir = args.out.clone().unwrap_or_else(|| PathBuf::from("out"));
-
+pub(crate) fn cmd_build(args: &BuildArgs) -> ExitCode {
     // --all → 空 targets（run_build 内部做全量 + 版本增量跳过：effective_version 与本地 repo 一致则跳过）
     let targets: Vec<String> = if args.all {
         Vec::new()
@@ -19,55 +17,62 @@ pub(crate) fn cmd_build(args: &Args) -> ExitCode {
         eprintln!("{}", lankefarm::tr!("build.usage"));
         return ExitCode::from(2);
     };
-    run_build_flow(args, pkgs_dir, out_dir, targets, /*validate=*/ false)
+    run_build_flow(
+        &args.repo,
+        targets,
+        /*validate=*/ false,
+        args.manual_sort,
+    )
 }
 
 /// validate：自动重建所有没有 `.build_ok` 标记的包（成功构建才写标记；跳过/blocked 不写）。
 /// 排序与增量构建一致（run_build 内部同一 topo_order + ABI 传播）。
-pub(crate) fn cmd_validate(args: &Args) -> ExitCode {
-    let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
-    let out_dir = args.out.clone().unwrap_or_else(|| PathBuf::from("out"));
-    run_build_flow(args, pkgs_dir, out_dir, Vec::new(), /*validate=*/ true)
+pub(crate) fn cmd_validate(args: &ValidateArgs) -> ExitCode {
+    run_build_flow(
+        &args.repo,
+        Vec::new(),
+        /*validate=*/ true,
+        /*manual_sort=*/ false,
+    )
 }
 
 /// abifix：自动修复「LankeBUILD.json 引用仓库无 provider SONAME」的包。
 /// abifix_plan（lib）载入旧索引 → 检测孤儿 → 逐个 bump release → 返回修复目标清单；
 /// 这里以这些包为显式目标强制重建（run_build 内 topo 排序 + ABI 传播级联照常）。
 /// **plan 返回空（无目标）时直接返回**——绝不能落到空目标的增量构建。
-pub(crate) fn cmd_abifix(args: &Args) -> ExitCode {
-    let pkgs_dir = args.pkgs.clone().unwrap_or_else(|| "pkgs".to_string());
-    let out_dir = args.out.clone().unwrap_or_else(|| PathBuf::from("out"));
-    let arch = args.arch.clone().unwrap_or_else(|| "x86_64".to_string());
-
-    let names = match lankefarm::build::abifix_plan(&PathBuf::from(&pkgs_dir), &out_dir, &arch) {
-        Ok(v) => v,
-        Err(e) => {
-            eprintln!("{e}");
-            return ExitCode::from(2);
-        }
-    };
+pub(crate) fn cmd_abifix(args: &AbiFixArgs) -> ExitCode {
+    let names =
+        match lankefarm::build::abifix_plan(&args.repo.pkgs, &args.repo.out, &args.repo.arch) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("{e}");
+                return ExitCode::from(2);
+            }
+        };
     if names.is_empty() {
         return ExitCode::SUCCESS;
     }
-    run_build_flow(args, pkgs_dir, out_dir, names, /*validate=*/ false)
+    run_build_flow(
+        &args.repo, names, /*validate=*/ false, /*manual_sort=*/ false,
+    )
 }
 
-/// build / validate 共用完整流程：state → image 校验 → 内嵌 serve → RealBinding → run_build → 汇总。
+/// build / validate / abifix 共用完整流程：state → image 校验 → 内嵌 serve → RealBinding →
+/// run_build → 汇总。
 fn run_build_flow(
-    args: &Args,
-    pkgs_dir: String,
-    out_dir: PathBuf,
+    repo: &RepoArgs,
     targets: Vec<String>,
     validate: bool,
+    manual_sort: bool,
 ) -> ExitCode {
     if let Some(code) = super::ensure_root() {
         return code;
     }
     // SQLite 状态（§11）：job 状态 + 构建历史（增量由 run_build 的版本对比驱动）
-    let state_path = args
+    let state_path = repo
         .state
         .clone()
-        .unwrap_or_else(|| out_dir.join("farm-state.db"));
+        .unwrap_or_else(|| repo.out.join("farm-state.db"));
     let state = match lankefarm::state::State::open(&state_path) {
         Ok(s) => {
             println!("{}", lankefarm::tr!("state.open", state_path.display()));
@@ -80,21 +85,21 @@ fn run_build_flow(
     };
 
     // 仅容器构建：--image 必填（禁止主机 lpkg build 污染宿主环境）
-    let base_image = match args.image.as_deref() {
+    let base_image = match repo.image.as_deref() {
         Some(i) if !i.is_empty() => i.to_string(),
         _ => {
             eprintln!("{}", lankefarm::tr!("build.need_image"));
             return ExitCode::from(2);
         }
     };
-    let arch = args.arch.clone().unwrap_or_else(|| "x86_64".to_string());
-    let repo_port = args.repo_port.unwrap_or(80);
+    let arch = repo.arch.clone();
+    let repo_port = repo.repo_port;
 
     // Ctrl+C 中断清理：rm 当前容器 → 删 DB 当前条目 → finalize（最新 commit 覆盖 base + 删 roll 镜像）。
     let cleanup = Arc::new(Mutex::new(CleanupState {
         current_cid: None,
         current_pkg: None,
-        out_dir: out_dir.clone(),
+        out_dir: repo.out.clone(),
         base_image: base_image.clone(),
         state_path: state_path.clone(),
     }));
@@ -112,7 +117,7 @@ fn run_build_flow(
                     let _ = st.delete_job(pkg);
                 }
             }
-            let _ = lankefarm::lpkg_binding::finalize_roll(&s.out_dir, &s.base_image);
+            let _ = lankefarm::lpkg_binding::docker::finalize_roll(&s.out_dir, &s.base_image);
             eprintln!("{}", lankefarm::tr!("build.ctrl_c_clean"));
             std::process::exit(130);
         }) {
@@ -123,15 +128,15 @@ fn run_build_flow(
     // serve_ready 绑定成功后经 channel 确认就绪；绑定失败（如非 root 绑默认端口 80）
     // 立即暴露并退出，不再静默吞掉 + 盲等 300ms。
     println!("{}", lankefarm::tr!("build.serve_start", repo_port));
-    let (serve_tx, serve_rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    let (serve_tx, serve_rx) = std::sync::mpsc::channel::<Result<(), FarmError>>();
     let serve_handle = {
-        let repo_root = out_dir.clone();
+        let repo_root = repo.out.clone();
         let port = repo_port;
         std::thread::spawn(move || {
             let res = lankefarm::serve::serve_ready("127.0.0.1", &repo_root, port, |_actual| {
                 serve_tx
                     .send(Ok(()))
-                    .map_err(|e| format!("serve 就绪信号发送失败: {e}"))
+                    .map_err(|e| format!("serve 就绪信号发送失败: {e}").into())
             });
             if let Err(e) = &res {
                 let _ = serve_tx.send(Err(e.clone()));
@@ -156,26 +161,26 @@ fn run_build_flow(
         }
     }
 
-    // RealBinding：--image 走 fresh container 编排（§8），否则宿主 lpkg build
+    // RealBinding：--image 走 fresh container 编排（§8）
     let mut binding = RealBinding::new(
         base_image.clone(),
-        pkgs_dir.clone(),
-        out_dir.clone(),
+        repo.pkgs.clone(),
+        repo.out.clone(),
         arch.clone(),
         repo_port,
         cleanup.clone(),
     );
     let opts = BuildOptions {
-        pkgs_dir: PathBuf::from(&pkgs_dir),
-        out_dir: out_dir.clone(),
+        pkgs_dir: repo.pkgs.clone(),
+        out_dir: repo.out.clone(),
         targets,
         arch,
         image: base_image.clone(),
-        download_retries: args.download_retries.unwrap_or(3),
+        download_retries: repo.download_retries,
         interactive: std::io::stdin().is_terminal(),
         build_data_dir: PathBuf::from("data/build"),
         validate,
-        manual_sort: args.manual_sort,
+        manual_sort,
     };
     let report = match build::run_build(&opts, &mut binding, state.as_ref()) {
         Ok(r) => r,
@@ -187,7 +192,7 @@ fn run_build_flow(
 
     // 整个 build 流程完毕后收尾：最新 commit 扁平化覆盖 base、删全部 roll 镜像、计数归零。
     // （Ctrl+C 时由信号处理器做同样的事）
-    if let Err(e) = lankefarm::lpkg_binding::finalize_roll(&out_dir, &base_image) {
+    if let Err(e) = lankefarm::lpkg_binding::docker::finalize_roll(&repo.out, &base_image) {
         eprintln!("{}", lankefarm::tr!("build.finalize_fail", e));
     }
 

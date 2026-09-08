@@ -6,6 +6,7 @@
 //! - 默认取 `info.version`（PyPI 最新版）与最新版 `urls` 里的 sdist URL；
 //! - `major-version-lock` 时在 `releases` 里按主版本过滤取最大稳定版（多数 python 包用不到）。
 
+use crate::error::FarmError;
 use crate::net::Fetcher;
 use crate::track::templates;
 use crate::track::{need, EntryProbe, SourceConfig};
@@ -15,7 +16,7 @@ pub fn probe(
     cfg: &SourceConfig,
     major: Option<&str>,
     _pkg_name: &str,
-) -> Result<EntryProbe, String> {
+) -> Result<EntryProbe, FarmError> {
     let project = need(&cfg.project, "project")?;
     let url = format!("https://pypi.org/pypi/{project}/json");
     let body = fetcher.get(&url)?;

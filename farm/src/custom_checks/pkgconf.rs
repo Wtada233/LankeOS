@@ -9,6 +9,7 @@
 //! 剥 `>=` 等版本约束）。
 
 use super::{walk_all, ChkOpts, Report};
+use crate::error::FarmError;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
@@ -46,7 +47,7 @@ fn parse_requires_line(value: &str, out: &mut Vec<String>) {
     }
 }
 
-fn analyze(extract: &Path) -> Result<serde_json::Value, String> {
+fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     let content = extract.join("content");
     let mut provides: Vec<String> = Vec::new();
     let mut requires: Vec<(String, String)> = Vec::new();
@@ -81,7 +82,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, String> {
 }
 
 /// 跑 pkgconfchk。
-pub fn run(opts: &ChkOpts) -> Result<Report, String> {
+pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let (analyses, hits, misses, failed) = walk_all(opts, |ext, _pkg| analyze(ext))?;
     let index = super::load_index(opts);
     let mut module_owners: BTreeMap<String, HashSet<String>> = BTreeMap::new();

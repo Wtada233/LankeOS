@@ -16,6 +16,7 @@
 //! **同时返回 LankeBUILD.json 需要的字段**（`update_lankebuild` 在调用方），确保仓库源定义
 //! 与包内 metadata 一致（§6：把漂移 diff 落回仓库，源定义是真相）。
 
+use crate::error::FarmError;
 use std::fs;
 use std::io::{self, Write};
 use std::os::unix::fs::{FileTypeExt, PermissionsExt};
@@ -30,7 +31,7 @@ pub fn repack_with_metadata(
     extract_dir: &Path,
     new_needed_so: &[String],
     new_provides: &[String],
-) -> Result<(), String> {
+) -> Result<(), FarmError> {
     if !extract_dir.join("metadata.json").exists() {
         scan::extract_lpkg(lpkg_path, extract_dir)?;
     }
@@ -60,11 +61,11 @@ pub fn repack_with_metadata(
 /// 遍历用 `symlink_metadata`（不 follow）——content 里的损坏 symlink（如 dbus 的
 /// `var/lib/dbus/machine-id` → 包内不存在的目标）按 symlink 存，不炸 `No such file`。
 /// build 每次成功都经此把容器产物归一化为发行档（level 22 + mtime 1970，字节可复现）。
-fn repack_lpkg(extract_dir: &Path, out_path: &Path) -> Result<(), String> {
+fn repack_lpkg(extract_dir: &Path, out_path: &Path) -> Result<(), FarmError> {
     repack_lpkg_at(extract_dir, out_path, 22)
 }
 
-fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(), String> {
+fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(), FarmError> {
     let tmp = out_path.with_extension("lpkg.tmp");
     let f = fs::File::create(&tmp).map_err(|e| format!("创建 {tmp:?} 失败: {e}"))?;
     let mut enc =
@@ -90,10 +91,10 @@ fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(),
 /// - symlink 按 symlink 存（`read_link`，**不 stat 目标**，容忍损坏 symlink）。
 /// - `read_dir` 结果按路径排序 → 遍历顺序确定（配合 mtime=0 得到字节可复现的归档）。
 /// - 遇到 socket/设备/fifo（LFS 包 content 不该有）→ 明确报错，不留静默。
-pub fn pack_dir_tar(root: &Path, out: &mut dyn Write) -> Result<(), String> {
+pub fn pack_dir_tar(root: &Path, out: &mut dyn Write) -> Result<(), FarmError> {
     let mut b = tar::Builder::new(out);
     append_tree(&mut b, root, root)?;
-    b.finish().map_err(|e| format!("tar 收尾失败: {e}"))
+    b.finish().map_err(|e| format!("tar 收尾失败: {e}").into())
 }
 
 /// 递归把 `abs_dir` 下的成员写进 builder；`abs_root` = 包根（tar 路径的相对基准）。
@@ -101,7 +102,7 @@ fn append_tree(
     b: &mut tar::Builder<&mut dyn Write>,
     abs_root: &Path,
     abs_dir: &Path,
-) -> Result<(), String> {
+) -> Result<(), FarmError> {
     let mut entries: Vec<(PathBuf, PathBuf)> = fs::read_dir(abs_dir)
         .map_err(|e| format!("读取 {abs_dir:?} 失败: {e}"))?
         .filter_map(|e| e.ok().map(|e| e.path()))
@@ -137,7 +138,8 @@ fn append_tree(
         } else if ft.is_socket() || ft.is_block_device() || ft.is_char_device() || ft.is_fifo() {
             return Err(format!(
                 "content 含不支持的特殊文件类型 {abs:?}（socket/设备/fifo）——不应出现在 .lpkg"
-            ));
+            )
+            .into());
         }
     }
     Ok(())

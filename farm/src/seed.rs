@@ -10,6 +10,7 @@
 //! 与容器可见的索引用，不再剥 needed_so、不再维护第二份 .abi.json。
 //! 播种得到的远程 index 即"旧索引"，Tier-1 ABI diff 从第一天就可用——无需全量构建（§8 冷启动）。
 
+use crate::error::FarmError;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
@@ -27,7 +28,7 @@ pub struct SeedReport {
 }
 
 /// 从远程 repo 播种本地 repo。返回报告。`jobs` = 并行下载/解包线程数。
-pub fn seed(remote: &str, arch: &str, out: &Path, jobs: usize) -> Result<SeedReport, String> {
+pub fn seed(remote: &str, arch: &str, out: &Path, jobs: usize) -> Result<SeedReport, FarmError> {
     // 1. 下载 + 解析 index.txt（完整 needed_so，单一真源）
     let index_url = format!("{remote}/{arch}/index.txt");
     let index_text = fetch(&index_url)?;
@@ -101,7 +102,7 @@ fn seed_chunk(
         let dest = pkg_dir.join(format!("{}.lpkg", info.version));
         match seed_one_pkg(&url, &dest, &pkg_dir, name, info) {
             Ok(()) => report.ok += 1,
-            Err(e) => report.failed.push((name.clone(), e)),
+            Err(e) => report.failed.push((name.clone(), e.to_string())),
         }
     }
     report
@@ -120,7 +121,7 @@ fn seed_one_pkg(
     pkg_dir: &Path,
     name: &str,
     info: &crate::graph::PkgInfo,
-) -> Result<(), String> {
+) -> Result<(), FarmError> {
     // 已有文件：增量跳过，但仍须校验哈希（防半文件/损坏被永久接受）
     if let Ok(meta) = fs::metadata(dest) {
         if meta.is_file() {
@@ -151,23 +152,24 @@ fn seed_one_pkg(
         }
         Ok(_) => {
             let _ = fs::remove_file(dest);
-            Err("SHA256 不匹配".to_string())
+            Err("SHA256 不匹配".to_string().into())
         }
         Err(e) => Err(e),
     }
 }
 
 /// 下载文本（index.txt）。
-fn fetch(url: &str) -> Result<String, String> {
+fn fetch(url: &str) -> Result<String, FarmError> {
     let body = ureq::get(url)
         .set("User-Agent", crate::net::CURL_UA)
         .call()
         .map_err(|e| format!("GET {url}: {e}"))?;
-    body.into_string().map_err(|e| format!("读 {url}: {e}"))
+    body.into_string()
+        .map_err(|e| format!("读 {url}: {e}").into())
 }
 
 /// 流式下载到文件。
-fn download(url: &str, dest: &Path) -> Result<(), String> {
+fn download(url: &str, dest: &Path) -> Result<(), FarmError> {
     let resp = ureq::get(url)
         .set("User-Agent", crate::net::CURL_UA)
         .call()
@@ -179,7 +181,7 @@ fn download(url: &str, dest: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn sha256_file(path: &Path) -> Result<String, String> {
+fn sha256_file(path: &Path) -> Result<String, FarmError> {
     let data = fs::read(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
     let mut hasher = Sha256::new();
     hasher.update(&data);

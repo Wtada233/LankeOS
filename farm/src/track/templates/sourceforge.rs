@@ -2,6 +2,7 @@
 //!
 //! **被动触发**：source 条目里 `tracker-template: sourceforge` + `project` + `path` + `pattern` + `template`。
 
+use crate::error::FarmError;
 use regex::Regex;
 
 use crate::net::Fetcher;
@@ -14,7 +15,7 @@ pub fn probe(
     cfg: &SourceConfig,
     major: Option<&str>,
     pkg_name: &str,
-) -> Result<EntryProbe, String> {
+) -> Result<EntryProbe, FarmError> {
     let project = need(&cfg.project, "project")?;
     let pattern = need(&cfg.pattern, "pattern")?;
     let template = need(&cfg.template, "template")?;

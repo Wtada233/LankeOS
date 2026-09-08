@@ -3,6 +3,7 @@
 //! **被动触发**：source 条目里 `tracker-template: github` + `repo` + `mode`(tags|releases) + `tag-prefix` + `template`。
 //! 探测用 GitHub API（tags 列表或 releases/latest），稳定版优先。
 
+use crate::error::FarmError;
 use crate::net::Fetcher;
 use crate::track::templates::{self, matches_major, max_tag_version, strip_version};
 use crate::track::{need, EntryProbe, SourceConfig};
@@ -13,7 +14,7 @@ pub fn probe(
     cfg: &SourceConfig,
     major: Option<&str>,
     _pkg_name: &str,
-) -> Result<EntryProbe, String> {
+) -> Result<EntryProbe, FarmError> {
     let repo = need(&cfg.repo, "repo")?;
     let tag_prefix = cfg.tag_prefix.as_deref().unwrap_or("");
     let template = need(&cfg.template, "template")?;

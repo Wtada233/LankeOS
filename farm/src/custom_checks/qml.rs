@@ -12,6 +12,7 @@
 //! 三段判定同其它 chk：闭包（deps∪needed_so）内找到即过；否则仓库内有 → Warning；仓库也没有 → Critical。
 
 use super::{walk_all, ChkOpts, Finding, Report, Severity};
+use crate::error::FarmError;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
@@ -85,7 +86,7 @@ fn imports_in(text: &str) -> Vec<(String, String)> {
 /// - files:    包内全部 .qml 文件的 content 相对路径（全局目录索引的输入）
 /// - requires: (文件, URI import)
 /// - rel:      (文件, 归一化后的绝对目录) 相对路径 include
-fn analyze(extract: &Path) -> Result<serde_json::Value, String> {
+fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     let content = extract.join("content");
     let mut provides: Vec<String> = Vec::new();
     let mut files: Vec<String> = Vec::new();
@@ -137,7 +138,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, String> {
 }
 
 /// 跑 qmlchk。
-pub fn run(opts: &ChkOpts) -> Result<Report, String> {
+pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let (analyses, hits, misses, failed) = walk_all(opts, |ext, _pkg| analyze(ext))?;
     let index = super::load_index(opts);
 

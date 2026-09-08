@@ -4,6 +4,7 @@
 //! （Arch noextract 对应——lpkg 只下载不解压，如 LibreOffice vendor tarball）。
 //! 返回完整清单（`ProbeResult`），不参与模板的位置模型。
 
+use crate::error::FarmError;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::net::Fetcher;
@@ -14,7 +15,11 @@ static SCRIPT_SEQ: AtomicU32 = AtomicU32::new(0);
 
 /// 运行内嵌 bash 脚本（stdout 第一行版本，后续行 URL）。
 /// 平台 token 通过 `GITHUB_TOKEN`/`GITLAB_TOKEN` 环境变量传给 curl，消除 script 里 GitHub/GitLab API 限流 403。
-pub fn probe(fetcher: &dyn Fetcher, content: &str, pkg_name: &str) -> Result<ProbeResult, String> {
+pub fn probe(
+    fetcher: &dyn Fetcher,
+    content: &str,
+    pkg_name: &str,
+) -> Result<ProbeResult, FarmError> {
     // 写到临时文件再跑，避免 -c 的参数转义地狱。
     // 文件名必须唯一（pkg-name + PID + 序号）：曾用固定 `lankefarm-track-{pkg}.sh`，
     // 两个并发 `farm track` 进程会互相覆盖/删除彼此的脚本——A 的 remove_file 删掉
@@ -37,13 +42,13 @@ pub fn probe(fetcher: &dyn Fetcher, content: &str, pkg_name: &str) -> Result<Pro
         .map_err(|e| format!("运行 track 脚本失败: {e}"))?;
     let _ = std::fs::remove_file(&tmp);
     if !out.status.success() {
-        return Err(format!("track 脚本退出码非零: {}", out.status));
+        return Err(format!("track 脚本退出码非零: {}", out.status).into());
     }
     let stdout = String::from_utf8_lossy(&out.stdout);
     let mut lines = stdout.lines();
     let version = lines.next().unwrap_or("").trim().to_string();
     if version.is_empty() {
-        return Err("track 脚本未输出版本（stdout 第一行）".to_string());
+        return Err("track 脚本未输出版本（stdout 第一行）".to_string().into());
     }
     // 契约：首行版本，随后行为 sources URL；出现标记行 `# work_sources` 后归为 work_sources
     let mut sources = Vec::new();

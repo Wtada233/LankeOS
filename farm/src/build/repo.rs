@@ -1,6 +1,7 @@
 //! repo.rs — 仓库侧操作：版本判定 / 漂移 repack / 上传 / index 更新 / 配方读写。
 
 use super::{read_lankebuild, BuildOptions};
+use crate::error::FarmError;
 use crate::graph::Index;
 use crate::lpkg_binding::BuildOutcome;
 use crate::repack;
@@ -41,7 +42,7 @@ pub(crate) fn repack_if_drift(
     outcome: &BuildOutcome,
     opts: &BuildOptions,
     pkg: &str,
-) -> Result<bool, String> {
+) -> Result<bool, FarmError> {
     let Some(lpkg) = &outcome.lpkg_path else {
         return Ok(false);
     };
@@ -85,7 +86,7 @@ pub(crate) fn repack_if_drift(
     // metadata 重写幂等 → 无漂移路径只是重新编码/归一化，产出字节确定。
     match repack::repack_with_metadata(lpkg, &extract, &outcome.needed_so, &outcome.provides) {
         Ok(()) => Ok(drifted),
-        Err(e) => Err(format!("repack {} 失败: {e}", pkg)),
+        Err(e) => Err(format!("repack {} 失败: {e}", pkg).into()),
     }
 }
 
@@ -98,9 +99,9 @@ pub(crate) fn place_in_repo(
     outcome: &BuildOutcome,
     opts: &BuildOptions,
     pkg: &str,
-) -> Result<PathBuf, String> {
+) -> Result<PathBuf, FarmError> {
     let Some(lpkg) = &outcome.lpkg_path else {
-        return Err("无构建产物".to_string());
+        return Err("无构建产物".to_string().into());
     };
     let version = effective_version(&opts.pkgs_dir, pkg).ok_or("配方无有效版本")?;
     let repo_pkg_dir = opts.out_dir.join(&opts.arch).join(pkg);
@@ -150,7 +151,7 @@ pub(crate) fn backup_removed_sonames(
     old_lpkg: &Path,
     pkg: &str,
     new_provides: &[String],
-) -> Result<(), String> {
+) -> Result<(), FarmError> {
     let Ok(meta) = crate::scan::read_lpkg_metadata(old_lpkg) else {
         return Ok(());
     };
@@ -477,7 +478,7 @@ pub(crate) fn update_repo_index(
     deps: &[String],
     provides: &[String],
     needed_so: &[String],
-) -> Result<(), String> {
+) -> Result<(), FarmError> {
     let path = out_dir.join(arch).join("index.txt");
     let content = fs::read_to_string(&path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
     let mut found = false;
@@ -515,10 +516,10 @@ pub(crate) fn update_repo_index(
             needed_so = needed_so.join(",")
         ));
     }
-    fs::write(&path, lines.join("\n") + "\n").map_err(|e| format!("写 {path:?} 失败: {e}"))
+    fs::write(&path, lines.join("\n") + "\n").map_err(|e| format!("写 {path:?} 失败: {e}").into())
 }
 
-pub(crate) fn sha256_file(path: &Path) -> Result<String, String> {
+pub(crate) fn sha256_file(path: &Path) -> Result<String, FarmError> {
     let data = fs::read(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
     let mut hasher = Sha256::new();
     hasher.update(&data);
@@ -573,16 +574,16 @@ pub(crate) fn update_lankebuild_metadata(pkgs_dir: &Path, pkg: &str, outcome: &B
 /// index.txt 含**完整 needed_so**（单一真源），传播（removed_sonames/revmap）、构建序（link_deps）
 /// 都从这里读。**必须有**——无基线构建是盲人摸象（needed_so 的 provider 无从校验、ABI diff 无从对比）。
 /// 缺失/为空 → 报错，要求先 `farm seed` 引入 repo 数据；不做网络 fallback，在线状态由 seed 显式落地。
-pub(crate) fn load_old_index(out_dir: &Path, arch: &str) -> Result<Index, String> {
+pub(crate) fn load_old_index(out_dir: &Path, arch: &str) -> Result<Index, FarmError> {
     let path = out_dir.join(arch).join("index.txt");
     let text = fs::read_to_string(&path).map_err(|e| {
         format!("缺少本地 repo 索引 {path:?}（{e}）——请先 `farm seed` 播种，禁止无基线构建")
     })?;
     let idx = Index::parse(&text);
     if idx.packages.is_empty() {
-        return Err(format!(
-            "本地 repo 索引 {path:?} 为空——请先 `farm seed` 播种，禁止无基线构建"
-        ));
+        return Err(
+            format!("本地 repo 索引 {path:?} 为空——请先 `farm seed` 播种，禁止无基线构建").into(),
+        );
     }
     // 全零 needed_so = 剥离时代遗留的旧索引（曾剥 needed_so）→ 传播会失明，提示重新 seed
     if idx.packages.values().all(|p| p.needed_so.is_empty()) {

@@ -10,6 +10,7 @@
 //!
 //! 扫描与 repack 共用一次解包（§6：单包单趟，避免二次解压）。扫描只读，不落库。
 
+use crate::error::FarmError;
 use std::collections::HashSet;
 use std::fs;
 use std::io::Read;
@@ -52,7 +53,7 @@ pub fn scan_lpkg(
     lpkg_path: &Path,
     extract_dir: &Path,
     repo_provides: &HashSet<String>,
-) -> Result<ScanResult, String> {
+) -> Result<ScanResult, FarmError> {
     extract_lpkg(lpkg_path, extract_dir)?;
     let meta = read_metadata_json(&extract_dir.join("metadata.json"))?;
     let name = meta["name"].as_str().unwrap_or("").to_string();
@@ -85,8 +86,8 @@ pub fn running_as_root() -> bool {
 /// 删除目录树。解包/重打包以 root 运行后，`fs::remove_dir_all` 能删 root 属主树（含 content/etc、
 /// content/var 等只读 root 目录——export 的 `.export-extract` 曾因删不动残留 14G）。
 /// 曾用 `sudo -n rm -rf` 兜底（已去 sudo，见 ARCH §「root 运行」）。
-pub(crate) fn remove_dir_tree(path: &Path) -> Result<(), String> {
-    fs::remove_dir_all(path).map_err(|e| format!("删除目录树 {path:?} 失败: {e}"))
+pub(crate) fn remove_dir_tree(path: &Path) -> Result<(), FarmError> {
+    fs::remove_dir_all(path).map_err(|e| format!("删除目录树 {path:?} 失败: {e}").into())
 }
 
 /// 解包 .lpkg（zstd 压缩 tar），保留 mode/uid/gid。纯 Rust（tar + zstd crate，无 sudo/tar/zstd CLI）。
@@ -94,7 +95,7 @@ pub(crate) fn remove_dir_tree(path: &Path) -> Result<(), String> {
 /// 语义对齐旧 `sudo tar --numeric-owner -xf`：mode 完整（含 SUID）、按 header 数字 uid/gid chown、
 /// 保留 mtime。以 root 运行时保留所有权（`/etc/shadow` 0600、SUID 等需要特权）；非 root（单测跑
 /// 用户属主 fixture）只保留 mode、不 chown。
-pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), String> {
+pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), FarmError> {
     if extract_dir.exists() {
         remove_dir_tree(extract_dir)?;
     }
@@ -108,18 +109,18 @@ pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), String> 
     ar.set_preserve_ownerships(running_as_root());
     ar.set_overwrite(true);
     ar.unpack(extract_dir)
-        .map_err(|e| format!("tar 解包 {lpkg_path:?} 失败: {e}"))
+        .map_err(|e| format!("tar 解包 {lpkg_path:?} 失败: {e}").into())
 }
 
 /// 读 metadata.json（返回 serde Value 供 name/version 与后续 repack 复用）。
-pub(crate) fn read_metadata_json(path: &Path) -> Result<serde_json::Value, String> {
+pub(crate) fn read_metadata_json(path: &Path) -> Result<serde_json::Value, FarmError> {
     let content = fs::read_to_string(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
-    serde_json::from_str(&content).map_err(|e| format!("解析 {path:?} 失败: {e}"))
+    serde_json::from_str(&content).map_err(|e| format!("解析 {path:?} 失败: {e}").into())
 }
 
 /// 流式读 .lpkg 的 metadata.json（不落盘 content）——seed 判断"是否已剥 needed_so"用。
 /// 若 metadata.json 是 tar 首项，则只解压到它为止，开销小。
-pub fn read_lpkg_metadata(lpkg_path: &Path) -> Result<serde_json::Value, String> {
+pub fn read_lpkg_metadata(lpkg_path: &Path) -> Result<serde_json::Value, FarmError> {
     let f = fs::File::open(lpkg_path).map_err(|e| format!("打开 {lpkg_path:?} 失败: {e}"))?;
     let dec = zstd::stream::read::Decoder::new(f)
         .map_err(|e| format!("zstd 解压 {lpkg_path:?} 失败: {e}"))?;
@@ -138,10 +139,11 @@ pub fn read_lpkg_metadata(lpkg_path: &Path) -> Result<serde_json::Value, String>
             use std::io::Read;
             e.read_to_string(&mut s)
                 .map_err(|e| format!("读 metadata.json 失败: {e}"))?;
-            return serde_json::from_str(&s).map_err(|e| format!("解析 metadata.json 失败: {e}"));
+            return serde_json::from_str(&s)
+                .map_err(|e| format!("解析 metadata.json 失败: {e}").into());
         }
     }
-    Err(format!("{lpkg_path:?} 内无 metadata.json"))
+    Err(format!("{lpkg_path:?} 内无 metadata.json").into())
 }
 
 /// 遍历 content/，扫 ELF → (needed_so, provides)。
