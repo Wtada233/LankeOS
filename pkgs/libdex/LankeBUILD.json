@@ -1,8 +1,10 @@
 {
   "name": "libdex",
   "version": "1.1.0",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "sysprof"
+  ],
   "needed_so": [
     "libatomic.so.1",
     "libc.so.6",

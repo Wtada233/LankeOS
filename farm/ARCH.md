@@ -268,3 +268,17 @@ build --all ──> run_build
   候选库（provider 目录内）提供 → 按包报告。候选为空跳过（无法判断，同 python）。
 - 确定性：包/文件排序遍历；provider 冲突（同 SONAME 多份）最后一次胜。consumer 判缺失在 provider
   目录建全后统一做。
+
+## 17. custom-checks：LankeOS 策略检测（qmlchk/pkgconfchk/pkg-errchk/hookchk/fullchk）
+
+`src/custom_checks/` 一族的策略/打包检测（非 farm 核心 ABI），参考 abichk（§16）的架构与缓存思路，
+由 `farm fullchk` 一并跑（或单跑）。逐包一次解包；**整包缓存 key = .lpkg 文件 sha256**（不是名字/版本），
+命中即复用分析。判定：
+- qmlchk/pkgconfchk：`import`/`Requires` 模块的**归属包** ∈ 本包 `deps`（配方）∪ `needed_so` 推导链接
+  依赖（`graph::link_deps`）即满足；仓库内无 provider 的外部模块忽略。
+- pkg-errchk：`usr/etc`|`usr/var` 错位、`.la`、`.a`（静态库一般应删；.cmake 引用的包用
+  `IGNORE_CHK_PKGERR` 豁免）。
+- hookchk：建了 `usr/lib/sysusers.d`/`tmpfiles.d` 的包，其 `hooks/postinst.sh` 必须调
+  `systemd-sysusers`/`systemd-tmpfiles --create`。
+配方 `farm_flags` 支持 `IGNORE_CHK_ABI/QML/PKGCONF/PKGERR/HOOK`（大写）整包豁免；这些 flag 已在
+`build/farm_flags.rs` 注册（topo 解析不告警）。检則都非 root、只读。

@@ -41,5 +41,8 @@
   "sources": [
     "https://gitlab.com/nicolasfella/signond/-/archive/VERSION_8.61/signond-VERSION_8.61.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

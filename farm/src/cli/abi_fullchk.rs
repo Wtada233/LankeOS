@@ -14,6 +14,24 @@ pub(crate) fn cmd_manual_abi_fullchk(args: &Args) -> ExitCode {
         .clone()
         .unwrap_or_else(|| abi_fullchk::default_cache_dir(&source));
     let pkgs = args.pkg.clone();
+    // 配方根：豁免(IGNORE_CHK_ABI)读 LankeBUILD.json farm_flags；默认 pkgs 不存在回落 ../pkgs
+    let recipes = args
+        .pkgs
+        .as_deref()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("pkgs"));
+    let pkgs_dir = if recipes.is_dir() {
+        recipes.clone()
+    } else if recipes == PathBuf::from("pkgs") {
+        let alt = PathBuf::from("../pkgs");
+        if alt.is_dir() {
+            alt
+        } else {
+            recipes
+        }
+    } else {
+        recipes
+    };
     println!(
         "{}",
         lankefarm::tr!(
@@ -33,6 +51,7 @@ pub(crate) fn cmd_manual_abi_fullchk(args: &Args) -> ExitCode {
         arch,
         cache,
         pkgs,
+        pkgs_dir,
         full_rescan: args.full_rescan,
     }) {
         Ok(r) => {
@@ -62,7 +81,11 @@ pub(crate) fn cmd_manual_abi_fullchk(args: &Args) -> ExitCode {
                             lankefarm::tr!(
                                 "abi_fullchk.missing_item",
                                 it.elf,
-                                it.name,
+                                format!(
+                                    "{}{}",
+                                    lankefarm::custom_checks::sev_marker(it.severity),
+                                    it.name
+                                ),
                                 it.ver,
                                 it.candidates.join(",")
                             )
@@ -71,17 +94,18 @@ pub(crate) fn cmd_manual_abi_fullchk(args: &Args) -> ExitCode {
                     if items.len() > 12 {
                         println!(
                             "{}",
-                            lankefarm::tr!(
-                                "abi_fullchk.more",
-                                (items.len() - 12).to_string()
-                            )
+                            lankefarm::tr!("abi_fullchk.more", (items.len() - 12).to_string())
                         );
                     }
                     total += items.len();
                 }
                 println!(
                     "{}",
-                    lankefarm::tr!("abi_fullchk.total", total.to_string(), r.missing.len().to_string())
+                    lankefarm::tr!(
+                        "abi_fullchk.total",
+                        total.to_string(),
+                        r.missing.len().to_string()
+                    )
                 );
             }
             for f in &r.failed {

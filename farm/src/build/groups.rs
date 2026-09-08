@@ -175,7 +175,8 @@ impl RebuildGroups {
             return Ok(Vec::new());
         };
         // 脚本 exit 0 → 重建（返回 stdout 供动态受害者解析）；exit≠0 → 跳过
-        let Some(stdout) = run_version_script(&g.script, old_ver, new_ver, pkgs_dir, out_dir, arch)?
+        let Some(stdout) =
+            run_version_script(&g.script, old_ver, new_ver, pkgs_dir, out_dir, arch)?
         else {
             return Ok(Vec::new());
         };
@@ -299,7 +300,9 @@ farm_pkg_extract() {  # $1=<pkg> $2=<dest>
     std::fs::write(&tmp, &body).map_err(|e| format!("写 version-change 脚本失败: {e}"))?;
 
     let mut cmd = std::process::Command::new("bash");
-    cmd.arg(&tmp).env("OLD_VER", old_ver).env("NEW_VER", new_ver);
+    cmd.arg(&tmp)
+        .env("OLD_VER", old_ver)
+        .env("NEW_VER", new_ver);
     if let (Some(pkgs), Some(out), Some(a)) = (pkgs_dir, out_dir, arch) {
         cmd.env("FARM_PKGS", pkgs)
             .env("FARM_OUT", out)
@@ -586,8 +589,7 @@ packages: perl-*
     fn version_change_dynamic_victims_via_stdout() {
         // version-change 脚本 exit 0 时，stdout 里打印的**合法包名**并入受害者（动态计算，
         // 如"扫所有包 ELF 里 import Qt_6_PRIVATE_API 的"）；glob 仍生效；on 自身、未知名被滤掉。
-        let dir =
-            std::env::temp_dir().join(format!("farm-groups-vdyn-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("farm-groups-vdyn-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let mut g = RebuildGroups::default();
@@ -599,20 +601,9 @@ packages: perl-*
                 globs: vec!["unused-*".into()],
             },
         );
-        let all: Vec<String> = ["q", "a", "b"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        let all: Vec<String> = ["q", "a", "b"].iter().map(|s| s.to_string()).collect();
         let v = g
-            .version_victims_ctx(
-                "q",
-                "1",
-                "2",
-                &all,
-                Some(&dir),
-                Some(&dir),
-                Some("x86_64"),
-            )
+            .version_victims_ctx("q", "1", "2", &all, Some(&dir), Some(&dir), Some("x86_64"))
             .unwrap();
         assert_eq!(v, vec!["a"], "stdout 动态受害者应只含合法包名 a: {v:?}");
 
@@ -625,15 +616,7 @@ packages: perl-*
             },
         );
         let v = g
-            .version_victims_ctx(
-                "q",
-                "1",
-                "2",
-                &all,
-                Some(&dir),
-                Some(&dir),
-                Some("x86_64"),
-            )
+            .version_victims_ctx("q", "1", "2", &all, Some(&dir), Some(&dir), Some("x86_64"))
             .unwrap();
         assert!(v.is_empty(), "exit≠0 应跳过: {v:?}");
         std::fs::remove_dir_all(&dir).ok();

@@ -8,7 +8,7 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     autoreconf -fiv
-    ./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
+    ./configure --disable-static --prefix=/usr --sysconfdir=/etc --localstatedir=/var \
         --disable-unittest
     make -j$(nproc)
 }

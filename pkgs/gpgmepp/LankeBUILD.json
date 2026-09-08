@@ -1,8 +1,10 @@
 {
   "name": "gpgmepp",
   "version": "2.1.0",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "libgpg-error"
+  ],
   "needed_so": [
     "libc.so.6",
     "libgcc_s.so.1",

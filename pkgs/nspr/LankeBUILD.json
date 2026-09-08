@@ -20,5 +20,8 @@
     "https://archive.mozilla.org/pub/nspr/releases/v4.40/src/nspr-4.40.tar.gz"
   ],
   "work_sources": [],
-  "no_strip": false
+  "no_strip": false,
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

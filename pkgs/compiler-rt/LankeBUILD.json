@@ -20,7 +20,8 @@
     "ninja"
   ],
   "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
+    "BUILD_AFTER_BUILD_DEPS",
+    "IGNORE_CHK_PKGERR"
   ],
   "sources": [
     "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/llvm-project-23.1.0.src.tar.xz"

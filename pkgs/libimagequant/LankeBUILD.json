@@ -21,5 +21,8 @@
   "sources": [
     "https://github.com/ImageOptim/libimagequant/archive/refs/tags/4.4.1.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

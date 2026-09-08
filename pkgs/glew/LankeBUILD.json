@@ -1,8 +1,10 @@
 {
   "name": "glew",
   "version": "2.3.1",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "glu"
+  ],
   "needed_so": [
     "libGL.so.1",
     "libX11.so.6",

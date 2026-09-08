@@ -55,6 +55,7 @@ use lankefarm::track::{dep_edges, TrackerConfig};
 /// 命令解析结果：clap 子命令 → 扁平结构，供各 cmd_* 使用（保持逻辑层签名不变）。
 mod abi_fullchk;
 mod build;
+mod custom_checks;
 mod export;
 mod seed;
 mod serve;
@@ -225,6 +226,32 @@ enum Command {
         /// 忽略缓存强制全量重扫
         #[arg(long)]
         full_rescan: bool,
+    },
+    /// QML import 依赖检查：import 模块的归属包须在本包 deps∪needed_so 内（缺则报）。
+    Qmlchk {
+        #[command(flatten)]
+        chk: custom_checks::ChkArgs,
+    },
+    /// pkg-config Requires 检查：.pc Requires(/private) 模块归属包须在本包 deps∪needed_so 内。
+    Pkgconfchk {
+        #[command(flatten)]
+        chk: custom_checks::ChkArgs,
+    },
+    /// 打包错误检查：usr/etc|usr/var 错位、.la、.a（除非 cmake 引用 + IGNORE_CHK_PKGERR 豁免）。
+    PkgErrchk {
+        #[command(flatten)]
+        chk: custom_checks::ChkArgs,
+    },
+    /// postinst hook 检查：建了 sysusers.d/tmpfiles.d 的包 postinst 须调 systemd-sysusers /
+    /// systemd-tmpfiles --create。
+    Hookchk {
+        #[command(flatten)]
+        chk: custom_checks::ChkArgs,
+    },
+    /// 用同一组参数跑全部 chk：manual-abi-fullchk + qmlchk + pkgconfchk + pkg-errchk + hookchk。
+    Fullchk {
+        #[command(flatten)]
+        chk: custom_checks::ChkArgs,
     },
     /// 探测上游版本
     Track {
@@ -1416,6 +1443,11 @@ pub fn run() -> ExitCode {
             };
             abi_fullchk::cmd_manual_abi_fullchk(&args)
         }
+        Command::Qmlchk { chk } => custom_checks::cmd_qmlchk(&chk),
+        Command::Pkgconfchk { chk } => custom_checks::cmd_pkgconfchk(&chk),
+        Command::PkgErrchk { chk } => custom_checks::cmd_pkg_errchk(&chk),
+        Command::Hookchk { chk } => custom_checks::cmd_hookchk(&chk),
+        Command::Fullchk { chk } => custom_checks::cmd_fullchk(&chk),
         Command::Track {
             pkg,
             all,

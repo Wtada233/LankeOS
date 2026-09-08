@@ -21,6 +21,7 @@ use std::path::{Path, PathBuf};
 use goblin::elf::header::ET_DYN;
 use sha2::{Digest, Sha256};
 
+use crate::custom_checks::Severity;
 use crate::scan;
 
 /// 一个缺失的 consumer 符号@版本。
@@ -32,6 +33,8 @@ pub struct MissingItem {
     pub ver: String,
     /// 候选 DT_NEEDED 库（provider 目录里有记录的），都未提供该 name@ver
     pub candidates: Vec<String>,
+    /// 三段判定：闭包内找不到；全仓库有其它的提供库 → Warning；仓库也无 → Critical。
+    pub severity: Severity,
 }
 
 /// fullchk 报告。
@@ -60,6 +63,8 @@ pub struct FullchkOpts {
     pub cache: PathBuf,
     /// 空 = 审计全部包；否则只审计/报告这些包（provider 仍来自 `source` 全量）
     pub pkgs: Vec<String>,
+    /// 配方根（读 farm_flags 的 IGNORE_CHK_ABI 豁免；只读 flags，deps 不管）
+    pub pkgs_dir: PathBuf,
     /// 忽略缓存强制全量重扫
     pub full_rescan: bool,
 }
@@ -80,8 +85,7 @@ struct Probe {
 }
 
 fn probe(bytes: &[u8]) -> Result<Probe, String> {
-    let elf = goblin::elf::Elf::parse(bytes)
-        .map_err(|e| format!("ELF 解析失败: {e}"))?;
+    let elf = goblin::elf::Elf::parse(bytes).map_err(|e| format!("ELF 解析失败: {e}"))?;
     Ok(Probe {
         is_dyn: elf.header.e_type == ET_DYN,
         soname: elf.soname.map(String::from),
@@ -125,7 +129,9 @@ fn symbols(
             if idx == 0 || idx == 1 {
                 continue; // VER_NDX_LOCAL / VER_NDX_GLOBAL：无版本
             }
-            let Some(name) = strtab.get_at(sym.st_name) else { continue };
+            let Some(name) = strtab.get_at(sym.st_name) else {
+                continue;
+            };
             if sym.st_shndx == 0 {
                 // SHN_UNDEF：import，需外部库提供
                 if let Some(ver) = needver.get(&idx) {
@@ -194,7 +200,9 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn is_elf_file(p: &Path) -> bool {
-    let Ok(f) = fs::File::open(p) else { return false };
+    let Ok(f) = fs::File::open(p) else {
+        return false;
+    };
     use std::io::Read;
     let mut magic = [0u8; 4];
     let mut r = f;
@@ -250,8 +258,7 @@ pub fn run_fullchk(o: &FullchkOpts) -> Result<FullchkReport, String> {
     pkgdirs.sort();
     // 审计范围：pkgs 为空 = 全部；否则只对列出的包收集 consumer 并报告（provider 仍全量建）
     let audit_all = o.pkgs.is_empty();
-    let audit: std::collections::BTreeSet<&str> =
-        o.pkgs.iter().map(String::as_str).collect();
+    let audit: std::collections::BTreeSet<&str> = o.pkgs.iter().map(String::as_str).collect();
 
     // provider 目录：soname -> name -> {ver}
     let mut catalog: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
@@ -361,6 +368,10 @@ pub fn run_fullchk(o: &FullchkOpts) -> Result<FullchkReport, String> {
         // consumer 判缺失：候选 = DT_NEEDED ∩ provider 目录；候选为空跳过（无法判断，同 python）
         consumers.sort_by(|a, b| (&a.pkg, &a.elf).cmp(&(&b.pkg, &b.elf)));
         for con in consumers {
+            // farm_flags 豁免：IGNORE_CHK_ABI 的包（LankeBUILD.json 只读 flags）
+            if crate::custom_checks::is_ignored(&o.pkgs_dir, &con.pkg, "ABI") {
+                continue;
+            }
             let cands: Vec<String> = con
                 .needed
                 .iter()
@@ -371,6 +382,8 @@ pub fn run_fullchk(o: &FullchkOpts) -> Result<FullchkReport, String> {
                 continue;
             }
             for (name, ver) in &con.undef {
+                // 三段判定：闭包内(DT_NEEDED 候选)找到 → ok；否则全仓库还有别的库提供 → Warning；
+                // 全仓库也无 → Critical（该 name@ver 无人提供 = 真缺口）。
                 let found = cands.iter().any(|s| {
                     catalog
                         .get(s)
@@ -378,6 +391,14 @@ pub fn run_fullchk(o: &FullchkOpts) -> Result<FullchkReport, String> {
                         .is_some_and(|vers| vers.contains(ver))
                 });
                 if !found {
+                    let whole_repo = catalog
+                        .values()
+                        .any(|nv| nv.get(name).is_some_and(|vs| vs.contains(ver)));
+                    let severity = if whole_repo {
+                        Severity::Warning
+                    } else {
+                        Severity::Critical
+                    };
                     report
                         .missing
                         .entry(con.pkg.clone())
@@ -387,6 +408,7 @@ pub fn run_fullchk(o: &FullchkOpts) -> Result<FullchkReport, String> {
                             name: name.clone(),
                             ver: ver.clone(),
                             candidates: cands.clone(),
+                            severity,
                         });
                 }
             }
@@ -424,10 +446,7 @@ mod tests {
 
     #[test]
     fn cache_hit_miss_and_write_roundtrip() {
-        let dir = std::env::temp_dir().join(format!(
-            "farm-abicache-{}",
-            std::process::id()
-        ));
+        let dir = std::env::temp_dir().join(format!("farm-abicache-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let versions: BTreeMap<String, Vec<String>> =
@@ -524,6 +543,7 @@ mod tests {
             arch: "x86_64".into(),
             cache: cache.clone(),
             pkgs: vec!["mylib".into()],
+            pkgs_dir: base.join("pkgs"),
             full_rescan: false,
         };
         let sha = sha256_hex(&real_bytes);
@@ -531,10 +551,7 @@ mod tests {
         let r1 = run_fullchk(&opts).unwrap();
         assert!(r1.cache_misses >= 1, "首扫应写缓存: {r1:?}");
         assert!(r1.failed.is_empty(), "不应有失败: {:?}", r1.failed);
-        assert!(
-            r1.provider_sonames >= 1,
-            "provider 目录应含 libc: {r1:?}"
-        );
+        assert!(r1.provider_sonames >= 1, "provider 目录应含 libc: {r1:?}");
         let cf = cache.join("libc.so.6.json");
         assert!(cf.exists(), "应写 libc.so.6.json");
         let c: SonameCache = serde_json::from_str(&fs::read_to_string(&cf).unwrap()).unwrap();
@@ -572,7 +589,11 @@ mod tests {
                 format!(r#"{{"name":"{name}","version":"1.0"}}"#),
             )
             .unwrap();
-            fs::copy(fx.join(fixture), root.join("content").join(rel).join(fixture)).unwrap();
+            fs::copy(
+                fx.join(fixture),
+                root.join("content").join(rel).join(fixture),
+            )
+            .unwrap();
             let pkgdir = repo.join(name);
             fs::create_dir_all(&pkgdir).unwrap();
             let f = fs::File::create(pkgdir.join("1.0.lpkg")).unwrap();
@@ -593,6 +614,7 @@ mod tests {
             arch: "x86_64".into(),
             cache: cache.clone(),
             pkgs,
+            pkgs_dir: base.join("pkgs"),
             full_rescan: false,
         };
         let r = run_fullchk(&mk_opts(vec![])).unwrap();

@@ -18,5 +18,8 @@
   "sources": [
     "https://downloads.sourceforge.net/sourceforge/tcl/tcl8.6.18-src.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

@@ -123,5 +123,8 @@
   "sources": [
     "https://archives.boost.io/release/1.92.0/source/boost_1_92_0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

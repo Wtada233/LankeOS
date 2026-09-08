@@ -1,8 +1,10 @@
 {
   "name": "librsvg",
   "version": "2.62.91",
-  "release": 4,
-  "deps": [],
+  "release": 5,
+  "deps": [
+    "freetype"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",

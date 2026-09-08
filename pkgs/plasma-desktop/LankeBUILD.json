@@ -169,5 +169,14 @@
   "sources": [
     "https://download.kde.org/stable/plasma/6.7.4/plasma-desktop-6.7.4.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    {
+      "QML_CHK_IGN_LST": [
+        "org.kde.plasma.shell",
+        "org.kde.plasma.shell.panel",
+        "org.kde.kscreenlocker"
+      ]
+    }
+  ]
 }

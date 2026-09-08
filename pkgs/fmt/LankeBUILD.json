@@ -23,5 +23,8 @@
   "sources": [
     "https://github.com/fmtlib/fmt/archive/refs/tags/12.2.0.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

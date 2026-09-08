@@ -7,7 +7,7 @@ lankebuild_prepare() {
 # 极简 autotools；0.12 是多年未动的稳定版。
 
 lankebuild_build() {
-    ./configure --prefix=/usr
+    ./configure --disable-static --prefix=/usr
     make -j$(nproc)
 }
 

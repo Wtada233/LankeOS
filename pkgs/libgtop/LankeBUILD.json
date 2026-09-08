@@ -1,7 +1,7 @@
 {
   "name": "libgtop",
   "version": "2.41.3",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libXau.so.6",

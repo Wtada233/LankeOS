@@ -103,5 +103,8 @@
   "sources": [
     "https://download.samba.org/pub/samba/stable/samba-4.24.6.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGCONF"
+  ]
 }

@@ -210,6 +210,12 @@ static ZH: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("abi_fullchk.more", "    ... 共 {}"),
         ("abi_fullchk.total", "\n[TOTAL] {} 个 not-found，分布在 {} 个包"),
         ("abi_fullchk.failed", "  [!] {}"),
+        ("chk.summary", "[{}] 检查 {} 包；缓存命中 {} / 重扫 {}"),
+        ("chk.none", "[{}] 无发现"),
+        ("chk.header", "\n### {}: {} 项"),
+        ("chk.item", "    {}\n        {}"),
+        ("chk.total", "[{}] 共 {} 项"),
+        ("chk.failed", "  [!] {}"),
     ])
 });
 
@@ -333,6 +339,12 @@ static EN: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("abi_fullchk.more", "    ... {} more"),
         ("abi_fullchk.total", "\n[TOTAL] {} not-found across {} packages"),
         ("abi_fullchk.failed", "  [!] {}"),
+        ("chk.summary", "[{}] checked {} packages; cache hits {} / rescans {}"),
+        ("chk.none", "[{}] no findings"),
+        ("chk.header", "\n### {}: {} item(s)"),
+        ("chk.item", "    {}\n        {}"),
+        ("chk.total", "[{}] {} total"),
+        ("chk.failed", "  [!] {}"),
     ])
 });
 

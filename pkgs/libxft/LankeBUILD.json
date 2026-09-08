@@ -1,8 +1,10 @@
 {
   "name": "libxft",
   "version": "2.3.9",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "xorgproto"
+  ],
   "needed_so": [
     "libX11.so.6",
     "libXrender.so.1",

@@ -148,6 +148,11 @@ cargo build --release        # binary: target/release/lankefarm
 | `validate --image <img>` | Rebuild every package missing its `.build_ok` marker |
 | `export --output <dir>` | Flatten-copy the build repo into distribution-format `<pkg>-<ver>.lpkg` files (no repack) |
 | `manual-abi-fullchk [--source <repo>] [--cache <dir>] [--pkgs …]` | Full ABI audit: ALL packages under `--source` build the provider catalog (native ELF scan of each SONAME's symbol@version; content-sha256 cached to `~/.cache/lankefarm-abi/`, hits skip rescan); `--pkgs` narrows the audited scope; report consumers referencing a symbol@version no provider supplies |
+| `qmlchk` | Check that the owner of each QML `import` module is in this package's deps∪needed_so |
+| `pkgconfchk` | Check that `.pc` Requires(/private) module owners are in deps∪needed_so |
+| `pkg-errchk` | Packaging errors: misplaced usr/etc|usr/var, `.la`, `.a` (exempt via IGNORE_CHK_PKGERR) |
+| `hookchk` | postinst hooks: shipping sysusers.d/tmpfiles.d must call systemd-sysusers / systemd-tmpfiles --create |
+| `fullchk` | Run abichk+qmlchk+pkgconfchk+pkg-errchk+hookchk with one set of args |
 | `track <pkg>\|--all [--run]` | Probe upstream versions (read-only proposal by default, `--run` applies) |
 | `gen-trackers` | Batch-generate tracker YAML files via an LLM |
 | `seed --remote <url>` | Cold-start a remote repository (parallel download + SHA-256 verification) |

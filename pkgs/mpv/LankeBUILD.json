@@ -1,8 +1,10 @@
 {
   "name": "mpv",
   "version": "0.41.0",
-  "release": 8,
+  "release": 9,
   "deps": [
+    "ffnvcodec-headers",
+    "wayland-protocols",
     "xwayland"
   ],
   "needed_so": [

@@ -18,5 +18,9 @@
     "https://go.dev/dl/go1.27.0.src.tar.gz"
   ],
   "work_sources": [],
-  "no_strip": true
+  "no_strip": true,
+  "farm_flags": [
+    "IGNORE_CHK_ABI",
+    "IGNORE_CHK_PKGERR"
+  ]
 }

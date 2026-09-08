@@ -106,17 +106,13 @@ fn append_tree(
         .map_err(|e| format!("读取 {abs_dir:?} 失败: {e}"))?
         .filter_map(|e| e.ok().map(|e| e.path()))
         .map(|abs| {
-            let rel = abs
-                .strip_prefix(abs_root)
-                .unwrap_or(&abs)
-                .to_path_buf();
+            let rel = abs.strip_prefix(abs_root).unwrap_or(&abs).to_path_buf();
             (abs, rel)
         })
         .collect();
     entries.sort_by(|a, b| a.1.cmp(&b.1)); // 按 tar 路径排序 → 确定序
     for (abs, rel) in entries {
-        let md = fs::symlink_metadata(&abs)
-            .map_err(|e| format!("stat {abs:?} 失败: {e}"))?;
+        let md = fs::symlink_metadata(&abs).map_err(|e| format!("stat {abs:?} 失败: {e}"))?;
         let ft = md.file_type();
         if ft.is_dir() {
             let mode = md.permissions().mode() & 0o7777;
@@ -288,7 +284,11 @@ mod tests {
         )
         .unwrap();
         fs::write(root.join("content/plain"), b"abc").unwrap();
-        fs::set_permissions(root.join("content/plain"), fs::Permissions::from_mode(0o640)).unwrap();
+        fs::set_permissions(
+            root.join("content/plain"),
+            fs::Permissions::from_mode(0o640),
+        )
+        .unwrap();
         std::os::unix::fs::symlink("nonexistent-target", root.join("content/broken")).unwrap();
         std::os::unix::fs::symlink("plain", root.join("content/ok-link")).unwrap();
         fs::set_permissions(root.join("content"), fs::Permissions::from_mode(0o750)).unwrap();
@@ -340,7 +340,11 @@ mod tests {
         let pm = fs::symlink_metadata(extract.join("content/plain")).unwrap();
         assert_eq!(pm.permissions().mode() & 0o7777, 0o640, "文件 mode 保留");
         // 落盘 mtime 归一 ~epoch（部分 FS 把 0 圆到 1），绝非构建时刻——header mtime==0 已在上方断言。
-        assert!(pm.mtime() < 3600, "解包后文件 mtime 应归一 ~1970-01-01: {}", pm.mtime());
+        assert!(
+            pm.mtime() < 3600,
+            "解包后文件 mtime 应归一 ~1970-01-01: {}",
+            pm.mtime()
+        );
         let dm = fs::symlink_metadata(extract.join("content")).unwrap();
         assert_eq!(dm.permissions().mode() & 0o7777, 0o750, "目录 mode 保留");
         assert!(

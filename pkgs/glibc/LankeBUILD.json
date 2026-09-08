@@ -47,5 +47,8 @@
   ],
   "work_sources": [
     "https://www.iana.org/time-zones/repository/releases/tzdata2026c.tar.gz"
+  ],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
   ]
 }

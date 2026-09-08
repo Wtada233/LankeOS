@@ -1,8 +1,10 @@
 {
   "name": "gpgme",
   "version": "2.1.2",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "glib"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libassuan.so.9",

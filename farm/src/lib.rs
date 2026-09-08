@@ -7,6 +7,7 @@
 pub mod abi;
 pub mod abi_fullchk;
 pub mod build;
+pub mod custom_checks;
 pub mod export;
 pub mod graph;
 pub mod i18n;

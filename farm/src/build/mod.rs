@@ -28,6 +28,7 @@ pub(crate) use repo::{
     update_repo_index,
 };
 mod farm_flags;
+pub use farm_flags::string_list;
 mod groups;
 mod prompt;
 mod sources;
@@ -95,9 +96,9 @@ pub struct LankeBuild {
     #[serde(default)]
     pub build_deps: Vec<String>,
     /// farm metadata：给 build/validate 看的声明式标志（lpkg 构建不消费）。
-    /// 格式见 `build/farm_flags.rs`（目前支持 `BUILD_AFTER_BUILD_DEPS`）。
+    /// 格式见 `build/farm_flags.rs`：成员可为字符串 flag，或对象 `{NAME:[…]}` 表达字符串列表 flag。
     #[serde(default)]
-    pub farm_flags: Vec<String>,
+    pub farm_flags: Vec<serde_json::Value>,
     #[serde(default)]
     pub sources: Vec<String>,
     #[serde(default)]
@@ -278,7 +279,9 @@ pub fn run_build(
             if !groups.is_version_change_on(on) {
                 continue;
             }
-            let Some(ov) = old.packages.get(on) else { continue };
+            let Some(ov) = old.packages.get(on) else {
+                continue;
+            };
             let newv = effective_version(&opts.pkgs_dir, on).unwrap_or_default();
             if newv.is_empty() || newv == ov.version {
                 continue; // 本轮 on 版本没变 → 组不触发

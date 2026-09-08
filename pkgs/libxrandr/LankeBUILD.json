@@ -1,8 +1,10 @@
 {
   "name": "libxrandr",
   "version": "1.5.5",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "xorgproto"
+  ],
   "needed_so": [
     "libX11.so.6",
     "libXext.so.6",

@@ -53,5 +53,8 @@
   "sources": [
     "https://download.gnome.org/sources/sysprof/50/sysprof-50.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

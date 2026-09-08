@@ -1,8 +1,10 @@
 {
   "name": "openexr",
   "version": "3.4.15",
-  "release": 1,
-  "deps": [],
+  "release": 2,
+  "deps": [
+    "imath"
+  ],
   "needed_so": [
     "libc.so.6",
     "libdeflate.so.0",

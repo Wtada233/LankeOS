@@ -115,5 +115,8 @@
   "sources": [
     "https://download.kde.org/stable/release-service/26.08.0/src/kdenlive-26.08.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

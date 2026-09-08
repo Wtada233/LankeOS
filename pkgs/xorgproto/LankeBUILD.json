@@ -1,8 +1,11 @@
 {
   "name": "xorgproto",
   "version": "2025.1",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "libxau",
+    "libxt"
+  ],
   "needed_so": [],
   "provides": [],
   "build_deps": [

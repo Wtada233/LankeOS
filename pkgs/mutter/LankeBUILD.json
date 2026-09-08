@@ -1,8 +1,11 @@
 {
   "name": "mutter",
   "version": "50.4",
-  "release": 5,
+  "release": 6,
   "deps": [
+    "gobject-introspection",
+    "gsettings-desktop-schemas",
+    "libxdamage",
     "sysprof"
   ],
   "needed_so": [

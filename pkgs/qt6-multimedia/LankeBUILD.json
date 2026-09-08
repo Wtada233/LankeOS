@@ -58,7 +58,13 @@
     "vulkan-headers"
   ],
   "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
+    "BUILD_AFTER_BUILD_DEPS",
+    "IGNORE_CHK_PKGERR",
+    {
+      "QML_CHK_IGN_LST": [
+        "QtSystemInfo"
+      ]
+    }
   ],
   "sources": [
     "https://download.qt.io/official_releases/qt/6.11/6.11.2/submodules/qtmultimedia-everywhere-src-6.11.2.tar.xz"

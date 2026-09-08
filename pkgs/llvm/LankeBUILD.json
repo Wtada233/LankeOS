@@ -47,5 +47,8 @@
     "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/llvm-project-23.1.0.src.tar.xz"
   ],
   "work_sources": [],
-  "no_strip": false
+  "no_strip": false,
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
 }

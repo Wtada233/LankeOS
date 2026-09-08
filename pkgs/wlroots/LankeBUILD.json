@@ -1,8 +1,9 @@
 {
   "name": "wlroots",
   "version": "0.20.2",
-  "release": 6,
+  "release": 7,
   "deps": [
+    "wayland-protocols",
     "xwayland"
   ],
   "needed_so": [

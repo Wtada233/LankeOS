@@ -197,5 +197,12 @@
   "sources": [
     "https://download.kde.org/stable/krita/6.0.3/krita-6.0.3.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    {
+      "QML_CHK_IGN_LST": [
+        "org.krita.flake.text"
+      ]
+    }
+  ]
 }

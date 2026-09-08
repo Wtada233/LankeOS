@@ -1,7 +1,7 @@
 {
   "name": "startup-notification",
   "version": "0.12",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libX11-xcb.so.1",

@@ -1,8 +1,10 @@
 {
   "name": "libice",
   "version": "1.1.2",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "xorgproto"
+  ],
   "needed_so": [
     "libc.so.6"
   ],
