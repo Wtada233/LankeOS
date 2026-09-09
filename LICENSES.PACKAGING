@@ -1,0 +1,51 @@
+LankeOS 打包配方许可 — LankeOS Packaging Recipes License
+Copyright (C) 2026 by Wtada233
+
+适用范围 / Scope
+=======================================================================
+
+本许可适用于 LankeOS 仓库 pkgs/ 目录下各软件包的打包配方：每个包目录中的
+LankeBUILD 与 LankeBUILD.json，以及为 LankeOS 编写/整理的随附补丁与辅助脚本。
+
+This license applies to the LankeOS packaging recipes under pkgs/: each
+package directory's LankeBUILD and LankeBUILD.json, together with the
+patches and helper scripts written for LankeOS.
+
+以上内容以 0BSD（零条款 BSD，Zero-Clause BSD）许可发布。
+The above is released under the 0BSD (Zero-Clause BSD) license.
+
+=======================================================================
+0BSD 许可证文本 / License text
+=======================================================================
+
+Copyright (C) 2026 by Wtada233
+
+Permission to use, copy, modify, and/or distribute this software for
+any purpose with or without fee is hereby granted.
+
+THE SOFTWARE IS PROVIDED “AS IS” AND THE AUTHOR DISCLAIMS ALL
+WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE
+FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
+DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+=======================================================================
+注解（重要）/ Note (important)
+=======================================================================
+
+pkgs/ 下的配方在编写过程中大量移植、改写或引用了第三方项目的构建脚本与
+补丁（典型如 Arch Linux packaging/packages 仓库的 PKGBUILD 及其补丁，以及
+各上游项目自带的补丁）。对于任何在配方中实际使用/包含的第三方补丁与脚本，
+其版权与许可证一律以原项目、原作者为准，本文件不试图予以覆盖或转让；
+上面的 0BSD 授权仅适用于 LankeOS 自有的配方逻辑与原创补丁部分。
+
+The recipes under pkgs/ incorporate, adapt, or reference build scripts and
+patches from third-party projects (notably PKGBUILDs and patches from the
+Arch Linux packaging/packages repositories, and patches carried by upstream
+projects themselves). Any third-party patches and scripts actually used in a
+recipe remain under the copyright and license of their original project or
+author, which this file does not purport to cover or transfer. The 0BSD grant
+above applies only to the recipe logic and original patches authored for
+LankeOS.

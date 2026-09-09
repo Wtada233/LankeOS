@@ -164,7 +164,7 @@ export default defineConfig({
           provider: 'local',
         },
         footer: {
-          message: '基于 GPL-3.0 协议开源',
+          message: '源码按 <a href="https://github.com/Wtada233/LankeOS/blob/main/LICENSE" target="_blank" rel="noopener">GPL-3.0</a> 开源 · 文档内容（Markdown）采用 <a href="https://github.com/Wtada233/LankeOS/blob/main/site/docs/LICENSE" target="_blank" rel="noopener">CC BY-SA 4.0</a>',
           copyright: 'Copyright © 2026 Wtada233',
         },
       },
@@ -227,7 +227,7 @@ export default defineConfig({
           provider: 'local',
         },
         footer: {
-          message: 'Open source under GPL-3.0',
+          message: 'Source code under <a href="https://github.com/Wtada233/LankeOS/blob/main/LICENSE" target="_blank" rel="noopener">GPL-3.0</a> · Documentation (Markdown) under <a href="https://github.com/Wtada233/LankeOS/blob/main/site/docs/LICENSE" target="_blank" rel="noopener">CC BY-SA 4.0</a>',
           copyright: 'Copyright © 2026 Wtada233',
         },
       },

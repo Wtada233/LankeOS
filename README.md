@@ -67,6 +67,12 @@ LankeOS 是一套基于 Linux From Scratch 方法论构建的 Linux 发行版。
 
 ## 许可证
 
-[GPL-3.0](LICENSE)
+本仓库由多部分构成，各部分按各自许可发布：
+
+- **主代码**（lpkg / farm / live / site 站点工具）：[GPL-3.0](LICENSE)
+- **打包配方**（pkgs/ 的 `LankeBUILD` 与 `LankeBUILD.json`，含随附补丁）：[0BSD](LICENSES.PACKAGING)
+- **文档**（site/docs/ 的 Markdown 内容）：[CC BY-SA 4.0](site/docs/LICENSE)
+
+> 打包配方中使用/包含的第三方补丁（如来自 Arch Linux packaging 仓库的补丁），以原项目版权与许可为准，见 [LICENSES.PACKAGING](LICENSES.PACKAGING)。
 
 <!-- BEAUTIFIED -->

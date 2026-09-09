@@ -67,6 +67,12 @@ LankeOS is a Linux distribution built using the Linux From Scratch methodology. 
 
 ## License
 
-[GPL-3.0](LICENSE)
+This repository is composed of several parts, each under its own license:
+
+- **Main code** (lpkg / farm / live / site tooling): [GPL-3.0](LICENSE)
+- **Packaging recipes** (`LankeBUILD` and `LankeBUILD.json` under pkgs/, incl. accompanying patches): [0BSD](LICENSES.PACKAGING)
+- **Documentation** (Markdown content under site/docs/): [CC BY-SA 4.0](site/docs/LICENSE)
+
+> Third-party patches used/included in the packaging recipes (e.g. patches from the Arch Linux packaging repositories) remain under the original project's copyright and license — see [LICENSES.PACKAGING](LICENSES.PACKAGING).
 
 <!-- BEAUTIFIED -->

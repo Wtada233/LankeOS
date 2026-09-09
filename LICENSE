@@ -1,3 +1,18 @@
+LankeOS 主许可证 — LankeOS Main License
+Copyright (C) 2026 Wtada233
+
+本仓库默认采用本文件所附的 GNU GPL-3.0 许可。凡未自带独立 LICENSE 文件的
+子项目 / 子目录，一律默认适用本主许可证；自带 LICENSE 的，以其自身许可为准。
+
+By default, this repository is licensed under the GNU GPL-3.0 set out in
+this file. Any sub-project / sub-directory that does not carry its own
+LICENSE file falls under this main license; those that do carry their own
+are governed by their own license.
+
+=======================================================================
+以下为 GNU GPL v3 官方许可证 / Official GNU GPL v3 text below
+=======================================================================
+
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
