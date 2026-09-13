@@ -1,0 +1,33 @@
+#
+# vte — 虚拟终端仿真控件（libvte-2.91 与 libvte-2.91-gtk4）
+# 基于 Arch Linux vte3(pkgbase) PKGBUILD 适配 LankeOS。
+# Arch 的 pkgbase 是 vte3，拆成 vte-common / vte3 / vte3-utils / vte4 / vte4-utils /
+# vte-docs；这里按仓库约定合成单包 vte（GTK3 与 GTK4 两个变体都建）。
+# 注意别与 Arch 的 vte 混淆：那个 vte 是 0.28.x 的 GTK2 老库（另一个上游分支），
+# LankeOS 的 vte 指的是这里这个现代 vte（Arch 的 vte3/vte4）。
+# 注意：使用 /bin/sh（POSIX sh），无 bashisms
+
+lankebuild_prepare() {
+    # gtk3 与 gtk4 两个变体都建（分别产出 libvte-2.91.so / libvte-2.91-gtk4.so，
+    # 演示程序是 vte-2.91 / vte-2.91-gtk4，名字不冲突——Arch 的 vte3-utils 与
+    # vte4-utils 装的就是这两个）。
+    # docs 上游默认就是 false（因此不需要 gi-docgen）；gir/vapi 保持默认开
+    # （Arch 也开；vala 在 build_deps 里）。
+    # --wrap-mode nofallback：fast_float / fmt 等必须来自系统包，不许退回子项目
+    # （仓库既有 meson 配方同此约定）。
+    meson setup _build --prefix={PREFIX} --buildtype=release --wrap-mode nofallback
+}
+
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+
+    # LGPL-3.0-or-later（库）+ GPL-3.0-or-later（app/utils），Arch 的 license 数组同此
+    install -Dm644 COPYING.LGPL3 "{STAGING_ROOT}{DATADIR}/licenses/vte/COPYING.LGPL3"
+    install -Dm644 COPYING.GPL3 "{STAGING_ROOT}{DATADIR}/licenses/vte/COPYING.GPL3"
+}

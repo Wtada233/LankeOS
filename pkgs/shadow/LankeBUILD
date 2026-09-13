@@ -1,81 +1,61 @@
 lankebuild_prepare() {
-    # shadow 上游 bug：find_new_sub_*ids.c 用 uintmax_t 但漏 <stdint.h>（LFS §8.30 同款修复）
-    sed -i '/stdio.h/i #include <stdint.h>' lib/find_new_sub_*ids.c
-    # passwd 路径被硬编码，configure 前需存在（LFS §8.30），否则安装脚本会建到错误位置
-    touch /usr/bin/passwd
+    _arch_patch="{WORK_DIR}/../arch-distro-4.20.0-arch1.patch"
+    if patch -Np1 --dry-run -i "$_arch_patch" >/dev/null 2>&1; then
+        patch -Np1 -i "$_arch_patch"
+    elif patch -Np1 -R --dry-run -i "$_arch_patch" >/dev/null 2>&1; then
+        echo "shadow: 跳过已应用的 Arch 发行补丁"
+    else
+        echo "shadow: Arch 发行补丁无法应用（上游改动撞上补丁涉及的文件，需按新版重做）" >&2
+        exit 1
+    fi
 }
 
 lankebuild_build() {
+    autoreconf -fiv
 
-    # 1. 禁用 groups 程序及其手册页，避免与 Coreutils 冲突
-    sed -i 's/groups\$(EXEEXT) //' src/Makefile.in
-    find man -name Makefile.in -exec sed -i 's/groups\.1 / /' {} \;
-    # 避免安装 Man-pages 已经提供的重复手册页
+    # 2. 避免安装 Man-pages 已经提供的重复手册页（Arch 补丁已删掉被取代工具的 man 页，只剩这两处）
     find man -name Makefile.in -exec sed -i 's/getspnam\.3 / /' {} \;
     find man -name Makefile.in -exec sed -i 's/passwd\.5 / /' {} \;
 
-    # 2. 核心配置修改：在源码层级将默认加密设为 YESCRYPT
-    sed -e 's:#ENCRYPT_METHOD DES:ENCRYPT_METHOD YESCRYPT:' -e 's:/var/spool/mail:/var/mail:' -e '/PATH=/{s@/sbin:@@;s@/bin:@@}' -i etc/login.defs
+    # 4. 准备编译：照搬 Arch PKGBUILD 的参数；--without-su 与 Arch 一致（su 归 util-linux）。
+    #    --without-audit：Arch 那边是 --with-audit，但它要求 libaudit.h，而本仓库没有 audit 包，
+    #    且 configure.ac 对"显式 --with-audit + 无 libaudit.h"是 AC_MSG_ERROR（不是自动降级）→ 必须显式关。
+    #    --with-btrfs：显式开（不写也因头文件在而默认开）。编译期只要内核 uapi 头
+    #    （linux/{magic,btrfs_tree}.h ← pkgs/linux 的 headers_install，经 base-devel 传递带上，与 btrfs-progs 无关）；
+    #    实际干活是运行时 exec `btrfs subvolume create/delete`，所以 LankeBUILD.json 的 deps 里显式写了 btrfs-progs。
+    ./configure --bindir={BINDIR} \
+                --disable-account-tools-setuid \
+                --enable-man \
+                --libdir={LIBDIR} \
+                --mandir={MANDIR} \
+                --prefix={PREFIX} \
+                --sbindir={BINDIR} \
+                --sysconfdir={SYSCONFDIR} \
+                --with-btrfs \
+                --with-fcaps \
+                --with-group-name-max-length=32 \
+                --with-libpam \
+                --with-yescrypt \
+                --without-audit \
+                --without-bcrypt \
+                --without-libbsd \
+                --without-nscd \
+                --without-selinux \
+                --without-su \
+                --disable-static
 
-    # 3. 准备编译：使用 LFS 推荐的参数并显式激活 PAM
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-static --with-bcrypt --with-yescrypt --without-libbsd --with-libpam --with-group-name-max-length=32
-
+    sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
     make -j$(nproc)
 
-    make exec_prefix=/usr pamddir= DESTDIR={STAGING_ROOT} install
-    make -C man DESTDIR={STAGING_ROOT} install-man
-    # 关键：修复 passwd 的 SUID 权限，否则无法联动 PAM 改密
-    chmod -v 4711 {STAGING_ROOT}{BINDIR}/passwd
-    # 添加 Shadow 链接
-    ln -sfv vipw {STAGING_ROOT}{BINDIR}/vigr
+    make DESTDIR="{STAGING_ROOT}" install
+    make DESTDIR="{STAGING_ROOT}" -C man install
 
-    mkdir -p "{STAGING_ROOT}/etc/pam.d/"
-    # 5. 打包前的 Hook 逻辑
-    cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
-pwconv
-grpconv
-mkdir -p /etc/default
-useradd -D --gid 999
-touch /etc/sub{u,g}id
-EOF
+    # license
+    install -vDm 644 COPYING -t "{STAGING_ROOT}/usr/share/licenses/{PKG_NAME}/"
+    install -vDm 644 "{WORK_DIR}"/../LICENSE "{STAGING_ROOT}/usr/share/licenses/{PKG_NAME}/0BSD.txt"
 
-    cat > "{STAGING_ROOT}/etc/pam.d/chsh" << 'EOF'
-#%PAM-1.0
-auth            sufficient      pam_rootok.so
-auth            required        pam_unix.so
-account         required        pam_unix.so
-session         required        pam_unix.so
-password        required        pam_permit.so
-EOF
-
-    cat > "{STAGING_ROOT}/etc/pam.d/chfn" << 'EOF'
-#%PAM-1.0
-auth            sufficient      pam_rootok.so
-auth            required        pam_unix.so
-account         required        pam_unix.so
-session         required        pam_unix.so
-password        required        pam_permit.so
-EOF
-
-    cat > "{STAGING_ROOT}/etc/pam.d/su" << 'EOF'
-#%PAM-1.0
-auth            sufficient      pam_rootok.so
-# Uncomment the following line to implicitly trust users in the "wheel" group.
-#auth           sufficient      pam_wheel.so trust use_uid
-# Uncomment the following line to require a user to be in the "wheel" group.
-#auth           required        pam_wheel.so use_uid
-auth            required        pam_unix.so
-account         required        pam_unix.so
-session	       required        pam_unix.so
-password        include         system-auth
-EOF
-
-    cat > "{STAGING_ROOT}/etc/pam.d/newusers" << 'EOF'
-#%PAM-1.0
-auth		sufficient	pam_rootok.so
-account		required	pam_permit.so
-password	include		system-auth
-EOF
+    # custom useradd(8) defaults (not provided by upstream)
+    install -vDm 600 "{WORK_DIR}"/../useradd.defaults "{STAGING_ROOT}/etc/default/useradd"
 }
 
 

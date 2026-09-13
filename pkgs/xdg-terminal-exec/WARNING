@@ -1,0 +1,24 @@
+本包可能不会长久，不要在其上构建长期依赖。
+
+xdg-terminal-exec 是 XDG「Default Terminal Execution Specification」**提案**的参考实现
+（提案 PR：terminal-wg/specifications!3；上游 README 自述 "while the Specification is in
+proposed status"）。它解决的是"规范未定稿期间先有个能用的默认终端启动器"的问题。
+
+规范一旦通过并被 xdg-utils 采纳，预期由 xdg-utils 提供 /usr/bin/xdg-terminal-exec，届时
+本包应撤下、改由 xdg-utils 承接（依赖方重新指向 xdg-utils）。注意：**"并入 xdg-utils"
+是预期，不是上游承诺**——上游 README 未提及，所以别把它当既定事实，按下面的信号判断。
+
+撤包信号（任一出现即复核本包去留）：
+  1. 提案 PR terminal-wg/specifications!3 被合并（规范定稿）；
+  2. 上游 gitlab.freedesktop.org/Vladimir-csp/xdg-terminal-exec 长期停更；
+  3. xdg-utils 的源里出现 xdg-terminal-exec（届时应由 xdg-utils 提供同名命令）。
+
+在那之前本包可正常使用，装出：
+  /usr/bin/xdg-terminal-exec                       默认终端启动器（POSIX sh）
+  /usr/share/xdg-terminal-exec/xdg-terminals.list  随包提供的默认终端优先级列表
+用户/发行版覆盖放 /etc/xdg/xdg-terminals.list（XDG_CONFIG_DIRS）或
+~/.config/xdg-terminals.list（XDG_CONFIG_HOME），也可放这两处的 xdg-terminal-exec/
+子目录——这些路径由规范约定，不随本包撤下而失效。
+
+构建说明：man 页由上游 Makefile 用 scdoc 生成，scdoc 不在 LankeOS 仓库，故配方只跑
+install-bin / install-conf 跳过 man 页（详见 LankeBUILD 注释）。

@@ -16,7 +16,7 @@ use super::{walk_all, ChkOpts, Finding, Report, Severity};
 use crate::error::FarmError;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use goblin::elf::Elf;
 
@@ -89,30 +89,8 @@ fn symbols(
     Ok((defined, undef))
 }
 
-/// 收集目录下所有常规文件（DFS，排序 → 确定序；不含符号链接成员——.so 真身是常规文件）。
-fn collect_files(root: &Path) -> Vec<PathBuf> {
-    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
-        let Ok(rd) = fs::read_dir(dir) else { return };
-        let mut subs: Vec<PathBuf> = Vec::new();
-        for e in rd.flatten() {
-            let p = e.path();
-            let Ok(ft) = e.file_type() else { continue };
-            if ft.is_dir() {
-                subs.push(p);
-            } else if ft.is_file() {
-                out.push(p);
-            }
-        }
-        subs.sort();
-        for s in subs {
-            walk(&s, out);
-        }
-    }
-    let mut v = Vec::new();
-    walk(root, &mut v);
-    v.sort();
-    v
-}
+/// 本检則 analysis 结构版本：只在 **abi** 分析逻辑变化时递增（与其他检則独立，见 `super::walk_all`）。
+const SCHEMA: u32 = 5;
 
 fn dedup_sorted_undef(mut undef: Vec<(String, String)>) -> Vec<(String, String)> {
     undef.sort();
@@ -124,7 +102,7 @@ fn dedup_sorted_undef(mut undef: Vec<(String, String)>) -> Vec<(String, String)>
 fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     let content = extract.join("content");
     let mut files: Vec<serde_json::Value> = Vec::new();
-    for f in collect_files(&content) {
+    for f in super::collect_regular_files(&content) {
         let Ok(bytes) = fs::read(&f) else {
             continue;
         };
@@ -154,7 +132,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
 /// 候选库都不提供该 `sym@ver` → `Finding`（`what` = `sym @ ver（候选提供: …）`）。整包缓存，
 /// `.lpkg` 未变不重扫（`farm chk full` 二遍起与其它 chk 一样全命中）。
 pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
-    let (analyses, hits, misses, failed) = walk_all(o, |ext, _pkg| analyze(ext))?;
+    let (analyses, hits, misses, failed) = walk_all(o, SCHEMA, |ext, _pkg| analyze(ext))?;
 
     // 1) provider 目录：soname → sym → {ver}
     let mut catalog: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
@@ -269,6 +247,7 @@ pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     /// 找宿主可用的带符号版本的共享库（无则 None，测试跳过——与 i18n test.skip_host_libc 同思路）。
     fn host_versioned_lib() -> Option<PathBuf> {

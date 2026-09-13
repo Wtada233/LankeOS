@@ -56,10 +56,10 @@ impl State {
     pub fn open(path: &Path) -> Result<State, FarmError> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)
-                .map_err(|e| format!("创建状态目录 {parent:?} 失败: {e}"))?;
+                .map_err(|e| FarmError::io(format!("创建状态目录 {parent:?} 失败"), e))?;
         }
         let conn = rusqlite::Connection::open(path)
-            .map_err(|e| format!("打开 SQLite {path:?} 失败: {e}"))?;
+            .map_err(|e| FarmError::sqlite(format!("打开 SQLite {path:?} 失败"), e))?;
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS jobs (
                 pkg TEXT PRIMARY KEY,
@@ -77,7 +77,7 @@ impl State {
             );
             ",
         )
-        .map_err(|e| format!("初始化 SQLite schema 失败: {e}"))?;
+        .map_err(|e| FarmError::sqlite("初始化 SQLite schema 失败", e))?;
         Ok(State { conn })
     }
 
@@ -98,7 +98,7 @@ impl State {
                     updated_at = datetime('now')",
                 rusqlite::params![pkg, status.as_str(), failure_stage, recipe_hash],
             )
-            .map_err(|e| format!("更新 job 状态失败: {e}"))?;
+            .map_err(|e| FarmError::sqlite("更新 job 状态失败", e))?;
         Ok(())
     }
 
@@ -132,7 +132,7 @@ impl State {
         self.conn
             .execute("DELETE FROM jobs WHERE pkg=?1", rusqlite::params![pkg])
             .map(|_| ())
-            .map_err(|e| format!("删除 job 条目失败: {e}").into())
+            .map_err(|e| FarmError::sqlite("删除 job 条目失败", e))
     }
 
     /// 指定状态的包列表。
@@ -153,7 +153,7 @@ impl State {
                 "INSERT INTO build_history (pkg, version, outcome) VALUES (?1, ?2, ?3)",
                 rusqlite::params![pkg, version, if ok { "ok" } else { "failed" }],
             )
-            .map_err(|e| format!("记录构建历史失败: {e}"))?;
+            .map_err(|e| FarmError::sqlite("记录构建历史失败", e))?;
         Ok(())
     }
 }

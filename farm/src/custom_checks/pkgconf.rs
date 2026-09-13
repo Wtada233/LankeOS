@@ -13,6 +13,9 @@ use crate::error::FarmError;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
+/// 本检則 analysis 结构版本：只在 **pkgconf** 分析逻辑变化时递增（与其他检則独立）。
+const SCHEMA: u32 = 5;
+
 fn pc_module(file: &Path, content: &Path) -> Option<String> {
     let rel = file.strip_prefix(content).ok()?;
     let s = rel.to_string_lossy();
@@ -83,7 +86,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
 
 /// 跑 pkgconfchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
-    let (analyses, hits, misses, failed) = walk_all(opts, |ext, _pkg| analyze(ext))?;
+    let (analyses, hits, misses, failed) = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
     let index = super::load_index(opts);
     let mut module_owners: BTreeMap<String, HashSet<String>> = BTreeMap::new();
     for (pkg, a) in &analyses {

@@ -58,12 +58,16 @@ fn handle_conn(mut stream: TcpStream, root: &Path) {
         Err(_) => return,
     };
     let req = String::from_utf8_lossy(&buf[..n]);
-    let (status, body) = match parse_request_path(&req) {
-        None => (Status::BadRequest, b"400 bad request".to_vec()),
-        Some(p) if p == "/" => (Status::Ok, b"LankeOS local repo".to_vec()),
-        Some(p) => serve_file(root, &p),
+    let (head_only, path) = match parse_request(&req) {
+        Some((h, p)) => (h, Some(p)),
+        None => (false, None),
     };
-    let _ = stream.write_all(&response(status, &body));
+    let (status, body) = match path.as_deref() {
+        None => (Status::BadRequest, b"400 bad request".to_vec()),
+        Some("/") => (Status::Ok, b"LankeOS local repo".to_vec()),
+        Some(p) => serve_file(root, p),
+    };
+    let _ = stream.write_all(&response(status, &body, head_only));
     let _ = stream.flush();
 }
 
@@ -111,7 +115,9 @@ impl Status {
     }
 }
 
-fn response(status: Status, body: &[u8]) -> Vec<u8> {
+/// 组响应。`head_only` 时**只回头不带 body**（RFC 7231：HEAD 的响应头与 GET 同，Content-Length
+/// 仍为 body 长度，但不发送 body）——曾把 HEAD 放行却照发 body，违反 HTTP/1.1。
+fn response(status: Status, body: &[u8], head_only: bool) -> Vec<u8> {
     let head = format!(
         "HTTP/1.1 {} {}\r\nContent-Length: {}\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n",
         status.code(),
@@ -119,19 +125,23 @@ fn response(status: Status, body: &[u8]) -> Vec<u8> {
         body.len()
     );
     let mut v = head.into_bytes();
-    v.extend_from_slice(body);
+    if !head_only {
+        v.extend_from_slice(body);
+    }
     v
 }
 
-/// 取请求行：`GET <path> HTTP/1.1`。非 GET/HEAD 返回 None。
-fn parse_request_path(req: &str) -> Option<String> {
+/// 取请求行：`GET|HEAD <path> HTTP/1.1`。返回 `(head_only, path)`；非 GET/HEAD 返回 None。
+fn parse_request(req: &str) -> Option<(bool, String)> {
     let line = req.lines().next()?;
     let mut parts = line.split_whitespace();
     let method = parts.next()?;
-    if method != "GET" && method != "HEAD" {
-        return None;
-    }
-    parts.next().map(|p| p.to_string())
+    let head_only = match method {
+        "GET" => false,
+        "HEAD" => true,
+        _ => return None,
+    };
+    parts.next().map(|p| (head_only, p.to_string()))
 }
 
 #[cfg(test)]
@@ -141,14 +151,29 @@ mod tests {
     #[test]
     fn parse_get_path() {
         assert_eq!(
-            parse_request_path("GET /x86_64/index.txt HTTP/1.1").as_deref(),
-            Some("/x86_64/index.txt")
+            parse_request("GET /x86_64/index.txt HTTP/1.1"),
+            Some((false, "/x86_64/index.txt".to_string()))
         );
         assert_eq!(
-            parse_request_path("POST / HTTP/1.1"),
-            None,
-            "非 GET/HEAD 拒绝"
+            parse_request("HEAD / HTTP/1.1"),
+            Some((true, "/".to_string())),
+            "HEAD 放行但标记 head_only"
         );
+        assert_eq!(parse_request("POST / HTTP/1.1"), None, "非 GET/HEAD 拒绝");
+    }
+
+    #[test]
+    fn head_response_omits_body_keeps_content_length() {
+        let s = String::from_utf8(response(Status::Ok, b"abc", true)).unwrap();
+        assert!(s.ends_with("\r\n\r\n"), "HEAD 响应应在头结束处停止: {s:?}");
+        assert!(!s.contains("abc"), "HEAD 不得含 body: {s:?}");
+        assert!(
+            s.contains("Content-Length: 3"),
+            "Content-Length 仍应为 body 长度 3: {s:?}"
+        );
+        // 对照：GET 带 body
+        let g = String::from_utf8(response(Status::Ok, b"abc", false)).unwrap();
+        assert!(g.ends_with("abc"), "GET 应带 body: {g:?}");
     }
 
     #[test]

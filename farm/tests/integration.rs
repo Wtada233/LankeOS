@@ -61,11 +61,7 @@ fn fake_new_index(old: &Index, pkg: &str, new_provides: &[String]) -> Index {
 }
 
 fn scan_of(provides: &[String], needed_so: &[String]) -> verify::ScanResult {
-    verify::ScanResult {
-        needed_so: needed_so.to_vec(),
-        provides: provides.to_vec(),
-        deps: vec![],
-    }
+    verify::ScanResult::from_parts(needed_so.to_vec(), provides.to_vec(), vec![])
 }
 
 #[test]

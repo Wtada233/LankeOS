@@ -1,6 +1,6 @@
 {
   "name": "llvm",
-  "version": "23.1.0",
+  "version": "23.1.1",
   "release": 3,
   "deps": [
     "perl",
@@ -44,7 +44,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.0/llvm-project-23.1.0.src.tar.xz"
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.1/llvm-project-23.1.1.src.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false,

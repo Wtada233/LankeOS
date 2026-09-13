@@ -4,15 +4,20 @@
 //! 架构：遍历 `source/<arch>` 下的 .lpkg、每包**一次解包**、按 **.lpkg 文件 sha256** 缓存逐包分析
 //! （命中即跳过解包重扫）、报告分包。
 //!
-//! 通用判定：qml/pkgconf 的「模块 provider 包」满足条件 = 属于本包 `deps`（读 pkgs 配方）∪
-//! `needed_so` 推导的链接依赖（`graph::link_deps`，即 abichk 已算覆盖的运行时链接）；不在仓库内任何
-//! 包提供的模块（外部模块）→ 忽略。`farm_flags` 的 `IGNORE_CHK_<KIND>` 可整包豁免某检則。
+//! 通用判定：qml/pkgconf 的「模块 provider 包」满足条件 = 属于本包 binpkg deps（仓库 index 记录的
+//! 运行时依赖，`binpkg_deps`；**不读 LankeBUILD.json**）∪ `needed_so` 推导的链接依赖
+//! （`graph::link_deps`，即 abichk 已算覆盖的运行时链接）。三段判定：闭包内命中 → 通过；
+//! 仓库内其它包提供但不在闭包 → Warning（少依赖）；仓库内无任何 provider → Critical（真缺口；
+//! 引擎/进程内注册型 QML 模块用配方 `QML_CHK_IGN_LST` 显式豁免）。`farm_flags` 的
+//! `IGNORE_CHK_<KIND>` 可整包豁免某检則。
 
 pub mod abi;
 pub mod hook;
+pub mod introspection;
 pub mod pkg_err;
 pub mod pkgconf;
 pub mod qml;
+pub mod vapi;
 
 use crate::error::FarmError;
 use std::collections::{BTreeMap, HashSet};
@@ -116,12 +121,67 @@ pub fn module_dep_findings(
     out
 }
 
-/// 默认缓存目录：`$HOME/.cache/lankefarm-<label>`（无 HOME 回落 source/.abi-cache）。
-pub fn default_cache_dir(source: &Path, label: &str) -> PathBuf {
-    match std::env::var("HOME") {
-        Ok(h) if !h.is_empty() => PathBuf::from(h).join(format!(".cache/lankefarm-{label}")),
+/// 文件在 content 下的相对路径（qml/pkg-err/introspection/vapi 共用）。
+pub(crate) fn rel_of(path: &Path, root: &Path) -> String {
+    path.strip_prefix(root)
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_else(|_| path.display().to_string())
+}
+
+/// **构建期依赖判定**（introspectionchk / vapichk 共用）：包内 shipped `files`（如 `.gir`/`.vapi`）由
+/// 某构建工具在**构建期**生成，配方 `build_deps` 必须声明该工具包 `dep`；缺失 → **Critical**——这不是
+/// 运行期依赖问题，是构建依赖漏写（构建会失败或产物缺失）。
+///
+/// - `pkg == dep` 自满足：工具包自带自己的产物（如 `vala` 装标准 `.vapi`、
+///   `gobject-introspection` 自带 `.gir`），不该要求它把自己写进 build_deps；
+/// - 配方不可读（无 `LankeBUILD.json`）→ 不判（无从得知 build_deps）；
+/// - 一包只报一条（列出前几个文件 + 计数），避免 `.gir` 多的包刷屏。
+pub fn build_dep_findings(
+    pkgs_dir: &Path,
+    pkg: &str,
+    dep: &str,
+    what: &str,
+    files: &[String],
+) -> Vec<Finding> {
+    if files.is_empty() || pkg == dep {
+        return Vec::new();
+    }
+    let Some(b) = crate::build::read_lankebuild(pkgs_dir, pkg) else {
+        return Vec::new();
+    };
+    if b.build_deps.iter().any(|d| d == dep) {
+        return Vec::new();
+    }
+    let shown: Vec<&str> = files.iter().take(3).map(String::as_str).collect();
+    let more = if files.len() > 3 {
+        format!(" 等 {} 个", files.len())
+    } else {
+        String::new()
+    };
+    vec![Finding {
+        file: format!("{}{more}", shown.join(", ")),
+        what: format!("{what}，但配方 build_deps 缺 {dep}（构建期需要该工具，请补进 build_deps）"),
+        severity: Severity::Critical,
+    }]
+}
+
+/// 检則缓存**根**：`$HOME/.cache/lankefarm`（无 HOME 回落 `source/.abi-cache`）。
+/// 单跑 `farm chk <kind>` 与 `farm chk full` 共用同一根 → 两个入口共享缓存。
+pub fn default_cache_base(source: &Path) -> PathBuf {
+    cache_base_from_home(std::env::var("HOME").ok().as_deref(), source)
+}
+
+/// 纯函数（可单测，不读环境）：HOME 为 Some 且非空 → `$HOME/.cache/lankefarm`；否则 `source/.abi-cache`。
+pub fn cache_base_from_home(home: Option<&str>, source: &Path) -> PathBuf {
+    match home {
+        Some(h) if !h.is_empty() => PathBuf::from(h).join(".cache/lankefarm"),
         _ => source.join(".abi-cache"),
     }
+}
+
+/// 单检則缓存目录 = `default_cache_base(source)/label`（每检則一子目录，互不干扰）。
+pub fn default_cache_dir(source: &Path, label: &str) -> PathBuf {
+    default_cache_base(source).join(label)
 }
 
 pub fn sha256_file(path: &Path) -> Result<String, FarmError> {
@@ -131,11 +191,22 @@ pub fn sha256_file(path: &Path) -> Result<String, FarmError> {
     Ok(format!("{:x}", h.finalize()))
 }
 
-/// 收集目录下所有叶子成员（常规文件 **和符号链接**；DFS，排序 → 确定序）。
+/// 收集叶子成员（常规文件 **和符号链接**；DFS，排序 → 确定序）。qml/pkgconf/pkg-err/hook 用。
 /// 符号链接必须算成员：打包常见 `usr/lib/pkgconfig/libpng.pc -> libpng16.pc` 这种软链，provider
 /// 模块名取自链接名；只对**目录**递归（不 follow 符号链接目录，避免环）。
 pub fn collect_files(root: &Path) -> Vec<PathBuf> {
-    fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
+    collect(root, true)
+}
+
+/// 只收集**常规文件**（排除符号链接）的变体，供 abi 审计用：`.so` 真身是常规文件，软链名不产生
+/// 符号（且 `fs::read` 软链会读目标，对损坏软链会失败）。行为等价于旧 abi 私有实现。
+pub fn collect_regular_files(root: &Path) -> Vec<PathBuf> {
+    collect(root, false)
+}
+
+/// 两个入口的公共实现；`include_symlinks=false` 时非目录且非常规文件的成员被跳过。
+fn collect(root: &Path, include_symlinks: bool) -> Vec<PathBuf> {
+    fn walk(dir: &Path, include_symlinks: bool, out: &mut Vec<PathBuf>) {
         let Ok(rd) = std::fs::read_dir(dir) else {
             return;
         };
@@ -145,33 +216,39 @@ pub fn collect_files(root: &Path) -> Vec<PathBuf> {
             let Ok(ft) = e.file_type() else { continue };
             if ft.is_dir() {
                 subs.push(p);
-            } else {
-                out.push(p); // is_file() 或 is_symlink()（含 broken symlink，读取端容错跳过）
+            } else if include_symlinks || ft.is_file() {
+                // include_symlinks：is_file() 或 is_symlink()（含 broken symlink，读取端容错跳过）
+                out.push(p);
             }
         }
         subs.sort();
         for s in subs {
-            walk(&s, out);
+            walk(&s, include_symlinks, out);
         }
     }
     let mut v = Vec::new();
-    walk(root, &mut v);
+    walk(root, include_symlinks, &mut v);
     v.sort();
     v
 }
 
 // ── 逐包分析缓存（key = .lpkg 文件 sha + 检查器 schema）───────────────
-/// 检查器/提取逻辑版本：改了分析逻辑（如收集符号链接成员）→ 递增使旧缓存整体失效重扫。
-const SCHEMA: u32 = 5;
+// schema 常量由**各检則模块自持**（见 `walk_all` 的 `schema` 参数）：改了某检則的分析逻辑只递增
+// 该检則的版本、只失效该类缓存，不再波及其余四类。
 
 fn cache_path(cache: &Path, pkg: &str) -> PathBuf {
     cache.join(format!("{pkg}.json"))
 }
 
-fn load_analysis(cache: &Path, pkg: &str, lpkg_sha: &str) -> Option<serde_json::Value> {
+fn load_analysis(
+    cache: &Path,
+    pkg: &str,
+    lpkg_sha: &str,
+    schema: u32,
+) -> Option<serde_json::Value> {
     let c: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(cache_path(cache, pkg)).ok()?).ok()?;
-    if c.get("schema").and_then(|v| v.as_u64()) != Some(SCHEMA as u64) {
+    if c.get("schema").and_then(|v| v.as_u64()) != Some(schema as u64) {
         return None;
     }
     if c.get("lpkg_sha").and_then(|v| v.as_str()) != Some(lpkg_sha) {
@@ -185,9 +262,10 @@ fn write_analysis(
     pkg: &str,
     lpkg_sha: &str,
     analysis: &serde_json::Value,
+    schema: u32,
 ) -> Result<(), FarmError> {
     std::fs::create_dir_all(cache).map_err(|e| format!("创建缓存目录 {:?} 失败: {e}", cache))?;
-    let c = serde_json::json!({ "schema": SCHEMA, "lpkg_sha": lpkg_sha, "analysis": analysis });
+    let c = serde_json::json!({ "schema": schema, "lpkg_sha": lpkg_sha, "analysis": analysis });
     std::fs::write(
         cache_path(cache, pkg),
         serde_json::to_string_pretty(&c).map_err(|e| format!("序列化缓存失败: {e}"))?,
@@ -198,8 +276,12 @@ fn write_analysis(
 /// 一次遍历 source 下**全部**包：每包一个当前 .lpkg，解包一次交给 `analyze`（仅 .lpkg sha 变才解包，
 /// 否则用缓存 analysis）。返回每个包的 analysis + 缓存命中/重扫计数。provider 类检則用它对全量建图，
 /// 判定类检則只关心（子集）包的 analysis。
+///
+/// `schema` = **本检則自己的** analysis 结构版本：只在**本检則**分析逻辑变化时递增。历史：5 个检則
+/// 共用一个常量，任一检則改逻辑 → 另外四类缓存连带失效（一次 845 包全量重扫，白烧几分钟）。
 pub fn walk_all(
     opts: &ChkOpts,
+    schema: u32,
     analyze: impl Fn(
         &Path, /*extract_dir*/
         &str,  /*pkg*/
@@ -249,7 +331,7 @@ pub fn walk_all(
             Err(_) => continue,
         };
         if !opts.full_rescan {
-            if let Some(a) = load_analysis(&opts.cache, &pkg, &sha) {
+            if let Some(a) = load_analysis(&opts.cache, &pkg, &sha, schema) {
                 analyses.insert(pkg.clone(), a);
                 hits += 1;
                 continue;
@@ -260,7 +342,7 @@ pub fn walk_all(
             Ok(()) => match analyze(&extract_dir, &pkg) {
                 Ok(a) => {
                     misses += 1;
-                    if write_analysis(&opts.cache, &pkg, &sha, &a).is_err() {
+                    if write_analysis(&opts.cache, &pkg, &sha, &a, schema).is_err() {
                         // 缓存写失败不致命：本轮照用内存分析
                     }
                     analyses.insert(pkg.clone(), a);
@@ -315,4 +397,66 @@ pub fn owner_covered(index: &Index, pkg: &str, owner: &str) -> bool {
     crate::graph::link_deps(index, pkg)
         .iter()
         .any(|d| d == owner)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cache_base_prefers_home_over_source() {
+        let src = Path::new("/srv/out");
+        assert_eq!(
+            cache_base_from_home(Some("/home/u"), src),
+            PathBuf::from("/home/u/.cache/lankefarm")
+        );
+        // 空 HOME / 无 HOME → 回落 source/.abi-cache
+        assert_eq!(cache_base_from_home(Some(""), src), src.join(".abi-cache"));
+        assert_eq!(cache_base_from_home(None, src), src.join(".abi-cache"));
+        // 单检則目录 = 根/label（单跑与 full 共用根 → 共享缓存）
+        assert_eq!(
+            cache_base_from_home(Some("/h"), src).join("qmlchk"),
+            PathBuf::from("/h/.cache/lankefarm/qmlchk")
+        );
+    }
+
+    #[test]
+    fn collect_variants_include_or_exclude_symlinks() {
+        let tmp = std::env::temp_dir().join(format!("farm-chk-collect-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&tmp);
+        std::fs::create_dir_all(tmp.join("d")).unwrap();
+        std::fs::write(tmp.join("a.txt"), b"x").unwrap();
+        std::fs::write(tmp.join("d/b.txt"), b"x").unwrap();
+        std::os::unix::fs::symlink("a.txt", tmp.join("link")).unwrap();
+
+        let all = collect_files(&tmp);
+        let reg = collect_regular_files(&tmp);
+        assert_eq!(all.len(), 3, "collect_files 含符号链接: {all:?}");
+        assert_eq!(reg.len(), 2, "collect_regular_files 排除符号链接: {reg:?}");
+        assert!(reg
+            .iter()
+            .all(|p| std::fs::symlink_metadata(p).unwrap().file_type().is_file()));
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn schema_or_sha_mismatch_invalidates_cache() {
+        let dir = std::env::temp_dir().join(format!("farm-chk-schema-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let a = serde_json::json!({"k": 1});
+        write_analysis(&dir, "p", "sha1", &a, 5).unwrap();
+        assert!(
+            load_analysis(&dir, "p", "sha1", 5).is_some(),
+            "同 schema+sha 命中"
+        );
+        assert!(
+            load_analysis(&dir, "p", "sha1", 6).is_none(),
+            "schema 变 → 本检則缓存失效"
+        );
+        assert!(
+            load_analysis(&dir, "p", "sha2", 5).is_none(),
+            ".lpkg sha 变 → 失效"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

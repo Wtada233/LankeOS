@@ -1,0 +1,11 @@
+pkg-name: docbook-xsl
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: docbook/xslt10-stylesheets
+  mode: tags
+  tag-prefix: release/
+  template: https://github.com/{repo}/releases/download/release%2F{version}/docbook-xsl-{version}.tar.gz
+- tracker-template: same-version
+  template: https://github.com/docbook/xslt10-stylesheets/releases/download/release%2F{version}/docbook-xsl-nons-{version}.tar.gz
+  same-version-of: docbook-xsl

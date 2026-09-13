@@ -16,33 +16,10 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-/// 扫描结果：needed_so / provides / deps（needed_so/provides 由扫描得出；deps 由 metadata.json 转述）。
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ScanResult {
-    pub name: String,
-    pub version: String,
-    pub needed_so: Vec<String>,
-    pub provides: Vec<String>,
-    pub deps: Vec<String>,
-}
-
-impl ScanResult {
-    pub fn new(
-        name: &str,
-        version: &str,
-        needed_so: &[&str],
-        provides: &[&str],
-        deps: &[&str],
-    ) -> Self {
-        ScanResult {
-            name: name.to_string(),
-            version: version.to_string(),
-            needed_so: needed_so.iter().map(|s| s.to_string()).collect(),
-            provides: provides.iter().map(|s| s.to_string()).collect(),
-            deps: deps.iter().map(|s| s.to_string()).collect(),
-        }
-    }
-}
+/// 扫描结果类型 = `verify::ScanResult` 的**单一来源**（曾在本模块另有一份同名异构定义，字段与
+/// verify 版不同 → 漂移风险。现由 verify 拥有、scan 复用；scan 依赖 verify 是上层依赖下层，
+/// 分层不变）。`scan_lpkg` 额外用 `with_name` 填 name/version 溯源信息。
+pub use crate::verify::ScanResult;
 
 /// 解包 .lpkg（zstd 压缩 PAX tar）到 `extract_dir`，然后扫描 content/。
 /// `extract_dir` 由调用方给出（确定性路径，非 /tmp——NOSUID，见 §6）。
@@ -67,13 +44,7 @@ pub fn scan_lpkg(
         })
         .unwrap_or_default();
     let (needed_so, provides) = scan_content(&extract_dir.join("content"), repo_provides);
-    Ok(ScanResult {
-        name,
-        version,
-        needed_so,
-        provides,
-        deps,
-    })
+    Ok(ScanResult::from_parts(needed_so, provides, deps).with_name(name, version))
 }
 
 /// 进程是否以 root 运行（farm 解包/重打包需读写 root 属主文件与 SUID，操作命令强制 root）。
@@ -149,7 +120,7 @@ pub fn read_lpkg_metadata(lpkg_path: &Path) -> Result<serde_json::Value, FarmErr
 /// 遍历 content/，扫 ELF → (needed_so, provides)。
 fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<String>, Vec<String>) {
     let mut files: Vec<PathBuf> = Vec::new();
-    collect_files(content_dir, content_dir, &mut files);
+    collect_files(content_dir, &mut files);
 
     let mut all_sonames: HashSet<String> = HashSet::new();
     let mut needs: HashSet<String> = HashSet::new();
@@ -230,20 +201,18 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
     (needed_so, provides)
 }
 
-/// 递归收集文件路径（含符号链接）。
-fn collect_files(dir: &Path, content_dir: &Path, out: &mut Vec<PathBuf>) {
+/// 递归收集叶子成员（含符号链接）到 `out`；只对**目录**递归。
+fn collect_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let Ok(rd) = fs::read_dir(dir) else { return };
     for entry in rd.flatten() {
         let p = entry.path();
         let Ok(ft) = entry.file_type() else { continue };
         if ft.is_dir() {
-            collect_files(&p, content_dir, out);
+            collect_files(&p, out);
         } else {
-            // 排除 metadata.json（在 content 外，不会走到；保险）
             out.push(p);
         }
     }
-    let _ = content_dir;
 }
 
 fn basename(s: &str) -> String {
@@ -332,6 +301,39 @@ mod tests {
             c
         ));
         assert!(!in_system_lib_dir(Path::new("/x/content/usr/bin/lpkg"), c));
+    }
+
+    #[test]
+    fn collect_files_includes_symlinks_and_broken() {
+        let tmp = std::env::temp_dir().join(format!("farm-scan-collect-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let content = tmp.join("content");
+        fs::create_dir_all(content.join("sub")).unwrap();
+        fs::write(content.join("b.txt"), b"x").unwrap();
+        fs::write(content.join("sub/a.txt"), b"x").unwrap();
+        std::os::unix::fs::symlink("b.txt", content.join("link")).unwrap();
+        std::os::unix::fs::symlink("nope", content.join("broken")).unwrap();
+
+        let mut out = Vec::new();
+        collect_files(&content, &mut out);
+        // 含普通文件与（含损坏的）符号链接，且只对目录递归
+        let names: std::collections::HashSet<String> = out
+            .iter()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(
+            names,
+            ["b.txt", "a.txt", "link", "broken"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            "应含普通文件与符号链接（含损坏的）: {out:?}"
+        );
+        // 顺序无关（下游是 HashSet），但同输入两次运行必须一致
+        let mut again = Vec::new();
+        collect_files(&content, &mut again);
+        assert_eq!(out, again, "同输入两次遍历顺序应一致");
+        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]

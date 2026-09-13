@@ -7,7 +7,13 @@ lankebuild_build() {
     # go-musicfox uses Makefile wrapping go build
     export CGO_ENABLED=1
     export CGO_CFLAGS="-I{INCLUDEDIR}"
-    make -j$(nproc) build
+    export MUSICFOX_VERSION="v{ORIG_PKG_VER}"
+    go build \
+      -trimpath \
+      -buildmode=pie \
+      -ldflags "-s -w -X github.com/go-musicfox/go-musicfox/internal/types.AppVersion=v{ORIG_PKG_VER} -X github.com/go-musicfox/go-musicfox/internal/types.GitRevision= -X github.com/go-musicfox/go-musicfox/internal/types.User=lankebuilder -X github.com/go-musicfox/go-musicfox/internal/types.Host=LankeOS -X github.com/go-musicfox/go-musicfox/internal/types.Time=1970-01-01T00:00:00" \
+      -o bin/musicfox \
+      ./cmd
     install -vDm 755 bin/musicfox {STAGING_ROOT}{BINDIR}/musicfox
 }
 

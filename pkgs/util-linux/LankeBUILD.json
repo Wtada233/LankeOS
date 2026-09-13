@@ -1,19 +1,24 @@
 {
   "name": "util-linux",
   "version": "2.41.5",
-  "release": 2,
+  "release": 4,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
+    "libcap-ng.so.0",
     "libcrypt.so.2",
     "libgcc_s.so.1",
     "libm.so.6",
     "libmagic.so.1",
     "libncursesw.so.6",
+    "libpam.so.0",
+    "libpam_misc.so.0",
     "libreadline.so.8",
+    "libsqlite3.so.0",
+    "libsystemd.so.0",
     "libudev.so.1",
     "libz.so.1"
   ],
@@ -22,6 +27,8 @@
     "libblkid.so.1",
     "libfdisk.so",
     "libfdisk.so.1",
+    "liblastlog2.so",
+    "liblastlog2.so.2",
     "libmount.so",
     "libmount.so.1",
     "libsmartcols.so",
@@ -33,9 +40,12 @@
     "base-devel",
     "bash-completion",
     "git",
+    "libcap-ng",
     "libxcrypt",
+    "linux-pam",
     "ncurses",
     "readline",
+    "sqlite",
     "zlib"
   ],
   "sources": [

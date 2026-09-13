@@ -4,11 +4,8 @@ lankebuild_prepare() {
     cd build
     meson setup --prefix={PREFIX} --sysconfdir={SYSCONFDIR}            \
                 --buildtype=release      \
-                -D tests=false           \
-                -D man=false             \
                 -D gtk_doc=false         \
-                -D docbook_docs=disabled \
-                -D introspection=auto    \
+                -D introspection=enabled \
                 ../
     cd ..
 }

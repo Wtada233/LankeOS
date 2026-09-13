@@ -21,6 +21,10 @@ use crate::ux;
 /// 强制排在触发包 `on` 之后，否则 `--all` 模式下 python-cairo 会在 python 重建前构建（容器升级时
 /// repo 还是旧 python，构建基于旧 ABI 白跑）。
 ///
+/// 参考 `lpkg/main/scripts/lankeos-world-rebuild-helper.py`（确定性 Kahn + 三色 DFS 切环）；区别：
+/// farm 增量构建，已就绪（不在 targets）的包不进图，无需全量重建。循环依赖：打印警告并切断构成环的
+/// 后向边（每轮一条，确定性），保证总能给出完整顺序。
+///
 /// `pkgs_dir` 用来读配方（LankeBUILD.json）：
 /// - **默认**：包 P 的 `build_deps` 里某个依赖 D 当且仅当「D 在本轮 targets」且「D 不在本轮起点
 ///   旧索引 `old.packages`」才作为边 P→D 参与排序——已在仓库的 D 不建边，维持 needed_so 语义。

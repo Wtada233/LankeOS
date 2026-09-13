@@ -1,0 +1,8 @@
+pkg-name: flameshot
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: flameshot-org/flameshot
+  mode: tags
+  tag-prefix: v
+  template: https://github.com/{repo}/archive/refs/tags/{tag}/{name}-{version}.tar.gz

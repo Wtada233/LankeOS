@@ -6,6 +6,32 @@
 
 use crate::error::FarmError;
 use std::collections::HashMap;
+use std::sync::LazyLock;
+use std::time::Duration;
+
+/// 连接超时（TCP + TLS 握手）。ureq 2 默认已是 30s，这里显式化。
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+/// **单次读写空闲**超时（不是请求总时长）：卡死/半开连接在此报错；慢速大文件下载不受总时长限制
+/// （ureq 2 默认 read/write **无超时**，可永久 hang；connect 默认 30s 已存在）。
+const READ_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
+const WRITE_IDLE_TIMEOUT: Duration = Duration::from_secs(60);
+
+static AGENT: LazyLock<ureq::Agent> =
+    LazyLock::new(|| build_agent(CONNECT_TIMEOUT, READ_IDLE_TIMEOUT, WRITE_IDLE_TIMEOUT));
+
+/// 构造 agent（测试注入短超时用，避免为超时写一个真等 60s 的测试）。
+pub fn build_agent(connect: Duration, read: Duration, write: Duration) -> ureq::Agent {
+    ureq::builder()
+        .timeout_connect(connect)
+        .timeout_read(read)
+        .timeout_write(write)
+        .build()
+}
+
+/// 进程内共享 HTTP agent（连接池 + 读写空闲超时）。所有出站 HTTP（下载/探测/track）都走它。
+pub fn http_agent() -> &'static ureq::Agent {
+    &AGENT
+}
 
 /// curl UA——镜像站/托管站对 curl 放行，对自定义或浏览器 UA 反而限流/挑战。
 /// 版本与系统 curl 一致，保证与 script 模板里 curl 发出的 UA 相同。
@@ -20,16 +46,47 @@ pub trait Fetcher {
     }
 }
 
+/// 取 URL 的 host（手写解析，无新依赖）：剥 scheme → 截到首个 `/`|`?`|`#` → 去 userinfo 与端口 → 小写。
+fn url_host(url: &str) -> String {
+    let after_scheme = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
+    let authority = after_scheme.split(['/', '?', '#']).next().unwrap_or("");
+    let host_port = authority.rsplit('@').next().unwrap_or(authority); // 去 userinfo
+    let host = host_port.split(':').next().unwrap_or(host_port); // 去端口
+    host.to_ascii_lowercase()
+}
+
+/// 取 URL 的 path（含前导 `/`，不含 query/fragment）。
+fn url_path(url: &str) -> &str {
+    let after_scheme = url.split_once("://").map(|(_, r)| r).unwrap_or(url);
+    match after_scheme.find('/') {
+        Some(i) => {
+            let p = &after_scheme[i..];
+            p.split(['?', '#']).next().unwrap_or(p)
+        }
+        None => "",
+    }
+}
+
 /// 平台 token 选择（纯函数，可单测）：
-/// `api.github.com` → GitHub token；gitlab API（含 `/api/v4/` 的自托管实例）→ GitLab token；其余无。
+/// - host `api.github.com` → GitHub token；
+/// - host `gitlab.com` / `*.gitlab.com` / 任一段为 `gitlab`（自托管 `gitlab.example.org`），
+///   或 path 以 `/api/v4/` 开头（自托管实例 API，如 invent.kde.org）→ GitLab token；
+/// - 其余无。
+/// 历史：曾 `url.contains("gitlab")` 过宽——镜像站 URL 里出现 "gitlab" 字样
+/// （如 `https://mirror.x/gitlab/foo.tar.gz`）会被误加 GitLab token（把 token 泄露给第三方）。
 pub fn bearer_token_for<'a>(
     url: &str,
     github: &'a Option<String>,
     gitlab: &'a Option<String>,
 ) -> Option<&'a str> {
-    if url.contains("api.github.com") {
-        github.as_deref()
-    } else if url.contains("gitlab") || url.contains("/api/v4/") {
+    let host = url_host(url);
+    if host == "api.github.com" {
+        return github.as_deref();
+    }
+    let is_gitlab_host = host == "gitlab.com"
+        || host.ends_with(".gitlab.com")
+        || host.split('.').any(|l| l == "gitlab");
+    if is_gitlab_host || url_path(url).starts_with("/api/v4/") {
         gitlab.as_deref()
     } else {
         None
@@ -67,13 +124,15 @@ impl Default for RealFetcher {
 
 impl Fetcher for RealFetcher {
     fn get(&self, url: &str) -> Result<String, FarmError> {
-        let mut req = ureq::get(url).set("User-Agent", CURL_UA);
+        let mut req = http_agent().get(url).set("User-Agent", CURL_UA);
         if let Some(tok) = bearer_token_for(url, &self.github_token, &self.gitlab_token) {
             req = req.set("Authorization", &format!("Bearer {tok}"));
         }
-        let resp = req.call().map_err(|e| format!("GET {url}: {e}"))?;
+        let resp = req
+            .call()
+            .map_err(|e| FarmError::http(format!("GET {url}"), e))?;
         resp.into_string()
-            .map_err(|e| format!("GET {url}: {e}").into())
+            .map_err(|e| FarmError::io(format!("GET {url}"), e))
     }
 
     fn token_env(&self) -> Vec<(String, String)> {
@@ -90,37 +149,62 @@ impl Fetcher for RealFetcher {
 
 /// 抓取文本（如 index.txt）。失败返回错误信息。
 pub fn fetch_text(url: &str) -> Result<String, FarmError> {
-    let body = ureq::get(url)
+    let body = http_agent()
+        .get(url)
         .set("User-Agent", CURL_UA)
         .call()
-        .map_err(|e| format!("GET {url}: {e}"))?;
+        .map_err(|e| FarmError::http(format!("GET {url}"), e))?;
     body.into_string()
-        .map_err(|e| format!("读 {url}: {e}").into())
+        .map_err(|e| FarmError::io(format!("读 {url}"), e))
+}
+
+/// 下载重试退避：第 `failed` 次失败后等待 `2^failed` 秒（封顶 30s）。固定 2s 在长时间故障下会
+/// 疯狂重试（镜像站限流时越试越糟），指数退避给对端恢复窗口。
+fn retry_backoff(failed: u32) -> Duration {
+    Duration::from_secs((1u64 << failed.min(5)).min(30))
 }
 
 /// 下载到文件（§8.6 源预下载），带可配置重试。瞬时网络错误可自愈；耗尽后返回错误。
+/// **失败必删半文件**：`download_once` 先 `File::create` 再 copy，网络中断会留下截断文件；不清理
+/// 则下次把它当"已就绪"（同类漏洞在 seed.rs 已修过，此处对齐）。调用方须保证 `dest` 此刻不是
+/// 有效文件（`sources.rs` 在 `dest.exists()` 时已 `continue`）。
 pub fn download_to_file(url: &str, dest: &std::path::Path, retries: u32) -> Result<(), FarmError> {
-    let attempts = retries.max(1);
+    download_with_backoff(url, dest, retries.max(1), std::thread::sleep)
+}
+
+/// `download_to_file` 主体：`sleep` 注入以便单测不真等。
+fn download_with_backoff(
+    url: &str,
+    dest: &std::path::Path,
+    attempts: u32,
+    sleep: impl Fn(Duration),
+) -> Result<(), FarmError> {
     for i in 1..=attempts {
         match download_once(url, dest) {
             Ok(()) => return Ok(()),
             Err(e) if i < attempts => {
                 eprintln!("{}", crate::tr!("net.download_fail", url, i, attempts, e));
-                std::thread::sleep(std::time::Duration::from_secs(2));
+                sleep(retry_backoff(i));
             }
-            Err(e) => return Err(e),
+            Err(e) => {
+                let _ = std::fs::remove_file(dest); // 清半文件，别让下次当"已下载"
+                return Err(e);
+            }
         }
     }
     unreachable!("重试循环已穷尽")
 }
 
 fn download_once(url: &str, dest: &std::path::Path) -> Result<(), FarmError> {
-    let resp = ureq::get(url)
+    let resp = http_agent()
+        .get(url)
         .set("User-Agent", CURL_UA)
         .call()
-        .map_err(|e| format!("GET {url}: {e}"))?;
-    let mut f = std::fs::File::create(dest).map_err(|e| format!("创建 {dest:?} 失败: {e}"))?;
-    std::io::copy(&mut resp.into_reader(), &mut f).map_err(|e| format!("写 {dest:?} 失败: {e}"))?;
+        .map_err(|e| FarmError::http(format!("GET {url}"), e))?;
+    let mut f =
+        std::fs::File::create(dest).map_err(|e| FarmError::io(format!("创建 {dest:?} 失败"), e))?;
+    std::io::copy(&mut resp.into_reader(), &mut f)
+        .map_err(|e| FarmError::io(format!("写 {dest:?} 失败"), e))?;
     Ok(())
 }
 
@@ -132,10 +216,10 @@ pub fn probe_source(url: &str) -> Result<(), FarmError> {
     if url.starts_with("git+") || url.starts_with("file://") {
         return Ok(());
     }
-    let resp = match ureq::get(url).set("User-Agent", CURL_UA).call() {
+    let resp = match http_agent().get(url).set("User-Agent", CURL_UA).call() {
         Ok(r) => r,
         Err(ureq::Error::Status(code, _)) => return Err(format!("{url} HTTP {code}").into()),
-        Err(e) => return Err(format!("{url} 请求失败: {e}").into()),
+        Err(e) => return Err(FarmError::http(format!("{url} 请求失败"), e)),
     };
     let status = resp.status();
     if !(200..400).contains(&status) {
@@ -145,7 +229,7 @@ pub fn probe_source(url: &str) -> Result<(), FarmError> {
     let mut reader = resp.into_reader();
     let mut buf = [0u8; 1];
     let _ = std::io::Read::read(&mut reader, &mut buf)
-        .map_err(|e| format!("读 {url} 响应失败: {e}"))?;
+        .map_err(|e| FarmError::io(format!("读 {url} 响应失败"), e))?;
     Ok(())
 }
 
@@ -209,6 +293,92 @@ mod tests {
 
         std::fs::remove_dir_all(&root).ok();
         drop(h);
+    }
+
+    #[test]
+    fn retry_backoff_is_exponential_and_capped() {
+        assert_eq!(retry_backoff(1), Duration::from_secs(2));
+        assert_eq!(retry_backoff(2), Duration::from_secs(4));
+        assert_eq!(retry_backoff(3), Duration::from_secs(8));
+        assert_eq!(retry_backoff(4), Duration::from_secs(16));
+        assert_eq!(retry_backoff(5), Duration::from_secs(30));
+        assert_eq!(retry_backoff(9), Duration::from_secs(30), "封顶 30s");
+    }
+
+    #[test]
+    fn download_failure_removes_partial_file_and_backs_off() {
+        // 对不存在路径下载（404，ureq 视为 Err）→ 重试耗尽后必须删掉残留文件（含预置垃圾）
+        let root = std::env::temp_dir().join(format!("farm-net-partial-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let port: u16 = 18082;
+        let r = root.clone();
+        let h = std::thread::spawn(move || {
+            let _ = crate::serve::serve("127.0.0.1", &r, port);
+        });
+        std::thread::sleep(Duration::from_millis(300));
+
+        let dest = root.join("dl.bin");
+        std::fs::write(&dest, b"stale-partial").unwrap(); // 预置垃圾，证明确实被清
+        let sleeps = std::cell::Cell::new(0u32);
+        let res = download_with_backoff(
+            &format!("http://127.0.0.1:{port}/missing"),
+            &dest,
+            3,
+            |_| sleeps.set(sleeps.get() + 1),
+        );
+        assert!(res.is_err(), "404 应报错");
+        assert!(!dest.exists(), "失败后不得留下半文件/旧垃圾");
+        assert_eq!(sleeps.get(), 2, "3 次尝试之间退避 2 次");
+        std::fs::remove_dir_all(&root).ok();
+        drop(h);
+    }
+
+    #[test]
+    fn bearer_token_not_added_for_mirror_paths() {
+        let gl = Some("gl-token".to_string());
+        // 回归：URL 里出现 "gitlab" 字样但 host 不是 gitlab → 不得加 token（旧实现会加）
+        assert_eq!(
+            bearer_token_for("https://mirror.example.com/gitlab/foo.tar.gz", &None, &gl),
+            None
+        );
+        assert_eq!(
+            bearer_token_for("https://mirror.example.com/d?ref=gitlab/x", &None, &gl),
+            None
+        );
+        // 自托管 gitlab（host 段含 gitlab）与 /api/v4/ 前缀仍应加
+        assert_eq!(
+            bearer_token_for("https://gitlab.example.org/api/v4/p/x", &None, &gl),
+            Some("gl-token")
+        );
+        assert_eq!(
+            bearer_token_for("https://invent.kde.org/api/v4/projects/x", &None, &gl),
+            Some("gl-token")
+        );
+    }
+
+    #[test]
+    fn agent_read_timeout_aborts_stalled_body() {
+        // 服务端接受连接但永不应答 → 读超时必须让调用在秒级失败，而非无限挂起
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            let _held = listener.accept();
+            std::thread::sleep(Duration::from_secs(10));
+        });
+        let agent = build_agent(
+            Duration::from_millis(200),
+            Duration::from_millis(200),
+            Duration::from_millis(200),
+        );
+        let start = std::time::Instant::now();
+        let res = agent.get(&format!("http://127.0.0.1:{port}/x")).call();
+        assert!(res.is_err(), "无应答连接应因读超时报错");
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "应在秒级超时而非挂起（实测 {:?}）",
+            start.elapsed()
+        );
     }
 
     #[test]

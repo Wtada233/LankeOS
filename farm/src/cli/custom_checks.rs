@@ -18,7 +18,7 @@ pub struct ChkArgs {
     /// 配方根（读 LankeBUILD.json 的 deps/farm_flags）
     #[arg(long, default_value = "pkgs")]
     pub pkgs_dir: PathBuf,
-    /// 缓存根（每个检則一个子目录；默认 ~/.cache/lankefarm-<chk>）
+    /// 缓存根（每个检則一个子目录；默认 ~/.cache/lankefarm）
     #[arg(long)]
     pub cache: Option<PathBuf>,
     /// 只检查/报告这些包（provider 仍来自 --source 全量）
@@ -44,7 +44,16 @@ fn resolve_pkgs_dir(a: &ChkArgs) -> PathBuf {
     a.pkgs_dir.clone()
 }
 
-fn opts_for(_label: &str, a: &ChkArgs, cache: PathBuf) -> ChkOpts {
+/// 缓存根：`--cache` 显式给（= **根**，非单检則目录）优先，否则 `~/.cache/lankefarm`
+/// （无 HOME 回落 `--source/.abi-cache`）。单跑与 `farm chk full` **共用同一根** → 两入口共享缓存
+/// （曾单跑 `~/.cache/lankefarm-<chk>`、full `~/.cache/lankefarm/<chk>`，同一检則互不命中）。
+fn cache_root(a: &ChkArgs) -> PathBuf {
+    a.cache
+        .clone()
+        .unwrap_or_else(|| custom_checks::default_cache_base(&a.source))
+}
+
+fn opts_for(a: &ChkArgs, cache: PathBuf) -> ChkOpts {
     ChkOpts {
         source: a.source.clone(),
         arch: a.arch.clone(),
@@ -112,12 +121,12 @@ fn finish(r: Result<Report, FarmError>) -> ExitCode {
 struct ChkDef {
     /// 报告 label（= 子命令名）
     label: &'static str,
-    /// 默认缓存目录键（`~/.cache/lankefarm-<cache>`；full 时作 base/<cache> 子目录）
+    /// 缓存子目录名（`<缓存根>/<cache>`；单跑与 full 同根，见 `cache_root`）
     cache: &'static str,
     run: fn(&ChkOpts) -> Result<Report, FarmError>,
 }
 
-const CHECKS: [ChkDef; 5] = [
+const CHECKS: [ChkDef; 7] = [
     ChkDef {
         label: "qml",
         cache: "qmlchk",
@@ -132,6 +141,16 @@ const CHECKS: [ChkDef; 5] = [
         label: "pkg-err",
         cache: "pkg-errchk",
         run: lankefarm::custom_checks::pkg_err::run,
+    },
+    ChkDef {
+        label: "introspection",
+        cache: "introspectionchk",
+        run: lankefarm::custom_checks::introspection::run,
+    },
+    ChkDef {
+        label: "vapi",
+        cache: "vapichk",
+        run: lankefarm::custom_checks::vapi::run,
     },
     ChkDef {
         label: "hook",
@@ -155,11 +174,7 @@ pub(crate) fn cmd_run(a: &ChkArgs, label: &str) -> ExitCode {
         eprintln!("未知检則: {label}");
         return ExitCode::from(2);
     };
-    let cache = a
-        .cache
-        .clone()
-        .unwrap_or_else(|| custom_checks::default_cache_dir(&a.source, d.cache));
-    let r = (d.run)(&opts_for(d.cache, a, cache));
+    let r = (d.run)(&opts_for(a, cache_root(a).join(d.cache)));
     if let Ok(rr) = &r {
         print_report(d.label, rr);
     }
@@ -168,14 +183,10 @@ pub(crate) fn cmd_run(a: &ChkArgs, label: &str) -> ExitCode {
 
 /// 一键跑全部（`farm chk full`）：同一张定义表依次跑所有检則，每类独立解包/独立缓存。
 pub(crate) fn cmd_fullchk(a: &ChkArgs) -> ExitCode {
-    let base = a.cache.clone().unwrap_or_else(|| {
-        std::env::var("HOME")
-            .map(|h| PathBuf::from(h).join(".cache/lankefarm"))
-            .unwrap_or_else(|_| a.source.join(".abi-cache"))
-    });
+    let base = cache_root(a);
     let mut bad = false;
     for d in &CHECKS {
-        match (d.run)(&opts_for(d.cache, a, base.join(d.cache))) {
+        match (d.run)(&opts_for(a, base.join(d.cache))) {
             Ok(r) => print_report(d.label, &r),
             Err(e) => {
                 eprintln!("{e}");
@@ -187,5 +198,35 @@ pub(crate) fn cmd_fullchk(a: &ChkArgs) -> ExitCode {
         ExitCode::from(2)
     } else {
         ExitCode::SUCCESS
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 钉死"注册面"：新增检則必须同时进 `CHECKS` 表（`farm chk full` 遍历它）并能被单跑入口
+    /// （`def()`）解析到——这正是"kind 字符串散落在 CHECKS/clap/farm_flags/is_ignored 四处"的
+    /// 软耦合点，少改一处会静默失效。
+    #[test]
+    fn checks_table_registers_every_kind() {
+        let labels: Vec<&str> = CHECKS.iter().map(|d| d.label).collect();
+        for want in [
+            "qml",
+            "pkgconf",
+            "pkg-err",
+            "introspection",
+            "vapi",
+            "hook",
+            "abi",
+        ] {
+            assert!(labels.contains(&want), "CHECKS 表缺 {want}: {labels:?}");
+            assert!(def(want).is_some(), "单跑入口解析不到 {want}");
+        }
+        // 数量钉死：新增一类必须同步这里（防漏注册/误删）
+        assert_eq!(CHECKS.len(), 7, "{labels:?}");
+        // 缓存子目录必须唯一：两检則共用目录会互相污染（A 的 analysis 被 B 当自己的读）
+        let caches: std::collections::HashSet<&str> = CHECKS.iter().map(|d| d.cache).collect();
+        assert_eq!(caches.len(), CHECKS.len(), "缓存子目录必须唯一");
     }
 }

@@ -1,0 +1,50 @@
+#
+# flameshot — 截图 + 标注工具（Qt6）
+# 基于 Arch Linux PKGBUILD 适配 LankeOS
+# 注意：使用 /bin/sh（POSIX sh），无 bashisms
+
+lankebuild_prepare() {
+    # -DUSE_KDSINGLEAPPLICATION=OFF：关掉单实例支持（Arch 同款）。这样 vendored 的
+    #   KDSingleApplication / QtColorWidgets 只被编成静态库，package 阶段清掉残留。
+    # -DUSE_WAYLAND_CLIPBOARD=ON：Wayland 剪贴板支持。
+    # -DDISABLE_UPDATE_CHECKER=ON：发行版包不自检更新。
+    #
+    # Wayland 截图走 XDG portal（src/utils/screengrabber.cpp 用
+    # org.freedesktop.portal.Desktop / org.freedesktop.portal.Screenshot），
+    # 所以运行时只需要 generic 前端 xdg-desktop-portal（见 json 的 deps）；
+    # 具体 backend（-gnome/-kde/-wlr）由桌面环境提供，不该由本包依赖
+    # （LankeOS 的 GNOME 桌面已由 gnome-session 拉进 xdg-desktop-portal-gnome）。
+    #
+    # 注：14.0 已移除 grim 适配器（翻译里那几条是 vanished），grim 不再是它的后端；
+    # Arch 的 optdepends('grim: …') 是过期的，所以本包不依赖 grim。
+    cmake -B build -S . -Wno-dev \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DUSE_WAYLAND_CLIPBOARD=ON \
+        -DDISABLE_UPDATE_CHECKER=ON \
+        -DUSE_KDSINGLEAPPLICATION=OFF
+}
+
+
+lankebuild_build() {
+    cmake --build build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" cmake --install build
+
+    # 清掉 vendored 静态库的安装残留（Arch 同款；.lpkg 不应含 .a/.la 及其 cmake/pc）
+    rm -rf "{STAGING_ROOT}/usr/include/QtColorWidgets" \
+           "{STAGING_ROOT}/usr/include/kdsingleapplication-qt6" \
+           "{STAGING_ROOT}/usr/lib/cmake/KDSingleApplication-qt6" \
+           "{STAGING_ROOT}/usr/lib/cmake/QtColorWidgets" \
+           "{STAGING_ROOT}/usr/lib/libQtColorWidgets.a" \
+           "{STAGING_ROOT}/usr/lib/libkdsingleapplication-qt6.a" \
+           "{STAGING_ROOT}/usr/lib/pkgconfig/QtColorWidgets.pc"
+    rmdir "{STAGING_ROOT}/usr/include" \
+          "{STAGING_ROOT}/usr/lib/cmake" \
+          "{STAGING_ROOT}/usr/lib/pkgconfig" 2>/dev/null || true
+
+    install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/flameshot/LICENSE"
+}

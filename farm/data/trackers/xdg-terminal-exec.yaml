@@ -1,0 +1,9 @@
+pkg-name: xdg-terminal-exec
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.freedesktop.org
+  mode: tags
+  project: Vladimir-csp/xdg-terminal-exec
+  tag-prefix: v
+  template: https://gitlab.freedesktop.org/Vladimir-csp/xdg-terminal-exec/-/archive/{tag}/{name}-{tag}.tar.gz

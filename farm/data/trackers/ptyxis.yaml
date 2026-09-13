@@ -1,0 +1,8 @@
+pkg-name: ptyxis
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.gnome.org
+  mode: tags
+  project: chergert/ptyxis
+  template: https://gitlab.gnome.org/chergert/ptyxis/-/archive/{tag}/{name}-{tag}.tar.gz

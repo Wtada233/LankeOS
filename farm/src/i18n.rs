@@ -1,6 +1,7 @@
 //! i18n.rs — 用户可见消息的本地化。
 //!
-//! 中文为默认；`LANG`/`LC_ALL` 以 `en` 开头时切英文。键缺失回退到键名（便于发现漏译）。
+//! 中文为默认；生效 locale 按 gettext/POSIX 优先级 `LC_ALL` > `LC_MESSAGES` > `LANG`（空值视为未设），
+//! 其值以 `en` 开头时切英文。键缺失回退到键名（便于发现漏译）。
 //! 用法：
 //!   `tr!("build.start")` → 取本地化字符串
 //!   `tr!("build.start", pkg, ver)` → `format!` 语义（目录串里用 `{}` 占位）
@@ -18,7 +19,7 @@ pub enum Lang {
 
 static LANG: OnceLock<Lang> = OnceLock::new();
 
-/// 纯函数：从 `LANG`/`LC_ALL` 环境值判定语言。`en` 开头 → 英文，否则中文。
+/// 纯函数：从生效 locale 值判定语言。`en` 开头 → 英文，否则中文。
 pub fn detect_lang(lang_env: &str) -> Lang {
     if lang_env.to_ascii_lowercase().starts_with("en") {
         Lang::En
@@ -27,12 +28,29 @@ pub fn detect_lang(lang_env: &str) -> Lang {
     }
 }
 
+/// 纯函数：按 gettext/POSIX 优先级取生效 locale —— `LC_ALL` > `LC_MESSAGES` > `LANG`，空值视为未设。
+/// 历史：曾 `LANG.or_else(LC_ALL)`（优先级颠倒）——POSIX 里 `LC_ALL` 覆盖一切，
+/// `LC_ALL=en_US.UTF-8` + `LANG=zh_CN.UTF-8` 时旧实现错选中文。
+pub fn pick_locale<'a>(
+    lc_all: Option<&'a str>,
+    lc_messages: Option<&'a str>,
+    lang: Option<&'a str>,
+) -> Option<&'a str> {
+    [lc_all, lc_messages, lang]
+        .into_iter()
+        .flatten()
+        .find(|s| !s.is_empty())
+}
+
 fn lang() -> Lang {
     *LANG.get_or_init(|| {
-        let l = std::env::var("LANG")
-            .or_else(|_| std::env::var("LC_ALL"))
-            .unwrap_or_default();
-        detect_lang(&l)
+        // 先绑定 String 再借（临时值会在 let 语句末 drop，不能直接 as_deref 传给 pick_locale）
+        let lc_all = std::env::var("LC_ALL").ok();
+        let lc_messages = std::env::var("LC_MESSAGES").ok();
+        let lang = std::env::var("LANG").ok();
+        let l =
+            pick_locale(lc_all.as_deref(), lc_messages.as_deref(), lang.as_deref()).unwrap_or("");
+        detect_lang(l)
     })
 }
 
@@ -361,6 +379,30 @@ mod tests {
         assert_eq!(detect_lang("C"), Lang::Zh); // POSIX C locale 回退中文
         assert_eq!(detect_lang(""), Lang::Zh);
         assert_eq!(detect_lang("fr_FR"), Lang::Zh); // 非 en 一律中文
+    }
+
+    #[test]
+    fn pick_locale_follows_gettext_precedence() {
+        // LC_ALL > LC_MESSAGES > LANG（POSIX：LC_ALL 覆盖一切）
+        assert_eq!(
+            pick_locale(
+                Some("en_US.UTF-8"),
+                Some("zh_CN.UTF-8"),
+                Some("zh_CN.UTF-8")
+            ),
+            Some("en_US.UTF-8")
+        );
+        // 无 LC_ALL：LC_MESSAGES 胜 LANG
+        assert_eq!(
+            pick_locale(None, Some("en_GB.UTF-8"), Some("zh_CN.UTF-8")),
+            Some("en_GB.UTF-8")
+        );
+        // 只有 LANG
+        assert_eq!(pick_locale(None, None, Some("en_US")), Some("en_US"));
+        // 空值视为未设（`LC_ALL=` 不应压掉 LANG）
+        assert_eq!(pick_locale(Some(""), None, Some("en_US")), Some("en_US"));
+        assert_eq!(pick_locale(None, None, None), None);
+        assert_eq!(pick_locale(Some(""), Some(""), Some("")), None);
     }
 
     #[test]

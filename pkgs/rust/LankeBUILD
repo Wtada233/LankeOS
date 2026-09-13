@@ -16,16 +16,27 @@ lankebuild_build() {
     export LIBSSH2_SYS_USE_PKG_CONFIG=1
     export LIBSQLITE3_SYS_USE_PKG_CONFIG=1
 
-    # compiler-rt builtins 所在目录（clang 资源目录，由 compiler-rt 包提供）
+    # compiler-rt 产物目录（clang 资源目录，由 compiler-rt 包提供），两份都要：
+    #  - libclang_rt.builtins-*.a → optimized-compiler-builtins（见下面 bootstrap.toml）
+    #  - libclang_rt.profile-*.a  → LLVM_PROFILER_RT_LIB：PGO 插桩的 runtime 必须与
+    #    做插桩的那个 LLVM 同源（系统 llvm 23.1.1）。不给这个变量，libprofiler_builtins
+    #    会用源码树自带的 compiler-rt 现编（rust 1.98 钉的是 LLVM 22），23 的插桩 +
+    #    22 的 runtime ⇒ 插桩编译器一跑就 SIGSEGV（崩在 __llvm_profile_instrument_target）。
     local clangdir
     clangdir="$(clang -print-resource-dir)"
+    export LLVM_PROFILER_RT_LIB="$clangdir/lib/linux/libclang_rt.profile-x86_64.a"
 
     # 生成 bootstrap.toml（适配 LankeOS x86_64）
-    # 用系统 rustc 作 stage0（rustc/cargo/rustfmt 指向 /usr/bin，配合 0003 补丁）
-    # 无 PGO/无 LTO：LLVM 23 的 PGO（value profiling）和 thin LTO（ThinLTO ValueInfo）
-    # 路径都有回归，构建会崩。Arch/Gentoo 停在 LLVM 22 所以没事。
+    # stage0 用系统 /usr/bin 那套 = 我们自己编出来装进去的 rust（带 0006 的 LLVM 23 修）。
+    # std 及其构建依赖都是 stage0 编的，所以 stage0 自己必须打过补丁：早期拿旧 1.98.0 当
+    # stage0 时，lto 一开就在它的 codegen 上炸 "expected function definition ... to have
+    # an associated value info"（ThinLTO 的 value info）。
+    # PGO 的坑不在 codegen：插桩由系统 LLVM 23.1.1 发出，profile runtime 必须与它同源，
+    # 否则插桩编译器一跑就 SIGSEGV（崩在 __llvm_profile_instrument_target）—— 见上面
+    # LLVM_PROFILER_RT_LIB 那段。
     cat > bootstrap.toml << EOF
 [build]
+description = "LankeOS Rust {ORIG_PKG_VER}"
 vendor = true
 target = ["x86_64-unknown-linux-gnu"]
 cargo = "/usr/bin/cargo"
@@ -48,6 +59,10 @@ incremental = false
 lld = false
 bootstrap-override-lld = "external"
 parallel-frontend-threads = $(nproc)
+# LTO：thin LTO 覆盖 std 与编译器自身；codegen-units-std=1 避免 std 在 LTO 前被拆碎
+lto = "thin"
+codegen-units = 16
+codegen-units-std = 1
 
 [target.x86_64-unknown-linux-gnu]
 llvm-config = "{BINDIR}/llvm-config"
@@ -57,7 +72,41 @@ optimized-compiler-builtins = "$clangdir/lib/linux/libclang_rt.builtins-x86_64.a
 prefix = "/usr"
 EOF
 
-    DESTDIR="{STAGING_ROOT}" python3 ./x.py install -j "$(nproc)"
+    local host_tuple="x86_64-unknown-linux-gnu"
+    local -a xpy_options=( -j "$(nproc)" )
+
+    # ── PGO 两阶段（Arch 同款流程）──
+    #  1) --rust-profile-generate 编出带计数器的插桩编译器
+    #  2) 用插桩编译器编 cargo 当采样负载，落 .profraw
+    #  3) llvm-profdata merge 出 profile，再 --rust-profile-use 正式编
+    local profraw="$PWD/build/profiles"
+    rm -rf "$profraw"
+    mkdir -p "$profraw"
+
+    echo ">>> PGO 1/3"
+    python3 ./x.py build sysroot "${xpy_options[@]}" --rust-profile-generate="$profraw"
+
+    echo ">>> PGO 2/3"
+    local stage2="$PWD/build/$host_tuple/stage2"
+    LLVM_PROFILE_FILE="$profraw/default_%m_%p.profraw" \
+    LD_LIBRARY_PATH="$stage2/lib" \
+    RUSTC="$stage2/bin/rustc" \
+        cargo build --offline --manifest-path=src/tools/cargo/Cargo.toml
+
+    echo ">>> PGO 3/3"
+    local profdata="$PWD/build/rustc.profdata"
+    llvm-profdata merge -o "$profdata" "$profraw"/*.profraw
+    stat -c "PGO profile 大小：%s 字节" "$profdata"
+    test -s "$profdata"
+
+    # 插桩产物（profraw + 插桩 stage2）已无用，删掉腾磁盘；
+    # 带 --rust-profile-use 会据 profile 重建 stage2
+    rm -rf "$profraw" "$stage2"*
+
+    xpy_options+=( --rust-profile-use="$profdata" )
+
+    echo ">>> Final BUILD（PGO + thin LTO）"
+    DESTDIR="{STAGING_ROOT}" python3 ./x.py install "${xpy_options[@]}"
 }
 
 lankebuild_package() {
@@ -70,6 +119,22 @@ lankebuild_package() {
     rm -rf "{STAGING_ROOT}{LIBDIR}/rustlib/etc"
     rm -f  "{STAGING_ROOT}{LIBDIR}/rustlib/rust-installer-version"
     rm -f  "{STAGING_ROOT}{LIBDIR}"/rustlib/manifest-*
+
+    # ── /etc 残留清理（Arch 同款）：安装器把自定义 target spec 的 JSON schema
+    #    丢在 /etc 根，运行期无人读；删掉后顺手收掉空掉的 /etc ──
+    rm -fv "{STAGING_ROOT}{SYSCONFDIR}/target-spec-json-schema.json"
+    rmdir --ignore-fail-on-non-empty "{STAGING_ROOT}{SYSCONFDIR}" 2>/dev/null || true
+
+    # ── 许可证归位：安装器把各组件许可证散在 usr/share/doc/<组件>/，
+    #    按仓库约定收进 usr/share/licenses/rust/（取源码树的规范三件套），
+    #    组件目录下的重复副本删掉；rustc/ 下的 COPYRIGHT*.html 与
+    #    licenses/*.txt（第三方文本，被 COPYRIGHT.html 引用）留在原处 ──
+    local ldir="{STAGING_ROOT}{DATADIR}/licenses/rust"
+    install -Dm644 "{SRC_DIR}/COPYRIGHT"      "$ldir/COPYRIGHT"
+    install -Dm644 "{SRC_DIR}/LICENSE-MIT"    "$ldir/LICENSE-MIT"
+    install -Dm644 "{SRC_DIR}/LICENSE-APACHE" "$ldir/LICENSE-APACHE"
+    find "{STAGING_ROOT}{DATADIR}/doc" -mindepth 2 -maxdepth 2 -type f \
+        \( -name LICENSE-APACHE -o -name LICENSE-MIT \) -delete 2>/dev/null || true
 
     # ── lld 外部化：bootstrap.toml 里 lld=false 不自建 rust-lld，
     #    把 self-contained 链接器软链到系统 lld / llvm-objcopy ──

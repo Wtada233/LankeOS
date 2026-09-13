@@ -15,6 +15,13 @@ pub struct ExportReport {
     pub failed: Vec<String>,
 }
 
+/// 名字安全校验（纵深防御）：包名/版本会被拼进输出文件名。虽 `file_name()`/`file_stem()` 取的是单个
+/// 路径分量（正常路径不可能越界），但挂载了不可信卷/畸形条目时仍须拒绝——含路径分隔符或 `..`
+/// 一律不导出并记 failed（曾无校验直拼）。
+fn safe_component(s: &str) -> bool {
+    !s.is_empty() && !s.contains('/') && !s.contains('\\') && !s.contains("..")
+}
+
 /// 遍历 `input/<arch>/<pkg>/*.lpkg`，逐个**复制**为 `<pkg>-<ver>.lpkg` 扁平输出（字节即仓库产物，
 /// 已 level 22 + mtime 1970 归一化，无需再解压/重压）。
 pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, FarmError> {
@@ -37,6 +44,10 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, F
         else {
             continue;
         };
+        if !safe_component(&pkg) {
+            report.failed.push(format!("{pkg}: 包名含非法字符，跳过"));
+            continue;
+        }
         let mut lpkg_files: Vec<PathBuf> = fs::read_dir(&pkgdir)
             .ok()
             .map(|it| {
@@ -58,6 +69,12 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, F
                     .push(format!("{pkg}: 无法解析 .lpkg 文件名版本"));
                 continue;
             };
+            if !safe_component(&ver) {
+                report
+                    .failed
+                    .push(format!("{pkg}: 版本名 {ver:?} 含非法字符，跳过"));
+                continue;
+            }
             let out_path = output.join(format!("{pkg}-{ver}.lpkg"));
             match fs::copy(&lpkg, &out_path) {
                 Ok(_) => report.exported.push(format!("{pkg}-{ver}")),
@@ -100,6 +117,35 @@ mod tests {
         enc.finish().unwrap();
         let _ = fs::remove_dir_all(&src);
         out_path.to_path_buf()
+    }
+
+    #[test]
+    fn export_rejects_unsafe_pkg_or_version_names() {
+        let tmp = std::env::temp_dir().join(format!("farm-export-unsafe-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let input = tmp.join("out");
+        let output = tmp.join("export");
+        // 合法包
+        let good = input.join("x86_64").join("ok");
+        fs::create_dir_all(&good).unwrap();
+        make_lpkg(&good.join("1.0.lpkg"), "ok", "1.0");
+        // 非法版本名（含 ".."）
+        let bad = input.join("x86_64").join("evil");
+        fs::create_dir_all(&bad).unwrap();
+        make_lpkg(&bad.join("1.0..2.lpkg"), "evil", "1.0..2");
+
+        let report = export(&input, &output, "x86_64").unwrap();
+        assert!(report.exported.contains(&"ok-1.0".to_string()));
+        assert!(
+            report.failed.iter().any(|f| f.contains("evil")),
+            "含 .. 的版本名应记 failed: {:?}",
+            report.failed
+        );
+        assert!(
+            !output.join("evil-1.0..2.lpkg").exists(),
+            "非法名不得产生输出"
+        );
+        let _ = fs::remove_dir_all(&tmp);
     }
 
     #[test]

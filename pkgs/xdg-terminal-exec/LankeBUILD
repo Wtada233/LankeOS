@@ -1,0 +1,29 @@
+#
+# xdg-terminal-exec — 按用户偏好启动终端的参考实现
+# （Default Terminal Execution Specification 的参考实现：纯 POSIX sh 脚本 + Makefile）
+# Arch 官方仓库未收录；建档时参照 AUR（同源归档、同版本 0.14.3），安装方式按 LankeOS 约定。
+# 注意：使用 /bin/sh（POSIX sh），无 bashisms
+
+lankebuild_prepare() {
+    :
+}
+
+
+lankebuild_build() {
+    # 上游 all 目标只是用 scdoc 把 xdg-terminal-exec.1.scd 生成 man 页；
+    # scdoc 不在 LankeOS 仓库 → 不构建 man 页（仓库既有取舍：man 页工具能关就关；
+    # 想要 man 页需先 port scdoc）。脚本本身无需构建。
+    :
+}
+
+
+lankebuild_package() {
+    # 只跑 install-bin / install-conf，跳过 install-man（依赖 scdoc）。
+    # 装出：/usr/bin/xdg-terminal-exec 与 /usr/share/xdg-terminal-exec/xdg-terminals.list
+    make install-bin install-conf \
+        prefix={PREFIX} \
+        DESTDIR="{STAGING_ROOT}"
+
+    install -Dm644 LICENSE \
+        "{STAGING_ROOT}{DATADIR}/licenses/xdg-terminal-exec/LICENSE"
+}

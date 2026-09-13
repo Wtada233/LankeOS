@@ -1,0 +1,30 @@
+diff -ruN a/third_party/openxr/BUILD.gn b/third_party/openxr/BUILD.gn
+--- a/third_party/openxr/BUILD.gn	2026-09-13 16:52:53.390727192 +0800
++++ b/third_party/openxr/BUILD.gn	2026-09-13 16:52:53.416031027 +0800
+@@ -31,6 +31,12 @@
+     ]
+ 
+     public_configs = [ ":config" ]
++
++    # The config above defines XR_USE_GRAPHICS_API_VULKAN on Linux, which makes
++    # openxr_platform.h include <vulkan/vulkan.h>. Depend on Chromium's Vulkan
++    # headers so the include path (and the VK_USE_PLATFORM_* defines) come from
++    # that target's own public config instead of the system include path.
++    public_deps = [ "//third_party/vulkan-headers/src:vulkan_headers" ]
+   }
+ 
+   source_set("openxr_headers") {
+@@ -155,7 +161,12 @@
+       "src/src/loader",
+     ]
+ 
+-    deps = [ "//third_party/jsoncpp" ]
++    deps = [
++      "//third_party/jsoncpp",
++      # Same reason as openxr_core_headers above: the loader's own sources reach
++      # <vulkan/vulkan.h> through src/common/xr_dependencies.h.
++      "//third_party/vulkan-headers/src:vulkan_headers",
++    ]
+ 
+     public_configs = [ ":config" ]
+ 

@@ -59,11 +59,29 @@ pub fn seed(remote: &str, arch: &str, out: &Path, jobs: usize) -> Result<SeedRep
             let names = chunk.to_vec();
             let remote = remote.to_string();
             let dest_arch = dest_arch.clone();
-            handles.push(s.spawn(move || seed_chunk(&remote, arch, &dest_arch, index, &names)));
+            // 保留该 chunk 的包名：worker panic 时据此归因（见下方 join）
+            let owned = names.clone();
+            handles.push((
+                owned,
+                s.spawn(move || seed_chunk(&remote, arch, &dest_arch, index, &names)),
+            ));
         }
         handles
             .into_iter()
-            .map(|h| h.join().unwrap_or_default())
+            .map(|(names, h)| match h.join() {
+                Ok(r) => r,
+                // worker panic（内部 unwrap/越界等）**不得静默丢包**：旧实现 `unwrap_or_default()`
+                // 让该 chunk 的包既不进 ok 也不进 failed，总数与 ok+failed 对不上且无任何告警。
+                // 全部记 failed 并在原因里标明，让 operator 看得见。
+                Err(_) => SeedReport {
+                    total: names.len(),
+                    ok: 0,
+                    failed: names
+                        .into_iter()
+                        .map(|n| (n, "worker panicked".to_string()))
+                        .collect(),
+                },
+            })
             .collect()
     });
     for r in results {
@@ -160,29 +178,32 @@ fn seed_one_pkg(
 
 /// 下载文本（index.txt）。
 fn fetch(url: &str) -> Result<String, FarmError> {
-    let body = ureq::get(url)
+    let body = crate::net::http_agent()
+        .get(url)
         .set("User-Agent", crate::net::CURL_UA)
         .call()
-        .map_err(|e| format!("GET {url}: {e}"))?;
+        .map_err(|e| FarmError::http(format!("GET {url}"), e))?;
     body.into_string()
-        .map_err(|e| format!("读 {url}: {e}").into())
+        .map_err(|e| FarmError::io(format!("读 {url}"), e))
 }
 
 /// 流式下载到文件。
 fn download(url: &str, dest: &Path) -> Result<(), FarmError> {
-    let resp = ureq::get(url)
+    let resp = crate::net::http_agent()
+        .get(url)
         .set("User-Agent", crate::net::CURL_UA)
         .call()
-        .map_err(|e| format!("GET {url}: {e}"))?;
-    let mut f = fs::File::create(dest).map_err(|e| format!("创建 {dest:?} 失败: {e}"))?;
+        .map_err(|e| FarmError::http(format!("GET {url}"), e))?;
+    let mut f =
+        fs::File::create(dest).map_err(|e| FarmError::io(format!("创建 {dest:?} 失败"), e))?;
     std::io::copy(&mut resp.into_reader(), &mut f)
-        .map_err(|e| format!("下载 {url} 写盘失败: {e}"))?;
-    f.flush().map_err(|e| format!("flush 失败: {e}"))?;
+        .map_err(|e| FarmError::io(format!("下载 {url} 写盘失败"), e))?;
+    f.flush().map_err(|e| FarmError::io("flush 失败", e))?;
     Ok(())
 }
 
 fn sha256_file(path: &Path) -> Result<String, FarmError> {
-    let data = fs::read(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
+    let data = fs::read(path).map_err(|e| FarmError::io(format!("读 {path:?} 失败"), e))?;
     let mut hasher = Sha256::new();
     hasher.update(&data);
     Ok(format!("{:x}", hasher.finalize()))

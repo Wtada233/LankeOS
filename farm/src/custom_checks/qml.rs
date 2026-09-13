@@ -18,8 +18,13 @@ use std::path::Path;
 
 const QML_ROOT: &str = "usr/lib/qt6/qml";
 
+/// 本检則 analysis 结构版本：只在 **qml** 分析逻辑变化时递增。
+/// 已递增至 6：analysis 改为扫描**剥离注释后**的文本（旧缓存里的 requires 含注释掉的 import）。
+const SCHEMA: u32 = 6;
+
 /// 引擎/进程内注册型 QML 模块的 URI 列表：由**各包配方 farm_flags** 的字符串列表 flag 声明，
-/// 值用 **JSON 数组**：`QML_CHK_IGN_LST=["org.kde.kwin","HelperWidgets"]`（兼容旧的逗号串）。
+/// 值用 **JSON 数组对象成员**：`{"QML_CHK_IGN_LST": ["org.kde.kwin", "HelperWidgets"]}`
+/// （裸串 `NAME=a,b` 不支持——consumer 只读 JSON 数组，见 build/farm_flags.rs）。
 /// 这类模块不以 qmldir 目录存在于仓库、靠 QML 引擎/宿主运行时注册，仓库无 provider 属正常——
 /// 声明后该包的这些 import 不再判缺失。
 fn internal_uris_of(pkgs_dir: &Path, pkg: &str) -> HashSet<String> {
@@ -31,12 +36,6 @@ fn internal_uris_of(pkgs_dir: &Path, pkg: &str) -> HashSet<String> {
         .into_iter()
         .filter(|u| !u.is_empty())
         .collect()
-}
-
-fn rel_of(path: &Path, root: &Path) -> String {
-    path.strip_prefix(root)
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| path.display().to_string())
 }
 
 /// 把相对路径 import 解析成 content 根下绝对目录（无前导 '/'；越出 content 根 → None）。
@@ -67,6 +66,83 @@ fn norm_join(base_dir: &str, imp: &str) -> Option<String> {
     }
 }
 
+/// 剥离 QML/JS 注释（`//` 行注释、`/* */` 块注释），**跳过字符串字面量**（`"…"`/`'…'`，处理 `\`
+/// 转义）——否则 `import "https://x/y"` 里的 `//` 会被当成注释起点误截。保留换行以维持 `(?m)^`
+/// 锚点行结构。历史事故：import 正则直接扫原文，`// import "components"`（注释掉的 import）
+/// 被当成真依赖 → 误报。
+fn strip_comments(text: &str) -> String {
+    #[derive(PartialEq)]
+    enum St {
+        Code,
+        Line,
+        Block,
+        Dq,
+        Sq,
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = String::with_capacity(text.len());
+    let mut st = St::Code;
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        let next = chars.get(i + 1).copied();
+        match st {
+            St::Code => {
+                if c == '/' && next == Some('/') {
+                    st = St::Line;
+                    i += 2;
+                } else if c == '/' && next == Some('*') {
+                    st = St::Block;
+                    i += 2;
+                } else {
+                    if c == '"' {
+                        st = St::Dq;
+                    } else if c == '\'' {
+                        st = St::Sq;
+                    }
+                    out.push(c);
+                    i += 1;
+                }
+            }
+            St::Line => {
+                if c == '\n' {
+                    out.push('\n');
+                    st = St::Code;
+                }
+                i += 1;
+            }
+            St::Block => {
+                if c == '*' && next == Some('/') {
+                    st = St::Code;
+                    i += 2;
+                } else {
+                    if c == '\n' {
+                        out.push('\n'); // 保留行结构
+                    }
+                    i += 1;
+                }
+            }
+            St::Dq | St::Sq => {
+                // 字符串内整体保留；`\` 转义吞掉下一字符（不触发注释/闭合判定）
+                if c == '\\' {
+                    out.push(c);
+                    if let Some(n) = next {
+                        out.push(n);
+                    }
+                    i += 2;
+                } else {
+                    out.push(c);
+                    if (st == St::Dq && c == '"') || (st == St::Sq && c == '\'') {
+                        st = St::Code;
+                    }
+                    i += 1;
+                }
+            }
+        }
+    }
+    out
+}
+
 /// import 行捕获：`import <URI>`（点分）或 `import "<相对路径>"`。返回 (kind, value)，
 /// kind = "uri" | "path"。
 fn imports_in(text: &str) -> Vec<(String, String)> {
@@ -93,7 +169,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     let mut requires: Vec<(String, String)> = Vec::new();
     let mut rel: Vec<(String, String)> = Vec::new();
     for f in super::collect_files(&content) {
-        let relp = rel_of(&f, &content);
+        let relp = super::rel_of(&f, &content);
         let name = f.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if name == "qmldir" && relp.starts_with(&format!("{QML_ROOT}/")) {
             if let Some(dir) = f.parent() {
@@ -112,6 +188,8 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
             let Ok(text) = std::fs::read_to_string(&f) else {
                 continue;
             };
+            // 先剥注释：注释掉的 import 不是真依赖（字符串字面量受保护，`https://` 不被误截）
+            let text = strip_comments(&text);
             let base = relp
                 .rsplit_once('/')
                 .map(|(d, _)| d.to_string())
@@ -139,7 +217,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
 
 /// 跑 qmlchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
-    let (analyses, hits, misses, failed) = walk_all(opts, |ext, _pkg| analyze(ext))?;
+    let (analyses, hits, misses, failed) = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
     let index = super::load_index(opts);
 
     // 1) URI 模块 → 归属包
@@ -254,4 +332,79 @@ fn import_re() -> &'static regex::Regex {
     IMPORT_RE.get_or_init(|| {
         regex::Regex::new(r#"(?m)^\s*import\s+(?:"([^"]+)"|([A-Za-z0-9_\.]+))"#).unwrap()
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn strip_comments_drops_commented_imports_but_keeps_strings() {
+        let src = "\
+import QtQuick 2.0
+// import \"components\"
+/*
+import Foo 1.0
+*/
+import \"https://x/y\"
+import A.B
+";
+        let stripped = strip_comments(src);
+        let imports = imports_in(&stripped);
+        let uri_names: Vec<&str> = imports.iter().map(|(_, v)| v.as_str()).collect();
+        assert!(
+            uri_names.contains(&"QtQuick"),
+            "真 import 应保留: {imports:?}"
+        );
+        assert!(uri_names.contains(&"A.B"), "真 import 应保留: {imports:?}");
+        assert!(
+            uri_names.contains(&"https://x/y"),
+            "字符串里的 // 不得被当注释: {imports:?}"
+        );
+        assert!(
+            !uri_names.iter().any(|v| *v == "components"),
+            "注释掉的 import 不得命中: {imports:?}"
+        );
+        assert!(
+            !uri_names.iter().any(|v| *v == "Foo"),
+            "块注释里的 import 不得命中: {imports:?}"
+        );
+        // 行结构保留（行数不变）
+        assert_eq!(stripped.lines().count(), src.lines().count());
+    }
+
+    #[test]
+    fn internal_uris_reads_json_array_flag_only() {
+        let dir = std::env::temp_dir().join(format!("farm-qml-flags-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let pkg = dir.join("p");
+        std::fs::create_dir_all(&pkg).unwrap();
+        std::fs::write(
+            pkg.join("LankeBUILD.json"),
+            serde_json::to_string(&serde_json::json!({
+                "name": "p", "version": "1.0",
+                "farm_flags": [{"QML_CHK_IGN_LST": ["org.kde.kwin", "HelperWidgets"]}]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let s = internal_uris_of(&dir, "p");
+        assert!(
+            s.contains("org.kde.kwin") && s.contains("HelperWidgets"),
+            "{s:?}"
+        );
+
+        // 逗号串裸形式：不再被接受（值丢失，不再静默）
+        std::fs::write(
+            pkg.join("LankeBUILD.json"),
+            serde_json::to_string(&serde_json::json!({
+                "name": "p", "version": "1.0",
+                "farm_flags": ["QML_CHK_IGN_LST=org.kde.kwin"]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(internal_uris_of(&dir, "p").is_empty(), "裸串不应再被读取");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

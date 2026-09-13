@@ -9,17 +9,14 @@ use crate::error::FarmError;
 use std::collections::HashSet;
 use std::path::Path;
 
-fn rel_of(path: &Path, root: &Path) -> String {
-    path.strip_prefix(root)
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| path.display().to_string())
-}
+/// 本检則 analysis 结构版本：只在 **pkg-err** 分析逻辑变化时递增（与其他检則独立）。
+const SCHEMA: u32 = 5;
 
 fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     let content = extract.join("content");
     let mut paths: Vec<(String, String)> = Vec::new();
     for f in super::collect_files(&content) {
-        let rel = rel_of(&f, &content);
+        let rel = super::rel_of(&f, &content);
         if rel.starts_with("usr/etc/") || rel.starts_with("usr/var/") {
             paths.push((rel, "misplaced-root".into()));
         } else if rel.ends_with(".la") {
@@ -33,7 +30,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
 
 /// 跑 pkg-errchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
-    let (analyses, hits, misses, failed) = walk_all(opts, |ext, _pkg| analyze(ext))?;
+    let (analyses, hits, misses, failed) = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
     let audit_all = opts.subset.is_empty();
     let audit: HashSet<&str> = opts.subset.iter().map(String::as_str).collect();
     let mut report = Report {

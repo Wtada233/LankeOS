@@ -1,0 +1,2166 @@
+Submitted By:            Xi Ruoyao <xry111 at xry111 dot site>
+Date:                    2026-09-04
+Initial Package Version: 1.98.1
+Upstream Status:         Applied for master but not 1.98.x
+Origin:                  Upstream git repo (see the From lines for
+                         revisions)
+Description:             Fix issues causing build failures and test
+                         failures with LLVM 23.
+
+From 1a56799fef3e4746385da26590928c54a39520ca Mon Sep 17 00:00:00 2001
+From: Krasimir Georgiev <krasimir@google.com>
+Date: Thu, 9 Jul 2026 10:57:52 +0000
+Subject: [PATCH] cleanup: upstream dropped AMX-TF32
+
+Co-authored-by: Gwen Mittertreiner <gmtr@google.com>
+---
+ compiler/rustc_target/src/target_features.rs | 1 -
+ library/std_detect/src/detect/arch/x86.rs    | 3 ---
+ library/std_detect/src/detect/os/x86.rs      | 1 -
+ library/std_detect/tests/x86-specific.rs     | 1 -
+ tests/ui/check-cfg/target_feature.stderr     | 1 -
+ 5 files changed, 7 deletions(-)
+
+diff --git a/compiler/rustc_target/src/target_features.rs b/compiler/rustc_target/src/target_features.rs
+index 8c1ebee8416e5..fc25849b2d602 100644
+--- a/compiler/rustc_target/src/target_features.rs
++++ b/compiler/rustc_target/src/target_features.rs
+@@ -423,7 +423,6 @@ static X86_FEATURES: &[(&str, Stability, ImpliedFeatures)] = &[
+     ("amx-fp16", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
+     ("amx-int8", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
+     ("amx-movrs", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
+-    ("amx-tf32", Unstable(sym::x86_amx_intrinsics), &["amx-tile"]),
+     ("amx-tile", Unstable(sym::x86_amx_intrinsics), &[]),
+     ("apxf", Unstable(sym::apx_target_feature), &[]),
+     ("avx", Stable, &["sse4.2"]),
+diff --git a/library/std_detect/src/detect/arch/x86.rs b/library/std_detect/src/detect/arch/x86.rs
+index ede4a80c088ed..e054546afcb19 100644
+--- a/library/std_detect/src/detect/arch/x86.rs
++++ b/library/std_detect/src/detect/arch/x86.rs
+@@ -91,7 +91,6 @@ features! {
+     /// * `"amx-avx512"`
+     /// * `"amx-fp8"`
+     /// * `"amx-movrs"`
+-    /// * `"amx-tf32"`
+     /// * `"f16c"`
+     /// * `"fma"`
+     /// * `"bmi1"`
+@@ -228,8 +227,6 @@ features! {
+     /// AMX-FP8 (Float8 Operations)
+     @FEATURE: #[unstable(feature = "x86_amx_intrinsics", issue = "126622")] amx_movrs: "amx-movrs";
+     /// AMX-MOVRS (Matrix MOVERS operations)
+-    @FEATURE: #[unstable(feature = "x86_amx_intrinsics", issue = "126622")] amx_tf32: "amx-tf32";
+-    /// AMX-TF32 (TensorFloat32 Operations)
+     @FEATURE: #[unstable(feature = "apx_target_feature", issue = "139284")] apxf: "apxf";
+     /// APX-F (Advanced Performance Extensions - Foundation)
+     @FEATURE: #[unstable(feature = "avx10_target_feature", issue = "138843")] avx10_1: "avx10.1";
+diff --git a/library/std_detect/src/detect/os/x86.rs b/library/std_detect/src/detect/os/x86.rs
+index 2b75cd6257087..4e739fb38d56e 100644
+--- a/library/std_detect/src/detect/os/x86.rs
++++ b/library/std_detect/src/detect/os/x86.rs
+@@ -216,7 +216,6 @@ pub(crate) fn detect_features() -> cache::Initializer {
+                             __cpuid_count(0x1e_u32, 1);
+ 
+                         enable(amx_feature_flags_eax, 4, Feature::amx_fp8);
+-                        enable(amx_feature_flags_eax, 6, Feature::amx_tf32);
+                         enable(amx_feature_flags_eax, 7, Feature::amx_avx512);
+                         enable(amx_feature_flags_eax, 8, Feature::amx_movrs);
+                     }
+diff --git a/library/std_detect/tests/x86-specific.rs b/library/std_detect/tests/x86-specific.rs
+index 4b02f78b7944e..117182558f46a 100644
+--- a/library/std_detect/tests/x86-specific.rs
++++ b/library/std_detect/tests/x86-specific.rs
+@@ -83,7 +83,6 @@ fn dump() {
+     println!("widekl: {:?}", is_x86_feature_detected!("widekl"));
+     println!("movrs: {:?}", is_x86_feature_detected!("movrs"));
+     println!("amx-fp8: {:?}", is_x86_feature_detected!("amx-fp8"));
+-    println!("amx-tf32: {:?}", is_x86_feature_detected!("amx-tf32"));
+     println!("amx-avx512: {:?}", is_x86_feature_detected!("amx-avx512"));
+     println!("amx-movrs: {:?}", is_x86_feature_detected!("amx-movrs"));
+ }
+diff --git a/tests/ui/check-cfg/target_feature.stderr b/tests/ui/check-cfg/target_feature.stderr
+index 98ba1de498bbe..eca0813e6a286 100644
+--- a/tests/ui/check-cfg/target_feature.stderr
++++ b/tests/ui/check-cfg/target_feature.stderr
+@@ -28,7 +28,6 @@ LL |     cfg!(target_feature = "_UNEXPECTED_VALUE");
+ `amx-fp8`
+ `amx-int8`
+ `amx-movrs`
+-`amx-tf32`
+ `amx-tile`
+ `apxf`
+ `atomics`
+From f7a6c996c5618a071ce07f7b29599dced5b52c50 Mon Sep 17 00:00:00 2001
+From: Krasimir Georgiev <krasimir@google.com>
+Date: Wed, 8 Jul 2026 13:52:00 +0000
+Subject: [PATCH] cleanup: upstream dropped AMX-TF32
+
+---
+ .../crates/core_arch/src/x86_64/amx.rs        | 98 -------------------
+ .../crates/stdarch-verify/tests/x86-intel.rs  |  2 +-
+ 2 files changed, 1 insertion(+), 99 deletions(-)
+
+diff --git a/library/stdarch/crates/core_arch/src/x86_64/amx.rs b/library/stdarch/crates/core_arch/src/x86_64/amx.rs
+index cddae18b7684d..f97acf1d3f746 100644
+--- a/library/stdarch/crates/core_arch/src/x86_64/amx.rs
++++ b/library/stdarch/crates/core_arch/src/x86_64/amx.rs
+@@ -632,50 +632,6 @@ pub unsafe fn __tile_stream_loaddrs(dst: *mut __tile1024i, base: *const u8, stri
+     (*dst).tile = tileloaddrst164_internal((*dst).rows, (*dst).colsb, base, stride as u64);
+ }
+ 
+-/// Perform matrix multiplication of two tiles a and b, containing packed single precision (32-bit)
+-/// floating-point elements, which are converted to TF32 (tensor-float32) format, and accumulate the
+-///  results into a packed single precision tile.
+-/// For each possible combination of (row of a, column of b), it performs
+-///  - convert to TF32
+-///  - multiply the corresponding elements of a and b
+-///  - accumulate the results into the corresponding row and column of dst using round-to-nearest-even
+-/// rounding mode.
+-/// Output FP32 denormals are always flushed to zero, input single precision denormals are always
+-/// handled and *not* treated as zero.
+-#[inline]
+-#[rustc_legacy_const_generics(0, 1, 2)]
+-#[target_feature(enable = "amx-tf32")]
+-#[cfg_attr(
+-    all(test, not(target_vendor = "apple")),
+-    assert_instr(tmmultf32ps, DST = 0, A = 1, B = 2)
+-)]
+-#[unstable(feature = "x86_amx_intrinsics", issue = "126622")]
+-pub unsafe fn _tile_mmultf32ps<const DST: i32, const A: i32, const B: i32>() {
+-    static_assert_uimm_bits!(DST, 3);
+-    static_assert_uimm_bits!(A, 3);
+-    static_assert_uimm_bits!(B, 3);
+-    tmmultf32ps(DST as i8, A as i8, B as i8);
+-}
+-
+-/// Perform matrix multiplication of two tiles a and b, containing packed single precision (32-bit)
+-/// floating-point elements, which are converted to TF32 (tensor-float32) format, and accumulate the
+-///  results into a packed single precision tile.
+-/// For each possible combination of (row of a, column of b), it performs
+-///  - convert to TF32
+-///  - multiply the corresponding elements of a and b
+-///  - accumulate the results into the corresponding row and column of dst using round-to-nearest-even
+-/// rounding mode.
+-/// Output FP32 denormals are always flushed to zero, input single precision denormals are always
+-/// handled and *not* treated as zero.
+-/// The shape of the tile is specified in the struct of [`__tile1024i`]. The register of the tile is allocated by the compiler.
+-#[inline]
+-#[target_feature(enable = "amx-tf32")]
+-#[cfg_attr(all(test, not(target_vendor = "apple")), assert_instr(tmmultf32ps))]
+-#[unstable(feature = "x86_amx_intrinsics", issue = "126622")]
+-pub unsafe fn __tile_mmultf32ps(dst: *mut __tile1024i, a: __tile1024i, b: __tile1024i) {
+-    (*dst).tile = tmmultf32ps_internal(a.rows, b.colsb, a.colsb, (*dst).tile, a.tile, b.tile);
+-}
+-
+ /// Moves a row from a tile register to a zmm register, converting the packed 32-bit signed integer
+ /// elements to packed single-precision (32-bit) floating-point elements.
+ #[inline]
+@@ -1037,11 +993,6 @@ unsafe extern "unadjusted" {
+     #[link_name = "llvm.x86.tileloaddrst164.internal"]
+     fn tileloaddrst164_internal(rows: u16, colsb: u16, base: *const u8, stride: u64) -> Tile;
+ 
+-    #[link_name = "llvm.x86.tmmultf32ps"]
+-    fn tmmultf32ps(dst: i8, a: i8, b: i8);
+-    #[link_name = "llvm.x86.tmmultf32ps.internal"]
+-    fn tmmultf32ps_internal(m: u16, n: u16, k: u16, dst: Tile, a: Tile, b: Tile) -> Tile;
+-
+     #[link_name = "llvm.x86.tcvtrowd2ps"]
+     fn tcvtrowd2ps(tile: i8, row: u32) -> f32x16;
+     #[link_name = "llvm.x86.tcvtrowd2psi"]
+@@ -2368,53 +2319,4 @@ mod tests {
+             }
+         }
+     }
+-
+-    #[simd_test(enable = "amx-tf32")]
+-    fn test_tile_mmultf32ps() {
+-        unsafe {
+-            _init_amx();
+-            let a: [[f32; 16]; 16] = array::from_fn(|i| [i as _; _]);
+-            let b: [[f32; 16]; 16] = [array::from_fn(|j| j as _); _];
+-            let mut res = [[0.0; 16]; 16];
+-
+-            let mut config = __tilecfg::default();
+-            config.palette = 1;
+-            (0..=2).for_each(|i| {
+-                config.colsb[i] = 64;
+-                config.rows[i] = 16;
+-            });
+-            _tile_loadconfig(config.as_ptr());
+-            _tile_zero::<0>();
+-            _tile_loadd::<1>(a.as_ptr().cast(), 64);
+-            _tile_loadd::<2>(b.as_ptr().cast(), 64);
+-            _tile_mmultf32ps::<0, 1, 2>();
+-            _tile_stored::<0>(res.as_mut_ptr().cast(), 64);
+-            _tile_release();
+-
+-            let expected = array::from_fn(|i| array::from_fn(|j| 16.0 * i as f32 * j as f32));
+-            assert_eq!(res, expected);
+-        }
+-    }
+-
+-    #[simd_test(enable = "amx-tf32")]
+-    fn test__tile_mmultf32ps() {
+-        unsafe {
+-            _init_amx();
+-            let a: [[f32; 16]; 16] = array::from_fn(|i| [i as _; _]);
+-            let b: [[f32; 16]; 16] = [array::from_fn(|j| j as _); _];
+-            let mut res = [[0.0; 16]; 16];
+-
+-            let mut tile_a = __tile1024i::zeroed(16, 64);
+-            let mut tile_b = __tile1024i::zeroed(16, 64);
+-            let mut tile_c = __tile1024i::zeroed(16, 64);
+-
+-            __tile_loadd(&mut tile_a, a.as_ptr().cast(), 64);
+-            __tile_loadd(&mut tile_b, b.as_ptr().cast(), 64);
+-            __tile_mmultf32ps(&mut tile_c, tile_a, tile_b);
+-            __tile_stored(res.as_mut_ptr().cast(), 64, tile_c);
+-
+-            let expected = array::from_fn(|i| array::from_fn(|j| 16.0 * i as f32 * j as f32));
+-            assert_eq!(res, expected);
+-        }
+-    }
+ }
+diff --git a/library/stdarch/crates/stdarch-verify/tests/x86-intel.rs b/library/stdarch/crates/stdarch-verify/tests/x86-intel.rs
+index 32726d1bf450b..be948df541b79 100644
+--- a/library/stdarch/crates/stdarch-verify/tests/x86-intel.rs
++++ b/library/stdarch/crates/stdarch-verify/tests/x86-intel.rs
+@@ -305,7 +305,7 @@ fn verify_all_signatures() {
+             }
+ 
+             // FIXME: these have not been added to Intrinsics Guide yet
+-            if ["amx-avx512", "amx-fp8", "amx-movrs", "amx-tf32", "movrs"]
++            if ["amx-avx512", "amx-fp8", "amx-movrs", "movrs"]
+                 .iter()
+                 .any(|f| feature.contains(f))
+             {
+From d7e4edd9a1dac40e4518ecd2031d1274a1fcd144 Mon Sep 17 00:00:00 2001
+From: sgasho <SuganoShota1999@gmail.com>
+Date: Fri, 3 Jul 2026 00:43:49 +0900
+Subject: [PATCH 1/2] Add -Zautodiff_post_passes flag to limit which llvm
+ passes to run after enzyme
+
+---
+ compiler/rustc_codegen_llvm/src/back/lto.rs   |   4 +-
+ compiler/rustc_codegen_llvm/src/back/write.rs |  10 +
+ compiler/rustc_codegen_llvm/src/llvm/ffi.rs   |   2 +
+ compiler/rustc_codegen_ssa/src/back/write.rs  |   5 +
+ compiler/rustc_interface/src/tests.rs         |   1 +
+ .../rustc_llvm/llvm-wrapper/PassWrapper.cpp   | 215 +++++++++---------
+ compiler/rustc_session/src/options.rs         |   2 +
+ 7 files changed, 136 insertions(+), 103 deletions(-)
+
+diff --git a/compiler/rustc_codegen_llvm/src/back/lto.rs b/compiler/rustc_codegen_llvm/src/back/lto.rs
+index 020c6668fb9d3..b2d22876c1858 100644
+--- a/compiler/rustc_codegen_llvm/src/back/lto.rs
++++ b/compiler/rustc_codegen_llvm/src/back/lto.rs
+@@ -620,7 +620,9 @@ pub(crate) fn run_pass_manager(
+     if cfg!(feature = "llvm_enzyme") && enable_ad && !thin {
+         let opt_stage = llvm::OptStage::FatLTO;
+         let stage = write::AutodiffStage::PostAD;
+-        if !config.autodiff.contains(&config::AutoDiff::NoPostopt) {
++        if !config.autodiff.contains(&config::AutoDiff::NoPostopt)
++            && config.autodiff_post_passes.as_deref() != Some("")
++        {
+             unsafe {
+                 write::llvm_optimize(
+                     cgcx, prof, dcx, module, None, None, config, opt_level, opt_stage, stage,
+diff --git a/compiler/rustc_codegen_llvm/src/back/write.rs b/compiler/rustc_codegen_llvm/src/back/write.rs
+index 4426f6ebb3c17..e44c579e06c83 100644
+--- a/compiler/rustc_codegen_llvm/src/back/write.rs
++++ b/compiler/rustc_codegen_llvm/src/back/write.rs
+@@ -566,6 +566,14 @@ pub(crate) unsafe fn llvm_optimize(
+     let print_before_enzyme = config.autodiff.contains(&config::AutoDiff::PrintModBefore);
+     let print_after_enzyme = config.autodiff.contains(&config::AutoDiff::PrintModAfter);
+     let print_passes = config.autodiff.contains(&config::AutoDiff::PrintPasses);
++    let passes_after_enzyme = if autodiff_stage == AutodiffStage::PostAD {
++        config.autodiff_post_passes.as_deref()
++    } else {
++        None
++    };
++    let passes_after_enzyme_ptr =
++        passes_after_enzyme.map_or(std::ptr::null(), |s| s.as_c_char_ptr());
++    let passes_after_enzyme_len = passes_after_enzyme.map_or(0, |s| s.len());
+     let merge_functions;
+     let unroll_loops;
+     let vectorize_slp;
+@@ -795,6 +803,8 @@ pub(crate) unsafe fn llvm_optimize(
+             llvm_selfprofiler,
+             selfprofile_before_pass_callback,
+             selfprofile_after_pass_callback,
++            passes_after_enzyme_ptr,
++            passes_after_enzyme_len,
+             extra_passes.as_c_char_ptr(),
+             extra_passes.len(),
+             llvm_plugins.as_c_char_ptr(),
+diff --git a/compiler/rustc_codegen_llvm/src/llvm/ffi.rs b/compiler/rustc_codegen_llvm/src/llvm/ffi.rs
+index dd527eafe8362..206b2da9eb6e8 100644
+--- a/compiler/rustc_codegen_llvm/src/llvm/ffi.rs
++++ b/compiler/rustc_codegen_llvm/src/llvm/ffi.rs
+@@ -2492,6 +2492,8 @@ unsafe extern "C" {
+         llvm_selfprofiler: *mut c_void,
+         begin_callback: SelfProfileBeforePassCallback,
+         end_callback: SelfProfileAfterPassCallback,
++        PostEnzymePasses: *const c_char,
++        PostEnzymePassesLen: size_t,
+         ExtraPasses: *const c_char,
+         ExtraPassesLen: size_t,
+         LLVMPlugins: *const c_char,
+diff --git a/compiler/rustc_codegen_ssa/src/back/write.rs b/compiler/rustc_codegen_ssa/src/back/write.rs
+index 112cf45ebbf2e..8f3a4711424a9 100644
+--- a/compiler/rustc_codegen_ssa/src/back/write.rs
++++ b/compiler/rustc_codegen_ssa/src/back/write.rs
+@@ -108,6 +108,7 @@ pub struct ModuleConfig {
+     pub emit_lifetime_markers: bool,
+     pub llvm_plugins: Vec<String>,
+     pub autodiff: Vec<config::AutoDiff>,
++    pub autodiff_post_passes: Option<String>,
+     pub offload: Vec<config::Offload>,
+ }
+ 
+@@ -259,6 +260,10 @@ impl ModuleConfig {
+             emit_lifetime_markers: sess.emit_lifetime_markers(),
+             llvm_plugins: if_regular!(sess.opts.unstable_opts.llvm_plugins.clone(), vec![]),
+             autodiff: if_regular!(sess.opts.unstable_opts.autodiff.clone(), vec![]),
++            autodiff_post_passes: if_regular!(
++                sess.opts.unstable_opts.autodiff_post_passes.clone(),
++                None
++            ),
+             offload: if_regular!(sess.opts.unstable_opts.offload.clone(), vec![]),
+         }
+     }
+diff --git a/compiler/rustc_interface/src/tests.rs b/compiler/rustc_interface/src/tests.rs
+index 5933d0fd4b356..c43acb7363107 100644
+--- a/compiler/rustc_interface/src/tests.rs
++++ b/compiler/rustc_interface/src/tests.rs
+@@ -788,6 +788,7 @@ fn test_unstable_options_tracking_hash() {
+     tracked!(annotate_moves, AnnotateMoves::Enabled(Some(1234)));
+     tracked!(assume_incomplete_release, true);
+     tracked!(autodiff, vec![AutoDiff::Enable, AutoDiff::NoTT]);
++    tracked!(autodiff_post_passes, Some("function(mem2reg,instsimplify,simplifycfg)".to_string()));
+     tracked!(binary_dep_depinfo, true);
+     tracked!(box_noalias, false);
+     tracked!(
+diff --git a/compiler/rustc_llvm/llvm-wrapper/PassWrapper.cpp b/compiler/rustc_llvm/llvm-wrapper/PassWrapper.cpp
+index 5dcaa5f6f84b8..c15ab2e944db8 100644
+--- a/compiler/rustc_llvm/llvm-wrapper/PassWrapper.cpp
++++ b/compiler/rustc_llvm/llvm-wrapper/PassWrapper.cpp
+@@ -606,6 +606,7 @@ extern "C" LLVMRustResult LLVMRustOptimize(
+     bool DebugInfoForProfiling, void *LlvmSelfProfiler,
+     LLVMRustSelfProfileBeforePassCallback BeforePassCallback,
+     LLVMRustSelfProfileAfterPassCallback AfterPassCallback,
++    const char *PostEnzymePasses, size_t PostEnzymePassesLen,
+     const char *ExtraPasses, size_t ExtraPassesLen, const char *LLVMPlugins,
+     size_t LLVMPluginsLen) {
+   Module *TheModule = unwrap(ModuleRef);
+@@ -842,120 +843,130 @@ extern "C" LLVMRustResult LLVMRustOptimize(
+   raw_string_ostream ThinLinkDataOS(ThinLTOSummaryBuffer->data);
+   bool IsLTO = OptStage == LLVMRustOptStage::ThinLTO ||
+                OptStage == LLVMRustOptStage::FatLTO;
+-  if (!NoPrepopulatePasses) {
+-    for (const auto &C : PipelineStartEPCallbacks)
+-      PB.registerPipelineStartEPCallback(C);
+-    for (const auto &C : OptimizerLastEPCallbacks)
+-      PB.registerOptimizerLastEPCallback(C);
+-
+-    // The pre-link pipelines don't support O0 and require using
+-    // buildO0DefaultPipeline() instead. At the same time, the LTO pipelines do
+-    // support O0 and using them is required.
+-    if (OptLevel == OptimizationLevel::O0 && !IsLTO) {
+-      // We manually schedule ThinLTOBufferPasses below, so don't pass the value
+-      // to enable it here.
+-      MPM = PB.buildO0DefaultPipeline(OptLevel);
+-    } else {
+-      switch (OptStage) {
+-      case LLVMRustOptStage::PreLinkNoLTO:
+-        if (ThinLTOBufferRef) {
+-          // This is similar to LLVM's `buildFatLTODefaultPipeline`, where the
+-          // bitcode for embedding is obtained after performing
+-          // `ThinLTOPreLinkDefaultPipeline`.
+-          MPM.addPass(PB.buildThinLTOPreLinkDefaultPipeline(OptLevel));
+-          MPM.addPass(ThinLTOBitcodeWriterPass(
+-              ThinLTODataOS,
+-              ThinLTOSummaryBufferRef ? &ThinLinkDataOS : nullptr));
+-          *ThinLTOBufferRef = ThinLTOBuffer.release();
+-          if (ThinLTOSummaryBufferRef) {
+-            *ThinLTOSummaryBufferRef = ThinLTOSummaryBuffer.release();
++  if (PostEnzymePassesLen) {
++    if (auto Err = PB.parsePassPipeline(
++            MPM, StringRef(PostEnzymePasses, PostEnzymePassesLen))) {
++      std::string ErrMsg = toString(std::move(Err));
++      LLVMRustSetLastError(ErrMsg.c_str());
++      return LLVMRustResult::Failure;
++    }
++  } else {
++    if (!NoPrepopulatePasses) {
++      for (const auto &C : PipelineStartEPCallbacks)
++        PB.registerPipelineStartEPCallback(C);
++      for (const auto &C : OptimizerLastEPCallbacks)
++        PB.registerOptimizerLastEPCallback(C);
++
++      // The pre-link pipelines don't support O0 and require using
++      // buildO0DefaultPipeline() instead. At the same time, the LTO pipelines
++      // do support O0 and using them is required.
++      if (OptLevel == OptimizationLevel::O0 && !IsLTO) {
++        // We manually schedule ThinLTOBufferPasses below, so don't pass the
++        // value to enable it here.
++        MPM = PB.buildO0DefaultPipeline(OptLevel);
++      } else {
++        switch (OptStage) {
++        case LLVMRustOptStage::PreLinkNoLTO:
++          if (ThinLTOBufferRef) {
++            // This is similar to LLVM's `buildFatLTODefaultPipeline`, where the
++            // bitcode for embedding is obtained after performing
++            // `ThinLTOPreLinkDefaultPipeline`.
++            MPM.addPass(PB.buildThinLTOPreLinkDefaultPipeline(OptLevel));
++            MPM.addPass(ThinLTOBitcodeWriterPass(
++                ThinLTODataOS,
++                ThinLTOSummaryBufferRef ? &ThinLinkDataOS : nullptr));
++            *ThinLTOBufferRef = ThinLTOBuffer.release();
++            if (ThinLTOSummaryBufferRef) {
++              *ThinLTOSummaryBufferRef = ThinLTOSummaryBuffer.release();
++            }
++            MPM.addPass(PB.buildModuleOptimizationPipeline(
++                OptLevel, ThinOrFullLTOPhase::None));
++            MPM.addPass(
++                createModuleToFunctionPassAdaptor(AnnotationRemarksPass()));
++          } else {
++            MPM = PB.buildPerModuleDefaultPipeline(OptLevel);
+           }
+-          MPM.addPass(PB.buildModuleOptimizationPipeline(
+-              OptLevel, ThinOrFullLTOPhase::None));
+-          MPM.addPass(
+-              createModuleToFunctionPassAdaptor(AnnotationRemarksPass()));
+-        } else {
+-          MPM = PB.buildPerModuleDefaultPipeline(OptLevel);
++          break;
++        case LLVMRustOptStage::PreLinkThinLTO:
++        case LLVMRustOptStage::PreLinkFatLTO:
++          MPM = PB.buildThinLTOPreLinkDefaultPipeline(OptLevel);
++          NeedThinLTOBufferPasses = false;
++          break;
++        case LLVMRustOptStage::ThinLTO:
++          // FIXME: Does it make sense to pass the ModuleSummaryIndex?
++          // It only seems to be needed for C++ specific optimizations.
++          MPM = PB.buildThinLTODefaultPipeline(OptLevel, nullptr);
++          break;
++        case LLVMRustOptStage::FatLTO:
++          MPM = PB.buildLTODefaultPipeline(OptLevel, nullptr);
++          NeedThinLTOBufferPasses = false;
++          break;
+         }
+-        break;
+-      case LLVMRustOptStage::PreLinkThinLTO:
+-      case LLVMRustOptStage::PreLinkFatLTO:
+-        MPM = PB.buildThinLTOPreLinkDefaultPipeline(OptLevel);
+-        NeedThinLTOBufferPasses = false;
+-        break;
+-      case LLVMRustOptStage::ThinLTO:
+-        // FIXME: Does it make sense to pass the ModuleSummaryIndex?
+-        // It only seems to be needed for C++ specific optimizations.
+-        MPM = PB.buildThinLTODefaultPipeline(OptLevel, nullptr);
+-        break;
+-      case LLVMRustOptStage::FatLTO:
+-        MPM = PB.buildLTODefaultPipeline(OptLevel, nullptr);
+-        NeedThinLTOBufferPasses = false;
+-        break;
+       }
++    } else {
++      // We're not building any of the default pipelines but we still want to
++      // add the verifier, instrumentation, etc passes if they were requested
++      for (const auto &C : PipelineStartEPCallbacks)
++        C(MPM, OptLevel);
++      for (const auto &C : OptimizerLastEPCallbacks)
++        C(MPM, OptLevel, ThinOrFullLTOPhase::None);
+     }
+-  } else {
+-    // We're not building any of the default pipelines but we still want to
+-    // add the verifier, instrumentation, etc passes if they were requested
+-    for (const auto &C : PipelineStartEPCallbacks)
+-      C(MPM, OptLevel);
+-    for (const auto &C : OptimizerLastEPCallbacks)
+-      C(MPM, OptLevel, ThinOrFullLTOPhase::None);
+-  }
+ 
+-  if (ExtraPassesLen) {
+-    if (auto Err =
+-            PB.parsePassPipeline(MPM, StringRef(ExtraPasses, ExtraPassesLen))) {
+-      std::string ErrMsg = toString(std::move(Err));
+-      LLVMRustSetLastError(ErrMsg.c_str());
+-      return LLVMRustResult::Failure;
++    if (ExtraPassesLen) {
++      if (auto Err = PB.parsePassPipeline(
++              MPM, StringRef(ExtraPasses, ExtraPassesLen))) {
++        std::string ErrMsg = toString(std::move(Err));
++        LLVMRustSetLastError(ErrMsg.c_str());
++        return LLVMRustResult::Failure;
++      }
+     }
+-  }
+ 
+-  if (NeedThinLTOBufferPasses) {
+-    MPM.addPass(CanonicalizeAliasesPass());
+-    MPM.addPass(NameAnonGlobalPass());
+-  }
+-  // For `-Copt-level=0`, and the pre-link fat/thin LTO stages.
+-  if (ThinLTOBufferRef && *ThinLTOBufferRef == nullptr) {
+-    // thin lto summaries prevent fat lto, so do not emit them if fat
+-    // lto is requested. See PR #136840 for background information.
+-    if (OptStage != LLVMRustOptStage::PreLinkFatLTO) {
+-      MPM.addPass(ThinLTOBitcodeWriterPass(
+-          ThinLTODataOS, ThinLTOSummaryBufferRef ? &ThinLinkDataOS : nullptr));
+-    } else {
+-      MPM.addPass(BitcodeWriterPass(ThinLTODataOS));
++    if (NeedThinLTOBufferPasses) {
++      MPM.addPass(CanonicalizeAliasesPass());
++      MPM.addPass(NameAnonGlobalPass());
+     }
+-    *ThinLTOBufferRef = ThinLTOBuffer.release();
+-    if (ThinLTOSummaryBufferRef) {
+-      *ThinLTOSummaryBufferRef = ThinLTOSummaryBuffer.release();
++    // For `-Copt-level=0`, and the pre-link fat/thin LTO stages.
++    if (ThinLTOBufferRef && *ThinLTOBufferRef == nullptr) {
++      // thin lto summaries prevent fat lto, so do not emit them if fat
++      // lto is requested. See PR #136840 for background information.
++      if (OptStage != LLVMRustOptStage::PreLinkFatLTO) {
++        MPM.addPass(ThinLTOBitcodeWriterPass(
++            ThinLTODataOS,
++            ThinLTOSummaryBufferRef ? &ThinLinkDataOS : nullptr));
++      } else {
++        MPM.addPass(BitcodeWriterPass(ThinLTODataOS));
++      }
++      *ThinLTOBufferRef = ThinLTOBuffer.release();
++      if (ThinLTOSummaryBufferRef) {
++        *ThinLTOSummaryBufferRef = ThinLTOSummaryBuffer.release();
++      }
+     }
+-  }
+ 
+-  // now load "-enzyme" pass:
+-  // With dlopen, ENZYME macro may not be defined, so check EnzymePtr directly
+-  // In the case of debug builds with multiple codegen units, we might not
+-  // have all function definitions available during the early compiler
+-  // invocations. We therefore wait for the final lto step to run Enzyme.
+-  if (EnzymePtr && IsLTO) {
+-
+-    if (PrintBeforeEnzyme) {
+-      // Handle the Rust flag `-Zautodiff=PrintModBefore`.
+-      std::string Banner = "Module before EnzymeNewPM";
+-      MPM.addPass(PrintModulePass(outs(), Banner, true, false));
+-    }
++    // now load "-enzyme" pass:
++    // With dlopen, ENZYME macro may not be defined, so check EnzymePtr directly
++    // In the case of debug builds with multiple codegen units, we might not
++    // have all function definitions available during the early compiler
++    // invocations. We therefore wait for the final lto step to run Enzyme.
++    if (EnzymePtr && IsLTO) {
++
++      if (PrintBeforeEnzyme) {
++        // Handle the Rust flag `-Zautodiff=PrintModBefore`.
++        std::string Banner = "Module before EnzymeNewPM";
++        MPM.addPass(PrintModulePass(outs(), Banner, true, false));
++      }
+ 
+-    EnzymePtr(PB, false);
+-    if (auto Err = PB.parsePassPipeline(MPM, "enzyme")) {
+-      std::string ErrMsg = toString(std::move(Err));
+-      LLVMRustSetLastError(ErrMsg.c_str());
+-      return LLVMRustResult::Failure;
+-    }
++      EnzymePtr(PB, false);
++      if (auto Err = PB.parsePassPipeline(MPM, "enzyme")) {
++        std::string ErrMsg = toString(std::move(Err));
++        LLVMRustSetLastError(ErrMsg.c_str());
++        return LLVMRustResult::Failure;
++      }
+ 
+-    if (PrintAfterEnzyme) {
+-      // Handle the Rust flag `-Zautodiff=PrintModAfter`.
+-      std::string Banner = "Module after EnzymeNewPM";
+-      MPM.addPass(PrintModulePass(outs(), Banner, true, false));
++      if (PrintAfterEnzyme) {
++        // Handle the Rust flag `-Zautodiff=PrintModAfter`.
++        std::string Banner = "Module after EnzymeNewPM";
++        MPM.addPass(PrintModulePass(outs(), Banner, true, false));
++      }
+     }
+   }
+ 
+diff --git a/compiler/rustc_session/src/options.rs b/compiler/rustc_session/src/options.rs
+index efc8a70f4feb2..e2ff67dd2fcf1 100644
+--- a/compiler/rustc_session/src/options.rs
++++ b/compiler/rustc_session/src/options.rs
+@@ -2294,6 +2294,8 @@ options! {
+         `=LooseTypes`
+         `=Inline`
+         Multiple options can be combined with commas."),
++    autodiff_post_passes: Option<String> = (None, parse_opt_string, [TRACKED],
++        "set llvm passes to run after enzyme (no passes run when it is empty)"),
+     #[rustc_lint_opt_deny_field_access("use `Session::binary_dep_depinfo` instead of this field")]
+     binary_dep_depinfo: bool = (false, parse_bool, [TRACKED],
+         "include artifacts (sysroot, crate dependencies) used during compilation in dep-info \
+
+From 2a9e45d646b39c48b5c1121a5cb359e546ac5c9c Mon Sep 17 00:00:00 2001
+From: sgasho <SuganoShota1999@gmail.com>
+Date: Fri, 3 Jul 2026 00:44:39 +0900
+Subject: [PATCH 2/2] Update LLVM IR checks in codegen-llvm/autodiff tests
+
+---
+ tests/codegen-llvm/autodiff/abi_handling.rs  | 36 ++++++++++----------
+ tests/codegen-llvm/autodiff/autodiffv2.rs    |  2 +-
+ tests/codegen-llvm/autodiff/batched.rs       | 32 ++++++++++-------
+ tests/codegen-llvm/autodiff/generic.rs       |  4 +--
+ tests/codegen-llvm/autodiff/identical_fnc.rs |  6 ++--
+ tests/codegen-llvm/autodiff/impl.rs          |  2 +-
+ tests/codegen-llvm/autodiff/scalar.rs        | 22 +++++++-----
+ tests/codegen-llvm/autodiff/sret.rs          | 22 +++++++-----
+ tests/codegen-llvm/autodiff/trait.rs         |  2 +-
+ tests/codegen-llvm/autodiff/typetree.rs      |  2 +-
+ tests/codegen-llvm/autodiff/void_ret.rs      |  2 +-
+ 11 files changed, 73 insertions(+), 59 deletions(-)
+
+diff --git a/tests/codegen-llvm/autodiff/abi_handling.rs b/tests/codegen-llvm/autodiff/abi_handling.rs
+index a8bc482fc293f..90a36823060cd 100644
+--- a/tests/codegen-llvm/autodiff/abi_handling.rs
++++ b/tests/codegen-llvm/autodiff/abi_handling.rs
+@@ -1,7 +1,7 @@
+ //@ revisions: debug release
+ 
+ //@[debug] compile-flags: -Zautodiff=Enable,NoTT -C opt-level=0 -Clto=fat
+-//@[release] compile-flags: -Zautodiff=Enable,NoTT -C opt-level=3 -Clto=fat
++//@[release] compile-flags: -Zautodiff=Enable,NoTT -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C opt-level=3 -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ 
+@@ -39,15 +39,15 @@ fn square(x: f32) -> f32 {
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal { float, float }
+ // debug-SAME: (ptr {{.*}}%x, ptr {{.*}}%bx_0)
+-// release-NEXT: define internal fastcc float
+-// release-SAME: (float %x.0.val, float %x.4.val)
++// release-NEXT: define internal fastcc { float, float }
++// release-SAME: (ptr {{.*}}%x)
+ 
+ // CHECK-LABEL: ; abi_handling::f1
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal float
+ // debug-SAME: (ptr {{.*}}%x)
+-// release-NEXT: define internal fastcc noundef float
+-// release-SAME: (float %x.0.val, float %x.4.val)
++// release-NEXT: define internal noundef float
++// release-SAME: (ptr {{.*}}%x)
+ #[autodiff_forward(df1, Dual, Dual)]
+ #[inline(never)]
+ fn f1(x: &[f32; 2]) -> f32 {
+@@ -58,15 +58,15 @@ fn f1(x: &[f32; 2]) -> f32 {
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal { float, float }
+ // debug-SAME: (ptr %f, float %x, float %dret)
+-// release-NEXT: define internal fastcc noundef float
++// release-NEXT: define internal fastcc { float, float }
+ // release-SAME: (float noundef %x)
+ 
+ // CHECK-LABEL: ; abi_handling::f2
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal float
+ // debug-SAME: (ptr %f, float %x)
+-// release-NEXT: define internal fastcc noundef float
+-// release-SAME: (float noundef %x)
++// release-NEXT: define internal noundef float
++// release-SAME: (ptr {{.*}}%f, float {{.*}}%x)
+ #[autodiff_reverse(df2, Const, Active, Active)]
+ #[inline(never)]
+ fn f2(f: fn(f32) -> f32, x: f32) -> f32 {
+@@ -77,15 +77,15 @@ fn f2(f: fn(f32) -> f32, x: f32) -> f32 {
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal { float, float }
+ // debug-SAME: (ptr align 4 %x, ptr align 4 %bx_0, ptr align 4 %y, ptr align 4 %by_0)
+-// release-NEXT: define internal fastcc float
+-// release-SAME: (float %x.0.val)
++// release-NEXT: define internal fastcc { float, float }
++// release-SAME: (ptr {{.*}}%x)
+ 
+ // CHECK-LABEL: ; abi_handling::f3
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal float
+ // debug-SAME: (ptr {{.*}}%x, ptr {{.*}}%y)
+-// release-NEXT: define internal fastcc noundef float
+-// release-SAME: (float %x.0.val)
++// release-NEXT: define internal noundef float
++// release-SAME: (ptr {{.*}}%y)
+ #[autodiff_forward(df3, Dual, Dual, Dual)]
+ #[inline(never)]
+ fn f3<'a>(x: &'a f32, y: &'a f32) -> f32 {
+@@ -103,7 +103,7 @@ fn f3<'a>(x: &'a f32, y: &'a f32) -> f32 {
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal float
+ // debug-SAME: (float %x.0, float %x.1)
+-// release-NEXT: define internal fastcc noundef float
++// release-NEXT: define internal noundef float
+ // release-SAME: (float noundef %x.0, float noundef %x.1)
+ #[autodiff_forward(df4, Dual, Dual)]
+ #[inline(never)]
+@@ -122,7 +122,7 @@ fn f4(x: (f32, f32)) -> f32 {
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal float
+ // debug-SAME: (float %i.0, float %i.1)
+-// release-NEXT: define internal fastcc noundef float
++// release-NEXT: define internal noundef float
+ // release-SAME: (float noundef %i.0, float noundef %i.1)
+ #[autodiff_forward(df5, Dual, Dual)]
+ #[inline(never)]
+@@ -142,7 +142,7 @@ fn f5(i: Input) -> f32 {
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal float
+ // debug-SAME: (float %i.0, float %i.1)
+-// release-NEXT: define internal fastcc noundef float
++// release-NEXT: define internal noundef float
+ // release-SAME: (float noundef %i.0, float noundef %i.1)
+ #[autodiff_forward(df6, Dual, Dual)]
+ #[inline(never)]
+@@ -155,14 +155,14 @@ fn f6(i: NestedInput) -> f32 {
+ // debug-NEXT: define internal { float, float }
+ // debug-SAME: (ptr align 4 %x.0, ptr align 4 %x.1, ptr align 4 %bx_0.0, ptr align 4 %bx_0.1)
+ // release-NEXT: define internal fastcc { float, float }
+-// release-SAME: (float %x.0.0.val, float %x.1.0.val)
++// release-SAME: (ptr {{.*}}%x.0, ptr {{.*}}%x.1)
+ 
+ // CHECK-LABEL: ; abi_handling::f7
+ // CHECK-NEXT: Function Attrs
+ // debug-NEXT: define internal float
+ // debug-SAME: (ptr {{.*}}%x.0, ptr {{.*}}%x.1)
+-// release-NEXT: define internal fastcc noundef float
+-// release-SAME: (float %x.0.0.val, float %x.1.0.val)
++// release-NEXT: define internal noundef float
++// release-SAME: (ptr {{.*}}%x.0, ptr {{.*}}%x.1)
+ #[autodiff_forward(df7, Dual, Dual)]
+ #[inline(never)]
+ fn f7(x: (&f32, &f32)) -> f32 {
+diff --git a/tests/codegen-llvm/autodiff/autodiffv2.rs b/tests/codegen-llvm/autodiff/autodiffv2.rs
+index c24a374148c34..10e619f84335e 100644
+--- a/tests/codegen-llvm/autodiff/autodiffv2.rs
++++ b/tests/codegen-llvm/autodiff/autodiffv2.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable -C opt-level=3  -Clto=fat
++//@ compile-flags: -Zautodiff=Enable,NoTT -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C opt-level=3  -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ //
+diff --git a/tests/codegen-llvm/autodiff/batched.rs b/tests/codegen-llvm/autodiff/batched.rs
+index 5a723ff041839..64d14a0f9c80e 100644
+--- a/tests/codegen-llvm/autodiff/batched.rs
++++ b/tests/codegen-llvm/autodiff/batched.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable,NoTT,NoPostopt -C opt-level=3  -Clto=fat
++//@ compile-flags: -Zautodiff=Enable,NoTT -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C opt-level=3  -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ 
+@@ -20,22 +20,28 @@ fn square(x: &f32) -> f32 {
+     x * x
+ }
+ 
+-// The base ("scalar") case d_square3, without batching.
+-// CHECK: define internal fastcc float @fwddiffesquare(float %x.0.val, float %"x'.0.val")
+-// CHECK:   %0 = fadd fast float %"x'.0.val", %"x'.0.val"
+-// CHECK-NEXT:   %1 = fmul fast float %0, %x.0.val
+-// CHECK-NEXT:   ret float %1
+-// CHECK-NEXT: }
+-
+-// d_square2
+-// CHECK: define internal fastcc [4 x float] @fwddiffe4square(float %x.0.val, [4 x ptr] %"x'")
+-// CHECK:   ret [4 x float]
++// CHECK: ; batched::d_square2
++// CHECK: define internal fastcc void
++// CHECK-SAME: (ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}})
++// CHECK:   ret void
+ // CHECK-NEXT:   }
+ 
+-// CHECK: define internal fastcc { float, [4 x float] } @fwddiffe4square.{{.*}}(float %x.0.val, [4 x ptr] %"x'")
+-// CHECK:   ret { float, [4 x float] }
++// CHECK: ; batched::d_square1
++// CHECK: define internal fastcc void
++// CHECK-SAME: (ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}}, ptr {{.*}})
++// CHECK:   ret void
+ // CHECK-NEXT:   }
+ 
++// The base ("scalar") case d_square3, without batching.
++// CHECK: define internal float @fwddiffesquare(ptr {{.*}}, ptr {{.*}})
++// CHECK:  [[SHADOW_X:%"_[0-9]+'ipl"]] = load float, ptr %"x'"
++// CHECK-NEXT:  [[PRIMAL_X:%_[0-9]+]] = load float, ptr %x
++// CHECK-NEXT:  [[MUL1:%[0-9]+]] = fmul fast float [[SHADOW_X]], [[PRIMAL_X]]
++// CHECK-NEXT:  [[MUL2:%[0-9]+]] = fmul fast float [[SHADOW_X]], [[PRIMAL_X]]
++// CHECK-NEXT:  [[ADD1:%[0-9]+]] = fadd fast float [[MUL1]], [[MUL2]]
++// CHECK-NEXT:  ret float [[ADD1]]
++// CHECK-NEXT: }
++
+ fn main() {
+     let x = std::hint::black_box(3.0);
+     let output = square(&x);
+diff --git a/tests/codegen-llvm/autodiff/generic.rs b/tests/codegen-llvm/autodiff/generic.rs
+index b31468c91c9c2..1c7ce7c544db5 100644
+--- a/tests/codegen-llvm/autodiff/generic.rs
++++ b/tests/codegen-llvm/autodiff/generic.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable -Zautodiff=NoPostopt -C opt-level=3 -Clto=fat
++//@ compile-flags: -Zautodiff=Enable -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C opt-level=3 -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ //@ revisions: F32 F64 Main
+@@ -34,7 +34,7 @@ fn square<T: std::ops::Mul<Output = T> + Copy>(x: &T) -> T {
+ // F64-NEXT: ; Function Attrs: {{.*}}
+ // F64-NEXT: define internal {{.*}} void
+ // F64-NEXT: start:
+-// F64-NEXT:   {{(tail )?}}call {{(fastcc )?}}void @diffe_{{.*}}(double {{.*}}, ptr {{.*}})
++// F64-NEXT:   {{(tail )?}}call fast { double } @diffe_{{.*}}(ptr {{.*}}, ptr {{.*}}, double {{.*}})
+ // F64-NEXT: ret void
+ 
+ // Main-LABEL: ; generic::main
+diff --git a/tests/codegen-llvm/autodiff/identical_fnc.rs b/tests/codegen-llvm/autodiff/identical_fnc.rs
+index a8b186c302ea1..294ffaa8f719b 100644
+--- a/tests/codegen-llvm/autodiff/identical_fnc.rs
++++ b/tests/codegen-llvm/autodiff/identical_fnc.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable -C opt-level=3  -Clto=fat
++//@ compile-flags: -Zautodiff=Enable -Zautodiff_post_passes=mergefunc,function(mem2reg,instsimplify,simplifycfg) -C opt-level=3  -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ //
+@@ -32,9 +32,9 @@ fn square2(x: &f64) -> f64 {
+ // CHECK-NOT:br
+ // CHECK-NOT:ret
+ // CHECK:; call identical_fnc::d_square
+-// CHECK-NEXT:call fastcc void @[[HASH:.+]](double %x.val, ptr noalias noundef align 8 dereferenceable(8) %dx1)
++// CHECK-NEXT:call fastcc void @[[HASH:.+]](ptr {{.*}}, ptr {{.*}})
+ // CHECK:; call identical_fnc::d_square
+-// CHECK-NEXT:call fastcc void @[[HASH]](double %x.val, ptr noalias noundef align 8 dereferenceable(8) %dx2)
++// CHECK-NEXT:call fastcc void @[[HASH]](ptr {{.*}}, ptr {{.*}})
+ 
+ fn main() {
+     let x = std::hint::black_box(3.0);
+diff --git a/tests/codegen-llvm/autodiff/impl.rs b/tests/codegen-llvm/autodiff/impl.rs
+index 185ea6af52e0f..ffcf28e472e8b 100644
+--- a/tests/codegen-llvm/autodiff/impl.rs
++++ b/tests/codegen-llvm/autodiff/impl.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable -Zautodiff=NoPostopt -C opt-level=3 -Clto=fat
++//@ compile-flags: -Zautodiff=Enable -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C opt-level=3 -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ 
+diff --git a/tests/codegen-llvm/autodiff/scalar.rs b/tests/codegen-llvm/autodiff/scalar.rs
+index 53672a89230ab..74e0bc6e32099 100644
+--- a/tests/codegen-llvm/autodiff/scalar.rs
++++ b/tests/codegen-llvm/autodiff/scalar.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable,NoTT -C opt-level=3  -Clto=fat
++//@ compile-flags: -Zautodiff=Enable,NoTT -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C opt-level=3  -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ #![feature(autodiff)]
+@@ -12,14 +12,18 @@ fn square(x: &f64) -> f64 {
+     x * x
+ }
+ 
+-// CHECK:define internal fastcc double @diffesquare(double %x.0.val, ptr nonnull align 8 captures(none) %"x'")
+-// CHECK-NEXT:invertstart:
+-// CHECK-NEXT:  %_0 = fmul double %x.0.val, %x.0.val
+-// CHECK-NEXT:  %0 = fadd fast double %x.0.val, %x.0.val
+-// CHECK-NEXT:  %1 = load double, ptr %"x'", align 8
+-// CHECK-NEXT:  %2 = fadd fast double %1, %0
+-// CHECK-NEXT:  store double %2, ptr %"x'", align 8
+-// CHECK-NEXT:  ret double %_0
++// CHECK:define internal { double } @diffesquare(ptr {{.*}}, ptr {{.*}}, double {{.*}})
++// CHECK-NEXT:start:
++// CHECK-NEXT:  [[X:%_[0-9]+]] = load double, ptr %x, align 8
++// CHECK-NEXT:  [[SQUARE:%_[0-9]+]] = fmul double [[X]], [[X]]
++// CHECK-NEXT:  [[DIFFR1:%[0-9]+]] = fmul fast double %differeturn, [[X]]
++// CHECK-NEXT:  [[DIFFR2:%[0-9]+]] = fmul fast double %differeturn, [[X]]
++// CHECK-NEXT:  [[ADD1:%[0-9]+]] = fadd fast double [[DIFFR1]], [[DIFFR2]]
++// CHECK-NEXT:  [[SHADOW_X:%[0-9]+]] = load double, ptr %"x'", align 8
++// CHECK-NEXT:  [[ADD2:%[0-9]+]] = fadd fast double [[SHADOW_X]], [[ADD1]]
++// CHECK-NEXT:  store double [[ADD2]], ptr %"x'", align 8
++// CHECK-NEXT:  [[RET:%[0-9]+]] = insertvalue { double } undef, double [[SQUARE]], 0
++// CHECK-NEXT:  ret { double } [[RET]]
+ // CHECK-NEXT:}
+ 
+ fn main() {
+diff --git a/tests/codegen-llvm/autodiff/sret.rs b/tests/codegen-llvm/autodiff/sret.rs
+index 498cd3fea012d..00ad0a58ffd08 100644
+--- a/tests/codegen-llvm/autodiff/sret.rs
++++ b/tests/codegen-llvm/autodiff/sret.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable,NoTT -C opt-level=3  -Clto=fat
++//@ compile-flags: -Zautodiff=Enable,NoTT -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C opt-level=3  -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ 
+@@ -18,17 +18,21 @@ fn primal(x: f32, y: f32) -> f64 {
+     (x * x * y) as f64
+ }
+ 
+-// CHECK: define internal fastcc { double, float, float } @diffeprimal(float noundef %x, float noundef %y)
+-// CHECK-NEXT: invertstart:
++// CHECK: define internal { double, float, float } @diffeprimal(float noundef %x, float noundef %y, double %differeturn)
++// CHECK-NEXT: start:
+ // CHECK-NEXT: %_4 = fmul float %x, %x
+ // CHECK-NEXT: %_3 = fmul float %_4, %y
+ // CHECK-NEXT: %_0 = fpext float %_3 to double
+-// CHECK-NEXT: %0 = fadd fast float %y, %y
+-// CHECK-NEXT: %1 = fmul fast float %0, %x
+-// CHECK-NEXT: %2 = insertvalue { double, float, float } undef, double %_0, 0
+-// CHECK-NEXT: %3 = insertvalue { double, float, float } %2, float %1, 1
+-// CHECK-NEXT: %4 = insertvalue { double, float, float } %3, float %_4, 2
+-// CHECK-NEXT: ret { double, float, float } %4
++// CHECK-NEXT: %0 = fptrunc fast double %differeturn to float
++// CHECK-NEXT: %1 = fmul fast float %0, %y
++// CHECK-NEXT: %2 = fmul fast float %0, %_4
++// CHECK-NEXT: %3 = fmul fast float %1, %x
++// CHECK-NEXT: %4 = fmul fast float %1, %x
++// CHECK-NEXT: %5 = fadd fast float %3, %4
++// CHECK-NEXT: %6 = insertvalue { double, float, float } undef, double %_0, 0
++// CHECK-NEXT: %7 = insertvalue { double, float, float } %6, float %5, 1
++// CHECK-NEXT: %8 = insertvalue { double, float, float } %7, float %2, 2
++// CHECK-NEXT: ret { double, float, float } %8
+ // CHECK-NEXT: }
+ 
+ fn main() {
+diff --git a/tests/codegen-llvm/autodiff/trait.rs b/tests/codegen-llvm/autodiff/trait.rs
+index 701f3a9e843bd..f82ceac2512dc 100644
+--- a/tests/codegen-llvm/autodiff/trait.rs
++++ b/tests/codegen-llvm/autodiff/trait.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable -Zautodiff=NoPostopt -C opt-level=3 -Clto=fat
++//@ compile-flags: -Zautodiff=Enable -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C opt-level=3 -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ 
+diff --git a/tests/codegen-llvm/autodiff/typetree.rs b/tests/codegen-llvm/autodiff/typetree.rs
+index 1cb0c2fb68be3..4c270c3ad58ec 100644
+--- a/tests/codegen-llvm/autodiff/typetree.rs
++++ b/tests/codegen-llvm/autodiff/typetree.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable -C opt-level=3 -Clto=fat
++//@ compile-flags: -Zautodiff=Enable -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C opt-level=3 -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ 
+diff --git a/tests/codegen-llvm/autodiff/void_ret.rs b/tests/codegen-llvm/autodiff/void_ret.rs
+index 98c6b98eef4e3..e80c93d23a5be 100644
+--- a/tests/codegen-llvm/autodiff/void_ret.rs
++++ b/tests/codegen-llvm/autodiff/void_ret.rs
+@@ -1,4 +1,4 @@
+-//@ compile-flags: -Zautodiff=Enable,NoTT,NoPostopt -C no-prepopulate-passes -C opt-level=3  -Clto=fat
++//@ compile-flags: -Zautodiff=Enable,NoTT -Zautodiff_post_passes=function(mem2reg,instsimplify,simplifycfg) -C no-prepopulate-passes -C opt-level=3  -Clto=fat
+ //@ no-prefer-dynamic
+ //@ needs-enzyme
+ 
+From b8d3a4ac9cfeb81d1e929fe6eab0af4b77ba3bb4 Mon Sep 17 00:00:00 2001
+From: Augie Fackler <augie@google.com>
+Date: Wed, 8 Jul 2026 11:48:53 -0400
+Subject: [PATCH] Reapply "LLVM 23: Run AssignGUIDPass in some places"
+
+This reverts commit 4919940fad92a2a503e3fe7fc6a5594fb9771e72.
+---
+ compiler/rustc_llvm/llvm-wrapper/PassWrapper.cpp         | 9 +++++++++
+ tests/codegen-llvm/bpf-allows-unaligned.rs               | 2 +-
+ tests/codegen-llvm/branch-protection.rs                  | 2 +-
+ tests/codegen-llvm/frame-pointer-cli-control.rs          | 2 +-
+ tests/codegen-llvm/frame-pointer.rs                      | 2 +-
+ tests/codegen-llvm/gpu-convergent.rs                     | 2 +-
+ tests/codegen-llvm/instrument-coverage/testprog.rs       | 4 ++--
+ tests/codegen-llvm/link_section.rs                       | 2 +-
+ ...pe-metadata-itanium-cxx-abi-normalized-generalized.rs | 6 +++---
+ .../some-non-zero-from-atomic-optimization.rs            | 2 +-
+ .../codegen-llvm/target-feature-negative-implication.rs  | 2 +-
+ tests/codegen-llvm/target-feature-overrides.rs           | 4 ++--
+ tests/codegen-llvm/unwind-abis/aapcs-unwind-abi.rs       | 4 ++--
+ tests/codegen-llvm/unwind-abis/c-unwind-abi.rs           | 4 ++--
+ tests/codegen-llvm/unwind-abis/cdecl-unwind-abi.rs       | 4 ++--
+ tests/codegen-llvm/unwind-abis/fastcall-unwind-abi.rs    | 4 ++--
+ tests/codegen-llvm/unwind-abis/stdcall-unwind-abi.rs     | 4 ++--
+ tests/codegen-llvm/unwind-abis/system-unwind-abi.rs      | 4 ++--
+ tests/codegen-llvm/unwind-abis/sysv64-unwind-abi.rs      | 4 ++--
+ tests/codegen-llvm/unwind-abis/thiscall-unwind-abi.rs    | 4 ++--
+ tests/codegen-llvm/unwind-abis/vectorcall-unwind-abi.rs  | 4 ++--
+ tests/codegen-llvm/unwind-abis/win64-unwind-abi.rs       | 4 ++--
+ 22 files changed, 44 insertions(+), 35 deletions(-)
+
+diff --git a/compiler/rustc_llvm/llvm-wrapper/PassWrapper.cpp b/compiler/rustc_llvm/llvm-wrapper/PassWrapper.cpp
+index fe5b8edce4a1d..e4807f10805c9 100644
+--- a/compiler/rustc_llvm/llvm-wrapper/PassWrapper.cpp
++++ b/compiler/rustc_llvm/llvm-wrapper/PassWrapper.cpp
+@@ -49,6 +49,9 @@
+ #include "llvm/Transforms/Instrumentation/RealtimeSanitizer.h"
+ #include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
+ #include "llvm/Transforms/Scalar/AnnotationRemarks.h"
++#if LLVM_VERSION_GE(23, 0)
++#include "llvm/Transforms/Utils/AssignGUID.h"
++#endif
+ #include "llvm/Transforms/Utils/CanonicalizeAliases.h"
+ #include "llvm/Transforms/Utils/FunctionImportUtils.h"
+ #include "llvm/Transforms/Utils/NameAnonGlobals.h"
+@@ -934,6 +937,9 @@ extern "C" LLVMRustResult LLVMRustOptimize(
+     if (NeedThinLTOBufferPasses) {
+       MPM.addPass(CanonicalizeAliasesPass());
+       MPM.addPass(NameAnonGlobalPass());
++#if LLVM_VERSION_GE(23, 0)
++      MPM.addPass(AssignGUIDPass());
++#endif
+     }
+     // For `-Copt-level=0`, and the pre-link fat/thin LTO stages.
+     if (ThinLTOBufferRef && *ThinLTOBufferRef == nullptr) {
+@@ -1475,6 +1481,9 @@ extern "C" LLVMRustBuffer *LLVMRustModuleSerialize(LLVMModuleRef M,
+         PB.registerLoopAnalyses(LAM);
+         PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+         ModulePassManager MPM;
++#if LLVM_VERSION_GE(23, 0)
++        MPM.addPass(AssignGUIDPass());
++#endif
+         MPM.addPass(ThinLTOBitcodeWriterPass(OS, nullptr));
+         MPM.run(*unwrap(M), MAM);
+       } else {
+diff --git a/tests/codegen-llvm/bpf-allows-unaligned.rs b/tests/codegen-llvm/bpf-allows-unaligned.rs
+index c7a70d5b2e502..7e95a56d984c9 100644
+--- a/tests/codegen-llvm/bpf-allows-unaligned.rs
++++ b/tests/codegen-llvm/bpf-allows-unaligned.rs
+@@ -5,7 +5,7 @@
+ 
+ #[no_mangle]
+ #[target_feature(enable = "allows-misaligned-mem-access")]
+-// CHECK: define noundef zeroext i8 @foo(i8 noundef returned %arg) unnamed_addr #0 {
++// CHECK: define noundef zeroext i8 @foo(i8 noundef returned %arg) unnamed_addr #0
+ pub unsafe fn foo(arg: u8) -> u8 {
+     arg
+ }
+diff --git a/tests/codegen-llvm/branch-protection.rs b/tests/codegen-llvm/branch-protection.rs
+index ed1cb2cd137ea..11847c256d6ba 100644
+--- a/tests/codegen-llvm/branch-protection.rs
++++ b/tests/codegen-llvm/branch-protection.rs
+@@ -22,7 +22,7 @@ extern crate minicore;
+ use minicore::*;
+ 
+ // A basic test function.
+-// CHECK: @test(){{.*}} [[ATTR:#[0-9]+]] {
++// CHECK: @test(){{.*}} [[ATTR:#[0-9]+]]
+ #[no_mangle]
+ pub fn test() {}
+ 
+diff --git a/tests/codegen-llvm/frame-pointer-cli-control.rs b/tests/codegen-llvm/frame-pointer-cli-control.rs
+index 911a5f03cbcda..79cdfc70f1ad7 100644
+--- a/tests/codegen-llvm/frame-pointer-cli-control.rs
++++ b/tests/codegen-llvm/frame-pointer-cli-control.rs
+@@ -45,7 +45,7 @@ Specific cases where platforms or tools rely on frame pointers for sound or corr
+ 
+ extern crate minicore;
+ 
+-// CHECK: i32 @peach{{.*}}[[PEACH_ATTRS:\#[0-9]+]] {
++// CHECK: i32 @peach{{.*}}[[PEACH_ATTRS:\#[0-9]+]]
+ #[no_mangle]
+ pub fn peach(x: u32) -> u32 {
+     x
+diff --git a/tests/codegen-llvm/frame-pointer.rs b/tests/codegen-llvm/frame-pointer.rs
+index 1d0dd762826b2..a52d95a23862d 100644
+--- a/tests/codegen-llvm/frame-pointer.rs
++++ b/tests/codegen-llvm/frame-pointer.rs
+@@ -18,7 +18,7 @@
+ extern crate minicore;
+ use minicore::*;
+ 
+-// CHECK: define i32 @peach{{.*}}[[PEACH_ATTRS:\#[0-9]+]] {
++// CHECK: define i32 @peach{{.*}}[[PEACH_ATTRS:\#[0-9]+]]
+ #[no_mangle]
+ pub fn peach(x: u32) -> u32 {
+     x
+diff --git a/tests/codegen-llvm/gpu-convergent.rs b/tests/codegen-llvm/gpu-convergent.rs
+index bb9271ab69996..376d65a3d4a25 100644
+--- a/tests/codegen-llvm/gpu-convergent.rs
++++ b/tests/codegen-llvm/gpu-convergent.rs
+@@ -17,7 +17,7 @@ extern "C" {
+     fn ext();
+ }
+ 
+-// CHECK: define {{.*}}_kernel void @fun(i32{{.*}}) unnamed_addr #[[ATTR:[0-9]+]] {
++// CHECK: define {{.*}}_kernel void @fun(i32{{.*}}) unnamed_addr #[[ATTR:[0-9]+]]
+ // CHECK: declare void @ext() unnamed_addr #[[ATTR]]
+ // CHECK: attributes #[[ATTR]] = {{.*}} convergent
+ #[no_mangle]
+diff --git a/tests/codegen-llvm/instrument-coverage/testprog.rs b/tests/codegen-llvm/instrument-coverage/testprog.rs
+index ef61ede6de8ee..67c49c438f9f7 100644
+--- a/tests/codegen-llvm/instrument-coverage/testprog.rs
++++ b/tests/codegen-llvm/instrument-coverage/testprog.rs
+@@ -101,7 +101,7 @@ fn main() {
+ // CHECK-SAME:   @__llvm_prf_nm
+ // CHECK-SAME:   section "llvm.metadata"
+ 
+-// CHECK:        define internal { {{.*}} } @_R{{[a-zA-Z0-9_]+}}testprog14will_be_called() unnamed_addr #{{[0-9]+}} {
++// CHECK:        define internal { {{.*}} } @_R{{[a-zA-Z0-9_]+}}testprog14will_be_called() unnamed_addr #{{[0-9]+}}
+ // CHECK-NEXT:   start:
+ // CHECK-NOT:    define internal
+ // CHECK:        atomicrmw add ptr
+@@ -109,7 +109,7 @@ fn main() {
+ 
+ // CHECK:        declare void @llvm.instrprof.increment(ptr, i64, i32, i32) #[[LLVM_INSTRPROF_INCREMENT_ATTR:[0-9]+]]
+ 
+-// WIN:          define linkonce_odr hidden i32 @__llvm_profile_runtime_user() #[[LLVM_PROFILE_RUNTIME_USER_ATTR:[0-9]+]] comdat {{.*}}{
++// WIN:          define linkonce_odr hidden i32 @__llvm_profile_runtime_user() #[[LLVM_PROFILE_RUNTIME_USER_ATTR:[0-9]+]] comdat {{.*}}
+ // WIN-NEXT:     %1 = load i32, ptr @__llvm_profile_runtime
+ // WIN-NEXT:     ret i32 %1
+ // WIN-NEXT:     }
+diff --git a/tests/codegen-llvm/link_section.rs b/tests/codegen-llvm/link_section.rs
+index f196ea86c447d..61bde683c0a41 100644
+--- a/tests/codegen-llvm/link_section.rs
++++ b/tests/codegen-llvm/link_section.rs
+@@ -29,7 +29,7 @@ pub static VAR2: E = E::A(666);
+ #[link_section = "__TEST,three"]
+ pub static VAR3: E = E::B(1.);
+ 
+-// CHECK: define {{(dso_local )?}}void @fn1() {{.*}} section "__TEST,four" {
++// CHECK: define {{(dso_local )?}}void @fn1() {{.*}} section "__TEST,four"
+ #[no_mangle]
+ #[link_section = "__TEST,four"]
+ pub fn fn1() {}
+diff --git a/tests/codegen-llvm/sanitizer/cfi/emit-type-metadata-itanium-cxx-abi-normalized-generalized.rs b/tests/codegen-llvm/sanitizer/cfi/emit-type-metadata-itanium-cxx-abi-normalized-generalized.rs
+index 7639ce7b10448..5b1aa97ab3338 100644
+--- a/tests/codegen-llvm/sanitizer/cfi/emit-type-metadata-itanium-cxx-abi-normalized-generalized.rs
++++ b/tests/codegen-llvm/sanitizer/cfi/emit-type-metadata-itanium-cxx-abi-normalized-generalized.rs
+@@ -7,21 +7,21 @@
+ 
+ pub fn foo(f: fn(i32) -> i32, arg: i32) -> i32 {
+     // CHECK-LABEL: define{{.*}}foo
+-    // CHECK-SAME:  {{.*}}![[TYPE1:[0-9]+]]
++    // CHECK-SAME:  {{.*}}!type ![[TYPE1:[0-9]+]]
+     // CHECK:       call i1 @llvm.type.test(ptr {{%f|%0}}, metadata !"_ZTSFu3i32S_E.normalized.generalized")
+     f(arg)
+ }
+ 
+ pub fn bar(f: fn(i32, i32) -> i32, arg1: i32, arg2: i32) -> i32 {
+     // CHECK-LABEL: define{{.*}}bar
+-    // CHECK-SAME:  {{.*}}![[TYPE2:[0-9]+]]
++    // CHECK-SAME:  {{.*}}!type ![[TYPE2:[0-9]+]]
+     // CHECK:       call i1 @llvm.type.test(ptr {{%f|%0}}, metadata !"_ZTSFu3i32S_S_E.normalized.generalized")
+     f(arg1, arg2)
+ }
+ 
+ pub fn baz(f: fn(i32, i32, i32) -> i32, arg1: i32, arg2: i32, arg3: i32) -> i32 {
+     // CHECK-LABEL: define{{.*}}baz
+-    // CHECK-SAME:  {{.*}}![[TYPE3:[0-9]+]]
++    // CHECK-SAME:  {{.*}}!type ![[TYPE3:[0-9]+]]
+     // CHECK:       call i1 @llvm.type.test(ptr {{%f|%0}}, metadata !"_ZTSFu3i32S_S_S_E.normalized.generalized")
+     f(arg1, arg2, arg3)
+ }
+diff --git a/tests/codegen-llvm/some-non-zero-from-atomic-optimization.rs b/tests/codegen-llvm/some-non-zero-from-atomic-optimization.rs
+index 35317b0dd39cc..3df2d569f9a40 100644
+--- a/tests/codegen-llvm/some-non-zero-from-atomic-optimization.rs
++++ b/tests/codegen-llvm/some-non-zero-from-atomic-optimization.rs
+@@ -72,7 +72,7 @@ pub unsafe fn some_non_zero_from_atomic_get() -> Option<NonZeroUsize> {
+ ///
+ /// The way we check that the LLVM IR is correct is by making sure that neither
+ /// `panic` nor `unreachable` is part of the LLVM IR:
+-// CHECK-LABEL: define {{.*}} i64 @some_non_zero_from_atomic_get2() {{.*}} {
++// CHECK-LABEL: define {{.*}} i64 @some_non_zero_from_atomic_get2() {{.*}}
+ // CHECK-NOT: panic
+ // CHECK-NOT: unreachable
+ #[no_mangle]
+diff --git a/tests/codegen-llvm/target-feature-negative-implication.rs b/tests/codegen-llvm/target-feature-negative-implication.rs
+index a9cdca4283991..376599738e526 100644
+--- a/tests/codegen-llvm/target-feature-negative-implication.rs
++++ b/tests/codegen-llvm/target-feature-negative-implication.rs
+@@ -13,7 +13,7 @@ use minicore::*;
+ #[no_mangle]
+ pub unsafe fn banana() {
+     // CHECK-LABEL: @banana()
+-    // CHECK-SAME: [[BANANAATTRS:#[0-9]+]] {
++    // CHECK-SAME: [[BANANAATTRS:#[0-9]+]]
+ }
+ 
+ // CHECK: attributes [[BANANAATTRS]]
+diff --git a/tests/codegen-llvm/target-feature-overrides.rs b/tests/codegen-llvm/target-feature-overrides.rs
+index 2adc8ee6f53bc..3bf05c7977ebf 100644
+--- a/tests/codegen-llvm/target-feature-overrides.rs
++++ b/tests/codegen-llvm/target-feature-overrides.rs
+@@ -23,7 +23,7 @@ extern "C" {
+ #[no_mangle]
+ pub unsafe fn apple() -> u32 {
+     // CHECK-LABEL: @apple()
+-    // CHECK-SAME: [[APPLEATTRS:#[0-9]+]] {
++    // CHECK-SAME: [[APPLEATTRS:#[0-9]+]]
+     // CHECK: {{.*}}call{{.*}}@peach
+     peach()
+ }
+@@ -32,7 +32,7 @@ pub unsafe fn apple() -> u32 {
+ #[no_mangle]
+ pub unsafe fn banana() -> u32 {
+     // CHECK-LABEL: @banana()
+-    // CHECK-SAME: [[BANANAATTRS:#[0-9]+]] {
++    // CHECK-SAME: [[BANANAATTRS:#[0-9]+]]
+     // COMPAT: {{.*}}call{{.*}}@peach
+     // INCOMPAT: {{.*}}call{{.*}}@apple
+     apple() // Compatible for inline in COMPAT revision and can't be inlined in INCOMPAT
+diff --git a/tests/codegen-llvm/unwind-abis/aapcs-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/aapcs-unwind-abi.rs
+index ecace722e0dbe..279780e3a7aeb 100644
+--- a/tests/codegen-llvm/unwind-abis/aapcs-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/aapcs-unwind-abi.rs
+@@ -16,11 +16,11 @@ pub trait Sized: MetaSized {}
+ // `aapcs-unwind` extern functions. `aapcs-unwind` functions MUST NOT have this attribute. We
+ // disable optimizations above to prevent LLVM from inferring the attribute.
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "aapcs" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "aapcs-unwind" fn rust_item_that_can_unwind() {}
+ 
+diff --git a/tests/codegen-llvm/unwind-abis/c-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/c-unwind-abi.rs
+index 46c08b5fc4ff4..1b3312839e3e8 100644
+--- a/tests/codegen-llvm/unwind-abis/c-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/c-unwind-abi.rs
+@@ -7,11 +7,11 @@
+ 
+ #![crate_type = "lib"]
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "C" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "C-unwind" fn rust_item_that_can_unwind() {}
+ 
+diff --git a/tests/codegen-llvm/unwind-abis/cdecl-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/cdecl-unwind-abi.rs
+index 8e643d6ce4947..6f4eafb353ccb 100644
+--- a/tests/codegen-llvm/unwind-abis/cdecl-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/cdecl-unwind-abi.rs
+@@ -7,11 +7,11 @@
+ 
+ #![crate_type = "lib"]
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "cdecl" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "cdecl-unwind" fn rust_item_that_can_unwind() {}
+ 
+diff --git a/tests/codegen-llvm/unwind-abis/fastcall-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/fastcall-unwind-abi.rs
+index 7df46813ed1dd..51c6fd15b9c5c 100644
+--- a/tests/codegen-llvm/unwind-abis/fastcall-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/fastcall-unwind-abi.rs
+@@ -16,11 +16,11 @@ pub trait Sized: MetaSized {}
+ // `fastcall-unwind` extern functions. `fastcall-unwind` functions MUST NOT have this attribute. We
+ // disable optimizations above to prevent LLVM from inferring the attribute.
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "fastcall" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "fastcall-unwind" fn rust_item_that_can_unwind() {}
+ 
+diff --git a/tests/codegen-llvm/unwind-abis/stdcall-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/stdcall-unwind-abi.rs
+index cc06ee125495a..b5fcea52b4d61 100644
+--- a/tests/codegen-llvm/unwind-abis/stdcall-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/stdcall-unwind-abi.rs
+@@ -16,11 +16,11 @@ pub trait Sized: MetaSized {}
+ // extern functions. `stdcall-unwind` functions MUST NOT have this attribute. We disable
+ // optimizations above to prevent LLVM from inferring the attribute.
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "stdcall" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "stdcall-unwind" fn rust_item_that_can_unwind() {}
+ 
+diff --git a/tests/codegen-llvm/unwind-abis/system-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/system-unwind-abi.rs
+index 5f9102483464b..15fce95fe285b 100644
+--- a/tests/codegen-llvm/unwind-abis/system-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/system-unwind-abi.rs
+@@ -7,11 +7,11 @@
+ 
+ #![crate_type = "lib"]
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "system" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "system-unwind" fn rust_item_that_can_unwind() {}
+ 
+diff --git a/tests/codegen-llvm/unwind-abis/sysv64-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/sysv64-unwind-abi.rs
+index 69bfaf80b4be6..1293e7c0a5f82 100644
+--- a/tests/codegen-llvm/unwind-abis/sysv64-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/sysv64-unwind-abi.rs
+@@ -16,11 +16,11 @@ pub trait Sized: MetaSized {}
+ // `sysv64-unwind` extern functions. `sysv64-unwind` functions MUST NOT have this attribute. We
+ // disable optimizations above to prevent LLVM from inferring the attribute.
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "sysv64" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "sysv64-unwind" fn rust_item_that_can_unwind() {}
+ 
+diff --git a/tests/codegen-llvm/unwind-abis/thiscall-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/thiscall-unwind-abi.rs
+index 05f6b8b70e171..a9b6c34ee58e2 100644
+--- a/tests/codegen-llvm/unwind-abis/thiscall-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/thiscall-unwind-abi.rs
+@@ -16,11 +16,11 @@ pub trait Sized: MetaSized {}
+ // `thiscall-unwind` extern functions. `thiscall-unwind` functions MUST NOT have this attribute. We
+ // disable optimizations above to prevent LLVM from inferring the attribute.
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "thiscall" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "thiscall-unwind" fn rust_item_that_can_unwind() {}
+ 
+diff --git a/tests/codegen-llvm/unwind-abis/vectorcall-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/vectorcall-unwind-abi.rs
+index d001a16b32a1c..8cedb55ae1d28 100644
+--- a/tests/codegen-llvm/unwind-abis/vectorcall-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/vectorcall-unwind-abi.rs
+@@ -16,11 +16,11 @@ pub trait Sized: MetaSized {}
+ // `vectorcall-unwind` extern functions. `vectorcall-unwind` functions MUST NOT have this attribute.
+ // We disable optimizations above to prevent LLVM from inferring the attribute.
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "vectorcall" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "vectorcall-unwind" fn rust_item_that_can_unwind() {}
+ 
+diff --git a/tests/codegen-llvm/unwind-abis/win64-unwind-abi.rs b/tests/codegen-llvm/unwind-abis/win64-unwind-abi.rs
+index 257f00b54e4d8..2a3ad330406e6 100644
+--- a/tests/codegen-llvm/unwind-abis/win64-unwind-abi.rs
++++ b/tests/codegen-llvm/unwind-abis/win64-unwind-abi.rs
+@@ -16,11 +16,11 @@ pub trait Sized: MetaSized {}
+ // `win64-unwind` extern functions. `win64-unwind` functions MUST NOT have this attribute. We
+ // disable optimizations above to prevent LLVM from inferring the attribute.
+ 
+-// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0 {
++// CHECK: @rust_item_that_cannot_unwind() unnamed_addr #0
+ #[no_mangle]
+ pub extern "win64" fn rust_item_that_cannot_unwind() {}
+ 
+-// CHECK: @rust_item_that_can_unwind() unnamed_addr #1 {
++// CHECK: @rust_item_that_can_unwind() unnamed_addr #1
+ #[no_mangle]
+ pub extern "win64-unwind" fn rust_item_that_can_unwind() {}
+ 
+From 0a81c75ed04159cc45768a2c0a0521374de0619f Mon Sep 17 00:00:00 2001
+From: Augie Fackler <augie@google.com>
+Date: Tue, 7 Jul 2026 13:40:23 -0400
+Subject: [PATCH] tests: clean up over-constraint on LLVM feature count
+
+Upstream dropped a feature, resulting in the invalid-attribute test
+failing because it was expecting "and 76 more" but now it's "and 75
+more". Adjust the test to do a replacement with a placeholder on that
+text so the test is less brittle.
+---
+ tests/ui/target-feature/invalid-attribute.rs  |  1 +
+ .../target-feature/invalid-attribute.stderr   | 60 +++++++++----------
+ 2 files changed, 31 insertions(+), 30 deletions(-)
+
+diff --git a/tests/ui/target-feature/invalid-attribute.rs b/tests/ui/target-feature/invalid-attribute.rs
+index 968fbdc1dc7f1..cd367fb722621 100644
+--- a/tests/ui/target-feature/invalid-attribute.rs
++++ b/tests/ui/target-feature/invalid-attribute.rs
+@@ -1,6 +1,7 @@
+ //@ add-minicore
+ //@ compile-flags: --target=x86_64-unknown-linux-gnu
+ //@ needs-llvm-components: x86
++//@ normalize-stderr: "and \d+ more" -> "and X more"
+ 
+ #![warn(unused_attributes)]
+ #![feature(no_core)]
+diff --git a/tests/ui/target-feature/invalid-attribute.stderr b/tests/ui/target-feature/invalid-attribute.stderr
+index 702ea3bb3ba5f..abe3ab431635f 100644
+--- a/tests/ui/target-feature/invalid-attribute.stderr
++++ b/tests/ui/target-feature/invalid-attribute.stderr
+@@ -1,5 +1,5 @@
+ error: `#[target_feature]` attribute cannot be used on extern crates
+-  --> $DIR/invalid-attribute.rs:11:1
++  --> $DIR/invalid-attribute.rs:12:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -7,7 +7,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on use statements
+-  --> $DIR/invalid-attribute.rs:15:1
++  --> $DIR/invalid-attribute.rs:16:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -15,7 +15,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on foreign modules
+-  --> $DIR/invalid-attribute.rs:19:1
++  --> $DIR/invalid-attribute.rs:20:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -23,7 +23,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error[E0539]: malformed `target_feature` attribute input
+-  --> $DIR/invalid-attribute.rs:23:1
++  --> $DIR/invalid-attribute.rs:24:1
+    |
+ LL | #[target_feature = "+sse2"]
+    | ^^^^^^^^^^^^^^^^^---------^
+@@ -37,7 +37,7 @@ LL + #[target_feature(enable = "feat1, feat2")]
+    |
+ 
+ error[E0539]: malformed `target_feature` attribute input
+-  --> $DIR/invalid-attribute.rs:29:1
++  --> $DIR/invalid-attribute.rs:30:1
+    |
+ LL | #[target_feature(bar)]
+    | ^^^^^^^^^^^^^^^^^---^^
+@@ -51,7 +51,7 @@ LL + #[target_feature(enable = "feat1, feat2")]
+    |
+ 
+ error[E0539]: malformed `target_feature` attribute input
+-  --> $DIR/invalid-attribute.rs:32:1
++  --> $DIR/invalid-attribute.rs:33:1
+    |
+ LL | #[target_feature(disable = "baz")]
+    | ^^^^^^^^^^^^^^^^^-------^^^^^^^^^^
+@@ -65,7 +65,7 @@ LL + #[target_feature(enable = "feat1, feat2")]
+    |
+ 
+ error: `#[target_feature]` attribute cannot be used on modules
+-  --> $DIR/invalid-attribute.rs:37:1
++  --> $DIR/invalid-attribute.rs:38:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -73,7 +73,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on constants
+-  --> $DIR/invalid-attribute.rs:41:1
++  --> $DIR/invalid-attribute.rs:42:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -81,7 +81,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on structs
+-  --> $DIR/invalid-attribute.rs:45:1
++  --> $DIR/invalid-attribute.rs:46:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -89,7 +89,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on enums
+-  --> $DIR/invalid-attribute.rs:49:1
++  --> $DIR/invalid-attribute.rs:50:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -97,7 +97,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on unions
+-  --> $DIR/invalid-attribute.rs:53:1
++  --> $DIR/invalid-attribute.rs:54:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -105,7 +105,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on type aliases
+-  --> $DIR/invalid-attribute.rs:60:1
++  --> $DIR/invalid-attribute.rs:61:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -113,7 +113,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on traits
+-  --> $DIR/invalid-attribute.rs:64:1
++  --> $DIR/invalid-attribute.rs:65:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -121,7 +121,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on statics
+-  --> $DIR/invalid-attribute.rs:74:1
++  --> $DIR/invalid-attribute.rs:75:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -129,7 +129,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on trait impl blocks
+-  --> $DIR/invalid-attribute.rs:78:1
++  --> $DIR/invalid-attribute.rs:79:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -137,7 +137,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on inherent impl blocks
+-  --> $DIR/invalid-attribute.rs:84:1
++  --> $DIR/invalid-attribute.rs:85:1
+    |
+ LL | #[target_feature(enable = "sse2")]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -145,7 +145,7 @@ LL | #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on expressions
+-  --> $DIR/invalid-attribute.rs:105:5
++  --> $DIR/invalid-attribute.rs:106:5
+    |
+ LL |     #[target_feature(enable = "sse2")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -153,7 +153,7 @@ LL |     #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can only be applied to functions
+ 
+ error: `#[target_feature]` attribute cannot be used on closures
+-  --> $DIR/invalid-attribute.rs:111:5
++  --> $DIR/invalid-attribute.rs:112:5
+    |
+ LL |     #[target_feature(enable = "sse2")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+@@ -161,7 +161,7 @@ LL |     #[target_feature(enable = "sse2")]
+    = help: `#[target_feature]` can be applied to functions and methods
+ 
+ error: cannot use `#[inline(always)]` with `#[target_feature]`
+-  --> $DIR/invalid-attribute.rs:68:1
++  --> $DIR/invalid-attribute.rs:69:1
+    |
+ LL | #[inline(always)]
+    | ^^^^^^^^^^^^^^^^^
+@@ -169,15 +169,15 @@ LL | #[inline(always)]
+    = note: See this issue for full discussion: https://github.com/rust-lang/rust/issues/145574
+ 
+ error: the feature named `foo` is not valid for this target
+-  --> $DIR/invalid-attribute.rs:26:18
++  --> $DIR/invalid-attribute.rs:27:18
+    |
+ LL | #[target_feature(enable = "foo")]
+    |                  ^^^^^^^^^^^^^^ `foo` is not valid for this target
+    |
+-   = help: valid names are: `fma`, `xop`, `adx`, `aes`, and `avx` and 76 more
++   = help: valid names are: `fma`, `xop`, `adx`, `aes`, and `avx` and X more
+ 
+ error[E0046]: not all trait items implemented, missing: `foo`
+-  --> $DIR/invalid-attribute.rs:80:1
++  --> $DIR/invalid-attribute.rs:81:1
+    |
+ LL | impl Quux for u8 {}
+    | ^^^^^^^^^^^^^^^^ missing `foo` in implementation
+@@ -186,7 +186,7 @@ LL |     fn foo();
+    |     --------- `foo` from trait
+ 
+ error: `#[target_feature(..)]` cannot be applied to safe trait method
+-  --> $DIR/invalid-attribute.rs:94:5
++  --> $DIR/invalid-attribute.rs:95:5
+    |
+ LL |     #[target_feature(enable = "sse2")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot be applied to safe trait method
+@@ -195,13 +195,13 @@ LL |     fn foo() {}
+    |     -------- not an `unsafe` function
+ 
+ error[E0053]: method `foo` has an incompatible type for trait
+-  --> $DIR/invalid-attribute.rs:97:5
++  --> $DIR/invalid-attribute.rs:98:5
+    |
+ LL |     fn foo() {}
+    |     ^^^^^^^^ expected safe fn, found unsafe fn
+    |
+ note: type in trait
+-  --> $DIR/invalid-attribute.rs:89:5
++  --> $DIR/invalid-attribute.rs:90:5
+    |
+ LL |     fn foo();
+    |     ^^^^^^^^^
+@@ -209,7 +209,7 @@ LL |     fn foo();
+               found signature `#[target_features] fn()`
+ 
+ error: the feature named `+sse2` is not valid for this target
+-  --> $DIR/invalid-attribute.rs:116:18
++  --> $DIR/invalid-attribute.rs:117:18
+    |
+ LL | #[target_feature(enable = "+sse2")]
+    |                  ^^^^^^^^^^^^^^^^ `+sse2` is not valid for this target
+@@ -221,20 +221,20 @@ LL + #[target_feature(enable = "sse2")]
+    |
+ 
+ error: the feature named `sse5` is not valid for this target
+-  --> $DIR/invalid-attribute.rs:121:18
++  --> $DIR/invalid-attribute.rs:122:18
+    |
+ LL | #[target_feature(enable = "sse5")]
+    |                  ^^^^^^^^^^^^^^^ `sse5` is not valid for this target
+    |
+-   = help: valid names are: `sse`, `sse2`, `sse3`, `sse4a`, and `ssse3` and 76 more
++   = help: valid names are: `sse`, `sse2`, `sse3`, `sse4a`, and `ssse3` and X more
+ 
+ error: the feature named `avx512` is not valid for this target
+-  --> $DIR/invalid-attribute.rs:126:18
++  --> $DIR/invalid-attribute.rs:127:18
+    |
+ LL | #[target_feature(enable = "avx512")]
+    |                  ^^^^^^^^^^^^^^^^^ `avx512` is not valid for this target
+    |
+-   = help: valid names are: `avx512f`, `avx2`, `avx512bw`, `avx512cd`, and `avx512dq` and 76 more
++   = help: valid names are: `avx512f`, `avx2`, `avx512bw`, `avx512cd`, and `avx512dq` and X more
+ 
+ error: aborting due to 26 previous errors
+ 
+From f27b2065728d361695eff955012e3e1054058514 Mon Sep 17 00:00:00 2001
+From: Nikita Popov <npopov@redhat.com>
+Date: Fri, 3 Jul 2026 15:29:32 +0200
+Subject: [PATCH] Update cov-map tests for LLVM 23
+
+There is a minor change in sorted order due to:
+https://github.com/llvm/llvm-project/commit/593103465326850f23bc9a6078ae7fb01065d46e
+---
+ tests/coverage/async.cov-map      |  8 ++++----
+ tests/coverage/async.coverage     |  2 +-
+ tests/coverage/async.rs           |  2 +-
+ tests/coverage/coroutine.cov-map  | 16 ++++++++--------
+ tests/coverage/coroutine.coverage |  1 +
+ tests/coverage/coroutine.rs       |  1 +
+ tests/coverage/yield.cov-map      | 28 ++++++++++++++--------------
+ tests/coverage/yield.coverage     |  1 +
+ tests/coverage/yield.rs           |  1 +
+ 9 files changed, 32 insertions(+), 28 deletions(-)
+
+diff --git a/tests/coverage/async.cov-map b/tests/coverage/async.cov-map
+index d75c4b5981a05..b4304a43d64e6 100644
+--- a/tests/coverage/async.cov-map
++++ b/tests/coverage/async.cov-map
+@@ -166,7 +166,7 @@ Number of file 0 mappings: 1
+ Highest counter ID seen: c0
+ 
+ Function name: async::i::{closure#0}
+-Raw bytes (75): 0x[01, 01, 03, 05, 09, 11, 15, 0d, 11, 0d, 01, 2c, 13, 00, 14, 01, 04, 0b, 00, 0c, 09, 01, 09, 00, 0a, 01, 00, 0e, 00, 0f, 01, 00, 0e, 00, 18, 05, 00, 1c, 00, 21, 09, 00, 27, 00, 30, 15, 01, 09, 00, 0a, 02, 00, 0e, 00, 17, 11, 00, 1b, 00, 20, 15, 00, 24, 00, 26, 06, 01, 0e, 00, 10, 0b, 02, 01, 00, 02]
++Raw bytes (75): 0x[01, 01, 03, 05, 09, 11, 15, 0d, 11, 0d, 01, 2c, 13, 00, 14, 01, 04, 0b, 00, 0c, 09, 01, 09, 00, 0a, 01, 00, 0e, 00, 18, 01, 00, 0e, 00, 0f, 05, 00, 1c, 00, 21, 09, 00, 27, 00, 30, 15, 01, 09, 00, 0a, 02, 00, 0e, 00, 17, 11, 00, 1b, 00, 20, 15, 00, 24, 00, 26, 06, 01, 0e, 00, 10, 0b, 02, 01, 00, 02]
+ Number of files: 1
+ - file 0 => $DIR/async.rs
+ Number of expressions: 3
+@@ -177,8 +177,8 @@ Number of file 0 mappings: 13
+ - Code(Counter(0)) at (prev + 44, 19) to (start + 0, 20)
+ - Code(Counter(0)) at (prev + 4, 11) to (start + 0, 12)
+ - Code(Counter(2)) at (prev + 1, 9) to (start + 0, 10)
+-- Code(Counter(0)) at (prev + 0, 14) to (start + 0, 15)
+ - Code(Counter(0)) at (prev + 0, 14) to (start + 0, 24)
++- Code(Counter(0)) at (prev + 0, 14) to (start + 0, 15)
+ - Code(Counter(1)) at (prev + 0, 28) to (start + 0, 33)
+ - Code(Counter(2)) at (prev + 0, 39) to (start + 0, 48)
+ - Code(Counter(5)) at (prev + 1, 9) to (start + 0, 10)
+@@ -193,7 +193,7 @@ Number of file 0 mappings: 13
+ Highest counter ID seen: c5
+ 
+ Function name: async::j
+-Raw bytes (65): 0x[01, 01, 03, 01, 05, 01, 0b, 05, 09, 0b, 01, 37, 01, 00, 0c, 01, 0b, 0b, 00, 0c, 05, 01, 09, 00, 0a, 01, 00, 0e, 00, 0f, 01, 00, 0e, 00, 1b, 05, 00, 1f, 00, 27, 09, 01, 09, 00, 0a, 02, 00, 0e, 00, 1a, 09, 00, 1e, 00, 20, 06, 01, 0e, 00, 10, 01, 02, 01, 00, 02]
++Raw bytes (65): 0x[01, 01, 03, 01, 05, 01, 0b, 05, 09, 0b, 01, 37, 01, 00, 0c, 01, 0b, 0b, 00, 0c, 05, 01, 09, 00, 0a, 01, 00, 0e, 00, 1b, 01, 00, 0e, 00, 0f, 05, 00, 1f, 00, 27, 09, 01, 09, 00, 0a, 02, 00, 0e, 00, 1a, 09, 00, 1e, 00, 20, 06, 01, 0e, 00, 10, 01, 02, 01, 00, 02]
+ Number of files: 1
+ - file 0 => $DIR/async.rs
+ Number of expressions: 3
+@@ -204,8 +204,8 @@ Number of file 0 mappings: 11
+ - Code(Counter(0)) at (prev + 55, 1) to (start + 0, 12)
+ - Code(Counter(0)) at (prev + 11, 11) to (start + 0, 12)
+ - Code(Counter(1)) at (prev + 1, 9) to (start + 0, 10)
+-- Code(Counter(0)) at (prev + 0, 14) to (start + 0, 15)
+ - Code(Counter(0)) at (prev + 0, 14) to (start + 0, 27)
++- Code(Counter(0)) at (prev + 0, 14) to (start + 0, 15)
+ - Code(Counter(1)) at (prev + 0, 31) to (start + 0, 39)
+ - Code(Counter(2)) at (prev + 1, 9) to (start + 0, 10)
+ - Code(Expression(0, Sub)) at (prev + 0, 14) to (start + 0, 26)
+diff --git a/tests/coverage/async.coverage b/tests/coverage/async.coverage
+index 9409e6b1deb85..fe1a353b5f1a1 100644
+--- a/tests/coverage/async.coverage
++++ b/tests/coverage/async.coverage
+@@ -4,7 +4,7 @@
+    LL|       |#![rustfmt::skip]
+    LL|       |//@ edition: 2018
+    LL|       |//@ compile-flags: -Copt-level=1
+-   LL|       |
++   LL|       |//@ min-llvm-version: 23
+    LL|       |//@ aux-build: executor.rs
+    LL|       |extern crate executor;
+    LL|       |
+diff --git a/tests/coverage/async.rs b/tests/coverage/async.rs
+index 777ad7ce7c0c3..d8f608df81535 100644
+--- a/tests/coverage/async.rs
++++ b/tests/coverage/async.rs
+@@ -4,7 +4,7 @@
+ #![rustfmt::skip]
+ //@ edition: 2018
+ //@ compile-flags: -Copt-level=1
+-
++//@ min-llvm-version: 23
+ //@ aux-build: executor.rs
+ extern crate executor;
+ 
+diff --git a/tests/coverage/coroutine.cov-map b/tests/coverage/coroutine.cov-map
+index daa42915a4af5..9599af9f0ab2c 100644
+--- a/tests/coverage/coroutine.cov-map
++++ b/tests/coverage/coroutine.cov-map
+@@ -1,11 +1,11 @@
+ Function name: coroutine::get_u32
+-Raw bytes (31): 0x[01, 01, 01, 01, 05, 05, 01, 0b, 01, 00, 2d, 01, 01, 08, 00, 0b, 05, 01, 09, 00, 0e, 02, 02, 09, 00, 28, 01, 02, 01, 00, 02]
++Raw bytes (31): 0x[01, 01, 01, 01, 05, 05, 01, 0c, 01, 00, 2d, 01, 01, 08, 00, 0b, 05, 01, 09, 00, 0e, 02, 02, 09, 00, 28, 01, 02, 01, 00, 02]
+ Number of files: 1
+ - file 0 => $DIR/coroutine.rs
+ Number of expressions: 1
+ - expression 0 operands: lhs = Counter(0), rhs = Counter(1)
+ Number of file 0 mappings: 5
+-- Code(Counter(0)) at (prev + 11, 1) to (start + 0, 45)
++- Code(Counter(0)) at (prev + 12, 1) to (start + 0, 45)
+ - Code(Counter(0)) at (prev + 1, 8) to (start + 0, 11)
+ - Code(Counter(1)) at (prev + 1, 9) to (start + 0, 14)
+ - Code(Expression(0, Sub)) at (prev + 2, 9) to (start + 0, 40)
+@@ -14,14 +14,14 @@ Number of file 0 mappings: 5
+ Highest counter ID seen: c1
+ 
+ Function name: coroutine::main
+-Raw bytes (93): 0x[01, 01, 02, 01, 05, 05, 09, 11, 01, 13, 01, 00, 0a, 01, 01, 09, 00, 10, 01, 00, 13, 00, 2e, 01, 01, 09, 00, 16, 01, 06, 0b, 00, 13, 01, 00, 14, 00, 22, 01, 00, 24, 00, 2a, 01, 00, 2b, 00, 2d, 05, 01, 2b, 00, 2d, 02, 01, 0e, 00, 14, 05, 02, 0b, 00, 13, 05, 00, 0b, 00, 2e, 05, 00, 14, 00, 22, 0d, 01, 22, 00, 27, 09, 00, 2c, 00, 2e, 06, 01, 0e, 00, 14, 09, 02, 01, 00, 02]
++Raw bytes (93): 0x[01, 01, 02, 01, 05, 05, 09, 11, 01, 14, 01, 00, 0a, 01, 01, 09, 00, 10, 01, 00, 13, 00, 2e, 01, 01, 09, 00, 16, 01, 06, 0b, 00, 13, 01, 00, 14, 00, 22, 01, 00, 24, 00, 2a, 01, 00, 2b, 00, 2d, 05, 01, 2b, 00, 2d, 02, 01, 0e, 00, 14, 05, 02, 0b, 00, 2e, 05, 00, 0b, 00, 13, 05, 00, 14, 00, 22, 0d, 01, 22, 00, 27, 09, 00, 2c, 00, 2e, 06, 01, 0e, 00, 14, 09, 02, 01, 00, 02]
+ Number of files: 1
+ - file 0 => $DIR/coroutine.rs
+ Number of expressions: 2
+ - expression 0 operands: lhs = Counter(0), rhs = Counter(1)
+ - expression 1 operands: lhs = Counter(1), rhs = Counter(2)
+ Number of file 0 mappings: 17
+-- Code(Counter(0)) at (prev + 19, 1) to (start + 0, 10)
++- Code(Counter(0)) at (prev + 20, 1) to (start + 0, 10)
+ - Code(Counter(0)) at (prev + 1, 9) to (start + 0, 16)
+ - Code(Counter(0)) at (prev + 0, 19) to (start + 0, 46)
+ - Code(Counter(0)) at (prev + 1, 9) to (start + 0, 22)
+@@ -32,8 +32,8 @@ Number of file 0 mappings: 17
+ - Code(Counter(1)) at (prev + 1, 43) to (start + 0, 45)
+ - Code(Expression(0, Sub)) at (prev + 1, 14) to (start + 0, 20)
+     = (c0 - c1)
+-- Code(Counter(1)) at (prev + 2, 11) to (start + 0, 19)
+-- Code(Counter(1)) at (prev + 0, 11) to (start + 0, 46)
++- Code(Counter(1)) at (prev + 2, 11) to (start + 0, 46)
++- Code(Counter(1)) at (prev + 0, 11) to (start + 0, 19)
+ - Code(Counter(1)) at (prev + 0, 20) to (start + 0, 34)
+ - Code(Counter(3)) at (prev + 1, 34) to (start + 0, 39)
+ - Code(Counter(2)) at (prev + 0, 44) to (start + 0, 46)
+@@ -43,12 +43,12 @@ Number of file 0 mappings: 17
+ Highest counter ID seen: c3
+ 
+ Function name: coroutine::main::{closure#0}
+-Raw bytes (24): 0x[01, 01, 00, 04, 01, 16, 08, 00, 09, 01, 01, 09, 00, 1f, 05, 01, 10, 00, 15, 05, 01, 05, 00, 06]
++Raw bytes (24): 0x[01, 01, 00, 04, 01, 17, 08, 00, 09, 01, 01, 09, 00, 1f, 05, 01, 10, 00, 15, 05, 01, 05, 00, 06]
+ Number of files: 1
+ - file 0 => $DIR/coroutine.rs
+ Number of expressions: 0
+ Number of file 0 mappings: 4
+-- Code(Counter(0)) at (prev + 22, 8) to (start + 0, 9)
++- Code(Counter(0)) at (prev + 23, 8) to (start + 0, 9)
+ - Code(Counter(0)) at (prev + 1, 9) to (start + 0, 31)
+ - Code(Counter(1)) at (prev + 1, 16) to (start + 0, 21)
+ - Code(Counter(1)) at (prev + 1, 5) to (start + 0, 6)
+diff --git a/tests/coverage/coroutine.coverage b/tests/coverage/coroutine.coverage
+index 611470c577388..02fc91bcf5863 100644
+--- a/tests/coverage/coroutine.coverage
++++ b/tests/coverage/coroutine.coverage
+@@ -1,3 +1,4 @@
++   LL|       |//@ min-llvm-version: 23
+    LL|       |#![feature(coroutines, coroutine_trait, stmt_expr_attributes)]
+    LL|       |
+    LL|       |use std::ops::{Coroutine, CoroutineState};
+diff --git a/tests/coverage/coroutine.rs b/tests/coverage/coroutine.rs
+index bd149764b3737..9a11abd934e4a 100644
+--- a/tests/coverage/coroutine.rs
++++ b/tests/coverage/coroutine.rs
+@@ -1,3 +1,4 @@
++//@ min-llvm-version: 23
+ #![feature(coroutines, coroutine_trait, stmt_expr_attributes)]
+ 
+ use std::ops::{Coroutine, CoroutineState};
+diff --git a/tests/coverage/yield.cov-map b/tests/coverage/yield.cov-map
+index 87d0a0472615f..8c1da30c08b6c 100644
+--- a/tests/coverage/yield.cov-map
++++ b/tests/coverage/yield.cov-map
+@@ -1,5 +1,5 @@
+ Function name: yield::main
+-Raw bytes (139): 0x[01, 01, 05, 01, 05, 05, 09, 09, 11, 11, 15, 11, 15, 19, 01, 07, 01, 00, 0a, 01, 01, 09, 00, 16, 01, 06, 0b, 00, 13, 01, 00, 0b, 00, 2e, 01, 00, 14, 00, 22, 05, 01, 27, 00, 29, 02, 01, 0e, 00, 14, 05, 02, 0b, 00, 13, 05, 00, 0b, 00, 2e, 05, 00, 14, 00, 22, 0d, 01, 22, 00, 27, 09, 00, 2c, 00, 2e, 06, 01, 0e, 00, 14, 09, 03, 09, 00, 16, 09, 08, 0b, 00, 13, 09, 00, 0b, 00, 2e, 09, 00, 14, 00, 22, 11, 01, 27, 00, 29, 0a, 01, 0e, 00, 14, 11, 02, 0b, 00, 13, 11, 00, 0b, 00, 2e, 11, 00, 14, 00, 22, 12, 01, 27, 00, 29, 15, 01, 0e, 00, 14, 12, 02, 01, 00, 02]
++Raw bytes (139): 0x[01, 01, 05, 01, 05, 05, 09, 09, 11, 11, 15, 11, 15, 19, 01, 08, 01, 00, 0a, 01, 01, 09, 00, 16, 01, 06, 0b, 00, 2e, 01, 00, 0b, 00, 13, 01, 00, 14, 00, 22, 05, 01, 27, 00, 29, 02, 01, 0e, 00, 14, 05, 02, 0b, 00, 2e, 05, 00, 0b, 00, 13, 05, 00, 14, 00, 22, 0d, 01, 22, 00, 27, 09, 00, 2c, 00, 2e, 06, 01, 0e, 00, 14, 09, 03, 09, 00, 16, 09, 08, 0b, 00, 2e, 09, 00, 0b, 00, 13, 09, 00, 14, 00, 22, 11, 01, 27, 00, 29, 0a, 01, 0e, 00, 14, 11, 02, 0b, 00, 2e, 11, 00, 0b, 00, 13, 11, 00, 14, 00, 22, 12, 01, 27, 00, 29, 15, 01, 0e, 00, 14, 12, 02, 01, 00, 02]
+ Number of files: 1
+ - file 0 => $DIR/yield.rs
+ Number of expressions: 5
+@@ -9,30 +9,30 @@ Number of expressions: 5
+ - expression 3 operands: lhs = Counter(4), rhs = Counter(5)
+ - expression 4 operands: lhs = Counter(4), rhs = Counter(5)
+ Number of file 0 mappings: 25
+-- Code(Counter(0)) at (prev + 7, 1) to (start + 0, 10)
++- Code(Counter(0)) at (prev + 8, 1) to (start + 0, 10)
+ - Code(Counter(0)) at (prev + 1, 9) to (start + 0, 22)
+-- Code(Counter(0)) at (prev + 6, 11) to (start + 0, 19)
+-- Code(Counter(0)) at (prev + 0, 11) to (start + 0, 46)
++- Code(Counter(0)) at (prev + 6, 11) to (start + 0, 46)
++- Code(Counter(0)) at (prev + 0, 11) to (start + 0, 19)
+ - Code(Counter(0)) at (prev + 0, 20) to (start + 0, 34)
+ - Code(Counter(1)) at (prev + 1, 39) to (start + 0, 41)
+ - Code(Expression(0, Sub)) at (prev + 1, 14) to (start + 0, 20)
+     = (c0 - c1)
+-- Code(Counter(1)) at (prev + 2, 11) to (start + 0, 19)
+-- Code(Counter(1)) at (prev + 0, 11) to (start + 0, 46)
++- Code(Counter(1)) at (prev + 2, 11) to (start + 0, 46)
++- Code(Counter(1)) at (prev + 0, 11) to (start + 0, 19)
+ - Code(Counter(1)) at (prev + 0, 20) to (start + 0, 34)
+ - Code(Counter(3)) at (prev + 1, 34) to (start + 0, 39)
+ - Code(Counter(2)) at (prev + 0, 44) to (start + 0, 46)
+ - Code(Expression(1, Sub)) at (prev + 1, 14) to (start + 0, 20)
+     = (c1 - c2)
+ - Code(Counter(2)) at (prev + 3, 9) to (start + 0, 22)
+-- Code(Counter(2)) at (prev + 8, 11) to (start + 0, 19)
+-- Code(Counter(2)) at (prev + 0, 11) to (start + 0, 46)
++- Code(Counter(2)) at (prev + 8, 11) to (start + 0, 46)
++- Code(Counter(2)) at (prev + 0, 11) to (start + 0, 19)
+ - Code(Counter(2)) at (prev + 0, 20) to (start + 0, 34)
+ - Code(Counter(4)) at (prev + 1, 39) to (start + 0, 41)
+ - Code(Expression(2, Sub)) at (prev + 1, 14) to (start + 0, 20)
+     = (c2 - c4)
+-- Code(Counter(4)) at (prev + 2, 11) to (start + 0, 19)
+-- Code(Counter(4)) at (prev + 0, 11) to (start + 0, 46)
++- Code(Counter(4)) at (prev + 2, 11) to (start + 0, 46)
++- Code(Counter(4)) at (prev + 0, 11) to (start + 0, 19)
+ - Code(Counter(4)) at (prev + 0, 20) to (start + 0, 34)
+ - Code(Expression(4, Sub)) at (prev + 1, 39) to (start + 0, 41)
+     = (c4 - c5)
+@@ -42,24 +42,24 @@ Number of file 0 mappings: 25
+ Highest counter ID seen: c5
+ 
+ Function name: yield::main::{closure#0}
+-Raw bytes (24): 0x[01, 01, 00, 04, 01, 09, 08, 00, 09, 01, 01, 09, 00, 10, 05, 01, 10, 00, 15, 05, 01, 05, 00, 06]
++Raw bytes (24): 0x[01, 01, 00, 04, 01, 0a, 08, 00, 09, 01, 01, 09, 00, 10, 05, 01, 10, 00, 15, 05, 01, 05, 00, 06]
+ Number of files: 1
+ - file 0 => $DIR/yield.rs
+ Number of expressions: 0
+ Number of file 0 mappings: 4
+-- Code(Counter(0)) at (prev + 9, 8) to (start + 0, 9)
++- Code(Counter(0)) at (prev + 10, 8) to (start + 0, 9)
+ - Code(Counter(0)) at (prev + 1, 9) to (start + 0, 16)
+ - Code(Counter(1)) at (prev + 1, 16) to (start + 0, 21)
+ - Code(Counter(1)) at (prev + 1, 5) to (start + 0, 6)
+ Highest counter ID seen: c1
+ 
+ Function name: yield::main::{closure#1}
+-Raw bytes (34): 0x[01, 01, 00, 06, 01, 18, 08, 00, 09, 01, 01, 09, 00, 10, 05, 01, 09, 00, 10, 09, 01, 09, 00, 10, 0d, 01, 10, 00, 15, 0d, 01, 05, 00, 06]
++Raw bytes (34): 0x[01, 01, 00, 06, 01, 19, 08, 00, 09, 01, 01, 09, 00, 10, 05, 01, 09, 00, 10, 09, 01, 09, 00, 10, 0d, 01, 10, 00, 15, 0d, 01, 05, 00, 06]
+ Number of files: 1
+ - file 0 => $DIR/yield.rs
+ Number of expressions: 0
+ Number of file 0 mappings: 6
+-- Code(Counter(0)) at (prev + 24, 8) to (start + 0, 9)
++- Code(Counter(0)) at (prev + 25, 8) to (start + 0, 9)
+ - Code(Counter(0)) at (prev + 1, 9) to (start + 0, 16)
+ - Code(Counter(1)) at (prev + 1, 9) to (start + 0, 16)
+ - Code(Counter(2)) at (prev + 1, 9) to (start + 0, 16)
+diff --git a/tests/coverage/yield.coverage b/tests/coverage/yield.coverage
+index 2c133cbec5495..2fea2d94dae4b 100644
+--- a/tests/coverage/yield.coverage
++++ b/tests/coverage/yield.coverage
+@@ -1,3 +1,4 @@
++   LL|       |//@ min-llvm-version: 23
+    LL|       |#![feature(coroutines, coroutine_trait, stmt_expr_attributes)]
+    LL|       |#![allow(unused_assignments)]
+    LL|       |
+diff --git a/tests/coverage/yield.rs b/tests/coverage/yield.rs
+index e02e3d3561243..da868e39f5893 100644
+--- a/tests/coverage/yield.rs
++++ b/tests/coverage/yield.rs
+@@ -1,3 +1,4 @@
++//@ min-llvm-version: 23
+ #![feature(coroutines, coroutine_trait, stmt_expr_attributes)]
+ #![allow(unused_assignments)]
+ 
+From e2159107f6ebc615ba6a92960d65528baf90cd35 Mon Sep 17 00:00:00 2001
+From: Nikita Popov <npopov@redhat.com>
+Date: Mon, 13 Jul 2026 15:17:30 +0200
+Subject: [PATCH] Update global_asm tests for LLVM 23
+
+There is now only a single "module asm", not one before each line.
+---
+ tests/codegen-llvm/asm/global_asm.rs         | 4 ++--
+ tests/codegen-llvm/asm/global_asm_include.rs | 4 ++--
+ tests/codegen-llvm/asm/global_asm_x2.rs      | 6 +++---
+ 3 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/tests/codegen-llvm/asm/global_asm.rs b/tests/codegen-llvm/asm/global_asm.rs
+index 32075daa3cf23..8c1c4a3b5881f 100644
+--- a/tests/codegen-llvm/asm/global_asm.rs
++++ b/tests/codegen-llvm/asm/global_asm.rs
+@@ -7,10 +7,10 @@
+ 
+ use std::arch::global_asm;
+ 
+-// CHECK-LABEL: foo
+ // CHECK: module asm
++// CHECK-LABEL: foo
+ // this regex will capture the correct unconditional branch inst.
+-// CHECK: module asm "{{[[:space:]]+}}jmp baz"
++// CHECK: "{{[[:space:]]+}}jmp baz"
+ global_asm!(
+     r#"
+     .global foo
+diff --git a/tests/codegen-llvm/asm/global_asm_include.rs b/tests/codegen-llvm/asm/global_asm_include.rs
+index 98be9c3e33322..cad9901336bf3 100644
+--- a/tests/codegen-llvm/asm/global_asm_include.rs
++++ b/tests/codegen-llvm/asm/global_asm_include.rs
+@@ -7,9 +7,9 @@
+ 
+ use std::arch::global_asm;
+ 
+-// CHECK-LABEL: foo
+ // CHECK: module asm
+-// CHECK: module asm "{{[[:space:]]+}}jmp baz"
++// CHECK-LABEL: foo
++// CHECK: "{{[[:space:]]+}}jmp baz"
+ global_asm!(include_str!("foo.s"));
+ 
+ extern "C" {
+diff --git a/tests/codegen-llvm/asm/global_asm_x2.rs b/tests/codegen-llvm/asm/global_asm_x2.rs
+index 9e3a00f068053..8c6f38289de33 100644
+--- a/tests/codegen-llvm/asm/global_asm_x2.rs
++++ b/tests/codegen-llvm/asm/global_asm_x2.rs
+@@ -8,12 +8,12 @@
+ 
+ use core::arch::global_asm;
+ 
+-// CHECK-LABEL: foo
+ // CHECK: module asm
+-// CHECK: module asm "{{[[:space:]]+}}jmp baz"
++// CHECK-LABEL: foo
++// CHECK: "{{[[:space:]]+}}jmp baz"
+ // any other global_asm will be appended to this first block, so:
+ // CHECK-LABEL: bar
+-// CHECK: module asm "{{[[:space:]]+}}jmp quux"
++// CHECK: "{{[[:space:]]+}}jmp quux"
+ global_asm!(
+     r#"
+     .global foo
+From 9e25e3aab5f22179038b3c60d3bafa530492d271 Mon Sep 17 00:00:00 2001
+From: Hans Wennborg <hans@chromium.org>
+Date: Wed, 15 Jul 2026 14:02:15 +0200
+Subject: [PATCH] Fix ignore-llvm-version directive in
+ codegen-llvm/array-equality.rs
+
+There needs to be spaces around the dash, otherwise it doesn't work as a
+range (which matters now that LLVM trunk is 24).
+---
+ tests/codegen-llvm/array-equality.rs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/tests/codegen-llvm/array-equality.rs b/tests/codegen-llvm/array-equality.rs
+index 385b7d7803594..706caebdcb6d4 100644
+--- a/tests/codegen-llvm/array-equality.rs
++++ b/tests/codegen-llvm/array-equality.rs
+@@ -1,5 +1,5 @@
+ //@ revisions: llvm-current llvm-next
+-//@[llvm-current] ignore-llvm-version: 23-99
++//@[llvm-current] ignore-llvm-version: 23 - 99
+ //@[llvm-next] min-llvm-version: 23
+ //@ compile-flags: -Copt-level=3 -Z merge-functions=disabled
+ //@ only-x86_64
+From 2d18054569d1169bfae7ce21e5c7111f32f16774 Mon Sep 17 00:00:00 2001
+From: Augie Fackler <augie@google.com>
+Date: Mon, 6 Jul 2026 15:48:13 -0400
+Subject: [PATCH] tests: fix enum-match.rs to handle LLVM 23
+
+A recent change in InstSimplify is able to skip the `and` in this
+codegen, which is strictly an improvement. We accept the new version on
+newer LLVM and the old verison on older ones using the revisions system.
+
+The change in array-cmp.rs appears to have come from the same revision,
+so I gave it the same treatment. It's weirder to me though, because it
+merely changes the order of the phi operands which if I understand right
+doesn't actually matter.
+---
+ tests/codegen-llvm/array-cmp.rs       | 6 +++++-
+ tests/codegen-llvm/enum/enum-match.rs | 8 ++++++--
+ 2 files changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/tests/codegen-llvm/array-cmp.rs b/tests/codegen-llvm/array-cmp.rs
+index 0106b9c15c11b..5b0a802f4097e 100644
+--- a/tests/codegen-llvm/array-cmp.rs
++++ b/tests/codegen-llvm/array-cmp.rs
+@@ -2,6 +2,9 @@
+ 
+ //@ compile-flags: -C opt-level=2
+ //@ needs-deterministic-layouts (checks depend on tuple layout)
++//@ revisions: LLVM22 LLVM23
++//@ [LLVM22] max-llvm-major-version: 22
++//@ [LLVM23] min-llvm-version: 23
+ 
+ #![crate_type = "lib"]
+ 
+@@ -66,7 +69,8 @@ pub fn array_of_tuple_le(a: &[(i16, u16); 2], b: &[(i16, u16); 2]) -> bool {
+     // CHECK-NEXT: br i1 %[[EQ01]], label %{{.+}}, label %[[EXIT_U]]
+ 
+     // CHECK: [[DONE]]:
+-    // CHECK: %[[RET:.+]] = phi i1 [ %{{.+}}, %[[EXIT_S]] ], [ %{{.+}}, %[[EXIT_U]] ], [ true, %[[L11]] ]
++    // LLVM22: %[[RET:.+]] = phi i1 [ %{{.+}}, %[[EXIT_S]] ], [ %{{.+}}, %[[EXIT_U]] ], [ true, %[[L11]] ]
++    // LLVM23: %[[RET:.+]] = phi i1 [ %{{.+}}, %[[EXIT_U]] ], [ %{{.+}}, %[[EXIT_S]] ], [ true, %[[L11]] ]
+     // CHECK: ret i1 %[[RET]]
+ 
+     a <= b
+diff --git a/tests/codegen-llvm/enum/enum-match.rs b/tests/codegen-llvm/enum/enum-match.rs
+index 6d8b97328f8e0..a0cba452e123c 100644
+--- a/tests/codegen-llvm/enum/enum-match.rs
++++ b/tests/codegen-llvm/enum/enum-match.rs
+@@ -1,5 +1,8 @@
+ //@ compile-flags: -Copt-level=1
+ //@ only-64bit
++//@ revisions: LLVM22 LLVM23
++//@ [LLVM22] max-llvm-major-version: 22
++//@ [LLVM23] min-llvm-version: 23
+ 
+ #![crate_type = "lib"]
+ #![feature(core_intrinsics)]
+@@ -18,8 +21,9 @@ pub enum Enum0 {
+ // CHECK-LABEL: define{{( dso_local)?}} noundef{{( range\(i8 [0-9]+, [0-9]+\))?}} i8 @match0(i8{{.+}}%0)
+ // CHECK-NEXT: start:
+ // CHECK-NEXT: %[[IS_B:.+]] = icmp eq i8 %0, 2
+-// CHECK-NEXT: %[[TRUNC:.+]] = and i8 %0, 1
+-// CHECK-NEXT: %[[R:.+]] = select i1 %[[IS_B]], i8 13, i8 %[[TRUNC]]
++// LLVM22-NEXT: %[[TRUNC:.+]] = and i8 %0, 1
++// LLVM22-NEXT: %[[R:.+]] = select i1 %[[IS_B]], i8 13, i8 %[[TRUNC]]
++// LLVM23-NEXT: %[[R:.+]] = select i1 %[[IS_B]], i8 13, i8 %0
+ // CHECK-NEXT: ret i8 %[[R]]
+ #[no_mangle]
+ pub fn match0(e: Enum0) -> u8 {
+From d4a24cd6e18b98326429d8c7e7bbb269da14a5aa Mon Sep 17 00:00:00 2001
+From: Nikita Popov <npopov@redhat.com>
+Date: Mon, 13 Jul 2026 15:21:18 +0200
+Subject: [PATCH] Adjust codegen test for LLVM 23
+
+The assume here is not really relevant to the purpose of the test,
+and it's position changed in LLVM 23.
+---
+ tests/codegen-llvm/issues/issue-107681-unwrap_unchecked.rs | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/tests/codegen-llvm/issues/issue-107681-unwrap_unchecked.rs b/tests/codegen-llvm/issues/issue-107681-unwrap_unchecked.rs
+index 5834255f3d313..c3090a20e4d14 100644
+--- a/tests/codegen-llvm/issues/issue-107681-unwrap_unchecked.rs
++++ b/tests/codegen-llvm/issues/issue-107681-unwrap_unchecked.rs
+@@ -14,7 +14,6 @@ pub unsafe fn foo(x: &mut Copied<Iter<'_, u32>>) -> u32 {
+     // CHECK-NOT: br {{.*}}
+     // CHECK-NOT: select
+     // CHECK: [[RET:%.*]] = load i32, ptr
+-    // CHECK-NEXT: assume
+-    // CHECK-NEXT: ret i32 [[RET]]
++    // CHECK: ret i32 [[RET]]
+     x.next().unwrap_unchecked()
+ }
+From 61d9ba28a99f073fbeb19dbb552ddf343aef62f0 Mon Sep 17 00:00:00 2001
+From: Nikita Popov <npopov@redhat.com>
+Date: Mon, 13 Jul 2026 16:37:25 +0200
+Subject: [PATCH] Disable slice is_ascii() test on LLVM 23
+
+This doesn't optimize as desired since:
+https://github.com/llvm/llvm-project/commit/21f439f13250bd9b7c19c8dd838177a04bf091ef
+---
+ tests/assembly-llvm/slice-is_ascii.rs | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/tests/assembly-llvm/slice-is_ascii.rs b/tests/assembly-llvm/slice-is_ascii.rs
+index e53cd5160cf56..6d660e78147c2 100644
+--- a/tests/assembly-llvm/slice-is_ascii.rs
++++ b/tests/assembly-llvm/slice-is_ascii.rs
+@@ -6,6 +6,11 @@
+ //@ only-x86_64
+ //@ ignore-sgx
+ 
++// No longer optimizes as desired, tracked at:
++// https://github.com/rust-lang/rust/issues/154141
++// https://github.com/llvm/llvm-project/issues/209216
++//@ max-llvm-major-version: 22
++
+ #![feature(str_internals)]
+ 
+ // CHECK-LABEL: is_ascii_simple_demo:
+From f05ac1dcb998e870466a5dba2dce9cac3eb7cee9 Mon Sep 17 00:00:00 2001
+From: Augie Fackler <augie@google.com>
+Date: Mon, 6 Jul 2026 21:01:44 -0400
+Subject: [PATCH] tests: catch up with LLVM returning f128 on the stack
+
+In LLVM 22 the x64 MSVC ABI wasn't matched and f128 was being directly
+returned in %xmm0, but now it correctly returns the value via a pointer.
+---
+ tests/assembly-llvm/x86_64-windows-float-abi.rs | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/tests/assembly-llvm/x86_64-windows-float-abi.rs b/tests/assembly-llvm/x86_64-windows-float-abi.rs
+index 51daff56789e6..b6ab9995fdb3e 100644
+--- a/tests/assembly-llvm/x86_64-windows-float-abi.rs
++++ b/tests/assembly-llvm/x86_64-windows-float-abi.rs
+@@ -3,6 +3,9 @@
+ //@ compile-flags: --target x86_64-pc-windows-msvc
+ //@ needs-llvm-components: x86
+ //@ add-minicore
++//@ revisions: LLVM22 LLVM23
++//@ [LLVM22] max-llvm-major-version: 22
++//@ [LLVM23] min-llvm-version: 23
+ 
+ #![feature(f16, f128)]
+ #![feature(no_core)]
+@@ -37,8 +40,12 @@ pub extern "C" fn second_f64(_: f64, x: f64) -> f64 {
+ }
+ 
+ // CHECK-LABEL: second_f128
+-// CHECK: movaps (%rdx), %xmm0
+-// CHECK-NEXT: retq
++// LLVM22: movaps (%rdx), %xmm0
++// LLVM22-NEXT: retq
++// LLVM23: movq %rcx, %rax
++// LLVM23-NEXT: movaps (%r8), %xmm0
++// LLVM23-NEXT: movaps %xmm0, (%rcx)
++// LLVM23-NEXT: retq
+ #[no_mangle]
+ pub extern "C" fn second_f128(_: f128, x: f128) -> f128 {
+     x

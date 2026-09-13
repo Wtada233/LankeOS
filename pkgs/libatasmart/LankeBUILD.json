@@ -17,5 +17,8 @@
   "sources": [
     "https://salsa.debian.org/utopia-team/libatasmart/-/archive/upstream/0.19/libatasmart-upstream-0.19.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_VAPI"
+  ]
 }

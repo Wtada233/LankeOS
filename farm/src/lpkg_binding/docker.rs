@@ -44,6 +44,26 @@ impl Drop for ContainerGuard {
     }
 }
 
+/// 杀在途构建容器（Ctrl+C 清理用）。与 RAII 路径共用 `ContainerGuard`——**唯一 spawn docker 的叶**
+/// 不变（架构 §5）：CLI 层不得直接 `Command::new("docker")`（曾破例，见 CHANGELOG）。
+pub fn kill_container(cid: &str) {
+    drop(ContainerGuard(cid.to_string()));
+}
+
+/// 静默 docker 命令（rm/start/cp/配置）：屏蔽 docker 的 cid 回显与 cp 进度噪音。
+fn docker_quiet(args: &[&str]) -> std::io::Result<std::process::ExitStatus> {
+    std::process::Command::new("docker")
+        .args(args)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+}
+
+/// 流式 docker 命令（构建/upgrade/commit）：实时输出，不捕获。
+fn docker_stream(args: &[&str]) -> std::io::Result<std::process::ExitStatus> {
+    std::process::Command::new("docker").args(args).status()
+}
+
 /// 滚动基础镜像：每 `ROLL_LIMIT` 个 commit 后 export+import 扁平化一次（commit 叠加 overlay
 /// 有性能损耗，需要周期性压平）。计数存 `<out_dir>/.build-roll`。
 const ROLL_LIMIT: u32 = 25;
@@ -195,8 +215,17 @@ fn sanitize_name(s: &str) -> String {
 fn cleanup_stale_build_containers(
     run_quiet: &dyn Fn(&[&str]) -> std::io::Result<std::process::ExitStatus>,
 ) {
+    // 必须取**名字**（`--format {{.Names}}`）：`docker ps -aq` 只输出容器 ID，下面的
+    // `strip_prefix("lankefarm-build-")` 会永远失败 → 旧实现静默成为空操作，孤儿容器从不清理。
     let Ok(out) = std::process::Command::new("docker")
-        .args(["ps", "-aq", "--filter", "name=lankefarm-build-"])
+        .args([
+            "ps",
+            "-a",
+            "--filter",
+            "name=lankefarm-build-",
+            "--format",
+            "{{.Names}}",
+        ])
         .output()
     else {
         return;
@@ -251,66 +280,69 @@ impl RealBinding {
         }
     }
 
-    /// docker cp 编排：配方拷进容器 → 容器内 lpkg upgrade+build → .lpkg 拷回 staging。
+    /// docker cp 编排（**拆成命名 step，顺序与语义与拆分前逐行一致**）：配方拷进容器 →
+    /// 容器内 lpkg upgrade+build → .lpkg 拷回 staging。
     /// 不 bind-mount pkgs（容器易失，残留随容器销毁）；容器经 host 网络从内嵌 repo 服务器拉依赖。
+    ///
+    /// 顺序约束（**关键**，改动务必保持）：`docker commit/export` 会把整个容器文件系统快照进镜像。
+    /// 备份旧 .so 的恢复、配方拷入都必须发生在 commit/GC **之后**，否则会滚进 roll 镜像、最终扁平化
+    /// 进 base——`cleanup_backups` 只清宿主 out/backups，镜像里残留的旧 lib 就永久留在 base（此前
+    /// base 被污染即由此而来）。upgrade 脚本末尾 `rm -rf /backups` 先把容器内 /backups 白洞化，commit
+    /// 之后再由 `restore_backups` 重新注入——旧 .so 只活在本次临时容器，随容器销毁。
     fn docker_build(&self, pkg: &str, staging: &Path) -> Result<PathBuf, FarmError> {
-        // 唯一容器名（进程 PID + 包名）：并发 build 进程互不踩踏——固定名 `lankefarm-build`
-        // 时后启动进程的 `rm -f`/`create --name` 会杀/撞前者的在途容器。
-        // 静默命令（rm/start/cp/配置）：屏蔽 docker 的 cid 回显与 cp 进度噪音；构建 exec 单独流式。
-        let run_quiet = |args: &[&str]| {
-            std::process::Command::new("docker")
-                .args(args)
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status()
-        };
-        // 只清理"创建者 PID 已死"的孤儿容器（SIGKILL/断电，RAII 未执行）；活容器不动——
-        // 否则并发进程的构建会被误杀。
-        cleanup_stale_build_containers(&run_quiet);
-        // 清上次崩溃/重跑遗留的悬空镜像（commit 覆盖 roll tag 的孤儿），保持长期不积累。
+        // 0. 前置清理：只清"创建者 PID 已死"的孤儿容器（SIGKILL/断电，RAII 未执行），活容器不动——
+        //    否则并发进程的构建会被误杀；再清上次崩溃/重跑遗留的悬空镜像。
+        cleanup_stale_build_containers(&docker_quiet);
         prune_dangling_images();
+
+        // 1. create 常驻容器（含 roll 镜像缺失回退）→ RAII guard → 记录在途 cid → start
+        let (cid, roll) = self.create_container(pkg)?;
+        let _guard = ContainerGuard(cid.clone());
+        // 记录在途容器 cid（Ctrl+C 清理用）；成功路径末尾清空，提前返回时 rm -f 幂等无害。
+        self.cleanup.lock().unwrap().current_cid = Some(cid.clone());
+        self.start_container(pkg, &cid)?;
+
+        // 2. mirror.conf
+        self.write_mirror_conf(pkg, &cid)?;
+
+        // 3. upgrade（成功后 commit/GC 滚动快照）
+        self.run_upgrade_and_roll(pkg, &cid, roll)?;
+
+        // 4. 恢复旧 .so（commit/GC 之后）
+        self.restore_backups(pkg, &cid)?;
+
+        // 5. 配方拷入（commit/GC 之后）
+        self.copy_recipe(pkg, &cid)?;
+
+        // 6. 构建 + 取产物回宿主
+        self.run_lpkg_build(pkg, &cid)?;
+        self.fetch_artifact(pkg, &cid, staging)
+    }
+
+    /// create 常驻容器（唯一容器名 = 进程 PID + 包名：并发 build 进程互不踩踏），返回
+    /// `(cid, roll)`。`roll` 是 create 时读到的滚动计数，供 `run_upgrade_and_roll` 决定 commit 编号
+    /// （**即便本次因 roll 镜像缺失回退过 base，也仍按这个值递增**——与拆分前一致）。
+    /// `sh -c "mkdir -p /work && tail -f /dev/null"`：mkdir 必须在 docker cp 前就位——对不存在的
+    /// /work，`docker cp <dir> :/work/` 会把配方内容直接铺进 /work，而不是建 /work/<pkg>（实测）；
+    /// tail -f 保活。DooD：挂宿主 docker socket（容器内可 docker run，docker 包 build tini 静态需要）。
+    fn create_container(&self, pkg: &str) -> Result<(String, u32), FarmError> {
         let name = format!(
             "lankefarm-build-{}-{}",
             std::process::id(),
             sanitize_name(pkg)
         );
-
-        // 滚动基础镜像：commit 链（<base>:roll<1..25>）或原始 base。
-        // `lpkg upgrade` 会把容器里所有"版本落后于当前仓库"的包全量更新——不滚动的话，仓库越攒
-        // 越多，每次 upgrade 越慢（滚雪球）。每构建一次、upgrade 成功后 commit 快照，下次从最新
-        // commit 起只升增量；达到 ROLL_LIMIT 个 commit 后扁平化（见 4.5）。
+        // 滚动基础镜像：commit 链（<base>:roll<1..25>）或原始 base。`lpkg upgrade` 会把容器里所有
+        // "版本落后于当前仓库"的包全量更新——不滚动的话仓库越攒越多，每次 upgrade 越慢（滚雪球）。
+        // 每构建一次、upgrade 成功后 commit 快照，下次从最新 commit 起只升增量；达到 ROLL_LIMIT 个
+        // commit 后扁平化（见 run_upgrade_and_roll）。
         let roll = read_roll_counter(&self.out_dir);
         let mut create_image = if roll == 0 {
             self.base_image.clone()
         } else {
             roll_image(&self.base_image, roll)
         };
-
-        // 1. create + start 常驻容器。`sh -c "mkdir -p /work && tail -f /dev/null"`：
-        //    mkdir 必须在 docker cp 前就位——对不存在的 /work，docker cp <dir> :/work/ 会把
-        //    配方内容直接铺进 /work，而不是建 /work/<pkg>（实测）。tail -f 保活，busybox/coreutils 都支持。
-        let mut create = std::process::Command::new("docker")
-            // DooD：挂宿主 docker socket，容器内可 docker run（docker 包 build tini 静态需要）。
-            .args([
-                "create",
-                "--network=host",
-                "--name",
-                &name,
-                "-v",
-                "/var/run/docker.sock:/var/run/docker.sock",
-                &create_image,
-                "sh",
-                "-c",
-                "mkdir -p /work && tail -f /dev/null",
-            ])
-            .output()
-            .map_err(|e| format!("docker create 失败: {e}"))?;
-        // 健壮性：roll 镜像缺失/已删（如 GC 后计数未及时归零的崩溃窗口）→ 回退原始 base 并重置计数。
-        if !create.status.success() && roll > 0 {
-            eprintln!("  [warn] 从 {create_image} 创建失败，回退原始 base 并重置滚动计数");
-            create_image = self.base_image.clone();
-            write_roll_counter(&self.out_dir, 0);
-            create = std::process::Command::new("docker")
+        let mk_create = |img: &str| {
+            std::process::Command::new("docker")
                 .args([
                     "create",
                     "--network=host",
@@ -318,13 +350,21 @@ impl RealBinding {
                     &name,
                     "-v",
                     "/var/run/docker.sock:/var/run/docker.sock",
-                    &create_image,
+                    img,
                     "sh",
                     "-c",
                     "mkdir -p /work && tail -f /dev/null",
                 ])
                 .output()
-                .map_err(|e| format!("docker create 失败: {e}"))?;
+                .map_err(|e| format!("docker create 失败: {e}"))
+        };
+        let mut create = mk_create(&create_image)?;
+        // 健壮性：roll 镜像缺失/已删（如 GC 后计数未及时归零的崩溃窗口）→ 回退原始 base 并重置计数。
+        if !create.status.success() && roll > 0 {
+            eprintln!("  [warn] 从 {create_image} 创建失败，回退原始 base 并重置滚动计数");
+            create_image = self.base_image.clone();
+            write_roll_counter(&self.out_dir, 0);
+            create = mk_create(&create_image)?;
         }
         if !create.status.success() {
             return Err(format!(
@@ -334,73 +374,65 @@ impl RealBinding {
             .into());
         }
         let cid = String::from_utf8_lossy(&create.stdout).trim().to_string();
-        let _guard = ContainerGuard(cid.clone());
-        // 记录在途容器 cid（Ctrl+C 清理用）；成功路径末尾清空，提前返回时 rm -f 幂等无害。
-        self.cleanup.lock().unwrap().current_cid = Some(cid.clone());
-        let ok = run_quiet(&["start", &cid])
+        Ok((cid, roll))
+    }
+
+    /// start 已 create 的容器（guard 由调用方持有，保证 start 失败也能 rm -f）。
+    fn start_container(&self, pkg: &str, cid: &str) -> Result<(), FarmError> {
+        let ok = docker_quiet(&["start", cid])
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {
             return Err(format!("docker start 失败（{pkg}）").into());
         }
+        Ok(())
+    }
 
-        // 2. 容器内 lpkg mirror.conf 指向内嵌 repo 服务器（--network=host ⇒ 127.0.0.1 即宿主）。
-        //    lpkg 的 repo URL 只从 /etc/lpkg/mirror.conf 读；不写则默认拉远端 lankerepo，
-        //    本地刚构建的新依赖根本看不见，增量语义就断了。
+    /// 写容器内 `/etc/lpkg/mirror.conf` 指向内嵌 repo 服务器（`--network=host` ⇒ 127.0.0.1 即宿主）。
+    /// lpkg 的 repo URL 只从 mirror.conf 读；不写则默认拉远端 lankerepo，本地刚构建的新依赖看不见，
+    /// 增量语义就断了。
+    fn write_mirror_conf(&self, pkg: &str, cid: &str) -> Result<(), FarmError> {
         let conf = format!(
             "mkdir -p /etc/lpkg && echo 'http://127.0.0.1:{}/' > /etc/lpkg/mirror.conf",
             self.repo_port
         );
-        let ok = run_quiet(&["exec", &cid, "sh", "-c", &conf])
+        let ok = docker_quiet(&["exec", cid, "sh", "-c", &conf])
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {
             return Err(format!("容器内写入 mirror.conf 失败（{pkg}）").into());
         }
+        Ok(())
+    }
 
-        // 4. 容器内构建——**实时流式日志**，不捕获（捕获 = 黑盒，构建完成才输出；
-        //    stdout 末尾混入 ls 结果会污染文件名提取）。
-        //    index.txt 现含**完整 needed_so**（单一真源），lpkg 的 SONAME 检查（前向/后向）在
-        //    容器里真实运行——过渡期的缺失 SONAME 由 `--missing-so-no-error`（upgrade）与
-        //    `--use-system-soname`（build，配合备份恢复的旧 .so）显式容忍，不再靠剥索引/清状态
-        //    压制检查（那些 hack 已删）。
-        //    流程：`lpkg install lpkg -y`（基础镜像里旧版无 force-solve-conflict）→ `lpkg upgrade`
-        //    拉 127.0.0.1 内嵌 repo 最新依赖；upgrade 若仍报错，用确认短语喂 force-solve-conflict
-        //    清理后重试（仅依赖环触发）。
-        // force-solve-conflict 是显式破坏性操作，lpkg 在非交互（-y）下直接拒绝执行——
-        // 它的确认短语从 stdin 读取，正确姿势是 `echo '...' | lpkg force-solve-conflict`
-        // （不带 -y）。带 -y 会把短语机制废掉，兜底永远失败 → 构建被 BLOCKED。
-        // 拆成两步：upgrade（成功后 commit 滚动快照）→ build。upgrade 失败时容器状态不可信，
-        // 不 commit、不滚动，直接报错。
-        // 顺序约束（**关键**）：docker commit/export 会把整个容器文件系统快照进镜像。备份的
-        // 旧 .so 恢复、配方拷入都必须发生在 commit 之后，否则会滚进 roll 镜像、最终扁平化进
-        // base——过渡期结束后 `cleanup_backups` 只清宿主 out/backups，镜像里残留的旧 lib 就
-        // 永久留在 base（此前 base 被污染即由此而来）。因此 upgrade 脚本末尾 `rm -rf /backups`
-        // 先把 /backups 白洞化（顺带清掉历史污染镜像里残留的 /backups），commit 之后（见 4.6）
-        // 再重新注入并恢复——旧 .so 只活在本次临时容器，随容器销毁。配方同样在 commit 之后
-        // 才拷入（见 4.7），否则每包源码会滚进镜像（滚雪球）。
+    /// 容器内 `lpkg install lpkg` → `lpkg upgrade`（必要时 force-solve-conflict 重试）→ `rm -rf
+    /// /backups` 白洞化；成功后 commit 滚动快照或 GC 扁平化。
+    ///
+    /// **实时流式日志**，不捕获（捕获 = 黑盒，构建完成才输出；stdout 末尾混入 ls 结果会污染文件名
+    /// 提取）。index.txt 含**完整 needed_so**（单一真源），lpkg 的 SONAME 检查在容器里真实运行——
+    /// 过渡期缺失 SONAME 由 `--missing-so-no-error` 显式容忍，不再靠剥索引/清状态压制检查。
+    /// force-solve-conflict 是显式破坏性操作，lpkg 在非交互（-y）下拒绝执行——确认短语从 stdin 读，
+    /// 正确姿势是 `echo '...' | lpkg force-solve-conflict`（不带 -y），带 -y 会废掉短语机制。
+    /// upgrade 失败 → 容器状态不可信，不 commit、不滚动，直接报错。
+    /// commit/GC 失败 → **硬报错**（滚动快照是性能核心，静默跳过会让下次 upgrade 重新滚雪球；且容器
+    /// 随后会被 rm，未 commit 的状态就丢了）。
+    fn run_upgrade_and_roll(&self, pkg: &str, cid: &str, roll: u32) -> Result<(), FarmError> {
         let upgrade_script = "lpkg install lpkg -y && \
              ( lpkg upgrade -y --missing-so-no-error || { echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; } ) || exit 1 ; \
              rm -rf /backups ; \
              exit 0";
-        let status = std::process::Command::new("docker")
-            .args(["exec", &cid, "sh", "-c", upgrade_script])
-            .status()
+        let status = docker_stream(&["exec", cid, "sh", "-c", upgrade_script])
             .map_err(|e| format!("docker exec 失败: {e}"))?;
         if !status.success() {
             return Err(format!("容器内 lpkg upgrade 失败（{pkg}）").into());
         }
 
-        // 4.5 滚动 commit / GC（仅 upgrade 成功）：commit → <base>:roll<N+1>；
-        //     达到 ROLL_LIMIT 个 commit 后 export+import 扁平化覆盖 base、删编号镜像、计数归零。
-        //     commit/GC 失败 → **硬报错**（滚动快照是性能核心，静默跳过会让下次 upgrade 重新滚雪球；
-        //     且容器随后会被 rm，未 commit 的状态就丢了）。
+        // 滚动 commit / GC：commit → <base>:roll<N+1>；达到 ROLL_LIMIT 后 export+import 扁平化
+        // 覆盖 base、删编号镜像、计数归零。
         if roll < ROLL_LIMIT {
             let next = roll + 1;
             let tag = roll_image(&self.base_image, next);
-            let ok = std::process::Command::new("docker")
-                .args(["commit", &cid, &tag])
-                .status()
+            let ok = docker_stream(&["commit", cid, &tag])
                 .map(|s| s.success())
                 .unwrap_or(false);
             if !ok {
@@ -408,22 +440,23 @@ impl RealBinding {
             }
             write_roll_counter(&self.out_dir, next);
         } else {
-            self.gc_roll(&cid)?;
+            self.gc_roll(cid)?;
             write_roll_counter(&self.out_dir, 0);
         }
+        Ok(())
+    }
 
-        // 4.6 旧 .so 恢复（**commit/GC 之后**）：重新注入备份 → cp 进 /usr/lib → ldconfig -X。
-        //     旧二进制（如链旧 libxml2.so.2 的 gettext）靠它继续运行，新构建用新 .so。
-        //     放 commit 后 ⇒ 恢复的旧 .so 只存在于本次临时容器，绝不进 roll/base 镜像
-        //     （commit/GC/finalize 的快照都是干净的，见 4 的顺序约束）。
-        //     **ldconfig 必须加 -X（只重建缓存、不更新符号链接）**：真 ABI 断裂时被移除的
-        //     SONAME 链接本就在备份里（cp 已还原，无需 ldconfig 再造）；而伪 SONAME 备份
-        //     （libvpx.so.12.0 → libvpx.so.12.0.0，实体真 SONAME 是 libvpx.so.12）会让无 -X 的
-        //     ldconfig 在容器里**新建** /usr/lib/libvpx.so.12 —— 这个 lpkg 不追踪的文件会和
-        //     新包安装冲突（"owned by package unknown (manual file)"）。-X 消除该合成。
+    /// 旧 .so 恢复（**commit/GC 之后**）：重新注入备份 → cp 进 /usr/lib → `ldconfig -X`。
+    /// 旧二进制（如链旧 libxml2.so.2 的 gettext）靠它继续运行，新构建用新 .so；放 commit 后 ⇒ 恢复的
+    /// 旧 .so 只存在于本次临时容器，绝不进 roll/base 镜像。
+    /// **`ldconfig` 必须加 `-X`（只重建缓存、不更新符号链接）**：真 ABI 断裂时被移除的 SONAME 链接
+    /// 本就在备份里（cp 已还原）；而伪 SONAME 备份（libvpx.so.12.0 → 实体真 SONAME libvpx.so.12）会让
+    /// 无 -X 的 ldconfig 在容器里**新建** /usr/lib/libvpx.so.12——lpkg 不追踪该文件，会与新包安装冲突
+    /// （"owned by package unknown (manual file)"）。-X 消除该合成。
+    fn restore_backups(&self, pkg: &str, cid: &str) -> Result<(), FarmError> {
         let backups = self.out_dir.join("backups");
         if backups.is_dir() {
-            let _ = run_quiet(&[
+            let _ = docker_quiet(&[
                 "cp",
                 backups.to_string_lossy().as_ref(),
                 &format!("{cid}:/backups"),
@@ -431,18 +464,19 @@ impl RealBinding {
         }
         let restore_script =
             "if [ -d /backups ]; then cp -a /backups/. /usr/lib/ && ldconfig -X; fi; true";
-        let status = std::process::Command::new("docker")
-            .args(["exec", &cid, "sh", "-c", restore_script])
-            .status()
+        let status = docker_stream(&["exec", cid, "sh", "-c", restore_script])
             .map_err(|e| format!("docker exec 恢复旧 .so 失败: {e}"))?;
         if !status.success() {
             return Err(format!("容器内恢复备份旧 .so 失败（{pkg}）").into());
         }
+        Ok(())
+    }
 
-        // 4.7 docker cp 配方进容器（/work/<pkg>）——必须放在 commit/GC 之后：
-        //     快照时 /work 为空（见 4 的顺序约束），否则配方/源码会随 commit 滚进镜像。
+    /// `docker cp` 配方进容器 `/work/<pkg>`——必须放在 commit/GC 之后：快照时 /work 为空，否则
+    /// 配方/源码会随 commit 滚进镜像（滚雪球）。
+    fn copy_recipe(&self, pkg: &str, cid: &str) -> Result<(), FarmError> {
         let src = self.repo_dir.join(pkg);
-        let ok = run_quiet(&[
+        let ok = docker_quiet(&[
             "cp",
             src.to_string_lossy().as_ref(),
             &format!("{cid}:/work/"),
@@ -452,23 +486,28 @@ impl RealBinding {
         if !ok {
             return Err(format!("docker cp {pkg} 配方进容器失败").into());
         }
+        Ok(())
+    }
 
-        // 5. 构建
+    /// 容器内 `lpkg build -y --use-system-soname`（流式日志）。
+    /// `--use-system-soname`：build 的 needed_so 检测命中 /usr/lib 里备份恢复的旧 .so。
+    fn run_lpkg_build(&self, pkg: &str, cid: &str) -> Result<(), FarmError> {
         let build_script = format!("cd /work/{pkg} && lpkg build -y --use-system-soname");
-        let status = std::process::Command::new("docker")
-            .args(["exec", &cid, "sh", "-c", &build_script])
-            .status()
+        let status = docker_stream(&["exec", cid, "sh", "-c", &build_script])
             .map_err(|e| format!("docker exec 失败: {e}"))?;
         if !status.success() {
             return Err(format!("容器内 lpkg build 失败（{pkg}）").into());
         }
+        Ok(())
+    }
 
-        // 5. 取精确产物名（独立干净的小命令；docker cp **不支持 glob**）。
-        //    注意 cd 进目录再 `ls *.lpkg` → 输出 basename（用绝对路径 glob 会输出完整路径，拼 remote 时重复）。
+    /// 取精确产物名（独立干净的小命令；`docker cp` **不支持 glob**）+ 拷回宿主 staging。
+    /// 注意 cd 进目录再 `ls *.lpkg` → 输出 basename（用绝对路径 glob 会输出完整路径，拼 remote 时重复）。
+    fn fetch_artifact(&self, pkg: &str, cid: &str, staging: &Path) -> Result<PathBuf, FarmError> {
         let out = std::process::Command::new("docker")
             .args([
                 "exec",
-                &cid,
+                cid,
                 "sh",
                 "-c",
                 &format!("cd /work/{pkg} && ls -1 *.lpkg 2>/dev/null | tail -1"),
@@ -479,10 +518,8 @@ impl RealBinding {
         if lpkg_name.is_empty() {
             return Err(format!("容器内未产出 .lpkg（{pkg}）").into());
         }
-
-        // 6. docker cp 回宿主 staging（精确文件名）
         let remote = format!("{cid}:/work/{pkg}/{lpkg_name}");
-        let ok = run_quiet(&["cp", &remote, staging.to_string_lossy().as_ref()])
+        let ok = docker_quiet(&["cp", &remote, staging.to_string_lossy().as_ref()])
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {

@@ -24,6 +24,24 @@ use std::path::{Path, PathBuf};
 
 use crate::scan;
 
+/// tmp 残骸清理守卫：`repack_lpkg_at` 的任何提前返回/panic 都删掉半成品 `*.lpkg.tmp`，
+/// 成功 `disarm()` 后不再动它。曾失败路径把 `<ver>.lpkg.tmp` 残骸永久留在 `out/<arch>/<pkg>/`。
+struct TmpGuard(Option<PathBuf>);
+
+impl TmpGuard {
+    fn disarm(&mut self) {
+        self.0 = None;
+    }
+}
+
+impl Drop for TmpGuard {
+    fn drop(&mut self) {
+        if let Some(p) = self.0.take() {
+            let _ = fs::remove_file(p);
+        }
+    }
+}
+
 /// 解包（若未解包）→ 改 metadata.json 的 needed_so/provides → 重打覆盖 .lpkg。
 /// `extract_dir` 复用 scan 的解包目录（单包单趟）。
 pub fn repack_with_metadata(
@@ -67,6 +85,8 @@ fn repack_lpkg(extract_dir: &Path, out_path: &Path) -> Result<(), FarmError> {
 
 fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(), FarmError> {
     let tmp = out_path.with_extension("lpkg.tmp");
+    // 先登记守卫（连 File::create 失败也清掉可能存在的旧残骸）
+    let mut guard = TmpGuard(Some(tmp.clone()));
     let f = fs::File::create(&tmp).map_err(|e| format!("创建 {tmp:?} 失败: {e}"))?;
     let mut enc =
         zstd::stream::write::Encoder::new(f, level).map_err(|e| format!("zstd 初始化失败: {e}"))?;
@@ -80,6 +100,7 @@ fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: i32) -> Result<(),
     let mut f = enc.finish().map_err(|e| format!("zstd 收尾失败: {e}"))?;
     f.flush().map_err(|e| format!("flush 失败: {e}"))?;
     fs::rename(&tmp, out_path).map_err(|e| format!("替换 {out_path:?} 失败: {e}"))?;
+    guard.disarm(); // 成功：tmp 已 rename 到目标，无需再删
     Ok(())
 }
 
@@ -363,6 +384,30 @@ mod tests {
                 .into_owned(),
             "plain"
         );
+        fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn repack_failure_removes_tmp_leftover() {
+        // 失败路径不得留 `.lpkg.tmp` 残骸：造一个含 FIFO 的打包树 → pack_dir_tar 明确报错。
+        let base = std::env::temp_dir().join(format!("farm-repack-tmp-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let root = base.join("root");
+        fs::create_dir_all(root.join("content")).unwrap();
+        let fifo = root.join("content/apipe");
+        let cpath = std::ffi::CString::new(fifo.to_str().unwrap()).unwrap();
+        // SAFETY: mkfifo 仅创建命名管道，参数为合法 C 路径；返回 0 表示成功。
+        let rc = unsafe { libc::mkfifo(cpath.as_ptr(), 0o644) };
+        assert_eq!(rc, 0, "mkfifo 应成功");
+
+        let out = base.join("out.lpkg");
+        let res = repack_lpkg_at(&root, &out, 3);
+        assert!(res.is_err(), "含 FIFO 的树必须报错");
+        assert!(
+            !out.with_extension("lpkg.tmp").exists(),
+            "失败路径不得留下 .lpkg.tmp 残骸"
+        );
+        assert!(!out.exists(), "失败不得产出目标 .lpkg");
         fs::remove_dir_all(&base).ok();
     }
 

@@ -1,0 +1,25 @@
+#
+# simdutf — Unicode 例程（UTF-8/16/32 校验与转码、Base64），SIMD 加速
+# 基于 Arch Linux PKGBUILD 适配 LankeOS
+# 注意：使用 /bin/sh（POSIX sh），无 bashisms
+
+lankebuild_prepare() {
+    cmake -B build -S . -Wno-dev \
+        -DCMAKE_BUILD_TYPE=None \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DBUILD_SHARED_LIBS=ON
+}
+
+
+lankebuild_build() {
+    cmake --build build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" cmake --install build
+
+    # 双许可（Arch 的 license 数组同此）
+    install -Dm644 LICENSE-MIT "{STAGING_ROOT}{DATADIR}/licenses/simdutf/LICENSE-MIT"
+    install -Dm644 LICENSE-APACHE "{STAGING_ROOT}{DATADIR}/licenses/simdutf/LICENSE-APACHE"
+}

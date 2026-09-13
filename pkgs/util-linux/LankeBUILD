@@ -4,14 +4,60 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --bindir={BINDIR} --libdir={LIBDIR} --runstatedir=/run --sbindir={SBINDIR} --disable-chfn-chsh --disable-login --disable-nologin --disable-su --disable-setpriv --disable-runuser --disable-pylibmount --disable-liblastlog2 --without-python --without-systemd --disable-static --disable-doc ADJTIME_PATH=/var/lib/hwclock/adjtime
+    # Arch 全功能：不再照 LFS 关掉 login/su/chfn-chsh/runuser/setpriv/pylibmount/liblastlog2/systemd/python。
+    # shadow 侧已按 Arch 砍掉 chfn/chsh/login/newgrp/vipw/vigr，这些改由 util-linux 提供；其中这两个
+    # 上游默认 *不* 构建（--help 里写作 --enable-*），必须显式打开：
+    #   --enable-newgrp --enable-vipw
+    # 与 Arch meson 选项对齐的两处显式关闭：-Dlibuser=disabled → --without-user、-Deconf=disabled → --without-econf。
+    # 注：老的 --disable-doc 已删——2.41 没有这个选项（只有 --disable-asciidoc / --disable-poman），
+    # 而且没装 asciidoctor，man 页本来就不生成（要 man 页得加 asciidoctor+po4a 进 build_deps）。
+    ./configure --bindir={BINDIR} --libdir={LIBDIR} --runstatedir=/run --sbindir={SBINDIR} \
+                --disable-static \
+                --enable-newgrp --enable-vipw \
+                --without-econf --without-user \
+                ADJTIME_PATH=/var/lib/hwclock/adjtime
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
+
+    # Arch 打包目录里的私有调整（他们自己标了 TODO(dreisner): offer this upstream?）：
+    # 给 uuidd.socket 加 RuntimeDirectory=uuidd —— socket 激活时把 /run/uuidd 建出来并归 uuidd 所有
+    sed -i '/ListenStream/ aRuntimeDirectory=uuidd' "{STAGING_ROOT}/usr/lib/systemd/system/uuidd.socket"
+
     # 添加 Util-linux 兼容性链接
     for arch in x86_64 i386 linux32 linux64 uname26; do
         ln -sfv setarch {STAGING_ROOT}{BINDIR}/$arch
     done
     ln -sfv last {STAGING_ROOT}{BINDIR}/lastb
+
+    # login-utils 的 PAM 配置：shadow 侧已按 Arch 不再提供 su/chsh/chfn 那几份，改由这里装。
+    # 源文件名 → 目标名与 Arch PKGBUILD 完全一致（common.pam 供 chfn/chsh，su.pam 供 su/su-l 等）。
+    install -vDm 0644 {WORK_DIR}/../common.pam  "{STAGING_ROOT}/etc/pam.d/chfn"
+    install -vDm 0644 {WORK_DIR}/../common.pam  "{STAGING_ROOT}/etc/pam.d/chsh"
+    install -vDm 0644 {WORK_DIR}/../login.pam   "{STAGING_ROOT}/etc/pam.d/login"
+    install -vDm 0644 {WORK_DIR}/../remote.pam  "{STAGING_ROOT}/etc/pam.d/remote"
+    install -vDm 0644 {WORK_DIR}/../runuser.pam "{STAGING_ROOT}/etc/pam.d/runuser"
+    install -vDm 0644 {WORK_DIR}/../runuser.pam "{STAGING_ROOT}/etc/pam.d/runuser-l"
+    install -vDm 0644 {WORK_DIR}/../su.pam      "{STAGING_ROOT}/etc/pam.d/su"
+    install -vDm 0644 {WORK_DIR}/../su.pam      "{STAGING_ROOT}/etc/pam.d/su-l"
+
+    # Arch 打包目录里的 rfkill 三件套 + 它引用的 rfkill 组（源文件名用下划线，装出来的名字带 @）：
+    # 规则给 /dev/rfkill 设 GROUP=rfkill MODE=0664，组由 sysusers.d/util-linux.conf 建（postinst 里 systemd-sysusers 生效）
+    install -vDm 0644 {WORK_DIR}/../util-linux.sysusers      "{STAGING_ROOT}/usr/lib/sysusers.d/util-linux.conf"
+    install -vDm 0644 {WORK_DIR}/../60-rfkill.rules          "{STAGING_ROOT}/usr/lib/udev/rules.d/60-rfkill.rules"
+    install -vDm 0644 {WORK_DIR}/../rfkill-block_.service    "{STAGING_ROOT}/usr/lib/systemd/system/rfkill-block@.service"
+    install -vDm 0644 {WORK_DIR}/../rfkill-unblock_.service  "{STAGING_ROOT}/usr/lib/systemd/system/rfkill-unblock@.service"
+
+    # Arch 同款：chfn/chsh/newgrp 上游 autotools 的安装钩子不设 setuid（meson 那边 Arch 是在 package() 里手动 chmod）
+    chmod -v 4755 {STAGING_ROOT}{BINDIR}/chfn {STAGING_ROOT}{BINDIR}/chsh {STAGING_ROOT}{BINDIR}/newgrp
+
+    # 打开 systemd/uuidd/liblastlog2 后包内会出现 usr/lib/sysusers.d 与 usr/lib/tmpfiles.d（uuidd / lastlog2 的 conf）
+    # → 安装期就要生效，不能等开机 systemd-sysusers-setup（仓库铁律：扫到 sysusers/tmpfiles 就写 postinst）
+    cat > "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+#!/bin/sh
+systemd-sysusers
+systemd-tmpfiles --create
+exit 0
+EOF
 }
 
 

@@ -9,21 +9,69 @@
 
 use std::collections::HashSet;
 
-/// 构建后实际扫描结果（scan.rs 对 .lpkg 解包的产物；demo 中来自 stub）。
+/// 构建后扫描结果 / 期望元数据 —— **全库唯一来源**。
+///
+/// 历史：曾有两份同名异构 `ScanResult`（`scan.rs` 版含 name/version，本模块版只有
+/// needed_so/provides/deps），调用方 `build/repo.rs` 手工把两侧 `deps` 填空 → 字段增减时极易只改
+/// 一边。现由 verify 拥有该类型：`decide()` 是唯一消费者、放它旁边最不易漂移；verify 不依赖
+/// scan/lpkg，分层不变（是上层 scan 依赖本模块）。
+/// `name`/`version` 是扫描侧的溯源信息，**`decide()` 不读**（只读 needed_so/provides；deps 亦不读）。
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ScanResult {
+    pub name: String,
+    pub version: String,
     pub needed_so: Vec<String>,
     pub provides: Vec<String>,
     pub deps: Vec<String>,
 }
 
 impl ScanResult {
+    /// 三名参构造（name/version 留空）：比较/测试侧用。
     pub fn new(needed_so: &[&str], provides: &[&str], deps: &[&str]) -> Self {
         ScanResult {
             needed_so: needed_so.iter().map(|s| s.to_string()).collect(),
             provides: provides.iter().map(|s| s.to_string()).collect(),
             deps: deps.iter().map(|s| s.to_string()).collect(),
+            ..Default::default()
         }
+    }
+
+    /// 由已知的三字段（已拥有所有权）构造（比较侧：`BuildOutcome` → actual）。
+    pub fn from_parts(needed_so: Vec<String>, provides: Vec<String>, deps: Vec<String>) -> Self {
+        ScanResult {
+            needed_so,
+            provides,
+            deps,
+            ..Default::default()
+        }
+    }
+
+    /// 由 `.lpkg` 内 metadata.json 的 `Value` 构造（期望值；缺字段 → 空）。name/version 仅作溯源。
+    pub fn from_metadata_json(meta: &serde_json::Value) -> Self {
+        let arr = |k: &str| -> Vec<String> {
+            meta[k]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        ScanResult {
+            name: meta["name"].as_str().unwrap_or("").to_string(),
+            version: meta["version"].as_str().unwrap_or("").to_string(),
+            needed_so: arr("needed_so"),
+            provides: arr("provides"),
+            deps: arr("deps"),
+        }
+    }
+
+    /// 补溯源信息（扫描侧：`scan_lpkg` 用）。
+    pub fn with_name(mut self, name: impl Into<String>, version: impl Into<String>) -> Self {
+        self.name = name.into();
+        self.version = version.into();
+        self
     }
 }
 
@@ -129,6 +177,36 @@ mod tests {
             &[],
         );
         assert_eq!(decide(&actual, &meta), VerifyAction::AbiBreak);
+    }
+
+    #[test]
+    fn name_version_do_not_affect_decide() {
+        // 合并类型后 name/version 只是溯源信息：两侧仅这两项不同 → 仍 Unchanged
+        let mut actual = ScanResult::new(&["libc.so.6"], &["libz.so"], &[]);
+        actual.name = "pkg-a".into();
+        actual.version = "1.0".into();
+        let mut meta = ScanResult::new(&["libc.so.6"], &["libz.so"], &[]);
+        meta.name = "pkg-a".into();
+        meta.version = "2.0".into();
+        assert_eq!(decide(&actual, &meta), VerifyAction::Unchanged);
+    }
+
+    #[test]
+    fn from_metadata_json_handles_missing_fields() {
+        let full = serde_json::json!({
+            "name": "p", "version": "1.0",
+            "needed_so": ["libc.so.6"], "provides": ["libp.so.1"], "deps": ["bash"],
+        });
+        let s = ScanResult::from_metadata_json(&full);
+        assert_eq!(s.name, "p");
+        assert_eq!(s.version, "1.0");
+        assert_eq!(s.needed_so, vec!["libc.so.6"]);
+        assert_eq!(s.provides, vec!["libp.so.1"]);
+        assert_eq!(s.deps, vec!["bash"]);
+        // 缺字段 → 空（不 panic）
+        let empty = ScanResult::from_metadata_json(&serde_json::json!({}));
+        assert!(empty.needed_so.is_empty() && empty.provides.is_empty() && empty.deps.is_empty());
+        assert_eq!(empty.name, "");
     }
 
     #[test]

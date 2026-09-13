@@ -12,17 +12,7 @@ lankebuild_build() {
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
     chmod 4755 {STAGING_ROOT}{BINDIR}/pkexec
-
-    # 安装 PAM 配置文件 (pkexec 和 polkit-1 共用)
-    install -Dm644 /dev/stdin {STAGING_ROOT}/etc/pam.d/polkit-1 << 'PAM_EOF'
-# Polkit authentication: system-auth stack
-auth            include         system-auth
-account         include         system-auth
-password        include         system-auth
-session         include         system-auth
-PAM_EOF
-    # pkexec 也用同一份
-    ln -sf polkit-1 {STAGING_ROOT}/etc/pam.d/polkit-pkexec
+    ln -sf polkit-1 "{STAGING_ROOT}"/usr/lib/pam.d/polkit-pkexec
 
     cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
 systemd-sysusers

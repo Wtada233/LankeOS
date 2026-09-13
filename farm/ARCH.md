@@ -225,11 +225,11 @@ SQLite（`out/farm-state.db`，可选 `--state`）：
 
 ## 12. serve（本地 repo HTTP）
 
-`serve.rs`：静态文件服务器，serve `out/` 根（`farm serve --root out --port 8000`）。build 的 docker 模式内嵌一个（`--repo-port`，默认 80）。
+`serve.rs`：静态文件服务器，serve `out/` 根（`farm serve --root out --port 8000`）。build 的 docker 模式内嵌一个（`--repo-port`，默认 80）。只接受 GET/HEAD（其余 400）；**HEAD 仅回头、无 body**（RFC 7231，`Content-Length` 仍为 body 长度）；路径穿越由组件级 `..` 拒绝 + `canonicalize` 双重兜底。
 
 ## 13. i18n / ux
 
-- **i18n.rs**：`tr!("key")` / `tr!("key", args)` 宏；中文默认，`LANG`/`LC_ALL` 以 `en` 开头切英文；`{}` 运行时替换（`format!` 需字面量，farm 用 `i18n::fmt` 手填）；键缺失回退键名；中英目录键一致性有测试。clap 帮助 `LANG=en` 时覆盖为英文。
+- **i18n.rs**：`tr!("key")` / `tr!("key", args)` 宏；中文默认，生效 locale 按 gettext/POSIX 优先级 **`LC_ALL` > `LC_MESSAGES` > `LANG`**（空值视为未设），其值以 `en` 开头切英文；`{}` 运行时替换（`format!` 需字面量，farm 用 `i18n::fmt` 手填）；键缺失回退键名；中英目录键一致性有测试。clap 帮助 `LANG=en` 时覆盖为英文。
 - **ux.rs**：ANSI 颜色（成功绿/信息灰/警告黄/错误红），非 TTY 或 `NO_COLOR` 降级纯文本，每个颜色带 `\x1b[0m` reset。
 
 ## 14. 数据流图
@@ -252,33 +252,49 @@ build --all ──> run_build
 
 ## 15. 测试
 
-- **src 内单元测试**（`#[cfg(test)]`）：内部函数（topo/reorder/scan/i18n/ux/repack/seed/repo）
-- **tests/integration.rs**：公共 API 集成（ABI 传播、track 排序、real index）
+- **src 内单元测试**（`#[cfg(test)]`）：内部函数（topo/reorder/scan/i18n/ux/repack/seed/repo/chk）
+- **tests/**：公共 API 集成——`integration.rs`（ABI 传播/track 排序/real index）、
+  `custom_checks_integration.rs`（qml/pkgconf/pkg-err/hook + 缓存 + hook 注释回归）、
+  `architecture_guards.rs`（分层守护：docker 只在 binding 叶 spawn、net 必设读写超时）、
+  `docker_binding_sequence.rs`（假 docker 影子脚本锁定 docker 子命令序列，拆步重构的行为不变证据）
 
-**206 个测试全绿**（183 lib + 11 bin + 5 integration + 7 doctest——`cargo test` 实测）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**。
+**231 个测试全绿**（204 lib + 11 bin + 16 integration——`cargo test` 实测；编译 0 告警）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**、**注释掉的 hook 调用 / QML import 不误判**、**docker 拆步后子命令序列不变**、**HTTP 读超时（无应答连接秒级失败）**。
 
 ## 16. ABI 符号/版本审计（`custom_checks/abi`，`farm chk abi`）
 
 `src/custom_checks/abi.rs`（原顶层 `abi_fullchk.rs` / `manual-abi-fullchk`）镜像 `/tmp/scan_elf_ver.py` 的两段式审计，但原生/缓存/单趟：
 - **provider/cache 来源 = `--source`（默认 out）下全部包**：每个 .lpkg 解包一次到临时目录，逐 ELF 用
-  goblin 读 `.gnu.version_d/.gnu.version_r/.gnu.version`（verdef/verneed/versym）——每个 SONAME 导出
-  的符号@版本按**内容 sha256** 缓存到 `~/.cache/lankefarm-abi/<soname>.json`（`{sha256, versions:{ver:[sym…]}}`）。
-  sha 命中 → 该文件不重扫；不匹配 → 原生重扫并覆写。**无 readelf/objdump、无新 Cargo 依赖**。
+  goblin 读 `.gnu.version_d/.gnu.version_r/.gnu.version`（verdef/verneed/versym）。**整包缓存**
+  `~/.cache/lankefarm/abi/<pkg>.json`（key = 当前 `.lpkg` 文件 sha256 + 本检則 `schema`；内容为该包
+  每个 ELF 的 soname/needed/defined/undef）。sha 命中 → 整包不重扫、不解包；不匹配 → 原生重扫并覆写。
+  **无 readelf/objdump、无新 Cargo 依赖**。
 - **`--pkgs` 只收窄审计范围**：consumer（可执行/未命中缓存的库）引用 `name@version` 无任何 DT_NEEDED
   候选库（provider 目录内）提供 → 按包报告。候选为空跳过（无法判断，同 python）。
 - 确定性：包/文件排序遍历；provider 冲突（同 SONAME 多份）最后一次胜。consumer 判缺失在 provider
   目录建全后统一做。
 
-## 17. `farm chk`：LankeOS 维护检則工具集（qml/pkgconf/pkg-err/hook/abi/full）
+## 17. `farm chk`：LankeOS 维护检則工具集（qml/pkgconf/pkg-err/introspection/vapi/hook/abi/full）
 
 `src/custom_checks/` 一族的策略/打包检测（非 farm 核心 ABI），参考 abichk（§16）的架构与缓存思路，
-由 `farm chk full` 一并跑（或 `farm chk <kind>` 单跑；ABI 审计 §16 同属此工具集）。逐包一次解包；**整包缓存 key = .lpkg 文件 sha256**（不是名字/版本），
-命中即复用分析。判定：
-- qmlchk/pkgconfchk：`import`/`Requires` 模块的**归属包** ∈ 本包 `deps`（配方）∪ `needed_so` 推导链接
-  依赖（`graph::link_deps`）即满足；仓库内无 provider 的外部模块忽略。
+由 `farm chk full` 一并跑（或 `farm chk <kind>` 单跑；ABI 审计 §16 同属此工具集）。逐包一次解包；
+**整包缓存 key = `.lpkg` 文件 sha256 + 本检則的 `schema` 常量**（不是名字/版本），命中即复用分析。
+缓存根 `~/.cache/lankefarm/<chk>`（无 HOME 回落 `--source/.abi-cache`）——**单跑与 `farm chk full` 共用同一根**
+（曾两处路径不一致、同一检則互不命中）；`schema` 由每个检則模块自持，改一类分析只失效该类缓存。判定：
+- qmlchk/pkgconfchk：`import`/`Requires` 模块的**归属包** ∈ 本包 binpkg `deps`（仓库 index 记录的运行时
+  依赖，`binpkg_deps`；**不读 LankeBUILD.json**）∪ `needed_so` 推导链接依赖（`graph::link_deps`）即满足。
+  三段判定：闭包内命中 → 通过；仓库内其它包提供但不在闭包 → Warning（少依赖）；**仓库内无任何 provider
+  → Critical（真缺口）**——引擎/进程内注册型 QML 模块（仓库无 qmldir 属正常）用配方 `QML_CHK_IGN_LST`
+  显式豁免。qmlchk 扫描前**剥离 QML 注释**（`//` 与 `/* */`，跳过字符串字面量）——注释掉的 `import`
+  不再误报。
 - pkg-errchk：`usr/etc`|`usr/var` 错位、`.la`、`.a`（静态库一般应删；.cmake 引用的包用
   `IGNORE_CHK_PKGERR` 豁免）。
+- introspectionchk/vapichk：装 `.gir` 的包，配方须声明 `gobject-introspection` 构建依赖；装 `.vapi`
+  的须声明 `vala`——两类文件都由**构建期**工具（`g-ir-scanner` / `valac`）生成。**读配方 `build_deps`**
+  （构建期依赖，区别于上面读 index 运行时 deps 的两条）；缺失 → **Critical**。`pkg == 工具包`自满足
+  （`vala`/`gobject-introspection` 自带自己的产物）。
 - hookchk：建了 `usr/lib/sysusers.d`/`tmpfiles.d` 的包，其 `hooks/postinst.sh` 必须调
-  `systemd-sysusers`/`systemd-tmpfiles --create`。
-配方 `farm_flags` 支持 `IGNORE_CHK_ABI/QML/PKGCONF/PKGERR/HOOK`（大写）整包豁免；这些 flag 已在
-`build/farm_flags.rs` 注册（topo 解析不告警）。检則都非 root、只读。
+  `systemd-sysusers`/`systemd-tmpfiles --create`；**只认非注释行**（行首可选空白后 `#` 视为注释）——
+  注释里出现字样不算已调用。
+配方 `farm_flags` 支持 `IGNORE_CHK_ABI/QML/PKGCONF/PKGERR/INTROSPECTION/VAPI/HOOK`（大写）整包豁免；列表值 flag
+（如 `QML_CHK_IGN_LST`）**只认 JSON 数组对象成员** `{"QML_CHK_IGN_LST": ["a","b"]}`（`NAME=a,b` 裸串
+已废弃，会告警）。这些 flag 已在 `build/farm_flags.rs` 注册（topo 解析不告警）。检則都非 root、只读。

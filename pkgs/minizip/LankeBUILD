@@ -3,8 +3,14 @@
 # 基于 zlib 的 ZIP 格式封装库，autoconf 构建，动态链接系统 zlib
 
 lankebuild_prepare() {
-    # contrib/minizip 用 autoconf，无 CMakeLists.txt
-    :
+    # 上游 zlib commit 36ff1be4 "contrib/minizip: install ints.h"（2026-02-17，晚于 1.3.2 发布，
+    # 所以 Arch 也把它当补丁带：其 PKGBUILD 的 source 里就是同一份 36ff1be48ef6...patch）。
+    # 背景：ioapi.h 第 74 行是**无条件** #include "ints.h"（mz64conf.h / bzlib.h 都有 #ifdef
+    # 包着，只有它没有），而 Makefile.am 的 minizip_include_HEADERS 漏列了 ints.h →
+    # make install 不装它 → 任何 #include <minizip/ioapi.h> 的消费者都编不过
+    # （chromium 删掉 bundled third_party/zlib 后走系统头，实测 fatal error: 'ints.h' not found）。
+    # 补丁改的是 Makefile.am，build() 里的 autoreconf 会据此重新生成 Makefile.in。
+    patch -Np1 -i "{WORK_DIR}/../minizip-1.3.2-install-ints.h.patch"
 }
 
 lankebuild_build() {
@@ -16,6 +22,13 @@ lankebuild_build() {
     ./configure --prefix={PREFIX} --libdir={LIBDIR} --disable-static --enable-demos
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
+
+    # crypt.h 是 minizip 的内部头，不对外暴露（与 Arch 同款做法，依据 zlib PR 229
+    # "minizip: don't install crypt.h"：历史上有人误 include 它）。
+    # 删除是安全的：已安装的 5 个公开头没有任何一个 include crypt.h（跨文件并集只有
+    # bzlib/ints/ioapi/mz64conf/unzip/zlib），全仓库唯一消费者 chromium 也不 include 它；
+    # 且 minizip.pc 的 Cflags 是 -I/usr/include，不会因删它产生解析变化。
+    rm -f "{STAGING_ROOT}{INCLUDEDIR}/minizip/crypt.h"
 
     install -Dm644 ../../LICENSE \
         "{STAGING_ROOT}{DATADIR}/licenses/minizip/LICENSE"

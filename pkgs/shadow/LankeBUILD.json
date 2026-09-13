@@ -1,8 +1,10 @@
 {
   "name": "shadow",
   "version": "4.20.2",
-  "release": 2,
-  "deps": [],
+  "release": 5,
+  "deps": [
+    "btrfs-progs"
+  ],
   "needed_so": [
     "libacl.so.1",
     "libc.so.6",

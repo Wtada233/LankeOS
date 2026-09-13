@@ -1,0 +1,52 @@
+libclc — TODO: 补丁在将来 LLVM release 上的可应用性
+==================================================
+
+本包当前无 bug，23.1.1 上九个补丁全部干净应用。
+
+但 0007 是"整文件删除"补丁，没有 fuzz 余量；上游一个已进 main 的修复
+（71a85ef）正好改了这个文件。将来切到 24.x 时 0007 必然无法干净应用。
+届时照第 5 节"修法"处理即可。
+
+现状（23.1.1，一切正常）：
+补丁栈：0001 在源码根应用（-p1），0002–0009 在 libclc/ 子目录应用（-p1）。实测九个补丁全部干净应用。
+
+将来Release可能需要修复（0007 是唯一没有 fuzz 余量的补丁）
+
+因为0007直接把整个文件删了：
+
+    diff --git a/clc/lib/generic/math/clc_remquo_stret.inc b/...
+    +++ /dev/null
+    @@ -1,158 +0,0 @@          <- 158 行必须逐行匹配
+    delete mode 100644 clc/lib/generic/math/clc_remquo_stret.inc
+
+整文件删除的 hunk 覆盖全文，被删内容里任何一行对不上，整个 hunk 就失败。
+patch 的 fuzz 只对 hunk 边缘的 context 行生效，改动落在 hunk 中部（如第 130 行）时
+fuzz 帮不上忙。
+
+而 0007 是在 fork 的 llvm_23 分支上、基于还没有下面这个修复的树生成的：
+
+  上游 71a85ef89fc1997205104b72447e0dc2c4ad83da（PR #217925，2026-09-02）
+  "[libclc] Fix remainder calculation in clc_remquo for subnormals"
+  把 clc_remquo_stret.inc 第 130 行从
+
+      __CLC_GENTYPE t = __clc_mad(y, -__CLC_CONVERT_GENTYPE(qsgn), x);
+
+  改成
+
+      __CLC_GENTYPE t = qsgn > 0 ? (x - y) : (x + y);
+
+注：该修复本身与本包无关——0007 反正会把整个文件删掉，它修的那行最终不存在。
+它唯一的作用是破坏 0007 的补丁上下文...无语了
+
+触发条件：
+
+  llvmorg-23.1.1（当前）      第 130 行 = 修复前 __clc_mad(...)    0007 干净
+  release/23.x HEAD（实测）   第 130 行 = 修复前 __clc_mad(...)    0007 干净
+  main（24.0.0 dev，实测）    第 130 行 = 已修复 qsgn > 0 ? ...    0007 失败
+
+- 71a85ef 目前在 release/23.x 上没有（GitHub compare 71a85ef...release/23.x
+  返回 diverged，behind_by 7105）。所以 23.1.x 线暂时安全。
+- 但若该修复被 cherry-pick 进 23.1.2，或我们升到 24.x（24.0.0 尚未发版，
+  main 上已确定包含），0007 就会挂。
+- 其余补丁（0002–0006 / 0008 / 0009）都是行内改动、有 fuzz 余量，失败更温和；
+  但同属 fork 补丁，一样会随下游漂移退化，届时也需要重新生成。

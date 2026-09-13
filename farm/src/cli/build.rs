@@ -108,9 +108,8 @@ fn run_build_flow(
         if let Err(e) = ctrlc::set_handler(move || {
             let s = c.lock().unwrap();
             if let Some(cid) = &s.current_cid {
-                let _ = std::process::Command::new("docker")
-                    .args(["rm", "-f", cid])
-                    .status();
+                // 杀容器收敛在 docker 叶（架构 §5：CLI 不得直接 spawn docker）
+                lankefarm::lpkg_binding::docker::kill_container(cid);
             }
             if let Some(pkg) = &s.current_pkg {
                 if let Ok(st) = lankefarm::state::State::open(&s.state_path) {
@@ -139,7 +138,9 @@ fn run_build_flow(
                     .map_err(|e| format!("serve 就绪信号发送失败: {e}").into())
             });
             if let Err(e) = &res {
-                let _ = serve_tx.send(Err(e.clone()));
+                // FarmError 不再 Clone（Io/Http/Sqlite 源类型非 Clone）——按消息重建一份即可
+                // （接收端只打印，无需保留 source 链）
+                let _ = serve_tx.send(Err(FarmError::Msg(e.to_string())));
             }
             res
         })

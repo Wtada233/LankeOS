@@ -1,0 +1,23 @@
+{
+  "name": "simdutf",
+  "version": "9.1.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6"
+  ],
+  "provides": [
+    "libsimdutf.so",
+    "libsimdutf.so.35"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake"
+  ],
+  "sources": [
+    "https://github.com/simdutf/simdutf/archive/refs/tags/v9.1.1/simdutf-9.1.1.tar.gz"
+  ],
+  "work_sources": []
+}

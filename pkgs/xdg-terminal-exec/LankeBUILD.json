@@ -1,0 +1,15 @@
+{
+  "name": "xdg-terminal-exec",
+  "version": "0.14.3",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/Vladimir-csp/xdg-terminal-exec/-/archive/v0.14.3/xdg-terminal-exec-v0.14.3.tar.gz"
+  ],
+  "work_sources": []
+}

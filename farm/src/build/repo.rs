@@ -54,32 +54,15 @@ pub(crate) fn repack_if_drift(
             extract.join("metadata.json").display()
         )
     })?;
-    let meta_needed: Vec<String> = meta["needed_so"]
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
-    let meta_provides: Vec<String> = meta["provides"]
-        .as_array()
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default();
-    let actual = crate::verify::ScanResult {
-        needed_so: outcome.needed_so.clone(),
-        provides: outcome.provides.clone(),
-        deps: Vec::new(), // farm 不扫 deps（gen_deps 生成，decide 不比较）
-    };
-    let expected = crate::verify::ScanResult {
-        needed_so: meta_needed,
-        provides: meta_provides,
-        deps: Vec::new(),
-    };
+    // actual.deps 恒空：farm 不扫 deps（gen_deps 生成，decide 不比较）
+    let actual = crate::verify::ScanResult::from_parts(
+        outcome.needed_so.clone(),
+        outcome.provides.clone(),
+        Vec::new(),
+    );
+    // 期望值 = .lpkg 内 metadata.json（由 lpkg build 从 LankeBUILD.json 写入）；
+    // deps 不参与 decide（verify 的 deps_drift_is_ignored 钉死该契约）
+    let expected = crate::verify::ScanResult::from_metadata_json(&meta);
     let drifted =
         crate::verify::decide(&actual, &expected) != crate::verify::VerifyAction::Unchanged;
     // 无条件重打（level 22 + mtime 1970；漂移时顺带修正 metadata.json），复用 scan 的解包目录。
@@ -605,18 +588,8 @@ pub(crate) fn sorted_pkg_names(pkgs_dir: &Path) -> Vec<String> {
     names
 }
 
-/// build_deps 拓扑分批（Kahn；环兜底按字典序）。
-/// Kahn 拓扑排序（精确链接依赖图）+ 循环检测切断。
-///
-/// 依赖边 = **旧索引 needed_so → provider**（`graph::link_deps`，需重建的链接库）∪
-/// **配方 build_deps**（构建工具），仅限 targets（本轮需要重建的包）内。
-/// 语义：让每个包在其所有"需要重建"的 needed_so provider 重建完毕之后再构建——
-/// 先建链接库（libc/glib/zlib…），再建依赖者（chromium 等叶子），避免
-/// "先建叶子、其依赖随后重建（ABI 变）导致叶子白跑一遍"。
-///
-/// 参考 lpkg/main/scripts/lankeos-world-rebuild-helper.py（确定性 Kahn + 三色 DFS 切环），
-/// 区别：farm 增量构建，已就绪（不在 targets）的包不进图，无需全量重建。
-/// 循环依赖：打印警告并切断构成环的后向边（每轮一条，确定性），保证总能给出完整顺序。
+/// 配方内容哈希（`LankeBUILD` + `LankeBUILD.json` 的文件名与原文）——`.build_ok` 标记与 job 记录的
+/// "配方未变"依据：变了 → 哈希失配 → validate 重建。
 pub(crate) fn recipe_hash(pkgs_dir: &Path, pkg: &str) -> Option<String> {
     let mut hasher = Sha256::new();
     for f in ["LankeBUILD", "LankeBUILD.json"] {

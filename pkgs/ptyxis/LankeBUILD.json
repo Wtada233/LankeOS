@@ -1,0 +1,45 @@
+{
+  "name": "ptyxis",
+  "version": "50.1",
+  "release": 1,
+  "deps": [
+    "dconf",
+    "gsettings-desktop-schemas"
+  ],
+  "needed_so": [
+    "libadwaita-1.so.0",
+    "libc.so.6",
+    "libcairo.so.2",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgtk-4.so.1",
+    "libjson-glib-1.0.so.0",
+    "libm.so.6",
+    "libpango-1.0.so.0",
+    "libportal-gtk4.so.1",
+    "libportal.so.1",
+    "libvte-2.91-gtk4.so.0"
+  ],
+  "provides": [],
+  "build_deps": [
+    "appstream",
+    "base-devel",
+    "cairo",
+    "glib",
+    "gtk4",
+    "hicolor-icon-theme",
+    "json-glib",
+    "libadwaita",
+    "libportal",
+    "meson",
+    "ninja",
+    "pango",
+    "vte"
+  ],
+  "sources": [
+    "https://gitlab.gnome.org/chergert/ptyxis/-/archive/50.1/ptyxis-50.1.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,22 @@
+#
+# ptyxis — 面向容器（podman / toolbox）的 GNOME 终端
+# 基于 Arch Linux PKGBUILD 适配 LankeOS
+# 注意：使用 /bin/sh（POSIX sh），无 bashisms
+
+lankebuild_prepare() {
+    # --wrap-mode nofallback：依赖一律用系统包，不许退回 meson 子项目
+    # （仓库既有 meson 配方同此约定）
+    meson setup _build --prefix={PREFIX} --buildtype=release --wrap-mode nofallback
+}
+
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+
+    install -Dm644 COPYING "{STAGING_ROOT}{DATADIR}/licenses/ptyxis/COPYING"
+}

@@ -19,9 +19,44 @@ _SYSTEM_LIBS="brotli dav1d flac fontconfig freetype harfbuzz
               openh264 opus zlib zstd"
 
 # 需要删除捆绑文件的目录名（libjpeg 映射为 libjpeg_turbo）
+# zlib 对应 --system-libraries 的 zlib（= 系统 zlib+minizip）：third_party/zlib 不存在
+# minizip/ 子目录（155 实测），写 minizip 会让 find 空跑、bundled 头文件留在树里，
+# 而库却是系统 libminizip → unz_file_info 结构体布局不一致。
 _UNWANTED_DIRS="brotli dav1d flac fontconfig freetype harfbuzz
                 libdrm libjpeg_turbo libwebp libxml libxslt
-                openh264 opus minizip zstd"
+                openh264 opus zlib zstd"
+
+# --- Google API key（可选，默认关闭）---
+# 默认构建**不带** API key：免费配额（每日调用量）根本不够一个发行版用，带上只会把配额
+# 烧光。需要的人自行开启：把自己的 AUTH 放进本包目录即可被读到。
+#
+#   cp ~/sec/AUTH pkgs/chromium/     # 然后正常构建
+#
+# AUTH 是 key=value 文本，只识别一个键（不做任何猜测式匹配，其他键一律忽略）：
+#   google_api_key=<...>
+# 用途：地理位置、拼写检查、翻译等需要服务端 API 的功能。
+#
+# farm 把整个包目录 docker cp 进容器 /work/<pkg>，而 _BD = dirname({WORK_DIR}) 就是包目录，
+# 所以放这里的 AUTH 在构建期可见（和 *.patch 同一条路径）。
+#
+# 不处理 OAuth2 client id/secret：Chromium 89 起 Google 已不放行第三方客户端的同步
+# scope（Arch 因此弃用，见 archlinux.org/news/chromium-losing-sync-support-in-early-march/），
+# 自己建的客户端同样过不了，编译进去也换不来登录/同步。要登录的人走**运行期**开关：
+#   chromium --oauth2-client-id=<...> --oauth2-client-secret=<...>
+# 这依赖 use-oauth2-client-switches-as-default.patch（它把这两个开关注册为覆盖入口），
+# 该补丁与编译期凭据无关，始终保留、别删。
+# AUTH 不存在或没有该键时留空：Chromium 走无 key 构建（相关功能禁用），不报错。
+_GOOG_API_KEY=""
+if [ -f "$_BD/AUTH" ]; then
+    _GOOG_API_KEY=$(sed -n 's/^google_api_key=//p' "$_BD/AUTH" | head -1)
+    if [ -n "$_GOOG_API_KEY" ]; then
+        echo "chromium: 检测到 $_BD/AUTH —— 将注入 Google API key"
+    else
+        echo "chromium: $_BD/AUTH 里没有 google_api_key=<...>，不注入" >&2
+    fi
+else
+    echo "chromium: 未启用 Google API key（默认行为；如需启用见本文件顶部说明）"
+fi
 
 
 lankebuild_prepare() {
@@ -33,6 +68,8 @@ lankebuild_prepare() {
         tools/generate_shim_headers/generate_shim_headers.py
 
     # https://crbug.com/893950
+    # 注：155 起 <xmlMalloc>/<xmlFree> 已不在下列任何文件里（上游已修），两条 s/// 是空操作，
+    # 只剩 -e '1i' 仍会在每个 .cc 头部插一行 #include <cstdlib>（无害）。留待一次成功构建后再删。
     sed -i -e 's/<xmlMalloc>/malloc/g' -e 's/<xmlFree>/free/g' \
            -e '1i #include <cstdlib>' \
         third_party/blink/renderer/core/xml/*.cc \
@@ -40,6 +77,13 @@ lankebuild_prepare() {
         third_party/libxml/chromium/*.cc
 
     # --- 应用补丁 ---
+    # 每条先 dry-run 判别：能正向应用就应用；已应用（reverse dry-run 成功）则跳过；
+    # 两者都失败说明与上游版本冲突，直接报错退出，避免产出「半补丁」的树。
+    #
+    # 注：devtools 的 GN 模板里有 5 处 public_inputs 声明（4 处在 group、1 处在 action）。
+    # group 上的 public_inputs 要较新的 gn 才被消费——gn 20260731 会报
+    # "Assignment had no effect"，20260911 正常。再遇到该错误先查 pkgs/gn 版本，别急着打补丁：
+    #   rg -n '^\s*public_inputs\s*=' third_party/devtools-frontend/src/
     # 注：compiler-rt-adjust-paths.patch 已删——它把 builtins 路径指到 lib/linux/（系统 clang
     # 布局），bundled clang 用官方 multiarch 路径（lib/x86_64-unknown-linux-gnu/），留着反而错。
     for _p in \
@@ -52,8 +96,19 @@ lankebuild_prepare() {
         chromium-147-rust-1.95-bytemuck.patch \
         glibc-2.42-baud-rate-fix.patch \
         chromium-149-use-of-undeclared-identifier-ERROR.patch \
-        chromium-150-revert-avx-flag-change.patch; do
-        patch -Np1 -i "$_BD/$_p"
+        chromium-150-revert-avx-flag-change.patch \
+        chromium-152-unbundle-minizip-undo-unicode.patch \
+        chromium-152-unbundle-opus-devtools.patch \
+        chromium-153-iamf-tools-unbundled-opus.patch \
+        openxr-vendored-vulkan-headers.patch; do
+        if patch -Np1 --dry-run -i "$_BD/$_p" >/dev/null 2>&1; then
+            patch -Np1 -i "$_BD/$_p"
+        elif patch -Np1 -R --dry-run -i "$_BD/$_p" >/dev/null 2>&1; then
+            echo "chromium: 跳过已应用的补丁 $_p"
+        else
+            echo "chromium: 补丁无法应用（与上游版本冲突）：$_p" >&2
+            return 1
+        fi
     done
 
     # --- 链接系统工具（node/jdk/gperf；rust 用内置工具链，见下） ---
@@ -93,7 +148,11 @@ lankebuild_prepare() {
             -delete 2>/dev/null || true
     done
 
-    # iamf_tools 要 opus 源码树的 include/opus.h（bundled 已删），用系统 opus 头补齐
+    # iamf_tools 原用 "include/opus.h"（靠 -Ithird_party/opus/src 解析）——已由
+    # chromium-153-iamf-tools-unbundled-opus.patch 改成走 opus shim 的完整路径。
+    # 下面的软链是兜底：凡 include third_party/opus/src/include/*.h 却不依赖
+    # //third_party/opus（拿不到 shim include dir）的目标，仍能从源码根解析到系统头。
+    # opus shim 只导出 opus.h/opus_defines.h/opus_multistream.h/opus_types.h，故多链两个无害。
     mkdir -p third_party/opus/src/include
     for _oph in opus.h opus_defines.h opus_types.h opus_custom.h opus_multistream.h opus_projection.h; do
         ln -sf "/usr/include/opus/$_oph" "third_party/opus/src/include/$_oph"
@@ -161,6 +220,11 @@ lankebuild_build() {
     # rust：内置工具链（use_chromium_rust_toolchain，rust_sysroot_absolute 留空即默认），
     # 版本/绑定由 third_party/rust-toolchain 的 VERSION 文件与 crubit 自动提供
     _flags="$_flags icu_use_data_file=false"
+
+    # Google API key（编译进 GOOGLE_API_KEY 宏，见 google_apis/BUILD.gn）
+    if [ -n "$_GOOG_API_KEY" ]; then
+        _flags="$_flags google_api_key=\"$_GOOG_API_KEY\""
+    fi
 
     # 使用系统 gn（需先安装 pkgs/gn）
     gn gen out/Release --args="$_flags"

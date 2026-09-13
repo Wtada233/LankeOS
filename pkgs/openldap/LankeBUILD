@@ -34,5 +34,5 @@ lankebuild_package() {
     # 共享库版本软链（Arch 同款）
     ln -sf liblber.so {STAGING_ROOT}{LIBDIR}/liblber.so.2
     ln -sf libldap.so {STAGING_ROOT}{LIBDIR}/libldap.so.2
-    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/openldap
+    install -Dm644 LICENSE {STAGING_ROOT}/usr/share/licenses/{PKG_NAME}/LICENSE
 }

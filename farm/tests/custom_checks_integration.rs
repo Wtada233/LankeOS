@@ -2,7 +2,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use lankefarm::custom_checks::{hook, pkg_err, pkgconf, qml, ChkOpts};
+use lankefarm::custom_checks::{hook, introspection, pkg_err, pkgconf, qml, vapi, ChkOpts};
 
 struct Repo {
     base: PathBuf,
@@ -70,6 +70,27 @@ impl Repo {
     fn write_recipe(&self, name: &str, deps: &[&str], flags: &[&str]) {
         std::fs::create_dir_all(self.pkgs.join(name)).unwrap();
         let mut m = serde_json::json!({ "name": name, "version": "1.0", "deps": deps });
+        if !flags.is_empty() {
+            m["farm_flags"] = serde_json::json!(flags);
+        }
+        std::fs::write(
+            self.pkgs.join(format!("{name}/LankeBUILD.json")),
+            serde_json::to_string(&m).unwrap(),
+        )
+        .unwrap();
+    }
+    /// 同 `add`，但配方额外声明 `build_deps`（introspection/vapi 检則的判定依据）。
+    fn add_bd(
+        &mut self,
+        name: &str,
+        content: &[(&str, &str)],
+        build_deps: &[&str],
+        flags: &[&str],
+    ) {
+        self.add(name, content, &[], flags, "");
+        let mut m = serde_json::json!({
+            "name": name, "version": "1.0", "deps": [], "build_deps": build_deps
+        });
         if !flags.is_empty() {
             m["farm_flags"] = serde_json::json!(flags);
         }
@@ -280,6 +301,120 @@ fn hookchk_reports_missing_sysusers_tmpfiles_calls() {
         has(&rep2, "bad", "systemd-sysusers"),
         "建了 sysusers 却未调应报: {:?}",
         rep2.findings
+    );
+    r.cleanup();
+}
+
+#[test]
+fn hookchk_ignores_commented_out_calls() {
+    // 注释里的字样不算"已调用"：包建了 sysusers.d 但 postinst 只在注释里提到 systemd-sysusers
+    // → 必须报（旧实现用 contains，会被注释骗过 → 漏报）。
+    let mut r = Repo::new("hookc");
+    r.add(
+        "cmt",
+        &[("usr/lib/sysusers.d/x.conf", "u x -\n")],
+        &[],
+        &[],
+        "#!/bin/sh\n# 用 systemd-sysusers 建用户（注释，非调用）\nexit 0\n",
+    );
+    let rep = hook::run(&r.opts("c1")).unwrap();
+    assert!(
+        has(&rep, "cmt", "systemd-sysusers"),
+        "只在注释里提到不算调用，应报: {:?}",
+        rep.findings
+    );
+    // 对照：真调用不报
+    r.add(
+        "real",
+        &[("usr/lib/sysusers.d/y.conf", "u y -\n")],
+        &[],
+        &[],
+        "#!/bin/sh\nsystemd-sysusers\nexit 0\n",
+    );
+    let rep2 = hook::run(&r.opts("c2")).unwrap();
+    assert!(
+        !rep2.findings.contains_key("real"),
+        "真调用不应报: {:?}",
+        rep2.findings
+    );
+    r.cleanup();
+}
+
+#[test]
+fn introspectionchk_flags_missing_gobject_introspection_build_dep() {
+    let mut r = Repo::new("gir");
+    // 声明了 gobject-introspection → 通过
+    r.add_bd(
+        "withgir",
+        &[("usr/share/gir-1.0/With-1.0.gir", "<repository/>")],
+        &["base-devel", "gobject-introspection"],
+        &[],
+    );
+    // 装了 .gir 却没声明 → Critical
+    r.add_bd(
+        "nogir",
+        &[("usr/share/gir-1.0/No-1.0.gir", "<repository/>")],
+        &["base-devel"],
+        &[],
+    );
+    // 无 .gir 文件 → 不判
+    r.add_bd("plain", &[("usr/bin/plain", "x")], &["base-devel"], &[]);
+    // 已知例外：IGNORE_CHK_INTROSPECTION 整包豁免
+    r.add_bd(
+        "ign",
+        &[("usr/share/gir-1.0/Ign-1.0.gir", "<repository/>")],
+        &["base-devel"],
+        &["IGNORE_CHK_INTROSPECTION"],
+    );
+    let rep = introspection::run(&r.opts("c1")).unwrap();
+    assert!(!rep.findings.contains_key("withgir"), "{:?}", rep.findings);
+    assert!(!rep.findings.contains_key("plain"), "{:?}", rep.findings);
+    assert!(
+        !rep.findings.contains_key("ign"),
+        "豁免包不应报: {:?}",
+        rep.findings
+    );
+    assert!(
+        has(&rep, "nogir", "gobject-introspection"),
+        "装了 .gir 却缺构建依赖应报: {:?}",
+        rep.findings
+    );
+    r.cleanup();
+}
+
+#[test]
+fn vapichk_flags_missing_vala_build_dep_and_honors_ignore_flag() {
+    let mut r = Repo::new("vapi");
+    r.add_bd(
+        "withvapi",
+        &[("usr/share/vala/vapi/libx.vapi", "namespace X {}")],
+        &["base-devel", "vala"],
+        &[],
+    );
+    r.add_bd(
+        "novapi",
+        &[("usr/share/vala/vapi/libx.vapi", "namespace X {}")],
+        &["base-devel"],
+        &[],
+    );
+    // 已知例外：IGNORE_CHK_VAPI 整包豁免
+    r.add_bd(
+        "ign",
+        &[("usr/share/vala/vapi/liby.vapi", "namespace Y {}")],
+        &["base-devel"],
+        &["IGNORE_CHK_VAPI"],
+    );
+    let rep = vapi::run(&r.opts("c1")).unwrap();
+    assert!(!rep.findings.contains_key("withvapi"), "{:?}", rep.findings);
+    assert!(
+        !rep.findings.contains_key("ign"),
+        "豁免包不应报: {:?}",
+        rep.findings
+    );
+    assert!(
+        has(&rep, "novapi", "vala"),
+        "装了 .vapi 却缺构建依赖应报: {:?}",
+        rep.findings
     );
     r.cleanup();
 }

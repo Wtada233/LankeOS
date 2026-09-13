@@ -1,0 +1,1340 @@
+From c873dd254733dc428622350ebfbb0b34f648cc05 Mon Sep 17 00:00:00 2001
+From: David Runge <dvzrv@archlinux.org>
+Date: Sat, 5 Nov 2022 23:40:18 +0100
+Subject: [PATCH 1/3] Disable replaced tools, their man pages and PAM
+ integration
+
+etc/pam.d/Makefile.am:
+The `chfn`, `chsh` and `login` tools are provided by util-linux.
+Disable installation of PAM integration for all of them.
+
+man/Makefile.am, man/*/Makefile.am:
+The `chfn`, `chsh`, `login`, `newgrp`, `nologin`, `sg`, `vigr`, `vipw`
+and `su` tools are provided by util-linux (`sg` is a symlink for
+`newgrp`).
+The `groups` tool is provided by coreutils.
+Disable man page integration for all of them.
+
+src/Makefile.am:
+- Set `usbindir` to use `bin` instead of `sbin`, as Arch Linux is a /usr
+  and bin merge distribution.
+- The `chfn`, `chsh`, `login`, `newgrp`, `nologin`, `sg`, `vigr`, `vipw`
+  and `su` tools are provided by util-linux.
+  Remove their use entirely.
+
+Signed-off-by: David Runge <dvzrv@archlinux.org>
+---
+ etc/pam.d/Makefile.am |  3 ---
+ man/Makefile.am       | 21 ++-------------------
+ man/cs/Makefile.am    |  5 +----
+ man/da/Makefile.am    |  8 +-------
+ man/de/Makefile.am    | 11 +----------
+ man/fi/Makefile.am    |  5 +----
+ man/fr/Makefile.am    | 11 +----------
+ man/hu/Makefile.am    |  7 +------
+ man/id/Makefile.am    |  2 --
+ man/it/Makefile.am    | 11 +----------
+ man/ja/Makefile.am    | 10 +---------
+ man/ko/Makefile.am    |  3 ---
+ man/pl/Makefile.am    |  7 +------
+ man/ru/Makefile.am    | 11 +----------
+ man/sv/Makefile.am    |  8 +-------
+ man/tr/Makefile.am    |  3 ---
+ man/uk/Makefile.am    | 11 +----------
+ man/zh_CN/Makefile.am | 11 +----------
+ man/zh_TW/Makefile.am |  4 ----
+ src/Makefile.am       | 15 ++++++---------
+ 20 files changed, 21 insertions(+), 146 deletions(-)
+
+diff --git a/etc/pam.d/Makefile.am b/etc/pam.d/Makefile.am
+index 9662cc08..b1da6b0d 100644
+--- a/etc/pam.d/Makefile.am
++++ b/etc/pam.d/Makefile.am
+@@ -3,9 +3,6 @@
+ 
+ pamd_files = \
+ 	chpasswd \
+-	chfn \
+-	chsh \
+-	login \
+ 	newusers \
+ 	passwd
+ 
+diff --git a/man/Makefile.am b/man/Makefile.am
+index 49ee0a1a..47ae5f4b 100644
+--- a/man/Makefile.am
++++ b/man/Makefile.am
+@@ -8,10 +8,8 @@ endif
+ 
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chfn.1 \
+ 	man8/chgpasswd.8 \
+ 	man8/chpasswd.8 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man3/getspnam.3 \
+@@ -23,24 +21,18 @@ man_MANS = \
+ 	man8/grpconv.8 \
+ 	man8/grpunconv.8 \
+ 	man5/gshadow.5 \
+-	man1/login.1 \
+ 	man5/login.defs.5 \
+-	man1/newgrp.1 \
+ 	man8/newusers.8 \
+-	man8/nologin.8 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man8/pwck.8 \
+ 	man8/pwconv.8 \
+ 	man8/pwunconv.8 \
+-	man1/sg.1 \
+ 	man3/shadow.3 \
+ 	man5/shadow.5 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+-	man8/usermod.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/usermod.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+@@ -73,10 +65,8 @@ endif
+ 
+ man_XMANS = \
+ 	chage.1.xml \
+-	chfn.1.xml \
+ 	chgpasswd.8.xml \
+ 	chpasswd.8.xml \
+-	chsh.1.xml \
+ 	faillog.5.xml \
+ 	faillog.8.xml \
+ 	getsubids.1.xml \
+@@ -87,11 +77,9 @@ man_XMANS = \
+ 	grpck.8.xml \
+ 	gshadow.5.xml \
+ 	limits.5.xml \
+-	login.1.xml \
+ 	login.access.5.xml \
+ 	login.defs.5.xml \
+ 	newgidmap.1.xml \
+-	newgrp.1.xml \
+ 	newuidmap.1.xml \
+ 	newusers.8.xml \
+ 	nologin.8.xml \
+@@ -102,15 +90,12 @@ man_XMANS = \
+ 	pwconv.8.xml \
+ 	shadow.3.xml \
+ 	shadow.5.xml \
+-	sg.1.xml \
+-	su.1.xml \
+ 	suauth.5.xml \
+ 	subgid.5.xml \
+ 	subuid.5.xml \
+ 	useradd.8.xml \
+ 	userdel.8.xml \
+-	usermod.8.xml \
+-	vipw.8.xml
++	usermod.8.xml
+ 
+ if ENABLE_LASTLOG
+ man_XMANS += lastlog.8.xml
+@@ -142,8 +127,6 @@ login_defs_v = \
+ 	HUSHLOGIN_FILE.xml \
+ 	ISSUE_FILE.xml \
+ 	KILLCHAR.xml \
+-	LASTLOG_ENAB.xml \
+-	LASTLOG_UID_MAX.xml \
+ 	LOGIN_RETRIES.xml \
+ 	LOGIN_STRING.xml \
+ 	LOGIN_TIMEOUT.xml \
+diff --git a/man/cs/Makefile.am b/man/cs/Makefile.am
+index e0100299..73c61b94 100644
+--- a/man/cs/Makefile.am
++++ b/man/cs/Makefile.am
+@@ -10,11 +10,8 @@ man_MANS = \
+ 	man8/groupmod.8 \
+ 	man8/grpck.8 \
+ 	man5/gshadow.5 \
+-	man8/nologin.8 \
+ 	man5/passwd.5 \
+-	man5/shadow.5 \
+-	man1/su.1 \
+-	man8/vipw.8
++	man5/shadow.5
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/da/Makefile.am b/man/da/Makefile.am
+index 0c85972b..dfe9610c 100644
+--- a/man/da/Makefile.am
++++ b/man/da/Makefile.am
+@@ -3,14 +3,8 @@ mandir = @mandir@/da
+ 
+ # 2012.01.28 - activate manpages with more than 50% translated messages
+ man_MANS = \
+-	man1/chfn.1 \
+ 	man8/groupdel.8 \
+-	man5/gshadow.5 \
+-	man1/newgrp.1 \
+-	man8/nologin.8 \
+-	man1/sg.1 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man5/gshadow.5
+ 
+ man_nopam = 
+ 
+diff --git a/man/de/Makefile.am b/man/de/Makefile.am
+index edb3a15b..d2617aff 100644
+--- a/man/de/Makefile.am
++++ b/man/de/Makefile.am
+@@ -3,10 +3,8 @@ mandir = @mandir@/de
+ 
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chfn.1 \
+ 	man8/chgpasswd.8 \
+ 	man8/chpasswd.8 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man3/getspnam.3 \
+@@ -18,26 +16,19 @@ man_MANS = \
+ 	man8/grpconv.8 \
+ 	man8/grpunconv.8 \
+ 	man5/gshadow.5 \
+-	man1/login.1 \
+ 	man5/login.defs.5 \
+-	man1/newgrp.1 \
+ 	man8/newusers.8 \
+-	man8/nologin.8 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man8/pwck.8 \
+ 	man8/pwconv.8 \
+ 	man8/pwunconv.8 \
+-	man1/sg.1 \
+ 	man3/shadow.3 \
+ 	man5/shadow.5 \
+-	man1/su.1 \
+ 	man5/suauth.5 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+-	man8/usermod.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/usermod.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/fi/Makefile.am b/man/fi/Makefile.am
+index 26a1a848..f02b92f3 100644
+--- a/man/fi/Makefile.am
++++ b/man/fi/Makefile.am
+@@ -1,10 +1,7 @@
+ 
+ mandir = @mandir@/fi
+ 
+-man_MANS = \
+-	man1/chfn.1 \
+-	man1/chsh.1 \
+-	man1/su.1
++man_MANS =
+ 
+ # Outdated manpages
+ #	passwd.1 (https://bugs.launchpad.net/ubuntu/+bug/384024)
+diff --git a/man/fr/Makefile.am b/man/fr/Makefile.am
+index b030fc6a..f86ed15e 100644
+--- a/man/fr/Makefile.am
++++ b/man/fr/Makefile.am
+@@ -3,10 +3,8 @@ mandir = @mandir@/fr
+ 
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chfn.1 \
+ 	man8/chgpasswd.8 \
+ 	man8/chpasswd.8 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man3/getspnam.3 \
+@@ -18,26 +16,19 @@ man_MANS = \
+ 	man8/grpconv.8 \
+ 	man8/grpunconv.8 \
+ 	man5/gshadow.5 \
+-	man1/login.1 \
+ 	man5/login.defs.5 \
+-	man1/newgrp.1 \
+ 	man8/newusers.8 \
+-	man8/nologin.8 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man8/pwck.8 \
+ 	man8/pwconv.8 \
+ 	man8/pwunconv.8 \
+-	man1/sg.1 \
+ 	man3/shadow.3 \
+ 	man5/shadow.5 \
+-	man1/su.1 \
+ 	man5/suauth.5 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+-	man8/usermod.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/usermod.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/hu/Makefile.am b/man/hu/Makefile.am
+index 6bf68e8a..5808b5a7 100644
+--- a/man/hu/Makefile.am
++++ b/man/hu/Makefile.am
+@@ -2,14 +2,9 @@
+ mandir = @mandir@/hu
+ 
+ man_MANS = \
+-	man1/chsh.1 \
+ 	man1/gpasswd.1 \
+-	man1/login.1 \
+-	man1/newgrp.1 \
+ 	man1/passwd.1 \
+-	man5/passwd.5 \
+-	man1/sg.1 \
+-	man1/su.1
++	man5/passwd.5
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/id/Makefile.am b/man/id/Makefile.am
+index 21f3dbe9..6d10b930 100644
+--- a/man/id/Makefile.am
++++ b/man/id/Makefile.am
+@@ -2,8 +2,6 @@
+ mandir = @mandir@/id
+ 
+ man_MANS = \
+-	man1/chsh.1 \
+-	man1/login.1 \
+ 	man8/useradd.8
+ 
+ EXTRA_DIST = $(man_MANS)
+diff --git a/man/it/Makefile.am b/man/it/Makefile.am
+index 4c2adb27..e5fc627a 100644
+--- a/man/it/Makefile.am
++++ b/man/it/Makefile.am
+@@ -3,10 +3,8 @@ mandir = @mandir@/it
+ 
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chfn.1 \
+ 	man8/chgpasswd.8 \
+ 	man8/chpasswd.8 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man3/getspnam.3 \
+@@ -18,26 +16,19 @@ man_MANS = \
+ 	man8/grpconv.8 \
+ 	man8/grpunconv.8 \
+ 	man5/gshadow.5 \
+-	man1/login.1 \
+ 	man5/login.defs.5 \
+-	man1/newgrp.1 \
+ 	man8/newusers.8 \
+-	man8/nologin.8 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man8/pwck.8 \
+ 	man8/pwconv.8 \
+ 	man8/pwunconv.8 \
+-	man1/sg.1 \
+ 	man3/shadow.3 \
+ 	man5/shadow.5 \
+-	man1/su.1 \
+ 	man5/suauth.5 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+-	man8/usermod.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/usermod.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/ja/Makefile.am b/man/ja/Makefile.am
+index 26c3c0c3..19eee4b1 100644
+--- a/man/ja/Makefile.am
++++ b/man/ja/Makefile.am
+@@ -3,9 +3,7 @@ mandir = @mandir@/ja
+ 
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chfn.1 \
+ 	man8/chpasswd.8 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man1/gpasswd.1 \
+@@ -15,24 +13,18 @@ man_MANS = \
+ 	man8/grpck.8 \
+ 	man8/grpconv.8 \
+ 	man8/grpunconv.8 \
+-	man1/login.1 \
+ 	man5/login.defs.5 \
+-	man1/newgrp.1 \
+ 	man8/newusers.8 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man8/pwck.8 \
+ 	man8/pwconv.8 \
+ 	man8/pwunconv.8 \
+-	man1/sg.1 \
+ 	man5/shadow.5 \
+-	man1/su.1 \
+ 	man5/suauth.5 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+-	man8/usermod.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/usermod.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/ko/Makefile.am b/man/ko/Makefile.am
+index 4f73651b..1efeae52 100644
+--- a/man/ko/Makefile.am
++++ b/man/ko/Makefile.am
+@@ -2,9 +2,6 @@
+ mandir = @mandir@/ko
+ 
+ man_MANS = \
+-	man1/chfn.1 \
+-	man1/chsh.1 \
+-	man1/login.1 \
+ 	man5/passwd.5 \
+ 	man1/su.1 \
+ 	man8/vigr.8 \
+diff --git a/man/pl/Makefile.am b/man/pl/Makefile.am
+index 998bbc2e..e6583dc7 100644
+--- a/man/pl/Makefile.am
++++ b/man/pl/Makefile.am
+@@ -4,7 +4,6 @@ mandir = @mandir@/pl
+ # 2012.01.28 - activate manpages with more than 50% translated messages
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man3/getspnam.3 \
+@@ -12,13 +11,9 @@ man_MANS = \
+ 	man8/groupdel.8 \
+ 	man8/groupmod.8 \
+ 	man8/grpck.8 \
+-	man1/newgrp.1 \
+-	man1/sg.1 \
+ 	man3/shadow.3 \
+ 	man8/userdel.8 \
+-	man8/usermod.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/usermod.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/ru/Makefile.am b/man/ru/Makefile.am
+index 69c43cf7..1c760de5 100644
+--- a/man/ru/Makefile.am
++++ b/man/ru/Makefile.am
+@@ -3,10 +3,8 @@ mandir = @mandir@/ru
+ 
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chfn.1 \
+ 	man8/chgpasswd.8 \
+ 	man8/chpasswd.8 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man3/getspnam.3 \
+@@ -18,26 +16,19 @@ man_MANS = \
+ 	man8/grpconv.8 \
+ 	man8/grpunconv.8 \
+ 	man5/gshadow.5 \
+-	man1/login.1 \
+ 	man5/login.defs.5 \
+-	man1/newgrp.1 \
+ 	man8/newusers.8 \
+-	man8/nologin.8 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man8/pwck.8 \
+ 	man8/pwconv.8 \
+ 	man8/pwunconv.8 \
+-	man1/sg.1 \
+ 	man3/shadow.3 \
+ 	man5/shadow.5 \
+-	man1/su.1 \
+ 	man5/suauth.5 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+-	man8/usermod.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/usermod.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/sv/Makefile.am b/man/sv/Makefile.am
+index 68818376..3111af1c 100644
+--- a/man/sv/Makefile.am
++++ b/man/sv/Makefile.am
+@@ -3,7 +3,6 @@ mandir = @mandir@/sv
+ # 2012.01.28 - activate manpages with more than 50% translated messages
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man3/getspnam.3 \
+@@ -12,17 +11,12 @@ man_MANS = \
+ 	man8/groupmod.8 \
+ 	man8/grpck.8 \
+ 	man5/gshadow.5 \
+-	man1/newgrp.1 \
+-	man8/nologin.8 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man8/pwck.8 \
+-	man1/sg.1 \
+ 	man3/shadow.3 \
+ 	man5/suauth.5 \
+-	man8/userdel.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/userdel.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/tr/Makefile.am b/man/tr/Makefile.am
+index 8d8b9166..4fe3632a 100644
+--- a/man/tr/Makefile.am
++++ b/man/tr/Makefile.am
+@@ -2,15 +2,12 @@ mandir = @mandir@/tr
+ 
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chfn.1 \
+ 	man8/groupadd.8 \
+ 	man8/groupdel.8 \
+ 	man8/groupmod.8 \
+-	man1/login.1 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man5/shadow.5 \
+-	man1/su.1 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+ 	man8/usermod.8
+diff --git a/man/uk/Makefile.am b/man/uk/Makefile.am
+index 60b6508c..45ce85d7 100644
+--- a/man/uk/Makefile.am
++++ b/man/uk/Makefile.am
+@@ -3,10 +3,8 @@ mandir = @mandir@/uk
+ 
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chfn.1 \
+ 	man8/chgpasswd.8 \
+ 	man8/chpasswd.8 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man3/getspnam.3 \
+@@ -18,26 +16,19 @@ man_MANS = \
+ 	man8/grpconv.8 \
+ 	man8/grpunconv.8 \
+ 	man5/gshadow.5 \
+-	man1/login.1 \
+ 	man5/login.defs.5 \
+-	man1/newgrp.1 \
+ 	man8/newusers.8 \
+-	man8/nologin.8 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man8/pwck.8 \
+ 	man8/pwconv.8 \
+ 	man8/pwunconv.8 \
+-	man1/sg.1 \
+ 	man3/shadow.3 \
+ 	man5/shadow.5 \
+-	man1/su.1 \
+ 	man5/suauth.5 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+-	man8/usermod.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/usermod.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/zh_CN/Makefile.am b/man/zh_CN/Makefile.am
+index 1d5f7b4c..7e65eba1 100644
+--- a/man/zh_CN/Makefile.am
++++ b/man/zh_CN/Makefile.am
+@@ -3,10 +3,8 @@ mandir = @mandir@/zh_CN
+ 
+ man_MANS = \
+ 	man1/chage.1 \
+-	man1/chfn.1 \
+ 	man8/chgpasswd.8 \
+ 	man8/chpasswd.8 \
+-	man1/chsh.1 \
+ 	man5/faillog.5 \
+ 	man8/faillog.8 \
+ 	man3/getspnam.3 \
+@@ -18,26 +16,19 @@ man_MANS = \
+ 	man8/grpconv.8 \
+ 	man8/grpunconv.8 \
+ 	man5/gshadow.5 \
+-	man1/login.1 \
+ 	man5/login.defs.5 \
+-	man1/newgrp.1 \
+ 	man8/newusers.8 \
+-	man8/nologin.8 \
+ 	man1/passwd.1 \
+ 	man5/passwd.5 \
+ 	man8/pwck.8 \
+ 	man8/pwconv.8 \
+ 	man8/pwunconv.8 \
+-	man1/sg.1 \
+ 	man3/shadow.3 \
+ 	man5/shadow.5 \
+-	man1/su.1 \
+ 	man5/suauth.5 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+-	man8/usermod.8 \
+-	man8/vigr.8 \
+-	man8/vipw.8
++	man8/usermod.8
+ 
+ if ENABLE_LASTLOG
+ man_MANS += man8/lastlog.8
+diff --git a/man/zh_TW/Makefile.am b/man/zh_TW/Makefile.am
+index c36ed2c7..26696b67 100644
+--- a/man/zh_TW/Makefile.am
++++ b/man/zh_TW/Makefile.am
+@@ -2,15 +2,11 @@
+ mandir = @mandir@/zh_TW
+ 
+ man_MANS = \
+-	man1/chfn.1 \
+-	man1/chsh.1 \
+ 	man8/chpasswd.8 \
+-	man1/newgrp.1 \
+ 	man8/groupadd.8 \
+ 	man8/groupdel.8 \
+ 	man8/groupmod.8 \
+ 	man5/passwd.5 \
+-	man1/su.1 \
+ 	man8/useradd.8 \
+ 	man8/userdel.8 \
+ 	man8/usermod.8
+diff --git a/src/Makefile.am b/src/Makefile.am
+index c935e05b..d4ae8ea1 100644
+--- a/src/Makefile.am
++++ b/src/Makefile.am
+@@ -3,7 +3,7 @@ EXTRA_DIST = \
+ 	.indent.pro
+ 
+ ubindir = ${prefix}/bin
+-usbindir = ${prefix}/sbin
++usbindir = ${prefix}/bin
+ suidperms = 4755
+ sgidperms = 2755
+ 
+@@ -26,9 +26,9 @@ AM_CFLAGS = $(LIBBSD_CFLAGS)
+ # and installation would be much simpler (just two directories,
+ # $prefix/bin and $prefix/sbin, no install-data hacks...)
+ 
+-bin_PROGRAMS   = login
+-sbin_PROGRAMS  = nologin
+-ubin_PROGRAMS  = faillog chage chfn chsh gpasswd newgrp passwd
++bin_PROGRAMS   =
++sbin_PROGRAMS  =
++ubin_PROGRAMS  = faillog chage gpasswd passwd
+ if ENABLE_SUBIDS
+ ubin_PROGRAMS += newgidmap newuidmap
+ endif
+@@ -53,15 +53,14 @@ usbin_PROGRAMS = \
+ 	pwunconv \
+ 	useradd \
+ 	userdel \
+-	usermod \
+-	vipw
++	usermod
+ 
+ # sulogin from sysvinit
+ noinst_PROGRAMS = sulogin
+ 
+ suidusbins     =
+ suidbins       =
+-suidubins      = chage chfn chsh gpasswd newgrp
++suidubins      = chage gpasswd
+ if WITH_SU
+ suidbins      += su
+ endif
+@@ -126,8 +125,6 @@ vipw_LDADD     = $(LDADD) $(LIBAUDIT) $(LIBSELINUX) $(LIBECONF)
+ 
+ install-am: all-am
+ 	$(MAKE) $(AM_MAKEFLAGS) install-exec-am install-data-am
+-	ln -sf newgrp	$(DESTDIR)$(ubindir)/sg
+-	ln -sf vipw	$(DESTDIR)$(usbindir)/vigr
+ 	set -e; for i in $(suidbins); do \
+ 		chmod $(suidperms) $(DESTDIR)$(bindir)/$$i; \
+ 	done
+
+From ad338d26f95d510a68839ae08a435e49138a567e Mon Sep 17 00:00:00 2001
+From: David Runge <dvzrv@archlinux.org>
+Date: Mon, 31 Oct 2022 09:45:13 +0100
+Subject: [PATCH 2/3] Adapt login.defs for PAM and util-linux
+
+etc/login.defs:
+Remove unused login.defs options, that are either irrelevant due to the
+use of PAM or because the util-linux version of a binary does not
+support them.
+Modify all options that are ignored when using PAM, but are supported by
+util-linux.
+
+Removed options because they are part of PAMDEFS (options in PAMDEFS are
+options silently ignored by shadow when built with PAM enabled):
+* CHFN_AUTH
+* CRACKLIB_DICTPATH
+* ENV_HZ
+* ENVIRON_FILE
+* ENV_TZ
+* FAILLOG_ENAB
+* FTMP_FILE
+* ISSUE_FILE
+* LASTLOG_ENAB
+* LOGIN_STRING
+* MAIL_CHECK_ENAB
+* NOLOGINS_FILE
+* OBSCURE_CHECKS_ENAB
+* PASS_ALWAYS_WARN
+* PASS_CHANGE_TRIES
+* PASS_MAX_LEN
+* PASS_MIN_LEN
+* PORTTIME_CHECKS_ENAB
+* QUOTAS_ENAB
+* SU_WHEEL_ONLY
+* SYSLOG_SU_ENAB
+* ULIMIT
+
+Removed options because they are not availablbe with PAM enabled:
+* BCRYPT_MIN_ROUNDS
+* BCRYPT_MAX_ROUNDS
+* CONSOLE_GROUPS
+* CONSOLE
+* MD5_CRYPT_ENAB
+* PREVENT_NO_AUTH
+
+Removed encryption methods (`ENCRYPT_METHOD`), because they are unsafe
+or not available with PAM:
+* BCRYPT
+* MD5
+
+Removed options because they are not supported by login from util-linux:
+* ERASECHAR
+* KILLCHAR
+* LOG_OK_LOGINS
+* TTYTYPE_FILE
+
+Removed options because they are not supported by su from util-linux:
+* SULOG_FILE
+* SU_NAME
+
+Adapted options because they are in PAMDEFS but are supported by login
+from util-linux:
+* MOTD_FILE
+
+man/login.defs.5.xml:
+Remove unavailable options from man 5 login.defs.
+
+Signed-off-by: David Runge <dvzrv@archlinux.org>
+---
+ etc/login.defs       | 167 +------------------------------------------
+ man/login.defs.5.xml | 119 +-----------------------------
+ 2 files changed, 4 insertions(+), 282 deletions(-)
+
+diff --git a/etc/login.defs b/etc/login.defs
+index c052d5b7..f55900ce 100644
+--- a/etc/login.defs
++++ b/etc/login.defs
+@@ -3,6 +3,8 @@
+ #
+ #	$Id$
+ #
++# NOTE: This file is adapted for the use on Arch Linux!
++#       Unsupported options due to the use of util-linux or PAM are removed.
+ 
+ #
+ # Delay in seconds before being allowed another attempt after a login failure
+@@ -11,26 +13,11 @@
+ #
+ FAIL_DELAY		3
+ 
+-#
+-# Enable logging and display of /var/log/faillog login(1) failure info.
+-#
+-FAILLOG_ENAB		yes
+-
+ #
+ # Enable display of unknown usernames when login(1) failures are recorded.
+ #
+ LOG_UNKFAIL_ENAB	no
+ 
+-#
+-# Enable logging of successful logins
+-#
+-LOG_OK_LOGINS		no
+-
+-#
+-# Enable logging and display of /var/log/lastlog login(1) time info.
+-#
+-LASTLOG_ENAB		yes
+-
+ #
+ # Limit the highest user ID number for which the lastlog entries should
+ # be updated.
+@@ -40,88 +27,13 @@ LASTLOG_ENAB		yes
+ #
+ #LASTLOG_UID_MAX
+ 
+-#
+-# Enable checking and display of mailbox status upon login.
+-#
+-# Disable if the shell startup files already check for mail
+-# ("mailx -e" or equivalent).
+-#
+-MAIL_CHECK_ENAB		yes
+-
+-#
+-# Enable additional checks upon password changes.
+-#
+-OBSCURE_CHECKS_ENAB	yes
+-
+-#
+-# Enable checking of time restrictions specified in /etc/porttime.
+-#
+-PORTTIME_CHECKS_ENAB	yes
+-
+-#
+-# Enable setting of ulimit, umask, and niceness from passwd(5) gecos field.
+-#
+-QUOTAS_ENAB		yes
+-
+-#
+-# Enable "syslog" logging of su(1) activity - in addition to sulog file logging.
+-# SYSLOG_SG_ENAB does the same for newgrp(1) and sg(1).
+-#
+-SYSLOG_SU_ENAB		yes
+-SYSLOG_SG_ENAB		yes
+-
+-#
+-# If defined, either full pathname of a file containing device names or
+-# a ":" delimited list of device names.  Root logins will be allowed only
+-# from these devices.
+-#
+-CONSOLE		/etc/securetty
+-#CONSOLE	console:tty01:tty02:tty03:tty04
+-
+-#
+-# If defined, all su(1) activity is logged to this file.
+-#
+-#SULOG_FILE	/var/log/sulog
+-
+ #
+ # If defined, ":" delimited list of "message of the day" files to
+ # be displayed upon login.
+ #
+-MOTD_FILE	/etc/motd
++MOTD_FILE
+ #MOTD_FILE	/etc/motd:/usr/lib/news/news-motd
+ 
+-#
+-# If defined, this file will be output before each login(1) prompt.
+-#
+-#ISSUE_FILE	/etc/issue
+-
+-#
+-# If defined, file which maps tty line to TERM environment parameter.
+-# Each line of the file is in a format similar to "vt100  tty01".
+-#
+-#TTYTYPE_FILE	/etc/ttytype
+-
+-#
+-# If defined, login(1) failures will be logged here in a utmp format.
+-# last(1), when invoked as lastb(1), will read /var/log/btmp, so...
+-#
+-FTMP_FILE	/var/log/btmp
+-
+-#
+-# If defined, name of file whose presence will inhibit non-root
+-# logins.  The content of this file should be a message indicating
+-# why logins are inhibited.
+-#
+-NOLOGINS_FILE	/etc/nologin
+-
+-#
+-# If defined, the command name to display when running "su -".  For
+-# example, if this is defined as "su" then ps(1) will display the
+-# command as "-su".  If not defined, then ps(1) will display the
+-# name of the shell actually being run, e.g. something like "-sh".
+-#
+-SU_NAME		su
+-
+ #
+ # *REQUIRED*
+ #   Directory where mailboxes reside, _or_ name of file, relative to the
+@@ -139,21 +51,6 @@ MAIL_DIR	/var/spool/mail
+ HUSHLOGIN_FILE	.hushlogin
+ #HUSHLOGIN_FILE	/etc/hushlogins
+ 
+-#
+-# If defined, either a TZ environment parameter spec or the
+-# fully-rooted pathname of a file containing such a spec.
+-#
+-#ENV_TZ		TZ=CST6CDT
+-#ENV_TZ		/etc/tzname
+-
+-#
+-# If defined, an HZ environment parameter spec.
+-#
+-# for Linux/x86
+-ENV_HZ		HZ=100
+-# For Linux/Alpha...
+-#ENV_HZ		HZ=1024
+-
+ #
+ # *REQUIRED*  The default PATH settings, for superuser and normal users.
+ #
+@@ -175,23 +72,6 @@ ENV_PATH	PATH=/bin:/usr/bin
+ TTYGROUP	tty
+ TTYPERM		0600
+ 
+-#
+-# Login configuration initializations:
+-#
+-#	ERASECHAR	Terminal ERASE character ('\010' = backspace).
+-#	KILLCHAR	Terminal KILL character ('\025' = CTRL/U).
+-#	ULIMIT		Default "ulimit" value.
+-#
+-# The ERASECHAR and KILLCHAR are used only on System V machines.
+-# The ULIMIT is used only if the system supports it.
+-# (now it works with setrlimit too; ulimit is in 512-byte units)
+-#
+-# Prefix these values with "0" to get octal, "0x" to get hexadecimal.
+-#
+-ERASECHAR	0177
+-KILLCHAR	025
+-#ULIMIT		2097152
+-
+ # Default initial "umask" value used by login(1) on non-PAM enabled systems.
+ # Default "umask" value for pam_umask(8) on PAM enabled systems.
+ # UMASK is also used by useradd(8) and newusers(8) to set the mode for new
+@@ -357,7 +237,6 @@ CHFN_RESTRICT		rwh
+ # Only works if compiled with ENCRYPTMETHOD_SELECT defined:
+ # If set to SHA256, SHA256-based algorithm will be used for encrypting password
+ # If set to SHA512, SHA512-based algorithm will be used for encrypting password
+-# If set to BCRYPT, BCRYPT-based algorithm will be used for encrypting password
+ # If set to YESCRYPT, YESCRYPT-based algorithm will be used for encrypting password
+ #
+ # Note: if you use PAM, it is recommended to use a value consistent with
+@@ -382,21 +261,6 @@ CHFN_RESTRICT		rwh
+ #SHA_CRYPT_MIN_ROUNDS 5000
+ #SHA_CRYPT_MAX_ROUNDS 5000
+ 
+-#
+-# Only works if ENCRYPT_METHOD is set to BCRYPT.
+-#
+-# Define the number of BCRYPT rounds.
+-# With a lot of rounds, it is more difficult to brute-force the password.
+-# However, more CPU resources will be needed to authenticate users if
+-# this value is increased.
+-#
+-# If not specified, 13 rounds will be attempted.
+-# If only one of the MIN or MAX values is set, then this value will be used.
+-# If MIN > MAX, the highest value will be used.
+-#
+-#BCRYPT_MIN_ROUNDS 13
+-#BCRYPT_MAX_ROUNDS 13
+-
+ #
+ # Only works if ENCRYPT_METHOD is set to YESCRYPT.
+ #
+@@ -410,17 +274,6 @@ CHFN_RESTRICT		rwh
+ #
+ #YESCRYPT_COST_FACTOR 5
+ 
+-#
+-# List of groups to add to the user's supplementary group set
+-# when logging in from the console (as determined by the CONSOLE
+-# setting).  Default is none.
+-#
+-# Use with caution - it is possible for users to gain permanent
+-# access to these groups, even when not logged in from the console.
+-# How to do it is left as an exercise for the reader...
+-#
+-#CONSOLE_GROUPS		floppy:audio:cdrom
+-
+ #
+ # Should login be allowed if we can't cd to the home directory?
+ # Default is no.
+@@ -435,12 +288,6 @@ DEFAULT_HOME	yes
+ #
+ NONEXISTENT	/nonexistent
+ 
+-#
+-# If this file exists and is readable, login environment will be
+-# read from it.  Every line should be in the form name=value.
+-#
+-ENVIRON_FILE	/etc/environment
+-
+ #
+ # If defined, this command is run when removing a user.
+ # It should remove any at/cron/print jobs etc. owned by
+@@ -488,14 +335,6 @@ USERGROUPS_ENAB yes
+ #
+ #GRANT_AUX_GROUP_SUBIDS yes
+ 
+-#
+-# Prevents an empty password field to be interpreted as "no authentication
+-# required".
+-# Set to "yes" to prevent for all accounts
+-# Set to "superuser" to prevent for UID 0 / root (default)
+-# Set to "no" to not prevent for any account (dangerous, historical default)
+-PREVENT_NO_AUTH superuser
+-
+ #
+ # Select the HMAC cryptography algorithm.
+ # Used in pam_timestamp module to calculate the keyed-hash message
+diff --git a/man/login.defs.5.xml b/man/login.defs.5.xml
+index b7cdf3e7..460de706 100644
+--- a/man/login.defs.5.xml
++++ b/man/login.defs.5.xml
+@@ -7,43 +7,24 @@
+ -->
+ <!DOCTYPE refentry PUBLIC "-//OASIS//DTD DocBook V4.5//EN"
+   "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+-<!ENTITY BCRYPT_MIN_ROUNDS     SYSTEM "login.defs.d/BCRYPT_MIN_ROUNDS.xml">
+-<!ENTITY CHFN_AUTH             SYSTEM "login.defs.d/CHFN_AUTH.xml">
+ <!ENTITY CHFN_RESTRICT         SYSTEM "login.defs.d/CHFN_RESTRICT.xml">
+-<!ENTITY CHSH_AUTH             SYSTEM "login.defs.d/CHSH_AUTH.xml">
+-<!ENTITY CONSOLE               SYSTEM "login.defs.d/CONSOLE.xml">
+-<!ENTITY CONSOLE_GROUPS        SYSTEM "login.defs.d/CONSOLE_GROUPS.xml">
+ <!ENTITY CREATE_HOME           SYSTEM "login.defs.d/CREATE_HOME.xml">
+ <!ENTITY DEFAULT_HOME          SYSTEM "login.defs.d/DEFAULT_HOME.xml">
+ <!ENTITY ENCRYPT_METHOD        SYSTEM "login.defs.d/ENCRYPT_METHOD.xml">
+-<!ENTITY ENV_HZ                SYSTEM "login.defs.d/ENV_HZ.xml">
+ <!ENTITY ENV_PATH              SYSTEM "login.defs.d/ENV_PATH.xml">
+ <!ENTITY ENV_SUPATH            SYSTEM "login.defs.d/ENV_SUPATH.xml">
+-<!ENTITY ENV_TZ                SYSTEM "login.defs.d/ENV_TZ.xml">
+-<!ENTITY ENVIRON_FILE          SYSTEM "login.defs.d/ENVIRON_FILE.xml">
+-<!ENTITY ERASECHAR             SYSTEM "login.defs.d/ERASECHAR.xml">
+ <!ENTITY FAIL_DELAY            SYSTEM "login.defs.d/FAIL_DELAY.xml">
+-<!ENTITY FAILLOG_ENAB          SYSTEM "login.defs.d/FAILLOG_ENAB.xml">
+-<!ENTITY FAKE_SHELL            SYSTEM "login.defs.d/FAKE_SHELL.xml">
+-<!ENTITY FTMP_FILE             SYSTEM "login.defs.d/FTMP_FILE.xml">
+ <!ENTITY GID_MAX               SYSTEM "login.defs.d/GID_MAX.xml">
+ <!ENTITY HMAC_CRYPTO_ALGO      SYSTEM "login.defs.d/HMAC_CRYPTO_ALGO.xml">
+ <!ENTITY HOME_MODE             SYSTEM "login.defs.d/HOME_MODE.xml">
+ <!ENTITY HUSHLOGIN_FILE        SYSTEM "login.defs.d/HUSHLOGIN_FILE.xml">
+-<!ENTITY ISSUE_FILE            SYSTEM "login.defs.d/ISSUE_FILE.xml">
+-<!ENTITY KILLCHAR              SYSTEM "login.defs.d/KILLCHAR.xml">
+-<!ENTITY LASTLOG_ENAB          SYSTEM "login.defs.d/LASTLOG_ENAB.xml">
+ <!ENTITY LASTLOG_UID_MAX       SYSTEM "login.defs.d/LASTLOG_UID_MAX.xml">
+-<!ENTITY LOG_OK_LOGINS         SYSTEM "login.defs.d/LOG_OK_LOGINS.xml">
+ <!ENTITY LOG_UNKFAIL_ENAB      SYSTEM "login.defs.d/LOG_UNKFAIL_ENAB.xml">
+ <!ENTITY LOGIN_RETRIES         SYSTEM "login.defs.d/LOGIN_RETRIES.xml">
+-<!ENTITY LOGIN_STRING          SYSTEM "login.defs.d/LOGIN_STRING.xml">
+ <!ENTITY LOGIN_TIMEOUT         SYSTEM "login.defs.d/LOGIN_TIMEOUT.xml">
+-<!ENTITY MAIL_CHECK_ENAB       SYSTEM "login.defs.d/MAIL_CHECK_ENAB.xml">
+ <!ENTITY MAIL_DIR              SYSTEM "login.defs.d/MAIL_DIR.xml">
+ <!ENTITY MAX_MEMBERS_PER_GROUP SYSTEM "login.defs.d/MAX_MEMBERS_PER_GROUP.xml">
+ <!ENTITY MOTD_FILE             SYSTEM "login.defs.d/MOTD_FILE.xml">
+-<!ENTITY NOLOGINS_FILE         SYSTEM "login.defs.d/NOLOGINS_FILE.xml">
+ <!ENTITY NONEXISTENT           SYSTEM "login.defs.d/NONEXISTENT.xml">
+ <!ENTITY OBSCURE_CHECKS_ENAB   SYSTEM "login.defs.d/OBSCURE_CHECKS_ENAB.xml">
+ <!ENTITY PASS_ALWAYS_WARN      SYSTEM "login.defs.d/PASS_ALWAYS_WARN.xml">
+@@ -52,25 +33,18 @@
+ <!ENTITY PASS_MAX_DAYS         SYSTEM "login.defs.d/PASS_MAX_DAYS.xml">
+ <!ENTITY PASS_WARN_AGE         SYSTEM "login.defs.d/PASS_WARN_AGE.xml">
+ <!ENTITY PORTTIME_CHECKS_ENAB  SYSTEM "login.defs.d/PORTTIME_CHECKS_ENAB.xml">
+-<!ENTITY QUOTAS_ENAB           SYSTEM "login.defs.d/QUOTAS_ENAB.xml">
+ <!ENTITY SHA_CRYPT_MIN_ROUNDS  SYSTEM "login.defs.d/SHA_CRYPT_MIN_ROUNDS.xml">
+-<!ENTITY SULOG_FILE            SYSTEM "login.defs.d/SULOG_FILE.xml">
+-<!ENTITY SU_NAME               SYSTEM "login.defs.d/SU_NAME.xml">
+-<!ENTITY SU_WHEEL_ONLY         SYSTEM "login.defs.d/SU_WHEEL_ONLY.xml">
+ <!ENTITY SUB_GID_COUNT         SYSTEM "login.defs.d/SUB_GID_COUNT.xml">
+ <!ENTITY SUB_GID_STORE_BY_UID  SYSTEM "login.defs.d/SUB_GID_STORE_BY_UID.xml">
+ <!ENTITY SUB_UID_COUNT         SYSTEM "login.defs.d/SUB_UID_COUNT.xml">
+ <!ENTITY SUB_UID_STORE_BY_UID  SYSTEM "login.defs.d/SUB_UID_STORE_BY_UID.xml">
+ <!ENTITY SYS_GID_MAX           SYSTEM "login.defs.d/SYS_GID_MAX.xml">
+ <!ENTITY SYSLOG_SG_ENAB        SYSTEM "login.defs.d/SYSLOG_SG_ENAB.xml">
+-<!ENTITY SYSLOG_SU_ENAB        SYSTEM "login.defs.d/SYSLOG_SU_ENAB.xml">
+ <!ENTITY SYS_UID_MAX           SYSTEM "login.defs.d/SYS_UID_MAX.xml">
+ <!ENTITY TCB_AUTH_GROUP        SYSTEM "login.defs.d/TCB_AUTH_GROUP.xml">
+ <!ENTITY TCB_SYMLINKS          SYSTEM "login.defs.d/TCB_SYMLINKS.xml">
+ <!ENTITY TTYGROUP              SYSTEM "login.defs.d/TTYGROUP.xml">
+-<!ENTITY TTYTYPE_FILE          SYSTEM "login.defs.d/TTYTYPE_FILE.xml">
+ <!ENTITY UID_MAX               SYSTEM "login.defs.d/UID_MAX.xml">
+-<!ENTITY ULIMIT                SYSTEM "login.defs.d/ULIMIT.xml">
+ <!ENTITY UMASK                 SYSTEM "login.defs.d/UMASK.xml">
+ <!ENTITY USERDEL_CMD           SYSTEM "login.defs.d/USERDEL_CMD.xml">
+ <!ENTITY USERGROUPS_ENAB       SYSTEM "login.defs.d/USERGROUPS_ENAB.xml">
+@@ -156,47 +130,25 @@
+     <para>The following configuration items are provided:</para>
+ 
+     <variablelist remap='IP'>
+-      &BCRYPT_MIN_ROUNDS; <!-- documents also BCRYPT_MAX_ROUNDS -->
+-      &CHFN_AUTH;
+       &CHFN_RESTRICT;
+-      &CHSH_AUTH;
+-      &CONSOLE;
+-      &CONSOLE_GROUPS;
+       &CREATE_HOME;
+       &DEFAULT_HOME;
+       &ENCRYPT_METHOD;
+-      &ENV_HZ;
+       &ENV_PATH;
+       &ENV_SUPATH;
+-      &ENV_TZ;
+-      &ENVIRON_FILE;
+-      &ERASECHAR;
+       &FAIL_DELAY;
+-      &FAILLOG_ENAB;
+-      &FAKE_SHELL;
+-      &FTMP_FILE;
+       &GID_MAX; <!-- documents also GID_MIN -->
+       &HMAC_CRYPTO_ALGO;
+       &HOME_MODE;
+       &HUSHLOGIN_FILE;
+-      &ISSUE_FILE;
+-      &KILLCHAR;
+-      &LASTLOG_ENAB;
+       &LASTLOG_UID_MAX;
+-      &LOG_OK_LOGINS;
+       &LOG_UNKFAIL_ENAB;
+       &LOGIN_RETRIES;
+-      &LOGIN_STRING;
+       &LOGIN_TIMEOUT;
+-      &MAIL_CHECK_ENAB;
+       &MAIL_DIR;
+       &MAX_MEMBERS_PER_GROUP;
+       &MOTD_FILE;
+-      &NOLOGINS_FILE;
+       &NONEXISTENT;
+-      &OBSCURE_CHECKS_ENAB;
+-      &PASS_ALWAYS_WARN;
+-      &PASS_CHANGE_TRIES;
+       &PASS_MAX_DAYS;
+       &PASS_WARN_AGE;
+       <para>
+@@ -207,11 +159,7 @@
+       </para>
+       &PASS_MIN_LEN;
+       &PORTTIME_CHECKS_ENAB;
+-      &QUOTAS_ENAB;
+       &SHA_CRYPT_MIN_ROUNDS; <!-- documents also SHA_CRYPT_MAX_ROUNDS -->
+-      &SULOG_FILE;
+-      &SU_NAME;
+-      &SU_WHEEL_ONLY;
+       &SUB_GID_COUNT; <!-- documents also SUB_GID_MIN SUB_GID_MAX SUB_GID_DETERMINISTIC UNSAFE_SUB_GID_DETERMINISTIC_WRAP -->
+       &SUB_GID_STORE_BY_UID;
+       &SUB_UID_COUNT; <!-- documents also SUB_UID_MIN SUB_UID_MAX SUB_UID_DETERMINISTIC UNSAFE_SUB_UID_DETERMINISTIC_WRAP -->
+@@ -219,13 +167,10 @@
+       &SYS_GID_MAX; <!-- documents also SYS_GID_MIN -->
+       &SYS_UID_MAX; <!-- documents also SYS_UID_MIN -->
+       &SYSLOG_SG_ENAB;
+-      &SYSLOG_SU_ENAB;
+       &TCB_AUTH_GROUP;
+       &TCB_SYMLINKS;
+       &TTYGROUP;
+-      &TTYTYPE_FILE;
+       &UID_MAX; <!-- documents also UID_MIN -->
+-      &ULIMIT;
+       &UMASK;
+       &USERDEL_CMD;
+       &USERGROUPS_ENAB;
+@@ -286,7 +231,7 @@
+ 	<term>chsh</term>
+ 	<listitem>
+ 	  <para>
+-	    CHSH_AUTH LOGIN_STRING
++	    CHSH_AUTH
+ 	  </para>
+ 	</listitem>
+       </varlistentry>
+@@ -349,34 +294,6 @@
+ 	  <para>LASTLOG_UID_MAX</para>
+ 	</listitem>
+       </varlistentry>
+-      <varlistentry>
+-	<term>login</term>
+-	<listitem>
+-	  <para>
+-	    <phrase condition="no_pam">CONSOLE</phrase>
+-	    CONSOLE_GROUPS DEFAULT_HOME
+-	    <phrase condition="no_pam">ENV_HZ ENV_PATH ENV_SUPATH
+-	    ENV_TZ ENVIRON_FILE</phrase>
+-	    ERASECHAR FAIL_DELAY
+-	    <phrase condition="no_pam">FAILLOG_ENAB</phrase>
+-	    FAKE_SHELL
+-	    <phrase condition="no_pam">FTMP_FILE</phrase>
+-	    HUSHLOGIN_FILE
+-	    <phrase condition="no_pam">ISSUE_FILE</phrase>
+-	    KILLCHAR
+-	    <phrase condition="no_pam">LASTLOG_ENAB LASTLOG_UID_MAX</phrase>
+-	    LOGIN_RETRIES
+-	    <phrase condition="no_pam">LOGIN_STRING</phrase>
+-	    LOGIN_TIMEOUT LOG_OK_LOGINS LOG_UNKFAIL_ENAB
+-	    <phrase condition="no_pam">MAIL_CHECK_ENAB MAIL_DIR MAIL_FILE
+-	    MOTD_FILE NOLOGINS_FILE PORTTIME_CHECKS_ENAB
+-	    QUOTAS_ENAB</phrase>
+-	    TTYGROUP TTYPERM TTYTYPE_FILE
+-	    <phrase condition="no_pam">ULIMIT UMASK</phrase>
+-	    USERGROUPS_ENAB
+-	  </para>
+-	</listitem>
+-      </varlistentry>
+       <varlistentry>
+ 	<term>newgrp / sg</term>
+ 	<listitem>
+@@ -448,32 +365,6 @@
+ 	  </para>
+ 	</listitem>
+       </varlistentry>
+-      <varlistentry>
+-	<term>su</term>
+-	<listitem>
+-	  <para>
+-	    <phrase condition="no_pam">CONSOLE</phrase>
+-	    CONSOLE_GROUPS DEFAULT_HOME
+-	    <phrase condition="no_pam">ENV_HZ ENVIRON_FILE</phrase>
+-	    ENV_PATH ENV_SUPATH
+-	    <phrase condition="no_pam">ENV_TZ LOGIN_STRING MAIL_CHECK_ENAB
+-	    MAIL_DIR MAIL_FILE QUOTAS_ENAB</phrase>
+-	    SULOG_FILE SU_NAME
+-	    <phrase condition="no_pam">SU_WHEEL_ONLY</phrase>
+-	    SYSLOG_SU_ENAB
+-	    <phrase condition="no_pam">USERGROUPS_ENAB</phrase>
+-	  </para>
+-	</listitem>
+-      </varlistentry>
+-      <varlistentry condition="no_pam">
+-	<term>sulogin</term>
+-	<listitem>
+-	  <para>
+-	    ENV_HZ
+-	    ENV_TZ
+-	  </para>
+-	</listitem>
+-      </varlistentry>
+       <varlistentry>
+ 	<term>useradd</term>
+ 	<listitem>
+@@ -518,14 +409,6 @@
+ 	  </para>
+ 	</listitem>
+       </varlistentry>
+-      <varlistentry condition="tcb">
+-	<term>vipw</term>
+-	<listitem>
+-	  <para>
+-	    <phrase condition="tcb">USE_TCB</phrase>
+-	  </para>
+-	</listitem>
+-      </varlistentry>
+     </variablelist>
+   </refsect1>
+ 
+
+From f8f5102e8bde4e3052f30ce0dcb9e70dbfa41534 Mon Sep 17 00:00:00 2001
+From: David Runge <dvzrv@archlinux.org>
+Date: Mon, 31 Oct 2022 10:10:22 +0100
+Subject: [PATCH 3/3] Add Arch Linux defaults for login.defs
+
+etc/login.defs:
+- Change `ENV_PATH` and `ENV_SUPATH` to only use
+  /usr/local/sbin:/usr/local/bin:/usr/bin as Arch Linux is a /usr and
+  bin merge distribution.
+- Set `HOME_MODE` to `0700` to be able to rely on a `UMASK` of `022`
+  while creating home directories in a privacy conserving manner.
+- Change SYS_UID_MIN and SYS_GID_MIN to 500 which gives more space for
+  distribution added UIDs and GIDs of system users.
+- Change ENCRYPT_METHOD to YESCRYPT as it is a safer hashing algorithm
+  than SHA512.
+
+Signed-off-by: David Runge <dvzrv@archlinux.org>
+---
+ etc/login.defs | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/etc/login.defs b/etc/login.defs
+index f55900ce..226c83fc 100644
+--- a/etc/login.defs
++++ b/etc/login.defs
+@@ -55,8 +55,8 @@ HUSHLOGIN_FILE	.hushlogin
+ # *REQUIRED*  The default PATH settings, for superuser and normal users.
+ #
+ # (they are minimal, add the rest in the shell startup files)
+-ENV_SUPATH	PATH=/sbin:/bin:/usr/sbin:/usr/bin
+-ENV_PATH	PATH=/bin:/usr/bin
++ENV_SUPATH	PATH=/usr/local/sbin:/usr/local/bin:/usr/bin
++ENV_PATH	PATH=/usr/local/sbin:/usr/local/bin:/usr/bin
+ 
+ #
+ # Terminal permissions
+@@ -84,7 +84,7 @@ UMASK		022
+ # HOME_MODE is used by useradd(8) and newusers(8) to set the mode for new
+ # home directories.
+ # If HOME_MODE is not set, the value of UMASK is used to create the mode.
+-#HOME_MODE	0700
++HOME_MODE	0700
+ 
+ #
+ # If "yes", the user must be listed as a member of the first gid 0 group
+@@ -100,7 +100,7 @@ SU_WHEEL_ONLY	no
+ UID_MIN			 1000
+ UID_MAX			60000
+ # System accounts
+-SYS_UID_MIN		  101
++SYS_UID_MIN		  500
+ SYS_UID_MAX		  999
+ # Extra per user uids
+ SUB_UID_MIN		   100000
+@@ -148,7 +148,7 @@ SUB_UID_COUNT		    65536
+ GID_MIN			 1000
+ GID_MAX			60000
+ # System accounts
+-SYS_GID_MIN		  101
++SYS_GID_MIN		  500
+ SYS_GID_MAX		  999
+ # Extra per user group ids
+ SUB_GID_MIN		   100000
+@@ -242,7 +242,7 @@ CHFN_RESTRICT		rwh
+ # Note: if you use PAM, it is recommended to use a value consistent with
+ # the PAM modules configuration.
+ #
+-#ENCRYPT_METHOD SHA512
++ENCRYPT_METHOD YESCRYPT
+ 
+ #
+ # Only works if ENCRYPT_METHOD is set to SHA256 or SHA512.

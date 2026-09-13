@@ -40,5 +40,8 @@
   "sources": [
     "https://salsa.debian.org/gnome-team/libcanberra/-/archive/debian/0.30-20/libcanberra-0.30-20.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_VAPI"
+  ]
 }
