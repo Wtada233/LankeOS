@@ -21,11 +21,15 @@
     "libdbusmenu-gtk3.so.4"
   ],
   "build_deps": [
+    "at-spi2-core",
     "base-devel",
+    "gdk-pixbuf",
+    "glib",
     "gobject-introspection",
     "gtk3",
     "gtk-doc",
-    "intltool"
+    "intltool",
+    "pango"
   ],
   "sources": [
     "https://deb.debian.org/debian/pool/main/libd/libdbusmenu/libdbusmenu_18.10.20180917~bzr492+repack1.orig.tar.xz"

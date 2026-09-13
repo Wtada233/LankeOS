@@ -70,9 +70,11 @@
     "libwbclient.so.0"
   ],
   "build_deps": [
+    "acl",
     "base-devel",
     "cups",
     "cyrus-sasl",
+    "dbus",
     "fuse3",
     "gdb",
     "git",
@@ -88,9 +90,12 @@
     "libtasn1",
     "libtirpc",
     "libunwind",
+    "liburing",
+    "libxcrypt",
     "libxslt",
     "linux-pam",
     "lmdb",
+    "ncurses",
     "nss",
     "openldap",
     "perl-parse-yapp",
@@ -98,7 +103,8 @@
     "readline",
     "rpcsvc-proto",
     "tdb",
-    "vala"
+    "vala",
+    "zlib"
   ],
   "sources": [
     "https://download.samba.org/pub/samba/stable/samba-4.24.6.tar.gz"

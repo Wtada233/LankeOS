@@ -63,6 +63,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cairo",
     "cmake",
     "glib",
     "gnome-online-accounts",
@@ -70,6 +71,8 @@
     "gperf",
     "gtk3",
     "gtk4",
+    "icu",
+    "json-glib",
     "krb5",
     "libcanberra",
     "libgweather-4",
@@ -81,8 +84,10 @@
     "nspr",
     "nss",
     "openldap",
+    "pango",
     "sqlite",
-    "vala"
+    "vala",
+    "zlib"
   ],
   "sources": [
     "https://download.gnome.org/sources/evolution-data-server/3.60/evolution-data-server-3.60.2.tar.xz"

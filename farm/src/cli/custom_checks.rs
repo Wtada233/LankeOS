@@ -126,7 +126,7 @@ struct ChkDef {
     run: fn(&ChkOpts) -> Result<Report, FarmError>,
 }
 
-const CHECKS: [ChkDef; 7] = [
+const CHECKS: [ChkDef; 8] = [
     ChkDef {
         label: "qml",
         cache: "qmlchk",
@@ -151,6 +151,11 @@ const CHECKS: [ChkDef; 7] = [
         label: "vapi",
         cache: "vapichk",
         run: lankefarm::custom_checks::vapi::run,
+    },
+    ChkDef {
+        label: "build-deps",
+        cache: "build-depschk",
+        run: lankefarm::custom_checks::build_deps::run,
     },
     ChkDef {
         label: "hook",
@@ -217,6 +222,7 @@ mod tests {
             "pkg-err",
             "introspection",
             "vapi",
+            "build-deps",
             "hook",
             "abi",
         ] {
@@ -224,7 +230,7 @@ mod tests {
             assert!(def(want).is_some(), "单跑入口解析不到 {want}");
         }
         // 数量钉死：新增一类必须同步这里（防漏注册/误删）
-        assert_eq!(CHECKS.len(), 7, "{labels:?}");
+        assert_eq!(CHECKS.len(), 8, "{labels:?}");
         // 缓存子目录必须唯一：两检則共用目录会互相污染（A 的 analysis 被 B 当自己的读）
         let caches: std::collections::HashSet<&str> = CHECKS.iter().map(|d| d.cache).collect();
         assert_eq!(caches.len(), CHECKS.len(), "缓存子目录必须唯一");

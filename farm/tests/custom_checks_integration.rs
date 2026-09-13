@@ -2,7 +2,9 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use lankefarm::custom_checks::{hook, introspection, pkg_err, pkgconf, qml, vapi, ChkOpts};
+use lankefarm::custom_checks::{
+    build_deps, hook, introspection, pkg_err, pkgconf, qml, vapi, ChkOpts,
+};
 
 struct Repo {
     base: PathBuf,
@@ -417,6 +419,67 @@ fn vapichk_flags_missing_vala_build_dep_and_honors_ignore_flag() {
         rep.findings
     );
     r.cleanup();
+}
+
+/// build-deps chk 是**纯配方**检則（不扫 .lpkg）——这里只造 LankeBUILD.json，不需要打包任何东西。
+#[test]
+fn build_depschk_flags_missing_provider_and_honors_ignore_flag() {
+    let base = std::env::temp_dir().join(format!("farm-cchk-bd-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&base);
+    let pkgs = base.join("pkgs");
+    let w = |name: &str, provides: &[&str], needed: &[&str], bd: &[&str], flags: &[&str]| {
+        std::fs::create_dir_all(pkgs.join(name)).unwrap();
+        let mut m = serde_json::json!({
+            "name": name, "version": "1.0",
+            "provides": provides, "needed_so": needed, "build_deps": bd
+        });
+        if !flags.is_empty() {
+            m["farm_flags"] = serde_json::json!(flags);
+        }
+        std::fs::write(
+            pkgs.join(format!("{name}/LankeBUILD.json")),
+            serde_json::to_string(&m).unwrap(),
+        )
+        .unwrap();
+    };
+    w("libfoo", &["libfoo.so.1"], &[], &["base-devel"], &[]);
+    w(
+        "ok",
+        &["ok.so.1"],
+        &["libfoo.so.1"],
+        &["base-devel", "libfoo"],
+        &[],
+    );
+    w("bad", &["bad.so.1"], &["libfoo.so.1"], &["base-devel"], &[]);
+    w(
+        "ign",
+        &["ign.so.1"],
+        &["libfoo.so.1"],
+        &["base-devel"],
+        &["IGNORE_CHK_BUILDDEPS"],
+    );
+
+    let o = ChkOpts {
+        source: base.clone(),
+        arch: "x86_64".into(),
+        cache: base.join("cache"),
+        pkgs_dir: pkgs.clone(),
+        subset: vec![],
+        full_rescan: false,
+    };
+    let rep = build_deps::run(&o).unwrap();
+    assert!(!rep.findings.contains_key("ok"), "{:?}", rep.findings);
+    assert!(
+        !rep.findings.contains_key("ign"),
+        "IGNORE_CHK_BUILDDEPS 应生效: {:?}",
+        rep.findings
+    );
+    assert!(
+        has(&rep, "bad", "libfoo.so.1"),
+        "needed_so 的 provider 未写进 build_deps 应报: {:?}",
+        rep.findings
+    );
+    let _ = std::fs::remove_dir_all(&base);
 }
 
 #[test]

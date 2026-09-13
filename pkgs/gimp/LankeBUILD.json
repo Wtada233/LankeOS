@@ -91,6 +91,7 @@
     "bash-completion",
     "bzip2",
     "cairo",
+    "cfitsio",
     "fontconfig",
     "freetype",
     "gdk-pixbuf",

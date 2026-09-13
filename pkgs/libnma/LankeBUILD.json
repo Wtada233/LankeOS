@@ -25,6 +25,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cairo",
     "dconf",
     "gcr-4",
     "glib",

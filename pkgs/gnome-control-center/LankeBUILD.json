@@ -59,6 +59,7 @@
     "base-devel",
     "blueprint-compiler",
     "cairo",
+    "colord",
     "colord-gtk",
     "cups",
     "dconf",

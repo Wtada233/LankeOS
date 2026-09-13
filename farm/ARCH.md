@@ -273,7 +273,7 @@ build --all ──> run_build
 - 确定性：包/文件排序遍历；provider 冲突（同 SONAME 多份）最后一次胜。consumer 判缺失在 provider
   目录建全后统一做。
 
-## 17. `farm chk`：LankeOS 维护检則工具集（qml/pkgconf/pkg-err/introspection/vapi/hook/abi/full）
+## 17. `farm chk`：LankeOS 维护检則工具集（qml/pkgconf/pkg-err/introspection/vapi/build-deps/hook/abi/full）
 
 `src/custom_checks/` 一族的策略/打包检测（非 farm 核心 ABI），参考 abichk（§16）的架构与缓存思路，
 由 `farm chk full` 一并跑（或 `farm chk <kind>` 单跑；ABI 审计 §16 同属此工具集）。逐包一次解包；
@@ -292,9 +292,14 @@ build --all ──> run_build
   的须声明 `vala`——两类文件都由**构建期**工具（`g-ir-scanner` / `valac`）生成。**读配方 `build_deps`**
   （构建期依赖，区别于上面读 index 运行时 deps 的两条）；缺失 → **Critical**。`pkg == 工具包`自满足
   （`vala`/`gobject-introspection` 自带自己的产物）。
+- build-deps chk：`needed_so` 的每个 SONAME，其提供者必须**直接**写在本包 `build_deps`——
+  **被别的 build_dep 传递满足也不算**（`needed_so` 是直接链接依赖，build_deps 要写全）；
+  `base`/`base-devel` 的**直接** `deps` 并集覆盖的提供者视为满足（铁律：这些包不该写进 build_deps）。
+  自提供、仓库内无 provider 的 SONAME 跳过（后者归 `farm abifix`）。**只读配方 `LankeBUILD.json`**
+  （SONAME→provider 关系取自各包 `provides` 字段，不扫 `.lpkg`），因此**不占缓存**。
 - hookchk：建了 `usr/lib/sysusers.d`/`tmpfiles.d` 的包，其 `hooks/postinst.sh` 必须调
   `systemd-sysusers`/`systemd-tmpfiles --create`；**只认非注释行**（行首可选空白后 `#` 视为注释）——
   注释里出现字样不算已调用。
-配方 `farm_flags` 支持 `IGNORE_CHK_ABI/QML/PKGCONF/PKGERR/INTROSPECTION/VAPI/HOOK`（大写）整包豁免；列表值 flag
+配方 `farm_flags` 支持 `IGNORE_CHK_ABI/QML/PKGCONF/PKGERR/INTROSPECTION/VAPI/BUILDDEPS/HOOK`（大写）整包豁免；列表值 flag
 （如 `QML_CHK_IGN_LST`）**只认 JSON 数组对象成员** `{"QML_CHK_IGN_LST": ["a","b"]}`（`NAME=a,b` 裸串
 已废弃，会告警）。这些 flag 已在 `build/farm_flags.rs` 注册（topo 解析不告警）。检則都非 root、只读。

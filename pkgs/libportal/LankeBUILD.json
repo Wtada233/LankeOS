@@ -33,6 +33,7 @@
     "gtk3",
     "gtk4",
     "meson",
+    "qt6-base",
     "vala"
   ],
   "sources": [

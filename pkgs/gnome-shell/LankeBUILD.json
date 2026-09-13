@@ -69,6 +69,7 @@
     "json-glib",
     "libadwaita",
     "libcanberra",
+    "libglvnd",
     "libgweather-4",
     "libical",
     "libnma",

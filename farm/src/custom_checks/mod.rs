@@ -12,6 +12,7 @@
 //! `IGNORE_CHK_<KIND>` 可整包豁免某检則。
 
 pub mod abi;
+pub mod build_deps;
 pub mod hook;
 pub mod introspection;
 pub mod pkg_err;

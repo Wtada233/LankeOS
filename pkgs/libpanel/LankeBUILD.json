@@ -19,6 +19,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cairo",
     "glib",
     "gobject-introspection",
     "graphene",

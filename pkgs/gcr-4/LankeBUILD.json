@@ -34,6 +34,7 @@
     "meson",
     "openssh",
     "p11-kit",
+    "pango",
     "vala"
   ],
   "sources": [
