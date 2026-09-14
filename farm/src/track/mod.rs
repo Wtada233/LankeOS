@@ -119,10 +119,10 @@ pub struct SourceConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pattern: Option<String>,
 
-    // ── multi-level-html-index（N 级：每级一个 {url, pattern}）──
-    /// N 级探测列表：`levels[i]` = 第 i+1 级页面 + 版本正则。
-    /// `levels[i].url` 可引用已解出的前级版本 `{v1}..{vi}`；`levels[i].pattern` 提取该级版本。
-    /// 最后一个 pattern 的捕获 = 最终版本（`{version}`），`template` 用 `{v1}..{vN}`/`{version}`/`{name}`。
+    // ── multi-level-html-index（N 级：每级 {name, url, pattern}）──
+    /// N 级探测列表：每级一个 `{name, url, pattern}`。**名字即占位符**（`{名字}`），
+    /// 只能在**后续级**的 url 与 template 里引用；名为 `version` 的那一级 = 包版本。
+    /// 详见 `templates/multi_level_html_index.rs` 的模块文档。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub levels: Vec<LevelConfig>,
 
@@ -152,11 +152,18 @@ pub struct SourceConfig {
     pub source_name: Option<String>, // 上游源目录/文件名覆盖（gtk3 的上游目录叫 gtk）
 }
 
-/// multi-level-html-index 的一级：页面 URL + 版本正则（同一条目配对，无并行数组错位）。
+/// multi-level-html-index 的一级：**显式名字**（= 占位符名）+ 页面 URL + 版本正则。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct LevelConfig {
-    /// 该级页面 URL。可引用已解出的前级版本 `{v1}..{vN}`。
+    /// 该级名字 —— **名字即占位符**：`{名字}` 可在**后续级**的 `url` 与 `template` 里引用。
+    ///
+    /// 保留名 **`version`**：这一级的捕获就是**包版本**（每份配置必须且只能有一级叫 `version`）。
+    /// 不得取名 `name`（与上游名占位符 `{name}` 冲突）。名字必须非空且唯一。
+    /// 位置隐式的 `{v1}..{vN}` 已废弃（引用它 → 未知占位符报错）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// 该级页面 URL，可引用**前面已解出**的级名 `{x}`（引用后面/不存在的级 → 报错）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     /// 该级版本正则（含一个捕获组），提取该级版本。
@@ -176,6 +183,12 @@ impl TrackerConfig {
     /// 序列化为 tracker yaml（提案文件内容）。
     pub fn to_yaml(&self) -> Result<String, FarmError> {
         serde_yaml_ng::to_string(self).map_err(|e| format!("序列化 tracker yaml 失败: {e}").into())
+    }
+
+    /// 从 tracker yaml 文本解析（与 `to_yaml` 对称）：供 `cli::load_trackers` 使用——
+    /// 解析失败必须**可见**（不能像以前那样 `if let Ok` 静默跳过，让写错的 tracker"看着在、实际不生效"）。
+    pub fn from_yaml(text: &str) -> Result<TrackerConfig, FarmError> {
+        serde_yaml_ng::from_str(text).map_err(|e| format!("解析 tracker yaml 失败: {e}").into())
     }
 
     /// 探测类型名（显示用）：script / template。
@@ -1196,5 +1209,28 @@ script-content: |
         let ordered = order_entries(names, &trackers);
         assert_eq!(&ordered[..3], &["aa", "bb", "zz"]);
         assert_eq!(ordered[3], "lastpkg");
+    }
+
+    /// 钉死：字符串字段（`major-version-lock` 等）写**裸数字**时 serde_yaml_ng **会强转成字符串**。
+    /// 仓库里两种写法并存（`'3'` 带引号 vs 裸 `6`），都有效——这条把该依赖行为钉住：一旦将来
+    /// serde_yaml_ng 改成报错，`qt6-base`/`tcl` 这类 tracker 会被 `cli::load_trackers` 的
+    /// `if let Ok` **静默丢弃**（配置看着在、实际不生效），必须先在此暴露。
+    #[test]
+    fn string_field_accepts_bare_number() {
+        let yaml = "\
+pkg-name: p
+sources:
+- tracker-template: html-index
+  url: https://example.com/
+  pattern: 'a([0-9]+)'
+  template: https://example.com/{version}.tar.gz
+  major-version-lock: 6
+";
+        let cfg = serde_yaml_ng::from_str::<TrackerConfig>(yaml).expect("裸数字应能解析");
+        assert_eq!(
+            cfg.sources[0].major_version_lock.as_deref(),
+            Some("6"),
+            "裸数字应被强转为 \"6\""
+        );
     }
 }

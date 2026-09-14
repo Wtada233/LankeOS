@@ -400,8 +400,13 @@ fn load_trackers(data_dir: &str) -> HashMap<String, TrackerConfig> {
                 continue;
             }
             if let Ok(content) = std::fs::read_to_string(&path) {
-                if let Ok(cfg) = serde_yaml_ng::from_str::<TrackerConfig>(&content) {
-                    map.insert(cfg.pkg_name.clone(), cfg);
+                match TrackerConfig::from_yaml(&content) {
+                    Ok(cfg) => {
+                        map.insert(cfg.pkg_name.clone(), cfg);
+                    }
+                    // 解析失败必须**可见**：`if let Ok` 静默跳过时，写错的 tracker 会"看着在、
+                    // 实际不生效"（字段拼错/schema 变更后未迁移都会落到这里）。
+                    Err(e) => eprintln!("  [warn] 忽略无法解析的 tracker {}: {e}", path.display()),
                 }
             }
         }
@@ -980,11 +985,23 @@ source 条目可用 tracker-template 及字段：
 - gnome: template
 - gcs: url(GCS/S3 桶目录), pattern, template
 - html-index: url(HTML 目录列表页), pattern, template
+- multi-level-html-index: levels, template —— **N 级目录逐级进**（版本藏在路径里，如 KDE frameworks
+  `6.11/` 目录 → 目录内 `ki18n-6.11.0.tar.xz`）。`levels` 每级 `{name, url, pattern}`：**`name` 即占位符名**
+  （`{名字}` 可在**后续级**的 url 与 template 里引用）；**必须有一级名为 `version`**（该级捕获 = 包版本，
+  按名字定、不按位置）。**不要用已废弃的 `{v1}`/`{v2}`**。例：
+  levels:
+  - name: series
+    url: https://download.kde.org/stable/frameworks/
+    pattern: href="([0-9][0-9.]*)/"
+  - name: version
+    url: https://download.kde.org/stable/frameworks/{series}/
+    pattern: ki18n-([0-9][0-9.]*)\.tar\.xz
+  template: https://download.kde.org/stable/frameworks/{series}/ki18n-{version}.tar.xz
 - same-version: same-version-of(锁定为指定包版本，直接确定版本不经探测), tag-prefix, repo, template
 
 条目级版本约束（只作用于本条目，探测模板适用）：major-of、major-version-lock、max-version、source-name。
 template 是**完整下载 URL**（含 https:// 和主机名，占位符替换后可直接下载），不要把 URL 拆开只留文件名/相对路径。
-template 占位符：{name} {version} {tag} {repo} {project} {path_version}。
+template 占位符：{name} {version} {tag} {repo} {project} {path_version}（multi-level-html-index 另可用各级的 name）。
 pattern 是提取版本的正则，必须含一个捕获组，如 (\d[\d.]*)。
 
 无法用现成模板覆盖的（独特 API、版本在路径里等）用 script 类型：
@@ -997,7 +1014,7 @@ script-content: |
 
 规则：
 - 根据探测输出的真实格式选模板，不要猜；探测失败时按源 URL 域名/结构选最合理的。
-- github 用 tags/releases API，gitlab 用其 API，GCS/S3 桶用 XML listing（?delimiter=/），纯 HTML 目录列表用 html-index。
+- github 用 tags/releases API，gitlab 用其 API，GCS/S3 桶用 XML listing（?delimiter=/），纯 HTML 目录列表用 html-index；**版本藏在多级目录路径里**（先有 `6.11/` 再进目录找 `pkg-6.11.0.tar.xz`）用 multi-level-html-index。
 - 稳定版优先（tracker 自动过滤 rc/beta/alpha）。
 - sources:/work_sources: 条目必须覆盖 LankeBUILD.json 里的全部源（探测成功时整包全量替换），顺序与 json 一致。
 

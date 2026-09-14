@@ -47,7 +47,7 @@ src/
   seed.rs          冷启动播种
   serve.rs         静态 HTTP 服务器
   state.rs         SQLite 状态库（job 状态记录；自动 requeue 未实现，见 §11 附注）
-  track/           tracker 模板（github/gitlab/sourceforge/gnome/gcs/html-index/script）
+  track/           tracker 模板（github/gitlab/sourceforge/gnome/gcs/html-index/multi-level-html-index/script）
   net.rs           HTTP 下载
   lpkg_binding.rs  唯一碰 lpkg 的接缝（docker 编排 + ABI 过渡备份注入）
   i18n.rs          l10n（tr! 宏 + zh/en 目录 + LANG 切换）
@@ -203,7 +203,23 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 
 `track/mod.rs`：从 LankeBUILD.json 的 source URL 匹配 tracker（`data/trackers/*.yaml`），探测上游最新版本。
 
-- **模板**：`github` / `gitlab` / `sourceforge` / `gnome` / `gcs` / `html-index` / `script`
+- **模板**：`github` / `gitlab` / `sourceforge` / `gnome` / `gcs` / `html-index` / `multi-level-html-index` / `script`
+- **`multi-level-html-index`（N 级目录逐级进，版本藏在路径里）**：`levels` 每级 `{name, url, pattern}`。
+  **级名即占位符**（`{series}` 只能在**后续级**的 url 与 template 里引用）；**必须且只能有一级叫 `version`**
+  ——它的捕获即包版本（**按名字定，不按位置**）。位置隐式的 `{v1}..{vN}` **已废弃**：引用它会得到
+  "未知占位符"报错（原先"靠级序号猜语义"的坑）。校验在探测前全部做完：级名必填/非空/唯一、不得取保留名
+  `name`（上游名占位符）、前向引用与未知占位符（**含 `levels[i].url`**，原先只查最终 URL）一律报错。
+  例（KDE frameworks，73 个 kf-* tracker 同形）：
+  ```yaml
+  levels:
+  - name: series      # {series} = 6.11
+    url: https://download.kde.org/stable/frameworks/
+    pattern: href="([0-9][0-9.]*)/"
+  - name: version     # 保留名：= 包版本 6.11.0
+    url: https://download.kde.org/stable/frameworks/{series}/
+    pattern: ki18n-([0-9][0-9.]*)\.tar\.xz
+  template: https://download.kde.org/stable/frameworks/{series}/ki18n-{version}.tar.xz
+  ```
 - **TrackerConfig 字段**：`pkg-name`（必填）、`tracker-template`（必填）、`source-name`（覆盖上游目录名）、`tag-prefix`、`same-version`（锁定某包版本）、`major-version-lock`、`max-version`、`stable-minor`（gnome 的 even/odd）、`order`（after/last 依赖排序）
 - **same-version**：读被锁包的已解析版本，`{version}`/`{tag}`/`{name}` 占位符替换（如 SPIRV-Tools/vulkan-loader 锁 vulkan-headers）
 - `farm track <pkg> --run` 单包应用；`--all -j N` 并行探测（依赖序门控）
