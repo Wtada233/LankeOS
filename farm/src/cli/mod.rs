@@ -266,6 +266,11 @@ pub(crate) enum ChkCommand {
         #[command(flatten)]
         chk: custom_checks::ChkArgs,
     },
+    /// Python 字节码缓存检查：包内不得含 `__pycache__` 目录（含空的）。
+    Pycache {
+        #[command(flatten)]
+        chk: custom_checks::ChkArgs,
+    },
     /// postinst hook 检查：建了 sysusers.d/tmpfiles.d 的包 postinst 须调 systemd-sysusers /
     /// systemd-tmpfiles --create。
     Hook {
@@ -278,7 +283,7 @@ pub(crate) enum ChkCommand {
         #[command(flatten)]
         chk: custom_checks::ChkArgs,
     },
-    /// 用同一组参数依次跑全部检則：qml + pkgconf + pkg-err + introspection + vapi + build-deps + hook + abi。
+    /// 用同一组参数依次跑全部检則：qml + pkgconf + pkg-err + introspection + vapi + build-deps + pycache + hook + abi。
     Full {
         #[command(flatten)]
         chk: custom_checks::ChkArgs,
@@ -301,7 +306,7 @@ enum Command {
     /// 把构建仓库扁平化为发行布局 `<pkg>-<ver>.lpkg`（纯复制，不重打包——仓库产物已归一化）。
     /// 遍历 `input/<arch>/<pkg>/*.lpkg`，复制到 output 目录。
     Export(ExportArgs),
-    /// 维护期实用检則工具集（qml / pkgconf / pkg-err / introspection / vapi / build-deps / hook / abi / full，含全 ABI 审计）。
+    /// 维护期实用检則工具集（qml / pkgconf / pkg-err / introspection / vapi / build-deps / pycache / hook / abi / full，含全 ABI 审计）。
     /// **非稳定接口**——可能因技术变迁移除；具体子命令见 `farm chk --help`。
     Chk {
         #[command(subcommand)]
@@ -1293,16 +1298,17 @@ fn localize_help(cmd: clap::Command) -> clap::Command {
             .mut_arg("out", |a| a.help("Local repo root directory"))
             .mut_arg("jobs", |a| a.help("Parallel download/extract threads")))
         .mut_subcommand("chk", |c| c
-            .about("Maintainer utility checks (qml/pkgconf/pkg-err/introspection/vapi/build-deps/hook/abi/full). NOT a stable interface - these tools may be removed as techniques change; see `farm chk --help`")
+            .about("Maintainer utility checks (qml/pkgconf/pkg-err/introspection/vapi/build-deps/pycache/hook/abi/full). NOT a stable interface - these tools may be removed as techniques change; see `farm chk --help`")
             .mut_subcommand("qml", |c| c.about("Check QML imports: each imported module's owner package must be in this package's deps∪needed_so"))
             .mut_subcommand("pkgconf", |c| c.about("Check pkg-config Requires(/private): each module's owner package must be in deps∪needed_so"))
             .mut_subcommand("pkg-err", |c| c.about("Packaging errors: usr/etc|usr/var misplacement, leftover .la/.a"))
             .mut_subcommand("introspection", |c| c.about("Packages shipping .gir must declare gobject-introspection as a build dependency"))
             .mut_subcommand("vapi", |c| c.about("Packages shipping .vapi must declare vala as a build dependency"))
             .mut_subcommand("build-deps", |c| c.about("Every needed_so provider must be declared directly in this package's build_deps (transitive availability does not count)"))
+            .mut_subcommand("pycache", |c| c.about("Packages must not ship __pycache__ bytecode caches (empty dirs included)"))
             .mut_subcommand("hook", |c| c.about("postinst hook check: packages shipping sysusers.d/tmpfiles.d must call systemd-sysusers / systemd-tmpfiles --create"))
             .mut_subcommand("abi", |c| c.about("Full ABI symbol@version audit (formerly manual-abi-fullchk)"))
-            .mut_subcommand("full", |c| c.about("Run every check with one set of args: qml + pkgconf + pkg-err + introspection + vapi + build-deps + hook + abi")))
+            .mut_subcommand("full", |c| c.about("Run every check with one set of args: qml + pkgconf + pkg-err + introspection + vapi + build-deps + pycache + hook + abi")))
 }
 
 /// 操作命令（会解包/重打包/写 out/ 的命令）必须以 root 运行：`.lpkg` 解包/重打包要读写 root
@@ -1339,6 +1345,7 @@ pub fn run() -> ExitCode {
             ChkCommand::Introspection { chk } => custom_checks::cmd_run(&chk, "introspection"),
             ChkCommand::Vapi { chk } => custom_checks::cmd_run(&chk, "vapi"),
             ChkCommand::BuildDeps { chk } => custom_checks::cmd_run(&chk, "build-deps"),
+            ChkCommand::Pycache { chk } => custom_checks::cmd_run(&chk, "pycache"),
             ChkCommand::Hook { chk } => custom_checks::cmd_run(&chk, "hook"),
             ChkCommand::Abi { chk } => custom_checks::cmd_run(&chk, "abi"),
             ChkCommand::Full { chk } => custom_checks::cmd_fullchk(&chk),
@@ -1389,6 +1396,7 @@ mod tests {
             ("introspection", "introspection"),
             ("vapi", "vapi"),
             ("build-deps", "build-deps"),
+            ("pycache", "pycache"),
         ] {
             let cli = Cli::try_parse_from(["farm", "chk", arg, "--source", "out"]).unwrap();
             let got = match cli.command {
@@ -1396,7 +1404,8 @@ mod tests {
                     ChkCommand::Introspection { .. } => "introspection",
                     ChkCommand::Vapi { .. } => "vapi",
                     ChkCommand::BuildDeps { .. } => "build-deps",
-                    _ => panic!("{arg} 应解析为 introspection/vapi/build-deps 子命令"),
+                    ChkCommand::Pycache { .. } => "pycache",
+                    _ => panic!("{arg} 应解析为 introspection/vapi/build-deps/pycache 子命令"),
                 },
                 _ => panic!("应解析为 chk 子命令"),
             };

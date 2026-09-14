@@ -1,7 +1,5 @@
 lankebuild_prepare() {
-    meson setup _build --prefix=/usr --buildtype=release \
-        -Dgconv=disabled \
-        -Ddoxygen-doc=disabled
+    meson setup _build --prefix=/usr --buildtype=release -D gconv=disabled -D qv4l2=disabled
 }
 
 lankebuild_build() {

@@ -15,7 +15,7 @@ lankebuild_prepare() {
     # （Arch 也开；vala 在 build_deps 里）。
     # --wrap-mode nofallback：fast_float / fmt 等必须来自系统包，不许退回子项目
     # （仓库既有 meson 配方同此约定）。
-    meson setup _build --prefix={PREFIX} --buildtype=release --wrap-mode nofallback
+    meson setup _build --prefix={PREFIX} --buildtype=release --wrap-mode nofallback -D app=false
 }
 
 

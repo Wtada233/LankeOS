@@ -1,6 +1,7 @@
 {
   "name": "libadwaita",
   "version": "1.9.3",
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libappstream.so.5",

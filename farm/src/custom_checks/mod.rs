@@ -17,6 +17,7 @@ pub mod hook;
 pub mod introspection;
 pub mod pkg_err;
 pub mod pkgconf;
+pub mod pycache;
 pub mod qml;
 pub mod vapi;
 

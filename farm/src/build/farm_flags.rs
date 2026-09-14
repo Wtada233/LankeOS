@@ -25,9 +25,10 @@
 //!   指向本轮不重建的包 → 边被丢弃，包直接构建不等待）。
 //!
 //! - `IGNORE_CHK_ABI` / `IGNORE_CHK_QML` / `IGNORE_CHK_PKGCONF` / `IGNORE_CHK_PKGERR` /
-//!   `IGNORE_CHK_INTROSPECTION` / `IGNORE_CHK_VAPI` / `IGNORE_CHK_BUILDDEPS` / `IGNORE_CHK_HOOK`：
-//!   包级**豁免**——`farm chk full` 及各 chk（qml/pkgconf/pkg-err/introspection/vapi/build-deps/hook/abi）
-//!   对带对应 flag 的包跳过该检則（承认已知/有意为之）。这些 flag 不影响构建序，只被 chk 消费；
+//!   `IGNORE_CHK_INTROSPECTION` / `IGNORE_CHK_VAPI` / `IGNORE_CHK_BUILDDEPS` / `IGNORE_CHK_PYCACHE` /
+//!   `IGNORE_CHK_HOOK`：包级**豁免**——`farm chk full` 及各 chk
+//!   （qml/pkgconf/pkg-err/introspection/vapi/build-deps/pycache/hook/abi）对带对应 flag 的包跳过该检則
+//!   （承认已知/有意为之）。这些 flag 不影响构建序，只被 chk 消费；
 //!   在此注册以免 build 解析时误报"未知 flag"。
 
 use std::collections::HashSet;
@@ -57,6 +58,8 @@ pub enum FarmFlag {
     IgnoreChkVapi,
     /// 忽略 build-deps chk（needed_so 的提供者未写进 build_deps）。
     IgnoreChkBuildDeps,
+    /// 忽略 pycachechk（包内含 `__pycache__` 字节码缓存目录）。
+    IgnoreChkPycache,
     IgnoreChkHook,
     /// 列表值 flag：类型化只需"已知"（构建序不消费，值由 `string_list` 从 JSON 数组读）。
     StringList,
@@ -100,6 +103,7 @@ impl FarmFlag {
             Some("INTROSPECTION") => Some(FarmFlag::IgnoreChkIntrospection),
             Some("VAPI") => Some(FarmFlag::IgnoreChkVapi),
             Some("BUILDDEPS") => Some(FarmFlag::IgnoreChkBuildDeps),
+            Some("PYCACHE") => Some(FarmFlag::IgnoreChkPycache),
             Some("HOOK") => Some(FarmFlag::IgnoreChkHook),
             _ => None,
         }

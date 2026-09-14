@@ -50,6 +50,11 @@ lankebuild_build() {
     # Arch 同款：chfn/chsh/newgrp 上游 autotools 的安装钩子不设 setuid（meson 那边 Arch 是在 package() 里手动 chmod）
     chmod -v 4755 {STAGING_ROOT}{BINDIR}/chfn {STAGING_ROOT}{BINDIR}/chsh {STAGING_ROOT}{BINDIR}/newgrp
 
+    # Python 字节码缓存不入包（`farm chk pycache`）：libmount 的 python 绑定在 make install 时生成了
+    # __pycache__/*.pyc —— 内含源文件绝对路径与编译期解释器版本，不可复现。
+    # **只删缓存，.py 源码保留**（解释器运行时按需再生成）；顺带清散落的 .pyc/.pyo（旧式布局）。
+    find "{STAGING_ROOT}" \( -name __pycache__ -o -name '*.py[co]' \) -prune -print -exec rm -rf {} +
+
     # 打开 systemd/uuidd/liblastlog2 后包内会出现 usr/lib/sysusers.d 与 usr/lib/tmpfiles.d（uuidd / lastlog2 的 conf）
     # → 安装期就要生效，不能等开机 systemd-sysusers-setup（仓库铁律：扫到 sysusers/tmpfiles 就写 postinst）
     cat > "{STAGING_HOOKS}/postinst.sh" << 'EOF'

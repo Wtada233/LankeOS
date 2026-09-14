@@ -16,7 +16,7 @@ lankebuild_prepare() {
         -D broadway_backend=true \
         -D x11_backend=true \
         -D wayland_backend=true \
-        -D man=false
+        -D demos=false
 
     cd ..
 }

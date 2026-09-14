@@ -1,6 +1,7 @@
 lankebuild_prepare() {
     # Prepare environment
-    meson setup _build --prefix=/usr --buildtype=release --wrap-mode nofallback
+    meson setup _build --prefix=/usr --buildtype=release --wrap-mode nofallback \
+        -Dexamples=false
 }
 
 lankebuild_build() {

@@ -1,7 +1,7 @@
 {
   "name": "gtk3",
   "version": "3.24.52",
-  "release": 2,
+  "release": 3,
   "deps": [
     "xwayland"
   ],

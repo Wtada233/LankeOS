@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use lankefarm::custom_checks::{
-    build_deps, hook, introspection, pkg_err, pkgconf, qml, vapi, ChkOpts,
+    build_deps, hook, introspection, pkg_err, pkgconf, pycache, qml, vapi, ChkOpts,
 };
 
 struct Repo {
@@ -417,6 +417,78 @@ fn vapichk_flags_missing_vala_build_dep_and_honors_ignore_flag() {
         has(&rep, "novapi", "vala"),
         "装了 .vapi 却缺构建依赖应报: {:?}",
         rep.findings
+    );
+    r.cleanup();
+}
+
+#[test]
+fn pycachechk_flags_pycache_dirs_and_honors_ignore_flag() {
+    let mut r = Repo::new("pyc");
+    // 干净包（只有 .py 源）→ 不报
+    r.add(
+        "clean",
+        &[("usr/lib/python3.14/site-packages/clean/__init__.py", "")],
+        &[],
+        &[],
+        "",
+    );
+    // 混入 __pycache__ → 报
+    r.add(
+        "dirty",
+        &[(
+            "usr/lib/python3.14/site-packages/dirty/__pycache__/m.cpython-314.pyc",
+            "x",
+        )],
+        &[],
+        &[],
+        "",
+    );
+    // 散落 .pyc（不在 __pycache__ 里）→ 也报（逐文件）
+    r.add(
+        "loose",
+        &[("usr/lib/python3.14/site-packages/legacy.pyc", "x")],
+        &[],
+        &[],
+        "",
+    );
+    // 豁免
+    r.add(
+        "ign",
+        &[(
+            "usr/lib/python3.14/site-packages/ign/__pycache__/m.pyc",
+            "x",
+        )],
+        &[],
+        &["IGNORE_CHK_PYCACHE"],
+        "",
+    );
+    let rep = pycache::run(&r.opts("c1")).unwrap();
+    assert!(!rep.findings.contains_key("clean"), "{:?}", rep.findings);
+    assert!(
+        has(&rep, "dirty", "__pycache__"),
+        "混入 __pycache__ 应报: {:?}",
+        rep.findings
+    );
+    assert!(
+        has(&rep, "loose", "散落的 Python 字节码"),
+        "散落 .pyc 应报: {:?}",
+        rep.findings
+    );
+    let lf = &rep.findings["loose"];
+    assert_eq!(lf.len(), 1, "散落文件每条一个: {lf:?}");
+    assert!(lf[0].file.ends_with("legacy.pyc"), "{:?}", lf[0]);
+    assert!(
+        !rep.findings.contains_key("ign"),
+        "IGNORE_CHK_PYCACHE 应生效: {:?}",
+        rep.findings
+    );
+    // 报告单位是**目录**（不是每个 .pyc 一条）
+    let f = &rep.findings["dirty"];
+    assert_eq!(f.len(), 1, "每目录一条: {f:?}");
+    assert!(
+        f[0].file.ends_with("__pycache__"),
+        "file 应为目录路径: {:?}",
+        f[0]
     );
     r.cleanup();
 }

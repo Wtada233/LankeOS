@@ -273,7 +273,7 @@ build --all ──> run_build
 - 确定性：包/文件排序遍历；provider 冲突（同 SONAME 多份）最后一次胜。consumer 判缺失在 provider
   目录建全后统一做。
 
-## 17. `farm chk`：LankeOS 维护检則工具集（qml/pkgconf/pkg-err/introspection/vapi/build-deps/hook/abi/full）
+## 17. `farm chk`：LankeOS 维护检則工具集（qml/pkgconf/pkg-err/introspection/vapi/build-deps/pycache/hook/abi/full）
 
 `src/custom_checks/` 一族的策略/打包检测（非 farm 核心 ABI），参考 abichk（§16）的架构与缓存思路，
 由 `farm chk full` 一并跑（或 `farm chk <kind>` 单跑；ABI 审计 §16 同属此工具集）。逐包一次解包；
@@ -297,9 +297,13 @@ build --all ──> run_build
   `base`/`base-devel` 的**直接** `deps` 并集覆盖的提供者视为满足（铁律：这些包不该写进 build_deps）。
   自提供、仓库内无 provider 的 SONAME 跳过（后者归 `farm abifix`）。**只读配方 `LankeBUILD.json`**
   （SONAME→provider 关系取自各包 `provides` 字段，不扫 `.lpkg`），因此**不占缓存**。
+- pycachechk：包内不得含 Python 字节码——① `__pycache__` 目录（**按目录报**：`file` = 该目录，附条目数；
+  一个目录里动辄上百 `.pyc`，逐文件报会刷屏，且删除单位就是目录；**遍历目录而非只扫文件**，空的
+  `__pycache__` 也算，tar 保留空目录）；② `__pycache__` 之外的**散落 `.pyc`/`.pyo`**（旧式布局，
+  **逐文件报**）。两类都是构建期生成、含绝对路径、不可复现。
 - hookchk：建了 `usr/lib/sysusers.d`/`tmpfiles.d` 的包，其 `hooks/postinst.sh` 必须调
   `systemd-sysusers`/`systemd-tmpfiles --create`；**只认非注释行**（行首可选空白后 `#` 视为注释）——
   注释里出现字样不算已调用。
-配方 `farm_flags` 支持 `IGNORE_CHK_ABI/QML/PKGCONF/PKGERR/INTROSPECTION/VAPI/BUILDDEPS/HOOK`（大写）整包豁免；列表值 flag
+配方 `farm_flags` 支持 `IGNORE_CHK_ABI/QML/PKGCONF/PKGERR/INTROSPECTION/VAPI/BUILDDEPS/PYCACHE/HOOK`（大写）整包豁免；列表值 flag
 （如 `QML_CHK_IGN_LST`）**只认 JSON 数组对象成员** `{"QML_CHK_IGN_LST": ["a","b"]}`（`NAME=a,b` 裸串
 已废弃，会告警）。这些 flag 已在 `build/farm_flags.rs` 注册（topo 解析不告警）。检則都非 root、只读。
