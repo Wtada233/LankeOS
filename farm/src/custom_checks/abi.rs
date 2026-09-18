@@ -333,19 +333,31 @@ mod tests {
     use std::path::PathBuf;
 
     /// 找宿主可用的带符号版本的共享库（无则 None，测试跳过——与 i18n test.skip_host_libc 同思路）。
+    /// glibc 落点随发行版变：Arch 平铺在 `/usr/lib/libc.so.6`，Debian/Ubuntu（含 CI 的
+    /// ubuntu-latest）在**多架构三元组目录** `/usr/lib/<triple>-linux-gnu/libc.so.6`。
+    /// 仅供 `native_parses_host_libc_exports_and_imports`（它就是要拿真 glibc 试解析）——
+    /// 其余测试一律用 `tests/fixtures/abi/` 的预编译 fixture，不碰宿主。
     fn host_versioned_lib() -> Option<PathBuf> {
-        for cand in [
+        let mut cands: Vec<PathBuf> = [
             "/usr/lib/libc.so.6",
             "/usr/lib64/libc.so.6",
             "/lib/libc.so.6",
             "/lib64/libc.so.6",
-        ] {
-            let p = Path::new(cand);
-            if p.is_file() {
-                return Some(p.to_path_buf());
+        ]
+        .into_iter()
+        .map(PathBuf::from)
+        .collect();
+        for root in ["/usr/lib", "/lib"] {
+            let Ok(entries) = fs::read_dir(root) else {
+                continue;
+            };
+            for e in entries.flatten() {
+                if e.file_name().to_string_lossy().ends_with("-linux-gnu") {
+                    cands.push(e.path().join("libc.so.6"));
+                }
             }
         }
-        None
+        cands.into_iter().find(|p| p.is_file())
     }
 
     /// 回归（runc/libpathrs）：dev 链接名（`libpathrs.so` / `libpathrs.so.0` 是符号链接，实体是
@@ -389,17 +401,17 @@ mod tests {
         assert!(!undef.is_empty(), "libc 也应引用外部符号@版本");
     }
 
-    /// 造一个假 .lpkg（宿主 libc 当内容），端到端跑 run：整包缓存落盘 / 第二遍命中，且不再有
+    /// 造一个假 .lpkg（fixture 库当内容），端到端跑 run：整包缓存落盘 / 第二遍命中，且不再有
     /// per-SONAME 单文件缓存。
     #[test]
     fn whole_package_cache_hit_and_no_soname_files() {
-        let Some(lib) = host_versioned_lib() else {
-            eprintln!("跳过：宿主无 libc.so.6");
-            return;
-        };
+        let fx = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/abi");
+        let lib = fx.join("libx.so.1");
+        // 考的是缓存行为，不是 glibc——用 fixture，别抓宿主 libc（落点随发行版变）
+        assert!(lib.is_file(), "缺 fixture: {lib:?}");
         let base = std::env::temp_dir().join(format!("farm-abicache-{}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
-        // 构造假仓库 out/x86_64/mylib/1.0.lpkg，content/usr/lib 放宿主 libc 副本
+        // 构造假仓库 out/x86_64/mylib/1.0.lpkg，content/usr/lib 放 fixture 库副本
         let src = base.join("src");
         fs::create_dir_all(src.join("content/usr/lib")).unwrap();
         fs::write(
@@ -407,8 +419,7 @@ mod tests {
             r#"{"name":"mylib","version":"1.0"}"#,
         )
         .unwrap();
-        let libname = lib.file_name().unwrap().to_string_lossy().into_owned();
-        fs::copy(&lib, src.join("content/usr/lib").join(&libname)).unwrap();
+        fs::copy(&lib, src.join("content/usr/lib/libx.so.1")).unwrap();
         let lpkg = base.join("repo/x86_64/mylib/1.0.lpkg");
         fs::create_dir_all(lpkg.parent().unwrap()).unwrap();
         let f = fs::File::create(&lpkg).unwrap();
@@ -434,7 +445,7 @@ mod tests {
         assert!(r1.failed.is_empty(), "不应有失败: {:?}", r1.failed);
         assert!(cache.join("mylib.json").exists(), "应有整包缓存 mylib.json");
         assert!(
-            !cache.join("libc.so.6.json").exists(),
+            !cache.join("libx.so.1.json").exists(),
             "不应再写 per-SONAME 单文件缓存"
         );
         // 第二遍：整包缓存命中，不重扫
@@ -449,19 +460,24 @@ mod tests {
         // consumer 的 DT_NEEDED 名字在仓库里**没有任何包提供** → 必须报 Critical。旧实现把它按
         // `catalog.contains_key` 过滤出候选、且无版本符号在 `undef.is_empty()` 处直接 continue
         // → 整类断裂静默漏报（chk abi 无发现，只有 lpkg upgrade 时才炸出来）。
-        let Some(bin) = host_elf_with_needed() else {
-            eprintln!("跳过：宿主无带 DT_NEEDED 的 ELF");
-            return;
-        };
-        let needed: Vec<String> = probe(&fs::read(&bin).unwrap()).unwrap().needed;
-        let libc = host_versioned_lib().expect("宿主应有 libc.so.6");
-        let libc_name = libc.file_name().unwrap().to_string_lossy().into_owned();
-        // 取一个「不是 libc」的依赖名当靶子（第二遍要把它变成有提供者，验证精确性）
-        let target = needed
-            .iter()
-            .find(|n| **n != libc_name)
-            .cloned()
-            .expect("宿主 ELF 至少该有一个非 libc 依赖");
+        //
+        // fixture（`tests/fixtures/abi/`，与 smoke_reports_missing_versioned_symbol 同一批）：
+        // consumer 的 DT_NEEDED = libx.so.1 + liby.so.1，初始都无 provider；第二遍补上 libx.so.1。
+        // **不抓宿主的 /usr/bin/ls + /usr/lib/libc.so.6**——宿主 libc 落点随发行版变（Arch 平铺
+        // `/usr/lib`，Debian/Ubuntu 在 `/usr/lib/<triple>-linux-gnu/`），会把测试绑死在跑测的机器上。
+        let fx = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/abi");
+        let bin = fx.join("consumer");
+        let libx = fx.join("libx.so.1");
+        for p in [&bin, &libx] {
+            assert!(p.is_file(), "缺 fixture: {p:?}");
+        }
+        let provided = "libx.so.1"; // 第二遍补上 provider 的那个
+        let target = "liby.so.1"; // 始终无 provider，必须继续报
+        let needed = probe(&fs::read(&bin).unwrap()).unwrap().needed;
+        assert!(
+            needed.iter().any(|n| n == provided) && needed.iter().any(|n| n == target),
+            "consumer fixture 的 DT_NEEDED 应是 {provided} + {target}: {needed:?}"
+        );
 
         let base = std::env::temp_dir().join(format!("farm-abi-orphan-{}", std::process::id()));
         let _ = fs::remove_dir_all(&base);
@@ -486,12 +502,7 @@ mod tests {
             enc.finish().unwrap();
             fs::remove_dir_all(&root).unwrap();
         };
-        put(
-            "consumer",
-            "usr/bin",
-            &bin,
-            bin.file_name().unwrap().to_str().unwrap(),
-        );
+        put("consumer", "usr/bin", &bin, "consumer");
 
         let cache = base.join("cache");
         let mk_opts = |rescan: bool| ChkOpts {
@@ -508,9 +519,9 @@ mod tests {
             .get("consumer")
             .expect("consumer 的 DT_NEEDED 无提供者，必须报");
         let whats: Vec<String> = items.iter().map(|f| f.what.clone()).collect();
-        for n in [&libc_name, &target] {
+        for n in [provided, target] {
             assert!(
-                whats.iter().any(|w| w.contains(n.as_str())),
+                whats.iter().any(|w| w.contains(n)),
                 "{n} 在仓库无任何包提供，必须报: {whats:?}"
             );
         }
@@ -519,8 +530,8 @@ mod tests {
             "无提供者的 DT_NEEDED 是 Critical: {items:?}"
         );
 
-        // 精确性：把宿主 libc 作为 provider 包放进仓库 → libc 不再报，靶子仍报
-        put("libc", "usr/lib", &libc, &libc_name);
+        // 精确性：把 libx 作为 provider 包放进仓库 → libx.so.1 不再报，靶子仍报
+        put("libx", "usr/lib", &libx, provided);
         let r2 = run(&mk_opts(true)).unwrap();
         let whats2: Vec<String> = r2
             .findings
@@ -528,25 +539,14 @@ mod tests {
             .map(|v| v.iter().map(|f| f.what.clone()).collect())
             .unwrap_or_default();
         assert!(
-            !whats2.iter().any(|w| w.contains(&libc_name)),
-            "{libc_name} 已有包提供，不应再报: {whats2:?}"
+            !whats2.iter().any(|w| w.contains(provided)),
+            "{provided} 已有包提供，不应再报: {whats2:?}"
         );
         assert!(
-            whats2.iter().any(|w| w.contains(target.as_str())),
+            whats2.iter().any(|w| w.contains(target)),
             "仍无提供者的 {target} 应继续报: {whats2:?}"
         );
         fs::remove_dir_all(&base).ok();
-    }
-
-    /// 宿主里找一个带 DT_NEEDED 的 ELF（无则 None，测试跳过）。
-    fn host_elf_with_needed() -> Option<PathBuf> {
-        for cand in ["/usr/bin/ls", "/bin/ls", "/usr/bin/cat", "/bin/cat"] {
-            let p = Path::new(cand);
-            if p.is_file() {
-                return Some(p.to_path_buf());
-            }
-        }
-        None
     }
 
     /// 预构建 + strip 的受控 fixture 端到端冒烟（用户场景）。fixture 二进制随仓库提交于
@@ -554,7 +554,9 @@ mod tests {
     /// 宿主编译器**：
     /// - 包 libx：libx.so.1 导出 sym1@V1、sym2@V2（真 .gnu.version_d）；
     /// - 包 foo：可执行（无 SONAME），引用 sym1@V2、sym2@V2（真 .gnu.version_r）；
-    /// - 包 nover：无版本节、无导入的可执行（空路径不炸）。
+    /// - 包 nover：无版本节、无导入的可执行（空路径不炸）；
+    /// - 包 consumer：可执行（无 SONAME），DT_NEEDED = libx.so.1 + liby.so.1、不引用任何符号
+    ///   （供 `reports_needed_soname_without_provider` 单独考 DT_NEEDED 无 provider）。
     ///
     /// provider 目录来自 source 全量；断言只报 foo 的 sym1@V2 缺失（sym2@V2 有 V2，不报）。
     #[test]
