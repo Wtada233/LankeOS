@@ -1,6 +1,6 @@
 {
   "name": "python-sentry-sdk",
-  "version": "2.68.1",
+  "version": "2.69.2",
   "release": 1,
   "deps": [
     "python",
@@ -18,11 +18,8 @@
     "python-urllib3",
     "python-wheel"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
-    "https://files.pythonhosted.org/packages/9a/e7/c504a4bd2d95df2e0ab73714a9161ff1cf6ff1486922685e5f46dfd9eba8/sentry_sdk-2.68.1.tar.gz"
+    "https://files.pythonhosted.org/packages/cc/08/1211e4652384195ef754f8ed570566088dc848f8eda7d005abf13f05f17f/sentry_sdk-2.69.2.tar.gz"
   ],
   "work_sources": []
 }

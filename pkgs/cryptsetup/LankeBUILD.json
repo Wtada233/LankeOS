@@ -1,6 +1,6 @@
 {
   "name": "cryptsetup",
-  "version": "2.8.7",
+  "version": "2.8.8",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -23,7 +23,7 @@
     "popt"
   ],
   "sources": [
-    "https://www.kernel.org/pub/linux/utils/cryptsetup/v2.8/cryptsetup-2.8.7.tar.xz"
+    "https://www.kernel.org/pub/linux/utils/cryptsetup/v2.8/cryptsetup-2.8.8.tar.xz"
   ],
   "work_sources": []
 }

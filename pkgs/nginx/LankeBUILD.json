@@ -1,6 +1,6 @@
 {
   "name": "nginx",
-  "version": "1.31.4",
+  "version": "1.31.6",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -26,7 +26,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/nginx/nginx/releases/download/release-1.31.4/nginx-1.31.4.tar.gz"
+    "https://github.com/nginx/nginx/releases/download/release-1.31.6/nginx-1.31.6.tar.gz"
   ],
   "work_sources": []
 }

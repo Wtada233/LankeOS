@@ -1,6 +1,6 @@
 {
   "name": "kf-baloo",
-  "version": "6.29.0",
+  "version": "6.30.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -46,7 +46,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.29/baloo-6.29.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.30/baloo-6.30.0.tar.xz"
   ],
   "work_sources": []
 }

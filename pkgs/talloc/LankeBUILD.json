@@ -1,0 +1,26 @@
+{
+  "name": "talloc",
+  "version": "2.5.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libm.so.6",
+    "libpython3.14.so.1.0"
+  ],
+  "provides": [
+    "libpytalloc-util.cpython-314-x86-64-linux-gnu.so",
+    "libpytalloc-util.cpython-314-x86-64-linux-gnu.so.2",
+    "libtalloc.so",
+    "libtalloc.so.1",
+    "libtalloc.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "docbook-xsl"
+  ],
+  "sources": [
+    "https://www.samba.org/ftp/talloc/talloc-2.5.0.tar.gz"
+  ],
+  "work_sources": []
+}

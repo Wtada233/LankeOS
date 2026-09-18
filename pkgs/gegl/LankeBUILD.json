@@ -1,6 +1,6 @@
 {
   "name": "gegl",
-  "version": "0.4.70",
+  "version": "0.4.72",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -20,6 +20,7 @@
     "libpango-1.0.so.0",
     "libpangocairo-1.0.so.0",
     "libpng16.so.16",
+    "libpoppler-glib.so.8",
     "librsvg-2.so.2",
     "libtiff.so.6",
     "libwebp.so.7"
@@ -34,22 +35,23 @@
     "babl",
     "base-devel",
     "cairo",
-    "gobject-introspection",
     "gdk-pixbuf",
     "glib",
+    "gobject-introspection",
     "json-glib",
     "lcms2",
     "libjpeg-turbo",
     "libpng",
     "librsvg",
+    "libtiff",
     "libwebp",
     "meson",
-    "vala",
-    "libtiff",
-    "pango"
+    "pango",
+    "poppler",
+    "vala"
   ],
   "sources": [
-    "https://download.gimp.org/pub/gegl/0.4/gegl-0.4.70.tar.xz"
+    "https://download.gimp.org/pub/gegl/0.4/gegl-0.4.72.tar.xz"
   ],
   "work_sources": []
 }

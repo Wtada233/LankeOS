@@ -24,14 +24,15 @@ pub fn probe(
     let version = match mode {
         "releases" => {
             if let Some(cap) = cap {
-                // max-version 需在版本列表上过滤（单条 /latest 无法封顶）→ 拉全部 releases，
-                // 稳定优先取不超过封顶的最大版。无 max-version 时保持 /releases/latest 语义。
-                let url = format!("https://api.github.com/repos/{repo}/releases?per_page=100");
-                let body = fetcher.get(&url)?;
-                let names = templates::extract_release_tag_names(&body)?;
+                // max-version 需在版本列表上过滤（单条 /latest 无法封顶）→ 拉 releases 列表，
+                // 每页 100 条（GitHub 上限）**逐页单独请求**直到末页，稳定优先取不超过封顶的最大版。
+                let base = format!("https://api.github.com/repos/{repo}/releases?per_page=100");
+                let items = templates::fetch_json_pages(fetcher, &base, 100, 10)?;
+                let names = templates::release_tag_names(&items);
                 max_tag_version(&names, tag_prefix, major, Some(cap))
                     .ok_or("releases 中无匹配版本/主版本")?
             } else {
+                // 无封顶：单条 `/releases/latest`（无分页窗口）
                 let url = format!("https://api.github.com/repos/{repo}/releases/latest");
                 let body = fetcher.get(&url)?;
                 let tag = templates::extract_latest_release_tag(&body)?;
@@ -41,9 +42,10 @@ pub fn probe(
             }
         }
         _ => {
-            let url = format!("https://api.github.com/repos/{repo}/tags");
-            let body = fetcher.get(&url)?;
-            let names = templates::extract_tag_names(&body)?;
+            // tags 模式：走 **git 协议列全量 tag**（libgit2 ref advertisement），**不是** REST `/tags`
+            // —— 后者分页（默认 30 / 最大 100，靠 Link 头翻页）且**顺序与版本无关**，只看首页会取到
+            // 老 tag（hdf5 事故：首页 30 个全是老 tag，`max` 够不到 2.2.0）。
+            let names = fetcher.list_tags(&format!("https://github.com/{repo}.git"))?;
             max_tag_version(&names, tag_prefix, major, cap).ok_or("tags 中无匹配版本/主版本")?
         }
     };
@@ -68,9 +70,9 @@ mod tests {
 
     #[test]
     fn probe_tags_max_version() {
-        let f = MockFetcher::new(std::collections::HashMap::new()).entry(
-            "https://api.github.com/repos/systemd/systemd/tags",
-            r#"[{"name":"v254"},{"name":"v256"},{"name":"v255"},{"name":"v261"}]"#,
+        let f = MockFetcher::new(std::collections::HashMap::new()).tags(
+            "https://github.com/systemd/systemd.git",
+            &["v254", "v256", "v255", "v261"],
         );
         let cfg = SourceConfig {
             tracker_template: "github".into(),
@@ -91,9 +93,9 @@ mod tests {
     #[test]
     fn tags_respects_max_version_cap() {
         // max-version 封顶（tags 模式）：超过封顶的 v261 被过滤，取 v256
-        let f = MockFetcher::new(std::collections::HashMap::new()).entry(
-            "https://api.github.com/repos/systemd/systemd/tags",
-            r#"[{"name":"v254"},{"name":"v256"},{"name":"v255"},{"name":"v261"}]"#,
+        let f = MockFetcher::new(std::collections::HashMap::new()).tags(
+            "https://github.com/systemd/systemd.git",
+            &["v254", "v256", "v255", "v261"],
         );
         let cfg = SourceConfig {
             tracker_template: "github".into(),
@@ -114,9 +116,9 @@ mod tests {
 
     #[test]
     fn releases_cap_fetches_list_and_filters() {
-        // max-version（releases 模式）：单条 /releases/latest 无法封顶 → 改拉 releases 列表
-        // （?per_page=100），稳定优先取不超过封顶的最大版（v2.0.0 被过滤取 v1.9.0）
-        let list_url = "https://api.github.com/repos/a/b/releases?per_page=100";
+        // max-version（releases 模式）：单条 /releases/latest 无法封顶 → 拉 releases 列表
+        // （每页 100 条，逐页请求），稳定优先取不超过封顶的最大版（v2.0.0 被过滤取 v1.9.0）
+        let list_url = "https://api.github.com/repos/a/b/releases?per_page=100&page=1";
         let f = MockFetcher::new(std::collections::HashMap::new()).entry(
             list_url,
             r#"[{"tag_name":"v2.0.0"},{"tag_name":"v1.9.0"},{"tag_name":"v1.8.0"}]"#,
@@ -136,6 +138,38 @@ mod tests {
             r.url,
             "https://github.com/a/b/archive/refs/tags/v1.9.0.tar.gz"
         );
+    }
+
+    #[test]
+    fn releases_cap_paginates_when_target_is_not_on_first_page() {
+        // 第 1 页满 100 条（= per_page）→ 必须继续请求第 2 页；目标 v1.9.0 在第 2 页
+        let page1 = format!(
+            "[{}]",
+            (0..100)
+                .map(|i| format!(r#"{{"tag_name":"v2.{i}.0"}}"#))
+                .collect::<Vec<_>>()
+                .join(",")
+        );
+        let f = MockFetcher::new(std::collections::HashMap::new())
+            .entry(
+                "https://api.github.com/repos/a/b/releases?per_page=100&page=1",
+                &page1,
+            )
+            .entry(
+                "https://api.github.com/repos/a/b/releases?per_page=100&page=2",
+                r#"[{"tag_name":"v1.9.0"},{"tag_name":"v1.8.0"}]"#,
+            );
+        let cfg = SourceConfig {
+            tracker_template: "github".into(),
+            repo: Some("a/b".into()),
+            mode: Some("releases".into()),
+            tag_prefix: Some("v".into()),
+            max_version: Some("1.9.0".into()),
+            template: Some("https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz".into()),
+            ..Default::default()
+        };
+        let r = probe(&f, &cfg, None, "b").unwrap();
+        assert_eq!(r.version, "1.9.0", "第 2 页的目标版本必须被翻页找到");
     }
 
     #[test]

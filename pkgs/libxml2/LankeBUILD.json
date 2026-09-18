@@ -1,6 +1,6 @@
 {
   "name": "libxml2",
-  "version": "2.15.3",
+  "version": "2.15.4",
   "release": 1,
   "deps": [
     "bash"
@@ -21,7 +21,7 @@
     "readline"
   ],
   "sources": [
-    "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.3.tar.xz"
+    "https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.4.tar.xz"
   ],
   "work_sources": []
 }

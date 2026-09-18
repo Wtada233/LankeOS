@@ -3,11 +3,14 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    # noctalia v5: meson build system
+    # noctalia v5: meson build system（照 Arch：关测试、release 关断言、压掉 unused-result 警告）
+    export CXXFLAGS="{CXXFLAGS} -Wno-unused-result"
     meson setup build \
         --prefix={PREFIX} \
         --buildtype=release \
-        -Ddefault_library=shared
+        -Ddefault_library=shared \
+        -Db_ndebug=true \
+        -Dtests=disabled
     ninja -C build
     DESTDIR={STAGING_ROOT} ninja -C build install
 }

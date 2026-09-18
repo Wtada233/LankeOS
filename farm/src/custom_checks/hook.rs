@@ -6,6 +6,7 @@
 
 use super::{walk_all, ChkOpts, Finding, Report, Severity};
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -74,7 +75,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
         {
             items.push(Finding {
                 file: "usr/lib/sysusers.d/*.conf".into(),
-                what: "建了 sysusers 档案但 postinst 未调 systemd-sysusers".into(),
+                what: tr!("chk.hook.sysusers").to_string(),
                 severity: Severity::Warning,
             });
         }
@@ -83,7 +84,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
         {
             items.push(Finding {
                 file: "usr/lib/tmpfiles.d/*.conf".into(),
-                what: "建了 tmpfiles 档案但 postinst 未调 systemd-tmpfiles --create".into(),
+                what: tr!("chk.hook.tmpfiles").to_string(),
                 severity: Severity::Warning,
             });
         }

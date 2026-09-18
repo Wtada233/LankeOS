@@ -1,0 +1,24 @@
+#
+# tevent — 基于 talloc 的事件循环库（samba 用外部版本）
+# 构建参数照 Arch PKGBUILD：NONE 禁止内置（talloc/cmocka 都取系统）、replace 作为 builtin
+# `--bundled-libraries=NONE` 关掉内置后 cmocka 必须来自系统（configure 硬性要求 ≥1.1.8）
+# ——发布 tarball 里没有 third_party/cmocka，只有 git 树才有
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure \
+        --prefix={PREFIX} \
+        --bundled-libraries=NONE \
+        --builtin-libraries=replace \
+        --disable-rpath-install
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,6 +1,6 @@
 {
   "name": "swig",
-  "version": "4.5.0",
+  "version": "4.5.1",
   "deps": [
     "ruby"
   ],
@@ -23,7 +23,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/swig/swig/archive/refs/tags/v4.5.0.tar.gz"
+    "https://github.com/swig/swig/archive/refs/tags/v4.5.1.tar.gz"
   ],
   "work_sources": []
 }

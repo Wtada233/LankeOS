@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cerrno>
 #include <cstdlib>
@@ -16,6 +17,7 @@
 #include <fstream>
 #include <iostream>
 #include <random>
+#include <sstream>
 
 #include "config.hpp"
 #include "elf/strip.hpp"
@@ -399,6 +401,79 @@ void fsync_parent_dir(const fs::path& child_path)
 // ============================================================================
 
 /**
+ * 路径 p 是否在 root 之内（含 root 自身）。
+ *
+ * 边界必须按目录比较：root=/lanke 时 /lankefoo 不算在根内。**且 root=="/" 必须成立**——
+ * 朴素写法 `p == root || p.starts_with(root + "/")` 在 root=="/" 时拼出 "//"，而
+ * lexically_normal 后的路径不可能是 "//" 开头，于是判定恒 false：调用方（stash 落点、
+ * query-file 路径解析）会把所有路径都当成"不在根内"，root_dir=="/"（常规安装）时全线失效。
+ */
+bool path_within(const fs::path& p, const fs::path& root)
+{
+    std::string rs = root.lexically_normal().string();
+    while (rs.size() > 1 && rs.back() == '/') rs.pop_back();  // "/mnt/base/" ≡ "/mnt/base"
+    if (rs.empty()) rs = "/";
+    const std::string ps = p.lexically_normal().string();
+    if (rs == "/") return !ps.empty() && ps.front() == '/';
+    return ps == rs || ps.rfind(rs + "/", 0) == 0;
+}
+
+namespace
+{
+/** mountinfo 字段的八进制转义还原（\040 空格、\011 制表、\012 换行、\134 反斜杠） */
+std::string unescape_mountinfo(const std::string& s)
+{
+    std::string out;
+    out.reserve(s.size());
+    for (size_t i = 0; i < s.size(); ++i) {
+        const bool oct = s[i] == '\\' && i + 4 <= s.size() && s[i + 1] >= '0' && s[i + 1] <= '7' &&
+                         s[i + 2] >= '0' && s[i + 2] <= '7' && s[i + 3] >= '0' && s[i + 3] <= '7';
+        if (oct) {
+            out += static_cast<char>(((s[i + 1] - '0') << 6) | ((s[i + 2] - '0') << 3) |
+                                     (s[i + 3] - '0'));
+            i += 3;
+        } else {
+            out += s[i];
+        }
+    }
+    return out;
+}
+
+/** lexically_normal 后去掉尾部分隔符（"/mnt/base/" 与 "/mnt/base" 视为同一个目录） */
+fs::path strip_trailing_sep(const fs::path& p)
+{
+    std::string s = p.lexically_normal().string();
+    while (s.size() > 1 && s.back() == '/') s.pop_back();
+    return fs::path(s);
+}
+}  // namespace
+
+const std::vector<fs::path>& mount_points()
+{
+    static const std::vector<fs::path> points = [] {
+        std::vector<fs::path> v;
+        std::ifstream f("/proc/self/mountinfo");
+        std::string line;
+        while (std::getline(f, line)) {
+            // 字段：mount_id parent_id major:minor root mount_point options [optional…] - …
+            std::istringstream is(line);
+            std::string id, parent, dev, root, mp;
+            if (!(is >> id >> parent >> dev >> root >> mp)) continue;
+            v.push_back(strip_trailing_sep(fs::path(unescape_mountinfo(mp))));
+        }
+        return v;
+    }();
+    return points;
+}
+
+bool is_mount_point(const fs::path& p)
+{
+    const fs::path n = strip_trailing_sep(p);
+    const auto& mps = mount_points();
+    return std::ranges::find(mps, n) != mps.end();
+}
+
+/**
  * 生成随机小写字母+数字后缀（用于 .lpkg_bak 重命名防冲突）
  */
 std::string random_suffix(size_t len)
@@ -520,6 +595,14 @@ void cleanup_orphan_stashes()
     };
 
     reap_dir(root);
+    // stash 落点 = 文件系统顶层 = 挂载点（见 detail::stash_parent_dir）。挂载点可以深于
+    // 一层（ESP 挂在 /mnt/base、tmpfs 挂在 /run/user/1000），只扫 root 顶层会漏。
+    for (const auto& mp : mount_points()) {
+        if (mp == root.lexically_normal()) continue;  // root 本身已扫
+        if (!path_within(mp, root)) continue;         // chroot 边界外不归本进程管
+        reap_dir(mp);
+    }
+    // /proc 不可用（挂载表为空）时的降级：root 顶层 + 顶层子挂载点（st_dev 判定）。
     for (auto it = fs::directory_iterator(root, ec); it != fs::directory_iterator{};
          it.increment(ec)) {
         if (ec) {

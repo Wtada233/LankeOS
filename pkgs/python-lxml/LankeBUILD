@@ -4,7 +4,10 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     # PEP 517 wheel 构建（build/installer 已成包，走标准模板）
-    python3 -m build --wheel --no-isolation
+    # pyproject 声明 Cython>=3.2.9,<3.3，但构建根本不用 Cython：sdist 自带生成的 .c
+    # （setupinfo 判 .c 齐全即 use_cython=False）。装上 Cython 反而会走上游探测它的分支，
+    # 故不装 Cython，只跳过 build 的构建依赖校验
+    python3 -m build --wheel --no-isolation --skip-dependency-check
 }
 
 lankebuild_package() {

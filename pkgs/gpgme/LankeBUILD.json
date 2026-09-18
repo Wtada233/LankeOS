@@ -1,6 +1,6 @@
 {
   "name": "gpgme",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "release": 2,
   "deps": [
     "glib"
@@ -23,7 +23,7 @@
     "libgpg-error"
   ],
   "sources": [
-    "https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-2.1.2.tar.bz2"
+    "https://www.gnupg.org/ftp/gcrypt/gpgme/gpgme-2.2.0.tar.bz2"
   ],
   "work_sources": []
 }

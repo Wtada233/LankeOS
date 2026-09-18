@@ -1,6 +1,6 @@
 {
   "name": "evolution-data-server",
-  "version": "3.60.2",
+  "version": "3.62.0",
   "release": 9,
   "deps": [],
   "needed_so": [
@@ -41,7 +41,7 @@
   ],
   "provides": [
     "libcamel-1.2.so",
-    "libcamel-1.2.so.67",
+    "libcamel-1.2.so.68",
     "libebackend-1.2.so",
     "libebackend-1.2.so.11",
     "libebook-1.2.so",
@@ -55,7 +55,7 @@
     "libedata-cal-2.0.so",
     "libedata-cal-2.0.so.2",
     "libedataserver-1.2.so",
-    "libedataserver-1.2.so.27",
+    "libedataserver-1.2.so.28",
     "libedataserverui-1.2.so",
     "libedataserverui-1.2.so.4",
     "libedataserverui4-1.0.so",
@@ -90,7 +90,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.gnome.org/sources/evolution-data-server/3.60/evolution-data-server-3.60.2.tar.xz"
+    "https://download.gnome.org/sources/evolution-data-server/3.62/evolution-data-server-3.62.0.tar.xz"
   ],
   "work_sources": []
 }

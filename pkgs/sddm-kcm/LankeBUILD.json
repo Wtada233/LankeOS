@@ -1,6 +1,6 @@
 {
   "name": "sddm-kcm",
-  "version": "6.7.4",
+  "version": "6.7.5",
   "release": 1,
   "deps": [
     "sddm"
@@ -45,7 +45,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.4/sddm-kcm-6.7.4.tar.xz"
+    "https://download.kde.org/stable/plasma/6.7.5/sddm-kcm-6.7.5.tar.xz"
   ],
   "work_sources": []
 }

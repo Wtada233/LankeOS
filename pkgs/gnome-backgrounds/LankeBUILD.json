@@ -1,6 +1,6 @@
 {
   "name": "gnome-backgrounds",
-  "version": "50.0",
+  "version": "51.0",
   "release": 1,
   "deps": [
     "libjxl"
@@ -13,7 +13,7 @@
     "meson"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gnome-backgrounds/50/gnome-backgrounds-50.0.tar.xz"
+    "https://download.gnome.org/sources/gnome-backgrounds/51/gnome-backgrounds-51.0.tar.xz"
   ],
   "work_sources": []
 }

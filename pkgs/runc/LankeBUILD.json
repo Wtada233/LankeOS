@@ -1,13 +1,13 @@
 {
   "name": "runc",
   "version": "1.5.1",
+  "release": 2,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "libc.so.6",
     "libpathrs.so",
-    "libresolv.so.2",
     "libseccomp.so.2"
   ],
   "provides": [],

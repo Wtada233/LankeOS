@@ -1,6 +1,6 @@
 {
   "name": "pcre2",
-  "version": "10.47",
+  "version": "10.48",
   "release": 2,
   "deps": [
     "bash"
@@ -22,7 +22,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.47/pcre2-10.47.tar.bz2"
+    "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.48/pcre2-10.48.tar.bz2"
   ],
   "work_sources": []
 }

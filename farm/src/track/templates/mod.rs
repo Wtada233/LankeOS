@@ -19,6 +19,7 @@ pub mod script;
 pub mod sourceforge;
 
 use crate::error::FarmError;
+use crate::net::Fetcher;
 use regex::Regex;
 
 use crate::track::vercmp;
@@ -80,28 +81,47 @@ fn is_stable(v: &str) -> bool {
         .any(|m| low.contains(m))
 }
 
-/// 从 JSON 数组 `[{"name": "v1.2"}]` 提取 tag 名列表。
-pub(crate) fn extract_tag_names(json: &str) -> Result<Vec<String>, FarmError> {
+/// 解析 JSON 数组响应（列表端点）。
+pub(crate) fn parse_json_array(json: &str, ctx: &str) -> Result<Vec<serde_json::Value>, FarmError> {
     let v: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| format!("tags API 响应解析失败: {e}"))?;
-    let arr = v.as_array().ok_or("tags API 响应非数组")?;
-    Ok(arr
-        .iter()
-        .filter_map(|e| e.get("name").and_then(|n| n.as_str()))
-        .map(String::from)
-        .collect())
+        serde_json::from_str(json).map_err(|e| format!("{ctx} API 响应解析失败: {e}"))?;
+    match v {
+        serde_json::Value::Array(a) => Ok(a),
+        _ => Err(format!("{ctx} API 响应非数组").into()),
+    }
 }
 
-/// 从 GitLab releases 列表 JSON `[{"tag_name": "v1.2"}]` 提取 tag 名列表。
-pub(crate) fn extract_release_tag_names(json: &str) -> Result<Vec<String>, FarmError> {
-    let v: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| format!("releases API 响应解析失败: {e}"))?;
-    let arr = v.as_array().ok_or("releases API 响应非数组")?;
-    Ok(arr
+/// 从已解析的 releases 数组取值里提取 `tag_name`（GitHub / GitLab releases 同构）。
+pub(crate) fn release_tag_names(items: &[serde_json::Value]) -> Vec<String> {
+    items
         .iter()
-        .filter_map(|e| e.get("tag_name").and_then(|t| t.as_str()))
-        .map(String::from)
-        .collect())
+        .filter_map(|e| e.get("tag_name").and_then(|t| t.as_str()).map(String::from))
+        .collect()
+}
+
+/// **分页**拉取 JSON 数组列表端点（GitHub / GitLab releases 同构：`?per_page=N&page=M`）。
+///
+/// 逐页**单独请求**，直到某页条目数 < `per_page`（末页）或到 `max_pages` 兜底。判末页只用 body：
+/// `Fetcher` 不暴露响应头（不依赖 `Link` / `X-Next-Page`），而两端点都返回数组且页大小由我们指定
+/// ⇒ "本页不足一页"即最后一页。这样 release/tag 数量再多也不会因为"只看第一页"漏掉目标版本。
+pub(crate) fn fetch_json_pages(
+    fetcher: &dyn Fetcher,
+    url_without_page: &str,
+    per_page: usize,
+    max_pages: usize,
+) -> Result<Vec<serde_json::Value>, FarmError> {
+    let mut out: Vec<serde_json::Value> = Vec::new();
+    for page in 1..=max_pages {
+        let url = format!("{url_without_page}&page={page}");
+        let body = fetcher.get(&url)?;
+        let mut arr = parse_json_array(&body, "列表")?;
+        let n = arr.len();
+        out.append(&mut arr);
+        if n < per_page {
+            break;
+        }
+    }
+    Ok(out)
 }
 
 /// 从 JSON `{"tag_name": "v1.2"}` 提取最新 release tag。

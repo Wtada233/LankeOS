@@ -7,22 +7,13 @@
 //! 目前支持的 flag：
 //!
 //! ```json
-//! { "farm_flags": ["BUILD_AFTER_BUILD_DEPS"] }
+//! { "farm_flags": ["IGNORE_CHK_QML"] }
 //! ```
 //!
-//! - `BUILD_AFTER_BUILD_DEPS`：把该包的 `build_deps` 无条件放入依赖边参与 Kahn
-//!   拓扑排序（**只要依赖在本轮 targets**）。
-//!
-//!   farm 的**默认语义**（无 flag）也已让 `build_deps` 进边——但**只限「本轮起点旧索引里没有的
-//!   依赖」**（从未进 repo、同轮首建/引导，如 gjs 构建依赖首建的 sysprof）：这类依赖不先建，
-//!   依赖方容器 `lpkg upgrade` 装不到它必然 BLOCKED。**已在仓库的依赖默认不建边**——容器里每个
-//!   构建 `lpkg upgrade` 从 repo 自取最新版构建工具，无需排队。
-//!
-//!   本 flag 是**更强的 opt-in**，覆盖默认不建的「依赖已在仓库但本轮也重建」场景：某些包
-//!   **构建期就依赖另一个也在重建的包**（如 python-bar 构建时需要 python-foo 刚产出的产物），
-//!   两者都在本轮 targets 时须先建被依赖者，否则容器里还是旧版、构建基于旧 ABI 白跑。
-//!   该 flag 的效果与链接边/组边一致：**只对 targets 内的包生效**（build_deps
-//!   指向本轮不重建的包 → 边被丢弃，包直接构建不等待）。
+//! > **已删除：`BUILD_AFTER_BUILD_DEPS`**。它曾把该包的 `build_deps` **无条件**放进拓扑依赖边；
+//! > 该行为现在就是**默认语义**（见 `build/sched.rs::topo_order`：`build_deps` 无条件进边，
+//! > 仅限本轮 targets 内）。配方里若还写着它 → 走"未知 farm flag"告警（`parse_all`），
+//! > **不是**静默忽略——留着它没有意义，应删掉。
 //!
 //! - `IGNORE_CHK_ABI` / `IGNORE_CHK_QML` / `IGNORE_CHK_PKGCONF` / `IGNORE_CHK_PKGERR` /
 //!   `IGNORE_CHK_INTROSPECTION` / `IGNORE_CHK_VAPI` / `IGNORE_CHK_BUILDDEPS` / `IGNORE_CHK_PYCACHE` /
@@ -33,9 +24,8 @@
 
 use std::collections::HashSet;
 
-/// 当前支持的 farm flag（字符串形式，即 LankeBUILD.json 里写死的字面量）。
-pub const BUILD_AFTER_BUILD_DEPS: &str = "BUILD_AFTER_BUILD_DEPS";
-/// `IGNORE_CHK_<KIND>`：fullchk 族对该包跳过检則 KIND（KIND ∈ ABI/QML/PKGCONF/PKGERR/HOOK）。
+/// `IGNORE_CHK_<KIND>`：fullchk 族对该包跳过检則 KIND
+/// （KIND ∈ ABI/QML/PKGCONF/PKGERR/INTROSPECTION/VAPI/BUILDDEPS/PYCACHE/HOOK）。
 pub const IGNORE_CHK_PREFIX: &str = "IGNORE_CHK_";
 /// **字符串列表 flag** 的**裸名**：值必须写成 JSON 数组对象成员
 /// `{"QML_CHK_IGN_LST": ["org.kde.kwin", "HelperWidgets"]}`（consumer = `string_list`）。
@@ -45,8 +35,6 @@ pub const QML_CHK_IGN_LST: &str = "QML_CHK_IGN_LST";
 /// 解析后的 farm flag（类型化，便于 `contains` 与未来扩展穷举）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FarmFlag {
-    /// 该包的 build_deps 也作为依赖边参与 Kahn 排序。
-    BuildAfterBuildDeps,
     /// 忽略 ABI 符号@版本检則（abichk / fullchk）。
     IgnoreChkAbi,
     IgnoreChkQml,
@@ -89,9 +77,6 @@ impl FarmFlag {
     /// 曾静默丢值；现在会走"未知 flag"告警，响亮暴露拼写错误。
     pub fn parse(s: &str) -> Option<FarmFlag> {
         let name = s.trim();
-        if name == BUILD_AFTER_BUILD_DEPS {
-            return Some(FarmFlag::BuildAfterBuildDeps);
-        }
         if name == QML_CHK_IGN_LST {
             return Some(FarmFlag::StringList);
         }
@@ -122,7 +107,7 @@ pub fn parse_all(flags: &[serde_json::Value]) -> HashSet<FarmFlag> {
             Some(f) => {
                 out.insert(f);
             }
-            None => eprintln!("  未知 farm flag: {raw}"),
+            None => eprintln!("{}", crate::tr!("farm_flags.unknown", raw)),
         }
     }
     out
@@ -134,16 +119,14 @@ mod tests {
 
     #[test]
     fn parse_known_and_unknown() {
-        assert_eq!(
-            FarmFlag::parse("BUILD_AFTER_BUILD_DEPS"),
-            Some(FarmFlag::BuildAfterBuildDeps)
-        );
+        // 已删除的 BUILD_AFTER_BUILD_DEPS 现在必须**未知**——配方里残留会走 warn，不静默
+        assert_eq!(FarmFlag::parse("BUILD_AFTER_BUILD_DEPS"), None);
         assert_eq!(FarmFlag::parse("UNKNOWN_FLAG"), None);
         assert_eq!(FarmFlag::parse(""), None);
         // 首尾空白容忍（人为手写 YAML/JSON 常见）
         assert_eq!(
-            FarmFlag::parse("  BUILD_AFTER_BUILD_DEPS  "),
-            Some(FarmFlag::BuildAfterBuildDeps)
+            FarmFlag::parse("  IGNORE_CHK_QML  "),
+            Some(FarmFlag::IgnoreChkQml)
         );
         // 豁免 flag：大写 KIND
         assert_eq!(
@@ -164,16 +147,12 @@ mod tests {
     #[test]
     fn parse_all_collects_known_ignores_unknown() {
         let set = parse_all(&[
-            serde_json::json!("BUILD_AFTER_BUILD_DEPS"),
             serde_json::json!("IGNORE_CHK_HOOK"),
             serde_json::json!("NOPE"),
-            serde_json::json!("BUILD_AFTER_BUILD_DEPS"),
+            serde_json::json!("IGNORE_CHK_HOOK"),
             serde_json::json!({ "QML_CHK_IGN_LST": ["org.kde.kwin"] }),
         ]);
-        assert_eq!(
-            set,
-            HashSet::from([FarmFlag::BuildAfterBuildDeps, FarmFlag::IgnoreChkHook])
-        );
+        assert_eq!(set, HashSet::from([FarmFlag::IgnoreChkHook]));
     }
 
     #[test]

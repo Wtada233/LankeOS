@@ -1,6 +1,6 @@
 {
   "name": "gimp",
-  "version": "3.2.4",
+  "version": "3.2.6",
   "release": 2,
   "deps": [
     "mypaint-brushes",
@@ -137,7 +137,7 @@
     "libunwind"
   ],
   "sources": [
-    "https://download.gimp.org/pub/gimp/v3.2/gimp-3.2.4.tar.xz"
+    "https://download.gimp.org/pub/gimp/v3.2/gimp-3.2.6.tar.xz"
   ],
   "work_sources": []
 }

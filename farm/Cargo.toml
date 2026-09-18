@@ -15,6 +15,9 @@ clap = { version = "4", features = ["derive"] }
 tar = "0.4"
 zstd = "0.13"
 goblin = "0.9"
+# git 协议列 tag（`mode: tags` 要**全量** tag，REST 端点是分页窗口）——
+# 链系统 libgit2（lpkg 的 `git+` 源用的是同一个库，本系统已装）。
+git2 = "0.20"
 rusqlite = { version = "0.31", features = ["bundled"] }
 sha2 = "0.10"
 ctrlc = "3"

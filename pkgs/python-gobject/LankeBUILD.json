@@ -29,9 +29,6 @@
     "python-cairo",
     "xorgproto"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
     "https://download.gnome.org/sources/pygobject/3.58/pygobject-3.58.0.tar.gz"
   ],

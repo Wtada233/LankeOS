@@ -1,7 +1,7 @@
 {
   "name": "samba",
-  "version": "4.24.6",
-  "release": 2,
+  "version": "4.24.7",
+  "release": 4,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -28,11 +28,14 @@
     "libpam.so.0",
     "libpanelw.so.6",
     "libpopt.so.0",
+    "libpytalloc-util.cpython-314-x86-64-linux-gnu.so.2",
     "libpython3.14.so.1.0",
     "libreadline.so.8",
     "libsystemd.so.0",
+    "libtalloc.so.2",
     "libtasn1.so.6",
     "libtdb.so.1",
+    "libtevent.so.0",
     "libtirpc.so.3",
     "liburing.so.2",
     "libz.so.1"
@@ -102,12 +105,14 @@
     "popt",
     "readline",
     "rpcsvc-proto",
+    "talloc",
     "tdb",
+    "tevent",
     "vala",
     "zlib"
   ],
   "sources": [
-    "https://download.samba.org/pub/samba/stable/samba-4.24.6.tar.gz"
+    "https://download.samba.org/pub/samba/stable/samba-4.24.7.tar.gz"
   ],
   "work_sources": [],
   "farm_flags": [

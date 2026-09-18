@@ -7,18 +7,31 @@
 //!
 //! 算法（两段式，镜像 python `/tmp/scan_elf_ver.py`）：
 //! 1. provider 目录：遍历全部包的 cached analysis，收集带 SONAME 的 ELF 导出的 `sym@ver`；
+//!    同时收集**全仓库 ELF 提供的名字**（SONAME + 文件名——无 SONAME 的运行时库如
+//!    `libtcl8.6.so` 靠文件名被 DT_NEEDED 引用）；
 //! 2. consumer：可执行/库的 `undef`（symbol@version）引用 → 若其 DT_NEEDED 候选库都不提供 → 报缺失。
+//!
+//! **另报「DT_NEEDED 的 SONAME 仓库无任何包提供」**（Critical）：提供者换了新 SONAME（ABI 断裂，
+//! 如 libunibreak.so.7 → .8）或该依赖从未进仓库时，旧实现把它当"候选为空"直接跳过 → 静默漏报
+//! （krita 链 libunibreak.so.7 / vte 链 libsimdutf.so.35 就栽在这里）。这类引用既不在符号版本
+//! 比对的范围里（无版本符号在步骤 2 被跳过），也不属于任何"候选提供"判定 → 必须独立成一条。
 //!
 //! 原生 ELF 扫描用 goblin 读 `.gnu.version_d/.gnu.version_r/.gnu.version`（verdef/verneed/versym）与
 //! dynsym/dynstr，不 shell readelf/objdump。语义注记：同 SONAME 多份（打包 bug）→ 排序遍历最后胜。
 
 use super::{walk_all, ChkOpts, Finding, Report, Severity};
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
 use goblin::elf::Elf;
+
+/// provider 侧导出：版本名 → 符号集。
+type DefinedMap = BTreeMap<String, BTreeSet<String>>;
+/// consumer 侧引用：(符号, 版本)。
+type UndefRefs = Vec<(String, String)>;
 
 /// 单个 ELF 的动态信息（轻解析，不做符号 join）。
 struct Probe {
@@ -36,9 +49,7 @@ fn probe(bytes: &[u8]) -> Result<Probe, FarmError> {
 
 /// 完整符号版本 join：defined（版本 → 符号集，provider 导出）与 undef（(符号, 版本)，
 /// consumer 引用）。索引 0/1（local/global=无版本）跳过（对齐 objdump -T 只收带 @ 的项）。
-fn symbols(
-    bytes: &[u8],
-) -> Result<(BTreeMap<String, BTreeSet<String>>, Vec<(String, String)>), FarmError> {
+fn symbols(bytes: &[u8]) -> Result<(DefinedMap, UndefRefs), FarmError> {
     let elf = goblin::elf::Elf::parse(bytes).map_err(|e| format!("ELF 解析失败: {e}"))?;
     let strtab = &elf.dynstrtab;
     // verdef：vd_ndx → 版本名（本 .so 导出的版本）
@@ -90,7 +101,11 @@ fn symbols(
 }
 
 /// 本检則 analysis 结构版本：只在 **abi** 分析逻辑变化时递增（与其他检則独立，见 `super::walk_all`）。
-const SCHEMA: u32 = 5;
+/// 5 → 6：判定逻辑新增「DT_NEEDED 的名字全仓库无提供者」这一类（Critical）——缓存条目虽然字段没变
+/// （`needed` 本就在里面），但旧缓存是"上一版判定"扫出来的世代，递增以强制按新判定全量重扫。
+/// 6 → 7：analysis 新增 `links`（包内**符号链接名**）——dev 链接（`libfoo.so → libfoo.so.1`）也是
+/// DT_NEEDED 的字面量，不收它会误报（runc 链 `libpathrs.so`）。
+const SCHEMA: u32 = 7;
 
 fn dedup_sorted_undef(mut undef: Vec<(String, String)>) -> Vec<(String, String)> {
     undef.sort();
@@ -98,7 +113,9 @@ fn dedup_sorted_undef(mut undef: Vec<(String, String)>) -> Vec<(String, String)>
     undef
 }
 
-/// 包的内容分析：遍历 content 下每个 ELF，存 soname/needed/defined/undef。供 `walk_all` 整包缓存。
+/// 包的内容分析：遍历 content 下每个 ELF，存 soname/needed/defined/undef；另收**符号链接名**
+/// （`links`）——链接名本身可能就是一个 DT_NEEDED 字面量（rust cdylib / 未做版本化 SONAME 的库：
+/// runc 的 `libpathrs.so` 指向实体 `libpathrs.so.0.2.6`，实体 SONAME 是 `libpathrs.so.0`）。
 fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     let content = extract.join("content");
     let mut files: Vec<serde_json::Value> = Vec::new();
@@ -124,13 +141,51 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
             "undef": dedup_sorted_undef(undef), // [[sym, ver]…]，consumer 引用
         }));
     }
-    Ok(serde_json::json!({ "files": files }))
+    let mut links: Vec<String> = super::collect_files(&content)
+        .into_iter()
+        .filter(|f| {
+            fs::symlink_metadata(f)
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false)
+        })
+        .map(|f| super::rel_of(&f, &content))
+        .collect();
+    links.sort();
+    Ok(serde_json::json!({ "files": files, "links": links }))
+}
+
+/// 全仓库「提供的名字」集合：每个包的 ELF SONAME ∪ 常规文件名 ∪ **符号链接名**（含目录前缀的
+/// 相对路径只取 basename）。抽成纯函数便于单测（runc/libpathrs 那类 dev 链接名就是被这里收进来的）。
+fn provided_names_from(analyses: &BTreeMap<String, serde_json::Value>) -> BTreeSet<String> {
+    let mut out: BTreeSet<String> = BTreeSet::new();
+    for a in analyses.values() {
+        if let Some(files) = a["files"].as_array() {
+            for f in files {
+                if let Some(s) = f["soname"].as_str() {
+                    out.insert(s.to_string());
+                }
+                if let Some(base) = f["file"].as_str().and_then(|rel| rel.rsplit('/').next()) {
+                    out.insert(base.to_string());
+                }
+            }
+        }
+        if let Some(links) = a["links"].as_array() {
+            for l in links.iter().filter_map(|v| v.as_str()) {
+                if let Some(base) = l.rsplit('/').next() {
+                    out.insert(base.to_string());
+                }
+            }
+        }
+    }
+    out
 }
 
 /// 与 qml/pkgconf/pkg_err/hook 同级的检則入口：审计 `ChkOpts.source` 全部包 → 统一 `Report`。
 /// provider = 全仓库带 SONAME ELF 的 `defined`；consumer = 各包 ELF 的 `undef` 引用——其 DT_NEEDED
-/// 候选库都不提供该 `sym@ver` → `Finding`（`what` = `sym @ ver（候选提供: …）`）。整包缓存，
-/// `.lpkg` 未变不重扫（`farm chk full` 二遍起与其它 chk 一样全命中）。
+/// 候选库都不提供该 `sym@ver` → `Finding`（`what` = `sym @ ver（候选提供: …）`）。
+/// **另报** DT_NEEDED 里有、而全仓库没有任何包提供的名字（`SONAME 或文件名`，Critical）——ABI 断裂
+/// （提供者换新 SONAME）或依赖未进仓库。整包缓存，`.lpkg` 未变不重扫（`farm chk full` 二遍起与其它
+/// chk 一样全命中）。
 pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
     let (analyses, hits, misses, failed) = walk_all(o, SCHEMA, |ext, _pkg| analyze(ext))?;
 
@@ -159,6 +214,13 @@ pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
         }
     }
 
+    // 1b) 全仓库「提供的名字」：ELF 的 SONAME ∪ 常规文件名 ∪ **符号链接名**——用于判定
+    //     「DT_NEEDED 的名字仓库里根本没人提供」= ABI 断裂（见步骤 2 的 ①）。
+    //     三类都要：tcl/expect 这类无 SONAME 的库靠**文件名**被引用；而 `libfoo.so → libfoo.so.1`
+    //     这种 **dev 链接名**本身就是某些 DT_NEEDED 的字面量（runc 链 `libpathrs.so`，实体 SONAME
+    //     却是 `libpathrs.so.0`）→ 只收常规文件会把它判成"没人提供"（误报）。
+    let provided_names = provided_names_from(&analyses);
+
     // 2) consumer 判定（全仓库 provider 已建全后统一做，确定性）
     let audit_all = o.subset.is_empty();
     let audit: BTreeSet<&str> = o.subset.iter().map(String::as_str).collect();
@@ -181,13 +243,34 @@ pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
             continue;
         };
         for f in files {
+            let rel = f["file"].as_str().unwrap_or("?");
+            // ① DT_NEEDED 里「仓库无任何包提供」的名字 → ABI 断裂（Critical）。
+            //    必须放在 undef 早退**之前**：没做符号版本的库（libunibreak/simdutf 这类）所有导入
+            //    都是无版本项，会在下面 `undef.is_empty()` 处直接 continue，够不到任何判定——旧实现
+            //    正是这样把 krita 链 libunibreak.so.7 / vte 链 libsimdutf.so.35 静默漏掉的。
+            let mut seen_needed: BTreeSet<&str> = BTreeSet::new();
+            for son in f["needed"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|v| v.as_str())
+            {
+                if provided_names.contains(son) || !seen_needed.insert(son) {
+                    continue;
+                }
+                items.push(Finding {
+                    file: rel.to_string(),
+                    what: tr!("chk.abi.orphan_soname", son),
+                    severity: Severity::Critical,
+                });
+            }
+            // ② 符号版本 join：本 ELF 的 `sym@ver` 引用能否被其 DT_NEEDED 候选库满足
             let Some(undef) = f["undef"].as_array() else {
                 continue;
             };
             if undef.is_empty() {
                 continue;
             }
-            let rel = f["file"].as_str().unwrap_or("?");
             // 候选 = 本 ELF 链接、且全仓库确有 provider 的 SONAME（都未提供才报）
             let cands: Vec<String> = f["needed"]
                 .as_array()
@@ -223,16 +306,16 @@ pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
                 };
                 items.push(Finding {
                     file: rel.to_string(),
-                    what: format!(
-                        "{} @ {}{}",
-                        sym,
-                        ver,
-                        if cands.is_empty() {
-                            String::new()
-                        } else {
-                            format!("（候选提供: {}）", cands.join(", "))
-                        }
-                    ),
+                    what: if cands.is_empty() {
+                        tr!("chk.abi.unresolved_symbol", sym, ver)
+                    } else {
+                        tr!(
+                            "chk.abi.unresolved_symbol_cands",
+                            sym,
+                            ver,
+                            cands.join(", ")
+                        )
+                    },
                     severity,
                 });
             }
@@ -263,6 +346,27 @@ mod tests {
             }
         }
         None
+    }
+
+    /// 回归（runc/libpathrs）：dev 链接名（`libpathrs.so` / `libpathrs.so.0` 是符号链接，实体是
+    /// `libpathrs.so.0.2.6`，其 SONAME 只有 `libpathrs.so.0`）也必须是「仓库提供的名字」——runc 的
+    /// DT_NEEDED 字面量就是 `libpathrs.so`，旧实现只收常规文件 → 误报"仓库无任何包提供"。
+    #[test]
+    fn provided_names_include_symlink_names() {
+        let analyses = BTreeMap::from([(
+            "libpathrs".to_string(),
+            serde_json::json!({
+                "files": [
+                    {"file": "usr/lib/libpathrs.so.0.2.6", "soname": "libpathrs.so.0",
+                     "needed": [], "defined": {}, "undef": []}
+                ],
+                "links": ["usr/lib/libpathrs.so", "usr/lib/libpathrs.so.0"],
+            }),
+        )]);
+        let names = provided_names_from(&analyses);
+        for want in ["libpathrs.so", "libpathrs.so.0", "libpathrs.so.0.2.6"] {
+            assert!(names.contains(want), "缺 {want}: {names:?}");
+        }
     }
 
     #[test]
@@ -339,12 +443,119 @@ mod tests {
         fs::remove_dir_all(&base).ok();
     }
 
+    #[test]
+    fn reports_needed_soname_without_provider() {
+        // 回归（krita 链 libunibreak.so.7 / vte 链 libsimdutf.so.35）：提供者换了新 SONAME 后，
+        // consumer 的 DT_NEEDED 名字在仓库里**没有任何包提供** → 必须报 Critical。旧实现把它按
+        // `catalog.contains_key` 过滤出候选、且无版本符号在 `undef.is_empty()` 处直接 continue
+        // → 整类断裂静默漏报（chk abi 无发现，只有 lpkg upgrade 时才炸出来）。
+        let Some(bin) = host_elf_with_needed() else {
+            eprintln!("跳过：宿主无带 DT_NEEDED 的 ELF");
+            return;
+        };
+        let needed: Vec<String> = probe(&fs::read(&bin).unwrap()).unwrap().needed;
+        let libc = host_versioned_lib().expect("宿主应有 libc.so.6");
+        let libc_name = libc.file_name().unwrap().to_string_lossy().into_owned();
+        // 取一个「不是 libc」的依赖名当靶子（第二遍要把它变成有提供者，验证精确性）
+        let target = needed
+            .iter()
+            .find(|n| **n != libc_name)
+            .cloned()
+            .expect("宿主 ELF 至少该有一个非 libc 依赖");
+
+        let base = std::env::temp_dir().join(format!("farm-abi-orphan-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let repo = base.join("repo/x86_64");
+        // consumer 包：只装这一个 ELF，仓库里没有任何 provider
+        let put = |name: &str, rel: &str, src: &Path, fname: &str| {
+            let root = base.join(format!("pkg-{name}"));
+            fs::create_dir_all(root.join("content").join(rel)).unwrap();
+            fs::write(
+                root.join("metadata.json"),
+                format!(r#"{{"name":"{name}","version":"1.0"}}"#),
+            )
+            .unwrap();
+            fs::copy(src, root.join("content").join(rel).join(fname)).unwrap();
+            let pkgdir = repo.join(name);
+            fs::create_dir_all(&pkgdir).unwrap();
+            let f = fs::File::create(pkgdir.join("1.0.lpkg")).unwrap();
+            let enc = zstd::stream::write::Encoder::new(f, 3).unwrap();
+            let mut b = tar::Builder::new(enc);
+            b.append_dir_all(".", &root).unwrap();
+            let enc = b.into_inner().unwrap();
+            enc.finish().unwrap();
+            fs::remove_dir_all(&root).unwrap();
+        };
+        put(
+            "consumer",
+            "usr/bin",
+            &bin,
+            bin.file_name().unwrap().to_str().unwrap(),
+        );
+
+        let cache = base.join("cache");
+        let mk_opts = |rescan: bool| ChkOpts {
+            source: base.join("repo"),
+            arch: "x86_64".into(),
+            cache: cache.clone(),
+            pkgs_dir: base.join("pkgs"),
+            subset: vec![],
+            full_rescan: rescan,
+        };
+        let r = run(&mk_opts(false)).unwrap();
+        let items = r
+            .findings
+            .get("consumer")
+            .expect("consumer 的 DT_NEEDED 无提供者，必须报");
+        let whats: Vec<String> = items.iter().map(|f| f.what.clone()).collect();
+        for n in [&libc_name, &target] {
+            assert!(
+                whats.iter().any(|w| w.contains(n.as_str())),
+                "{n} 在仓库无任何包提供，必须报: {whats:?}"
+            );
+        }
+        assert!(
+            items.iter().all(|f| f.severity == Severity::Critical),
+            "无提供者的 DT_NEEDED 是 Critical: {items:?}"
+        );
+
+        // 精确性：把宿主 libc 作为 provider 包放进仓库 → libc 不再报，靶子仍报
+        put("libc", "usr/lib", &libc, &libc_name);
+        let r2 = run(&mk_opts(true)).unwrap();
+        let whats2: Vec<String> = r2
+            .findings
+            .get("consumer")
+            .map(|v| v.iter().map(|f| f.what.clone()).collect())
+            .unwrap_or_default();
+        assert!(
+            !whats2.iter().any(|w| w.contains(&libc_name)),
+            "{libc_name} 已有包提供，不应再报: {whats2:?}"
+        );
+        assert!(
+            whats2.iter().any(|w| w.contains(target.as_str())),
+            "仍无提供者的 {target} 应继续报: {whats2:?}"
+        );
+        fs::remove_dir_all(&base).ok();
+    }
+
+    /// 宿主里找一个带 DT_NEEDED 的 ELF（无则 None，测试跳过）。
+    fn host_elf_with_needed() -> Option<PathBuf> {
+        for cand in ["/usr/bin/ls", "/bin/ls", "/usr/bin/cat", "/bin/cat"] {
+            let p = Path::new(cand);
+            if p.is_file() {
+                return Some(p.to_path_buf());
+            }
+        }
+        None
+    }
+
     /// 预构建 + strip 的受控 fixture 端到端冒烟（用户场景）。fixture 二进制随仓库提交于
     /// `tests/fixtures/abi/`（strip 过，模拟 LankeOS 打包），测试只把它们装进 .lpkg 跑——**不依赖
     /// 宿主编译器**：
     /// - 包 libx：libx.so.1 导出 sym1@V1、sym2@V2（真 .gnu.version_d）；
     /// - 包 foo：可执行（无 SONAME），引用 sym1@V2、sym2@V2（真 .gnu.version_r）；
     /// - 包 nover：无版本节、无导入的可执行（空路径不炸）。
+    ///
     /// provider 目录来自 source 全量；断言只报 foo 的 sym1@V2 缺失（sym2@V2 有 V2，不报）。
     #[test]
     fn smoke_reports_missing_versioned_symbol() {

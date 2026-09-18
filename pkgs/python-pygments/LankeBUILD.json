@@ -16,9 +16,6 @@
     "python-setuptools",
     "python-wheel"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
     "https://files.pythonhosted.org/packages/49/2e/ced460408999b33da6b31b0021b0f37d329e202d4169aeb164493778f25b/pygments-2.21.0.tar.gz"
   ],

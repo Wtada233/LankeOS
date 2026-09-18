@@ -1,6 +1,6 @@
 {
   "name": "glycin",
-  "version": "2.1.5",
+  "version": "2.2.1",
   "release": 1,
   "deps": [
     "bubblewrap"
@@ -18,7 +18,6 @@
     "libheif.so.1",
     "libjxl.so.0.12",
     "libjxl_threads.so.0.12",
-    "liblcms2.so.2",
     "libm.so.6",
     "librsvg-2.so.2",
     "libseccomp.so.2"
@@ -48,7 +47,7 @@
     "vala"
   ],
   "sources": [
-    "https://download.gnome.org/sources/glycin/2.1/glycin-2.1.5.tar.xz"
+    "https://download.gnome.org/sources/glycin/2.2/glycin-2.2.1.tar.xz"
   ],
   "work_sources": []
 }

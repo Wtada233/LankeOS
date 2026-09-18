@@ -12,6 +12,7 @@
 
 use super::{walk_all, ChkOpts, Finding, Report, Severity};
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -106,10 +107,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
                 };
                 items.push(Finding {
                     file: path.to_string(),
-                    what: format!(
-                        "包含 __pycache__ 字节码缓存目录（{n} 项；构建期生成、含绝对路径且不可复现，\
-                         应在 package 阶段删除）"
-                    ),
+                    what: tr!("chk.pycache.dir", n),
                     severity: Severity::Warning,
                 });
             }
@@ -119,9 +117,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
             for p in arr.iter().filter_map(|v| v.as_str()) {
                 items.push(Finding {
                     file: p.to_string(),
-                    what: "散落的 Python 字节码（.pyc/.pyo，不在 __pycache__ 里；构建期生成、\
-                           不可复现，应在 package 阶段删除）"
-                        .to_string(),
+                    what: tr!("chk.pycache.loose").to_string(),
                     severity: Severity::Warning,
                 });
             }

@@ -67,10 +67,12 @@ std::unordered_set<std::string> get_all_required_packages();
 // ============================================================================
 
 /**
- * phys 所在文件系统的"顶层同设备祖先"（= 可安全放 stash 的目录）。沿 phys 所在目录
- * 向上走到 `st_dev` 变化处（设备/挂载边界）或 `Config::root_dir()` 边界为止，
- * **恒 clamp 在 root_dir() 内**（chroot 运行）。stash 放这里保证与 phys 同设备
- * → rename(2) 永不 EXDEV、永不逃出 chroot。多设备时每个文件系统各自一个 stash 根。
+ * phys 所在文件系统的顶层（= 可安全放 stash 的目录）。沿 phys 所在目录向上走到
+ * **挂载点**（/proc/self/mountinfo，vfsmount 才是 rename 的 EXDEV 边界）或
+ * `Config::root_dir()` 边界为止，**恒 clamp 在 root_dir() 内**（chroot 运行）。
+ * stash 放这里保证与 phys 同一挂载 → rename(2) 永不 EXDEV、永不逃出 chroot。
+ * 多文件系统时各自一个 stash 根。边界判据不用 st_dev：overlay 上目录与 upper 层
+ * 文件的 st_dev 本就不同（见 utils.hpp 的 mount_points 注释）。
  */
 std::filesystem::path stash_parent_dir(const std::filesystem::path& phys);
 

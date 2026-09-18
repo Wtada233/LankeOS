@@ -20,9 +20,6 @@
     "python-pluggy",
     "python-trove-classifiers"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
     "https://files.pythonhosted.org/packages/69/08/33331757185504aae48b8d9bd78cec03a76e3aecfb52e549d05a2347c0dd/hatchling-1.32.0.tar.gz"
   ],

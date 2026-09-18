@@ -35,7 +35,7 @@ fn resolve_pkgs_dir(a: &ChkArgs) -> PathBuf {
     if a.pkgs_dir.is_dir() {
         return a.pkgs_dir.clone();
     }
-    if a.pkgs_dir == PathBuf::from("pkgs") {
+    if a.pkgs_dir.as_path() == std::path::Path::new("pkgs") {
         let alt = PathBuf::from("../pkgs");
         if alt.is_dir() {
             return alt;
@@ -181,7 +181,7 @@ fn def(label: &str) -> Option<&'static ChkDef> {
 /// 单类检則（`farm chk qml|pkgconf|pkg-err|hook|abi`）：从定义表取 runner，跑 + 打印。
 pub(crate) fn cmd_run(a: &ChkArgs, label: &str) -> ExitCode {
     let Some(d) = def(label) else {
-        eprintln!("未知检則: {label}");
+        eprintln!("{}", lankefarm::tr!("chk.unknown_kind", label));
         return ExitCode::from(2);
     };
     let r = (d.run)(&opts_for(a, cache_root(a).join(d.cache)));

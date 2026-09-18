@@ -13,10 +13,8 @@ lankebuild_prepare() {
     export LDFLAGS="{LDFLAGS} -Wl,-Bsymbolic-functions"
     meson setup _build --prefix=/usr --buildtype=release \
         -D docs=false \
-        -D egl_device=true \
         -D installed_tests=false \
-        -D tests=disabled \
-        -D wayland_eglstream=false
+        -D tests=disabled
 }
 
 lankebuild_build() {

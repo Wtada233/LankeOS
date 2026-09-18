@@ -1,6 +1,6 @@
 {
   "name": "libwacom",
-  "version": "2.19.1",
+  "version": "2.20.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -24,7 +24,7 @@
     "meson"
   ],
   "sources": [
-    "https://github.com/linuxwacom/libwacom/releases/download/libwacom-2.19.1/libwacom-2.19.1.tar.xz"
+    "https://github.com/linuxwacom/libwacom/releases/download/libwacom-2.20.0/libwacom-2.20.0.tar.xz"
   ],
   "work_sources": []
 }

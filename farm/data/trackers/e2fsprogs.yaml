@@ -2,7 +2,11 @@ pkg-name: e2fsprogs
 version-source: sources[0]
 sources:
 - tracker-template: sourceforge
-  pattern: v(\d[\d.]*)
+  # 原 `v(\d[\d.]*)` 靠版本目录段 `v1.47.4` 做锚：现在能跑，但**任何 `v<数字>` 都算**
+  # —— 将来若出现 `v20260101` 这类日期式条目，vercmp 会压过真实版本（libtirpc 同款事故）。
+  # 锚定 RSS 里的**真实 tarball 文件名**（`.../v1.47.4/e2fsprogs-1.47.4.tar.gz/download`）：
+  # 只有 tarball 的版本参与比较；`e2fsprogs-libs-*` 因前缀不含 `e2fsprogs-<digit>` 自然不匹配。
+  pattern: 'e2fsprogs-([0-9][0-9.]*)\.tar\.gz'
   project: e2fsprogs
   path: e2fsprogs
   template: https://downloads.sourceforge.net/project/{project}/e2fsprogs/v{path_version}/e2fsprogs-{version}.tar.gz

@@ -1,6 +1,6 @@
 {
   "name": "coreutils",
-  "version": "9.11",
+  "version": "9.12",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -22,7 +22,7 @@
     "libcap"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/coreutils/coreutils-9.11.tar.xz"
+    "https://ftp.gnu.org/gnu/coreutils/coreutils-9.12.tar.xz"
   ],
   "work_sources": []
 }

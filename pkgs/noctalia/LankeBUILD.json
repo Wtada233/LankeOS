@@ -1,12 +1,13 @@
 {
   "name": "noctalia",
-  "version": "5.0.0-beta1",
+  "version": "5.1.0",
   "release": 3,
   "deps": [
     "bash",
     "python"
   ],
   "needed_so": [
+    "ld-linux-x86-64.so.2",
     "libEGL.so.1",
     "libGLESv2.so.2",
     "libc.so.6",
@@ -19,7 +20,12 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libharfbuzz.so.0",
+    "libical.so.4.0",
+    "libjemalloc.so.2",
+    "libjxl.so.0.12",
+    "libjxl_threads.so.0.12",
     "libm.so.6",
+    "libmd4c.so.0",
     "libpam.so.0",
     "libpango-1.0.so.0",
     "libpangocairo-1.0.so.0",
@@ -30,10 +36,15 @@
     "libqalculate.so.23",
     "librsvg-2.so.2",
     "libsdbus-c++.so.2",
+    "libsecret-1.so.0",
+    "libsndfile.so.1",
+    "libsodium.so.26",
     "libstdc++.so.6",
+    "libtomlplusplus.so.3",
     "libwayland-client.so.0",
     "libwayland-egl.so.1",
     "libwebp.so.7",
+    "libwebpdemux.so.2",
     "libwireplumber-0.5.so.0",
     "libxkbcommon.so.0",
     "libxml2.so.16"
@@ -47,24 +58,35 @@
     "freetype",
     "glib",
     "harfbuzz",
+    "jemalloc",
     "libglvnd",
+    "libical",
+    "libjxl",
     "libqalculate",
     "librsvg",
+    "libsecret",
+    "libsndfile",
+    "libsodium",
     "libwebp",
     "libxkbcommon",
     "libxml2",
     "linux-pam",
+    "md4c",
     "meson",
     "ninja",
+    "nlohmann-json",
     "pango",
     "pipewire",
     "polkit",
     "sdbus-cpp",
+    "stb",
+    "tomlplusplus",
     "wayland",
     "wayland-protocols",
     "wireplumber"
   ],
   "sources": [
-    "https://github.com/noctalia-dev/noctalia/releases/download/v5.0.0-beta1/noctalia-latest.tar.gz"
-  ]
+    "https://github.com/noctalia-dev/noctalia/releases/download/v5.1.0/noctalia-latest.tar.gz"
+  ],
+  "work_sources": []
 }

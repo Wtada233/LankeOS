@@ -96,10 +96,37 @@ void write_string_to_file(const std::filesystem::path& path, std::string_view co
 void cleanup_tmp_dirs();
 
 /**
+ * 路径 p 是否在 root 之内（含 root 自身）。两边取 lexically_normal、root 尾部分隔符
+ * 归一后，按目录边界比较（p == root，或以 root + "/" 开头）。
+ *
+ * **不要手写 `root + "/"` 前缀拼接**：root == "/" 时得到 "//"，而 lexically_normal
+ * 后的路径不可能以 "//" 开头 → 判定恒为 false，把所有路径都判成"不在根内"。
+ * root_dir == "/" 恰恰是常规安装（不带 --root）的形态。
+ */
+bool path_within(const std::filesystem::path& p, const std::filesystem::path& root);
+
+/**
+ * 本进程可见的挂载点集合（读 /proc/self/mountinfo，还原 \040 等八进制转义、去尾分隔符）。
+ *
+ * **判"是否跨文件系统"必须用它，不能用 st_dev**：overlay 上"目录报 overlay 的 dev、
+ * upper 层文件报底层 fs 的 dev"，btrfs 子卷/多层镜像里同一条路径链上的 st_dev 也不一致
+ * ——拿 st_dev 当边界，会把同一次 rename 的源和目标误判成跨设备（或反之）。真正的
+ * EXDEV 边界是 vfsmount：跨挂载点一律 EXDEV，即使同一 superblock 的 bind mount。
+ *
+ * /proc 未挂载（最小 chroot）时返回空表，调用方自行降级。结果按进程缓存：事务期间
+ * lpkg 自身不改挂载表（hook 的 mount namespace 在子进程里）。
+ */
+const std::vector<std::filesystem::path>& mount_points();
+
+/** p（去尾分隔符后）是否为挂载点（= 其所在文件系统的顶层）。 */
+bool is_mount_point(const std::filesystem::path& p);
+
+/**
  * 回收孤儿备份 stash（TODO.md §5）：删除各文件系统根下、pid 已死的
  * `.lpkg_bak_<pkg>_<pid>` 目录（崩溃/续传未覆盖的残留）。范围：root_dir 顶层 +
- * 顶层子目录中 st_dev 与 root_dir 不同（= 子挂载点）的直接子目录，扫描有界；
- * 只认"存活进程已消失"（kill(pid,0) 返回 ESRCH）的，绝不碰正在运行/自 pid 的 stash。
+ * root_dir 内每个挂载点（= stash 的落点集合，见 mount_points）；/proc 不可用时降级为
+ * root 顶层 + 顶层子挂载点。只认"存活进程已消失"（kill(pid,0) 返回 ESRCH）的，
+ * 绝不碰正在运行/自 pid 的 stash。
  */
 void cleanup_orphan_stashes();
 

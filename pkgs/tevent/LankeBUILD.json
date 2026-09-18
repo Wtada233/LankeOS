@@ -1,0 +1,25 @@
+{
+  "name": "tevent",
+  "version": "0.17.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libc.so.6",
+    "libm.so.6",
+    "libtalloc.so.2"
+  ],
+  "provides": [
+    "libtevent.so",
+    "libtevent.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmocka",
+    "talloc"
+  ],
+  "sources": [
+    "https://www.samba.org/ftp/tevent/tevent-0.17.2.tar.gz"
+  ],
+  "work_sources": []
+}

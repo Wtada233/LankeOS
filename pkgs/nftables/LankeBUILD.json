@@ -1,6 +1,6 @@
 {
   "name": "nftables",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "deps": [],
   "needed_so": [
     "libc.so.6",
@@ -23,7 +23,7 @@
     "readline"
   ],
   "sources": [
-    "https://www.netfilter.org/projects/nftables/files/nftables-1.1.6.tar.xz"
+    "https://www.netfilter.org/projects/nftables/files/nftables-1.1.7.tar.xz"
   ],
   "work_sources": []
 }

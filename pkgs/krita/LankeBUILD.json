@@ -1,6 +1,6 @@
 {
   "name": "krita",
-  "version": "6.0.3",
+  "version": "6.0.4",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -22,6 +22,7 @@
     "libOpenEXR-3_4.so.33",
     "libQt6Core.so.6",
     "libQt6Core5Compat.so.6",
+    "libQt6DBus.so.6",
     "libQt6Gui.so.6",
     "libQt6Network.so.6",
     "libQt6OpenGL.so.6",
@@ -66,7 +67,7 @@
     "libstdc++.so.6",
     "libtiff.so.6",
     "libturbojpeg.so.0",
-    "libunibreak.so.7",
+    "libunibreak.so.8",
     "libwayland-client.so.0",
     "libwebp.so.7",
     "libwebpdemux.so.2",
@@ -77,8 +78,6 @@
   "provides": [
     "libkritabasicflakes.so",
     "libkritabasicflakes.so.21",
-    "libkritacolor.so",
-    "libkritacolor.so.21",
     "libkritacommand.so",
     "libkritacommand.so.21",
     "libkritaexifcommon.so",
@@ -195,7 +194,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.kde.org/stable/krita/6.0.3/krita-6.0.3.tar.xz"
+    "https://download.kde.org/stable/krita/6.0.4/krita-6.0.4.tar.xz"
   ],
   "work_sources": [],
   "farm_flags": [

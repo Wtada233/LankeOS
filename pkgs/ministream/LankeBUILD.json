@@ -1,0 +1,27 @@
+{
+  "name": "ministream",
+  "version": "0.99.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0"
+  ],
+  "provides": [
+    "libministream.so",
+    "libministream.so.1"
+  ],
+  "build_deps": [
+    "appstream",
+    "base-devel",
+    "glib",
+    "gobject-introspection",
+    "meson",
+    "ninja"
+  ],
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/ministream/-/archive/0.99.1/ministream-0.99.1.tar.gz"
+  ],
+  "work_sources": []
+}

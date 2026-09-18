@@ -1,6 +1,6 @@
 {
   "name": "iniparser",
-  "version": "4.2.6",
+  "version": "4.3.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -16,6 +16,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/ndevilla/iniparser/archive/refs/tags/v4.2.6.tar.gz"
-  ]
+    "https://github.com/ndevilla/iniparser/archive/refs/tags/v4.3.0.tar.gz"
+  ],
+  "work_sources": []
 }

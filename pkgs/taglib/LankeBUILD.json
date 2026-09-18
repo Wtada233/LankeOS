@@ -1,6 +1,6 @@
 {
   "name": "taglib",
-  "version": "2.3.1",
+  "version": "2.3.2",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -25,7 +25,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/taglib/taglib/releases/download/v2.3.1/taglib-2.3.1.tar.gz"
+    "https://github.com/taglib/taglib/releases/download/v2.3.2/taglib-2.3.2.tar.gz"
   ],
   "work_sources": []
 }

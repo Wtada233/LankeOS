@@ -1,6 +1,6 @@
 {
   "name": "python-vcs-versioning",
-  "version": "2.3.1",
+  "version": "2.4.1",
   "release": 1,
   "deps": [
     "python",
@@ -17,11 +17,8 @@
     "python-setuptools",
     "python-wheel"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
-    "https://files.pythonhosted.org/packages/a6/cb/6f5c4ed4da249ef5eea34ddfbb38174c5533ff3da8703b8252bf44b80396/vcs_versioning-2.3.1.tar.gz"
+    "https://files.pythonhosted.org/packages/3e/97/792a4ef20344f9af3e16098b58b45eb5d6202259b84fc80c43bc000a5e6c/vcs_versioning-2.4.1.tar.gz"
   ],
   "work_sources": []
 }

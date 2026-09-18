@@ -406,7 +406,10 @@ fn load_trackers(data_dir: &str) -> HashMap<String, TrackerConfig> {
                     }
                     // 解析失败必须**可见**：`if let Ok` 静默跳过时，写错的 tracker 会"看着在、
                     // 实际不生效"（字段拼错/schema 变更后未迁移都会落到这里）。
-                    Err(e) => eprintln!("  [warn] 忽略无法解析的 tracker {}: {e}", path.display()),
+                    Err(e) => eprintln!(
+                        "{}",
+                        lankefarm::tr!("track.parse_fail_ignored", path.display(), e)
+                    ),
                 }
             }
         }

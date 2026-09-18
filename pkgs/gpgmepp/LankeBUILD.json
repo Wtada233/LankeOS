@@ -1,6 +1,6 @@
 {
   "name": "gpgmepp",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "release": 2,
   "deps": [
     "libgpg-error"
@@ -23,7 +23,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/gpg/gpgmepp/archive/refs/tags/gpgmepp-2.1.0.tar.gz"
+    "https://github.com/gpg/gpgmepp/archive/refs/tags/gpgmepp-2.2.0.tar.gz"
   ],
   "work_sources": []
 }

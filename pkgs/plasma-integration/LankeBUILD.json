@@ -1,6 +1,6 @@
 {
   "name": "plasma-integration",
-  "version": "6.7.4",
+  "version": "6.7.5",
   "release": 3,
   "deps": [
     "kf-qqc2-desktop-style",
@@ -62,7 +62,7 @@
     "wayland"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.4/plasma-integration-6.7.4.tar.xz"
+    "https://download.kde.org/stable/plasma/6.7.5/plasma-integration-6.7.5.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "kf-solid",
-  "version": "6.29.0",
+  "version": "6.30.0",
   "release": 2,
   "deps": [
     "udisks2",
@@ -31,7 +31,7 @@
     "upower"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.29/solid-6.29.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.30/solid-6.30.0.tar.xz"
   ],
   "work_sources": []
 }

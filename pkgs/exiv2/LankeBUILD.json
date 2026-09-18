@@ -1,6 +1,6 @@
 {
   "name": "exiv2",
-  "version": "0.28.8",
+  "version": "0.28.9",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -29,7 +29,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/Exiv2/exiv2/archive/refs/tags/v0.28.8.tar.gz"
+    "https://github.com/Exiv2/exiv2/archive/refs/tags/v0.28.9.tar.gz"
   ],
   "work_sources": []
 }

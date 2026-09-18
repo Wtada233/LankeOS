@@ -1,6 +1,6 @@
 {
   "name": "gnupg",
-  "version": "2.5.21",
+  "version": "2.5.22",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -31,7 +31,7 @@
     "readline"
   ],
   "sources": [
-    "https://www.gnupg.org/ftp/gcrypt/gnupg/gnupg-2.5.21.tar.bz2"
+    "https://www.gnupg.org/ftp/gcrypt/gnupg/gnupg-2.5.22.tar.bz2"
   ],
   "work_sources": []
 }

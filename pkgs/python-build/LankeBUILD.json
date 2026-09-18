@@ -1,6 +1,6 @@
 {
   "name": "python-build",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "release": 3,
   "deps": [
     "python",
@@ -13,12 +13,9 @@
     "base-devel",
     "git"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
     "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
-    "https://files.pythonhosted.org/packages/4d/b7/1db48a9ce2984842c8c886432ec8a2719613322e868a966ba82a28862f25/build-1.6.0.tar.gz"
+    "https://files.pythonhosted.org/packages/bd/67/4898a44ea4f3f8e213b0954ec0aa0a16971d62a6212d6ea3931e97115b99/build-1.6.1.tar.gz"
   ],
   "work_sources": []
 }

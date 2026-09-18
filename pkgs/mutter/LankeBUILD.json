@@ -1,6 +1,6 @@
 {
   "name": "mutter",
-  "version": "50.4",
+  "version": "51.0",
   "release": 6,
   "deps": [
     "gobject-introspection",
@@ -37,7 +37,6 @@
     "libgcc_s.so.1",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
-    "libglycin-2.so.0",
     "libgmodule-2.0.so.0",
     "libgnome-desktop-4.so.2",
     "libgobject-2.0.so.0",
@@ -63,8 +62,8 @@
     "libxkbregistry.so.0"
   ],
   "provides": [
-    "libmutter-18.so",
-    "libmutter-18.so.0"
+    "libmutter-51.so",
+    "libmutter-51.so.0"
   ],
   "build_deps": [
     "at-spi2-core",
@@ -119,7 +118,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://download.gnome.org/sources/mutter/50/mutter-50.4.tar.xz"
+    "https://download.gnome.org/sources/mutter/51/mutter-51.0.tar.xz"
   ],
   "work_sources": []
 }

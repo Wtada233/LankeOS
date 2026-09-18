@@ -1,6 +1,6 @@
 {
   "name": "rust-bindgen",
-  "version": "0.72.1",
+  "version": "0.73.2",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -15,7 +15,7 @@
     "rust"
   ],
   "sources": [
-    "https://github.com/rust-lang/rust-bindgen/archive/refs/tags/v0.72.1.tar.gz"
+    "https://github.com/rust-lang/rust-bindgen/archive/refs/tags/v0.73.2.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "gn",
-  "version": "20260911.cfcd774b",
+  "version": "20260916.1b0f22ec",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -15,7 +15,7 @@
     "ninja"
   ],
   "sources": [
-    "https://gn.googlesource.com/gn/+archive/cfcd774b98f3433e18b722f9a7ff06119825b8eb.tar.gz"
+    "https://gn.googlesource.com/gn/+archive/1b0f22ec57d7b2ee354e7c59e0b6b3ba97680188.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

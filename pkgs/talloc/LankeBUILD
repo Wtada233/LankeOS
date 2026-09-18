@@ -1,0 +1,25 @@
+#
+# talloc — Samba 家族的分层内存池分配器（tevent/samba 用外部版本，不再内置各自副本）
+# 构建参数照 Arch PKGBUILD：NONE 禁止内置、replace 作为 builtin、保留 python 绑定与 talloc1 兼容库
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR}/samba \
+        --localstatedir=/var \
+        --bundled-libraries=NONE \
+        --builtin-libraries=replace \
+        --disable-rpath-install \
+        --enable-talloc-compat1
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

@@ -1,6 +1,6 @@
 {
   "name": "gnome-shell-extensions",
-  "version": "50.3",
+  "version": "51.0",
   "release": 1,
   "deps": [
     "gnome-shell"
@@ -13,7 +13,7 @@
     "meson"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gnome-shell-extensions/50/gnome-shell-extensions-50.3.tar.xz"
+    "https://download.gnome.org/sources/gnome-shell-extensions/51/gnome-shell-extensions-51.0.tar.xz"
   ],
   "work_sources": []
 }

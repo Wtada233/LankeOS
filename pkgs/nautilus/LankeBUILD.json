@@ -1,6 +1,6 @@
 {
   "name": "nautilus",
-  "version": "50.2.2",
+  "version": "51.0.1",
   "release": 1,
   "deps": [
     "gvfs",
@@ -70,7 +70,7 @@
     "xdg-user-dirs-gtk"
   ],
   "sources": [
-    "https://download.gnome.org/sources/nautilus/50/nautilus-50.2.2.tar.xz"
+    "https://download.gnome.org/sources/nautilus/51/nautilus-51.0.1.tar.xz"
   ],
   "work_sources": []
 }

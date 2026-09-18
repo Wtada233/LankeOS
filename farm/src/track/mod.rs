@@ -665,18 +665,9 @@ script-content: |
     fn package_probe_multi_source_version_source() {
         // 版本由 work_sources[0] 提供，sources 两条各自探测出 URL
         let f = MockFetcher::new(HashMap::new())
-            .entry(
-                "https://api.github.com/repos/a/main/tags",
-                r#"[{"name":"v2.0"},{"name":"v1.0"}]"#,
-            )
-            .entry(
-                "https://api.github.com/repos/b/vendored/tags",
-                r#"[{"name":"v9.0"}]"#,
-            )
-            .entry(
-                "https://api.github.com/repos/c/ver/tags",
-                r#"[{"name":"v3.1"},{"name":"v3.0"}]"#,
-            );
+            .tags("https://github.com/a/main.git", &["v2.0", "v1.0"])
+            .tags("https://github.com/b/vendored.git", &["v9.0"])
+            .tags("https://github.com/c/ver.git", &["v3.1", "v3.0"]);
         let cfg = TrackerConfig {
             pkg_name: "pkg".into(),
             version_source: Some("work_sources[0]".into()),
@@ -729,10 +720,7 @@ script-content: |
 
     #[test]
     fn package_probe_defaults_version_to_sources0() {
-        let f = MockFetcher::new(HashMap::new()).entry(
-            "https://api.github.com/repos/a/main/tags",
-            r#"[{"name":"v2.0"}]"#,
-        );
+        let f = MockFetcher::new(HashMap::new()).tags("https://github.com/a/main.git", &["v2.0"]);
         let cfg = TrackerConfig {
             pkg_name: "pkg".into(),
             sources: vec![SourceConfig {
@@ -787,10 +775,7 @@ script-content: |
 
     #[test]
     fn version_source_out_of_range_errors() {
-        let f = MockFetcher::new(HashMap::new()).entry(
-            "https://api.github.com/repos/a/main/tags",
-            r#"[{"name":"v2.0"}]"#,
-        );
+        let f = MockFetcher::new(HashMap::new()).tags("https://github.com/a/main.git", &["v2.0"]);
         let cfg = TrackerConfig {
             pkg_name: "pkg".into(),
             version_source: Some("sources[5]".into()),
@@ -918,9 +903,9 @@ script-content: |
     #[test]
     fn entry_major_of_filters_by_major() {
         // 条目级 major-of：只匹配指定包主版本的 tag
-        let f = MockFetcher::new(HashMap::new()).entry(
-            "https://api.github.com/repos/KhronosGroup/SPIRV-LLVM-Translator/tags",
-            r#"[{"name":"v21.1.0"},{"name":"v22.1.2"},{"name":"v22.0.0"},{"name":"v23.0.0"}]"#,
+        let f = MockFetcher::new(HashMap::new()).tags(
+            "https://github.com/KhronosGroup/SPIRV-LLVM-Translator.git",
+            &["v21.1.0", "v22.1.2", "v22.0.0", "v23.0.0"],
         );
         let cfg = TrackerConfig {
             pkg_name: "SPIRV-LLVM-Translator".into(),
@@ -986,10 +971,7 @@ script-content: |
             }],
             ..Default::default()
         };
-        let f = MockFetcher::new(HashMap::new()).entry(
-            "https://api.github.com/repos/a/b/tags",
-            r#"[{"name":"v1.2"}]"#,
-        );
+        let f = MockFetcher::new(HashMap::new()).tags("https://github.com/a/b.git", &["v1.2"]);
         let err = cfg.probe(&f).unwrap_err();
         assert!(err.to_string().contains("残留未替换占位符"), "err: {err}");
     }
@@ -1018,9 +1000,9 @@ script-content: |
     #[test]
     fn github_entry_accepts_max_version_and_caps() {
         // github 模板支持 max-version：tags 列表封顶生效（v261 被过滤取 v256）
-        let f = MockFetcher::new(HashMap::new()).entry(
-            "https://api.github.com/repos/systemd/systemd/tags",
-            r#"[{"name":"v254"},{"name":"v256"},{"name":"v255"},{"name":"v261"}]"#,
+        let f = MockFetcher::new(HashMap::new()).tags(
+            "https://github.com/systemd/systemd.git",
+            &["v254", "v256", "v255", "v261"],
         );
         let cfg = TrackerConfig {
             pkg_name: "systemd".into(),
@@ -1048,9 +1030,9 @@ script-content: |
     #[test]
     fn gitlab_entry_accepts_max_version_and_caps() {
         // gitlab 模板支持 max-version：不报"不支持字段"，且封顶生效（v2.0.0 被过滤取 1.5.0）
-        let f = MockFetcher::new(HashMap::new()).entry(
-            "https://gitlab.com/api/v4/projects/a%2Fb/repository/tags?per_page=50",
-            r#"[{"name":"v2.0.0"},{"name":"v1.5.0"},{"name":"v1.2.0"}]"#,
+        let f = MockFetcher::new(HashMap::new()).tags(
+            "https://gitlab.com/a/b.git",
+            &["v2.0.0", "v1.5.0", "v1.2.0"],
         );
         let cfg = TrackerConfig {
             pkg_name: "x".into(),

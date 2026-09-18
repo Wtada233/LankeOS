@@ -1,6 +1,6 @@
 {
   "name": "kwin",
-  "version": "6.7.4",
+  "version": "6.7.5",
   "release": 5,
   "deps": [
     "qt5compat",
@@ -159,7 +159,7 @@
     "xcb-util-wm"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.4/kwin-6.7.4.tar.xz"
+    "https://download.kde.org/stable/plasma/6.7.5/kwin-6.7.5.tar.xz"
   ],
   "work_sources": [],
   "farm_flags": [

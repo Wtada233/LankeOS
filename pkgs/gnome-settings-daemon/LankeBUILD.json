@@ -1,6 +1,6 @@
 {
   "name": "gnome-settings-daemon",
-  "version": "50.1",
+  "version": "51.0",
   "release": 1,
   "deps": [
     "geoclue"
@@ -68,7 +68,7 @@
     "upower"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gnome-settings-daemon/50/gnome-settings-daemon-50.1.tar.xz"
+    "https://download.gnome.org/sources/gnome-settings-daemon/51/gnome-settings-daemon-51.0.tar.xz"
   ],
   "work_sources": []
 }

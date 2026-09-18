@@ -1,0 +1,20 @@
+#
+# ministream — libadwaita 1.10 新增的依赖（其 subprojects/ministream.wrap 钉 GNOME/ministream @0.99.1）
+# 按上游默认构建：**不关任何功能**（introspection 会产 GIR/typelib，as-compare 需要 libxml2+appstream）。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix={PREFIX} \
+        --buildtype=release \
+        -Ddefault_library=shared
+    ninja -C build
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    :
+}

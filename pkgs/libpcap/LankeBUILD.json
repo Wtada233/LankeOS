@@ -1,6 +1,6 @@
 {
   "name": "libpcap",
-  "version": "1.10.6",
+  "version": "1.11.0",
   "deps": [
     "bash"
   ],
@@ -16,7 +16,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://www.tcpdump.org/release/libpcap-1.10.6.tar.gz"
+    "https://www.tcpdump.org/release/libpcap-1.11.0.tar.gz"
   ],
   "work_sources": []
 }

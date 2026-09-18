@@ -16,6 +16,7 @@
 
 use super::{ChkOpts, Finding, Report, Severity};
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 
@@ -90,11 +91,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
             let o: Vec<&str> = owners.iter().map(String::as_str).collect();
             items.push(Finding {
                 file: soname.clone(),
-                what: format!(
-                    "needed_so 的 {soname} 由 {} 提供，但不在本包 build_deps（构建容器只装 \
-                     build_deps；被传递满足也不算——needed_so 是直接链接依赖）",
-                    o.join("|")
-                ),
+                what: tr!("chk.build-deps.provider_not_declared", soname, o.join("|")),
                 severity: Severity::Critical,
             });
         }

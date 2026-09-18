@@ -22,6 +22,7 @@ pub mod qml;
 pub mod vapi;
 
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -102,7 +103,7 @@ pub fn module_dep_findings(
         if owners.is_empty() {
             out.push(Finding {
                 file,
-                what: format!("{m}：仓库内无任何包提供（{m} 缺失）"),
+                what: tr!("chk.module.no_provider", m, m),
                 severity: Severity::Critical,
             });
             continue;
@@ -113,9 +114,7 @@ pub fn module_dep_findings(
             let o = owners.iter().cloned().collect::<Vec<_>>().join("|");
             out.push(Finding {
                 file,
-                what: format!(
-                    "依赖树不正确：{pkg} 少依赖（提供者 {o}，请加入 deps 或由 needed_so 覆盖）"
-                ),
+                what: tr!("chk.module.missing_dep", pkg, o),
                 severity: Severity::Warning,
             });
         }
@@ -142,7 +141,7 @@ pub fn build_dep_findings(
     pkgs_dir: &Path,
     pkg: &str,
     dep: &str,
-    what: &str,
+    label: &str,
     files: &[String],
 ) -> Vec<Finding> {
     if files.is_empty() || pkg == dep {
@@ -156,13 +155,13 @@ pub fn build_dep_findings(
     }
     let shown: Vec<&str> = files.iter().take(3).map(String::as_str).collect();
     let more = if files.len() > 3 {
-        format!(" 等 {} 个", files.len())
+        tr!("chk.builddep.files_more", files.len())
     } else {
         String::new()
     };
     vec![Finding {
         file: format!("{}{more}", shown.join(", ")),
-        what: format!("{what}，但配方 build_deps 缺 {dep}（构建期需要该工具，请补进 build_deps）"),
+        what: tr!("chk.builddep.missing_tool", label, dep),
         severity: Severity::Critical,
     }]
 }
@@ -275,6 +274,11 @@ fn write_analysis(
     .map_err(|e| format!("写缓存 {pkg} 失败: {e}").into())
 }
 
+/// 单包 analysis（结构由各检則自定义）。
+pub type Analysis = serde_json::Value;
+/// `walk_all` 返回：(每包 analysis, 缓存命中, 重扫, 失败明细)。
+pub type WalkAll = (BTreeMap<String, Analysis>, u64, u64, Vec<String>);
+
 /// 一次遍历 source 下**全部**包：每包一个当前 .lpkg，解包一次交给 `analyze`（仅 .lpkg sha 变才解包，
 /// 否则用缓存 analysis）。返回每个包的 analysis + 缓存命中/重扫计数。provider 类检則用它对全量建图，
 /// 判定类检則只关心（子集）包的 analysis。
@@ -284,11 +288,8 @@ fn write_analysis(
 pub fn walk_all(
     opts: &ChkOpts,
     schema: u32,
-    analyze: impl Fn(
-        &Path, /*extract_dir*/
-        &str,  /*pkg*/
-    ) -> Result<serde_json::Value, FarmError>,
-) -> Result<(BTreeMap<String, serde_json::Value>, u64, u64, Vec<String>), FarmError> {
+    analyze: impl Fn(&Path /*extract_dir*/, &str /*pkg*/) -> Result<Analysis, FarmError>,
+) -> Result<WalkAll, FarmError> {
     std::fs::create_dir_all(&opts.cache).map_err(|e| format!("创建缓存目录失败: {e}"))?;
     let repo_root = opts.source.join(&opts.arch);
     let mut pkgdirs: Vec<PathBuf> = std::fs::read_dir(&repo_root)

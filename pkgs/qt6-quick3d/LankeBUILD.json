@@ -65,7 +65,6 @@
     "zlib"
   ],
   "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS",
     "IGNORE_CHK_PKGERR",
     {
       "QML_CHK_IGN_LST": [

@@ -1,6 +1,6 @@
 {
   "name": "automake",
-  "version": "1.18.1",
+  "version": "1.19",
   "release": 2,
   "deps": [
     "bash",
@@ -15,7 +15,7 @@
     "vala"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/automake/automake-1.18.1.tar.xz"
+    "https://ftp.gnu.org/gnu/automake/automake-1.19.tar.xz"
   ],
   "work_sources": []
 }

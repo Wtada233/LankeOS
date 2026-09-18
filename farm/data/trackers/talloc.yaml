@@ -1,0 +1,7 @@
+pkg-name: talloc
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.samba.org/ftp/talloc/
+  pattern: talloc-(\d[\d.]*)\.tar\.gz
+  template: https://www.samba.org/ftp/talloc/talloc-{version}.tar.gz

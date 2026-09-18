@@ -1,6 +1,6 @@
 {
   "name": "libsecret",
-  "version": "0.21.7",
+  "version": "0.21.8.2",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -23,7 +23,8 @@
     "ninja"
   ],
   "sources": [
-    "https://download.gnome.org/sources/libsecret/0.21/libsecret-0.21.7.tar.xz"
+    "https://download.gnome.org/sources/libsecret/0.21/libsecret-0.21.8.2.tar.xz"
   ],
-  "no_strip": false
+  "no_strip": false,
+  "work_sources": []
 }

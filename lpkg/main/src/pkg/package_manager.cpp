@@ -929,10 +929,9 @@ void query_file(const std::string& filename)
             const fs::path p(filename);
             if (!fs::is_symlink(p)) {
                 const fs::path abs_p = fs::absolute(p);
-                // 前缀判断必须带目录边界：root=/lanke 时 /lankefoo 不应算在根内
-                const std::string root = Config::instance().root_dir().string();
-                const std::string abs_s = abs_p.string();
-                const bool in_root = (abs_s == root) || abs_s.starts_with(root + "/");
+                // 前缀判断必须带目录边界（root=/lanke 时 /lankefoo 不算根内），
+                // 且 root=="/" 必须成立——见 path_within
+                const bool in_root = path_within(abs_p, Config::instance().root_dir());
                 if (in_root) {
                     const std::string logical =
                         "/" + fs::relative(abs_p, Config::instance().root_dir()).string();

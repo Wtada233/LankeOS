@@ -1,6 +1,6 @@
 {
   "name": "python-urllib3",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "release": 1,
   "deps": [
     "python"
@@ -16,11 +16,8 @@
     "python-setuptools-scm",
     "python-wheel"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
-    "https://github.com/urllib3/urllib3/archive/2.7.0/python-urllib3-2.7.0.tar.gz"
+    "https://files.pythonhosted.org/packages/e3/05/b17359e1cefb4f909b5e40b1b90a496d987258916dbbf88e842c729f510e/urllib3-2.8.0.tar.gz"
   ],
   "work_sources": []
 }

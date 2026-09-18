@@ -1,8 +1,14 @@
 #
 # samba — SMB/CIFS（gcc printers 面板要 libsmbclient/smbclient）。
-# 构建参数以 BLFS 为准（talloc/tdb/tevent/ldb 内置）；缺的 feature 关（--without-ad-dc）。
+# 构建参数以 BLFS 为准；talloc/tevent/tdb/popt 取系统库（!list），ldb 仍内置（仓库无 ldb 包）；
+# 缺的 feature 关（--without-ad-dc）。
 # 不跑 selftest；perl Parse-Yapp / rpcsvc-proto 是 BLFS Required 构建工具——若 configure 报缺再补。
 # 单包含 smbclient + libsmbclient + daemon（Arch 拆分 hack 不适用，LankeOS 并一包）。
+# 默认配置照 Arch：/etc/pam.d/samba（PAM 认证必需，否则 smbd 的 auth 全废）、/etc/logrotate.d/samba、
+# /usr/lib/tmpfiles.d/samba.conf（+ postinst systemd-tmpfiles --create）、/etc/samba/private、/var/spool/samba；
+# 另装上上游 examples/smb.conf.default 作为默认 /etc/samba/smb.conf（Arch 不装，我们装）。
+
+_BD=$(dirname {WORK_DIR})
 
 lankebuild_prepare() {
     :
@@ -19,11 +25,25 @@ lankebuild_build() {
         --without-ad-dc \
         --with-system-mitkrb5 \
         --with-systemd \
-        --disable-rpath-install \
-        --systemd-install-services
+        --systemd-install-services \
+        --bundled-libraries='!talloc,!tdb,!tevent,!popt,!pytalloc-util' \
+        --disable-rpath-install
     make -j$(nproc)
 }
 
 lankebuild_package() {
     make install DESTDIR={STAGING_ROOT}
+
+    # 默认配置（照 Arch）
+    install -Dm644 "$_BD/samba.pam" "{STAGING_ROOT}{SYSCONFDIR}/pam.d/samba"
+    install -Dm644 "$_BD/samba.logrotate" "{STAGING_ROOT}{SYSCONFDIR}/logrotate.d/samba"
+    install -Dm644 "$_BD/samba.tmpfiles" "{STAGING_ROOT}/usr/lib/tmpfiles.d/samba.conf"
+    install -d -m700 "{STAGING_ROOT}{SYSCONFDIR}/samba/private"
+    install -d -m1777 "{STAGING_ROOT}/var/spool/samba"
+
+    # 默认 smb.conf（上游 examples/smb.conf.default：全注释样例 + [homes]/[printers]）
+    install -Dm644 examples/smb.conf.default "{STAGING_ROOT}{SYSCONFDIR}/samba/smb.conf"
+
+    # 装完即建 /run/samba、/var/log/samba（不依赖开机 systemd-tmpfiles-setup.service）
+    echo "systemd-tmpfiles --create" >> "{STAGING_HOOKS}/postinst.sh"
 }

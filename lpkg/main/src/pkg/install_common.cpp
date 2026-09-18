@@ -33,24 +33,29 @@ fs::path stash_parent_dir(const fs::path& phys)
         struct stat st{};
         return ::lstat(p.c_str(), &st) == 0 ? st.st_dev : static_cast<dev_t>(-1);
     };
-    auto within_root = [&](const fs::path& p) -> bool {
-        const fs::path n = p.lexically_normal();
-        const std::string ps = n.string();
-        const std::string rs = root_n.string();
-        return ps == rs || ps.rfind(rs + "/", 0) == 0;
-    };
+    // 边界判定统一走 path_within：这里曾手写 `rs + "/"`，root_dir=="/" 时拼成 "//" →
+    // within_root 对除 "/" 外的所有路径恒 false → cur 被 clamp 成 "/" → 循环第一轮
+    // par == best 直接 break → 无论目标文件在哪个文件系统，stash 恒落在 "/"（宿主
+    // rootfs），跨设备 rename 立刻 EXDEV（vfat ESP 上的 /boot/vmlinuz 升级必炸）。
+    auto within_root = [&](const fs::path& p) -> bool { return path_within(p, root_n); };
 
     fs::path cur = phys.has_parent_path() ? phys.parent_path() : phys;
     if (cur.empty() || !within_root(cur)) cur = root;  // 一律 clamp 回 root_dir
     const dev_t d = dev_of(phys);
     if (d == static_cast<dev_t>(-1)) return cur;  // phys 已消失 → 用它所在目录位置
 
+    // 上溯边界 = 挂载点（vfsmount 才是 rename 的 EXDEV 边界），**不是 st_dev**：
+    // overlay 上目录报 overlay 的 dev、upper 层文件报底层 fs 的 dev，同一条路径链上
+    // 两者不等 → 用 st_dev 判"到边界了"会在第一个父目录就误停，stash 落进文件自己
+    // 所在目录（包子树内），破坏"stash 挂文件系统顶层、不在被删子树里"的约定。
+    const bool have_mounts = !mount_points().empty();
     fs::path best = cur;
     while (true) {
+        if (have_mounts && is_mount_point(best)) break;  // best 已是本文件系统顶层
         const fs::path par = best.parent_path();
         if (par.empty() || par == best) break;
         if (!within_root(par)) break;  // 越过 root_dir 边界 → best 是根内最上层
-        if (dev_of(par) != d) break;   // 设备边界 → best 是该文件系统的顶层（同设备）
+        if (!have_mounts && dev_of(par) != d) break;  // /proc 不可用 → 退回 st_dev 近似
         best = par;
     }
     return best;

@@ -9,7 +9,7 @@ lankebuild_build() {
         --buildtype=release \
         -D introspection=enabled \
         -D man=false \
-        -D glycin=disabled
+        -D glycin=enabled
     ninja -j$(nproc)
     
     DESTDIR={STAGING_ROOT} ninja install

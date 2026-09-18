@@ -1,6 +1,6 @@
 {
   "name": "suitesparse",
-  "version": "7.14.0",
+  "version": "7.14.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -61,7 +61,7 @@
     "mpfr"
   ],
   "sources": [
-    "https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/v7.14.0.tar.gz"
+    "https://github.com/DrTimothyAldenDavis/SuiteSparse/archive/refs/tags/v7.14.1.tar.gz"
   ],
   "work_sources": []
 }

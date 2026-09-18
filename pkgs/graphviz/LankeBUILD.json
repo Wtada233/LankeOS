@@ -1,6 +1,6 @@
 {
   "name": "graphviz",
-  "version": "16.0.0",
+  "version": "16.1.0",
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -61,7 +61,7 @@
     "zlib"
   ],
   "sources": [
-    "https://gitlab.com/graphviz/graphviz/-/archive/16.0.0/graphviz-16.0.0.tar.gz"
+    "https://gitlab.com/graphviz/graphviz/-/archive/16.1.0/graphviz-16.1.0.tar.gz"
   ],
   "work_sources": []
 }

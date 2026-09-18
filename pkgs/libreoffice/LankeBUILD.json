@@ -1,7 +1,7 @@
 {
   "name": "libreoffice",
   "version": "26.8.0.3",
-  "release": 5,
+  "release": 6,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -90,7 +90,7 @@
     "libpangocairo-1.0.so.0",
     "libplc4.so",
     "libpng16.so.16",
-    "libpoppler.so.163",
+    "libpoppler.so.164",
     "libpq.so.5",
     "libpython3.14.so.1.0",
     "libqxp-0.0.so.0",
@@ -115,7 +115,9 @@
     "libzmf-0.0.so.0",
     "libzstd.so.1"
   ],
-  "provides": [],
+  "provides": [
+    "liblibreofficekitgtk.so"
+  ],
   "build_deps": [
     "abseil-cpp",
     "ant",

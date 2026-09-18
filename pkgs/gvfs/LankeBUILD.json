@@ -1,12 +1,11 @@
 {
   "name": "gvfs",
-  "version": "1.60.2",
+  "version": "1.62.0",
   "release": 2,
   "deps": [
     "openssh"
   ],
   "needed_so": [
-    "libarchive.so.13",
     "libc.so.6",
     "libfuse3.so.4",
     "libgcc_s.so.1",
@@ -42,7 +41,7 @@
     "udisks2"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gvfs/1.60/gvfs-1.60.2.tar.xz"
+    "https://download.gnome.org/sources/gvfs/1.62/gvfs-1.62.0.tar.xz"
   ],
   "work_sources": []
 }

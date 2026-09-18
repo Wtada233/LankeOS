@@ -1,6 +1,6 @@
 {
   "name": "libime",
-  "version": "1.1.15",
+  "version": "1.1.16",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -30,7 +30,7 @@
     "zstd"
   ],
   "sources": [
-    "git+https://github.com/fcitx/libime@1.1.15"
+    "git+https://github.com/fcitx/libime@1.1.16"
   ],
   "work_sources": []
 }

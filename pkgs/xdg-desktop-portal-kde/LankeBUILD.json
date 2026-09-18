@@ -1,6 +1,6 @@
 {
   "name": "xdg-desktop-portal-kde",
-  "version": "6.7.4",
+  "version": "6.7.5",
   "release": 2,
   "deps": [
     "kio-fuse"
@@ -70,7 +70,7 @@
     "xdg-desktop-portal"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.4/xdg-desktop-portal-kde-6.7.4.tar.xz"
+    "https://download.kde.org/stable/plasma/6.7.5/xdg-desktop-portal-kde-6.7.5.tar.xz"
   ],
   "work_sources": []
 }

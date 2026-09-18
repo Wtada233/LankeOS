@@ -3,9 +3,13 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    export GOPATH="{SRC_DIR}"
+    export BUILDTAGS='seccomp apparmor'
+    export CGO_CFLAGS="{CFLAGS}"
+    export CGO_CXXFLAGS="{CXXFLAGS}"
+    export CGO_LDFLAGS="{LDFLAGS}"
     export GOFLAGS="-trimpath -mod=readonly -modcacherw"
-    export BUILDTAGS="seccomp"
-    make runc
+    make runc 
 }
 
 

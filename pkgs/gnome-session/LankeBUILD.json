@@ -1,6 +1,6 @@
 {
   "name": "gnome-session",
-  "version": "50.1",
+  "version": "51.0",
   "release": 1,
   "deps": [
     "dconf",
@@ -27,7 +27,7 @@
     "xmlto"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gnome-session/50/gnome-session-50.1.tar.xz"
+    "https://download.gnome.org/sources/gnome-session/51/gnome-session-51.0.tar.xz"
   ],
   "work_sources": []
 }

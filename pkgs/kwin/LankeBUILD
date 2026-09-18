@@ -1,6 +1,5 @@
 lankebuild_prepare() {
-    # Arch 为 mesa 26.2 打的兼容补丁（Backport fix）
-    patch -Np1 -i "{WORK_DIR}/../2d0613ac.patch"
+    :
 }
 
 lankebuild_build() {

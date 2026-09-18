@@ -33,12 +33,88 @@ pub fn http_agent() -> &'static ureq::Agent {
     &AGENT
 }
 
+/// 用 libgit2（git 协议 ref advertisement）列出远端**全部** tag——`git ls-remote --tags` 的进程内等价。
+///
+/// 为什么不用平台 REST 的 tags 端点：那是**分页窗口**（GitHub 默认 30 / 最大 100，GitLab 上限 100，
+/// 都靠翻页），而且**顺序与版本无关**——tracker 要的是"最新版本"，只看首页会取到老 tag
+/// （hdf5 事故：`/repos/HDFGroup/hdf5/tags` 首页 30 个全是老 tag，`max` 够不到 2.2.0）。
+/// ref advertisement 一次给全，与 tag 数量无关（不需要猜 per_page 要多大）。
+///
+/// 凭据策略（用户规则）：**有 token 就用，没有就走匿名**——不用凭据助手、不做其它 fallback：
+/// - `token = Some(_)`：设凭据回调，服务端要认证时用 PAT（`USER_PASS_PLAINTEXT`，用户名任意：
+///   GitHub 惯用 `x-access-token`、GitLab 用 `oauth2`）；**服务端允许匿名时 libgit2 不会调它**，
+///   所以 public 仓库带不带 token 都正常走。
+/// - `token = None`：不设回调 → libgit2 匿名连接（private 仓库会失败，属预期）。
+/// - 回调内若服务端只接受我们不支持的凭据类型（如 SSH key）→ 交回空凭据（退回匿名）而非硬失败。
+pub fn list_remote_tags(repo_url: &str, token: Option<&str>) -> Result<Vec<String>, FarmError> {
+    let mut remote = git2::Remote::create_detached(repo_url)
+        .map_err(|e| format!("创建 remote {repo_url} 失败: {e}"))?;
+    let mut callbacks = git2::RemoteCallbacks::new();
+    if let Some(tok) = token {
+        let tok = tok.to_string();
+        callbacks.credentials(move |_url, _user_from_url, allowed| {
+            if allowed.contains(git2::CredentialType::USER_PASS_PLAINTEXT) {
+                git2::Cred::userpass_plaintext("x-access-token", &tok)
+            } else {
+                // 只认我们不支持的凭据类型 → 退回"无凭据"（匿名），不在这里硬失败
+                git2::Cred::default()
+            }
+        });
+    }
+    remote
+        .connect_auth(git2::Direction::Fetch, Some(callbacks), None)
+        .map_err(|e| format!("连接 {repo_url} 失败: {e}"))?;
+    let heads = remote
+        .list()
+        .map_err(|e| format!("列出 {repo_url} 的 refs 失败: {e}"))?;
+    let mut tags: Vec<String> = heads
+        .iter()
+        .filter_map(|h| h.name().strip_prefix("refs/tags/"))
+        // annotated tag 会同时出现 `refs/tags/v1` 与 peeled 的 `refs/tags/v1^{}` → 归一
+        .map(|t| t.trim_end_matches("^{}").to_string())
+        .collect();
+    tags.sort();
+    tags.dedup();
+    Ok(tags)
+}
+
+/// 裸 git URL 的平台 token 选择（按 host，纯函数可单测）：
+/// `github.com` / `*.github.com` → GitHub token；`gitlab.com` / `*.gitlab.com` / host 段含 `gitlab`
+/// （自托管）→ GitLab token；其余（含自托管 GitHub/其它）→ 无（匿名）。
+fn git_token_for<'a>(
+    url: &str,
+    github: &'a Option<String>,
+    gitlab: &'a Option<String>,
+) -> Option<&'a str> {
+    let host = url_host(url);
+    if host == "github.com" || host.ends_with(".github.com") {
+        github.as_deref()
+    } else if host == "gitlab.com"
+        || host.ends_with(".gitlab.com")
+        || host.split('.').any(|l| l == "gitlab")
+    {
+        gitlab.as_deref()
+    } else {
+        None
+    }
+}
+
 /// curl UA——镜像站/托管站对 curl 放行，对自定义或浏览器 UA 反而限流/挑战。
 /// 版本与系统 curl 一致，保证与 script 模板里 curl 发出的 UA 相同。
 pub const CURL_UA: &str = "curl/8.21.0";
 
 pub trait Fetcher {
     fn get(&self, url: &str) -> Result<String, FarmError>;
+
+    /// 列出远端仓库的**全部 tag**（`git ls-remote --tags` 语义：一次拿全，无分页窗口）。
+    ///
+    /// `repo_url` = 裸 git URL（如 `https://github.com/owner/repo.git`）。
+    /// **不要**退回平台 REST 的 tags 端点：那是**分页**的（GitHub 默认 30 / 最大 100，
+    /// GitLab `per_page` 上限 100，都靠翻页），且**顺序与版本无关**——tracker 要的是"最新版本"，
+    /// 只看首页会取到老 tag（hdf5 事故：首页 30 个全是老 tag，`max` 够不到 2.2.0）。
+    fn list_tags(&self, repo_url: &str) -> Result<Vec<String>, FarmError> {
+        Err(format!("list_tags 未实现: {repo_url}").into())
+    }
 
     /// 平台 token 环境变量（供 script 模板内嵌 curl 继承），无则空。
     fn token_env(&self) -> Vec<(String, String)> {
@@ -72,6 +148,7 @@ fn url_path(url: &str) -> &str {
 /// - host `gitlab.com` / `*.gitlab.com` / 任一段为 `gitlab`（自托管 `gitlab.example.org`），
 ///   或 path 以 `/api/v4/` 开头（自托管实例 API，如 invent.kde.org）→ GitLab token；
 /// - 其余无。
+///
 /// 历史：曾 `url.contains("gitlab")` 过宽——镜像站 URL 里出现 "gitlab" 字样
 /// （如 `https://mirror.x/gitlab/foo.tar.gz`）会被误加 GitLab token（把 token 泄露给第三方）。
 pub fn bearer_token_for<'a>(
@@ -144,6 +221,12 @@ impl Fetcher for RealFetcher {
             v.push(("GITLAB_TOKEN".to_string(), t.clone()));
         }
         v
+    }
+
+    fn list_tags(&self, repo_url: &str) -> Result<Vec<String>, FarmError> {
+        // 有 token 就用（private 仓库/私有实例需要），没有就走匿名
+        let tok = git_token_for(repo_url, &self.github_token, &self.gitlab_token);
+        list_remote_tags(repo_url, tok)
     }
 }
 
@@ -237,15 +320,29 @@ pub fn probe_source(url: &str) -> Result<(), FarmError> {
 #[derive(Debug, Default)]
 pub struct MockFetcher {
     pub responses: HashMap<String, String>,
+    /// `list_tags` 的预设：repo URL → 全部 tag（模拟 git 协议的全量结果）。
+    pub tags: HashMap<String, Vec<String>>,
 }
 
 impl MockFetcher {
     pub fn new(responses: HashMap<String, String>) -> Self {
-        MockFetcher { responses }
+        MockFetcher {
+            responses,
+            tags: HashMap::new(),
+        }
     }
 
     pub fn entry(mut self, url: impl Into<String>, body: impl Into<String>) -> Self {
         self.responses.insert(url.into(), body.into());
+        self
+    }
+
+    /// 预设某 repo 的**全量** tag 列表（`list_tags` 用）。
+    pub fn tags(mut self, repo_url: impl Into<String>, tags: &[&str]) -> Self {
+        self.tags.insert(
+            repo_url.into(),
+            tags.iter().map(|t| t.to_string()).collect(),
+        );
         self
     }
 }
@@ -256,6 +353,13 @@ impl Fetcher for MockFetcher {
             .get(url)
             .cloned()
             .ok_or_else(|| format!("MockFetcher: 无预设响应 {url}").into())
+    }
+
+    fn list_tags(&self, repo_url: &str) -> Result<Vec<String>, FarmError> {
+        self.tags
+            .get(repo_url)
+            .cloned()
+            .ok_or_else(|| format!("MockFetcher: 无预设 tags {repo_url}").into())
     }
 }
 
@@ -378,6 +482,39 @@ mod tests {
             start.elapsed() < Duration::from_secs(5),
             "应在秒级超时而非挂起（实测 {:?}）",
             start.elapsed()
+        );
+    }
+
+    #[test]
+    fn git_token_for_picks_by_host() {
+        let gh = Some("gh-token".to_string());
+        let gl = Some("gl-token".to_string());
+        // github.com → GitHub token；没有就匿名
+        assert_eq!(
+            git_token_for("https://github.com/o/r.git", &gh, &gl),
+            Some("gh-token")
+        );
+        assert_eq!(
+            git_token_for("https://github.com/o/r.git", &None, &gl),
+            None
+        );
+        // gitlab.com 与自托管 gitlab（host 段含 gitlab）→ GitLab token
+        assert_eq!(
+            git_token_for("https://gitlab.com/a/b.git", &gh, &gl),
+            Some("gl-token")
+        );
+        assert_eq!(
+            git_token_for("https://gitlab.example.org/a/b.git", &gh, &gl),
+            Some("gl-token")
+        );
+        // 其它 forge（自托管 gitea 等）→ 无凭据（匿名）
+        assert_eq!(
+            git_token_for("https://git.example.com/a/b.git", &gh, &gl),
+            None
+        );
+        assert_eq!(
+            git_token_for("https://gitea.example.org/a/b.git", &gh, &gl),
+            None
         );
     }
 

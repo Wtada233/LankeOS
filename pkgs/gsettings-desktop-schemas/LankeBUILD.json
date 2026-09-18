@@ -1,6 +1,6 @@
 {
   "name": "gsettings-desktop-schemas",
-  "version": "50.1",
+  "version": "51.0",
   "deps": [],
   "needed_so": [],
   "provides": [],
@@ -12,7 +12,7 @@
     "ninja"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gsettings-desktop-schemas/50/gsettings-desktop-schemas-50.1.tar.xz"
+    "https://download.gnome.org/sources/gsettings-desktop-schemas/51/gsettings-desktop-schemas-51.0.tar.xz"
   ],
   "work_sources": []
 }

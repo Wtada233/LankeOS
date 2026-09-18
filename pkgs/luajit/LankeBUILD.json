@@ -1,6 +1,6 @@
 {
   "name": "luajit",
-  "version": "2.1.1787165859.1ee778a",
+  "version": "2.1.1788856981.c6ffc14",
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -16,7 +16,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/LuaJIT/LuaJIT/archive/1ee778a4e37122d8ca7d5733c590a47dafd6b15c.tar.gz"
+    "https://github.com/LuaJIT/LuaJIT/archive/c6ffc141a8762b41703f9287d63d93622a13dd8f.tar.gz"
   ],
   "work_sources": []
 }

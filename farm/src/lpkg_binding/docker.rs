@@ -361,7 +361,7 @@ impl RealBinding {
         let mut create = mk_create(&create_image)?;
         // 健壮性：roll 镜像缺失/已删（如 GC 后计数未及时归零的崩溃窗口）→ 回退原始 base 并重置计数。
         if !create.status.success() && roll > 0 {
-            eprintln!("  [warn] 从 {create_image} 创建失败，回退原始 base 并重置滚动计数");
+            eprintln!("{}", crate::tr!("build.image_fallback", create_image));
             create_image = self.base_image.clone();
             write_roll_counter(&self.out_dir, 0);
             create = mk_create(&create_image)?;

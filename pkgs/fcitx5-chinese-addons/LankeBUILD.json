@@ -1,6 +1,6 @@
 {
   "name": "fcitx5-chinese-addons",
-  "version": "5.1.13",
+  "version": "5.1.14",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -14,7 +14,6 @@
     "libc.so.6",
     "libcurl.so.4",
     "libgcc_s.so.1",
-    "libm.so.6",
     "libstdc++.so.6"
   ],
   "provides": [],
@@ -27,10 +26,11 @@
     "fcitx5",
     "git",
     "libime",
-    "ninja"
+    "ninja",
+    "nlohmann-json"
   ],
   "sources": [
-    "https://github.com/fcitx/fcitx5-chinese-addons/archive/refs/tags/5.1.13.tar.gz"
+    "https://github.com/fcitx/fcitx5-chinese-addons/archive/refs/tags/5.1.14.tar.gz"
   ],
   "work_sources": []
 }

@@ -241,7 +241,55 @@ impl BlockStage {
     }
 }
 
-/// 构建计划（增量选择 → version-change 受害者并入 → 确定性 topo 排序）→ 就绪队列。
+/// 把「仓库缺失」的 build_deps 递归并入本轮构建集（fixpoint，确定性）。
+///
+/// 判据与 `topo_order` 的 build_deps 边同源：`!old.packages.contains_key(d)` = 该依赖**从未进过仓库**
+/// （首建/引导，如 gjs 依赖同轮首建的 sysprof、samba 依赖新加的 talloc/tevent）——依赖方容器
+/// `lpkg upgrade` 从本地 repo 装不到它，不并入本轮先建必然 BLOCKED。已在仓库的依赖**不**并入
+/// （每个容器各自 `lpkg upgrade` 自取最新版，无需排队）。配方不存在的名字不并入（不是本仓库的包，
+/// 留给构建期报错）。`--manual-sort`（严格手工顺序/引导链）不并入，由 operator 点名。
+fn expand_missing_build_deps(
+    pkgs_dir: &Path,
+    initial: Vec<String>,
+    old: &Index,
+    manual_sort: bool,
+) -> Vec<String> {
+    if manual_sort {
+        return initial;
+    }
+    let mut out: Vec<String> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+    for p in initial {
+        if seen.insert(p.clone()) {
+            out.push(p);
+        }
+    }
+    let mut i = 0;
+    while i < out.len() {
+        if let Some(lb) = read_lankebuild(pkgs_dir, &out[i]) {
+            let mut added: Vec<String> = Vec::new();
+            for d in &lb.build_deps {
+                if seen.contains(d) || old.packages.contains_key(d.as_str()) {
+                    continue;
+                }
+                if read_lankebuild(pkgs_dir, d).is_none() {
+                    continue;
+                }
+                added.push(d.clone());
+            }
+            for d in added {
+                if seen.insert(d.clone()) {
+                    out.push(d);
+                }
+            }
+        }
+        i += 1;
+    }
+    out.sort();
+    out
+}
+
+/// 构建计划（增量选择 → 缺失构建依赖并入 → version-change 受害者并入 → 确定性 topo 排序）→ 就绪队列。
 ///
 /// 从 run_build 抽出（纯计算，可单测，不含交互/副作用）：返回 `(就绪队列, version-change
 /// 预排受害者名集)`。`version_planned_names` 供弹包时决定是否 release bump；`all_pkgs`
@@ -276,6 +324,11 @@ fn build_plan(
     } else {
         opts.targets.clone()
     };
+    // ---- 仓库缺失的构建依赖：**并入本轮先建** ----
+    // 点名 `build samba` 时，samba 的 build_deps 里从未进过仓库的包（talloc/tevent 这类首建依赖）
+    // 若不同轮先建，依赖方容器 `lpkg upgrade` 装不到它 → 必然 BLOCKED。故递归并入初始集，
+    // 再由 topo_order 的 build_deps 边排到依赖者之前。已在仓库的依赖不并入。
+    let initial = expand_missing_build_deps(&opts.pkgs_dir, initial, old, opts.manual_sort);
     // 组边参与初始排序：声明式组受害者（python-* 等）排在触发包之后——
     // `--all` 时它们已在初始队列，没有 needed_so 链接边，须靠组边强制 python 先建（见下方 `edges`）。
 
@@ -303,9 +356,11 @@ fn build_plan(
                 &ov.version,
                 &newv,
                 all_pkgs,
-                Some(&opts.pkgs_dir),
-                Some(&opts.out_dir),
-                Some(&opts.arch),
+                Some(groups::ScriptEnv {
+                    pkgs_dir: opts.pkgs_dir.as_path(),
+                    out_dir: opts.out_dir.as_path(),
+                    arch: opts.arch.as_str(),
+                }),
             ) {
                 Ok(v) if !v.is_empty() => {
                     for x in &v {
@@ -1144,12 +1199,12 @@ mod tests {
     }
 
     #[test]
-    fn build_after_build_deps_orders_foo_before_bar_in_python_group() {
+    fn build_deps_edge_orders_foo_before_bar_by_default() {
         // python 重建组（rebuild-on-abichange: python，packages: python-*）：python ABI 变化时
-        // python-foo / python-bar 都会重建。python-bar 构建依赖 python-foo 且声明
-        // BUILD_AFTER_BUILD_DEPS → Kahn 排序必须把 python-foo 排在 python-bar 前。
-        // 没有该 flag 时两者是同级（无 bar→foo 边），名字升序会是 python-bar 先建——构建时
-        // 容器里还没有 python-foo 刚产出的产物，基于旧 foo 构建白跑。
+        // python-foo / python-bar 都会重建。python-bar 的 build_deps 含 python-foo →
+        // **默认语义**（无需任何 flag）Kahn 排序就把 python-foo 排在 python-bar 前，否则容器里
+        // 还没有 python-foo 本轮刚产出的产物，基于旧 foo 构建白跑。
+        // 注：原 `BUILD_AFTER_BUILD_DEPS` flag 已删除——这个行为现在就是默认。
         let dir = std::env::temp_dir().join("farm-build-after-builddeps");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -1161,14 +1216,12 @@ mod tests {
             &["libpython3.14.so.1", "libc.so.6"],
             &["python"],
         );
-        write_pkg_flags(
+        write_pkg(
             &dir,
             "python-bar",
-            "1.0",
             &["libpybar.so"],
             &["libpython3.14.so.1", "libc.so.6"],
             &["python-foo"],
-            &["BUILD_AFTER_BUILD_DEPS"],
         );
         let old = index_of(&[
             ("python", vec!["libpython3.14.so.1"], vec!["libc.so.6"]),
@@ -1195,7 +1248,7 @@ mod tests {
         let groups = RebuildGroups::load(&gdir);
 
         // --all 模式：python + 两个组受害者都在 targets。边 = 组边（foo/bar → python）+
-        // 链接边（foo/bar 链 libpython）+ BUILD_AFTER_BUILD_DEPS 边（bar → foo）。
+        // 链接边（foo/bar 链 libpython）+ build_deps 边（bar → foo）。
         let targets: Vec<String> = ["python", "python-foo", "python-bar"]
             .iter()
             .map(|s| s.to_string())
@@ -1209,7 +1262,7 @@ mod tests {
         );
         assert!(
             pos("python-foo") < pos("python-bar"),
-            "python-bar 声明 BUILD_AFTER_BUILD_DEPS，必须先建构建依赖 python-foo: {order:?}"
+            "build_deps 边默认生效（无需 flag）：先建构建依赖 python-foo: {order:?}"
         );
 
         // ABI 受害者重排路径（reorder_queue）：python 已建完，foo/bar 作为组受害者动态入队 →
@@ -1228,32 +1281,30 @@ mod tests {
         );
         assert!(queue.iter().all(|(_, v)| *v), "受害者标记应保留: {queue:?}");
 
-        // 对照：去掉 BUILD_AFTER_BUILD_DEPS → bar/foo 同级（无 bar→foo 边），名字升序
-        // python-bar 在 python-foo 前——证明 flag 才是 foo 先建的唯一原因。
-        write_pkg_flags(
+        // 对照：把 python-bar 的 **build_deps 去掉**（不再依赖 python-foo）→ 两者同级（无
+        // bar→foo 边），按名字升序 python-bar 在前——证明 foo 先建的原因**只**来自 build_deps。
+        write_pkg(
             &dir,
             "python-bar",
-            "1.0",
             &["libpybar.so"],
             &["libpython3.14.so.1", "libc.so.6"],
-            &["python-foo"],
             &[],
         );
-        let order_noflag = topo_order(&dir, &targets, &old, &edges);
-        let pos2 = |x: &str| order_noflag.iter().position(|n| n == x).unwrap();
+        let order_nodep = topo_order(&dir, &targets, &old, &edges);
+        let pos2 = |x: &str| order_nodep.iter().position(|n| n == x).unwrap();
         assert!(
             pos2("python-bar") < pos2("python-foo"),
-            "无 flag 时同级按名字升序（python-bar 在前），flag 是 foo 先建的唯一原因: {order_noflag:?}"
+            "无 build_deps 时同级按名字升序（python-bar 在前）: {order_nodep:?}"
         );
         fs::remove_dir_all(&dir).ok();
         fs::remove_dir_all(&gdir).ok();
     }
 
     #[test]
-    fn build_after_build_deps_skips_dep_not_in_targets() {
+    fn build_deps_edge_skipped_when_dep_not_in_targets() {
         // python-bar 构建依赖 python-foo，但本轮 python-foo **不会被 rebuild**（不在 targets）。
-        // BUILD_AFTER_BUILD_DEPS 只对 targets 内的包生效 → bar→foo 边丢弃，python-bar 直接
-        // 构建不等待 foo（与无关包 zlib 同级，按名字升序排在其前）。
+        // build_deps 边只对 targets 内的包生效 → bar→foo 边丢弃，python-bar 直接构建不等待 foo
+        // （与无关包 zlib 同级，按名字升序排在其前）。
         let dir = std::env::temp_dir().join("farm-build-after-builddeps-skip");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -1265,14 +1316,12 @@ mod tests {
             &["libpython3.14.so.1", "libc.so.6"],
             &["python"],
         );
-        write_pkg_flags(
+        write_pkg(
             &dir,
             "python-bar",
-            "1.0",
             &["libpybar.so"],
             &["libpython3.14.so.1", "libc.so.6"],
             &["python-foo"],
-            &["BUILD_AFTER_BUILD_DEPS"],
         );
         // zlib：本轮要重建、但与 python-bar 无任何依赖的无关包（名字升序锚点）。
         write_pkg(&dir, "zlib", &["libz.so.1"], &["libc.so.6"], &[]);
@@ -1327,10 +1376,10 @@ mod tests {
     }
 
     #[test]
-    fn topo_order_build_deps_default_no_edge_when_dep_in_repo() {
-        // 对照：sysprof **已在仓库**（旧索引有）且本轮也重建 → 默认**不加** build_deps 边
-        // （原 needed_so 语义：每个容器 lpkg upgrade 自取最新版，无需排队）→ 同级按名字升序
-        // gjs 先建。这是 BUILD_AFTER_BUILD_DEPS flag 才覆盖的更强场景。
+    fn topo_order_build_deps_edge_even_when_dep_in_repo() {
+        // sysprof **已在仓库**（旧索引有）且本轮也重建 → build_deps 边**照样**加（默认语义不再
+        // 区分"依赖在不在仓库"）：gjs 构建期要 sysprof 本轮刚产出的产物，必须等它先建。
+        // （原 BUILD_AFTER_BUILD_DEPS flag 覆盖的正是这个场景；flag 已删、行为成默认。）
         let dir = std::env::temp_dir().join("farm-build-builddeps-inrepo");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
@@ -1341,8 +1390,8 @@ mod tests {
         let order = topo_order(&dir, &targets, &old, &[]);
         let pos = |x: &str| order.iter().position(|n| n == x).unwrap();
         assert!(
-            pos("gjs") < pos("sysprof"),
-            "已在仓库的依赖默认不加 build_deps 边（原语义，同级名字升序）: {order:?}"
+            pos("sysprof") < pos("gjs"),
+            "已在仓库的依赖也加 build_deps 边（默认语义，同级名字升序不再是 gjs 先）: {order:?}"
         );
         fs::remove_dir_all(&dir).ok();
     }
@@ -1395,6 +1444,65 @@ mod tests {
         assert!(
             pos("sysprof") < pos("gjs"),
             "默认 build_deps 边应让 sysprof 先于 gjs 构建: {:?}",
+            report.built
+        );
+        fs::remove_dir_all(&dir).ok();
+        fs::remove_dir_all(&out).ok();
+    }
+
+    #[test]
+    fn build_plan_pulls_in_repo_missing_build_deps() {
+        // samba 场景（回归）：只点名 samba，其 build_deps 里 talloc/tevent **从未进过仓库**
+        // → 必须自动并入本轮（否则容器 lpkg upgrade 装不到 → BLOCKED），且 topo 排在 samba 之前；
+        // 已在仓库的依赖（tdb）**不**并入（容器各自 upgrade 自取最新版）。
+        let dir = temp_dir("farm-plan-missing-bd");
+        let out = temp_dir("farm-plan-missing-bd-out");
+        write_baseline(
+            &out,
+            "sysroot|1.0:h::libc.so.6:|\ntdb|1.4.15:h::libtdb.so.1:libc.so.6|\n",
+        );
+        write_pkg(&dir, "samba", &[], &[], &["talloc", "tdb", "tevent"]);
+        write_pkg(&dir, "talloc", &[], &[], &[]);
+        write_pkg(&dir, "tevent", &[], &[], &["talloc"]);
+        write_pkg(&dir, "tdb", &["libtdb.so.1"], &["libc.so.6"], &[]);
+        let sm = stage_lpkg(&out, "samba", "1.0", &[], &[]);
+        let ta = stage_lpkg(&out, "talloc", "1.0", &[], &[]);
+        let tv = stage_lpkg(&out, "tevent", "1.0", &[], &[]);
+        let mut b = ScanLikeBinding::default();
+        for (n, p) in [("samba", sm), ("talloc", ta), ("tevent", tv)] {
+            b.full_needed.insert(n.into(), vec![]);
+            b.provides.insert(n.into(), vec![]);
+            b.lpkg.insert(n.into(), p);
+        }
+        let opts = BuildOptions {
+            pkgs_dir: dir.clone(),
+            out_dir: out.clone(),
+            targets: vec!["samba".into()],
+            arch: "x86_64".into(),
+            image: String::new(),
+            download_retries: 3,
+            interactive: false,
+            build_data_dir: std::path::PathBuf::from("data/build"),
+            validate: false,
+            manual_sort: false,
+        };
+        let report = run_build(&opts, &mut b, None).unwrap();
+        assert!(report.blocked.is_empty(), "blocked={:?}", report.blocked);
+        let pos = |x: &str| {
+            report
+                .built
+                .iter()
+                .position(|n| n == x)
+                .unwrap_or_else(|| panic!("{x} 应被构建: {:?}", report.built))
+        };
+        assert!(
+            pos("talloc") < pos("tevent") && pos("tevent") < pos("samba"),
+            "缺失构建依赖应先建（talloc → tevent → samba）: {:?}",
+            report.built
+        );
+        assert!(
+            !report.built.contains(&"tdb".to_string()),
+            "已在仓库的构建依赖不并入: {:?}",
             report.built
         );
         fs::remove_dir_all(&dir).ok();

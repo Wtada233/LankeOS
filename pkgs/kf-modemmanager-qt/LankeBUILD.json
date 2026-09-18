@@ -1,6 +1,6 @@
 {
   "name": "kf-modemmanager-qt",
-  "version": "6.29.0",
+  "version": "6.30.0",
   "release": 1,
   "deps": [
     "modemmanager"
@@ -25,7 +25,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.29/modemmanager-qt-6.29.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.30/modemmanager-qt-6.30.0.tar.xz"
   ],
   "work_sources": []
 }

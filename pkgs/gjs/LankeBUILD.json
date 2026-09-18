@@ -1,6 +1,6 @@
 {
   "name": "gjs",
-  "version": "1.88.1",
+  "version": "1.90.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -35,7 +35,7 @@
     "sysprof"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gjs/1.88/gjs-1.88.1.tar.xz"
+    "https://download.gnome.org/sources/gjs/1.90/gjs-1.90.0.tar.xz"
   ],
   "work_sources": []
 }

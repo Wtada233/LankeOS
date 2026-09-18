@@ -9,6 +9,11 @@
 //! （`match` 可区分网络 / IO / DB，供将来重试或权限分支）。带路径的 io 失败若语境只有路径本身，
 //! 仍走 `Msg`（`Io` 的 Display 不含路径）；需要时把 `Msg` 换成 `Io { ctx, source }` 即可（Display 不变）。
 //!
+//! **三者的 payload 一律 `Box`**：不 Box 时整个枚举 ≥296 字节（`ureq::Error`/`rusqlite::Error`
+//! 各自带 String/Vec 字段），于是**每个** `Result<_, FarmError>` 都触发 clippy 的
+//! `result_large_err`（全库 117 处）与 `large_enum_variant`——错误路径本就冷，多一次分配换回
+//! 128 字节以下的枚举，`?`/`Display`/`source()` 语义全不变。
+//!
 //! `From<String>` / `From<&str>` 使既有 `Err("…".to_string())` 与 `.map_err(|e| format!(…))`
 //! 产生 String 的调用点经 `?` 自动桥接——函数体几乎无需改动，只改签名 + 直出 `Err(…)` 处补 `.into()`。
 
@@ -22,21 +27,21 @@ pub enum FarmError {
     Io {
         ctx: String,
         #[source]
-        source: std::io::Error,
+        source: Box<std::io::Error>,
     },
     /// HTTP（ureq）+ 上下文。
     #[error("{ctx}: {source}")]
     Http {
         ctx: String,
         #[source]
-        source: ureq::Error,
+        source: Box<ureq::Error>,
     },
     /// SQLite（rusqlite）+ 上下文。
     #[error("{ctx}: {source}")]
     Sqlite {
         ctx: String,
         #[source]
-        source: rusqlite::Error,
+        source: Box<rusqlite::Error>,
     },
 }
 
@@ -45,7 +50,7 @@ impl FarmError {
     pub fn io(ctx: impl Into<String>, source: std::io::Error) -> Self {
         FarmError::Io {
             ctx: ctx.into(),
-            source,
+            source: Box::new(source),
         }
     }
 
@@ -53,7 +58,7 @@ impl FarmError {
     pub fn http(ctx: impl Into<String>, source: ureq::Error) -> Self {
         FarmError::Http {
             ctx: ctx.into(),
-            source,
+            source: Box::new(source),
         }
     }
 
@@ -61,7 +66,7 @@ impl FarmError {
     pub fn sqlite(ctx: impl Into<String>, source: rusqlite::Error) -> Self {
         FarmError::Sqlite {
             ctx: ctx.into(),
-            source,
+            source: Box::new(source),
         }
     }
 }

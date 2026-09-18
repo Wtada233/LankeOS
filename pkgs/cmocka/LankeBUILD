@@ -1,0 +1,20 @@
+#
+# cmocka — C 单元测试框架（tevent 关掉 bundled-libraries 后硬性要求系统 cmocka ≥1.1.8）
+# 构建参数照 Arch PKGBUILD（CMake 构建，UNIT_TESTING 开着编自带测试但不跑）
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    cmake -B build -S . \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_BUILD_TYPE=None \
+        -DUNIT_TESTING=ON \
+        -Wno-dev
+    cmake --build build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR={STAGING_ROOT} cmake --install build
+}

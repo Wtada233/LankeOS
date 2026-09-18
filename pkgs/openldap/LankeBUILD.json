@@ -1,6 +1,6 @@
 {
   "name": "openldap",
-  "version": "2.7.0",
+  "version": "2.7.1",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -20,7 +20,7 @@
     "cyrus-sasl"
   ],
   "sources": [
-    "https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-2.7.0.tgz"
+    "https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-2.7.1.tgz"
   ],
   "work_sources": []
 }

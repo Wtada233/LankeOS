@@ -1,6 +1,6 @@
 {
   "name": "plasma-wayland-protocol",
-  "version": "1.21.0",
+  "version": "1.22.0",
   "release": 1,
   "deps": [],
   "needed_so": [],
@@ -9,10 +9,11 @@
     "base-devel",
     "cmake",
     "extra-cmake-modules",
-    "ninja"
+    "ninja",
+    "qt6-base"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma-wayland-protocols/plasma-wayland-protocols-1.21.0.tar.xz"
+    "https://download.kde.org/stable/plasma-wayland-protocols/plasma-wayland-protocols-1.22.0.tar.xz"
   ],
   "work_sources": []
 }

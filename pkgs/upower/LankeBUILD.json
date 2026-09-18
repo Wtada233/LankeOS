@@ -1,6 +1,6 @@
 {
   "name": "upower",
-  "version": "1.91.3",
+  "version": "1.91.4",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -29,7 +29,7 @@
     "polkit"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/upower/upower/-/archive/v1.91.3/upower-v1.91.3.tar.gz"
+    "https://gitlab.freedesktop.org/upower/upower/-/archive/v1.91.4/upower-v1.91.4.tar.gz"
   ],
   "work_sources": []
 }

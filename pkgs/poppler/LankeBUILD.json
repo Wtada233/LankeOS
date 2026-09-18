@@ -1,6 +1,6 @@
 {
   "name": "poppler",
-  "version": "26.08.0",
+  "version": "26.09.0",
   "release": 2,
   "deps": [
     "poppler-data"
@@ -19,6 +19,8 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libgpgmepp.so.7",
+    "libharfbuzz-subset.so.0",
+    "libharfbuzz.so.0",
     "libjpeg.so.62",
     "liblcms2.so.2",
     "libm.so.6",
@@ -40,7 +42,7 @@
     "libpoppler-qt6.so",
     "libpoppler-qt6.so.3",
     "libpoppler.so",
-    "libpoppler.so.163"
+    "libpoppler.so.164"
   ],
   "build_deps": [
     "base-devel",
@@ -54,20 +56,21 @@
     "glib",
     "gobject-introspection",
     "gpgmepp",
+    "harfbuzz",
     "icu",
+    "lcms2",
     "libjpeg-turbo",
     "libpng",
     "libtiff",
-    "lcms2",
     "ninja",
-    "nss",
     "nspr",
+    "nss",
     "openjpeg",
     "qt6-base",
     "zlib"
   ],
   "sources": [
-    "https://poppler.freedesktop.org/poppler-26.08.0.tar.xz"
+    "https://poppler.freedesktop.org/poppler-26.09.0.tar.xz"
   ],
   "work_sources": []
 }

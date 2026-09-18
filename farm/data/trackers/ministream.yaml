@@ -1,0 +1,9 @@
+pkg-name: ministream
+version-source: sources[0]
+sources:
+- tracker-template: gitlab
+  host: gitlab.gnome.org
+  project: GNOME/ministream
+  mode: tags
+  tag-prefix: ''
+  template: https://gitlab.gnome.org/GNOME/ministream/-/archive/{tag}/ministream-{tag}.tar.gz

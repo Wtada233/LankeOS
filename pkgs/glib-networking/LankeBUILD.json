@@ -1,6 +1,6 @@
 {
   "name": "glib-networking",
-  "version": "2.80.1",
+  "version": "2.90.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -21,7 +21,8 @@
     "ninja"
   ],
   "sources": [
-    "https://download.gnome.org/sources/glib-networking/2.80/glib-networking-2.80.1.tar.xz"
+    "https://download.gnome.org/sources/glib-networking/2.90/glib-networking-2.90.0.tar.xz"
   ],
-  "no_strip": false
+  "no_strip": false,
+  "work_sources": []
 }

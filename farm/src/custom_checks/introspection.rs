@@ -9,6 +9,7 @@
 
 use super::{build_dep_findings, walk_all, ChkOpts, Report};
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -60,7 +61,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
             &opts.pkgs_dir,
             pkg,
             TOOL,
-            "包含 g-ir-scanner 生成的 .gir（GObject Introspection 元数据）",
+            tr!("chk.introspection.label"),
             &files,
         );
         if !items.is_empty() {

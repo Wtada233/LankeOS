@@ -1,6 +1,6 @@
 {
   "name": "gnome-keyring",
-  "version": "50.0",
+  "version": "51.0",
   "release": 1,
   "deps": [
     "gcr",
@@ -39,7 +39,7 @@
     "p11-kit"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gnome-keyring/50/gnome-keyring-50.0.tar.xz"
+    "https://download.gnome.org/sources/gnome-keyring/51/gnome-keyring-51.0.tar.xz"
   ],
   "work_sources": []
 }

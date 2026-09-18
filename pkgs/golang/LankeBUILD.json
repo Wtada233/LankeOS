@@ -1,6 +1,6 @@
 {
   "name": "golang",
-  "version": "1.27.0",
+  "version": "1.27.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -15,7 +15,7 @@
     "libtiff"
   ],
   "sources": [
-    "https://go.dev/dl/go1.27.0.src.tar.gz"
+    "https://go.dev/dl/go1.27.1.src.tar.gz"
   ],
   "work_sources": [],
   "no_strip": true,

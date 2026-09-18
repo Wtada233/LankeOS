@@ -1,6 +1,6 @@
 {
   "name": "kate",
-  "version": "26.08.0",
+  "version": "26.08.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -51,7 +51,7 @@
     "libstdc++.so.6"
   ],
   "provides": [
-    "libkateprivate.so.26.08.0"
+    "libkateprivate.so.26.08.1"
   ],
   "build_deps": [
     "base-devel",
@@ -87,7 +87,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/release-service/26.08.0/src/kate-26.08.0.tar.xz"
+    "https://download.kde.org/stable/release-service/26.08.1/src/kate-26.08.1.tar.xz"
   ],
   "work_sources": []
 }

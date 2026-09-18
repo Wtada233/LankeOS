@@ -8,6 +8,7 @@
 
 use super::{build_dep_findings, walk_all, ChkOpts, Report};
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -55,7 +56,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
                     .collect()
             })
             .unwrap_or_default();
-        let items = build_dep_findings(&opts.pkgs_dir, pkg, TOOL, "包含 Vala 绑定 .vapi", &files);
+        let items = build_dep_findings(&opts.pkgs_dir, pkg, TOOL, tr!("chk.vapi.label"), &files);
         if !items.is_empty() {
             report.findings.insert(pkg.clone(), items);
         }

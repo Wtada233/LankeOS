@@ -1,6 +1,6 @@
 {
   "name": "dolphin",
-  "version": "26.08.0",
+  "version": "26.08.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -88,7 +88,7 @@
     "qt6-multimedia"
   ],
   "sources": [
-    "https://download.kde.org/stable/release-service/26.08.0/src/dolphin-26.08.0.tar.xz"
+    "https://download.kde.org/stable/release-service/26.08.1/src/dolphin-26.08.1.tar.xz"
   ],
   "work_sources": []
 }

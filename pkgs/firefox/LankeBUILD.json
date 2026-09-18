@@ -1,6 +1,6 @@
 {
   "name": "firefox",
-  "version": "155.0",
+  "version": "156.0",
   "release": 4,
   "deps": [
     "ffmpeg"
@@ -79,7 +79,7 @@
     "zlib"
   ],
   "sources": [
-    "https://archive.mozilla.org/pub/firefox/releases/155.0/source/firefox-155.0.source.tar.xz"
+    "https://archive.mozilla.org/pub/firefox/releases/156.0/source/firefox-156.0.source.tar.xz"
   ],
   "work_sources": []
 }

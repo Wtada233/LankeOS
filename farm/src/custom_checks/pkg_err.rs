@@ -6,6 +6,7 @@
 
 use super::{walk_all, ChkOpts, Finding, Report, Severity};
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -55,15 +56,11 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
             let (Some(file), Some(kind)) = (p[0].as_str(), p[1].as_str()) else {
                 continue;
             };
-            let what = match kind {
-                "misplaced-root" => {
-                    "错位：应为 /etc 或 /var（无 usr 前缀），不能有 usr/etc|usr/var".into()
-                }
-                "libtool-archive" => "包含 .la（libtool 存档，已废弃，应删）".into(),
-                "static-lib" => {
-                    "包含 .a 静态库（一般应删；若 .cmake 引用则用 IGNORE_CHK_PKGERR 豁免）".into()
-                }
-                _ => kind.into(),
+            let what: String = match kind {
+                "misplaced-root" => tr!("chk.pkg-err.misplaced_root").to_string(),
+                "libtool-archive" => tr!("chk.pkg-err.libtool_archive").to_string(),
+                "static-lib" => tr!("chk.pkg-err.static_lib").to_string(),
+                _ => kind.to_string(),
             };
             items.push(Finding {
                 file: file.to_string(),

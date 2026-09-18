@@ -20,9 +20,6 @@
     "ninja",
     "spirv-headers"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
     "https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v23.1.1.tar.gz"
   ],

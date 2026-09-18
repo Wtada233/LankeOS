@@ -1,6 +1,6 @@
 {
   "name": "localsearch",
-  "version": "3.11.2",
+  "version": "3.12.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -56,7 +56,7 @@
     "upower"
   ],
   "sources": [
-    "https://download.gnome.org/sources/localsearch/3.11/localsearch-3.11.2.tar.xz"
+    "https://download.gnome.org/sources/localsearch/3.12/localsearch-3.12.0.tar.xz"
   ],
   "work_sources": []
 }

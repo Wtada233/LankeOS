@@ -1,0 +1,23 @@
+#
+# tomlplusplus — C++17 的 TOML 解析/序列化库（noctalia 的 meson 依赖它：dependency('tomlplusplus')）
+# 上游默认 **header-only**（meson 选项 build_lib 默认 false）→ 必须显式 -Dbuild_lib=true：
+# 否则不编 libtomlplusplus.so、也不装 tomlplusplus.pc，下游 dependency() 直接找不到
+# （Arch 的包带 .so/.pc/cmake config，见其文件表）。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup build \
+        --prefix={PREFIX} \
+        --buildtype=release \
+        -Ddefault_library=shared \
+        -Dbuild_lib=true
+    ninja -C build
+    DESTDIR={STAGING_ROOT} ninja -C build install
+}
+
+lankebuild_package() {
+    install -Dm644 LICENSE "{STAGING_ROOT}{DATADIR}/licenses/tomlplusplus/LICENSE"
+}

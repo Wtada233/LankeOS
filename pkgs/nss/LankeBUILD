@@ -1,6 +1,5 @@
 #
-# nss — Network Security Services
-# 参照 Arch Linux PKGBUILD 适配
+# nss — Network Security Services（照 Arch PKGBUILD 适配）
 # 需要：nspr、p11-kit、gyp（构建依赖）
 
 _BD=$(dirname {WORK_DIR})
@@ -8,13 +7,18 @@ _BD=$(dirname {WORK_DIR})
 lankebuild_prepare() {
     cd "{SRC_DIR}"
 
-    # 复制 Arch 提供的辅助脚本到源码根目录
+    # Arch 提供的辅助脚本（证书提取 / CA bundle 打包）
     cp "$_BD/bundle.sh" "$_BD/certdata2pem.py" .
 
-    # 创建证书目录并链接 NSS 内置证书数据
+    # 内置证书数据的链接（certdata2pem.py / bundle.sh 从这里读）
     mkdir -p certs
     ln -sf "$PWD/nss/lib/ckfw/builtins/certdata.txt" certs/
     ln -sf "$PWD/nss/lib/ckfw/builtins/nssckbi.h" certs/
+
+    # --system-nspr 下生成 nss.pc 的修复（Arch 同款补丁）：build.sh 会去读本地的
+    # $obj_dir/lib/pkgconfig/nspr.pc，用系统 nspr 时该文件不存在 → sed 退出码 2。
+    cd nss
+    patch -Np1 -i "$_BD/0001-Fix-generating-nss.pc-with-system-nspr.patch"
 }
 
 lankebuild_build() {
@@ -28,7 +32,7 @@ lankebuild_build() {
     # 2. 生成 CA bundle
     ./bundle.sh
 
-    # 3. 构建 NSS
+    # 3. 构建 NSS（产物在 {SRC_DIR}/dist/）
     cd nss
     ./build.sh \
         --disable-tests \
@@ -36,20 +40,16 @@ lankebuild_build() {
         --opt \
         --system-nspr \
         --system-sqlite
+}
 
-    # 回到源码根目录（构建产物在 {SRC_DIR}/dist/，模板在 {SRC_DIR}/nss/）
-    cd {SRC_DIR}
+lankebuild_package() {
+    cd "{SRC_DIR}"
 
-    # ---------------------------------------------------------------
-    # 安装
-    # ---------------------------------------------------------------
     libdir=/usr/lib
     includedir=/usr/include/nss
 
-    # 获取系统 nspr 版本
-    nsprver="$(pkg-config --modversion nspr 2>/dev/null || echo "4.38")"
-
     # a) nss.pc — 从模板生成
+    nsprver="$(pkg-config --modversion nspr)"
     sed nss/pkg/pkg-config/nss.pc.in \
         -e "s,%prefix%,/usr,g" \
         -e "s,%exec_prefix%,\${prefix},g" \
@@ -64,10 +64,10 @@ lankebuild_build() {
     # b) 共享库
     install -Dt "{STAGING_ROOT}$libdir" dist/Release/lib/*.so
 
-    # c) nss-config — 从模板生成
-    vmajor=$(awk '/NSS_VMAJOR/ {print $3}' nss/lib/nss/nss.h)
-    vminor=$(awk '/NSS_VMINOR/ {print $3}' nss/lib/nss/nss.h)
-    vpatch=$(awk '/NSS_VPATCH/ {print $3}' nss/lib/nss/nss.h)
+    # c) nss-config — 从模板生成（版本取自 nss.h）
+    vmajor=$(awk '/#define.*NSS_VMAJOR/ {print $3}' nss/lib/nss/nss.h)
+    vminor=$(awk '/#define.*NSS_VMINOR/ {print $3}' nss/lib/nss/nss.h)
+    vpatch=$(awk '/#define.*NSS_VPATCH/ {print $3}' nss/lib/nss/nss.h)
 
     sed nss/pkg/pkg-config/nss-config.in \
         -e "s,@prefix@,/usr,g" \
@@ -99,13 +99,9 @@ lankebuild_build() {
         fi
     done
 
-    # g) 替换内置 trust module 为 p11-kit 连接
+    # g) 内置 trust module 换成 p11-kit 连接
     ln -sf pkcs11/p11-kit-trust.so "{STAGING_ROOT}$libdir/libnssckbi.so"
 
     # h) 许可证
     install -Dm644 nss/COPYING "{STAGING_ROOT}{DATADIR}/licenses/nss/COPYING"
-}
-
-lankebuild_package() {
-    :
 }

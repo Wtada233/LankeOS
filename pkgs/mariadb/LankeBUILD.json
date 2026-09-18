@@ -1,6 +1,6 @@
 {
   "name": "mariadb",
-  "version": "12.3.3",
+  "version": "13.0.2",
   "release": 2,
   "deps": [
     "jemalloc"
@@ -67,7 +67,7 @@
     "zstd"
   ],
   "sources": [
-    "git+https://github.com/MariaDB/server.git@mariadb-12.3.3"
+    "git+https://github.com/MariaDB/server.git@mariadb-13.0.2"
   ],
   "work_sources": []
 }

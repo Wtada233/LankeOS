@@ -66,7 +66,7 @@ src/
 - **`provides`**：本包提供的 SONAME/能力（如 `libmagic.so.1`）
 - **`deps`**：包级运行时依赖（由 gen_deps/deprules 规则生成，**farm 不扫不比**）
 
-farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不读不改；`deps` 不参与构建序、`build_deps` **默认只对「仓库缺失 + 本轮 targets」的构建依赖参与**——见 §4）。
+farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不读不改；`deps` 不参与构建序、`build_deps` **无条件参与**（仅限本轮 targets 内）——见 §4）。
 
 ## 4. build 调度（run_build）
 
@@ -80,7 +80,7 @@ farm **不再 spawn `sudo`/`tar`/`zstd` CLI**——解包走 `zstd`+`tar` Rust c
 
 1. **旧索引基线**：`load_old_index` 读 `out/<arch>/index.txt`（**完整 needed_so**，单一真源）。缺失/为空 → 报错（**禁止无基线构建**，`farm seed` 是唯一入口）；旧索引全零 needed_so → 警告重新 seed，否则 ABI 传播失明。
 2. **增量选择**：`--all` 时用 `needs_build`（配方 effective_version vs 旧索引）跳过一致的包；指定 `pkg` 强制重建。
-3. **拓扑排序**：`sched::topo_order` 按 **needed_so 链接边 ∪ 声明式重建组边**（victim → on）做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps` 不参与排序；`build_deps` **默认只对「本轮起点旧索引里没有（从未进 repo，首建/引导）且在本轮 targets」的构建依赖进边**（否则依赖方容器 `lpkg upgrade` 装不到它必然 BLOCKED，如 gjs 依赖同轮首建的 sysprof）；已在仓库的构建依赖默认不进边——build 工具由每个容器 `lpkg upgrade` 从 repo 拿最新版，无需排队；混入它们反而引入伪环（把 glibc 排到 python/cmake 之后，错误）。声明 `BUILD_AFTER_BUILD_DEPS`（farm_flags）的包其 `build_deps` **无条件进边**（依赖已在仓库也要等本轮重建产物，如 python-bar→python-foo）。组边保证"不链 libpython 的 python-* 包"也排在 python 之后（见 §4 声明式组）。
+3. **拓扑排序**：`sched::topo_order` 按 **needed_so 链接边 ∪ 声明式重建组边（victim → on）∪ build_deps 边** 做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps` 不参与排序；`build_deps` **无条件进边（仅限本轮 targets 内）**——构建期需要另一个包先产出时必须等它先建（如 python-bar 要 python-foo 本轮重建的产物、gjs 要同轮首建的 sysprof）；指向本轮不重建的包 → 边丢弃。组边保证"不链 libpython 的 python-* 包"也排在 python 之后（见 §4 声明式组）。**切环偏好**：出现环时按 **build_deps → 组边 → needed_so 链接边** 挑边切断——无条件进边会引入"构建工具伪环"（如 glibc ← python/cmake 的 build_deps），这些边正是**该被切**的那类，链接序不会因此被破坏。
 4. **计划预览 + 确认**（2.5）：交互模式（stdin 是 tty）列出 topo 顺序（包 + 版本）并让 operator 确认（回车继续 / n 取消）；非交互（CI/测试/脚本）直接开始。
 5. **预下载拆分**：确认后**只给确认集** bulk 预下载全部源；ABI 受害者动态入队**不预下载**（构建时由 lpkg build 自己下载）。批量预下载失败不阻塞——循环里每个确认集包会再走一次源就绪门（带交互接管）。
 6. **逐包循环**（队列，受害者带 `is_victim` 标记）：
@@ -95,8 +95,8 @@ farm **不再 spawn `sudo`/`tar`/`zstd` CLI**——解包走 `zstd`+`tar` Rust c
 
 ### 排序与 ABI 受害者重排（build/sched.rs）
 
-- `topo_order`：**needed_so 链接边 + build_deps 依赖边 + 声明式组边** Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响 + 组受害者排触发包之后）**。
-- `build_deps` 边（`src/build/sched.rs`）：读配方 LankeBUILD.json，`build_deps` 里某依赖 D 当且仅当 **D 在本轮 targets** 且（**D 不在本轮起点旧索引 `old.packages`** —— 默认，首建/引导先建；或 声明 `BUILD_AFTER_BUILD_DEPS` —— 无条件）作为边 P→D 入图。与链接/组边同规则，只对 targets 内生效。**有回归测试锁死（仓库缺失依赖 gjs→sysprof 先建；已在仓库依赖不加边维持名字升序）**。
+- `topo_order`：**needed_so 链接边 + build_deps 依赖边 + 声明式组边** Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**切环偏好**（`EdgeKind`）：按 **build_deps(0) → 组边(1) → needed_so 链接边(2)** 挑后向边切断；同一对 (P→D) 同时是多种边时取**最高**优先级（不把链接边降级成可切的 build_deps 边）。理由：链接边是构建序的真相（切了消费者会先于库重建、按旧 ABI 白跑），build_deps 环多是构建工具互赖（gtk4 ↔ sysprof）或无条件进边引入的伪环。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响 + 组受害者排触发包之后 + 切环优先挑 build_deps/组边、只有链接边时才切链接边）**。
+- `build_deps` 边（`src/build/sched.rs`）：读配方 LankeBUILD.json，`build_deps` 里某依赖 D 当且仅当 **D 在本轮 targets** 时作为边 P→D 入图——**无条件**（原 `BUILD_AFTER_BUILD_DEPS` flag 已删除，该行为已成默认；配方里再写它会得到"未知 farm flag"告警）。与链接/组边同规则，只对 targets 内生效。**有回归测试锁死（gjs→sysprof 先建，无论 sysprof 在不在旧索引；D 不在 targets 时不加边、维持名字升序）**。
 
 ### 声明式 ABI 重建组（build/groups.rs，data/build/*.yaml）
 

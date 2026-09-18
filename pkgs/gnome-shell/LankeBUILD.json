@@ -1,17 +1,17 @@
 {
   "name": "gnome-shell",
-  "version": "50.4",
-  "release": 4,
+  "version": "51.0",
+  "release": 5,
   "deps": [
     "accountsservice",
     "gdm",
+    "glycin",
     "gnome-session",
     "gnome-settings-daemon",
     "gvfs",
     "libibus"
   ],
   "needed_so": [
-    "libGLESv2.so.2",
     "libX11.so.6",
     "libXext.so.6",
     "libXfixes.so.3",
@@ -20,7 +20,7 @@
     "libc.so.6",
     "libcairo.so.2",
     "libecal-2.0.so.3",
-    "libedataserver-1.2.so.27",
+    "libedataserver-1.2.so.28",
     "libgcc_s.so.1",
     "libgcr-4.so.4",
     "libgdk_pixbuf-2.0.so.0",
@@ -36,7 +36,7 @@
     "libical-glib.so.4.0",
     "libjson-glib-1.0.so.0",
     "libm.so.6",
-    "libmutter-18.so.0",
+    "libmutter-51.so.0",
     "libnm.so.0",
     "libpango-1.0.so.0",
     "libpipewire-0.3.so.0",
@@ -44,6 +44,7 @@
     "libpolkit-gobject-1.so.0",
     "libpulse-mainloop-glib.so.0",
     "libpulse.so.0",
+    "librsvg-2.so.2",
     "libsecret-1.so.0",
     "libsoup-3.0.so.0",
     "libsystemd.so.0"
@@ -60,6 +61,7 @@
     "gdk-pixbuf",
     "gjs",
     "glib",
+    "glycin",
     "gnome-autoar",
     "gnome-desktop",
     "gobject-introspection",
@@ -74,6 +76,7 @@
     "libical",
     "libnma",
     "libpulse",
+    "librsvg",
     "libsecret",
     "libsoup",
     "libx11",
@@ -89,7 +92,7 @@
     "sassc"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gnome-shell/50/gnome-shell-50.4.tar.xz"
+    "https://download.gnome.org/sources/gnome-shell/51/gnome-shell-51.0.tar.xz"
   ],
   "work_sources": []
 }

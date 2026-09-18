@@ -1,6 +1,6 @@
 {
   "name": "tinysparql",
-  "version": "3.11.1",
+  "version": "3.12.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -24,7 +24,7 @@
     "libtinysparql-3.0.so.0",
     "libtracker-sparql-3.0.so",
     "libtracker-sparql-3.0.so.0",
-    "libtracker-sparql-3.0.so.0.1101.0"
+    "libtracker-sparql-3.0.so.0.1200.0"
   ],
   "build_deps": [
     "base-devel",
@@ -40,7 +40,7 @@
     "vala"
   ],
   "sources": [
-    "https://download.gnome.org/sources/tinysparql/3.11/tinysparql-3.11.1.tar.xz"
+    "https://download.gnome.org/sources/tinysparql/3.12/tinysparql-3.12.0.tar.xz"
   ],
   "work_sources": []
 }

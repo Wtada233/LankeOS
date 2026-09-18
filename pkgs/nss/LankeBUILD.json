@@ -1,9 +1,10 @@
 {
   "name": "nss",
-  "version": "3.128",
+  "version": "3.129",
   "release": 1,
   "deps": [
-    "bash"
+    "bash",
+    "p11-kit"
   ],
   "needed_so": [
     "libc.so.6",
@@ -31,7 +32,7 @@
     "zlib"
   ],
   "sources": [
-    "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_128_RTM/src/nss-3.128.tar.gz"
+    "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_129_RTM/src/nss-3.129.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

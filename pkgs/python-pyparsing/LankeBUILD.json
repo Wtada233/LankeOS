@@ -15,9 +15,6 @@
     "python-setuptools",
     "python-wheel"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
     "https://github.com/pyparsing/pyparsing/archive/refs/tags/3.3.2.tar.gz"
   ],

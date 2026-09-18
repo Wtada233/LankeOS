@@ -85,6 +85,16 @@ pub struct RebuildGroups {
     version: HashMap<String, VersionChangeGroup>,
 }
 
+/// version-change 脚本的运行上下文：`pkgs_dir`/`out_dir`/`arch` **三者同生共死**——要么全给
+/// （脚本可用 farm 导出的 `farm_pkg_list`/`farm_pkg_extract` 工具动态算受害者），要么全不给。
+/// 用一个 `Option<ScriptEnv>` 表达，避免三个 `Option` 参数各自为政（也免了 8 参数告警）。
+#[derive(Clone, Copy)]
+pub struct ScriptEnv<'a> {
+    pub pkgs_dir: &'a Path,
+    pub out_dir: &'a Path,
+    pub arch: &'a str,
+}
+
 impl RebuildGroups {
     /// 扫描 `data/build/*.yaml` 加载全部重建组。目录缺失/空 → 空组（无害）。
     pub fn load(data_dir: &Path) -> RebuildGroups {
@@ -152,13 +162,14 @@ impl RebuildGroups {
         new_ver: &str,
         all_pkgs: &[String],
     ) -> Result<Vec<String>, FarmError> {
-        self.version_victims_ctx(on, old_ver, new_ver, all_pkgs, None, None, None)
+        self.version_victims_ctx(on, old_ver, new_ver, all_pkgs, None)
     }
 
     /// 同上，但给脚本额外暴露 farm 导出的工具环境（`pkgs_dir`/`out_dir`/`arch` 均 Some 时才启用）：
     /// 脚本可 `source` 注入的两个 bash 函数（在脚本前自动 prepend）：
     /// - `farm_pkg_list`：打印全部配方包名（一行一个）
     /// - `farm_pkg_extract <pkg> <dest>`：把该包当前 .lpkg 解到 dest
+    ///
     /// 语义：脚本 exit 0 = 重建。受害者 = 静态 `packages:` glob ∪ **脚本 stdout 里输出的合法包名**
     /// （动态计算，如"扫所有包 ELF 里 import Qt_6_PRIVATE_API 的"，无需时间戳）。
     /// exit 非零 = 跳过（返回空）。运行失败（bash 缺失等）→ Err。
@@ -168,12 +179,15 @@ impl RebuildGroups {
         old_ver: &str,
         new_ver: &str,
         all_pkgs: &[String],
-        pkgs_dir: Option<&Path>,
-        out_dir: Option<&Path>,
-        arch: Option<&str>,
+        env: Option<ScriptEnv<'_>>,
     ) -> Result<Vec<String>, FarmError> {
         let Some(g) = self.version.get(on) else {
             return Ok(Vec::new());
+        };
+        // 脚本上下文三者同生共死（要么全给要么全不给）→ 摊平成 run_version_script 的三个 Option
+        let (pkgs_dir, out_dir, arch) = match env {
+            Some(e) => (Some(e.pkgs_dir), Some(e.out_dir), Some(e.arch)),
+            None => (None, None, None),
         };
         // 脚本 exit 0 → 重建（返回 stdout 供动态受害者解析）；exit≠0 → 跳过
         let Some(stdout) =
@@ -604,7 +618,17 @@ packages: perl-*
         );
         let all: Vec<String> = ["q", "a", "b"].iter().map(|s| s.to_string()).collect();
         let v = g
-            .version_victims_ctx("q", "1", "2", &all, Some(&dir), Some(&dir), Some("x86_64"))
+            .version_victims_ctx(
+                "q",
+                "1",
+                "2",
+                &all,
+                Some(ScriptEnv {
+                    pkgs_dir: &dir,
+                    out_dir: &dir,
+                    arch: "x86_64",
+                }),
+            )
             .unwrap();
         assert_eq!(v, vec!["a"], "stdout 动态受害者应只含合法包名 a: {v:?}");
 
@@ -617,7 +641,17 @@ packages: perl-*
             },
         );
         let v = g
-            .version_victims_ctx("q", "1", "2", &all, Some(&dir), Some(&dir), Some("x86_64"))
+            .version_victims_ctx(
+                "q",
+                "1",
+                "2",
+                &all,
+                Some(ScriptEnv {
+                    pkgs_dir: &dir,
+                    out_dir: &dir,
+                    arch: "x86_64",
+                }),
+            )
             .unwrap();
         assert!(v.is_empty(), "exit≠0 应跳过: {v:?}");
         std::fs::remove_dir_all(&dir).ok();

@@ -11,9 +11,6 @@
     "base-devel",
     "git"
   ],
-  "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS"
-  ],
   "sources": [
     "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
     "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz"

@@ -3,6 +3,9 @@ version-source: sources[0]
 sources:
 - tracker-template: sourceforge
   project: libtirpc
-  pattern: '(\d[\d.]*)'
+  # 锚定 RSS 里的**真实文件名**（`.../libtirpc/1.3.8/libtirpc-1.3.8.tar.bz2/download`）——
+  # 原来的裸 `(\d[\d.]*)` 会把 RSS 里任何数字串（file-id/计数/时间戳）当版本，且 max-by-vercmp
+  # 一路取最大 → 曾抓到 17 位垃圾 `01261718651105901`（源探测门拦住未写入，见 track 的 [跳过写入]）。
+  pattern: 'libtirpc-([0-9][0-9.]*)\.tar\.bz2'
   path: libtirpc
   template: https://downloads.sourceforge.net/sourceforge/libtirpc/libtirpc-{version}.tar.bz2

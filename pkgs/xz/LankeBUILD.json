@@ -1,6 +1,6 @@
 {
   "name": "xz",
-  "version": "5.8.3",
+  "version": "5.8.4",
   "release": 2,
   "deps": [
     "bash"
@@ -17,7 +17,7 @@
     "git"
   ],
   "sources": [
-    "https://github.com/tukaani-project/xz/releases/download/v5.8.3/xz-5.8.3.tar.xz"
+    "https://github.com/tukaani-project/xz/releases/download/v5.8.4/xz-5.8.4.tar.xz"
   ],
   "work_sources": []
 }

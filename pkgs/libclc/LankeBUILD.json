@@ -13,7 +13,6 @@
     "spirv-llvm-translator"
   ],
   "farm_flags": [
-    "BUILD_AFTER_BUILD_DEPS",
     "IGNORE_CHK_PKGERR"
   ],
   "sources": [

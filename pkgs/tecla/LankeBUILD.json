@@ -1,6 +1,6 @@
 {
   "name": "tecla",
-  "version": "50.0",
+  "version": "51.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -28,7 +28,7 @@
     "wayland"
   ],
   "sources": [
-    "https://gitlab.gnome.org/GNOME/tecla/-/archive/50.0/tecla-50.0.tar.gz"
+    "https://gitlab.gnome.org/GNOME/tecla/-/archive/51.0/tecla-51.0.tar.gz"
   ],
   "work_sources": []
 }

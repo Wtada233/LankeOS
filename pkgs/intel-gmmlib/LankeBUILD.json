@@ -1,6 +1,6 @@
 {
   "name": "intel-gmmlib",
-  "version": "22.10.1",
+  "version": "22.10.2",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -17,7 +17,7 @@
     "cmake"
   ],
   "sources": [
-    "https://github.com/intel/gmmlib/archive/refs/tags/intel-gmmlib-22.10.1.tar.gz"
+    "https://github.com/intel/gmmlib/archive/refs/tags/intel-gmmlib-22.10.2.tar.gz"
   ],
   "work_sources": []
 }

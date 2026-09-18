@@ -13,6 +13,7 @@
 
 use super::{walk_all, ChkOpts, Finding, Report, Severity};
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
@@ -52,9 +53,7 @@ fn norm_join(base_dir: &str, imp: &str) -> Option<String> {
         match seg {
             "" | "." => {}
             ".." => {
-                if parts.pop().is_none() {
-                    return None; // 越出 content/（/）根
-                }
+                parts.pop()?; // 越出 content/（/）根
             }
             s => parts.push(s),
         }
@@ -173,7 +172,7 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
         let name = f.file_name().and_then(|n| n.to_str()).unwrap_or("");
         if name == "qmldir" && relp.starts_with(&format!("{QML_ROOT}/")) {
             if let Some(dir) = f.parent() {
-                if let Some(modrel) = dir.strip_prefix(content.join(QML_ROOT)).ok() {
+                if let Ok(modrel) = dir.strip_prefix(content.join(QML_ROOT)) {
                     provides.push(
                         modrel
                             .to_string_lossy()
@@ -299,9 +298,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
                     let o = owners.iter().cloned().collect::<Vec<_>>().join("|");
                     items.push(Finding {
                         file: file.to_string(),
-                        what: format!(
-                            "相对路径 include {target} 的提供者在 {o}，不在本包 deps/needed_so"
-                        ),
+                        what: tr!("chk.qml.rel_include", target, o),
                         severity: Severity::Warning,
                     });
                 }
@@ -319,7 +316,7 @@ fn longest_owner(map: &BTreeMap<String, HashSet<String>>, imp: &str) -> HashSet<
     for (m, o) in map {
         if m == imp || imp.starts_with(&format!("{m}.")) {
             let l = m.len();
-            if best.as_ref().map_or(true, |(bl, _)| l > *bl) {
+            if best.as_ref().is_none_or(|(bl, _)| l > *bl) {
                 best = Some((l, o.clone()));
             }
         }
@@ -362,11 +359,11 @@ import A.B
             "字符串里的 // 不得被当注释: {imports:?}"
         );
         assert!(
-            !uri_names.iter().any(|v| *v == "components"),
+            !uri_names.contains(&"components"),
             "注释掉的 import 不得命中: {imports:?}"
         );
         assert!(
-            !uri_names.iter().any(|v| *v == "Foo"),
+            !uri_names.contains(&"Foo"),
             "块注释里的 import 不得命中: {imports:?}"
         );
         // 行结构保留（行数不变）

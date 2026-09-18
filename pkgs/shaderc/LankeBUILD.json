@@ -1,6 +1,6 @@
 {
   "name": "shaderc",
-  "version": "2026.3",
+  "version": "2026.4",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -24,7 +24,7 @@
     "spirv-tools"
   ],
   "sources": [
-    "https://github.com/google/shaderc/archive/refs/tags/v2026.3.tar.gz"
+    "https://github.com/google/shaderc/archive/refs/tags/v2026.4.tar.gz"
   ],
   "work_sources": []
 }

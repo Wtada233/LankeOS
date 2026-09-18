@@ -1,0 +1,7 @@
+pkg-name: tevent
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://www.samba.org/ftp/tevent/
+  pattern: tevent-(\d[\d.]*)\.tar\.gz
+  template: https://www.samba.org/ftp/tevent/tevent-{version}.tar.gz

@@ -1,6 +1,6 @@
 {
   "name": "kf-qqc2-desktop-style",
-  "version": "6.29.0",
+  "version": "6.30.0",
   "release": 3,
   "deps": [
     "kf-sonnet"
@@ -34,7 +34,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.29/qqc2-desktop-style-6.29.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.30/qqc2-desktop-style-6.30.0.tar.xz"
   ],
   "work_sources": []
 }
