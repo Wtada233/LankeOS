@@ -1,0 +1,7 @@
+pkg-name: gst-plugins-good
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://gstreamer.freedesktop.org/src/gst-plugins-good/
+  pattern: gst-plugins-good-([\d.]+)\.tar\.(?:xz|gz)
+  template: https://gstreamer.freedesktop.org/src/gst-plugins-good/gst-plugins-good-{version}.tar.xz

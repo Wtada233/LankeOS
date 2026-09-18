@@ -1,0 +1,26 @@
+lankebuild_prepare() {
+    mkdir -p build
+}
+
+lankebuild_build() {
+    echo "Configuring gst-plugins-good-{ORIG_PKG_VER}"
+    cd build
+    # good 的插件是纯 C，**不产 GIR**（源码里无 generate_gir / 无 introspection 选项，
+    # 别照抄 gst-plugins-bad 的 -Dintrospection=enabled——meson 会直接报 Unknown option）
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR}        \
+                   --buildtype=release  \
+                   -Ddoc=disabled       \
+                   -Dnls=disabled       \
+                   -Dtests=disabled     \
+                   -Dexamples=disabled
+    echo "Building gst-plugins-good-{ORIG_PKG_VER}"
+    ninja -j$(nproc)
+    echo "Build complete."
+}
+
+lankebuild_package() {
+    echo "Packaging gst-plugins-good-{ORIG_PKG_VER}"
+    cd build
+    DESTDIR="{STAGING_ROOT}" ninja install
+    echo "Package staging complete."
+}

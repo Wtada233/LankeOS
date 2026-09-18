@@ -1,9 +1,18 @@
 lankebuild_prepare() {
+    # 后端全开：Qt 的 feature 开关就是 `FEATURE_<名>`（QtFeature.cmake 里
+    # set("FEATURE_${feature}" … CACHE BOOL)）。三个后端 feature 都是 AUTODETECT，
+    # 显式 ON 可让"依赖不在"时直接 configure 报错，而不是静默退回软件解码。
+    #   FEATURE_ffmpeg   ← ffmpeg（libavcodec/avformat/avutil/swresample/swscale）
+    #   FEATURE_vaapi    ← libva + libdrm（且要求 linux_dmabuf 编译测试通过）
+    #   FEATURE_pipewire ← pipewire（screencapture 另需 dbus）
     cmake -B build -G Ninja \
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DQT_BUILD_EXAMPLES=OFF \
         -DQT_BUILD_TESTS=OFF \
-        -DBUILD_SHARED_LIBS=ON
+        -DBUILD_SHARED_LIBS=ON \
+        -DFEATURE_ffmpeg=ON \
+        -DFEATURE_vaapi=ON \
+        -DFEATURE_pipewire=ON
 }
 
 lankebuild_build() {

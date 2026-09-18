@@ -1,8 +1,9 @@
 {
   "name": "qt6-multimedia",
   "version": "6.11.2",
-  "release": 1,
+  "release": 2,
   "deps": [
+    "gst-plugins-good",
     "qt6-base"
   ],
   "needed_so": [
@@ -13,9 +14,17 @@
     "libQt6DBus.so.6",
     "libQt6Gui.so.6",
     "libQt6Network.so.6",
+    "libQt6OpenGL.so.6",
     "libQt6Qml.so.6",
     "libQt6Quick.so.6",
+    "libQt6Quick3D.so.6",
     "libQt6Widgets.so.6",
+    "libX11.so.6",
+    "libXext.so.6",
+    "libXrandr.so.2",
+    "libavcodec.so.63",
+    "libavformat.so.63",
+    "libavutil.so.61",
     "libc.so.6",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
@@ -30,7 +39,10 @@
     "libgstvideo-1.0.so.0",
     "libm.so.6",
     "libpulse.so.0",
-    "libstdc++.so.6"
+    "libstdc++.so.6",
+    "libswresample.so.7",
+    "libswscale.so.10",
+    "libva.so.2"
   ],
   "provides": [
     "libQt6Multimedia.so",
@@ -39,23 +51,32 @@
     "libQt6MultimediaQuick.so.6",
     "libQt6MultimediaWidgets.so",
     "libQt6MultimediaWidgets.so.6",
+    "libQt6Quick3DSpatialAudio.so",
+    "libQt6Quick3DSpatialAudio.so.6",
     "libQt6SpatialAudio.so",
     "libQt6SpatialAudio.so.6"
   ],
   "build_deps": [
     "base-devel",
     "cmake",
+    "dbus",
+    "ffmpeg",
     "glib",
     "gst-plugins-bad",
     "gst-plugins-base",
     "gstreamer",
+    "libdrm",
     "libglvnd",
     "libpulse",
+    "libva",
     "ninja",
+    "pipewire",
     "qt6-base",
     "qt6-declarative",
+    "qt6-quick3d",
     "qt6-shadertools",
-    "vulkan-headers"
+    "vulkan-headers",
+    "wayland"
   ],
   "farm_flags": [
     "IGNORE_CHK_PKGERR",
