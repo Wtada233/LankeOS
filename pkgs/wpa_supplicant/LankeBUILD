@@ -37,7 +37,8 @@ lankebuild_build() {
 
     install -v -d {STAGING_ROOT}{SBINDIR}
     install -v -m755 wpa_cli wpa_passphrase wpa_supplicant {STAGING_ROOT}{SBINDIR}/
-    install -v -m644 systemd/*.service {LIBDIR}/systemd/system/
+    install -v -d {STAGING_ROOT}{LIBDIR}/systemd/system/
+    install -v -m644 systemd/*.service {STAGING_ROOT}{LIBDIR}/systemd/system/
 
     # 安装手册页
     install -v -d {STAGING_ROOT}{MANDIR}/man5 {STAGING_ROOT}{MANDIR}/man8
