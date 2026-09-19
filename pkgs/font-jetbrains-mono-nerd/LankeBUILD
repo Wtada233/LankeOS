@@ -4,7 +4,11 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir -p {STAGING_ROOT}{DATADIR}/fonts/TTF
-    cp -v *.ttf {STAGING_ROOT}{DATADIR}/fonts/TTF/
+    # 上游 zip 有 96 个 ttf：6 个族 × 16 个字重/斜体，每个 ~2.4 M，全装 232 M。
+    # 只保留 Regular 字重 → 6 个文件 ~14.6 M（省 94%）。
+    # 六个族：NerdFont=常规(含连字) / Mono=强制等宽(终端对齐) / Propo=比例间距，
+    #         外加 NL* 三个对应的「No Ligatures」版本。各族都留 Regular。
+    cp -v *-Regular.ttf {STAGING_ROOT}{DATADIR}/fonts/TTF/
     chmod 644 {STAGING_ROOT}{DATADIR}/fonts/TTF/*.ttf
 
     cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
