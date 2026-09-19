@@ -8,10 +8,15 @@ lankebuild_build() {
     # --disable-opt：关掉上游硬编码的 -O3/SSE 优化（老代码在现代 gcc 下会炸）
     ./configure --prefix={PREFIX} --disable-opt
     make -j$(nproc)
-    make DESTDIR={STAGING_ROOT} install
 }
 
 lankebuild_package() {
-    # Installation handled by builder
-    :
+    make DESTDIR={STAGING_ROOT} install
+
+    # 静态库只能事后删（本包确实没有开关）：configure 里 libkyotocabinet.a 是硬编码
+    # 无条件的 —— MYLIBRARYFILES="libkyotocabinet.a"（configure:2126），只有 .so 被放进
+    # `if test "$enable_shared" != "no"` 分支。帮助里那个 `--enable-static` 是摆设：
+    # Makefile.in 从不引用 enable_static。且 kyotocabinet.pc 只写 -lkyotocabinet、
+    # 不引用 .a，所以删除安全。
+    find {STAGING_ROOT} -name '*.a' -delete
 }

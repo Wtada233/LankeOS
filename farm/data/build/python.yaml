@@ -1,5 +1,14 @@
 # 声明式 ABI 重建组：python 的 libpython SONAME 断裂时，强制重建这些**不链 libpython**、
 # 但靠 python 运行时/工具链运行的包（它们不产生 needed_so 链接边，不会自动成为 ABI 受害者）。
 # packages 是空格分隔的 glob（`*` 通配）；匹配 farm 配方目录里的包名。
+#
+# 2026-09-19 补 8 个（按「产物里含版本烙印 python 产物」逐个核实后加入）。
+# 注意 python 版本号在产物里有四种写法，任一单独正则都会漏：
+#   python3.14  → /usr/lib/python3.14/                       （site-packages、stdlib）
+#   cpython-314 → _giscanner.cpython-314-x86_64-linux-gnu.so （ABI 标签）
+#   python314   → libboost_python314.so                      （库名，无点无前缀）
+#   py3.14      → libboost_python-variant-shared-py3.14.cmake（cmake 变体名）
+# 本清单是权威，扫描只作提示 —— 别用扫描结果反删条目（gobject-introspection / boost
+# 都曾被误判为"冗余"，实际都在组里且都确有烙印产物）。
 rebuild-on-abichange: python
-packages: python-* meson gobject-introspection blueman boost gyp at-spi2-core lsb xcb-proto libblockdev libbytesize libgexiv2 libixion liborcus libreoffice packagekit volume_key blueprint-compiler gnome-tweaks libdex
+packages: python-* meson gobject-introspection blueman boost gyp at-spi2-core lsb xcb-proto libblockdev libbytesize libgexiv2 libixion liborcus libreoffice packagekit volume_key blueprint-compiler gnome-tweaks libdex bash-completion ibus kf-kapidox newt samba talloc tevent util-linux

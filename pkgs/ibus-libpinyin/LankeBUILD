@@ -19,6 +19,11 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    # Installation handled by builder
     make DESTDIR={STAGING_ROOT} install
+
+    # 清构建期 __pycache__：setup_libpinyin_PYTHON 是 automake 的 *_PYTHON primary，
+    # 安装时必调 py-compile 生成字节码。automake 没有对应开关，py-compile 本身也不认
+    # PYTHONDONTWRITEBYTECODE（它直接 py_compile.compile()，显式编译不受该变量影响）。
+    # .pyc 含绝对路径、不可复现 —— 与本仓库其余 63 个包同款处理。
+    find {STAGING_ROOT} -type d -name __pycache__ -prune -exec rm -rf {} +
 }

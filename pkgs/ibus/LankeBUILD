@@ -59,4 +59,11 @@ lankebuild_package() {
     # 合并成单包 → 直接整装；Arch 拆包那套 `make uninstall` / 剔 lib 的体操全不需要，
     # 头文件/GIR/typelib/.pc/vapi 自然与 daemon 同包。
     make DESTDIR={STAGING_ROOT} install
+
+    # 清构建期 __pycache__，本包有两处：
+    #   usr/share/ibus/setup/            —— ibus-setup 的脚本
+    #   usr/lib/python3.*/site-packages/gi/overrides/  —— bindings/ 装出的 IBus.py
+    # automake 的 *_PYTHON primary 安装时必调 py-compile 生成字节码，没有开关，
+    # py-compile 本身也不认 PYTHONDONTWRITEBYTECODE（直接 py_compile.compile()）。
+    find {STAGING_ROOT} -type d -name __pycache__ -prune -exec rm -rf {} +
 }

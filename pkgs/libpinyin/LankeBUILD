@@ -19,7 +19,10 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    ./configure --prefix={PREFIX} --with-dbm=KyotoCabinet --enable-libzhuyin
+    # --disable-static：libtool 标准选项（configure --help 明确列出，默认 [default=yes]）。
+    # 从源头不编 libpinyin.a / libzhuyin.a —— 有开关就别事后 find -delete。
+    ./configure --prefix={PREFIX} --with-dbm=KyotoCabinet --enable-libzhuyin \
+        --disable-static
     make -j$(nproc)
 }
 
