@@ -1,0 +1,7 @@
+pkg-name: kyotocabinet
+version-source: sources[0]
+sources:
+- tracker-template: html-index
+  url: https://dbmx.net/kyotocabinet/pkg/
+  pattern: kyotocabinet-(\d[\d.]*)\.tar\.gz
+  template: https://dbmx.net/kyotocabinet/pkg/kyotocabinet-{version}.tar.gz

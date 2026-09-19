@@ -1,0 +1,62 @@
+# ibus — 完整 daemon + panel + GTK3/4 immodule + lib/GIR/typelib/vapi
+# （原 libibus 合并进来：libibus 只是 Arch 的拆包名，上游源码就叫 ibus）
+#
+# 为什么要有 daemon：gnome-shell 的 gjs 硬 import IBus-1.0，只有 lib+typelib 时会连上
+# fcitx5 的 ibusfrontend 假实现 → 协商失败 → libibus 对象生命周期错乱 → gjs GC 双 unref
+# SIGSEGV。真 ibus-daemon + `--replace` 才是正确接管路径（已定：照上游，不偏离）。
+# 环境变量接管：Arch 的 ibus 不装 /etc/xdg/autostart、xinput.d、environment.d、profile.d
+# （xinput-ibus 在源码里只在 EXTRA_DIST，无 install 规则）→ 照抄 Arch 就天然不污染 fcitx5。
+
+lankebuild_prepare() {
+    # 上游修复 (ibus#2889)：IBusText.attrs 拿到的是**浮动**引用却被直接赋值，没走
+    # ibus_text_set_attributes()（内含 g_object_ref_sink）。GNOME 51 的 inputMethod.js
+    # 同时新增了 set_preedit_format(HINT) 和 get_attributes()：前者让 libibus 走到
+    # ibus_input_context_convert_text() 这条有 bug 的路径，后者让 gjs 去 sink 那个
+    # 浮动引用 —— 于是 attrs 被 IBusText 和 gjs wrapper 双重持有，一方减引用就悬垂，
+    # ibus_text_destroy 里 unref 已释放对象 → SIGSEGV。
+    # 修复提交 5bbe88a193（2026-05-27），首发 1.5.35-alpha1；1.5.34 之后没有新的稳定版。
+    # 容错：patch -N 对"已应用"返回 1，用 reverse-dry-run 判别 —— 将来上游纳入后自动 no-op。
+    _p=ibus-2889-attrlist-floating-ref.patch
+    if patch -Np1 --dry-run -i "{WORK_DIR}/../$_p" >/dev/null 2>&1; then
+        patch -Np1 -i "{WORK_DIR}/../$_p"
+    elif patch -R -p1 --dry-run -i "{WORK_DIR}/../$_p" >/dev/null 2>&1; then
+        echo "$_p 已应用，跳过"
+    else
+        echo "$_p 应用失败" >&2
+        exit 1
+    fi
+}
+
+lankebuild_build() {
+    # Arch 同款 configure 全套；--libexecdir 必须 /usr/lib/ibus ——
+    # /etc/xdg/Xwayland-session.d/10-ibus-x11 的内容里硬编了该路径。
+    ./configure \
+        --prefix=/usr \
+        --libexecdir=/usr/lib/ibus \
+        --sysconfdir=/etc \
+        --enable-dconf \
+        --enable-wayland \
+        --enable-gtk3 \
+        --enable-gtk4 \
+        --enable-xim \
+        --enable-ui \
+        --enable-setup \
+        --enable-python-library \
+        --enable-systemd-services \
+        --enable-libnotify \
+        --disable-gtk2 \
+        --disable-memconf \
+        --disable-python2 \
+        --with-python=python3 \
+        --with-ucd-dir=/usr/share/unicode/ \
+        --enable-gtk-doc
+    # Arch 同款：给 libtool 生成的库链接补 -Wl,-O1,--as-needed（libtool 脚本由 configure 生成，故在其后）
+    sed -i 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    # 合并成单包 → 直接整装；Arch 拆包那套 `make uninstall` / 剔 lib 的体操全不需要，
+    # 头文件/GIR/typelib/.pc/vapi 自然与 daemon 同包。
+    make DESTDIR={STAGING_ROOT} install
+}

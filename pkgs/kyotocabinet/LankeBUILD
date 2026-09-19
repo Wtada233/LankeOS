@@ -1,0 +1,17 @@
+# kyotocabinet — C++ 的 DBM 实现（libpinyin 的 DBM 后端；上游 fallabs 已停更，源码由 dbmx.net 承接）
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # --disable-opt：关掉上游硬编码的 -O3/SSE 优化（老代码在现代 gcc 下会炸）
+    ./configure --prefix={PREFIX} --disable-opt
+    make -j$(nproc)
+    make DESTDIR={STAGING_ROOT} install
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    :
+}

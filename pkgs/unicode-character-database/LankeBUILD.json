@@ -1,0 +1,16 @@
+{
+  "name": "unicode-character-database",
+  "version": "18.0.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [],
+  "work_sources": [
+    "https://www.unicode.org/Public/18.0.0/ucd/UCD.zip",
+    "https://www.unicode.org/Public/18.0.0/ucd/Unihan.zip"
+  ]
+}

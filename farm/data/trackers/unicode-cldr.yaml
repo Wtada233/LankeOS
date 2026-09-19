@@ -1,0 +1,9 @@
+pkg-name: unicode-cldr
+version-source: sources[0]
+sources:
+- tracker-template: multi-level-html-index
+  levels:
+  - name: version
+    url: https://unicode.org/Public/cldr/
+    pattern: 'href="([0-9]+\.[0-9]+)/"'
+  template: https://unicode.org/Public/cldr/{version}/cldr-common-{version}.zip

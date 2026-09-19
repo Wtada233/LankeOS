@@ -17,4 +17,12 @@ lankebuild_package() {
 XMODIFIERS=@im=fcitx
 IMSETTINGS_MODULE=fcitx
 EOF
+
+    # GNOME 会话不自动拉起 fcitx5（GNOME 用真 ibus，两套 IM 各自待在自己的桌面）。
+    # gnome-session 的 gsm_app_peek_is_disabled() 会按 XDG_CURRENT_DESKTOP 判 show-in
+    # → 在 [Desktop Entry] 组里加 NotShowIn=GNOME; 即可让它不启动。
+    _d="{STAGING_ROOT}{SYSCONFDIR}/xdg/autostart/org.fcitx.Fcitx5.desktop"
+    if [ -f "$_d" ]; then
+        sed -i '/^\[Desktop Entry\]/a NotShowIn=GNOME;' "$_d"
+    fi
 }

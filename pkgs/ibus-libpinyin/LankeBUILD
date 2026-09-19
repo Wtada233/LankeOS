@@ -1,0 +1,24 @@
+# ibus-libpinyin — ibus 的 libpinyin 拼音引擎（给 GNOME 会话用；fcitx5 不受影响）
+#
+# 两个不同前缀缺一不可（缺了引擎注册得上却起不来）：
+#   --libexecdir=/usr/lib/ibus-libpinyin → 引擎 + setup 脚本
+#   默认 pkgdatadir=/usr/share/ibus-libpinyin → XML/引擎数据
+# opencc 未开（仓库没这包，且是可选的简繁转换）；非 release 源才需要 autoreconf，这里是 release tarball。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    ./configure \
+        --prefix=/usr \
+        --libexecdir=/usr/lib/ibus-libpinyin \
+        --enable-boost \
+        --enable-cloud-input-mode
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    # Installation handled by builder
+    make DESTDIR={STAGING_ROOT} install
+}

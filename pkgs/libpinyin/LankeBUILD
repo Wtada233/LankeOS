@@ -1,0 +1,28 @@
+# libpinyin — 拼音处理库（ibus-libpinyin 的硬依赖，configure 要求 libpinyin >= 2.9.92）
+#
+# DBM 后端用 kyotocabinet（上游 configure.ac 只支持 BerkeleyDB / KyotoCabinet 两者）。
+#
+# ★ 本包用 release tarball，模型数据已随包分发，不需要任何预置或 sed：
+#   Arch 的 PKGBUILD 用「git+ 源」，git 树里没有 data/ 的大文件，所以它才要额外下
+#   model20.text.tar.gz 并 sed 掉 data/Makefile.am 里的 wget 规则。
+#   release tarball 的 data/ 已含全部 .table 与 interpolation2.text，且与 model20
+#   逐字节相同（md5 验证）——照搬 Arch 那套纯属多余。而且 data/Makefile.am:51 那条
+#   wget 规则没有前置依赖，文件存在就永远不会执行。
+#
+#   ⚠ 别 sed data/Makefile.am：那会让它比 data/Makefile.in 新，make 由此触发
+#   automake 重新生成规则，而 tarball 记录的是 automake-1.18、容器只有 1.19，
+#   直接 "missing: automake-1.18: command not found" (exit 127)。
+
+lankebuild_prepare() {
+    # 无预置步骤。函数必须存在——builder 无条件调用三个阶段。
+    :
+}
+
+lankebuild_build() {
+    ./configure --prefix={PREFIX} --with-dbm=KyotoCabinet --enable-libzhuyin
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR={STAGING_ROOT} install
+}

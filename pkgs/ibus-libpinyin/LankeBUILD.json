@@ -1,0 +1,38 @@
+{
+  "name": "ibus-libpinyin",
+  "version": "1.16.5",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libibus-1.0.so.5",
+    "libjson-glib-1.0.so.0",
+    "liblua.so.5.5",
+    "libnotify.so.4",
+    "libpinyin.so.15",
+    "libsoup-3.0.so.0",
+    "libsqlite3.so.0",
+    "libstdc++.so.6"
+  ],
+  "provides": [],
+  "build_deps": [
+    "base-devel",
+    "boost",
+    "glib",
+    "ibus",
+    "json-glib",
+    "libnotify",
+    "libpinyin",
+    "libsoup",
+    "lua",
+    "sqlite"
+  ],
+  "sources": [
+    "https://github.com/libpinyin/ibus-libpinyin/releases/download/1.16.5/ibus-libpinyin-1.16.5.tar.gz"
+  ],
+  "work_sources": []
+}
