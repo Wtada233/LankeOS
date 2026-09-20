@@ -18,6 +18,7 @@
 #include "config/config.hpp"
 #include "cxxopts.hpp"
 #include "db/cache.hpp"
+#include "db/wal_op.hpp"
 #include "i18n/localization.hpp"
 #include "nlohmann/json.hpp"
 #include "pkg/depend_scanner.hpp"
