@@ -128,7 +128,6 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
 
     const bool use_chroot =
         (Config::instance().root_dir() != "/" && Config::instance().root_dir().string() != "/");
-    std::vector<std::string> args = {std::string(constants::BIN_BASH), "-c"};
 
     if (use_chroot) {
         // 钩子由 BIN_BASH 执行，chroot 后按 /bin/bash 解析——必须检查 bash 而非 sh
@@ -138,34 +137,16 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
                                       get_string("error.bash_not_found")));
             return;
         }
-        const fs::path hook_rel = fs::relative(hook_path, Config::instance().root_dir());
-        args.push_back("/" + hook_rel.string());
-    } else {
-        args.push_back(hook_path.string());
     }
 
-    pid_t pid = fork();
-    if (pid == -1) return;
-    if (pid == 0) {
-        if (use_chroot) {
-            // 创建独立的 mount namespace，避免影响主机挂载
-            if (unshare(CLONE_NEWNS) != 0) _exit(1);
-            mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr);
-            if (chroot(Config::instance().root_dir().c_str()) != 0) _exit(1);
-            if (chdir("/") != 0) _exit(1);
-        }
+    // chroot 内按**目标 root 的绝对路径**解析脚本，否则用宿主绝对路径。
+    // 执行统一交给 run_shell_in_root：chroot/fork/exec/waitpid 只有那一份实现，
+    // 与外部触发器（trigger.cpp）走同一条路径（此前这里有一份等价但独立的代码）。
+    const std::string script =
+        use_chroot ? "/" + fs::relative(hook_path, Config::instance().root_dir()).string()
+                   : fs::absolute(hook_path).string();
 
-        std::vector<char*> c_args;
-        for (const auto& arg : args) c_args.push_back(const_cast<char*>(arg.c_str()));
-        c_args.push_back(nullptr);
-
-        execv(c_args[0], c_args.data());
-        _exit(1);
-    }
-    int status;
-    waitpid(pid, &status, 0);
-    int ret = WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-
+    const int ret = run_shell_in_root(shell_quote(script));
     if (ret != 0) {
         log_warning(
             string_format("warning.hook_failed_exec", std::string(hook_name), std::to_string(ret)));
@@ -273,11 +254,21 @@ static std::vector<std::string> collect_system_sonames()
     return out;
 }
 
+/**
+ * 目标是否为"用户显式请求"（决定 hold/autoremove 保护与 --force 生效范围）。
+ *
+ * 除同名匹配外必须一并匹配 **provides**：按能力/SONAME 安装时（`lpkg install libssl`
+ * 由 openssl 提供）目标串是能力名、解析出的真实包名不同，只比包名会把用户显式请求
+ * 记成"依赖"→ 不 hold → **紧接着一条 autoremove 就把它删掉**（TODO.md E2）。
+ */
 static bool is_explicit_target(const std::vector<std::pair<std::string, std::string>>& targets,
-                               const std::string& name)
+                               const std::string& name, const std::vector<std::string>& provides)
 {
-    for (const auto& [n, v] : targets)
+    for (const auto& [n, v] : targets) {
         if (n == name) return true;
+        for (const auto& prov : provides)
+            if (prov == n) return true;
+    }
     return false;
 }
 
@@ -347,7 +338,7 @@ void resolve_with_solver(InstallContext& ctx)
         p.name = rp.name;
         p.actual_version = rp.version;
         p.sha256 = info.sha256;
-        p.is_explicit = is_explicit_target(ctx.targets, rp.name);
+        p.is_explicit = is_explicit_target(ctx.targets, rp.name, info.provides);
         if (lp != local_paths.end()) p.local_path = lp->second;
         p.dependencies = info.dependencies;
         p.provides = info.provides;

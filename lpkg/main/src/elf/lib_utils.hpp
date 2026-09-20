@@ -1,6 +1,35 @@
 #pragma once
+#include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <string>
+
+// ============================================================================
+// ELF 边界/计数校验（strip 与 lib_utils 共用）
+// ============================================================================
+// 这里处理的都是**上游构建产物**（不可信输入），畸形/构造的 ELF 必须只导致"放弃处理"，
+// 不能让打包进程越界读写或除零（TODO.md X1：ASan 实测过堆溢出与 SIGFPE）。
+
+/**
+ * @brief [off, off+size) 是否完整落在容量 limit 之内。
+ *
+ * 用 `size <= limit - off` 而非 `off + size <= limit`：后者在 uint64 下会**回绕**
+ * （sh_size = 2^64-0x1000 这类值让检查通过，随后就是越界 memcpy）。
+ */
+inline bool elf_range_within(uint64_t off, uint64_t size, size_t limit)
+{
+    return off <= limit && size <= static_cast<uint64_t>(limit) - off;
+}
+
+/**
+ * @brief 节区条目数（如 SHT_DYNAMIC 的 Dyn 个数）；sh_entsize == 0 时返回 0。
+ *
+ * 直接算 `sh_size / sh_entsize` 会在 sh_entsize == 0 时 SIGFPE（实测）。
+ */
+inline size_t elf_section_entry_count(uint64_t sh_size, uint64_t sh_entsize)
+{
+    return sh_entsize == 0 ? 0 : static_cast<size_t>(sh_size / sh_entsize);
+}
 
 /**
  * @brief 为给定目录中的共享库生成 SONAME 符号链接

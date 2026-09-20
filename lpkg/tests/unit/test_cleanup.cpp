@@ -309,10 +309,13 @@ TEST_F(CleanupTest, BackupPathHasRandomSuffix)
 // CLEANUP + continue_cleanup 恢复续传
 // ============================================================================
 
-TEST_F(CleanupTest, RecWithCleanupDoesNotReverse)
+TEST_F(CleanupTest, RecWithCleanupStillReversesUncommittedBatch)
 {
-    // 模拟 rec 场景：WAL 中有 CLEANUP 条目，无 COMMIT_PKGS
-    // rec 应继续清理，不做 reverse_execute
+    // **语义已变更（ARCH.md §11.3）**：CLEANUP 现在只由 post-commit 收尾
+    // （finish_committed_batch）写入，**事务内不可能有 CLEANUP 行**；因此
+    // "见到 CLEANUP 就不回滚"的分岔已被删除，未提交批次**一律 reverse_execute**。
+    // 本用例保留旧版 lpkg 的 WAL 形状（CLEANUP 在批次内）作为回归钉子：
+    // 现行语义下它必须被当作普通未提交批次回滚。
     create_file("usr/share/doc/pkg/README");
     fs::path bak_path = test_root / "usr/share/doc/pkg/README.lpkg_bak_pkg_aaa";
     fs::rename(test_root / "usr/share/doc/pkg/README", bak_path);
@@ -335,14 +338,11 @@ TEST_F(CleanupTest, RecWithCleanupDoesNotReverse)
     // 此时 .bak 还在磁盘上
     EXPECT_TRUE(fs::exists(bak_path));
 
-    // recover_packages 应继续 cleanup 流程（删除残留 .bak）
     recover_packages();
 
-    // 文件没有被 reverse_execute 恢复（因为 CLEANUP 存在）
-    EXPECT_FALSE(fs::exists(readme_path));
-    // .bak 应被 contine_cleanup 删除
-    EXPECT_FALSE(fs::exists(bak_path));
-    // WAL 应以 COMMIT_PKGS 结束
+    // 未提交批次一律回滚：文件从 .bak 恢复、批次以 COMMIT_PKGS 收尾
+    EXPECT_TRUE(fs::exists(readme_path)) << "未提交批次必须回滚（恢复 BACKUP 的文件）";
+    EXPECT_FALSE(fs::exists(bak_path)) << "备份已被 rename 回原位";
     std::string wal = read_wal();
     EXPECT_TRUE(wal.find("COMMIT_PKGS") != std::string::npos);
 }
@@ -376,7 +376,7 @@ TEST_F(CleanupTest, RecWithoutCleanupReverseExecutes)
     EXPECT_FALSE(fs::exists(bak_path));
 }
 
-TEST_F(CleanupTest, RecWithPartialCleanupContinues)
+TEST_F(CleanupTest, RecWithPartiallyCleanedBatchReversesWhatItCan)
 {
     // 部分 CLEANUP：3 个文件，只 CLEANUP 了 2 个，rec 应清理第 3 个
     create_file("usr/bin/a");
@@ -398,9 +398,9 @@ TEST_F(CleanupTest, RecWithPartialCleanupContinues)
         std::ofstream f(wpath);
         f << "BEGIN_PKGS 1\n"
           << "RM_BEGIN pkg 1.0\n"
-          << "BACKUP /usr/bin/a → " << bak_a.string() << "\n"
-          << "BACKUP /usr/bin/b → " << bak_b.string() << "\n"
-          << "BACKUP /usr/bin/c → " << bak_c.string() << "\n"
+          << "BACKUP " << (test_root / "usr/bin/a").string() << " → " << bak_a.string() << "\n"
+          << "BACKUP " << (test_root / "usr/bin/b").string() << " → " << bak_b.string() << "\n"
+          << "BACKUP " << (test_root / "usr/bin/c").string() << " → " << bak_c.string() << "\n"
           << "RM_COMMIT pkg 1.0\n"
           // 只有 a 和 b 的 CLEANUP
           << "CLEANUP " << bak_a.string() << "\n"
@@ -412,15 +412,15 @@ TEST_F(CleanupTest, RecWithPartialCleanupContinues)
 
     recover_packages();
 
-    // a 和 b 的 .bak 已被清理（之前已 CLEANUP）
+    // 未提交批次一律回滚（ARCH.md §11.3）：能还原的都还原回来
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/c")) << "c 的备份应被 rename 回原位";
+    EXPECT_FALSE(fs::exists(bak_c));
+    // a/b 的备份在旧设计里已被物理删除（"批次内部分清理"形状，现行代码不会再产生）：
+    // 回滚只能跳过它们 —— 这正是新设计把清理挪到提交后所消除的不一致窗口
     EXPECT_FALSE(fs::exists(bak_a));
     EXPECT_FALSE(fs::exists(bak_b));
-    // c 的 .bak 应被 continue_cleanup 清理
-    EXPECT_FALSE(fs::exists(bak_c));
-    // 原始文件不应恢复
     EXPECT_FALSE(fs::exists(test_root / "usr/bin/a"));
     EXPECT_FALSE(fs::exists(test_root / "usr/bin/b"));
-    EXPECT_FALSE(fs::exists(test_root / "usr/bin/c"));
     EXPECT_TRUE(read_wal().find("COMMIT_PKGS") != std::string::npos);
 }
 
@@ -502,9 +502,11 @@ TEST_F(CleanupTest, TrimPreservesPendingPostCommitCleanup)
 // CLEANUP + 目录续传
 // ============================================================================
 
-TEST_F(CleanupTest, RecDirBakCleanupContinues)
+TEST_F(CleanupTest, RecWithPartiallyCleanedDirBakReversesWholeBatch)
 {
-    // 目录 .bak 在 CLEANUP 阶段被部分处理，rec 应继续
+    // 同上：旧版 lpkg 的"批次内部分清理"形状。现行语义下整个未提交批次回滚 ——
+    // 目录从 .bak 整体还原（**已经被物理删掉的 f1 回不来**，这正是旧设计把清理
+    // 放进批次内要避免的不一致；新设计里清理只发生在提交后，故不会出现该形状）。
     fs::path dir = test_root / "usr/share/doc/pkg";
     fs::path file1 = dir / "f1";
     fs::path file2 = dir / "f2";
@@ -529,7 +531,7 @@ TEST_F(CleanupTest, RecDirBakCleanupContinues)
         std::ofstream f(wpath);
         f << "BEGIN_PKGS 1\n"
           << "RM_BEGIN pkg 1.0\n"
-          << "BACKUP /usr/share/doc/pkg → " << dir_bak.string() << "\n"
+          << "BACKUP " << (test_root / "usr/share/doc/pkg").string() << " → " << dir_bak.string() << "\n"
           << "RM_COMMIT pkg 1.0\n"
           // 只有 f1 的清理已完成（模拟 dir 遍历中 crash）
           << "CLEANUP " << (dir_bak / "f1").string() << "\n";
@@ -540,11 +542,12 @@ TEST_F(CleanupTest, RecDirBakCleanupContinues)
 
     recover_packages();
 
-    // dir_bak 应被清理（f2 被删除，dir_bak 被删除）
+    // 未提交批次回滚：目录整体从 .bak 还原
+    EXPECT_TRUE(fs::exists(dir)) << "未提交批次必须回滚（目录从 .bak 还原）";
     EXPECT_FALSE(fs::exists(dir_bak));
-    EXPECT_FALSE(fs::exists(dir_bak / "f2"));
-    // 原始目录不应被恢复
-    EXPECT_FALSE(fs::exists(dir));
+    // 已被物理删除的 f1 无法恢复（回滚只 rename 整棵备份树）——记录该已知边界
+    EXPECT_FALSE(fs::exists(dir / "f1"));
+    EXPECT_TRUE(fs::exists(dir / "f2"));
 }
 
 // ============================================================================

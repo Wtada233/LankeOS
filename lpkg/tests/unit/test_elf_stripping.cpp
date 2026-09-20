@@ -9,6 +9,7 @@
 #include <fstream>
 #include <vector>
 
+#include "lib_utils.hpp"
 #include "strip.hpp"
 
 namespace fs = std::filesystem;
@@ -629,4 +630,115 @@ TEST_F(StripTest, ArchiveWithGroupObjects)
 
     fs::remove_all(extract_dir);
     fs::remove(archive_file);
+}
+
+// ============================================================================
+// 畸形 ELF 的边界/计数校验（TODO.md X1）
+//
+// strip 处理的是**上游构建产物**（不可信输入）。修复前的三处缺陷都实测过：
+//   ① `memcpy(output, input, min(headers_size, input.size()))` 只按输入大小夹紧，
+//      e_phoff 很大时向输出缓冲越界写（ASan：128 字节区域写 4320）
+//   ② 节区源区间检查用 `off + size <= limit`，uint64 回绕后通过 → 越界 memcpy
+//   ③ `sh_size / sh_entsize`，sh_entsize == 0 时 SIGFPE
+// 修法：共用 elf_range_within()（饱和比较）与 elf_section_entry_count()，校验不过
+// 一律返回 false（调用方告警并保留原文件），绝不部分拷贝出损坏产物。
+// ============================================================================
+
+class CraftedElfTest : public StripTest
+{
+protected:
+    /** 手搓最小 ELF64：一个可指定区间/类型的节区 + 一个（未被保留的）附加节区 */
+    void write_crafted_elf(uint64_t sh_offset, uint64_t sh_size, uint32_t sh_type,
+                           uint64_t sh_flags, uint16_t e_phoff_lo, uint16_t e_phnum,
+                           size_t file_size)
+    {
+        std::vector<uint8_t> buf(file_size, 0);
+        Elf64_Ehdr ehdr{};
+        std::memcpy(ehdr.e_ident, ELFMAG, SELFMAG);
+        ehdr.e_ident[EI_CLASS] = ELFCLASS64;
+        ehdr.e_ident[EI_DATA] = ELFDATA2LSB;
+        ehdr.e_ident[EI_VERSION] = EV_CURRENT;
+        ehdr.e_type = ET_EXEC;
+        ehdr.e_machine = EM_X86_64;
+        ehdr.e_version = EV_CURRENT;
+        ehdr.e_ehsize = sizeof(Elf64_Ehdr);
+        ehdr.e_phoff = e_phoff_lo;
+        ehdr.e_phnum = e_phnum;
+        ehdr.e_shoff = sizeof(Elf64_Ehdr);
+        ehdr.e_shnum = 2;
+        ehdr.e_shentsize = sizeof(Elf64_Shdr);
+        ehdr.e_shstrndx = 0;  // 无节区名表（名字全空，不影响本组断言）
+        std::memcpy(buf.data(), &ehdr, sizeof(ehdr));
+
+        Elf64_Shdr sh[2]{};
+        sh[0] = Elf64_Shdr{};
+        sh[1].sh_type = sh_type;
+        sh[1].sh_flags = sh_flags;
+        sh[1].sh_offset = sh_offset;
+        sh[1].sh_size = sh_size;
+        sh[1].sh_entsize = 0;  // ① 与 ② 的场景都需要它（SHT_DYNAMIC 走安全计数）
+        std::memcpy(buf.data() + sizeof(Elf64_Ehdr), sh, sizeof(sh));
+
+        std::ofstream f(test_file, std::ios::binary | std::ios::trunc);
+        f.write(reinterpret_cast<const char*>(buf.data()), static_cast<std::streamsize>(buf.size()));
+    }
+};
+
+TEST_F(CraftedElfTest, HugeProgramHeaderOffsetIsRejectedInsteadOfHeapOverflow)
+{
+    // e_phoff = 0x1000 + 4 个 phdr = headers_size 4320，而重排后的输出缓冲只有 ~176 字节
+    write_crafted_elf(/*sh_offset=*/0x40, /*sh_size=*/16, SHT_PROGBITS, SHF_ALLOC,
+                      /*e_phoff=*/0x1000, /*e_phnum=*/4, /*file_size=*/8192);
+
+    std::string error_msg;
+    EXPECT_FALSE(strip_file(test_file, error_msg))
+        << "畸形 e_phoff 应被拒绝（返回 false），而不是越界写入输出缓冲";
+}
+
+TEST_F(CraftedElfTest, OverflowingSectionRangeIsRejectedInsteadOfOutOfBoundsCopy)
+{
+    // sh_offset + sh_size 回绕成 0：旧检查 `off + size <= limit` 因此通过
+    constexpr uint64_t kOff = 0x1000;
+    const uint64_t kSize = ~uint64_t{0} - kOff + 1;  // 2^64 - 0x1000
+    write_crafted_elf(kOff, kSize, SHT_PROGBITS, SHF_ALLOC, /*e_phoff=*/0, /*e_phnum=*/0,
+                      /*file_size=*/8192);
+
+    std::string error_msg;
+    EXPECT_FALSE(strip_file(test_file, error_msg))
+        << "回绕的节区区间应被拒绝，而不是做 2^64 级别的 memcpy";
+}
+
+TEST_F(CraftedElfTest, ZeroEntsizeDynamicSectionDoesNotDivideByZero)
+{
+    // SHT_DYNAMIC 且 sh_entsize == 0：旧代码 `sh_size / sh_entsize` 直接 SIGFPE
+    // （identify_file_type 的 SONAME 扫描 与 get_elf_soname 两处都是）
+    write_crafted_elf(/*sh_offset=*/192, /*sh_size=*/16, SHT_DYNAMIC, /*sh_flags=*/0,
+                      /*e_phoff=*/0, /*e_phnum=*/0, /*file_size=*/208);
+
+    // 能走到下一行就说明没有除零崩溃
+    EXPECT_EQ(get_elf_soname(test_file), "") << "畸形 SHT_DYNAMIC 不应产出 SONAME";
+
+    std::string error_msg;
+    EXPECT_NO_THROW(strip_file(test_file, error_msg))
+        << "strip 路径（identify_file_type 的 SONAME 扫描）也不得除零崩溃";
+}
+
+TEST_F(CraftedElfTest, RealSharedLibraryStillStripsAndKeepsSoname)
+{
+    // 正向对照：正常产物必须仍然能被 strip 且 SONAME 可读（防止校验过严把好文件拒了）
+    const fs::path src = test_file.string() + ".c";
+    {
+        std::ofstream f(src);
+        f << "int crafted_test_func(int x) { return x + 1; }\n";
+    }
+    const std::string cmd = "gcc -shared -fPIC -Wl,-soname,libtest.so.1 -o " +
+                            test_file.string() + " " + src.string() + " 2>/dev/null";
+    const int ret = std::system(cmd.c_str());
+    fs::remove(src);
+    if (ret != 0 || !fs::exists(test_file)) GTEST_SKIP() << "gcc 不可用";
+
+    EXPECT_EQ(get_elf_soname(test_file), "libtest.so.1");
+    std::string error_msg;
+    EXPECT_TRUE(strip_file(test_file, error_msg)) << error_msg;
+    EXPECT_EQ(get_elf_soname(test_file), "libtest.so.1") << "strip 后 SONAME 丢失";
 }

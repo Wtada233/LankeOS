@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -41,6 +42,12 @@ struct DbMilestone {
 // ============================================================================
 
 enum class WALOpType {
+    // 解析失败/未知类型。**必须留在首位**：WALOp 默认构造即 INVALID，任何未被成功解析的
+    // 行都是"惰性"的，扫描方只需 is_valid() 一处判断。曾经用 `type=BEGIN_PKGS` 当哨兵 +
+    // `arg1="__INVALID__"` 字符串标记，导致破损行在"找最后一个 BEGIN_PKGS"的反向扫描里
+    // 冒充真实批次起点，整批回滚静默失效（见 TODO.md A2）。
+    INVALID,
+
     // 批次边界
     BEGIN_PKGS,   // BEGIN_PKGS <N>
     COMMIT_PKGS,  // COMMIT_PKGS
@@ -85,7 +92,7 @@ enum class WALOpType {
 };
 
 struct WALOp {
-    WALOpType type;
+    WALOpType type = WALOpType::INVALID;  // 默认惰性：未成功解析的行不得被当成真实操作
     std::string raw;   // 原始行文本（调试用）
     std::string arg1;  // 参数1
     std::string arg2;  // 参数2
@@ -93,6 +100,12 @@ struct WALOp {
     std::string arg4;  // 参数4（预留）
     std::string arg5;  // 参数5（预留）
     std::string arg6;  // 参数6（预留）
+
+    /// 行是否被成功解析（未知/损坏行 = INVALID）。所有扫描/回放都必须先判它。
+    bool is_valid() const
+    {
+        return type != WALOpType::INVALID;
+    }
 
     bool is_metadata() const
     {
@@ -111,10 +124,10 @@ struct WALOp {
                type == WALOpType::REMOVE_DIR;     // 旧名称兼容
     }
 
-    /// reverse_execute 需要跳过的行（元数据/审计/CLEANUP 均不可逆）
+    /// reverse_execute 需要跳过的行（未解析/元数据/审计/CLEANUP 均不可逆）
     bool skip_in_reverse() const
     {
-        return is_metadata() || is_restore_audit() || type == WALOpType::CLEANUP;
+        return !is_valid() || is_metadata() || is_restore_audit() || type == WALOpType::CLEANUP;
     }
 };
 
@@ -181,24 +194,18 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path);
  * 4. DB /pkgs :batch-start
  * 5. ROLLBACK pkg + END pkg 对每个已回滚包
  * 6. COMMIT_PKGS
+ *
+ * @return true = 确实回滚了（批次已由 COMMIT_PKGS 收尾，DB 备份已被消费，可以安全清理）；
+ *         false = 无可回滚的行（WAL 里没有未完成批次，如尾部破损行导致 ops 为空）——
+ *         此时**批次仍开着、DB 备份还没被消费**，调用方必须保留它们交给下次 rec 续传，
+ *         绝不能 cleanup_db_backups()（否则文件能还原而 DB 永远还原不回来，见 TODO.md A2/A3）。
  */
-void batch_rollback(const std::vector<std::string>& successfully_installed);
+bool batch_rollback(const std::vector<std::string>& successfully_installed);
 
 // ============================================================================
 // 崩溃续传清理（recover.cpp 实现）
 // ============================================================================
 
-/**
- * 继续清理未完成的 .lpkg_bak 清理操作（批次已进入 CLEANUP 阶段，不可回滚）。
- *
- * 只清理文件/目录，不做 reverse_execute 回滚；完成后重载 Cache 并写 COMMIT_PKGS。
- * 语义：一旦某个批次出现 CLEANUP 行，其包含的 remove 均已 RM_COMMIT、DB 已落盘，
- * 系统状态稳定，只剩 .lpkg_bak 临时文件待清——**异常/崩溃一律续删+提交（移除保持
- * 最终），不回滚**。回滚需要恢复 DB 但被删的 bak 回不来 → 不一致；且"bak 是否被删"
- * 无法可靠判定（父目录被删、dangling 路径都会让 exists() 误判）。崩溃恢复
- * （recover_packages）与正常异常路径（run_batch_transaction catch）共用本函数。
- */
-void continue_cleanup(const std::vector<WALOp>& ops);
 
 /**
  * 备份目标 → 其所在 stash 根：父目录名以 `.lpkg_bak_` 开头（= stash 目录）则取父目录，
@@ -206,6 +213,14 @@ void continue_cleanup(const std::vector<WALOp>& ops);
  * 再写一遍"父目录即 stash"的判定。
  */
 std::filesystem::path stash_root_of_bak(const std::filesystem::path& bak);
+
+/**
+ * WAL 当前仍引用到的 stash 根集合（BACKUP/REMOVE_OLD 的 dst、CLEANUP 的 arg1）。
+ * `cleanup_orphan_stashes()` **必须**跳过这些：它们是回滚/续传的数据来源，而 stash 落在
+ * 文件系统顶层（= root_dir 的直接子目录）正是 reaper 的扫描范围，被延迟处理的未提交批次
+ * 其 pid 又必然已死 —— 不排除就会在同一次启动里被回收（TODO.md Z5）。
+ */
+std::set<std::filesystem::path> referenced_stash_roots();
 
 // ============================================================================
 // stash 收尸（TODO：备份移到每文件系统隔离 stash 后）

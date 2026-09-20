@@ -223,3 +223,86 @@ TEST_F(BuilderExecutorTest, LoadBuildDefaults_ReadsConfigFile)
     // 未配置的 cxxflags → 内置默认
     EXPECT_EQ(d.cxxflags, std::string(build_defaults::CXXFLAGS));
 }
+
+// ============================================================================
+// safe_name_from_url —— 源 URL → 安全目录/文件名（TODO.md C1）
+//
+// 旧实现直接 `fs::path(url).filename()`：URL 以 `/..` 结尾得到 ".."，以 `/` 结尾得到 ""，
+// 调用方随后 `work_root / name` + `fs::remove_all(dest)` 会**删掉整个构建目录或整棵源码树**
+// （实测：remove_all(work/"..") 会清空父目录所有条目，含 LankeBUILD.json）。
+// ============================================================================
+
+TEST_F(BuilderExecutorTest, SafeNameRejectsParentTraversalUrl)
+{
+    // `git+https://host/a/b/..` → filename() == ".." → 曾会删掉构建目录本身
+    EXPECT_THROW(safe_name_from_url("https://host/a/b/.."), LpkgException);
+}
+
+TEST_F(BuilderExecutorTest, SafeNameRejectsTrailingSlashUrl)
+{
+    // `…/repo/` → filename() == "" → 曾会清空整个 work_root
+    EXPECT_THROW(safe_name_from_url("https://host/archives/"), LpkgException);
+    EXPECT_THROW(safe_name_from_url("git+https://host/repo.git/"), LpkgException);
+}
+
+TEST_F(BuilderExecutorTest, SafeNameRejectsDotAndEmpty)
+{
+    EXPECT_THROW(safe_name_from_url("https://host/a/b/."), LpkgException);
+    EXPECT_THROW(safe_name_from_url(""), LpkgException);
+}
+
+TEST_F(BuilderExecutorTest, SafeNameKeepsOrdinaryNames)
+{
+    EXPECT_EQ(safe_name_from_url("https://host/pub/foo-1.2.3.tar.gz"), "foo-1.2.3.tar.gz");
+    EXPECT_EQ(safe_name_from_url("https://host/group/repo.git"), "repo.git");
+    // 含空格的文件名是合法的，必须原样保留（不能"为了安全"改名字）
+    EXPECT_EQ(safe_name_from_url("https://host/a/my source.tar.xz"), "my source.tar.xz");
+}
+
+TEST_F(BuilderExecutorTest, SafeNameNeverEscapesWorkRoot)
+{
+    // 不变量：任何被接受的名字，拼到 work_root 之后仍在其内部
+    const fs::path work_root = test_dir / "work";
+    for (const char* url : {"https://h/a/b.tar.gz", "https://h/a/b..c", "https://h/a/..b",
+                            "https://h/a/b.tar.gz?v=1"}) {
+        const std::string name = safe_name_from_url(url);
+        const fs::path dest = (work_root / name).lexically_normal();
+        EXPECT_EQ(dest.parent_path(), work_root) << url << " → " << dest;
+    }
+}
+
+TEST_F(BuilderExecutorTest, SourceDownloadIsAtomicAndCleansStrayPart)
+{
+    // C4 回归：源码包**先下到 .part 再 rename**，正式文件只在下载完整后出现。
+    // 修复前直接写正式文件 + `if (!fs::exists(dest))` 复用，被中断（SIGKILL/断电）
+    // 留下的截断包会被永久当成"已下载好"，错误延后到无关阶段才爆出来。
+    const fs::path src = test_dir / "src.tar.gz";
+    { std::ofstream f(src); f << "REAL"; }
+    const fs::path build = test_dir / "build";
+    const fs::path stray = build / "src.tar.gz.part";
+    fs::create_directories(build);
+    { std::ofstream f(stray); f << "HALF"; }  // 上次被中断留下的半截
+
+    auto files = download_and_prepare_sources({"file://" + src.string()}, {}, build,
+                                              test_dir / "work");
+    ASSERT_FALSE(files.empty()) << "源码没有被下载";
+
+    const fs::path dest = build / "src.tar.gz";
+    ASSERT_TRUE(fs::exists(dest));
+    std::ifstream in(dest);
+    std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    EXPECT_EQ(content, "REAL") << "正式文件内容不是本次下载的结果";
+    EXPECT_FALSE(fs::exists(stray)) << "残留 .part 未被清理：下载没有走 .part + rename";
+}
+
+TEST_F(BuilderExecutorTest, FailedSourceDownloadLeavesNoPartialFile)
+{
+    const fs::path build = test_dir / "build2";
+    fs::create_directories(build);
+    EXPECT_THROW(download_and_prepare_sources({"file:///nonexistent/nope.tar.gz"}, {}, build,
+                                              test_dir / "work"),
+                 LpkgException);
+    EXPECT_FALSE(fs::exists(build / "nope.tar.gz"))
+        << "下载失败却留下了正式文件（会被当成已下载好）";
+    EXPECT_FALSE(fs::exists(build / "nope.tar.gz.part")) << "下载失败却留下了 .part";
+}

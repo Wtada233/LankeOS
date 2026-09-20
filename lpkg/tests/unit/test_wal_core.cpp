@@ -326,14 +326,19 @@ TEST_F(WalCoreTest, ParseOpRestoreDbRm)
 TEST_F(WalCoreTest, ParseOpInvalidLine)
 {
     auto op = wal::parse_op("GARBAGE_LINE_WITH_UNKNOWN_TYPE");
-    EXPECT_EQ(op.arg1, "__INVALID__");
+    // 未解析行 = 独立的 INVALID 类型（曾用 `type=BEGIN_PKGS` 当哨兵 + arg1="__INVALID__"，
+    // 破损行会被"找最后一个 BEGIN_PKGS"的反向扫描冒充批次起点 → 整批回滚失效）
+    EXPECT_FALSE(op.is_valid());
+    EXPECT_EQ(op.type, wal::WALOpType::INVALID);
+    EXPECT_TRUE(op.skip_in_reverse());
 }
 
 TEST_F(WalCoreTest, ParseOpEmptyLine)
 {
     auto op = wal::parse_op("");
-    // split_line("") 返回 [""]，walop_type_from_name("") 抛异常 → arg1 = "__INVALID__"
-    EXPECT_EQ(op.arg1, "__INVALID__");
+    // 类型 token 为空 → walop_type_from_name("") 抛异常 → INVALID（惰性，不冒充任何真实操作）
+    EXPECT_FALSE(op.is_valid());
+    EXPECT_EQ(op.type, wal::WALOpType::INVALID);
 }
 
 // ============================================================================
@@ -1053,9 +1058,10 @@ TEST_F(WalCoreTest, ParseOpWithLeadingWhitespace)
 
 TEST_F(WalCoreTest, ParseOpWithTrailingWhitespace)
 {
-    // WAL 行由内部写入，不应包含 \r。\r 会导致解析失败。
+    // WAL 行由内部写入，不应包含 \r。\r 粘在类型 token 上 → 未知类型 → 惰性 INVALID。
     auto op = wal::parse_op("COMMIT_PKGS\r");
-    EXPECT_EQ(op.arg1, "__INVALID__");
+    EXPECT_FALSE(op.is_valid());
+    EXPECT_NE(op.type, wal::WALOpType::COMMIT_PKGS);
 }
 
 TEST_F(WalCoreTest, WalOpTypeNameRoundtrip)

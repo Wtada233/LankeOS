@@ -33,6 +33,9 @@ WalWriter::WalWriter()
 
     fd_ = ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, constants::PERM_WAL_LOG);
     if (fd_ < 0) throw LpkgException(string_format("error.wal_open_failed", path));
+    // 新建/首次打开后 fsync 父目录：否则断电可能只丢了目录项——已经 fsync 过的 WAL 行
+    // （描述了文件系统改动）变得不可达，回滚依据随之消失（I-FSYNC-3，TODO.md X7）。
+    fsync_parent_dir(path);
 }
 
 WalWriter::~WalWriter()
@@ -98,6 +101,7 @@ void log_wal_line(std::string_view line)
         ::close(fd);
         throw LpkgException(string_format("error.wal_write_failed", path));
     }
+    fsync_parent_dir(path);  // 首次创建时把目录项也落盘（见 WalWriter 注释）
 
     if (::fsync(fd) != 0) {
         ::close(fd);

@@ -95,11 +95,9 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
     }
     plan[pkg_info->name] = {pkg_info->name, pkg_info->version, already, deps};
 
-    // 已安装的传递依赖包直接记录并跳过进一步递归展开（与函数注释规范对齐）
-    if (already && visited.size() > 1) {
-        visited.erase(pkg_name);
-        return;
-    }
+    // 曾在此处对"已安装的中间节点"直接 return、不再展开 → 它背后**未安装**的依赖
+    // 不会出现在 `depend install` 的树里，"将要装什么"因此不准（TODO G3）。
+    // visited 已保证无环，继续展开即可。
 
     for (const auto& dep : deps) {
         if (!Config::instance().no_deps_mode()) {
@@ -112,6 +110,30 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
         }
     }
     visited.erase(pkg_name);
+}
+
+/**
+ * 仓库包名（排序）。存在性判定与 show_all 都需要"仓库里有哪些包"这个问题，
+ * 而反向依赖表回答不了它（无依赖者的包不在表里）。
+ */
+std::vector<std::string> repo_package_names()
+{
+    std::vector<std::string> names;
+    Repository repo;
+    try {
+        repo.load_index();
+    } catch (const std::exception&) {
+        return names;
+    }
+    for (const auto& name : repo.packages() | std::views::keys) names.push_back(std::string(name));
+    std::ranges::sort(names);
+    return names;
+}
+
+bool repo_has_package(const std::string& name)
+{
+    const auto names = repo_package_names();
+    return std::ranges::find(names, name) != names.end();
 }
 
 }  // anonymous namespace
@@ -149,7 +171,7 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
 
     // 第一遍：读入行 + 建 SONAME → 提供者 反图（needed_so 反查依赖需要它）
     std::vector<std::pair<std::string, std::string>> name_needed;  // (包名, needed_so 字段)
-    std::unordered_map<std::string, std::string> soname_provider;
+    std::unordered_map<std::string, std::unordered_set<std::string>> soname_provider;
     std::ifstream f(idx);
     std::string line;
     while (std::getline(f, line)) {
@@ -169,7 +191,9 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
         for (auto s : split_string_view(vh[3], constants::COMMA_CHAR)) {
             if (s.empty()) continue;
             std::string key(s);
-            if (soname_provider.find(key) == soname_provider.end()) soname_provider[key] = name;
+            // **同一 SONAME 可能有多个提供者**（捆绑/私有 .so）。此前只记第一个 →
+            // 反向图只连到一个提供者，删除/ABI 影响面会被少算一半（TODO 低危项）
+            soname_provider[key].insert(name);
         }
     }
 
@@ -178,7 +202,10 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
         for (auto s : split_string_view(needed, constants::COMMA_CHAR)) {
             if (s.empty()) continue;
             auto it = soname_provider.find(std::string(s));
-            if (it != soname_provider.end() && it->second != name) rev[it->second].insert(name);
+            if (it != soname_provider.end()) {
+                    for (const auto& prov : it->second)
+                        if (prov != name) rev[prov].insert(name);  // 所有提供者都连边
+                }
         }
     }
     return rev;
@@ -278,11 +305,14 @@ void build_install_tree(ScanNode* parent, const std::string& parent_name, const 
 //  若包未安装则回退到仓库分析，否则从本地缓存构建反向依赖树
 // ═══════════════════════════════════════════════════════════════════════════
 
-ScanNode scan_remove_tree(const std::string& pkg_name, bool /*show_all*/)
+ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
 {
     // 恒用仓库反向依赖图：计算整个仓库删除该包的影响，不看本地装了啥
     auto rev = load_repo_revdep();
-    if (rev.find(pkg_name) == rev.end()) {
+    // 存在性判定：**仓库索引里有，或图上出现过**（并集，严格比"只看反向依赖表"宽松）。
+    // 只看反向依赖表时，没有任何依赖者的包会被误报成 "not found in repository"（TODO G2）；
+    // 保留图上判定则覆盖索引读不到/被裁剪的场景，两者都不放过。
+    if (!repo_has_package(pkg_name) && rev.find(pkg_name) == rev.end()) {
         ScanNode r;
         r.name = pkg_name;
         r.version = "(not found)";
@@ -302,6 +332,21 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool /*show_all*/)
     root.reason = "target package (repo)";
     affected.erase(pkg_name);
     build_remove_tree_repo(root, pkg_name, rev, affected);
+
+    // show_all：与 build_install_tree 的 show_all 同义——不只显示受影响节点，
+    // 把其余仓库包也作为"不受影响"列出（此前该形参被丢弃，`depend remove --all`
+    // 与不带 --all 完全一样，TODO G2）
+    if (show_all) {
+        for (const auto& name : repo_package_names()) {
+            if (name == pkg_name || affected.contains(name)) continue;
+            ScanNode keep;
+            keep.name = name;
+            keep.version = version_or_missing(name);
+            keep.status = ScanStatus::KEEP;
+            keep.reason = "unaffected";
+            root.children.push_back(std::move(keep));
+        }
+    }
     return root;
 }
 

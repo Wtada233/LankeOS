@@ -20,6 +20,18 @@ std::vector<std::filesystem::path> download_and_prepare_sources(
     const std::filesystem::path& build_dir, const std::filesystem::path& work_root);
 
 /**
+ * @brief 从源 URL 推导一个安全的本地目录/文件名（只取最后一段，拒绝 "." / ".." / 空）。
+ *
+ * `fs::path(url).filename()` 对 `…/a/b/..` 返回 `".."`、对 `…/x/` 返回 `""`，调用方
+ * 随之 `work_root / name` 得到的就是 `work_root/".."`（= 构建目录本身）或 `work_root`，
+ * 紧接着的 `fs::remove_all(dest)` 会**删掉整个构建目录 / 整棵源码树**。
+ * 非法输入一律抛 LpkgException：宁可不构建，也不能静默删目录。
+ *
+ * @throws LpkgException 无法从 URL 推导出合法名字时
+ */
+std::string safe_name_from_url(const std::string& url);
+
+/**
  * @brief 检测 work_root 中是否仅包含单个子目录（常见于 tarball 解压结果）
  * @param work_root 工作区根目录
  * @return 若仅有一个顶层子目录则返回该子目录，否则返回 work_root 自身

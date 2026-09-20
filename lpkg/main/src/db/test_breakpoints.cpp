@@ -27,10 +27,11 @@ bool BreakpointManager::hit(const std::string& name)
 
     for (auto it = breakpoints_.begin(); it != breakpoints_.end(); ++it) {
         if (it->first == name) {
-            if (it->second) {
-                it->second();  // 执行 action（通常抛异常）
-            }
-            breakpoints_.erase(it);  // 单次触发
+            // **先 erase 再执行 action**：action 的约定用法就是抛异常（注入失败），
+            // 若先执行则 erase 不可达 → 断点会重复触发（曾使"期望第二次成功"的用例失效）
+            auto action = std::move(it->second);
+            breakpoints_.erase(it);
+            if (action) action();
             return true;
         }
     }

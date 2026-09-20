@@ -264,3 +264,63 @@ TEST_F(AggregatedIndexTest, FindProviderReturnsVersionThatActuallyProvides)
     // 无提供者 → nullopt
     EXPECT_FALSE(repo.find_provider("libmissing.so.1").has_value());
 }
+
+// ============================================================================
+// 索引 deps 字段里的复合约束（TODO.md D2）
+//
+// 索引用 ',' 连接各依赖，而依赖语法**本身**也用 ',' 表达复合约束
+// （`"cmake >= 3.20, < 4.0"` 是一个依赖）。旧解析直接按 ',' 拆再逐个解析，
+// 于是 "< 4.0" 变成**空名依赖**（libsolv ID_EMPTY：不解析不报错，求解静默产出空事务）。
+// 修法：以"操作符开头"为判据把续接片段合回上一条 —— 依赖名不会这样开头。
+// ============================================================================
+
+TEST_F(AggregatedIndexTest, CompoundConstraintInDepsFieldStaysOneDependency)
+{
+    write_index("libfoo|1.0:aaa:cmake >= 3.20, < 4.0::|\n");
+
+    Repository repo;
+    repo.load_index();
+    auto info = repo.find_package("libfoo", "1.0");
+    ASSERT_TRUE(info.has_value());
+    ASSERT_EQ(info->dependencies.size(), 1u) << "复合约束被拆成了多个依赖";
+    EXPECT_EQ(info->dependencies[0].name, "cmake");
+    ASSERT_EQ(info->dependencies[0].constraints.size(), 2u);
+    EXPECT_EQ(info->dependencies[0].constraints[0].op, ">=");
+    EXPECT_EQ(info->dependencies[0].constraints[0].version, "3.20");
+    EXPECT_EQ(info->dependencies[0].constraints[1].op, "<");
+    EXPECT_EQ(info->dependencies[0].constraints[1].version, "4.0");
+}
+
+TEST_F(AggregatedIndexTest, CompoundConstraintMixedWithPlainDeps)
+{
+    write_index("app|1.0:aaa:glibc, cmake >= 3.20, < 4.0, ncurses::|\n");
+
+    Repository repo;
+    repo.load_index();
+    auto info = repo.find_package("app", "1.0");
+    ASSERT_TRUE(info.has_value());
+    ASSERT_EQ(info->dependencies.size(), 3u);  // glibc / cmake(复合) / ncurses
+    EXPECT_EQ(info->dependencies[0].name, "glibc");
+    EXPECT_EQ(info->dependencies[1].name, "cmake");
+    EXPECT_EQ(info->dependencies[1].constraints.size(), 2u);
+    EXPECT_EQ(info->dependencies[2].name, "ncurses");
+    // 关键：**没有任何空名依赖**
+    for (const auto& d : info->dependencies) EXPECT_FALSE(d.name.empty());
+}
+
+TEST_F(AggregatedIndexTest, EmptyAndTrailingCommasProduceNoDependencies)
+{
+    write_index("empty1|1.0:aaa:,::|\nempty2|1.0:aaa:glibc,,::|\n");
+
+    Repository repo;
+    repo.load_index();
+
+    auto e1 = repo.find_package("empty1", "1.0");
+    ASSERT_TRUE(e1.has_value());
+    EXPECT_TRUE(e1->dependencies.empty()) << "空 deps 字段不应产生依赖";
+
+    auto e2 = repo.find_package("empty2", "1.0");
+    ASSERT_TRUE(e2.has_value());
+    ASSERT_EQ(e2->dependencies.size(), 1u);
+    EXPECT_EQ(e2->dependencies[0].name, "glibc");
+}

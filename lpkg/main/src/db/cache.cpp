@@ -348,23 +348,6 @@ void Cache::write_providers()
     write_db_file_direct(Config::instance().provides_db(), providers);
 }
 
-// ── 文件系统辅助 ───────────────────────────────────────────────────
-
-namespace
-{
-
-void atomic_write_with_fsync(const fs::path& dst, const fs::path& tmp)
-{
-    int fd = ::open(tmp.c_str(), O_WRONLY);
-    if (fd >= 0) {
-        ::fsync(fd);
-        ::close(fd);
-    }
-    safe_rename(tmp, dst);
-}
-
-}  // namespace
-
 void Cache::write_db_file_direct(
     const fs::path& path,
     const std::map<std::string, std::unordered_set<std::string>, std::less<>>& db)
@@ -388,7 +371,7 @@ void Cache::write_db_file_direct(
         if (!f) throw LpkgException(string_format("error.db_write_failed", tmp.string()));
     }
 
-    atomic_write_with_fsync(path, tmp);
+    fsync_and_rename(tmp, path);
 }
 
 void Cache::write_set_file_direct(const fs::path& path, const std::unordered_set<std::string>& data)
@@ -404,7 +387,7 @@ void Cache::write_set_file_direct(const fs::path& path, const std::unordered_set
         if (!f) throw LpkgException(string_format("error.db_write_failed", tmp.string()));
     }
 
-    atomic_write_with_fsync(path, tmp);
+    fsync_and_rename(tmp, path);
 }
 
 // ============================================================================
@@ -460,7 +443,7 @@ void Cache::write_db_file_wal(
     }
 
     // 4. fsync .tmp
-    atomic_write_with_fsync(db_path, tmp);
+    fsync_and_rename(tmp, db_path);
 }
 
 void Cache::write_set_file_wal(const fs::path& path, const std::unordered_set<std::string>& data,
@@ -495,7 +478,7 @@ void Cache::write_set_file_wal(const fs::path& path, const std::unordered_set<st
     }
 
     // 4. fsync .tmp + rename + fsync parent
-    atomic_write_with_fsync(path, tmp);
+    fsync_and_rename(tmp, path);
 }
 
 std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::read_db_uncached(

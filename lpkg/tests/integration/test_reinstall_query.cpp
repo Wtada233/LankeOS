@@ -292,3 +292,19 @@ TEST_F(NewFeaturesTest, ReinstallAtomicRollback)
     std::getline(f, s);
     EXPECT_EQ(s, "content of usr/bin/app");
 }
+TEST_F(NewFeaturesTest, QueryDirectoryWithoutTrailingSlashStillResolvesOwner)
+{
+    // G1 回归：目录条目以**尾斜杠**注册（`/usr/share/dir_owner_ns/`）。用户手打
+    // `lpkg query /usr/share/dir_owner_ns`（不带斜杠）此前会报"不属于任何包"。
+    create_pkg("dir_owner_ns", "1.0", {{"usr/share/dir_owner_ns/data.txt", "/"}});
+    install_packages({(pkg_dir / "dir_owner_ns-1.0.lpkg").string()}, "", false);
+
+    testing::internal::CaptureStdout();
+    query_file("/usr/share/dir_owner_ns");  // 注意：不带尾斜杠
+    const std::string out = testing::internal::GetCapturedStdout();
+    // 断言消息文本本身（"is owned by" / "不属于任何已安装的包"），**不能**只断言包名出现——
+    // 查询路径里本来就含包名，"未归属"的消息会回显该路径，子串断言会假通过。
+    EXPECT_EQ(out.find("is not owned by any installed package"), std::string::npos)
+        << "不带尾斜杠查询目录被判为无归属：" << out;
+    EXPECT_NE(out.find("is owned by"), std::string::npos) << "没有输出归属信息：" << out;
+}

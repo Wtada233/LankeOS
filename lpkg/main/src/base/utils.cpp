@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <sys/file.h>
 #include <sys/stat.h>
+#include <sys/mount.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -32,6 +33,20 @@ extern std::atomic<bool> sigint_graceful;
 
 namespace
 {
+/**
+ * 严格解析十进制 PID：必须非空且全为数字。
+ * `std::stoi` 接受数字前缀（"1234junk" → 1234），会让 `/tmp/lpkg_1234junk` 这类
+ * **非本工具**创建的目录被判成"自己的临时目录"并连带 pid 存活检查一起误删。
+ */
+bool parse_pid_strict(const std::string& s, int& out)
+{
+    if (s.empty() || s.size() > 9) return false;
+    for (const char c : s)
+        if (c < '0' || c > '9') return false;
+    out = std::stoi(s);
+    return out > 0;
+}
+
 std::mutex log_mutex;
 bool is_stdout_tty = false;
 bool is_stderr_tty = false;
@@ -165,6 +180,33 @@ int run_shell(const std::string& cmd, const fs::path& work_dir)
     return run_command({std::string(constants::BIN_BASH), "-c", cmd}, work_dir);
 }
 
+int run_shell_in_root(const std::string& cmd)
+{
+    const fs::path root = Config::instance().root_dir();
+    if (root == "/" || root.string() == "/") return run_shell(cmd);
+
+    const fs::path bash_rel = fs::path("/bin/bash").relative_path();
+    if (!fs::exists(root / bash_rel)) return -1;  // 目标 root 里没有 bash → 无法执行
+
+    pid_t pid = fork();
+    if (pid == -1) return -1;
+    if (pid == 0) {
+        if (unshare(CLONE_NEWNS) != 0) _exit(1);
+        mount(nullptr, "/", nullptr, MS_REC | MS_PRIVATE, nullptr);
+        if (chroot(root.c_str()) != 0) _exit(1);
+        if (chdir("/") != 0) _exit(1);
+        const char* argv[] = {"/bin/bash", "-c", cmd.c_str(), nullptr};
+        execv(argv[0], const_cast<char**>(argv));
+        _exit(1);
+    }
+    int status = 0;
+    pid_t waited;
+    do {
+        waited = waitpid(pid, &status, 0);
+    } while (waited == -1 && errno == EINTR);
+    return (waited == pid && WIFEXITED(status)) ? WEXITSTATUS(status) : -1;
+}
+
 /**
  * 向用户请求确认（y/n）
  * 根据非交互模式配置自动返回 yes/no
@@ -235,7 +277,10 @@ void check_root()
 DBLock::DBLock()
 {
     ensure_dir_exists(Config::instance().lock_dir());
-    lock_fd = open(Config::instance().lock_file().c_str(), O_CREAT | O_RDWR, 0644);
+    // O_CLOEXEC：锁是 flock 在 open file description 上的，fork/exec 的子进程若继承
+    // 这个 fd，就会在 lpkg 退出后继续持有锁 → 之后每次 lpkg 都报 "database is locked"，
+    // 而现场没有任何 lpkg 在跑（构建/hook 起的长命子进程是常见来源，TODO.md C3）。
+    lock_fd = open(Config::instance().lock_file().c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0644);
     if (lock_fd < 0) {
         throw LpkgException(
             string_format("error.create_file_failed", Config::instance().lock_file().string()));
@@ -289,6 +334,41 @@ TmpDirManager::~TmpDirManager()
  * 确保目录存在，不存在则递归创建
  * 如果路径存在但不是目录则抛出异常
  */
+std::string trim_copy(std::string_view s)
+{
+    while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.remove_prefix(1);
+    while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.remove_suffix(1);
+    return std::string(s);
+}
+
+bool is_safe_path_component(std::string_view s)
+{
+    if (s.empty() || s == "." || s == "..") return false;
+    if (s.find('/') != std::string_view::npos || s.find('\0') != std::string_view::npos)
+        return false;
+    // 空白也必须拒绝：包名会进入 WAL 的**里程碑**字段（`DB <path> <pkg>:<state>`），
+    // 而 WAL 是空格分帧的（尾字段从右锚定）——带空格的里程碑会让 reverse_execute 推出的
+    // 备份名与实际不符 → DB 回滚被静默跳过、备份随后被 cleanup_db_backups 删掉。
+    for (const char c : s)
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return false;
+    return true;
+}
+
+std::string shell_quote(std::string_view s)
+{
+    std::string out;
+    out.reserve(s.size() + 2);
+    out += '\'';
+    for (const char c : s) {
+        if (c == '\'')
+            out += "'\\''";
+        else
+            out += c;
+    }
+    out += '\'';
+    return out;
+}
+
 void ensure_dir_exists(const fs::path& path)
 {
     if (!fs::exists(path)) {
@@ -349,6 +429,25 @@ void write_set_to_file(const fs::path& path, const std::unordered_set<std::strin
     write_string_to_file(path, content);
 }
 
+void fsync_and_rename(const fs::path& tmp, const fs::path& dst)
+{
+    // O_RDONLY 足以 fsync；打开失败必须报错（不能"跳过 fsync 直接 rename"）
+    const int fd = ::open(tmp.c_str(), O_RDONLY);
+    if (fd < 0) {
+        throw LpkgException(string_format("error.open_file_failed", tmp.string()) + ": " +
+                            std::strerror(errno));
+    }
+    const int rc = ::fsync(fd);
+    const int err = errno;
+    ::close(fd);
+    if (rc != 0) {
+        // 磁盘满/IO 错误的**唯一**可靠信号（此前被无条件丢弃）
+        throw LpkgException(string_format("error.db_write_failed", tmp.string()) + ": " +
+                            std::strerror(err));
+    }
+    safe_rename(tmp, dst);  // 内含 fsync 父目录
+}
+
 void write_string_to_file(const fs::path& path, std::string_view content)
 {
     fs::path tmp_path = path.string() + ".tmp";
@@ -365,12 +464,7 @@ void write_string_to_file(const fs::path& path, std::string_view content)
         }
     }
     // fsync 确保 .tmp 内容在断电前完整落盘，然后 rename 原子替换
-    int fd = ::open(tmp_path.c_str(), O_WRONLY);
-    if (fd >= 0) {
-        ::fsync(fd);
-        ::close(fd);
-    }
-    safe_rename(tmp_path, path);
+    fsync_and_rename(tmp_path, path);
 }
 
 /**
@@ -537,8 +631,8 @@ void cleanup_tmp_dirs()
             const auto pid_str = dirname.substr(5);
             if (pid_str.empty()) continue;
 
-            int pid = std::stoi(pid_str);
-            if (pid <= 0 || pid == getpid()) continue;
+            int pid = 0;
+            if (!parse_pid_strict(pid_str, pid) || pid == getpid()) continue;
 
             if (::kill(pid, 0) != 0 && errno == ESRCH) {
                 fs::remove_all(entry.path());
@@ -558,7 +652,7 @@ void cleanup_tmp_dirs()
  * st_dev 与 root_dir 不同的（= 子挂载点）的直接子目录。pid 已死（kill ESRCH）才删，
  * 绝不碰自己/存活进程的 stash。stash 正常由 CLEANUP 清除，本函数只是兜底安全网。
  */
-void cleanup_orphan_stashes()
+void cleanup_orphan_stashes(const std::set<fs::path>& keep)
 {
     const fs::path root = Config::instance().root_dir();
     std::error_code ec;
@@ -578,15 +672,12 @@ void cleanup_orphan_stashes()
             const std::string name = p.filename().string();
             if (name.rfind(".lpkg_bak_", 0) != 0) continue;
             if (!it->is_directory() || fs::is_symlink(p)) continue;
+            // WAL 仍引用（回滚/续传还要用）→ 绝不回收
+            if (keep.contains(p.lexically_normal())) continue;
             const auto sep = name.rfind('_');
             if (sep == std::string::npos || sep + 1 >= name.size()) continue;
             int pid = 0;
-            try {
-                pid = std::stoi(name.substr(sep + 1));
-            } catch (...) {
-                continue;
-            }
-            if (pid <= 0 || pid == ::getpid()) continue;
+            if (!parse_pid_strict(name.substr(sep + 1), pid) || pid == ::getpid()) continue;
             if (::kill(pid, 0) != 0 && errno == ESRCH) {
                 std::error_code ec2;
                 fs::remove_all(p, ec2);

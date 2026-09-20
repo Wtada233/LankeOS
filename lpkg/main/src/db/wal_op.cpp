@@ -77,71 +77,90 @@ WALOpType walop_type_from_name(std::string_view name)
 
 // 解析格式:
 //   TYPE arg1 [arg2 [arg3 [arg4 [arg5 [arg6]]]]]
-// 多参数操作（如 BACKUP，COPY）使用 "→" 作分隔符
+//
+// **分帧规则**（路径可以含空格，所以不能无脑按空格切——见 TODO.md A1）：
+//   - 箭头形式（BACKUP/COPY/REMOVE_OLD/RESTORE_FILE/RESTORE_DB）以 " → " 为界，
+//     两侧整段各自成一个参数：TYPE <src> → <dst>
+//   - 其余形式用 tail_args() 给出"arg1 之后还有几个固定字段"，那些字段**从右往左**切，
+//     剩下的整段归 arg1：
+//       TYPE <路径可含空格> <milestone>        (DB/DBNEW/DBRM/BEGIN/COMMIT/ROLLBACK/END/RM_*，tail=1)
+//       TYPE <路径可含空格> <mode> <uid> <gid> (DIR_RM，tail=3)
+//       TYPE <路径可含空格>                    (NEW/NEW_DIR/CLEANUP/RESTORE_*_RM，tail=0)
+//   尾字段都是版本号/里程碑/数字元数据，不可能含空格，故从右侧锚定是安全的。
+//   历史 WAL 行的字段内没有空格，"整段归 arg1" 退化成旧的逐空格切分 → 完全向后兼容。
+//   （残留：路径含换行会破行、含字面 " → " 会破箭头分帧——都是文件系统允许但现实中
+//     不会出现的名字。）
 
-static std::vector<std::string_view> split_line(std::string_view line)
+/// arg1 之后固定字段的个数（从右往左数）
+static int tail_args(WALOpType t)
 {
-    std::vector<std::string_view> parts;
-
-    // 先找第一个空格 → type
-    auto space = line.find(' ');
-    if (space == std::string_view::npos) {
-        parts.push_back(line);
-        return parts;
+    switch (t) {
+        case WALOpType::DIR_RM:
+            return 3;  // <mode> <uid> <gid>
+        case WALOpType::DB:
+        case WALOpType::DBNEW:
+        case WALOpType::DBRM:
+        case WALOpType::BEGIN:
+        case WALOpType::COMMIT:
+        case WALOpType::ROLLBACK:
+        case WALOpType::END:
+        case WALOpType::RM_BEGIN:
+        case WALOpType::RM_COMMIT:
+        case WALOpType::RM_END:
+            return 1;  // <milestone> / <ver>
+        default:
+            return 0;  // 单参数/无参数：arg1 取整段剩余
     }
-
-    parts.push_back(line.substr(0, space));
-    std::string_view rest = line.substr(space + 1);
-
-    // 检查是否包含 "→"（多参数格式: BACKUP src → dst 或 COPY src → dst）
-    auto arrow = rest.find(" \xe2\x86\x92 ");  // " → " in UTF-8
-    if (arrow != std::string_view::npos) {
-        // 箭头格式恰好两参（BACKUP/COPY/REMOVE_OLD/RESTORE_*）：
-        // arg1 = 箭头前整段（src），arg2 = 箭头后整段（dst）。
-        // **不再按空格继续切 dst**——目标路径可含空格，之前会把含空格的 dst 误拆成两参。
-        parts.push_back(rest.substr(0, arrow));
-        rest.remove_prefix(arrow + 5);  // skip " → " (3 bytes + 2 spaces)
-        parts.push_back(rest);
-    } else {
-        // 简单空格分割
-        while (!rest.empty()) {
-            auto sp = rest.find(' ');
-            if (sp == std::string_view::npos) {
-                parts.push_back(rest);
-                break;
-            }
-            parts.push_back(rest.substr(0, sp));
-            rest.remove_prefix(sp + 1);
-        }
-    }
-    return parts;
 }
 
 WALOp parse_op(const std::string& line)
 {
-    WALOp op;
+    WALOp op;  // type 默认 INVALID：未成功解析的行不会冒充真实操作
     op.raw = line;
 
-    auto parts = split_line(std::string_view(line));
-    if (parts.empty()) return op;
+    // 先切出类型 token，其余整段交给下面的分帧规则
+    std::string_view rest = line;
+    const auto space = rest.find(' ');
+    const std::string_view type_sv =
+        (space == std::string_view::npos) ? rest : rest.substr(0, space);
+    rest = (space == std::string_view::npos) ? std::string_view{} : rest.substr(space + 1);
 
     try {
-        op.type = walop_type_from_name(parts[0]);
+        op.type = walop_type_from_name(type_sv);
     } catch (const LpkgException&) {
-        // 未知类型 — 返回空 op（调用者跳过），但记警告：损坏/半写/未来格式的 WAL 行
-        // 会静默丢失对应操作，值得让用户知道（行为不变，仍跳过）。
+        // 未知类型（损坏/半写/未来格式）：保持 INVALID 并记警告。**不能借用任何真实类型
+        // 当哨兵**——破损行会被"找最后一个 BEGIN_PKGS"的反向扫描当成批次起点。
         log_warning(string_format("warning.wal_invalid_line", line));
-        op.type = WALOpType::BEGIN_PKGS;  // 哨兵，由 skip 逻辑处理
-        op.arg1 = "__INVALID__";
         return op;
     }
 
-    if (parts.size() > 1) op.arg1 = std::string(parts[1]);
-    if (parts.size() > 2) op.arg2 = std::string(parts[2]);
-    if (parts.size() > 3) op.arg3 = std::string(parts[3]);
-    if (parts.size() > 4) op.arg4 = std::string(parts[4]);
-    if (parts.size() > 5) op.arg5 = std::string(parts[5]);
-    if (parts.size() > 6) op.arg6 = std::string(parts[6]);
+    // 箭头形式：两段各以 " → " 为界（两侧都可含空格）
+    const auto arrow = rest.find(" \xe2\x86\x92 ");
+    if (arrow != std::string_view::npos) {
+        op.arg1 = std::string(rest.substr(0, arrow));
+        op.arg2 = std::string(rest.substr(arrow + 5));  // skip " → " (3 bytes + 2 spaces)
+        return op;
+    }
+
+    // 尾部固定字段从右往左切，剩余整段归 arg1
+    const int tail = tail_args(op.type);
+    std::string tail_vals[3];  // tail_args() 返回 0..3
+    std::string_view head = rest;
+    for (int i = 0; i < tail; ++i) {
+        const auto sp = head.rfind(' ');
+        if (sp == std::string_view::npos) {
+            // 字段数不够（畸形/历史短行）→ 整段归 arg1，与旧行为一致
+            op.arg1 = std::string(rest);
+            return op;
+        }
+        tail_vals[tail - 1 - i] = std::string(head.substr(sp + 1));
+        head.remove_suffix(head.size() - sp);
+    }
+    while (!head.empty() && head.back() == ' ') head.remove_suffix(1);
+    op.arg1 = std::string(head);
+    if (tail > 0) op.arg2 = tail_vals[0];
+    if (tail > 1) op.arg3 = tail_vals[1];
+    if (tail > 2) op.arg4 = tail_vals[2];
 
     return op;
 }
@@ -206,10 +225,7 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
     for (int i = static_cast<int>(ops.size()) - 1; i >= 0; --i) {
         const auto& op = ops[i];
 
-        // 跳过无效行
-        if (op.arg1 == "__INVALID__") continue;
-
-        // 跳过元数据和 RESTORE 审计行
+        // 跳过未解析行（skip_in_reverse 已含 INVALID）与元数据/RESTORE 审计行
         if (op.skip_in_reverse()) continue;
 
         // 跳过 :batch-start DB 条目（最终状态标记）
@@ -411,6 +427,9 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path)
     int start_idx = -1;
     for (int i = static_cast<int>(lines.size()) - 1; i >= 0; --i) {
         auto op = parse_op(lines[i]);
+        // 未解析行（破损/半写尾部）必须跳过：否则它会以 INVALID 之外的类型参与判断，
+        // 甚至被当作批次起点，导致整个批次的操作集被截断（见 TODO.md A2）。
+        if (!op.is_valid()) continue;
         if (op.type == WALOpType::BEGIN_PKGS) {
             start_idx = i;
             break;
@@ -425,7 +444,7 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path)
 
     for (size_t i = start_idx; i < lines.size(); ++i) {
         auto op = parse_op(lines[i]);
-        if (op.arg1 != "__INVALID__") ops.push_back(op);
+        if (op.is_valid()) ops.push_back(op);
     }
 
     return ops;
@@ -480,13 +499,8 @@ void write_string_file_wal(const std::string& path, const std::string& content,
         f.flush();
         if (!f) throw LpkgException(string_format("error.db_write_failed", path));
     }
-    int fd = ::open(tmp.c_str(), O_WRONLY);
-    if (fd >= 0) {
-        ::fsync(fd);
-        ::close(fd);
-    }
-    safe_rename(tmp, p);
-    fsync_parent_dir(p);
+    // fsync(.tmp) 必须成功（磁盘满/EIO 的唯一信号）→ rename → fsync 父目录
+    fsync_and_rename(tmp, p);
 }
 
 fs::path stash_root_of_bak(const fs::path& bak)
@@ -516,11 +530,17 @@ void purge_consumed_stashes(const std::vector<WALOp>& ops)
 // 批次回滚
 // ============================================================================
 
-void batch_rollback(const std::vector<std::string>& successfully_installed)
+bool batch_rollback(const std::vector<std::string>& successfully_installed)
 {
     std::string wpath = wal_log_path();
     auto ops = extract_current_batch_ops(wpath);
-    if (ops.empty()) return;
+    if (ops.empty()) {
+        // 没有可回滚的行（如 WAL 尾部破损导致提取为空）：批次仍未提交、DB 备份
+        // 尚未被消费。**绝不写 COMMIT_PKGS、绝不谎报已回滚**——调用方据此保留
+        // WAL 与备份，交给下次 recover_packages() 幂等续传。
+        log_warning(get_string("warning.wal_no_pending_batch"));
+        return false;
+    }
 
     // 1. 无需在此手动清理内存 cache：下方 reverse_execute 恢复磁盘 DB 后，
     //    步骤 3 的 cache.load() 会从磁盘整体重载（曾对 successfully_installed 逐包
@@ -557,6 +577,7 @@ void batch_rollback(const std::vector<std::string>& successfully_installed)
 
     // 6. COMMIT_PKGS
     wal_append_raw("COMMIT_PKGS");
+    return true;
 }
 
 // ============================================================================

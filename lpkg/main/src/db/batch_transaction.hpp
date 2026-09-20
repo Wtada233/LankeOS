@@ -75,27 +75,15 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
         // LpkgException 是 std::runtime_error 的子类，一并覆盖。
         // 批次回滚 → 回滚完成（COMMIT_PKGS 已写）→ 清理 DB 备份 → 重抛原异常。
         try {
-            // CLEANUP 感知：一旦批次已进入 CLEANUP 阶段（remove 的 .lpkg_bak 清理开始，
-            // 即该批次包含的所有 remove 都已 RM_COMMIT、DB 已落盘），系统状态稳定，
-            // 只剩 .lpkg_bak 临时文件待清——**不回滚**，走 continue_cleanup 续删+提交
-            // （移除保持最终）。回滚会恢复 DB 但被删的 bak 回不来 → 不一致；且
-            // "bak 是否被删"无法可靠判定（父目录被删/dangling 路径都会让 exists 误判）。
-            // 崩溃路径的 recover_packages 已有同一判断；这里补上异常路径的同一判断。
-            const auto ops = wal::extract_current_batch_ops(wal::wal_log_path());
-            bool has_cleanup = false;
-            for (const auto& op : ops) {
-                if (op.type == wal::WALOpType::CLEANUP) {
-                    has_cleanup = true;
-                    break;
-                }
+            // 未提交批次**一律回滚**：CLEANUP 只出现在事务之外（post-commit 收尾记录，
+            // 由 finish_committed_batch 写），事务内不可能有 CLEANUP 行——因此不需要
+            // "见到 CLEANUP 就不回滚"的分岔。旧版 lpkg 把 CLEANUP 写在批次内，其遗留 WAL
+            // **不在支持范围**：lpkg 经 lpkg 升级时旧二进制会先 recover_packages() 处理掉
+            // 遗留 WAL、新二进制才上线；手工替换二进制不受支持（ARCH.md §11.3）。
+            if (wal::batch_rollback(successfully_installed)) {
+                cleanup_db_backups();
+                trim_completed();
             }
-            if (has_cleanup) {
-                wal::continue_cleanup(ops);
-            } else {
-                wal::batch_rollback(successfully_installed);
-            }
-            cleanup_db_backups();
-            trim_completed();
         } catch (...) {
             // **回滚自身失败**（如 reverse_execute 的 safe_rename 中途报错）：
             // 绝不清理 DB 备份、不 trim——保留 WAL 的未提交批次与全部

@@ -37,8 +37,19 @@ void TriggerManager::load_config()
 
     auto conf_path = Config::instance().triggers_conf();
 
-    // 默认配置由 Makefile 安装到 /etc/lpkg/triggers.conf。若不存在则跳过。
-    if (!std::filesystem::exists(conf_path)) return;
+    // 默认配置由 Makefile 安装到 /etc/lpkg/triggers.conf。**文件缺失 = 所有触发器
+    // 静默失效**（连内部 ldconfig 分支也不会执行，因为它同样由配置里的命令名驱动），
+    // 所以必须告警——但只告警一次（每次 check_file 都打印会淹没输出），
+    // 且**不能置 config_loaded**：调用方可能在之后才创建该文件（首次安装/测试即是），
+    // 置位会让它永远不被加载。
+    if (!std::filesystem::exists(conf_path)) {
+        static bool warned_missing_conf = false;
+        if (!warned_missing_conf) {
+            log_warning(string_format("warning.trigger_conf_missing", conf_path.string()));
+            warned_missing_conf = true;
+        }
+        return;
+    }
     std::ifstream file(Config::instance().triggers_conf());
     std::string line;
     while (std::getline(file, line)) {
@@ -108,8 +119,9 @@ void TriggerManager::run_all()
             // 测试模式下跳过外部命令（systemctl daemon-reload 等），避免 polkit 弹窗
             log_info(string_format("info.testing_skip_trigger", cmd.c_str()));
         } else {
-            // 使用 run_shell 执行，基于 exec 的更安全方案
-            if (int ret = run_shell(cmd); ret != 0) {
+            // **在目标 root 内**执行：命令里写的是绝对路径（/usr/share/... 等），
+            // 不 chroot 就会打在宿主上、目标 root 反而没更新（TODO F3）
+            if (int ret = run_shell_in_root(cmd); ret != 0) {
                 log_warning(string_format("warning.trigger_failed", std::to_string(ret).c_str()));
             }
         }

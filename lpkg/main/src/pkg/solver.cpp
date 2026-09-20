@@ -128,10 +128,14 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                 info == SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP) {
                 const char* dep_name = dep ? pool_id2str(pool, dep) : "";
                 if (dep_name && *dep_name) {
-                    if (looks_like_soname(dep_name))
-                        missing_so.emplace_back(dep_name);
-                    else if (info == SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP)
+                    // **先看 JOB/PKG，再看名字形状**：顶层请求（JOB）即使形似 SONAME
+                    // 也是"用户要的包/能力不存在"，必须硬报错；此前先判形状 → 形似 SONAME
+                    // 的顶层目标被归入可容忍的 missing_so，配 --missing-so-no-error 就
+                    // "求解成功但事务为空"（TODO D5，落点已由 D3 的兜底拦住，但诊断仍是错的）
+                    if (info == SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP)
                         missing_target.emplace_back(dep_name);  // 直接请求的包/能力
+                    else if (looks_like_soname(dep_name))
+                        missing_so.emplace_back(dep_name);
                     else
                         missing_dep.emplace_back(dep_name);  // 传递依赖
                 }
@@ -558,14 +562,19 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
         break;
     }
 
-    // 纯 force_reinstall（全部已装同版本）：solver 无操作，逐目标补回
-    if (result.order.empty() && opts.force_reinstall) {
+    // --force 的"已是最新版本"目标：同版本无需安装，libsolv 不会为它们产生事务步骤，
+    // 必须逐目标补回。**不能只在 result.order 为空时补**——`install --force A B`
+    // （A 已当前版本、B 新装）会因为 B 让 order 非空而静默漏掉 A（TODO.md E1）。
+    if (opts.force_reinstall) {
+        std::set<std::string> in_order;
+        for (const auto& r : result.order) in_order.insert(r.name);
         for (const auto& [name, vspec] : targets) {
+            if (in_order.contains(name)) continue;  // 已在事务里（升级/新装）→ 不重复补
             auto it = installed.find(name);
-            if (it != installed.end()) {
-                result.order.push_back(ResolvedPkg{name, it->second.version, /*is_install=*/false,
-                                                   /*is_explicit=*/true});
-            }
+            if (it == installed.end()) continue;  // 未安装 → 由 solver 负责
+            result.order.push_back(ResolvedPkg{name, it->second.version, /*is_install=*/false,
+                                               /*is_explicit=*/true});
+            in_order.insert(name);
         }
     }
     return result;
@@ -586,11 +595,18 @@ std::set<std::string> repo_revrequires(const Repository& repo, const std::string
                 }
             if (hit) break;
             for (const auto& so : pkg.needed_so) {
-                auto prov = repo.find_provider(so);
-                if (prov && prov->name == target) {
-                    hit = true;
-                    break;
+                // 不能只问 find_provider（它返回**第一个**提供者）：同一 SONAME 可能有
+                // 多个提供者（捆绑/私有 .so），只取第一个会漏掉 target 是提供者的情形
+                const auto tp = repo.packages().find(target);
+                if (tp != repo.packages().end()) {
+                    for (const auto& tv : tp->second) {
+                        if (std::ranges::find(tv.provides, so) != tv.provides.end()) {
+                            hit = true;
+                            break;
+                        }
+                    }
                 }
+                if (hit) break;
             }
             if (hit) break;
         }

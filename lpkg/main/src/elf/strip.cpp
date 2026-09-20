@@ -3,6 +3,8 @@
 #endif
 #include "strip.hpp"
 
+#include "lib_utils.hpp"
+
 #include <archive.h>
 #include <archive_entry.h>
 #include <fcntl.h>
@@ -121,14 +123,14 @@ FileType identify_file_type(const fs::path& path)
         Elf_Scn* scn = nullptr;
         while ((scn = elf_nextscn(elf, scn)) != nullptr) {
             GElf_Shdr shdr;
-            gelf_getshdr(scn, &shdr);
+            if (gelf_getshdr(scn, &shdr) == nullptr) continue;
             if (shdr.sh_type == SHT_DYNAMIC) {
                 Elf_Data* data = elf_getdata(scn, nullptr);
                 if (data) {
-                    size_t ext_count = shdr.sh_size / shdr.sh_entsize;
+                    const size_t ext_count = elf_section_entry_count(shdr.sh_size, shdr.sh_entsize);
                     for (size_t i = 0; i < ext_count; ++i) {
                         GElf_Dyn dyn;
-                        gelf_getdyn(data, i, &dyn);
+                        if (gelf_getdyn(data, i, &dyn) == nullptr) continue;
                         if (dyn.d_tag == DT_SONAME) {
                             has_soname = true;
                             break;
@@ -184,7 +186,7 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
     while ((scn = elf_nextscn(in_elf, scn)) != nullptr) {
         size_t old_idx = elf_ndxscn(scn);
         GElf_Shdr shdr;
-        gelf_getshdr(scn, &shdr);
+        if (gelf_getshdr(scn, &shdr) == nullptr) continue;
         const char* name_ptr = elf_strptr(in_elf, shstrndx, shdr.sh_name);
         std::string name = name_ptr ? name_ptr : "";
 
@@ -199,6 +201,12 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
             idx_map[old_idx] = new_idx++;
         }
     }
+
+    // 下面会改写符号表 / SHT_GROUP 数据。libelf 的 Elf_Data 指向**输入缓冲区**，
+    // 直接 `*out_data = *in_data` 就是就地修改调用方的输入（.a 成员的原始数据）——
+    // 失败路径下会把半改写的成员写回归档。故每个节区先复制一份自有缓冲。
+    std::vector<std::vector<uint8_t>> owned_data;
+    owned_data.reserve(to_keep.size());
 
     for (auto& info : to_keep) {
         Elf_Scn* new_scn = elf_newscn(out_elf);
@@ -223,7 +231,10 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
         Elf_Data* in_data = elf_getdata(info.old_scn, nullptr);
         Elf_Data* out_data = elf_newdata(new_scn);
         if (in_data) {
+            const auto* begin = static_cast<const uint8_t*>(in_data->d_buf);
+            owned_data.emplace_back(begin, begin + in_data->d_size);
             *out_data = *in_data;
+            out_data->d_buf = owned_data.back().data();
             // 更新符号表中的节区索引
             if (new_shdr.sh_type == SHT_SYMTAB) {
                 size_t sym_count = out_data->d_size / gelf_fsize(out_elf, ELF_T_SYM, 1, EV_CURRENT);
@@ -260,7 +271,13 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
         updated_ehdr.e_shstrndx = SHN_UNDEF;
 
     gelf_update_ehdr(out_elf, &updated_ehdr);
-    elf_update(out_elf, ELF_C_WRITE);
+    // elf_update 失败（内存/IO）返回 < 0，此时 memfd 里是**部分写入**的内容——
+    // 不检查就会把截断的 ELF 当作 strip 成功写回原文件（静默损坏二进制）
+    if (elf_update(out_elf, ELF_C_WRITE) < 0) {
+        elf_end(out_elf);
+        close(out_fd);
+        return false;
+    }
 
     off_t size = lseek(out_fd, 0, SEEK_END);
     output_data.resize(size);
@@ -308,7 +325,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
     while ((scn = elf_nextscn(in_elf, scn)) != nullptr) {
         size_t old_idx = elf_ndxscn(scn);
         GElf_Shdr shdr;
-        gelf_getshdr(scn, &shdr);
+        if (gelf_getshdr(scn, &shdr) == nullptr) continue;
         const char* name_ptr = elf_strptr(in_elf, shstrndx, shdr.sh_name);
         std::string name = name_ptr ? name_ptr : "";
 
@@ -377,23 +394,33 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
         Elf_Scn* old_scn = elf_getscn(in_elf, ks.old_index);
         if (old_scn) {
             GElf_Shdr old_shdr;
-            gelf_getshdr(old_scn, &old_shdr);
+            if (gelf_getshdr(old_scn, &old_shdr) == nullptr) continue;
             if (old_shdr.sh_type != SHT_NOBITS && old_shdr.sh_size > 0) {
-                // 确保不会越界读取（防御性边界检查）
-                if (old_shdr.sh_offset + old_shdr.sh_size <= input_data.size()) {
-                    std::memcpy(output_data.data() + ks.shdr.sh_offset,
-                                input_data.data() + old_shdr.sh_offset, ks.shdr.sh_size);
+                // 源区间（输入缓冲）与目标区间（重排后的输出缓冲）都必须完整落在各自
+                // 缓冲内。校验用 elf_range_within（饱和比较，加法不会回绕）。
+                // 不一致 = 输入 ELF 的节区布局与重排结果矛盾（构造/畸形文件）→
+                // 放弃 strip 并返回 false，由调用方告警并**保留原文件**：
+                // 绝不部分拷贝出损坏产物，更不能越界写（曾实测 128 字节区域写 4320）。
+                if (!elf_range_within(old_shdr.sh_offset, old_shdr.sh_size, input_data.size()) ||
+                    !elf_range_within(ks.shdr.sh_offset, ks.shdr.sh_size, output_data.size())) {
+                    return false;
                 }
+                std::memcpy(output_data.data() + ks.shdr.sh_offset,
+                            input_data.data() + old_shdr.sh_offset, ks.shdr.sh_size);
             }
         }
     }
 
-    // 复制 ELF 头和程序头到输出缓冲区
+    // 复制 ELF 头和程序头到输出缓冲区（长度同样必须落在**两个**缓冲内）
     size_t headers_size = updated_ehdr.e_phoff +
                           updated_ehdr.e_phnum *
                               ((elf_class == ELFCLASS64) ? sizeof(Elf64_Phdr) : sizeof(Elf32_Phdr));
     headers_size = std::max(headers_size, (size_t)updated_ehdr.e_ehsize);
-    std::memcpy(output_data.data(), input_data.data(), std::min(headers_size, input_data.size()));
+    if (!elf_range_within(0, headers_size, input_data.size()) ||
+        !elf_range_within(0, headers_size, output_data.size())) {
+        return false;
+    }
+    std::memcpy(output_data.data(), input_data.data(), headers_size);
 
     // 写入更新后的 ELF 头（节区表偏移、数量和字符串表索引）
     auto write_ehdr = [&]<typename Hdr>() {

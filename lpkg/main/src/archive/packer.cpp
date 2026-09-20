@@ -56,6 +56,11 @@ void add_to_archive(struct archive* a, const fs::path& path, const std::string& 
 
     if (S_ISREG(st.st_mode)) {
         std::ifstream f(path, std::ios::binary);
+        if (!f.is_open()) {  // lstat 成功但 open 失败（权限/竞态）→ 绝不能写出零填充文件
+            archive_entry_free(entry);
+            throw LpkgException(
+                string_format("error.archive_open_failed", path.string()));
+        }
         std::array<char, constants::PACK_IO_BUFFER_SIZE> buffer{};
         while (f.read(buffer.data(), buffer.size()) || f.gcount() > 0) {
             if (archive_write_data(a, buffer.data(), f.gcount()) < 0) {
@@ -109,6 +114,13 @@ void pack_package(const std::string& output_filename, const std::string& source_
         throw LpkgException(string_format("error.archive_open_failed", archive_error_string(a)));
     }
 
+    // 打包失败时丢弃半成品：残留的截断 .lpkg 会被误当成有效包（其哈希也算得出来）
+    const auto discard_partial = [&output_filename] {
+        std::error_code ec;
+        fs::remove(output_filename, ec);
+    };
+    int close_rc = ARCHIVE_OK;
+
     try {
         log_info(get_string("info.pack_scanning"));
 
@@ -141,12 +153,25 @@ void pack_package(const std::string& output_filename, const std::string& source_
         add_to_archive(a, root_dir, std::string(constants::DIR_CONTENT));
         add_dir_recursive(a, root_dir, std::string(constants::DIR_CONTENT));
 
-        archive_write_close(a);
+        close_rc = archive_write_close(a);
         archive_write_free(a);
     } catch (...) {
         archive_write_close(a);
         archive_write_free(a);
+        discard_partial();
         throw;
+    }
+
+    // close 的返回值就是"整包是否真的写完落盘"：写失败（磁盘满/EIO）时 libarchive
+    // 返回 ARCHIVE_FAILED/FATAL。不检查就会把**截断的 .lpkg 当成功**，还对截断内容
+    // 算 SHA256 → farm 把该哈希写进索引，下游校验通过、装到一半才炸（TODO.md B2）。
+    // 阈值取 ARCHIVE_WARN：FAILED/FATAL 一律失败，WARN 只告警（与 archive.cpp 读侧一致）。
+    if (close_rc < ARCHIVE_WARN) {
+        discard_partial();
+        throw LpkgException(string_format("error.archive_close_failed", output_filename));
+    }
+    if (close_rc < ARCHIVE_OK) {
+        log_warning(string_format("error.archive_close_failed", output_filename));
     }
 
     std::string hash = calculate_sha256(output_filename);

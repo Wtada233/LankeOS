@@ -41,6 +41,15 @@ namespace fs = std::filesystem;
 /** 在 main.cpp 中声明，由 SIGINT 信号处理函数设置 */
 extern std::atomic<bool> sigint_graceful;
 
+namespace
+{
+/// 批次**提交后**收尾（清理本批 stash → trim → 清 DB 备份）。定义在文件下部的匿名
+/// namespace 里，这里前置声明以便 install/upgrade/remove 三条路径共用。
+void finish_committed_batch(
+    std::vector<fs::path>& stashes, const std::vector<std::string>& removed_pkgs = {},
+    const std::vector<std::pair<std::string, std::vector<std::string>>>& hook_sets = {});
+}  // namespace
+
 // =====================================================================
 // 公开 API
 // =====================================================================
@@ -51,17 +60,21 @@ extern std::atomic<bool> sigint_graceful;
  *
  * **write-ahead 顺序：先写 CLEANUP WAL 行（一行 = 一个 stash 根），再物理删除。**
  * 崩溃语义与旧 cleanup_baks 相同：
- *   - 崩溃在"日志后、删除前"→ 恢复看到 CLEANUP → continue_cleanup 续删 → 一致
- *   - 崩溃在"删除后、下一条日志前"→ 已有 CLEANUP 行 → continue_cleanup 续删 → 一致
- *   - 崩溃在首条 CLEANUP 前 → 无 CLEANUP 行 → reverse_execute 整体恢复 → 一致
+ *   - 崩溃在"日志后、删除前"→ 恢复看到 CLEANUP → continue_post_commit_cleanup 续删 → 一致
+ *   - 崩溃在"删除后、下一条日志前"→ 已有 CLEANUP 行 → 同上续删 → 一致
+ *   - 崩溃在首条 CLEANUP 前 → 清理尚未开始 → stash 仍在（recover 的 post-commit 阶段会收掉）
  * stash 是隔离根（只装本批次的备份），remove_all 不会碰到任何活文件/其他包内容，
  * 因此不再需要"逐 bak 递归删除/按路径长度排序/symlink 守卫"。
  *
- * **调用时机**：
- *   - remove：批次内（COMMIT_PKGS 前，RM_COMMIT 后）。
- *   - install/upgrade：批次提交后（COMMIT_PKGS 之后，I-BAK-2 要求 bak 存活到提交）。
- *     此时写出的 CLEANUP 行位于事务之外（trailing 记录），由 trim_completed 保留
- *     （清理未完成时）+ recover_packages 续传，完成后随下一次 trim 一并清掉。
+ * **调用时机（install/upgrade/remove 三条路径统一）**：**批次提交之后**。
+ * stash 是回滚的唯一来源（install 是"被覆盖的旧文件"、remove 是"被删掉的文件"），
+ * 所以必须活到"批次已不可能回滚"= COMMIT_PKGS 之后才清。CLEANUP 行因而位于事务之外
+ * （trailing 记录），由 trim_completed 保留（清理未完成时）+ recover_packages 续传，
+ * 完成后随下一次 trim 一并清掉。
+ *
+ * （历史：remove 曾在**批次内**清理，等于把"删 stash"当成批次内的不可逆点——异常路径
+ *   见到 CLEANUP 就不回滚，导致"所有包都删完、尚未提交"这个窗口里 Ctrl+C 不会恢复已删
+ *   的包。现在与 install 同款：只要批次未提交，中途中断一律整批回滚。）
  */
 void cleanup_stashes(std::vector<fs::path>& stashes)
 {
@@ -91,6 +104,38 @@ void cleanup_stashes(std::vector<fs::path>& stashes)
 void write_cache()
 {
     Cache::instance().write();
+}
+
+/**
+ * 找出第一个"请求了但没落到计划里"的目标；全部落实则返回空串。
+ *
+ * 兜底用途：畸形依赖（空名 → libsolv ID_EMPTY）等原因会让 solver 把请求静默丢掉、
+ * 产出**空事务**，落点是 plan.empty() 的"所有包都已安装"分支——用户看到成功、
+ * 实际什么都没装（TODO.md D3）。能力目标（SONAME 等）与真实包名不同，故必须
+ * 同时匹配 provides 与"已装包提供的能力"。
+ */
+static std::string first_unreached_target(
+    const std::vector<std::pair<std::string, std::string>>& targets,
+    const std::map<std::string, InstallPlan>& plan)
+{
+    auto& cache = Cache::instance();
+    const auto provided_by_plan = [&](const std::string& t) {
+        for (const auto& p : plan | std::views::values)
+            if (std::ranges::find(p.provides, t) != p.provides.end()) return true;
+        return false;
+    };
+    const auto provided_by_installed = [&](const std::string& t) {
+        for (const auto& prov : cache.get_providers(t))
+            if (cache.is_installed(prov)) return true;
+        return false;
+    };
+    for (const auto& [tn, tv] : targets) {
+        if (plan.contains(tn) || cache.is_installed(tn) || provided_by_plan(tn) ||
+            provided_by_installed(tn))
+            continue;
+        return tn;
+    }
+    return "";
 }
 
 /**
@@ -168,6 +213,12 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
             if (!p.local_path.empty()) p.sha256 = provided_hash;
     }
 
+    // 请求的目标必须真的进了计划（或已装/已由计划包或已装包提供该能力）。
+    // 否则是"求解成功但什么都没装"——绝不能报"所有包都已安装"（TODO.md D3）。
+    if (const std::string unreached = first_unreached_target(targets, plan); !unreached.empty()) {
+        throw LpkgException(string_format("error.target_missing_from_plan", unreached));
+    }
+
     if (plan.empty()) {
         log_info(get_string("info.all_packages_already_installed"));
         return;
@@ -197,6 +248,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
     // 执行安装（WAL 2.0 批量事务）
     std::vector<fs::path> all_stashes;
+    std::vector<std::pair<std::string, std::vector<std::string>>> hook_sets;
     run_batch_transaction([&](std::vector<std::string>& success) {
         auto& cache = Cache::instance();
 
@@ -264,6 +316,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
             // 收集备份 stash 供批次成功后统一清理（升级/重装时产生）
             for (const auto& s : task.get_stashes()) all_stashes.emplace_back(s);
+            hook_sets.emplace_back(p.name, task.get_hook_files());
 
             cache.write(p.name + ":installed");
             success.push_back(p.name);
@@ -271,17 +324,8 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
         }
     });
 
-    // 清理批次产生的备份 stash（post-commit：写 CLEANUP WAL，崩溃可续传）。
-    // 清理失败（磁盘满等）不视为安装失败——批次已提交、DB 一致，残留 stash 的
-    // CLEANUP 记录留在 WAL，由下次 recover 续传。
-    try {
-        cleanup_stashes(all_stashes);
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.cleanup_deferred", e.what()));
-    }
-
-    trim_completed();
-    cleanup_db_backups();
+    // post-commit 收尾（写 CLEANUP → 清理 stash → trim → 清 DB 备份）
+    finish_committed_batch(all_stashes, {}, hook_sets);
 
     TriggerManager::instance().run_all();
     log_info(get_string("info.install_complete"));
@@ -298,7 +342,7 @@ namespace
  *
  * 文件备份（BACKUP + rename 到每文件系统 stash）产出进入 stashes；目录删除走
  * DIR_RM（rmdir + 元数据记录，不再整目录实体备份）。stashes 由调用方在合适时机
- * 统一走 cleanup_stashes() 清理（CLEANUP 阶段，事务内、COMMIT_PKGS 前）。
+ * 文件备份进 stash；stash 在**批次提交后**统一清理（见 cleanup_stashes 的调用时机）。
  */
 void do_remove_package(const std::string& pkg_name, bool force, const std::string& ver,
                        std::vector<fs::path>& stashes)
@@ -429,8 +473,9 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
     cleanup_with_dbr(
         Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), "man");
 
-    std::error_code ec;
-    fs::remove_all(Config::instance().hooks_dir() / pkg_name, ec);
+    // 注：hooks_dir/<pkg> 的删除**不在这里**——它无 WAL 记录，放在可回滚的批次内会让
+    // 批次回滚后钩子永久丢失（之后 remove/upgrade 静默跳过钩子）。改由提交后的
+    // finish_committed_batch() 删除（TODO.md Z7）。
     cache.remove_installed(pkg_name);
 
     if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
@@ -443,6 +488,138 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
     wal::log_wal_line("RM_END " + pkg_name + " " + ver);
 }
 
+/**
+ * 批次**提交后**收尾：清理本批 stash（写 CLEANUP → 物理删除）→ trim → 清 DB 备份。
+ *
+ * 清理失败**不算批次失败**（批次已提交、DB 一致）：只告警并保留 CLEANUP 记录，
+ * 由下次 recover_packages 续传。install / upgrade / remove 三条路径共用同一收尾。
+ */
+void finish_committed_batch(
+    std::vector<fs::path>& stashes, const std::vector<std::string>& removed_pkgs,
+    const std::vector<std::pair<std::string, std::vector<std::string>>>& hook_sets)
+{
+    try {
+        cleanup_stashes(stashes);
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.cleanup_deferred", e.what()));
+    }
+    // 被移除包的 hooks 在**提交后**删除：移除已是最终态；批次若回滚则钩子完好无损（Z7）
+    for (const auto& p : removed_pkgs) {
+        std::error_code ec;
+        fs::remove_all(Config::instance().hooks_dir() / p, ec);
+    }
+    // 安装/升级：剪枝新版本**不再提供**的 hook 文件。同样放在提交后——批次回滚时
+    // 旧 hook 必须完好（与 Z7 同一理由）。若新版本完全没有 hooks，整目录清掉。
+    for (const auto& [pkg, files] : hook_sets) {
+        const fs::path dir = Config::instance().hooks_dir() / pkg;
+        std::error_code ec;
+        if (files.empty()) {
+            fs::remove_all(dir, ec);
+            continue;
+        }
+        for (const auto& e : fs::directory_iterator(dir, ec)) {
+            const std::string name = e.path().filename().string();
+            if (std::ranges::find(files, name) == files.end()) fs::remove(e.path(), ec);
+        }
+    }
+    trim_completed();
+    cleanup_db_backups();
+}
+
+/**
+ * 移除前的安全检查（essential / 反向依赖 / 能力反向依赖）。
+ * 任一项不通过 → 返回 false 并已打印原因：这是**拒绝**（log + return）而不是报错，
+ * 保持既有 CLI 语义（`lpkg remove <essential>` 不抛异常）。
+ */
+static bool removal_allowed(const std::string& pkg_name, bool force)
+{
+    if (force) return true;
+    auto& cache = Cache::instance();
+    if (cache.is_essential(pkg_name)) {
+        log_error(string_format("error.skip_remove_essential", pkg_name));
+        return false;
+    }
+    const auto refused = [&](const std::string& what) {
+        auto rdeps = cache.get_reverse_deps(what);
+        if (rdeps.empty()) return false;
+        std::string list;
+        for (const auto& d : rdeps) list += d + " ";
+        log_info(string_format("info.skip_remove_dependency", what, list));
+        return true;
+    };
+    if (refused(pkg_name)) return false;
+    for (const auto& cap : cache.get_package_provides(pkg_name))
+        if (refused(cap)) return false;
+    return true;
+}
+
+/**
+ * 在**一个批次**里依次移除若干包（调用方必须已用 run_batch_transaction 之外的检查筛过）。
+ *
+ * 全部包都删完（各自 RM_COMMIT + DB 落盘）之后才写一次 CLEANUP —— 那是批次内的
+ * 不可逆点（stash 是移除的唯一回滚来源），因此在那之前任何中断（Ctrl+C/失败）
+ * 都能**整批**回滚。
+ */
+static void remove_packages_in_one_batch(const std::vector<std::string>& pkgs, bool force,
+                                         std::vector<fs::path>& stashes_out)
+{
+    run_batch_transaction([&](std::vector<std::string>& success) {
+        auto& cache = Cache::instance();
+
+        for (const auto& p : pkgs) {
+            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+            log_info(string_format("info.removing_package", p));
+            do_remove_package(p, force, cache.get_installed_version(p), stashes_out);
+            success.push_back(p);
+
+            // 断点：本包已删完、下一包尚未开始 —— 模拟"多包移除中途 Ctrl+C"
+            BreakpointManager::instance().hit("remove_after_package_" + p);
+        }
+
+        // 断点：全部包都已删完、批次尚未提交 —— 这是"清理前最后可回滚点"
+        BreakpointManager::instance().hit("remove_batch_before_commit");
+    });
+    // **不在此清理 stash**：stash 是回滚的唯一来源，必须活到批次提交之后
+    // （与 install/upgrade 同款；调用方在提交后用 finish_committed_batch 收尾）。
+}
+
+/**
+ * 移除一组包的统一入口：检查 → 单批次原子移除 → 收尾。
+ *
+ * **所有多包移除都必须走这里**（`remove a b c` / autoremove / 递归闭包）：
+ * 曾逐包各自 `remove_package()`，等于每包一批，中途 Ctrl+C 只回滚当前包那个批次
+ * ——用户实测到"删掉几个包、其余不恢复"。
+ *
+ * @return 实际移除的包数（被拒绝/未安装的不计）
+ */
+static size_t remove_packages_checked(const std::vector<std::string>& pkgs, bool force,
+                                      bool* refused_out = nullptr)
+{
+    std::vector<std::string> to_remove;
+    for (const auto& p : pkgs) {
+        if (Cache::instance().get_installed_version(p).empty()) {
+            log_info(string_format("info.package_not_installed", p));
+            continue;
+        }
+        if (!removal_allowed(p, force)) {
+            if (refused_out) *refused_out = true;
+            continue;
+        }
+        to_remove.push_back(p);
+    }
+    if (to_remove.empty()) return 0;
+    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+
+    std::vector<fs::path> stashes;
+    remove_packages_in_one_batch(to_remove, force, stashes);
+    finish_committed_batch(stashes, to_remove);
+
+    for (const auto& p : to_remove)
+        log_info(string_format("info.package_removed_successfully", p));
+    return to_remove.size();
+}
+
 }  // anonymous namespace
 
 /**
@@ -452,52 +629,19 @@ void do_remove_package(const std::string& pkg_name, bool force, const std::strin
  */
 void remove_package(const std::string& pkg_name, bool force, bool /*wrap_in_txn*/)
 {
-    const std::string ver = Cache::instance().get_installed_version(pkg_name);
-    if (ver.empty()) {
-        log_info(string_format("info.package_not_installed", pkg_name));
-        return;
-    }
+    remove_packages_checked({pkg_name}, force);
+}
 
-    if (!force) {
-        if (Cache::instance().is_essential(pkg_name)) {
-            log_error(string_format("error.skip_remove_essential", pkg_name));
-            return;
-        }
-        if (auto rdeps = Cache::instance().get_reverse_deps(pkg_name); !rdeps.empty()) {
-            std::string list;
-            for (const auto& d : rdeps) list += d + " ";
-            log_info(string_format("info.skip_remove_dependency", pkg_name, list));
-            return;
-        }
-        for (const auto& cap : Cache::instance().get_package_provides(pkg_name)) {
-            if (auto rdeps = Cache::instance().get_reverse_deps(cap); !rdeps.empty()) {
-                std::string list;
-                for (const auto& d : rdeps) list += d + " ";
-                log_info(string_format("info.skip_remove_dependency", cap, list));
-                return;
-            }
-        }
-    }
-
-    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-    log_info(string_format("info.removing_package", pkg_name));
-
-    // WAL 2.0 批量事务：单个包移除 = 一批一包
-    run_batch_transaction([&](std::vector<std::string>& success) {
-        std::vector<fs::path> stashes;
-        do_remove_package(pkg_name, force, ver, stashes);
-
-        // ── CLEANUP 阶段（事务内、COMMIT_PKGS 前；write-ahead：先记日志再删）──
-        cleanup_stashes(stashes);
-
-        success.push_back(pkg_name);
-    });
-
-    trim_completed();
-    cleanup_db_backups();
-
-    log_info(string_format("info.package_removed_successfully", pkg_name));
+/** 移除多个包：**一个批次**内原子完成（中途中断整批回滚） */
+void remove_packages(const std::vector<std::string>& pkg_names, bool force)
+{
+    if (pkg_names.empty()) return;
+    // CLI 边界（main 的 `remove a b c` 走这里）：**被安全检查拒绝 → 报错**，
+    // 让脚本/farm 凭退出码区分"删掉了"与"被拒绝"（TODO G4）。库层 remove_package
+    // 保持"打印原因后返回"的友好语义（测试与内部调用依赖它）。
+    bool refused = false;
+    remove_packages_checked(pkg_names, force, &refused);
+    if (refused) throw LpkgException(get_string("error.removal_refused"));
 }
 
 void remove_package_files(const std::string& pkg_name, bool force)
@@ -558,19 +702,29 @@ void autoremove()
             if (!req.contains(name)) to_rem.push_back(name);
         }
     }
+    // 核心包永不自动移除：下面走的是 force 的批量移除，会跳过
+    // is_essential 检查（force 的语义是"无视反向依赖"，不该顺带无视核心包保护）。
+    // 必须在锁外调用（is_essential 自己会加同一把锁，TODO.md E3）。
+    std::erase_if(to_rem, [&](const std::string& n) {
+        if (!cache.is_essential(n)) return false;
+        log_info(string_format("info.autoremove_skip_essential", n));
+        return true;
+    });
 
     if (to_rem.empty()) {
         log_info(get_string("info.no_autoremove_packages"));
     } else {
         log_info(string_format("info.autoremove_candidates", to_rem.size()));
-        for (const auto& n : to_rem) {
-            try {
-                remove_package(n, true);
-            } catch (const std::exception& e) {
-                log_warning(string_format("warning.autoremove_remove_failed", n, e.what()));
-            }
+        // **整批一次**：逐包各自 remove_package() 等于每包一批，中途中断会留下
+        // "删了几个、其余还在"的状态。这里与 `remove a b c` 共用同一批次语义。
+        try {
+            remove_packages_checked(to_rem, /*force=*/true);
+            log_info(string_format("info.autoremove_complete", to_rem.size()));
+        } catch (const std::exception& e) {
+            // 整批已回滚 → **不得**再报"完成"（否则脚本无法区分成功与回滚，TODO.md Z8）
+            log_warning(string_format("warning.autoremove_batch_failed", to_rem.size(), e.what()) +
+                        " [not removed: batch rolled back]");
         }
-        log_info(string_format("info.autoremove_complete", to_rem.size()));
     }
 }
 
@@ -676,6 +830,7 @@ void upgrade_packages()
     ctx.installed_set.clear();
 
     std::vector<fs::path> upgrade_stashes;
+    std::vector<std::pair<std::string, std::vector<std::string>>> upgrade_hook_sets;
     size_t upgraded_count = 0;
     run_batch_transaction([&](std::vector<std::string>& success) {
         auto& cache = Cache::instance();
@@ -760,6 +915,7 @@ void upgrade_packages()
             task.run(&ctx);
 
             for (const auto& s : task.get_stashes()) upgrade_stashes.emplace_back(s);
+            upgrade_hook_sets.emplace_back(n, task.get_hook_files());
 
             cache.write(n + ":installed");
             success.push_back(n);
@@ -768,16 +924,14 @@ void upgrade_packages()
         }
     });
 
-    // 清理批次产生的备份 stash（post-commit：写 CLEANUP WAL，崩溃可续传）。
-    // 清理失败不视为升级失败——批次已提交、DB 一致，残留 stash 由下次 recover 续传。
-    try {
-        cleanup_stashes(upgrade_stashes);
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.cleanup_deferred", e.what()));
-    }
+    // post-commit 收尾（与 install/remove 同一实现）
+    finish_committed_batch(upgrade_stashes, {}, upgrade_hook_sets);
 
-    trim_completed();
-    cleanup_db_backups();
+    // 与 install_packages 对称：升级同样会产生待执行触发器（copy_package_files 里
+    // check_file() 照常累积），漏掉这一行会让 glib-compile-schemas /
+    // systemctl daemon-reload / gtk-update-icon-cache 在升级后**一次都不跑**
+    // （schema 不可见、unit 不生效、图标缓存陈旧，TODO.md F1）。
+    TriggerManager::instance().run_all();
 
     log_info(string_format("info.upgraded_packages", upgraded_count));
 }
@@ -864,7 +1018,8 @@ void force_solve_conflict()
         throw LpkgException(get_string("error.force_solve_phrase_mismatch"));
     }
 
-    for (const auto& p : broken) remove_package(p, true);
+    // 同样**整批一次**：逐包调用会失去跨包原子性（与 remove/autoremove 同一理由）
+    remove_packages({broken.begin(), broken.end()}, /*force=*/true);
     cache.write();
     log_info(string_format("info.force_solve_removed", broken.size()));
 }
@@ -942,6 +1097,18 @@ void query_file(const std::string& filename)
         } catch (const std::exception& e) {
             log_warning(string_format("warning.query_path_resolve_failed", filename) + ": " +
                         e.what());
+        }
+    }
+
+    // 目录是以**尾斜杠**注册的（scan_content_files 的约定：`/usr/bin/` 才是目录键，
+    // 普通文件不带斜杠），所以查询目录时要再试一次带斜杠的形式：
+    // 否则 `lpkg query /usr/bin` 报"不属于任何包"，而 `/usr/bin/` 才查得到（TODO.md G1）。
+    if (owners.empty() && !target.ends_with('/')) {
+        std::string with_slash = target + "/";
+        auto dir_owners = cache.get_file_owners(with_slash);
+        if (!dir_owners.empty()) {
+            owners = std::move(dir_owners);
+            target = std::move(with_slash);
         }
     }
 
@@ -1079,28 +1246,11 @@ void remove_package_recursive(const std::string& pkg_name, bool force)
         return;
     }
 
-    // WAL 2.0: 整批原子移除
-    // 文件备份进 stash、目录 DIR_RM，stash 通过 CLEANUP WAL 在事务内清理
-    run_batch_transaction([&](std::vector<std::string>& success) {
-        auto& cache = Cache::instance();
-        std::vector<fs::path> all_stashes;
-
-        for (const auto& p : to_remove) {
-            log_info(string_format("info.recursive_removing", p));
-
-            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-            std::string ver = cache.get_installed_version(p);
-            do_remove_package(p, true, ver, all_stashes);
-            success.push_back(p);
-        }
-
-        // ── CLEANUP 阶段（事务内、COMMIT_PKGS 前；write-ahead：先记日志再删）──
-        cleanup_stashes(all_stashes);
-    });
-
-    trim_completed();
-    cleanup_db_backups();
+    // 整批原子移除（与 remove_packages_checked 共用同一实现：闭包内所有包一个批次），
+    // stash 活到批次提交之后才清（install/upgrade 同款）
+    std::vector<fs::path> stashes;
+    remove_packages_in_one_batch(to_remove, /*force=*/true, stashes);
+    finish_committed_batch(stashes, to_remove);
 
     log_info(get_string("info.recursive_remove_done"));
 }

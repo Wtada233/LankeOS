@@ -19,6 +19,8 @@ namespace
 {
 std::unordered_map<std::string, std::string> translations;
 std::unordered_map<std::string, std::string> missing_key_placeholders;
+/// 英文兜底表：<lang>.txt 存在但个别 key 缺失时用它，而不是直接吐 [MISSING_STRING]
+std::unordered_map<std::string, std::string> english_fallback;
 
 /**
  * 获取可执行文件所在的目录路径
@@ -28,7 +30,8 @@ fs::path get_executable_dir()
 {
     std::array<char, PATH_MAX> result{};
     ssize_t count = readlink("/proc/self/exe", result.data(), result.size() - 1);
-    if (count != -1) {
+    // count == size-1 说明被截断（readlink 不保证 NUL 结尾）→ 走回退，别用半个路径
+    if (count > 0 && static_cast<size_t>(count) < result.size() - 1) {
         result[count] = '\0';
         return fs::path(result.data()).parent_path();
     } else {
@@ -63,6 +66,7 @@ void load_strings(const std::string& lang, const fs::path& base_dir)
         if (pos != std::string::npos) {
             std::string key = line.substr(0, pos);
             std::string value = line.substr(pos + 1);
+            if (lang == "en") english_fallback[key] = value;  // 英文同时作为兜底表
             translations[key] = value;
         }
     }
@@ -108,6 +112,8 @@ const std::string& get_string(const std::string& key)
     if (it != translations.end()) {
         return it->second;
     }
+    // 本语言缺该 key → 回退英文（此前只在整文件打不开时才回退，缺单个 key 会吐占位符）
+    if (auto en = english_fallback.find(key); en != english_fallback.end()) return en->second;
     auto missing_it = missing_key_placeholders.find(key);
     if (missing_it == missing_key_placeholders.end()) {
         missing_it = missing_key_placeholders.emplace(key, "[MISSING_STRING: " + key + "]").first;

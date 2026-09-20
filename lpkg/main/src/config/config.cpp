@@ -145,7 +145,11 @@ bool Config::has_system_soname(const std::string& soname) const noexcept
 {
     // 系统 /usr/lib（或 /usr/lib64）已有该 .so 文件（如 ABI 过渡备份的旧 SONAME）→ 视为已满足。
     for (const std::string_view sub : {constants::USR_LIB, constants::USR_LIB64}) {
-        if (fs::exists(root_dir_ / fs::path(sub) / soname)) {
+        // SONAME 来自不可信元数据/ELF：绝对路径或 `..` 会让 `root/usr/lib / soname`
+        // 逃出该目录（甚至到宿主），从而把宿主上的同名文件当成"系统已有该 so"
+        const fs::path lib_dir = (root_dir_ / fs::path(sub)).lexically_normal();
+        const fs::path cand = (lib_dir / soname).lexically_normal();
+        if (path_within(cand, lib_dir) && fs::exists(cand)) {
             return true;
         }
     }
@@ -220,6 +224,14 @@ std::string Config::get_mirror_url()
     if (!std::getline(mirror_file, mirror_url) || mirror_url.empty()) {
         throw LpkgException(get_string("error.invalid_mirror_config"));
     }
+    // 首行是**原样使用**的：注释、CRLF 的 \r、首尾空白都会成为 URL 的一部分 →
+    // 索引下载必然失败，而失败又会落进"空索引"路径（静默说"已是最新"）。此处统一归一。
+    if (const auto hash = mirror_url.find('#'); hash != std::string::npos)
+        mirror_url.resize(hash);
+    const auto is_space = [](char c) { return c == ' ' || c == '\t' || c == '\r'; };
+    while (!mirror_url.empty() && is_space(mirror_url.back())) mirror_url.pop_back();
+    while (!mirror_url.empty() && is_space(mirror_url.front())) mirror_url.erase(mirror_url.begin());
+    if (mirror_url.empty()) throw LpkgException(get_string("error.invalid_mirror_config"));
     if (mirror_url.back() != '/') {
         mirror_url += '/';
     }

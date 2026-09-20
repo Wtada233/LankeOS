@@ -56,8 +56,18 @@ void scan_orphans(const std::string& scan_root_override)
         // 跳过本身就是符号链接的根目录（例如 /bin -> /usr/bin）
         if (fs::is_symlink(root)) continue;
 
-        for (const auto& entry : fs::recursive_directory_iterator(
-                 root, fs::directory_options::skip_permission_denied)) {
+        // 显式迭代器循环（而非范围 for）：范围 for 的自增发生在循环体**之外**，
+        // 目录在遍历中被删时 increment 抛出的 filesystem_error 会逃出整趟扫描
+        // （所有 root 一起失败）。用 ec 重载 → 该 root 停止、其余 root 继续。
+        std::error_code walk_ec;
+        for (auto it = fs::recursive_directory_iterator(
+                 root, fs::directory_options::skip_permission_denied);
+             it != fs::recursive_directory_iterator(); it.increment(walk_ec)) {
+            if (walk_ec) {
+                walk_ec.clear();
+                continue;
+            }
+            const auto& entry = *it;
             try {
                 if (entry.is_symlink() || entry.is_regular_file()) {
                     scanned_count++;
@@ -74,7 +84,10 @@ void scan_orphans(const std::string& scan_root_override)
 
                     std::string key = path;
                     if (actual_root != "/") {
-                        fs::path relative = fs::relative(entry.path(), actual_root);
+                        // lexically_relative 而非 fs::relative：后者会**解析符号链接**，
+                        // 非 / root 下 `lib64 -> lib` 这类路径会被换成真实路径、
+                        // 与登记的属主键对不上 → 假孤儿
+                        fs::path relative = entry.path().lexically_relative(actual_root);
                         key = "/" + relative.string();
                     }
 

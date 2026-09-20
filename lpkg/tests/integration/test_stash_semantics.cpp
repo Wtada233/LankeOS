@@ -207,14 +207,14 @@ TEST_F(StashSemanticsTest, RemoveWritesSingleCleanupPerStash)
     pack_package(pkgf.string(), work.string(), "tiny", "1.0");
     install_packages({pkgf.string()});
 
-    // 在"首条 CLEANUP 已写、删除前"打断。注意：异常后 run_batch_transaction 会
-    // continue_cleanup + trim_completed 清空日志，所以必须在断点动作里当场抓 WAL 快照。
+    // 在"首条 CLEANUP 已写、删除前"打断。清理发生在**批次提交之后**（install/upgrade
+    // 同款），失败只告警不抛出；WAL 快照在断点动作里当场抓。
     std::string snap;
     BreakpointManager::instance().set("cleanup_after_wal", [this, &snap] {
         snap = read_wal();
         throw LpkgException("interrupt right after CLEANUP row written");
     });
-    EXPECT_THROW(remove_package("tiny", false), LpkgException);
+    EXPECT_NO_THROW(remove_package("tiny", false));
     BreakpointManager::instance().clear_all();
 
     int n_cleanup = 0;
@@ -230,13 +230,15 @@ TEST_F(StashSemanticsTest, RemoveWritesSingleCleanupPerStash)
     EXPECT_EQ(n_cleanup, 1) << "remove 应恰好写一条 CLEANUP（stash 根），不逐文件：\n" << snap;
     EXPECT_TRUE(stash_path.find(".lpkg_bak_tiny_") != std::string::npos)
         << "CLEANUP 应指向 stash 根，got: " << stash_path;
-    // 后续 continue_cleanup 已把 stash 根清掉（快照之外），磁盘上应无残留
-    EXPECT_FALSE(fs::exists(fs::path(stash_path)));
+    // 清理未完成：stash 仍在磁盘、CLEANUP 记录留在 WAL → 由下次 rec 续传
+    EXPECT_TRUE(fs::exists(fs::path(stash_path))) << "清理未完成时 stash 不该消失";
+    recover_packages();
+    EXPECT_FALSE(fs::exists(fs::path(stash_path))) << "rec 续传后 stash 应被清掉";
     std::error_code ec;
     for (const auto& e : fs::recursive_directory_iterator(test_root, ec)) {
         if (ec) break;
         EXPECT_EQ(e.path().filename().string().find(".lpkg_bak"), std::string::npos)
-            << "不得残留 .lpkg_bak/stash: " << e.path();
+            << "rec 续传后不得残留 .lpkg_bak/stash: " << e.path();
     }
 }
 

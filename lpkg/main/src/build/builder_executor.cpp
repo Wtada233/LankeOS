@@ -32,12 +32,28 @@ bool is_git_url(const std::string& url)
     return url.rfind("git+", 0) == 0;
 }
 
+std::string safe_name_from_url(const std::string& url)
+{
+    const std::string name = fs::path(url).filename().string();
+    // "." / ".." / 空 都会让 `work_root / name` 退化成 work_root 自己或其父目录；
+    // 分隔符检查是兜底（filename() 正常不会带分隔符）。
+    if (name.empty() || name == "." || name == ".." || name.find('/') != std::string::npos ||
+        name.find('\\') != std::string::npos) {
+        throw LpkgException(string_format("error.invalid_source_url", url));
+    }
+    return name;
+}
+
 /** 解析 `git+<git_url>@<ref>` → (git_url, ref)。ref 缺省为 HEAD。 */
 void parse_git_url(const std::string& url, std::string& git_url, std::string& ref)
 {
     std::string rest = url.substr(4);  // strip "git+"
-    auto at = rest.rfind('@');
-    if (at != std::string::npos) {
+    // ref 只可能在**最后一个 '/' 之后**——否则 URL 自带的认证信息里的 '@'
+    // （git+ssh://git@host/repo.git、git+https://user@host/repo.git）会被误当分隔符
+    const auto at = rest.rfind('@');
+    const auto slash = rest.rfind('/');
+    const bool has_ref = (at != std::string::npos && (slash == std::string::npos || at > slash));
+    if (has_ref) {
         git_url = rest.substr(0, at);
         ref = rest.substr(at + 1);
     } else {
@@ -280,7 +296,7 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
     std::string git_url, ref;
     parse_git_url(url, git_url, ref);
 
-    std::string name = fs::path(git_url).filename().string();
+    std::string name = safe_name_from_url(git_url);
     if (name.ends_with(".git")) {
         name.resize(name.size() - 4);
     }
@@ -419,10 +435,18 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
     std::vector<fs::path> downloaded_files;
 
     auto download_one = [&](const std::string& url) -> fs::path {
-        fs::path filename = fs::path(url).filename();
+        fs::path filename = safe_name_from_url(url);
         fs::path dest = build_dir / filename;
         if (!fs::exists(dest)) {
-            download_with_retries(url, dest, 3, true);
+            // **先下到 .part 再 rename**：被中断（SIGKILL/断电）的构建只会留下不完整的
+            // .part，正式文件仅在下载完整后出现。否则 `if (!fs::exists(dest))` 会把上次
+            // 留下的**截断源码包永久当成"已下载好"**，错误延后到某个无关的构建阶段
+            // 才以看不懂的形式爆出来（TODO.md C4）。
+            const fs::path part = dest.string() + ".part";
+            std::error_code ec;
+            fs::remove(part, ec);  // 清掉上次残留的半截
+            download_with_retries(url, part, 3, true);
+            safe_rename(part, dest);
             downloaded_files.push_back(dest);
         } else {
             log_info(string_format("info.source_exists", filename.string()));
@@ -546,25 +570,11 @@ void execute_build_phase(const std::string& phase_name, const fs::path& work_dir
     const std::string makeflags =
         flags.makeflags.empty() ? build_defaults::default_makeflags() : flags.makeflags;
 
-    // 单引号包裹 export 值；标志串内若含单引号则按 POSIX 转义（防御）
-    auto shell_quote = [](const std::string& s) {
-        std::string out;
-        out.reserve(s.size() + 2);
-        out += '\'';
-        for (char c : s) {
-            if (c == '\'')
-                out += "'\\''";
-            else
-                out += c;
-        }
-        out += '\'';
-        return out;
-    };
-
+    // 单引号包裹 export 值（共用 base/utils 的 shell_quote：与 hook 执行路径同一实现）
     std::string cmd = "export CFLAGS=" + shell_quote(cflags) + " CXXFLAGS=" + shell_quote(cxxflags) +
                       " LDFLAGS=" + shell_quote(ldflags) + " MAKEFLAGS=" + shell_quote(makeflags) +
-                      "; set -e; . " + fs::absolute(processed_script_path).string() + " && " +
-                      phase_name;
+                      "; set -e; . " + shell_quote(fs::absolute(processed_script_path).string()) +
+                      " && " + phase_name;
     int ret = run_shell(cmd, work_dir);
     if (ret != 0) {
         fs::remove(processed_script_path);

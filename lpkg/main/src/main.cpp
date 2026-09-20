@@ -29,7 +29,9 @@
 struct CurlGlobalInitializer {
     CurlGlobalInitializer()
     {
-        curl_global_init(CURL_GLOBAL_DEFAULT);
+        // 返回值必须检查：失败后所有下载都会以莫名其妙的方式失败
+        if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0)
+            throw LpkgException(get_string("error.curl_init_failed"));
     }
     ~CurlGlobalInitializer()
     {
@@ -131,10 +133,10 @@ static int handle_command(const std::string& command, const cxxopts::ParseResult
                 write_cache();
             }
         } else {
-            for (const auto& pkg : result["packages"].as<std::vector<std::string>>()) {
-                remove_package(pkg, result["force"].as<bool>());
-                write_cache();
-            }
+            // 一次调用 = **一个批次**：中途 Ctrl+C/失败会整批回滚
+            remove_packages(result["packages"].as<std::vector<std::string>>(),
+                            result["force"].as<bool>());
+            write_cache();
         }
         log_info(get_string("info.uninstall_complete"));
 
@@ -189,8 +191,12 @@ static int handle_command(const std::string& command, const cxxopts::ParseResult
 
     } else if (command == constants::CMD_BUILD) {
         std::string dir = ".";
-        if (result.count("packages"))
-            if (auto v = result["packages"].as<std::vector<std::string>>(); !v.empty()) dir = v[0];
+        if (result.count("packages")) {
+            auto v = result["packages"].as<std::vector<std::string>>();
+            // `lpkg build a b c` 曾静默只编 a —— 多余参数一律报错，别假装成功
+            if (v.size() > 1) throw LpkgException(get_string("error.build_single_dir"));
+            if (!v.empty()) dir = v[0];
+        }
         run_build(fs::absolute(dir));
 
     } else if (command == constants::CMD_DEPEND) {
@@ -346,10 +352,12 @@ int main(int argc, char* argv[])
         if (result.count("force-overwrite"))
             Config::instance().set_force_overwrite_mode(result["force-overwrite"].as<bool>());
 
-        if (result["yes"].as<bool>())
-            Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
-        if (result["no"].as<bool>())
-            Config::instance().set_non_interactive_mode(NonInteractiveMode::NO);
+        // --yes 与 --no 同给时曾静默取后者（no）——用户意图矛盾，必须报错而不是猜
+        const bool want_yes = result.count("yes") && result["yes"].as<bool>();
+        const bool want_no = result.count("no") && result["no"].as<bool>();
+        if (want_yes && want_no) throw LpkgException(get_string("error.conflicting_yes_no"));
+        if (want_yes) Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
+        if (want_no) Config::instance().set_non_interactive_mode(NonInteractiveMode::NO);
 
         // 必须有命令
         if (!result.count("command")) {
@@ -369,7 +377,7 @@ int main(int argc, char* argv[])
             recover_packages();
             trim_completed();
             // 兜底回收孤儿备份 stash（pid 已死才删）
-            cleanup_orphan_stashes();
+            cleanup_orphan_stashes(wal::referenced_stash_roots());
         }
 
         // 安装/移除/升级等写操作启用 SIGINT 防护

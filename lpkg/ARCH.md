@@ -45,7 +45,11 @@
 
 - **I-BAK-1**: `.lpkg_bak` 文件在 `COMMIT_PKGS` 之前绝不删除。即使批次中一个包已成功安装，其 `.lpkg_bak` 也必须保留到批次提交后。
 - **I-BAK-2**: 安装流程的 `.lpkg_bak` 清理统一在 `COMMIT_PKGS` 之后执行（调用方收集 `task.get_backups()` 后 `fs::remove`）。批次内绝不提前清理，确保批量回滚时可恢复每个已安装包的文件。
-- **I-BAK-3**: 移除流程的 `.lpkg_bak` 清理在 `RM_COMMIT` 后的 `CLEANUP` 阶段执行（事务内，`COMMIT_PKGS` 前）。`RM_COMMIT` 前 `.lpkg_bak` 文件/目录不变。
+- **I-BAK-3**: 移除流程的 `.lpkg_bak` 清理与安装**完全一致**：统一在 `COMMIT_PKGS` **之后**执行
+  （`finish_committed_batch()`：写 `CLEANUP` 行 → 物理删除 stash → `trim_completed` → `cleanup_db_backups`）。
+  stash 是移除的**唯一回滚来源**（装的是刚被删掉的文件），因此必须活到"批次已不可能回滚"为止——
+  推论：**只要批次未提交，中途中断（Ctrl+C/失败）一律整批恢复**；`CLEANUP` 行位于事务之外
+  （trailing 记录），未清理完的部分由 `continue_post_commit_cleanup`（§10）续传。
 
 ### 1.4 WAL 语义
 
@@ -709,17 +713,11 @@ do_remove_package(pkg_name, force)
 │
 ├── WAL: RM_COMMIT <pkg> <ver>           ← fsync
 │
-├── ── CLEANUP 阶段（事务内，COMMIT_PKGS 前）──
-│   for each .lpkg_bak path（最深路径优先）:
-│     if 文件: fs::remove
-│     if 目录: 从里到外逐层删除文件 + 删除空目录
-│     WAL: CLEANUP <path>                 ← fsync
-│     （删除失败时警告而非崩溃——不可回滚阶段）
-│
-├── WAL: RM_END <pkg> <ver>              ← fsync
-│
-└── return ✓
+└── WAL: RM_END <pkg> <ver>              ← fsync
 ```
+
+> **CLEANUP 不在包级流程内**：stash（刚被删掉的文件）是回滚的唯一来源，必须活到批次提交之后。
+> 清理由批次级的 `finish_committed_batch()` 在 `COMMIT_PKGS` 之后统一执行（见 §7.4）。
 
 ### 7.3 移除回滚
 
@@ -984,14 +982,9 @@ void recover_packages() {
     //    EOF + in_txn=true → uncommitted_txns.push(ops)
     // 3. 对每个未完成事务：
     //    a) parse_op 解析为 WALOp 列表
-    //    b) 检查是否已有 CLEANUP 条目：
-    //       ┌─ 有 CLEANUP → continue_cleanup(ops)
-    //       │   ├── 收集所有 BACKUP dst 路径
-    //       │   ├── 删除仍存在于磁盘上的 .bak
-    //       │   ├── 对新增删除写 CLEANUP 日志
-    //       │   ├── Cache::load()
-    //       │   └── COMMIT_PKGS
-    //       └─ 无 CLEANUP → reverse_execute(ops, true)
+    //    b) reverse_execute(ops, true)——未提交批次**一律回滚**：
+    //       CLEANUP 只可能出现在事务之外（post-commit 收尾记录），
+    //       事务内不存在 CLEANUP，故不需要"CLEANUP ⇒ 不回滚"的分岔
     //           ├── 跳过 RESTORE_*/REMOVE_*/元数据/CLEANUP/:batch-start
     //           ├── 只执行正向操作的逆向
     //           ├── Cache::load()
@@ -1007,7 +1000,8 @@ void recover_packages() {
 | 是否跳过 RESTORE_* 行 | ✅ 跳过 | RESTORE_* 是 rollback 的产物，再次逆序会重做正向操作 |
 | 是否处理 :batch-start DB 标记 | ✅ 跳过 | :batch-start 是"最终状态"，不逆向 |
 | 是否写 RESTORE_* 审计 | ✅ 是 | rec 的 reverse_execute 应该与 batch_rollback 行为一致 |
-| 是否检测 CLEANUP 分岔 | ✅ 是 | 有 CLEANUP → 继续清理（不可回滚）；无 CLEANUP → reverse_execute |
+| 旧版二进制写入的"批次内 CLEANUP"WAL | ❌ **不支持** | lpkg 经 lpkg 升级时，**旧二进制**会先跑 `recover_packages()` 处理掉遗留 WAL，新二进制才上线；因此更新后不存在需要兼容的旧形状事务。**手工替换 lpkg 二进制不受支持**（若此时正躺着一个被中断的 remove WAL，回滚会让 DB 回到"已安装"而文件已删 —— 遇到时用 `lpkg rec` 前先人工核对） |
+| 是否检测 CLEANUP 分岔 | ❌ 不再需要 | CLEANUP 只出现在事务之外（post-commit），事务内不可能有 → 未提交批次一律 `reverse_execute`。post-commit 的残留清理由 `continue_post_commit_cleanup` 负责（§10） |
 | 是否清理孤备份 | ✅ 是 | 清理 .lpkg_db_bak 残留 |
 
 ---
@@ -1053,8 +1047,8 @@ trim 不关心具体行内容，只跟踪 BATCH 边界。RESTORE_* 等行在已�
 
 ### 第 3 阶段：移除事务
 
-- **3.1 `remove_package`** — 重构于 `package_manager.cpp`。单包移除封装在 `run_batch_transaction` 中。与递归移除共用 `do_remove_package`/`cleanup_baks`（去重）。流程：`RM_BEGIN` → `BACKUP`（文件+目录，随机后缀）→ `DBRM`（deps/needed_so/man）→ `RM_COMMIT` → `RM_END` → `CLEANUP` 阶段（`cleanup_baks`，**write-ahead：先写 CLEANUP WAL 再删**，最深优先）。
-- **3.2 `remove_package_recursive`** — 重构于 `package_manager.cpp`。所有受影响包在同一个 `run_batch_transaction` 中移除，任一失败则整批回滚。
+- **3.1 `remove_packages_checked`**（`package_manager.cpp`）— **所有多包移除的唯一实现**：`remove_package`（单包）、`remove_packages`（`remove a b c`）、`autoremove`、`remove_package_recursive`（闭包）、`force_solve_conflict` 全部经由它。筛选（未安装/essential/反向依赖）→ `remove_packages_in_one_batch()`（**整组一个批次**，逐包 `do_remove_package`：`RM_BEGIN` → `BACKUP` → `DBRM`（deps/needed_so/man）→ DB → `RM_COMMIT` → `RM_END`）→ `finish_committed_batch()`（post-commit：`CLEANUP` 行 → 删 stash → trim）。逐包各开批次会失去跨包原子性（中途 Ctrl+C 只回滚当前包）。
+- **3.2 `remove_package_recursive`** — 重构于 `package_manager.cpp`。算出依赖闭包后走 §3.1 的同一批次机制：闭包内所有包同一个 `run_batch_transaction`，任一失败整批回滚。
 
 ### 第 4 阶段：升级事务
 
@@ -1085,9 +1079,11 @@ trim 不关心具体行内容，只跟踪 BATCH 边界。RESTORE_* 等行在已�
 成功安装:
   BEGIN_PKGS → ... → COMMIT_PKGS
 
-成功移除:
-  BEGIN_PKGS → RM_BEGIN → BACKUP... → BACKUP dir(最后持有者)... → DBRM... → DB... → RM_COMMIT
-  └─ CLEANUP 阶段: 清理 .lpkg_bak（文件/目录，最深优先）→ RM_END → COMMIT_PKGS
+成功移除（`remove a b c` / `autoremove` / `remove -r` 闭包 / `force-solve-conflict`
+共用 `remove_packages_checked()`，**整组一个批次**）:
+  BEGIN_PKGS → [逐包: RM_BEGIN → BACKUP... → DBRM... → DB... → RM_COMMIT → RM_END] → COMMIT_PKGS
+  └─ post-commit 收尾（finish_committed_batch）: CLEANUP <stash 根> → 删除 stash → trim_completed
+                                               → cleanup_db_backups
 
 安装失败回滚:
   BEGIN_PKGS → ... A OK → ... B FAIL → ROLLBACK B → END B

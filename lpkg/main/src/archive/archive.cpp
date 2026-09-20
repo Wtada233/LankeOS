@@ -38,6 +38,33 @@ using ArchiveReadHandle = std::unique_ptr<struct archive, ArchiveReadDeleter>;
 using ArchiveWriteHandle = std::unique_ptr<struct archive, ArchiveWriteDeleter>;
 
 /**
+ * 归档成员名 → 解压根内的相对路径（去掉前导 "./" 与 "/"）。
+ *
+ * 成员名是**不可信输入**（未校验的 .lpkg、无校验和的上游源码包）。`fs::path` 语义下
+ * `output_dir / "/etc/x"` **等于 "/etc/x"**（绝对右值丢弃左值），所以绝对路径成员会写到
+ * 解压根之外：安装期解压根是 /tmp 下的临时目录、构建期是源码树，两者都会污染/覆盖宿主
+ * 文件，而且这类写入不进 file_db，`query` 看不到、`remove` 删不掉（TODO.md X2）。
+ *
+ * 只归一化**成员名**；符号链接的**目标内容**保持原样（包内绝对链接是合法的）。
+ */
+static std::string member_path_relative(const char* raw)
+{
+    std::string_view sv(raw);
+    while (true) {
+        if (sv.starts_with("./")) {
+            sv.remove_prefix(2);
+            continue;
+        }
+        if (sv.starts_with('/')) {
+            sv.remove_prefix(1);
+            continue;
+        }
+        break;
+    }
+    return std::string(sv);
+}
+
+/**
  * 解压 tar.zst 归档文件到目标目录
  * 包含安全检查：路径穿越防护、符号链接权限修复、硬链接/软链接目标重映射
  * 每解压 100 个文件输出一次进度
@@ -54,6 +81,10 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir)
                        ARCHIVE_EXTRACT_ACL | ARCHIVE_EXTRACT_FFLAGS |
                        ARCHIVE_EXTRACT_SECURE_SYMLINKS | ARCHIVE_EXTRACT_SECURE_NODOTDOT |
                        ARCHIVE_EXTRACT_UNLINK);
+    // 注：这里**不能**加 ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS —— 本实现是先把
+    // "解压根 + 成员名"的绝对路径写回 entry 再交给 disk writer，该选项会因此拒绝
+    // 每一个成员（实测 "Path is absolute"）。绝对路径的防护由下面的 member_path_relative
+    // 归一化承担：成员名先变成相对路径再拼根，绝无逃出 output_dir 的可能。
     // 已移除：archive_write_disk_set_standard_lookup(ext.get());
     // 该函数在静态链接的 chroot 环境下因 NSS 问题可能导致段错误
 
@@ -82,9 +113,11 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir)
         const char* current_path = archive_entry_pathname(entry);
         if (!current_path) continue;
 
-        // 路径直接拼接根目录，不进行路径穿越校验。
-        // 包管理器在根目录下安装文件，绝对路径的符号链接应保持原样。
-        fs::path dest_path = output_dir / current_path;
+        // 成员名归一化为相对路径后再拼解压根（`..` 由 SECURE_NODOTDOT 兜底），
+        // 保证任何成员都落在 output_dir 之内 —— 见 member_path_relative 的说明。
+        const std::string member = member_path_relative(current_path);
+        if (member.empty()) continue;  // "." 之类不产生文件的成员
+        fs::path dest_path = output_dir / member;
         archive_entry_set_pathname(entry, dest_path.c_str());
 
         // 修复：Linux 没有 lchmod，libarchive 可能会对符号链接使用 chmod，
@@ -93,11 +126,19 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir)
             archive_entry_set_perm(entry, 0);
         }
 
-        // 硬链接：直接以输出目录为根，不再进行路径校验
+        // 硬链接：目标必须落在解压根内 —— 否则一个成员就能给任意已有文件
+        // （如 /etc/shadow）起别名，随后被当作包内容复制进系统。
+        // 判据用**原始目标**：绝对路径（指向根外）或 `..` 上溯出根 → 跳过该成员；
+        // 根内的相对目标按"归一化后的绝对路径"重写（libarchive 需要绝对路径）。
         const char* hardlink = archive_entry_hardlink(entry);
         if (hardlink) {
-            fs::path link_dest = output_dir / hardlink;
-            archive_entry_set_hardlink(entry, link_dest.c_str());
+            const fs::path root_n = output_dir.lexically_normal();
+            const fs::path hl_norm = (root_n / member_path_relative(hardlink)).lexically_normal();
+            if (fs::path(hardlink).is_absolute() || !path_within(hl_norm, root_n)) {
+                log_warning(string_format("warning.archive_unsafe_member", hardlink));
+                continue;
+            }
+            archive_entry_set_hardlink(entry, hl_norm.c_str());
         }
 
         r = archive_write_header(ext.get(), entry);
@@ -169,7 +210,17 @@ std::string extract_file_from_archive(const fs::path& archive_path,
             path = path.substr(constants::CURRENT_DIR_PREFIX.length());
 
         if (path == internal_path) {
-            size_t size = archive_entry_size(entry);
+            // 归档自报大小是**不可信输入**（GNU base-256 头可以声明 1 TiB）：
+            // 无上限的 resize 会 bad_alloc/abort 掉整个进程，而调用方只承诺抛
+            // LpkgException。要读的只有 metadata.json（几 KB），超过上限即畸形归档。
+            constexpr la_int64_t kMaxMemberSize = 16 * 1024 * 1024;
+            const la_int64_t declared = archive_entry_size(entry);
+            if (declared < 0 || declared > kMaxMemberSize) {
+                throw LpkgException(string_format("error.archive_member_too_large",
+                                                  std::to_string(declared),
+                                                  archive_path.string()));
+            }
+            size_t size = static_cast<size_t>(declared);
             std::string content;
             content.resize(size);
             ssize_t bytes_read = archive_read_data(a.get(), content.data(), size);

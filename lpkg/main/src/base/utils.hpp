@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <set>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -31,6 +32,20 @@ void log_progress(const std::string& msg, double percentage, int bar_width = 50)
 int run_command(const std::vector<std::string>& args, const std::filesystem::path& work_dir = "");
 /** 执行外部命令（Shell 字符串形式） */
 int run_shell(const std::string& cmd, const std::filesystem::path& work_dir = "");
+
+/**
+ * 在**目标 root 内**执行 shell 命令。
+ *
+ * `root_dir == "/"` 时等价于 run_shell；否则 fork + unshare(CLONE_NEWNS) +
+ * mount --make-private + chroot + chdir("/") 后再执行——与 `run_hook` 的做法一致。
+ * 目标 root 内没有 /bin/bash（或 unshare/chroot 失败）时返回 -1，由调用方告警。
+ *
+ * 为什么必须有它：外部触发器命令（`systemctl daemon-reload` /
+ * `glib-compile-schemas /usr/share/glib-2.0/schemas` / `gtk-update-icon-cache`）里写的是
+ * 绝对路径。`lpkg --root /mnt/base install ...` 时若不 chroot，它们会**打在宿主上**，
+ * 目标 root 反而没更新（TODO F3）。
+ */
+int run_shell_in_root(const std::string& cmd);
 
 // ============ 用户交互 ============
 
@@ -80,6 +95,13 @@ private:
 
 /** 确保目录存在，不存在则创建 */
 void ensure_dir_exists(const std::filesystem::path& path);
+
+/**
+ * 去除首尾空白（空格与制表符）。依赖串/索引字段/配置值都要按同一套规则归一，
+ * 否则 " glibc"、"glibc " 会被当成两个不同的包名去找（TODO.md D1）。
+ */
+std::string trim_copy(std::string_view s);
+
 /** 确保文件存在，不存在则创建 */
 void ensure_file_exists(const std::filesystem::path& path);
 /** 从文件读取字符串集合（每行一个元素） */
@@ -92,6 +114,17 @@ void write_set_to_file(const std::filesystem::path& path,
  * 断电在 rename 前 → 原文件不变；断电在 rename 后 → 新文件完整。顺序保持内容原样。
  */
 void write_string_to_file(const std::filesystem::path& path, std::string_view content);
+
+/**
+ * 收尾一次"已写好 .tmp"的原子写：fsync(.tmp) → rename → fsync 父目录。
+ *
+ * **fsync 的返回值必须检查**：ofstream 成功只说明内容进了页缓存，磁盘满/EIO 要等
+ * fsync 才暴露；丢掉它就等于把截断内容 rename 进正式位置（DB 静默损坏、且下一轮
+ * 还会把这个截断内容当成"备份"）。失败抛 LpkgException。
+ *
+ * 所有 `.tmp + fsync + rename` 的写入路径都必须走这里，不要各写一套（TODO.md B1）。
+ */
+void fsync_and_rename(const std::filesystem::path& tmp, const std::filesystem::path& dst);
 /** 清理所有临时目录 */
 void cleanup_tmp_dirs();
 
@@ -104,6 +137,15 @@ void cleanup_tmp_dirs();
  * root_dir == "/" 恰恰是常规安装（不带 --root）的形态。
  */
 bool path_within(const std::filesystem::path& p, const std::filesystem::path& root);
+
+/**
+ * 单个路径分量是否安全：非空、不含 '/' 与 NUL、不是 "." / ".."。
+ *
+ * 包名与版本号来自**不可信来源**（远端索引、.lpkg 内的 metadata.json），而它们会被
+ * 直接当成路径分量拼进 tmp_pkg_dir() / dep_dir() / docs_dir() / 下载 URL，
+ * 一个 `../` 就能以 root 写到这些目录之外（TODO.md X4）。
+ */
+bool is_safe_path_component(std::string_view s);
 
 /**
  * 本进程可见的挂载点集合（读 /proc/self/mountinfo，还原 \040 等八进制转义、去尾分隔符）。
@@ -128,7 +170,7 @@ bool is_mount_point(const std::filesystem::path& p);
  * root 顶层 + 顶层子挂载点。只认"存活进程已消失"（kill(pid,0) 返回 ESRCH）的，
  * 绝不碰正在运行/自 pid 的 stash。
  */
-void cleanup_orphan_stashes();
+void cleanup_orphan_stashes(const std::set<std::filesystem::path>& keep = {});
 
 /**
  * fsync 目标文件所在父目录，确保 rename 后的 dentry 落盘。
@@ -162,6 +204,12 @@ std::string random_suffix(size_t len = constants::RANDOM_SUFFIX_LEN);
 
 /** 替换字符串中的所有匹配子串 */
 void string_replace_all(std::string& str, const std::string& from, const std::string& to);
+
+/**
+ * 用单引号把一段文本包成安全的 shell 参数；文本内的单引号按 POSIX 方式转义为 `'\''`。
+ * 构建阶段命令行与 hook 执行路径共用它（此前两处各写一份）。
+ */
+std::string shell_quote(std::string_view s);
 
 /**
  * 按分隔符切分 string_view，返回子串列表（零拷贝，仅分配 vector）

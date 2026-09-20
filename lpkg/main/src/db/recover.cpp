@@ -30,57 +30,23 @@ namespace fs = std::filesystem;
 namespace wal
 {
 
-/**
- * continue_cleanup — 崩溃续传：继续清理未完成的 .lpkg_bak 清理操作。
- * 在 recover_packages 中检测到 CLEANUP 条目时调用，也被 run_batch_transaction
- * 的异常路径复用（CLEANUP 阶段内 IO 异常 → 续删+提交而非回滚）。
- * 只清理文件/目录，不做 reverse_execute 回滚。
- */
-void continue_cleanup(const std::vector<WALOp>& ops)
+std::set<fs::path> referenced_stash_roots()
 {
-    std::vector<fs::path> all_baks;
-    std::set<std::string> cleaned;
-
-    for (const auto& op : ops) {
+    std::set<fs::path> roots;
+    std::ifstream file(wal_log_path());
+    if (!file.is_open()) return roots;
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        auto op = parse_op(line);
+        if (!op.is_valid()) continue;
         if ((op.type == WALOpType::BACKUP || op.type == WALOpType::REMOVE_OLD) &&
-            !op.arg2.empty()) {
-            all_baks.push_back(op.arg2);
-        } else if (op.type == WALOpType::CLEANUP && !op.arg1.empty()) {
-            cleaned.insert(op.arg1);
-            // CLEANUP 行的 bak 也要纳入清理范围：write-ahead 下"CLEANUP 已记、删除未做"
-            // 的 bak 仍可能在磁盘上，续传要能定位它（尤其 trim 已裁掉 BACKUP 行的尾部场景）。
-            all_baks.push_back(op.arg1);
-        }
+            !op.arg2.empty())
+            roots.insert(stash_root_of_bak(op.arg2).lexically_normal());
+        else if (op.type == WALOpType::CLEANUP && !op.arg1.empty())
+            roots.insert(stash_root_of_bak(op.arg1).lexically_normal());
     }
-
-    if (all_baks.empty()) {
-        // 批次已进入 CLEANUP 阶段但无待清理备份（可能上一轮续删已完成但未提交）：
-        // 直接提交，防止批次永久卡在"未提交"、每次启动重复进入本分支。
-        Cache::instance().load();
-        commit_batch();
-        return;
-    }
-
-    // 归一为 stash 根再整目录 remove_all：备份文件在 stash 内（父目录名 `.lpkg_bak_`），
-    // CLEANUP 行本身就是 stash 根。隔离根删除 → 不需要递归/排序/symlink 守卫。
-    std::vector<fs::path> roots;
-    for (auto& bak : all_baks) {
-        roots.push_back(wal::stash_root_of_bak(bak));
-    }
-    std::ranges::sort(roots);
-    auto last = std::unique(roots.begin(), roots.end());
-    roots.erase(last, roots.end());
-
-    for (const auto& root : roots) {
-        if (!fs::exists(root) && !fs::is_symlink(root)) continue;  // 已删除
-        if (!cleaned.contains(root.string())) log_wal_line("CLEANUP " + root.string());
-        std::error_code ec;
-        fs::remove_all(root, ec);
-        if (ec) log_warning(string_format("warning.cleanup_failed", root.string()));
-    }
-
-    Cache::instance().load();
-    commit_batch();
+    return roots;
 }
 
 }  // namespace wal
@@ -105,35 +71,37 @@ void continue_cleanup(const std::vector<WALOp>& ops)
  */
 static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
 {
-    // 1. 定位：最后一个未配对 BEGIN_PKGS（未提交批次起点）与最后一个 COMMIT_PKGS
-    ssize_t unpaired = -1;
+    // 1. 定位：**第一个**未配对 BEGIN_PKGS（未提交区域起点）与最后一个 COMMIT_PKGS。
+    //
+    //    必须取"第一个"而不是"最后一个"：一次崩溃可能留下**两个**未提交批次（前一批
+    //    回滚自身失败后同进程又开了新批次），夹在它们之间的 bak 属于**还没还原**的前一批，
+    //    若按"已提交区域"删掉就是永久丢文件（TODO.md X6）。已提交批次区间用配对记账
+    //    （depth 回到 0）识别，未配对的那个 BEGIN_PKGS 之后的一切都归未提交区域。
     ssize_t last_commit = -1;
+    ssize_t open_begin = -1;  // 当前未配对批次的起点；配对成功即清空
     int depth = 0;
-    for (ssize_t i = static_cast<ssize_t>(lines.size()) - 1; i >= 0; --i) {
+    for (size_t i = 0; i < lines.size(); ++i) {
         auto op = wal::parse_op(lines[i]);
-        if (op.arg1 == "__INVALID__") continue;
-        if (op.type == wal::WALOpType::COMMIT_PKGS) {
-            if (last_commit < 0) last_commit = i;
+        if (!op.is_valid()) continue;
+        if (op.type == wal::WALOpType::BEGIN_PKGS) {
+            if (depth == 0) open_begin = static_cast<ssize_t>(i);
             ++depth;
-        } else if (op.type == wal::WALOpType::BEGIN_PKGS) {
-            if (depth > 0)
-                --depth;
-            else {
-                unpaired = i;
-                break;
-            }
+        } else if (op.type == wal::WALOpType::COMMIT_PKGS) {
+            last_commit = static_cast<ssize_t>(i);
+            if (depth > 0 && --depth == 0) open_begin = -1;  // 该批次已配对提交
         }
     }
+    const ssize_t unpaired = open_begin;
 
     // 2. 收集 bak：
     //    - 已提交区域（[0, unpaired) 或全部）的 BACKUP/REMOVE_OLD dst；
     //    - post-commit 尾部（最后一个 COMMIT_PKGS 之后、未提交批次之前）的
-    //      CLEANUP 行引用的 bak。绝不动未提交批次的 CLEANUP（那是 continue_cleanup 的活）。
+    //      CLEANUP 行引用的 bak。未提交批次内的东西一个都不碰（回滚要用）。
     std::vector<fs::path> baks;
     const size_t region_end = (unpaired < 0) ? lines.size() : static_cast<size_t>(unpaired);
     for (size_t i = 0; i < region_end; ++i) {
         auto op = wal::parse_op(lines[i]);
-        if (op.arg1 == "__INVALID__") continue;
+        if (!op.is_valid()) continue;
         if ((op.type == wal::WALOpType::BACKUP || op.type == wal::WALOpType::REMOVE_OLD) &&
             !op.arg2.empty())
             baks.push_back(op.arg2);
@@ -141,7 +109,7 @@ static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
     const size_t tail_start = (last_commit < 0) ? 0 : static_cast<size_t>(last_commit) + 1;
     for (size_t i = tail_start; i < region_end; ++i) {
         auto op = wal::parse_op(lines[i]);
-        if (op.arg1 == "__INVALID__") continue;
+        if (!op.is_valid()) continue;
         if (op.type == wal::WALOpType::CLEANUP && !op.arg1.empty()) baks.push_back(op.arg1);
     }
     if (baks.empty()) return;
@@ -203,15 +171,24 @@ void recover_packages()
         size_t end_line;  // 批次最后一行（不含，即 lines.size() 如果到 EOF）
     };
 
+    bool any_batch_failed = false;
     std::vector<BatchInfo> uncommitted_batches;
     int depth = 0;
     size_t batch_start = 0;
 
     for (size_t i = 0; i < lines.size(); ++i) {
         auto op = wal::parse_op(lines[i]);
-        if (op.arg1 == "__INVALID__") continue;
+        if (!op.is_valid()) continue;
 
         if (op.type == wal::WALOpType::BEGIN_PKGS) {
+            // 区域起点 = **第一个未配对** BEGIN_PKGS（depth 0→1 的那一个），一次逆序回滚
+            // 整个未提交区域（最近的批次先逆、更早的后逆）。
+            //
+            // 曾改成"记最后一个 BEGIN_PKGS"以求"每轮只收尾最近一批、逐 pass 收敛"——**错的**：
+            // 已提交批次的行仍留在 WAL 里，下一轮扫描的起点仍落在它上面，更早那批永远轮不到
+            // （实测两轮下来文件一次都没被还原）。而"区域横跨两个未提交批次"曾经危险，只是因为
+            // 当时存在 `has_cleanup ⇒ continue_cleanup` 分支会对整个区域 remove_all（会删掉前一批
+            // 尚未还原的 stash）；该分支已删除，故一次性回滚整个区域正确且真正收敛（TODO.md X6/Z5）。
             if (depth == 0) batch_start = i;
             ++depth;
         } else if (op.type == wal::WALOpType::COMMIT_PKGS) {
@@ -239,34 +216,40 @@ void recover_packages()
         std::vector<wal::WALOp> ops;
         for (size_t i = batch.start_line; i < batch.end_line; ++i) {
             auto op = wal::parse_op(lines[i]);
-            if (op.arg1 != "__INVALID__") ops.push_back(op);
+            if (op.is_valid()) ops.push_back(op);
         }
 
         if (ops.empty()) continue;
 
-        // b) 检查是否已有 CLEANUP 条目（CLEANUP 阶段已开始，不可回滚）
-        bool has_cleanup = false;
+        // 未提交批次一律反序回滚（CLEANUP 只可能出现在事务之外，见 ARCH.md §11.3；
+        // 旧版二进制写入的"批次内 CLEANUP"形状不在支持范围）。
+        // **单个批次失败不得卡死整个恢复**：告警、保持该批次未提交（WAL 与备份原样保留，
+        // 下次 rec 可重试），继续处理其余批次；并且此后不清理 DB 备份（那是重试的依据）。
+        std::string first_pkg;
         for (const auto& op : ops) {
-            if (op.type == wal::WALOpType::CLEANUP) {
-                has_cleanup = true;
+            if ((op.type == wal::WALOpType::BEGIN || op.type == wal::WALOpType::RM_BEGIN) &&
+                !op.arg1.empty()) {
+                first_pkg = op.arg1;
                 break;
             }
         }
-
-        if (has_cleanup) {
-            // 已有 CLEANUP → 继续清理，不回滚（CLEANUP 不可逆）
-            continue_cleanup(ops);
-        } else {
-            // 无 CLEANUP → 正常 reverse_execute 回滚
+        try {
             wal::reverse_execute(ops, true);
-            wal::purge_consumed_stashes(ops);  // stash 里的文件已还原 → 清空 stash 根
-            Cache::instance().load();
-            wal::commit_batch();
+        } catch (const std::exception& e) {
+            log_warning(
+                string_format("warning.rollback_remove_failed", first_pkg, e.what()) +
+                " [rec: 该批次保持未提交，可重试]");
+            any_batch_failed = true;
+            continue;
         }
+        wal::purge_consumed_stashes(ops);  // stash 里的文件已还原 → 清空 stash 根
+        Cache::instance().load();
+        wal::commit_batch();
     }
 
-    // 4. 清理残留的 .lpkg_db_bak_before:* 备份文件
-    cleanup_db_backups();
+    // 4. 清理残留的 .lpkg_db_bak_before:* 备份文件。
+    //    有批次恢复失败时**跳过**：那些备份是重试还原 DB 的唯一依据（TODO.md A3 同理）。
+    if (!any_batch_failed) cleanup_db_backups();
 }
 
 // ============================================================================
@@ -302,26 +285,25 @@ void trim_completed()
     // 如果最后一行是 COMMIT_PKGS，找到对应的 BEGIN_PKGS 并保留最后一个
     // 未提交的批次
 
-    // 先找到最后一个未配对的 BEGIN_PKGS 的位置
-    ssize_t last_unpaired_begin = -1;
+    // 找**第一个**未配对 BEGIN_PKGS 的位置（= 需保留区域的起点）。
+    //
+    // 必须取"第一个"而不是"最后一个"：一次崩溃可能留下两个未提交批次（前一批回滚失败后
+    // 同进程又开了新批次），若按"最后一个未配对"裁剪，前一批的 BEGIN/BACKUP 行会被当作
+    // 已完成内容删掉 —— 恢复依据就此消失（TODO.md X6/Z5）。配对用前向 depth 记账识别，
+    // 与 continue_post_commit_cleanup、recover_packages 的区域判定一致。
+    ssize_t first_unpaired_begin = -1;
     int depth = 0;
-
-    for (ssize_t i = static_cast<ssize_t>(lines.size()) - 1; i >= 0; --i) {
+    for (size_t i = 0; i < lines.size(); ++i) {
         auto op = wal::parse_op(lines[i]);
-        if (op.arg1 == "__INVALID__") continue;
-
-        if (op.type == wal::WALOpType::COMMIT_PKGS) {
-            depth++;
-        } else if (op.type == wal::WALOpType::BEGIN_PKGS) {
-            if (depth > 0) {
-                depth--;
-            } else {
-                // 未配对的 BEGIN_PKGS
-                last_unpaired_begin = i;
-                break;
-            }
+        if (!op.is_valid()) continue;
+        if (op.type == wal::WALOpType::BEGIN_PKGS) {
+            if (depth == 0) first_unpaired_begin = static_cast<ssize_t>(i);
+            ++depth;
+        } else if (op.type == wal::WALOpType::COMMIT_PKGS) {
+            if (depth > 0 && --depth == 0) first_unpaired_begin = -1;  // 该批次已配对
         }
     }
+    const ssize_t last_unpaired_begin = first_unpaired_begin;
 
     if (last_unpaired_begin < 0) {
         // 所有事务都已提交。但可能还有 post-commit 清理记录未完成（install/upgrade
@@ -334,7 +316,7 @@ void trim_completed()
         bool pending = false;
         for (size_t i = 0; i < lines.size(); ++i) {
             auto op = wal::parse_op(lines[i]);
-            if (op.arg1 == "__INVALID__") continue;
+            if (!op.is_valid()) continue;
             if ((op.type == wal::WALOpType::BACKUP || op.type == wal::WALOpType::REMOVE_OLD) &&
                 !op.arg2.empty() && (fs::exists(op.arg2) || fs::is_symlink(op.arg2))) {
                 pending = true;

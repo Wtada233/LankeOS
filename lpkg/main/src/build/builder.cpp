@@ -318,11 +318,9 @@ void run_build(const fs::path& build_dir)
     auto vars = build_variable_map(cfg, work_root, actual_work_dir, staging_root, staging_hooks,
                                    effective_version, flags);
     fs::path processed_script = build_dir / constants::LANK_BUILD_PROCESSED;
-    {
-        std::string content = process_build_script(script_path, vars);
-        std::ofstream f(processed_script);
-        f << content;
-    }
+    // 用原子写助手（写 .tmp → 检查 → fsync → rename）：裸 ofstream 在磁盘满时会
+    // 静默产出**截断的构建脚本**，随后被 source 执行 —— 失败方式极难定位。
+    write_string_to_file(processed_script, process_build_script(script_path, vars));
 
     try {
         execute_build_phase("lankebuild_prepare", actual_work_dir, processed_script, flags);
@@ -360,7 +358,12 @@ void run_build(const fs::path& build_dir)
     // 7. 打包
     log_info(get_string("info.packing_built_pkg"));
     std::string output_filename =
-        cfg.name + "-" + effective_version + std::string(constants::EXT_LPKG);
+        // name/version 来自配方 JSON（可被 LankeBUILD.json 直接控制）：未校验就拼进
+        // 相对路径会让 `"name": "../x"` 把 .lpkg 写到构建目录之外
+        (is_safe_path_component(cfg.name) && is_safe_path_component(effective_version))
+            ? cfg.name + "-" + effective_version + std::string(constants::EXT_LPKG)
+            : throw LpkgException(string_format("error.unsafe_path_component", "package name",
+                                                cfg.name + " / " + effective_version));
     pack_package(output_filename, build_dir.string(), cfg.name, effective_version, cfg.deps,
                  cfg.provides, cfg.man_content, cfg.needed_so);
     log_info(string_format("info.build_success", output_filename));

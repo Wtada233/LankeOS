@@ -80,7 +80,9 @@ std::string from_libsolv_evr(const std::string& v)
     }
     std::string ver = v.substr(0, pos);
     std::replace(ver.begin(), ver.end(), '~', '-');
-    return ver + "+" + v.substr(pos + 1);
+    std::string rel = v.substr(pos + 1);
+    std::replace(rel.begin(), rel.end(), '~', '-');  // release 段里的 '~' 同源（原 '-'）
+    return ver + "+" + rel;
 }
 
 bool version_compare(const std::string& v1_str, const std::string& v2_str)

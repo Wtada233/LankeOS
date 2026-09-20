@@ -100,7 +100,8 @@ TEST_F(AtomicRemoveTest, RemoveWithDependentsBlocked)
     std::string pDep = create_pkg("depender", "1.0", {"removepkg"}, {});
     install_packages({pDep});
 
-    // 尝试移除被依赖的包应该被阻止
+    // 尝试移除被依赖的包应该被阻止（库层：打印原因后返回，包保持已装。
+    // CLI 边界 `remove_packages()` 才把"被拒绝"变成非零退出码，见 G4）
     remove_package("removepkg", false);
     EXPECT_FALSE(Cache::instance().get_installed_version("removepkg").empty());
 }

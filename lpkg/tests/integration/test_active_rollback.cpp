@@ -453,7 +453,7 @@ TEST_F(ActiveRollbackTest, UpgradeCommitFailPreservesOldFilesAndDb)
 // 可靠判定（父目录被删/dangling 路径会让 exists 误判）。
 // ============================================================================
 
-TEST_F(ActiveRollbackTest, CleanupAfterWalBreakpointKeepsRemoval)
+TEST_F(ActiveRollbackTest, CleanupFailureAfterCommitDoesNotUndoRemoval)
 {
     std::string p = create_pkg("bp_cleanup_wa", "1.0");
     install_packages({p});
@@ -463,18 +463,41 @@ TEST_F(ActiveRollbackTest, CleanupAfterWalBreakpointKeepsRemoval)
     BreakpointManager::instance().set("cleanup_after_wal",
                                       [] { throw LpkgException("injected cleanup crash"); });
 
-    EXPECT_THROW(remove_package("bp_cleanup_wa", false), LpkgException);
+    // 新语义（与 install/upgrade 同款）：cleanup 在**批次提交后**，失败只告警不抛出
+    // ——批次已提交、DB 一致，清理失败不该让命令失败，残留由 WAL 的 CLEANUP 记录续传。
+    EXPECT_NO_THROW(remove_package("bp_cleanup_wa", false));
     BreakpointManager::instance().clear_all();
 
-    // cleanup 阶段不可回滚 → 续删+提交：包保持已移除、文件已删
+    // 包保持已移除（已提交的批次绝不因 cleanup 异常回滚）
     Cache::instance().load();
     EXPECT_TRUE(Cache::instance().get_installed_version("bp_cleanup_wa").empty())
-        << "cleanup 阶段异常应继续清理而非回滚：包保持已移除";
-    EXPECT_FALSE(fs::exists(test_root / "usr/bin/bp_cleanup_wa"))
-        << "binary should be removed (continue_cleanup finished the cleanup)";
+        << "cleanup 异常不得回滚已提交的移除";
+    EXPECT_FALSE(fs::exists(test_root / "usr/bin/bp_cleanup_wa"));
 
-    // 收尾后 WAL 应已 trim
-    std::ifstream wf(wal::wal_log_path());
-    std::string wc((std::istreambuf_iterator<char>(wf)), {});
-    EXPECT_EQ(wc.find("BEGIN_PKGS"), std::string::npos);
+    // 未完成的 post-commit 清理：CLEANUP 记录留在 WAL，stash 仍在磁盘 → 由下次 rec 续传
+    {
+        std::ifstream wf(wal::wal_log_path());
+        std::string wc((std::istreambuf_iterator<char>(wf)), {});
+        EXPECT_NE(wc.find("CLEANUP "), std::string::npos)
+            << "未完成的清理必须留下 CLEANUP 记录供 rec 续传";
+        EXPECT_NE(wc.find("COMMIT_PKGS"), std::string::npos) << "批次应已提交";
+    }
+    const int before = [] {
+        int n = 0;
+        std::error_code ec;
+        for (const auto& e : fs::recursive_directory_iterator(Config::instance().root_dir(), ec)) {
+            if (ec) break;
+            if (e.path().filename().string().find(".lpkg_bak_") != std::string::npos) ++n;
+        }
+        return n;
+    }();
+    EXPECT_GT(before, 0) << "清理未完成时 stash 应仍在磁盘";
+
+    recover_packages();  // 续传
+    std::error_code ec;
+    for (const auto& e : fs::recursive_directory_iterator(Config::instance().root_dir(), ec)) {
+        if (ec) break;
+        EXPECT_EQ(e.path().filename().string().find(".lpkg_bak_"), std::string::npos)
+            << "rec 续传后不得残留 stash: " << e.path();
+    }
 }

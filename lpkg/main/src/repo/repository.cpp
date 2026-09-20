@@ -10,12 +10,40 @@
 
 #include "archive/downloader.hpp"
 #include "base/constants.hpp"
-#include "base/exception.hpp"
 #include "base/utils.hpp"
+#include "base/exception.hpp"
 #include "config/config.hpp"
 #include "i18n/localization.hpp"
 #include "vercmp/dep_parser.hpp"
 #include "vercmp/version.hpp"
+
+/**
+ * 拆索引里的 deps 字段为依赖字符串列表。
+ *
+ * 索引用 ',' 连接各依赖，而**依赖语法本身也用 ',' 表达复合约束**
+ * （`"cmake >= 3.20, < 4.0"` 是一个依赖，见 tests/integration/test_build_deps.cpp）。
+ * 所以拆开后，以操作符开头的片段是上一条的续接（"< 4.0"），必须合回上一条——
+ * 否则它会变成空名依赖，在 libsolv 里是 ID_EMPTY：不解析也不报错，求解静默产出
+ * 空事务，用户看到"所有包都已安装"却没装任何东西（TODO.md D2）。
+ *
+ * 判断依据是"片段是否以比较操作符开头"——依赖名不可能这样开头。
+ */
+static std::vector<std::string> split_dep_field(std::string_view deps_sv)
+{
+    const auto starts_with_operator = [](const std::string& s) {
+        return !s.empty() && (s[0] == '<' || s[0] == '>' || s[0] == '=' || s[0] == '!');
+    };
+    std::vector<std::string> dep_strs;
+    for (auto piece_sv : split_string_view(deps_sv, constants::COMMA_CHAR)) {
+        const std::string piece = trim_copy(piece_sv);
+        if (piece.empty()) continue;  // 空片段（尾随/连续逗号）不成依赖
+        if (starts_with_operator(piece) && !dep_strs.empty())
+            dep_strs.back() += ", " + piece;  // 复合约束的续接
+        else
+            dep_strs.push_back(piece);
+    }
+    return dep_strs;
+}
 
 /**
  * 加载仓库索引文件
@@ -62,6 +90,12 @@ void Repository::load_index()
 
     // 逐个解析索引行，格式: 包名|版本:哈希:依赖;版本2:哈希2:依赖2|提供者
     std::ifstream file(index_path);
+    if (!file.is_open()) {
+        // 文件"存在"但打不开（权限/竟是个目录）此前完全静默：解析出 0 个包 → 上层会
+        // 报告"所有包都已是最新版本"，用户以为没事（TODO D4）
+        log_warning(string_format("warning.repo_index_unreadable", index_path.string()));
+        return;
+    }
     std::string line;
 
     while (std::getline(file, line)) {
@@ -91,17 +125,17 @@ void Repository::load_index()
             std::string_view deps_sv = (vh_parts.size() > 2) ? vh_parts[2] : "";
 
             // provides/needed_so 在版本块内（第 4、5 字段），每个版本独立
+            // 版本级 provides（第 4 字段）；为空时回退**包级** provides（每行第 3 字段，
+            // 旧格式/部分写入器会写在那里——此前该字段被完全忽略，能力解析会报"无提供者"）
             std::string_view ver_prov_sv = (vh_parts.size() > 3) ? vh_parts[3] : std::string_view{};
+            if (ver_prov_sv.empty() && parts.size() > 2) ver_prov_sv = parts[2];
             std::string_view ver_needed_so_sv =
                 (vh_parts.size() > 4) ? vh_parts[4] : std::string_view{};
 
             // 解析依赖字符串（复用 vercmp/dep_parser 的统一实现）
             std::vector<DependencyInfo> deps;
             if (!deps_sv.empty()) {
-                std::vector<std::string> dep_strs;
-                for (auto ds : split_string_view(deps_sv, constants::COMMA_CHAR))
-                    dep_strs.push_back(std::string(ds));
-                deps = detail::parse_dep_strings(dep_strs);
+                deps = detail::parse_dep_strings(split_dep_field(deps_sv));
             }
 
             // 记录提供者（provides）— 版本级优先，回退到包级
@@ -131,6 +165,12 @@ void Repository::load_index()
             }
             packages_[pkg.name].push_back(std::move(pkg));
         }
+    }
+
+    // 解析出 0 个包（空文件/半截下载/全是被跳过的坏行）必须告警：否则上游会把
+    // "仓库为空"读成"一切正常"，`lpkg upgrade` 直接打印"所有包都已是最新版本"（TODO D4）
+    if (packages_.empty()) {
+        log_warning(string_format("warning.repo_index_empty", index_path.string()));
     }
 
     // 每个包的版本列表按版本号升序排列（最后一个就是最新版）

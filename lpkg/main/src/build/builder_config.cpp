@@ -6,6 +6,7 @@
 
 #include "base/constants.hpp"
 #include "base/exception.hpp"
+#include "base/utils.hpp"
 #include "config/config.hpp"
 #include "i18n/localization.hpp"
 #include "nlohmann/json.hpp"
@@ -50,14 +51,6 @@ BuildConfig parse_build_config(const fs::path& json_path)
 
 namespace
 {
-/** 去除首尾空白 */
-std::string trim_copy(std::string_view s)
-{
-    while (!s.empty() && (s.front() == ' ' || s.front() == '\t')) s.remove_prefix(1);
-    while (!s.empty() && (s.back() == ' ' || s.back() == '\t')) s.remove_suffix(1);
-    return std::string(s);
-}
-
 /** 解析 makepkg.conf 风格的 KEY=value 行（去掉包裹引号） */
 std::string parse_value(std::string_view raw)
 {
@@ -91,12 +84,14 @@ build_defaults::BuildFlags load_build_defaults()
 
         const std::string key = trim_copy(sv.substr(0, eq));
         const std::string value = parse_value(sv.substr(eq + 1));
+        // 空值 = 未配置 → 回退内置默认（与 MAKEFLAGS 一致）。否则 `CFLAGS=""` 会让
+        // {CFLAGS} 占位符为空、而 execute_build_phase 注入的环境变量仍走默认 → 两者不一致。
         if (key == "CFLAGS")
-            f.cflags = value;
+            f.cflags = value.empty() ? std::string(build_defaults::CFLAGS) : value;
         else if (key == "CXXFLAGS")
-            f.cxxflags = value;
+            f.cxxflags = value.empty() ? std::string(build_defaults::CXXFLAGS) : value;
         else if (key == "LDFLAGS")
-            f.ldflags = value;
+            f.ldflags = value.empty() ? std::string(build_defaults::LDFLAGS) : value;
         else if (key == "LTOFLAGS")
             f.ltoflags = value;
         else if (key == "MAKEFLAGS")

@@ -64,6 +64,13 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version, bo
       expected_hash_(std::move(expected_hash)),
       force_reinstall_(force_reinstall)
 {
+    // 包名来自**不可信来源**（远端索引 / .lpkg 内的 metadata.json），而它会被当成路径
+    // 分量拼进 tmp_pkg_dir()、dep_dir()、needed_so_dir()、docs_dir()、hooks_dir()
+    // —— 一个 `../` 就能以 root 写到这些目录之外（TODO.md X4）。此处在唯一的构造入口挡住。
+    if (!is_safe_path_component(pkg_name_)) {
+        throw LpkgException(
+            string_format("error.unsafe_path_component", "package name", pkg_name_));
+    }
 }
 
 /**
@@ -186,6 +193,10 @@ void InstallationTask::commit_without_file_ops()
             if (!cache.get_file_owners(old_file).empty()) continue;
 
             const fs::path phys = to_phys(old_file);
+            // 新版本把该路径变成了**目录**（文件→目录的升级，TODO E4）：内容已由拷贝阶段
+            // 替换好，这里绝不能再把它当"废弃旧文件"搬进 stash——否则刚建好的目录被搬走，
+            // 升级"成功"但目录消失（实测）。目录的清理由阶段 2 负责。
+            if (fs::is_directory(phys) && !fs::is_symlink(phys)) continue;
             if (!(fs::exists(phys) || fs::is_symlink(phys))) continue;
             trace_remove("obsolete FILE " + old_file + " → rename into stash");
             log_info(string_format("info.removing_obsolete_file", old_file));
@@ -250,7 +261,26 @@ void InstallationTask::backup_existing_files()
 
         std::error_code ec;
         if (f.ends_with('/')) {
-            bool is_new_dir = !fs::exists(physical_path);
+            // **必须先去掉尾斜杠再判存在**：目录条目的 physical_path 以 '/' 结尾，而
+            // `fs::exists("/x/foo/")` 对**已存在的普通文件**返回 false（尾斜杠要求它是目录）
+            // ——直接用 physical_path 判会把"这里有个文件"误判成"路径不存在"，
+            // 于是既不备份也不删除，随后 copy_package_files 的 ensure_dir_exists 抛
+            // "Failed to create directory: File exists" 让整批中止（实测）。
+            const std::string ps = physical_path.string();
+            const fs::path probe(ps.ends_with('/') ? ps.substr(0, ps.size() - 1) : ps);
+            const bool path_exists = fs::exists(probe) || fs::is_symlink(probe);
+            bool is_new_dir = !path_exists;
+
+            // 升级里"**文件 → 目录**"的真实场景（如 python 包 foo.py → foo/__init__.py）：
+            // 该路径上现在是个文件/符号链接，而新版本要求是目录。按文件冲突处理：
+            // 搬进 stash（BACKUP，可回滚）+ 删除，让目录得以创建（TODO E4）。
+            if (path_exists && (!fs::is_directory(probe) || fs::is_symlink(probe))) {
+                fs::path bak = detail::stash_bak_target(probe, pkg_name_);
+                wal::log_wal_line("BACKUP " + probe.string() + " \xe2\x86\x92 " + bak.string());
+                safe_rename(probe, bak);
+                stashes_.emplace_back(bak.parent_path());
+                is_new_dir = true;
+            }
             if (is_new_dir) {
                 new_dirs_.push_back(physical_path);
                 // WAL: NEW_DIR <path>  (write-ahead: 先写 WAL 再做实际操作)
@@ -354,6 +384,13 @@ void InstallationTask::download_and_verify_package()
         } else {
             throw LpkgException(string_format("warning.package_not_in_repo", pkg_name_));
         }
+    }
+
+    // 版本号同样不可信（CLI `pkg:版本` 或远端索引），它会被拼进下载落点与
+    // `tmp_pkg_dir_ / (版本 + ".lpkg")` —— 含 `../` 即可写到临时目录之外（TODO.md X4）。
+    if (!is_safe_path_component(actual_version_)) {
+        throw LpkgException(
+            string_format("error.unsafe_path_component", "version", actual_version_));
     }
 
     const std::string download_url = mirror_url + arch + "/" + pkg_name_ + "/" + actual_version_ +
@@ -633,7 +670,12 @@ void InstallationTask::copy_package_files()
             fs::path dest = physical_path;
 
             const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
-            if (is_config && fs::exists(physical_path) && !fs::is_directory(physical_path)) {
+            // 注意 `fs::is_directory` 会跟随符号链接：`/etc/x -> /some/dir` 会被判成"目录"
+            // 从而绕过配置保护（既不备份也不留 .lpkgnew，直接替换）。故符号链接一律按冲突处理。
+            const bool cfg_conflict =
+                fs::exists(physical_path) || fs::is_symlink(physical_path);
+            if (is_config && cfg_conflict &&
+                (fs::is_symlink(physical_path) || !fs::is_directory(physical_path))) {
                 dest += std::string(constants::SUFFIX_LPKG_NEW);
                 log_warning(string_format("warning.config_conflict", physical_path.string(),
                                           dest.string()));
@@ -686,7 +728,9 @@ void InstallationTask::copy_package_files()
             const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
             fs::path final_dest = physical_path;
 
-            if (is_config && fs::exists(physical_path) && !fs::is_directory(physical_path)) {
+            // 同上：符号链接（含指向目录的）必须走配置保护，不能被 is_directory 跟随而漏掉
+            if (is_config && (fs::exists(physical_path) || fs::is_symlink(physical_path)) &&
+                (fs::is_symlink(physical_path) || !fs::is_directory(physical_path))) {
                 final_dest += std::string(constants::SUFFIX_LPKG_NEW);
                 if (fs::exists(final_dest) || fs::is_symlink(final_dest)) fs::remove(final_dest);
                 log_warning(string_format("warning.config_conflict", physical_path.string(),
@@ -841,6 +885,7 @@ void InstallationTask::run_post_install_hook()
             fs::permissions(dest,
                             fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
                             fs::perm_options::add);
+            hook_files_.push_back(entry.path().filename().string());  // 提交后据此剪枝陈旧 hook
         }
     }
     detail::run_hook(pkg_name_, std::string(constants::POSTINST_SH));

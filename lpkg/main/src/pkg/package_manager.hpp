@@ -88,6 +88,12 @@ public:
         tmp_pkg_dir_ = p;
     }
 
+    /// 本次安装写入 hooks_dir/<pkg>/ 的文件名（供**提交后**剪枝新版本已不再提供的 hook）
+    const std::vector<std::string>& get_hook_files() const
+    {
+        return hook_files_;
+    }
+
 private:
     std::string pkg_name_;
     std::string version_;
@@ -124,6 +130,7 @@ private:
     std::vector<std::filesystem::path> stashes_;  // 本次产生的备份 stash 目录（提交后清理）
     std::vector<std::filesystem::path> new_files_;
     std::vector<std::filesystem::path> new_dirs_;
+    std::vector<std::string> hook_files_;  // 本次写入的 hook 文件名（提交后据此剪枝）
 };
 
 /// 公共 API：安装包
@@ -131,6 +138,8 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
                       bool force_reinstall = false);
 
 void remove_package(const std::string& pkg_name, bool force = false, bool wrap_in_txn = true);
+/// 移除多个包：**单批次原子**（多包命令必须走它，逐包调用会失去跨包回滚）
+void remove_packages(const std::vector<std::string>& pkg_names, bool force = false);
 void autoremove();
 void upgrade_packages();
 void force_solve_conflict();
