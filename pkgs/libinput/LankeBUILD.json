@@ -1,6 +1,6 @@
 {
   "name": "libinput",
-  "version": "1.31.901",
+  "version": "1.32.0",
   "release": 2,
   "deps": [
     "python"
@@ -34,7 +34,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/libinput/libinput/-/archive/1.31.901/libinput-1.31.901.tar.gz"
+    "https://gitlab.freedesktop.org/libinput/libinput/-/archive/1.32.0/libinput-1.32.0.tar.gz"
   ],
   "work_sources": []
 }

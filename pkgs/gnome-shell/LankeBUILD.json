@@ -1,7 +1,7 @@
 {
   "name": "gnome-shell",
   "version": "51.0",
-  "release": 6,
+  "release": 7,
   "deps": [
     "accountsservice",
     "gdm",
@@ -9,7 +9,7 @@
     "gnome-session",
     "gnome-settings-daemon",
     "gvfs",
-    "ibus"
+    "libibus"
   ],
   "needed_so": [
     "libX11.so.6",

@@ -1,6 +1,6 @@
 {
   "name": "less",
-  "version": "704",
+  "version": "710",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -13,7 +13,7 @@
     "ncurses"
   ],
   "sources": [
-    "https://www.greenwoodsoftware.com/less/less-704.tar.gz"
+    "https://www.greenwoodsoftware.com/less/less-710.tar.gz"
   ],
   "work_sources": []
 }

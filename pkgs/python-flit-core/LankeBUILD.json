@@ -1,6 +1,6 @@
 {
   "name": "python-flit-core",
-  "version": "4.0.2",
+  "version": "4.1.0",
   "release": 2,
   "deps": [
     "python"
@@ -13,7 +13,7 @@
   ],
   "sources": [
     "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
-    "https://files.pythonhosted.org/packages/46/ef/34533186e76c526d9ec17a1ad9a10c7354cbfb20f51583cc36dfe4bdccd0/flit_core-4.0.2.tar.gz"
+    "https://files.pythonhosted.org/packages/e7/91/add211b38c357bf1b94900b4f79c34661a92be65c0243d2b0a3393c5092d/flit_core-4.1.0.tar.gz"
   ],
   "work_sources": []
 }

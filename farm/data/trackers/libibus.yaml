@@ -1,5 +1,4 @@
-# ibus — 完整 daemon+panel+immodule+lib（原 libibus 合并，Arch ibus/libibus 双包合一）。
-pkg-name: ibus
+pkg-name: libibus
 version-source: sources[0]
 sources:
 - tracker-template: github

@@ -1,6 +1,6 @@
 {
   "name": "jemalloc",
-  "version": "5.3.1",
+  "version": "5.4.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -17,7 +17,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/jemalloc/jemalloc/releases/download/5.3.1/jemalloc-5.3.1.tar.bz2"
+    "https://github.com/jemalloc/jemalloc/releases/download/5.4.0/jemalloc-5.4.0.tar.bz2"
   ],
   "work_sources": []
 }

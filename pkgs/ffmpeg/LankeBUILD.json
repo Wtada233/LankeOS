@@ -1,6 +1,6 @@
 {
   "name": "ffmpeg",
-  "version": "9.0.1",
+  "version": "9.0.2",
   "release": 6,
   "deps": [
     "xwayland"
@@ -88,7 +88,7 @@
     "glib"
   ],
   "sources": [
-    "https://ffmpeg.org/releases/ffmpeg-9.0.1.tar.xz"
+    "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz"
   ],
   "work_sources": []
 }

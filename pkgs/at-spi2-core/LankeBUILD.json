@@ -1,6 +1,6 @@
 {
   "name": "at-spi2-core",
-  "version": "2.60.6",
+  "version": "2.62.0.1",
   "release": 2,
   "deps": [
     "bash",
@@ -12,6 +12,7 @@
     "libXtst.so.6",
     "libc.so.6",
     "libdbus-1.so.3",
+    "libgcc_s.so.1",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
@@ -40,7 +41,7 @@
     "python-setuptools"
   ],
   "sources": [
-    "https://download.gnome.org/sources/at-spi2-core/2.60/at-spi2-core-2.60.6.tar.xz"
+    "https://download.gnome.org/sources/at-spi2-core/2.62/at-spi2-core-2.62.0.1.tar.xz"
   ],
   "work_sources": []
 }

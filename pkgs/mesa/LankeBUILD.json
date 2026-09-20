@@ -1,6 +1,6 @@
 {
   "name": "mesa",
-  "version": "26.2.2",
+  "version": "26.2.3",
   "release": 6,
   "deps": [
     "libclc",
@@ -56,7 +56,7 @@
     "libVkLayer_MESA_overlay.so",
     "libVkLayer_MESA_screenshot.so",
     "libVkLayer_MESA_vram_report_limit.so",
-    "libgallium-26.2.2.so",
+    "libgallium-26.2.3.so",
     "libgbm.so",
     "libgbm.so.1",
     "libvulkan_intel.so",
@@ -105,7 +105,7 @@
     "zstd"
   ],
   "sources": [
-    "https://archive.mesa3d.org/mesa-26.2.2.tar.xz"
+    "https://archive.mesa3d.org/mesa-26.2.3.tar.xz"
   ],
   "work_sources": []
 }
