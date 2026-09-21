@@ -1,14 +1,18 @@
 {
   "name": "unzip",
   "version": "6.0",
-  "release": 2,
-  "deps": [],
+  "release": 4,
+  "deps": [
+    "bash"
+  ],
   "needed_so": [
+    "libbz2.so.1.0",
     "libc.so.6"
   ],
   "provides": [],
   "build_deps": [
-    "base-devel"
+    "base-devel",
+    "bzip2"
   ],
   "sources": [
     "https://downloads.sourceforge.net/project/infozip/UnZip%206.x%20%28latest%29/UnZip%206.0/unzip60.tar.gz"

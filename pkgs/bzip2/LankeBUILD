@@ -1,11 +1,63 @@
+#
+# bzip2 — 高质量数据压缩
+# 基于 Arch Linux PKGBUILD 适配 LankeOS
+#
+# 1.0.8 是官方最后一个版本（2019-07，sourceware 上至今没有更新的正式发布），
+# 之后的修复全靠发行版补丁。补丁集 = Debian 1.0.8-6 series（6 条）
+# + Mageia 1.0.8-8（2 条，含官方维护者 Mark Wielaard 的 CVE-2026-42250）
+# + Fedora（2 条）逐条审过去重后的并集；Arch 不用补丁，它的贡献是构建/打包形态。
+# 命名沿用 rust 包的 NNNN-<子系统>-<描述>.patch，序号即应用顺序。
+#
+# 弃用与理由：
+#  - debian/makefile.diff：Debian 自己那套共享库构建（主 Makefile 里加 libbz2.so.1.0.4
+#    规则），ABI 文件名是 Debian 的，且与 Fedora 的两条平行重复 → 不取。
+#  - fedora/bzip2-saneso.patch：把 SONAME 从上游的 libbz2.so.1.0 改成 libbz2.so.1。
+#    那是 Fedora 专属 ABI —— LankeOS 全发行版的 DT_NEEDED 都是 libbz2.so.1.0
+#    （unzip/zip/... 的 needed_so 可查），改了会全线断裂。要跨发行版兼容，
+#    正确做法是像 Arch 那样额外建 libbz2.so.1 软链（下方 package() 已做）。
+#  - mageia/bzip2-1.0.8-makefile.patch：Mageia 专属的 Makefile 重构（要它的 config.in）。
+#  - Mageia 自带的 bzgrep/bzme/bzme.1 源文件：发行版自加内容，非上游。
+#  - 原先那个 bzip2-1.0.8-install_docs-1.patch（LFS）已删除：它给 Makefile 的 install
+#    目标加文档安装，而本配方从不跑 make install（全是手工 install），manual.html/pdf/ps
+#    也从不构建 —— 是彻底的死代码。
+
+_BD=$(dirname {WORK_DIR})
+
 lankebuild_prepare() {
-    :
+    # 按文件名顺序应用（NNNN 前缀即 Debian series 的顺序）。
+    # -F0：禁止 fuzz，见 unzip 同名注释。
+    # -t：batch 模式，绝不交互提问。**这条是必需的**：目标文件缺失时 patch 会问
+    #     "File to patch:"，无 tty 时静默跳过该 hunk 却仍返回 0 —— Fedora 的
+    #     man_gzipdiff.patch 目标写成 bzip2.1.new 就是这样在它自己那儿也成了死补丁。
+    #     加 -t 后这种情况返回 1，被下面的容错链捕获。
+    # 容错：上游将来把某项纳入 tarball 后，正向失败但 reverse-dry-run 成功 = 已应用，跳过。
+    for _p in "$_BD"/patches/*.patch; do
+        [ -f "$_p" ] || continue
+        patch -N -F0 -t -p1 -i "$_p" \
+            || patch -R --dry-run -F0 -t -p1 -i "$_p" >/dev/null 2>&1 \
+            || { echo "补丁应用失败（-F0：既打不上，反向 dry-run 也不成立，即不是'已应用'）: $_p"
+                 echo "  注意：prepare 只应在从 tarball 全新解压的树上跑一次。"
+                 exit 1; }
+    done
 }
 
 lankebuild_build() {
-    for patchfile in "{WORK_DIR}"/../*.patch; do
-        patch -Np1 -i "$patchfile"
-    done
+    # 0010 把两个 Makefile 里的硬编 CFLAGS/LDFLAGS 删掉了（Fedora 的设计：flag 由构建者提供），
+    # 所以这里必须自己补全，否则：
+    #   - 共享库目标缺 -fpic -fPIC → 编出非 PIC 目标，.so 链接直接失败；
+    #   - -D_FILE_OFFSET_BITS=64 原本来自被删掉的 BIGFILES 变量。
+    # CFLAGS/LDFLAGS 走 make 命令行覆盖（命令行变量优先于 Makefile 内的赋值）。
+    make -f Makefile-libbz2_so CC=gcc \
+        CFLAGS="-fpic -fPIC -D_FILE_OFFSET_BITS=64 {CFLAGS}" \
+        LDFLAGS="{LDFLAGS}"
+
+    # 两轮之间必须清掉目标文件：共享库那轮编的是 PIC 目标，静态那轮不能复用（Fedora 同款）。
+    # 静态 bzip2 不装（装的是动态的 bzip2-shared），所以第二轮只要 bzip2recover。
+    rm -f *.o
+    make bzip2recover CC=gcc \
+        CFLAGS="-D_FILE_OFFSET_BITS=64 {CFLAGS}" \
+        LDFLAGS="{LDFLAGS}"
+
     cat > bzip2.pc <<EOF
 prefix=/usr
 exec_prefix=/usr
@@ -19,18 +71,27 @@ Version: {ORIG_PKG_VER}
 Libs: -L\${libdir} -lbz2
 Cflags: -I\${includedir}
 EOF
-    make -f Makefile-libbz2_so -j$(nproc)
-    make bzip2 bzip2recover -j$(nproc)
 }
 
 lankebuild_package() {
     install -dm755 {STAGING_ROOT}{BINDIR} {STAGING_ROOT}{LIBDIR} {STAGING_ROOT}{INCLUDEDIR} {STAGING_ROOT}{MANDIR}/man1
 
+    # bzip2-shared 是动态链接版（静态版不装）。
+    # bzmore 在 tarball 里是 0644（不可执行），必须靠 install -m755 修正，否则 bzless/bzmore 不可用。
     install -m755 bzip2-shared {STAGING_ROOT}{BINDIR}/bzip2
     install -m755 bzip2recover bzdiff bzgrep bzmore {STAGING_ROOT}{BINDIR}/
-    ln -sf bzip2 {STAGING_ROOT}{BINDIR}/bunzip2
-    ln -sf bzip2 {STAGING_ROOT}{BINDIR}/bzcat
 
+    # 别名一律靠 argv[0] 分派（同 zipinfo）。bzegrep/bzfgrep 之所以能真的走 grep -E/-F，
+    # 靠的是 0007（bzgrep 按 $prog 的 basename 匹配 *egrep/*fgrep 来选 grep 参数）。
+    ln -sf bzip2  {STAGING_ROOT}{BINDIR}/bunzip2
+    ln -sf bzip2  {STAGING_ROOT}{BINDIR}/bzcat
+    ln -sf bzdiff {STAGING_ROOT}{BINDIR}/bzcmp
+    ln -sf bzmore {STAGING_ROOT}{BINDIR}/bzless
+    ln -sf bzgrep {STAGING_ROOT}{BINDIR}/bzegrep
+    ln -sf bzgrep {STAGING_ROOT}{BINDIR}/bzfgrep
+
+    # libbz2.so.1.0.8 的 SONAME 是 libbz2.so.1.0（未改，全发行版消费者都用这个）；
+    # libbz2.so.1 是给其他发行版兼容用的额外软链（Arch 同款）。
     cp -a libbz2.so* {STAGING_ROOT}{LIBDIR}/
     ln -sf libbz2.so.1.0.8 {STAGING_ROOT}{LIBDIR}/libbz2.so.1
     ln -sf libbz2.so.1 {STAGING_ROOT}{LIBDIR}/libbz2.so
@@ -42,8 +103,15 @@ lankebuild_package() {
     ln -sf bzip2.1 {STAGING_ROOT}{MANDIR}/man1/bzcat.1
     ln -sf bzip2.1 {STAGING_ROOT}{MANDIR}/man1/bzip2recover.1
 
+    # bzdiff.1/bzgrep.1/bzmore.1 是 tarball 自带的，原配方只装 bzip2.1，
+    # 于是 bzdiff/bzgrep/bzmore 三个命令装出来没有 man 页（Debian 与 Fedora 都装全）。
+    install -m644 bzdiff.1 bzgrep.1 bzmore.1 {STAGING_ROOT}{MANDIR}/man1/
+    ln -sf bzdiff.1 {STAGING_ROOT}{MANDIR}/man1/bzcmp.1
+    ln -sf bzmore.1 {STAGING_ROOT}{MANDIR}/man1/bzless.1
+    ln -sf bzgrep.1 {STAGING_ROOT}{MANDIR}/man1/bzegrep.1
+    ln -sf bzgrep.1 {STAGING_ROOT}{MANDIR}/man1/bzfgrep.1
+
     install -Dm644 bzip2.pc {STAGING_ROOT}{LIBDIR}/pkgconfig/bzip2.pc
 
     install -Dm644 LICENSE {STAGING_ROOT}{DATADIR}/licenses/bzip2/LICENSE
 }
-

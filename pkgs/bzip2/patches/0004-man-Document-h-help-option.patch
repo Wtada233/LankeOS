@@ -1,0 +1,79 @@
+Description: mention the --help command line option in the documentation
+Bug-Debian: https://bugs.debian.org/517257
+
+--- a/manual.xml
++++ b/manual.xml
+@@ -160,12 +160,21 @@
+  <listitem><para><computeroutput>bzip2</computeroutput> [
+   -cdfkqstvzVL123456789 ] [ filenames ...  ]</para></listitem>
+ 
++ <listitem><para><computeroutput>bzip2</computeroutput> [
++  -h | --help ]</para></listitem>
++
+  <listitem><para><computeroutput>bunzip2</computeroutput> [
+   -fkvsVL ] [ filenames ...  ]</para></listitem>
+ 
++ <listitem><para><computeroutput>bunzip2</computeroutput> [
++  -h | --help ]</para></listitem>
++
+  <listitem><para><computeroutput>bzcat</computeroutput> [ -s ] [
+   filenames ...  ]</para></listitem>
+ 
++ <listitem><para><computeroutput>bzcat</computeroutput> [
++  -h | --help ]</para></listitem>
++
+  <listitem><para><computeroutput>bzip2recover</computeroutput>
+   filename</para></listitem>
+ 
+@@ -397,6 +406,10 @@
+   will not be suppressed.</para></listitem>
+  </varlistentry>
+ 
++ <varlistentry><term><computeroutput>-h --help</computeroutput></term>
++ <listitem><para>Print a help message and exit.</para></listitem>
++ </varlistentry>
++
+  <varlistentry>
+  <term><computeroutput>-v --verbose</computeroutput></term>
+  <listitem><para>Verbose mode -- show the compression ratio for
+--- a/bzip2.1
++++ b/bzip2.1
+@@ -13,6 +13,9 @@
+ [
+ .I "filenames \&..."
+ ]
++.br
++.B bzip2
++.RB [ " \-h|\-\-help " ]
+ .ll -8
+ .br
+ .B bunzip2
+@@ -21,12 +24,18 @@
+ .I "filenames \&..."
+ ]
+ .br
++.B bunzip2
++.RB [ " \-h|\-\-help " ]
++.br
+ .B bzcat
+ .RB [ " \-s " ]
+ [
+ .I "filenames \&..."
+ ]
+ .br
++.B bzcat
++.RB [ " \-h|\-\-help " ]
++.br
+ .B bzip2recover
+ .I "filename"
+ 
+@@ -238,6 +247,9 @@
+ Further \-v's increase the verbosity level, spewing out lots of
+ information which is primarily of interest for diagnostic purposes.
+ .TP
++.B \-h \-\-help
++Print a help message and exit.
++.TP
+ .B \-L --license -V --version
+ Display the software version, license terms and conditions.
+ .TP

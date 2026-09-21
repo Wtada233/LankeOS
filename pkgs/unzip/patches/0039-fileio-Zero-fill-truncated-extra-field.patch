@@ -1,0 +1,35 @@
+NOTE (LankeOS, fuzz removal): hunk context regenerated.
+This patch's context was written against the upstream author's tree, which carries
+different sibling patches than ours at this point in the series, so the hunks below
+applied with fuzz 2 -- i.e. patch guessed the placement from a partial context match.
+Only the @@ headers and the surrounding context lines were rewritten to match our
+tree; the changed lines are byte-identical to upstream.
+Verified: pristine tree + this patch applied with -F0 is byte-identical to
+pristine tree + the original patch applied with default fuzz.
+
+diff --git a/fileio.c b/fileio.c
+index ba0a1d0..03fc4be 100644
+--- a/fileio.c
++++ b/fileio.c
+@@ -2006,6 +2006,7 @@ int do_string(__G__ length, option)   /* return PK-type error code */
+     unsigned comment_bytes_left;
+     unsigned int block_len;
+     int error=PK_OK;
++    unsigned int length2;
+ #ifdef AMIGA
+     char tmp_fnote[2 * AMIGA_FILENOTELEN];   /* extra room for squozen chars */
+ #endif
+@@ -2310,8 +2310,12 @@ int do_string(__G__ length, option)   /* return PK-type error code */
+             seek_zipf(__G__ G.cur_zipfile_bufstart - G.extra_bytes +
+                       (G.inptr-G.inbuf) + length);
+         } else {
+-            if (readbuf(__G__ (char *)G.extra_field, length) == 0)
++            if ((length2 = readbuf(__G__ (char *)G.extra_field, length)) == 0)
+                 return PK_EOF;
++            if(length2 < length) {
++              memset (__G__ (char *)G.extra_field+length2, 0 , length-length2);
++              length = length2;
++            }
+             /* Looks like here is where extra fields are read */
+             if (getZip64Data(__G__ G.extra_field, length) != PK_COOL)
+             {

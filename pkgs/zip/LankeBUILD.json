@@ -1,8 +1,10 @@
 {
   "name": "zip",
   "version": "3.0",
-  "release": 2,
-  "deps": [],
+  "release": 4,
+  "deps": [
+    "unzip"
+  ],
   "needed_so": [
     "libbz2.so.1.0",
     "libc.so.6"

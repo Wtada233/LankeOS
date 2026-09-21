@@ -1,0 +1,92 @@
+LankeOS adaptation of Mageia's bzgrep egrep/fgrep patch.
+Regenerated context: Debian's 20-legacy patch (0002) rewrites bzgrep first, so the
+upstream context no longer matches. Only @@ headers and context lines were rewritten;
+the changed lines are byte-identical to the original patch.
+Verified: this patch applied with -F0 is byte-identical to the original applied with
+default fuzz.
+
+--- a/bzgrep
++++ b/bzgrep
+@@ -26,8 +26,8 @@
+ 
+ prog=`echo "$0" | sed 's|.*/||'`
+ case "$prog" in
+-	*egrep)	grep=${EGREP-egrep}	;;
+-	*fgrep)	grep=${FGREP-fgrep}	;;
++	*egrep)	grep=${EGREP-grep -E}	;;
++	*fgrep)	grep=${FGREP-grep -F}	;;
+ 	*)	grep=${GREP-grep}	;;
+ esac
+ 
+@@ -66,7 +66,7 @@
+   case "$after_dash_dash$1" in
+   -[ef])   opt="$opt $1"; shift; pat="$1"
+            if test "$grep" = grep; then  # grep is buggy with -e on SVR4
+-             grep=egrep
++             grep="grep -E"
+            fi;;
+   -[ABCdm])opt="$opt $1 $2"; shift;;
+   --)      opt="$opt $1"; after_dash_dash=1;;
+
+--- a/xmlproc.sh
++++ b/xmlproc.sh
+@@ -74,7 +74,7 @@
+    flags='--noout --xinclude --noblanks --postvalid'
+    dtd='--dtdvalid http://www.oasis-open.org/docbook/xml/4.2/docbookx.dtd'
+    xmllint $flags $dtd $xmlfmtfile 2> $OUT 
+-   egrep 'error' $OUT 
++   grep -F 'error' $OUT
+    rm $OUT
+   ;;
+ 
+
+--- a/bzgrep.1
++++ b/bzgrep.1
+@@ -5,17 +5,17 @@
+ bzgrep, bzfgrep, bzegrep \- search possibly bzip2 compressed files for a regular expression
+ .SH SYNOPSIS
+ .B bzgrep
+-[ grep_options ]
++[ grep options ]
+ .BI  [\ -e\ ] " pattern"
+ .IR filename ".\|.\|."
+ .br
+ .B bzegrep
+-[ egrep_options ]
++[ grep -E options ]
+ .BI  [\ -e\ ] " pattern"
+ .IR filename ".\|.\|."
+ .br
+ .B bzfgrep
+-[ fgrep_options ]
++[ grep -F options ]
+ .BI  [\ -e\ ] " pattern"
+ .IR filename ".\|.\|."
+ .SH DESCRIPTION
+@@ -36,9 +36,9 @@
+ or
+ .I bzfgrep
+ then
+-.I egrep
++.I grep -E
+ or
+-.I fgrep
++.I grep -F
+ is used instead of
+ .I grep.
+ If the GREP environment variable is set,
+@@ -47,10 +47,10 @@
+ .I grep
+ program to be invoked. For example:
+ 
+-    for sh:  GREP=fgrep  bzgrep string files
+-    for csh: (setenv GREP fgrep; bzgrep string files)
++    for sh:  GREP="grep -F" bzgrep string files
++    for csh: (setenv GREP "grep -F"; bzgrep string files)
+ .SH AUTHOR
+ Charles Levert (charles@comm.polymtl.ca). Adapted to bzip2 by Philippe
+ Troin <phil@fifi.org> for Debian GNU/Linux.
+ .SH "SEE ALSO"
+-grep(1), egrep(1), fgrep(1), bzdiff(1), bzmore(1), bzless(1), bzip2(1)
++grep(1), bzdiff(1), bzmore(1), bzless(1), bzip2(1)
+

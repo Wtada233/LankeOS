@@ -1,7 +1,7 @@
 {
   "name": "bzip2",
   "version": "1.0.8",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],

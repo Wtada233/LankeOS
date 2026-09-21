@@ -1,0 +1,157 @@
+Description: escape special characters in XML source of the manual.
+
+--- a/manual.xml
++++ b/manual.xml
+@@ -1162,9 +1162,9 @@
+   if the library has been mis-compiled
+ BZ_PARAM_ERROR
+   if strm is NULL 
+-  or blockSize < 1 or blockSize > 9
+-  or verbosity < 0 or verbosity > 4
+-  or workFactor < 0 or workFactor > 250
++  or blockSize &lt; 1 or blockSize &gt; 9
++  or verbosity &lt; 0 or verbosity &gt; 4
++  or workFactor &lt; 0 or workFactor &gt; 250
+ BZ_MEM_ERROR 
+   if not enough memory is available
+ BZ_OK 
+@@ -1474,8 +1474,8 @@
+ BZ_CONFIG_ERROR
+   if the library has been mis-compiled
+ BZ_PARAM_ERROR
+-  if ( small != 0 && small != 1 )
+-  or (verbosity <; 0 || verbosity > 4)
++  if ( small != 0 &amp;&amp; small != 1 )
++  or (verbosity &lt; 0 || verbosity &gt; 4)
+ BZ_MEM_ERROR
+   if insufficient memory is available
+ </programlisting>
+@@ -1560,7 +1560,7 @@
+ <programlisting>
+ BZ_PARAM_ERROR
+   if strm is NULL or strm->s is NULL
+-  or strm->avail_out < 1
++  or strm->avail_out &lt; 1
+ BZ_DATA_ERROR
+   if a data integrity error is detected in the compressed stream
+ BZ_DATA_ERROR_MAGIC
+@@ -1733,8 +1733,8 @@
+ BZ_PARAM_ERROR
+   if f is NULL
+   or small is neither 0 nor 1
+-  or ( unused == NULL && nUnused != 0 )
+-  or ( unused != NULL && !(0 <= nUnused <= BZ_MAX_UNUSED) )
++  or ( unused == NULL &amp;&amp; nUnused != 0 )
++  or ( unused != NULL &amp;&amp; !(0 &lt;= nUnused &lt;= BZ_MAX_UNUSED) )
+ BZ_IO_ERROR
+   if ferror(f) is nonzero
+ BZ_MEM_ERROR
+@@ -1813,7 +1813,7 @@
+ 
+ <programlisting>
+ BZ_PARAM_ERROR
+-  if b is NULL or buf is NULL or len < 0
++  if b is NULL or buf is NULL or len &lt; 0
+ BZ_SEQUENCE_ERROR
+   if b was opened with BZ2_bzWriteOpen
+ BZ_IO_ERROR
+@@ -1971,7 +1971,7 @@
+   if the library has been mis-compiled
+ BZ_PARAM_ERROR
+   if f is NULL
+-  or blockSize100k < 1 or blockSize100k > 9
++  or blockSize100k &lt; 1 or blockSize100k &gt; 9
+ BZ_IO_ERROR
+   if ferror(f) is nonzero
+ BZ_MEM_ERROR
+@@ -2018,7 +2018,7 @@
+ 
+ <programlisting>
+ BZ_PARAM_ERROR
+-  if b is NULL or buf is NULL or len < 0
++  if b is NULL or buf is NULL or len &lt; 0
+ BZ_SEQUENCE_ERROR
+   if b was opened with BZ2_bzReadOpen
+ BZ_IO_ERROR
+@@ -2169,7 +2169,7 @@
+ if ( !f ) {
+  /* handle error */
+ }
+-b = BZ2_bzWriteOpen( &bzerror, f, 9 );
++b = BZ2_bzWriteOpen( &amp;bzerror, f, 9 );
+ if (bzerror != BZ_OK) {
+  BZ2_bzWriteClose ( b );
+  /* handle error */
+@@ -2177,14 +2177,14 @@
+ 
+ while ( /* condition */ ) {
+  /* get data to write into buf, and set nBuf appropriately */
+- nWritten = BZ2_bzWrite ( &bzerror, b, buf, nBuf );
++ nWritten = BZ2_bzWrite ( &amp;bzerror, b, buf, nBuf );
+  if (bzerror == BZ_IO_ERROR) { 
+-   BZ2_bzWriteClose ( &bzerror, b );
++   BZ2_bzWriteClose ( &amp;bzerror, b );
+    /* handle error */
+  }
+ }
+ 
+-BZ2_bzWriteClose( &bzerror, b );
++BZ2_bzWriteClose( &amp;bzerror, b );
+ if (bzerror == BZ_IO_ERROR) {
+  /* handle error */
+ }
+@@ -2204,24 +2204,24 @@
+ if ( !f ) {
+   /* handle error */
+ }
+-b = BZ2_bzReadOpen ( &bzerror, f, 0, NULL, 0 );
++b = BZ2_bzReadOpen ( &amp;bzerror, f, 0, NULL, 0 );
+ if ( bzerror != BZ_OK ) {
+-  BZ2_bzReadClose ( &bzerror, b );
++  BZ2_bzReadClose ( &amp;bzerror, b );
+   /* handle error */
+ }
+ 
+ bzerror = BZ_OK;
+-while ( bzerror == BZ_OK && /* arbitrary other conditions */) {
+-  nBuf = BZ2_bzRead ( &bzerror, b, buf, /* size of buf */ );
++while ( bzerror == BZ_OK &amp;&amp; /* arbitrary other conditions */) {
++  nBuf = BZ2_bzRead ( &amp;bzerror, b, buf, /* size of buf */ );
+   if ( bzerror == BZ_OK ) {
+     /* do something with buf[0 .. nBuf-1] */
+   }
+ }
+ if ( bzerror != BZ_STREAM_END ) {
+-   BZ2_bzReadClose ( &bzerror, b );
++   BZ2_bzReadClose ( &amp;bzerror, b );
+    /* handle error */
+ } else {
+-   BZ2_bzReadClose ( &bzerror, b );
++   BZ2_bzReadClose ( &amp;bzerror, b );
+ }
+ </programlisting>
+ 
+@@ -2287,9 +2287,9 @@
+   if the library has been mis-compiled
+ BZ_PARAM_ERROR
+   if dest is NULL or destLen is NULL
+-  or blockSize100k < 1 or blockSize100k > 9
+-  or verbosity < 0 or verbosity > 4
+-  or workFactor < 0 or workFactor > 250
++  or blockSize100k &lt; 1 or blockSize100k &gt; 9
++  or verbosity &lt; 0 or verbosity &gt; 4
++  or workFactor &lt; 0 or workFactor &gt; 250
+ BZ_MEM_ERROR
+   if insufficient memory is available 
+ BZ_OUTBUFF_FULL
+@@ -2355,8 +2355,8 @@
+   if the library has been mis-compiled
+ BZ_PARAM_ERROR
+   if dest is NULL or destLen is NULL
+-  or small != 0 && small != 1
+-  or verbosity < 0 or verbosity > 4
++  or small != 0 &amp;&amp; small != 1
++  or verbosity &lt; 0 or verbosity &gt; 4
+ BZ_MEM_ERROR
+   if insufficient memory is available 
+ BZ_OUTBUFF_FULL

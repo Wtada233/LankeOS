@@ -1,11 +1,62 @@
+#
+# zip — Info-ZIP Zip，创建/修改 .zip
+# 基于 Arch Linux PKGBUILD 适配 LankeOS
+#
+# 补丁集主体按 Debian 3.0-16 的 debian/patches/series 顺序（17 条），另取 Fedora 中
+# 非发行版特定的 4 条。Arch 用的 7 条已被完全覆盖：两条精确重复
+# （debian/fclose-in-file-not-fclose-x ≡ fedora/zipnote、
+#   debian/hardening-build-fix-1 ≡ fedora/zip-3.0-format-security）、
+# 两条同义不同路径（debian/stack-markings ≡ fedora/zip-3.0-exec-shield、
+#   debian/buffer-overflow-unicode-filename ≡ fedora/buffer_overflow）、
+# 两条已取 Fedora 版（currdir、man-strip-extra）。
+# Fedora 的 zip-gnu89-build 不取：它改的是 generic_gcc 的 CC，而 0012 已把 configure
+# 里在 gcc14+ 下会失败的函数探测注掉（治本），Debian 同样不传 -std=gnu89。
+# 命名沿用 rust 包的 NNNN-<子系统>-<描述>.patch，序号即应用顺序。
+#
+# deps 手写 unzip（极少数手写 deps 的场合之一）：zip 运行时会 exec unzip ——
+# `-T`/`-TT` 测试归档走 zip.c 的 check_zipfile()，POSIX 分支在 zip.c:1614 的
+# system(cmd)，找 unzip 版本另有一处 zip.c:1299 的 popen()。ELF 扫描查不到这类
+# 依赖，所以必须显式写。参考发行版亦然：Fedora `Requires: unzip`、Debian
+# `Recommends: unzip`（LankeOS 无 Recommends，故取 deps）。
+# 反向也确认过没有环：unzip 自己不 exec 任何东西（它的两处 system() 都在
+# `#ifdef CHEAP_SFX_AUTORUN` 与 `#ifdef NO_MKDIR` 里，本构建都不成立）。
+
+# 补丁在包目录的 patches/ 下（构建时 cwd 是源码目录，包目录 = work 的父级）
+_BD=$(dirname {WORK_DIR})
+
 lankebuild_prepare() {
-    :
+    # 按文件名顺序应用（NNNN 前缀即 Debian series 的顺序）。
+    # -F0：禁止 fuzz，见 unzip 同名注释（fuzz 是唯一一种不报错却改错代码的失败方式）。
+    # -t：batch 模式，绝不交互提问。**必需**：目标文件缺失时 patch 会问 "File to patch:"，
+    #     无 tty 时静默跳过 hunk 却仍返回 0（见 bzip2 配方里 Fedora man 补丁的例子）。
+    # 容错：上游将来把某项纳入 tarball 后，正向失败但 reverse-dry-run 成功 = 已应用，跳过。
+    for _p in "$_BD"/patches/*.patch; do
+        [ -f "$_p" ] || continue
+        patch -N -F0 -t -p1 -i "$_p" \
+            || patch -R --dry-run -F0 -t -p1 -i "$_p" >/dev/null 2>&1 \
+            || { echo "补丁应用失败（-F0：既打不上，反向 dry-run 也不成立，即不是'已应用'）: $_p"
+                 echo "  注意：prepare 只应在从 tarball 全新解压的树上跑一次。"
+                 exit 1; }
+    done
 }
 
 lankebuild_build() {
-    make -f unix/Makefile generic CC="gcc -std=gnu89"
+    # 手工跑 unix/configure 把我们完整的 CFLAGS 传进去 —— configure 据此探测平台并生成
+    # flags 文件（顺手打开 BZIP2/LARGE_FILE/UNICODE 支持），随后 make generic 读该文件。
+    # 不能只 make generic：那样 configure 通过 `flags` 目标只收到 CFLAGS_NOOPT（= -I. -DUNIX），
+    # 生成的 flags 里 CFLAGS 就没有我们的 -O2/-Wall/加固 flag（旧配方即如此，实测只剩
+    # `-I. -DUNIX -O3`，-O3 还是 configure 自己塞的，且 LDFLAGS 全丢）。
+    # 也不用 generic_gcc：它把 CC=gcc 硬写在子 make 命令行上，会压掉从外面传的 CC。
+    # LDFLAGS 走环境变量：0009 让 configure 把它写进 flags 的 LFLAGS1（链接期才生效）。
+    LDFLAGS="{LDFLAGS}" sh unix/configure gcc "-O2 {CFLAGS} -Wall -I. -DUNIX"
+    make -f unix/Makefile generic
 }
 
 lankebuild_package() {
-    make prefix={STAGING_ROOT}{PREFIX} MANDIR={STAGING_ROOT}{MANDIR}/man1 -f unix/Makefile install
+    # install 目标装 ZIPS（zip zipcloak zipnote zipsplit）+ 4 个 man 页。
+    # MANDIR 必须显式给：configure 探测出的是 `manl`（configure 自身的笔误），
+    # 而 Makefile 默认 $(prefix)/man/man1 也不是 LankeOS 的 /usr/share/man/man1。
+    make -f unix/Makefile install \
+        prefix="{STAGING_ROOT}{PREFIX}" \
+        MANDIR="{STAGING_ROOT}{MANDIR}/man1"
 }

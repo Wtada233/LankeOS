@@ -1,0 +1,66 @@
+#
+# 7zip — 官方 7-Zip（Igor Pavlov），取代已无维护的 p7zip
+# 基于 Arch Linux PKGBUILD 适配 LankeOS
+#
+# 为什么换：p7zip 是第三方移植（最后版本 17.06 / 2021，上游 p7zip-project 已停更），
+# 而官方 7-Zip 仍在维护（26.03 / 2026-09）。Arch 也是同样的替换
+# （provides/conflicts/replaces p7zip）。lpkg 没有 conflicts/replaces 机制，
+# 所以这里是直接删掉 pkgs/p7zip、新增本包 —— 全仓库没有任何包依赖 p7zip（已核）。
+#
+# 无补丁：源用官方 GitHub tag 归档（ip7z/7zip，即 Igor Pavlov 的官方仓库；
+# 与 7-zip.org 的 tarball 内容等价，实测去掉 CR 后 1292 个文件零差异，
+# 只是行尾 LF vs CRLF）。版本与 URL 都来自 tag，无需任何格式变换。
+#
+# 编译期注意：
+#  - USE_ASM=1 MY_ASM=uasm：x86_64 要用 uasm 汇编 Asm/x86/*.asm（MASM 语法，
+#    nasm/yasm 不兼容）。实测收益主要在**解压**（约 25-30%），压缩约 0-5%；
+#    产出的归档体积与官方预编译版完全一致。
+#  - CFLAGS_WARN_WALL 覆盖：makefile 硬编了 `-Werror -Wall -Wextra`，而 GCC 16 在
+#    ProgressUtils.h 的 COM 引用计数模式上报 -Warray-bounds 误报，被 -Werror 提升为
+#    错误 → Format7zF（产出 7z.so）编不出来。7z.so 是**运行时必需**的（UI/Console 的
+#    7z 带 Z7_EXTERNAL_CODECS 编译，用可执行文件同目录下的 7z.so 加载编解码器；
+#    缺了它连 `7z a` 都报 E_NOTIMPL）。这里只降级这一个诊断，其余仍保留 -Werror。
+
+lankebuild_prepare() {
+    # 无需打补丁（本包零补丁）。但三段必须都存在：lpkg 无条件调用 prepare/build/package，
+    # 缺一段就是 `lankebuild_prepare: command not found` + exit 127。
+    :
+}
+
+lankebuild_build() {
+    # 5 个组件各自 make（上游设计如此，没有顶层 all）。
+    # LFLAGS_STRIP= 保留符号，交给打包期处理（Arch 同款）。
+    #
+    # `|| return 1`：循环里任何一个组件失败都必须让整个阶段失败。否则最后一个组件成功
+    # 会把函数的退出码覆盖成 0，阶段"通过"而产物不全（少了 7z.so 的 7z 是坏的）。
+    for _c in Bundles/Alone Bundles/Alone7z Bundles/Format7zF Bundles/SFXCon UI/Console; do
+        make -C CPP/7zip/$_c -f ../../cmpl_gcc.mak \
+            PLATFORM=x64 IS_X64=1 MY_ASM=uasm USE_ASM=1 \
+            LFLAGS_STRIP= \
+            CFLAGS_WARN_WALL="-Werror -Wall -Wextra -Wno-error=array-bounds" \
+            CC="cc {CFLAGS} {LDFLAGS}" CXX="g++ {CXXFLAGS} {LDFLAGS}" \
+            || { echo "构建失败: $_c"; return 1; }
+    done
+}
+
+lankebuild_package() {
+    install -d "{STAGING_ROOT}{LIBDIR}/7zip" "{STAGING_ROOT}{BINDIR}"
+
+    # 实体全放 {LIBDIR}/7zip（7z 从**可执行文件所在目录**加载 7z.so，必须同目录）
+    install -m755 \
+        CPP/7zip/Bundles/Alone/b/g/7za \
+        CPP/7zip/Bundles/Alone7z/b/g/7zr \
+        CPP/7zip/Bundles/Format7zF/b/g/7z.so \
+        CPP/7zip/UI/Console/b/g/7z \
+        "{STAGING_ROOT}{LIBDIR}/7zip/"
+    install -m755 CPP/7zip/Bundles/SFXCon/b/g/7zCon "{STAGING_ROOT}{LIBDIR}/7zip/7zCon.sfx"
+
+    # /usr/bin 下是 wrapper 脚本（Arch 同款）
+    for _p in 7za 7zr 7z; do
+        printf '#!/bin/sh\nexec {LIBDIR}/7zip/%s "$@"\n' "$_p" \
+            | install -Dm755 /dev/stdin "{STAGING_ROOT}{BINDIR}/$_p" || return 1
+    done
+
+    install -Dm644 DOC/License.txt "{STAGING_ROOT}{DATADIR}/licenses/7zip/License.txt"
+    install -Dm644 DOC/unRarLicense.txt "{STAGING_ROOT}{DATADIR}/licenses/7zip/unRarLicense.txt"
+}

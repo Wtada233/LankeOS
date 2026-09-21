@@ -1,40 +1,98 @@
+#
+# unzip — Info-ZIP UnZip，解压 .zip
+# 基于 Arch Linux PKGBUILD 适配 LankeOS
+#
+# 源码坚持官方 unzip60.tar.gz（SourceForge），补丁集自行维护（不换 patched fork）。
+# 主体按 Debian 6.0-31 的 debian/patches/series 顺序，含 2026 年新增的三个安全修复
+# （can-2026-2034440/42/43，unzip-p 等 fork 尚未收录）；另取 Fedora 中非发行版特定的
+# 项、Arch 的 CVE-2021-4217，以及 madler/unzip 上游分支里 Debian/Fedora 都没有的修复。
+# 命名沿用 rust 包的 NNNN-<子系统>-<描述>.patch，序号即应用顺序。
+# 文件头带 "LankeOS-generated/adaptation" 的是自建补丁，原因见文件头。
+#
+# deps 手写 bash：zipgrep 是 /bin/sh 脚本（解释器由 bash 包提供的 /usr/bin/sh 满足）。
+# 其余运行时 exec 的都是 base 里已有的（grep/sed/coreutils）—— 仓库惯例也不声明它们
+# （bash 有 83 个包声明，grep/sed/coreutils 各只有 2 个，其中一个还是 base 自己）。
+# unzip 二进制本身不 exec 任何东西：两处 system() 分别在 #ifdef CHEAP_SFX_AUTORUN
+# 与 #ifdef NO_MKDIR 里，本构建都不成立（后者不定义 = 用真 mkdir() 系统调用）。
+
+# 补丁在包目录的 patches/ 下（构建时 cwd 是源码目录，包目录 = work 的父级；
+# farm 用 `docker cp <pkgs>/<pkg> :/work/` 递归拷整个包目录，子目录会一并进容器）
+_BD=$(dirname {WORK_DIR})
+
+# 编译期特性开关（Arch/Debian 同款）。unzip60 默认这些一个都不开：
+#   LARGE_FILE_SUPPORT   >2GiB；unix/unxcfg.h 见到它会自动打开 ZIP64_SUPPORT，
+#                        不开则 Zip64 归档和大文件都读不了（原配方就是这个状态，
+#                        unzip -v 里只有 USE_DEFLATE64）。
+#   UNICODE_SUPPORT + UNICODE_WCHAR + UTF8_MAYBE_NATIVE
+#                        归档内 UTF-8 文件名（0041/0042 两个补丁靠这三项才生效，
+#                        不开就是死代码）。
+#   NO_LCHMOD            Linux 没有 lchmod()。
+#   DATE_FORMAT=DF_YMD   日期用 ISO y/m/d，而非美式 m/d/y。
+#   NO_WORKING_ISPRINT   不用 locale 相关的 isprint()，否则非 ASCII 输出会被吞。
+_FEATURES="-DLARGE_FILE_SUPPORT -DUNICODE_SUPPORT -DUNICODE_WCHAR -DUTF8_MAYBE_NATIVE -DNO_LCHMOD -DDATE_FORMAT=DF_YMD -DNO_WORKING_ISPRINT"
+
 lankebuild_prepare() {
-    # 删除冲突的 gmtime/localtime 声明
-    sed -i '/struct tm \*gmtime/d' unix/unxcfg.h
-    sed -i '/struct tm \*localtime/d' unix/unxcfg.h
+    # 按文件名顺序应用（NNNN 前缀即 Debian series 的顺序，顺序有意义：
+    # 0034 依赖 0003、0026 依赖 0025、0044 依赖 0041 …）。
+    # -F0：禁止 fuzz。默认的 fuzz=2 会在上下文只有部分匹配时"猜"位置，可能把
+    # hunk 静默落到错地方——那是唯一一种既不报错又改错代码的失败方式。补丁集已
+    # 校准为全部零 fuzz 应用（0025/0039 的上下文按本树重制过，见文件头 NOTE），
+    # 所以 -F0 下任何失败都是真失败。
+    # -t：batch 模式，绝不交互提问。**必需**：目标文件缺失时 patch 会问
+    #     "File to patch:"，无 tty 时静默跳过 hunk 却仍返回 0（bzip2 那边 Fedora 的
+    #     man 补丁目标写成 bzip2.1.new 就是这样成了死补丁）。加 -t 后返回 1，被下面捕获。
+    # 容错：上游将来把某项纳入 tarball 后，正向失败但 reverse-dry-run 成功 = 已应用，跳过。
+    for _p in "$_BD"/patches/*.patch; do
+        [ -f "$_p" ] || continue
+        patch -N -F0 -t -p1 -i "$_p" \
+            || patch -R --dry-run -F0 -t -p1 -i "$_p" >/dev/null 2>&1 \
+            || { echo "补丁应用失败（-F0：既打不上，反向 dry-run 也不成立，即不是'已应用'）: $_p"
+                 echo "  注意：prepare 只应在从 tarball 全新解压的树上跑一次；"
+                 echo "  对已 prepare 过的树重跑会在此处失败，因为后续补丁重写过前面补丁的上下文。"
+                 exit 1; }
+    done
 }
 
 lankebuild_build() {
-    # 1. 构建主程序 unzip（使用 linux_noasm 目标）
-    make -f unix/Makefile linux_noasm CC="gcc -std=gnu89"
-    
-    # 2. 单独构建 zipinfo（它没有被 linux_noasm 包含）
-    make -f unix/Makefile zipinfo CC="gcc -std=gnu89"
+    # 直接走 unzips 目标，不能用 linux_noasm：后者的配方把 CC/LD/CFLAGS 硬写在
+    # 子 make 命令行上（`$(MAKE) unzips CC=gcc LD=gcc CFLAGS="-O -Wall"`），命令行
+    # 变量优先于 MAKEFLAGS 继承，会把我们传的任何 CFLAGS/LOCAL_UNZIP 整个压掉
+    # （原配方的 -std=gnu89 就是这样失效的）。unix_make 目标只是给顶层建一个
+    # unix/Makefile 软链，用 -f unix/Makefile 时不需要。
+    # bzip2 解压支持：D_USE_BZ2 进编译期定义、L_BZ2 进链接（用**系统** libbz2，
+    # 不设 LIBBZ2 所以不会去编源码树里那套自带的；unzip60/bzip2/ 只有打包脚本，
+    # 无源码也无 bzlib.h，头来自 /usr/include）。Debian 与 Arch 都开：
+    # 不开的话 unzip 读不了 bzip2 压缩的条目 —— 而**我们自己的 zip 默认就能产出**
+    # （zip 的 configure 自动探测开 BZIP2），表现为 `zip -Z bzip2` 建的包被 unzip
+    # 以 "need PK compat. v4.6 (can do v4.5)" 跳过、目录解出来是空的。
+    make -f unix/Makefile unzips \
+        CC=gcc LD=gcc \
+        CFLAGS="-O2 {CFLAGS}" \
+        LOCAL_UNZIP="$_FEATURES" \
+        D_USE_BZ2=-DUSE_BZIP2 \
+        L_BZ2=-lbz2 \
+        LF2="{LDFLAGS} -s"
+
+    # zipinfo 不在 unzips 目标里：unzip 6.0 的 zipinfo.c 是编进 unzip 二进制的
+    # （OBJS3 含 zipinfo.o），运行时按 argv[0] 分派，所以这一步只是建硬链接。
+    make -f unix/Makefile zipinfo CC=gcc
 }
 
 lankebuild_package() {
-    # 安装主程序
-    if [ -f unzip ]; then
-        install -Dm755 unzip "{STAGING_ROOT}{BINDIR}/unzip"
-    fi
-    
-    # 安装 zipinfo（如果存在）
-    if [ -f zipinfo ]; then
-        install -Dm755 zipinfo "{STAGING_ROOT}{BINDIR}/zipinfo"
-    else
-        echo "⚠️  zipinfo not built, skipping"
-    fi
-    
-    # 安装手册页（检查实际路径）
-    if [ -f unix/unzip.1 ]; then
-        install -Dm644 unix/unzip.1 "{STAGING_ROOT}{MANDIR}/man1/unzip.1"
-    else
-        echo "⚠️  unzip.1 not found, skipping"
-    fi
-    
-    if [ -f unix/zipinfo.1 ]; then
-        install -Dm644 unix/zipinfo.1 "{STAGING_ROOT}{MANDIR}/man1/zipinfo.1"
-    else
-        echo "⚠️  zipinfo.1 not found, skipping"
-    fi
+    install -d "{STAGING_ROOT}{BINDIR}"
+
+    # unzips 目标产出 unzip / funzip / unzipsfx 三个二进制；
+    # zipgrep 是 /bin/sh 脚本（原配方这两个都没装）。
+    install -m755 unzip    "{STAGING_ROOT}{BINDIR}/unzip"
+    install -m755 funzip   "{STAGING_ROOT}{BINDIR}/funzip"
+    install -m755 unzipsfx "{STAGING_ROOT}{BINDIR}/unzipsfx"
+    install -m755 unix/zipgrep "{STAGING_ROOT}{BINDIR}/zipgrep"
+
+    ln -sf unzip "{STAGING_ROOT}{BINDIR}/zipinfo"
+
+    # man 页在 man/ 下，不在 unix/ —— 原配方查 unix/*.1 所以从来没装成功过。
+    # 0001 已把 .TH 的 section 从 1L 改回 1，否则 man/unzip 找不到。
+    for _m in funzip unzip unzipsfx zipgrep zipinfo; do
+        install -Dm644 "man/$_m.1" "{STAGING_ROOT}{MANDIR}/man1/$_m.1"
+    done
 }

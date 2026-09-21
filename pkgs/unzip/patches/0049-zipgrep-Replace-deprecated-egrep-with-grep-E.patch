@@ -1,0 +1,54 @@
+--- a/unix/zipgrep
++++ b/unix/zipgrep
+@@ -1,11 +1,11 @@
+ #!/bin/sh
+ #
+-#    zipgrep: Use unzip and egrep to search the specified members of a
++#    zipgrep: Use unzip and grep -E to search the specified members of a
+ # Zip archive for a string or pattern.  Search all members if no members
+-# are specified explicitly.  The script attempts to handle egrep's "-h"
++# are specified explicitly.  The script attempts to handle grep's "-h"
+ # and "-l" options internally.
+ #
+-# This script assumes that the desired "unzip" and "egrep" (and "sed")
++# This script assumes that the desired "unzip" and "grep -E" (and "sed")
+ # programs are on the user's PATH.
+ #
+ 
+@@ -25,8 +25,8 @@
+ done
+ 
+ if test $# = 0; then
+-  echo usage: `basename "$0"` "[egrep_options] pattern zipfile [members...]"
+-  echo Uses unzip and egrep to search the zip members for a string or pattern.
++  echo usage: `basename "$0"` "[grep -E options] pattern zipfile [members...]"
++  echo Uses unzip and grep -E to search the zip members for a string or pattern.
+   exit 1
+ fi
+ zipfile="$1"; shift
+@@ -55,13 +55,13 @@
+   if test $list -eq 1; then
+     # "-l": Show only the archive member name, not the matching line(s).
+     unzip -p-L "$zipfile" "$i" | \
+-     egrep $opt "$pat" > /dev/null && echo "$i"
++     grep -E $opt "$pat" > /dev/null && echo "$i"
+     status_grep=$?
+   elif test $silent -eq 1; then
+     # "-h": Show only the matching line(s), not the archive member name.
+-    # ("-s" in "opt" will silence "egrep", stopping all output.)
++    # ("-s" in "opt" will silence "grep", stopping all output.)
+     unzip -p-L "$zipfile" "$i" | \
+-     egrep $opt "$pat"
++     grep -E $opt "$pat"
+     status_grep=$?
+   else
+     # Escape (or re-escape) shell-special characters in the archive
+@@ -75,7 +75,7 @@
+     exec 4>&1
+     status_grep=` ( \
+      ( unzip -p-L "$zipfile" "$i" | \
+-     egrep $opt "$pat" 1>&4 ; echo $? >&3 ) 4>&1 | \
++     grep -E $opt "$pat" 1>&4 ; echo $? >&3 ) 4>&1 | \
+      sed "s|^|${i}:|" 1>&4 \
+      ) 3>&1 `
+   fi

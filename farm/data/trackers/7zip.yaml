@@ -1,8 +1,8 @@
-pkg-name: p7zip
+pkg-name: 7zip
 version-source: sources[0]
 sources:
 - tracker-template: github
-  repo: p7zip-project/p7zip
+  repo: ip7z/7zip
   mode: tags
-  tag-prefix: v
+  tag-prefix: ''
   template: https://github.com/{repo}/archive/{tag}/{name}-{tag}.tar.gz

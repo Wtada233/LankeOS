@@ -1,0 +1,27 @@
+From: Reuben Thomas <rrt@sc3d.org>
+Subject: Fix typo RISC OS/2 -> OS/2
+Bug-Debian: https://bugs.debian.org/1092811
+X-Debian-version: 3.0-15
+
+--- a/man/zip.1
++++ b/man/zip.1
+@@ -2776,7 +2776,7 @@
+ However, the structure layout returned by the 32-bit DosQueryPathInfo()
+ is a bit different, it uses extra padding bytes and link pointers (it's
+ a linked list) to have all fields on 4-byte boundaries for portability
+-to future RISC OS/2 versions. Therefore the value reported by
++to future OS/2 versions. Therefore the value reported by
+ .I zip
+ (which uses this 32-bit-mode size) differs from that reported by DIR.
+ .I zip
+--- a/zip.txt
++++ b/zip.txt
+@@ -1974,7 +1974,7 @@
+        when  DIRing  a  file.   However,  the structure layout returned by the
+        32-bit DosQueryPathInfo() is a bit different,  it  uses  extra  padding
+        bytes  and  link  pointers  (it's  a linked list) to have all fields on
+-       4-byte boundaries for portability to future RISC OS/2 versions.  There-
++       4-byte  boundaries  for  portability  to  future OS/2 versions.  There-
+        fore  the value reported by zip (which uses this 32-bit-mode size) dif-
+        fers from that reported by DIR.   zip  stores  the  32-bit  format  for
+        portability, even the 16-bit MS-C-compiled version running on OS/2 1.3,

@@ -1,0 +1,47 @@
+#
+# uasm — MASM 兼容汇编器（UASM，JWasm 的后继）
+# 基于 Arch Linux PKGBUILD 适配 LankeOS
+#
+# 用途：7-Zip 的 x86_64 构建要用它汇编 Asm/x86/*.asm（MASM 语法，nasm/yasm 不兼容）。
+# 上游 v2.57r（2024-08）之后未再发版，Arch 用 11 个 PR #216 的 cherry-pick 让它能在
+# GCC 14 / Clang 18 上构建 —— 这里把那些 cherry-pick 合成单条补丁（0001），
+# 构建期不再需要 git（源用 tag tarball而不是 git+ 克隆）。
+#
+# 与 Arch 的差异：
+#  - 不装 uasm-nocolor：那只是给终端用户去 ANSI 色的便捷 wrapper（内含从 superuser
+#    抄来的 CC-BY-SA-3.0 片段），7-Zip 构建用的是 uasm 本体，用不到它。
+#  - 构建日期在配方里直接写死（Arch 是 sed 注入 git 提交日期）。这样构建期不需要 git，
+#    且避开了 Arch 那步的隐患：`git log --date=format:'%b %d %Y'` 跟随 locale，
+#    在中文 locale 下会把 "8月 10 2024" 编进二进制（实测）。
+# 命名沿用 rust 包的 NNNN-<子系统>-<描述>.patch，序号即应用顺序。
+
+_BD=$(dirname {WORK_DIR})
+
+lankebuild_prepare() {
+    # -F0 禁 fuzz、-t 禁交互（见 unzip / bzip2 同名注释）。
+    for _p in "$_BD"/patches/*.patch; do
+        [ -f "$_p" ] || continue
+        patch -N -F0 -t -p1 -i "$_p" \
+            || patch -R --dry-run -F0 -t -p1 -i "$_p" >/dev/null 2>&1 \
+            || { echo "补丁应用失败: $_p"; exit 1; }
+    done
+
+    # 0002 把 __DATE__ 换成 @COMMIT_DATE@，这里填 tag v2.57r 的提交日期。
+    # 写死而非取 git 时间：构建期不需要 git，且结果可复现（不受 locale / 构建日期影响）。
+    sed -i 's/@COMMIT_DATE@/Aug 10 2024/' H/msgdef.h
+}
+
+lankebuild_build() {
+    # Makefile-Linux.mak 是 0001 里重命名出来的（上游叫 Makefile_Linux.mak）
+    make -f Makefile-Linux.mak CC="cc {CFLAGS}" LDFLAGS="{LDFLAGS}"
+}
+
+lankebuild_package() {
+    install -Dm755 GccUnixR/uasm "{STAGING_ROOT}{BINDIR}/uasm"
+
+    install -d "{STAGING_ROOT}{DATADIR}/doc/uasm"
+    install -m644 Readme.txt History.txt README.md "{STAGING_ROOT}{DATADIR}/doc/uasm/"
+    cp -a Doc "{STAGING_ROOT}{DATADIR}/doc/uasm/"
+
+    install -Dm644 License.txt "{STAGING_ROOT}{DATADIR}/licenses/uasm/License.txt"
+}

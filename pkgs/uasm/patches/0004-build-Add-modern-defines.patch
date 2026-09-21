@@ -1,0 +1,11 @@
+--- a/Makefile-Linux.mak
++++ b/Makefile-Linux.mak
+@@ -16,7 +16,7 @@ CC = gcc
+ ifeq ($(DEBUG),0)
+ extra_c_flags = -DNDEBUG -O2 -funsigned-char -Werror=write-strings
+ extra_c_flags += -Wunused -Wuninitialized
+-extra_c_flags += -Wno-switch -Wno-enum-conversion -Wno-enum-compare
++extra_c_flags += -Wno-switch -Wno-enum-conversion -Wno-enum-compare --std=c17 -D_POSIX_C_SOURCE=200809L
+ OUTD=GccUnixR
+ else
+ extra_c_flags = -DDEBUG_OUT -g
