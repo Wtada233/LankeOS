@@ -24,7 +24,6 @@ lankebuild_build() {
     #    （linux/{magic,btrfs_tree}.h ← pkgs/linux 的 headers_install，经 base-devel 传递带上，与 btrfs-progs 无关）；
     #    实际干活是运行时 exec `btrfs subvolume create/delete`，所以 LankeBUILD.json 的 deps 里显式写了 btrfs-progs。
     ./configure --bindir={BINDIR} \
-                --disable-account-tools-setuid \
                 --enable-man \
                 --libdir={LIBDIR} \
                 --mandir={MANDIR} \
@@ -32,7 +31,6 @@ lankebuild_build() {
                 --sbindir={BINDIR} \
                 --sysconfdir={SYSCONFDIR} \
                 --with-btrfs \
-                --with-fcaps \
                 --with-group-name-max-length=32 \
                 --with-libpam \
                 --with-yescrypt \
