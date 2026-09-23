@@ -5,44 +5,157 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Ddefault_library=shared -Ddefault-dnssec=no -Dfirstboot=false -Dman=disabled -Dpam=enabled -Dlogind=true -Dmode=release -Dwerror=false -Dseccomp=enabled
+    # 关掉的都是"镜像/扩展/安装/家目录"这一族**非核心可选栈**（每一项都实测过没有包依赖它）：
+    # - networkd：systemd-networkd 整套（内核态网络交给 NetworkManager）
+    # - sysext：systemd-sysext / systemd-confext（扩展镜像层）
+    # - sysupdate + sysupdated：**两个独立选项**——前者是 CLI 工具、后者是守护服务（262 的
+    #   meson_options.txt 里 sysupdated 是 combo，choices = auto/enabled/disabled），
+    #   只关前者会留下 systemd-sysupdated，必须两个都关。
+    # - mountfsd / nsresourced：镜像挂载 / 非特权 userns 两个 varlink 服务。**唯一客户端在 systemd
+    #   自己的工具里**（`systemd-dissect --mount`、nspawn/run 的非特权路径）；实测 udisks2 / gvfs /
+    #   gnome-shell / nautilus / plasma-workspace / kf-solid / flatpak / libblockdev **全部零引用**
+    #   —— 桌面自动挂载走 udisks2，gvfs 走自己的 FUSE，与这两个服务无关。
+    # - homed：systemd-homed / homectl / pam_systemd_home.so。linux-pam 的 PAM 配置里那 4 行
+    #   `pam_systemd_home.so` **带 `-` 前缀**（= 模块缺失不报错），注释也写着"尚未构建"，故关掉与现状一致。
+    # - sysinstall：262 的交互式 OS 安装器（提示选目标盘、注册固件启动项）—— 不是发行版安装路径。
+    #   它的 varlink 客户端依赖是 `io.systemd.Repart`（23 处）+ BootControl/Credentials/Shutdown，
+    #   **不依赖 mountfsd**（实测）。
+    # - repart：按 `/usr/lib/repart.d/*.conf` 声明式**创建/增长分区表**（典型用途：镜像写盘后首次
+    #   启动把根分区撑满、mkosi 打磁盘镜像）。关了之后发行版里没有任何消费者（sysinstall 已关）。
+    # - imds：**v262 新增**的云端实例元数据栈（systemd-imdsd / systemd-imds 工具 / imds-generator /
+    #   metrics socket / polkit policy / sysusers 用户 / 40-imds.hwdb，共 12 个产物；面向
+    #   AWS/Azure/GCE 那类云主机 169.254.169.254 的元数据服务）。桌面发行版零用途。
+    #   关键点：它是 `feature` 型且**没写 `value`** → meson 默认 `auto` → 因 build_deps 里有
+    #   curl（libcurl 被找到）而**被自动打开**，不是我们显式开的。
+    #   关掉开关整族干净消失：units/meson.build 里 6 个 imds unit 全带 `conditions: ['ENABLE_IMDS']`，
+    #   sysusers.d/systemd-imds.conf 与 io.systemd.imds.policy 同在 src/imds（`subdir_done()` 门后），
+    #   上游 vendor preset 也**没有** enable 任何 imds unit（不留悬空 preset 条目）。
+    #   **唯一例外是 40-imds.hwdb**（hwdb.d/meson.build 里它在 `hwdb_files_test` 列表，只随
+    #   ENABLE_HWDB 装）→ 见下面单独 rm。
+    # - bootloader：**显式设 `=disabled`**。它是 sd-boot/stub 与用户态工具的门，连带
+    #   `systemd-bless-boot`(+generator)、`systemd-boot-*` 服务，以及（配合 HAVE_OPENSSL+HAVE_TPM2）
+    #   整族 TPM2/PCR 度量与 pcrlock：`pcrlock*` / `pcrphase*` / `tpm2-setup*` / `pcrextend`。
+    #   **为什么要显式写**：它是 `auto`（要求 `pyelftools + efi + efi_arch`，top_meson.build）。
+    #   实测目前解析为 0 —— release 6/7/8 里 `bless-boot`/`*.efi`/`pcrlock`/`pcrphase`/`tpm2-setup`
+    #   一律为空 ——**但那只是环境碰巧**：哪天 pyelftools / efi 被满足，这一族会悄无声息冒出来。
+    #   写死它，结果就不依赖 auto 的依赖探测。
+    #   **注意它并不门控 `bootctl`**：bootctl 在独立目录 `src/bootctl/`，唯一条件是 `HAVE_BLKID`；
+    #   `systemd-boot-check-no-failures`（`src/bless-boot/meson.build` 第三条）更是**无条件**。
+    #   两者是**通用 EFI 管理/查询工具**，不依赖 sd-boot，配 GRUB 一样有用（实测 `bootctl`
+    #   照常输出固件、Secure Boot 状态、`TPM2 Support: yes`——那是**固件** EFI TCG2 协议的探测，
+    #   与 systemd 编译选项无关），故保留、不受这个开关影响。
+    #   将来要做 TPM 度量启动 / pcrlock / LUKS-TPM：需 `-Dbootloader=enabled` + python-pyelftools
+    #   + tpm2-tss（仓库里目前**没有** tpm2-tss 包）。
+    # - remote："journal over the network"：journal-upload 推日志、journal-remote 收日志、
+    #   journal-gatewayd 用 HTTP 暴露本机 journal。桌面单机无用，上游 preset 也把这三个全 disable。
+    #   注意 `systemd-journal-remote` **二进制是无条件构建的**（源码注释：更精简的版本总能编）→
+    #   关掉开关只拿走 5 条 unit 与 /etc/systemd/journal-upload.conf，二进制见下方单独 rm。
+    # - portabled：Portable Services（把服务打成自包含镜像，再 attach/detach 到宿主，用于跨发行版
+    #   分发服务）。src/portable 整体在 `ENABLE_PORTABLED` 的 `subdir_done()` 门后 → 关掉干净消失
+    #   （含 portablectl / D-Bus org.freedesktop.portable1 / polkit policy / 四个 profile /
+    #   tmpfiles.d/portables.conf）。桌面无用。
+    # - importd：从 URL 下载 OS/容器镜像（tar/raw/qcow2，含 OCI）导入本地机器库，供 machinectl
+    #   pull-* 与 nspawn 使用；**root 特权守护**（下载+解包）。src/import 整体在 `ENABLE_IMPORTD`
+    #   的 `subdir_done()` 门后 → 关掉干净消失（importd/pull/import/import-fs/export/importctl/
+    #   generator/D-Bus org.freedesktop.import1/polkit/import-pubring.pgp）。
+    #   注：`sysupdate` 的 require() 依赖 ENABLE_IMPORTD —— 我们本来就 `-Dsysupdate=disabled`，无影响。
+    # - resolve：systemd-resolved 整套（`resolvectl` / D-Bus `org.freedesktop.resolve1` / polkit /
+    #   nss-resolve 模块 / sysusers 用户 / `/usr/lib/systemd/resolv.conf` / `/etc/systemd/resolved.conf`
+    #   / 上游自己的 `resolvconf`+`systemd-resolve` 软链）—— `src/resolve` 整体在
+    #   `ENABLE_RESOLVE` 的 `subdir_done()` 门后。**DNS 交给 NetworkManager 管**，故关掉。
+    #   **必须一起关掉的关键一条**：`tmpfiles.d/systemd-resolve.conf` 的全部内容就是
+    #   `L! /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf`，它受 `ENABLE_RESOLVE`
+    #   门控（tmpfiles.d/meson.build）。若留着它而 resolved 不在，`systemd-tmpfiles --create` 会把
+    #   /etc/resolv.conf 强制指向一个不存在的 stub → **DNS 直接死**。关掉后 /etc/resolv.conf 由 NM 直写。
+    #   连带：`nss-resolve` 是 auto，top_meson.build 里 `allowed()` 分支取 `get_option('resolve')`
+    #   → 自动跟着关，`libnss_resolve.so.2` 随之消失（provides 由 farm 构建后**自动重扫**，不手编）。
+    #   配方里那两条 `ln -sfv resolvectl …/{systemd-resolve,resolvconf}` 也已删：上游
+    #   `src/resolve/meson.build` 自己就 install_symlink 了这两个名字，resolve 关掉后那两条只会变悬空链。
+    # 想用其中任一功能：去掉对应开关重编即可（一次 systemd 重编的代价）。
+    # 注：factory-reset **没有 meson 开关**（见下方删除块）。
+    #
+    # **开关取值按 meson 类型写，别一律用 false**（实测踩过）：
+    #   - `feature` 型（homed / repart / sysupdate / imds）必须写 `enabled`/`disabled`/`auto`。
+    #     `=false` 只对声明了 `deprecated : { 'true':'enabled', 'false':'disabled' }` 的选项能过，
+    #     且 meson 会打 `DEPRECATION: value 'false' is replaced by 'disabled'`；
+    #     **`imds` 没有这个映射** → `-Dimds=false` 直接报
+    #     `Value "false" (of type "string") for option "imds" is not one of the choices`。
+    #   - `boolean` 型（networkd / sysext / mountfsd / nsresourced / sysinstall / firstboot）写 true/false。
+    #   - `combo` 型写它的 choices（sysupdated: auto/enabled/disabled）。
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Ddefault_library=shared -Ddefault-dnssec=no -Dfirstboot=false -Dman=disabled -Dpam=enabled -Dlogind=true -Dmode=release -Dwerror=false -Dseccomp=enabled -Dnetworkd=false -Dsysext=false -Dsysupdate=disabled -Dsysupdated=disabled -Dmountfsd=false -Dnsresourced=false -Dhomed=disabled -Dsysinstall=false -Drepart=disabled -Dimds=disabled -Dbootloader=disabled -Dremote=disabled -Dportabled=false -Dimportd=disabled -Dresolve=false
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
+
+    # factory-reset（systemd-factory-reset + factory-reset*.target 等）：上游**没有 meson 开关**
+    # （meson_options.txt 里无 factory* 选项；units/meson.build 的条目也没有 conditions）→ 只能事后删。
+    # glob 覆盖 二进制 / generator / unit / wants 链接与空目录，上游将来新增同名 unit 也一并覆盖。
+    # （原先是在设备上手工把 unit mask 到 /dev/null —— 那样字节仍在包里；这里是根本不打包。）
+    #
+    # pattern 必须写 `factory-reset*`、**不能**写 `factory-reset*.target`：上游把
+    # `factory-reset.target.wants/` 这个**目录**也装出来（units/meson.build 两条条目带
+    # `'symlinks': ['factory-reset.target.wants/']`），目录名以 `.wants` 结尾不匹配 `*.target`
+    # → 里面两个链接被删、空目录留下（实测残留一个空 `factory-reset.target.wants/`）。
+    # 改成 `factory-reset*` 后，find 的后序（-delete 隐含 -depth）会先删内容再 rmdir 空目录。
+    find "{STAGING_ROOT}" \
+        \( -name 'systemd-factory-reset*' -o -name 'factory-reset*' \
+           -o -name 'systemd-pcrphase-factory-reset.service' \) -delete
+
+    # 两个「开关关不掉」的残留（理由见上方 imds / remote 注释）。`rm -f` 在文件不存在时静默通过，
+    # 上游将来改名/加门也不会炸构建。
+    #   - 40-imds.hwdb：只随 ENABLE_HWDB 装，不在 ENABLE_IMDS 门下。
+    #   - systemd-journal-remote：src/journal-remote 里该条目**没有 conditions**（无条件构建），
+    #     `-Dremote=disabled` 只拿走它的 5 条 unit。
+    rm -f "{STAGING_ROOT}{LIBDIR}/udev/hwdb.d/40-imds.hwdb"
+    rm -f "{STAGING_ROOT}{LIBDIR}/systemd/systemd-journal-remote"
+
+    # **不要动 `{DATADIR}/factory`**：那是 systemd **自己**的 /etc 骨架模板目录
+    # （`factorydir = datadir / 'factory'`，meson.build 无条件 install_subdir('factory/etc')：
+    # issue / locale.conf / nsswitch.conf / vconsole.conf / pam.d/{other,system-auth}），
+    # 由 `tmpfiles.d/etc.conf` 的五条 `C!`（/etc/locale.conf、nsswitch.conf、vconsole.conf、
+    # pam.d、issue）在首启 `systemd-tmpfiles --create` 时**复制并覆盖**到 /etc。
+    # 这里曾多写一行 `rm -rf ...{DATADIR}/factory`，把骨架连根删掉 → 那五条 C! 全部源缺失而失败，
+    # 全新安装的 /etc/nsswitch.conf、/etc/pam.d、/etc/locale.conf 再也不会生成。
+    # 它跟 factory-**reset** 只是名字像，毫无关系。{LIBDIR}/factory 更是从来不存在。
 
     # 添加系统管理链接
     for tool in reboot halt poweroff shutdown telinit runlevel; do
         ln -sfv systemctl {STAGING_ROOT}{BINDIR}/$tool
     done
-    ln -sfv resolvectl {STAGING_ROOT}{BINDIR}/systemd-resolve
-    ln -sfv resolvectl {STAGING_ROOT}{BINDIR}/resolvconf
+    # 注意：**不建** `systemd-resolve` 与 `resolvconf` 这两条软链 —— 一是上游
+    # `src/resolve/meson.build` 自己就 install_symlink 了它们（这里原本是重复），二是
+    # `-Dresolve=false` 后 resolvectl 不存在，建了就是悬空链。
     ln -sfv ../lib/systemd/systemd {STAGING_ROOT}{BINDIR}/init
     ln -sfv systemd-run {STAGING_ROOT}{BINDIR}/run0
-    ln -sfv systemd-sysext {STAGING_ROOT}{BINDIR}/systemd-confext
     ln -sfv systemd-mount {STAGING_ROOT}{BINDIR}/systemd-umount
     ln -sfv udevadm {STAGING_ROOT}{BINDIR}/udevd
-
-    # 建立 LankeOS 默认预设策略：禁用自带网络管理，优先使用 NetworkManager
-    mkdir -pv {STAGING_ROOT}{LIBDIR}/systemd/system-preset
-    cat > {STAGING_ROOT}{LIBDIR}/systemd/system-preset/99-lankeos.preset << "EOF"
-disable systemd-networkd.service
-disable systemd-resolved.service
-enable NetworkManager.service
-enable sshd.service
-enable bluetooth.service
-EOF
-
-    echo "systemd-machine-id-setup" >> "{STAGING_HOOKS}/postinst.sh"
-    echo "systemctl preset-all" >> "{STAGING_HOOKS}/postinst.sh"
+    # 注意：**不建** `systemd-confext -> systemd-sysext` 这条软链 —— sysext/confext 已用
+    # `-Dsysext=false` 关掉，建了就是指向不存在二进制的悬空链（ln 不检查目标）。
 }
 
 
 lankebuild_package() {
-    # sysusers.d 的 basic/systemd-* 用户需 postinst 建（rtkit 同款；安装期即建，
-    # 不依赖开机 systemd-sysusers.service）
+    # **刻意不在这里放发行版预设（`system-preset/*.preset`）**：systemd 是基础件，不应该知道
+    # NetworkManager / sshd / bluetooth 这些**上层组件**的存在。原先这里有一份 99-lankeos.preset
+    # （disable networkd/resolved + enable NetworkManager/sshd/bluetooth），已删。
+    #
+    # `systemctl preset-all` **仍然要调**，但它现在只应用 **systemd 自带的 vendor 预设**
+    # （`presets/90-systemd.preset` → 装到 `/usr/lib/systemd/system-preset/`）——那是 systemd
+    # **自己**的默认策略，不是我们替上层做的决定。注意它的默认是 **enable**
+    # `systemd-networkd.service` / `systemd-resolved.service` / `systemd-*-sysroot.service`；
+    # 前两者里 networkd 我们已不构建（preset 对不存在的 unit 是 no-op），**resolved 会被 enable**。
+    #
+    # 这里只做 systemd **自己**的事：
+    # - sysusers.d 的 basic/systemd-* 用户在安装期建出来（rtkit 同款，不依赖开机
+    #   systemd-sysusers.service）；tmpfiles 同理（不依赖 systemd-tmpfiles-setup.service）。
+    # - `systemd-machine-id-setup` 生成 /etc/machine-id：**必须合并进这一个 heredoc**。
+    #   原先是 `echo >> postinst.sh` 追加、随后被这里的 `cat >` 覆盖 —— 静默丢失（CLAUDE.md
+    #   明写的坑：已有 postinst 要合并追加，别用 `cat >` 覆盖掉原逻辑）。
     cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
 #!/bin/sh
 systemd-sysusers
 systemd-tmpfiles --create
+systemd-machine-id-setup
+systemctl preset-all
 exit 0
 EOF
 }

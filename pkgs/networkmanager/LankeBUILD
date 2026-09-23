@@ -5,30 +5,40 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Ddefault_library=shared -Dpolkit=true -Dintrospection=true -Dvapi=true -Dnmtui=true -Dppp=false -Dlibaudit=no -Dselinux=false -Dcrypto=gnutls -Dmodem_manager=false -Dovs=false -Dnm_cloud_setup=false -Dqt=false -Dnbft=false -Dsession_tracking=systemd -Dlibpsl=true -Dclat=false
+    # 开关说明（与 Arch 的差异一律取 Arch 同款；布尔项**显式写死**，不依赖上游默认值）：
+    # - `-Dconfig_dns_rc_manager_default=symlink`：/etc/resolv.conf 交给 NM 独占管理
+    #   （软链到 /run/NetworkManager/resolv.conf，原子更新）。**systemd-resolved 已关、
+    #   resolvconf 软链已删**，若不钉这个，`auto` 会在运行时探测后退化成"直接写文件"。
+    # - `-Dpolkit_noauth_group=wheel`：上游据此装 `org.freedesktop.NetworkManager.rules`
+    #   （data/meson.build 的 configure_file），**只授一条**：`settings.modify.system` ∧
+    #   wheel 组 ∧ `subject.local`（本地控制台免密改系统连接）。原先配方手写过同路径的规则文件，
+    #   给根本不存在的 netdev 组**无条件放行整族 action**，既覆盖了上游又宽得多 —— 已删。
+    # - `-Dppp=true` / `-Dmodem_manager=true`：**构建期硬性要求**对应包在 build_deps 里
+    #   （ppp 要 `pppd/pppd.h` + 找到 `/usr/sbin/pppd`，modem 要 `mm-glib.pc`），否则 meson assert 失败。
+    # - `-Db_lto=true`：Arch 同款。NM 的 meson 说明"构建会检查这个选项，只从 *FLAGS 注入是坏的"。
+    # - `-Dclat=false`：CLAT 只影响 IPv6-only + NAT64 网络访问 IPv4，而 1.58 的 CLAT 是
+    #   **用 eBPF 实现**的，依赖链仓库里凑不齐：`meson.build:522` 要 `libbpf >= 1.3.0`
+    #   （**仓库无 libbpf 包**；libndp 那条我们 1.9 正好满足），`src/core/bpf/meson.build` 还要
+    #   BPF 编译器（clang `-target bpf` 或 gcc 的 bpf 交叉工具链）+ **`bpftool`**
+    #   （**仓库无 bpftool 包**，Arch 的 `bpf` 包从内核源码树构建）。
+    #   要开：先建这两个包，再改回 true 并加 `-Dbpf-compiler=clang` + `clang` 进 build_deps。
+    meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Ddefault_library=shared -Dpolkit=true -Dintrospection=true -Dvapi=true -Dnmtui=true -Dlibaudit=no -Dselinux=false -Dcrypto=gnutls -Dovs=false -Dnm_cloud_setup=false -Dqt=false -Dnbft=false -Dsession_tracking=systemd -Dlibpsl=true -Dppp=true -Dmodem_manager=true -Dclat=false -Db_lto=true -Dconfig_dns_rc_manager_default=symlink -Dpolkit_noauth_group=wheel
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
-    # 创建官方推荐的基础配置
+    # 只放**默认**配置，不写任何覆盖值：
+    # - `plugins` 不设 → NM 内置默认即 keyfile（我们没编 ifcfg-rh/ifupdown，没有别的可选）；
+    # - `auth-polkit` 不设 → 构建期 `polkit=true` 时 `config_auth_polkit_default` 本来就是 `true`
+    #   （NM 的 meson：option 为 'default' 时取 `enable_polkit ? 'true' : 'false'`）。
+    # 所以这里只装一个空模板当用户的编辑入口（Arch 同款内容）。
     mkdir -pv {STAGING_ROOT}/etc/NetworkManager/conf.d
     cat > {STAGING_ROOT}/etc/NetworkManager/NetworkManager.conf << "EOF"
-[main]
-plugins=keyfile
+# Configuration file for NetworkManager.
+# See "man 5 NetworkManager.conf" for details.
 EOF
-    cat > {STAGING_ROOT}/etc/NetworkManager/conf.d/polkit.conf << "EOF"
-[main]
-auth-polkit=true
-EOF
-    # 写入 NetworkManager 的 Polkit 权限规则 (允许 netdev 组)
-    mkdir -pv {STAGING_ROOT}{DATADIR}/polkit-1/rules.d
-    cat > {STAGING_ROOT}{DATADIR}/polkit-1/rules.d/org.freedesktop.NetworkManager.rules << "EOF"
-polkit.addRule(function(action, subject) {
-    if (action.id.indexOf("org.freedesktop.NetworkManager.") == 0 && subject.isInGroup("netdev")) {
-        return polkit.Result.YES;
-    }
-});
-EOF
+    # **不写 polkit 规则文件、也不写 conf.d/polkit.conf**：前者由上游按
+    # `-Dpolkit_noauth_group=wheel` 自己装（且只授一条最窄的规则），后者是默认值。
+    # 不再建 netdev 组（权限改由 `-Dpolkit_noauth_group=wheel` 走上游规则）。
     cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
-getent group netdev >/dev/null || groupadd -fg 86 netdev
 systemctl enable NetworkManager
 EOF
 }

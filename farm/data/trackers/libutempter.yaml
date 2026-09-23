@@ -1,8 +1,21 @@
 pkg-name: libutempter
-version-source: sources[0]
+# ALT Linux 的 tag 是 `<上游版本>-alt<release>`——`alt` = ALT 的**包 release**，语义同 Arch 的
+# pkgrel（1.2.3-alt1 = 上游 1.2.3 + ALT 第 1 次打包）。这个仓库的 tag 不是上游 release tag。
+#
+# 原样用会踩 vercmp：`-` 之后被当作**预发布段**，于是 `1.2.3-alt1` **小于** `1.2.3` → 每轮全量跑
+# 都命中"探测到倒退版本"守卫而被忽略，tracker 事实上是死的（永远产不出更新）。
+#
+# 修法：只把 `-alt` 的**连字符去掉**（1.2.3-alt1 → 1.2.3alt1）。`alt1` 于是落到 vercmp 的
+# alpha_suffix（非空 > 基础版），排序为 `1.2.3 < 1.2.3alt1 < 1.2.3alt2 < 1.2.4alt1` ✓
+# —— 既升序正确，又**保留 ALT 的 release**；若把 `-altN` 整段剥掉，`-alt1` 与 `-alt2` 会同为
+# `1.2.3`，就再也检测不到 ALT 的重新打包了。
+#
+# URL 用**原始 tag**（`git+…@1.2.3-alt1`，与本包现有源一致），只对版本串做改写。
+# 「按正则改写版本串」模板表达不了（CLAUDE.md 例外表第①类），故用条目级 script。
 sources:
-- tracker-template: github
-  repo: altlinux/libutempter
-  mode: tags
-  tag-prefix: ''
-  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+  - tracker-template: script
+    script: |
+      tag=$(git ls-remote --tags --refs https://github.com/altlinux/libutempter 2>/dev/null \
+            | sed 's#.*refs/tags/##' | grep -E '^[0-9]+(\.[0-9]+)+-alt[0-9]+$' | sort -V | tail -n1)
+      test -n "$tag" || exit 1
+      echo "${tag/-alt/alt}|git+https://github.com/altlinux/libutempter.git@$tag"

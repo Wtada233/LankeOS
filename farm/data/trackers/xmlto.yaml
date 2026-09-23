@@ -1,6 +1,10 @@
 pkg-name: xmlto
+# pagure 不是 GitHub/GitLab（例外③），无对应模板；但**可以从 git tag 真跟踪**。
+# 原来这里硬编码 `echo "0.0.29"` —— 等于完全不跟踪，上游发新版永远不会知道。
 sources:
-  - tracker-template: script
-    script: |
-      #!/bin/bash
-      echo "0.0.29|https://pagure.io/xmlto/archive/0.0.29/xmlto-0.0.29.tar.gz"
+- tracker-template: script
+  script: |
+    ver=$(git ls-remote --tags --refs https://pagure.io/xmlto.git 2>/dev/null \
+          | sed 's#.*refs/tags/##' | grep -E '^[0-9]+(\.[0-9]+)+$' | sort -V | tail -n1)
+    test -n "$ver" || exit 1
+    echo "$ver|https://pagure.io/xmlto/archive/$ver/xmlto-$ver.tar.gz"

@@ -1,6 +1,6 @@
 {
   "name": "parallel",
-  "version": "20260822",
+  "version": "20260922",
   "release": 2,
   "deps": [
     "bash",
@@ -12,7 +12,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/parallel/parallel-20260822.tar.bz2"
+    "https://ftp.gnu.org/gnu/parallel/parallel-20260922.tar.bz2"
   ],
   "work_sources": []
 }

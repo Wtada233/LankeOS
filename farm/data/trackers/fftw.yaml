@@ -1,8 +1,7 @@
 pkg-name: fftw
+version-source: sources[0]
 sources:
-  - tracker-template: script
-    script: |
-      #!/bin/bash
-      set -e
-      ver=$(curl -fsSL https://www.fftw.org/download.html | grep -oE 'fftw-[0-9]+(\.[0-9]+)+\.tar\.gz' | sed -E 's/fftw-([0-9.]+)\.tar\.gz/\1/' | sort -V | tail -n1)
-      echo "$ver|https://www.fftw.org/fftw-${ver}.tar.gz"
+- tracker-template: html-index
+  url: https://www.fftw.org/download.html
+  pattern: 'fftw-([0-9.]+)\.tar\.gz'
+  template: https://www.fftw.org/fftw-{version}.tar.gz

@@ -1,8 +1,16 @@
 pkg-name: libibus
-version-source: sources[0]
+# 为什么是 script（两条模板路都不通）：
+# - `mode: releases` 无 `max-version` 时走 GitHub `/releases/latest`，而**上游把 rc 发成普通
+#   release**（实测：1.5.33/34/35 的 rc 全是 `prerelease: false`，而所有 beta 是 `true`）→
+#   GitHub 的 latest 对 ibus **恒等于最新 rc** ✗。
+# - `mode: tags` 会被 `20080901` 这种日期 tag 带偏：它是纯数字，vercmp 里比 `1.5.34` 大 ✗。
+# 判据取 **Arch 同款**：Arch 停在 `1.5.34`（不上 rc）。脚本用"**必须带点**"把日期 tag 与版本号天然
+# 分开（`20080901` 无点 ✗），同时 `-alpha/-beta/-rc` 因含 `-` 自然被排除 ✗。
+# 走 git 协议列 tag → 不占 GitHub API 配额。
 sources:
-- tracker-template: github
-  repo: ibus/ibus
-  mode: releases
-  tag-prefix: ''
-  template: https://github.com/ibus/ibus/releases/download/{tag}/ibus-{version}.tar.gz
+- tracker-template: script
+  script: |
+    tag=$(git ls-remote --tags --refs https://github.com/ibus/ibus 2>/dev/null \
+          | sed 's#.*refs/tags/##' | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)*$' | sort -V | tail -n1)
+    test -n "$tag" || exit 1
+    echo "$tag|https://github.com/ibus/ibus/releases/download/$tag/ibus-$tag.tar.gz"

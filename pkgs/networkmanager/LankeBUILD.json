@@ -1,8 +1,12 @@
 {
   "name": "networkmanager",
   "version": "1.58.1",
-  "release": 2,
-  "deps": [],
+  "release": 3,
+  "deps": [
+    "mobile-broadband-provider-info",
+    "modemmanager",
+    "ppp"
+  ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
     "libc.so.6",
@@ -13,6 +17,7 @@
     "libgmodule-2.0.so.0",
     "libgnutls.so.30",
     "libgobject-2.0.so.0",
+    "libmm-glib.so.0",
     "libndp.so.0",
     "libnewt.so.0.52",
     "libpsl.so.5",
@@ -38,9 +43,12 @@
     "libpsl",
     "libxslt",
     "meson",
+    "mobile-broadband-provider-info",
+    "modemmanager",
     "newt",
     "ninja",
     "polkit",
+    "ppp",
     "python-gobject",
     "readline",
     "slang",

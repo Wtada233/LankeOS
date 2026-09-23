@@ -1,7 +1,7 @@
 {
   "name": "systemd",
-  "version": "261.3",
-  "release": 5,
+  "version": "262",
+  "release": 9,
   "deps": [
     "bash",
     "python"
@@ -15,7 +15,6 @@
   "provides": [
     "libnss_myhostname.so.2",
     "libnss_mymachines.so.2",
-    "libnss_resolve.so.2",
     "libnss_systemd.so.2",
     "libsystemd.so",
     "libsystemd.so.0",
@@ -53,7 +52,7 @@
     "xz"
   ],
   "sources": [
-    "https://github.com/systemd/systemd/archive/refs/tags/v261.3.tar.gz"
+    "https://github.com/systemd/systemd/archive/refs/tags/v262.tar.gz"
   ],
   "work_sources": []
 }
