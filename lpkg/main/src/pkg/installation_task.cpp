@@ -672,8 +672,7 @@ void InstallationTask::copy_package_files()
             const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
             // 注意 `fs::is_directory` 会跟随符号链接：`/etc/x -> /some/dir` 会被判成"目录"
             // 从而绕过配置保护（既不备份也不留 .lpkgnew，直接替换）。故符号链接一律按冲突处理。
-            const bool cfg_conflict =
-                fs::exists(physical_path) || fs::is_symlink(physical_path);
+            const bool cfg_conflict = fs::exists(physical_path) || fs::is_symlink(physical_path);
             if (is_config && cfg_conflict &&
                 (fs::is_symlink(physical_path) || !fs::is_directory(physical_path))) {
                 dest += std::string(constants::SUFFIX_LPKG_NEW);
@@ -738,6 +737,7 @@ void InstallationTask::copy_package_files()
                 has_config_conflicts_ = true;
                 fs::copy(src_path, final_dest,
                          fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+                copy_xattrs(src_path, final_dest);  // fs::copy 不带 xattr（含文件能力）
                 // config 冲突文件虽不进 WAL（"请审阅"文件），仍按纪律 fsync，避免断电丢内容
                 if (int cfd = ::open(final_dest.c_str(), O_RDONLY); cfd >= 0) {
                     ::fsync(cfd);
@@ -748,6 +748,7 @@ void InstallationTask::copy_package_files()
                 tmp_path += ".lpkgtmp";
                 fs::copy(src_path, tmp_path,
                          fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+                copy_xattrs(src_path, tmp_path);  // 先搬到 .lpkgtmp，rename 后 xattr 随之生效
 
                 struct stat st;
                 if (lstat(src_path.c_str(), &st) == 0) {
@@ -882,6 +883,7 @@ void InstallationTask::run_post_install_hook()
         if (entry.is_regular_file()) {
             const fs::path dest = dest_dir / entry.path().filename();
             fs::copy(entry.path(), dest, fs::copy_options::overwrite_existing);
+            copy_xattrs(entry.path(), dest);
             fs::permissions(dest,
                             fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
                             fs::perm_options::add);

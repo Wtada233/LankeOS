@@ -1,9 +1,9 @@
 pkg-name: gimp
-type: script
-script-content: |
-  tags=$(git ls-remote --tags https://gitlab.gnome.org/GNOME/gimp.git 'refs/tags/GIMP_*')
-  tag=$(printf '%s\n' "$tags" | sed 's/.*refs\/tags\///; s/\^{}//' | grep -E '^GIMP_[0-9]+_[0-9]+_[0-9]+$' | sort -V | tail -n1)
-  test -n "$tag" || exit 1
-  version=$(echo "${tag#GIMP_}" | tr '_' '.')
-  echo "$version"
-  echo "https://download.gimp.org/pub/gimp/v${version%.*}/gimp-$version.tar.xz"
+sources:
+  - tracker-template: script
+    script: |
+      tags=$(git ls-remote --tags https://gitlab.gnome.org/GNOME/gimp.git 'refs/tags/GIMP_*')
+      tag=$(printf '%s\n' "$tags" | sed 's/.*refs\/tags\///; s/\^{}//' | grep -E '^GIMP_[0-9]+_[0-9]+_[0-9]+$' | sort -V | tail -n1)
+      test -n "$tag" || exit 1
+      version=$(echo "${tag#GIMP_}" | tr '_' '.')
+      echo "$version|https://download.gimp.org/pub/gimp/v${version%.*}/gimp-$version.tar.xz"

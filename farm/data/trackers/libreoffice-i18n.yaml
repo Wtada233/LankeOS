@@ -1,25 +1,27 @@
 pkg-name: libreoffice-i18n
-type: script
-script-content: |
-  set -e
-  srcbase=https://download.documentfoundation.org/libreoffice/src
+sources:
+  - tracker-template: script
+    expand: true
+    script: |
+      set -e
+      srcbase=https://download.documentfoundation.org/libreoffice/src
 
-  # 1. 探测最新版本（3 段目录 + 4 段 tarball，与主 libreoffice tracker 同款）
-  listing=$(curl -fsSL "$srcbase/")
-  dir=$(printf '%s\n' "$listing" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+/' | tr -d '/' | sort -V | tail -n1)
-  test -n "$dir" || exit 1
-  page=$(curl -fsSL "$srcbase/$dir/")
-  ver=$(printf '%s\n' "$page" | grep -oE 'libreoffice-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.tar\.xz' | head -n1 | sed 's/libreoffice-//; s/\.tar\.xz$//')
-  test -n "$ver" || exit 1
+      # 1. 探测最新版本（3 段目录 + 4 段 tarball，与主 libreoffice tracker 同款）
+      listing=$(curl -fsSL "$srcbase/")
+      dir=$(printf '%s\n' "$listing" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+/' | tr -d '/' | sort -V | tail -n1)
+      test -n "$dir" || exit 1
+      page=$(curl -fsSL "$srcbase/$dir/")
+      ver=$(printf '%s\n' "$page" | grep -oE 'libreoffice-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.tar\.xz' | head -n1 | sed 's/libreoffice-//; s/\.tar\.xz$//')
+      test -n "$ver" || exit 1
 
-  # 2. 从上游枚举该版本的 langpack（只匹配精确版本，排除 .asc）
-  base="https://download.documentfoundation.org/libreoffice/testing/$dir/rpm/x86_64/"
-  esc=$(printf '%s' "$ver" | sed 's/\./\\./g')
-  packs=$(curl -fsSL "$base/" | grep -oE "LibreOffice_${esc}_Linux_x86-64_rpm_langpack_[A-Za-z0-9_-]+\.tar\.gz" | sort -u)
-  test -n "$packs" || exit 1
+      # 2. 从上游枚举该版本的 langpack（只匹配精确版本，排除 .asc）——数量与语言码都不固定，
+      #    故本条目声明 `expand: true`：每次探测产出几个便写几个槽位，上游新增语言自动跟上。
+      base="https://download.documentfoundation.org/libreoffice/testing/$dir/rpm/x86_64/"
+      esc=$(printf '%s' "$ver" | sed 's/\./\\./g')
+      packs=$(curl -fsSL "$base/" | grep -oE "LibreOffice_${esc}_Linux_x86-64_rpm_langpack_[A-Za-z0-9_-]+\.tar\.gz" | sort -u)
+      test -n "$packs" || exit 1
 
-  # 3. 输出：版本 + 全部 langpack URL
-  echo "$ver"
-  for p in $packs; do
-    echo "$base$p"
-  done
+      # 3. 输出：每个 langpack 一行 `<版本>|URL`（顺序即槽位顺序）
+      for p in $packs; do
+        echo "$ver|$base$p"
+      done

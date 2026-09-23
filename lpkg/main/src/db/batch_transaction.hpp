@@ -96,4 +96,3 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
 }
 
 // （曾提供 run_ordered_batch 便捷包装，但从未被任何调用点使用，已移除。）
-

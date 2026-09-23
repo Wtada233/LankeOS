@@ -1,9 +1,10 @@
 pkg-name: intel-media-driver
-type: script
-script-content: |
-  #!/bin/bash
-  tags=$(git ls-remote --tags https://github.com/intel/media-driver.git 2>/dev/null)
-  version=$(printf '%s\n' "$tags" | grep 'refs/tags/intel-media-[0-9][0-9.]*$' | sed 's#.*refs/tags/intel-media-##' | grep -vE '^600' | sort -V | tail -n1)
-  test -n "$version" || exit 1
-  echo "$version"
-  echo "https://github.com/intel/media-driver/archive/refs/tags/intel-media-$version.tar.gz"
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: intel/media-driver
+    mode: tags
+    tag-prefix: intel-media-
+    # 上游混着 `intel-media-600` 这种非版本 tag（数值上大于真实版本，会被误选）
+    exclude: '^600'
+    template: https://github.com/intel/media-driver/archive/refs/tags/intel-media-{version}.tar.gz

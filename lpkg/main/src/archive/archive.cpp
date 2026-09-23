@@ -78,7 +78,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir)
     ArchiveWriteHandle ext(archive_write_disk_new());
     archive_write_disk_set_options(
         ext.get(), ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_OWNER |
-                       ARCHIVE_EXTRACT_ACL | ARCHIVE_EXTRACT_FFLAGS |
+                       ARCHIVE_EXTRACT_ACL | ARCHIVE_EXTRACT_XATTR | ARCHIVE_EXTRACT_FFLAGS |
                        ARCHIVE_EXTRACT_SECURE_SYMLINKS | ARCHIVE_EXTRACT_SECURE_NODOTDOT |
                        ARCHIVE_EXTRACT_UNLINK);
     // 注：这里**不能**加 ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS —— 本实现是先把
@@ -217,8 +217,7 @@ std::string extract_file_from_archive(const fs::path& archive_path,
             const la_int64_t declared = archive_entry_size(entry);
             if (declared < 0 || declared > kMaxMemberSize) {
                 throw LpkgException(string_format("error.archive_member_too_large",
-                                                  std::to_string(declared),
-                                                  archive_path.string()));
+                                                  std::to_string(declared), archive_path.string()));
             }
             size_t size = static_cast<size_t>(declared);
             std::string content;

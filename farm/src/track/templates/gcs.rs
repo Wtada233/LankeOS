@@ -43,7 +43,8 @@ pub fn probe(
     }
 
     let re = Regex::new(pattern).map_err(|e| format!("正则无效 {}: {e}", pattern))?;
-    let version = templates::max_match(&re, &all_xml, major, cfg.max_version.as_deref())
+    let f = templates::version_filter(cfg, major)?;
+    let version = templates::max_match(&re, &all_xml, &f)
         .ok_or_else(|| format!("{url} GCS 列表未匹配到版本"))?;
     let name = cfg.effective_name(pkg_name);
     let url = templates::substitute(template, &[("name", name), ("version", &version)]);

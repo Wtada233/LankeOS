@@ -213,8 +213,7 @@ TEST_F(UpgradeObsoleteDirCleanupTest, UpgradeKeepsObsoleteDirStillUsedByAnotherP
     const fs::path keeper = shared_dir / "keeper.txt";
 
     install_packages({build_site_pkg(a, "1.0", dist_files("83.0.0"))});
-    install_packages(
-        {build_site_pkg(b, "1.0", {"setuptools-83.0.0.dist-info/keeper.txt"})});
+    install_packages({build_site_pkg(b, "1.0", {"setuptools-83.0.0.dist-info/keeper.txt"})});
     ASSERT_TRUE(fs::exists(keeper));
 
     install_packages({build_site_pkg(a, "2.0", dist_files("84.0.0"))});
@@ -287,8 +286,7 @@ TEST_F(UpgradeObsoleteDirCleanupTest, RemoveKeepsDirStillUsedByAnotherPackage)
     const fs::path keeper = shared_dir / "keeper.txt";
 
     install_packages({build_site_pkg(a, "1.0", dist_files("83.0.0"))});
-    install_packages(
-        {build_site_pkg(b, "1.0", {"setuptools-83.0.0.dist-info/keeper.txt"})});
+    install_packages({build_site_pkg(b, "1.0", {"setuptools-83.0.0.dist-info/keeper.txt"})});
     ASSERT_TRUE(fs::exists(keeper));
 
     remove_package(a, /*force=*/false);

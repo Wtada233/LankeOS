@@ -103,20 +103,36 @@ sources:
     template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
 ```
 
-Templates: `github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version` (directly locks another package's version). Each template accepts only its own fields — setting an unsupported field (e.g. `max-version` on github) or misspelling a field name (e.g. `tag-prefx`) errors out instead of being silently ignored.
+Templates: `github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version` (directly locks another package's version) `script` (inline bash). Each template accepts only its own fields — setting an unsupported field (e.g. `max-version` on github) or misspelling a field name (e.g. `tag-prefx`) errors out instead of being silently ignored.
 
-`type: script` is a package-level escape hatch — the script returns the full manifest (stdout line 1 = version, following lines = URLs, after a `# work_sources` marker line they count as work_sources):
+`script` is an **entry-level** escape hatch (a peer of the other templates, not a package-level type): one script produces one source/work_source slot, with stdout being **exactly one line** `<version>|URL`. Use it only when no template can express the source — scripts are not reusable and cannot be uniformly validated:
 
 ```yaml
-pkg-name: libreoffice
-type: script
-script-content: |
-  #!/bin/bash
-  echo "25.2.0"
-  echo "https://x/lo-25.2.0.tar.xz"
-  echo "# work_sources"
-  echo "https://x/vendor-25.2.0.tar.gz"
+pkg-name: ant
+version-source: sources[0]
+sources:
+  - tracker-template: script
+    script: |
+      page=$(curl -fsSL "https://www.apache.org/dist/ant/source/")
+      ver=$(printf '%s\n' "$page" | grep -oE 'apache-ant-[0-9.]+-src\.tar\.bz2' | sed 's/apache-ant-//; s/-src.tar.bz2//' | sort -V | tail -n1)
+      test -n "$ver" || exit 1
+      echo "$ver|https://www.apache.org/dist/ant/source/apache-ant-$ver-src.tar.bz2"
 ```
+
+When upstream publishes a **dynamically enumerated** set (the number of files is not fixed), add `expand: true`: each stdout line is one `<version>|URL` and maps to one consecutive slot (e.g. libreoffice-i18n's 123 langpacks). Without it, **multiple lines are an error** — deliberately, so an un-migrated script fails loudly instead of being silently truncated.
+
+When one entry's content is **derived from** another entry, use `version-var` to inject the upstream resolved version as a script variable. Probing independently would produce a **version-inconsistent manifest** if upstream releases between the two probes (main source at version A, vendor at version B — the build breaks):
+
+```yaml
+work_sources:
+  - tracker-template: script
+    expand: true
+    version-var: {main: sources[0]}   # $main = the version sources[0] resolved this run
+    script: |
+      echo "$main|https://x/vendor-$main.tar.gz"
+```
+
+Only slots **earlier** than the entry can be referenced (`sources` are probed before `work_sources`, left to right within a list); forward/self references fail at probe time with the usable range in the message.
 
 work_sources-only packages (fonts, jars — non-archive files must live in work_sources) carry only a work_sources list plus `version-source: work_sources[0]`, with no `sources` entry.
 

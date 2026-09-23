@@ -83,9 +83,9 @@ WALOpType walop_type_from_name(std::string_view name)
 //     两侧整段各自成一个参数：TYPE <src> → <dst>
 //   - 其余形式用 tail_args() 给出"arg1 之后还有几个固定字段"，那些字段**从右往左**切，
 //     剩下的整段归 arg1：
-//       TYPE <路径可含空格> <milestone>        (DB/DBNEW/DBRM/BEGIN/COMMIT/ROLLBACK/END/RM_*，tail=1)
-//       TYPE <路径可含空格> <mode> <uid> <gid> (DIR_RM，tail=3)
-//       TYPE <路径可含空格>                    (NEW/NEW_DIR/CLEANUP/RESTORE_*_RM，tail=0)
+//       TYPE <路径可含空格> <milestone> (DB/DBNEW/DBRM/BEGIN/COMMIT/ROLLBACK/END/RM_*，tail=1) TYPE
+//       <路径可含空格> <mode> <uid> <gid> (DIR_RM，tail=3) TYPE <路径可含空格>
+//       (NEW/NEW_DIR/CLEANUP/RESTORE_*_RM，tail=0)
 //   尾字段都是版本号/里程碑/数字元数据，不可能含空格，故从右侧锚定是安全的。
 //   历史 WAL 行的字段内没有空格，"整段归 arg1" 退化成旧的逐空格切分 → 完全向后兼容。
 //   （残留：路径含换行会破行、含字面 " → " 会破箭头分帧——都是文件系统允许但现实中

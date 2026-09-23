@@ -1,9 +1,9 @@
 pkg-name: libevent
-type: script
-script-content: |
-  data=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} https://api.github.com/repos/libevent/libevent/releases/latest)
-  tag=$(printf '%s\n' "$data" | grep -o '"tag_name": *"release-[0-9.]*-stable"' | head -n1 | sed 's/.*"tag_name": *"//; s/"//')
-  version=$(printf '%s' "$tag" | sed 's/^release-//; s/-stable$//')
-  test -n "$version" || exit 1
-  echo "$version"
-  echo "https://github.com/libevent/libevent/archive/refs/tags/${tag}.tar.gz"
+sources:
+  - tracker-template: script
+    script: |
+      data=$(curl -fsSL ${GITHUB_TOKEN:+-H "Authorization: Bearer $GITHUB_TOKEN"} https://api.github.com/repos/libevent/libevent/releases/latest)
+      tag=$(printf '%s\n' "$data" | grep -o '"tag_name": *"release-[0-9.]*-stable"' | head -n1 | sed 's/.*"tag_name": *"//; s/"//')
+      version=$(printf '%s' "$tag" | sed 's/^release-//; s/-stable$//')
+      test -n "$version" || exit 1
+      echo "$version|https://github.com/libevent/libevent/archive/refs/tags/${tag}.tar.gz"

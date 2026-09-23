@@ -56,11 +56,11 @@ inline std::string default_makeflags()
  * 一次构建解析出的完整标志集合（resolve_build_flags 填充后各字段非空）。
  */
 struct BuildFlags {
-    std::string cflags;    ///< 编译 C 标志
-    std::string cxxflags;  ///< 编译 C++ 标志
-    std::string ldflags;   ///< 链接标志
-    std::string makeflags; ///< make 并行标志（-jN）
-    std::string ltoflags;  ///< LTO 标志（lto:true 时追加到编译与链接标志）
+    std::string cflags;     ///< 编译 C 标志
+    std::string cxxflags;   ///< 编译 C++ 标志
+    std::string ldflags;    ///< 链接标志
+    std::string makeflags;  ///< make 并行标志（-jN）
+    std::string ltoflags;   ///< LTO 标志（lto:true 时追加到编译与链接标志）
 };
 
 }  // namespace build_defaults

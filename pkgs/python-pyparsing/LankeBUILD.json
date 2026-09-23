@@ -1,6 +1,6 @@
 {
   "name": "python-pyparsing",
-  "version": "3.3.2",
+  "version": "3.3.3",
   "release": 1,
   "deps": [
     "python"
@@ -16,7 +16,7 @@
     "python-wheel"
   ],
   "sources": [
-    "https://github.com/pyparsing/pyparsing/archive/refs/tags/3.3.2.tar.gz"
+    "https://files.pythonhosted.org/packages/e4/11/b213bebff182584360cb8d17c72c1677fec5c5c228de439e63bcf8ab1c8f/pyparsing-3.3.3.tar.gz"
   ],
   "work_sources": []
 }

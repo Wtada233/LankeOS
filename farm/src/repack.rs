@@ -4,10 +4,14 @@
 //! （NOSUID，suid 程序受影响，§6）。解包/重打包**纯 Rust**（tar + zstd crate），不再 spawn
 //! `sudo`/`tar`/`zstd` CLI（操作命令以 root 运行，见 ARCH §「root 运行」）。
 //!
-//! **xattr 保留：明确不做（已决策，原 TODO）**。tar 0.4.46 的 Builder 不暴露 PAX xattr 写入
-//! （`SCHILY.xattr.*`），解包侧虽有 `xattr` feature 也补不上 repack 的写入侧；libarchive 绑定
-//! （ADR #13 绑定优先）成本高。LankeOS 是 LFS 系系统，默认无 SELinux xattr；SUID/SGID 已由
-//! mode 保留覆盖。若将来需要 `security.capability`（如 systemd native 构建），才需引入 libarchive。
+//! **xattr 保留：做**（原先的"明确不做"决策已作废——它基于"tar 0.4.46 的 Builder 不暴露 PAX
+//! xattr 写入"，而实测 `Builder::append_pax_extensions` 就在 `tar::pax` 里，且该模块**无 feature
+//! 门控**）。打包时把每个条目的 xattr 逐条写成 PAX 的 `SCHILY.xattr.<name>=<value>`（GNU tar 的
+//! 约定），解包侧由 `scan::extract_lpkg` 的 `set_unpack_xattrs(true)` 还原——两侧对称。
+//! 丢 xattr 的代价是**功能性的**：`security.capability` 一丢，systemd native 二进制、ping 这类
+//! 靠文件能力提权的程序就废了；SUID/SGID 由 mode 保留覆盖不到它（那是另一套机制）。
+//!
+//! 仍然不做 libarchive（ADR #13 绑定优先）：tar + xattr 两个 crate 已经够，无需引入 C 绑定。
 //!
 //! repack 有效性由构建不变量保证（§6：构建成功 ⇒ needed_so 的 provider 当时都在 local repo），
 //! 无需额外 guard。
@@ -136,6 +140,13 @@ fn append_tree(
     for (abs, rel) in entries {
         let md = fs::symlink_metadata(&abs).map_err(|e| format!("stat {abs:?} 失败: {e}"))?;
         let ft = md.file_type();
+        // 先写 xattr、再写条目本体：PAX 扩展头是**紧随其后**那个条目的元数据，顺序不能反。
+        // 目录/文件/符号链接都适用（三种都可能有 xattr）。
+        let xattrs = read_pax_xattrs(&abs)?;
+        if !xattrs.is_empty() {
+            b.append_pax_extensions(xattrs.iter().map(|(k, v)| (k.as_str(), v.as_slice())))
+                .map_err(|e| format!("tar 写 xattr（{abs:?}）失败: {e}"))?;
+        }
         if ft.is_dir() {
             let mode = md.permissions().mode() & 0o7777;
             let mut h = new_header(mode, 0, tar::EntryType::Directory);
@@ -164,6 +175,52 @@ fn append_tree(
         }
     }
     Ok(())
+}
+
+/// PAX 键前缀（GNU tar 的 xattr 约定）。与**读取端**对称：tar crate 的 `entry.rs` 用
+/// `pax::PAX_SCHILYXATTR`（值即此串）剥掉前缀后 `xattr::set` 还原——那个常量在 tar 的**私有**
+/// 模块 `pax` 里取不到，故这里字面写下同一份。两侧任一变都意味着格式漂移，改动时要一起看。
+const PAX_SCHILYXATTR: &str = "SCHILY.xattr.";
+
+/// 读条目**自身**的全部 xattr，转成 PAX 的 `SCHILY.xattr.<名>` → 值字节对。
+///
+/// - **不跟随符号链接**（`list_deref`/`get_deref`）：符号链接的 xattr 属于链接本身，不属于目标。
+/// - 值是**原始字节**：`security.capability` 是二进制结构，不能当字符串处理（PAX 值本就是字节串）。
+/// - **按 PAX 键排序**：枚举顺序由文件系统决定，不排序会破坏"同一内容两次打包字节一致"的可复现性
+///   契约——mtime/uid/gid 都已归一到 0，xattr 顺序是同一个契约的一部分。
+/// - 读失败分两类，不能一刀切（实测教训）：
+///   - **`ENOENT`（悬空符号链接）/ `EOPNOTSUPP`（文件系统或该文件类型不支持 xattr）** → 当"没有
+///     xattr"：这两种表示**这里本来就没东西可保**，不是读失败。悬空符号链接是**合法包内容**
+///     （dbus 的 `var/lib/dbus/machine-id`、ncurses 等都有；`repack_survives_broken_symlink_in_content`
+///     就是守它的），在它上面 `llistxattr` 会返回 ENOENT——最初按"任何错误都致命"写，直接把那三个
+///     既有测试打挂了。
+///   - **其余错误**（EACCES 等）→ **报错**：静默丢一个 `security.capability` 等于发个残包
+///     （与"repack 失败必须 BLOCK、绝不静默降级"的既有立场一致）。
+fn read_pax_xattrs(path: &Path) -> Result<Vec<(String, Vec<u8>)>, FarmError> {
+    let names = match xattr::list_deref(path) {
+        Ok(n) => n,
+        Err(e)
+            if matches!(
+                e.kind(),
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::Unsupported
+            ) =>
+        {
+            return Ok(Vec::new());
+        }
+        Err(e) => return Err(format!("列 xattr {path:?} 失败: {e}").into()),
+    };
+    let mut out: Vec<(String, Vec<u8>)> = Vec::new();
+    for name in names {
+        let value = xattr::get_deref(path, name.as_os_str())
+            .map_err(|e| format!("读 xattr {name:?}（{path:?}）失败: {e}"))?
+            .unwrap_or_default();
+        out.push((
+            format!("{PAX_SCHILYXATTR}{}", name.to_string_lossy()),
+            value,
+        ));
+    }
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    Ok(out)
 }
 
 /// 构造一个 uid/gid/mtime 固定为 0 的 tar header（path 由 `append_data` 写入 header）。
@@ -436,6 +493,67 @@ mod tests {
             0o4755,
             "SUID 位应随打包/解包保留（root 下）"
         );
+        fs::remove_dir_all(&base).ok();
+    }
+
+    /// xattr 打包/解包往返：**保真**（含二进制值）+ **字节可复现**（枚举顺序不确定，必须排序）。
+    /// 文件系统不支持 xattr 时跳过——与 `pack_preserves_suid_when_root` 的非 root 跳过同款。
+    #[test]
+    fn pack_roundtrip_preserves_xattrs_and_stays_reproducible() {
+        let base = std::env::temp_dir().join(format!("farm-xattr-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&base);
+        let root = base.join("root");
+        fs::create_dir_all(root.join("content")).unwrap();
+        let f = root.join("content/hascap");
+        fs::write(&f, b"x").unwrap();
+
+        // 值刻意取**二进制**（`security.capability` 就是二进制结构，当字符串处理会坏）
+        if xattr::set(&f, "user.lankefarm_a", b"cap\x00\x01\xff").is_err()
+            || xattr::set(&f, "user.lankefarm_b", b"second").is_err()
+        {
+            eprintln!("文件系统不支持 user.* xattr（或权限不足），跳过");
+            fs::remove_dir_all(&base).ok();
+            return;
+        }
+        // 特权命名空间单独测一条（root 下）：真正要保住的 `security.capability` 就在这一档
+        // （需要 CAP_SETFCAP）；这里用 `trusted.*` 走**同一条特权 syscall 路径**，避免手搓
+        // `vfs_cap_data` 的二进制格式（格式错会被内核拒，测的就成了格式而不是保留行为）。
+        let priv_ns = crate::scan::running_as_root()
+            && xattr::set(&f, "trusted.lankefarm_priv", b"priv\x00\xff").is_ok();
+
+        let lpkg1 = base.join("a.lpkg");
+        let lpkg2 = base.join("b.lpkg");
+        repack_lpkg_at(&root, &lpkg1, 3).unwrap();
+        repack_lpkg_at(&root, &lpkg2, 3).unwrap();
+        assert_eq!(
+            fs::read(&lpkg1).unwrap(),
+            fs::read(&lpkg2).unwrap(),
+            "含 xattr 也必须字节可复现（xattr 按名字排序）"
+        );
+
+        // 解包还原：两个 xattr 都在，且二进制值原样
+        let extract = base.join("extract");
+        crate::scan::extract_lpkg(&lpkg1, &extract).unwrap();
+        let got = extract.join("content/hascap");
+        assert_eq!(
+            xattr::get(&got, "user.lankefarm_a").unwrap().as_deref(),
+            Some(&b"cap\x00\x01\xff"[..]),
+            "二进制 xattr 值必须原样还原"
+        );
+        assert_eq!(
+            xattr::get(&got, "user.lankefarm_b").unwrap().as_deref(),
+            Some(&b"second"[..]),
+            "多个 xattr 都要还原"
+        );
+        if priv_ns {
+            assert_eq!(
+                xattr::get(&got, "trusted.lankefarm_priv")
+                    .unwrap()
+                    .as_deref(),
+                Some(&b"priv\x00\xff"[..]),
+                "特权命名空间（security.capability 所在档）的 xattr 也必须原样还原"
+            );
+        }
         fs::remove_dir_all(&base).ok();
     }
 }

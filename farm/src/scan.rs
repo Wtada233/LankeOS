@@ -79,6 +79,12 @@ pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), FarmErro
     ar.set_preserve_permissions(true);
     ar.set_preserve_ownerships(running_as_root());
     ar.set_overwrite(true);
+    // xattr：tar 默认**不还原**（`unpack_xattrs: false`），必须显式打开——否则
+    // `security.capability`（文件能力，如 systemd native 二进制、ping）在解包/重打这条路上直接丢。
+    // tar 从 PAX 的 `SCHILY.xattr.<name>` 记录还原（`xattr::set`，**跟随符号链接**；符号链接自身的
+    // xattr 极少见，此处不特殊处理）。设 `security.*` 需要特权——真实路径都要求 root（CLI 的
+    // `ensure_root` 强制），非 root 单测的 fixture 不带 xattr，故不会误伤。
+    ar.set_unpack_xattrs(true);
     ar.unpack(extract_dir)
         .map_err(|e| format!("tar 解包 {lpkg_path:?} 失败: {e}").into())
 }

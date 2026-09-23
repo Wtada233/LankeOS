@@ -10,8 +10,8 @@
 
 #include "archive/downloader.hpp"
 #include "base/constants.hpp"
-#include "base/utils.hpp"
 #include "base/exception.hpp"
+#include "base/utils.hpp"
 #include "config/config.hpp"
 #include "i18n/localization.hpp"
 #include "vercmp/dep_parser.hpp"

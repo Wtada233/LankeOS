@@ -203,9 +203,9 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
             if (s.empty()) continue;
             auto it = soname_provider.find(std::string(s));
             if (it != soname_provider.end()) {
-                    for (const auto& prov : it->second)
-                        if (prov != name) rev[prov].insert(name);  // 所有提供者都连边
-                }
+                for (const auto& prov : it->second)
+                    if (prov != name) rev[prov].insert(name);  // 所有提供者都连边
+            }
         }
     }
     return rev;

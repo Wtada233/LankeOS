@@ -615,8 +615,7 @@ static size_t remove_packages_checked(const std::vector<std::string>& pkgs, bool
     remove_packages_in_one_batch(to_remove, force, stashes);
     finish_committed_batch(stashes, to_remove);
 
-    for (const auto& p : to_remove)
-        log_info(string_format("info.package_removed_successfully", p));
+    for (const auto& p : to_remove) log_info(string_format("info.package_removed_successfully", p));
     return to_remove.size();
 }
 

@@ -63,6 +63,11 @@ pub fn probe(
         regex::escape(name)
     ))
     .map_err(|e| e.to_string())?;
+    // 版本筛选约束走共享汇点（`exclude` / `stable-minor` 由此对 gnome 生效）。
+    // **cap 置 None**：GNOME 的 `max-version` 已在上一步按**目录**过滤过；此处再按最终版本过滤会
+    // 改变既有 gnome tracker（gtk3 等封顶场景）的行为——保持原样，不动既有语义。
+    let mut f = templates::version_filter(cfg, major)?;
+    f.cap = None;
     let mut found: Option<(String, String)> = None; // (dir, version)
     for d in &candidates {
         let level2 = format!("{level1}{d}/");
@@ -70,7 +75,7 @@ pub fn probe(
             Ok(h) => h,
             Err(_) => continue,
         };
-        if let Some(v) = templates::max_match(&file_re, &html2, major, None) {
+        if let Some(v) = templates::max_match(&file_re, &html2, &f) {
             found = Some((d.to_string(), v));
             break;
         }

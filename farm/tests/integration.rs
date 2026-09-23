@@ -157,7 +157,7 @@ fn real_index_smoke() {
 /// 端到端：`farm track --all -j N` 并行探测必须保序——
 /// `beta`（after: alpha + 条目级 same-version: alpha）必须读到 alpha **本轮解析出的新版本** 2.0，
 /// 而非 LankeBUILD.json 的旧版本 1.0（保序 + resolved 传播）。
-/// alpha 用 `type: script`，bash 直接 echo 版本，无需网络。
+/// alpha 用条目级 `tracker-template: script`，bash 直接 echo `版本|URL`，无需网络。
 #[test]
 fn track_all_parallel_respects_after_ordering() {
     let tmp = std::env::temp_dir().join(format!("lankefarm-track-j-{}", std::process::id()));
@@ -175,10 +175,10 @@ fn track_all_parallel_respects_after_ordering() {
         &pkgs.join("beta/LankeBUILD.json"),
         r#"{"name":"beta","version":"1.0","sources":["https://example.com/b-1.0.tar.gz"]}"#,
     );
-    // alpha：type: script，echo 出 2.0
+    // alpha：条目级 script，echo 出 `2.0|URL`
     write(
         &data.join("alpha.yaml"),
-        "pkg-name: alpha\ntype: script\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/a-2.0.tar.gz\"\n",
+        "pkg-name: alpha\nsources:\n  - tracker-template: script\n    script: |\n      #!/bin/bash\n      echo \"2.0|https://example.com/a-2.0.tar.gz\"\n",
     );
     // beta：after: alpha + same-version 模板锁定 alpha 版本，构建 URL（无网络）
     write(
@@ -229,11 +229,11 @@ fn track_all_cycle_does_not_crash_or_hang() {
     // 互指 after → 依赖环
     write(
         &data.join("alpha.yaml"),
-        "pkg-name: alpha\ntype: script\nafter: beta\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/a-2.0.tar.gz\"\n",
+        "pkg-name: alpha\nafter: beta\nsources:\n  - tracker-template: script\n    script: |\n      #!/bin/bash\n      echo \"2.0|https://example.com/a-2.0.tar.gz\"\n",
     );
     write(
         &data.join("beta.yaml"),
-        "pkg-name: beta\ntype: script\nafter: alpha\nscript-content: |\n  #!/bin/bash\n  echo \"2.0\"\n  echo \"https://example.com/b-2.0.tar.gz\"\n",
+        "pkg-name: beta\nafter: alpha\nsources:\n  - tracker-template: script\n    script: |\n      #!/bin/bash\n      echo \"2.0|https://example.com/b-2.0.tar.gz\"\n",
     );
 
     let bin = env!("CARGO_BIN_EXE_lankefarm");

@@ -93,13 +93,13 @@ enum class WALOpType {
 
 struct WALOp {
     WALOpType type = WALOpType::INVALID;  // 默认惰性：未成功解析的行不得被当成真实操作
-    std::string raw;   // 原始行文本（调试用）
-    std::string arg1;  // 参数1
-    std::string arg2;  // 参数2
-    std::string arg3;  // 参数3
-    std::string arg4;  // 参数4（预留）
-    std::string arg5;  // 参数5（预留）
-    std::string arg6;  // 参数6（预留）
+    std::string raw;                      // 原始行文本（调试用）
+    std::string arg1;                     // 参数1
+    std::string arg2;                     // 参数2
+    std::string arg3;                     // 参数3
+    std::string arg4;                     // 参数4（预留）
+    std::string arg5;                     // 参数5（预留）
+    std::string arg6;                     // 参数6（预留）
 
     /// 行是否被成功解析（未知/损坏行 = INVALID）。所有扫描/回放都必须先判它。
     bool is_valid() const
@@ -205,7 +205,6 @@ bool batch_rollback(const std::vector<std::string>& successfully_installed);
 // ============================================================================
 // 崩溃续传清理（recover.cpp 实现）
 // ============================================================================
-
 
 /**
  * 备份目标 → 其所在 stash 根：父目录名以 `.lpkg_bak_` 开头（= stash 目录）则取父目录，

@@ -1,8 +1,7 @@
 pkg-name: libepubgen
-type: script
-script-content: |
-  page=$(curl -fsSL "https://sourceforge.net/projects/libepubgen/files/")
-  ver=$(printf '%s\n' "$page" | grep -oE 'libepubgen-[0-9.]+/' | sed 's/libepubgen-//; s/\/$//' | sort -V | tail -n1)
-  test -n "$ver" || exit 1
-  echo "$ver"
-  echo "https://sourceforge.net/projects/libepubgen/files/libepubgen-$ver/libepubgen-$ver.tar.xz"
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://sourceforge.net/projects/libepubgen/files/
+    pattern: 'libepubgen-([0-9.]+)/'
+    template: https://sourceforge.net/projects/libepubgen/files/libepubgen-{version}/libepubgen-{version}.tar.xz

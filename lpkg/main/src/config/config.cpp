@@ -226,11 +226,11 @@ std::string Config::get_mirror_url()
     }
     // 首行是**原样使用**的：注释、CRLF 的 \r、首尾空白都会成为 URL 的一部分 →
     // 索引下载必然失败，而失败又会落进"空索引"路径（静默说"已是最新"）。此处统一归一。
-    if (const auto hash = mirror_url.find('#'); hash != std::string::npos)
-        mirror_url.resize(hash);
+    if (const auto hash = mirror_url.find('#'); hash != std::string::npos) mirror_url.resize(hash);
     const auto is_space = [](char c) { return c == ' ' || c == '\t' || c == '\r'; };
     while (!mirror_url.empty() && is_space(mirror_url.back())) mirror_url.pop_back();
-    while (!mirror_url.empty() && is_space(mirror_url.front())) mirror_url.erase(mirror_url.begin());
+    while (!mirror_url.empty() && is_space(mirror_url.front()))
+        mirror_url.erase(mirror_url.begin());
     if (mirror_url.empty()) throw LpkgException(get_string("error.invalid_mirror_config"));
     if (mirror_url.back() != '/') {
         mirror_url += '/';

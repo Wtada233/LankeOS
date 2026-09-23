@@ -40,8 +40,7 @@ std::set<fs::path> referenced_stash_roots()
         if (line.empty()) continue;
         auto op = parse_op(line);
         if (!op.is_valid()) continue;
-        if ((op.type == WALOpType::BACKUP || op.type == WALOpType::REMOVE_OLD) &&
-            !op.arg2.empty())
+        if ((op.type == WALOpType::BACKUP || op.type == WALOpType::REMOVE_OLD) && !op.arg2.empty())
             roots.insert(stash_root_of_bak(op.arg2).lexically_normal());
         else if (op.type == WALOpType::CLEANUP && !op.arg1.empty())
             roots.insert(stash_root_of_bak(op.arg1).lexically_normal());
@@ -188,7 +187,8 @@ void recover_packages()
             // 已提交批次的行仍留在 WAL 里，下一轮扫描的起点仍落在它上面，更早那批永远轮不到
             // （实测两轮下来文件一次都没被还原）。而"区域横跨两个未提交批次"曾经危险，只是因为
             // 当时存在 `has_cleanup ⇒ continue_cleanup` 分支会对整个区域 remove_all（会删掉前一批
-            // 尚未还原的 stash）；该分支已删除，故一次性回滚整个区域正确且真正收敛（TODO.md X6/Z5）。
+            // 尚未还原的 stash）；该分支已删除，故一次性回滚整个区域正确且真正收敛（TODO.md
+            // X6/Z5）。
             if (depth == 0) batch_start = i;
             ++depth;
         } else if (op.type == wal::WALOpType::COMMIT_PKGS) {
@@ -236,9 +236,8 @@ void recover_packages()
         try {
             wal::reverse_execute(ops, true);
         } catch (const std::exception& e) {
-            log_warning(
-                string_format("warning.rollback_remove_failed", first_pkg, e.what()) +
-                " [rec: 该批次保持未提交，可重试]");
+            log_warning(string_format("warning.rollback_remove_failed", first_pkg, e.what()) +
+                        " [rec: 该批次保持未提交，可重试]");
             any_batch_failed = true;
             continue;
         }

@@ -1,7 +1,7 @@
 {
   "name": "krita",
   "version": "6.0.4",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -19,7 +19,7 @@
     "libKSeExpr.so.6",
     "libKSeExprUI.so.6",
     "libOpenColorIO.so.2.5",
-    "libOpenEXR-3_4.so.33",
+    "libOpenEXR-3_5.so.34",
     "libQt6Core.so.6",
     "libQt6Core5Compat.so.6",
     "libQt6DBus.so.6",

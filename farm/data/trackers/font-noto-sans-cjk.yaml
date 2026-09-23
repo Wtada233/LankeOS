@@ -1,9 +1,9 @@
 pkg-name: font-noto-sans-cjk
-type: script
-script-content: |
-  #!/bin/bash
-  tags=$(curl -sL "https://api.github.com/repos/googlefonts/noto-cjk/tags?per_page=100" | grep '"name"' | sed 's/.*"name": "\(.*\)",/\1/')
-  tag=$(echo "$tags" | grep '^Sans' | sort -V | tail -1)
-  version=${tag#Sans}
-  echo "$version"
-  echo "https://github.com/googlefonts/noto-cjk/raw/$tag/Sans/OTC/NotoSansCJK-Regular.ttc"
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: googlefonts/noto-cjk
+    mode: tags
+    tag-prefix: Sans
+    # 上游把 ttc 放在 tag 树里的原始路径（不是 release 资产），raw 直链。
+    template: https://github.com/googlefonts/noto-cjk/raw/{tag}/Sans/OTC/NotoSansCJK-Regular.ttc

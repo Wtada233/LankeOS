@@ -21,7 +21,7 @@ pub fn probe(
     let mode = cfg.mode.as_deref().unwrap_or("tags");
     let enc = urlencode(project);
 
-    let cap = cfg.max_version.as_deref();
+    let f = templates::version_filter(cfg, major)?;
     let version = match mode {
         // releases：**先打 latest 快捷方式**（`/releases/permalink/latest`，单条响应、无分页窗口）；
         // 它不满足 major/max-version 约束（或端点不可用）时，回退到 releases 列表——每页 100 条
@@ -33,7 +33,7 @@ pub fn probe(
                 .get(&latest_url)
                 .ok()
                 .and_then(|b| templates::extract_latest_release_tag(&b).ok())
-                .and_then(|tag| max_tag_version(&[tag], tag_prefix, major, cap));
+                .and_then(|tag| max_tag_version(&[tag], tag_prefix, &f));
             match from_latest {
                 Some(v) => v,
                 None => {
@@ -41,8 +41,7 @@ pub fn probe(
                         format!("https://{host}/api/v4/projects/{enc}/releases?per_page=100");
                     let items = templates::fetch_json_pages(fetcher, &base, 100, 10)?;
                     let names = templates::release_tag_names(&items);
-                    max_tag_version(&names, tag_prefix, major, cap)
-                        .ok_or("releases 中无匹配版本/主版本")?
+                    max_tag_version(&names, tag_prefix, &f).ok_or("releases 中无匹配版本/主版本")?
                 }
             }
         }
@@ -50,7 +49,7 @@ pub fn probe(
             // tags 模式：同 github——走 **git 协议列全量 tag**（libgit2）；REST tags 端点 per_page
             // 上限 100，靠翻页且顺序与版本无关。
             let names = fetcher.list_tags(&format!("https://{host}/{project}.git"))?;
-            max_tag_version(&names, tag_prefix, major, cap).ok_or("tags 中无匹配版本/主版本")?
+            max_tag_version(&names, tag_prefix, &f).ok_or("tags 中无匹配版本/主版本")?
         }
     };
     let tag = format!("{tag_prefix}{version}");

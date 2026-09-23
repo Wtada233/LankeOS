@@ -1,14 +1,9 @@
 pkg-name: perl
-type: script
-script-content: |
-  #!/bin/bash
-  html=$(curl -fsSL https://www.cpan.org/src/5.0/) || exit 1
-  for ver in $(printf '%s\n' "$html" | grep -oE 'perl-5\.[0-9]+\.[0-9]+\.tar\.xz' | sed 's/perl-//; s/\.tar\.xz//' | sort -uVr); do
-      minor=$(echo "$ver" | cut -d. -f2)
-      if [ $((10#$minor % 2)) -eq 0 ]; then
-          echo "$ver"
-          echo "https://www.cpan.org/src/5.0/perl-${ver}.tar.xz"
-          exit 0
-      fi
-  done
-  exit 1
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://www.cpan.org/src/5.0/
+    pattern: 'perl-([0-9]+\.[0-9]+\.[0-9]+)\.tar\.xz'
+    # 上游同时有 5.43(开发) 与 5.44(稳定)：偶 minor 才是稳定分支
+    stable-minor: even
+    template: https://www.cpan.org/src/5.0/perl-{version}.tar.xz

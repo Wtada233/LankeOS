@@ -1,0 +1,44 @@
+#
+# lld — LLVM 的链接器（从 llvm monorepo 拆出）
+#
+# **独立子项目构建**：只编 lld，复用已装 llvm 的 cmake 配置与共享库（build_deps 含 llvm），
+# 与 compiler-rt 的拆包方式一致。参照 Arch PKGBUILD 适配（去掉 docs/tests/sphinx）。
+# `BUILD_SHARED_LIBS=ON` → lld 的库走共享库，`ninja install` 不会带出 .a（故无需 pkg-err 豁免）。
+
+lankebuild_prepare() {
+    mkdir -p build-lld
+}
+
+lankebuild_build() {
+    # 只出最小调试信息（与 clang 食谱同款保险）：本仓库 CFLAGS 本就没有 `-g`，LLVM 的 Release
+    # 也不加；追加 `-g0` 压掉任何继承来的 `-g*`（末位生效）。
+    export CFLAGS="$CFLAGS -g0"
+    export CXXFLAGS="$CXXFLAGS -g0"
+
+    cd build-lld
+
+    cmake -G Ninja ../lld \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR} \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DBUILD_SHARED_LIBS=ON \
+        -DLLVM_LINK_LLVM_DYLIB=ON \
+        -DLLVM_MAIN_SRC_DIR={SRC_DIR}/llvm \
+        -DLLVM_INCLUDE_TESTS=OFF \
+        -DLLVM_INCLUDE_BENCHMARKS=OFF \
+        -DLLVM_BUILD_DOCS=OFF \
+        -DLLVM_ENABLE_SPHINX=OFF
+
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+
+    install -Dm644 ../lld/LICENSE.TXT "{STAGING_ROOT}{DATADIR}/licenses/lld/LICENSE"
+
+    # lld 的 cmake 不装 man 页（docs 关掉后更不会），源码树里那份手工装
+    install -Dm644 ../lld/docs/ld.lld.1 "{STAGING_ROOT}{DATADIR}/man/man1/ld.lld.1"
+}
+
+lankebuild_package() {
+    :
+}

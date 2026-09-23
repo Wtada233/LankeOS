@@ -1,0 +1,7 @@
+pkg-name: lld
+version-source: sources[0]
+after: llvm
+sources:
+- tracker-template: same-version
+  template: https://github.com/llvm/llvm-project/releases/download/llvmorg-{version}/llvm-project-{version}.src.tar.xz
+  same-version-of: llvm

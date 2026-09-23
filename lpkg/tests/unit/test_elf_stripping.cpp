@@ -680,7 +680,8 @@ protected:
         std::memcpy(buf.data() + sizeof(Elf64_Ehdr), sh, sizeof(sh));
 
         std::ofstream f(test_file, std::ios::binary | std::ios::trunc);
-        f.write(reinterpret_cast<const char*>(buf.data()), static_cast<std::streamsize>(buf.size()));
+        f.write(reinterpret_cast<const char*>(buf.data()),
+                static_cast<std::streamsize>(buf.size()));
     }
 };
 
@@ -731,8 +732,8 @@ TEST_F(CraftedElfTest, RealSharedLibraryStillStripsAndKeepsSoname)
         std::ofstream f(src);
         f << "int crafted_test_func(int x) { return x + 1; }\n";
     }
-    const std::string cmd = "gcc -shared -fPIC -Wl,-soname,libtest.so.1 -o " +
-                            test_file.string() + " " + src.string() + " 2>/dev/null";
+    const std::string cmd = "gcc -shared -fPIC -Wl,-soname,libtest.so.1 -o " + test_file.string() +
+                            " " + src.string() + " 2>/dev/null";
     const int ret = std::system(cmd.c_str());
     fs::remove(src);
     if (ret != 0 || !fs::exists(test_file)) GTEST_SKIP() << "gcc 不可用";
@@ -741,4 +742,26 @@ TEST_F(CraftedElfTest, RealSharedLibraryStillStripsAndKeepsSoname)
     std::string error_msg;
     EXPECT_TRUE(strip_file(test_file, error_msg)) << error_msg;
     EXPECT_EQ(get_elf_soname(test_file), "libtest.so.1") << "strip 后 SONAME 丢失";
+}
+
+TEST_F(StripTest, StripObjectWithBssSection)
+{
+    // **回归（我引入的）**：`.bss` 是 SHT_NOBITS —— libelf 给它的 Elf_Data.d_buf 为 NULL
+    // 而 d_size > 0。曾经为"不就地改写调用方输入"而按 d_size 复制缓冲，从 NULL 构造
+    // vector 是 UB（bad_alloc/崩溃）→ 整个 strip 失败，且**在此之前所有 strip 测试都是
+    // 无 .bss 的 .o，全绿也照样漏掉**（LLVM 的 .o 带 .bss，实测把 llvm 卡在 package 阶段）。
+    const fs::path src = test_file.string() + ".c";
+    {
+        std::ofstream f(src);
+        f << "int uninit_global[4096];\nint foo(void){ return uninit_global[0]; }\n";
+    }
+    const std::string cmd = "gcc -c -o " + test_file.string() + " " + src.string() + " 2>/dev/null";
+    const int ret = std::system(cmd.c_str());
+    fs::remove(src);
+    if (ret != 0 || !fs::exists(test_file)) GTEST_SKIP() << "gcc not available";
+
+    std::string error_msg;
+    EXPECT_TRUE(strip_file(test_file, error_msg)) << "带 .bss 的 .o 必须能 strip: " << error_msg;
+    EXPECT_TRUE(fs::exists(test_file));
+    EXPECT_GT(fs::file_size(test_file), 0);
 }

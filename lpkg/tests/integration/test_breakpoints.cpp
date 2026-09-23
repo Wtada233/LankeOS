@@ -6,8 +6,9 @@
  *   2. 手工构造测试：针对特定断电点的 WAL 状态（真实管线无法产生的场景）
  */
 
-#include "../../main/src/db/cache.hpp"
 #include "../../main/src/db/test_breakpoints.hpp"
+
+#include "../../main/src/db/cache.hpp"
 #include "../../main/src/db/wal_op.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
 #include "../test_base.hpp"

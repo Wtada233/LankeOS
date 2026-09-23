@@ -1,10 +1,12 @@
 pkg-name: python-cython
-type: script
-script-content: |
-  tags=$(git ls-remote --tags https://github.com/cython/cython 2>/dev/null \
-    | awk -F/ '$NF ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ {print $NF}' \
-    | sort -V)
-  latest=$(printf '%s\n' "$tags" | tail -n1)
-  test -n "$latest" || exit 1
-  echo "$latest"
-  echo "https://github.com/cython/cython/archive/refs/tags/${latest}.tar.gz"
+version-source: sources[0]
+sources:
+  # PyPI 是 cython 的正式分发渠道，与其余 python-* 包一致（argcomplete / fastjsonschema /
+  # trove-classifiers 等都用 pypi 模板）——cython 此前是唯一走 github tags 的异类。
+  #
+  # 那个异类身份正是它需要 `exclude` 的原因：上游同时发 `3.3.0` 与 PEP 440 预发布
+  # （`3.3.0a1` / `3.3.0b1`，历史上有 13 个），而预发布按版本比较排在正式版**之后**，
+  # naive max 会选到 beta（实测踩过两次：`3.3.0b1`、`3.3.0b1-3`）。
+  # 这在 PyPI 侧早已解决：`info.version` 本身优先稳定版，模板侧也按 PEP 440 识别预发布。
+  - tracker-template: pypi
+    project: cython

@@ -1,6 +1,6 @@
 {
   "name": "libgsf",
-  "version": "1.14.58",
+  "version": "1.14.59",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -25,7 +25,7 @@
     "bzip2"
   ],
   "sources": [
-    "https://download.gnome.org/sources/libgsf/1.14/libgsf-1.14.58.tar.xz"
+    "https://download.gnome.org/sources/libgsf/1.14/libgsf-1.14.59.tar.xz"
   ],
   "work_sources": []
 }

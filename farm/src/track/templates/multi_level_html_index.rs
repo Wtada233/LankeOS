@@ -53,6 +53,8 @@ pub fn probe(
         .position(|n| n == VERSION_LEVEL)
         .ok_or("levels 缺 name: version（该级捕获 = 包版本）")?;
     let upstream = cfg.effective_name(pkg_name);
+    // 版本筛选约束（exclude / stable-minor / 封顶）逐级生效，与单级模板同一汇点
+    let f = templates::version_filter(cfg, major)?;
 
     let mut vers: Vec<String> = Vec::with_capacity(cfg.levels.len());
     for (i, lvl) in cfg.levels.iter().enumerate() {
@@ -67,7 +69,7 @@ pub fn probe(
         let html = fetcher.get(&page)?;
         let pat = need(&lvl.pattern, &format!("levels[{i}].pattern"))?;
         let re = Regex::new(pat).map_err(|e| format!("正则无效 {pat}: {e}"))?;
-        let v = templates::max_match(&re, &html, major, cfg.max_version.as_deref())
+        let v = templates::max_match(&re, &html, &f)
             .ok_or_else(|| format!("{page} 中未匹配到版本（pattern: {pat}）"))?;
         vers.push(v);
     }

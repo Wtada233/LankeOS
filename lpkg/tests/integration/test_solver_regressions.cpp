@@ -50,8 +50,7 @@ protected:
         // 触发器规则是**文件驱动**的（/etc/lpkg/triggers.conf，缺失则所有触发器静默
         // 失效）——沙盒 root 里必须显式提供，否则 F1/F2 的断言测不到东西
         {
-            std::ofstream(Config::instance().triggers_conf())
-                << "^/usr/lib/.*\\.so.*\tldconfig\n";
+            std::ofstream(Config::instance().triggers_conf()) << "^/usr/lib/.*\\.so.*\tldconfig\n";
         }
     }
 
@@ -227,7 +226,9 @@ TEST_F(SolverRegressionTest, AutoremoveNeverRemovesEssentialPackages)
     ASSERT_TRUE(Cache::instance().is_installed("corelib"));
     ASSERT_FALSE(Cache::instance().is_held("corelib"));
 
-    { std::ofstream(Config::instance().essential_file()) << "corelib\n"; }
+    {
+        std::ofstream(Config::instance().essential_file()) << "corelib\n";
+    }
     Cache::instance().load();  // 重新读 essential + 已装列表
 
     remove_package("app", false);
@@ -265,8 +266,7 @@ TEST_F(SolverRegressionTest, UpgradeFlushesTriggersAndRegeneratesSonameLinks)
     upgrade_packages();
 
     Cache::instance().load();
-    EXPECT_EQ(Cache::instance().get_installed_version("libtrig"), "2.0")
-        << "升级没有落地新版本";
+    EXPECT_EQ(Cache::instance().get_installed_version("libtrig"), "2.0") << "升级没有落地新版本";
     EXPECT_TRUE(fs::exists(test_root / "usr/lib/libtrig.so.2.0")) << "新版本文件不存在";
     EXPECT_TRUE(fs::exists(link))
         << "升级没有 flush 触发器（ldconfig/glib-compile-schemas/daemon-reload 全都不跑）";
@@ -332,8 +332,7 @@ TEST_F(SolverRegressionTest, TraversingPackageNameIsRejected)
 
     EXPECT_THROW(install_packages({evil}), LpkgException);
     // 逃逸落点必须没有被创建（dep_dir() 是 <root>/var/lib/lpkg/deps → 上一级是 <root>/var/lib）
-    EXPECT_FALSE(fs::exists(test_root / "var/lib/evilpkg"))
-        << "包名穿越写出了状态目录之外的东西";
+    EXPECT_FALSE(fs::exists(test_root / "var/lib/evilpkg")) << "包名穿越写出了状态目录之外的东西";
     EXPECT_FALSE(fs::exists(test_root / "var/lib/lpkg/deps/../../../evilpkg"));
 }
 
@@ -372,9 +371,8 @@ TEST_F(SolverRegressionTest, MultiPackageRemoveRollsBackAllWhenInterrupted)
     ASSERT_TRUE(Cache::instance().is_installed("ma"));
 
     // ma 已删完、mb 尚未开始 → 模拟 Ctrl+C（循环下一次迭代会看到 gracefully 标志并抛出）
-    BreakpointManager::instance().set("remove_after_package_ma", [] {
-        sigint_graceful.store(true);
-    });
+    BreakpointManager::instance().set("remove_after_package_ma",
+                                      [] { sigint_graceful.store(true); });
     EXPECT_THROW(remove_packages({"ma", "mb"}, false), LpkgException);
     BreakpointManager::instance().clear_all();
     sigint_graceful.store(false);
@@ -395,9 +393,8 @@ TEST_F(SolverRegressionTest, AutoremoveRollsBackAllPackagesWhenInterrupted)
     add_to_mirror("d1", "1.0");
     add_to_mirror("d2", "1.0");
     add_to_mirror("app", "1.0");
-    update_index({{"d1", "1.0", "", "", ""},
-                  {"d2", "1.0", "", "", ""},
-                  {"app", "1.0", "d1,d2", "", ""}});
+    update_index(
+        {{"d1", "1.0", "", "", ""}, {"d2", "1.0", "", "", ""}, {"app", "1.0", "d1,d2", "", ""}});
 
     install_packages({"app"});
     ASSERT_TRUE(Cache::instance().is_installed("d1"));
@@ -406,9 +403,8 @@ TEST_F(SolverRegressionTest, AutoremoveRollsBackAllPackagesWhenInterrupted)
     ASSERT_TRUE(Cache::instance().is_installed("d1"));
 
     // 第一个候选包删完后中断 → autoremove 必须整批回滚（旧实现逐包各一批，d1 会永久丢失）
-    BreakpointManager::instance().set("remove_after_package_d1", [] {
-        sigint_graceful.store(true);
-    });
+    BreakpointManager::instance().set("remove_after_package_d1",
+                                      [] { sigint_graceful.store(true); });
     autoremove();  // 内部 catch 异常并告警
     BreakpointManager::instance().clear_all();
     sigint_graceful.store(false);

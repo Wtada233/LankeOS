@@ -73,13 +73,10 @@ fs::path setup_build_directories(const fs::path& build_dir)
 }
 
 /** 构建模板变量映射表，将占位符替换为实际的路径和配置值 */
-std::map<std::string, std::string> build_variable_map(const BuildConfig& cfg,
-                                                      const fs::path& work_root,
-                                                      const fs::path& actual_work_dir,
-                                                      const fs::path& staging_root,
-                                                      const fs::path& staging_hooks,
-                                                      const std::string& effective_version,
-                                                      const build_defaults::BuildFlags& flags)
+std::map<std::string, std::string> build_variable_map(
+    const BuildConfig& cfg, const fs::path& work_root, const fs::path& actual_work_dir,
+    const fs::path& staging_root, const fs::path& staging_hooks,
+    const std::string& effective_version, const build_defaults::BuildFlags& flags)
 {
     return {
         {"{PKG_NAME}", cfg.name},
@@ -153,7 +150,13 @@ void finalize_staging(const fs::path& staging_root, bool no_strip)
                 }
                 if (!is_strippable) continue;
 
-                strip_binary(entry.path());
+                // 二次防护（strip_binary 内部已 try/catch）：任何意外都只告警、继续处理其余文件
+                try {
+                    strip_binary(entry.path());
+                } catch (const std::exception& e) {
+                    log_warning(
+                        string_format("warning.strip_failed", entry.path().string(), e.what()));
+                }
             }
         }
     }
@@ -162,7 +165,11 @@ void finalize_staging(const fs::path& staging_root, bool no_strip)
 
     if (fs::exists(staging_root / constants::USR / constants::LIB)) {
         log_info(get_string("info.generating_soname_links"));
-        apply_soname_links(staging_root / constants::USR / constants::LIB);
+        try {
+            apply_soname_links(staging_root / constants::USR / constants::LIB);
+        } catch (const std::exception& e) {
+            log_warning(string_format("warning.soname_link_failed", "-", "-", e.what()));
+        }
     }
 }
 

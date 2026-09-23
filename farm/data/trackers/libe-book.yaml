@@ -1,8 +1,7 @@
 pkg-name: libe-book
-type: script
-script-content: |
-  page=$(curl -fsSL "https://sourceforge.net/projects/libebook/files/")
-  ver=$(printf '%s\n' "$page" | grep -oE 'libe-book-[0-9.]+/' | sed 's/libe-book-//; s/\/$//' | sort -V | tail -n1)
-  test -n "$ver" || exit 1
-  echo "$ver"
-  echo "https://sourceforge.net/projects/libebook/files/libe-book-$ver/libe-book-$ver.tar.xz"
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://sourceforge.net/projects/libebook/files/
+    pattern: 'libe-book-([0-9.]+)/'
+    template: https://sourceforge.net/projects/libebook/files/libe-book-{version}/libe-book-{version}.tar.xz

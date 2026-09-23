@@ -1,8 +1,7 @@
 pkg-name: libzmf
-type: script
-script-content: |
-  page=$(curl -fsSL "https://dev-www.libreoffice.org/src/libzmf/")
-  ver=$(printf '%s\n' "$page" | grep -oE "libzmf-[0-9.]+\.tar\.xz" | sed "s/^libzmf-//; s/\.tar\.xz$//" | sort -V | tail -n1)
-  test -n "$ver" || exit 1
-  echo "$ver"
-  echo "https://dev-www.libreoffice.org/src/libzmf/libzmf-$ver.tar.xz"
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://dev-www.libreoffice.org/src/libzmf/
+    pattern: 'libzmf-([0-9.]+)\.tar\.xz'
+    template: https://dev-www.libreoffice.org/src/libzmf/libzmf-{version}.tar.xz

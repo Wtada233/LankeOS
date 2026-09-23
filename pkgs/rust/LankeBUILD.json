@@ -1,9 +1,10 @@
 {
   "name": "rust",
   "version": "1.98.1",
-  "release": 4,
+  "release": 5,
   "deps": [
-    "bash"
+    "bash",
+    "lld"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -19,10 +20,11 @@
     "libstdc++.so.6"
   ],
   "provides": [
-    "librustc_driver-e6a30e2f761eefcc.so"
+    "librustc_driver-ccedc30bcc480aeb.so"
   ],
   "build_deps": [
     "base-devel",
+    "clang",
     "cmake",
     "compiler-rt",
     "curl",

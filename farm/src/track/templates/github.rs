@@ -5,7 +5,7 @@
 
 use crate::error::FarmError;
 use crate::net::Fetcher;
-use crate::track::templates::{self, matches_major, max_tag_version, strip_version};
+use crate::track::templates::{self, max_tag_version, strip_version};
 use crate::track::{need, EntryProbe, SourceConfig};
 
 /// 探测最新稳定版本（GitHub API），返回该槽位版本 + URL。`major` 非空时只匹配该主版本的 tag。
@@ -19,25 +19,25 @@ pub fn probe(
     let tag_prefix = cfg.tag_prefix.as_deref().unwrap_or("");
     let template = need(&cfg.template, "template")?;
     let mode = cfg.mode.as_deref().unwrap_or("tags");
-    let cap = cfg.max_version.as_deref();
+    let f = templates::version_filter(cfg, major)?;
 
     let version = match mode {
         "releases" => {
-            if let Some(cap) = cap {
+            if f.cap.is_some() {
                 // max-version 需在版本列表上过滤（单条 /latest 无法封顶）→ 拉 releases 列表，
                 // 每页 100 条（GitHub 上限）**逐页单独请求**直到末页，稳定优先取不超过封顶的最大版。
                 let base = format!("https://api.github.com/repos/{repo}/releases?per_page=100");
                 let items = templates::fetch_json_pages(fetcher, &base, 100, 10)?;
                 let names = templates::release_tag_names(&items);
-                max_tag_version(&names, tag_prefix, major, Some(cap))
-                    .ok_or("releases 中无匹配版本/主版本")?
+                max_tag_version(&names, tag_prefix, &f).ok_or("releases 中无匹配版本/主版本")?
             } else {
                 // 无封顶：单条 `/releases/latest`（无分页窗口）
                 let url = format!("https://api.github.com/repos/{repo}/releases/latest");
                 let body = fetcher.get(&url)?;
                 let tag = templates::extract_latest_release_tag(&body)?;
+                // 单条候选也要过约束（否则 /releases/latest 会绕开 max-version/exclude/稳定版过滤）
                 strip_version(&tag, tag_prefix)
-                    .filter(|v| matches_major(v, major))
+                    .filter(|v| f.allows(v))
                     .ok_or("release tag 无匹配版本/主版本")?
             }
         }
@@ -46,7 +46,7 @@ pub fn probe(
             // —— 后者分页（默认 30 / 最大 100，靠 Link 头翻页）且**顺序与版本无关**，只看首页会取到
             // 老 tag（hdf5 事故：首页 30 个全是老 tag，`max` 够不到 2.2.0）。
             let names = fetcher.list_tags(&format!("https://github.com/{repo}.git"))?;
-            max_tag_version(&names, tag_prefix, major, cap).ok_or("tags 中无匹配版本/主版本")?
+            max_tag_version(&names, tag_prefix, &f).ok_or("tags 中无匹配版本/主版本")?
         }
     };
     let tag = format!("{tag_prefix}{version}");

@@ -1,6 +1,6 @@
 {
   "name": "gzip",
-  "version": "1.14",
+  "version": "1.15",
   "release": 2,
   "deps": [
     "bash"
@@ -13,7 +13,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/gzip/gzip-1.14.tar.xz"
+    "https://ftp.gnu.org/gnu/gzip/gzip-1.15.tar.xz"
   ],
   "work_sources": []
 }

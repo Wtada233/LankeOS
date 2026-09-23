@@ -164,8 +164,16 @@ extract 后 `grep -rla "Qt_6_PRIVATE_API"` 命中即 echo 包名。这覆盖 **Q
 provides 漂移优先（ABI 面是最高信号）。
 
 **`deps` 不参与判定**：deps 由 gen_deps/deprules 规则生成，farm 不扫不比（`BuildOutcome.deps` 恒空，
-`ScanResult.deps` 保留但 `decide` 不读）。**xattr 保留明确不做**（见 repack.rs 决策：tar Builder
-不写 PAX xattr，libarchive 绑定成本高，LFS 无 SELinux 默认场景）。
+`ScanResult.deps` 保留但 `decide` 不读）。
+
+**xattr 保留：做**（原"明确不做"的决策已作废——它假定 tar 的 Builder 不能写 PAX xattr，而
+`Builder::append_pax_extensions` 就在 `tar::pax` 里且无 feature 门控）。两侧对称：打包
+（`repack.rs`）把每个条目的 xattr 写成 PAX `SCHILY.xattr.<name>`，解包（`scan.rs::extract_lpkg`）
+开 `set_unpack_xattrs(true)` 还原。**丢 `security.capability` 是功能性损坏**（systemd native 二进制、
+ping 这类靠文件能力提权的程序会失效），SUID/SGID 是另一套机制、覆盖不到它。
+细节：值按**原始字节**走（capability 是二进制结构）；xattr 按名排序后才写（保"同一内容两次打包
+字节一致"）；悬空符号链接上 `llistxattr` 返回 `ENOENT`、不支持 xattr 的文件系统返回 `EOPNOTSUPP`，
+这两类是"本来就没有 xattr"（不是读失败），其余错误致命。
 
 ### 交互接管（build/prompt.rs）
 
@@ -220,7 +228,38 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
     pattern: ki18n-([0-9][0-9.]*)\.tar\.xz
   template: https://download.kde.org/stable/frameworks/{series}/ki18n-{version}.tar.xz
   ```
-- **TrackerConfig 字段**：`pkg-name`（必填）、`tracker-template`（必填）、`source-name`（覆盖上游目录名）、`tag-prefix`、`same-version`（锁定某包版本）、`major-version-lock`、`max-version`、`stable-minor`（gnome 的 even/odd）、`order`（after/last 依赖排序）
+- **`script`（条目级逃生舱，与其他模板平级）**：stdout 每行 `<版本>|URL`，**默认恰好一行**
+  （多行报错——故意的，能让"忘了改格式"的漏迁移立刻炸出来而不是被静默截断）；声明 `expand: true`
+  时才允许多行，每行 = **同一列表里的一个连续槽位**（上游动态枚举，如 libreoffice-i18n 的 123 个
+  langpack，数量随上游变）。条目声明在哪个列表就填哪个列表。只认 `script`/`expand`/`version-var`
+  三个字段（连 `major-of`/`max-version` 都不认——脚本自己过滤版本）。
+- **`version-var`（条目间的版本派生）**：`{变量名: 选择器}`，把**已探测**槽位的版本注入为脚本
+  环境变量。`version-var: {main: sources[0]}` → 脚本里 `$main` 即 `sources[0]` 本轮解析出的版本。
+  存在的理由：一个条目的**内容派生自**另一条目时（libreoffice 的 vendor 文件名来自主源里的
+  `download.lst`），若各自重探上游，两次探测之间上游发新版就会产出**版本不一致的清单**
+  （主源 26.8.0.3 + vendor 26.8.0.4 → 构建必坏；该条目要下载 300MB tarball，窗口是分钟级）。
+  **只能引用位于它之前的槽位**（`sources` 先于 `work_sources` 探测，列表内从左到右；与
+  multi-level「只能引用前面的级」同规则），前向/自引用在探测时报错并说明可用范围。
+- **包级字段**（`TrackerConfig`）：`pkg-name`（必填）、`version-source`（`sources[i]` /
+  `work_sources[i]`，缺省 `sources[0]`、空则 `work_sources[0]`）、`after` / `last`（依赖排序）、
+  `sources` / `work_sources`。**没有包级 `type`**——`type: script` / `script-content` 已废弃；
+  字段仍被解析但只用于给出**明确的迁移错误**（否则 `deny_unknown_fields` 只吐 `unknown field`）。
+- **版本筛选：各模板共享的单一汇点**（`templates::VersionFilter`）。所有探测模板的候选版本一律
+  先过这一层，再谈"稳定版优先 → 取最大"：
+  - `major-of` / `major-version-lock`（主版本）、`max-version`（数值封顶）；
+  - **`exclude`（版本黑名单，正则）**——作用于**提取出的版本字符串**，命中即整条候选丢弃。
+    上游混着历史异常 tag 时用：uasm 的 `v213`（旧命名法，按版本比较 `213 > 2.57` 会被误选）、
+    cython 的 `3.3.0b1`（PEP 440 预发布，`is_stable` 只认 rc/beta 这类**单词**，认不出裸 `bN`）、
+    intel-media-driver 的 `600`。
+  - **`stable-minor: even`**——只保留 minor（第二段）为偶数的候选，**全被滤掉时退回全部**
+    （与 GNOME 同款兜底：上游偶尔没有偶数 minor 的稳定分支时不该直接探测失败）。GNOME 惯例
+    （pango/vala/perl 等开发分支与稳定分支同号段并存）。
+  - **加约束请加在这一层**：历史上 `max-version` 只有部分模板支持，正是"各写各的"造成的漂移。
+    `script` / `same-version` 不参与（前者自带逻辑、后者不探测）。
+- **条目字段**（`SourceConfig`）：`tracker-template`（必填）、`script` + `expand` + `version-var`（仅 script）、
+  `source-name`（覆盖上游目录名）、`repo` / `host` / `project` / `url` / `pattern` / `levels` /
+  `template`、`tag-prefix` / `mode`、`same-version-of`、`major-of` / `major-version-lock` /
+  `max-version` / `exclude` / `stable-minor`。白名单逐模板校验，越界即报错。
 - **same-version**：读被锁包的已解析版本，`{version}`/`{tag}`/`{name}` 占位符替换（如 SPIRV-Tools/vulkan-loader 锁 vulkan-headers）
 - `farm track <pkg> --run` 单包应用；`--all -j N` 并行探测（依赖序门控）
 

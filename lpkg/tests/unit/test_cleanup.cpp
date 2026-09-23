@@ -531,7 +531,8 @@ TEST_F(CleanupTest, RecWithPartiallyCleanedDirBakReversesWholeBatch)
         std::ofstream f(wpath);
         f << "BEGIN_PKGS 1\n"
           << "RM_BEGIN pkg 1.0\n"
-          << "BACKUP " << (test_root / "usr/share/doc/pkg").string() << " → " << dir_bak.string() << "\n"
+          << "BACKUP " << (test_root / "usr/share/doc/pkg").string() << " → " << dir_bak.string()
+          << "\n"
           << "RM_COMMIT pkg 1.0\n"
           // 只有 f1 的清理已完成（模拟 dir 遍历中 crash）
           << "CLEANUP " << (dir_bak / "f1").string() << "\n";

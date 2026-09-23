@@ -10,9 +10,9 @@
  * 硬链接目标必须落在解压根内。符号链接的**目标内容**保持原样（包内绝对链接合法）。
  */
 
-#include <gtest/gtest.h>
 #include <archive.h>
 #include <archive_entry.h>
+#include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
@@ -20,9 +20,9 @@
 #include <vector>
 
 #include "../../main/src/archive/archive.hpp"
-#include "../../main/src/pkg/install_common.hpp"
 #include "../../main/src/base/exception.hpp"
 #include "../../main/src/i18n/localization.hpp"
+#include "../../main/src/pkg/install_common.hpp"
 
 namespace fs = std::filesystem;
 
@@ -53,9 +53,9 @@ protected:
 
     struct Member {
         std::string name;
-        std::string data;         // 普通文件内容（空 = 不写数据）
-        std::string hardlink;     // 非空则写成硬链接
-        std::string symlink;      // 非空则写成符号链接（内容是"目标"）
+        std::string data;      // 普通文件内容（空 = 不写数据）
+        std::string hardlink;  // 非空则写成硬链接
+        std::string symlink;   // 非空则写成符号链接（内容是"目标"）
         bool is_dir = false;
     };
 
@@ -119,15 +119,16 @@ TEST_F(ArchiveConfinementTest, DotDotMemberDoesNotEscape)
     // `..` 成员由 libarchive 的 SECURE_NODOTDOT 直接拒绝（这是**既有**策略，未改动）：
     // 整次解压失败并抛错，而不是把文件写到解压根的父目录。
     EXPECT_THROW(extract_tar_zst(pkg, out_dir), LpkgException);
-    EXPECT_FALSE(fs::exists(suite_dir / "ESCAPED_DOTDOT.txt"))
-        << "`..` 成员逃到了解压根的父目录";
+    EXPECT_FALSE(fs::exists(suite_dir / "ESCAPED_DOTDOT.txt")) << "`..` 成员逃到了解压根的父目录";
 }
 
 TEST_F(ArchiveConfinementTest, HardlinkTargetOutsideRootIsSkipped)
 {
     // 先造一个"系统里已有"的目标文件（模拟 /etc/shadow 这类），再让归档给它起别名
     const fs::path secret = escape_dir / "secret.txt";
-    { std::ofstream(secret) << "sensitive"; }
+    {
+        std::ofstream(secret) << "sensitive";
+    }
 
     write_archive({
         {"content/evil_link", "", secret.string(), "", false},  // 硬链接指向根外
@@ -167,8 +168,7 @@ TEST_F(ArchiveConfinementTest, AbsoluteSymlinkTargetIsPreservedAsIs)
 
     const fs::path link = out_dir / "content/abslink";
     ASSERT_TRUE(fs::is_symlink(link));
-    EXPECT_EQ(fs::read_symlink(link).string(), "/usr/lib/libfoo.so.1")
-        << "符号链接目标被错误改写";
+    EXPECT_EQ(fs::read_symlink(link).string(), "/usr/lib/libfoo.so.1") << "符号链接目标被错误改写";
 }
 
 TEST_F(ArchiveConfinementTest, OversizedDeclaredMemberSizeIsRejected)

@@ -212,6 +212,14 @@ void string_replace_all(std::string& str, const std::string& from, const std::st
 std::string shell_quote(std::string_view s);
 
 /**
+ * 把 from 的 xattr 全部复制到 to（用 l* 变体：不跟随符号链接）。
+ *
+ * `std::filesystem::copy` **不复制 xattr**，而 `security.capability` 就是一个 xattr ——
+ * ping/fping/traceroute/mtr 这类包靠**文件能力**而非 SUID，丢了它非 root 直接不能用。
+ */
+void copy_xattrs(const std::filesystem::path& from, const std::filesystem::path& to);
+
+/**
  * 按分隔符切分 string_view，返回子串列表（零拷贝，仅分配 vector）
  * @param s  输入的字符串视图
  * @param d  分隔字符

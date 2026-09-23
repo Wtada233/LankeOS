@@ -1,33 +1,35 @@
 {
   "name": "openexr",
-  "version": "3.4.15",
-  "release": 3,
+  "version": "3.5.0",
+  "release": 4,
   "deps": [
     "imath"
   ],
   "needed_so": [
+    "ld-linux-x86-64.so.2",
     "libc.so.6",
     "libdeflate.so.0",
     "libgcc_s.so.1",
     "libm.so.6",
     "libopenjph.so.0.32",
-    "libstdc++.so.6"
+    "libstdc++.so.6",
+    "libzstd.so.1"
   ],
   "provides": [
-    "libIex-3_4.so",
-    "libIex-3_4.so.33",
+    "libIex-3_5.so",
+    "libIex-3_5.so.34",
     "libIex.so",
-    "libIlmThread-3_4.so",
-    "libIlmThread-3_4.so.33",
+    "libIlmThread-3_5.so",
+    "libIlmThread-3_5.so.34",
     "libIlmThread.so",
-    "libOpenEXR-3_4.so",
-    "libOpenEXR-3_4.so.33",
+    "libOpenEXR-3_5.so",
+    "libOpenEXR-3_5.so.34",
     "libOpenEXR.so",
-    "libOpenEXRCore-3_4.so",
-    "libOpenEXRCore-3_4.so.33",
+    "libOpenEXRCore-3_5.so",
+    "libOpenEXRCore-3_5.so.34",
     "libOpenEXRCore.so",
-    "libOpenEXRUtil-3_4.so",
-    "libOpenEXRUtil-3_4.so.33",
+    "libOpenEXRUtil-3_5.so",
+    "libOpenEXRUtil-3_5.so.34",
     "libOpenEXRUtil.so"
   ],
   "build_deps": [
@@ -37,10 +39,11 @@
     "libdeflate",
     "ninja",
     "openjph",
-    "zlib"
+    "zlib",
+    "zstd"  
   ],
   "sources": [
-    "https://github.com/openexr/openexr/archive/refs/tags/v3.4.15.tar.gz"
+    "https://github.com/openexr/openexr/archive/refs/tags/v3.5.0.tar.gz"
   ],
   "work_sources": []
 }

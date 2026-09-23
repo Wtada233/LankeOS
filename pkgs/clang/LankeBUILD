@@ -1,0 +1,107 @@
+#
+# clang — LLVM 的 C/C++/ObjC 前端（从 llvm monorepo 拆出）
+#
+# **独立子项目构建**：只编 clang（+ clang-tools-extra），复用已装 llvm 的 cmake 配置与共享库
+# （build_deps 含 llvm），不重建整个 monorepo —— 与 compiler-rt 的拆包方式一致。
+# 参照 Arch PKGBUILD 适配：
+# - **保留** Arch 的 `LLVM_DISTRIBUTION_COMPONENTS` + `install-distribution` 方案（跳过
+#   clang-libraries）：静态库不进暂存区，无需事后 find -delete，也不会被 chk pkg-err 报。
+# - **保留** Arch 的 python 绑定（clang.cindex）与 scan-build 库进 site-packages、bash 补全归位。
+# - **不跟** Arch 把分析器脚本从 /usr/libexec 挪到 /usr/lib/clang —— 那是 Arch 的目录策略，
+#   LankeOS 保持上游布局（不挪，也就不需要 Arch 那条配套的 sed）。
+# - **去掉** docs/tests/sphinx —— 省掉 python-sphinx / python-myst-parser / lit 三个构建依赖。
+# - **去掉** Arch 的 `python -m compileall` —— LankeOS 明令包内不得含字节码。
+# - **不用** Arch 的两个 patch：`fstack-protector-strong` 是发行版硬化政策（我们的 gcc 没有
+#   `--enable-default-ssp`，只给 clang 加会让两个编译器默认行为不一致）；`fveclib=ArmPL` 的
+#   revert 在没有 AArch64 后端时是 no-op（我们的 LLVM_TARGETS_TO_BUILD 里没有 AArch64）。
+
+lankebuild_prepare() {
+    mkdir -p build-clang
+}
+
+lankebuild_build() {
+    # 只出最小调试信息。**保险性质**：本仓库的 CFLAGS 里本就没有 `-g`，LLVM 的 Release 也不加；
+    # 追加 `-g0` 压掉任何继承来的 `-g*`（末位生效），避免哪天 flags 里冒出 `-g` 就把 DWARF 全带出来。
+    # （Arch 用 `-g1` 是因为它的 CFLAGS 默认带 `-g`；这里直接 `-g0` 更彻底。）
+    export CFLAGS="$CFLAGS -g0"
+    export CXXFLAGS="$CXXFLAGS -g0"
+
+    cd build-clang
+
+    # 独立构建：clang-tools-extra 与 llvm 源码树都在同一 monorepo 里，用 *_SOURCE_DIR 指过去。
+    # 关掉测试/文档（省掉 python-sphinx / python-myst-parser / lit 三个构建依赖）。
+    # 参数列表内**不写注释**（`\` 续行下 `#` 会吞掉该行到结尾的全部参数，mlt 踩过）。
+    local cmake_args=(
+        -G Ninja
+        -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_INSTALL_PREFIX={PREFIX}
+        -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR}
+        -DCMAKE_SKIP_RPATH=ON
+        -DLLVM_MAIN_SRC_DIR={SRC_DIR}/llvm
+        -DLLVM_THIRD_PARTY_DIR={SRC_DIR}/third-party
+        -DLLVM_EXTERNAL_CLANG_TOOLS_EXTRA_SOURCE_DIR={SRC_DIR}/clang-tools-extra
+        -DLLVM_LINK_LLVM_DYLIB=ON
+        -DLLVM_ENABLE_RTTI=ON
+        -DCLANG_DEFAULT_PIE_ON_LINUX=ON
+        -DCLANG_LINK_CLANG_DYLIB=ON
+        -DENABLE_LINKER_BUILD_ID=ON
+        -DLLVM_INCLUDE_TESTS=OFF
+        -DLLVM_INCLUDE_BENCHMARKS=OFF
+        -DLLVM_BUILD_DOCS=OFF
+        -DLLVM_ENABLE_SPHINX=OFF
+    )
+
+    cmake ../clang "${cmake_args[@]}"
+
+    # 只装分发包组件（跳过静态库 clang-libraries），与 llvm 食谱同法
+    local components
+    components=$(ninja -t targets | grep -Po 'install-\K.*(?=-stripped:)' | while read -r target; do
+        case $target in
+            clang-libraries|distribution) continue ;;
+            clang|clangd|clang-*) ;;
+            clang*|findAllSymbols) continue ;;
+        esac
+        echo "$target"
+    done | paste -sd\;)
+
+    test -n "$components"
+    cmake_args+=("-DLLVM_DISTRIBUTION_COMPONENTS=$components")
+    cmake ../clang "${cmake_args[@]}"
+
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install-distribution
+
+    install -Dm644 ../clang/LICENSE.TXT "{STAGING_ROOT}{DATADIR}/licenses/clang/LICENSE"
+
+    # bash 补全：上游装在 share/clang/ 下，归位到 bash-completion 的约定位置
+    if [ -f "{STAGING_ROOT}{DATADIR}/clang/bash-autocomplete.sh" ]; then
+        install -d "{STAGING_ROOT}{DATADIR}/bash-completion/completions"
+        mv "{STAGING_ROOT}{DATADIR}/clang/bash-autocomplete.sh" \
+           "{STAGING_ROOT}{DATADIR}/bash-completion/completions/clang"
+    fi
+}
+
+lankebuild_package() {
+    # python 绑定与 scan-build 归位（照 Arch 的布局）：
+    # scan-build/scan-view 靠 site-packages 里的 libear/libscanbuild 运行；clang.cindex 绑定也从这里装。
+    # **不做 Arch 的 `python -m compileall`**：LankeOS 明令包内不得含字节码（chk pycache 会报），
+    # 字节码由解释器安装后自行生成。
+    local site_packages
+    site_packages=$(python3 -c "import site; print(site.getsitepackages()[0])")
+
+    # install -d 只在真有东西要放进去时做：否则会给本包挂上一个空目录，
+    # 而 site-packages 是 python 包持有的目录（无谓地多一个共同持有者）。
+    for d in libear libscanbuild; do
+        if [ -d "{STAGING_ROOT}{LIBDIR}/$d" ]; then
+            install -d "{STAGING_ROOT}${site_packages}"
+            mv "{STAGING_ROOT}{LIBDIR}/$d" "{STAGING_ROOT}${site_packages}/"
+        fi
+    done
+    if [ -d "{SRC_DIR}/clang/bindings/python/clang" ]; then
+        install -d "{STAGING_ROOT}${site_packages}"
+        cp -a "{SRC_DIR}/clang/bindings/python/clang" "{STAGING_ROOT}${site_packages}/"
+    fi
+
+    # **不动 /usr/libexec**：Arch 把分析器脚本挪到 /usr/lib/clang 是它的目录策略，LankeOS 不跟。
+    # 不挪也就不需要 Arch 那条 `sed 's|libexec|lib/clang|'`——脚本里原有的 libexec 引用本来就有效。
+}

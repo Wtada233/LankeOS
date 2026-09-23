@@ -1,12 +1,21 @@
 pkg-name: chromium
-version-source: sources[0]
 sources:
-- tracker-template: gcs
-  url: https://commondatastorage.googleapis.com/chromium-browser-official/
-  pattern: chromium-([\d.]+)-lite\.tar\.xz
-  template: https://commondatastorage.googleapis.com/chromium-browser-official/chromium-{version}-lite.tar.xz
-- tracker-template: github
-  repo: foutrelis/chromium-launcher
-  mode: tags
-  tag-prefix: v
-  template: https://github.com/{repo}/archive/{tag}/chromium-launcher-{version}.tar.gz
+  - tracker-template: script
+    script: |
+      set -e
+      # 版本来源：Chrome for Testing 的 last-known-good-versions.json（小而稳定的 JSON API），
+      # 取代原先对 chromium-browser-official 桶 XML 列表的抓取。只跟 **Stable 通道**。
+      # 发 URL 前 HEAD 探一次 lite tarball：CfT 标记 known-good 早于 GCS 上传 tarball，
+      # 探测不到就报错退出（绝不写出 404 源）。
+      json=$(curl -fsSL https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json)
+      v=$(printf '%s' "$json" | python3 -c "import json,sys; print(json.load(sys.stdin)['channels']['Stable']['version'])")
+      url="https://commondatastorage.googleapis.com/chromium-browser-official/chromium-$v-lite.tar.xz"
+      curl -fsSI -o /dev/null "$url" || { echo "Stable $v 的 lite tarball 尚未发布" >&2; exit 1; }
+      echo "$v|$url"
+  # 第二源 chromium-launcher：github 模板本就够用（mode: tags 走 git 协议列全量 tag，
+  # 与脚本里的 `git ls-remote --tags` 同一机制），不必写脚本。
+  - tracker-template: github
+    repo: foutrelis/chromium-launcher
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/{tag}/chromium-launcher-{version}.tar.gz

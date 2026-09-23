@@ -7,8 +7,12 @@ CXX ?= g++
 # 它**之后**（--as-needed 下前置的 -lssl 无符号引用会被丢弃 → "DSO missing from command line"）。
 # 故 openssl 放最后，保证 -lssl -lcrypto 紧跟 -lgit2。
 PKGS = libcurl libarchive libelf libgit2 libsolv openssl
-PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS))
-LIBS = $(shell pkg-config --libs $(PKGS))
+# 吞掉 pkg-config 的 stderr：模块缺失时它直接往终端喷 "Package 'x' not found / Perhaps you
+# should add …"，而这两行是**递归变量**（只在真正在本机编译/链接时才展开），那份噪音对
+# `make docker`（编译发生在容器里，主机 lib 根本用不到）纯属垃圾。缺依赖真正该看的诊断是
+# deps-check —— 它带版本窗口、逐模块明确报缺哪一个。
+PKG_CFLAGS = $(shell pkg-config --cflags $(PKGS) 2>/dev/null)
+LIBS = $(shell pkg-config --libs $(PKGS) 2>/dev/null)
 # 动态链接（测试二进制必须动态——全静态链接会改变运行时行为，导致 Tar/pack 等异常）。
 # Alpine 默认 --no-copy-dt-needed-entries：.so 的传递依赖（libarchive→libz 等）不自动继承，
 # 用 --copy-dt-needed-entries 恢复（链接器从共享库的 DT_NEEDED 复制传递依赖）。
@@ -74,7 +78,7 @@ deps-check:
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 7.0.0
+VERSION ?= 7.0.1
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -110,11 +114,42 @@ COMMON_CXXFLAGS = -std=c++20 -fPIC -Wall -Wextra -I$(MAIN_DIR)/third_party/inclu
            -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\" \
            -DLPKG_VERSION=\"$(VERSION)\" \
            -DFMT_HEADER_ONLY \
-           -Werror -Wall -Wextra \
-           -Wl,--copy-dt-needed-entries
+           -Werror
+# 转义引号吃掉，宏展开成 /etc/lpkg 被当成除法（实测炸过构建）；用户显式覆盖的项目同名
+# flag（如 -O3 覆盖 -O2）不在项目列表里 → 保留，仍然后者胜。
 
-CXXFLAGS = $(COMMON_CXXFLAGS) -O2
-TEST_CXXFLAGS = $(COMMON_CXXFLAGS) -g
+# --- 主机环境传入的 flags（"系统 flags"）---
+# 必须在下面与项目 flags 合成**之前**捕获：这是要注入容器的那一份原始值
+# （合成后的 CXXFLAGS 含 COMMON_CXXFLAGS，注入会重复）。
+HOST_CFLAGS := $(CFLAGS)
+HOST_CXXFLAGS := $(CXXFLAGS)
+HOST_LDFLAGS := $(LDFLAGS)
+HOST_TEST_CXXFLAGS := $(TEST_CXXFLAGS)
+
+# 系统 flags 里的 `-Wp,-D_FORTIFY_SOURCE=3` 会和编译器**内建**的那份打架：`-Wp,` 把宏直接塞给
+# cpp，driver 的 specs 守卫（`%{!D_FORTIFY_SOURCE:…}`）看不见它，于是 gcc 在 -O2 下照样按自己
+# 的默认再定义一次 `_FORTIFY_SOURCE`（`<built-in>`，Alpine 13.2 是 2）→ cpp 报
+# `"_FORTIFY_SOURCE" redefined`，被本项目的 -Werror 升成**致命错误**（实测整包编译全灭，
+# 而该诊断没有 -W 选项名：-Wno-error=builtin-macro-redefined / -Wno-builtin-macro-redefined
+# 都关不掉）。干净解法是先 `-U` 掉内建那份，让调用方显式给的值生效（fortify 等级以系统
+# flags 为准）。**只在其确实带了这个宏时才 -U** —— 否则会平白关掉编译器默认的 fortify。
+SYSTEM_FORTIFY_UNDEF = $(if $(findstring _FORTIFY_SOURCE,$(HOST_CFLAGS) $(HOST_CXXFLAGS)),-U_FORTIFY_SOURCE)
+
+# 链接期行为 flag 必须在**库之前**出现（ld 的 --copy-dt-needed-entries 决定其后 DSO 的
+# DT_NEEDED 是否被继承；放到 -larchive 之后 = 不生效，Alpine 上直接报
+# "libarchive.so: undefined reference to deflateInit_ / DSO missing from command line"）。
+# 放进 LDFLAGS：语义正确（它就是链接选项）且位置天然在 $^ 与 $(LIBS) 之前。
+LDFLAGS := $(HOST_LDFLAGS) -Wl,--copy-dt-needed-entries
+
+# 系统 flags 追加在**后面**（gcc 后者胜）；-U 必须排在它们**前面**才压得住内建定义。
+# 这里必须是 `=`（递归展开），**不能**用 `:=`：COMMON_CXXFLAGS 里含 $(shell pkg-config …)，
+# 立即展开会让**每一次** make（包括主机上根本不编译的 `make docker`）都去主机跑 pkg-config
+# —— 主机没装 libsolv 就满屏 "Package 'libsolv' not found"，而那份输出主机上根本用不到
+# （真正编译发生在容器里，容器内 pkg-config 齐全）。同理引用 HOST_CXXFLAGS 而不是
+# $(CXXFLAGS)：递归变量引用自身会死循环。
+CXXFLAGS = $(COMMON_CXXFLAGS) -O2 $(SYSTEM_FORTIFY_UNDEF) $(HOST_CXXFLAGS)
+# 测试编译同样吃主机 CXXFLAGS（"不忽略系统 flags"对测试构建一样成立）
+TEST_CXXFLAGS = $(COMMON_CXXFLAGS) -g $(SYSTEM_FORTIFY_UNDEF) $(HOST_TEST_CXXFLAGS) $(HOST_CXXFLAGS)
 
 MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp) \
 	$(wildcard $(APP_SRC_DIR)/base/*.cpp) $(wildcard $(APP_SRC_DIR)/vercmp/*.cpp) \
@@ -146,7 +181,7 @@ test: docker-env
 	@$(MAKE) docker-sync
 	@# 装 l10n 到编译路径（LPKG_L10N_DIR=/usr/share/lpkg/l10n），否则 get_string 全返回 [MISSING_STRING]
 	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "mkdir -p /usr/share/lpkg && cp -r /app/main/l10n /usr/share/lpkg/"
-	@docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make -j$$(nproc) build/run_tests && ./build/run_tests"
+	@docker exec $(DOCKER_ENV_FLAGS) -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make -j$$(nproc) build/run_tests && ./build/run_tests"
 	@echo "------------------------------------------"
 	@echo "Tests completed inside Docker container."
 
@@ -170,17 +205,19 @@ build_test_internal: $(BUILD_DIR)/$(TEST_TARGET)
 # 链接 recipe 的 $^ 会把字面量 "deps-check" 当输入文件塞给 ld。
 $(BUILD_DIR)/$(TARGET): $(MAIN_OBJS) | deps-check
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(BUILD_DIR)/$(TEST_TARGET): $(TEST_OBJS) $(LPKG_OBJS) | deps-check
 	@mkdir -p $(@D)
-	$(CXX) $(TEST_CXXFLAGS) -o $@ $^ $(TEST_LIBS)
+	$(CXX) $(TEST_CXXFLAGS) $(LDFLAGS) -o $@ $^ $(TEST_LIBS)
 
 static: deps-check $(BUILD_DIR)/$(TARGET)-static
 
+# $(LDFLAGS) 放在 -static **之前**：主机 LDFLAGS 若带 -pie 之类的链接模式 flag，
+# 也必须让 -static（本目标的语义）最后胜出。
 $(BUILD_DIR)/$(TARGET)-static: $(MAIN_OBJS)
 	@mkdir -p $(@D)
-	$(CXX) $(CXXFLAGS) -static -o $@ $^ $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -static -o $@ $^ $(LIBS)
 
 $(BUILD_DIR)/main/%.o: $(APP_SRC_DIR)/%.cpp | deps-check
 	@mkdir -p $(@D)
@@ -222,6 +259,19 @@ uninstall:
 	rm -rf $(INSTALL_LOCK_DIR)
 
 DOCKER_ENV_CONTAINER = lpkg-builder
+
+# 把主机 flags 注入容器：docker exec **不继承主机环境**（只有 -e 明确指定的变量才进容器），
+# 于是默认的 `make docker` 路径此前把主机的 CFLAGS/CXXFLAGS/LDFLAGS 全丢了 —— 容器里 `make`
+# 看到的这三个变量是空的，只剩 Makefile 自带的 COMMON_CXXFLAGS/-O2 生效（实测主机
+# `CXXFLAGS=-march=x86-64-v3` 根本到不了容器内的编译行）。
+# 用上面捕获的 HOST_*（与项目 flags 合成**之前**的原始值）逐个 -e 注入；容器内
+# `CXXFLAGS := $(COMMON_CXXFLAGS) -O2 $(CXXFLAGS)` 再把它们拼到**末尾**（gcc 后者胜，
+# 与主机直编路径同一语义）。flag 值含空格/反斜杠 → 整体单引号包成单个 shell 词，
+# docker 只取 '=' 之后的字面值，不再过一层 shell 展开。
+# （docker-env 里 apk/cmake 构建的依赖库不注入：它们由 tag 戳缓存，注入既不触发重编，
+#   又会把主机的 glibc 工具链假设带进 musl 容器。）
+DOCKER_ENV_FLAGS = -e 'CFLAGS=$(HOST_CFLAGS)' -e 'CXXFLAGS=$(HOST_CXXFLAGS)' -e 'LDFLAGS=$(HOST_LDFLAGS)'
+
 # libsolv 锁定版本（tag，稳定发布版，非浮动 HEAD）：git clone --branch 拉取发布 tag。
 # /usr/lib/libsolv.tag 版本戳记录已装版本，改 tag 后 docker-env 自动重编（见下），无需手动删容器。
 LIBSOLV_TAG = 0.7.39
@@ -229,6 +279,16 @@ LIBSOLV_TAG = 0.7.39
 # docker-env 通过 /usr/lib/libgit2.tag 版本戳自动重编（见下），无需手动删容器。
 LIBGIT2_TAG = v1.7.2
 
+# 容器内两个 Alpine 没有（或静态库不可用）的依赖，从源码构建：
+# libgit2 —— alpine 的 libgit2-static 依赖系统 http-parser/ssh2，而 http-parser 无静态库，
+# 全静态链接会失败；故自建（bundled http-parser、USE_SSH=OFF）。锁定 LIBGIT2_TAG（见上），
+# /usr/lib/libgit2.tag 记录已装版本，与 pin 不符或 .a 缺失时重编。
+# libsolv —— Alpine 无此包（apk 自家 resolver 不用 libsolv）。锁定 LIBSOLV_TAG（见上，稳定
+# 发布 tag），/usr/lib/libsolv.tag 记录已装版本，与 pin 不符或 lib 缺失时重编，防止现有容器
+# 静默沿用旧版 libsolv（版本漂移的来源）。cmake：共享库 libsolv.so 默认无条件构建（无需
+# ENABLE_SHARED）；ENABLE_STATIC=ON 额外构建静态库 libsolv.a（供静态链接的 lpkg 二进制）。
+# libsolv 无 ENABLE_TESTS 选项。
+# （这些注释写在 recipe **外面**：recipe 里的 `#` 行会被 make 原样回显到构建日志里刷屏。）
 docker-env:
 	@mkdir -p $(BUILD_DIR)
 	@if ! docker inspect $(DOCKER_ENV_CONTAINER) >/dev/null 2>&1; then \
@@ -239,15 +299,7 @@ docker-env:
 		docker start $(DOCKER_ENV_CONTAINER) >/dev/null; \
 	fi
 	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base bash pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx gtest-dev tar sudo git cmake
-	# 从源码构建 libgit2-static（bundled http-parser、USE_SSH=OFF）：alpine 的 libgit2-static 依赖系统
-	# http-parser/ssh2，而 http-parser 无静态库，全静态链接会失败。
-	# 锁定 LIBGIT2_TAG（见上）；/usr/lib/libgit2.tag 记录已装版本，与 pin 不符或 .a 缺失时重编。
 	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "LIBGIT2_TAG=$(LIBGIT2_TAG); if [ ! -f /usr/lib/libgit2.a ] || [ \"\$$(cat /usr/lib/libgit2.tag 2>/dev/null)\" != \"\$$LIBGIT2_TAG\" ]; then rm -rf /tmp/libgit2 && git clone -q --depth 1 --branch \$$LIBGIT2_TAG https://github.com/libgit2/libgit2.git /tmp/libgit2 && cd /tmp/libgit2 && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=OFF -DBUILD_CLI=OFF -DBUILD_TESTS=OFF -DUSE_SSH=OFF -DUSE_HTTPS=OpenSSL >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null && echo \$$LIBGIT2_TAG > /usr/lib/libgit2.tag; fi"
-	# 从源码构建 libsolv（Alpine 无此包——apk 自家 resolver 不用 libsolv，故未打包）。
-	# 锁定 LIBSOLV_TAG（见上，稳定发布 tag）；/usr/lib/libsolv.tag 记录已装版本，与 pin 不符
-	# 或 lib 缺失时重编——防止现有容器静默沿用旧版 libsolv（版本漂移的来源）。
-	# cmake：共享库 libsolv.so 默认无条件构建（无需 ENABLE_SHARED）；ENABLE_STATIC=ON
-	# 额外构建静态库 libsolv.a（供静态链接的 lpkg 二进制）。libsolv 无 ENABLE_TESTS 选项。
 	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "LIBSOLV_TAG=$(LIBSOLV_TAG); if [ ! -f /usr/lib/libsolv.so ] || [ \"\$$(cat /usr/lib/libsolv.tag 2>/dev/null)\" != \"\$$LIBSOLV_TAG\" ]; then rm -rf /tmp/libsolv && git clone -q --depth 1 --branch \$$LIBSOLV_TAG https://github.com/openSUSE/libsolv.git /tmp/libsolv && cd /tmp/libsolv && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_STATIC=ON >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null && echo \$$LIBSOLV_TAG > /usr/lib/libsolv.tag; fi"
 
 docker-sync:
@@ -257,7 +309,7 @@ docker-sync:
 
 $(BUILD_DIR)/$(TARGET)-docker: docker-env
 	$(MAKE) docker-sync
-	docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make static -j$$(nproc) && strip --strip-all $(BUILD_DIR)/$(TARGET)-static && upx -9 $(BUILD_DIR)/$(TARGET)-static"
+	docker exec $(DOCKER_ENV_FLAGS) -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make static -j$$(nproc) && strip --strip-all $(BUILD_DIR)/$(TARGET)-static && upx -9 $(BUILD_DIR)/$(TARGET)-static"
 	docker cp $(DOCKER_ENV_CONTAINER):/app/$(BUILD_DIR)/$(TARGET)-static $@
 	@echo "--------------------------------------------------------"
 	@echo "Success! Pure static binary is ready at: $@"

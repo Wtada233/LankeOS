@@ -1,7 +1,7 @@
 {
   "name": "mesa",
   "version": "26.2.3",
-  "release": 6,
+  "release": 9,
   "deps": [
     "libclc",
     "python"
@@ -68,6 +68,7 @@
   "build_deps": [
     "base-devel",
     "cbindgen",
+    "clang",
     "cmake",
     "elfutils",
     "expat",

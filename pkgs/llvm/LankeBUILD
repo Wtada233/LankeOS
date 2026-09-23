@@ -6,18 +6,21 @@ lankebuild_build() {
     # LLVM 23 的 PGO 路径有解引用空 std::optional 的回归，_GLIBCXX_ASSERTIONS 会把它变成
     # 致命断言（rust 的 PGO 构建在 stage1 std 编译时 SIGABRT）。去掉这层硬化，
     # 与上游 LLVM 行为一致（静默 UB）。参考 llvm/llvm-project 对 optional 迁移期的处理。
-    CXXFLAGS="${CXXFLAGS//-Wp,-D_GLIBCXX_ASSERTIONS/}"
-    CXXFLAGS="${CXXFLAGS//-D_GLIBCXX_ASSERTIONS/}"
-    export CXXFLAGS
+    #CXXFLAGS="${CXXFLAGS//-Wp,-D_GLIBCXX_ASSERTIONS/}"
+    #CXXFLAGS="${CXXFLAGS//-D_GLIBCXX_ASSERTIONS/}"
+    #export CXXFLAGS
 
     mkdir build && cd build
 
+    # clang / lld 已拆成独立包（pkgs/clang、pkgs/lld）：本包只出 LLVM 自身
+    # （libLLVM / libLTO / libRemarks / LLVMgold + llvm-* 工具 + 头文件 + cmake 配置）。
+    # 拆出的两个包按 standalone 子项目构建，依赖本包装出的 LLVMConfig.cmake 与共享库。
+    # 参数列表内**不写注释**（`\` 续行下 `#` 会吞掉该行到结尾的全部参数，mlt 踩过）。
     local cmake_args=(
         -G Ninja
         -DLLVM_BINUTILS_INCDIR=/usr/include
         -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_INSTALL_PREFIX={PREFIX} -DCMAKE_INSTALL_SYSCONFDIR={SYSCONFDIR}
-        -DLLVM_ENABLE_PROJECTS='clang;lld'
         -DLLVM_TARGETS_TO_BUILD='X86;AMDGPU;NVPTX;SPIRV'
         -DLLVM_BUILD_LLVM_DYLIB=ON
         -DLLVM_LINK_LLVM_DYLIB=ON
@@ -29,9 +32,6 @@ lankebuild_build() {
         -DLLVM_ENABLE_FFI=ON
         -DLLVM_ENABLE_CURL=ON
         -DLLVM_ENABLE_HTTPLIB=ON
-        -DCLANG_DEFAULT_PIE_ON_LINUX=ON
-        -DCLANG_LINK_CLANG_DYLIB=ON
-        -DENABLE_LINKER_BUILD_ID=ON
     )
 
     cmake ../llvm "${cmake_args[@]}"
@@ -40,17 +40,13 @@ lankebuild_build() {
     local components
     components=$(ninja -t targets | grep -Po 'install-\K.*(?=-stripped:)' | while read -r target; do
         case $target in
-            llvm-libraries|distribution|clang-libraries|lld-libraries)
+            llvm-libraries|distribution)
                 continue ;;
             LLVM|LLVMgold) ;;
             LLVMDemangle|LLVMSupport|LLVMTableGen|LLVMDebuginfod|LLVMHTTP) ;;
             LLVMTestingAnnotations|LLVMTestingSupport) ;;
             LLVM*) continue ;;
             llvm-exegesis) continue ;;
-            clang|clangd|clang-*) ;;
-            clang*|findAllSymbols) continue ;;
-            lld|lld-*) ;;
-            lld*) continue ;;
         esac
         echo "$target"
     done | paste -sd\;)

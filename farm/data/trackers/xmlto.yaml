@@ -1,6 +1,6 @@
 pkg-name: xmlto
-type: script
-script-content: |
-  #!/bin/bash
-  echo "0.0.29"
-  echo "https://pagure.io/xmlto/archive/0.0.29/xmlto-0.0.29.tar.gz"
+sources:
+  - tracker-template: script
+    script: |
+      #!/bin/bash
+      echo "0.0.29|https://pagure.io/xmlto/archive/0.0.29/xmlto-0.0.29.tar.gz"

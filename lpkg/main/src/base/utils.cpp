@@ -4,9 +4,10 @@
 #include <poll.h>
 #include <signal.h>
 #include <sys/file.h>
-#include <sys/stat.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/xattr.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -352,6 +353,23 @@ bool is_safe_path_component(std::string_view s)
     for (const char c : s)
         if (c == ' ' || c == '\t' || c == '\n' || c == '\r') return false;
     return true;
+}
+
+void copy_xattrs(const fs::path& from, const fs::path& to)
+{
+    ssize_t len = ::llistxattr(from.c_str(), nullptr, 0);
+    if (len <= 0) return;
+    std::vector<char> names(static_cast<size_t>(len));
+    len = ::llistxattr(from.c_str(), names.data(), names.size());
+    if (len <= 0) return;
+    for (const char* n = names.data(); n < names.data() + len; n += std::strlen(n) + 1) {
+        if (*n == '\0') continue;
+        const ssize_t vlen = ::lgetxattr(from.c_str(), n, nullptr, 0);
+        if (vlen < 0) continue;
+        std::vector<char> val(static_cast<size_t>(vlen));
+        if (::lgetxattr(from.c_str(), n, val.data(), val.size()) != vlen) continue;
+        (void)::lsetxattr(to.c_str(), n, val.data(), val.size(), 0);
+    }
 }
 
 std::string shell_quote(std::string_view s)
@@ -727,10 +745,18 @@ void string_replace_all(std::string& str, const std::string& from, const std::st
  */
 void strip_binary(const fs::path& path)
 {
-    std::string error_msg;
-    if (!strip_file(path, error_msg)) {
-        if (!error_msg.empty()) {
+    // strip 是**尽力而为**的步骤：出任何问题都只该让包大一点，绝不能失败整个构建。
+    // 曾因 strip 内部异常（SHT_NOBITS 的 d_buf 为 NULL → bad_alloc）逃出本函数，
+    // 把 lankebuild_package 阶段整个打死（llvm 白跑一次）。这里兜住所有异常。
+    try {
+        std::string error_msg;
+        if (!strip_file(path, error_msg) && !error_msg.empty()) {
             log_warning(string_format("warning.strip_failed", path.string(), error_msg));
         }
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.strip_failed", path.string(), e.what()));
+    } catch (...) {
+        log_warning(
+            string_format("warning.strip_failed", path.string(), get_string("error.unknown")));
     }
 }

@@ -54,7 +54,7 @@ fs::path stash_parent_dir(const fs::path& phys)
         if (have_mounts && is_mount_point(best)) break;  // best 已是本文件系统顶层
         const fs::path par = best.parent_path();
         if (par.empty() || par == best) break;
-        if (!within_root(par)) break;  // 越过 root_dir 边界 → best 是根内最上层
+        if (!within_root(par)) break;                 // 越过 root_dir 边界 → best 是根内最上层
         if (!have_mounts && dev_of(par) != d) break;  // /proc 不可用 → 退回 st_dev 近似
         best = par;
     }

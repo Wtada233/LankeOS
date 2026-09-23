@@ -1,6 +1,6 @@
 {
   "name": "chromium",
-  "version": "155.0.8059.2",
+  "version": "153.0.8010.52",
   "release": 3,
   "deps": [
     "gtk3",
@@ -115,7 +115,7 @@
     "zstd"
   ],
   "sources": [
-    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-155.0.8059.2-lite.tar.xz",
+    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-153.0.8010.52-lite.tar.xz",
     "https://github.com/foutrelis/chromium-launcher/archive/v8/chromium-launcher-8.tar.gz"
   ],
   "work_sources": []

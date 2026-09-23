@@ -1,8 +1,10 @@
 pkg-name: liblangtag
-type: script
-script-content: |
-  page=$(curl -fsSL "https://dev-www.libreoffice.org/src/")
-  ver=$(printf '%s\n' "$page" | grep -oE "liblangtag-[0-9.]+\.tar\." | sed "s/^liblangtag-//; s/\.tar\..*$//" | sort -V | tail -n1)
-  test -n "$ver" || exit 1
-  echo "$ver"
-  echo "https://dev-www.libreoffice.org/src/liblangtag-$ver.tar.xz"
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    # 上游在 dev-www 的 src 根只发 .tar.bz2（0.6.x 全是 bz2）。旧脚本写死 .tar.xz → URL 必然 404。
+    # 注：LankeBUILD.json 当前钉的是一个 gitlab upload 链接（一次性上传，不可追踪）；
+    # 本 tracker 产出的是 dev-www 上的规范位置。
+    url: https://dev-www.libreoffice.org/src/
+    pattern: 'liblangtag-([0-9.]+)\.tar\.bz2'
+    template: https://dev-www.libreoffice.org/src/liblangtag-{version}.tar.bz2

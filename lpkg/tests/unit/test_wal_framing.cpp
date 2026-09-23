@@ -103,11 +103,10 @@ TEST_F(WalFramingTest, DirRmSplitsModeUidGidFromTheRight)
 TEST_F(WalFramingTest, PackageMetadataOpsKeepVersionSeparate)
 {
     // 包名不含空格，版本号也不含空格：从右切出 1 个字段
-    for (const auto& type : {WALOpType::BEGIN, WALOpType::COMMIT, WALOpType::ROLLBACK,
-                             WALOpType::END, WALOpType::RM_BEGIN, WALOpType::RM_COMMIT,
-                             WALOpType::RM_END}) {
-        const std::string line =
-            std::string(wal::walop_type_name(type)) + " mypkg 1.2.3+4";
+    for (const auto& type :
+         {WALOpType::BEGIN, WALOpType::COMMIT, WALOpType::ROLLBACK, WALOpType::END,
+          WALOpType::RM_BEGIN, WALOpType::RM_COMMIT, WALOpType::RM_END}) {
+        const std::string line = std::string(wal::walop_type_name(type)) + " mypkg 1.2.3+4";
         const WALOp op = wal::parse_op(line);
         ASSERT_TRUE(op.is_valid()) << line;
         EXPECT_EQ(op.type, type) << line;
@@ -141,7 +140,8 @@ TEST_F(WalFramingTest, ArrowOpsKeepBothSidesIntact)
     EXPECT_EQ(copy.arg1, "/tmp/my pkg/x.lpkgtmp");
     EXPECT_EQ(copy.arg2, "/usr/bin/x y");
 
-    const WALOp rdb = wal::parse_op("RESTORE_DB /var/lib/a b/pkgs.bak \xe2\x86\x92 /var/lib/a b/pkgs");
+    const WALOp rdb =
+        wal::parse_op("RESTORE_DB /var/lib/a b/pkgs.bak \xe2\x86\x92 /var/lib/a b/pkgs");
     EXPECT_EQ(rdb.type, WALOpType::RESTORE_DB);
     EXPECT_EQ(rdb.arg1, "/var/lib/a b/pkgs.bak");
     EXPECT_EQ(rdb.arg2, "/var/lib/a b/pkgs");
@@ -166,30 +166,30 @@ TEST_F(WalFramingTest, HistoricalLineFormsStillParseIdentically)
         {"NEW /usr/share/doc/curl/README", WALOpType::NEW, "/usr/share/doc/curl/README", "", "",
          ""},
         {"NEW_DIR /usr/share/doc/curl/", WALOpType::NEW_DIR, "/usr/share/doc/curl/", "", "", ""},
-        {"BACKUP /usr/bin/curl \xe2\x86\x92 /usr/bin/curl.lpkg_bak_curl_ab12cd",
-         WALOpType::BACKUP, "/usr/bin/curl", "/usr/bin/curl.lpkg_bak_curl_ab12cd", "", ""},
+        {"BACKUP /usr/bin/curl \xe2\x86\x92 /usr/bin/curl.lpkg_bak_curl_ab12cd", WALOpType::BACKUP,
+         "/usr/bin/curl", "/usr/bin/curl.lpkg_bak_curl_ab12cd", "", ""},
         {"COPY /tmp/x.lpkgtmp \xe2\x86\x92 /usr/bin/curl", WALOpType::COPY, "/tmp/x.lpkgtmp",
          "/usr/bin/curl", "", ""},
         {"REMOVE_OLD /usr/bin/old \xe2\x86\x92 /usr/lib/.lpkg_bak_a_1/old.lpkg_bak_a_ab12cd",
-         WALOpType::REMOVE_OLD, "/usr/bin/old",
-         "/usr/lib/.lpkg_bak_a_1/old.lpkg_bak_a_ab12cd", "", ""},
-        {"DIR_RM /usr/share/doc/old 0755 0 0", WALOpType::DIR_RM, "/usr/share/doc/old", "0755",
-         "0", "0"},
-        {"DB /var/lib/lpkg/pkgs A:installed", WALOpType::DB, "/var/lib/lpkg/pkgs",
-         "A:installed", "", ""},
-        {"DB /var/lib/lpkg/pkgs :batch-start", WALOpType::DB, "/var/lib/lpkg/pkgs",
-         ":batch-start", "", ""},
+         WALOpType::REMOVE_OLD, "/usr/bin/old", "/usr/lib/.lpkg_bak_a_1/old.lpkg_bak_a_ab12cd", "",
+         ""},
+        {"DIR_RM /usr/share/doc/old 0755 0 0", WALOpType::DIR_RM, "/usr/share/doc/old", "0755", "0",
+         "0"},
+        {"DB /var/lib/lpkg/pkgs A:installed", WALOpType::DB, "/var/lib/lpkg/pkgs", "A:installed",
+         "", ""},
+        {"DB /var/lib/lpkg/pkgs :batch-start", WALOpType::DB, "/var/lib/lpkg/pkgs", ":batch-start",
+         "", ""},
         {"DBNEW /var/lib/lpkg/deps/A A:installed", WALOpType::DBNEW, "/var/lib/lpkg/deps/A",
          "A:installed", "", ""},
-        {"DBRM /var/lib/lpkg/needed_so/A A:installed", WALOpType::DBRM,
-         "/var/lib/lpkg/needed_so/A", "A:installed", "", ""},
-        {"CLEANUP /usr/lib/.lpkg_bak_A_42", WALOpType::CLEANUP, "/usr/lib/.lpkg_bak_A_42", "",
-         "", ""},
+        {"DBRM /var/lib/lpkg/needed_so/A A:installed", WALOpType::DBRM, "/var/lib/lpkg/needed_so/A",
+         "A:installed", "", ""},
+        {"CLEANUP /usr/lib/.lpkg_bak_A_42", WALOpType::CLEANUP, "/usr/lib/.lpkg_bak_A_42", "", "",
+         ""},
         {"RM_BEGIN A 1.0", WALOpType::RM_BEGIN, "A", "1.0", "", ""},
         {"ROLLBACK A 1.0", WALOpType::ROLLBACK, "A", "1.0", "", ""},
         {"END A 1.0", WALOpType::END, "A", "1.0", "", ""},
-        {"RESTORE_FILE /a.lpkg_bak_A_1 \xe2\x86\x92 /a", WALOpType::RESTORE_FILE,
-         "/a.lpkg_bak_A_1", "/a", "", ""},
+        {"RESTORE_FILE /a.lpkg_bak_A_1 \xe2\x86\x92 /a", WALOpType::RESTORE_FILE, "/a.lpkg_bak_A_1",
+         "/a", "", ""},
         {"RESTORE_FILE_RM /usr/bin/a", WALOpType::RESTORE_FILE_RM, "/usr/bin/a", "", "", ""},
         {"REMOVE_FILE /usr/bin/legacy", WALOpType::REMOVE_FILE, "/usr/bin/legacy", "", "", ""},
     };
@@ -223,8 +223,7 @@ TEST_F(WalFramingTest, UnknownLineIsInvalidSentinelNotBeginPkgs)
     // 会让"找最后一个 BEGIN_PKGS"的反向扫描把它当成批次起点）
     for (const char* line : {"PY /tmp/x \xe2\x86\x92 /usr/bin/x",  // 半写：COPY → PY
                              "/tmp/x \xe2\x86\x92 /usr/bin/x",     // 半写：类型整个丢了
-                             "THIS_LINE_IS_COMPLETELY_UNKNOWN_XXX_YYY",
-                             " DBNEW /x A:installed"}) {
+                             "THIS_LINE_IS_COMPLETELY_UNKNOWN_XXX_YYY", " DBNEW /x A:installed"}) {
         const WALOp op = wal::parse_op(line);
         EXPECT_FALSE(op.is_valid()) << line;
         EXPECT_EQ(op.type, WALOpType::INVALID) << line;

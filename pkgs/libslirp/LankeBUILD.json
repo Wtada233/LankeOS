@@ -1,6 +1,6 @@
 {
   "name": "libslirp",
-  "version": "4.9.4",
+  "version": "4.9.5",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -18,7 +18,7 @@
     "ninja"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/slirp/libslirp/-/archive/v4.9.4/libslirp-v4.9.4.tar.gz"
+    "https://gitlab.freedesktop.org/slirp/libslirp/-/archive/v4.9.5/libslirp-v4.9.5.tar.gz"
   ],
   "work_sources": []
 }

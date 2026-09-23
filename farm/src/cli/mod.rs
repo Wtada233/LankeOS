@@ -978,7 +978,6 @@ const SYSTEM_PROMPT: &str = r#"你是 LankeOS 发行版的 tracker 配置生成�
 tracker yaml 是 sources/work_sources 的完整清单，结构：
 - pkg-name（顶层必填，=包名）
 - version-source：版本来源选择器（sources[i] 或 work_sources[i]，默认 sources[0]，空则 work_sources[0]）
-- type：template（默认，逐条目声明式探测）| script（整包走内嵌 bash）
 - sources: / work_sources:：逐条 source 槽位的探测配置（**位置对应 LankeBUILD.json 的 sources/work_sources 数组**，不要 url-match、不要写 pkg-name）
 
 source 条目可用 tracker-template 及字段：
@@ -1001,19 +1000,23 @@ source 条目可用 tracker-template 及字段：
     pattern: ki18n-([0-9][0-9.]*)\.tar\.xz
   template: https://download.kde.org/stable/frameworks/{series}/ki18n-{version}.tar.xz
 - same-version: same-version-of(锁定为指定包版本，直接确定版本不经探测), tag-prefix, repo, template
+- script: script（内嵌 bash，stdout 每行 `<版本>|URL`；**默认恰好一行**，加 expand: true 才允许多行/多槽位）——**条目级**，与其他模板平级
 
 条目级版本约束（只作用于本条目，探测模板适用）：major-of、major-version-lock、max-version、source-name。
 template 是**完整下载 URL**（含 https:// 和主机名，占位符替换后可直接下载），不要把 URL 拆开只留文件名/相对路径。
 template 占位符：{name} {version} {tag} {repo} {project} {path_version}（multi-level-html-index 另可用各级的 name）。
 pattern 是提取版本的正则，必须含一个捕获组，如 (\d[\d.]*)。
 
-无法用现成模板覆盖的（独特 API、版本在路径里等）用 script 类型：
-type: script
-script-content: |
-  #!/bin/bash
-  # stdout 第一行=版本，后续行=具体下载 URL；`# work_sources` 标记行之后归 work_sources
-  echo "1.2.3"
-  echo "https://.../pkg-1.2.3.tar.gz"
+**实在**无法用现成模板覆盖的（独特 API、版本在文件内容里等）才用**条目级** script：
+- 一个脚本条目产**一个**槽位（放哪个列表就填哪个列表）。stdout 恰好一行 `<版本>|URL`。
+- 只有上游**动态枚举**（目录里有几个文件不确定）才加 `expand: true`，此时 stdout 每行
+  一个 `<版本>|URL`，逐行对应一个连续槽位。**能不用就不用**——脚本不可复用、无法统一校验。
+sources:
+  - tracker-template: script
+    script: |
+      #!/bin/bash
+      # stdout 恰好一行：<版本>|URL（两侧都不得为空）
+      echo "1.2.3|https://.../pkg-1.2.3.tar.gz"
 
 规则：
 - 根据探测输出的真实格式选模板，不要猜；探测失败时按源 URL 域名/结构选最合理的。
@@ -1033,9 +1036,10 @@ sources:
     template: ...
 ===
 pkg-name: alacritty
-type: script
-script-content: |
-  ...
+sources:
+  - tracker-template: script
+    script: |
+      ...
 ===
 
 容错规则：
@@ -1484,7 +1488,7 @@ mod tests {
                 "https://github.com/notofonts/noto-cjk/raw/refs/tags/Sans2.005/Sans/Mono/font.otf"
                     .into(),
             ],
-            kind: "template".into(),
+            kind: "html-index+script".into(),
         };
         apply_version_update(&mut value, &prop);
         assert_eq!(value["version"], "2.005");

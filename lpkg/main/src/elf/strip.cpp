@@ -3,8 +3,6 @@
 #endif
 #include "strip.hpp"
 
-#include "lib_utils.hpp"
-
 #include <archive.h>
 #include <archive_entry.h>
 #include <fcntl.h>
@@ -27,6 +25,7 @@
 
 #include "base/utils.hpp"
 #include "i18n/localization.hpp"
+#include "lib_utils.hpp"
 
 namespace fs = std::filesystem;
 
@@ -231,10 +230,16 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
         Elf_Data* in_data = elf_getdata(info.old_scn, nullptr);
         Elf_Data* out_data = elf_newdata(new_scn);
         if (in_data) {
-            const auto* begin = static_cast<const uint8_t*>(in_data->d_buf);
-            owned_data.emplace_back(begin, begin + in_data->d_size);
             *out_data = *in_data;
-            out_data->d_buf = owned_data.back().data();
+            // **只为真有数据的节区复制自有缓冲**：SHT_NOBITS（.bss 等）在 libelf 里
+            // d_buf == NULL 而 d_size > 0 —— 按 d_size 从 NULL 构造 vector 是 UB
+            // （bad_alloc/崩溃），会让整个 strip 失败（LLVM 的 .o 带 .bss，实测卡住其构建）。
+            // 这类节区没有数据可改写，直接沿用描述符即可。
+            if (in_data->d_buf != nullptr && in_data->d_size > 0) {
+                const auto* begin = static_cast<const uint8_t*>(in_data->d_buf);
+                owned_data.emplace_back(begin, begin + in_data->d_size);
+                out_data->d_buf = owned_data.back().data();
+            }
             // 更新符号表中的节区索引
             if (new_shdr.sh_type == SHT_SYMTAB) {
                 size_t sym_count = out_data->d_size / gelf_fsize(out_elf, ELF_T_SYM, 1, EV_CURRENT);

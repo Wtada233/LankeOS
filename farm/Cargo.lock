@@ -555,6 +555,7 @@ dependencies = [
  "tar",
  "thiserror",
  "ureq",
+ "xattr",
  "zstd",
 ]
 

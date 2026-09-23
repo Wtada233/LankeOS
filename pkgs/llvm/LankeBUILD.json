@@ -1,6 +1,6 @@
 {
   "name": "llvm",
-  "version": "23.1.1",
+  "version": "23.1.2",
   "release": 3,
   "deps": [
     "perl",
@@ -26,11 +26,7 @@
     "libLTO.so",
     "libLTO.so.23.1",
     "libRemarks.so",
-    "libRemarks.so.23.1",
-    "libclang-cpp.so",
-    "libclang-cpp.so.23.1",
-    "libclang.so",
-    "libclang.so.23.1"
+    "libRemarks.so.23.1"
   ],
   "build_deps": [
     "base-devel",
@@ -44,7 +40,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.1/llvm-project-23.1.1.src.tar.xz"
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.2/llvm-project-23.1.2.src.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false,

@@ -13,6 +13,9 @@ regex = "1"
 ureq = { version = "2", features = ["tls"] }
 clap = { version = "4", features = ["derive"] }
 tar = "0.4"
+# 读条目的 xattr（repack 打包时写成 PAX 的 `SCHILY.xattr.*`；解包侧由 tar 的 xattr feature 还原）。
+# 本来就在依赖树里（tar 的传递依赖），显式声明才能直接用。
+xattr = "1"
 zstd = "0.13"
 goblin = "0.9"
 # git 协议列 tag（`mode: tags` 要**全量** tag，REST 端点是分页窗口）——

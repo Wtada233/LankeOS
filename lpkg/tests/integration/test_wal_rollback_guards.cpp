@@ -73,7 +73,8 @@ protected:
     {
         const fs::path work = suite_work_dir / ("_pkg_" + name);
         fs::create_directories(work / "content" / "usr" / "bin");
-        std::ofstream(work / "content" / "usr" / "bin" / name) << "#!/bin/sh\necho " << name << "\n";
+        std::ofstream(work / "content" / "usr" / "bin" / name)
+            << "#!/bin/sh\necho " << name << "\n";
         const std::string path = (pkg_dir / (name + "-" + version + ".lpkg")).string();
         pack_package(path, work.string(), name, version, deps, {}, "man " + name, {});
         return path;
@@ -111,9 +112,7 @@ protected:
 
 TEST_F(WalRollbackGuardTest, SandboxPathsReallyContainSpaces)
 {
-    const auto has_space = [](const std::string& s) {
-        return s.find(' ') != std::string::npos;
-    };
+    const auto has_space = [](const std::string& s) { return s.find(' ') != std::string::npos; };
     EXPECT_TRUE(has_space(Config::instance().pkgs_file().string()));
     EXPECT_TRUE(has_space(Config::instance().state_dir().string()));
     EXPECT_TRUE(has_space(wal::wal_log_path()));
@@ -130,9 +129,8 @@ TEST_F(WalRollbackGuardTest, FailedBatchRestoresBothFilesAndDbWhenRootHasSpaces)
     const std::string b = create_pkg("wb", "1.0", {"wa"});  // 依赖 wa → 顺序确定 [wa, wb]
 
     // wa 装完并写入 DB 里程碑（cache.write("wa:installed")）之后，在 wb 的安装起点打断
-    BreakpointManager::instance().set("install_after_begin_wb", [] {
-        throw LpkgException("interrupt before wb files land");
-    });
+    BreakpointManager::instance().set(
+        "install_after_begin_wb", [] { throw LpkgException("interrupt before wb files land"); });
     EXPECT_THROW(install_packages({a, b}), LpkgException);
     BreakpointManager::instance().clear_all();
 
@@ -210,8 +208,7 @@ TEST_F(WalRollbackGuardTest, UnclosableRollbackKeepsDbBackupsForRec)
     // 若被 cleanup_db_backups() 删掉，连人工恢复 DB 的余地都没有了）
     const fs::path start_bak =
         fs::path(Config::instance().pkgs_file().string() + ".lpkg_db_bak_before::batch-start");
-    EXPECT_TRUE(fs::exists(start_bak))
-        << "回滚未完成却清理了 DB 备份 → 再也没有还原 DB 的依据";
+    EXPECT_TRUE(fs::exists(start_bak)) << "回滚未完成却清理了 DB 备份 → 再也没有还原 DB 的依据";
     EXPECT_GT(count_db_backups(), 0);
 
     // 且没有被补写一个假的收尾标记（WAL 是被清空的，这里断言的是"没有谎报已提交"）
@@ -224,9 +221,8 @@ TEST_F(WalRollbackGuardTest, NormalFailureConsumesAndCleansDbBackups)
     // 否则备份会在每次失败后无限累积）
     const std::string a = create_pkg("wa", "1.0");
 
-    BreakpointManager::instance().set("install_after_begin_wa", [] {
-        throw LpkgException("plain interrupt");
-    });
+    BreakpointManager::instance().set("install_after_begin_wa",
+                                      [] { throw LpkgException("plain interrupt"); });
     EXPECT_THROW(install_packages({a}), LpkgException);
     BreakpointManager::instance().clear_all();
 
@@ -290,4 +286,3 @@ TEST_F(WalRollbackGuardTest, TwoUncommittedBatchesConvergeInOnePass)
 // （原 RecoveryOfLaterBatchKeepsEarlierBatchsBackups 已删除：它断言"恢复区域只覆盖
 //   最近一批、前一批保留待后续 pass"——那是区域起点取错的产物，现行语义是
 //   "一次逆序回滚整个未提交区域、一轮收敛"，由下方 TwoUncommittedBatchesConvergeInOnePass 覆盖。）
-

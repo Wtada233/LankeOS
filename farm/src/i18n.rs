@@ -256,6 +256,10 @@ static ZH: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("chk.unknown_kind", "未知检則: {}"),
         ("farm_flags.unknown", "  未知 farm flag: {}"),
         ("build.image_fallback", "  [warn] 从 {} 创建失败，回退原始 base 并重置滚动计数"),
+        (
+            "build.container_kept",
+            "  [容器已保留] 构建现场在里面，进去看：docker exec -it {} bash（用完请 docker rm -f {}）",
+        ),
         ("track.parse_fail_ignored", "  [warn] 忽略无法解析的 tracker {}: {}"),
     ])
 });
@@ -408,6 +412,10 @@ static EN: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(|| {
         ("chk.unknown_kind", "unknown check kind: {}"),
         ("farm_flags.unknown", "  unknown farm flag: {}"),
         ("build.image_fallback", "  [warn] failed to create from {}, falling back to the original base and resetting the roll counter"),
+        (
+            "build.container_kept",
+            "  [container kept] the build tree is inside it: docker exec -it {} bash  (clean up later with docker rm -f {})",
+        ),
         ("track.parse_fail_ignored", "  [warn] ignoring unparsable tracker {}: {}"),
     ])
 });

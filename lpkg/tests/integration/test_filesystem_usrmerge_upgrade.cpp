@@ -161,9 +161,9 @@ protected:
 TEST_F(FilesystemUsrMergeUpgradeTest, UpgradeFilesystemPreservesOtherPkgsBinaries)
 {
     // 1. 先装一个持有 /usr/bin 与 /usr/lib 文件的包（模拟 bash/coreutils）
-    std::string bin_pkg = pack_pkg("coreutils-like", "1.0",
-                                   {{"usr/bin/ls", "#!/bin/sh\nls\n"},
-                                    {"usr/lib/libfoo.so.1", "ELF\n"}});
+    std::string bin_pkg =
+        pack_pkg("coreutils-like", "1.0",
+                 {{"usr/bin/ls", "#!/bin/sh\nls\n"}, {"usr/lib/libfoo.so.1", "ELF\n"}});
     ASSERT_NO_THROW(install_packages({bin_pkg}));
     write_cache();
     ASSERT_TRUE(exists_in_root("usr/bin/ls"));

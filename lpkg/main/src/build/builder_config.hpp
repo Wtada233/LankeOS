@@ -24,11 +24,11 @@ struct BuildConfig {
     int release = 0;                        ///< 发行修订号（构建时附加 +N 到版本号）
 
     // ── 编译/链接标志覆盖（空字符串 = 使用 build_defaults 默认值）──────
-    std::string cflags;    ///< 覆盖 CFLAGS（如 "-O3 -march=x86-64-v3"）
-    std::string cxxflags;  ///< 覆盖 CXXFLAGS
-    std::string ldflags;   ///< 覆盖 LDFLAGS
-    std::string makeflags; ///< 覆盖 MAKEFLAGS（如 "-j2"）
-    bool lto = false;      ///< 启用 LTO（追加 -flto=auto 到编译与链接标志）
+    std::string cflags;     ///< 覆盖 CFLAGS（如 "-O3 -march=x86-64-v3"）
+    std::string cxxflags;   ///< 覆盖 CXXFLAGS
+    std::string ldflags;    ///< 覆盖 LDFLAGS
+    std::string makeflags;  ///< 覆盖 MAKEFLAGS（如 "-j2"）
+    bool lto = false;       ///< 启用 LTO（追加 -flto=auto 到编译与链接标志）
 };
 
 /**

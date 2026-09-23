@@ -3,8 +3,12 @@
 //! source 条目里 `tracker-template: pypi` + `project: <PyPI 项目名>`（可与 pkg-name 不同，
 //! 如 `pkg-name: python-setuptools` / `project: setuptools`）。
 //! probe 抓 `https://pypi.org/pypi/{project}/json`：
-//! - 默认取 `info.version`（PyPI 最新版）与最新版 `urls` 里的 sdist URL；
-//! - `major-version-lock` 时在 `releases` 里按主版本过滤取最大稳定版（多数 python 包用不到）。
+//! - 默认取 `info.version` 与最新版 `urls` 里的 sdist URL；
+//! - 带约束（`major-version-lock` / `max-version` / `exclude` / `stable-minor`）时改在
+//!   `releases` 里按 `VersionFilter` 挑选——单条 `info.version` 表达不了那些约束。
+//!
+//! **预发布不需要本模板操心**：PyPI 的 `info.version` 本身就优先**稳定版**（实测 cython 有
+//! `3.3.0b1` 时 `info.version` 仍是 `3.3.0`），所以不必在这里另写一套 PEP 440 判定。
 
 use crate::error::FarmError;
 use crate::net::Fetcher;
@@ -23,42 +27,42 @@ pub fn probe(
     let json: serde_json::Value =
         serde_json::from_str(&body).map_err(|e| format!("PyPI JSON 解析失败（{url}）: {e}"))?;
 
-    let (version, sdist_url) = match major {
-        Some(m) => {
-            // 按主版本过滤 releases，取最大稳定版，再找对应 sdist
-            let releases = json["releases"]
-                .as_object()
-                .ok_or_else(|| format!("PyPI {url} 无 releases"))?;
-            let versions: Vec<String> = releases.keys().cloned().collect();
-            let v = templates::max_version_stable_first(versions, Some(m), None)
-                .ok_or_else(|| format!("PyPI {project} 主版本 {m} 无稳定版本"))?;
-            let sdist = json["releases"][&v]
-                .as_array()
-                .and_then(|arr| {
-                    arr.iter()
-                        .find(|f| f["packagetype"].as_str() == Some("sdist"))
-                })
-                .and_then(|f| f["url"].as_str())
-                .ok_or_else(|| format!("PyPI {project} {v} 无 sdist URL"))?
-                .to_string();
-            (v, sdist)
-        }
-        None => {
-            let v = json["info"]["version"]
-                .as_str()
-                .ok_or_else(|| format!("PyPI {url} 无 info.version"))?
-                .to_string();
-            let sdist = json["urls"]
-                .as_array()
-                .and_then(|arr| {
-                    arr.iter()
-                        .find(|f| f["packagetype"].as_str() == Some("sdist"))
-                })
-                .and_then(|f| f["url"].as_str())
-                .ok_or_else(|| format!("PyPI {project} 最新版无 sdist URL"))?
-                .to_string();
-            (v, sdist)
-        }
+    // 有约束（major-of / exclude / stable-minor）时必须扫 `releases` 全量挑选：
+    // 单条 `info.version` 表达不了"排除某版""只要偶数 minor"。
+    let f = templates::version_filter(cfg, major)?;
+    let constrained = major.is_some() || cfg.exclude.is_some() || cfg.stable_minor.is_some();
+    let (version, sdist_url) = if constrained {
+        let releases = json["releases"]
+            .as_object()
+            .ok_or_else(|| format!("PyPI {url} 无 releases"))?;
+        let versions: Vec<String> = releases.keys().cloned().collect();
+        let v = templates::max_version_stable_first(versions, &f)
+            .ok_or_else(|| format!("PyPI {project} 无满足约束的版本（major={major:?}）"))?;
+        let sdist = json["releases"][&v]
+            .as_array()
+            .and_then(|arr| {
+                arr.iter()
+                    .find(|f| f["packagetype"].as_str() == Some("sdist"))
+            })
+            .and_then(|f| f["url"].as_str())
+            .ok_or_else(|| format!("PyPI {project} {v} 无 sdist URL"))?
+            .to_string();
+        (v, sdist)
+    } else {
+        let v = json["info"]["version"]
+            .as_str()
+            .ok_or_else(|| format!("PyPI {url} 无 info.version"))?
+            .to_string();
+        let sdist = json["urls"]
+            .as_array()
+            .and_then(|arr| {
+                arr.iter()
+                    .find(|f| f["packagetype"].as_str() == Some("sdist"))
+            })
+            .and_then(|f| f["url"].as_str())
+            .ok_or_else(|| format!("PyPI {project} 最新版无 sdist URL"))?
+            .to_string();
+        (v, sdist)
     };
     Ok(EntryProbe {
         version,

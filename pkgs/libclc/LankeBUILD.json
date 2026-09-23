@@ -1,12 +1,13 @@
 {
   "name": "libclc",
-  "version": "23.1.1",
+  "version": "23.1.2",
   "release": 2,
   "deps": [],
   "needed_so": [],
   "provides": [],
   "build_deps": [
     "base-devel",
+    "clang",
     "cmake",
     "llvm",
     "ninja",
@@ -16,7 +17,7 @@
     "IGNORE_CHK_PKGERR"
   ],
   "sources": [
-    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.1/llvm-project-23.1.1.src.tar.xz"
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.2/llvm-project-23.1.2.src.tar.xz"
   ],
   "work_sources": [],
   "no_strip": true

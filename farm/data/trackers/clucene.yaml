@@ -1,5 +1,5 @@
 pkg-name: clucene
-type: script
-script-content: |
-  echo "2.3.3.4"
-  echo "https://downloads.sourceforge.net/clucene/clucene-core-2.3.3.4.tar.gz"
+sources:
+  - tracker-template: script
+    script: |
+      echo "2.3.3.4|https://downloads.sourceforge.net/clucene/clucene-core-2.3.3.4.tar.gz"

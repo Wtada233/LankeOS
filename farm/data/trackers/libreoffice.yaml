@@ -1,43 +1,66 @@
 pkg-name: libreoffice
-type: script
-script-content: |
-  set -e
-  base=https://download.documentfoundation.org/libreoffice/src
+# 3 个主源：上游把版本藏在两段路径里（src/26.8.0/ 目录内是 4 段 libreoffice-26.8.0.3.tar.xz），
+# 正是 multi-level-html-index 的场景 → 三条声明式条目，只换 template 里的文件名。
+sources:
+  - tracker-template: multi-level-html-index
+    levels:
+      - name: series
+        url: https://download.documentfoundation.org/libreoffice/src/
+        pattern: '([0-9]+\.[0-9]+\.[0-9]+)/'
+      - name: version
+        url: https://download.documentfoundation.org/libreoffice/src/{series}/
+        pattern: 'libreoffice-([0-9.]+)\.tar\.xz'
+    template: https://download.documentfoundation.org/libreoffice/src/{series}/libreoffice-{version}.tar.xz
+  - tracker-template: multi-level-html-index
+    levels:
+      - name: series
+        url: https://download.documentfoundation.org/libreoffice/src/
+        pattern: '([0-9]+\.[0-9]+\.[0-9]+)/'
+      - name: version
+        url: https://download.documentfoundation.org/libreoffice/src/{series}/
+        pattern: 'libreoffice-([0-9.]+)\.tar\.xz'
+    template: https://download.documentfoundation.org/libreoffice/src/{series}/libreoffice-help-{version}.tar.xz
+  - tracker-template: multi-level-html-index
+    levels:
+      - name: series
+        url: https://download.documentfoundation.org/libreoffice/src/
+        pattern: '([0-9]+\.[0-9]+\.[0-9]+)/'
+      - name: version
+        url: https://download.documentfoundation.org/libreoffice/src/{series}/
+        pattern: 'libreoffice-([0-9.]+)\.tar\.xz'
+    template: https://download.documentfoundation.org/libreoffice/src/{series}/libreoffice-translations-{version}.tar.xz
+# vendor tarball 归 work_sources（Arch noextract 对应，lpkg 只下载不解压）。
+# 这 20 个文件名是 **download.lst 里的数据**（在 source tarball 内部）——模板读不到文件内容，
+# 硬编进 yaml 又会随 LO 升级 vendor 而静默腐烂 → 这里用脚本是唯一正确的选择。
+# `expand: true`：一个脚本产出全部 20 个槽位（每行一个）。
+work_sources:
+  - tracker-template: script
+    expand: true
+    # 版本直接取 sources[0] **本轮解析出**的值（`$main`）——不自己重探上游。
+    # 若各探各的，两次探测之间上游发新版就会产出「主源 26.8.0.3 + vendor 26.8.0.4」的
+    # 不一致清单（本条目要下载 300MB 主 tarball 读 download.lst，窗口有几分钟，不是理论风险）。
+    version-var:
+      main: sources[0]
+    script: |
+      set -e
+      # download.lst 直接从 LO 的 git 标签取（**32KB 文本**）。它也在主 tarball 里，但为了它
+      # 去流式解一个 **300MB** 的 tarball 会让一次 track 卡几分钟——本脚本曾经就是这么干的。
+      # 两者同源（tarball 就是从该 tag 打出来的）；取不到就 `set -e` 硬失败，不静默降级。
+      dl=$(curl -fsSL "https://raw.githubusercontent.com/LibreOffice/core/libreoffice-$main/download.lst")
+      test -n "$dl" || exit 1
 
-  # 1. 最新版本：3 段目录（26.8.0/）→ 目录内 4 段 tarball（libreoffice-26.8.0.3.tar.xz）
-  listing=$(curl -fsSL "$base/")
-  dir=$(printf '%s\n' "$listing" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+/' | tr -d '/' | sort -V | tail -n1)
-  test -n "$dir" || exit 1
-  page=$(curl -fsSL "$base/$dir/")
-  ver=$(printf '%s\n' "$page" | grep -oE 'libreoffice-[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\.tar\.xz' | head -n1 | sed 's/libreoffice-//; s/\.tar\.xz$//')
-  test -n "$ver" || exit 1
-
-  # 2. 下载主 tarball，流式提取 download.lst（不落盘）
-  main="$base/$dir/libreoffice-$ver.tar.xz"
-  dl=$(curl -fsSL "$main" | tar -xJOf - "libreoffice-$ver/download.lst" 2>/dev/null)
-  test -n "$dl" || exit 1
-
-  # 3. 输出：版本 + 3 个主源（main/help/translations，上游 URL；TUNA 仅本地临时下载用）
-  echo "$ver"
-  echo "$base/$dir/libreoffice-$ver.tar.xz"
-  echo "$base/$dir/libreoffice-help-$ver.tar.xz"
-  echo "$base/$dir/libreoffice-translations-$ver.tar.xz"
-  # 4. vendor tarball 归 work_sources（Arch noextract 对应，lpkg 只下载不解压）
-  echo "# work_sources"
-  # 5. download.lst 里的 vendor 变量（src）
-  for v in XSLTML_TARBALL JFREEREPORT_FLUTE_TARBALL JFREEREPORT_FLOW_ENGINE_TARBALL \
-           LANGTAGREG_TARBALL HSQLDB_TARBALL PDFIUM_TARBALL AFDKO_TARBALL \
-           ANTLR4CPPRUNTIME_TARBALL LXML_TARBALL FIREBIRD_TARBALL SKIA_TARBALL \
-           BOX2D_TARBALL DRAGONBOX_TARBALL FROZEN_TARBALL ZXCVBN_C_TARBALL \
-           JAVA_WEBSOCKET_TARBALL LIBEOT_TARBALL; do
-    name=$(printf '%s\n' "$dl" | grep -E "^${v} := " | sed 's/.*:= *//')
-    test -n "$name" || exit 1
-    echo "https://dev-www.libreoffice.org/src/$name"
-  done
-
-  # 6. extern（3 个）
-  for v in OPENSYMBOL_TTF ODFVALIDATOR_JAR OFFICEOTRON_JAR; do
-    name=$(printf '%s\n' "$dl" | grep -E "^${v} := " | sed 's/.*:= *//')
-    test -n "$name" || exit 1
-    echo "https://dev-www.libreoffice.org/extern/$name"
-  done
+      # download.lst 里的 vendor 变量（src）+ extern，每个一行 `<版本>|URL`
+      for v in XSLTML_TARBALL JFREEREPORT_FLUTE_TARBALL JFREEREPORT_FLOW_ENGINE_TARBALL \
+               LANGTAGREG_TARBALL HSQLDB_TARBALL PDFIUM_TARBALL AFDKO_TARBALL \
+               ANTLR4CPPRUNTIME_TARBALL LXML_TARBALL FIREBIRD_TARBALL SKIA_TARBALL \
+               BOX2D_TARBALL DRAGONBOX_TARBALL FROZEN_TARBALL ZXCVBN_C_TARBALL \
+               JAVA_WEBSOCKET_TARBALL LIBEOT_TARBALL; do
+        name=$(printf '%s\n' "$dl" | grep -E "^${v} := " | sed 's/.*:= *//')
+        test -n "$name" || exit 1
+        echo "$main|https://dev-www.libreoffice.org/src/$name"
+      done
+      for v in OPENSYMBOL_TTF ODFVALIDATOR_JAR OFFICEOTRON_JAR; do
+        name=$(printf '%s\n' "$dl" | grep -E "^${v} := " | sed 's/.*:= *//')
+        test -n "$name" || exit 1
+        echo "$main|https://dev-www.libreoffice.org/extern/$name"
+      done

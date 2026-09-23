@@ -103,20 +103,36 @@ sources:
     template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
 ```
 
-模板：`github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version`（直接锁定另一包版本）。每模板只接受自己的字段——设置不支持的（如 github + `max-version`）或拼错字段名（如 `tag-prefx`）都报错，不静默忽略。
+模板：`github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version`（直接锁定另一包版本）`script`（内嵌 bash）。每模板只接受自己的字段——设置不支持的（如 github + `max-version`）或拼错字段名（如 `tag-prefx`）都报错，不静默忽略。
 
-`type: script` 是包级逃生舱——脚本返回完整清单（stdout 第一行=版本，后续行=URL，`# work_sources` 标记行后归 work_sources）：
+`script` 是**条目级**逃生舱（与其他模板平级，不是包级类型）：一个脚本产一个 source/work_source 槽位，stdout **恰好一行** `<版本>|URL`。模板覆盖不了时才用——脚本不可复用、无法统一校验：
 
 ```yaml
-pkg-name: libreoffice
-type: script
-script-content: |
-  #!/bin/bash
-  echo "25.2.0"
-  echo "https://x/lo-25.2.0.tar.xz"
-  echo "# work_sources"
-  echo "https://x/vendor-25.2.0.tar.gz"
+pkg-name: ant
+version-source: sources[0]
+sources:
+  - tracker-template: script
+    script: |
+      page=$(curl -fsSL "https://www.apache.org/dist/ant/source/")
+      ver=$(printf '%s\n' "$page" | grep -oE 'apache-ant-[0-9.]+-src\.tar\.bz2' | sed 's/apache-ant-//; s/-src.tar.bz2//' | sort -V | tail -n1)
+      test -n "$ver" || exit 1
+      echo "$ver|https://www.apache.org/dist/ant/source/apache-ant-$ver-src.tar.bz2"
 ```
+
+上游**动态枚举**（目录里有几个文件不确定）时加 `expand: true`：stdout 每行一个 `<版本>|URL`，逐行对应一个连续槽位（如 libreoffice-i18n 的 123 个 langpack，数量随上游变）。**默认多行会报错**——这是故意的，能立刻暴露"忘了改格式"的漏迁移。
+
+一个条目的内容**派生自**另一条目时用 `version-var`，把上游已解析的版本注入成脚本变量。不这样做、各探各的，两次探测之间上游发新版就会产出**版本不一致的清单**（主源 A 版 + vendor B 版 → 构建必坏）：
+
+```yaml
+work_sources:
+  - tracker-template: script
+    expand: true
+    version-var: {main: sources[0]}   # 脚本里 $main = sources[0] 本轮解析出的版本
+    script: |
+      echo "$main|https://x/vendor-$main.tar.gz"
+```
+
+只能引用**位于它之前**的槽位（`sources` 先于 `work_sources` 探测，列表内从左到右）；前向/自引用在探测时报错并说明可用范围。
 
 work_sources-only 包（字体、jar 等非归档源必须放 work_sources）只写 work_sources 列表 + `version-source: work_sources[0]`，无 sources 条目。
 

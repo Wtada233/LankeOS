@@ -27,8 +27,8 @@ pub fn probe(
     let rss_url = format!("https://sourceforge.net/projects/{project}/rss{p}");
     let rss = fetcher.get(&rss_url)?;
     let re = Regex::new(pattern).map_err(|e| format!("正则无效: {e}"))?;
-    let version = templates::max_match(&re, &rss, major, cfg.max_version.as_deref())
-        .ok_or("RSS 中未匹配到版本")?;
+    let f = templates::version_filter(cfg, major)?;
+    let version = templates::max_match(&re, &rss, &f).ok_or("RSS 中未匹配到版本")?;
     let name = cfg.effective_name(pkg_name);
     let url = templates::substitute(
         template,

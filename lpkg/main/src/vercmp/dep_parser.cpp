@@ -50,8 +50,7 @@ std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& de
                 // 跳过约束之间的分隔（空格与 ','）："cmake >= 3.20, < 4.0" 里的逗号
                 // 属于复合约束语法，不能被当成版本号的一部分（否则 version 解析成
                 // "3.20,"，版本比较必然失败 → 依赖被误判为不满足）
-                while (pos < remaining.size() &&
-                       (remaining[pos] == ' ' || remaining[pos] == ','))
+                while (pos < remaining.size() && (remaining[pos] == ' ' || remaining[pos] == ','))
                     ++pos;
                 if (pos >= remaining.size()) break;
 

@@ -1,10 +1,12 @@
 //! track 系统（§9）：追踪上游最新版本，产出更新提案。
 //!
 //! 每个包在 `data/trackers/<pkg>.yaml` 维护一个 **tracker 配置**，它是 sources / work_sources 的
-//! **完整清单**：`type: template`（默认）时，`sources:` / `work_sources:` 列表逐条声明式探测，
-//! 每个条目产出该槽位的一个下载 URL；`version-source` 指定哪条提供包版本。`type: script` 时
-//! 整包走内嵌 bash（stdout 第一行=版本，后续行=URL，`# work_sources` 标记行之后归 work_sources），
-//! 是模板覆盖不了的逃生舱。
+//! **完整清单**：`sources:` / `work_sources:` 列表逐条探测，每个条目产出**该槽位**的一个下载 URL；
+//! `version-source` 指定哪条提供包版本。**没有包级类型**——所有条目一视同仁。
+//!
+//! 条目用 `tracker-template` 选探测后端（github / gitlab / html-index / … / script）。
+//! `script` 是**条目级**逃生舱：内嵌 bash，stdout 每行 `<版本>|URL`，默认**恰好一行**
+//! （声明 `expand: true` 时可多行，每行 = 同一列表里的一个连续槽位）。模板覆盖不了时才用它。
 //!
 //! ```yaml
 //! pkg-name: glibc
@@ -22,6 +24,18 @@
 //!     template: https://www.iana.org/time-zones/repository/releases/tzdata{version}.tar.gz
 //! ```
 //!
+//! 条目级 script（模板覆盖不了时用；`expand: true` 才允许一个脚本产多个槽位）：
+//!
+//! ```yaml
+//! sources:
+//!   - tracker-template: script
+//!     script: |
+//!       page=$(curl -fsSL "https://example.com/src/")
+//!       ver=$(printf '%s' "$page" | grep -oE 'pkg-[0-9.]+\.tar\.xz' | sed 's/pkg-//; s/\.tar\.xz//' | sort -V | tail -1)
+//!       test -n "$ver" || exit 1
+//!       echo "$ver|https://example.com/src/pkg-$ver.tar.xz"
+//! ```
+//!
 //! **探测成功且版本变新时，LankeBUILD.json 的 sources / work_sources 被原子全量替换**为探测出的
 //! 清单（旧值丢弃，空列表也写键，lpkg 默认形态）。任一条目探测失败 → 整包不更新（半截清单比不写更糟）。
 //!
@@ -33,6 +47,7 @@ pub mod vercmp;
 
 use crate::error::FarmError;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 use crate::net::Fetcher;
 
@@ -41,6 +56,18 @@ use crate::net::Fetcher;
 pub struct EntryProbe {
     pub version: String,
     pub url: String,
+}
+
+/// **已探测出的槽位表**（`version-var` 解析用）。
+///
+/// 探测顺序固定为「`sources` 全部 → `work_sources` 全部」，且列表内**从左到右**逐条探测；
+/// 因此 `version-var` 只能引用**位于它之前**的槽位——`work_sources` 条目可引用全部 sources
+/// 槽位，`sources` 条目只能引用更靠前的 sources 槽位。前向/自引用取不到 → 报错。
+/// 这与 multi-level 的「占位符只能引用前面已解出的级」是同一条规则。
+#[derive(Debug, Default, Clone)]
+pub(crate) struct ResolvedSlots {
+    pub sources: Vec<EntryProbe>,
+    pub work_sources: Vec<EntryProbe>,
 }
 
 /// 包级探测结果（= 完整清单）：版本 + 全部 sources / work_sources URL。
@@ -59,7 +86,8 @@ pub struct Proposal {
     pub new_version: String,
     pub sources: Vec<String>,
     pub work_sources: Vec<String>,
-    pub kind: String, // template | script（显示用）
+    /// 用到的模板名（去重、升序、`+` 连接；显示用，如 `script` / `html-index+script`）。
+    pub kind: String,
 }
 
 /// tracker yaml 配置（包级）。`deny_unknown_fields`：typo 字段名解析即报错。
@@ -77,12 +105,14 @@ pub struct TrackerConfig {
     /// 最后处理：所有非 last 包都先于它（等价于声明一堆 after 边）。
     #[serde(default, skip_serializing_if = "is_false")]
     pub last: bool,
-    /// 探测类型：`template`（默认，逐条目声明式）| `script`（包级逃生舱）。
-    #[serde(rename = "type", default, skip_serializing_if = "is_template")]
-    pub type_: String,
-    /// type: script 时的内嵌 bash（stdout 第一行=版本，后续行=URL，`# work_sources` 后归 work_sources）。
+    /// **已废弃**：`type: script` 已降为条目级模板（`sources[i].tracker-template: script`）。
+    /// 保留字段只为给出明确的迁移错误——`deny_unknown_fields` 只会吐 serde 的 `unknown field`，
+    /// 那对 73 个待迁移的 yaml 毫无帮助。`type: template` 仍静默接受（等价于不写）。
+    #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+    pub deprecated_type: Option<String>,
+    /// **已废弃**：改用条目级 `sources[i].script`。同上，保留只为报迁移错。
     #[serde(rename = "script-content", skip_serializing_if = "Option::is_none")]
-    pub script_content: Option<String>,
+    pub deprecated_script_content: Option<String>,
     /// sources 各槽位的追踪配置（位置对应 LankeBUILD.json 的 sources 数组）。
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sources: Vec<SourceConfig>,
@@ -95,13 +125,38 @@ pub struct TrackerConfig {
     pub work_sources: Vec<SourceConfig>,
 }
 
-/// source 条目配置（type: template 的每个槽位）。版本约束只作用于本条目。
+/// source 条目配置（每个槽位一条）。版本约束只作用于本条目。
 /// `deny_unknown_fields`：typo 字段名（如 `tag-prefx`）解析即报错，而非静默忽略。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceConfig {
     #[serde(rename = "tracker-template")]
     pub tracker_template: String,
+
+    // ── script（**条目级**逃生舱；模板覆盖不了时才用）──
+    /// 内嵌 bash：stdout 每行 `<版本>|URL`。默认**恰好一行**（多行报错）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub script: Option<String>,
+    /// 允许本脚本周产出**多个**槽位（每行一个，顺序即槽位顺序）。缺省 false = 必须恰好一行。
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub expand: bool,
+    /// **其他槽位的版本注入为脚本环境变量**：`{变量名: 选择器}`，如
+    /// `version-var: {main: sources[0]}` → 脚本里 `$main` 即 `sources[0]` 探测出的版本。
+    ///
+    /// 存在的理由：一个条目的**内容派生自**另一条目时（libreoffice 的 vendor 文件名来自主源里的
+    /// `download.lst`），若各自重探上游，两次探测之间上游发新版就会产出**版本不一致的清单**
+    /// （主源 26.8.0.3 + vendor 26.8.0.4 → 构建必坏）。用本字段把派生关系显式表达出来，
+    /// 下游条目直接拿上游**本轮已解析**的值，天然同版本、还省掉重复探测。
+    ///
+    /// **只能引用位于它之前的槽位**（与 multi-level "只能引用前面的级" 同规则）：
+    /// `sources` 先于 `work_sources` 探测，所以 `work_sources` 条目可引用全部 sources 槽位，
+    /// 而 `sources` 条目只能引用更靠前的 sources 槽位。前向/自引用 → 探测时报错。
+    #[serde(
+        rename = "version-var",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub version_var: BTreeMap<String, String>,
 
     // ── github / gitlab ──
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -147,7 +202,13 @@ pub struct SourceConfig {
     #[serde(rename = "max-version", skip_serializing_if = "Option::is_none")]
     pub max_version: Option<String>, // 版本封顶（gtk3 稳定系列止于 3.24）
     #[serde(rename = "stable-minor", skip_serializing_if = "Option::is_none")]
-    pub stable_minor: Option<String>, // gnome 模板：even(默认) 偶 minor 稳定分支；all 取最大版本
+    pub stable_minor: Option<String>, // even：偶 minor 稳定分支；all：不按奇偶过滤（缺省不过滤）
+    /// **版本黑名单**（正则，作用于**提取出的版本字符串**）：命中即整条候选丢弃。
+    /// 上游混着历史异常 tag 时用——uasm 的 `v213`（旧命名法，按版本比较 213 > 2.57 会被误选）、
+    /// cython 的 `3.3.0b1`（PEP 440 预发布，`is_stable` 只认 rc/beta 这类**单词**，认不出裸 `bN`）、
+    /// intel-media-driver 的 `600`。**所有探测模板都支持**（script / same-version 除外）。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exclude: Option<String>,
     #[serde(rename = "source-name", skip_serializing_if = "Option::is_none")]
     pub source_name: Option<String>, // 上游源目录/文件名覆盖（gtk3 的上游目录叫 gtk）
 }
@@ -171,12 +232,15 @@ pub struct LevelConfig {
     pub pattern: Option<String>,
 }
 
-fn is_template(t: &str) -> bool {
-    t.is_empty() || t == "template"
-}
-
 fn is_false(b: &bool) -> bool {
     !*b
+}
+
+/// 是否合法 shell 变量名（`version-var` 的键会作为环境变量名注入脚本）。
+fn is_shell_ident(s: &str) -> bool {
+    let mut it = s.chars();
+    matches!(it.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')
+        && it.all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
 impl TrackerConfig {
@@ -188,45 +252,84 @@ impl TrackerConfig {
     /// 从 tracker yaml 文本解析（与 `to_yaml` 对称）：供 `cli::load_trackers` 使用——
     /// 解析失败必须**可见**（不能像以前那样 `if let Ok` 静默跳过，让写错的 tracker"看着在、实际不生效"）。
     pub fn from_yaml(text: &str) -> Result<TrackerConfig, FarmError> {
-        serde_yaml_ng::from_str(text).map_err(|e| format!("解析 tracker yaml 失败: {e}").into())
+        let cfg: TrackerConfig =
+            serde_yaml_ng::from_str(text).map_err(|e| format!("解析 tracker yaml 失败: {e}"))?;
+        cfg.check_deprecated()?;
+        Ok(cfg)
     }
 
-    /// 探测类型名（显示用）：script / template。
-    pub fn kind(&self) -> &str {
-        if is_template(&self.type_) {
-            "template"
-        } else {
-            "script"
+    /// 用到的模板名（去重、升序、`+` 连接；显示用）。
+    pub fn kind(&self) -> String {
+        let mut names: Vec<&str> = self
+            .sources
+            .iter()
+            .chain(&self.work_sources)
+            .map(|e| e.tracker_template.as_str())
+            .collect();
+        names.sort_unstable();
+        names.dedup();
+        names.join("+")
+    }
+
+    /// 已废弃字段的迁移守卫：给出**可执行**的指引，而不是 serde 的 `unknown field`。
+    /// 保留 `type`/`script-content` 两个字段的**唯一**理由就是这个（见字段文档）。
+    pub fn check_deprecated(&self) -> Result<(), FarmError> {
+        if let Some(t) = &self.deprecated_type {
+            if t != "template" {
+                return Err(format!(
+                    "tracker {} 的 `type: {t}` 已废弃：script 现在是**条目级模板**，\
+                     改用 `sources: [{{tracker-template: script, script: |...}}]`\
+                     （stdout 每行 `<版本>|URL`；需一个脚本产多个槽位时加 `expand: true`）",
+                    self.pkg_name
+                )
+                .into());
+            }
         }
+        if self.deprecated_script_content.is_some() {
+            return Err(format!(
+                "tracker {} 的 `script-content` 已废弃：改用条目级 `sources[i].script`\
+                 （stdout 每行 `<版本>|URL`；需多个槽位时加 `expand: true`）",
+                self.pkg_name
+            )
+            .into());
+        }
+        Ok(())
     }
 
-    /// 包级探测：type=script 走脚本；否则逐条目声明式探测，按 version-source 取版本。
+    /// 包级探测：逐条目探测，按 version-source 取版本。
     /// **任一条目失败 → 整包失败**（原子性：只在全清单可产出时才应用）。
     pub fn probe_with(
         &self,
         fetcher: &dyn Fetcher,
         lookup: &dyn Fn(&str) -> Option<String>,
     ) -> Result<ProbeResult, FarmError> {
-        if !is_template(&self.type_) {
-            let content = need(&self.script_content, "script-content")?;
-            return templates::script::probe(fetcher, content, &self.pkg_name);
-        }
-        let srcs = probe_entry_list(&self.sources, fetcher, lookup, "sources", &self.pkg_name)?;
+        self.check_deprecated()?;
+        // 已探测槽位表随探测推进（供 version-var 引用）；顺序见 ResolvedSlots 文档。
+        let mut resolved = ResolvedSlots::default();
+        let srcs = probe_entry_list(
+            &self.sources,
+            fetcher,
+            lookup,
+            SlotList::Sources,
+            &self.pkg_name,
+            &mut resolved,
+        )?;
         let wss = probe_entry_list(
             &self.work_sources,
             fetcher,
             lookup,
-            "work_sources",
+            SlotList::WorkSources,
             &self.pkg_name,
+            &mut resolved,
         )?;
         // version-source 选择器：显式或默认（sources[0] 优先，空则 work_sources[0]）
-        let (is_work, idx) = match &self.version_source {
+        let (which, idx) = match &self.version_source {
             Some(sel) => parse_version_source(sel)?,
             None => {
                 if !self.sources.is_empty() {
-                    (false, 0)
+                    (SlotList::Sources, 0)
                 } else if !self.work_sources.is_empty() {
-                    (true, 0)
+                    (SlotList::WorkSources, 0)
                 } else {
                     return Err(
                         format!("tracker {} 无 sources/work_sources 条目", self.pkg_name).into(),
@@ -234,11 +337,14 @@ impl TrackerConfig {
                 }
             }
         };
-        let pool = if is_work { &wss } else { &srcs };
+        let pool = match which {
+            SlotList::Sources => &srcs,
+            SlotList::WorkSources => &wss,
+        };
         let version = pool.get(idx).map(|e| e.version.clone()).ok_or_else(|| {
             format!(
                 "version-source 越界: {}[{}]（共 {} 条）",
-                if is_work { "work_sources" } else { "sources" },
+                which.label(),
                 idx,
                 pool.len()
             )
@@ -269,7 +375,7 @@ impl TrackerConfig {
             new_version: result.version,
             sources: result.sources,
             work_sources: result.work_sources,
-            kind: self.kind().to_string(),
+            kind: self.kind(),
         })
     }
 
@@ -283,20 +389,47 @@ impl TrackerConfig {
     }
 }
 
+/// 槽位所在的列表。**显式枚举**——不要拿"报错用的字段名"当行为开关：
+/// 那样改个文案就会悄悄改掉往哪张表里并槽位。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SlotList {
+    Sources,
+    WorkSources,
+}
+
+impl SlotList {
+    /// 报错与选择器用的字段名（与 yaml 键一致）。
+    fn label(self) -> &'static str {
+        match self {
+            SlotList::Sources => "sources",
+            SlotList::WorkSources => "work_sources",
+        }
+    }
+}
+
 /// 逐条目探测一个列表（sources 或 work_sources），任一条失败即整列表失败（带槽位上下文）。
 fn probe_entry_list(
     list: &[SourceConfig],
     fetcher: &dyn Fetcher,
     lookup: &dyn Fn(&str) -> Option<String>,
-    field: &str,
+    which: SlotList,
     pkg_name: &str,
+    resolved: &mut ResolvedSlots,
 ) -> Result<Vec<EntryProbe>, FarmError> {
+    let field = which.label();
     let mut out = Vec::with_capacity(list.len());
     for (i, cfg) in list.iter().enumerate() {
-        out.push(
-            cfg.probe_with(fetcher, lookup, pkg_name)
-                .map_err(|e| format!("{field}[{i}] 探测失败: {e}"))?,
-        );
+        // 一条目可产多个槽位（`expand` 的 script）→ 展平进同一张扁平槽位表。
+        // 槽位顺序 = 条目顺序 × 条目内展开顺序，即 LankeBUILD.json 数组的位置语义。
+        let probes = cfg
+            .probe_with(fetcher, lookup, pkg_name, resolved)
+            .map_err(|e| format!("{field}[{i}] 探测失败: {e}"))?;
+        // 立即并入已探测表：只有**后面的**条目能用 version-var 引用它（前向引用取不到 → 报错）
+        match which {
+            SlotList::Sources => resolved.sources.extend(probes.iter().cloned()),
+            SlotList::WorkSources => resolved.work_sources.extend(probes.iter().cloned()),
+        }
+        out.extend(probes);
     }
     Ok(out)
 }
@@ -307,15 +440,54 @@ impl SourceConfig {
         self.source_name.as_deref().unwrap_or(pkg_name)
     }
 
-    /// 探测本条目：返回检测版本 + 该槽位下载 URL。
-    pub fn probe_with(
+    /// 解析 `version-var`：把**已探测**槽位的版本取出来，供脚本作环境变量使用。
+    /// 引用尚不可用（前向/自引用/越界）→ 报错并说明可用范围（不猜、不静默给空值）。
+    fn version_vars(&self, resolved: &ResolvedSlots) -> Result<Vec<(String, String)>, FarmError> {
+        let mut out = Vec::with_capacity(self.version_var.len());
+        // BTreeMap → 迭代顺序确定（序列化与报错信息都可复现）
+        for (name, sel) in &self.version_var {
+            if !is_shell_ident(name) {
+                return Err(format!(
+                    "version-var 名 `{name}` 不是合法 shell 变量名（应为 [A-Za-z_][A-Za-z0-9_]*）"
+                )
+                .into());
+            }
+            if name == "PKG_NAME" {
+                return Err("version-var 名不得占用保留变量 `PKG_NAME`"
+                    .to_string()
+                    .into());
+            }
+            let (which, idx) = parse_version_source(sel)?;
+            let pool = match which {
+                SlotList::Sources => &resolved.sources,
+                SlotList::WorkSources => &resolved.work_sources,
+            };
+            let version = pool.get(idx).map(|e| e.version.clone()).ok_or_else(|| {
+                format!(
+                    "version-var `{name}: {sel}` 尚不可用——只能引用本 tracker 中**位于它之前**的槽位\
+                     （sources 先于 work_sources 探测，列表内从左到右；当前 {} 已探测 {} 条）",
+                    which.label(),
+                    pool.len()
+                )
+            })?;
+            out.push((name.clone(), version));
+        }
+        Ok(out)
+    }
+
+    /// 探测本条目：返回它占据的**全部槽位**（检测版本 + 下载 URL）。
+    /// 绝大多数模板是 1 条；`tracker-template: script` + `expand: true` 可产多条。
+    pub(crate) fn probe_with(
         &self,
         fetcher: &dyn Fetcher,
         lookup: &dyn Fn(&str) -> Option<String>,
         pkg_name: &str,
-    ) -> Result<EntryProbe, FarmError> {
+        resolved: &ResolvedSlots,
+    ) -> Result<Vec<EntryProbe>, FarmError> {
         // 显式字段校验：声明的 tracker-template 只支持特定字段，设置不支持的 → 报错
         validate_supported_fields(self)?;
+        // version-var：把**已探测**槽位的版本解析成脚本环境变量（见字段文档）
+        let vars = self.version_vars(resolved)?;
         // 主版本约束：major-version-lock（常量）优先，否则 major-of（取指定包主版本）
         let major = if let Some(lock) = &self.major_version_lock {
             Some(lock.clone())
@@ -330,25 +502,68 @@ impl SourceConfig {
                 None => None,
             }
         };
-        let probe = match self.tracker_template.as_str() {
+        // 一条目 → N 槽位：`script` 可直接产多条（`expand`），其余模板恒为 1 条。
+        let probes: Vec<EntryProbe> = match self.tracker_template.as_str() {
+            // script：条目级逃生舱。stdout 每行 `<版本>|URL`，行数受 `expand` 约束。
+            "script" => templates::script::probe(fetcher, self, pkg_name, &vars)?,
             // same-version：直接锁定另一包版本（不经网络探测），需要 lookup 解析
-            "same-version" => templates::same_version::probe(self, lookup, pkg_name),
-            "github" => templates::github::probe(fetcher, self, major.as_deref(), pkg_name),
-            "gitlab" => templates::gitlab::probe(fetcher, self, major.as_deref(), pkg_name),
-            "sourceforge" => {
-                templates::sourceforge::probe(fetcher, self, major.as_deref(), pkg_name)
+            "same-version" => vec![templates::same_version::probe(self, lookup, pkg_name)?],
+            "github" => vec![templates::github::probe(
+                fetcher,
+                self,
+                major.as_deref(),
+                pkg_name,
+            )?],
+            "gitlab" => vec![templates::gitlab::probe(
+                fetcher,
+                self,
+                major.as_deref(),
+                pkg_name,
+            )?],
+            "sourceforge" => vec![templates::sourceforge::probe(
+                fetcher,
+                self,
+                major.as_deref(),
+                pkg_name,
+            )?],
+            "gnome" => vec![templates::gnome::probe(
+                fetcher,
+                self,
+                major.as_deref(),
+                pkg_name,
+            )?],
+            "gcs" => vec![templates::gcs::probe(
+                fetcher,
+                self,
+                major.as_deref(),
+                pkg_name,
+            )?],
+            "html-index" => {
+                vec![templates::html_index::probe(
+                    fetcher,
+                    self,
+                    major.as_deref(),
+                    pkg_name,
+                )?]
             }
-            "gnome" => templates::gnome::probe(fetcher, self, major.as_deref(), pkg_name),
-            "gcs" => templates::gcs::probe(fetcher, self, major.as_deref(), pkg_name),
-            "html-index" => templates::html_index::probe(fetcher, self, major.as_deref(), pkg_name),
-            "multi-level-html-index" => {
-                templates::multi_level_html_index::probe(fetcher, self, major.as_deref(), pkg_name)
-            }
-            "pypi" => templates::pypi::probe(fetcher, self, major.as_deref(), pkg_name),
-            other => Err(format!("未知 tracker_template: {other}").into()),
-        }?;
-        validate_url(&probe.url)?;
-        Ok(probe)
+            "multi-level-html-index" => vec![templates::multi_level_html_index::probe(
+                fetcher,
+                self,
+                major.as_deref(),
+                pkg_name,
+            )?],
+            "pypi" => vec![templates::pypi::probe(
+                fetcher,
+                self,
+                major.as_deref(),
+                pkg_name,
+            )?],
+            other => return Err(format!("未知 tracker_template: {other}").into()),
+        };
+        for p in &probes {
+            validate_url(&p.url)?;
+        }
+        Ok(probes)
     }
 }
 
@@ -359,12 +574,23 @@ impl SourceConfig {
 fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), FarmError> {
     const CORE: &[&str] = &["major-of", "major-version-lock"];
     let (template, mut supported): (&str, Vec<&str>) = match cfg.tracker_template.as_str() {
+        // script：条目级逃生舱。脚本自己决定一切（含版本过滤）→ 除 script/expand 外一律不支持，
+        // 也**不**参与下面的 CORE 扩展。
+        "script" => ("script", vec!["script", "expand", "version-var"]),
         // same-version：直接锁版本，只认 same-version-of + template，占位符仅 {version}/{major_minor}
         // （URL 全写在 template：tag 前缀/仓库路径/上游名都烘进去，不支持 tag-prefix/repo/source-name）
         "same-version" => ("same-version", vec!["same-version-of", "template"]),
         "github" => (
             "github",
-            vec!["repo", "mode", "tag-prefix", "template", "max-version"],
+            vec![
+                "repo",
+                "mode",
+                "tag-prefix",
+                "template",
+                "max-version",
+                "stable-minor",
+                "exclude",
+            ],
         ),
         "gitlab" => (
             "gitlab",
@@ -375,23 +601,54 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), FarmError> {
                 "tag-prefix",
                 "template",
                 "max-version",
+                "stable-minor",
+                "exclude",
             ],
         ),
         "html-index" => (
             "html-index",
-            vec!["url", "pattern", "template", "max-version", "source-name"],
+            vec![
+                "url",
+                "pattern",
+                "template",
+                "max-version",
+                "stable-minor",
+                "exclude",
+                "source-name",
+            ],
         ),
         "multi-level-html-index" => (
             "multi-level-html-index",
-            vec!["levels", "template", "max-version", "source-name"],
+            vec![
+                "levels",
+                "template",
+                "max-version",
+                "stable-minor",
+                "exclude",
+                "source-name",
+            ],
         ),
         "gcs" => (
             "gcs",
-            vec!["url", "pattern", "template", "max-version", "source-name"],
+            vec![
+                "url",
+                "pattern",
+                "template",
+                "max-version",
+                "stable-minor",
+                "exclude",
+                "source-name",
+            ],
         ),
         "gnome" => (
             "gnome",
-            vec!["template", "max-version", "stable-minor", "source-name"],
+            vec![
+                "template",
+                "max-version",
+                "stable-minor",
+                "exclude",
+                "source-name",
+            ],
         ),
         "sourceforge" => (
             "sourceforge",
@@ -401,17 +658,26 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), FarmError> {
                 "pattern",
                 "template",
                 "max-version",
+                "stable-minor",
+                "exclude",
                 "source-name",
             ],
         ),
-        "pypi" => ("pypi", vec!["project"]), // URL 来自 PyPI API，不用 template
+        // URL 来自 PyPI API（不用 template）；版本约束与其它探测模板一致地走 `VersionFilter`
+        "pypi" => (
+            "pypi",
+            vec!["project", "max-version", "stable-minor", "exclude"],
+        ),
         other => return Err(format!("未知 tracker_template: {other}").into()),
     };
-    // 探测模板才有版本过滤约束；same-version 直接锁定版本，不参与 major 过滤
-    if template != "same-version" {
+    // 探测模板才有版本过滤约束；same-version 直接锁定版本、script 自带逻辑，都不参与 major 过滤
+    if !matches!(template, "same-version" | "script") {
         supported.extend_from_slice(CORE);
     }
     let set = [
+        ("script", cfg.script.is_some()),
+        ("expand", cfg.expand),
+        ("version-var", !cfg.version_var.is_empty()),
         ("repo", cfg.repo.is_some()),
         ("host", cfg.host.is_some()),
         ("mode", cfg.mode.is_some()),
@@ -427,6 +693,7 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), FarmError> {
         ("major-version-lock", cfg.major_version_lock.is_some()),
         ("max-version", cfg.max_version.is_some()),
         ("stable-minor", cfg.stable_minor.is_some()),
+        ("exclude", cfg.exclude.is_some()),
         ("source-name", cfg.source_name.is_some()),
     ];
     let unsupported: Vec<&str> = set
@@ -436,7 +703,7 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), FarmError> {
         .collect();
     if !unsupported.is_empty() {
         return Err(format!(
-            "tracker-template {template} 不支持字段: {}（需要版本封顶/稳定分支等约束时改用支持它的模板，或用 script 类型）",
+            "tracker-template {template} 不支持字段: {}（需要版本封顶/稳定分支等约束时改用支持它的模板，或用条目级 script 模板 `tracker-template: script`）",
             unsupported.join(", ")
         )
         .into());
@@ -444,13 +711,14 @@ fn validate_supported_fields(cfg: &SourceConfig) -> Result<(), FarmError> {
     Ok(())
 }
 
-/// 解析 `version-source` 选择器：`sources[i]` / `work_sources[i]` → (is_work, index)。
-pub fn parse_version_source(sel: &str) -> Result<(bool, usize), FarmError> {
+/// 解析 `version-source` / `version-var` 选择器：`sources[i]` / `work_sources[i]`
+/// → `(列表, 下标)`。
+pub(crate) fn parse_version_source(sel: &str) -> Result<(SlotList, usize), FarmError> {
     let err = || format!("version-source 无效 '{sel}'（应为 sources[i] 或 work_sources[i]）");
-    let (is_work, rest) = if let Some(r) = sel.strip_prefix("sources[") {
-        (false, r)
+    let (which, rest) = if let Some(r) = sel.strip_prefix("sources[") {
+        (SlotList::Sources, r)
     } else if let Some(r) = sel.strip_prefix("work_sources[") {
-        (true, r)
+        (SlotList::WorkSources, r)
     } else {
         return Err(err().into());
     };
@@ -458,7 +726,7 @@ pub fn parse_version_source(sel: &str) -> Result<(bool, usize), FarmError> {
         .strip_suffix(']')
         .and_then(|s| s.parse::<usize>().ok())
         .ok_or_else(err)?;
-    Ok((is_work, idx))
+    Ok((which, idx))
 }
 
 /// 需要的必填字段缺失时给出清晰错误。
@@ -610,28 +878,70 @@ work_sources:
     }
 
     #[test]
-    fn script_type_yaml_roundtrip() {
+    fn script_entry_yaml_roundtrip() {
         let yaml = r#"
 pkg-name: rhino
-type: script
 after: base
-script-content: |
-  #!/bin/bash
-  echo "1.7.15"
-  echo "https://github.com/mozilla/rhino/releases/download/rhino1.7.15/rhino-1.7.15.zip"
+sources:
+  - tracker-template: script
+    script: |
+      #!/bin/bash
+      echo "1.7.15|https://github.com/mozilla/rhino/releases/download/rhino1.7.15/rhino-1.7.15.zip"
 "#;
-        let cfg: TrackerConfig = serde_yaml_ng::from_str(yaml).unwrap();
+        let cfg = TrackerConfig::from_yaml(yaml).unwrap();
         assert_eq!(cfg.kind(), "script");
         assert_eq!(cfg.after.as_deref(), Some("base"));
-        let content = cfg.script_content.unwrap();
-        assert!(content.contains("echo \"1.7.15\""));
+        assert!(!cfg.sources[0].expand, "expand 缺省 false");
+        assert!(cfg.sources[0]
+            .script
+            .as_ref()
+            .unwrap()
+            .contains("echo \"1.7.15|"));
+        // 序列化往返：提案写回 yaml 时不得丢 script 内容
+        let back = TrackerConfig::from_yaml(&cfg.to_yaml().unwrap()).unwrap();
+        assert_eq!(back.sources[0].script, cfg.sources[0].script);
+    }
+
+    #[test]
+    fn deprecated_package_level_script_is_rejected_with_guidance() {
+        // 保留 type/script-content 字段的唯一目的是给出**可执行**的迁移指引，
+        // 而不是 serde 的 `unknown field`。73 个待迁移 yaml 全靠这条定位。
+        let e = TrackerConfig::from_yaml(
+            "pkg-name: rhino\ntype: script\nscript-content: |\n  echo x\n",
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(e.contains("条目级"), "应给出迁移指引: {e}");
+        let e2 = TrackerConfig::from_yaml("pkg-name: rhino\nscript-content: |\n  echo x\n")
+            .unwrap_err()
+            .to_string();
+        assert!(e2.contains("script-content"), "{e2}");
+        // `type: template` 等价于不写 → 静默接受
+        assert!(TrackerConfig::from_yaml("pkg-name: x\ntype: template\n").is_ok());
+    }
+
+    #[test]
+    fn kind_lists_distinct_templates() {
+        let cfg = TrackerConfig {
+            pkg_name: "p".into(),
+            sources: vec![SourceConfig {
+                tracker_template: "github".into(),
+                ..Default::default()
+            }],
+            work_sources: vec![SourceConfig {
+                tracker_template: "script".into(),
+                script: Some("x".into()),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        assert_eq!(cfg.kind(), "github+script");
     }
 
     #[test]
     fn yaml_serialization_skips_defaults() {
         let cfg = TrackerConfig {
             pkg_name: "bash".into(),
-            type_: "template".into(),
             sources: vec![SourceConfig {
                 tracker_template: "html-index".into(),
                 url: Some("https://ftp.gnu.org/gnu/bash/".into()),
@@ -645,16 +955,35 @@ script-content: |
         assert!(yaml.contains("pkg-name: bash"));
         assert!(yaml.contains("tracker-template: html-index"));
         assert!(!yaml.contains("repo:")); // 默认字段不序列化
-        assert!(!yaml.contains("type:")); // template 是默认 type，不写
+        assert!(!yaml.contains("type:"), "已废弃字段不得写出");
+        assert!(!yaml.contains("script-content:"));
+        assert!(!yaml.contains("script:"));
+        assert!(!yaml.contains("expand:"), "expand 缺省 false，不写");
         assert!(!yaml.contains("after:"));
         assert!(!yaml.contains("version-source:"));
+
+        // expand: true 必须写出来（否则提案写回 yaml 会丢掉多槽位语义）
+        let mut cfg2 = cfg.clone();
+        cfg2.sources[0].tracker_template = "script".into();
+        cfg2.sources[0].script = Some("echo x".into());
+        cfg2.sources[0].expand = true;
+        assert!(cfg2.to_yaml().unwrap().contains("expand: true"));
     }
 
     #[test]
     fn parse_version_source_selectors() {
-        assert_eq!(parse_version_source("sources[0]").unwrap(), (false, 0));
-        assert_eq!(parse_version_source("sources[3]").unwrap(), (false, 3));
-        assert_eq!(parse_version_source("work_sources[0]").unwrap(), (true, 0));
+        assert_eq!(
+            parse_version_source("sources[0]").unwrap(),
+            (SlotList::Sources, 0)
+        );
+        assert_eq!(
+            parse_version_source("sources[3]").unwrap(),
+            (SlotList::Sources, 3)
+        );
+        assert_eq!(
+            parse_version_source("work_sources[0]").unwrap(),
+            (SlotList::WorkSources, 0)
+        );
         assert!(parse_version_source("sources[]").is_err());
         assert!(parse_version_source("sources[abc]").is_err());
         assert!(parse_version_source("source[0]").is_err());
@@ -1088,22 +1417,214 @@ script-content: |
         assert!(err.to_string().contains("tag-prefx"), "err: {err}");
     }
 
+    /// 造一个条目级 script 条目（`expand` 缺省 false）。
+    fn script_entry(script: &str, expand: bool) -> SourceConfig {
+        SourceConfig {
+            tracker_template: "script".into(),
+            script: Some(script.into()),
+            expand,
+            ..Default::default()
+        }
+    }
+
     #[test]
-    fn script_type_returns_full_manifest() {
-        // type: script：stdout 第一行版本，后续行 sources，`# work_sources` 标记后归 work_sources
+    fn script_entry_produces_one_slot() {
         let cfg = TrackerConfig {
-            pkg_name: "libreoffice".into(),
-            type_: "script".into(),
-            script_content: Some(
-                "#!/bin/bash\necho \"25.2.0\"\necho \"https://x/lo-25.2.0.tar.xz\"\necho \"# work_sources\"\necho \"https://x/vendor-25.2.0.tar.gz\"\n"
-                    .into(),
-            ),
+            pkg_name: "pkg".into(),
+            sources: vec![script_entry(
+                "#!/bin/bash\necho \"2.0|https://x/a-2.0.tar.gz\"\n",
+                false,
+            )],
             ..Default::default()
         };
         let r = cfg.probe(&crate::net::RealFetcher::default()).unwrap();
-        assert_eq!(r.version, "25.2.0");
-        assert_eq!(r.sources, vec!["https://x/lo-25.2.0.tar.xz"]);
-        assert_eq!(r.work_sources, vec!["https://x/vendor-25.2.0.tar.gz"]);
+        assert_eq!(r.version, "2.0");
+        assert_eq!(r.sources, vec!["https://x/a-2.0.tar.gz"]);
+        assert!(r.work_sources.is_empty());
+    }
+
+    #[test]
+    fn script_entry_works_in_work_sources_and_can_expand() {
+        // 同一个模型的三个要点：script 也能放 work_sources；expand 产多槽位；
+        // sources/work_sources 各归各的（条目在哪个列表就填哪个列表）。
+        let cfg = TrackerConfig {
+            pkg_name: "libreoffice".into(),
+            sources: vec![script_entry(
+                "#!/bin/bash\necho \"26.8.0.3|https://x/main.tar.xz\"\n",
+                false,
+            )],
+            work_sources: vec![script_entry(
+                "#!/bin/bash\nprintf '%s\\n' \"26.8.0.3|https://x/v1\" \"26.8.0.3|https://x/v2\" \"26.8.0.3|https://x/v3\"\n",
+                true,
+            )],
+            ..Default::default()
+        };
+        let r = cfg.probe(&crate::net::RealFetcher::default()).unwrap();
+        assert_eq!(r.version, "26.8.0.3");
+        assert_eq!(r.sources, vec!["https://x/main.tar.xz"]);
+        assert_eq!(
+            r.work_sources,
+            vec!["https://x/v1", "https://x/v2", "https://x/v3"]
+        );
+    }
+
+    #[test]
+    fn version_source_indexes_into_expanded_slots() {
+        // expand 之后 `version-source` 索引的是**扁平槽位表**（= LankeBUILD.json 的 sources 数组）：
+        // 第 0 条展开成 3 个槽位，则 sources[2] 是它的第 3 个槽位，sources[3] 才轮到第 1 条。
+        let cfg = TrackerConfig {
+            pkg_name: "pkg".into(),
+            version_source: Some("sources[2]".into()),
+            sources: vec![
+                script_entry(
+                    "#!/bin/bash\nprintf '%s\\n' \"1|https://x/a\" \"2|https://x/b\" \"3|https://x/c\"\n",
+                    true,
+                ),
+                script_entry("#!/bin/bash\necho \"9|https://x/d\"\n", false),
+            ],
+            ..Default::default()
+        };
+        let r = cfg.probe(&crate::net::RealFetcher::default()).unwrap();
+        assert_eq!(r.version, "3", "sources[2] 应落到展开出的第 3 个槽位");
+        assert_eq!(
+            r.sources,
+            vec!["https://x/a", "https://x/b", "https://x/c", "https://x/d"]
+        );
+    }
+
+    #[test]
+    fn script_template_rejects_other_fields() {
+        // script 只认 script/expand（连 CORE 的 major-of/max-version 都不认——脚本自己过滤版本）
+        let mut e = script_entry("#!/bin/bash\necho \"1|https://x/a\"\n", false);
+        e.max_version = Some("1.0".into());
+        let cfg = TrackerConfig {
+            pkg_name: "p".into(),
+            sources: vec![e],
+            ..Default::default()
+        };
+        let err = cfg.probe(&crate::net::RealFetcher::default()).unwrap_err();
+        assert!(err.to_string().contains("不支持字段"), "{err}");
+
+        // expand 只属于 script：放到别的模板上必须报错（否则会静默无效）
+        let mut e2 = SourceConfig {
+            tracker_template: "html-index".into(),
+            url: Some("https://x/".into()),
+            pattern: Some(r"v([0-9.]+)".into()),
+            template: Some("https://x/{version}".into()),
+            ..Default::default()
+        };
+        e2.expand = true;
+        let cfg2 = TrackerConfig {
+            pkg_name: "p".into(),
+            sources: vec![e2],
+            ..Default::default()
+        };
+        let err2 = cfg2.probe(&crate::net::RealFetcher::default()).unwrap_err();
+        assert!(err2.to_string().contains("expand"), "{err2}");
+    }
+
+    #[test]
+    fn version_var_injects_upstream_resolved_version() {
+        // work_sources 的脚本用 $main 取 sources[0] **本轮解析出**的版本——
+        // 不再自己重探上游，两个列表因此必然描述同一个版本。
+        let cfg = TrackerConfig {
+            pkg_name: "p".into(),
+            sources: vec![script_entry(
+                "#!/bin/bash\necho \"26.8.0.3|https://x/main.tar.xz\"\n",
+                false,
+            )],
+            work_sources: vec![SourceConfig {
+                tracker_template: "script".into(),
+                script: Some("#!/bin/bash\necho \"$main|https://x/vendor-$main.tar.gz\"\n".into()),
+                version_var: BTreeMap::from([("main".to_string(), "sources[0]".to_string())]),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let r = cfg.probe(&crate::net::RealFetcher::default()).unwrap();
+        assert_eq!(r.version, "26.8.0.3");
+        assert_eq!(r.work_sources, vec!["https://x/vendor-26.8.0.3.tar.gz"]);
+    }
+
+    #[test]
+    fn version_var_only_references_earlier_slots() {
+        // sources[0] 引用 sources[1]（前向）→ 取不到 → 报错
+        let fwd = TrackerConfig {
+            pkg_name: "p".into(),
+            sources: vec![
+                SourceConfig {
+                    tracker_template: "script".into(),
+                    script: Some("#!/bin/bash\necho \"1|https://x/a\"\n".into()),
+                    version_var: BTreeMap::from([("v".to_string(), "sources[1]".to_string())]),
+                    ..Default::default()
+                },
+                script_entry("#!/bin/bash\necho \"2|https://x/b\"\n", false),
+            ],
+            ..Default::default()
+        };
+        let e = fwd
+            .probe(&crate::net::RealFetcher::default())
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("位于它之前"), "{e}");
+
+        // sources 条目不引用 work_sources（后者整列表都在它之后才探测）
+        let cross = TrackerConfig {
+            pkg_name: "p".into(),
+            sources: vec![SourceConfig {
+                tracker_template: "script".into(),
+                script: Some("#!/bin/bash\necho \"1|https://x/a\"\n".into()),
+                version_var: BTreeMap::from([("v".to_string(), "work_sources[0]".to_string())]),
+                ..Default::default()
+            }],
+            work_sources: vec![script_entry("#!/bin/bash\necho \"2|https://x/b\"\n", false)],
+            ..Default::default()
+        };
+        let e2 = cross
+            .probe(&crate::net::RealFetcher::default())
+            .unwrap_err()
+            .to_string();
+        assert!(e2.contains("位于它之前"), "{e2}");
+    }
+
+    #[test]
+    fn version_var_validates_name_and_belongs_to_script_only() {
+        let with_name = |name: &str| TrackerConfig {
+            pkg_name: "p".into(),
+            sources: vec![SourceConfig {
+                tracker_template: "script".into(),
+                script: Some("#!/bin/bash\necho \"1|https://x/a\"\n".into()),
+                version_var: BTreeMap::from([(name.to_string(), "sources[0]".to_string())]),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        for bad in ["1bad", "has-dash", "PKG_NAME"] {
+            assert!(
+                with_name(bad)
+                    .probe(&crate::net::RealFetcher::default())
+                    .is_err(),
+                "{bad} 应被拒绝"
+            );
+        }
+        // version-var 只属于 script：放到探测模板上 → 白名单报错
+        let cfg = TrackerConfig {
+            pkg_name: "p".into(),
+            sources: vec![SourceConfig {
+                tracker_template: "html-index".into(),
+                url: Some("https://x/".into()),
+                pattern: Some(r"v([0-9.]+)".into()),
+                template: Some("https://x/{version}".into()),
+                version_var: BTreeMap::from([("v".to_string(), "sources[0]".to_string())]),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let e = cfg
+            .probe(&crate::net::RealFetcher::default())
+            .unwrap_err()
+            .to_string();
+        assert!(e.contains("version-var"), "{e}");
     }
 
     #[test]

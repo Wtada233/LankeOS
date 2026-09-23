@@ -2,10 +2,12 @@
 
 #include <archive.h>
 #include <archive_entry.h>
+#include <sys/xattr.h>
 
 #include <algorithm>
 #include <array>
 #include <climits>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -29,15 +31,25 @@ namespace
 /** 将磁盘上的单个文件或目录添加到归档中，保留文件元数据和符号链接信息 */
 void add_to_archive(struct archive* a, const fs::path& path, const std::string& entry_name)
 {
-    struct archive_entry* entry = archive_entry_new();
-    archive_entry_set_pathname(entry, entry_name.c_str());
-
     struct stat st;
-    if (lstat(path.c_str(), &st) != 0) {
+    if (lstat(path.c_str(), &st) != 0) return;
+
+    // 用 libarchive 的 **disk reader** 填 entry：它会一并带上 xattr **和真正的 ACL 记录**
+    // （PAX `SCHILY.acl.access` 等）。此前手工 copy_stat + 把 ACL 当裸 xattr 写
+    // （`SCHILY.xattr.system.posix_acl_access`）是**不生效**的——libarchive 不会把裸 xattr
+    // 当 ACL 应用，实测（真 lpkg pack/install 后 `getfacl` 命名条目消失；bsdtar 用
+    // `--xattrs --acls` 解也照样丢，证明问题在打包侧而非 lpkg 的解压/拷贝）。
+    struct archive* disk = archive_read_disk_new();
+    archive_read_disk_set_symlink_physical(disk);  // 不跟随符号链接（与 lstat 语义一致）
+    struct archive_entry* entry = archive_entry_new();
+    archive_entry_set_pathname(entry, path.c_str());  // disk reader 按此路径读元数据
+    if (archive_read_disk_entry_from_file(disk, entry, -1, &st) < ARCHIVE_WARN) {
         archive_entry_free(entry);
+        archive_read_free(disk);
         return;
     }
-    archive_entry_copy_stat(entry, &st);
+    archive_entry_set_pathname(entry, entry_name.c_str());  // 归档内改回目标名
+    archive_read_free(disk);
 
     if (S_ISLNK(st.st_mode)) {
         char link_target[PATH_MAX];
@@ -58,8 +70,7 @@ void add_to_archive(struct archive* a, const fs::path& path, const std::string& 
         std::ifstream f(path, std::ios::binary);
         if (!f.is_open()) {  // lstat 成功但 open 失败（权限/竞态）→ 绝不能写出零填充文件
             archive_entry_free(entry);
-            throw LpkgException(
-                string_format("error.archive_open_failed", path.string()));
+            throw LpkgException(string_format("error.archive_open_failed", path.string()));
         }
         std::array<char, constants::PACK_IO_BUFFER_SIZE> buffer{};
         while (f.read(buffer.data(), buffer.size()) || f.gcount() > 0) {

@@ -35,11 +35,38 @@ pub struct RealBinding {
 
 /// docker 容器 RAII：作用域结束自动 `docker rm -f`，覆盖所有 `?` 提前返回与失败路径，
 /// 不再依赖每处手动清理。
-struct ContainerGuard(String);
+///
+/// **构建失败是例外**：`keep()` 之后不再删。原因是失败路径自相矛盾——BLOCKED 时给 operator 的
+/// "修复 shell" 开在**宿主** `pkgs/<pkg>/`，够不到容器；而一小时的构建现场（构建树 + 已装好的
+/// staging + 容器内 lpkg 状态）**全在容器里**，先删容器再请人修复 = 把现场砸了再修。
+/// 保留的容器由 `cleanup_stale_build_containers` 回收——它只清"创建者 PID 已死"的容器，
+/// 所以**下一次 farm 运行**才清，operator 有完整时间 `docker exec` 进去看/续。
+struct ContainerGuard {
+    cid: String,
+    keep: bool,
+}
+
+impl ContainerGuard {
+    fn new(cid: impl Into<String>) -> Self {
+        ContainerGuard {
+            cid: cid.into(),
+            keep: false,
+        }
+    }
+
+    /// 保留容器不删（构建失败时用）。
+    fn keep(&mut self) {
+        self.keep = true;
+    }
+}
+
 impl Drop for ContainerGuard {
     fn drop(&mut self) {
+        if self.keep {
+            return;
+        }
         let _ = std::process::Command::new("docker")
-            .args(["rm", "-f", &self.0])
+            .args(["rm", "-f", &self.cid])
             .status();
     }
 }
@@ -47,7 +74,7 @@ impl Drop for ContainerGuard {
 /// 杀在途构建容器（Ctrl+C 清理用）。与 RAII 路径共用 `ContainerGuard`——**唯一 spawn docker 的叶**
 /// 不变（架构 §5）：CLI 层不得直接 `Command::new("docker")`（曾破例，见 CHANGELOG）。
 pub fn kill_container(cid: &str) {
-    drop(ContainerGuard(cid.to_string()));
+    drop(ContainerGuard::new(cid));
 }
 
 /// 静默 docker 命令（rm/start/cp/配置）：屏蔽 docker 的 cid 回显与 cp 进度噪音。
@@ -193,6 +220,17 @@ pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), FarmError> 
     Ok(())
 }
 
+/// 构建容器名：`lankefarm-build-<创建者 PID>-<pkg>`。
+/// 名字里的 PID 是孤儿清理的判活依据（见 `cleanup_stale_build_containers`），
+/// 也是构建失败时提示 operator `docker exec` 的入口。
+fn container_name(pkg: &str) -> String {
+    format!(
+        "lankefarm-build-{}-{}",
+        std::process::id(),
+        sanitize_name(pkg)
+    )
+}
+
 /// 容器名只保留 `[a-zA-Z0-9._-]`（docker create --name 的合法字符集），其余转 `-`。
 fn sanitize_name(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -297,26 +335,47 @@ impl RealBinding {
 
         // 1. create 常驻容器（含 roll 镜像缺失回退）→ RAII guard → 记录在途 cid → start
         let (cid, roll) = self.create_container(pkg)?;
-        let _guard = ContainerGuard(cid.clone());
+        let mut guard = ContainerGuard::new(cid.clone());
         // 记录在途容器 cid（Ctrl+C 清理用）；成功路径末尾清空，提前返回时 rm -f 幂等无害。
         self.cleanup.lock().unwrap().current_cid = Some(cid.clone());
-        self.start_container(pkg, &cid)?;
+
+        // 2..6 步。**任一步失败 → 保留容器**：构建现场（构建树、已装好的 staging、容器内 lpkg 状态）
+        // 全在容器里，而 BLOCKED 给的修复 shell 开在宿主，够不到容器——先删就等于把现场砸了再让人修。
+        // 保留的容器由孤儿清理在下一次 farm 运行时回收（只清创建者 PID 已死的）。
+        let res = self.docker_build_steps(pkg, &cid, roll, staging);
+        if res.is_err() {
+            guard.keep();
+            let name = container_name(pkg);
+            eprintln!("{}", crate::tr!("build.container_kept", name, name));
+        }
+        res
+    }
+
+    /// `docker_build` 的 2..6 步。拆出来只为让失败路径能统一"保留容器"（见 `docker_build`）。
+    fn docker_build_steps(
+        &self,
+        pkg: &str,
+        cid: &str,
+        roll: u32,
+        staging: &Path,
+    ) -> Result<PathBuf, FarmError> {
+        self.start_container(pkg, cid)?;
 
         // 2. mirror.conf
-        self.write_mirror_conf(pkg, &cid)?;
+        self.write_mirror_conf(pkg, cid)?;
 
         // 3. upgrade（成功后 commit/GC 滚动快照）
-        self.run_upgrade_and_roll(pkg, &cid, roll)?;
+        self.run_upgrade_and_roll(pkg, cid, roll)?;
 
         // 4. 恢复旧 .so（commit/GC 之后）
-        self.restore_backups(pkg, &cid)?;
+        self.restore_backups(pkg, cid)?;
 
         // 5. 配方拷入（commit/GC 之后）
-        self.copy_recipe(pkg, &cid)?;
+        self.copy_recipe(pkg, cid)?;
 
         // 6. 构建 + 取产物回宿主
-        self.run_lpkg_build(pkg, &cid)?;
-        self.fetch_artifact(pkg, &cid, staging)
+        self.run_lpkg_build(pkg, cid)?;
+        self.fetch_artifact(pkg, cid, staging)
     }
 
     /// create 常驻容器（唯一容器名 = 进程 PID + 包名：并发 build 进程互不踩踏），返回
@@ -326,11 +385,7 @@ impl RealBinding {
     /// /work，`docker cp <dir> :/work/` 会把配方内容直接铺进 /work，而不是建 /work/<pkg>（实测）；
     /// tail -f 保活。DooD：挂宿主 docker socket（容器内可 docker run，docker 包 build tini 静态需要）。
     fn create_container(&self, pkg: &str) -> Result<(String, u32), FarmError> {
-        let name = format!(
-            "lankefarm-build-{}-{}",
-            std::process::id(),
-            sanitize_name(pkg)
-        );
+        let name = container_name(pkg);
         // 滚动基础镜像：commit 链（<base>:roll<1..25>）或原始 base。`lpkg upgrade` 会把容器里所有
         // "版本落后于当前仓库"的包全量更新——不滚动的话仓库越攒越多，每次 upgrade 越慢（滚雪球）。
         // 每构建一次、upgrade 成功后 commit 快照，下次从最新 commit 起只升增量；达到 ROLL_LIMIT 个

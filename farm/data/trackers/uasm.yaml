@@ -1,13 +1,11 @@
 pkg-name: uasm
-type: script
-script-content: |
-  #!/bin/bash
-  # 上游 tag 里混着旧命名法的 v213（= v2.13，无对应 release），
-  # 按版本比较 213 > 2.57 会被选中（实测 tracker 曾把版本写成 213）。
-  # Arch 的 nvchecker 用 exclude_regex = "v213" 排除；farm 的 github 模板
-  # 只有 max-version 数值封顶、没有排除正则，故走 script。
-  tags=$(git ls-remote --tags https://github.com/Terraspace/UASM.git 2>/dev/null)
-  version=$(printf '%s\n' "$tags" | grep 'refs/tags/v[0-9][0-9.]*[a-z]*$' | sed 's#.*refs/tags/v##' | grep -vx '213' | sort -V | tail -n1)
-  test -n "$version" || exit 1
-  echo "$version"
-  echo "https://github.com/Terraspace/UASM/archive/refs/tags/v$version.tar.gz"
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: Terraspace/UASM
+    mode: tags
+    tag-prefix: v
+    # 上游混着旧命名法的 tag `v213`（= v2.13，无对应 release）。按版本比较 213 > 2.57 会被误选
+    # （实测 tracker 曾把版本写成 213）；Arch 的 nvchecker 用 exclude_regex 排除，farm 用 exclude。
+    exclude: '^213$'
+    template: https://github.com/Terraspace/UASM/archive/refs/tags/v{version}.tar.gz

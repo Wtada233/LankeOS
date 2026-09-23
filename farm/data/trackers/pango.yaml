@@ -1,9 +1,13 @@
 pkg-name: pango
-type: script
-script-content: |
-  #!/bin/bash
-  tags=$(git ls-remote --tags https://gitlab.gnome.org/GNOME/pango.git 2>/dev/null)
-  version=$(printf '%s\n' "$tags" | grep -oE 'refs/tags/[0-9]+\.[0-9]+\.[0-9]+$' | sed 's#refs/tags/##' | awk -F. '$2 % 2 == 0 && $2 < 90' | sort -V | tail -n1)
-  test -n "$version" || exit 1
-  echo "$version"
-  echo "https://gitlab.gnome.org/GNOME/pango/-/archive/${version}/pango-${version}.tar.gz"
+version-source: sources[0]
+sources:
+  - tracker-template: gitlab
+    host: gitlab.gnome.org
+    project: GNOME/pango
+    mode: tags
+    tag-prefix: ''
+    # GNOME 惯例：偶 minor 是稳定分支（1.57 是开发版）
+    stable-minor: even
+    # minor 9x 是历史 dev 系列（旧脚本里写作 `$2 < 90`）
+    exclude: '\.9[0-9]'
+    template: https://gitlab.gnome.org/GNOME/pango/-/archive/{version}/pango-{version}.tar.gz

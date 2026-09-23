@@ -1,0 +1,43 @@
+{
+  "name": "lld",
+  "version": "23.1.2",
+  "release": 1,
+  "deps": [],
+  "provides": [
+    "liblldCOFF.so",
+    "liblldCOFF.so.23.1",
+    "liblldCommon.so",
+    "liblldCommon.so.23.1",
+    "liblldELF.so",
+    "liblldELF.so.23.1",
+    "liblldMachO.so",
+    "liblldMachO.so.23.1",
+    "liblldMinGW.so",
+    "liblldMinGW.so.23.1",
+    "liblldWasm.so",
+    "liblldWasm.so.23.1"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2",
+    "libLLVM.so.23.1",
+    "libc.so.6",
+    "libstdc++.so.6",
+    "libz.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "libedit",
+    "libffi",
+    "libxml2",
+    "llvm",
+    "ninja",
+    "zlib",
+    "zstd"
+  ],
+  "sources": [
+    "https://github.com/llvm/llvm-project/releases/download/llvmorg-23.1.2/llvm-project-23.1.2.src.tar.xz"
+  ],
+  "work_sources": [],
+  "no_strip": false
+}

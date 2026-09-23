@@ -1,8 +1,7 @@
 pkg-name: libfreehand
-type: script
-script-content: |
-  page=$(curl -fsSL "https://dev-www.libreoffice.org/src/libfreehand/")
-  ver=$(printf '%s\n' "$page" | grep -oE "libfreehand-[0-9.]+\.tar\.xz" | sed "s/^libfreehand-//; s/\.tar\.xz$//" | sort -V | tail -n1)
-  test -n "$ver" || exit 1
-  echo "$ver"
-  echo "https://dev-www.libreoffice.org/src/libfreehand/libfreehand-$ver.tar.xz"
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://dev-www.libreoffice.org/src/libfreehand/
+    pattern: 'libfreehand-([0-9.]+)\.tar\.xz'
+    template: https://dev-www.libreoffice.org/src/libfreehand/libfreehand-{version}.tar.xz

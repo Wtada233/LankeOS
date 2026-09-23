@@ -277,14 +277,20 @@ TEST_F(BuilderExecutorTest, SourceDownloadIsAtomicAndCleansStrayPart)
     // 修复前直接写正式文件 + `if (!fs::exists(dest))` 复用，被中断（SIGKILL/断电）
     // 留下的截断包会被永久当成"已下载好"，错误延后到无关阶段才爆出来。
     const fs::path src = test_dir / "src.tar.gz";
-    { std::ofstream f(src); f << "REAL"; }
+    {
+        std::ofstream f(src);
+        f << "REAL";
+    }
     const fs::path build = test_dir / "build";
     const fs::path stray = build / "src.tar.gz.part";
     fs::create_directories(build);
-    { std::ofstream f(stray); f << "HALF"; }  // 上次被中断留下的半截
+    {
+        std::ofstream f(stray);
+        f << "HALF";
+    }  // 上次被中断留下的半截
 
-    auto files = download_and_prepare_sources({"file://" + src.string()}, {}, build,
-                                              test_dir / "work");
+    auto files =
+        download_and_prepare_sources({"file://" + src.string()}, {}, build, test_dir / "work");
     ASSERT_FALSE(files.empty()) << "源码没有被下载";
 
     const fs::path dest = build / "src.tar.gz";

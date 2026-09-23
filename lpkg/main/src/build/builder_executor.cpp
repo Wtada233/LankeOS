@@ -571,10 +571,11 @@ void execute_build_phase(const std::string& phase_name, const fs::path& work_dir
         flags.makeflags.empty() ? build_defaults::default_makeflags() : flags.makeflags;
 
     // 单引号包裹 export 值（共用 base/utils 的 shell_quote：与 hook 执行路径同一实现）
-    std::string cmd = "export CFLAGS=" + shell_quote(cflags) + " CXXFLAGS=" + shell_quote(cxxflags) +
-                      " LDFLAGS=" + shell_quote(ldflags) + " MAKEFLAGS=" + shell_quote(makeflags) +
-                      "; set -e; . " + shell_quote(fs::absolute(processed_script_path).string()) +
-                      " && " + phase_name;
+    std::string cmd = "export CFLAGS=" + shell_quote(cflags) +
+                      " CXXFLAGS=" + shell_quote(cxxflags) + " LDFLAGS=" + shell_quote(ldflags) +
+                      " MAKEFLAGS=" + shell_quote(makeflags) + "; set -e; . " +
+                      shell_quote(fs::absolute(processed_script_path).string()) + " && " +
+                      phase_name;
     int ret = run_shell(cmd, work_dir);
     if (ret != 0) {
         fs::remove(processed_script_path);
