@@ -14,4 +14,9 @@ lankebuild_build() {
 lankebuild_package() {
     cd "{SRC_DIR}"
     make DESTDIR="{STAGING_ROOT}" install
+
+    # 不装 /var/run：发行版布局里它是 `-> ../run` 的符号链接（tmpfs），包提供实体目录会与
+    # 目录符号链接语义冲突（lpkg 现在按 pacman 语义：symlink→目录 算文件，目录条目撞上即判
+    # 冲突、整批中止）。运行期需要的子目录交给 tmpfiles.d。
+    rm -rf "{STAGING_ROOT}/var/run"
 }

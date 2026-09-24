@@ -26,6 +26,7 @@
 #include "../../main/src/crypto/hash.hpp"
 #include "../../main/src/db/cache.hpp"
 #include "../../main/src/db/test_breakpoints.hpp"
+#include "../../main/src/db/wal_op.hpp"  // wal::wal_log_path()（取证用）
 #include "../../main/src/elf/lib_utils.hpp"
 #include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
@@ -382,6 +383,183 @@ TEST_F(SolverRegressionTest, MultiPackageRemoveRollsBackAllWhenInterrupted)
     EXPECT_TRUE(Cache::instance().is_installed("mb"));
     EXPECT_TRUE(fs::exists(test_root / "usr/bin/ma"));
     EXPECT_TRUE(fs::exists(test_root / "usr/bin/mb"));
+}
+
+// ============================================================================
+// `remove a b c` 的**全或无**：列表里任一包被安全检查拒绝 → 一个包都不删
+//
+// 旧实现：逐个跑 removal_allowed()，被拒的那几个 `continue` 掉、**其余照删**，删完才因
+// refused 抛错 —— 落点是"部分包已删 + 非零退出码"。而非零退出码对脚本/farm 的含义是
+// "什么都没发生"（TODO G4 就是为这个语义加的），盘面却已经少了几个包。
+// pacman 的 `-R a b` 是整个列表先检完，任一不通过即中止、一个都不删。
+// ============================================================================
+
+TEST_F(SolverRegressionTest, MultiPackageRemoveRefusedRemovesNothing)
+{
+    create_pkg("good", "1.0");
+    create_pkg("needed", "1.0");
+    create_pkg("dependent", "1.0", {"needed"});
+    add_to_mirror("good", "1.0");
+    add_to_mirror("needed", "1.0");
+    add_to_mirror("dependent", "1.0");
+    update_index({{"good", "1.0", "", "", ""},
+                  {"needed", "1.0", "", "", ""},
+                  {"dependent", "1.0", "needed", "", ""}});
+    install_packages({"good", "dependent"});  // dependent 把 needed 作为依赖拉进来
+    ASSERT_TRUE(Cache::instance().is_installed("good"));
+    ASSERT_TRUE(Cache::instance().is_installed("needed"));
+    ASSERT_FALSE(Cache::instance().get_reverse_deps("needed").empty())
+        << "fixture 自检：needed 必须真的被 dependent 依赖，否则下面的'拒绝'退化成恒真";
+
+    const std::string wal_before = read_file(wal::wal_log_path());
+
+    // 判别力在**批次内**：`rm_before_file_removal_<pkg>` 写在 do_remove_package 内部
+    // （good 的文件已搬进 stash、即将真删那一刻），命中 ⟺ good 真的被删过。拒绝必须发生在
+    // 任何文件操作之前 → 这条断点必然不命中；旧实现（检查在批次内逐包做）里 good 会走完
+    // 整条删除路径 → 它必然命中。
+    bool good_removal_began = false;
+    BreakpointManager::instance().set("rm_before_file_removal_good",
+                                      [&] { good_removal_began = true; });
+
+    // needed 被 dependent 依赖 → 拒绝；good 排在列表**前面**，旧实现会先把它删掉再报错
+    std::string msg;
+    try {
+        remove_packages({"good", "needed"}, /*force=*/false);
+        FAIL() << "needed 被 dependent 依赖，整批移除必须被拒绝";
+    } catch (const LpkgException& e) {
+        msg = e.what();
+    }
+    BreakpointManager::instance().clear_all();
+
+    // 拒绝的理由：CLI 边界（remove_packages）在"被安全检查拒绝"时抛这条（TODO G4）
+    EXPECT_NE(msg.find(get_string("error.removal_refused")), std::string::npos)
+        << "拒绝信息不是'移除被拒'：" << msg;
+    EXPECT_FALSE(good_removal_began)
+        << "good 的删除已经开始（批次内断点命中）—— 拒绝没有前移到任何文件操作之前";
+    // 全或无：被拒绝时不得动任何包
+    EXPECT_TRUE(Cache::instance().is_installed("good")) << "被拒绝的移除仍把 good 从 DB 里删掉了";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/good")) << "被拒绝的移除仍删掉了 good 的文件";
+    // ⚠ **本断言不具判别力**（注释此前把因果写反了）：`run_batch_transaction` 的异常路径
+    // 回滚成功后同样会 `trim_completed()` —— 它把**已提交且无残留 bak**的整个 WAL 清空
+    // （而进批次前那次 trim 与成功批次收尾的 trim 也会清）。于是"预检/入口拒绝"与旧实现
+    // 的"批次内拒绝 → 回滚"两条路径终点都是空 WAL：`RM_BEGIN` 在两边都不存在。
+    // 它钉得住的只是"拒绝后没有留下未提交批次"，判别力来自上面那条
+    // `rm_before_file_removal_good` 断点（+ 拒绝信息点名理由）。
+    const std::string wal_after = read_file(wal::wal_log_path());
+    EXPECT_EQ(wal_after.find("RM_BEGIN"), std::string::npos)
+        << "被拒绝的移除留下了事务痕迹（WAL 里出现 RM_BEGIN）：拒绝必须前移到任何文件操作"
+           "之前，且事后不得残留未提交批次。WAL 变化：\n"
+        << wal_before << "\n----→\n"
+        << wal_after;
+
+    // ── 正向对照：同一个断点名字必须是活的（否则上面那条"没命中"只是名字打错） ──
+    // 真删一次（force 绕过反依赖检查）→ `rm_before_file_removal_good` 必须命中。
+    BreakpointManager::instance().set("rm_before_file_removal_good",
+                                      [&] { good_removal_began = true; });
+    ASSERT_NO_THROW(remove_packages({"good"}, /*force=*/true)) << "force 移除应当成功";
+    BreakpointManager::instance().clear_all();
+    EXPECT_TRUE(good_removal_began)
+        << "正向对照：真的删 good 时该断点必须命中（名字写错的话上面的'没命中'是恒真的）";
+    EXPECT_FALSE(Cache::instance().is_installed("good"));
+}
+
+// ============================================================================
+// `reinstall a b` / `remove -r a b` 也必须**整组一个批次**
+//
+// 旧实现：main.cpp 里这两个命令**逐参数各调一次**库函数，等于每参数一个批次、跨参数
+// 不原子 —— 后面那个失败时前面那个已经装完/删完并提交，而退出码非零又让脚本/farm
+// 以为"什么都没发生"。与 `remove a b c` 曾经踩的是同一个坑（那条已修），install/remove
+// 也早已是整批，只有这两条漏了。
+// ============================================================================
+
+TEST_F(SolverRegressionTest, ReinstallGroupIsOneBatch)
+{
+    create_pkg("rna", "1.0");
+    create_pkg("rnb", "1.0");
+    add_to_mirror("rna", "1.0");
+    add_to_mirror("rnb", "1.0");
+    update_index({{"rna", "1.0", "", "", ""}, {"rnb", "1.0", "", "", ""}});
+    install_packages({"rna", "rnb"});
+
+    // 模拟 rna 装坏了（文件丢失）：重装的目的正是把它补回来。旧实现下"补回来"这个
+    // 副作用会在 rnb 失败**之前**随 rna 自己的批次提交，因此这条断言能区分两种实现。
+    const fs::path rna_bin = test_root / "usr/bin/rna";
+    ASSERT_TRUE(fs::exists(rna_bin));
+    fs::remove(rna_bin);
+
+    // ── 顺序必须**钉住**：rna 先于 rnb ─────────────────────────────────────────
+    // 本用例的全部判别力都建立在"rna 已经跑过、rnb 才失败"之上。顺序反过来（rnb 先）
+    // 时，"rnb 失败前 rna 已经提交"这件事**根本没发生过** —— 下面那条 EXPECT_FALSE
+    // 在旧实现下也会通过，判别力静默消失。所以顺序不能只靠"碰巧这么排"。
+    //
+    // 这两个成员都已是最新版本，libsolv 不为它们产生事务步骤，顺序由 solver 的
+    // `force_reinstall` 补回兜底给出：它按 **targets（CLI 参数序）** 逐个补
+    // （solver.cpp 的 force_reinstall 段），所以 rna 在 rnb 之前来自**参数序**。
+    // 断言它即可把顺序钉死：一旦求解器的排法改回拓扑序、或有人调换了传参，
+    // 这里**响亮地**失败，而不是悄悄失去判别力。
+    std::vector<std::string> order_log;
+    BreakpointManager::instance().set("install_after_begin_rna",
+                                      [&] { order_log.push_back("rna"); });
+    // 第二个成员在事务中途失败（BEGIN 之后、任何文件操作之前）
+    BreakpointManager::instance().set("install_after_begin_rnb", [&] {
+        order_log.push_back("rnb");
+        throw LpkgException("injected failure: 重装批次中途失败");
+    });
+    EXPECT_THROW(reinstall_packages({"rna", "rnb"}), LpkgException);
+    BreakpointManager::instance().clear_all();
+    Cache::instance().load();
+
+    EXPECT_EQ(order_log, (std::vector<std::string>{"rna", "rnb"}))
+        << "批次内处理顺序不是 rna → rnb：顺序反过来时下面那条断言恒真（rna 压根没轮到），"
+           "本用例失去判别力";
+    EXPECT_FALSE(fs::exists(rna_bin))
+        << "重装是逐参数各一批：rnb 失败前 rna 已经提交，'整组一个批次'不成立";
+    EXPECT_TRUE(Cache::instance().is_installed("rna")) << "批次回滚后 rna 应仍是已安装";
+    EXPECT_TRUE(Cache::instance().is_installed("rnb"));
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/rnb"));
+}
+
+TEST_F(SolverRegressionTest, RecursiveRemoveGroupIsOneBatch)
+{
+    // ── 顺序必须**钉住**：rra 先于 rrb ─────────────────────────────────────────
+    // rra **依赖** rrb → 反向依赖数 rra=0、rrb=1，而移除序按"反向依赖数升序（叶子先删）"
+    // 排（`remove_packages_recursive`）。于是 rra 必定排在 rrb 之前。
+    //
+    // 为什么非要依赖不可：本用例的判别力全在"rrb 失败前 rra 已经删完并提交"上。无依赖
+    // 时两者的反向依赖数都是 0，顺序只剩 `std::ranges::sort`（**不稳定**排序）对等键的
+    // 实现细节 —— 一旦反过来，下面那条断言在旧实现下也会通过，判别力静默消失。
+    create_pkg("rra", "1.0", {"rrb"});
+    create_pkg("rrb", "1.0");
+    add_to_mirror("rra", "1.0");
+    add_to_mirror("rrb", "1.0");
+    update_index({{"rra", "1.0", "rrb", "", ""}, {"rrb", "1.0", "", "", ""}});
+    install_packages({"rra", "rrb"});
+    ASSERT_TRUE(fs::exists(test_root / "usr/bin/rra"));
+    ASSERT_TRUE(fs::exists(test_root / "usr/bin/rrb"));
+
+    // 断点按**每个文件**的 BACKUP 命中，同一个包会产生多条 → 只记首次出现的转移
+    std::vector<std::string> order_log;
+    auto mark = [&](const char* who) {
+        if (order_log.empty() || order_log.back() != who) order_log.push_back(who);
+    };
+    BreakpointManager::instance().set("rm_backup_after_wal_rra", [&] { mark("rra"); });
+    // 第二个成员在删除中途失败（BACKUP 的 write-ahead 窗口里注入）
+    BreakpointManager::instance().set("rm_backup_after_wal_rrb", [&] {
+        mark("rrb");
+        throw LpkgException("injected failure: 递归移除批次中途失败");
+    });
+    EXPECT_THROW(remove_packages_recursive({"rra", "rrb"}), LpkgException);
+    BreakpointManager::instance().clear_all();
+    Cache::instance().load();
+
+    EXPECT_EQ(order_log, (std::vector<std::string>{"rra", "rrb"}))
+        << "批次内处理顺序不是 rra → rrb：顺序反过来时下面那条断言恒真（rra 压根没轮到），"
+           "本用例失去判别力";
+    EXPECT_TRUE(Cache::instance().is_installed("rra"))
+        << "`remove -r a b` 逐参数各一批：rrb 失败前 rra 已经删完并提交";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/rra")) << "rra 的文件必须被整批回滚还原";
+    EXPECT_TRUE(Cache::instance().is_installed("rrb"));
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/rrb"));
 }
 
 TEST_F(SolverRegressionTest, AutoremoveRollsBackAllPackagesWhenInterrupted)

@@ -87,8 +87,8 @@ protected:
     }
 };
 
-/** 配置文件在非 force 卸载时应保留在磁盘上 */
-TEST_F(RegressionTest, ConfigFilePreservedOnNormalRemove)
+/** 普通卸载：配置文件改名为 .lpkgsave 保留（不原地留、也不删），普通文件真删 */
+TEST_F(RegressionTest, ConfigFileSavedAsLpkgsaveOnNormalRemove)
 {
     std::string pkg = create_pkg("conf-keep", "1.0",
                                  {
@@ -102,10 +102,12 @@ TEST_F(RegressionTest, ConfigFilePreservedOnNormalRemove)
     EXPECT_TRUE(fs::exists(conf));
     EXPECT_TRUE(fs::exists(bin));
 
-    // 正常卸载——配置文件应保留，普通文件应删除
+    // 正常卸载——配置文件应改名为 <路径>.lpkgsave，普通文件应删除
     remove_package("conf-keep", false);
 
-    EXPECT_TRUE(fs::exists(conf)) << "配置文件应在普通卸载时保留";
+    fs::path saved = test_root / "etc/myapp.conf.lpkgsave";
+    EXPECT_FALSE(fs::exists(conf)) << "配置不得原地保留（原地留 = 移除动作没做完）";
+    EXPECT_TRUE(fs::exists(saved)) << "配置文件应改名为 .lpkgsave 保留";
     EXPECT_FALSE(fs::exists(bin)) << "普通文件应在卸载时删除";
 
     // 所有权应已被移除
@@ -113,8 +115,8 @@ TEST_F(RegressionTest, ConfigFilePreservedOnNormalRemove)
     EXPECT_TRUE(owners.empty()) << "配置文件的所有权应从 DB 移除";
 }
 
-/** force 卸载时应删除配置文件 */
-TEST_F(RegressionTest, ConfigFileDeletedOnForceRemove)
+/** force 卸载：同样改名保留（force 的语义是跳过安全检查，不是丢配置） */
+TEST_F(RegressionTest, ConfigFileSavedAsLpkgsaveOnForceRemove)
 {
     std::string pkg = create_pkg("conf-force", "1.0",
                                  {
@@ -127,7 +129,26 @@ TEST_F(RegressionTest, ConfigFileDeletedOnForceRemove)
 
     remove_package("conf-force", true);
 
-    EXPECT_FALSE(fs::exists(conf)) << "配置文件应在 force 卸载时删除";
+    EXPECT_FALSE(fs::exists(conf)) << "配置不得原地保留";
+    EXPECT_TRUE(fs::exists(test_root / "etc/myapp.conf.lpkgsave")) << "--force 不得把配置真删";
+}
+
+/** 只有显式 --purge-config 才真删配置文件 */
+TEST_F(RegressionTest, ConfigFilePurgedOnlyWithPurgeConfig)
+{
+    std::string pkg = create_pkg("conf-purge", "1.0",
+                                 {
+                                     {"etc/myapp.conf", "/"},
+                                 });
+    install_packages({pkg}, "", false);
+
+    fs::path conf = test_root / "etc/myapp.conf";
+    EXPECT_TRUE(fs::exists(conf));
+
+    remove_package("conf-purge", /*force=*/false, /*wrap_in_txn=*/true, /*purge_config=*/true);
+
+    EXPECT_FALSE(fs::exists(conf));
+    EXPECT_FALSE(fs::exists(test_root / "etc/myapp.conf.lpkgsave"));
 }
 
 /** 两个包不能同时拥有同一个配置文件 */
@@ -140,8 +161,19 @@ TEST_F(RegressionTest, CrossPackageConfigConflict)
     EXPECT_THROW(install_packages({pkgB}, "", false), LpkgException);
 }
 
-/** 同包升级应产生 .lpkgnew 且原配置保留 */
-TEST_F(RegressionTest, SamePackageConfigNewOnUpgrade)
+/**
+ * 同包升级、且**包内配置逐字节未变**：保留用户改过的配置，且**不产生** .lpkgnew。
+ *
+ * 这是三哈希分流（pacman `add.c`）的第 ② 条：`hash_orig == hash_pkg`（旧包记录 == 新包）
+ * = 包本身没改这个配置文件 → 没有"新东西"要给用户审阅，保留用户文件、连 `.lpkgnew` 都不产生。
+ * （改前：无条件产生 `.lpkgnew`，每次升级都往 /etc 堆一个"其实和用户文件无关"的新版。
+ *  v1/v2 配置**不同**时必须产生 `.lpkgnew` 的那条由
+ *  tests/integration/test_config_three_way_hash.cpp 覆盖。）
+ *
+ * 同文件另一条不变量（用户改过的配置**永远**不被静默覆盖）在本用例里同样成立：
+ * 盘上那份仍是 user modified。
+ */
+TEST_F(RegressionTest, SamePackageUnchangedConfigKeepsUserFile)
 {
     std::string pkg = create_pkg("cfg-upgrade", "1.0", {{"etc/app.conf", "/"}});
     install_packages({pkg}, "", false);
@@ -157,16 +189,16 @@ TEST_F(RegressionTest, SamePackageConfigNewOnUpgrade)
         f.close();
     }
 
-    // 安装新版本（同包名）
+    // 安装新版本（同包名，配置内容与 v1 相同）
     std::string pkg2 = create_pkg("cfg-upgrade", "2.0", {{"etc/app.conf", "/"}});
     EXPECT_NO_THROW(install_packages({pkg2}, "", false));
 
-    // 原配置应保留，新版本应产生 .lpkgnew
     {
         std::ifstream f(conf);
         std::string s;
         std::getline(f, s);
         EXPECT_EQ(s, "user modified") << "原配置应保留";
     }
-    EXPECT_TRUE(fs::exists(conf_new)) << "应产生 .lpkgnew";
+    EXPECT_FALSE(fs::exists(conf_new))
+        << "包没改这个配置（旧记录 == 新包）→ 没有要审阅的新内容，不该产生 .lpkgnew";
 }

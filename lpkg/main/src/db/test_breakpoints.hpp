@@ -24,6 +24,10 @@
  *   copy_after_<N>           COPY rename 后
  *   commit_before            包 COMMIT 前
  *   file_<N>_of_<total>      处理到 N/total 个文件时
+ *   hook_run_<hook 文件名>    包的 hook（postinst.sh / prerm.sh）**执行点**：hooks 已启用、
+ *                           脚本确实存在、只剩 exec（沙盒里没有 bash，这是唯一能确定性
+ *                           观测"钩子跑了没有"的位置，见
+ * tests/integration/test_hook_transaction.cpp）
  */
 class BreakpointManager
 {

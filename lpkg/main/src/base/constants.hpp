@@ -88,7 +88,17 @@ inline constexpr std::string_view EXT_ZST = ".zst";
 inline constexpr std::string_view EXT_LA = ".la";
 inline constexpr std::string_view SUFFIX_LPKG_NEW = ".lpkgnew";
 inline constexpr std::string_view SUFFIX_LPKG_BAK = ".lpkg_bak_";
+/// 移除时配置文件改名保留的后缀（pacman 的 `.pacsave` 对应物）。
+/// 已存在时**移位不覆盖**：旧的先改名成 `<路径>.lpkgsave.<N>`（N 从 1 起取第一个空闲后缀，
+/// pacman 的 shift_pacsave），再把本次的配置落到 `<路径>.lpkgsave` —— 两条 rename 各是一条
+/// 可回滚的 SAVE_CONF WAL 行，且**移位必须严格先于本次改名**（否则回滚会把上一批的旧存档
+/// rename 到配置原位、盖掉真配置）。见 `detail::OpSink::save_config` 与 ARCH §7.2.1。
+inline constexpr std::string_view SUFFIX_LPKG_SAVE = ".lpkgsave";
 inline constexpr std::string_view SUFFIX_MAN = ".man";
+
+/// confhashes.db 取值列里 `<包名>` 与 `<sha256>` 之间的分隔符
+/// （见 `Config::conf_hashes_db()`：键是逻辑路径，取值是 `"<pkg>:<sha256>"`）
+inline constexpr std::string_view CONF_HASH_SEP = ":";
 
 // CLI 命令名
 inline constexpr std::string_view CMD_INSTALL = "install";

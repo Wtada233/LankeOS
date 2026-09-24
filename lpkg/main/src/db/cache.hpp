@@ -21,8 +21,20 @@ public:
     Cache(const Cache&) = delete;
     Cache& operator=(const Cache&) = delete;
 
-    /** 从磁盘加载所有缓存数据 */
-    void load();
+    /**
+     * 从磁盘加载所有缓存数据。
+     *
+     * @param tolerate_missing_set_files
+     *        **默认 false**：pkgs / holdpkgs 缺失即抛 error.open_file_failed —— 正常操作
+     *        路径上"库丢了"必须是个响亮的错误，绝不能退化成"静默空库"（那会让所有已装包
+     *        凭空消失）。
+     *        true **只给崩溃恢复路径**（recover_packages 的回滚收尾）用：一条缺失记录不该
+     *        把整个恢复作废（其余文件的还原、WAL 收尾、备份清理都还要做）；缺库会逐个告警
+     *        （warning.db_set_file_missing），且"存在却打不开"照旧抛。
+     *        即使容忍，后续正常操作路径（install/remove/upgrade 入口的 load()）仍按严格
+     *        语义报错 —— 损失只被容忍一次，不会被静默延续。
+     */
+    void load(bool tolerate_missing_set_files = false);
     /** 将所有脏数据写入磁盘 */
     void write();
     /** 将所有脏数据写入磁盘（兼容旧接口，wal_tag 已无意义） */
@@ -54,6 +66,26 @@ public:
     std::unordered_set<std::string> get_file_owners(std::string_view path);
     /** 检查某文件是否由指定包所有 */
     bool is_file_owned_by(std::string_view path, std::string_view pkg);
+
+    // ===== 配置文件哈希（升级时三哈希分流的 hash_orig） =====
+
+    /**
+     * 记下"**本包这次往该路径装进去的内容**"的哈希（覆盖本包自己那条记录）。
+     *
+     * 调用者必须传**包内内容**的哈希，不是"盘上此刻那份"的哈希：走 `.lpkgnew` 分支时盘上
+     * 仍是用户的文件，把它记成 hash_orig 会让**下一次**升级满足"盘上 == 旧记录"而把用户
+     * 改过的配置静默覆盖 —— 那正是 `.lpkgnew` 要防的事。
+     */
+    void set_conf_hash(std::string_view path, std::string_view pkg, std::string_view hash);
+    /**
+     * 撤销本包在该路径上的哈希记录（包被移除、或新版本不再提供该文件）。
+     *
+     * 记录**随包走**：一个已不在册的包留下的记录，会让重新装回来的包把"上一次装的哈希"
+     * 当成旧记录，从而把一份它并不拥有的同名文件静默覆盖。
+     */
+    void remove_conf_hash(std::string_view path, std::string_view pkg);
+    /** 查询本包在该路径上记录过的哈希（**无记录 → 空串** = 无从判定，调用者按保守处理） */
+    std::string get_conf_hash(std::string_view path, std::string_view pkg);
 
     /** 添加 provider（能力名称 -> 包名） */
     void add_provider(std::string_view capability, std::string_view pkg);
@@ -105,6 +137,8 @@ public:
 
     // 文件归属数据库（路径 -> 包名集合）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> file_db;
+    // 配置文件哈希数据库（逻辑路径 -> "<pkg>:<sha256>" 集合；见 conf_hashes_db()）
+    std::map<std::string, std::unordered_set<std::string>, std::less<>> conf_hashes;
     // providers 数据库（能力 -> 包名集合）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> providers;
     // 已安装包（包名 -> 版本）
@@ -131,6 +165,8 @@ public:
     void write_holdpkgs();
     /** 直接写入文件归属数据库 */
     void write_file_db();
+    /** 直接写入配置文件哈希数据库 */
+    void write_conf_hashes();
     /** 直接写入 providers 数据库 */
     void write_providers();
 

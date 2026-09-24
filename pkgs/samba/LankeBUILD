@@ -1,9 +1,22 @@
 #
 # samba — SMB/CIFS（gcc printers 面板要 libsmbclient/smbclient）。
-# 构建参数以 BLFS 为准；talloc/tevent/tdb/popt 取系统库（!list），ldb 仍内置（仓库无 ldb 包）；
-# 缺的 feature 关（--without-ad-dc）。
+# 构建参数以 BLFS 为准；talloc/tevent/tdb/popt 取系统库（!list），ldb 仍内置（仓库无 ldb 包）。
+#
+# **AD DC 开着，走打包内置的 Heimdal**（Arch 与 Debian 默认构建的同款做法）：
+#   原先这里是 `--without-ad-dc --with-system-mitkrb5` —— 那不是"缺依赖所以关"，而是**上游逼出来的配对**：
+#   wscript:372-379 规定 `--with-system-mitkrb5` 必须配 `--without-ad-dc` 或 `--with-experimental-mit-ad-dc`，
+#   而后者上游 help 原文是 "Note that security patches are not issued for this configuration"（**不给安全补丁**）。
+#   所以要用 AD DC 就只能用内置 Heimdal：两个开关**都不传**即可 —— 不传时 wscript:345-346 定义
+#   AD_DC_BUILD_IS_ENABLED，且 `if not conf.CONFIG_GET('KRB5_VENDOR')` 会走 embedded_heimdal 规则。
+#   代价：构建明显变重，包里多出一套 Heimdal 库（provides/needed_so 由 farm 重扫，不手改）。
+#   AD DC 的其余硬性要求上游只额外卡一项 —— **jansson**（wscript:429-437 原文 "Jansson JSON library is
+#   required for building the AD DC"），build_deps 里已有；flex/bison/perl/python 由 base-devel 覆盖。
+#   注意：AD DC 的**内置 DNS 动态更新**要 `python-dnspython`（Arch 的 optdepends 原文
+#   "samba_dnsupdate and samba_upgradedns in AD setup"），**仓库里没有这个包**。
+#   `krb5` 不再需要（内置 Heimdal 取代），已从 build_deps 移除。
 # 不跑 selftest；perl Parse-Yapp / rpcsvc-proto 是 BLFS Required 构建工具——若 configure 报缺再补。
-# 单包含 smbclient + libsmbclient + daemon（Arch 拆分 hack 不适用，LankeOS 并一包）。
+# 单包含 smbclient + libsmbclient + daemon + **AD DC**（Arch 拆 samba-* 子包、Debian 另拆
+# samba-ad-dc，LankeOS 一律并一包）。
 # 默认配置照 Arch：/etc/pam.d/samba（PAM 认证必需，否则 smbd 的 auth 全废）、/etc/logrotate.d/samba、
 # /usr/lib/tmpfiles.d/samba.conf（+ postinst systemd-tmpfiles --create）、/etc/samba/private、/var/spool/samba；
 # 另装上上游 examples/smb.conf.default 作为默认 /etc/samba/smb.conf（Arch 不装，我们装）。
@@ -22,8 +35,6 @@ lankebuild_build() {
         --with-piddir=/run/samba \
         --with-pammodulesdir=/usr/lib/security \
         --enable-fhs \
-        --without-ad-dc \
-        --with-system-mitkrb5 \
         --with-systemd \
         --systemd-install-services \
         --bundled-libraries='!talloc,!tdb,!tevent,!popt,!pytalloc-util' \
@@ -43,6 +54,10 @@ lankebuild_package() {
 
     # 默认 smb.conf（上游 examples/smb.conf.default：全注释样例 + [homes]/[printers]）
     install -Dm644 examples/smb.conf.default "{STAGING_ROOT}{SYSCONFDIR}/samba/smb.conf"
+
+    # 不装 /var/run：`--localstatedir=/var` 让 make install 建出实体 var/run/，而发行版里
+    # /var/run 是 `-> ../run` 的符号链接（tmpfs）；/run/samba 交给 tmpfiles.d（下面 --create）
+    rm -rf "{STAGING_ROOT}/var/run"
 
     # 装完即建 /run/samba、/var/log/samba（不依赖开机 systemd-tmpfiles-setup.service）
     echo "systemd-tmpfiles --create" >> "{STAGING_HOOKS}/postinst.sh"

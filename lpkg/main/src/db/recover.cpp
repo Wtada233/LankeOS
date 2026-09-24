@@ -242,7 +242,11 @@ void recover_packages()
             continue;
         }
         wal::purge_consumed_stashes(ops);  // stash 里的文件已还原 → 清空 stash 根
-        Cache::instance().load();
+        // 容忍"pkgs/holdpkgs 不存在"：reverse_execute 已把能从备份还原的库都还原了，这里再
+        // 撞上一个缺失的库就说明它连备份都没有（真的丢了）—— 一条缺失记录不该把整个恢复
+        // 作废（其余批次、stash 收尸、WAL 收尾、备份清理都还要做），但它**不静默**：load 会
+        // 逐个告警；正常操作路径（install/remove 入口的 Cache::load()）仍是硬错误。
+        Cache::instance().load(/*tolerate_missing_set_files=*/true);
         wal::commit_batch();
     }
 

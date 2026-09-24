@@ -63,7 +63,9 @@ std::unordered_set<std::string> get_all_required_packages();
 // ============================================================================
 
 // ============================================================================
-// 每文件系统 sidecar stash + 目录元数据化删除（TODO.md 第 2 节）
+// 每文件系统 sidecar stash（TODO.md 第 2 节）
+// 「备份 + 它的 WAL 行」的成对写入在写入层原语 detail::OpSink（pkg/op_sink.hpp）里；
+// 这里只放 stash 自身的路径计算与清理。
 // ============================================================================
 
 /**
@@ -90,11 +92,8 @@ std::filesystem::path stash_bak_target(const std::filesystem::path& phys, std::s
 /// 删除一个 stash 目录（整体 remove_all）。
 void remove_stash_dir(const std::filesystem::path& stash);
 
-/**
- * 删除一个空目录并记录元数据供回滚重建。write-ahead：先写
- * `DIR_RM <path> <mode> <uid> <gid>` 再 `rmdir`。前置：phys 是真实空目录（非 symlink）；
- * 非空目录（含无主内容/状态目录/conffile/其他包文件）绝不能走到这里。
- */
-void remove_empty_dir_with_meta(const std::filesystem::path& phys);
+// 注：「删除空目录 + DIR_RM 元数据记录」已并入写入层原语
+// `detail::OpSink::remove_empty_dir()`（`pkg/op_sink.hpp`）—— WAL 行与 rmdir 成对发生，
+// 路径规范化（strip_trailing_slash）也在那里统一做，不再有第二个入口。
 
 }  // namespace detail

@@ -78,7 +78,7 @@ deps-check:
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 7.0.1
+VERSION ?= 7.1.0
 
 BUILD_DIR = build
 MAIN_DIR = main

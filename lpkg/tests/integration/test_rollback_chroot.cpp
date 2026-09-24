@@ -142,6 +142,16 @@ TEST_F(AdvancedPackageManagerTest, ChrootHook)
     install_packages({pkg});
     testing::internal::GetCapturedStderr();
 
+    // 护栏的三条腿（改钩子执行时机时这是唯一的 chroot 护栏，缺一条就能被绕过）：
+    //  (1) 钩子脚本**确实**被装进了目标 root 的 hooks 目录 —— 否则下面的"没跑"是空转
+    //      （包不带 hook / hook 没被识别，都不会有证据）
+    //  (2) 钩子的副作用**没有**落在目标 root 里（沙盒 root 里没有 /bin/bash，run_hook 会
+    //      提前 return —— 这里要钉的正是"绝不退化成在宿主上执行"）
+    //  (3) 也**没有**落在宿主真实的 / 上（配置若漏了 root 前缀就会写到这里）
+    const fs::path hook_file = Config::instance().hooks_dir() / "hook_test" / "postinst.sh";
+    EXPECT_TRUE(fs::exists(hook_file)) << "hook 没被装到目标 root 的 hooks_dir 里，护栏是空转的";
     EXPECT_FALSE(fs::exists(test_root / "hook_ran.txt"));
     EXPECT_FALSE(fs::exists("/hook_ran.txt"));
+    EXPECT_FALSE(fs::exists("/etc/lpkg/hooks/hook_test"))
+        << "hook 落到宿主真实的 /etc/lpkg 上了（root 前缀被漏掉）";
 }

@@ -11,7 +11,7 @@
 
 #include "base/exception.hpp"
 #include "base/utils.hpp"
-#include "db/transaction_log.hpp"
+#include "db/test_breakpoints.hpp"
 #include "i18n/localization.hpp"
 #include "solver.hpp"
 
@@ -67,8 +67,16 @@ fs::path ensure_stash_dir(const fs::path& phys, std::string_view pkg)
     fs::path dir = parent / (std::string(".lpkg_bak_") + std::string(pkg) + "_" +
                              std::to_string(static_cast<long long>(::getpid())));
     std::error_code ec;
+    const auto before = fs::symlink_status(dir, ec);
+    const bool pre_existing = !ec && before.type() != fs::file_type::not_found;
+    // 该名字被**符号链接**占着：create_directories 对"已存在的 symlink→目录"静默成功，
+    // 随后的 chmod 与备份 rename 全会**穿过链接**落进目标目录 —— 备份跑到外面去了，
+    // 而清理侧（remove_stash_dir / cleanup_orphan_stashes）根本看不见它们。绝不接受。
+    if (pre_existing && before.type() == fs::file_type::symlink) {
+        throw LpkgException(string_format("error.bak_collision", phys.string(), std::string(pkg)));
+    }
     fs::create_directories(dir, ec);
-    if (!ec) (void)::chmod(dir.c_str(), 0700);  // root-only：备份残留隔离
+    if (!ec && !pre_existing) (void)::chmod(dir.c_str(), 0700);  // root-only：备份残留隔离
     return dir;
 }
 
@@ -88,18 +96,6 @@ void remove_stash_dir(const fs::path& stash)
 {
     std::error_code ec;
     fs::remove_all(stash, ec);
-}
-
-void remove_empty_dir_with_meta(const fs::path& phys)
-{
-    // 前置：phys 是真实空目录（非 symlink）。非空绝不走到这里（调用方先判空）。
-    struct stat st{};
-    if (::lstat(phys.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) return;
-    // write-ahead：先记 DIR_RM 再 rmdir（断电/崩溃可回滚重建）
-    wal::log_wal_line("DIR_RM " + phys.string() + " " + std::to_string(st.st_mode & 07777) + " " +
-                      std::to_string(st.st_uid) + " " + std::to_string(st.st_gid));
-    std::error_code ec;
-    fs::remove(phys, ec);  // rmdir（仅当为空才成功）
 }
 
 /** 从 lpkg 归档文件中读取 metadata.json 并解析为 JSON 对象 */
@@ -123,6 +119,12 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
 
     const fs::path hook_path = Config::instance().hooks_dir() / pkg_name / hook_name;
     if (!fs::exists(hook_path) || !fs::is_regular_file(hook_path)) return;
+
+    // 断点：**hook 执行点**（hooks 已启用、脚本确实存在、只剩 exec）。测试据此取证
+    // "这个 hook 到底跑了没有"——沙盒 root 里没有 /bin/bash，真让脚本跑起来需要一整套
+    // rootfs，取证只能落在"执行决策已作出"这一刻；本行是 postinst/prerm 唯一执行入口
+    // 里唯一这样的位置（test_hook_transaction.cpp 用它钉住钩子的执行时机）。
+    BreakpointManager::instance().hit("hook_run_" + std::string(hook_name));
 
     log_info(string_format("info.running_hook", std::string(hook_name)));
 

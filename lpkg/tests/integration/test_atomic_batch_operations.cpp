@@ -11,6 +11,9 @@
  *   - 多版本共存
  */
 
+#include <fstream>
+#include <sstream>
+
 #include "../../main/src/pkg/package_manager.hpp"
 #include "../test_base.hpp"
 
@@ -238,8 +241,17 @@ TEST_F(AtomicBatchTest, VersionConstraintRejection)
     install_packages({pLib});
 
     std::string pApp = create_pkg("vcApp2", "1.0", {"vcLib2 >= 2.0"});
-    // 已安装 vcLib2 1.0 不满足 >= 2.0 约束
-    EXPECT_THROW(install_packages({pApp}), LpkgException);
+    // 已安装 vcLib2 1.0 不满足 >= 2.0 约束 → 必须报错，且报错要点名**是哪个依赖**
+    // （只断言"抛了异常"的话，"包没找到 / 路径写错"同样能让它绿）
+    std::string msg;
+    try {
+        install_packages({pApp});
+        FAIL() << "vcLib2 >= 2.0 无法满足，安装必须被拒绝";
+    } catch (const LpkgException& e) {
+        msg = e.what();
+    }
+    EXPECT_NE(msg.find("vcLib2"), std::string::npos)
+        << "拒绝信息没点名不满足的依赖 vcLib2：" << msg;
 }
 
 // ── 符号链接 ──────────────────────────────────────────────────────────
@@ -264,11 +276,20 @@ TEST_F(AtomicBatchTest, ConfigFilePreservation)
         f << "user modified config\n";
     }
 
-    // 重装应保存 .lpkgnew
+    // 重装（同版本，包内配置与上次装的**逐字节相同**）：三哈希分流第 ② 条 ——
+    // hash_orig == hash_pkg（旧记录 == 新包）= 包没改这个配置 → 保留用户文件，
+    // **不产生** .lpkgnew（没有"新东西"要审阅）。见 test_config_three_way_hash.cpp。
     install_packages({p}, "", true);
 
     EXPECT_TRUE(fs::exists(test_root / "etc/app.conf"));
-    EXPECT_TRUE(fs::exists(test_root / "etc/app.conf.lpkgnew"));
+    {
+        std::ifstream f(test_root / "etc/app.conf");
+        std::stringstream ss;
+        ss << f.rdbuf();
+        EXPECT_EQ(ss.str(), "user modified config\n") << "用户改过的配置不许被静默覆盖";
+    }
+    EXPECT_FALSE(fs::exists(test_root / "etc/app.conf.lpkgnew"))
+        << "包没改配置 → 不该产生 .lpkgnew";
 }
 
 // ── 并发锁 ────────────────────────────────────────────────────────────

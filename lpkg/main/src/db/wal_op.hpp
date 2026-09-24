@@ -65,6 +65,11 @@ enum class WALOpType {
     COPY,        // COPY <src> → <dst>
     REMOVE_OLD,  // REMOVE_OLD <src> → <dst>
     DIR_RM,      // DIR_RM <path> <mode> <uid> <gid>  (删除空目录；回滚按元数据重建)
+    // 配置文件"改名保留"：<src> → <src>.lpkgsave（必要时先把旧 .lpkgsave 移位到
+    // .lpkgsave.N —— 那也是同类型的一行）。逆操作 = rename(dst → src)，与 BACKUP 同形；
+    // 区别在 dst **不在 stash 里**（它是原地旁边的兄弟名，批次提交后**不**被
+    // cleanup_stashes 删掉）—— 这正是"保留"与"--purge-config 真删"的分界。
+    SAVE_CONF,  // SAVE_CONF <src> → <dst>
 
     // 移除操作
     RM_BEGIN,   // RM_BEGIN <pkg> <ver>
@@ -164,10 +169,12 @@ struct RollbackStats {
  * 逆向执行一组 WAL 操作。
  *
  * 对每条操作按类型执行逆向，每个操作后写入 RESTORE_* 审计行。
- * 跳过 RESTORE_x/REMOVE_x/元数据行和 :batch-start DB 条目。
+ * 跳过 RESTORE_x/REMOVE_x/元数据行；:batch-start DB 条目**只在正式文件仍在时**跳过
+ * （文件不在 = 进程死在 write_db_file_wal/write_set_file_wal 的 rename 窗口里，此时那份
+ * 备份是唯一的还原依据 —— 详见 wal_op.cpp 里的注释）。
  *
- * 没有"里程碑提前停止"机制：:batch-start DB 条目本就被跳过（最终状态标记），
- * 逆序跑完整个批次恰好恢复到批次开始状态，不需要（也无法）提前停。
+ * 没有"里程碑提前停止"机制：正常路径下 :batch-start DB 条目与"逆序跑完整个批次"的结果
+ * 逐字节相同（同一个批次起点状态），所以不需要（也无法）提前停。
  *
  * @param ops              待逆向执行的操作（正向顺序）
  * @param write_audit      是否写 RESTORE WAL 审计行
@@ -254,5 +261,19 @@ void write_string_file_wal(const std::string& path, const std::string& content,
 
 /// 获取 WAL 日志文件的路径
 std::string wal_log_path();
+
+/**
+ * 以追加模式打开 WAL 文件，并报告**本次调用是否创建了它**（`created`）。
+ *
+ * 为什么要区分"创建"与"打开"：WAL 文件**自身**的目录项（dentry）只在**首次创建**那一刻
+ * 需要落盘（`fsync(文件)` 管不到父目录），所以 `wal::log_wal_line` 与 `wal_append_raw`
+ * 这两条"每行都要走一次"的路径只在 `created == true` 时付父目录 fsync —— 恒做等于每条
+ * WAL 行白付一次（实测占 fsync 总数 34%~40%）。**行内容自己的 `::fsync(fd)` 恒生效**，
+ * 与这里无关（I-FSYNC-1 的前提不变）。
+ *
+ * 判定用 `O_CREAT|O_EXCL`（原子，无 TOCTOU）：成功 = 本次创建；`EEXIST` = 本来就在 →
+ * 退回普通追加打开。返回的 fd 由调用方负责 `::close`；`< 0` 时调用方按原有口径报错。
+ */
+int open_wal_append(bool& created);
 
 }  // namespace wal

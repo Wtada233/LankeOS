@@ -15,6 +15,7 @@
 #include "base/exception.hpp"
 #include "base/utils.hpp"
 #include "build/builder.hpp"
+#include "config/cli.hpp"
 #include "config/config.hpp"
 #include "cxxopts.hpp"
 #include "db/cache.hpp"
@@ -129,21 +130,23 @@ static int handle_command(const std::string& command, const cxxopts::ParseResult
     } else if (command == constants::CMD_REMOVE) {
         pre_operation_check(result, usage, 1);
         if (result["recursive"].as<bool>()) {
-            for (const auto& pkg : result["packages"].as<std::vector<std::string>>()) {
-                remove_package_recursive(pkg, result["force"].as<bool>());
-                write_cache();
-            }
+            // 一次调用 = **一个批次**：多参数跨包原子（逐参数调用等于每参数一批，
+            // 后面那个失败时前面那个已经删完并提交，而退出码非零又表示"什么都没发生"）
+            remove_packages_recursive(result["packages"].as<std::vector<std::string>>(),
+                                      result["force"].as<bool>(),
+                                      result["purge-config"].as<bool>());
+            write_cache();
         } else {
             // 一次调用 = **一个批次**：中途 Ctrl+C/失败会整批回滚
             remove_packages(result["packages"].as<std::vector<std::string>>(),
-                            result["force"].as<bool>());
+                            result["force"].as<bool>(), result["purge-config"].as<bool>());
             write_cache();
         }
         log_info(get_string("info.uninstall_complete"));
 
     } else if (command == constants::CMD_AUTOREMOVE) {
         pre_operation_check(result, usage, 0, 0);
-        autoremove();
+        autoremove(result["purge-config"].as<bool>());
         write_cache();
 
     } else if (command == constants::CMD_UPGRADE) {
@@ -155,13 +158,13 @@ static int handle_command(const std::string& command, const cxxopts::ParseResult
         // 显式删除所有被当前仓库打破的包（ABI 断裂/SONAME 缺失的依赖者）。
         // 要求输入确认短语后才执行；install/upgrade 的冲突不再自动卸载。
         pre_operation_check(result, usage, 0, 0);
-        force_solve_conflict();
+        force_solve_conflict(result["purge-config"].as<bool>());
         write_cache();
 
     } else if (command == constants::CMD_REINSTALL) {
         pre_operation_check(result, usage, 1);
-        for (const auto& pkg : result["packages"].as<std::vector<std::string>>())
-            reinstall_package(pkg);
+        // 一次调用 = **一个批次**：多参数跨包原子（与 install/remove 多参数一致）
+        reinstall_packages(result["packages"].as<std::vector<std::string>>());
         write_cache();
 
     } else if (command == constants::CMD_QUERY) {
@@ -279,25 +282,8 @@ int main(int argc, char* argv[])
         options.add_options(get_string("help.group_general"))(
             "h,help", get_string("info.help_desc"))("v,version", get_string("help.version"));
 
-        // --- 安装/移除选项 ---
-        options.add_options(get_string("help.group_install"))(
-            "y,yes", get_string("help.yes_mode"), cxxopts::value<bool>()->default_value("false"))(
-            "n,no", get_string("help.no_mode"), cxxopts::value<bool>()->default_value("false"))(
-            "force", get_string("help.force"), cxxopts::value<bool>()->default_value("false"))(
-            "force-overwrite", get_string("help.force_overwrite"),
-            cxxopts::value<bool>()->default_value("false"))(
-            "no-hooks", get_string("help.no_hooks"),
-            cxxopts::value<bool>()->default_value("false"))(
-            "no-deps", get_string("help.no_deps"), cxxopts::value<bool>()->default_value("false"))(
-            "missing-so-no-error", get_string("help.missing_so_no_error"),
-            cxxopts::value<bool>()->default_value("false"))(
-            "use-system-soname", get_string("help.use_system_soname"),
-            cxxopts::value<bool>()->default_value("false"))(
-            "r,recursive", get_string("help.recursive"),
-            cxxopts::value<bool>()->default_value("false"))("root", get_string("help.root_dir"),
-                                                            cxxopts::value<std::string>())(
-            "arch", get_string("help.target_arch"), cxxopts::value<std::string>())(
-            "hash", get_string("help.hash"), cxxopts::value<std::string>());
+        // --- 安装/移除选项 ---（在 config/cli.cpp 里注册：单独翻译单元才能被测试驱动）
+        register_cli_options(options);
 
         // --- 查询选项 ---
         options.add_options(get_string("help.group_query"))(
@@ -350,8 +336,9 @@ int main(int argc, char* argv[])
             Config::instance().set_root_path(result["root"].as<std::string>());
         if (result.count("arch"))
             Config::instance().set_architecture(result["arch"].as<std::string>());
-        if (result.count("force-overwrite"))
-            Config::instance().set_force_overwrite_mode(result["force-overwrite"].as<bool>());
+        // 覆盖豁免（--force-overwrite / --overwrite）与 durable fsync 的落定，见
+        // config/cli.cpp —— 同样是"抽出去才能被测试驱动"的那部分。
+        apply_cli_config(result);
 
         // --yes 与 --no 同给时曾静默取后者（no）——用户意图矛盾，必须报错而不是猜
         const bool want_yes = result.count("yes") && result["yes"].as<bool>();

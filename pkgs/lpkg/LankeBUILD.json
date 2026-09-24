@@ -1,7 +1,7 @@
 {
   "name": "lpkg",
-  "version": "7.0.1",
-  "release": 2,
+  "version": "7.1.0",
+  "release": 1,
   "deps": [],
   "needed_so": [],
   "provides": [],

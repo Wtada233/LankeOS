@@ -5,7 +5,9 @@
 #include <libelf.h>
 #include <unistd.h>
 
+#include <cctype>
 #include <filesystem>
+#include <string_view>
 
 #include "base/utils.hpp"
 #include "i18n/localization.hpp"
@@ -64,8 +66,47 @@ std::string get_elf_soname(const fs::path& path)
 }
 
 /**
- * 扫描指定库目录中的 ELF 共享库文件，为每个文件创建 SONAME 符号链接
- * 仅当目标链接不存在时才创建，避免覆盖用户已存在的文件
+ * 链接名是否形如**我们生成的** SONAME 链接：`<name>.so.<数字…>`。
+ *
+ * 用来把"本函数自己建的链接"与用户/其他工具建的链接区分开（清理那一遍只碰前者）。
+ */
+static bool looks_like_soname_link(std::string_view name)
+{
+    const size_t pos = name.rfind(".so.");
+    if (pos == std::string_view::npos) return false;
+    const std::string_view ver = name.substr(pos + 4);
+    return !ver.empty() && std::isdigit(static_cast<unsigned char>(ver.front())) != 0;
+}
+
+/**
+ * 链接是否已经**正确**：目标存在，且目标的 DT_SONAME 就等于链接名。
+ *
+ * 这是"存在即跳过"的替代判据（ldconfig 的语义）。注意别退回
+ * `fs::exists(link) || fs::is_symlink(link)`：`fs::exists` 会**跟随**符号链接，悬空链接
+ * 的 exists() 是 false，而 is_symlink() 是 true —— 两个条件一个不成立、一个成立，
+ * 于是悬空链接既不重建也不清理，可以永久留在 /usr/lib（依赖它的二进制报
+ * cannot open shared object file）。
+ */
+static bool link_already_correct(const fs::path& link_path, const std::string& soname)
+{
+    std::error_code ec;
+    const fs::path target = fs::read_symlink(link_path, ec);
+    if (ec) return false;
+    // fs::path 的 `/` 语义：右值若为绝对路径则丢弃左值 —— 相对/绝对目标都能正确解析
+    const fs::path resolved = link_path.parent_path() / target;
+    if (!fs::exists(resolved, ec) || ec) return false;
+    return get_elf_soname(resolved) == soname;
+}
+
+/**
+ * 扫描指定库目录中的 ELF 共享库文件，为每个文件创建/修正 SONAME 符号链接。
+ *
+ * 判据是"链接**正确**"而不是"链接**存在**"（= ldconfig 的行为）：链接要指向当前目录里
+ * 存在、且其 DT_SONAME 就等于链接名的库；指错（悬空 / 指向别的库）就删掉重建。
+ * 此外清理掉"无人再提供该 SONAME"的悬空链接 —— 删库文件的那一侧只有它能收尾。
+ *
+ * **实体文件一律不动**：包自己就提供 `libfoo.so.1` 这个真文件时，把它换成链接等于
+ * 覆盖包产物（旧行为如此，保持不变）。
  */
 void apply_soname_links(const fs::path& lib_dir)
 {
@@ -86,16 +127,47 @@ void apply_soname_links(const fs::path& lib_dir)
                                           entry.path().filename().string(), lib_dir.string()));
                 continue;
             }
-            // 仅在链接不存在时创建，避免与已存在的文件冲突
-            if (!fs::exists(link_path) && !fs::is_symlink(link_path)) {
-                try {
-                    fs::create_symlink(entry.path().filename(), link_path);
-                } catch (const std::exception& e) {
+            if (fs::is_symlink(link_path)) {
+                // 链接已存在：正确就不动（避免无谓的 inode/时间戳抖动）；
+                // 否则删掉重建 —— 升级到"同 SONAME、不同文件名"后指向已删旧文件的悬空
+                // 链接在这一步被纠正（旧判据"存在即跳过"会让它永久悬空）
+                if (link_already_correct(link_path, soname)) continue;
+                std::error_code rm_ec;
+                fs::remove(link_path, rm_ec);
+                if (rm_ec) {
                     log_warning(string_format("warning.soname_link_failed",
                                               entry.path().filename().string(), link_path.string(),
-                                              e.what()));
+                                              rm_ec.message()));
+                    continue;
                 }
+            } else if (fs::exists(link_path)) {
+                continue;  // 实体文件/目录：包自己的产物，绝不覆盖（原行为）
             }
+            try {
+                fs::create_symlink(entry.path().filename(), link_path);
+            } catch (const std::exception& e) {
+                log_warning(string_format("warning.soname_link_failed",
+                                          entry.path().filename().string(), link_path.string(),
+                                          e.what()));
+            }
+        }
+    }
+
+    // 第二遍：清理**悬空**的 SONAME 链接（它对应的库已经不在这两个目录里了）。
+    // 只认"我们生成的形状"：目标是不带目录的裸文件名（create_symlink 的产物就是同目录
+    // 裸名），链接名形如 <name>.so.<数字>；指向绝对路径/其他目录的悬空链接一律不碰
+    // （multiarch 之类布局里那可能是刻意的）。
+    for (const auto& entry : fs::directory_iterator(lib_dir)) {
+        if (!entry.is_symlink()) continue;
+        if (!looks_like_soname_link(entry.path().filename().string())) continue;
+        std::error_code ec;
+        const fs::path target = fs::read_symlink(entry.path(), ec);
+        if (ec || target.has_parent_path()) continue;
+        if (fs::exists(entry.path(), ec)) continue;  // 能解析 → 不是悬空
+        fs::remove(entry.path(), ec);
+        if (ec) {
+            log_warning(string_format("warning.soname_link_failed", target.string(),
+                                      entry.path().string(), ec.message()));
         }
     }
 }

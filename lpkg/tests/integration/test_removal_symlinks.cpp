@@ -492,7 +492,19 @@ TEST_F(RemovalSymlinkTest, ConflictDetectedOnTwoPackagesSameFile)
     std::string pkg2 = create_package_with_content(
         "second-pkg", "1.0", {{"usr/bin/first-pkg", "#!/bin/sh\necho collision"}});
 
-    EXPECT_THROW(install_packages({pkg2}), LpkgException);
+    // 拒绝的判据是"点名了谁"：路径 + **真实持有者**（只断言"抛了异常"的话，
+    // "包没找到 / 别的什么原因"同样能让它绿）
+    std::string msg;
+    try {
+        install_packages({pkg2});
+        FAIL() << "second-pkg 与 first-pkg 发同一路径，必须判冲突中止";
+    } catch (const LpkgException& e) {
+        msg = e.what();
+    }
+    EXPECT_NE(msg.find("usr/bin/first-pkg"), std::string::npos)
+        << "冲突信息没点名冲突路径：" << msg;
+    EXPECT_NE(msg.find("first-pkg"), std::string::npos)
+        << "冲突信息必须点名真实持有者 first-pkg：" << msg;
 }
 
 TEST_F(RemovalSymlinkTest, ForceOverwriteBypassesConflict)

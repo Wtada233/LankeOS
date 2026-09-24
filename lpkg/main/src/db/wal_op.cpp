@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <filesystem>
 #include <fstream>
 #include <map>
@@ -40,6 +41,7 @@ static constexpr std::pair<std::string_view, WALOpType> TYPE_MAP[] = {
     {"COPY", WALOpType::COPY},
     {"REMOVE_OLD", WALOpType::REMOVE_OLD},
     {"DIR_RM", WALOpType::DIR_RM},
+    {"SAVE_CONF", WALOpType::SAVE_CONF},
     {"RM_BEGIN", WALOpType::RM_BEGIN},
     {"RM_COMMIT", WALOpType::RM_COMMIT},
     {"RM_END", WALOpType::RM_END},
@@ -186,8 +188,32 @@ static bool is_batch_start_milestone(const WALOp& op)
 static void wal_append_raw(const std::string& line)
 {
     std::string path = wal_log_path();
-    int fd = ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0644);
+    bool created = false;
+    int fd = open_wal_append(created);
     if (fd < 0) throw LpkgException(string_format("error.wal_open_failed", path));
+
+    // WAL 文件的**目录项** fsync —— 这是 WAL 的**第三条打开/创建路径**（前两条：`WalWriter`
+    // 构造、`wal::log_wal_line`）。**恒生效**（所以套守卫，不受默认关闭的
+    // durable_fsync_enabled() 影响）：与那两条同理 —— `fsync(文件)` 不覆盖父目录的
+    // dentry，"行已 fsync、文件整个不存在"是断电后真实可能的状态，而 WAL 行是回滚的
+    // 唯一依据（不可恢复组合）。走到本函数的今天确实都是"批次进行中"，WAL 必然已存在，
+    // 所以这是**危害低**的一处补丁；但判据是"这条路径**会不会**创建 WAL 文件"（O_CREAT
+    // 在这里写着），不是"今天它是不是恰好不会" —— 依赖后者的话，哪天有人从中途调用它，
+    // 保证就静默失效了。
+    //
+    // **只在真的创建了文件时才做**：目录项只有在那一刻才需要落盘，文件本来就在时再
+    // fsync 一次父目录是白付（这条路径每写一行审计行就会走一次；`open_wal_append` 用
+    // O_CREAT|O_EXCL 原子地判出"本次是否创建"，不是 TOCTOU 的 fs::exists）。原先恒做，
+    // 实测占全部 fsync 的 34%~40%。行内容的 ::fsync(fd) 不受影响，恒生效。
+    //
+    // 守卫**只包这一小块**：绝不能扩成整个函数/函数外 —— `write_string_file_wal` 在它的
+    // 最外层已经有一个守卫（那是 DB/元数据写的保证），而"批量文件数据"（包内容、
+    // .lpkgtmp/.lpkgnew）的 fsync 是故意留给开关控制的，顺手打开会让两万文件规模的
+    // 安装慢到分钟级。
+    if (created) {
+        DurableFsyncGuard durable;  // WAL 文件目录项：创建即落盘，与开关无关
+        fsync_parent_dir(path);
+    }
 
     std::string l = line + "\n";
     ssize_t written = ::write(fd, l.data(), l.size());
@@ -217,6 +243,32 @@ static bool safe_remove(const fs::path& p)
     return fs::remove(p, ec);
 }
 
+/// 该 :batch-start DB 行的正式文件是否**仍然持有批次起点的内容**（= 这行可以跳过）
+///
+/// 判据不只是 fs::exists —— main 的启动顺序是 init_filesystem()（main.cpp 约 397 行）→
+/// recover_packages()（约 400 行），而 init_filesystem 的 ensure_file_exists 会把崩溃窗口里
+/// 消失的库**按空文件重建**（config.cpp）。于是崩在窗口里的库到恢复时是"存在但 0 字节"，
+/// 只看 fs::exists 就又把它跳过去了 —— 后果与"文件缺失"完全相同（静默空库 + 唯一备份被
+/// cleanup_db_backups 删掉，不可逆），而且这才是**真实二进制**的形态。故：
+///
+///   - 文件不存在        → 不能跳过（内容没了，备份是唯一依据）
+///   - 文件非空          → 跳过（正常路径的语义一字不变）
+///   - 文件空 + 备份空   → 跳过（批次起点本来就是空库，正式文件与备份等价，跳过/还原同效）
+///   - 文件空 + 备份非空 → **不**跳过（只可能是内容丢了，从备份还原）
+///
+/// 最后一条不会误伤正常路径：处理到本行时，正式文件已被"更晚各里程碑的逆操作"带回批次
+/// 起点状态（= 备份里那份内容）；真正合法的空正式文件 ⟹ 批次起点是空库 ⟹ 备份也是空的。
+static bool batch_start_db_still_in_place(const WALOp& op)
+{
+    std::error_code ec;
+    if (!fs::exists(op.arg1, ec) || ec) return false;
+    const auto official_size = fs::file_size(op.arg1, ec);
+    // stat 失败（异常文件类型等）保守放行：保持既有"在位即跳过"的行为，不在这里发明新语义
+    if (ec || official_size > 0) return true;
+    const auto bak_size = fs::file_size(db_bak_path(op.arg1, op.arg2), ec);
+    return ec ? true : bak_size == 0;  // 备份不存在/无法 stat → 没有可还原的东西 → 跳过
+}
+
 RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
 {
     RollbackStats stats;
@@ -228,13 +280,39 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
         // 跳过未解析行（skip_in_reverse 已含 INVALID）与元数据/RESTORE 审计行
         if (op.skip_in_reverse()) continue;
 
-        // 跳过 :batch-start DB 条目（最终状态标记）
-        if (is_batch_start_milestone(op)) continue;
+        // :batch-start DB 条目（最终状态标记）—— **仅当正式文件仍在（仍持有批次起点内容，
+        // 判据见 batch_start_db_still_in_place）时**跳过。
+        //
+        // 为什么不能无条件跳过：write_db_file_wal / write_set_file_wal（cache.cpp）的序列是
+        //   WAL 行 → rename(正式名 → .lpkg_db_bak_before:<milestone>) → 写 .tmp → fsync →
+        //   rename(.tmp → 正式名)
+        // 批次开头的 5 个 DB 写入（pkgs/files.db/provides.db/confhashes.db/holdpkgs）全是
+        // :batch-start 里程碑。进程若死在"正式名已消失、.tmp 还没 rename 回来"这个窗口里
+        // （SIGKILL/OOM/段错误/掉电），盘上就只剩那份备份 —— 无条件跳过等于它**永远无人
+        // 消费**，两个后果都不可逆：pkgs/holdpkgs 缺失让 read_set_from_file 抛异常、整个
+        // recover_packages() 失败；files.db/provides.db/confhashes.db 缺失被 read_db_uncached
+        // 静默当空表 → 归属归零，且紧接着 cleanup_db_backups() 会把唯一备份删掉。
+        //
+        // 放宽不会破坏既有语义：处理到本行时，正式文件已被"更晚各里程碑的逆操作"带回批次
+        // 起点状态（WAL 里没有更晚的 DB 行时，正式文件压根没被动过，仍然是批次起点状态）——
+        // 正是下面 DB/DBNEW/DBRM 分支要从备份里还原出来的那个状态。所以"文件在位 → 跳过"与
+        // "从备份还原"在正常路径上**等价**；而"正式文件缺失 + 该里程碑的备份存在"只可能来自
+        // 上面那个崩溃窗口（WAL 行先写、rename 后做，文件缺失必是 rename 之后死的）。
+        // 本条不改任何既有策略：备份仍是每里程碑一份、.lpkgsave/三哈希/冲突判据一律不碰。
+        //
+        // "在位"的判据见 batch_start_db_still_in_place（存在**且仍持有批次起点内容**：
+        // init_filesystem 会把窗口里消失的库按空文件重建，"存在但空"同样是内容丢了）。
+        if (is_batch_start_milestone(op) && batch_start_db_still_in_place(op)) continue;
 
         switch (op.type) {
-            // ── BACKUP / REMOVE_OLD ──────────────────────────────────────────
+            // ── BACKUP / REMOVE_OLD / SAVE_CONF ──────────────────────────────
+            // 三者的**逆操作完全相同**：rename(arg2 → arg1)（找不到 arg2 → 跳过，幂等）。
+            // SAVE_CONF 的正向 dst 是配置文件原位旁边的 `<路径>.lpkgsave`（不在 stash 里，
+            // 批次提交后**不**被 CLEANUP/cleanup_stashes 删掉）—— 它只是"改名保留"还是
+            // "--purge-config 真删"的分界，回滚侧无需区分。
             case WALOpType::BACKUP:
-            case WALOpType::REMOVE_OLD: {
+            case WALOpType::REMOVE_OLD:
+            case WALOpType::SAVE_CONF: {
                 // arg1 = src (原始路径), arg2 = dst (.lpkg_bak 路径)
                 fs::path bak_path = op.arg2;
                 fs::path orig_path = op.arg1;
@@ -255,7 +333,10 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
             // ── DIR_RM（删除空目录；回滚按元数据重建）───────────────────────
             case WALOpType::DIR_RM: {
                 // arg1 = 目录路径, arg2 = mode(十进制), arg3 = uid, arg4 = gid
-                fs::path p = op.arg1;
+                // 目录键带尾斜杠 → 先规范化：否则下面的 is_symlink 守卫恒假（尾斜杠解引用末尾
+                // 链接），回滚会 chmod/lchown **穿过**链接改掉链接目标目录的权限/属主，还写一行
+                // RESTORE_DIR 谎报"已重建"。
+                fs::path p = strip_trailing_slash(op.arg1);
                 if (p.empty()) break;
                 std::error_code ec;
                 if (!(fs::exists(p, ec) || fs::is_symlink(p))) {
@@ -288,7 +369,12 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
                 // arg2 = dst（目标文件路径）
                 // 逆向：删除目标文件（含 dangling symlink）
                 fs::path dst = op.arg2;
-                if (fs::exists(dst) || fs::is_symlink(dst)) {
+                // 绝不 rmdir：COPY 的落点只可能是文件/符号链接（"归档文件撞真目录"已在
+                // check_for_file_conflicts 前置拒绝）。这里仍显式挡住真目录 —— `fs::remove`
+                // 对**空目录**会 rmdir 成功，实测会把盘上原有的空目录删掉而 DB 仍声称持有
+                // （盘面/DB 脱节，且没有 BACKUP 行可还原）。
+                if ((fs::exists(dst) || fs::is_symlink(dst)) &&
+                    !(fs::is_directory(dst) && !fs::is_symlink(dst))) {
                     safe_remove(dst);
                     stats.files_cleaned++;
 
@@ -468,6 +554,10 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path)
 void write_string_file_wal(const std::string& path, const std::string& content,
                            const std::string& milestone, bool create_empty)
 {
+    // 元数据（dep/needed_so/man 记录）与 DB 同族：单文件、同样由 cleanup_db_backups
+    // 在批次提交后删掉 .lpkg_db_bak_before:*，丢了就是依赖图归零 → 永远持久化，
+    // 不受 durable_fsync_enabled()（默认关闭）影响。
+    DurableFsyncGuard durable;
     const fs::path p(path);
     const bool is_new = !fs::exists(p);
 
@@ -587,6 +677,28 @@ bool batch_rollback(const std::vector<std::string>& successfully_installed)
 std::string wal_log_path()
 {
     return (Config::instance().state_dir() / "transaction.log").string();
+}
+
+int open_wal_append(bool& created)
+{
+    const std::string path = wal_log_path();
+    created = false;
+
+    // 先按 O_CREAT|O_EXCL 试创建：成功 = **本次调用**创建了 WAL 文件（父目录的 dentry
+    // 只有这一刻需要落盘）；EEXIST = 文件本来就在（dentry 早已落过盘）→ 退回普通追加打开。
+    //
+    // 不用"先 fs::exists 再 open"：那是 TOCTOU 判定（两次系统调用之间文件可能被创建/
+    // 删除），而且多一次 stat。这里两次 open 的判定是原子的，且**创建与打开用的是同一
+    // 个 O_CREAT 语义** —— 原实现就是"不存在则创建"，这里只是把"创建了"这件事显式化。
+    int fd = ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_EXCL | O_CLOEXEC,
+                    constants::PERM_WAL_LOG);
+    if (fd >= 0) {
+        created = true;
+        return fd;
+    }
+    if (errno != EEXIST) return fd;  // 其他错误（ENOENT/权限…）交给调用方按原口径报错
+
+    return ::open(path.c_str(), O_WRONLY | O_APPEND | O_CLOEXEC, constants::PERM_WAL_LOG);
 }
 
 }  // namespace wal

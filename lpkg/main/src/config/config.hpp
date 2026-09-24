@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <mutex>
 #include <string>
+#include <vector>
 
 /**
  * 非交互模式枚举
@@ -118,6 +119,18 @@ public:
     {
         return provides_db_;
     }
+    /**
+     * 配置文件哈希数据库（逻辑路径 → `"<pkg>:<sha256>"` 集合）。
+     *
+     * 记录"**这个包的这个版本往这个 /etc 路径里装过什么内容**"，供升级时的三哈希分流判定
+     * `hash_orig`（用户改没改过）。**不能并进 files.db**：那里的取值是**属主包名集合**，
+     * 被 `add_file_owner`（单一属主检查）/ `get_file_owners` 当属主集合直接读，混入哈希会
+     * 污染所有权语义。
+     */
+    const std::filesystem::path& conf_hashes_db() const noexcept
+    {
+        return conf_hashes_db_;
+    }
     /** 互斥锁文件路径 */
     const std::filesystem::path& lock_file() const noexcept
     {
@@ -134,12 +147,26 @@ public:
     /** 设置非交互模式 */
     void set_non_interactive_mode(NonInteractiveMode m) noexcept;
 
-    /** 是否强制覆盖文件 */
-    bool force_overwrite_mode() const noexcept
-    {
-        return force_overwrite_mode_;
-    }
-    /** 设置强制覆盖模式 */
+    // --- 覆盖豁免（pacman `--overwrite` 语义） ---------------------------------
+
+    /** 该路径是否被覆盖豁免（空列表 = 什么都不豁免） */
+    bool overwrite_allows(const std::string& path) const;
+
+    /** 整体设置覆盖豁免模式列表（CLI 的 `--overwrite` 收集结果） */
+    void set_overwrite_patterns(std::vector<std::string> patterns);
+
+    /**
+     * 组装覆盖豁免模式列表：`--force-overwrite` 等价于在**最前面**追加 `'*'`——
+     * 它排在最后被判定（pacman 倒序遍历），于是后给的 `--overwrite` 模式（含 `!` 取反）
+     * 都能覆盖它：两者同给时更具体的赢，不报错。
+     */
+    static std::vector<std::string> compose_overwrite_patterns(
+        bool force_overwrite, const std::vector<std::string>& explicit_patterns);
+
+    /**
+     * 向后兼容入口：`--force-overwrite` / 既有测试用的进程级开关。
+     * `true` ≡ `set_overwrite_patterns({"*"})`，`false` ≡ 清空（什么都不豁免）。
+     */
     void set_force_overwrite_mode(bool v) noexcept;
 
     /** 是否禁用钩子 */
@@ -226,16 +253,17 @@ private:
     std::filesystem::path build_conf_;      // 构建默认标志配置文件
     std::filesystem::path files_db_;        // 文件归属数据库
     std::filesystem::path provides_db_;     // providers 数据库
+    std::filesystem::path conf_hashes_db_;  // 配置文件哈希数据库（升级三哈希分流的 hash_orig）
     std::filesystem::path lock_file_;       // 互斥锁文件
 
     // --- 模式成员 ---------------------------------------------------------
     NonInteractiveMode non_interactive_mode_{NonInteractiveMode::INTERACTIVE};  // 非交互模式
-    bool force_overwrite_mode_ = false;                                         // 强制覆盖
-    bool no_hooks_mode_ = false;                                                // 禁用钩子
-    bool no_deps_mode_ = false;                                                 // 跳过依赖
-    bool missing_so_no_error_mode_ = false;  // 缺失 SONAME 不报错
-    bool use_system_soname_mode_ = false;    // 优先用系统 .so 满足 needed_so
-    bool testing_mode_ = false;              // 测试模式
+    std::vector<std::string> overwrite_patterns_;  // 覆盖豁免模式列表（倒序判定，见 .cpp）
+    bool no_hooks_mode_ = false;                   // 禁用钩子
+    bool no_deps_mode_ = false;                    // 跳过依赖
+    bool missing_so_no_error_mode_ = false;        // 缺失 SONAME 不报错
+    bool use_system_soname_mode_ = false;          // 优先用系统 .so 满足 needed_so
+    bool testing_mode_ = false;                    // 测试模式
 
     // --- 架构覆盖 ---------------------------------------------------------
     std::string architecture_override_;  // 架构覆盖值（可选）

@@ -56,6 +56,7 @@ TEST_F(WalEdgeCaseTest, AllOpTypesParseRoundtrip)
         {"NEW_DIR /new/dir", wal::WALOpType::NEW_DIR},
         {"COPY /tmp/x \xe2\x86\x92 /dst/x", wal::WALOpType::COPY},
         {"REMOVE_OLD /old \xe2\x86\x92 /old.bak", wal::WALOpType::REMOVE_OLD},
+        {"SAVE_CONF /etc/x.conf \xe2\x86\x92 /etc/x.conf.lpkgsave", wal::WALOpType::SAVE_CONF},
         {"RM_BEGIN pkg 1.0", wal::WALOpType::RM_BEGIN},
         {"RM_COMMIT pkg 1.0", wal::WALOpType::RM_COMMIT},
         {"RM_END pkg 1.0", wal::WALOpType::RM_END},

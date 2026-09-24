@@ -122,6 +122,18 @@ TEST_F(ComprehensiveTest, InterTransactionConflict)
     std::string pA = create_pkg("conflictA", "1.0", {{"usr/bin/shared.bin", "/"}});
     std::string pB = create_pkg("conflictB", "1.0", {{"usr/bin/shared.bin", "/"}});
 
-    // 两个包文件相同 → 预检阶段应检测到冲突并抛出
-    EXPECT_THROW(install_packages({pA, pB}), LpkgException);
+    // 两个包文件相同 → 预检阶段应检测到冲突并抛出。判据是"点名了谁"：冲突路径 +
+    // 批次内的真实持有者（顺序由 solver 决定，两个成员谁是持有者都算对）
+    std::string msg;
+    try {
+        install_packages({pA, pB});
+        FAIL() << "同批次两个包发同一路径，必须判冲突中止";
+    } catch (const LpkgException& e) {
+        msg = e.what();
+    }
+    EXPECT_NE(msg.find("usr/bin/shared.bin"), std::string::npos)
+        << "冲突信息没点名冲突路径：" << msg;
+    EXPECT_TRUE(msg.find("conflictA") != std::string::npos ||
+                msg.find("conflictB") != std::string::npos)
+        << "冲突信息必须点名批次内的真实持有者（conflictA/conflictB）：" << msg;
 }

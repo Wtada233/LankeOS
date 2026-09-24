@@ -110,7 +110,17 @@ TEST_F(ConflictResolverTest, PromptToRemoveBrokenExistingPackage)
     std::string p_lib2 = create_pkg("libtest", "2.0");
     std::string p_new = create_pkg("newapp", "1.0", {"libtest >= 2.0"});
 
-    EXPECT_THROW(install_packages({p_new, p_lib2}), LpkgException);
+    // 拒绝的判据是"点名了谁"：必须点出被打破的**已装包** oldapp（只断言"抛了异常"的话，
+    // "包没找到 / 路径写错"同样能让它绿）
+    std::string msg;
+    try {
+        install_packages({p_new, p_lib2});
+        FAIL() << "升级 libtest 到 2.0 会打破 oldapp 的 libtest == 1.0，必须硬报错";
+    } catch (const LpkgException& e) {
+        msg = e.what();
+    }
+    EXPECT_NE(msg.find("oldapp"), std::string::npos)
+        << "拒绝信息必须点名被打破的已装包 oldapp：" << msg;
     // oldapp 未被自动删除；libtest 也未升级（事务回滚）
     {
         std::ifstream pkgs(Config::instance().pkgs_file());

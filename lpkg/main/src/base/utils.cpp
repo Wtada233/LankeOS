@@ -400,6 +400,46 @@ void ensure_dir_exists(const fs::path& path)
     }
 }
 
+fs::path strip_trailing_slash(const fs::path& p)
+{
+    std::string s = p.string();
+    while (s.size() > 1 && s.back() == '/') s.pop_back();
+    return fs::path(s);
+}
+
+namespace
+{
+// 默认关闭：只保证 rename 原子性 + kill/回滚语义，不保证断电持久性（见 utils.hpp 的说明）。
+bool g_durable_fsync = false;
+// 受开关影响的原语实际发出过多少次 ::fsync（仅测试读取，见 utils.hpp 的说明）。
+std::atomic<size_t> g_durable_fsync_count{0};
+}  // namespace
+
+bool durable_fsync_enabled()
+{
+    return g_durable_fsync;
+}
+
+void set_durable_fsync_enabled(bool on)
+{
+    g_durable_fsync = on;
+}
+
+size_t durable_fsync_count_for_tests()
+{
+    return g_durable_fsync_count.load();
+}
+
+DurableFsyncGuard::DurableFsyncGuard() : prev_(g_durable_fsync)
+{
+    g_durable_fsync = true;
+}
+
+DurableFsyncGuard::~DurableFsyncGuard()
+{
+    g_durable_fsync = prev_;  // 还原（不是无条件 false：嵌套/显式 --fsync 下都要保持原值）
+}
+
 /**
  * 确保文件存在，不存在则创建空文件
  */
@@ -416,11 +456,19 @@ void ensure_file_exists(const fs::path& path)
 
 /**
  * 从文件读取字符串集合（每行一个元素，自动去除 \r 换行符）
+ *
+ * policy=Empty 时**仅**对"路径不存在"退化成空集（崩溃恢复路径：一条缺失记录不该让整个
+ * recover_packages() 打挂）。"存在却打不开"（权限/IO/半损）在两种策略下都抛 —— 把
+ * 不可读的库当空库是**静默归零**，比报错危险得多。
  */
-std::unordered_set<std::string> read_set_from_file(const fs::path& path)
+std::unordered_set<std::string> read_set_from_file(const fs::path& path,
+                                                   MissingSetFilePolicy policy)
 {
     std::ifstream file(path);
     if (!file.is_open()) {
+        std::error_code ec;
+        const bool absent = !fs::exists(path, ec) && !ec;
+        if (policy == MissingSetFilePolicy::Empty && absent) return {};
         throw LpkgException(string_format("error.open_file_failed", path.string()));
     }
     std::unordered_set<std::string> result;
@@ -455,7 +503,11 @@ void fsync_and_rename(const fs::path& tmp, const fs::path& dst)
         throw LpkgException(string_format("error.open_file_failed", tmp.string()) + ": " +
                             std::strerror(errno));
     }
-    const int rc = ::fsync(fd);
+    // 默认模式跳过 fsync：rename 的原子性仍在，断电持久性不做（见 durable_fsync_enabled）。
+    // 磁盘满/IO 错误仍有信号 —— 内容是在 write_string_to_file 里写并检查 ofstream 状态的。
+    const bool do_fsync = durable_fsync_enabled();
+    const int rc = do_fsync ? ::fsync(fd) : 0;
+    if (do_fsync) ++g_durable_fsync_count;
     const int err = errno;
     ::close(fd);
     if (rc != 0) {
@@ -491,9 +543,10 @@ void write_string_to_file(const fs::path& path, std::string_view content)
  */
 static void fsync_dir_internal(const fs::path& dir)
 {
+    if (!durable_fsync_enabled()) return;  // 默认模式：目录项不落盘（见 durable_fsync_enabled）
     int dir_fd = ::open(dir.c_str(), O_RDONLY | O_DIRECTORY);
     if (dir_fd >= 0) {
-        ::fsync(dir_fd);
+        if (::fsync(dir_fd) == 0) ++g_durable_fsync_count;
         ::close(dir_fd);
     }
 }
@@ -646,7 +699,13 @@ void cleanup_tmp_dirs()
             const std::string dirname = entry.path().filename().string();
             if (!dirname.starts_with("lpkg_")) continue;
 
-            const auto pid_str = dirname.substr(5);
+            // 生产端（config.cpp 的 TmpDirManager）名字是 `lpkg_<pid>_<rand>`，所以只取第一个
+            // '_' 之前那段做 PID。此前整串都喂 parse_pid_strict，带 `_<rand>` 后缀的名字永远
+            // 解析失败 → SIGKILL/断电残留的临时目录**永远不被回收**（实测：/tmp 里 lpkg_<pid>_<n>
+            // 长期堆积，正常退出才有 TmpDirManager 析构清理）。
+            const std::string rest = dirname.substr(5);
+            const auto sep = rest.find('_');
+            const std::string pid_str = (sep == std::string::npos) ? rest : rest.substr(0, sep);
             if (pid_str.empty()) continue;
 
             int pid = 0;

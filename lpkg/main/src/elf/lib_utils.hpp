@@ -32,7 +32,11 @@ inline size_t elf_section_entry_count(uint64_t sh_size, uint64_t sh_entsize)
 }
 
 /**
- * @brief 为给定目录中的共享库生成 SONAME 符号链接
+ * @brief 为给定目录中的共享库生成/修正 SONAME 符号链接（ldconfig 语义）
+ *
+ * 幂等：链接指向当前目录里存在、且其 DT_SONAME 就等于链接名的库时不动它，否则重建；
+ * 无人再提供该 SONAME 的悬空链接被清理（库被删除/替换后收尾）。实体文件不动。
+ *
  * @param lib_dir 共享库所在目录
  */
 void apply_soname_links(const std::filesystem::path& lib_dir);

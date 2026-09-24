@@ -1,11 +1,14 @@
 #include "config.hpp"
 
+#include <fnmatch.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <string_view>
+#include <utility>
 
 #include "base/constants.hpp"
 #include "exception.hpp"
@@ -13,6 +16,39 @@
 #include "utils.hpp"
 
 namespace fs = std::filesystem;
+
+namespace
+{
+/**
+ * pacman `_alpm_fnmatch_patterns` 的语义（lib/libalpm/util.c）：
+ *   · **倒序**遍历模式列表 —— 后写的先判，先命中的赢（"后续匹配覆盖先前的"）；
+ *   · `!` 前缀 = 取反（命中即"明确**不**豁免"）；
+ *   · 前导 `\` 是转义（剥掉后交给 fnmatch —— pacman 也是剥掉再 fnmatch，故 `\!x`
+ *     匹配字面量 `!x`）。
+ *
+ * 返回 1 = 命中普通模式（豁免）、-1 = 命中取反模式（明确不豁免）、0 = 没有模式命中。
+ *
+ * 模式侧与路径侧都归一到"**唯一的**一种形态"（相对 root、无前导斜杠）：模式写不写前导
+ * 斜杠等价，`!` 因此永远只有一个匹配目标、必然生效。pacman 的
+ * `_alpm_can_overwrite_file` 是"两种形态各判一次再取或"，那会让带前导斜杠的 `!` 模式被
+ * 另一形态的普通命中盖掉（取反实际失效）—— 这里收紧为单形态。
+ */
+int match_overwrite_pattern(const std::vector<std::string>& patterns, const std::string& path)
+{
+    for (auto it = patterns.rbegin(); it != patterns.rend(); ++it) {
+        std::string_view pat = *it;
+        const bool inverted = !pat.empty() && pat.front() == '!';
+        if (inverted || (!pat.empty() && pat.front() == '\\')) pat.remove_prefix(1);
+        const auto first = pat.find_first_not_of('/');
+        pat = (first == std::string_view::npos) ? std::string_view{} : pat.substr(first);
+        // fnmatch(3) 默认 flags=0 的 shell 语义：`*` 跨 `/` 匹配、`\` 转义、`?`/`[]` 同
+        // shell —— 与 pacman 完全一致（它也是 fnmatch(pattern, string, 0)）。
+        // pat.data() 可直接当 C 串用：std::string 的缓冲以 NUL 结尾，剥前缀后依然如此。
+        if (::fnmatch(pat.data(), path.c_str(), 0) == 0) return inverted ? -1 : 1;
+    }
+    return 0;
+}
+}  // namespace
 
 /**
  * 获取 Config 单例实例
@@ -73,6 +109,7 @@ void Config::rebase_paths()
     build_conf_ = config_dir_ / "build.conf";
     files_db_ = state_dir_ / "files.db";
     provides_db_ = state_dir_ / "provides.db";
+    conf_hashes_db_ = state_dir_ / "confhashes.db";
     lock_file_ = lock_dir_ / "db.lck";
 }
 
@@ -111,10 +148,44 @@ void Config::set_non_interactive_mode(NonInteractiveMode m) noexcept
     non_interactive_mode_ = m;
 }
 
+void Config::set_overwrite_patterns(std::vector<std::string> patterns)
+{
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    overwrite_patterns_ = std::move(patterns);
+}
+
+std::vector<std::string> Config::compose_overwrite_patterns(
+    bool force_overwrite, const std::vector<std::string>& explicit_patterns)
+{
+    std::vector<std::string> out;
+    // `--force-overwrite` ≡ 在**最前面**追加 `*`（最宽松的兜底）：倒序遍历判定时它排在
+    // 最后，于是后给的 `--overwrite` 模式（含 `!` 取反）都能覆盖它 —— 更具体的赢。
+    if (force_overwrite) out.emplace_back("*");
+    out.insert(out.end(), explicit_patterns.begin(), explicit_patterns.end());
+    return out;
+}
+
+bool Config::overwrite_allows(const std::string& path) const
+{
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    if (overwrite_patterns_.empty()) return false;
+
+    // 归一到唯一形态：剥掉前导斜杠（相对 root 的形态）与尾斜杠（归档目录条目是否带尾斜杠
+    // 不该影响判定）。模式侧由 match_overwrite_pattern 做同一件事。
+    const auto first = path.find_first_not_of('/');
+    if (first == std::string::npos) return false;
+    std::string bare = path.substr(first);
+    while (!bare.empty() && bare.back() == '/') bare.pop_back();
+    if (bare.empty()) return false;
+
+    return match_overwrite_pattern(overwrite_patterns_, bare) == 1;
+}
+
 void Config::set_force_overwrite_mode(bool v) noexcept
 {
     std::lock_guard<std::mutex> lock(config_mutex_);
-    force_overwrite_mode_ = v;
+    overwrite_patterns_.clear();
+    if (v) overwrite_patterns_.emplace_back("*");
 }
 
 void Config::set_no_hooks_mode(bool v) noexcept
@@ -181,6 +252,16 @@ void Config::init_filesystem()
     ensure_file_exists(essential_file_);
     ensure_file_exists(files_db_);
     ensure_file_exists(provides_db_);
+    // 与兄弟库同一口径：DB 一族（pkgs/holdpkgs/files.db/provides.db/confhashes.db）要么都预建、
+    // 要么都不建。两个具体理由：
+    //   · 备份链：`Cache::write(milestone)` 对一族逐个"备份原文件 + 全量重写"，而
+    //     write_db_file_wal 对**不存在**的文件走 DBNEW、**不产生** :batch-start 备份 ——
+    //     不预建就等于这一族的"每里程碑一份备份"对这一个库不成立；
+    //   · 崩溃恢复判据：`batch_start_db_still_in_place` 把"存在但 0 字节"读作"内容丢了"
+    //     （备份非空 → 从 :batch-start 备份还原），而"文件缺失"是另一支 —— 预建后它与兄弟库
+    //     走同一条还原路径，"恢复行为取决于这是第几个加进来的库"这件事就不存在了。
+    //     （main 的启动顺序是 init_filesystem() → recover_packages()，所以这才是真实形态。）
+    ensure_file_exists(conf_hashes_db_);
 }
 
 /**

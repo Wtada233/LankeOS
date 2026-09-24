@@ -738,7 +738,10 @@ TEST_F(RecursiveRemoveCleanupTest, DepNeededSoManHooksCleanedOnRecursiveRemove)
 {
     // Bug 2 回归：remove_package_recursive 遗漏 DBRM 清理
     // 创建 libA: 有 needed_so, man 页，hooks
-    std::string pA = create_pkg("libA", "1.0", {}, {"libA.so.1"}, {"libA.so.1"});
+    // （hooks 必须**真的有**：早先这里用 create_pkg 的默认参数打了一个不含 hooks 的包，
+    //   而下面 `EXPECT_FALSE(fs::exists(hk_d))` 对"压根没建过的目录"恒真 —— 断言是死的。
+    //   故补上 postinst.sh，并在移除前先自检它确实装上了。）
+    std::string pA = create_pkg("libA", "1.0", {}, {"libA.so.1"}, {"libA.so.1"}, {"postinst.sh"});
     // 创建 appB: 依赖 libA
     std::string pB = create_pkg("appB", "1.0", {"libA"});
 
@@ -762,6 +765,8 @@ TEST_F(RecursiveRemoveCleanupTest, DepNeededSoManHooksCleanedOnRecursiveRemove)
     EXPECT_TRUE(fs::exists(dep_f)) << "dep 文件应存在（安装后）";
     EXPECT_TRUE(fs::exists(nso_f)) << "needed_so 文件应存在（安装后）";
     EXPECT_TRUE(fs::exists(man_f)) << "man 文件应存在（安装后）";
+    ASSERT_TRUE(fs::exists(hk_d / "postinst.sh"))
+        << "fixture 自检：libA 的 hook 没装上 —— 下面'hooks 目录应被清理'会退化成恒真";
 
     // 递归移除 libA（连带 appB）
     remove_package_recursive("libA", true);

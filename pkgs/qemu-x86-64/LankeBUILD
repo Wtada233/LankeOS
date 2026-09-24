@@ -13,5 +13,7 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    :
+    # `make install` 会在 staging 里建出实体 var/run/ —— 发行版里 /var/run 是 `-> ../run`
+    # 的符号链接（tmpfs），绝不能由包提供实体目录（同 pkgs/cups 的说明）。
+    rm -rf "{STAGING_ROOT}/var/run"
 }
