@@ -3,8 +3,18 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    # 插件按依赖自动探测（SOFT_FAILURE 跳过缺依赖的插件），仓库有的后端尽量开
-    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR}
+    # 插件按依赖自动探测（SOFT_FAILURE 跳过缺依赖的插件），仓库有的后端尽量开。
+    # **例外：nvdimm 显式关**（选项名确认自上游 acinclude.m4:88-92 的
+    # `AC_DEFUN([LIBBLOCKDEV_PLUGIN], [AC_ARG_WITH([$2], …)])` → `$2=nvdimm` 即 `--without-nvdimm`；
+    # autoconf 对不认识的 --without-X 只警告不报错，所以这个选项名必须查实、不能猜）。三条理由：
+    #   ① 上游自己在 configure 摘要里就把它标成 `NVDIMM plugin (deprecated)`；
+    #   ② 消费者是 **udisks2** —— `libblockdev.so.3`（udisksd 链的就是它）按**文件名 dlopen**
+    #      `libbd_nvdimm.so.3`，所以 needed_so/JSON 里查不到任何消费者，**不能用 rg 判断有没有人用**；
+    #   ③ LankeOS 内核根本没编这两样：pkgs/linux/linux.cfg 里
+    #      `# CONFIG_LIBNVDIMM is not set`、`# CONFIG_CXL_BUS is not set`、`# CONFIG_ACPI_NFIT is not set`
+    #      → 本发行版上这个插件不可能有用。
+    #   关掉它后 libndctl 也不再需要，build_deps 里的 ndctl 已一并移除。
+    ./configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --without-nvdimm
     sed -i -e 's/ -shared / -Wl,-O1,--as-needed\0/g' libtool
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install

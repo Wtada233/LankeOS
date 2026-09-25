@@ -1,7 +1,7 @@
 {
   "name": "util-linux",
   "version": "2.41.6",
-  "release": 4,
+  "release": 5,
   "deps": [
     "bash"
   ],

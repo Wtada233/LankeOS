@@ -69,4 +69,7 @@ EOF
 lankebuild_package() {
     # Installation handled by builder
     :
+
+    # 逐 unit 禁用不该默认启用的 unit（一次性迁移助手；理由见文件头注释）
+    install -Dm644 "{WORK_DIR}/../50-util-linux.preset" "{STAGING_ROOT}/usr/lib/systemd/system-preset/50-util-linux.preset"
 }

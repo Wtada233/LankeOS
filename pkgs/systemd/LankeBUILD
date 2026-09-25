@@ -158,4 +158,7 @@ systemd-machine-id-setup
 systemctl preset-all
 exit 0
 EOF
+
+    # 逐 unit 禁用不该默认启用的 unit（v262 varlink 守护，对应功能已用 meson 开关关掉；理由见文件头注释）
+    install -Dm644 "{WORK_DIR}/../50-systemd.preset" "{STAGING_ROOT}/usr/lib/systemd/system-preset/50-systemd.preset"
 }

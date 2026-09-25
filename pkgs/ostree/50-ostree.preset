@@ -1,0 +1,12 @@
+# LankeOS: ostree 自己声明"不该默认启用"的 unit
+#
+# 为什么逐 unit 禁用、而不是在 systemd 包里写 catchall `disable *`：那会把 `systemctl preset-all`
+# —— systemd 文档鼓励、安装器/工具随时可能调用的**常规操作** —— 变成"把一切没被显式 enable 过的
+# 服务（NetworkManager/sddm/sshd…）一并禁掉"的毁系统操作。逐 unit 禁用最坏只多启用几个无关服务。
+#
+# 优先级 50 排在 systemd 上游 vendor 预设（90-systemd.preset）之前：preset 是"第一条匹配行胜出"，
+# 将来上游给这些 unit 加行也抢不走本文件的判定。
+#
+# 只有 ostree 系统才需要（LankeOS 不是 ostree）：它负责把 / 重新挂成 ostree 的 rw 挂载点。
+
+disable ostree-remount.service

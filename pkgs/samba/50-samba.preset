@@ -1,0 +1,27 @@
+# LankeOS: Samba 角色专用 unit 的默认策略（由**拥有这些 unit 的包**自己声明）
+#
+# 为什么不做 systemd 包级别的 catchall `disable *`：那会把 `systemctl preset-all` —— 一个
+# systemd 文档鼓励、安装器/工具随时可能调用的**常规操作** —— 变成"把一切没被显式 enable 过的
+# 服务（NetworkManager / sddm / sshd …）一并禁掉"的毁系统操作 ✗。逐 unit 禁用最坏只多启用几个
+# 无关服务 ✓，量级完全不同。
+#
+# 优先级 50：排在 systemd 上游 vendor 预设（90-systemd.preset）**前面**，所以这三条的判定
+# 不会因为上游将来给它们加行而被抢走（preset 是"第一条匹配行胜出"）。
+#
+# Samba 一个源码树里带**互斥的两种角色**：文件服务器（smb/nmb）与 AD DC（samba）。发行版默认把
+# 文件服务器那套留着（要启用由使用者/live 显式 enable），下面三条默认禁用。
+#
+# ⚠ **动作行的行尾绝对不能写注释**：preset 的语法是 `disable <glob> [<glob>…]`，`#` 之后的
+# 每个词都会被当成**额外的匹配模式**（实测：写成 `disable samba.service  # 说明` 时这条 disable
+# 不生效，unit 照样被兜底 enable）。说明一律写在**单独成行**的 `#` 注释里。
+#
+# 想要 AD DC：`samba-tool domain provision` 之后 `systemctl enable samba`（并停掉 smb/nmb）。
+#
+# disable samba.service —— 仅 AD DC：`samba` 二进制在 standalone/域成员下按上游检查拒绝启动
+disable samba.service
+#
+# disable ctdb.service —— 集群 CTDB，单机无意义
+disable ctdb.service
+#
+# disable winbind.service —— 域成员专用；没有域配置时只会刷错误日志
+disable winbind.service

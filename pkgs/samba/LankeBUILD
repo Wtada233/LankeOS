@@ -19,7 +19,10 @@
 # samba-ad-dc，LankeOS 一律并一包）。
 # 默认配置照 Arch：/etc/pam.d/samba（PAM 认证必需，否则 smbd 的 auth 全废）、/etc/logrotate.d/samba、
 # /usr/lib/tmpfiles.d/samba.conf（+ postinst systemd-tmpfiles --create）、/etc/samba/private、/var/spool/samba；
-# 另装上上游 examples/smb.conf.default 作为默认 /etc/samba/smb.conf（Arch 不装，我们装）。
+# 默认 /etc/samba/smb.conf **由本包自带**（pkgs/samba/smb.conf：最小 FHS 骨架）。Arch 不装这个
+# 文件；我们此前装的是上游 examples/smb.conf.default —— 那是"从源码装到 /usr/local/samba"的
+# 场景示例，当发行版默认有三处不对（日志/私有目录指到 /usr/local/samba 与本发行版 --enable-fhs
+# 的编译期默认打架、默认带 [homes] 把家目录暴露出去、路径假设不一致），故改为自带骨架。
 
 _BD=$(dirname {WORK_DIR})
 
@@ -52,8 +55,14 @@ lankebuild_package() {
     install -d -m700 "{STAGING_ROOT}{SYSCONFDIR}/samba/private"
     install -d -m1777 "{STAGING_ROOT}/var/spool/samba"
 
-    # 默认 smb.conf（上游 examples/smb.conf.default：全注释样例 + [homes]/[printers]）
-    install -Dm644 examples/smb.conf.default "{STAGING_ROOT}{SYSCONFDIR}/samba/smb.conf"
+    # 默认 smb.conf：本包自带的最小 FHS 骨架（standalone server、路径对齐 --enable-fhs、
+    # 不带 [homes]/[printers] 之类的示例共享；AD DC 用户先 samba-tool domain provision 重写它）
+    install -Dm644 "$_BD/smb.conf" "{STAGING_ROOT}{SYSCONFDIR}/samba/smb.conf"
+
+    # 角色专用 unit 的默认策略（`disable samba/ctdb/winbind`）——由本包自己声明，
+    # 不靠发行版对全系统做 catchall 兜底。详见文件头注释。
+    install -Dm644 "$_BD/50-samba.preset" \
+        "{STAGING_ROOT}/usr/lib/systemd/system-preset/50-samba.preset"
 
     # 不装 /var/run：`--localstatedir=/var` 让 make install 建出实体 var/run/，而发行版里
     # /var/run 是 `-> ../run` 的符号链接（tmpfs）；/run/samba 交给 tmpfiles.d（下面 --create）

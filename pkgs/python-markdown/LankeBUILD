@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # PEP 517 wheel 构建（build/installer 已成包）
+    # --no-isolation：不走隔离环境。上游 [build-system] 只要 setuptools>=77，而仓库里的
+    # python-setuptools 已是 84，后端齐备 → 不必每次构建都起一个隔离环境去联网装后端。
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

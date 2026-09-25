@@ -40,4 +40,7 @@ lankebuild_package() {
 systemd-tmpfiles --create
 exit 0
 EOF
+
+    # 逐 unit 禁用不该默认启用的 unit（本应由该包声明"不该默认启用"；理由见文件头注释）
+    install -Dm644 "{WORK_DIR}/../50-ostree.preset" "{STAGING_ROOT}/usr/lib/systemd/system-preset/50-ostree.preset"
 }

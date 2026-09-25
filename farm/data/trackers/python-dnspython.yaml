@@ -1,0 +1,5 @@
+pkg-name: python-dnspython
+version-source: sources[0]
+sources:
+- tracker-template: pypi
+  project: dnspython

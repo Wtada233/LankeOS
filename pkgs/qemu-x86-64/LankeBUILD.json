@@ -1,18 +1,19 @@
 {
   "name": "qemu-x86-64",
   "version": "11.1.1",
-  "release": 2,
+  "release": 3,
   "deps": [
     "xwayland"
   ],
   "needed_so": [
+    "libSDL2-2.0.so.0",
     "libX11.so.6",
     "libasound.so.2",
     "libbz2.so.1.0",
     "libc.so.6",
     "libcairo.so.2",
+    "libcap-ng.so.0",
     "libcurl.so.4",
-    "libdaxctl.so.1",
     "libdw.so.1",
     "libepoxy.so.0",
     "libfdt.so.1",
@@ -37,9 +38,11 @@
     "libpixman-1.so.0",
     "libpng16.so.16",
     "libpulse.so.0",
+    "libseccomp.so.2",
     "libslirp.so.0",
     "libudev.so.1",
     "liburing.so.2",
+    "libusb-1.0.so.0",
     "libxkbcommon.so.0",
     "libz.so.1",
     "libzstd.so.1"
@@ -70,7 +73,6 @@
     "linux-pam",
     "mesa",
     "ncurses",
-    "ndctl",
     "pipewire",
     "pixman",
     "python-distlib",

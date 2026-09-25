@@ -1,7 +1,7 @@
 {
   "name": "libblockdev",
   "version": "3.5.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -23,7 +23,6 @@
     "libkmod.so.2",
     "libm.so.6",
     "libmount.so.1",
-    "libndctl.so.6",
     "libnss3.so",
     "libnvme.so.1",
     "libparted-fs-resize.so.0",
@@ -53,8 +52,6 @@
     "libbd_mdraid.so.3",
     "libbd_mpath.so",
     "libbd_mpath.so.3",
-    "libbd_nvdimm.so",
-    "libbd_nvdimm.so.3",
     "libbd_nvme.so",
     "libbd_nvme.so.3",
     "libbd_part.so",
@@ -86,7 +83,6 @@
     "libbytesize",
     "libnvme",
     "libyaml",
-    "ndctl",
     "nss",
     "parted",
     "volume_key"

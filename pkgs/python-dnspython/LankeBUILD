@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # PEP 517 wheel 构建（build/installer 已成包）
+    # --no-isolation：上游 [build-system] 只要 hatchling>=1.21，仓库里 python-hatchling 已成包
+    # → 不必每次构建都起一个隔离环境去联网装后端。
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}
