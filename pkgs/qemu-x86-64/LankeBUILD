@@ -1,3 +1,33 @@
+#
+# qemu-x86-64 — 只要 x86_64-softmmu（系统模拟），不要 user-mode / 其他架构。
+#
+# 音频后端（meson 选项 audio_drv_list，choices 见 meson_options.txt:21）：
+#   这个列表**同时决定两件事**，少一样都不行：
+#     ① 探测：meson.build:1327 起 `pulse = dependency('libpulse', ... required: get_option('pa'))` ——
+#        linux + have_system 时**总会探测**，但 pa 是 auto，装了 libpulse 只是 available、缺了也不报错；
+#     ② 编不编：meson.build:2302 的循环把 audio_drv_list 展开成 audio_drivers_selected，
+#        **不在列表里的后端根本不编**（CONFIG_AUDIO_PA 会被定义，但 audio/ 里那条 backend 不参与构建）。
+#   所以原来写 `alsa,pipewire` = 只有 ALSA + PipeWire 两个后端，**PulseAudio 后端从来没有过**
+#   （`pa` 只是默认列表 audio_drivers_priority 的第一项，被显式列表整个覆盖掉了；
+#    当初 needed_so 里的 libpulse.so.0 是 sdl2 带进来的，不是 qemu 的 pa 后端）。
+#   现在三个都是真后端：alsa 直挂硬件、pipewire 现代桌面、pa = PulseAudio 客户端兼容层。
+#   顺带一提：列表里出现但没找到 → meson 直接 error('Audio driver "pa" not available.')
+#   （meson.build:2306），所以这一行同时是"缺 libpulse 就构建失败"的显式断言，
+#   不需要再叠一个 --enable-pa（libpulse 已在 build_deps）。
+#
+# virtio-gpu 的 GL 加速（hw/display/meson.build:80 / :103 / :126）：
+#   virtio-gpu-gl、virtio-gpu-pci-gl、virtio-vga-gl 三个设备**只在
+#   `virgl.found() and opengl.found()` 时才被编出来**：
+#     - virgl  ← dependency('virglrenderer', method:'pkg-config')（meson.build:1421），
+#                默认 auto → 没装 virglrenderer 时**静默**没有这三个设备；
+#     - opengl ← dependency('epoxy') + 头 epoxy/egl.h（meson.build:1772），同样 auto。
+#   两个都显式写 enabled：缺依赖时 configure 阶段硬报错，不会编出一个"能启动、但
+#   `-device virtio-gpu-gl` 直接 unknown device"的 qemu（那才是最难查的形态）。
+#   gbm（mesa）在 needed_so 里已有：它被 opengl 分支连带探测，同时是 vhost-user-gpu 的
+#   第三个条件（meson.build:1785），virgl 到位后 vhost-user-gpu 也会一并出现。
+#   注：modules 默认关 → 这三个设备是**编进 qemu-system-x86_64 主二进制**的，
+#   不产生 qemu-hw-display-*.so，也不需要 --enable-modules。
+
 lankebuild_prepare() {
     :
 }
@@ -7,7 +37,9 @@ lankebuild_build() {
         --prefix={PREFIX} \
         --localstatedir={LOCALSTATEDIR} \
         --target-list=x86_64-softmmu \
-        --audio-drv-list=alsa,pipewire
+        --audio-drv-list=alsa,pipewire,pa \
+        --enable-opengl \
+        --enable-virglrenderer
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install
 }

@@ -1,7 +1,7 @@
 {
   "name": "qemu-x86-64",
   "version": "11.1.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "xwayland"
   ],
@@ -43,6 +43,7 @@
     "libudev.so.1",
     "liburing.so.2",
     "libusb-1.0.so.0",
+    "libvirglrenderer.so.1",
     "libxkbcommon.so.0",
     "libz.so.1",
     "libzstd.so.1"
@@ -62,12 +63,15 @@
     "gnutls",
     "gtk3",
     "keyutils",
+    "libcap-ng",
     "libepoxy",
     "libjpeg-turbo",
     "libpng",
     "libpulse",
+    "libseccomp",
     "libslirp",
     "liburing",
+    "libusb",
     "libx11",
     "libxkbcommon",
     "linux-pam",
@@ -79,6 +83,8 @@
     "python-pip",
     "python-setuptools",
     "python-wheel",
+    "sdl2",
+    "virglrenderer",
     "xkeyboard-config",
     "zlib",
     "zstd"

@@ -1,0 +1,83 @@
+#
+# virglrenderer — 虚拟 3D GPU 库：guest 把 GL/Vulkan 命令流交给**宿主 GPU** 执行。
+# 本仓库唯一的消费者是 qemu 的加速显示设备（qemu 用 pkg-config `virglrenderer` 探测，
+# 命中才会编出 virtio-gpu-gl / virtio-gpu-pci-gl / virtio-vga-gl 三个设备）。
+#
+# 源码：上游**不发 release tarball**（官网只给 git），用 gitlab 的 tag 归档（meson 工程，
+# 归档只缺 .git，不需要 autoreconf）。tag 有两种历史形态：新的 `1.3.0` 与旧的
+# `virglrenderer-1.3.0`；tracker 用 `tag-prefix: ''` + "必须以数字开头" 的版本校验，
+# 旧形态自动落选（见 farm/src/track/templates/mod.rs 的 strip_version），与 Arch 取的
+# 是同一个 tag。归档顶层目录 = virglrenderer-<版本>。
+#
+# 依赖（build_deps 里逐条对应下面某个 pkg-config 查询，缺一个就硬报错）：
+#   - libepoxy >= 1.5.4：`dependency('epoxy')`，**无条件**；且两份 winsys 都要求它的
+#     pc 变量 epoxy_has_egl / epoxy_has_glx 为 1（即 libepoxy 必须 --enable-egl/--enable-glx 编）。
+#   - libdrm >= 2.4.50：`required: with_drm_renderers or video` —— 我们两个都开，所以是硬依赖。
+#     `libdrm_amdgpu >= 2.4.121` 只被 amdgpu 那个渲染器要。
+#   - gbm >= 18.0.0（mesa 提供）：platforms=egl 时查，EGL 没有 gbm 就等于没有。
+#   - libx11：platforms=glx 时 `dependency('x11')`。
+#   - libva + libva-drm：video=true 时查（libva-drm 是 libva 包里的另一个 .pc，同一源码树）。
+#   - sysprof：**只提供静态库** libsysprof-capture-4.a 与 sysprof-capture-4.pc。
+#     Arch 把 sysprof 拆成 sysprof + libsysprof-capture 两个包，本仓库 sysprof **不拆**
+#     （capture 随主包装，gjs / mutter / libdex / gtk4 已经这么用），故这里写 `sysprof`。
+#     tracing=sysprof 是**编译期静态链进去**的 → 不产生运行时 SONAME 依赖，
+#     所以它不会出现在 provides / needed_so 里（这是预期，不是漏扫）。
+#     **但它是本包的运行时依赖**——`deps` 里那条唯一手写的条目：meson 生成的
+#     virglrenderer.pc 把全部依赖摊进 `Requires.private`：
+#       Requires.private: epoxy >= 1.5.4, libdrm >= 2.4.50, sysprof-capture-4 >= 3.38.0,
+#                         gbm >= 18.0.0, x11, libdrm_amdgpu >= 2.4.121, libva, libva-drm
+#     里头 7 个都是本包真正的 DT_NEEDED（在 needed_so 里，会被自动推导成 deps），
+#     **只有 sysprof-capture-4 因为静态链接查不到 DT_NEEDED**；而 pkg-config 对
+#     Requires.private 的模块存在性**不论 --static 与否都会校验** → 任何消费者跑
+#     `pkg-config --cflags virglrenderer` 都会直接失败：
+#       Package 'sysprof-capture-4', required by 'virglrenderer', not found
+#     （qemu 的 meson 就是死在 meson.build:1421 那次 dependency('virglrenderer') 上。）
+#     所以 sysprof 必须写进 deps：消费者构建容器只装 build_deps + **递归的运行时依赖**，
+#     别人家的 build_deps 不会跟过去 —— 挂在 deps 上才能自动传到每个消费者手里。
+#   - python3：venus 的设备对象代码生成（src/venus/vkr_device_object.py）；解释器由 base-devel
+#     覆盖，但**还要 PyYAML** —— 树内 vendored 的 mesa gallium 辅助代码在 configure 阶段
+#     `import yaml` 生成格式表，缺了直接 `src/gallium/meson.build:72: python3 is missing
+#     modules: yaml`（实测踩过）。故 build_deps 里显式写 `python-pyyaml`（Arch 同款 python-yaml）。
+#   - 注意 venus 用的 Vulkan 头是**树内 vendored**（src/venus/venus-protocol/vulkan.h），
+#     不需要 vulkan-headers；vulkan-dload 默认 true → 运行时 dlopen libvulkan，
+#     编译期也不需要 vulkan-loader。
+#
+# 开关的取舍——对齐 Arch PKGBUILD，逐条说明"为什么开"（都是 qemu 侧真的会去用的能力，
+# 不是上游默认值的堆砌；每条都对应 qemu 源码里的一个判定）：
+#   - platforms=egl,glx：**显式**而非默认的 auto —— 写死后 require_egl/require_glx 为真，
+#     缺依赖是构建期硬报错，不会静默少编一条 winsys。
+#   - venus=true：Vulkan 直通。qemu 侧 virtio-gpu-gl 的 `venus=on` 属性会置
+#     VIRGL_RENDERER_VENUS | VIRGL_RENDERER_RENDER_SERVER（hw/display/virtio-gpu-virgl.c:1458）；
+#     库没编 venus 时该属性要到运行时初始化才报错。开 venus 会一并编出
+#     /usr/libexec/virgl_render_server（render-server-worker 默认 process，不开 minijail）。
+#   - video=true：guest 内 VA-API 硬解（vrend 的视频前端）。
+#   - drm-renderers=…：DRM native context（qemu 的 `drm=on` 属性 → VIRGL_RENDERER_DRM，
+#     同上文件 :1461）。五个原生上下文渲染器全开，与 Arch 一致。
+#   - tracing=sysprof：编译期埋点（Arch 同款）。见上，静态链、无运行时依赖。
+#   - tests=false（上游默认）：上游测试套件要 check、且只在 Arch 的 check() 里跑，
+#     发行版构建不跑；显式写出来是为了钉住"我们不跑上游测试"这个决定。
+#
+# 产物：lib/libvirglrenderer.so.1（SONAME 取自 binary_age.interface_age.revision = 1.11.0）、
+# bin/virgl_test_server（vtest，上游无条件装）、libexec/virgl_render_server（venus）、
+# include/virgl/*.h、lib/pkgconfig/virglrenderer.pc。
+# libvirgl.a / libgallium.a / libmesa.a / libvtest.a 都是**内部** static_library（不 install），
+# 不会进包，所以 package() 里不需要删 .a。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    meson setup _build --prefix={PREFIX} --buildtype=release \
+        -Dplatforms=egl,glx \
+        -Dvenus=true \
+        -Dvideo=true \
+        -Ddrm-renderers=amdgpu-experimental,panfrost-experimental,asahi,msm,i915-experimental \
+        -Dtracing=sysprof \
+        -Dtests=false
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+}
