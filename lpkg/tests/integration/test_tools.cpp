@@ -72,7 +72,7 @@ TEST_F(ToolsTest, PackAndVerifyContent)
     fs::path verify_dir = suite_work_dir / "verify_pack";
     fs::create_directories(verify_dir);
 
-    extract_tar_zst(output_pkg, verify_dir);
+    extract_tar_zst(output_pkg, verify_dir, fs::path(output_pkg).filename().string());
 
     // Check core file structure (metadata.json replaces files.txt)
     EXPECT_TRUE(fs::exists(verify_dir / "content/usr/bin/hello"));

@@ -100,7 +100,7 @@ TEST_F(ArchiveConfinementTest, AbsoluteMemberPathStaysInsideExtractionRoot)
         {escaped, "pwned", "", "", false},
     });
 
-    extract_tar_zst(pkg, out_dir);
+    extract_tar_zst(pkg, out_dir, pkg.filename().string());
 
     EXPECT_TRUE(fs::exists(out_dir / "content/hello.txt")) << "普通成员没解出来";
     EXPECT_FALSE(fs::exists(escape_dir / "ESCAPED.txt"))
@@ -118,7 +118,7 @@ TEST_F(ArchiveConfinementTest, DotDotMemberDoesNotEscape)
 
     // `..` 成员由 libarchive 的 SECURE_NODOTDOT 直接拒绝（这是**既有**策略，未改动）：
     // 整次解压失败并抛错，而不是把文件写到解压根的父目录。
-    EXPECT_THROW(extract_tar_zst(pkg, out_dir), LpkgException);
+    EXPECT_THROW(extract_tar_zst(pkg, out_dir, pkg.filename().string()), LpkgException);
     EXPECT_FALSE(fs::exists(suite_dir / "ESCAPED_DOTDOT.txt")) << "`..` 成员逃到了解压根的父目录";
 }
 
@@ -135,7 +135,8 @@ TEST_F(ArchiveConfinementTest, HardlinkTargetOutsideRootIsSkipped)
         {"content/ok.txt", "ok", "", "", false},
     });
 
-    EXPECT_NO_THROW(extract_tar_zst(pkg, out_dir));  // 逃逸成员被跳过，不影响其余成员
+    EXPECT_NO_THROW(
+        extract_tar_zst(pkg, out_dir, pkg.filename().string()));  // 逃逸成员被跳过，不影响其余成员
     EXPECT_FALSE(fs::exists(out_dir / "content/evil_link")) << "根外硬链接目标未被拒绝";
     EXPECT_TRUE(fs::exists(out_dir / "content/ok.txt"));
 }
@@ -148,7 +149,7 @@ TEST_F(ArchiveConfinementTest, LegitimateHardlinkInsideRootStillWorks)
         {"content/link.txt", "", "content/orig.txt", "", false},
     });
 
-    extract_tar_zst(pkg, out_dir);
+    extract_tar_zst(pkg, out_dir, pkg.filename().string());
 
     ASSERT_TRUE(fs::exists(out_dir / "content/orig.txt"));
     ASSERT_TRUE(fs::exists(out_dir / "content/link.txt"));
@@ -164,7 +165,7 @@ TEST_F(ArchiveConfinementTest, AbsoluteSymlinkTargetIsPreservedAsIs)
         {"content/abslink", "", "", "/usr/lib/libfoo.so.1", false},
     });
 
-    extract_tar_zst(pkg, out_dir);
+    extract_tar_zst(pkg, out_dir, pkg.filename().string());
 
     const fs::path link = out_dir / "content/abslink";
     ASSERT_TRUE(fs::is_symlink(link));

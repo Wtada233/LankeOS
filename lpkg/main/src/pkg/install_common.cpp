@@ -126,7 +126,9 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
     // 里唯一这样的位置（test_hook_transaction.cpp 用它钉住钩子的执行时机）。
     BreakpointManager::instance().hit("hook_run_" + std::string(hook_name));
 
-    log_info(string_format("info.running_hook", std::string(hook_name)));
+    // 带上包名：挂载时机统一到批次提交后（见 finish_committed_batch），一次多包批次会连续跑
+    // 多个钩子，"正在运行钩子: postinst.sh" 这种说法在日志里完全没有上下文（哪个包？）。
+    log_info(string_format("info.running_hook", std::string(hook_name), std::string(pkg_name)));
 
     const bool use_chroot =
         (Config::instance().root_dir() != "/" && Config::instance().root_dir().string() != "/");

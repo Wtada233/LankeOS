@@ -468,7 +468,9 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
             ext == ".tar" || ext == ".zip") {
             log_info(string_format("info.auto_extracting", filename.string()));
             try {
-                extract_tar_zst(dest, work_root);
+                // 标签用源码归档文件名：构建期"在解压谁"就是哪个源码包（与上一行的
+                // info.auto_extracting 同一口径），包名在这一层已经拿不到了。
+                extract_tar_zst(dest, work_root, filename.string());
             } catch (const std::exception& e) {
                 log_warning(
                     string_format("warning.auto_extract_failed", filename.string(), e.what()));

@@ -697,7 +697,7 @@ TEST_F(RemovalSymlinkTest, PackerIncludesDirectorySymlinks)
 
     fs::path extract_dir = suite_work_dir / "packer_extract_raw";
     fs::remove_all(extract_dir);
-    extract_tar_zst(pkg_path, extract_dir);
+    extract_tar_zst(pkg_path, extract_dir, fs::path(pkg_path).filename().string());
 
     // The directory symlink IS in the archive (packer doesn't filter)
     EXPECT_TRUE(fs::exists(extract_dir / "content" / "bin"))
@@ -721,7 +721,7 @@ TEST_F(RemovalSymlinkTest, PackerIncludesSymlinksToRegularFiles)
 
     fs::path extract_dir = suite_work_dir / "packer_sym_extract";
     fs::remove_all(extract_dir);
-    extract_tar_zst(pkg_path, extract_dir);
+    extract_tar_zst(pkg_path, extract_dir, fs::path(pkg_path).filename().string());
 
     EXPECT_TRUE(fs::exists(extract_dir / "content" / "usr" / "lib" / "libfoo.so"));
     EXPECT_TRUE(fs::exists(extract_dir / "content" / "usr" / "lib" / "libfoo.so.1"));
@@ -749,7 +749,7 @@ TEST_F(RemovalSymlinkTest, PackedWithCleanupHasNoDirSymlinks)
 
     fs::path extract_dir = suite_work_dir / "packer_clean_extract";
     fs::remove_all(extract_dir);
-    extract_tar_zst(pkg_path, extract_dir);
+    extract_tar_zst(pkg_path, extract_dir, fs::path(pkg_path).filename().string());
 
     // After clean-up, dir symlink should NOT be in archive
     EXPECT_FALSE(fs::exists(extract_dir / "content" / "bin"))

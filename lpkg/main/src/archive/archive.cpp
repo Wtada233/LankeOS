@@ -67,9 +67,10 @@ static std::string member_path_relative(const char* raw)
 /**
  * 解压 tar.zst 归档文件到目标目录
  * 包含安全检查：路径穿越防护、符号链接权限修复、硬链接/软链接目标重映射
- * 每解压 100 个文件输出一次进度
+ * 每解压 100 个文件输出一次进度；进度与完成日志都点名 label（多包批次里分得清在解压谁）
  */
-void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir)
+void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
+                     const std::string& label)
 {
     ArchiveReadHandle a(archive_read_new());
     archive_read_support_filter_all(a.get());
@@ -178,11 +179,11 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir)
         }
 
         if (++count % constants::PROGRESS_INTERVAL_FILES == 0) {
-            log_info(string_format("info.extracting", count));
+            log_info(string_format("info.extracting", label, count));
         }
     }
 
-    log_info(string_format("info.extract_complete", count));
+    log_info(string_format("info.extract_complete", label, count));
 }
 
 /**

@@ -179,8 +179,11 @@ all: deps-check $(BUILD_DIR)/$(TARGET)
 
 test: docker-env
 	@$(MAKE) docker-sync
-	@# 装 l10n 到编译路径（LPKG_L10N_DIR=/usr/share/lpkg/l10n），否则 get_string 全返回 [MISSING_STRING]
-	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "mkdir -p /usr/share/lpkg && cp -r /app/main/l10n /usr/share/lpkg/"
+	@# l10n 兜底副本。init_localization 的查找顺序是 <exe>/../l10n → <exe>/../main/l10n →
+	@# <exe>/../src/l10n → 安装路径，容器里测试命中 /app/main/l10n（同步进去的源码树），
+	@# 这一份是"源码树布局不可用"时的后备。必须拷进 l10n/ 目录**本身**：
+	@# `cp -r /app/main/l10n /usr/share/lpkg/` 在目标已存在时会嵌套成 l10n/l10n（踩过）。
+	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "mkdir -p /usr/share/lpkg/l10n && rm -rf /usr/share/lpkg/l10n/* && cp -r /app/main/l10n/. /usr/share/lpkg/l10n/"
 	@docker exec $(DOCKER_ENV_FLAGS) -w /app $(DOCKER_ENV_CONTAINER) sh -c "make clean && make -j$$(nproc) build/run_tests && ./build/run_tests"
 	@echo "------------------------------------------"
 	@echo "Tests completed inside Docker container."

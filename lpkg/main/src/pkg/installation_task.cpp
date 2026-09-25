@@ -211,7 +211,7 @@ void InstallationTask::commit_without_file_ops()
     std::unordered_set<std::string> old_files;
     if (!old_version_to_replace_.empty()) {
         old_files = Cache::instance().get_package_files(pkg_name_);
-        log_info(string_format("info.upgrade_old_files_check", old_version_to_replace_,
+        log_info(string_format("info.upgrade_old_files_check", pkg_name_, old_version_to_replace_,
                                actual_version_, old_files.size()));
     }
 
@@ -487,8 +487,8 @@ void InstallationTask::extract_and_validate_package()
     // 元数据回读。标记只在预检成功解压后置位，而计划重解会整体重建 InstallPlan（标记归零，
     // 见 InstallPlan::content_ready），故不会指向别的版本的解压产物。
     if (!content_ready_) {
-        log_info(get_string("info.extracting_to_tmp"));
-        extract_tar_zst(archive_path_, tmp_pkg_dir_);
+        log_info(string_format("info.extracting_to_tmp", pkg_name_));
+        extract_tar_zst(archive_path_, tmp_pkg_dir_, pkg_name_);
     }
 
     for (const auto& meta : {constants::PKG_METADATA_FILE, constants::DIR_CONTENT}) {
@@ -511,7 +511,7 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
     auto actual_deps = detail::parse_dep_strings(deps_);
     if (actual_deps.empty()) return;
 
-    log_info(string_format("info.checking_deps"));
+    log_info(string_format("info.checking_deps", pkg_name_));
 
     for (const auto& dep : actual_deps) {
         const std::string& dep_name = dep.name;
@@ -995,7 +995,7 @@ void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
 
 void InstallationTask::copy_package_files()
 {
-    log_info(get_string("info.copying_files"));
+    log_info(string_format("info.copying_files", pkg_name_));
     // 写入层原语：COPY 的 WAL 行与 rename 成对发生（见 op_sink.hpp）
     detail::OpSink sink(pkg_name_, &stashes_);
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;

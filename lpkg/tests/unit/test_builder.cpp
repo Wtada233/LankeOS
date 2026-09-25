@@ -79,7 +79,7 @@ TEST_F(BuilderTest, VariableSubstitutionWorks)
     fs::path extract_dir = test_dir / "extract";
     fs::create_directories(extract_dir);
 
-    extract_tar_zst(pkg_file, extract_dir);
+    extract_tar_zst(pkg_file, extract_dir, pkg_file);
 
     fs::path test_bin = extract_dir / "content/usr/bin/test_bin";
     ASSERT_TRUE(fs::exists(test_bin)) << "test_bin not found in extracted package";

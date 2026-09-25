@@ -253,7 +253,7 @@ void run_build(const fs::path& build_dir)
     // 4. 检测源码树
     // 4.5. 安装构建时依赖（支持版本约束 "cmake >= 3.20"）
     if (!cfg.build_deps.empty()) {
-        log_info(get_string("info.checking_deps"));
+        log_info(string_format("info.checking_deps", cfg.name));
         // 解析版本约束为 name:version 格式
         std::vector<std::string> resolved;
         auto parsed = detail::parse_dep_strings(cfg.build_deps);
