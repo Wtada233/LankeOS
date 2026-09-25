@@ -5,8 +5,20 @@
 # 服务（NetworkManager/sddm/sshd…）一并禁掉"的毁系统操作。逐 unit 禁用最坏只多启用几个无关服务。
 #
 # 优先级 50 排在 systemd 上游 vendor 预设（90-systemd.preset）之前：preset 是"第一条匹配行胜出"，
-# 将来上游给这些 unit 加行也抢不走本文件的判定。
+# 而且**与目录无关、只按文件名字典序**读；同名文件另有 /etc > /run > /usr/local/lib > /usr/lib 的
+# 覆盖规则。将来上游给这些 unit 加行也抢不走本文件的判定。（实测：拿 v262 自己的 systemctl 在
+# 假 root 上跑，只有本文件与 90 都命中时，它打的是 "Preset files say disable <unit>."，
+# 一条链接都不建 —— 所以"90 排在后面所以更优先"是错觉，preset 不是"后来者胜"。）
 #
+# ⚠ **写 disable 不等于真的不会启用**：`systemctl preset-all` 的 enable 那一趟
+# （execute_preset → install_context_apply）会沿单元 `[Install]` 里的 **`Also=`** 递归跟进，
+# "被谁 enable"这件事**不看预设判定**。所以只要有一个**默认启用**（没有任何预设行提到它 →
+# 兜底 enable）的单元在 [Install] 里 `Also=` 引用了我们想禁的 unit，它就会被建回来：
+# 现象是 `systemctl preset-all` 对同一个 unit **先 Removed 再 Created**，净结果还是 enabled。
+# 判断顺序还会随目录遍历（readdir）顺序变：引用者先被处理时，被引用者直接进 plus、
+# 连本文件那条 disable 都不会被求值（"已见过就跳过"守卫）。**凡是被 Also= 引用的必须连引用者
+# 一起禁用**；v262 里踩到的就是 systemd-userdbd 那一族（见文件末尾）。
+
 # v262 新增的 varlink 守护：服务对象是 repart / dissect / storage / userdb 那一族，而发行版**已经用
 # meson 开关关掉**了对应功能（-Drepart=disabled -Dmountfsd=false -Dsysinstall=false -Dimportd=disabled
 # -Dhomed=disabled …），留着就是一批白开的 socket。
@@ -20,4 +32,28 @@ disable systemd-report-sign-tsm.socket
 disable systemd-journalctl-metrics.socket
 disable systemd-storage-block.socket
 disable systemd-storage-fs.socket
-disable systemd-userdbd.socket
+
+# ── **刻意不管** systemd-userdbd 一族（曾被误列入本文件，2026-09 撤掉）──────────────
+# 判据回顾：上面那 9 个之所以禁，是因为 v262 的 varlink 守护**绑在被 meson 关掉的特性上**
+# （repart / mountfsd / dissect / storage / journalctl-metrics 那一族），留着才是白开的 socket。
+# userdbd **不满足这个判据**：它不绑任何被关掉的 meson 特性（`-Dhomed=disabled` 关的是 homed
+# 本身，不是它），一直是构建且可用的，停它省不到任何东西 —— 它是 **socket 激活**的，平时只是
+# 一个躺着的监听 socket，守护进程只在真有查询时才起。
+#
+# 而且它**根本停不掉**（这就是当初"写了 disable 等于没写"的真因，值得记一笔）：
+#   · 90-systemd.preset 第 50 行显式 `enable systemd-userdbd.socket`（上游策略）；
+#   · `systemd-userdbd.service` 没有任何预设行提到 → 兜底 **enable**，而它的 [Install] 是
+#         Also=systemd-userdbd.socket
+#     → enable 那一趟（execute_preset → install_context_apply）会沿 `Also=` **递归把 socket 建回来**，
+#       跟预设判定无关（它同时还 `Requires=systemd-userdbd.socket`，service 一起来也会拉起 socket）。
+#   现象：`systemctl preset-all` 对同一个 unit **先 Removed 再 Created**，净结果还是 enabled；
+#   目录遍历顺序还会让那条 disable 连求值都轮不到（`preset_prepare_one` 的"已见过就跳过"守卫）。
+#   要真停就得连 service 和 systemd-userdb-load-credentials.service 一起停 = 为一个 socket
+#   偏离上游三个单元，不值。
+#
+# 功能上也不需要停：GDM/登录界面的用户列表走 AccountsService → NSS（/etc/passwd + nss-systemd）；
+# 而 nss-systemd 的 DynamicUser 记录**不来自 userdbd** —— 那个 varlink 服务是 PID 1 自己提供的
+# （core/varlink.c 建 /run/systemd/userdb/io.systemd.DynamicUser，core/varlink-dynamic-user.c 实现）。
+# userdbd 多给的只有 Multiplexer（转发器）、Home（homed 已关）、以及 NSS/DropIn 两条桥 ——
+# 后两者客户端自带本地模拟兜底（shared/userdb.c 的 nss_covered / dropin_covered + userdb-dropin.c），
+# 所以 userdbctl、/etc/userdb 的 JSON 记录、DynamicUser 解析在没有守护进程时照样工作。
