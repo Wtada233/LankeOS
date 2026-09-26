@@ -20,22 +20,22 @@ hero:
       link: https://github.com/Wtada233/LankeOS
 
 features:
-  - title: ⚡ Fast Boot
-    details: The optimized initramfs takes about 4 seconds from power-on to desktop, achieved by disabling non-essential startup services like ldconfig.service.
-  - title: 🖥 Pure Wayland Desktop
-    details: Powered by Wayland + Mesa graphics stack — no X11 baggage. Full GPU hardware acceleration for a smooth native Wayland experience.
-  - title: 📦 Custom Package Manager lpkg
-    details: Written in C++20 with atomic transaction rollback, inline metadata validation, aggregate indexes, ELF self-stripping, and multi-segment version comparison. Supports static compilation.
-  - title: 🌐 Full Toolchain Coverage
-    details: GCC, LLVM/Clang, Rust, Python, Ruby, Perl, Lua — a development environment ready out of the box.
-  - title: 🔧 Chinese Language Support
-    details: Fcitx5 input method works out of the box with pre-installed Noto Sans CJK fonts. lpkg package manager features a full bilingual Chinese/English interface.
-  - title: 💾 Live ISO + Persistence
-    details: Bootable Live ISO with toram support to load entirely into RAM. OverlayFS persistence via a LABEL=LANKE_DATA partition for keeping changes across reboots.
-  - title: 🎵 PipeWire Audio
-    details: Complete PipeWire audio/video routing with ALSA and JACK compatibility layers. USB audio devices are plug-and-play.
-  - title: 🖼 GTK3/4 + Firefox
-    details: Full GTK3/4 graphics stack with Firefox browser and GStreamer multimedia framework. Run modern GTK applications.
-  - title: 🔐 Security Architecture
-    details: Linux-PAM authentication, Polkit authorization framework, OpenSSL and GnuTLS crypto libraries. Complete multi-user security model.
+  - title: ↻ ABI-Driven Incremental Builds
+    details: The lankefarm build farm computes removed SONAMEs from the old index's needed_so / provides and locates the consuming packages directly — no transitive closure. A libxml2 break rebuilds llvm only; if llvm's ABI is unchanged, rust stays put. The rebuild set is exactly the set that must be rebuilt.
+  - title: ⇄ ABI Transition Backups
+    details: When a library's SONAME changes, the old .so is backed up automatically and injected into every build container, so both ABIs coexist throughout the rebuild. Already-installed binaries never break because of a library upgrade.
+  - title: ▲ Declarative Upstream Tracking
+    details: One readable tracker YAML per package declares its version source and filtering rules — major-version locks, numeric caps, blacklists for anomalous tags, even-minor-only. lankefarm track follows upstream accordingly; the vast majority of packages need no script at all.
+  - title: ▣ Custom Package Manager lpkg
+    details: Written in C++20 as a static single binary with no runtime dependencies. WAL 2.0 atomic transactions — all-or-nothing batches, automatic rollback on failure, and idempotent resumption even if the rollback itself is interrupted. Runtime dependencies are derived from the artifacts' ELF needed_so rather than written by hand — only implicit ones invisible to scanning (dlopen, QML) need declaring.
+  - title: ✓ Repository-Wide Semantic Audits
+    details: farm chk checks consistency across the whole repository — which package owns a QML import, a .pc file's Requires, build-dependency declarations for .gir / .vapi, leftover Python bytecode, sysusers / tmpfiles hooks, and a symbol@version ABI audit spanning every package.
+  - title: ≡ Reproducible Packaging
+    details: Repacking is always normalised — mtime zeroed, uid / gid pinned, traversal sorted by path, extended attributes (including security.capability) preserved. Identical input yields a byte-identical package.
+  - title: ⇩ Low Barrier to Install
+    details: Download the ISO, boot it, run sudo lanke_install — three steps. No compiling the whole system yourself as source-based distributions require, and no manual partitioning or bootloader setup — the installer handles GPT partitioning, formatting and GRUB configuration.
+  - title: ⊞ Wayland Desktop, Two Ecosystems
+    details: Both KDE Plasma and the GNOME core stack are available, natively on Wayland (X11 apps run through xwayland). Intel, AMD and NVIDIA all use open-source drivers (iris / radeonsi / nouveau + NVK) — no proprietary blobs required.
+  - title: 文 Chinese Friendly
+    details: The Fcitx5 input method and Noto Sans CJK fonts work out of the box, and lpkg ships a complete bilingual Chinese/English interface with localised error messages.
 ---

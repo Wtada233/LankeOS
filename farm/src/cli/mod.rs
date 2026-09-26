@@ -71,7 +71,8 @@ pub(crate) struct RepoArgs {
     /// 产物/解包/发布目录
     #[arg(long, default_value = "out")]
     pub out: PathBuf,
-    /// SQLite 状态库（job 状态记录，供 operator 排查；自动 requeue 未实现）
+    /// SQLite 状态库（job 状态记录，供 operator 排查；farm 是批式 CLI、无后台 requeue
+    /// ——「配方 hash 变了就重建」由 validate 在每次运行时评估）
     #[arg(long)]
     pub state: Option<PathBuf>,
     /// 架构（发布到 out/<arch>/<pkg>/）

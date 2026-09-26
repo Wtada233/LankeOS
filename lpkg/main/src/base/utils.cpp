@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cerrno>
 #include <cstdlib>
@@ -22,14 +23,13 @@
 #include <sstream>
 
 #include "config.hpp"
-#include "elf/strip.hpp"
 #include "exception.hpp"
 #include "localization.hpp"
 namespace fs = std::filesystem;
 
 #include <mutex>
 
-/** 在 main.cpp 中定义，由 SIGINT 信号处理函数设置（SigIntGuard 生命周期内生效） */
+/** 在 main/src/main_cli.cpp 中定义，由 SIGINT 信号处理函数设置（SigIntGuard 生命周期内生效） */
 extern std::atomic<bool> sigint_graceful;
 
 namespace
@@ -187,7 +187,9 @@ int run_shell_in_root(const std::string& cmd)
     if (root == "/" || root.string() == "/") return run_shell(cmd);
 
     const fs::path bash_rel = fs::path("/bin/bash").relative_path();
-    if (!fs::exists(root / bash_rel)) return -1;  // 目标 root 里没有 bash → 无法执行
+    // 符号链接环会让 `fs::exists` 抛（见 utils.hpp 的不抛谓词说明）——这里是"root 里有没有
+    // bash"的存在性判定，不该有能力把 chroot 执行路径打断，故用 follow 语义的不抛版本。
+    if (!exists_follow(root / bash_rel)) return -1;  // 目标 root 里没有 bash → 无法执行
 
     pid_t pid = fork();
     if (pid == -1) return -1;
@@ -212,7 +214,7 @@ int run_shell_in_root(const std::string& cmd)
  * 向用户请求确认（y/n）
  * 根据非交互模式配置自动返回 yes/no
  *
- * 交互模式用轮询读 stdin：安装/移除等事务中的 SIGINT（Ctrl+C）会由 main.cpp 的
+ * 交互模式用轮询读 stdin：安装/移除等事务中的 SIGINT（Ctrl+C）会由 main_cli.cpp 的
  * SigIntGuard 设置 sigint_graceful 并打印提示——轮询循环检测到即视为用户取消
  * （返回 false），而不是卡在 std::cin 上对 Ctrl+C 无响应。
  */
@@ -372,6 +374,131 @@ void copy_xattrs(const fs::path& from, const fs::path& to)
     }
 }
 
+std::vector<std::string> list_xattr_keys(const fs::path& p)
+{
+    std::vector<std::string> keys;
+    // 两次调用是 llistxattr 的既定用法（第一次问长度、第二次取值），中间可能因并发而变化：
+    // 第二次返回的长度若变大，多出来的部分取不到（内核会截断）—— 对"列键"这件事无害
+    // （下一轮/下一个调用点会看到），所以不重试，也**不报错**（见头文件的语义说明）。
+    ssize_t len = ::llistxattr(p.c_str(), nullptr, 0);
+    if (len <= 0) return keys;
+    std::vector<char> names(static_cast<size_t>(len));
+    len = ::llistxattr(p.c_str(), names.data(), names.size());
+    if (len <= 0) return keys;
+    for (const char* n = names.data(); n < names.data() + len; n += std::strlen(n) + 1) {
+        if (*n == '\0') continue;
+        keys.emplace_back(n);
+    }
+    return keys;
+}
+
+std::optional<std::vector<char>> read_xattr(const fs::path& p, const std::string& key)
+{
+    const ssize_t vlen = ::lgetxattr(p.c_str(), key.c_str(), nullptr, 0);
+    // < 0 = 键不存在（ENODATA）/ 不支持 xattr（ENOTSUP）/ 其它读失败 —— 一律当"没有"。
+    // **不能把 0 也当"没有"**：0 是合法的"值长度为零"，与"键不存在"必须分开（后者返回
+    // nullopt，前者返回空 vector）—— 分不开就会在回滚时把"本来就有的空值键"误判成
+    // "本来没有"而删掉它。
+    if (vlen < 0) return std::nullopt;
+    std::vector<char> val(static_cast<size_t>(vlen));
+    if (vlen > 0 &&
+        ::lgetxattr(p.c_str(), key.c_str(), val.data(), val.size()) != static_cast<ssize_t>(vlen))
+        return std::nullopt;  // 并发改变等：当作读不到（保守，不返回半份数据）
+    return val;
+}
+
+bool write_xattr(const fs::path& p, const std::string& key, const std::vector<char>& value)
+{
+    return ::lsetxattr(p.c_str(), key.c_str(), value.data(), value.size(), 0) == 0;
+}
+
+bool remove_xattr(const fs::path& p, const std::string& key)
+{
+    return ::lremovexattr(p.c_str(), key.c_str()) == 0;
+}
+
+namespace
+{
+constexpr char B64_ALPHABET[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+/// 反查表（0..255 → 0..63，非法字符为 -1）。只建一次。
+const std::array<signed char, 256>& b64_reverse()
+{
+    static const std::array<signed char, 256> table = [] {
+        std::array<signed char, 256> t{};
+        t.fill(-1);
+        for (int i = 0; i < 64; ++i) t[static_cast<unsigned char>(B64_ALPHABET[i])] = i;
+        return t;
+    }();
+    return table;
+}
+}  // namespace
+
+std::string base64_encode(const std::vector<char>& data)
+{
+    std::string out;
+    out.reserve(((data.size() + 2) / 3) * 4);
+    size_t i = 0;
+    while (i + 2 < data.size()) {
+        const unsigned v = (static_cast<unsigned char>(data[i]) << 16) |
+                           (static_cast<unsigned char>(data[i + 1]) << 8) |
+                           static_cast<unsigned char>(data[i + 2]);
+        out += B64_ALPHABET[(v >> 18) & 0x3F];
+        out += B64_ALPHABET[(v >> 12) & 0x3F];
+        out += B64_ALPHABET[(v >> 6) & 0x3F];
+        out += B64_ALPHABET[v & 0x3F];
+        i += 3;
+    }
+    const size_t rem = data.size() - i;
+    if (rem == 1) {
+        const unsigned v = static_cast<unsigned char>(data[i]) << 16;
+        out += B64_ALPHABET[(v >> 18) & 0x3F];
+        out += B64_ALPHABET[(v >> 12) & 0x3F];
+        out += "==";
+    } else if (rem == 2) {
+        const unsigned v = (static_cast<unsigned char>(data[i]) << 16) |
+                           (static_cast<unsigned char>(data[i + 1]) << 8);
+        out += B64_ALPHABET[(v >> 18) & 0x3F];
+        out += B64_ALPHABET[(v >> 12) & 0x3F];
+        out += B64_ALPHABET[(v >> 6) & 0x3F];
+        out += '=';
+    }
+    return out;
+}
+
+std::optional<std::vector<char>> base64_decode(std::string_view s)
+{
+    const auto& rev = b64_reverse();
+    std::vector<char> out;
+    out.reserve((s.size() / 4) * 3);
+    unsigned acc = 0;
+    int nbits = 0;
+    size_t pad = 0;
+    for (const char c : s) {
+        if (c == '=') {  // 填充只在末尾、最多两个
+            if (++pad > 2) return std::nullopt;
+            continue;
+        }
+        if (pad > 0) return std::nullopt;  // 填充之后还有数据 → 非法
+        const signed char v = rev[static_cast<unsigned char>(c)];
+        if (v < 0) return std::nullopt;  // 非字母表字符（含空格/换行/`→`）
+        acc = (acc << 6) | static_cast<unsigned>(v);
+        nbits += 6;
+        if (nbits >= 8) {
+            nbits -= 8;
+            out.push_back(static_cast<char>((acc >> nbits) & 0xFF));
+        }
+    }
+    // 收尾：剩余位数必须是"被填充掉的"（0 位 = 干净收尾；否则输入被截断/非法）
+    if (nbits != 0 && nbits != 2 && nbits != 4) return std::nullopt;
+    if (nbits == 2 || nbits == 4) {
+        if (pad == 0) return std::nullopt;  // 该有填充却没有 → 非法
+    } else if (pad != 0) {
+        return std::nullopt;  // 不该有填充却有 → 非法
+    }
+    return out;
+}
+
 std::string shell_quote(std::string_view s)
 {
     std::string out;
@@ -389,15 +516,68 @@ std::string shell_quote(std::string_view s)
 
 void ensure_dir_exists(const fs::path& path)
 {
-    if (!fs::exists(path)) {
+    // 判定必须走**不抛**的 exists_follow：`fs::exists` 在符号链接环（ELOOP）上抛
+    // filesystem_error，那会把"创建一个目录"变成"进程带着半截事务崩掉"。解不开的路径
+    // 在这里的答案是"不存在"→ 交给 create_directories 去撞真实错误（EEXIST/ELOOP），
+    // 于是报错是 LpkgException（点名路径）而不是 std::filesystem 的原始异常。
+    if (!exists_follow(path)) {
         std::error_code ec;
         if (!fs::create_directories(path, ec)) {
             throw LpkgException(string_format("error.create_dir_failed", path.string()) + ": " +
                                 ec.message());
         }
-    } else if (!fs::is_directory(path)) {
+    } else if (!is_directory_follow(path)) {
+        // 判据**保持跟随语义**（与改前的 `fs::is_directory` 逐字一致）：这里的父目录/状态
+        // 目录可以是指向别处的符号链接（usr-merge 的 `/lib -> usr/lib`、管理员搬走的
+        // `/var/lib/lpkg`），换成 lstat 语义会让这些布局直接报"不是目录"。本次只把
+        // "抛"换成"自己报错"；解不开（ELOOP）的路径在上面 exists_follow 处已归到
+        // "不存在"，走的是 create_directories 分支，落成 error.create_dir_failed。
         throw LpkgException(string_format("error.path_not_dir", path.string()));
     }
+}
+
+bool exists_no_follow(const fs::path& p)
+{
+    std::error_code ec;
+    (void)fs::symlink_status(p, ec);  // lstat：末段链接**不**解引用
+    return !ec;                       // 只有 lstat 成功才是"名字被占"
+}
+
+bool exists_follow(const fs::path& p)
+{
+    std::error_code ec;
+    const bool found = fs::exists(p, ec);
+    return found && !ec;  // 悬空链接/ELOOP/EACCES 下 ec 非零 → false（绝不抛）
+}
+
+bool is_directory_follow(const fs::path& p)
+{
+    std::error_code ec;
+    return fs::is_directory(p, ec) && !ec;
+}
+
+bool is_real_directory(const fs::path& p)
+{
+    std::error_code ec;
+    const auto st = fs::symlink_status(p, ec);
+    return !ec && st.type() == fs::file_type::directory;
+}
+
+bool is_regular_file_no_follow(const fs::path& p)
+{
+    std::error_code ec;
+    const auto st = fs::symlink_status(p, ec);
+    return !ec && st.type() == fs::file_type::regular;
+}
+
+bool is_symlink_no_follow(const fs::path& p)
+{
+    // `symlink_status` = lstat：末段**不**解引用，且把 ELOOP/EACCES 放进 ec 而不是抛。
+    // 注意这对"中间段成环"同样成立（`symlink_status("self/x")` 只报 ec，不抛）——
+    // 与 `fs::is_symlink` 的关键差别就在这里（实测见 utils.hpp 那段订正）。
+    std::error_code ec;
+    const auto st = fs::symlink_status(p, ec);
+    return !ec && st.type() == fs::file_type::symlink;
 }
 
 fs::path strip_trailing_slash(const fs::path& p)
@@ -445,13 +625,47 @@ DurableFsyncGuard::~DurableFsyncGuard()
  */
 void ensure_file_exists(const fs::path& path)
 {
-    if (!fs::exists(path)) {
+    // 同 ensure_dir_exists：判定不抛（ELOOP 会让 fs::exists 抛，见 utils.hpp 的谓词说明）
+    if (!exists_follow(path)) {
         std::ofstream file(path);
         if (!file) {
             throw LpkgException(string_format("error.create_file_failed", path.string()) + ": " +
                                 strerror(errno));
         }
     }
+}
+
+std::vector<RepoIndexVersionBlock> parse_repo_index_line(std::string_view line)
+{
+    std::vector<RepoIndexVersionBlock> blocks;
+    if (!line.empty() && line.back() == '\r') line.remove_suffix(1);
+    if (line.empty() || line[0] == '#') return blocks;
+
+    const auto parts = split_string_view(line, constants::PIPE_CHAR);
+    if (parts.size() < 2) return blocks;
+
+    const std::string pkg_name(parts[0]);
+    // 包级 provides（行内第 3 段）：版本级为空时回退到这里。旧格式/部分写入器把 provides
+    // 写在这一级，此前该字段被完全忽略 → 能力解析报"无提供者"。
+    const std::string_view pkg_level_provides = (parts.size() > 2) ? parts[2] : std::string_view{};
+
+    for (auto version_info_sv : split_string_view(parts[1], constants::SEMICOLON_CHAR)) {
+        if (version_info_sv.empty()) continue;
+
+        const auto vh = split_string_view(version_info_sv, constants::COLON_CHAR);
+        if (vh.empty() || vh[0].empty()) continue;  // 畸形短块（`名|:哈希:`）不成版本
+
+        RepoIndexVersionBlock b;
+        b.name = pkg_name;
+        b.version = std::string(vh[0]);
+        b.hash = (vh.size() > 1) ? std::string(vh[1]) : std::string{};
+        b.deps = (vh.size() > 2) ? std::string(vh[2]) : std::string{};
+        b.provides = (vh.size() > 3) ? std::string(vh[3]) : std::string{};
+        if (b.provides.empty()) b.provides = std::string(pkg_level_provides);
+        b.needed_so = (vh.size() > 4) ? std::string(vh[4]) : std::string{};
+        blocks.push_back(std::move(b));
+    }
+    return blocks;
 }
 
 /**
@@ -691,11 +905,18 @@ void safe_rename(const fs::path& from, const fs::path& to)
 void cleanup_tmp_dirs()
 {
     const fs::path tmp_path = "/tmp";
-    if (!fs::exists(tmp_path) || !fs::is_directory(tmp_path)) return;
+    // 判定不抛：/tmp 是符号链接环时 `fs::exists` 会抛，而这里是启动期的清理兜底
+    // （见 utils.hpp 的不抛谓词说明）。**跟随**语义与原来的 exists+is_directory 一致
+    // （/tmp 可以是指向 /var/tmp 的符号链接）。
+    if (!is_directory_follow(tmp_path)) return;
 
     for (const auto& entry : fs::directory_iterator(tmp_path)) {
         try {
-            if (fs::is_symlink(entry.path()) || !entry.is_directory()) continue;
+            // 一次 lstat 的"真目录"判据（2026-09-26 修）：原来的
+            // `fs::is_symlink(p) || !entry.is_directory()` 两个操作数**都会在环上抛** ——
+            // 前者对中间段成环抛、后者（`directory_entry::is_directory()` 走 `status()`）
+            // 对末段成环抛。而本函数跑在清理路径上：一次抛 = 包已落地、DB 已提交、命令报失败。
+            if (!is_real_directory(entry.path())) continue;
             const std::string dirname = entry.path().filename().string();
             if (!dirname.starts_with("lpkg_")) continue;
 
@@ -748,7 +969,8 @@ void cleanup_orphan_stashes(const std::set<fs::path>& keep)
             const fs::path p = it->path();
             const std::string name = p.filename().string();
             if (name.rfind(".lpkg_bak_", 0) != 0) continue;
-            if (!it->is_directory() || fs::is_symlink(p)) continue;
+            // 同上（2026-09-26 修）：两个操作数在环上都抛；换成一次 lstat 的真目录判据。
+            if (!is_real_directory(p)) continue;
             // WAL 仍引用（回滚/续传还要用）→ 绝不回收
             if (keep.contains(p.lexically_normal())) continue;
             const auto sep = name.rfind('_');
@@ -778,7 +1000,8 @@ void cleanup_orphan_stashes(const std::set<fs::path>& keep)
             break;
         }
         const fs::path p = it->path();
-        if (fs::is_symlink(p) || !it->is_directory()) continue;
+        // 同上（2026-09-26 修）。
+        if (!is_real_directory(p)) continue;
         struct stat st{};
         if (::lstat(p.c_str(), &st) != 0) continue;
         if (st.st_dev != root_st.st_dev) reap_dir(p);  // 顶层子挂载点根
@@ -795,27 +1018,5 @@ void string_replace_all(std::string& str, const std::string& from, const std::st
     while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
         str.replace(start_pos, from.length(), to);
         start_pos += to.length();
-    }
-}
-
-/**
- * 对二进制文件执行 strip 操作
- * 失败时仅记录警告而不中断流程
- */
-void strip_binary(const fs::path& path)
-{
-    // strip 是**尽力而为**的步骤：出任何问题都只该让包大一点，绝不能失败整个构建。
-    // 曾因 strip 内部异常（SHT_NOBITS 的 d_buf 为 NULL → bad_alloc）逃出本函数，
-    // 把 lankebuild_package 阶段整个打死（llvm 白跑一次）。这里兜住所有异常。
-    try {
-        std::string error_msg;
-        if (!strip_file(path, error_msg) && !error_msg.empty()) {
-            log_warning(string_format("warning.strip_failed", path.string(), error_msg));
-        }
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.strip_failed", path.string(), e.what()));
-    } catch (...) {
-        log_warning(
-            string_format("warning.strip_failed", path.string(), get_string("error.unknown")));
     }
 }

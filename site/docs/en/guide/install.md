@@ -6,148 +6,45 @@ title: Installation Guide
 
 ## Prerequisites
 
-Installing LankeOS requires:
-- Basic Linux command-line operations
-- Understanding of disk partitioning concepts (GPT, EFI system partition, etc.)
-- x86_64 UEFI system
+- Basic Linux command-line skills
+- An **x86_64-v3** UEFI system (packages are built with `-march=x86-64-v3`; legacy BIOS/MBR boot is not supported)
+- A target disk that will be **completely erased**
 
-## Method 1: Using the Built-in Installer (Recommended)
+## Installation
 
-Boot into the live environment and run:
+Run the built-in installer from the live environment:
 
 ```bash
 sudo lanke_install
 ```
 
-Installer workflow:
+The installer walks you through the whole process:
 
-1. **Select Disk** — Lists all available disks
-2. **Partition Scheme** — Automatically creates GPT partitions:
-   - EFI System Partition (512 MiB, Label set to `LANKE_BASE`)
-   - Root partition (remaining space, Label optionally set to `LANKE_DATA`)
-3. **Format and Copy** — Formats partitions and copies live system data to the hard disk
-4. **Finish** — Reboot into the installed system
+1. **Select Disk** — lists all available disks (from `lsblk`); enter the target device name (e.g. `sda`)
+2. **Confirm Erase** — requires an explicit `y`, then `wipefs` clears the old partition table
+3. **Automatic Partitioning** (GPT, via `sfdisk`):
+   - `LANKE_BASE` — **4 GiB**, FAT32. The boot partition, holding the kernel, initramfs, GRUB and `live/rootfs.sfs`
+   - `LANKE_DATA` — remaining space, ext4. Persistent storage
+4. **Format and Copy** — copies the entire system from the live medium onto `LANKE_BASE`
+5. **Write GRUB Configuration** — generates the boot entry (without live-specific kernel parameters)
 
-## Method 2: Manual Installation
+Reboot afterwards, remove the boot medium, and start from the hard disk.
 
-### 1. Partitioning
+First login: user `LankeOS`, password `LankeOS`. **Change it right after logging in.**
 
-Use `gdisk` or `fdisk` to create the following partitions:
+`root` cannot log in directly — in live mode its password field is cleared (`su` accepts no password at all, a PAM safety mechanism), and on an installed system it holds a value set during development that is not published. Use `sudo` for root privileges, or run `sudo passwd root` first to set a password.
 
-```bash
-# Example: /dev/nvme0n1
-gdisk /dev/nvme0n1
-```
+> The installer does **not** run `grub-install`; it reuses the GRUB EFI files already present on the live medium, because `grub-install` fails inside an OverlayFS environment. This is also why the boot partition needs 4 GiB: `live/rootfs.sfs` (~1.5 GiB) has to sit on the same partition as the kernel.
 
-| Partition | Size | Type | Label | Description |
-|-----------|------|------|-------|-------------|
-| `/dev/nvme0n1p1` | 512 MiB | EF00 (EFI System) | `LANKE_BASE` | **Required** — initramfs uses this label to locate the boot media |
-| `/dev/nvme0n1p2` | Remaining | 8300 (Linux) | `LANKE_DATA` | Optional, for persistent storage |
+### One hard constraint if you install manually
 
-### 2. Formatting
+If you partition and copy things yourself instead of using the installer, remember this: **`live/rootfs.sfs` must live on the partition labelled `LANKE_BASE`.** initramfs locates the boot medium with `findfs LABEL=LANKE_BASE` and then looks for `live/rootfs.sfs` on that partition; if it is missing the system drops straight to a rescue shell. `LANKE_DATA` only serves as the OverlayFS persistence upper directory and does not hold rootfs.sfs.
 
-```bash
-# EFI partition — Label MUST be set to LANKE_BASE
-mkfs.fat -F 32 -n LANKE_BASE /dev/nvme0n1p1
+## Persistent Storage (Live USB)
 
-# Root partition (if persistence is needed)
-mkfs.ext4 -L LANKE_DATA /dev/nvme0n1p2
-```
-
-> The `-n LANKE_BASE` flag sets the FAT partition label. The initramfs uses `findfs LABEL=LANKE_BASE` to locate the boot partition.
-
-### 3. Copy Data
-
-After booting into the live environment, copy the boot files and rootfs from the ISO to the hard disk:
+To keep changes on a live USB without installing to a hard disk, create a partition labelled `LANKE_DATA` and format it as ext4 — initramfs will automatically mount it as the OverlayFS upper directory at boot:
 
 ```bash
-# Locate the boot media path (mounted by initramfs in live mode)
-LIVE_MNT="/mnt/lanke_live"
-
-# Mount the target partition
-mount /dev/nvme0n1p1 /mnt
-
-# Copy kernel, initramfs, and GRUB EFI bootloader
-cp -a "$LIVE_MNT/boot" /mnt/
-cp -a "$LIVE_MNT/EFI" /mnt/
-
-# If using a persistence partition, copy rootfs.sfs as well
-mount /dev/nvme0n1p2 /data
-cp -a "$LIVE_MNT/live" /data/
-```
-
-> Note: Running `grub-install` within an OverlayFS environment will fail, so we directly copy the pre-installed GRUB EFI files from the Live ISO.
-
-### 4. Configure GRUB
-
-The installed system does not need the `live` or `toram` kernel parameters. Write a new GRUB configuration:
-
-```bash
-cat > /mnt/boot/grub/grub.cfg << 'EOF'
-# ---------------------------------------------------------
-# LankeOS GRUB Configuration
-# ---------------------------------------------------------
-
-# Load basic modules
-insmod part_gpt
-insmod part_msdos
-insmod fat
-insmod iso9660
-insmod ext2
-
-# Video output
-insmod all_video
-insmod video_bochs
-insmod video_cirrus
-insmod gfxterm
-
-# Basic display settings
-terminal_input console
-terminal_output console
-
-# Timeout and defaults
-set timeout=10
-set default=0
-set menu_color_normal=white/black
-set menu_color_highlight=black/light-gray
-
-# ---------------------------------------------------------
-# Boot Entries
-# ---------------------------------------------------------
-
-menuentry "LankeOS" --class lankeos --class gnu-linux {
-    echo "Loading LankeOS Kernel..."
-    linux /boot/vmlinuz-lanke rw loglevel=3 console=ttyS0 console=tty1
-
-    echo "Loading LankeOS Initramfs..."
-    initrd /boot/initrd.img
-}
-
-menuentry "Reboot System" {
-    reboot
-}
-
-menuentry "Power Off" {
-    halt
-}
-EOF
-```
-
-> Unlike live mode, the installed system runs **without** the `live` parameter. This tells initramfs to skip live-specific steps like password clearing, auto-login injection, and installer execution. If a `LANKE_DATA` partition is present, initramfs will automatically mount it as an OverlayFS upper directory for persistence.
-
-## Persistent Storage
-
-To use persistent storage on a Live USB (retaining changes after reboot):
-
-1. Create a second partition on the USB drive with label `LANKE_DATA`
-2. Format as ext4
-3. The system will automatically detect it and mount it as the OverlayFS upper directory on boot
-
-```bash
-# Example: create a persistence partition on /dev/sda
-# First create the second partition
-gdisk /dev/sda
-# Then format it
 mkfs.ext4 -L LANKE_DATA /dev/sda2
 ```
 
@@ -155,15 +52,17 @@ mkfs.ext4 -L LANKE_DATA /dev/sda2
 
 ### Cannot enter graphical environment after boot
 
-Check graphics driver support:
+Check whether the graphics driver loaded:
 
 ```bash
-# View system logs
+# Look for DRM drivers in the kernel log
 journalctl -b | grep -i "drm\|i915\|amdgpu\|nouveau"
 
 # Check session type
 loginctl show-session <SESSION_ID> -p Type
 ```
+
+LankeOS uses open-source driver stacks for all three GPU vendors: `iris` for Intel, `radeonsi` for AMD, and `nouveau`/NVK for NVIDIA (including GSP firmware on Ada and newer), so no proprietary driver is needed.
 
 ### Wi-Fi not connecting
 

@@ -16,6 +16,13 @@ using json = nlohmann::json;
 class SymlinkLogicTest : public ::testing::Test
 {
 protected:
+    /// 读整个文件（本文件要比对两份内容是否逐字节相同）
+    static std::string read_file(const std::filesystem::path& p)
+    {
+        std::ifstream f(p);
+        return {std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
+    }
+
     void Set_Up_Test_Env(const std::string& root_name)
     {
         // Use /tmp to avoid polluting project root
@@ -142,6 +149,18 @@ TEST_F(SymlinkLogicTest, HandlesConfigSymlinkConflict)
 
     ASSERT_NO_THROW(task.copy_package_files());
 
-    EXPECT_TRUE(fs::is_symlink(lpkgnew_path));
-    EXPECT_EQ(fs::read_symlink(lpkgnew_path), "/usr/lib/os-release");
+    // **类型变化**（盘上是普通文件、包内是符号链接）→ 原物改名 `<路径>.lpkgsave`，
+    // 新链接**就地**落位（2026-09-26 统一；改前是"链接一律按配置冲突退 `.lpkgnew`、原文件
+    // 留原样"）。这是直连写入趟的**回退路径**（无记录 ⇒ 没有让开趟），所以那次改名由写入趟
+    // 自己按表的 `let_go = SaveConfig` 补做。
+    EXPECT_TRUE(fs::is_symlink(conf_phys)) << "新链接应当**就地**落 /etc/os-release";
+    EXPECT_EQ(fs::read_symlink(conf_phys), "/usr/lib/os-release");
+    const fs::path save = test_root / "etc/os-release.lpkgsave";
+    ASSERT_TRUE(fs::is_regular_file(save)) << "原物（盘上那份普通文件）应当整份改名到 .lpkgsave";
+    EXPECT_EQ(read_file(save), "old release") << ".lpkgsave 里必须逐字节是原来那份";
+
+    // 先前就存在的那份**陈旧 `.lpkgnew`** 不关本格的事（类型变化不再往 `.lpkgnew` 落），
+    // 谁也没碰它 —— 既不是链接、内容也一字未改。
+    EXPECT_FALSE(fs::is_symlink(lpkgnew_path)) << "类型变化不该往 .lpkgnew 落东西";
+    EXPECT_EQ(read_file(lpkgnew_path), "stale new file") << "无关的陈旧残留不该被动";
 }

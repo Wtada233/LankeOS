@@ -148,6 +148,12 @@ namespace
 /**
  * 从缓存的仓库索引文件构建反向依赖图
  * 只考虑每个包的最新版本，返回: 被依赖的包 -> {直接依赖它的包集合}
+ *
+ * **索引行解析走 `parse_repo_index_line`（base/utils.cpp，唯一实现）**：这里曾有一套
+ * 自己的解析器，要求版本块 ≥5 字段，而 `repository.cpp` 有意容忍 4 字段（旧/部分写入器
+ * 把 provides 写在 vh[3]、不写 needed_so）。后果是 4 字段的索引行在这里被**整行丢掉**
+ * → 反向依赖图缺一整类边 → `lpkg depend remove` / `depend abibreak` 静默报
+ * "无受影响包"（给的是错误答案，不是报错）。切分逻辑不再有任何第二份。
  */
 std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revdep_map()
 {
@@ -155,7 +161,7 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
 
     // 优先读取远程缓存索引（下载到临时目录的）
     fs::path idx = Config::get_tmp_dir() / constants::REPO_INDEX_TMP;
-    if (!fs::exists(idx)) {
+    if (!exists_follow(idx)) {
         // 回退到本地镜像的索引文件
         try {
             std::string mirror_url = Config::instance().get_mirror_url();
@@ -167,33 +173,31 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
             return rev;
         }
     }
-    if (!fs::exists(idx)) return rev;
+    if (!exists_follow(idx)) return rev;
 
     // 第一遍：读入行 + 建 SONAME → 提供者 反图（needed_so 反查依赖需要它）
+    // 每个包只取**版本号最大**的那个版本块（= repository.cpp 排序后的"最新版"；
+    // 曾取索引里的**最后一块**，那只是写入顺序，不是版本序）。
     std::vector<std::pair<std::string, std::string>> name_needed;  // (包名, needed_so 字段)
     std::unordered_map<std::string, std::unordered_set<std::string>> soname_provider;
+    std::unordered_map<std::string, RepoIndexVersionBlock> latest;
     std::ifstream f(idx);
     std::string line;
     while (std::getline(f, line)) {
-        if (line.empty() || line[0] == '#') continue;
-        if (line.back() == '\r') line.pop_back();
-        auto parts = split_string_view(line, constants::PIPE_CHAR);
-        if (parts.size() < 2) continue;
+        for (auto& b : parse_repo_index_line(line)) {
+            auto it = latest.find(b.name);
+            if (it == latest.end() || version_compare(it->second.version, b.version))
+                latest[b.name] = std::move(b);  // 无版本 / 更旧 → 换成新的
+        }
+    }
 
-        std::string name(parts[0]);
-        auto blocks = split_string_view(parts[1], constants::SEMICOLON_CHAR);
-        if (blocks.empty()) continue;
-        // 取最后一个版本块（最新版本）作为依赖分析的依据
-        auto vh = split_string_view(blocks.back(), constants::COLON_CHAR);
-        if (vh.size() < 5) continue;  // 需要 provides(vh[3]) 和 needed_so(vh[4])
-
-        name_needed.emplace_back(name, std::string(vh[4]));
-        for (auto s : split_string_view(vh[3], constants::COMMA_CHAR)) {
+    for (const auto& [name, b] : latest) {
+        name_needed.emplace_back(name, b.needed_so);
+        for (auto s : split_string_view(b.provides, constants::COMMA_CHAR)) {
             if (s.empty()) continue;
-            std::string key(s);
             // **同一 SONAME 可能有多个提供者**（捆绑/私有 .so）。此前只记第一个 →
             // 反向图只连到一个提供者，删除/ABI 影响面会被少算一半（TODO 低危项）
-            soname_provider[key].insert(name);
+            soname_provider[std::string(s)].insert(name);
         }
     }
 

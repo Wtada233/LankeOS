@@ -41,18 +41,25 @@ sudo lanke_install
 
 | 硬件 | 最低配置 | 推荐配置 |
 |------|---------|---------|
-| CPU | x86_64, 单核 | Intel Core i3 或同等 |
-| 内存 | 300 MiB | 4 GiB+ |
-| 存储 | 1 GiB | 10 GiB+ |
-| 显卡 | 支持 KMS/DRM | Intel / AMD GPU |
-| UEFI | 64位 UEFI | 64位 UEFI |
+| CPU | x86_64-**v3** | Intel Core i3 或同等 |
+| 内存 | 128 MiB（仅基础系统） | 2 GiB+（KDE 桌面） |
+| 存储 | 4 GiB | 10 GiB+ |
+| 显卡 | 支持 KMS/DRM | Intel / AMD / NVIDIA |
+| UEFI | 64 位 UEFI | 64 位 UEFI |
+
+> **关于这几项要求**
+>
+> - **CPU 需要支持 x86-64-v3**（AVX2 / FMA / BMI 等）：所有软件包都以 `-march=x86-64-v3` 构建，覆盖 2013 年后的绝大多数 x86-64 机器（Intel Haswell 及以后、AMD Excavator 及以后）。不支持 v3 的老 CPU 不保证能运行。
+> - **内存取决于你跑什么桌面**：仅基础系统（无图形）约 **128 MiB** 即可启动；niri 等轻量 Wayland 合成器 + 基本 GUI 需要 **300 MiB 以上**；KDE Plasma 完整桌面建议 **2 GiB 以上**。上表"推荐"一列按 KDE 桌面给出。
+> - **存储的最低 4 GiB** 来自安装器固定的启动分区大小——`live/rootfs.sfs`（约 1.5 GB）必须与内核放在同一分区上；如需持久化存储还需额外空间。
+> - **显卡三厂商全部走开源驱动栈**：Intel（`iris`）、AMD（`radeonsi`）、NVIDIA（`nouveau` / NVK，含 Ada 及以后的 GSP 固件），无需闭源驱动。
 
 > 更多版本信息请查看 [发布历史](/releases)。
 
 ## 软件包仓库
 
-LankeOS 使用腾讯云 COS 作为软件包分发后端：
+仓库地址：
 
 ```
-Repository: https://lankerepo.wtada233.top/x86_64
+https://lankerepo.wtada233.top/x86_64
 ```

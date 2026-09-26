@@ -8,6 +8,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "op_sink.hpp"
 #include "repo/repository.hpp"
 
 /// 安装计划：已解析完毕、待安装的包
@@ -156,6 +157,17 @@ private:
     void ensure_dependencies_satisfied(InstallContext& ctx);
     void check_for_file_conflicts(InstallContext* ctx = nullptr);
     void backup_existing_files();
+    /**
+     * 让开趟（后半，第②b 步）：移除**旧版本不再提供**的触碰面 ——
+     * 废弃普通文件/符号链接搬进 stash（WAL `REMOVE_OLD`）、`/etc` 废弃条目只撤所有权与配置
+     * 记录（**不搬、不删**）、废弃目录空则 `rmdir`（WAL `DIR_RM`）。定义在
+     * `installation_task_letgo.cpp`。
+     *
+     * 原先是个自由函数、五个入参（包名 / 新旧版本 / 临时目录 / stash 记账）—— 那五个恰好就是
+     * 本类的成员（唯一调用点就是 `run()` 里原样传进来），拆 TU 时收回成成员（**只改形参来源，
+     * 判据 / WAL 行 / 回滚方式一律未变**）。
+     */
+    void remove_obsolete_files();
     void commit_without_file_ops();
     void register_package();
     /// 把归档 hooks/ 里的脚本落进 hooks_dir/<pkg>/。**不含执行**：postinst 只在批次
@@ -177,6 +189,14 @@ private:
     std::vector<std::string> hook_files_;  // 本次写入的 hook 文件名（提交后据此剪枝）
     /// run() 是否真的处理过本包（早退分支保持 false，见 did_process()）
     bool processed_ = false;
+    /**
+     * 本 task 的「路径事实」记录表：让开趟 probe 一次并记事实，写入趟**逐字复用**，
+     * 记事实，写入趟**逐字复用**，两趟查决策表时看到同一份 `PathFacts`。
+     *
+     * 刻意是**成员**而不是函数级静态表：生命周期 = 一个 task ⇒ 同一进程里先后处理同名包
+     * （批量安装 / 依赖递归里重名 / 先卸后装）在结构上不可能互相清踩。详见 op_sink.hpp。
+     */
+    detail::ProbeLedger probe_ledger_;
 };
 
 /// 公共 API：安装包

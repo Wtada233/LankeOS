@@ -16,6 +16,7 @@
 #include "packer.hpp"
 #include "pkg/package_manager.hpp"
 #include "repo/repository.hpp"
+#include "strip.hpp"  // strip_binary（原住 base/utils.hpp，2026-09-26 挪回本层）
 #include "vercmp/dep_parser.hpp"
 
 namespace fs = std::filesystem;
@@ -118,7 +119,12 @@ void finalize_staging(const fs::path& staging_root, bool no_strip)
     for (auto it = fs::recursive_directory_iterator(staging_root, ec);
          it != fs::recursive_directory_iterator(); it.increment(ec)) {
         if (ec) break;
-        if (it->is_regular_file() && it->path().extension() == constants::EXT_LA) {
+        // 判定走**不抛**形态（见 base/utils.hpp 的谓词族）：`directory_entry::is_regular_file()`
+        // 走 `status()`（**跟随**末段链接），而这里扫的是**构建 staging = 包内容** —— 源码树里
+        // 有一个符号链接环（上游自指链接很常见）就会抛 ELOOP，把整个构建打死。
+        std::error_code fec;
+        if (it->path().extension() == constants::EXT_LA && fs::is_regular_file(it->path(), fec) &&
+            !fec) {
             fs::remove(it->path(), ec);
         }
     }
@@ -126,9 +132,13 @@ void finalize_staging(const fs::path& staging_root, bool no_strip)
     if (!no_strip) {
         log_info(get_string("info.stripping_binaries"));
         fs::path usr_root = staging_root / constants::USR;
-        if (fs::exists(usr_root) && fs::is_directory(usr_root)) {
+        // 同上：`is_directory_follow` 是不抛的跟随语义判定（`exists && is_directory` 的等价形）
+        if (is_directory_follow(usr_root)) {
             for (const auto& entry : fs::recursive_directory_iterator(usr_root)) {
-                if (!entry.is_regular_file() || entry.is_symlink()) continue;
+                // `is_symlink()` 放前面**短路**，`is_regular_file` 用不抛形态：staging 里的环
+                // 同样不该把构建打死。语义不变 —— 符号链接一律跳过，只 strip 普通文件。
+                std::error_code fec;
+                if (entry.is_symlink() || !fs::is_regular_file(entry.path(), fec) || fec) continue;
 
                 // 对 ELF（可执行/共享库）和 ar 归档（静态库 .a）进行 strip
                 bool is_strippable = false;
@@ -163,7 +173,8 @@ void finalize_staging(const fs::path& staging_root, bool no_strip)
 
     fs::remove(staging_root / "usr/share/info/dir", ec);
 
-    if (fs::exists(staging_root / constants::USR / constants::LIB)) {
+    // 不抛判定（staging 是包内容；环不该打断构建）
+    if (exists_follow(staging_root / constants::USR / constants::LIB)) {
         log_info(get_string("info.generating_soname_links"));
         try {
             apply_soname_links(staging_root / constants::USR / constants::LIB);
@@ -187,26 +198,21 @@ void cleanup_build([[maybe_unused]] const fs::path& build_dir, const fs::path& w
     }
 }
 
-}  // anonymous namespace
+// ── run_build 的零件（2026-09-26 从 172 行的函数里按构建阶段抽出）───────────────
+// 全都是**纯搬移**：语句、顺序、日志、异常与清理行为与抽之前逐行一致。
 
-// =====================================================================
-// 公开 API
-// =====================================================================
+/** 解析并校验过的构建元数据（run_build 后续各阶段只读）。 */
+struct BuildMetadata {
+    fs::path json_path;
+    fs::path script_path;
+    BuildConfig cfg;
+    std::string effective_version;
+    build_defaults::BuildFlags flags;
+};
 
-/**
- * 执行完整的包构建流程：
- * 1. 解析 LankeBUILD.json 配置
- * 2. 准备构建目录结构和 UsrMerge 符号链接
- * 3. 下载并解压源码
- * 4. 检测源码树结构
- * 5. 处理构建脚本并执行各构建阶段（prepare/build/package）
- * 6. 后处理：strip、清理 libtool 文件、生成 SONAME 链接
- * 7. 打包为 .lpkg 文件
- * 8. 清理临时文件
- */
-void run_build(const fs::path& build_dir)
+/** 阶段 1：校验 LankeBUILD/LankeBUILD.json 存在、解析元数据、算有效版本号与构建标志。 */
+BuildMetadata resolve_build_metadata(const fs::path& build_dir)
 {
-    // 1. 解析元数据
     fs::path json_path = build_dir / constants::LANK_BUILD_JSON;
     fs::path script_path = build_dir / constants::LANK_BUILD_SCRIPT;
 
@@ -241,6 +247,169 @@ void run_build(const fs::path& build_dir)
         log_info(string_format("info.auto_generated_man", cfg.name));
     }
 
+    return {json_path, script_path, cfg, effective_version, flags};
+}
+
+/** 阶段 4.5：安装构建时依赖（支持版本约束 "cmake >= 3.20"）。 */
+void install_build_deps(const BuildConfig& cfg)
+{
+    if (cfg.build_deps.empty()) {
+        return;
+    }
+    log_info(string_format("info.checking_deps", cfg.name));
+    // 解析版本约束为 name:version 格式
+    std::vector<std::string> resolved;
+    auto parsed = detail::parse_dep_strings(cfg.build_deps);
+    Repository repo;
+    repo.load_index();
+    for (const auto& dep : parsed) {
+        std::string arg = dep.name;
+        if (!dep.constraints.empty()) {
+            if (auto match = repo.find_best_matching_version(dep.name, dep.constraints)) {
+                arg += ":" + match->version;
+            } else {
+                arg += ":" + dep.constraints[0].version;
+            }
+        }
+        resolved.push_back(arg);
+    }
+    // 在 -n 模式下，如果有 build_deps 则拒绝构建
+    if (Config::instance().non_interactive_mode() == NonInteractiveMode::NO) {
+        throw LpkgException(get_string("error.build_deps_refused_n"));
+    }
+    install_packages(resolved, "", false);
+}
+
+/** 阶段 4.75：autohacks —— 执行构建前的环境修补脚本（`hacks.sh`，不存在则什么都不做）。 */
+void run_autohacks(const fs::path& json_path)
+{
+    fs::path hacks_path = json_path.parent_path() / "hacks.sh";
+    if (!fs::exists(hacks_path)) {
+        return;
+    }
+    log_info(string_format("info.autohacks_found", hacks_path.string()));
+
+    // 读取并显示脚本内容
+    std::ifstream hacks_file(hacks_path);
+    std::string hacks_content((std::istreambuf_iterator<char>(hacks_file)),
+                              std::istreambuf_iterator<char>());
+    std::cout << "─────────────────────────────────────────\n";
+    std::cout << hacks_content << "\n";
+    std::cout << "─────────────────────────────────────────\n";
+
+    auto& cfg_ref = Config::instance();
+    bool should_run = false;
+    switch (cfg_ref.non_interactive_mode()) {
+        case NonInteractiveMode::YES:
+            should_run = true;
+            break;
+        case NonInteractiveMode::NO:
+            should_run = false;
+            log_info(get_string("info.autohacks_skipped"));
+            break;
+        case NonInteractiveMode::INTERACTIVE:
+        default:
+            should_run = user_confirms(get_string("prompt.autohacks_run"));
+            break;
+    }
+
+    if (should_run) {
+        log_info(get_string("info.autohacks_running"));
+        std::string cmd = "bash \"" + hacks_path.string() + "\"";
+        int rc = std::system(cmd.c_str());
+        if (rc != 0) {
+            throw LpkgException(string_format("error.autohacks_failed", rc));
+        }
+        log_info(get_string("info.autohacks_done"));
+    }
+}
+
+/** 阶段 5：替换占位符写出构建脚本，依次执行 prepare/build/package 三个阶段。 */
+void run_build_phases(const fs::path& build_dir, const BuildMetadata& meta, const BuildConfig& cfg,
+                      const fs::path& work_root, const fs::path& actual_work_dir,
+                      const fs::path& staging_root, const fs::path& staging_hooks)
+{
+    auto vars = build_variable_map(cfg, work_root, actual_work_dir, staging_root, staging_hooks,
+                                   meta.effective_version, meta.flags);
+    fs::path processed_script = build_dir / constants::LANK_BUILD_PROCESSED;
+    // 用原子写助手（写 .tmp → 检查 → fsync → rename）：裸 ofstream 在磁盘满时会
+    // 静默产出**截断的构建脚本**，随后被 source 执行 —— 失败方式极难定位。
+    write_string_to_file(processed_script, process_build_script(meta.script_path, vars));
+
+    try {
+        execute_build_phase("lankebuild_prepare", actual_work_dir, processed_script, meta.flags);
+        execute_build_phase("lankebuild_build", actual_work_dir, processed_script, meta.flags);
+        execute_build_phase("lankebuild_package", actual_work_dir, processed_script, meta.flags);
+    } catch (...) {
+        fs::remove(processed_script);
+        throw;
+    }
+    fs::remove(processed_script);
+}
+
+/**
+ * 阶段 6.5：移除 USR-Merge 兼容符号链接（除非 keep_fs_layout=true）。
+ * 这些链接是构建阶段的辅助设施，不应打包入包：
+ *       Builder 在 setup_build_directories() 中创建这些链接使构建脚本能够
+ *       向 bin/、lib/ 等路径安装文件（实际写入 usr/bin/、usr/lib/）。
+ *       现在打包前清理它们，避免每个包都声称"拥有"这些系统级符号链接，
+ *       从而导致卸载时因"文件被其他包共享"而拒绝移除。
+ *       若 LankeBUILD.json 中 keep_fs_layout=true，则保留这些符号链接
+ *       并将其一并打包（用于需要真正声明该文件布局的包）。
+ */
+void remove_usr_merge_symlinks(const fs::path& staging_root)
+{
+    for (const auto& link :
+         {staging_root / constants::BIN, staging_root / constants::SBIN,
+          staging_root / constants::LIB, staging_root / constants::LIB64,
+          staging_root / constants::USR_SBIN, staging_root / constants::USR_LIB64}) {
+        std::error_code ec;
+        if (fs::is_symlink(link, ec) || (!ec && fs::exists(link))) {
+            fs::remove(link, ec);
+        }
+    }
+}
+
+/**
+ * 阶段 7 的产物文件名：name/version 来自配方 JSON（可被 LankeBUILD.json 直接控制），
+ * 未校验就拼进相对路径会让 `"name": "../x"` 把 .lpkg 写到构建目录之外。
+ */
+std::string output_package_filename(const BuildConfig& cfg, const std::string& effective_version)
+{
+    if (!is_safe_path_component(cfg.name) || !is_safe_path_component(effective_version)) {
+        throw LpkgException(string_format("error.unsafe_path_component", "package name",
+                                          cfg.name + " / " + effective_version));
+    }
+    return cfg.name + "-" + effective_version + std::string(constants::EXT_LPKG);
+}
+
+}  // anonymous namespace
+
+// =====================================================================
+// 公开 API
+// =====================================================================
+
+/**
+ * 执行完整的包构建流程：
+ * 1. 解析 LankeBUILD.json 配置（校验存在性 + 有效版本号 + 构建标志 + man 内容）
+ * 2. 准备构建目录结构和 UsrMerge 符号链接
+ * 3. 下载并解压源码
+ * 4. 安装构建时依赖 → autohacks → 检测源码树结构
+ * 5. 处理构建脚本并执行各构建阶段（prepare/build/package）
+ * 6. 后处理：strip、清理 libtool 文件、生成 SONAME 链接、移除 UsrMerge 辅助链接
+ * 7. 打包为 .lpkg 文件
+ * 8. 清理临时文件
+ *
+ * 每一步的实现在上方匿名命名空间里同名的小函数（`resolve_build_metadata` /
+ * `install_build_deps` / `run_autohacks` / `run_build_phases` / `remove_usr_merge_symlinks` /
+ * `output_package_filename`），本函数只负责把它们按顺序串起来。
+ */
+void run_build(const fs::path& build_dir)
+{
+    // 1. 解析元数据（校验 + 有效版本号 + 构建标志 + man 内容）
+    const BuildMetadata meta = resolve_build_metadata(build_dir);
+    const BuildConfig& cfg = meta.cfg;
+
     // 2. 准备目录
     fs::path work_root = build_dir / constants::DIR_WORK;
     fs::path staging_root = build_dir / constants::DIR_CONTENT;
@@ -250,128 +419,30 @@ void run_build(const fs::path& build_dir)
     auto downloaded =
         download_and_prepare_sources(cfg.sources, cfg.work_sources, build_dir, work_root);
 
-    // 4. 检测源码树
-    // 4.5. 安装构建时依赖（支持版本约束 "cmake >= 3.20"）
-    if (!cfg.build_deps.empty()) {
-        log_info(string_format("info.checking_deps", cfg.name));
-        // 解析版本约束为 name:version 格式
-        std::vector<std::string> resolved;
-        auto parsed = detail::parse_dep_strings(cfg.build_deps);
-        Repository repo;
-        repo.load_index();
-        for (const auto& dep : parsed) {
-            std::string arg = dep.name;
-            if (!dep.constraints.empty()) {
-                if (auto match = repo.find_best_matching_version(dep.name, dep.constraints)) {
-                    arg += ":" + match->version;
-                } else {
-                    arg += ":" + dep.constraints[0].version;
-                }
-            }
-            resolved.push_back(arg);
-        }
-        // 在 -n 模式下，如果有 build_deps 则拒绝构建
-        if (Config::instance().non_interactive_mode() == NonInteractiveMode::NO) {
-            throw LpkgException(get_string("error.build_deps_refused_n"));
-        }
-        install_packages(resolved, "", false);
-    }
+    // 4. 安装构建时依赖（版本约束见 install_build_deps）
+    install_build_deps(cfg);
 
-    // 4.75. autohacks — 执行构建前的环境修补脚本
-    {
-        fs::path hacks_path = json_path.parent_path() / "hacks.sh";
-        if (fs::exists(hacks_path)) {
-            log_info(string_format("info.autohacks_found", hacks_path.string()));
+    // 4.5. autohacks —— 执行构建前的环境修补脚本
+    run_autohacks(meta.json_path);
 
-            // 读取并显示脚本内容
-            std::ifstream hacks_file(hacks_path);
-            std::string hacks_content((std::istreambuf_iterator<char>(hacks_file)),
-                                      std::istreambuf_iterator<char>());
-            std::cout << "─────────────────────────────────────────\n";
-            std::cout << hacks_content << "\n";
-            std::cout << "─────────────────────────────────────────\n";
-
-            auto& cfg_ref = Config::instance();
-            bool should_run = false;
-            switch (cfg_ref.non_interactive_mode()) {
-                case NonInteractiveMode::YES:
-                    should_run = true;
-                    break;
-                case NonInteractiveMode::NO:
-                    should_run = false;
-                    log_info(get_string("info.autohacks_skipped"));
-                    break;
-                case NonInteractiveMode::INTERACTIVE:
-                default:
-                    should_run = user_confirms(get_string("prompt.autohacks_run"));
-                    break;
-            }
-
-            if (should_run) {
-                log_info(get_string("info.autohacks_running"));
-                std::string cmd = "bash \"" + hacks_path.string() + "\"";
-                int rc = std::system(cmd.c_str());
-                if (rc != 0) {
-                    throw LpkgException(string_format("error.autohacks_failed", rc));
-                }
-                log_info(get_string("info.autohacks_done"));
-            }
-        }
-    }
-
+    // 4.75. 检测源码树（放在最后：构建时依赖与 autohacks 都可能改动 work_root）
     auto actual_work_dir = detect_source_tree(work_root);
 
-    // 5. 处理脚本并执行构建阶段
-    auto vars = build_variable_map(cfg, work_root, actual_work_dir, staging_root, staging_hooks,
-                                   effective_version, flags);
-    fs::path processed_script = build_dir / constants::LANK_BUILD_PROCESSED;
-    // 用原子写助手（写 .tmp → 检查 → fsync → rename）：裸 ofstream 在磁盘满时会
-    // 静默产出**截断的构建脚本**，随后被 source 执行 —— 失败方式极难定位。
-    write_string_to_file(processed_script, process_build_script(script_path, vars));
+    // 5. 处理脚本并执行构建阶段（prepare/build/package）
+    run_build_phases(build_dir, meta, cfg, work_root, actual_work_dir, staging_root, staging_hooks);
 
-    try {
-        execute_build_phase("lankebuild_prepare", actual_work_dir, processed_script, flags);
-        execute_build_phase("lankebuild_build", actual_work_dir, processed_script, flags);
-        execute_build_phase("lankebuild_package", actual_work_dir, processed_script, flags);
-    } catch (...) {
-        fs::remove(processed_script);
-        throw;
-    }
-    fs::remove(processed_script);
-
-    // 6. 后处理
+    // 6. 后处理（strip、清理 libtool 文件、生成 SONAME 链接）
     finalize_staging(staging_root, cfg.no_strip);
 
-    // 6.5. 移除 USR-Merge 兼容符号链接（除非 keep_fs_layout=true）
-    // 默认情况下，这些链接是构建阶段的辅助设施，不应打包入包：
-    //       Builder 在 setup_build_directories() 中创建这些链接使构建脚本能够
-    //       向 bin/、lib/ 等路径安装文件（实际写入 usr/bin/、usr/lib/）。
-    //       现在打包前清理它们，避免每个包都声称"拥有"这些系统级符号链接，
-    //       从而导致卸载时因"文件被其他包共享"而拒绝移除。
-    //       若 LankeBUILD.json 中 keep_fs_layout=true，则保留这些符号链接
-    //       并将其一并打包（用于需要真正声明该文件布局的包）。
+    // 6.5. 打包前移除构建期造的 USR-Merge 辅助符号链接（keep_fs_layout=true 时保留）
     if (!cfg.keep_fs_layout) {
-        for (const auto& link :
-             {staging_root / constants::BIN, staging_root / constants::SBIN,
-              staging_root / constants::LIB, staging_root / constants::LIB64,
-              staging_root / constants::USR_SBIN, staging_root / constants::USR_LIB64}) {
-            std::error_code ec;
-            if (fs::is_symlink(link, ec) || (!ec && fs::exists(link))) {
-                fs::remove(link, ec);
-            }
-        }
+        remove_usr_merge_symlinks(staging_root);
     }
 
     // 7. 打包
     log_info(get_string("info.packing_built_pkg"));
-    std::string output_filename =
-        // name/version 来自配方 JSON（可被 LankeBUILD.json 直接控制）：未校验就拼进
-        // 相对路径会让 `"name": "../x"` 把 .lpkg 写到构建目录之外
-        (is_safe_path_component(cfg.name) && is_safe_path_component(effective_version))
-            ? cfg.name + "-" + effective_version + std::string(constants::EXT_LPKG)
-            : throw LpkgException(string_format("error.unsafe_path_component", "package name",
-                                                cfg.name + " / " + effective_version));
-    pack_package(output_filename, build_dir.string(), cfg.name, effective_version, cfg.deps,
+    const std::string output_filename = output_package_filename(cfg, meta.effective_version);
+    pack_package(output_filename, build_dir.string(), cfg.name, meta.effective_version, cfg.deps,
                  cfg.provides, cfg.man_content, cfg.needed_so);
     log_info(string_format("info.build_success", output_filename));
 

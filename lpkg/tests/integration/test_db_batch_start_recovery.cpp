@@ -201,7 +201,8 @@ TEST_F(DbBatchStartRecoveryTest, BatchStartIsStillSkippedWhenOfficialFileExists)
 // ============================================================================
 // 同一个崩溃窗口在**真实启动顺序**下的形状：库被 init_filesystem 按空文件重建
 //
-// main.cpp 的启动顺序是 init_filesystem()（约 397 行）→ recover_packages()（约 400 行），
+// CLI 的启动顺序是 init_filesystem() → recover_packages()（main_cli.cpp 的
+// init_database_for()，CLI 拆分前在 main.cpp），
 // 而 init_filesystem 的 ensure_file_exists 会把"消失的"库**按 0 字节重建**（config.cpp）。
 // 于是崩在窗口里的库到恢复时是"存在但空"而不是"不存在" —— 只看 fs::exists 就会把它当成
 // "仍在位"跳过，后果与不修完全一样：空库 + 唯一备份被 cleanup_db_backups 删掉（不可逆）。
@@ -216,7 +217,7 @@ TEST_F(DbBatchStartRecoveryTest, RecreatedEmptyPkgsIsRestoredFromBatchStartBacku
     write_bytes(bak_of(pkgs, ":batch-start"), pre_crash);
     fs::remove(pkgs);
     write_wal("BEGIN_PKGS 3\nDB " + pkgs.string() + " :batch-start\n");
-    // main.cpp 的启动顺序：init_filesystem（ensure_file_exists 把缺库建成空文件）→ 恢复
+    // CLI 的启动顺序：init_filesystem（ensure_file_exists 把缺库建成空文件）→ 恢复
     Config::instance().init_filesystem();
     ASSERT_TRUE(fs::exists(pkgs));
     ASSERT_EQ(read_bytes(pkgs), std::string()) << "前置条件：库已被按空文件重建";
@@ -262,7 +263,7 @@ TEST_F(DbBatchStartRecoveryTest, ConfHashesDbIsPrecreatedAndRestoredFromBatchSta
     write_bytes(bak_of(conf_db, ":batch-start"), pre_crash);
     fs::remove(conf_db);
     write_wal("BEGIN_PKGS 3\nDB " + conf_db.string() + " :batch-start\n");
-    // main.cpp 的启动顺序：init_filesystem（把窗口里消失的库按空文件重建）→ recover_packages
+    // CLI 的启动顺序：init_filesystem（把窗口里消失的库按空文件重建）→ recover_packages
     Config::instance().init_filesystem();
     ASSERT_TRUE(fs::exists(conf_db));
     ASSERT_EQ(read_bytes(conf_db), std::string()) << "前置条件：库已被按空文件重建";

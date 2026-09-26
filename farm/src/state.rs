@@ -2,9 +2,12 @@
 //!
 //! 心智模型：**容器易失，repo 持久，SQLite 记账**。
 //! - job 队列 / 构建历史 / 配方 hash：跨运行持久，供 operator 用 `--state` 查看与排查；
-//! - ⚠️ 当前只有写端（`set_job`/`record_build`），`job_recipe_hash`/`list_by_status` 等读端
-//!   尚无调用方：**"配方 hash 变化自动 requeue"尚未实现**。BLOCKED 包的续跑目前靠 operator
-//!   手动 `farm build <pkg>` 重跑。若将来实现差分 requeue，读端已就绪。
+//! - 读端（`job_recipe_hash`/`list_by_status`）当前无调用方，**这是架构使然、不是缺口**：
+//!   farm 是批式 CLI 而非常驻 daemon，所以"配方 hash 变了就重建"由
+//!   `recipe_hash` + `.build_ok` + `farm validate` 在**每次运行时**评估
+//!   （`build::has_build_ok`），无需按 job 状态在后台 requeue。
+//!   读端只在将来出现"常驻监听 / 重启后按 job 状态续跑"的形态时才有用武之地。
+//!   BLOCKED 包的续跑靠 operator 手动 `farm build <pkg>` 重跑。
 //!   注意失败路径（source 缺失 / repack / repo / index 失败）也会 `set_job(Blocked)` 落库，
 //!   避免 job 永久停在 Building。
 

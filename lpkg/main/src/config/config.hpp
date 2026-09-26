@@ -131,6 +131,29 @@ public:
     {
         return conf_hashes_db_;
     }
+    /**
+     * xattr 键归属数据库（`<逻辑路径>\x1f<base64 键>` → **属主包名集合**）。
+     *
+     * 记录"**哪个包在这个目录上声明过这个 xattr 键**"，供升级/移除时判断"这个键还该不该在"。
+     * 为什么需要它（而不是照 `files.db` 那样只记路径）：xattr 是**按目录共用**的 —— 一个目录
+     * 被多个包持有、每个包各自声明自己那几个键，所以撤销时的判据必须是"**这个键**还有没有
+     * 别的属主"，而不是"这个目录还有没有别的属主"（后者会让 A 包撤掉 B 包的键）。
+     *
+     * **只记目录**（普通文件的 xattr 随"`.lpkgtmp` + rename"进新对象，不存在陈旧键问题）。
+     *
+     * **不能并进 `files.db`**：那里的键是**裸路径**，取值是属主集合，而这里每个目录会有
+     * 多行（每个键一行）、键里还带 base64 —— 混在一起会让 `get_file_owners()` 把
+     * `"<路径>\x1f<b64>"` 当成另一个路径。
+     *
+     * 键里的分隔符用 `\x1f`（US，控制字符）：归档成员名消毒已经挡掉了 `\n`/`\r`/`\0` 与
+     * 字面 `" → "`，但**没挡控制字符**，所以写入侧还要额外拒绝"路径里含 `\x1f` 或 `\t`"
+     * 的条目（`\t` 会破 DB 格式本身 —— 与 `files.db` 同一个约束）——见 cache 的
+     * `add_xattr_key_owner()`。
+     */
+    const std::filesystem::path& xattr_keys_db() const noexcept
+    {
+        return xattr_keys_db_;
+    }
     /** 互斥锁文件路径 */
     const std::filesystem::path& lock_file() const noexcept
     {
@@ -254,6 +277,7 @@ private:
     std::filesystem::path files_db_;        // 文件归属数据库
     std::filesystem::path provides_db_;     // providers 数据库
     std::filesystem::path conf_hashes_db_;  // 配置文件哈希数据库（升级三哈希分流的 hash_orig）
+    std::filesystem::path xattr_keys_db_;   // xattr 键归属数据库（撤销"本包不再声明"的键）
     std::filesystem::path lock_file_;       // 互斥锁文件
 
     // --- 模式成员 ---------------------------------------------------------

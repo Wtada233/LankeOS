@@ -18,9 +18,12 @@
  *   ④ 布尔默认值：不给 `--purge-config` / `--fsync` 时为 false。
  *
  * 覆盖边界（明确不测、别当已覆盖）：`--purge-config` → `remove_packages(..., purge_config)`
- * 的**派发**在 main.cpp 的 handle_command 命令分支里，测试二进制够不到（main.cpp 有自己的
- * main()）。本套件只钉"能被解析、默认值可无条件读"——而这正是那行派发代码
- * （`result["purge-config"].as<bool>()`，不带 count 判断）的前提。
+ * 的**派发**在 main/src/main_cli.cpp 的 handle_command 命令分支里。
+ * （订正 2026-09-26：此处原写"测试二进制够不到，因为 main.cpp 有自己的 main()"—— 那个
+ * 理由已不成立：分派路径随 main_cli.cpp 进了 LPKG_OBJS ⇒ 进了测试二进制，端到端的
+ * 分派层用例在 tests/unit/test_cli_dispatch.cpp。本套件仍然只钉"能被解析、默认值可
+ * 无条件读"——而这正是那行派发代码（`result["purge-config"].as<bool>()`，不带 count
+ * 判断）的前提，两者互补不重复。）
  *
  * 夹具：覆盖豁免模式与 durable fsync 都是**进程级**全局状态（别的套件依赖其默认值：
  * test_overwrite_globs.cpp 从"什么都不豁免"起、test_durable_fsync_db.cpp 依赖默认关），
@@ -43,7 +46,7 @@ namespace
 /**
  * 用真实 argv 数组走一遍解析（等价 main() 里的 `options.parse(argc, argv)`）。
  *
- * 只注册 install/remove 组选项（本轮 4 个开关都在这一组）。main.cpp 随后注册的位置参数
+ * 只注册 install/remove 组选项（本轮 4 个开关都在这一组）。main_cli.cpp 随后注册的位置参数
  * （command/packages）不在这里：本套件测的是"选项名能被识别 + 解析结果落到 Config"，
  * 位置参数与这两件事无关（且不注册位置参数时 cxxopts 只把它们收进 unmatched，不报错）。
  */

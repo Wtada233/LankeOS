@@ -46,6 +46,96 @@ static std::vector<std::string> split_dep_field(std::string_view deps_sv)
 }
 
 /**
+ * 定位仓库索引文件：本地镜像（file:// 或裸路径）直接拼路径，远程镜像下载到临时目录。
+ *
+ * 三种失败都发**各自**的告警并返回 nullopt —— 它们的文案不同（配置/下载/不存在），但都只
+ * 意味着"本次没有索引可用"，与"索引文件存在却打不开"（硬失败，见 load_index）不同类。
+ */
+static std::optional<std::filesystem::path> resolve_index_path()
+{
+    // 读取镜像地址（可能为本地路径或 http URL）
+    std::string mirror;
+    try {
+        mirror = Config::instance().get_mirror_url();
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.repo_mirror_config", e.what()));
+        return std::nullopt;
+    }
+    std::string arch = Config::instance().get_architecture();
+
+    bool is_local = mirror.find(constants::PROTOCOL_FILE) == 0 || mirror.find("/") == 0;
+
+    try {
+        std::filesystem::path index_path;
+        if (is_local) {
+            std::string path_str =
+                (mirror.find(constants::PROTOCOL_FILE) == 0) ? mirror.substr(7) : mirror;
+            index_path = std::filesystem::path(path_str) / arch / constants::REPO_INDEX_FILE;
+        } else {
+            std::string url = mirror + arch + "/" + std::string(constants::REPO_INDEX_FILE);
+            index_path = Config::get_tmp_dir() / constants::REPO_INDEX_TMP;
+            download_file(url, index_path, false);
+        }
+        // 判定用不抛的 exists_follow：索引路径若被一个符号链接环占着，`fs::exists` 会抛
+        // filesystem_error 而不是判"没有索引"（见 base/utils.hpp 的谓词说明）。
+        if (!exists_follow(index_path)) {
+            log_warning(string_format("warning.repo_index_missing", index_path.string()));
+            return std::nullopt;
+        }
+        return index_path;
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.repo_index_download", e.what()));
+        return std::nullopt;
+    }
+}
+
+/** 索引里的一个版本块 → PackageInfo（deps 串含复合约束，交给 split_dep_field 合并） */
+static PackageInfo make_package_info(const RepoIndexVersionBlock& b)
+{
+    PackageInfo pkg;
+    pkg.name = b.name;
+    pkg.version = b.version;
+    pkg.sha256 = b.hash;
+    // b.deps 为空时 split_dep_field 会切出空片段，必须在调用前挡住（同 provides/needed_so）
+    if (!b.deps.empty()) pkg.dependencies = detail::parse_dep_strings(split_dep_field(b.deps));
+    if (!b.provides.empty()) {
+        for (auto prov : split_string_view(b.provides, constants::COMMA_CHAR)) {
+            pkg.provides.push_back(std::string(prov));
+        }
+    }
+    if (!b.needed_so.empty()) {
+        for (auto needed : split_string_view(b.needed_so, constants::COMMA_CHAR)) {
+            pkg.needed_so.push_back(std::string(needed));
+        }
+    }
+    return pkg;
+}
+
+/**
+ * 吸收索引里的一行（该行的**全部**版本块）。
+ *
+ * 每块先记 providers_（provides —— 版本级优先，解析器已回退到包级），再把 PackageInfo
+ * 追加进 packages_ 的该包版本列表。两处顺序与逐行内联时一致，不要调换。
+ */
+void Repository::absorb_index_line(std::string_view line)
+{
+    for (const auto& b : parse_repo_index_line(line)) {
+        // 记录提供者（provides）——版本级优先，解析器已回退到包级
+        if (!b.provides.empty()) {
+            for (auto prov : split_string_view(b.provides, constants::COMMA_CHAR)) {
+                auto& pv = providers_[std::string(prov)];
+                if (pv.empty() || pv.back() != b.name) {
+                    pv.push_back(b.name);
+                }
+            }
+        }
+        // 先构造再索引（两步分开写，避免"索引表已被插入空壳、构造却抛了"这种副作用顺序差）
+        PackageInfo pkg = make_package_info(b);
+        packages_[pkg.name].push_back(std::move(pkg));
+    }
+}
+
+/**
  * 加载仓库索引文件
  * 支持远程（http/https）和本地（file://）两种方式。
  * 远程索引会被下载到临时目录后解析。
@@ -56,121 +146,48 @@ void Repository::load_index()
     packages_.clear();
     providers_.clear();
 
-    // 读取镜像地址（可能为本地路径或 http URL）
-    std::string mirror;
-    try {
-        mirror = Config::instance().get_mirror_url();
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.repo_mirror_config", e.what()));
-        return;
-    }
-    std::string arch = Config::instance().get_architecture();
+    const auto index_path = resolve_index_path();
+    if (!index_path) return;  // 告警已由 resolve_index_path 按各自的失败原因发出
 
-    bool is_local = mirror.find(constants::PROTOCOL_FILE) == 0 || mirror.find("/") == 0;
-    std::filesystem::path index_path;
-
-    try {
-        if (is_local) {
-            std::string path_str =
-                (mirror.find(constants::PROTOCOL_FILE) == 0) ? mirror.substr(7) : mirror;
-            index_path = std::filesystem::path(path_str) / arch / constants::REPO_INDEX_FILE;
-        } else {
-            std::string url = mirror + arch + "/" + std::string(constants::REPO_INDEX_FILE);
-            index_path = Config::get_tmp_dir() / constants::REPO_INDEX_TMP;
-            download_file(url, index_path, false);
-        }
-        if (!std::filesystem::exists(index_path)) {
-            log_warning(string_format("warning.repo_index_missing", index_path.string()));
-            return;
-        }
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.repo_index_download", e.what()));
-        return;
-    }
-
-    // 逐个解析索引行，格式: 包名|版本:哈希:依赖;版本2:哈希2:依赖2|提供者
-    std::ifstream file(index_path);
+    // 逐个解析索引行，格式: 包名|版本:哈希:依赖:提供:needed_so;版本2:...|包级提供
+    //
+    // **字段切分走 base/utils.cpp 的 parse_repo_index_line（唯一实现）**：本函数与
+    // pkg/depend_scanner.cpp 曾各写一份，而那份要求版本块 ≥5 字段 —— 4 字段的行
+    // （provides 在 vh[3]、无 needed_so）在 `depend remove` / `depend abibreak` 里被整行
+    // 丢掉，静默报"无受影响包"。切分逻辑不再有任何第二份。
+    std::ifstream file(*index_path);
     if (!file.is_open()) {
-        // 文件"存在"但打不开（权限/竟是个目录）此前完全静默：解析出 0 个包 → 上层会
-        // 报告"所有包都已是最新版本"，用户以为没事（TODO D4）
-        log_warning(string_format("warning.repo_index_unreadable", index_path.string()));
+        // 文件"存在"但打不开此前完全静默：解析出 0 个包 → 上层会报告"所有包都已是最新版本"，
+        // 用户以为没事（TODO D4）。
+        //
+        // ⚠️ **实测订正 2026-09-26：这条分支几乎不可达，别指望它兜住"索引是目录/损坏"**。
+        //    · "**竟是个目录**"不成立 —— Linux 上 `std::ifstream` **打开目录是成功的**（失败的
+        //      是随后的读），于是目录索引会落到下面"解析出 0 个包"那条告警（`repo_index_empty`）
+        //      上，而不是这里（实测：造一个目录索引，捕获到的是 `repo_index_empty`）。
+        //    · "权限"也挡不住 —— lpkg 永远以 root 跑。
+        //    真正兜住"索引损坏/是目录/被截断"的是下面那条 **`warning.repo_index_empty`**：
+        //    它可达、且是用户可见的那个"不静默"。本分支保留是纵深防御（FIFO/设备之类的怪场景）。
+        //
+        // ⚠️ **这里的处置与 `resolve_index_path()` 的几种失败是同一形状：告警 + 返回（仓库留空、
+        //    不抛）**，不是"中止命令"。（订正 2026-09-26：本行原写"**这是硬失败，不是当空仓库**"
+        //    —— 那句话描述的是**意图**，而实现就是"当空仓库 + 告警"，两者不可区分；这种措辞会让人
+        //    以为改这里会挡住安装。）
+        //    **为什么不抛**：仓库只用于**依赖解析**，本地 `.lpkg` 走 `local_candidates` 那条路 ——
+        //    "仓库连不上/索引坏掉"不该让 `lpkg install ./x.lpkg` 失败（离线装包是常见用法）。
+        //    所以真正的要求不是"硬失败"，而是**绝不静默**：四种取不到索引的情形
+        //    （配置缺失 / 索引不存在 / 下载失败 / 打不开）各发自己的告警键，用户能区分原因。
+        log_warning(string_format("warning.repo_index_unreadable", index_path->string()));
         return;
     }
     std::string line;
-
     while (std::getline(file, line)) {
-        if (line.empty() || line[0] == '#') continue;
-        std::string_view sv = line;
-        if (!sv.empty() && sv.back() == '\r') sv.remove_suffix(1);
-
-        // 格式: 包名|版本:哈希:依赖:提供者:needed_so;版本2:...|
-        auto parts = split_string_view(sv, constants::PIPE_CHAR);
-        if (parts.size() < 2) continue;
-
-        std::string pkg_name(parts[0]);
-        std::string_view version_blocks_sv = parts[1];
-
-        // 旧格式兼容（已移除）：provides/needed_so 在版本块内
-
-        // 一个包可能对应多个版本，用 ';' 分隔
-        for (auto version_info_sv :
-             split_string_view(version_blocks_sv, constants::SEMICOLON_CHAR)) {
-            if (version_info_sv.empty()) continue;
-
-            auto vh_parts = split_string_view(version_info_sv, constants::COLON_CHAR);
-            if (vh_parts.empty()) continue;
-
-            std::string version(vh_parts[0]);
-            std::string hash = (vh_parts.size() > 1) ? std::string(vh_parts[1]) : "";
-            std::string_view deps_sv = (vh_parts.size() > 2) ? vh_parts[2] : "";
-
-            // provides/needed_so 在版本块内（第 4、5 字段），每个版本独立
-            // 版本级 provides（第 4 字段）；为空时回退**包级** provides（每行第 3 字段，
-            // 旧格式/部分写入器会写在那里——此前该字段被完全忽略，能力解析会报"无提供者"）
-            std::string_view ver_prov_sv = (vh_parts.size() > 3) ? vh_parts[3] : std::string_view{};
-            if (ver_prov_sv.empty() && parts.size() > 2) ver_prov_sv = parts[2];
-            std::string_view ver_needed_so_sv =
-                (vh_parts.size() > 4) ? vh_parts[4] : std::string_view{};
-
-            // 解析依赖字符串（复用 vercmp/dep_parser 的统一实现）
-            std::vector<DependencyInfo> deps;
-            if (!deps_sv.empty()) {
-                deps = detail::parse_dep_strings(split_dep_field(deps_sv));
-            }
-
-            // 记录提供者（provides）— 版本级优先，回退到包级
-            if (!ver_prov_sv.empty()) {
-                for (auto prov : split_string_view(ver_prov_sv, constants::COMMA_CHAR)) {
-                    auto& pv = providers_[std::string(prov)];
-                    if (pv.empty() || pv.back() != pkg_name) {
-                        pv.push_back(pkg_name);
-                    }
-                }
-            }
-
-            PackageInfo pkg;
-            pkg.name = pkg_name;
-            pkg.version = version;
-            pkg.sha256 = hash;
-            pkg.dependencies = std::move(deps);
-            if (!ver_prov_sv.empty()) {
-                for (auto prov : split_string_view(ver_prov_sv, constants::COMMA_CHAR)) {
-                    pkg.provides.push_back(std::string(prov));
-                }
-            }
-            if (!ver_needed_so_sv.empty()) {
-                for (auto needed : split_string_view(ver_needed_so_sv, constants::COMMA_CHAR)) {
-                    pkg.needed_so.push_back(std::string(needed));
-                }
-            }
-            packages_[pkg.name].push_back(std::move(pkg));
-        }
+        absorb_index_line(line);
     }
 
     // 解析出 0 个包（空文件/半截下载/全是被跳过的坏行）必须告警：否则上游会把
     // "仓库为空"读成"一切正常"，`lpkg upgrade` 直接打印"所有包都已是最新版本"（TODO D4）
     if (packages_.empty()) {
-        log_warning(string_format("warning.repo_index_empty", index_path.string()));
+        log_warning(string_format("warning.repo_index_empty", index_path->string()));
     }
 
     // 每个包的版本列表按版本号升序排列（最后一个就是最新版）

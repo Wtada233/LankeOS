@@ -9,13 +9,19 @@
  * 跳过；CLEANUP 清完 bak 后没人回头删 → 嵌套第 2 层（licenses/）空壳永久残留，
  * 下游构建自动探测 site-packages 的 dist-info 崩溃。
  *
- * 正确语义（remove 与 upgrade 共用 detail::backup_dir_tree_whole，ARCH.md §3.6）：
- *   目录走独立阶段、**最深优先**，逐目录整树 rename 成单个 .lpkg_bak（CLEANUP 一次
- *   清光）。先决条件是目录此刻已是"纯本包残留"——每个直接子项都是本包 .lpkg_bak
- *   （更深的本包目录先被整树 rename 成 bak）。**任何非本包残留**（无主文件/目录、
- *   lpkg 自身状态目录、保留的 conffile、其他包文件）都会让整树保留，绝不误删不属于
- *   本包的东西（曾用"子树无其他包 owner 即可删"的递归规则把共享祖先下
+ * 正确语义（remove 与 upgrade 共用同一套判据，ARCH.md §3.6）：
+ *   文件逐个进 stash（`BACKUP`/`REMOVE_OLD`，可回滚）；**目录走独立阶段、最深优先**，
+ *   且必须同时满足"盘上是**真目录**（非 symlink）/ 已空 / 本包是最后持有者"才 `DIR_RM`
+ *   （rmdir + 元数据记录，回滚按元数据 `RESTORE_DIR` 重建）。**任何非本包残留**
+ *   （无主文件/目录、lpkg 自身状态目录、保留的 conffile、其他包文件）都会让目录保留，
+ *   绝不误删不属于本包的东西（曾用"子树无其他包 owner 即可删"的递归规则把共享祖先下
  *   usr/share/lpkg/docs 等删掉，3 套测试回归，已否决）。
+ *
+ * 订正 2026-09-25：本注释原先描述的是 `detail::backup_dir_tree_whole`（逐目录**整树**
+ *   rename 成单个 `.lpkg_bak`）。该函数**全仓已不存在**（`grep -rn backup_dir_tree_whole
+ *   main/src/` = 0），现行实现是上文的"逐文件进 stash + 空目录 DIR_RM"。本文件 pin 的
+ *   **不变量**（最深优先、非本包残留绝不删、嵌套第 2 层也要清掉）不随实现变化，故用例
+ *   本身无需改；改的只是机制描述。
  *
  * 本文件 pin：
  *   upgrade/remove 各自：整棵 owned dist-info（含嵌套第 2 层）被清掉；
@@ -29,12 +35,14 @@
 
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <vector>
 
 #include "../../main/src/base/exception.hpp"
 #include "../../main/src/base/utils.hpp"
 #include "../../main/src/db/cache.hpp"
 #include "../../main/src/db/test_breakpoints.hpp"
+#include "../../main/src/db/wal_op.hpp"  // wal::wal_log_path()（下面 REMOVE_OLD 窗口用例读 WAL）
 #include "../../main/src/pkg/package_manager.hpp"
 #include "../test_base.hpp"
 
@@ -338,4 +346,71 @@ TEST_F(UpgradeObsoleteDirCleanupTest, RemoveCleansDeepNestedOwnedDirs)
 
     EXPECT_FALSE(fs::exists(dist)) << "remove 应整树清掉 >2 层深嵌套的 owned dist-info";
     EXPECT_TRUE(fs::is_directory(site())) << "sysroot-base 持有的祖先目录必须保留";
+}
+
+// ============================================================================
+// 8) 废弃搬运（`REMOVE_OLD`）的 write-ahead 窗口 —— 2026-09-26 补
+// ============================================================================
+namespace
+{
+/// 读整个 WAL（下面的窗口用例要断言"行已落"）
+std::string read_wal_text()
+{
+    std::ifstream f(wal::wal_log_path(), std::ios::binary);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return ss.str();
+}
+}  // namespace
+
+/**
+ * `OpSink::backup_obsolete()` 此前**没有** `after_wal_breakpoint` 参数 ——
+ * `backup` / `save_config` / `un_stash` / `commit_copy` / `dir_meta` / `set_xattr` /
+ * `unset_xattr` 七个都有，只有它没有 ⇒ **"废弃搬运的 WAL（`REMOVE_OLD`）已写、rename 未做"
+ * 这个窗口注入不进去**，是断点覆盖之外的一个洞（与"链接/目录落位无断点"是同一类空档）。
+ *
+ * 三件都钉（只钉前两件的话，"先改盘再补写行"的实现照样绿）：
+ *   · 断点**真命中**（没命中 = 参数没传到调用点，窗口仍注入不进去）；
+ *   · 命中时刻 WAL 里**已有**那条 `REMOVE_OLD <src> → <bak>` 行 ⇒ 行在前；
+ *   · 命中时刻**盘面还没被改**（那个废弃文件仍在原位）⇒ 动作在后。
+ * 外加：注入失败 ⇒ 整批回滚，文件仍在原位、v1 仍装着（write-ahead 的意义就在这里）。
+ */
+TEST_F(UpgradeObsoleteDirCleanupTest, RemoveOldWindowWritesRowBeforeRenaming)
+{
+    const std::string pkg = "rmw";
+    const std::string keep = "keep.txt";
+    const std::string gone_rel = "gone-1.0.0.dist-info/old.txt";
+    const fs::path gone = site() / gone_rel;
+
+    install_sysroot();
+    ASSERT_NO_THROW(install_packages({build_site_pkg(pkg, "1.0", {keep, gone_rel})}));
+    ASSERT_TRUE(fs::exists(gone)) << "前置：v1 的废弃文件已装到盘上";
+
+    bool hit = false;
+    std::string wal_at_hit;
+    bool on_disk_at_hit = false;
+    BreakpointManager::instance().set("remove_old_after_wal_" + pkg, [&] {
+        hit = true;
+        wal_at_hit = read_wal_text();
+        on_disk_at_hit = fs::exists(gone);
+        throw LpkgException("injected: REMOVE_OLD 行已落、rename 未做");
+    });
+
+    // v2 不再提供那个文件（⇒ 废弃搬运），但仍提供 keep.txt（写入趟有活干、批次有得回滚）
+    EXPECT_THROW(install_packages({build_site_pkg(pkg, "2.0", {keep})}), LpkgException);
+    BreakpointManager::instance().clear_all();
+
+    EXPECT_TRUE(hit) << "断点没命中 ⇒ `backup_obsolete` 的 after_wal_breakpoint 没被调用点传下去"
+                        "（这个窗口仍然注入不进去）";
+    EXPECT_NE(wal_at_hit.find("REMOVE_OLD " + gone.string() + " "), std::string::npos)
+        << "命中时刻 WAL 里没有那条 REMOVE_OLD 行 ⇒ 行写在 rename **之后**（不是 write-ahead）。"
+           "捕获到的 WAL：\n"
+        << wal_at_hit;
+    EXPECT_TRUE(on_disk_at_hit)
+        << "命中时刻盘上已经没有那个文件 ⇒ 物理动作做在行**之前**，不是 write-ahead";
+
+    // 回滚保真：废弃文件从未离开原位，v1 仍是已装版本
+    EXPECT_TRUE(fs::exists(gone)) << "注入失败后废弃文件没回来（write-ahead + 回滚这条链断了）";
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version(pkg), "1.0") << "批次失败后应仍是 v1";
 }

@@ -51,10 +51,16 @@ void scan_orphans(const std::string& scan_root_override)
     long long orphan_count = 0;
 
     for (const auto& root : scan_roots) {
-        if (!fs::exists(root)) continue;
+        // 两处判定都走**不抛**的谓词（2026-09-26 修）：这两个 root 是拼出来的已知路径，
+        // 其中**中间段**成环时抛型重载会以 ELOOP 打断整趟扫描 —— 而这不是"某个文件读不了"
+        // （那种有下面的 try/catch 兜着），是整趟 `lpkg scan` 直接失败。
+        // 判据本身保持原语义：`exists_follow` = 跟随语义的 `fs::exists`；
+        // `is_symlink_no_follow` = `fs::is_symlink` 的 lstat 孪生（这个 root 名字**本身**
+        // 是符号链接就跳过，例如 /bin -> /usr/bin）。
+        if (!exists_follow(root)) continue;
 
         // 跳过本身就是符号链接的根目录（例如 /bin -> /usr/bin）
-        if (fs::is_symlink(root)) continue;
+        if (is_symlink_no_follow(root)) continue;
 
         // 显式迭代器循环（而非范围 for）：范围 for 的自增发生在循环体**之外**，
         // 目录在遍历中被删时 increment 抛出的 filesystem_error 会逃出整趟扫描

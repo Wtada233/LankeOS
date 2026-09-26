@@ -581,7 +581,9 @@ TEST_F(CleanupTest, ReverseExecuteCopyRemovesFile)
 
     std::vector<wal::WALOp> ops;
     auto op = wal::parse_op("COPY /tmp/src → /usr/bin/copied");
-    op.arg1 = "/tmp/src";
+    // 第③步的 confinement：WAL 行里的路径必须落在 root 内，否则该行会被跳过
+    // （合成字面量 `/tmp/src` 在沙箱 root 之外 —— 这条行本来是"非法形态"）
+    op.arg1 = (test_root / "tmp/src").string();
     op.arg2 = dst.string();
     ops.push_back(op);
 

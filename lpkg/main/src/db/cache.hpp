@@ -5,6 +5,8 @@
 #include <mutex>
 #include <string>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 /**
  * 本地状态数据库（单例）
@@ -87,6 +89,33 @@ public:
     /** 查询本包在该路径上记录过的哈希（**无记录 → 空串** = 无从判定，调用者按保守处理） */
     std::string get_conf_hash(std::string_view path, std::string_view pkg);
 
+    // ===== xattr 键归属（升级/移除时撤销"本包不再声明"的键） =====
+
+    /**
+     * 登记"本包在**这个目录**上声明了**这个 xattr 键**"。
+     *
+     * 调用点只有一个方向上的正当性：**写入侧真的往那个目录写了这个键**（`write_dir_entry` /
+     * `let_go_make_dir`）。登记不等于"这个键现在在盘上"——它记的是"**这是我们装的**"，
+     * 与 `files.db` 记"这个路径是我们装的"同一个口径。
+     *
+     * **不可登记的键**（返回 false，调用方应当据此不撤销它）：`path` 里含 `\x1f`（记录键的
+     * 分隔符）或 `\t`/`\n`/`\r`（DB 格式本身的分隔符 —— 与 `files.db` 同一个约束）。这类
+     * 路径在现行归档成员名消毒下造不出来，但消毒**不保证**这一点（它只挡 `\n`/`\r`/`\0` 与
+     * 字面 `" → "`），所以这里是**唯一**能把它们挡在 DB 之外的地方。宁可不记（那个键将来
+     * 不会被撤销 = 留一份陈旧 xattr），也不能记成一条会被解析歪的记录（那会导致**删错键**）。
+     */
+    bool add_xattr_key_owner(std::string_view path, std::string_view key, std::string_view pkg);
+    /** 摘掉本包对该 (路径, 键) 的登记（**其他属主仍在时只摘本包**；无人持有则整条删掉） */
+    void remove_xattr_key_owner(std::string_view path, std::string_view key, std::string_view pkg);
+    /** 该 (路径, 键) 的属主集合（**键不存在 → 空集**） */
+    std::unordered_set<std::string> get_xattr_key_owners(std::string_view path,
+                                                         std::string_view key);
+    /**
+     * 本包声明过的全部 (路径, 键) 对 —— 撤销趟遍历它就是遍历"我们可能要撤的键"。
+     * 路径用**逻辑形态**（`/usr/share/x/`，目录键带尾斜杠，与 `files.db` 同形）。
+     */
+    std::vector<std::pair<std::string, std::string>> get_package_xattr_keys(std::string_view pkg);
+
     /** 添加 provider（能力名称 -> 包名） */
     void add_provider(std::string_view capability, std::string_view pkg);
     /** 移除 provider */
@@ -139,6 +168,8 @@ public:
     std::map<std::string, std::unordered_set<std::string>, std::less<>> file_db;
     // 配置文件哈希数据库（逻辑路径 -> "<pkg>:<sha256>" 集合；见 conf_hashes_db()）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> conf_hashes;
+    // xattr 键归属数据库（`<逻辑路径>\x1f<base64 键>` -> 属主包名集合；见 xattr_keys_db()）
+    std::map<std::string, std::unordered_set<std::string>, std::less<>> xattr_keys;
     // providers 数据库（能力 -> 包名集合）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> providers;
     // 已安装包（包名 -> 版本）
@@ -167,6 +198,8 @@ public:
     void write_file_db();
     /** 直接写入配置文件哈希数据库 */
     void write_conf_hashes();
+    /** 直接写入 xattr 键归属数据库 */
+    void write_xattr_keys();
     /** 直接写入 providers 数据库 */
     void write_providers();
 

@@ -70,6 +70,28 @@ enum class WALOpType {
     // 区别在 dst **不在 stash 里**（它是原地旁边的兄弟名，批次提交后**不**被
     // cleanup_stashes 删掉）—— 这正是"保留"与"--purge-config 真删"的分界。
     SAVE_CONF,  // SAVE_CONF <src> → <dst>
+    // stash → 原位：把 `OpSink::un_stash()` 搬回去的那份记账（见 `ARCH.md` §9.2 的 `UNSTASH` 行）。
+    // arg1 = bak（stash 里那份），arg2 = orig（它被搬回的位置）。**与 BACKUP 恰好互为逆**：
+    // 正向 rename(bak → orig)，逆操作 rename(orig → bak)（找不到 orig → 跳过，幂等）。
+    // 用途：`/etc` 配置的两种"保留"结果（三哈希的 KeepLocal / SaveLpkgnew）——
+    // 第③步统一让开之后，这两种结果从"完全不碰盘"变成"先搬进 stash，判定后再搬回来"，
+    // 可观测行为不变（文件回到原位，逐字节、逐 inode 属性不变）。
+    UNSTASH,  // UNSTASH <bak> → <orig>
+    // 目录的"改前状态"（2026-09-26 新增）：目录是就地改**活对象**的（不像普通文件那样
+    // 先写 `.lpkgtmp` 再 rename 覆盖，旧 inode 由 BACKUP 保住），所以 lchown/chmod/xattr
+    // 必须**先把旧状态记下来**才能回滚。三行的共同语义是"**记录改前的状态**"，不是
+    // "记录正向动作" —— 于是"覆盖一个已有键"与"删掉一个已有键"共用 `XATTR_SET`
+    // （两者的改前状态都是"有个值"，逆操作都是把它写回去）。
+    //
+    // 为什么键与值都要 **base64**：它们是任意字节串（`system.posix_acl_default` 就是二进制），
+    // 而 WAL 是行式、空格分帧、`" → "` 是箭头分界的文本协议（见 parse_op）—— 裸放一个含
+    // ` → ` / 换行 / 尾部空格的键就会把一条行**重新分帧**成另一条合法行，回滚照着重构出的
+    // 路径去 chmod/lsetxattr。归档成员名那套消毒（archive.cpp）挡得住路径，挡不住 xattr 键
+    // 名与值，所以这里用编码而不是拒绝。空值编码成空串，故 `XATTR_SET` 的第三个字段用
+    // 哨兵把"空值"与"没有这一侧"区分开（见 op_sink.cpp 的 write_xattr）。
+    DIR_META,   // DIR_META <path> <mode> <uid> <gid>   (改前的元数据；逆 = 写回)
+    XATTR_SET,  // XATTR_SET <path> <b64_key> <b64_old_value>  (改前有值；逆 = 写回旧值)
+    XATTR_NEW,  // XATTR_NEW <path> <b64_key>   (改前没有这个键；逆 = 删掉它)
 
     // 移除操作
     RM_BEGIN,   // RM_BEGIN <pkg> <ver>
@@ -91,6 +113,10 @@ enum class WALOpType {
     RESTORE_FILE_RM,  // RESTORE_FILE_RM <path>   (COPY/NEW 逆操作)
     RESTORE_DIR_RM,   // RESTORE_DIR_RM <path>    (NEW_DIR 逆操作)
     RESTORE_DB_RM,    // RESTORE_DB_RM <path>     (DBNEW 无备份 逆操作)
+    // 目录状态（元数据 / xattr）被写回 —— DIR_META / XATTR_SET / XATTR_NEW 三者的逆操作
+    // 共用一条审计行：它们记的是同一个对象（那个目录）的"改前状态"，分三种关键字只会
+    // 让审计词汇表变大而收益为零。审计里**不带**键名（键是 base64，塞进来人眼也读不出）。
+    RESTORE_DIRSTATE,  // RESTORE_DIRSTATE <path>
     // 旧名称 — 仅用于解析旧 WAL 文件，不再写入
     REMOVE_FILE,  // 已废弃 → RESTORE_FILE_RM
     REMOVE_DIR,   // 已废弃 → RESTORE_DIR_RM
@@ -125,6 +151,7 @@ struct WALOp {
         return type == WALOpType::RESTORE_FILE || type == WALOpType::RESTORE_DB ||
                type == WALOpType::RESTORE_DIR || type == WALOpType::RESTORE_FILE_RM ||
                type == WALOpType::RESTORE_DIR_RM || type == WALOpType::RESTORE_DB_RM ||
+               type == WALOpType::RESTORE_DIRSTATE ||
                type == WALOpType::REMOVE_FILE ||  // 旧名称兼容
                type == WALOpType::REMOVE_DIR;     // 旧名称兼容
     }
@@ -176,6 +203,12 @@ struct RollbackStats {
  * 没有"里程碑提前停止"机制：正常路径下 :batch-start DB 条目与"逆序跑完整个批次"的结果
  * 逐字节相同（同一个批次起点状态），所以不需要（也无法）提前停。
  *
+ * **路径 confinement（纵深防御）**：每条可逆行的**全部目标路径**都必须落在
+ * `Config::instance().root_dir()` 之内（或已知的 stash 根之内，见
+ * `wal_line_paths_confined()`）；越界的行**告警 + 跳过** —— 与"bak 不存在 → 跳过"同一个
+ * 保守方向，**绝不**因此让恢复失败（恢复失败 = 每次启动都重试、所有 lpkg 命令起不来）。
+ * `root_dir()` 是 `/`（默认安装）时整套检查自动关掉（任何绝对路径都在其内）。
+ *
  * @param ops              待逆向执行的操作（正向顺序）
  * @param write_audit      是否写 RESTORE WAL 审计行
  * @return RollbackStats
@@ -186,7 +219,20 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit = 
 // 批次操作提取
 // ============================================================================
 
-/// 从 WAL 日志文件提取当前（最后一个未完成的）批次的操作行列表
+/**
+ * 从 WAL 提取**当前（正在进行、尚未提交）的那个批次**的操作行：**从文件末尾反向扫**，
+ * 撞到第一条 `BEGIN_PKGS` 就是它（若先撞到 `COMMIT_PKGS` 说明尾部批次已提交 → 返回空）。
+ * 调用者是 `batch_rollback()` —— 它回滚的正是**本进程刚刚执行失败的那一批**。
+ *
+ * ⚠️ **不要把它与 `recover.cpp` 的"未提交区域起点"统一**（2026-09-26 明确记录，
+ *    免得后人当重复代码合并掉）：那是**另一个问题** —— 崩溃恢复要从**第一个**未配对
+ *    `BEGIN_PKGS` 开始，好把"更早的、同样没提交的批次"一起收掉（`scan_batch_pairing()`
+ *    一处实现、四个消费者；那里踩过"取最后一个 ⇒ 更早那批永远轮不到"的坑，见 ARCH §11.2）。
+ *    而这里问的是"**当前**那批是谁"，反向扫才对。
+ *    两者在实践中重合（进程内未配对 `BEGIN_PKGS` 至多一个 —— 批次事务不可重入），
+ *    但在**手工构造/破损的 WAL** 上会给出不同答案，而测试正好钉住那些形状
+ *    （`test_write_file_wal.cpp` / `test_wal_edge_cases.cpp` / `test_wal_rollback_guards.cpp`）。
+ */
 std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path);
 
 // ============================================================================
@@ -237,6 +283,10 @@ std::set<std::filesystem::path> referenced_stash_roots();
  * 文件从 stash 还原后，stash 应已空；本函数把 ops 中所有指向 stash（父目录名为
  * `.lpkg_bak_*`）的备份目标父目录 remove_all 掉，避免空 stash 残留。
  * 只应在完整 reverse（未抛异常）后调用——若还有未还原的 bak 在里面绝不能删。
+ *
+ * `UNSTASH` 行**不**作为触发器（它的 bak 与同批次的 BACKUP 同根，已被收集；单独拿它当
+ * 触发器是把"刚从 stash 搬出来"误读成"这个 stash 可以整目录删"），但会参与**收敛检查**：
+ * UNSTASH 引用的 bak 在 reverse 之后仍在 ⇒ 回滚没收敛 ⇒ 保留该根（详见实现里的说明）。
  */
 void purge_consumed_stashes(const std::vector<WALOp>& ops);
 

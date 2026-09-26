@@ -110,6 +110,7 @@ void Config::rebase_paths()
     files_db_ = state_dir_ / "files.db";
     provides_db_ = state_dir_ / "provides.db";
     conf_hashes_db_ = state_dir_ / "confhashes.db";
+    xattr_keys_db_ = state_dir_ / "xattrkeys.db";
     lock_file_ = lock_dir_ / "db.lck";
 }
 
@@ -220,7 +221,10 @@ bool Config::has_system_soname(const std::string& soname) const noexcept
         // 逃出该目录（甚至到宿主），从而把宿主上的同名文件当成"系统已有该 so"
         const fs::path lib_dir = (root_dir_ / fs::path(sub)).lexically_normal();
         const fs::path cand = (lib_dir / soname).lexically_normal();
-        if (path_within(cand, lib_dir) && fs::exists(cand)) {
+        // 不抛判定：`cand` 是**目标 root 的 /usr/lib 下**的一个候选路径（= 包内容），
+        // 盘上那个名字可能是符号链接环 → `fs::exists` 会抛（见 base/utils.hpp 的谓词族）。
+        // 语义不变：仍是"跟随"语义的"这个路径通不通"。
+        if (path_within(cand, lib_dir) && exists_follow(cand)) {
             return true;
         }
     }
@@ -252,8 +256,8 @@ void Config::init_filesystem()
     ensure_file_exists(essential_file_);
     ensure_file_exists(files_db_);
     ensure_file_exists(provides_db_);
-    // 与兄弟库同一口径：DB 一族（pkgs/holdpkgs/files.db/provides.db/confhashes.db）要么都预建、
-    // 要么都不建。两个具体理由：
+    // 与兄弟库同一口径：DB 一族（pkgs/holdpkgs/files.db/provides.db/confhashes.db/xattrkeys.db）
+    // 要么都预建、要么都不建。两个具体理由：
     //   · 备份链：`Cache::write(milestone)` 对一族逐个"备份原文件 + 全量重写"，而
     //     write_db_file_wal 对**不存在**的文件走 DBNEW、**不产生** :batch-start 备份 ——
     //     不预建就等于这一族的"每里程碑一份备份"对这一个库不成立；
@@ -262,6 +266,7 @@ void Config::init_filesystem()
     //     走同一条还原路径，"恢复行为取决于这是第几个加进来的库"这件事就不存在了。
     //     （main 的启动顺序是 init_filesystem() → recover_packages()，所以这才是真实形态。）
     ensure_file_exists(conf_hashes_db_);
+    ensure_file_exists(xattr_keys_db_);
 }
 
 /**

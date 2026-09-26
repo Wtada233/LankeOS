@@ -619,3 +619,27 @@ bool process_archive(const fs::path& path, [[maybe_unused]] std::string& error_m
         return false;
     }
 }
+
+/**
+ * 对二进制文件执行 strip 操作
+ * 失败时仅记录警告而不中断流程
+ *
+ * （2026-09-26 从 `base/utils.cpp` 搬来：见 `strip.hpp` 里的说明 —— 它属于本层。）
+ */
+void strip_binary(const fs::path& path)
+{
+    // strip 是**尽力而为**的步骤：出任何问题都只该让包大一点，绝不能失败整个构建。
+    // 曾因 strip 内部异常（SHT_NOBITS 的 d_buf 为 NULL → bad_alloc）逃出本函数，
+    // 把 lankebuild_package 阶段整个打死（llvm 白跑一次）。这里兜住所有异常。
+    try {
+        std::string error_msg;
+        if (!strip_file(path, error_msg) && !error_msg.empty()) {
+            log_warning(string_format("warning.strip_failed", path.string(), error_msg));
+        }
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.strip_failed", path.string(), e.what()));
+    } catch (...) {
+        log_warning(
+            string_format("warning.strip_failed", path.string(), get_string("error.unknown")));
+    }
+}

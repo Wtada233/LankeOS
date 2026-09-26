@@ -1,10 +1,22 @@
-// font-subset.mjs — 构建后自动子集化字体
+// font-subset.mjs — 构建后自动子集化字体 + 内容哈希指纹
 //
 // 参考 wtada233.top/scripts/font-subset.ts（subset-font 方案）。
 // 从 VitePress 构建产物 (docs/.vitepress/dist) 的 HTML 中提取实际用到的字符，
 // 用 subset-font 对字体做子集化并覆写 dist 内的副本（public 源字体保持完整）。
+//
+// ⚠️ **为什么必须给字体文件名加内容哈希**（否则会踩一个很难定位的坑）：
+// `docs/public/fonts/Unifont.ttf` 是 public 资源，Vite 原样拷贝、**不做指纹**，
+// 于是 URL 永远是 `/fonts/Unifont.ttf`。而子集化的**内容每次构建都可能变**
+// （新增字符 → 新字形）。浏览器按 URL 缓存字体，URL 不变就继续用旧副本 →
+// 新加的字符在旧子集里没有字形 → 落到系统最后的兜底字体（LastResort 之类，
+// 把每个码位画成带十六进制码的方框）→ 表现成"字符无法显示 / 显示成码位占位符"，
+// 而服务端与源码其实都是对的。**已实际踩过一次**（首页图标换成 ↻/⊞ 后如此）。
+// 解法：子集化后按内容哈希重命名（`Unifont.<hash>.ttf`）并改写 dist 内所有引用，
+// 内容一变 URL 就变 → 浏览器必然重新下载。比加 `?v=` query 更稳（不受中间缓存
+// 忽略 query 的影响）。
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import subsetFont from "subset-font";
 
@@ -77,7 +89,9 @@ async function main() {
   const allChars = Array.from(charSet).sort().join("");
   console.log(`[font-subset] 从 ${htmlFiles.length} 个 HTML 提取 ${charSet.size} 个字符`);
 
-  // 2. 逐字体子集化并覆写 dist 副本
+  // 2. 逐字体子集化 → 按内容哈希改名（指纹）→ 记录待改写的引用映射
+  //    renames: 旧路径 → 新路径，供第 3 步改写 dist 内所有引用
+  const renames = new Map();
   for (const font of FONTS) {
     const fontPath = path.join(DIST_DIR, font.src.replace(/^\//, ""));
     if (!fs.existsSync(fontPath)) {
@@ -87,15 +101,44 @@ async function main() {
     try {
       const buf = fs.readFileSync(fontPath);
       const subset = await subsetFont(buf, allChars, { targetFormat: "truetype" });
-      fs.writeFileSync(fontPath, subset);
+
+      // 内容哈希前 10 位做指纹；`.ttf` 前插入，保持扩展名可被静态服务器正确 Content-Type
+      const hash = crypto.createHash("sha256").update(subset).digest("hex").slice(0, 10);
+      const ext = path.extname(fontPath);
+      const hashedName = `${path.basename(fontPath, ext)}.${hash}${ext}`;
+      const hashedPath = path.join(path.dirname(fontPath), hashedName);
+
+      fs.writeFileSync(hashedPath, subset);
+      fs.rmSync(fontPath); // 删掉无指纹的那份：不留"旧名字仍可用"的退路
+      renames.set(`/fonts/${path.basename(fontPath)}`, `/fonts/${hashedName}`);
+
       const oldKB = (buf.length / 1024).toFixed(1);
       const newKB = (subset.length / 1024).toFixed(1);
       const pct = ((1 - subset.length / buf.length) * 100).toFixed(1);
-      console.log(`[font-subset] ✔ ${font.name}: ${oldKB} KB → ${newKB} KB (-${pct}%)`);
+      console.log(
+        `[font-subset] ✔ ${font.name}: ${oldKB} KB → ${newKB} KB (-${pct}%) → ${hashedName}`,
+      );
     } catch (err) {
       console.error(`[font-subset] ✘ ${font.name} 子集化失败:`, err);
     }
   }
+
+  // 3. 改写 dist 内所有对字体的引用为带指纹的名字。
+  //    @font-face 的 src 在打包后的 CSS 里（VitePress 还会把关键 CSS 内联进 HTML），
+  //    所以 .css 与 .html 都要扫；.js 一并扫是无害的兜底。
+  if (renames.size === 0) return;
+  let touched = 0;
+  for (const file of getFilesRecursive(DIST_DIR, [".css", ".html", ".js"])) {
+    let text = fs.readFileSync(file, "utf-8");
+    const before = text;
+    for (const [from, to] of renames) text = text.split(from).join(to);
+    if (text !== before) {
+      fs.writeFileSync(file, text);
+      touched += 1;
+    }
+  }
+  console.log(`[font-subset] 已改写 ${touched} 个文件中的字体引用`);
+  for (const [from, to] of renames) console.log(`[font-subset]   ${from} → ${to}`);
 }
 
 main().catch((err) => {

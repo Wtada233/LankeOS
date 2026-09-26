@@ -666,12 +666,16 @@ TEST_F(ConfigThreeWayHashTest, DegenerateRecordNeverAuthorizesSilentOverwrite)
 // ============================================================================
 // ⑬ 记录被删 + 该路径重新归本包 = "追认"被**重新武装**（触发链 A）
 //
-//    `v1 装 → v2 丢掉该 /etc 文件（记录被删、盘上那份按 /etc 语义保留）→ v3 重新发它`
-//    —— v3 走的是"无旧记录 + 盘上有那份"的退化路径，改前它把盘上那份追认进 DB，
-//    于是 v4 升级时 ① 成立 → 用户那份被静默覆盖。
-//    "追认只发生一次"这个说法只对"记录不再被删"成立；记录按设计有三处会删（⑫ 的说明）。
+//    `v1 装 → v2 丢掉该 /etc 文件（记录被删）→ v3 重新发它`
+//    —— **改前**：v2 只撤记录、用户那份仍**占着原路径**，v3 走"无旧记录 + 盘上有那份"的
+//    退化路径把盘上那份追认进 DB，v4 升级时 ① 成立 → 用户那份被静默覆盖。
+//    **改后（2026-09-26）**：v2 把那份改名 `.lpkgsave`，原路径变空 ⇒ v3 直接就地落位、
+//    压根不经过退化路径，追认无从发生（用户那份仍留在 `.lpkgsave` 里）。
+//    本用例因此改钉**新终态**：丢弃留副本、重新发布就地处，且记录值永远是包内内容的哈希。
+//    "追认只发生一次"这个说法只对"记录不再被删"成立；记录按设计有三处会删（⑫ 的说明）——
+//    退化路径本身仍在（无主文件占着路径 + `--overwrite`），那条不变量由本文件前半段钉。
 // ============================================================================
-TEST_F(ConfigThreeWayHashTest, ReshippedConfigAfterDropDoesNotAuthorizeSilentOverwrite)
+TEST_F(ConfigThreeWayHashTest, ReshippedAfterDropLandsInPlaceAndKeepsUserCopy)
 {
     const fs::path conf = test_root / "etc/c3y.conf";
     const fs::path conf_new = test_root / "etc/c3y.conf.lpkgnew";
@@ -681,37 +685,42 @@ TEST_F(ConfigThreeWayHashTest, ReshippedConfigAfterDropDoesNotAuthorizeSilentOve
     install_packages({v1}, "", false);
     user_edit(conf, "USER-KEPT\n");
 
-    // v2 **不再提供**这个配置：/etc 条目被丢弃 → 归属与记录一并撤；盘上那份不物理删除
-    // （配置从不物理删除，与 remove 侧的 .lpkgsave 同源语义）
+    // v2 **不再提供**这个配置：/etc 条目被丢弃 → 归属与记录一并撤；盘上那份改名
+    // `<路径>.lpkgsave` **保留下来**（2026-09-26 起；改前是"原地不动、只撤所有权"）。
+    // 与"类型变化"、移除整包统一到一条规则：/etc 下的东西永远不会被无声丢掉，
+    // 也永远不会占着"新版本该用的那个名字"。
     const std::string v2 = create_pkg_files("c3y", "2.0", {{"usr/bin/c3y", "#!/bin/sh\n"}});
     install_packages({v2}, "", false);
-    ASSERT_EQ(read_file(conf), "USER-KEPT\n") << "升级丢弃 /etc 条目时那份配置本身不该被删";
+    const fs::path conf_save = test_root / "etc/c3y.conf.lpkgsave";
+    ASSERT_FALSE(fs::exists(conf)) << "废弃的 /etc 文件不该再占着原路径";
+    ASSERT_EQ(read_file(conf_save), "USER-KEPT\n") << "用户那份必须逐字节留在 .lpkgsave 里";
     ASSERT_EQ(conf_db_bytes().find("/etc/c3y.conf"), std::string::npos)
         << "记录必须随归属一起撤：" << conf_db_bytes();
 
-    // v3 重新发它（内容变了）→ 无旧记录 + 盘上有那份 = 退化路径（原文件不动 + .lpkgnew）。
-    // 此刻那份文件是**无主**的（归属已随 v2 撤掉）→ 需要 --overwrite 豁免
+    // ── 本条用例原先要钉的"追认被重新武装"在这个场景下**消失了**（2026-09-26）────────
+    // 改前：v2 丢弃条目后用户那份仍**占着 `/etc/c3y.conf`**，于是 v3 重新发它时走的是
+    // "无旧记录 + 盘上有那份"的**退化路径** —— 那条路会把盘上那份追认进 DB，v4 升级时
+    // ① 成立 → 用户那份被**静默覆盖**。
+    // 改后：v2 已经把那份改名到 `.lpkgsave`，`/etc/c3y.conf` 是**空路径**，v3 直接就地落位
+    // ⇒ 退化路径压根不经过，追认无从发生。用户那份仍在 `.lpkgsave` 里（可寻回）。
+    // 所以下面钉的是**新终态**，不是把旧断言放宽。
     const std::string v3 = create_pkg_files(
         "c3y", "3.0", {{"etc/c3y.conf", "C3Y-V3\n"}, {"usr/bin/c3y", "#!/bin/sh\n"}});
-    Config::instance().set_force_overwrite_mode(true);
     install_packages({v3}, "", false);
-    Config::instance().set_force_overwrite_mode(false);
-    ASSERT_EQ(read_file(conf), "USER-KEPT\n");
-    ASSERT_TRUE(fs::exists(conf_new));
-    ASSERT_EQ(read_file(conf_new), "C3Y-V3\n");
-    EXPECT_NE(conf_db_bytes().find(calculate_sha256(conf_new)), std::string::npos)
-        << "重新发这个配置时也不许追认盘上那份：" << conf_db_bytes();
-    EXPECT_EQ(conf_db_bytes().find(calculate_sha256(conf)), std::string::npos)
-        << "不许把盘上那份（用户文件）追认成我们装进去过的东西：" << conf_db_bytes();
+    EXPECT_EQ(read_file(conf), "C3Y-V3\n") << "空路径 → 就地落新版（无需 --overwrite）";
+    EXPECT_FALSE(fs::exists(conf_new))
+        << "路径是空的、没有要与用户对照的旧内容 ⇒ 不该产生 .lpkgnew";
+    EXPECT_EQ(read_file(conf_save), "USER-KEPT\n") << "用户那份全程留在 .lpkgsave 里，不被覆盖";
+    // 记录值仍然必须是**包内那份**（不许追认盘上任何东西）
+    EXPECT_NE(conf_db_bytes().find(calculate_sha256(conf)), std::string::npos)
+        << "记录值必须是包内内容（C3Y-V3）的哈希：" << conf_db_bytes();
 
-    // 用户审阅后删掉 .lpkgnew，此后**不再编辑**该文件
-    fs::remove(conf_new);
+    // v4 再升一次：用户那份早已不在原路径上 ⇒ 不存在"被静默覆盖"的窗口
     const std::string v4 = create_pkg_files(
         "c3y", "4.0", {{"etc/c3y.conf", "C3Y-V4\n"}, {"usr/bin/c3y", "#!/bin/sh\n"}});
     install_packages({v4}, "", false);
-    EXPECT_EQ(read_file(conf), "USER-KEPT\n") << "追认被重新武装 → 用户那份被静默覆盖";
-    ASSERT_TRUE(fs::exists(conf_new));
-    EXPECT_EQ(read_file(conf_new), "C3Y-V4\n");
+    EXPECT_EQ(read_file(conf), "C3Y-V4\n") << "用户没改过盘上那份（它本来就是包内的）→ 静默换新版";
+    EXPECT_EQ(read_file(conf_save), "USER-KEPT\n") << "用户那份仍在 .lpkgsave 里";
 }
 
 // ============================================================================
@@ -1236,4 +1245,70 @@ TEST_F(ConfigThreeWayHashTest, TakeoverDoesNotInheritTheOldOwnersHashRecord)
     EXPECT_EQ(conf_db_bytes().find("c3w_a:"), std::string::npos)
         << "归属已摘 → 旧记录必须消失（不许改名转手）：" << conf_db_bytes();
     EXPECT_NE(conf_db_bytes().find("c3w_b:"), std::string::npos);
+}
+
+// ============================================================================
+// ①c **只改权限、内容一字未动** 的 `/etc` 配置：升级会纠正权限 —— 此前**完全静默**
+//
+// 三哈希判的是**内容哈希**（`hash_local` / `hash_orig` / `hash_pkg`），所以"用户只 chmod 过
+// 这份配置"在它眼里与"用户没动过"**不可区分** ⇒ 走 ① 静默换新版那条分支。而落位时
+// `stage_regular_file` 的 `lchown`/`chmod` 取自**包内条目**，于是用户改的权限被一并改回
+// 包内值。实测（2026-09-26）：盘上 0600 → 升级后 0644，**且没有任何输出**。
+// 目录那边至少有 `warning.dir_perm_mismatch`（目录元数据的改前值是 write-ahead 的，顺手能比），
+// 文件这边此前连告警都没有。
+//
+// 本用例钉的是 **route (b)：先告警、再纠正** —— 只把"静默"变"可见"，**不改语义**。
+// **策略已拍板（2026-09-26）：不保留用户改的 mode，包内值胜出**，要求只是「不静默」。
+// 所以本用例的断言就是这条决定的体现：① 告警**必须出现**（否则退回静默）；② 权限**照样被**
+// **纠正**。将来若改成「保留用户 mode」，第 ② 条会红 —— 那时这条注释与断言一起改。
+// ============================================================================
+TEST_F(ConfigThreeWayHashTest, ModeOnlyUserEditIsReportedNotSilentlyReverted)
+{
+    const std::string pkg = "c3mode";
+    const fs::path target = test_root / "etc/c3mode.conf";
+    const auto files = [](const char* body) {
+        return std::vector<std::pair<std::string, std::string>>{{"etc/c3mode.conf", body},
+                                                                {"usr/bin/c3mode", "#!/bin/sh\n"}};
+    };
+    ASSERT_NO_THROW(install_packages({create_pkg_files(pkg, "1.0", files("SAME\n"))}, "", false));
+
+    // 包内 mode 是多少取决于 umask ⇒ 先读"装完之后"的值（那就是包内值），再改成一个**确定不同**的
+    struct stat st{};
+    ASSERT_EQ(::lstat(target.c_str(), &st), 0);
+    const mode_t pkg_mode = st.st_mode & 07777;
+    const mode_t user_mode = (pkg_mode == 0600u) ? 0640u : 0600u;
+    ASSERT_EQ(::chmod(target.c_str(), user_mode), 0);
+    ASSERT_NE(user_mode, pkg_mode);
+
+    // 内容逐字节不变 ⇒ 三哈希判"用户没动过" ⇒ 走静默换新版那条路（本用例要考的正是它）
+    std::ostringstream cap;
+    auto* old = std::cerr.rdbuf(cap.rdbuf());
+    ASSERT_NO_THROW(install_packages({create_pkg_files(pkg, "2.0", files("SAME\n"))}, "", false));
+    std::cerr.rdbuf(old);
+
+    // ① 告警必须**真的出现**（否则仍是静默改用户的盘）。锚取模板里**最长的字面片段** ——
+    //    与语言无关，且比"取第一个 `{}` 之前"稳：本键那个前缀只有两个字，太泛，等于没断言。
+    const std::string tmpl = get_string("warning.file_perm_mismatch");
+    std::string needle;
+    for (size_t b = 0; b <= tmpl.size();) {
+        const size_t e = tmpl.find("{}", b);
+        const size_t end = (e == std::string::npos) ? tmpl.size() : e;
+        if (end - b > needle.size()) needle = tmpl.substr(b, end - b);
+        if (e == std::string::npos) break;
+        b = e + 2;
+    }
+    ASSERT_GE(needle.size(), 8u) << "l10n 模板里没有足够长的字面片段可作锚：" << tmpl;
+    EXPECT_NE(cap.str().find(needle), std::string::npos)
+        << "用户只改过权限、内容没变 ⇒ 升级纠正权限时**必须留下告警**，否则就是静默改用户的盘。"
+           "要找的锚：\n"
+        << needle << "\n捕获到的 stderr：\n"
+        << cap.str();
+
+    // ② 当前**语义**：权限照样被纠正（route (b) 只让它可见）。将来若改成保留用户 mode，这条会红。
+    ASSERT_EQ(::lstat(target.c_str(), &st), 0);
+    EXPECT_EQ(st.st_mode & 07777, pkg_mode)
+        << "已拍板：**不保留**用户改的 mode（包内值胜出），只保证「不静默」（上面那条告警）—— "
+           "若这里红了，说明策略被改成"
+           "保留用户 mode，请连带更新本用例的注释与上面那条告警断言";
+    EXPECT_EQ(read_file(target), "SAME\n") << "内容不该被动（v1/v2 逐字节相同）";
 }

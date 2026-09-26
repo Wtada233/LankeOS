@@ -568,8 +568,8 @@ TEST_F(ComplexAtomicTest, MixedBackupCopyNewRecovery)
         "NEW " +
         new_file.string() +
         "\n"
-        "COPY /tmp/mixed.lpkgtmp \xe2\x86\x92 " +
-        copied_file.string() +
+        "COPY " +
+        (test_root / "tmp/mixed.lpkgtmp").string() + " \xe2\x86\x92 " + copied_file.string() +
         "\n"
         "COMMIT mixed 1.0\n"
         "END mixed 1.0\n");

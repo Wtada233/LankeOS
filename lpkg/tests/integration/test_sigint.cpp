@@ -15,10 +15,11 @@
 
 namespace fs = std::filesystem;
 
-// 测试二进制不链接 main.o，因此在此处定义 sigint_graceful 供给
-// package_manager.cpp 的 extern 声明使用。
-// 生产环境中此变量在 main.cpp 中定义并由 SIGINT 信号处理函数设置。
-std::atomic<bool> sigint_graceful{false};
+// sigint_graceful 的**定义**在 main/src/main_cli.cpp（2026-09-26 从 main.cpp 下沉）：
+// 那个翻译单元是 LPKG_OBJS 的一员 ⇒ 已经进测试二进制，所以这里**只能声明、不能再定义**
+// （重复定义 → 链接期报错）。package_manager.cpp / installation_task*.cpp 与
+// tests/test_hygiene.hpp 引用的都是同一份。
+extern std::atomic<bool> sigint_graceful;
 
 // =========================================================================
 // SIGINT 优雅退出测试套件

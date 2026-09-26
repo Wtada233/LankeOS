@@ -10,7 +10,9 @@
 void register_cli_options(cxxopts::Options& options)
 {
     // --- 安装/移除选项 ---
-    // 选项名/默认值/帮助文本逐字搬自 main.cpp（帮助输出按注册顺序排版，顺序也不能变）。
+    // 选项名/默认值/帮助文本与 `main_cli.cpp`
+    // 的注册点逐字一致（帮助输出按注册顺序排版，顺序也不能变）。 （2026-09-26 订正：原写"逐字搬自
+    // main.cpp"—— 那些选项的注册点现已搬到 main_cli.cpp。）
     // `--overwrite` 是**取值**的向量选项：cxxopts 的向量语义 = 重复给出累积、按 ','
     // 切分（CXXOPTS_VECTOR_DELIMITER，默认 ','）—— 逗号切分与累积都靠它，测试钉住。
     options.add_options(get_string("help.group_install"))(

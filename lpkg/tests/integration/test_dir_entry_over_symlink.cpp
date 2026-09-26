@@ -391,15 +391,29 @@ TEST_F(DirEntryOverSymlinkTest, StashDirectorySymlinkIsRejected)
 }
 
 // ============================================================================
-// 本包自己的"目录 → 文件"升级：force 也不放行（pacman case 5 对任何持有者都不放行）
+// 本包自己的"目录 → 文件"升级：**接管成功**（走"整棵树都是我们的"这条正路，与 --force
+// 无关），且目录是带 WAL `BACKUP` 行搬进 stash 的 → 可回滚。
 // ============================================================================
-
-TEST_F(DirEntryOverSymlinkTest, ForceDoesNotExemptOwnDirReplacedByFile)
+//
+// 历史与订正（2026-09-25）：
+//   这条路径**曾经**被无条件拒绝，理由写的是"pacman 的 case 5 对任何持有者都不放行"。
+//   复核上游源码后这个理由**不成立**：`add.c` 那条 "extract: not overwriting dir with
+//   file" 是**解压层**的无条件拒绝，而 `conflict.c` 的**冲突层**（`dir_belongsto_pkgs`）
+//   在"目录里外全属于本包/本次要升级的包"时是**放行**的 —— pacman 先删旧包文件（含目录）
+//   再解压，解压时那个路径已经不存在，所以撞不到 add.c 那道闸。
+//
+//   当年撞 EISDIR 崩溃的真实原因不是"不该放行"，而是**放行了却没先把目录让开**：第③步
+//   `rename(.lpkgtmp → 该路径)` 撞 EISDIR；崩在事务中途后，回滚的 COPY 逆操作对**空目录**
+//   `fs::remove` 会 rmdir 成功 → 盘面路径凭空消失、files.db 却仍声称持有它（且没有
+//   BACKUP 行可还原）。现在第②步 `backup_existing_files` 会先把挡路的真目录搬进 stash
+//   （写 `BACKUP` 行），路径让开后才写文件：崩溃点消失、回滚有依据、所有权不再脱节。
+//
+//   许可条件也比"本包持有"更严：`dir_tree_entirely_ours`（对齐 pacman 的
+//   `dir_belongsto_pkgs`）要求**整棵子树**都只属于本包或本批次升级的包 —— 目录键是累加
+//   持有者的，共享目录整树让开会搬走别人的文件。共享/无主目录仍被拒绝（见本文件
+//   `FileEntryOverRealDirIsRefused` 与 `test_overwrite_globs.cpp` 的对应用例）。
+TEST_F(DirEntryOverSymlinkTest, OwnDirReplacedByFileTakesOverWithWalBackup)
 {
-    // 审查探针挖出的真缺陷：`ours` 的豁免曾是对称的，于是 force 下"本包自己的目录→文件"
-    // 绕过了类型变更检查 → 拷贝阶段 rename 撞 EISDIR 崩溃 → 回滚的 COPY 逆操作又是
-    // `fs::remove`，对**空目录**会 rmdir 成功 → 盘面路径凭空消失，而 files.db 仍声称持有
-    // 它（盘面/DB 脱节、且没有 BACKUP 行可还原）。故选**空**目录做这一格。
     const std::string v1 = pack("evolve-f2d", "1.0", [&](const fs::path& c) {
         fs::create_directories(c / "usr/share/thing");
     });
@@ -410,18 +424,33 @@ TEST_F(DirEntryOverSymlinkTest, ForceDoesNotExemptOwnDirReplacedByFile)
         write_file(c / "usr/share/thing", "now a file\n");
     });
 
-    Config::instance().set_force_overwrite_mode(true);
-    const std::string msg =
-        refusal_message([&] { install_packages({v2}); }, "本包自己的 dir→文件（force 也不放行）");
-    EXPECT_NE(msg.find("usr/share/thing"), std::string::npos) << "拒绝信息没点名冲突路径：" << msg;
-    // 该目录在 DB 里记的是 `usr/share/thing/`（目录键带尾斜杠）→ 报错必须点出**持有者**
-    // 是 evolve-f2d 自己，而不是泛化的"未知手工目录"。这条同时钉住"判据没退化"：
-    // 若类型变更检查被删掉，失败会变成拷贝阶段的 EISDIR 崩溃（另一种报错文本）。
-    EXPECT_NE(msg.find("evolve-f2d"), std::string::npos)
-        << "拒绝信息必须点名持有者 evolve-f2d：" << msg;
-    EXPECT_TRUE(fs::is_directory(test_root / "usr/share/thing"))
-        << "空目录被删掉了：回滚的 COPY 逆操作 rmdir 了它";
-    EXPECT_FALSE(fs::is_symlink(test_root / "usr/share/thing")) << "目录被换成了符号链接";
+    // ① 回滚保真：注入"COPY 的 WAL 行已写、尚未 rename"处的失败 → 空目录必须被搬回来
+    //    （这一条同时证明"目录确实是被 `sink.backup` 搬走的"——否则没有 BACKUP 行可逆）
+    BreakpointManager::instance().set("copy_after_wal_evolve-f2d",
+                                      [] { throw LpkgException("injected copy failure"); });
+    EXPECT_THROW(install_packages({v2}), LpkgException);
+    BreakpointManager::instance().clear_all();
+
+    EXPECT_TRUE(fs::is_directory(test_root / "usr/share/thing")) << "回滚没把被搬走的目录还原回来";
+    EXPECT_FALSE(fs::is_symlink(test_root / "usr/share/thing"));
     EXPECT_FALSE(fs::exists(test_root / "usr/share/thing.lpkgtmp")) << "留下半成品 .lpkgtmp";
-    Config::instance().set_force_overwrite_mode(false);
+    std::error_code ec;
+    for (const auto& e : fs::recursive_directory_iterator(test_root, ec))
+        EXPECT_EQ(e.path().filename().string().find(".lpkg_bak_"), std::string::npos)
+            << "回滚后残留备份: " << e.path();
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version("evolve-f2d"), "1.0");
+
+    // ② 干净升级：不带 --force 也要成功（走的是"整棵树都是我们的"，与 --overwrite 无关）
+    ASSERT_NO_THROW(install_packages({v2})) << "本包自己的 dir→文件 应当接管成功";
+    EXPECT_TRUE(fs::is_regular_file(test_root / "usr/share/thing"));
+    EXPECT_FALSE(fs::is_directory(test_root / "usr/share/thing"));
+    EXPECT_FALSE(fs::is_symlink(test_root / "usr/share/thing"));
+    EXPECT_FALSE(fs::exists(test_root / "usr/share/thing.lpkgtmp")) << "留下半成品 .lpkgtmp";
+    // 让开的那份进了 stash、提交后被清理 → 不残留
+    for (const auto& e : fs::recursive_directory_iterator(test_root, ec))
+        EXPECT_EQ(e.path().filename().string().find(".lpkg_bak_"), std::string::npos)
+            << "提交后残留备份: " << e.path();
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version("evolve-f2d"), "2.0");
 }

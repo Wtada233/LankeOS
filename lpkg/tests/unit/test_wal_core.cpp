@@ -454,6 +454,7 @@ TEST_F(WalCoreTest, ReverseExecuteCopyRemove)
 
     std::vector<wal::WALOp> ops;
     ops.push_back(wal::parse_op("COPY dummy → dummy"));
+    ops[0].arg1 = (test_root / "tmp/dummy.lpkgtmp").string();  // confinement：必须落在 root 内
     ops[0].arg2 = dst.string();
 
     wal::RollbackStats stats = wal::reverse_execute(ops, false);
@@ -468,6 +469,7 @@ TEST_F(WalCoreTest, ReverseExecuteCopyNoTarget)
 
     std::vector<wal::WALOp> ops;
     ops.push_back(wal::parse_op("COPY dummy → dummy"));
+    ops[0].arg1 = (test_root / "tmp/dummy.lpkgtmp").string();  // confinement：必须落在 root 内
     ops[0].arg2 = dst.string();
 
     wal::RollbackStats stats = wal::reverse_execute(ops, false);
@@ -700,6 +702,7 @@ TEST_F(WalCoreTest, ReverseExecuteAuditNamingCopyReverse)
 
     std::vector<wal::WALOp> ops;
     auto op = wal::parse_op("COPY /tmp/src → /usr/bin/copied_file");
+    op.arg1 = (test_root / "tmp/src").string();  // confinement：必须落在 root 内
     op.arg2 = fpath.string();
     ops.push_back(op);
 
@@ -954,6 +957,7 @@ TEST_F(WalCoreTest, ReverseExecuteIdempotentCopy)
 
     std::vector<wal::WALOp> ops;
     ops.push_back(wal::parse_op("COPY dummy → dummy"));
+    ops[0].arg1 = (test_root / "tmp/dummy.lpkgtmp").string();  // confinement：必须落在 root 内
     ops[0].arg2 = p.string();
 
     // 第一次：删除

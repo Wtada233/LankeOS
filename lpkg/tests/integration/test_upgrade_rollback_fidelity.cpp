@@ -411,7 +411,8 @@ protected:
      * DB 的一部分，走 DBNEW/DBRM 回滚）。
      *
      * DB 一族的清单取自 test_base.hpp 的 db_family_files()（与 test_db_backup_chain.cpp
-     * 同一份）——一族有 5 个库，逐处硬编码的 4 元素清单正是漏掉第 5 个（confhashes.db）的
+     * 同一份）——一族有 **6** 个库（订正 2026-09-26：原文写 5 个；`xattrkeys.db`
+     * 加进来时清单没跟着加、 本文件因此盲掉了它，已修）。逐处硬编码清单正是漏掉新库的地方：
      * 地方："回滚后逐字节回到批次前"这条不变量必须对**整族**成立。
      */
     std::map<std::string, std::string> db_state() const
@@ -901,11 +902,14 @@ TEST_F(UpgradeRollbackFidelityTest, MidCopyFailureOfTheFailingPackageRollsBackWh
     // 回滚因此要同时撤销"前面已成功包的"和"它自己的"文件操作。
     //
     // 取证只用**与 readdir 顺序无关**的事实（`scan_content_files` 走
-    // recursive_directory_iterator，顺序不定）：backup_existing_files 是先整阶段跑完的，所以
-    // gamma 的 v1 文件此刻**一定**已不在原位；而断点卡在第一个文件的 rename 之前，所以
-    // gamma 的 v2 内容**一个都没落地**。废弃文件（v1 独有、v2 不再发）的移除属于 REMOVE_OLD，
-    // 那是 commit_without_ops 的事、在拷贝**之后** —— 它此刻还在，正好反证断点落在"拷贝中途"
-    // 而不是更晚的阶段。
+    // recursive_directory_iterator，顺序不定）：让开趟（backup_existing_files +
+    // remove_obsolete_files）是先整阶段跑完的，所以 gamma 的 v1 文件（含 v2 不再发的废弃
+    // 文件）此刻**一定**已不在原位；而断点卡在第一个文件的 rename 之前，所以 gamma 的 v2
+    // 内容**一个都没落地**、盘上只多出 `.lpkgtmp`。三条合起来才是"断点落在拷贝中途"的
+    // 取证 —— **订正 2026-09-26（第③步）**：废弃文件的移除原先在 commit_without_ops、拷贝
+    // 之后，那时它"还在盘上"也是一条证据；重构把这一步**整体前移到写入之前**（
+    // 让开趟的
+    // ②b（`remove_obsolete_files()`）），那条证据因此反过来（此刻它已经不在），改由上面三条承担。
     std::map<std::string, std::string> mid;
     BreakpointManager::instance().set("copy_after_wal_gamma", [&] {
         mid["alpha_ver"] = Cache::instance().get_installed_version("alpha");
@@ -943,9 +947,12 @@ TEST_F(UpgradeRollbackFidelityTest, MidCopyFailureOfTheFailingPackageRollsBackWh
     EXPECT_EQ(mid["gamma_ver"], V1) << "失败的 gamma 不该已经算装上";
     EXPECT_EQ(mid["gamma_bin_gone"], "yes")
         << "gamma 的 v1 二进制还在原位 —— 断点没落在 backup_existing_files 之后";
-    EXPECT_EQ(mid["gamma_v1_only_gone"], "no")
-        << "v1 独有文件不该在拷贝阶段就被移除 —— 那是 commit 阶段 REMOVE_OLD 的事，"
-           "在这里被移除说明断点落到了更晚的阶段";
+    EXPECT_EQ(mid["gamma_v1_only_gone"], "yes")
+        << "第③步之后，废弃文件（v1 独有、v2 不再发）的移除属于**让开趟的后半**"
+           "（remove_obsolete_files），它跑在写入趟**之前** —— 断点落在拷贝中途时它已经"
+           "进 stash 了。所以这条不再是「阶段不晚于拷贝」的证据，改由下面三条承担："
+           "gamma 的 v1 二进制已让开（gamma_bin_gone）、v2 内容一个都没落地"
+           "（gamma_new_landed）、盘上有 .lpkgtmp（tmp_files >= 1）。";
     EXPECT_EQ(mid["gamma_new_landed"], "no") << "断点取得太晚：gamma 的新内容已经落地了";
     EXPECT_GE(std::stoi(mid["tmp_files"]), 1)
         << "盘上没有 .lpkgtmp —— 断点没落在拷贝途中（COPY 的中间态）";

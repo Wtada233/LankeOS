@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 #include "../../main/src/base/constants.hpp"
 #include "../../main/src/config/config.hpp"
@@ -323,4 +324,49 @@ TEST_F(AggregatedIndexTest, EmptyAndTrailingCommasProduceNoDependencies)
     ASSERT_TRUE(e2.has_value());
     ASSERT_EQ(e2->dependencies.size(), 1u);
     EXPECT_EQ(e2->dependencies[0].name, "glibc");
+}
+
+/**
+ * 索引路径**是个目录**（"存在但根本读不出内容"的一种）⇒ 仓库为空，但**必须留下可见告警**。
+ *
+ * ## 实测（2026-09-26）：目录**不会**让 `ifstream::open` 失败
+ * 我原先按"造个目录就能命中 `repo_index_unreadable` 分支"写，**红**了 —— 捕获到的 stderr 是
+ * `Warning: Repository index parsed to zero packages (empty or truncated?): …/index.txt`。
+ * 原因：Linux 上 `std::ifstream` **打开目录是成功的**（失败的是随后的读），于是
+ * `!file.is_open()` 那道闸不拦它，流程落到"解析出 0 个包"那条告警上。
+ * ⇒ 源码里"文件存在但打不开（权限 / **竟是个目录**）"这句的**目录那半是错的**，已订正。
+ *
+ * ## 由此带出的更重要结论：`repo_index_unreadable` 分支**在真实条件下几乎不可达**
+ * lpkg 永远以 root 跑 ⇒ 权限位挡不住它；目录又能被打开。要构造出 `open` 真失败得靠 FIFO/设备
+ * 之类，属人为场景。**真正兜住"索引损坏/是目录/被截断"的是"解析出 0 个包"这条告警** ——
+ * 它就是用户可见的那个"不静默"。所以本用例钉的是**那条**（可达、且是真实防线）。
+ *
+ * ## 为什么"不静默"是这里唯一能断言的行为差异
+ * "静默当成空仓库"与"告警后当成空仓库"给出的 `packages()` **都是空** —— 只有告警能区分。
+ * 而静默的后果不是"少几个包"，而是上层把"仓库为空"读成"一切正常"：`lpkg upgrade` 会打印
+ * "所有包都已是最新版本"并 exit 0（D4 事故形态）。
+ * `log_warning` 落 `std::cerr`（`base/utils.cpp:103`），故换 `rdbuf` 捕获
+ * （同 `tests/unit/test_cli_dispatch.cpp` 的手法）。
+ */
+TEST_F(AggregatedIndexTest, DirectoryIndexIsReportedNotEmptyRepo)
+{
+    // 用一个**目录**占住索引路径：它存在（`exists_follow` 为真）但读不出任何行
+    fs::create_directories(index_dir / "index.txt");
+
+    std::ostringstream cap;
+    auto* old = std::cerr.rdbuf(cap.rdbuf());
+    Repository repo;
+    repo.load_index();
+    std::cerr.rdbuf(old);
+
+    EXPECT_TRUE(repo.packages().empty());
+
+    // 关键锚点：**告警真的出现了**（键存在、且被渲染出来）。模板带 `{}`，取占位符前的前缀匹配。
+    const std::string tmpl = get_string("warning.repo_index_empty");
+    const auto cut = tmpl.find("{}");
+    const std::string needle = tmpl.substr(0, cut == std::string::npos ? tmpl.size() : cut);
+    ASSERT_FALSE(needle.empty()) << "l10n 键缺失（get_string 回了 [MISSING_STRING]？）：" << tmpl;
+    EXPECT_NE(cap.str().find(needle), std::string::npos)
+        << "索引读不出内容时**必须留下可见告警**，否则就是静默当成空仓库。捕获到的 stderr：\n"
+        << cap.str();
 }

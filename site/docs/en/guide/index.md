@@ -8,13 +8,15 @@ title: Quick Start
 
 **LankeOS** is a Linux distribution built from scratch based on Linux From Scratch (LFS). It is not a derivative of any existing distribution — all packages are manually configured, compiled, and packaged.
 
-Core features:
+Its core strength is **automating how the distribution is built and maintained**:
 
-- **Custom package manager** `lpkg` (C++20)
-- **Native Wayland desktop**
-- **Fast boot** (~4 seconds to desktop)
+- **ABI-driven build farm** `lankefarm` — incremental rebuilds keyed on link-level SONAME changes, rebuilding only what must be rebuilt
+- **Custom package manager** `lpkg` (C++20) — atomic transactions and rollback, SONAME provider validation before install, dependencies derived from the artifacts' ELF rather than written by hand
+- **Declarative upstream tracking** — one readable YAML per package declaring its source and filtering rules, following upstream automatically
+- **Native Wayland desktop** — the KDE Plasma and GNOME core stacks, with open-source drivers across all three GPU vendors
+- **Low barrier to entry** — download the ISO, boot it, run the installer; no need to compile the whole system yourself
+- **Chinese-friendly support** (Fcitx5 + Noto CJK out of the box)
 - **Built from source** complete toolchain
-- **Chinese-first support** (Fcitx5 + Noto CJK out of the box)
 
 ## Quick Experience
 
@@ -45,12 +47,14 @@ On first boot you'll see:
 
 ### 4. Login
 
-Usernames and passwords (automatic login in Live mode):
+The default user is `LankeOS` with password `LankeOS`. Live mode additionally does two things: it clears `root`'s password field and auto-logs in `LankeOS` (on tty1 and serial). Persistence mode and the installed system do neither, so you log in manually:
 
-| Account | Live Mode | Persistence Mode |
-|---------|-----------|------------------|
-| `root` | Auto-login | Password is empty |
-| `LankeOS` | Auto-login | Password is empty |
+| Account | Live Mode | Persistence Mode / Installed System |
+|---------|-----------|-------------------------------------|
+| `LankeOS` | Auto-login; password `LankeOS` (for sudo and graphical login) | Password `LankeOS` |
+| `root` | Password field cleared → **`su` accepts no password at all** (a PAM safety mechanism), so root cannot log in directly | Password was set during development and is not published; for a root shell, reset it with `sudo passwd root` |
+
+> Get root privileges through `sudo` (as `LankeOS`). If you do want a working root password, run `sudo passwd root` first.
 
 ### 5. Explore the System
 

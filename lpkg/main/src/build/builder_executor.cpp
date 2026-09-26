@@ -182,7 +182,8 @@ int prepare_repo(const fs::path& dest, const std::string& url,
 /** 前向声明：update_one_submodule 递归子模块时调用（--recursive 的等价）。定义在下方。 */
 int update_submodules(git_repository* repo, GitProgress* prog);
 
-/** 更新单个 submodule：手动建仓库 → 浅拉默认分支 → 锁定 commit 不在浅层则完整拉兜底 → checkout
+/** 更新单个 submodule：手动建仓库 → 浅拉（refspec = **全部分支 + 全部 tag**，不是"默认分支"；
+ *  见下面的 `refspecs`）→ 锁定 commit 不在浅层则完整拉兜底 → checkout
  * 到锁定 commit。 */
 int update_one_submodule(git_repository* parent, const std::string& name, GitProgress* prog)
 {
@@ -198,7 +199,9 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
     const git_oid* oid = git_submodule_index_id(sm);
     const char* wd = git_repository_workdir(parent);
     if (url == nullptr || path == nullptr || oid == nullptr || wd == nullptr) {
-        prog->err = get_string("error.unknown");
+        // 点名是**哪个**子模块、以及缺的是什么 —— 原先只写 `error.unknown`，连入参 `name`
+        // 都不报（实测可达：`.gitmodules` 声明了条目但父仓库索引里没有 gitlink）。
+        prog->err = string_format("error.git_submodule_entry_incomplete", name);
         git_submodule_free(sm);
         return -1;
     }
@@ -221,6 +224,12 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
                                          "+refs/tags/*:refs/tags/*"};
     err = prepare_repo(sub_dir, final_url, refspecs, {oid_hex}, prog, &sub);
     if (err != 0) {
+        // `GIT_ENOTFOUND` = **fetch 成功但目标 commit 不在**子模块仓库里（浅拉与完整拉都没拿到）。
+        // `prepare_repo` 在这条路上不写 `prog->err`，于是最终文案回落到 `error.unknown` ——
+        // 用户看到 "Failed to update submodules of <父仓库>: Unknown error"，既不知道是哪个
+        // 子模块、也不知道它钉的是哪个 commit（而这三样这里全都有）。
+        if (err == GIT_ENOTFOUND)
+            prog->err = string_format("error.git_submodule_rev_missing", name, oid_hex, final_url);
         git_submodule_free(sm);
         git_buf_dispose(&resolved);
         return err;
@@ -290,105 +299,193 @@ int update_submodules(git_repository* repo, GitProgress* prog)
     return 0;
 }
 
+// ── clone_git_source 的零件（2026-09-26 从 128 行的函数里按自然缝抽出）──────────
+// 全都是**纯搬移 + 参数化**：语义、调用顺序、资源释放顺序与抽之前逐行一致。
+
+/** 取 libgit2 最后一条错误消息；没有则回落到通用文案（绝不吐空串）。 */
+std::string last_git_error()
+{
+    const git_error* e = git_error_last();
+    return (e && e->message) ? e->message : get_string("error.unknown");
+}
+
+/** 上报用文案：prog->err 为空时回落到通用文案。 */
+std::string clone_error_detail(const GitProgress& prog)
+{
+    return prog.err.empty() ? get_string("error.unknown") : prog.err;
+}
+
+/**
+ * libgit2 全局初始化的 RAII 门：构造 `git_libgit2_init()`、析构 `git_libgit2_shutdown()`。
+ *
+ * 抽之前是三处"各自 `git_libgit2_shutdown()` 再 throw"；用门之后**每条**退出路径
+ * （含异常展开）都恰好 shutdown 一次，不会漏也不会重。shutdown 相对 throw 的时机只差
+ * 在"异常对象已构造"之后 —— 异常文案读的是 `prog.err`（std::string 副本）与 l10n 表，
+ * 都不碰 libgit2 全局态，所以可观测行为不变。
+ */
+class GitLibGuard
+{
+public:
+    GitLibGuard()
+    {
+        git_libgit2_init();
+    }
+    ~GitLibGuard()
+    {
+        git_libgit2_shutdown();
+    }
+    GitLibGuard(const GitLibGuard&) = delete;
+    GitLibGuard& operator=(const GitLibGuard&) = delete;
+};
+
+/**
+ * 准备克隆目标：`work_root/<repo>`（URL 最后一段，剥掉 `.git` 后缀）。
+ * **目标已存在时先整体删除** —— 语义是"清空再全新克隆"，既不报错也不增量复用。
+ */
+fs::path prepare_clone_destination(const std::string& git_url, const fs::path& work_root)
+{
+    std::string name = safe_name_from_url(git_url);
+    if (name.ends_with(".git")) {
+        name.resize(name.size() - 4);
+    }
+    fs::path dest = work_root / name;
+    // `exists_no_follow`（2026-09-26 修）：悬空链接也占着这个名字 ⇒ 必须清掉，否则随后的
+    // clone 撞 EEXIST，而报错只说"目标已存在"、定位不到真实原因（一个悬空链接）。
+    if (exists_no_follow(dest)) {
+        fs::remove_all(dest);  // 对链接按名字删（`remove_all` 不跟随**末段**）
+    }
+    return dest;
+}
+
+/** 默认分支克隆：git_clone 的默认分支处理最可靠（浅克隆）。返回 0 或 libgit2 错误码。 */
+int clone_default_head(const std::string& git_url, const fs::path& dest, GitProgress* prog,
+                       git_repository** out)
+{
+    git_clone_options opts = GIT_CLONE_OPTIONS_INIT;
+    opts.checkout_opts.checkout_strategy = 0;  // 先不 checkout，下面统一处理
+    opts.fetch_opts.depth = 1;
+    opts.fetch_opts.callbacks.transfer_progress = transfer_progress_cb;
+    opts.fetch_opts.callbacks.payload = prog;
+    int err = git_clone(out, git_url.c_str(), dest.string().c_str(), &opts);
+    if (err != 0) {
+        prog->err = last_git_error();
+    }
+    return err;
+}
+
+/** 默认分支的收尾 checkout：git_clone 已把 HEAD 指向默认分支，只差这一步。 */
+int checkout_default_head(git_repository* repo, GitProgress* prog)
+{
+    git_checkout_options co = GIT_CHECKOUT_OPTIONS_INIT;
+    co.checkout_strategy = GIT_CHECKOUT_FORCE;
+    int err = git_checkout_head(repo, &co);
+    if (err != 0) {
+        prog->err = last_git_error();
+    }
+    return err;
+}
+
+/** 依次 revparse 这些 rev，取第一个**能解开**的并剥到 commit 对象；都解不开返回 nullptr。 */
+git_object* peel_first_rev_to_commit(git_repository* repo, const std::vector<std::string>& revs)
+{
+    git_object* obj = nullptr;
+    for (const auto& r : revs) {
+        if (git_revparse_single(&obj, repo, r.c_str()) == 0) {
+            break;
+        }
+    }
+    git_object* commit_obj = nullptr;
+    if (obj != nullptr) {
+        git_object_peel(&commit_obj, obj, GIT_OBJECT_COMMIT);
+        git_object_free(obj);
+    }
+    return commit_obj;
+}
+
+/**
+ * checkout 到 rev（annotated tag → 剥到 commit）并置 detached HEAD。
+ * revs 依次尝试（`ref` 本身 → `refs/remotes/origin/<ref>`，分支 ref 走后者）。
+ * 失败时记录 prog->err，返回非 0。
+ */
+int checkout_rev(git_repository* repo, const std::vector<std::string>& revs, GitProgress* prog)
+{
+    git_object* commit_obj = peel_first_rev_to_commit(repo, revs);
+    git_checkout_options co = GIT_CHECKOUT_OPTIONS_INIT;
+    co.checkout_strategy = GIT_CHECKOUT_FORCE;
+    int err = -1;
+    if (commit_obj != nullptr) {
+        err = git_checkout_tree(repo, commit_obj, &co);
+        if (err == 0) {
+            err = git_repository_set_head_detached(repo, git_object_id(commit_obj));
+        }
+        git_object_free(commit_obj);
+    }
+    if (err != 0) {
+        prog->err = last_git_error();
+    }
+    return err;
+}
+
+/**
+ * 指定 ref（tag/branch）的拉取：fresh repo + 只拉该 ref（浅拉，失败完整兜底）。
+ * 返回 0=成功（*out 可用）；GIT_ENOTFOUND=ref 不存在；其他=真实 fetch 错误（prog->err 已记录）。
+ */
+int prepare_ref_repo(const fs::path& dest, const std::string& git_url, const std::string& ref,
+                     GitProgress* prog, git_repository** out)
+{
+    std::vector<std::string> refspecs = {"+refs/tags/" + ref + ":refs/tags/" + ref,
+                                         "+refs/heads/" + ref + ":refs/remotes/origin/" + ref};
+    std::vector<std::string> revs = {ref, "refs/tags/" + ref, "refs/remotes/origin/" + ref};
+    return prepare_repo(dest, git_url, refspecs, revs, prog, out);
+}
+
+/**
+ * 拉取阶段的失败上报（两条不同的 l10n 键）：`ref` 真不存在 vs 真实 fetch 错误。
+ * 两者都点名 URL；前者额外点名 ref。
+ */
+[[noreturn]] void throw_fetch_error(int fetch_err, const std::string& git_url,
+                                    const std::string& ref, const GitProgress& prog)
+{
+    if (fetch_err == GIT_ENOTFOUND) {
+        throw LpkgException(
+            string_format("error.git_ref_not_found", ref, git_url, clone_error_detail(prog)));
+    }
+    throw LpkgException(string_format("error.git_clone_failed", git_url, clone_error_detail(prog)));
+}
+
 /** 克隆 git 源到 work_root/<repo>，checkout 指定 ref，并更新 submodule。 */
 void clone_git_source(const std::string& url, const fs::path& work_root)
 {
     std::string git_url, ref;
     parse_git_url(url, git_url, ref);
 
-    std::string name = safe_name_from_url(git_url);
-    if (name.ends_with(".git")) {
-        name.resize(name.size() - 4);
-    }
-    fs::path dest = work_root / name;
-    if (fs::exists(dest)) {
-        fs::remove_all(dest);
-    }
+    const fs::path dest = prepare_clone_destination(git_url, work_root);
 
     GitProgress prog{};
     prog.is_tty = isatty(STDOUT_FILENO) == 1;  // 进度刷在 stdout，与 downloader 一致
-    prog.current = name;                       // 主仓库下载时进度行显示仓库名
+    prog.current = dest.filename().string();   // 主仓库下载时进度行显示仓库名
 
-    git_libgit2_init();
+    GitLibGuard libgit2;
     git_repository* repo = nullptr;
+    const bool head_default = (ref.empty() || ref == "HEAD");
     int err = 0;
-    bool head_default = false;
 
-    if (ref.empty() || ref == "HEAD") {
-        // 默认分支：git_clone 的默认分支处理最可靠（浅克隆）
-        head_default = true;
-        git_clone_options opts = GIT_CLONE_OPTIONS_INIT;
-        opts.checkout_opts.checkout_strategy = 0;  // 先不 checkout，下面统一处理
-        opts.fetch_opts.depth = 1;
-        opts.fetch_opts.callbacks.transfer_progress = transfer_progress_cb;
-        opts.fetch_opts.callbacks.payload = &prog;
-        err = git_clone(&repo, git_url.c_str(), dest.string().c_str(), &opts);
-        if (err != 0) {
-            const git_error* e = git_error_last();
-            prog.err = (e && e->message) ? e->message : get_string("error.unknown");
-        }
+    if (head_default) {
+        err = clone_default_head(git_url, dest, &prog, &repo);
     } else {
-        // 指定 ref（tag/branch）：fresh repo + 只拉该 ref（浅拉，失败完整兜底）
-        std::vector<std::string> rs = {"+refs/tags/" + ref + ":refs/tags/" + ref,
-                                       "+refs/heads/" + ref + ":refs/remotes/origin/" + ref};
-        std::vector<std::string> revs = {ref, "refs/tags/" + ref, "refs/remotes/origin/" + ref};
-        err = prepare_repo(dest, git_url, rs, revs, &prog, &repo);
-        if (err != 0) {
+        // 指定 ref（tag/branch）：拉取失败只能出在这里（此时 repo 尚未建立）
+        const int fetch_err = prepare_ref_repo(dest, git_url, ref, &prog, &repo);
+        if (fetch_err != 0) {
             clear_progress_line(&prog);
-            git_libgit2_shutdown();
-            if (err == GIT_ENOTFOUND) {
-                // ref 真不存在
-                throw LpkgException(
-                    string_format("error.git_ref_not_found", ref, git_url,
-                                  prog.err.empty() ? get_string("error.unknown") : prog.err));
-            }
-            // fetch 失败：上报真实错误
-            throw LpkgException(
-                string_format("error.git_clone_failed", git_url,
-                              prog.err.empty() ? get_string("error.unknown") : prog.err));
+            throw_fetch_error(fetch_err, git_url, ref, prog);
         }
-        if (err == 0) {
-            // checkout 到目标 ref（annotated tag → 剥到 commit）
-            git_object* obj = nullptr;
-            git_object* commit_obj = nullptr;
-            if (git_revparse_single(&obj, repo, ref.c_str()) != 0) {
-                git_revparse_single(&obj, repo, ("refs/remotes/origin/" + ref).c_str());
-            }
-            if (obj != nullptr) {
-                git_object_peel(&commit_obj, obj, GIT_OBJECT_COMMIT);
-            }
-            git_checkout_options co = GIT_CHECKOUT_OPTIONS_INIT;
-            co.checkout_strategy = GIT_CHECKOUT_FORCE;
-            if (commit_obj != nullptr) {
-                err = git_checkout_tree(repo, commit_obj, &co);
-                if (err == 0) {
-                    err = git_repository_set_head_detached(repo, git_object_id(commit_obj));
-                }
-            } else {
-                err = -1;
-            }
-            if (commit_obj != nullptr) {
-                git_object_free(commit_obj);
-            }
-            if (obj != nullptr) {
-                git_object_free(obj);
-            }
-            if (err != 0) {
-                const git_error* e = git_error_last();
-                prog.err = (e && e->message) ? e->message : get_string("error.unknown");
-            }
-        }
+        // checkout 到目标 ref；失败则落进下面统一的失败收尾（与 clone 失败同一条路）
+        err = checkout_rev(repo, {ref, "refs/remotes/origin/" + ref}, &prog);
     }
 
     if (err == 0 && head_default) {
         // 默认分支：git_clone 已把 HEAD 指向默认分支，只差 checkout
-        git_checkout_options co = GIT_CHECKOUT_OPTIONS_INIT;
-        co.checkout_strategy = GIT_CHECKOUT_FORCE;
-        err = git_checkout_head(repo, &co);
-        if (err != 0) {
-            const git_error* e = git_error_last();
-            prog.err = (e && e->message) ? e->message : get_string("error.unknown");
-        }
+        err = checkout_default_head(repo, &prog);
     }
 
     if (err != 0) {
@@ -396,10 +493,8 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
         if (repo != nullptr) {
             git_repository_free(repo);
         }
-        git_libgit2_shutdown();
         throw LpkgException(
-            string_format("error.git_clone_failed", git_url,
-                          prog.err.empty() ? get_string("error.unknown") : prog.err));
+            string_format("error.git_clone_failed", git_url, clone_error_detail(prog)));
     }
 
     // 更新 submodule（--recurse-submodules 的等价）
@@ -407,17 +502,14 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
     if (err != 0) {
         clear_progress_line(&prog);
         git_repository_free(repo);
-        git_libgit2_shutdown();
         throw LpkgException(
-            string_format("error.git_submodule_failed", git_url,
-                          prog.err.empty() ? get_string("error.unknown") : prog.err));
+            string_format("error.git_submodule_failed", git_url, clone_error_detail(prog)));
     }
 
     git_repository_free(repo);
-    git_libgit2_shutdown();
 
     // 结束输出：清掉进度行，统一走 l10n 的 log_info
-    double total_mb = (prog.cumulative + prog.last_received) / (1024.0 * 1024.0);
+    const double total_mb = (prog.cumulative + prog.last_received) / (1024.0 * 1024.0);
     clear_progress_line(&prog);
     log_info(string_format("info.git_download", total_mb));
 }
@@ -485,7 +577,14 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
 
         log_info(string_format("info.copying_to_workdir", filename.string()));
         try {
-            if (fs::exists(target_path)) {
+            // **`exists_no_follow`（2026-09-26 修）**：判据要的是"**这个名字**被占着"，
+            // 而 `fs::exists` 跟随末段链接 ⇒ **悬空链接判 false**（不让开），紧接着
+            // `fs::copy_file` 也**跟随** ⇒ 内容被写到**链接目标**上（父目录存在时），
+            // 即以 root 写到 `work_root` **之外**。可达路径：源码归档里一个悬空链接
+            // （`xxx.jar -> ../../etc/ld.so.preload`）+ 同名 work_source。
+            // 判据换成 lstat 语义后，悬空链接会被 `fs::remove` 按名字删掉（`remove` 对链接
+            // 本来就是不跟随的），随后的 copy_file 落在**新文件**上。
+            if (exists_no_follow(target_path)) {
                 fs::remove(target_path);
             }
             fs::copy_file(dest, target_path, fs::copy_options::overwrite_existing);
@@ -505,7 +604,9 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
  */
 fs::path detect_source_tree(const fs::path& work_root)
 {
-    if (!fs::exists(work_root) || !fs::is_directory(work_root)) {
+    // 不抛判定：work_root 下就是解压出来的**上游源码树**，里面可能有符号链接环；
+    // 判定类调用不该有能力把构建打死（见 base/utils.hpp 的谓词族）。
+    if (!is_directory_follow(work_root)) {
         return work_root;
     }
 
@@ -513,7 +614,10 @@ fs::path detect_source_tree(const fs::path& work_root)
     fs::path lone_dir;
 
     for (const auto& entry : fs::directory_iterator(work_root)) {
-        if (entry.is_directory()) {
+        // 保持"跟随"语义、只把"抛"换成"判否"（`entry.is_directory()` 走 status()，
+        // 对源码树里的符号链接环会抛 ELOOP）
+        std::error_code fec;
+        if (fs::is_directory(entry.path(), fec) && !fec) {
             lone_dir = entry.path();
             ++dir_count;
         } else {

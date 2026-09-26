@@ -90,11 +90,12 @@ void init_localization()
     fs::path main_l10n_dir = exec_dir / ".." / "main" / "l10n";  // main/l10n 目录布局
     fs::path src_l10n_dir = exec_dir / ".." / "src" / "l10n";    // 测试目录下的 src/l10n 布局
 
-    if (fs::exists(relative_l10n_dir) && fs::is_directory(relative_l10n_dir)) {
+    if (is_directory_follow(relative_l10n_dir)) {  // 不抛：这些目录可能被符号链接环占着（见
+                                                   // base/utils.hpp 的谓词族）
         load_strings(lang, relative_l10n_dir);
-    } else if (fs::exists(main_l10n_dir) && fs::is_directory(main_l10n_dir)) {
+    } else if (is_directory_follow(main_l10n_dir)) {
         load_strings(lang, main_l10n_dir);
-    } else if (fs::exists(src_l10n_dir) && fs::is_directory(src_l10n_dir)) {
+    } else if (is_directory_follow(src_l10n_dir)) {
         load_strings(lang, src_l10n_dir);
     } else {
         load_strings(lang,

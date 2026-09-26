@@ -11,25 +11,33 @@
 #include "../main/src/config/config.hpp"
 #include "../main/src/db/cache.hpp"
 #include "../main/src/i18n/localization.hpp"
+#include "../main/src/trigger/trigger.hpp"
 
 namespace fs = std::filesystem;
 
 /**
- * "DB 一族"的文件清单：pkgs / files.db / provides.db / confhashes.db / holdpkgs。
+ * "DB 一族"的文件清单：pkgs / files.db / provides.db / confhashes.db / xattrkeys.db / holdpkgs。
  *
- * 这 5 个是同一族：`Cache::write(milestone)` 对它们逐个做"WAL 行 → 备份原文件 → 全量重写"
+ * 这 **6** 个是同一族：`Cache::write(milestone)` 对它们逐个做"WAL 行 → 备份原文件 → 全量重写"
  * （cache.cpp，里程碑 `:batch-start` 与 `<pkg>:installed` 各写一次），于是"每里程碑一份
  * 备份""回滚后逐字节回到批次前"这类**整体**不变量必须对整族成立。
  *
  * 清单只放这一份：凡是"对 DB 一族做整体断言"的测试（备份计数、逐字节快照、里程碑枚举）
- * 都从这里取。第 5 个库 confhashes.db 加进来时，几处各自硬编码的 4 元素清单（备份计数、
- * 快照）正好就是漏掉它的地方 —— 那是口径分歧，不是"恰好没写"。
+ * 都从这里取。
+ *
+ * 订正 2026-09-26（第 6 个库）：原文写着"第 5 个库 confhashes.db 加进来时，几处各自硬编码的
+ * 4 元素清单正好就是漏掉它的地方 —— 那是**口径分歧**"。**同一个分歧又发生了一次**：
+ * `xattrkeys.db` 加进 `Cache::write(milestone)` 时，这个唯一的清单没跟着加，于是三个使用者
+ * （备份计数 `test_db_backup_chain`、逐字节快照 `test_upgrade_rollback_fidelity`、
+ * `test_ultimate_multipkg`）全都**盲掉了第 6 个库**（最后那个在本地用一行 `add_file(...)`
+ * 绕过，现已删）。连"写在注释里的预言"都没能防住它 —— 所以这条订正痕迹留着：
+ * **往这一族加库时，回来改这个函数**，别只改 cache.cpp。
  */
 inline std::vector<fs::path> db_family_files()
 {
     auto& cfg = Config::instance();
-    return {cfg.pkgs_file(), cfg.files_db(), cfg.provides_db(), cfg.conf_hashes_db(),
-            cfg.holdpkgs_file()};
+    return {cfg.pkgs_file(),      cfg.files_db(),      cfg.provides_db(),
+            cfg.conf_hashes_db(), cfg.xattr_keys_db(), cfg.holdpkgs_file()};
 }
 
 /** 集成测试基类：自动处理 Sandbox 环境 Setup/TearDown */
@@ -62,6 +70,10 @@ protected:
     void TearDown() override
     {
         Config::instance().set_root_path("/");
+        // 进程级全局状态（`TriggerManager` 的规则表与粘性 `config_loaded`、`sigint_graceful`）
+        // 由 `tests/test_hygiene.hpp` 的 listener **在每个用例结束时无条件复位** —— 那才是
+        // 与 fixture 无关的地方（本基类覆盖不到派生自 `::testing::Test` 的用例，而污染源恰恰
+        // 可能是它们）。这里不再重复复位，免得留下两套机制。
         fs::remove_all(suite_work_dir);
     }
 

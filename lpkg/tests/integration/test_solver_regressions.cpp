@@ -35,7 +35,7 @@
 
 namespace fs = std::filesystem;
 
-/** 在 main.cpp 中定义（测试二进制不链接 main.o）；此处声明以便模拟 Ctrl+C */
+/** 定义在 main/src/main_cli.cpp（随 LPKG_OBJS 进测试二进制）；此处声明以便模拟 Ctrl+C */
 extern std::atomic<bool> sigint_graceful;
 
 class SolverRegressionTest : public IntegrationTestBase

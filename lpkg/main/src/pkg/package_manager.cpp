@@ -39,7 +39,27 @@
 
 namespace fs = std::filesystem;
 
-/** 在 main.cpp 中声明，由 SIGINT 信号处理函数设置 */
+// ============================================================================
+// 入口索引（本文件 ~1500 行、20+ 个相互独立的入口；**按操作分组**，组内顺序即文件内顺序）
+//
+//   共用工具   cleanup_stashes / write_cache / first_unreached_target / finish_committed_batch
+//   安装       install_packages / reinstall_package(s)
+//   移除       do_remove_package（单包主体）/ remove_package_files / remove_package(s)
+//              removal_allowed / check_removal_preconditions / remove_packages_in_one_batch
+//              remove_packages_checked / autoremove
+//              递归移除：collect_recursive_remove_set / remove_packages_recursive /
+//                        remove_package_recursive
+//   升级       upgrade_packages / force_solve_conflict
+//   查询与文档 query_package / query_file / show_man_page
+//
+// **为什么没像 `installation_task.cpp` 那样拆成多个 TU**：本文件是"扁平入口清单"，每个函数
+// 自成一件事、函数名就是缝；而 `installation_task.cpp` 的难导航来自**三趟交织**（让开/写入/
+// 注册共用一套决策表与 WAL 契约），拆开才真正降复杂度。拆本文件还得为 4 个跨入口的共用工具
+// 新开一个内部头文件 —— 那是拿"多一层间接"换"行数下降"，不划算。**新增入口请按上面分组就近放。**
+// ============================================================================
+
+/** 定义在 `main_cli.cpp`（从 main.cpp 搬来，2026-09-26），由 SIGINT 信号处理函数设置。
+ *  非 static：安装/移除诸路径也读它。 */
 extern std::atomic<bool> sigint_graceful;
 
 namespace
@@ -49,6 +69,16 @@ namespace
 void finish_committed_batch(
     std::vector<fs::path>& stashes, const std::vector<std::string>& removed_pkgs = {},
     const std::vector<std::pair<std::string, std::vector<std::string>>>& hook_sets = {});
+
+/**
+ * 元数据验证的结论（`verify_package_metadata()` 定义在文件下部的匿名 namespace 里 ——
+ * 这里前置声明，是因为 **install 与 upgrade 两条路径共用它**）。
+ */
+enum class MetadataVerdict {
+    Proceed,   ///< 一致（或此前已核对过）→ 按当前计划继续处理这个包
+    ReSolved,  ///< 不一致 → **已**重解计划，调用方须把批次游标复位（`i = 0`）后再来
+};
+MetadataVerdict verify_package_metadata(InstallContext& ctx, InstallPlan& p);
 }  // namespace
 
 // =====================================================================
@@ -56,8 +86,10 @@ void finish_committed_batch(
 // =====================================================================
 
 /**
- * 清理一批 stash 目录（CLEANUP 阶段，不可回滚）。TODO：备份现存放于每文件系统的
- * 隔离 stash（<fsroot>/.lpkg_bak_<pkg>_<pid>），清理 = 对每个 stash 根 remove_all。
+ * 清理一批 stash 目录（CLEANUP 阶段，不可回滚）。备份现存放于每文件系统的隔离 stash
+ * （`<fsroot>/.lpkg_bak_<pkg>_<pid>`），清理 = 对每个 stash 根 `remove_all`。
+ * （订正 2026-09-26：原文本行以"TODO："开头，但后面描述的其实是**现行**形态、不是待办 ——
+ *   这个前缀会让人以为这里还欠一件事。）
  *
  * **write-ahead 顺序：先写 CLEANUP WAL 行（一行 = 一个 stash 根），再物理删除。**
  * 崩溃语义与旧 cleanup_baks 相同：
@@ -88,7 +120,12 @@ void cleanup_stashes(std::vector<fs::path>& stashes)
     paths.erase(last, paths.end());
 
     for (const auto& p : paths) {
-        if (!fs::exists(p) && !fs::is_symlink(p)) continue;
+        // 两个判据**都**是抛型（2026-09-26 修）：`!fs::exists(p) && !fs::is_symlink(p)` 在
+        // 中间段成环的路径上必抛 ELOOP（`fs::exists` 抛型对环不返回 false），而这一段跑在
+        // **post-commit 清理**上 —— 一次抛就是"包已落地、DB 已提交、命令却报失败"。
+        // `exists_no_follow` 就是这条表达式想要的语义（lstat 成功 = 名字被占，含悬空链接与
+        // 环），而且不抛。见 base/utils.hpp 的谓词说明。
+        if (!exists_no_follow(p)) continue;
 
         // write-ahead：先记日志再删除（见函数注释）
         wal::log_wal_line("CLEANUP " + p.string());
@@ -269,50 +306,10 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
             auto& p = plan.at(n);
 
-            if (!p.metadata_verified) {
-                InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
-                                            Cache::instance().get_installed_version(p.name),
-                                            p.local_path, p.sha256, p.force_reinstall);
-                ensure_dir_exists(check_task.tmp_pkg_dir());
-                check_task.download_and_verify_package();
-
-                json meta = detail::read_archive_metadata(check_task.archive_path());
-                std::vector<std::string> dep_strs =
-                    meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
-                auto actual_deps = detail::parse_dep_strings(dep_strs);
-                std::vector<std::string> actual_provides =
-                    meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
-                std::vector<std::string> actual_needed_so =
-                    meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
-
-                bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
-                                        (actual_provides != p.provides) ||
-                                        (actual_needed_so != p.needed_so);
-                if (!metadata_differs) {
-                    for (size_t di = 0; di < actual_deps.size(); ++di) {
-                        if (actual_deps[di].name != p.dependencies[di].name ||
-                            actual_deps[di].constraints != p.dependencies[di].constraints) {
-                            metadata_differs = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (metadata_differs) {
-                    log_info(string_format("info.resolving_metadata", p.name));
-                    ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
-                                                 actual_provides, actual_needed_so);
-                    ctx.local_candidates[p.name] = check_task.archive_path();
-
-                    ctx.plan.clear();
-                    ctx.install_order.clear();
-                    detail::resolve_with_solver(ctx);
-                    i = 0;
-                    continue;
-                }
-
-                p.local_path = check_task.archive_path();
-                p.metadata_verified = true;
+            // 下载后核对真实 metadata 与索引是否一致（不一致 ⇒ 重解计划并把批次游标复位）
+            if (verify_package_metadata(ctx, p) == MetadataVerdict::ReSolved) {
+                i = 0;
+                continue;
             }
 
             InstallationTask task(p.name, p.actual_version, p.is_explicit,
@@ -408,13 +405,20 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
         // 走到这里说明是 `--force`，此时也只**跳过**，绝不 rename 进 stash —— stash 在批次提交后
         // 会被 remove_all，等于连带删掉目录里的全部内容（ARCH §3.6：无主内容一律不删）。
         // 配置文件同理：`<dir>.lpkgsave` 会把不知名的目录整个搬走，宁可不碰（只告警）。
+        // 判定一律走**不抛**的形态：包自己的内容里可以有**符号链接环**（`a -> a`，或中间段
+        // 成环），而 `fs::exists` / `fs::is_directory` 的抛异常重载遇到 ELOOP 是**抛**（不是
+        // 返回 false）—— 一个这样的条目就让整批卸载中止并回滚，那个包**永远卸不掉**
+        // （实测：`fs::exists` 在自环上抛 "Too many levels of symbolic links"）。
+        // 语义不变：`exists_no_follow`（lstat）对自环为真 —— 正是这里要的"该路径上有东西、
+        // 得搬走"；中间段成环时判否，按"盘上本来就没有"跳过（与"包记了这个路径、盘上已不存在"
+        // 同路）。详见 base/utils.hpp 里那组 `*_no_follow` 的说明。
         std::error_code ec;
-        if (fs::is_directory(phys, ec) && !fs::is_symlink(phys)) {
+        if (fs::is_directory(phys, ec) && !fs::is_symlink(phys, ec)) {
             log_warning(string_format("warning.remove_path_is_dir", phys.string()));
             continue;
         }
 
-        if (fs::exists(phys) || fs::is_symlink(phys)) {
+        if (exists_no_follow(phys)) {
             if (is_conf && !purge_config) {
                 // WAL: SAVE_CONF + rename 到兄弟名（断点位于 write-ahead 窗口内）
                 const fs::path kept = sink.save_config(phys, "rm_save_conf_after_wal_" + pkg_name);
@@ -433,6 +437,22 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
 
     if (file_count > 0) log_info(string_format("info.files_removed", file_count));
 
+    // 目录 xattr 的撤销（2026-09-26 补）：本包声明过的键**逐键**撤 —— 判据是"这个**键**还有
+    // 没有别的属主"（不是"这个目录还有没有别的属主"：xattr 按目录共用，一个目录被多个包
+    // 持有是常态，按目录判会撤掉别人的键）。
+    // ⚠️ 与 `purge_config` **无关**：那个开关管的是 `/etc` 那份**配置文件**的处置
+    // （真删 vs 改名 `.lpkgsave`），而 xattr 没有"保留成 .lpkgsave"这一说 —— 陈旧的
+    // `posix_acl_default` / `security.selinux` 留在盘上会**继续生效**，属于必须撤掉的东西。
+    // 放在阶段 A（文件处置）之后、阶段 B（目录删除）之前：目录随后可能被 rmdir 掉，那时
+    // 键随目录一起消失；先撤一遍对那种情形是**幂等**的（`unset_xattr` 对已消失的键返回
+    // false 且不写 WAL 行）。
+    for (const auto& [logical, key] : cache.get_package_xattr_keys(pkg_name)) {
+        if (detail::revoke_xattr_key_if_unowned(cache, pkg_name, logical, key, sink,
+                                                Config::instance().root_dir())) {
+            log_info(string_format("info.xattr_key_revoked", key, logical));
+        }
+    }
+
     if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
 
     // 断点：移除的 BACKUP 阶段完成后、文件删除前
@@ -445,32 +465,14 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
     // 阶段 B：owned 目录（最深优先，仅最后持有者）→ 空则 DIR_RM（rmdir + 元数据记录）。
     //   文件已全部搬进 stash，目录此刻只剩"无主内容"才会非空 → 非空即保留（安全边界：
     //   无主文件/状态目录/conffile/其他包内容一律不碰）。
+    //   五条判据（剥尾斜杠 / 最深优先 / 最后持有者 / 真目录 / 此刻为空）与目录型挂载点的
+    //   保留 + 告警都在 `remove_empty_owned_dirs` 里**只有一份**（升级侧同一套语义）；
+    //   这里只提供**候选集**：移除侧 = 本包全部 owned 目录键。
     {
-        std::vector<fs::path> dir_paths;
+        std::vector<std::string> dir_keys;
         for (const auto& e : owned_entries)
-            if (e.ends_with('/')) dir_paths.emplace_back(fs::path(e));
-        std::ranges::sort(dir_paths, std::greater<>{});
-
-        for (const auto& p : dir_paths) {
-            cache.remove_file_owner(p.string(), pkg_name);
-            if (!cache.get_file_owners(p.string()).empty()) continue;
-
-            // 目录键带尾斜杠，必须先规范化：否则 is_symlink 恒假（尾斜杠会解引用末尾的链接），
-            // "别动 symlink→目录"的守卫形同虚设 —— is_empty 看的是链接目标、rmdir 也落在目标上
-            // （实测：移除一个在 `/var/run -> ../run` 上落了目录条目的包，真实 `/run` 被 rmdir）。
-            const fs::path key = strip_trailing_slash(p);
-            const fs::path phys = key.is_absolute()
-                                      ? Config::instance().root_dir() / key.relative_path()
-                                      : Config::instance().root_dir() / key;
-            std::error_code ec;
-            if (!fs::is_directory(phys, ec) || fs::is_symlink(phys)) continue;
-            if (!fs::is_empty(phys, ec)) continue;  // 含无主内容 → 整树保留
-            // WAL: DIR_RM（含 mode/uid/gid） + rmdir（一次调用）
-            // 目录型**挂载点**由 remove_empty_dir 自己挡下（rmdir 恒 EBUSY，写行就成了
-            // "行说删了、盘面还在"）→ 跳过 + 告警，目录保留。
-            if (sink.remove_empty_dir(phys) == detail::DirRemoval::SkippedMountPoint)
-                log_warning(string_format("warning.remove_mount_point", phys.string()));
-        }
+            if (e.ends_with('/')) dir_keys.push_back(e);
+        detail::remove_empty_owned_dirs(cache, pkg_name, dir_keys, sink);
     }
 
     // DBRM 清理
@@ -666,8 +668,9 @@ static void check_removal_preconditions(const std::vector<std::string>& pkgs, bo
             if (entry.starts_with(std::string(constants::DIR_ETC_PREFIX))) continue;
             const fs::path phys = strip_trailing_slash(Config::instance().root_dir() /
                                                        fs::path(entry).relative_path());
-            std::error_code ec;
-            if (!fs::is_directory(phys, ec) || fs::is_symlink(phys)) continue;
+            // 右操作数是**抛型**（2026-09-26 修）：`fs::is_directory(phys, ec)` 为假时
+            // `||` 必然求值它，而它对中间段成环抛 ELOOP。`is_symlink_no_follow` 不抛。
+            if (!is_real_directory(phys)) continue;
             std::string holders;
             for (const auto& owner : cache.get_file_owners(entry + "/")) {
                 if (!holders.empty()) holders += ", ";
@@ -730,9 +733,12 @@ static void remove_packages_in_one_batch(const std::vector<std::string>& pkgs, b
 /**
  * 移除一组包的统一入口：检查 → 单批次原子移除 → 收尾。
  *
- * **所有多包移除都必须走这里**（`remove a b c` / autoremove / 递归闭包）：
- * 曾逐包各自 `remove_package()`，等于每包一批，中途 Ctrl+C 只回滚当前包那个批次
- * ——用户实测到"删掉几个包、其余不恢复"。
+ * **所有多包移除都汇到 `remove_packages_in_one_batch`**（本函数是其中带筛选/收尾的那条入口，
+ * 覆盖 `remove a b c` / autoremove；`remove_packages_recursive` 自带闭包筛选后**直接调它**，
+ * 不经过本函数）：曾逐包各自 `remove_package()`，等于每包一批，中途 Ctrl+C 只回滚当前包
+ * 那个批次——用户实测到"删掉几个包、其余不恢复"。
+ * （2026-09-25 订正：原文写"所有多包移除都必须走这里"并把递归闭包算进来，与调用链不符；
+ *  行为（一个批次、跨包原子）一直是错的不是这条，只是落点写错了。）
  *
  * **筛选整体前置，拒绝即全或无**：只要有任何一个包被安全检查拒绝，就一个包都不删
  * （见下面 refused_any 处的注释）。这与"多包一个批次"是同一条不变量的两个面：
@@ -890,6 +896,178 @@ void autoremove(bool purge_config)
     }
 }
 
+namespace
+{
+// ============================================================================
+// `upgrade_packages()` 的各阶段函数
+//
+// 该函数原先是一个整体（全仓第三长、嵌套 7）：读索引 → 快照已装 → 筛可升级 → 求解 →
+// 拼确认清单 → 整批预检 → 批次内逐包（含"下载后比对真实元数据、不一致就重解并复位
+// 游标"）→ 收尾。各段之间**只靠局部变量传递**，拆开后主函数退化成一条直线：
+//
+//     收集可升级目标 → 求解 → 用户确认 → 批次执行（预检 + 逐包）→ 收尾
+//
+// 判据、日志与 SIGINT 轮询点全部留在原位：两个 `sigint_graceful.load()` 检查点分别在
+// `collect_upgrade_targets()` 的循环首与批次 `while` 的循环首（位置一字未变）。
+// ============================================================================
+
+/** 逐包升级的记账目标（`upgrade_packages()` 的局部量，升级每个包时往里写） */
+struct UpgradeBatchLog {
+    std::vector<fs::path>& stashes;  ///< 本批产生的备份 stash（批次提交后统一清理）
+    std::vector<std::pair<std::string, std::vector<std::string>>>& hook_sets;  ///< 逐包 hooks
+    size_t& upgraded;  ///< 真的换了版本的包数（本次计划新拉入的依赖不计）
+};
+
+/**
+ * 找出可升级的包，构造升级目标列表（版本一律 `VER_LATEST`，最终版本由求解器定）。
+ *
+ * 需要先收集完毕再统一解析，避免在遍历 installed 时修改 plan。
+ */
+std::vector<std::pair<std::string, std::string>> collect_upgrade_targets(
+    Repository& repo, const std::vector<std::pair<std::string, std::string>>& installed)
+{
+    std::vector<std::pair<std::string, std::string>> upgrade_targets;
+    for (const auto& [n, curr] : installed) {
+        // 与全仓另外 12 处 SIGINT 检查一致：**抛异常**而不是 return。
+        // return 会让 upgrade_packages() 正常返回 → main 返回 0 → 脚本/farm 认为
+        // "升级已全部完成"（实际一个包都没升）。install/remove 都是抛，退出码 1。
+        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+        auto opt = repo.find_package(n);
+        if (!opt) continue;
+        if (!version_compare(curr, opt->version)) continue;
+        upgrade_targets.emplace_back(n, std::string(constants::VER_LATEST));
+    }
+    return upgrade_targets;
+}
+
+/**
+ * 用户确认用的清单：逐条列"旧版本 → 新版本"，外加本次计划**新拉入的依赖**
+ * （没有旧版本可列，按 `is_explicit` 选措辞）。
+ *
+ * 已是最新版本的条目**不显示**（可能是其他依赖引入的、本就满足的依赖）。
+ */
+std::string build_upgrade_prompt(const std::vector<std::string>& order,
+                                 const std::map<std::string, InstallPlan>& plan)
+{
+    std::string prompt;
+    for (const auto& n : order) {
+        const auto& p = plan.at(n);
+        const std::string old_ver = Cache::instance().get_installed_version(n);
+        if (!old_ver.empty()) {
+            if (old_ver != p.actual_version) {
+                // 已有旧版本且版本不同 → 升级
+                prompt += "  " + n + " " + old_ver + " \xe2\x86\x92 " + p.actual_version + "\n";
+            } else {
+                // 已是最新版本（可能是其他依赖引入的已满足依赖）→ 不显示
+                continue;
+            }
+        } else {
+            // 新增的依赖
+            prompt += "  " +
+                      string_format(
+                          p.is_explicit ? "info.package_list_item" : "info.package_list_item_dep",
+                          p.name, p.actual_version) +
+                      "\n";
+        }
+    }
+    return prompt;
+}
+
+/// 逐包"下载后比对真实 metadata 与索引是否一致"的结论
+/**
+ * 元数据验证：下载后比对真实 metadata 和索引是否一致（和 install_packages 中的逻辑一致）。
+ *
+ * 不一致 ⇒ 用归档里的真实元数据更新索引、把该包登记成本地候选，然后**重解整个计划**
+ * （`ctx.plan` / `install_order` 被清空后由 `resolve_with_solver` 重建）—— 调用方据此把
+ * 批次游标复位到 0 重跑。⚠️ 这条分支之后 `p` 已随 `ctx.plan.clear()` 失效，调用方**不得**
+ * 再碰它（原实现同样只 `continue`）。
+ */
+MetadataVerdict verify_package_metadata(InstallContext& ctx, InstallPlan& p)
+{
+    if (p.metadata_verified) return MetadataVerdict::Proceed;
+
+    InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
+                                Cache::instance().get_installed_version(p.name), p.local_path,
+                                p.sha256, p.force_reinstall);
+    ensure_dir_exists(check_task.tmp_pkg_dir());
+    check_task.download_and_verify_package();
+
+    json meta = detail::read_archive_metadata(check_task.archive_path());
+    std::vector<std::string> dep_strs =
+        meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
+    auto actual_deps = detail::parse_dep_strings(dep_strs);
+    std::vector<std::string> actual_provides =
+        meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+    std::vector<std::string> actual_needed_so =
+        meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+
+    bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
+                            (actual_provides != p.provides) || (actual_needed_so != p.needed_so);
+    if (!metadata_differs) {
+        for (size_t di = 0; di < actual_deps.size(); ++di) {
+            if (actual_deps[di].name != p.dependencies[di].name ||
+                actual_deps[di].constraints != p.dependencies[di].constraints) {
+                metadata_differs = true;
+                break;
+            }
+        }
+    }
+
+    if (metadata_differs) {
+        log_info(string_format("info.resolving_metadata", p.name));
+        ctx.repo.update_package_info(p.name, p.actual_version, actual_deps, actual_provides,
+                                     actual_needed_so);
+        ctx.local_candidates[p.name] = check_task.archive_path();
+
+        ctx.plan.clear();
+        ctx.install_order.clear();
+        detail::resolve_with_solver(ctx);
+        return MetadataVerdict::ReSolved;
+    }
+
+    p.local_path = check_task.archive_path();
+    p.metadata_verified = true;
+    return MetadataVerdict::Proceed;
+}
+
+/**
+ * 升级（或作为新依赖装入）**单个包**：跑完这个包的 task，并把它记进批次账。
+ *
+ * `old_ver` 为空 = 本包此前没装着（本次计划新拉入的依赖）—— 日志用
+ * `info.installing_package`，且不计入 `upgraded` 计数。
+ */
+void upgrade_one_package(InstallContext& ctx, InstallPlan& p, const std::string& name,
+                         const std::string& old_ver, std::vector<std::string>& success,
+                         UpgradeBatchLog& log)
+{
+    auto& cache = Cache::instance();
+    // 确定 hold 标志：保留当前 hold 状态，新增依赖不 hold
+    const bool hold_pkg = cache.is_held(name);
+
+    if (!old_ver.empty()) {
+        log_info(string_format("info.upgrading_package", name, old_ver, p.actual_version));
+    } else {
+        log_info(string_format("info.installing_package", name, p.actual_version));
+    }
+
+    InstallationTask task(p.name, p.actual_version, hold_pkg, old_ver, p.local_path, p.sha256,
+                          p.force_reinstall);
+    task.set_content_ready(p.content_ready);
+    task.run(&ctx);
+
+    for (const auto& s : task.get_stashes()) log.stashes.emplace_back(s);
+    // 同上（install 侧）：早退的包（已装同版本）不记账 —— 它的空 hook_files_
+    // 含义是"没被处理"，不是"新版本没有 hooks"。本循环上面已有显式 skip 分支，
+    // 这里让不变量落在**记账处**而不依赖各循环各自记得加 guard。
+    if (task.did_process()) log.hook_sets.emplace_back(name, task.get_hook_files());
+
+    cache.write(name + ":installed");
+    success.push_back(name);
+    ctx.installed_set.insert(name);
+    if (!old_ver.empty()) ++log.upgraded;
+}
+}  // namespace
+
 /**
  * 升级所有已安装的包
  *
@@ -917,26 +1095,14 @@ void upgrade_packages()
         }
     }
 
-    // 找出可升级的包，构造升级目标列表
-    // 需要先收集完毕再统一解析，避免在遍历 installed 时修改 plan
-    std::vector<std::pair<std::string, std::string>> upgrade_targets;
-    for (const auto& [n, curr] : installed) {
-        if (sigint_graceful.load()) {
-            log_info(get_string("info.sigint_aborted"));
-            return;
-        }
-        auto opt = repo.find_package(n);
-        if (!opt) continue;
-        if (!version_compare(curr, opt->version)) continue;
-        upgrade_targets.emplace_back(n, std::string(constants::VER_LATEST));
-    }
-
+    // ── 阶段 1：找出可升级的包，构造升级目标列表 ──────────────────────
+    auto upgrade_targets = collect_upgrade_targets(repo, installed);
     if (upgrade_targets.empty()) {
         log_info(get_string("info.all_packages_latest"));
         return;
     }
 
-    // ── 依赖解析（和 install_packages 使用同一套机制） ──────────────
+    // ── 阶段 2：依赖解析（和 install_packages 使用同一套机制） ──────────
     std::map<std::string, InstallPlan> plan;
     std::vector<std::string> order;
     std::map<std::string, fs::path> local_candidates;
@@ -958,34 +1124,13 @@ void upgrade_packages()
 
     // 冲突/ABI 一致性已由 libsolv solver 原生保证（取代旧的手动三校验）
 
-    // ── 用户确认 ────────────────────────────────────────────────────
-    std::string prompt;
-    for (const auto& n : order) {
-        const auto& p = plan.at(n);
-        const std::string old_ver = Cache::instance().get_installed_version(n);
-        if (!old_ver.empty()) {
-            if (old_ver != p.actual_version) {
-                // 已有旧版本且版本不同 → 升级
-                prompt += "  " + n + " " + old_ver + " \xe2\x86\x92 " + p.actual_version + "\n";
-            } else {
-                // 已是最新版本（可能是其他依赖引入的已满足依赖）→ 不显示
-                continue;
-            }
-        } else {
-            // 新增的依赖
-            prompt += "  " +
-                      string_format(
-                          p.is_explicit ? "info.package_list_item" : "info.package_list_item_dep",
-                          p.name, p.actual_version) +
-                      "\n";
-        }
-    }
-    if (!user_confirms(prompt + get_string("info.confirm_proceed"))) {
+    // ── 阶段 3：用户确认 ────────────────────────────────────────────
+    if (!user_confirms(build_upgrade_prompt(order, plan) + get_string("info.confirm_proceed"))) {
         log_info(get_string("info.installation_aborted"));
         return;
     }
 
-    // ── 执行升级（WAL 2.0 批量事务） ────────────────────────────────
+    // ── 阶段 4：执行升级（WAL 2.0 批量事务） ────────────────────────
     // 处理顺序由 resolve_with_solver（libsolv transaction_order）产生的 order 决定
     // （依赖先处理），确保新依赖在依赖者之前安装
     ctx.successfully_installed.clear();
@@ -999,9 +1144,8 @@ void upgrade_packages()
     std::vector<fs::path> upgrade_stashes;
     std::vector<std::pair<std::string, std::vector<std::string>>> upgrade_hook_sets;
     size_t upgraded_count = 0;
+    UpgradeBatchLog batch_log{upgrade_stashes, upgrade_hook_sets, upgraded_count};
     run_batch_transaction([&](std::vector<std::string>& success) {
-        auto& cache = Cache::instance();
-
         size_t i = 0;
         while (i < order.size()) {
             if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
@@ -1012,7 +1156,7 @@ void upgrade_packages()
             if (ctx.installed_set.contains(n)) continue;
 
             auto& p = plan.at(n);
-            const std::string old_ver = cache.get_installed_version(n);
+            const std::string old_ver = Cache::instance().get_installed_version(n);
 
             // 跳过已是最新版本的包（如依赖已满足的情况）
             if (!p.force_reinstall && !old_ver.empty() && old_ver == p.actual_version) {
@@ -1021,77 +1165,13 @@ void upgrade_packages()
             }
 
             // ── 元数据验证：下载后比对真实 metadata 和索引是否一致 ──
-            // （和 install_packages 中的逻辑一致）
-            if (!p.metadata_verified) {
-                InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
-                                            cache.get_installed_version(p.name), p.local_path,
-                                            p.sha256, p.force_reinstall);
-                ensure_dir_exists(check_task.tmp_pkg_dir());
-                check_task.download_and_verify_package();
-
-                json meta = detail::read_archive_metadata(check_task.archive_path());
-                std::vector<std::string> dep_strs =
-                    meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
-                auto actual_deps = detail::parse_dep_strings(dep_strs);
-                std::vector<std::string> actual_provides =
-                    meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
-                std::vector<std::string> actual_needed_so =
-                    meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
-
-                bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
-                                        (actual_provides != p.provides) ||
-                                        (actual_needed_so != p.needed_so);
-                if (!metadata_differs) {
-                    for (size_t di = 0; di < actual_deps.size(); ++di) {
-                        if (actual_deps[di].name != p.dependencies[di].name ||
-                            actual_deps[di].constraints != p.dependencies[di].constraints) {
-                            metadata_differs = true;
-                            break;
-                        }
-                    }
-                }
-
-                if (metadata_differs) {
-                    log_info(string_format("info.resolving_metadata", p.name));
-                    ctx.repo.update_package_info(p.name, p.actual_version, actual_deps,
-                                                 actual_provides, actual_needed_so);
-                    ctx.local_candidates[p.name] = check_task.archive_path();
-
-                    ctx.plan.clear();
-                    ctx.install_order.clear();
-                    detail::resolve_with_solver(ctx);
-                    i = 0;
-                    continue;
-                }
-
-                p.local_path = check_task.archive_path();
-                p.metadata_verified = true;
+            // 不一致 ⇒ 已用归档里的真实元数据重解了计划 ⇒ 游标复位重头再来
+            if (verify_package_metadata(ctx, p) == MetadataVerdict::ReSolved) {
+                i = 0;
+                continue;
             }
 
-            // 确定 hold 标志：保留当前 hold 状态，新增依赖不 hold
-            const bool hold_pkg = cache.is_held(n);
-
-            if (!old_ver.empty()) {
-                log_info(string_format("info.upgrading_package", n, old_ver, p.actual_version));
-            } else {
-                log_info(string_format("info.installing_package", n, p.actual_version));
-            }
-
-            InstallationTask task(p.name, p.actual_version, hold_pkg, old_ver, p.local_path,
-                                  p.sha256, p.force_reinstall);
-            task.set_content_ready(p.content_ready);
-            task.run(&ctx);
-
-            for (const auto& s : task.get_stashes()) upgrade_stashes.emplace_back(s);
-            // 同上（install 侧）：早退的包（已装同版本）不记账 —— 它的空 hook_files_
-            // 含义是"没被处理"，不是"新版本没有 hooks"。本循环上面已有显式 skip 分支，
-            // 这里让不变量落在**记账处**而不依赖各循环各自记得加 guard。
-            if (task.did_process()) upgrade_hook_sets.emplace_back(n, task.get_hook_files());
-
-            cache.write(n + ":installed");
-            success.push_back(n);
-            ctx.installed_set.insert(n);
-            if (!old_ver.empty()) ++upgraded_count;
+            upgrade_one_package(ctx, p, n, old_ver, success, batch_log);
         }
     });
 
@@ -1273,14 +1353,21 @@ void query_file(const std::string& filename)
     if (owners.empty()) {
         try {
             const fs::path p(filename);
-            if (!fs::is_symlink(p)) {
+            // 不抛谓词（2026-09-26 修）：`p` 来自命令行/依赖文件的文本，其父链可能在盘上
+            // 是环 —— `fs::is_symlink` 对中间段成环抛 ELOOP，而这里在**纯查询**路径上，
+            // 抛出去就是一个"查一下归属"的命令报 filesystem_error。
+            if (!is_symlink_no_follow(p)) {
                 const fs::path abs_p = fs::absolute(p);
                 // 前缀判断必须带目录边界（root=/lanke 时 /lankefoo 不算根内），
                 // 且 root=="/" 必须成立——见 path_within
                 const bool in_root = path_within(abs_p, Config::instance().root_dir());
                 if (in_root) {
+                    // `lexically_relative`（2026-09-26 修）：`fs::relative` 会解析符号链接，
+                    // 而这个键要用来查 DB 归属 —— 解析过的键与登记的键对不上就是"无主"的假答案
+                    // （`scan/scanner.cpp:93` 同一处修法与理由）。上面那条 `path_within` 也是
+                    // 词法判据，两处口径因此一致。
                     const std::string logical =
-                        "/" + fs::relative(abs_p, Config::instance().root_dir()).string();
+                        "/" + abs_p.lexically_relative(Config::instance().root_dir()).string();
                     owners = cache.get_file_owners(logical);
                     if (!owners.empty()) target = logical;
                 }

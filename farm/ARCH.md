@@ -46,7 +46,7 @@ src/
   repack.rs        metadata.json 漂移修正 + 重打
   seed.rs          冷启动播种
   serve.rs         静态 HTTP 服务器
-  state.rs         SQLite 状态库（job 状态记录；自动 requeue 未实现，见 §11 附注）
+  state.rs         SQLite 状态库（job 状态记录；读端未启用，见 §11 附注）
   track/           tracker 模板（github/gitlab/sourceforge/gnome/gcs/html-index/multi-level-html-index/script）
   net.rs           HTTP 下载
   lpkg_binding.rs  唯一碰 lpkg 的接缝（docker 编排 + ABI 过渡备份注入）
@@ -273,10 +273,13 @@ SQLite（`out/farm-state.db`，可选 `--state`）：
 - `jobs` 表：每包状态（`Building`/`Done`/`Blocked`/`Skipped`）+ 失败阶段 + 配方 hash
 - `build_history`：版本 + 成功/失败
 
-> ⚠️ 现状：**只有写端**（`set_job`/`record_build`），`job_recipe_hash`/`list_by_status` 等读端
-> 尚无调用方。**"配方 hash 变化自动 requeue"尚未实现**——BLOCKED 包需 operator 手动
-> `farm build <pkg>` 重跑。失败路径（source 缺失 / repack / repo / index 失败）也会
-> `set_job(Blocked)` 落库，job 不会永久停在 `Building`。若将来实现差分 requeue，读端已就绪。
+> 只有写端（`set_job`/`record_build`），`job_recipe_hash`/`list_by_status` 等读端尚无调用方。
+> **这是架构使然，不是缺口**：farm 是批式 CLI、不足常驻 daemon，所以"配方 hash 变了就重建"
+> 由 `recipe_hash` + `.build_ok` + `farm validate` 在**每次运行时**评估（`build::has_build_ok`），
+> 不需要按 job 状态在后台 requeue。读端只在将来出现"常驻监听 / 重启后按 job 状态续跑"的
+> 形态时才有用武之地。BLOCKED 包的续跑靠 operator 手动 `farm build <pkg>` 重跑。
+> 失败路径（source 缺失 / repack / repo / index 失败）也会 `set_job(Blocked)` 落库，
+> job 不会永久停在 `Building`。
 
 ## 12. serve（本地 repo HTTP）
 
@@ -313,7 +316,8 @@ build --all ──> run_build
   `architecture_guards.rs`（分层守护：docker 只在 binding 叶 spawn、net 必设读写超时）、
   `docker_binding_sequence.rs`（假 docker 影子脚本锁定 docker 子命令序列，拆步重构的行为不变证据）
 
-**231 个测试全绿**（204 lib + 11 bin + 16 integration——`cargo test` 实测；编译 0 告警）。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**、**注释掉的 hook 调用 / QML import 不误判**、**docker 拆步后子命令序列不变**、**HTTP 读超时（无应答连接秒级失败）**。
+**285 个测试全绿**（252 lib + 33 集成/二进制——`cargo test` 实测 2026-09-25）。
+> 这个数字随每次加测试而变；写死只代表当时状态，别当契约。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**、**注释掉的 hook 调用 / QML import 不误判**、**docker 拆步后子命令序列不变**、**HTTP 读超时（无应答连接秒级失败）**。
 
 ## 16. ABI 符号/版本审计（`custom_checks/abi`，`farm chk abi`）
 

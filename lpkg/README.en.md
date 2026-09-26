@@ -42,7 +42,7 @@ English | [中文](README.md)
 -   **Embedded metadata**: All metadata (name, version, dependencies, needed_so, virtual provides, man page) is stored in a `metadata.json` inside each package.
 -   **Auto dependency generation**: Includes `gen_deps.py` that scans ELF files to auto-generate both `needed_so` (DT_NEEDED SONAME list) and `deps` (provider package names), eliminating manual version constraint maintenance.
 -   **Layout-as-content**: The `content/` directory layout maps directly to the root filesystem.
--   **Automated operations**: Includes `lrepo-mgr.py` for publishing to Tencent Cloud COS (S3) or SCP remote servers. The `--path` flag enables local filesystem repositories for offline testing.
+-   **Automated operations**: Includes `lrepo-mgr.py` for publishing to S3-compatible storage or SCP remote servers. The `--path` flag enables local filesystem repositories for offline testing.
 -   **Highly compatible static builds**: Built-in automatic detection of system CA certificate paths ensures statically compiled binaries work across different Linux distributions.
 -   **Security**: Mandatory SHA256 hash verification, file conflict detection, and malicious path filtering.
 -   **System hooks and triggers**: Supports per-package `postinst`/`prerm` scripts and system-level triggers (e.g. `ldconfig`).
@@ -100,12 +100,12 @@ sudo pacman -S curl libarchive openssl fmt
 The project provides a repository management script at `main/scripts/lrepo-mgr.py`.
 
 ### 1. Configure Repository Connection
-Supports S3 (Tencent Cloud COS, AWS) or SCP:
+Supports S3-compatible storage or SCP:
 ```bash
-# Configure S3/COS
+# Configure S3-compatible storage
 ./main/scripts/lrepo-mgr.py config --set \
     storage.type=s3 \
-    storage.endpoint=https://cos.ap-hongkong.myqcloud.com \
+    storage.endpoint=https://your-s3-endpoint.example.com \
     storage.bucket=your-bucket-id \
     storage.access_key=AK... \
     storage.secret_key=SK...

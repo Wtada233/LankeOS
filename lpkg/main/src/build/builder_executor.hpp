@@ -20,6 +20,33 @@ std::vector<std::filesystem::path> download_and_prepare_sources(
     const std::filesystem::path& build_dir, const std::filesystem::path& work_root);
 
 /**
+ * @brief 是否为 git 源：URL 以 `git+` 开头
+ *
+ * 这三个函数原本只在 `builder_executor.cpp` 里可见（`git+<url>@<ref>` 的克隆路径），
+ * 2026-09-26 提到头文件 —— 它们是**真实构建里天天走、而测试完全没有直接覆盖**的路径，
+ * 不给测试留入口就只能靠 `run_build` 间接撞。
+ */
+bool is_git_url(const std::string& url);
+
+/**
+ * @brief 解析 `git+<git_url>@<ref>` → (git_url, ref)；ref 缺省为 `HEAD`
+ *
+ * `@` 只认**最后一个 `/` 之后**的那一个：URL 自带的认证信息（`git+ssh://git@host/repo.git`）
+ * 里的 `@` 不能被当成 ref 分隔符。
+ */
+void parse_git_url(const std::string& url, std::string& git_url, std::string& ref);
+
+/**
+ * @brief 克隆 git 源到 `work_root/<repo>`，checkout 指定 ref，并更新 submodule
+ *
+ * 目标目录**已存在时先整体删除**再克隆（不报错、不增量复用）。
+ *
+ * @throws LpkgException ref 不存在（`error.git_ref_not_found`）、clone/fetch 失败
+ *         （`error.git_clone_failed`）、submodule 更新失败（`error.git_submodule_failed`）
+ */
+void clone_git_source(const std::string& url, const std::filesystem::path& work_root);
+
+/**
  * @brief 从源 URL 推导一个安全的本地目录/文件名（只取最后一段，拒绝 "." / ".." / 空）。
  *
  * `fs::path(url).filename()` 对 `…/a/b/..` 返回 `".."`、对 `…/x/` 返回 `""`，调用方

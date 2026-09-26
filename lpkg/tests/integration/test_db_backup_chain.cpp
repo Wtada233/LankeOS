@@ -1,24 +1,28 @@
 /**
  * test_db_backup_chain.cpp — DB 备份链是**每个里程碑一份**（保守选择，2026-09 复核后明确保留）
  *
- * `Cache::write(milestone)` 对 **DB 一族的 5 个文件**（见 test_base.hpp 的 db_family_files：
- * pkgs / files.db / provides.db / confhashes.db / holdpkgs）各做一次"备份原文件 + 全量重写"，
- * 批次循环**每装完一个包**就调一次 → N 包批次落 5×(N+1) 份全量副本（`:batch-start` 一份 +
- * 每包一份）。这是**有意保留的保守设计**：收益（省 IO、少几个崩溃窗口）不抵代价（改动落在
+ * `Cache::write(milestone)` 对 **DB 一族的 6 个文件**（见 test_base.hpp 的 db_family_files：
+ * pkgs / files.db / provides.db / confhashes.db / xattrkeys.db / holdpkgs）各做一次"备份原文件 +
+ * 全量重写"， 批次循环**每装完一个包**就调一次 → N 包批次落 6×(N+1) 份全量副本（`:batch-start` 一份
+ * + 每包一份）。这是**有意保留的保守设计**：收益（省 IO、少几个崩溃窗口）不抵代价（改动落在
  * 最难测的"崩溃条件下的恢复"路径上），每里程碑一份还原点让任何一条 WAL DB 行都能就地恢复。
  *
- * 清单**不在这里硬编码**：一族里加第 5 个库（confhashes.db）时，硬编码的 4 元素清单就是
+ * 清单**不在这里硬编码**：一族里加 confhashes.db 时，硬编码的 4 元素清单就是
  * 各自漏掉它的地方 —— 本文件的三处（备份计数、逐字节快照、里程碑枚举）与
  * test_upgrade_rollback_fidelity.cpp 的 db_state() 现在都从 db_family_files() 取。
  *
+ * 订正 2026-09-26：**同一处分歧又发生了一次** —— 加 `xattrkeys.db` 时那个唯一的清单没跟着
+ * 加（清单在 test_base.hpp，不在本文件，所以本文件根本没机会发现）。已修。本文件的算术是
+ * 从清单派生的，因此自动跟着从 5 变成 6 —— 这正是当初把清单抽出来的用意。
+ *
  * 本文件钉住这条链的两个可观测性质 + 端到端不变式：
- *   ① **副本数随批次大小增长**：峰值 = 5×(1+N)（`:batch-start` + 每包一份），每装一个包
+ *   ① **副本数随批次大小增长**：峰值 = 6×(1+N)（`:batch-start` + 每包一份），每装一个包
  *      多一份；提交后清干净（0）。
  *   ② **每个里程碑都有自己的备份文件**，且内容就是**该里程碑之前**的状态（链式语义：
  *      `:batch-start` 里没有 p1、`p1:installed` 里有 p1 没有 p2）——WAL 行与备份文件一一对应，
  *      这正是"任何一条 DB 行都能就地恢复"的依据。
  *   ③ **端到端不变式**（与备份链无关，改动不得破坏）：批次中途崩溃后 `rec` 收敛出与批次前
- *      **逐字节相同**的 DB（**全部 5 个库**，含 confhashes.db）；正常失败回滚、单包失败、
+ *      **逐字节相同**的 DB（**全部 6 个库**，含 confhashes.db）；正常失败回滚、单包失败、
  *      升级失败（含 deps/man 元数据与被 DBRM 删空的文件）同样逐字节还原。
  */
 
@@ -49,7 +53,7 @@ class DbBackupChainTest : public IntegrationTestBase
 protected:
     static constexpr const char* BAK_TAG = ".lpkg_db_bak_before:";
 
-    /** DB 一族的 5 个文件（清单只在 test_base.hpp 的 db_family_files 里有一份） */
+    /** DB 一族的 6 个文件（清单只在 test_base.hpp 的 db_family_files 里有一份） */
     std::vector<fs::path> db_files() const
     {
         return db_family_files();
@@ -89,7 +93,7 @@ protected:
     /**
      * 打一个包：内容是一个 `usr/bin/<name>` + 一个 `/etc/<name>.conf`，man 页固定。
      *
-     * `/etc` 条目是**故意**加的：它让第 5 个库 `confhashes.db` 在整个文件里始终有**真实内容**
+     * `/etc` 条目是**故意**加的：它让 `confhashes.db` 在整个文件里始终有**真实内容**
      * （每次安装/升级都写一条记录）。少了它，本文件那几条"DB 逐字节回到批次前"的不变量对
      * confhashes.db 就退化成"空文件 == 空文件"的恒真断言 —— 覆盖是假的。
      */
@@ -131,7 +135,7 @@ protected:
         return n;
     }
 
-    /** DB 一族（5 个文件）此刻的副本总数 */
+    /** DB 一族（6 个文件）此刻的副本总数 */
     int global_db_baks() const
     {
         const auto counts = bak_copies_per_file();
@@ -200,7 +204,7 @@ TEST_F(DbBackupChainTest, PeakBackupCountGrowsWithBatchSize)
     int peak_5pkg = -1;
     BreakpointManager::instance().set("install_after_begin_chain4", [&] {
         peak_5pkg = global_db_baks();
-        // **每个**DB 文件此刻有 5 份：:batch-start + chain0..chain3 —— 含第 5 个库
+        // **每个**DB 文件此刻有 5 份：:batch-start + chain0..chain3 —— 含 confhashes.db
         // confhashes.db（少了它，这一族里就有一个库没人盯）
         for (const auto& [base, cnt] : bak_copies_per_file())
             EXPECT_EQ(cnt, 1 + 4) << base << " 在 5 包批次中途应有 5 份里程碑副本（实测 " << cnt
@@ -219,7 +223,7 @@ TEST_F(DbBackupChainTest, PeakBackupCountGrowsWithBatchSize)
 // ============================================================================
 // ② 每个里程碑都有自己的备份文件（名字 = <db>.lpkg_db_bak_before:<milestone>），
 //    且与 WAL 的 DB 行一一对应（"任何一条 DB 行都能就地恢复"的依据）——
-//    **整族 5 个库逐个枚举**（含 confhashes.db）
+//    **整族 6 个库逐个枚举**（含 confhashes.db）
 // ============================================================================
 
 TEST_F(DbBackupChainTest, EveryMilestoneHasItsOwnBackupFile)
@@ -301,7 +305,7 @@ TEST_F(DbBackupChainTest, BackupContentsFormTheMilestoneChain)
 }
 
 // ============================================================================
-// ④ 升级批次同样每里程碑一份（整族 5 个 DB 文件都已存在 → 每包写完都落一份）
+// ④ 升级批次同样每里程碑一份（整族 6 个 DB 文件都已存在 → 每包写完都落一份）
 // ============================================================================
 
 TEST_F(DbBackupChainTest, UpgradeBatchKeepsPerPackageBackups)

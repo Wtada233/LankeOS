@@ -101,6 +101,14 @@ void TriggerManager::add(const std::string& cmd)
  * 特殊处理 ldconfig 命令：直接调用内部 SONAME 链接生成，而非执行外部程序
  * 在测试模式（testing mode）下跳过所有系统级触发器执行
  */
+void TriggerManager::reset_for_test()
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    pending_triggers.clear();
+    custom_triggers.clear();
+    config_loaded = false;  // 关键：粘性的"已加载"标志必须一起清，否则下一个用例仍看到旧规则
+}
+
 void TriggerManager::run_all()
 {
     std::lock_guard<std::mutex> lock(mtx);

@@ -51,7 +51,14 @@ std::string get_elf_soname(const fs::path& path)
                     GElf_Dyn dyn;
                     if (gelf_getdyn(data, i, &dyn) == nullptr) continue;  // 不读未初始化的 dyn
                     if (dyn.d_tag == DT_SONAME) {
-                        soname = elf_strptr(elf, shdr.sh_link, dyn.d_un.d_val);
+                        // libelf 在 offset 越出 .dynstr、sh_link 不是 SHT_STRTAB、或该节不存在时
+                        // **返回 NULL**。直接赋给 std::string 是 UB（libstdc++ 下等价
+                        // strlen(nullptr) → SIGSEGV），而本函数对 usr/lib 下**每个** ELF 调用，
+                        // 输入来自不可信包 → 一个畸形 .so 就能让安装后的 ldconfig 触发器
+                        // （root）或构建进程在事务中途段错误。strip.cpp 对同一 API 是判空的
+                        // （`name_ptr ? name_ptr : ""`），这里与之对齐。
+                        const char* s = elf_strptr(elf, shdr.sh_link, dyn.d_un.d_val);
+                        soname = s ? s : "";
                         break;
                     }
                 }
@@ -110,10 +117,23 @@ static bool link_already_correct(const fs::path& link_path, const std::string& s
  */
 void apply_soname_links(const fs::path& lib_dir)
 {
-    if (!fs::exists(lib_dir) || !fs::is_directory(lib_dir)) return;
+    // **判定**一律不抛（见 base/utils.hpp 的谓词族说明）：本函数的**两个调用点传的都是包
+    // 内容** —— `trigger.cpp` 传目标 root 的 `<root>/usr/lib`，`builder.cpp` 传构建 staging 的
+    // `<staging>/usr/lib`。盘上（或 staging 里）有**符号链接环**时，抛出型判定会让任何提供
+    // `usr/lib/**.so*` 的包在**提交之后**的触发器里炸：包已落地、DB 已提交，命令却报失败。
+    // 措辞订正 2026-09-26：原文写"判定一律不抛"，但下面 `fs::directory_iterator(lib_dir)`
+    // 是**抛型**构造（没有 ec 重载）—— 它靠**紧邻的上面这一行**守卫：`is_directory_follow`
+    // 解不开就返回 false 提前退出，所以迭代只在 lib_dir 确实解析到目录时才进入。
+    // 这是"判定不抛 + 迭代有守卫"，不是"整段不可能抛"。
+    if (!is_directory_follow(lib_dir)) return;
 
     for (const auto& entry : fs::directory_iterator(lib_dir)) {
-        if (!entry.is_regular_file()) continue;
+        // **保持"跟随"语义、只把"抛"换成"判否"**（不要换成 lstat 语义）：`libfoo.so ->
+        // libfoo.so.1.2.3` 这类链接本就该被本函数处理（修正指错的 SONAME 链接正是它的职责），
+        // 换成 lstat 会把这些条目一并跳过 = 静默丢掉一段行为。
+        // `directory_entry::is_regular_file()` 走 `status()`，对环抛 ELOOP（实测 code=40）。
+        std::error_code entry_ec;
+        if (!fs::is_regular_file(entry.path(), entry_ec) || entry_ec) continue;
 
         std::string soname = get_elf_soname(entry.path());
         if (!soname.empty()) {
@@ -127,7 +147,12 @@ void apply_soname_links(const fs::path& lib_dir)
                                           entry.path().filename().string(), lib_dir.string()));
                 continue;
             }
-            if (fs::is_symlink(link_path)) {
+            // 不抛谓词（2026-09-26 修）：本函数的两个调用点传进来的都是**包内容**
+            // （trigger.cpp 的目标 root、builder.cpp 的 staging），而包的 `usr/lib` 下完全
+            // 可以有自环/两跳环 —— `fs::is_symlink` 对**中间段**成环抛 ELOOP，那一刻包已经
+            // 落地、DB 已经提交，命令却报失败（本文件上方那句"判定一律不抛"的横幅此前并不
+            // 成立，见 CLAUDE.md 的记账）。
+            if (is_symlink_no_follow(link_path)) {
                 // 链接已存在：正确就不动（避免无谓的 inode/时间戳抖动）；
                 // 否则删掉重建 —— 升级到"同 SONAME、不同文件名"后指向已删旧文件的悬空
                 // 链接在这一步被纠正（旧判据"存在即跳过"会让它永久悬空）
@@ -140,8 +165,10 @@ void apply_soname_links(const fs::path& lib_dir)
                                               rm_ec.message()));
                     continue;
                 }
-            } else if (fs::exists(link_path)) {
-                continue;  // 实体文件/目录：包自己的产物，绝不覆盖（原行为）
+            } else if (exists_follow(link_path)) {
+                // 实体文件/目录：包自己的产物，绝不覆盖（原行为）。不抛：soname 取自 ELF
+                // （不可信输入），盘上那个名字完全可能被一个环占着 —— 那也只是"不覆盖"。
+                continue;
             }
             try {
                 fs::create_symlink(entry.path().filename(), link_path);

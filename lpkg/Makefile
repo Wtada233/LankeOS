@@ -78,7 +78,7 @@ deps-check:
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 7.1.0
+VERSION ?= 7.1.1
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -200,6 +200,38 @@ coverage:
 	@rm -rf build_test
 	@echo "------------------------------------------------------"
 	@echo "Coverage report is available in: coverage_report/index.html"
+
+# ---- 格式检查 / 就地格式化（2026-09-26 新增）----------------------------------
+# clang-format 在**主机**跑、不进容器：它只读文本，不解析头文件、不链接依赖库，所以没有任何
+# 理由为它把 llvm 拉进 lpkg-builder（容器是 alpine，clang-format 在 clang-extra 里，会带整条
+# llvm 依赖）。全仓当前 **0 残留 / 165 个文件**（clang-format 23.1.2 实测），所以这条是
+# **可执行的不变量**，而不是"大概干净"。换个大版本可能因换行决策不同而误报 →
+# 可用 `make format-check CLANG_FORMAT=clang-format-18` 指定。
+# 覆盖范围 = lpkg 自己拥有的源码树（main/src + tests）；**不含** main/third_party（别人的
+# 代码，改了下次同步就丢）。
+FMT_DIRS = $(APP_SRC_DIR) $(TESTS_DIR)
+FMT_FIND = find $(FMT_DIRS) -type f \( -name '*.cpp' -o -name '*.hpp' \)
+CLANG_FORMAT ?= clang-format
+
+.PHONY: format-check format
+format-check:
+	@command -v $(CLANG_FORMAT) >/dev/null 2>&1 || \
+	  { echo "format-check: error: 未找到 $(CLANG_FORMAT)（装 clang，或指定 CLANG_FORMAT=/path/to/clang-format）"; exit 1; }
+	@# 一次调用喂**全部**文件：clang-format 逐条打印违规位置（文件:行:列 + 原行 + 插入符），
+	@# 任一文件不合规即退出码非 0 —— "红"是那个退出码说的，不是我们 grep 输出凑出来的。
+	@n=$$($(FMT_FIND) | wc -l); \
+	 if $(CLANG_FORMAT) --dry-run --Werror $$($(FMT_FIND)); then \
+	   echo "format-check: $$n 个文件全部符合 .clang-format"; \
+	 else \
+	   echo ""; \
+	   echo "format-check: 上面这些位置不符合 .clang-format —— 跑 make format 就地修"; \
+	   exit 1; \
+	 fi
+
+# -i 就地改写。这是唯一会改文件内容的形态目标（不编译、不碰容器、不依赖 deps-check）。
+format:
+	@$(FMT_FIND) -print0 | xargs -0 $(CLANG_FORMAT) -i
+	@echo "format: 已按 .clang-format 就地格式化 ($(FMT_DIRS))"
 
 build_test_internal: $(BUILD_DIR)/$(TEST_TARGET)
 	@FILTER="$(GTEST_FILTER)"; if [ -n "$$FILTER" ]; then ./$(BUILD_DIR)/$(TEST_TARGET) --gtest_filter="$$FILTER"; else ./$(BUILD_DIR)/$(TEST_TARGET); fi

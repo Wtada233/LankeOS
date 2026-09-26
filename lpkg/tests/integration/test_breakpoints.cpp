@@ -212,8 +212,8 @@ TEST_F(BreakpointTest, CopyPowerLoss_Completed)
 
     write_wal(
         "BEGIN_PKGS 1\nBEGIN cp 1.0\n"
-        "COPY /tmp/x \xe2\x86\x92 " +
-        dst.string() + "\n");
+        "COPY " +
+        (test_root / "tmp/x").string() + " \xe2\x86\x92 " + dst.string() + "\n");
 
     recover_packages();
     EXPECT_FALSE(fs::exists(dst));
@@ -304,8 +304,8 @@ TEST_F(BreakpointTest, SecondaryRollbackAfterRestoreDb)
         "BACKUP " +
         a.string() + " \xe2\x86\x92 " + abak.string() +
         "\n"
-        "COPY /tmp/a \xe2\x86\x92 " +
-        a.string() +
+        "COPY " +
+        (test_root / "tmp/a").string() + " \xe2\x86\x92 " + a.string() +
         "\n"
         "COMMIT A 1.0\nEND A 1.0\n"
         "DB " +
@@ -315,8 +315,8 @@ TEST_F(BreakpointTest, SecondaryRollbackAfterRestoreDb)
         "NEW " +
         bnew.string() +
         "\n"
-        "COPY /tmp/b \xe2\x86\x92 " +
-        bnew.string() +
+        "COPY " +
+        (test_root / "tmp/b").string() + " \xe2\x86\x92 " + bnew.string() +
         "\n"
         "ROLLBACK B 1.0\nEND B 1.0\n"
         "RESTORE_DB " +
@@ -349,8 +349,8 @@ TEST_F(BreakpointTest, SecondaryRollbackAllDoneBeforeCommit)
         "BACKUP " +
         a.string() + " \xe2\x86\x92 " + abak.string() +
         "\n"
-        "COPY /tmp/a \xe2\x86\x92 " +
-        a.string() +
+        "COPY " +
+        (test_root / "tmp/a").string() + " \xe2\x86\x92 " + a.string() +
         "\n"
         "COMMIT A 1.0\nEND A 1.0\n"
         "DB " +
@@ -468,16 +468,16 @@ TEST_F(BreakpointTest, SecondaryRollbackAfterRestoreFileRm)
         "BACKUP " +
         a_orig.string() + " \xe2\x86\x92 " + a_bak.string() +
         "\n"
-        "COPY /tmp/a \xe2\x86\x92 " +
-        a_orig.string() +
+        "COPY " +
+        (test_root / "tmp/a").string() + " \xe2\x86\x92 " + a_orig.string() +
         "\n"
         "COMMIT A 1.0\nEND A 1.0\n"
         "BEGIN B 1.0\n"
         "NEW " +
         b_new.string() +
         "\n"
-        "COPY /tmp/b \xe2\x86\x92 " +
-        b_new.string() +
+        "COPY " +
+        (test_root / "tmp/b").string() + " \xe2\x86\x92 " + b_new.string() +
         "\n"
         "ROLLBACK B 1.0\nEND B 1.0\n"
         "RESTORE_FILE " +
@@ -574,8 +574,8 @@ TEST_F(BreakpointTest, MixedNewCopyBackupReverse)
         "NEW " +
         new_f.string() +
         "\n"
-        "COPY /tmp/mix \xe2\x86\x92 " +
-        copied_f.string() +
+        "COPY " +
+        (test_root / "tmp/mix").string() + " \xe2\x86\x92 " + copied_f.string() +
         "\n"
         "COMMIT mix 1.0\nEND mix 1.0\n");
 

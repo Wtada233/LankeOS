@@ -530,6 +530,28 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                 result.problems.push_back(string_format("error.unresolved_soname", c));
             for (const auto& c : soname_conflicts)
                 result.problems.push_back(string_format("error.unresolved_soname", c));
+
+            // ── 兜底桶：libsolv 报了问题，却**没有任何桶认领** ────────────────────────
+            //
+            // `solver_solve` 的返回值是**问题数**（0 = 求解成功），所以 `res != 0` 意味着
+            // libsolv 确实有一个它无法满足的约束。而本函数把问题按"规则类型"分桶，
+            // 末尾那段 `else`（通用 JOB、DISTUPGRADE、CHOICE、BEST、YUMOBS、BLACK …）
+            // 是**故意跳过**的：那些规则在 lpkg 的 pool 里不该成为最终冲突（可容忍/结构性）。
+            //
+            // 但"跳过"不能变成"什么都不报"：`result.problems` 空 = `ok()` = 上层把它读成
+            // **求解成功、无事可做** —— `upgrade` 会打印"所有包都已是最新版本"并以 0 退出，
+            // 而磁盘上什么都没变。这是把"失败"伪装成"成功"的最恶劣形态（脚本无法区分）。
+            // 所以此处兜底：诊断不出具体原因也要**报一次失败**，绝不放行。
+            //
+            // 可达性：**未证实**（2026-09-25 静态分析：lpkg 的 pool 只建模 provides +
+            // requires，没有 CONFLICTS/OBSOLETES；任何装不上的目标最终都由某条 requires 规则
+            // 触发，而它的类型落在 PKG_* / JOB_* 桶里；weak 规则（choice 等）参与的问题会被
+            // libsolv 的 analyze_unsolvable 直接撤销、不会留在 problems 队列里）。
+            // 这是**纵深防御**：不在上面加桶的那天起，这段就只是把"漏报"钉成"必报"。
+            if (result.problems.empty()) {
+                result.problems.push_back(
+                    string_format("error.solve_failed_undiagnosed", std::to_string(res)));
+            }
             solver_free(solv);
             return result;
         }

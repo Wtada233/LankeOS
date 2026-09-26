@@ -1,3 +1,25 @@
+/**
+ * 安装事务的骨架 + 文件冲突判定引擎。
+ *
+ * 本文件负责：
+ *   · `InstallationTask` 的生命周期 —— 构造、`run()` 对三趟的编排（BEGIN/COMMIT/END 的
+ *     WAL 行、SIGINT 早退、异常 → 包级回滚标记）、元数据校验与依赖校验、`parse_deps()`；
+ *   · 冲突判定引擎 —— `collect_content_conflicts()`（六条语义只有一份）与它绑定的两种
+ *     "世界"（逐包的真实视图 `real_conflict_view`、整批预检的模拟视图），
+ *     以及两个入口 `check_for_file_conflicts()` / `check_batch_file_conflicts()`。
+ *
+ * 按趟拆出去的三个 TU（本文件原本是它们加上上面这些的总和）：
+ *   · `installation_task_letgo.cpp`    —— 让开趟（②）：`backup_existing_files` /
+ * `remove_obsolete_files` · `installation_task_copy.cpp`     —— 写入趟（③）：`copy_package_files`
+ *   · `installation_task_register.cpp` —— 注册趟（④）：`commit_without_file_ops` /
+ * `register_package` / `install_hook_files`
+ *
+ * ⚠️ 拆分是**纯代码搬移**：每一段都是原文件的逐字副本，一行逻辑都没改（`Makefile` 用
+ *    wildcard 收集 `main/src/pkg` 下的全部 `.cpp`，新 TU 自动纳入）。
+ *    此处刻意整块沿用原文件的 include 列表 —— 按符号逐个收敛 include 是另一件事，
+ *    混在纯搬移里会让"没改逻辑"这个论证失去意义。
+ */
+
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -9,6 +31,7 @@
 #include <fstream>
 #include <functional>
 #include <map>
+#include <optional>
 #include <random>
 #include <ranges>
 #include <set>
@@ -38,69 +61,6 @@ extern std::atomic<bool> sigint_graceful;
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
-
-namespace
-{
-/**
- * 升级/移除的目录清理追踪。设 LPKG_TRACE_REMOVE=1 时逐条打印废弃文件/目录的决策与
- * 底层操作（与 strace 的 unlink/rmdir/rename 对照，定位"哪些目录没被删、为什么"）。
- * 默认静默，不引入日志噪音。
- */
-void trace_remove(const std::string& msg)
-{
-    if (const char* v = std::getenv("LPKG_TRACE_REMOVE"); v && std::string_view(v) == "1")
-        fprintf(stderr, "[lpkg-remove-trace] %s\n", msg.c_str());
-}
-
-/**
- * 配置文件升级时的**三哈希分流**结论（pacman `add.c` 的语义）。
- *
- * 三份哈希：`hash_local` = 盘上那份的内容哈希；`hash_orig` = **上一次我们往这个包的
- * 这个路径里装进去的内容**的哈希（记在 `confhashes.db` 里，见 `Config::conf_hashes_db()`）；
- * `hash_pkg` = 本次包里那个条目的内容哈希。
- */
-enum class ConfigDisposition {
-    /// ① 盘上 == 上次装进去的 → 用户**没改过** → 静默换成新版（不产生 `.lpkgnew`）
-    InstallNew,
-    /// ② 上次装进去的 == 本次的 → 包本身没改这个配置 → 保留用户文件、**连 `.lpkgnew` 都不产生**
-    KeepLocal,
-    /// ③ 三者互异 / 无从判定 → 新版落 `.lpkgnew` + 告警
-    SaveLpkgnew,
-};
-
-/**
- * 三哈希分流的判定表。语义只有这一份（pacman `add.c` 的三条分支 + 老 DB 的退化路径），
- * 别在调用点再写一遍。
- *
- * **有旧记录**（正常路径）：
- *   ① 盘上 == 旧记录   → `InstallNew`（用户没改过，静默换新版）
- *   ② 旧记录 == 新包   → `KeepLocal`（包没改这个配置，保留用户文件、不产生 `.lpkgnew`）
- *   ③ 其余（含 `hash_local` 拿不到 —— 盘上是符号链接/读不到）→ `SaveLpkgnew`（原文件不动）
- *
- * **无旧记录**（老 DB：本特性之前装的包，`confhashes.db` 里没有这一条）——只算两份哈希：
- *   · 盘上那份 == 新包那份 → `KeepLocal`（内容一致 = 没有"新东西"要给用户审阅，
- *     也就不该产生 `.lpkgnew`）；
- *   · 不一致（或盘上那份不可读）→ `SaveLpkgnew`（无从判定用户改没改过 → 保守）。
- *   两个分支都由调用点把 **`hash_pkg`（包内那份）**的哈希写进 DB —— 这里**没有例外**：
- *   盘上那份（退化路径上往往还是**无主**文件）永不被追认（历史与后果见 `record` 处的注释）。
- *   ⚠ 代价说明（有意为之）：盘上那份与记录不相等时，包每改一次配置都会再落一份**可见的**
- *   `.lpkgnew`（吵，但绝不静默）；用户把 `.lpkgnew` 合并进盘上那份（此后盘上 == 记录）就
- *   回到正常分流。曾经的做法是"追认盘上那份"——换来"`.lpkgnew` 不刷"，代价是把用户文件
- *   当成我们装的：下一次升级满足 ① 静默覆盖它，且记录被删（升级丢弃 /etc 条目 /
- *   remove_conf_hash / 移除包，三处都会删）之后"追认"会被重新武装、反复发生。
- */
-ConfigDisposition classify_config_update(std::string_view hash_local, std::string_view hash_orig,
-                                         std::string_view hash_pkg)
-{
-    if (hash_orig.empty()) {
-        if (!hash_local.empty() && hash_local == hash_pkg) return ConfigDisposition::KeepLocal;
-        return ConfigDisposition::SaveLpkgnew;
-    }
-    if (!hash_local.empty() && hash_local == hash_orig) return ConfigDisposition::InstallNew;
-    if (hash_orig == hash_pkg) return ConfigDisposition::KeepLocal;
-    return ConfigDisposition::SaveLpkgnew;
-}
-}  // namespace
 
 // ===== InstallationTask 实现 =====
 
@@ -158,6 +118,25 @@ void InstallationTask::run(InstallContext* ctx)
     // 第一阶段：预检——不碰文件，只做检查
     prepare(ctx);
 
+    // 版本号是**不可信**输入：本地 .lpkg 的版本取自归档 metadata.json、远端索引与 CLI
+    // `pkg:版本` 同理（package_manager 读出后放进 InstallPlan::actual_version）。而它被原样
+    // 拼进下面（以及 COMMIT/END/ROLLBACK）的 WAL 行，WAL 又是**按行、空格分帧**的文本协议
+    // —— 一个 `\n` 就能把 BEGIN 行截断，第二行成为**攻击者可控的合法 WAL 行**。回滚
+    // （batch_rollback）与 `lpkg rec`（recover_packages）都会把那些行交给 reverse_execute，
+    // 而该函数**没有任何路径 confinement**：它按 WAL 里的绝对路径直接 rename/remove/chmod
+    // —— 一条 `NEW /etc/sudoers` 行就是一次任意删除。
+    //
+    // 校验点放在这里而不是 download_and_verify_package()：那里对**本地包**提前 return
+    // （archive_path_ 直接取本地路径，版本号根本不参与拼路径），够不到；这里是所有来源的
+    // 汇合点，COMMIT/END/ROLLBACK 行又都用同一个 actual_version_，一个点覆盖全部出口。
+    // 位置必须在 BEGIN 行**之前**：BEGIN 是 WAL 里"本包已开始"的标记，写出去就晚了。
+    // （那一处原有的同名校验**保留**：它挡的是"版本号当路径分量拼进下载 URL 与归档落点"，
+    //   与这里挡的"进 WAL"是两件事，都不是多余的。）
+    if (!is_safe_path_component(actual_version_)) {
+        throw LpkgException(
+            string_format("error.unsafe_path_component", "version", actual_version_));
+    }
+
     // WAL: BEGIN <pkg> <ver> + fsync
     wal::log_wal_line("BEGIN " + pkg_name_ + " " + actual_version_);
 
@@ -165,11 +144,22 @@ void InstallationTask::run(InstallContext* ctx)
     BreakpointManager::instance().hit("install_after_begin_" + pkg_name_);
 
     try {
-        // 第二阶段：备份 + 复制（含 WAL 条目）
+        // 第二阶段：让开 —— **先移除旧版本的全部触碰面**（②a 归档条目 / ②b DB 旧键）：
+        //   · backup_existing_files：新版本会碰的每个路径（挡路物搬进 stash / `/etc` 配置
+        //     搬进 stash 待判定 / 该 `.lpkgsave` 的整树改名 / 建目录）；
+        //   · remove_obsolete_files：旧版本有、新版本不再提供的触碰面（搬进 stash / 撤所有权
+        //     / 空目录 rmdir）。
+        // 第③步（改执行顺序）把第二步从原来的位置（写入**之后**、`commit_without_file_ops`
+        // 里）挪到这里 —— pacman 也是"先删旧包文件（含目录）、再解压新包"，写入阶段因此
+        // 看到的是**已经让开的盘面**（类型转换不再是特例）。挪动只改时序、不改语义：
+        // 废弃清除的判据、WAL 行、回滚方式一字未变（见 remove_obsolete_files 的说明）。
         backup_existing_files();
+        remove_obsolete_files();
+
+        // 第三阶段：写入新内容（路径已被让开）
         copy_package_files();
 
-        // 第三阶段：注册——数据库修改
+        // 第四阶段：注册——数据库修改 + hooks 落位
         commit_without_file_ops();
 
         // WAL: COMMIT <pkg> <ver> + fsync
@@ -200,207 +190,6 @@ void InstallationTask::prepare(InstallContext* ctx)
         ensure_dependencies_satisfied(*ctx);
     }
     check_for_file_conflicts(ctx);
-}
-
-/**
- * 提交安装（无文件操作部分）：注册包 -> 移除旧版废弃文件 -> 运行 post-install
- * 钩子
- */
-void InstallationTask::commit_without_file_ops()
-{
-    std::unordered_set<std::string> old_files;
-    if (!old_version_to_replace_.empty()) {
-        old_files = Cache::instance().get_package_files(pkg_name_);
-        log_info(string_format("info.upgrade_old_files_check", pkg_name_, old_version_to_replace_,
-                               actual_version_, old_files.size()));
-    }
-
-    register_package();
-
-    // 移除新版本中不再包含的旧文件/目录（REMOVE_OLD / DIR_RM，原子、可回滚）。
-    //
-    // **备份进 stash（TODO.md）后目录删除天然成立**：旧文件搬到每文件系统 stash（不在
-    // 原目录里占位），旧目录随即**为空** → 最深优先逐个 `rmdir` + `DIR_RM`（元数据记录），
-    // 不再需要整目录实体备份，也不会再有"刚 rename 的 bak 占着目录 → 单层判空失败 →
-    // 嵌套第 2 层空壳（dist-info/licenses/）残留"的历史缺陷。
-    // 目录非空（含无主内容/状态目录/conffile/其他包文件）→ 保留，绝不误删不属于本包的东西。
-    if (!old_files.empty()) {
-        // 写入层原语：废弃文件/目录的 WAL 行与物理操作成对发生（见 op_sink.hpp）
-        detail::OpSink sink(pkg_name_, &stashes_);
-        const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
-        auto new_files = detail::scan_content_files(content_dir);
-        std::unordered_set<std::string> new_set;
-        for (const auto& f : new_files) new_set.insert((fs::path("/") / f).string());
-
-        auto& cache = Cache::instance();
-        const fs::path root = Config::instance().root_dir();
-        const auto to_phys = [&](const std::string& logical) -> fs::path {
-            return fs::path(logical).is_absolute() ? root / fs::path(logical).relative_path()
-                                                   : root / logical;
-        };
-
-        // ── 阶段 1：废弃的普通文件（含符号链接）→ rename 进 stash（REMOVE_OLD）──
-        for (const auto& old_file : old_files) {
-            if (old_file.ends_with('/')) continue;  // 目录 → 阶段 2
-            if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) {
-                if (!new_set.contains(old_file)) {
-                    cache.remove_file_owner(old_file, pkg_name_);
-                    // 本包不再提供这个配置 → 记的"我们装进去过什么"也失效：留着它，等
-                    // 新版本**重新**发这个文件时会把旧记录的哈希当成 hash_orig。
-                    cache.remove_conf_hash(old_file, pkg_name_);
-                }
-                continue;
-            }
-            if (new_set.contains(old_file)) continue;
-            auto owners = cache.get_file_owners(old_file);
-            if (!owners.contains(pkg_name_)) continue;
-            cache.remove_file_owner(old_file, pkg_name_);
-            if (!cache.get_file_owners(old_file).empty()) continue;
-
-            const fs::path phys = strip_trailing_slash(to_phys(old_file));
-            // 新版本把该路径变成了**目录**（文件→目录的升级，TODO E4）：内容已由拷贝阶段
-            // 替换好，这里绝不能再把它当"废弃旧文件"搬进 stash——否则刚建好的目录被搬走，
-            // 升级"成功"但目录消失（实测）。目录的清理由阶段 2 负责。
-            if (fs::is_directory(phys) && !fs::is_symlink(phys)) continue;
-            // 盘上是 symlink→目录、而新版本在该路径登记了**目录条目**（`path/`）：同理 —— 拷贝
-            // 阶段已**穿过链接**把内容写进真实目录，把链接搬进 stash 会让这个路径整个消失
-            // （实测：v1 发 symlink `var/run` → v2 发目录 `var/run/`，升级后 /var/run 干脆不存在，
-            // 比原事故更糟 —— 原事故至少还留下一个实体目录）。
-            if (fs::is_directory(phys) && new_set.contains(old_file + "/")) continue;
-            if (!(fs::exists(phys) || fs::is_symlink(phys))) continue;
-            trace_remove("obsolete FILE " + old_file + " → rename into stash");
-            log_info(string_format("info.removing_obsolete_file", old_file));
-            // WAL: REMOVE_OLD + rename 进 stash（一次调用，顺序不可能写反）
-            sink.backup_obsolete(phys);
-        }
-
-        // ── 阶段 2：废弃的目录（最深优先，仅最后持有者）→ 空则 DIR_RM（rmdir+元数据）──
-        std::vector<fs::path> obsolete_dirs;
-        for (const auto& old_file : old_files) {
-            if (!old_file.ends_with('/')) continue;
-            if (old_file.starts_with(std::string(constants::DIR_ETC_PREFIX))) {
-                // 配置目录从不物理删除（与 /etc 文件一致，保留系统配置）
-                if (!new_set.contains(old_file)) {
-                    cache.remove_file_owner(old_file, pkg_name_);
-                    cache.remove_conf_hash(old_file, pkg_name_);  // 记录随归属一起撤（同阶段 1）
-                }
-                continue;
-            }
-            if (new_set.contains(old_file)) continue;
-            auto owners = cache.get_file_owners(old_file);
-            if (!owners.contains(pkg_name_)) continue;
-            cache.remove_file_owner(old_file, pkg_name_);
-            // 目录键带尾斜杠 → 物理路径先规范化：否则下面阶段里的 is_symlink 守卫恒假，
-            // rmdir 会穿过链接删掉链接指向的真实目录（见 strip_trailing_slash）
-            if (cache.get_file_owners(old_file).empty())
-                obsolete_dirs.push_back(strip_trailing_slash(to_phys(old_file)));
-        }
-        // 子目录先于父目录处理（父目录只有在子目录被 rmdir 后才为空）
-        std::ranges::sort(obsolete_dirs, [](const fs::path& a, const fs::path& b) {
-            return a.string().size() > b.string().size();
-        });
-
-        for (const auto& phys : obsolete_dirs) {
-            std::error_code ec;
-            if (!fs::is_directory(phys, ec) || fs::is_symlink(phys)) continue;
-            if (!fs::is_empty(phys, ec)) {
-                trace_remove("obsolete DIR  " + phys.string() + " → SKIP（含无主内容，整树保留）");
-                continue;
-            }
-            trace_remove("obsolete DIR  " + phys.string() + " → rmdir + DIR_RM");
-            log_info(string_format("info.removing_obsolete_file", phys.string()));
-            // WAL: DIR_RM（含 mode/uid/gid） + rmdir（一次调用）
-            // 目录型**挂载点**由 remove_empty_dir 挡下（rmdir 恒 EBUSY）→ 跳过 + 告警
-            if (sink.remove_empty_dir(phys) == detail::DirRemoval::SkippedMountPoint)
-                log_warning(string_format("warning.remove_mount_point", phys.string()));
-        }
-    }
-
-    install_hook_files();
-}
-
-/** 备份所有将被覆盖的文件为 .lpkgbak，同时写入 WAL 条目 */
-void InstallationTask::backup_existing_files()
-{
-    // 写入层原语：BACKUP/NEW/NEW_DIR 的 WAL 行与物理操作成对发生（见 op_sink.hpp）
-    detail::OpSink sink(pkg_name_, &stashes_);
-    const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
-    auto files = detail::scan_content_files(content_dir);
-
-    for (const auto& f : files) {
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-        fs::path rel_f = f;
-        if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
-        const fs::path physical_path = Config::instance().root_dir() / rel_f;
-        const fs::path phys_dir = physical_path.parent_path();
-
-        const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
-        if (is_config) continue;
-
-        std::error_code ec;
-        if (f.ends_with('/')) {
-            // **必须先去掉尾斜杠再判存在**：目录条目的 physical_path 以 '/' 结尾，而
-            // `fs::exists("/x/foo/")` 对**已存在的普通文件**返回 false（尾斜杠要求它是目录）
-            // ——直接用 physical_path 判会把"这里有个文件"误判成"路径不存在"，
-            // 于是既不备份也不删除，随后 copy_package_files 的 ensure_dir_exists 抛
-            // "Failed to create directory: File exists" 让整批中止（实测）。
-            // 判之前必须先剥尾斜杠：否则 lstat / is_symlink 会把末尾的符号链接**解引用**
-            // （pacman 为此专门写了 llstat()，见 FS#51377 / commit 16b91f79）。
-            const fs::path probe = strip_trailing_slash(physical_path);
-            const bool path_exists = fs::exists(probe) || fs::is_symlink(probe);
-            bool is_new_dir = !path_exists;
-
-            // 盘上不是**真目录**（lstat 语义：普通文件、符号链接都算"非目录"）而归档要求目录
-            // → 按文件冲突接管：搬进 stash（BACKUP，可回滚）+ 建目录（TODO E4 的"文件→目录"）。
-            // **不写穿 symlink→目录**：pacman 明确不支持该语义（"We do not support treating
-            // symlinks to directories as directories. They are considered a file."），而且包内容
-            // 会落进链接目标（`/var/run` 这类通常是 tmpfs，重启即蒸发），DB 记的逻辑路径与实际
-            // 落点也会脱节。挡住这类接管的责任在 check_for_file_conflicts：只要该路径不是**本包
-            // 旧版本**以非目录形态持有（E4），就在那里判冲突、整批中止，触碰不到这里。
-            if (path_exists && (!fs::is_directory(probe) || fs::is_symlink(probe))) {
-                // WAL: BACKUP + rename 进 stash（一次调用；此路径无 write-ahead 断点）
-                sink.backup(probe);
-                is_new_dir = true;
-            }
-            if (is_new_dir) {
-                new_dirs_.push_back(physical_path);
-                // WAL: NEW_DIR <path>  (write-ahead: 先写 WAL 再做实际操作)
-                sink.new_dir(physical_path);
-            }
-            fs::create_directories(phys_dir, ec);
-            if (is_new_dir) {
-                fs::create_directories(physical_path, ec);
-                std::string dir_rel = f;
-                if (dir_rel.ends_with('/')) dir_rel.pop_back();
-                const fs::path src_dir = content_dir / dir_rel;
-                struct stat st;
-                if (lstat(src_dir.c_str(), &st) == 0) {
-                    (void)lchown(physical_path.c_str(), st.st_uid, st.st_gid);
-                    (void)chmod(physical_path.c_str(), st.st_mode & constants::PERM_MASK_ALL);
-                }
-            }
-            continue;
-        }
-
-        fs::create_directories(phys_dir, ec);
-        if (fs::exists(physical_path) || fs::is_symlink(physical_path)) {
-            // is_directory 会跟随符号链接：symlink→目录 会被误判为"目录"而跳过备份。
-            // 但 copy_package_files 的 symlink/普通文件分支都会直接替换该路径（且无 WAL
-            // 记录），回滚时没有 BACKUP 可恢复 → 旧符号链接永久丢失。故符号链接（含指向
-            // 目录的）一律备份；仅真正的目录（非 symlink）由目录逻辑处理、跳过。
-            if (fs::is_symlink(physical_path) || !fs::is_directory(physical_path)) {
-                // check_for_file_conflicts 已处理文件冲突，此处无需重复检测
-                // 备份进每文件系统 stash（不再原位占目录，避免父目录删除时 bak 被包进去）
-                // WAL: BACKUP + rename（断点位于 write-ahead 窗口内，只能在 sink 里命中）
-                sink.backup(physical_path, "backup_after_wal_" + pkg_name_);
-            }
-        } else {
-            new_files_.push_back(physical_path);
-            // WAL: NEW <path>
-            sink.new_file(physical_path);
-        }
-    }
 }
 
 /**
@@ -439,7 +228,9 @@ void InstallationTask::rollback_files()
 void InstallationTask::download_and_verify_package()
 {
     if (!local_package_path_.empty()) {
-        if (!fs::exists(local_package_path_))
+        // 用户给的路径也是外部输入：环在这里应当报"本地包不存在"（点名的 LpkgException），
+        // 而不是让 std::filesystem 的原始异常穿出去
+        if (!exists_follow(local_package_path_))
             throw LpkgException(
                 string_format("error.local_pkg_not_found", local_package_path_.string()));
         log_info(string_format("info.installing_local_file", local_package_path_.string()));
@@ -505,6 +296,123 @@ void InstallationTask::extract_and_validate_package()
     }
 }
 
+namespace
+{
+
+/** 计划中是否有包提供该名字（能力名≠包名时，libsolv 已按能力解析过） */
+bool plan_provides(const InstallContext& ctx, const std::string& name)
+{
+    for (const auto& [pn, plan_pkg] : ctx.plan)
+        for (const auto& prov : plan_pkg.provides)
+            if (prov == name) return true;
+    return false;
+}
+
+/** 是否已是本批次的目标（libsolv 会处理） */
+bool is_planned_target(const InstallContext& ctx, const std::string& name)
+{
+    for (const auto& [tn, tv] : ctx.targets)
+        if (tn == name) return true;
+    return false;
+}
+
+/**
+ * 依赖是否**已被盘面满足**：真实包已安装且满足约束，或名字是能力（无同名真实包，
+ * 但已有包注册提供该能力）→ 视为满足。能力（多为无版本 SONAME）不带版本，约束对之无意义。
+ */
+bool dep_satisfied_on_disk(const DependencyInfo& dep)
+{
+    const std::string installed_ver = Cache::instance().get_installed_version(dep.name);
+    if (!installed_ver.empty()) {
+        return dep.constraints.empty() || version_satisfies_all(installed_ver, dep.constraints);
+    }
+    return !Cache::instance().get_providers(dep.name).empty();
+}
+
+/**
+ * 对一个**未被满足**的依赖做最终裁定：计划中已有同名真实包 / 由计划中某包提供 /
+ * 已是目标（libsolv 会处理）→ 都算处理完，返回。
+ *
+ * 命名能力那一支要把能力名记入 `ctx.targets`：提供者的**真实元数据可能与本索引不一致**
+ * （如 DynamicProviderChange 场景），供元数据验证触发的重解（i=0 重启）重新拉取正确提供者。
+ * **绝不在此重解**：中途改写 order 且不重置批次游标会导致依赖者先于提供者安装、产生
+ * 重复计划项（曾因此乱序）。
+ *
+ * 三者皆非 = solver/plan 不一致：依赖未安装、不在计划、也不由计划包提供。元数据验证
+ * （install_packages/upgrade_packages）在批次开始前已按真实元数据重解并 i=0 重启，这里
+ * 不应再发现新依赖 → 显式报错，整批回滚。
+ */
+void resolve_unmet_dep(InstallContext& ctx, const std::string& dep_name,
+                       const std::string& pkg_name)
+{
+    if (ctx.plan.contains(dep_name)) return;  // 计划中已有同名真实包
+
+    if (plan_provides(ctx, dep_name)) {
+        if (!is_planned_target(ctx, dep_name))
+            ctx.targets.emplace_back(dep_name, std::string(constants::VER_LATEST));
+        return;
+    }
+
+    if (is_planned_target(ctx, dep_name)) return;  // 已是目标（libsolv 会处理）
+
+    throw LpkgException(string_format("error.dep_missing_from_plan", dep_name, pkg_name));
+}
+
+/**
+ * 已安装的包中有该 SONAME 的提供者，且该提供者**不在本批次计划里** —— 在计划里的那份
+ * 会被本批次换成另一版本，不能算作"盘上已满足"。
+ */
+bool installed_provider_available(const InstallContext& ctx, const std::string& soname)
+{
+    for (const auto& p : Cache::instance().get_providers(soname)) {
+        if (Cache::instance().is_installed(p) && !ctx.plan.contains(p)) return true;
+    }
+    return false;
+}
+
+/**
+ * 仓库里该 SONAME 的提供者，且**未被"认领"** —— 提供者已安装、或在本批次计划中以另一版本
+ * 出现时，其版本已被锁定，仓库里其它版本提供此 SONAME 不能算数（否则依赖者声明的版本
+ * 约束/已装版本会被仓库旧版本悄悄绕过）。
+ */
+bool unclaimed_repo_provider(const InstallContext& ctx, const std::string& soname)
+{
+    auto prov_pkg = ctx.repo.find_provider(soname);
+    if (!prov_pkg) return false;
+    if (ctx.plan.contains(prov_pkg->name) || Cache::instance().is_installed(prov_pkg->name))
+        return false;
+    for (const auto& prov : prov_pkg->provides) {
+        if (prov == soname) return true;
+    }
+    return false;
+}
+
+/**
+ * 单个 SONAME 是否已满足：计划中有包提供 / 已装的提供者（且不随本批被换掉）/ 仓库里
+ * 未认领的提供者 / `--use-system-soname` 下系统 /usr/lib 已有该 `.so`。
+ *
+ * `--use-system-soname`（如 backup 的旧 SONAME）配合 farm 的 ABI 过渡机制：旧二进制在
+ * 过渡期加载旧 .so，新构建用新 .so。
+ */
+bool soname_satisfied(const InstallContext& ctx, const std::string& soname)
+{
+    if (plan_provides(ctx, soname)) return true;
+    if (installed_provider_available(ctx, soname)) return true;
+    if (unclaimed_repo_provider(ctx, soname)) return true;
+
+    return Config::instance().use_system_soname_mode() &&
+           Config::instance().has_system_soname(soname);
+}
+
+}  // namespace
+
+/**
+ * 校验依赖与 needed_so 是否都被满足（不碰盘、不改 DB，只读）。
+ *
+ * 主体只剩两条循环：每个依赖交给 `dep_satisfied_on_disk` / `resolve_unmet_dep`，
+ * 每个 SONAME 交给 `soname_satisfied` —— 判定与消息都在那几个小函数里，
+ * 原先 8 层嵌套现在最深 4 层。
+ */
 void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
 {
     if (Config::instance().no_deps_mode()) return;
@@ -514,129 +422,25 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
     log_info(string_format("info.checking_deps", pkg_name_));
 
     for (const auto& dep : actual_deps) {
-        const std::string& dep_name = dep.name;
-        const std::string installed_ver = Cache::instance().get_installed_version(dep_name);
-
-        if (!installed_ver.empty()) {
-            if (dep.constraints.empty() || version_satisfies_all(installed_ver, dep.constraints)) {
-                continue;  // 真实包已安装且满足
-            }
-        } else if (!Cache::instance().get_providers(dep_name).empty()) {
-            // 名称是能力（无同名真实包，但已有包注册提供该能力）→ 视为满足。
-            // 能力（多为无版本 SONAME）不带版本，约束对之无意义。
-            continue;
-        }
-
-        if (ctx.plan.contains(dep_name)) continue;  // 计划中已有同名真实包
-
-        // 命名能力：由计划中某包提供（能力名≠包名，libsolv 已按能力解析）。
-        // 提供者的**真实元数据可能与本索引不一致**（如 DynamicProviderChange 场景）——
-        // 把该能力记入 ctx.targets，供元数据验证触发的重解（i=0 重启）重新拉取正确
-        // 提供者。**绝不在此重解**：中途改写 order 且不重置批次游标会导致依赖者先于
-        // 提供者安装、产生重复计划项（曾因此乱序）。
-        bool provided_by_plan = false;
-        for (const auto& [pn, plan_pkg] : ctx.plan) {
-            for (const auto& prov : plan_pkg.provides) {
-                if (prov == dep_name) {
-                    provided_by_plan = true;
-                    break;
-                }
-            }
-            if (provided_by_plan) break;
-        }
-        if (provided_by_plan) {
-            bool already_target = false;
-            for (const auto& [tn, tv] : ctx.targets)
-                if (tn == dep_name) {
-                    already_target = true;
-                    break;
-                }
-            if (!already_target)
-                ctx.targets.emplace_back(dep_name, std::string(constants::VER_LATEST));
-            continue;
-        }
-
-        // 已是目标（libsolv 会处理）
-        bool is_target = false;
-        for (const auto& [tn, tv] : ctx.targets)
-            if (tn == dep_name) {
-                is_target = true;
-                break;
-            }
-        if (is_target) continue;
-
-        // 走到这里 = solver/plan 不一致：依赖未安装、不在计划、也不由计划包提供。
-        // 元数据验证（install_packages/upgrade_packages）在批次开始前已按真实元数据
-        // 重解并 i=0 重启，这里不应再发现新依赖。**绝不在此重解**（中途改写 order 且
-        // 不重置游标 → 乱序安装），改为显式报错，整批回滚。
-        throw LpkgException(string_format("error.dep_missing_from_plan", dep_name, pkg_name_));
+        if (dep_satisfied_on_disk(dep)) continue;
+        resolve_unmet_dep(ctx, dep.name, pkg_name_);
     }
 
     if (!needed_so_.empty()) {
         for (const auto& soname : needed_so_) {
-            bool provided = false;
+            if (soname_satisfied(ctx, soname)) continue;
 
-            for (const auto& [pn, plan_pkg] : ctx.plan) {
-                for (const auto& prov : plan_pkg.provides) {
-                    if (prov == soname) {
-                        provided = true;
-                        break;
-                    }
-                }
-                if (provided) break;
-            }
-
-            if (!provided) {
-                auto providers = Cache::instance().get_providers(soname);
-                for (const auto& p : providers) {
-                    if (Cache::instance().is_installed(p)) {
-                        if (!ctx.plan.contains(p)) {
-                            provided = true;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            if (!provided) {
-                if (auto prov_pkg = ctx.repo.find_provider(soname)) {
-                    // 提供者已被"认领"（已安装，或在本批次计划中以另一版本出现）时，
-                    // 其版本已被锁定——仓库里其它版本提供此 SONAME 不能算数。
-                    // 否则依赖者声明的版本约束/已装版本会被仓库旧版本悄悄绕过。
-                    bool claimed = ctx.plan.contains(prov_pkg->name) ||
-                                   Cache::instance().is_installed(prov_pkg->name);
-                    if (!claimed) {
-                        for (const auto& prov : prov_pkg->provides) {
-                            if (prov == soname) {
-                                provided = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // --use-system-soname：系统 /usr/lib 已有该 .so（如 backup 的旧 SONAME）→ 视为满足。
-            // 配合 farm 的 ABI 过渡机制：旧二进制在过渡期加载旧 .so，新构建用新 .so。
-            if (!provided && Config::instance().use_system_soname_mode() &&
-                Config::instance().has_system_soname(soname)) {
-                provided = true;
-            }
-
-            if (!provided) {
-                if (Config::instance().missing_so_no_error_mode()) {
-                    // --missing-so-no-error：bootstrap/过渡期容忍缺失 SONAME，警告继续。
-                    log_warning(string_format("warning.missing_so_no_error", soname, pkg_name_));
-                } else {
-                    throw LpkgException(
-                        string_format("error.unresolvable_drift", pkg_name_,
-                                      string_format("error.unresolved_soname", soname)));
-                }
+            if (Config::instance().missing_so_no_error_mode()) {
+                // --missing-so-no-error：bootstrap/过渡期容忍缺失 SONAME，警告继续。
+                log_warning(string_format("warning.missing_so_no_error", soname, pkg_name_));
+            } else {
+                throw LpkgException(
+                    string_format("error.unresolvable_drift", pkg_name_,
+                                  string_format("error.unresolved_soname", soname)));
             }
         }
     }
 }
-
 namespace
 {
 /**
@@ -646,6 +450,16 @@ namespace
  * （pacman 为此专门写了 `llstat()`，见 FS#51377 / commit 16b91f79），`is_symlink` 恒假、
  * "别动 symlink→目录"的守卫集体失效。`root / <绝对路径>` 会**丢弃**左值（archive.cpp
  * 里踩过同一个坑），所以这里先把逻辑路径转成相对路径再拼。
+ *
+ * ⚠️ **判据一律走不抛谓词族**（2026-09-26 修）：这两个字段**对每个归档条目**都会被求值
+ * （install/upgrade 的批次预检入口），而老的写法
+ * `fs::exists(phys, ec) || fs::is_symlink(phys)` 在**中间段**是符号链接环时**必抛**：
+ * `fs::exists` 带 ec 对 ELOOP 返回 false（不抛），于是 `||` **必然**求值那个抛型的
+ * `fs::is_symlink`，而它对 `"self/x"`（中间段成环）抛 code=40 —— 抛出来的还是 **raw
+ * `filesystem_error`**（不是 LpkgException、无 l10n 文案），整批中止、异常穿透到 CLI。
+ * 触发形状毫不特殊：盘上 `/usr/share/pylib -> pylib`（自环）**加**包内
+ * `content/usr/share/pylib/real.txt`（普通文件）就够了。
+ * （实测细节见 base/utils.hpp 那族谓词的说明 —— `fs::is_symlink` 只在**末段**是环时不抛。）
  */
 struct PathProbe {
     bool exists = false;
@@ -657,10 +471,9 @@ PathProbe probe_path(const fs::path& root, const std::string& logical_bare)
     fs::path rel = logical_bare;
     if (rel.is_absolute()) rel = rel.relative_path();
     const fs::path phys = strip_trailing_slash(root / rel);
-    std::error_code ec;
     PathProbe p;
-    p.exists = fs::exists(phys, ec) || fs::is_symlink(phys);
-    p.is_dir = p.exists && fs::is_directory(phys, ec) && !fs::is_symlink(phys);
+    p.exists = exists_no_follow(phys);
+    p.is_dir = is_real_directory(phys);
     return p;
 }
 
@@ -686,12 +499,91 @@ struct ConflictView {
 };
 
 /**
+ * "`dir_bare` 下的整棵子树是否只属于 pkg 或本批次正在升级的包"（pacman 的
+ * `dir_belongsto_pkgs`）—— 用于放行"盘上是真目录、新条目是文件/符号链接"（dir → 非目录）
+ * 的接管。**不加视图成员**：判据只需要 `owners` 与 `all_upgrading` 两个既有成员，
+ * 由调用处直接传入，两个视图（真实 / 整批预检的模拟世界）自动共用同一段遍历逻辑。
+ *
+ * 为什么要"整棵树"而不是"这个目录路径归我"：目录可以被多个包共享（目录键是**累加**持有者
+ * 的），把一棵被共享的目录整树让开（搬进 stash / 改名 .lpkgsave）会**连带搬走别人的文件**。
+ * pacman 为此在 `conflict.c` 里写了 `dir_belongsto_pkgs`：遍历目录、逐条查归属，任何一条
+ * 不属于"本包 ∪ 本次要移除/升级的包"就判否。
+ *
+ * 走**盘面**取条目（与 pacman 同构：无主文件在盘上就是盘上），归属与"是否在升级"则分别问
+ * 两个回调 —— 真实视图查 Cache、整批预检查模拟世界，两种"世界"共用这一段遍历逻辑。
+ */
+/// `out_first_foreign`（可空）：判否时写入**第一个不属于我们的条目**的持有者名；该条目无主时
+/// 写入空串。供调用方在报错里点名**真实**冲突源，而不是含糊地报"这个目录归本包"。
+bool dir_tree_entirely_ours(
+    const fs::path& root, const std::string& dir_bare, const std::string& pkg,
+    const std::function<std::vector<std::string>(const std::string&)>& owners_of,
+    const std::function<bool(const std::vector<std::string>&)>& is_upgrading,
+    std::string* out_first_foreign = nullptr)
+{
+    fs::path rel = dir_bare;
+    if (rel.is_absolute()) rel = rel.relative_path();
+    const fs::path phys = strip_trailing_slash(root / rel);
+    std::error_code ec;
+    if (!fs::is_directory(phys, ec)) return false;  // 不是真目录 → 该判据不适用
+
+    for (fs::recursive_directory_iterator
+             it(phys, fs::directory_options::skip_permission_denied, ec),
+         end;
+         it != end; it.increment(ec)) {
+        if (ec) return false;
+        // 目录键在 DB 里**带尾斜杠**；符号链接一律算非目录（与 probe_path/§3.6.1 同口径）
+        const bool real_dir = !it->is_symlink(ec) && it->is_directory(ec);
+        if (ec) return false;
+        // **`lexically_relative` 而不是 `fs::relative`**（2026-09-26 修）：后者会**解析
+        // 符号链接（含末段）**，于是"逐条查归属"查的是**链接目标**的键，而不是这个名字的。
+        // 两个后果都是实的：① 树里有一个**别的包持有**的链接、其解析目标归本包 ⇒ 判"整树
+        // 都是我们的" ⇒ 整树搬进 stash ⇒ 提交后 stash 被 `remove_all` ⇒ 别人那份文件**永久
+        // 消失**，而它的 DB 归属还在原位（所有权脱节 —— 正是本函数存在的唯一意义）；
+        // ② 中间段是链接（usr-merge `/bin`→`usr/bin`、`/lib64`）⇒ 键查不到 ⇒ 判"无主" ⇒
+        // **拒绝**本可放行的 dir→非目录 升级。同仓库 `scan/scanner.cpp:93` 早已为同一问题
+        // 改用 `lexically_relative` 并写明"假孤儿"的成因。
+        const fs::path rel_entry = it->path().lexically_relative(root);
+        if (rel_entry.empty()) return false;  // 词法上也对不上 → 判不了 → 拒绝（保守）
+        fs::path logical = fs::path("/") / rel_entry;
+        std::string key = logical.generic_string();
+        if (real_dir) key += "/";
+
+        const std::vector<std::string> holders = owners_of(key);
+        if (holders.empty()) {
+            if (out_first_foreign) out_first_foreign->clear();  // 无主 → 渲染成"未知（手动文件）"
+            return false;
+        }
+        for (const auto& h : holders) {
+            if (h == pkg) continue;
+            if (!is_upgrading({h})) {
+                if (out_first_foreign) *out_first_foreign = h;
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+/**
  * 文件冲突判定核心（pacman conflict.c 的安装侧语义）。六条必须逐字保持：
  *
  *   ① 自持短路：该路径由**本包**持有 → 不判冲突（重装 / 升级自己）；
  *   ② `ours` 豁免是**方向性**的：只豁免"归档**目录**条目接管本包旧版本的**文件/符号链接**"
- *      （文件→目录升级，TODO E4）；反方向 dir→文件 **永不**豁免（pacman 的 case 5 对任何
- *      持有者都不放行，实测放行会 rename 撞 EISDIR、回滚还把空目录 rmdir 掉）；
+ *      （文件→目录升级，TODO E4）；反方向 dir→文件 **永不**豁免。
+ *
+ *      理由**不是**"pacman 也不允许"（订正 2026-09-25，原文如此写、引证错层）：pacman 的
+ *      **冲突层**其实允许它 —— `conflict.c` 的 `_alpm_db_find_fileconflicts` 里有
+ *      "check if all files of the dir belong to the installed pkg"，当目录里外全属于
+ *      `dbpkg ∪ rem`（本包已装版本 ∪ 本次要移除的包）时 `resolved_conflict = 1`，
+ *      **不报冲突**；`add.c` 那条 "extract: not overwriting dir with file"（case 5）是
+ *      **解压层**的无条件拒绝，pacman 之所以撞不到它，是因为它**先删旧包文件（含目录）、
+ *      再解压新包**，解压时那个路径已不存在。
+ *
+ *      lpkg 撞得到，是**阶段顺序**决定的：旧目录由 `commit_without_file_ops()`（第 ④ 步）
+ *      清理，而新文件在 `copy_package_files()`（第 ③ 步）就要落位 —— 此时旧目录还在盘上，
+ *      `rename(.lpkgtmp → <该路径>)` 撞 EISDIR，回滚还会把已清空的目录 rmdir 掉。
+ *      所以这里必须前置拒绝、整批中止。**要支持对称语义得把"旧目录清除"挪到拷贝之前**
+ *      （动事务内阶段顺序），不是改这一处判定就够的。
  *   ③ `--overwrite <glob>`（含等价的 `--force-overwrite` ≡ `--overwrite '*'`）只豁免
  *      **命中该路径**的同一类冲突（`force_exempts = entry_is_dir`），不豁免 dir→文件；
  *      豁免是**逐路径**问 `Config::overwrite_allows(path)` 的，不是"开了就全局放行"。
@@ -729,15 +621,45 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
                     view.owned_by(bare, pkg_name) || view.owned_by(bare + "/", pkg_name);
                 // 上面这层只在"类型不一致"时进入，所以 `!disk.is_dir` 恒等于"归档是目录条目"。
                 const bool entry_is_dir = !disk.is_dir;
-                const bool ours_exempts = ours && entry_is_dir;
-                const bool force_exempts = entry_is_dir;  // 豁免也只覆盖这一类
+                // **dir → 非目录**（归档是文件/符号链接、盘上是真目录）对称放行，但要满足
+                // pacman 的 `dir_belongsto_pkgs`：**整棵目录树**都归本包或本批次正在升级的包。
+                // 为什么必须"整棵树"：目录键是**累加**持有者的（目录可被多包共享），只凭
+                // "这个目录路径归我"就整树让开，会连带搬走别的包的文件。
+                std::string
+                    foreign_holder;  // 判否时 = 树里第一个"不是我们的"条目的持有者（无主则空）
+                const bool dir_takeover =
+                    disk.is_dir && ours &&
+                    dir_tree_entirely_ours(Config::instance().root_dir(), bare, pkg_name,
+                                           view.owners, view.all_upgrading, &foreign_holder);
+                const bool ours_exempts = ours && (entry_is_dir || dir_takeover);
+                // `--overwrite` 仍**不**豁免 dir→非目录（pacman 的 add.c 对
+                // "not overwriting dir with file" 也是无条件拒绝；dir → 非目录只能靠
+                // "整棵树都是我们自己的"这条正路走通，不能靠开关强推）。
+                const bool force_exempts = entry_is_dir;
                 if (!ours_exempts &&
                     !(force_exempts && Config::instance().overwrite_allows(bare))) {
                     auto holders = view.owners(bare);
                     if (holders.empty()) holders = view.owners(bare + "/");
-                    conflicts[path_str] =
-                        holders.empty() ? get_string("error.unknown_manual_file") : holders.front();
+                    // 报错要点名**真实**冲突源。盘上是本包的目录、但树里有别人的/无主的条目时，
+                    // 直接报那个条目的持有者；只报"本包持有这个目录"会把人引去查一个不存在的
+                    // 冲突源（实测：报 "owned by other packages: owned by package <自己>"）。
+                    if (disk.is_dir && ours) {
+                        conflicts[path_str] = foreign_holder.empty()
+                                                  ? get_string("error.unknown_manual_file")
+                                                  : foreign_holder;
+                    } else {
+                        conflicts[path_str] = holders.empty()
+                                                  ? get_string("error.unknown_manual_file")
+                                                  : holders.front();
+                    }
                 }
+                // **放行之后必须跳出**：`dir_takeover` 判真说明这次是"盘上是本包的目录、归档是
+                // 文件/符号链接"，而**目录在 DB 里的键带尾斜杠**（`<bare>/`）。放行后若继续往下
+                // 走尾部的"路径级"检查，那里按 bare（无尾斜杠）查归属 → 什么都查不到，会把刚
+                // 放行的接管又判成"无主手工文件"重新拒掉（实测：报 "owned by package unknown
+                // (manual file)"，整条升级路径依旧装不上；`/etc` 的 save_config 分支也因此
+                // 永远不可达）。
+                if (dir_takeover) continue;
             }
         }
 
@@ -990,441 +912,6 @@ void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
             const PathProbe disk = probe_now(bare);
             if (disk.exists && !disk.is_dir) released.insert(bare);
         }
-    }
-}
-
-void InstallationTask::copy_package_files()
-{
-    log_info(string_format("info.copying_files", pkg_name_));
-    // 写入层原语：COPY 的 WAL 行与 rename 成对发生（见 op_sink.hpp）
-    detail::OpSink sink(pkg_name_, &stashes_);
-    const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
-    auto files = detail::scan_content_files(content_dir);
-    // ① 分支（用户没改过 → 静默换新版）本次碰到的配置路径：**只记账，循环结束后按包
-    // 聚合一行**。逐配置文件打日志在真实场景里是数量级的：`lpkg upgrade` 一次几百个包、
-    // 每个包几个 /etc 条目 ⇒ 光这一句就刷几百行（pacman 对静默替换一行都不打）。
-    std::vector<std::string> silently_updated_configs;
-
-    for (const auto& f : files) {
-        if (on_before_file_copy) on_before_file_copy();
-
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-        fs::path rel_f = f;
-        if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
-        const fs::path src_path = content_dir / f;
-        const fs::path physical_path = Config::instance().root_dir() / rel_f;
-
-        if (!fs::exists(src_path) && !fs::is_symlink(src_path)) continue;
-
-        fs::path parent = physical_path.parent_path();
-        std::vector<fs::path> to_create;
-        while (!parent.empty() && !fs::exists(parent)) {
-            to_create.push_back(parent);
-            if (parent == Config::instance().root_dir()) break;
-            parent = parent.parent_path();
-        }
-        for (const auto& d : to_create | std::views::reverse) {
-            ensure_dir_exists(d);
-        }
-
-        if (fs::is_symlink(src_path)) {
-            fs::path link_target = fs::read_symlink(src_path);
-            fs::path dest = physical_path;
-
-            const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
-            // 注意 `fs::is_directory` 会跟随符号链接：`/etc/x -> /some/dir` 会被判成"目录"
-            // 从而绕过配置保护（既不备份也不留 .lpkgnew，直接替换）。故符号链接一律按冲突处理。
-            const bool cfg_conflict = fs::exists(physical_path) || fs::is_symlink(physical_path);
-            if (is_config && cfg_conflict &&
-                (fs::is_symlink(physical_path) || !fs::is_directory(physical_path))) {
-                dest += std::string(constants::SUFFIX_LPKG_NEW);
-                log_warning(string_format("warning.config_conflict", physical_path.string(),
-                                          dest.string()));
-                has_config_conflicts_ = true;
-            }
-
-            // 目录无法被符号链接替换：backup_existing_files 不备份目录，若静默
-            // remove 会留下无 WAL 记录的破坏且回滚无法恢复——作为文件冲突拒绝。
-            if (fs::is_directory(dest) && !fs::is_symlink(dest)) {
-                throw LpkgException(string_format("error.copy_failed_rollback", f,
-                                                  physical_path.string(),
-                                                  get_string("error.dir_replaced_by_symlink")));
-            }
-
-            // 落位这份链接同样是"这个批次改了盘面"（改的不是配置本体而已），**必须能回滚**：
-            // 裸 `fs::remove(dest)` + `fs::create_symlink(...)` 是**事务外的副作用** —— 批次被
-            // 回滚后包根本没装上，/etc 上却多出一份「请审阅」链接（dest 可能是 `<配置>.lpkgnew`），
-            // 盘面与 WAL 描述的世界不一致；批次前已有的那份也会被无条件删掉、回不来。
-            // 故与普通文件分支共用**同一套写入层原语**（OpSink）：
-            //   · 目标已存在（上一次留下的 .lpkgnew / 被链接接管的旧文件）→ 先 `backup` 把它
-            //     **让开**（WAL BACKUP + 搬进 stash）。这里**不能**再单独 fs::remove 一次 ——
-            //     旧的那份已经进 stash 了，删掉的是别人（它在回滚时要被 rename 回来）；
-            //   · 无论哪条路径，随后先写 `NEW <dest>` 行（逆操作 = 删除该路径，对符号链接
-            //     幂等），再 `create_symlink` —— 此时 dest 必然不存在，是**单次原子操作**。
-            // 行序 BACKUP → NEW 不可反：逆序回滚才会"先撤新链接（NEW 的逆操作）、再还原旧那份
-            // （BACKUP 的逆操作）"。
-            if (fs::exists(dest) || fs::is_symlink(dest)) sink.backup(dest);
-            sink.new_file(dest);
-            fs::create_symlink(link_target, dest);
-            struct stat st;
-            if (lstat(src_path.c_str(), &st) == 0) {
-                (void)lchown(dest.c_str(), st.st_uid, st.st_gid);
-            }
-            fsync_parent_dir(dest);
-            TriggerManager::instance().check_file((fs::path("/") / f).string());
-            continue;
-        }
-
-        if (fs::is_directory(src_path)) {
-            // 目录条目的物理路径带尾斜杠：先规范化（尾斜杠会让下面的 lstat/chmod 解引用链接）
-            const fs::path probe = strip_trailing_slash(physical_path);
-            bool existed = fs::exists(probe);
-            ensure_dir_exists(physical_path);
-            // 落在 symlink→目录 上（`/lib64 -> usr/lib`、`/var/run -> ../run`）：内容要**穿过**
-            // 链接写进真实目录，但目录条目的 uid/mode **不能**跟着穿过去 —— lchown/chmod 会跟随
-            // 链接，把**别的包持有的**目录（如 /usr/lib）的属主/权限改成包内值（对普通用户直接
-            // 变成不可读/不可执行）。链接目标与包内目录本就不是同一个对象，也谈不上"权限不一致"，
-            // 故整个元数据块跳过。
-            struct stat st;
-            if (!fs::is_symlink(probe) && lstat(src_path.c_str(), &st) == 0) {
-                (void)lchown(probe.c_str(), st.st_uid, st.st_gid);
-                mode_t pkg_mode = st.st_mode & constants::PERM_MASK_ALL;
-                if (existed) {
-                    struct stat dst_st;
-                    if (lstat(probe.c_str(), &dst_st) == 0) {
-                        mode_t cur_mode = dst_st.st_mode & constants::PERM_MASK_ALL;
-                        if (cur_mode != pkg_mode) {
-                            log_warning(string_format("warning.dir_perm_mismatch", probe.string(),
-                                                      static_cast<int>(cur_mode),
-                                                      static_cast<int>(pkg_mode)));
-                        }
-                    }
-                }
-                (void)chmod(probe.c_str(), pkg_mode);
-            }
-            continue;
-        }
-
-        try {
-            const bool is_config = f.starts_with(std::string(constants::DIR_ETC));
-            fs::path final_dest = physical_path;
-
-            // 盘上该路径已有**非目录**物。符号链接也算"已被占用"：`fs::is_directory` 会
-            // 跟随链接，指向目录的链接会被误判成"目录"，那样配置保护整段被绕过（既不备份
-            // 也不留 .lpkgnew，直接替换）—— 故 `target_is_dir` 显式排掉符号链接。
-            const bool target_taken = fs::exists(physical_path) || fs::is_symlink(physical_path);
-            const bool target_is_dir =
-                target_taken && !fs::is_symlink(physical_path) && fs::is_directory(physical_path);
-
-            // ── 三哈希分流（pacman add.c）────────────────────────────────────────
-            // 判定表只有一份：classify_config_update()。这里只负责**备料**（三份哈希）与
-            // **记录**（把"这次装进去的内容"写回 DB，供下次升级当 hash_orig）。
-            auto disposition = ConfigDisposition::InstallNew;
-            if (is_config) {
-                const std::string logical_path = (fs::path("/") / f).string();
-                const std::string hash_pkg = calculate_sha256(src_path);  // 包内那份
-                // 盘上那份（hash_local）：只有**普通文件**才有可比的内容。符号链接、
-                // 目录、读不到的路径 → 留空（= 无从判定 → 保守路径）。
-                std::string hash_local;
-                if (target_taken && !fs::is_symlink(physical_path) &&
-                    fs::is_regular_file(physical_path)) {
-                    try {
-                        hash_local = calculate_sha256(physical_path);
-                    } catch (const std::exception&) {
-                        hash_local.clear();
-                    }
-                }
-                auto& cache = Cache::instance();
-                const std::string hash_orig = cache.get_conf_hash(logical_path, pkg_name_);
-                if (target_taken && !target_is_dir) {
-                    disposition = classify_config_update(hash_local, hash_orig, hash_pkg);
-                }
-                // 记录值（判定表之外的**另一半**语义，见 classify_config_update 的说明）：
-                // 永远是**包内内容**的哈希 —— 记录只声明"这个包的这个版本提供过什么"。
-                // 用户的文件**永不**被追认成我们的内容：追认它，下一次升级就满足
-                // "盘上 == 旧记录"而把用户改过的配置**静默覆盖**（踩中底线）。而退化路径
-                // （无旧记录 + 盘上已有这份配置）上那份往往正是**用户**的文件（无主文件撞
-                // 包内文件时 `--overwrite` 是唯一合法入口），追认它就是把"用户那份"宣布成
-                // 我们装的 —— 且这不是一次性的：记录有三处会按设计被删除（升级丢弃 /etc
-                // 条目、remove_conf_hash、移除包），该路径重新归本包时"追认"会被重新武装。
-                // 代价（有意为之）：老 DB 的配置在用户把 `.lpkgnew` **合并进**盘上那份之前，
-                // 包每改一次配置都会再落一份**可见的** `.lpkgnew`（吵，但绝不静默）；合并后
-                // 盘上 == 记录，回到正常分流。判定表本身不受影响：无记录时仍是"两份一致 →
-                // 保留原文件、不一致 → 落 `.lpkgnew` + 告警"，用户可见行为不变。
-                cache.set_conf_hash(logical_path, pkg_name_, hash_pkg);
-            }
-
-            // 落到目标路径本体的分支（①）/ 不落地的分支（② 保留、③ 落 .lpkgnew）
-            bool install_in_place = true;
-            if (is_config && target_taken && !target_is_dir) {
-                switch (disposition) {
-                    case ConfigDisposition::InstallNew:
-                        // ① 盘上 == 上次装进去的（用户没改过）→ 静默换新版。**会真的改盘**，
-                        // 所以先把盘上那份搬进 stash（BACKUP，可回滚）：批次失败时 reverse_execute
-                        // 把它 rename 回原位，静默替换不留"改得动、撤不回"的缺口。
-                        // （提交后它随 stash 清理掉是预期的：用户没改过，没有要保留的内容；
-                        //   "保留"是移除侧 .lpkgsave 的语义。）
-                        sink.backup(physical_path, "conf_replace_after_wal_" + pkg_name_);
-                        // 降噪：此处**不打日志**（逐配置文件一行会是几百行）。记账，
-                        // 循环结束后按包聚合一行 —— 条数与完整路径都在那一行里（见下）。
-                        silently_updated_configs.push_back(physical_path.string());
-                        break;
-                    case ConfigDisposition::KeepLocal:
-                        // ② 包本身没改这个配置（旧记录 == 新包）→ 保留用户文件，**连
-                        // .lpkgnew 都不产生**：没有"新东西"要给用户审阅，产生它只会让 /etc
-                        // 越堆越多。本分支不碰盘面，故无需进 WAL。
-                        install_in_place = false;
-                        break;
-                    case ConfigDisposition::SaveLpkgnew: {
-                        // ③ 三者互异（含"无从判定"）→ 新版落 .lpkgnew + 告警（原行为）
-                        install_in_place = false;
-                        final_dest += std::string(constants::SUFFIX_LPKG_NEW);
-                        log_warning(string_format("warning.config_conflict", physical_path.string(),
-                                                  final_dest.string()));
-                        has_config_conflicts_ = true;
-                        // "请审阅"文件也**必须能回滚**：落 .lpkgnew 同样是"这个批次改了盘面"，
-                        // 只是改的不是配置本身。裸 fs::copy 是事务外的副作用 —— 批次回滚后包
-                        // 没装上、配置也退回了批次前，却平白多出一份（还盖掉了上一次留下的）
-                        // "请审阅"副本，盘面与 WAL 描述的世界不一致。故与普通文件分支走**同一套
-                        // 写入层原语**：内容先写进 .lpkgtmp（+ xattr + 属主/权限 + fsync），再
-                        // commit_copy 落位（WAL COPY）。
-                        fs::path tmp_path = final_dest;
-                        tmp_path += ".lpkgtmp";
-                        fs::copy(
-                            src_path, tmp_path,
-                            fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-                        copy_xattrs(src_path,
-                                    tmp_path);  // 先搬到 .lpkgtmp，rename 后 xattr 随之生效
-                        struct stat st;
-                        if (lstat(src_path.c_str(), &st) == 0) {
-                            (void)lchown(tmp_path.c_str(), st.st_uid, st.st_gid);
-                            if (!S_ISLNK(st.st_mode)) {
-                                (void)chmod(tmp_path.c_str(),
-                                            st.st_mode & constants::PERM_MASK_ALL);
-                            }
-                        }
-                        // fsync .lpkgtmp 后再写 WAL（断电丢内容的话，WAL 指向的就是空文件）
-                        if (durable_fsync_enabled()) {
-                            if (int cfd = ::open(tmp_path.c_str(), O_RDONLY); cfd >= 0) {
-                                ::fsync(cfd);
-                                ::close(cfd);
-                            }
-                        }
-                        // 目标已存在（上一次留下的 .lpkgnew，用户可能还没审阅）→ 先 BACKUP 进
-                        // stash 再落新的：回滚时它是"把旧那份 rename 回来"，而不是连带删掉
-                        // 一份与本批次无关、用户尚未处理的审阅文件（顺序也不可反：BACKUP 行
-                        // 必须先于 COPY 行，逆序回滚才会"先撤新那份、再还原旧那份"）。
-                        if (fs::exists(final_dest) || fs::is_symlink(final_dest))
-                            sink.backup(final_dest);
-                        sink.commit_copy(tmp_path, final_dest);
-                        break;
-                    }
-                }
-            }
-
-            if (install_in_place) {
-                fs::path tmp_path = final_dest;
-                tmp_path += ".lpkgtmp";
-                fs::copy(src_path, tmp_path,
-                         fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-                copy_xattrs(src_path, tmp_path);  // 先搬到 .lpkgtmp，rename 后 xattr 随之生效
-
-                struct stat st;
-                if (lstat(src_path.c_str(), &st) == 0) {
-                    (void)lchown(tmp_path.c_str(), st.st_uid, st.st_gid);
-                    if (!S_ISLNK(st.st_mode)) {
-                        (void)chmod(tmp_path.c_str(), st.st_mode & constants::PERM_MASK_ALL);
-                    }
-                }
-                // fsync .lpkgtmp 后再写 WAL
-                if (durable_fsync_enabled()) {
-                    int fd = ::open(tmp_path.c_str(), O_RDONLY);
-                    if (fd >= 0) {
-                        ::fsync(fd);
-                        ::close(fd);
-                    }
-                }
-                // WAL: COPY <tmp> → <dst> (write-ahead: WAL 先于 rename)
-                // （断点位于 write-ahead 窗口内，只能在 sink 里命中）
-                sink.commit_copy(tmp_path, final_dest, "copy_after_wal_" + pkg_name_);
-            }
-
-            TriggerManager::instance().check_file((fs::path("/") / f).string());
-        } catch (const std::exception& e) {
-            throw LpkgException(
-                string_format("error.copy_failed_rollback", f, physical_path.string(), e.what()));
-        }
-    }
-
-    // ① 分支的降噪出口：每包**一行**（条数 + 完整路径清单）。信息一点没丢 —— 用户仍然
-    // 查得到"到底哪些配置被静默换了"，只是不再一个文件占一行。放在循环之后（而不是每
-    // 次碰到就打印）是聚合的前提；批次中途失败时这一行不会打，但那时整批回滚、盘面回到
-    // 批次前，没有"静默替换"可言。
-    if (!silently_updated_configs.empty()) {
-        std::string joined;
-        for (const auto& p : silently_updated_configs) {
-            if (!joined.empty()) joined += ", ";
-            joined += p;
-        }
-        log_info(
-            string_format("info.config_updated_batch", silently_updated_configs.size(), joined));
-    }
-    if (has_config_conflicts_) log_warning(get_string("info.config_review_reminder"));
-}
-
-void InstallationTask::register_package()
-{
-    auto& cache = Cache::instance();
-
-    if (!old_version_to_replace_.empty()) {
-        const fs::path old_dep_file = Config::instance().dep_dir() / pkg_name_;
-        if (fs::exists(old_dep_file)) {
-            std::ifstream f(old_dep_file);
-            std::string line;
-            while (std::getline(f, line)) {
-                if (!line.empty()) {
-                    std::stringstream ss(line);
-                    std::string dn;
-                    if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name_);
-                }
-            }
-        }
-        for (const auto& cap : cache.get_package_provides(pkg_name_)) {
-            cache.remove_provider(cap, pkg_name_);
-        }
-        // 旧 needed_so 文件不在此处删除——由下方的 write_string_file_wal 备份后
-        // 覆盖（回滚时可恢复旧版 needed_so 元数据）。
-    }
-
-    std::unordered_set<std::string> dep_entries;
-    for (const auto& d : deps_) {
-        dep_entries.insert(d);
-        std::string name = d;
-        if (const auto pos = d.find_first_of(" \t<>="); pos != std::string::npos)
-            name = d.substr(0, pos);
-        cache.add_reverse_dep(name, pkg_name_);
-    }
-
-    for (const auto& soname : needed_so_) {
-        auto providers = cache.get_providers(soname);
-        for (const auto& prov_pkg : providers) {
-            if (prov_pkg != pkg_name_ && cache.is_installed(prov_pkg)) {
-                // 只记反向依赖（移除时阻止误删），不把 SONAME 提供者写进 deps/：
-                // deps/ 只放命名依赖。写入会污染 deps/ 且依赖安装顺序
-                // （is_installed 检查），让 autoremove 对提供者误判。
-                cache.add_reverse_dep(prov_pkg, pkg_name_);
-            }
-        }
-    }
-
-    std::vector<std::string> sorted_deps(dep_entries.begin(), dep_entries.end());
-    std::sort(sorted_deps.begin(), sorted_deps.end());
-    // WAL → 原子写（write-ahead：已存在的旧文件先备份，升级回滚可恢复旧版元数据）
-    {
-        std::string deps_content;
-        for (const auto& entry : sorted_deps) {
-            deps_content += entry;
-            deps_content += constants::NL;
-        }
-        wal::write_string_file_wal((Config::instance().dep_dir() / pkg_name_).string(),
-                                   deps_content, pkg_name_ + ":installed",
-                                   /*create_empty=*/true);
-    }
-
-    {
-        std::string nso_content;
-        for (const auto& sn : needed_so_) {
-            nso_content += sn;
-            nso_content += constants::NL;
-        }
-        // 空内容 → DBRM 备份并删除旧文件（回滚恢复）；非空 → DBNEW/DB + 备份
-        wal::write_string_file_wal((Config::instance().needed_so_dir() / pkg_name_).string(),
-                                   nso_content, pkg_name_ + ":installed");
-    }
-
-    const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
-    for (const auto& f : detail::scan_content_files(content_dir)) {
-        // 目录允许共享所有权（多个包安装到同一目录是正常的，如 /usr/bin/），
-        // 走 add_dir_owner 累加所有者；普通文件强制单一所有者，冲突由
-        // add_file_owner 的 error.file_already_owned 检测。
-        if (f.ends_with('/'))
-            cache.add_dir_owner((fs::path("/") / f).string(), pkg_name_);
-        else
-            cache.add_file_owner((fs::path("/") / f).string(), pkg_name_);
-    }
-
-    const fs::path man_path =
-        Config::instance().docs_dir() / (pkg_name_ + std::string(constants::SUFFIX_MAN));
-    // 空 man → DBRM 备份并删除旧文件（回滚恢复）；非空 → DBNEW/DB + 备份
-    wal::write_string_file_wal(man_path.string(), man_content_, pkg_name_ + ":installed");
-
-    for (const auto& cap : provides_) {
-        cache.add_provider(cap, pkg_name_);
-    }
-    cache.add_installed(pkg_name_, actual_version_, explicit_install_);
-}
-
-/**
- * 把本包归档 hooks/ 里的脚本落进 hooks_dir/<pkg>/，并记下文件名（提交后据此剪枝）。
- *
- * **这里不执行任何钩子**（原实现在末尾直接 `run_hook(POSTINST_SH)`）。执行时机只有一个：
- * 批次**提交之后**的 finish_committed_batch() —— 批次是"全或无"，回滚能撤销文件与 DB，
- * 却撤不回钩子的副作用（钩子以 root 跑 systemd-sysusers / tmpfiles --create / useradd，
- * 改的是系统状态）：留在批次内 = 已经回滚掉的批次在系统上留下撤不掉的痕迹。上游 libalpm
- * 同理：POST hook 整段在"提交/中断"判定之后，提交失败则一个 hook 都不跑。
- *
- * **脚本文件本身走写入层原语（OpSink），因而在事务内可回滚**。原先直接
- * `fs::copy(..., overwrite_existing)` 是错的：hook 按**包名**存在 hooks_dir/<pkg>/ 下，
- * 新版本覆盖旧版本即永久丢失 —— 批次一旦回滚，包体回到旧版本而钩子是新版本的内容，
- * 之后 remove/upgrade 跑的是**错版本**的脚本（上游 libalpm 把脚本按版本存在 local DB 的包
- * 目录里：新版本进新目录、旧目录提交末尾才删，故不存在"旧脚本被覆盖"）。这里改为
- * BACKUP（旧脚本进 stash，回滚原样搬回）+ COPY（新脚本 .lpkgtmp → fsync → rename）。
- * 顺带修掉 `fs::copy(overwrite_existing)` 落在**符号链接**上时会写穿链接、改掉链接目标的
- * 隐患（rename 不跟随末段链接）。
- */
-void InstallationTask::install_hook_files()
-{
-    const fs::path hook_src = tmp_pkg_dir_ / constants::DIR_HOOKS;
-    if (!fs::exists(hook_src) || !fs::is_directory(hook_src)) return;
-
-    detail::OpSink sink(pkg_name_, &stashes_);
-    const fs::path dest_dir = Config::instance().hooks_dir() / pkg_name_;
-    if (!fs::exists(dest_dir)) {
-        // 目录本体也进事务：NEW_DIR 的逆操作会删掉它，失败批次不在 hooks_dir 下留空壳
-        sink.new_dir(dest_dir);
-        ensure_dir_exists(dest_dir);
-    }
-    for (const auto& entry : fs::directory_iterator(hook_src)) {
-        if (!entry.is_regular_file()) continue;
-        const fs::path dest = dest_dir / entry.path().filename();
-
-        // hooks_dir/<pkg>/ 下的同名**实体目录**：不是本包能接管的东西。搬进 stash 会在提交后
-        // 被 remove_all 连带删掉整棵树（ARCH §3.6：无主内容一律不碰），所以宁可直接失败、
-        // 让批次回滚 —— 这也与原实现一致（fs::copy 到目录目标会失败）。
-        std::error_code dec;
-        if (fs::is_directory(dest, dec) && !fs::is_symlink(dest)) {
-            throw LpkgException(string_format("error.hook_path_is_dir", dest.string()));
-        }
-        // 旧版本的同一个 hook（含符号链接）先搬进 stash：批次回滚时原样搬回
-        if (fs::exists(dest) || fs::is_symlink(dest)) sink.backup(dest);
-
-        fs::path tmp = dest;
-        tmp += ".lpkgtmp";
-        fs::copy(entry.path(), tmp, fs::copy_options::overwrite_existing);
-        copy_xattrs(entry.path(), tmp);  // 先搬到 .lpkgtmp，rename 后 xattr 随之生效
-        fs::permissions(tmp, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
-                        fs::perm_options::add);
-        // fsync .lpkgtmp 后再写 WAL（与包内容同一纪律）
-        if (durable_fsync_enabled()) {
-            if (int fd = ::open(tmp.c_str(), O_RDONLY); fd >= 0) {
-                ::fsync(fd);
-                ::close(fd);
-            }
-        }
-        // WAL: COPY <tmp> → <dst>（write-ahead：WAL 先于 rename）
-        sink.commit_copy(tmp, dest);
-        hook_files_.push_back(dest.filename().string());  // 提交后据此剪枝陈旧 hook
     }
 }
 

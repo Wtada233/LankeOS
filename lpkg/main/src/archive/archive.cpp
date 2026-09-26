@@ -37,8 +37,40 @@ struct ArchiveWriteDeleter {
 using ArchiveReadHandle = std::unique_ptr<struct archive, ArchiveReadDeleter>;
 using ArchiveWriteHandle = std::unique_ptr<struct archive, ArchiveWriteDeleter>;
 
+/// lpkg 自用的临时落位后缀（`.lpkgtmp`）。常量头只导出了 `SUFFIX_LPKG_NEW`，安装期
+/// "先写临时文件再 rename"用的 `".lpkgtmp"` 在 installation_task_copy.cpp /
+/// installation_task_register.cpp 里是字面量 —— 这里为守卫补一份，两边改动要一起改（守卫见
+/// member_path_relative）。
+static constexpr std::string_view SUFFIX_LPKG_TMP = ".lpkgtmp";
+
 /**
- * 归档成员名 → 解压根内的相对路径（去掉前导 "./" 与 "/"）。
+ * 把成员名里的不可见字节渲染成可见形式（供异常消息用）。
+ *
+ * 危险名字**本身就是攻击载荷**，不能原样进消息：含 ANSI 转义的名字会再污染一份终端，
+ * 含 `\n` 的名字会把异常消息**自己**切成两行 —— 错误消息被行式消费的地方（日志、CLI
+ * 输出）就重演了这里正在修的同一个 bug。故一律转义后再进消息。
+ */
+static std::string escape_member_name(std::string_view name)
+{
+    static constexpr char HEX[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(name.size());
+    for (const unsigned char c : name) {
+        if (c == '\\') {
+            out += "\\\\";
+        } else if (c >= 0x20 && c != 0x7f) {
+            out.push_back(static_cast<char>(c));
+        } else {
+            out += "\\x";
+            out.push_back(HEX[c >> 4]);
+            out.push_back(HEX[c & 0x0f]);
+        }
+    }
+    return out;
+}
+
+/**
+ * 归档成员名 → 解压根内的相对路径（去掉前导 "./" 与 "/"），**并拒绝危险成员名**。
  *
  * 成员名是**不可信输入**（未校验的 .lpkg、无校验和的上游源码包）。`fs::path` 语义下
  * `output_dir / "/etc/x"` **等于 "/etc/x"**（绝对右值丢弃左值），所以绝对路径成员会写到
@@ -46,8 +78,17 @@ using ArchiveWriteHandle = std::unique_ptr<struct archive, ArchiveWriteDeleter>;
  * 文件，而且这类写入不进 file_db，`query` 看不到、`remove` 删不掉（TODO.md X2）。
  *
  * 只归一化**成员名**；符号链接的**目标内容**保持原样（包内绝对链接是合法的）。
+ *
+ * 守卫放在本函数（而非两个调用点各自判）的理由：成员名流入文件系统的**唯一**通道就是
+ * 这里 —— 成员自己的名字与硬链接的**目标名**都经本函数变成路径。`extract_file_from_archive`
+ * 虽然也读名字，但它只做字符串比较、不落盘，不构成通道。
+ *
+ * 命中即**拒绝整个归档**（抛错，失败要响），绝不"跳过该成员继续"：归档已经表达了恶意
+ * 意图，静默跳过只会让用户拿到"装了一半、某文件莫名消失"的包。
+ *
+ * @param archive_path 仅用于错误消息（用户要知道是哪个归档被拒）
  */
-static std::string member_path_relative(const char* raw)
+static std::string member_path_relative(const char* raw, const fs::path& archive_path)
 {
     std::string_view sv(raw);
     while (true) {
@@ -61,7 +102,51 @@ static std::string member_path_relative(const char* raw)
         }
         break;
     }
-    return std::string(sv);
+    const std::string member(sv);
+
+    // ── 危险成员名守卫 ────────────────────────────────────────────────────────
+    //
+    // 为什么必须在这里挡：成员名会经 `scan_content_files` → file_db → 安装期 OpSink 变成
+    // **WAL 行的字面内容**（`op + " " + src.string() + " → " + bak.string()`，op_sink.cpp），
+    // 而 WAL 是**行式**协议 —— 写侧 `line + "\n"`（wal_append_raw），读侧 std::getline 逐行
+    // 再 parse_op 分帧，两侧都不转义。于是：
+    //   · 名字里的 `\n` 把一行切成两行，第二行成为**独立可解析**的 WAL 行：成员名
+    //     `usr/share/x\nDIR_RM /etc 511 0 0` 造出的第二行是一条合法 DIR_RM（mode 记的是
+    //     十进制，511 = 八进制 0777），而回滚侧会照行里的**绝对路径** create_directories +
+    //     chmod/lchown —— 崩溃恢复/回滚就会以 root 去 chmod/chown 任意绝对路径、
+    //     `--root` 隔离失效。
+    //     （订正 2026-09-26：本条原先写"`reverse_execute()` 的 DIR_RM 分支**没有任何**路径
+    //      confinement"—— 那是当时的实况，现在**已经有**了（两级判据，见 ARCH §9.2）。
+    //     但**名字消毒仍然是必需的**：① confinement 只保证"不越出 root"，挡不住"落在 root 内
+    //     的**另一个**路径"（下面那条字面 `" → "` 破坏分帧就属这类，confinement 完全挡不住）；
+    //     ② 纵深防御 —— 输入端堵比让回滚侧拒绝更早、更省事。）
+    //   · 名字里的字面 `" → "` 破坏箭头分帧：parse_op 把它当分界，非箭头类型的 arg1 被截断成
+    //     前缀，回滚就作用到"前缀同名"的**别的路径**上。
+    // 伤害都发生在**解压之后**（WAL 层无从分辨），唯一能挡的地方就是名字进入系统之前。
+    // key 取 const char*（而非 string_view）：string_format 收 `const std::string&`，而
+    // string_view→string 的构造是 explicit 的，传 string_view 编不过。
+    const auto reject = [&](const char* key) {
+        throw LpkgException(string_format(key, archive_path.string(), escape_member_name(member)));
+    };
+    // `\0` 到不了这里（archive_entry_pathname 返回 C 串，内部 NUL 会把它截断），留着是
+    // 兜底：判据写全，将来若换成按长度取名的 API 也照样成立。
+    for (const char c : member)
+        if (c == '\n' || c == '\r' || c == '\0') reject("error.unsafe_member_control");
+    if (member.find(" \xe2\x86\x92 ") != std::string::npos) reject("error.unsafe_member_arrow");
+
+    // `.lpkgtmp` / `.lpkgnew` 是 lpkg 自用的命名空间：安装期"先写 `<dst>.lpkgtmp` 再 rename
+    // 到位"与"配置冲突时落 `<dst>.lpkgnew` 给用户审阅"都用它们。包声明同名成员会与那些落位
+    // 撞名：`<dst>.lpkgtmp → <dst>` 的 rename 会盖掉包里的成员（反之亦然），而 `.lpkgnew`
+    // 更是把"待用户审阅的配置"直接变成包内容。合法包里不该出现这两个名字。
+    // 目录条目可能带尾斜杠（`x.lpkgnew/`）→ 先剥掉再取末段。
+    std::string_view last = member;
+    while (last.ends_with('/')) last.remove_suffix(1);
+    if (const auto slash = last.rfind('/'); slash != std::string_view::npos)
+        last = last.substr(slash + 1);
+    if (last.ends_with(constants::SUFFIX_LPKG_NEW) || last.ends_with(SUFFIX_LPKG_TMP))
+        reject("error.unsafe_member_suffix");
+
+    return member;
 }
 
 /**
@@ -115,8 +200,9 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
         if (!current_path) continue;
 
         // 成员名归一化为相对路径后再拼解压根（`..` 由 SECURE_NODOTDOT 兜底），
-        // 保证任何成员都落在 output_dir 之内 —— 见 member_path_relative 的说明。
-        const std::string member = member_path_relative(current_path);
+        // 保证任何成员都落在 output_dir 之内；危险名字（控制字符 / 字面 " → " / lpkg 自用
+        // 后缀）在这里**整包拒绝** —— 见 member_path_relative 的说明。
+        const std::string member = member_path_relative(current_path, archive_path);
         if (member.empty()) continue;  // "." 之类不产生文件的成员
         fs::path dest_path = output_dir / member;
         archive_entry_set_pathname(entry, dest_path.c_str());
@@ -134,7 +220,8 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
         const char* hardlink = archive_entry_hardlink(entry);
         if (hardlink) {
             const fs::path root_n = output_dir.lexically_normal();
-            const fs::path hl_norm = (root_n / member_path_relative(hardlink)).lexically_normal();
+            const fs::path hl_norm =
+                (root_n / member_path_relative(hardlink, archive_path)).lexically_normal();
             if (fs::path(hardlink).is_absolute() || !path_within(hl_norm, root_n)) {
                 log_warning(string_format("warning.archive_unsafe_member", hardlink));
                 continue;

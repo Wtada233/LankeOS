@@ -312,3 +312,39 @@ TEST_F(BuilderExecutorTest, FailedSourceDownloadLeavesNoPartialFile)
         << "下载失败却留下了正式文件（会被当成已下载好）";
     EXPECT_FALSE(fs::exists(build / "nope.tar.gz.part")) << "下载失败却留下了 .part";
 }
+
+/**
+ * `work_sources` 落位时：**悬空符号链接**既必须被让开、也绝不能把内容写到它指向的地方。
+ *
+ * 2026-09-26 修的两处跟随语义：判"这个名字空不空"原来用 `fs::exists`（**跟随**）⇒ 悬空链接
+ * 判 false（不让开），而紧接着的 `fs::copy_file` **也跟随** ⇒ 内容被写到**链接目标**上
+ * （父目录存在时），也就是以 root 写到 `work_root` **之外**。可达路径：源码归档里一个悬空
+ * 链接（`xxx.jar -> ../../etc/ld.so.preload`）+ 与它同名的 work_source。
+ *
+ * 现场必须让链接**悬空**（目标文件不存在）—— 目标存在时它就是个活链接，`copy_file` 会写穿
+ * 到目标、而"让开"那一步按名字删掉它，两种语义的差别被掩盖。
+ */
+TEST_F(BuilderExecutorTest, DanglingSymlinkWorkSourceTargetIsNotWrittenThrough)
+{
+    const fs::path outside_dir = test_dir / "outside";
+    fs::create_directories(outside_dir);
+    const fs::path planted = outside_dir / "planted.txt";
+    const fs::path link = test_dir / "work" / "readme.txt";
+    fs::create_directories(link.parent_path());
+    fs::create_symlink(planted, link);
+    ASSERT_TRUE(fs::is_symlink(link));
+    ASSERT_FALSE(fs::exists(link)) << "前置：链接必须是悬空的（目标不存在）";
+
+    // 源文件预先放好，`download_one` 走已存在路径（不联网）
+    create_file(test_dir / "build" / "readme.txt", "work source content\n");
+
+    download_and_prepare_sources({}, {(test_dir / "build" / "readme.txt").string()},
+                                 test_dir / "build", test_dir / "work");
+
+    EXPECT_FALSE(fs::exists(planted))
+        << "内容被写到 work_root **之外**了（悬空链接既没被让开、又被 copy_file 写穿）";
+    EXPECT_FALSE(fs::is_symlink(link)) << "悬空链接必须被让开，换成真实文件";
+    std::ifstream f(link);
+    const std::string got{std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
+    EXPECT_EQ(got, "work source content\n") << "落位的应该是 work_source 的内容";
+}

@@ -18,6 +18,7 @@
 #include "db/cache.hpp"
 #include "i18n/localization.hpp"
 #include "nlohmann/json.hpp"
+#include "op_sink.hpp"
 #include "package_manager.hpp"
 #include "repo/repository.hpp"
 #include "vercmp/version.hpp"
@@ -48,6 +49,27 @@ std::vector<std::string> scan_content_files(const fs::path& content_dir);
 /// 解析原始依赖字符串（如 "libfoo >= 1.0"）为 DependencyInfo 结构体
 std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& dep_strs);
 
+// ============================================================================
+// 从 `installation_task.cpp` 拆出后**多趟共用**的纯函数
+// （让开趟 / 写入趟 / 注册趟各在自己的 TU 里，两个函数都要用 → 下沉到这里）
+// ============================================================================
+
+/**
+ * 配置文件升级时的**三哈希分流**判定表（pacman `add.c` 的三条分支 + 老 DB 的退化路径）。
+ * 语义只有这一份，别在调用点再写一遍 —— 完整判定表见 .cpp 里的定义处。
+ *
+ * 输入：`hash_local`（盘上那份）/ `hash_orig`（confhashes 记的"上次我们装进去的"）/
+ * `hash_pkg`（本次包里那份）。输出：`ConfigDisposition`（落点，见 op_sink.hpp）。
+ */
+ConfigDisposition classify_config_update(std::string_view hash_local, std::string_view hash_orig,
+                                         std::string_view hash_pkg);
+
+/**
+ * `.lpkgtmp` 落位前的最后一道闸：tmp 路径是**符号链接**时拒绝写入（抛 `LpkgException`）。
+ * 判据只能是 `is_symlink` 不能是 `exists` —— 完整理由见 .cpp 里的定义处。
+ */
+void refuse_symlink_tmp_path(const std::filesystem::path& tmp_path);
+
 /// 用 libsolv 求解安装/升级/重装计划，填充 InstallContext 的 plan + install_order。
 /// 取代旧的手动递归解析 resolve_package_dependencies 及其配套手动校验
 /// （check_plan_consistency / check_needed_so_consistency / check_forward_soname_integrity）：
@@ -61,6 +83,61 @@ std::unordered_set<std::string> get_all_required_packages();
 // ============================================================================
 // 目录整树删除（remove 与 upgrade 共用，见 ARCH.md §3.6）
 // ============================================================================
+
+/**
+ * `remove_empty_owned_dirs()` 的逐目录回调：`removed == true` = 这个目录真的被 `rmdir`
+ * 掉了（`DIR_RM` 已写）；`false` = 因"含无主内容"整树保留。**只用于报告**
+ * （升级侧据此打 `info.removing_obsolete_file` 日志与 `LPKG_TRACE_REMOVE` 追踪），
+ * 不参与任何判据 —— 传 nullptr 即完全不报告。
+ */
+using DirReporter = void (*)(const std::filesystem::path& phys, bool removed);
+
+/**
+ * 删除一组"本包独占、且此刻为空"的 owned 目录（`DIR_RM` + 元数据记录）。
+ *
+ * **唯一实现**：移除侧（`do_remove_package()` 阶段 B）与升级侧
+ * （`remove_obsolete_files()` 阶段 2）共用 —— 两处原本各写了一遍"剥尾斜杠 → 最深优先 →
+ * 最后持有者 → 真目录 → 此刻为空"，任一侧改了守卫另一侧不会跟着变。
+ *
+ * **候选集与"时序守卫"留在调用点**（那是两侧真正的差异，不塞进这里用参数开关表达）：
+ *   · 移除侧 = 本包全部 owned 目录键；
+ *   · 升级侧 = 仅"新版本不再提供"的，且先排除"新版本在该目录下还有条目"的
+ *     （那一趟跑在写入**之前**，判据要钉回与原来"写入之后"同一口径）。
+ *
+ * 判据（五条，逐条见 .cpp 的定义处）与"目录型挂载点保留 + 告警"都在本函数内。
+ *
+ * @param candidate_dir_keys 候选目录键（**DB 键的原始形态**，带尾斜杠）
+ * @param report             逐目录报告回调（可空；只影响日志/追踪，不影响判据）
+ */
+void remove_empty_owned_dirs(Cache& cache, const std::string& pkg,
+                             const std::vector<std::string>& candidate_dir_keys, OpSink& sink,
+                             DirReporter report = nullptr);
+
+// ============================================================================
+// xattr 键的撤销（remove 与 upgrade 共用）
+// ============================================================================
+
+/**
+ * 本包在某个目录上"声明过、但现在不该再有了"的某个键 → 撤掉它。
+ *
+ * **唯一实现**：升级侧（`revoke_undeclared_xattrs()`：新版本不再声明这个键）与移除侧
+ * （`do_remove_package()`：整包没了）共用 —— 两处的差异只在**怎么算出待撤清单**，而
+ * "撤一个键"这件事的判据（别的包还持有吗 / 盘上还有吗 / 行怎么写）必须只有一份。
+ *
+ * 三件事，顺序不可换：
+ *   1. **别的包仍持有这个键 → 不动盘**，只摘本包的登记。xattr 是按目录共用的，一个目录
+ *      被多个包持有是常态 —— 按"目录还有没有别的属主"判会撤掉**别人的**键。
+ *   2. **撤之前先把旧值写进 WAL**（`OpSink::unset_xattr` 内部做：改前有值 → `XATTR_SET`），
+ *      这样整批回滚能把键逐字节还原。
+ *   3. 从归属表里摘掉本包；无人持有则整条记录消失（`remove_xattr_key_owner` 负责）。
+ *      第 3 步**无论第 1 步走哪一支都要做**：本包确实不再声明它了。
+ *
+ * @param logical 目录的**逻辑路径**（DB 目录键形态，带尾斜杠，如 `/usr/share/x/`）
+ * @return 是否真的从盘上撤掉了（false = 别的包还持有 / 盘上本来就没有那个键）
+ */
+bool revoke_xattr_key_if_unowned(Cache& cache, const std::string& pkg, const std::string& logical,
+                                 const std::string& key, OpSink& sink,
+                                 const std::filesystem::path& root);
 
 // ============================================================================
 // 每文件系统 sidecar stash（TODO.md 第 2 节）

@@ -265,7 +265,8 @@ TEST_F(WalRollbackGuardTest, TwoUncommittedBatchesConvergeInOnePass)
         w << "CLEANUP " << stash2.string() << "\n";
     }
 
-    // 真实启动序列（main.cpp 顺序）两轮：第一轮收敛，第二轮必须幂等 ——
+    // 真实启动序列（`run_cli` 里 init_database_for 的顺序，main_cli.cpp）两轮：
+    // 第一轮收敛，第二轮必须幂等 ——
     // 且中途的孤儿回收**不得**碰 WAL 仍引用的 stash（否则前一批再无还原依据）
     for (int pass = 0; pass < 2; ++pass) {
         ASSERT_NO_THROW(recover_packages()) << "pass " << pass;

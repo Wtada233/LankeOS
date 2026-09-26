@@ -2,22 +2,12 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
+#include "vercmp/dep_parser.hpp"  // `DependencyInfo`（纯语法层类型，见那里的说明）
 #include "vercmp/version.hpp"
-
-/**
- * 依赖信息：包名 + 可选的多个版本约束
- *
- * 支持复合约束表达区间，格式（索引 / metadata.json）：
- *   "glibc >= 2.0.0 < 3.0.0"
- * 解析时先按包名分隔符（逗号）切割，再在一个 dep 内提取所有 (op, version) 对。
- */
-struct DependencyInfo {
-    std::string name;                     // 依赖包名
-    std::vector<Constraint> constraints;  // 版本约束列表，为空则无版本要求
-};
 
 /**
  * 包信息：从仓库索引中解析的完整包描述
@@ -66,6 +56,9 @@ public:
     }
 
 private:
+    /** 吸收索引里的一行（该行的**全部**版本块）到包表与 provider 表 */
+    void absorb_index_line(std::string_view line);
+
     std::unordered_map<std::string, std::vector<PackageInfo>> packages_;  // 包名 -> 版本列表
     std::unordered_map<std::string, std::vector<std::string>>
         providers_;  // 能力 -> 提供该能力的包名列表
