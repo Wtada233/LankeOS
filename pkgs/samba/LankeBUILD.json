@@ -1,6 +1,6 @@
 {
   "name": "samba",
-  "version": "4.24.7",
+  "version": "4.25.0",
   "release": 6,
   "deps": [
     "python-dnspython",
@@ -113,7 +113,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.samba.org/pub/samba/stable/samba-4.24.7.tar.gz"
+    "https://download.samba.org/pub/samba/stable/samba-4.25.0.tar.gz"
   ],
   "work_sources": [],
   "farm_flags": [

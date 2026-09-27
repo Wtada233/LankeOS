@@ -8,6 +8,28 @@ lankebuild_prepare() {
         echo "shadow: Arch 发行补丁无法应用（上游改动撞上补丁涉及的文件，需按新版重做）" >&2
         exit 1
     fi
+
+    # 5. 上游 4.20.3 的回归：`lib/nscd.h` 的 stub 从**宏**改成了内联函数，**参数类型却写成 `int`**
+    #    （上游 commit deef7d84c「nscd_flush_cache(): Define as static inline function」；它本意是
+    #    消掉宏 `(0)` 当语句用的"statement with no effect"诊断，见上游 issue #1733）。
+    #    而全仓 ~28 处调用都传 `char*`、外层**没有** `#ifdef USE_NSCD`，我们又是 `--without-nscd`
+    #    ⇒ 指针→整型。**GCC 14 起 -Wint-conversion 是默认 error**（实测 gcc 16.2：不带 -Werror
+    #    也退出码 2）⇒ 4.20.3 在新工具链上必炸；而 4.19.0–4.20.2 的宏只触发"语句无效果"，
+    #    **仅在传 -Werror 时**才失败 —— 这就是"那三版都好、偏偏 4.20.3 挂"的原因。
+    #    （master 至今未修、也无人报过这个新形态；4.20.3 的 release note 声称修了 #1733。）
+    #    这里把参数类型写对：既保留上游"让调用成为真函数调用"的意图，又让调用点类型正确。
+    #    **已应用会自动跳过**（正向 dry-run 失败、反向成功）；只有连上下文都对不上时才报错
+    #    （那时上游多半已经改过这个头文件，需要人来按新版重做）。产物行为不变（stub 恒返回 0，
+    #    会被内联掉）。
+    _nscd_patch="{WORK_DIR}/../fix-nscd-flush-cache-param-type.patch"
+    if patch -Np1 --dry-run -i "$_nscd_patch" >/dev/null 2>&1; then
+        patch -Np1 -i "$_nscd_patch"
+    elif patch -Np1 -R --dry-run -i "$_nscd_patch" >/dev/null 2>&1; then
+        echo "shadow: 跳过已应用的 nscd stub 签名补丁"
+    else
+        echo "shadow: nscd stub 签名补丁无法应用（上游改了 lib/nscd.h 的上下文，需按新版重做）" >&2
+        exit 1
+    fi
 }
 
 lankebuild_build() {

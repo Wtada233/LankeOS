@@ -1,6 +1,6 @@
 {
   "name": "xdg-dbus-proxy",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -18,7 +18,7 @@
     "meson"
   ],
   "sources": [
-    "https://github.com/flatpak/xdg-dbus-proxy/archive/refs/tags/0.1.8.tar.gz"
+    "https://github.com/flatpak/xdg-dbus-proxy/archive/refs/tags/0.1.9.tar.gz"
   ],
   "work_sources": []
 }

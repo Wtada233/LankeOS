@@ -1,6 +1,6 @@
 {
   "name": "openexr",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "release": 4,
   "deps": [
     "imath"
@@ -40,10 +40,10 @@
     "ninja",
     "openjph",
     "zlib",
-    "zstd"  
+    "zstd"
   ],
   "sources": [
-    "https://github.com/openexr/openexr/archive/refs/tags/v3.5.0.tar.gz"
+    "https://github.com/openexr/openexr/archive/refs/tags/v3.5.1.tar.gz"
   ],
   "work_sources": []
 }

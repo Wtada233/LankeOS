@@ -1,6 +1,6 @@
 {
   "name": "beanshell",
-  "version": "2.1.1",
+  "version": "3.0.0b1",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -9,6 +9,7 @@
     "base-devel"
   ],
   "work_sources": [
-    "https://github.com/beanshell/beanshell/releases/download/2.1.1/bsh-2.1.1.jar"
-  ]
+    "https://github.com/beanshell/beanshell/releases/download/3.0.0b1/bsh-3.0.0b1.jar"
+  ],
+  "sources": []
 }

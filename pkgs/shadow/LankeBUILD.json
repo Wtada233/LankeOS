@@ -1,6 +1,6 @@
 {
   "name": "shadow",
-  "version": "4.20.2",
+  "version": "4.20.3",
   "release": 6,
   "deps": [
     "btrfs-progs"
@@ -30,7 +30,7 @@
     "linux-pam"
   ],
   "sources": [
-    "https://github.com/shadow-maint/shadow/releases/download/4.20.2/shadow-4.20.2.tar.xz"
+    "https://github.com/shadow-maint/shadow/releases/download/4.20.3/shadow-4.20.3.tar.xz"
   ],
   "work_sources": []
 }

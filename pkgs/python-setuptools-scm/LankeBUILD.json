@@ -1,6 +1,6 @@
 {
   "name": "python-setuptools-scm",
-  "version": "10.2.3",
+  "version": "10.3.4",
   "release": 1,
   "deps": [
     "python",
@@ -21,7 +21,7 @@
     "python-wheel"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/3c/87/1ff7adcf6e03021ae58ce401565be3c9b8c739a44d14a8253d38b3754117/setuptools_scm-10.2.3.tar.gz"
+    "https://files.pythonhosted.org/packages/85/d8/fc143f88819ccf10ba2388ba86732ee2de193e578234e25a783f6cc14bf7/setuptools_scm-10.3.4.tar.gz"
   ],
   "work_sources": []
 }

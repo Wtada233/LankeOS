@@ -1,6 +1,6 @@
 {
   "name": "xwayland-satellite",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "release": 2,
   "deps": [
     "xwayland"
@@ -22,7 +22,7 @@
     "xcb-util-cursor"
   ],
   "sources": [
-    "https://github.com/Supreeeme/xwayland-satellite/archive/refs/tags/v0.8.2.tar.gz"
+    "https://github.com/Supreeeme/xwayland-satellite/archive/refs/tags/v0.8.3.tar.gz"
   ],
   "work_sources": []
 }

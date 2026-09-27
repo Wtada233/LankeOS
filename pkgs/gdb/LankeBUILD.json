@@ -1,6 +1,6 @@
 {
   "name": "gdb",
-  "version": "17.2",
+  "version": "18.1",
   "release": 1,
   "deps": [
     "python"
@@ -37,7 +37,7 @@
     "zstd"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/gdb/gdb-17.2.tar.xz"
+    "https://ftp.gnu.org/gnu/gdb/gdb-18.1.tar.xz"
   ],
   "work_sources": []
 }

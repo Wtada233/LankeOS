@@ -1,6 +1,6 @@
 {
   "name": "parted",
-  "version": "3.7",
+  "version": "3.8",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -24,7 +24,7 @@
     "readline"
   ],
   "sources": [
-    "https://ftp.gnu.org/gnu/parted/parted-3.7.tar.xz"
+    "https://ftp.gnu.org/gnu/parted/parted-3.8.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "fcitx5-chinese-addons",
-  "version": "5.1.14",
+  "version": "5.1.15",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -30,7 +30,7 @@
     "nlohmann-json"
   ],
   "sources": [
-    "https://github.com/fcitx/fcitx5-chinese-addons/archive/refs/tags/5.1.14.tar.gz"
+    "https://github.com/fcitx/fcitx5-chinese-addons/archive/refs/tags/5.1.15.tar.gz"
   ],
   "work_sources": []
 }

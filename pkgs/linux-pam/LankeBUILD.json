@@ -1,6 +1,6 @@
 {
   "name": "linux-pam",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "release": 4,
   "deps": [
     "bash"
@@ -28,7 +28,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/linux-pam/linux-pam/archive/refs/tags/v1.7.2.tar.gz"
+    "https://github.com/linux-pam/linux-pam/archive/refs/tags/v1.7.3.tar.gz"
   ],
   "work_sources": []
 }
