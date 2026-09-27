@@ -463,8 +463,17 @@ void write_regular_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
             // stash 再落新的：回滚时它是"把旧那份 rename 回来"，而不是连带删掉
             // 一份与本批次无关、用户尚未处理的审阅文件（顺序也不可反：BACKUP 行
             // 必须先于 COPY 行，逆序回滚才会"先撤新那份、再还原旧那份"）。
-            if (exists_no_follow(final_dest)) sink.backup(final_dest);
-            sink.commit_copy(tmp_path, final_dest);
+            //
+            // ⚠️ **两处断点是 2026-09-27 补的**：此前整支**一个 `after_wal_breakpoint` 都没传**
+            // ⇒ "`.lpkgnew` 的 WAL 行已写、rename 未做"这个窗口**注入不进去**（与
+            // `backup_obsolete` 同类）。这不只是覆盖率问题：CI 上那条 flaky 用例
+            // （原名 `…ConfigIsStashedAwayWhenTheWritePassRuns`，2026-09-27 已改为顺序无关版）
+            // 正是因为**本支没有断点**，才只能去借
+            // "另一个文件的 COPY 窗口"，从而变成**顺序依赖**（同提交三跑两过一挂）。
+            // 补上之后，`.lpkgnew` 这一步可以被直接观测了。
+            if (exists_no_follow(final_dest))
+                sink.backup(final_dest, "lpkgnew_bak_after_wal_" + pkg_name);
+            sink.commit_copy(tmp_path, final_dest, "lpkgnew_after_wal_" + pkg_name);
             break;
         }
         default:

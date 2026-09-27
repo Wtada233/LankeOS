@@ -79,6 +79,7 @@
 #include "../../main/src/crypto/hash.hpp"
 #include "../../main/src/db/cache.hpp"
 #include "../../main/src/db/test_breakpoints.hpp"
+#include "../../main/src/db/wal_op.hpp"
 #include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
 #include "../test_base.hpp"
@@ -1311,4 +1312,55 @@ TEST_F(ConfigThreeWayHashTest, ModeOnlyUserEditIsReportedNotSilentlyReverted)
            "若这里红了，说明策略被改成"
            "保留用户 mode，请连带更新本用例的注释与上面那条告警断言";
     EXPECT_EQ(read_file(target), "SAME\n") << "内容不该被动（v1/v2 逐字节相同）";
+}
+
+// ============================================================================
+// ①d `.lpkgnew` 的 write-ahead 窗口（2026-09-27 补的断点）
+//
+// 这一支（`WriteLpkgnew`）此前**一个 `after_wal_breakpoint` 都没传** ⇒ "`.lpkgnew` 的 COPY 行
+// 已写、rename 未做"这个窗口**注入不进去**（与 `backup_obsolete` 同类）。这不只是覆盖率问题：
+// CI 上那条 flaky 用例（原 `ConfigIsStashedAwayWhenTheWritePassRuns`）正是因为**本支没有断点**，
+// 才只能去借"另一个文件的 COPY 窗口"，从而变成**顺序依赖**（同一提交三跑两过一挂）。
+// 本用例钉三件事：断点**真命中** / 命中时刻 WAL 里**已有**那条指向 `.lpkgnew` 的 COPY 行 /
+// 命中时刻落点**还没被改**。
+// ============================================================================
+TEST_F(ConfigThreeWayHashTest, LpkgnewWindowWritesRowBeforeRenaming)
+{
+    const std::string pkg = "c3win";
+    const auto files = [](const char* body) {
+        return std::vector<std::pair<std::string, std::string>>{{"etc/c3win.conf", body},
+                                                                {"usr/bin/c3win", "#!/bin/sh\n"}};
+    };
+    ASSERT_NO_THROW(install_packages({create_pkg_files(pkg, "1.0", files("V1\n"))}, "", false));
+    {
+        std::ofstream f(test_root / "etc/c3win.conf");  // 用户改过 ⇒ 三哈希 ③ SaveLpkgnew
+        f << "USER\n";
+    }
+
+    bool hit = false;
+    std::string wal_at_bp;
+    bool dest_there_at_bp = true;
+    BreakpointManager::instance().set("lpkgnew_after_wal_" + pkg, [&] {
+        hit = true;
+        wal_at_bp = read_file(wal::wal_log_path());
+        dest_there_at_bp = fs::exists(test_root / "etc/c3win.conf.lpkgnew");
+        throw LpkgException("injected: .lpkgnew 的 WAL 行已写、rename 未做");
+    });
+    EXPECT_THROW(install_packages({create_pkg_files(pkg, "2.0", files("V2\n"))}, "", false),
+                 LpkgException);
+    BreakpointManager::instance().clear_all();
+
+    EXPECT_TRUE(hit) << "断点没命中 ⇒ 这一支没把 after_wal_breakpoint 传下去";
+    EXPECT_NE(wal_at_bp.find("c3win.conf.lpkgnew"), std::string::npos)
+        << "命中时刻 WAL 里没有指向 `.lpkgnew` 的那条行 ⇒ 行写在 rename **之后**（不是 "
+           "write-ahead）。"
+           "捕获到的 WAL：\n"
+        << wal_at_bp;
+    EXPECT_FALSE(dest_there_at_bp)
+        << "命中时刻 `.lpkgnew` 已经落位 ⇒ 物理动作做在行**之前**，不是 write-ahead";
+    // 回滚后：用户那份逐字节回来、不残留 `.lpkgnew`（与 ③ 的既有用例同口径）
+    EXPECT_EQ(read_file(test_root / "etc/c3win.conf"), "USER\n");
+    EXPECT_FALSE(fs::exists(test_root / "etc/c3win.conf.lpkgnew"));
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version(pkg), "1.0");
 }

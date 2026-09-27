@@ -349,6 +349,15 @@ std::vector<std::string> scan_content_files(const fs::path& content_dir)
             entries.push_back(rel);
         }
     }
+    // **排序：让遍历顺序确定**（2026-09-27 补）。此前直接返回 `recursive_directory_iterator`
+    // 的顺序 —— 那是 **readdir 顺序，由文件系统决定**（同一份包在不同机器/容器里可能不同）。
+    // 这不只是"不好看"：安装/升级的**逐条目处理顺序**（进而 WAL 行序、stash 里的备份顺序）
+    // 会跟着变，于是任何"在某一步观测盘面"的断言都可能变成**顺序依赖的 flaky**
+    // —— CI 上已经实打实挂过一次（该用例原名 `…ConfigIsStashedAwayWhenTheWritePassRuns`，
+    // 2026-09-27 改为与顺序无关的 `…UntilTheWritePassRestoresIt`，
+    // 同一个提交三跑两过一挂：success / failure / success）。
+    // 排序后同一份包在任何机器上都走同一个顺序。
+    std::ranges::sort(entries);
     return entries;
 }
 

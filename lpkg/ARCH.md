@@ -2088,11 +2088,14 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 ### 第 6 阶段：测试
 
 - **6.1 断电模拟** — `tests/integration/test_breakpoints.cpp`（20 tests，2026-09-26 计数）。
-  断点总数 **19**（第③步补了"符号链接落位 / 目录落位 / `UNSTASH`"三个空档：`symlink_after_wal_<pkg>`、
+  断点总数 **21**（第③步补了"符号链接落位 / 目录落位 / `UNSTASH`"三个空档：`symlink_after_wal_<pkg>`、
   `newdir_after_wal_<pkg>`、`unstash_after_wal_<pkg>`；2026-09-26 又补**目录状态**那三个窗口：
   `dirmeta_after_wal_<pkg>` / `xattrset_after_wal_<pkg>` / `xattrrm_after_wal_<pkg>`，见 §3.8；
   2026-09-26 再补**废弃搬运**那一个：`remove_old_after_wal_<pkg>`（`REMOVE_OLD` 行已落、
   rename 未做 —— 此前只有 `backup_obsolete` 没有 `after_wal_breakpoint`，是断点覆盖之外的洞）；
+  2026-09-27 又补 **`.lpkgnew` 两个**：`lpkgnew_after_wal_<pkg>`（COPY 行已落、rename 未做）/
+  `lpkgnew_bak_after_wal_<pkg>`（BACKUP 行已落、rename 未做）—— `WriteLpkgnew` 那一支此前
+  **整支一个断点都没传**；
   完整清单见 `CLAUDE.md` §2）——
   第③步那三个由 `tests/integration/test_unstash_primitive.cpp` 的 `UnstashBreakpointTest`（6 tests）
   覆盖，WAL 行路径 confinement 由 `tests/integration/test_wal_confinement.cpp` 的
@@ -2107,7 +2110,7 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 - **6.5 集成测试** — 多个测试文件覆盖：批量安装/移除/升级、依赖链、provides 解析、版本约束、config 保护、SIGINT 保护、并发锁、autoremove、recursive remove。
 - **6.6 CLEANUP 阶段测试** — `tests/unit/test_cleanup.cpp`（26 tests）。覆盖 CLEANUP 解析与不可逆性、stash / `DIR_RM` 恢复、随机后缀唯一性、rec CLEANUP 续传、安全检查、现有行为回归。
 - **6.7 双重回滚回归（2026-08-03）** — `tests/integration/test_active_rollback.cpp`。升级中途 COPY 失败 / COMMIT 后失败 → 旧文件必须保留（曾双重回滚删旧文件）；CLEANUP write-ahead 崩溃窗口 → 整批可恢复。
-- **6.8 全量** — 当前 **984 个测试宏全绿**（docker 容器 `make test`；`grep -rhE 'TEST(_F|_P)?\(' tests/ | wc -l`，2026-09-26 计数：**984 tests / 117 suites / 983 PASSED / 0 FAILED**，1 SKIPPED = `UpgradePropertyTest.SingleSeedReplay`，它是需要显式指定种子的复现入口），覆盖上述全部章节。**该数字随加测试而变，别当契约** —— 要引用它请现数一次；`tests/` 才是唯一事实来源。
+- **6.8 全量** — 当前 **985 个测试宏全绿**（docker 容器 `make test`；`grep -rhE 'TEST(_F|_P)?\(' tests/ | wc -l`，2026-09-26 计数：**985 tests / 117 suites / 984 PASSED / 0 FAILED**，1 SKIPPED = `UpgradePropertyTest.SingleSeedReplay`，它是需要显式指定种子的复现入口），覆盖上述全部章节。**该数字随加测试而变，别当契约** —— 要引用它请现数一次；`tests/` 才是唯一事实来源。
 
 ---
 

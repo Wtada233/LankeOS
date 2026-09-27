@@ -482,17 +482,25 @@ TEST_F(UnstashBreakpointTest, UnstashWindowInjectsFailureAndRollsBackSaveLpkgnew
     EXPECT_EQ(Cache::instance().get_installed_version(pkg), "1.0");
 }
 
-// ── B5) 第③步的结构性断言：写入趟开始时，本包的 `/etc` 配置**已经不在盘上** ────────
+// ── B5) 第③步的结构性断言：写入趟**把配置搬回原位之前**，它确实不在盘上 ──────────
 
 /**
  * 第③步的目标语义是"先移除旧版本的全部触碰面，再安装新版本"，`/etc` 配置家族也不例外：
- * 让开趟把它搬进 stash（为了从 stash 副本读 `hash_local`）、判定之后再搬回来。所以在**写入
- * 趟的中间态**（`copy_after_wal_<pkg>`，WAL 行已落、rename 未做）该配置**不在盘上**，
- * 而 stash 里躺着一份 —— 这条断言把"先搬空再写入"钉成可执行的形态（不是靠注释描述）。
+ * 让开趟把它搬进 stash（为了从 stash 副本读 `hash_local`）、判定之后再搬回来。所以要断言的
+ * 是"**搬回之前那份不在盘上**"。
+ *
+ * ⚠️ **观测点必须取"配置自己的搬回窗口"（`unstash_after_wal_<pkg>`），不能借别的文件的 COPY
+ * 窗口** —— 2026-09-27 CI 实测踩过：三哈希 ③（`SaveLpkgnew`）下写入趟**故意**先 `un_stash`
+ * 把配置搬回原位、再落 `.lpkgnew`，于是"配置此刻在不在盘上"**只取决于条目处理先后**；而
+ * 条目顺序来自 `scan_content_files` 的 readdir 顺序（当时**无排序**，文件系统决定）⇒
+ * 原版用例（挂在别的文件的 `copy_after_wal_<pkg>` 上）是**顺序依赖**的，同一个提交在 CI 上
+ * **三跑两过一挂**（success / failure / success）。挂在配置自己的搬回窗口上则与顺序无关：
+ * 那一刻 UNSTASH 行已落、rename 未做 ⇒ 盘上那份必然还没回来、stash 里必然还躺着它。
+ * （`scan_content_files` 同日已排序，顺序依赖的**根**也一并去掉了。）
  *
  * 同一条断言的另一半（回滚保真）也在这里：注入失败后配置必须逐字节回到原位。
  */
-TEST_F(UnstashBreakpointTest, ConfigIsStashedAwayWhenTheWritePassRuns)
+TEST_F(UnstashBreakpointTest, ConfigIsStashedAwayUntilTheWritePassRestoresIt)
 {
     const std::string pkg = "ub_order";
     ASSERT_NO_THROW(install_packages({pack(pkg, "1.0", [](const fs::path& c) {
@@ -502,16 +510,18 @@ TEST_F(UnstashBreakpointTest, ConfigIsStashedAwayWhenTheWritePassRuns)
     Cache::instance().load();
     write_file(test_root / "etc/ub_order.conf", "USER\n");  // 用户改过
 
-    bool conf_on_disk_during_write = true;
+    bool bp_hit = false;
+    std::string disk_shape_at_unstash = "unset";
     int stash_baks = 0;
-    BreakpointManager::instance().set("copy_after_wal_" + pkg, [&] {
-        conf_on_disk_during_write = fs::exists(test_root / "etc/ub_order.conf");
+    BreakpointManager::instance().set("unstash_after_wal_" + pkg, [&] {
+        bp_hit = true;
+        disk_shape_at_unstash = shape_of(test_root / "etc/ub_order.conf");
         std::error_code ec;
         for (const auto& e : fs::recursive_directory_iterator(test_root, ec)) {
             if (ec) break;
             if (e.path().filename().string().find(".lpkg_bak_") != std::string::npos) ++stash_baks;
         }
-        throw LpkgException("injected: 停在写入趟中间态取证");
+        throw LpkgException("injected: 停在写入趟把配置搬回原位的那一刻");
     });
     EXPECT_THROW(install_packages({pack(pkg, "2.0",
                                         [](const fs::path& c) {
@@ -521,8 +531,9 @@ TEST_F(UnstashBreakpointTest, ConfigIsStashedAwayWhenTheWritePassRuns)
                  LpkgException);
     BreakpointManager::instance().clear_all();
 
-    EXPECT_FALSE(conf_on_disk_during_write)
-        << "写入趟开始时 `/etc` 配置还在盘上 —— 说明让开趟没有先把它搬走（第③步的语义没生效）";
+    EXPECT_TRUE(bp_hit) << "断点没命中：这批没走到「把配置搬回原位」那一步（本用例没考到）";
+    EXPECT_EQ(disk_shape_at_unstash, "absent")
+        << "搬回**之前**盘上那份竟然还在 —— 说明让开趟没有先把它搬走（第③步的语义没生效）";
     EXPECT_GE(stash_baks, 1) << "配置被搬走了，但 stash 里找不到那份备份（搬哪去了？）";
     // 回滚：判定没做完就失败 → 配置必须逐字节回到批次前（先撤 UNSTASH、再撤 BACKUP）
     EXPECT_EQ(read_file(test_root / "etc/ub_order.conf"), "USER\n");
