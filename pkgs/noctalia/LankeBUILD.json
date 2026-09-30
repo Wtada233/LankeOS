@@ -1,6 +1,6 @@
 {
   "name": "noctalia",
-  "version": "5.1.0",
+  "version": "5.2.0",
   "release": 3,
   "deps": [
     "bash",
@@ -86,7 +86,7 @@
     "wireplumber"
   ],
   "sources": [
-    "https://github.com/noctalia-dev/noctalia/releases/download/v5.1.0/noctalia-latest.tar.gz"
+    "https://github.com/noctalia-dev/noctalia/releases/download/v5.2.0/noctalia-latest.tar.gz"
   ],
   "work_sources": []
 }

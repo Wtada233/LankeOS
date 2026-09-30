@@ -10,7 +10,24 @@ lankebuild_build() {
         install                                                 \
         NUM_JOBS=$(nproc)
 
-    # Step 2: Delete firmware for kernel-disabled drivers (blacklist)
+    # Step 2: 删掉"内核里没有对应驱动"的固件（黑名单）
+    #
+    # 判据：**以内核自己声明的固件需求为准**，不要靠驱动名猜——
+    #   · 内建驱动（=y）：/lib/modules/$K/modules.builtin.modinfo 里的 `<模块名>.firmware=`
+    #   · 模块驱动（=m）：`modinfo -F firmware <x.ko>`
+    # 驱动存在于已构建内核（=y/=m）→ 它声明的固件就必须随包发出。
+    #
+    # 盲区（改本清单前务必回源码核一次）：驱动用 snprintf 按设备 ID 拼名的固件在 modinfo
+    # 里查不到，例如 btusb 的 `qca/rampatch_usb_*.bin`、btbcm 的 `brcm/BCM-<vid>-<pid>.hcd`、
+    # ath11k 的板级文件、sdca 的 `sdca/%x/%x/...`；也有驱动漏写 MODULE_FIRMWARE 的
+    # （btmtksdio 的 MT7902 蓝牙固件）。核法：在内核源码里 grep 固件路径字面量，
+    # 再看承载它的源码文件是否被编进内核（Makefile 的 obj-$(CONFIG_...) 对 config）。
+    #
+    # 2026-09 复核放行的：mediatek MT7922/MT7902/MT7961a 的 WiFi+BT、mt7610e/u、mt7650e、
+    # mt7663pr2h（MT7663 蓝牙）、mt7925 蓝牙固件、rtlwifi/rtl8192cufw_{A,B,TMSC}、整目录 qca/、
+    # rtl_nic/rtl8153{,-2,-3,-4}/8153b-2/8153c-1/8156a-2/8156b-2.fw（r8152 USB 网卡驱动已启用）。
+    # 仍保留删除的 mt7663_n9_v3/n9_rebb/pr2h_rebb 只被 MT7663 的 SDIO/USB 源文件引用，
+    # 而 CONFIG_MT7663S/U 未启用 —— 将来若启用，需把这三个也放行。
     cd "{STAGING_ROOT}{LIBDIR}/firmware"
     xargs -r rm -rf <<'BLACKLIST'
 3com/
@@ -73,7 +90,6 @@ netronome/
 nxp/
 ositech/
 powervr/
-qca/
 qcom/
 qed/
 qlogic/
@@ -196,27 +212,14 @@ intel/vsc/ivsc_skucfg_ovti2740_0_1.bin
 intel/vsc/ivsc_skucfg_ovti5678_0_1.bin
 intel/vsc/ivsc_skucfg_ovti9734_0_1.bin
 intel/vsc/ivsc_skucfg_ovti9738_0_1.bin
-mediatek/BT_RAM_CODE_MT7902_1_1_hdr.bin
-mediatek/BT_RAM_CODE_MT7922_1_1_hdr.bin
-mediatek/BT_RAM_CODE_MT7961_1a_2_hdr.bin
-mediatek/WIFI_MT7902_patch_mcu_1_1_hdr.bin
-mediatek/WIFI_MT7922_patch_mcu_1_1_hdr.bin
-mediatek/WIFI_MT7961_patch_mcu_1a_2_hdr.bin
-mediatek/WIFI_RAM_CODE_MT7902_1.bin
-mediatek/WIFI_RAM_CODE_MT7922_1.bin
-mediatek/WIFI_RAM_CODE_MT7961_1a.bin
-mediatek/mt7610e.bin
-mediatek/mt7610u.bin
 mediatek/mt7622_n9.bin
 mediatek/mt7622_rom_patch.bin
-mediatek/mt7650e.bin
 mediatek/mt7662.bin
 mediatek/mt7662_rom_patch.bin
 mediatek/mt7662u.bin
 mediatek/mt7662u_rom_patch.bin
 mediatek/mt7663_n9_rebb.bin
 mediatek/mt7663_n9_v3.bin
-mediatek/mt7663pr2h.bin
 mediatek/mt7663pr2h_rebb.bin
 mediatek/mt7915_eeprom.bin
 mediatek/mt7915_eeprom_dbdc.bin
@@ -227,7 +230,6 @@ mediatek/mt7916_eeprom.bin
 mediatek/mt7916_rom_patch.bin
 mediatek/mt7916_wa.bin
 mediatek/mt7916_wm.bin
-mediatek/mt7925/BT_RAM_CODE_MT7925_1_1_hdr.bin
 mediatek/mt7925/WIFI_MT7925_PATCH_MCU_1_1_hdr.bin
 mediatek/mt7925/WIFI_RAM_CODE_MT7925_1_1.bin
 mediatek/mt7927/WIFI_MT6639_PATCH_MCU_2_1_hdr.bin
@@ -314,21 +316,11 @@ nvidia/tegra194/vic.bin
 nvidia/tegra194/xusb.bin
 nvidia/tegra210/vic04_ucode.bin
 nvidia/tegra210/xusb.bin
-rtl_nic/rtl8153a-2.fw
-rtl_nic/rtl8153a-3.fw
-rtl_nic/rtl8153a-4.fw
-rtl_nic/rtl8153b-2.fw
-rtl_nic/rtl8153c-1.fw
-rtl_nic/rtl8156a-2.fw
-rtl_nic/rtl8156b-2.fw
 rtlwifi/rtl8188efw.bin
 rtlwifi/rtl8192cfw.bin
 rtlwifi/rtl8192cfwU.bin
 rtlwifi/rtl8192cfwU_B.bin
 rtlwifi/rtl8192cufw.bin
-rtlwifi/rtl8192cufw_A.bin
-rtlwifi/rtl8192cufw_B.bin
-rtlwifi/rtl8192cufw_TMSC.bin
 rtlwifi/rtl8192defw.bin
 rtlwifi/rtl8192dufw.bin
 rtlwifi/rtl8192sefw.bin

@@ -1,6 +1,6 @@
 {
   "name": "hunspell",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -22,7 +22,7 @@
     "readline"
   ],
   "sources": [
-    "https://github.com/hunspell/hunspell/releases/download/v1.7.3/hunspell-1.7.3.tar.gz"
+    "https://github.com/hunspell/hunspell/releases/download/v1.7.4/hunspell-1.7.4.tar.gz"
   ],
   "work_sources": []
 }

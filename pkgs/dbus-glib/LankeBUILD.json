@@ -1,6 +1,6 @@
 {
   "name": "dbus-glib",
-  "version": "0.114",
+  "version": "0.116",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -23,7 +23,7 @@
     "expat"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/dbus/dbus-glib/-/archive/dbus-glib-0.114/dbus-glib-dbus-glib-0.114.tar.gz"
+    "https://gitlab.freedesktop.org/dbus/dbus-glib/-/archive/dbus-glib-0.116/dbus-glib-dbus-glib-0.116.tar.gz"
   ],
   "work_sources": []
 }

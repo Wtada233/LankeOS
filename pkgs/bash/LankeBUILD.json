@@ -1,13 +1,11 @@
 {
   "name": "bash",
   "version": "5.3",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6",
-    "libhistory.so.8",
     "libm.so.6",
-    "libncursesw.so.6",
     "libreadline.so.8"
   ],
   "provides": [],

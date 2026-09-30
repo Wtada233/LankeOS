@@ -15,5 +15,28 @@ lankebuild_build() {
 }
 
 lankebuild_package() {
-    :
+    # 注册为合法登录 shell：login/sshd 的 PAM 栈（system-login）首行是 pam_shells.so，
+    # 它把 passwd 里的 pw_shell 与 /etc/shells 各行做 **strcmp**（linux-pam
+    # modules/pam_shells/pam_shells.c，逐字符比对，不做 realpath 解析）。没列出的 shell
+    # 直接 PAM_AUTH_ERR —— login 一律报 "Login incorrect"，密码根本不会被验证
+    # （sudo 走自己的 pam.d/sudo，不含 pam_shells，所以同密码照常可用）。
+    # 默认用户的 shell 是 /bin/fish，而 etc/shells 只有 /bin/sh、/bin/bash。
+    # /bin 与 /usr/bin 是同一文件（usr-merge）但比对按字符串，两个字面量都要写。
+    cat > "{STAGING_HOOKS}/postinst.sh" << 'HOOK'
+#!/bin/sh
+for _s in /usr/bin/fish /bin/fish; do
+    grep -qxF "$_s" /etc/shells 2>/dev/null || echo "$_s" >> /etc/shells
+done
+exit 0
+HOOK
+    chmod +x "{STAGING_HOOKS}/postinst.sh"
+
+    cat > "{STAGING_HOOKS}/prerm.sh" << 'HOOK'
+#!/bin/sh
+if [ -f /etc/shells ]; then
+    sed -i -e '\|^/usr/bin/fish$|d' -e '\|^/bin/fish$|d' /etc/shells
+fi
+exit 0
+HOOK
+    chmod +x "{STAGING_HOOKS}/prerm.sh"
 }

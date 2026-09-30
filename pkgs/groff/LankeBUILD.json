@@ -1,6 +1,6 @@
 {
   "name": "groff",
-  "version": "1.24.1",
+  "version": "1.24.2",
   "release": 2,
   "deps": [
     "bash",
@@ -18,7 +18,7 @@
     "git"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/groff/groff-1.24.1.tar.gz"
+    "https://ftp.gnu.org/gnu/groff/groff-1.24.2.tar.gz"
   ],
   "work_sources": []
 }

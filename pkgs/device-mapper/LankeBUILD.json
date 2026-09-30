@@ -1,6 +1,6 @@
 {
   "name": "device-mapper",
-  "version": "2.03.42",
+  "version": "2.03.43",
   "deps": [
     "bash"
   ],
@@ -20,7 +20,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://sourceware.org/pub/lvm2/releases/LVM2.2.03.42.tgz"
+    "https://sourceware.org/pub/lvm2/releases/LVM2.2.03.43.tgz"
   ],
   "work_sources": []
 }

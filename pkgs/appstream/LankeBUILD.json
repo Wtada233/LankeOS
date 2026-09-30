@@ -1,6 +1,6 @@
 {
   "name": "appstream",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6",
@@ -63,7 +63,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/ximion/appstream/archive/refs/tags/v1.2.0.tar.gz"
+    "https://github.com/ximion/appstream/archive/refs/tags/v1.2.1.tar.gz"
   ],
   "work_sources": [],
   "release": 5

@@ -1,6 +1,6 @@
 {
   "name": "egl-wayland",
-  "version": "1.1.22",
+  "version": "1.1.23",
   "release": 2,
   "deps": [
     "eglexternalplatform"
@@ -25,7 +25,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://github.com/NVIDIA/egl-wayland/archive/refs/tags/1.1.22.tar.gz"
+    "https://github.com/NVIDIA/egl-wayland/archive/refs/tags/1.1.23.tar.gz"
   ],
   "work_sources": []
 }

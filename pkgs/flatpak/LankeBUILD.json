@@ -1,6 +1,6 @@
 {
   "name": "flatpak",
-  "version": "1.19.0",
+  "version": "1.19.2",
   "release": 3,
   "deps": [
     "bubblewrap",
@@ -45,6 +45,7 @@
     "docbook-xsl",
     "fuse3",
     "gdk-pixbuf",
+    "git",
     "glib",
     "gobject-introspection",
     "gpgme",
@@ -67,7 +68,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/flatpak/flatpak/archive/refs/tags/1.19.0.tar.gz"
+    "https://github.com/flatpak/flatpak/archive/refs/tags/1.19.2.tar.gz"
   ],
   "work_sources": []
 }

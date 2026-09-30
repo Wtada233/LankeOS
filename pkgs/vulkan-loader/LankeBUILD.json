@@ -1,6 +1,6 @@
 {
   "name": "vulkan-loader",
-  "version": "1.4.357.0",
+  "version": "1.4.363.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -24,7 +24,7 @@
     "wayland"
   ],
   "sources": [
-    "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-1.4.357.0.tar.gz"
+    "https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-1.4.363.0.tar.gz"
   ],
   "work_sources": []
 }

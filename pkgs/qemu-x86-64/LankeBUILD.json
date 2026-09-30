@@ -1,6 +1,6 @@
 {
   "name": "qemu-x86-64",
-  "version": "11.1.1",
+  "version": "11.1.2",
   "release": 4,
   "deps": [
     "xwayland"
@@ -90,7 +90,7 @@
     "zstd"
   ],
   "sources": [
-    "https://download.qemu.org/qemu-11.1.1.tar.xz"
+    "https://download.qemu.org/qemu-11.1.2.tar.xz"
   ],
   "work_sources": []
 }

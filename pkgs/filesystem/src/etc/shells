@@ -1,6 +1,9 @@
 # Begin /etc/shells
-
-/bin/sh
-/bin/bash
+#
+# 本文件由各 shell 包自行维护：安装时 postinst 追加自己的路径，卸载时 prerm 删除。
+#
+# 注意 pam_shells（login/sshd 的 PAM 栈 system-login 首行）会把 passwd 里的 pw_shell
+# 与本文件各行做**逐字符 strcmp**（不做 realpath）——未注册的 shell 会被判为非法，
+# login/sshd 直接报 "Login incorrect"，密码根本不会被验证。
 
 # End /etc/shells
