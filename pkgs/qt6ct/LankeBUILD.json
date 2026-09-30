@@ -4,16 +4,12 @@
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
-    "libGLX.so.0",
-    "libOpenGL.so.0",
     "libQt6Core.so.6",
     "libQt6Gui.so.6",
     "libQt6Widgets.so.6",
     "libc.so.6",
     "libgcc_s.so.1",
-    "libm.so.6",
-    "libstdc++.so.6",
-    "libxkbcommon.so.0"
+    "libstdc++.so.6"
   ],
   "provides": [
     "libqt6ct-common.so",
@@ -23,8 +19,6 @@
     "base-devel",
     "cmake",
     "git",
-    "libglvnd",
-    "libxkbcommon",
     "ninja",
     "qt6-base",
     "qt6-tools"
@@ -32,5 +26,6 @@
   "sources": [
     "https://www.opencode.net/trialuser/qt6ct/-/archive/0.11/qt6ct-0.11.tar.gz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 1
 }

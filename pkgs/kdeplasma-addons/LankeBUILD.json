@@ -1,7 +1,7 @@
 {
   "name": "kdeplasma-addons",
   "version": "6.7.5",
-  "release": 3,
+  "release": 4,
   "deps": [
     "qt6-quick3d",
     "kwin",

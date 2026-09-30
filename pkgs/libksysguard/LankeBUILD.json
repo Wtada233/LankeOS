@@ -1,7 +1,7 @@
 {
   "name": "libksysguard",
   "version": "6.7.5",
-  "release": 3,
+  "release": 4,
   "deps": [
     "qt5compat",
     "kf-kirigami",

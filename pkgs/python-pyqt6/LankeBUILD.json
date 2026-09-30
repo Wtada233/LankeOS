@@ -1,7 +1,7 @@
 {
   "name": "python-pyqt6",
   "version": "6.11.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python",
     "python-pyqt6-sip"
@@ -9,6 +9,7 @@
   "needed_so": [
     "libGLX.so.0",
     "libOpenGL.so.0",
+    "libQt6Concurrent.so.6",
     "libQt6Core.so.6",
     "libQt6DBus.so.6",
     "libQt6Designer.so.6",
@@ -22,7 +23,11 @@
     "libQt6PrintSupport.so.6",
     "libQt6Qml.so.6",
     "libQt6Quick.so.6",
+    "libQt6Quick3D.so.6",
+    "libQt6Quick3DRuntimeRender.so.6",
+    "libQt6Quick3DUtils.so.6",
     "libQt6QuickWidgets.so.6",
+    "libQt6ShaderTools.so.6",
     "libQt6SpatialAudio.so.6",
     "libQt6Sql.so.6",
     "libQt6Svg.so.6",

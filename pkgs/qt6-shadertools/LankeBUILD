@@ -3,7 +3,8 @@ lankebuild_prepare() {
         -DCMAKE_INSTALL_PREFIX=/usr \
         -DQT_BUILD_EXAMPLES=OFF \
         -DQT_BUILD_TESTS=OFF \
-        -DBUILD_SHARED_LIBS=ON
+        -DBUILD_SHARED_LIBS=ON \
+        -DQT_INSTALL_XDG_DESKTOP_ENTRIES=ON
 }
 
 lankebuild_build() {

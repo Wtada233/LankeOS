@@ -1,15 +1,29 @@
 lankebuild_prepare() {
-    # SIP ABI 版本 13.0→13.8（Arch 同款，PyQt6 兼容）
-    sed -e 's|13.0|13.8|' -i cmake/modules/SIPMacros.cmake
-    # 改字体修复（Arch 同款 986ae3c0）
-    if patch -Np1 --dry-run -i "{WORK_DIR}/../krita-986ae3c0.patch" >/dev/null 2>&1; then
-        patch -Np1 -i "{WORK_DIR}/../krita-986ae3c0.patch"
-    elif patch -R -p1 --dry-run -i "{WORK_DIR}/../krita-986ae3c0.patch" >/dev/null 2>&1; then
-        echo "krita-986ae3c0.patch 已应用，跳过"
-    else
-        echo "krita-986ae3c0.patch 应用失败" >&2
-        exit 1
-    fi
+    # 应用包目录里的补丁。容错：forward dry-run 失败但 reverse dry-run 成功 = 已应用
+    # （上游将来纳入修复后补丁自动变 no-op）；两者都失败才算真失败。
+    _apply_patch() {
+        local p="{WORK_DIR}/../$1"
+        if patch -Np1 --dry-run -i "$p" >/dev/null 2>&1; then
+            patch -Np1 -i "$p"
+        elif patch -R -p1 --dry-run -i "$p" >/dev/null 2>&1; then
+            echo "$1 已应用，跳过"
+        else
+            echo "$1 应用失败" >&2
+            exit 1
+        fi
+    }
+
+    # SIP ABI 版本 13.0→13.8（Arch 同款，PyQt6 兼容）。Krita 6.0.4 的
+    # cmake/modules/SIPMacros.cmake 在 QT_MAJOR_VERSION 6 分支里写的是 13.0。
+    _apply_patch krita-sip-abi-13.8.patch
+
+    # Qt 6.12 的 uic 严格校验 widget 的 class 名：源码里 AssistantsToolOptions.ui 有个
+    # widget 写成 `class=" QWidget"`（多一个前导空格）。6.11 的 uic 容忍，6.12 直接判整个
+    # .ui 文件无效（`Invalid class name: " QWidget"`），而 KI18n 的 kf6i18nuic.cmake 包装器
+    # **吞掉 uic 的失败并返回 0**（266 个 ui_*.h 一个都没生成也不报错），症状表现为下游编译
+    # 报 "ui_AssistantsToolOptions.h: No such file or directory"。全树 281 个 .ui 只此一处
+    # （逐个过 uic 6.12 验证过），上游 master 仍未修。
+    _apply_patch krita-uic-qt612-classname.patch
 }
 
 lankebuild_build() {

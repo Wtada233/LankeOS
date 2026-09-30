@@ -1,7 +1,7 @@
 {
   "name": "kf-purpose",
   "version": "6.30.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "kf-bluez-qt",
     "kf-kirigami",

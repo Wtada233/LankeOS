@@ -1,7 +1,7 @@
 {
   "name": "kdenlive",
   "version": "26.08.1",
-  "release": 5,
+  "release": 6,
   "deps": [
     "frei0r-plugins",
     "kf-qqc2-desktop-style"

@@ -1,7 +1,7 @@
 {
   "name": "kate",
   "version": "26.08.1",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",

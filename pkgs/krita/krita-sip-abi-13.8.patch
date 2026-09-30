@@ -1,0 +1,11 @@
+--- a/cmake/modules/SIPMacros.cmake	2026-09-30 22:54:34.366997607 +0800
++++ b/cmake/modules/SIPMacros.cmake	2026-09-30 22:54:34.368152754 +0800
+@@ -152,7 +152,7 @@
+         endif()
+ 
+         if (QT_MAJOR_VERSION STREQUAL "6")
+-            set(abi_version "13.0")
++            set(abi_version "13.8")
+             set(sip_disabled_features "[\"Krita_Qt5\"]")
+         else()
+             set(abi_version "12.8")

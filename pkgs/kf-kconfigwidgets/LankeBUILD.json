@@ -1,7 +1,7 @@
 {
   "name": "kf-kconfigwidgets",
   "version": "6.30.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libKF6Codecs.so.6",

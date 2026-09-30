@@ -1,7 +1,7 @@
 {
   "name": "kinfocenter",
   "version": "6.7.5",
-  "release": 2,
+  "release": 3,
   "deps": [
     "kf-kirigami",
     "kf-kdeclarative"
@@ -11,6 +11,7 @@
     "libKF6ConfigCore.so.6",
     "libKF6CoreAddons.so.6",
     "libKF6I18n.so.6",
+    "libKF6KCMUtils.so.6",
     "libKF6KCMUtilsCore.so.6",
     "libKF6KCMUtilsQuick.so.6",
     "libKF6KIOCore.so.6",
@@ -26,7 +27,8 @@
     "libc.so.6",
     "libdrm.so.2",
     "libstdc++.so.6",
-    "libudev.so.1"
+    "libudev.so.1",
+    "libusb-1.0.so.0"
   ],
   "provides": [
     "libKInfoCenterInternal.so"

@@ -1,7 +1,7 @@
 {
   "name": "powerdevil",
   "version": "6.7.5",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libKF6AuthCore.so.6",
