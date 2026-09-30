@@ -1,7 +1,7 @@
 {
   "name": "kinfocenter",
   "version": "6.7.5",
-  "release": 3,
+  "release": 4,
   "deps": [
     "kf-kirigami",
     "kf-kdeclarative"
@@ -52,6 +52,7 @@
     "libdisplay-info",
     "libdrm",
     "libpulse",
+    "libusb",
     "lm_sensors",
     "qt6-base",
     "qt6-declarative",

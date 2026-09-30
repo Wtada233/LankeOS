@@ -1,6 +1,7 @@
 {
   "name": "qt6-tools",
   "version": "6.12.0",
+  "release": 1,
   "deps": [],
   "needed_so": [
     "libLLVM.so.23.1",
@@ -37,6 +38,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "clang",
     "cmake",
     "git",
     "libglvnd",

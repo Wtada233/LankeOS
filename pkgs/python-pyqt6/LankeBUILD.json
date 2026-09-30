@@ -1,7 +1,7 @@
 {
   "name": "python-pyqt6",
   "version": "6.11.0",
-  "release": 3,
+  "release": 4,
   "deps": [
     "python",
     "python-pyqt6-sip"
@@ -54,6 +54,8 @@
     "qt6-tools",
     "qt6-multimedia",
     "qt6-svg",
+    "qt6-quick3d",
+    "qt6-shadertools",
     "python-sip",
     "libglvnd"
   ],

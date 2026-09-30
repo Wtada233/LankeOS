@@ -1,7 +1,7 @@
 {
   "name": "frei0r-plugins",
   "version": "3.6.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2",
@@ -18,6 +18,7 @@
     "base-devel",
     "cairo",
     "cmake",
+    "libglvnd",
     "ninja"
   ],
   "sources": [
