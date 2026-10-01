@@ -1,6 +1,6 @@
 {
   "name": "libsoup",
-  "version": "3.6.6",
+  "version": "3.8.0",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -11,7 +11,8 @@
     "libnghttp2.so.14",
     "libpsl.so.5",
     "libsqlite3.so.0",
-    "libz.so.1"
+    "libz.so.1",
+    "libzstd.so.1"
   ],
   "provides": [
     "libsoup-3.0.so",
@@ -27,10 +28,12 @@
     "nghttp2",
     "ninja",
     "sqlite",
-    "zlib"
+    "zlib",
+    "zstd"
   ],
   "sources": [
-    "https://download.gnome.org/sources/libsoup/3.6/libsoup-3.6.6.tar.xz"
+    "https://download.gnome.org/sources/libsoup/3.8/libsoup-3.8.0.tar.xz"
   ],
-  "no_strip": false
+  "no_strip": false,
+  "work_sources": []
 }

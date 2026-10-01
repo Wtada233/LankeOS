@@ -1,4 +1,11 @@
 lankebuild_prepare() {
+    for patch in "{WORK_DIR}"/../*.patch; do
+        if [ -f "$patch" ]; then
+            echo "Applying patch: $patch"
+            patch -Np1 < "$patch"
+        fi
+    done
+
     # GTK3 从 3.24.36 开始使用 Meson 构建[reference:2]
     # 创建独立的构建目录
     mkdir -p build

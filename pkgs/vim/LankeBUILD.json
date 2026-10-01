@@ -1,6 +1,6 @@
 {
   "name": "vim",
-  "version": "9.2.1152",
+  "version": "9.2.1161",
   "release": 2,
   "deps": [
     "bash",
@@ -28,6 +28,7 @@
     "libncursesw.so.6",
     "libpango-1.0.so.0",
     "libpangocairo-1.0.so.0",
+    "libpixman-1.so.0",
     "libwayland-client.so.0"
   ],
   "provides": [],
@@ -48,11 +49,12 @@
     "lua",
     "ncurses",
     "pango",
+    "pixman",
     "wayland",
     "zlib"
   ],
   "sources": [
-    "https://github.com/vim/vim/archive/refs/tags/v9.2.1152.tar.gz"
+    "https://github.com/vim/vim/archive/refs/tags/v9.2.1161.tar.gz"
   ],
   "work_sources": []
 }

@@ -6,9 +6,11 @@ sources:
   mode: tags
   tag-prefix: v
   template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
-- tracker-template: same-version
-  template: https://github.com/moby/moby/archive/refs/tags/docker-v{version}.tar.gz
-  same-version-of: docker
+- tracker-template: script
+  version-var:
+    main: sources[0]
+  script: |
+    echo "$main|https://github.com/moby/moby/archive/refs/tags/docker-v$main.tar.gz"
 - tracker-template: github
   repo: krallin/tini
   mode: tags

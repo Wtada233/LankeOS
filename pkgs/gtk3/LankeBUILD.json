@@ -1,7 +1,7 @@
 {
   "name": "gtk3",
   "version": "3.24.52",
-  "release": 3,
+  "release": 4,
   "deps": [
     "xwayland"
   ],
@@ -20,6 +20,7 @@
     "libc.so.6",
     "libcairo-gobject.so.2",
     "libcairo.so.2",
+    "libcolord.so.2",
     "libcups.so.2",
     "libepoxy.so.0",
     "libfontconfig.so.1",
@@ -51,6 +52,7 @@
     "at-spi2-core",
     "base-devel",
     "cairo",
+    "colord",
     "cups",
     "fontconfig",
     "fribidi",

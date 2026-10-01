@@ -1,6 +1,6 @@
 {
   "name": "python",
-  "version": "3.14.7",
+  "version": "3.14.8",
   "release": 3,
   "deps": [
     "bash"
@@ -47,7 +47,7 @@
     "zstd"
   ],
   "sources": [
-    "https://www.python.org/ftp/python/3.14.7/Python-3.14.7.tar.xz"
+    "https://www.python.org/ftp/python/3.14.8/Python-3.14.8.tar.xz"
   ],
   "work_sources": []
 }

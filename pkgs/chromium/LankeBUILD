@@ -14,7 +14,7 @@ else
 fi
 
 # 系统库 unbundle 列表（空格分隔，供 replace_gn_files.py 使用）
-_SYSTEM_LIBS="brotli dav1d flac fontconfig freetype harfbuzz
+_SYSTEM_LIBS="brotli dav1d flac fontconfig freetype harfbuzz highway
               libdrm libjpeg libwebp libxml libxslt
               openh264 opus zlib zstd"
 
@@ -22,9 +22,24 @@ _SYSTEM_LIBS="brotli dav1d flac fontconfig freetype harfbuzz
 # zlib 对应 --system-libraries 的 zlib（= 系统 zlib+minizip）：third_party/zlib 不存在
 # minizip/ 子目录（155 实测），写 minizip 会让 find 空跑、bundled 头文件留在树里，
 # 而库却是系统 libminizip → unz_file_info 结构体布局不一致。
-_UNWANTED_DIRS="brotli dav1d flac fontconfig freetype harfbuzz
+_UNWANTED_DIRS="brotli dav1d flac fontconfig freetype harfbuzz highway
                 libdrm libjpeg_turbo libwebp libxml libxslt
                 openh264 opus zlib zstd"
+
+# --- 运行期集成依赖（写在 LankeBUILD.json 的 deps 里，不是 build_deps）---
+# 下面这些是 Chromium **运行时**通过 dlopen / exec / D-Bus 才用到的，编译期不链接 →
+# farm 的 needed_so 扫描永远查不到，只能手写进 deps（CLAUDE.md 的 dlopen 例外；
+# 本包的 gtk3/xwayland 同理）。build_deps 只决定构建容器装什么，写那儿对运行期没用。
+#   gtk4         ui/gtk/gtk_compat.cc          DlOpen("libgtk-4.so.1")  → --gtk-version=4
+#   pipewire     webrtc modules/portal/pipewire_utils.cc
+#                                              DlOpen("libpipewire-0.3.so.0") → Wayland 屏幕共享
+#                （构建期的 rtc_use_pipewire=true 是另一码事，那个在 build_deps）
+#   upower       services/device/battery       走 D-Bus org.freedesktop.UPower（Battery Status API）
+#   xdg-utils    chrome/browser/platform_util_linux.cc   exec "xdg-open"
+#   desktop-file-utils / hicolor-icon-theme    Arch 同款 depends（桌面项注册、图标主题兜底）
+# 另：kdialog/zenity（process_singleton_dialog_linux.cc 直接 exec，缺则回落 xmessage）
+# 与 ttf-liberation 仓库里没有，要补得先打包；密码存储的 Secret Service 提供者
+# （gnome-keyring / KWallet）Arch 放 optdepends，我们暂不硬依赖。
 
 # --- Google API key（可选，默认关闭）---
 # 默认构建**不带** API key：免费配额（每日调用量）根本不够一个发行版用，带上只会把配额
@@ -213,10 +228,21 @@ lankebuild_build() {
     _flags="$_flags use_custom_libcxx=true use_sysroot=false"
     _flags="$_flags use_system_libffi=true enable_hangout_services_extension=true"
     _flags="$_flags enable_widevine=true"
-    _flags="$_flags use_qt5=false use_qt6=false use_clang_modules=false"
+    # Qt6 集成（Arch 同款开关）：ui/qt/qt.gni 的 declare_args 里 use_qt6 默认是
+    # `use_sysroot && is_linux && ...`，我们 use_sysroot=false → 默认关闭，必须显式开。
+    # 非 sysroot 构建时 qt_shim 的 moc 是构建期现跑的（moc_wrapper.py 调 $moc_qt6_path/moc），
+    # moc 由系统 qt6-base 提供（/usr/lib/qt6/moc），Qt6Core/Qt6Widgets 走 pkg-config。
+    # 产物 libqt6_shim.so 由 chrome 运行时手动 dlopen（见 package() 的资源文件列表）。
+    _flags="$_flags use_qt5=false use_qt6=true moc_qt6_path=\"/usr/lib/qt6\""
+    _flags="$_flags use_clang_modules=false"
     # clang：内置（third_party/llvm-build，git-LLVM-23，与 rust-toolchain 一致；版本从 cr_build_revision 读）
     _flags="$_flags clang_use_chrome_plugins=false"
-    _flags="$_flags chrome_pgo_phase=0"
+    # PGO：用 tarball 自带的官方 profile（chrome/build/pgo_profiles/chrome-linux-*.profdata，
+    # 由同目录的 linux.pgo.txt 指名），gn gen 时 update_pgo_profiles.py get_profile_path
+    # 本地解析路径 —— 不下载、不跑训练。pgo.gni 对 is_official_build+linux 的默认值本就是 2。
+    # Arch 钉 0 的理由是"系统 clang 读不了 bundled profile"，我们用与 profile 同版本的
+    # bundled clang，不适用。ThinLTO 不受影响（is_official_build+linux 早已开启）。
+    _flags="$_flags chrome_pgo_phase=2"
     # rust：内置工具链（use_chromium_rust_toolchain，rust_sysroot_absolute 留空即默认），
     # 版本/绑定由 third_party/rust-toolchain 的 VERSION 文件与 crubit 自动提供
     _flags="$_flags icu_use_data_file=false"
@@ -229,14 +255,9 @@ lankebuild_build() {
     # 使用系统 gn（需先安装 pkgs/gn）
     gn gen out/Release --args="$_flags"
 
-    # Chromium 构建极耗内存，留出 4 核给系统
-    _nc=$(nproc)
-    if [ "$_nc" -gt 4 ]; then
-      _jobs=$((_nc - 4))
-    else
-      _jobs=1
-    fi
-    ninja -C out/Release -j$_jobs chrome chrome_sandbox chromedriver.unstripped
+    # 全速构建：并发只看内存，不看核数——旧机器是"核数 > 内存 G 数"（16G 跑 8 个
+    # clang job 就在换页），才要留余量；现在 64G 内存充足，直接吃满全部线程。
+    ninja -C out/Release -j$(nproc) chrome chrome_sandbox chromedriver.unstripped
 }
 
 
@@ -291,7 +312,7 @@ lankebuild_package() {
     # --- 资源文件 ---
     for _f in \
         chrome_100_percent.pak chrome_200_percent.pak \
-        chrome_crashpad_handler resources.pak v8_context_snapshot.bin \
+        chrome_crashpad_handler libqt6_shim.so resources.pak v8_context_snapshot.bin \
         libEGL.so libGLESv2.so libvk_swiftshader.so libvulkan.so.1 \
         vk_swiftshader_icd.json; do
         cp "out/Release/$_f" "{STAGING_ROOT}/usr/lib/chromium/"

@@ -12,5 +12,5 @@ lankebuild_build() {
 
 lankebuild_package() {
     # Installation handled by builder
-    :
+    rm "{STAGING_ROOT}"/usr/lib/*.la # 删除libtool归档，不知道为啥lpkg没有自动处理，可能是断链
 }

@@ -1,6 +1,6 @@
 {
   "name": "spirv-llvm-translator",
-  "version": "23.1.1",
+  "version": "23.1.2",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -21,7 +21,7 @@
     "spirv-headers"
   ],
   "sources": [
-    "https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v23.1.1.tar.gz"
+    "https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/v23.1.2.tar.gz"
   ],
   "work_sources": []
 }

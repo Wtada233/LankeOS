@@ -1,0 +1,97 @@
+diff -Nur gtk-3.24.52.orig/gtk/gtkimmodule.c gtk-3.24.52/gtk/gtkimmodule.c
+--- gtk-3.24.52.orig/gtk/gtkimmodule.c
++++ gtk-3.24.52/gtk/gtkimmodule.c
+@@ -693,10 +693,10 @@
+ }
+ 
+ static gboolean
+-match_backend (GtkIMContextInfo *context)
++context_id_matches_backend (const gchar *context_id)
+ {
+ #ifdef GDK_WINDOWING_WAYLAND
+-  if (g_strcmp0 (context->context_id, "wayland") == 0)
++  if (g_strcmp0 (context_id, "wayland") == 0)
+     {
+       GdkDisplay *display = gdk_display_get_default ();
+ 
+@@ -704,7 +704,7 @@
+              gdk_wayland_display_query_registry (display,
+                                                  "zwp_text_input_manager_v3");
+     }
+-  if (g_strcmp0 (context->context_id, "waylandgtk") == 0)
++  if (g_strcmp0 (context_id, "waylandgtk") == 0)
+     {
+       GdkDisplay *display = gdk_display_get_default ();
+ 
+@@ -715,23 +715,29 @@
+ #endif
+ 
+ #ifdef GDK_WINDOWING_BROADWAY
+-  if (g_strcmp0 (context->context_id, "broadway") == 0)
++  if (g_strcmp0 (context_id, "broadway") == 0)
+     return GDK_IS_BROADWAY_DISPLAY (gdk_display_get_default ());
+ #endif
+ 
+ #ifdef GDK_WINDOWING_X11
+-  if (g_strcmp0 (context->context_id, "xim") == 0)
++  if (g_strcmp0 (context_id, "xim") == 0)
+     return GDK_IS_X11_DISPLAY (gdk_display_get_default ());
+ #endif
+ 
+ #ifdef GDK_WINDOWING_WIN32
+-  if (g_strcmp0 (context->context_id, "ime") == 0)
++  if (g_strcmp0 (context_id, "ime") == 0)
+     return GDK_IS_WIN32_DISPLAY (gdk_display_get_default ());
+ #endif
+ 
+   return TRUE;
+ }
+ 
++static gboolean
++match_backend (GtkIMContextInfo *context)
++{
++  return context_id_matches_backend (context->context_id);
++}
++
+ static const gchar *
+ lookup_immodule (gchar **immodules_list)
+ {
+@@ -747,7 +753,7 @@
+ 	  gchar *context_id;
+ 	  found = g_hash_table_lookup_extended (contexts_hash, *immodules_list,
+ 						(gpointer *) &context_id, NULL);
+-	  if (found)
++	  if (found && context_id_matches_backend (context_id))
+ 	    return context_id;
+ 	}
+       immodules_list++;
+diff -Nur gtk-3.24.52.orig/modules/input/imwayland.c gtk-3.24.52/modules/input/imwayland.c
+--- gtk-3.24.52.orig/modules/input/imwayland.c
++++ gtk-3.24.52/modules/input/imwayland.c
+@@ -977,7 +977,15 @@
+ MODULE_ENTRY (void, init) (GTypeModule * module)
+ {
+   gtk_im_context_wayland_register_type (module);
+-  gtk_im_context_wayland_global_init (gdk_display_get_default ());
++
++  /* The Wayland text input protocol only exists on a Wayland display.
++   * If this module gets loaded anywhere else (e.g. GTK_IM_MODULE=wayland
++   * on X11), gdk_wayland_display_get_wl_display() returns NULL and
++   * wl_display_get_registry(NULL) crashes. Skip the setup instead;
++   * create() below then refuses to hand out a context.
++   */
++  if (GDK_IS_WAYLAND_DISPLAY (gdk_display_get_default ()))
++    gtk_im_context_wayland_global_init (gdk_display_get_default ());
+ }
+ 
+ MODULE_ENTRY (void, exit) (void)
+@@ -992,6 +1000,9 @@
+ 
+ MODULE_ENTRY (GtkIMContext *, create) (const gchar * context_id)
+ {
++  if (global == NULL)
++    return NULL;
++
+   if (strcmp (context_id, "wayland") == 0)
+     return g_object_new (type_wayland, NULL);
+   else

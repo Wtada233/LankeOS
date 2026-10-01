@@ -1,6 +1,6 @@
 {
   "name": "libpng",
-  "version": "1.6.58",
+  "version": "1.6.59",
   "release": 2,
   "deps": [
     "bash"
@@ -21,7 +21,7 @@
     "zlib"
   ],
   "sources": [
-    "https://downloads.sourceforge.net/libpng/libpng-1.6.58.tar.xz"
+    "https://downloads.sourceforge.net/libpng/libpng-1.6.59.tar.xz"
   ],
   "work_sources": []
 }

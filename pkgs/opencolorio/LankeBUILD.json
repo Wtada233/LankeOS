@@ -1,6 +1,6 @@
 {
   "name": "opencolorio",
-  "version": "2.5.2",
+  "version": "2.6.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -16,7 +16,7 @@
   ],
   "provides": [
     "libOpenColorIO.so",
-    "libOpenColorIO.so.2.5"
+    "libOpenColorIO.so.2.6"
   ],
   "build_deps": [
     "base-devel",
@@ -34,7 +34,7 @@
     "yaml-cpp"
   ],
   "sources": [
-    "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/refs/tags/v2.5.2.tar.gz"
+    "https://github.com/AcademySoftwareFoundation/OpenColorIO/archive/refs/tags/v2.6.0.tar.gz"
   ],
   "work_sources": []
 }
