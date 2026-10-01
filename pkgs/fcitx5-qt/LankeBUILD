@@ -1,0 +1,56 @@
+lankebuild_prepare() {
+    # Prepare environment
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    # 上游 cmake 用 option 控制各 Qt 世代，且 qt5/ 子目录是 find_package(Qt5 ... REQUIRED)
+    # （qt5/CMakeLists.txt:5）——本仓库没有 qt5-*，**必须显式 OFF**，否则配置阶段直接失败。
+    # 产出只有 Qt6 那套：platforminputcontexts/libfcitx5platforminputcontextplugin.so、
+    # Fcitx5Qt6 的 dbus/gui/widgets addons、fcitx5-qt6-immodule-probing。
+    # 另两个开关决定 build_deps：
+    #   ENABLE_QT6_WAYLAND_WORKAROUND=ON → 需要 Qt6GuiPrivate 与 Qt6WaylandClientPrivate
+    #     两个私有 cmake 配置（qt6-base / qt6-wayland 都带，已核实），并取得 Wayland 下
+    #     候选窗口定位所需的 Qt6WaylandClient；
+    #   ENABLE_X11=ON → ECM 的 FindXCB 找 libxcb，另有 find_package(X11)（libx11）与
+    #     find_package(XKBCommon)（libxkbcommon）。
+    # 还有 find_package(Fcitx5Utils)（fcitx5 包）与 find_package(Gettext)
+    # （gettext 在 base/base-devel 直接依赖并集内，故不写进 build_deps）。
+    cmake -G Ninja .. \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBEXECDIR={LIBDIR} \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DENABLE_QT4=OFF \
+        -DENABLE_QT5=OFF \
+        -DENABLE_QT6=ON \
+        -DENABLE_X11=ON \
+        -DENABLE_QT6_WAYLAND_WORKAROUND=ON
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    # 会话级环境：Qt 侧的输入法模块选择。
+    #   QT_IM_MODULES（复数）是**分号分隔的列表**，优先级高于单数 QT_IM_MODULE
+    #   （qplatforminputcontextfactory.cpp::requested()）。键分两类：
+    #     ① 输入上下文插件名 —— 按插件元数据 Keys 解析；本包产出的插件声明
+    #        Keys=["fcitx","fcitx5"]（qt5/platforminputcontext/fcitx5.json.in，加上
+    #        WITH_FCITX_PLUGIN_NAME 默认 ON 注入的 "fcitx"）——列表里用 fcitx，
+    #        与 fcitx5-diagnose 给出的值一致（两个键都注册，等价）；
+    #     ② 特殊键 "wayland"（qwaylanddisplay_p.h:47 的 WAYLAND_IM_KEY）—— 不经插件
+    #        工厂，由 wayland 平台插件在 QWaylandIntegration::reconfigureInputContext()
+    #        里特判，对应 Qt 原生 text-input。注意该文件在 Qt 6.10 起已从 qtwayland 搬进
+    #        **qtbase**（本机 /usr/lib/qt6/plugins/platforms/libqwayland.so 属于 qt6-base，
+    #        qt6-wayland 只剩 QtWaylandClient 那套库）。
+    #   **必须把 wayland 显式写出来**：平台插件判断"是否要用原生 wayland IM"的条件是
+    #        requested.isEmpty() || requested.contains("wayland")     （p.h:402）
+    #   —— 设了非空列表却不含 wayland，原生路径会被**整个从候选链里剔掉**（不是降级成
+    #   后备）。另外它只会在用户列表**之后**补 wayland、再补 compose 兜底。
+    #   所以值取 "fcitx;wayland"：fcitx 模块优先（fcitx5 对 Qt 应用的推荐路线，键名取
+    #   fcitx5-diagnose 推荐值），Qt 原生 text-input 作后备，compose 由平台插件自动兜底。
+    install -dm 755 "{STAGING_ROOT}/usr/lib/environment.d"
+    cat > "{STAGING_ROOT}/usr/lib/environment.d/fcitx5-qt.conf" << 'EOF'
+QT_IM_MODULES=fcitx;wayland
+EOF
+}

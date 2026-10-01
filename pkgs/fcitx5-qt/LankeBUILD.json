@@ -1,0 +1,41 @@
+{
+  "name": "fcitx5-qt",
+  "version": "5.1.16",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libFcitx5Utils.so.2",
+    "libQt6Core.so.6",
+    "libQt6DBus.so.6",
+    "libQt6Gui.so.6",
+    "libQt6WaylandClient.so.6",
+    "libQt6Widgets.so.6",
+    "libc.so.6",
+    "libgcc_s.so.1",
+    "libstdc++.so.6",
+    "libxcb.so.1",
+    "libxkbcommon.so.0"
+  ],
+  "provides": [
+    "libFcitx5Qt6DBusAddons.so",
+    "libFcitx5Qt6DBusAddons.so.1",
+    "libFcitx5Qt6WidgetsAddons.so",
+    "libFcitx5Qt6WidgetsAddons.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "extra-cmake-modules",
+    "fcitx5",
+    "libx11",
+    "libxcb",
+    "libxkbcommon",
+    "ninja",
+    "qt6-base",
+    "qt6-wayland"
+  ],
+  "sources": [
+    "https://github.com/fcitx/fcitx5-qt/archive/refs/tags/5.1.16.tar.gz"
+  ],
+  "work_sources": []
+}

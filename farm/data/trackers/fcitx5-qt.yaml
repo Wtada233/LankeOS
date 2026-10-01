@@ -1,0 +1,8 @@
+pkg-name: fcitx5-qt
+version-source: sources[0]
+sources:
+- tracker-template: github
+  repo: fcitx/fcitx5-qt
+  mode: tags
+  tag-prefix: ''
+  template: https://github.com/fcitx/fcitx5-qt/archive/refs/tags/{tag}.tar.gz

@@ -66,7 +66,7 @@ lankebuild_package() {
 
     # 不装 /var/run：`--localstatedir=/var` 让 make install 建出实体 var/run/，而发行版里
     # /var/run 是 `-> ../run` 的符号链接（tmpfs）；/run/samba 交给 tmpfiles.d（下面 --create）
-    rm -rf "{STAGING_ROOT}/var/run"
+    rm -rf "{STAGING_ROOT}/var/"{run,lock}
 
     # 装完即建 /run/samba、/var/log/samba（不依赖开机 systemd-tmpfiles-setup.service）
     echo "systemd-tmpfiles --create" >> "{STAGING_HOOKS}/postinst.sh"

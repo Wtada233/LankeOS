@@ -1,15 +1,13 @@
 {
   "name": "fcitx5-gtk",
   "version": "5.1.7",
-  "release": 3,
+  "release": 6,
   "deps": [
     "xwayland"
   ],
   "needed_so": [
     "libX11.so.6",
-    "libatk-1.0.so.0",
     "libc.so.6",
-    "libcairo-gobject.so.2",
     "libcairo.so.2",
     "libgcc_s.so.1",
     "libgdk-3.so.0",
@@ -17,14 +15,13 @@
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
+    "libgraphene-1.0.so.0",
     "libgtk-3.so.0",
-    "libharfbuzz.so.0",
-    "libm.so.6",
+    "libgtk-4.so.1",
     "libpango-1.0.so.0",
     "libpangocairo-1.0.so.0",
     "libstdc++.so.6",
-    "libxkbcommon.so.0",
-    "libz.so.1"
+    "libxkbcommon.so.0"
   ],
   "provides": [
     "libFcitx5GClient.so",
@@ -41,6 +38,7 @@
     "glib",
     "gobject-introspection",
     "gtk3",
+    "gtk4",
     "harfbuzz",
     "libx11",
     "libxkbcommon",
