@@ -1,7 +1,7 @@
 {
   "name": "fcitx5-gtk",
   "version": "5.1.7",
-  "release": 6,
+  "release": 7,
   "deps": [
     "xwayland"
   ],
@@ -37,6 +37,7 @@
     "git",
     "glib",
     "gobject-introspection",
+    "graphene",
     "gtk3",
     "gtk4",
     "harfbuzz",
