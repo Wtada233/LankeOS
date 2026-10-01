@@ -1,8 +1,8 @@
 pkg-name: libusb
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: libusb/libusb
-  mode: tags
-  tag-prefix: v
-  template: https://github.com/libusb/libusb/releases/download/{tag}/libusb-{version}.tar.bz2
+  - tracker-template: github
+    repo: libusb/libusb
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/libusb/libusb/releases/download/{tag}/libusb-{version}.tar.bz2

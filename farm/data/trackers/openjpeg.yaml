@@ -1,8 +1,8 @@
 pkg-name: openjpeg
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: uclouvain/openjpeg
-  mode: tags
-  tag-prefix: v
-  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+  - tracker-template: github
+    repo: uclouvain/openjpeg
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

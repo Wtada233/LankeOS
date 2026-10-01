@@ -1,7 +1,7 @@
 pkg-name: parallel
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://ftp.gnu.org/gnu/parallel/
-  pattern: parallel-([0-9]+)\.tar\.bz2
-  template: https://ftp.gnu.org/gnu/parallel/parallel-{version}.tar.bz2
+  - tracker-template: html-index
+    url: https://ftp.gnu.org/gnu/parallel/
+    pattern: parallel-([0-9]+)\.tar\.bz2
+    template: https://ftp.gnu.org/gnu/parallel/parallel-{version}.tar.bz2

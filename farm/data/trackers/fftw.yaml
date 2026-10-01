@@ -1,7 +1,7 @@
 pkg-name: fftw
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://www.fftw.org/download.html
-  pattern: 'fftw-([0-9.]+)\.tar\.gz'
-  template: https://www.fftw.org/fftw-{version}.tar.gz
+  - tracker-template: html-index
+    url: https://www.fftw.org/download.html
+    pattern: 'fftw-([0-9.]+)\.tar\.gz'
+    template: https://www.fftw.org/fftw-{version}.tar.gz

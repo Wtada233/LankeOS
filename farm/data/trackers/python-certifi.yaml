@@ -1,5 +1,5 @@
 pkg-name: python-certifi
 version-source: sources[0]
 sources:
-- tracker-template: pypi
-  project: certifi
+  - tracker-template: pypi
+    project: certifi

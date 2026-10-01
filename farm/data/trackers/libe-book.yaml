@@ -3,5 +3,5 @@ version-source: sources[0]
 sources:
   - tracker-template: html-index
     url: https://sourceforge.net/projects/libebook/files/
-    pattern: 'libe-book-([0-9.]+)/'
+    pattern: "libe-book-([0-9.]+)/"
     template: https://sourceforge.net/projects/libebook/files/libe-book-{version}/libe-book-{version}.tar.xz

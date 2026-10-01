@@ -1,9 +1,9 @@
 pkg-name: libei
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.freedesktop.org
-  mode: tags
-  tag-prefix: ''
-  project: libinput/libei
-  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.freedesktop.org
+    mode: tags
+    tag-prefix: ""
+    project: libinput/libei
+    template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

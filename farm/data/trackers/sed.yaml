@@ -1,7 +1,7 @@
 pkg-name: sed
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://ftp.gnu.org/gnu/sed/
-  pattern: sed-(\d[\d.]*)\.tar\.xz
-  template: https://ftp.gnu.org/gnu/sed/sed-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://ftp.gnu.org/gnu/sed/
+    pattern: sed-(\d[\d.]*)\.tar\.xz
+    template: https://ftp.gnu.org/gnu/sed/sed-{version}.tar.xz

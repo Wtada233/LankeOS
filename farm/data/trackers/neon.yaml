@@ -1,8 +1,8 @@
 pkg-name: neon
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: notroj/neon
-  mode: tags
-  tag-prefix: ''
-  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+  - tracker-template: github
+    repo: notroj/neon
+    mode: tags
+    tag-prefix: ""
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

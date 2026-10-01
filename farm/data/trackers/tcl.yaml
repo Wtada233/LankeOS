@@ -1,9 +1,9 @@
 pkg-name: tcl
 version-source: sources[0]
 sources:
-- tracker-template: sourceforge
-  pattern: tcl([\d.]+)-src\.tar\.gz
-  project: tcl
-  path: Tcl
-  template: https://downloads.sourceforge.net/sourceforge/tcl/tcl{version}-src.tar.gz
-  major-version-lock: 8
+  - tracker-template: sourceforge
+    pattern: tcl([\d.]+)-src\.tar\.gz
+    project: tcl
+    path: Tcl
+    template: https://downloads.sourceforge.net/sourceforge/tcl/tcl{version}-src.tar.gz
+    major-version-lock: 8

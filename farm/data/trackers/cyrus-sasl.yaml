@@ -1,8 +1,8 @@
 pkg-name: cyrus-sasl
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: cyrusimap/cyrus-sasl
-  mode: tags
-  tag-prefix: cyrus-sasl-
-  template: https://github.com/cyrusimap/cyrus-sasl/releases/download/{tag}/cyrus-sasl-{version}.tar.gz
+  - tracker-template: github
+    repo: cyrusimap/cyrus-sasl
+    mode: tags
+    tag-prefix: cyrus-sasl-
+    template: https://github.com/cyrusimap/cyrus-sasl/releases/download/{tag}/cyrus-sasl-{version}.tar.gz

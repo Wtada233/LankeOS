@@ -1,5 +1,5 @@
 pkg-name: python-pygments
 version-source: sources[0]
 sources:
-- tracker-template: pypi
-  project: pygments
+  - tracker-template: pypi
+    project: pygments

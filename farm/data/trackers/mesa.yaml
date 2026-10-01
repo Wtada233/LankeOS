@@ -1,7 +1,7 @@
 pkg-name: mesa
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://archive.mesa3d.org/
-  pattern: mesa-([0-9.]+)\.tar\.
-  template: https://archive.mesa3d.org/mesa-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://archive.mesa3d.org/
+    pattern: mesa-([0-9.]+)\.tar\.
+    template: https://archive.mesa3d.org/mesa-{version}.tar.xz

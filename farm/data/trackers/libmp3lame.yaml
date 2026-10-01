@@ -1,8 +1,8 @@
 pkg-name: libmp3lame
 version-source: sources[0]
 sources:
-- tracker-template: sourceforge
-  pattern: lame-(\d+\.\d[\d.]*)\.tar\.gz
-  project: lame
-  path: lame
-  template: https://downloads.sourceforge.net/project/{project}/lame/{path_version}/lame-{version}.tar.gz
+  - tracker-template: sourceforge
+    pattern: lame-(\d+\.\d[\d.]*)\.tar\.gz
+    project: lame
+    path: lame
+    template: https://downloads.sourceforge.net/project/{project}/lame/{path_version}/lame-{version}.tar.gz

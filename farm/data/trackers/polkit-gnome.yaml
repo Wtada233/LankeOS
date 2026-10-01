@@ -1,6 +1,6 @@
 pkg-name: polkit-gnome
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  template: https://download.gnome.org/sources/polkit-gnome/{path_version}/polkit-gnome-{version}.tar.xz
-  stable-minor: all
+  - tracker-template: gnome
+    template: https://download.gnome.org/sources/polkit-gnome/{path_version}/polkit-gnome-{version}.tar.xz
+    stable-minor: all

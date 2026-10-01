@@ -1,8 +1,8 @@
 pkg-name: procps-ng
 version-source: sources[0]
 sources:
-- tracker-template: sourceforge
-  pattern: procps-ng-(\d[\d.]*)\.tar\.
-  project: procps-ng
-  path: Production
-  template: https://downloads.sourceforge.net/project/{project}/{path}/procps-ng-{version}.tar.xz
+  - tracker-template: sourceforge
+    pattern: procps-ng-(\d[\d.]*)\.tar\.
+    project: procps-ng
+    path: Production
+    template: https://downloads.sourceforge.net/project/{project}/{path}/procps-ng-{version}.tar.xz

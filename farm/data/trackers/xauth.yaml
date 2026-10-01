@@ -1,7 +1,7 @@
 pkg-name: xauth
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://xorg.freedesktop.org/releases/individual/app/
-  pattern: xauth-(\d[\d.]*)\.tar\.(?:gz|xz|bz2)
-  template: https://xorg.freedesktop.org/releases/individual/app/xauth-{version}.tar.gz
+  - tracker-template: html-index
+    url: https://xorg.freedesktop.org/releases/individual/app/
+    pattern: xauth-(\d[\d.]*)\.tar\.(?:gz|xz|bz2)
+    template: https://xorg.freedesktop.org/releases/individual/app/xauth-{version}.tar.gz

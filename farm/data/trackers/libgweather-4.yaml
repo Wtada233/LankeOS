@@ -2,9 +2,8 @@
 pkg-name: libgweather-4
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  source-name: libgweather
-  stable-minor: all
-  max-version: 4.89.99
-  template: https://download.gnome.org/sources/libgweather/{path_version}/libgweather-{version}.tar.xz
-
+  - tracker-template: gnome
+    source-name: libgweather
+    stable-minor: all
+    max-version: 4.89.99
+    template: https://download.gnome.org/sources/libgweather/{path_version}/libgweather-{version}.tar.xz

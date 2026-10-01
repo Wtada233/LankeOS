@@ -1,13 +1,13 @@
 pkg-name: kf-kdesu
 version-source: sources[0]
 sources:
-- tracker-template: multi-level-html-index
-  levels:
-  - name: series
-    url: https://download.kde.org/stable/frameworks/
-    pattern: href="([0-9][0-9.]*)/"
-  - name: version
-    url: https://download.kde.org/stable/frameworks/{series}/
-    pattern: kdesu-([0-9][0-9.]*)\.tar\.xz
-  major-version-lock: 6
-  template: https://download.kde.org/stable/frameworks/{series}/kdesu-{version}.tar.xz
+  - tracker-template: multi-level-html-index
+    levels:
+      - name: series
+        url: https://download.kde.org/stable/frameworks/
+        pattern: href="([0-9][0-9.]*)/"
+      - name: version
+        url: https://download.kde.org/stable/frameworks/{series}/
+        pattern: kdesu-([0-9][0-9.]*)\.tar\.xz
+    major-version-lock: 6
+    template: https://download.kde.org/stable/frameworks/{series}/kdesu-{version}.tar.xz

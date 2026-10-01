@@ -1,8 +1,8 @@
 pkg-name: fuse3
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: libfuse/libfuse
-  mode: releases
-  tag-prefix: fuse-
-  template: https://github.com/libfuse/libfuse/releases/download/fuse-{version}/fuse-{version}.tar.gz
+  - tracker-template: github
+    repo: libfuse/libfuse
+    mode: releases
+    tag-prefix: fuse-
+    template: https://github.com/libfuse/libfuse/releases/download/fuse-{version}/fuse-{version}.tar.gz

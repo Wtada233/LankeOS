@@ -1,7 +1,7 @@
 pkg-name: libksba
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://www.gnupg.org/ftp/gcrypt/libksba/
-  pattern: libksba-(\d[\d.]*)\.tar\.bz2
-  template: https://www.gnupg.org/ftp/gcrypt/libksba/libksba-{version}.tar.bz2
+  - tracker-template: html-index
+    url: https://www.gnupg.org/ftp/gcrypt/libksba/
+    pattern: libksba-(\d[\d.]*)\.tar\.bz2
+    template: https://www.gnupg.org/ftp/gcrypt/libksba/libksba-{version}.tar.bz2

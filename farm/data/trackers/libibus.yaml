@@ -8,9 +8,9 @@ pkg-name: libibus
 # 分开（`20080901` 无点 ✗），同时 `-alpha/-beta/-rc` 因含 `-` 自然被排除 ✗。
 # 走 git 协议列 tag → 不占 GitHub API 配额。
 sources:
-- tracker-template: script
-  script: |
-    tag=$(git ls-remote --tags --refs https://github.com/ibus/ibus 2>/dev/null \
-          | sed 's#.*refs/tags/##' | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)*$' | sort -V | tail -n1)
-    test -n "$tag" || exit 1
-    echo "$tag|https://github.com/ibus/ibus/releases/download/$tag/ibus-$tag.tar.gz"
+  - tracker-template: script
+    script: |
+      tag=$(git ls-remote --tags --refs https://github.com/ibus/ibus 2>/dev/null \
+            | sed 's#.*refs/tags/##' | grep -E '^[0-9]+\.[0-9]+(\.[0-9]+)*$' | sort -V | tail -n1)
+      test -n "$tag" || exit 1
+      echo "$tag|https://github.com/ibus/ibus/releases/download/$tag/ibus-$tag.tar.gz"

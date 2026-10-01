@@ -2,6 +2,6 @@
 pkg-name: gnome-bluetooth
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  source-name: gnome-bluetooth
-  template: https://download.gnome.org/sources/gnome-bluetooth/{path_version}/gnome-bluetooth-{version}.tar.xz
+  - tracker-template: gnome
+    source-name: gnome-bluetooth
+    template: https://download.gnome.org/sources/gnome-bluetooth/{path_version}/gnome-bluetooth-{version}.tar.xz

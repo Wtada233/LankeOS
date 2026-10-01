@@ -3,8 +3,8 @@
 pkg-name: gcr-4
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  source-name: gcr
-  stable-minor: all
-  max-version: 4.89.99
-  template: https://download.gnome.org/sources/gcr/{path_version}/gcr-{version}.tar.xz
+  - tracker-template: gnome
+    source-name: gcr
+    stable-minor: all
+    max-version: 4.89.99
+    template: https://download.gnome.org/sources/gcr/{path_version}/gcr-{version}.tar.xz

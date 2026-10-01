@@ -7,5 +7,5 @@ sources:
     tag-prefix: v
     # 上游混着旧命名法的 tag `v213`（= v2.13，无对应 release）。按版本比较 213 > 2.57 会被误选
     # （实测 tracker 曾把版本写成 213）；Arch 的 nvchecker 用 exclude_regex 排除，farm 用 exclude。
-    exclude: '^213$'
+    exclude: "^213$"
     template: https://github.com/Terraspace/UASM/archive/refs/tags/v{version}.tar.gz

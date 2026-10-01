@@ -1,8 +1,8 @@
 pkg-name: dosfstools
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: dosfstools/dosfstools
-  mode: releases
-  tag-prefix: v
-  template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.gz
+  - tracker-template: github
+    repo: dosfstools/dosfstools
+    mode: releases
+    tag-prefix: v
+    template: https://github.com/{repo}/releases/download/{tag}/{name}-{version}.tar.gz

@@ -3,6 +3,6 @@
 pkg-name: libgexiv2
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  template: https://download.gnome.org/sources/gexiv2/{path_version}/gexiv2-{version}.tar.xz
-  source-name: gexiv2
+  - tracker-template: gnome
+    template: https://download.gnome.org/sources/gexiv2/{path_version}/gexiv2-{version}.tar.xz
+    source-name: gexiv2

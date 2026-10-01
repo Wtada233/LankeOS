@@ -1,7 +1,7 @@
 pkg-name: libmnl
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://www.netfilter.org/projects/libmnl/downloads.html
-  pattern: libmnl-(\d[\d.]*)\.tar\.bz2
-  template: https://www.netfilter.org/projects/libmnl/files/libmnl-{version}.tar.bz2
+  - tracker-template: html-index
+    url: https://www.netfilter.org/projects/libmnl/downloads.html
+    pattern: libmnl-(\d[\d.]*)\.tar\.bz2
+    template: https://www.netfilter.org/projects/libmnl/files/libmnl-{version}.tar.bz2

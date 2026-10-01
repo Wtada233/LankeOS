@@ -1,7 +1,7 @@
 pkg-name: fastfetch
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: fastfetch-cli/fastfetch
-  mode: tags
-  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+  - tracker-template: github
+    repo: fastfetch-cli/fastfetch
+    mode: tags
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

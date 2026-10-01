@@ -1,8 +1,8 @@
 pkg-name: simde
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: simd-everywhere/simde
-  mode: tags
-  tag-prefix: v
-  template: https://github.com/simd-everywhere/simde/archive/refs/tags/{tag}.tar.gz
+  - tracker-template: github
+    repo: simd-everywhere/simde
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/simd-everywhere/simde/archive/refs/tags/{tag}.tar.gz

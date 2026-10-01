@@ -1,9 +1,9 @@
 pkg-name: power-profiles-daemon
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.freedesktop.org
-  mode: tags
-  tag-prefix: ''
-  project: upower/power-profiles-daemon
-  template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.freedesktop.org
+    mode: tags
+    tag-prefix: ""
+    project: upower/power-profiles-daemon
+    template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

@@ -1,9 +1,9 @@
 pkg-name: libaccounts-glib
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.com
-  mode: tags
-  tag-prefix: VERSION_
-  project: accounts-sso/libaccounts-glib
-  template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.com
+    mode: tags
+    tag-prefix: VERSION_
+    project: accounts-sso/libaccounts-glib
+    template: https://gitlab.com/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

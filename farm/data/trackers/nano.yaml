@@ -1,12 +1,12 @@
 pkg-name: nano
 version-source: sources[0]
 sources:
-- tracker-template: multi-level-html-index
-  levels:
-  - name: major
-    url: https://www.nano-editor.org/dist/
-    pattern: 'href="v([0-9]+)/"'
-  - name: version
-    url: https://www.nano-editor.org/dist/v{major}/
-    pattern: 'nano-([0-9.]+)\.tar\.xz'
-  template: https://www.nano-editor.org/dist/v{major}/nano-{version}.tar.xz
+  - tracker-template: multi-level-html-index
+    levels:
+      - name: major
+        url: https://www.nano-editor.org/dist/
+        pattern: 'href="v([0-9]+)/"'
+      - name: version
+        url: https://www.nano-editor.org/dist/v{major}/
+        pattern: 'nano-([0-9.]+)\.tar\.xz'
+    template: https://www.nano-editor.org/dist/v{major}/nano-{version}.tar.xz

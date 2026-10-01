@@ -1,8 +1,8 @@
 pkg-name: duktape
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: svaarala/duktape
-  mode: tags
-  tag-prefix: v
-  template: https://duktape.org/duktape-{version}.tar.xz
+  - tracker-template: github
+    repo: svaarala/duktape
+    mode: tags
+    tag-prefix: v
+    template: https://duktape.org/duktape-{version}.tar.xz

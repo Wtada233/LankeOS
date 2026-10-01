@@ -1,7 +1,7 @@
 pkg-name: golang
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://go.dev/dl/
-  pattern: go(1\.[\d.]+)\.src\.tar\.gz
-  template: https://go.dev/dl/go{version}.src.tar.gz
+  - tracker-template: html-index
+    url: https://go.dev/dl/
+    pattern: go(1\.[\d.]+)\.src\.tar\.gz
+    template: https://go.dev/dl/go{version}.src.tar.gz

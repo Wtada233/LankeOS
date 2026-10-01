@@ -1,7 +1,7 @@
 pkg-name: kirigami-app-components
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://download.kde.org/stable/kirigami-app-components/
-  pattern: kirigami\-app\-components-([0-9][0-9.]*)\.tar\.xz
-  template: https://download.kde.org/stable/kirigami-app-components/kirigami-app-components-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://download.kde.org/stable/kirigami-app-components/
+    pattern: kirigami\-app\-components-([0-9][0-9.]*)\.tar\.xz
+    template: https://download.kde.org/stable/kirigami-app-components/kirigami-app-components-{version}.tar.xz

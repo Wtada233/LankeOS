@@ -1,6 +1,6 @@
 pkg-name: libxml2
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  template: https://download.gnome.org/sources/libxml2/{path_version}/libxml2-{version}.tar.xz
-  stable-minor: all
+  - tracker-template: gnome
+    template: https://download.gnome.org/sources/libxml2/{path_version}/libxml2-{version}.tar.xz
+    stable-minor: all

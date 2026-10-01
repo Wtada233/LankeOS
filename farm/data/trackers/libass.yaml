@@ -1,8 +1,8 @@
 pkg-name: libass
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: libass/libass
-  mode: releases
-  tag-prefix: ''
-  template: https://github.com/{repo}/releases/download/{tag}/libass-{version}.tar.xz
+  - tracker-template: github
+    repo: libass/libass
+    mode: releases
+    tag-prefix: ""
+    template: https://github.com/{repo}/releases/download/{tag}/libass-{version}.tar.xz

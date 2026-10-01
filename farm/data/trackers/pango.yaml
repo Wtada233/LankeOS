@@ -5,7 +5,7 @@ sources:
     host: gitlab.gnome.org
     project: GNOME/pango
     mode: tags
-    tag-prefix: ''
+    tag-prefix: ""
     # GNOME 惯例：偶 minor 是稳定分支（1.57 是开发版）
     stable-minor: even
     # minor 9x 是历史 dev 系列（旧脚本里写作 `$2 < 90`）

@@ -1,7 +1,7 @@
 pkg-name: libpciaccess
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://www.x.org/pub/individual/lib/
-  pattern: libpciaccess-(\d[\d.]*)\.tar\.
-  template: https://www.x.org/pub/individual/lib/libpciaccess-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://www.x.org/pub/individual/lib/
+    pattern: libpciaccess-(\d[\d.]*)\.tar\.
+    template: https://www.x.org/pub/individual/lib/libpciaccess-{version}.tar.xz

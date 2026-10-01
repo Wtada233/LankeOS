@@ -1,9 +1,9 @@
 pkg-name: weston
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.freedesktop.org
-  mode: tags
-  tag-prefix: ''
-  project: wayland/weston
-  template: https://gitlab.freedesktop.org/{project}/-/releases/{version}/downloads/{name}-{version}.tar.xz
+  - tracker-template: gitlab
+    host: gitlab.freedesktop.org
+    mode: tags
+    tag-prefix: ""
+    project: wayland/weston
+    template: https://gitlab.freedesktop.org/{project}/-/releases/{version}/downloads/{name}-{version}.tar.xz

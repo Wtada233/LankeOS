@@ -1,7 +1,7 @@
 pkg-name: gdbm
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://ftp.gnu.org/gnu/gdbm/
-  pattern: gdbm-(\d[\d.]*)\.tar\.gz
-  template: https://ftp.gnu.org/gnu/gdbm/gdbm-{version}.tar.gz
+  - tracker-template: html-index
+    url: https://ftp.gnu.org/gnu/gdbm/
+    pattern: gdbm-(\d[\d.]*)\.tar\.gz
+    template: https://ftp.gnu.org/gnu/gdbm/gdbm-{version}.tar.gz

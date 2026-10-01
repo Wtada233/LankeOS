@@ -1,8 +1,8 @@
 pkg-name: sway
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: swaywm/sway
-  mode: tags
-  tag-prefix: ''
-  template: https://github.com/swaywm/sway/archive/refs/tags/{version}.tar.gz
+  - tracker-template: github
+    repo: swaywm/sway
+    mode: tags
+    tag-prefix: ""
+    template: https://github.com/swaywm/sway/archive/refs/tags/{version}.tar.gz

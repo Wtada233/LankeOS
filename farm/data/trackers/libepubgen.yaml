@@ -3,5 +3,5 @@ version-source: sources[0]
 sources:
   - tracker-template: html-index
     url: https://sourceforge.net/projects/libepubgen/files/
-    pattern: 'libepubgen-([0-9.]+)/'
+    pattern: "libepubgen-([0-9.]+)/"
     template: https://sourceforge.net/projects/libepubgen/files/libepubgen-{version}/libepubgen-{version}.tar.xz

@@ -1,7 +1,7 @@
 pkg-name: raptor
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://librdf.org/dist/source/
-  pattern: raptor2-([0-9.]+)\.tar\.gz
-  template: https://librdf.org/dist/source/raptor2-{version}.tar.gz
+  - tracker-template: html-index
+    url: https://librdf.org/dist/source/
+    pattern: raptor2-([0-9.]+)\.tar\.gz
+    template: https://librdf.org/dist/source/raptor2-{version}.tar.gz

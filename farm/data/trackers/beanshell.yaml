@@ -1,8 +1,8 @@
 pkg-name: beanshell
 version-source: work_sources[0]
 work_sources:
-- tracker-template: github
-  repo: beanshell/beanshell
-  mode: releases
-  tag-prefix: ''
-  template: https://github.com/beanshell/beanshell/releases/download/{tag}/bsh-{version}.jar
+  - tracker-template: github
+    repo: beanshell/beanshell
+    mode: releases
+    tag-prefix: ""
+    template: https://github.com/beanshell/beanshell/releases/download/{tag}/bsh-{version}.jar

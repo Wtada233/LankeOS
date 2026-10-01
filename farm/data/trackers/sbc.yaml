@@ -1,7 +1,7 @@
 pkg-name: sbc
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://www.kernel.org/pub/linux/bluetooth/
-  pattern: sbc-(\d[\d.]*)\.tar\.xz
-  template: https://www.kernel.org/pub/linux/bluetooth/sbc-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://www.kernel.org/pub/linux/bluetooth/
+    pattern: sbc-(\d[\d.]*)\.tar\.xz
+    template: https://www.kernel.org/pub/linux/bluetooth/sbc-{version}.tar.xz

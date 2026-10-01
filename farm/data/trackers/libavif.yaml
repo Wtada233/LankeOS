@@ -1,8 +1,8 @@
 pkg-name: libavif
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: AOMediaCodec/libavif
-  mode: tags
-  tag-prefix: v
-  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+  - tracker-template: github
+    repo: AOMediaCodec/libavif
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

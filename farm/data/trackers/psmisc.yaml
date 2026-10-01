@@ -1,8 +1,8 @@
 pkg-name: psmisc
 version-source: sources[0]
 sources:
-- tracker-template: sourceforge
-  pattern: psmisc-(\d[\d.]*)\.tar\.
-  project: psmisc
-  path: psmisc
-  template: https://downloads.sourceforge.net/project/{project}/{path}/psmisc-{version}.tar.xz
+  - tracker-template: sourceforge
+    pattern: psmisc-(\d[\d.]*)\.tar\.
+    project: psmisc
+    path: psmisc
+    template: https://downloads.sourceforge.net/project/{project}/{path}/psmisc-{version}.tar.xz

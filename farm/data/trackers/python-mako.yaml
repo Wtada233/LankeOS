@@ -1,5 +1,5 @@
 pkg-name: python-mako
 version-source: sources[0]
 sources:
-- tracker-template: pypi
-  project: mako
+  - tracker-template: pypi
+    project: mako

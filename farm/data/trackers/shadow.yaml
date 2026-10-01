@@ -1,7 +1,7 @@
 pkg-name: shadow
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: shadow-maint/shadow
-  mode: releases
-  template: https://github.com/{repo}/releases/download/{tag}/shadow-{version}.tar.xz
+  - tracker-template: github
+    repo: shadow-maint/shadow
+    mode: releases
+    template: https://github.com/{repo}/releases/download/{tag}/shadow-{version}.tar.xz

@@ -1,7 +1,7 @@
 pkg-name: ant
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://www.apache.org/dist/ant/source/
-  pattern: 'apache-ant-([0-9.]+)-src\.tar\.bz2'
-  template: https://www.apache.org/dist/ant/source/apache-ant-{version}-src.tar.bz2
+  - tracker-template: html-index
+    url: https://www.apache.org/dist/ant/source/
+    pattern: 'apache-ant-([0-9.]+)-src\.tar\.bz2'
+    template: https://www.apache.org/dist/ant/source/apache-ant-{version}-src.tar.bz2

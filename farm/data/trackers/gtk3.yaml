@@ -1,8 +1,8 @@
 pkg-name: gtk3
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  template: https://download.gnome.org/sources/gtk/{path_version}/gtk-{version}.tar.xz
-  major-version-lock: '3'
-  max-version: '3.24'
-  source-name: gtk
+  - tracker-template: gnome
+    template: https://download.gnome.org/sources/gtk/{path_version}/gtk-{version}.tar.xz
+    major-version-lock: "3"
+    max-version: "3.24"
+    source-name: gtk

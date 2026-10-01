@@ -6,5 +6,5 @@ sources:
     mode: tags
     tag-prefix: intel-media-
     # 上游混着 `intel-media-600` 这种非版本 tag（数值上大于真实版本，会被误选）
-    exclude: '^600'
+    exclude: "^600"
     template: https://github.com/intel/media-driver/archive/refs/tags/intel-media-{version}.tar.gz

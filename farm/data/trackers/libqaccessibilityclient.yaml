@@ -1,7 +1,7 @@
 pkg-name: libqaccessibilityclient
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://download.kde.org/stable/libqaccessibilityclient/
-  pattern: libqaccessibilityclient-([0-9][0-9.]*)\.tar\.xz
-  template: https://download.kde.org/stable/libqaccessibilityclient/libqaccessibilityclient-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://download.kde.org/stable/libqaccessibilityclient/
+    pattern: libqaccessibilityclient-([0-9][0-9.]*)\.tar\.xz
+    template: https://download.kde.org/stable/libqaccessibilityclient/libqaccessibilityclient-{version}.tar.xz

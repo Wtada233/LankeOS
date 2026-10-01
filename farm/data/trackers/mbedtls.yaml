@@ -1,9 +1,9 @@
 pkg-name: mbedtls
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: Mbed-TLS/mbedtls
-  mode: tags
-  tag-prefix: v
-  template: git+https://github.com/{repo}@{tag}
-  major-version-lock: '3'
+  - tracker-template: github
+    repo: Mbed-TLS/mbedtls
+    mode: tags
+    tag-prefix: v
+    template: git+https://github.com/{repo}@{tag}
+    major-version-lock: "3"

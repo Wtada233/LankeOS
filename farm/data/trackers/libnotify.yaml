@@ -1,5 +1,5 @@
 pkg-name: libnotify
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  template: https://download.gnome.org/sources/libnotify/0.8/libnotify-{version}.tar.xz
+  - tracker-template: gnome
+    template: https://download.gnome.org/sources/libnotify/0.8/libnotify-{version}.tar.xz

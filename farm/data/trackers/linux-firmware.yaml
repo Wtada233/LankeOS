@@ -1,9 +1,9 @@
 pkg-name: linux-firmware
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.com
-  mode: tags
-  tag-prefix: ''
-  project: kernel-firmware/linux-firmware
-  template: https://gitlab.com/kernel-firmware/linux-firmware/-/archive/{version}/linux-firmware-{version}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.com
+    mode: tags
+    tag-prefix: ""
+    project: kernel-firmware/linux-firmware
+    template: https://gitlab.com/kernel-firmware/linux-firmware/-/archive/{version}/linux-firmware-{version}.tar.gz

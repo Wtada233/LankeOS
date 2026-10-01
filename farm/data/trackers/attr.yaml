@@ -1,7 +1,7 @@
 pkg-name: attr
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://download-mirror.savannah.gnu.org/releases/attr/
-  pattern: attr-(\d[\d.]*)\.tar\.gz
-  template: https://download-mirror.savannah.gnu.org/releases/attr/{name}-{version}.tar.gz
+  - tracker-template: html-index
+    url: https://download-mirror.savannah.gnu.org/releases/attr/
+    pattern: attr-(\d[\d.]*)\.tar\.gz
+    template: https://download-mirror.savannah.gnu.org/releases/attr/{name}-{version}.tar.gz

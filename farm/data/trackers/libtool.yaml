@@ -1,7 +1,7 @@
 pkg-name: libtool
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://ftp.gnu.org/gnu/libtool/
-  pattern: libtool-(\d[\d.]*)\.tar\.xz
-  template: https://ftp.gnu.org/gnu/libtool/libtool-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://ftp.gnu.org/gnu/libtool/
+    pattern: libtool-(\d[\d.]*)\.tar\.xz
+    template: https://ftp.gnu.org/gnu/libtool/libtool-{version}.tar.xz

@@ -2,9 +2,9 @@ pkg-name: spirv-llvm-translator
 version-source: sources[0]
 after: llvm
 sources:
-- tracker-template: github
-  repo: KhronosGroup/SPIRV-LLVM-Translator
-  mode: tags
-  tag-prefix: v
-  template: https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/{tag}.tar.gz
-  major-of: llvm
+  - tracker-template: github
+    repo: KhronosGroup/SPIRV-LLVM-Translator
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/KhronosGroup/SPIRV-LLVM-Translator/archive/refs/tags/{tag}.tar.gz
+    major-of: llvm

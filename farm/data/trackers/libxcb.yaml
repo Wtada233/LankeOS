@@ -1,7 +1,7 @@
 pkg-name: libxcb
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://xorg.freedesktop.org/archive/individual/lib/
-  pattern: libxcb-(\d[\d.]*)\.tar\.xz
-  template: https://xorg.freedesktop.org/archive/individual/lib/libxcb-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://xorg.freedesktop.org/archive/individual/lib/
+    pattern: libxcb-(\d[\d.]*)\.tar\.xz
+    template: https://xorg.freedesktop.org/archive/individual/lib/libxcb-{version}.tar.xz

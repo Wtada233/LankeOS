@@ -1,9 +1,9 @@
 pkg-name: libixion
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.com
-  mode: tags
-  tag-prefix: ''
-  project: ixion/ixion
-  template: https://gitlab.com/api/v4/projects/ixion%2Fixion/packages/generic/source/{version}/libixion-{version}.tar.xz
+  - tracker-template: gitlab
+    host: gitlab.com
+    mode: tags
+    tag-prefix: ""
+    project: ixion/ixion
+    template: https://gitlab.com/api/v4/projects/ixion%2Fixion/packages/generic/source/{version}/libixion-{version}.tar.xz

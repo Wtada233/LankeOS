@@ -21,4 +21,5 @@ version-change-script: |
     fi
     rm -rf "$d"
   done
+
 # 受害者 = 脚本 stdout 动态输出（上面的扫描）；无需静态 packages glob（留空）

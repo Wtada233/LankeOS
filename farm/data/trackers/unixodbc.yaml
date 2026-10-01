@@ -1,8 +1,8 @@
 pkg-name: unixodbc
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: lurcher/unixODBC
-  mode: releases
-  tag-prefix: v
-  template: https://github.com/{repo}/releases/download/{tag}/unixODBC-{version}.tar.gz
+  - tracker-template: github
+    repo: lurcher/unixODBC
+    mode: releases
+    tag-prefix: v
+    template: https://github.com/{repo}/releases/download/{tag}/unixODBC-{version}.tar.gz

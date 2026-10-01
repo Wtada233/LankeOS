@@ -6,5 +6,5 @@ sources:
     mode: tags
     tag-prefix: release-
     # 上游 tag 是 `release-2.x.y`；锁主版本 2，免于误入 SDL3 的 `release-3.*`
-    major-version-lock: '2'
+    major-version-lock: "2"
     template: https://github.com/libsdl-org/SDL/releases/download/{tag}/SDL2-{version}.tar.gz

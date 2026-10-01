@@ -1,7 +1,7 @@
 pkg-name: glpk
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://ftp.gnu.org/gnu/glpk/
-  pattern: href="glpk-([0-9.]+)\.tar\.gz"
-  template: https://ftp.gnu.org/gnu/glpk/glpk-{version}.tar.gz
+  - tracker-template: html-index
+    url: https://ftp.gnu.org/gnu/glpk/
+    pattern: href="glpk-([0-9.]+)\.tar\.gz"
+    template: https://ftp.gnu.org/gnu/glpk/glpk-{version}.tar.gz

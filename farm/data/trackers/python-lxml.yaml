@@ -1,5 +1,5 @@
 pkg-name: python-lxml
 version-source: sources[0]
 sources:
-- tracker-template: pypi
-  project: lxml
+  - tracker-template: pypi
+    project: lxml

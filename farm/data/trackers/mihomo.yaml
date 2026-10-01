@@ -1,8 +1,8 @@
 pkg-name: mihomo
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: MetaCubeX/mihomo
-  mode: tags
-  tag-prefix: v
-  template: https://github.com/MetaCubeX/mihomo/archive/refs/tags/{tag}.tar.gz
+  - tracker-template: github
+    repo: MetaCubeX/mihomo
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/MetaCubeX/mihomo/archive/refs/tags/{tag}.tar.gz

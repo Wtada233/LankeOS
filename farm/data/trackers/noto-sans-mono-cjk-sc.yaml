@@ -1,8 +1,8 @@
 pkg-name: noto-sans-mono-cjk-sc
 version-source: work_sources[0]
 work_sources:
-- tracker-template: github
-  repo: notofonts/noto-cjk
-  mode: tags
-  tag-prefix: Sans
-  template: https://github.com/notofonts/noto-cjk/raw/refs/tags/{tag}/Sans/Mono/NotoSansMonoCJKsc-Regular.otf
+  - tracker-template: github
+    repo: notofonts/noto-cjk
+    mode: tags
+    tag-prefix: Sans
+    template: https://github.com/notofonts/noto-cjk/raw/refs/tags/{tag}/Sans/Mono/NotoSansMonoCJKsc-Regular.otf

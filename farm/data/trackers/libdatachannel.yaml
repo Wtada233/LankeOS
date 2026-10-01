@@ -1,8 +1,8 @@
 pkg-name: libdatachannel
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: paullouisageneau/libdatachannel
-  mode: tags
-  tag-prefix: v
-  template: git+https://github.com/{repo}@{tag}
+  - tracker-template: github
+    repo: paullouisageneau/libdatachannel
+    mode: tags
+    tag-prefix: v
+    template: git+https://github.com/{repo}@{tag}

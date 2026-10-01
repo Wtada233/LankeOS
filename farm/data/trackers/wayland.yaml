@@ -1,9 +1,9 @@
 pkg-name: wayland
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.freedesktop.org
-  mode: tags
-  tag-prefix: ''
-  project: wayland/wayland
-  template: https://gitlab.freedesktop.org/wayland/wayland/-/archive/{tag}/wayland-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.freedesktop.org
+    mode: tags
+    tag-prefix: ""
+    project: wayland/wayland
+    template: https://gitlab.freedesktop.org/wayland/wayland/-/archive/{tag}/wayland-{tag}.tar.gz

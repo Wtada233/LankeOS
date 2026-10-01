@@ -1,7 +1,7 @@
 pkg-name: perl-file-sharedir-install
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://cpan.metacpan.org/authors/id/E/ET/ETHER/
-  pattern: File-ShareDir-Install-(\d[\d.]*)\.tar\.gz
-  template: https://cpan.metacpan.org/authors/id/E/ET/ETHER/File-ShareDir-Install-{version}.tar.gz
+  - tracker-template: html-index
+    url: https://cpan.metacpan.org/authors/id/E/ET/ETHER/
+    pattern: File-ShareDir-Install-(\d[\d.]*)\.tar\.gz
+    template: https://cpan.metacpan.org/authors/id/E/ET/ETHER/File-ShareDir-Install-{version}.tar.gz

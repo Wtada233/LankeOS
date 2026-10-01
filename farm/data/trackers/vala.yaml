@@ -5,7 +5,7 @@ sources:
     host: gitlab.gnome.org
     project: GNOME/vala
     mode: tags
-    tag-prefix: ''
+    tag-prefix: ""
     # GNOME 惯例：偶 minor 是稳定分支
     stable-minor: even
     template: https://gitlab.gnome.org/GNOME/vala/-/archive/{version}/vala-{version}.tar.gz

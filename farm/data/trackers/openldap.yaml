@@ -1,7 +1,7 @@
 pkg-name: openldap
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://www.openldap.org/software/download/OpenLDAP/openldap-release/
-  pattern: href="openldap-([0-9.]+)\.tgz"
-  template: https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-{version}.tgz
+  - tracker-template: html-index
+    url: https://www.openldap.org/software/download/OpenLDAP/openldap-release/
+    pattern: href="openldap-([0-9.]+)\.tgz"
+    template: https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-{version}.tgz

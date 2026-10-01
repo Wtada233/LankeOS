@@ -1,12 +1,12 @@
 pkg-name: krb5
 version-source: sources[0]
 sources:
-- tracker-template: multi-level-html-index
-  levels:
-  - name: series
-    url: https://web.mit.edu/kerberos/dist/krb5/
-    pattern: 'href="([0-9]+\.[0-9]+)/"'
-  - name: version
-    url: https://web.mit.edu/kerberos/dist/krb5/{series}/
-    pattern: 'krb5-([0-9.]+)\.tar\.gz'
-  template: https://web.mit.edu/kerberos/dist/krb5/{series}/krb5-{version}.tar.gz
+  - tracker-template: multi-level-html-index
+    levels:
+      - name: series
+        url: https://web.mit.edu/kerberos/dist/krb5/
+        pattern: 'href="([0-9]+\.[0-9]+)/"'
+      - name: version
+        url: https://web.mit.edu/kerberos/dist/krb5/{series}/
+        pattern: 'krb5-([0-9.]+)\.tar\.gz'
+    template: https://web.mit.edu/kerberos/dist/krb5/{series}/krb5-{version}.tar.gz

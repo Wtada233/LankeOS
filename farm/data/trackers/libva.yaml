@@ -1,7 +1,7 @@
 pkg-name: libva
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: intel/libva
-  mode: releases
-  template: https://github.com/intel/libva/releases/download/{version}/libva-{version}.tar.bz2
+  - tracker-template: github
+    repo: intel/libva
+    mode: releases
+    template: https://github.com/intel/libva/releases/download/{version}/libva-{version}.tar.bz2

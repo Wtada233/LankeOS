@@ -1,8 +1,8 @@
 pkg-name: swig
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: swig/swig
-  mode: tags
-  tag-prefix: v
-  template: https://github.com/swig/swig/archive/refs/tags/{tag}.tar.gz
+  - tracker-template: github
+    repo: swig/swig
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/swig/swig/archive/refs/tags/{tag}.tar.gz

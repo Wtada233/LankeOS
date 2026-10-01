@@ -1,7 +1,7 @@
 pkg-name: dbus
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://dbus.freedesktop.org/releases/dbus/
-  pattern: dbus-(\d[\d.]*)\.tar\.xz
-  template: https://dbus.freedesktop.org/releases/dbus/dbus-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://dbus.freedesktop.org/releases/dbus/
+    pattern: dbus-(\d[\d.]*)\.tar\.xz
+    template: https://dbus.freedesktop.org/releases/dbus/dbus-{version}.tar.xz

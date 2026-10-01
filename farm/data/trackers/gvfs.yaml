@@ -2,6 +2,6 @@
 pkg-name: gvfs
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  source-name: gvfs
-  template: https://download.gnome.org/sources/gvfs/{path_version}/gvfs-{version}.tar.xz
+  - tracker-template: gnome
+    source-name: gvfs
+    template: https://download.gnome.org/sources/gvfs/{path_version}/gvfs-{version}.tar.xz

@@ -1,8 +1,8 @@
 pkg-name: qcoro
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: danvratil/qcoro
-  mode: tags
-  tag-prefix: v
-  template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+  - tracker-template: github
+    repo: danvratil/qcoro
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

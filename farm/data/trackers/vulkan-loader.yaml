@@ -2,6 +2,6 @@ pkg-name: vulkan-loader
 version-source: sources[0]
 after: vulkan-headers
 sources:
-- tracker-template: same-version
-  template: https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-{version}.tar.gz
-  same-version-of: vulkan-headers
+  - tracker-template: same-version
+    template: https://github.com/KhronosGroup/Vulkan-Loader/archive/refs/tags/vulkan-sdk-{version}.tar.gz
+    same-version-of: vulkan-headers

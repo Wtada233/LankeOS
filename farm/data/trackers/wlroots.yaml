@@ -1,9 +1,9 @@
 pkg-name: wlroots
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.freedesktop.org
-  mode: tags
-  tag-prefix: ''
-  project: wlroots/wlroots
-  template: https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/{tag}/wlroots-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.freedesktop.org
+    mode: tags
+    tag-prefix: ""
+    project: wlroots/wlroots
+    template: https://gitlab.freedesktop.org/wlroots/wlroots/-/archive/{tag}/wlroots-{tag}.tar.gz

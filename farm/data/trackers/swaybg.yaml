@@ -1,8 +1,8 @@
 pkg-name: swaybg
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: swaywm/swaybg
-  mode: releases
-  tag-prefix: v
-  template: https://github.com/swaywm/swaybg/releases/download/{tag}/swaybg-{version}.tar.gz
+  - tracker-template: github
+    repo: swaywm/swaybg
+    mode: releases
+    tag-prefix: v
+    template: https://github.com/swaywm/swaybg/releases/download/{tag}/swaybg-{version}.tar.gz

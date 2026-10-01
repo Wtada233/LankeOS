@@ -1,7 +1,7 @@
 pkg-name: kquickimageeditor
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://download.kde.org/stable/kquickimageeditor/
-  pattern: kquickimageeditor-([0-9][0-9.]*)\.tar\.xz
-  template: https://download.kde.org/stable/kquickimageeditor/kquickimageeditor-{version}.tar.xz
+  - tracker-template: html-index
+    url: https://download.kde.org/stable/kquickimageeditor/
+    pattern: kquickimageeditor-([0-9][0-9.]*)\.tar\.xz
+    template: https://download.kde.org/stable/kquickimageeditor/kquickimageeditor-{version}.tar.xz

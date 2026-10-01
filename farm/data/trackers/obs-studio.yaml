@@ -1,7 +1,7 @@
 pkg-name: obs-studio
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: obsproject/obs-studio
-  mode: tags
-  template: git+https://github.com/{repo}@{tag}
+  - tracker-template: github
+    repo: obsproject/obs-studio
+    mode: tags
+    template: git+https://github.com/{repo}@{tag}

@@ -1,7 +1,7 @@
 pkg-name: perl-file-sharedir
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://cpan.metacpan.org/authors/id/R/RE/REHSACK/
-  pattern: File-ShareDir-(\d[\d.]*)\.tar\.gz
-  template: https://cpan.metacpan.org/authors/id/R/RE/REHSACK/File-ShareDir-{version}.tar.gz
+  - tracker-template: html-index
+    url: https://cpan.metacpan.org/authors/id/R/RE/REHSACK/
+    pattern: File-ShareDir-(\d[\d.]*)\.tar\.gz
+    template: https://cpan.metacpan.org/authors/id/R/RE/REHSACK/File-ShareDir-{version}.tar.gz

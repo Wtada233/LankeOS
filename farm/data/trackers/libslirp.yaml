@@ -1,9 +1,9 @@
 pkg-name: libslirp
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.freedesktop.org
-  mode: tags
-  tag-prefix: v
-  project: slirp/libslirp
-  template: https://gitlab.freedesktop.org/slirp/libslirp/-/archive/{tag}/libslirp-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.freedesktop.org
+    mode: tags
+    tag-prefix: v
+    project: slirp/libslirp
+    template: https://gitlab.freedesktop.org/slirp/libslirp/-/archive/{tag}/libslirp-{tag}.tar.gz

@@ -1,9 +1,9 @@
 pkg-name: libpulse
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.freedesktop.org
-  mode: tags
-  tag-prefix: v
-  project: pulseaudio/pulseaudio
-  template: https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/archive/{tag}/pulseaudio-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.freedesktop.org
+    mode: tags
+    tag-prefix: v
+    project: pulseaudio/pulseaudio
+    template: https://gitlab.freedesktop.org/pulseaudio/pulseaudio/-/archive/{tag}/pulseaudio-{tag}.tar.gz

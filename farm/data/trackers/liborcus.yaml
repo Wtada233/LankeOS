@@ -1,9 +1,9 @@
 pkg-name: liborcus
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.com
-  mode: tags
-  tag-prefix: ''
-  project: orcus/orcus
-  template: https://gitlab.com/orcus/orcus/-/archive/{tag}/orcus-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.com
+    mode: tags
+    tag-prefix: ""
+    project: orcus/orcus
+    template: https://gitlab.com/orcus/orcus/-/archive/{tag}/orcus-{tag}.tar.gz

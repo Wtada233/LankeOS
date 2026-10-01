@@ -1,8 +1,8 @@
 pkg-name: shared-mime-info
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.freedesktop.org
-  mode: tags
-  project: xdg/shared-mime-info
-  template: https://gitlab.freedesktop.org/xdg/shared-mime-info/-/archive/{tag}/shared-mime-info-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.freedesktop.org
+    mode: tags
+    project: xdg/shared-mime-info
+    template: https://gitlab.freedesktop.org/xdg/shared-mime-info/-/archive/{tag}/shared-mime-info-{tag}.tar.gz

@@ -1,8 +1,8 @@
 pkg-name: gtk-doc
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.gnome.org
-  mode: tags
-  project: GNOME/gtk-doc
-  template: https://gitlab.gnome.org/GNOME/gtk-doc/-/archive/{tag}/gtk-doc-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.gnome.org
+    mode: tags
+    project: GNOME/gtk-doc
+    template: https://gitlab.gnome.org/GNOME/gtk-doc/-/archive/{tag}/gtk-doc-{tag}.tar.gz

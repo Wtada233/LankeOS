@@ -1,7 +1,7 @@
 pkg-name: opus
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://ftp.osuosl.org/pub/xiph/releases/opus/
-  pattern: opus-([0-9.]+)\.tar\.gz
-  template: https://ftp.osuosl.org/pub/xiph/releases/opus/opus-{version}.tar.gz
+  - tracker-template: html-index
+    url: https://ftp.osuosl.org/pub/xiph/releases/opus/
+    pattern: opus-([0-9.]+)\.tar\.gz
+    template: https://ftp.osuosl.org/pub/xiph/releases/opus/opus-{version}.tar.gz

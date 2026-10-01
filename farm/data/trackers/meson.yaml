@@ -1,7 +1,7 @@
 pkg-name: meson
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: mesonbuild/meson
-  mode: releases
-  template: https://github.com/mesonbuild/meson/releases/download/{tag}/meson-{version}.tar.gz
+  - tracker-template: github
+    repo: mesonbuild/meson
+    mode: releases
+    template: https://github.com/mesonbuild/meson/releases/download/{tag}/meson-{version}.tar.gz

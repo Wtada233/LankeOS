@@ -1,8 +1,8 @@
 pkg-name: libplacebo
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: haasn/libplacebo
-  mode: tags
-  tag-prefix: v
-  template: git+https://github.com/{repo}@{tag}
+  - tracker-template: github
+    repo: haasn/libplacebo
+    mode: tags
+    tag-prefix: v
+    template: git+https://github.com/{repo}@{tag}

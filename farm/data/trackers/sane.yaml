@@ -1,9 +1,9 @@
 pkg-name: sane
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.com
-  mode: tags
-  tag-prefix: ''
-  project: sane-project/backends
-  template: https://gitlab.com/sane-project/backends/-/archive/{version}/backends-{version}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.com
+    mode: tags
+    tag-prefix: ""
+    project: sane-project/backends
+    template: https://gitlab.com/sane-project/backends/-/archive/{version}/backends-{version}.tar.gz

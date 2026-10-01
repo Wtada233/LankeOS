@@ -4,8 +4,8 @@
 pkg-name: spidermonkey
 version-source: sources[0]
 sources:
-- tracker-template: html-index
-  url: https://archive.mozilla.org/pub/firefox/releases/
-  pattern: '>(\d+\.\d+(?:\.\d+)*)esr/<'
-  max-version: 141.0.0
-  template: https://archive.mozilla.org/pub/firefox/releases/{version}esr/source/firefox-{version}esr.source.tar.xz
+  - tracker-template: html-index
+    url: https://archive.mozilla.org/pub/firefox/releases/
+    pattern: '>(\d+\.\d+(?:\.\d+)*)esr/<'
+    max-version: 141.0.0
+    template: https://archive.mozilla.org/pub/firefox/releases/{version}esr/source/firefox-{version}esr.source.tar.xz

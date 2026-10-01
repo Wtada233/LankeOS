@@ -2,9 +2,9 @@
 pkg-name: blueprint-compiler
 version-source: sources[0]
 sources:
-- tracker-template: gitlab
-  host: gitlab.gnome.org
-  mode: tags
-  tag-prefix: v
-  project: GNOME/blueprint-compiler
-  template: https://gitlab.gnome.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz
+  - tracker-template: gitlab
+    host: gitlab.gnome.org
+    mode: tags
+    tag-prefix: v
+    project: GNOME/blueprint-compiler
+    template: https://gitlab.gnome.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

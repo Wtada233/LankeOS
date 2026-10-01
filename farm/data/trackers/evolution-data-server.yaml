@@ -2,6 +2,6 @@
 pkg-name: evolution-data-server
 version-source: sources[0]
 sources:
-- tracker-template: gnome
-  source-name: evolution-data-server
-  template: https://download.gnome.org/sources/evolution-data-server/{path_version}/evolution-data-server-{version}.tar.xz
+  - tracker-template: gnome
+    source-name: evolution-data-server
+    template: https://download.gnome.org/sources/evolution-data-server/{path_version}/evolution-data-server-{version}.tar.xz

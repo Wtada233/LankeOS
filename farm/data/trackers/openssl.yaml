@@ -1,9 +1,9 @@
 pkg-name: openssl
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: openssl/openssl
-  mode: tags
-  tag-prefix: openssl-
-  template: https://github.com/openssl/openssl/releases/download/{tag}/{name}-{version}.tar.gz
-  major-version-lock: '3'
+  - tracker-template: github
+    repo: openssl/openssl
+    mode: tags
+    tag-prefix: openssl-
+    template: https://github.com/openssl/openssl/releases/download/{tag}/{name}-{version}.tar.gz
+    major-version-lock: "3"

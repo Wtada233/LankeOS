@@ -1,8 +1,8 @@
 pkg-name: cmake
 version-source: sources[0]
 sources:
-- tracker-template: github
-  repo: Kitware/CMake
-  mode: releases
-  tag-prefix: v
-  template: https://github.com/{repo}/releases/download/v{version}/cmake-{version}.tar.gz
+  - tracker-template: github
+    repo: Kitware/CMake
+    mode: releases
+    tag-prefix: v
+    template: https://github.com/{repo}/releases/download/v{version}/cmake-{version}.tar.gz
