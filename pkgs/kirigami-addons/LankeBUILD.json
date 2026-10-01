@@ -1,6 +1,6 @@
 {
   "name": "kirigami-addons",
-  "version": "1.14.2",
+  "version": "1.15.0",
   "release": 4,
   "deps": [
     "qt6-multimedia",
@@ -60,7 +60,7 @@
     "qt6-multimedia"
   ],
   "sources": [
-    "https://download.kde.org/stable/kirigami-addons/kirigami-addons-1.14.2.tar.xz"
+    "https://download.kde.org/stable/kirigami-addons/kirigami-addons-1.15.0.tar.xz"
   ],
   "work_sources": []
 }

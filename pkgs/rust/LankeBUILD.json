@@ -1,6 +1,6 @@
 {
   "name": "rust",
-  "version": "1.98.1",
+  "version": "1.99.0",
   "release": 5,
   "deps": [
     "bash",
@@ -20,7 +20,7 @@
     "libstdc++.so.6"
   ],
   "provides": [
-    "librustc_driver-ccedc30bcc480aeb.so"
+    "librustc_driver-2a0a3ddadc1a6b23.so"
   ],
   "build_deps": [
     "base-devel",
@@ -38,7 +38,7 @@
     "zlib"
   ],
   "sources": [
-    "https://static.rust-lang.org/dist/rustc-1.98.1-src.tar.xz"
+    "https://static.rust-lang.org/dist/rustc-1.99.0-src.tar.xz"
   ],
   "work_sources": [],
   "farm_flags": [
