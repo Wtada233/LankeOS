@@ -13,7 +13,6 @@
 use super::{walk_all, ChkOpts, Finding, Report, Severity};
 use crate::error::FarmError;
 use crate::tr;
-use std::collections::HashSet;
 use std::path::Path;
 
 /// 本检則 analysis 结构版本：只在 **pycache** 分析逻辑变化时递增（与其他检則独立）。
@@ -81,23 +80,10 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
 
 /// 跑 pycachechk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
-    let (analyses, hits, misses, failed) = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
-    let audit_all = opts.subset.is_empty();
-    let audit: HashSet<&str> = opts.subset.iter().map(String::as_str).collect();
-    let mut report = Report {
-        cache_hits: hits,
-        cache_misses: misses,
-        failed,
-        ..Default::default()
-    };
-    for (pkg, a) in &analyses {
-        if !(audit_all || audit.contains(pkg.as_str())) {
-            continue;
-        }
-        if super::is_ignored(&opts.pkgs_dir, pkg, "PYCACHE") {
-            continue;
-        }
-        report.checked += 1;
+    let walk = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
+
+    // 过滤（subset / IGNORE flag）与汇总由公共骨架做，这里只回答"本包有什么问题"
+    Ok(super::collect_findings(opts, walk, |_pkg, a| {
         let mut items: Vec<Finding> = Vec::new();
         // 缓存目录：每目录一条
         if let Some(arr) = a["dirs"].as_array() {
@@ -122,11 +108,8 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
                 });
             }
         }
-        if !items.is_empty() {
-            report.findings.insert(pkg.clone(), items);
-        }
-    }
-    Ok(report)
+        items
+    }))
 }
 
 #[cfg(test)]

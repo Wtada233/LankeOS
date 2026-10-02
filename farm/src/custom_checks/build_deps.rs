@@ -20,9 +20,6 @@ use crate::tr;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 
-/// `IGNORE_CHK_<KIND>` 的 KIND。
-const KIND: &str = "BUILDDEPS";
-
 /// SONAME → provider 包名集合（从全部配方的 `provides` 建立；确定性排序）。
 fn provider_map(pkgs_dir: &Path, pkgs: &[String]) -> BTreeMap<String, BTreeSet<String>> {
     let mut map: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
@@ -64,7 +61,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
         if !(audit_all || audit.contains(pkg.as_str())) {
             continue;
         }
-        if super::is_ignored(&opts.pkgs_dir, pkg, KIND) {
+        if super::is_ignored(opts, pkg) {
             continue;
         }
         let Some(b) = crate::build::read_lankebuild(&opts.pkgs_dir, pkg) else {
@@ -126,6 +123,7 @@ mod tests {
             source: pkgs_dir.to_path_buf(),
             arch: "x86_64".into(),
             cache: pkgs_dir.join(".cache"),
+            kind: "BUILDDEPS".into(),
             pkgs_dir: pkgs_dir.to_path_buf(),
             subset: vec![],
             full_rescan: false,

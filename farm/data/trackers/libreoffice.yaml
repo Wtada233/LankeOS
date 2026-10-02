@@ -11,24 +11,15 @@ sources:
         url: https://download.documentfoundation.org/libreoffice/src/{series}/
         pattern: 'libreoffice-([0-9.]+)\.tar\.xz'
     template: https://download.documentfoundation.org/libreoffice/src/{series}/libreoffice-{version}.tar.xz
-  - tracker-template: multi-level-html-index
-    levels:
-      - name: series
-        url: https://download.documentfoundation.org/libreoffice/src/
-        pattern: '([0-9]+\.[0-9]+\.[0-9]+)/'
-      - name: version
-        url: https://download.documentfoundation.org/libreoffice/src/{series}/
-        pattern: 'libreoffice-([0-9.]+)\.tar\.xz'
-    template: https://download.documentfoundation.org/libreoffice/src/{series}/libreoffice-help-{version}.tar.xz
-  - tracker-template: multi-level-html-index
-    levels:
-      - name: series
-        url: https://download.documentfoundation.org/libreoffice/src/
-        pattern: '([0-9]+\.[0-9]+\.[0-9]+)/'
-      - name: version
-        url: https://download.documentfoundation.org/libreoffice/src/{series}/
-        pattern: 'libreoffice-([0-9.]+)\.tar\.xz'
-    template: https://download.documentfoundation.org/libreoffice/src/{series}/libreoffice-translations-{version}.tar.xz
+  # help / translations 与主源同版本同目录，只换文件名 → **锁 sources[0] 本轮解出的版本**，
+  # 不再各探一遍同一个目录列表（既省请求，也杜绝"三次探测之间上游发新版"的不一致）。
+  # 目录段 series 是版本前 **3** 段（`26.8.0` / 版本文件是 4 段 `26.8.0.3`）→ `{major_minor_patch}`。
+  - tracker-template: same-version-of-source
+    same-version-of-source: sources[0]
+    template: https://download.documentfoundation.org/libreoffice/src/{major_minor_patch}/libreoffice-help-{version}.tar.xz
+  - tracker-template: same-version-of-source
+    same-version-of-source: sources[0]
+    template: https://download.documentfoundation.org/libreoffice/src/{major_minor_patch}/libreoffice-translations-{version}.tar.xz
 # vendor tarball 归 work_sources（Arch noextract 对应，lpkg 只下载不解压）。
 # 这 20 个文件名是 **download.lst 里的数据**（在 source tarball 内部）——模板读不到文件内容，
 # 硬编进 yaml 又会随 LO 升级 vendor 而静默腐烂 → 这里用脚本是唯一正确的选择。

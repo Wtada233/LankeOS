@@ -1,8 +1,13 @@
 //! track 内置模板：**一个模板一个文件一个探测后端**（§9）。
 //!
-//! 每个模板文件只含 `probe(fetcher, cfg, major, pkg_name) -> Result<EntryProbe>`：
-//! 联网抓最新版本，返回该 source 槽位的版本 + URL。模板**被动触发**——由 source 条目的
-//! `tracker_template` 字段指定，模板不主动从 URI 猜格式（yaml 由人工/AI 编写，模板只是探测执行器）。
+//! 每个模板文件只含一个 `probe(...) -> Result<EntryProbe>`（返回该槽位的版本 + URL），
+//! 签名按"版本从哪来"分两类：
+//! - **探测模板**（github/gitlab/…）：`probe(fetcher, cfg, major, pkg_name)`——联网抓上游最新版本；
+//! - **锁版本模板**（`same-version` / `same-version-of-source`）：不联网，分别取
+//!   `lookup(包名)` / `resolved`（本 tracker 已探测槽位）。
+//!
+//! 模板**被动触发**——由 source 条目的 `tracker_template` 字段指定，模板不主动从 URI 猜格式
+//! （yaml 由人工/AI 编写，模板只是探测执行器）。
 //!
 //! `script` 是**条目级**模板（与其他模板平级，不是包级类型）：一个脚本产一个槽位，
 //! stdout 为一行 `<版本>|URL`；声明 `expand: true` 时可产多个槽位（每行一个）。
@@ -16,6 +21,7 @@ pub mod html_index;
 pub mod multi_level_html_index;
 pub mod pypi;
 pub mod same_version;
+pub mod same_version_of_source;
 pub mod script;
 pub mod sourceforge;
 
@@ -23,7 +29,186 @@ use crate::error::FarmError;
 use crate::net::Fetcher;
 use regex::Regex;
 
-use crate::track::{vercmp, SourceConfig};
+use crate::track::{vercmp, EntryProbe, ResolvedSlots, SourceConfig};
+
+// ───────────────────────────────────────────────────────────────────────────
+// 模板注册表：**唯一的模板清单** —— 新增模板 = 新文件 + 这里一行
+// ───────────────────────────────────────────────────────────────────────────
+
+/// 探测函数的签名族。模板"版本从哪来"的差异是**本质的**（联网探测 / 读另一个包 / 读本 tracker
+/// 更早槽位 / 脚本自述），所以不强行统一成一个 ctx 结构体——用枚举把四种形态显式写出来。
+/// 联网探测上游：`(fetcher, cfg, major, pkg_name)`（8 个探测模板都是这一形态）
+pub(crate) type WebProbe =
+    fn(&dyn Fetcher, &SourceConfig, Option<&str>, &str) -> Result<EntryProbe, FarmError>;
+/// 锁**另一个包**的版本：`lookup(包名) -> 版本`（`same-version`）
+pub(crate) type LookupProbe =
+    fn(&SourceConfig, &dyn Fn(&str) -> Option<String>, &str) -> Result<EntryProbe, FarmError>;
+/// 锁**本 tracker 更早槽位**的版本（`same-version-of-source`）
+pub(crate) type SlotProbe = fn(&SourceConfig, &ResolvedSlots) -> Result<EntryProbe, FarmError>;
+/// 脚本自述：`(fetcher, cfg, pkg_name, version-var 变量表)`（`script`；`expand: true` 时可产多个槽位）
+pub(crate) type ScriptProbe = fn(
+    &dyn Fetcher,
+    &SourceConfig,
+    &str,
+    &[(String, String)],
+) -> Result<Vec<EntryProbe>, FarmError>;
+
+#[derive(Debug)]
+pub(crate) enum ProbeFn {
+    Web(WebProbe),
+    LockPackage(LookupProbe),
+    LockSlot(SlotProbe),
+    Script(ScriptProbe),
+}
+
+/// 一个模板的注册项。
+#[derive(Debug)]
+pub(crate) struct TemplateSpec {
+    pub name: &'static str,
+    /// 本模板接受的**条目字段**（yaml 键）。`tracker-template` 由注册表统一放行，不必写在这里。
+    ///
+    /// 注意"用户实际设了哪些字段"**不在这里**——那由 `serde` 投影得到（`track::validate_supported_fields`
+    /// 序列化 `SourceConfig` 取键集，靠各字段的 `skip_serializing_if`）。所以**新增字段不必逐个模板登记**，
+    /// 只有"某模板要开始支持某字段"才改这里。
+    pub supported: &'static [&'static str],
+    /// 是否吃版本约束（`major-of` / `major-version-lock`）：探测模板吃；锁版本 / 脚本不吃。
+    pub version_constraints: bool,
+    pub probe: ProbeFn,
+}
+
+/// 版本约束字段。用 `VersionFilter` 的模板才有意义（`TemplateSpec::version_constraints`）。
+pub(crate) const VERSION_CONSTRAINT_FIELDS: &[&str] = &["major-of", "major-version-lock"];
+
+/// 模板注册表。字段白名单（`validate_supported_fields`）与探测分发（`probe_with`）都从这里取，
+/// 别再各写一份 `match`——历史上加一个模板要同步改 5 处（struct / set 表 / supported / 分发 / 文档）。
+pub(crate) const TEMPLATES: &[TemplateSpec] = &[
+    TemplateSpec {
+        name: "github",
+        supported: &[
+            "repo",
+            "mode",
+            "tag-prefix",
+            "template",
+            "max-version",
+            "stable-minor",
+            "exclude",
+        ],
+        version_constraints: true,
+        probe: ProbeFn::Web(github::probe),
+    },
+    TemplateSpec {
+        name: "gitlab",
+        supported: &[
+            "host",
+            "project",
+            "mode",
+            "tag-prefix",
+            "template",
+            "max-version",
+            "stable-minor",
+            "exclude",
+        ],
+        version_constraints: true,
+        probe: ProbeFn::Web(gitlab::probe),
+    },
+    TemplateSpec {
+        name: "html-index",
+        supported: &[
+            "url",
+            "pattern",
+            "template",
+            "max-version",
+            "stable-minor",
+            "exclude",
+            "source-name",
+        ],
+        version_constraints: true,
+        probe: ProbeFn::Web(html_index::probe),
+    },
+    TemplateSpec {
+        name: "multi-level-html-index",
+        supported: &[
+            "levels",
+            "template",
+            "max-version",
+            "stable-minor",
+            "exclude",
+            "source-name",
+        ],
+        version_constraints: true,
+        probe: ProbeFn::Web(multi_level_html_index::probe),
+    },
+    TemplateSpec {
+        name: "gcs",
+        supported: &[
+            "url",
+            "pattern",
+            "template",
+            "max-version",
+            "stable-minor",
+            "exclude",
+            "source-name",
+        ],
+        version_constraints: true,
+        probe: ProbeFn::Web(gcs::probe),
+    },
+    TemplateSpec {
+        name: "gnome",
+        supported: &[
+            "template",
+            "max-version",
+            "stable-minor",
+            "exclude",
+            "source-name",
+        ],
+        version_constraints: true,
+        probe: ProbeFn::Web(gnome::probe),
+    },
+    TemplateSpec {
+        name: "sourceforge",
+        supported: &[
+            "project",
+            "path",
+            "pattern",
+            "template",
+            "max-version",
+            "stable-minor",
+            "exclude",
+            "source-name",
+        ],
+        version_constraints: true,
+        probe: ProbeFn::Web(sourceforge::probe),
+    },
+    TemplateSpec {
+        name: "pypi",
+        supported: &["project", "max-version", "stable-minor", "exclude"],
+        version_constraints: true,
+        probe: ProbeFn::Web(pypi::probe),
+    },
+    TemplateSpec {
+        name: "same-version",
+        supported: &["same-version-of", "template"],
+        version_constraints: false,
+        probe: ProbeFn::LockPackage(same_version::probe),
+    },
+    TemplateSpec {
+        name: "same-version-of-source",
+        supported: &["same-version-of-source", "template"],
+        version_constraints: false,
+        probe: ProbeFn::LockSlot(same_version_of_source::probe),
+    },
+    TemplateSpec {
+        name: "script",
+        supported: &["script", "expand", "version-var"],
+        version_constraints: false,
+        probe: ProbeFn::Script(script::probe),
+    },
+];
+
+/// 按名字取注册项（`None` = 未知模板，由调用方报错）。
+pub(crate) fn spec(name: &str) -> Option<&'static TemplateSpec> {
+    TEMPLATES.iter().find(|s| s.name == name)
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // 版本筛选约束（各模板共享的**单一汇点**）
@@ -46,7 +231,7 @@ pub(crate) struct VersionFilter<'a> {
     pub even_minor: bool,
 }
 
-impl VersionFilter<'_> {
+impl<'a> VersionFilter<'a> {
     /// 单个候选是否通过**硬约束**（major / `max-version` 封顶 / `exclude` 黑名单）。
     ///
     /// **不含 `stable-minor`**——那是"优先偶 minor、一条都没有才退回全部"的**池级偏好**，
@@ -58,6 +243,19 @@ impl VersionFilter<'_> {
                 .cap
                 .is_none_or(|c| vercmp::cmp_version(v, c) != std::cmp::Ordering::Greater)
             && self.exclude.as_ref().is_none_or(|re| !re.is_match(v))
+    }
+
+    /// 去掉 `max-version` 封顶的副本（其余约束不变）。
+    ///
+    /// 给"封顶已经在**上一层**判过、本层不该再判"的两段式探测用——gnome 按**目录**判封顶，
+    /// 而目录里的**文件**版本串更长（`3.24.1` vs 封顶 `3.24`），再按封顶过滤会让整个目录落空。
+    pub(crate) fn without_cap(&self) -> VersionFilter<'a> {
+        VersionFilter {
+            major: self.major,
+            cap: None,
+            exclude: self.exclude.clone(),
+            even_minor: self.even_minor,
+        }
     }
 }
 
@@ -95,28 +293,37 @@ pub(crate) fn max_match(re: &Regex, text: &str, f: &VersionFilter) -> Option<Str
     max_version_stable_first(versions, f)
 }
 
-/// 候选版本的统一筛选 + 选取：约束过滤 → `stable-minor` → 稳定版优先 → 取最大。
+/// **池级过滤**：`allows`（major / `max-version` 封顶 / `exclude`）→ `stable-minor` 的奇偶偏好。
 ///
-/// 约束过滤走 `VersionFilter::allows`（major / max-version 封顶 / exclude 黑名单）。
-/// `stable-minor: even` 只保留 minor 为偶数的候选，**全被滤掉时退回全部**（与 GNOME 同款兜底：
-/// 上游偶尔没有偶数 minor 的稳定分支时不该直接探测失败）。
+/// 这是"约束筛选"在**池**这个粒度上的唯一实现。`max_version_stable_first`（一维候选列表）与
+/// `gnome`（两段式：先挑目录、再挑目录里的文件，候选不是一维的）都从这里走，
+/// 免得同一套约束在模板里出现第二份实现。
+///
+/// 奇偶偏好（`stable-minor`）：只保留 minor 为偶数的候选，**全被滤掉时退回全部**——上游偶尔
+/// 没有偶数 minor 的稳定分支（GNOME 里非核心库就是），那不该直接探测失败。
+/// 顺序是"先硬约束、后软偏好"：先 `allows` 再 even（历史 gnome 实现是反的，见 CHANGELOG）。
+pub(crate) fn pool_filter(versions: Vec<String>, f: &VersionFilter) -> Vec<String> {
+    let filtered: Vec<String> = versions.into_iter().filter(|v| f.allows(v)).collect();
+    if !f.even_minor {
+        return filtered;
+    }
+    let even: Vec<String> = filtered
+        .iter()
+        .filter(|v| minor_is_even(v))
+        .cloned()
+        .collect();
+    if even.is_empty() {
+        filtered
+    } else {
+        even
+    }
+}
+
+/// 候选版本的统一筛选 + 选取：池级过滤 → 稳定版优先 → 取最大。
+///
 /// 稳定版优先：`is_stable` 命中者优先，全都不稳定（全是 rc/beta…）才在所有候选里取最大。
 pub(crate) fn max_version_stable_first(versions: Vec<String>, f: &VersionFilter) -> Option<String> {
-    let filtered: Vec<String> = versions.into_iter().filter(|v| f.allows(v)).collect();
-    let filtered: Vec<String> = if f.even_minor {
-        let even: Vec<String> = filtered
-            .iter()
-            .filter(|v| minor_is_even(v))
-            .cloned()
-            .collect();
-        if even.is_empty() {
-            filtered
-        } else {
-            even
-        }
-    } else {
-        filtered
-    };
+    let filtered = pool_filter(versions, f);
     let stable: Vec<&String> = filtered.iter().filter(|v| is_stable(v)).collect();
     let pool: Vec<&String> = if stable.is_empty() {
         filtered.iter().collect()
@@ -230,6 +437,36 @@ pub(crate) fn urlencode(path: &str) -> String {
     path.replace('/', "%2F")
 }
 
+/// 「锁定一个已知版本」类模板（`same-version` / `same-version-of-source`）共用的占位符替换。
+///
+/// 提供的占位符（两个模板完全一致）：
+/// - `{version}`：锁定的版本号；
+/// - `{major_minor}` = `{version:2}`；`{major_minor_patch}` = `{version:3}`
+///   （上游把版本拆进目录层级时用：qt6 的 `qt/<6.11>/<6.11.1>/`、libreoffice 的
+///   `src/<26.8.0>/libreoffice-<26.8.0.3>.tar.xz`）；
+/// - `{version:N}`：版本**前 N 段**（点分）——上两个具名占位符的通用形式。
+///
+/// 段数不足（如 2 段版本配 `{major_minor_patch}`、N 大于实际段数）时占位符**不会被替换** →
+/// `validate_url` 报"残留占位符"（显式失败，不静默产坏 URL）。
+/// tag 前缀 / 仓库路径 / 上游名一律**烘进 template**（这两个模板不认 tag-prefix/repo/source-name）。
+pub(crate) fn substitute_locked_version(template: &str, version: &str) -> String {
+    let segs: Vec<&str> = version.split('.').collect();
+    let prefix = |n: usize| segs.iter().take(n).copied().collect::<Vec<_>>().join(".");
+    let mut owned: Vec<(String, String)> = vec![("version".to_string(), version.to_string())];
+    owned.push(("major_minor".to_string(), prefix(2)));
+    if segs.len() >= 3 {
+        owned.push(("major_minor_patch".to_string(), prefix(3)));
+    }
+    for n in 1..=segs.len() {
+        owned.push((format!("version:{n}"), prefix(n)));
+    }
+    let vars: Vec<(&str, &str)> = owned
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.as_str()))
+        .collect();
+    substitute(template, &vars)
+}
+
 /// 目录段是否为稳定分支候选（GNOME 惯例）。
 /// 两段式 `x.y` 看 minor（glib 2.80 稳定 / 2.81 开发）；**单段式 `N`（桌面级版本号）恒为稳定候选**——
 /// 桌面每个版本号都是正式版（44/45 都稳定），开发分支（51/90 等）靠"目录里只有 alpha/beta 文件 → 降级"过滤，不按奇偶排除。
@@ -245,6 +482,48 @@ pub(crate) fn minor_is_even(dir: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pool_filter_applies_hard_constraints_before_even_preference() {
+        // 唯一偶 minor 的候选被 major 排除时，**不能**整体落空：先 allows、再 even（空则退回全部）
+        let f = VersionFilter {
+            major: Some("3"),
+            cap: None,
+            exclude: None,
+            even_minor: true,
+        };
+        assert_eq!(
+            pool_filter(vec!["2.10".into(), "3.1".into()], &f),
+            vec!["3.1".to_string()],
+            "偶数候选被 major 排除后应退回全部（而不是空池）"
+        );
+        // 无硬约束时 even 偏好照常生效
+        let f = VersionFilter {
+            major: None,
+            cap: None,
+            exclude: None,
+            even_minor: true,
+        };
+        assert_eq!(
+            pool_filter(vec!["2.10".into(), "3.1".into()], &f),
+            vec!["2.10".to_string()]
+        );
+    }
+
+    #[test]
+    fn locked_version_placeholders_cover_segment_prefixes() {
+        // {version} / {major_minor}(={version:2}) / {major_minor_patch}(={version:3}) / {version:N}
+        assert_eq!(
+            substitute_locked_version(
+                "a/{version}/b/{major_minor}/c/{major_minor_patch}/d/{version:3}",
+                "26.8.0.3"
+            ),
+            "a/26.8.0.3/b/26.8/c/26.8.0/d/26.8.0"
+        );
+        // 段数不足 → 占位符残留（调用方的 validate_url 会拒，不静默产坏 URL）
+        assert!(substitute_locked_version("{version:5}", "1.2").contains('{'));
+        assert!(substitute_locked_version("{major_minor_patch}", "1.2").contains('{'));
+    }
 
     /// 造一个约束（不经过 `SourceConfig`，直接构造）。
     fn vf<'a>(major: Option<&'a str>, cap: Option<&'a str>) -> VersionFilter<'a> {

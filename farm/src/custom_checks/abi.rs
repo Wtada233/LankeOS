@@ -187,7 +187,8 @@ fn provided_names_from(analyses: &BTreeMap<String, serde_json::Value>) -> BTreeS
 /// （提供者换新 SONAME）或依赖未进仓库。整包缓存，`.lpkg` 未变不重扫（`farm chk full` 二遍起与其它
 /// chk 一样全命中）。
 pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
-    let (analyses, hits, misses, failed) = walk_all(o, SCHEMA, |ext, _pkg| analyze(ext))?;
+    let walk = walk_all(o, SCHEMA, |ext, _pkg| analyze(ext))?;
+    let analyses = &walk.0;
 
     // 1) provider 目录：soname → sym → {ver}
     let mut catalog: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
@@ -219,28 +220,14 @@ pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
     //     三类都要：tcl/expect 这类无 SONAME 的库靠**文件名**被引用；而 `libfoo.so → libfoo.so.1`
     //     这种 **dev 链接名**本身就是某些 DT_NEEDED 的字面量（runc 链 `libpathrs.so`，实体 SONAME
     //     却是 `libpathrs.so.0`）→ 只收常规文件会把它判成"没人提供"（误报）。
-    let provided_names = provided_names_from(&analyses);
+    let provided_names = provided_names_from(analyses);
 
     // 2) consumer 判定（全仓库 provider 已建全后统一做，确定性）
-    let audit_all = o.subset.is_empty();
-    let audit: BTreeSet<&str> = o.subset.iter().map(String::as_str).collect();
-    let mut report = Report {
-        cache_hits: hits,
-        cache_misses: misses,
-        failed,
-        ..Default::default()
-    };
-    for (pkg, a) in &analyses {
-        if !(audit_all || audit.contains(pkg.as_str())) {
-            continue;
-        }
-        if super::is_ignored(&o.pkgs_dir, pkg, "ABI") {
-            continue;
-        }
-        report.checked += 1;
+    // 过滤（subset / IGNORE_CHK_ABI）与汇总由公共骨架做，这里只回答"本包有什么问题"
+    Ok(super::collect_findings(o, walk, |_pkg, a| {
         let mut items: Vec<Finding> = Vec::new();
         let Some(files) = a["files"].as_array() else {
-            continue;
+            return Vec::new();
         };
         for f in files {
             let rel = f["file"].as_str().unwrap_or("?");
@@ -320,11 +307,8 @@ pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
                 });
             }
         }
-        if !items.is_empty() {
-            report.findings.insert(pkg.clone(), items);
-        }
-    }
-    Ok(report)
+        items
+    }))
 }
 
 #[cfg(test)]
@@ -435,6 +419,7 @@ mod tests {
             source: base.join("repo"),
             arch: "x86_64".into(),
             cache: cache.clone(),
+            kind: "ABI".into(),
             pkgs_dir: base.join("pkgs"),
             subset: vec!["mylib".into()],
             full_rescan: false,
@@ -509,6 +494,7 @@ mod tests {
             source: base.join("repo"),
             arch: "x86_64".into(),
             cache: cache.clone(),
+            kind: "ABI".into(),
             pkgs_dir: base.join("pkgs"),
             subset: vec![],
             full_rescan: rescan,
@@ -602,6 +588,7 @@ mod tests {
             source: base.join("repo"),
             arch: "x86_64".into(),
             cache: cache.clone(),
+            kind: "ABI".into(),
             pkgs_dir: base.join("pkgs"),
             subset: pkgs,
             full_rescan: false,

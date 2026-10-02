@@ -162,7 +162,7 @@ pub(crate) fn backup_removed_sonames(
     crate::scan::extract_lpkg(old_lpkg, &tmp)?;
     let backup_dir = out_dir.join("backups"); // 扁平：备份文件直接放 out/backups/<soname>.so.*
     fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败: {e}"))?;
-    for sub in ["usr/lib", "lib", "usr/lib64", "lib64"] {
+    for sub in crate::scan::LIB_DIRS {
         let lib_dir = tmp.join("content").join(sub);
         if !lib_dir.is_dir() {
             continue;
@@ -257,17 +257,8 @@ fn resolve_link_target(target: &Path, lib_dir: &Path, content_root: &Path) -> (P
     if target.is_absolute() {
         let abs = target.strip_prefix("/").unwrap_or(target);
         let src = content_root.join(abs);
-        let rel = if let Ok(rest) = abs.strip_prefix("usr/lib/") {
-            PathBuf::from(rest)
-        } else if let Ok(rest) = abs.strip_prefix("usr/lib64/") {
-            PathBuf::from(rest)
-        } else if let Ok(rest) = abs.strip_prefix("lib/") {
-            PathBuf::from(rest)
-        } else if let Ok(rest) = abs.strip_prefix("lib64/") {
-            PathBuf::from(rest)
-        } else {
-            PathBuf::from(target.file_name().unwrap_or_default())
-        };
+        let rel = crate::scan::strip_lib_dir(abs)
+            .unwrap_or_else(|| PathBuf::from(target.file_name().unwrap_or_default()));
         (src, rel)
     } else {
         (lib_dir.join(target), target.to_path_buf())
@@ -286,12 +277,11 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
     if !backups.is_dir() {
         return;
     }
-    let Ok(text) = fs::read_to_string(out_dir.join(arch).join("index.txt")) else {
+    let Some(idx) = read_index(out_dir, arch) else {
         return;
     };
-    let idx = Index::parse(&text);
     if idx.packages.is_empty() || idx.packages.values().all(|p| p.needed_so.is_empty()) {
-        return; // 剥离时代遗留的旧索引 → 引用无从判断，保守保留
+        return; // 索引里没有任何 needed_so → 引用无从判断，保守保留（宁留不删）
     }
     let referenced: std::collections::HashSet<String> = idx
         .packages
@@ -300,96 +290,8 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
         .collect();
     let mut any_removed = false;
 
-    /// 预扫描：收集「仍被引用的符号链接」指向的实体目标路径。
-    /// 实体文件的删除不能只看自身文件名派生的 SONAME——符号链接名与实体文件名可能
-    /// SONAME 不一致（display-info 类：soversion=3、version=0.3.0 ⇒
-    /// libdisplay-info.so.3 → libdisplay-info.so.0.3.0）。此时实体自身派生 SONAME
-    /// （libdisplay-info.so.0）未被引用，但指向它的符号链接仍被 needed_so 引用；
-    /// 删实体 = 令仍被使用的 SONAME 链接 dangling。
-    fn collect_referenced_link_targets(
-        dir: &Path,
-        backups_root: &Path,
-        referenced: &std::collections::HashSet<String>,
-        protected: &mut std::collections::HashSet<PathBuf>,
-    ) {
-        let Ok(rd) = fs::read_dir(dir) else { return };
-        for e in rd.flatten() {
-            let p = e.path();
-            let Ok(ft) = fs::symlink_metadata(&p) else {
-                continue;
-            };
-            if ft.file_type().is_dir() {
-                collect_referenced_link_targets(&p, backups_root, referenced, protected);
-            } else if ft.file_type().is_symlink() {
-                let fname = e.file_name().to_string_lossy().into_owned();
-                let soname = soname_of(&fname)
-                    .map(str::to_string)
-                    .unwrap_or_else(|| fname.clone());
-                // 引用判定同时看完整文件名与截断 SONAME：SONAME 可以是完整版本化文件名
-                // （libLLVM.so.22.1，四段），截断派生会漏判（libLLVM.so.22）→ 误删仍被引用的实体。
-                if referenced.contains(&fname) || referenced.contains(&soname) {
-                    if let Ok(target) = fs::read_link(&p) {
-                        let resolved = if target.is_absolute() {
-                            backups_root.join(abs_target_rel(&target))
-                        } else {
-                            p.parent().unwrap_or(dir).join(&target)
-                        };
-                        protected.insert(normalize_lexically(&resolved));
-                    }
-                }
-            }
-        }
-    }
-
-    /// 递归遍历备份树：清理无引用的备份文件（含复刻的子目录实体，如
-    /// expect5.45.4/libexpect5.45.4.so），并剪除随之变空的子目录。
-    fn walk(
-        dir: &Path,
-        referenced: &std::collections::HashSet<String>,
-        protected: &std::collections::HashSet<PathBuf>,
-        any_removed: &mut bool,
-    ) {
-        let Ok(rd) = fs::read_dir(dir) else { return };
-        for e in rd.flatten() {
-            let p = e.path();
-            let Ok(ft) = fs::symlink_metadata(&p) else {
-                continue;
-            };
-            if ft.file_type().is_dir() {
-                walk(&p, referenced, protected, any_removed);
-                // 子目录变空（其目标文件被清理）→ 剪除
-                if fs::read_dir(&p)
-                    .map(|mut r| r.next().is_none())
-                    .unwrap_or(false)
-                {
-                    let _ = fs::remove_dir(&p);
-                }
-                continue;
-            }
-            let fname = e.file_name().to_string_lossy().into_owned();
-            // 版本化 .so.* → SONAME 前缀；无 SONAME 的实体库（libtcl8.6.so）→ 文件名即身份
-            let soname = soname_of(&fname)
-                .map(str::to_string)
-                .unwrap_or_else(|| fname.clone());
-            // 引用判定同时看完整文件名与截断 SONAME：SONAME 可为完整版本化文件名
-            // （libLLVM.so.22.1 而非 libLLVM.so.22——rust 的 needed_so 链的是前者），
-            // 只按截断派生匹配会误删仍被引用的备份（升级后旧 .so 全靠备份过渡，删了
-            // 下游构建/运行断链不可恢复）。保留偏保守：仍无引用时下次 build 完成会再清。
-            if referenced.contains(&fname) || referenced.contains(&soname) {
-                continue; // 仍有包需要旧 SONAME → 保留
-            }
-            // 实体文件：自身派生 SONAME 未被引用，但仍被引用的符号链接指向它
-            // （符号链接名与实体文件名 SONAME 不一致）→ 保留，否则该 SONAME 链接 dangling。
-            if !ft.file_type().is_symlink() && protected.contains(&normalize_lexically(&p)) {
-                continue;
-            }
-            if fs::remove_file(&p).is_ok() {
-                println!("{}", tr!("build.backup_clean", p.display()));
-                *any_removed = true;
-            }
-        }
-    }
-
+    // 预扫描：收集「仍被引用的符号链接」指向的实体目标路径（实体文件的删除不能只看自身
+    // 文件名派生的 SONAME——符号链接名与实体文件名可能不一致），再按引用情况递归清理。
     let mut protected: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
     collect_referenced_link_targets(&backups, &backups, &referenced, &mut protected);
     walk(&backups, &referenced, &protected, &mut any_removed);
@@ -401,6 +303,96 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
             .unwrap_or(false)
     {
         let _ = fs::remove_dir(&backups);
+    }
+}
+
+// ── cleanup_backups 的两个递归助手（原为内嵌 fn；提出后各自可测）──
+
+/// SONAME 不一致（display-info 类：soversion=3、version=0.3.0 ⇒
+/// libdisplay-info.so.3 → libdisplay-info.so.0.3.0）。此时实体自身派生 SONAME
+/// （libdisplay-info.so.0）未被引用，但指向它的符号链接仍被 needed_so 引用；
+/// 删实体 = 令仍被使用的 SONAME 链接 dangling。
+fn collect_referenced_link_targets(
+    dir: &Path,
+    backups_root: &Path,
+    referenced: &std::collections::HashSet<String>,
+    protected: &mut std::collections::HashSet<PathBuf>,
+) {
+    let Ok(rd) = fs::read_dir(dir) else { return };
+    for e in rd.flatten() {
+        let p = e.path();
+        let Ok(ft) = fs::symlink_metadata(&p) else {
+            continue;
+        };
+        if ft.file_type().is_dir() {
+            collect_referenced_link_targets(&p, backups_root, referenced, protected);
+        } else if ft.file_type().is_symlink() {
+            let fname = e.file_name().to_string_lossy().into_owned();
+            let soname = soname_of(&fname)
+                .map(str::to_string)
+                .unwrap_or_else(|| fname.clone());
+            // 引用判定同时看完整文件名与截断 SONAME：SONAME 可以是完整版本化文件名
+            // （libLLVM.so.22.1，四段），截断派生会漏判（libLLVM.so.22）→ 误删仍被引用的实体。
+            if referenced.contains(&fname) || referenced.contains(&soname) {
+                if let Ok(target) = fs::read_link(&p) {
+                    let resolved = if target.is_absolute() {
+                        backups_root.join(abs_target_rel(&target))
+                    } else {
+                        p.parent().unwrap_or(dir).join(&target)
+                    };
+                    protected.insert(normalize_lexically(&resolved));
+                }
+            }
+        }
+    }
+}
+
+/// 递归遍历备份树：清理无引用的备份文件（含复刻的子目录实体，如
+/// expect5.45.4/libexpect5.45.4.so），并剪除随之变空的子目录。
+fn walk(
+    dir: &Path,
+    referenced: &std::collections::HashSet<String>,
+    protected: &std::collections::HashSet<PathBuf>,
+    any_removed: &mut bool,
+) {
+    let Ok(rd) = fs::read_dir(dir) else { return };
+    for e in rd.flatten() {
+        let p = e.path();
+        let Ok(ft) = fs::symlink_metadata(&p) else {
+            continue;
+        };
+        if ft.file_type().is_dir() {
+            walk(&p, referenced, protected, any_removed);
+            // 子目录变空（其目标文件被清理）→ 剪除
+            if fs::read_dir(&p)
+                .map(|mut r| r.next().is_none())
+                .unwrap_or(false)
+            {
+                let _ = fs::remove_dir(&p);
+            }
+            continue;
+        }
+        let fname = e.file_name().to_string_lossy().into_owned();
+        // 版本化 .so.* → SONAME 前缀；无 SONAME 的实体库（libtcl8.6.so）→ 文件名即身份
+        let soname = soname_of(&fname)
+            .map(str::to_string)
+            .unwrap_or_else(|| fname.clone());
+        // 引用判定同时看完整文件名与截断 SONAME：SONAME 可为完整版本化文件名
+        // （libLLVM.so.22.1 而非 libLLVM.so.22——rust 的 needed_so 链的是前者），
+        // 只按截断派生匹配会误删仍被引用的备份（升级后旧 .so 全靠备份过渡，删了
+        // 下游构建/运行断链不可恢复）。保留偏保守：仍无引用时下次 build 完成会再清。
+        if referenced.contains(&fname) || referenced.contains(&soname) {
+            continue; // 仍有包需要旧 SONAME → 保留
+        }
+        // 实体文件：自身派生 SONAME 未被引用，但仍被引用的符号链接指向它
+        // （符号链接名与实体文件名 SONAME 不一致）→ 保留，否则该 SONAME 链接 dangling。
+        if !ft.file_type().is_symlink() && protected.contains(&normalize_lexically(&p)) {
+            continue;
+        }
+        if fs::remove_file(&p).is_ok() {
+            println!("{}", tr!("build.backup_clean", p.display()));
+            *any_removed = true;
+        }
     }
 }
 
@@ -440,12 +432,7 @@ fn normalize_lexically(p: &Path) -> PathBuf {
 /// 本代码创建的备份符号链接一律相对路径，绝对目标仅兜底历史备份。
 fn abs_target_rel(target: &Path) -> PathBuf {
     let abs = target.strip_prefix("/").unwrap_or(target);
-    for prefix in ["usr/lib/", "usr/lib64/", "lib/", "lib64/"] {
-        if let Ok(rest) = abs.strip_prefix(prefix) {
-            return rest.to_path_buf();
-        }
-    }
-    abs.to_path_buf()
+    crate::scan::strip_lib_dir(abs).unwrap_or_else(|| abs.to_path_buf())
 }
 
 /// 更新本地 repo index.txt：替换该包的版本块（写入 metadata.json 转述的 deps；新 version/hash/provides）。
@@ -511,7 +498,7 @@ pub(crate) fn sha256_file(path: &Path) -> Result<String, FarmError> {
 
 /// 传播重建前 bump release（规则 1）。
 pub(crate) fn bump_release(pkgs_dir: &Path, pkg: &str) {
-    let path = pkgs_dir.join(pkg).join("LankeBUILD.json");
+    let path = super::recipe_json_path(pkgs_dir, pkg);
     let Ok(content) = fs::read_to_string(&path) else {
         return;
     };
@@ -527,7 +514,7 @@ pub(crate) fn bump_release(pkgs_dir: &Path, pkg: &str) {
 
 /// 元数据漂移双写：LankeBUILD.json 的 needed_so/provides 同步为扫描实际值（规则 2）。
 pub(crate) fn update_lankebuild_metadata(pkgs_dir: &Path, pkg: &str, outcome: &BuildOutcome) {
-    let path = pkgs_dir.join(pkg).join("LankeBUILD.json");
+    let path = super::recipe_json_path(pkgs_dir, pkg);
     let Ok(content) = fs::read_to_string(&path) else {
         return;
     };
@@ -557,6 +544,15 @@ pub(crate) fn update_lankebuild_metadata(pkgs_dir: &Path, pkg: &str, outcome: &B
 /// index.txt 含**完整 needed_so**（单一真源），传播（removed_sonames/revmap）、构建序（link_deps）
 /// 都从这里读。**必须有**——无基线构建是盲人摸象（needed_so 的 provider 无从校验、ABI diff 无从对比）。
 /// 缺失/为空 → 报错，要求先 `farm seed` 引入 repo 数据；不做网络 fallback，在线状态由 seed 显式落地。
+/// 宽松读索引：读不到 → `None`（调用方各自决定"缺索引时怎么办"）。
+/// **所有 `index.txt` 读取都从这里走**（历史上有 3 处各写一遍 `read_to_string` + `Index::parse`）。
+/// 严格版见 `load_old_index`（构建路径用：缺/空索引直接报错，禁止无基线构建）。
+pub(crate) fn read_index(out_dir: &Path, arch: &str) -> Option<Index> {
+    fs::read_to_string(out_dir.join(arch).join("index.txt"))
+        .ok()
+        .map(|t| Index::parse(&t))
+}
+
 pub(crate) fn load_old_index(out_dir: &Path, arch: &str) -> Result<Index, FarmError> {
     let path = out_dir.join(arch).join("index.txt");
     let text = fs::read_to_string(&path).map_err(|e| {
@@ -567,10 +563,6 @@ pub(crate) fn load_old_index(out_dir: &Path, arch: &str) -> Result<Index, FarmEr
         return Err(
             format!("本地 repo 索引 {path:?} 为空——请先 `farm seed` 播种，禁止无基线构建").into(),
         );
-    }
-    // 全零 needed_so = 剥离时代遗留的旧索引（曾剥 needed_so）→ 传播会失明，提示重新 seed
-    if idx.packages.values().all(|p| p.needed_so.is_empty()) {
-        println!("{}", tr!("build.index_no_soname", path.display()));
     }
     Ok(idx)
 }
@@ -601,101 +593,4 @@ pub(crate) fn recipe_hash(pkgs_dir: &Path, pkg: &str) -> Option<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn removed_soname_file_matches_exact_soname() {
-        let removed = ["libfoo.so.2"];
-        // SONAME 本体 + 其实体版本文件 → 匹配
-        assert!(is_removed_soname_file("libfoo.so.2", &removed));
-        assert!(is_removed_soname_file("libfoo.so.2.1.3", &removed));
-        // 精确前缀（`r.`），绝不误匹配别的 major：libfoo.so.2 不该吞掉 libfoo.so.20
-        assert!(
-            !is_removed_soname_file("libfoo.so.20", &removed),
-            "不应误匹配 libfoo.so.20"
-        );
-        assert!(!is_removed_soname_file("libfoo.so.1", &removed));
-        // 裸 .so dev 符号链接（归新包）→ 不匹配
-        assert!(!is_removed_soname_file("libfoo.so", &removed));
-    }
-
-    #[test]
-    fn soname_of_derives_versioned_soname() {
-        // 备份文件名 → SONAME（lib<name>.so.<major>，取前 3 段）
-        assert_eq!(soname_of("libfoo.so.1"), Some("libfoo.so.1"));
-        assert_eq!(soname_of("libfoo.so.1.2.3"), Some("libfoo.so.1"));
-        assert_eq!(soname_of("libxml2.so.2"), Some("libxml2.so.2"));
-        assert_eq!(soname_of("ld-linux.so.2"), Some("ld-linux.so.2"));
-        // 非库 / 无版本 / 第二段不是 so → None
-        assert_eq!(soname_of("libfoo.so"), None, "裸 .so 无 SONAME");
-        assert_eq!(soname_of("libfoo.1"), None, "第二段须是 so");
-        assert_eq!(soname_of("README.txt"), None);
-        assert_eq!(soname_of(""), None);
-    }
-
-    #[test]
-    fn repack_if_drift_errors_when_metadata_missing() {
-        // 曾静默返回 false（当作"无漂移"）→ 照发陈旧 metadata，.lpkg 与 index 永久失配。
-        // 现在 metadata.json 不可读必须 Err（上层 BLOCK，不得静默发布）。
-        let out = std::env::temp_dir().join(format!("farm-repack-meta-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&out);
-        fs::create_dir_all(out.join("extract").join("p")).unwrap();
-        fs::create_dir_all(out.join(".staging").join("p")).unwrap();
-        let lpkg = out.join(".staging").join("p").join("p-1.0.lpkg");
-        fs::write(&lpkg, b"not-a-real-lpkg").unwrap();
-
-        let opts = BuildOptions {
-            pkgs_dir: out.join("pkgs"),
-            out_dir: out.clone(),
-            targets: vec!["p".into()],
-            arch: "x86_64".into(),
-            image: String::new(),
-            download_retries: 1,
-            interactive: false,
-            build_data_dir: std::path::PathBuf::from("data/build"),
-            validate: false,
-            manual_sort: false,
-        };
-        let outcome = BuildOutcome {
-            ok: true,
-            needed_so: vec![],
-            provides: vec!["liba.so.1".into()],
-            deps: vec![],
-            failure_stage: None,
-            lpkg_path: Some(lpkg),
-        };
-
-        let res = repack_if_drift(&outcome, &opts, "p");
-        assert!(res.is_err(), "metadata.json 缺失必须报错而非静默当无漂移");
-        fs::remove_dir_all(&out).ok();
-    }
-
-    #[test]
-    fn update_repo_index_writes_deps() {
-        let out = std::env::temp_dir().join(format!("farm-repo-deps-test-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&out);
-        let arch_dir = out.join("x86_64");
-        fs::create_dir_all(&arch_dir).unwrap();
-        fs::write(arch_dir.join("index.txt"), "# index\n").unwrap();
-
-        update_repo_index(
-            &out,
-            "x86_64",
-            "mypkg",
-            "1.0",
-            "hash123",
-            &["glibc>=2.34".to_string(), "bash".to_string()],
-            &["libmypkg.so.1".to_string()],
-            &["libc.so.6".to_string()],
-        )
-        .unwrap();
-
-        let content = fs::read_to_string(arch_dir.join("index.txt")).unwrap();
-        assert!(
-            content.contains("mypkg|1.0:hash123:glibc>=2.34,bash:libmypkg.so.1:libc.so.6|"),
-            "index.txt 应包含转述的 deps: {content}"
-        );
-        fs::remove_dir_all(&out).ok();
-    }
-}
+mod tests;

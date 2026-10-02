@@ -86,10 +86,12 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
 
 /// 跑 pkgconfchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
-    let (analyses, hits, misses, failed) = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
+    let walk = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
+
     let index = super::load_index(opts);
     let mut module_owners: BTreeMap<String, HashSet<String>> = BTreeMap::new();
-    for (pkg, a) in &analyses {
+    // 预聚合：模块 → 提供它的包（全仓一遍，供逐包判定归属）
+    for (pkg, a) in &walk.0 {
         let Some(prov) = a["provides"].as_array() else {
             continue;
         };
@@ -101,24 +103,10 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
         }
     }
 
-    let audit_all = opts.subset.is_empty();
-    let audit: HashSet<&str> = opts.subset.iter().map(String::as_str).collect();
-    let mut report = Report {
-        cache_hits: hits,
-        cache_misses: misses,
-        failed,
-        ..Default::default()
-    };
-    for (pkg, a) in &analyses {
-        if !(audit_all || audit.contains(pkg.as_str())) {
-            continue;
-        }
-        if super::is_ignored(&opts.pkgs_dir, pkg, "PKGCONF") {
-            continue;
-        }
-        report.checked += 1;
+    // 过滤（subset / IGNORE flag）与汇总由公共骨架做，这里只回答"本包有什么问题"
+    Ok(super::collect_findings(opts, walk, |pkg, a| {
         let Some(reqs) = a["requires"].as_array() else {
-            continue;
+            return Vec::new();
         };
         // 三段判定：闭包命中→无；闭包缺但仓库有→Warning；仓库也无→Critical
         let mut reqs_out: Vec<(String, String, HashSet<String>)> = Vec::new();
@@ -132,10 +120,41 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
                 module_owners.get(m).cloned().unwrap_or_default(),
             ));
         }
-        let items = super::module_dep_findings(&index, pkg, reqs_out);
-        if !items.is_empty() {
-            report.findings.insert(pkg.clone(), items);
-        }
+        super::module_dep_findings(&index, pkg, reqs_out)
+    }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 逗号分段 + 剥版本约束 + 内联注释截断（`.pc` 里 `Requires: # nettle` 很常见）。
+    #[test]
+    fn parse_requires_line_splits_strips_versions_and_comments() {
+        let mut out = Vec::new();
+        parse_requires_line("foo >= 1.2, bar, baz # nettle", &mut out);
+        assert_eq!(out, vec!["foo", "bar", "baz"]);
+        let mut out = Vec::new();
+        parse_requires_line(" # 整行都是注释", &mut out);
+        assert!(out.is_empty());
+        let mut out = Vec::new();
+        parse_requires_line("", &mut out);
+        assert!(out.is_empty());
     }
-    Ok(report)
+
+    /// 只有 `*/pkgconfig/*.pc` 才算模块——`usr/lib/cmake/foo.pc` 之类的名字空间不同，不能混进来。
+    #[test]
+    fn pc_module_only_accepts_pkgconfig_dirs() {
+        let content = Path::new("/x/content");
+        assert_eq!(
+            pc_module(Path::new("/x/content/usr/lib/pkgconfig/foo.pc"), content).as_deref(),
+            Some("foo")
+        );
+        assert_eq!(
+            pc_module(Path::new("/x/content/usr/share/pkgconfig/bar.pc"), content).as_deref(),
+            Some("bar")
+        );
+        assert!(pc_module(Path::new("/x/content/usr/lib/cmake/foo.pc"), content).is_none());
+        assert!(pc_module(Path::new("/x/content/usr/lib/pkgconfig/foo.h"), content).is_none());
+    }
 }

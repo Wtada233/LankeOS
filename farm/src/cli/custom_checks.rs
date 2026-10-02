@@ -53,11 +53,12 @@ fn cache_root(a: &ChkArgs) -> PathBuf {
         .unwrap_or_else(|| custom_checks::default_cache_base(&a.source))
 }
 
-fn opts_for(a: &ChkArgs, cache: PathBuf) -> ChkOpts {
+fn opts_for(a: &ChkArgs, def: &ChkDef) -> ChkOpts {
     ChkOpts {
         source: a.source.clone(),
         arch: a.arch.clone(),
-        cache,
+        cache: cache_root(a).join(def.cache),
+        kind: def.kind(),
         pkgs_dir: resolve_pkgs_dir(a),
         subset: a.pkg.clone(),
         full_rescan: a.full_rescan,
@@ -126,6 +127,17 @@ struct ChkDef {
     run: fn(&ChkOpts) -> Result<Report, FarmError>,
 }
 
+impl ChkDef {
+    /// `IGNORE_CHK_<KIND>` 里的 KIND —— **从 label 派生**（kebab → 去连字符大写）：
+    /// `pkg-err → PKGERR`、`build-deps → BUILDDEPS`、`qml → QML`。
+    ///
+    /// 检則不再各自手写 KIND（历史上 9 处手写，且 label / KIND / `FarmFlag` 三份列表互不校验 →
+    /// 拼错就静默失效）。派生正确性由 `tests::kind_is_derivable_and_known_to_farm_flags` 钉住。
+    fn kind(&self) -> String {
+        self.label.replace('-', "").to_ascii_uppercase()
+    }
+}
+
 const CHECKS: [ChkDef; 9] = [
     ChkDef {
         label: "qml",
@@ -184,7 +196,7 @@ pub(crate) fn cmd_run(a: &ChkArgs, label: &str) -> ExitCode {
         eprintln!("{}", lankefarm::tr!("chk.unknown_kind", label));
         return ExitCode::from(2);
     };
-    let r = (d.run)(&opts_for(a, cache_root(a).join(d.cache)));
+    let r = (d.run)(&opts_for(a, d));
     if let Ok(rr) = &r {
         print_report(d.label, rr);
     }
@@ -193,10 +205,9 @@ pub(crate) fn cmd_run(a: &ChkArgs, label: &str) -> ExitCode {
 
 /// 一键跑全部（`farm chk full`）：同一张定义表依次跑所有检則，每类独立解包/独立缓存。
 pub(crate) fn cmd_fullchk(a: &ChkArgs) -> ExitCode {
-    let base = cache_root(a);
     let mut bad = false;
     for d in &CHECKS {
-        match (d.run)(&opts_for(a, base.join(d.cache))) {
+        match (d.run)(&opts_for(a, d)) {
             Ok(r) => print_report(d.label, &r),
             Err(e) => {
                 eprintln!("{e}");
@@ -240,5 +251,60 @@ mod tests {
         // 缓存子目录必须唯一：两检則共用目录会互相污染（A 的 analysis 被 B 当自己的读）
         let caches: std::collections::HashSet<&str> = CHECKS.iter().map(|d| d.cache).collect();
         assert_eq!(caches.len(), CHECKS.len(), "缓存子目录必须唯一");
+    }
+
+    /// 跨切面契约：**发现项（Warning/Critical）不影响退出码**——`finish` 只在**运行失败**（`Err`）
+    /// 时返回 2，成功路径一律 SUCCESS（`cmd_run` / `cmd_fullchk` 都走它）。
+    /// 这条契约整个子系统原先没有任何测试钉住（只在 `finish` 的 3 行里隐式存在）。
+    #[test]
+    fn findings_do_not_change_exit_code() {
+        let mut r = Report {
+            checked: 1,
+            ..Default::default()
+        };
+        r.findings.insert(
+            "pkg".to_string(),
+            vec![lankefarm::custom_checks::Finding {
+                file: "usr/lib/x".into(),
+                what: "w".into(),
+                severity: lankefarm::custom_checks::Severity::Critical,
+            }],
+        );
+        assert_eq!(
+            finish(Ok(r)),
+            ExitCode::SUCCESS,
+            "有 Critical 发现也不得改变退出码（只影响报告）"
+        );
+        assert_eq!(
+            finish(Err("boom".into())),
+            ExitCode::from(2),
+            "运行失败才返回 2"
+        );
+    }
+
+    /// `IGNORE_CHK_<KIND>` 的 KIND 现在**由 label 派生**（`ChkDef::kind`），检則不再各自手写。
+    /// 这条把派生结果与 `farm_flags` 的注册面钉在一起：改了 label 却忘了 farm_flags →
+    /// 配方里写那个 flag 会走"未知 flag"告警，而 `is_ignored` 永远不匹配（静默失效）。
+    #[test]
+    fn kind_is_derived_from_label_and_known_to_farm_flags() {
+        use lankefarm::build::FarmFlag;
+        // 派生规则本身（kebab → 去连字符大写）
+        assert_eq!(
+            ChkDef {
+                label: "pkg-err",
+                cache: "x",
+                run: |_| unreachable!()
+            }
+            .kind(),
+            "PKGERR"
+        );
+        for d in &CHECKS {
+            let flag = format!("IGNORE_CHK_{}", d.kind());
+            assert!(
+                FarmFlag::parse(&flag).is_some(),
+                "检則 {} 派生出 {flag}，但 farm_flags 不认识它（写进配方只会得到未知 flag 告警）",
+                d.label
+            );
+        }
     }
 }

@@ -16,7 +16,7 @@ use crate::error::FarmError;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::net::Fetcher;
-use crate::track::{need, validate_url, EntryProbe, SourceConfig};
+use crate::track::{need, EntryProbe, SourceConfig};
 
 /// 每个 probe 调用分配一个唯一序号，配合 PID 保证临时脚本文件名互不冲突。
 static SCRIPT_SEQ: AtomicU32 = AtomicU32::new(0);
@@ -90,7 +90,7 @@ fn parse_stdout(stdout: &str, expand: bool) -> Result<Vec<EntryProbe>, FarmError
         if url.is_empty() {
             return Err(format!("脚本 stdout 第 {n} 行 URL 为空: {line}").into());
         }
-        validate_url(url)?;
+        // 残留占位符不在这里判：`track::probe_with` 对**每个产出槽位**统一 validate_url（唯一一处）
         probes.push(EntryProbe {
             version: ver.to_string(),
             url: url.to_string(),

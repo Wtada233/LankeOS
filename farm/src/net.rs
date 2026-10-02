@@ -183,14 +183,6 @@ impl RealFetcher {
             gitlab_token,
         }
     }
-
-    /// 从环境变量构造：`GITHUB_TOKEN` / `GITLAB_TOKEN`。
-    pub fn from_env() -> Self {
-        RealFetcher {
-            github_token: std::env::var("GITHUB_TOKEN").ok(),
-            gitlab_token: std::env::var("GITLAB_TOKEN").ok(),
-        }
-    }
 }
 
 impl Default for RealFetcher {

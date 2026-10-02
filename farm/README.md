@@ -103,7 +103,7 @@ sources:
     template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
 ```
 
-模板：`github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version`（直接锁定另一包版本）`script`（内嵌 bash）。每模板只接受自己的字段——设置不支持的（如 github + `max-version`）或拼错字段名（如 `tag-prefx`）都报错，不静默忽略。
+模板：`github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version`（直接锁定另一包版本）`same-version-of-source`（锁定本 tracker 更早槽位的本轮版本）`script`（内嵌 bash）。每模板只接受自己的字段——设置不支持的（如 github + `max-version`）或拼错字段名（如 `tag-prefx`）都报错，不静默忽略。
 
 `script` 是**条目级**逃生舱（与其他模板平级，不是包级类型）：一个脚本产一个 source/work_source 槽位，stdout **恰好一行** `<版本>|URL`。模板覆盖不了时才用——脚本不可复用、无法统一校验：
 

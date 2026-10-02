@@ -216,14 +216,17 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
 
 /// 跑 qmlchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
-    let (analyses, hits, misses, failed) = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
+    let walk = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
+
     let index = super::load_index(opts);
 
     // 1) URI 模块 → 归属包
     let mut module_owners: BTreeMap<String, HashSet<String>> = BTreeMap::new();
     // 2) 目录 → 归属包（由各包 .qml 文件目录的祖先建立）
     let mut dir_owners: BTreeMap<String, HashSet<String>> = BTreeMap::new();
-    for (pkg, a) in &analyses {
+
+    // 预聚合（全仓两遍）：先把所有包的 provides/files 汇总成归属表，再逐包判定
+    for (pkg, a) in &walk.0 {
         if let Some(prov) = a["provides"].as_array() {
             for m in prov.iter().filter_map(|v| v.as_str()) {
                 module_owners
@@ -250,22 +253,8 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
         }
     }
 
-    let audit_all = opts.subset.is_empty();
-    let audit: HashSet<&str> = opts.subset.iter().map(String::as_str).collect();
-    let mut report = Report {
-        cache_hits: hits,
-        cache_misses: misses,
-        failed,
-        ..Default::default()
-    };
-    for (pkg, a) in &analyses {
-        if !(audit_all || audit.contains(pkg.as_str())) {
-            continue;
-        }
-        if super::is_ignored(&opts.pkgs_dir, pkg, "QML") {
-            continue;
-        }
-        report.checked += 1;
+    // 过滤（subset / IGNORE flag）与汇总由公共骨架做，这里只回答"本包有什么问题"
+    Ok(super::collect_findings(opts, walk, |pkg, a| {
         let internal = internal_uris_of(&opts.pkgs_dir, pkg);
         let mut items: Vec<Finding> = Vec::new();
         // URI imports：三段判定（本包 farm_flags 声明的引擎注册型 URI 跳过）
@@ -304,11 +293,8 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
                 }
             }
         }
-        if !items.is_empty() {
-            report.findings.insert(pkg.clone(), items);
-        }
-    }
-    Ok(report)
+        items
+    }))
 }
 
 fn longest_owner(map: &BTreeMap<String, HashSet<String>>, imp: &str) -> HashSet<String> {

@@ -3,141 +3,11 @@
 //! 用 fixture + StubBinding 跑通 graph → detect → propagate → verify，
 //! 绕开真实 `lpkg build`。同时用真实 lankerepo index.txt 做冒烟。
 
-use std::collections::HashMap;
-
-use lankefarm::abi;
 use lankefarm::graph::{self, Index, RevMap};
-use lankefarm::lpkg_binding::{BuildOutcome, StubBinding};
-use lankefarm::verify;
 
 fn fixture(name: &str) -> Index {
     let path = format!("{}/tests/fixtures/{}", env!("CARGO_MANIFEST_DIR"), name);
     Index::parse(&std::fs::read_to_string(path).unwrap())
-}
-
-fn to_refs(v: &[String]) -> Vec<&str> {
-    v.iter().map(String::as_str).collect()
-}
-
-/// stub：所有包重建后 provides 与旧索引一致（ABI 保持 → 级联停）。
-fn abi_preserving_stub(index: &Index, pkgs: &[String]) -> StubBinding {
-    let mut outcomes = HashMap::new();
-    for p in pkgs {
-        if let Some(info) = index.packages.get(p) {
-            outcomes.insert(
-                p.clone(),
-                BuildOutcome::success(
-                    &to_refs(&info.needed_so),
-                    &to_refs(&info.provides),
-                    &to_refs(&info.deps),
-                ),
-            );
-        }
-    }
-    StubBinding::new(outcomes)
-}
-
-fn bump_soname(old: &Index, pkg: &str) -> Vec<String> {
-    let info = &old.packages[pkg];
-    let mut new_provides = info.provides.clone();
-    for p in &mut new_provides {
-        if graph::is_soname_versioned(p) {
-            if let Some(pos) = p.rfind(".so.") {
-                let n: u32 = p[pos + 4..].parse().unwrap();
-                *p = format!("{}.so.{}", &p[..pos], n + 1);
-                break;
-            }
-        }
-    }
-    new_provides
-}
-
-fn fake_new_index(old: &Index, pkg: &str, new_provides: &[String]) -> Index {
-    let mut packages = old.packages.clone();
-    if let Some(info) = packages.get_mut(pkg) {
-        info.provides = new_provides.to_vec();
-    }
-    Index::from_packages(packages)
-}
-
-fn scan_of(provides: &[String], needed_so: &[String]) -> verify::ScanResult {
-    verify::ScanResult::from_parts(needed_so.to_vec(), provides.to_vec(), vec![])
-}
-
-#[test]
-fn full_pipeline_libxml2_break_rebuilds_only_direct() {
-    let old = fixture("chain-index.txt");
-    let rev = RevMap::build(&old);
-    let new_provides = bump_soname(&old, "libxml2");
-
-    let breaks = abi::detect_abi_breaks(&old, &fake_new_index(&old, "libxml2", &new_provides));
-    assert_eq!(breaks, vec!["libxml2"]);
-
-    let direct = graph::reverse_dependents(&old, &rev, "libxml2");
-    assert_eq!(direct, vec!["llvm"]);
-    let mut binding = abi_preserving_stub(&old, &direct);
-    let res = abi::propagate(&old, &rev, "libxml2", &new_provides, &mut binding);
-
-    assert_eq!(res.rebuilt, vec!["libxml2", "llvm"]);
-    assert!(!res.rebuilt.contains(&"rust".to_string()));
-    assert!(res.blocked.is_empty());
-
-    let root_action = verify::decide(
-        &scan_of(&new_provides, &[]),
-        &scan_of(&old.packages["libxml2"].provides, &[]),
-    );
-    assert_eq!(root_action, verify::VerifyAction::AbiBreak);
-
-    let llvm_action = verify::decide(
-        &scan_of(
-            &old.packages["llvm"].provides,
-            &old.packages["llvm"].needed_so,
-        ),
-        &scan_of(
-            &old.packages["llvm"].provides,
-            &old.packages["llvm"].needed_so,
-        ),
-    );
-    assert_eq!(llvm_action, verify::VerifyAction::Unchanged);
-}
-
-#[test]
-fn cascade_when_llvm_abi_changes_includes_rust() {
-    let old = fixture("chain-index.txt");
-    let rev = RevMap::build(&old);
-    let new_provides = bump_soname(&old, "libxml2");
-
-    let mut outcomes = HashMap::new();
-    outcomes.insert(
-        "llvm".to_string(),
-        BuildOutcome {
-            ok: true,
-            needed_so: vec!["libxml2.so.3".into(), "libc.so.6".into()],
-            provides: vec!["libLLVM.so".into(), "libLLVM.so.19".into()],
-            deps: vec![],
-            failure_stage: None,
-            lpkg_path: None,
-        },
-    );
-    let mut binding = StubBinding::new(outcomes);
-    let res = abi::propagate(&old, &rev, "libxml2", &new_provides, &mut binding);
-    assert_eq!(res.rebuilt, vec!["libxml2", "llvm", "rust"]);
-}
-
-#[test]
-fn blocked_on_build_failure() {
-    let old = fixture("chain-index.txt");
-    let rev = RevMap::build(&old);
-    let new_provides = bump_soname(&old, "libxml2");
-    let mut outcomes = HashMap::new();
-    outcomes.insert(
-        "llvm".to_string(),
-        BuildOutcome::failure("lankebuild_build"),
-    );
-    let mut binding = StubBinding::new(outcomes);
-    let res = abi::propagate(&old, &rev, "libxml2", &new_provides, &mut binding);
-    assert_eq!(res.rebuilt, vec!["libxml2"]);
-    assert_eq!(res.blocked, vec!["llvm"]);
 }
 
 #[test]
@@ -149,8 +19,14 @@ fn real_index_smoke() {
         old.len()
     );
     let rev = RevMap::build(&old);
-    let rdeps = graph::reverse_dependents(&old, &rev, "systemd");
-    assert!(!rdeps.is_empty(), "systemd 的真实直接依赖者不应为空");
+    // 反图非空：systemd 的某个 SONAME 有真实依赖者（用 revmap 直接问，`reverse_dependents`
+    // 的粗粒度包装已删——活路径用更窄的 `abi::direct_victims`，只按被移除的 SONAME 找受害者）
+    assert!(
+        old.soname_provides("systemd")
+            .iter()
+            .any(|s| !rev.needers(s).is_empty()),
+        "systemd 的真实直接依赖者不应为空"
+    );
     assert!(graph::link_deps(&old, "systemd").contains(&"glibc".to_string()));
 }
 

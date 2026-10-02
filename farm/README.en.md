@@ -103,7 +103,7 @@ sources:
     template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
 ```
 
-Templates: `github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version` (directly locks another package's version) `script` (inline bash). Each template accepts only its own fields — setting an unsupported field (e.g. `max-version` on github) or misspelling a field name (e.g. `tag-prefx`) errors out instead of being silently ignored.
+Templates: `github` `gitlab` `html-index` `gnome` `gcs` `sourceforge` `pypi` `same-version` (directly locks another package's version) `same-version-of-source` (locks an earlier slot's version from this same tracker) `script` (inline bash). Each template accepts only its own fields — setting an unsupported field (e.g. `max-version` on github) or misspelling a field name (e.g. `tag-prefx`) errors out instead of being silently ignored.
 
 `script` is an **entry-level** escape hatch (a peer of the other templates, not a package-level type): one script produces one source/work_source slot, with stdout being **exactly one line** `<version>|URL`. Use it only when no template can express the source — scripts are not reusable and cannot be uniformly validated:
 

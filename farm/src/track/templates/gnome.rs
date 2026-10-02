@@ -7,7 +7,7 @@ use crate::error::FarmError;
 use regex::Regex;
 
 use crate::net::Fetcher;
-use crate::track::templates::{self, minor_is_even};
+use crate::track::templates;
 use crate::track::vercmp;
 use crate::track::{need, EntryProbe, SourceConfig};
 
@@ -29,32 +29,18 @@ pub fn probe(
         .captures_iter(&html)
         .filter_map(|c| c.get(1).map(|m| m.as_str().to_string()))
         .collect();
-    // 偶 minor 为稳定分支，优先取最大稳定目录（2.89 是开发版）。
-    // 但该假设对非核心 GNOME 库不成立（libepoxy 1.5 是稳定版）——yaml 可用 stable-minor: all 关闭。
-    let even_only = cfg.stable_minor.as_deref().unwrap_or("even") == "even";
-    let mut candidates: Vec<&String> = if even_only {
-        let even: Vec<&String> = dirs.iter().filter(|d| minor_is_even(d)).collect();
-        if even.is_empty() {
-            dirs.iter().collect()
-        } else {
-            even
-        }
-    } else {
-        dirs.iter().collect()
-    };
-    if candidates.is_empty() {
+    if dirs.is_empty() {
         return Err("gnome 目录列表无版本子目录".into());
     }
-    // major-version-lock / major-of：只保留该主版本的目录（gtk3 锁 3 → 只留 3.x，不误入 4.x）
-    if let Some(m) = major {
-        candidates.retain(|d| templates::matches_major(d, Some(m)));
-    }
-    // max-version：只保留不超过封顶版本的目录（gtk3 的 3.98 是历史 dev 分支，封顶 3.24）
-    if let Some(cap) = &cfg.max_version {
-        candidates.retain(|d| vercmp::cmp_version(d, cap) != std::cmp::Ordering::Greater);
-    }
+    // 约束筛选（major-of / max-version 封顶 / exclude / 奇偶偏好）**走共享汇点** —— 与其它模板
+    // 同一处实现（`pool_filter`），不再在本文件里重写一遍 major/封顶/even 的判定。
+    let mut f = templates::version_filter(cfg, major)?;
+    // GNOME 惯例：`stable-minor` **未显式设置**时默认按偶 minor 取稳定分支（2.89 是开发版）。
+    // 该假设对非核心 GNOME 库不成立（libepoxy 1.5 是稳定版）——yaml 写 `stable-minor: all` 关闭。
+    f.even_minor = cfg.stable_minor.as_deref() != Some("all");
+    let mut candidates: Vec<String> = templates::pool_filter(dirs, &f);
     if candidates.is_empty() {
-        return Err("gnome 目录无匹配主版本的子目录".into());
+        return Err("gnome 目录无匹配主版本/封顶的子目录".into());
     }
     // 降序遍历候选目录，取第一个有稳定版本文件的：2.90 可能只有 alpha 快照 → 落到 2.80
     candidates.sort_by(|a, b| vercmp::cmp_version(b, a));
@@ -63,11 +49,10 @@ pub fn probe(
         regex::escape(name)
     ))
     .map_err(|e| e.to_string())?;
-    // 版本筛选约束走共享汇点（`exclude` / `stable-minor` 由此对 gnome 生效）。
-    // **cap 置 None**：GNOME 的 `max-version` 已在上一步按**目录**过滤过；此处再按最终版本过滤会
-    // 改变既有 gnome tracker（gtk3 等封顶场景）的行为——保持原样，不动既有语义。
-    let mut f = templates::version_filter(cfg, major)?;
-    f.cap = None;
+    // 文件层用**去掉封顶**的副本：`max-version` 已在目录层判过，而目录里的文件版本串更长
+    // （`3.24.1` vs 封顶 `3.24`），再按封顶过滤会让整个目录落空（gtk3 等封顶场景）。
+    // 其余约束（major / exclude / 奇偶）保持不变。
+    let f_file = f.without_cap();
     let mut found: Option<(String, String)> = None; // (dir, version)
     for d in &candidates {
         let level2 = format!("{level1}{d}/");
@@ -75,7 +60,7 @@ pub fn probe(
             Ok(h) => h,
             Err(_) => continue,
         };
-        if let Some(v) = templates::max_match(&file_re, &html2, &f) {
+        if let Some(v) = templates::max_match(&file_re, &html2, &f_file) {
             found = Some((d.to_string(), v));
             break;
         }
@@ -123,6 +108,29 @@ mod tests {
             r.url,
             "https://download.gnome.org/sources/glib/2.84/glib-2.84.0.tar.xz"
         );
+    }
+
+    #[test]
+    fn hard_constraints_apply_before_even_preference() {
+        // 唯一偶 minor 的目录被 major 约束排除时**不应**整体落空：硬约束（allows）先判、奇偶偏好后判。
+        // 历史实现是先算 even 池（在未过滤的目录上）再判 major ⇒ 这里会报"无匹配主版本的子目录"。
+        let f = MockFetcher::new(HashMap::new())
+            .entry("https://download.gnome.org/sources/glib/", "2.10/\n3.1/\n")
+            .entry(
+                "https://download.gnome.org/sources/glib/3.1/",
+                "glib-3.1.5.tar.xz\n",
+            );
+        let cfg = SourceConfig {
+            tracker_template: "gnome".into(),
+            template: Some(
+                "https://download.gnome.org/sources/{name}/{path_version}/{name}-{version}.tar.xz"
+                    .into(),
+            ),
+            ..Default::default()
+        };
+        // 模板层 `major` 是**参数**（`major-version-lock` / `major-of` 在 mod.rs 里解析后才传进来）
+        let r = probe(&f, &cfg, Some("3"), "glib").unwrap();
+        assert_eq!(r.version, "3.1.5");
     }
 
     #[test]

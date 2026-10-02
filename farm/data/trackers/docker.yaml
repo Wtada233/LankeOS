@@ -6,11 +6,12 @@ sources:
     mode: tags
     tag-prefix: v
     template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
-  - tracker-template: script
-    version-var:
-      main: sources[0]
-    script: |
-      echo "$main|https://github.com/moby/moby/archive/refs/tags/docker-v$main.tar.gz"
+  # moby 的 tag 是 `docker-v<本包版本>`：URL 里嵌的是**本包**的版本号。
+  # 用 `same-version-of-source: sources[0]` 锁 sources[0] **本轮**解出的版本——
+  # 写 `same-version-of: docker`（锁自己）会读到 LankeBUILD.json 里的旧版本。
+  - tracker-template: same-version-of-source
+    same-version-of-source: sources[0]
+    template: https://github.com/moby/moby/archive/refs/tags/docker-v{version}.tar.gz
   - tracker-template: github
     repo: krallin/tini
     mode: tags

@@ -1,14 +1,14 @@
 //! state.rs — SQLite 持久状态（§11）。
 //!
 //! 心智模型：**容器易失，repo 持久，SQLite 记账**。
-//! - job 队列 / 构建历史 / 配方 hash：跨运行持久，供 operator 用 `--state` 查看与排查；
-//! - 读端（`job_recipe_hash`/`list_by_status`）当前无调用方，**这是架构使然、不是缺口**：
-//!   farm 是批式 CLI 而非常驻 daemon，所以"配方 hash 变了就重建"由
-//!   `recipe_hash` + `.build_ok` + `farm validate` 在**每次运行时**评估
-//!   （`build::has_build_ok`），无需按 job 状态在后台 requeue。
-//!   读端只在将来出现"常驻监听 / 重启后按 job 状态续跑"的形态时才有用武之地。
-//!   BLOCKED 包的续跑靠 operator 手动 `farm build <pkg>` 重跑。
-//!   注意失败路径（source 缺失 / repack / repo / index 失败）也会 `set_job(Blocked)` 落库，
+//! - **只写**：job 状态（`building` / `done` / `blocked` / `skipped`）与构建历史（`build_history`）。
+//!   `--state <db>` 落库后，operator 直接用 sqlite3 查——批式 CLI 不需要读 API。
+//! - **没有读端，这是有意的**：farm 是批式 CLI 而非常驻 daemon，所以"配方 hash 变了就重建"由
+//!   `recipe_hash` + `.build_ok` + `farm validate` 在**每次运行时**评估（`build::has_build_ok`），
+//!   无需按 job 状态在后台 requeue。BLOCKED 包的续跑靠 operator 手动 `farm build <pkg>`。
+//!   （曾按"将来可能常驻"预留了读端与 `queued`/`verifying` 两态；已明确**暂不做 daemon** ⇒ 删除，
+//!   将来真要常驻时再按那时的形态补。）
+//! - 失败路径（source 缺失 / repack / repo / index 失败）也会 `set_job(Blocked)` 落库，
 //!   避免 job 永久停在 Building。
 
 use crate::error::FarmError;
@@ -19,12 +19,12 @@ pub struct State {
     conn: rusqlite::Connection,
 }
 
-/// job 状态机（§11：queued → building → verifying → done | blocked | skipped）。
+/// job 状态机（§11：building → done | blocked | skipped）。
+/// 只有这四个：`queued`/`verifying` 原是给"常驻 daemon"预留的中途态，已随"暂不做 daemon"删除
+/// （farm 是批式 CLI，一个包要么在建、要么终态）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum JobStatus {
-    Queued,
     Building,
-    Verifying,
     Done,
     Blocked,
     Skipped,
@@ -33,23 +33,10 @@ pub enum JobStatus {
 impl JobStatus {
     pub fn as_str(&self) -> &'static str {
         match self {
-            JobStatus::Queued => "queued",
             JobStatus::Building => "building",
-            JobStatus::Verifying => "verifying",
             JobStatus::Done => "done",
             JobStatus::Blocked => "blocked",
             JobStatus::Skipped => "skipped",
-        }
-    }
-    fn from_str(s: &str) -> Option<JobStatus> {
-        match s {
-            "queued" => Some(JobStatus::Queued),
-            "building" => Some(JobStatus::Building),
-            "verifying" => Some(JobStatus::Verifying),
-            "done" => Some(JobStatus::Done),
-            "blocked" => Some(JobStatus::Blocked),
-            "skipped" => Some(JobStatus::Skipped),
-            _ => None,
         }
     }
 }
@@ -105,49 +92,12 @@ impl State {
         Ok(())
     }
 
-    pub fn job_status(&self, pkg: &str) -> Option<JobStatus> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT status FROM jobs WHERE pkg=?1")
-            .ok()?;
-        let s: String = stmt.query_row(rusqlite::params![pkg], |r| r.get(0)).ok()?;
-        JobStatus::from_str(&s)
-    }
-
-    pub fn job_failure_stage(&self, pkg: &str) -> Option<String> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT failure_stage FROM jobs WHERE pkg=?1")
-            .ok()?;
-        stmt.query_row(rusqlite::params![pkg], |r| r.get(0)).ok()
-    }
-
-    pub fn job_recipe_hash(&self, pkg: &str) -> Option<String> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT recipe_hash FROM jobs WHERE pkg=?1")
-            .ok()?;
-        stmt.query_row(rusqlite::params![pkg], |r| r.get(0)).ok()
-    }
-
     /// 删除某包的 job 条目（Ctrl+C 中断时清理当前在途条目）。
     pub fn delete_job(&self, pkg: &str) -> Result<(), FarmError> {
         self.conn
             .execute("DELETE FROM jobs WHERE pkg=?1", rusqlite::params![pkg])
             .map(|_| ())
             .map_err(|e| FarmError::sqlite("删除 job 条目失败", e))
-    }
-
-    /// 指定状态的包列表。
-    pub fn list_by_status(&self, status: JobStatus) -> Vec<String> {
-        let mut stmt = match self.conn.prepare("SELECT pkg FROM jobs WHERE status=?1") {
-            Ok(s) => s,
-            Err(_) => return Vec::new(),
-        };
-        let Ok(rows) = stmt.query_map(rusqlite::params![status.as_str()], |r| r.get(0)) else {
-            return Vec::new();
-        };
-        rows.filter_map(|r| r.ok()).collect()
     }
 
     pub fn record_build(&self, pkg: &str, version: &str, ok: bool) -> Result<(), FarmError> {
@@ -162,63 +112,4 @@ impl State {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn job_status_roundtrip() {
-        let path = std::env::temp_dir().join("farm-state-test.db");
-        let _ = std::fs::remove_file(&path);
-        let st = State::open(&path).unwrap();
-        st.set_job(
-            "llvm",
-            JobStatus::Blocked,
-            Some("lankebuild_build"),
-            Some("abc123"),
-        )
-        .unwrap();
-        assert_eq!(st.job_status("llvm"), Some(JobStatus::Blocked));
-        assert_eq!(
-            st.job_failure_stage("llvm").as_deref(),
-            Some("lankebuild_build")
-        );
-        assert_eq!(st.job_recipe_hash("llvm").as_deref(), Some("abc123"));
-        assert_eq!(
-            st.list_by_status(JobStatus::Blocked),
-            vec!["llvm".to_string()]
-        );
-        assert!(st.list_by_status(JobStatus::Done).is_empty());
-        st.record_build("llvm", "18.1.0", true).unwrap();
-        std::fs::remove_file(&path).ok();
-    }
-
-    #[test]
-    fn delete_job_removes_entry() {
-        let path = std::env::temp_dir().join("farm-state-del-test.db");
-        let _ = std::fs::remove_file(&path);
-        let st = State::open(&path).unwrap();
-        st.set_job("alpha", JobStatus::Building, None, Some("h1"))
-            .unwrap();
-        st.set_job("beta", JobStatus::Blocked, Some("x"), Some("h2"))
-            .unwrap();
-        st.delete_job("alpha").unwrap();
-        assert_eq!(st.job_status("alpha"), None);
-        assert_eq!(st.job_status("beta"), Some(JobStatus::Blocked));
-        std::fs::remove_file(&path).ok();
-    }
-
-    #[test]
-    fn status_str_roundtrip() {
-        for s in [
-            JobStatus::Queued,
-            JobStatus::Building,
-            JobStatus::Verifying,
-            JobStatus::Done,
-            JobStatus::Blocked,
-            JobStatus::Skipped,
-        ] {
-            assert_eq!(JobStatus::from_str(s.as_str()), Some(s));
-        }
-        assert_eq!(JobStatus::from_str("nope"), None);
-    }
-}
+mod tests;

@@ -40,13 +40,13 @@ src/
     prompt.rs      BLOCKED/源缺失的交互接管（开 shell/跳过/结束）+ 构建计划预览/确认
     sources.rs     源预下载
     repo.rs        版本判定/漂移 repack/上传/index 更新/备份清理/配方读写
-  abi.rs           removed_sonames / detect_abi_breaks / propagate
+  abi.rs           removed_sonames / direct_victims（传播循环内联在 build::run_build）
   graph.rs         index.txt 解析 + Index/RevMap + link_deps
   scan.rs          .lpkg 解包 + ELF needed_so/provides 扫描
   repack.rs        metadata.json 漂移修正 + 重打
   seed.rs          冷启动播种
   serve.rs         静态 HTTP 服务器
-  state.rs         SQLite 状态库（job 状态记录；读端未启用，见 §11 附注）
+  state.rs         SQLite 状态库（**只写**：job 状态 + 构建历史；无读 API，operator 直接查库）
   track/           tracker 模板（github/gitlab/sourceforge/gnome/gcs/html-index/multi-level-html-index/script）
   net.rs           HTTP 下载
   lpkg_binding.rs  唯一碰 lpkg 的接缝（docker 编排 + ABI 过渡备份注入）
@@ -211,7 +211,14 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 
 `track/mod.rs`：从 LankeBUILD.json 的 source URL 匹配 tracker（`data/trackers/*.yaml`），探测上游最新版本。
 
-- **模板**：`github` / `gitlab` / `sourceforge` / `gnome` / `gcs` / `html-index` / `multi-level-html-index` / `script`
+- **模板**（11 个；**清单以 `templates::TEMPLATES` 注册表为唯一真源**）：`github` / `gitlab` /
+  `html-index` / `multi-level-html-index` / `gcs` / `gnome` / `sourceforge` / `pypi` /
+  `same-version` / `same-version-of-source` / `script`。
+  **加模板 = 新文件 + 注册表加一行**：字段白名单（`validate_supported_fields`）与探测分发
+  （`SourceConfig::probe_with`）都从注册表取，**不再各写一份 `match`**（历史上加一个模板要同步改
+  5 处：struct / set 表 / supported / 分发 / 文档）。注册项里 `ProbeFn` 用四族类型别名显式写出
+  "版本从哪来"的差异：`Web`（联网探测）/ `LockPackage`（读另一个包）/ `LockSlot`（读本 tracker
+  更早槽位）/ `Script`（脚本自述）。
 - **`multi-level-html-index`（N 级目录逐级进，版本藏在路径里）**：`levels` 每级 `{name, url, pattern}`。
   **级名即占位符**（`{series}` 只能在**后续级**的 url 与 template 里引用）；**必须且只能有一级叫 `version`**
   ——它的捕获即包版本（**按名字定，不按位置**）。位置隐式的 `{v1}..{vN}` **已废弃**：引用它会得到
@@ -242,8 +249,9 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
   multi-level「只能引用前面的级」同规则），前向/自引用在探测时报错并说明可用范围。
 - **包级字段**（`TrackerConfig`）：`pkg-name`（必填）、`version-source`（`sources[i]` /
   `work_sources[i]`，缺省 `sources[0]`、空则 `work_sources[0]`）、`after` / `last`（依赖排序）、
-  `sources` / `work_sources`。**没有包级 `type`**——`type: script` / `script-content` 已废弃；
-  字段仍被解析但只用于给出**明确的迁移错误**（否则 `deny_unknown_fields` 只吐 `unknown field`）。
+  `sources` / `work_sources`。**没有包级 `type`**——`type` / `script-content` 是**已删除**的旧字段
+  （曾为"迁移期给明确指引"而保留，850 个 tracker 迁完后连同守卫一起删了）；现在写它们落回
+  `deny_unknown_fields` 的 `unknown field`（仍是报错）。
 - **版本筛选：各模板共享的单一汇点**（`templates::VersionFilter`）。所有探测模板的候选版本一律
   先过这一层，再谈"稳定版优先 → 取最大"：
   - `major-of` / `major-version-lock`（主版本）、`max-version`（数值封顶）；
@@ -255,12 +263,27 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
     （与 GNOME 同款兜底：上游偶尔没有偶数 minor 的稳定分支时不该直接探测失败）。GNOME 惯例
     （pango/vala/perl 等开发分支与稳定分支同号段并存）。
   - **加约束请加在这一层**：历史上 `max-version` 只有部分模板支持，正是"各写各的"造成的漂移。
-    `script` / `same-version` 不参与（前者自带逻辑、后者不探测）。
+    `script` 与两个**锁版本**模板（`same-version` / `same-version-of-source`）不参与——它们不探测上游。
+  - **约束的实现在 `pool_filter` 一处**：硬约束（`allows`：major / 封顶 / exclude）+ 奇偶偏好。
+    一维候选列表（`max_version_stable_first`）与**两段式探测**（`gnome` 先按目录挑、再挑目录里的
+    文件）共用它——`gnome` 不再自己重写一份 major/封顶/even 判定。顺序是"**先硬约束、后软偏好**"
+    （偶数候选被 major/封顶全滤掉时退回全部，而不是整体落空）；`without_cap()` 给"封顶已在上一层
+    判过"的文件层用（目录里的文件版本串更长：`3.24.1` vs 封顶 `3.24`）。
 - **条目字段**（`SourceConfig`）：`tracker-template`（必填）、`script` + `expand` + `version-var`（仅 script）、
   `source-name`（覆盖上游目录名）、`repo` / `host` / `project` / `url` / `pattern` / `levels` /
-  `template`、`tag-prefix` / `mode`、`same-version-of`、`major-of` / `major-version-lock` /
-  `max-version` / `exclude` / `stable-minor`。白名单逐模板校验，越界即报错。
-- **same-version**：读被锁包的已解析版本，`{version}`/`{tag}`/`{name}` 占位符替换（如 SPIRV-Tools/vulkan-loader 锁 vulkan-headers）
+  `template`、`tag-prefix` / `mode`、`same-version-of` / `same-version-of-source`、`major-of` /
+  `major-version-lock` / `max-version` / `exclude` / `stable-minor`。白名单逐模板校验，越界即报错。
+  **白名单不由手写表驱动**：模板支持集在注册表，"用户实际设了哪些字段"由 `serde` 投影得到
+  （序列化 `SourceConfig` 取键集——各字段的 `skip_serializing_if` 保证未设的字段不出现）⇒
+  **新增字段不必逐个模板登记**，只有"某模板要开始支持某字段"才改注册表那一行。
+  残留占位符（替换后 URL 里还残留 `{`）在 `probe_with` **统一一处**兜底，模板不自己验
+  （`multi_level` 另有"允许哪些占位符"的**替换前**校验，那是另一件事）。
+- **锁版本的两个模板**（都不联网，占位符只有 `{version}`、`{major_minor}`（前 2 段）、
+  `{major_minor_patch}`（前 3 段）、`{version:N}`（前 N 段）——tag 前缀/仓库路径/上游名一律烘进 `template`）：
+  - **same-version**：`same-version-of: <包名>` 读被锁**包**的已解析版本（如 SPIRV-Tools/vulkan-loader 锁 vulkan-headers）。
+  - **same-version-of-source**：`same-version-of-source: sources[0]` 读**本 tracker 里位于它之前**的槽位
+    在**本轮**解析出的版本——治"第二个 source 的 URL 嵌本包版本、却锁到 json 旧版本"（如 docbook-xsl）。
+    排序规则与 `version-var` 相同：前向 / 自引用 / 越界在探测时报错。
 - `farm track <pkg> --run` 单包应用；`--all -j N` 并行探测（依赖序门控）
 
 ## 10. gen-trackers（LLM 批量）

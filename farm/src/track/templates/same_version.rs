@@ -5,12 +5,13 @@
 //! 因此它**直接确定版本号**，是一个独立探测来源，而不是其它模板的"约束"——所以它
 //! 是独立模板，`same-version-of` 只能在这里用，其它模板写 `same-version`/`same-version-of` 都报错。
 //!
-//! 字段收得最简：只认 `same-version-of` + `template`，占位符仅 `{version}` 与 `{major_minor}`
-//! （tag 前缀 / 仓库路径 / 上游名都烘进 template，不支持 tag-prefix/repo/source-name/{tag}/{name}）。
+//! 字段收得最简：只认 `same-version-of` + `template`，占位符仅 `{version}`、`{major_minor}`（前 2 段）、
+//! `{major_minor_patch}`（前 3 段）与 `{version:N}`（前 N 段）（tag 前缀 / 仓库路径 / 上游名都烘进
+//! template，不支持 tag-prefix/repo/source-name/{tag}/{name}）。
 
 use crate::error::FarmError;
 use crate::track::templates;
-use crate::track::{need, validate_url, EntryProbe, SourceConfig};
+use crate::track::{need, EntryProbe, SourceConfig};
 
 /// 探测：锁定 `same-version-of` 指定包的版本，用 template 拼出该槽位 URL。
 /// 签名与其它模板不同（`lookup` 取代 `major`）：它不联网，直接读版本输入。
@@ -24,14 +25,9 @@ pub fn probe(
         format!("same-version-of 依赖 {target} 无版本（读 LankeBUILD.json/已解析版本失败）")
     })?;
     let template = need(&cfg.template, "template")?;
-    // {major_minor} = 版本前两段（qt6 等目录结构 qt/<6.11>/<6.11.1>/，不能锁死 minor）。
-    let major_minor: String = v.split('.').take(2).collect::<Vec<_>>().join(".");
-    let vars = vec![
-        ("version", v.as_str()),
-        ("major_minor", major_minor.as_str()),
-    ];
-    let url = templates::substitute(template, &vars);
-    validate_url(&url)?;
+    // {version} / {major_minor} 的替换与 same-version-of-source 共用同一处（见 templates::substitute_locked_version）
+    // 残留占位符不在这里判：`track::probe_with` 对**每个产出槽位**统一 validate_url（唯一一处）。
+    let url = templates::substitute_locked_version(template, &v);
     Ok(EntryProbe { version: v, url })
 }
 

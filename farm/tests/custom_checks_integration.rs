@@ -116,12 +116,13 @@ impl Repo {
         }
         std::fs::write(self.repo.join(self.arch).join("index.txt"), s).unwrap();
     }
-    fn opts(&mut self, cache_tag: &str) -> ChkOpts {
+    fn opts(&mut self, cache_tag: &str, kind: &str) -> ChkOpts {
         self.sync_index();
         ChkOpts {
             source: self.repo.clone(),
             arch: self.arch.into(),
             cache: self.base.join(cache_tag),
+            kind: kind.into(),
             pkgs_dir: self.pkgs.clone(),
             subset: vec![],
             full_rescan: false,
@@ -170,7 +171,7 @@ fn qmlchk_reports_missing_dep_then_satisfied() {
         &[],
         "",
     );
-    let rep = qml::run(&r.opts("c1")).unwrap();
+    let rep = qml::run(&r.opts("c1", "QML")).unwrap();
     assert!(
         has(&rep, "appB", "提供者 libA"),
         "缺 deps 应报(W): {:?}",
@@ -187,7 +188,7 @@ fn qmlchk_reports_missing_dep_then_satisfied() {
     assert_eq!(ghost.severity, lankefarm::custom_checks::Severity::Critical);
     // 补 deps 后 → 消
     r.recipe("appB", &["libA"], &[]);
-    let rep2 = qml::run(&r.opts("c2")).unwrap();
+    let rep2 = qml::run(&r.opts("c2", "QML")).unwrap();
     assert!(
         !has(&rep2, "appB", "提供者 libA"),
         "补 deps 后不应报: {:?}",
@@ -195,7 +196,7 @@ fn qmlchk_reports_missing_dep_then_satisfied() {
     );
     // IGNORE_CHK_QML 豁免
     r.recipe("appB", &[], &["IGNORE_CHK_QML"]);
-    let rep3 = qml::run(&r.opts("c3")).unwrap();
+    let rep3 = qml::run(&r.opts("c3", "QML")).unwrap();
     assert!(
         !rep3.findings.contains_key("appB"),
         "IGNORE_CHK_QML 应豁免: {:?}",
@@ -227,14 +228,14 @@ fn pkgconfchk_reports_missing_requires_then_satisfied() {
         &[],
         "",
     );
-    let rep = pkgconf::run(&r.opts("c1")).unwrap();
+    let rep = pkgconf::run(&r.opts("c1", "PKGCONF")).unwrap();
     assert!(
         has(&rep, "glib", "提供者 pcre2"),
         "Requires.private 缺 deps 应报: {:?}",
         rep.findings
     );
     r.recipe("glib", &["pcre2"], &[]);
-    let rep2 = pkgconf::run(&r.opts("c2")).unwrap();
+    let rep2 = pkgconf::run(&r.opts("c2", "PKGCONF")).unwrap();
     assert!(
         !has(&rep2, "glib", "提供者 pcre2"),
         "补 deps 后不应报: {:?}",
@@ -259,7 +260,7 @@ fn pkg_err_reports_misplaced_static_la() {
         &[],
         "",
     );
-    let rep = pkg_err::run(&r.opts("c1")).unwrap();
+    let rep = pkg_err::run(&r.opts("c1", "PKGERR")).unwrap();
     assert!(has(&rep, "bad", "usr/etc"), "{:?}", rep.findings);
     assert!(has(&rep, "bad", "usr/var"), "{:?}", rep.findings);
     assert!(has(&rep, "bad", ".a"), "{:?}", rep.findings);
@@ -285,7 +286,7 @@ fn hookchk_reports_missing_sysusers_tmpfiles_calls() {
         &[],
         "#!/bin/sh\nsystemd-sysusers\nsystemd-tmpfiles --create\nexit 0\n",
     );
-    let rep = hook::run(&r.opts("c1")).unwrap();
+    let rep = hook::run(&r.opts("c1", "HOOK")).unwrap();
     assert!(
         !rep.findings.contains_key("rtkit"),
         "都调了不应报: {:?}",
@@ -298,7 +299,7 @@ fn hookchk_reports_missing_sysusers_tmpfiles_calls() {
         &[],
         "#!/bin/sh\nexit 0\n",
     );
-    let rep2 = hook::run(&r.opts("c2")).unwrap();
+    let rep2 = hook::run(&r.opts("c2", "HOOK")).unwrap();
     assert!(
         has(&rep2, "bad", "systemd-sysusers"),
         "建了 sysusers 却未调应报: {:?}",
@@ -319,7 +320,7 @@ fn hookchk_ignores_commented_out_calls() {
         &[],
         "#!/bin/sh\n# 用 systemd-sysusers 建用户（注释，非调用）\nexit 0\n",
     );
-    let rep = hook::run(&r.opts("c1")).unwrap();
+    let rep = hook::run(&r.opts("c1", "HOOK")).unwrap();
     assert!(
         has(&rep, "cmt", "systemd-sysusers"),
         "只在注释里提到不算调用，应报: {:?}",
@@ -333,7 +334,7 @@ fn hookchk_ignores_commented_out_calls() {
         &[],
         "#!/bin/sh\nsystemd-sysusers\nexit 0\n",
     );
-    let rep2 = hook::run(&r.opts("c2")).unwrap();
+    let rep2 = hook::run(&r.opts("c2", "HOOK")).unwrap();
     assert!(
         !rep2.findings.contains_key("real"),
         "真调用不应报: {:?}",
@@ -368,7 +369,7 @@ fn introspectionchk_flags_missing_gobject_introspection_build_dep() {
         &["base-devel"],
         &["IGNORE_CHK_INTROSPECTION"],
     );
-    let rep = introspection::run(&r.opts("c1")).unwrap();
+    let rep = introspection::run(&r.opts("c1", "INTROSPECTION")).unwrap();
     assert!(!rep.findings.contains_key("withgir"), "{:?}", rep.findings);
     assert!(!rep.findings.contains_key("plain"), "{:?}", rep.findings);
     assert!(
@@ -406,7 +407,7 @@ fn vapichk_flags_missing_vala_build_dep_and_honors_ignore_flag() {
         &["base-devel"],
         &["IGNORE_CHK_VAPI"],
     );
-    let rep = vapi::run(&r.opts("c1")).unwrap();
+    let rep = vapi::run(&r.opts("c1", "VAPI")).unwrap();
     assert!(!rep.findings.contains_key("withvapi"), "{:?}", rep.findings);
     assert!(
         !rep.findings.contains_key("ign"),
@@ -462,7 +463,7 @@ fn pycachechk_flags_pycache_dirs_and_honors_ignore_flag() {
         &["IGNORE_CHK_PYCACHE"],
         "",
     );
-    let rep = pycache::run(&r.opts("c1")).unwrap();
+    let rep = pycache::run(&r.opts("c1", "PYCACHE")).unwrap();
     assert!(!rep.findings.contains_key("clean"), "{:?}", rep.findings);
     assert!(
         has(&rep, "dirty", "__pycache__"),
@@ -535,6 +536,7 @@ fn build_depschk_flags_missing_provider_and_honors_ignore_flag() {
         source: base.clone(),
         arch: "x86_64".into(),
         cache: base.join("cache"),
+        kind: "BUILDDEPS".into(),
         pkgs_dir: pkgs.clone(),
         subset: vec![],
         full_rescan: false,
@@ -564,7 +566,7 @@ fn cache_second_run_hits_by_lpkg_sha() {
         &[],
         "",
     );
-    let o = r.opts("cc");
+    let o = r.opts("cc", "PKGCONF");
     let rep1 = pkgconf::run(&o).unwrap();
     assert!(rep1.cache_misses >= 1 && rep1.cache_hits == 0, "{rep1:?}");
     let rep2 = pkgconf::run(&o).unwrap();

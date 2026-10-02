@@ -54,17 +54,5 @@ fn is_skip_source(url: &str) -> bool {
     url.starts_with("file://") || url.starts_with("git+")
 }
 
-/// 所有网络源的文件是否已就绪（source-missing 后 operator 放置文件 → 差分应重建）。
 #[cfg(test)]
-pub fn sources_ready(pkgs_dir: &Path, pkg: &str) -> bool {
-    let Some(b) = read_lankebuild(pkgs_dir, pkg) else {
-        return false;
-    };
-    b.sources.iter().chain(b.work_sources.iter()).all(|url| {
-        if is_skip_source(url) {
-            return true;
-        }
-        let filename = source_filename(url);
-        !filename.is_empty() && pkgs_dir.join(pkg).join(filename).exists()
-    })
-}
+mod tests;

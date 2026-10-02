@@ -27,7 +27,6 @@ use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::graph::Index;
-use sha2::{Digest, Sha256};
 
 /// 检則共同选项（与 abichk 同构）。
 #[derive(Debug, Clone)]
@@ -39,6 +38,9 @@ pub struct ChkOpts {
     pub cache: PathBuf,
     /// 配方根（读 LankeBUILD.json 的 deps / farm_flags），默认 `pkgs`。
     pub pkgs_dir: PathBuf,
+    /// `IGNORE_CHK_<KIND>` 里的 KIND（**由 `ChkDef::kind()` 从 label 派生**，见 `cli/custom_checks.rs`）。
+    /// 检則自己不再手写 KIND 串——那是 9 处手工同步点，且与 label / `FarmFlag` 两份列表互不校验。
+    pub kind: String,
     /// 空 = 检查全部；否则只审计/报告这些包（provider 仍来自全量 source）。
     pub subset: Vec<String>,
     /// 忽略缓存强制全量重扫。
@@ -180,18 +182,6 @@ pub fn cache_base_from_home(home: Option<&str>, source: &Path) -> PathBuf {
     }
 }
 
-/// 单检則缓存目录 = `default_cache_base(source)/label`（每检則一子目录，互不干扰）。
-pub fn default_cache_dir(source: &Path, label: &str) -> PathBuf {
-    default_cache_base(source).join(label)
-}
-
-pub fn sha256_file(path: &Path) -> Result<String, FarmError> {
-    let data = std::fs::read(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
-    let mut h = Sha256::new();
-    h.update(&data);
-    Ok(format!("{:x}", h.finalize()))
-}
-
 /// 收集叶子成员（常规文件 **和符号链接**；DFS，排序 → 确定序）。qml/pkgconf/pkg-err/hook 用。
 /// 符号链接必须算成员：打包常见 `usr/lib/pkgconfig/libpng.pc -> libpng16.pc` 这种软链，provider
 /// 模块名取自链接名；只对**目录**递归（不 follow 符号链接目录，避免环）。
@@ -276,6 +266,42 @@ fn write_analysis(
 
 /// 单包 analysis（结构由各检則自定义）。
 pub type Analysis = serde_json::Value;
+
+/// 基于 `walk_all` 的检則的**公共骨架**：subset 白名单 + `IGNORE_CHK_<KIND>` 豁免过滤，
+/// 再把 `body` 为一个包算出的 findings 汇总进 `Report`。
+///
+/// 各模块原先各写 20-23 行**同形**代码（`walk_all` → `audit_all` / `audit` → 构造 `Report` →
+/// 双层过滤 → `checked += 1` → 模块专属判定 → `findings.insert`）。`body` 只回答"这个包有什么
+/// 问题"；需要**全仓预聚合**的检則（`abi` 的 provider catalog、`qml`/`pkgconf` 的 owner 表）
+/// 在调用前自行算好、由闭包捕获。
+pub(crate) fn collect_findings<F>(opts: &ChkOpts, walk: WalkAll, mut body: F) -> Report
+where
+    F: FnMut(&str, &Analysis) -> Vec<Finding>,
+{
+    let (analyses, cache_hits, cache_misses, failed) = walk;
+    let audit_all = opts.subset.is_empty();
+    let audit: HashSet<&str> = opts.subset.iter().map(String::as_str).collect();
+    let mut report = Report {
+        cache_hits,
+        cache_misses,
+        failed,
+        ..Default::default()
+    };
+    for (pkg, a) in &analyses {
+        if !(audit_all || audit.contains(pkg.as_str())) {
+            continue;
+        }
+        if is_ignored(opts, pkg) {
+            continue;
+        }
+        report.checked += 1;
+        let items = body(pkg, a);
+        if !items.is_empty() {
+            report.findings.insert(pkg.clone(), items);
+        }
+    }
+    report
+}
 /// `walk_all` 返回：(每包 analysis, 缓存命中, 重扫, 失败明细)。
 pub type WalkAll = (BTreeMap<String, Analysis>, u64, u64, Vec<String>);
 
@@ -329,7 +355,7 @@ pub fn walk_all(
             .unwrap_or_default();
         lpkg.sort_by_key(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok());
         let Some(l) = lpkg.last() else { continue };
-        let sha = match sha256_file(l) {
+        let sha = match crate::build::sha256_file(l) {
             Ok(s) => s,
             Err(_) => continue,
         };
@@ -361,11 +387,12 @@ pub fn walk_all(
 }
 
 /// 本包是否带 `IGNORE_CHK_<KIND>` farm flag（豁免该检則；farm_flags 在配方里）。
-pub fn is_ignored(pkgs_dir: &Path, pkg: &str, kind: &str) -> bool {
-    let Some(b) = crate::build::read_lankebuild(pkgs_dir, pkg) else {
+/// KIND 取自 `opts.kind`（由 label 派生）——检則不传字符串，杜绝手写 KIND 漂移。
+pub fn is_ignored(opts: &ChkOpts, pkg: &str) -> bool {
+    let Some(b) = crate::build::read_lankebuild(&opts.pkgs_dir, pkg) else {
         return false;
     };
-    let want = format!("IGNORE_CHK_{kind}");
+    let want = format!("IGNORE_CHK_{}", opts.kind);
     b.farm_flags.iter().any(|v| {
         v.as_str()
             .is_some_and(|f| f.trim().eq_ignore_ascii_case(&want))
@@ -373,10 +400,9 @@ pub fn is_ignored(pkgs_dir: &Path, pkg: &str, kind: &str) -> bool {
 }
 
 /// 载入仓库旧/当前索引（needed_so 链接判定 + binpkg deps 用）。缺失 → 空 Index（无覆盖信息）。
+/// 读取走 `build::read_index`（全仓唯一读索引处）。
 pub fn load_index(opts: &ChkOpts) -> Index {
-    std::fs::read_to_string(opts.source.join(&opts.arch).join("index.txt"))
-        .map(|t| Index::parse(&t))
-        .unwrap_or_default()
+    crate::build::read_index(&opts.source, &opts.arch).unwrap_or_default()
 }
 
 /// binpkg deps（repo index 记录的运行时手写依赖——**以装好的包为准**，不读 LankeBUILD.json）。
