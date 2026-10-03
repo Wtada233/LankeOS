@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
+#include <format>
 #include <fstream>
 
 #include "../../main/src/archive/packer.hpp"
@@ -30,7 +32,7 @@ protected:
         Config::instance().set_no_deps_mode(false);
         init_localization();
 
-        test_root = fs::absolute("tmp_real_world_test");
+        test_root = fs::absolute("tmp_real_world_test_" + std::to_string(::getpid()));
         repo_dir = test_root / "repo";
         fs::remove_all(test_root);
         fs::create_directories(repo_dir);
@@ -55,16 +57,17 @@ protected:
     }
 
     std::string create_pkg(const std::string& name, const std::string& ver,
-                           std::vector<std::pair<std::string, std::string>> deps = {},
-                           std::vector<std::string> provides = {},
-                           std::vector<std::pair<std::string, std::string>> files = {})
+                           const std::vector<std::pair<std::string, std::string>>& deps = {},
+                           const std::vector<std::string>& provides = {},
+                           const std::vector<std::pair<std::string, std::string>>& files = {})
     {
         fs::path work_dir = test_root / ("work_" + name);
         fs::remove_all(work_dir);
         fs::create_directories(work_dir / "content");
 
         std::vector<std::string> deps_list;
-        for (const auto& d : deps) deps_list.push_back(d.first + " " + d.second);
+        deps_list.reserve(deps.size());
+        for (const auto& d : deps) deps_list.push_back(std::format("{} {}", d.first, d.second));
 
         for (auto const& file : files) {
             fs::path src = work_dir / "content" / file.first;

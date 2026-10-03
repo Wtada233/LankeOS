@@ -35,4 +35,20 @@ namespace detail
  */
 std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& dep_strs);
 
+/**
+ * 一行 `deps/` 元数据 → 依赖**包名**（去掉版本约束）。空串输入 ⇒ 空串。
+ *
+ * 存在的理由是**消灭第二份语法**：`deps/` 文件里存的是**原样的**元数据串
+ * （`register_package` 直接写 `deps_`），而"从这一行取出包名"曾在四处各写一遍、
+ * 用了三种规则（运算符感知 / 纯空白 / `ss >>`）。规则不一的后果是**同一个包在不同路径上
+ * 算出不同的键** —— 最要命的一条在 `Cache::ensure_reverse_deps`：用纯空白切名字时，
+ * `provb>=2.0` 这种**约束紧贴包名**的写法会让整串成为键，于是"按包名查反向依赖"
+ * 永远查不到（`autoremove` 正是这么查的，见集成用例
+ * `tests/integration/test_reverse_dep_key_consistency.cpp`）。
+ *
+ * 判据与 `parse_dep_strings` **同一套**（事实上它就在用本函数取名字）：包名 =
+ * **最早出现的**合法运算符**之前**的那一段，两侧去空白；没有运算符则整串就是包名。
+ */
+std::string dependency_name_of(std::string_view line);
+
 }  // namespace detail

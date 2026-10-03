@@ -1,9 +1,11 @@
 #pragma once
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
+#include <string>
 #include <vector>
 
 #include "../main/src/archive/packer.hpp"
@@ -54,7 +56,11 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_lpkg_itest");
+        // 目录名带 **PID**：两个测试进程并发时会各自 `rm -rf` 对方的固定名目录（实测主会话
+        // 与另一进程同时跑时产生 58 条 SetUp 假失败：`cannot remove all: Directory not empty
+        // [/app/tmp_lpkg_itest]`）。同一进程内 getpid 不变 ⇒ 多次 SetUp/TearDown 仍复用同一
+        // 路径，TearDown 照旧清理干净。
+        suite_work_dir = fs::absolute("tmp_lpkg_itest_" + std::to_string(getpid()));
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";

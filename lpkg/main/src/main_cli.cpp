@@ -8,6 +8,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -86,40 +87,50 @@ struct SigIntGuard {
     }
 };
 
-/** 打印帮助信息 */
-void print_usage(const cxxopts::Options& options)
+/**
+ * 帮助文本 —— **唯一构建处**。
+ *
+ * 为什么要有这个函数而不是直接往流里写（2026-10-03 修）：`--help` 是**正常输出**（约定走
+ * stdout，否则 `lpkg --help | less`／`grep` 拿到的永远是空 —— 此前全部写 stderr），而
+ * "参数数量不合法"时打用法是**错误输出**（约定走 stderr）。两者内容必须逐字一致，所以文本
+ * 只在这里构建一次，由两个薄打印函数各自选流。
+ */
+std::string usage_text(const cxxopts::Options& options)
 {
-    std::cerr << options.help();
-    std::cerr << get_string("info.commands") << std::endl;
-    std::cerr << get_string("info.install_desc") << "  " << get_string("info.install_opts")
-              << std::endl;
-    std::cerr << get_string("info.remove_desc") << "  " << get_string("info.remove_opts")
-              << std::endl;
-    std::cerr << get_string("info.autoremove_desc") << std::endl;
-    std::cerr << get_string("info.upgrade_desc") << "  " << get_string("info.upgrade_opts")
-              << std::endl;
-    std::cerr << get_string("info.force_solve_desc") << std::endl;
-    std::cerr << get_string("info.reinstall_desc") << "  " << get_string("info.reinstall_opts")
-              << std::endl;
-    std::cerr << get_string("info.query_desc") << "  " << get_string("info.query_opts")
-              << std::endl;
-    std::cerr << get_string("info.man_desc") << std::endl;
-    std::cerr << get_string("info.pack_desc") << "  " << get_string("info.pack_opts") << std::endl;
-    std::cerr << get_string("info.build_desc") << std::endl;
-    std::cerr << get_string("info.depend_desc") << std::endl;
-    std::cerr << get_string("info.scan_desc") << std::endl;
-    std::cerr << get_string("info.rec_desc") << std::endl;
+    std::ostringstream out;
+    out << options.help();
+    out << get_string("info.commands") << '\n';
+    out << get_string("info.install_desc") << "  " << get_string("info.install_opts") << '\n';
+    out << get_string("info.remove_desc") << "  " << get_string("info.remove_opts") << '\n';
+    out << get_string("info.autoremove_desc") << '\n';
+    out << get_string("info.upgrade_desc") << "  " << get_string("info.upgrade_opts") << '\n';
+    out << get_string("info.force_solve_desc") << '\n';
+    out << get_string("info.reinstall_desc") << "  " << get_string("info.reinstall_opts") << '\n';
+    out << get_string("info.query_desc") << "  " << get_string("info.query_opts") << '\n';
+    out << get_string("info.man_desc") << '\n';
+    out << get_string("info.pack_desc") << "  " << get_string("info.pack_opts") << '\n';
+    out << get_string("info.build_desc") << '\n';
+    out << get_string("info.depend_desc") << '\n';
+    out << get_string("info.scan_desc") << '\n';
+    out << get_string("info.rec_desc") << '\n';
+    return out.str();
 }
 
-#include <functional>
+/// 错误路径：参数不合法时打用法 → **stderr**（`--help` 那条走 stdout，见 `usage_text`）。
+void print_usage(const cxxopts::Options& options)
+{
+    std::cerr << usage_text(options);
+}
+
 #include <optional>
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
 /** 检查命令行参数数量是否合法 */
-void pre_operation_check(const cxxopts::ParseResult& result, std::function<void()> print_usage_func,
-                         size_t min, std::optional<size_t> max = std::nullopt)
+void pre_operation_check(const cxxopts::ParseResult& result,
+                         const std::function<void()>& print_usage_func, size_t min,
+                         std::optional<size_t> max = std::nullopt)
 {
     log_info(get_string("info.pre_op_check"));
     size_t count =
@@ -147,7 +158,10 @@ static void run_install_command(const cxxopts::ParseResult& result, const std::s
 {
     pre_operation_check(result, usage, 1);
     install_packages(packages_of(result), hash_file, result["force"].as<bool>());
-    log_info(get_string("info.install_complete"));
+    // 完成消息由 `install_packages()` 自己打（它也可能早退：全部已装 / 用户中止 ——
+    // 那两种情况下打"安装完成"是**假消息**）。这里**不要**再补一条：曾经两处各打一次，
+    // `lpkg install x` 会打印两遍，而 `--no` 中止后仍打印"安装完成"、退出码 0，
+    // 脚本/farm 无法区分"装好了"与"什么都没做"。
 }
 
 /** 本函数负责 `lpkg remove`：参数校验 → 按 `--recursive` 选移除路径 → 写缓存 → 完成消息 */
@@ -158,16 +172,21 @@ static void run_remove_command(const cxxopts::ParseResult& result,
     const auto pkgs = packages_of(result);
     const bool force = result["force"].as<bool>();
     const bool purge_config = result["purge-config"].as<bool>();
+    size_t removed = 0;
     if (result["recursive"].as<bool>()) {
         // 一次调用 = **一个批次**：多参数跨包原子（逐参数调用等于每参数一批，
         // 后面那个失败时前面那个已经删完并提交，而退出码非零又表示"什么都没发生"）
-        remove_packages_recursive(pkgs, force, purge_config);
+        removed = remove_packages_recursive(pkgs, force, purge_config);
     } else {
         // 一次调用 = **一个批次**：中途 Ctrl+C/失败会整批回滚
-        remove_packages(pkgs, force, purge_config);
+        removed = remove_packages(pkgs, force, purge_config);
     }
     write_cache();
-    log_info(get_string("info.uninstall_complete"));
+    // **什么都没删就打"卸载完成"是假消息**（2026-10-03 修，与 install 侧同款取舍）：
+    // `lpkg remove <从未安装过的包>` 此前照样打印这句 —— 脚本/farm 会以为删掉了。
+    // 未安装/保护性跳过已经各自打过一条原因（`info.package_not_installed` /
+    // `info.recursive_nothing_to_remove`），这里只在真删了东西时收尾。
+    if (removed > 0) log_info(get_string("info.uninstall_complete"));
 }
 
 /** 本函数负责 `lpkg autoremove`：清掉不再被依赖的孤儿包（`--purge-config` 透传）。 */
@@ -456,18 +475,26 @@ static std::unique_ptr<DBLock> init_database_for(const std::string& command)
     return db_lock;
 }
 
-/** 安装/移除/升级等**写操作**启用 SIGINT 防护（首次 Ctrl+C 设 graceful 标志）。 */
+/**
+ * 哪些命令启用 SIGINT 防护（首次 Ctrl+C 只设 graceful 标志、不打断当前动作）。
+ *
+ * 写操作（install/remove/autoremove/upgrade/reinstall/force-solve）自不必说；
+ * **build / pack 也在内**（2026-10-03 补）：它们是长时操作（下载源码 + 编译），此前不在名单
+ * 里 ⇒ Ctrl+C 走 `SIG_DFL` **立刻杀进程**，`run_build` 的清理路径根本没机会跑，
+ * `<dir>/build/work|content|hooks` 与已下载的源码整片留在盘上。挂上防护后：子进程（make/cc，
+ * 同一前台进程组）照样收到 Ctrl+C 而死，本进程在**阶段边界**把它翻成 `UserAbort`
+ * （见 `build/builder.cpp` 的 `run_build_phases`）→ 走带 cleanup 的异常路径。
+ */
 static bool needs_sigint_guard(const std::string& command)
 {
     return command == constants::CMD_INSTALL || command == constants::CMD_REMOVE ||
            command == constants::CMD_AUTOREMOVE || command == constants::CMD_UPGRADE ||
-           command == constants::CMD_REINSTALL || command == constants::CMD_FORCE_SOLVE;
+           command == constants::CMD_REINSTALL || command == constants::CMD_FORCE_SOLVE ||
+           command == constants::CMD_BUILD || command == constants::CMD_PACK;
 }
 
 int run_cli(const std::vector<std::string>& argv)
 {
-    CurlGlobalInitializer curl_initializer;
-
     // cxxopts 只吃 `const char* const*`（真实 main() 里就是 argv 原样）。从 vector<string>
     // 造一份视图：指针指向 vector 元素内部的缓冲区，本函数内不再改动该 vector
     // ⇒ 指针全程有效（别把它传出去）。末尾补 nullptr 哨兵，保持"argv 以 null 结尾"的
@@ -479,6 +506,10 @@ int run_cli(const std::vector<std::string>& argv)
     const int argc = static_cast<int>(argv.size());
 
     try {
+        // 注意：本对象的构造**必须**在 try 之内 —— 它的构造函数会抛 LpkgException
+        // （curl_global_init 失败），而构造点在 try 之外时异常不经过下面的 catch，
+        // 会一路穿透 run_cli/main → std::terminate（abort，而不是干净的错误信息）。
+        CurlGlobalInitializer curl_initializer;
         init_localization();
 
         // argv[0] 是程序名；测试直接调 run_cli 时可能不给（空向量）→ 用 "lpkg" 兜底，
@@ -491,7 +522,10 @@ int run_cli(const std::vector<std::string>& argv)
         auto result = options.parse(argc, raw_argv.data());
 
         if (result.count("help")) {
-            print_usage(options);
+            // `--help` 是**正常输出** → stdout（2026-10-03 修）：此前写 stderr，
+            // `lpkg --help | less` / `| grep` 拿到的永远是空。参数不合法时的用法仍走 stderr
+            // （`print_usage`），两者文本逐字相同（同一个 `usage_text()`）。
+            std::cout << usage_text(options);
             return 0;
         }
 
@@ -523,6 +557,11 @@ int run_cli(const std::vector<std::string>& argv)
 
     } catch (const cxxopts::exceptions::exception& e) {
         log_error(string_format("error.cmd_parse_error", e.what()));
+        return 1;
+    } catch (const UserAbort& e) {
+        // 用户取消（答"不" / 验证码错 / Ctrl+C）：**不是错误** —— 用 log_info 不打 `Error:` 前缀，
+        // 但退出码仍然非零（脚本/farm 必须能区分"什么都没做"与"做完了"）。
+        log_info(e.what());
         return 1;
     } catch (const LpkgException& e) {
         log_error(string_format("error.lpkg_error", e.what()));

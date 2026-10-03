@@ -1,12 +1,15 @@
 #include "config.hpp"
 
 #include <fnmatch.h>
+#include <stdlib.h>
+#include <sys/stat.h>
 #include <sys/utsname.h>
 #include <unistd.h>
 
+#include <cerrno>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <random>
 #include <string_view>
 #include <utility>
 
@@ -41,6 +44,30 @@ int match_overwrite_pattern(const std::vector<std::string>& patterns, const std:
         if (inverted || (!pat.empty() && pat.front() == '\\')) pat.remove_prefix(1);
         const auto first = pat.find_first_not_of('/');
         pat = (first == std::string_view::npos) ? std::string_view{} : pat.substr(first);
+        // **尾斜杠也要剥**（2026-10-03 修）：路径侧在 `overwrite_allows` 里已经统一成"裸形态"
+        // （归档目录条目带尾斜杠，不该影响判定），模式侧此前只剥前导斜杠 —— 于是
+        // `--overwrite=usr/lib/foo/` 这种写法会**静默不匹配**（fnmatch 拿 `usr/lib/foo/` 去
+        // 比 `usr/lib/foo` 永远失败），而上面那段注释声明的是"两侧做同一件事"。
+        //
+        // 但**剥完只剩通配符的就不剥**（`*/` → `*`、`??/` → `??`）：`*` 在 fnmatch 里本就跨
+        // `/` 匹配，剥了等于把"用户以为只针对目录"的写法**静默放大成"豁免一切冲突"** ——
+        // 那是危险的方向（豁免会跳过文件冲突检查）。保持不匹配 = 照常报冲突（fail-closed），
+        // 用户看得见冲突就有机会把模式写清楚。
+        //
+        // ⚠️ **剥尾必须落成真实串**：`fnmatch(3)` 只吃 C 串（没有长度参数），而 view 的"余下
+        // 部分一直读到 NUL"这个技巧**只对剥前缀成立** —— 剪掉尾巴时 NUL 还在被剪掉的那段之后，
+        // fnmatch 照样看得见它（第一版就是这么写的：`usr/lib/foo/` 依旧不匹配，是**假修**）。
+        std::string pat_owned;
+        if (!pat.empty() && pat.back() == '/') {
+            std::string_view stripped = pat;
+            while (!stripped.empty() && stripped.back() == '/') stripped.remove_suffix(1);
+            const bool only_wildcards =
+                !stripped.empty() && stripped.find_first_not_of("*/?") == std::string_view::npos;
+            if (!only_wildcards) {
+                pat_owned.assign(stripped);
+                pat = pat_owned;
+            }
+        }
         // fnmatch(3) 默认 flags=0 的 shell 语义：`*` 跨 `/` 匹配、`\` 转义、`?`/`[]` 同
         // shell —— 与 pacman 完全一致（它也是 fnmatch(pattern, string, 0)）。
         // pat.data() 可直接当 C 串用：std::string 的缓冲以 NUL 结尾，剥前缀后依然如此。
@@ -125,21 +152,71 @@ void Config::set_root_path(const std::string& root_path)
     rebase_paths();
 }
 
+namespace
+{
 /**
- * 获取当前进程的临时目录，路径为 /tmp/lpkg_<PID>
+ * 确保暂存根**此刻可用**：真目录（lstat 语义）+ 属主是本进程 + mode `0700`。
+ *
+ * 为什么每次用之前都要复核（2026-10-03，全量测试里实测出来的）：`get_tmp_dir()` 的 `mkdtemp`
+ * 只管**第一次**创建。而 `~TmpDirManager()` 会 `remove_all` 掉这个根（同一进程内的生命周期
+ * 管理），之后任何一句 `create_directories(<根>/<pkg>/…)` 都会把根**重新建出来 —— 用
+ * `0777 & ~umask`（实测 0755）**，于是 §1.7 的加固在进程活着的中途就悄悄没了；更要紧的是，
+ * 那一格又回到了"静默接受一个已存在的同名路径"（= 最初那条可劫持缺陷的形态）。
+ *
+ * 所以：不存在 → `mkdir(2)` 原子建（`EEXIST` 说明有人抢先，走下面的复核，**绝不"接管"**别人
+ * 的目录）；mode 被放宽过 → `chmod` 收回来；是符号链接 / 别人的目录 → 抛错。
+ */
+void ensure_tmp_dir_usable(const fs::path& dir)
+{
+    struct stat st{};
+    if (::lstat(dir.c_str(), &st) != 0) {
+        if (::mkdir(dir.c_str(), 0700) != 0 && errno != EEXIST) {
+            throw LpkgException(string_format("error.create_dir_failed", dir.string()) + ": " +
+                                std::strerror(errno));
+        }
+        if (::lstat(dir.c_str(), &st) != 0) {
+            throw LpkgException(string_format("error.create_dir_failed", dir.string()) + ": " +
+                                std::strerror(errno));
+        }
+    }
+    if (!S_ISDIR(st.st_mode) || st.st_uid != ::geteuid())
+        throw LpkgException(string_format("error.create_dir_failed", dir.string()));
+    if ((st.st_mode & 07777) != 0700) (void)::chmod(dir.c_str(), 0700);
+}
+}  // namespace
+
+/**
+ * 获取当前进程的临时目录：`/tmp/lpkg_<PID>_<随机后缀>`（**原子创建、mode 0700**）
  */
 fs::path Config::get_tmp_dir()
 {
     static const fs::path tmp_dir = []() {
-        // 使用 PID + 随机后缀降低 PID 复用冲突概率。
-        // cleanup_tmp_dirs 通过 lpkg_ 前缀识别并 kill(pid,0) 检查存活性，
-        // 随机后缀不会影响清理逻辑（stoi 在首个非数字处停止）。
-        std::random_device rd;
-        auto dir = fs::path("/tmp") /
-                   ("lpkg_" + std::to_string(getpid()) + "_" + std::to_string(rd() % 10000));
-        fs::create_directories(dir);
-        return dir;
+        // 名字形状与 `cleanup_tmp_dirs` 的解析约定绑定：那里在**首个 `_`** 处切开取 PID 段
+        // （用 parse_pid_strict，**不是** stoi —— stoi 在首个非数字处停止，`83_abc` 会被读成
+        // 83）。`mkdtemp` 只把结尾的 `XXXXXX` 换成随机串，`lpkg_<pid>_` 前缀原样保留 ⇒ 清理
+        // 逻辑一行都不用改。
+        //
+        // **必须是原子创建**（2026-10-03 修）：此前是
+        // `exists()` 探测 + `fs::create_directories()`，那是 TOCTOU —— 本地无权用户可以在
+        // 探测与创建之间预建同名路径（一个他拥有的目录，或一个指向 `/etc` 的符号链接），
+        // root 随后把包内容/索引解压进去、再拷进系统 ⇒ 任意内容以 root 安装。
+        // 而且 `create_directories` 对"已存在"与"symlink→目录"**都静默成功**，等于白送。
+        // `mkdtemp` 底层是 `mkdir(2)`：名字被占就自己换一个（不跟随末段符号链接），并且
+        // 建出来必是 `0700` + 属主为本进程（umask 只能清位，不会放宽 0700）。
+        //
+        // 注意"建完再清空目录内容"**不是**这个缺陷的修法：攻击者若真持有那个目录 inode，
+        // 清空之后他照样能再放东西（能 unlink/替换靠的是目录的 w 权限，不是内容）。
+        std::string tmpl = "/tmp/lpkg_" + std::to_string(getpid()) + "_XXXXXX";
+        if (::mkdtemp(tmpl.data()) == nullptr) {
+            throw LpkgException(string_format("error.create_dir_failed", tmpl) + ": " +
+                                std::strerror(errno));
+        }
+        return fs::path(tmpl);
     }();
+    // **每次取用都复核**（不只是创建那一次）：根被 `~TmpDirManager()` 删掉之后，下一次
+    // `create_directories(<根>/…)` 会用 0755 把它重建、且不再有任何人检查它是不是我们的
+    // （见上面 helper 的说明）。这里是"用它之前"的唯一漏斗。
+    ensure_tmp_dir_usable(tmp_dir);
     return tmp_dir;
 }
 
@@ -235,6 +312,35 @@ void Config::set_testing_mode(bool v) noexcept
 {
     std::lock_guard<std::mutex> lock(config_mutex_);
     testing_mode_ = v;
+}
+
+/**
+ * **仅供测试**：复位到"测试用的中性值"。
+ *
+ * 为什么需要它：这些字段挂在**进程级单例**上，一个用例改了、它后面**每一个**用例都看得见，
+ * 只有当"负责复位的那个用例"恰好也在本次过滤范围内时才会被清掉 —— 症状就是**单跑绿、全量红**。
+ * 本仓库实测撞过三次，前两次记在 `tests/test_hygiene.hpp` 顶部；第三次（2026-10-03）是
+ * `no_hooks_mode`：上一个用例在自己的 TearDown 里置 true，于是下一个用例里"运行安装后钩子"
+ * 那一节整段静默 —— 更糟的是它那条"没有钩子就不该出现该阶段"的断言变成了**空转的绿**。
+ *
+ * 两处**有意不取构造默认值**（构造默认 = `testing_mode_ false` / `non_interactive_ INTERACTIVE`）：
+ *   · `testing_mode_` → **true**：整个测试二进制都是测试，断点与测试分支要生效；
+ *   · `non_interactive_mode_` → **YES**：用例绝不能卡在 stdin 上（INTERACTIVE 会让"依赖上一个
+ *     用例留下 YES"的用例**永久挂起**，那比一条红断言难查得多）。
+ */
+void Config::reset_for_test()
+{
+    std::lock_guard<std::mutex> lock(config_mutex_);
+    root_dir_ = "/";
+    rebase_paths();
+    architecture_override_.clear();
+    overwrite_patterns_.clear();
+    no_hooks_mode_ = false;
+    no_deps_mode_ = false;
+    missing_so_no_error_mode_ = false;
+    use_system_soname_mode_ = false;
+    testing_mode_ = true;
+    non_interactive_mode_ = NonInteractiveMode::YES;
 }
 
 /**

@@ -18,15 +18,17 @@
  * 注册 install/remove 组选项 —— 本轮新增的 4 个开关（`--purge-config`、
  * `--force-overwrite`、`--overwrite`、`--fsync`）都在这一组。
  *
- * 其余组（general/query/pack/other/位置参数）仍在 main.cpp 里注册：帮助输出按**注册顺序**
- * 分组排版，整组搬家才能逐字节保持同一份帮助文本。选项名/默认值/帮助文本以 main.cpp
+ * 其余组（general/query/pack/other/位置参数）仍在 `main_cli.cpp` 的
+ * `register_all_options()` 里注册（原先在 `main.cpp`）：帮助输出按**注册顺序**分组排版，
+ * 整组搬家才能逐字节保持同一份帮助文本。选项名/默认值/帮助文本以搬迁前的 `main.cpp`
  * 原样搬来，不得改动。
  */
 void register_cli_options(cxxopts::Options& options);
 
 /**
  * 把解析结果落到进程级配置：覆盖豁免模式（`--force-overwrite` + `--overwrite` 的组装）与
- * durable fsync 全局开关。不含位置参数、`--root`/`--arch` 之类的路径/模式设置（那些仍在
- * main.cpp，因为它们的取值要留在局部供后续命令分发使用）。
+ * durable fsync 全局开关。不含位置参数，也不含 `--root`/`--arch` 之类的路径/模式设置
+ * （那些在 `main_cli.cpp` 的 `apply_global_options()` 里落定，其中 `--hash` 的取值还要
+ * 返回给 `run_cli()` 供后续命令分发使用）。
  */
 void apply_cli_config(const cxxopts::ParseResult& result);

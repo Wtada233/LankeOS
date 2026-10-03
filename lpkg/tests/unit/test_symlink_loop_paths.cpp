@@ -37,6 +37,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -86,7 +87,7 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_symlink_loop_test");
+        suite_work_dir = fs::absolute("tmp_symlink_loop_test_" + std::to_string(::getpid()));
         fs::remove_all(suite_work_dir);
         root = suite_work_dir / "root";
         probe_dir = suite_work_dir / "probe";

@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "../base/constants.hpp"
 #include "../base/exception.hpp"
 #include "../i18n/localization.hpp"
 
@@ -60,29 +61,42 @@ int evr_cmp(const std::string& a, const std::string& b)
 
 std::string to_libsolv_evr(const std::string& v)
 {
-    std::string s = normalize(v);
-    // `+N` 是发行修订号。libsolv 的 pool_evrcmp 按**最后一个 `-`** 切 version/release，
-    // 把 `+` 转成 `-` 让 release 被正确识别——否则整串平铺比较会把 `261.2+3` 判成
-    // `< 261+3`，依赖要求新版本时 libsolv 误判为"降级"、只能升级满足依赖 → 事务无解。
-    std::replace(s.begin(), s.end(), '+', '-');
-    return s;
+    if (const auto bad = v.find_first_of(constants::EVR_RESERVED_CHARS); bad != std::string::npos) {
+        // 见头文件：这三个字符对 libsolv 有特殊含义，是桥接的保留字符。**绝不静默** ——
+        // 让它们混进去的后果是依赖匹配悄悄错序/编解码不再一一对应，比一次显式失败糟得多。
+        throw LpkgException(
+            string_format("error.version_reserved_char", v, std::string(1, v[bad])));
+    }
+    std::string s =
+        normalize(v);  // 非 const：下面 `return s` 要能自动 move（tidy: no-automatic-move）
+    const auto pos = s.find('+');
+    if (pos == std::string::npos) return s;  // 无 release：版本部分本身就是完整 EVR
+    // 退化写法 `1.0+`（`+` 后为空）：**与"没有 release"同义** —— `evr_cmp` 就是这么判的
+    // （`split_release` 给出空 release ⇒ `1.0+ == 1.0`）。不特判会编出 `1.0^^`，而它在
+    // libsolv 里**大于** `1.0` ⇒ 桥接在这个边界上不再保序（实测 6 对退化串分叉）。
+    // 真实版本不以 `+` 结尾（索引 678 个里 0 个），但把边界钉平比留个静默分叉便宜。
+    if (pos + 1 == s.size()) return s.substr(0, pos);
+    // `^` 的位置承重（见头文件）：libsolv 的 rpm 比较器把 `^` 当"比基础版新、比任何真实
+    // 下一段旧"，正是发行修订号的语义；而且全串不出现 `-` ⇒ libsolv 的 version/release
+    // 切分永远是"没有 release"，EVRCMP_MATCH_RELEASE 那两个 ±2 特例分支不可能触发。
+    return s.substr(0, pos) + std::string(constants::EVR_RELEASE_SEP) + s.substr(pos + 1);
 }
 
 std::string from_libsolv_evr(const std::string& v)
 {
-    // EVR 里 `~` = 预发布（原 `-`）；唯一的 `-` 是 release 分隔符（原 `+`）。
-    // 按最后一个 `-` 切分：其前 `~`→`-` 还原版本，其后用 `+` 接回 release。
-    const auto pos = v.rfind('-');
-    if (pos == std::string::npos) {
-        std::string s = v;
-        std::replace(s.begin(), s.end(), '~', '-');
-        return s;
-    }
-    std::string ver = v.substr(0, pos);
-    std::replace(ver.begin(), ver.end(), '~', '-');
-    std::string rel = v.substr(pos + 1);
-    std::replace(rel.begin(), rel.end(), '~', '-');  // release 段里的 '~' 同源（原 '-'）
-    return ver + "+" + rel;
+    // `~` = 预发布（原 `-`）；**唯一的** `^^` 是 release 分隔符（原 `+`）。
+    // 切分是**无损**的：版本部分里不允许出现 `^`（`to_libsolv_evr` 会拒绝），所以第一个
+    // `^^` 一定是分隔符 —— 不再有"按最后一个 `-` 猜"那种有损还原（旧实现在版本/release
+    // 里含 `~` 时会还原错）。
+    const auto unnormalize = [](std::string_view s) {
+        std::string out(s);
+        std::replace(out.begin(), out.end(), '~', '-');
+        return out;
+    };
+    const auto pos = v.find(constants::EVR_RELEASE_SEP);
+    if (pos == std::string::npos) return unnormalize(v);
+    return unnormalize(std::string_view(v).substr(0, pos)) + "+" +
+           unnormalize(std::string_view(v).substr(pos + constants::EVR_RELEASE_SEP.size()));
 }
 
 bool version_compare(const std::string& v1_str, const std::string& v2_str)

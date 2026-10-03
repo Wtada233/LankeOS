@@ -317,7 +317,11 @@ TEST_F(OverwriteGlobsTest, DirEntryOverDiskFileIsExemptedWhenMatched)
         msg = e.what();
     }
     EXPECT_NE(msg.find("usr/share/ogfile"), std::string::npos) << msg;
-    EXPECT_NE(msg.find(get_string("error.unknown_manual_file")), std::string::npos) << msg;
+    EXPECT_NE(msg.find(string_format("error.file_conflict_unowned", "/usr/share/ogfile/")),
+              std::string::npos)
+        << msg;
+    EXPECT_EQ(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
+        << "占位文本不该被当成持有者名渲染进报告：" << msg;
     EXPECT_TRUE(fs::is_regular_file(test_root / "usr/share/ogfile"))
         << "被拒绝时盘上文件必须原样保留";
 
@@ -368,6 +372,59 @@ TEST_F(OverwriteGlobsTest, OverwriteAllowsSemantics)
     cfg.set_overwrite_patterns(Config::compose_overwrite_patterns(true, {"!/usr/share/b/*"}));
     EXPECT_TRUE(cfg.overwrite_allows("/usr/share/a/x"));
     EXPECT_FALSE(cfg.overwrite_allows("/usr/share/b/x"));
+
+    cfg.set_overwrite_patterns({});
+}
+
+// ============================================================================
+// 尾斜杠语义（2026-10-03）：模式侧**剥尾斜杠**（`usr/lib/foo/` ≡ `usr/lib/foo`），
+// 但**剥完只剩通配符的不剥**（`*/`、`??/` 保持原样 ⇒ 依旧不匹配 = fail-closed）
+// ============================================================================
+
+TEST_F(OverwriteGlobsTest, TrailingSlashInPatternIsStrippedUnlessOnlyWildcards)
+{
+    auto& cfg = Config::instance();
+
+    // ① 模式写尾斜杠 = 同一路径：剥掉后 fnmatch 才拿到 `usr/lib/foo` 去比 `usr/lib/foo`。
+    //    修复前这里**静默不匹配**（fnmatch 拿 `usr/lib/foo/` 比 `usr/lib/foo` 永远失败）。
+    //    缺陷下会红：若"剥尾斜杠"这步被拿掉（又只剩剥前导斜杠），下面三条 EXPECT_TRUE
+    //    全部从 true 变 false；反过来若实现被改成"截断目录前缀"，最后那条 EXPECT_FALSE 会红。
+    cfg.set_overwrite_patterns({"/usr/lib/foo/"});
+    EXPECT_TRUE(cfg.overwrite_allows("/usr/lib/foo")) << "模式尾斜杠必须剥掉，与裸形态等价";
+    EXPECT_TRUE(cfg.overwrite_allows("usr/lib/foo")) << "前导斜杠差异也不该影响";
+    EXPECT_TRUE(cfg.overwrite_allows("/usr/lib/foo/")) << "路径侧本就归一（两个方向都剥）";
+    EXPECT_FALSE(cfg.overwrite_allows("/usr/lib/foobar")) << "剥尾斜杠不能被实现成'截断到目录前缀'";
+
+    // ② 剥完**只剩通配符**的不剥：`*/` 保持原样 ⇒ fnmatch("*/", "usr/lib/foo") 不匹配。
+    //    这是**有意的 fail-closed** —— `*` 在 fnmatch（flags=0）里跨 `/` 匹配，若把 `*/`
+    //    剥成 `*`（或直接跟 `*` 等价），用户"以为只针对目录"的写法会被静默放大成
+    //    "豁免**一切**冲突"（豁免会跳过文件冲突检查，是危险方向）。保持不匹配 ⇒ 照常报冲突，
+    //    用户看得见冲突就有机会把模式写清楚。
+    //    缺陷下会红：若剥尾斜杠时**漏了** only_wildcards 守卫（无条件剥），`*/` → `*`
+    //    就会命中一切 —— 这条 EXPECT_FALSE 从 false 变 true。`??/` 同理。
+    cfg.set_overwrite_patterns({"*/"});
+    EXPECT_FALSE(cfg.overwrite_allows("/usr/lib/foo"))
+        << "`*/` 剥成 `*` 会把'只针对目录'的写法放大成豁免一切冲突（危险方向）";
+    cfg.set_overwrite_patterns(
+        {"??"
+         "/"});  // 拆开写：`??/` 是 trigraph，会被 -Werror 拦
+    EXPECT_FALSE(cfg.overwrite_allows("/usr/lib/foo"))
+        << "`??` `/` 剥成 `??` 同样会静默放大豁免范围";
+
+    // ③ 取反方向正确：`!` 剥完尾斜杠后仍钉住**那个路径**（否则取反的尾斜杠写法静默失效，
+    //    用户以为否决了、其实没否决）。缺陷下会红：若取反模式没走同一套剥斜杠逻辑，
+    //    `!/usr/lib/foo/` 匹配不到 `usr/lib/foo` ⇒ 该路径会被前面的 `*` 放行 ⇒
+    //    第一条 EXPECT_FALSE 从 false 变 true。
+    cfg.set_overwrite_patterns({"*", "!/usr/lib/foo/"});
+    EXPECT_FALSE(cfg.overwrite_allows("/usr/lib/foo"))
+        << "`!/usr/lib/foo/` 必须否决 usr/lib/foo（否则取反的尾斜杠写法静默失效）";
+    EXPECT_TRUE(cfg.overwrite_allows("/usr/lib/bar")) << "被 `*` 放行的别的路径不受这条取反影响";
+
+    // ④ 对照：裸 `*`（不含尾斜杠、根本不进"剥尾斜杠"分支）仍命中一切 —— 证明 ② 的红
+    //    确实来自 only_wildcards 守卫，而不是"所有含 `*` 的模式都被禁掉了"。
+    cfg.set_overwrite_patterns({"*"});
+    EXPECT_TRUE(cfg.overwrite_allows("/usr/lib/foo"));
+    EXPECT_TRUE(cfg.overwrite_allows("anywhere/at/all"));
 
     cfg.set_overwrite_patterns({});
 }

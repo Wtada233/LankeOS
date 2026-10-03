@@ -63,6 +63,31 @@ bool looks_like_soname(const char* name)
     return after == '\0' || after == '.' || (after >= '0' && after <= '9');
 }
 
+/**
+ * 把 libsolv **自己拼出来的字符串**解回 lpkg 版本域。
+ *
+ * 为什么需要（2026-10-03，实测的泄漏）：`solver_ruleinfo2str()`（以及它内部用的
+ * `pool_solvid2str` / `pool_dep2str`）打印的是池里的 **EVR 原样**，也就是我们的编码串。
+ * 直接打给用户等于把内部编码暴露出去 —— 而真实索引 861 个版本里 **807 个带 `+`**，
+ * 于是几乎每条冲突消息都长这样：
+ *     `cannot install both lib-2.0^^1 and lib-1.0^^1`
+ * 用户拿它既 grep 不到仓库里的版本，也对应不回"到底哪两个版本冲突了"。
+ * （`1.0-rc1` 这类预发布更早就显示成 `1.0~rc1`。）
+ *
+ * 替换是**安全**的：`^` / `~` / `:` 都是版本域保留字符（包名/版本里不许出现，
+ * 见 `vercmp/version.hpp` 与 `is_safe_path_component`），所以消息里出现的它们只可能来自编码。
+ */
+std::string decode_libsolv_message(std::string msg)
+{
+    // `^^` → `+`（release 分隔符）；再把残余 `~` → `-`（预发布）。
+    // 顺序有讲究：先把两字符分隔符处理掉，再处理单字符，免得把 `^^` 拆坏。
+    for (std::size_t pos = msg.find(constants::EVR_RELEASE_SEP); pos != std::string::npos;
+         pos = msg.find(constants::EVR_RELEASE_SEP, pos))
+        msg.replace(pos, constants::EVR_RELEASE_SEP.size(), "+");
+    std::replace(msg.begin(), msg.end(), '~', '-');
+    return msg;
+}
+
 void add_provides(Solvable* s, Pool* pool, const std::vector<std::string>& provides)
 {
     for (const auto& cap : provides) {
@@ -140,10 +165,21 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                         missing_dep.emplace_back(dep_name);  // 传递依赖
                 }
             } else if (info == SOLVER_RULE_JOB_UNKNOWN_PACKAGE) {
-                // 请求的包不存在 → 真错误（走 l10n）
-                fatal.emplace_back(get_string("error.requested_package_not_exist"));
-            } else if (info >= SOLVER_RULE_PKG && info < SOLVER_RULE_JOB) {
-                // PKG 规则。若 dep 是 SONAME 且全池确无提供者 → libsolv 把它当冲突报
+                // 请求的包不存在 → 真错误（走 l10n）。**必须点名包**：libsolv 的 job 规则里
+                // `dep` 就是 job 的选择 Id（包名）—— 不带名字的 "does not exist" 让人查不出
+                // 是哪个包。注：lpkg 的 job 全用真实 solvable / 名字 id 构造，这条分支当前
+                // **不可达**（纵深防御）；一旦 libsolv 改了规则分类，这里也要能定位。
+                const char* unknown = dep ? pool_id2str(pool, dep) : nullptr;
+                fatal.emplace_back(
+                    string_format("error.requested_package_not_exist", unknown ? unknown : "?"));
+
+            } else if ((info & SOLVER_RULE_TYPEMASK) == SOLVER_RULE_PKG) {
+                // PKG 规则。判据用**类型掩码**：曾写成
+                // `info >= SOLVER_RULE_PKG && info < SOLVER_RULE_JOB`，而 libsolv 的
+                // UPDATE(0x200) 与 FEATURE(0x300) 也落在 [0x100,0x400) 这个数值区间里 ——
+                // 它们会被当成真冲突报成 fatal，与下面"其余（UPDATE…）跳过"的注释矛盾
+                // （2026-10-02 修）。
+                // 若 dep 是 SONAME 且全池确无提供者 → libsolv 把它当冲突报
                 // （qt6-base requires libgbm.so.1 之类），归 soname_conflicts 供容忍；
                 // 否则才是真冲突（版本不符/CONFLICTS/SAME_NAME/OBSOLETES...）。
                 const char* dn = dep ? pool_id2str(pool, dep) : nullptr;
@@ -154,8 +190,17 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                         continue;
                     }
                 }
+                // `desc` 为 null（libsolv 给不出规则描述）时回退到 l10n 的 "(conflict)"。
+                // 三元里 const char* 与 std::string 混合，结果类型是 std::string（旧写法直接
+                // 塞硬编码英文，且本处是用户可见的冲突原因）。
+                // ⚠️ **该回退近不可达**：实测 libsolv 对本处收集的这几类规则都给出了描述，
+                // 所以它**没有对应用例 —— 这是有意的，不是漏测**。保留是纵深防御：
+                // `solver_ruleinfo2str` 的契约允许返回 NULL，直接解引用会崩。
                 const char* desc = solver_ruleinfo2str(solv, info, from, to, dep);
-                fatal.emplace_back(desc ? desc : "(conflict)");
+                // `desc` 是 libsolv 拼的串，里面的 EVR 是**编码串**（`1.0^^1`）—— 它是用户
+                // 可见的冲突原因，必须先解回 lpkg 版本域（见 decode_libsolv_message）。
+                fatal.emplace_back(desc ? decode_libsolv_message(desc)
+                                        : get_string("info.solver_rule_conflict"));
             }
             // 其余（通用 JOB、UPDATE、DISTUPGRADE 等）→ 缺依赖的症状/结构性，跳过
         }
@@ -163,9 +208,37 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
     }
 }
 
+/**
+ * libsolv Pool 的 RAII 持有者。
+ *
+ * **拷贝必须禁掉**：它持有裸 `Pool*`，隐式拷贝（用户声明了析构 ⇒ 拷贝构造仍被隐式声明、
+ * 只是 deprecated）会造成两个对象各自 `pool_free` 同一个 pool —— double free。此前只靠
+ * `build_pool` 的 `return ps;` 走 NRVO/移动语义侥幸不触发（2026-10-02 修）。这里显式
+ * 删除拷贝、补上移动（`return ps;` 即使不 NRVO 也走移动）。
+ */
 struct PoolState {
     Pool* pool = nullptr;
     Repo* avail = nullptr;
+
+    PoolState() = default;
+    PoolState(const PoolState&) = delete;
+    PoolState& operator=(const PoolState&) = delete;
+    PoolState(PoolState&& other) noexcept : pool(other.pool), avail(other.avail)
+    {
+        other.pool = nullptr;
+        other.avail = nullptr;
+    }
+    PoolState& operator=(PoolState&& other) noexcept
+    {
+        if (this != &other) {
+            if (pool) pool_free(pool);
+            pool = other.pool;
+            avail = other.avail;
+            other.pool = nullptr;
+            other.avail = nullptr;
+        }
+        return *this;
+    }
     ~PoolState()
     {
         if (pool) pool_free(pool);
@@ -406,8 +479,9 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                 FOR_REPO_SOLVABLES(ps.avail, pi, sa)
                 {
                     if (sa->name != nid) continue;
-                    // pool 内 evr 是归一化后的 libsolv EVR（`+release`→`-`、`-预发布`→`~`），
-                    // 用 version_compare 前须 from_libsolv_evr 还原回 lpkg 版本域。
+                    // pool 内 evr 是归一化后的 libsolv EVR（`-预发布`→`~`、`+release`→`^^`，见
+                    // vercmp/version.hpp）， 用 version_compare 前须 from_libsolv_evr 还原回 lpkg
+                    // 版本域。
                     if (!best ||
                         version_compare(from_libsolv_evr(pool_id2str(
                                             ps.pool, pool_id2solvable(ps.pool, best)->evr)),

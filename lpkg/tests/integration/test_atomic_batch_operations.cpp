@@ -109,6 +109,15 @@ TEST_F(AtomicBatchRemoveTest, RemoveInstalledPackage)
 TEST_F(AtomicBatchRemoveTest, RemoveNonexistentPackage)
 {
     EXPECT_NO_THROW(remove_package("no_such_pkg", false));
+
+    // "移除不存在的包"必须**无副作用**（只验不抛看不出它有没有误删/误动状态）：
+    // fixture 装的 removeTarget 应原封不动；不存在的包不该被登记成已装。
+    EXPECT_TRUE(Cache::instance().get_installed_version("no_such_pkg").empty())
+        << "不存在的包被登记成了已装";
+    EXPECT_EQ(Cache::instance().get_installed_version("removeTarget"), "1.0")
+        << "移除不存在的包牵连到了无关的已装包";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/removeTarget"))
+        << "移除不存在的包删掉了别的包的文件";
 }
 
 TEST_F(AtomicBatchRemoveTest, RemoveWithForce)

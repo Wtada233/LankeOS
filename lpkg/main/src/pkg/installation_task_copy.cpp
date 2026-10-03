@@ -30,7 +30,6 @@
 #include <map>
 #include <optional>
 #include <random>
-#include <ranges>
 #include <set>
 #include <sstream>
 #include <string>
@@ -52,6 +51,7 @@
 #include "install_common.hpp"
 #include "op_sink.hpp"
 #include "trigger/trigger.hpp"
+#include "ui/term.hpp"
 #include "vercmp/version.hpp"
 
 extern std::atomic<bool> sigint_graceful;
@@ -75,8 +75,8 @@ struct ContentEntry {
  * 从根上消掉"两趟各看一次盘面"的漂移可能。走这里的情形只有一种：**测试直接调用本函数**
  * （没有让开趟，记录表是空的）。
  */
-detail::PathFacts write_facts(const std::string& entry, const fs::path& physical, bool entry_is_dir,
-                              bool entry_is_symlink)
+detail::PathFacts write_facts(const std::string& entry, const fs::path& src_path,
+                              const fs::path& physical, bool entry_is_dir, bool entry_is_symlink)
 {
     detail::PathFacts facts;
     facts.logical = (fs::path("/") / entry).string();
@@ -92,6 +92,10 @@ detail::PathFacts write_facts(const std::string& entry, const fs::path& physical
     // `!facts.disk_is_dir` 为真（`is_real_directory` 对环判 false）⇒ 抛型那半边**必然**
     // 被求值（短路方向问题，不是"用了抛型"本身）。见 base/utils.hpp 的谓词说明。
     facts.disk_is_symlink = !facts.disk_is_dir && is_symlink_no_follow(probe);
+    // 两边都是符号链接时，目标是否逐字节相同（事实说明见 op_sink.hpp）。与让开趟同一条判据
+    // （`symlink_targets_equal`，不抛）—— 两趟必须给出同一答案，否则写入趟的落点会漂移。
+    if (entry_is_symlink && facts.disk_is_symlink)
+        facts.disk_symlink_matches_entry = symlink_targets_equal(src_path, probe);
     return facts;
 }
 
@@ -99,26 +103,46 @@ detail::PathFacts write_facts(const std::string& entry, const fs::path& physical
  * 把包内那份普通文件 staged 成 `<dst>.lpkgtmp`（内容 + xattr + 属主/权限 + fsync），
  * 返回 tmp 路径交给 `sink.commit_copy` 落位。两个落点（原位 / `.lpkgnew`）共用这一份：
  * 原先两处逐字重复，而"先 fsync .lpkgtmp 再写 WAL"的纪律靠人肉同步。
+ *
+ * ⚠️ 调用方**必须**在**本函数返回之后**建一个 `TmpStageGuard(tmp_path)`（见其注释）：
+ * 它负责"BACKUP 旧目标 → commit rename"这一段；本函数内部只负责自己写坏的那半个 tmp。
  */
 fs::path stage_regular_file(const fs::path& src, const fs::path& dst)
 {
-    fs::path tmp_path = dst;
-    tmp_path += ".lpkgtmp";
-    // 落位前先挡住"tmp 路径是符号链接"（写 tmp 会跟随链接写到链接目标上）
+    fs::path tmp_path = detail::staged_tmp_path(dst);
+    // 落位前先挡住"tmp 路径是符号链接"（写 tmp 会跟随链接写到链接目标上）。
+    // ⚠️ 这一步**必须**在任何收尾之前：拒绝时盘上原有那个链接是用户的，不许动。
     detail::refuse_symlink_tmp_path(tmp_path);
-    fs::copy(src, tmp_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-    copy_xattrs(src, tmp_path);  // 先搬到 .lpkgtmp，rename 后 xattr 随之生效
+    // 从这里往下，tmp 路径上的东西就是"我们正在写的"（`fs::copy` 会覆盖它）—— 中途失败就地
+    // 收掉，别留半个文件（那时 WAL 里同样没有描述它的行）。
+    try {
+        fs::copy(src, tmp_path, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+        copy_xattrs(src, tmp_path);  // 先搬到 .lpkgtmp，rename 后 xattr 随之生效
+    } catch (...) {
+        detail::drop_staged_tmp(tmp_path);
+        throw;
+    }
     struct stat st;
     if (lstat(src.c_str(), &st) == 0) {
-        (void)lchown(tmp_path.c_str(), st.st_uid, st.st_gid);
+        // 不抛（这是落位前的准备，抛了整批回滚），但也不静默：属主/权限设不上去意味着
+        // 装出来的文件与包内声明不一致 —— 对 setuid 文件来说这是安全问题，不是小事。
+        if (lchown(tmp_path.c_str(), st.st_uid, st.st_gid) != 0)
+            log_warning(string_format("warning.chown_failed", tmp_path.string()));
         if (!S_ISLNK(st.st_mode)) {
-            (void)chmod(tmp_path.c_str(), st.st_mode & constants::PERM_MASK_ALL);
+            if (chmod(tmp_path.c_str(), st.st_mode & constants::PERM_MASK_ALL) != 0)
+                log_warning(string_format("warning.chmod_failed", tmp_path.string()));
         }
     }
-    // fsync .lpkgtmp 后再写 WAL（断电丢内容的话，WAL 指向的就是空文件）
+    // fsync .lpkgtmp 后再写 WAL（断电丢内容的话，WAL 指向的就是空文件）。失败不抛（这是
+    // 落位前的准备，抛了整批回滚），但**要出声** —— 忽略 open/fsync 的返回值等于静默放弃
+    // 持久性（与"检查 fsync 返回值"这条纪律相悖）。
     if (durable_fsync_enabled()) {
-        if (int fd = ::open(tmp_path.c_str(), O_RDONLY); fd >= 0) {
-            ::fsync(fd);
+        const int fd = ::open(tmp_path.c_str(), O_RDONLY);
+        if (fd < 0) {
+            log_warning(string_format("warning.fsync_failed", tmp_path.string()));
+        } else {
+            if (::fsync(fd) != 0)
+                log_warning(string_format("warning.fsync_failed", tmp_path.string()));
             ::close(fd);
         }
     }
@@ -153,8 +177,15 @@ void write_symlink_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
     const detail::PathRecord* rec = ledger.find(e.name);
     const detail::PathDecision decision =
         detail::decide_path(rec ? rec->facts
-                                : write_facts(e.name, e.physical_path, /*entry_is_dir=*/false,
-                                              /*entry_is_symlink=*/true));
+                                : write_facts(e.name, e.src_path, e.physical_path,
+                                              /*entry_is_dir=*/false, /*entry_is_symlink=*/true));
+    // 目标**完全相同**的 symlink→symlink：表给 `KeepOnDisk` —— 盘上那份就是我们要的，
+    // 一个字节都不该碰（连 `.lpkgnew` 都不产生；旧行为不看目标，链接没变的重装也吐副本，
+    // 反复重装就在 `/etc` 上堆垃圾）。让开趟对这一格是 `Noop`（不搬），所以直接返回，
+    // 没有要 `un_stash` 的东西。**本函数不按 `decision.write` 分派**（下面只用它挑后缀），
+    // 所以这一条必须显式早退 —— 否则下面照旧 backup + create_symlink 一遍。
+    if (decision.write == detail::PathAction::KeepOnDisk) return;
+
     if (decision.write == detail::PathAction::WriteLpkgnew) {
         dest += std::string(constants::SUFFIX_LPKG_NEW);
         log_warning(
@@ -196,7 +227,12 @@ void write_symlink_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
         else
             sink.backup(dest);  // 环（lstat 存在）也要让开
     }
-    sink.new_file(dest);
+    // `NEW <dest>` 由谁写：若让开趟已按决策表的 `RegisterNew` 登记过（`rec` 存在且
+    // `let_go == RegisterNew`），这一行**已经写进 WAL 了**，此处不再重复 —— 此前无论哪条
+    // 路径都无条件再写一次，盘上没有旧物料的"全新符号链接"于是落**两条** NEW 行（逆操作
+    // 幂等、无害，但按 WAL 行计数的工具会看到重复）。其余情形（让开趟搬走了旧物料、或压根
+    // 没跑让开趟）由写入趟自己写这一行。
+    if (rec == nullptr || decision.let_go != detail::PathAction::RegisterNew) sink.new_file(dest);
     // 断点：`NEW <dest>` 行已落、`create_symlink` 未做 —— write-ahead 窗口。
     // （此前**符号链接分支没有断点**，只有普通文件的 COPY 有：lpkg/CLAUDE.md §2
     //  记着"链接已写 WAL、尚未 create_symlink"这个中间态无法注入故障。补上之后
@@ -205,7 +241,8 @@ void write_symlink_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
     fs::create_symlink(link_target, dest);
     struct stat st;
     if (lstat(src_path.c_str(), &st) == 0) {
-        (void)lchown(dest.c_str(), st.st_uid, st.st_gid);
+        if (lchown(dest.c_str(), st.st_uid, st.st_gid) != 0)
+            log_warning(string_format("warning.chown_failed", dest.string()));
     }
     fsync_parent_dir(dest);
     TriggerManager::instance().check_file((fs::path("/") / e.name).string());
@@ -230,8 +267,8 @@ void write_dir_entry(const ContentEntry& e, const detail::ProbeLedger& ledger, d
             : nullptr;  // 回退路径（测试直连本函数）没有记录，见下面 record_previous 的取值
     const detail::PathDecision decision =
         detail::decide_path(rec ? rec->facts
-                                : write_facts(e.name, e.physical_path, /*entry_is_dir=*/true,
-                                              /*entry_is_symlink=*/false));
+                                : write_facts(e.name, e.src_path, e.physical_path,
+                                              /*entry_is_dir=*/true, /*entry_is_symlink=*/false));
     if (decision.write != detail::PathAction::WriteDirMetadata) {
         throw LpkgException(string_format("error.copy_failed_rollback", e.name,
                                           e.physical_path.string(),
@@ -259,9 +296,13 @@ void write_dir_entry(const ContentEntry& e, const detail::ProbeLedger& ledger, d
             if (lstat(probe.c_str(), &dst_st) == 0) {
                 mode_t cur_mode = dst_st.st_mode & constants::PERM_MASK_ALL;
                 if (cur_mode != pkg_mode) {
-                    log_warning(string_format("warning.dir_perm_mismatch", probe.string(),
-                                              static_cast<int>(cur_mode),
-                                              static_cast<int>(pkg_mode)));
+                    // mode 必须以**八进制**渲染（`{:o}`，2026-10-03 订正）：原先传 int 走默认
+                    // 十进制，0644 会显示成 420、0755 成 493 —— 与 `ls -l` / chmod 的口径不符，
+                    // 用户看不懂告警里那两个数。
+                    const std::string cur_o = std::format("{:o}", static_cast<unsigned>(cur_mode));
+                    const std::string pkg_o = std::format("{:o}", static_cast<unsigned>(pkg_mode));
+                    log_warning(
+                        string_format("warning.dir_perm_mismatch", probe.string(), cur_o, pkg_o));
                 }
             }
         }
@@ -329,7 +370,8 @@ void write_regular_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
     // 也不留 .lpkgnew，直接替换）—— 故 `target_taken`/`target_is_dir` 显式排掉符号链接
     // （与决策表同一个口径：`disk_is_dir` 就是 lstat 语义的真目录）。
     detail::PathFacts facts = rec ? rec->facts
-                                  : write_facts(e.name, e.physical_path, /*entry_is_dir=*/false,
+                                  : write_facts(e.name, e.src_path, e.physical_path,
+                                                /*entry_is_dir=*/false,
                                                 /*entry_is_symlink=*/false);
     const bool target_taken = facts.disk_exists;
     const bool target_is_dir = facts.disk_is_dir;
@@ -426,7 +468,9 @@ void write_regular_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
             // WAL: COPY <tmp> → <dst> (write-ahead: WAL 先于 rename)
             // （断点位于 write-ahead 窗口内，只能在 sink 里命中）
             const fs::path tmp_path = stage_regular_file(e.src_path, final_dest);
+            detail::TmpStageGuard tmp_guard(tmp_path);  // staging 之后才接活（见其注释）
             sink.commit_copy(tmp_path, final_dest, "copy_after_wal_" + pkg_name);
+            tmp_guard.disarm();
             break;
         }
         case detail::PathAction::KeepOnDisk:
@@ -458,7 +502,10 @@ void write_regular_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
             // "请审阅"副本，盘面与 WAL 描述的世界不一致。故与落原位分支走**同一套
             // 写入层原语**：内容先写进 .lpkgtmp（+ xattr + 属主/权限 + fsync），再
             // commit_copy 落位（WAL COPY）。
+            // 守卫覆盖"BACKUP 旧 `.lpkgnew` → commit"这一段：BACKUP 那步失败时
+            // WAL 里只有 BACKUP 行、没有描述 tmp 的行，回滚不会碰它（实测残留）。
             const fs::path tmp_path = stage_regular_file(e.src_path, final_dest);
+            detail::TmpStageGuard tmp_guard(tmp_path);
             // 目标已存在（上一次留下的 .lpkgnew，用户可能还没审阅）→ 先 BACKUP 进
             // stash 再落新的：回滚时它是"把旧那份 rename 回来"，而不是连带删掉
             // 一份与本批次无关、用户尚未处理的审阅文件（顺序也不可反：BACKUP 行
@@ -474,6 +521,7 @@ void write_regular_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
             if (exists_no_follow(final_dest))
                 sink.backup(final_dest, "lpkgnew_bak_after_wal_" + pkg_name);
             sink.commit_copy(tmp_path, final_dest, "lpkgnew_after_wal_" + pkg_name);
+            tmp_guard.disarm();
             break;
         }
         default:
@@ -492,7 +540,21 @@ void write_regular_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
 
 void InstallationTask::copy_package_files()
 {
-    log_info(string_format("info.copying_files", pkg_name_));
+    // 进度行（pacman 风格）：左 = 动作 + 包，中 = `34/120 个文件`，右 = 进度条。
+    // 条目数**事先已知**（scan_content_files 刚扫完），所以进度是精确的，不需要估。
+    //
+    // **动词按操作分**（pacman 的 `正在安装 / 正在升级 / 正在重新安装` 三种说法）：本函数手上
+    // 就有 `old_version_to_replace_` 与 `actual_version_`，所以不必让调用方再补一行"正在升级
+    // 软件包 X 从 A 到 B" —— 版本变化直接写进这一行（升级路径的逐包输出因此从 3 行降到 1 行）。
+    std::string what;
+    if (old_version_to_replace_.empty()) {
+        what = string_format("ui.installing", pkg_name_ + " " + actual_version_);
+    } else if (old_version_to_replace_ == actual_version_) {
+        what = string_format("ui.reinstalling", pkg_name_ + " " + actual_version_);
+    } else {
+        what = string_format("ui.upgrading", pkg_name_, old_version_to_replace_, actual_version_);
+    }
+    ui::Line line(std::move(what));
     // 写入层原语：COPY 的 WAL 行与 rename 成对发生（见 op_sink.hpp）
     detail::OpSink sink(pkg_name_, &stashes_);
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
@@ -502,15 +564,36 @@ void InstallationTask::copy_package_files()
     // 每个包几个 /etc 条目 ⇒ 光这一句就刷几百行（pacman 对静默替换一行都不打）。
     std::vector<std::string> silently_updated_configs;
 
+    const auto total_entries = files.size();
+    std::size_t done_entries = 0;
+    int last_pct = -1;
+    // 每个条目处理后按"整数百分比变化"节流重绘（条目数多时最多 ~100 次写）。
+    const auto advance = [&]() {
+        if (total_entries == 0) return;
+        ++done_entries;
+        const int pct = static_cast<int>(done_entries * 100 / total_entries);
+        if (pct == last_pct && done_entries != total_entries) return;
+        last_pct = pct;
+        line.progress(
+            100.0 * static_cast<double>(done_entries) / static_cast<double>(total_entries),
+            string_format("ui.file_count", done_entries, total_entries));
+    };
+
     for (const auto& f : files) {
         if (on_before_file_copy) on_before_file_copy();
 
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+        if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
+
+        // 在**循环体开头**推进（而不是末尾）：体里有多条 `continue`，放在末尾会被跳过；
+        // 差一个条目的显示偏差无所谓（末尾 `finish(bar(100))` 会收正）。
+        advance();
 
         fs::path rel_f = f;
         if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
         const fs::path src_path = content_dir / f;
-        const fs::path physical_path = Config::instance().root_dir() / rel_f;
+        // 落位目标走 `confine_target_path`（不是裸 `root_dir() / rel_f`）：后者只约束**词法**
+        // 归属，而拷贝会跟随中间段符号链接 —— `<root>/usr -> /` 时内容会写到宿主（2026-10-03）。
+        const fs::path physical_path = detail::confine_target_path(rel_f);
 
         // 判定走**不抛**的 `exists_no_follow`（lstat 语义 = 原来的 `exists || is_symlink`）：
         // `src_path` 是**包内内容**，包自己的 `content/` 里带符号链接环时 `fs::exists` 会抛
@@ -519,20 +602,16 @@ void InstallationTask::copy_package_files()
         // tests/integration/test_symlink_loop_install.cpp。
         if (!exists_no_follow(src_path)) continue;
 
-        fs::path parent = physical_path.parent_path();
-        std::vector<fs::path> to_create;
-        // 同样是**包要落位的目标路径**（不是 lpkg 自己的命名空间）：父链上出现环时
-        // `fs::exists` 会抛。用**跟随语义**的不抛版（与 `fs::exists` 逐字同义）——
-        // 解不开的父目录在这里判"不存在"，交给 ensure_dir_exists 去报一个点名的
-        // LpkgException，而不是让 std::filesystem 的原始异常穿出去。
-        while (!parent.empty() && !exists_follow(parent)) {
-            to_create.push_back(parent);
-            if (parent == Config::instance().root_dir()) break;
-            parent = parent.parent_path();
-        }
-        for (const auto& d : to_create | std::views::reverse) {
-            ensure_dir_exists(d);
-        }
+        // 父目录**不在这里创建**（2026-10-03 删除了原先那段 `ensure_dir_exists` 父链补建）：
+        // 解压器（libarchive 的 disk writer）会为文件成员**自动补建**缺失的父目录 ——
+        // 实测：只含 `content/usr/bin/foo`、不含任何目录成员的归档，解压后
+        // `content/usr`、`content/usr/bin` 都真实存在（lpkg 用的那套
+        // `archive_write_disk_set_options` 逐字复刻验证过）。
+        // 于是 `scan_content_files` 会把它们当**普通目录条目**扫到 → 让开趟照常写 `NEW_DIR`、
+        // 注册趟照常登记归属 —— 与归档显式带了目录条目时**走完全同一条路**，结果确定。
+        // 原先那段补建是解压器行为的重复实现；真触发时它建出的目录反而**既没有 WAL 行、
+        // 也不进 files.db**（那才是"无主目录"的来源）。删掉它不改变任何可达情形的结果。
+        // 注：`pkg_name_` 在本循环里仍由三个 handler 使用，别以为它随这段一起没用了。
 
         const ContentEntry entry{f, src_path, physical_path};
 
@@ -551,6 +630,8 @@ void InstallationTask::copy_package_files()
         try {
             write_regular_entry(entry, probe_ledger_, sink, pkg_name_, has_config_conflicts_,
                                 silently_updated_configs);
+        } catch (const UserAbort&) {
+            throw;  // 取消语义必须原样上抛 —— 宽 catch 会把它降级成普通错误（CLAUDE.md §1.7）
         } catch (const std::exception& e) {
             throw LpkgException(
                 string_format("error.copy_failed_rollback", f, physical_path.string(), e.what()));
@@ -564,6 +645,7 @@ void InstallationTask::copy_package_files()
     //
     // 让开趟的记录到此消费完毕（本包只有这两趟读它）→ 释放，别让长批次里逐包累积。
     probe_ledger_.clear();
+    line.finish_progress();
     if (!silently_updated_configs.empty()) {
         std::string joined;
         for (const auto& p : silently_updated_configs) {

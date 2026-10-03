@@ -25,7 +25,11 @@ fs::path shifted_save_name(const fs::path& dst, unsigned n)
 }
 
 /// 移位搜索上限。pacman 用 INT_MAX；这里给个有限上界，免得病态目录把移除挂死。
-/// 真到上限宁可抛错让整批失败（回滚会把配置还原回原位），也绝不覆盖已有存档。
+/// **为什么是 10000**：同一路径被移除/留存 N 次才会堆到 `.lpkgsave.<N>`，正常机器上一位数
+/// 就到顶；10000 远高于任何合理值（不会误伤真用户），又足够小、让极端情况下（目录里挤了
+/// 上万个同名存档，正常机器到不了）的循环在有限步内停下而不是挂死。到上限时**不覆盖已有
+/// 存档**，改为抛 `error.config_save_shift_exhausted` 让整批失败 —— 回滚会把配置还原回原位，
+/// 不丢数据。
 constexpr unsigned MAX_CONFIG_SAVE_SHIFTS = 10000;
 }  // namespace
 
@@ -37,9 +41,21 @@ OpSink::OpSink(std::string pkg, std::vector<fs::path>* stashes)
 {
 }
 
+bool OpSink::confined(const fs::path& phys) const
+{
+    const fs::path root = Config::instance().root_dir();
+    if (root.empty() || root == fs::path("/")) return true;  // 生产 root：恒真、不付检索代价
+    if (path_within_resolved(phys, root)) return true;
+    log_warning(string_format("warning.path_outside_root_skipped", phys.string(), pkg_));
+    return false;
+}
+
 fs::path OpSink::backup_impl(const fs::path& phys, std::string_view op,
                              std::string_view after_wal_breakpoint)
 {
+    // 越界（DB 键派生的路径解析到了 root 之外）→ 告警 + 不写 WAL、不 rename
+    // （写行会承诺一次没发生的备份；不写才是"什么都没做"）。
+    if (!confined(phys)) return {};
     // 物理路径先规范化：调用点传进来的可能是 DB 目录键形态（`/x/y/`）或归档条目形态。
     // 尾斜杠会让**判定类**调用（`lstat`/`is_symlink`/`is_empty`/`exists`）落到末尾符号链接的
     // **目标**上，而 WAL 行记的必须是"我们真正动了哪个对象"——两侧理解不一致正是 §3.6.1 第 1 条
@@ -86,6 +102,7 @@ void OpSink::new_file(const fs::path& phys)
 
 fs::path OpSink::save_config(const fs::path& phys, std::string_view after_wal_breakpoint)
 {
+    if (!confined(phys)) return {};
     const fs::path src = strip_trailing_slash(phys);
     const fs::path dst(src.string() + std::string(constants::SUFFIX_LPKG_SAVE));
 
@@ -129,6 +146,9 @@ fs::path OpSink::save_config(const fs::path& phys, std::string_view after_wal_br
 bool OpSink::un_stash(const fs::path& bak, const fs::path& orig,
                       std::string_view after_wal_breakpoint)
 {
+    // 搬回的目标越界 → 不动盘（`bak` 自己一定在 root 内的 stash 里，见 stash_parent_dir）
+    if (bak.empty()) return false;  // "被跳过的备份"在账本里是空路径（见 backup_impl 的闸）
+    if (!confined(orig)) return false;
     // 两个路径都规范化：bak 的形态由 stash_bak_target 决定（不含尾斜杠），orig 可能是
     // 目录键形态（`/etc/a/`）—— 尾斜杠会让判定类调用落到末尾符号链接的**目标**上。
     const fs::path src = strip_trailing_slash(bak);
@@ -173,6 +193,7 @@ void OpSink::new_dir(const fs::path& phys)
 void OpSink::dir_meta(const fs::path& phys, mode_t mode, uid_t uid, gid_t gid, bool record_previous,
                       std::string_view after_wal_breakpoint)
 {
+    if (!confined(phys)) return;  // 目录状态也是"就地改活对象"，越界一律不碰
     // 目录键带尾斜杠 → 先规范化：lstat/lchown/chmod 对带尾斜杠的路径会**穿透**末段符号
     // 链接落到目标上（见 base/utils.hpp 的谓词说明），而 WAL 行记的必须是"我们真正动了
     // 哪个对象"。
@@ -195,8 +216,13 @@ void OpSink::dir_meta(const fs::path& phys, mode_t mode, uid_t uid, gid_t gid, b
             BreakpointManager::instance().hit(std::string(after_wal_breakpoint));
     }
 
-    (void)::lchown(target.c_str(), uid, gid);
-    (void)::chmod(target.c_str(), mode);
+    // 这两个调用**不抛**（目录是就地改的活对象，抛在这里等于把整批回滚掉，而回滚同样改不动它），
+    // 但也不能**静默**：失败意味着目录的属主/权限与包内声明不一致，且 WAL 行已经写下"我们改过它"
+    // —— 回滚会把"改前值"再写一遍，同样会失败。让用户至少看得见这件事。
+    if (::lchown(target.c_str(), uid, gid) != 0)
+        log_warning(string_format("warning.chown_failed", target.string()));
+    if (::chmod(target.c_str(), mode) != 0)
+        log_warning(string_format("warning.chmod_failed", target.string()));
 }
 
 namespace
@@ -218,6 +244,7 @@ std::string xattr_key_field(const std::string& key)
 bool OpSink::set_xattr(const fs::path& phys, const std::string& key, const std::vector<char>& value,
                        std::string_view after_wal_breakpoint)
 {
+    if (!confined(phys)) return false;
     const fs::path target = strip_trailing_slash(phys);
     // 前置同 dir_meta：真实目录、非符号链接（见头文件说明）。
     struct stat st{};
@@ -243,12 +270,17 @@ bool OpSink::set_xattr(const fs::path& phys, const std::string& key, const std::
     // （它对每个键都 `(void)::lsetxattr`）。
     // 注意：行已经写了、而写盘失败 ⇒ 回滚会"把改前值写回去"（对本来有值的键是幂等的
     // no-op；对本来没值的键会 `lremovexattr` 一个不存在的键，同样无害）。
-    return ::write_xattr(target, key, value);
+    if (!::write_xattr(target, key, value)) {
+        log_warning(string_format("warning.xattr_set_failed", target.string(), key));
+        return false;
+    }
+    return true;
 }
 
 bool OpSink::unset_xattr(const fs::path& phys, const std::string& key,
                          std::string_view after_wal_breakpoint)
 {
+    if (!confined(phys)) return false;
     const fs::path target = strip_trailing_slash(phys);
     // 前置同 dir_meta。**注意这里与 set_xattr 的同一个判据含义不同**：撤销路径上"目标
     // 已经不是真目录了"（被别的包换成符号链接 / 已被删）是**正常结局**，跳过即正确语义。
@@ -268,7 +300,13 @@ bool OpSink::unset_xattr(const fs::path& phys, const std::string& key,
     if (!after_wal_breakpoint.empty())
         BreakpointManager::instance().hit(std::string(after_wal_breakpoint));
 
-    return ::remove_xattr(target, key);
+    // 同 set_xattr：不抛（xattr 是附加信息），但不静默 —— 撤不掉的键会留在盘上，
+    // 而我们的归属记录已经认为它被撤销了。
+    if (!::remove_xattr(target, key)) {
+        log_warning(string_format("warning.xattr_remove_failed", target.string(), key));
+        return false;
+    }
+    return true;
 }
 
 DirRemoval OpSink::remove_empty_dir(const fs::path& phys)
@@ -294,6 +332,12 @@ DirRemoval OpSink::remove_empty_dir(const fs::path& phys)
     // （判据必须用 is_mount_point 而不是"rmdir 失败"—— 后者会把 ENOTEMPTY/EACCES 这类
     //   真错误一并吞掉；且 pacman 对目录型 mountpoint 的语义就是保留。）
     if (is_mount_point(target)) return DirRemoval::SkippedMountPoint;
+
+    // 祖先链闸：越界（DB 键派生的路径解析到 root 之外）→ 不动盘。放在挂载点判定**之后**：
+    // 挂载点是"更具体的保留理由"（`SkippedMountPoint` 语义：我们有意留着它），
+    // 而它天然也可能在 root 之外（沙盒 root 下的用例就是如此）—— 顺序反了会把前者盖成
+    // `NotRemoved`。两条例都在生产 root（`/`）下不触发。
+    if (!confined(phys)) return DirRemoval::NotRemoved;  // 已告警（见 confined）
 
     // **xattr 先记（2026-09-26 补）**：`DIR_RM` 行只带 mode/uid/gid，而回滚侧的
     // `Undo::RecreateDir` 只 `create_directories` + `lchown`/`chmod` ⇒ 被 rmdir 又在回滚里
@@ -331,9 +375,12 @@ DirRemoval OpSink::remove_empty_dir(const fs::path& phys)
     // 回滚会照着行里的元数据把它"重建"出来。挂载点已被上面的守卫拦掉，走到这里是 EROFS /
     // EACCES / is_empty 与 rmdir 之间的 ENOTEMPTY 竞态这类**真错误**，必须让用户看见。
     //
-    // 告警在**本方法内部**打，而不是把错误信息回传给调用方：两个调用点都只看
-    // SkippedMountPoint，加一个带消息的返回值意味着"每个调用点都要记得判"，而漏判的后果
-    // 正是这次要修的静默。本文件的 include 里已有日志设施（base/utils.hpp）。
+    // 告警在**本方法内部**打，而不是把错误信息回传给调用方：生产端**只有一处**调用点
+    // （`install_common.cpp:238`，移除空目录那一趟），它只按 `SkippedMountPoint` 分流；
+    // 加一个带消息的返回值意味着"调用方要记得判"，而漏判的后果正是这次要修的静默。
+    // 本文件的 include 里已有日志设施（base/utils.hpp）。
+    // （订正 2026-10-03：原文写"两个调用点都只看 SkippedMountPoint"—— `grep -rn
+    //   remove_empty_dir main/src` 实测生产端调用点只有那一处。）
     if (ec) log_warning(string_format("warning.dir_remove_failed", target.string(), ec.message()));
 
     return ec ? DirRemoval::NotRemoved : DirRemoval::Removed;
@@ -342,6 +389,11 @@ DirRemoval OpSink::remove_empty_dir(const fs::path& phys)
 void OpSink::commit_copy(const fs::path& tmp, const fs::path& dst,
                          std::string_view after_wal_breakpoint)
 {
+    // 越界 → 不 rename（我们 staged 的那份要自己收掉，别留在盘上；见 TmpStageGuard 的说明）。
+    if (!confined(dst)) {
+        drop_staged_tmp(strip_trailing_slash(tmp));
+        return;
+    }
     // 两个路径都是普通文件路径（不含尾斜杠），规范化在这里是 no-op；仍然过一遍是为了
     // 让"任何碰文件系统的方法都先规范化"成为本类无例外的规则（见头文件契约 2）。
     const fs::path src = strip_trailing_slash(tmp);
@@ -483,9 +535,17 @@ PathDecision decide_path_unchecked(const PathFacts& f)
             if (!f.disk_exists) {
                 d.write = PathAction::WriteInPlace;
             } else if (f.entry_is_symlink) {
-                // 归档条目与盘上那份**都是符号链接**：不接管盘上那条（`is_directory` 跟随
-                // 链接会把整段配置保护绕过去），v2 退到 `.lpkgnew`。
-                d.write = PathAction::WriteLpkgnew;
+                // 归档条目与盘上那份**都是符号链接**：
+                //   · 目标逐字节相同 → `KeepOnDisk`：这条路径压根没变，盘上那份就是我们要的，
+                //     连 `.lpkgnew` 都不该产生。旧行为**不看目标**、一律退 `.lpkgnew`，于是
+                //     链接没变的重装也吐一份同内容副本，反复重装就在 `/etc` 上堆垃圾。
+                //     与让开趟自洽：这一格的让开动作是 `Noop`（不搬），而 `KeepOnDisk` 的
+                //     handler 只在 `stashed_bak` 有值时才 `un_stash` —— 这里恒为空 ⇒
+                //     **一个字节都不碰**。
+                //   · 目标不同 → 不接管盘上那条（`is_directory` 跟随链接会把整段配置保护
+                //     绕过去），v2 退到 `.lpkgnew` 交给用户审阅。
+                d.write = f.disk_symlink_matches_entry ? PathAction::KeepOnDisk
+                                                       : PathAction::WriteLpkgnew;
             } else {
                 // 盘上被**普通文件**占住 → 三哈希分流决定落点（判定表只有一份：
                 // classify_config_update()，这里只用它的结论）
@@ -499,6 +559,17 @@ PathDecision decide_path_unchecked(const PathFacts& f)
                     case ConfigDisposition::SaveLpkgnew:
                         d.write = PathAction::WriteLpkgnew;
                         break;
+                    default: {
+                        // ConfigDisposition 目前只有上面三格（见 op_sink.hpp）。走到这里 =
+                        // 新加了枚举值却忘了在决策表里给它落点。**绝不静默**：若放它过去，
+                        // `d.write` 会停在默认的 `Unclaimed`，虽然 `check_decision_invariants`
+                        // 也会把"写入动作漏格"抛掉，但那条报错点不出**真正的成因**，所以这里
+                        // 当场点名。措辞不走 l10n（同 decision_hole_msg：内部错误，永不出现）。
+                        const std::string msg =
+                            "内部一致性错误：决策表漏格 —— /etc 配置处置（ConfigDisposition）"
+                            "没有落点分支，见 op_sink.cpp 的 decide_path_unchecked";
+                        throw LpkgException(msg);
+                    }
                 }
             }
             return d;

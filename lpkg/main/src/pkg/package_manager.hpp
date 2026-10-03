@@ -26,12 +26,32 @@ struct InstallPlan {
      * （check_batch_file_conflicts 置位）。
      *
      * 预检必须拿到 content 清单才能判定，而事务内的 prepare() 又要再解压一遍 —— 这个标记
-     * 让后者复用同一份解压产物（不重复 tar 解压）。**失效条件**：计划被重解
-     * （`ctx.plan.clear()` + resolve_with_solver）时 InstallPlan 整体重建、标记自然归零，
-     * 不会出现"标记指向另一个版本的解压产物"。
+     * 让后者复用同一份解压产物（不重复 tar 解压）。**计划在批次内不再变动**（元数据不一致
+     * 一律硬报错，见 package_manager.cpp 的 verify_package_metadata），所以这个标记与它所属的
+     * InstallPlan 一样，不会在批次中途指向"另一个版本的解压产物"。
      */
     bool content_ready = false;
 };
+
+/**
+ * 本批**不该处理**这个包：盘上已经是目标版本，且没有 `--force`。
+ *
+ * **判据只有这一份**：四个阶段（下载 / 解压 / 文件冲突预检 / 安装）与 `InstallationTask::run()`
+ * 的早退分支必须同判 —— 各写一份就会漂移（一个循环下载/解压了另一个循环跳过的包，冲突预检
+ * 还会去扫一个根本不存在的内容目录）。`p.force_reinstall` 已在 `resolve_with_solver` 里限定为
+ * "`--force` 且本包是显式目标"（见 `install_common.cpp`），所以这里不必再判 `is_explicit`。
+ */
+inline bool plan_member_skipped(bool force_reinstall, const std::string& installed_ver,
+                                const std::string& target_ver)
+{
+    return !force_reinstall && !installed_ver.empty() && installed_ver == target_ver;
+}
+
+/// `InstallPlan` 便捷形式（三个阶段循环用）。
+inline bool plan_member_skipped(const InstallPlan& p, const std::string& installed_ver)
+{
+    return plan_member_skipped(p.force_reinstall, installed_ver, p.actual_version);
+}
 
 /// 递归安装事务的共享上下文
 struct InstallContext {
@@ -42,10 +62,29 @@ struct InstallContext {
     std::vector<std::pair<std::string, std::string>>& targets;
     bool force_reinstall;
     bool top_level;                                   ///< 是否为顶级调用（非递归子调用）
-    std::vector<std::string> successfully_installed;  ///< 当前事务中已成功安装的包
-    std::unordered_set<std::string>
-        installed_set{};  ///< 与 successfully_installed 同步，用于 O(1) 成员检查
+    std::unordered_set<std::string> installed_set{};  ///< 本事务中已成功安装的包（O(1) 成员检查）
 };
+
+namespace detail
+{
+/**
+ * **计划版本复核**：`dep`（带约束的依赖）若出现在 `plan` 里，其**计划版本**必须满足该约束
+ * —— 按 **lpkg 语义**（`version_satisfies_all`），不是 libsolv 的匹配语义。不满足则抛
+ * `error.dep_version_mismatch`（点名依赖名、计划版本、发起包）。**唯一实现**。
+ *
+ * 为什么它还在（2026-10-03 起是**纵深防御**）：桥接修好之前，libsolv 的 EVR 匹配把"要求侧
+ * 缺 release"当通配，会选出 lpkg 认为不满足的版本，这道复核是唯一拦得住的地方（当时的用例
+ * 只能借"求解器产出违规计划"来触达它）。桥接修好之后（等价性矩阵见
+ * `tests/unit/test_vercmp_libsolv_bridge.cpp`）求解器不再产出这种计划 ⇒ 正常路径上这里
+ * **不会触发**。留着的理由是：求解器选版本与 lpkg 判据是**两条独立实现路径**，任一侧将来
+ * 改动（换编码、升 libsolv、改 `version_satisfies`）都可能让它们重新分叉，而分叉的代价是
+ * "装出坏系统"。⇒ 它的用例**直接喂手搓的计划**（`tests/unit/test_plan_dep_version_check.cpp`），
+ * 不再假装靠求解器触达（那种用例在修好之后是假绿）。
+ */
+void check_planned_dep_version(const DependencyInfo& dep,
+                               const std::map<std::string, InstallPlan>& plan,
+                               const std::string& pkg_name);
+}  // namespace detail
 
 class InstallationTask
 {
@@ -65,6 +104,7 @@ public:
     }
 
     // --- 元数据验证模式（公开） ---
+    /** 下载并校验包（本地 `.lpkg` 直接用给定路径）。成功路径**不打日志**（进度行已点名包）。 */
     void download_and_verify_package();
     void extract_and_validate_package();
 
@@ -184,9 +224,7 @@ private:
 
     // 事务状态（仅供文件级备份/清理使用，不含事务保护语义）
     std::vector<std::filesystem::path> stashes_;  // 本次产生的备份 stash 目录（提交后清理）
-    std::vector<std::filesystem::path> new_files_;
-    std::vector<std::filesystem::path> new_dirs_;
-    std::vector<std::string> hook_files_;  // 本次写入的 hook 文件名（提交后据此剪枝）
+    std::vector<std::string> hook_files_;         // 本次写入的 hook 文件名（提交后据此剪枝）
     /// run() 是否真的处理过本包（早退分支保持 false，见 did_process()）
     bool processed_ = false;
     /**
@@ -226,9 +264,11 @@ void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
  */
 void remove_package(const std::string& pkg_name, bool force = false, bool wrap_in_txn = true,
                     bool purge_config = false);
-/// 移除多个包：**单批次原子**（多包命令必须走它，逐包调用会失去跨包回滚）
-void remove_packages(const std::vector<std::string>& pkg_names, bool force = false,
-                     bool purge_config = false);
+/// 移除多个包：**单批次原子**（多包命令必须走它，逐包调用会失去跨包回滚）。
+/// @return 实际移除的包数（"没装过"的不计）—— 调用方据此决定要不要打"卸载完成"
+///         （2026-10-03：此前 CLI 无条件打，`lpkg remove <未安装>` 会打印一条假完成消息）。
+size_t remove_packages(const std::vector<std::string>& pkg_names, bool force = false,
+                       bool purge_config = false);
 void autoremove(bool purge_config = false);
 void upgrade_packages();
 void force_solve_conflict(bool purge_config = false);
@@ -242,6 +282,7 @@ void write_cache();
 void remove_package_files(const std::string& pkg_name);
 void remove_package_recursive(const std::string& pkg_name, bool force = false,
                               bool purge_config = false);
-/// 递归移除多个包：**单批次原子**（多参数命令必须走它，逐参数调用会失去跨参数回滚）
-void remove_packages_recursive(const std::vector<std::string>& pkg_names, bool force = false,
-                               bool purge_config = false);
+/// 递归移除多个包：**单批次原子**（多参数命令必须走它，逐参数调用会失去跨参数回滚）。
+/// @return 实际移除的包数（与 `remove_packages` 同一约定；"没什么可删"的早退返回 0）。
+size_t remove_packages_recursive(const std::vector<std::string>& pkg_names, bool force = false,
+                                 bool purge_config = false);

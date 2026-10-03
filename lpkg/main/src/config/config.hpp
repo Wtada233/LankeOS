@@ -5,15 +5,7 @@
 #include <string>
 #include <vector>
 
-/**
- * 非交互模式枚举
- * 控制是否以及如何自动响应用户提示
- */
-enum class NonInteractiveMode {
-    INTERACTIVE,  // 默认：交互式，等待用户输入
-    YES,          // 自动回答"是"
-    NO            // 自动回答"否"
-};
+#include "base/constants.hpp"  // NonInteractiveMode（下移到 base，修 base↔config 成环）
 
 /**
  * 全局配置单例
@@ -234,6 +226,15 @@ public:
     }
     /** 设置测试模式 */
     void set_testing_mode(bool v) noexcept;
+
+    /**
+     * **仅供测试**：把所有粘性开关与路径复位到"测试用的中性值"（见 .cpp 的定义处说明）。
+     *
+     * 存在的理由：这些都是**进程级单例**上的状态，一个用例改了、后面每个用例都看得见 ——
+     * 症状是"单跑绿、全量红"。复位由测试的**全局 listener**（`tests/test_hygiene.hpp`）
+     * 在每个用例结束时无条件调用，与 fixture 无关。
+     */
+    void reset_for_test();
 
     // --- 操作方法 ---------------------------------------------------------
 

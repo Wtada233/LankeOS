@@ -59,7 +59,7 @@ protected:
     void SetUp() override
     {
         if (elf_version(EV_CURRENT) == EV_NONE) FAIL() << "libelf version mismatch";
-        test_dir = fs::absolute("tmp_soname_null_check");
+        test_dir = fs::absolute("tmp_soname_null_check_" + std::to_string(::getpid()));
         if (fs::exists(test_dir)) fs::remove_all(test_dir);
         fs::create_directories(test_dir);
         test_file = test_dir / "crafted.so";

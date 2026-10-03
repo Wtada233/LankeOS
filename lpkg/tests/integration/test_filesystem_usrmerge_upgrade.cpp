@@ -14,6 +14,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -44,7 +45,7 @@ protected:
         Config::instance().set_no_deps_mode(false);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_fs_usrmerge_test");
+        suite_work_dir = fs::absolute("tmp_fs_usrmerge_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";

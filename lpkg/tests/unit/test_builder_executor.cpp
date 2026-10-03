@@ -1,3 +1,5 @@
+#include <archive.h>
+#include <archive_entry.h>
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -5,9 +7,11 @@
 
 #include "base/build_defaults.hpp"
 #include "base/constants.hpp"
+#include "base/exception.hpp"
 #include "base/utils.hpp"
 #include "builder_config.hpp"
 #include "builder_executor.hpp"
+#include "config/config.hpp"  // 显式包含：Config 此前是靠 base/utils.hpp 传递进来的
 #include "i18n/localization.hpp"
 
 namespace fs = std::filesystem;
@@ -116,6 +120,35 @@ TEST_F(BuilderExecutorTest, DownloadPrepareSources_WorkSourcesCopy)
 
     // readme.txt 应已被复制到 work 目录
     EXPECT_TRUE(fs::exists(test_dir / "work" / "readme.txt"));
+}
+
+TEST_F(BuilderExecutorTest, SameBasenameDifferentUrlsAreRejectedNotSilentlyReused)
+{
+    // 两个**不同** URL 落成同一个 basename：`download_one` 的 `if (!fs::exists(dest))` 会让
+    // 第二个被静默跳过、复用第一个文件 —— 配方从**错源码**构建且毫无提示（2026-10-03 修）。
+    // 修法是显式报错、点名两个 URL。
+    const fs::path a = test_dir / "dirA";
+    const fs::path b = test_dir / "dirB";
+    create_file(a / "foo.txt", "A-content");
+    create_file(b / "foo.txt", "B-content");
+    const fs::path build = test_dir / "build_collide";
+    fs::create_directories(build);
+
+    EXPECT_THROW(download_and_prepare_sources(
+                     {"file://" + (a / "foo.txt").string(), "file://" + (b / "foo.txt").string()},
+                     {}, build, test_dir / "work"),
+                 LpkgException)
+        << "同 basename 的两个不同源必须报错，而不是静默复用第一个";
+
+    // 正向对照：不同 basename 的两个源都要下到（守卫不能过宽）。
+    const fs::path c = test_dir / "dirC";
+    create_file(c / "bar.txt", "C-content");
+    const fs::path build2 = test_dir / "build_ok";
+    fs::create_directories(build2);
+    const auto files = download_and_prepare_sources(
+        {"file://" + (a / "foo.txt").string(), "file://" + (c / "bar.txt").string()}, {}, build2,
+        test_dir / "work");
+    EXPECT_EQ(files.size(), 2u) << "不同 basename 的两个源都应被下载";
 }
 
 TEST_F(BuilderExecutorTest, ProcessBuildScript)
@@ -347,4 +380,32 @@ TEST_F(BuilderExecutorTest, DanglingSymlinkWorkSourceTargetIsNotWrittenThrough)
     std::ifstream f(link);
     const std::string got{std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
     EXPECT_EQ(got, "work source content\n") << "落位的应该是 work_source 的内容";
+}
+
+TEST_F(BuilderExecutorTest, UnsafeSourceArchiveAbortsInsteadOfBeingTolerated)
+{
+    // 源码归档成员名含控制字符 → 自动解压必须**抛**，而不是像"扩展名骗人"（`.tar.gz` 其实
+    // 不是归档）那样只告警继续：安全拒绝发生在解压循环**中途**，源码树只解出了一半，
+    // 继续构建只会以离奇方式失败（2026-10-02 修：此前 `catch (const std::exception&)` 把它
+    // 一起吞了，与成员名消毒"整包拒绝"的契约矛盾）。
+    const fs::path src = test_dir / "danger.tar";
+    {
+        struct archive* a = archive_write_new();
+        archive_write_set_format_pax_restricted(a);
+        archive_write_open_filename(a, src.c_str());
+        struct archive_entry* e = archive_entry_new();
+        archive_entry_set_pathname(e, "evil\nname");
+        archive_entry_set_filetype(e, AE_IFREG);
+        archive_entry_set_perm(e, 0644);
+        archive_entry_set_size(e, 1);
+        archive_write_header(a, e);
+        archive_write_data(a, "x", 1);
+        archive_entry_free(e);
+        archive_write_close(a);
+        archive_write_free(a);
+    }
+
+    EXPECT_THROW(download_and_prepare_sources({"file://" + src.string()}, {}, test_dir / "build",
+                                              test_dir / "work"),
+                 UnsafeArchiveException);
 }

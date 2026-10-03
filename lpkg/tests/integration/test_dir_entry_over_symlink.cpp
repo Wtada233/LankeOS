@@ -54,7 +54,7 @@ protected:
         init_localization();
         BreakpointManager::instance().clear_all();
 
-        suite_work_dir = fs::absolute("tmp_dir_entry_symlink_test");
+        suite_work_dir = fs::absolute("tmp_dir_entry_symlink_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
@@ -185,8 +185,11 @@ TEST_F(DirEntryOverSymlinkTest, DirEntryOverUnownedSymlinkIsRefused)
     const std::string msg =
         refusal_message([&] { install_packages({b}); }, "归档目录条目撞无人持有的 symlink→目录");
     EXPECT_NE(msg.find("var/run"), std::string::npos) << "拒绝信息没点名冲突路径：" << msg;
-    EXPECT_NE(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
-        << "无人持有 → 判据文本必须是 " << get_string("error.unknown_manual_file") << "：" << msg;
+    EXPECT_NE(msg.find(string_format("error.file_conflict_unowned", "/var/run/")),
+              std::string::npos)
+        << "无人持有 → 应报 error.file_conflict_unowned：" << msg;
+    EXPECT_EQ(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
+        << "占位文本不该被当成持有者名渲染进报告：" << msg;
     EXPECT_TRUE(fs::is_symlink(test_root / "var/run"));
     EXPECT_TRUE(fs::is_directory(test_root / "run"));
     EXPECT_EQ(count_bak_residue(), 0);
@@ -204,8 +207,11 @@ TEST_F(DirEntryOverSymlinkTest, DirEntryOverUnownedFileIsRefused)
     const std::string msg =
         refusal_message([&] { install_packages({b}); }, "归档目录条目撞无人持有的盘上文件");
     EXPECT_NE(msg.find("var/run"), std::string::npos) << "拒绝信息没点名冲突路径：" << msg;
-    EXPECT_NE(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
-        << "无人持有 → 判据文本必须是 " << get_string("error.unknown_manual_file") << "：" << msg;
+    EXPECT_NE(msg.find(string_format("error.file_conflict_unowned", "/var/run/")),
+              std::string::npos)
+        << "无人持有 → 应报 error.file_conflict_unowned：" << msg;
+    EXPECT_EQ(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
+        << "占位文本不该被当成持有者名渲染进报告：" << msg;
     EXPECT_TRUE(fs::is_regular_file(test_root / "var/run")) << "手工文件被搬走/覆盖";
     EXPECT_EQ(count_bak_residue(), 0);
 }
@@ -222,9 +228,11 @@ TEST_F(DirEntryOverSymlinkTest, FileEntryOverRealDirIsRefused)
     const std::string msg =
         refusal_message([&] { install_packages({b}); }, "归档文件撞盘上真目录（不 force）");
     EXPECT_NE(msg.find("usr/share/thing"), std::string::npos) << "拒绝信息没点名冲突路径：" << msg;
-    EXPECT_NE(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
-        << "手工建的目录无人持有 → 判据文本必须是 " << get_string("error.unknown_manual_file")
-        << "：" << msg;
+    EXPECT_NE(msg.find(string_format("error.file_conflict_unowned", "/usr/share/thing")),
+              std::string::npos)
+        << "手工建的目录无人持有 → 应报 error.file_conflict_unowned：" << msg;
+    EXPECT_EQ(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
+        << "占位文本不该被当成持有者名渲染进报告：" << msg;
     EXPECT_TRUE(fs::is_directory(test_root / "usr/share/thing"));
     EXPECT_TRUE(fs::exists(test_root / "usr/share/thing/inner.txt")) << "目录里的内容被删";
 
@@ -239,9 +247,11 @@ TEST_F(DirEntryOverSymlinkTest, FileEntryOverRealDirIsRefused)
         refusal_message([&] { install_packages({b}); }, "归档文件撞盘上真目录（force 也不该豁免）");
     EXPECT_NE(forced_msg.find("usr/share/thing"), std::string::npos)
         << "拒绝信息没点名冲突路径：" << forced_msg;
-    EXPECT_NE(forced_msg.find(get_string("error.unknown_manual_file")), std::string::npos)
-        << "force 下判据文本也必须是 " << get_string("error.unknown_manual_file") << "："
-        << forced_msg;
+    EXPECT_NE(forced_msg.find(string_format("error.file_conflict_unowned", "/usr/share/thing")),
+              std::string::npos)
+        << "force 下也应报 error.file_conflict_unowned：" << forced_msg;
+    EXPECT_EQ(forced_msg.find(get_string("error.unknown_manual_file")), std::string::npos)
+        << "占位文本不该被当成持有者名渲染进报告：" << forced_msg;
     EXPECT_TRUE(fs::is_directory(test_root / "usr/share/thing"));
     EXPECT_TRUE(fs::exists(test_root / "usr/share/thing/inner.txt")) << "force 下目录内容被删";
     Config::instance().set_force_overwrite_mode(false);

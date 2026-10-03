@@ -14,6 +14,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -30,7 +31,7 @@ protected:
 
     void SetUp() override
     {
-        root = fs::absolute("tmp_path_safety");
+        root = fs::absolute("tmp_path_safety_" + std::to_string(::getpid()));
         if (fs::exists(root)) fs::remove_all(root);
         fs::create_directories(root);
         Config::instance().set_root_path(root.string());

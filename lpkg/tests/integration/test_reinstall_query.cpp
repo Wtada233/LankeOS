@@ -33,7 +33,7 @@ protected:
         setenv("LANG", "C", 1);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_new_features_test");
+        suite_work_dir = fs::absolute("tmp_new_features_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_work_dir)) {
             std::string clean_cmd = "sudo rm -rf " + suite_work_dir.string();
             run_shell(clean_cmd);

@@ -6,6 +6,7 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <map>
 
 #include "archive.hpp"
 #include "base/constants.hpp"
@@ -13,6 +14,7 @@
 #include "base/utils.hpp"
 #include "downloader.hpp"
 #include "i18n/localization.hpp"
+#include "ui/term.hpp"
 
 namespace fs = std::filesystem;
 
@@ -48,11 +50,23 @@ std::string safe_name_from_url(const std::string& url)
 void parse_git_url(const std::string& url, std::string& git_url, std::string& ref)
 {
     std::string rest = url.substr(4);  // strip "git+"
-    // ref 只可能在**最后一个 '/' 之后**——否则 URL 自带的认证信息里的 '@'
-    // （git+ssh://git@host/repo.git、git+https://user@host/repo.git）会被误当分隔符
+    // 分隔符是 URL 里最后一个 '@'，但要判它是"凭据里的 '@'（userinfo 的 user@host）"还是
+    // "ref 分隔符"。判据以 **`://` 之后的第一个 `/`**（权威段与路径的分界）为准：
+    //   · 凭据的 '@' 一定在它**之前**（位于 `scheme://[user[:pass]@]host` 的 userinfo 段）；
+    //   · ref 里的 '/' 一定在它**之后**（ref 是路径段的一部分，如 `repo.git@feature/x`）。
+    // **订正**：旧判据是"最后一个 '/' 之后"，它把 `@feature/x` 判成"无 ref"——因为那个 '@'
+    // 在最后一个 '/' 之前，于是整段 `feature/x` 被吞进 URL、ref 回落 HEAD，静默克隆默认分支。
     const auto at = rest.rfind('@');
-    const auto slash = rest.rfind('/');
-    const bool has_ref = (at != std::string::npos && (slash == std::string::npos || at > slash));
+    std::string::size_type boundary = std::string::npos;
+    const auto scheme = rest.find("://");
+    if (scheme != std::string::npos) {
+        boundary = rest.find('/', scheme + 3);  // 权威段结束处（`://` 后的第一个 '/'）
+    }
+    if (boundary == std::string::npos) {
+        boundary = rest.rfind('/');  // 无 `://`（scp 风格 host:path 等）→ 回落原启发式
+    }
+    const bool has_ref =
+        (at != std::string::npos && (boundary == std::string::npos || at > boundary));
     if (has_ref) {
         git_url = rest.substr(0, at);
         ref = rest.substr(at + 1);
@@ -64,26 +78,38 @@ void parse_git_url(const std::string& url, std::string& git_url, std::string& re
 
 // git 传输进度状态（shallow clone + 下载进度）
 struct GitProgress {
-    bool is_tty;             // 输出是否为终端
-    std::string current;     // 正在下载的仓库名（主仓库名 / submodule 名），进度行显示
-    uint64_t last_received;  // 当前 fetch 已接收字节
-    uint64_t cumulative;     // 已完成的 fetch 累计（主 clone + tag fetch + 各 submodule）
-    size_t last_line_len;    // 上一条进度行长度（\r 刷新时补空格清残留，避免叠字）
-    std::string err;         // submodule 更新失败时记录的错误（回调里不能安全抛异常）
+    ui::Line line;               // 进度行（惰性：非 TTY 不输出；仓库名变了就重建，见下）
+    std::string line_for;        // 上面那条行当前对应的仓库名（主仓库名 / submodule 名）
+    std::string current;         // 正在下载的仓库名（进度行左文本用）
+    uint64_t last_received = 0;  // 当前 fetch 已接收字节
+    uint64_t cumulative = 0;     // 已完成的 fetch 累计（主 clone + tag fetch + 各 submodule）
+    std::string err;             // submodule 更新失败时记录的错误（回调里不能安全抛异常）
 };
 
-/** 清掉 tty 上 \r 刷新出来的进度行。 */
-void clear_progress_line(GitProgress* p)
+/** 懒重建进度行：主 clone 与各 submodule 轮着来，仓库名变了就换一条（左文本跟着换）。 */
+void ensure_progress_line(GitProgress* p)
 {
-    if (!p->is_tty) {
-        return;
-    }
-    size_t len = p->last_line_len ? p->last_line_len : 64;
-    std::cout << "\r" << std::string(len, ' ') << "\r" << std::flush;
-    p->last_line_len = 0;
+    if (p->line_for == p->current) return;
+    p->line = ui::Line(string_format("ui.git_fetch", p->current));
+    p->line_for = p->current;
 }
 
-/** git 传输进度回调：tty 上 \r 刷新下载 MiB；非 tty 不显示，结束后统一输出。 */
+/** 收尾：成功落到 100%（保留最后一帧的字节/对象数），失败换成 [FAILED]。 */
+void end_progress_line(GitProgress* p, bool ok)
+{
+    if (ok)
+        p->line.finish_progress();
+    else
+        p->line.finish(ui::ok(false));
+}
+
+/**
+ * git 传输进度回调 → `ui::Line` 的进度条（与下载/解压同一条渲染路径）。
+ *
+ * 百分比取**对象数**：fetch 没有"总字节数"（libgit2 只给 `total_objects` / `received_objects`，
+ * 字节侧只有已收值），所以拿对象数当分子分母；pack 头还没到（`total_objects == 0`）时按 0% 画，
+ * 等它到了再动。`mid` 报 `123/456 objects  1.2 MiB`（跨 fetch 累计，不归零）。
+ */
 int transfer_progress_cb(const git_indexer_progress* stats, void* payload)
 {
     auto* p = static_cast<GitProgress*>(payload);
@@ -92,18 +118,14 @@ int transfer_progress_cb(const git_indexer_progress* stats, void* payload)
         p->cumulative += p->last_received;
     }
     p->last_received = stats->received_bytes;
-    if (!p->is_tty) {
-        return 0;  // 非 tty：不刷新，结束后 log_info 一次性输出
-    }
-    // 显示累计字节（跨 fetch 不归零），并标注当前正在下载的仓库
-    double total_mb = (p->cumulative + p->last_received) / (1024.0 * 1024.0);
-    std::string line = string_format("info.git_progress", p->current, total_mb);
-    // \r 刷新：新行比旧行短时补空格清掉旧行残留（否则出现 "MiB MiB" 这类叠字）
-    if (line.size() < p->last_line_len) {
-        line.append(p->last_line_len - line.size(), ' ');
-    }
-    p->last_line_len = line.size();
-    std::cout << "\r" << line << std::flush;
+
+    ensure_progress_line(p);
+    const double pct =
+        stats->total_objects > 0 ? 100.0 * stats->received_objects / stats->total_objects : 0.0;
+    const std::string mid =
+        string_format("ui.git_objects", stats->received_objects, stats->total_objects) + "  " +
+        ui::human_size(p->cumulative + p->last_received);
+    p->line.progress(pct, mid);
     return 0;
 }
 
@@ -146,6 +168,11 @@ int prepare_repo(const fs::path& dest, const std::string& url,
                  GitProgress* prog, git_repository** out)
 {
     int last_err = GIT_ENOTFOUND;
+    // ⚠️ **`depth=0` 这一轮在测试里到不了 —— 有意的，不是漏测**（lpkg/CLAUDE.md §7.4）：
+    // 测试用本地 `file://` fixture，而 libgit2 的**本地传输不认 depth** ⇒ 第一轮 `depth=1`
+    // 就已经拿到全部对象、`any_rev_exists` 直接成功，第二轮**永不执行**（`test_git_submodules.cpp`
+    // 把这条实测钉成字面量兼绊线：哪天本地传输开始认 depth 它会变红）。网络传输认 depth，但
+    // 测试一律不碰网。**所以这条兜底在生产走得到、在测试走不到** —— 别以为它没用。
     for (int depth : {1, 0}) {  // 先浅拉，再完整拉
         std::error_code ec;
         fs::remove_all(dest, ec);  // 每轮全新仓库，避免浅层状态干扰完整拉
@@ -158,6 +185,7 @@ int prepare_repo(const fs::path& dest, const std::string& url,
         if (err == 0) {
             std::vector<char*> rp;
             std::vector<std::string> storage = refspec_strs;
+            rp.reserve(storage.size());
             for (auto& s : storage) {
                 rp.push_back(s.data());
             }
@@ -264,6 +292,10 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
         git_object_free(target);
     }
     if (err != 0) {
+        // ⚠️ **这条失败路径从生产入口不可达、测试里也没有对应用例 —— 有意的，不是漏测**
+        // （lpkg/CLAUDE.md §7.4）：走到这里要求"子模块的锁定 commit 已解析成功、却 checkout
+        // 不出来"，实践中构造不出。保留是因为 libgit2 的返回值必须处理，且 `err` 还兜住上面
+        // revparse 失败那一格（`err = -1`）。
         const git_error* e = git_error_last();
         prog->err = (e && e->message) ? e->message : get_string("error.unknown");
     }
@@ -347,6 +379,14 @@ fs::path prepare_clone_destination(const std::string& git_url, const fs::path& w
     std::string name = safe_name_from_url(git_url);
     if (name.ends_with(".git")) {
         name.resize(name.size() - 4);
+    }
+    // **剥完 `.git` 必须重新校验**：`safe_name_from_url` 只挡 "."/".."/空/分隔符，而 URL
+    // 末段**恰好**是 `.git`（裸仓库，如 `git+file:///srv/repos/.git`）时，上面的 resize 会把
+    // 名字变成**空串** —— `work_root / ""` 就是 work_root 自己，下面那句 `fs::remove_all(dest)`
+    // 会**删掉整个构建工作根**。这与 safe_name_from_url 头注释警告的危险同类，只是发生在
+    // "剥后缀"之后（2026-10-02 修）。
+    if (name.empty() || name == "." || name == "..") {
+        throw LpkgException(string_format("error.invalid_source_url", git_url));
     }
     fs::path dest = work_root / name;
     // `exists_no_follow`（2026-09-26 修）：悬空链接也占着这个名字 ⇒ 必须清掉，否则随后的
@@ -462,8 +502,7 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
     const fs::path dest = prepare_clone_destination(git_url, work_root);
 
     GitProgress prog{};
-    prog.is_tty = isatty(STDOUT_FILENO) == 1;  // 进度刷在 stdout，与 downloader 一致
-    prog.current = dest.filename().string();   // 主仓库下载时进度行显示仓库名
+    prog.current = dest.filename().string();  // 主仓库下载时进度行显示仓库名
 
     GitLibGuard libgit2;
     git_repository* repo = nullptr;
@@ -476,7 +515,7 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
         // 指定 ref（tag/branch）：拉取失败只能出在这里（此时 repo 尚未建立）
         const int fetch_err = prepare_ref_repo(dest, git_url, ref, &prog, &repo);
         if (fetch_err != 0) {
-            clear_progress_line(&prog);
+            end_progress_line(&prog, /*ok=*/false);
             throw_fetch_error(fetch_err, git_url, ref, prog);
         }
         // checkout 到目标 ref；失败则落进下面统一的失败收尾（与 clone 失败同一条路）
@@ -489,7 +528,7 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
     }
 
     if (err != 0) {
-        clear_progress_line(&prog);
+        end_progress_line(&prog, /*ok=*/false);
         if (repo != nullptr) {
             git_repository_free(repo);
         }
@@ -500,7 +539,7 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
     // 更新 submodule（--recurse-submodules 的等价）
     err = update_submodules(repo, &prog);
     if (err != 0) {
-        clear_progress_line(&prog);
+        end_progress_line(&prog, /*ok=*/false);
         git_repository_free(repo);
         throw LpkgException(
             string_format("error.git_submodule_failed", git_url, clone_error_detail(prog)));
@@ -508,9 +547,9 @@ void clone_git_source(const std::string& url, const fs::path& work_root)
 
     git_repository_free(repo);
 
-    // 结束输出：清掉进度行，统一走 l10n 的 log_info
+    // 结束：进度行收在 100%，再补一条**汇总**（跨主仓库 + 各 submodule 的累计字节）
+    end_progress_line(&prog, /*ok=*/true);
     const double total_mb = (prog.cumulative + prog.last_received) / (1024.0 * 1024.0);
-    clear_progress_line(&prog);
     log_info(string_format("info.git_download", total_mb));
 }
 
@@ -525,10 +564,22 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
                                                    const fs::path& work_root)
 {
     std::vector<fs::path> downloaded_files;
+    // 本次运行内 `dest → 产生它的 URL`：两个**不同** URL 落成同一个 basename 时，下面那个
+    // `if (!fs::exists(dest))` 会让第二个被静默跳过、复用第一个文件 —— 配方于是从**错源码**
+    // 构建，且没有任何提示（2026-10-03 修）。记下来并显式报错（点名两个 URL）。
+    // 与"上次运行留下的文件"区分：那种 dest 在本次运行开始前就存在、不在本表里，保持原样
+    // 跳过（行为不变，见 DownloadPrepareSources_WorkSourcesCopy）。
+    std::map<fs::path, std::string> claimed_by;
 
     auto download_one = [&](const std::string& url) -> fs::path {
         fs::path filename = safe_name_from_url(url);
         fs::path dest = build_dir / filename;
+        const auto prior = claimed_by.find(dest);
+        if (prior != claimed_by.end() && prior->second != url) {
+            throw LpkgException(string_format("error.source_basename_collision", filename.string(),
+                                              prior->second, url));
+        }
+        claimed_by.emplace(dest, url);
         if (!fs::exists(dest)) {
             // **先下到 .part 再 rename**：被中断（SIGKILL/断电）的构建只会留下不完整的
             // .part，正式文件仅在下载完整后出现。否则 `if (!fs::exists(dest))` 会把上次
@@ -558,11 +609,15 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
         std::string ext = dest.extension().string();
         if (ext == ".gz" || ext == ".bz2" || ext == ".xz" || ext == ".zst" || ext == ".tgz" ||
             ext == ".tar" || ext == ".zip") {
-            log_info(string_format("info.auto_extracting", filename.string()));
             try {
-                // 标签用源码归档文件名：构建期"在解压谁"就是哪个源码包（与上一行的
-                // info.auto_extracting 同一口径），包名在这一层已经拿不到了。
+                // 标签用源码归档文件名：构建期"在解压谁"就是哪个源码包（包名在这一层
+                // 已经拿不到了）。进度行由 `extract_tar_zst` 自己画（与安装路径同一条）。
                 extract_tar_zst(dest, work_root, filename.string());
+            } catch (const UnsafeArchiveException&) {
+                // **安全拒绝不得吞**：成员名消毒失败意味着归档里有危险成员，而且拒绝发生在
+                // 循环中途、源码树只解出了一半 —— 继续构建只会以离奇方式失败。与"扩展名骗人"
+                // （`.tar.gz` 其实不是归档）区分开：那种是普通的 `LpkgException`，下面容忍。
+                throw;
             } catch (const std::exception& e) {
                 log_warning(
                     string_format("warning.auto_extract_failed", filename.string(), e.what()));
@@ -643,6 +698,11 @@ std::string process_build_script(const fs::path& script_path,
     std::string content;
     {
         std::ifstream f(script_path);
+        // 必须查 open：不查的话脚本会被读成空串，之后 source 一个空文件只会报一个定位不了的
+        // 错。点名 script_path 才能定位到是哪个构建脚本没打开（缺失/权限/ELOOP）。
+        if (!f.is_open()) {
+            throw LpkgException(string_format("error.open_file_failed", script_path.string()));
+        }
         content.assign(std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>());
     }
     for (const auto& [from, to] : vars) {

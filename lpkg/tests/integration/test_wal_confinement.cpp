@@ -291,3 +291,96 @@ TEST_F(WalConfinementTest, AbsoluteSymlinkFinalComponentIsNotAnEscape)
         << "末段是绝对目标链接不该被当成越界 —— 逆操作删的是链接本身（不跟随末段）";
     EXPECT_FALSE(exists_no_follow(link)) << "本批次新建的链接必须被撤销";
 }
+
+// ============================================================================
+// 10) `--root` 带尾斜杠：不得把 root 内的行全判成越界（否则回滚静默什么都不做）
+// ============================================================================
+
+/**
+ * `Config::set_root_path()` 存的是 `lexically_normal()`，而它对 `/mnt/base/` 会**保留**尾斜杠
+ * （末尾落下一个空文件名分量）。`path_within_root` 若直接拿它做分量前缀比较，`""` 跟 `usr`
+ * 一比就否 —— 于是 `--root /mnt/base/` 下**每一条** WAL 行都被当越界跳过，回滚/崩溃恢复静默
+ * 什么都不做。这两条成对：一个钉"合法行不许被拒"，一个钉"越界行照样拒"。
+ */
+TEST_F(WalConfinementTest, TrailingSlashRootStillExecutesInRootLines)
+{
+    Config::instance().set_root_path(test_root.string() + "/");  // 模拟用户传入带尾斜杠的 --root
+
+    const fs::path orig = test_root / "usr" / "bin" / "tool";
+    const fs::path stash = test_root / ".lpkg_bak_pkgx_1";
+    const fs::path bak = stash / "tool.lpkg_bak_pkgx_1";
+    fs::create_directories(orig.parent_path());  // rename 的**目标**父目录必须先存在
+    write_file(bak, "OLD\n");
+
+    std::vector<wal::WALOp> ops;
+    ops.push_back(wal::parse_op("BACKUP " + orig.string() + ARROW + bak.string()));
+    const wal::RollbackStats st = wal::reverse_execute(ops, false);
+
+    EXPECT_EQ(st.files_restored, 1)
+        << "带尾斜杠的 --root 不得让 root 内的合法行被判越界（否则整批回滚静默失效）";
+    EXPECT_EQ(read_file(orig), "OLD\n");
+}
+
+TEST_F(WalConfinementTest, TrailingSlashRootStillSkipsOutsideLines)
+{
+    Config::instance().set_root_path(test_root.string() + "/");
+
+    const fs::path victim = outside("victim_ts.txt");
+    write_file(victim, "OUTSIDE\n");
+    const fs::path stash = test_root / ".lpkg_bak_pkgx_1";
+    const fs::path bak = stash / "v.lpkg_bak_pkgx_1";
+    write_file(bak, "BACKED-UP\n");
+
+    std::vector<wal::WALOp> ops;
+    ops.push_back(wal::parse_op("BACKUP " + victim.string() + ARROW + bak.string()));
+    const wal::RollbackStats st = wal::reverse_execute(ops, false);
+
+    EXPECT_EQ(st.files_restored, 0) << "带尾斜杠不该把 root 外的路径放进来";
+    EXPECT_EQ(read_file(victim), "OUTSIDE\n");
+}
+
+// ============================================================================
+// 4) post-commit 清理（`continue_post_commit_cleanup`）也只能删 stash 根
+// ============================================================================
+
+TEST_F(WalConfinementTest, PostCommitCleanupDoesNotRemoveNonStashTargets)
+{
+    // 纵深防御：`recover.cpp` 的 post-commit 清理按 WAL **字面路径** `remove_all` "stash 根"。
+    // 合法行引用的永远是以 `.lpkg_bak_` 开头的目录；被篡改/损坏的 WAL 里一条
+    // `CLEANUP /some/dir` 会让它把那个目录整棵删掉（`stash_root_of_bak` 对不匹配的路径
+    // **原样返回自己**）。这里钉的正是清理路径 —— `reverse_execute` 的 confinement 管不到它，
+    // 它是**另一个** WAL 消费者。
+    const fs::path victim = outside("victim_cleanup_dir");
+    write_file(victim / "keep.txt", "KEEP\n");
+
+    {
+        std::ofstream w(wal::wal_log_path());
+        w << "CLEANUP " << victim.string() << "\n";
+    }
+
+    recover_packages();
+
+    EXPECT_TRUE(fs::exists(victim / "keep.txt"))
+        << "非 stash 根的 CLEANUP 目标不得被 post-commit 清理 remove_all";
+}
+
+TEST_F(WalConfinementTest, PostCommitCleanupStillRemovesCommittedStashRoots)
+{
+    // 正向对照（防"改成恒跳过"这种过度修正）：已提交批次尾部引用的、名字确为 `.lpkg_bak_*`
+    // 的 stash 根必须照旧被 remove_all。
+    const fs::path stash = test_root / ".lpkg_bak_pkgz_4242";
+    write_file(stash / "f.lpkg_bak_pkgz_ab", "x\n");
+
+    {
+        std::ofstream w(wal::wal_log_path());
+        w << "BEGIN_PKGS\n";
+        w << "BEGIN pkgz 1.0\n";
+        w << "COMMIT pkgz 1.0\n";
+        w << "COMMIT_PKGS\n";
+        w << "CLEANUP " << stash.string() << "\n";
+    }
+
+    recover_packages();
+
+    EXPECT_FALSE(fs::exists(stash)) << "合法的 stash 根必须仍被清理（守卫不能过宽）";
+}

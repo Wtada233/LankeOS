@@ -8,8 +8,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "config.hpp"  // NonInteractiveMode
-#include "constants.hpp"
+#include "constants.hpp"  // 含 NonInteractiveMode（下移到 base，见那里的说明）
 #include "exception.hpp"
 
 // ============ 日志输出 ============
@@ -20,12 +19,9 @@ void log_info(std::string_view msg);
 void log_warning(std::string_view msg);
 /** 输出错误日志 */
 void log_error(std::string_view msg);
-/**
- * 输出带进度条的日志
- * @param percentage 进度百分比 (0-100)
- * @param bar_width 进度条宽度（字符数）
- */
-void log_progress(const std::string& msg, double percentage, int bar_width = 50);
+// 进度条 / 单行状态 / 阶段分隔条走 `ui/term.hpp`（`ui::Line` / `ui::section`）——
+// 原先这里有个只在 TTY 生效的 `log_progress`，它只会画一条固定宽度的裸进度条、
+// 不带字节/速率，且无法原地收尾（`[OK]`）；2026-10-03 由 `ui::Line` 取代。
 
 // ============ 进程执行 ============
 
@@ -49,6 +45,17 @@ int run_shell(const std::string& cmd, const std::filesystem::path& work_dir = ""
 int run_shell_in_root(const std::string& cmd);
 
 // ============ 用户交互 ============
+
+/**
+ * 从 stdin 读**一行**（不含行尾），期间轮询 SIGINT 标志 —— **所有交互式输入都走这里**。
+ *
+ * 直接 `std::cin >> x` / `std::getline(std::cin, …)` 会让该处输入期间**不可中断**：glibc 的
+ * handler 带 `SA_RESTART`，被打断的 `read` 自动重启 ⇒ Ctrl+C 只置标志、进程仍旧卡着
+ * （用户看到"Ctrl+C 无效，只能 kill -9"）。
+ *
+ * @return true = 读到一行；false = Ctrl+C 打断 **或** EOF（调用方通常都当作"放弃当前操作"）
+ */
+bool read_line_interruptible(std::string& out);
 
 /** 向用户请求确认（非交互模式自动返回 true） */
 bool user_confirms(const std::string& prompt);
@@ -176,6 +183,16 @@ bool is_real_directory(const std::filesystem::path& p);
  * （lstat 成功就说明没有 ELOOP），但只要右操作数有可能自己吃到环，就必须用本函数。
  */
 bool is_symlink_no_follow(const std::filesystem::path& p);
+
+/**
+ * 两个路径**各自**解出的符号链接目标是否逐字节相同；任一侧不是符号链接 / 读不出 → false。
+ * **绝不抛**（`read_symlink` 的 ec 重载 —— 与谓词族同一纪律：环、权限不足都不得打断整批）。
+ *
+ * "不确定就判不同"是**有意**的保守方向：调用方（`/etc` 的 symlink→symlink 那一格）用它决定
+ * "这条路径变了没有"。判成"不同"顶多多留一份给用户审阅的 `.lpkgnew`；判成"相同"却会把
+ * 真正改过的链接当成没动过、直接放过。
+ */
+bool symlink_targets_equal(const std::filesystem::path& a, const std::filesystem::path& b);
 
 /**
  * 末段是**普通文件**（lstat 语义，符号链接一律 false）→ true；解不开 / 是目录 / 是 FIFO /
@@ -373,6 +390,46 @@ void cleanup_tmp_dirs();
 bool path_within(const std::filesystem::path& p, const std::filesystem::path& root);
 
 /**
+ * 同 `path_within`，但**加一层 canonical 复核**（只解析父目录）—— 用于"路径来自纯文本、
+ * 可能被篡改/写坏"的场合（WAL 行、`--root` 下的落位目标）。**永不抛。**
+ *
+ * ① **词法级**：`path_within(p, root)`。不碰文件系统，负责挡掉 `../` 逃逸与"绝对路径就指在
+ *    root 之外"（WAL 行是纯文本，`NEW /etc/sudoers` 在坏 WAL 里只是一行字）。
+ * ② **canonical 复核**（尽力而为，**只解析父目录**）：`weakly_canonical(root)` 与
+ *    `weakly_canonical(p.parent_path())` 都成功时再比一次 —— 挡的是词法上合法、实际却穿透
+ *    出去的那种：`<root>/evil -> /etc` 配上 `<root>/evil/shadow`。
+ *    **末段不解析**：rename/unlink/rmdir 与"落位"都不跟随末段链接，而 `--root` 安装里包发
+ *    绝对目标链接（`<root>/usr/bin/foo -> /etc/foo`）完全合法 —— 解析它会误伤。
+ *
+ * **解不开就不判越界**（`ec != 0` → 放行）：这条判据跑在回滚/恢复路径上，绝不允许因为"这个
+ * 路径暂时解不开"而拒绝一条合法的行。典型是 ELOOP 自环（那份备份必须能被逆操作搬回原位，
+ * `tests/integration/test_symlink_loop_install.cpp` 钉着）与"中间段尚未重建的 `DIR_RM`"。
+ * 空 `p` / 空 `root` 一律放行（含义由调用方自己处理）。
+ *
+ * 2026-10-03：本函数是 `db/wal_op.cpp` 里那份 `path_within_root()`（参数顺序相反：这里是
+ * `(p, root)`）与"落位目标的祖先链约束"**共用**的唯一实现 —— 此前那两处各写了一套分量比较，
+ * 只靠注释声明"用同一套剥离规则"，必然漂移。
+ */
+bool path_within_resolved(const std::filesystem::path& p, const std::filesystem::path& root);
+
+/**
+ * `dir` **实际解析到的那个目录**是否落在 `root` 内 —— **整条路径都解析（含末段）**。
+ *
+ * 与 `path_within_resolved` 的分工：那个刻意**不解析末段**（用于 rename/unlink/落位那种
+ * "要处置的就是这个名字"的场合）；本函数要问的恰恰相反 —— "这条路径最后落在哪个目录"，
+ * 用于**跟随语义**使用该目录的场合（典型：`apply_soname_links()` 会在其中 `create_symlink` /
+ * `fs::remove`，而它用 `is_directory_follow` 判定入参）。
+ *
+ * 为什么需要它（2026-10-03 审计）：`<root>/usr/lib` 本身可以是一条**包发的符号链接**
+ * （末段不解析是有意的，见 §5.4 不变量 6），若它指向 root 之外，提交后的触发器就会在宿主的
+ * 那个目录里建/删 SONAME 链接 —— `--root` 的隔离被"提交后阶段"穿透。
+ *
+ * 解不开（ELOOP / 不存在）→ 返回 true（放行）：与其余 confinement 同一条纪律，判定不得因
+ * "解不开"而拒掉合法操作。
+ */
+bool path_resolves_within(const std::filesystem::path& dir, const std::filesystem::path& root);
+
+/**
  * 单个路径分量是否安全：非空、不含 '/' 与 NUL、不是 "." / ".."。
  *
  * 包名与版本号来自**不可信来源**（远端索引、.lpkg 内的 metadata.json），而它们会被
@@ -503,9 +560,20 @@ std::optional<std::vector<char>> base64_decode(std::string_view s);
 
 /**
  * 按分隔符切分 string_view，返回子串列表（零拷贝，仅分配 vector）
+ *
+ * **契约（勿改行为）**：切分**总会产出尾段**，并且**保留空段**：
+ *   `""`    → `[""]`
+ *   `"a,"`  → `["a", ""]`
+ *   `"a,,b"`→ `["a", "", "b"]`
+ * 也就是说，产出里**包含空串**是**正常结果**，不是错误。调用方**必须自行跳过空段**
+ * （`if (x.empty()) continue;`）—— 否则空串会被当成一个真实的 token（例如被收进 libsolv
+ * 的 pool 成为 `STRID_EMPTY`，或变成一个空名依赖），后果参见 repository.cpp 的
+ * `split_dep_field` / `split_comma_list` 的说明。**不要**为了"省掉一次 `if`"而修改本函数
+ * 去吞掉空段：那会波及全部调用点，且会改变 `"a,"` 这类输入对"尾段存在性"的语义。
+ *
  * @param s  输入的字符串视图
  * @param d  分隔字符
- * @return   切分后的子串列表
+ * @return   切分后的子串列表（含空段，含尾段）
  */
 inline std::vector<std::string_view> split_string_view(std::string_view s, char d)
 {

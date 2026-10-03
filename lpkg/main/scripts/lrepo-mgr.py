@@ -162,7 +162,21 @@ class RepoManager:
 
     @staticmethod
     def parse_aggregated_index(content):
-        """格式: name|ver:hash:deps:provides:needed_so;ver2:...|"""
+        """
+        格式: name|ver:hash:deps:provides:needed_so;ver2:...|row_level_provides
+
+        **必须与 C++ 侧的 `parse_repo_index_line()`（main/src/base/utils.cpp）逐条同语义** ——
+        本函数的结果会被 `push` 用来**读-改-写整份索引**、被 `cleanup` 用来决定删哪些包文件，
+        所以"少读一条"不是显示问题而是**数据丢失 + 删掉仍被引用的文件**。
+
+        两处曾与 C++ 不一致、2026-10-03 对齐：
+          · 版本级 provides 为空时应**回退到行级**（`parts[2]`）—— 原先完全忽略；
+          · 只含版本号、没有冒号的版本块**是合法的**（hash/deps/... 为空）—— 原先整块丢弃。
+
+        契约由同一份 fixture + 同一份期望维持，两侧各自断言：
+          · 本侧：main/scripts/check_index_conformance.py
+          · C++ 侧：tests/unit/test_repo_index_conformance.cpp
+        """
         data = {}
         for line in content.splitlines():
             line = line.strip()
@@ -172,15 +186,20 @@ class RepoManager:
             if len(parts) < 2:
                 continue
             name = parts[0]
+            # 行级 provides：版本级为空时的回退（与 C++ 的 pkg_level_provides 同义）
+            row_provides = parts[2] if len(parts) > 2 else ""
             for v_block in parts[1].split(';'):
                 v_info = v_block.split(':')
-                if len(v_info) < 2:
-                    continue
+                if not v_info[0]:
+                    continue  # 空块（`;;` 之间）不是版本
+                provides = v_info[3] if len(v_info) > 3 else ""
+                if not provides:
+                    provides = row_provides
                 data.setdefault(name, {"versions": {}})
                 data[name]["versions"][v_info[0]] = {
-                    "sha256": v_info[1],
+                    "sha256": v_info[1] if len(v_info) > 1 else "",
                     "deps": v_info[2] if len(v_info) > 2 else "",
-                    "provides": v_info[3] if len(v_info) > 3 else "",
+                    "provides": provides,
                     "needed_so": v_info[4] if len(v_info) > 4 else "",
                 }
         return data

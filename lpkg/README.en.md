@@ -21,7 +21,6 @@ English | [中文](README.md)
 
 <p align="center">
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker" />
-  <img src="https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white" alt="SQLite" />
   <img src="https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnubash&logoColor=white" alt="Bash" />
   <img src="https://img.shields.io/badge/zstd-1E5B8C?style=flat&logo=zstandard&logoColor=white" alt="zstd" />
 </p>
@@ -40,7 +39,7 @@ English | [中文](README.md)
 -   **Smart version parsing**: Supports multi-segment revision numbers (e.g. `1.0.0.1`) with a rigorous comparison algorithm that correctly handles cases like `6.16.1 > 6.6.1`. Supports compound range constraints (e.g. `>= 2.0.0 < 3.0.0`).
 -   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their respective hashes, deps, provides, and needed_so.
 -   **Embedded metadata**: All metadata (name, version, dependencies, needed_so, virtual provides, man page) is stored in a `metadata.json` inside each package.
--   **Auto dependency generation**: Includes `gen_deps.py` that scans ELF files to auto-generate both `needed_so` (DT_NEEDED SONAME list) and `deps` (provider package names), eliminating manual version constraint maintenance.
+-   **Auto dependency generation**: The build farm (`farm/`, Rust) scans ELF DT_NEEDED SONAMEs after packaging to generate `needed_so`, then resolves provider package names into `deps`, eliminating manual version constraint maintenance.
 -   **Layout-as-content**: The `content/` directory layout maps directly to the root filesystem.
 -   **Automated operations**: Includes `lrepo-mgr.py` for publishing to S3-compatible storage or SCP remote servers. The `--path` flag enables local filesystem repositories for offline testing.
 -   **Highly compatible static builds**: Built-in automatic detection of system CA certificate paths ensures statically compiled binaries work across different Linux distributions.
@@ -75,11 +74,10 @@ The following libraries are only needed when building `lpkg` directly on the hos
 - `libcurl`: For file downloads.
 - `libarchive`: For extracting package files.
 - `libcrypto` (OpenSSL): For hash computation.
-- `libfmt`: For string formatting (header-only).
 
 On Arch Linux:
 ```bash
-sudo pacman -S curl libarchive openssl fmt
+sudo pacman -S curl libarchive openssl
 ```
 
 ### Building and Installing
@@ -158,7 +156,7 @@ hooks/                # Hook scripts (optional)
 |-------|-------------|
 | `name` | Package name |
 | `version` | Version string |
-| `deps` | Dependency package names (no version constraints; auto-resolved from needed_so by gen_deps) |
+| `deps` | Dependency package names (no version constraints; auto-resolved from needed_so by the build farm) |
 | `provides` | SONAMEs and virtual capabilities this package provides |
 | `needed_so` | DT_NEEDED SONAME list from the package's ELF files (ground truth for runtime deps) |
 | `man` | Inline man page content (optional) |

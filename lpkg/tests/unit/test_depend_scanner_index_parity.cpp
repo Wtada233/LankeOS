@@ -22,6 +22,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -52,7 +53,7 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_depscan_parity_test");
+        suite_work_dir = fs::absolute("tmp_depscan_parity_test_" + std::to_string(::getpid()));
         fs::remove_all(suite_work_dir);
         test_root = suite_work_dir / "root";
         fs::create_directories(test_root);
@@ -220,4 +221,36 @@ TEST_F(IndexParityTest, FourFieldDependentCannotBeInferred)
     EXPECT_FALSE(has_child(tree, "appB"))
         << "4 字段块没有 needed_so 字段，反图无从推断它是依赖者 —— 这属于索引信息缺失，"
            "不是解析器丢行（对照 FourFieldProviderLineStillRegistersProvider）";
+}
+
+// ── show_all 分支复用同一份仓库包名清单（缺陷 4）────────────────────────────────
+TEST_F(IndexParityTest, RemoveShowAllStillListsUnaffectedRepoPackages)
+{
+    // `scan_remove_tree` 曾把仓库包名清单算两遍（存在性判定一次、show_all 再一次），
+    // 一条 `depend remove --all` 会加载/排序索引多遍。改成只算一次并复用后，show_all
+    // 仍必须把**不受影响**的仓库包作为 KEEP 列出（不能因为复用就漏掉它们）。
+    const std::string index =
+        "libA|1.0:hhh::liba.so.1:\n"   // 提供 liba.so.1
+        "appB|2.0:hhh::,:liba.so.1\n"  // 依赖 liba.so.1 → 受影响
+        "pkgZ|3.0:hhh::\n";            // 4 字段，与 libA 无关 → 不受影响
+    write_raw_index(index);
+    const fs::path mirror = suite_work_dir / "mirror";
+    fs::create_directories(mirror / "x86_64");
+    std::ofstream(mirror / "x86_64" / "index.txt") << index;
+    {
+        fs::create_directories(Config::instance().mirror_conf().parent_path());
+        std::ofstream mc(Config::instance().mirror_conf());
+        mc << "file://" << mirror.string() << "/\n";
+        mc.flush();
+    }
+    Config::instance().set_architecture("x86_64");
+
+    auto tree = depscan::scan_remove_tree("libA", /*show_all=*/true);
+    EXPECT_TRUE(has_child(tree, "appB")) << "受影响包 appB 必须出现";
+    EXPECT_TRUE(has_child(tree, "pkgZ")) << "不受影响的仓库包必须作为 KEEP 列出（show_all）";
+    for (const auto& c : tree.children) {
+        if (c.name == "pkgZ") {
+            EXPECT_EQ(c.status, depscan::ScanStatus::KEEP);
+        }
+    }
 }

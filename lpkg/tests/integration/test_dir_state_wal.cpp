@@ -187,8 +187,10 @@ TEST_F(DirStateWalTest, ExistingDirModeIsRestoredOnRollback)
  * 为什么补这一条：这条告警此前**没有任何用例钉住**，于是"它到底响没响"只能靠翻日志猜，本轮
  * 就真出过一次误判 —— 拿**键名** `dir_perm_mismatch` 去 grep 整份全量日志得 **0 次**，被读成
  * "分支没跑"；实际 `log_warning(string_format(键, …))` 打的是 **l10n 渲染后的译文**，键名永远
- * 不出现在输出里（实测那里有恰好一次：`... permissions differ: current 448, package wants
- * 493 — corrected`，448/493 就是 0700/0755）。
+ * 不出现在输出里（实测那里有恰好一次：`... permissions differ: current 700, package wants
+ * 755 — corrected`）。**订正 2026-10-03**：mode 参数此后按**八进制**渲染 —— 这里原先记的
+ * `448/493` 是**十进制**旧读数（同一批修复见 `ARCH.md` §17）。上面这条断言是动态取锚的，
+ * 与进制无关，故仍然成立。
  *
  * 所以断言一律锚在**渲染文本**上，且取模板里第一个 `{}` 之前的前缀 ⇒ 与语言无关
  * （同 `tests/unit/test_repo_index_parsing.cpp` 的手法）。

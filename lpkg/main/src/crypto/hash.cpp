@@ -56,6 +56,12 @@ std::string calculate_sha256(const fs::path& file_path)
             throw LpkgException(get_string("error.openssl_update_failed"));
         }
     }
+    // **必须查 `bad()`**：循环条件 `read(...) || gcount() > 0` 把"读到 EOF"与"读出错"
+    // （磁盘/网络 FS 的 EIO）都当成了正常结束 —— 于是对**截断的内容**算出一个哈希，
+    // 拿它去比对只会得到莫名其妙 "hash mismatch"，而不是"I/O 错误"（2026-10-02 修）。
+    if (file.bad()) {
+        throw LpkgException(string_format("error.file_read_failed", file_path.string()));
+    }
 
     std::array<unsigned char, EVP_MAX_MD_SIZE> hash{};
     unsigned int hash_len;

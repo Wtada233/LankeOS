@@ -16,6 +16,16 @@
 
 namespace fs = std::filesystem;
 
+namespace
+{
+/** 读整个文件为字符串（供 WAL / 盘面内容的**内容级**断言；文件不存在则返回空串）。 */
+std::string slurp(const fs::path& p)
+{
+    std::ifstream f(p);
+    return std::string((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+}
+}  // namespace
+
 // ============================================================================
 // 原子安装测试
 // ============================================================================
@@ -304,6 +314,16 @@ TEST_F(RecoveryTest, RecoverWithRestoreAuditLines)
     }
 
     EXPECT_NO_THROW(recover_packages());
+
+    // 真实盘面断言（此前**唯一**断言是 EXPECT_NO_THROW —— recover 变空转也绿）：
+    // 整段未提交区域被逆序回滚，BACKUP 的逆操作 = rename(bak → orig)，
+    // 于是 bak 里那份 "backup data" 必须回到 orig、bak 自己被消费掉。
+    ASSERT_TRUE(fs::exists(orig)) << "恢复没有还原被 BACKUP 走的文件（recover 空转？）";
+    EXPECT_EQ(slurp(orig), "backup data");
+    EXPECT_FALSE(fs::exists(bak)) << "还原后 bak 必须被消费掉（否则是「复制」不是「还原」）";
+    // 批次被 COMMIT_PKGS 封口（与 RecoverRestoresBackedUpFiles 同口径）
+    EXPECT_NE(slurp(wal::wal_log_path()).find("COMMIT_PKGS"), std::string::npos)
+        << "恢复后批次应被 COMMIT_PKGS 封口";
 }
 
 TEST_F(RecoveryTest, RecoverHandlesEmptyWal)
@@ -347,7 +367,16 @@ TEST_F(SecondaryRollbackTest, DoubleRecoverIsIdempotent)
     }
 
     recover_packages();
+    // 首次恢复必须**真的**还原（否则"第二次幂等"是空壳 —— 两次都空转也绿）
+    ASSERT_TRUE(fs::exists(orig)) << "首次恢复没有还原被 BACKUP 走的文件";
+    EXPECT_EQ(slurp(orig), "pre-install data\n");
+    EXPECT_FALSE(fs::exists(bak));
+
     EXPECT_NO_THROW(recover_packages());  // 第二次幂等
+    // 幂等 = 第二次既不再抛，也**不破坏**已还原的盘面
+    EXPECT_TRUE(fs::exists(orig)) << "第二次恢复把已还原的文件又弄没了";
+    EXPECT_EQ(slurp(orig), "pre-install data\n");
+    EXPECT_FALSE(fs::exists(bak));
 }
 
 TEST_F(SecondaryRollbackTest, CleanupDbBackupsClearsOrphans)
@@ -443,6 +472,15 @@ TEST_F(SecondaryRollbackTest, BatchWithRollbackFullRecovery)
     }
 
     EXPECT_NO_THROW(recover_packages());
+
+    // 真实盘面断言（此前**唯一**断言是 EXPECT_NO_THROW）：
+    //   · A 的 BACKUP 逆操作把 a_bak 的 "old a" 还原回 a_file；
+    //   · B 的新建文件 b_new 被 NEW 逆操作删除。
+    ASSERT_TRUE(fs::exists(a_file)) << "A 的 BACKUP 没被还原（recover 空转？）";
+    EXPECT_EQ(slurp(a_file), "old a\n");
+    EXPECT_FALSE(fs::exists(a_bak)) << "还原后 a_bak 必须被消费掉";
+    EXPECT_FALSE(fs::exists(b_new)) << "B 的新建文件未被 NEW 逆操作删除";
+    EXPECT_NE(slurp(wal::wal_log_path()).find("COMMIT_PKGS"), std::string::npos);
 }
 
 TEST_F(SecondaryRollbackTest, WALWithOnlyBeginPkgs)
@@ -468,6 +506,11 @@ TEST_F(SecondaryRollbackTest, CorruptedWalLine)
     }
 
     EXPECT_NO_THROW(recover_packages());
+
+    // 破损行必须被**跳过**、但不阻断整批回滚：BACKUP 仍要还原（此前只验"不抛"）。
+    ASSERT_TRUE(fs::exists(orig)) << "有一条无法解析的行 ⇒ 整批 BACKUP 没被还原";
+    EXPECT_EQ(slurp(orig), "data\n");
+    EXPECT_FALSE(fs::exists(bak));
 }
 
 TEST_F(SecondaryRollbackTest, EmptyWalWithOnlyCommittedBatches)
@@ -482,6 +525,11 @@ TEST_F(SecondaryRollbackTest, EmptyWalWithOnlyCommittedBatches)
     }
 
     EXPECT_NO_THROW(recover_packages());
+
+    // 全已提交的 WAL：recover 应把它**裁剪干净**（trim_completed），而不是原样留下。
+    // 若 recover 变空转，"done" 仍会留在 WAL 里 → 本条红（与 TrimThenRecoverIsNoop 同口径）。
+    const std::string content = slurp(wal::wal_log_path());
+    EXPECT_TRUE(content.empty() || content == "\n") << "已提交批次未被裁剪，WAL 残留：" << content;
 }
 
 TEST_F(SecondaryRollbackTest, MultipleTrimInvocationsAreIdempotent)

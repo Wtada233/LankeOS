@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <optional>
 #include <ranges>
 #include <sstream>
 #include <unordered_map>
@@ -29,11 +30,11 @@ namespace depscan
 namespace
 {
 
-/** 获取包版本号，未安装时返回 "(not installed)" */
+/** 获取包版本号；未安装时返回 l10n 的 `info.depend_version_not_installed`（原硬编码英文） */
 std::string version_or_missing(const std::string& pkg)
 {
     auto ver = Cache::instance().get_installed_version(pkg);
-    return ver.empty() ? "(not installed)" : ver;
+    return ver.empty() ? get_string("info.depend_version_not_installed") : ver;
 }
 
 /**
@@ -47,6 +48,41 @@ struct ResolvedDep {
     std::vector<DependencyInfo> deps;
 };
 using DepMap = std::unordered_map<std::string, ResolvedDep>;
+
+/// 约束的文字形态（`>= 2.0, < 3.0`）—— 只用于告警文案。
+std::string constraint_text(const std::vector<Constraint>& cs)
+{
+    std::string out;
+    for (const auto& c : cs) {
+        if (!out.empty()) out += ", ";
+        out += c.op + " " + c.version;
+    }
+    return out;
+}
+
+/**
+ * 预览用的依赖版本解析。
+ *
+ * **约束存在但仓库里没有任何版本满足时必须返回 `nullopt`**（调用方告警 + 跳过），
+ * **不能**回退到"最新版"（2026-10-03 修）：最新版正是约束排除掉的那个 ——
+ * `lpkg install` 会拒绝这种依赖，预览却报"将装最新版"，预览与实做**相反**。
+ * 同类处置在别处都是 fail-loud：`builder.cpp` 抛 `error.build_dep_unsatisfiable`、
+ * `force_solve_conflict` 把 nullopt 当"被打破"。这里是唯一漏网处（只影响 `depend install`
+ * 这个**只读预览**，不动盘）。
+ */
+std::optional<std::string> resolve_dep_version(Repository& repo, const DependencyInfo& dep)
+{
+    if (dep.constraints.empty()) return std::string(constants::VER_LATEST);
+    if (auto m = repo.find_best_matching_version(dep.name, dep.constraints)) return m->version;
+    return std::nullopt;
+}
+
+/// 约束不可满足时的可见告警（预览里不能静默按"最新版"继续）。
+void warn_unsatisfiable(const DependencyInfo& dep)
+{
+    log_warning(string_format("warning.depend_constraint_unsatisfiable", dep.name,
+                              constraint_text(dep.constraints)));
+}
 
 /**
  * 递归解析传递依赖，将结果写入 plan
@@ -101,12 +137,12 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
 
     for (const auto& dep : deps) {
         if (!Config::instance().no_deps_mode()) {
-            std::string dv(constants::VER_LATEST);
-            if (!dep.constraints.empty()) {
-                if (auto m = repo.find_best_matching_version(dep.name, dep.constraints))
-                    dv = m->version;
+            auto dv = resolve_dep_version(repo, dep);
+            if (!dv) {
+                warn_unsatisfiable(dep);
+                continue;
             }
-            resolve_transitive_deps(dep.name, dv, plan, visited, repo);
+            resolve_transitive_deps(dep.name, *dv, plan, visited, repo);
         }
     }
     visited.erase(pkg_name);
@@ -120,20 +156,13 @@ std::vector<std::string> repo_package_names()
 {
     std::vector<std::string> names;
     Repository repo;
-    try {
-        repo.load_index();
-    } catch (const std::exception&) {
-        return names;
-    }
+    // 别把"索引加载失败"静默成"仓库里没有包"——那会让 `depend remove/abibreak` 报出错误的
+    // "无受影响包"。统一入口 `load_index_or_warn()`（全仓同一条
+    // `warning.repo_index_load_failed`）。
+    if (!load_index_or_warn(repo)) return names;
     for (const auto& name : repo.packages() | std::views::keys) names.push_back(std::string(name));
     std::ranges::sort(names);
     return names;
-}
-
-bool repo_has_package(const std::string& name)
-{
-    const auto names = repo_package_names();
-    return std::ranges::find(names, name) != names.end();
 }
 
 }  // anonymous namespace
@@ -182,6 +211,11 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
     std::unordered_map<std::string, std::unordered_set<std::string>> soname_provider;
     std::unordered_map<std::string, RepoIndexVersionBlock> latest;
     std::ifstream f(idx);
+    // 守卫此前只有上面的 `exists_follow(idx)`：索引文件"存在但打不开"（FIFO/设备）或
+    // "读不出"（是目录 —— Linux 下 open 成功、随后读才失败；或 EIO）时，循环静默跑零次 ⇒
+    // 反向依赖图残缺（空）⇒ `depend remove` / `depend abibreak` 报"无受影响包"。
+    // 这是**给错误答案且不报错**：用户据此删包。fail-closed，点名文件报错。
+    if (!f.is_open()) throw LpkgException(string_format("error.open_file_failed", idx.string()));
     std::string line;
     while (std::getline(f, line)) {
         for (auto& b : parse_repo_index_line(line)) {
@@ -190,13 +224,17 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
                 latest[b.name] = std::move(b);  // 无版本 / 更旧 → 换成新的
         }
     }
+    // 非 EOF 收尾且 `bad`（实测：目录 = open 成功 + badbit；空文件是干净的 eof）⇒
+    // 读中途失败，不能静默当空（否则反向依赖图残缺、报"无受影响包"）。
+    if (f.bad()) throw LpkgException(string_format("error.read_file_failed", idx.string()));
 
     for (const auto& [name, b] : latest) {
         name_needed.emplace_back(name, b.needed_so);
         for (auto s : split_string_view(b.provides, constants::COMMA_CHAR)) {
             if (s.empty()) continue;
-            // **同一 SONAME 可能有多个提供者**（捆绑/私有 .so）。此前只记第一个 →
-            // 反向图只连到一个提供者，删除/ABI 影响面会被少算一半（TODO 低危项）
+            // **同一 SONAME 可能有多个提供者**（捆绑/私有 .so）：全部记下（`insert` 进集合）。
+            // 已修（2026-09-20）：此前只记第一个 → 反向图只连到一个提供者，删除/ABI 影响面
+            // 会被少算一半。这不是待办，别再按 TODO 读。
             soname_provider[std::string(s)].insert(name);
         }
     }
@@ -230,15 +268,20 @@ void repo_transitive_rdeps(
     }
 }
 
-/** 加载仓库并构建反向依赖图；失败时返回空 map */
+/**
+ * 加载仓库并构建反向依赖图；失败时返回空 map。
+ *
+ * ⚠️ 下面这次 `load_index()` **只为告警**，它**不喂给**返回的图 —— `build_repo_revdep_map()`
+ * 自己不收参数、另建 `Repository` 重读一遍索引（索引因此被加载/解析多遍，属已知取舍，见
+ * `scan_remove_tree()` 的说明）。所以这里只用一个局部、名字也点名此意，**别**把它误读成
+ * "图的数据来源"；它的唯一价值是让"索引读不出来"这件事落一条 `warning.repo_index_load_failed`。
+ */
 auto load_repo_revdep() -> std::unordered_map<std::string, std::unordered_set<std::string>>
 {
-    Repository repo;
-    try {
-        repo.load_index();
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.repo_index_load_failed", e.what()));
-    }
+    // 只为告警：读一次索引，读不出来就落一条 warning（真正的图由 build_repo_revdep_map() 自建，
+    // 这次的结果**不喂给它** —— 见上面的说明）。走统一入口，别在这里各写一份 try/catch。
+    Repository probe;
+    (void)load_index_or_warn(probe);
     return build_repo_revdep_map();
 }
 
@@ -259,9 +302,9 @@ void build_remove_tree_repo(
         affected.erase(dep);
         ScanNode child;
         child.name = dep;
-        child.version = "(in repository)";
+        child.version = get_string("info.depend_version_in_repo");
         child.status = ScanStatus::REMOVED;
-        child.reason = "depends on " + node_name + " (repo)";
+        child.reason = string_format("info.depend_reason_depends_on_repo", node_name);
         build_remove_tree_repo(child, dep, rev, affected);
         node.children.push_back(std::move(child));
     }
@@ -294,7 +337,9 @@ void build_install_tree(ScanNode* parent, const std::string& parent_name, const 
         child.name = dit->second.name;
         child.version = dit->second.version;
         child.status = dit->second.already_installed ? ScanStatus::KEEP : ScanStatus::INSTALL;
-        child.reason = dit->second.already_installed ? "already installed" : "dependency";
+        child.reason =
+            get_string(dit->second.already_installed ? "info.depend_reason_already_installed"
+                                                     : "info.depend_reason_dependency");
 
         build_install_tree(&child, real, plan, seen, repo, show_all);
 
@@ -313,15 +358,22 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
 {
     // 恒用仓库反向依赖图：计算整个仓库删除该包的影响，不看本地装了啥
     auto rev = load_repo_revdep();
+    // 仓库包名清单**只算一次**并复用：它内建 Repository + load_index + 全量排序，而
+    // 同一条 `depend remove` 此前会算两遍（存在性判定一次、show_all 再一次），再加上
+    // load_repo_revdep 的那次加载 —— 索引被加载/解析最多 4 遍。两次调用的输入相同、结果
+    // 确定，复用同一份向量**不改变行为**（唯一差异是少打一条重复的
+    // `warning.repo_index_load_failed`）。
+    const std::vector<std::string> repo_names = repo_package_names();
     // 存在性判定：**仓库索引里有，或图上出现过**（并集，严格比"只看反向依赖表"宽松）。
     // 只看反向依赖表时，没有任何依赖者的包会被误报成 "not found in repository"（TODO G2）；
     // 保留图上判定则覆盖索引读不到/被裁剪的场景，两者都不放过。
-    if (!repo_has_package(pkg_name) && rev.find(pkg_name) == rev.end()) {
+    if (std::ranges::find(repo_names, pkg_name) == repo_names.end() &&
+        rev.find(pkg_name) == rev.end()) {
         ScanNode r;
         r.name = pkg_name;
-        r.version = "(not found)";
+        r.version = get_string("info.depend_version_not_found");
         r.status = ScanStatus::REMOVED;
-        r.reason = "not found in repository";
+        r.reason = get_string("info.depend_reason_not_found_repo");
         return r;
     }
 
@@ -329,11 +381,17 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
     repo_transitive_rdeps(pkg_name, rev, affected, visited);
     affected.insert(pkg_name);
 
+    // ⚠️ `build_remove_tree_repo` 会把**已经渲染过的**节点逐个从 `affected` 里 `erase`
+    // （那是它防重复的机制）—— 树建完之后 `affected` 基本是空的。下面 `show_all` 的过滤若
+    // 直接用它，等于**什么都没过滤**：刚刚标成"将被移除"的包会被原样再列一遍、还写着
+    // "不受影响"，输出自相矛盾。先快照一份"哪些包已经展示过"。
+    const std::unordered_set<std::string> already_shown = affected;
+
     ScanNode root;
     root.name = pkg_name;
     root.version = version_or_missing(pkg_name);
     root.status = ScanStatus::REMOVED;
-    root.reason = "target package (repo)";
+    root.reason = get_string("info.depend_reason_target_repo");
     affected.erase(pkg_name);
     build_remove_tree_repo(root, pkg_name, rev, affected);
 
@@ -341,13 +399,13 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
     // 把其余仓库包也作为"不受影响"列出（此前该形参被丢弃，`depend remove --all`
     // 与不带 --all 完全一样，TODO G2）
     if (show_all) {
-        for (const auto& name : repo_package_names()) {
-            if (name == pkg_name || affected.contains(name)) continue;
+        for (const auto& name : repo_names) {
+            if (already_shown.contains(name)) continue;
             ScanNode keep;
             keep.name = name;
             keep.version = version_or_missing(name);
             keep.status = ScanStatus::KEEP;
-            keep.reason = "unaffected";
+            keep.reason = get_string("info.depend_reason_unaffected");
             root.children.push_back(std::move(keep));
         }
     }
@@ -367,7 +425,7 @@ ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all)
     root.name = pkg_name;
     root.version = version_or_missing(pkg_name);
     root.status = ScanStatus::ABI_CHANGED;
-    root.reason = "ABI changed — direct dependents need rebuild";
+    root.reason = get_string("info.depend_reason_abi_changed");
 
     auto it = rev.find(pkg_name);
     if (it != rev.end()) {
@@ -375,9 +433,9 @@ ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all)
             if (dep == pkg_name) continue;
             ScanNode child;
             child.name = dep;
-            child.version = "(in repository)";
+            child.version = get_string("info.depend_version_in_repo");
             child.status = ScanStatus::REBUILD;
-            child.reason = "direct dependency of " + pkg_name + " (repo)";
+            child.reason = string_format("info.depend_reason_direct_dep_of_repo", pkg_name);
 
             // --all 模式下显示间接依赖（标记为不变）
             if (show_all) {
@@ -387,9 +445,9 @@ ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all)
                         if (gdep == dep || gdep == pkg_name) continue;
                         ScanNode k;
                         k.name = gdep;
-                        k.version = "(in repository)";
+                        k.version = get_string("info.depend_version_in_repo");
                         k.status = ScanStatus::KEEP;
-                        k.reason = "indirect — ABI preserved through abstraction";
+                        k.reason = get_string("info.depend_reason_indirect_abi_kept");
                         child.children.push_back(std::move(k));
                     }
                 }
@@ -408,11 +466,7 @@ ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all)
 ScanNode scan_install_tree(const std::string& pkg_name, bool show_all)
 {
     Repository repo;
-    try {
-        repo.load_index();
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.repo_index_load_failed", e.what()));
-    }
+    (void)load_index_or_warn(repo);  // 统一入口：失败只告警（见 repository.hpp）
 
     std::string target_name = pkg_name;
     std::string target_ver(constants::VER_LATEST);
@@ -431,19 +485,41 @@ ScanNode scan_install_tree(const std::string& pkg_name, bool show_all)
         r.name = target_name;
         r.version = version_or_missing(target_name);
         r.status = ScanStatus::KEEP;
-        r.reason = "package not found in repository";
+        r.reason = get_string("info.depend_reason_pkg_not_found_repo");
         return r;
     }
 
-    auto it = plan.find(target_name);
+    // ⚠️ `resolve_transitive_deps` 把计划按**解析后的包名**建键（能力名会经 `find_provider`
+    // 落到提供者身上），所以这里**不能**直接 `plan.find(target_name)`：`lpkg depend install
+    // libc.so.6` 这类能力目标会落成 `glibc`，`plan` 里根本没有 `"libc.so.6"` 这个键 ——
+    // `find` 返回 `end()`，解引用即 UB（实测：段错误，或读到垃圾包名/版本）。
+    // 按**同一套**回退先把目标解析成包名再查；`build_install_tree` 同理（它内部也是
+    // `plan.find(parent_name)`，传能力名会**立刻返回**、整棵树变成空的）。
+    std::string resolved = target_name;
+    if (!plan.contains(target_name)) {
+        if (const auto prov = repo.find_provider(target_name)) resolved = prov->name;
+    }
+    const auto it = plan.find(resolved);
+    if (it == plan.end()) {
+        ScanNode r;
+        r.name = target_name;
+        r.version = version_or_missing(target_name);
+        r.status = ScanStatus::KEEP;
+        r.reason = get_string("info.depend_reason_pkg_not_found_repo");
+        return r;
+    }
+
     ScanNode root;
     root.name = it->second.name;
     root.version = it->second.version;
     root.status = it->second.already_installed ? ScanStatus::KEEP : ScanStatus::INSTALL;
-    root.reason = it->second.already_installed ? "already installed" : "target package";
+    root.reason = get_string(it->second.already_installed ? "info.depend_reason_already_installed"
+                                                          : "info.depend_reason_target");
 
-    std::set<std::string> seen{target_name};
-    build_install_tree(&root, target_name, plan, seen, repo, show_all);
+    // 两个名字都要记进 `seen`：能力名与它解析出的包名指的是**同一个**根节点，
+    // 漏掉任何一个都会让根在它自己的子节点里再出现一次。
+    std::set<std::string> seen{target_name, resolved};
+    build_install_tree(&root, resolved, plan, seen, repo, show_all);
     return root;
 }
 
@@ -451,18 +527,24 @@ ScanNode scan_install_tree(const std::string& pkg_name, bool show_all)
 ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all)
 {
     json meta;
+    std::string name;
+    std::string version;
     try {
         meta = detail::read_archive_metadata(fs::absolute(lpkg_path));
+        // 与安装侧（`package_manager.cpp` 的本地包参数解析）同一写法：读取与字段提取共用
+        // 同一个 try。此前 `.at()` 在 try **之外**裸调用，metadata.json 存在却缺
+        // `name`/`version` 时会逸出 `json::out_of_range`（未本地化、也不是 LpkgException），
+        // 让 `lpkg depend install ./x.lpkg` 直接带着原始 JSON 异常崩掉。
+        name = meta.at(std::string(constants::J_NAME));
+        version = meta.at(std::string(constants::J_VERSION));
     } catch (const std::exception& e) {
         ScanNode r;
         r.name = lpkg_path.filename().string();
         r.status = ScanStatus::KEEP;
-        r.reason = std::string("error: ") + e.what();
+        r.reason = string_format("info.depend_reason_error", e.what());
         return r;
     }
 
-    std::string name = meta.at(std::string(constants::J_NAME));
-    std::string version = meta.at(std::string(constants::J_VERSION));
     auto deps = detail::parse_dep_strings(
         meta.value(std::string(constants::J_DEPS), std::vector<std::string>{}));
 
@@ -471,25 +553,22 @@ ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all)
     root.name = name;
     root.version = version;
     root.status = not_installed ? ScanStatus::INSTALL : ScanStatus::KEEP;
-    root.reason = not_installed ? "target package (local)" : "already installed (local)";
+    root.reason = get_string(not_installed ? "info.depend_reason_target_local"
+                                           : "info.depend_reason_already_installed_local");
 
     // 解析传递依赖仓库
     Repository repo;
-    try {
-        repo.load_index();
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.repo_index_load_failed", e.what()));
-    }
+    (void)load_index_or_warn(repo);  // 统一入口：失败只告警（见 repository.hpp）
 
     DepMap plan;
     std::set<std::string> visited;
     for (const auto& dep : deps) {
-        std::string dv(constants::VER_LATEST);
-        if (!dep.constraints.empty()) {
-            if (auto m = repo.find_best_matching_version(dep.name, dep.constraints))
-                dv = m->version;
+        auto dv = resolve_dep_version(repo, dep);
+        if (!dv) {
+            warn_unsatisfiable(dep);
+            continue;
         }
-        resolve_transitive_deps(dep.name, dv, plan, visited, repo);
+        resolve_transitive_deps(dep.name, *dv, plan, visited, repo);
     }
 
     std::set<std::string> seen{name};
@@ -507,7 +586,7 @@ ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all)
                 c.name = real;
                 c.version = iv;
                 c.status = ScanStatus::KEEP;
-                c.reason = "already installed";
+                c.reason = get_string("info.depend_reason_already_installed");
                 root.children.push_back(std::move(c));
             }
             continue;
@@ -518,7 +597,9 @@ ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all)
         child.name = pit->second.name;
         child.version = pit->second.version;
         child.status = pit->second.already_installed ? ScanStatus::KEEP : ScanStatus::INSTALL;
-        child.reason = pit->second.already_installed ? "already installed" : "dependency";
+        child.reason =
+            get_string(pit->second.already_installed ? "info.depend_reason_already_installed"
+                                                     : "info.depend_reason_dependency");
 
         std::set<std::string> cs{real};
         build_install_tree(&child, real, plan, cs, repo, show_all);
@@ -532,22 +613,22 @@ ScanNode scan_install_from_file(const fs::path& lpkg_path, bool show_all)
 //  显示辅助函数
 // ═══════════════════════════════════════════════════════════════════════════
 
-/** 返回状态对应的文字标签 */
-std::string_view status_label(ScanStatus s)
+/** 状态对应的 l10n 键（调用方 `get_string(...)` 取译文） */
+std::string_view status_label_key(ScanStatus s)
 {
     switch (s) {
         case ScanStatus::REMOVED:
-            return "WILL BE REMOVED";
+            return "info.depend_status_removed";
         case ScanStatus::REBUILD:
-            return "NEEDS REBUILD";
+            return "info.depend_status_rebuild";
         case ScanStatus::INSTALL:
-            return "WILL BE INSTALLED";
+            return "info.depend_status_install";
         case ScanStatus::ABI_CHANGED:
-            return "ABI CHANGED";
+            return "info.depend_status_abi_changed";
         case ScanStatus::KEEP:
-            return "UNCHANGED";
+            return "info.depend_status_keep";
     }
-    return "UNKNOWN";
+    return "info.depend_status_unknown";
 }
 
 namespace
@@ -579,7 +660,8 @@ void print_subtree(const ScanNode& node, const std::string& prefix)
         bool last = (i == node.children.size() - 1);
         std::cout << prefix << (last ? "└── " : "├── ") << status_color(child.status) << child.name
                   << " (" << child.version << ") "
-                  << "[" << status_label(child.status) << "]" << constants::COLOR_RESET;
+                  << "[" << get_string(std::string(status_label_key(child.status))) << "]"
+                  << constants::COLOR_RESET;
         if (!child.reason.empty()) std::cout << "  (" << child.reason << ")";
         std::cout << "\n";
         print_subtree(child, prefix + (last ? "    " : "│   "));
@@ -592,7 +674,8 @@ void print_subtree(const ScanNode& node, const std::string& prefix)
 void print_tree(const ScanNode& node)
 {
     std::cout << status_color(node.status) << node.name << " (" << node.version << ") "
-              << "[" << status_label(node.status) << "]" << constants::COLOR_RESET;
+              << "[" << get_string(std::string(status_label_key(node.status))) << "]"
+              << constants::COLOR_RESET;
     if (!node.reason.empty()) std::cout << "  (" << node.reason << ")";
     std::cout << "\n";
     print_subtree(node, "");

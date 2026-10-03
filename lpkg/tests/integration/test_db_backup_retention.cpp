@@ -184,3 +184,49 @@ TEST_F(DbBackupRetentionTest, SecondUnpairedBatchAfterCommittedOneStillRetains)
 
     expect_backups_kept("第二批仍未配对（深度记账不能只看最后一行/最后一次 COMMIT_PKGS）");
 }
+
+// ── ⑦ **回滚没做全**时，重试依据也必须留着（2026-10-03 新增的失败信号）──────
+//
+// 这是 `recover.cpp` 里那条**新分支**唯一的用例：`rollback_uncommitted_region` 跑完
+// `reverse_execute` 之后，若 `stats.failures > 0`（有撤销动作**真的没成功**）就**不 seal**
+// —— 不 `purge_consumed_stashes`、不 `commit_batch`，于是 `recover_packages` 也不会
+// `cleanup_db_backups()`。整段保持"未提交"，下次 `lpkg rec` 幂等重做。
+//
+// 在此之前这件事**无从表达**：一次"文件存在却删不掉"与"幂等跳过"完全同形，恢复会照常
+// seal 并清掉唯一的重试依据。
+
+TEST_F(DbBackupRetentionTest, RecoveryWithFailedUndoKeepsTheRetryBasis)
+{
+    // 造一条**真的撤不掉**的行，不需要任何特权：`DIR_RM` 的逆操作要 `create_directories`，
+    // 而它的父路径被一个**普通文件**占着 ⇒ ENOTDIR。
+    const fs::path blocker = test_root / "blk";
+    {
+        std::ofstream f(blocker);
+        f << "x";  // blk 是个**文件**，不是目录
+    }
+    const fs::path target = test_root / "blk/sub";  // 因此这个目录建不出来
+
+    write_wal(std::string("BEGIN_PKGS 1\n") + "BEGIN crashed 1.0\n" + "DIR_RM " + target.string() +
+              " 488 0 0\n");
+    seed_backups();
+
+    recover_packages();
+
+    expect_backups_kept("回滚有撤不掉的行 ⇒ 整段保持未提交，重试依据必须留着");
+}
+
+/** 对照组：同一条 DIR_RM 在路径**建得出来**时，恢复照常 seal 并清备份。 */
+TEST_F(DbBackupRetentionTest, RecoveryWithFullySuccessfulUndoCleansTheRetryBasis)
+{
+    const fs::path target = test_root / "ok/leaf";
+
+    write_wal(std::string("BEGIN_PKGS 1\n") + "BEGIN crashed 1.0\n" + "DIR_RM " + target.string() +
+              " 488 0 0\n");
+    seed_backups();
+
+    recover_packages();
+
+    ASSERT_TRUE(fs::is_directory(target))
+        << "取证无效：对照组本该把目录建出来（说明那条行确实跑到了）";
+    expect_backups_cleaned("回滚做全了 ⇒ 照常清理（没有这一条，上面那个「保留」就没有区分力）");
+}

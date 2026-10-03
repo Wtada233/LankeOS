@@ -387,10 +387,26 @@ TEST_F(WalEdgeCaseTest, BatchRollbackEmptySuccessList)
         "BEGIN none 1.0\n"
         "BACKUP /a \xe2\x86\x92 /a.bak\n");
 
-    EXPECT_NO_THROW(wal::batch_rollback({}));
+    // 订正（2026-10-03）：原注释声明"空列表 → 应提前返回、WAL 应保留、不写 COMMIT_PKGS"，
+    // 与实现**不符** —— `batch_rollback` 的提前返回判据是 **`ops.empty()`**（WAL 里没有
+    // 未提交批次），**不是** `successfully_installed.empty()`（见 wal_op.cpp `batch_rollback`
+    // 开头与 wal_op.hpp 的返回值说明）。本用例的 WAL 有一个尚未配对的 `BEGIN_PKGS` ⇒ 批次
+    // 仍开着 ⇒ 即便"已成功安装的包"列表为空，批次照样要被逆向执行 + 用 `COMMIT_PKGS` 封口。
+    // 空列表只意味着"没有包级 `ROLLBACK`/`END` 要写"。
+    // 断言因此钉**真实行为**（有区分力：若改为"空列表提前返回"，返回值与 WAL 都会变）。
+    EXPECT_TRUE(wal::batch_rollback({}))
+        << "有未提交行 ⇒ 回滚必须真的执行并封口（返回 true），与「无可回滚的行」不同";
 
-    // 空列表 → 应提前返回（无要移除的包）
-    // WAL 应保留，不写 COMMIT_PKGS
+    std::ifstream f(wal::wal_log_path());
+    std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+    // 批次被 COMMIT_PKGS 封口（而不是被"空列表"提前 return 掉）
+    EXPECT_NE(content.find("COMMIT_PKGS"), std::string::npos)
+        << "空的成功列表不该让批次保持敞开：\n"
+        << content;
+    // 空列表 ⇒ 不写任何包级 ROLLBACK（没有已成功安装的包要回滚）
+    EXPECT_EQ(content.find("ROLLBACK"), std::string::npos)
+        << "没有已成功安装的包 ⇒ 不该写出包级 ROLLBACK 行：\n"
+        << content;
 }
 
 // ── cleanup_db_backups 递归清理子目录 ────────────────────────────
@@ -431,4 +447,23 @@ TEST_F(WalEdgeCaseTest, ExtractReturnsEmptyOnAllCommitted)
 
     auto ops = wal::extract_current_batch_ops(wal::wal_log_path());
     EXPECT_TRUE(ops.empty());
+}
+
+// -----------------------------------------------------------------------
+// CRLF 的 WAL：referenced_stash_roots() 必须与 read_wal_lines 同口径剥 `\r`
+// -----------------------------------------------------------------------
+TEST_F(WalEdgeCaseTest, ReferencedStashRootsStripsCarriageReturns)
+{
+    // 手写/外部工具产出的 CRLF WAL。此前 `referenced_stash_roots()` 用手写 getline、
+    // **不剥** `\r`（`read_wal_lines` 剥）→ arg2 尾上粘 `\r` → 算出的 stash 根带 `\r`
+    // → 它作为 confinement 白名单 / `cleanup_orphan_stashes` 的 keep 集时
+    // **漏保护真正的 stash 根**（2026-10-02 修）。
+    const std::string bak = (test_root / "usr/lib/.lpkg_bak_pkg_123").string();
+    write_wal("BACKUP " + (test_root / "usr/lib/libx.so").string() + " \xe2\x86\x92 " + bak +
+              "\r\n");
+
+    const auto roots = wal::referenced_stash_roots();
+    ASSERT_EQ(roots.size(), 1u) << "应当解析出一条 stash 根";
+    EXPECT_EQ(roots.begin()->string().find('\r'), std::string::npos)
+        << "stash 根带上了 CR：" << roots.begin()->string();
 }

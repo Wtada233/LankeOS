@@ -570,8 +570,7 @@ TEST_F(UnstashBreakpointTest, VanishedPackageContentDoesNotLoseTheConfig)
         bp_hit = true;
         // 把**包内**那份（解压临时目录里的）删掉：模拟"写入趟扫描不到它"
         std::error_code ec;
-        fs::remove(Config::instance().get_tmp_dir() / pkg / "content" / "etc" / "ub_vanish.conf",
-                   ec);
+        fs::remove(Config::get_tmp_dir() / pkg / "content" / "etc" / "ub_vanish.conf", ec);
     });
     // ② 放回那一刻（`UNSTASH` 行已落、rename 未做）—— 这个断点此前**没接**在这个调用点上
     // （`record_let_go_facts()` 是唯一不传 `after_wal_breakpoint` 的 un_stash 调用点），

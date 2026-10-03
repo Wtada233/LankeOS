@@ -20,6 +20,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -42,7 +43,7 @@ protected:
 
     void SetUp() override
     {
-        suite_dir = fs::absolute("tmp_durable_fsync_test");
+        suite_dir = fs::absolute("tmp_durable_fsync_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_dir)) fs::remove_all(suite_dir);
         test_root = suite_dir / "root";
         fs::create_directories(test_root);

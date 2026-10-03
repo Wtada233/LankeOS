@@ -77,6 +77,9 @@ struct FactCell {
     /// ⚠️ **必须留在最后**：本结构到处用**位置初始化**（`{true, false, true, true, false}`），
     /// 往中间插一个字段会让下面每一条 case 静默错位、而且错得很像"表算错了"。
     bool disk_is_symlink = false;
+    /// 归档条目与盘上那份都是符号链接、且**目标逐字节相同**（2026-10-02 新增）。
+    /// ⚠️ 同 `disk_is_symlink`：**必须留在最后**（本结构到处用位置初始化）。
+    bool disk_symlink_matches_entry = false;
 };
 
 const char* cfg_name(ConfigDisposition c)
@@ -141,6 +144,8 @@ std::string describe(const FactCell& c, bool in_archive)
     s += !c.disk_exists
              ? "无"
              : (c.disk_is_dir ? "真目录" : (c.disk_is_symlink ? "符号链接" : "普通文件"));
+    if (c.entry_is_symlink && c.disk_is_symlink)
+        s += c.disk_symlink_matches_entry ? " 目标相同" : " 目标不同";
     s += " cfg=";
     s += cfg_name(c.cfg);
     if (!in_archive) {
@@ -163,6 +168,7 @@ PathFacts facts_of(const FactCell& c, bool in_archive)
     f.disk_exists = c.disk_exists;
     f.disk_is_dir = c.disk_is_dir;
     f.disk_is_symlink = c.disk_is_symlink;
+    f.disk_symlink_matches_entry = c.disk_symlink_matches_entry;
     f.cfg = c.cfg;
     f.obsolete = c.obsolete;
     f.last_owner = c.last_owner;
@@ -194,18 +200,29 @@ void for_each_cell(F&& visit)
                                             // "符号链接"互斥（lstat 语义，见 PathFacts）
                                             if (disk_is_symlink && (!disk_exists || disk_is_dir))
                                                 continue;
-                                            FactCell c;
-                                            c.is_config = is_config;
-                                            c.entry_is_dir = entry_is_dir;
-                                            c.entry_is_symlink = entry_is_symlink;
-                                            c.disk_exists = disk_exists;
-                                            c.disk_is_dir = disk_is_dir;
-                                            c.disk_is_symlink = disk_is_symlink;
-                                            c.cfg = cfg;
-                                            c.obsolete = obsolete;
-                                            c.last_owner = last_owner;
-                                            c.new_dir_entry = new_dir_entry;
-                                            visit(c);
+                                            // "目标相同"只在**两边都是符号链接**时才可能为真；
+                                            // 其余组合下那个变量恒假，枚举它只是让空间翻倍而不
+                                            // 增值（同 `disk_is_dir 蕴含 disk_exists`
+                                            // 的既有做法）。
+                                            const bool both_link =
+                                                entry_is_symlink && disk_is_symlink;
+                                            for (int link_matches = 0;
+                                                 link_matches <= (both_link ? 1 : 0);
+                                                 ++link_matches) {
+                                                FactCell c;
+                                                c.is_config = is_config;
+                                                c.entry_is_dir = entry_is_dir;
+                                                c.entry_is_symlink = entry_is_symlink;
+                                                c.disk_exists = disk_exists;
+                                                c.disk_is_dir = disk_is_dir;
+                                                c.disk_is_symlink = disk_is_symlink;
+                                                c.disk_symlink_matches_entry = link_matches;
+                                                c.cfg = cfg;
+                                                c.obsolete = obsolete;
+                                                c.last_owner = last_owner;
+                                                c.new_dir_entry = new_dir_entry;
+                                                visit(c);
+                                            }
                                         }
 }
 
@@ -258,8 +275,12 @@ TEST(DecisionTableModelTest, EveryFactCombinationIsClaimedExactlyOnce)
     //   `disk_is_symlink ⇒ disk_exists ∧ ¬disk_is_dir`（8 种里去掉 3 种 ⇒ 去掉 3/8）。
     // 前两条互不相交于第三条的维度之外，逐维相乘：
     //   16(自由维) × 3(条目维) × 4(盘面三维) × 3(cfg) = 576
-    EXPECT_EQ(archive_cells, 576u) << "事实空间的枚举数目变了（改了 for_each_cell 的维数？）";
-    EXPECT_EQ(old_key_cells, 576u);
+    // 2026-10-02：新增 `disk_symlink_matches_entry` 一维。它只在**两边都是符号链接**时才可能
+    // 为真，`for_each_cell` 也只在那里枚举它（其余组合下枚举它只是让空间翻倍而不增值）⇒
+    // 多出的格子 = 16(自由维) × 1(条目维＝符号链接) × 1(盘面三维＝符号链接) × 3(cfg) = 48。
+    // 故 576 + 48 = 624。
+    EXPECT_EQ(archive_cells, 624u) << "事实空间的枚举数目变了（改了 for_each_cell 的维数？）";
+    EXPECT_EQ(old_key_cells, 624u);
 }
 
 /** 取一格的决策（断言消息里带上摘要，失败时能直接复现） */
@@ -347,6 +368,15 @@ TEST(DecisionTableModelTest, GoldenTableMatchesArchSection63)
          true,
          PathAction::Noop,
          PathAction::WriteLpkgnew,
+         PathAction::Unclaimed},
+        // 同上，但**目标逐字节相同** ⇒ `KeepOnDisk`：连 `.lpkgnew` 都不产生。
+        // 旧行为不看目标、一律退 `.lpkgnew`，于是链接没变的重装也堆副本（2026-10-02 修）。
+        {"归档符号链接撞盘上符号链接（/etc，类型未变，**目标相同**）→ 盘上那份就是我们要的",
+         {true, false, true, true, false, ConfigDisposition::InstallNew, false, false, false, true,
+          true},
+         true,
+         PathAction::Noop,
+         PathAction::KeepOnDisk,
          PathAction::Unclaimed},
         // 同上，只是新形态是**符号链接**（与 dir→file 同一落点政策，见 `ARCH.md` §6.3）
         {"归档符号链接撞盘上真目录（dir→symlink，/etc）→ 整树改名 .lpkgsave 后就地落链接",
@@ -526,6 +556,25 @@ TEST(DecisionTableModelTest, LetGoActuallyClearsTheWay)
                        "（let_go="
                     << action_name(d.let_go) << "）—— rename 恒 EISDIR：" << ctx;
             }
+            // `KeepOnDisk` = 写入趟**不碰盘**。它有两个来源，各自的让开动作**必须配套**，
+            // 配错就是把盘上那份搬走了却没人搬回来（②）或没搬却去搬回（①）：
+            //   ① `/etc` file→file 判为 `KeepLocal`（三哈希）→ 让开趟 `Stash` 走了，
+            //      写入趟 `un_stash` 搬回（那个分支的 `stashed_bak` 有值）；
+            //   ② `/etc` symlink→symlink 且**目标逐字节相同**（2026-10-02 新增）→ 让开趟
+            //      `Noop`（压根没搬），写入趟因此也不该有搬运。
+            if (d.write == PathAction::KeepOnDisk) {
+                if (c.entry_is_symlink) {
+                    EXPECT_TRUE(c.disk_symlink_matches_entry)
+                        << "符号链接条目的 KeepOnDisk 只该来自「目标逐字节相同」：" << ctx;
+                    EXPECT_EQ(action_name(d.let_go), action_name(PathAction::Noop))
+                        << "目标相同的 symlink→symlink：让开趟必须是 Noop（没搬就不能搬回）："
+                        << ctx;
+                } else {
+                    EXPECT_EQ(action_name(d.let_go), action_name(PathAction::Stash))
+                        << "file→file 的 KeepOnDisk：让开趟必须是 Stash（写入趟靠它 un_stash）"
+                        << ctx;
+                }
+            }
         }
         // ── DB 旧键侧：废弃清除的三条落点各自的适用条件 ───────────────────────────
         {
@@ -556,7 +605,7 @@ TEST(DecisionTableModelTest, LetGoActuallyClearsTheWay)
             }
         }
     });
-    EXPECT_EQ(checked, 576u) << "事实空间没被整片检查（枚举写错了？）";
+    EXPECT_EQ(checked, 624u) << "事实空间没被整片检查（枚举写错了？）";
 }
 
 }  // namespace

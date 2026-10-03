@@ -19,7 +19,18 @@
  *
  *   正向路径：
  *     BEGIN_PKGS → Cache::write(":batch-start") → execute()
- *     → 逐包 Cache::write(pkg + ":installed") → COMMIT_PKGS
+ *     → Cache::write(":batch-end") → COMMIT_PKGS
+ *
+ *   `:batch-end` 那一次由 **op 自己在末尾调用**（执行器不认识 Cache），全批次**只写一次**。
+ *   曾经是**逐包** `Cache::write(pkg + ":installed")`：每包把 6 个 DB 文件全量重写一遍、
+ *   各留一份全量备份，本机实测 `files.db` 19.8 MB ⇒ 100 包批次落下 ~2 GB 临时备份。
+ *   改为一次的依据有两条，都是查实的：① **批次进行中没有任何读取器读盘上的 DB**
+ *   （`Cache::load()` 的调用点全在批次之外，循环内一律走内存 `Cache`）；② 未提交批次
+ *   **一律整体回滚**，所以中途的盘上状态既不可观测、也不可能成为最终状态。
+ *   崩溃窗口逐条对过仍然安全：提交前崩溃 ⇒ 该行不存在、官方文件从未被碰；写 `:batch-end`
+ *   的中途崩溃 ⇒ 普通的 `DbBakExists` 守卫处理（不是 `:batch-start` 那条跳过判据）。
+ *   ⚠️ 里程碑名**不能**用 `:batch-start`：`batch_start_db_still_in_place` 会把它判成
+ *   "可跳过"，批次后的 DB 就永远回滚不回来了。
  *
  *   异常路径（catch）：
  *     execute() 抛异常
@@ -81,10 +92,19 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
             // "见到 CLEANUP 就不回滚"的分岔。旧版 lpkg 把 CLEANUP 写在批次内，其遗留 WAL
             // **不在支持范围**：lpkg 经 lpkg 升级时旧二进制会先 recover_packages() 处理掉
             // 遗留 WAL、新二进制才上线；手工替换二进制不受支持（ARCH.md §11.3）。
-            if (wal::batch_rollback(successfully_installed)) {
-                cleanup_db_backups();
-                trim_completed();
+            wal::RollbackStats rs;
+            if (wal::batch_rollback(successfully_installed, &rs)) {
+                // 有撤销动作**真的没成功**（EROFS / immutable / 权限…）⇒ 批次虽已封口，
+                // 但 DB 备份是**唯一还能重试的还原点**：留着它，下次 `lpkg rec` 或人工处理
+                // 还有第二次机会。宁可留残留，也不删未还原的数据 —— 与
+                // `purge_consumed_stashes` 的收敛判据同一取向。
+                // 告警已由 `reverse_execute` 统一发出（那是唯一看得到全部失败行的地方）。
+                if (rs.failures == 0) {
+                    cleanup_db_backups();
+                    trim_completed();
+                }
             }
+            // NOLINTNEXTLINE(bugprone-empty-catch) — 下面的注释就是理由：绝不清理，留给下次 rec
         } catch (...) {
             // **回滚自身失败**（如 reverse_execute 的 safe_rename 中途报错）：
             // 绝不清理 DB 备份、不 trim——保留 WAL 的未提交批次与全部

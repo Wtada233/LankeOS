@@ -3,13 +3,16 @@
  *
  * 挂载时机统一到批次提交后之后（见 finish_committed_batch），一次多包批次会连着跑多个钩子，
  * 而原日志是 `正在运行钩子: postinst.sh` / `Running hook: postinst.sh` —— 在日志里没有任何
- * 上下文（哪个包？）。改成带包名的形态。
+ * 上下文（哪个包？）。现在是 systemd 风格的单行状态：
+ * `==> Running post-install hook of package foo ... [OK]`（2026-10-03 起钩子名翻成人话，
+ * 见 `hook_display_name` 与 `ui.running_hook`）。
  *
  * 断言刻意**落在那一行本身**（先按行切开、再找含 hook 名的那行），而不是在整个输出里
  * `find(包名)` —— 后者是空转：安装过程本来就会打印"开始安装 <包名>"，无论日志行改没改都会绿。
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -42,7 +45,7 @@ protected:
         init_localization();
         BreakpointManager::instance().clear_all();
 
-        suite_work_dir = fs::absolute("tmp_hook_log_test");
+        suite_work_dir = fs::absolute("tmp_hook_log_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
@@ -57,13 +60,16 @@ protected:
     void TearDown() override
     {
         BreakpointManager::instance().clear_all();
-        Config::instance().set_no_hooks_mode(true);
         Config::instance().set_root_path("/");
+        // 不在这里 set_no_hooks_mode(true)：那是**进程级**开关，留给后面每个用例的都是"钩子禁用"
+        // （2026-10-03 实测把 PhaseSectionTest 打红，还让它的断言空转）—— 复位交给
+        // tests/test_hygiene.hpp 的全局 listener。
         fs::remove_all(suite_work_dir);
     }
 
-    /** 打一个带 postinst 钩子的包 */
-    std::string pack_with_postinst(const std::string& name)
+    /** 打一个带 postinst **与 prerm** 钩子的包（2026-10-03：原来只有 postinst，prerm 用例恒空转）
+     */
+    std::string pack_with_hooks(const std::string& name)
     {
         const fs::path work = suite_work_dir / ("_pkg_" + name);
         fs::create_directories(work / "content" / "usr" / "bin");
@@ -71,6 +77,7 @@ protected:
         // packer 会把 <work>/hooks/ 整个作为归档里的 hooks/ 加进去
         fs::create_directories(work / "hooks");
         std::ofstream(work / "hooks" / std::string(constants::POSTINST_SH)) << "#!/bin/sh\ntrue\n";
+        std::ofstream(work / "hooks" / std::string(constants::PRERM_SH)) << "#!/bin/sh\ntrue\n";
         const std::string path = (pkg_dir / (name + "-1.0.lpkg")).string();
         pack_package(path, work.string(), name, "1.0", {}, {}, "man " + name, {});
         return path;
@@ -110,13 +117,15 @@ protected:
 
 TEST_F(HookLogMessageTest, PostinstLogLineNamesThePackage)
 {
-    const std::string pkg = pack_with_postinst("hooklog");
+    const std::string pkg = pack_with_hooks("hooklog");
 
     testing::internal::CaptureStdout();
     install_packages({pkg});
     const std::string out = testing::internal::GetCapturedStdout();
 
-    const std::string line = running_hook_line(out, std::string(constants::POSTINST_SH));
+    // 找的是**人话**版钩子名（`post-install hook`），不是文件名 `postinst.sh` ——
+    // 后者已不再出现在日志里（2026-10-03 改）。
+    const std::string line = running_hook_line(out, get_string("hook.name.postinst"));
     ASSERT_FALSE(line.empty()) << "输出里没有\"运行钩子\"那条消息（只有路径行不算）：\n" << out;
     // 关键断言：那一行**本身**必须带包名（整个输出里含包名是必然的，不能拿来当证据）
     EXPECT_NE(line.find("hooklog"), std::string::npos)
@@ -126,17 +135,18 @@ TEST_F(HookLogMessageTest, PostinstLogLineNamesThePackage)
 
 TEST_F(HookLogMessageTest, PrermLogLineNamesThePackage)
 {
-    const std::string pkg = pack_with_postinst("hooklogrm");
+    const std::string pkg = pack_with_hooks("hooklogrm");
     install_packages({pkg});
 
     testing::internal::CaptureStdout();
     remove_packages({"hooklogrm"});
     const std::string out = testing::internal::GetCapturedStdout();
 
-    // 这个 fixture 只带 postinst；移除时若没有 prerm 就不会有对应日志行——
-    // 所以只断言"若出现 prerm 行则必须点名包"，避免把 fixture 的形态当成断言前提。
-    const std::string line = running_hook_line(out, "prerm");
-    if (!line.empty()) {
-        EXPECT_NE(line.find("hooklogrm"), std::string::npos) << "该行实际是：\n" << line;
-    }
+    // 2026-10-03 订正：fixture 原来只打 postinst，prerm 行不存在 ⇒ 断言被 `if (!line.empty())`
+    // 包住、**恒空转**。现在 fixture 同时带 prerm，改成强断言：prerm 行**必须出现**且点名包。
+    const std::string line = running_hook_line(out, get_string("hook.name.prerm"));
+    ASSERT_FALSE(line.empty()) << "移除时应打印 prerm 钩子行（只有路径行不算）：\n" << out;
+    EXPECT_NE(line.find("hooklogrm"), std::string::npos)
+        << "prerm 钩子执行日志没有点名包。该行实际是：\n"
+        << line;
 }

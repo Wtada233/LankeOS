@@ -2,6 +2,28 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
+
+/**
+ * @brief 归档成员名"危险"判定 —— `pack`（写侧）与解压（读侧）**共用的唯一判据**。
+ *
+ * 成员名会变成 WAL 行的**字面内容**（`op + " " + src + " → " + bak`），而 WAL 是行式协议，
+ * 两侧都不转义 —— 含 `\n` 的名字能伪造 WAL 行、含字面 `" → "` 的名字能破坏箭头分帧，
+ * `.lpkgtmp`/`.lpkgnew` 则会与 lpkg 自己的 rename/落位撞名。伤害发生在解压**之后**，
+ * 唯一能挡的地方就是名字进入系统之前（判据的完整推导见 `archive.cpp` 的长注释）。
+ *
+ * 返回**空串** = 名字合法；否则返回**已填好参数**的错误消息（可直接交给异常）。
+ *
+ * @param member         待判定的成员名（未归一化，含前导 `./`·`/` 也不误判）
+ * @param container_path 仅用于消息：解压侧传归档路径，打包侧传**输出**文件路径。
+ *                       打包侧也要判的理由：不判的话 `lpkg pack` 能产出自己的 extractor
+ *                       会拒收的包 —— 缺陷要拖到下游、甚至用户手上才暴露。
+ *
+ * 只判**内容**，不负责剥前导 `./`·`/`：那是解压侧"成员名 → 解压根内相对路径"的事，
+ * 打包侧的名字本来就是相对的。
+ */
+std::string member_name_rejection_message(std::string_view member,
+                                          const std::string& container_path);
 
 /**
  * @brief 解压 .tar.zst 存档到指定目录

@@ -40,6 +40,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -116,7 +117,7 @@ protected:
         fs::create_directories(work / "hooks");
         for (const auto& [file, content] : hooks) std::ofstream(work / "hooks" / file) << content;
 
-        const std::string path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
+        const std::string path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
         pack_package(path, work.string(), name, ver, {}, provides, "", needed_so);
         return path;
     }
@@ -347,7 +348,7 @@ TEST_F(HookTransactionTest, AlreadyInstalledBatchMemberKeepsItsHooks)
                                                                              "libua.so.1", ""},
               std::tuple<std::string, std::string, std::string, std::string>{"ub", "1.0", "",
                                                                              "libua.so.1"}}) {
-            const fs::path built = pkg_dir / (n + "-" + v + ".lpkg");
+            const fs::path built = pkg_dir / std::format("{}-{}.lpkg", n, v);
             fs::create_directories(mirror / n);
             fs::copy(built, mirror / n / (v + ".lpkg"), fs::copy_options::overwrite_existing);
             index << n << "|" << v << ":" << calculate_sha256(built) << "::" << prov << ":" << nso

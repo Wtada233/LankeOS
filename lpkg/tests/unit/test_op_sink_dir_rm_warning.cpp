@@ -18,6 +18,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -47,7 +48,7 @@ protected:
     {
         init_localization();
         Config::instance().set_testing_mode(true);
-        suite_dir = fs::absolute("tmp_op_sink_dir_rm_warning_test");
+        suite_dir = fs::absolute("tmp_op_sink_dir_rm_warning_test_" + std::to_string(::getpid()));
         fs::remove_all(suite_dir);
         root = suite_dir / "root";
         fs::create_directories(root);

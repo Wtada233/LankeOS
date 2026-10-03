@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <string>
 
 // ============================================================================
@@ -37,9 +38,18 @@ inline size_t elf_section_entry_count(uint64_t sh_size, uint64_t sh_entsize)
  * 幂等：链接指向当前目录里存在、且其 DT_SONAME 就等于链接名的库时不动它，否则重建；
  * 无人再提供该 SONAME 的悬空链接被清理（库被删除/替换后收尾）。实体文件不动。
  *
- * @param lib_dir 共享库所在目录
+ * @param lib_dir       共享库所在目录
+ * @param keep_dangling 可选的**注入判据**：返回 true 表示"这条悬空链接**不要删**"。
+ *   存在的理由是"**别删属于某个包的链接**"——包可以刻意发一条
+ *   `libfoo.so.1 -> libfoo.so.1.2.3`、而 `.1.2.3` 由**另一个**包提供且此刻还没装，
+ *   删掉它没有任何机制会重建 ⇒ 运行期 `cannot open shared object file`。
+ *   本函数住在 `elf/` 层，**不能**自己去问 `Cache`（那是 `db/`，反向依赖），所以由调用方
+ *   注入：安装期的 ldconfig 触发器传一个查 `Cache` 归属的判据；构建期（staging）不传 ——
+ *   那一侧算出来的逻辑键与宿主 DB 对不上，一律按"无主"处理，行为与改动前一致。
  */
-void apply_soname_links(const std::filesystem::path& lib_dir);
+void apply_soname_links(
+    const std::filesystem::path& lib_dir,
+    const std::function<bool(const std::filesystem::path&)>& keep_dangling = {});
 
 /**
  * @brief 从 ELF 文件中提取 SONAME

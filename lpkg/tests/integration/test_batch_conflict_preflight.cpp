@@ -31,6 +31,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <map>
 #include <sstream>
@@ -105,7 +106,7 @@ protected:
             fs::create_directories(work / "hooks");
             for (const auto& h : hooks) std::ofstream(work / "hooks" / h) << "#!/bin/sh\nexit 0\n";
         }
-        const std::string path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
+        const std::string path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
         pack_package(path, work.string(), name, ver, deps, {}, "man " + name, {});
         return path;
     }
@@ -292,9 +293,15 @@ TEST_F(BatchConflictPreflightTest, ManualFileConflictIsRefusedByPreflightToo)
     }
     BreakpointManager::instance().clear_all();
 
-    // 无人持有 → 泛化消息（与逐包检查同一份措辞）
-    EXPECT_NE(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
-        << "无人持有时应报 " << get_string("error.unknown_manual_file") << "：" << msg;
+    // 无人持有 → 用"不属于任何包"的**配套措辞**（`error.file_conflict_unowned`，只认文件路径）；
+    // **不再**把占位文本 `error.unknown_manual_file` 当**持有者名**塞进 file_conflict_entry
+    // （那会渲染成 "owned by package unknown (manual file)"，2026-10-03
+    // 改）。判据与逐包检查同一份。
+    EXPECT_NE(msg.find(string_format("error.file_conflict_unowned", "/usr/share/manual.txt")),
+              std::string::npos)
+        << "无人持有 → 应报 error.file_conflict_unowned（只认文件路径）：" << msg;
+    EXPECT_EQ(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
+        << "占位文本不该被当成持有者名渲染进报告：" << msg;
     EXPECT_FALSE(a_install_began) << "预检必须在批次第一个包开始装之前拦下";
     EXPECT_FALSE(fs::exists(test_root / "usr/bin/mfirst"));
     EXPECT_EQ(read_text(test_root / "usr/share/manual.txt"), "手工放的文件\n")
@@ -418,7 +425,7 @@ TEST_F(BatchConflictPreflightTest, UpgradeBatchIsGatedToo)
     std::ofstream index(mirror / "index.txt");
     for (const auto& [n, v] :
          {std::pair<std::string, std::string>{"ualpha", "2.0"}, {"uvictim", "2.0"}}) {
-        const fs::path built = pkg_dir / (n + "-" + v + ".lpkg");
+        const fs::path built = pkg_dir / std::format("{}-{}.lpkg", n, v);
         fs::create_directories(mirror / n);
         fs::copy(built, mirror / n / (v + ".lpkg"), fs::copy_options::overwrite_existing);
         index << n << "|" << v << ":" << calculate_sha256(built) << ":"
@@ -489,4 +496,41 @@ TEST_F(BatchConflictPreflightTest, UpgradeExemptionHoldsWhenOldFileMovesToALater
     EXPECT_TRUE(Cache::instance().get_file_owners("/usr/lib/libmoved.so.1").contains("taker"));
     EXPECT_FALSE(Cache::instance().get_file_owners("/usr/lib/libmoved.so.1").contains("migrator"));
     EXPECT_EQ(count_residue(), 0);
+}
+
+/**
+ * **回归（2026-10-02）**：上一条用例的 `/etc` 孪生版 —— 同一形状原样搬到 `/etc` 下。
+ *
+ * 预检里模拟"前序成员腾空了这些路径"的那段，曾经对**所有** `/etc` 键一刀切 `continue`，
+ * 注释理由是"`/etc` 的废弃条目只撤所有权、文件留在盘上（改名 .lpkgsave 是移除侧的事）"。
+ * 那描述的是 **2026-09-26 之前**的语义：现在升级侧会把废弃的 `/etc` **文件/符号链接**改名成
+ * `<路径>.lpkgsave`（`SaveConfigObsolete`，见 `installation_task_letgo.cpp`），该路径**确实
+ * 被腾空**。沿用旧注释 ⇒ 后序成员的合法接管被判成"无主手工文件"⇒ **整批拒绝**，而且随成员
+ * 顺序时好时坏。非 `/etc` 的孪生用例一直是绿的，正是因为它不走那行 `continue`。
+ */
+TEST_F(BatchConflictPreflightTest, UpgradeExemptionHoldsForEtcFileMovedToALaterMember)
+{
+    const std::string v1 = pack("etc_migrator", "1.0", {}, [&](const fs::path& c) {
+        write_file(c / "usr" / "bin" / "etc_migrator", "v1\n");
+        write_file(c / "etc" / "moved.conf", "moved v1\n");
+    });
+    ASSERT_NO_THROW(install_packages({v1}));
+    ASSERT_TRUE(Cache::instance().get_file_owners("/etc/moved.conf").contains("etc_migrator"));
+
+    // 依赖把顺序钉成 [etc_migrator, etc_taker]：释放者在前面、接手者在后面
+    const std::string v2 = pack("etc_migrator", "2.0", {}, [&](const fs::path& c) {
+        write_file(c / "usr" / "bin" / "etc_migrator", "v2\n");
+    });
+    const std::string taker = pack("etc_taker", "1.0", {"etc_migrator"}, [&](const fs::path& c) {
+        write_file(c / "etc" / "moved.conf", "moved from taker\n");
+    });
+
+    ASSERT_NO_THROW(install_packages({v2, taker}))
+        << "前一成员升级时废弃的 /etc 文件会改名 .lpkgsave 让开，后一成员接管它是合法批次";
+    EXPECT_EQ(Cache::instance().get_installed_version("etc_migrator"), "2.0");
+    // 旧配置留档（不丢数据），新物就地落位
+    EXPECT_TRUE(fs::exists(test_root / "etc/moved.conf.lpkgsave")) << "旧配置必须留档，不能消失";
+    EXPECT_EQ(read_text(test_root / "etc/moved.conf"), "moved from taker\n");
+    EXPECT_TRUE(Cache::instance().get_file_owners("/etc/moved.conf").contains("etc_taker"));
+    EXPECT_FALSE(Cache::instance().get_file_owners("/etc/moved.conf").contains("etc_migrator"));
 }

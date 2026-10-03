@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -24,7 +25,7 @@ protected:
 
     void SetUp() override
     {
-        test_root = fs::absolute("tmp_feature_test");
+        test_root = fs::absolute("tmp_feature_test_" + std::to_string(::getpid()));
         pkgs_dir = test_root / "pkgs";
         if (fs::exists(test_root)) fs::remove_all(test_root);
         fs::create_directories(pkgs_dir);
@@ -127,9 +128,14 @@ TEST_F(FeatureTest, TriggerActivation)
     install_packages({pkg_path});
     std::string output = testing::internal::GetCapturedStdout();
 
-    bool found = (output.find("Trigger: ldconfig") != std::string::npos) ||
-                 (output.find("触发器: ldconfig") != std::string::npos);
-    EXPECT_TRUE(found) << "Output was: " << output;
+    // 语言无关的锚：拿 `ui.running_trigger` 模板里第一个占位符之前的字面前缀，后面紧跟命令名。
+    // （此前写死 "Trigger: ldconfig"/"触发器: ldconfig" —— 那一行已改成 systemd 风格的
+    //   `==> Running system trigger: ldconfig ... [OK]`。）
+    const std::string tmpl = get_string("ui.running_trigger");
+    const std::string anchor = tmpl.substr(0, tmpl.find('{'));
+    ASSERT_FALSE(anchor.empty()) << "l10n 键 ui.running_trigger 缺失：" << tmpl;
+    EXPECT_NE(output.find(anchor + "ldconfig"), std::string::npos)
+        << "没看到触发器执行行。Output was: " << output;
 }
 
 TEST_F(FeatureTest, BootstrapInstallation)

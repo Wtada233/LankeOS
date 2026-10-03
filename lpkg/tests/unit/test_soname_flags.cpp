@@ -53,7 +53,7 @@ TEST_F(SonameFlagTest, HasSystemSonameInUsrLib)
     std::string root = "/tmp/lpkg_test_soname";
     fs::remove_all(root);
     fs::create_directories(fs::path(root) / constants::USR_LIB);
-    std::ofstream(fs::path(root) / constants::USR_LIB / "libold.so.1");
+    ensure_file_exists(fs::path(root) / constants::USR_LIB / "libold.so.1");
     Config::instance().set_root_path(root);
 
     EXPECT_TRUE(Config::instance().has_system_soname("libold.so.1"));
@@ -68,7 +68,7 @@ TEST_F(SonameFlagTest, HasSystemSonameInUsrLib64)
     std::string root = "/tmp/lpkg_test_soname64";
     fs::remove_all(root);
     fs::create_directories(fs::path(root) / constants::USR_LIB64);
-    std::ofstream(fs::path(root) / constants::USR_LIB64 / "libold.so.2");
+    ensure_file_exists(fs::path(root) / constants::USR_LIB64 / "libold.so.2");
     Config::instance().set_root_path(root);
 
     EXPECT_TRUE(Config::instance().has_system_soname("libold.so.2"));
@@ -114,7 +114,7 @@ TEST_F(SonameFlagTest, ForwardCheckToleratedUnderMissingSoNoError)
     opts.use_system_soname = true;
     opts.system_sonames = {"libfoo.so.1"};
     fs::create_directories(fs::path(work) / "root" / constants::USR_LIB);
-    std::ofstream(fs::path(work) / "root" / constants::USR_LIB / "libfoo.so.1");
+    ensure_file_exists(fs::path(work) / "root" / constants::USR_LIB / "libfoo.so.1");
     auto r3 = solv::solve_install(repo, {}, {}, {{"orphan", "latest"}}, opts);
     EXPECT_TRUE(r3.ok());
 

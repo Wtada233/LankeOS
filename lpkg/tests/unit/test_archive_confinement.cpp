@@ -13,6 +13,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -37,7 +38,7 @@ protected:
     void SetUp() override
     {
         init_localization();
-        suite_dir = fs::absolute("tmp_archive_confinement_test");
+        suite_dir = fs::absolute("tmp_archive_confinement_test_" + std::to_string(::getpid()));
         fs::remove_all(suite_dir);
         out_dir = suite_dir / "out";
         escape_dir = suite_dir / "outside";  // 与 out_dir 平级 → 逃逸目标落在解压根之外
@@ -156,6 +157,30 @@ TEST_F(ArchiveConfinementTest, LegitimateHardlinkInsideRootStillWorks)
     std::error_code ec;
     EXPECT_TRUE(fs::equivalent(out_dir / "content/orig.txt", out_dir / "content/link.txt", ec))
         << "根内硬链接应当是同一 inode: " << ec.message();
+}
+
+TEST_F(ArchiveConfinementTest, ContentRootSymlinkIsRefusedByScanner)
+{
+    // 成员的**名字**消毒挡不住"把 `content` 本身做成符号链接"：归档能正常解压（libarchive
+    // 建的就是那条链接），而 `scan_content_files` 的 `recursive_directory_iterator(content_dir)`
+    // 会**跟随起点目录**去枚举链接目标 —— 安装机上的任意文件会被当成"包内容"登记、复制
+    // （2026-10-02 前实测复现）。修法：content 根必须是**真目录**（lstat 语义）。
+    const fs::path outside = escape_dir / "victim";
+    fs::create_directories(outside);
+    {
+        std::ofstream(outside / "TOPSECRET.txt") << "sensitive";
+    }
+
+    write_archive({
+        {"content", "", "", outside.string(), false},  // 只有这一条：content -> 根外目录
+    });
+    extract_tar_zst(pkg, out_dir, pkg.filename().string());
+
+    // 前提：解压确实把 content 留成了符号链接（若哪天 libarchive 换行为，这条会先红）
+    ASSERT_TRUE(fs::is_symlink(out_dir / "content")) << "前提变了：content 不再是符号链接";
+
+    EXPECT_THROW(detail::scan_content_files(out_dir / "content"), LpkgException)
+        << "content 是符号链接时必须拒绝扫描，否则会枚举解压根之外的文件";
 }
 
 TEST_F(ArchiveConfinementTest, AbsoluteSymlinkTargetIsPreservedAsIs)

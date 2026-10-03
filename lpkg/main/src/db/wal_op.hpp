@@ -14,8 +14,12 @@ namespace wal
 // ============================================================================
 
 struct DbMilestone {
-    std::string pkg;    // 包名，":batch-start" 时 pkg=""
-    std::string state;  // "installed" | "removed" | "batch-start"
+    std::string pkg;  // 包名；批次级里程碑（":batch-start" / ":batch-end"）时 pkg=""
+    // 生产端实际写入的 state（2026-10-03 订正，原文缺 "batch-end"）：
+    //   "batch-start" / "batch-end" —— DB 一族（`Cache::write`）的批次级里程碑；
+    //   "installed" / "removed"    —— 包级元数据文件（deps/needed_so/man，经
+    //                                 `wal::write_string_file_wal`）安装/卸载时的里程碑。
+    std::string state;
 
     std::string to_string() const
     {
@@ -120,6 +124,13 @@ enum class WALOpType {
     // 旧名称 — 仅用于解析旧 WAL 文件，不再写入
     REMOVE_FILE,  // 已废弃 → RESTORE_FILE_RM
     REMOVE_DIR,   // 已废弃 → RESTORE_DIR_RM
+
+    // 哨兵：枚举取值的个数。**必须留在最后**（不加新类型就不该动它）。
+    // 存在的唯一目的是让完整性检查能遍历**全部**取值 —— 加新类型时只要写在它前面，
+    // `UndoTableCompletenessTest` 就会要求你同时做一件事：要么在 `UNDO_TABLE` 里登记
+    // 可逆行，要么让它落进 `skip_in_reverse()`。两件都没做的话 `reverse_execute`
+    // 既不 confine 也不撤销，而且**完全静默**（见 `wal_type_is_reversible` 的说明）。
+    TYPE_COUNT,
 };
 
 struct WALOp {
@@ -170,6 +181,16 @@ struct WALOp {
 std::string_view walop_type_name(WALOpType t);
 WALOpType walop_type_from_name(std::string_view name);
 
+/**
+ * 该类型在 `UNDO_TABLE` 里**有没有可撤销的行**。
+ *
+ * 唯一用途是让"每个类型要么可逆、要么被显式跳过"成为**可执行的**不变量（见
+ * `tests/unit/test_undo_table.cpp` 的 `UndoTableCompletenessTest`）。为什么需要它：
+ * 类型不在表里 ⇒ `rows_of()` 返回空区间 ⇒ `reverse_execute` 既不 confine 也不撤销，
+ * 而且**完全静默**（不计统计、不写审计行）—— 回滚少做一件事，没有任何痕迹。
+ */
+bool wal_type_is_reversible(WALOpType t);
+
 // ============================================================================
 // WAL 行解析
 // ============================================================================
@@ -186,6 +207,21 @@ struct RollbackStats {
     int files_cleaned = 0;
     int dirs_recreated = 0;
     int db_restored = 0;
+
+    /**
+     * **撤销动作真的没成功**的行数（2026-10-03 新增）。
+     *
+     * 前四个字段全是**成功计数**，它们答不了"有没有哪一行没撤掉"。而这个区别是承重的：
+     * `apply_row` 原先把"guard 跳过（正常的重复回滚）"与"动作执行了却没成功"压成同一个
+     * `false`，于是**一次"文件存在却删不掉"（EROFS / EACCES / immutable）会被当成
+     * 回滚成功** —— 批次照常封 `COMMIT_PKGS`、`cleanup_db_backups()` 照常删掉唯一的还原点，
+     * 现场只剩一条 `warning.rollback_path_not_removed` 日志（2026-10-02 才补上的那一半）。
+     *
+     * **语义边界**：只计"guard 过了、动作也执行了、却没成功"。guard 跳过与
+     * `UndoResult::NothingToDo` **一律不计** —— 重复回滚是正常结局，把它们计进来会让这个
+     * 数字失去区分力。所以四个成功计数的含义与所有断言它们的既有用例**一字未变**。
+     */
+    int failures = 0;
 };
 
 // ============================================================================
@@ -248,12 +284,18 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path);
  * 5. ROLLBACK pkg + END pkg 对每个已回滚包
  * 6. COMMIT_PKGS
  *
+ * @param out_stats 可选出参：回滚的计数（**含 `failures`**）。传它的调用方能在"批次已封口"
+ *                  的同时知道**有没有哪一行其实没撤掉** —— `batch_rollback` 的返回值答不了
+ *                  这个问题（它只答"有没有可回滚的行"）。不传则行为与从前**完全一致**。
  * @return true = 确实回滚了（批次已由 COMMIT_PKGS 收尾，DB 备份已被消费，可以安全清理）；
  *         false = 无可回滚的行（WAL 里没有未完成批次，如尾部破损行导致 ops 为空）——
  *         此时**批次仍开着、DB 备份还没被消费**，调用方必须保留它们交给下次 rec 续传，
  *         绝不能 cleanup_db_backups()（否则文件能还原而 DB 永远还原不回来，见 TODO.md A2/A3）。
+ *         ⚠️ 返回 true **不代表回滚完整** —— `stats.failures > 0` 时批次照样被封口，
+ *         但调用方应当保留 DB 备份（那是唯一还能重试的还原点）。
  */
-bool batch_rollback(const std::vector<std::string>& successfully_installed);
+bool batch_rollback(const std::vector<std::string>& successfully_installed,
+                    RollbackStats* out_stats = nullptr);
 
 // ============================================================================
 // 崩溃续传清理（recover.cpp 实现）
@@ -275,7 +317,9 @@ std::filesystem::path stash_root_of_bak(const std::filesystem::path& bak);
 std::set<std::filesystem::path> referenced_stash_roots();
 
 // ============================================================================
-// stash 收尸（TODO：备份移到每文件系统隔离 stash 后）
+// stash 收尸（备份落点已是每文件系统隔离 stash `<fsroot>/.lpkg_bak_<pkg>_<pid>/`，
+// 故按 stash 根整目录 remove_all 是安全的 —— 这正是先前「待备份移到隔离 stash 后」
+// 那个 TODO 所指的前提，已随该设计落地，见 ARCH.md §3.6）
 // ============================================================================
 
 /**

@@ -1,9 +1,12 @@
+#include <archive.h>
+#include <archive_entry.h>
 #include <gtest/gtest.h>
 
 #include <filesystem>
 #include <fstream>
 #include <map>
 #include <set>
+#include <string>
 
 #include "../../main/src/config/config.hpp"
 #include "../../main/src/db/cache.hpp"
@@ -91,6 +94,30 @@ protected:
             std::string ver = (it != index_versions_.end()) ? it->second : "1.0";
             f << name << "|" << ver << ":hash::" << e.provides << ":" << e.needed_so << ":\n";
         }
+    }
+
+    /**
+     * 写一个最小 .lpkg（未压缩 tar）：只含一个 metadata.json，内容由调用方给定。
+     * 用于钉"metadata.json 存在但字段缺失"这条路径（read_archive_metadata 能正常读出，
+     * 缺字段由调用方随后 `.at()` 触发）。
+     */
+    fs::path write_archive_with_metadata(const std::string& metadata_json)
+    {
+        const fs::path pkg = suite_work_dir / "meta_test.lpkg";
+        struct archive* a = archive_write_new();
+        archive_write_set_format_pax_restricted(a);
+        archive_write_open_filename(a, pkg.c_str());
+        struct archive_entry* e = archive_entry_new();
+        archive_entry_set_pathname(e, "metadata.json");
+        archive_entry_set_filetype(e, AE_IFREG);
+        archive_entry_set_perm(e, 0644);
+        archive_entry_set_size(e, static_cast<la_int64_t>(metadata_json.size()));
+        archive_write_header(a, e);
+        archive_write_data(a, metadata_json.data(), metadata_json.size());
+        archive_entry_free(e);
+        archive_write_close(a);
+        archive_write_free(a);
+        return pkg;
     }
 
     // Count nodes with a given status in the tree
@@ -365,11 +392,16 @@ TEST_F(DependScannerTest, ComplexGraph)
 
 TEST_F(DependScannerTest, StatusLabels)
 {
-    EXPECT_EQ(depscan::status_label(depscan::ScanStatus::REMOVED), "WILL BE REMOVED");
-    EXPECT_EQ(depscan::status_label(depscan::ScanStatus::REBUILD), "NEEDS REBUILD");
-    EXPECT_EQ(depscan::status_label(depscan::ScanStatus::INSTALL), "WILL BE INSTALLED");
-    EXPECT_EQ(depscan::status_label(depscan::ScanStatus::ABI_CHANGED), "ABI CHANGED");
-    EXPECT_EQ(depscan::status_label(depscan::ScanStatus::KEEP), "UNCHANGED");
+    // 状态 → l10n 键的映射（译文由 get_string 取；以前这里断言硬编码英文标签）
+    EXPECT_EQ(depscan::status_label_key(depscan::ScanStatus::REMOVED),
+              "info.depend_status_removed");
+    EXPECT_EQ(depscan::status_label_key(depscan::ScanStatus::REBUILD),
+              "info.depend_status_rebuild");
+    EXPECT_EQ(depscan::status_label_key(depscan::ScanStatus::INSTALL),
+              "info.depend_status_install");
+    EXPECT_EQ(depscan::status_label_key(depscan::ScanStatus::ABI_CHANGED),
+              "info.depend_status_abi_changed");
+    EXPECT_EQ(depscan::status_label_key(depscan::ScanStatus::KEEP), "info.depend_status_keep");
 }
 
 TEST_F(DependScannerTest, AbibreakNoDeps)
@@ -385,4 +417,21 @@ TEST_F(DependScannerTest, PrintTreeNoCrash)
     root.name = "test";
     root.status = depscan::ScanStatus::KEEP;
     EXPECT_NO_THROW(depscan::print_tree(root));
+}
+
+TEST_F(DependScannerTest, InstallFromFileWithMissingMetadataFieldDoesNotThrow)
+{
+    // 缺陷：`scan_install_from_file` 的 try 只包住 `read_archive_metadata`，其后的
+    // `meta.at(J_NAME)` / `meta.at(J_VERSION)` 裸调用 —— metadata.json **能读出**却缺字段时
+    // 逸出 `json::out_of_range`（未本地化、也不是 LpkgException）。修法：与安装侧
+    // （`package_manager.cpp` 的本地包参数解析）同一写法，把字段提取并入同一 try。
+    const fs::path pkg = write_archive_with_metadata(R"({"version":"1.0"})");  // 缺 name
+
+    depscan::ScanNode node;
+    EXPECT_NO_THROW({ node = depscan::scan_install_from_file(pkg, /*show_all=*/false); })
+        << "缺字段的 metadata.json 逸出了未本地化的 json::out_of_range";
+
+    // 定位：落在"读取失败"节点上 —— 名字是文件名、reason 非空（走 info.depend_reason_error）
+    EXPECT_EQ(node.name, pkg.filename().string());
+    EXPECT_FALSE(node.reason.empty());
 }

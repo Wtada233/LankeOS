@@ -11,6 +11,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -40,7 +41,7 @@ protected:
 
     void SetUp() override
     {
-        suite_dir = fs::absolute("tmp_cleanup_test");
+        suite_dir = fs::absolute("tmp_cleanup_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_dir)) fs::remove_all(suite_dir);
         test_root = suite_dir / "root";
         fs::create_directories(test_root);
@@ -434,14 +435,23 @@ TEST_F(CleanupTest, RecoverContinuesPostCommitCleanup)
 {
     // 升级成功（批次已提交），post-commit 清理崩溃中断：
     //   bak1 已写 CLEANUP（但删除未做即崩溃），bak2 连 CLEANUP 都没写。
+    // ⚠️ 备份用**真实布局**：`<父目录>/.lpkg_bak_<pkg>_<pid>/<名>.lpkg_bak_<pkg>_<suffix>`
+    //    （见 install_common.cpp 的 ensure_stash_dir / stash_bak_target）。post-commit 清理
+    //    只删 `stash_root_of_bak` 归一出的**stash 根**（那个 `.lpkg_bak_*` 目录）—— fixture
+    //    若用"平铺的 `<orig>.lpkg_bak_pkg_x` 兄弟文件"，归一结果不以 `.lpkg_bak_` 开头，
+    //    会被现行守卫拒绝（那不是生产形态，生产只造 `.lpkg_bak_*` 目录）。
     create_file("usr/bin/foo");
-    fs::path orig1 = test_root / "usr/bin/foo";
-    fs::path bak1 = test_root / "usr/bin/foo.lpkg_bak_pkg_pc1";
+    const fs::path stash1 = test_root / "usr/bin/.lpkg_bak_pkg_pc1";
+    const fs::path orig1 = test_root / "usr/bin/foo";
+    fs::create_directories(stash1);
+    const fs::path bak1 = stash1 / "foo.lpkg_bak_pkg_pc1";
     fs::rename(orig1, bak1);
 
     create_file("usr/share/doc/pkg/README");
-    fs::path orig2 = test_root / "usr/share/doc/pkg/README";
-    fs::path bak2 = test_root / "usr/share/doc/pkg/README.lpkg_bak_pkg_pc2";
+    const fs::path stash2 = test_root / "usr/share/doc/pkg/.lpkg_bak_pkg_pc2";
+    const fs::path orig2 = test_root / "usr/share/doc/pkg/README";
+    fs::create_directories(stash2);
+    const fs::path bak2 = stash2 / "README.lpkg_bak_pkg_pc2";
     fs::rename(orig2, bak2);
 
     {
@@ -453,8 +463,8 @@ TEST_F(CleanupTest, RecoverContinuesPostCommitCleanup)
           << "COMMIT pkg 2.0\n"
           << "END pkg 2.0\n"
           << "COMMIT_PKGS\n"
-          // post-commit 清理：只处理到 bak1（CLEANUP 已写但删除未做即崩溃）
-          << "CLEANUP " << bak1.string() << "\n";
+          // post-commit 清理：只处理到 stash1（CLEANUP 已写但删除未做即崩溃）
+          << "CLEANUP " << stash1.string() << "\n";
     }
 
     EXPECT_TRUE(fs::exists(bak1));
@@ -462,9 +472,9 @@ TEST_F(CleanupTest, RecoverContinuesPostCommitCleanup)
 
     recover_packages();
 
-    // recover 应续传：两个 bak 都删掉（bak1 有 CLEANUP 记录、bak2 有 BACKUP 记录）
-    EXPECT_FALSE(fs::exists(bak1));
-    EXPECT_FALSE(fs::exists(bak2));
+    // recover 应续传：两个 stash 根都删掉（stash1 有 CLEANUP 记录、stash2 有 BACKUP 记录）
+    EXPECT_FALSE(fs::exists(stash1));
+    EXPECT_FALSE(fs::exists(stash2));
     // 原始文件保持"已删除"（新版本已装，不回滚）
     EXPECT_FALSE(fs::exists(orig1));
     EXPECT_FALSE(fs::exists(orig2));

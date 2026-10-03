@@ -169,6 +169,69 @@ std::filesystem::path stash_bak_target(const std::filesystem::path& phys, std::s
 /// 删除一个 stash 目录（整体 remove_all）。
 void remove_stash_dir(const std::filesystem::path& stash);
 
+/**
+ * 落位/让开的目标路径：`root_dir()/rel`，并把**祖先链**约束在 root 之内 —— 越界即抛
+ * （`error.install_escape_root`），解不开则放行。
+ *
+ * **为什么要有这一层**（2026-10-03 审计）：`root_dir()/rel` 只约束了**词法**归属，而
+ * `fs::copy` / `create_symlink` / rename 会**跟随中间段符号链接**。`--root <R>` 下若先有一个
+ * 包发过 `content/usr -> /`（绝对目标链接 —— 成员名消毒是**有意**放行的），再装一个含
+ * `content/usr/bin/x` 的包时，`<R>/usr` 解析成宿主 `/` ⇒ `.lpkgtmp` 写到宿主 `/bin/x`、
+ * rename 到位：`--root` 的隔离当场失效（`--no-hooks` 也挡不住，这条走的是文件拷贝）。
+ *
+ * 判据复用 `base/utils.hpp` 的 `path_within_resolved`（**只解析父目录**）：
+ *  · `root_dir() == "/"`（常规安装）→ 恒成立、不付检索代价；
+ *  · `<root>/lib -> usr/lib` 这类**根内** usr-merge 链接 → 解析后仍在 root 内，照常放行；
+ *  · 包内条目自身的绝对目标链接（`<root>/usr/bin/foo -> /etc/foo`）→ **末段不解析**，不误伤；
+ *  · 中间段解不开（ELOOP / 目录尚未建）→ 放行，与回滚侧的 confinement 同一条纪律。
+ */
+/// `<dst>` 的暂存路径：`<dst>.lpkgtmp`（**唯一出处**：包内容落位与 hook 脚本落位共用）。
+std::filesystem::path staged_tmp_path(const std::filesystem::path& dst);
+
+/// 收掉我们自己刚写的 `<dst>.lpkgtmp`（失败只告警，绝不让正在传播的原异常被顶替）。
+void drop_staged_tmp(const std::filesystem::path& tmp);
+
+/**
+ * **staging 成功之后**、到 `commit_copy` 完成 rename 之前的收尾守卫（RAII）。
+ *
+ * 为什么需要：`COPY <tmp> → <dst>` 这一行是在 `commit_copy` 里才写的 —— 在它**之前**失败
+ * （典型：`WriteLpkgnew` 先 `backup()` 旧的 `.lpkgnew` 那一步抛）时，WAL 里**没有任何一行**
+ * 描述这个 tmp ⇒ 回滚不会碰它 ⇒ 目标树/状态目录里留下 `<dst>.lpkgtmp`（2026-10-03 断点注入
+ * 实测：`/etc/x.conf.lpkgnew.lpkgtmp`）。
+ *
+ * ⚠️ **只在 staging 成功之后接活**：`refuse_symlink_tmp_path()` 拒绝写入时，那个占名的符号
+ * 链接是**用户的东西**，绝不能连带删掉（`TmpPathSymlinkGuardTest.InPlaceTmpSymlinkIsRefused`
+ * 钉着这条）。所以覆盖"写坏的那半个 tmp"是 `stage_regular_file()` 内部那份就地收尾。
+ */
+class TmpStageGuard
+{
+public:
+    explicit TmpStageGuard(std::filesystem::path tmp) : tmp_(std::move(tmp))
+    {
+    }
+
+    ~TmpStageGuard()
+    {
+        if (!armed_) return;
+        drop_staged_tmp(tmp_);  // 不抛：析构里抛会 std::terminate（异常展开途中）
+    }
+
+    TmpStageGuard(const TmpStageGuard&) = delete;
+    TmpStageGuard& operator=(const TmpStageGuard&) = delete;
+
+    /// `commit_copy` 成功（tmp 已被 rename 到 `<dst>`）→ 不再由本守卫负责。
+    void disarm() noexcept
+    {
+        armed_ = false;
+    }
+
+private:
+    std::filesystem::path tmp_;
+    bool armed_ = true;
+};
+
+std::filesystem::path confine_target_path(const std::filesystem::path& rel);
+
 // 注：「删除空目录 + DIR_RM 元数据记录」已并入写入层原语
 // `detail::OpSink::remove_empty_dir()`（`pkg/op_sink.hpp`）—— WAL 行与 rmdir 成对发生，
 // 路径规范化（strip_trailing_slash）也在那里统一做，不再有第二个入口。

@@ -4,6 +4,8 @@
 #include <unistd.h>
 
 #include <array>
+#include <atomic>
+#include <chrono>
 #include <cstdio>
 #include <fstream>
 #include <iomanip>
@@ -13,8 +15,13 @@
 #include "base/exception.hpp"
 #include "base/utils.hpp"
 #include "i18n/localization.hpp"
+#include "ui/term.hpp"
 
 namespace fs = std::filesystem;
+
+/** 定义在 `main_cli.cpp`，由 SIGINT 处理函数设置（`SigIntGuard` 生命周期内生效）。
+ *  本文件只在进度回调里读它 —— 那是下载期间唯一能看见 Ctrl+C 的地方。 */
+extern std::atomic<bool> sigint_graceful;
 
 /** HTTP 下载回调函数，将 curl 接收到的数据写入 ostream 输出流 */
 size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream)
@@ -25,17 +32,56 @@ size_t write_data_cpp(void* ptr, size_t size, size_t nmemb, void* stream)
     return out->good() ? bytes : 0;
 }
 
-/** 下载进度回调函数，计算并显示下载百分比进度 */
-int progress_callback([[maybe_unused]] void* clientp, curl_off_t dltotal, curl_off_t dlnow,
+namespace
+{
+/// curl 进度回调的上下文：目标行 + 速率/ETA 的计时基准。
+struct DlProgress {
+    ui::Line* line = nullptr;
+    std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point last = start;
+    int last_pct = -1;  ///< 与上一帧相同就跳过：小文件会在毫秒内回调好几次、每帧都是 100%
+};
+
+/**
+ * 下载进度：`pkg/1.0.lpkg   968.5 KiB  4.57 MiB/s 00:02  [####----]  62%`
+ * （左 = 包名/文件名，中 = 已收字节 + 速率 + ETA，右 = 进度条；非 TTY 全部降级为一行纯文本）。
+ *
+ * **节流**：curl 每次收到数据都回调，逐次重绘等于每条数据一个 write 系统调用 —— 上限
+ * 10 次/秒（完成时不受节流，保证 100% 那一帧一定画出来）。
+ */
+int progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
                       [[maybe_unused]] curl_off_t ultotal, [[maybe_unused]] curl_off_t ulnow)
 {
-    if (dltotal <= 0) {
+    auto* st = static_cast<DlProgress*>(clientp);
+    // **Ctrl+C 的唯一出口**（2026-10-03 补）：`lpkg build` 下载源码是**进程内** curl
+    // （没有子进程接收信号），而这个回调是下载期间唯一被反复调到的地方 —— 在这里看一眼
+    // 优雅退出标志并**返回非 0**，curl 会以 `CURLE_ABORTED_BY_CALLBACK` 中止传输
+    // （调用方据此抛 `UserAbort`，走带清理的异常路径）。不这么做的话，`SIGINT` 只是置了个
+    // 标志位，`build` 会**继续下完**整个源码包 —— 用户按 Ctrl+C 看起来毫无反应。
+    if (sigint_graceful.load()) return 1;
+    if (!st || !st->line || dltotal <= 0) return 0;  // 服务端没给长度 → 算不出百分比
+
+    const double pct = 100.0 * static_cast<double>(dlnow) / static_cast<double>(dltotal);
+    const int pct_i = static_cast<int>(pct);
+    if (pct_i == st->last_pct) return 0;  // 同一帧不重画
+
+    const auto now = std::chrono::steady_clock::now();
+    const bool done = dlnow >= dltotal;
+    if (!done &&
+        std::chrono::duration_cast<std::chrono::milliseconds>(now - st->last).count() < 100)
         return 0;
-    }
-    double percentage = static_cast<double>(dlnow) / static_cast<double>(dltotal) * 100.0;
-    log_progress(get_string("info.downloading"), percentage);
+    st->last = now;
+    st->last_pct = pct_i;
+
+    const double secs = std::chrono::duration<double>(now - st->start).count();
+    const double rate = secs > 0.0 ? static_cast<double>(dlnow) / secs : 0.0;
+    std::string mid =
+        ui::human_size(static_cast<std::uint64_t>(dlnow)) + "  " + ui::human_rate(rate);
+    if (rate > 0.0) mid += "  " + ui::human_time(static_cast<double>(dltotal - dlnow) / rate);
+    st->line->progress(pct, mid);
     return 0;
 }
+}  // namespace
 
 /** CURL 句柄的自定义删除器，用于智能指针自动清理 */
 struct CurlDeleter {
@@ -96,24 +142,40 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
     }
 
     curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT, constants::CURL_CONNECT_TIMEOUT_SEC);
-    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_LIMIT,
-                     100L);  // 最低速度限制 100 字节/秒
-    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_TIME,
-                     30L);  // 持续低于最低速度 30 秒则超时
+    // 低速超时：平均速度低于 CURL_LOW_SPEED_LIMIT_BPS 字节/秒、持续 CURL_LOW_SPEED_TIME_SEC 秒
+    // 即中止（防"连上了但不动"的挂死）。阈值集中在 base/constants.hpp，别再硬编码。
+    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_LIMIT, constants::CURL_LOW_SPEED_LIMIT_BPS);
+    curl_easy_setopt(curl.get(), CURLOPT_LOW_SPEED_TIME, constants::CURL_LOW_SPEED_TIME_SEC);
 
-    if (show_progress) {
-        curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
-        curl_easy_setopt(curl.get(), CURLOPT_XFERINFOFUNCTION, progress_callback);
-    } else {
-        curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 1L);
-    }
+    // 进度行：左 = `<包名>/<文件名>`（下载落点的父目录名 + 文件名），右 = 进度条。
+    // 落点常是 `.part`（构建期"先下到 .part 再 rename"，见 download_and_prepare_sources）——
+    // 显示时剥掉那个后缀，用户该看到的是目标文件名，不是我们的临时名。
+    std::string fname = output_path.filename().string();
+    if (fname.ends_with(".part")) fname.resize(fname.size() - 5);
+    const std::string parent = output_path.parent_path().filename().string();
+    ui::Line line;
+    DlProgress prog;
+    if (show_progress) line = ui::Line(parent.empty() ? fname : parent + "/" + fname);
+    // 回调**总是**装上（`show_progress=false` 时只是不刷进度行）：它是下载期间唯一能看见
+    // Ctrl+C 的地方 —— 见 progress_callback 的说明。装 NOPROGRESS=1 会让 curl 干脆不调它。
+    prog.line = show_progress ? &line : nullptr;
+    curl_easy_setopt(curl.get(), CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl.get(), CURLOPT_XFERINFOFUNCTION, progress_callback);
+    curl_easy_setopt(curl.get(), CURLOPT_XFERINFODATA, &prog);
 
     CURLcode res = curl_easy_perform(curl.get());
+    // TTY：把进度条那一行原地收在 100%（失败则换成 [FAILED]）；非 TTY：一行纯文本。
     if (show_progress) {
-        if (isatty(STDOUT_FILENO)) {
-            std::cout << std::endl;
-        }
+        if (res == CURLE_OK)
+            line.finish_progress();
+        else
+            line.finish(ui::ok(false));
     }
+
+    // 用户取消 ≠ 下载失败：`CURLE_ABORTED_BY_CALLBACK` 只可能由我们的回调（Ctrl+C）产生，
+    // 报成"下载失败"会让上层把它当 I/O 错误、也让用户看不懂（见 progress_callback）。
+    if (res == CURLE_ABORTED_BY_CALLBACK && sigint_graceful.load())
+        throw UserAbort(get_string("info.sigint_aborted"));
 
     if (res != CURLE_OK) {
         throw LpkgException(string_format("error.download_failed", url) + ": " +
@@ -140,7 +202,11 @@ void download_with_retries(const std::string& url, const fs::path& output_path, 
             download_file(url, output_path, show_progress);
             return;
         } catch (const LpkgException& e) {
-            fs::remove(output_path);  // 清理失败的下载文件
+            // 用 ec 重载：抛型 `fs::remove` 若失败（文件本就不存在/权限问题）会**顶替**原异常，
+            // 于是原始失败原因被丢掉、且 `throw;` 的后续重试逻辑被跳过。清理失败无所谓，
+            // 绝不能覆盖正在处理的错误。
+            std::error_code ec;
+            fs::remove(output_path, ec);  // 清理失败的下载文件
             if (i < max_retries - 1) {
                 log_warning(string_format("info.retrying", e.what()));
             } else {

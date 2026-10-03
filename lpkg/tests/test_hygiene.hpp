@@ -4,6 +4,9 @@
 
 #include <atomic>
 
+#include "../main/src/base/utils.hpp"  // set_durable_fsync_enabled
+#include "../main/src/config/config.hpp"
+#include "../main/src/db/test_breakpoints.hpp"
 #include "../main/src/trigger/trigger.hpp"
 
 /**
@@ -32,9 +35,18 @@ extern std::atomic<bool> sigint_graceful;
  *      里**后一条必然红** —— 报 `Installation aborted by user (SIGINT)`，看起来像被测代码坏了。
  *      （2026-09-26 实测复现：`3 tests ran / 1 PASSED / 2 FAILED`。这不是某个改动引入的，
  *       改前改后一样。）
+ *   3. `Config` 的各模式开关（2026-10-03 实测）：`test_hook_log_message` 在自己的 TearDown 里
+ *      `set_no_hooks_mode(true)`，于是**后面每个用例都跑在"钩子禁用"下**。症状有两种，第二种更阴：
+ *      ① `PhaseSectionTest` 里"运行安装后钩子"那一节整段消失；
+ *      ② 它那条"**没有**钩子的包不该出现该阶段"的断言因此变成**空转的绿**（两种情形都给绿）。
+ *      `overwrite_patterns_` / `use_system_soname_mode_` / `durable_fsync_enabled` 同理 ——
+ *      一个用例打开的开关会改变后面用例的**语义**，而断言常常照样绿。
  *
  * 所以复位放在**与 fixture 无关**的地方：一个 listener，在每个用例结束时无条件清一遍。
- * **新增全局状态时请在这里一并复位**（并在上面两段里补一行说明，写清"单跑绿全量红"的那种症状）。
+ * **新增全局状态时请在这里一并复位**（并在上面几段里补一行说明，写清"单跑绿全量红"的那种症状）。
+ *
+ * ⚠️ 复位的是**配置类**状态；`Cache`（内存 DB）不在其列 —— 它由各 fixture 的 SetUp 自己
+ * `load()`，而 listener 跑在 fixture 的 TearDown **之后**，此时代码已经不需要那份状态了。
  */
 class TestHygieneListener : public ::testing::EmptyTestEventListener
 {
@@ -43,6 +55,11 @@ public:
     {
         sigint_graceful.store(false);                 // 见上文第 2 条
         TriggerManager::instance().reset_for_test();  // 见上文第 1 条
+        Config::instance().reset_for_test();          // 见上文第 3 条（各模式开关 + 路径 + 架构）
+        set_durable_fsync_enabled(false);             // 见上文第 3 条（CLI 用例会打开它）
+        // 断点也是进程级状态：设了断点却在跑之前就抛异常的用例，会把断点留给下一个用例
+        // （"命中即清除"只对命中过的生效）。清一遍是零成本的保险。
+        BreakpointManager::instance().clear_all();
     }
 };
 

@@ -18,6 +18,37 @@ import argparse
 from collections import defaultdict
 
 
+def dependency_name_of(line):
+    """
+    一行 `deps` 元数据 → 依赖**包名**（去掉版本约束）。
+
+    **必须与 C++ 侧 `vercmp/dep_parser.cpp` 的 `dependency_name_of()` 同语义** ——
+    那是"从一行依赖串里取包名"的**唯一实现**，本函数是它的 Python 侧镜像。
+    两侧对着**同一组向量**各自断言，任一侧漂移都会被抓住：
+      · C++   ：tests/unit/test_version.cpp 的
+                `DepParser.DependencyNameOfMatchesParseDepStrings`
+      · Python：main/scripts/check_index_conformance.py
+
+    本脚本原先按**整串**做集合成员判断，于是**仓库自己测试夹具里就有的**
+    `"libB >= 2.0 < 3.0"` 会被报成"缺少名为 `libB >= 2.0 < 3.0` 的包" ——
+    一份给出错误答案的检查比没有检查更糟。
+
+    判据（与 C++ 一致）：包名 = **最早出现的**合法运算符之前那段，去两侧空白；
+    没有运算符则整串就是包名。
+    """
+    # 与 C++ 的 `trim_copy` **逐字等价**：它只去**空格与制表符**，外加先剥一个行尾 `\r`
+    # —— 别用 `str.strip()`，那个还会吃掉 `\n`/`\v`/`\f`，两侧就不再是同一条判据了。
+    s = line[:-1] if line.endswith('\r') else line
+    s = s.strip(' \t')
+    for i, ch in enumerate(s):
+        # 每个合法运算符都以 `<`/`>`/`=`/`!` 开头 —— 找最早出现的那个字符即可
+        # （C++ 那边逐位置、按 `>=`,`<=`,`!=`,`==`,`>`,`<`,`=` 的顺序试，
+        #   "位置最早优先"这一条与逐字符扫描等价）
+        if ch in '<>=!':
+            return s[:i].rstrip()
+    return s
+
+
 def read_metadata(lpkg_path):
     """从 .lpkg 中读取 metadata.json（支持 ./ 前缀或无前缀）。"""
     try:
@@ -77,9 +108,12 @@ def main():
         if 'error' in info:
             continue
         for dep in info['deps']:
-            if dep not in all_names:
-                missing.append((name, dep, info['lpkg']))
-            if dep == name:
+            # 取**包名**再比：`deps` 里存的是带约束的原串（`"libB >= 2.0 < 3.0"`），
+            # 拿整串去比会把每一条带约束的依赖都误报成"无此包"。
+            dep_name = dependency_name_of(dep)
+            if dep_name not in all_names:
+                missing.append((name, dep_name, info['lpkg']))
+            if dep_name == name:
                 self_refs.append((name, info['lpkg']))
 
     if missing:
@@ -135,8 +169,8 @@ def main():
         if 'error' in info:
             continue
         for dep in info['deps']:
-            if dep in all_names:
-                depended.add(dep)
+            if dependency_name_of(dep) in all_names:
+                depended.add(dependency_name_of(dep))
 
     core = {'glibc', 'gcc', 'linux', 'bash', 'coreutils', 'systemd', 'filesystem'}
     undepended = sorted(n for n in all_names if n not in depended and n not in core
@@ -168,8 +202,9 @@ def main():
             return
         color[node] = GRAY
         for dep in packages.get(node, {}).get('deps', []):
-            if dep in color:
-                dfs(dep, path + [node])
+            dep_name = dependency_name_of(dep)
+            if dep_name in color:
+                dfs(dep_name, path + [node])
         color[node] = BLACK
 
     for node in sorted(color.keys()):

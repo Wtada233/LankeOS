@@ -1,27 +1,33 @@
 /**
- * test_db_backup_chain.cpp — DB 备份链是**每个里程碑一份**（保守选择，2026-09 复核后明确保留）
+ * test_db_backup_chain.cpp — DB 批次内**只落盘一次**，快照恒两份（2026-10-03 改）
  *
  * `Cache::write(milestone)` 对 **DB 一族的 6 个文件**（见 test_base.hpp 的 db_family_files：
  * pkgs / files.db / provides.db / confhashes.db / xattrkeys.db / holdpkgs）各做一次"备份原文件 +
- * 全量重写"， 批次循环**每装完一个包**就调一次 → N 包批次落 6×(N+1) 份全量副本（`:batch-start` 一份
- * + 每包一份）。这是**有意保留的保守设计**：收益（省 IO、少几个崩溃窗口）不抵代价（改动落在
- * 最难测的"崩溃条件下的恢复"路径上），每里程碑一份还原点让任何一条 WAL DB 行都能就地恢复。
+ * 全量重写"。它现在每批次只被调**两次**：`BEGIN_PKGS` 之后的 `:batch-start`，以及提交之前的
+ * `:batch-end` ⇒ N 包批次恒为 6×2 份副本，**与 N 无关**。
  *
- * 清单**不在这里硬编码**：一族里加 confhashes.db 时，硬编码的 4 元素清单就是
- * 各自漏掉它的地方 —— 本文件的三处（备份计数、逐字节快照、里程碑枚举）与
- * test_upgrade_rollback_fidelity.cpp 的 db_state() 现在都从 db_family_files() 取。
+ * ⚠️ **本文件 2026-10-03 有意推翻了自己原来的钉法**。原文把"每里程碑一份、副本数随批次增长"
+ * 当**保守设计正面钉住**，理由是"收益（省 IO、少几个崩溃窗口）不抵代价（改动落在最难测的
+ * 恢复路径上）"。推翻的不是**保证**，是**表示**：查实了两件事 ——
+ *   ① 批次进行中**没有任何读取器**读盘上的 DB（`Cache::load()` 的调用点全在批次之外，
+ *      循环内一律走内存 `Cache`）；
+ *   ② 未提交批次**一律整体回滚**，所以中途的盘上状态既不可观测、也不可能成为最终状态。
+ * 于是"每包一个还原点"换不来任何可观测的东西，却让 100 包批次在 `/var/lib/lpkg` 落下
+ * ~2 GB 临时备份（本机 `files.db` 实测 19.8 MB / 286k 行，整仓升级 ~15 GB）。
+ * 现在唯一的还原点是 `:batch-start`，加一份提交前的 `:batch-end`。
  *
- * 订正 2026-09-26：**同一处分歧又发生了一次** —— 加 `xattrkeys.db` 时那个唯一的清单没跟着
- * 加（清单在 test_base.hpp，不在本文件，所以本文件根本没机会发现）。已修。本文件的算术是
- * 从清单派生的，因此自动跟着从 5 变成 6 —— 这正是当初把清单抽出来的用意。
+ * 清单**不在这里硬编码**：一族里加 confhashes.db / xattrkeys.db 时硬编码清单就是各自漏掉它
+ * 的地方 —— 本文件三处计数/快照与 test_upgrade_rollback_fidelity.cpp 的 db_state() 都从
+ * db_family_files() 取。
  *
- * 本文件钉住这条链的两个可观测性质 + 端到端不变式：
- *   ① **副本数随批次大小增长**：峰值 = 6×(1+N)（`:batch-start` + 每包一份），每装一个包
- *      多一份；提交后清干净（0）。
- *   ② **每个里程碑都有自己的备份文件**，且内容就是**该里程碑之前**的状态（链式语义：
- *      `:batch-start` 里没有 p1、`p1:installed` 里有 p1 没有 p2）——WAL 行与备份文件一一对应，
- *      这正是"任何一条 DB 行都能就地恢复"的依据。
- *   ③ **端到端不变式**（与备份链无关，改动不得破坏）：批次中途崩溃后 `rec` 收敛出与批次前
+ * 本文件钉住：
+ *   ① **副本数恒为 6×2**，批次中途只有 `:batch-start` 一份，**不随批次大小增长**；
+ *      提交后清干净（0）。
+ *   ② **批次中途盘上的 DB 停在批次前**，WAL 里**没有**包级 DB 行 —— "逐包写入已取消"的
+ *      可观测形式。
+ *   ③ **新窗口**：`:batch-end` 行已落、`COMMIT_PKGS` 未写时崩溃 ⇒ 整批（含这次 DB 写）
+ *      逐字节退回批次前。这个窗口在逐包写入时代**不存在**，此前没有用例走过它。
+ *   ④ **端到端不变式**（与备份表示无关，改动不得破坏）：批次中途崩溃后 `rec` 收敛出与批次前
  *      **逐字节相同**的 DB（**全部 6 个库**，含 confhashes.db）；正常失败回滚、单包失败、
  *      升级失败（含 deps/man 元数据与被 DBRM 删空的文件）同样逐字节还原。
  */
@@ -176,10 +182,13 @@ protected:
 };
 
 // ============================================================================
-// ① 副本数随批次大小增长：1 包峰值 4（:batch-start 一份），5 包峰值 4×5（每包再多一份）
+// ① 副本数**与批次大小无关**：DB 每批次只落盘两次，峰值恒为 6×2。
+//    批次**中途**只有 `:batch-start` 一份（`:batch-end` 还没写），所以此刻是 6。
+//    （原用例名 PeakBackupCountGrowsWithBatchSize 断言峰值 = 6×(1+N) 且必须随批次增长 ——
+//      2026-10-03 有意推翻，理由见文件头。）
 // ============================================================================
 
-TEST_F(DbBackupChainTest, PeakBackupCountGrowsWithBatchSize)
+TEST_F(DbBackupChainTest, PeakBackupCountIsIndependentOfBatchSize)
 {
     // 1 包批次
     int peak_1pkg = -1;
@@ -192,7 +201,7 @@ TEST_F(DbBackupChainTest, PeakBackupCountGrowsWithBatchSize)
         << "1 包批次：" << db_file_count() << " 个 DB 文件各一份 :batch-start 备份";
     EXPECT_EQ(total_baks(), 0) << "成功批次收尾必须把 DB 备份清干净";
 
-    // 5 包批次（依赖链保证顺序；最后一个包开始装时前 4 个包已各自写过 DB）
+    // 5 包批次（依赖链保证顺序）
     std::vector<std::string> pkgs;
     for (int i = 0; i < 5; ++i) {
         const std::string name = std::string("chain") + std::to_string(i);
@@ -204,29 +213,30 @@ TEST_F(DbBackupChainTest, PeakBackupCountGrowsWithBatchSize)
     int peak_5pkg = -1;
     BreakpointManager::instance().set("install_after_begin_chain4", [&] {
         peak_5pkg = global_db_baks();
-        // **每个**DB 文件此刻有 5 份：:batch-start + chain0..chain3 —— 含 confhashes.db
-        // confhashes.db（少了它，这一族里就有一个库没人盯）
+        // **每个**DB 文件此刻只有 :batch-start 一份 —— 含 confhashes.db
+        // （少了它，这一族里就有一个库没人盯）
         for (const auto& [base, cnt] : bak_copies_per_file())
-            EXPECT_EQ(cnt, 1 + 4) << base << " 在 5 包批次中途应有 5 份里程碑副本（实测 " << cnt
-                                  << " 份）";
+            EXPECT_EQ(cnt, 1) << base << " 在 5 包批次中途只该有 :batch-start 一份（实测 " << cnt
+                              << " 份）—— 包级里程碑副本已取消";
     });
     ASSERT_NO_THROW(install_packages(pkgs));
     BreakpointManager::instance().clear_all();
 
     ASSERT_GT(peak_5pkg, 0) << "断点没命中（取证无效）";
-    EXPECT_EQ(peak_5pkg, db_file_count() * 5)
-        << "5 包批次：每个 DB 文件 1 份 :batch-start + 4 份已装包的里程碑副本；实测 " << peak_5pkg;
-    EXPECT_GT(peak_5pkg, peak_1pkg) << "每个里程碑各自一份备份 → 副本数必须随批次增长";
+    EXPECT_EQ(peak_5pkg, db_file_count())
+        << "5 包批次中途同样只有每个 DB 文件的一份 :batch-start；实测 " << peak_5pkg;
+    EXPECT_EQ(peak_5pkg, peak_1pkg)
+        << "1 包与 5 包的峰值必须**相同** —— 副本数不随批次大小增长（这是 2026-10-03 的改动点）";
     EXPECT_EQ(total_baks(), 0) << "成功批次收尾必须把 DB 备份清干净";
 }
 
 // ============================================================================
-// ② 每个里程碑都有自己的备份文件（名字 = <db>.lpkg_db_bak_before:<milestone>），
-//    且与 WAL 的 DB 行一一对应（"任何一条 DB 行都能就地恢复"的依据）——
-//    **整族 6 个库逐个枚举**（含 confhashes.db）
+// ② 批次中途**没有**包级里程碑备份，也没有对应的 WAL DB 行
+//    （原用例 EveryMilestoneHasItsOwnBackupFile 钉的是"每个里程碑一份、与 WAL 行一一对应"
+//      —— 2026-10-03 有意推翻，理由见文件头）—— **整族 6 个库逐个枚举**（含 confhashes.db）
 // ============================================================================
 
-TEST_F(DbBackupChainTest, EveryMilestoneHasItsOwnBackupFile)
+TEST_F(DbBackupChainTest, NoPerPackageBackupOrWalRowMidBatch)
 {
     std::vector<std::string> pkgs = {pack("mb1", "1.0")};
     pkgs.push_back(pack("mb2", "1.0", {"mb1"}));
@@ -237,18 +247,16 @@ TEST_F(DbBackupChainTest, EveryMilestoneHasItsOwnBackupFile)
         fired = true;
         const std::string wal = read_wal();
         for (const auto& db : db_files()) {
-            // 批次开始那份
+            // 批次开始那份必须在（它是唯一的还原点）
             EXPECT_TRUE(fs::exists(bak_of(db, ":batch-start")))
                 << "缺 :batch-start 备份：" << bak_of(db, ":batch-start");
-            // mb1 / mb2 各自的里程碑那份
+            // mb1 / mb2 已装完，但**不该**留下各自的里程碑备份，也不该有对应的 WAL DB 行
             for (const char* p : {"mb1", "mb2"}) {
-                const fs::path bak = bak_of(db, std::string(p) + ":installed");
-                EXPECT_TRUE(fs::exists(bak)) << "缺里程碑备份：" << bak;
-                EXPECT_NE(wal.find("DB " + db.string() + " " + p + ":installed"), std::string::npos)
-                    << "WAL 里没有与备份对应的 DB 行：" << p;
+                EXPECT_FALSE(fs::exists(bak_of(db, std::string(p) + ":installed")))
+                    << "批次中途不该有包级里程碑备份：" << p;
+                EXPECT_EQ(wal.find("DB " + db.string() + " " + p + ":installed"), std::string::npos)
+                    << "WAL 里不该有包级 DB 行（逐包落盘已取消）：" << p;
             }
-            // mb3 还没装完 → 它的里程碑备份不该存在
-            EXPECT_FALSE(fs::exists(bak_of(db, "mb3:installed")));
         }
     });
     ASSERT_NO_THROW(install_packages(pkgs));
@@ -258,12 +266,52 @@ TEST_F(DbBackupChainTest, EveryMilestoneHasItsOwnBackupFile)
 }
 
 // ============================================================================
-// ③ 链的语义：每份备份的内容 = **该里程碑之前**的状态（逐级递进）
+// ②' 批次中途**盘上的 DB 停在批次前** —— 这是"逐包写入已取消"最直接的可观测形式：
+//     已装完的 mb1/mb2 此刻**不在**盘上的 pkgs 里（而它们在**内存** Cache 里）
 // ============================================================================
 
-TEST_F(DbBackupChainTest, BackupContentsFormTheMilestoneChain)
+TEST_F(DbBackupChainTest, OnDiskDbStaysAtBatchStartUntilCommit)
 {
-    // 先装 ch0：让"批次前状态"非空，链的递进才看得出来
+    ASSERT_NO_THROW(install_packages({pack("ob0", "1.0")}));
+    const fs::path pkgs_db = Config::instance().pkgs_file();
+    const std::string before_batch = read_text(pkgs_db);
+
+    std::vector<std::string> batch = {pack("ob1", "1.0")};
+    batch.push_back(pack("ob2", "1.0", {"ob1"}));
+
+    bool fired = false;
+    BreakpointManager::instance().set("install_after_begin_ob2", [&] {
+        fired = true;
+        const std::string live = read_text(pkgs_db);
+        EXPECT_EQ(live, before_batch)
+            << "批次中途盘上的 DB 必须**逐字节等于批次前** —— 改变了说明又有人在逐包落盘了";
+        EXPECT_NE(live.find("ob0:1.0"), std::string::npos)
+            << "ob0 应在；下面那条断言才有区分力（否则是空文件比空文件）";
+        EXPECT_EQ(live.find("ob1:1.0"), std::string::npos)
+            << "ob1 已经装完，但盘上的 DB 里不该有它（批次未提交）";
+        // 内存 Cache 是对的 —— 批次内的判定一律走它，不走盘
+        EXPECT_EQ(Cache::instance().get_installed_version("ob1"), "1.0")
+            << "内存里必须已经记上 ob1（否则批次内的依赖判定会瞎）";
+    });
+    ASSERT_NO_THROW(install_packages(batch));
+    BreakpointManager::instance().clear_all();
+    ASSERT_TRUE(fired) << "断点没命中（取证无效）";
+
+    // 提交之后才落盘：最终 DB 里三个包都在
+    const std::string final_db = read_text(pkgs_db);
+    for (const char* p : {"ob0:1.0", "ob1:1.0", "ob2:1.0"})
+        EXPECT_NE(final_db.find(p), std::string::npos) << "最终 DB 里缺 " << p;
+}
+
+// ============================================================================
+// ③ `:batch-start` 那份备份的内容 = **批次前**的状态（唯一的还原点）
+//    （原用例 BackupContentsFormTheMilestoneChain 钉的是链式递进语义 —— 2026-10-03 有意
+//      推翻，理由见文件头）
+// ============================================================================
+
+TEST_F(DbBackupChainTest, BatchStartBackupHoldsThePreBatchState)
+{
+    // 先装 ch0：让"批次前状态"非空，"等于批次前"这条断言才有区分力
     ASSERT_NO_THROW(install_packages({pack("ch0", "1.0")}));
     const fs::path pkgs_db = Config::instance().pkgs_file();
     const std::string before_batch = read_text(pkgs_db);
@@ -273,31 +321,25 @@ TEST_F(DbBackupChainTest, BackupContentsFormTheMilestoneChain)
 
     bool fired = false;
     std::string start_bak;
-    std::string ch1_bak;
-    // ch2 开始装的那一刻：ch1 已写完 DB → :batch-start 与 ch1:installed 两份都在
+    // ch2 开始装的那一刻：ch1 已装完（内存里），但盘上不该有任何包级里程碑备份
     BreakpointManager::instance().set("install_after_begin_ch2", [&] {
         fired = true;
         start_bak = read_text(bak_of(pkgs_db, ":batch-start"));
-        ch1_bak = read_text(bak_of(pkgs_db, "ch1:installed"));
+        EXPECT_FALSE(fs::exists(bak_of(pkgs_db, "ch1:installed")))
+            << "批次中途不该出现包级里程碑备份";
     });
 
     ASSERT_NO_THROW(install_packages(batch));
     BreakpointManager::instance().clear_all();
     ASSERT_TRUE(fired) << "断点没命中（取证无效）";
 
-    // 命名语义（ARCH §2.3）：`<pkg>:installed` 那份备份的内容 = 该里程碑**之前**的状态。
-    // 于是链"错开一格"：:batch-start 那份 = 批次前；ch1:installed 那份 = 批次开始时
-    // （ch1 还没写盘）的状态 —— 而"ch1 写盘前的状态"恰好就是 :batch-start 写下的内容。
+    // `:batch-start` 是**唯一**的还原点，它的内容 = 批次**前**的状态
     EXPECT_EQ(start_bak, before_batch) << ":batch-start 备份必须逐字节等于批次前的 DB";
-    EXPECT_EQ(ch1_bak, before_batch)
-        << "ch1:installed 那份备份 = ch1 写盘**之前**的状态 = 批次开始时的状态";
-    EXPECT_NE(ch1_bak.find("ch0:1.0"), std::string::npos) << "批次前的包应保留在链里";
-    EXPECT_EQ(ch1_bak.find("ch1:1.0"), std::string::npos)
-        << "该里程碑之前的备份不该含有该里程碑自己的包";
-    // 此刻盘上的 DB = 下一个里程碑（ch2:installed）那份备份将要保存的内容：ch0+ch1
-    const std::string live = read_text(pkgs_db);
-    EXPECT_NE(live.find("ch0:1.0"), std::string::npos);
-    EXPECT_NE(live.find("ch1:1.0"), std::string::npos) << "ch1 的 DB 写必须已发生";
+    EXPECT_NE(start_bak.find("ch0:1.0"), std::string::npos)
+        << "取证无效：批次前的状态是空的，下面那条就成了恒真废话";
+    EXPECT_EQ(start_bak.find("ch1:1.0"), std::string::npos)
+        << "批次**前**的备份里不该有本批次才装的包";
+
     // 最终状态：ch0/ch1/ch2 都在
     const std::string final_db = read_text(pkgs_db);
     for (const char* p : {"ch0:1.0", "ch1:1.0", "ch2:1.0"})
@@ -308,46 +350,55 @@ TEST_F(DbBackupChainTest, BackupContentsFormTheMilestoneChain)
 // ④ 升级批次同样每里程碑一份（整族 6 个 DB 文件都已存在 → 每包写完都落一份）
 // ============================================================================
 
-TEST_F(DbBackupChainTest, UpgradeBatchKeepsPerPackageBackups)
+// ============================================================================
+// ④ 升级批次同样**不**留包级里程碑备份（原用例 UpgradeBatchKeepsPerPackageBackups
+//    断言相反的事 —— 2026-10-03 有意推翻）
+// ============================================================================
+
+TEST_F(DbBackupChainTest, UpgradeBatchLeavesNoPerPackageBackups)
 {
     std::vector<std::string> v1;
+    v1.reserve(3);
     for (int i = 0; i < 3; ++i) v1.push_back(pack(std::string("up") + std::to_string(i), "1.0"));
     ASSERT_NO_THROW(install_packages(v1));
     ASSERT_EQ(total_baks(), 0) << "成功批次收尾必须把 DB 备份清干净";
 
     std::vector<std::string> v2;
+    v2.reserve(3);
     for (int i = 0; i < 3; ++i) v2.push_back(pack(std::string("up") + std::to_string(i), "2.0"));
 
     // 升级顺序由求解器定，不假设哪个包最后 —— 取三处断点观测值的**最大值**（即峰值）
     bool fired = false;
     int peak = 0;
-    int pkg_milestone_baks = 0;
+    int pkgs_baks = 0;
     for (const char* n : {"up0", "up1", "up2"}) {
-        BreakpointManager::instance().set(std::string("install_after_begin_") + n, [&, n] {
+        // 不捕获 `n`：闭包里没用到它（捕获了却不引用的，clang 会报 -Wunused-lambda-capture）
+        BreakpointManager::instance().set(std::string("install_after_begin_") + n, [&] {
             fired = true;
             peak = std::max(peak, global_db_baks());
-            // pkgs 这个文件此刻的副本数（1 份 :batch-start + 已装完包的里程碑）
             const auto counts = bak_copies_per_file();  // 先落地：别跨两个临时表比较迭代器
-            if (const auto it = counts.find("pkgs"); it != counts.end())
-                pkg_milestone_baks = it->second;
+            if (const auto it = counts.find("pkgs"); it != counts.end()) pkgs_baks = it->second;
         });
     }
     ASSERT_NO_THROW(install_packages(v2));
     BreakpointManager::instance().clear_all();
     ASSERT_TRUE(fired) << "断点没命中（取证无效）";
 
-    EXPECT_GT(peak, db_file_count())
-        << "升级批次中途应已出现**包级里程碑**副本（:batch-start 之外的额外副本）；实测 " << peak;
-    EXPECT_LE(peak, db_file_count() * 4) << "副本数不该超过 :batch-start + 每包一份；实测 " << peak;
-    EXPECT_GE(pkg_milestone_baks, 2)
-        << "pkgs 此刻应有 :batch-start + 至少一个 <pkg>:installed 副本；实测 "
-        << pkg_milestone_baks;
+    EXPECT_EQ(peak, db_file_count())
+        << "升级批次中途也只该有每个 DB 文件的一份 :batch-start；实测 " << peak;
+    EXPECT_EQ(pkgs_baks, 1) << "pkgs 此刻只该有 :batch-start 一份；实测 " << pkgs_baks;
+    // 内存里升级确实发生了（DB 落盘在批次末尾，见 write_batch_db）
     EXPECT_EQ(Cache::instance().get_installed_version("up0"), "2.0");
     EXPECT_EQ(total_baks(), 0) << "成功批次收尾必须把 DB 备份清干净";
 }
 
 // ============================================================================
-// ⑤ 批次之间互不影响：前一批次的备份已清干净，后一批次重新从 :batch-start 起链
+// ⑤ 批次之间互不影响：**前一次操作的**备份已清干净，**下一次操作**从自己的 :batch-start 起。
+//
+// 注意"批次"的口径：**一条命令 = 一个批次**（`run_batch_transaction` 全项目只有三个调用点 ——
+// `install_packages` / `remove_packages_in_one_batch` / `upgrade_packages`，互不嵌套）。
+// 本用例是在**同一个测试进程里连调三次 `install_packages()`**，等于模拟**三条命令**，
+// 所以这里说的是"三个批次之间"，不是"一条命令内的两批"。
 // ============================================================================
 
 TEST_F(DbBackupChainTest, BatchesDoNotShareBackupChain)
@@ -407,12 +458,16 @@ TEST_F(DbBackupChainTest, RecoverAfterMidBatchCrashRestoresByteIdenticalDb)
     ASSERT_EQ(Cache::instance().get_installed_version("cr1"), "1.0")
         << "cr1 确实装完了（崩溃点之前）";
 
-    // 崩溃现场：每个已装包的里程碑各留一份备份（链还在，`rec` 有依据可回退）
-    for (const char* p : {"cr1", "cr2"}) {
-        EXPECT_TRUE(
-            fs::exists(bak_of(Config::instance().pkgs_file(), std::string(p) + ":installed")))
-            << "崩溃现场缺少里程碑备份：" << p;
+    // 崩溃现场：每个 DB 文件都留着 `:batch-start` 那份 —— 它是 `rec` 唯一的回退依据。
+    // （2026-10-03 前这里断言的是"每个已装包的里程碑各留一份"；逐包落盘取消后不再有那些，
+    //   但**回退依据仍然在**，所以下面"逐字节回到批次前"的断言照旧成立。）
+    for (const auto& db : db_files()) {
+        EXPECT_TRUE(fs::exists(bak_of(db, ":batch-start")))
+            << "崩溃现场缺少 :batch-start 备份（rec 就没有回退依据了）：" << db;
     }
+    // 崩溃点在 cr3 的 BEGIN 之后、批次末尾的 DB 落盘之前 ⇒ 连 :batch-end 都还没写
+    EXPECT_FALSE(fs::exists(bak_of(Config::instance().pkgs_file(), ":batch-end")))
+        << "崩溃发生在批次末尾落盘之前，不该有 :batch-end";
 
     ASSERT_NO_THROW(recover_packages());
     trim_completed();
@@ -449,6 +504,43 @@ TEST_F(DbBackupChainTest, ActiveRollbackAlsoRestoresByteIdenticalDb)
     expect_db_unchanged(before, "主动回滚后");
     EXPECT_EQ(read_wal().find("BEGIN_PKGS"), std::string::npos) << "批次未收尾";
     EXPECT_TRUE(Cache::instance().get_installed_version("ar1").empty());
+    EXPECT_EQ(total_baks(), 0) << "回滚已收尾，DB 备份应被消费并清理干净";
+}
+
+// ============================================================================
+// ⑥'' **新窗口**：`:batch-end` 行已落、`COMMIT_PKGS` 未写时失败 ⇒ 整批（含这次 DB 写）
+//      逐字节退回批次前。
+//
+// 这个窗口是 2026-10-03 的改动**新引入**的：DB 改成批次末尾写一次之前，最后一个包的
+// COMMIT 之后就不再有 DB 写要撤。现在批次末尾多了一次 DB 落盘，而它**必须在 COMMIT_PKGS
+// 之前**完成 —— 否则崩溃留下"批次已提交、DB 还是旧的"，而**已提交批次不会被回滚**，
+// 没有任何机制能修回来。本用例把"它确实发生在提交之前（= 可回滚）"钉住：
+// 断点命中说明那次落盘真的执行到了，随后的关断说明**它被完整撤回了**。
+// ============================================================================
+
+TEST_F(DbBackupChainTest, FailureAfterBatchDbWriteRollsBackByteIdentically)
+{
+    ASSERT_NO_THROW(install_packages({pack("nb0", "1.0")}));
+    const auto before = db_bytes();
+
+    std::vector<std::string> batch = {pack("nb1", "1.0")};
+    batch.push_back(pack("nb2", "1.0", {"nb1"}));
+
+    bool fired = false;
+    BreakpointManager::instance().set("batch_db_before_commit", [&] {
+        fired = true;
+        throw LpkgException("injected failure right after the batch DB write");
+    });
+    EXPECT_THROW(install_packages(batch), LpkgException);
+    BreakpointManager::instance().clear_all();
+    ASSERT_TRUE(fired) << "断点 `batch_db_before_commit` 没命中 —— 批次末尾那次 DB 落盘不见了？"
+                          "或它被挪到了 COMMIT_PKGS **之后**（那才是真问题：已提交批次不回滚）";
+
+    expect_db_unchanged(before, "批次末尾 DB 落盘之后失败、回滚后");
+    for (const auto& n : {"nb1", "nb2"})
+        EXPECT_TRUE(Cache::instance().get_installed_version(n).empty())
+            << n << " 未回滚干净（批次是全或无）";
+    EXPECT_FALSE(fs::exists(test_root / "usr/bin/nb1")) << "批次回滚必须把文件也退回去";
     EXPECT_EQ(total_baks(), 0) << "回滚已收尾，DB 备份应被消费并清理干净";
 }
 

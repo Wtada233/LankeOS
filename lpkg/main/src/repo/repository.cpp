@@ -63,7 +63,7 @@ static std::optional<std::filesystem::path> resolve_index_path()
     }
     std::string arch = Config::instance().get_architecture();
 
-    bool is_local = mirror.find(constants::PROTOCOL_FILE) == 0 || mirror.find("/") == 0;
+    bool is_local = mirror.find(constants::PROTOCOL_FILE) == 0 || mirror.find('/') == 0;
 
     try {
         std::filesystem::path index_path;
@@ -89,6 +89,25 @@ static std::optional<std::filesystem::path> resolve_index_path()
     }
 }
 
+/**
+ * 逗号分隔字段 → **非空** token 列表（去首尾空白、丢空片段）。
+ *
+ * `split_string_view` **总是**产出尾随一段（`"a,"` → `["a", ""]`），而索引里的
+ * `provides`/`needed_so` 用 `,` 连接。不处理空 token / 前导空白会把**空串**当成一个
+ * capability 收进 libsolv 的 pool：它是 `STRID_EMPTY`，无人提供，而 `collect_problems`
+ * 又因为 `dep_name` 为空而跳过它 —— 用户只看到一条无从定位的 "solve failed"
+ * （2026-10-02 修）。`deps` 字段早有 `split_dep_field` 做同样的清洗，这里补齐另两个字段。
+ */
+static std::vector<std::string> split_comma_list(std::string_view sv)
+{
+    std::vector<std::string> out;
+    for (auto piece : split_string_view(sv, constants::COMMA_CHAR)) {
+        std::string s = trim_copy(piece);
+        if (!s.empty()) out.push_back(std::move(s));
+    }
+    return out;
+}
+
 /** 索引里的一个版本块 → PackageInfo（deps 串含复合约束，交给 split_dep_field 合并） */
 static PackageInfo make_package_info(const RepoIndexVersionBlock& b)
 {
@@ -98,16 +117,8 @@ static PackageInfo make_package_info(const RepoIndexVersionBlock& b)
     pkg.sha256 = b.hash;
     // b.deps 为空时 split_dep_field 会切出空片段，必须在调用前挡住（同 provides/needed_so）
     if (!b.deps.empty()) pkg.dependencies = detail::parse_dep_strings(split_dep_field(b.deps));
-    if (!b.provides.empty()) {
-        for (auto prov : split_string_view(b.provides, constants::COMMA_CHAR)) {
-            pkg.provides.push_back(std::string(prov));
-        }
-    }
-    if (!b.needed_so.empty()) {
-        for (auto needed : split_string_view(b.needed_so, constants::COMMA_CHAR)) {
-            pkg.needed_so.push_back(std::string(needed));
-        }
-    }
+    pkg.provides = split_comma_list(b.provides);
+    pkg.needed_so = split_comma_list(b.needed_so);
     return pkg;
 }
 
@@ -120,13 +131,13 @@ static PackageInfo make_package_info(const RepoIndexVersionBlock& b)
 void Repository::absorb_index_line(std::string_view line)
 {
     for (const auto& b : parse_repo_index_line(line)) {
-        // 记录提供者（provides）——版本级优先，解析器已回退到包级
-        if (!b.provides.empty()) {
-            for (auto prov : split_string_view(b.provides, constants::COMMA_CHAR)) {
-                auto& pv = providers_[std::string(prov)];
-                if (pv.empty() || pv.back() != b.name) {
-                    pv.push_back(b.name);
-                }
+        // 记录提供者（provides）——版本级优先，解析器已回退到包级。
+        // 走 `split_comma_list`（与 make_package_info 同一清洗）：空 token 不能进 providers_，
+        // 否则 `find_provider("")` / 依赖判定会拿到脏结果。
+        for (const auto& prov : split_comma_list(b.provides)) {
+            auto& pv = providers_[prov];
+            if (pv.empty() || pv.back() != b.name) {
+                pv.push_back(b.name);
             }
         }
         // 先构造再索引（两步分开写，避免"索引表已被插入空壳、构造却抛了"这种副作用顺序差）
@@ -342,4 +353,16 @@ std::optional<PackageInfo> Repository::find_best_matching_version(const std::str
         }
     }
     return std::nullopt;
+}
+
+/** 见 repository.hpp 的说明：`load_index()` 失败时"只告警不抛"的**唯一**实现。 */
+bool load_index_or_warn(Repository& repo)
+{
+    try {
+        repo.load_index();
+        return true;
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.repo_index_load_failed", e.what()));
+        return false;
+    }
 }

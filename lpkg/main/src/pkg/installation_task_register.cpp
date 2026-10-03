@@ -46,6 +46,7 @@
 #include "install_common.hpp"
 #include "op_sink.hpp"
 #include "trigger/trigger.hpp"
+#include "vercmp/dep_parser.hpp"  // detail::dependency_name_of（`deps/` 行 → 包名，唯一实现）
 #include "vercmp/version.hpp"
 
 extern std::atomic<bool> sigint_graceful;
@@ -72,15 +73,23 @@ void InstallationTask::register_package()
 
     if (!old_version_to_replace_.empty()) {
         const fs::path old_dep_file = Config::instance().dep_dir() / pkg_name_;
-        if (fs::exists(old_dep_file)) {
+        // 判定走**不抛**的 `exists_follow`（与 `fs::exists` 同义）：这是以包名命名的
+        // lpkg 状态文件（DB 键派生的路径，见 lpkg/CLAUDE.md §6），环/不可达时 `fs::exists`
+        // 抛 raw `filesystem_error`，会让一次升级在"摘除旧反向依赖"这一步崩掉。
+        if (exists_follow(old_dep_file)) {
             std::ifstream f(old_dep_file);
+            // 守卫只判存在（且是跟随语义），不判"是普通文件"：真打开不了时**不许静默**当成
+            // "没有旧反向依赖"（那会让摘除悄悄不发生），点名文件报错、整批回滚。
+            if (!f.is_open())
+                throw LpkgException(string_format("error.open_file_failed", old_dep_file.string()));
             std::string line;
             while (std::getline(f, line)) {
-                if (!line.empty()) {
-                    std::stringstream ss(line);
-                    std::string dn;
-                    if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name_);
-                }
+                // **摘除**与下面的**登记**必须算出同一个键。原先这里用 `ss >> dn`（纯空白切），
+                // 而登记用 `find_first_of(" \t<>=")` —— 对 `provb>=2.0` 两者给出不同的键。
+                // （那条分叉在实践中被 `Cache::load()` 之后的惰性重建掩盖了，所以没有
+                //   直接观察到；但对齐后就不再有"靠掩盖才不出事"的地方。）见 dep_parser.hpp。
+                const std::string dn = detail::dependency_name_of(line);
+                if (!dn.empty()) cache.remove_reverse_dep(dn, pkg_name_);
             }
         }
         for (const auto& cap : cache.get_package_provides(pkg_name_)) {
@@ -92,11 +101,8 @@ void InstallationTask::register_package()
 
     std::unordered_set<std::string> dep_entries;
     for (const auto& d : deps_) {
-        dep_entries.insert(d);
-        std::string name = d;
-        if (const auto pos = d.find_first_of(" \t<>="); pos != std::string::npos)
-            name = d.substr(0, pos);
-        cache.add_reverse_dep(name, pkg_name_);
+        dep_entries.insert(d);  // 文件里存的是**原样**的依赖串（注释见文件头）
+        cache.add_reverse_dep(detail::dependency_name_of(d), pkg_name_);
     }
 
     for (const auto& soname : needed_so_) {
@@ -179,12 +185,17 @@ void InstallationTask::register_package()
 void InstallationTask::install_hook_files()
 {
     const fs::path hook_src = tmp_pkg_dir_ / constants::DIR_HOOKS;
-    // `hook_src` 是包内内容（tmp_pkg_dir_/hooks）：环上不抛
-    if (!exists_follow(hook_src) || !is_directory_follow(hook_src)) return;
+    // 只接受**真目录**（lstat，不是符号链接）：`hooks -> /etc` 的归档会让 follow 语义放行，
+    // 随后 `fs::copy` 把宿主任意文件拷进 hooks_dir/<pkg>/ 并当 postinst 执行（2026-10-02 修）。
+    // 环/悬空/不存在一律判否 → 不抛、正常跳过（`is_real_directory` 不抛）。
+    if (!is_real_directory(hook_src)) return;
 
     detail::OpSink sink(pkg_name_, &stashes_);
     const fs::path dest_dir = Config::instance().hooks_dir() / pkg_name_;
-    if (!fs::exists(dest_dir)) {
+    // 判定走**不抛**的 `exists_follow`（与 `fs::exists` 同义）：`dest_dir` 由包名拼出
+    // （DB 键派生的路径），环/不可达时 `fs::exists` 抛 raw `filesystem_error` —— 与本文件
+    // 上面摘除旧反向依赖那处是同一类，判据要一致（2026-10-03）。
+    if (!exists_follow(dest_dir)) {
         // 目录本体也进事务：NEW_DIR 的逆操作会删掉它，失败批次不在 hooks_dir 下留空壳
         sink.new_dir(dest_dir);
         ensure_dir_exists(dest_dir);
@@ -203,10 +214,19 @@ void InstallationTask::install_hook_files()
         // 是合法用法、照旧跟随复制（这也是今天的行为，不改变它）；指到包外的整包拒绝
         // （与归档成员名消毒同款处置），错误**点名那个条目与它解析到的目标**（§8 第 7 条）。
         if (entry.is_symlink()) {
-            std::error_code rec_ec;
-            const fs::path resolved = fs::weakly_canonical(entry.path(), rec_ec);
-            const fs::path pkg_root = fs::weakly_canonical(tmp_pkg_dir_, rec_ec);
-            if (rec_ec || !path_within(resolved, pkg_root)) {
+            // 两次 weakly_canonical **各用一个 error_code**（2026-10-03 订正）：原先共用一个
+            // `rec_ec`，第二次调用会把第一次的错误清掉 —— 若解析 entry.path() 失败而解析
+            // pkg_root 成功，`rec_ec` 被清空 ⇒ 逃逸检查被静默放过。两个 ec 都判才算真的
+            // "两次都成功且 resolved 落在 pkg_root 之内"。
+            std::error_code entry_ec;
+            const fs::path resolved = fs::weakly_canonical(entry.path(), entry_ec);
+            std::error_code root_ec;
+            const fs::path pkg_root = fs::weakly_canonical(tmp_pkg_dir_, root_ec);
+            // ⚠️ `entry_ec || root_ec` 这半边**没有专门用例 —— 有意的，不是漏测**：
+            // `weakly_canonical` 失败（`entry_ec`/`root_ec` 置位）需要很极端的路径条件，
+            // 测试里强制不出来。真正被用例钉住的是 `!path_within(...)` 那半边（逃逸检查），
+            // 这半边是配套的纵深防御 —— 两次解析任一失败都算"拿不准"，一律拒绝。
+            if (entry_ec || root_ec || !path_within(resolved, pkg_root)) {
                 throw LpkgException(string_format("error.hook_symlink_escapes_package",
                                                   entry.path().string(), resolved.string()));
             }
@@ -225,24 +245,31 @@ void InstallationTask::install_hook_files()
         // 旧版本的同一个 hook（含符号链接）先搬进 stash：批次回滚时原样搬回
         if (exists_no_follow(dest)) sink.backup(dest);
 
-        fs::path tmp = dest;
-        tmp += ".lpkgtmp";
+        const fs::path tmp = detail::staged_tmp_path(dest);
         // 落位前先挡住"tmp 路径是符号链接"：`fs::copy`/`fs::permissions` 都会跟随它，把 hook
-        // 脚本的内容与执行位写到链接目标上（同包内容分支的处理，见 refuse_symlink_tmp_path）
+        // 脚本的内容与执行位写到链接目标上（同包内容分支的处理，见 refuse_symlink_tmp_path）。
+        // ⚠️ 这一句必须在守卫**之前**：拒绝时盘上那个链接是用户的东西，不许连带删（见
+        // `TmpStageGuard` 的说明）。
         detail::refuse_symlink_tmp_path(tmp);
+        detail::TmpStageGuard tmp_guard(tmp);
         fs::copy(entry.path(), tmp, fs::copy_options::overwrite_existing);
         copy_xattrs(entry.path(), tmp);  // 先搬到 .lpkgtmp，rename 后 xattr 随之生效
         fs::permissions(tmp, fs::perms::owner_exec | fs::perms::group_exec | fs::perms::others_exec,
                         fs::perm_options::add);
-        // fsync .lpkgtmp 后再写 WAL（与包内容同一纪律）
+        // fsync .lpkgtmp 后再写 WAL（与包内容同一纪律）；失败不抛但要出声（见 copy 侧说明）
         if (durable_fsync_enabled()) {
-            if (int fd = ::open(tmp.c_str(), O_RDONLY); fd >= 0) {
-                ::fsync(fd);
+            const int fd = ::open(tmp.c_str(), O_RDONLY);
+            if (fd < 0) {
+                log_warning(string_format("warning.fsync_failed", tmp.string()));
+            } else {
+                if (::fsync(fd) != 0)
+                    log_warning(string_format("warning.fsync_failed", tmp.string()));
                 ::close(fd);
             }
         }
         // WAL: COPY <tmp> → <dst>（write-ahead：WAL 先于 rename）
         sink.commit_copy(tmp, dest);
+        tmp_guard.disarm();                               // 已 rename 到位，tmp 不复存在
         hook_files_.push_back(dest.filename().string());  // 提交后据此剪枝陈旧 hook
     }
 }

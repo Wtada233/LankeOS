@@ -193,7 +193,13 @@ protected:
              it != fs::recursive_directory_iterator(); it.increment(ec)) {
             if (ec) break;
             const std::string name = it->path().filename().string();
-            if (name.find(".lpkg_bak_") != std::string::npos || name.ends_with(".lpkgtmp")) ++n;
+            if (name.find(".lpkg_bak_") != std::string::npos || name.ends_with(".lpkgtmp")) {
+                ++n;
+                // 失败时要能一眼看出**残留的是哪一条**（目录？bak 文件？）——否则"残留 1"
+                // 只能靠猜，而这一族断言正是"回滚没收尾"的信号。
+                std::cerr << "[residue] " << it->path().string()
+                          << (fs::is_directory(it->path()) ? " (dir)" : " (file)") << "\n";
+            }
         }
         return n;
     }
@@ -761,12 +767,25 @@ TEST_F(ConfigThreeWayHashTest, BatchRollbackRestoresConfigAndHashDb)
         "c3ra", "2.0", {{"etc/c3ra.conf", "C3RA-V2\n"}, {"usr/bin/c3ra", "#!/bin/sh\n"}});
     const std::string b2 = create_pkg_files("c3rb", "2.0", {{"usr/bin/c3rb", "#!/bin/sh\n"}});
 
-    // 批次中途取证：a 已 COMMIT（配置已被静默换成 v2、DB 里程碑已落）之后、b 失败之前
+    // 批次中途取证：a 已 COMMIT（配置已被静默换成 v2、内存里的哈希记录已更新）之后、b 失败之前
+    //
+    // ⚠️ 2026-10-03：DB 现在**只在批次末尾**落盘一次（见 package_manager.cpp 的
+    //    `write_batch_db`），所以中途**盘上**的 confhashes.db **故意**还是批次前的内容 ——
+    //    "记录已更新"这件事必须改从**内存 Cache** 取证（批次内的判定本来就走它）。
+    //    盘上那份不变本身也是新语义的一部分，下面顺带把它一起钉住。
+    const auto inmem_conf_record = [] {
+        const auto recs = Cache::instance().conf_hashes_for_path("/etc/c3ra.conf");
+        return recs.empty() ? std::string("<none>") : *recs.begin();
+    };
+    const std::string inmem_before = inmem_conf_record();
+    ASSERT_NE(inmem_before, "<none>") << "批次前内存里就该有 c3ra.conf 的记录";
+
     std::map<std::string, std::string> mid;
     std::tuple<unsigned, unsigned long long, unsigned long long> mid_stat{};
     BreakpointManager::instance().set("install_after_begin_c3rb", [&] {
         mid["conf"] = read_file(test_root / "etc/c3ra.conf");
         mid["db"] = conf_db_bytes();
+        mid["db_inmem"] = inmem_conf_record();
         mid_stat = stat_of(conf_a);
         throw LpkgException("injected failure: 批次中途失败");
     });
@@ -778,7 +797,11 @@ TEST_F(ConfigThreeWayHashTest, BatchRollbackRestoresConfigAndHashDb)
     // 且属主/权限也确实换成了包内那份（root:root）—— 回滚要还原的正是这个"换过"的状态
     ASSERT_FALSE(mid.empty()) << "断点没命中";
     ASSERT_EQ(mid["conf"], "C3RA-V2\n") << "断点取得太早：a 的配置还没被静默替换";
-    EXPECT_NE(mid["db"], db_before) << "断点取得太早：a 的哈希记录还没落盘";
+    // 盘上那份**不变**（DB 每批次末尾才落盘一次）—— 这一条是**新语义**，不是取证失效
+    EXPECT_EQ(mid["db"], db_before)
+        << "批次中途盘上的哈希 DB 必须还是批次前的内容（DB 只在批次末尾落盘一次）";
+    // 真正的"记录已更新"从内存取证 —— 没有它，下面的回滚断言就是恒真废话
+    EXPECT_NE(mid["db_inmem"], inmem_before) << "断点取得太早：内存里的哈希记录还没更新";
     EXPECT_NE(mid_stat, stat_before)
         << "替换后属主/权限还是用户那份 —— 回滚的「属主/权限」维度没被考到";
 
@@ -830,17 +853,23 @@ TEST_F(ConfigThreeWayHashTest, BatchRollbackDropsHashRecordThatDidNotExistBefore
     const std::string b2 = create_pkg_files("c3rd", "2.0", {{"usr/bin/c3rd", "#!/bin/sh\n"}});
 
     std::string mid_db;
+    bool mid_inmem_has_record = false;
     BreakpointManager::instance().set("install_after_begin_c3rd", [&] {
         mid_db = conf_db_bytes();
+        // 2026-10-03 起 DB 只在**批次末尾**落盘一次 ⇒ "记录已建起来"从**内存**取证
+        // （批次内的判定本来就走内存 Cache；盘上那份此刻**故意**还没变）
+        mid_inmem_has_record = !Cache::instance().conf_hashes_for_path("/etc/c3rc.conf").empty();
         throw LpkgException("injected failure: 批次中途失败");
     });
 
     EXPECT_THROW(install_packages({a2, b2}, "", false), LpkgException);
     BreakpointManager::instance().clear_all();
 
-    // 中途取证：退化路径确实把"盘上那份"的记录建起来了（否则下面的"回到不存在"是空壳）
-    ASSERT_NE(mid_db.find("/etc/c3rc.conf"), std::string::npos)
-        << "退化路径没有建记录（批次还没走完？）：" << mid_db;
+    // 盘上那份还没变 —— 这一条是**新语义**（DB 每批次末尾才落盘），不是取证失效
+    EXPECT_EQ(mid_db.find("/etc/c3rc.conf"), std::string::npos)
+        << "批次中途盘上的哈希 DB 不该已经有这条记录：" << mid_db;
+    // 真正的取证：退化路径确实在**内存**里把记录建起来了（否则下面的"回到不存在"是空壳）
+    ASSERT_TRUE(mid_inmem_has_record) << "退化路径没有在内存里建记录（批次还没走完？）";
 
     // 回滚后：记录回到**不存在**（不是回到某个旧值），盘上那份也原样
     EXPECT_EQ(read_file(conf), "C3RC-V1\n") << "回滚必须还原原文件";
@@ -1363,4 +1392,77 @@ TEST_F(ConfigThreeWayHashTest, LpkgnewWindowWritesRowBeforeRenaming)
     EXPECT_FALSE(fs::exists(test_root / "etc/c3win.conf.lpkgnew"));
     Cache::instance().load();
     EXPECT_EQ(Cache::instance().get_installed_version(pkg), "1.0");
+}
+
+// ============================================================================
+// ①e `.lpkgnew` 的 **BACKUP 窗口**（先 BACKUP 现有 `.lpkgnew` 再 commit）——
+//     `lpkgnew_bak_after_wal_<pkg>` 断点此前**生产端接了线、tests 里 0 处使用**：
+//     `lpkgnew_after_wal_<pkg>`（①d）只覆盖"落新 `.lpkgnew`"那一半，而"目标已存在（上一次
+//     升级留下、用户还没审阅）→ 先把旧那份 BACKUP 进 stash"这半条腿从未被注入验证过。
+//     本用例钉四件事：断点**真命中** / 命中时刻 WAL 里**已有**那条 BACKUP 行 /
+//     命中时刻旧 `.lpkgnew` **还没被改名**（盘面未变）/ 回滚后盘面 == 基线（旧的 `.lpkgnew`
+//     被还原回来，不是被删掉、也不是被新的盖住）。
+//
+//    ⚠️ `BreakpointManager` 的断点是**一次性**的（命中即自动清除）；且归档里的祖先目录条目
+//       也会命中别的断点 —— 故本用例只设这一个断点，且断言都围绕 `.lpkgnew` 这个**具体**路径。
+// ============================================================================
+TEST_F(ConfigThreeWayHashTest, LpkgnewBackupWindowWritesRowBeforeReplacingPrevLpkgnew)
+{
+    const std::string pkg = "c3wbak";
+    const fs::path conf = test_root / "etc/c3wbak.conf";
+    const fs::path conf_new = test_root / "etc/c3wbak.conf.lpkgnew";
+    const auto files = [](const char* body) {
+        return std::vector<std::pair<std::string, std::string>>{{"etc/c3wbak.conf", body},
+                                                                {"usr/bin/c3wbak", "#!/bin/sh\n"}};
+    };
+
+    // v1 → 用户改过 → v2：走 ③，落下一份"待审阅"的 `.lpkgnew`（内容 = v2 版）
+    ASSERT_NO_THROW(install_packages({create_pkg_files(pkg, "1.0", files("V1\n"))}, "", false));
+    user_edit(conf, "USER\n");
+    ASSERT_NO_THROW(install_packages({create_pkg_files(pkg, "2.0", files("V2\n"))}, "", false));
+    ASSERT_EQ(read_file(conf), "USER\n") << "fixture 自检：用户那份不许被静默覆盖";
+    ASSERT_EQ(read_file(conf_new), "V2\n")
+        << "fixture 自检：v2 升级应已留下一份待审阅的 `.lpkgnew`（目标已存在，才有 BACKUP 窗口）";
+
+    // v3：目标 `.lpkgnew` 已存在 ⇒ 进 BACKUP 分支（先备份旧那份再 commit）。
+    bool hit = false;
+    std::string wal_at_bp;
+    std::string prev_lpkgnew_at_bp = "<未取到>";
+    BreakpointManager::instance().set("lpkgnew_bak_after_wal_" + pkg, [&] {
+        hit = true;
+        wal_at_bp = read_file(wal::wal_log_path());
+        prev_lpkgnew_at_bp = read_file(conf_new);
+        throw LpkgException("injected: `.lpkgnew` 的 BACKUP WAL 行已写、rename 未做");
+    });
+    EXPECT_THROW(install_packages({create_pkg_files(pkg, "3.0", files("V3\n"))}, "", false),
+                 LpkgException);
+    BreakpointManager::instance().clear_all();
+
+    // ① 断点真命中（否则这一支没把 after_wal_breakpoint 传下去）
+    EXPECT_TRUE(hit) << "断点 `lpkgnew_bak_after_wal_` 没命中 ⇒ 该分支没把断点传下去";
+    // ② 命中时刻 WAL 里**已有**那条 BACKUP 行（write-ahead：行先于 rename）——
+    //    锚取**完整的一行前缀** `BACKUP <conf_new 绝对路径>`（而不是只找 "BACKUP" 或路径本身：
+    //    本批次里 /etc 配置自己也有 BACKUP 行，v2 批次还可能留下过指向同一路径的 COPY 行）。
+    const std::string expected_row = "BACKUP " + conf_new.string();
+    EXPECT_NE(wal_at_bp.find(expected_row), std::string::npos)
+        << "命中时刻 WAL 里没有「BACKUP <`.lpkgnew` 路径>」这一行（行写在 rename 之后？）：\n"
+        << wal_at_bp;
+    EXPECT_NE(wal_at_bp.find("BACKUP"), std::string::npos) << "命中时刻 WAL 里没有 BACKUP 行：\n"
+                                                           << wal_at_bp;
+    // ③ 命中时刻旧 `.lpkgnew`**还没被改名**（仍逐字节是 v2 那份；若已 rename 进 stash，这里
+    //    会是"<不存在>"——那说明断点落在 rename **之后**，不是 write-ahead 窗口）。
+    EXPECT_EQ(prev_lpkgnew_at_bp, "V2\n")
+        << "命中时刻旧的 `.lpkgnew` 已被改动/移走 ⇒ 断点不在「行已写、rename 未做」窗口内";
+
+    // ④ 回滚后盘面 == 基线：批次前那份 `.lpkgnew`（"V2"）必须被**还原**回来
+    //    （不是被删掉、也不是被 v3 的 "V3" 盖住 —— 用户还没审阅过它）。
+    EXPECT_EQ(read_file(conf), "USER\n") << "回滚必须把用户那份配置原样留下";
+    ASSERT_TRUE(fs::exists(conf_new))
+        << "批次前就存在的 `.lpkgnew` 必须被 BACKUP 进 stash 后**还原**回来（不是删掉）";
+    EXPECT_EQ(read_file(conf_new), "V2\n")
+        << "还原的必须是**批次前那份** `.lpkgnew`（不是被 v3 的 \"V3\" 盖住、也不是消失）";
+    EXPECT_EQ(count_residue(), 0) << "回滚后仍有 .lpkg_bak_* / .lpkgtmp 残留";
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version(pkg), "2.0")
+        << "回滚后应停留在批次前的版本 2.0";
 }

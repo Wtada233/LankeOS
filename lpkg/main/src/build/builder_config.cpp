@@ -22,30 +22,40 @@ BuildConfig parse_build_config(const fs::path& json_path)
         std::ifstream f(json_path);
         f >> meta;
     } catch (const std::exception& e) {
-        throw LpkgException(string_format("error.lankebuild_parse_failed", std::string(e.what())));
+        throw LpkgException(
+            string_format("error.lankebuild_parse_failed", json_path.string(), e.what()));
     }
 
     BuildConfig cfg;
-    cfg.name = meta.at(std::string(constants::J_NAME)).get<std::string>();
-    cfg.version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
-    cfg.sources = meta.value(std::string(constants::J_SOURCES), std::vector<std::string>{});
-    cfg.work_sources =
-        meta.value(std::string(constants::J_WORK_SOURCES), std::vector<std::string>{});
-    cfg.no_strip = meta.value(std::string(constants::J_NO_STRIP), false);
-    cfg.keep_fs_layout = meta.value(std::string(constants::J_KEEP_FS_LAYOUT), false);
-    cfg.deps = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
-    cfg.build_deps = meta.value(std::string(constants::J_BUILD_DEPS), std::vector<std::string>{});
-    cfg.provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
-    cfg.needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
-    cfg.man_content = meta.value(std::string(constants::J_MAN), "");
-    cfg.release = meta.value(std::string(constants::J_RELEASE), 0);
+    try {
+        cfg.name = meta.at(std::string(constants::J_NAME)).get<std::string>();
+        cfg.version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
+        cfg.sources = meta.value(std::string(constants::J_SOURCES), std::vector<std::string>{});
+        cfg.work_sources =
+            meta.value(std::string(constants::J_WORK_SOURCES), std::vector<std::string>{});
+        cfg.no_strip = meta.value(std::string(constants::J_NO_STRIP), false);
+        cfg.keep_fs_layout = meta.value(std::string(constants::J_KEEP_FS_LAYOUT), false);
+        cfg.deps = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
+        cfg.build_deps =
+            meta.value(std::string(constants::J_BUILD_DEPS), std::vector<std::string>{});
+        cfg.provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+        cfg.needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+        cfg.man_content = meta.value(std::string(constants::J_MAN), "");
+        cfg.release = meta.value(std::string(constants::J_RELEASE), 0);
 
-    // 构建标志覆盖（空串 = 用 build_defaults 默认）
-    cfg.cflags = meta.value(std::string(constants::J_CFLAGS), std::string{});
-    cfg.cxxflags = meta.value(std::string(constants::J_CXXFLAGS), std::string{});
-    cfg.ldflags = meta.value(std::string(constants::J_LDFLAGS), std::string{});
-    cfg.makeflags = meta.value(std::string(constants::J_MAKEFLAGS), std::string{});
-    cfg.lto = meta.value(std::string(constants::J_LTO), false);
+        // 构建标志覆盖（空串 = 用 build_defaults 默认）
+        cfg.cflags = meta.value(std::string(constants::J_CFLAGS), std::string{});
+        cfg.cxxflags = meta.value(std::string(constants::J_CXXFLAGS), std::string{});
+        cfg.ldflags = meta.value(std::string(constants::J_LDFLAGS), std::string{});
+        cfg.makeflags = meta.value(std::string(constants::J_MAKEFLAGS), std::string{});
+        cfg.lto = meta.value(std::string(constants::J_LTO), false);
+    } catch (const std::exception& e) {
+        // 缺 name/version、字段类型不对等：nlohmann 抛的是 `json::exception`（**不是**
+        // LpkgException），此前会一路穿到 main 的兜底 catch —— 报错里也不点名是哪个
+        // LankeBUILD.json（2026-10-02 修）。
+        throw LpkgException(
+            string_format("error.lankebuild_parse_failed", json_path.string(), e.what()));
+    }
     return cfg;
 }
 

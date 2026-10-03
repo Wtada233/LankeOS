@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
 
 #include "../../main/src/archive/packer.hpp"
@@ -42,7 +44,7 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_needed_so_test");
+        suite_work_dir = fs::absolute("tmp_needed_so_test_" + std::to_string(::getpid()));
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
         mirror_dir = suite_work_dir / "mirror" / "x86_64";
@@ -76,7 +78,7 @@ protected:
         fs::create_directories(work_dir / "content" / "usr" / "bin");
         std::ofstream(work_dir / "content" / "usr" / "bin" / name).close();
 
-        std::string pkg_filename = name + "-" + ver + ".lpkg";
+        std::string pkg_filename = std::format("{}-{}.lpkg", name, ver);
         std::string pkg_path = (pkg_dir / pkg_filename).string();
         pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, "", needed_so);
 
@@ -95,7 +97,7 @@ protected:
     {
         std::ofstream index(mirror_dir / "index.txt");
         for (const auto& [name, ver, deps, provides, needed_so] : entries) {
-            std::string pkg_filename = name + "-" + ver + ".lpkg";
+            std::string pkg_filename = std::format("{}-{}.lpkg", name, ver);
             std::string pkg_path = (pkg_dir / pkg_filename).string();
             std::string hash = "unknown";
             if (fs::exists(pkg_path)) {
@@ -261,11 +263,43 @@ TEST_F(NeededSoTest, OneOfManyMissingThrows)
 }
 
 // -----------------------------------------------------------------------
-// 9. 动态重解析后 needed_so 可满足
-//    index 说 app 依赖 libA（无 needed_so），实际 metadata 说需要 libE.so.1
-//    libE 提供 libE.so.1 → 重解析后安装 libE，校验通过
+// 8c. deps 为空、needed_so 缺失 → 安装期的 SONAME 校验**必须真的跑到**
+//     此前 `ensure_dependencies_satisfied` 的 `if (actual_deps.empty()) return;` 把整段
+//     needed_so 校验变成了死代码（SONAME 检查与"有没有命名依赖"无关）。这里用
+//     --missing-so-no-error 让 solver 容忍缺失，安装期那道校验就必须打出告警。
 // -----------------------------------------------------------------------
-TEST_F(NeededSoTest, DynamicReResolutionSatisfiesNeededSo)
+TEST_F(NeededSoTest, MissingSoWarningFiresEvenWhenPackageHasNoNamedDeps)
+{
+    Config::instance().set_missing_so_no_error_mode(true);
+    create_pkg("needy", "1.0", /*deps=*/{}, /*provides=*/{}, /*needed_so=*/{"ghost.so.1"});
+    update_index({{"needy", "1.0", "", "", "ghost.so.1"}});
+    const std::string pkg = (pkg_dir / "needy-1.0.lpkg").string();
+
+    testing::internal::CaptureStderr();
+    bool threw = false;
+    try {
+        install_packages({pkg});
+    } catch (const std::exception&) {
+        threw = true;
+    }
+    const std::string err = testing::internal::GetCapturedStderr();
+    Config::instance().set_missing_so_no_error_mode(false);
+
+    EXPECT_FALSE(threw) << "缺 SONAME 在 --missing-so-no-error 下应被容忍并继续安装";
+    // 锚取模板里第一个占位符之前的**字面前缀**（足够特定；别拿一个词当锚）
+    const std::string tmpl = get_string("warning.missing_so_no_error");
+    const std::string anchor = tmpl.substr(0, tmpl.find('{'));
+    EXPECT_NE(err.find(anchor), std::string::npos)
+        << "needed_so 校验没跑到（deps 为空时被早退屏蔽）。stderr:\n"
+        << err;
+}
+
+// -----------------------------------------------------------------------
+// 9. 索引与归档的 needed_so 不一致 → **拒绝**（不再"重解析后满足"）
+//    index 说 app 依赖 libA、needs libA.so.1；归档里 app 实际依赖 libE、needs libE.so.1。
+//    2026-10-02 起：metadata 与索引不一致一律硬报错 error.metadata_mismatch，整批回滚。
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, IndexNeededSoMismatchIsRefused)
 {
     create_pkg("libA", "1.0", {}, {"libA.so.1"});
     create_pkg("libE", "1.0", {}, {"libE.so.1"});
@@ -280,21 +314,20 @@ TEST_F(NeededSoTest, DynamicReResolutionSatisfiesNeededSo)
         {"libE", "1.0", "", "libE.so.1", ""},
     });
 
-    // 重解析后 app 实际依赖 libE，libE 提供 libE.so.1 → 通过
-    EXPECT_NO_THROW(install_packages({"app"}));
+    EXPECT_THROW(install_packages({"app"}), LpkgException);
 
+    // 整批回滚：三个包一个都不装
     Cache::instance().load();
-    EXPECT_TRUE(Cache::instance().is_installed("app"));
-    EXPECT_TRUE(Cache::instance().is_installed("libE"));
-    // libA 可能仍存在（无原子回滚），但 app 的正确依赖 libE 已安装
+    EXPECT_FALSE(Cache::instance().is_installed("app"));
+    EXPECT_FALSE(Cache::instance().is_installed("libA"));
+    EXPECT_FALSE(Cache::instance().is_installed("libE"));
 }
 
 // -----------------------------------------------------------------------
-// 10. 动态重解析后 needed_so 仍不可满足 → 拒绝
-//     index 说 app 依赖 libA，实际 metadata 需要 ghost.so.1，
-//     ghost.so.1 无任何提供者 → 重解析后抛出
+// 10. 索引与归档不一致 + needed_so 无提供者 → 拒绝（同 9，拒绝发生在一致性校验处）
+//     index 说 app 依赖 libA，实际 metadata 依赖 lib-new / 需要 ghost.so.1
 // -----------------------------------------------------------------------
-TEST_F(NeededSoTest, DynamicReResolutionFailsOnMissingNeededSo)
+TEST_F(NeededSoTest, IndexMismatchFailsEvenWhenNeededSoIsMissing)
 {
     create_pkg("libA", "1.0", {}, {"libA.so.1"});
     // app 实际 metadata 依赖并需要 ghost.so.1（不存在）
@@ -672,7 +705,7 @@ TEST_F(NeededSoTest, AutoremoveKeepsAutoPulledNeededSoProvider)
 TEST_F(NeededSoTest, UseSystemSonamePrefersSystemSo)
 {
     fs::create_directories(test_root / fs::path(constants::USR_LIB));
-    std::ofstream(test_root / fs::path(constants::USR_LIB) / "libsys.so.1");
+    ensure_file_exists(test_root / fs::path(constants::USR_LIB) / "libsys.so.1");
 
     create_pkg("pkg-sys", "1.0", {}, {"libsys.so.1"});
     create_pkg("app", "1.0", {}, {}, {"libsys.so.1"});
@@ -698,7 +731,7 @@ TEST_F(NeededSoTest, UseSystemSonamePrefersSystemSo)
 TEST_F(NeededSoTest, DefaultPathStillPullsProviderEvenWithSystemSo)
 {
     fs::create_directories(test_root / fs::path(constants::USR_LIB));
-    std::ofstream(test_root / fs::path(constants::USR_LIB) / "libsys.so.1");
+    ensure_file_exists(test_root / fs::path(constants::USR_LIB) / "libsys.so.1");
 
     create_pkg("pkg-sys", "1.0", {}, {"libsys.so.1"});
     create_pkg("app", "1.0", {}, {}, {"libsys.so.1"});
@@ -1105,4 +1138,32 @@ TEST_F(NeededSoTest, LocalPackageMultiVersionSonameResolution)
     EXPECT_TRUE(Cache::instance().is_installed("local-app"));
     EXPECT_TRUE(Cache::instance().is_installed("libP"));
     EXPECT_EQ(Cache::instance().get_installed_version("libP"), "2.0");
+}
+
+// -----------------------------------------------------------------------
+// 8d. 依赖一致性检查**成功时静默**
+//     它是**校验**（不是解析的一步）：只在出错时出声。曾打过 `info.checking_deps`，
+//     在批量输出里既吵又误导 —— 只带 SONAME 的包不打那行，看起来像"只有第一个包查了依赖"
+//     （实测 `reinstall rust nano`）。
+// -----------------------------------------------------------------------
+TEST_F(NeededSoTest, DependencyCheckIsSilentOnSuccess)
+{
+    create_pkg("libso2", "1.0", {}, {"libso2.so.1"});
+    update_index({{"libso2", "1.0", "", "libso2.so.1", ""}});
+    ASSERT_NO_THROW(install_packages({"libso2"}));
+
+    create_pkg("silent-so", "1.0", /*deps=*/{}, /*provides=*/{}, /*needed_so=*/{"libso2.so.1"});
+    const std::string pkg = (pkg_dir / "silent-so-1.0.lpkg").string();
+
+    testing::internal::CaptureStdout();
+    ASSERT_NO_THROW(install_packages({pkg}));
+    const std::string out = testing::internal::GetCapturedStdout();
+
+    // 拿模板里第一个占位符之前的字面前缀当锚；**成功时它一次都不该出现**
+    const std::string tmpl = get_string("info.checking_deps");
+    const std::string head = tmpl.substr(0, tmpl.find('{'));
+    ASSERT_FALSE(head.empty()) << "l10n 键缺失：" << tmpl;
+    EXPECT_EQ(out.find(head), std::string::npos)
+        << "依赖一致性检查成功时必须静默（它是校验，不是解析的一步）：\n"
+        << out;
 }

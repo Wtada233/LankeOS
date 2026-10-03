@@ -17,6 +17,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -98,6 +99,31 @@ TEST_F(WalFramingTest, DirRmSplitsModeUidGidFromTheRight)
     EXPECT_EQ(op.arg2, "0755");
     EXPECT_EQ(op.arg3, "1000");
     EXPECT_EQ(op.arg4, "1000");
+}
+
+TEST_F(WalFramingTest, TrailingSpaceInArg1IsNotStripped)
+{
+    // 目录名/文件名允许以空格结尾（如 `foo `）。`DIR_META /…/foo  1777 0 0` 里路径与首个
+    // 尾字段之间只有**一个**分隔空格；从右往左切完 3 个尾字段后，arg1 恰是路径本身（含尾
+    // 空格）。曾经的 `while (head.back()==' ') remove_suffix` 会无条件把它剥掉 → 路径变成
+    // `/…/foo`：回滚的 DIR_META 改不到真实目录（mode/xattr 还原不回去），DIR_RM 的
+    // RESTORE_DIR 还会凭空造一个 `/…/foo`。
+    const WALOp meta = wal::parse_op("DIR_META /usr/share/foo  1777 0 0");
+    ASSERT_TRUE(meta.is_valid());
+    EXPECT_EQ(meta.type, WALOpType::DIR_META);
+    EXPECT_EQ(meta.arg1, "/usr/share/foo ") << "arg1 的尾随空格被吞掉（目录名被改写）";
+    EXPECT_EQ(meta.arg2, "1777");
+    EXPECT_EQ(meta.arg3, "0");
+    EXPECT_EQ(meta.arg4, "0");
+
+    // 同一路径的 DIR_RM（tail=3）与 DB（tail=1）也必须保留尾空格
+    EXPECT_EQ(wal::parse_op("DIR_RM /usr/share/foo  0755 1000 1000").arg1, "/usr/share/foo ");
+    EXPECT_EQ(wal::parse_op("DB /var/lib/lpkg/foo  :batch-start").arg1, "/var/lib/lpkg/foo ");
+    EXPECT_EQ(wal::parse_op("DB /var/lib/lpkg/foo  :batch-start").arg2, ":batch-start");
+
+    // tail=0 的单参数行同理（NEW / NEW_DIR 只按原样记路径）
+    EXPECT_EQ(wal::parse_op("NEW /usr/share/foo ").arg1, "/usr/share/foo ");
+    EXPECT_EQ(wal::parse_op("NEW_DIR /usr/share/foo /").arg1, "/usr/share/foo /");
 }
 
 TEST_F(WalFramingTest, PackageMetadataOpsKeepVersionSeparate)
@@ -246,7 +272,7 @@ protected:
 
     void SetUp() override
     {
-        suite_dir = fs::absolute("tmp_wal_framing_test");
+        suite_dir = fs::absolute("tmp_wal_framing_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_dir)) fs::remove_all(suite_dir);
         test_root = suite_dir / "root";
         fs::create_directories(test_root);

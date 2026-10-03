@@ -23,6 +23,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -55,7 +56,7 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_plan_repo_miss_test");
+        suite_work_dir = fs::absolute("tmp_plan_repo_miss_test_" + std::to_string(::getpid()));
         fs::remove_all(suite_work_dir);
 
         root = suite_work_dir / "root";
@@ -103,7 +104,6 @@ protected:
                            c.targets,
                            force,
                            /*top_level=*/true,
-                           /*successfully_installed=*/{},
                            /*installed_set=*/{}};
         return ctx;
     }

@@ -84,7 +84,9 @@ void WalWriter::log_no_fsync(std::string_view line)
     if (fd_ < 0) return;
 
     std::string l = std::string(line) + "\n";
-    ::write(fd_, l.data(), l.size());
+    // 与 log() 同：write 失败必须报错，不能写完照旧 ++lines_（那会让调用方以为行已落盘）。
+    if (::write(fd_, l.data(), l.size()) != static_cast<ssize_t>(l.size()))
+        throw LpkgException(string_format("error.wal_write_failed", wal_log_path()));
     ++lines_;
 }
 
@@ -100,9 +102,8 @@ void WalWriter::fsync_wal()
 WalWriter begin_batch()
 {
     WalWriter w;
-    // 不写包数 N：批次开启时无法预知最终包数（metadata 重解析会增长批次），
-    // 且恢复逻辑从不读取 N（只按 BEGIN_PKGS/COMMIT_PKGS 类型做 depth 跟踪）。
-    // 一个不可信的数字不应留在协议里。
+    // 不写包数 N：批次开启时最终成员数并不确定，且恢复逻辑从不读取 N（只按
+    // BEGIN_PKGS/COMMIT_PKGS 类型做 depth 跟踪）。一个不可信的数字不应留在协议里。
     w.log("BEGIN_PKGS");
     return w;
 }

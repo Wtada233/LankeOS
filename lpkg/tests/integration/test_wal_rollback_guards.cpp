@@ -13,6 +13,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -47,7 +48,7 @@ protected:
         init_localization();
         BreakpointManager::instance().clear_all();
 
-        suite_work_dir = fs::absolute("tmp_wal_guards_test");
+        suite_work_dir = fs::absolute("tmp_wal_guards_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
         // 关键：root 路径含空格 → state_dir/WAL/DB 全部带空格（重现 A1 的必然触发条件）
         test_root = suite_work_dir / "root with space";
@@ -163,6 +164,37 @@ TEST_F(WalRollbackGuardTest, SuccessfulBatchKeepsInstalledStateWhenRootHasSpaces
     EXPECT_EQ(count_db_backups(), 0);
 }
 
+TEST_F(WalRollbackGuardTest, DanglingSymlinkAtDepFileIsRestoredOnRollback)
+{
+    // 写入侧判"DB 旧内容是否存在"用 `exists_no_follow`（**悬空链接**也算占位）→ 把它 rename 成了
+    // `<path>.lpkg_db_bak_before:<milestone>`。回滚侧的 `DbBakExists` 必须用**同一个谓词**；
+    // 跟随语义会把这个悬空链接备份判成"不存在" ⇒ 这一行被静默跳过 ⇒ wa 的 deps 文件停留在
+    // **新版**内容，而批次开始时的盘面（那条悬空链接）永久消失。
+    const std::string base = create_pkg("wbase", "1.0");
+    const std::string a = create_pkg("wa", "1.0", {"wbase"});  // wa 有依赖 → deps/wa 内容非空
+    const std::string b = create_pkg("wb", "1.0", {"wa"});
+
+    // 安装前用一条**悬空符号链接**占住 wa 的 deps 文件路径（init_filesystem 只建 deps/ 目录，
+    // 不预建 deps/<pkg>，所以这个占位物会活到 write_string_file_wal 那一步）
+    const fs::path dep = Config::instance().dep_dir() / "wa";
+    fs::create_directories(dep.parent_path());
+    fs::create_symlink("/nonexistent/old-deps", dep);
+    ASSERT_TRUE(fs::is_symlink(fs::symlink_status(dep)));
+    ASSERT_FALSE(fs::exists(dep)) << "现场没造出悬空链接";
+
+    // wa 完整装完（deps/wa 已写）之后、在 wb 的安装起点打断 → 整批回滚
+    BreakpointManager::instance().set(
+        "install_after_begin_wb", [] { throw LpkgException("interrupt after wa's db written"); });
+    EXPECT_THROW(install_packages({base, a, b}), LpkgException);
+    BreakpointManager::instance().clear_all();
+    Cache::instance().load();
+
+    EXPECT_TRUE(fs::is_symlink(fs::symlink_status(dep)))
+        << "wa 的 deps 路径上那条悬空链接未被还原（DbBakExists 跟随语义 → 回滚静默跳过）";
+    ASSERT_TRUE(fs::is_symlink(fs::symlink_status(dep)));
+    EXPECT_EQ(fs::read_symlink(dep).string(), "/nonexistent/old-deps");
+}
+
 // ============================================================================
 // A2：破损尾部行不得让整批回滚失效
 // ============================================================================
@@ -198,7 +230,7 @@ TEST_F(WalRollbackGuardTest, UnclosableRollbackKeepsDbBackupsForRec)
     BreakpointManager::instance().set("install_after_begin_wa", [] {
         // 模拟"WAL 记录整段丢失"（state 目录被误删/文件被截断）：此时提取不到任何
         // 可回滚的批次，batch_rollback 必须返回 false，调用方据此保留 DB 备份
-        std::ofstream(wal::wal_log_path(), std::ios::trunc);
+        fs::resize_file(wal::wal_log_path(), 0);  // 截断成空（`ensure_file_exists` 只建不截）
         throw LpkgException("wal lost mid-batch");
     });
     EXPECT_THROW(install_packages({a}), LpkgException);

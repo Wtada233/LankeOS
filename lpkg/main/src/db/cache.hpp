@@ -144,27 +144,43 @@ public:
     /** 获取某包提供的所有能力 */
     std::unordered_set<std::string> get_package_provides(std::string_view pkg);
 
-    // ===== 迭代支持（调用者需自行管理锁） =====
+    // ===== 迭代支持：**一律值语义快照**（2026-10-03 收紧） =====
+    //
+    // 这里原本是 `std::mutex& get_mutex()` + 两个**引用返回**的访问器，契约是"调用者自己
+    // 加锁、加锁期间不得再调任何会加锁的方法"。那条契约有两处纰漏：
+    //   · 引用返回的两个访问器**根本不用锁**就把内部容器交了出去；
+    //   · `get_mutex()` 的外泄让"持锁跨文件 I/O"成为可能（`force_solve_conflict` 曾经
+    //     在锁内做 `ifstream` 与 `find_provider`），而正确写法从来不需要那样。
+    // 全部改成"持锁拷贝一份出去"：调用方拿到的是**快照**，不再需要也不该持有锁。
+    // 没有一处调用点需要"跨读-改-写持锁"—— 所有改动本来就都走 Cache 自己的加锁方法。
 
-    /** 获取内部互斥锁引用 */
-    std::mutex& get_mutex()
-    {
-        return mtx;
-    }
-    /** 获取所有已安装包（名称 -> 版本） */
-    const std::map<std::string, std::string, std::less<>>& get_all_installed()
-    {
-        return installed_pkgs;
-    }
-    /** 获取所有锁定包名集合 */
-    const std::unordered_set<std::string>& get_all_held()
-    {
-        return holdpkgs;
-    }
+    /** 已安装包（名称 → 版本）的**快照**。 */
+    std::map<std::string, std::string, std::less<>> get_all_installed();
+
+    /** 锁定包名集合的**快照**。 */
+    std::unordered_set<std::string> get_all_held();
+
+    /**
+     * **整张文件归属表**的快照（路径 → 包名集合）。
+     *
+     * 专门给"冲突预检要拿一份**原子**的基线、然后在本地把它推演成批内各步之后的样子"
+     * 那个用法。给它一个引用访问器等于把坑再挖一遍（调用方得自己加锁、加锁期间不能调
+     * 别的方法、还可能顺手改到活状态）。
+     */
+    std::map<std::string, std::unordered_set<std::string>, std::less<>> snapshot_file_ownership();
+
+    /**
+     * 某路径上的**全部**配置哈希记录（`<pkg>:<sha256>` 集合）快照。
+     *
+     * `get_conf_hash(path, pkg)` 是"这一对有没有记录"，答不了"这个路径上有没有**任何**
+     * 记录" —— 而后者正是"批次前就没有记录 ⇒ 回滚后也必须没有"那类断言要问的。
+     */
+    std::unordered_set<std::string> conf_hashes_for_path(std::string_view path);
 
     Cache();
 
     // 文件归属数据库（路径 -> 包名集合）
+private:
     std::map<std::string, std::unordered_set<std::string>, std::less<>> file_db;
     // 配置文件哈希数据库（逻辑路径 -> "<pkg>:<sha256>" 集合；见 conf_hashes_db()）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> conf_hashes;
@@ -186,6 +202,7 @@ public:
     bool reverse_deps_loaded = false;  // 反向依赖是否已加载
     bool essentials_loaded = false;    // 核心包是否已加载
 
+public:
     /** 从文件读取多值数据库（不经过缓存） */
     std::map<std::string, std::unordered_set<std::string>, std::less<>> read_db_uncached(
         const std::filesystem::path& path);
@@ -222,7 +239,11 @@ public:
      *
      * @param db_path     DB 文件路径
      * @param db          要写入的 DB 内容
-     * @param milestone   里程碑标签（如 "glibc:installed"）
+     * @param milestone   里程碑标签（如 ":batch-start" / ":batch-end"）。本函数只由
+     *                    `Cache::write(milestone)` 调用，里程碑只有这两个批次级值
+     *                    （订正 2026-10-03：原示例写 "glibc:installed"，那是逐包落盘时代的
+     *                    形态，DB 已不再逐包写；包级元数据文件走的是 `wal::write_string_file_wal`，
+     *                    不经本函数）
      * @param wal_op_type WAL 操作类型（DB / DBNEW / DBRM）
      */
     void write_db_file_wal(

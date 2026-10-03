@@ -26,6 +26,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -287,7 +288,7 @@ void revoke_undeclared_xattrs(Cache& cache, const std::string& pkg_name, const f
             if (declared.contains(key)) continue;  // 新版本仍声明 → 归写入侧管，不撤
             if (revoke_xattr_key_if_unowned(cache, pkg_name, logical, key, sink, root)) {
                 log_info(string_format("info.xattr_key_revoked", key, logical));
-                trace_remove("obsolete XATTR " + logical + " " + key + " → lremovexattr");
+                trace_remove(std::format("obsolete XATTR {} {} → lremovexattr", logical, key));
             }
         }
     }
@@ -331,9 +332,9 @@ void InstallationTask::remove_obsolete_files()
     if (old_version_to_replace_.empty()) return;  // 全新安装：没有"旧版本"可言
 
     auto& cache = Cache::instance();
+    // 不再打 `info.upgrade_old_files_check`（"正在替换 X: 旧 → 新, N 个旧文件待处理"）：
+    // 包名与版本已由 `==> Installing X <ver>` 进度行点名，"N 个旧文件"是实现细节。
     const auto old_files = cache.get_package_files(pkg_name_);
-    log_info(string_format("info.upgrade_old_files_check", pkg_name_, old_version_to_replace_,
-                           actual_version_, old_files.size()));
     if (old_files.empty()) return;
 
     // 写入层原语：废弃文件/目录的 WAL 行与物理操作成对发生（见 op_sink.hpp）
@@ -372,7 +373,7 @@ namespace
 //
 // handler 一律是本 TU 的文件内自由函数、参数显式传入（与 installation_task_copy.cpp 同款）：
 // `InstallationTask` 的声明在 package_manager.hpp，本趟不碰它。要落回 task 的东西
-// （`new_dirs_` / `new_files_` / `probe_ledger_` / `rec`）由主循环以出参、或在自己那侧写账。
+// （`probe_ledger_` / `rec`）由主循环以出参、或在自己那侧写账。
 // ============================================================================
 
 /// 一条归档条目在让开趟的上下文（主循环 probe 完算好，五个 handler 共用）
@@ -419,7 +420,7 @@ struct LetGoBatch {
  *     conflict.c 的 "replacing package file with a directory, not a conflict"，
  *     条件是挡路文件由**本包已装版本**持有 —— 由 check_for_file_conflicts 保证）。
  */
-void let_go_make_dir(const LetGoBatch& batch, const LetGoEntry& e, std::vector<fs::path>& new_dirs)
+void let_go_make_dir(const LetGoBatch& batch, const LetGoEntry& e)
 {
     const fs::path probe = strip_trailing_slash(e.physical_path);
     if (e.decision.let_go == detail::PathAction::SaveConfigAndMkDir) {
@@ -428,7 +429,6 @@ void let_go_make_dir(const LetGoBatch& batch, const LetGoEntry& e, std::vector<f
         // WAL: BACKUP + rename 进 stash（一次调用；此路径无 write-ahead 断点）
         batch.sink.backup(probe);
     }
-    new_dirs.push_back(e.physical_path);
     // WAL: NEW_DIR <path>  (write-ahead: 先写 WAL 再做实际操作)
     batch.sink.new_dir(e.physical_path);
     // 断点：`NEW_DIR` 行已落、`create_directories` 未做 —— write-ahead 窗口。
@@ -501,8 +501,10 @@ void let_go_make_dir(const LetGoBatch& batch, const LetGoEntry& e, std::vector<f
 void let_go_noop(const LetGoEntry& e)
 {
     if (e.decision.write == detail::PathAction::WriteDirMetadata) {
-        std::error_code ec;
-        fs::create_directories(e.phys_dir, ec);
+        // 走唯一实现 `ensure_dir_exists()`（不抛 exists_follow 判否 + 带 ec 的
+        // create_directories + **点名路径**报错）。此前这里 `std::error_code ec` 被整个丢掉
+        // （订正 2026-10-03）：创建失败会**静默**继续，盘面与 WAL 描述的世界不一致。
+        ensure_dir_exists(e.phys_dir);
     }
 }
 
@@ -535,18 +537,20 @@ void let_go_noop(const LetGoEntry& e)
  */
 void let_go_stash(const LetGoBatch& batch, const LetGoEntry& e, detail::PathRecord& rec)
 {
-    {
-        std::error_code ec;
-        fs::create_directories(e.phys_dir, ec);
-    }
+    // 建父链失败**必须报**（原先 `std::error_code ec` 被丢掉、静默继续，2026-10-03 订正）：
+    // 失败时后面的 `sink.backup` 会把文件搬进一个不存在/不可写的目录。走唯一实现
+    // `ensure_dir_exists()`（不抛 exists_follow + 带 ec 的 create_directories + 点名路径报错）。
+    ensure_dir_exists(e.phys_dir);
     rec.stashed = (e.decision.let_go == detail::PathAction::Stash);
 
     // `/etc` 配置的 **mode** —— 内容改没改，三哈希看得出来；**只改权限看不出来**。
     // 用户 `chmod 600` 过的那份配置，会在写入趟被 `stage_regular_file` 用**包内条目**的
     // mode/uid/gid 落位（实测：0600 → 0644），而三哈希判的是**内容哈希**、看不到这一层 ⇒
     // 此前是**完全静默**的替换（目录那边至少有 `warning.dir_perm_mismatch`，文件这边没有）。
-    // 与目录那边对称：**先告警、再纠正** —— 只把"静默"变"可见"，**不改语义**
-    // （"内容未变时是否该保留用户改的 mode"是一条独立的策略问题，未定）。
+    // 与目录那边对称：**先告警、再纠正** —— 只把"静默"变"可见"，**不改语义**。
+    // （订正 2026-10-03：原文写"内容未变时是否该保留用户改的 mode"是"未定"的策略问题 ——
+    //  维护者 2026-09-26 已拍板：**不保留**，包内值胜出，只要求"不静默"（见
+    //  lpkg/CLAUDE.md §6 与 ARCH.md）。所以这里的"纠正"就是既定语义，不再悬而未决。）
     // **此处是唯一还看得见盘上那份的时刻**：下一步就把它搬进 stash 了，而写入趟落位时
     // 原位已空（`/etc` 的这一格由让开趟 `Stash` 清空）。判据取 **lstat**（不跟随末段链接），
     // 两侧都是；只比 **mode**（与目录那条告警同口径，不含 uid/gid）。
@@ -558,8 +562,10 @@ void let_go_stash(const LetGoBatch& batch, const LetGoEntry& e, detail::PathReco
             const mode_t pkg_mode = pkg_st.st_mode & constants::PERM_MASK_ALL;
             const mode_t cur_mode = cur_st.st_mode & constants::PERM_MASK_ALL;
             if (cur_mode != pkg_mode) {
+                // 八进制渲染（`{:o}`，2026-10-03 订正）：原先传 int 走十进制，0644 显示成 420。
                 log_warning(string_format("warning.file_perm_mismatch", e.physical_path.string(),
-                                          static_cast<int>(cur_mode), static_cast<int>(pkg_mode)));
+                                          std::format("{:o}", static_cast<unsigned>(cur_mode)),
+                                          std::format("{:o}", static_cast<unsigned>(pkg_mode))));
             }
         }
     }
@@ -574,8 +580,7 @@ void let_go_stash(const LetGoBatch& batch, const LetGoEntry& e, detail::PathReco
 /**
  * `/etc` 的**非目录**条目撞盘上真目录（dir → 文件 / 符号链接）：整树改名成
  * `<路径>.lpkgsave`（内容一个不丢、`SAVE_CONF` 可回滚），让开之后由写入趟
- * **就地**落位。**不建目录、不进 new_files_**（那条路径由写入趟的 COPY / NEW
- * 记账，这里只负责让路）。
+ * **就地**落位。**不建目录**（那条路径由写入趟的 COPY / NEW 记账，这里只负责让路）。
  */
 void let_go_save_config(const LetGoBatch& batch, const LetGoEntry& e)
 {
@@ -583,14 +588,11 @@ void let_go_save_config(const LetGoBatch& batch, const LetGoEntry& e)
 }
 
 /// 盘上本来就没有 → 只登记（WAL `NEW`；回滚据此删除本包要落位的那个路径）
-void let_go_register_new(const LetGoBatch& batch, const LetGoEntry& e,
-                         std::vector<fs::path>& new_files)
+void let_go_register_new(const LetGoBatch& batch, const LetGoEntry& e)
 {
-    {
-        std::error_code ec;
-        fs::create_directories(e.phys_dir, ec);
-    }
-    new_files.push_back(e.physical_path);
+    // 同 let_go_stash：建父链失败必须报，不再丢弃 ec（2026-10-03 订正）。唯一实现
+    // `ensure_dir_exists()`：不抛 exists_follow + 带 ec 的 create_directories + 点名路径报错。
+    ensure_dir_exists(e.phys_dir);
     batch.sink.new_file(e.physical_path);
 }
 
@@ -648,9 +650,14 @@ void record_let_go_facts(const LetGoBatch& batch, const LetGoEntry& e, detail::P
         //
         // 但"不可达"不等于"不必注入"：断点**必须传下去**，否则这个窗口永远造不出来、
         // 这条防御就无法验证（"接了断点却没传"= 一个测不到的接线）。用例
-        // `LetGoUnstashDefenseTest.MissingArchiveCopyPutsStashedConfigBack` 用
+        // `UnstashBreakpointTest.VanishedPackageContentDoesNotLoseTheConfig`
+        // （`tests/integration/test_unstash_primitive.cpp`）用
         // `conf_replace_after_wal_<pkg>`（让开趟 stash 那一刻）从断点里删掉包内那份，
-        // 把这个状态显式造出来 —— 正是故障注入设施存在的意义。
+        // 把这个状态显式造出来；再用 `unstash_after_wal_<pkg>` 钉住"放回原位"的窗口 ——
+        // 正是故障注入设施存在的意义。
+        // （订正 2026-10-03：原文点名的是 `LetGoUnstashDefenseTest.
+        //   MissingArchiveCopyPutsStashedConfigBack` —— 全仓 grep 不到这个用例，是个不存在的
+        //   名字；它让人误信"这条防御已有覆盖"。真正覆盖它的是上面那个用例。）
         if (e.wants_cfg_record && rec.stashed) {
             batch.sink.un_stash(rec.bak, e.physical_path, "unstash_after_wal_" + batch.pkg_name);
         }
@@ -676,19 +683,22 @@ void InstallationTask::backup_existing_files()
     detail::OpSink sink(pkg_name_, &stashes_);
     const fs::path content_dir = tmp_pkg_dir_ / constants::DIR_CONTENT;
     auto files = detail::scan_content_files(content_dir);
-    const fs::path root = Config::instance().root_dir();
+    // `root_dir()` 不再在这里取：落位/让开目标统一走 `detail::confine_target_path()`
+    // （它内部取 root 并把祖先链约束在 root 内，见 install_common.hpp）—— 2026-10-03。
     // 本包这一轮的事实记录表（**生产者**是这一趟，消费者是写入趟；见 op_sink.hpp）
     probe_ledger_.begin();
     const LetGoBatch batch{sink, content_dir, pkg_name_};
 
     for (const auto& f : files) {
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+        if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
         fs::path rel_f = f;
         if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
         LetGoEntry e;
         e.name = f;
-        e.physical_path = root / rel_f;
+        // 让开趟同样要约束祖先链：这里对 `physical_path` 做的是**备份 rename** —— 穿出去
+        // 就会把宿主的文件搬进 stash（2026-10-03）。判据与写入趟共用同一实现。
+        e.physical_path = detail::confine_target_path(rel_f);
         // **先剥尾斜杠、再取父目录**。目录条目的 `physical_path` 恒带尾斜杠，而实测
         // `fs::path("/a/b/").parent_path()` 给的是 **"/a/b"（它自己）**、`filename()` 是空串
         // —— 于是 `phys_dir` 对目录条目**等于 `physical_path`**，"确保父目录存在"这个意图
@@ -729,6 +739,12 @@ void InstallationTask::backup_existing_files()
             // 不抛谓词 —— 同 installation_task_copy.cpp 的 write_facts：中间段成环时
             // `fs::is_symlink` 抛，而 `!disk_is_dir` 对环为真 ⇒ 必然求值到它。
             e.facts.disk_is_symlink = !e.facts.disk_is_dir && is_symlink_no_follow(probe);
+            // 两边都是符号链接时，目标是否逐字节相同（2026-10-02 新增）。判"相同" ⇒ 写入趟
+            // 落 `KeepOnDisk`，这一格才不会再往 `/etc` 吐一份同内容的 `.lpkgnew`（分支说明见
+            // op_sink.cpp）。只在两边都是符号链接时读 —— 其余形态这个事实无意义。
+            // `symlink_targets_equal` 用 `read_symlink` 的 ec 重载（不抛），与谓词族同一纪律。
+            if (e.facts.entry_is_symlink && e.facts.disk_is_symlink)
+                e.facts.disk_symlink_matches_entry = symlink_targets_equal(content_dir / f, probe);
         }
         e.decision = detail::decide_path(e.facts);
         // 写入趟要用的记录（**每个归档条目**都记：事实部分对所有形态都有意义，写入趟的
@@ -743,7 +759,7 @@ void InstallationTask::backup_existing_files()
             case detail::PathAction::MakeDir:
             case detail::PathAction::StashAndMkDir:
             case detail::PathAction::SaveConfigAndMkDir:
-                let_go_make_dir(batch, e, new_dirs_);
+                let_go_make_dir(batch, e);
                 break;
             case detail::PathAction::Noop:
                 let_go_noop(e);
@@ -755,12 +771,22 @@ void InstallationTask::backup_existing_files()
                 let_go_save_config(batch, e);
                 break;
             case detail::PathAction::RegisterNew:
-                let_go_register_new(batch, e, new_files_);
+                let_go_register_new(batch, e);
                 break;
             default:
-                // 其余动作都不归"让开趟"：决策表保证归档条目的 `let_go` 只可能是上面 6 个之一
-                // （`decide_path` 的后置条件在入口处已经检查过）。
-                break;
+                // 决策表保证归档条目的 `let_go` 只可能是上面 7 个标签之一：`decide_path_unchecked`
+                // （op_sink.cpp）对 `in_archive` 只赋 {MakeDir, Noop, StashAndMkDir,
+                // SaveConfigAndMkDir, Stash, SaveConfig, RegisterNew}，其后置条件
+                // `check_decision_invariants` 另保证 `let_go != Unclaimed`。所以 default
+                // **不可达** —— 但**绝不静默**（裸 `break` 会把"本该让开的路径"无人处理地放过去，
+                // 那正是历史上漏格那一类缺陷）：一旦将来有人给 `let_go` 赋了写入/登记趟的动作，
+                // 这里当场点名，而不是悄悄跳过。措辞不走 l10n —— 内部一致性错误，正常永不出现
+                // （与 op_sink.cpp 的漏格分支同款）。
+                throw LpkgException(
+                    std::string("内部一致性错误：让开趟遇到不归它的动作 ") +
+                    std::to_string(static_cast<int>(e.decision.let_go)) + "（路径 " +
+                    e.facts.logical +
+                    "）—— 归档条目的 let_go 只可能是让开趟的动作，见 decide_path。");
         }
 
         record_let_go_facts(batch, e, probe_ledger_, rec);

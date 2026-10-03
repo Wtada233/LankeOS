@@ -230,10 +230,13 @@ TEST_F(GitSubmoduleTest, SubmoduleIsFetchedAtTheCommitPinnedByParent)
     // fixture：leaf 有 c1(leaf-v1) → c2(leaf-v2)；父仓库在 c2 处挂上它；
     // 之后 leaf 又前进到 c3(leaf-v3) —— 父仓库的 gitlink **仍钉在 c2**。
     //
-    // 于是这条用例同时压两件事：
-    //   1. 子模块不是"拉个默认分支就完事"，而是检出父仓库记录的 **index id**；
-    //   2. `prepare_repo` 的**浅拉未命中 → 完整拉兜底**：depth=1 只拿得到分支 tip(c3)，
-    //      钉住的 c2 不在里面 → 必须退到 depth=0 才拿得到（这是该兜底存在的理由）。
+    // 于是这条用例压的是：子模块不是"拉个默认分支就完事"，而是检出父仓库记录的 **index id**
+    // (c2)，而不是 leaf 的分支尖端(c3)。
+    //
+    // ⚠️ 它**不**覆盖 `prepare_repo` 的"{1,0} 完整拉兜底轮"：本用例曾被写成压那件事，但实测
+    // 不成立 —— 本地 `file://` 传输**不认 depth**（机制见 ⑯），depth=1 那一轮就拿到了全部
+    // 对象，钉住的 c2 是**直接**取到的、并非退到 depth=0 才拿到。兜底轮在本地 fixture 里
+    // 不可达（⑮/⑯ 已把这点钉成字面量）。
     const fs::path leaf = upstream_path("leaf-repo");
     make_repo(leaf);
     commit_file(leaf, "leaf.txt", "leaf-v1\n", "c1");

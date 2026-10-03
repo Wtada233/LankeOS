@@ -163,11 +163,21 @@ TEST_F(StashSemanticsTest, PurgeConsumedStashesRemovesStashRoots)
     ops.push_back(o1);
     ops.push_back(o2);
 
+    // 方向一（2026-10-02 修）：**bak 还在**说明这条逆操作没被消费 —— 例如
+    // `reverse_execute` 因路径越界（confinement）**跳过**了它（只告警），那一刻原物
+    // **只存在于 stash 里**。此时整目录 remove_all 会把**唯一一份数据**删掉，必须保留。
+    // 旧行为是不看 bak 在不在、一律删（这正是缺陷）。
     wal::purge_consumed_stashes(ops);
+    EXPECT_TRUE(fs::exists(stash)) << "bak 仍在 ⇒ 逆操作没收敛 ⇒ 绝不能删这个 stash 根";
+    EXPECT_TRUE(fs::exists(bak1));
+    EXPECT_TRUE(fs::exists(bak2));
 
-    EXPECT_FALSE(fs::exists(stash)) << "purge 应整目录 remove_all stash 根";
-    EXPECT_FALSE(fs::exists(bak1));
-    EXPECT_FALSE(fs::exists(bak2));
+    // 方向二：逆操作把 baks 消费掉之后（正常回滚路径的形状 —— `reverse_execute` 会把每个
+    // bak rename 回原位），才该整目录清掉。
+    fs::remove(bak1);
+    fs::remove(bak2);
+    wal::purge_consumed_stashes(ops);
+    EXPECT_FALSE(fs::exists(stash)) << "purge 应整目录 remove_all 已消费的 stash 根";
 }
 
 // ============================================================================

@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <atomic>
 #include <filesystem>
+#include <format>
 #include <fstream>
 
 #include "../../main/src/archive/packer.hpp"
@@ -44,7 +46,7 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_sigint_test");
+        suite_work_dir = fs::absolute("tmp_sigint_test_" + std::to_string(::getpid()));
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
         mirror_dir = suite_work_dir / "mirror" / "x86_64";
@@ -78,7 +80,7 @@ protected:
         fs::create_directories(work_dir / "content" / "usr" / "bin");
         std::ofstream(work_dir / "content" / "usr" / "bin" / name).close();
 
-        std::string pkg_filename = name + "-" + ver + ".lpkg";
+        std::string pkg_filename = std::format("{}-{}.lpkg", name, ver);
         std::string pkg_path = (pkg_dir / pkg_filename).string();
         pack_package(pkg_path, work_dir.string(), name, ver, deps);
 
@@ -95,7 +97,7 @@ protected:
     {
         std::ofstream idx(mirror_dir / "index.txt");
         for (const auto& [name, ver, deps] : entries) {
-            std::string pkg_path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
+            std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
             std::string hash = "unknown";
             if (fs::exists(pkg_path)) {
                 hash = calculate_sha256(pkg_path);

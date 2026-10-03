@@ -23,6 +23,7 @@
 #include <archive.h>
 #include <archive_entry.h>
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -30,6 +31,7 @@
 #include <vector>
 
 #include "../../main/src/archive/archive.hpp"
+#include "../../main/src/archive/packer.hpp"
 #include "../../main/src/base/exception.hpp"
 #include "../../main/src/i18n/localization.hpp"
 
@@ -45,7 +47,7 @@ protected:
     void SetUp() override
     {
         init_localization();
-        suite_dir = fs::absolute("tmp_archive_member_name_test");
+        suite_dir = fs::absolute("tmp_archive_member_name_test_" + std::to_string(::getpid()));
         fs::remove_all(suite_dir);
         out_dir = suite_dir / "out";
         fs::create_directories(out_dir);
@@ -297,4 +299,146 @@ TEST_F(ArchiveMemberNameSafetyTest, SuspiciousLookingButLegalNamesStillExtract)
     EXPECT_EQ(content(out_dir / "usr/share/deep/dir/file.txt"), "5");
     EXPECT_TRUE(fs::is_directory(out_dir / "usr/share/d.lpkgnewx"))
         << "末段后缀不匹配的目录名不该被拒";
+}
+
+// ============================================================================
+// 6. 成员名消毒抛的是 **UnsafeArchiveException**（子类）—— 构建期自动解压据此区分
+//    "普通失败（容忍）"与"安全拒绝（必须放行）"
+// ============================================================================
+
+TEST_F(ArchiveMemberNameSafetyTest, MemberNameRejectionIsAnUnsafeArchiveException)
+{
+    // `UnsafeArchiveException` 是 `LpkgException` 的**子类**：所有既有的
+    // `catch (const LpkgException&)` 照旧接得住，而构建期"自动解压源码归档"额外加一条
+    // 更具体的 catch 把它 rethrow（见 base/exception.hpp 与 builder_executor.cpp）。
+    write_archive({{"content/evil\nname", "x", "", false}});
+
+    EXPECT_THROW(extract_tar_zst(pkg, out_dir, pkg.filename().string()), UnsafeArchiveException);
+}
+
+// ============================================================================
+// 7. 打包侧对称：`pack` 不得产出**自己的 extractor 会拒收**的包
+//
+// 解压侧的拒绝发生在下游（装包/建包时才发现），那时坏包已经传出去了 —— 该出声的地方是
+// 产生它的那一刻。判据本体是两处**共用**的同一个函数，所以这里钉的是"打包侧真的调了它"，
+// 以及"消息点名了是哪个输出文件"。
+// ============================================================================
+
+TEST_F(ArchiveMemberNameSafetyTest, PackerRefusesNamesItsOwnExtractorWouldReject)
+{
+    const fs::path src = suite_dir / "pkgsrc";
+    fs::create_directories(src / "content/usr/share");
+    // 换行是 Linux 上**合法的文件名字符**，但不含 `/`（含 `/` 的话 fs::path 会把它当分隔符，
+    // ofstream 静默失败、文件根本没建起来 —— 实测踩到：那样 pack 无物可打，用例变成恒真空转）。
+    // 解压侧那条用例能直接用 libarchive 造任意名字，打包侧必须先有**真的文件**。
+    const fs::path evil_rel = "usr/share/x\npwned";
+    {
+        std::ofstream f(src / "content" / evil_rel);
+        ASSERT_TRUE(f.is_open()) << "测试场景没建起来（名字里只该有换行，不该有 /）";
+        f << "pwned\n";
+    }
+    ASSERT_TRUE(fs::exists(src / "content" / evil_rel))
+        << "测试场景没建起来 —— 没有这个文件，下面的「没抛」断言就成了恒真空转";
+
+    const fs::path out = suite_dir / "evil_out.lpkg";
+    std::string err;
+    try {
+        pack_package(out.string(), src.string(), "evil", "1.0");
+    } catch (const LpkgException& e) {
+        err = e.what();
+    }
+
+    ASSERT_FALSE(err.empty()) << "含换行的成员名必须在**打包**时就被拒绝，而不是留给下游";
+    EXPECT_NE(err.find(key_head("error.unsafe_member_control")), std::string::npos)
+        << "打包侧的拒绝原因不是控制字符守卫（共用的判据没生效？）：" << err;
+    EXPECT_NE(err.find(out.string()), std::string::npos)
+        << "消息必须点名**输出文件**（用户要知道哪个包没打成）：" << err;
+    // 半成品必须丢弃：残留的截断 .lpkg 会被当成有效包，其哈希也算得出来，farm 会把它写进索引
+    EXPECT_FALSE(fs::exists(out)) << "打包失败后留下了半成品 .lpkg";
+}
+
+// 正面对照：只是"看起来可疑"的名字必须照常打得出来 —— 否则守卫过严会把合法包一起拒了。
+// 顺带证明**对称性真的成立**：产物能被自己的 extractor 原样读回来。
+TEST_F(ArchiveMemberNameSafetyTest, PackerAcceptsLegalSuspiciousNames)
+{
+    const fs::path src = suite_dir / "pkgsrc_ok";
+    fs::create_directories(src / "content/usr/share");
+    {
+        std::ofstream(src / "content/usr/share/has space.txt") << "1";
+        std::ofstream(src / "content/usr/share/lpkgnew.txt") << "3";
+        std::ofstream(src / "content/usr/share/x.lpkgnewx") << "4";
+    }
+
+    const fs::path out = suite_dir / "ok_out.lpkg";
+    ASSERT_NO_THROW(pack_package(out.string(), src.string(), "ok", "1.0"));
+    ASSERT_TRUE(fs::exists(out));
+
+    const fs::path back = suite_dir / "back_from_pack";
+    ASSERT_NO_THROW(extract_tar_zst(out, back, out.filename().string()));
+    EXPECT_TRUE(fs::exists(back / "content/usr/share/has space.txt"));
+    EXPECT_TRUE(fs::exists(back / "content/usr/share/lpkgnew.txt"));
+    EXPECT_TRUE(fs::exists(back / "content/usr/share/x.lpkgnewx"));
+}
+
+// ============================================================================
+// TAB：破坏**制表符分帧**的归属数据库（键在重载时被截断）
+// ============================================================================
+
+TEST_F(ArchiveMemberNameSafetyTest, TabInMemberNameIsRejected)
+{
+    // `\t` 是合法文件名字节、也不会伪造 WAL 行（WAL 是空格分帧），但它会破坏**制表符分帧**
+    // 的归属数据库：files.db / provides.db 写成 `key\tvalues\n`、按**第一个** TAB 读回
+    // （cache.cpp），带 TAB 的键在重载时被截断、属主串错位（误报共享文件 / 假孤儿）。
+    // 守卫此前只拒 \n / \r / \0 / `→`，漏了 TAB。
+    write_archive({{"usr/share/a\tb.txt", "x", "", false}});
+
+    const std::string err = extract_error();
+    ASSERT_FALSE(err.empty()) << "含制表符的成员名必须被拒绝（throw），而不是照解不误";
+    EXPECT_NE(err.find(key_head("error.unsafe_member_control")), std::string::npos) << err;
+    EXPECT_EQ(count_entries(out_dir), 0u) << "被拒后仍有文件落盘";
+}
+
+// ============================================================================
+// `.lpkgsave`（2026-10-03 新列入的保留后缀）：与 `.lpkgtmp` / `.lpkgnew` 同一条守卫
+//
+// 上面第 5 节的后缀用例只列了 `.lpkgtmp` / `.lpkgnew`；`.lpkgsave` 是这一轮新加的第三个。
+// 它是"类型变化 / 废弃的配置改名保留"的落点（`OpSink::save_config`）：包声明同名成员会与它
+// 撞名 —— `save_config` 发现目标名被占时会把旧 `.lpkgsave` **移位**成 `<dst>.lpkgsave.<N>`
+// （2026-10-03 审计），那会把**另一个包**的同名文件挤开、归属当场脱节。合法包里不该有这个名字，
+// 故与另外两个一样在解压侧**整包拒绝**。目录条目形态（`x.lpkgsave/`）同样要判：末段判据先剥尾斜杠。
+// ============================================================================
+
+TEST_F(ArchiveMemberNameSafetyTest, ReservedLpkgsaveSuffixIsRejected)
+{
+    const std::vector<std::string> bad_names = {
+        "usr/share/app.conf.lpkgsave",  // 文件形态：与"保留用户配置"的落位撞名
+        "usr/share/d.lpkgsave/",        // 目录条目形态：末段判据必须先剥掉尾斜杠
+    };
+
+    for (const auto& name : bad_names) {
+        fs::remove_all(out_dir);
+        fs::create_directories(out_dir);
+        const bool dir = name.ends_with('/');
+        write_archive({Member{name, dir ? "" : "x", "", dir}});
+
+        const std::string err = extract_error();
+        // 断言点名 l10n 键对应的**文案片段**（不是"抛了就行"）：缺陷下会红 —— 若守卫漏了
+        // `.lpkgsave` 这一支，这个合法成员会被照常解出 ⇒ err 为空 ⇒ find 返回 npos。
+        EXPECT_NE(err.find(key_head("error.unsafe_member_suffix")), std::string::npos)
+            << "成员名 " << name << " 用了 .lpkgsave 保留后缀，必须被**守卫**拒绝：" << err;
+        EXPECT_EQ(count_entries(out_dir), 0u) << "成员名 " << name << " 被拒后仍有文件落盘";
+    }
+
+    // 正面对照：`.lpkgsave` 出现在**中间**或**后接字符**时不命中（只有**末段整体**以它结尾
+    // 才算）。缺陷下会红：若判据被写成 `member.find(".lpkgsave") != npos`（子串匹配而非末段
+    // 后缀），这两个合法名字会被误拒 ⇒ EXPECT_NO_THROW 从"不抛"变"抛"。
+    fs::remove_all(out_dir);
+    fs::create_directories(out_dir);
+    write_archive({
+        {"usr/share/foo.lpkgsave.txt", "1", "", false},  // 含 `.lpkgsave` 但不在末尾
+        {"usr/share/x.lpkgsavex", "2", "", false},       // 后缀后还接了字符
+    });
+    EXPECT_NO_THROW(extract_tar_zst(pkg, out_dir, pkg.filename().string()));
+    EXPECT_TRUE(fs::exists(out_dir / "usr/share/foo.lpkgsave.txt"));
+    EXPECT_TRUE(fs::exists(out_dir / "usr/share/x.lpkgsavex"));
 }

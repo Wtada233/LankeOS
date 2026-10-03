@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include "../../main/src/base/exception.hpp"
 #include "../../main/src/db/cache.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
 #include "../test_base.hpp"
@@ -14,7 +15,7 @@ class PackageManagerEdgeTest : public IntegrationTestBase
 };
 
 // ── 1. 无效本地包 ──
-TEST_F(PackageManagerEdgeTest, InvalidLocalPackageSkipped)
+TEST_F(PackageManagerEdgeTest, InvalidLocalPackageIsRejectedNotSkipped)
 {
     // 创建一个损坏的 .lpkg（不是有效的 tar.zst）
     fs::path bad_pkg = pkg_dir / "corrupt-1.0.lpkg";
@@ -23,15 +24,36 @@ TEST_F(PackageManagerEdgeTest, InvalidLocalPackageSkipped)
         f << "this is not a valid package file";
     }
 
-    // 安装时应跳过此文件而非崩溃
-    EXPECT_NO_THROW(install_packages({bad_pkg.string()}));
+    // 原用例名是 `...Skipped`、断言 `EXPECT_NO_THROW` —— 那是在**pin 缺陷**：参数被静默丢掉，
+    // 然后走到"所有包都已安装"分支 ⇒ `lpkg install ./corrupt.lpkg` 打一行错误再**退出码 0**，
+    // 用户以为装上了。**2026-10-02 修**：点名拒绝（异常 → `Error:` + 非零退出码）。
+    // pacman 对找不到/装不了的目标同样是中止，不是跳过。
+    bool threw = false;
+    try {
+        install_packages({bad_pkg.string()});
+    } catch (const LpkgException& e) {
+        threw = true;
+        EXPECT_NE(std::string(e.what()).find("corrupt-1.0.lpkg"), std::string::npos)
+            << "报错必须点名是哪个文件：\n"
+            << e.what();
+    }
+    EXPECT_TRUE(threw) << "损坏的本地包必须被拒绝，而不是静默跳过";
 }
 
 // ── 2. 不存在的本地包路径 ──
-TEST_F(PackageManagerEdgeTest, NonExistentLocalPath)
+TEST_F(PackageManagerEdgeTest, NonExistentLocalPathIsRejected)
 {
     fs::path missing = pkg_dir / "nonexistent-1.0.lpkg";
-    EXPECT_NO_THROW(install_packages({missing.string()}));
+    bool threw = false;
+    try {
+        install_packages({missing.string()});
+    } catch (const LpkgException& e) {
+        threw = true;
+        EXPECT_NE(std::string(e.what()).find("nonexistent-1.0.lpkg"), std::string::npos)
+            << "报错必须点名路径：\n"
+            << e.what();
+    }
+    EXPECT_TRUE(threw) << "点名了却不存在的本地包必须被拒绝（旧行为是静默跳过 + 退出码 0）";
 }
 
 // ── 3. Hash 文件内容为空 → read_hash_failed ──
@@ -42,9 +64,18 @@ TEST_F(PackageManagerEdgeTest, EmptyHashFileFails)
         std::ofstream f(hash_file);
     }
 
-    // 带本地包 + 空 hash 文件
+    // 带本地包 + 空 hash 文件。报错必须点名是哪个 hash 文件（与上面两条同一锚点纪律）。
     std::string pkg_path = create_pkg("hash-test", "1.0");
-    EXPECT_THROW(install_packages({pkg_path}, hash_file.string()), LpkgException);
+    bool threw = false;
+    try {
+        install_packages({pkg_path}, hash_file.string());
+    } catch (const LpkgException& e) {
+        threw = true;
+        EXPECT_NE(std::string(e.what()).find(hash_file.filename().string()), std::string::npos)
+            << "报错必须点名 hash 文件：\n"
+            << e.what();
+    }
+    EXPECT_TRUE(threw) << "空 hash 文件必须被拒绝";
 }
 
 // ── 4. 本地包 + hash 参数 ──
@@ -89,14 +120,18 @@ TEST_F(PackageManagerEdgeTest, PackageVersionFormat)
     EXPECT_TRUE(Cache::instance().is_installed("ver-pkg"));
 }
 
-// ── 6. 用户确认拒绝 → 安装中止 ──
+// ── 6. 用户确认拒绝 → 安装中止（**取消**语义：抛 UserAbort，而不是"正常返回"）──
 TEST_F(PackageManagerEdgeTest, NonInteractiveModeNoAborts)
 {
     Config::instance().set_non_interactive_mode(NonInteractiveMode::NO);
     std::string pkg_path = create_pkg("no-install", "1.0");
 
-    // NonInteractiveMode::NO 应拒绝安装
-    EXPECT_NO_THROW(install_packages({pkg_path}));
+    // 2026-10-03 订正：这里原先断言 `EXPECT_NO_THROW` —— 那是**弱断言**（"取消"与"装好了"
+    // 都成立），也正是"取消后仍报完成、退出码 0"那个缺陷能存活至今的原因。现在取消要么抛
+    // `UserAbort`（库层判据），要么由 `run_cli` 翻成**非零退出码**。
+    EXPECT_THROW(install_packages({pkg_path}), UserAbort);
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("no-install")) << "取消 = 什么都没做";
     Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
 }
 

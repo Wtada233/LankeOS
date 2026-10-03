@@ -6,8 +6,11 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <charconv>
 #include <filesystem>
+#include <format>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <set>
 #include <sstream>
@@ -110,9 +113,9 @@ static int tail_args(WALOpType t)
         case WALOpType::DIR_META:
             return 3;  // <mode> <uid> <gid>
         case WALOpType::XATTR_SET:
-            return 2;  // <b64_key> <b64_old_value>
-        case WALOpType::XATTR_NEW:
-            return 1;  // <b64_key>
+            return 2;               // <b64_key> <b64_old_value>
+        case WALOpType::XATTR_NEW:  // NOLINT(bugprone-branch-clone) — 与上一格同元数但**不同类型**
+            return 1;               // <b64_key>
         case WALOpType::DB:
         case WALOpType::DBNEW:
         case WALOpType::DBRM:
@@ -172,7 +175,13 @@ WALOp parse_op(const std::string& line)
         tail_vals[tail - 1 - i] = std::string(head.substr(sp + 1));
         head.remove_suffix(head.size() - sp);
     }
-    while (!head.empty() && head.back() == ' ') head.remove_suffix(1);
+    // **不要在这里剥 arg1 的尾随空格**：`substr(0, sp)` 在切每个尾字段时，已经把 arg1 与
+    // 首个尾字段之间那**一个**分隔空格排除在外（`sp` 就是那个空格的下标，substr 取不到它），
+    // 剩下的 `head` 恰好就是 arg1 本身。目录名/文件名允许以空格结尾（如 `foo `），
+    // 曾经的 `while (head.back()==' ') remove_suffix` 会**无条件**吃掉它们：目录 `foo ` 的
+    // `DIR_META /…/foo  1777 0 0` 被解析成 `/…/foo` —— 回滚的 `RESTORE_DIRSTATE` 改不到真实
+    // 目录（mode/xattr 还原不回去），`DIR_RM` 的 `RESTORE_DIR` 还会凭空造一个 `/…/foo`。
+    // 见 tests/unit/test_wal_framing.cpp 的 TrailingSpaceInArg1IsNotStripped。
     op.arg1 = std::string(head);
     if (tail > 0) op.arg2 = tail_vals[0];
     if (tail > 1) op.arg3 = tail_vals[1];
@@ -321,7 +330,6 @@ enum class Guard {
     OrigTakenInStash,   ///< UNSTASH：原位仍被占、且 stash 侧那份的父目录还在
     TargetTakenNotDir,  ///< 主路径被占、且**不是**真目录（lstat 语义）
     TargetIsRealDir,    ///< 主路径是**真目录**（lstat 语义，不跟随末段链接）
-    TargetTaken,        ///< 主路径被占（lstat 语义）
     DbBakExists,        ///< DB 备份文件存在（**跟随**语义 + **不抛**：`exists_follow`）
     TargetExists,       ///< 主路径存在（**跟随**语义 + **不抛**：`exists_follow`）
     /// 主路径是真实目录（lstat 语义）—— DIR_META 的逆：**只回写真正是目录的那些**。
@@ -329,10 +337,6 @@ enum class Guard {
     /// 不存在的路径上毫无意义，落到**符号链接**上更糟（lchown 改链接自身、chmod 穿透到
     /// 链接目标 —— 而那可能是别的包持有的目录，正是写入侧整块跳过 xattr/元数据的那条边界）。
     RealDir,  ///< 主路径是真实目录（lstat 语义）
-    /// 主路径被占、且**不是符号链接**（lstat 语义）—— XATTR_* 的逆：xattr 写入要落在
-    /// 真实对象上。与 `RealDir` 分开是因为这里的对象除了目录还可能是普通文件（同一条
-    /// 行类型将来若被文件路径复用，判据不该跟着改）。
-    TakenNotSymlink,  ///< 主路径存在（lstat 语义）且不是符号链接
 };
 
 /// 审计行 —— 记的是**实际动作**（不是正向操作名）
@@ -536,7 +540,10 @@ constexpr UndoRow UNDO_TABLE[] = {
      Undo::RemoveFile,
      {ARG1, false},
      {},
-     Guard::TargetTaken,
+     // 同上面 ①：`Undo::RemoveFile` 是 `fs::remove`，对**空目录**会 rmdir 成功。
+     // `.lpkgtmp` 永远是普通文件（写它的一定是 stage_regular_file / install_hook_files），
+     // 但盘上那个名字完全可能被别的东西占着 —— 用 `TargetTakenNotDir` 保证"真目录一律不碰"。
+     Guard::TargetTakenNotDir,
      Confine::Arg1AndArg2,
      {},
      Stat::FilesCleaned},
@@ -546,7 +553,10 @@ constexpr UndoRow UNDO_TABLE[] = {
      Undo::RemoveFile,
      {ARG1, false},
      {},
-     Guard::TargetTaken,
+     // 同 COPY 两支：`fs::remove` 对空目录会 rmdir，而 NEW 只可能描述文件/符号链接
+     // （目录走 NEW_DIR）。盘上若被真目录占了那个名字，宁可跳过也不 rmdir
+     // （2026-10-02 与 COPY 的 ① 支对齐）。
+     Guard::TargetTakenNotDir,
      Confine::Arg1Only,
      {"RESTORE_FILE_RM", {ARG1, false}, {}},
      Stat::FilesCleaned},
@@ -643,6 +653,17 @@ RowRange rows_of(WALOpType t)
     return {first, b};
 }
 
+}  // namespace
+
+bool wal_type_is_reversible(WALOpType t)
+{
+    const RowRange r = rows_of(t);
+    return r.first != r.last;
+}
+
+namespace
+{
+
 /// 表里 `guard` 列的实现（幂等口径）。**永不抛。**
 bool guard_ok(Guard g, const fs::path& orig, const fs::path& bak)
 {
@@ -660,21 +681,28 @@ bool guard_ok(Guard g, const fs::path& orig, const fs::path& bak)
             return exists_no_follow(orig) && !is_real_directory(orig);
         case Guard::TargetIsRealDir:
             return is_real_directory(orig);
-        case Guard::TargetTaken:
-            return exists_no_follow(orig);
         case Guard::DbBakExists:
-            // **跟随**语义的不抛孪生（`fs::exists` 的判否等价物）—— **不是** `exists_no_follow`：
-            // 这两格的历史口径就是 `fs::exists`（跟随末段链接），换成 lstat 语义会**改变答案**
-            // （DB 文件可以是符号链接：管理员把 `state_dir` 搬到别处时常见）。原先是**抛**的
-            // `fs::exists`，与上面那条"**永不抛**"的纪律直接冲突 —— 备份路径被符号链接环占着时
-            // 它会抛 ELOOP，而回滚路径上的判定绝不能有能力打断事务（2026-09-26 修）。
-            return exists_follow(bak);
+            // **lstat 语义**（`exists_no_follow`）—— 与**写入侧**同一个谓词。
+            // 写入侧（`cache.cpp` 的 `write_db_file_wal` / `write_set_file_wal`、
+            // `write_string_file_wal`）判"旧内容是否存在"用的是 `exists_no_follow`：**任何**
+            // 占着这个名字的东西（含悬空/自环符号链接）都算"旧内容在" → 把它 rename 成
+            // `<path>.lpkg_db_bak_before:<milestone>`（原位**已经空了**）。
+            // 所以回滚侧也必须用 lstat —— 用跟随语义会把悬空/自环链接的备份判成"不存在" ⇒
+            // 这一行被**静默跳过**（不计失败、不写审计），原物永久消失（`cleanup_db_backups`
+            // 随后还会删掉那个备份）。跟随语义在这里不是"更宽容"，而是**漏掉写入侧真的搬过的
+            // 那一份**。可达的 `bak`（目标存在的普通符号链接）两种谓词都给 true，所以
+            // "管理员把 `state_dir` 搬到别处"的布局不受影响（2026-10-03 修，见
+            // tests/unit/test_undo_table.cpp 的 DbBakSymlinkLoopIsRestoredNotSkipped）。
+            // 仍守原纪律：lstat（`exists_no_follow`）**永不抛** —— 回滚路径上的判定绝不能
+            // 有能力打断事务。
+            return exists_no_follow(bak);
         case Guard::TargetExists:
-            return exists_follow(orig);  // 同上：跟随语义 + 不抛
+            // 跟随语义 + 不抛。（这一格只服务 `DBNEW` 无备份行：写入侧写 `DBNEW` 的前提是
+            // `exists_no_follow(orig)==false`，随后它写的是**普通文件**，所以回滚时跟随与
+            // lstat 给同一答案 —— 无可达分歧，保持原样以缩小改动面。）
+            return exists_follow(orig);
         case Guard::RealDir:
             return is_real_directory(orig);
-        case Guard::TakenNotSymlink:
-            return exists_no_follow(orig) && !fs::is_symlink(orig);
     }
     return false;
 }
@@ -695,10 +723,74 @@ std::optional<std::string> decode_b64_text(const std::string& s)
     return std::string(bytes->begin(), bytes->end());
 }
 
+/**
+ * `DIR_META` / `NEW_DIR` 行（arg2=mode, arg3=uid, arg4=gid，均为十进制，由 `dir_meta()` 写行时
+ * 从 `lstat` 得来）里"解析元数据 + 施加到目录"的共用段。`RecreateDir`（重建目录后套回）与
+ * `RestoreDirMeta`（只还原已存在目录的元数据）**逐字共用**这一段 —— 两者唯一的区别是"要不要
+ * `create_directories`"，与元数据的施加方式无关，故抽到这里避免两份实现漂移。
+ *
+ * 字段缺失/解析失败 → 对应项保持 `-1` 哨兵（**有意吞**：单行写坏不该中断回滚，与 `guard_ok`
+ * 同一条纪律）；`lchown` 只在 uid 与 gid **都**有效时才做（`-1` 是"不改"，不是合法属主）。
+ *
+ * 2026-10-03 修：这里的"解析失败"此前**名不副实** —— 用的是 `std::stoul`，而它恰好对两类坏
+ * 输入都不抛（于是上面的 `catch` 形同虚设、哨兵永远不会被触发）：
+ *   · `stoul("-1")` → `ULONG_MAX`（接受前导负号、按模回绕），`& 07777` 之后正好是 `07777`
+ *     （setuid+setgid+sticky+世界可写）⇒ 一条写坏的 WAL 行就能把**任意目录**改成完全开放；
+ *   · `stoul("1777junk")` → `1777`（尾随垃圾静默忽略）。
+ * 现在走下面这个"整串必须是数字"的严格解析。
+ */
+namespace
+{
+/// 严格十进制：**整串都是数字**、非空、不越界 —— 任一条不满足即 false（不给任何隐式跳过）。
+bool parse_decimal_strict(std::string_view s, unsigned long long& out)
+{
+    if (s.empty()) return false;
+    const char* first = s.data();
+    const char* last = s.data() + s.size();
+    // from_chars 是唯一"不做隐式跳过/不做符号回绕"的接口，顺带把越界判掉。
+    const auto [ptr, ec] = std::from_chars(first, last, out);
+    return ec == std::errc{} && ptr == last;
+}
+}  // namespace
+
+void apply_dir_meta(const WALOp& op, const fs::path& orig)
+{
+    uid_t uid = static_cast<uid_t>(-1);
+    gid_t gid = static_cast<gid_t>(-1);
+    mode_t mode = static_cast<mode_t>(-1);
+    unsigned long long v = 0;
+    // 每项的**下界/上界都要判**：越界同样留哨兵（"不改"），绝不截断成一个别的合法值。
+    if (parse_decimal_strict(op.arg2, v) && v <= 07777) mode = static_cast<mode_t>(v);
+    if (parse_decimal_strict(op.arg3, v) && v <= std::numeric_limits<uid_t>::max())
+        uid = static_cast<uid_t>(v);
+    if (parse_decimal_strict(op.arg4, v) && v <= std::numeric_limits<gid_t>::max())
+        gid = static_cast<gid_t>(v);
+    if (uid != static_cast<uid_t>(-1) && gid != static_cast<gid_t>(-1)) {
+        if (::lchown(orig.c_str(), uid, gid) != 0)
+            log_warning(string_format("warning.chown_failed", orig.string()));
+    }
+    if (mode != static_cast<mode_t>(-1)) {
+        if (::chmod(orig.c_str(), mode) != 0)
+            log_warning(string_format("warning.chmod_failed", orig.string()));
+    }
+}
+
 /// 表里 `undo` 列的实现。返回**是否真的动了盘**（false ⇒ 不计数、不写审计行）。
 /// 幂等判据（guard）与"动作没做成"是两件事：guard 过了但动作没做成（如 rmdir 因
 /// ENOTEMPTY 失败）同样不算动过盘 —— 计数与审计行都只描述**实际发生**的动作。
-bool perform_undo(Undo u, const WALOp& op, const fs::path& orig, const fs::path& bak)
+/**
+ * `perform_undo` 的三种结局 —— **必须分开**，因为它们的后果完全不同：
+ * 前两种都"没动盘"（不计数、不写审计行），但只有 `Failed` 是**回滚没做到**。
+ * 把它们压成一个 `bool` 是本文件原先的形态，后果见 `RollbackStats::failures` 的说明：
+ * 一次"文件存在却删不掉"会被报成**回滚成功**，批次照样封口、备份照样被删。
+ */
+enum class UndoResult {
+    Did,          ///< 真的动了盘 → 计 `stat`、写 `RESTORE_*` 审计行
+    NothingToDo,  ///< 幂等：目标本就不在 / 形态不符 / 行本身残缺 —— 正常的重复回滚，静默
+    Failed,       ///< guard 过了、动作也执行了，却**没成功** —— 回滚没做到，必须能被上层看见
+};
+
+UndoResult perform_undo(Undo u, const WALOp& op, const fs::path& orig, const fs::path& bak)
 {
     switch (u) {
         case Undo::RestoreFromBak:
@@ -706,83 +798,85 @@ bool perform_undo(Undo u, const WALOp& op, const fs::path& orig, const fs::path&
             // 方向由 undo 列决定（备份类：bak → orig；UNSTASH：orig → bak）
             const bool from_bak = (u == Undo::RestoreFromBak);
             ::safe_rename(from_bak ? bak : orig, from_bak ? orig : bak);
-            return true;
+            return UndoResult::Did;
         }
         case Undo::RecreateDir: {
-            if (orig.empty()) return false;
+            if (orig.empty()) return UndoResult::NothingToDo;  // 行本身残缺，无处下手
             std::error_code ec;
             // 逆序保证父目录已重建（`create_directories` 连父一起建）
             if (!exists_no_follow(orig)) fs::create_directories(orig, ec);
             // 解不开的路径在这里判"不存在"，交给 create_directories 去撞真实错误
             // （错误码进 ec）；`is_real_directory` 不抛，两者一起守住元数据块。
-            if (ec || !is_real_directory(orig)) return false;
-            uid_t uid = static_cast<uid_t>(-1);
-            gid_t gid = static_cast<gid_t>(-1);
-            mode_t mode = static_cast<mode_t>(-1);
-            try {
-                if (!op.arg2.empty()) mode = static_cast<mode_t>(std::stoul(op.arg2)) & 07777;
-                if (!op.arg3.empty()) uid = static_cast<uid_t>(std::stoul(op.arg3));
-                if (!op.arg4.empty()) gid = static_cast<gid_t>(std::stoul(op.arg4));
-            } catch (const std::exception&) {
-            }
-            if (uid != static_cast<uid_t>(-1) && gid != static_cast<gid_t>(-1))
-                (void)::lchown(orig.c_str(), uid, gid);
-            if (mode != static_cast<mode_t>(-1)) (void)::chmod(orig.c_str(), mode);
-            return true;
+            if (ec || !is_real_directory(orig)) return UndoResult::Failed;
+            apply_dir_meta(op, orig);  // 与 RestoreDirMeta 同一套解析/施加方式（抽成共用 helper）
+            return UndoResult::Did;
         }
-        case Undo::RemoveFile:
-            // 删除失败**不算错误**（与守卫同向：该路径上已经没有可删的东西了）
-            safe_remove(orig);
-            return true;
+        case Undo::RemoveFile: {
+            // 两种"没动盘"必须分开：
+            //   · 文件本来就没有 → 这条 NEW/COPY 还没落地，没什么可撤（幂等，**静默**）；
+            //   · **存在却删不掉**（EACCES / EROFS / immutable 目录）→ 回滚**没做到**。
+            // 后者此前与前者完全同形：不计统计、不写审计行 —— 回滚报"成功"，DB 已还原成
+            // "没装"而盘上那个文件还在。先判存在性就是为了把两者分开。
+            if (!exists_no_follow(orig)) return UndoResult::NothingToDo;
+            if (safe_remove(orig)) return UndoResult::Did;
+            log_warning(string_format("warning.rollback_path_not_removed", orig.string()));
+            return UndoResult::Failed;
+        }
         case Undo::RemoveEmptyDir: {
             std::error_code ec;
-            if (!fs::is_empty(orig, ec)) return false;
+            const bool empty = fs::is_empty(orig, ec);
+            if (ec) {
+                // 路径不存在 = 幂等（正常结局，静默）；其余错误码 = **判不出来**，值得出声。
+                if (exists_no_follow(orig)) {
+                    log_warning(string_format("warning.rollback_path_not_removed", orig.string()));
+                    return UndoResult::Failed;
+                }
+                return UndoResult::NothingToDo;
+            }
+            if (!empty)
+                return UndoResult::NothingToDo;  // 非空：NEW_DIR 的逆不该 rmdir 掉别人放进去的东西
             fs::remove(orig, ec);
-            return !ec;  // rmdir 真失败 ⇒ 没动过盘（不写 RESTORE_DIR_RM 谎报）
+            if (ec) {
+                log_warning(string_format("warning.rollback_path_not_removed", orig.string()));
+                return UndoResult::Failed;
+            }
+            return UndoResult::Did;  // rmdir 成功才算"动了盘"（不写 RESTORE_DIR_RM 谎报）
         }
         case Undo::RestoreDb:
             ::safe_rename(bak, orig);
-            return true;
+            return UndoResult::Did;
         case Undo::RestoreDirMeta: {
-            if (orig.empty()) return false;
-            // 与 RecreateDir 的元数据半段同一套解析/施加方式（mode/uid/gid 都是十进制，
-            // 由 `dir_meta()` 写行时从 lstat 得来）。区别只有一个：**不 create_directories**
-            // —— 这里要还原的是"本来就存在的目录"的元数据，目录缺失说明它已被别的逆操作
-            // 处理掉（或无人在意），凭空重建它会造出一个本不该存在的路径。
-            uid_t uid = static_cast<uid_t>(-1);
-            gid_t gid = static_cast<gid_t>(-1);
-            mode_t mode = static_cast<mode_t>(-1);
-            try {
-                if (!op.arg2.empty()) mode = static_cast<mode_t>(std::stoul(op.arg2)) & 07777;
-                if (!op.arg3.empty()) uid = static_cast<uid_t>(std::stoul(op.arg3));
-                if (!op.arg4.empty()) gid = static_cast<gid_t>(std::stoul(op.arg4));
-            } catch (const std::exception&) {
-            }
-            if (uid != static_cast<uid_t>(-1) && gid != static_cast<gid_t>(-1))
-                (void)::lchown(orig.c_str(), uid, gid);
-            if (mode != static_cast<mode_t>(-1)) (void)::chmod(orig.c_str(), mode);
-            return true;
+            if (orig.empty()) return UndoResult::NothingToDo;
+            // 与 RecreateDir 的元数据半段同一套解析/施加方式（现抽为 `apply_dir_meta()`）。
+            // 区别只有一个：**不 create_directories** —— 这里要还原的是"本来就存在的目录"
+            // 的元数据，目录缺失说明它已被别的逆操作处理掉（或无人在意），凭空重建它会造出
+            // 一个本不该存在的路径。
+            apply_dir_meta(op, orig);
+            return UndoResult::Did;
         }
         case Undo::SetXattr: {
             const std::optional<std::string> key = decode_b64_text(op.arg2);
-            if (!key) return false;  // 行被写坏/非 base64 → 不动盘（回滚路径绝不抛）
+            if (!key) return UndoResult::NothingToDo;  // 行被写坏/非 base64（回滚路径绝不抛）
             // 值的三种形态：`-` = 空值（哨兵，见 xattr_b64_value 的说明）、base64 文本 = 有值。
             std::vector<char> val;
             if (op.arg3 != "-") {
                 const auto decoded = base64_decode(op.arg3);
-                if (!decoded) return false;
+                if (!decoded) return UndoResult::NothingToDo;
                 val = *decoded;
             }
-            return write_xattr(orig, *key, val);
+            // 这一格**没有**"本来就不用做"的情形：它就是要写这个键。写不上 = 回滚没做到。
+            return write_xattr(orig, *key, val) ? UndoResult::Did : UndoResult::Failed;
         }
         case Undo::RemoveXattr: {
             const std::optional<std::string> key = decode_b64_text(op.arg2);
-            if (!key) return false;
-            // 键本来就不在 → write_xattr/remove_xattr 都返回 false，"没动过盘" ⇒ 不写审计行。
-            return remove_xattr(orig, *key);
+            if (!key) return UndoResult::NothingToDo;
+            // `remove_xattr` 的 false 把"键本来就不在"（幂等）与"删不掉"（失败）压在一起
+            // —— 与 `RemoveFile` 同一个坑。先读一次存在性就能分开。
+            if (!read_xattr(orig, *key)) return UndoResult::NothingToDo;
+            return remove_xattr(orig, *key) ? UndoResult::Did : UndoResult::Failed;
         }
     }
-    return false;
+    return UndoResult::NothingToDo;  // 不可达（switch 覆盖全部枚举）
 }
 
 /**
@@ -799,8 +893,17 @@ bool apply_row(const UndoRow& row, const WALOp& op, bool write_audit, RollbackSt
     const fs::path orig = arg_path(op, row.orig);
     const fs::path bak = arg_path(op, row.bak);
 
+    // ① 幂等：guard 说跳过 ⇒ 不计、不写审计行、**也不算失败**（正常的重复回滚）。
     if (!guard_ok(row.guard, orig, bak)) return false;
-    if (!perform_undo(row.undo, op, orig, bak)) return false;
+
+    // ② 动作：三态**必须**分开 —— 把 `Failed` 也当成"没动盘"，正是"回滚报成功"的来源。
+    const UndoResult r = perform_undo(row.undo, op, orig, bak);
+    if (r == UndoResult::Failed) {
+        stats.failures++;  // 只在这里递增：guard 跳过与 NothingToDo 都不算
+        return false;
+    }
+    if (r == UndoResult::NothingToDo) return false;
+    // 到这里 r == UndoResult::Did —— 真的动了盘，才计 stat 与审计行 ↓
 
     switch (row.stat) {
         case Stat::None:
@@ -840,56 +943,10 @@ bool apply_row(const UndoRow& row, const WALOp& op, bool write_audit, RollbackSt
 
 namespace
 {
-/// 分量级前缀比较（`/a/bc` **不**以 `/a/b` 为前缀）。两侧都应已 lexically_normal()。
-bool path_has_prefix(const fs::path& prefix, const fs::path& p)
-{
-    auto pi = prefix.begin();
-    auto qi = p.begin();
-    for (; pi != prefix.end(); ++pi, ++qi) {
-        if (qi == p.end() || *pi != *qi) return false;
-    }
-    return true;
-}
-
-/**
- * `p` 是否落在 `root` 之内（`reverse_execute` 的 confinement 判据）。**永不抛。**
- *
- * 两级判据：
- *  ① **词法级**：`p.lexically_normal()` 必须落在 `root.lexically_normal()` 之内。不碰
- *     文件系统，负责挡掉 `../` 逃逸与"绝对路径就指在 root 之外"（WAL 行是纯文本，
- *     `NEW /etc/sudoers` 这种行在坏 WAL / 被篡改的 WAL 里是一行字而已）。
- *  ② **canonical 复核**（尽力而为，**只解析父目录**）：`weakly_canonical(root)` 与
- *     `weakly_canonical(p.parent_path())` 都成功时再比一次 —— 挡的是词法上合法、实际却
- *     穿透出去的那种：`<root>/evil -> /etc` 配上 `<root>/evil/shadow`。
- *     **末段不解析**：回滚的动作（rename/unlink/rmdir）不跟随末段链接，而 `--root` 安装里
- *     包发绝对目标链接（`<root>/usr/bin/foo -> /etc/foo`）完全合法 —— 解析它会误伤。
- *
- * **解不开就不判越界**（`ec != 0` → 放行）：回滚路径上的判定绝不允许因为"这个路径解不开"
- * 而拒绝一条合法的行。典型是 ELoop 自环 —— 那份备份必须能被 `BACKUP` 的逆操作搬回原位
- * （`tests/integration/test_symlink_loop_install.cpp` 钉着这条），而 canonical 对环恒失败。
- * 同理，中间段尚未重建的 `DIR_RM`（`create_directories` 之前）也解不开。
- */
-bool path_within_root(const fs::path& root, const fs::path& p)
-{
-    if (root.empty() || p.empty()) return true;  // 空路径的含义由各分支自己处理
-    const fs::path r = root.lexically_normal();
-    const fs::path q = p.lexically_normal();
-    if (!path_has_prefix(r, q)) return false;
-
-    // canonical 复核**只解析父目录，末段一律不解析**：
-    //   · 回滚侧对这些路径做的是 rename/unlink/rmdir，**内核不跟随末段符号链接** ——
-    //     末段指向哪里与被动的那个对象无关（与 op_sink.hpp 里"尾斜杠/末段链接"那条同一课）；
-    //   · 解析末段还会**误伤合法 WAL**：`--root` 安装里包可以发绝对目标符号链接
-    //     （`<root>/usr/bin/foo -> /etc/foo`），解析它在宿主上落到 root 之外 —— 而它
-    //     指向的是**目标系统**里的 `/etc/foo`，完全合法（`NEW`/`COPY` 的逆操作删的就是那个
-    //     链接本身）。所以判据落在"**它所在的目录**是不是在 root 里"。
-    std::error_code ec_r;
-    std::error_code ec_q;
-    const fs::path cr = fs::weakly_canonical(r, ec_r);
-    const fs::path cq = fs::weakly_canonical(q.parent_path(), ec_q);
-    if (ec_r || ec_q) return true;  // 解不开（ELOOP 等）→ 不判越界（见上）
-    return path_has_prefix(cr, cq);
-}
+// 2026-10-03：这里原先自有一份 `path_has_prefix()` + `path_within_root()`（分量级比较 +
+// canonical 复核），与 `base/utils.cpp` 的 `path_within()` 是**同概念的第二份实现** —— 两者
+// 只靠注释声明"用同一套剥离规则"，必然漂移。现已收敛到 `base/utils.cpp` 的
+// `path_within_resolved(p, root)`（**唯一实现**，参数顺序与旧名相反），本文件只保留调用。
 
 /**
  * 一条 WAL 行的**全部目标路径**是否都在允许范围内 —— 不在就跳过该行（并告警）。
@@ -917,9 +974,9 @@ bool wal_line_paths_confined(const WALOp& op, Confine scope, const fs::path& roo
     const auto ok = [&](const std::string& s) {
         if (s.empty()) return true;
         const fs::path p(s);
-        if (path_within_root(root, p)) return true;
+        if (path_within_resolved(p, root)) return true;
         for (const auto& sr : stash_roots) {
-            if (path_within_root(sr, p)) return true;
+            if (path_within_resolved(p, sr)) return true;
         }
         return false;
     };
@@ -937,8 +994,9 @@ bool wal_line_paths_confined(const WALOp& op, Confine scope, const fs::path& roo
 }  // namespace
 
 /// 该 :batch-start DB 行的正式文件是否**仍然持有批次起点的内容**（= 这行可以跳过）///
-/// 判据不只是 fs::exists —— main 的启动顺序是 init_filesystem()（main.cpp 约 397 行）→
-/// recover_packages()（约 400 行），而 init_filesystem 的 ensure_file_exists 会把崩溃窗口里
+/// 判据不只是 fs::exists —— 启动路径是 `main_cli.cpp` 的 `run_cli()` 里的
+/// `init_database_for()`：先 `init_filesystem()` 再 `recover_packages()`，而
+/// init_filesystem 的 ensure_file_exists 会把崩溃窗口里
 /// 消失的库**按空文件重建**（config.cpp）。于是崩在窗口里的库到恢复时是"存在但 0 字节"，
 /// 只看 fs::exists 就又把它跳过去了 —— 后果与"文件缺失"完全相同（静默空库 + 唯一备份被
 /// cleanup_db_backups 删掉，不可逆），而且这才是**真实二进制**的形态。故：
@@ -989,8 +1047,19 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
         // 本 op 类型在撤销表里的行（同类型多行的按表序执行；无行 = 本类型不可逆）
         const RowRange rows = rows_of(op.type);
 
-        // 越界的行：**告警 + 跳过**（与"bak 不存在 → 跳过"同一个保守方向）——绝不因此让
-        // 恢复失败。措辞刻意不走 l10n（内部/安全诊断；且 test_localization_keys.cpp 会把
+        // 越界的行：**告警 + 跳过** —— 绝不因此让恢复失败。
+        //
+        // 订正 2026-10-03：原文接着说"与 'bak 不存在 → 跳过' 同一个保守方向"，**那是错的**，
+        // 而且正是 `perform_undo` 当初把三态压成 `bool` 的同一个混淆：
+        //   · `bak 不存在 → 跳过`  = **活已经干过了**（幂等，重复回滚的正常结局）；
+        //   · **越界 → 跳过**      = **这一行压根没被撤销**（我们拒绝了）。
+        // 后者属于 `RollbackStats::failures` 那一类，但这里**有意不计**，理由是：
+        // `confine_enabled` 只在 `--root` 下为真，而越界的行很可能是**有意拒绝触碰**的
+        // （例如非 root 运行留下的行）。计进去 ⇒ `rollback_uncommitted_region` 不 seal ⇒
+        // 之后**每次**恢复都重试同一段、永远不 trim、`cleanup_db_backups` 永远不跑 ——
+        // 永久停摆，比漏报一次更糟。生产（root=="/"）下 confinement 整个关闭，这条路径
+        // 根本不可达。**改这里之前先想清楚"永久停摆"这个代价。**
+        // 措辞刻意不走 l10n（内部/安全诊断；且 test_localization_keys.cpp 会把
         // 「日志函数名(字面量)」当成 l10n 键，故用变量传）。
         // 查哪些字段由表里的 confine 列给出 —— 同一类型的各行共用这一格（取首行即可）。
         if (confine_enabled && rows.first != rows.last &&
@@ -1035,6 +1104,12 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
             if (apply_row(*row, op, write_audit, stats) && !row->also) break;
         }
     }
+
+    // **在这里报一次**（而不是在每个调用点各报一次）：这是唯一能看到全部失败行的地方，
+    // 而且两个消费者（`batch_rollback` 与崩溃恢复的 `rollback_uncommitted_region`）都
+    // 途经它，所以不会漏、也不会重复。消费者据此**保留还原点**，见各自的注释。
+    if (stats.failures > 0)
+        log_warning(string_format("warning.rollback_incomplete", stats.failures));
 
     return stats;
 }
@@ -1186,20 +1261,31 @@ void purge_consumed_stashes(const std::vector<WALOp>& ops)
     //    之后**仍然存在** ⇒ 不收敛 ⇒ 保留该根（宁可留残留，也不删未收敛的数据）。
     //    正常路径下这个分支不可达（每个 UNSTASH 的 bak 都会被它的 BACKUP 逆操作搬走）。
     std::set<fs::path> unconverged;
-    for (const auto& op : ops) {
-        if (op.type != WALOpType::UNSTASH || op.arg1.empty()) continue;
-        const fs::path bak = op.arg1;
-        if (!exists_no_follow(bak)) continue;
+    // 内部一致性告警，**刻意不走 l10n**：这两条永远不该出现（出现即"回滚没收敛"这个
+    // 编程错误/环境异常），与 op_sink.cpp 的决策表内部错误同一口径、同一理由。
+    // 同样不把字面量直接喂给日志函数：`test_localization_keys.cpp` 的正则会把
+    // 「日志函数名(字面量)」当成 l10n 键去翻译目录里查（连注释都不放过）——用变量传。
+    const auto note_unconverged = [&](const fs::path& bak) {
         unconverged.insert(stash_root_of_bak(bak));
-        // 内部一致性告警，**刻意不走 l10n**：这条永远不该出现（出现即"回滚没收敛"这个
-        // 编程错误/环境异常），与 op_sink.cpp 的决策表内部错误同一口径、同一理由。
-        // 同样不把字面量直接喂给日志函数：`test_localization_keys.cpp` 的正则会把
-        // 「日志函数名(字面量)」当成 l10n 键去翻译目录里查（连注释都不放过）——用变量传。
         const std::string msg =
-            "反撤销未收敛：UNSTASH 的备份仍在 stash 中，保留整个 stash 目录不删"
+            "反撤销未收敛：备份仍在 stash 中，保留整个 stash 目录不删"
             "（否则会丢掉唯一一份数据）：" +
             bak.string();
         log_warning(msg);
+    };
+    for (const auto& op : ops) {
+        // ②-a UNSTASH 的逆操作没收敛：它引用的 bak 仍在（见上面 ②）
+        if (op.type == WALOpType::UNSTASH && !op.arg1.empty() && exists_no_follow(op.arg1))
+            note_unconverged(op.arg1);
+        // ②-b **同一推论的推广（2026-10-02 修）**：`reverse_execute` 会因**路径越界
+        // （confinement）**而**跳过**某条可逆行（只告警），那一刻原物**只存在于 stash 里**，
+        // 而下面照样整目录 remove_all ⇒ 把它删掉。判据与 ②-a 完全一样、方向也一样
+        // （宁可留残留，也不删未还原的数据）：**reverse 之后 bak 还在 ⇒ 没被消费 ⇒ 保留**。
+        // 正常路径下不可达：成功的逆操作会把 bak rename 回原位。
+        // （可达前提是 `confine_enabled`，即 `--root`；`root=="/"` 时整套关闭。）
+        if ((op.type == WALOpType::BACKUP || op.type == WALOpType::REMOVE_OLD) &&
+            !op.arg2.empty() && exists_no_follow(op.arg2))
+            note_unconverged(op.arg2);
     }
 
     for (const auto& s : stashes) {
@@ -1214,7 +1300,8 @@ void purge_consumed_stashes(const std::vector<WALOp>& ops)
 // 批次回滚
 // ============================================================================
 
-bool batch_rollback(const std::vector<std::string>& successfully_installed)
+bool batch_rollback(const std::vector<std::string>& successfully_installed,
+                    RollbackStats* out_stats)
 {
     std::string wpath = wal_log_path();
     auto ops = extract_current_batch_ops(wpath);
@@ -1233,7 +1320,8 @@ bool batch_rollback(const std::vector<std::string>& successfully_installed)
     auto& cache = Cache::instance();
 
     // 2. 逆向执行操作
-    reverse_execute(ops, true);
+    const RollbackStats stats = reverse_execute(ops, true);
+    if (out_stats) *out_stats = stats;
 
     // 2.5 stash 收尸：reverse 已把每个文件从 stash 还原，清掉空 stash（绝不能在
     //     reverse 完成前删——残留的 bak 是"还没还原"的数据）
@@ -1255,8 +1343,8 @@ bool batch_rollback(const std::vector<std::string>& successfully_installed)
     for (const auto& pkg : successfully_installed) {
         auto it = pkg_versions.find(pkg);
         std::string ver = (it != pkg_versions.end()) ? it->second : std::string{};
-        wal_append_raw("ROLLBACK " + pkg + " " + ver);
-        wal_append_raw("END " + pkg + " " + ver);
+        wal_append_raw(std::format("ROLLBACK {} {}", pkg, ver));
+        wal_append_raw(std::format("END {} {}", pkg, ver));
     }
 
     // 6. COMMIT_PKGS

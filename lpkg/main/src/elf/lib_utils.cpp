@@ -5,9 +5,11 @@
 #include <libelf.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <cctype>
 #include <filesystem>
 #include <string_view>
+#include <vector>
 
 #include "base/utils.hpp"
 #include "i18n/localization.hpp"
@@ -115,7 +117,8 @@ static bool link_already_correct(const fs::path& link_path, const std::string& s
  * **实体文件一律不动**：包自己就提供 `libfoo.so.1` 这个真文件时，把它换成链接等于
  * 覆盖包产物（旧行为如此，保持不变）。
  */
-void apply_soname_links(const fs::path& lib_dir)
+void apply_soname_links(const fs::path& lib_dir,
+                        const std::function<bool(const fs::path&)>& keep_dangling)
 {
     // **判定**一律不抛（见 base/utils.hpp 的谓词族说明）：本函数的**两个调用点传的都是包
     // 内容** —— `trigger.cpp` 传目标 root 的 `<root>/usr/lib`，`builder.cpp` 传构建 staging 的
@@ -127,6 +130,19 @@ void apply_soname_links(const fs::path& lib_dir)
     // 这是"判定不抛 + 迭代有守卫"，不是"整段不可能抛"。
     if (!is_directory_follow(lib_dir)) return;
 
+    // **顺序必须确定**（可复现构建）：`fs::directory_iterator` 的顺序由 readdir 决定 —— 同一个
+    // 包在不同机器/文件系统上会得到不同的链接目标。故先把候选条目收集起来再按确定顺序处理。
+    //
+    // 排序键 = (是否符号链接, 文件名)：**实体库文件先于符号链接**。这样按 SONAME 生成的链接
+    // 指向的是**真实库文件**，而不是包自带的另一条链接 —— 例如包发 `libfoo.so ->
+    // libfoo.so.1.2.3` 却不发 `libfoo.so.1` 时，若先遍历到 `libfoo.so`（链接目标取"被遍历
+    // 条目自己的文件名"）就会建出链式目标 `libfoo.so.1 -> libfoo.so`，且**随 readdir 顺序
+    // 漂移**。先处理实体文件则一律得到 `libfoo.so.1 -> libfoo.so.1.2.3`。
+    struct LibEntry {
+        fs::path path;
+        bool is_symlink;
+    };
+    std::vector<LibEntry> entries;
     for (const auto& entry : fs::directory_iterator(lib_dir)) {
         // **保持"跟随"语义、只把"抛"换成"判否"**（不要换成 lstat 语义）：`libfoo.so ->
         // libfoo.so.1.2.3` 这类链接本就该被本函数处理（修正指错的 SONAME 链接正是它的职责），
@@ -134,8 +150,16 @@ void apply_soname_links(const fs::path& lib_dir)
         // `directory_entry::is_regular_file()` 走 `status()`，对环抛 ELOOP（实测 code=40）。
         std::error_code entry_ec;
         if (!fs::is_regular_file(entry.path(), entry_ec) || entry_ec) continue;
+        entries.push_back({entry.path(), is_symlink_no_follow(entry.path())});
+    }
+    std::sort(entries.begin(), entries.end(), [](const LibEntry& a, const LibEntry& b) {
+        // 实体库文件优先于符号链接；同类按文件名定序（确定、可复现）。
+        if (a.is_symlink != b.is_symlink) return !a.is_symlink;
+        return a.path.filename() < b.path.filename();
+    });
 
-        std::string soname = get_elf_soname(entry.path());
+    for (const auto& e : entries) {
+        std::string soname = get_elf_soname(e.path);
         if (!soname.empty()) {
             // SONAME 取自被扫描的库文件（不可信输入）：绝对路径或 `..` 会让
             // `lib_dir / soname` 逃出 lib_dir（fs::path 语义下绝对右值丢弃左值），
@@ -144,7 +168,7 @@ void apply_soname_links(const fs::path& lib_dir)
             const fs::path link_path = (lib_dir_n / soname).lexically_normal();
             if (!path_within(link_path, lib_dir_n)) {
                 log_warning(string_format("warning.soname_escapes_lib_dir", soname,
-                                          entry.path().filename().string(), lib_dir.string()));
+                                          e.path.filename().string(), lib_dir.string()));
                 continue;
             }
             // 不抛谓词（2026-09-26 修）：本函数的两个调用点传进来的都是**包内容**
@@ -161,7 +185,7 @@ void apply_soname_links(const fs::path& lib_dir)
                 fs::remove(link_path, rm_ec);
                 if (rm_ec) {
                     log_warning(string_format("warning.soname_link_failed",
-                                              entry.path().filename().string(), link_path.string(),
+                                              e.path.filename().string(), link_path.string(),
                                               rm_ec.message()));
                     continue;
                 }
@@ -171,11 +195,10 @@ void apply_soname_links(const fs::path& lib_dir)
                 continue;
             }
             try {
-                fs::create_symlink(entry.path().filename(), link_path);
-            } catch (const std::exception& e) {
-                log_warning(string_format("warning.soname_link_failed",
-                                          entry.path().filename().string(), link_path.string(),
-                                          e.what()));
+                fs::create_symlink(e.path.filename(), link_path);
+            } catch (const std::exception& e2) {
+                log_warning(string_format("warning.soname_link_failed", e.path.filename().string(),
+                                          link_path.string(), e2.what()));
             }
         }
     }
@@ -191,6 +214,12 @@ void apply_soname_links(const fs::path& lib_dir)
         const fs::path target = fs::read_symlink(entry.path(), ec);
         if (ec || target.has_parent_path()) continue;
         if (fs::exists(entry.path(), ec)) continue;  // 能解析 → 不是悬空
+        // ⚠️ **别删属于某个包的链接**（2026-10-02 修）：包可以刻意发一条
+        // `libfoo.so.1 -> libfoo.so.1.2.3`，而 `.1.2.3` 由**另一个**包提供、此刻还没装 ——
+        // 那条链接当下就是悬空的，但删掉它**没有任何机制会重建**（第一遍只会按 SONAME 生成
+        // 链接，而这里的名字未必是任何库的 SONAME）⇒ 运行期 `cannot open shared object file`。
+        // 判据由调用方注入（本层不依赖 `db/`）：安装期问 `Cache` 归属，构建期不传。
+        if (keep_dangling && keep_dangling(entry.path())) continue;
         fs::remove(entry.path(), ec);
         if (ec) {
             log_warning(string_format("warning.soname_link_failed", target.string(),

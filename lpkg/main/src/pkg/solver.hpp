@@ -51,7 +51,12 @@ struct InstalledPkg {
 /// 用 libsolv 求解安装/升级/重装计划。
 /// repo：可用仓库（权威 provider 源）；local：本地 .lpkg 候选包（也进 available repo）；
 /// installed：已装包名 -> 版本+requires；targets：(包名, 版本说明)；"latest"=选最佳版本。
-SolveResult solve_install(const class Repository& repo, const std::vector<class PackageInfo>& local,
+// `struct PackageInfo`：它在 `repo/repository.hpp` 里是 **struct** —— 这里写 `class` 是
+// "elaborated type specifier 标签不一致"（clang-diagnostic-mismatched-tags，GCC 下无害、
+// MSVC ABI 下会变成链接错误）。是 `make tidy` 第一轮跑出来的真发现；顺带它会让 clang-tidy
+// 把整个 TU 判成"有编译错误"从而**一条都不分析**。
+SolveResult solve_install(const class Repository& repo,
+                          const std::vector<struct PackageInfo>& local,
                           const std::map<std::string, InstalledPkg>& installed,
                           const std::vector<std::pair<std::string, std::string>>& targets,
                           const SolveOptions& opts);

@@ -21,7 +21,6 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker" />
-  <img src="https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite&logoColor=white" alt="SQLite" />
   <img src="https://img.shields.io/badge/Bash-4EAA25?style=flat&logo=gnubash&logoColor=white" alt="Bash" />
   <img src="https://img.shields.io/badge/zstd-1E5B8C?style=flat&logo=zstandard&logoColor=white" alt="zstd" />
 </p>
@@ -40,7 +39,7 @@
 -   **智能版本解析**：支持多位修订号（如 `1.0.0.1`），内置严谨的比较算法，确保 `6.16.1 > 6.6.1`。支持复合区间约束（如 `>= 2.0.0 < 3.0.0`）。
 -   **聚合索引**：采用 `index.txt` 聚合格式，一行即可记录包的所有版本及各自的哈希、依赖、provides、needed_so。
 -   **包内嵌元数据**：采用 `metadata.json` 嵌入包内，统一存储名称、版本、依赖、needed_so、虚拟提供、手册页等元数据。
--   **自动依赖推导**：提供 `gen_deps.py` 工具，基于 ELF 文件扫描自动生成 `needed_so`（DT_NEEDED SONAME 列表）和 `deps`（提供者包名），无需手动维护版本约束。
+-   **自动依赖推导**：构建农场（`farm/`，Rust）在打包后扫描 ELF 的 DT_NEEDED SONAME 生成 `needed_so`，并据此解析提供者包名作为 `deps`，无需手动维护版本约束。
 -   **内容即文件布局**：包的 `content/` 目录结构直接对应根目录文件布局。
 -   **自动化运维**：提供 `lrepo-mgr.py` 工具，支持一键推送到 S3 兼容存储或 SCP 远程服务器。新增 `--path` 参数支持本地文件系统仓库，便于离线测试。
 -   **高兼容性静态构建**：内置系统 CA 证书路径自动探测，确保静态编译版本在不同 Linux 发行版上都能正常联网。
@@ -74,11 +73,10 @@ lpkg [选项] <命令> [参数]
 - `libcurl`: 用于文件下载。
 - `libarchive`: 用于解压包文件。
 - `libcrypto` (OpenSSL): 用于计算哈希。
-- `libfmt`: 用于字符串格式化(Header-only)。
 
 在 Arch Linux 上安装:
 ```bash
-sudo pacman -S curl libarchive openssl fmt
+sudo pacman -S curl libarchive openssl
 ```
 
 ### 编译与安装
@@ -157,7 +155,7 @@ hooks/                # 钩子脚本（可选）
 |------|------|
 | `name` | 包名 |
 | `version` | 版本号 |
-| `deps` | 依赖包名列表（无版本约束，由 gen_deps 自动解析 needed_so 生成） |
+| `deps` | 依赖包名列表（无版本约束，由构建农场扫描 needed_so 自动解析生成） |
 | `provides` | 本包提供的 SONAME 及虚拟能力列表 |
 | `needed_so` | 本包 ELF 文件声明的 DT_NEEDED SONAME 列表（运行时依赖的原始真相） |
 | `man` | 内联手册页内容（可选） |

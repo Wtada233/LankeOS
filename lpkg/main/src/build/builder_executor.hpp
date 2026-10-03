@@ -31,8 +31,9 @@ bool is_git_url(const std::string& url);
 /**
  * @brief 解析 `git+<git_url>@<ref>` → (git_url, ref)；ref 缺省为 `HEAD`
  *
- * `@` 只认**最后一个 `/` 之后**的那一个：URL 自带的认证信息（`git+ssh://git@host/repo.git`）
- * 里的 `@` 不能被当成 ref 分隔符。
+ * 分隔符判据以 `://` 之后的**第一个 `/`**（权威段结束处）为界：URL 自带的认证信息
+ * （`git+ssh://git@host/repo.git`）里的 `@` 在它**之前**，而含 `/` 的 ref（如 `@feature/x`）
+ * 里的 `/` 在它**之后**。无 `://`（scp 风格）时回落"最后一个 `/`"的启发式。
  */
 void parse_git_url(const std::string& url, std::string& git_url, std::string& ref);
 

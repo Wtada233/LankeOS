@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -35,12 +36,14 @@
 #include "op_sink.hpp"
 #include "repo/repository.hpp"
 #include "trigger/trigger.hpp"
+#include "ui/term.hpp"
+#include "vercmp/dep_parser.hpp"  // detail::dependency_name_of（deps/ 行 → 包名，唯一实现）
 #include "vercmp/version.hpp"
 
 namespace fs = std::filesystem;
 
 // ============================================================================
-// 入口索引（本文件 ~1500 行、20+ 个相互独立的入口；**按操作分组**，组内顺序即文件内顺序）
+// 入口索引（本文件 ~1900 行、20+ 个相互独立的入口；**按操作分组**，组内顺序即文件内顺序）
 //
 //   共用工具   cleanup_stashes / write_cache / first_unreached_target / finish_committed_batch
 //   安装       install_packages / reinstall_package(s)
@@ -62,23 +65,54 @@ namespace fs = std::filesystem;
  *  非 static：安装/移除诸路径也读它。 */
 extern std::atomic<bool> sigint_graceful;
 
+namespace detail
+{
+
+void check_planned_dep_version(const DependencyInfo& dep,
+                               const std::map<std::string, InstallPlan>& plan,
+                               const std::string& pkg_name)
+{
+    if (dep.constraints.empty()) return;  // 无约束：没有版本可复核
+    const auto it = plan.find(dep.name);
+    if (it == plan.end()) return;  // 不在计划里 → 由调用方的"盘面/能力"那条路判
+    if (version_satisfies_all(it->second.actual_version, dep.constraints)) return;
+    throw LpkgException(
+        string_format("error.dep_version_mismatch", dep.name, it->second.actual_version, pkg_name));
+}
+
+}  // namespace detail
+
 namespace
 {
-/// 批次**提交后**收尾（清理本批 stash → trim → 清 DB 备份）。定义在文件下部的匿名
-/// namespace 里，这里前置声明以便 install/upgrade/remove 三条路径共用。
+// 批次**提交后**的三段收尾（定义在文件下部的匿名 namespace 里，这里前置声明以便
+// install/upgrade/remove 各条路径共用）。**顺序是承重的**：
+//   ① finish_committed_batch  —— 清本批 stash + 删被移除包的 hook 目录 + **剪枝** hook 文件
+//   ② run_post_install_hooks  —— 逐包跑 postinst（**必须在剪枝之后**：此刻 hooks_dir/<pkg>/
+//                                里就是本版本最终的那份脚本）
+//   ③ finish_post_commit_cleanup —— trim WAL + 回收 DB 备份
+// 三段都只告警不抛（批次已提交、DB 一致，它们失败不该把"装好了"报成失败）。
 void finish_committed_batch(
     std::vector<fs::path>& stashes, const std::vector<std::string>& removed_pkgs = {},
     const std::vector<std::pair<std::string, std::vector<std::string>>>& hook_sets = {});
+void run_post_install_hooks(
+    const std::vector<std::pair<std::string, std::vector<std::string>>>& hook_sets);
+void finish_post_commit_cleanup();
+void download_batch(std::map<std::string, InstallPlan>& plan,
+                    const std::vector<std::string>& order);
+void extract_batch(std::map<std::string, InstallPlan>& plan, const std::vector<std::string>& order);
+/// 批次 summary（数量 + 名单，按终端显示列截断）—— install / upgrade / remove 共用。
+void log_summary(const char* l10n_key,
+                 const std::vector<std::pair<std::string, std::string>>& pkgs);
 
 /**
- * 元数据验证的结论（`verify_package_metadata()` 定义在文件下部的匿名 namespace 里 ——
- * 这里前置声明，是因为 **install 与 upgrade 两条路径共用它**）。
+ * 元数据一致性校验（`verify_package_metadata()` 定义在文件下部的匿名 namespace 里 ——
+ * 这里前置声明，是因为 **install / upgrade / reinstall 三条路径共用它**
+ * （reinstall 经 `install_packages` 走到）。
+ *
+ * 不一致即**抛异常**。它曾做的是"重解计划 + 批次游标复位重跑"—— 2026-10-02 删除，
+ * 理由见函数定义处的长注释。
  */
-enum class MetadataVerdict {
-    Proceed,   ///< 一致（或此前已核对过）→ 按当前计划继续处理这个包
-    ReSolved,  ///< 不一致 → **已**重解计划，调用方须把批次游标复位（`i = 0`）后再来
-};
-MetadataVerdict verify_package_metadata(InstallContext& ctx, InstallPlan& p);
+void verify_package_metadata(InstallPlan& p);
 }  // namespace
 
 // =====================================================================
@@ -114,6 +148,7 @@ void cleanup_stashes(std::vector<fs::path>& stashes)
     if (stashes.empty()) return;
 
     std::vector<fs::path> paths;
+    paths.reserve(stashes.size());
     for (auto& s : stashes) paths.push_back(std::move(s));
     std::ranges::sort(paths);
     auto last = std::unique(paths.begin(), paths.end());
@@ -142,6 +177,33 @@ void cleanup_stashes(std::vector<fs::path>& stashes)
 void write_cache()
 {
     Cache::instance().write();
+}
+
+/**
+ * 批次末尾的 DB 落盘 —— install / upgrade / remove **三条路径共用**，全批次只调一次。
+ *
+ * 曾经是**逐包** `Cache::write(pkg + ":installed")`：每包把 DB 一族的 6 个文件全量重写一遍、
+ * 各留一份全量备份。本机实测 `files.db` 19.8 MB（744 包装机）⇒ 100 包批次落下 ~2 GB 临时
+ * 备份、整仓升级 ~15 GB。改为一次的依据（都是查实的，见 `db/batch_transaction.hpp`）：
+ * ① 批次进行中**没有任何读取器**读盘上的 DB（`Cache::load()` 的调用点全在批次之外）；
+ * ② 未提交批次**一律整体回滚**，中途的盘上状态既不可观测也不可能成为最终状态。
+ *
+ * **位置是承重的**：必须在 `COMMIT_PKGS` **之前**（调用点都在 op 内、`commit_batch()` 之前）。
+ * 写到提交之后的话，崩溃会留下"批次已提交、DB 还是旧的"，而**已提交批次不会被回滚** ——
+ * 没有任何机制能修回来。断点 `batch_db_before_commit` 钉的正是这个新窗口
+ * （它在逐包写入时代不存在，所以此前没有任何恢复用例走过它）。
+ *
+ * 空批次直接返回：`:batch-start` 已经把同样的内容写过一遍，再写一次是纯 I/O。
+ * 里程碑名**不能**用 `:batch-start` —— `batch_start_db_still_in_place` 会把那种行判成
+ * "可跳过"，批次后的 DB 就永远回滚不回来了。
+ */
+static void write_batch_db(const std::vector<std::string>& success)
+{
+    if (success.empty()) return;
+    Cache::instance().write(":batch-end");
+    // 断点：DB 行已落、`COMMIT_PKGS` 未写 —— 此刻注入失败，恢复必须把整批（含这次 DB 写）
+    // 逐字节退回批次前。
+    BreakpointManager::instance().hit("batch_db_before_commit");
 }
 
 /**
@@ -187,11 +249,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     Cache::instance().load();
     TmpDirManager tmp;
     Repository repo;
-    try {
-        repo.load_index();
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.repo_index_load_failed", e.what()));
-    }
+    (void)load_index_or_warn(repo);  // 统一入口：失败只告警（见 repository.hpp）
 
     std::map<std::string, InstallPlan> plan;
     std::vector<std::string> order;
@@ -201,15 +259,19 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     std::string provided_hash;
     if (!hash_file_path.empty()) {
         std::ifstream hf(hash_file_path);
-        if (!(hf >> provided_hash)) throw LpkgException(get_string("error.read_hash_failed"));
+        if (!(hf >> provided_hash))
+            throw LpkgException(string_format("error.read_hash_failed", hash_file_path));
     }
 
     // 安装参数解析
+    std::string rejected_arg;  // 第一个"点名了却解析不出来"的本地包参数
+    std::string rejected_why;
     for (const auto& arg : pkg_args) {
         const fs::path p(arg);
         if (p.extension() == constants::EXT_ZST || p.extension() == constants::EXT_LPKG ||
             arg.find('/') != std::string::npos) {
-            if (fs::exists(p)) {
+            // 非抛的**跟随**谓词（本地包常是符号链接，语义要跟随；`fs::exists` 遇自环会抛）
+            if (exists_follow(p)) {
                 try {
                     json meta = detail::read_archive_metadata(fs::absolute(p));
                     std::string n = meta.at(std::string(constants::J_NAME));
@@ -217,10 +279,13 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
                     locals[n] = fs::absolute(p);
                     targets.emplace_back(n, v);
                 } catch (const std::exception& e) {
-                    log_error(string_format("warning.skip_invalid_local_pkg", arg, e.what()));
+                    if (rejected_arg.empty()) {
+                        rejected_arg = arg;
+                        rejected_why = e.what();
+                    }
                 }
-            } else {
-                log_error(string_format("error.local_pkg_not_found", arg));
+            } else if (rejected_arg.empty()) {
+                rejected_arg = arg;
             }
         } else {
             std::string n = arg, v = std::string(constants::VER_LATEST);
@@ -232,13 +297,27 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
         }
     }
 
+    // ⚠️ 点名要装的本地包**解析不出来**（文件不存在 / 归档读不出元数据）⇒ **中止**。
+    // 此前这里只打一行错误就把该参数丢掉，然后继续走到"所有包都已安装"那个 `plan.empty()`
+    // 分支 —— `lpkg install ./typo.lpkg` 于是**打一行错误、再报成功、退出码 0**；混装时
+    // （`install good.lpkg ./bad.lpkg`）坏参数被静默忽略、好包照装。pacman 对找不到的目标是
+    // **中止**（`target not found`，一个都不装），这里对齐。本地包没有仓库索引可查，
+    // 所以"点名了就必须解析得出来"是唯一守得住的底线。
+    if (!rejected_arg.empty()) {
+        throw LpkgException(
+            rejected_why.empty()
+                ? string_format("error.local_pkg_not_found", rejected_arg)
+                : string_format("error.local_pkg_unreadable", rejected_arg, rejected_why));
+    }
+
     InstallContext ctx{repo, plan, order, locals, targets, force_reinstall, /*top_level=*/true, {}};
 
-    // 解析安装计划。真正的"元数据一致性重解析"发生在 run_batch_transaction 内部
-    // 的 metadata verification 循环（见下），此处不再需要外层死循环。
+    // 解析安装计划。计划一旦解出就**不再变动**：元数据一致性在批次循环内逐包校验
+    // （`verify_package_metadata`），不一致即抛错、整批回滚 —— 没有外层重试循环，
+    // 也没有"批次中途重解"（2026-10-02 起，见该函数的说明）。
     plan.clear();
     order.clear();
-    ctx.successfully_installed.clear();
+
     ctx.installed_set.clear();
 
     detail::resolve_with_solver(ctx);
@@ -276,41 +355,33 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
                           p.name, p.actual_version) +
             "\n";
     }
-    if (!user_confirms(prompt + get_string("info.confirm_proceed"))) {
-        log_info(get_string("info.installation_aborted"));
-        return;
-    }
+    // 用户答"不" ⇒ **取消**（不是错误、也不是成功）：抛 UserAbort 交给 run_cli —— 它用
+    // log_info 打消息、**不打完成消息**、退出码非零（原先只 log+return，命令会继续走到
+    // "安装完成"并以 0 退出，脚本无从区分"取消"与"装好了"）。
+    if (!user_confirms(prompt + get_string("info.confirm_proceed")))
+        throw UserAbort(get_string("info.user_aborted"));
 
-    ctx.successfully_installed.clear();
     ctx.installed_set.clear();
 
-    // **整批文件冲突预检**：在进入事务之前（任何 BEGIN_PKGS 之前）对整批一次性判定。
-    // 逐包的 check_for_file_conflicts 保留为第二道防线（见 check_batch_file_conflicts 的
-    // 实现说明：为什么冲突判定必须整批做）。
-    check_batch_file_conflicts(plan, order);
+    // ====== 阶段①②：下载 → 解压（末尾跑整批文件冲突预检）======
+    download_batch(plan, order);
+    extract_batch(plan, order);
 
+    // ====== 安装 ======
+    ui::section(get_string("ui.section_install"));
     // 执行安装（WAL 2.0 批量事务）
     std::vector<fs::path> all_stashes;
     std::vector<std::pair<std::string, std::vector<std::string>>> hook_sets;
+    std::vector<std::pair<std::string, std::string>> installed;  // summary 用（did_process 记账）
     run_batch_transaction([&](std::vector<std::string>& success) {
-        auto& cache = Cache::instance();
-
-        size_t i = 0;
-        while (i < order.size()) {
-            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-            const std::string& n = order[i];
-            ++i;
+        // 计划在本批次内**不再变动**：元数据不一致一律硬报错、整批回滚，不再重解计划
+        // （见 verify_package_metadata 的说明）。所以按 order 顺序走一遍即可，不需要游标复位。
+        for (const std::string& n : order) {
+            if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
             if (ctx.installed_set.contains(n)) continue;
 
             auto& p = plan.at(n);
-
-            // 下载后核对真实 metadata 与索引是否一致（不一致 ⇒ 重解计划并把批次游标复位）
-            if (verify_package_metadata(ctx, p) == MetadataVerdict::ReSolved) {
-                i = 0;
-                continue;
-            }
 
             InstallationTask task(p.name, p.actual_version, p.is_explicit,
                                   Cache::instance().get_installed_version(p.name), p.local_path,
@@ -326,19 +397,27 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
             // 处理"，不是"新版本没有 hooks"；记进去就会让 finish_committed_batch 把它的
             // hooks_dir/<pkg>/ 整个 remove_all 掉（静默删 hook，包却仍装着）。
             // upgrade_packages 对同一件事有显式 skip 分支，这里靠 did_process() 统一。
-            if (task.did_process()) hook_sets.emplace_back(p.name, task.get_hook_files());
+            if (task.did_process()) {
+                hook_sets.emplace_back(p.name, task.get_hook_files());
+                // 只记**真被处理过**的包（早退的包不算"装了"）——与 hook 账同一个闸门。
+                installed.emplace_back(p.name, p.actual_version);
+            }
 
-            cache.write(p.name + ":installed");
             success.push_back(p.name);
             ctx.installed_set.insert(p.name);
         }
+
+        // 全批次就位后只落盘一次 DB —— 理由与位置要求见 `write_batch_db` 的说明。
+        write_batch_db(success);
     });
 
     // post-commit 收尾（写 CLEANUP → 清理 stash → trim → 清 DB 备份）
     finish_committed_batch(all_stashes, {}, hook_sets);
+    run_post_install_hooks(hook_sets);
+    finish_post_commit_cleanup();
 
     TriggerManager::instance().run_all();
-    log_info(get_string("info.install_complete"));
+    log_summary("info.install_summary", installed);
 }
 
 namespace
@@ -368,7 +447,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
     // 写入层原语：BACKUP/DIR_RM 的 WAL 行与物理操作成对发生（见 op_sink.hpp）
     detail::OpSink sink(pkg_name, &stashes);
 
-    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+    if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
     // prerm：**文件被删之前**跑（按定义如此，不能挪到提交后 —— 那等于静默变成 postrm）。
     // 因此"整批的安全检查"必须在此之前跑完，见 check_removal_preconditions()。
@@ -399,7 +478,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
         const fs::path phys = strip_trailing_slash(Config::instance().root_dir() /
                                                    fs::path(path_str).relative_path());
 
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+        if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
         // 盘上是**实体目录**而 DB 记的是文件键：非 force 时上面已经拒绝整批（走不到这里）；
         // 走到这里说明是 `--force`，此时也只**跳过**，绝不 rename 进 stash —— stash 在批次提交后
@@ -422,7 +501,9 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
             if (is_conf && !purge_config) {
                 // WAL: SAVE_CONF + rename 到兄弟名（断点位于 write-ahead 窗口内）
                 const fs::path kept = sink.save_config(phys, "rm_save_conf_after_wal_" + pkg_name);
-                log_info(string_format("info.config_saved_as", kept.string()));
+                // 空返回 = 闸掉了（那条路径解析到 root 之外，见 OpSink::confined）——
+                // 已经告警过，这里不能再报"已保存为 <空路径>"。
+                if (!kept.empty()) log_info(string_format("info.config_saved_as", kept.string()));
             } else {
                 // WAL: BACKUP + rename 进 stash（一次调用；断点位于 write-ahead 窗口内）
                 sink.backup(phys, "rm_backup_after_wal_" + pkg_name);
@@ -453,14 +534,14 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
         }
     }
 
-    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+    if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
     // 断点：移除的 BACKUP 阶段完成后、文件删除前
     BreakpointManager::instance().hit("rm_before_file_removal_" + pkg_name);
 
     remove_package_files(pkg_name);
 
-    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+    if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
     // 阶段 B：owned 目录（最深优先，仅最后持有者）→ 空则 DIR_RM（rmdir + 元数据记录）。
     //   文件已全部搬进 stash，目录此刻只剩"无主内容"才会非空 → 非空即保留（安全边界：
@@ -476,8 +557,12 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
     }
 
     // DBRM 清理
-    auto cleanup_with_dbr = [&](const fs::path& fpath, const std::string& /*desc*/) {
-        if (fs::exists(fpath)) {
+    auto cleanup_with_dbr = [&](const fs::path& fpath) {
+        // 判定走**不抛**的 `exists_follow`（与 `fs::exists` 同义：跟随末段链接）——`fpath` 是
+        // lpkg 状态目录下**以被移除包名命名**的文件（DB 键派生的路径，见 lpkg/CLAUDE.md §6），
+        // 环/不可达时 `fs::exists` 抛的是 raw `filesystem_error`，会把一次干净的卸载变成
+        // 未本地化的崩溃（与 `cleanup_stashes` 同款理由）。
+        if (exists_follow(fpath)) {
             wal::log_wal_line("DBRM " + fpath.string() + " " + pkg_name + ":removed");
             safe_rename(fpath,
                         fs::path(fpath.string() + ".lpkg_db_bak_before:" + pkg_name + ":removed"));
@@ -485,43 +570,67 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
     };
 
     const fs::path dep_file = Config::instance().dep_dir() / pkg_name;
-    if (fs::exists(dep_file)) {
+    if (exists_follow(dep_file)) {  // 不抛谓词，理由同上（DB 键派生的包名路径）
         std::ifstream f(dep_file);
+        // 守卫此前只判"存在"（exists_follow）：文件存在却**打不开**（FIFO/设备/权限）时
+        // `open` 失败，或**读不出**（是目录 —— Linux 下 open 成功、随后读才失败；或 EIO）时
+        // 循环静默跑零次，被当成"没有反向依赖" ⇒ 这些边永远留在 DB 里（陈旧反向依赖，
+        // 之后会错误地挡住别的包卸载）。这与**升级侧**读同一个文件、做同一件事
+        // （`installation_task_register.cpp` 摘除旧反向依赖）的处置必须一致：fail-closed，
+        // 点名文件报错、整批回滚 —— 不静默、不当作空数据。
+        if (!f.is_open())
+            throw LpkgException(string_format("error.open_file_failed", dep_file.string()));
         std::string l;
         while (std::getline(f, l)) {
-            std::stringstream ss(l);
-            std::string dn;
-            if (ss >> dn) cache.remove_reverse_dep(dn, pkg_name);
+            // 键提取走 `vercmp/dep_parser` 的**唯一实现**（2026-10-03 修）：这里原先自己
+            // `ss >> dn` 按空白切，对约束**紧贴包名**的写法（`provb>=2.0`）会切出整串
+            // `provb>=2.0`，而重建侧（`ensure_reverse_deps`）用 `dependency_name_of` 得到的是
+            // `provb` ⇒ **摘不掉**，内存里留下"已删包仍在反向依赖表里"的陈旧边
+            // （`test_reverse_dep_key_consistency.cpp` 记录过：两处"一致地错"时互相抵消，
+            // 重建侧改成唯一实现之后这个不对称才暴露出来）。
+            const std::string dn = detail::dependency_name_of(l);
+            if (!dn.empty()) cache.remove_reverse_dep(dn, pkg_name);
         }
+        // 非 EOF 收尾且 `bad`（实测：目录 = open 成功 + badbit；空文件是干净的 eof）⇒
+        // 读中途失败，不能静默当空。
+        if (f.bad())
+            throw LpkgException(string_format("error.read_file_failed", dep_file.string()));
     }
     // needed_so 派生的反向依赖（register_package 按提供者加边）也要清理，
     // 否则同一进程内 get_reverse_deps(provider) 会返回已移除的包。
     {
         const fs::path nso_file = Config::instance().needed_so_dir() / pkg_name;
-        if (fs::exists(nso_file)) {
+        if (exists_follow(nso_file)) {  // 不抛谓词，理由同上
             std::ifstream f(nso_file);
+            // 同 dep_file 的理由：打不开 / 读不出都不能静默当成"没有 SONAME 反向依赖"。
+            if (!f.is_open())
+                throw LpkgException(string_format("error.open_file_failed", nso_file.string()));
             std::string soname;
             while (std::getline(f, soname)) {
                 if (soname.empty()) continue;
                 for (const auto& prov_pkg : cache.get_providers(soname))
                     cache.remove_reverse_dep(prov_pkg, pkg_name);
             }
+            if (f.bad())
+                throw LpkgException(string_format("error.read_file_failed", nso_file.string()));
         }
     }
-    cleanup_with_dbr(dep_file, "dep");
-    cleanup_with_dbr(Config::instance().needed_so_dir() / pkg_name, "needed_so");
-    cleanup_with_dbr(
-        Config::instance().docs_dir() / (pkg_name + std::string(constants::SUFFIX_MAN)), "man");
+    cleanup_with_dbr(dep_file);
+    cleanup_with_dbr(Config::instance().needed_so_dir() / pkg_name);
+    cleanup_with_dbr(Config::instance().docs_dir() /
+                     (pkg_name + std::string(constants::SUFFIX_MAN)));
 
     // 注：hooks_dir/<pkg> 的删除**不在这里**——它无 WAL 记录，放在可回滚的批次内会让
     // 批次回滚后钩子永久丢失（之后 remove/upgrade 静默跳过钩子）。改由提交后的
     // finish_committed_batch() 删除（TODO.md Z7）。
     cache.remove_installed(pkg_name);
 
-    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+    if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
-    // DB 落盘（先于 RM_COMMIT：提交标记前 DB 已持久化，崩溃可恢复）
-    cache.write(pkg_name + ":removed");
+    // DB **不在这里落盘**：本批次结束时统一写一次（见 `remove_packages_in_one_batch` 的
+    // `:batch-end`）。理由与 install 路径同（batch_transaction.hpp 的协议说明）—— 逐包
+    // 全量重写 6 个 DB 文件既不可观测也无必要。`walk` 仍在此处改**内存** Cache，
+    // 批次提交前 DB 落盘、崩溃可恢复这一点不变。
 
     // WAL: RM_COMMIT + RM_END
     wal::log_wal_line("RM_COMMIT " + pkg_name + " " + ver);
@@ -529,19 +638,17 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
 }
 
 /**
- * 批次**提交后**收尾：清理本批 stash（写 CLEANUP → 物理删除）→ 剪枝 hooks → **执行 postinst**
- * → trim → 清 DB 备份。
+ * 批次**提交后**收尾（第一段）：清本批 stash → 删被移除包的 hook 目录 → **剪枝** hook 文件。
+ *
+ * **不含 postinst，也不含 trim / DB 备份回收** —— 那两段分别是 `run_post_install_hooks()`
+ * 与 `finish_post_commit_cleanup()`（2026-10-03 按阶段拆开，顺序见上面的前置声明）。
  *
  * 清理失败**不算批次失败**（批次已提交、DB 一致）：只告警并保留 CLEANUP 记录，
- * 由下次 recover_packages 续传。install / upgrade / remove 三条路径共用同一收尾。
+ * 由下次 recover_packages 续传。
  *
- * **postinst 的执行时机就在这里，全仓唯一**（原先在 InstallationTask::commit_without_file_ops
- * 末尾 = 批次内）：批次是"全或无"，回滚能撤销文件与 DB，却撤不回钩子的副作用（钩子以 root
- * 跑 systemd-sysusers / tmpfiles --create / useradd，改的是系统状态）—— 留在批次内等于让
- * 一个已经整批回滚的事务在系统上留下撤不掉的痕迹。上游 libalpm 同理：POST hook 整段在
- * "提交 / 中断"判定之后，提交失败一个都不跑。
- * 放在剪枝之后：此刻 hooks_dir/<pkg>/ 里就是本版本最终的那一份脚本（回滚过的批次根本走不到
- * 这里，它的旧脚本由事务回滚原样还原）。
+ * 被移除包的 hooks 与"新版本不再提供"的 hook 文件都在**提交后**才删：批次若回滚，旧 hook
+ * 必须完好无损（Z7）。剪枝放在 postinst **之前**是承重的：跑的时候 hooks_dir/<pkg>/ 里
+ * 就是本版本最终的那份脚本。
  */
 void finish_committed_batch(
     std::vector<fs::path>& stashes, const std::vector<std::string>& removed_pkgs,
@@ -555,7 +662,9 @@ void finish_committed_batch(
     // 被移除包的 hooks 在**提交后**删除：移除已是最终态；批次若回滚则钩子完好无损（Z7）
     for (const auto& p : removed_pkgs) {
         std::error_code ec;
-        fs::remove_all(Config::instance().hooks_dir() / p, ec);
+        const fs::path d = Config::instance().hooks_dir() / p;
+        fs::remove_all(d, ec);
+        if (ec) log_warning(string_format("warning.hook_prune_failed", d.string(), ec.message()));
     }
     // 安装/升级：剪枝新版本**不再提供**的 hook 文件。同样放在提交后——批次回滚时
     // 旧 hook 必须完好（与 Z7 同一理由）。若新版本完全没有 hooks，整目录清掉。
@@ -564,29 +673,194 @@ void finish_committed_batch(
         std::error_code ec;
         if (files.empty()) {
             fs::remove_all(dir, ec);
+            if (ec)
+                log_warning(string_format("warning.hook_prune_failed", dir.string(), ec.message()));
             continue;
         }
-        for (const auto& e : fs::directory_iterator(dir, ec)) {
-            const std::string name = e.path().filename().string();
-            if (std::ranges::find(files, name) == files.end()) fs::remove(e.path(), ec);
+        // **先收集再删**：边遍历 `directory_iterator` 边 `fs::remove` 会让 readdir 跳过条目
+        // （POSIX 下这是未定义/实现相关的），残留的旧 hook 脚本会让之后的 remove/upgrade
+        // 跑错版本（2026-10-02 修）。
+        // **用显式 `increment(ec)`，不用 range-for**（2026-10-03 修）：range-for 展开成
+        // `operator++()`（**抛型**重载），遍历中途出错会抛出去 —— 而这里已在 `COMMIT_PKGS`
+        // 之后、外层没有 try/catch，抛出去会让"**已提交**的批次"报 `Error:` + 退出码 1，
+        // 脚本/farm 会误读成"什么都没发生"（`cache.cpp` 的 `cleanup_db_backups` 早就是这个形态）。
+        std::vector<fs::path> stale;
+        for (fs::directory_iterator it(dir, ec), end; it != end && !ec; it.increment(ec)) {
+            const std::string name = it->path().filename().string();
+            if (std::ranges::find(files, name) == files.end()) stale.push_back(it->path());
+        }
+        // 遍历出错（权限/竞态）与逐个删除失败都要出声 —— 否则残留的旧 hook 会静默影响后续
+        // remove/upgrade（语义与上面的 remove_all 一致）。
+        if (ec) log_warning(string_format("warning.hook_prune_failed", dir.string(), ec.message()));
+        for (const auto& p : stale) {
+            fs::remove(p, ec);
+            if (ec)
+                log_warning(string_format("warning.hook_prune_failed", p.string(), ec.message()));
         }
     }
-    // postinst：只在**此处**执行（理由见函数注释）。run_hook 自己判 no_hooks_mode 与脚本
-    // 是否存在，执行失败只告警不抛（见 install_common.cpp）—— 批次已提交，包确实装上了，
-    // 在这里抛异常只会把"装好了"报成"失败"。
+}
+
+/**
+ * 提交后阶段：逐包跑 `postinst`。
+ *
+ * **只在这里执行**（全仓唯一）。批次是"全或无"，回滚能撤销文件与 DB，却撤不回钩子的副作用
+ * （钩子以 root 跑 systemd-sysusers / tmpfiles --create / useradd）—— 留在批次内等于让一个
+ * 已经整批回滚的事务在系统上留下撤不掉的痕迹。上游 libalpm 同理：POST hook 整段在
+ * "提交 / 中断"判定之后，提交失败一个都不跑。
+ *
+ * **调用时机**：紧接 `finish_committed_batch()`（剪枝）之后 —— 此刻 `hooks_dir/<pkg>/` 里就是
+ * 本版本最终的那份脚本（回滚过的批次根本走不到这里，它的旧脚本由事务回滚原样还原）。
+ *
+ * **不变量**：`hook_sets` 里每个条目都是**真被处理过**的包（调用方按 `did_process()` 记账）。
+ * 空的文件表含义是"新版本没有 hooks"，与"本包没被处理"是两回事 —— 别在这里用
+ * `hook_sets.empty()` 之类的判据去推断"有没有钩子要跑"。
+
+ */
+void run_post_install_hooks(
+    const std::vector<std::pair<std::string, std::vector<std::string>>>& hook_sets)
+{
+    if (Config::instance().no_hooks_mode()) return;
+
+    // 只有**真的有包要跑 postinst** 时才开这一节：`hook_sets` 对每个被处理的包都有一条
+    // （没 hook 的包记的是空表，而空表在下游是"本版本没有 hooks"的硬信号），所以判据是
+    // "某个成员带了 postinst.sh"，不是"表非空"。
+    const bool any_postinst = std::ranges::any_of(hook_sets, [](const auto& hs) {
+        return std::ranges::find(hs.second, constants::POSTINST_SH) != hs.second.end();
+    });
+    if (!any_postinst) return;
+
+    ui::section(get_string("ui.section_postinst"));
     for (const auto& hs : hook_sets) {
-        detail::run_hook(hs.first, std::string(constants::POSTINST_SH));
+        // run_hook 自己判"脚本是否存在 / 目标 root 里有没有 bash"，执行失败只告警不抛。
+        // 整段仍套一层 catch：它理论上仍可能抛（fs::absolute、ui::Line 之类），而**后面的
+        // trim / DB 备份回收绝不能被一个 hook 的异常带掉**（那是提交后清理，必须跑到）。
+        try {
+            detail::run_hook(hs.first, std::string(constants::POSTINST_SH));
+        } catch (const std::exception& e) {
+            log_warning(string_format("warning.hook_exec_exception", hs.first, e.what()));
+        }
     }
-    trim_completed();
-    cleanup_db_backups();
+}
+
+/**
+ * 提交后收尾的最后一节：剪 WAL + 回收 DB 备份。
+ *
+ * 与 `cleanup_stashes` 同属"提交后的清理"：失败**不算批次失败**（批次已提交、DB 一致），
+ * 只告警、留给下次 recover/trim 续传。此前它们裸露在 `finish_committed_batch` 里 ——
+ * `cleanup_db_backups` 的遍历错误会把"安装已成功"报成命令失败（2026-10-02 修）。
+ *
+ * ⚠️ **每个调用 `finish_committed_batch()` 的地方都必须调它**（install / upgrade / remove /
+ * 递归移除四条路径）：漏掉 = 不再 trim WAL、不再回收 DB 备份，静默地越积越多。
+ * 恢复路径（`recover.cpp` 的 `continue_post_commit_cleanup`）也做这两件事，但**不跑 postinst**。
+ */
+void finish_post_commit_cleanup()
+{
+    try {
+        trim_completed();
+        cleanup_db_backups();
+    } catch (const std::exception& e) {
+        log_warning(string_format("warning.cleanup_deferred", e.what()));
+    }
+}
+
+/**
+ * 批次 summary：一行报数量 + 名单（`:: 已安装 2 个包: app 1.0, libdep 1.0`）。
+ *
+ * 取代"每装好一个包打一行" —— 一次 300 包的升级因此从 ~300 行降成 1 行。名单按**终端显示列**
+ * 截断（超长以 `...` 收尾），所以日志里也永远不会是一行超长文本。
+ *
+ * @param pkgs  `(包名, 版本)`；版本为空则只印包名（卸载侧就是这种 —— 批次跑完版本已从
+ *              cache 消失，而名单要等 `run_all()` 之后才打）。
+ */
+void log_summary(const char* l10n_key, const std::vector<std::pair<std::string, std::string>>& pkgs)
+{
+    if (pkgs.empty()) return;
+    std::string list;
+    for (const auto& [n, v] : pkgs) {
+        if (!list.empty()) list += ", ";
+        list += v.empty() ? n : std::format("{} {}", n, v);
+    }
+    // 前缀（`:: ` + "已安装 300 个包: "）要留出来 —— 对半分是最省事又不失真的划法。
+    const auto total = static_cast<std::size_t>(ui::width());
+    const std::size_t budget = total > 20 ? total - total / 2 : total;
+    if (ui::visible_len(list) > budget)
+        list = ui::truncate_width(list, budget > 3 ? budget - 3 : 0) + "...";
+    log_info(string_format(l10n_key, pkgs.size(), list));
+}
+
+/**
+ * 阶段①：把计划里**本批真要装**的每个包取到标准临时目录，并把落点记进计划。
+ *
+ * 只做"取包"：下载/复用本地归档 + sha256 校验 + **逐字段核对 metadata（vs 索引）**。
+ * 解压与文件冲突预检在下一阶段（`extract_batch`）—— 分开是为了让"在取什么"和"在解开什么"
+ * 各自可见，也让"索引与归档不一致"在**解开、落盘之前**就报出来。
+ */
+void download_batch(std::map<std::string, InstallPlan>& plan, const std::vector<std::string>& order)
+{
+    ui::section(get_string("ui.section_download"));
+    for (const auto& n : order) {
+        if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
+
+        const auto it = plan.find(n);
+        if (it == plan.end()) continue;  // 与批次循环一致：不在计划里的条目不会被处理
+        InstallPlan& p = it->second;
+        const std::string old_ver = Cache::instance().get_installed_version(n);
+        if (plan_member_skipped(p, old_ver)) continue;
+
+        InstallationTask task(p.name, p.actual_version, p.is_explicit, old_ver, p.local_path,
+                              p.sha256, p.force_reinstall);
+        ensure_dir_exists(task.tmp_pkg_dir());  // 下载器自己不建父目录
+        task.download_and_verify_package();
+        p.local_path = task.archive_path();
+        // 下载完就核对索引：不一致即抛（此时**什么都没落盘**，连 BEGIN_PKGS 都还没写）。
+        verify_package_metadata(p);
+    }
+}
+
+/**
+ * 阶段②：把每个包解压到标准临时目录并标记 `content_ready`；收尾跑整批文件冲突预检。
+ *
+ * 解压产物由事务内 `prepare()` 依据 `content_ready` 复用（不重复解 tar）。
+ * 冲突预检留在这一阶段的**末尾**：它需要每个成员的 content 清单，而且是**整批一次**判定
+ * （所有权接管/释放的时间线只有放在一起才算得对），位置仍在事务之前。
+ */
+void extract_batch(std::map<std::string, InstallPlan>& plan, const std::vector<std::string>& order)
+{
+    ui::section(get_string("ui.section_extract"));
+    for (const auto& n : order) {
+        if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
+
+        const auto it = plan.find(n);
+        if (it == plan.end()) continue;
+        InstallPlan& p = it->second;
+        const std::string old_ver = Cache::instance().get_installed_version(n);
+        if (plan_member_skipped(p, old_ver)) continue;
+
+        InstallationTask task(p.name, p.actual_version, p.is_explicit, old_ver, p.local_path,
+                              p.sha256, p.force_reinstall);
+        ensure_dir_exists(task.tmp_pkg_dir());
+        // 归档已经在下载阶段落好（`p.local_path`），这里只是把 archive_path_ 定下来。
+        task.download_and_verify_package();
+        task.extract_and_validate_package();
+        p.content_ready = true;
+    }
+
+    check_batch_file_conflicts(plan, order);
 }
 
 /**
  * 移除前的安全检查（essential / 反向依赖 / 能力反向依赖）。
  * 任一项不通过 → 返回 false 并已打印原因：这是**拒绝**（log + return）而不是报错，
  * 保持既有 CLI 语义（`lpkg remove <essential>` 不抛异常）。
+ *
+ * ⚠️ `batch` 是**本批次要一起移除**的包名集合（2026-10-02 修）：反向依赖检查必须把
+ * 它们排除掉 —— 否则 `lpkg remove a b`（b 依赖 a）会被判成"a 还有依赖者 b"而**整批拒绝**，
+ * 一个包都删不掉。pacman 不是这样：`alpm_checkdeps`（`lib/libalpm/deps.c`）先把包库分成
+ * "本次要移走的"(rem) 与 "留下的"(dblist) 两桶，**只遍历留下的那些**报冲突 —— 集合**内部**
+ * 的相互依赖根本不检。本函数因此与它对齐。
  */
-static bool removal_allowed(const std::string& pkg_name, bool force)
+static bool removal_allowed(const std::string& pkg_name, bool force,
+                            const std::unordered_set<std::string>& batch)
 {
     if (force) return true;
     auto& cache = Cache::instance();
@@ -596,6 +870,8 @@ static bool removal_allowed(const std::string& pkg_name, bool force)
     }
     const auto refused = [&](const std::string& what) {
         auto rdeps = cache.get_reverse_deps(what);
+        // 同批一起走的依赖者不算阻碍（它们与 `what` 同时消失）
+        std::erase_if(rdeps, [&](const std::string& d) { return batch.contains(d); });
         if (rdeps.empty()) return false;
         std::string list;
         for (const auto& d : rdeps) list += d + " ";
@@ -709,11 +985,13 @@ static void remove_packages_in_one_batch(const std::vector<std::string>& pkgs, b
 {
     check_removal_preconditions(pkgs, force);
 
+    // ====== 卸载 ======
+    ui::section(get_string("ui.section_remove"));
     run_batch_transaction([&](std::vector<std::string>& success) {
         auto& cache = Cache::instance();
 
         for (const auto& p : pkgs) {
-            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+            if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
             log_info(string_format("info.removing_package", p));
             do_remove_package(p, purge_config, cache.get_installed_version(p), stashes_out);
@@ -725,6 +1003,11 @@ static void remove_packages_in_one_batch(const std::vector<std::string>& pkgs, b
 
         // 断点：全部包都已删完、批次尚未提交 —— 这是"清理前最后可回滚点"
         BreakpointManager::instance().hit("remove_batch_before_commit");
+
+        // 全批次改完之后只落盘一次 DB —— 理由与位置要求见 `write_batch_db` 的说明。
+        // 断点 `remove_batch_before_commit`（上一行）因此落在**这次 DB 落盘之前**：
+        // 此刻盘上的 DB 仍是批次前的内容，这正是"逐包写入已取消"的可观测证据。
+        write_batch_db(success);
     });
     // **不在此清理 stash**：stash 是回滚的唯一来源，必须活到批次提交之后
     // （与 install/upgrade 同款；调用方在提交后用 finish_committed_batch 收尾）。
@@ -750,6 +1033,12 @@ static void remove_packages_in_one_batch(const std::vector<std::string>& pkgs, b
 static size_t remove_packages_checked(const std::vector<std::string>& pkgs, bool force,
                                       bool purge_config, bool* refused_out = nullptr)
 {
+    // 本批**一起**要移除的集合：反向依赖检查据此豁免"同批也在删"的依赖者
+    // （否则 `remove a b`（b 依赖 a）会被自己人挡下 —— 见 removal_allowed 的说明）
+    std::unordered_set<std::string> batch;
+    for (const auto& p : pkgs)
+        if (!Cache::instance().get_installed_version(p).empty()) batch.insert(p);
+
     std::vector<std::string> to_remove;
     bool refused_any = false;
     for (const auto& p : pkgs) {
@@ -757,7 +1046,7 @@ static size_t remove_packages_checked(const std::vector<std::string>& pkgs, bool
             log_info(string_format("info.package_not_installed", p));
             continue;
         }
-        if (!removal_allowed(p, force)) {
+        if (!removal_allowed(p, force, batch)) {
             refused_any = true;
             continue;
         }
@@ -774,18 +1063,23 @@ static size_t remove_packages_checked(const std::vector<std::string>& pkgs, bool
         return 0;
     }
     if (to_remove.empty()) return 0;
-    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+    if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
     std::vector<fs::path> stashes;
     remove_packages_in_one_batch(to_remove, force, purge_config, stashes);
     finish_committed_batch(stashes, to_remove);
+    finish_post_commit_cleanup();
 
     // 与 install/upgrade 一致：**提交后**flush 一次待执行触发器。删除路径此前一次都不跑，
     // 于是删掉 /usr/lib 下的库之后，它的 SONAME 链接留在原地悬空（依赖它的二进制报
     // cannot open shared object file）。apply_soname_links 幂等（正确的链接不动）。
     TriggerManager::instance().run_all();
 
-    for (const auto& p : to_remove) log_info(string_format("info.package_removed_successfully", p));
+    // 逐包的"X 已成功移除"改为批次结束后一条 summary（版本这时已从 cache 消失 ⇒ 只印名字）
+    std::vector<std::pair<std::string, std::string>> removed;
+    removed.reserve(to_remove.size());
+    for (const auto& p : to_remove) removed.emplace_back(p, std::string{});
+    log_summary("info.remove_summary", removed);
     return to_remove.size();
 }
 
@@ -802,21 +1096,32 @@ void remove_package(const std::string& pkg_name, bool force, bool /*wrap_in_txn*
     remove_packages_checked({pkg_name}, force, purge_config);
 }
 
-/** 移除多个包：**一个批次**内原子完成（中途中断整批回滚） */
-void remove_packages(const std::vector<std::string>& pkg_names, bool force, bool purge_config)
+/** 移除多个包：**一个批次**内原子完成（中途中断整批回滚）。返回实际移除的包数。 */
+size_t remove_packages(const std::vector<std::string>& pkg_names, bool force, bool purge_config)
 {
-    if (pkg_names.empty()) return;
+    if (pkg_names.empty()) return 0;
     // CLI 边界（main 的 `remove a b c` 走这里）：**被安全检查拒绝 → 报错**，
     // 让脚本/farm 凭退出码区分"删掉了"与"被拒绝"（TODO G4）。库层 remove_package
     // 保持"打印原因后返回"的友好语义（测试与内部调用依赖它）。
     bool refused = false;
-    remove_packages_checked(pkg_names, force, purge_config, &refused);
+    const size_t removed = remove_packages_checked(pkg_names, force, purge_config, &refused);
     if (refused) throw LpkgException(get_string("error.removal_refused"));
+    return removed;
 }
 
 void remove_package_files(const std::string& pkg_name)
 {
     auto& cache = Cache::instance();
+
+    // **先撤能力（provides），且必须在下面的早退之前**：一个"声明了 provides、却没有任何
+    // 文件"的包（纯能力/元包，`content/` 为空）会在下一行直接 `return` —— 若把撤能力放在
+    // 函数末尾，它的 provider 记录就永远留在 `provides.db` 里（2026-10-02 前实测：移除后
+    // `get_providers("capX")` 仍返回该包）。而 `dep_satisfied_on_disk()` 只看"providers
+    // 非空"、**不看 is_installed**，于是后续安装依赖该能力的东西会被"假满足"放行。
+    for (const auto& cap : cache.get_package_provides(pkg_name)) {
+        cache.remove_provider(cap, pkg_name);
+    }
+
     auto owned_entries = cache.get_package_files(pkg_name);
     if (owned_entries.empty()) return;
 
@@ -835,7 +1140,7 @@ void remove_package_files(const std::string& pkg_name)
     // `<路径>.lpkgsave`），此处只做 DB 收尾：清文件归属 + 清 provides。目录归属由阶段 B
     // 的目录循环清。
     for (const auto& path_str : owned_entries) {
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+        if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
         if (path_str.ends_with('/')) continue;
         cache.remove_file_owner(path_str, pkg_name);
         // 配置文件的哈希记录**随包走**：本包对 /etc 的归属一撤销，我们记的"往这里装进去过
@@ -846,10 +1151,6 @@ void remove_package_files(const std::string& pkg_name)
         // 记录的内容从来不是"盘上有什么"，而是"我们装过什么"。
         if (path_str.starts_with(std::string(constants::DIR_ETC_PREFIX)))
             cache.remove_conf_hash(path_str, pkg_name);
-    }
-
-    for (const auto& cap : cache.get_package_provides(pkg_name)) {
-        cache.remove_provider(cap, pkg_name);
     }
 }
 
@@ -863,8 +1164,9 @@ void autoremove(bool purge_config)
     std::vector<std::string> to_rem;
     auto& cache = Cache::instance();
     {
-        std::lock_guard lock(cache.get_mutex());
-        for (const auto& name : cache.get_all_installed() | std::views::keys) {
+        // 快照**必须先落成具名变量**：`views::keys` 建在原临时对象上会悬垂。
+        const auto installed = cache.get_all_installed();
+        for (const auto& name : installed | std::views::keys) {
             if (!req.contains(name)) to_rem.push_back(name);
         }
     }
@@ -885,14 +1187,16 @@ void autoremove(bool purge_config)
         // "删了几个、其余还在"的状态。这里与 `remove a b c` 共用同一批次语义。
         // force=true 是**内部**的（孤儿本就没有反向依赖者，无需再查），它不代表"可以丢配置"：
         // 配置文件按 purge_config（CLI 的 --purge-config，默认 false）改名保留。
-        try {
-            remove_packages_checked(to_rem, /*force=*/true, purge_config);
-            log_info(string_format("info.autoremove_complete", to_rem.size()));
-        } catch (const std::exception& e) {
-            // 整批已回滚 → **不得**再报"完成"（否则脚本无法区分成功与回滚，TODO.md Z8）
-            log_warning(string_format("warning.autoremove_batch_failed", to_rem.size(), e.what()) +
-                        " [not removed: batch rolled back]");
-        }
+        //
+        // ⚠️ **这一句外面绝不能套 `catch (const std::exception&)`**（2026-10-02 修）：那会把
+        // `UserAbort`（Ctrl+C / 取消）和**任何真实的批次失败**一起降级成"打条警告就返回"，
+        // 于是 `lpkg autoremove` **退出码仍是 0** —— 脚本/farm 据此判断"删成功了"，而实际上
+        // 一个包都没删。e842e6a8 立的规矩是"取消 ≠ 完成：凭退出码区分"，这里曾经是唯一
+        // 漏网的那条路（全仓只有 `main_cli` 接 `UserAbort`）。批次的回滚在
+        // `remove_packages_checked` 内部已经做完，异常照常上抛即可 —— `run_cli` 会给
+        // `UserAbort` 打取消消息、给其它异常打 `Error:` 前缀，两者都是非零退出码。
+        remove_packages_checked(to_rem, /*force=*/true, purge_config);
+        log_info(string_format("info.autoremove_complete", to_rem.size()));
     }
 }
 
@@ -902,8 +1206,8 @@ namespace
 // `upgrade_packages()` 的各阶段函数
 //
 // 该函数原先是一个整体（全仓第三长、嵌套 7）：读索引 → 快照已装 → 筛可升级 → 求解 →
-// 拼确认清单 → 整批预检 → 批次内逐包（含"下载后比对真实元数据、不一致就重解并复位
-// 游标"）→ 收尾。各段之间**只靠局部变量传递**，拆开后主函数退化成一条直线：
+// 拼确认清单 → 整批预检 → 批次内逐包（含"下载后比对真实元数据与索引"的一致性校验）→ 收尾。
+// 各段之间**只靠局部变量传递**，拆开后主函数退化成一条直线：
 //
 //     收集可升级目标 → 求解 → 用户确认 → 批次执行（预检 + 逐包）→ 收尾
 //
@@ -916,6 +1220,9 @@ struct UpgradeBatchLog {
     std::vector<fs::path>& stashes;  ///< 本批产生的备份 stash（批次提交后统一清理）
     std::vector<std::pair<std::string, std::vector<std::string>>>& hook_sets;  ///< 逐包 hooks
     size_t& upgraded;  ///< 真的换了版本的包数（本次计划新拉入的依赖不计）
+    /// summary 用的两张名单：**真升级的**与**新装进来的依赖**（`upgraded` 只数前者）。
+    std::vector<std::pair<std::string, std::string>>& upgraded_pkgs;
+    std::vector<std::pair<std::string, std::string>>& new_deps;
 };
 
 /**
@@ -928,10 +1235,10 @@ std::vector<std::pair<std::string, std::string>> collect_upgrade_targets(
 {
     std::vector<std::pair<std::string, std::string>> upgrade_targets;
     for (const auto& [n, curr] : installed) {
-        // 与全仓另外 12 处 SIGINT 检查一致：**抛异常**而不是 return。
+        // 与全仓另外 15 处 SIGINT 检查一致：**抛异常**而不是 return。
         // return 会让 upgrade_packages() 正常返回 → main 返回 0 → 脚本/farm 认为
         // "升级已全部完成"（实际一个包都没升）。install/remove 都是抛，退出码 1。
-        if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+        if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
         auto opt = repo.find_package(n);
         if (!opt) continue;
         if (!version_compare(curr, opt->version)) continue;
@@ -956,7 +1263,7 @@ std::string build_upgrade_prompt(const std::vector<std::string>& order,
         if (!old_ver.empty()) {
             if (old_ver != p.actual_version) {
                 // 已有旧版本且版本不同 → 升级
-                prompt += "  " + n + " " + old_ver + " \xe2\x86\x92 " + p.actual_version + "\n";
+                prompt += std::format("  {} {} \xe2\x86\x92 {}\n", n, old_ver, p.actual_version);
             } else {
                 // 已是最新版本（可能是其他依赖引入的已满足依赖）→ 不显示
                 continue;
@@ -973,18 +1280,77 @@ std::string build_upgrade_prompt(const std::vector<std::string>& order,
     return prompt;
 }
 
-/// 逐包"下载后比对真实 metadata 与索引是否一致"的结论
 /**
- * 元数据验证：下载后比对真实 metadata 和索引是否一致（和 install_packages 中的逻辑一致）。
+ * 元数据一致性校验：下载归档后比对真实 metadata 与仓库索引，**不一致即硬报错**。
  *
- * 不一致 ⇒ 用归档里的真实元数据更新索引、把该包登记成本地候选，然后**重解整个计划**
- * （`ctx.plan` / `install_order` 被清空后由 `resolve_with_solver` 重建）—— 调用方据此把
- * 批次游标复位到 0 重跑。⚠️ 这条分支之后 `p` 已随 `ctx.plan.clear()` 失效，调用方**不得**
- * 再碰它（原实现同样只 `continue`）。
+ * 三条安装路径共用：`install_packages` / `upgrade_packages` / `reinstall_packages`
+ * （reinstall 经 `install_packages` 走到）。校验点在每个包的 `task.run()`（写盘）**之前**。
+ *
+ * ⚠️⚠️ 这里**曾经**做的是"重解计划"：用归档里的真实 metadata 覆盖索引 → 清空
+ *      `plan`/`install_order` → `resolve_with_solver` → 调用方把批次游标复位到 0 重跑。
+ *      **2026-10-02 删除，且明确不准备再次加入。** 原因：
+ *   · 它是 **lpkg 手动解析依赖时代**的产物 —— 当时依赖是逐包现场递归解析的，索引里的
+ *     `deps` 不可信，只能"下到包、读到真 metadata、再解一遍"。
+ *   · 引入 **libsolv** 之后，计划是**一次性整体求解**出来的：安装顺序（拓扑排序）、
+ *     provides、ABI/needed_so 一致性、`--no-deps` / `--use-system-soname` /
+ *     `--missing-so-no-error` 的效果，全部固化在那一刻的 `plan` + `order` 里。批次跑到
+ *     一半再改计划，等于把**已经落地的包、已经写出的 WAL 行、已经生成的 hook 账目**留在
+ *     旧计划里，而后半段按新计划继续 —— 后果不可枚举：新计划里已装过的包会**重复安装 /
+ *     顺序倒置**，旧计划里已装的包可能在新计划里**消失**（所有权脱节），依赖者可能
+ *     **先于提供者**安装。
+ *   · 索引与归档不一致**本身就是"索引损坏 / 镜像被污染 / 上游改了包"的强信号**。正确处置
+ *     是 fail-closed：响亮地失败，让人重建索引或换镜像，而不是猜着继续装。
+ *   · **要重新引入之前先把上面三条想清楚 —— 结论是：不做。**
+ *
+ * 判据：**逐字段**比对归档 `metadata.json` 与索引（name / version / deps / provides /
+ * needed_so —— 见 `metadata_view()`），**任何一个字段不符就抛**，差异逐条点名
+ * （`字段: '索引值' → '归档值'`）。包文件完整性另由 `download_and_verify_package()`
+ * 按索引里的 SHA256 校验。
  */
-MetadataVerdict verify_package_metadata(InstallContext& ctx, InstallPlan& p)
+/**
+ * `metadata.json` / 索引**共有字段 → 规范化值**的视图 —— "逐字段比对"的唯一实现。
+ *
+ * 规范化（两边都做，所以"写法不同、语义相同"不会误报）：
+ *   · `deps`：先 `parse_dep_strings`，再重拼成 `名字 op 版本 ...`（索引侧本来就是解析过的）；
+ *   · 列表（deps/provides/needed_so）：**排序**后拼接 —— 顺序不是语义。
+ *
+ * ⚠️ 只列**索引也有**的字段：索引是唯一的对照物，`man` 之类不在索引里，无从校验。
+ * 要加字段就加在这里（两侧共用一份；别在比较处再写第二遍）。
+ */
+std::map<std::string, std::string> metadata_view(const std::string& name,
+                                                 const std::string& version,
+                                                 const std::vector<DependencyInfo>& deps,
+                                                 const std::vector<std::string>& provides,
+                                                 const std::vector<std::string>& needed_so)
 {
-    if (p.metadata_verified) return MetadataVerdict::Proceed;
+    const auto join = [](std::vector<std::string> v) {
+        std::ranges::sort(v);
+        std::string s;
+        for (const auto& x : v) {
+            if (!s.empty()) s += ", ";
+            s += x;
+        }
+        return s;
+    };
+    std::vector<std::string> dep_keys;
+    dep_keys.reserve(deps.size());
+    for (const auto& d : deps) {
+        std::string k = d.name;
+        for (const auto& c : d.constraints) k += " " + c.op + " " + c.version;
+        dep_keys.push_back(std::move(k));
+    }
+    return {
+        {"name", name},
+        {"version", version},
+        {"deps", join(std::move(dep_keys))},
+        {"provides", join(provides)},
+        {"needed_so", join(needed_so)},
+    };
+}
+
+void verify_package_metadata(InstallPlan& p)
+{
+    if (p.metadata_verified) return;
 
     InstallationTask check_task(p.name, p.actual_version, p.is_explicit,
                                 Cache::instance().get_installed_version(p.name), p.local_path,
@@ -992,49 +1358,39 @@ MetadataVerdict verify_package_metadata(InstallContext& ctx, InstallPlan& p)
     ensure_dir_exists(check_task.tmp_pkg_dir());
     check_task.download_and_verify_package();
 
-    json meta = detail::read_archive_metadata(check_task.archive_path());
-    std::vector<std::string> dep_strs =
-        meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
-    auto actual_deps = detail::parse_dep_strings(dep_strs);
-    std::vector<std::string> actual_provides =
-        meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
-    std::vector<std::string> actual_needed_so =
-        meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+    // **逐字段**比对归档 metadata.json 与索引（不是只比依赖面）：任何字段不符 → 拒绝安装。
+    const json meta = detail::read_archive_metadata(check_task.archive_path());
+    const auto from_archive =
+        metadata_view(meta.value(std::string(constants::J_NAME), std::string{}),
+                      meta.value(std::string(constants::J_VERSION), std::string{}),
+                      detail::parse_dep_strings(
+                          meta.value(std::string(constants::J_DEPS), std::vector<std::string>{})),
+                      meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{}),
+                      meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{}));
+    const auto from_index =
+        metadata_view(p.name, p.actual_version, p.dependencies, p.provides, p.needed_so);
 
-    bool metadata_differs = (actual_deps.size() != p.dependencies.size()) ||
-                            (actual_provides != p.provides) || (actual_needed_so != p.needed_so);
-    if (!metadata_differs) {
-        for (size_t di = 0; di < actual_deps.size(); ++di) {
-            if (actual_deps[di].name != p.dependencies[di].name ||
-                actual_deps[di].constraints != p.dependencies[di].constraints) {
-                metadata_differs = true;
-                break;
-            }
-        }
+    std::string diffs;
+    for (const auto& [field, actual] : from_archive) {
+        const auto it = from_index.find(field);
+        if (it == from_index.end() || it->second == actual)
+            continue;  // 索引没有这个字段 → 无从校验
+        diffs += string_format("error.metadata_mismatch_field", field, it->second, actual) + "\n";
     }
-
-    if (metadata_differs) {
-        log_info(string_format("info.resolving_metadata", p.name));
-        ctx.repo.update_package_info(p.name, p.actual_version, actual_deps, actual_provides,
-                                     actual_needed_so);
-        ctx.local_candidates[p.name] = check_task.archive_path();
-
-        ctx.plan.clear();
-        ctx.install_order.clear();
-        detail::resolve_with_solver(ctx);
-        return MetadataVerdict::ReSolved;
+    if (!diffs.empty()) {
+        throw LpkgException(string_format("error.metadata_mismatch", p.name, p.actual_version) +
+                            "\n" + diffs + get_string("error.metadata_mismatch_hint"));
     }
 
     p.local_path = check_task.archive_path();
     p.metadata_verified = true;
-    return MetadataVerdict::Proceed;
 }
 
 /**
  * 升级（或作为新依赖装入）**单个包**：跑完这个包的 task，并把它记进批次账。
  *
- * `old_ver` 为空 = 本包此前没装着（本次计划新拉入的依赖）—— 日志用
- * `info.installing_package`，且不计入 `upgraded` 计数。
+ * `old_ver` 为空 = 本包此前没装着（本次计划新拉入的依赖）—— **不打日志框**（包名与版本由
+ * copy 阶段的进度行 `==> Installing X <ver>` 点名），且不计入 `upgraded` 计数。
  */
 void upgrade_one_package(InstallContext& ctx, InstallPlan& p, const std::string& name,
                          const std::string& old_ver, std::vector<std::string>& success,
@@ -1044,11 +1400,8 @@ void upgrade_one_package(InstallContext& ctx, InstallPlan& p, const std::string&
     // 确定 hold 标志：保留当前 hold 状态，新增依赖不 hold
     const bool hold_pkg = cache.is_held(name);
 
-    if (!old_ver.empty()) {
-        log_info(string_format("info.upgrading_package", name, old_ver, p.actual_version));
-    } else {
-        log_info(string_format("info.installing_package", name, p.actual_version));
-    }
+    // 不在这里报"正在升级软件包 X 从 A 到 B"：包、旧版本、新版本都已由 copy 阶段的进度行
+    // `==> 正在升级 X A → B … 100%` 点名（copy_package_files 自己判动词）。
 
     InstallationTask task(p.name, p.actual_version, hold_pkg, old_ver, p.local_path, p.sha256,
                           p.force_reinstall);
@@ -1061,10 +1414,16 @@ void upgrade_one_package(InstallContext& ctx, InstallPlan& p, const std::string&
     // 这里让不变量落在**记账处**而不依赖各循环各自记得加 guard。
     if (task.did_process()) log.hook_sets.emplace_back(name, task.get_hook_files());
 
-    cache.write(name + ":installed");
+    // DB **不在这里落盘**：本批次结束时统一写一次（见 `upgrade_packages` 里的 `:batch-end`）。
+    // 理由与 install / remove 路径同 —— 逐包全量重写 6 个 DB 文件既不可观测也无必要。
     success.push_back(name);
     ctx.installed_set.insert(name);
-    if (!old_ver.empty()) ++log.upgraded;
+    if (old_ver.empty())
+        log.new_deps.emplace_back(name, p.actual_version);
+    else {
+        ++log.upgraded;
+        log.upgraded_pkgs.emplace_back(name, p.actual_version);
+    }
 }
 }  // namespace
 
@@ -1079,20 +1438,23 @@ void upgrade_packages()
     log_info(get_string("info.checking_upgradable"));
     TmpDirManager tmp;
     Repository repo;
-    try {
-        repo.load_index();
-    } catch (const std::exception& e) {
-        log_warning(string_format("warning.repo_index_load_failed", e.what()));
-        return;
-    }
+    if (!load_index_or_warn(repo)) return;  // 统一入口：失败已告警，这里按自身语义提前返回
 
     // 快照已安装包列表
     std::vector<std::pair<std::string, std::string>> installed;
     {
-        std::lock_guard lock(Cache::instance().get_mutex());
         for (const auto& [name, ver] : Cache::instance().get_all_installed()) {
             installed.emplace_back(name, ver);
         }
+    }
+
+    // ── 索引可用性守卫 ────────────────────────────────────────────────
+    // 索引为空 ⇒ 一个"可升级目标"都找不出来，而下面的早退会把这种情况报成
+    // "所有包都已是最新版本" + exit 0 —— 把"升不了"伪装成"不用升"（TODO D4）。有已装包
+    // 却读不到任何索引内容时**响亮失败**（2026-10-02 修）。已装包本身为空时不做判断
+    // （那种情况下"无事可做"是真的）。
+    if (repo.packages().empty() && !installed.empty()) {
+        throw LpkgException(string_format("error.repo_index_empty", repo.packages().size()));
     }
 
     // ── 阶段 1：找出可升级的包，构造升级目标列表 ──────────────────────
@@ -1125,58 +1487,56 @@ void upgrade_packages()
     // 冲突/ABI 一致性已由 libsolv solver 原生保证（取代旧的手动三校验）
 
     // ── 阶段 3：用户确认 ────────────────────────────────────────────
-    if (!user_confirms(build_upgrade_prompt(order, plan) + get_string("info.confirm_proceed"))) {
-        log_info(get_string("info.installation_aborted"));
-        return;
-    }
+    if (!user_confirms(build_upgrade_prompt(order, plan) + get_string("info.confirm_proceed")))
+        throw UserAbort(get_string("info.user_aborted"));  // 同上：取消 → 非零退出、无"完成"
 
     // ── 阶段 4：执行升级（WAL 2.0 批量事务） ────────────────────────
     // 处理顺序由 resolve_with_solver（libsolv transaction_order）产生的 order 决定
     // （依赖先处理），确保新依赖在依赖者之前安装
-    ctx.successfully_installed.clear();
+
     ctx.installed_set.clear();
 
-    // **整批文件冲突预检**：与 install_packages 同一道闸门（升级批次同样可能几百个包，
-    // "前面若干包已落地之后才发现后面某包的冲突"在这里同样成立）。见
-    // check_batch_file_conflicts 的实现说明。
-    check_batch_file_conflicts(plan, order);
+    // ====== 阶段①②：下载 → 解压（末尾跑整批文件冲突预检）======
+    download_batch(plan, order);
+    extract_batch(plan, order);
+
+    // ====== 升级 ======
+    ui::section(get_string("ui.section_upgrade"));
 
     std::vector<fs::path> upgrade_stashes;
     std::vector<std::pair<std::string, std::vector<std::string>>> upgrade_hook_sets;
     size_t upgraded_count = 0;
-    UpgradeBatchLog batch_log{upgrade_stashes, upgrade_hook_sets, upgraded_count};
+    std::vector<std::pair<std::string, std::string>> upgraded_pkgs;
+    std::vector<std::pair<std::string, std::string>> new_deps;
+    UpgradeBatchLog batch_log{upgrade_stashes, upgrade_hook_sets, upgraded_count, upgraded_pkgs,
+                              new_deps};
     run_batch_transaction([&](std::vector<std::string>& success) {
-        size_t i = 0;
-        while (i < order.size()) {
-            if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
-
-            const std::string& n = order[i];
-            ++i;
+        // 同 install_packages：计划在批次内不再变动（不一致一律硬报错），顺序走一遍即可。
+        for (const std::string& n : order) {
+            if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
 
             if (ctx.installed_set.contains(n)) continue;
 
             auto& p = plan.at(n);
             const std::string old_ver = Cache::instance().get_installed_version(n);
 
-            // 跳过已是最新版本的包（如依赖已满足的情况）
-            if (!p.force_reinstall && !old_ver.empty() && old_ver == p.actual_version) {
+            // 跳过已是最新版本的包（如依赖已满足的情况）——判据见 plan_member_skipped
+            if (plan_member_skipped(p, old_ver)) {
                 ctx.installed_set.insert(n);
-                continue;
-            }
-
-            // ── 元数据验证：下载后比对真实 metadata 和索引是否一致 ──
-            // 不一致 ⇒ 已用归档里的真实元数据重解了计划 ⇒ 游标复位重头再来
-            if (verify_package_metadata(ctx, p) == MetadataVerdict::ReSolved) {
-                i = 0;
                 continue;
             }
 
             upgrade_one_package(ctx, p, n, old_ver, success, batch_log);
         }
+
+        // 全批次就位后只落盘一次 DB —— 理由与位置要求见 `write_batch_db` 的说明。
+        write_batch_db(success);
     });
 
     // post-commit 收尾（与 install/remove 同一实现）
     finish_committed_batch(upgrade_stashes, {}, upgrade_hook_sets);
+    run_post_install_hooks(upgrade_hook_sets);
+    finish_post_commit_cleanup();
 
     // 与 install_packages 对称：升级同样会产生待执行触发器（copy_package_files 里
     // check_file() 照常累积），漏掉这一行会让 glib-compile-schemas /
@@ -1184,7 +1544,9 @@ void upgrade_packages()
     // （schema 不可见、unit 不生效、图标缓存陈旧，TODO.md F1）。
     TriggerManager::instance().run_all();
 
-    log_info(string_format("info.upgraded_packages", upgraded_count));
+    // 两行上限：真升级的 / 本次顺带新拉进来的依赖（`upgrade` 会拉依赖，别把它们算成"升级"）。
+    log_summary("info.upgrade_summary", upgraded_pkgs);
+    log_summary("info.install_summary", new_deps);
 }
 
 /**
@@ -1207,15 +1569,28 @@ void force_solve_conflict(bool purge_config)
     Repository repo;
     repo.load_index();
 
+    // 索引为空/不可用 ⇒ 每个 SONAME 都"无人提供"、每条约束都"无法满足"，会把**全部**
+    // 已装包判成 broken 并提议删光。这比"什么都不做"危险得多 —— 直接拒绝（2026-10-02 修）。
+    if (repo.packages().empty()) {
+        throw LpkgException(string_format("error.repo_index_empty", repo.packages().size()));
+    }
+
     std::set<std::string> broken;
     auto& cache = Cache::instance();
     {
-        std::lock_guard lock(cache.get_mutex());
+        // 值语义快照 —— 顺带解掉一个真实的坑：原先是"持锁遍历"，而这个循环体里要做
+        // `ifstream` 读 deps/needed_so 与 `repo.find_provider()`。也就是说**文件 I/O 与
+        // 求解器调用全程占着 Cache 的互斥锁**（本该是个瞬息即逝的临界区）。
         for (const auto& [pkg, ver] : cache.get_all_installed()) {
             // needed_so：当前仓库无人提供 → 打破
             const fs::path nso_file = Config::instance().needed_so_dir() / pkg;
-            if (fs::exists(nso_file)) {
+            if (exists_follow(nso_file)) {
                 std::ifstream f(nso_file);
+                // 这里必须 fail-closed（与其他几处同款守卫，但后果**最重**）：把读不到
+                // 当成"没有 SONAME 依赖"，等价于认定这个包**没被打破** —— force-solve 会
+                // 给出"无需清理"的错误答案且不报错。不静默、不当作空数据。
+                if (!f.is_open())
+                    throw LpkgException(string_format("error.open_file_failed", nso_file.string()));
                 std::string soname;
                 while (std::getline(f, soname)) {
                     if (soname.empty()) continue;
@@ -1224,12 +1599,19 @@ void force_solve_conflict(bool purge_config)
                         break;
                     }
                 }
+                // `bad()` 对"中途读失败"（目录/EIO）为真，对**提前 break** 与干净 eof 为假，
+                // 所以放在循环外不会误伤上面那条 break 的成功判定。
+                if (f.bad())
+                    throw LpkgException(string_format("error.read_file_failed", nso_file.string()));
             }
             if (broken.count(pkg)) continue;
             // deps：版本约束在仓库中无法满足 → 打破
             const fs::path dep_file = Config::instance().dep_dir() / pkg;
-            if (fs::exists(dep_file)) {
+            if (exists_follow(dep_file)) {
                 std::ifstream f(dep_file);
+                // 同 nso_file：读不到 = 漏判约束 → "无需清理"的错误答案。
+                if (!f.is_open())
+                    throw LpkgException(string_format("error.open_file_failed", dep_file.string()));
                 std::string line;
                 while (std::getline(f, line)) {
                     if (line.empty()) continue;
@@ -1241,6 +1623,8 @@ void force_solve_conflict(bool purge_config)
                         }
                     }
                 }
+                if (f.bad())
+                    throw LpkgException(string_format("error.read_file_failed", dep_file.string()));
             }
         }
     }
@@ -1263,8 +1647,8 @@ void force_solve_conflict(bool purge_config)
     std::cout << string_format("info.force_solve_confirm", PHRASE);
     std::cout.flush();
     std::string input;
-    std::getline(std::cin, input);
-    if (!input.empty() && input.back() == '\r') input.pop_back();
+    // 轮询读（不是裸 std::getline）：否则输入期间 Ctrl+C **无效** —— 只能 kill -9。
+    if (!read_line_interruptible(input)) throw UserAbort(get_string("info.sigint_aborted"));
     if (input != PHRASE) {
         throw LpkgException(get_string("error.force_solve_phrase_mismatch"));
     }
@@ -1279,7 +1663,9 @@ void force_solve_conflict(bool purge_config)
 void show_man_page(const std::string& pkg_name)
 {
     const fs::path p = Config::instance().docs_dir() / (pkg_name + ".man");
-    if (!fs::exists(p)) throw LpkgException(string_format("error.no_man_page", pkg_name));
+    // 不抛谓词：`docs_dir()/(包名+".man")` 是 DB 键派生的路径，环/不可达时 `fs::exists` 抛
+    // raw `filesystem_error`（用户看到的是未本地化的异常，而不是下面这条 `error.no_man_page`）。
+    if (!exists_follow(p)) throw LpkgException(string_format("error.no_man_page", pkg_name));
     std::ifstream f(p);
     if (!f.is_open()) throw LpkgException(string_format("error.open_man_page_failed", p.string()));
     std::cout << f.rdbuf();
@@ -1333,8 +1719,13 @@ void reinstall_package(const std::string& arg)
 void query_package(const std::string& pkg_name)
 {
     if (Cache::instance().get_installed_version(pkg_name).empty()) {
-        log_info(string_format("info.package_not_installed", pkg_name));
-        return;
+        // 此前复用 `info.package_not_installed`（remove 语境的文案 "…no need to remove"）且
+        // **静默返回退出码 0**：`lpkg query -p <未安装的包>` 会像"查询成功、只是没文件"一样
+        // 结束，脚本无法与正常结果区分。改为与同文件的 `show_man_page` 一致 —— 抛
+        // `LpkgException`，由 `run_cli` 的 catch 落成退出码 1（**不需要 main_cli 侧改动**：
+        // `run_query_command` 直接调用本函数、不吞异常）。query 语境用**自己的键**，
+        // 别让 remove 的 "no need to remove" 文案泄漏到查询。
+        throw LpkgException(string_format("error.query_package_not_installed", pkg_name));
     }
     log_info(string_format("info.package_files", pkg_name));
     auto files = Cache::instance().get_package_files(pkg_name);
@@ -1364,8 +1755,8 @@ void query_file(const std::string& filename)
                 if (in_root) {
                     // `lexically_relative`（2026-09-26 修）：`fs::relative` 会解析符号链接，
                     // 而这个键要用来查 DB 归属 —— 解析过的键与登记的键对不上就是"无主"的假答案
-                    // （`scan/scanner.cpp:93` 同一处修法与理由）。上面那条 `path_within` 也是
-                    // 词法判据，两处口径因此一致。
+                    // （`scan/scanner.cpp` 的 `scan_orphans` 里是同一处修法与理由）。上面那条
+                    // `path_within` 也是词法判据，两处口径因此一致。
                     const std::string logical =
                         "/" + abs_p.lexically_relative(Config::instance().root_dir()).string();
                     owners = cache.get_file_owners(logical);
@@ -1465,11 +1856,11 @@ std::unordered_set<std::string> collect_recursive_remove_set(const std::string& 
  * 所以"return"的影响范围也只到该参数自己）——闭包里出现的 essential 包一律进
  * essential_pkgs 并从移除集合里剔除（info.recursive_protected_header 告警）。
  */
-void remove_packages_recursive(const std::vector<std::string>& pkg_names, bool force,
-                               bool purge_config)
+size_t remove_packages_recursive(const std::vector<std::string>& pkg_names, bool force,
+                                 bool purge_config)
 {
-    if (pkg_names.empty()) return;
-    if (sigint_graceful.load()) throw LpkgException(get_string("info.sigint_aborted"));
+    if (pkg_names.empty()) return 0;
+    if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
     Cache::instance().load();
 
     // 各参数的受影响闭包**并集**（顺序无关，下面统一排序）
@@ -1483,8 +1874,9 @@ void remove_packages_recursive(const std::vector<std::string>& pkg_names, bool f
             continue;
         }
 
+        // `collect_recursive_remove_set` 恒把 seed（pkg_name）放进结果 ⇒ 不可能为空；
+        // 原先的 `if (affected.empty()) continue;` 是死代码。
         auto affected = collect_recursive_remove_set(pkg_name);
-        if (affected.empty()) continue;
 
         if (!force && Cache::instance().is_essential(pkg_name)) {
             log_error(string_format("error.skip_remove_essential", pkg_name));
@@ -1509,7 +1901,7 @@ void remove_packages_recursive(const std::vector<std::string>& pkg_names, bool f
 
     if (to_remove.empty()) {
         log_info(get_string("info.recursive_nothing_to_remove"));
-        return;
+        return 0;  // 与 remove_packages 同一约定：调用方据此不打"卸载完成"
     }
 
     if (!essential_pkgs.empty()) {
@@ -1529,23 +1921,28 @@ void remove_packages_recursive(const std::vector<std::string>& pkg_names, bool f
 
     // 3 轮验证码确认
     bool confirmed = true;
-    if (Config::instance().non_interactive_mode() == NonInteractiveMode::INTERACTIVE) {
+    const NonInteractiveMode ni_mode = Config::instance().non_interactive_mode();
+    if (ni_mode == NonInteractiveMode::INTERACTIVE) {
         for (int i = 0; i < 3; ++i) {
             std::string code = generate_code();
             log_info(string_format("info.recursive_confirm_prompt", std::to_string(i + 1), code));
             std::string input;
-            std::cin >> input;
-            if (input != code) {
+            // 轮询读（不是裸 std::cin >>）：否则输入期间 Ctrl+C **无效** —— 只能 kill -9。
+            // `trim_copy` 保持旧 `>>` 的"跳过首尾空白"语义。
+            if (!read_line_interruptible(input)) throw UserAbort(get_string("info.sigint_aborted"));
+            if (trim_copy(input) != code) {
                 log_info(get_string("info.recursive_confirm_failed"));
                 confirmed = false;
                 break;
             }
         }
+    } else if (ni_mode == NonInteractiveMode::NO) {
+        // `--no` = "对所有提问自动答否"。递归删除是破坏性操作：非交互下**不能**跳过确认
+        // 径直执行（此前 `confirmed` 初值即 true、只在 INTERACTIVE 分支里被改写 ⇒ `--no`
+        // 与 `-y` 一样放行）。`--yes`（YES）仍按"自动答是"放行。
+        confirmed = false;
     }
-    if (!confirmed) {
-        log_info(get_string("info.installation_aborted"));
-        return;
-    }
+    if (!confirmed) throw UserAbort(get_string("info.user_aborted"));  // 验证码错 / --no = 取消
 
     // 整批原子移除（与 remove_packages_checked 共用同一实现：闭包内所有包一个批次），
     // stash 活到批次提交之后才清（install/upgrade 同款）。
@@ -1555,11 +1952,17 @@ void remove_packages_recursive(const std::vector<std::string>& pkg_names, bool f
     std::vector<fs::path> stashes;
     remove_packages_in_one_batch(to_remove, /*force=*/true, purge_config, stashes);
     finish_committed_batch(stashes, to_remove);
+    finish_post_commit_cleanup();
 
     // 同 remove_packages_checked：提交后 flush 触发器（否则被删库的 SONAME 链接悬空）
     TriggerManager::instance().run_all();
 
+    std::vector<std::pair<std::string, std::string>> removed;
+    removed.reserve(to_remove.size());
+    for (const auto& p : to_remove) removed.emplace_back(p, std::string{});
+    log_summary("info.remove_summary", removed);
     log_info(get_string("info.recursive_remove_done"));
+    return to_remove.size();
 }
 
 /** 单包递归移除：与多参数版**同一实现、同一批次语义**（见上）。 */

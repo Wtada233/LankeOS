@@ -93,7 +93,7 @@ protected:
 
         const fs::path pkg_file = pkg_dir / (name + "-" + ver + ".lpkg");
         pack_package(pkg_file.string(), work.string(), name, ver, /*deps=*/{}, /*provides=*/{},
-                     /*man=*/"Man page for " + name, /*needed_so=*/{});
+                     /*man_content=*/"Man page for " + name, /*needed_so=*/{});
         return pkg_file.string();
     }
 

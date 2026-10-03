@@ -125,7 +125,8 @@ protected:
         init_localization();
         BreakpointManager::instance().clear_all();
 
-        suite_work_dir = fs::absolute("tmp_upgrade_rollback_fidelity");
+        suite_work_dir =
+            fs::absolute("tmp_upgrade_rollback_fidelity_" + std::to_string(::getpid()));
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
@@ -691,9 +692,12 @@ TEST_F(UpgradeRollbackFidelityTest, ThreePackageUpgradeFailureRollsBackFilesAndO
             mid["shared_owners"] = owners;
         }
         mid["v1_only_gone"] = fs::exists(test_root / "usr/share/alpha-v1-only.txt") ? "no" : "yes";
-        // 落盘 DB（pkgs 里程碑 + files.db 归属）此刻也必须已经变了
-        mid["pkgs"] = read_text(Config::instance().pkgs_file());
-        mid["files_db"] = read_text(Config::instance().files_db());
+        // 中途取证改从**内存 Cache** 取：2026-10-03 起 DB 只在**批次末尾**落盘一次
+        // （见 `write_batch_db`），所以此刻盘上的 DB **故意**还是批次前的内容 ——
+        // 拿它当"中途确实变了"的证据必然不成立。真正的状态在内存里（批次内的判定一律走它）。
+        mid["pkgs_inmem"] = Cache::instance().get_installed_version("beta");
+        mid["files_db_inmem"] =
+            Cache::instance().get_file_owners("/usr/share/shared.txt").empty() ? "no" : "yes";
         // 失败点用**断点注入**（确定性）：断点取在 gamma 的 WAL BEGIN 之后，此刻 alpha/beta
         // 已完全落地（含跨包所有权接管），正是回滚最容易漏掉的那部分状态。冲突本身由 ① 与
         // DirEntryOverSymlinkTest.FileEntryOverRealDirIsRefused 覆盖（含 force 不放行）。
@@ -713,14 +717,22 @@ TEST_F(UpgradeRollbackFidelityTest, ThreePackageUpgradeFailureRollsBackFilesAndO
     EXPECT_EQ(mid["shared"], "shared from beta v2\n") << "后装的 beta 没有覆盖 alpha 的文件";
     EXPECT_EQ(mid["shared_owners"], "beta,") << "跨包同路径的所有权接管没有发生";
     EXPECT_EQ(mid["v1_only_gone"], "yes") << "alpha 的废弃文件没有被移除（REMOVE_OLD 没走）";
-    EXPECT_NE(mid["pkgs"].find("beta:2.0"), std::string::npos);
-    EXPECT_NE(mid["files_db"].find("/usr/share/shared.txt"), std::string::npos)
-        << "files.db 里没有 shared.txt 的归属记录（DB 相等断言就没有证明力）";
+    EXPECT_EQ(mid["pkgs_inmem"], V2)
+        << "内存里 beta 应已升到 v2（取证有效性：没有它，下面的回滚断言就是恒真废话）";
+    EXPECT_EQ(mid["files_db_inmem"], "yes")
+        << "内存 files.db 里没有 shared.txt 的归属记录（同上的取证有效性）";
 
     // (b) 文件系统保真
     expect_same_snapshot(fs_before, fs_state(), "文件系统 manifest");
     // (c) DB 保真（含 files.db 的所有权：接管只改了 Cache 内存，回滚必须连内存一起回到旧值）
     expect_same_snapshot(db_before, db_state(), "DB 文件");
+    // 字节相同之外还要有**语义**：失败批次里的升级一点都没生效。
+    // （2026-10-03 起 DB 只在批次末尾写一次，所以一个**失败**批次根本不会去动盘上的 DB ——
+    //   "回滚后逐字节等于批次前"于是是**构造上**成立的。真正会暴露问题的是：那次提交前的
+    //   落盘有没有漏进已提交状态。下面两条直接查内存的最终值，不依赖"字节没变"。）
+    for (const auto& n : {"alpha", "beta"})
+        EXPECT_EQ(Cache::instance().get_installed_version(n), V1)
+            << n << " 在失败批次后必须仍是 v1（升级不得部分生效）";
     EXPECT_EQ(count_residue(), 0) << "回滚后仍有 .lpkg_bak_* / .lpkgtmp 残留";
     EXPECT_EQ(count_db_backups(), 0);
     expect_no_open_batch();

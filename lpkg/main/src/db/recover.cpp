@@ -38,6 +38,10 @@ std::set<fs::path> referenced_stash_roots()
     if (!file.is_open()) return roots;
     std::string line;
     while (std::getline(file, line)) {
+        // 与 read_wal_lines 同一口径剥 `\r`（这里是手写读取，此前漏了）：CRLF 的 WAL 会让
+        // op.arg2/arg1 尾上粘一个 `\r`，算出来的 stash 根带 `\r` ⇒ 用这个集合做 confinement
+        // 白名单 / cleanup_orphan_stashes 的 keep 集时会漏保护真正的 stash 根。
+        if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty()) continue;
         auto op = parse_op(line);
         if (!op.is_valid()) continue;
@@ -47,9 +51,11 @@ std::set<fs::path> referenced_stash_roots()
         // 原位、arg2 是 stash 侧）。实践上它总与配对的 BACKUP 同根、已被上面那行收集，
         // 所以这里是**冗余**的；但"WAL 仍引用哪些 stash 根"这个集合的定义应该是"凡是 WAL 里
         // 出现过的 stash 侧路径"，不该依赖"总有配对的 BACKUP"这条论证 —— 机制 > 论证。
-        else if (op.type == WALOpType::UNSTASH && !op.arg1.empty())
-            roots.insert(stash_root_of_bak(op.arg1).lexically_normal());
-        else if (op.type == WALOpType::CLEANUP && !op.arg1.empty())
+        // `UNSTASH` 与 `CLEANUP` 的 stash 侧**都是 arg1**，动作也逐字相同 ⇒ 合成一支。
+        // （不是"长得像就合并"：两支的判据与动作完全一致，分开写只会让 clang-tidy 报
+        //   branch-clone。合并后与上面那段"凡是 WAL 里出现过的 stash 侧路径"的定义一致。）
+        else if (!op.arg1.empty() &&
+                 (op.type == WALOpType::UNSTASH || op.type == WALOpType::CLEANUP))
             roots.insert(stash_root_of_bak(op.arg1).lexically_normal());
     }
     return roots;
@@ -81,8 +87,10 @@ static std::optional<std::vector<std::string>> read_wal_lines(const std::string&
     std::vector<std::string> lines;
     std::string line;
     while (std::getline(file, line)) {
+        // 先剥 `\r` 再判空：反过来的话，一行只有 "\r" 会被"非空"放行、剥完变成空串推进去
+        // （下游按 INVALID 丢弃，`rewrite_wal_tail` 还会把空行写回去）。
+        if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty()) continue;
-        if (line.back() == '\r') line.pop_back();
         lines.push_back(line);
     }
     return lines;
@@ -174,6 +182,7 @@ static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
 
     // 3. 归一为 stash 根再整目录 remove_all（文件备份在 stash 内；CLEANUP 行即 stash 根）
     std::vector<fs::path> roots;
+    roots.reserve(baks.size());
     for (auto& bak : baks) {
         roots.push_back(wal::stash_root_of_bak(bak));
     }
@@ -183,6 +192,23 @@ static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
 
     // 4. 删除仍存在的 stash 根（幂等：已删的跳过）
     for (const auto& root : roots) {
+        // **只删真正的 stash 根**（名字以 `.lpkg_bak_` 开头）—— 纵深防御。
+        //
+        // 合法行（BACKUP/REMOVE_OLD 的 stash 侧、CLEANUP 行）引用的**永远**是 lpkg 自己造的
+        // `<某层>/.lpkg_bak_<pkg>_<pid>` 目录（`install_common.cpp`）—— `stash_root_of_bak`
+        // 也正是靠"父目录名以 `.lpkg_bak_` 开头"判它是不是 stash 根。而被篡改/损坏的 WAL 里
+        // 一条 `CLEANUP /etc` 会让它**原样返回**那个路径（父目录名不匹配），于是这里就
+        // `remove_all("/etc")` —— 这条清理路径**不经过** `reverse_execute` 的 confinement，
+        // 它是另一个 WAL 消费者（2026-10-03 修，见 test_wal_confinement.cpp 的
+        // PostCommitCleanupDoesNotRemoveNonStashTargets）。
+        //
+        // 判据用**名字**而不是"落在 root 内"：生产形态 `root=="/"` 下包含判定**恒真**、拦不住
+        // 任何东西（那正是最该防的形态），而名字判据与 root 无关。名字不匹配 → 跳过并告警，
+        // **绝不抛**（恢复路径上的判定不能有能力打断事务）。
+        if (root.filename().string().rfind(constants::SUFFIX_LPKG_BAK, 0) != 0) {
+            log_warning(string_format("warning.cleanup_skipped_not_stash", root.string()));
+            continue;
+        }
         // lstat 语义：**任何**占着这个名字的东西（含悬空/自环符号链接）都要 remove_all ——
         // 原来写成 `fs::exists || fs::is_symlink`，那在符号链接环上会抛 filesystem_error
         // （见 base/utils.hpp 的谓词说明），把 post-commit 清理打断。
@@ -228,11 +254,21 @@ static bool rollback_uncommitted_region(const std::vector<std::string>& lines, s
     if (ops.empty()) return false;
 
     const std::string first_pkg = first_package_of(ops);
+    wal::RollbackStats stats;
     try {
-        wal::reverse_execute(ops, true);
+        stats = wal::reverse_execute(ops, true);
     } catch (const std::exception& e) {
-        log_warning(string_format("warning.rollback_remove_failed", first_pkg, e.what()) +
-                    " [rec: 该批次保持未提交，可重试]");
+        log_warning(string_format("warning.rollback_remove_failed", first_pkg, e.what()) + " " +
+                    get_string("warning.rec_kept_uncommitted"));
+        return true;
+    }
+
+    if (stats.failures > 0) {
+        // 逆向执行跑完了，但**有若干行的撤销动作真的没成功** ⇒ **绝不 seal**
+        // （不 `purge_consumed_stashes`、不 `commit_batch`）：让这一段保持"未提交"，
+        // 下次 `lpkg rec` 会**幂等重做**，那些没撤掉的还有机会。
+        // 这与上面 catch 分支的处置同源 —— 那里也是 `return true`（保持未提交）。
+        // 告警已由 `reverse_execute` 统一发出。
         return true;
     }
     wal::purge_consumed_stashes(ops);  // stash 里的文件已还原 → 清空 stash 根
@@ -331,10 +367,14 @@ static void rewrite_wal_tail(const std::string& wpath, const std::vector<std::st
     }
     {
         int fd = ::open(tmp_path.c_str(), O_WRONLY);
-        if (fd >= 0) {
-            ::fsync(fd);
+        // 打开失败或 fsync 失败都必须中止：否则 safe_rename 会把这个**没落盘**的截断 WAL
+        // 当成新 WAL 覆盖上去 —— 被 trim 掉的行就此静默消失（原来两处都忽略返回值）。
+        if (fd < 0) throw LpkgException(string_format("error.open_file_failed", tmp_path));
+        if (::fsync(fd) != 0) {
             ::close(fd);
+            throw LpkgException(string_format("error.wal_fsync_failed", tmp_path));
         }
+        ::close(fd);
     }
 
     safe_rename(tmp_path, wpath);
@@ -348,9 +388,10 @@ void trim_completed()
 
     const std::vector<std::string>& lines = *maybe_lines;
     if (lines.empty()) {
-        // 空文件 → 删除
+        // 空文件 → 删除（删不掉就留待下次，但**要出声**，别静默）
         std::error_code ec;
         fs::remove(wpath, ec);
+        if (ec) log_warning(string_format("warning.cleanup_failed", wpath));
         return;
     }
 
@@ -363,8 +404,13 @@ void trim_completed()
         // 所有事务都已提交 —— 但**不无条件清空**：先确认 post-commit 清理没有留下未删的 bak。
         if (post_commit_cleanup_pending(lines))
             return;  // 清理未完成 → 保留整个文件，等 recover 续传
-        // 清理完成 → 清空整个日志文件（全是完成事务/历史清理记录）
-        std::ofstream(wpath, std::ios::trunc).close();
+        // 清理完成 → 清空整个日志文件（全是完成事务/历史清理记录）。
+        // 必须检查流状态：ENOSPC/EIO 时 WAL **实际没被清空**，原先丢弃结果会把这种失败
+        // 当成功 —— 完成批次的记录一直留着（非致命，但 trim 会每次都白跑一遍）。失败按
+        // 上方空文件分支的 fs::remove 失败同样方式告警，不静默。
+        std::ofstream ofs(wpath, std::ios::trunc);
+        ofs.close();
+        if (!ofs) log_warning(string_format("warning.cleanup_failed", wpath));
         return;
     }
 
@@ -414,8 +460,12 @@ namespace
 bool wal_has_unpaired_batch()
 {
     const std::string path = wal::wal_log_path();
-    std::error_code ec;
-    const bool exists = fs::exists(path, ec);
+    // ⚠️ 必须用 **lstat 语义**（`exists_no_follow`）：`fs::exists` 是**跟随**的，而它在
+    // stat 失败（ELOOP 自环、EACCES……）时**返回 false** —— 于是"存在却打不开"这种情形
+    // 恰好落到了注释所说的**反面**：判成"没有未配对批次"，`cleanup_db_backups()` 随即把
+    // `.lpkg_db_bak_before:*` 这些**唯一还原点**删掉。这个守卫的全部意义就是"拿不准时偏
+    // 保守"，`exists_no_follow` 才是它想要的判据（名字被占就算存在，含悬空链接与环）。
+    const bool exists = exists_no_follow(path);
     const auto lines = read_wal_lines(path);
     // lines == nullopt 把两种情形合在了一起（不存在 / 打不开），用 exists 拆开：
     // 不存在 → "没有"（正常路径：trim 之后）；存在却打不开 → 保守判"有"。
@@ -430,30 +480,43 @@ void cleanup_db_backups()
     //
     // 守卫放在本函数而不是各调用点，是因为调用点有三个而此前只有一个带守卫：
     //   ① recover_packages() 自己判 any_batch_failed 后跳过 —— 唯一正确的那处；
-    //   ② main.cpp 的 `lpkg rec` 分支：recover_packages() 之后**无条件**再调一次，
+    //   ② `lpkg rec` 分支（`main_cli.cpp` 的 `run_rec_command()`）：recover_packages()
+    //      之后**无条件**再调一次，
     //      于是"恢复失败"时刚被特意保留的还原点立刻被删光，CLI 还照打"恢复完成"；
     //   ③ finish_committed_batch()：任何一次成功提交都会把**上一个未配对批次**的重试
     //      依据一并扫掉（trim_completed 只删已配对块，未配对区域仍在，但备份没了）。
     // 后果是"文件被逆向还原了、DB 却停在已安装"的不可恢复状态。
     if (wal_has_unpaired_batch()) return;
 
-    std::error_code ec;
     // 递归扫描 DBRM 创建的备份。除 state_dir（deps/、needed_so/ 等子目录）外，
     // man 备份由 write_string_file_wal 写在 docs/ 目录（state_dir 之外），
     // 漏扫会导致每次安装/升级都残留 *.man.lpkg_db_bak_before:* 文件。
+    //
+    // ⚠️ 三个坑（2026-10-02 一起修）：
+    //   · **单个删除失败不能中断整轮**：此前删除与迭代器共用同一个 `ec`，一个删不掉的
+    //     备份（EACCES/EROFS/immutable）会让下一轮 `if (ec) break` 直接跳出，该 base 下
+    //     **其余备份全被跳过**。
+    //   · **自增不能用抛型重载**：`range-for` 的 `operator++` 会抛，而本函数在
+    //     `finish_committed_batch()`（批次**已提交之后**）被调用、那里没有 try/catch ——
+    //     一次遍历错误就把"装好了"报成"命令失败"。改用显式 `increment(ec)`。
+    //   · 删除失败的备份**保留**（下次再试），只记一条警告。
     for (const fs::path& base : {Config::instance().state_dir(), Config::instance().docs_dir()}) {
         // 判定不抛（ELOOP 会让 fs::exists 抛，见 base/utils.hpp 的谓词说明）；仍用**跟随**
         // 语义（原来是 exists + is_directory），状态目录可以是符号链接。
         if (!is_directory_follow(base)) continue;
 
-        for (const auto& entry : fs::recursive_directory_iterator(base, ec)) {
-            if (ec) break;
-
-            const std::string fname = entry.path().filename().string();
-            if (fname.find(".lpkg_db_bak_before:") != std::string::npos) {
-                fs::remove(entry.path(), ec);
+        std::error_code walk_ec;
+        for (auto it = fs::recursive_directory_iterator(base, walk_ec);
+             it != fs::recursive_directory_iterator(); it.increment(walk_ec)) {
+            if (walk_ec) {  // 遍历错误（权限/竞态）→ 该 base 到此为止，其余 base 继续
+                walk_ec.clear();
+                break;
             }
+            const std::string fname = it->path().filename().string();
+            if (fname.find(".lpkg_db_bak_before:") == std::string::npos) continue;
+            std::error_code rm_ec;
+            fs::remove(it->path(), rm_ec);
+            if (rm_ec) log_warning(string_format("warning.cleanup_failed", it->path().string()));
         }
-        ec.clear();
     }
 }

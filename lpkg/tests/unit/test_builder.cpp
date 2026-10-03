@@ -207,3 +207,25 @@ TEST_F(BuilderTest, ProcessedScriptIsRemovedAfterBuild)
     EXPECT_FALSE(fs::exists(test_dir / constants::LANK_BUILD_PROCESSED))
         << "替换后的构建脚本残留在构建目录里";
 }
+
+TEST_F(BuilderTest, MissingNameFieldErrorNamesTheJsonPath)
+{
+    // LankeBUILD.json 缺 name/version 或字段类型不对时，nlohmann 抛的是 `json::exception`
+    // （**不是** LpkgException）。此前那几个 `meta.at(...)` 在 try 之外，异常会一路穿到 main 的
+    // 兜底 catch，报错里也**不点名是哪个 LankeBUILD.json**（2026-10-02 修）。
+    {
+        std::ofstream json(test_dir / "LankeBUILD.json");
+        json << R"({"version": "1.0.0"})";  // 故意缺 name
+    }
+
+    try {
+        run_build(test_dir);
+        FAIL() << "缺 name 的 LankeBUILD.json 必须报错";
+    } catch (const LpkgException& e) {
+        const std::string msg = e.what();
+        EXPECT_NE(msg.find("LankeBUILD.json"), std::string::npos)
+            << "报错必须点名 LankeBUILD.json：" << msg;
+        EXPECT_NE(msg.find(test_dir.string()), std::string::npos)
+            << "报错必须点名是哪个文件：" << msg;
+    }
+}

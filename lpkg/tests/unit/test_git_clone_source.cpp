@@ -135,7 +135,7 @@ protected:
         must_run(git("commit -q -m c3"));
         must_run(git("checkout -q main"));
 
-        // 名字里带 '/' 的分支：用来钉住 parse_git_url 的已知限制（见下方用例）
+        // 名字里带 '/' 的分支：钉住 parse_git_url 对含 '/' 的 ref 的解析（见下方用例）
         must_run(git("branch topic/slash v1.0"));
     }
 };
@@ -270,20 +270,18 @@ TEST_F(GitCloneSourceTest, RelativeParentRefIsRejectedBeforeAnyClone)
     EXPECT_TRUE(fs::exists(work_root)) << "work_root 被删掉了";
 }
 
-TEST_F(GitCloneSourceTest, BranchNameWithSlashIsNotSupported)
+TEST_F(GitCloneSourceTest, BranchNameWithSlashIsParsedAndCheckedOut)
 {
-    // 名字带 '/' 的分支（`topic/slash`）今天**取不到**：parse_git_url 把 `@topic/slash`
-    // 整段留在 URL 上 → 克隆的是一个不存在的 URL → 以 error.git_clone_failed 失败。
-    // 报错里点名的是那个被拼坏的 URL（含 "topic/slash"），用户能据此定位。
-    // ⚠️ 现状即为如此，本轮（纯搬移）不改；修法见 parse_git_url 处的 ⚠️ 说明。
-    try {
-        clone_git_source("git+" + url_base + "@topic/slash", work_root);
-        FAIL() << "`@topic/slash` 被当成 ref 解析了（限制已消失？请更新本用例与注释）";
-    } catch (const LpkgException& e) {
-        const std::string msg = e.what();
-        EXPECT_NE(msg.find("topic/slash"), std::string::npos)
-            << "报错没有带上被拼坏的 URL，用户无法定位: " << msg;
-    }
+    // 名字带 '/' 的分支（fixture 里的 `topic/slash`，从 v1.0 拉出）现在能被正确解析：
+    // parse_git_url 以 `://` 之后第一个 '/'（权威段结束处）为界 —— `@topic/slash` 那个 '@'
+    // 在分界**之后** ⇒ 判为 ref。旧判据"最后一个 '/' 之后"会把整串 `topic/slash` 吞进 URL、
+    // ref 回落 HEAD、静默克隆默认分支（`BranchNameWithSlashIsNotSupported` 曾把该错行为钉住）。
+    clone_git_source("git+" + url_base + "@topic/slash", work_root);
+
+    ASSERT_TRUE(fs::is_directory(dest())) << "克隆目标目录不存在: " << dest();
+    // topic/slash 指向 v1.0(c1)：file.txt == "main\n"，且没有 feature 分支才有的文件
+    EXPECT_EQ(read_file(dest() / "file.txt"), "main\n");
+    EXPECT_FALSE(fs::exists(dest() / "feature.txt")) << "取到的不是 topic/slash 那个 commit";
 }
 
 TEST_F(GitCloneSourceTest, FailedCloneLeavesPartialRepoBehind)
@@ -296,7 +294,7 @@ TEST_F(GitCloneSourceTest, FailedCloneLeavesPartialRepoBehind)
     try {
         clone_git_source("git+file://" + (root / "no-such-repo").string() + "@v1.0", work_root);
         FAIL() << "克隆一个不存在的仓库竟然成功了";
-    } catch (const LpkgException&) {
+    } catch (const LpkgException&) {  // NOLINT(bugprone-empty-catch) — 这正是本用例要断言的那条路
         // 预期路径
     }
 
@@ -317,7 +315,7 @@ TEST(GitUrlParsingTest, DetectsGitScheme)
     EXPECT_FALSE(is_git_url(""));
 }
 
-TEST(GitUrlParsingTest, SplitsRefAfterLastSlash)
+TEST(GitUrlParsingTest, SplitsRefAtSchemeAuthorityBoundary)
 {
     std::string url, ref;
 
@@ -339,12 +337,23 @@ TEST(GitUrlParsingTest, SplitsRefAfterLastSlash)
     EXPECT_EQ(url, "ssh://git@host/repo.git");
     EXPECT_EQ(ref, "main");
 
-    // ⚠️ **已知限制（实测 2026-09-26，非本轮引入）**：ref 里**不能有 '/'**。分隔规则是
-    // "取最后一个 '/' 之后的 '@'"，所以 `@feature/x` 里那个 '@' 在最后一个 '/' 之前
-    // → 整串被当成"无 ref"，`/x` 留在 URL 上、ref 回落 HEAD。后果是**静默克隆默认分支**
-    // （不是报错）—— `git+<url>@feature/x` 这种写法今天拿不到分支 x。
-    // 本轮只搬移不改语义，故按现状钉住；要支持得改成"先在 refs/heads / refs/tags 里探测"。
+    // ref 里**可以带 '/'**：分隔规则以 `://` 之后的第一个 '/'（权威段结束处）为界 ——
+    // 凭据的 '@' 必在它之前（userinfo 段），ref 里的 '/' 必在它之后。于是
+    // `repo.git@feature/x` 正确解析为 url=repo.git、ref=feature/x。
+    // ⚠️ 订正（2026-10-03）：旧判据"最后一个 '/' 之后"会把 `@feature/x` 判成"无 ref"
+    // （那个 '@' 在最后一个 '/' 之前）→ 整串落在 URL 上、ref 回落 HEAD、**静默克隆默认分支**。
     parse_git_url("git+https://host/repo.git@feature/x", url, ref);
-    EXPECT_EQ(url, "https://host/repo.git@feature/x");
+    EXPECT_EQ(url, "https://host/repo.git");
+    EXPECT_EQ(ref, "feature/x");
+
+    // 无 `://` 的 scp 风格回落原启发式（最后一个 '/' 之后）。
+    // 有 ref：`host:user/repo.git@v1.0` 的 `git@` 没有 `://`，用 '/' 分界判位。
+    parse_git_url("git+git@host:user/repo.git@v1.0", url, ref);
+    EXPECT_EQ(url, "git@host:user/repo.git");
+    EXPECT_EQ(ref, "v1.0");
+
+    // 无 ref：`git@host` 的 '@' 在最后一个 '/' 之前，不是分隔符。
+    parse_git_url("git+git@host:user/repo.git", url, ref);
+    EXPECT_EQ(url, "git@host:user/repo.git");
     EXPECT_EQ(ref, "HEAD");
 }

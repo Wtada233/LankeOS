@@ -14,11 +14,14 @@
  */
 
 #include <gtest/gtest.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <set>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -37,6 +40,23 @@
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
+
+namespace
+{
+/** 取 l10n 模板里最长的一段**字面**文本（`{}` 之间）—— 用作与语言无关的断言锚。 */
+std::string longest_template_literal(const std::string& tmpl)
+{
+    std::string needle;
+    for (size_t b = 0; b <= tmpl.size();) {
+        const size_t e = tmpl.find("{}", b);
+        const size_t end = (e == std::string::npos) ? tmpl.size() : e;
+        if (end - b > needle.size()) needle = tmpl.substr(b, end - b);
+        if (e == std::string::npos) break;
+        b = e + 2;
+    }
+    return needle;
+}
+}  // namespace
 
 // =========================================================================
 // Fixture: set up isolated test root with Config + Cache ready
@@ -58,7 +78,7 @@ protected:
         Config::instance().set_no_deps_mode(false);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_removal_symlink_test");
+        suite_work_dir = fs::absolute("tmp_removal_symlink_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
@@ -357,6 +377,14 @@ TEST_F(RemovalSymlinkTest, ForceRemoveBypassesSharedDirSymlinks)
     Cache::instance().add_installed("pkgB", "2.0", true);
 
     EXPECT_NO_THROW(remove_package("pkgA", true));
+
+    // 名字承诺"真移除" —— 只断言"没抛"是空转（包没被移除也不会抛）。断言结果真的变了：
+    EXPECT_FALSE(is_registered("pkgA")) << "pkgA 应已被移除";
+    EXPECT_FALSE(Cache::instance().is_file_owned_by("/usr/bin/pA", "pkgA"))
+        << "pkgA 的文件所有权应已撤销";
+    // 另一个包不受影响（单所有权：只删目标包）
+    EXPECT_TRUE(is_registered("pkgB"));
+    EXPECT_TRUE(Cache::instance().is_file_owned_by("/usr/bin/pB", "pkgB"));
 }
 
 // =========================================================================
@@ -375,14 +403,19 @@ TEST_F(RemovalSymlinkTest, RemovePackageWithNoSharedFiles)
     EXPECT_FALSE(file_installed("usr/bin/alone-pkg"));
 }
 
-TEST_F(RemovalSymlinkTest, RemoveBlockedOnSharedRegularFile)
+TEST_F(RemovalSymlinkTest, RemoveSucceedsWhenNoReverseDeps)
 {
-    // 单所有权：没有共享文件，remove 只检查逆向依赖
+    // 单所有权：没有共享文件，remove 只检查逆向依赖。
+    // 订正 2026-10-03：本用例原名 `RemoveBlockedOnSharedRegularFile`，但正文（与语义）都是
+    // "无逆向依赖 → 移除**成功**"—— 名字与断言相反。按代码行为改名，而不是改代码去迁就名字。
     Cache::instance().add_file_owner("/usr/bin/a-only", "pkgA");
     Cache::instance().add_installed("pkgA", "1.0", true);
 
     // pkgA 没有依赖者，正常移除应成功
     EXPECT_NO_THROW(remove_package("pkgA", false));
+    EXPECT_FALSE(is_registered("pkgA")) << "无逆向依赖时移除应真正生效";
+    EXPECT_FALSE(Cache::instance().is_file_owned_by("/usr/bin/a-only", "pkgA"))
+        << "移除后文件所有权应被撤销";
 }
 
 TEST_F(RemovalSymlinkTest, ForceRemoveBypassesSharedFileCheck)
@@ -393,12 +426,27 @@ TEST_F(RemovalSymlinkTest, ForceRemoveBypassesSharedFileCheck)
 
     EXPECT_NO_THROW(remove_package("pkgA", true));
     write_cache();
+
+    // 名字承诺"绕过检查后真的移除"——补结果断言（原先只有 EXPECT_NO_THROW，是空转）
+    EXPECT_FALSE(is_registered("pkgA"));
+    EXPECT_FALSE(Cache::instance().is_file_owned_by("/usr/bin/pkgA", "pkgA"));
 }
 
 TEST_F(RemovalSymlinkTest, RemoveNonExistentPackage)
 {
+    // 放一个"哨兵"包，用来验证"移除不存在的包"确实**无副作用**（只验不抛不够：
+    // 若误删/误动状态，不抛照样绿）。哨兵在移除不存在包的调用**之前**建好。
+    Cache::instance().add_file_owner("/usr/bin/sentinel-keep", "sentinel-pkg");
+    Cache::instance().add_installed("sentinel-pkg", "1.0", true);
+
     EXPECT_NO_THROW(remove_package("nonexistent-pkg", false));
     EXPECT_NO_THROW(remove_package("nonexistent-pkg", true));
+
+    // 不存在的包不该被登记；哨兵包与其文件所有权都应原封不动
+    EXPECT_FALSE(is_registered("nonexistent-pkg")) << "不存在的包被登记成了已装";
+    EXPECT_TRUE(is_registered("sentinel-pkg")) << "移除不存在的包把无关的已装包也删了";
+    EXPECT_TRUE(Cache::instance().is_file_owned_by("/usr/bin/sentinel-keep", "sentinel-pkg"))
+        << "移除不存在的包撤销了无关包的文件所有权";
 }
 
 // =========================================================================
@@ -519,6 +567,18 @@ TEST_F(RemovalSymlinkTest, ForceOverwriteBypassesConflict)
     Config::instance().set_force_overwrite_mode(true);
     EXPECT_NO_THROW(install_packages({pkg2}));
     Config::instance().set_force_overwrite_mode(false);
+
+    // 名字承诺"强制覆盖"——补结果断言（原先只有 EXPECT_NO_THROW）：所有权真的转到 pkg2，
+    // 旧持有者交棒，且盘上内容换成 pkg2 那份。
+    EXPECT_TRUE(Cache::instance().is_file_owned_by("/usr/bin/pkg1", "pkg2"))
+        << "强制覆盖后 /usr/bin/pkg1 应归 pkg2";
+    EXPECT_FALSE(Cache::instance().is_file_owned_by("/usr/bin/pkg1", "pkg1"))
+        << "旧持有者 pkg1 应已交棒";
+    std::ifstream f(test_root / "usr/bin/pkg1");
+    std::ostringstream buf;
+    buf << f.rdbuf();
+    EXPECT_NE(buf.str().find("different"), std::string::npos)
+        << "盘上应是 pkg2 的内容，实际：" << buf.str();
 }
 
 TEST_F(RemovalSymlinkTest, NoConflictWhenFileAlreadyOwnedBySelf)
@@ -527,11 +587,59 @@ TEST_F(RemovalSymlinkTest, NoConflictWhenFileAlreadyOwnedBySelf)
     install_packages({pkg});
     write_cache();
     EXPECT_NO_THROW(install_packages({pkg}));
+
+    // 重装同包不得被当成"无主/冲突"（补结果断言）：仍注册、所有权仍归自己、文件仍在。
+    EXPECT_TRUE(is_registered("self-pkg"));
+    EXPECT_TRUE(Cache::instance().is_file_owned_by("/usr/bin/self-pkg", "self-pkg"));
+    EXPECT_TRUE(file_installed("usr/bin/self-pkg"));
 }
 
 // =========================================================================
 // SECTION 8: Shared file error message verification
 // =========================================================================
+
+/**
+ * 无主手工文件冲突：报错**不得**把占位文本 `error.unknown_manual_file`
+ * （"unknown (manual file)"）当成**包名**塞进 `error.file_conflict_entry` 的持有者槽
+ * ——那会渲染成 "File {} is owned by package unknown (manual file)"，语法破碎（2026-10-03 修）。
+ * 改用配套措辞 `error.file_conflict_unowned`（只认文件路径）。
+ *
+ * 判定"抛了异常"不够：得钉住**措辞换了**且旧噪声**不再出现**，否则改回去也能绿。
+ */
+TEST_F(RemovalSymlinkTest, UnownedManualFileConflictUsesDedicatedWording)
+{
+    const std::string pkg = create_simple_package("manual-clash", "1.0");
+
+    // 盘上先塞一个**无主**文件（不归任何包），再装一个要落同一路径的包 → 无主手工文件冲突
+    const fs::path on_disk = test_root / "usr/bin/manual-clash";
+    ensure_dir_exists(on_disk.parent_path());
+    std::ofstream(on_disk) << "user's own file\n";
+
+    std::string msg;
+    try {
+        install_packages({pkg});
+        FAIL() << "盘上已有无主文件，装同名包必须判冲突中止";
+    } catch (const LpkgException& e) {
+        msg = e.what();
+    }
+
+    // ① 点名冲突路径
+    EXPECT_NE(msg.find("usr/bin/manual-clash"), std::string::npos) << "冲突信息没点名路径：\n"
+                                                                   << msg;
+
+    // ② 必须用"不属于任何包"的配套措辞（锚取模板里最长字面片段，与语言无关）
+    const std::string unowned_tmpl = get_string("error.file_conflict_unowned");
+    const std::string new_anchor = longest_template_literal(unowned_tmpl);
+    ASSERT_GE(new_anchor.size(), 8u) << "l10n 模板里没有足够长的字面片段可作锚";
+    EXPECT_NE(msg.find(new_anchor), std::string::npos)
+        << "无主文件冲突应改用 error.file_conflict_unowned 的措辞，实际：\n"
+        << msg;
+
+    // ③ 旧噪声（占位文本被当持有者名渲染）必须消失
+    EXPECT_EQ(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
+        << "占位文本被当成持有者名渲染进报告：\n"
+        << msg;
+}
 
 TEST_F(RemovalSymlinkTest, SharedFileErrorShowsActualPackageNames)
 {
@@ -1008,6 +1116,21 @@ TEST_F(RemovalSymlinkTest, DirPermWarningOnMismatch)
     EXPECT_TRUE(stderr_output.find("permission") != std::string::npos ||
                 stderr_output.find("权限") != std::string::npos)
         << "Should warn about directory permission mismatch, got: " << stderr_output;
+
+    // 2026-10-03 订正：mode 必须以**八进制**渲染（盘上 0755、包内 0700）。改前传 int 走十进制，
+    // 0755 会显示成 493、0700 成 448 —— 与 `ls -l` / chmod 的口径不符，用户看不懂。
+    EXPECT_NE(stderr_output.find("755"), std::string::npos)
+        << "盘上 0755 必须以八进制 755 出现在告警里（不是十进制 493）：\n"
+        << stderr_output;
+    EXPECT_NE(stderr_output.find("700"), std::string::npos)
+        << "包内 0700 必须以八进制 700 出现在告警里（不是十进制 448）：\n"
+        << stderr_output;
+    EXPECT_EQ(stderr_output.find("493"), std::string::npos)
+        << "mode 不该以十进制渲染（0755 → 493）：\n"
+        << stderr_output;
+    EXPECT_EQ(stderr_output.find("448"), std::string::npos)
+        << "mode 不该以十进制渲染（0700 → 448）：\n"
+        << stderr_output;
 }
 
 TEST_F(RemovalSymlinkTest, NoDirPermWarningWhenMatch)
@@ -1041,6 +1164,52 @@ TEST_F(RemovalSymlinkTest, NoDirPermWarningWhenMatch)
     EXPECT_TRUE(stderr_output.find("permission") == std::string::npos &&
                 stderr_output.find("权限") == std::string::npos)
         << "Should NOT warn when permissions match, got: " << stderr_output;
+}
+
+/**
+ * `/etc` 配置的 **file_perm_mismatch** 告警：mode 必须以**八进制**渲染（2026-10-03 订正）。
+ *
+ * 场景：装带 `etc/...` 的包 v1 → 用户 `chmod` 改权限（内容一字不动）→ 升到 v2。
+ * 三哈希只看**内容**哈希，看不出"只改了权限" ⇒ 走静默换新版那条路；让开趟在搬进 stash
+ * **之前**还看得见盘上那份，于是比对 mode 并告警（`warning.file_perm_mismatch`）。
+ * 改前把 `st_mode` 直接当十进制传进告警，0644 会显示成 420 —— 本用例钉住八进制口径。
+ */
+TEST_F(RemovalSymlinkTest, FilePermWarningRendersModeAsOctal)
+{
+    std::string v1 = create_package_with_content(
+        "permfile", "1.0", {{"etc/permfile.conf", "SAME\n"}, {"usr/bin/permfile", "#!/bin/sh\n"}});
+    ASSERT_NO_THROW(install_packages({v1}));
+    write_cache();
+
+    const fs::path target = test_root / "etc" / "permfile.conf";
+    struct stat st{};
+    ASSERT_EQ(::lstat(target.c_str(), &st), 0) << "配置应已装到 " << target;
+    const mode_t pkg_mode = st.st_mode & 07777;
+    // 选一个**八进制与十进制写法不同**的用户 mode（0750 → 八进制 "750" / 十进制 "488"），
+    // 这样"断言八进制出现 / 十进制不出现"才有区分力。
+    const mode_t user_mode = 0750;
+    ASSERT_NE(user_mode, pkg_mode);
+    ASSERT_EQ(::chmod(target.c_str(), user_mode), 0);
+
+    std::string v2 = create_package_with_content(
+        "permfile", "2.0", {{"etc/permfile.conf", "SAME\n"}, {"usr/bin/permfile", "#!/bin/sh\n"}});
+    testing::internal::CaptureStderr();
+    ASSERT_NO_THROW(install_packages({v2}));
+    const std::string err = testing::internal::GetCapturedStderr();
+
+    const auto oct = [](unsigned m) {
+        std::ostringstream o;
+        o << std::oct << m;
+        return o.str();
+    };
+    EXPECT_NE(err.find(oct(user_mode)), std::string::npos)
+        << "用户改的 0750 必须以八进制 750 出现：\n"
+        << err;
+    EXPECT_NE(err.find(oct(pkg_mode)), std::string::npos) << "包内 mode 必须以八进制出现：\n"
+                                                          << err;
+    EXPECT_EQ(err.find(std::to_string(user_mode)), std::string::npos)
+        << "mode 不该以十进制渲染（0750 → 488）：\n"
+        << err;
 }
 
 // =========================================================================

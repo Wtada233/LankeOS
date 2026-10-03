@@ -46,16 +46,39 @@ bool version_satisfies_all(const std::string& current_version,
                            const std::vector<Constraint>& constraints);
 
 /**
- * lpkg 版本 → libsolv EVR 字符串（供 pool 边界使用）。
+ * lpkg 版本 → libsolv EVR 字符串（**桥接的唯一入口**）。
  *
- * 归一化：`pool_evrcmp`（libsolv）把版本串**最后一个 `-` 之后当 release**、且 `~` 当预发布。
- *   - `-预发布` → `~`：lpkg 的 `-` 只出现在预发布位置，rpm 用 `~` 表达"预发布（旧于基础版）"，
- *     避免 `1.0-rc1` 被 libsolv 当成 release 而判成 `> 1.0`；
- *   - `+release` → `-`：让 `261.2+3` 的 release 被 libsolv 正确切出，避免整串平铺比较把
- *     `261.2+3` 判成 `< 261+3`（依赖要求新版本时误判为降级 → 事务无解）。
+ * **要求：libsolv 的依赖匹配必须与 lpkg 的 `version_satisfies()` 逐条一致** —— 求解器按前者
+ * 出方案、安装期按后者验收，两者不一致就会出现"求出来的方案被自己拒掉"（假不满足 ⇒ 事务
+ * 无解）或"装出来才发现不满足"（假满足 ⇒ 坏系统）。
+ *
+ * 编码规则（`norm` = `-`→`~`，即把 lpkg 的预发布标记换成 rpm 的 tilde）：
+ *   `[V, R]` = 在第一个 `+` 处切；`enc = V`（R 空）或 `V + "^^" + R`（R 非空）。
+ *
+ * **为什么不是"把 `+` 换成 `-` 交给 libsolv 当 release"**（2026-10-03 之前就是这么做的）：
+ * libsolv 的依赖匹配走 `EVRCMP_MATCH_RELEASE`（`src/pooldep.c` 的 `pool_intersect_evrs`），
+ * 它把"有一侧没有 release"当**通配**（`pool_evrcmp` 返回 ±2 的两个特例分支）⇒ 实测
+ * `foo = 1.0` 会匹配 `1.0+1`/`1.0+2`，而 `foo > 1.0+1` 反过来会匹配 `1.0`，
+ * `foo >= 1.0` 又不匹配 `1.0+1`。在一份 4032 组合的 (候选版本 × 约束) 矩阵上，它与
+ * `version_satisfies` 差 **78 处**，**两个方向都有**。详见
+ * `tests/unit/test_vercmp_libsolv_bridge.cpp`（同一矩阵，是这道桥的回归闸门）。
+ *
+ * **为什么 `^` 对**：libsolv 的 rpm 比较器把 caret 定义为"**比基础版新、比任何真实下一段
+ * 旧**"（`1.0^post > 1.0` 且 `1.0^post < 1.0.1`）—— 正是发行修订号的语义；而且全串**不含
+ * `-`** ⇒ libsolv 切出的 release 永远为空 ⇒ 上面那些 ±2 特例分支**不可能触发**。同一矩阵
+ * 上不一致数 = 0。
+ *
+ * **因此 `^` 是版本域里的保留字符**：lpkg 版本/包名里不允许出现（`is_safe_path_component`
+ * 拒、本函数也抛）。实测真实索引 678 个版本里 0 个含 `^`。
+ *
+ * @throws LpkgException 版本含保留字符 `^`
  */
 std::string to_libsolv_evr(const std::string& v);
 
-/** libsolv EVR 字符串 → lpkg 版本：`~` 还原为 `-`（预发布），最后一个 `-`（release 分隔符）
- *  还原为 `+`。lpkg 版本不含 `~`，可安全往返。 */
+/**
+ * libsolv EVR 字符串 → lpkg 版本（`to_libsolv_evr` 的**无损**逆）。
+ *
+ * `~` 还原为 `-`；分隔符是**唯一的** `^^`（版本部分不许含 `^`，所以第一个 `^^` 一定是
+ * 分隔符）→ 还原为 `+`。旧实现按"最后一个 `-`"切分，在版本/release 含 `~` 时会还原错。
+ */
 std::string from_libsolv_evr(const std::string& v);

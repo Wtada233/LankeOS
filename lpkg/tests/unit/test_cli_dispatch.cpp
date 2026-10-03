@@ -50,7 +50,14 @@ struct CliRun {
     std::string out;
     std::string err;
 
-    /** 两个流拼起来：消息走 stdout 还是 stderr 多属实现细节，断言通常只关心"打出来了" */
+    /**
+     * 两个流拼起来：**多数**消息走 stdout 还是 stderr 属实现细节，断言通常只关心"打出来了"。
+     *
+     * ⚠️ **例外（有意区分，别用 all() 图省事）**：错误路径的用法（`print_usage`）**有意**走
+     * stderr，而 `--help` / `--version` 走 stdout —— 这是对外契约（`lpkg --help | less` 要
+     * 拿到正文、脚本要能把错误输出与正常输出分开）。凡断言"用法/正文"的流向，必须分别用
+     * `r.out` / `r.err`。
+     */
     std::string all() const
     {
         return out + err;
@@ -122,14 +129,18 @@ protected:
 
 // ── 无副作用的两条：在数据库初始化**之前**就返回 ────────────────────────────
 
-TEST_F(CliDispatchTest, HelpExitsZeroAndPrintsUsage)
+TEST_F(CliDispatchTest, HelpExitsZeroAndPrintsUsageToStdout)
 {
     const CliRun r = run_cli_captured({"lpkg", "--help"});
     // 锚点 1 = 退出码 0；锚点 2 = 用法正文真的打了（`info.commands` = "Commands:"）
     expect_code_and_message(r, 0, "Commands:");
-    // 帮助走 stderr（`print_usage` 全用 std::cerr）——顺带钉住"没有跑到 stdout"
-    EXPECT_NE(r.err.find("Commands:"), std::string::npos);
-    EXPECT_EQ(r.out.find("Commands:"), std::string::npos);
+    // 2026-10-03 修：`--help` 是**正常输出** → stdout。此前全部走 stderr，于是
+    // `lpkg --help | less` / `| grep` 拿到的永远是空 —— 而本用例当时把"走 stderr"钉成了
+    // 正确行为（在 **pin 缺陷**）：断言方向已翻转。参数不合法时的用法仍走 stderr，
+    // 由下面 `NoCommandPrintsUsageAndExitsOne` / `UnknownCommandPrintsUsageAndExitsOne`
+    // 各钉两条（stderr **有** + stdout **无**）。
+    EXPECT_NE(r.out.find("Commands:"), std::string::npos) << r.all();
+    EXPECT_EQ(r.err.find("Commands:"), std::string::npos) << r.all();
 }
 
 TEST_F(CliDispatchTest, VersionExitsZeroAndPrintsToStdout)
@@ -148,6 +159,14 @@ TEST_F(CliDispatchTest, NoCommandPrintsUsageAndExitsOne)
     const CliRun r = run_cli_captured({"lpkg"});
     // 锚点 1 = 退出码 1；锚点 2 = 打了用法正文
     expect_code_and_message(r, 1, "Commands:");
+    // 锚点 3 = 用法确实打在 **stderr**、且 stdout **没有** —— 这正是 HelpExitsZero 的注释所
+    // 声称的"参数不合法时的用法仍走 stderr"。缺陷下会红：若 `print_usage`（main_cli.cpp）
+    // 被改成写 `std::cout`（与 `--help` 合流），错误输出就混进了 stdout ——
+    // `lpkg | grep` 会拿到本该只在 stderr 的用法 ⇒ 这两条 EXPECT 同时翻。
+    EXPECT_NE(r.err.find("Commands:"), std::string::npos)
+        << "错误路径的用法必须走 stderr：" << r.all();
+    EXPECT_EQ(r.out.find("Commands:"), std::string::npos)
+        << "错误路径的用法不该出现在 stdout（那会污染管道消费）：" << r.all();
 }
 
 TEST_F(CliDispatchTest, UnknownCommandPrintsUsageAndExitsOne)
@@ -157,6 +176,13 @@ TEST_F(CliDispatchTest, UnknownCommandPrintsUsageAndExitsOne)
     expect_code_and_message(r, 1, "Commands:");
     // 未知命令**不**是异常路径：`error.lpkg_error` 的 "Lpkg error:" 前缀不该出现
     EXPECT_EQ(r.all().find("Lpkg error:"), std::string::npos);
+    // 锚点 3 = 与 NoCommand 同一条契约：未知命令的用法也走 stderr、不进 stdout。
+    // 缺陷下会红：`handle_command` 的默认分支把 `usage()`（= print_usage → cerr）改成往 cout 打，
+    // 或 run_cli 的 catch 路径顺手在 stdout 上再打一份用法 ⇒ 下面两条 EXPECT 翻。
+    EXPECT_NE(r.err.find("Commands:"), std::string::npos)
+        << "未知命令的用法必须走 stderr：" << r.all();
+    EXPECT_EQ(r.out.find("Commands:"), std::string::npos)
+        << "未知命令的用法不该出现在 stdout：" << r.all();
 }
 
 TEST_F(CliDispatchTest, InstallRejectsConflictingYesAndNo)

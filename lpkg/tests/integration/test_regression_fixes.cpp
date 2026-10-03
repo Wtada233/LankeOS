@@ -152,10 +152,18 @@ TEST_F(RegressionFixTest, InstallVirtualCapabilityNameDoesNotCrash)
 
 TEST_F(RegressionFixTest, ForceSolveInNonInteractiveModeThrows)
 {
-    // 构造一个 needed_so 在空仓库中无人提供的已装包
+    // 构造一个 needed_so 在**仓库**中无人提供的已装包
     auto pP = create_pkg("fxs_prov", "1.0", {}, {"libprov.so.1"});
     auto pQ = create_pkg("fxs_need", "1.0", {}, {}, {"libprov.so.1"});
     install_packages({pP, pQ});
+
+    // 索引必须**非空**：force_solve_conflict 现在有一条"索引为空 → 拒绝"的守卫
+    // （否则它会把每个包都判成 broken、提议删光）。那条守卫是另一条用例的范畴；
+    // 本用例要走到的是"非交互模式"那道检查，所以给一个非空、但不提供 libprov.so.1 的索引。
+    {
+        std::ofstream idx(suite_work_dir / "mirror" / "x86_64" / "index.txt");
+        idx << "fxs_unrelated|1.0:::|\n";
+    }
 
     // 非交互模式（IntegrationTestBase 已设 YES）→ 直接抛错而非读 stdin
     try {
@@ -164,6 +172,74 @@ TEST_F(RegressionFixTest, ForceSolveInNonInteractiveModeThrows)
     } catch (const LpkgException& e) {
         EXPECT_STREQ(e.what(), get_string("error.force_solve_requires_interactive").c_str());
     }
+}
+
+// ============================================================================
+// force-solve-conflict：索引为空时必须拒绝，绝不把全部包判成 broken
+// ============================================================================
+
+TEST_F(RegressionFixTest, ForceSolveRefusesWhenRepoIndexEmpty)
+{
+    auto pP = create_pkg("fxs2_prov", "1.0", {}, {"libprov2.so.1"});
+    auto pQ = create_pkg("fxs2_need", "1.0", {}, {}, {"libprov2.so.1"});
+    install_packages({pP, pQ});
+
+    // 镜像里没有 index.txt（→ 解析出 0 个包）。此前会把两个包都判成 broken 并提议删除。
+    try {
+        force_solve_conflict();
+        FAIL() << "force_solve_conflict must refuse when the repository index is empty";
+    } catch (const LpkgException& e) {
+        EXPECT_EQ(std::string(e.what()), string_format("error.repo_index_empty", 0));
+    }
+
+    // 两个包都必须还在
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().get_installed_version("fxs2_prov").empty());
+    EXPECT_FALSE(Cache::instance().get_installed_version("fxs2_need").empty());
+}
+
+// ============================================================================
+// upgrade：索引为空/不可用 + 有已装包 → 拒绝，不得报"所有包都是最新"
+// ============================================================================
+
+TEST_F(RegressionFixTest, UpgradeRefusesWhenRepoIndexEmpty)
+{
+    auto p = create_pkg("fxu_one", "1.0");
+    install_packages({p});  // 有已装包，但镜像里没有 index.txt（解析出 0 个包）
+
+    try {
+        upgrade_packages();
+        FAIL() << "upgrade must refuse when the repository index is empty, not claim 'up to date'";
+    } catch (const LpkgException& e) {
+        EXPECT_EQ(std::string(e.what()), string_format("error.repo_index_empty", std::size_t{0}));
+    }
+}
+
+// ============================================================================
+// 移除"声明了 provides、却没有任何文件"的包 → provider 记录必须一起撤掉
+// ============================================================================
+
+TEST_F(RegressionFixTest, RemovingFilelessPackageClearsItsProvides)
+{
+    // 不能走 create_pkg：它总会在 content/usr/bin/ 下放一个文件，那样
+    // `remove_package_files` 的 `owned_entries.empty()` 早退就碰不到。手工造一个**空 content/**。
+    const fs::path work = suite_work_dir / "_pkg_fxp_meta";
+    fs::create_directories(work / "content");
+    const std::string pkg_path = (pkg_dir / "fxp_meta-1.0.lpkg").string();
+    pack_package(pkg_path, work.string(), "fxp_meta", "1.0", {}, {"capX"}, "", {});
+
+    install_packages({pkg_path});
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("fxp_meta"));
+    ASSERT_TRUE(Cache::instance().get_providers("capX").contains("fxp_meta"));
+
+    remove_package("fxp_meta", /*force=*/true, /*wrap_in_txn=*/false, /*purge_config=*/false);
+
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("fxp_meta"));
+    EXPECT_TRUE(Cache::instance().get_providers("capX").empty())
+        << "provider 记录必须随包移除一起撤 —— 此前它会残留（早退在撤 provider 之前），"
+           "而 dep_satisfied_on_disk() 只看 providers 非空、不看 is_installed";
 }
 
 // ============================================================================
@@ -222,4 +298,94 @@ TEST_F(RegressionFixTest, QueryFileSiblingPrefixDoesNotThrow)
     // root 前缀匹配但实际在外的路径（rootE/...）不崩溃、不误归因
     const std::string evil = test_root.string() + "E/usr/bin/fxq_a";
     EXPECT_NO_THROW(query_file(evil));
+}
+
+// ============================================================================
+// reinstall 路径也必须走元数据一致性校验（三条路径共用 verify_package_metadata）
+// ============================================================================
+
+TEST_F(RegressionFixTest, ReinstallAlsoRefusesMetadataMismatch)
+{
+    setup_local_mirror();
+    // 镜像里 app 的真实 metadata 依赖 libz；索引却（过时）声明它没有依赖。
+    create_pkg("libz", "1.0");
+    create_pkg("fxi_app", "1.0", {"libz"});
+    add_to_mirror("libz", "1.0");
+    add_to_mirror("fxi_app", "1.0");
+    {
+        std::ofstream idx(suite_work_dir / "mirror" / "x86_64" / "index.txt");
+        idx << "fxi_app|1.0:::|\n";  // 故意漏掉 deps=libz
+        idx << "libz|1.0:::|\n";
+    }
+
+    try {
+        reinstall_packages({"fxi_app"});  // 内部走 install_packages(force_reinstall=true)
+        FAIL() << "reinstall 也必须拒绝 metadata 与索引不一致的包";
+    } catch (const LpkgException& e) {
+        const std::string msg = e.what();
+        EXPECT_NE(msg.find("fxi_app"), std::string::npos) << msg;
+        EXPECT_NE(msg.find("deps"), std::string::npos) << msg;
+    }
+
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("fxi_app"));
+}
+
+/**
+ * 约束违反的批次必须**拒绝**：`vdapp` 要求 `vdlib <= 1.0`，而同一批次又显式要求装 `vdlib 1.0+1`。
+ *
+ * **订正 2026-10-03（版本桥接修好后）**：此前 libsolv 的 EVR 匹配把"要求侧缺 release"当通配，
+ * 会**接受**这个计划，靠安装期的版本复核（`error.dep_version_mismatch`）才拦下来 —— 本用例
+ * 原先断言的就是那条报错。桥接修好后（`to_libsolv_evr` 改用 caret 分隔 release，见
+ * `tests/unit/test_vercmp_libsolv_bridge.cpp` 的等价性矩阵）求解器**自己**就拒绝这个批次，
+ * 报错换成"依赖无解"。⇒ 这里只钉"必须拒绝 + 整批回滚"这条不变量，**不再钉具体文案**；
+ * 那道复核判据本身改由 `tests/unit/test_plan_dep_version_check.cpp` 直接喂手搓计划来钉
+ * （否则它就成了"永远走不到的分支上写的假绿用例"）。
+ */
+TEST_F(RegressionFixTest, PlanVersionViolatingDependencyConstraintIsRejected)
+{
+    const std::string lib = create_pkg("vdlib", "1.0+1");
+    const std::string app = create_pkg("vdapp", "1.0", {"vdlib<=1.0"});
+
+    try {
+        install_packages({app, lib});
+        FAIL() << "计划把依赖解析到违反约束的版本（1.0+1 不满足 <= 1.0），必须拒绝";
+    } catch (const LpkgException& e) {
+        EXPECT_NE(std::string(e.what()).find("vdlib"), std::string::npos)
+            << "报错必须点名那个依赖：" << e.what();
+    }
+
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("vdapp"));
+    EXPECT_FALSE(Cache::instance().is_installed("vdlib"));
+}
+
+/**
+ * 版本复核**不能被"盘上那份满足"短路**：约束被**已装版本**满足、但计划要把该依赖换成
+ * 违反约束的版本时，也必须拦下 —— 批次后生效的是**计划版本**，不是盘上那份。
+ *
+ * **订正 2026-10-03**：桥接修好后求解器自己就会拒这个批次（不再产出"计划版本违规"的方案），
+ * 所以这里同样只钉"必须拒绝 + 整批回滚"；那道复核判据的每一格（含"计划版本 vs 盘上版本"
+ * 的取舍）改由 `tests/unit/test_plan_dep_version_check.cpp` 直接喂手搓计划钉。
+ */
+TEST_F(RegressionFixTest, VersionRecheckIsNotShortCircuitedBySatisfiedOnDiskVersion)
+{
+    // ① 先装 vslib 1.0（满足 <= 1.0）。
+    const std::string lib10 = create_pkg("vslib", "1.0");
+    ASSERT_NO_THROW(install_packages({lib10}));
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("vslib"));
+    ASSERT_EQ(Cache::instance().get_installed_version("vslib"), "1.0");
+
+    // ② 同一批次里把 vslib 换成 1.0+1、并装 vsapp（dep: vslib<=1.0）。盘上那份（1.0）满足，
+    //    但计划版本（1.0+1）不满足 —— 必须拒绝，且整批回滚。
+    const std::string libNew = create_pkg("vslib", "1.0+1");
+    const std::string app = create_pkg("vsapp", "1.0", {"vslib<=1.0"});
+    EXPECT_THROW(install_packages({app, libNew}), LpkgException)
+        << "计划把「已装且满足约束」的依赖升级到违反约束的版本，必须拒绝";
+
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("vslib")) << "整批回滚：vslib 应仍是 1.0";
+    EXPECT_EQ(Cache::instance().get_installed_version("vslib"), "1.0");
+    EXPECT_FALSE(Cache::instance().is_installed("vsapp"));
 }

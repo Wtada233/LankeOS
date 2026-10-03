@@ -456,8 +456,9 @@ TEST_F(TypeTransitionMatrixTest, DirToFile)
  * 故宁可拒绝升级（用户得自己处理它）。
  *
  * 断言三件事：① 拒绝发生在**进事务之前**（盘面一字未动、连 v2 的伴生文件都没落、
- * 无 stash 残留）；② 报错点名**真实冲突源**（无主条目 → `error.unknown_manual_file`，
- * 而不是含糊地报"这个目录归本包"，那会把人引去查一个不存在的冲突源）；③ 无主文件原样还在。
+ * 无 stash 残留）；② 报错点名**真实冲突源**（无主条目 → `error.file_conflict_unowned`
+ * 的配套措辞，而不是含糊地报"这个目录归本包"，那会把人引去查一个不存在的冲突源）；
+ * ③ 无主文件原样还在。
  */
 TEST_F(TypeTransitionMatrixTest, DirToFileWithUnownedContentIsRefused)
 {
@@ -476,8 +477,11 @@ TEST_F(TypeTransitionMatrixTest, DirToFileWithUnownedContentIsRefused)
         << "目录树里有无人持有的条目 ⇒ dir→file 必须被拒绝（整树搬走会毁掉那个文件）";
     std::cerr << "[type-matrix] " << pkg << " 拒绝原文：" << msg << "\n";
     EXPECT_NE(msg.find("usr/share/thing"), std::string::npos) << "拒绝信息没点名冲突路径：" << msg;
-    EXPECT_NE(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
-        << "无主条目 → 判据必须是 " << get_string("error.unknown_manual_file") << "：" << msg;
+    EXPECT_NE(msg.find(string_format("error.file_conflict_unowned", "/usr/share/thing")),
+              std::string::npos)
+        << "无主条目 → 应报 error.file_conflict_unowned：" << msg;
+    EXPECT_EQ(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
+        << "占位文本不该被当成持有者名渲染进报告：" << msg;
 
     // ① 进事务之前就拒了：盘面一字未动
     expect_dir_v1("整批拒绝时盘面必须**一个文件都没动**");
@@ -891,6 +895,42 @@ TEST_F(TypeTransitionMatrixTest, EtcSymlinkToSymlinkStaysLpkgnew)
     }
     EXPECT_EQ(shape_of(test_root / "etc/foo.lpkgsave"), "absent")
         << "类型未变**不该**走 .lpkgsave（那是类型变化的落点）";
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version(pkg), "2.0");
+}
+
+/**
+ * **目标逐字节相同**的 symlink → symlink：盘上那份就是我们要的 ⇒ **一个字节都不碰**，
+ * 连 `.lpkgnew` 都不产生（2026-10-02 修）。
+ *
+ * 上面那条用例钉"目标**不同** ⇒ 退 `.lpkgnew`"，这一条钉它的**边界**。旧实现**不看目标**、
+ * 一律退 `.lpkgnew` —— 于是**链接压根没变的升级也吐一份同内容副本**，反复升级/重装就在
+ * `/etc` 上堆垃圾。落点规则（`ARCH.md` §6.3）本来就不给这一格 BACKUP/UNSTASH，
+ * 所以"什么都不做"在这里是自洽的，不是遗漏。
+ */
+TEST_F(TypeTransitionMatrixTest, EtcSymlinkToSymlinkWithIdenticalTargetIsUntouched)
+{
+    const std::string pkg = "m_etc_s2s_same";
+    const auto make = [&](const std::string& ver) {
+        return pack(pkg, ver, [](const fs::path& c) {
+            fs::create_directories(c / "etc");
+            fs::create_symlink("same-target.conf", c / "etc/foo");
+        });
+    };
+
+    ASSERT_TRUE(install_err(make("1.0")).empty()) << "前置：v1 装不上";
+    ASSERT_EQ(shape_of(test_root / "etc/foo"), "symlink");
+
+    const std::string e2 = install_err(make("2.0"));
+    EXPECT_TRUE(e2.empty()) << "v2 安装失败，异常原文：" << e2;
+
+    EXPECT_EQ(shape_of(test_root / "etc/foo"), "symlink") << "目标没变 ⇒ 盘上那条链接原样留着";
+    if (fs::is_symlink(test_root / "etc/foo")) {
+        EXPECT_EQ(fs::read_symlink(test_root / "etc/foo").string(), "same-target.conf");
+    }
+    EXPECT_EQ(shape_of(test_root / "etc/foo.lpkgnew"), "absent")
+        << "目标没变 ⇒ **不该**产生 .lpkgnew（旧行为不看目标，每次升级都堆一份）";
+    EXPECT_EQ(shape_of(test_root / "etc/foo.lpkgsave"), "absent");
     Cache::instance().load();
     EXPECT_EQ(Cache::instance().get_installed_version(pkg), "2.0");
 }

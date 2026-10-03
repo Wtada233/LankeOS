@@ -144,3 +144,20 @@ TEST_F(UtilsTest, SplitStringView_NoDelimiter)
     ASSERT_EQ(parts.size(), 1);
     EXPECT_EQ(parts[0], "hello");
 }
+
+// ── strip_trailing_slash：**唯一**一份"剥尾斜杠"实现（2026-10-03 合并了 strip_trailing_sep）──
+//
+// 不变量：只剥**末尾**的 '/'，根 "/" 原样保留，**不做**任何 lexically_normal 之外的规范化
+// （合并后 `strip_trailing_sep` 仍先 lexically_normal 再走这里，行为与合并前逐字节一致）。
+
+TEST_F(UtilsTest, StripTrailingSlashRemovesOnlyTrailingSeparators)
+{
+    EXPECT_EQ(strip_trailing_slash("/usr/share/x/"), fs::path("/usr/share/x"));
+    EXPECT_EQ(strip_trailing_slash("/usr/share/x///"), fs::path("/usr/share/x"));
+    EXPECT_EQ(strip_trailing_slash("/usr/share/x"), fs::path("/usr/share/x"));
+    // 根不能剥成空串
+    EXPECT_EQ(strip_trailing_slash("/"), fs::path("/"));
+    // 相对路径同样只剥尾部
+    EXPECT_EQ(strip_trailing_slash("a/b/"), fs::path("a/b"));
+    EXPECT_EQ(strip_trailing_slash(""), fs::path(""));
+}

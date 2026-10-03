@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -9,6 +10,7 @@
 #include "../../main/src/base/utils.hpp"
 #include "../../main/src/config/config.hpp"
 #include "../../main/src/crypto/hash.hpp"
+#include "../../main/src/db/cache.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
 #include "nlohmann/json.hpp"
 
@@ -27,7 +29,7 @@ protected:
         Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
         Config::instance().set_testing_mode(true);
 
-        suite_work_dir = fs::absolute("tmp_order_test");
+        suite_work_dir = fs::absolute("tmp_order_test_" + std::to_string(::getpid()));
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
 
@@ -73,10 +75,22 @@ TEST_F(ParamOrderTest, OrderVariation)
 
     EXPECT_NO_THROW(install_packages({pkg}, hash_file.string()));
 
+    // 断言"参数顺序正确"必须落到**结果**上（只验不抛是空转：顺序接反也可能不抛）：
+    // 第一个参数是包路径、第二个是哈希文件 → 包**真的装上**、盘上文件**真的出现**。
+    EXPECT_EQ(Cache::instance().get_installed_version("orderpkg"), "1.0")
+        << "带哈希文件（正确哈希）的安装没真正装上";
+    EXPECT_TRUE(fs::exists(test_root / "file")) << "包内容（content/file）没落到盘上";
+
     remove_package("orderpkg", true);
     fs::remove(test_root / "file");
+    EXPECT_TRUE(Cache::instance().get_installed_version("orderpkg").empty())
+        << "移除后 orderpkg 仍登记在册";
 
+    // 第二个参数为空 = 不做哈希校验，包同样应装上（换一种参数形态）
     EXPECT_NO_THROW(install_packages({pkg}, ""));
+    EXPECT_EQ(Cache::instance().get_installed_version("orderpkg"), "1.0")
+        << "哈希参数为空时安装没真正装上";
+    EXPECT_TRUE(fs::exists(test_root / "file")) << "哈希参数为空时包内容没落到盘上";
 }
 
 TEST_F(ParamOrderTest, MultiplePackagesWithOneHash)

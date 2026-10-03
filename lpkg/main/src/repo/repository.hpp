@@ -63,3 +63,19 @@ private:
     std::unordered_map<std::string, std::vector<std::string>>
         providers_;  // 能力 -> 提供该能力的包名列表
 };
+
+/**
+ * 加载仓库索引 —— **失败只告警、不抛** 的唯一入口（2026-10-03 收敛）。
+ *
+ * 为什么必须收敛成一处：`load_index()` 失败时"降级成仓库暂时不可用"这条语义，在
+ * 6 个调用点上**必须逐字一致**（同一条 `warning.repo_index_load_failed`）。此前每个调用点
+ * 各抄一遍 `try { repo.load_index(); } catch (...) { log_warning(...); }` —— 抄漏一次，
+ * 失败就变成**静默的"仓库里没有这个包"**，而 `depend remove` / `depend abibreak` 会据此
+ * 报出错误的"无受影响包"（给的是错误答案，不是报错）。日志键本身也属这条契约的一部分。
+ *
+ * @param repo 待加载的仓库。失败后它保持**已构造、未加载**（即空仓库）的状态 —— 这是既有
+ *             语义，不是本函数新增的：调用点可以照常继续用它。
+ * @return true = 加载成功；false = 失败（已发告警）。是否提前返回由调用点按自身语义决定
+ *         （有的调用点失败即 `return`，有的继续走空仓库）。
+ */
+bool load_index_or_warn(Repository& repo);

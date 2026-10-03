@@ -6,6 +6,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -30,7 +31,7 @@ protected:
 
     void SetUp() override
     {
-        suite_dir = fs::absolute("tmp_wal_core_test");
+        suite_dir = fs::absolute("tmp_wal_core_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_dir)) fs::remove_all(suite_dir);
         test_root = suite_dir / "root";
         fs::create_directories(test_root);
@@ -748,28 +749,31 @@ TEST_F(WalCoreTest, ReverseExecuteSkipMetadataLines)
 // reverse_execute 测试 — 里程碑停止
 // ============================================================================
 
-TEST_F(WalCoreTest, ReverseExecuteMilestoneStop)
+TEST_F(WalCoreTest, BatchStartMilestoneRowSkipsOnlyWhenOfficialFileIsStillInPlace)
 {
-    // 设置场景：
-    //   DB /pkgs glibc:installed  (需要逆向，恢复为 bash 状态)
-    //   DB /pkgs bash:installed   (达到此里程碑即停止)
-    //   BACKUP ...
-    // 目标是 :batch-start，遇到 DB bash:installed 时停止
+    // `:batch-start` 的 DB 行**不是"停止处理"**：`reverse_execute` 逆序遍历、遇到它只是
+    // `continue`（判据见 wal_op.cpp 的 `batch_start_db_still_in_place`）——语义是"正式文件
+    // 仍持有批次起点内容 → 无需从备份还原"。旧断言
+    // `EXPECT_GE(files_restored + files_cleaned + db_restored, 0)` 对**非负计数恒真** =
+    // 什么都没断言；而且旧场景的路径（`/pkgs`、`dummy`）在沙盒 root 之外，会被 confinement
+    // 整行跳过，根本走不到里程碑逻辑。这条把两条腿都钉住。
+    const fs::path db = test_root / "var/lpkg/pkgs";
+    const fs::path bak = test_root / "var/lpkg/pkgs.lpkg_db_bak_before::batch-start";
 
-    // 验证里程碑字符串检查逻辑 — is_batch_start_milestone 在 :batch-start 时停止
-    // 这里测试完整的里程碑停止机制
+    // 腿①：正式文件非空 → 跳过（不还原、不动原位）
+    create_file("var/lpkg/pkgs", "batch-start content");
+    wal::RollbackStats stats =
+        wal::reverse_execute({wal::parse_op("DB " + db.string() + " :batch-start")}, false);
+    EXPECT_EQ(stats.db_restored, 0) << "正式文件在位（非空）→ :batch-start 行跳过";
+    EXPECT_TRUE(fs::exists(db)) << "跳过就不能动原位那份";
 
-    std::vector<wal::WALOp> ops;
-    ops.push_back(wal::parse_op("BACKUP dummy → dummy"));
-    ops.push_back(wal::parse_op("DB /pkgs glibc:installed"));
-    ops.push_back(wal::parse_op("DB /pkgs :batch-start"));  // 应跳过（batch-start）
-
-    // 两个 BACKUP 作为正向操作
-    wal::RollbackStats stats = wal::reverse_execute(ops, false);
-
-    // 到达 :batch-start 即停止，不再处理前面的 BACKUP
-    // stats 依赖于具体文件状态，但核心行为是遇到里程碑后提前返回
-    EXPECT_GE(stats.files_restored + stats.files_cleaned + stats.db_restored, 0);
+    // 腿②：正式文件**空** + 备份非空（崩溃窗口的真实形态：ensure_file_exists 会把消失的库
+    // 重建成空文件）→ **不**跳过，必须从备份还原（否则那份备份永远无人消费、随后被清理）
+    create_file("var/lpkg/pkgs", "");
+    create_file("var/lpkg/pkgs.lpkg_db_bak_before::batch-start", "batch-start content");
+    stats = wal::reverse_execute({wal::parse_op("DB " + db.string() + " :batch-start")}, false);
+    EXPECT_EQ(stats.db_restored, 1) << "正式文件空而备份非空 → 必须还原";
+    EXPECT_FALSE(fs::exists(bak)) << "备份应已被消费（rename 回原位）";
 }
 
 // ============================================================================
@@ -900,9 +904,9 @@ TEST_F(WalCoreTest, TrimCompletedMultipleBatches)
 
     std::string content = read_file("var/lib/lpkg/transaction.log");
     // 只保留第三个批次
-    EXPECT_EQ(content.find("a"), std::string::npos);
-    EXPECT_EQ(content.find("b"), std::string::npos);
-    EXPECT_NE(content.find("c"), std::string::npos);
+    EXPECT_EQ(content.find('a'), std::string::npos);
+    EXPECT_EQ(content.find('b'), std::string::npos);
+    EXPECT_NE(content.find('c'), std::string::npos);
 }
 
 // ============================================================================

@@ -19,8 +19,10 @@
  */
 
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <string>
 #include <tuple>
@@ -51,7 +53,8 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_system_soname_dangling_test");
+        suite_work_dir =
+            fs::absolute("tmp_system_soname_dangling_test_" + std::to_string(::getpid()));
         fs::remove_all(suite_work_dir);
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
@@ -87,7 +90,7 @@ protected:
         fs::create_directories(work_dir / "content" / "usr" / "bin");
         std::ofstream(work_dir / "content" / "usr" / "bin" / name).close();
 
-        const std::string pkg_path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
+        const std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
         pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, "", needed_so);
 
         fs::path mirror_pkg_dir = mirror_dir / name;
@@ -104,7 +107,7 @@ protected:
         std::ofstream index(mirror_dir / "index.txt");
         for (const auto& [name, ver, deps, provides, needed_so] : entries) {
             std::string hash = "unknown";
-            const fs::path pkg_path = pkg_dir / (name + "-" + ver + ".lpkg");
+            const fs::path pkg_path = pkg_dir / (std::format("{}-{}.lpkg", name, ver));
             if (fs::exists(pkg_path)) hash = calculate_sha256(pkg_path);
             index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
                   << needed_so << "\n";

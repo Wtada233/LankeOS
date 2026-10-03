@@ -101,8 +101,7 @@ void InstallationTask::run(InstallContext* ctx)
 {
     const std::string current_installed_version =
         Cache::instance().get_installed_version(pkg_name_);
-    if (!force_reinstall_ && !current_installed_version.empty() &&
-        current_installed_version == actual_version_) {
+    if (plan_member_skipped(force_reinstall_, current_installed_version, actual_version_)) {
         // **早退：本包未被处理**。`processed_` 保持 false —— 这正是不变量所在：此刻
         // `hook_files_` 也是空的，但它表示"本任务没跑过"，**不是**"新版本没有 hooks"。
         // 批次级记账（package_manager 的 hook_sets）据此区分，否则会把一个已装同版本
@@ -112,7 +111,8 @@ void InstallationTask::run(InstallContext* ctx)
     }
     processed_ = true;  // 从这里往下：本任务真的会动盘 / 改 DB
 
-    log_info(string_format("info.installing_package", pkg_name_, version_));
+    // 不再单打一行"开始安装 X (版本 Y)"：copy 阶段的进度行 `==> Installing X <ver>`
+    // 已经点名了包与版本，这里只留"准备/解压/拷贝"各阶段自己的输出。
     ensure_dir_exists(tmp_pkg_dir_);
 
     // 第一阶段：预检——不碰文件，只做检查
@@ -173,7 +173,8 @@ void InstallationTask::run(InstallContext* ctx)
         // 注意：不在此处清理 .lpkg_bak！
         // 所有备份文件延迟到 COMMIT_PKGS 后统一清理（见 batch_transaction.hpp）
 
-        log_info(string_format("info.package_installed_successfully", pkg_name_));
+        // 逐包的"X 已成功安装!"不在这里打：批次结束后由调用方打**一条 summary**
+        // （`info.install_summary`，只列真正处理过的包）。300 包的批次因此少 300 行。
     } catch (...) {
         // 包级文件回滚
         rollback_files();
@@ -216,8 +217,6 @@ void InstallationTask::rollback_files()
 
     // 清空内部追踪（撤销由 reverse_execute 依据 WAL 完成）
     stashes_.clear();
-    new_files_.clear();
-    new_dirs_.clear();
 }
 
 /**
@@ -233,7 +232,6 @@ void InstallationTask::download_and_verify_package()
         if (!exists_follow(local_package_path_))
             throw LpkgException(
                 string_format("error.local_pkg_not_found", local_package_path_.string()));
-        log_info(string_format("info.installing_local_file", local_package_path_.string()));
         archive_path_ = local_package_path_;
         if (!expected_hash_.empty() && calculate_sha256(archive_path_) != expected_hash_)
             throw LpkgException(string_format("error.hash_mismatch", pkg_name_));
@@ -251,7 +249,14 @@ void InstallationTask::download_and_verify_package()
             actual_version_ = info->version;
             expected_hash_ = info->sha256;
         } else {
-            throw LpkgException(string_format("warning.package_not_in_repo", pkg_name_));
+            // 抛异常却用 `warning.*` 键（2026-10-03 订正：原为 warning.package_not_in_repo）
+            // —— 报错类别与键名对不上，同一件事在别处（`upgrade` 等）一律是 `error.*`。
+            //
+            // ⚠️ **本分支无对应用例 —— 有意的，不是漏测**：走到这里要求"包名在本地索引里
+            // 查不到"，而正常安装路径上 `find_package` 更早就该命中（未命中会先以
+            // `error.plan_pkg_not_in_repo` 失败）。要构造它得让索引与已解析的包名不一致，
+            // 测试里没有现成手法。保留为防御：不报错的话会拿**空的** version/hash 继续往下走。
+            throw LpkgException(string_format("error.package_not_in_repo", pkg_name_));
         }
     }
 
@@ -275,18 +280,24 @@ void InstallationTask::download_and_verify_package()
 void InstallationTask::extract_and_validate_package()
 {
     // 内容已由整批预检下载解压（同一归档、同一解压根）→ 不重复 tar 解压，只做结构校验与
-    // 元数据回读。标记只在预检成功解压后置位，而计划重解会整体重建 InstallPlan（标记归零，
-    // 见 InstallPlan::content_ready），故不会指向别的版本的解压产物。
+    // 元数据回读。标记只在预检成功解压后置位；计划在批次内不再变动，故它不会指向别的
+    // 版本的解压产物（见 InstallPlan::content_ready）。
     if (!content_ready_) {
-        log_info(string_format("info.extracting_to_tmp", pkg_name_));
+        // 进度行由 `extract_tar_zst` 自己画（`==> Extracting <pkg>  [####] 100%`）——
+        // 不再单打一行"正在解压到临时目录"（那是同一件事的第二种说法）。
         extract_tar_zst(archive_path_, tmp_pkg_dir_, pkg_name_);
     }
 
-    for (const auto& meta : {constants::PKG_METADATA_FILE, constants::DIR_CONTENT}) {
-        if (!fs::exists(tmp_pkg_dir_ / meta))
-            throw LpkgException(
-                string_format("error.incomplete_package", (tmp_pkg_dir_ / meta).string()));
-    }
+    // metadata.json 必须是**真文件**、content 必须是**真目录**（lstat 语义，不跟随符号链接）：
+    // `fs::exists` 会跟随链接，于是 `content -> /etc` 这类归档能通过校验，随后
+    // `scan_content_files` 会把链接目标的内容当包内容（见那里的说明）。`metadata.json`
+    // 同理 —— 一条 `metadata.json -> /etc/passwd` 会让随后的读取落到包外（2026-10-02 修）。
+    const fs::path meta_path = tmp_pkg_dir_ / constants::PKG_METADATA_FILE;
+    if (!is_regular_file_no_follow(meta_path))
+        throw LpkgException(string_format("error.incomplete_package", meta_path.string()));
+    const fs::path content_path = tmp_pkg_dir_ / constants::DIR_CONTENT;
+    if (!is_real_directory(content_path))
+        throw LpkgException(string_format("error.content_not_directory", content_path.string()));
 
     std::string meta_name, meta_version;
     detail::read_package_metadata(tmp_pkg_dir_, meta_name, meta_version, deps_, provides_,
@@ -330,28 +341,27 @@ bool dep_satisfied_on_disk(const DependencyInfo& dep)
 }
 
 /**
- * 对一个**未被满足**的依赖做最终裁定：计划中已有同名真实包 / 由计划中某包提供 /
+ * 对一个**不在计划里、且盘面也没满足**的依赖做最终裁定：由计划中某包提供 /
  * 已是目标（libsolv 会处理）→ 都算处理完，返回。
  *
- * 命名能力那一支要把能力名记入 `ctx.targets`：提供者的**真实元数据可能与本索引不一致**
- * （如 DynamicProviderChange 场景），供元数据验证触发的重解（i=0 重启）重新拉取正确提供者。
- * **绝不在此重解**：中途改写 order 且不重置批次游标会导致依赖者先于提供者安装、产生
- * 重复计划项（曾因此乱序）。
+ * 注意"计划中已有同名真实包"那一格**不在这里**：它由调用方（`verify deps` 的循环）**先**
+ * 处理，因为那一格要按 lpkg 语义复核**计划版本**是否符合约束 —— 而且必须在
+ * `dep_satisfied_on_disk()` 之前判（盘上那份满足 ≠ 计划要换上的那份满足）。
  *
- * 三者皆非 = solver/plan 不一致：依赖未安装、不在计划、也不由计划包提供。元数据验证
- * （install_packages/upgrade_packages）在批次开始前已按真实元数据重解并 i=0 重启，这里
- * 不应再发现新依赖 → 显式报错，整批回滚。
+ * ⚠️ 这里**不再**把能力名记入 `ctx.targets`（以及相应的 `is_planned_target` 兜底仍保留，
+ * 但不再写 targets）。那一步原本是给"元数据验证触发的重解"用的 —— 重解要靠 targets 记住
+ * 被点名过的能力，才能在下一次求解时换个提供者。**重解已在 2026-10-02 删除**
+ * （见 `package_manager.cpp` 的 `verify_package_metadata`）：此刻 `resolve_with_solver`
+ * 早已跑完、`is_explicit` 早已定下，再写 targets 不会产生任何效果。
+ *
+ * 两者皆非 = solver/plan 不一致：依赖未安装、不在计划、也不由计划包提供。元数据一致性
+ * 校验（`verify_package_metadata`）已在**每个包写盘之前**逐包比对过归档与索引，这里再
+ * 发现新依赖说明索引/求解结果本身有问题 → 显式报错、整批回滚；**绝不在批次中途改计划**。
  */
 void resolve_unmet_dep(InstallContext& ctx, const std::string& dep_name,
                        const std::string& pkg_name)
 {
-    if (ctx.plan.contains(dep_name)) return;  // 计划中已有同名真实包
-
-    if (plan_provides(ctx, dep_name)) {
-        if (!is_planned_target(ctx, dep_name))
-            ctx.targets.emplace_back(dep_name, std::string(constants::VER_LATEST));
-        return;
-    }
+    if (plan_provides(ctx, dep_name)) return;  // 由计划中某包提供（本批次会装上）
 
     if (is_planned_target(ctx, dep_name)) return;  // 已是目标（libsolv 会处理）
 
@@ -417,12 +427,36 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
 {
     if (Config::instance().no_deps_mode()) return;
     auto actual_deps = detail::parse_dep_strings(deps_);
-    if (actual_deps.empty()) return;
+    // 早退只在"命名依赖与 SONAME **都没有**"时成立。这里曾经写的是
+    // `if (actual_deps.empty()) return;` —— 于是下面**整段 needed_so 校验成了死代码**
+    // （SONAME 检查与"有没有命名依赖"毫无关系）：一个 deps 为空、needed_so 缺失的包可以
+    // 静默滑过这道防线（2026-10-02 修）。
+    if (actual_deps.empty() && needed_so_.empty()) return;
 
-    log_info(string_format("info.checking_deps", pkg_name_));
+    // **成功时完全静默**：这是**一致性校验**（"盘面/计划能不能撑起这个包的依赖"），不是依赖解析
+    // 的一步 —— 解析早在 solver 那一步做完了。校验只在**出错时**出声（下面两处 throw 与
+    // `warning.missing_so_no_error`），不报"我在检查"。
+    // 曾经打过一行 `info.checking_deps`：在批量输出里既吵又**误导** —— 只有带命名依赖的包打、
+    // 只带 SONAME 的不打，看起来像"只有第一个包查了依赖"（实测 `reinstall rust nano`）。
 
     for (const auto& dep : actual_deps) {
+        // ① 计划里要装这个依赖 → 批次结束后生效的是**计划版本**，不是盘上那份。即使盘上
+        //    那份满足约束，计划把它换成违反约束的版本同样是错（libsolv 的 EVR 匹配把"要求
+        //    侧缺 release"当通配，可能选出这种版本）。所以**先**按 lpkg 语义复核计划版本，
+        //    且**不受**"盘上已满足"短路 —— 那个短路只看盘面，会漏掉"计划正要换掉它"这一格。
+        if (ctx.plan.contains(dep.name)) {
+            // 计划里要装这个依赖 → 批次结束后生效的是**计划版本**，不是盘上那份。即使盘上
+            // 那份满足约束，计划把它换成违反约束的版本同样是错。复核**不受**"盘上已满足"
+            // 短路 —— 那个短路只看盘面，会漏掉"计划正要换掉它"这一格。
+            //
+            // 判据本体在 `detail::check_planned_dep_version()`（**唯一实现**，且可被直接
+            // 喂手搓的计划做单测 —— 见其声明处说明）。
+            detail::check_planned_dep_version(dep, ctx.plan, pkg_name_);
+            continue;
+        }
+        // ② 不在计划里 → 看盘面（已装且满足 / 有能力提供者）
         if (dep_satisfied_on_disk(dep)) continue;
+        // ③ 计划里没有、盘上也没满足 → 由 resolve_unmet_dep 裁定（能力 / 已是目标 / 报错）
         resolve_unmet_dep(ctx, dep.name, pkg_name_);
     }
 
@@ -652,6 +686,17 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
                                                   ? get_string("error.unknown_manual_file")
                                                   : holders.front();
                     }
+                } else if (!ours_exempts) {
+                    // ⚠️ 这里放行的是"归档**目录**覆盖盘上属于**别的包**的文件"，靠
+                    // `--overwrite` 豁免（`force_exempts && overwrite_allows(bare)`）。
+                    // **必须撤销旧持有者的文件键**（2026-10-02 修）：下面那句
+                    // `path_str.ends_with('/')` 会把控制流直接跳过去，于是旧持有者那条
+                    // `/usr/share/x`（**文件**键）永远留在 DB 里，而盘上该路径已经是目录 ——
+                    // `check_removal_preconditions` 的"文件键却在盘上是实体目录"检查随即
+                    // **拒绝卸载那个旧包**（只有 `--force` 能过）。非类型变化的那条路
+                    // （下面的路径级块）在豁免时就是这么做的（`view.drop_owners(path_str)`），
+                    // 这一格漏了同一件事。
+                    view.drop_owners(bare);
                 }
                 // **放行之后必须跳出**：`dir_takeover` 判真说明这次是"盘上是本包的目录、归档是
                 // 文件/符号链接"，而**目录在 DB 里的键带尾斜杠**（`<bare>/`）。放行后若继续往下
@@ -701,9 +746,23 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
 void throw_on_file_conflicts(const std::map<std::string, std::string>& conflicts)
 {
     if (conflicts.empty()) return;
+    // "无主手工文件"不是**包名**：它是 `error.unknown_manual_file`（"unknown (manual file)"）
+    // 这个占位文本，塞进 `error.file_conflict_entry` 的持有者槽会渲染成
+    // "File {} is owned by package unknown (manual file)" —— 语法破碎（2026-10-03 订正）。
+    // 判定持有者就是那个占位文本时改用与它配套的措辞
+    // `error.file_conflict_unowned`（只认文件路径）。 注意：赋值点仍保留
+    // `error.unknown_manual_file`（它仍是"这一格没有真实持有者"的哨兵，
+    // 冲突集合的**值**语义不变，只是渲染分开）。
+    // 取**值**而不是 `const std::string&`：`get_string` 按值返回，绑引用会触发
+    // `-Wdangling-reference`（GCC 13，-Werror 下直接编译失败）。这里只要一份快照。
+    const std::string unowned = get_string("error.unknown_manual_file");
     std::string msg = get_string("error.file_conflict_header") + "\n";
-    for (const auto& [file, owner] : conflicts)
-        msg += "  " + string_format("error.file_conflict_entry", file, owner) + "\n";
+    for (const auto& [file, owner] : conflicts) {
+        if (owner == unowned)
+            msg += "  " + string_format("error.file_conflict_unowned", file) + "\n";
+        else
+            msg += "  " + string_format("error.file_conflict_entry", file, owner) + "\n";
+    }
     throw LpkgException(msg + get_string("error.installation_aborted"));
 }
 
@@ -800,6 +859,10 @@ void InstallationTask::check_for_file_conflicts(InstallContext* ctx)
  *
  * **不改变失败语义**：预检拒绝时尚未 `run_batch_transaction`，WAL 里不会出现 BEGIN_PKGS
  * —— "什么都没发生"（与 check_removal_preconditions 前移后的形态一致）。
+ *
+ * ⚠️ **前置条件（2026-10-03 起）**：每个成员的归档**已经下载并解压**到标准临时目录
+ * （由 `download_batch` / `extract_batch` 两个阶段完成）。本函数**只读**那份内容清单，
+ * 自己不再下载/解压（此前它在同一趟里把两件事都做了）。
  */
 void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
                                 const std::vector<std::string>& order)
@@ -815,8 +878,8 @@ void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
     // 模拟状态：所有权（初值 = 盘上 DB 的 file_db，键含目录键的尾斜杠形态）
     std::map<std::string, std::set<std::string>> owners;
     {
-        std::lock_guard lock(cache.get_mutex());
-        for (const auto& [path, holders] : cache.file_db)
+        // 要的是"**原子地**拿一份整张归属表的基线"，不是"持锁遍历"—— 快照方法正是为此加的。
+        for (const auto& [path, holders] : cache.snapshot_file_ownership())
             owners[path].insert(holders.begin(), holders.end());
     }
     // 模拟状态：本批次前序成员已**物理移除**的 bare 逻辑路径（升级丢弃的废弃文件）。
@@ -836,21 +899,15 @@ void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
         const size_t cur = order_index.at(n);
 
         const std::string old_ver = cache.get_installed_version(n);
-        // 批次循环对"已装同版本且非强制重装"的包直接返回（run() 的早退分支 / 升级循环的
-        // 显式 skip）：不碰文件、不注册、也不下载。预检同样跳过。
-        if (!p.force_reinstall && !old_ver.empty() && old_ver == p.actual_version) continue;
+        // 与四个阶段/`run()` 早退共用同一份判据（见 plan_member_skipped）。
+        if (plan_member_skipped(p, old_ver)) continue;
 
-        // ── 取内容清单：下载 + 解压到标准临时目录（**不碰目标 root**）──
-        // 用的是与事务内 prepare() 完全相同的 InstallationTask 布局，解压产物由
-        // InstallationTask::extract_and_validate_package 依据 content_ready 复用
-        // （否则整批要多解压一遍 tar）。
-        InstallationTask task(p.name, p.actual_version, p.is_explicit, old_ver, p.local_path,
-                              p.sha256, p.force_reinstall);
-        ensure_dir_exists(task.tmp_pkg_dir());
-        task.download_and_verify_package();
-        task.extract_and_validate_package();
-        const auto files = detail::scan_content_files(task.tmp_pkg_dir() / constants::DIR_CONTENT);
-        p.content_ready = true;
+        // ── 取内容清单：**只读**已经由"解压"阶段就位的那份（不下载、不解压、不写盘）──
+        // 落点是标准临时目录（与事务内 prepare() 同一个布局），`scan_content_files` 在根不是
+        // 真目录时会抛 `error.content_not_directory` —— 所以"忘了先解压"会当场报出来，
+        // 而不是静默判成"这个包没有内容"。
+        const auto files =
+            detail::scan_content_files(Config::get_tmp_dir() / p.name / constants::DIR_CONTENT);
 
         // ── 判定（与逐包检查同一份语义，只有"世界"不同）──
         const ConflictView view{probe_now,
@@ -899,8 +956,14 @@ void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
         for (const auto& old_key : cache.get_package_files(n)) {
             if (new_keys.contains(old_key)) continue;
             owners[old_key].erase(n);
-            // /etc 的废弃条目只撤所有权、文件留在盘上（改名 .lpkgsave 是移除侧的事）
-            if (old_key.starts_with(std::string(constants::DIR_ETC_PREFIX))) continue;
+            // ⚠️ 这里**不再**对 `/etc` 一刀切地 `continue`（2026-10-02 修）。原先那行写着
+            // "`/etc` 的废弃条目只撤所有权、文件留在盘上（改名 .lpkgsave 是移除侧的事）"，
+            // 但那描述的是 **2026-09-26 之前**的语义：现在升级侧会把废弃的 `/etc`
+            // **文件/符号链接**改名成 `<路径>.lpkgsave`（`SaveConfigObsolete`，
+            // 见 installation_task_letgo.cpp），该路径**确实被腾空**了。沿用旧注释会让
+            // "后序成员合法接管这个路径"被误判成"无主手工文件"⇒ **整批拒绝**，而且随成员
+            // 顺序时好时坏（`taker` 排在 `migrator` 前就没事）。只有废弃的 `/etc` **目录**
+            // 才留在原地（`DropOwnership`），而那已由下面那句 `ends_with('/')` 覆盖。
             // 废弃**目录**键不在这里模拟：阶段 2 只在"本包是最后持有者且目录为空"时 rmdir，
             // 漏建模的方向是"预检偏保守"，且此类形态变化由逐包检查兜底。
             if (old_key.ends_with('/')) continue;

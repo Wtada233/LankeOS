@@ -3,7 +3,7 @@
  *
  * 严格按 TODO.md 要求：
  *   - remove -r 中途回滚（模拟 Ctrl+C / 断电）
- *   - 批量操作中途元数据变化重解析
+ *   - 批量安装本地包（其中一个依赖另一个）
  *   - 升级 needed_so 断裂后回滚
  *   - WAL 断裂后幂等恢复
  *   - force_overwrite 回滚后所有权恢复
@@ -99,14 +99,15 @@ TEST_F(ComplexAtomicTest, RecursiveRemoveRollbackDeepChain)
 }
 
 // ============================================================================
-// 场景 2: 批量安装 [A,B,C] 中 B 的元数据与 index 不一致 → 重解析 → 成功
+// 场景 2: 批量安装两个**本地**包，后者依赖前者（依赖由归档自身 metadata 决定）
 // ============================================================================
 
-TEST_F(ComplexAtomicTest, MetadataDriftDuringInstall)
+TEST_F(ComplexAtomicTest, BatchInstallLocalPackagesWithInterDependency)
 {
-    // 模拟真实场景：index 中的 deps 过时，实际包的元数据不同
-    // create_pkg 用实际元数据，但 install_packages 从 repo 读取 index
-    // 这里测试通过本地文件路径直接安装
+    // 用本地文件路径安装：计划里的 deps/provides 直接从**归档 metadata** 读出，与索引天然
+    // 一致，所以元数据一致性校验（不一致即硬报错）不会拦它。
+    // （2026-10-02 订正：原名 `MetadataDriftDuringInstall`，测的是已删除的"动态重解析"；
+    //   那套行为不再存在 —— 索引与归档不一致一律拒绝安装。）
 
     std::string pA = create_pkg("md_drift_A", "1.0", {}, {"libA_drift.so.1"});
     std::string pB = create_pkg("md_drift_B", "1.0", {"md_drift_A"}, {"libB_drift.so.1"});

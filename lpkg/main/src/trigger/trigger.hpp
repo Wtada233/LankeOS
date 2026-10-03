@@ -46,6 +46,15 @@ public:
      */
     void reset_for_test();
 
+    /**
+     * **仅供测试**：返回当前待执行命令集合的副本。
+     *
+     * 存在理由：此前触发器用例**只断言 `EXPECT_NO_THROW`**，而配置文件在测试环境里不存在时
+     * 规则表恒空 ⇒ 队列恒空 ⇒ "不抛"是**恒真的废话**（用例名却声称验证了触发器匹配）。
+     * 有了它，用例才能断言"匹配/去重**真的发生了**"。
+     */
+    std::set<std::string> pending_for_test();
+
 private:
     TriggerManager();
 

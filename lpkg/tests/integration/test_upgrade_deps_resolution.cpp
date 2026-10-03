@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <set>
 
@@ -42,7 +44,7 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_upgrade_deps_test");
+        suite_work_dir = fs::absolute("tmp_upgrade_deps_test_" + std::to_string(::getpid()));
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
         mirror_dir = suite_work_dir / "mirror" / "x86_64";
@@ -88,7 +90,7 @@ protected:
             f.close();
         }
 
-        std::string pkg_file = name + "-" + ver + ".lpkg";
+        std::string pkg_file = std::format("{}-{}.lpkg", name, ver);
         std::string pkg_path = (pkg_dir / pkg_file).string();
         pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, "man " + name,
                      needed_so);
@@ -102,7 +104,7 @@ protected:
     {
         fs::path pkg_subdir = mirror_dir / name;
         fs::create_directories(pkg_subdir);
-        fs::copy(pkg_dir / (name + "-" + ver + ".lpkg"), pkg_subdir / (ver + ".lpkg"),
+        fs::copy(pkg_dir / (std::format("{}-{}.lpkg", name, ver)), pkg_subdir / (ver + ".lpkg"),
                  fs::copy_options::overwrite_existing);
     }
 
@@ -112,7 +114,7 @@ protected:
     {
         std::ofstream index(mirror_dir / "index.txt");
         for (const auto& [name, ver, deps, provides, needed_so] : entries) {
-            std::string pkg_path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
+            std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
             std::string hash = "unknown";
             if (fs::exists(pkg_path)) hash = calculate_sha256(pkg_path);
             index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"

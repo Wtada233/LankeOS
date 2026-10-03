@@ -67,8 +67,17 @@ void ensure_tty_check()
  * 日志输出内部辅助函数
  * 支持终端彩色输出（tty 检测），非 tty 时仅输出纯文本
  */
-void log_internal(std::string_view prefix, std::string_view color, std::string_view msg,
-                  std::ostream& stream)
+/**
+ * 日志输出内部辅助函数。着色**对齐 pacman**（`src/pacman/conf.c` 的 `colstr` +
+ * `src/pacman/util.c` 的 `colon_printf` / `pm_printf`）：
+ *   · `::` 前缀 = **BOLDBLUE**，正文 = **BOLD** —— pacman 的 `colon` 串就是
+ *     `BOLDBLUE "::" BOLD " "`，正文在 BOLD 生效期间打印；
+ *   · `error:` / `warning:` 前缀 = BOLDRED / BOLDYELLOW，而**正文不着色**（pacman 打完前缀
+ *     立刻 reset，正文用默认色）。
+ * 非 TTY 一律纯文本（不写任何转义）。
+ */
+void log_internal(std::string_view prefix, std::string_view prefix_color,
+                  std::string_view body_color, std::string_view msg, std::ostream& stream)
 {
     std::lock_guard<std::mutex> lock(log_mutex);
 
@@ -82,8 +91,10 @@ void log_internal(std::string_view prefix, std::string_view color, std::string_v
     }
 
     if (current_stream_is_tty) {
-        stream << color << prefix << constants::COLOR_WHITE << msg << constants::COLOR_RESET
-               << std::endl;
+        stream << prefix_color << prefix;
+        // 正文色为空 ⇒ 前缀后立刻 reset（pacman 的 error/warning 就是这个形状）
+        stream << (body_color.empty() ? constants::COLOR_RESET : body_color);
+        stream << msg << constants::COLOR_RESET << std::endl;
     } else {
         stream << prefix << msg << std::endl;
     }
@@ -95,7 +106,10 @@ void log_internal(std::string_view prefix, std::string_view color, std::string_v
  */
 void log_info(std::string_view msg)
 {
-    log_internal(get_string("info.log_prefix"), constants::COLOR_GREEN, msg, std::cout);
+    // 前缀后补一个空格（与 warning/error 一致）：pacman 风格的信息前缀是 `::`。
+    // 颜色：`::` 粗蓝 + 正文粗体（pacman 的 `colstr.colon` / `colstr.title`）。
+    log_internal(get_string("info.log_prefix") + " ", constants::COLOR_BOLDBLUE,
+                 constants::COLOR_BOLD, msg, std::cout);
 }
 
 /**
@@ -103,7 +117,7 @@ void log_info(std::string_view msg)
  */
 void log_warning(std::string_view msg)
 {
-    log_internal(get_string("warning.prefix") + " ", constants::COLOR_YELLOW, msg, std::cerr);
+    log_internal(get_string("warning.prefix") + " ", constants::COLOR_YELLOW, {}, msg, std::cerr);
 }
 
 /**
@@ -111,36 +125,7 @@ void log_warning(std::string_view msg)
  */
 void log_error(std::string_view msg)
 {
-    log_internal(get_string("error.prefix") + " ", constants::COLOR_RED, msg, std::cerr);
-}
-
-/**
- * 输出进度条信息（仅 tty 终端生效）
- * 格式: ==> 消息 [########>-----] 66.7%
- */
-void log_progress(const std::string& msg, double percentage, int bar_width)
-{
-    {
-        std::lock_guard<std::mutex> lock(log_mutex);
-        ensure_tty_check();
-        if (!is_stdout_tty) {
-            return;
-        }
-    }
-
-    int pos = static_cast<int>(bar_width * percentage / 100.0);
-
-    std::cout << "\r" << constants::COLOR_GREEN << "==> " << constants::COLOR_WHITE << msg << " [";
-    for (int i = 0; i < bar_width; ++i) {
-        if (i < pos)
-            std::cout << "#";
-        else if (i == pos)
-            std::cout << ">";
-        else
-            std::cout << "-";
-    }
-    std::cout << "] " << std::fixed << std::setprecision(1) << percentage << "%"
-              << constants::COLOR_RESET << std::flush;
+    log_internal(get_string("error.prefix") + " ", constants::COLOR_RED, {}, msg, std::cerr);
 }
 
 /**
@@ -161,6 +146,7 @@ int run_command(const std::vector<std::string>& args, const fs::path& work_dir)
             }
         }
         std::vector<char*> c_args;
+        c_args.reserve(args.size() + 1);  // +1 给末尾的 nullptr
         for (const auto& arg : args) {
             c_args.push_back(const_cast<char*>(arg.c_str()));
         }
@@ -169,7 +155,11 @@ int run_command(const std::vector<std::string>& args, const fs::path& work_dir)
         _exit(127);
     }
     int status;
-    if (waitpid(pid, &status, 0) == -1) return -1;
+    // waitpid 可能被信号中断（EINTR）—— 必须重试，否则把"被信号打断"误报成"命令失败"。
+    // 与 run_shell_in_root 的处理一致。
+    while (waitpid(pid, &status, 0) == -1) {
+        if (errno != EINTR) return -1;
+    }
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 
@@ -211,12 +201,53 @@ int run_shell_in_root(const std::string& cmd)
 }
 
 /**
+ * 从 stdin 读**一行**（读到 `\n` / `\r` 为止，行尾不进结果），期间**轮询 `sigint_graceful`**。
+ *
+ * 为什么不能用 `std::cin >> x` / `std::getline(std::cin, …)`：`std::signal()` 装的 handler 在
+ * glibc 下带 `SA_RESTART`，被信号打断的 `read(2)` 会被**自动重启**；而 iostreams 也会重试。
+ * 于是 Ctrl+C 只是把 `sigint_graceful` 置位、打印一句提示，进程**仍旧卡在输入上** ——
+ * 用户看到的现象是"**Ctrl+C 无效，只能 kill -9**"（`std::getline` 尤其明显：它连 EINTR 都
+ * 不往外抛）。轮询把"信号"与"输入"解耦：100ms 一轮，每轮先看标志。
+ *
+ * **所有交互式输入都必须走这里**（`user_confirms` 与两处确认短语都是）。别在别处再写
+ * `std::cin`：那会让该处又变回"输入期间不可中断"。
+ *
+ * @return true = 读到一行（不含行尾）；false = 被 Ctrl+C 打断 **或** stdin 到 EOF。
+ *         两者对调用方的处置通常相同（放弃当前操作），故不区分。
+ */
+bool read_line_interruptible(std::string& out)
+{
+    out.clear();
+    while (!sigint_graceful.load()) {
+        struct pollfd pfd{STDIN_FILENO, POLLIN, 0};
+        const int r = ::poll(&pfd, 1, 100);  // 100ms 轮询，期间可响应信号
+        if (r < 0) {
+            if (errno == EINTR) continue;  // 信号打断 poll → 重新检查 flag
+            return false;
+        }
+        if (r == 0) continue;  // 超时 → 继续轮询（保持响应 Ctrl+C）
+        if (pfd.revents & (POLLIN | POLLHUP)) {
+            char ch = 0;
+            const ssize_t n = ::read(STDIN_FILENO, &ch, 1);
+            if (n == 0) return false;  // EOF
+            if (n < 0) {
+                if (errno == EINTR) continue;
+                return false;
+            }
+            if (ch == '\n' || ch == '\r') return true;
+            out.push_back(ch);
+        }
+    }
+    return false;  // Ctrl+C
+}
+
+/**
  * 向用户请求确认（y/n）
  * 根据非交互模式配置自动返回 yes/no
  *
- * 交互模式用轮询读 stdin：安装/移除等事务中的 SIGINT（Ctrl+C）会由 main_cli.cpp 的
- * SigIntGuard 设置 sigint_graceful 并打印提示——轮询循环检测到即视为用户取消
- * （返回 false），而不是卡在 std::cin 上对 Ctrl+C 无响应。
+ * 交互模式走 `read_line_interruptible()`：SIGINT（Ctrl+C）由 `main_cli.cpp` 的 `SigIntGuard`
+ * 置 `sigint_graceful`，轮询循环检测到即视为用户取消（返回 false），而不是卡在 `std::cin` 上
+ * 对 Ctrl+C 无响应。
  */
 bool user_confirms(const std::string& prompt)
 {
@@ -231,34 +262,10 @@ bool user_confirms(const std::string& prompt)
             std::cout.flush();
 
             std::string response;
-            char ch;
-            while (!sigint_graceful.load()) {
-                struct pollfd pfd{STDIN_FILENO, POLLIN, 0};
-                const int r = ::poll(&pfd, 1, 100);  // 100ms 轮询，期间可响应信号
-                if (r < 0) {
-                    if (errno == EINTR) continue;  // 信号打断 poll → 重新检查 flag
-                    return false;
-                }
-                if (r == 0) continue;  // 超时 → 继续轮询（保持响应 Ctrl+C）
-                if (pfd.revents & (POLLIN | POLLHUP)) {
-                    const ssize_t n = ::read(STDIN_FILENO, &ch, 1);
-                    if (n == 0) return false;  // EOF
-                    if (n < 0) {
-                        if (errno == EINTR) continue;
-                        return false;
-                    }
-                    if (ch == '\n' || ch == '\r') break;
-                    response.push_back(ch);
-                }
-            }
-            if (sigint_graceful.load()) return false;  // Ctrl+C → 视为取消
-
+            if (!read_line_interruptible(response)) return false;  // Ctrl+C / EOF → 视为取消
             // 与旧的 std::cin >> 语义一致：忽略首尾空白后匹配 y/Y
-            while (!response.empty() && (response.front() == ' ' || response.front() == '\t'))
-                response.erase(response.begin());
-            while (!response.empty() && (response.back() == ' ' || response.back() == '\t'))
-                response.pop_back();
-            return (response == "y" || response == "Y");
+            const std::string trimmed = trim_copy(response);
+            return (trimmed == "y" || trimmed == "Y");
         }
     }
 }
@@ -328,7 +335,7 @@ TmpDirManager::~TmpDirManager()
 {
     try {
         fs::remove_all(tmp_dir_path_);
-    } catch (const fs::filesystem_error&) {
+    } catch (const fs::filesystem_error&) {  // NOLINT(bugprone-empty-catch) — 析构里不能抛
         // 静默处理删除失败，避免在析构中抛出异常
     }
 }
@@ -349,6 +356,23 @@ bool is_safe_path_component(std::string_view s)
     if (s.empty() || s == "." || s == "..") return false;
     if (s.find('/') != std::string_view::npos || s.find('\0') != std::string_view::npos)
         return false;
+    // **分帧字符一律拒绝**：包名/版本号会被写进几种"行式 + 分隔符"的状态文件，重载时按那些
+    // 分隔符切分 —— 带进去就等于把一条记录重新分帧成另一条合法记录：
+    //   `:`  `pkgs` 集合（`name:version`）与索引行的版本块（`<ver>:<hash>:<deps>:…`）
+    //   `|`  索引行的一级字段（`<name>|<版本块>|<…>`）
+    //   `;`  索引行的版本块分隔
+    //   `,`  `files.db` 的属主集合（`a,b,c`）与索引行的 deps 字段
+    // 2026-10-03 审计实测的后果（`coreutils,evil` 这种名字）：`files.db` 读回变成两个幽灵
+    // 属主 ⇒ 该包能"卸载成功"（退 0）却把文件与归属全留下，而真实包 `coreutils` 会**误含**
+    // 它的文件（autoremove / remove -r / force-solve 这些内部 force 路径会把文件搬走删掉）。
+    // `^` / `~` / `:` 是**版本桥接的保留字符**（对 libsolv 的 EVR 解析各有特殊含义，
+    // 见 vercmp/version.hpp）：混进版本号会让求解器看到的语义悄悄错位。实测真实索引
+    // 678 个版本里这三个字符一个都没有，所以拒它们不误伤任何现存包。
+    // 本函数只用于包名与版本号，不用于内容文件路径，所以不会误伤合法文件名。
+    for (const char c : s)
+        if (c == '|' || c == ';' || c == ',' ||
+            constants::EVR_RESERVED_CHARS.find(c) != std::string_view::npos)
+            return false;
     // 空白也必须拒绝：包名会进入 WAL 的**里程碑**字段（`DB <path> <pkg>:<state>`），
     // 而 WAL 是空格分帧的（尾字段从右锚定）——带空格的里程碑会让 reverse_execute 推出的
     // 备份名与实际不符 → DB 回滚被静默跳过、备份随后被 cleanup_db_backups 删掉。
@@ -580,6 +604,18 @@ bool is_symlink_no_follow(const fs::path& p)
     return !ec && st.type() == fs::file_type::symlink;
 }
 
+bool symlink_targets_equal(const fs::path& a, const fs::path& b)
+{
+    // 任一侧读不出（不存在／不是符号链接／中间段成环／权限不足）一律判**不同**：
+    // 保守方向见头文件（判"不同"只多留一份 `.lpkgnew`，判"相同"可能放过真正改过的链接）。
+    std::error_code ea;
+    const fs::path ta = fs::read_symlink(a, ea);
+    if (ea) return false;
+    std::error_code eb;
+    const fs::path tb = fs::read_symlink(b, eb);
+    return !eb && ta == tb;
+}
+
 fs::path strip_trailing_slash(const fs::path& p)
 {
     std::string s = p.string();
@@ -627,11 +663,15 @@ void ensure_file_exists(const fs::path& path)
 {
     // 同 ensure_dir_exists：判定不抛（ELOOP 会让 fs::exists 抛，见 utils.hpp 的谓词说明）
     if (!exists_follow(path)) {
-        std::ofstream file(path);
-        if (!file) {
+        // 用 ::open 而不是 ofstream：iostreams **不保证**在失败时设置 errno，读 strerror(errno)
+        // 可能打出上一次系统调用留下的陈旧 errno（误导定位）。open 失败后 errno 才是这次失败
+        // 的可靠原因。mode 0666 与 ofstream 的默认创建权限一致（同样受 umask 约束）。
+        const int fd = ::open(path.c_str(), O_WRONLY | O_CREAT, 0666);
+        if (fd < 0) {
             throw LpkgException(string_format("error.create_file_failed", path.string()) + ": " +
-                                strerror(errno));
+                                std::strerror(errno));
         }
+        ::close(fd);
     }
 }
 
@@ -754,13 +794,26 @@ void write_string_to_file(const fs::path& path, std::string_view content)
 /**
  * fsync 目录条目。
  * open + fsync + close 确保目录元数据（包括其中的 dentry）落盘。
+ *
+ * 口径说明：`fsync_and_rename` 对 fsync 失败是**抛**的，但这里**只告警、不抛**。差别在于
+ * 调用位置 —— 本函数经 `fsync_parent_dir` ← `safe_rename` 挂在**事务中途**：在那里抛会把
+ * 一次已经开始的 rename/事务打断，代价比"目录项可能没落盘"更高。所以持久化失败在这里是
+ * **尽力而为 + 可见**：告警点名目录，让用户知道断电可能丢这些数据，但流程继续。
+ * 返回值/计数口径不变（`g_durable_fsync_count` 仍是"成功的 fsync 次数"，供测试观察）；
+ * 默认模式下仍然什么都不做（见 durable_fsync_enabled）。
  */
 static void fsync_dir_internal(const fs::path& dir)
 {
     if (!durable_fsync_enabled()) return;  // 默认模式：目录项不落盘（见 durable_fsync_enabled）
     int dir_fd = ::open(dir.c_str(), O_RDONLY | O_DIRECTORY);
     if (dir_fd >= 0) {
-        if (::fsync(dir_fd) == 0) ++g_durable_fsync_count;
+        if (::fsync(dir_fd) == 0) {
+            ++g_durable_fsync_count;
+        } else {
+            // 此前静默忽略：断电可能丢掉这个目录项（进而丢掉它下面的 rename），而调用方
+            // 以为已经持久化。告警（不抛），点名目录。
+            log_warning(string_format("warning.fsync_failed", dir.string()));
+        }
         ::close(dir_fd);
     }
 }
@@ -797,6 +850,37 @@ bool path_within(const fs::path& p, const fs::path& root)
     return ps == rs || ps.rfind(rs + "/", 0) == 0;
 }
 
+bool path_resolves_within(const fs::path& dir, const fs::path& root)
+{
+    if (dir.empty() || root.empty()) return true;
+    if (root == fs::path("/")) return true;  // 生产 root：任何绝对路径都在其内，不付检索代价
+    std::error_code ec;
+    const fs::path cd = fs::weakly_canonical(dir, ec);
+    if (ec) return true;  // 解不开（ELOOP 等）→ 放行（见头文件）
+    return path_within(cd, root);
+}
+
+bool path_within_resolved(const fs::path& p, const fs::path& root)
+{
+    // 空路径的含义由各调用方自己处理（WAL 侧历史上就是"放行"）——见 utils.hpp 的说明。
+    if (p.empty() || root.empty()) return true;
+    // ① 词法级：**复用上面那份唯一实现**（此前这里与 db/wal_op.cpp 各写了一套分量比较，
+    //    只靠注释约束"两侧同一套规则"——那正是要消灭的形态）。
+    if (!path_within(p, root)) return false;
+
+    const fs::path r = strip_trailing_slash(root.lexically_normal());
+    const fs::path q = p.lexically_normal();
+    if (q == r) return true;  // p 就是 root 自身：其父目录落在 root 之外很正常
+
+    // ② canonical 复核：**只解析父目录，末段一律不解析**（理由见 utils.hpp）。
+    std::error_code ec_r;
+    std::error_code ec_q;
+    const fs::path cr = fs::weakly_canonical(r, ec_r);
+    const fs::path cq = fs::weakly_canonical(q.parent_path(), ec_q);
+    if (ec_r || ec_q) return true;  // 解不开（ELOOP / 中间段未重建）→ 不判越界
+    return path_within(cq, cr);
+}
+
 namespace
 {
 /** mountinfo 字段的八进制转义还原（\040 空格、\011 制表、\012 换行、\134 反斜杠） */
@@ -821,9 +905,9 @@ std::string unescape_mountinfo(const std::string& s)
 /** lexically_normal 后去掉尾部分隔符（"/mnt/base/" 与 "/mnt/base" 视为同一个目录） */
 fs::path strip_trailing_sep(const fs::path& p)
 {
-    std::string s = p.lexically_normal().string();
-    while (s.size() > 1 && s.back() == '/') s.pop_back();
-    return fs::path(s);
+    // 复用 `strip_trailing_slash` 这**唯一**一份"剥尾斜杠"实现：这里只是先 `lexically_normal`
+    // （近重复两处极易漂移 —— 改一处不改另一处不会有任何编译错误）。
+    return strip_trailing_slash(p.lexically_normal());
 }
 }  // namespace
 
@@ -935,7 +1019,7 @@ void cleanup_tmp_dirs()
             if (::kill(pid, 0) != 0 && errno == ESRCH) {
                 fs::remove_all(entry.path());
             }
-        } catch (const std::invalid_argument&) {
+        } catch (const std::invalid_argument&) {  // NOLINT(bugprone-empty-catch) — 名字不是 PID
             // 非 PID 命名的 lpkg_* 目录——忽略，不删除
         } catch (const std::exception& e) {
             log_warning(string_format("warning.cleanup_old_tmp_failed", entry.path().string()) +

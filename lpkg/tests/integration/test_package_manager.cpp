@@ -55,6 +55,14 @@ TEST_F(PackageManagerTest, VirtualPackages)
     install_packages({p_prov});
 
     install_packages({p_cons});
+
+    // 断言（这条用例此前**零断言** —— 装不上也会"通过"）：provider 与依赖虚拟 provides
+    // (`libssl`) 的 consumer 都必须真的装上，且文件落在沙盒 root 里。
+    EXPECT_TRUE(Cache::instance().is_installed("provider"));
+    EXPECT_TRUE(Cache::instance().is_installed("consumer"))
+        << "consumer 依赖 provider 提供的虚拟能力 libssl，虚拟 provides 解析失败就会漏装";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin" / "provider"));
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin" / "consumer"));
 }
 
 TEST_F(PackageManagerTest, VersionConstraints)

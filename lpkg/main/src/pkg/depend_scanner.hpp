@@ -58,7 +58,8 @@ ScanNode scan_install_from_file(const std::filesystem::path& lpkg_path, bool sho
 // Pretty-print a dependency tree to stdout with Unicode box-drawing.
 void print_tree(const ScanNode& node);
 
-// Get a human-readable label for a ScanStatus.
-std::string_view status_label(ScanStatus s);
+// ScanStatus → l10n 键（调用方用 `get_string(...)` 取译文）。以前这里返回硬编码英文标签，
+// 而 `depend`/`scan` 的树形输出是**用户可见**的 —— 与 CLI 其余部分不一致。
+std::string_view status_label_key(ScanStatus s);
 
 }  // namespace depscan

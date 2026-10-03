@@ -10,6 +10,7 @@
 #include "../../main/src/base/constants.hpp"
 #include "../../main/src/base/utils.hpp"
 #include "../../main/src/config/config.hpp"
+#include "../../main/src/db/test_breakpoints.hpp"
 #include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
 #include "nlohmann/json.hpp"
@@ -33,7 +34,9 @@ protected:
         Config::instance().set_no_deps_mode(false);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_advanced_test");
+        // 目录名带 PID：并发的第二个测试进程会 rm -rf 掉固定名目录（同 test_base.hpp 的
+        // `tmp_lpkg_itest`，实测产生成片 SetUp 假失败）。
+        suite_work_dir = fs::absolute("tmp_advanced_test_" + std::to_string(getpid()));
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
 
@@ -138,20 +141,35 @@ TEST_F(AdvancedPackageManagerTest, ChrootHook)
         fs::remove_all(work_dir);
     }
 
+    // 正向对照：`run_hook` 的**执行点**断点（hooks 已启用、脚本确实存在、只剩 exec）。
+    // 沙盒 root 里没有 /bin/bash，run_hook 会在 chroot 分支提前 return —— 钩子不会真的执行。
+    // 正因如此，"没有落文件"这句若不配这个断点就是**恒真**：包不带 hook / hook 没被识别 /
+    // 钩子被禁用，都会得到"没落文件"，而它们与 root 前缀对不对无关。断点先钉住"处理确实走到
+    // 了执行决策那一步"，下面的否定断言才有咬合力（同 test_hook_transaction.cpp 的取证方式）。
+    bool hook_exec_point_reached = false;
+    auto on_hook = [&] { hook_exec_point_reached = true; };
+    BreakpointManager::instance().set("hook_run_postinst.sh", on_hook);
+
     testing::internal::CaptureStderr();
     install_packages({pkg});
     testing::internal::GetCapturedStderr();
+    BreakpointManager::instance().clear_all();
 
-    // 护栏的三条腿（改钩子执行时机时这是唯一的 chroot 护栏，缺一条就能被绕过）：
-    //  (1) 钩子脚本**确实**被装进了目标 root 的 hooks 目录 —— 否则下面的"没跑"是空转
-    //      （包不带 hook / hook 没被识别，都不会有证据）
-    //  (2) 钩子的副作用**没有**落在目标 root 里（沙盒 root 里没有 /bin/bash，run_hook 会
-    //      提前 return —— 这里要钉的正是"绝不退化成在宿主上执行"）
-    //  (3) 也**没有**落在宿主真实的 / 上（配置若漏了 root 前缀就会写到这里）
+    // (1) 正向对照本身：执行点确实被走到 —— 否则下面全是空转
+    ASSERT_TRUE(hook_exec_point_reached) << "run_hook 未走到执行点（钩子被禁用 / 未识别）";
+
+    // (2) 钩子脚本**确实**被装进了目标 root 的 hooks 目录
     const fs::path hook_file = Config::instance().hooks_dir() / "hook_test" / "postinst.sh";
-    EXPECT_TRUE(fs::exists(hook_file)) << "hook 没被装到目标 root 的 hooks_dir 里，护栏是空转的";
+    ASSERT_TRUE(fs::exists(hook_file)) << "hook 没被装到目标 root 的 hooks_dir 里，护栏是空转的";
+
+    // (3) 执行点已到，但副作用**没有**落在目标 root、也**没有**落到宿主真实的 / 上。两条
+    //     合起来排除了"chroot 建不起来就退化成在宿主上执行"这种回退（那会把 hook_ran.txt 写到
+    //     宿主 /）。本沙盒里钩子最终被"缺 bash"那道守卫**跳过**，所以这里证明不了"钩子会在目标
+    //     root 内真的跑起来"——那要往沙盒塞一整套 rootfs，属于"考环境"（同 test_hook_transaction
+    //     的说明）；但"绝不退化到宿主执行"这条能证，且正是本用例要守的不变量。
     EXPECT_FALSE(fs::exists(test_root / "hook_ran.txt"));
     EXPECT_FALSE(fs::exists("/hook_ran.txt"));
+    // (4) hook 脚本本身也没落到宿主真实的 /etc/lpkg（root 前缀漏掉就会写到这里）
     EXPECT_FALSE(fs::exists("/etc/lpkg/hooks/hook_test"))
         << "hook 落到宿主真实的 /etc/lpkg 上了（root 前缀被漏掉）";
 }

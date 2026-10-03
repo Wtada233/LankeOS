@@ -90,17 +90,25 @@ void init_localization()
     fs::path main_l10n_dir = exec_dir / ".." / "main" / "l10n";  // main/l10n 目录布局
     fs::path src_l10n_dir = exec_dir / ".." / "src" / "l10n";    // 测试目录下的 src/l10n 布局
 
-    if (is_directory_follow(relative_l10n_dir)) {  // 不抛：这些目录可能被符号链接环占着（见
-                                                   // base/utils.hpp 的谓词族）
-        load_strings(lang, relative_l10n_dir);
+    // 定位到实际存在的那个 l10n 目录（不抛判定：这些目录可能被符号链接环占着，见
+    // base/utils.hpp 的谓词族）。
+    fs::path l10n_dir;
+    if (is_directory_follow(relative_l10n_dir)) {
+        l10n_dir = relative_l10n_dir;
     } else if (is_directory_follow(main_l10n_dir)) {
-        load_strings(lang, main_l10n_dir);
+        l10n_dir = main_l10n_dir;
     } else if (is_directory_follow(src_l10n_dir)) {
-        load_strings(lang, src_l10n_dir);
+        l10n_dir = src_l10n_dir;
     } else {
-        load_strings(lang,
-                     Config::instance().l10n_dir());  // 回退到安装路径下的配置目录
+        l10n_dir = Config::instance().l10n_dir();  // 回退到安装路径下的配置目录
     }
+
+    // **先装英文**：它既是"整份语言包缺失"时的回退，也是"个别 key 缺失"时的兜底
+    // （`get_string` 从 `english_fallback` 取）。此前只有前者生效 —— 因为 `en` 只在
+    // 整份语言文件打不开时才被递归加载，而 zh.txt 正常打开时 `en` 压根没被读，
+    // `english_fallback` 恒空，缺单个 key 仍吐 `[MISSING_STRING: …]`。
+    load_strings("en", l10n_dir);
+    if (lang != "en") load_strings(lang, l10n_dir);
 }
 
 /**

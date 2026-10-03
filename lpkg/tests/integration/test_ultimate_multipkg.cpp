@@ -125,7 +125,6 @@ constexpr const char* ETC_S2F = "etc/ult-s2f.conf";                  ///< 类型
 constexpr const char* ETC_GONE = "etc/ult-gone.conf";                ///< 废弃
 
 // ── 合租目录与它的 xattr 键 ───────────────────────────────────────────────────
-constexpr const char* SHARED_DIR = "usr/share/ult/shared";
 constexpr const char* KEEP = "user.k_keep";
 constexpr const char* DROP = "user.k_drop";
 constexpr const char* CHANGE = "user.k_change";

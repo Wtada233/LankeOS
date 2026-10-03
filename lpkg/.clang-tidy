@@ -1,0 +1,61 @@
+# lpkg 的 clang-tidy 配置（`make tidy` 读它）
+#
+# ⚠️ **基线版本与 clang-format 不同，这是已知且有意接受的差异**：
+#   · `make format-check` 跑在**能跑的那一侧**，用 clang-format **23.1.2**；
+#   · `make tidy` 跑在**容器**里（本项目的验证环境；解析编译数据库要 `pkg-config` 那些
+#     `-I`，容器里是装齐的），那一侧是 clang-tidy **17.0.5**。
+#   换大版本时告警集会有出入。真要对齐，路径是**把容器里的 LLVM 升到 23**，
+#   而不是改这里的 checks。
+#
+# ⚠️ **本配置是"报告"而不是"闸门"**：`WarningsAsErrors` 留空，`make tidy` 也**不看退出码**。
+#   目的是先把实际告警量与构成摊开看清，再挑高价值项逐条升级成拦截 ——
+#   一上来全开会被噪音淹掉，等于没有信号。
+#
+# `Checks` 的取舍原则：只收**指向真问题**的检查。刻意排除几类在成熟代码里必然刷屏、
+# 且大多无害的（见下面的逐条理由），它们会把真正该看的东西埋掉。
+
+# ⚠️ **`bugprone-unchecked-optional-access` 是**关闭的，理由是它在本仓库**全是假阳性**：
+#   它不认识 gtest 的 `ASSERT_*` —— 而 gtest 把 `ASSERT_TRUE(x.has_value())` 展开成
+#   **`if (...) return;`**，运行时确实收窄了，工具却看不到。实测首轮 120 条里 60 条全是
+#   这个：**0 条在 `main/src`**，60 条全在 `tests/`，且每一条前面都紧跟着一条
+#   `ASSERT_TRUE(...has_value())`。留着它只会训练人忽略这个工具的输出。
+#   （clang-tidy 较新版本才对 gtest 断言建模；要重新打开，先确认新版能识别。）
+#
+# ⚠️ **`clang-diagnostic-missing-field-initializers` 也是关闭的，理由同样充分**：
+#   它对**库自带的 INIT 宏**一律误报 —— `GIT_FETCH_OPTIONS_INIT` /
+#   `GIT_CHECKOUT_OPTIONS_INIT` / `GIT_CLONE_OPTIONS_INIT` 展开后**只列了前几个字段**
+#   （且不止 version：checkout 那个还带 `GIT_CHECKOUT_SAFE`、fetch 那个还带 callbacks /
+#   prune / `update_fetchhead=1`），其余留零 —— 那是**库有意的部分初始化**，不是漏写。
+#   **我按这条告警改成'逐个赋值'时真把行为改坏了**（丢了 checkout_strategy 与 fetch 的
+#   callbacks/prune/update_fetchhead ⇒ 子模块检出全挂），已还原。
+#   **教训：动库的 INIT 宏之前先看宏定义，别信告警。**
+---
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-unchecked-optional-access,
+  -clang-diagnostic-missing-field-initializers,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-suspicious-stringview-data-usage,
+  performance-*,
+  -performance-avoid-endl,
+  modernize-use-nullptr,
+  modernize-use-override,
+  modernize-use-bool-literals,
+  readability-duplicate-include,
+  readability-redundant-string-cstr,
+  readability-static-accessed-through-instance,
+  readability-container-size-empty,
+
+# 留空 = 只报告不拦。改成 '警告模式串' 才是闸门，见文件头的说明。
+WarningsAsErrors: ''
+
+# 只对**本项目自己的**代码报（`main/src` 与 `tests`；不含 `main/third_party`，
+# 那是别人的代码 —— 与 `make format-check` 的覆盖面一致）。
+HeaderFilterRegex: '(main/src|tests)/.*'
+
+# 让 tidy 用仓库自己的 .clang-format 渲染建议的替换代码，免得给出一堆要重排的 diff。
+FormatStyle: file
+...

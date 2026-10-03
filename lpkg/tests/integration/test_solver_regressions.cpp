@@ -15,6 +15,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <sstream>
 #include <tuple>
@@ -68,7 +69,7 @@ protected:
     {
         std::ofstream index(mirror_dir / "index.txt");
         for (const auto& [name, ver, deps, provides, needed_so] : entries) {
-            const std::string pkg_path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
+            const std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
             const std::string hash = fs::exists(pkg_path) ? calculate_sha256(pkg_path) : "unknown";
             index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
                   << needed_so << "|\n";
@@ -95,8 +96,8 @@ protected:
         const std::string cmd = "gcc -shared -fPIC -Wl,-soname," + name + ".so.1 -o " +
                                 out.string() + " " + src.string() + " 2>/dev/null";
         if (std::system(cmd.c_str()) != 0 || !fs::exists(out)) return false;
-        pack_package((pkg_dir / (name + "-" + ver + ".lpkg")).string(), work.string(), name, ver,
-                     {}, {}, "", {});
+        pack_package((pkg_dir / std::format("{}-{}.lpkg", name, ver)).string(), work.string(), name,
+                     ver, {}, {}, "", {});
         return true;
     }
 
@@ -580,10 +581,14 @@ TEST_F(SolverRegressionTest, AutoremoveRollsBackAllPackagesWhenInterrupted)
     remove_package("app", false);
     ASSERT_TRUE(Cache::instance().is_installed("d1"));
 
-    // 第一个候选包删完后中断 → autoremove 必须整批回滚（旧实现逐包各一批，d1 会永久丢失）
+    // 第一个候选包删完后中断 → autoremove 必须整批回滚（旧实现逐包各一批，d1 会永久丢失），
+    // **且取消必须上抛**（2026-10-02 修）：此前 `autoremove` 用一个 `catch
+    // (const std::exception&)` 把异常吞成"一条警告"，于是 `lpkg autoremove` 被 Ctrl+C
+    // 之后**退出码仍是 0** —— 脚本/farm 会以为删成功了，而实际一个包都没删。取消（以及任何
+    // 真实的批次失败）都该照常上抛，由 `run_cli` 翻成非零退出码（见 ARCH §14.4 取消 ≠ 完成）。
     BreakpointManager::instance().set("remove_after_package_d1",
                                       [] { sigint_graceful.store(true); });
-    autoremove();  // 内部 catch 异常并告警
+    EXPECT_THROW(autoremove(), UserAbort);
     BreakpointManager::instance().clear_all();
     sigint_graceful.store(false);
 

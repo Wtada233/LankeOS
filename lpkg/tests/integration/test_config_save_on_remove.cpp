@@ -22,6 +22,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -75,7 +76,7 @@ protected:
             std::ofstream f(p);
             f << content;
         }
-        std::string pkg_path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
+        std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
         pack_package(pkg_path, work_dir.string(), name, ver, deps, {}, "Man page for " + name, {});
         fs::remove_all(work_dir);
         return pkg_path;
@@ -87,7 +88,7 @@ protected:
     {
         std::ofstream index(mirror_dir / "index.txt");
         for (const auto& [name, ver, deps, provides, needed_so] : entries) {
-            const std::string pkg_path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
+            const std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
             const std::string hash = fs::exists(pkg_path) ? calculate_sha256(pkg_path) : "unknown";
             index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
                   << needed_so << "|\n";

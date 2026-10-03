@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -24,7 +25,7 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        suite_work_dir = fs::absolute("tmp_aggregated_index_test");
+        suite_work_dir = fs::absolute("tmp_aggregated_index_test_" + std::to_string(::getpid()));
         fs::remove_all(suite_work_dir);
 
         root = suite_work_dir / "root";
@@ -369,4 +370,24 @@ TEST_F(AggregatedIndexTest, DirectoryIndexIsReportedNotEmptyRepo)
     EXPECT_NE(cap.str().find(needle), std::string::npos)
         << "索引读不出内容时**必须留下可见告警**，否则就是静默当成空仓库。捕获到的 stderr：\n"
         << cap.str();
+}
+
+TEST_F(AggregatedIndexTest, EmptyTokensInProvidesAndNeededSoAreDropped)
+{
+    // 索引行里的尾随/连续逗号会切出空 token。空串进 libsolv 就是 `STRID_EMPTY`（一个无人
+    // 提供的 capability），而 `collect_problems` 又因 `dep_name` 为空而跳过它 —— 用户只看到
+    // 一条无从定位的 "solve failed"。`provides`/`needed_so` 必须与 `deps` 一样清洗
+    // （trim + 丢空片段，2026-10-02 修）。
+    write_index("libfoo|1.0:abc123::libx.so.1,,liby.so.2,:liba.so.1,|\n");
+    Repository repo;
+    repo.load_index();
+
+    const auto pkg = repo.find_package("libfoo");
+    ASSERT_TRUE(pkg.has_value());
+    EXPECT_EQ(pkg->provides, (std::vector<std::string>{"libx.so.1", "liby.so.2"}));
+    EXPECT_EQ(pkg->needed_so, (std::vector<std::string>{"liba.so.1"}));
+
+    // providers_ 表也必须只记非空 capability
+    EXPECT_TRUE(repo.find_provider("libx.so.1").has_value());
+    EXPECT_FALSE(repo.find_provider("").has_value());
 }

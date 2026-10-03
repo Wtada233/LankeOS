@@ -15,12 +15,42 @@
 #include "db/test_breakpoints.hpp"
 #include "i18n/localization.hpp"
 #include "solver.hpp"
+#include "ui/term.hpp"
+#include "vercmp/dep_parser.hpp"  // detail::dependency_name_of（`deps/` 行 → 包名，唯一实现）
 
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
 namespace detail
 {
+
+fs::path staged_tmp_path(const fs::path& dst)
+{
+    fs::path p = dst;
+    p += constants::SUFFIX_LPKG_TMP;
+    return p;
+}
+
+void drop_staged_tmp(const fs::path& tmp)
+{
+    // 不抛重载 + 独立 ec：收尾删除失败绝不能顶替正在传播的原异常（与 builder 侧同一纪律）。
+    std::error_code ec;
+    fs::remove(tmp, ec);
+    if (ec) log_warning(string_format("warning.cleanup_failed", tmp.string()));
+}
+
+fs::path confine_target_path(const fs::path& rel)
+{
+    const fs::path root = Config::instance().root_dir();
+    const fs::path physical = root / rel;
+    // `root_dir() == "/"`（常规安装，不带 --root）：任何绝对路径都在其内 —— 不付检索代价
+    // （与 `reverse_execute` 的 confinement 同一条"只在真可能出现越界时才检查"的取舍）。
+    if (root.empty() || root == fs::path("/")) return physical;
+    // 判据只解析**父目录**（末段是要落位的那个名字本身，且包里合法的绝对目标链接必须放行）；
+    // 解不开就放行。两点的完整理由见 `install_common.hpp` 的声明注释。
+    if (path_within_resolved(physical, root)) return physical;
+    throw LpkgException(string_format("error.install_escape_root", rel.string(), root.string()));
+}
 
 // ============================================================================
 // 每文件系统 sidecar stash + 目录元数据化删除（TODO.md 第 2 节）
@@ -108,7 +138,15 @@ fs::path ensure_stash_dir(const fs::path& phys, std::string_view pkg)
         throw LpkgException(string_format("error.bak_collision", phys.string(), std::string(pkg)));
     }
     fs::create_directories(dir, ec);
-    if (!ec && !pre_existing) (void)::chmod(dir.c_str(), 0700);  // root-only：备份残留隔离
+    if (ec) {
+        // 创建失败必须**当场失败**（2026-10-03 修）：此前 `ec` 被丢弃、函数照样返回这个目录 ——
+        // 后续的 `sink.backup` rename 会报一个与真实原因无关的错（ENOENT/误导性路径），
+        // 而 `0700` 加固静默没生效（目录压根不存在）。对照 `base/utils.cpp` 的
+        // `ensure_dir_exists`：那边一直是 fail-closed，这里漏了。
+        throw LpkgException(string_format("error.create_dir_failed", dir.string()) + ": " +
+                            ec.message());
+    }
+    if (!pre_existing) (void)::chmod(dir.c_str(), 0700);  // root-only：备份残留隔离
     return dir;
 }
 
@@ -131,6 +169,37 @@ void remove_stash_dir(const fs::path& stash)
 {
     std::error_code ec;
     fs::remove_all(stash, ec);
+    // 失败**不抛**：调用点在"批次已提交"之后的收尾路径上，抛了会把"安装已成功"报成命令失败。
+    // 但也不能**静默** —— 残留的 stash 会一直占着磁盘（大包能占几百 MB），而唯一会再回头收它的
+    // 是 `cleanup_orphan_stashes`。判据与措辞同 recover.cpp / wal_op.cpp 里同形的 remove_all 失败。
+    if (ec) log_warning(string_format("warning.cleanup_failed", stash.string()));
+}
+
+/**
+ * 撤销"本包对该目录 xattr 键的声明"，并在**没有别的属主**时把键从盘上删掉（改前值写 WAL）。
+ *
+ * 订正 2026-10-03：上面那段"删除本包独占、且此刻为空的 owned 目录"的函数文档原本**错位贴在
+ * 本函数上** —— 它讲的是 `candidate_dir_keys` / `report` 两个参数与五条判据，属于下面的
+ * `remove_empty_owned_dirs()`（那里已放回原位）。本函数签名里没有那两个参数，说明文档贴错了。
+ */
+bool revoke_xattr_key_if_unowned(Cache& cache, const std::string& pkg, const std::string& logical,
+                                 const std::string& key, OpSink& sink, const fs::path& root)
+{
+    // 归属集合里先摘掉本包：**无论盘上撤不撤**，本包都不再声明这个键了（第 ② 步的判据）。
+    auto owners = cache.get_xattr_key_owners(logical, key);
+    owners.erase(pkg);
+
+    bool removed = false;
+    if (owners.empty()) {
+        // 无人持有才动盘。路径由**逻辑目录键**拼出：`fs::path("/usr/share/x/").relative_path()`
+        // 给出 `usr/share/x/`，最后 `strip_trailing_slash` —— `lremovexattr` 对带尾斜杠的路径
+        // 会**穿透**到末段符号链接的目标上（与元数据块逐字同源的那条边界）。
+        const fs::path phys = strip_trailing_slash(root / fs::path(logical).relative_path());
+        // 撤旧值先写 WAL（`unset_xattr` 内部做），整批回滚能把键逐字节还原。
+        removed = sink.unset_xattr(phys, key, "xattrrm_after_wal_" + pkg);
+    }
+    cache.remove_xattr_key_owner(logical, key, pkg);
+    return removed;
 }
 
 /**
@@ -163,27 +232,10 @@ void remove_stash_dir(const fs::path& stash)
  *                           保留"的那一支（`removed == false`）与真正要 rmdir 之前
  *                           （`removed == true`，**在 sink.remove_empty_dir 之前**，与调用点
  *                           原先自己打日志的时刻逐字一致）。它不参与任何判据。
+ *
+ * 订正 2026-10-03：本段函数文档原先**错位贴在**上面的 `revoke_xattr_key_if_unowned()` 上
+ * （那份签名没有 `candidate_dir_keys` / `report`），已挪回这里。
  */
-bool revoke_xattr_key_if_unowned(Cache& cache, const std::string& pkg, const std::string& logical,
-                                 const std::string& key, OpSink& sink, const fs::path& root)
-{
-    // 归属集合里先摘掉本包：**无论盘上撤不撤**，本包都不再声明这个键了（第 ② 步的判据）。
-    auto owners = cache.get_xattr_key_owners(logical, key);
-    owners.erase(pkg);
-
-    bool removed = false;
-    if (owners.empty()) {
-        // 无人持有才动盘。路径由**逻辑目录键**拼出：`fs::path("/usr/share/x/").relative_path()`
-        // 给出 `usr/share/x/`，最后 `strip_trailing_slash` —— `lremovexattr` 对带尾斜杠的路径
-        // 会**穿透**到末段符号链接的目标上（与元数据块逐字同源的那条边界）。
-        const fs::path phys = strip_trailing_slash(root / fs::path(logical).relative_path());
-        // 撤旧值先写 WAL（`unset_xattr` 内部做），整批回滚能把键逐字节还原。
-        removed = sink.unset_xattr(phys, key, "xattrrm_after_wal_" + pkg);
-    }
-    cache.remove_xattr_key_owner(logical, key, pkg);
-    return removed;
-}
-
 void remove_empty_owned_dirs(Cache& cache, const std::string& pkg,
                              const std::vector<std::string>& candidate_dir_keys, OpSink& sink,
                              DirReporter report)
@@ -235,6 +287,20 @@ json read_archive_metadata(const fs::path& archive_path)
     return json::parse(meta_json);
 }
 
+namespace
+{
+/**
+ * 钩子文件名的**人话**：`postinst.sh` → "post-install hook"（`hook.name.*` 键）。
+ * 未知名字回退成文件名本身（新增钩子类型时不必先补 l10n 才不崩）。
+ */
+std::string hook_display_name(std::string_view hook_name)
+{
+    if (hook_name == constants::POSTINST_SH) return get_string("hook.name.postinst");
+    if (hook_name == constants::PRERM_SH) return get_string("hook.name.prerm");
+    return std::string(hook_name);
+}
+}  // namespace
+
 /**
  * 执行包的钩子脚本（如 post-install、pre-remove）
  * 支持 chroot 环境下运行，使用 mount namespace 隔离
@@ -255,9 +321,12 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
     // 里唯一这样的位置（test_hook_transaction.cpp 用它钉住钩子的执行时机）。
     BreakpointManager::instance().hit("hook_run_" + std::string(hook_name));
 
-    // 带上包名：挂载时机统一到批次提交后（见 finish_committed_batch），一次多包批次会连续跑
-    // 多个钩子，"正在运行钩子: postinst.sh" 这种说法在日志里完全没有上下文（哪个包？）。
-    log_info(string_format("info.running_hook", std::string(hook_name), std::string(pkg_name)));
+    // 人性化名字 + 包名（systemd/pacman 风格的**单行状态**）：`==> Running post-install hook
+    // of package foo ... [OK]`，[OK] 靠终端最右边。挂载时机统一到批次提交后（见
+    // finish_committed_batch），一次多包批次会连续跑多个钩子，只写 `postinst.sh`
+    // 在日志里没有上下文（哪个包？在人跑什么？）。
+    const std::string human = hook_display_name(hook_name);
+    ui::Line line(string_format("ui.running_hook", human, std::string(pkg_name)));
 
     const bool use_chroot =
         (Config::instance().root_dir() != "/" && Config::instance().root_dir().string() != "/");
@@ -267,6 +336,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
         const fs::path bash_rel = std::string(constants::BIN_BASH).substr(1);  // "bin/bash"
         // 判定不抛（ELOOP 会让 fs::exists 抛，见 base/utils.hpp 的谓词说明）
         if (!exists_follow(Config::instance().root_dir() / bash_rel)) {
+            line.finish(ui::skipped());  // 目标 root 里没有 bash：明确告诉用户"跳过了"
             log_warning(string_format("warning.hook_failed_setup", std::string(hook_name),
                                       get_string("error.bash_not_found")));
             return;
@@ -283,9 +353,41 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
                    : fs::absolute(hook_path).string();
 
     const int ret = run_shell_in_root(shell_quote(script));
+    line.finish(ui::ok(ret == 0));
     if (ret != 0) {
         log_warning(
             string_format("warning.hook_failed_exec", std::string(hook_name), std::to_string(ret)));
+    }
+}
+
+/**
+ * `deps` / `provides` / `needed_so` 的每一条都必须"单行、无控制字符"。
+ *
+ * **为什么非校验不可**（2026-10-03 审计）：归档**成员名**早就有消毒（`archive.cpp` 的
+ * `member_name_rejection_message`），但这三个字段没有 —— 它们同样会被写进**行式 / 制表符
+ * 分帧**的状态文件：
+ *   · `deps/<pkg>`、`needed_so/<pkg>`：**一行一条**（`\n` 注入 ⇒ 凭空多出依赖 / 多出
+ *     一条 SONAME 记录）；
+ *   · `provides.db`：`<capability>\t<pkgs>`（`\t` 注入 ⇒ 键在重载时被截断、提供者串错位）。
+ * 实测后果：`provides = ["a\ncapX\tE"]` 读回会变成幽灵提供者，而 `dep_satisfied_on_disk`
+ * 只看"这个 capability 有没有提供者" ⇒ **假满足**依赖（装出一个坏系统）；`deps`/`needed_so`
+ * 里的 `\n` 还会污染反向依赖图，**阻止**正常卸载（DoS）。仓库来源的包另有一道"与索引逐字段
+ * 比对"，但本地 `.lpkg` 走不到那里 —— 校验放在这里（metadata 解析的唯一出口）才覆盖全。
+ *
+ * **只拒控制字符，不拒 `,`**：依赖串允许带约束（`"cmake >= 3.20, < 4.0"`，见
+ * `vercmp/dep_parser.cpp` 对逗号的处理），拒了会误伤合法包。空串不在这里拦（读者本来就会
+ * 跳过空行/空取值，拦下来反而是行为变化）。
+ */
+void reject_unsafe_metadata_tokens(const std::vector<std::string>& values, std::string_view field,
+                                   const fs::path& meta_path)
+{
+    for (const auto& v : values) {
+        // 注意用**带长度**的 string_view：`"\0..."` 这种字面量走 C 串构造会在第一个字节就断。
+        const std::size_t bad = v.find_first_of(std::string_view("\0\n\r\t", 4));
+        if (bad == std::string::npos) continue;
+        // 实参顺序与 l10n 文案的占位符一致：`{} {} {}` = 元数据文件、字段名、偏移。
+        throw LpkgException(string_format("error.unsafe_metadata_field", meta_path.string(),
+                                          std::string(field), std::to_string(bad)));
     }
 }
 
@@ -295,6 +397,17 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
                            std::vector<std::string>& needed_so, std::string& man)
 {
     fs::path meta_path = tmp_pkg_dir / constants::PKG_METADATA_FILE;
+    // 大小上限检查在**解析之前**，且与"JSON 解析失败"是**两种不同的错**：前者 = "这份元数据
+    // 本就不该这么大"（畸形/恶意归档，可定位到文件与字节数）；后者 = "内容不是合法 JSON"。
+    // 取大小用带 ec 的 file_size：取不到（如文件缺失）时**不在这里报错**，交给下面的
+    // ifstream 打开失败，保留原有那条 `error.open_file_failed`，报错点不重复。
+    std::error_code size_ec;
+    const std::uintmax_t meta_size = fs::file_size(meta_path, size_ec);
+    // 上限是 `constants::ARCHIVE_MEMBER_MAX_SIZE` —— 与 `extract_file_from_archive` 共用
+    // 同一个常量（别在这里另写一份魔数）。
+    if (!size_ec && meta_size > constants::ARCHIVE_MEMBER_MAX_SIZE)
+        throw LpkgException(string_format("error.archive_member_too_large",
+                                          std::to_string(meta_size), meta_path.string()));
     json meta;
     {
         std::ifstream f(meta_path);
@@ -307,6 +420,10 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
     deps = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
     provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
     needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+    // 这三个字段会进行式/制表符分帧的状态文件 —— 控制字符会**伪造出额外记录**（见上方注释）。
+    reject_unsafe_metadata_tokens(deps, constants::J_DEPS, meta_path);
+    reject_unsafe_metadata_tokens(provides, constants::J_PROVIDES, meta_path);
+    reject_unsafe_metadata_tokens(needed_so, constants::J_NEEDED_SO, meta_path);
     man = meta.value(std::string(constants::J_MAN), "");
 }
 
@@ -331,6 +448,14 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
  */
 std::vector<std::string> scan_content_files(const fs::path& content_dir)
 {
+    // 包的 `content/` **必须**是真目录（lstat 语义，不是符号链接）。
+    // 归档成员名消毒挡不住"把 `content` 本身做成符号链接"：`content -> /etc` 的归档能正常
+    // 解压（libarchive 建的就是那条链接），而 `recursive_directory_iterator(content_dir)`
+    // 会**跟随起点目录**去枚举链接目标 → 安装机上的任意文件被当成"包内容"登记、复制进目标
+    // root（2026-10-02 端到端实测复现）。正规包的 `content` 永远是解压出来的真目录，直接拒绝。
+    if (!is_real_directory(content_dir)) {
+        throw LpkgException(string_format("error.content_not_directory", content_dir.string()));
+    }
     std::vector<std::string> entries;
     for (const auto& entry : fs::recursive_directory_iterator(content_dir)) {
         std::string rel = entry.path().lexically_relative(content_dir).string();
@@ -373,6 +498,12 @@ static void collect_installed_requires(const std::string& name, solv::InstalledP
     const fs::path dep_f = Config::instance().dep_dir() / name;
     if (exists_follow(dep_f)) {
         std::ifstream f(dep_f);
+        // 前置只判了"名字存在"（exists_follow），没判"打得开"：真打不开时 getline 一个字符
+        // 都读不到，会**静默**当成"这个包没有 requires" —— 而这两处喂的是 solver 的已装模型
+        // （下面 nso_f 同理），漏掉 requires/SONAME 会让升级破坏它却不报冲突。fail-closed：
+        // 点名文件报错，不静默降级。（TOCTOU/权限场景极罕见，但"绝不静默"是硬纪律。）
+        if (!f.is_open())
+            throw LpkgException(string_format("error.open_file_failed", dep_f.string()));
         std::vector<std::string> lines;
         std::string line;
         while (std::getline(f, line))
@@ -382,6 +513,8 @@ static void collect_installed_requires(const std::string& name, solv::InstalledP
     const fs::path nso_f = Config::instance().needed_so_dir() / name;
     if (exists_follow(nso_f)) {
         std::ifstream f(nso_f);
+        if (!f.is_open())  // 同上：静默空集会让 solver 漏掉这个包的 SONAME 依赖
+            throw LpkgException(string_format("error.open_file_failed", nso_f.string()));
         std::string so;
         while (std::getline(f, so))
             if (!so.empty()) p.needed_so.push_back(so);
@@ -399,7 +532,9 @@ static void collect_installed_requires(const std::string& name, solv::InstalledP
  * 见 farm/ARCH.md）就只剩一条 warning，**装出一个缺库的系统**。
  *
  * 曾经的偏离点：这里只要"名字像 `lib*.so*`"且 `is_symlink()` 为真就收，**不看链接目标在不在**。
- * 而 `has_system_soname` 用 `fs::exists(cand)`（**跟随**链接）→ 悬空链接判为"不满足"。
+ * 而 `has_system_soname` 用 `exists_follow(cand)`（**跟随**链接、**不抛**，`config.cpp`）→
+ * 悬空链接判为"不满足"。（订正 2026-10-03：原文写 `fs::exists(cand)` —— 实际早已是不抛谓词
+ * `exists_follow`；`fs::exists` 在环上会抛。）
  * 悬空链接是现实中真会出现的形态（升级/清理删掉真实 .so、只留下 SONAME 链接）。
  * 修法：存在性判据**直接复用 `has_system_soname`**，而不是在这里再写一份 `fs::exists` ——
  * 两处判据从此是同一个谓词，结构上不可能再次漂移。（`is_regular_file || is_symlink` 的
@@ -551,8 +686,7 @@ std::unordered_set<std::string> get_all_required_packages()
     auto& cache = Cache::instance();
     std::unordered_set<std::string> req;
     {
-        std::lock_guard lock(cache.get_mutex());
-        req = cache.get_all_held();
+        req = cache.get_all_held();  // 值语义快照：不再需要（也不该）自己持锁
     }
     std::vector q(req.begin(), req.end());
     size_t head = 0;
@@ -569,11 +703,17 @@ std::unordered_set<std::string> get_all_required_packages()
         const fs::path p = Config::instance().dep_dir() / curr;
         if (exists_follow(p)) {
             std::ifstream f(p);
+            // 前置只判"存在"，真打不开时下方循环读到空 → 这个包的依赖不会进 required 集
+            // ⇒ autoremove 会把它**当作孤儿删掉**（破坏性方向）。fail-closed：点名报错。
+            if (!f.is_open())
+                throw LpkgException(string_format("error.open_file_failed", p.string()));
             std::string line;
             while (std::getline(f, line)) {
-                std::string d_name = line;
-                if (const auto pos = line.find_first_of(" \t<>="); pos != std::string::npos)
-                    d_name = line.substr(0, pos);
+                // 包名提取走 `vercmp/dep_parser` 的**唯一实现**。这里原先自己写了
+                // `find_first_of(" \t<>=")`：对 `foo!=1.0` 会切出 `foo!`（`!` 不在字符集里，
+                // 而 `!=` 是合法运算符），而对 `foo==1.0` 会切出 `foo`（恰好对）——
+                // 同一族里对错参半，正是"第二份实现必然漂移"的形态。
+                const std::string d_name = detail::dependency_name_of(line);
                 if (cache.is_installed(d_name))
                     check_and_add(d_name);
                 else
@@ -587,6 +727,8 @@ std::unordered_set<std::string> get_all_required_packages()
         const fs::path nso_f = Config::instance().needed_so_dir() / curr;
         if (exists_follow(nso_f)) {
             std::ifstream nf(nso_f);
+            if (!nf.is_open())  // 同上：静默空集会让 autoremove 误删 SONAME 提供者
+                throw LpkgException(string_format("error.open_file_failed", nso_f.string()));
             std::string so;
             while (std::getline(nf, so)) {
                 if (so.empty()) continue;

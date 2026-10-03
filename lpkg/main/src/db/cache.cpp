@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <format>
 #include <fstream>
 #include <sstream>
 #include <string_view>
@@ -15,6 +16,7 @@
 #include "localization.hpp"
 #include "transaction_log.hpp"
 #include "utils.hpp"
+#include "vercmp/dep_parser.hpp"  // detail::dependency_name_of（`deps/` 行 → 包名，唯一实现）
 #include "wal_op.hpp"
 
 namespace fs = std::filesystem;
@@ -409,6 +411,35 @@ std::unordered_set<std::string> Cache::get_package_provides(std::string_view pkg
     return result;
 }
 
+// ── 值语义快照（2026-10-03：替代原先的 `get_mutex()` + 两个引用返回的访问器）──────
+// 契约只有一条：**持锁拷一份出去**，调用方拿到快照后不需要、也不该持有锁。
+// 这些方法都是"读一整块状态"，逐个走加锁方法既做不到原子、又会退化成 O(n²)。
+
+std::map<std::string, std::string, std::less<>> Cache::get_all_installed()
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    return installed_pkgs;
+}
+
+std::unordered_set<std::string> Cache::get_all_held()
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    return holdpkgs;
+}
+
+std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::snapshot_file_ownership()
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    return file_db;
+}
+
+std::unordered_set<std::string> Cache::conf_hashes_for_path(std::string_view path)
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    const auto it = conf_hashes.find(path);
+    return (it == conf_hashes.end()) ? std::unordered_set<std::string>{} : it->second;
+}
+
 void Cache::load(bool tolerate_missing_set_files)
 {
     std::lock_guard<std::mutex> lock(mtx);
@@ -457,25 +488,32 @@ void Cache::ensure_reverse_deps()
 {
     if (reverse_deps_loaded) return;
     reverse_deps.clear();
-    // 判定不抛（ELOOP 会让 fs::exists/is_directory 抛，见 base/utils.hpp 的谓词说明）；
-    // 语义**仍是跟随**：dep_dir 可以被管理员指向别处的符号链接。
+    // ⚠️ 这里**整段**都得是不抛的形态（2026-10-02 修）：上面那句守卫特意换成了
+    // `is_directory_follow`（不抛），可**紧接着两行**用的却是抛型的 `fs::directory_iterator`
+    // 与 `directory_entry::is_regular_file()` —— 后者是**跟随**语义，路径上任何一段成环都会
+    // 抛 ELOOP，而我们正走在这条路的入口上（`get_reverse_deps` / `add_reverse_dep` /
+    // `remove_reverse_dep` 都从 `ensure_reverse_deps` 开始）。改成 `increment(ec)` +
+    // lstat 语义谓词，判据与守卫保持一致：**不抛**。
+    // 语义说明：目录本身**仍是跟随**（dep_dir 可以被管理员指向别处的符号链接）；条目一级
+    // 取 lstat（这些目录里只该有 lpkg 写的普通文件）。
     if (is_directory_follow(Config::instance().dep_dir())) {
-        for (const auto& entry : fs::directory_iterator(Config::instance().dep_dir())) {
-            if (entry.is_regular_file()) {
-                std::string pkg_name = entry.path().filename().string();
-                std::ifstream f(entry.path());
-                std::string line;
-                while (std::getline(f, line)) {
-                    if (line.empty()) continue;
-                    std::string_view sv = line;
-                    if (sv.back() == '\r') sv.remove_suffix(1);
-                    if (auto pos = sv.find_first_of(" \t"); pos != std::string_view::npos) {
-                        sv = sv.substr(0, pos);
-                    }
-                    if (!sv.empty()) {
-                        reverse_deps[std::string(sv)].insert(pkg_name);
-                    }
-                }
+        std::error_code it_ec;
+        for (auto it = fs::directory_iterator(Config::instance().dep_dir(), it_ec);
+             !it_ec && it != fs::directory_iterator{}; it.increment(it_ec)) {
+            const fs::path entry_path = it->path();
+            if (!is_regular_file_no_follow(entry_path)) continue;
+            std::string pkg_name = entry_path.filename().string();
+            std::ifstream f(entry_path);
+            std::string line;
+            while (std::getline(f, line)) {
+                if (line.empty()) continue;
+                // 包名提取走 `vercmp/dep_parser` 的**唯一实现**。这里原先用纯空白切
+                // （`find_first_of(" \t")`）⇒ `provb>=2.0` 这种**约束紧贴包名**的写法会让
+                // 整串成为键，于是 `get_reverse_deps("provb")` 永远查不到这一个依赖者 ——
+                // 而 `autoremove` 正是按包名查的（会把还有依赖者的包当成可删）。
+                // 集成用例见 tests/integration/test_reverse_dep_key_consistency.cpp。
+                const std::string name = detail::dependency_name_of(line);
+                if (!name.empty()) reverse_deps[name].insert(pkg_name);
             }
         }
     }
@@ -484,17 +522,20 @@ void Cache::ensure_reverse_deps()
     // 链路失效。用 providers_ 映射直读（ensure_reverse_deps 常持锁被调用，
     // 不能调 get_providers 再拿锁）。
     if (is_directory_follow(Config::instance().needed_so_dir())) {
-        for (const auto& entry : fs::directory_iterator(Config::instance().needed_so_dir())) {
-            if (!entry.is_regular_file()) continue;
-            std::string pkg_name = entry.path().filename().string();
-            std::ifstream f(entry.path());
+        std::error_code it_ec;
+        for (auto it = fs::directory_iterator(Config::instance().needed_so_dir(), it_ec);
+             !it_ec && it != fs::directory_iterator{}; it.increment(it_ec)) {
+            const fs::path entry_path = it->path();
+            if (!is_regular_file_no_follow(entry_path)) continue;
+            std::string pkg_name = entry_path.filename().string();
+            std::ifstream f(entry_path);
             std::string so;
             while (std::getline(f, so)) {
                 if (so.empty()) continue;
                 if (so.back() == '\r') so.pop_back();
-                auto it = providers.find(so);
-                if (it == providers.end()) continue;
-                for (const auto& prov : it->second)
+                auto prov_it = providers.find(so);
+                if (prov_it == providers.end()) continue;
+                for (const auto& prov : prov_it->second)
                     if (prov != pkg_name) reverse_deps[prov].insert(pkg_name);  // 不自引用
             }
         }
@@ -564,7 +605,7 @@ void Cache::write(const std::string& milestone)
 std::unordered_set<std::string> Cache::build_pkgs_set() const
 {
     std::unordered_set<std::string> result;
-    for (const auto& [name, ver] : installed_pkgs) result.insert(name + ":" + ver);
+    for (const auto& [name, ver] : installed_pkgs) result.insert(std::format("{}:{}", name, ver));
     return result;
 }
 
@@ -572,7 +613,7 @@ void Cache::write_pkgs()
 {
     std::unordered_set<std::string> pkg_set;
     for (const auto& [name, ver] : installed_pkgs) {
-        pkg_set.insert(name + ":" + ver);
+        pkg_set.insert(std::format("{}:{}", name, ver));
     }
     write_set_file_direct(Config::instance().pkgs_file(), pkg_set);
 }
@@ -613,7 +654,8 @@ void Cache::write_db_file_direct(
 
     {
         std::ofstream f(tmp, std::ios::trunc);
-        if (!f.is_open()) throw LpkgException(string_format("error.create_tmp_db_failed"));
+        if (!f.is_open())
+            throw LpkgException(string_format("error.create_tmp_db_failed", tmp.string()));
         for (const auto& [key, values] : db) {
             f << key << "\t" << join_sorted(values) << "\n";
         }
@@ -691,7 +733,8 @@ void Cache::write_db_file_wal(
     const fs::path tmp = db_path.string() + ".tmp";
     {
         std::ofstream f(tmp, std::ios::trunc);
-        if (!f.is_open()) throw LpkgException(string_format("error.create_tmp_db_failed"));
+        if (!f.is_open())
+            throw LpkgException(string_format("error.create_tmp_db_failed", tmp.string()));
         for (const auto& [key, values] : db) {
             f << key << "\t" << join_sorted(values) << "\n";
         }
@@ -746,7 +789,15 @@ std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::read_
 {
     std::map<std::string, std::unordered_set<std::string>, std::less<>> db;
     std::ifstream db_file(path);
-    if (!db_file.is_open()) return db;
+    if (!db_file.is_open()) {
+        // 文件**真的不存在**（首次运行 / 老 DB 没这个文件）→ 返回空表，这是常态、不是错误。
+        // 文件**存在却打不开**（权限 / ELOOP 自环 / FIFO 等）→ **绝不静默当空库**：这四个
+        // 库（files/provides/confhashes/xattrkeys）一旦被当成空表，已装包的归属就凭空归零。
+        // 与 read_set_from_file 统一口径：缺文件才允许为空，"存在却不可读"一律抛（点名路径）。
+        // 判定用不抛的 lstat 谓词 exists_no_follow —— `fs::exists` 对符号链接环会抛。
+        if (!exists_no_follow(path)) return db;
+        throw LpkgException(string_format("error.open_file_failed", path.string()));
+    }
     std::string line;
     while (std::getline(db_file, line)) {
         if (line.empty()) continue;

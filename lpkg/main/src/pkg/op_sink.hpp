@@ -48,9 +48,12 @@ enum class DirRemoval {
  *      `backup*`/`commit_copy` 里**先** `stash_bak_target()` 建好 stash 根、**再**写行
  *      —— stash 根的 mkdir 不在回滚范围内，与基线逐字一致。）
  *   2. **路径规范化在这一层兜底**：**凡要碰文件系统的方法**（backup / backup_obsolete /
- *      save_config / un_stash / remove_empty_dir / commit_copy）都在内部
- *      `strip_trailing_slash()`（逐个核过 **6/6**；`backup` / `backup_obsolete` 共用
- *      `backup_impl`，剥在那一处）。
+ *      save_config / un_stash / remove_empty_dir / commit_copy / dir_meta / set_xattr /
+ *      unset_xattr）都在内部 `strip_trailing_slash()`（逐个核过 **9/9**；`backup` /
+ *      `backup_obsolete` 共用 `backup_impl`，剥在那一处）。
+ *      （订正 2026-10-03：原清单只列了前 6 个、写作 **6/6**，漏了后 3 个 —— `dir_meta`
+ *       在 `op_sink.cpp:183`、`set_xattr` 在 `:230`、`unset_xattr` 在 `:265`，各自都
+ *       `strip_trailing_slash()`。它们同样"碰文件系统"，同属本条契约。）
  *      ⚠️ **这一层是唯一保证，不是"防御性兜底"**。原文写"当前 **9** 个调用点都已各自剥过、
  *      判据必须在调用点（见 §3.6.1 第 1 条）"——实测**两个数都不对**：调用点实际是 **22** 个，
  *      其中**至少 5 个没有自剥**（`installation_task_letgo.cpp` 的 `backup(e.physical_path)`
@@ -225,6 +228,22 @@ public:
                      std::string_view after_wal_breakpoint = {});
 
 private:
+    /**
+     * 写入层的**最后一道闸**：物理路径的**祖先链**必须解析在 `root_dir()` 之内
+     * （判据 = `base/utils.cpp::path_within_resolved`，只解析父目录 —— 末段是要处置的名字
+     * 本身，且包发的绝对目标链接是合法的）。
+     *
+     * **放在原语里而不是各调用点**（2026-10-03 审计后的收口）：归档内容那条腿已经在
+     * `confine_target_path()` 上挡过，但**由 DB 键派生的路径**（升级废弃文件、移除趟、
+     * 空目录回收、xattr 撤销）走的是另一条腿 —— 逐调用点补等于"每加一处都要记得"，而原语是
+     * **唯一写盘入口**，闸放这里才是结构性的（任何将来的调用点自动被覆盖）。
+     *
+     * 语义是**跳过 + 告警**，绝不抛：这些路径出现在移除/回滚链上，抛了等于"包卸载不掉"；
+     * 而"跳过"的方向是安全的 —— 按定义那个路径解析在 root 之外，本来就不该被我们动。
+     * `root_dir() == "/"`（常规安装）时恒真，不付任何代价。
+     */
+    bool confined(const std::filesystem::path& phys) const;
+
     /// backup / backup_obsolete 的唯一实现（只有 WAL 关键字不同）
     std::filesystem::path backup_impl(const std::filesystem::path& phys, std::string_view op,
                                       std::string_view after_wal_breakpoint);
@@ -350,6 +369,15 @@ struct PathFacts {
     bool last_owner = false;        ///< 第⑤趟：摘掉本包归属后，该路径已无其他持有者
     bool new_dir_entry = false;     ///< 第⑤趟：新版本在 `<bare>/` 登记了**目录**条目
     ConfigDisposition cfg = ConfigDisposition::InstallNew;  ///< 仅 `/etc` 且盘上被占且非目录
+
+    /// 归档条目与盘上那份**都是符号链接**、且两者的目标逐字节相同（2026-10-02 新增）。
+    /// 只在 `entry_is_symlink && disk_is_symlink` 时有意义。加它是因为 `/etc` 的
+    /// symlink→symlink 那一格旧行为**不看目标**、一律退 `.lpkgnew` —— 链接压根没变的重装
+    /// 也吐一份同内容副本，反复重装就在 `/etc` 上堆垃圾。判据是 `symlink_targets_equal()`
+    /// （读不出就判"不同"，保守方向）。
+    /// ⚠️ **新字段一律加在本结构末尾**：`tests/integration/test_upgrade_decision_table.cpp`
+    /// 的 `FactCell` 与本结构在别处都用**位置初始化**，往中间插一个字段会让那些 case 静默错位。
+    bool disk_symlink_matches_entry = false;
 };
 
 /**

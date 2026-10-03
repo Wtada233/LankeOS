@@ -112,6 +112,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <functional>
 #include <iostream>
@@ -527,7 +528,11 @@ struct EtcOutcome {
     int dir_entry_over_nondir =
         0;  ///< 归档是**目录**、盘上是非目录（file/链接 → 目录）→ 整树 `.lpkgsave` + 建目录
     int write_in_place = 0;  ///< 盘上没被占（或让开趟已清空）→ 就地落位
-    int kept_on_disk = 0;    ///< 盘上那份被保留（= keep_local + save_lpkgnew，读起来直观）
+    int kept_on_disk = 0;    ///< 盘上那份被保留（= 上面三项之和，读起来直观）
+    /// 符号链接条目的 symlink→symlink 且**目标逐字节相同** → `KeepOnDisk`：盘上那条就是
+    /// 我们要的，**连 `.lpkgnew` 都不产生**（2026-10-03 新增；旧模型"符号链接条目一律退
+    /// `.lpkgnew`"会让链接没变的重装堆一堆同内容副本）。它是 `kept_on_disk` 的第三种来源。
+    int symlink_identical_kept = 0;
 };
 
 /**
@@ -613,7 +618,15 @@ EtcOutcome model_etc_after(const Tree& v1, const Tree& disk_before, const Tree& 
 
         // ── 判据 5：盘上被**非目录**占住 ──────────────────────────────────────
         if (node.kind == "symlink") {
-            o.tree[path + K_LPKGNEW] = node;  // 符号链接条目一律按配置冲突处理
+            // 2026-10-03：**目标逐字节相同**的 symlink→symlink 是 no-op（决策表给
+            // `KeepOnDisk`）—— 盘上那条链接就是我们要的，连 `.lpkgnew` 都不产生。
+            // 目标**不同**才按配置冲突处理、退 `.lpkgnew`（盘上那份不动）。
+            // 判据用**载荷（链接目标）相等**，与实现里的 `symlink_targets_equal` 同义。
+            if (it->second.kind == "symlink" && it->second.payload == node.payload) {
+                ++o.symlink_identical_kept;
+                continue;
+            }
+            o.tree[path + K_LPKGNEW] = node;  // 符号链接条目按配置冲突处理
             ++o.save_lpkgnew;
             continue;
         }
@@ -650,7 +663,7 @@ EtcOutcome model_etc_after(const Tree& v1, const Tree& disk_before, const Tree& 
         ++o.obsolete_to_lpkgsave;
     }
 
-    o.kept_on_disk = o.keep_local + o.save_lpkgnew;
+    o.kept_on_disk = o.keep_local + o.save_lpkgnew + o.symlink_identical_kept;
     return o;
 }
 
@@ -1272,7 +1285,8 @@ std::vector<UserEdit> plan_edits_impl(const Tree& v1, const Tree& v2,
                 e.kind = "file";
                 e.payload = "user edited: " + owned + "\n";
             } else {
-                e.payload = path + "/" + note_name;  // 目录保留/废弃：内部加一个用户文件
+                e.payload =
+                    std::format("{}/{}", path, note_name);  // 目录保留/废弃：内部加一个用户文件
             }
         }
         edits.push_back(std::move(e));
@@ -2121,7 +2135,7 @@ protected:
             return;
         }
         // 回滚的基准 = **改动后**的实际盘面（逐项快照；不是 v1 原始形态）
-        const auto baseline = got_edited;
+        const auto& baseline = got_edited;
 
         // ②′ `/etc` 的用户改动：同一套手法（模型 + 盘面各做一遍，再绑死）。
         //     刻意用**独立 RNG 流**：usr 侧的改动逐字保持原样，加 /etc 维度不改变既有种子。
@@ -2139,7 +2153,7 @@ protected:
                                     render_diff(diff_summaries(want_etc_edited, got_etc_edited))));
             return;
         }
-        const auto etc_baseline = got_etc_edited;
+        const auto& etc_baseline = got_etc_edited;
         // xattr 的**回滚基准**（同样取"改动后"的实际盘面）：与形态基线同一时刻、同一口径
         XMap x_baseline_usr, x_baseline_etc;
         snapshot_xattrs(m, x_baseline_usr, x_baseline_etc);
@@ -2846,7 +2860,7 @@ TEST_F(UpgradePropertyTest, CleanUpgrade_NoDirReplaced)
  * test_type_transition_matrix.cpp 的 DirToFileWithForeignPackageContentIsRefused 钉。
  *
  * 断言链（缺一不可，否则"拒绝"与"接管被写坏了"分不开）：
- *   ① 被拒 + 报错点名该路径与 `error.unknown_manual_file`（**真实**冲突源）；
+ *   ① 被拒 + 报错点名该路径与 `error.file_conflict_unowned`（**真实**冲突源）；
  *   ② 盘面逐项零改动（含那个无主文件、含 v2 的伴生文件没落、含无 stash 残留）、DB 版本不变；
  *   ③ **把那个无主文件移走之后，同一次升级必须成功** —— 这一条把"拒绝的原因"钉死在那个
  *      文件上：否则"被拒"也可能只是接管路径整个坏了，而 ① ② 都照样满足。
@@ -2886,8 +2900,13 @@ TEST_F(UpgradePropertyTest, DirReplacedByNonDirWithUnownedContentIsRefused)
         << "目录树里有无人持有的条目 ⇒ dir→非目录 必须被拒绝（整树搬走会毁掉那个文件）";
     std::cerr << "[prop-fixed] " << pkg << " 拒绝原文：" << msg << "\n";
     EXPECT_NE(msg.find(dir_path), std::string::npos) << "拒绝信息没点名冲突路径：" << msg;
-    EXPECT_NE(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
-        << "无主条目 → 判据必须是 " << get_string("error.unknown_manual_file") << "：" << msg;
+    // `dir_path` 是**相对于 root 的键**（`usr/share/...`，无前导斜杠），而报错里渲染的是
+    // 绝对形式（`/usr/share/...`）—— 拼上前导斜杠才能逐字命中。
+    EXPECT_NE(msg.find(string_format("error.file_conflict_unowned", "/" + dir_path)),
+              std::string::npos)
+        << "无主条目 → 应报 error.file_conflict_unowned：" << msg;
+    EXPECT_EQ(msg.find(get_string("error.unknown_manual_file")), std::string::npos)
+        << "占位文本不该被当成持有者名渲染进报告：" << msg;
 
     // ④ 盘面逐项零改动（整批预检在**进事务之前**拒绝）+ DB 版本不变 + 无 stash 残留
     const SummaryDiff d = diff_summaries(baseline, summary_of_disk(test_root / base));

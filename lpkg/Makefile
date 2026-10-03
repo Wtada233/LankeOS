@@ -78,7 +78,7 @@ deps-check:
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 7.1.1
+VERSION ?= 7.2.0
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -107,13 +107,13 @@ COMMON_CXXFLAGS = -std=c++20 -fPIC -Wall -Wextra -I$(MAIN_DIR)/third_party/inclu
 	-I$(APP_SRC_DIR)/repo -I$(APP_SRC_DIR)/trigger \
 	-I$(APP_SRC_DIR)/pkg -I$(APP_SRC_DIR)/archive -I$(APP_SRC_DIR)/build \
 	-I$(APP_SRC_DIR)/elf -I$(APP_SRC_DIR)/scan \
+	-I$(APP_SRC_DIR)/ui \
            $(PKG_CFLAGS) \
            -DLPKG_CONF_DIR=\"$(INSTALL_CONF_DIR)\" \
            -DLPKG_L10N_DIR=\"$(INSTALL_L10N_DIR)\" \
            -DLPKG_DOCS_DIR=\"$(INSTALL_DOCS_DIR)\" \
            -DLPKG_LOCK_DIR=\"$(INSTALL_LOCK_DIR)\" \
            -DLPKG_VERSION=\"$(VERSION)\" \
-           -DFMT_HEADER_ONLY \
            -Werror
 # 转义引号吃掉，宏展开成 /etc/lpkg 被当成除法（实测炸过构建）；用户显式覆盖的项目同名
 # flag（如 -O3 覆盖 -O2）不在项目列表里 → 保留，仍然后者胜。
@@ -158,7 +158,7 @@ MAIN_SRCS = $(wildcard $(APP_SRC_DIR)/*.cpp) \
 	$(wildcard $(APP_SRC_DIR)/repo/*.cpp) $(wildcard $(APP_SRC_DIR)/trigger/*.cpp) \
 	$(wildcard $(APP_SRC_DIR)/pkg/*.cpp) $(wildcard $(APP_SRC_DIR)/archive/*.cpp) \
 	$(wildcard $(APP_SRC_DIR)/build/*.cpp) $(wildcard $(APP_SRC_DIR)/elf/*.cpp) \
-	$(wildcard $(APP_SRC_DIR)/scan/*.cpp)
+	$(wildcard $(APP_SRC_DIR)/scan/*.cpp) $(wildcard $(APP_SRC_DIR)/ui/*.cpp)
 TEST_SRCS = $(TESTS_DIR)/main.cpp $(wildcard $(TESTS_DIR)/unit/*.cpp) $(wildcard $(TESTS_DIR)/integration/*.cpp)
 MAIN_OBJS = $(patsubst $(APP_SRC_DIR)/%.cpp,$(BUILD_DIR)/main/%.o,$(MAIN_SRCS))
 TEST_OBJS = $(patsubst $(TESTS_DIR)/%.cpp,$(BUILD_DIR)/tests/%.o,$(TEST_SRCS))
@@ -204,7 +204,7 @@ coverage:
 # ---- 格式检查 / 就地格式化（2026-09-26 新增）----------------------------------
 # clang-format 在**主机**跑、不进容器：它只读文本，不解析头文件、不链接依赖库，所以没有任何
 # 理由为它把 llvm 拉进 lpkg-builder（容器是 alpine，clang-format 在 clang-extra 里，会带整条
-# llvm 依赖）。全仓当前 **0 残留 / 165 个文件**（clang-format 23.1.2 实测），所以这条是
+# llvm 依赖）。全仓当前 **0 残留 / 176 个文件**（clang-format 23.1.2 实测），所以这条是
 # **可执行的不变量**，而不是"大概干净"。换个大版本可能因换行决策不同而误报 →
 # 可用 `make format-check CLANG_FORMAT=clang-format-18` 指定。
 # 覆盖范围 = lpkg 自己拥有的源码树（main/src + tests）；**不含** main/third_party（别人的
@@ -232,6 +232,127 @@ format-check:
 format:
 	@$(FMT_FIND) -print0 | xargs -0 $(CLANG_FORMAT) -i
 	@echo "format: 已按 .clang-format 就地格式化 ($(FMT_DIRS))"
+
+# ---- 索引格式契约（C++ ↔ Python）-----------------------------------------------
+# 索引格式有两份读者：C++ 的 `parse_repo_index_line()`（base/utils.cpp）与
+# `main/scripts/lrepo-mgr.py` 的 `parse_aggregated_index()` —— 后者的结果会被 `push`
+# 用来**读-改-写整份索引**、被 `cleanup` 用来决定删哪些包文件。两侧必须同语义。
+#
+# 契约的**全部**机制是「同一份 fixture + 同一份期望」，两侧各自断言、谁也不调谁：
+#   · C++ 侧   ：tests/unit/test_repo_index_conformance.cpp（随 `make test` 跑）
+#   · Python 侧：本目标（**在主机跑**，用主机的 python3 —— 不为它给 alpine 容器装 24 MiB
+#                的 python3，那是一处当前不可达的潜在分叉不值的机器成本）
+# **两处的 fixture 与期望逐字相同，改一处必须同时改另一处**（两边注释里都写着）。
+.PHONY: check-index-format
+check-index-format:
+	@command -v python3 >/dev/null 2>&1 || \
+	  { echo "check-index-format: error: 未找到 python3"; exit 1; }
+	@python3 $(MAIN_DIR)/scripts/check_index_conformance.py
+
+# ---- clang-tidy 的编译数据库（`make tidy` 的前置）-------------------------------
+# 本仓库是**纯 Make**（不是 CMake），所以 `compile_commands.json` 得自己生成。上
+# `bear` / `compiledb` 是没必要的额外工具：Makefile 本来就知道每一条编译命令
+# （就是下面那两条模式规则，用的还是同一组 `$(CXXFLAGS)` / `$(TEST_CXXFLAGS)`）。
+#
+# **不依赖 `deps-check`**：生成阶段不编译，只要求 `pkg-config --cflags` 能解析 ——
+# 所以本目标跟 `tidy` 一样跑在容器里（依赖装齐的那一侧）。
+# 落在 `build/` 下：那个目录本来就不入版本库（本目录也没有 .gitignore，
+# 别为了它去根目录拉一个新文件）。
+#
+# flags 里的 `-DLPKG_CONF_DIR=\"/etc/lpkg\"` 带引号，JSON 里必须转义 —— 见下面的 sed。
+.PHONY: compile-commands
+compile-commands:
+	@mkdir -p $(BUILD_DIR)
+	@printf '[\n' > $(BUILD_DIR)/compile_commands.json
+	@first=1; \
+	for src in $(MAIN_SRCS) $(TEST_SRCS); do \
+	  case "$$src" in $(TESTS_DIR)/*) flags='$(TEST_CXXFLAGS)' ;; *) flags='$(CXXFLAGS)' ;; esac; \
+	  cmd="$(CXX) $$flags -MMD -MP -c $$src"; \
+	  esc=$$(printf '%s' "$$cmd" | sed 's/\\/\\\\/g; s/"/\\"/g'); \
+	  if [ $$first -eq 0 ]; then printf ',\n'; fi; first=0; \
+	  printf '  {"directory": "%s", "command": "%s", "file": "%s"}' '$(CURDIR)' "$$esc" "$$src"; \
+	done >> $(BUILD_DIR)/compile_commands.json
+	@printf '\n]\n' >> $(BUILD_DIR)/compile_commands.json
+	@echo "compile-commands: 已写出 $(BUILD_DIR)/compile_commands.json（$$(grep -c file $(BUILD_DIR)/compile_commands.json) 条）"
+
+# ---- clang-tidy 静态检查（**只报告，不拦**）-----------------------------------
+# 跑在**容器**里（本项目的验证环境就是它，`docker-env` 把依赖装齐）。
+# 配置见 `.clang-tidy`。
+#
+# **本目标刻意不看退出码**（下面的 `|| true`）：现在的用途是"把实际告警摊开给人看"，
+# 挑出高价值项、逐条改完之后再把它们升级成拦截。**别把它接到 CI 上** ——
+# 一个红度未知的闸门只会挡住所有提交。
+# 基线注意：tidy 用的是容器里的 clang-tidy 17，与 `format-check` 的 clang-format 23.1.2
+# **不是同一个版本**（两者跑在不同的地方：format 在能跑的那一侧跑，tidy 在容器里）。
+.PHONY: tidy
+tidy:
+	@mkdir -p $(BUILD_DIR)
+	@# `docker-env` 的输出（`apk` 的 fetch 行、"OK: N MiB in M packages"）对使用者没用，
+	@# 但**失败时必须看得见** —— 所以落日志、只在失败时回放。
+	@$(MAKE) docker-env > $(BUILD_DIR)/docker-env.log 2>&1 || \
+	  { echo "tidy: docker-env 失败，日志如下："; cat $(BUILD_DIR)/docker-env.log; exit 1; }
+	@# **必须 sync**（2026-10-03 加）：clang-tidy 在容器里跑，分析的是**容器那份源码** ——
+	@# 不 sync 就会拿上一次 sync 的旧源码出报告（实测：改完再跑，仍报旧行号/旧告警，看着像
+	@# "没修掉"，实际是根本没看到新代码）。这与 `test` 目标同一条纪律。
+	@$(MAKE) docker-sync >/dev/null
+	@# **必须并行**，不能逐个 `clang-tidy` 串行跑：143 个 TU，每个都要把
+	@# `nlohmann/json.hpp`（920 KB）之类的三方头解析一遍 —— 这是 clang-tidy 的**固有成本，
+	@# 配置绕不开**（tidy 必须建完整 AST 才能分析；`HeaderFilterRegex` 只管**报不报**，
+	@# 管不了**解不解析**）。串行实测 4 分半都跑不完；下面按核数并行。
+	@#
+	@# 用 `xargs -P` 而**不是** `run-clang-tidy`：后者是个 **Python 脚本**，容器里没有 python3
+	@#（实测 `env: can't execute 'python3'` —— 当初换成它时**整个目标一行都没跑**，
+	@# 却因为日志文件在、报出"0 告警"，看着像通过）。`xargs` 是 busybox 自带的，没有这个坑。
+	@echo "tidy: 并行静态检查（跑在容器里）..."
+	@start=$$(date +%s); \
+	docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c \
+	  'make -s compile-commands >/dev/null && \
+	   printf "%s\n" $(MAIN_SRCS) $(TEST_SRCS) | \
+	     xargs -P $$(nproc) -I{} clang-tidy -p $(BUILD_DIR) \
+	       --extra-arg=-Wno-missing-field-initializers {}' \
+	  > $(BUILD_DIR)/tidy.log 2>&1 || true; \
+	echo "tidy: 耗时 $$(( $$(date +%s) - start ))s，结果在 $(BUILD_DIR)/tidy.log"
+	@echo -n "tidy: 告警总数 = "
+	@grep -c 'warning:' $(BUILD_DIR)/tidy.log || echo 0
+	@echo "tidy: 按 check 分类 ——"
+	@sed -n 's/.*\[\([a-z0-9.,-]*\)\]$$/\1/p' $(BUILD_DIR)/tidy.log | sort | uniq -c | sort -rn | head -20 || true
+
+# ---- ASan + UBSan 下的测试 -----------------------------------------------------
+# **独立的一棵构建树**（`build-san/`），不污染正常的 `build/`。
+#
+# 为什么用 **clang** 而不是容器自带的 gcc：**alpine 的 gcc 不带 sanitizer 运行时**
+# （实测 `g++ -fsanitize=address` 报 `cannot find -lasan` —— 它只装了头文件
+# `plugin/include/asan.h`）。`clang` + `compiler-rt` 由 `docker-env` 装进容器。
+#
+# ⚠️ **本目标现在的用途是"跑一遍看掉出来什么"，不是闸门**：一个 1000+ 用例、大量依赖
+# root 与文件系统副作用的套件在 sanitizer 下**大概率会暴露一批既有问题**（含夹具自身的
+# 泄漏）。先把它们**分类**（真缺陷 / 夹具问题 / 第三方库噪音），分完之后才谈接不接 CI ——
+# 在那之前接上去，等于用一个红度未知的闸门挡住所有提交。
+#
+# 不加 `-fno-sanitize-recover`：先要**列全**，不想第一个 UBSan 发现问题就中止。
+#
+# `-Wno-error`：**clang 的告警集与 gcc 不同，本项目目前只在 gcc 下过了 `-Werror`**。
+# 实测 clang 17 会额外报（都是 gcc 不报的）：11 处 `-Wmissing-field-initializers`
+# （`git_clone_options{}` 这类 libgit2 结构体的花括号初始化）、2 处
+# `-Wunused-lambda-capture`、1 处 `-Wunused-const-variable`。
+# **让项目在 clang 下也过 `-Werror` 是一件独立的事（跨编译器可移植性）**，不该混进
+# "跑一遍 sanitizer"这件事里 —— 所以这里先放宽，先拿数据。清完之后再把 `-Wno-error` 去掉。
+SANITIZE_FLAGS ?= -fsanitize=address,undefined -fno-omit-frame-pointer -g -Wno-error
+SAN_BUILD_DIR = build-san
+
+.PHONY: test-sanitize
+test-sanitize: docker-env
+	@echo "test-sanitize: 用 clang + ASan/UBSan 重建测试二进制并跑（容器内，独立构建树 $(SAN_BUILD_DIR)/）..."
+	@$(MAKE) docker-sync >/dev/null
+	@# flags 走 **`HOST_CXXFLAGS`**（不是 `HOST_TEST_CXXFLAGS`）：后者只进 `TEST_CXXFLAGS`，
+	@# 而主源码用的是 `CXXFLAGS` —— 实测把 `-Wno-error` 放错地方时，测试 TU 放行了、
+	@# `builder_executor.cpp` 照样被 `-Werror` 卡住（clang 独有的 missing-field-initializers）。
+	@# `HOST_CXXFLAGS` 同时进 `CXXFLAGS` 与 `TEST_CXXFLAGS`，链接行也吃 `TEST_CXXFLAGS`，
+	@# 所以 sanitizer 运行时能链上。
+	@docker exec -w /app $(DOCKER_ENV_CONTAINER) sh -c \
+	  'make -j$$(nproc) BUILD_DIR=$(SAN_BUILD_DIR) CXX=clang++ \
+	        HOST_CXXFLAGS="$(SANITIZE_FLAGS)" \
+	        $(SAN_BUILD_DIR)/$(TEST_TARGET) && ./$(SAN_BUILD_DIR)/$(TEST_TARGET)'
 
 build_test_internal: $(BUILD_DIR)/$(TEST_TARGET)
 	@FILTER="$(GTEST_FILTER)"; if [ -n "$$FILTER" ]; then ./$(BUILD_DIR)/$(TEST_TARGET) --gtest_filter="$$FILTER"; else ./$(BUILD_DIR)/$(TEST_TARGET); fi
@@ -333,7 +454,11 @@ docker-env:
 		echo "Container exists but is stopped. Starting $(DOCKER_ENV_CONTAINER)..."; \
 		docker start $(DOCKER_ENV_CONTAINER) >/dev/null; \
 	fi
-	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base bash pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static fmt-dev elfutils-dev upx gtest-dev tar sudo git cmake
+	@# `clang` + `compiler-rt`：`make test-sanitize` 用（**容器自带的 gcc 不带 sanitizer
+	@# 运行时** —— 实测 `g++ -fsanitize=address` 报 `cannot find -lasan`；alpine 的 gcc 只装了
+	@# 头文件 `plugin/include/asan.h`）。`clang-extra-tools`：`make tidy` 用的 `clang-tidy`
+	@# （**不在 `clang` 包里**，实测 `apk info -L clang | grep -c clang-tidy` = 0）。
+	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base bash pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static elfutils-dev upx gtest-dev tar sudo git cmake clang compiler-rt clang-extra-tools
 	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "LIBGIT2_TAG=$(LIBGIT2_TAG); if [ ! -f /usr/lib/libgit2.a ] || [ \"\$$(cat /usr/lib/libgit2.tag 2>/dev/null)\" != \"\$$LIBGIT2_TAG\" ]; then rm -rf /tmp/libgit2 && git clone -q --depth 1 --branch \$$LIBGIT2_TAG https://github.com/libgit2/libgit2.git /tmp/libgit2 && cd /tmp/libgit2 && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=OFF -DBUILD_CLI=OFF -DBUILD_TESTS=OFF -DUSE_SSH=OFF -DUSE_HTTPS=OpenSSL >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null && echo \$$LIBGIT2_TAG > /usr/lib/libgit2.tag; fi"
 	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "LIBSOLV_TAG=$(LIBSOLV_TAG); if [ ! -f /usr/lib/libsolv.so ] || [ \"\$$(cat /usr/lib/libsolv.tag 2>/dev/null)\" != \"\$$LIBSOLV_TAG\" ]; then rm -rf /tmp/libsolv && git clone -q --depth 1 --branch \$$LIBSOLV_TAG https://github.com/openSUSE/libsolv.git /tmp/libsolv && cd /tmp/libsolv && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_STATIC=ON >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null && echo \$$LIBSOLV_TAG > /usr/lib/libsolv.tag; fi"
 

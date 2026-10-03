@@ -5,10 +5,26 @@
 #include <iostream>
 #include <sstream>
 
+#include "cache.hpp"
 #include "config.hpp"
 #include "elf/lib_utils.hpp"
 #include "localization.hpp"
+#include "ui/term.hpp"
 #include "utils.hpp"
+
+namespace
+{
+/**
+ * `load_config` 的"配置不可用只告警一次"门控。
+ *
+ * 放在**文件作用域**（而不再是 `load_config` 里的函数级 static）是为了让
+ * `reset_for_test()` 能复位它 —— 否则这是进程级状态跨用例泄漏：某个用例触发过一次
+ * "配置缺失"告警后，后面每个用例都不再打印，一旦有人为 `warning.trigger_conf_missing`
+ * 写用例就会"单跑绿、全量红"。这正是 `tests/test_hygiene.hpp` 那条契约（新增全局状态
+ * 必须在其中一并复位）要防的事。
+ */
+bool g_warned_conf_unavailable = false;
+}  // namespace
 
 /**
  * 获取 TriggerManager 单例实例
@@ -37,20 +53,37 @@ void TriggerManager::load_config()
 
     auto conf_path = Config::instance().triggers_conf();
 
-    // 默认配置由 Makefile 安装到 /etc/lpkg/triggers.conf。**文件缺失 = 所有触发器
+    // 默认配置由 Makefile 安装到 /etc/lpkg/triggers.conf。**配置不可用 = 所有触发器
     // 静默失效**（连内部 ldconfig 分支也不会执行，因为它同样由配置里的命令名驱动），
     // 所以必须告警——但只告警一次（每次 check_file 都打印会淹没输出），
     // 且**不能置 config_loaded**：调用方可能在之后才创建该文件（首次安装/测试即是），
     // 置位会让它永远不被加载。
-    if (!std::filesystem::exists(conf_path)) {
-        static bool warned_missing_conf = false;
-        if (!warned_missing_conf) {
+    // 判定用**不抛谓词族**（见 base/utils.hpp）：`fs::exists` 在中间段成环（ELOOP）时会抛，
+    // 判定类调用不该有能力打断命令。用 follow 语义：配置文件是符号链接时按**目标**判定 ——
+    // 悬空链接视同缺失（否则会静默跳过加载、所有触发器失效）。
+    //
+    // "配置不可用"有**两种**：文件缺失，与文件存在却打不开。两种的用户可见后果完全一样
+    // （所有触发器失效），所以共用同一次告警（复用 `warning.trigger_conf_missing`：文案说的是
+    // "未找到配置"，但失效后果与路径名都一致；l10n 键在本改动边界之外，不新增键）。
+    auto warn_disabled_once = [&] {
+        if (!g_warned_conf_unavailable) {
             log_warning(string_format("warning.trigger_conf_missing", conf_path.string()));
-            warned_missing_conf = true;
+            g_warned_conf_unavailable = true;
         }
+    };
+
+    if (!exists_follow(conf_path)) {
+        warn_disabled_once();
         return;
     }
-    std::ifstream file(Config::instance().triggers_conf());
+    // 用 conf_path（与上面**同一条**路径表达式）打开，并**检查结果**：此前这里另取
+    // `Config::instance().triggers_conf()` 且不查 open —— 打开失败会读成空配置却照样走到
+    // 末尾置 `config_loaded = true`，于是所有触发器静默失效、且再也不会重试。
+    std::ifstream file(conf_path);
+    if (!file.is_open()) {
+        warn_disabled_once();
+        return;
+    }
     std::string line;
     while (std::getline(file, line)) {
         if (line.empty() || line[0] == '#') continue;
@@ -107,6 +140,15 @@ void TriggerManager::reset_for_test()
     pending_triggers.clear();
     custom_triggers.clear();
     config_loaded = false;  // 关键：粘性的"已加载"标志必须一起清，否则下一个用例仍看到旧规则
+    // "配置不可用只告警一次"的门控同样是进程级状态，一起复位（见文件顶部 g_warned_conf_unavailable
+    // 的说明与 tests/test_hygiene.hpp 的契约）。
+    g_warned_conf_unavailable = false;
+}
+
+std::set<std::string> TriggerManager::pending_for_test()
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    return pending_triggers;
 }
 
 void TriggerManager::run_all()
@@ -114,22 +156,48 @@ void TriggerManager::run_all()
     std::lock_guard<std::mutex> lock(mtx);
     if (pending_triggers.empty()) return;
 
-    log_info(get_string("info.running_triggers"));
+    ui::section(get_string("ui.section_triggers"));
 
     for (const auto& cmd : pending_triggers) {
-        log_info(string_format("info.trigger_exec", cmd.c_str()));
+        // 单行状态：`==> Running system trigger: ldconfig ... [OK]`（[OK] 靠终端最右）。
+        ui::Line line(string_format("ui.running_trigger", cmd));
 
         // 内部处理 ldconfig，避免调用外部程序
         if (cmd == "ldconfig") {
-            log_info(get_string("info.generating_soname_links"));
-            apply_soname_links(Config::instance().root_dir() / "usr/lib");
+            // **提交后阶段不得穿透 --root**（2026-10-03 审计）：`apply_soname_links` 用**跟随**
+            // 语义处理这个目录（`is_directory_follow` + `create_symlink` + `fs::remove`），而
+            // 包发的 `usr/lib -> <root 外>` 链接是**有意**放行的（§5.4 不变量 6 只解析父目录）
+            // ⇒ 不挡就是"提交之后在宿主的那个目录里建/删链接"。
+            // 这里**只告警不抛**：触发器跑在批次提交之后，抛了等于"包已装好却报命令失败"
+            // （与其余触发器失败的处置一致）；判据见 `base/utils.hpp::path_resolves_within`。
+            const std::filesystem::path soname_dir = Config::instance().root_dir() / "usr/lib";
+            if (!path_resolves_within(soname_dir, Config::instance().root_dir())) {
+                log_warning(string_format("warning.soname_dir_outside_root", soname_dir.string()));
+                line.finish(ui::skipped());
+            } else {
+                // 清理悬空 SONAME 链接时**跳过属于某个包的那些**：包可以刻意发一条指向
+                // "由另一个包提供、此刻还没装"的库的链接，删掉它没有任何机制会重建
+                // （详见 apply_soname_links 的说明）。归属判据在这里注入 —— `elf/` 层不许
+                // 反向依赖 `db/`。逻辑键按 `root_dir()` 归一（与其他调用点同一口径）。
+                apply_soname_links(soname_dir, [](const std::filesystem::path& link) {
+                    const std::filesystem::path rel =
+                        link.lexically_relative(Config::instance().root_dir());
+                    if (rel.empty() || rel.native().starts_with("..")) return false;
+                    const std::string logical =
+                        (std::filesystem::path("/") / rel).lexically_normal().string();
+                    return !Cache::instance().get_file_owners(logical).empty();
+                });
+                line.finish(ui::ok(true));
+            }
         } else if (Config::instance().testing_mode()) {
             // 测试模式下跳过外部命令（systemctl daemon-reload 等），避免 polkit 弹窗
-            log_info(string_format("info.testing_skip_trigger", cmd.c_str()));
+            line.finish(ui::skipped());
         } else {
             // **在目标 root 内**执行：命令里写的是绝对路径（/usr/share/... 等），
             // 不 chroot 就会打在宿主上、目标 root 反而没更新（TODO F3）
-            if (int ret = run_shell_in_root(cmd); ret != 0) {
+            const int ret = run_shell_in_root(cmd);
+            line.finish(ui::ok(ret == 0));
+            if (ret != 0) {
                 log_warning(string_format("warning.trigger_failed", std::to_string(ret).c_str()));
             }
         }

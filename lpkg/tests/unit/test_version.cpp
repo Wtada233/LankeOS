@@ -304,13 +304,18 @@ TEST(VersionCompare, LibsolvEvrRoundTrip)
 {
     EXPECT_EQ(to_libsolv_evr("1.0-rc1"), "1.0~rc1");
     EXPECT_EQ(to_libsolv_evr("1.0"), "1.0");
-    // `+release` → `-`：libsolv 按最后一个 `-` 切 version/release
-    EXPECT_EQ(to_libsolv_evr("6.0.0+3.lpkg"), "6.0.0-3.lpkg");
-    EXPECT_EQ(to_libsolv_evr("261.2+3"), "261.2-3");
+    // `+release` → `^^`（caret 分隔）。**不能用 `-`**：那是 libsolv 的 release 槽位，而它的
+    // 依赖匹配走 EVRCMP_MATCH_RELEASE，把"有一侧没有 release"当**通配** —— 实测会让
+    // `= 1.0` 匹配 `1.0+1`、`> 1.0+1` 匹配 `1.0`。等价性矩阵见
+    // tests/unit/test_vercmp_libsolv_bridge.cpp（那道闸门才是这条断言的依据）。
+    EXPECT_EQ(to_libsolv_evr("6.0.0+3.lpkg"), "6.0.0^^3.lpkg");
+    EXPECT_EQ(to_libsolv_evr("261.2+3"), "261.2^^3");
     EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("1.0-rc1")), "1.0-rc1");
     EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("22.1.7+2")), "22.1.7+2");
     EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("261.2+3")), "261.2+3");
     EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("0.2385.9ece3f52+1")), "0.2385.9ece3f52+1");
+    // 预发布 + release 同时存在：旧解码（按最后一个 `-` 切）在这类串上会还原错
+    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("1.0-rc1+2")), "1.0-rc1+2");
     // 归一化后：rc 旧于基础版
     EXPECT_TRUE(version_compare("1.0-rc1", "1.0"));
     EXPECT_FALSE(version_compare("1.0", "1.0-rc1"));
@@ -327,4 +332,51 @@ TEST(DepParser, OperatorAppearanceOrder)
     EXPECT_EQ(deps[0].constraints[0].version, "2.0");
     EXPECT_EQ(deps[0].constraints[1].op, ">=");
     EXPECT_EQ(deps[0].constraints[1].version, "1.0");
+}
+
+// ============================================================================
+// dependency_name_of —— "一行 deps/ 元数据 → 依赖包名"的**唯一**实现
+//
+// 它存在之前，这条规则在四处各写了一遍、用了三种不同的判据（运算符感知 / 纯空白 /
+// `ss >>`），于是同一个包在不同路径上会算出**不同的键**（真可达的一条见
+// tests/integration/test_reverse_dep_key_consistency.cpp：纯空白规则把 `provb>=2.0`
+// 整串当成包名，`get_reverse_deps("provb")` 于是永远查不到那个依赖者）。
+//
+// 本用例钉两件事：
+//   ① 逐条列举的语义（含最容易写错的"约束紧贴包名"与 `!=`）；
+//   ② **与 `parse_dep_strings` 交叉验证** —— 两者对同一个串必须给出同一个名字。
+//      第 ② 条是关键：只要有人在任一头上改了判据，这里立刻红。
+// ============================================================================
+TEST(DepParser, DependencyNameOfMatchesParseDepStrings)
+{
+    const std::vector<std::string> lines = {
+        "glibc",                 // 无约束
+        "cmake >= 3.20",         // 常规带空格
+        "cmake>=3.20",           // **约束紧贴包名**（纯空白规则在这里给出整串）
+        "foo!=1.0",              // `!` 打头的二元运算符（`find_first_of(" \t<>=")` 给出 "foo!"）
+        "libfoo <= 2.0 >= 1.0",  // 复合约束：名字是最早那个运算符之前那段
+        "  cmake  ",             // 前后空白
+        "cmake  >=  3.20",       // 运算符两侧多余空格
+        "ninja",                 // 名字里没有运算符
+        "gcc-libs",              // 名字含 `-`
+    };
+    for (const auto& line : lines) {
+        const std::string name = detail::dependency_name_of(line);
+        EXPECT_FALSE(name.empty())
+            << "名字不该为空（空名会让调用方算出一个永远查不到的键）：" << line;
+        // ② 交叉验证：同一个串，名字提取与语法解析必须一致
+        const auto parsed = detail::parse_dep_strings({line});
+        ASSERT_EQ(parsed.size(), 1u) << line;
+        EXPECT_EQ(name, parsed[0].name)
+            << "名字提取与 parse_dep_strings 不一致（两者是同一套判据的两面）：" << line;
+    }
+
+    // ① 逐条点名 —— 这三条正是旧的三份实现各错一条的地方
+    EXPECT_EQ(detail::dependency_name_of("cmake>=3.20"), "cmake");
+    EXPECT_EQ(detail::dependency_name_of("foo!=1.0"), "foo");
+    EXPECT_EQ(detail::dependency_name_of("  cmake  "), "cmake");
+    EXPECT_EQ(detail::dependency_name_of("provb>=2.0 <3.0"), "provb");
+    // CRLF：`trim_copy` 只去空格与制表符，**不碰 `\r`** —— 行读的尾巴必须在里面剥掉
+    EXPECT_EQ(detail::dependency_name_of("provb\r"), "provb");
+    EXPECT_EQ(detail::dependency_name_of("provb>=2.0\r"), "provb");
 }

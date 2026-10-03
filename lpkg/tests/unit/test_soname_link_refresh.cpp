@@ -12,6 +12,7 @@
 
 #include <gtest/gtest.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <cstdlib>
 #include <filesystem>
@@ -29,7 +30,7 @@ protected:
 
     void SetUp() override
     {
-        dir = fs::absolute("tmp_soname_refresh_test");
+        dir = fs::absolute("tmp_soname_refresh_test_" + std::to_string(::getpid()));
         if (fs::exists(dir)) fs::remove_all(dir);
         fs::create_directories(dir);
     }

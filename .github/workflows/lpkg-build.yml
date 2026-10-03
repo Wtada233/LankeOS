@@ -15,9 +15,40 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # 钉住发行版而不是 `ubuntu-latest`：下面要用 apt.llvm.org 的 **官方** clang-format，
+    # 而那个仓库按 codename 分发（`llvm-toolchain-noble-23`）—— 浮动到 26.04 会让这一行
+    # 直接 404。钉住既让 CI 可复现，也让那个 URL 有个确定的含义。
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
+
+      # 格式合规是**可执行的不变量**（`make format-check`），但它在 CI 里一直没有接线：
+      # 容器是 alpine、没装 clang，所以它**必须跑在宿主**（见 Makefile 的说明）。
+      # 放在 docker 那一步**之前**：违反格式是最便宜也最常见的失败，不该等整个静态构建跑完。
+      #
+      # **工具来源**：apt.llvm.org（LLVM 官方仓库）的 `clang-format-23`，直接是**真 ELF**
+      # （`/usr/bin/clang-format-23`），版本 `1:23.1.2~...` 与仓库基线 23.1.2 同一大版本线。
+      # 版本必须钉在 23.x：clang-format 换**大版本**会因换行决策不同而**误报**（见 Makefile）。
+      # 不用 PyPI 的 `clang-format` 包：它只是把官方二进制重新打包，作者是第三方而非 LLVM，
+      # 还多一层 Python shim；也不用 LLVM 的 GitHub release 包 —— 那是 1.9 GB，只为拿一个
+      # 格式化工具不值得。
+      - name: clang-format 23（LLVM 官方 apt 仓库）
+        run: |
+          curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/noble/ llvm-toolchain-noble-23 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang-format-23
+          make -C lpkg format-check CLANG_FORMAT=clang-format-23
+
+      # 索引格式的**跨语言契约**：C++ 的 `parse_repo_index_line()` 与
+      # `main/scripts/lrepo-mgr.py` 的 `parse_aggregated_index()` 必须同语义 —— 后者的结果
+      # 会被 `push` 用来读-改-写整份索引、被 `cleanup` 用来决定删哪些包文件，读丢一条
+      # 就是"删掉仍被引用的文件"。C++ 侧那一半随容器里的 `make test` 跑，这里补 Python 侧。
+      # runner 自带 python3（不需要额外安装）；契约靠"两侧同一份 fixture + 同一份期望"。
+      - name: 索引格式契约（C++ ↔ Python，Python 侧）
+        run: make -C lpkg check-index-format
 
       - name: Build static binary and run tests (Alpine 3.19 Docker)
         run: make -C lpkg docker test

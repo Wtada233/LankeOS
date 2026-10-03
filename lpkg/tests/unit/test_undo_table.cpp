@@ -19,6 +19,7 @@
 
 #include <gtest/gtest.h>
 #include <sys/xattr.h>
+#include <unistd.h>
 
 #include <filesystem>
 #include <fstream>
@@ -46,7 +47,7 @@ protected:
 
     void SetUp() override
     {
-        suite_dir = fs::absolute("tmp_undo_table_test");
+        suite_dir = fs::absolute("tmp_undo_table_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_dir)) fs::remove_all(suite_dir);
         test_root = suite_dir / "root";
         fs::create_directories(test_root);
@@ -418,16 +419,15 @@ TEST_F(UndoTableTest, DbFamilyRestoresBackupOrDropsNewlyCreatedFile)
     EXPECT_FALSE(fs::exists(bak2));
 }
 
-TEST_F(UndoTableTest, DbGuardOnSymlinkLoopBakDoesNotThrowAndSkips)
+TEST_F(UndoTableTest, DbBakSymlinkLoopIsRestoredNotSkipped)
 {
-    // `Guard::DbBakExists` 原先是**抛**的 `fs::exists` —— 备份路径被**符号链接环**占着时它以
-    // ELOOP 打断整条回滚，而本文件上方 `guard_ok()` 的纪律明写"回滚路径上的判定绝不能有能力
-    // 打断事务"。实测（宿主最小复现）：`stat("self")` = **ELOOP**（抛版 `fs::exists` 就在这条
-    // 路上抛），而**跟随语义的不抛**判据给 false。
-    //
-    // 判否的后果是**跳过这一行**（"备份解不开 ⇒ 当它不可用 ⇒ 原文件还在 ⇒ 幂等跳过"），
-    // 不是把整批拖垮 —— 所以断言必须同时钉三件：**不抛** / 跳过（计数为 0）/ **原位一个字节
-    // 没被动**且**没写审计行**。只钉"不抛"不够：一个"抛之前先改了盘"的实现也能过。
+    // 本条原先钉的是"备份是符号链接环 ⇒ 跟随语义判否 ⇒ 跳过（幂等）"。**那条前提在真实写入
+    // 路径上不成立**：写入侧（`cache.cpp` / `write_string_file_wal`）用 `exists_no_follow` 判
+    // "旧内容是否存在"，把占着 DB 路径的那个自环链接 **rename 成了 bak**（原位**已经空了**）——
+    // 所以"跳过"不是幂等，而是**把原物丢掉**：这一行不计失败、不写审计，随后
+    // `cleanup_db_backups` 还会把那个备份删掉，原物永久消失。
+    // 判定因此统一到写入侧同一个谓词（lstat）。原纪律仍要守：回滚路径上的判定**绝不能抛**
+    // （`exists_no_follow` 是 lstat 语义、不抛 —— 自环下 lstat 成功）。
     const fs::path db = in_root("var/lpkg/pkgs");
     const fs::path bak = in_root("var/lpkg/pkgs.lpkg_db_bak_before:pkg:installed");
     touch(db, "official");
@@ -437,18 +437,15 @@ TEST_F(UndoTableTest, DbGuardOnSymlinkLoopBakDoesNotThrowAndSkips)
     wal::RollbackStats stats{};
     EXPECT_NO_THROW(stats = run({make_op("DB", db.string(), "pkg:installed")}))
         << "回滚路径上的判定把异常抛出去了 —— 整条回滚会断在这里";
-    EXPECT_EQ(stats.db_restored, 0) << "备份解不开 ⇒ 跳过（幂等）";
-    {
-        std::ifstream f(db);
-        std::stringstream ss;
-        ss << f.rdbuf();
-        EXPECT_EQ(ss.str(), "official") << "跳过就不能动原位那份";
-    }
-    EXPECT_EQ(read_wal().find("RESTORE_DB "), std::string::npos) << "跳过就不该写审计行";
+    EXPECT_EQ(stats.db_restored, 1) << "自环链接也是写入侧搬进来的备份，必须还原（不是跳过）";
+    EXPECT_FALSE(fs::exists(bak)) << "备份被消费（rename 回原位）";
+    ASSERT_TRUE(fs::is_symlink(fs::symlink_status(db))) << "原位还原成那条自环链接";
+    EXPECT_EQ(fs::read_symlink(db).string(), bak.string());
+    EXPECT_NE(read_wal().find("RESTORE_DB "), std::string::npos) << "还原了就该写审计行";
 
-    // 对照（防"把跟随语义换成 lstat 语义"这种修法）：**备份是普通符号链接且目标可达**时，
-    // 这一格必须照旧判"存在"并真的还原 —— `exists_no_follow` 也会给 true，所以这条不区分两者；
-    // 它挡的是"改成恒 false / 索性不判"这类过度修正。
+    // 对照（防"改成恒 true / 索性不判"这类过度修正）：**备份是普通符号链接且目标可达**时，
+    // 这一格必须照旧判"存在"并真的还原 —— lstat 与跟随语义在这里都给 true，所以它挡的是
+    // 过度修正，不是两种谓词之分。
     const fs::path db2 = in_root("var/lpkg/provides.db");
     const fs::path bak2 = in_root("var/lpkg/provides.db.lpkg_db_bak_before:pkg:installed");
     const fs::path real_bak2 = in_root("var/lpkg/provides.db.real");
@@ -456,13 +453,34 @@ TEST_F(UndoTableTest, DbGuardOnSymlinkLoopBakDoesNotThrowAndSkips)
     touch(real_bak2, "old");
     fs::create_symlink(real_bak2, bak2);
     stats = run({make_op("DB", db2.string(), "pkg:installed")});
-    EXPECT_EQ(stats.db_restored, 1) << "跟随语义：链接可达就是要还原";
+    EXPECT_EQ(stats.db_restored, 1) << "链接可达就是要还原";
     {
         std::ifstream f(db2);
         std::stringstream ss;
         ss << f.rdbuf();
         EXPECT_EQ(ss.str(), "old");
     }
+}
+
+TEST_F(UndoTableTest, DbBakDanglingSymlinkIsRestored)
+{
+    // 写入侧判"旧内容是否存在"用的是 `exists_no_follow`（lstat）——**悬空链接**也算"这个名字
+    // 被占着"，于是它被 rename 成了 `<path>.lpkg_db_bak_before:<milestone>`。回滚侧的
+    // `DbBakExists` 必须用同一个谓词；用跟随语义会把这条悬空链接备份判成"不存在" ⇒ 这一行
+    // 被静默跳过（不计失败、不写审计），原物永久消失。
+    const fs::path db = in_root("var/lpkg/pkgs");
+    const fs::path bak = in_root("var/lpkg/pkgs.lpkg_db_bak_before:pkg:installed");
+    touch(db, "new");
+    fs::create_symlink("/nonexistent/old-target", bak);
+    ASSERT_TRUE(fs::is_symlink(fs::symlink_status(bak)));
+    ASSERT_FALSE(fs::exists(bak)) << "现场没造出悬空链接";
+
+    const wal::RollbackStats stats = run({make_op("DB", db.string(), "pkg:installed")});
+
+    EXPECT_EQ(stats.db_restored, 1) << "悬空链接备份也是备份，必须还原（跟随语义会漏掉它）";
+    ASSERT_TRUE(fs::is_symlink(fs::symlink_status(db)));
+    EXPECT_EQ(fs::read_symlink(db).string(), "/nonexistent/old-target");
+    EXPECT_NE(read_wal().find("RESTORE_DB "), std::string::npos);
 }
 
 // ============================================================================
@@ -526,4 +544,138 @@ TEST_F(UndoTableTest, SetXattrUndoSkipsPlainFileTargets)
     std::ifstream f(file);
     const std::string got{std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
     EXPECT_EQ(got, "i am a plain file\n");
+}
+
+// ============================================================================
+// NEW / COPY-tmp 的逆操作同样不得 rmdir 真目录（2026-10-02 与 COPY 落点支对齐）
+// ============================================================================
+
+TEST_F(UndoTableTest, NewNeverRemovesRealDirectoryAtTarget)
+{
+    // `Undo::RemoveFile` 是 `fs::remove`，对**空目录**会 rmdir 成功。NEW 只描述
+    // 文件/符号链接（目录走 NEW_DIR），但盘上那个名字完全可能被真目录占着（别的包/用户
+    // 建的）—— 表里必须用 `TargetTakenNotDir` 挡住：宁可跳过，也绝不 rmdir 一个没被
+    // BACKUP 记录过的目录。
+    const fs::path p = in_root("usr/bin/occupied");
+    fs::create_directories(p);
+
+    const auto stats = run({make_op("NEW", p.string())});
+
+    EXPECT_TRUE(fs::is_directory(p)) << "真目录绝不能被 NEW 的逆操作 rmdir 掉";
+    EXPECT_EQ(stats.files_cleaned, 0) << "被守卫挡住 → 没动盘";
+    EXPECT_EQ(read_wal().find("RESTORE_FILE_RM " + p.string()), std::string::npos);
+}
+
+TEST_F(UndoTableTest, CopyLeftoverTmpIsNotRmdirWhenItIsARealDirectory)
+{
+    // 第二支（清 `.lpkgtmp` 残留）同样用 `TargetTakenNotDir`：`.lpkgtmp` 只可能是普通文件，
+    // 但盘上那个名字若被真目录占着，绝不 rmdir。落点那一支**不受影响**、照常删。
+    const fs::path tmp = in_root("var/lpkg/app.lpkgtmp");
+    const fs::path dst = in_root("usr/bin/app");
+    fs::create_directories(tmp);
+    touch(dst);
+
+    const auto stats = run({make_op("COPY", tmp.string(), dst.string())});
+
+    EXPECT_TRUE(fs::is_directory(tmp)) << "真目录绝不能被当作 .lpkgtmp 残留 rmdir 掉";
+    EXPECT_FALSE(fs::exists(dst)) << "落点那一支照常删";
+    EXPECT_EQ(stats.files_cleaned, 1) << "只有落点那一支动了盘";
+}
+
+// ============================================================================
+// 表的**完整性**：每个 WAL 类型要么可逆、要么被显式跳过
+// ============================================================================
+
+/**
+ * `rows_of()` 对**不在表里**的类型返回空区间 ⇒ `reverse_execute` 既不 confine 也不撤销，
+ * 而且**完全静默**（不计统计、不写审计行）。也就是：加一个 WAL 类型却忘了在 `UNDO_TABLE`
+ * 里登记，回滚会**少做一件事而毫无痕迹** —— 这正是"静默不回滚"的定义。
+ *
+ * 本用例遍历 `WALOpType::TYPE_COUNT`（枚举末尾的哨兵）的**全部**取值，要求每个类型恰好
+ * 满足下面两条之一：
+ *   · `wal_type_is_reversible` —— 在表里，`reverse_execute` 会处理它；
+ *   · `skip_in_reverse()` —— 未解析 / 元数据（BEGIN·COMMIT·ROLLBACK·…）/ 审计行 / CLEANUP。
+ * 两者都不是 ⇒ 红。新类型只要写在 `TYPE_COUNT` 前面，这条就会逼你做出选择，
+ * 而**不写**是唯一会静默出错的选项。
+ *
+ * 顺带钉住"名字必须登记进 `TYPE_MAP`"：`walop_type_name` 认不出 = 解析器也不认，
+ * 那么写出去的那行永远落回 INVALID（同一种静默）。
+ */
+TEST(UndoTableCompletenessTest, EveryTypeIsEitherReversibleOrExplicitlySkipped)
+{
+    using namespace wal;  // 本文件其余用例都经 `make_op` 助手，从没直接点过这些类型名
+    for (int i = 0; i < static_cast<int>(WALOpType::TYPE_COUNT); ++i) {
+        const auto t = static_cast<WALOpType>(i);
+        WALOp probe;
+        probe.type = t;
+
+        // `INVALID` 有意**不在** `TYPE_MAP` 里：它是"这一行没解析出来"的哨兵，
+        // 不存在可写出的名字（`walop_type_name` 对它返回 "UNKNOWN" 是预期）。
+        if (t != WALOpType::INVALID) {
+            EXPECT_NE(walop_type_name(t), "UNKNOWN") << "枚举值 " << i
+                                                     << " 没有登记进 TYPE_MAP —— 解析器认不出它，"
+                                                        "写出去的行会永远落回 INVALID（静默）";
+        }
+
+        const bool reversible = wal_type_is_reversible(t);
+        const bool skipped = probe.skip_in_reverse();
+        EXPECT_NE(reversible, skipped)
+            << "类型 " << std::string(walop_type_name(t)) << "（枚举值 " << i << "）"
+            << "既不在 UNDO_TABLE 里、也不被 skip_in_reverse 跳过 —— reverse_execute 会"
+               "**静默**放过它（既不 confine 也不撤销，不计统计、不写审计行）";
+    }
+}
+
+// ============================================================================
+// 失败的**可观测性**：`RollbackStats::failures`
+//
+// 这一族钉的是"回滚到底做到了没有"**能被表达出来**。此前 `perform_undo` 返回 `bool`，
+// 把"guard 跳过（正常的重复回滚）"与"动作执行了却没成功"压成同一个 `false` ——
+// 于是一次"目录建不回来"会被报成**回滚成功**：批次照常封 `COMMIT_PKGS`、
+// `cleanup_db_backups()` 照常删掉唯一还能重试的还原点。见 `wal_op.hpp` 的字段说明。
+// ============================================================================
+
+TEST_F(UndoTableTest, RealFailureIsCountedInFailures)
+{
+    // 造一个**真的撤不掉**的场景，且不需要任何特权：`DIR_RM` 的逆操作要
+    // `create_directories`，而它的父路径被一个**普通文件**占着 ⇒ ENOTDIR。
+    // （EACCES / EROFS 那两类要 root 之外的权限或只读挂载，沙盒里造不出来；
+    //   这一条造得出来，所以本文件能真的把 `failures` 考到。）
+    const fs::path blocker = in_root("blk");
+    touch(blocker);                              // blk 是个**文件**，不是目录
+    const fs::path target = in_root("blk/sub");  // 因此这个目录建不出来
+
+    const auto stats = run({wal::parse_op("DIR_RM " + target.string() + "/ 488 0 0")});
+
+    EXPECT_EQ(stats.dirs_recreated, 0) << "没建出来就不该计进成功数";
+    EXPECT_EQ(stats.failures, 1) << "撤不掉却被当成'无事可做'（零失败）—— 这正是'回滚报成功'的来源";
+}
+
+TEST_F(UndoTableTest, SuccessfulUndoCountsNoFailures)
+{
+    // 对照组：同一条 DIR_RM 在路径**可建**时必须计成功、不计失败 ——
+    // 没有这一条，上面那个 `failures == 1` 就没有区分力（若两种情形都报 1 则毫无意义）。
+    const fs::path target = in_root("ok/leaf");
+    const auto stats = run({wal::parse_op("DIR_RM " + target.string() + "/ 488 0 0")});
+
+    EXPECT_TRUE(fs::is_directory(target)) << "取证无效：对照组本该把目录建出来";
+    EXPECT_EQ(stats.dirs_recreated, 1);
+    EXPECT_EQ(stats.failures, 0) << "成功的撤销**绝不能**计失败";
+}
+
+TEST_F(UndoTableTest, IdempotentSkipIsNotAFailure)
+{
+    // **幂等跳过绝不能被算成失败**：重复回滚是正常结局（崩溃恢复会整段重做），把它们
+    // 计进 `failures` 会让每一次正常回滚都"看起来没做全"⇒ 备份永远清不掉。
+    const fs::path p = in_root("usr/bin/created");
+    touch(p);
+
+    const auto first = run({make_op("NEW", p.string())});
+    ASSERT_EQ(first.files_cleaned, 1) << "取证无效：第一遍根本没删掉";
+    EXPECT_EQ(first.failures, 0) << "成功的撤销不该计失败";
+
+    const auto second = run({make_op("NEW", p.string())});
+    EXPECT_EQ(second.files_cleaned, 0) << "第二遍目标已不在 ⇒ 幂等跳过";
+    EXPECT_EQ(second.failures, 0)
+        << "幂等跳过被算成了失败 —— 那会让每次正常回滚都保留 DB 备份、永远清不掉";
 }

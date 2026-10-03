@@ -14,6 +14,7 @@
 #include <sstream>
 #include <vector>
 
+#include "archive/archive.hpp"
 #include "base/constants.hpp"
 #include "base/exception.hpp"
 #include "base/utils.hpp"
@@ -29,8 +30,17 @@ using json = nlohmann::json;
 namespace
 {
 /** 将磁盘上的单个文件或目录添加到归档中，保留文件元数据和符号链接信息 */
-void add_to_archive(struct archive* a, const fs::path& path, const std::string& entry_name)
+void add_to_archive(struct archive* a, const fs::path& path, const std::string& entry_name,
+                    const std::string& container_path)
 {
+    // 成员名守卫（与解压侧**共用**同一份判据）。这是名字进入归档的**唯一**漏斗，
+    // 所以判在这里、而不是在各调用点：不判的话 `lpkg pack` 能产出一个自己的 extractor
+    // 会整包拒收的包 —— 缺陷要拖到下游甚至用户手上才暴露，而该出声的地方是产生它的那一刻。
+    // 常量名（content / hooks / metadata.json）天然合法，走同一条路只是纵深防御。
+    if (const std::string why = member_name_rejection_message(entry_name, container_path);
+        !why.empty())
+        throw LpkgException(why);
+
     struct stat st;
     if (lstat(path.c_str(), &st) != 0) return;
 
@@ -54,6 +64,12 @@ void add_to_archive(struct archive* a, const fs::path& path, const std::string& 
     if (S_ISLNK(st.st_mode)) {
         char link_target[PATH_MAX];
         ssize_t len = readlink(path.c_str(), link_target, sizeof(link_target) - 1);
+        // readlink 不保证 NUL 结尾：len == 缓冲上限即"被截断"。静默打包一个**错误**的链接
+        // 目标不可接受 —— 拒绝（与 localization.cpp 处理截断的判据一致）。
+        if (len == static_cast<ssize_t>(sizeof(link_target) - 1)) {
+            archive_entry_free(entry);
+            throw LpkgException(string_format("error.readlink_target_too_long", path.string()));
+        }
         if (len != -1) {
             link_target[len] = '\0';
             archive_entry_set_symlink(entry, link_target);
@@ -61,9 +77,10 @@ void add_to_archive(struct archive* a, const fs::path& path, const std::string& 
     }
 
     if (archive_write_header(a, entry) != ARCHIVE_OK) {
+        const char* err = archive_error_string(a);  // 可能为 NULL：先取再兜底
         archive_entry_free(entry);
-        throw LpkgException(
-            string_format("error.archive_write_header_failed", archive_error_string(a)));
+        throw LpkgException(string_format("error.archive_write_header_failed",
+                                          err ? err : get_string("error.unknown")));
     }
 
     if (S_ISREG(st.st_mode)) {
@@ -75,10 +92,17 @@ void add_to_archive(struct archive* a, const fs::path& path, const std::string& 
         std::array<char, constants::PACK_IO_BUFFER_SIZE> buffer{};
         while (f.read(buffer.data(), buffer.size()) || f.gcount() > 0) {
             if (archive_write_data(a, buffer.data(), f.gcount()) < 0) {
+                const char* err = archive_error_string(a);  // 可能为 NULL：先取再兜底
                 archive_entry_free(entry);
-                throw LpkgException(
-                    string_format("error.archive_write_data_failed", archive_error_string(a)));
+                throw LpkgException(string_format("error.archive_write_data_failed",
+                                                  err ? err : get_string("error.unknown")));
             }
+        }
+        // 读到一半的 I/O 错误会置 badbit（上面的循环就此结束）—— 不检查就会**静默**写出一份
+        // 缺数据的包，还照常算 SHA256 报成功。判据与 crypto/hash.cpp 里那道一致。
+        if (f.bad()) {
+            archive_entry_free(entry);
+            throw LpkgException(string_format("error.archive_read_failed", path.string()));
         }
     }
 
@@ -86,12 +110,19 @@ void add_to_archive(struct archive* a, const fs::path& path, const std::string& 
 }
 
 /** 递归遍历目录并将所有文件和子目录添加到归档中 */
-void add_dir_recursive(struct archive* a, const fs::path& dir, const std::string& archive_prefix)
+void add_dir_recursive(struct archive* a, const fs::path& dir, const std::string& archive_prefix,
+                       const std::string& container_path)
 {
-    for (const auto& entry : fs::recursive_directory_iterator(dir)) {
-        fs::path rel = entry.path().lexically_relative(dir);
+    // **必须排序**：`recursive_directory_iterator` 的顺序由 readdir 决定（文件系统相关），
+    // 而归档成员顺序直接决定 `.lpkg` 的哈希 —— 不排序则同一棵内容树在不同机器/文件系统上
+    // 打出不同的 SHA256，破坏可复现构建（install_common.cpp 的对应扫描就显式排序）。
+    std::vector<fs::path> paths;
+    for (const auto& entry : fs::recursive_directory_iterator(dir)) paths.push_back(entry.path());
+    std::sort(paths.begin(), paths.end());  // 字典序天然把父目录排在子项之前
+    for (const auto& p : paths) {
+        fs::path rel = p.lexically_relative(dir);
         std::string entry_name = archive_prefix + "/" + rel.string();
-        add_to_archive(a, entry.path(), entry_name);
+        add_to_archive(a, p, entry_name, container_path);
     }
 }
 }  // namespace
@@ -122,7 +153,9 @@ void pack_package(const std::string& output_filename, const std::string& source_
     archive_write_set_format_pax_restricted(a);
 
     if (archive_write_open_filename(a, output_filename.c_str()) != ARCHIVE_OK) {
-        throw LpkgException(string_format("error.archive_open_failed", archive_error_string(a)));
+        const char* err = archive_error_string(a);  // 可能为 NULL：先取再兜底
+        throw LpkgException(
+            string_format("error.archive_open_failed", err ? err : get_string("error.unknown")));
     }
 
     // 打包失败时丢弃半成品：残留的截断 .lpkg 会被误当成有效包（其哈希也算得出来）
@@ -147,22 +180,25 @@ void pack_package(const std::string& output_filename, const std::string& source_
             meta[std::string(constants::J_NEEDED_SO)] = needed_so;
             meta[std::string(constants::J_MAN)] = man_content;
 
-            std::ofstream f(tmp_meta);
-            f << meta.dump(2) << std::endl;
+            // 用 `write_string_to_file`（带 open/写失败检查 + fsync + 原子 rename）而不是
+            // 裸 `std::ofstream`：后者不查失败，磁盘满/IO 错误会留下**截断的 metadata.json**
+            // 并被照常打进 `.lpkg`，而 `pack_package` 仍报成功、还给它算 SHA256
+            // （2026-10-02 修）。
+            write_string_to_file(tmp_meta, meta.dump(2) + "\n");
         }
-        add_to_archive(a, tmp_meta, std::string(constants::PKG_METADATA_FILE));
+        add_to_archive(a, tmp_meta, std::string(constants::PKG_METADATA_FILE), output_filename);
         std::error_code ec;
         fs::remove(tmp_meta, ec);
 
         // 2. 添加 hooks 目录
         if (fs::exists(hooks_dir)) {
-            add_dir_recursive(a, hooks_dir, std::string(constants::DIR_HOOKS));
+            add_dir_recursive(a, hooks_dir, std::string(constants::DIR_HOOKS), output_filename);
         }
 
         // 3. 添加内容文件（root 目录 -> content/）
         // 先添加目录条目本身
-        add_to_archive(a, root_dir, std::string(constants::DIR_CONTENT));
-        add_dir_recursive(a, root_dir, std::string(constants::DIR_CONTENT));
+        add_to_archive(a, root_dir, std::string(constants::DIR_CONTENT), output_filename);
+        add_dir_recursive(a, root_dir, std::string(constants::DIR_CONTENT), output_filename);
 
         close_rc = archive_write_close(a);
         archive_write_free(a);
@@ -182,7 +218,10 @@ void pack_package(const std::string& output_filename, const std::string& source_
         throw LpkgException(string_format("error.archive_close_failed", output_filename));
     }
     if (close_rc < ARCHIVE_OK) {
-        log_warning(string_format("error.archive_close_failed", output_filename));
+        // 这里**没有**丢弃归档（随后照常算 SHA256、报成功），所以用不带"已丢弃"文案的
+        // warning 键；`< ARCHIVE_WARN` 的上面那一支才是真丢弃，那一支仍用
+        // error.archive_close_failed。
+        log_warning(string_format("warning.archive_close_incomplete", output_filename));
     }
 
     std::string hash = calculate_sha256(output_filename);
