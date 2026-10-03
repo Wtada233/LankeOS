@@ -375,7 +375,7 @@ FUZZ_FLAGS ?= -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer -g -O1
 FUZZ_TIME_ELF ?= 60
 FUZZ_TIME_ARCHIVE ?= 60
 FUZZ_ONLY ?=
-FUZZ_NAMES = elf_strip_fuzz archive_name_fuzz
+FUZZ_NAMES = elf_strip_fuzz archive_name_fuzz strip_archive_fuzz vercmp_fuzz elf_soname_fuzz
 
 # ⚠️ harness 的 `.o` **必须**也纳入头依赖追踪。它们走的是通用的
 # `$(BUILD_DIR)/tests/%.o` 规则，而 `TEST_SRCS`（:162）只收 `tests/main.cpp` + `unit/` +

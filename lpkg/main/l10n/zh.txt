@@ -110,6 +110,7 @@ error.skip_remove_essential=无法移除核心包: {}。移除它可能会破坏
 error.solve_failed_undiagnosed=依赖求解失败（libsolv 报了 {} 个约束问题，但无法归类到任何已知原因）——拒绝继续。
 error.source_basename_collision=源码文件名冲突：'{}' 同时来自两个不同的源（'{}' 与 '{}'）；请重命名其中一个
 error.strip_archive_broken=静态库畸形，或读不出/写不回内容
+error.strip_archive_index_unsupported=静态库的符号索引（{}）无法重算，跳过剥离以免写出失效的索引（库保持原样）
 error.strip_archive_open=打不开静态库
 error.strip_file_not_exist=文件不存在: {}
 error.strip_foreign_endian=ELF 字节序与本机不同，拒绝剥离

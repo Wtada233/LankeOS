@@ -110,6 +110,7 @@ error.skip_remove_essential=Cannot remove essential package: {}. Removal might b
 error.solve_failed_undiagnosed=Dependency solving failed (libsolv reported {} constraint problem(s) that match no known cause) — refusing to continue.
 error.source_basename_collision=Source filename conflict: '{}' is used by two different sources ('{}' and '{}'); rename one of them
 error.strip_archive_broken=Static library is malformed, or cannot be read/rewritten
+error.strip_archive_index_unsupported=Archive symbol index ({}) cannot be rebuilt; skipping strip rather than writing a stale index (library left unchanged)
 error.strip_archive_open=Cannot open static library
 error.strip_file_not_exist=File does not exist: {}
 error.strip_foreign_endian=Refusing to strip an ELF whose byte order differs from the host

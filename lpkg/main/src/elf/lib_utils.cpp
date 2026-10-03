@@ -53,14 +53,14 @@ std::string get_elf_soname(const fs::path& path)
                     GElf_Dyn dyn;
                     if (gelf_getdyn(data, i, &dyn) == nullptr) continue;  // 不读未初始化的 dyn
                     if (dyn.d_tag == DT_SONAME) {
-                        // libelf 在 offset 越出 .dynstr、sh_link 不是 SHT_STRTAB、或该节不存在时
-                        // **返回 NULL**。直接赋给 std::string 是 UB（libstdc++ 下等价
-                        // strlen(nullptr) → SIGSEGV），而本函数对 usr/lib 下**每个** ELF 调用，
-                        // 输入来自不可信包 → 一个畸形 .so 就能让安装后的 ldconfig 触发器
-                        // （root）或构建进程在事务中途段错误。strip.cpp 对同一 API 是判空的
-                        // （`name_ptr ? name_ptr : ""`），这里与之对齐。
-                        const char* s = elf_strptr(elf, shdr.sh_link, dyn.d_un.d_val);
-                        soname = s ? s : "";
+                        // **判空 ≠ 判有界**：原先这里是 `elf_strptr(...)` + `s ? s : ""`。判空
+                        // 只挡得住"指针为 NULL"，挡不住"指针非 NULL 但**没有 NUL 终止**" ——
+                        // 那种情况下 `std::string s = ptr` 的 `strlen` 会越过 `.dynstr` 一路读。
+                        // 改用**有界**取值（见 `lib_utils.hpp` 的 `elf_strtab_get`）。
+                        // ⚠️ 这条是**推理出来的纵深防御**，不是被复现的活缺陷（订正 2026-10-03：
+                        // 当初写"fuzz 实测读回垃圾"是错的，那次是 harness 的 oracle 把
+                        // `char` 与 `uint8_t` 直接比较导致的误报）。
+                        soname = std::string(elf_strtab_get(elf, shdr.sh_link, dyn.d_un.d_val));
                         break;
                     }
                 }

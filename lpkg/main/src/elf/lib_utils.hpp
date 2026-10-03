@@ -1,9 +1,14 @@
 #pragma once
+#include <gelf.h>
+#include <libelf.h>
+
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <functional>
 #include <string>
+#include <string_view>
 
 // ============================================================================
 // ELF 边界/计数校验（strip 与 lib_utils 共用）
@@ -30,6 +35,47 @@ inline bool elf_range_within(uint64_t off, uint64_t size, size_t limit)
 inline size_t elf_section_entry_count(uint64_t sh_size, uint64_t sh_entsize)
 {
     return sh_entsize == 0 ? 0 : static_cast<size_t>(sh_size / sh_entsize);
+}
+
+/**
+ * @brief 从字符串表节区里**有界地**取一个字符串（offset 越界、或数据内找不到 NUL ⇒ 空串）。
+ *
+ * **为什么不用 `elf_strptr` + 判空**：`elf_strptr(elf, index, off)` 只校验 `off` 落在该节区的
+ * `d_size` **之内**，**不保证其后有 NUL 终止**，返回的是**裸 `const char*`**（文件映射上的
+ * 指针）。于是 `std::string s = ptr;` 的 `strlen` 会一直读下去 —— 本节数据里没有 NUL 时，
+ * **越过本节、读到文件其余部分，甚至读过映射末尾**。**判空拦不住它**：指针非 NULL，只是
+ * **没有界**。
+ *
+ * ⚠️ **订正 2026-10-03（重要，别把这条当"实测过的活缺陷"）**：引入本函数时我写的理由是
+ * "fuzz 在某个畸变 `.so` 上实测读回 6 字节不在文件里的垃圾" —— **那个观察是假的**：真因是
+ * `tests/fuzz/elf_soname_fuzz` 第一版的 oracle **把 `char`（有符号）与 `uint8_t` 直接比较**，
+ * 于是**凡 SONAME 含 ≥0x80 字节就被误报**；那 6 字节其实老老实实在文件偏移 1167 处（已订正
+ * oracle）。**所以本函数属于"纵深防御"，不是"修了一条被复现的越界"** —— 上面那条越界路径是
+ * **推理**出来的（`elf_strptr` 的语义 + `strlen` 无界），没有实测样本。保留它的理由是**代价
+ * 只有几行、而一旦真的无 NUL 就是 root 进程读越界**；但**不要**据此宣称修过活缺陷，也不要
+ * 为"会不会触发"编造数据。
+ *
+ * 影响面（如果真触发）：`apply_soname_links` 在**安装后以 root 跑**，扫 `/usr/lib` 下**每个**
+ * ELF，输入来自**不可信包**。同一形态在 `strip.cpp` 的两处节区名解析上也有。
+ *
+ * @param strtab_index 字符串表节区的**节区索引**（`.dynstr` 用 `sh_link`，节区名用 `e_shstrndx`）
+ * @return 指向节区数据内部的 `string_view`（长度由 NUL 界出）；任何一处不满足即返回空
+ */
+inline std::string_view elf_strtab_get(Elf* elf, size_t strtab_index, uint64_t offset)
+{
+    Elf_Scn* scn = elf_getscn(elf, strtab_index);
+    if (scn == nullptr) return {};
+    GElf_Shdr shdr;
+    if (gelf_getshdr(scn, &shdr) == nullptr || shdr.sh_type != SHT_STRTAB) return {};
+    Elf_Data* data = elf_getdata(scn, nullptr);
+    if (data == nullptr || data->d_buf == nullptr) return {};
+    if (offset >= data->d_size) return {};
+    const char* base = static_cast<const char*>(data->d_buf);
+    const size_t off = static_cast<size_t>(offset);
+    // **这一步正是 `elf_strptr` 不做的**：NUL 必须落在**本节的**数据之内。
+    const void* nul = std::memchr(base + off, '\0', data->d_size - off);
+    if (nul == nullptr) return {};
+    return std::string_view(base + off, static_cast<const char*>(nul) - (base + off));
 }
 
 /**

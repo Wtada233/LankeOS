@@ -15,6 +15,7 @@
 #include <string_view>
 #include <vector>
 
+#include "i18n/localization.hpp"
 #include "lib_utils.hpp"
 #include "strip.hpp"
 
@@ -503,14 +504,18 @@ TEST_F(StripTest, ArchiveWithObjectMembers)
 namespace
 {
 struct ArProbe {
-    bool has_index = false;    ///< 归档里有符号索引成员 `/`
-    bool has_entries = false;  ///< 索引里至少有一个符号条目
-    bool stale = false;        ///< 索引里有偏移**没有**落在成员头上（= 索引已失效）
+    bool has_index = false;                ///< 归档里有符号索引成员 `/`
+    bool has_entries = false;              ///< 索引里至少有一个符号条目
+    bool stale = false;                    ///< 索引里有偏移**没有**落在成员头上（= 索引已失效）
+    std::vector<uint64_t> member_offsets;  ///< 非索引成员的头偏移（按文件顺序）
+    std::vector<std::pair<std::string, uint64_t>> symbols;  ///< 索引条目：符号名 → 它指的偏移
 };
 
 /** 解析 ar 归档，检查符号索引（成员 `/`）里的每个偏移是否都落在某个成员头的位置上。
  *
- *  索引里存的是**符号名**不是成员名，所以唯一能判的就是"偏移指不指得到成员头"。
+ *  索引里存的是**符号名**不是成员名，所以"偏移指不指得到成员头"是唯一能直接判的。
+ *  但那个判据在**多成员**时不够：指到**另一个**成员同样是"指向某个成员头"。所以还要拿
+ *  `symbols` 按"哪个成员定义哪个符号"去钉指对了没有 —— 那才是能骗过 stale 的形态。
  *  （GNU ar 格式：8 字节 magic 后是 60 字节一个的成员头；size 在偏移 48、10 字节。） */
 ArProbe probe_ar_index(const fs::path& p)
 {
@@ -544,7 +549,9 @@ ArProbe probe_ar_index(const fs::path& p)
             r.has_index = true;
             idx_off = body;
             idx_size = size;
-        } else {
+        } else if (name != "//" && name != "__.SYMDEF" && name != "__.SYMDEF SORTED") {
+            // 只把**内容成员**算进"成员头位置"：`//` 长名表与 BSD ranlib 表都不是内容成员，
+            // 索引条目也绝不该指向它们（指向了就是 stale）。
             starts.push_back(pos);
         }
         pos = body + size + (size & 1);
@@ -555,6 +562,7 @@ ArProbe probe_ar_index(const fs::path& p)
         return (static_cast<uint32_t>(d[o]) << 24) | (static_cast<uint32_t>(d[o + 1]) << 16) |
                (static_cast<uint32_t>(d[o + 2]) << 8) | static_cast<uint32_t>(d[o + 3]);
     };
+    r.member_offsets = starts;
     const uint32_t n = be32(idx_off);
     r.has_entries = n > 0;
     if (idx_size < 4ull + 4ull * n) {
@@ -563,10 +571,18 @@ ArProbe probe_ar_index(const fs::path& p)
     }
     for (uint32_t i = 0; i < n; ++i) {
         const uint64_t off = be32(idx_off + 4 + 4 * i);
-        if (std::find(starts.begin(), starts.end(), off) == starts.end()) {
-            r.stale = true;
-            break;
-        }
+        if (std::find(starts.begin(), starts.end(), off) == starts.end()) r.stale = true;
+    }
+    // 符号名紧跟偏移数组（NUL 分隔）—— 解析出来好按"哪个成员定义哪个符号"去钉指对了没有
+    size_t at = idx_off + 4 + 4ull * n;
+    const size_t idx_end = idx_off + idx_size;
+    for (uint32_t i = 0; i < n && at < idx_end; ++i) {
+        const size_t start = at;
+        while (at < idx_end && d[at] != 0) ++at;
+        r.symbols.emplace_back(
+            std::string(reinterpret_cast<const char*>(d.data()) + start, at - start),
+            be32(idx_off + 4 + 4 * i));
+        ++at;
     }
     return r;
 }
@@ -631,10 +647,52 @@ TEST_F(StripTest, ArchiveWithTwoMembersKeepsIndexConsistent)
     std::string error_msg;
     EXPECT_TRUE(strip_file(archive_file, error_msg)) << error_msg;
 
-    // 后置条件：索引要么被丢掉、要么仍**逐个指向成员头** —— 绝不能留着一份失效的
+    // 后置条件（**订正 2026-10-03**）：索引必须**保留**并被重算到成员的新位置。
+    // 此前写的是"索引要么被丢掉、要么仍逐个指向成员头"——**丢掉那一半是错的**：那是把 `.a`
+    // 降级成非正常形态（链接器只能退化成顺序扫描），而 binutils 在 `--strip-debug` / `-g` /
+    // `--strip-unneeded` 档位都**保留并重算**（`binutils/objcopy.c`：只有
+    // `strip_symbols == STRIP_ALL` 才 `has_armap = false`）——lpkg 剥的正是"调试信息那一档"，
+    // 契约与它一致。实测（binutils 2.47）：同一套判据跑两边产物，索引**逐条一致**。
     const ArProbe after = probe_ar_index(archive_file);
-    EXPECT_FALSE(after.stale) << "重写后符号索引指向了非成员头的位置（索引已失效）";
+    ASSERT_TRUE(after.has_index) << "重写后符号索引必须仍在（丢索引 = 把 .a 降级成非正常形态）";
+    EXPECT_FALSE(after.stale) << "重写后索引里有偏移指不到成员头（索引已失效）";
     EXPECT_LT(fs::file_size(archive_file), orig_size) << "两个带 -g 的成员应当被剥离变小";
+    ASSERT_EQ(after.member_offsets.size(), 2u);
+
+    // **精确判据**：sym_a / sym_b 必须各自指到**自己那个成员**（a.o 在前、b.o 在后）。
+    // 只判"指向某个成员头"不够 —— 指到另一个成员同样是合法的成员头，但链接器会取错成员。
+    // b.o 那条是承重的：它在 strip 后**必然前移**，正是本回归要钉的位置。
+    const auto offset_of = [&](const std::string& sym) -> uint64_t {
+        for (const auto& [s, off] : after.symbols) {
+            if (s == sym) return off;
+        }
+        return UINT64_MAX;
+    };
+    EXPECT_EQ(offset_of("sym_a"), after.member_offsets[0]) << "sym_a 应指向 a.o";
+    EXPECT_EQ(offset_of("sym_b"), after.member_offsets[1]) << "sym_b 应指向 b.o";
+
+    // **端到端判据：拿真正的 ld 做一次最终链接**（入口点直接指到 use，所以不需要 crt/libc）。
+    // ⚠️ **判据先验过有区分力**：`ld -r`（可重定位链接）**允许未定义符号** —— 什么都不喂也
+    // rc=0（实测），拿它当闸门等于恒真废话；`ld -r --no-undefined` 同样不设防。只有**最终
+    // 链接**会真的进归档里找符号：索引错位时实测 `error adding symbols: malformed archive`
+    // ——那正是 `bison` / `nspr` / `gcc` 三个包的现场。
+    if (std::system("ld --version >/dev/null 2>&1") == 0) {
+        const fs::path use_obj = dir / "use.o";
+        {
+            std::ofstream f(dir / "use.c");
+            f << "int sym_a(void); int sym_b(void);\nint use(void) { return sym_a() + sym_b(); }\n";
+        }
+        const std::string ccmd = "cd " + dir.string() + " && gcc -c use.c -o use.o 2>/dev/null";
+        if (std::system(ccmd.c_str()) == 0 && fs::exists(use_obj)) {
+            const std::string lcmd =
+                "cd " + dir.string() + " && ld -e use -o link.out use.o lib.a > link.log 2>&1";
+            const int lrc = std::system(lcmd.c_str());
+            std::ifstream lf(dir / "link.log");
+            const std::string llog((std::istreambuf_iterator<char>(lf)),
+                                   std::istreambuf_iterator<char>());
+            EXPECT_EQ(lrc, 0) << "ld 解不出剥离后索引里的符号: " << llog;
+        }
+    }
 
     fs::remove_all(dir, ec);
 }
@@ -731,13 +789,16 @@ bool ar_has_member(const fs::path& p, std::string_view want)
 /**
  * **回归（2026-10-03）**：`//` 长名表与归档符号索引必须**同一判据**。
  *
- * 旧判据只认"有 `.o` 成员在 strip 后变短"（`scan == 1`）才丢索引，却漏掉了**另一种会让偏移
- * 改变的情形**：`//` 长名表在重写时恒定被丢弃（libarchive 已把它的 size 归零，照抄只会写出
- * 一张空表 → 读回 "Invalid string table"），其后成员整体前移。于是一个"带 `//`、成员**没有**
- * 变短"的归档会被判成"索引仍然有效"而照抄索引 —— 但成员已经移位，偏移全错
+ * 旧判据只认"有 `.o` 成员在 strip 后变短"（`scan == 1`）才处理索引，却漏掉了**另一种会让
+ * 偏移改变的情形**：`//` 长名表在重写时恒定被丢弃（libarchive 已把它的 size 归零，照抄只会
+ * 写出一张空表 → 读回 "Invalid string table"），其后成员整体前移。于是一个"带 `//`、成员
+ * **没有**变短"的归档会被判成"索引仍然有效"而照抄索引 —— 但成员已经移位，偏移全错
  * （子审计逐字节复刻：索引 stale 0 → 2）。真实 GNU `ar` 只在有 >15 字节名字时才产 `//`，
  * 那种库会被"长名放弃"整库跳过；但**外来/构造归档**可以带一张没人引用的 `//`，正是这里手工
  * 构造的形态。
+ *
+ * 处置是**重算偏移后保留索引**（丢掉会把 `.a` 降级成非正常形态，见
+ * `ArchiveWithTwoMembersKeepsIndexConsistent`）。
  */
 TEST_F(StripTest, ArchiveWithUnreferencedLongNameTableIsNotLeftWithStaleIndex)
 {
@@ -760,26 +821,43 @@ TEST_F(StripTest, ArchiveWithUnreferencedLongNameTableIsNotLeftWithStaleIndex)
     EXPECT_TRUE(strip_file(archive_file, error_msg)) << error_msg;
 
     const ArProbe after = probe_ar_index(archive_file);
+    ASSERT_TRUE(after.has_index) << "`/` 索引成员必须保留（丢索引 = 把 .a 降级成非正常形态）";
     EXPECT_FALSE(after.stale)
-        << "归档里有被丢弃的 `//` 长名表 → 成员已前移；照抄的索引必须一并重写（丢弃），"
-           "否则偏移全部错位（ld: error adding symbols: no more archived files）";
-    // 直接断言"索引成员被丢掉了"（`//` 必丢 → 索引必丢），失败信息比 stale 更直白。
-    EXPECT_FALSE(ar_has_member(archive_file, "/")) << "`/` 索引成员没有被丢弃";
+        << "归档里有被丢弃的 `//` 长名表 → 成员已前移；照抄的索引偏移必然全部错位"
+           "（ld: error adding symbols: no more archived files）";
+    EXPECT_FALSE(ar_has_member(archive_file, "//")) << "`//` 长名表必须被丢弃（size 已被归零）";
+
+    // **精确判据**：索引条目必须指到 a.o **移动之后**的位置。
+    ASSERT_EQ(after.member_offsets.size(), 1u);
+    ASSERT_EQ(after.symbols.size(), 1u);
+    EXPECT_EQ(after.symbols[0].first, "sym_a");
+    EXPECT_EQ(after.symbols[0].second, after.member_offsets[0]) << "索引没有指向 a.o 的新位置";
+    // 且新位置必须**与重写前不同** —— 否则上面那条断言没有区分力（成员压根没动）
+    ASSERT_EQ(before.member_offsets.size(), 1u);
+    EXPECT_NE(after.member_offsets[0], before.member_offsets[0])
+        << "前置条件：丢掉 `//` 应当让 a.o 前移（否则这条用例测不到重映射）";
 
     std::error_code ec;
     fs::remove(archive_file, ec);
 }
 
 /**
- * **回归（2026-10-03）**：BSD `__.SYMDEF`（ranlib 表）与 GNU `/` 同理 —— 它记录的也是
- * "符号 → 字节偏移"，成员一旦前移就失效，必须与 `/`、`/SYM64/` **同判据丢弃**。此前只认
- * `/` 与 `/SYM64/`，`__.SYMDEF` 会被原样照抄（成员变短后即失效）。
+ * **回归（2026-10-03）**：BSD `__.SYMDEF`（ranlib 表）**认不出来就整个库不剥** ——
+ * 维护者定的原则是"lpkg 不产出错误产物"。它记录的也是"符号 → 字节偏移"，成员一变短就失效；
+ * 而它的数值字段是**宿主字节序**（bfd 自己的注释："Probably we're using the wrong byte
+ * ordering"），跨平台没有可靠判据，GNU ar 在 Linux/ELF 上也不产它。
+ *
+ * 于是**不能**照抄（偏移错位 ⇒ `malformed archive`），也**不该**丢掉（把 `.a` 降级成非正常
+ * 形态、且没人能保证后续工具都愿意顺序扫描）——只能原样留着并告警。此前（含我这个会话
+ * 早些时候的版本）处置是"丢掉"。
  *
  * GNU `ar` 不产 `__.SYMDEF`，故用构造归档：一个带 `-g`、strip 后会变短的 `.o` 成员把重写
- * 推进"索引失效"分支，再断言 `__.SYMDEF` 被丢弃（ld 对丢弃索引的库退化为顺序扫描，链接照常）。
+ * 推进"索引失效"分支，再断言整份归档**一个字节都没动**。
  */
-TEST_F(StripTest, BsdSymdefIsDroppedAlongWithTheIndex)
+TEST_F(StripTest, ArchiveWithBsdSymdefIsLeftUntouchedRatherThanMisindexed)
 {
+    init_localization();  // 下面要断"报错点名了是哪种索引"，没初始化只会拿到 [MISSING_STRING]
+
     const fs::path dir = fs::current_path() / "strip_symdef";
     std::error_code ec;
     fs::remove_all(dir, ec);
@@ -805,15 +883,75 @@ TEST_F(StripTest, BsdSymdefIsDroppedAlongWithTheIndex)
     const fs::path archive_file = dir / "lib.a";
     std::vector<ArMember> members = {ArMember{"a.o", obj_data},
                                      ArMember{"__.SYMDEF", "symdef-payload"}};
-    write_file(archive_file, build_ar(members));
+    const std::string original = build_ar(members);
+    write_file(archive_file, original);
 
     ASSERT_TRUE(ar_has_member(archive_file, "__.SYMDEF")) << "前置条件：构造的归档含 __.SYMDEF";
 
     std::string error_msg;
-    EXPECT_TRUE(strip_file(archive_file, error_msg)) << error_msg;
+    // 认不出索引 ⇒ **整份归档不剥**（返回失败让调用方 `strip_binary` 打 warning）
+    EXPECT_FALSE(strip_file(archive_file, error_msg)) << "带 BSD ranlib 表的库不该被重写";
+    EXPECT_NE(error_msg.find("__.SYMDEF"), std::string::npos)
+        << "拒绝必须点名是哪种索引（报错要能定位），实际: " << error_msg;
 
-    EXPECT_FALSE(ar_has_member(archive_file, "__.SYMDEF"))
-        << "__.SYMDEF 是 ranlib 索引：成员变短后它的偏移已失效，必须与 / 同判据丢弃";
+    // 原文件**一个字节都没动**：索引照旧有效、链接照常（宁可少剥一个库）
+    std::ifstream rf(archive_file, std::ios::binary);
+    const std::string now((std::istreambuf_iterator<char>(rf)), std::istreambuf_iterator<char>());
+    EXPECT_EQ(now, original) << "拒绝时不许动原文件";
+    EXPECT_TRUE(ar_has_member(archive_file, "__.SYMDEF"));
+
+    fs::remove_all(dir, ec);
+}
+
+/**
+ * **回归（2026-10-03）**：**畸形的 GNU 索引**（条目指向的不是成员头）同样"不产出错误产物"。
+ *
+ * 判据是"每一条偏移都必须**正好**落在某个成员头上"，任一条对不上就说明这份索引不是我们能
+ * 重算的东西：照抄会把偏移写错 —— 只能整份归档原样留着 + 告警（不产出错误产物）。
+ *
+ * 构造：`[`/` 索引（条目指向一个根本不存在的位置）]` + `[带 -g、strip 后会变短的 a.o]`。
+ */
+TEST_F(StripTest, ArchiveWithUnmappableIndexIsLeftUntouchedRatherThanMisindexed)
+{
+    init_localization();  // 要断"报错点名了索引成员名"（没初始化只会拿到 [MISSING_STRING]）
+
+    const fs::path dir = fs::current_path() / "strip_bad_index";
+    std::error_code ec;
+    fs::remove_all(dir, ec);
+    fs::create_directories(dir, ec);
+    const fs::path obj = dir / "a.o";
+    const fs::path src = dir / "a.c";
+    {
+        std::ofstream f(src);
+        f << "int sym_a(void) { return 1; }\n";
+    }
+    const std::string cmd = "gcc -c -g -o " + obj.string() + " " + src.string() + " 2>/dev/null";
+    const int rc = std::system(cmd.c_str());
+    std::error_code e2;
+    fs::remove(src, e2);
+    if (rc != 0 || !fs::exists(obj)) {
+        fs::remove_all(dir, e2);
+        GTEST_SKIP() << "gcc 不可用";
+    }
+    std::ifstream in(obj, std::ios::binary);
+    const std::string obj_data((std::istreambuf_iterator<char>(in)),
+                               std::istreambuf_iterator<char>());
+
+    const fs::path archive_file = dir / "lib.a";
+    std::vector<ArMember> members = {ArMember{"/", ""}, ArMember{"a.o", obj_data}};
+    members[0].data = make_ar_index(0);         // 先按真实长度占位
+    members[0].data = make_ar_index(0x00ffff);  // 条目指向一个不存在的位置（文件远没有这么长）
+    const std::string original = build_ar(members);
+    write_file(archive_file, original);
+
+    std::string error_msg;
+    EXPECT_FALSE(strip_file(archive_file, error_msg)) << "索引条目指不到成员头 ⇒ 不该重写";
+    EXPECT_NE(error_msg.find("/"), std::string::npos)
+        << "拒绝必须点名是哪张索引（报错要能定位），实际: " << error_msg;
+
+    std::ifstream rf(archive_file, std::ios::binary);
+    const std::string now((std::istreambuf_iterator<char>(rf)), std::istreambuf_iterator<char>());
+    EXPECT_EQ(now, original) << "拒绝时不许动原文件";
 
     fs::remove_all(dir, ec);
 }

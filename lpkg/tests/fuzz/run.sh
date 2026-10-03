@@ -22,11 +22,24 @@ CORPUS=tests/fuzz/corpus
 # 每次全量重编。为什么值得：`HOST_CXXFLAGS` 变了 make 不感知，复用上一轮的 .o 会让
 # sanitizer/插桩**静默失效** —— 那是最坏的一种失败（看起来在 fuzz，其实没插桩）。
 rm -rf "$BUILD"
-mkdir -p "$SCRATCH/elf_strip" "$SCRATCH/archive_name" "$ARTIFACTS"
+# 暂存语料目录**按 harness 名派生**（与下面的构建目标同一套推导）：加 harness 不必回来改这里。
+# （libFuzzer 要求"第一个语料目录"必须存在，否则直接报 `required directory ... does not exist`
+# 并退出 —— 实测就是这么发现漏建的。）
+mkdir -p "$ARTIFACTS"
+for src in tests/fuzz/*_fuzz.cpp; do
+    mkdir -p "$SCRATCH/$(basename "$src" _fuzz.cpp)"
+done
 
 echo "fuzz: 容器内构建（clang + libFuzzer/ASan/UBSan，构建树 $BUILD/）..."
-make -j"$(nproc)" BUILD_DIR="$BUILD" CXX=clang++ HOST_CXXFLAGS="$FLAGS" \
-    "$BUILD/elf_strip_fuzz" "$BUILD/archive_name_fuzz" || exit 1
+# 构建目标**从源文件自动推导**：加一个 harness 只要往这里的 `*_fuzz.cpp` 放一个文件，
+# 不必回来改这行（实测踩过：Makefile 里加了名字、这行还写着旧的两个 ⇒ 新 harness 压根
+# 没编出来，要到"跑"那一步才报"没有那个文件"）。
+targets=""
+for src in tests/fuzz/*_fuzz.cpp; do
+    targets="$targets $BUILD/$(basename "$src" .cpp)"
+done
+# shellcheck disable=SC2086  # 故意不加引号：$targets 是"多个目标"的列表
+make -j"$(nproc)" BUILD_DIR="$BUILD" CXX=clang++ HOST_CXXFLAGS="$FLAGS" $targets || exit 1
 
 want() { [ -z "$ONLY" ] || [ "$ONLY" = "$1" ]; }
 
@@ -35,6 +48,7 @@ want() { [ -z "$ONLY" ] || [ "$ONLY" = "$1" ]; }
 rc=0
 run_one() {
     name="$1"
+    want "$name" || return 0
     short="${name%_fuzz}"  # 语料与暂存目录用短名：tests/fuzz/corpus/elf_strip、…/archive_name
     seconds="$2"
     shift 2
@@ -51,12 +65,13 @@ run_one() {
         -artifact_prefix="$ARTIFACTS/" -print_final_stats=1 -max_total_time="$seconds" || rc=1
 }
 
-if want elf_strip_fuzz; then
-    run_one elf_strip_fuzz "$TIME_ELF" -max_len=262144
-fi
-if want archive_name_fuzz; then
-    run_one archive_name_fuzz "$TIME_ARCHIVE" -max_len=4096
-fi
+# 逐个跑（`run_one` 自己看 `$ONLY` 决定跑不跑）。`-max_len` 按**输入形态**给：
+# 版本串是小文本（1024 足够表达所有形态，也让每次迭代更快），ELF/归档可以很大。
+run_one elf_strip_fuzz "$TIME_ELF" -max_len=262144
+run_one strip_archive_fuzz "$TIME_ELF" -max_len=262144
+run_one vercmp_fuzz "$TIME_ELF" -max_len=1024
+run_one elf_soname_fuzz "$TIME_ELF" -max_len=262144
+run_one archive_name_fuzz "$TIME_ARCHIVE" -max_len=4096
 
 echo "fuzz: 跑完（rc=$rc）"
 exit $rc

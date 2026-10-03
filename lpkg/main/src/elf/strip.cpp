@@ -250,8 +250,9 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
         size_t old_idx = elf_ndxscn(scn);
         GElf_Shdr shdr;
         if (gelf_getshdr(scn, &shdr) == nullptr) continue;
-        const char* name_ptr = elf_strptr(in_elf, shstrndx, shdr.sh_name);
-        std::string name = name_ptr ? name_ptr : "";
+        // 用**有界**取值：`elf_strptr` + 判空挡不住"offset 在节区内但 NUL 在节区外"
+        // （见 lib_utils.hpp 的 `elf_strtab_get`，那条洞是 fuzz 实测出来的）。
+        const std::string name(elf_strtab_get(in_elf, shstrndx, shdr.sh_name));
 
         bool keep = true;
         // 过滤掉调试信息和注释节区
@@ -439,8 +440,9 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
         size_t old_idx = elf_ndxscn(scn);
         GElf_Shdr shdr;
         if (gelf_getshdr(scn, &shdr) == nullptr) continue;
-        const char* name_ptr = elf_strptr(in_elf, shstrndx, shdr.sh_name);
-        std::string name = name_ptr ? name_ptr : "";
+        // 用**有界**取值：`elf_strptr` + 判空挡不住"offset 在节区内但 NUL 在节区外"
+        // （见 lib_utils.hpp 的 `elf_strtab_get`，那条洞是 fuzz 实测出来的）。
+        const std::string name(elf_strtab_get(in_elf, shstrndx, shdr.sh_name));
 
         bool keep = true;
         // 保留 SHF_ALLOC 节区（运行时需要的节区）
@@ -834,30 +836,335 @@ static int archive_strip_scan(const fs::path& path, std::string& error_msg,
     return result;
 }
 
+// ---------------------------------------------------------------------------
+// 归档符号索引（`/` 32 位、`/SYM64/` 64 位）：解析 → 重映射 → 回填
+// ---------------------------------------------------------------------------
+//
+// **为什么必须重映射，而不是丢掉**（订正 2026-10-03 —— 原文写的是"重写就丢弃索引"，
+// 那是错的）：重写会让 `.o` 成员变短 ⇒ 其后每个成员的偏移前移，**照抄**的旧索引全部失效,
+// 链接器直接拒绝 —— 实测 `ld: error adding symbols: malformed archive`（同族症状还有
+// `no more archived files`，本机 `bison` / `nspr` / `gcc` 三个包的 `.a` 曾这样被写坏）。
+//
+// binutils 的做法（`binutils/objcopy.c` 原文）：
+//     if (strip_symbols == STRIP_ALL) obfd->has_armap = false;
+//     else                            obfd->has_armap = ibfd->has_armap;  /* 交给 BFD 重新生成 */
+// —— 只有 `--strip-all`（连符号一起剥）才不要索引；`--strip-debug` / `-g` /
+// `--strip-unneeded` 都**保留并重建**。而 lpkg 剥的正是"调试信息那一档"（ET_REL 路径只丢
+// `.debug*` / `.comment`，`.symtab` 保留），所以索引必须保留并重算。实测：`ar rcs` 出的归档
+// 经 `strip --strip-debug` 后索引成员仍在、符号集不变、偏移被重算成新位置（b 2846→1358、
+// c 5602→2626）；同一套判据跑 lpkg 现在的产物，1 / 8 / 30 成员三档的索引**逐条与 binutils
+// 一致**，且每条都落在"真正定义该符号"的那个成员头上。
+//
+// ⚠️ **别把理由写成"没有索引就链不了"**（2026-10-03 我先这么写，实测**不成立**）：本机
+// GNU ld 2.47 对**无索引**的归档会退化成**顺序扫描成员**，`ar rcS` 造的无索引库照样链得上
+// （`nm`/`ar t` 也照常）。"保留索引"的理由是：**与 binutils 同档位的行为一致**、省掉链接器的
+// 顺序扫描、不把一份正常形态的 `.a` 降级成畸形形态 —— 不是"否则链接失败"。
+//
+// 格式（bfd `do_slurp_coff_armap` 原话："all numeric information in a coff archive is
+// always in big endian format, no matter the host or target"）：
+//   `/`       `<n:4BE>` + n × `<成员头偏移:4BE>` + n 个 NUL 结尾的符号名
+//   `/SYM64/` 同上，偏移是 8 字节（>4GiB 的归档，Irix 6 出身）
+// 重建只需**换偏移**：符号名与顺序逐字节照旧（strip 不删 `.symtab` ⇒ 符号集不变）。
+//
+// **认不出的索引一律"整份归档不剥 + 告警"，绝不产出错误产物**（维护者 2026-10-03 定）：
+//   · `__.SYMDEF` / `__.SYMDEF SORTED`（BSD ranlib 表）—— 数值字段是**宿主字节序**
+//     （bfd 自己的注释："Probably we're using the wrong byte ordering"），跨平台没有可靠
+//     判据，而 GNU ar 在 Linux/ELF 上也不产它；
+//   · 畸形的 GNU 索引（计数/偏移/名字区任何一处对不上）。
+// 处置都是**把整个库原样留着**（一个字节不动，索引照旧有效、链接照常）并返回失败让调用方
+// 告警 —— 而不是"丢掉索引接着写"。丢索引在这里虽然还能链（链接器顺序扫描，见上），但那是
+// 把一份正常形态的 `.a` 降级成畸形形态，而且我们**没法保证**重算出来的偏移是对的；
+// 少剥一个库只是大几 KB，**不产出错误产物**优先（维护者 2026-10-03 定）。
+
+constexpr std::string_view kArIndexName = "/";
+constexpr std::string_view kArIndex64Name = "/SYM64/";
+constexpr std::string_view kArLongNameTable = "//";
+constexpr std::string_view kArBsdSymdef = "__.SYMDEF";
+constexpr std::string_view kArBsdSymdefSorted = "__.SYMDEF SORTED";
+
+/// 索引成员的处置（判据见 `process_archive` 开头）。
+enum class ArIndexAction {
+    Copy,     ///< 偏移仍然成立（成员没变短、也没丢 `//`）→ 原样照抄（保住索引这个优化）
+    Rebuild,  ///< 偏移会变 → 按成员的新位置重算（binutils `strip --strip-debug` 的行为）
+    Refuse,   ///< 认不出（BSD ranlib 表 / 畸形的 GNU 索引）→ **整份归档不剥** + 告警
+};
+
+/**
+ * @brief 重写归档时**保留**（照原样再写一遍）的成员 —— 其余都被丢掉。
+ *
+ * 被丢的三种：`//` 长名表（libarchive 已把它的 size 归零，照抄只会写出一张空表 → 读回
+ * "Invalid string table"）；索引成员（重建时由我们在最前面重写一份）；BSD ranlib 表。
+ *
+ * ⚠️ 丢掉任何一个都会让**其后成员整体前移** ⇒ 索引偏移必须重算 —— 这个判据与
+ * `process_archive` 的 `index_invalid` 是**同一个**，别在两处各写一份条件。
+ * （`Refuse` 走不到这里：那一路在写任何一个字节之前就返回了。）
+ */
+static bool ar_member_is_kept(std::string_view n, ArIndexAction action)
+{
+    if (n == kArLongNameTable) return false;
+    if (n == kArIndexName || n == kArIndex64Name) return action == ArIndexAction::Copy;
+    if (n == kArBsdSymdef || n == kArBsdSymdefSorted) return action == ArIndexAction::Copy;
+    return true;
+}
+
+/// 原归档的**线性布局**：只按 60 字节成员头走一遍（外加把索引成员的数据读出来）。
+/// 任何一步对不上就 `ok = false` —— 调用方据此退回"丢弃索引"。
+struct ArRawLayout {
+    bool ok = false;
+    std::vector<uint64_t> header_offsets;  ///< 每个成员头的文件偏移，按文件顺序
+    std::vector<std::string> names;        ///< 与 header_offsets 一一对应
+    bool has_index = false;
+    bool index_sym64 = false;
+    std::vector<uint8_t> index_data;
+};
+
+/**
+ * @brief 按 60 字节成员头线性走一遍原归档（不读内容成员，只读索引成员的数据）。
+ *
+ * 走完必须**恰好**落在文件末尾（`pos == file_size`）才算 `ok` —— 尾部有残留说明布局不是
+ * 我们认得的形态（长名引用 `/123`、非标准填充……），此时索引偏移不可信，宁可退回丢弃。
+ */
+static ArRawLayout scan_ar_raw_layout(const fs::path& path, uint64_t file_size)
+{
+    ArRawLayout out;
+    std::ifstream f(path, std::ios::binary);
+    if (!f) return out;
+    char magic[8];
+    if (!f.read(magic, 8) || std::memcmp(magic, "!<arch>\n", 8) != 0) return out;
+
+    uint64_t pos = 8;
+    while (pos + 60 <= file_size) {
+        if (f.seekg(static_cast<std::streamoff>(pos)).fail()) return out;
+        char hdr[60];
+        if (!f.read(hdr, 60)) return out;
+        if (hdr[58] != '`' || hdr[59] != '\n') return out;  // 成员头哨兵
+
+        std::string name(hdr, 16);
+        while (!name.empty() && name.back() == ' ') name.pop_back();
+        // 内容成员的名字带尾 `/`（`a.o/`）；`/`、`//`、`/SYM64/` 是特殊成员，原样留着。
+        if (name.size() > 1 && name.back() == '/' && name.front() != '/') name.pop_back();
+        if (!name.empty() && name.front() == '/' && name != kArIndexName &&
+            name != kArIndex64Name && name != kArLongNameTable)
+            return out;  // `/123`（长名表引用）之类：不是我们认得的形态
+
+        uint64_t size = 0;
+        for (int i = 48; i < 58; ++i) {
+            const char c = hdr[i];
+            if (c == ' ') continue;  // 数值字段右侧补空格
+            if (c < '0' || c > '9') return out;
+            size = size * 10 + static_cast<uint64_t>(c - '0');
+        }
+        if (pos + 60 + size > file_size) return out;
+
+        out.header_offsets.push_back(pos);
+        out.names.push_back(name);
+        if (!out.has_index && (name == kArIndexName || name == kArIndex64Name)) {
+            out.has_index = true;
+            out.index_sym64 = (name == kArIndex64Name);
+            out.index_data.resize(static_cast<std::size_t>(size));
+            if (size > 0) {
+                if (f.seekg(static_cast<std::streamoff>(pos + 60)).fail()) return out;
+                if (!f.read(reinterpret_cast<char*>(out.index_data.data()),
+                            static_cast<std::streamsize>(size)))
+                    return out;
+            }
+        }
+        pos += 60 + size + (size & 1);  // 成员内容按偶数字节对齐
+    }
+    out.ok = (pos == file_size);
+    return out;
+}
+
+/// 索引里的一条记录：符号名 + 它指向的**成员头**偏移（原归档坐标）。
+struct ArIndexEntry {
+    std::string name;
+    uint64_t offset = 0;
+};
+
+static uint32_t ar_be32(const std::vector<uint8_t>& d, std::size_t at)
+{
+    return (static_cast<uint32_t>(d[at]) << 24) | (static_cast<uint32_t>(d[at + 1]) << 16) |
+           (static_cast<uint32_t>(d[at + 2]) << 8) | static_cast<uint32_t>(d[at + 3]);
+}
+
+static uint64_t ar_be64(const std::vector<uint8_t>& d, std::size_t at)
+{
+    uint64_t v = 0;
+    for (std::size_t i = 0; i < 8; ++i) v = (v << 8) | d[at + i];
+    return v;
+}
+
+/**
+ * @brief 解析 GNU 符号索引体（`/` 或 `/SYM64/`）。
+ *
+ * **任何一处对不上都返回 false**（计数越界、偏移数组放不下、名字区走不完 n 个 NUL 结尾的
+ * 串）—— 调用方据此退回"丢弃索引"，而不是猜一份可能错的偏移进去。
+ */
+static bool parse_gnu_ar_index(const std::vector<uint8_t>& d, bool sym64,
+                               std::vector<ArIndexEntry>& out)
+{
+    const std::size_t width = sym64 ? 8 : 4;
+    if (d.size() < 4) return false;
+    const uint64_t n = ar_be32(d, 0);
+    // `n == 0` 是**合法**的（`ar rcs` 对"没有任何全局符号"的库会写一张空表）：没有偏移要改，
+    // 调用方按"原样照抄"处理 —— 别在这里当成畸形拒掉，那会让这种库整个剥不了。
+    if (n > d.size()) return false;  // 每个条目至少 4 字节 ⇒ n 不可能超过总长
+    const std::size_t names_at0 = 4 + width * static_cast<std::size_t>(n);
+    if (names_at0 > d.size()) return false;
+
+    out.clear();
+    out.reserve(static_cast<std::size_t>(n));
+    std::size_t names_at = names_at0;
+    for (uint64_t i = 0; i < n; ++i) {
+        const uint64_t off = sym64 ? ar_be64(d, 4 + 8 * static_cast<std::size_t>(i))
+                                   : ar_be32(d, 4 + 4 * static_cast<std::size_t>(i));
+        const std::size_t start = names_at;
+        while (names_at < d.size() && d[names_at] != 0) ++names_at;
+        if (names_at >= d.size()) return false;  // 没有 NUL 终止 ⇒ 名字区不是这个形态
+        out.push_back(
+            {std::string(reinterpret_cast<const char*>(d.data() + start), names_at - start), off});
+        ++names_at;  // 跳过 NUL
+    }
+    return true;
+}
+
+/// 序列化偏移数组（回填用）：n 个 4/8 字节大端。
+static std::vector<uint8_t> serialize_ar_offsets(bool sym64, const std::vector<uint64_t>& offsets)
+{
+    std::vector<uint8_t> d;
+    const std::size_t width = sym64 ? 8 : 4;
+    d.reserve(offsets.size() * width);
+    for (const uint64_t v : offsets) {
+        for (std::size_t i = 0; i < width; ++i) {
+            d.push_back(static_cast<uint8_t>((v >> (8 * (width - 1 - i))) & 0xff));
+        }
+    }
+    return d;
+}
+
+/// 序列化整份索引体。占位那份传全 0 的 offsets —— 大小与重建后**逐字节相同**
+/// （计数与符号名都不变），所以回填只是原地改写那几个字节，不动任何成员的位置。
+static std::vector<uint8_t> build_gnu_ar_index(bool sym64, const std::vector<ArIndexEntry>& entries,
+                                               const std::vector<uint64_t>& offsets)
+{
+    std::vector<uint8_t> d;
+    const uint32_t n = static_cast<uint32_t>(entries.size());
+    d.push_back(static_cast<uint8_t>((n >> 24) & 0xff));
+    d.push_back(static_cast<uint8_t>((n >> 16) & 0xff));
+    d.push_back(static_cast<uint8_t>((n >> 8) & 0xff));
+    d.push_back(static_cast<uint8_t>(n & 0xff));
+    const std::vector<uint8_t> offs = serialize_ar_offsets(sym64, offsets);
+    d.insert(d.end(), offs.begin(), offs.end());
+    for (const auto& e : entries) {
+        d.insert(d.end(), e.name.begin(), e.name.end());
+        d.push_back(0);
+    }
+    return d;
+}
+
 /**
  * 处理静态库（ar 归档文件）：遍历其中的 .o 文件，对每个进行 ELF strip，
  * 重新打包为新的归档文件
  *
- * ⚠️ **只要重写会改变成员偏移，就必须丢掉归档符号索引**（`/` 32 位、`/SYM64/` 64 位 GNU、
- * `__.SYMDEF` / `__.SYMDEF SORTED` BSD）：索引存的是一串"符号 → 字节偏移"，偏移一旦错位就是
- * **链接硬失败** —— `ld: error adding symbols: no more archived files`（本机 `bison` /
- * `nspr` / `gcc` 三个包的 `.a` 曾被这样写坏）。丢掉索引后 `ld` 会退化成顺序扫描全部成员，
- * 链接照常；要索引的一方可以自己 `ranlib`。
+ * ⚠️ **重写会改变成员偏移 ⇒ 归档符号索引必须重算**（`/` 32 位、`/SYM64/` 64 位 GNU）。
+ * 索引存的是一串"符号 → 成员头偏移"，偏移一旦错位链接器就硬失败：
+ * `ld: error adding symbols: malformed archive`（本机 `bison` / `nspr` / `gcc`
+ * 三个包的 `.a` 曾被写坏）。做法与 binutils `strip --strip-debug` 一致：
+ * **保留索引成员、把偏移重映射到新位置**（符号名与顺序照旧 —— strip 不删 `.symtab`）。
+ * 见上面那段"归档符号索引"的说明；**别退回"干脆丢掉索引"**（那是非正常形态，也偏离 binutils
+ * 同档位的行为）。
  *
  * 会造成偏移改变的有两种，**判据必须两个都看**（2026-10-02 只看了前者）：
  *   ① 有 `.o` 成员在 strip 后**变短**（预扫的 `scan == 1`）；
  *   ② 归档里有 `//` 长名表 —— 它恒定被丢弃（见下），其后成员整体前移。
  * ② 正是"外来/构造归档"能钻的空子：一张没人引用的 `//` 表配上有效的 `/` 索引，成员没变短
  * 也照样让索引失效（子审计逐字节复刻验证过 stale 0 → 2）。因此 `//` 与索引**同一判据**。
+ * 两种情形都走"重映射"这条路；只有**认不出索引**（畸形、BSD ranlib 表）才退回"整份归档
+ * 不剥 + 告警"（`ArIndexAction::Refuse`）—— 见上面那段说明，**不是**"丢掉索引接着写"。
  */
 bool process_archive(const fs::path& path, std::string& error_msg)
 {
     // 先扫一遍：长名成员 → 放弃（写不出来）；真失败 → `error_msg` 已填、由调用方告警；
-    // 有无 `//` 长名表 → 由 `has_long_name_table` 带出（它也决定索引能不能保留）。
+    // 有无 `//` 长名表 → 由 `has_long_name_table` 带出（它也决定索引能不能重映射）。
     bool has_long_name_table = false;
     const int scan = archive_strip_scan(path, error_msg, has_long_name_table);
     if (scan < 0) return false;
     const bool index_invalid = (scan == 1) || has_long_name_table;
+
+    // 索引的处置（见上面"归档符号索引"那段）。映射必须在**写之前**算出来：索引成员占着
+    // 输出归档的**第一个**位置（bfd 只看首成员的名字决定读哪张索引表），收工再反悔就得把
+    // 整份归档挪位。原归档的线性布局只读 60 字节头，很便宜。
+    ArIndexAction index_action = ArIndexAction::Copy;
+    std::vector<ArIndexEntry> idx_entries;
+    std::vector<std::size_t> idx_rank;  // 每个索引条目 → 该成员在"保留序列"里的序号
+    ArRawLayout raw;
+    std::size_t kept_count = 0;
+    if (index_invalid) {
+        raw = scan_ar_raw_layout(path, fs::file_size(path));
+        if (!raw.ok) {
+            // 连布局都认不出来 ⇒ 我们甚至不确定它有没有索引，那就一个字节都别动它
+            // （同下面那条：宁可少剥一个库，也不产出"索引指向错位置"的 `.a`）。
+            error_msg = get_string("error.strip_archive_broken");
+            return false;
+        }
+        bool bsd_table = false;
+        for (const auto& n : raw.names) {
+            if (n == kArBsdSymdef || n == kArBsdSymdefSorted) bsd_table = true;
+        }
+        if (bsd_table || raw.has_index) {          // 有索引才谈得上"重算"或"拒绝"
+            index_action = ArIndexAction::Refuse;  // 先按最坏打算
+            std::vector<ArIndexEntry> parsed;
+            if (!bsd_table && parse_gnu_ar_index(raw.index_data, raw.index_sym64, parsed)) {
+                if (parsed.empty()) {
+                    index_action = ArIndexAction::Copy;  // 空索引：没有偏移要改，照抄
+                } else {
+                    // "保留序列"的前缀计数：`kept_prefix[j]` = 前 j 个成员里有几个被保留
+                    std::vector<std::size_t> kept_prefix(raw.names.size() + 1, 0);
+                    for (std::size_t j = 0; j < raw.names.size(); ++j) {
+                        kept_prefix[j + 1] =
+                            kept_prefix[j] +
+                            (ar_member_is_kept(raw.names[j], ArIndexAction::Rebuild) ? 1 : 0);
+                    }
+                    kept_count = kept_prefix.back();
+
+                    // 逐条查指向：偏移必须**正好**落在某个成员头上、且那个成员会被保留。
+                    // 任一条不满足 ⇒ 整份索引不用（Refuse）—— 绝不写一份"可能对"的偏移。
+                    bool mapped = true;
+                    idx_rank.reserve(parsed.size());
+                    for (const auto& e : parsed) {
+                        const auto it = std::find(raw.header_offsets.begin(),
+                                                  raw.header_offsets.end(), e.offset);
+                        if (it == raw.header_offsets.end()) {
+                            mapped = false;
+                            break;
+                        }
+                        const std::size_t j =
+                            static_cast<std::size_t>(it - raw.header_offsets.begin());
+                        if (!ar_member_is_kept(raw.names[j], ArIndexAction::Rebuild)) {
+                            mapped = false;
+                            break;
+                        }
+                        idx_rank.push_back(kept_prefix[j]);
+                    }
+                    if (mapped) {
+                        index_action = ArIndexAction::Rebuild;
+                        idx_entries = std::move(parsed);
+                    }
+                }
+            }
+            if (index_action == ArIndexAction::Refuse) {
+                // **不产出错误产物**：这份索引我们改不动，那就整个库都别剥 —— 原文件一个
+                // 字节不动、索引照旧有效、链接照常。warning 由调用方 `strip_binary` 打
+                // （`error_msg` 非空即告警，且点名文件）。
+                error_msg = string_format(
+                    "error.strip_archive_index_unsupported",
+                    bsd_table ? std::string(kArBsdSymdef)
+                              : std::string(raw.index_sym64 ? kArIndex64Name : kArIndexName));
+                return false;
+            }
+        }
+    }
+    const bool rebuild_index = (index_action == ArIndexAction::Rebuild);
 
     struct archive* a = archive_read_new();
     archive_read_support_format_all(a);
@@ -896,32 +1203,41 @@ bool process_archive(const fs::path& path, std::string& error_msg)
         return false;
     };
 
+    // 重建索引时，索引成员必须**第一个**写（bfd 的 `bfd_slurp_armap` 只看归档首成员的名字
+    // 来决定读哪张索引表），可它的偏移要等成员全写完才晓得 —— 所以先写一份**大小逐字节
+    // 相同**的占位（符号名与计数照旧、偏移先给 0），收尾再按 GNU ar 自己的做法**原地回填**
+    // 那几个字节：只改索引成员内部的数据，不动任何成员的位置。
+    std::vector<uint64_t> new_offsets;  // 与"保留的成员"一一对应，按写入顺序
+    uint64_t pos = 8;                   // 归档 magic 之后
+    if (rebuild_index) {
+        const std::vector<uint8_t> placeholder = build_gnu_ar_index(
+            raw.index_sym64, idx_entries, std::vector<uint64_t>(idx_entries.size(), 0));
+        struct archive_entry* ie = archive_entry_new();
+        archive_entry_set_pathname(ie, raw.index_sym64 ? "/SYM64/" : "/");
+        archive_entry_set_size(ie, static_cast<la_int64_t>(placeholder.size()));
+        archive_entry_set_filetype(ie, AE_IFREG);
+        archive_entry_set_perm(ie, 0644);
+        const int ih = archive_write_header(out, ie);
+        const ssize_t iw =
+            ih == ARCHIVE_OK ? archive_write_data(out, placeholder.data(), placeholder.size()) : -1;
+        archive_entry_free(ie);
+        if (ih != ARCHIVE_OK || iw < 0 || static_cast<std::size_t>(iw) != placeholder.size())
+            return bail();
+        pos += 60 + placeholder.size() + (placeholder.size() & 1);
+    }
+
     while (true) {
         const int r = archive_read_next_header(a, &entry);
         if (r == ARCHIVE_EOF) break;
         if (r < ARCHIVE_OK) return bail();
         const char* name = archive_entry_pathname(entry);
         const std::string_view nm = name ? std::string_view(name) : std::string_view();
-        // 长名表 `//`：libarchive 已把成员名解析成完整长名，并把 `//` 成员的 size **归零** ——
-        // 照抄只会写出一张 size=0 的空表（读回时 "Invalid string table" → FATAL），必须丢。
-        // ⚠️ **丢 `//` 会让其后成员整体前移**，所以它**不能**单独决定：只要归档里有 `//`，下面
-        // 那份索引的偏移就全部失效（判据由预扫统一给出，见 process_archive 的 `index_invalid`）。
-        // 订正 2026-10-03：原文写"走到这里说明所有成员名都 ≤15 字节，长名表根本用不上"——
-        // **不成立**：外来/构造的归档可以带一张没人引用的 `//` 表，此时成员名确实都 ≤15，
-        // 但丢掉 `//` 仍会让索引失效（子审计逐字节复刻验证过 stale 0 → 2）。
-        if (nm == "//") {
-            archive_read_data_skip(a);
-            continue;
-        }
-        // 归档符号索引：`/`（32 位 GNU）、`/SYM64/`（64 位 GNU）、`__.SYMDEF` /
-        // `__.SYMDEF SORTED`（BSD ranlib 表）—— 记录的都是"符号 → 字节偏移"。
-        // **只要有一个成员变短、或归档里丢了 `//` 长名表**，那串偏移就全失效，必须一起丢
-        // （此前只认 `/`：`/SYM64/` / `__.SYMDEF` 会被原样照抄 → 偏移错位）。若两者都不成立
-        // （预扫给 0 且无 `//`），偏移仍然成立，照抄即可（保住索引这个优化）。
-        // 注：`__.SYMDEF SORTED` 有 16 字节，会被预扫的"名字 >15 → 放弃整个库"先拦下，
-        // 故当前走不到这里；一并列出是为了判据对齐（BSD 的排序表同样是索引）。
-        if ((nm == "/" || nm == "/SYM64/" || nm == "__.SYMDEF" || nm == "__.SYMDEF SORTED") &&
-            index_invalid) {
+        // 丢掉的成员（见 `ar_member_is_kept`）：`//` 长名表 —— libarchive 已把它的 size
+        // **归零**，照抄只会写出一张空表（读回时 "Invalid string table" → FATAL）；
+        // 索引成员 —— 重建时由我们写在最前面；BSD ranlib 表。**判据只有那一处**，别在这里
+        // 另写一份条件（漏一个就会让索引与成员对不上）。
+        // ⚠️ 丢任何一个都会让**其后成员整体前移** ⇒ 索引偏移必须重算（`index_invalid`）。
+        if (!ar_member_is_kept(nm, index_action)) {
             archive_read_data_skip(a);
             continue;
         }
@@ -930,6 +1246,9 @@ bool process_archive(const fs::path& path, std::string& error_msg)
 
         const ssize_t bytes_read = archive_read_data(a, data.data(), size);
         if (bytes_read < 0 || static_cast<size_t>(bytes_read) != size) return bail();
+
+        // 这个成员头会落在输出归档的哪个偏移上（收尾回填索引要用的值）。
+        const uint64_t member_at = pos;
 
         // 对 .o 目标文件进行 strip 处理
         if (nm.ends_with(".o")) {
@@ -942,6 +1261,10 @@ bool process_archive(const fs::path& path, std::string& error_msg)
                     archive_write_data(out, stripped_data.data(), stripped_data.size());
                 if (written < 0 || static_cast<size_t>(written) != stripped_data.size())
                     return bail();
+                if (rebuild_index) {
+                    new_offsets.push_back(member_at);
+                    pos += 60 + stripped_data.size() + (stripped_data.size() & 1);
+                }
                 continue;
             }
         }
@@ -949,6 +1272,10 @@ bool process_archive(const fs::path& path, std::string& error_msg)
         if (archive_write_header(out, entry) != ARCHIVE_OK) return bail();
         const ssize_t written = archive_write_data(out, data.data(), size);
         if (written < 0 || static_cast<size_t>(written) != size) return bail();
+        if (rebuild_index) {
+            new_offsets.push_back(member_at);
+            pos += 60 + size + (size & 1);
+        }
     }
 
     // **完整性判据（2026-10-02）**：libarchive 的 ar 读取器在"magic 之后读不出成员头"时
@@ -977,6 +1304,45 @@ bool process_archive(const fs::path& path, std::string& error_msg)
         error_msg = get_string("error.strip_archive_broken");
         fs::remove(temp_path);
         return false;
+    }
+
+    if (rebuild_index) {
+        // **布局自检**：我们逐成员累加出来的位置必须与实际写出的文件长度**对得上**。
+        // 对不上说明"60 字节成员头 + 偶数字节对齐"这条前提在这份归档上不成立，回填的偏移
+        // 就不可信 —— 此时宁可整库不剥（原文件一个字节没动），也绝不写出一份错的索引。
+        std::error_code sz_ec;
+        const uint64_t actual = fs::file_size(temp_path, sz_ec);
+        if (sz_ec || actual != pos || new_offsets.size() != kept_count) {
+            error_msg = get_string("error.strip_archive_broken");
+            fs::remove(temp_path);
+            return false;
+        }
+
+        // 回填：新偏移 = 该成员在"保留序列"里的序号查出来的写入位置。
+        // 索引成员的数据从文件偏移 `8(magic) + 60(成员头)` 开始，偏移数组在计数（4 字节）之后。
+        std::vector<uint64_t> mapped(idx_entries.size(), 0);
+        bool mapped_ok = true;
+        for (std::size_t i = 0; i < idx_entries.size(); ++i) {
+            if (idx_rank[i] >= new_offsets.size()) {
+                mapped_ok = false;
+                break;
+            }
+            mapped[i] = new_offsets[idx_rank[i]];
+            if (!raw.index_sym64 && mapped[i] > 0xffffffffull) {  // 32 位索引装不下
+                mapped_ok = false;
+                break;
+            }
+        }
+        const std::vector<uint8_t> off_bytes =
+            mapped_ok ? serialize_ar_offsets(raw.index_sym64, mapped) : std::vector<uint8_t>();
+        Fd fd(::open(temp_path.c_str(), O_WRONLY));
+        if (!mapped_ok || !fd.ok() ||
+            ::pwrite(fd.get(), off_bytes.data(), off_bytes.size(), 8 + 60 + 4) !=
+                static_cast<ssize_t>(off_bytes.size())) {
+            error_msg = get_string("error.strip_archive_broken");
+            fs::remove(temp_path);
+            return false;
+        }
     }
 
     try {
