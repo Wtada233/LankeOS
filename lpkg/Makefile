@@ -354,6 +354,71 @@ test-sanitize: docker-env
 	        HOST_CXXFLAGS="$(SANITIZE_FLAGS)" \
 	        $(SAN_BUILD_DIR)/$(TEST_TARGET) && ./$(SAN_BUILD_DIR)/$(TEST_TARGET)'
 
+# ---- libFuzzer 模糊测试（手动跑：`make fuzz`；**不接 CI、不做闸门**）--------------------
+# 与 test-sanitize 同构：容器内、clang、独立构建树、flags 走 HOST_CXXFLAGS。三处不同：
+#   1) `-fsanitize=` 组合里多一个 `fuzzer`（clang driver 自动链 libclang_rt.fuzzer-x86_64.a，
+#      **它提供 main**）⇒ 绝不能链 `TEST_LIBS`（:19 含 `-lgtest_main`，会撞 main）；
+#   2) 链接只吃 `$(LIBS)`；
+#   3) 语料与产物路径要考虑 `docker-sync` 会清空 `/app`（见 `tests/fuzz/run.sh`）。
+# 为什么不接 CI：fuzz 的产出依赖时间与种子，天生不确定，与"全量绿才算过"冲突 ——
+# 同 test-sanitize 注释里那条"别用红度未知的闸门挡住所有提交"。
+#
+# **harness 放 `tests/fuzz/` 而不是顶层新目录**：那里既有的 `$(BUILD_DIR)/tests/%.o`
+# 规则（见下方模式规则）能直接编它们，又被 format-check 的 `FMT_FIND`（:213，递归 find
+# main/src tests）自动覆盖 —— FMT_DIRS 一行都不用改。而 `TEST_SRCS`（:162）只收
+# `tests/main.cpp` + `unit/` + `integration/`，所以它们**不会**被编进 run_tests。
+FUZZ_BUILD_DIR = build-fuzz
+FUZZ_DIR = $(TESTS_DIR)/fuzz
+FUZZ_ARTIFACTS_DIR = fuzz-artifacts
+FUZZ_FLAGS ?= -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer -g -O1 -Wno-error
+# 默认限时，保证 `make fuzz` 会结束；要长跑：`make fuzz FUZZ_TIME_ELF=600`
+FUZZ_TIME_ELF ?= 60
+FUZZ_TIME_ARCHIVE ?= 60
+FUZZ_ONLY ?=
+FUZZ_NAMES = elf_strip_fuzz archive_name_fuzz
+
+# ⚠️ harness 的 `.o` **必须**也纳入头依赖追踪。它们走的是通用的
+# `$(BUILD_DIR)/tests/%.o` 规则，而 `TEST_SRCS`（:162）只收 `tests/main.cpp` + `unit/` +
+# `integration/`，**不含 `tests/fuzz/`** ⇒ 它们的 `.d` 不在 `DEPS` 里 ⇒ **改了
+# `tests/fuzz/*.hpp` 不会触发重编**。实测踩过：改了追踪逻辑跑出来的还是旧二进制，
+# 白折腾一轮（症状是"日志行数对不上、采样一次都没打"）。
+FUZZ_OBJS = $(patsubst $(FUZZ_DIR)/%.cpp,$(BUILD_DIR)/tests/fuzz/%.o,$(wildcard $(FUZZ_DIR)/*.cpp))
+DEPS += $(FUZZ_OBJS:.o=.d)
+
+# $^ = harness.o + $(LPKG_OBJS)（:165 已剔掉 build/main/main.o ⇒ 不会有第二个 main）
+$(BUILD_DIR)/%_fuzz: $(BUILD_DIR)/tests/fuzz/%_fuzz.o $(LPKG_OBJS) | deps-check
+	@mkdir -p $(@D)
+	$(CXX) $(TEST_CXXFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
+
+.PHONY: fuzz fuzz-collect
+
+fuzz: docker-env
+	@echo "fuzz: clang + libFuzzer/ASan/UBSan（容器内，构建树 $(FUZZ_BUILD_DIR)/）..."
+	@$(MAKE) docker-sync >/dev/null
+	@# 环境变量用 docker exec -e 传，不在命令行里拼嵌套引号（make → sh → docker exec → sh
+	@# 四层引号，错法全是静默的：少跑一个 harness 看起来也是绿的）。
+	@# `rc=` 捕获 + 无条件跑 fuzz-collect：harness 崩了也**必须**先把样本取回来，
+	@# 否则下一轮 docker-sync 的 `rm -rf /app/*` 会把它清掉。
+	@mkdir -p $(FUZZ_BUILD_DIR)
+	@docker exec -w /app \
+	   -e FUZZ_BUILD='$(FUZZ_BUILD_DIR)' \
+	   -e FUZZ_FLAGS='$(FUZZ_FLAGS)' \
+	   -e FUZZ_TIME_ELF='$(FUZZ_TIME_ELF)' \
+	   -e FUZZ_TIME_ARCHIVE='$(FUZZ_TIME_ARCHIVE)' \
+	   -e FUZZ_ONLY='$(FUZZ_ONLY)' \
+	   $(DOCKER_ENV_CONTAINER) sh $(FUZZ_DIR)/run.sh; rc=$$?; \
+	 $(MAKE) fuzz-collect; exit $$rc
+
+fuzz-collect:
+	@mkdir -p $(FUZZ_ARTIFACTS_DIR)
+	@docker cp $(DOCKER_ENV_CONTAINER):/app/$(FUZZ_ARTIFACTS_DIR)/. $(FUZZ_ARTIFACTS_DIR)/ 2>/dev/null || true
+	@if ls $(FUZZ_ARTIFACTS_DIR)/* >/dev/null 2>&1; then \
+	   echo "fuzz: 有崩溃样本 —— $(FUZZ_ARTIFACTS_DIR)/（逐个转成 gtest 回归用例后删掉）"; \
+	   ls -l $(FUZZ_ARTIFACTS_DIR)/; \
+	 else \
+	   echo "fuzz: 本轮无崩溃样本"; \
+	 fi
+
 build_test_internal: $(BUILD_DIR)/$(TEST_TARGET)
 	@FILTER="$(GTEST_FILTER)"; if [ -n "$$FILTER" ]; then ./$(BUILD_DIR)/$(TEST_TARGET) --gtest_filter="$$FILTER"; else ./$(BUILD_DIR)/$(TEST_TARGET); fi
 
@@ -386,7 +451,9 @@ $(BUILD_DIR)/tests/%.o: $(TESTS_DIR)/%.cpp | deps-check
 -include $(DEPS)
 
 clean:
-	rm -rf $(BUILD_DIR) build_test coverage_report
+	rm -rf $(BUILD_DIR) build_test coverage_report $(FUZZ_BUILD_DIR)
+	@# 注意**不删** $(FUZZ_ARTIFACTS_DIR)：崩溃样本是**证据**不是产物（转成 gtest 回归用例
+	@# 之后手工删），跟 §8.3 那条"验证手段不入库、但也不能随手清掉"同一个道理。
 
 define do_install
 	install -Dm755 $(1) $(INSTALL_BIN_DIR)/$(TARGET)

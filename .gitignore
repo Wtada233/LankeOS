@@ -2,6 +2,11 @@ lpkg/build_test/
 lpkg/build/
 lpkg/coverage_report/
 
+# fuzz：构建树只在容器里（build-san 同理不需要这里），但崩溃样本会被 docker cp 回宿主 ——
+# 那是**证据不是产物**（转成 gtest 回归用例后手工删），不该进提交。
+lpkg/fuzz-artifacts/
+lpkg/build-fuzz/
+
 *.o
 lrepo-mgr.json
 

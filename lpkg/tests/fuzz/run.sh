@@ -1,0 +1,62 @@
+#!/bin/sh
+# 在**容器内**跑：构建两个 harness、生成富语料、逐个 fuzz，最后把结局计数打出来。
+#
+# 由 `make fuzz` 经 `docker exec` 调用 —— 那层只负责 docker-sync、传环境变量、以及把产物
+# 拷回宿主。逻辑放这里而不是塞进 Makefile recipe：那几条嵌套引号（make → sh → docker exec
+# → sh）极易写错，而这里的错法都是静默的（少跑一个 harness 也"绿"）。
+#
+# 为什么必须在容器里编：alpine 的 gcc 不带 sanitizer 运行时（只装了头文件），
+# 只有容器里的 clang + compiler-rt 能编出 libFuzzer 目标（见 Makefile 的 test-sanitize 说明）。
+
+set -u
+
+BUILD="${FUZZ_BUILD:-build-fuzz}"
+FLAGS="${FUZZ_FLAGS:--fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer -g -O1 -Wno-error}"
+TIME_ELF="${FUZZ_TIME_ELF:-60}"
+TIME_ARCHIVE="${FUZZ_TIME_ARCHIVE:-60}"
+ONLY="${FUZZ_ONLY:-}"
+SCRATCH=/tmp/lpkg-fuzz-corpus
+ARTIFACTS=/app/fuzz-artifacts
+CORPUS=tests/fuzz/corpus
+
+# 每次全量重编。为什么值得：`HOST_CXXFLAGS` 变了 make 不感知，复用上一轮的 .o 会让
+# sanitizer/插桩**静默失效** —— 那是最坏的一种失败（看起来在 fuzz，其实没插桩）。
+rm -rf "$BUILD"
+mkdir -p "$SCRATCH/elf_strip" "$SCRATCH/archive_name" "$ARTIFACTS"
+
+echo "fuzz: 容器内构建（clang + libFuzzer/ASan/UBSan，构建树 $BUILD/）..."
+make -j"$(nproc)" BUILD_DIR="$BUILD" CXX=clang++ HOST_CXXFLAGS="$FLAGS" \
+    "$BUILD/elf_strip_fuzz" "$BUILD/archive_name_fuzz" || exit 1
+
+want() { [ -z "$ONLY" ] || [ "$ONLY" = "$1" ]; }
+
+# 注意**不用 `set -e`**：harness 崩了也要继续把另一个跑完、并且退出去让 `make fuzz`
+# 收集产物。红度靠末尾的退出码传出去。
+rc=0
+run_one() {
+    name="$1"
+    short="${name%_fuzz}"  # 语料与暂存目录用短名：tests/fuzz/corpus/elf_strip、…/archive_name
+    seconds="$2"
+    shift 2
+    echo "===== $name（${seconds}s）====="
+    # ASAN_OPTIONS=detect_leaks=0：libFuzzer 在 musl 上**启动就漏 56 字节**（8 直接 + 48 间接），
+    # 一个**空的** libFuzzer harness 也照样漏（对照实验：`clang++ -fsanitize=fuzzer,address` 编一个
+    # 只 `return 0` 的 harness，跑 `-runs=1` 即复现）—— 那是 compiler-rt 的启动分配，不是 lpkg、
+    # 也不是 harness。留着它会让每次跑都"报一个崩溃"，把真信号淹掉。lpkg 自身的泄漏另由
+    # `make test-sanitize` 覆盖（那条基线实测是干净的）。
+    #
+    # libFuzzer 语义：**第一个**语料目录是"新单元写出处"，其余是只读种子源。
+    # scratch 放 /tmp：既不污染入库种子，也不受 docker-sync 清空 /app 的影响。
+    ASAN_OPTIONS='detect_leaks=0' ./"$BUILD/$name" "$SCRATCH/$short" "$CORPUS/$short" "$@" \
+        -artifact_prefix="$ARTIFACTS/" -print_final_stats=1 -max_total_time="$seconds" || rc=1
+}
+
+if want elf_strip_fuzz; then
+    run_one elf_strip_fuzz "$TIME_ELF" -max_len=262144
+fi
+if want archive_name_fuzz; then
+    run_one archive_name_fuzz "$TIME_ARCHIVE" -max_len=4096
+fi
+
+echo "fuzz: 跑完（rc=$rc）"
+exit $rc

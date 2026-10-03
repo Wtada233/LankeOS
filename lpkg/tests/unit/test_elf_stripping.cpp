@@ -1173,16 +1173,39 @@ protected:
 
 TEST_F(CraftedElfTest, HugeProgramHeaderOffsetIsRejectedInsteadOfHeapOverflow)
 {
-    // e_phoff = 0x1000 + 4 个 phdr = headers_size 4320，而重排后的输出缓冲只有 ~176 字节
+    // e_phoff = 0x1000 + 4 个 phdr ⇒ headers_size = 4320。旧实现的输出缓冲只按
+    // `e_shoff + e_shnum*shentsize` 算（~176 字节），于是"复制 4320 字节的头/程序头"会越界写。
+    // 当年的处置是**拒绝这个输入**，本用例钉的就是那个拒绝。
+    //
+    // **订正 2026-10-03**：给节区落点补上 `max(…, headers_size)` 这道下界之后（见 strip.cpp 里
+    // `layout_base` 的说明 —— 那处同源缺陷由 `tests/fuzz/elf_strip_fuzz.cpp` 实测抓到），输出
+    // 缓冲已被**正确放大**到装得下整个头 + 程序头，越界不再可能，于是这个输入变成"安全地接受"
+    // （产出 4448 字节：头与 phdr 原样保留、节区表排在 phdr 之后）。
+    // 所以本用例改钉**不变量**而不是那个中间机制：要么拒绝（且带原因），要么接受、但产物必须
+    // 仍是 libelf 能解析的 ELF。越界本身由 `make test-sanitize`（ASan）那套保证。
     write_crafted_elf(/*sh_offset=*/0x40, /*sh_size=*/16, SHT_PROGBITS, SHF_ALLOC,
                       /*e_phoff_lo=*/0x1000, /*e_phnum=*/4, /*file_size=*/8192);
 
     std::string error_msg;
-    EXPECT_FALSE(strip_file(test_file, error_msg))
-        << "畸形 e_phoff 应被拒绝（返回 false），而不是越界写入输出缓冲";
-    EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因 —— strip_binary 的告警判据是 "
-                                       "`!strip_file(...) && !error_msg.empty()`，"
-                                       "空串 = 检测到了也一声不响（静默跳过）";
+    const bool ok = strip_file(test_file, error_msg);
+
+    std::ifstream in(test_file, std::ios::binary);
+    ASSERT_TRUE(in.good()) << "strip 之后文件不该消失";
+    std::vector<uint8_t> out{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    ASSERT_GE(out.size(), static_cast<size_t>(EI_NIDENT));
+    EXPECT_EQ(std::memcmp(out.data(), ELFMAG, SELFMAG), 0) << "产物必须仍是 ELF";
+
+    Elf* elf = elf_memory(reinterpret_cast<char*>(out.data()), out.size());
+    ASSERT_NE(elf, nullptr);
+    GElf_Ehdr got{};
+    EXPECT_NE(gelf_getehdr(elf, &got), nullptr) << "产物必须能被 libelf 解析";
+    elf_end(elf);
+
+    if (!ok) {
+        EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因 —— strip_binary 的告警判据是 "
+                                           "`!strip_file(...) && !error_msg.empty()`，"
+                                           "空串 = 检测到了也一声不响（静默跳过）";
+    }
 }
 
 TEST_F(CraftedElfTest, OverflowingSectionRangeIsRejectedInsteadOfOutOfBoundsCopy)
@@ -1212,6 +1235,127 @@ TEST_F(CraftedElfTest, ZeroEntsizeDynamicSectionDoesNotDivideByZero)
     std::string error_msg;
     EXPECT_NO_THROW(strip_file(test_file, error_msg))
         << "strip 路径（identify_file_type 的 SONAME 扫描）也不得除零崩溃";
+}
+
+TEST_F(CraftedElfTest, SectionTableNeverOverwritesTheElfHeader)
+{
+    // 触发条件：既没有 SHF_ALLOC 数据（max_alloc_end == 0）、也没有非 ALLOC 载荷 ⇒ 重排算出的
+    // `e_shoff` 落到 0。而 `kept_sections` **永远含节区 0**（null section，内容全零），
+    // `write_shdr(0)` 于是正好写在第 0 字节 —— **把 ELF 头覆盖成全零**，函数却返回 true
+    // （`process_elf` 据此把损坏内容写回原文件，`strip_binary` 还当成功、一声不响）。
+    // 由 fuzz harness（tests/fuzz/elf_strip_fuzz.cpp）实测抓到。修复前用本用例这条输入跑
+    // 独立复现：返回 true + 输出 128 字节全零；修复后：返回 true + 192 字节合法 ELF。
+    write_crafted_elf(/*sh_offset=*/0, /*sh_size=*/0, SHT_PROGBITS, SHF_ALLOC,
+                      /*e_phoff_lo=*/0, /*e_phnum=*/0, /*file_size=*/192);
+
+    std::string error_msg;
+    const bool ok = strip_file(test_file, error_msg);
+
+    // 不变量（与 fuzz oracle 同一条）：无论接受还是拒绝，盘上留下的都必须是**能解析的 ELF**。
+    // strip 的语义是"尽力而为；失败就保留原文件"，绝不允许"报成功却写出损坏产物"。
+    std::ifstream in(test_file, std::ios::binary);
+    ASSERT_TRUE(in.good()) << "strip 之后文件不该消失";
+    std::vector<uint8_t> out{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    ASSERT_GE(out.size(), static_cast<size_t>(EI_NIDENT));
+    EXPECT_EQ(std::memcmp(out.data(), ELFMAG, SELFMAG), 0)
+        << "ELF 魔数被覆盖了（修复前：节区表写在偏移 0，把 ELF 头整块清零）";
+
+    Elf* elf = elf_memory(reinterpret_cast<char*>(out.data()), out.size());
+    ASSERT_NE(elf, nullptr);
+    GElf_Ehdr got{};
+    EXPECT_NE(gelf_getehdr(elf, &got), nullptr) << "strip 的产物必须仍能被 libelf 解析";
+    elf_end(elf);
+
+    if (!ok) {
+        EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
+    }
+}
+
+TEST_F(CraftedElfTest, RelSectionSizeBeyondFileIsRejectedInsteadOfRunawayAllocation)
+{
+    // 触发条件：**ET_REL** 的某个带数据节区声明了远超文件大小的 `sh_size`。
+    // `strip_elf_rel_object` 会把节区头（含 `sh_size`）原样写进输出 ELF，再交给 `elf_update`
+    // 去布局 —— libelf 会**按这些尺寸创建/分配空间**。由 fuzz harness 抓到、再最小复现：
+    // **1224 字节**的输入声明了 3 个节区共约 480 GB，让 shmem 一路涨到容器的 cgroup 上限
+    // （实测容器被自己的 30 GiB 限制杀掉；在还没给容器设限时它会直接打死宿主桌面）。
+    //
+    // 本用例用 **1 GiB** 而不是 192 GB：判据是同一条（"带数据的节区必须整段落在文件内"），
+    // 而**万一将来这道判据被改坏**，1 GiB 只会让测试失败，不会把跑测试的机器打爆。
+    std::vector<uint8_t> buf(256, 0);
+    Elf64_Ehdr ehdr{};
+    std::memcpy(ehdr.e_ident, ELFMAG, SELFMAG);
+    ehdr.e_ident[EI_CLASS] = ELFCLASS64;
+    ehdr.e_ident[EI_DATA] = ELFDATA2LSB;
+    ehdr.e_ident[EI_VERSION] = EV_CURRENT;
+    ehdr.e_type = ET_REL;  // ← 关键：走 strip_elf_rel_object（修复前正是这条路没有量级封顶）
+    ehdr.e_machine = EM_X86_64;
+    ehdr.e_version = EV_CURRENT;
+    ehdr.e_ehsize = sizeof(Elf64_Ehdr);
+    ehdr.e_shoff = sizeof(Elf64_Ehdr);
+    ehdr.e_shnum = 2;
+    ehdr.e_shentsize = sizeof(Elf64_Shdr);
+    ehdr.e_shstrndx = 0;
+    std::memcpy(buf.data(), &ehdr, sizeof(ehdr));
+
+    Elf64_Shdr sh[2]{};
+    sh[1].sh_type = SHT_PROGBITS;
+    sh[1].sh_offset = 128;
+    sh[1].sh_size = 1ull << 30;  // 1 GiB，而整个文件只有 256 字节
+    std::memcpy(buf.data() + sizeof(Elf64_Ehdr), sh, sizeof(sh));
+    {
+        std::ofstream f(test_file, std::ios::binary | std::ios::trunc);
+        f.write(reinterpret_cast<const char*>(buf.data()),
+                static_cast<std::streamsize>(buf.size()));
+    }
+
+    std::string error_msg;
+    EXPECT_FALSE(strip_file(test_file, error_msg))
+        << "节区数据超出文件范围的 ET_REL 必须被拒绝，而不是让 elf_update 去申请上 GiB";
+    EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
+}
+
+TEST_F(CraftedElfTest, RelSectionWithHugeAddralignIsRejectedInsteadOfRunawayAllocation)
+{
+    // 触发条件：ET_REL 的某个节区声明了**天文数字的 `sh_addralign`**。
+    // `strip_elf_rel_object` 把它原样写进输出 ELF，而 `elf_update` **按它对齐节区落点** ——
+    // 输出偏移随之间断到该对齐值，memfd 被 `ftruncate` 到那么大并**真实占掉几十 GB**。
+    // 由 fuzz harness 抓到、再用"只改这一个字段"的最小复现钉死：取一个正常的 gcc `.o`，
+    // **只**把某节区的 `sh_addralign` 改成 2^56，宿主内存 7 秒掉 48 GB（进程自身 RSS 仅 0.4 GB）。
+    // 本用例用 **2^32（4 GiB）** 而不是 2^56：判据相同，而万一判据将来被改坏，测试只会**失败**，
+    // 不会把跑测试的机器打爆。
+    std::vector<uint8_t> buf(256, 0);
+    Elf64_Ehdr ehdr{};
+    std::memcpy(ehdr.e_ident, ELFMAG, SELFMAG);
+    ehdr.e_ident[EI_CLASS] = ELFCLASS64;
+    ehdr.e_ident[EI_DATA] = ELFDATA2LSB;
+    ehdr.e_ident[EI_VERSION] = EV_CURRENT;
+    ehdr.e_type = ET_REL;
+    ehdr.e_machine = EM_X86_64;
+    ehdr.e_version = EV_CURRENT;
+    ehdr.e_ehsize = sizeof(Elf64_Ehdr);
+    ehdr.e_shoff = sizeof(Elf64_Ehdr);
+    ehdr.e_shnum = 2;
+    ehdr.e_shentsize = sizeof(Elf64_Shdr);
+    ehdr.e_shstrndx = 0;
+    std::memcpy(buf.data(), &ehdr, sizeof(ehdr));
+
+    Elf64_Shdr sh[2]{};
+    sh[1].sh_type = SHT_PROGBITS;
+    sh[1].sh_offset = 128;
+    sh[1].sh_size = 16;               // 数据本身在文件内（这是关键：只把**对齐**写大）
+    sh[1].sh_addralign = 1ull << 32;  // ← 4 GiB 对齐，而整个文件只有 256 字节
+    std::memcpy(buf.data() + sizeof(Elf64_Ehdr), sh, sizeof(sh));
+    {
+        std::ofstream f(test_file, std::ios::binary | std::ios::trunc);
+        f.write(reinterpret_cast<const char*>(buf.data()),
+                static_cast<std::streamsize>(buf.size()));
+    }
+
+    std::string error_msg;
+    EXPECT_FALSE(strip_file(test_file, error_msg))
+        << "sh_addralign 远大于整个文件的 ET_REL 必须被拒绝，而不是让 elf_update 去铺一个 4 GiB+ "
+           "的文件";
+    EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
 }
 
 TEST_F(CraftedElfTest, RealSharedLibraryStillStripsAndKeepsSoname)

@@ -213,7 +213,8 @@ FileType identify_file_type(const fs::path& path)
  * 同时更新节区索引映射（包括 SHT_SYMTAB 中的符号索引和 SHT_GROUP 中的节区索引）
  */
 static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrndx, int elf_class,
-                                 std::vector<uint8_t>& output_data, std::string& error_msg)
+                                 std::vector<uint8_t>& output_data, std::string& error_msg,
+                                 size_t input_size)
 {
     Fd out_fd(memfd_create("strip_out", 0));
     if (!out_fd.ok()) {
@@ -258,6 +259,31 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
             name.starts_with(".rel.debug") || name == ".comment")
             keep = false;
 
+        // **量级封顶（2026-10-03 修）**：`sh_size` 是**输入可控**的，而下面会把整份节区头
+        // （含 `sh_size`）写进输出 ELF，再交给 `elf_update` 去布局 —— libelf 会**按这些尺寸
+        // 创建/分配空间**。实测（fuzz harness 抓到、再最小复现）：一个 **1224 字节**的 ET_REL
+        // 声明了 192 GB 的节区 ⇒ `elf_update` 去申请上百 GB ⇒ 容器 cgroup 的 shmem 冲到上限、
+        // 全局 OOM。**合法 ELF 的节区数据必然落在文件内**，所以用输入大小封顶 ——
+        // 与 `strip_elf_exec_dyn` 那条路是**同一判据**（那边判的是"重排后的输出不可能大于输入"）。
+        // 判据写全：**带数据的节区**（SHT_NOBITS 的 off/size 在 ELF 里本就是无意义的）
+        // 其 [sh_offset, sh_offset+sh_size) 必须整段落在输入文件内。既挡 `sh_size` 巨大
+        // （最小复现里是 192 GB），也挡 `sh_offset` 巨大（同一份复现里第 8 节区 off=480 GB）。
+        // 用减法而不是加法判越界，避免 `sh_offset + sh_size` 回绕。
+        if (shdr.sh_type != SHT_NOBITS &&
+            (shdr.sh_offset > input_size || shdr.sh_size > input_size - shdr.sh_offset)) {
+            error_msg = get_string("error.strip_malformed_elf");
+            return false;
+        }
+        // **`sh_addralign` 也必须封顶**（2026-10-03 由 fuzz harness 抓到、再用"只改这一个字段"
+        // 的最小复现钉死）：`elf_update` 会**按 `sh_addralign` 对齐每个节区的落点** —— 一个
+        // `sh_addralign = 2^56` 的节区就让输出文件的偏移跳到 64 PiB，memfd 随之被 `ftruncate`
+        // 到 64 PiB 并**真实占掉几十 GB**（实测：宿主内存 7 秒掉 48 GB，进程自身 RSS 只有
+        // 0.4 GB，每次都被内存上限杀掉）。这正是先前只封 `sh_offset`/`sh_size` 时漏掉的那一格。
+        // 判据同族：**对齐值不可能大于整个输入文件**。`sh_entsize` 是同一类输入可控字段，一并封。
+        if (shdr.sh_addralign > input_size || shdr.sh_entsize > input_size) {
+            error_msg = get_string("error.strip_malformed_elf");
+            return false;
+        }
         if (keep) {
             to_keep.push_back({scn, shdr, name, old_idx});
             idx_map[old_idx] = new_idx++;
@@ -443,13 +469,25 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
         }
     }
 
-    // 对非 SHF_ALLOC 节区重新排列，紧跟在已分配数据之后
-    if (max_alloc_end > UINT64_MAX - constants::ELF_SECTION_ALIGN_MASK) {
+    // 节区数据与节区表的落点必须**整体排在 ELF 头 + 程序头之后**。
+    // 少了这道下界时（2026-10-03 由 `tests/fuzz/elf_strip_fuzz.cpp` 实测抓到）：一个
+    // "既没有 SHF_ALLOC 数据、又没有非 ALLOC 载荷"的文件会算出 `current_offset == 0`，
+    // 于是 `e_shoff == 0`；而 `kept_sections` **永远含节区 0**（null section，内容全零），
+    // `write_shdr(0)` 正好写在第 0 字节 —— **把 ELF 头覆盖成全零**，函数却返回 true，
+    // `process_elf` 据此把损坏内容写回原文件。程序头一并纳入下界（否则节区表会盖住 phdr）。
+    // 复现输入（128 字节、只有一个 null 节区）→ 修复前：返回 true 且输出 64 字节全零。
+    const size_t phdr_size = (elf_class == ELFCLASS64) ? sizeof(Elf64_Phdr) : sizeof(Elf32_Phdr);
+    const size_t headers_size =
+        std::max(static_cast<size_t>(ehdr.e_phoff + ehdr.e_phnum * phdr_size),
+                 static_cast<size_t>(ehdr.e_ehsize));
+
+    const uint64_t layout_base = std::max<uint64_t>(max_alloc_end, headers_size);
+    if (layout_base > UINT64_MAX - constants::ELF_SECTION_ALIGN_MASK) {
         error_msg = get_string("error.strip_malformed_elf");
         return false;
     }
     uint64_t current_offset =
-        (max_alloc_end + constants::ELF_SECTION_ALIGN_MASK) & ~constants::ELF_SECTION_ALIGN_MASK;
+        (layout_base + constants::ELF_SECTION_ALIGN_MASK) & ~constants::ELF_SECTION_ALIGN_MASK;
     for (size_t i = 1; i < kept_sections.size(); ++i) {
         auto& ks = kept_sections[i];
         if (!(ks.shdr.sh_flags & SHF_ALLOC)) {
@@ -556,11 +594,9 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
         }
     }
 
-    // 复制 ELF 头和程序头到输出缓冲区（长度同样必须落在**两个**缓冲内）
-    size_t headers_size = updated_ehdr.e_phoff +
-                          updated_ehdr.e_phnum *
-                              ((elf_class == ELFCLASS64) ? sizeof(Elf64_Phdr) : sizeof(Elf32_Phdr));
-    headers_size = std::max(headers_size, (size_t)updated_ehdr.e_ehsize);
+    // 复制 ELF 头和程序头到输出缓冲区（长度同样必须落在**两个**缓冲内）。
+    // 这里直接复用本函数开头算好的 `headers_size`：节区落点的下界要用它，两处各算一份
+    // 迟早会漂移（`updated_ehdr` 是 `ehdr` 的副本，只改了 e_shoff/e_shnum/e_shstrndx）。
     if (!elf_range_within(0, headers_size, input_data.size()) ||
         !elf_range_within(0, headers_size, output_data.size())) {
         // 同上：拒绝必须带原因，否则调用方静默跳过（2026-10-03 修）。
@@ -672,7 +708,8 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
 
     bool result = false;
     if (ehdr.e_type == ET_REL) {
-        result = strip_elf_rel_object(in_elf, ehdr, shstrndx, elf_class, output_data, error_msg);
+        result = strip_elf_rel_object(in_elf, ehdr, shstrndx, elf_class, output_data, error_msg,
+                                      input_data.size());
     } else {
         result = strip_elf_exec_dyn(in_elf, ehdr, shstrndx, elf_class, input_data, output_data,
                                     error_msg);
