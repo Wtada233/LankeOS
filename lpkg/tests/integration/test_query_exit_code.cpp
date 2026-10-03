@@ -148,3 +148,45 @@ TEST_F(QueryExitCodeTest, QueryingInstalledPackageExitsZero)
                                                        << r.all();
     EXPECT_NE(r.all().find(pkg), std::string::npos) << r.all();
 }
+
+// ── 两条查询腿口径统一：`query <文件>` 查不到属主也必须非零退出 ──────────────
+//
+// 此前 `query -p <未安装>` 抛错退 1，而 `query <无主文件>` 只打一条 `info.file_not_owned`
+// 并**静默退 0** —— 同是"查不到"，脚本拿不到统一判据。2026-10-03 统一成非零：本处改成抛
+// `LpkgException`（新键 `error.query_file_not_owned`），`info.file_not_owned` 随之失去唯一
+// 使用点、已从两份 l10n 中删除（否则"无孤儿键"那条闸门会红）。
+
+TEST_F(QueryExitCodeTest, QueryingUnownedFileExitsNonZero)
+{
+    const std::string pkg = "qec_file_owner";
+    const std::string pkg_path = create_pkg(pkg, "1.0");
+    ASSERT_NO_THROW(install_packages({pkg_path}));
+
+    // 谁都不拥有的路径（不在任何已安装包的文件清单里）
+    const std::string unowned = (test_root / "usr" / "bin" / "definitely_unowned").string();
+    const CliRun r = run_cli_captured({"lpkg", "--root", test_root.string(), "query", unowned});
+
+    EXPECT_EQ(r.code, 1) << "查询无主文件必须非零退出（与 query -p 同口径）：\n" << r.all();
+
+    const std::string tmpl = get_string("error.query_file_not_owned");
+    const std::string rendered = std::vformat(tmpl, std::make_format_args(unowned));
+    EXPECT_NE(r.all().find(rendered), std::string::npos)
+        << "应打印 error.query_file_not_owned 的渲染结果：\n  期望: [" << rendered << "]\n  实际: ["
+        << r.all() << "]";
+    EXPECT_NE(r.all().find("definitely_unowned"), std::string::npos) << "报错必须点名是哪个路径：\n"
+                                                                     << r.all();
+}
+
+TEST_F(QueryExitCodeTest, QueryingOwnedFileExitsZero)
+{
+    // 对照组：防"query 一律退 1"也能让上一条绿。
+    const std::string pkg = "qec_file_owned";
+    const std::string pkg_path = create_pkg(pkg, "1.0");
+    ASSERT_NO_THROW(install_packages({pkg_path}));
+
+    const std::string owned = (test_root / "usr" / "bin" / pkg).string();
+    const CliRun r = run_cli_captured({"lpkg", "--root", test_root.string(), "query", owned});
+
+    EXPECT_EQ(r.code, 0) << "查询有主文件必须退 0：\n" << r.all();
+    EXPECT_NE(r.all().find(pkg), std::string::npos) << r.all();
+}

@@ -896,22 +896,6 @@ struct SeedModel {
     /// v2 里 xattr 声明集**变小**的路径（= 撤销趟真的有事可做的那些目录）
     std::vector<std::string> xattr_revoked_paths;
 
-    /** 别的包（合租方）是否持有该 (路径, 键) —— 撤销判据里的第二道闸 */
-    bool other_owns_xattr(const std::string& path, const std::string& key) const
-    {
-        const auto it = x_co.find(path);
-        return it != x_co.end() && it->second.contains(key);
-    }
-
-    /// 本包在 usr 侧声明的全部 (路径, 键)（= 升级时"可能要撤"的候选集）
-    std::vector<std::pair<std::string, std::string>> owned_usr_xattrs() const
-    {
-        std::vector<std::pair<std::string, std::string>> out;
-        for (const auto& [p, kv] : x_v1)
-            for (const auto& [k, v] : kv) out.emplace_back(p, k);
-        return out;
-    }
-
     fs::path root(const fs::path& test_root) const
     {
         return test_root / base;

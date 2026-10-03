@@ -1,5 +1,5 @@
 /**
- * test_archive_confinement.cpp — 解压必须锁在目标目录内（TODO.md X2）
+ * test_archive_confinement.cpp — 解压必须锁在目标目录内（历史 TODO.md X2）
  *
  * 归档成员名是**不可信输入**（未校验的 .lpkg、无校验和的上游源码包）。`fs::path` 语义下
  * `output_dir / "/abs/x"` **等于 "/abs/x"**（绝对右值丢弃左值），所以修复前一个绝对路径

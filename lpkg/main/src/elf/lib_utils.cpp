@@ -25,7 +25,7 @@ std::string get_elf_soname(const fs::path& path)
 {
     // libelf 要求进程先调用 elf_version(EV_CURRENT)，否则 elf_begin 恒返回 NULL。
     // 此前只有 strip.cpp 调过它 → 安装期的 ldconfig 触发器（apply_soname_links）
-    // 在"本进程没 strip 过"时**一个 SONAME 链接都不建，且完全静默**（TODO.md F2）。
+    // 在"本进程没 strip 过"时**一个 SONAME 链接都不建，且完全静默**（历史 TODO.md F2）。
     // 这里做一次性的惰性初始化，消除调用顺序依赖。
     static const bool elf_ready = (elf_version(EV_CURRENT) != EV_NONE);
     if (!elf_ready) return "";
@@ -163,7 +163,7 @@ void apply_soname_links(const fs::path& lib_dir,
         if (!soname.empty()) {
             // SONAME 取自被扫描的库文件（不可信输入）：绝对路径或 `..` 会让
             // `lib_dir / soname` 逃出 lib_dir（fs::path 语义下绝对右值丢弃左值），
-            // 从而以 root 在任意位置建符号链接（TODO.md X3）。只接受落在 lib_dir 内的。
+            // 从而以 root 在任意位置建符号链接（历史 TODO.md X3）。只接受落在 lib_dir 内的。
             const fs::path lib_dir_n = lib_dir.lexically_normal();
             const fs::path link_path = (lib_dir_n / soname).lexically_normal();
             if (!path_within(link_path, lib_dir_n)) {

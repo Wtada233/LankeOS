@@ -163,6 +163,44 @@ hooks/                # Hook scripts (optional)
 
 The files under `content/` are extracted directly to the target root (`/`).
 
+## Build Flag Configuration (build.conf)
+
+`lpkg build` uses **Arch Linux compile/link flags with an x86-64-v3 ISA baseline** by default
+(`-march=native` is never used, so the build host's CPU features beyond v3 can never leak into
+the distribution — v3 means AVX2/FMA and friends, covering the vast majority of x86-64 machines
+made after 2013). The defaults live in `main/src/base/build_defaults.hpp` (fallback); the
+system-wide config is `/etc/lpkg/build.conf` (makepkg.conf style, installed from
+`main/conf/build.conf` by `make install`):
+
+```text
+CFLAGS="-march=x86-64-v3 -mtune=generic -O2 -pipe -fno-plt -fexceptions ..."
+CXXFLAGS="$CFLAGS -Wp,-D_GLIBCXX_ASSERTIONS"   # fully expanded in the file
+LDFLAGS="-Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,relro -Wl,-z,now ..."
+LTOFLAGS="-flto=auto"
+MAKEFLAGS="-j$(nproc)"                          # $(nproc) expands to the logical core count
+```
+
+Before each stage of `build` (`lankebuild_prepare`/`build`/`package`) those flags are
+`export`ed into the build environment, so configure/make/cmake inherit them automatically; a
+LankeBUILD script may also reference the template variables `{CFLAGS}`, `{CXXFLAGS}`,
+`{LDFLAGS}` and `{MAKEFLAGS}`.
+
+**Per-package override** (highest precedence): add optional fields to `LankeBUILD.json`;
+leaving them out means "use the configured default":
+
+```json
+{
+  "name": "foo",
+  "version": "1.0",
+  "cflags": "-O2 -march=x86-64-v3",
+  "ldflags": "-Wl,--as-needed",
+  "makeflags": "-j2",
+  "lto": true
+}
+```
+
+`"lto": true` appends `LTOFLAGS` (default `-flto=auto`) to both the compile and link flags.
+
 ## Repository Specification
 
 ### Directory Structure

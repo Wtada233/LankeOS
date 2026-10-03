@@ -211,7 +211,7 @@ void pack_package(const std::string& output_filename, const std::string& source_
 
     // close 的返回值就是"整包是否真的写完落盘"：写失败（磁盘满/EIO）时 libarchive
     // 返回 ARCHIVE_FAILED/FATAL。不检查就会把**截断的 .lpkg 当成功**，还对截断内容
-    // 算 SHA256 → farm 把该哈希写进索引，下游校验通过、装到一半才炸（TODO.md B2）。
+    // 算 SHA256 → farm 把该哈希写进索引，下游校验通过、装到一半才炸（历史 TODO.md B2）。
     // 阈值取 ARCHIVE_WARN：FAILED/FATAL 一律失败，WARN 只告警（与 archive.cpp 读侧一致）。
     if (close_rc < ARCHIVE_WARN) {
         discard_partial();

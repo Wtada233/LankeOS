@@ -211,7 +211,7 @@ static void write_batch_db(const std::vector<std::string>& success)
  *
  * 兜底用途：畸形依赖（空名 → libsolv ID_EMPTY）等原因会让 solver 把请求静默丢掉、
  * 产出**空事务**，落点是 plan.empty() 的"所有包都已安装"分支——用户看到成功、
- * 实际什么都没装（TODO.md D3）。能力目标（SONAME 等）与真实包名不同，故必须
+ * 实际什么都没装（历史 TODO.md D3）。能力目标（SONAME 等）与真实包名不同，故必须
  * 同时匹配 provides 与"已装包提供的能力"。
  */
 static std::string first_unreached_target(
@@ -331,7 +331,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     }
 
     // 请求的目标必须真的进了计划（或已装/已由计划包或已装包提供该能力）。
-    // 否则是"求解成功但什么都没装"——绝不能报"所有包都已安装"（TODO.md D3）。
+    // 否则是"求解成功但什么都没装"——绝不能报"所有包都已安装"（历史 TODO.md D3）。
     if (const std::string unreached = first_unreached_target(targets, plan); !unreached.empty()) {
         throw LpkgException(string_format("error.target_missing_from_plan", unreached));
     }
@@ -622,7 +622,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
 
     // 注：hooks_dir/<pkg> 的删除**不在这里**——它无 WAL 记录，放在可回滚的批次内会让
     // 批次回滚后钩子永久丢失（之后 remove/upgrade 静默跳过钩子）。改由提交后的
-    // finish_committed_batch() 删除（TODO.md Z7）。
+    // finish_committed_batch() 删除（历史 TODO.md Z7）。
     cache.remove_installed(pkg_name);
 
     if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
@@ -1054,7 +1054,7 @@ static size_t remove_packages_checked(const std::vector<std::string>& pkgs, bool
     }
     // **全或无**：整个列表先检完，任一不通过即中止、一个都不删（pacman 的 `-R a b` 同义）。
     // 旧实现是"被拒的 continue 掉、其余照删，最后才因 refused 抛错" → 落点"部分包已删 +
-    // 非零退出码"，而调用方（脚本/farm）拿非零退出码判断的是"什么都没发生"（TODO G4 正是
+    // 非零退出码"，而调用方（脚本/farm）拿非零退出码判断的是"什么都没发生"（历史 TODO G4 正是
     // 为这个语义加的），盘面却已经少了几个包。拒绝必须发生在**任何文件操作之前** ——
     // 走到这里时连事务都还没开（remove_packages_in_one_batch 都没被调用），WAL 里不留
     // RM_BEGIN，也就不存在"删一半"的中间态。
@@ -1101,7 +1101,7 @@ size_t remove_packages(const std::vector<std::string>& pkg_names, bool force, bo
 {
     if (pkg_names.empty()) return 0;
     // CLI 边界（main 的 `remove a b c` 走这里）：**被安全检查拒绝 → 报错**，
-    // 让脚本/farm 凭退出码区分"删掉了"与"被拒绝"（TODO G4）。库层 remove_package
+    // 让脚本/farm 凭退出码区分"删掉了"与"被拒绝"（历史 TODO G4）。库层 remove_package
     // 保持"打印原因后返回"的友好语义（测试与内部调用依赖它）。
     bool refused = false;
     const size_t removed = remove_packages_checked(pkg_names, force, purge_config, &refused);
@@ -1172,7 +1172,7 @@ void autoremove(bool purge_config)
     }
     // 核心包永不自动移除：下面走的是 force 的批量移除，会跳过
     // is_essential 检查（force 的语义是"无视反向依赖"，不该顺带无视核心包保护）。
-    // 必须在锁外调用（is_essential 自己会加同一把锁，TODO.md E3）。
+    // 必须在锁外调用（is_essential 自己会加同一把锁，历史 TODO.md E3）。
     std::erase_if(to_rem, [&](const std::string& n) {
         if (!cache.is_essential(n)) return false;
         log_info(string_format("info.autoremove_skip_essential", n));
@@ -1450,7 +1450,7 @@ void upgrade_packages()
 
     // ── 索引可用性守卫 ────────────────────────────────────────────────
     // 索引为空 ⇒ 一个"可升级目标"都找不出来，而下面的早退会把这种情况报成
-    // "所有包都已是最新版本" + exit 0 —— 把"升不了"伪装成"不用升"（TODO D4）。有已装包
+    // "所有包都已是最新版本" + exit 0 —— 把"升不了"伪装成"不用升"（历史 TODO D4）。有已装包
     // 却读不到任何索引内容时**响亮失败**（2026-10-02 修）。已装包本身为空时不做判断
     // （那种情况下"无事可做"是真的）。
     if (repo.packages().empty() && !installed.empty()) {
@@ -1541,7 +1541,7 @@ void upgrade_packages()
     // 与 install_packages 对称：升级同样会产生待执行触发器（copy_package_files 里
     // check_file() 照常累积），漏掉这一行会让 glib-compile-schemas /
     // systemctl daemon-reload / gtk-update-icon-cache 在升级后**一次都不跑**
-    // （schema 不可见、unit 不生效、图标缓存陈旧，TODO.md F1）。
+    // （schema 不可见、unit 不生效、图标缓存陈旧，历史 TODO.md F1）。
     TriggerManager::instance().run_all();
 
     // 两行上限：真升级的 / 本次顺带新拉进来的依赖（`upgrade` 会拉依赖，别把它们算成"升级"）。
@@ -1771,7 +1771,7 @@ void query_file(const std::string& filename)
 
     // 目录是以**尾斜杠**注册的（scan_content_files 的约定：`/usr/bin/` 才是目录键，
     // 普通文件不带斜杠），所以查询目录时要再试一次带斜杠的形式：
-    // 否则 `lpkg query /usr/bin` 报"不属于任何包"，而 `/usr/bin/` 才查得到（TODO.md G1）。
+    // 否则 `lpkg query /usr/bin` 报"不属于任何包"，而 `/usr/bin/` 才查得到（历史 TODO.md G1）。
     if (owners.empty() && !target.ends_with('/')) {
         std::string with_slash = target + "/";
         auto dir_owners = cache.get_file_owners(with_slash);
@@ -1788,7 +1788,12 @@ void query_file(const std::string& filename)
     }
 
     if (owners.empty()) {
-        log_info(string_format("info.file_not_owned", filename));
+        // 与 `query -p`（本文件上面的 `query_package`）口径统一（2026-10-03）：两条查询腿
+        // 同是"查不到"，此前一条抛错退 1（`query -p <未安装>`）、一条打 info 退 0（本处），
+        // 脚本无法用统一判据识别"查询未命中"。现在都抛 `LpkgException` → `run_cli` 落退出码 1。
+        // 用 **query 语境自己的键**：`info.file_not_owned`（"…is not owned by any package"）是
+        // 正常结果语气的 info 文案，留在别处（如扫描/诊断）继续用，别把它当错误文案复用。
+        throw LpkgException(string_format("error.query_file_not_owned", filename));
     } else {
         std::string os;
         for (auto it = owners.begin(); it != owners.end(); ++it) {

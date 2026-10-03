@@ -56,7 +56,7 @@ std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& de
         const std::string d = trim_copy(raw);
         // 空片段（索引里 "a,,b" 拆出的空元素、纯空白）不成依赖。**空名依赖必须在
         // 这里就被挡掉**：它在 libsolv 里是 ID_EMPTY，既不解析也不报错，求解会"成功"
-        // 却产出空事务 → 上层打印"所有包都已安装"并 exit 0（TODO.md D1/D3）。
+        // 却产出空事务 → 上层打印"所有包都已安装"并 exit 0（历史 TODO.md D1/D3）。
         if (d.empty()) continue;
 
         DependencyInfo dep;

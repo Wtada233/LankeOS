@@ -268,7 +268,7 @@ TEST_F(AggregatedIndexTest, FindProviderReturnsVersionThatActuallyProvides)
 }
 
 // ============================================================================
-// 索引 deps 字段里的复合约束（TODO.md D2）
+// 索引 deps 字段里的复合约束（历史 TODO.md D2）
 //
 // 索引用 ',' 连接各依赖，而依赖语法**本身**也用 ',' 表达复合约束
 // （`"cmake >= 3.20, < 4.0"` 是一个依赖）。旧解析直接按 ',' 拆再逐个解析，

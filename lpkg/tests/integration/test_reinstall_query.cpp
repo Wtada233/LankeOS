@@ -7,6 +7,7 @@
 #include <fstream>
 
 #include "../../main/src/archive/packer.hpp"
+#include "../../main/src/base/exception.hpp"
 #include "../../main/src/base/utils.hpp"
 #include "../../main/src/config/config.hpp"
 #include "../../main/src/crypto/hash.hpp"
@@ -239,14 +240,29 @@ TEST_F(NewFeaturesTest, QuerySymlinkDoesNotResolve)
     // 模拟用户删除了 files.db 中 /usr/bin/link 的条目
     Cache::instance().remove_file_owner("/usr/bin/link", "symlink_query_test");
 
-    // BUG 复现：此时 query_file 不应跟随软链接去解析目标
+    // BUG 复现：此时 query_file 不应跟随软链接去解析目标。
+    //
+    // ⚠️ 断言 2026-10-03 随语义改动更新（原来的 `"is not owned by any package"` 那条
+    // 钉的是 `info.file_not_owned` 这条 info 文案 + 静默退 0 的旧行为；现在"查不到属主"
+    // 与 `query -p <未安装>` 口径统一 —— 抛 `LpkgException`，`run_cli` 落退出码 1）。
+    // **本条用例真正守的不变量没变**：绝不能跟随软链接把归属算到**目标**头上。
+    // 改成异常断言后反而更强 —— 旧写法里"静默返回"与"报对了"是分不开的。
+    std::string msg;
     testing::internal::CaptureStdout();
-    query_file("/usr/bin/link");
-    out = testing::internal::GetCapturedStdout();
+    try {
+        query_file("/usr/bin/link");
+        ADD_FAILURE() << "无主路径必须抛 LpkgException，而不是静默返回";
+    } catch (const LpkgException& e) {
+        msg = e.what();
+    }
+    const std::string out_unowned = testing::internal::GetCapturedStdout();
 
-    // 不应该显示目标路径的所有权（目标路径属于 symlink_query_test 但不应该被查到）
-    // 且应该报告文件不受管理
-    EXPECT_NE(out.find("is not owned by any package"), std::string::npos);
+    EXPECT_NE(msg.find("/usr/bin/link"), std::string::npos)
+        << "报错必须点名被查询的路径：[" << msg << "]";
+    EXPECT_EQ(msg.find("symlink_query_test"), std::string::npos)
+        << "跟随软链接把归属算到了**目标**头上（本条用例守的就是这个缺陷）：[" << msg << "]";
+    EXPECT_EQ(out_unowned.find("is owned by"), std::string::npos)
+        << "无主路径不该打印任何归属信息：[" << out_unowned << "]";
 }
 
 /** 回归测试：重装时应检测孤立文件冲突 */
@@ -300,11 +316,12 @@ TEST_F(NewFeaturesTest, QueryDirectoryWithoutTrailingSlashStillResolvesOwner)
     install_packages({(pkg_dir / "dir_owner_ns-1.0.lpkg").string()}, "", false);
 
     testing::internal::CaptureStdout();
-    query_file("/usr/share/dir_owner_ns");  // 注意：不带尾斜杠
+    // 2026-10-03 起"查不到属主"是**抛异常**（`error.query_file_not_owned`），所以
+    // "没被判成无主"最直接的判据就是"不抛" —— 比原来那条"消息里不含某某文案"的**否定式**
+    // 断言更强（那条在新语义下恒真，等于没有牙）。断言消息文本本身仍然需要：只断言包名
+    // 出现会假通过（查询路径里本来就含包名）。
+    EXPECT_NO_THROW(query_file("/usr/share/dir_owner_ns"))  // 注意：不带尾斜杠
+        << "不带尾斜杠查询目录被判为无归属";
     const std::string out = testing::internal::GetCapturedStdout();
-    // 断言消息文本本身（"is owned by" / "不属于任何已安装的包"），**不能**只断言包名出现——
-    // 查询路径里本来就含包名，"未归属"的消息会回显该路径，子串断言会假通过。
-    EXPECT_EQ(out.find("is not owned by any installed package"), std::string::npos)
-        << "不带尾斜杠查询目录被判为无归属：" << out;
     EXPECT_NE(out.find("is owned by"), std::string::npos) << "没有输出归属信息：" << out;
 }

@@ -88,7 +88,7 @@ WALOpType walop_type_from_name(std::string_view name)
 // 解析格式:
 //   TYPE arg1 [arg2 [arg3 [arg4 [arg5 [arg6]]]]]
 //
-// **分帧规则**（路径可以含空格，所以不能无脑按空格切——见 TODO.md A1）：
+// **分帧规则**（路径可以含空格，所以不能无脑按空格切——见 历史 TODO.md A1）：
 //   - 箭头形式（BACKUP/COPY/REMOVE_OLD/RESTORE_FILE/RESTORE_DB）以 " → " 为界，
 //     两侧整段各自成一个参数：TYPE <src> → <dst>
 //   - 其余形式用 tail_args() 给出"arg1 之后还有几个固定字段"，那些字段**从右往左**切，
@@ -1137,7 +1137,7 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path)
     for (int i = static_cast<int>(lines.size()) - 1; i >= 0; --i) {
         auto op = parse_op(lines[i]);
         // 未解析行（破损/半写尾部）必须跳过：否则它会以 INVALID 之外的类型参与判断，
-        // 甚至被当作批次起点，导致整个批次的操作集被截断（见 TODO.md A2）。
+        // 甚至被当作批次起点，导致整个批次的操作集被截断（见 历史 TODO.md A2）。
         if (!op.is_valid()) continue;
         if (op.type == WALOpType::BEGIN_PKGS) {
             start_idx = i;

@@ -106,28 +106,56 @@ static std::optional<std::vector<std::string>> read_wal_lines(const std::string&
  * **两个**未提交批次（前一批回滚自身失败后同进程又开了新批次），按"最后一个"裁剪/回滚会让
  * 更早那批的 BEGIN/BACKUP 行被当成已完成内容处理 —— 恢复依据就此消失；而且已提交批次的行
  * 仍留在 WAL 里、下一轮扫描的起点仍落在它上面，更早那批永远轮不到（实测两轮下来文件一次都
- * 没被还原，TODO.md X6/Z5）。配对成功的批次（depth 回到 0）即清空起点。
+ * 没被还原，历史 TODO.md X6/Z5）。配对成功的批次（depth 回到 0）即清空起点。
  */
 struct BatchPairing {
     ssize_t unpaired_begin = -1;  // **第一个**未配对 BEGIN_PKGS 的行号；-1 = 无未提交区域
     ssize_t last_commit = -1;     // **最后一个** COMMIT_PKGS 的行号；-1 = 一条都没有
+    size_t unpaired_count = 0;    // 扫描结束时仍开着的批次数（= 需要补写的 COMMIT 条数）
+    // `committed_line[i] == true` ⇒ 第 i 行属于一个**已经配对提交**的批次。
+    //
+    // 它只在一种形状下非空：已提交批次**嵌套**在更早的未提交批次里
+    // （`BEGIN₁ …(未封口) BEGIN₂ … COMMIT₂`）。这种形状下，未提交区域 `[unpaired_begin, EOF)`
+    // 会**把已提交的那一批包进去**，而整段回滚会把上一轮"明明装成功并提交了"的成果一并撤销
+    // （详见 `rollback_uncommitted_region`）。回滚必须**跳过**这些行。
+    //
+    // 这种形状从哪来：`rollback_uncommitted_region` 在"有撤销动作真的没成功"时**故意不 seal**
+    // （留给下次 rec 重做），而 `init_database_for` 不返回恢复成败、同进程继续执行用户命令 ⇒
+    // 新批次在未封口的 WAL 上开了。2026-10-03 起 `run_batch_transaction` 入口加了守卫堵住这条
+    // 产生路径；这里保留跳过逻辑，是为了**已有现场**（旧二进制留下的 WAL）也不被误回滚。
+    std::vector<bool> committed_line;
+
+    bool is_committed_line(size_t i) const
+    {
+        return i < committed_line.size() && committed_line[i];
+    }
 };
 
 static BatchPairing scan_batch_pairing(const std::vector<std::string>& lines)
 {
     BatchPairing pairing;
-    int depth = 0;
+    pairing.committed_line.assign(lines.size(), false);
+    // 尚未配对的 BEGIN_PKGS 行号，LIFO —— 配对语义是"COMMIT 关掉**最近一个**开着的批次"。
+    std::vector<size_t> open_begins;
     for (size_t i = 0; i < lines.size(); ++i) {
         auto op = wal::parse_op(lines[i]);
         if (!op.is_valid()) continue;
         if (op.type == wal::WALOpType::BEGIN_PKGS) {
-            if (depth == 0) pairing.unpaired_begin = static_cast<ssize_t>(i);
-            ++depth;
+            if (open_begins.empty()) pairing.unpaired_begin = static_cast<ssize_t>(i);
+            open_begins.push_back(i);
         } else if (op.type == wal::WALOpType::COMMIT_PKGS) {
             pairing.last_commit = static_cast<ssize_t>(i);
-            if (depth > 0 && --depth == 0) pairing.unpaired_begin = -1;  // 该批次已配对提交
+            if (open_begins.empty()) continue;  // 多余的 COMMIT：不配对任何东西（与过去一致）
+            const size_t begin = open_begins.back();
+            open_begins.pop_back();
+            if (!open_begins.empty()) {
+                // 刚被提交的这一批**嵌套在**更早的未提交批次里 ⇒ 它的行不得被回滚。
+                for (size_t j = begin; j <= i; ++j) pairing.committed_line[j] = true;
+            }
+            if (open_begins.empty()) pairing.unpaired_begin = -1;  // 该批次已配对提交
         }
     }
+    pairing.unpaired_count = open_begins.size();
     return pairing;
 }
 
@@ -154,7 +182,7 @@ static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
     // 1. 定位：**第一个**未配对 BEGIN_PKGS（未提交区域起点）与最后一个 COMMIT_PKGS。
     //
     //    夹在两个未提交批次之间的 bak 属于**还没还原**的前一批，若按"已提交区域"删掉就是
-    //    永久丢文件（TODO.md X6）；配对记账的语义见 scan_batch_pairing 的说明。
+    //    永久丢文件（历史 TODO.md X6）；配对记账的语义见 scan_batch_pairing 的说明。
     const BatchPairing pairing = scan_batch_pairing(lines);
     const ssize_t unpaired = pairing.unpaired_begin;
     const ssize_t last_commit = pairing.last_commit;
@@ -243,11 +271,17 @@ static std::string first_package_of(const std::vector<wal::WALOp>& ops)
  * **回滚失败不得卡死整个恢复**：告警、保持现场（WAL 与备份原样保留，下次 rec 可重试），
  * 并把失败上报给调用方；此后不清理 DB 备份（那是重试的依据）。
  */
-static bool rollback_uncommitted_region(const std::vector<std::string>& lines, size_t region_start)
+static bool rollback_uncommitted_region(const std::vector<std::string>& lines, size_t region_start,
+                                        const BatchPairing& pairing)
 {
     // a) 解析操作行
+    //    **跳过"落在未提交区域之内、但属于已提交批次"的行**（嵌套提交形状，见 BatchPairing
+    //    的 `committed_line` 说明）：它们的成果已经提交过，反过来执行 = 静默撤销上一轮已完成的
+    //    安装。未提交区域 [region_start, EOF) 是按"第一个未配对 BEGIN"划的，它并不**等于**
+    //    "全都是未提交的行" —— 这条跳过就是那个差集。
     std::vector<wal::WALOp> ops;
     for (size_t i = region_start; i < lines.size(); ++i) {
+        if (pairing.is_committed_line(i)) continue;
         auto op = wal::parse_op(lines[i]);
         if (op.is_valid()) ops.push_back(op);
     }
@@ -277,7 +311,11 @@ static bool rollback_uncommitted_region(const std::vector<std::string>& lines, s
     // 作废（stash 收尸、WAL 收尾、备份清理都还要做），但它**不静默**：load 会逐个告警；
     // 正常操作路径（install/remove 入口的 Cache::load()）仍是硬错误。
     Cache::instance().load(/*tolerate_missing_set_files=*/true);
-    wal::commit_batch();
+    // seal：**补足**与未配对 BEGIN_PKGS **条数相等**的 COMMIT_PKGS。
+    // 只写一条是错的 —— WAL 里有两个未配对 BEGIN 时（前一批回滚失败后同进程又开了新批），
+    // 一条 COMMIT 让 depth 停在 1 ⇒ "未提交区域"永远存在：下一轮恢复把整段再回滚一遍，
+    // `trim_completed` 永不裁剪、WAL 无限增长。配对的语义是"一条 COMMIT 关掉一批"。
+    for (size_t n = 0; n < pairing.unpaired_count; ++n) wal::commit_batch();
     return false;
 }
 
@@ -295,7 +333,8 @@ void recover_packages()
 
     // 2. 状态机扫描：未提交区域 = [**第一个**未配对 BEGIN_PKGS, EOF)
     //    （BEGIN_PKGS 开批、COMMIT_PKGS 配对；扫描语义见 scan_batch_pairing）
-    const ssize_t unpaired_begin = scan_batch_pairing(lines).unpaired_begin;
+    const BatchPairing pairing = scan_batch_pairing(lines);
+    const ssize_t unpaired_begin = pairing.unpaired_begin;
 
     if (unpaired_begin < 0) {
         // 没有未完成的批次，清理整个日志。
@@ -307,12 +346,12 @@ void recover_packages()
         return;
     }
 
-    // 3. 一次逆序回滚整段未提交区域
+    // 3. 一次逆序回滚整段未提交区域（跳过其中属于**已提交**批次的行，见 BatchPairing）
     const bool any_batch_failed =
-        rollback_uncommitted_region(lines, static_cast<size_t>(unpaired_begin));
+        rollback_uncommitted_region(lines, static_cast<size_t>(unpaired_begin), pairing);
 
     // 4. 清理残留的 .lpkg_db_bak_before:* 备份文件。
-    //    有批次恢复失败时**跳过**：那些备份是重试还原 DB 的唯一依据（TODO.md A3 同理）。
+    //    有批次恢复失败时**跳过**：那些备份是重试还原 DB 的唯一依据（历史 TODO.md A3 同理）。
     if (!any_batch_failed) cleanup_db_backups();
 }
 
@@ -425,10 +464,12 @@ void trim_completed()
 // cleanup_db_backups — 清理孤立的 .lpkg_db_bak_before:* 文件
 // ============================================================================
 
-namespace
-{
 /**
  * WAL 里是否还留着未配对的 BEGIN_PKGS（= 存在未提交批次）。
+ *
+ * **公开**（声明在 `cache.hpp`）：除 `cleanup_db_backups()` 用它当"别删还原点"的门控外，
+ * `run_batch_transaction()` 也用它当**入口守卫** —— 未封口的 WAL 上不许再开新批次
+ * （否则会造出"已提交批次嵌套在未提交批次里"的形状，见 `scan_batch_pairing`）。
  *
  * 读不到 WAL 文件时保守返回 true（"有"）——宁可让备份多留一会儿，也不误删唯一还原点。
  * 文件不存在 / 为空则明确是"没有"（正常路径：trim 之后）。
@@ -472,7 +513,6 @@ bool wal_has_unpaired_batch()
     if (!lines) return exists;
     return scan_batch_pairing(*lines).unpaired_begin >= 0;
 }
-}  // namespace
 
 void cleanup_db_backups()
 {

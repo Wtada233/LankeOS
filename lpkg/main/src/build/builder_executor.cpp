@@ -584,7 +584,7 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
             // **先下到 .part 再 rename**：被中断（SIGKILL/断电）的构建只会留下不完整的
             // .part，正式文件仅在下载完整后出现。否则 `if (!fs::exists(dest))` 会把上次
             // 留下的**截断源码包永久当成"已下载好"**，错误延后到某个无关的构建阶段
-            // 才以看不懂的形式爆出来（TODO.md C4）。
+            // 才以看不懂的形式爆出来（历史 TODO.md C4）。
             const fs::path part = dest.string() + ".part";
             std::error_code ec;
             fs::remove(part, ec);  // 清掉上次残留的半截

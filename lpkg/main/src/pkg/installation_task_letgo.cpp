@@ -155,7 +155,7 @@ void obsolete_files_pass(Cache& cache, const std::string& pkg_name, const fs::pa
         facts.last_owner = cache.get_file_owners(old_file).empty();
         // 只剩本包持有时才可能搬走；盘面形态参与判定（新版本是否把它变成了目录）
         const fs::path phys = strip_trailing_slash(to_phys(old_file));
-        // 新版本把该路径变成了**目录**（文件→目录的升级，TODO E4）：内容已由拷贝阶段
+        // 新版本把该路径变成了**目录**（文件→目录的升级，历史 TODO E4）：内容已由拷贝阶段
         // 替换好，这里绝不能再把它当"废弃旧文件"搬进 stash——否则刚建好的目录被搬走，
         // 升级"成功"但目录消失（实测）。目录的清理由阶段 2 负责。
         // 盘上是 symlink→目录、而新版本在该路径登记了**目录条目**（`path/`）：同理 —— 拷贝

@@ -258,7 +258,7 @@ TEST_F(BuilderExecutorTest, LoadBuildDefaults_ReadsConfigFile)
 }
 
 // ============================================================================
-// safe_name_from_url —— 源 URL → 安全目录/文件名（TODO.md C1）
+// safe_name_from_url —— 源 URL → 安全目录/文件名（历史 TODO.md C1）
 //
 // 旧实现直接 `fs::path(url).filename()`：URL 以 `/..` 结尾得到 ".."，以 `/` 结尾得到 ""，
 // 调用方随后 `work_root / name` + `fs::remove_all(dest)` 会**删掉整个构建目录或整棵源码树**

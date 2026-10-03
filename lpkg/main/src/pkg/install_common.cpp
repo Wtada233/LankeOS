@@ -53,7 +53,7 @@ fs::path confine_target_path(const fs::path& rel)
 }
 
 // ============================================================================
-// 每文件系统 sidecar stash + 目录元数据化删除（TODO.md 第 2 节）
+// 每文件系统 sidecar stash + 目录元数据化删除（历史 TODO.md 第 2 节）
 // ============================================================================
 
 fs::path stash_parent_dir(const fs::path& phys)
@@ -564,7 +564,7 @@ static std::vector<std::string> collect_system_sonames()
  *
  * 除同名匹配外必须一并匹配 **provides**：按能力/SONAME 安装时（`lpkg install libssl`
  * 由 openssl 提供）目标串是能力名、解析出的真实包名不同，只比包名会把用户显式请求
- * 记成"依赖"→ 不 hold → **紧接着一条 autoremove 就把它删掉**（TODO.md E2）。
+ * 记成"依赖"→ 不 hold → **紧接着一条 autoremove 就把它删掉**（历史 TODO.md E2）。
  */
 static bool is_explicit_target(const std::vector<std::pair<std::string, std::string>>& targets,
                                const std::string& name, const std::vector<std::string>& provides)

@@ -64,6 +64,17 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
     // 这里再 trim 一次已完成的批次，保证新批次从干净的日志开始。
     trim_completed();
 
+    // **入口守卫（2026-10-03 补）**：上面那条"前提"此前只是**假设** —— 调用方不一定做得到。
+    // `recover_packages()` 在"有撤销动作真的没成功"时会**故意不封口**（留给下次 rec 重做），
+    // 而 `init_database_for()` 不返回恢复成败、同进程继续执行用户命令 ⇒ 新批次就开在了未封口的
+    // WAL 上，造出 `BEGIN₁ …(未封口) BEGIN₂ … COMMIT₂` 这种"已提交批次**嵌套**在未提交批次里"
+    // 的形状。下一轮恢复的配对记账会因此把**已提交那一批**也回滚掉（静默撤销上一轮成功的安装）。
+    // fail-closed：点名原因、让用户先处理那个撤不掉的路径，再用 `lpkg rec` 重试 —— 宁可拒绝
+    // 执行，也不把"已提交批次被连带回滚"的风险留给下一轮。
+    if (wal_has_unpaired_batch()) {
+        throw LpkgException(get_string("error.wal_unpaired_batch_blocks_new_batch"));
+    }
+
     auto& cache = Cache::instance();
     std::vector<std::string> successfully_installed;
 

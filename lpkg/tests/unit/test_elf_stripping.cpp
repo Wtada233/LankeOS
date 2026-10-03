@@ -946,7 +946,7 @@ TEST_F(StripTest, ArchiveWithUnmappableIndexIsLeftUntouchedRatherThanMisindexed)
 
     std::string error_msg;
     EXPECT_FALSE(strip_file(archive_file, error_msg)) << "索引条目指不到成员头 ⇒ 不该重写";
-    EXPECT_NE(error_msg.find("/"), std::string::npos)
+    EXPECT_NE(error_msg.find('/'), std::string::npos)
         << "拒绝必须点名是哪张索引（报错要能定位），实际: " << error_msg;
 
     std::ifstream rf(archive_file, std::ios::binary);
@@ -1257,7 +1257,7 @@ TEST_F(StripTest, ArchiveWithGroupObjects)
 }
 
 // ============================================================================
-// 畸形 ELF 的边界/计数校验（TODO.md X1）
+// 畸形 ELF 的边界/计数校验（历史 TODO.md X1）
 //
 // strip 处理的是**上游构建产物**（不可信输入）。修复前的三处缺陷都实测过：
 //   ① `memcpy(output, input, min(headers_size, input.size()))` 只按输入大小夹紧，
@@ -1716,4 +1716,140 @@ TEST_F(CraftedElfTest, ForeignEndianElfIsRefusedNotCorrupted)
     EXPECT_FALSE(strip_file(test_file, error_msg))
         << "非本机端序的 ELF 必须被拒绝，而不是被写成混合端序";
     EXPECT_FALSE(error_msg.empty()) << "拒绝时应当给出原因";
+}
+
+// ============================================================================
+// “输入可控的尺寸进分配但没有上界”（2026-10-03 修）—— 两条同族缺陷
+//
+//   A. ar 成员**自报**尺寸（`archive_entry_size`）无上界：它来自归档头、是不可信输入
+//      （ar 的 size 字段是 10 位十进制，上限约 9.3 GiB）。libarchive 对“成员头合法、成员体被
+//      截断”的归档**第一次 `archive_read_next_header` 就返回 OK**，于是旧实现
+//      `std::vector<uint8_t> data(size)` 会按那个自报值分配并逐字节清零 —— 一个几十字节的
+//      文件就能触发上 GiB 分配。上界取**结构性**的那一个：成员数据不可能大于整个归档文件。
+//   B. ET_REL 产物/中间量无**聚合**上界：逐节区守卫只判“单个节区落在文件内”，挡不住多个
+//      节区指向输入里同一片数据、各自声明 ~input_size（`owned_data` 与 `elf_update` 各拷贝
+//      一份 ⇒ 峰值 ~input²/128）。判据与 ET_EXEC/ET_DYN 那条同源：strip 只删节区 ⇒ 产物
+//      不可能大于输入。
+// ============================================================================
+
+TEST_F(StripTest, ArMemberDeclaredSizeBeyondArchiveIsRefusedBeforeAllocation)
+{
+    // **回归（2026-10-03）**：ar 头里的 size 是**归档自报**的不可信值。旧实现用
+    // `const size_t size = archive_entry_size(entry); std::vector<uint8_t> data(size);`
+    // 直接按它分配 —— 而 libarchive 对“成员头合法、成员体被截断”的归档第一次
+    // `archive_read_next_header` 就返回 OK，于是这个 **~70 字节**的文件会触发 ~9.3 GiB 分配
+    // （实测症状：OOM / `std::bad_alloc`）。修复后必须在**分配之前**用结构性上界拒掉。
+    //
+    // ⚠️ `9999999999` 是 ar 的 size 字段能放下的最大值（10 位十进制）。修复前的运行会真的去
+    // 分配它 —— 那正是本条要钉的缺陷；修复后判据在分配之前命中，不会真的分配。
+    std::string ar = "!<arch>\n";
+    std::string hdr(60, ' ');
+    std::memcpy(hdr.data(), "a.o", 3);
+    std::memcpy(hdr.data() + 48, "9999999999", 10);  // size 字段：声称 ~9.3 GiB
+    hdr[58] = '`';
+    hdr[59] = '\n';
+    ar += hdr;
+    ar += "short";  // 成员体故意远小于自报尺寸（归档被截断）
+
+    const fs::path archive_file = test_file.string() + "_liar.a";
+    write_file(archive_file, ar);
+    ASSERT_LT(fs::file_size(archive_file), 100u) << "前置条件：归档必须很小";
+
+    std::string error_msg;
+    bool result = true;
+    EXPECT_NO_THROW({ result = strip_file(archive_file, error_msg); })
+        << "畸形尺寸必须在**分配之前**判掉，而不是先按它分配（修前会 bad_alloc / OOM）";
+    EXPECT_FALSE(result) << "自报尺寸大于整个归档 ⇒ 必须判失败";
+    EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
+
+    // 拒绝时不动原文件（与相邻早退一致）
+    std::ifstream rf(archive_file, std::ios::binary);
+    const std::string now((std::istreambuf_iterator<char>(rf)), std::istreambuf_iterator<char>());
+    EXPECT_EQ(now, ar) << "拒绝时不许改写原归档";
+
+    std::error_code ec;
+    fs::remove(archive_file, ec);
+    fs::remove(archive_file.string() + ".tmp", ec);
+}
+
+namespace
+{
+/**
+ * 写一个最小 ET_REL：一个 `.shstrtab` + 一组由 `(sh_offset, sh_size)` 给定的 SHT_PROGBITS
+ * 节区（外加 null 节区）。带**真实**的 `.shstrtab` 是为了让 `e_shstrndx` 有有效值 ——
+ * 与真实 gcc `.o` 同形，避免走到 libelf 对"名表索引指向非 strtab"的行为上去。
+ */
+void write_crafted_rel(const fs::path& p, const std::vector<std::pair<uint64_t, uint64_t>>& secs,
+                       size_t file_size)
+{
+    constexpr uint64_t kNamesOff = 64;
+    const char kNames[] = "\0.shstrtab";  // [0]=NUL（空名的 offset 0），[1]=".shstrtab"
+    constexpr uint64_t kNamesLen = sizeof(kNames);
+    constexpr uint64_t kShdrOff = 128;
+
+    std::vector<uint8_t> buf(file_size, 0);
+    Elf64_Ehdr ehdr{};
+    std::memcpy(ehdr.e_ident, ELFMAG, SELFMAG);
+    ehdr.e_ident[EI_CLASS] = ELFCLASS64;
+    ehdr.e_ident[EI_DATA] = ELFDATA2LSB;
+    ehdr.e_ident[EI_VERSION] = EV_CURRENT;
+    ehdr.e_type = ET_REL;
+    ehdr.e_machine = EM_X86_64;
+    ehdr.e_version = EV_CURRENT;
+    ehdr.e_ehsize = sizeof(Elf64_Ehdr);
+    ehdr.e_shoff = kShdrOff;
+    ehdr.e_shnum = static_cast<uint16_t>(secs.size() + 2);  // null + .shstrtab + secs
+    ehdr.e_shentsize = sizeof(Elf64_Shdr);
+    ehdr.e_shstrndx = 1;  // 指向 .shstrtab
+    std::memcpy(buf.data(), &ehdr, sizeof(ehdr));
+    std::memcpy(buf.data() + kNamesOff, kNames, kNamesLen);
+
+    std::vector<Elf64_Shdr> sh(secs.size() + 2);  // [0] = null 节区
+    sh[1].sh_name = 1;                            // ".shstrtab"
+    sh[1].sh_type = SHT_STRTAB;
+    sh[1].sh_offset = kNamesOff;
+    sh[1].sh_size = kNamesLen;
+    sh[1].sh_addralign = 1;
+    for (size_t i = 0; i < secs.size(); ++i) {
+        sh[i + 2].sh_type = SHT_PROGBITS;
+        sh[i + 2].sh_offset = secs[i].first;
+        sh[i + 2].sh_size = secs[i].second;
+    }
+    std::memcpy(buf.data() + kShdrOff, sh.data(), sh.size() * sizeof(Elf64_Shdr));
+
+    std::ofstream f(p, std::ios::binary | std::ios::trunc);
+    f.write(reinterpret_cast<const char*>(buf.data()), static_cast<std::streamsize>(buf.size()));
+}
+}  // namespace
+
+TEST_F(CraftedElfTest, RelSectionsWithinFileStillStrip)
+{
+    // **正向对照**：两个各 128 字节、数据都落在文件内的节区，尺寸之和 256 ≤ 512 ⇒ 必须照常
+    // strip。它证明下面那条聚合判据只挡“超过输入大小”的形态，不会把正常 ELF 拒掉；同时它也给
+    // “本套 crafted-ET_REL 夹具确实能走到 elf_update 并成功”留一条可观察证据。
+    write_crafted_rel(test_file, {{0, 128}, {256, 128}}, 512);
+
+    std::string error_msg;
+    EXPECT_TRUE(strip_file(test_file, error_msg)) << "正常形态必须照常 strip: " << error_msg;
+    EXPECT_TRUE(fs::exists(test_file));
+    EXPECT_GT(fs::file_size(test_file), 0);
+}
+
+TEST_F(CraftedElfTest, RelOverlappingSectionsAggregateBeyondFileIsRejected)
+{
+    // **回归（2026-10-03）**：ET_REL 的逐节区守卫只判“每个节区落在文件内”，挡不住**多个节区
+    // 指向输入里同一片数据、各自声明 ~input_size** 的形态：`strip_elf_rel_object` 会为每个这样
+    // 的节区复制一份自有缓冲（`owned_data`），`elf_update` 再各布局一份 ⇒ 峰值 ~input²/128
+    // （实测：223 KB 输入 → 167 MB 输出；节区数越多放大越狠）。
+    // 判据 = “被保留、带数据的节区尺寸之和 ≤ 输入大小”（与 ET_EXEC/ET_DYN 那条**同源**：
+    // strip 只删节区 ⇒ 产物不可能大于输入）。本用例用 ~512 字节的输入、2 个各 512 字节的节区
+    // （都指向偏移 0，逐节区守卫刚好全过）——量级刻意取小：判据若被改坏，测试只会**失败**，
+    // 不会把跑测试的机器打爆（修前这里产出约 1 KiB，远不是天文数字）。
+    write_crafted_rel(test_file, {{0, 512}, {0, 512}}, 512);
+
+    std::string error_msg;
+    EXPECT_FALSE(strip_file(test_file, error_msg))
+        << "两个各占满整个文件（且指向同一片）的节区，尺寸之和 1024 > 512 ⇒ 必须拒绝";
+    EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
+    EXPECT_EQ(fs::file_size(test_file), 512u) << "拒绝时不许改写原文件";
 }

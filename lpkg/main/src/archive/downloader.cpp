@@ -183,7 +183,7 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
     }
 
     // 本地写盘错误（磁盘满/EIO）只会在 flush/close 时暴露：不检查就会留下被静默
-    // 截断的文件，而 download_with_retries 会把它当成"下载成功"（TODO.md B4）。
+    // 截断的文件，而 download_with_retries 会把它当成"下载成功"（历史 TODO.md B4）。
     ofile.flush();
     if (!ofile) {
         throw LpkgException(string_format("error.create_file_failed", output_path.string()));

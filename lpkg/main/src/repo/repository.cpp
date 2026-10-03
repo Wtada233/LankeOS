@@ -24,7 +24,7 @@
  * （`"cmake >= 3.20, < 4.0"` 是一个依赖，见 tests/integration/test_build_deps.cpp）。
  * 所以拆开后，以操作符开头的片段是上一条的续接（"< 4.0"），必须合回上一条——
  * 否则它会变成空名依赖，在 libsolv 里是 ID_EMPTY：不解析也不报错，求解静默产出
- * 空事务，用户看到"所有包都已安装"却没装任何东西（TODO.md D2）。
+ * 空事务，用户看到"所有包都已安装"却没装任何东西（历史 TODO.md D2）。
  *
  * 判断依据是"片段是否以比较操作符开头"——依赖名不可能这样开头。
  */
@@ -169,7 +169,7 @@ void Repository::load_index()
     std::ifstream file(*index_path);
     if (!file.is_open()) {
         // 文件"存在"但打不开此前完全静默：解析出 0 个包 → 上层会报告"所有包都已是最新版本"，
-        // 用户以为没事（TODO D4）。
+        // 用户以为没事（历史 TODO D4）。
         //
         // ⚠️ **实测订正 2026-09-26：这条分支几乎不可达，别指望它兜住"索引是目录/损坏"**。
         //    · "**竟是个目录**"不成立 —— Linux 上 `std::ifstream` **打开目录是成功的**（失败的
@@ -196,7 +196,7 @@ void Repository::load_index()
     }
 
     // 解析出 0 个包（空文件/半截下载/全是被跳过的坏行）必须告警：否则上游会把
-    // "仓库为空"读成"一切正常"，`lpkg upgrade` 直接打印"所有包都已是最新版本"（TODO D4）
+    // "仓库为空"读成"一切正常"，`lpkg upgrade` 直接打印"所有包都已是最新版本"（历史 TODO D4）
     if (packages_.empty()) {
         log_warning(string_format("warning.repo_index_empty", index_path->string()));
     }

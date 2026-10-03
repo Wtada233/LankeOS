@@ -132,7 +132,7 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
     plan[pkg_info->name] = {pkg_info->name, pkg_info->version, already, deps};
 
     // 曾在此处对"已安装的中间节点"直接 return、不再展开 → 它背后**未安装**的依赖
-    // 不会出现在 `depend install` 的树里，"将要装什么"因此不准（TODO G3）。
+    // 不会出现在 `depend install` 的树里，"将要装什么"因此不准（历史 TODO G3）。
     // visited 已保证无环，继续展开即可。
 
     for (const auto& dep : deps) {
@@ -365,7 +365,7 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
     // `warning.repo_index_load_failed`）。
     const std::vector<std::string> repo_names = repo_package_names();
     // 存在性判定：**仓库索引里有，或图上出现过**（并集，严格比"只看反向依赖表"宽松）。
-    // 只看反向依赖表时，没有任何依赖者的包会被误报成 "not found in repository"（TODO G2）；
+    // 只看反向依赖表时，没有任何依赖者的包会被误报成 "not found in repository"（历史 TODO G2）；
     // 保留图上判定则覆盖索引读不到/被裁剪的场景，两者都不放过。
     if (std::ranges::find(repo_names, pkg_name) == repo_names.end() &&
         rev.find(pkg_name) == rev.end()) {
@@ -397,7 +397,7 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
 
     // show_all：与 build_install_tree 的 show_all 同义——不只显示受影响节点，
     // 把其余仓库包也作为"不受影响"列出（此前该形参被丢弃，`depend remove --all`
-    // 与不带 --all 完全一样，TODO G2）
+    // 与不带 --all 完全一样，历史 TODO G2）
     if (show_all) {
         for (const auto& name : repo_names) {
             if (already_shown.contains(name)) continue;

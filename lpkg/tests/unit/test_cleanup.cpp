@@ -86,11 +86,6 @@ protected:
         std::ofstream f(p);
         f << content;
     }
-
-    bool file_exists(const std::string& path)
-    {
-        return fs::exists(test_root / path);
-    }
 };
 
 // ============================================================================

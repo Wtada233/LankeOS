@@ -245,6 +245,9 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
     std::vector<SectionInfo> to_keep;
     Elf_Scn* scn = nullptr;
     size_t new_idx = 1;
+    // 被保留、且**带数据**的节区的累计字节数 —— 下面对每个这样的节区各复制一份自有缓冲
+    // （`owned_data`），`elf_update` 还会再按 `sh_size` 布局输出。封顶判据在下面 `keep` 分支里。
+    size_t retained_data_total = 0;
 
     while ((scn = elf_nextscn(in_elf, scn)) != nullptr) {
         size_t old_idx = elf_ndxscn(scn);
@@ -286,6 +289,24 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
             return false;
         }
         if (keep) {
+            // **聚合量级封顶（2026-10-03 修）**：上面的 `sh_offset`/`sh_size` 守卫只**逐节区**
+            // 判"落在文件内"，挡不住**多个节区指向输入里同一片数据**、各自声明 ~input_size 的
+            // 形态 —— k 个这样的节区让下面的 `owned_data.emplace_back` 与 `elf_update` 各拷贝
+            // k 份 ⇒ 峰值 ~input²/128（实测：**223 KB** 的输入产出 **167 MB** 输出）。
+            //
+            // 判据与 `strip_elf_exec_dyn` 那条**是同一个不变量**（那边是
+            // `e_shoff + e_shnum*shentsize > input_data.size()` 的封顶）：**strip 只删节区 ⇒
+            // 产物不可能大于输入**；而良构 ELF 里各节区数据是输入文件内**互不重叠**的子区间，
+            // 所以"被保留、且带数据的节区尺寸之和"也必然 ≤ 输入大小。SHT_NOBITS 无数据、不计。
+            // 用减法判越界：上面的逐节区守卫已保证每个 `sh_size <= input_size`，且
+            // `retained_data_total` 恒 ≤ input_size ⇒ 这个减法不回绕。
+            if (shdr.sh_type != SHT_NOBITS) {
+                if (shdr.sh_size > input_size - retained_data_total) {
+                    error_msg = get_string("error.strip_malformed_elf");
+                    return false;
+                }
+                retained_data_total += shdr.sh_size;
+            }
             to_keep.push_back({scn, shdr, name, old_idx});
             idx_map[old_idx] = new_idx++;
         }
@@ -728,6 +749,14 @@ bool process_elf(const fs::path& path, std::string& error_msg)
         return false;
     }
     std::streamsize size = is.tellg();
+    // `tellg()` 失败返回 **-1**，而 `std::vector<uint8_t> buffer(size)` 会把它当
+    // `size_t` 用一个天文数字去分配（bad_alloc / OOM）—— 同"输入可控尺寸进分配"那一族
+    // （见本文件 `ar_member_declared_size_ok` 与 ET_REL 的聚合封顶）。这里来源是本机已存在
+    // 文件的元数据、不是归档自报的不可信值，可达性低，但守卫同样只值一行。
+    if (size < 0) {
+        error_msg = string_format("error.file_read_failed", path.string());
+        return false;
+    }
     is.seekg(0, std::ios::beg);
 
     std::vector<uint8_t> buffer(size);
@@ -759,6 +788,29 @@ bool process_elf(const fs::path& path, std::string& error_msg)
         return false;
     }
     return true;
+}
+
+/**
+ * ar 成员**自报**尺寸的合法性判据（`archive_strip_scan` 与 `process_archive` **共用同一份**，
+ * 别在两处各写一遍条件 —— 本仓库明文禁止第二份实现）。
+ *
+ * `archive_entry_size()` 返回 `la_int64_t`，是**归档自报**的不可信值（ar 头里的 size 字段是
+ * 10 位十进制，上限约 9.3 GiB）。libarchive 对"成员头合法、成员体被截断"的归档**第一次
+ * `archive_read_next_header` 就返回 OK**，于是紧随其后的 `std::vector<uint8_t> data(size)`
+ * 会按那个自报值分配并逐字节清零 —— 一个 **约 72 字节**的文件就能触发 ~9.3 GiB 分配
+ * （实测症状：OOM / `std::bad_alloc`）。**必须在分配之前**判掉。
+ *
+ * 上界取**结构性**的那一个：成员数据不可能大于整个归档文件本身 —— 所以调用方在进循环前
+ * `fs::file_size` 取一次传进来，判据里不含任何魔数。**绝不能**复用
+ * `constants::ARCHIVE_MEMBER_MAX_SIZE`（那是给 `metadata.json` 的 16 MiB）：静态库几百 MB
+ * 完全合法，用那个常量会把正常的 `.a` 整库拒掉。
+ *
+ * 返回 false = 尺寸不可信（负数/未知，或大于归档文件本身）。
+ */
+static bool ar_member_declared_size_ok(la_int64_t declared, uint64_t archive_size)
+{
+    if (declared < 0) return false;
+    return static_cast<uint64_t>(declared) <= archive_size;
 }
 
 /**
@@ -796,6 +848,15 @@ static int archive_strip_scan(const fs::path& path, std::string& error_msg,
         error_msg = get_string("error.strip_archive_open");
         return -1;
     }
+    // 成员自报尺寸的封顶值（= 归档文件本身的大小）。取一次，供循环里逐成员判 —— 判据与
+    // `process_archive` 共用 `ar_member_declared_size_ok`。
+    std::error_code size_ec;
+    const uint64_t archive_size = fs::file_size(path, size_ec);
+    if (size_ec) {  // 刚打开成功却 stat 不到：保守地当失败，绝不无条件分配
+        archive_read_free(a);
+        error_msg = get_string("error.strip_archive_open");
+        return -1;
+    }
     int result = 0;
     struct archive_entry* entry;
     while (true) {
@@ -815,7 +876,14 @@ static int archive_strip_scan(const fs::path& path, std::string& error_msg,
             result = -1;  // 写不出来 → 整个库放弃（有意，不告警：见函数注释）
             break;
         }
-        const size_t size = archive_entry_size(entry);
+        // 归档自报尺寸是**不可信输入**：先在分配之前判掉（见 `ar_member_declared_size_ok`）。
+        const la_int64_t declared = archive_entry_size(entry);
+        if (!ar_member_declared_size_ok(declared, archive_size)) {
+            error_msg = get_string("error.strip_archive_broken");
+            result = -1;
+            break;
+        }
+        const size_t size = static_cast<size_t>(declared);
         std::vector<uint8_t> data(size);
         const ssize_t got = archive_read_data(a, data.data(), size);
         if (got < 0 || static_cast<size_t>(got) != size) {
@@ -1091,6 +1159,15 @@ bool process_archive(const fs::path& path, std::string& error_msg)
     if (scan < 0) return false;
     const bool index_invalid = (scan == 1) || has_long_name_table;
 
+    // 成员自报尺寸的封顶值（= 归档文件本身的大小）。与 `archive_strip_scan` 用**同一个**
+    // `ar_member_declared_size_ok`（别在这里另写一份魔数/条件）。
+    std::error_code size_ec;
+    const uint64_t archive_size = fs::file_size(path, size_ec);
+    if (size_ec) {
+        error_msg = get_string("error.strip_archive_open");
+        return false;
+    }
+
     // 索引的处置（见上面"归档符号索引"那段）。映射必须在**写之前**算出来：索引成员占着
     // 输出归档的**第一个**位置（bfd 只看首成员的名字决定读哪张索引表），收工再反悔就得把
     // 整份归档挪位。原归档的线性布局只读 60 字节头，很便宜。
@@ -1241,7 +1318,12 @@ bool process_archive(const fs::path& path, std::string& error_msg)
             archive_read_data_skip(a);
             continue;
         }
-        const size_t size = archive_entry_size(entry);
+        // 同上：归档自报尺寸不可信，先在分配之前判掉（共用的 `ar_member_declared_size_ok`）。
+        // 走到这里通常已由 `archive_strip_scan` / `scan_ar_raw_layout` 挡过一遍，这里是**纵深
+        // 防御** —— 分配点只该信结构性上界，不该依赖上游判据的完备性。
+        const la_int64_t declared = archive_entry_size(entry);
+        if (!ar_member_declared_size_ok(declared, archive_size)) return bail();
+        const size_t size = static_cast<size_t>(declared);
         std::vector<uint8_t> data(size);
 
         const ssize_t bytes_read = archive_read_data(a, data.data(), size);

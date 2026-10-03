@@ -288,16 +288,18 @@ TEST_F(RegressionFixTest, RemoveCleansNeededSoReverseDeps)
 // query_file：root 前缀兄弟路径不误判（冒烟测试，不崩溃）
 // ============================================================================
 
-TEST_F(RegressionFixTest, QueryFileSiblingPrefixDoesNotThrow)
+TEST_F(RegressionFixTest, QueryFileSiblingPrefixIsNotMistakenForOwned)
 {
     auto p = create_pkg("fxq_a", "1.0");
     install_packages({p});
 
-    // 根内绝对路径正常
+    // 根内绝对路径正常：**已安装**的文件照常查得到，不抛
     EXPECT_NO_THROW(query_file((test_root / "usr" / "bin" / "fxq_a").string()));
-    // root 前缀匹配但实际在外的路径（rootE/...）不崩溃、不误归因
+    // root 前缀匹配但实际在外的路径（rootE/...）**既不能误归因**，也必须**出声**：
+    // 2026-10-03 起 `query <文件>` 查不到属主与 `query -p <未安装>` 口径统一 —— 抛
+    // `LpkgException`（退出码 1），不再是"打条 info 然后退 0"。
     const std::string evil = test_root.string() + "E/usr/bin/fxq_a";
-    EXPECT_NO_THROW(query_file(evil));
+    EXPECT_THROW(query_file(evil), LpkgException);
 }
 
 // ============================================================================

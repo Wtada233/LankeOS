@@ -10,9 +10,8 @@
  * 自定义触发器：文件路径正则匹配 -> 执行命令
  */
 struct CustomTrigger {
-    std::regex pattern;       // 文件路径匹配正则
-    std::string command;      // 匹配后执行的命令
-    std::string pattern_str;  // 正则表达式的字符串形式（用于调试/日志）
+    std::regex pattern;   // 文件路径匹配正则
+    std::string command;  // 匹配后执行的命令
 };
 
 /**

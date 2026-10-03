@@ -49,7 +49,7 @@ enum class WALOpType {
     // 解析失败/未知类型。**必须留在首位**：WALOp 默认构造即 INVALID，任何未被成功解析的
     // 行都是"惰性"的，扫描方只需 is_valid() 一处判断。曾经用 `type=BEGIN_PKGS` 当哨兵 +
     // `arg1="__INVALID__"` 字符串标记，导致破损行在"找最后一个 BEGIN_PKGS"的反向扫描里
-    // 冒充真实批次起点，整批回滚静默失效（见 TODO.md A2）。
+    // 冒充真实批次起点，整批回滚静默失效（见 历史 TODO.md A2）。
     INVALID,
 
     // 批次边界
@@ -290,8 +290,8 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path);
  * @return true = 确实回滚了（批次已由 COMMIT_PKGS 收尾，DB 备份已被消费，可以安全清理）；
  *         false = 无可回滚的行（WAL 里没有未完成批次，如尾部破损行导致 ops 为空）——
  *         此时**批次仍开着、DB 备份还没被消费**，调用方必须保留它们交给下次 rec 续传，
- *         绝不能 cleanup_db_backups()（否则文件能还原而 DB 永远还原不回来，见 TODO.md A2/A3）。
- *         ⚠️ 返回 true **不代表回滚完整** —— `stats.failures > 0` 时批次照样被封口，
+ *         绝不能 cleanup_db_backups()（否则文件能还原而 DB 永远还原不回来，见 历史 TODO.md
+ * A2/A3）。 ⚠️ 返回 true **不代表回滚完整** —— `stats.failures > 0` 时批次照样被封口，
  *         但调用方应当保留 DB 备份（那是唯一还能重试的还原点）。
  */
 bool batch_rollback(const std::vector<std::string>& successfully_installed,
@@ -312,7 +312,7 @@ std::filesystem::path stash_root_of_bak(const std::filesystem::path& bak);
  * WAL 当前仍引用到的 stash 根集合（BACKUP/REMOVE_OLD 的 dst、CLEANUP 的 arg1）。
  * `cleanup_orphan_stashes()` **必须**跳过这些：它们是回滚/续传的数据来源，而 stash 落在
  * 文件系统顶层（= root_dir 的直接子目录）正是 reaper 的扫描范围，被延迟处理的未提交批次
- * 其 pid 又必然已死 —— 不排除就会在同一次启动里被回收（TODO.md Z5）。
+ * 其 pid 又必然已死 —— 不排除就会在同一次启动里被回收（历史 TODO.md Z5）。
  */
 std::set<std::filesystem::path> referenced_stash_roots();
 

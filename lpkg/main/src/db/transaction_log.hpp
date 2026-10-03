@@ -62,10 +62,6 @@ public:
     /// 失败时静默返回
     void log_no_fsync(std::string_view line);
 
-    /// 对 WAL 文件执行 fsync（`log()` 已逐行 fsync；此接口留给"批量写 + 一次 fsync"
-    /// 的调用方，以及需要额外一次 bar 的场合）
-    void fsync_wal();
-
     /// 获取当前写入的行数
     size_t lines_written() const
     {

@@ -79,7 +79,7 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version, bo
 {
     // 包名来自**不可信来源**（远端索引 / .lpkg 内的 metadata.json），而它会被当成路径
     // 分量拼进 tmp_pkg_dir()、dep_dir()、needed_so_dir()、docs_dir()、hooks_dir()
-    // —— 一个 `../` 就能以 root 写到这些目录之外（TODO.md X4）。此处在唯一的构造入口挡住。
+    // —— 一个 `../` 就能以 root 写到这些目录之外（历史 TODO.md X4）。此处在唯一的构造入口挡住。
     if (!is_safe_path_component(pkg_name_)) {
         throw LpkgException(
             string_format("error.unsafe_path_component", "package name", pkg_name_));
@@ -261,7 +261,7 @@ void InstallationTask::download_and_verify_package()
     }
 
     // 版本号同样不可信（CLI `pkg:版本` 或远端索引），它会被拼进下载落点与
-    // `tmp_pkg_dir_ / (版本 + ".lpkg")` —— 含 `../` 即可写到临时目录之外（TODO.md X4）。
+    // `tmp_pkg_dir_ / (版本 + ".lpkg")` —— 含 `../` 即可写到临时目录之外（历史 TODO.md X4）。
     if (!is_safe_path_component(actual_version_)) {
         throw LpkgException(
             string_format("error.unsafe_path_component", "version", actual_version_));
@@ -603,7 +603,7 @@ bool dir_tree_entirely_ours(
  *
  *   ① 自持短路：该路径由**本包**持有 → 不判冲突（重装 / 升级自己）；
  *   ② `ours` 豁免是**方向性**的：只豁免"归档**目录**条目接管本包旧版本的**文件/符号链接**"
- *      （文件→目录升级，TODO E4）；反方向 dir→文件 **永不**豁免。
+ *      （文件→目录升级，历史 TODO E4）；反方向 dir→文件 **永不**豁免。
  *
  *      理由**不是**"pacman 也不允许"（订正 2026-09-25，原文如此写、引证错层）：pacman 的
  *      **冲突层**其实允许它 —— `conflict.c` 的 `_alpm_db_find_fileconflicts` 里有
@@ -647,7 +647,7 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
         //   归档是目录 `x/`、盘上是文件/符号链接 → 不能"搬走它再建目录"（实测事故：把
         //     filesystem 的 `/var/run -> ../run` 换成实体目录）
         //   归档是文件 `x`、盘上是真目录     → 永不覆盖（pacman："not overwriting dir with file"）
-        // 例外：该路径由**本包**以另一形态持有（文件→目录升级，TODO E4）→ 照旧接管。
+        // 例外：该路径由**本包**以另一形态持有（文件→目录升级，历史 TODO E4）→ 照旧接管。
         {
             const PathProbe disk = view.probe(bare);
             if (disk.exists && disk.is_dir != path_str.ends_with('/')) {
@@ -970,7 +970,7 @@ void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
             // 还有别的持有者 → 文件不搬走（REMOVE_OLD 的 `!owners.empty()` 分支）
             if (!owners[old_key].empty()) continue;
             const std::string bare = strip_trailing_slash(old_key);
-            // 新版本把它变成了**目录**（文件→目录升级，TODO E4）：文件不消失、也不搬 stash
+            // 新版本把它变成了**目录**（文件→目录升级，历史 TODO E4）：文件不消失、也不搬 stash
             if (new_keys.contains(bare + "/")) continue;
             const PathProbe disk = probe_now(bare);
             if (disk.exists && !disk.is_dir) released.insert(bare);

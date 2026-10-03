@@ -78,12 +78,6 @@ protected:
         f << content;
     }
 
-    /// 检查文件是否存在
-    bool file_exists(const std::string& path)
-    {
-        return fs::exists(test_root / path);
-    }
-
     /// 读取文件内容
     std::string read_file(const std::string& path)
     {

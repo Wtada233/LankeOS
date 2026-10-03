@@ -34,7 +34,7 @@ WalWriter::WalWriter()
     fd_ = ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, constants::PERM_WAL_LOG);
     if (fd_ < 0) throw LpkgException(string_format("error.wal_open_failed", path));
     // 新建/首次打开后 fsync 父目录：否则断电可能只丢了目录项——已经 fsync 过的 WAL 行
-    // （描述了文件系统改动）变得不可达，回滚依据随之消失（I-FSYNC-3，TODO.md X7）。
+    // （描述了文件系统改动）变得不可达，回滚依据随之消失（I-FSYNC-3，历史 TODO.md X7）。
     //
     // **必须恒生效**（所以套守卫，不受默认关闭的 durable_fsync_enabled() 影响）：
     // POSIX 下 fsync(文件) 不覆盖父目录的 dentry，于是"WAL 行已 fsync、文件整个不存在"
@@ -88,11 +88,6 @@ void WalWriter::log_no_fsync(std::string_view line)
     if (::write(fd_, l.data(), l.size()) != static_cast<ssize_t>(l.size()))
         throw LpkgException(string_format("error.wal_write_failed", wal_log_path()));
     ++lines_;
-}
-
-void WalWriter::fsync_wal()
-{
-    if (fd_ >= 0) ::fsync(fd_);
 }
 
 // ============================================================================

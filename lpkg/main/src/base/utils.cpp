@@ -289,7 +289,7 @@ DBLock::DBLock()
     ensure_dir_exists(Config::instance().lock_dir());
     // O_CLOEXEC：锁是 flock 在 open file description 上的，fork/exec 的子进程若继承
     // 这个 fd，就会在 lpkg 退出后继续持有锁 → 之后每次 lpkg 都报 "database is locked"，
-    // 而现场没有任何 lpkg 在跑（构建/hook 起的长命子进程是常见来源，TODO.md C3）。
+    // 而现场没有任何 lpkg 在跑（构建/hook 起的长命子进程是常见来源，历史 TODO.md C3）。
     lock_fd = open(Config::instance().lock_file().c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0644);
     if (lock_fd < 0) {
         throw LpkgException(
@@ -1029,7 +1029,7 @@ void cleanup_tmp_dirs()
 }
 
 /**
- * 回收孤儿备份 stash（TODO.md §5）：崩溃/续传没清掉的
+ * 回收孤儿备份 stash（历史 TODO.md §5）：崩溃/续传没清掉的
  * `<fsroot>/.lpkg_bak_<pkg>_<pid>`。扫描范围有界：root_dir 顶层 + 顶层子目录里
  * st_dev 与 root_dir 不同的（= 子挂载点）的直接子目录。pid 已死（kill ESRCH）才删，
  * 绝不碰自己/存活进程的 stash。stash 正常由 CLEANUP 清除，本函数只是兜底安全网。

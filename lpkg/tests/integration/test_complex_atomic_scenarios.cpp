@@ -1,7 +1,7 @@
 /**
  * test_complex_atomic_scenarios.cpp — 复杂真实场景原子性测试
  *
- * 严格按 TODO.md 要求：
+ * 严格按 历史 TODO.md 要求：
  *   - remove -r 中途回滚（模拟 Ctrl+C / 断电）
  *   - 批量安装本地包（其中一个依赖另一个）
  *   - 升级 needed_so 断裂后回滚
@@ -34,15 +34,6 @@ protected:
         std::ofstream f(wpath, std::ios::trunc);
         f << content;
         f.close();
-    }
-
-    /// 创建带特定 needed_so 的包
-    std::string create_pkg_with_so(const std::string& name, const std::string& version,
-                                   const std::vector<std::string>& deps = {},
-                                   const std::vector<std::string>& provides = {},
-                                   const std::vector<std::string>& needed_so = {})
-    {
-        return create_pkg(name, version, deps, provides, needed_so);
     }
 };
 

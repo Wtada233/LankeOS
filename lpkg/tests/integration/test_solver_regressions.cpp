@@ -1,5 +1,5 @@
 /**
- * test_solver_regressions.cpp — 求解 / 包管理行为的回归（TODO.md D3/E1/E2/E3/F1/F2）
+ * test_solver_regressions.cpp — 求解 / 包管理行为的回归（历史 TODO.md D3/E1/E2/E3/F1/F2）
  *
  * 每条都对应一个"命令照打就中、且结果是静默错误"的缺陷：
  *   D3 目标没进计划 → 曾打印"所有包都已安装"并 exit 0（实际什么都没装）
@@ -391,7 +391,7 @@ TEST_F(SolverRegressionTest, MultiPackageRemoveRollsBackAllWhenInterrupted)
 //
 // 旧实现：逐个跑 removal_allowed()，被拒的那几个 `continue` 掉、**其余照删**，删完才因
 // refused 抛错 —— 落点是"部分包已删 + 非零退出码"。而非零退出码对脚本/farm 的含义是
-// "什么都没发生"（TODO G4 就是为这个语义加的），盘面却已经少了几个包。
+// "什么都没发生"（历史 TODO G4 就是为这个语义加的），盘面却已经少了几个包。
 // pacman 的 `-R a b` 是整个列表先检完，任一不通过即中止、一个都不删。
 // ============================================================================
 
@@ -432,7 +432,7 @@ TEST_F(SolverRegressionTest, MultiPackageRemoveRefusedRemovesNothing)
     }
     BreakpointManager::instance().clear_all();
 
-    // 拒绝的理由：CLI 边界（remove_packages）在"被安全检查拒绝"时抛这条（TODO G4）
+    // 拒绝的理由：CLI 边界（remove_packages）在"被安全检查拒绝"时抛这条（历史 TODO G4）
     EXPECT_NE(msg.find(get_string("error.removal_refused")), std::string::npos)
         << "拒绝信息不是'移除被拒'：" << msg;
     EXPECT_FALSE(good_removal_began)

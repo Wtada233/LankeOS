@@ -1,5 +1,5 @@
 /**
- * test_wal_rollback_guards.cpp — 含空格 root 下的批次回滚 + 回滚守卫（TODO.md A1/A2/A3）
+ * test_wal_rollback_guards.cpp — 含空格 root 下的批次回滚 + 回滚守卫（历史 TODO.md A1/A2/A3）
  *
  * 三个真实缺陷的行为级回归：
  *   A1 WAL 非箭头行按空格切 → 路径含空格时 DB 里程碑被截断 → reverse_execute 算出的

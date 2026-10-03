@@ -28,7 +28,6 @@ namespace constants
 // 分隔符字符常量
 inline constexpr std::string_view NL = "\n";
 inline constexpr std::string_view TAB = "\t";
-inline constexpr char TAB_CHAR = '\t';
 inline constexpr char PIPE_CHAR = '|';
 inline constexpr char COMMA_CHAR = ',';
 inline constexpr char COLON_CHAR = ':';
@@ -68,7 +67,6 @@ inline constexpr std::string_view REPO_INDEX_FILE = "index.txt";
 inline constexpr std::string_view REPO_INDEX_TMP = "repo_index.txt";
 inline constexpr std::string_view PROTOCOL_FILE = "file://";
 inline constexpr std::string_view VER_LATEST = "latest";
-inline constexpr std::string_view VER_DEFAULT = "0.0.0";
 inline constexpr std::string_view CURRENT_DIR_PREFIX = "./";
 
 // 内部目录名
@@ -88,7 +86,6 @@ inline constexpr std::string_view LIB = "lib";
 inline constexpr std::string_view LIB64 = "lib64";
 inline constexpr std::string_view INCLUDE = "include";
 inline constexpr std::string_view SHARE_MAN = "share/man";
-inline constexpr std::string_view LIBEXEC = "libexec";
 inline constexpr std::string_view DIR_ETC = "etc/";
 inline constexpr std::string_view DIR_ETC_PREFIX = "/etc/";
 
@@ -163,9 +160,8 @@ inline constexpr std::string_view COLOR_RESET = "\033[0m";
 inline constexpr mode_t PERM_MASK_ALL = 07777;
 inline constexpr mode_t PERM_WAL_LOG = 0644;
 
-// 随机后缀长度与字符集
+// 随机后缀长度（字符集在 `base/utils.cpp` 的 `random_suffix()` 里）
 inline constexpr size_t RANDOM_SUFFIX_LEN = 6;
-inline constexpr std::string_view RANDOM_SUFFIX_CHARS = "0123456789abcdefghijklmnopqrstuvwxyz";
 // 网络下载
 inline constexpr long CURL_CONNECT_TIMEOUT_SEC = 10;
 inline constexpr long CURL_LOW_SPEED_LIMIT_BPS = 100;

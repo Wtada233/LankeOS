@@ -352,13 +352,6 @@ std::unordered_set<std::string> Cache::get_providers(std::string_view capability
     return (it != providers.end()) ? it->second : std::unordered_set<std::string>{};
 }
 
-bool Cache::is_provided_by(std::string_view capability, std::string_view pkg)
-{
-    std::lock_guard<std::mutex> lock(mtx);
-    auto it = providers.find(capability);
-    return it != providers.end() && it->second.contains(std::string(pkg));
-}
-
 void Cache::add_reverse_dep(std::string_view dep, std::string_view pkg)
 {
     std::lock_guard<std::mutex> lock(mtx);

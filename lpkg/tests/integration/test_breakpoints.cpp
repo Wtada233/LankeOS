@@ -39,26 +39,6 @@ protected:
         if (!f.is_open()) return "";
         return {std::istreambuf_iterator<char>(f), std::istreambuf_iterator<char>()};
     }
-
-    /// 移除 WAL 中的 COMMIT_PKGS 行，模拟崩溃
-    void strip_commit_pkgs_from_wal()
-    {
-        auto content = read_wal();
-        auto pos = content.rfind("COMMIT_PKGS");
-        if (pos != std::string::npos) {
-            content = content.substr(0, pos);
-            // 也去掉后面的 \n
-            while (!content.empty() && content.back() == '\n') content.pop_back();
-            content += '\n';
-            write_wal(content);
-        }
-    }
-
-    /// 清空 WAL 模拟写前断电
-    void clear_wal()
-    {
-        write_wal("");
-    }
 };
 
 // ============================================================================
@@ -163,7 +143,7 @@ TEST_F(BreakpointTest, UpgradeCleansLpkgBakAfterSuccess)
 }
 
 // ============================================================================
-// 手工构造: TODO.md §3 各断电点的 WAL 状态
+// 手工构造: 历史 TODO.md §3 各断电点的 WAL 状态
 // ============================================================================
 
 // §3.2: WAL 先于 rename — 原文件还在

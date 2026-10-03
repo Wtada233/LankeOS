@@ -97,12 +97,6 @@ public:
     /// 主入口：执行安装任务，ctx 用于递归依赖发现
     void run(InstallContext* ctx = nullptr);
 
-    /// 外部调用者仍使用旧接口
-    void run_simple()
-    {
-        run(nullptr);
-    }
-
     // --- 元数据验证模式（公开） ---
     /** 下载并校验包（本地 `.lpkg` 直接用给定路径）。成功路径**不打日志**（进度行已点名包）。 */
     void download_and_verify_package();

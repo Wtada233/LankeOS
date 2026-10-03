@@ -11,7 +11,7 @@
  *   · **symlink 一律算「非目录」**："We do not support treating symlinks to directories as
  *     directories. They are considered a file."（pacman-dev）
  *   · 类型不一致（归档目录 vs 盘上非目录、归档文件 vs 盘上真目录）→ **默认判冲突、整批
- *     中止**；只有"该路径由**本包旧版本**以另一形态持有"（文件→目录升级，TODO E4）才放行 ——
+ *     中止**；只有"该路径由**本包旧版本**以另一形态持有"（文件→目录升级，历史 TODO E4）才放行 ——
  *     pacman 的 "Check if the directory was a file in dbpkg"，`fileconflict00x.py` 钉的就是这条。
  *   · 删除侧：symlink 一律 unlink、绝不 rmdir 也不跟随（commit `b1e495b8`）；DB 记为文件键
  *     而盘上已是目录 → 拒绝（`--force` 才跳过，且仍然只跳过、不搬目录）。
@@ -258,7 +258,7 @@ TEST_F(DirEntryOverSymlinkTest, FileEntryOverRealDirIsRefused)
 }
 
 // ============================================================================
-// 安装侧：本包自己旧版本以另一形态持有 → 放行（pacman 的 dbpkg 豁免 = TODO E4）
+// 安装侧：本包自己旧版本以另一形态持有 → 放行（pacman 的 dbpkg 豁免 = 历史 TODO E4）
 // ============================================================================
 
 TEST_F(DirEntryOverSymlinkTest, OwnedFileBecomesDirOnUpgrade)

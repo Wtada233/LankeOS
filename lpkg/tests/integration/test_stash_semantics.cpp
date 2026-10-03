@@ -1,5 +1,5 @@
 /**
- * test_stash_semantics.cpp — stash + DIR_RM 的专属语义测试（TODO.md §6 测试补位）
+ * test_stash_semantics.cpp — stash + DIR_RM 的专属语义测试（历史 TODO.md §6 测试补位）
  *
  * 覆盖（WAL 级 + 行为级）：
  *   1. DIR_RM 行解析（mode/uid/gid）

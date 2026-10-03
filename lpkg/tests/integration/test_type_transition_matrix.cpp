@@ -384,7 +384,7 @@ TEST_F(TypeTransitionMatrixTest, FileToFile)
 }
 
 /**
- * file → dir（TODO E4 的正方向；usr 与 /etc 两腿已分别由 test_dir_entry_over_symlink.cpp /
+ * file → dir（历史 TODO E4 的正方向；usr 与 /etc 两腿已分别由 test_dir_entry_over_symlink.cpp /
  * test_etc_dir_upgrade.cpp 覆盖）。这里补的是**回滚**维度：挡路文件已进 stash、目录已建、
  * 新文件正落位时失败 —— 旧文件必须逐字节回到原位，而不是"目录没了、文件也没了"。
  */

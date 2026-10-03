@@ -94,7 +94,7 @@ void TriggerManager::load_config()
             std::getline(iss >> std::ws, command);
             if (!command.empty()) {
                 try {
-                    custom_triggers.push_back({std::regex(pattern), command, pattern});
+                    custom_triggers.push_back({std::regex(pattern), command});
                 } catch (const std::regex_error& e) {
                     log_warning(string_format("warning.invalid_trigger_regex", pattern.c_str()));
                 }
@@ -194,7 +194,7 @@ void TriggerManager::run_all()
             line.finish(ui::skipped());
         } else {
             // **在目标 root 内**执行：命令里写的是绝对路径（/usr/share/... 等），
-            // 不 chroot 就会打在宿主上、目标 root 反而没更新（TODO F3）
+            // 不 chroot 就会打在宿主上、目标 root 反而没更新（历史 TODO F3）
             const int ret = run_shell_in_root(cmd);
             line.finish(ui::ok(ret == 0));
             if (ret != 0) {

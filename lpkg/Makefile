@@ -204,7 +204,7 @@ coverage:
 # ---- 格式检查 / 就地格式化（2026-09-26 新增）----------------------------------
 # clang-format 在**主机**跑、不进容器：它只读文本，不解析头文件、不链接依赖库，所以没有任何
 # 理由为它把 llvm 拉进 lpkg-builder（容器是 alpine，clang-format 在 clang-extra 里，会带整条
-# llvm 依赖）。全仓当前 **0 残留 / 176 个文件**（clang-format 23.1.2 实测），所以这条是
+# llvm 依赖）。全仓当前 **0 残留 / 197 个文件**（clang-format 23.1.2 实测），所以这条是
 # **可执行的不变量**，而不是"大概干净"。换个大版本可能因换行决策不同而误报 →
 # 可用 `make format-check CLANG_FORMAT=clang-format-18` 指定。
 # 覆盖范围 = lpkg 自己拥有的源码树（main/src + tests）；**不含** main/third_party（别人的

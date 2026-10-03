@@ -140,7 +140,7 @@ bool revoke_xattr_key_if_unowned(Cache& cache, const std::string& pkg, const std
                                  const std::filesystem::path& root);
 
 // ============================================================================
-// 每文件系统 sidecar stash（TODO.md 第 2 节）
+// 每文件系统 sidecar stash（历史 TODO.md 第 2 节）
 // 「备份 + 它的 WAL 行」的成对写入在写入层原语 detail::OpSink（pkg/op_sink.hpp）里；
 // 这里只放 stash 自身的路径计算与清理。
 // ============================================================================

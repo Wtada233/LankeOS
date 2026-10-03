@@ -122,8 +122,6 @@ public:
     void remove_provider(std::string_view capability, std::string_view pkg);
     /** 查询提供某能力的包集合 */
     std::unordered_set<std::string> get_providers(std::string_view capability);
-    /** 检查某能力是否由指定包提供 */
-    bool is_provided_by(std::string_view capability, std::string_view pkg);
 
     /** 添加反向依赖记录 */
     void add_reverse_dep(std::string_view dep, std::string_view pkg);
@@ -269,3 +267,12 @@ void trim_completed();
 
 /// 清理孤立的 .lpkg_db_bak_before:* 备份文件
 void cleanup_db_backups();
+
+/**
+ * WAL 里是否还留着未配对的 BEGIN_PKGS（= 存在未提交批次）。
+ *
+ * 这是"上一次恢复**没能**把某一行撤掉"的信号：`rollback_uncommitted_region` 在这种情形下
+ * **故意不封口**（留给下次 `lpkg rec` 幂等重做）。调用方据此 fail-closed —— `cleanup_db_backups`
+ * 用它保住唯一的重试还原点，`run_batch_transaction` 用它**拒绝**在未封口的 WAL 上再开新批次。
+ */
+bool wal_has_unpaired_batch();

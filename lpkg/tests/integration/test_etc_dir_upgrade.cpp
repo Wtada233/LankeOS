@@ -1,5 +1,5 @@
 /**
- * test_etc_dir_upgrade.cpp — `/etc` 下的**文件→目录**升级必须能成功（TODO E4 的 /etc 腿）
+ * test_etc_dir_upgrade.cpp — `/etc` 下的**文件→目录**升级必须能成功（历史 TODO E4 的 /etc 腿）
  *
  * ── 缺陷 ────────────────────────────────────────────────────────────────────
  * `InstallationTask::backup_existing_files()` 开头有一句

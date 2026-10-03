@@ -237,7 +237,7 @@ TEST_F(ArchiveMemberNameSafetyTest, ArrowInHardlinkTargetAbortsExtraction)
 
 // ============================================================================
 // 5. `.lpkgtmp` / `.lpkgnew`：lpkg 自用后缀，包声明同名成员会与落位撞名 → 拒绝
-//    （目录条目带尾斜杠，判据要剥掉斜杠再比末段）
+//    （判据按 `/` 切分量逐段判后缀；目录条目的尾斜杠由"空分量"覆盖）
 // ============================================================================
 
 TEST_F(ArchiveMemberNameSafetyTest, ReservedLpkgSuffixesAreRejected)
@@ -245,7 +245,7 @@ TEST_F(ArchiveMemberNameSafetyTest, ReservedLpkgSuffixesAreRejected)
     const std::vector<std::string> bad_names = {
         "usr/share/data.txt.lpkgtmp",  // 与 "<dst>.lpkgtmp → <dst>" 的 rename 撞名
         "usr/share/app.conf.lpkgnew",  // 与"配置冲突落 .lpkgnew 请用户审阅"撞名
-        "usr/share/d.lpkgnew/",        // 目录条目（带尾斜杠）：末段判据必须剥掉斜杠
+        "usr/share/d.lpkgnew/",        // 目录条目（带尾斜杠）：切分量后照样命中
     };
 
     for (const auto& name : bad_names) {
@@ -267,7 +267,8 @@ TEST_F(ArchiveMemberNameSafetyTest, ReservedLpkgSuffixesAreRejected)
 // 守卫过严会拒掉合法包，所以每条规则都要有一个"不该命中"的对照：
 //   · 含空格的名字（tar 成员名允许空格，WAL 分帧靠箭头/tail 字段，不靠空格）
 //   · 箭头两侧**没有**空格的 `a→b`（不构成 " → "，不破坏分帧）
-//   · `.lpkgnew`/`.lpkgtmp` 出现在**中间**或**后接字符**（只有末段整体以它结尾才算撞名）
+//   · `.lpkgnew`/`.lpkgtmp` 出现在**任一命名分量里、但该分量不以它结尾**（判据是"某分量
+//     以这三个后缀结尾"，不是子串匹配；分量整体以它结尾的另见"任一分量"那条用例）
 //   · 多级子目录
 // ============================================================================
 
@@ -399,13 +400,74 @@ TEST_F(ArchiveMemberNameSafetyTest, TabInMemberNameIsRejected)
 }
 
 // ============================================================================
+// 后缀判据必须按**任一路径分量**判，不能只看末段
+//
+// 只看末段会漏掉 `content/usr/bin/bash.lpkgtmp/x` 这类成员 —— 它的**末段是 `x`**，旧判据放行。
+// 而 libarchive 的 disk writer 会为文件成员**自动补建缺失的父目录**（本仓库已实测记录：
+// 一个只含 `content/usr/bin/foo`、不含任何目录成员的归档，解压后 `content/usr/bin` 真实存在）。
+// 于是包里就"合法地"装出一个**目录** `usr/bin/bash.lpkgtmp/`。此后别的包安装 `bash` 时，
+// `<dst>.lpkgtmp` 的落位路径正撞上那个目录：
+//   · 全新安装 `rename(目录 → 不存在路径)` **成功** ⇒ `usr/bin/bash` 变成一个**目录**而 lpkg
+//     报成功（用户拿到坏系统）；
+//   · 升级 `rename(目录 → 已存在文件)` = `ENOTDIR` ⇒ 整批回滚，且报错定位不到真因。
+// 冲突预检拦不住（它只比对清单里的路径，不比对 `<目标>.lpkgtmp`），故必须在名字进系统之前、
+// 在解压侧按**分量**拒绝整个归档。
+// ============================================================================
+
+TEST_F(ArchiveMemberNameSafetyTest, ReservedSuffixInAnyPathComponentIsRejected)
+{
+    const std::vector<std::string> bad_names = {
+        // 后缀落在**中间分量**上（末段是 `x`）：修复前旧判据（只看末段）会放行 —— 这条会红
+        "content/usr/bin/bash.lpkgtmp/x",
+        "content/usr/share/app.lpkgnew/y",
+        "content/usr/lib/libfoo.lpkgsave/z",
+        // 中间分量**整体**就是后缀（目录条目形态，带尾斜杠），后面还接了子文件
+        "content/usr/bin/bash.lpkgtmp/",
+        // 前导 `./`（member_path_relative 会先归一化掉）之后，中间分量仍必须命中
+        "./content/usr/bin/bash.lpkgtmp/evil",
+    };
+
+    for (const auto& name : bad_names) {
+        fs::remove_all(out_dir);
+        fs::create_directories(out_dir);
+        // 中间分量那几条写成**普通文件**成员：带后缀的父目录由 libarchive 自动补建 ——
+        // 正是这条缺陷赖以成立的前提（末尾带 `/` 的那条本身是目录条目，照直写成目录）。
+        const bool dir = name.ends_with('/');
+        write_archive({Member{name, dir ? "" : "x", "", dir}});
+
+        const std::string err = extract_error();
+        // 断言**拒绝原因**（不是"抛了就行"）：修复前 err 为空（放行），`find` 返回 npos ⇒ 红。
+        EXPECT_NE(err.find(key_head("error.unsafe_member_suffix")), std::string::npos)
+            << "成员名 " << name << " 的中间分量带了 lpkg 自用后缀，必须被**后缀守卫**整包拒绝："
+            << (err.empty() ? "<被放行、根本没抛>" : err);
+        EXPECT_EQ(count_entries(out_dir), 0u) << "成员名 " << name << " 被拒后仍有文件落盘";
+    }
+
+    // 正面对照：分量里**含**后缀样串、但不以它**结尾**的名字必须照常解出 —— 判据是
+    // "某分量以这三个后缀结尾"，不是子串匹配。若修复被写成 `member.find(".lpkgtmp") != npos`
+    // 之类的子串匹配，下面这几个合法名字会被误拒 ⇒ EXPECT_NO_THROW 从"不抛"变"抛"。
+    fs::remove_all(out_dir);
+    fs::create_directories(out_dir);
+    write_archive({
+        {"content/usr/share/x.lpkgnewx/y", "1", "", false},       // 后缀后还接了字符
+        {"content/usr/share/foo.lpkgtmp.txt/z", "2", "", false},  // 后缀不在分量末尾
+        {"content/usr/share/d.lpkgsavex/", "", "", true},         // 目录名后缀后接了字符
+    });
+    EXPECT_NO_THROW(extract_tar_zst(pkg, out_dir, pkg.filename().string()));
+    EXPECT_TRUE(fs::exists(out_dir / "content/usr/share/x.lpkgnewx/y"));
+    EXPECT_TRUE(fs::exists(out_dir / "content/usr/share/foo.lpkgtmp.txt/z"));
+    EXPECT_TRUE(fs::is_directory(out_dir / "content/usr/share/d.lpkgsavex"))
+        << "分量后缀不完整匹配的合法名字不该被拒";
+}
+
+// ============================================================================
 // `.lpkgsave`（2026-10-03 新列入的保留后缀）：与 `.lpkgtmp` / `.lpkgnew` 同一条守卫
 //
 // 上面第 5 节的后缀用例只列了 `.lpkgtmp` / `.lpkgnew`；`.lpkgsave` 是这一轮新加的第三个。
 // 它是"类型变化 / 废弃的配置改名保留"的落点（`OpSink::save_config`）：包声明同名成员会与它
 // 撞名 —— `save_config` 发现目标名被占时会把旧 `.lpkgsave` **移位**成 `<dst>.lpkgsave.<N>`
 // （2026-10-03 审计），那会把**另一个包**的同名文件挤开、归属当场脱节。合法包里不该有这个名字，
-// 故与另外两个一样在解压侧**整包拒绝**。目录条目形态（`x.lpkgsave/`）同样要判：末段判据先剥尾斜杠。
+// 故与另外两个一样在解压侧**整包拒绝**。目录条目形态（`x.lpkgsave/`）同样要判：切分量后空分量跳过。
 // ============================================================================
 
 TEST_F(ArchiveMemberNameSafetyTest, ReservedLpkgsaveSuffixIsRejected)

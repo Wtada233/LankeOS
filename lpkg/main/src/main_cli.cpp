@@ -344,6 +344,36 @@ static void run_rec_command()
 }
 
 /**
+ * **唯一的**命令名清单（`constants::CMD_*`）。两处消费者：
+ *   ① `handle_command` 的 if 链（真正的分派）；
+ *   ② `is_known_command` —— 在本文件 `run_cli` 里**先于** `init_database_for` 拒掉未知命令。
+ *
+ * 为什么 `is_known_command` 必须存在（2026-10-03 补）：`init_database_for` 一进门就
+ * `check_root()`，而它此前排在"判断命令是否认识"之前 ⇒ 非 root 用户敲一个拼错的命令
+ * （`lpkg instal …`）得到的是 **"Root permission is required to run."** —— 一个与真实
+ * 问题无关的错误，用户会去查权限而不是查拼写。现在未知命令在任何 root/锁/恢复动作之前
+ * 就被拒，打印用法、退 1。
+ *
+ * ⚠️ 加新命令时**两处都要动**（这份清单 + `handle_command` 的 if 链）。测试容器里 lpkg
+ * 恒以 root 运行 ⇒ `check_root()` 不会失败 ⇒ 这条顺序**无法在套件里断言**；验证走
+ * "以非 root 跑一遍真二进制"（见提交信息）。
+ */
+static constexpr std::string_view KNOWN_COMMANDS[] = {
+    constants::CMD_INSTALL,    constants::CMD_REMOVE,    constants::CMD_AUTOREMOVE,
+    constants::CMD_UPGRADE,    constants::CMD_REINSTALL, constants::CMD_QUERY,
+    constants::CMD_MAN,        constants::CMD_PACK,      constants::CMD_BUILD,
+    constants::CMD_DEPEND,     constants::CMD_SCAN,      constants::CMD_REC,
+    constants::CMD_FORCE_SOLVE};
+
+static bool is_known_command(std::string_view command)
+{
+    for (const auto name : KNOWN_COMMANDS) {
+        if (command == name) return true;
+    }
+    return false;
+}
+
+/**
  * 命令分发函数：把解析出的命令字符串与常量表匹配后交对应 handler 执行。
  * 所有命令的数据库初始化（root check、filesystem、锁）已在 run_cli 中完成。
  * 未知命令：打印用法并返回退出码 1。
@@ -545,6 +575,13 @@ int run_cli(const std::vector<std::string>& argv)
         }
 
         const std::string& command = result["command"].as<std::string>();
+
+        // **未知命令先拒**：必须发生在 `init_database_for`（内含 `check_root()`）**之前**，
+        // 否则非 root 用户敲错命令只会看到"需要 root"，与真实问题无关。见 `KNOWN_COMMANDS`。
+        if (!is_known_command(command)) {
+            print_usage(options);
+            return 1;
+        }
 
         // 数据库初始化（非 man 命令）与写操作的 SIGINT 防护；两者的生命周期都到本函数结束
         auto db_lock = init_database_for(command);

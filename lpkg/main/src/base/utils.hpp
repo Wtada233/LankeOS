@@ -40,7 +40,7 @@ int run_shell(const std::string& cmd, const std::filesystem::path& work_dir = ""
  * 为什么必须有它：外部触发器命令（`systemctl daemon-reload` /
  * `glib-compile-schemas /usr/share/glib-2.0/schemas` / `gtk-update-icon-cache`）里写的是
  * 绝对路径。`lpkg --root /mnt/base install ...` 时若不 chroot，它们会**打在宿主上**，
- * 目标 root 反而没更新（TODO F3）。
+ * 目标 root 反而没更新（历史 TODO F3）。
  */
 int run_shell_in_root(const std::string& cmd);
 
@@ -229,7 +229,7 @@ std::filesystem::path strip_trailing_slash(const std::filesystem::path& p);
 
 /**
  * 去除首尾空白（空格与制表符）。依赖串/索引字段/配置值都要按同一套规则归一，
- * 否则 " glibc"、"glibc " 会被当成两个不同的包名去找（TODO.md D1）。
+ * 否则 " glibc"、"glibc " 会被当成两个不同的包名去找（历史 TODO.md D1）。
  */
 std::string trim_copy(std::string_view s);
 
@@ -298,7 +298,7 @@ void write_string_to_file(const std::filesystem::path& path, std::string_view co
  * fsync 才暴露；丢掉它就等于把截断内容 rename 进正式位置（DB 静默损坏、且下一轮
  * 还会把这个截断内容当成"备份"）。失败抛 LpkgException。
  *
- * 所有 `.tmp + fsync + rename` 的写入路径都必须走这里，不要各写一套（TODO.md B1）。
+ * 所有 `.tmp + fsync + rename` 的写入路径都必须走这里，不要各写一套（历史 TODO.md B1）。
  */
 void fsync_and_rename(const std::filesystem::path& tmp, const std::filesystem::path& dst);
 
@@ -434,7 +434,7 @@ bool path_resolves_within(const std::filesystem::path& dir, const std::filesyste
  *
  * 包名与版本号来自**不可信来源**（远端索引、.lpkg 内的 metadata.json），而它们会被
  * 直接当成路径分量拼进 tmp_pkg_dir() / dep_dir() / docs_dir() / 下载 URL，
- * 一个 `../` 就能以 root 写到这些目录之外（TODO.md X4）。
+ * 一个 `../` 就能以 root 写到这些目录之外（历史 TODO.md X4）。
  */
 bool is_safe_path_component(std::string_view s);
 
@@ -455,7 +455,7 @@ const std::vector<std::filesystem::path>& mount_points();
 bool is_mount_point(const std::filesystem::path& p);
 
 /**
- * 回收孤儿备份 stash（TODO.md §5）：删除各文件系统根下、pid 已死的
+ * 回收孤儿备份 stash（历史 TODO.md §5）：删除各文件系统根下、pid 已死的
  * `.lpkg_bak_<pkg>_<pid>` 目录（崩溃/续传未覆盖的残留）。范围：root_dir 顶层 +
  * root_dir 内每个挂载点（= stash 的落点集合，见 mount_points）；/proc 不可用时降级为
  * root 顶层 + 顶层子挂载点。只认"存活进程已消失"（kill(pid,0) 返回 ESRCH）的，

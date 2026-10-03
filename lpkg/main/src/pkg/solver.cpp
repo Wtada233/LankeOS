@@ -156,7 +156,7 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                     // **先看 JOB/PKG，再看名字形状**：顶层请求（JOB）即使形似 SONAME
                     // 也是"用户要的包/能力不存在"，必须硬报错；此前先判形状 → 形似 SONAME
                     // 的顶层目标被归入可容忍的 missing_so，配 --missing-so-no-error 就
-                    // "求解成功但事务为空"（TODO D5，落点已由 D3 的兜底拦住，但诊断仍是错的）
+                    // "求解成功但事务为空"（历史 TODO D5，落点已由 D3 的兜底拦住，但诊断仍是错的）
                     if (info == SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP)
                         missing_target.emplace_back(dep_name);  // 直接请求的包/能力
                     else if (looks_like_soname(dep_name))
@@ -660,7 +660,7 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
 
     // --force 的"已是最新版本"目标：同版本无需安装，libsolv 不会为它们产生事务步骤，
     // 必须逐目标补回。**不能只在 result.order 为空时补**——`install --force A B`
-    // （A 已当前版本、B 新装）会因为 B 让 order 非空而静默漏掉 A（TODO.md E1）。
+    // （A 已当前版本、B 新装）会因为 B 让 order 非空而静默漏掉 A（历史 TODO.md E1）。
     if (opts.force_reinstall) {
         std::set<std::string> in_order;
         for (const auto& r : result.order) in_order.insert(r.name);
