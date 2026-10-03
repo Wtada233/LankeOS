@@ -7,7 +7,6 @@ lpkg/coverage_report/
 lpkg/fuzz-artifacts/
 lpkg/build-fuzz/
 
-*.o
 lrepo-mgr.json
 
 # Rust (farm)
