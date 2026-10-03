@@ -223,6 +223,51 @@ TEST_F(IndexParityTest, FourFieldDependentCannotBeInferred)
            "不是解析器丢行（对照 FourFieldProviderLineStillRegistersProvider）";
 }
 
+// ── 显式 `deps` 边：**包名依赖**也必须进反图，不能只看 needed_so ────────────────
+//
+// 反图此前只认 SONAME 边（needed_so → provides），**完全不看**行内的 deps 段。本仓库的
+// `deps` 绝大多数是 farm 从 needed_so 推导的（所以两种边通常重合、缺陷看不出来），但
+// CLAUDE.md 里那几类**例外**是手写的：纯 Python 包（`python-*`）、`xwayland`、以及
+// **dlopen** 加载的依赖（`kf-networkmanager-qt` → `networkmanager`、`kf-kapidox` →
+// `python-jinja`）—— 它们编译期不链接、ELF 里没有 DT_NEEDED，deps 是**唯一**的依赖声明。
+//
+// 对这类包，只看 SONAME 边 = 漏掉整条边 ⇒ `depend remove <被依赖者>` 与
+// `depend abibreak` 给出**少算的清单**（静默的错误答案，不是报错）。
+//
+// 索引行格式：name|ver:hash:deps:provides:needed_so（**尾冒号不能省**，5 段）。
+TEST_F(IndexParityTest, ExplicitDependencyEdgeIsHonoured)
+{
+    // appB 显式 deps=libA（第 3 段），而它的 needed_so 段为空 ——
+    // 即"声明了包依赖、却不链接任何 SONAME"。手写 deps 的包就是这个形态。
+    write_raw_index(
+        "libA|1.0:hhh:::\n"
+        "appB|2.0:hhh:libA::\n");
+
+    auto tree = depscan::scan_remove_tree("libA");
+    EXPECT_TRUE(has_child(tree, "appB"))
+        << "显式 deps 边被漏掉 → depend remove 对手写 deps 的包（Python/dlopen 场景）"
+           "给出少算的清单，而且不报错";
+    EXPECT_EQ(count_status(tree, depscan::ScanStatus::REMOVED), 2)
+        << "受影响集应含 libA 自身与依赖它的 appB";
+}
+
+// ── `depend abibreak` 只看 SONAME 边（与 remove 有意不同）───────────────────────
+// abibreak 问的是"ABI 断裂后谁**需要重构建**"：只声明包依赖、并不链接该 .so 的包
+// **不该**被报成要重构建（它根本没链那个库）。所以上面新加的 deps 边**只进 remove 的图**。
+TEST_F(IndexParityTest, AbibreakIgnoresExplicitDependencyEdge)
+{
+    // 同一份索引：appB 显式 deps=libA，但 needed_so 为空（没链 libA 提供的任何 .so）
+    write_raw_index(
+        "libA|1.0:hhh::liba.so.1:\n"
+        "appB|2.0:hhh:libA::\n");
+
+    auto abi = depscan::scan_abibreak_tree("libA");
+    EXPECT_FALSE(has_child(abi, "appB"))
+        << "appB 没有链接 libA 的 .so，ABI 断裂不需要它重构建 —— 把包名依赖并进 abibreak "
+           "会让 REBUILD 清单虚增";
+    EXPECT_EQ(abi.name, "libA") << "目标包自身是根节点";
+}
+
 // ── show_all 分支复用同一份仓库包名清单（缺陷 4）────────────────────────────────
 TEST_F(IndexParityTest, RemoveShowAllStillListsUnaffectedRepoPackages)
 {

@@ -120,7 +120,7 @@ static bool link_already_correct(const fs::path& link_path, const std::string& s
 void apply_soname_links(const fs::path& lib_dir,
                         const std::function<bool(const fs::path&)>& keep_dangling)
 {
-    // **判定**一律不抛（见 base/utils.hpp 的谓词族说明）：本函数的**两个调用点传的都是包
+    // **判定**一律不抛（见 base/path_predicates.hpp 的谓词族说明）：本函数的**两个调用点传的都是包
     // 内容** —— `trigger.cpp` 传目标 root 的 `<root>/usr/lib`，`builder.cpp` 传构建 staging 的
     // `<staging>/usr/lib`。盘上（或 staging 里）有**符号链接环**时，抛出型判定会让任何提供
     // `usr/lib/**.so*` 的包在**提交之后**的触发器里炸：包已落地、DB 已提交，命令却报失败。
@@ -164,9 +164,22 @@ void apply_soname_links(const fs::path& lib_dir,
             // SONAME 取自被扫描的库文件（不可信输入）：绝对路径或 `..` 会让
             // `lib_dir / soname` 逃出 lib_dir（fs::path 语义下绝对右值丢弃左值），
             // 从而以 root 在任意位置建符号链接（历史 TODO.md X3）。只接受落在 lib_dir 内的。
+            //
+            // ⚠️ 判据必须**带 canonical 复核**，不能只用词法判据：`path_within` 是纯词法的，
+            // 而这里要判的是"这条链接**落位时会被跟随**的路径"。包同时发一条
+            // `usr/lib/sub -> /etc`（`write_symlink_entry` 对链接目标不做校验）与一个
+            // SONAME 为 `sub/evil.so` 的库时，`lib_dir/sub/evil.so` 词法上**完全在**
+            // lib_dir 内，`create_symlink` 却会穿过中间段的 `sub` 建到 lib_dir 之外。
+            // 两个调用点 2026-10-03 加的 `path_resolves_within(lib_dir, root)` 只护了
+            // `lib_dir` **自身**、护不到它的**子项** —— 同族判据只推了一条分支。
+            // `path_within_resolved` 的语义正是这里要的：① 词法级 ② 父目录 canonical 复核
+            // （只解析父目录、末段不解析 ⇒ 不误伤"要建的那条链接名本身不存在"）。
+            // 裸 SONAME 时 `parent_path() == lib_dir`，行为与旧判据逐字相同。
+            // 解不开（ELOOP 等）时它 fail-open —— 与全仓"判定一律不抛"的取向一致，
+            // 且此时 `create_symlink` 会失败并被下面的 catch 转成告警，不构成逃逸。
             const fs::path lib_dir_n = lib_dir.lexically_normal();
             const fs::path link_path = (lib_dir_n / soname).lexically_normal();
-            if (!path_within(link_path, lib_dir_n)) {
+            if (!path_within_resolved(link_path, lib_dir_n)) {
                 log_warning(string_format("warning.soname_escapes_lib_dir", soname,
                                           e.path.filename().string(), lib_dir.string()));
                 continue;
@@ -213,7 +226,19 @@ void apply_soname_links(const fs::path& lib_dir,
         std::error_code ec;
         const fs::path target = fs::read_symlink(entry.path(), ec);
         if (ec || target.has_parent_path()) continue;
-        if (fs::exists(entry.path(), ec)) continue;  // 能解析 → 不是悬空
+        // 能解析 → 不是悬空。
+        //
+        // ⚠️ **这里只判返回值、不判 `ec`，是有意的**（2026-10-03 审计报过"姊妹点 `:106` 写了
+        // `|| ec`、此处漏了"——**实测后判定不成立，故不改**，把量出来的事实记在这里免得下轮再报）：
+        //   · `fs::exists(p, ec)` 对**真悬空**（ENOENT）返回 false 且 **`ec` 被清成 0**
+        //     （实测：悬空链接 → `exists=false, ec=0`）；
+        //   · 只有 ELOOP（自环/多跳环）与 EACCES/EIO 才让 `ec != 0`（实测 ELOOP → `ec=40`）。
+        // 所以补 `|| ec` 会**改变行为**：把"环链接"从"清理"变成"永久留下"，那不是修缺陷、
+        // 是改语义（本函数的职责就是收尾解不开的 SONAME 链接）。而 `:106` 的 `|| ec` 是**另一
+        // 极性**的用途（判"链接是否正确"⇒ 判不出来就重建，是安全动作），两者不可互推。
+        // 真正"判不出来"的只剩 EACCES/EIO —— lpkg 恒以 root 跑、目标在自家 usr/lib 下，
+        // 这条分支不可达，不为它写分支（本仓纪律：别为走不到的路径写判据）。
+        if (fs::exists(entry.path(), ec)) continue;
         // ⚠️ **别删属于某个包的链接**（2026-10-02 修）：包可以刻意发一条
         // `libfoo.so.1 -> libfoo.so.1.2.3`，而 `.1.2.3` 由**另一个**包提供、此刻还没装 ——
         // 那条链接当下就是悬空的，但删掉它**没有任何机制会重建**（第一遍只会按 SONAME 生成

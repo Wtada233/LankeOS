@@ -201,6 +201,14 @@ void download_with_retries(const std::string& url, const fs::path& output_path, 
         try {
             download_file(url, output_path, show_progress);
             return;
+        } catch (const UserAbort&) {
+            // **取消不是可重试的失败**：`UserAbort` 是 `LpkgException` 的子类，被下面那个宽
+            // catch 接住的话，Ctrl+C 会变成"删掉已下了一半的文件 → 打一条「正在重试」→ 接着
+            // 重试 5 次"。而重试期间 `sigint_graceful` 仍为真、进度回调立刻又返回 1 ⇒ 空转。
+            // 必须单独先接住、直接穿透（与 main_cli.cpp 的 catch 顺序同款）。
+            // 用例：tests/unit/test_download_cancel.cpp（两个锚点：不得出现重试告警 +
+            // 已落位的输出文件不得被删）。
+            throw;
         } catch (const LpkgException& e) {
             // 用 ec 重载：抛型 `fs::remove` 若失败（文件本就不存在/权限问题）会**顶替**原异常，
             // 于是原始失败原因被丢掉、且 `throw;` 的后续重试逻辑被跳过。清理失败无所谓，

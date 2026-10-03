@@ -247,7 +247,7 @@ void obsolete_dirs_pass(Cache& cache, const std::string& pkg_name,
  * 撤销"本包声明过、**新版本不再声明**"的目录 xattr 键。
  *
  * 为什么需要这一趟（而不是靠"写入侧只写声明过的键"就够了）：写入侧从不**删**键
- * （`copy_xattrs` 的语义就是"只写我有的"，见 base/utils.hpp）—— 于是新版本**撤掉**一个
+ * （`copy_xattrs` 的语义就是"只写我有的"，见 base/xattr.hpp）—— 于是新版本**撤掉**一个
  * 键时它留在盘上继续生效。陈旧键不是无害的杂物：`system.posix_acl_default` 是**该目录下
  * 新建文件的继承权限**，`security.selinux` 是标签 —— 一个已经被上游删掉的
  * `posix_acl_default` 会继续给新文件放权限。所以这属于**安全性质**，不是清理洁癖。
@@ -735,7 +735,7 @@ void InstallationTask::backup_existing_files()
             // 盘上是符号链接（只在"存在且不是真目录"时有意义）—— `/etc` 的落点规则按
             // **类型是否变化**分流，而 `disk_exists` + `disk_is_dir` 区分不出"普通文件"与
             // "符号链接"，故补这一个事实（见 op_sink.hpp 的字段说明）。`fs::is_symlink`
-            // 走 lstat、对环不抛（base/utils.hpp 的谓词说明里逐条列了哪个抛哪个不抛）。
+            // 走 lstat、对环不抛（base/path_predicates.hpp 的谓词说明里逐条列了哪个抛哪个不抛）。
             // 不抛谓词 —— 同 installation_task_copy.cpp 的 write_facts：中间段成环时
             // `fs::is_symlink` 抛，而 `!disk_is_dir` 对环为真 ⇒ 必然求值到它。
             e.facts.disk_is_symlink = !e.facts.disk_is_dir && is_symlink_no_follow(probe);

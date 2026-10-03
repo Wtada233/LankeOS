@@ -385,6 +385,65 @@ TEST_F(ArchiveMemberNameSafetyTest, PackerAcceptsLegalSuspiciousNames)
 // TAB：破坏**制表符分帧**的归属数据库（键在重载时被截断）
 // ============================================================================
 
+// ============================================================================
+// `.lpkg_bak_`：**第四个**自用命名空间，而且是**前缀**形态 —— 守卫此前整类漏掉
+//
+// 前三个（`.lpkgtmp`/`.lpkgnew`/`.lpkgsave`）都是"追加在目标名**之后**"的后缀，判据是
+// `component.ends_with(...)`；而 stash 名是 `.lpkg_bak_<pkg>_<pid>`（见
+// `install_common.cpp` 的 `stash_parent_dir`），token 在**开头** ⇒ `ends_with` 结构上
+// 就抓不到它，加进那张后缀清单也没用。
+//
+// 后果（可达且静默）：包发 `content/.lpkg_bak_x_999999/payload` 能合法装进
+// `<root>/.lpkg_bak_x_999999/` 并登记进 files.db；而 `cleanup_orphan_stashes()`
+// （`base/utils.cpp`）**正是**按这个前缀 + 尾段 pid 已死（kill ESRCH）就 `remove_all`
+// —— 下次任意 lpkg 命令会把已安装的文件连同目录静默删掉，盘面与 DB 当场脱节
+// （`query` 说文件属于某包、盘上已经没了）。
+//
+// 判据形态与另外三个一致：**按 `/` 切分量、逐分量判**（`.lpkg_bak_` 落在中间分量上同样
+// 要命中，因为 libarchive 会为文件成员自动补建父目录 —— 与 `.lpkgtmp` 那条同因）。
+// ⚠️ 仍然**不是**子串匹配：`x.lpkg_bak_1` 只是**含**该串、不以它开头，必须照常解出。
+// ============================================================================
+
+TEST_F(ArchiveMemberNameSafetyTest, ReservedStashNamespaceIsRejectedInAnyPathComponent)
+{
+    const std::vector<std::string> bad_names = {
+        ".lpkg_bak_pkgx_999999/payload",    // 顶层（stash 真正的落点）：与孤儿回收的前缀判据撞名
+        "content/.lpkg_bak_pkgx_999999/y",  // 包内容形态
+        "content/usr/lib/.lpkg_bak_a_1/z",  // 中间分量（末段是 `z`）：父目录由 libarchive 自动补建
+        "content/usr/bin/.lpkg_bak_b_2/",   // 目录条目形态（带尾斜杠）
+    };
+
+    for (const auto& name : bad_names) {
+        fs::remove_all(out_dir);
+        fs::create_directories(out_dir);
+        const bool dir = name.ends_with('/');
+        write_archive({Member{name, dir ? "" : "x", "", dir}});
+
+        const std::string err = extract_error();
+        ASSERT_FALSE(err.empty()) << "成员名 " << name
+                                  << " 用了 lpkg 自用的 stash 命名空间，必须整包拒绝（未抛）";
+        EXPECT_EQ(count_entries(out_dir), 0u) << "成员名 " << name << " 被拒后仍有文件落盘";
+        // 拒绝的**原因**必须点名了这个命名空间 —— 文案与判据必须同步更新（只加判据、不改
+        // 文案的话，用户看到的仍是"只列了三个后缀"的旧说明，指向不了真因）。
+        EXPECT_NE(err.find(".lpkg_bak_"), std::string::npos)
+            << "拒绝原因不是 stash 命名空间守卫（或 l10n 文案没跟上判据）：" << err;
+    }
+
+    // 正面对照：只是**含**该串、但分量不以 `.lpkg_bak_` **开头**的名字必须照常解出 ——
+    // 与另外三个后缀的对照用例同一条纪律（判据是前缀，不是子串）。
+    fs::remove_all(out_dir);
+    fs::create_directories(out_dir);
+    write_archive({
+        {"content/usr/share/x.lpkg_bak_1.txt", "1", "", false},  // 串在中间
+        {"content/usr/share/foo.lpkg_bak.txt", "2", "", false},  // 尾部不同
+        {"content/usr/share/d.lpkg_bak_1/", "", "", true},       // 目录名不以 token 开头
+    });
+    EXPECT_NO_THROW(extract_tar_zst(pkg, out_dir, pkg.filename().string()));
+    EXPECT_TRUE(fs::exists(out_dir / "content/usr/share/x.lpkg_bak_1.txt"));
+    EXPECT_TRUE(fs::exists(out_dir / "content/usr/share/foo.lpkg_bak.txt"));
+    EXPECT_TRUE(fs::is_directory(out_dir / "content/usr/share/d.lpkg_bak_1"));
+}
+
 TEST_F(ArchiveMemberNameSafetyTest, TabInMemberNameIsRejected)
 {
     // `\t` 是合法文件名字节、也不会伪造 WAL 行（WAL 是空格分帧），但它会破坏**制表符分帧**

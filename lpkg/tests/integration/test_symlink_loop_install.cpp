@@ -130,7 +130,8 @@ TEST_F(SymlinkLoopInstallTest, PackageWithSelfLoopSymlinkInstallsAndCanBeRemoved
     // "路径不可达"就分不开，本用例考的东西也就无从谈起。
     EXPECT_THROW(
         { (void)fs::exists(test_root / "usr/lib/self"); }, fs::filesystem_error)
-        << "前提变了：libstdc++ 不再对 ELOOP 抛 —— 请一并复核 base/utils.hpp 的谓词族说明";
+        << "前提变了：libstdc++ 不再对 ELOOP 抛 —— 请一并复核 base/path_predicates.hpp "
+           "的谓词族说明";
     EXPECT_EQ(fs::read_symlink(test_root / "usr/lib/self").string(), "self");
     EXPECT_EQ(read_file(test_root / "usr/share/real.txt"), "real\n")
         << "同一个包里的普通文件不受影响";

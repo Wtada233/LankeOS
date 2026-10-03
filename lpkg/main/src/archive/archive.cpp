@@ -86,21 +86,25 @@ std::string member_name_rejection_message(std::string_view member,
     if (!key && member.find(" \xe2\x86\x92 ") != std::string_view::npos)
         key = "error.unsafe_member_arrow";
 
-    // `.lpkgtmp` / `.lpkgnew` / `.lpkgsave` 是 lpkg 自用的命名空间：安装期"先写
-    // `<dst>.lpkgtmp` 再 rename 到位"、"配置冲突时落 `<dst>.lpkgnew` 给用户审阅"、
-    // "类型变化/废弃的配置改名 `<dst>.lpkgsave` 保留"都用它们。包声明同名成员会与那些落位
-    // 撞名：`<dst>.lpkgtmp → <dst>` 的 rename 会盖掉包里的成员（反之亦然），`.lpkgnew` 把
-    // "待用户审阅的配置"直接变成包内容，而 `.lpkgsave` 更绕 —— `save_config` 发现目标名被占
-    // 时会把它**移位**成 `<dst>.lpkgsave.<N>`（2026-10-03 审计）：那会把**另一个包**同名文件
-    // 挤开、归属当场脱节。合法包里不该出现这三个名字。
-    // 判据：**任一路径分量**以这三个后缀结尾即拒（不是只看末段）。
+    // lpkg 自用文件名命名空间（`.lpkgtmp` / `.lpkgnew` / `.lpkgsave` / `.lpkg_bak_` …）：
+    // 包声明同名成员会与 lpkg 自己的 rename/落位撞名（逐条后果见
+    // `constants::RESERVED_MEMBER_NAMES` 的说明）。合法包里不该出现这些名字。
+    //
+    // **清单只有一张**：`constants::RESERVED_MEMBER_NAMES` —— 本循环遍历它，不在这里另列一遍。
+    // 2026-10-03 的缺陷正是"常量头里有 `SUFFIX_LPKG_BAK`、这里只硬编码了另外三个"，而且那个
+    // token 是**前缀**形态（`.lpkg_bak_<pkg>_<pid>`），`ends_with` 结构上就抓不到它。
+    //
+    // 判据：**任一路径分量**命中即拒（不是只看末段）。
     // 只看末段会漏掉 `content/usr/bin/bash.lpkgtmp/x` 这类成员 —— 它的**末段是 `x`**，
     // 而 libarchive 的 disk writer 会为文件成员**自动补建缺失的父目录**（本仓库已实测），
     // 于是包里合法地装出一个目录 `usr/bin/bash.lpkgtmp/`：此后别的包安装 `bash` 时，
     // `<dst>.lpkgtmp` 的落位路径正撞上它 —— 全新安装 `rename(目录 → 不存在路径)` 成功
     // （`usr/bin/bash` 变成**目录**而 lpkg 报成功）；升级 `rename(目录 → 已存在文件)` =
     // ENOTDIR（整批回滚、报错定位不到真因）。冲突预检拦不住（它不比对 `<目标>.lpkgtmp`），
-    // 故必须在名字进系统之前按**分量**拒绝。
+    // 故必须在名字进系统之前按**分量**拒绝；
+    // `.lpkg_bak_` 同理且更隐蔽：`content/.lpkg_bak_x_999999/payload` 装出来的顶层目录会被
+    // `cleanup_orphan_stashes()`（按该前缀 + pid 已死）在**下一次任意 lpkg 命令**里静默删掉。
+    //
     // 目录条目可能带尾斜杠（`x.lpkgnew/`）：按 `/` 切分量、空分量跳过，尾斜杠形态自然覆盖。
     if (!key) {
         std::string_view rest = member;
@@ -108,13 +112,16 @@ std::string member_name_rejection_message(std::string_view member,
             const auto slash = rest.find('/');
             const std::string_view component =
                 slash == std::string_view::npos ? rest : rest.substr(0, slash);
-            // 空分量（前导/连续/尾随 `/`）ends_with 必为 false，不必显式跳过。
-            if (component.ends_with(constants::SUFFIX_LPKG_NEW) ||
-                component.ends_with(constants::SUFFIX_LPKG_TMP) ||
-                component.ends_with(constants::SUFFIX_LPKG_SAVE)) {
-                key = "error.unsafe_member_suffix";
-                break;
+            for (const auto& reserved : constants::RESERVED_MEMBER_NAMES) {
+                // 空分量（前导/连续/尾随 `/`）两个判据都必为 false，不必显式跳过。
+                const bool hit = reserved.starts_with ? component.starts_with(reserved.token)
+                                                      : component.ends_with(reserved.token);
+                if (hit) {
+                    key = "error.unsafe_member_suffix";
+                    break;
+                }
             }
+            if (key) break;
             if (slash == std::string_view::npos) break;
             rest.remove_prefix(slash + 1);
         }

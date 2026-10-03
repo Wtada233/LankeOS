@@ -91,7 +91,7 @@ void init_localization()
     fs::path src_l10n_dir = exec_dir / ".." / "src" / "l10n";    // 测试目录下的 src/l10n 布局
 
     // 定位到实际存在的那个 l10n 目录（不抛判定：这些目录可能被符号链接环占着，见
-    // base/utils.hpp 的谓词族）。
+    // base/path_predicates.hpp 的谓词族）。
     fs::path l10n_dir;
     if (is_directory_follow(relative_l10n_dir)) {
         l10n_dir = relative_l10n_dir;

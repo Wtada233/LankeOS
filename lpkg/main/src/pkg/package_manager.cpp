@@ -50,8 +50,7 @@ namespace fs = std::filesystem;
 //   移除       do_remove_package（单包主体）/ remove_package_files / remove_package(s)
 //              removal_allowed / check_removal_preconditions / remove_packages_in_one_batch
 //              remove_packages_checked / autoremove
-//              递归移除：collect_recursive_remove_set / remove_packages_recursive /
-//                        remove_package_recursive
+//              递归移除：collect_recursive_remove_set / remove_packages_recursive
 //   升级       upgrade_packages / force_solve_conflict
 //   查询与文档 query_package / query_file / show_man_page
 //
@@ -159,7 +158,7 @@ void cleanup_stashes(std::vector<fs::path>& stashes)
         // 中间段成环的路径上必抛 ELOOP（`fs::exists` 抛型对环不返回 false），而这一段跑在
         // **post-commit 清理**上 —— 一次抛就是"包已落地、DB 已提交、命令却报失败"。
         // `exists_no_follow` 就是这条表达式想要的语义（lstat 成功 = 名字被占，含悬空链接与
-        // 环），而且不抛。见 base/utils.hpp 的谓词说明。
+        // 环），而且不抛。见 base/path_predicates.hpp 的谓词说明。
         if (!exists_no_follow(p)) continue;
 
         // write-ahead：先记日志再删除（见函数注释）
@@ -169,7 +168,11 @@ void cleanup_stashes(std::vector<fs::path>& stashes)
         // （此刻 stash 仍在磁盘，异常/崩溃可由 batch_rollback/rec 完整恢复）
         BreakpointManager::instance().hit("cleanup_after_wal");
 
-        detail::remove_stash_dir(p);  // 隔离根 remove_all（失败仅告警语义在上层？此处静默）
+        // 失败由 `remove_stash_dir` **自己**打 `warning.cleanup_failed`（不抛：调用点在"批次
+        // 已提交"之后的收尾路径上，抛了会把"安装已成功"报成命令失败）—— 这里**不需要**、
+        // 也**不该**再补一层告警。（订正 2026-10-03：原注释写"失败仅告警语义在上层？此处静默"，
+        // 两处都不实 —— 它不静默、也不靠上层；照那句去"补上层告警"会造成同一次失败重复告警。）
+        detail::remove_stash_dir(p);
     }
 }
 
@@ -427,7 +430,7 @@ namespace
  * 单包移除核心（须在 run_batch_transaction 内调用）。
  *
  * **唯一调用点是 `remove_packages_in_one_batch`**（`remove_package` / `remove a b c` /
- * remove_package_recursive / autoremove / force-solve 最终都汇到那个批次，
+ * remove_packages_recursive / autoremove / force-solve 最终都汇到那个批次，
  * 原先是两处近乎逐字重复的移除逻辑）。安全检查不在这里：共享文件与"陈旧文件键撞实体
  * 目录"两项已整体前移到批次入口 `check_removal_preconditions()`。
  *
@@ -490,7 +493,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
         // （实测：`fs::exists` 在自环上抛 "Too many levels of symbolic links"）。
         // 语义不变：`exists_no_follow`（lstat）对自环为真 —— 正是这里要的"该路径上有东西、
         // 得搬走"；中间段成环时判否，按"盘上本来就没有"跳过（与"包记了这个路径、盘上已不存在"
-        // 同路）。详见 base/utils.hpp 里那组 `*_no_follow` 的说明。
+        // 同路）。详见 base/path_predicates.hpp 里那组 `*_no_follow` 的说明。
         std::error_code ec;
         if (fs::is_directory(phys, ec) && !fs::is_symlink(phys, ec)) {
             log_warning(string_format("warning.remove_path_is_dir", phys.string()));
@@ -1968,10 +1971,4 @@ size_t remove_packages_recursive(const std::vector<std::string>& pkg_names, bool
     log_summary("info.remove_summary", removed);
     log_info(get_string("info.recursive_remove_done"));
     return to_remove.size();
-}
-
-/** 单包递归移除：与多参数版**同一实现、同一批次语义**（见上）。 */
-void remove_package_recursive(const std::string& pkg_name, bool force, bool purge_config)
-{
-    remove_packages_recursive({pkg_name}, force, purge_config);
 }

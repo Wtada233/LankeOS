@@ -27,7 +27,6 @@ namespace constants
 {
 // 分隔符字符常量
 inline constexpr std::string_view NL = "\n";
-inline constexpr std::string_view TAB = "\t";
 inline constexpr char PIPE_CHAR = '|';
 inline constexpr char COMMA_CHAR = ',';
 inline constexpr char COLON_CHAR = ':';
@@ -123,6 +122,36 @@ inline constexpr std::string_view SUFFIX_LPKG_BAK = ".lpkg_bak_";
 /// rename 到配置原位、盖掉真配置）。见 `detail::OpSink::save_config` 与 ARCH §7.2.1。
 inline constexpr std::string_view SUFFIX_LPKG_SAVE = ".lpkgsave";
 inline constexpr std::string_view SUFFIX_MAN = ".man";
+
+/// lpkg 自用文件名命名空间 —— **归档成员名**里出现这些名字一律整包拒绝。
+///
+/// 为什么需要它：这些都落在 lpkg **自己的 rename/落位**会撞上的名字上。
+/// 包声明一个同名成员会与落位撞名，例如 `<dst>.lpkgtmp → <dst>` 的 rename 会盖掉包里的成员、
+/// `.lpkgnew` 把"待用户审阅的配置"直接变成包内容、`.lpkgsave` 被 `save_config` 移位成
+/// `<dst>.lpkgsave.<N>` 时把**另一个包**的同名文件挤开（归属当场脱节）；
+/// `.lpkg_bak_` 更隐蔽：`cleanup_orphan_stashes()` 按这个前缀 + 尾段 pid 已死就 `remove_all`，
+/// 包只要装出一个 `.lpkg_bak_<任意>_<已死 pid>/` 目录，**下一次任意 lpkg 命令就会把它静默删掉**。
+///
+/// 字段含义：`starts_with=false` → 分量**以** token **结尾**（追加在目标名之后的落位后缀）；
+/// `starts_with=true` → 分量**以** token **开头**（自带包名与 pid 的变长名）。
+/// 两者都**不是**子串匹配 —— `x.lpkgnewx` / `foo.lpkgtmp.txt` / `d.lpkg_bak_1` 是合法名字，
+/// 必须照常解出（`tests/unit/test_archive_member_name_safety.cpp` 有明文的正面对照）。
+///
+/// ⚠️ **新增 lpkg 自用的落位名时，加进这一张表**：守卫（`archive/archive.cpp` 的
+/// `member_name_rejection_message`，读侧解压与写侧 `packer.cpp` **共用同一份判据**）遍历它，
+/// 不要在守卫里另列一遍 —— 2026-10-03 的缺陷正是"常量头里有 `SUFFIX_LPKG_BAK`、守卫里只列了
+/// 另外三个"。同理，`l10n` 的 `error.unsafe_member_suffix` 文案也要跟着列全。
+struct ReservedMemberName {
+    std::string_view token;
+    bool starts_with;
+};
+
+inline constexpr ReservedMemberName RESERVED_MEMBER_NAMES[] = {
+    {SUFFIX_LPKG_TMP, false},   // <dst>.lpkgtmp（先写临时文件再 rename 到位）
+    {SUFFIX_LPKG_NEW, false},   // <dst>.lpkgnew（配置冲突，留给用户审阅）
+    {SUFFIX_LPKG_SAVE, false},  // <dst>.lpkgsave（废弃/类型变化的配置改名保留）
+    {SUFFIX_LPKG_BAK, true},    // .lpkg_bak_<pkg>_<pid>（每文件系统的 stash 根）
+};
 
 /// confhashes.db 取值列里 `<包名>` 与 `<sha256>` 之间的分隔符
 /// （见 `Config::conf_hashes_db()`：键是逻辑路径，取值是 `"<pkg>:<sha256>"`）

@@ -299,8 +299,8 @@ bool Config::has_system_soname(const std::string& soname) const noexcept
         const fs::path lib_dir = (root_dir_ / fs::path(sub)).lexically_normal();
         const fs::path cand = (lib_dir / soname).lexically_normal();
         // 不抛判定：`cand` 是**目标 root 的 /usr/lib 下**的一个候选路径（= 包内容），
-        // 盘上那个名字可能是符号链接环 → `fs::exists` 会抛（见 base/utils.hpp 的谓词族）。
-        // 语义不变：仍是"跟随"语义的"这个路径通不通"。
+        // 盘上那个名字可能是符号链接环 → `fs::exists` 会抛（见 base/path_predicates.hpp
+        // 的谓词族）。 语义不变：仍是"跟随"语义的"这个路径通不通"。
         if (path_within(cand, lib_dir) && exists_follow(cand)) {
             return true;
         }

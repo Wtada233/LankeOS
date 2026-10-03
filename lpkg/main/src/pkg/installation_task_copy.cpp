@@ -90,7 +90,7 @@ detail::PathFacts write_facts(const std::string& entry, const fs::path& src_path
     facts.disk_is_dir = is_real_directory(probe);
     // 不抛谓词（**必须**）：`fs::is_symlink` 在**中间段**成环时抛 code=40，而这里
     // `!facts.disk_is_dir` 为真（`is_real_directory` 对环判 false）⇒ 抛型那半边**必然**
-    // 被求值（短路方向问题，不是"用了抛型"本身）。见 base/utils.hpp 的谓词说明。
+    // 被求值（短路方向问题，不是"用了抛型"本身）。见 base/path_predicates.hpp 的谓词说明。
     facts.disk_is_symlink = !facts.disk_is_dir && is_symlink_no_follow(probe);
     // 两边都是符号链接时，目标是否逐字节相同（事实说明见 op_sink.hpp）。与让开趟同一条判据
     // （`symlink_targets_equal`，不抛）—— 两趟必须给出同一答案，否则写入趟的落点会漂移。

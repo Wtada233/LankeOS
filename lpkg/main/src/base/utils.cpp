@@ -661,7 +661,8 @@ DurableFsyncGuard::~DurableFsyncGuard()
  */
 void ensure_file_exists(const fs::path& path)
 {
-    // 同 ensure_dir_exists：判定不抛（ELOOP 会让 fs::exists 抛，见 utils.hpp 的谓词说明）
+    // 同 ensure_dir_exists：判定不抛（ELOOP 会让 fs::exists 抛，见 base/path_predicates.hpp
+    // 的谓词说明）
     if (!exists_follow(path)) {
         // 用 ::open 而不是 ofstream：iostreams **不保证**在失败时设置 errno，读 strerror(errno)
         // 可能打出上一次系统调用留下的陈旧 errno（误导定位）。open 失败后 errno 才是这次失败
@@ -739,16 +740,6 @@ std::unordered_set<std::string> read_set_from_file(const fs::path& path,
 /**
  * 将字符串集合写入文件（原子写入：先写临时文件再重命名）
  */
-void write_set_to_file(const fs::path& path, const std::unordered_set<std::string>& data)
-{
-    std::string content;
-    for (const auto& item : data) {
-        content += item;
-        content += '\n';
-    }
-    write_string_to_file(path, content);
-}
-
 void fsync_and_rename(const fs::path& tmp, const fs::path& dst)
 {
     // O_RDONLY 足以 fsync；打开失败必须报错（不能"跳过 fsync 直接 rename"）
@@ -1028,11 +1019,23 @@ void cleanup_tmp_dirs()
     }
 }
 
+bool is_stash_dir_name(std::string_view name)
+{
+    return name.starts_with(constants::SUFFIX_LPKG_BAK);
+}
+
 /**
  * 回收孤儿备份 stash（历史 TODO.md §5）：崩溃/续传没清掉的
  * `<fsroot>/.lpkg_bak_<pkg>_<pid>`。扫描范围有界：root_dir 顶层 + 顶层子目录里
  * st_dev 与 root_dir 不同的（= 子挂载点）的直接子目录。pid 已死（kill ESRCH）才删，
  * 绝不碰自己/存活进程的 stash。stash 正常由 CLEANUP 清除，本函数只是兜底安全网。
+ *
+ * ⚠️ 这里**只按名字**认 stash：包若能在 `<fsroot>` 顶层装出一个
+ * `.lpkg_bak_<任意>_<已死 pid>/` 目录，它会被本函数连同里面的文件一起删掉（盘面与
+ * `files.db` 当场脱节）。挡在入口的是**归档成员名守卫**
+ * （`constants::RESERVED_MEMBER_NAMES` 里的 `.lpkg_bak_` 前缀那条）：本层没有更硬的判据可
+ * 用 —— "这真的是个 stash 吗"在盘上没有可分辨的特征，而本层（`base/`）也不许反向依赖 `db/`
+ * 去查包归属。所以这条防线是**入口那道**，不是这里。
  */
 void cleanup_orphan_stashes(const std::set<fs::path>& keep)
 {
@@ -1052,7 +1055,7 @@ void cleanup_orphan_stashes(const std::set<fs::path>& keep)
             }
             const fs::path p = it->path();
             const std::string name = p.filename().string();
-            if (name.rfind(".lpkg_bak_", 0) != 0) continue;
+            if (!is_stash_dir_name(name)) continue;
             // 同上（2026-09-26 修）：两个操作数在环上都抛；换成一次 lstat 的真目录判据。
             if (!is_real_directory(p)) continue;
             // WAL 仍引用（回滚/续传还要用）→ 绝不回收

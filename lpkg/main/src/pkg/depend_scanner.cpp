@@ -15,6 +15,7 @@
 #include "i18n/localization.hpp"
 #include "install_common.hpp"
 #include "repo/repository.hpp"
+#include "repo/revdep.hpp"
 #include "vercmp/version.hpp"
 
 namespace fs = std::filesystem;
@@ -175,19 +176,27 @@ namespace
 {
 
 /**
- * 从缓存的仓库索引文件构建反向依赖图
- * 只考虑每个包的最新版本，返回: 被依赖的包 -> {直接依赖它的包集合}
+ * 从缓存的仓库索引文件构建反向依赖图：被依赖的包 → {直接依赖它的包}。
  *
- * **索引行解析走 `parse_repo_index_line`（base/utils.cpp，唯一实现）**：这里曾有一套
- * 自己的解析器，要求版本块 ≥5 字段，而 `repository.cpp` 有意容忍 4 字段（旧/部分写入器
- * 把 provides 写在 vh[3]、不写 needed_so）。后果是 4 字段的索引行在这里被**整行丢掉**
- * → 反向依赖图缺一整类边 → `lpkg depend remove` / `depend abibreak` 静默报
- * "无受影响包"（给的是错误答案，不是报错）。切分逻辑不再有任何第二份。
+ * **本函数不再有任何自己的解析/建图代码**（2026-10-03 收敛）：
+ *   · 索引解析 → `Repository::load_index_from_file()`（唯一索引解析入口，见 repository.cpp）；
+ *   · 建反图 → `repo::build_reverse_dependency_map()`（唯一反向依赖实现，见 repo/revdep.hpp）。
+ * 收敛前这里曾是一份**独立实现**，且**只看 SONAME 边、完全忽略显式 `deps`** —— 对手写 deps
+ * 的包（纯 Python 包 / `xwayland` / **dlopen** 场景，见 CLAUDE.md 的 deps 例外清单）会漏掉
+ * 整条边，让 `depend remove` / `depend abibreak` 给出**少算的清单**（静默的错误答案）。
+ * 更早还自带过一套要求 ≥5 字段的解析器，会把 4 字段的索引行整行丢掉 —— 那类"第二实现必漂移"
+ * 的形态在这里已经消灭两轮，别再长回来。
+ *
+ * **只按路径读、绝不下载**：优先读 `tmp` 里那份已下载的缓存副本，回退到本地镜像路径。
+ * 这不是为了省流量，而是因为本函数在"索引不存在"时返回**空图**：若改成
+ * `Repository::load_index()`（它会为远程镜像 `download_file`），"没有索引"就会变成
+ * "偷偷联网下载"。真要联网取索引时，那次下载由 `load_repo_revdep()` 的探测完成。
+ *
+ * @param edges 收哪些边 —— `depend remove` 与 `depend abibreak` **有意不同**，见 revdep.hpp
  */
-std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revdep_map()
+std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revdep_map(
+    RevdepEdges edges)
 {
-    std::unordered_map<std::string, std::unordered_set<std::string>> rev;
-
     // 优先读取远程缓存索引（下载到临时目录的）
     fs::path idx = Config::get_tmp_dir() / constants::REPO_INDEX_TMP;
     if (!exists_follow(idx)) {
@@ -198,59 +207,27 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_repo_revd
             std::string path_str = mirror_url;
             if (path_str.find(constants::PROTOCOL_FILE) == 0) path_str = path_str.substr(7);
             idx = fs::path(path_str) / arch / std::string(constants::REPO_INDEX_FILE);
-        } catch (...) {
-            return rev;
+        } catch (const std::exception& e) {
+            // 此前这里是 `catch (...) { return rev; }` —— **静默**返回空图，于是
+            // `depend remove` / `depend abibreak` 打印"无受影响包"（给的是错误答案，不是报错），
+            // 与下面"打不开/读不出就抛"的取向正好相反。现在至少出声。
+            // 键与 `resolve_index_path()` 的同一种失败同源（都是"读不出镜像配置"）。
+            log_warning(string_format("warning.repo_mirror_config", e.what()));
+            return {};
         }
     }
-    if (!exists_follow(idx)) return rev;
+    if (!exists_follow(idx)) return {};
 
-    // 第一遍：读入行 + 建 SONAME → 提供者 反图（needed_so 反查依赖需要它）
-    // 每个包只取**版本号最大**的那个版本块（= repository.cpp 排序后的"最新版"；
-    // 曾取索引里的**最后一块**，那只是写入顺序，不是版本序）。
-    std::vector<std::pair<std::string, std::string>> name_needed;  // (包名, needed_so 字段)
-    std::unordered_map<std::string, std::unordered_set<std::string>> soname_provider;
-    std::unordered_map<std::string, RepoIndexVersionBlock> latest;
-    std::ifstream f(idx);
-    // 守卫此前只有上面的 `exists_follow(idx)`：索引文件"存在但打不开"（FIFO/设备）或
-    // "读不出"（是目录 —— Linux 下 open 成功、随后读才失败；或 EIO）时，循环静默跑零次 ⇒
-    // 反向依赖图残缺（空）⇒ `depend remove` / `depend abibreak` 报"无受影响包"。
-    // 这是**给错误答案且不报错**：用户据此删包。fail-closed，点名文件报错。
-    if (!f.is_open()) throw LpkgException(string_format("error.open_file_failed", idx.string()));
-    std::string line;
-    while (std::getline(f, line)) {
-        for (auto& b : parse_repo_index_line(line)) {
-            auto it = latest.find(b.name);
-            if (it == latest.end() || version_compare(it->second.version, b.version))
-                latest[b.name] = std::move(b);  // 无版本 / 更旧 → 换成新的
-        }
+    // 索引"存在但打不开"（FIFO/设备）或"读不出"（是目录 —— Linux 下 open 成功、随后读才
+    // 失败；或 EIO）时必须**报错而不是静默当空**：静默会让反向依赖图残缺 ⇒ 用户拿到
+    // "无受影响包"并据此删包。这是**本消费者自己的策略** —— `Repository::load_index()` 对
+    // 同一个失败是"降级成空仓库 + 告警"（离线装包是常见用法），两者有意不同，
+    // 所以共享的解析入口只报告结果、由这里决定 fail-closed。
+    Repository repo;
+    if (!repo.load_index_from_file(idx)) {
+        throw LpkgException(string_format("error.read_file_failed", idx.string()));
     }
-    // 非 EOF 收尾且 `bad`（实测：目录 = open 成功 + badbit；空文件是干净的 eof）⇒
-    // 读中途失败，不能静默当空（否则反向依赖图残缺、报"无受影响包"）。
-    if (f.bad()) throw LpkgException(string_format("error.read_file_failed", idx.string()));
-
-    for (const auto& [name, b] : latest) {
-        name_needed.emplace_back(name, b.needed_so);
-        for (auto s : split_string_view(b.provides, constants::COMMA_CHAR)) {
-            if (s.empty()) continue;
-            // **同一 SONAME 可能有多个提供者**（捆绑/私有 .so）：全部记下（`insert` 进集合）。
-            // 已修（2026-09-20）：此前只记第一个 → 反向图只连到一个提供者，删除/ABI 影响面
-            // 会被少算一半。这不是待办，别再按 TODO 读。
-            soname_provider[std::string(s)].insert(name);
-        }
-    }
-
-    // 第二遍：needed_so → 提供者 → 反向依赖图
-    for (const auto& [name, needed] : name_needed) {
-        for (auto s : split_string_view(needed, constants::COMMA_CHAR)) {
-            if (s.empty()) continue;
-            auto it = soname_provider.find(std::string(s));
-            if (it != soname_provider.end()) {
-                for (const auto& prov : it->second)
-                    if (prov != name) rev[prov].insert(name);  // 所有提供者都连边
-            }
-        }
-    }
-    return rev;
+    return build_reverse_dependency_map(repo, edges);
 }
 
 /** 在仓库反向依赖图上做传递 BFS，收集所有间接依赖者 */
@@ -269,20 +246,26 @@ void repo_transitive_rdeps(
 }
 
 /**
- * 加载仓库并构建反向依赖图；失败时返回空 map。
+ * 加载仓库并构建反向依赖图；索引不可用时返回空 map。
  *
  * ⚠️ 下面这次 `load_index()` **只为告警**，它**不喂给**返回的图 —— `build_repo_revdep_map()`
- * 自己不收参数、另建 `Repository` 重读一遍索引（索引因此被加载/解析多遍，属已知取舍，见
- * `scan_remove_tree()` 的说明）。所以这里只用一个局部、名字也点名此意，**别**把它误读成
- * "图的数据来源"；它的唯一价值是让"索引读不出来"这件事落一条 `warning.repo_index_load_failed`。
+ * 自己按路径重读一遍索引（索引因此被加载/解析多遍，属已知取舍，见 `scan_remove_tree()` 的
+ * 说明）。所以这里只用一个局部、名字也点名此意，**别**把它误读成"图的数据来源"；它的价值是
+ * 让"索引读不出来"这件事落一条 `warning.repo_index_load_failed`。
+ *
+ * @param edges 收哪些边 —— 由调用方按语义选（`depend remove` 两种边都要、`depend abibreak`
+ *              只看 SONAME 边），见 `repo/revdep.hpp`。
  */
-auto load_repo_revdep() -> std::unordered_map<std::string, std::unordered_set<std::string>>
+auto load_repo_revdep(RevdepEdges edges)
+    -> std::unordered_map<std::string, std::unordered_set<std::string>>
 {
     // 只为告警：读一次索引，读不出来就落一条 warning（真正的图由 build_repo_revdep_map() 自建，
     // 这次的结果**不喂给它** —— 见上面的说明）。走统一入口，别在这里各写一份 try/catch。
+    // 顺带一提：这一步**会**为远程镜像下载索引（那是 `load_index()` 的既有行为），
+    // 而紧随其后的建图只读本地缓存 —— 所以"绝不下载"是建图那一层的契约，不是这里的。
     Repository probe;
     (void)load_index_or_warn(probe);
-    return build_repo_revdep_map();
+    return build_repo_revdep_map(edges);
 }
 
 /**
@@ -356,8 +339,10 @@ void build_install_tree(ScanNode* parent, const std::string& parent_name, const 
 
 ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
 {
-    // 恒用仓库反向依赖图：计算整个仓库删除该包的影响，不看本地装了啥
-    auto rev = load_repo_revdep();
+    // 恒用仓库反向依赖图：计算整个仓库删除该包的影响，不看本地装了啥。
+    // **两种边都收**（SONAME 边 + 显式 deps 边）：删包问的是"谁依赖它"，而手写 deps 的包
+    // （纯 Python / xwayland / dlopen）**没有** SONAME 边 —— 只看 SONAME 会漏掉它们。
+    auto rev = load_repo_revdep(RevdepEdges::DepsAndSoname);
     // 仓库包名清单**只算一次**并复用：它内建 Repository + load_index + 全量排序，而
     // 同一条 `depend remove` 此前会算两遍（存在性判定一次、show_all 再一次），再加上
     // load_repo_revdep 的那次加载 —— 索引被加载/解析最多 4 遍。两次调用的输入相同、结果
@@ -419,8 +404,10 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
 
 ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all)
 {
-    // 恒用仓库反向依赖图：计算整个仓库里需要该包 SONAME 的直接依赖者
-    auto rev = load_repo_revdep();
+    // 恒用仓库反向依赖图：计算整个仓库里需要该包 SONAME 的直接依赖者。
+    // **只看 SONAME 边**：ABI 断裂后要重构建的是**链接了那个 .so** 的包；只声明包依赖、
+    // 并不链接它的包（手写 deps 的那些）不需要重构建 —— 把 deps 边并进来会让 REBUILD 清单虚增。
+    auto rev = load_repo_revdep(RevdepEdges::SonameOnly);
     ScanNode root;
     root.name = pkg_name;
     root.version = version_or_missing(pkg_name);

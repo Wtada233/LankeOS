@@ -2,6 +2,7 @@
 
 #include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/solver.hpp"
+#include "../../main/src/repo/revdep.hpp"
 #include "../../main/src/vercmp/dep_parser.hpp"
 
 using namespace solv;
@@ -240,15 +241,34 @@ TEST_F(SolverTest, NotEqualOperatorMapping)
     }
 }
 
-// 回归测试：repo_revrequires 不包含自身
-TEST_F(SolverTest, RepoRevRequiresExcludesSelf)
+// 回归测试：反向依赖图不包含自身。
+//
+// 这条原本钉的是 `solv::repo_revrequires()`（生产侧零调用、只被本用例吊着）。2026-10-03 把
+// 它与 `pkg/depend_scanner.cpp` 的第二份实现收敛成一份（`repo/revdep.hpp`），断言迁到这里：
+// 语义按"两种边都看"，而"不把 glibc 记成自己的反向依赖"改由**构建期排自环**保证
+// （不是查询期再 skip 一次 —— 那样两个消费者都得各写一遍）。
+TEST_F(SolverTest, ReverseDependencyMapExcludesSelf)
 {
     add("glibc", "2.34", {}, {"libc.so.6"}, {"libc.so.6"});
     add("appZ", "1.0", {}, {}, {"libc.so.6"});
 
-    auto rev = repo_revrequires(repo, "glibc");
-    EXPECT_TRUE(rev.contains("appZ"));
-    EXPECT_FALSE(rev.contains("glibc")) << "repo_revrequires 不应把 glibc 自身记为自己的反向依赖";
+    const auto rev = build_reverse_dependency_map(repo, RevdepEdges::DepsAndSoname);
+    ASSERT_TRUE(rev.contains("glibc")) << "appZ 链接了 glibc 提供的 libc.so.6，必须有反向依赖";
+    EXPECT_TRUE(rev.at("glibc").contains("appZ"));
+    EXPECT_FALSE(rev.at("glibc").contains("glibc")) << "反向依赖图不该把 glibc 记成自己的反向依赖";
+}
+
+// 自环的**另一条来源**：包在自己的显式 deps 里写了包名自己。
+// （老实现靠查询期的 `name == target` 跳过；新实现把自环挡在构建期，两条边都要挡。）
+TEST_F(SolverTest, ReverseDependencyMapExcludesSelfDeclaredDependency)
+{
+    add("appSelf", "1.0", {"appSelf"}, {}, {});
+    add("appOther", "1.0", {"appSelf"}, {}, {});
+
+    const auto rev = build_reverse_dependency_map(repo, RevdepEdges::DepsAndSoname);
+    ASSERT_TRUE(rev.contains("appSelf"));
+    EXPECT_FALSE(rev.at("appSelf").contains("appSelf")) << "包在自己 deps 里写自己，不许产生自环";
+    EXPECT_TRUE(rev.at("appSelf").contains("appOther")) << "别的包对它的依赖照常记";
 }
 
 // S1 回归：裸名 install 已装最新版 → no-op（既有语义，防回归）

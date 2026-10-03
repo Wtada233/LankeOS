@@ -77,7 +77,7 @@ static std::optional<std::filesystem::path> resolve_index_path()
             download_file(url, index_path, false);
         }
         // 判定用不抛的 exists_follow：索引路径若被一个符号链接环占着，`fs::exists` 会抛
-        // filesystem_error 而不是判"没有索引"（见 base/utils.hpp 的谓词说明）。
+        // filesystem_error 而不是判"没有索引"（见 base/path_predicates.hpp 的谓词说明）。
         if (!exists_follow(index_path)) {
             log_warning(string_format("warning.repo_index_missing", index_path.string()));
             return std::nullopt;
@@ -146,6 +146,50 @@ void Repository::absorb_index_line(std::string_view line)
     }
 }
 
+void Repository::sort_package_versions()
+{
+    // 每个包的版本列表按版本号升序排列（最后一个就是最新版）
+    for (auto& versions : packages_ | std::views::values) {
+        std::ranges::sort(versions, [](const PackageInfo& a, const PackageInfo& b) {
+            return version_compare(a.version, b.version);
+        });
+    }
+}
+
+/**
+ * 按**路径**解析索引文件 —— 与 `load_index()` 共用同一套解析与排序，只是不负责"去哪拿"。
+ *
+ * 逐个解析索引行，格式: 包名|版本:哈希:依赖:提供:needed_so;版本2:...|包级提供
+ *
+ * **字段切分走 base/utils.cpp 的 parse_repo_index_line（唯一实现）**：本函数与
+ * pkg/depend_scanner.cpp 曾各写一份，而那份要求版本块 ≥5 字段 —— 4 字段的行
+ * （provides 在 vh[3]、无 needed_so）在 `depend remove` / `depend abibreak` 里被整行
+ * 丢掉，静默报"无受影响包"。切分逻辑不再有任何第二份。
+ *
+ * 失败语义：**打不开**抛（`error.open_file_failed`）；**读中途出错**（`badbit`，包表可能
+ * 残缺）返回 `false`，由调用方按自己的策略处理 —— 本函数**不发任何告警、也不决定**读失败
+ * 算不算致命（两个消费者的策略有意不同，见头文件）。
+ */
+bool Repository::load_index_from_file(const std::filesystem::path& index_path)
+{
+    packages_.clear();
+    providers_.clear();
+
+    std::ifstream file(index_path);
+    if (!file.is_open()) {
+        throw LpkgException(string_format("error.open_file_failed", index_path.string()));
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        absorb_index_line(line);
+    }
+    // 非 EOF 收尾且 `bad`（实测：目录 = open 成功 + badbit；空文件是干净的 eof）⇒
+    // 读中途失败。**不抛**：调用方要先决定"这算不算致命"（见头文件的两条策略）。
+    const bool clean = !file.bad();
+    sort_package_versions();
+    return clean;
+}
+
 /**
  * 加载仓库索引文件
  * 支持远程（http/https）和本地（file://）两种方式。
@@ -160,16 +204,16 @@ void Repository::load_index()
     const auto index_path = resolve_index_path();
     if (!index_path) return;  // 告警已由 resolve_index_path 按各自的失败原因发出
 
-    // 逐个解析索引行，格式: 包名|版本:哈希:依赖:提供:needed_so;版本2:...|包级提供
-    //
-    // **字段切分走 base/utils.cpp 的 parse_repo_index_line（唯一实现）**：本函数与
-    // pkg/depend_scanner.cpp 曾各写一份，而那份要求版本块 ≥5 字段 —— 4 字段的行
-    // （provides 在 vh[3]、无 needed_so）在 `depend remove` / `depend abibreak` 里被整行
-    // 丢掉，静默报"无受影响包"。切分逻辑不再有任何第二份。
-    std::ifstream file(*index_path);
-    if (!file.is_open()) {
-        // 文件"存在"但打不开此前完全静默：解析出 0 个包 → 上层会报告"所有包都已是最新版本"，
-        // 用户以为没事（历史 TODO D4）。
+    try {
+        // 返回值（读中途出错 = 包表可能残缺）在这条路径上**有意忽略**：本函数无论读没读全，
+        // 结局都是"空/残缺仓库 + 告警"，由下面那条 packages_.empty() 兜住用户可见性。
+        // 实测契约：索引用**目录**占住时（open 成功、读即失败 ⇒ badbit）这里落的是
+        // `warning.repo_index_empty`，**不是** `repo_index_unreadable`
+        // —— `AggregatedIndexTest.DirectoryIndexIsReportedNotEmptyRepo` 钉着它。
+        (void)load_index_from_file(*index_path);
+    } catch (const std::exception&) {
+        // 文件"存在"但打不开/读不出来此前完全静默：解析出 0 个包 → 上层会报告"所有包
+        // 都已是最新版本"，用户以为没事（历史 TODO D4）。
         //
         // ⚠️ **实测订正 2026-09-26：这条分支几乎不可达，别指望它兜住"索引是目录/损坏"**。
         //    · "**竟是个目录**"不成立 —— Linux 上 `std::ifstream` **打开目录是成功的**（失败的
@@ -190,22 +234,11 @@ void Repository::load_index()
         log_warning(string_format("warning.repo_index_unreadable", index_path->string()));
         return;
     }
-    std::string line;
-    while (std::getline(file, line)) {
-        absorb_index_line(line);
-    }
 
     // 解析出 0 个包（空文件/半截下载/全是被跳过的坏行）必须告警：否则上游会把
     // "仓库为空"读成"一切正常"，`lpkg upgrade` 直接打印"所有包都已是最新版本"（历史 TODO D4）
     if (packages_.empty()) {
         log_warning(string_format("warning.repo_index_empty", index_path->string()));
-    }
-
-    // 每个包的版本列表按版本号升序排列（最后一个就是最新版）
-    for (auto& versions : packages_ | std::views::values) {
-        std::ranges::sort(versions, [](const PackageInfo& a, const PackageInfo& b) {
-            return version_compare(a.version, b.version);
-        });
     }
 }
 

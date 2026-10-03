@@ -61,7 +61,10 @@ SolveResult solve_install(const class Repository& repo,
                           const std::vector<std::pair<std::string, std::string>>& targets,
                           const SolveOptions& opts);
 
-/// 用 libsolv 求整仓反向依赖：谁 requires target 提供的 capability（soname/包名）。
-std::set<std::string> repo_revrequires(const class Repository& repo, const std::string& target);
+// 曾有两个同义入口：本头里的 `repo_revrequires()`（吃内存 Repository、两种边都看）与
+// `repo/revdep.hpp` 的 `build_reverse_dependency_map()`（生产用、当时只看 SONAME 边）。
+// 2026-10-03 收敛成**一份** —— `build_reverse_dependency_map()`，边种类由调用方选。
+// 前者的语义（两种边都看）成了 `RevdepEdges::DepsAndSoname`，它的"不包含自身"不变量
+// 改由构建期排自环保证（用例见 tests/unit/test_solver.cpp）。
 
 }  // namespace solv

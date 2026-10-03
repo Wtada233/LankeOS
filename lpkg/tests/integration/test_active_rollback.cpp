@@ -270,7 +270,7 @@ TEST_F(ActiveRollbackTest, RecursiveRemoveSIGINTMidwayRestoresAll)
     });
 
     // 模拟递归移除 rr_leaf（所有 3 个都在受影响集中）
-    EXPECT_THROW(remove_package_recursive("rr_leaf", true), LpkgException);
+    EXPECT_THROW(remove_packages_recursive({"rr_leaf"}, true), LpkgException);
 
     // 回滚后全部 3 个包应恢复
     Cache::instance().load();

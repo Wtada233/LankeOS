@@ -146,8 +146,9 @@ void finalize_staging(const fs::path& staging_root, bool no_strip)
         // 逐个文件检查 Ctrl+C：这一趟要对**整棵 staging** 做 strip（libelf，进程内、
         // 大二进制上可达秒级/文件），是 build 里最容易"按了没反应"的窗口之一。
         check_sigint_abort();
-        // 判定走**不抛**形态（见 base/utils.hpp 的谓词族）：`directory_entry::is_regular_file()`
-        // 走 `status()`（**跟随**末段链接），而这里扫的是**构建 staging = 包内容** —— 源码树里
+        // 判定走**不抛**形态（见 base/path_predicates.hpp
+        // 的谓词族）：`directory_entry::is_regular_file()` 走
+        // `status()`（**跟随**末段链接），而这里扫的是**构建 staging = 包内容** —— 源码树里
         // 有一个符号链接环（上游自指链接很常见）就会抛 ELOOP，把整个构建打死。
         std::error_code fec;
         if (it->path().extension() == constants::EXT_LA && fs::is_regular_file(it->path(), fec) &&

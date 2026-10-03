@@ -28,8 +28,9 @@
 17. [2026-10-03 第二批审计修复](#17-2026-10-03-第二批审计修复行为--不变量变更)
 18. [2026-10-03 第三批修复](#18-2026-10-03-第三批修复行为--不变量变更)
 19. [2026-10-03 第四批修复（四路子 agent 复审后的收口）](#19-2026-10-03-第四批修复四路子-agent-复审后的收口)
-20. [附录：完整 WAL 示例总结](#附录完整-wal-示例总结)
-21. [附录 B：代码注释里的 `历史 TODO.md <编号>` 是什么](#附录-b代码注释里的-历史-todomd-编号-是什么)
+20. [2026-10-03 第五批：两条中危缺陷 + 保留命名空间表 + 反向依赖收敛 + `utils.hpp` 拆分](#20-2026-10-03-第五批两条中危缺陷--保留命名空间表--反向依赖收敛--utilshpp-拆分)
+21. [附录：完整 WAL 示例总结](#附录完整-wal-示例总结)
+22. [附录 B：代码注释里的 `历史 TODO.md <编号>` 是什么](#附录-b代码注释里的-历史-todomd-编号-是什么)
 
 ---
 
@@ -120,7 +121,7 @@
 > （而不是"还原"）。改成 `exists_no_follow` 后，悬空链接算"名字被占" ⇒ 走有备份的那一支。
 >
 > 始终成立**：`Cache` 的四个 DB 写函数与 `wal::write_string_file_wal` 都带
-> `DurableFsyncGuard`（`base/utils.hpp`）。理由是不可恢复窗口：备份
+> `DurableFsyncGuard`（`base/fs_atomic.hpp`）。理由是不可恢复窗口：备份
 > `.lpkg_db_bak_before:*` 在批次提交后立刻被 `cleanup_db_backups()` 删掉，若新库只
 > rename 到页缓存，断电就落在"库空/截断 + 唯一备份已删"上（`files.db`/`pkgs` 是单文件，
 > 丢了就是全库所有权归零）。每里程碑只多约 5 次 fsync。（对照：libalpm 从不 fsync、
@@ -659,7 +660,7 @@ reinstall 后符号链接被 rename 进 stash、再建出实体目录（系统�
 采用的判据（逐条对应 libalpm 的实现与回归测试）：
 
 1. **判"盘上是什么"一律 `lstat`（不跟随末段），且必须先剥尾斜杠**
-   （`strip_trailing_slash()`，`base/utils.hpp`）。pacman 侧这是**两件事**，别混：
+   （`strip_trailing_slash()`，`base/path_predicates.hpp`）。pacman 侧这是**两件事**，别混：
    `llstat()` 在 `src/common/util-common.c`（尾斜杠剥离 + lstat，剥离来自 commit
    `bbeced26`，2014）；而 **FS#51377 修的是 `remove.c` 的 `unlink_file` 在判类型前自己
    剥尾斜杠**（commit `0fd8455c` / cherry-pick `16b91f79`，2017-04-09，随附测试
@@ -2289,7 +2290,7 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 - **6.5 集成测试** — 多个测试文件覆盖：批量安装/移除/升级、依赖链、provides 解析、版本约束、config 保护、SIGINT 保护、并发锁、autoremove、recursive remove。
 - **6.6 CLEANUP 阶段测试** — `tests/unit/test_cleanup.cpp`（26 tests）。覆盖 CLEANUP 解析与不可逆性、stash / `DIR_RM` 恢复、随机后缀唯一性、rec CLEANUP 续传、安全检查、现有行为回归。
 - **6.7 双重回滚回归（2026-08-03）** — `tests/integration/test_active_rollback.cpp`。升级中途 COPY 失败 / COMMIT 后失败 → 旧文件必须保留（曾双重回滚删旧文件）；CLEANUP write-ahead 崩溃窗口 → 整批可恢复。
-- **6.8 全量** — 当前全量运行读数：**1158 tests / 142 suites / 1157 PASSED / 0 FAILED**（docker 容器 `make test`，2026-10-03）。同一时点现数的宏数也是 **1158 / 142 suites**（`grep -rhE 'TEST(_F|_P)?\(' tests/ | wc -l`）。1 SKIPPED = `UpgradePropertyTest.SingleSeedReplay`，它是需要显式指定种子的复现入口。覆盖上述全部章节。**该数字随加测试而变，别当契约** —— 要引用它请现数一次；`tests/` 才是唯一事实来源。
+- **6.8 全量** — 当前全量运行读数：**1164 tests / 143 suites / 1163 PASSED / 0 FAILED**（docker 容器 `make test`，2026-10-03 第五批之后）。同一时点现数的宏数也是 **1164 / 143 suites**（`grep -rhE 'TEST(_F|_P)?\(' tests/ | wc -l`）。1 SKIPPED = `UpgradePropertyTest.SingleSeedReplay`，它是需要显式指定种子的复现入口。覆盖上述全部章节。**该数字随加测试而变，别当契约** —— 要引用它请现数一次；`tests/` 才是唯一事实来源。
 
 ---
 
@@ -2369,7 +2370,7 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
   命令**继续走到完成行**且退出码 0；`remove -r` 输错验证码就是这个症状。）
 - ⚠️ 两条文案（`info.sigint_aborted` / `info.user_aborted`）必须**与操作无关** —— 它们被
   install / upgrade / remove 共用，别再写死"安装"（原先卸载操作会打"安装被用户中止"）。
-- ⚠️ **所有交互式输入都必须走 `read_line_interruptible()`**（`base/utils.hpp`）：裸
+- ⚠️ **所有交互式输入都必须走 `read_line_interruptible()`**（`base/process.hpp`）：裸
   `std::cin >> x` / `std::getline(std::cin, …)` 在输入期间**不可中断** —— glibc 的 handler 带
   `SA_RESTART`，被打断的 `read` 会被自动重启，于是 Ctrl+C 只置标志、进程仍卡着
   （用户看到"**Ctrl+C 无效，只能 kill -9**"）。回归测试 `tests/unit/test_prompt_interrupt.cpp`
@@ -2662,7 +2663,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 2. **`apply_soname_links()` 的目录跟随可穿透 `--root`**：它用 `is_directory_follow` 判定入参，
    而 `<root>/usr/lib` **本身**可以是一条包发的逃逸符号链接（末段不解析是有意的，§5.4 不变量 6）
    ⇒ 提交后的触发器会在**宿主**目录里建/删 SONAME 链接。新增判据
-   `base/utils.hpp::path_resolves_within()`（**整条路径都解析** —— 与只解析父目录的
+   `base/path_safety.hpp::path_resolves_within()`（**整条路径都解析** —— 与只解析父目录的
    `path_within_resolved` 分工不同：那个用于"要处置的名字"，这个用于"要**进入**的目录"），
    在 `trigger.cpp` 与 `builder.cpp` 两个调用点各挡一次，**只告警不抛**（触发器跑在提交之后，
    抛了等于"包已装好却报命令失败"）。
@@ -2721,6 +2722,163 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 - "root 之外那个目录里什么也没多出来"**不具区分力**：让开趟对 `usr/lib/` 走 `StashAndMkDir`，
   会**先把挡路符号链接 rename 进 stash、再建真目录**，所以即便调用点改回裸路径也不会真写出去。
   真正区分接线的断言是"该抛 `install_escape_root` 的必须抛"（用例就是这么钉的）。
+
+---
+
+## 20. 2026-10-03 第五批：两条中危缺陷 + 保留命名空间表 + 反向依赖收敛 + `utils.hpp` 拆分
+
+起因是一轮**全仓评估**（四路并行只读审计 + 全量测试 1158/142 实测全绿）。两路审计各报出
+**新缺陷**，都是本仓库自己命名的缺陷形态（"同族判据只推了一条分支" / "第二实现必漂移"）。
+全程按纪律：**先写会红的测试、再改代码**（三条新用例各自红/绿的原始输出都留过档）。
+
+### 20.1 `apply_soname_links()` 的 confinement 只做了词法层（可达，`--root` 下穿透）
+
+- **现象**：`elf/lib_utils.cpp` 里按 SONAME 生成链接前的守卫用的是 **`path_within()`** ——
+  那是**纯词法**判据（`base/path_predicates.hpp` 的说明写着"不碰文件系统、不解析任何符号链接"）。
+  而这条路径**注定要被跟随使用**（`fs::create_symlink` / `fs::remove`）。
+- **可达链**：包同时发 ① 一条 `content/usr/lib/sub -> /etc` 的符号链接
+  （`write_symlink_entry` 对**链接目标不做任何校验**，直接 `read_symlink`）与 ② 一个
+  `DT_SONAME = "sub/EVIL.so"` 的库（`get_elf_soname()` 对 SONAME 内容**零校验**）。
+  于是 `lib_dir/sub/EVIL.so` **词法上完全在** lib_dir 内 ⇒ 放行 ⇒ `create_symlink` 穿过
+  `sub`，在 `<root>` 之外建出链接。
+- **为什么是"同族判据只推了一条分支"**：两个调用点（`trigger/trigger.cpp` 的 ldconfig 触发器、
+  `build/builder.cpp` 的 staging）在 2026-10-03 已经加了 `path_resolves_within(lib_dir, root)`，
+  注释里连"包发的 `usr/lib -> <root 外>` 链接是有意放行的，不挡就是在宿主目录里建/删链接"都写明了 ——
+  但那道守卫只护 `lib_dir` **自身**，护不到它的**子项**。
+- **修法**：判据换成 **`path_within_resolved()`**（词法级 + **只解析父目录**的 canonical 复核）。
+  裸 SONAME 时 `parent_path() == lib_dir`，行为与旧判据逐字相同；绝对路径 SONAME 仍由它内部的
+  词法层拒掉。解不开（ELOOP）时它 fail-open —— 与全仓"判定一律不抛"的取向一致，且此时
+  `create_symlink` 会失败并被下面的 catch 转成告警，**不构成逃逸**。
+  不采用"对 soname 调 `is_safe_path_component`"：那个判据还拒 `,;|^~:` 与空白，概念上属于
+  包名/版本号域，拿来判 SONAME 是语义串味。
+- **用例**：`SolverRegressionTest.SonameWithSlashCannotEscapeThroughIntermediateSymlink`
+  （`tests/integration/test_solver_regressions.cpp`）。⚠️ 断言必须用 **`fs::is_symlink`（lstat 语义）**：
+  `create_symlink` 建的是**悬空**链接（目标是同目录裸文件名），而 `fs::exists()` 对悬空链接
+  返回 false —— **用它做断言的话，"链接建没建出来"都判 false**，是一条恒真废话
+  （实测：`is_symlink=true / exists=false`）。修前该用例的失败信息直接打出了逃逸出去的真实路径。
+
+### 20.2 归档成员名守卫漏了第四个自用命名空间 `.lpkg_bak_`（可达，静默删已装文件）
+
+- **现象**：`archive/archive.cpp` 的 `member_name_rejection_message()` 按 `/` 切分量、只拒
+  **以** `.lpkgnew`/`.lpkgtmp`/`.lpkgsave` **结尾**的分量；而 `constants::SUFFIX_LPKG_BAK`
+  （`.lpkg_bak_`）是**前缀**形态（`.lpkg_bak_<pkg>_<pid>`）—— 既没被列进去，`ends_with`
+  结构上也抓不到。
+- **后果（可达且静默）**：包发 `content/.lpkg_bak_x_999999/payload` 能合法装进
+  `<root>/.lpkg_bak_x_999999/` 并登记进 `files.db`；而 `cleanup_orphan_stashes()`
+  **正是**按这个前缀 + 尾段 pid 已死（`kill(pid,0)` → `ESRCH`）就 `remove_all`
+  ⇒ **下一次任意 lpkg 命令**把已装文件连同目录静默删掉，盘面与 DB 当场脱节
+  （`query` 说文件属于某包、盘上已经没了）。
+- **修法（含"防漂移"的结构改动）**：在 `base/constants.hpp` 立**唯一一张表**
+  `RESERVED_MEMBER_NAMES[]`（`{token, starts_with}`），守卫**遍历它**，不再在守卫里另列一遍。
+  2026-10-03 的缺陷正是"常量头里有 `SUFFIX_LPKG_BAK`、守卫里只硬编码了另外三个"。
+  ⚠️ 判据语义**不许改成子串匹配**：`tests/unit/test_archive_member_name_safety.cpp` 有**明文
+  正面对照**断言"若写成 `find() != npos` 就会误拒 `x.lpkgnewx` / `foo.lpkgtmp.txt` 这类合法名"。
+- **同一判据的三处重复一并收敛**：`base/utils.cpp`（裸字面量）、`db/wal_op.cpp`（裸字面量）、
+  `db/recover.cpp`（用常量）各写了一遍 `.lpkg_bak_` 前缀判定 —— 新增
+  **`base::is_stash_dir_name()`** 作为唯一实现，三处共用。
+- **l10n 同步**：`error.unsafe_member_suffix` 的文案此前只列三个后缀（用户照它定位不到真因），
+  en/zh 两份都补上 `.lpkg_bak_`；用例断言里也钉了"文案必须跟上判据"。
+- **用例**：`ArchiveMemberNameSafetyTest.ReservedStashNamespaceIsRejectedInAnyPathComponent`
+  + fuzz 语料补 `tests/fuzz/corpus/archive_name/reject_lpkg_bak`（此前三个命名空间都有语料，
+  唯独缺它）。
+
+### 20.3 反向依赖的两份实现 → 一份（边种类由调用方选）
+
+- **现象**：生产侧 `pkg/depend_scanner.cpp` 的 `build_repo_revdep_map()` **只看 SONAME 边、
+  完全忽略显式 `deps`**；而 `pkg/solver.cpp` 的 `repo_revrequires()`（两种边都看）**生产侧
+  零调用**、只被一个单测吊着。两份问的是同一个问题 —— 必漂移。
+- **可达性（先写测试定性，已证实）**：本仓库的 `deps` 多由 farm 从 needed_so 推导，两种边通常
+  重合；但**手写 deps 的那几类例外**（纯 Python 包 / `xwayland` / **dlopen** 加载的依赖如
+  `kf-networkmanager-qt` → `networkmanager`）编译期不链接、ELF 里没有 DT_NEEDED ⇒ deps 是
+  **唯一**的依赖声明，只看 SONAME 边会漏掉整条边 ⇒ `depend remove` / `depend abibreak`
+  给出**少算的清单**（静默的错误答案）。用例 `IndexParityTest.ExplicitDependencyEdgeIsHonoured`
+  在修前为红（受影响集只有 `libA` 自己，`appB` 整个不见了）。
+- **修法**：新建 `repo/revdep.{hpp,cpp}` 的 **`build_reverse_dependency_map(repo, edges)`**
+  —— 唯一实现；`edges ∈ {SonameOnly, DepsAndSoname}`。
+  - `depend remove`（"删掉 A 会波及谁"）→ **两种边都看**；
+  - `depend abibreak`（"ABI 断裂后谁要重构建"）→ **只看 SONAME 边**：只声明包依赖、
+    并不链接那个 `.so` 的包**不该**被报成要重构建，把 deps 边并进同一张图就是让 REBUILD 清单虚增
+    （用例 `AbibreakIgnoresExplicitDependencyEdge` 把这条决定钉住）。
+  - 版本策略保持 **latest-only**（既有 `LatestVersionIsByVersionOrderNotFileOrder` 钉着它；
+    改 all-versions 会让 `depend` 报出"最新版早已不依赖它"的包 ⇒ 误报膨胀）。
+  - **自环在构建期排除**（不靠查询期 skip）：原来 `repo_revrequires` 靠查询期 `name == target`
+    跳过，两份实现各写一遍；现在只在建图处挡一次，"不把自己记成自己的反向依赖"这条不变量
+    由用例 `SolverTest.ReverseDependencyMapExcludesSelf{,DeclaredDependency}` 钉住。
+- **`Repository::load_index_from_file(path)`**（新）：**只按路径读、绝不下载**。反向依赖图
+  **不能**改用 `load_index()` —— 那会对远程镜像 `download_file`，把"没有索引 ⇒ 空图"变成
+  "偷偷联网"。
+- **⚠️ 一个被既有用例当场打回来的设计错误（值得记）**：第一版让 `load_index_from_file()` 在
+  `file.bad()` 时**抛** `error.read_file_failed`，于是**把两个消费者的不同策略烘进了共享函数** ——
+  `AggregatedIndexTest.DirectoryIndexIsReportedNotEmptyRepo` 立刻变红：它钉的是"索引用一个
+  **目录**占住时（Linux 下 `ifstream` 打开目录成功、随后的读才失败）`load_index()` 要落
+  `warning.repo_index_empty`"这条**实测契约**。两条策略**有意不同**（`load_index()`：读不出内容
+  ⇒ 降级成空仓库 + 告警，因为离线装本地 `.lpkg` 是常见用法；反向依赖图：⇒ fail-closed 抛错，
+  因为静默当空会让它报"无受影响包"这个**错误答案**）。修法是**让共享函数只报告结果**
+  （返回 `bool clean`），**策略留给调用方**。
+
+### 20.4 `base/utils.hpp` 拆出子头（聚合头转发，调用方零改动）
+
+- **现状**：611 行声明、被 **90 个文件**包含，同时住着日志、进程执行、用户交互、并发锁、
+  临时目录、路径谓词族、索引解析、集合文件 IO、fsync 一族、路径安全判据、stash、字符串、
+  xattr、base64 —— 事实上的 god header。
+- **做法**：按职责拆成 **11 个子头**（`process` / `locking` / `tmpdir` / `path_predicates` /
+  `path_safety` / `stash` / `fs_atomic` / `io_set_file` / `repo_index` / `strings` / `xattr`），
+  `utils.hpp` 变成**只含 `#include` 的聚合头** ⇒ 90 个包含者**一个都不用改**。
+  `base/utils.cpp` 本轮不动。
+- **⚠️ 聚合头必须保留原来的 std/`constants.hpp`/`exception.hpp` include**：90 个包含者长期靠它
+  **传递**拿到这些头。拆头时删掉它们会同时打断一批"自己没写 include、全靠这里传递"的文件
+  （仓库的已知形态：**别用 grep 预判影响面，直接 `make -k` 一次把所有错误抖出来** —— 本次
+  `make -k` 全绿，未见断裂）。
+- **验证"纯搬移"用机械证据**（不是"人工看了一遍"）：① 去掉注释与空行后做**行集合对照**
+  （`git show HEAD:… | norm` vs 新文件 `norm`，`comm -23`）—— 只剩 **1 行**差异，即本次有意
+  改写的 include 注释；② **逐个**子头单独 `g++ -std=c++20 -fsyntax-only` 全绿（聚合头会**掩盖**
+  子头漏 include，这一步不能省）。
+- **顺带清理过期指认**：代码注释与文档里约 20 处"见 `base/utils.hpp` 的谓词说明/strip_trailing_slash/
+  `path_resolves_within`/`read_line_interruptible`/`copy_xattrs`/`DurableFsyncGuard`"全部改指对应子头
+  —— 这些引用在聚合头下**并没有失效**，但不改就是下一批"过期地址"。
+
+### 20.5 同批小缺陷
+
+| 位置 | 问题 | 处置 |
+|---|---|---|
+| `archive/downloader.cpp` | `download_with_retries()` 捕 `const LpkgException&`，而 **`UserAbort` 是它的子类** ⇒ 用户 Ctrl+C 被当成可重试失败：删掉已落位的输出文件、打「正在重试」、**空转 5 次**（重试期间 `sigint_graceful` 仍为真、进度回调立刻又中止 curl） | 在宽 catch **之前**单独接住 `UserAbort` 并 `throw;`（与 `main_cli.cpp` 的 catch 顺序同款）。用例 `DownloadCancelTest.CancelIsNotRetried`，两个独立锚点：stderr 里不得出现重试告警 + 已落位的输出文件不得被删 |
+| `pkg/depend_scanner.cpp` | 回退路径上的 `catch (...) { return rev; }` **静默**返回空图 ⇒ `depend remove/abibreak` 报"无受影响包"（错误答案），与同文件"打不开就抛"的取向相反 | 改落 `warning.repo_mirror_config`（与 `resolve_index_path()` 的同一种失败同源） |
+| `pkg/package_manager.cpp` | 注释"（失败仅告警语义在上层？此处静默）"**不实** —— `remove_stash_dir` 自身就打 `warning.cleanup_failed` | 改成自足且正确的表述（防后人按注释"补上层告警"造成重复告警） |
+| `tests/integration/test_cancel_semantics.cpp` | 断言输出不含 `info.install_complete`，而**该键根本不存在** ⇒ `get_string` 返回 `[MISSING_STRING: …]` ⇒ **恒真断言** | 删掉该行（下一行已用**存在**的键 `info.install_summary` 断言同一件事） |
+| `base/constants.hpp` | `constants::TAB` **零引用**（全仓生产/测试各 0 处） | 删 |
+
+> ⚠️ **一条被实测推翻、因而不改的审计结论**（留档免得下轮再报）：审计报
+> `elf/lib_utils.cpp` 第二遍清理悬空 SONAME 链接时的 `fs::exists(entry.path(), ec)`
+> **只判返回值不判 `ec`**，而姊妹点写的是 `!fs::exists(...) || ec`，属"同族判据只推一条分支"。
+> **实测不成立**：`fs::exists(p, ec)` 对**真悬空**（ENOENT）返回 false 且 **`ec` 被清成 0**；
+> 只有 ELOOP / EACCES / EIO 才让 `ec != 0`（实测 ELOOP → `ec=40`）。补 `|| ec` 会把**环链接**
+> 从"清理"变成"永久留下" —— 那不是修缺陷、是改语义（该函数的职责就是收尾解不开的 SONAME 链接）。
+> 而 `:106` 那个 `|| ec` 是**另一极性**的用途（判"链接是否正确"⇒ 判不出来就重建，是安全动作），
+> 两者不可互推。真正"判不出来"的只剩 EACCES/EIO，而 lpkg 恒以 root 跑、目标在自家 `usr/lib` 下
+> —— 不可达，不为它写分支。**结论写进代码注释**，未改代码。
+
+### 20.6 死 API 的判定：**"只有测试在用"要分两种**
+
+一轮复核里对四个"生产零调用"的 API 做了逐个判定。**它们不是同一类东西**，判定依据是
+"删掉它，有没有一条**生产不变量**失去唯一的观测点"：
+
+| API | 它到底是什么 | 判定 |
+|---|---|---|
+| `remove_package_recursive()`（单数） | **三行纯转发**给复数版；测试借它走一遍，而生产全走复数版 | **删**：迁移 4 个测试调用点，覆盖一点不丢（行为在复数版里） |
+| `write_set_to_file()` | 生产写集合文件走的是 `Cache` 自己的 `ofstream + fsync_and_rename`，**根本不用它**；唯一消费者是与 `read_set_from_file` 的往返测试 | **删**：测试改成直接 `ofstream` 造文件 —— 读侧覆盖保住，且不再"自己写、自己读" |
+| `conf_hashes_for_path()` | "这个路径上有没有**任何**记录"；两处取证用它做粗粒度存在性检查 | **删**：两处改用 `get_conf_hash(path, pkg)` —— 问得更**紧**（哪个包的记录），旧 API 唯一的价值是让用例少写一个包名 |
+| `wal_type_is_reversible()` | `UNDO_TABLE` 的**唯一观测点** | **保留**：它守的是"新增 WAL 类型忘了登记 ⇒ 回滚静默少做一步"这条**生产不变量**（数据一致性），删它等于删掉那条闸门。生产不调用它，但它观测的是生产行为 |
+
+**判据（可复用）**：一个只有测试在用的 API，如果它**只是通往生产行为的另一条门**
+（入口/包装/转发），那是死代码，删；如果它**是某条不变量唯一的观测点**，那它活着 ——
+"生产零调用"与"无用"不是一回事。反过来说也成立：**测试自己写、自己读的往返用例
+（`write_set_to_file` + `read_set_from_file`）什么也没证明** —— 它证明的是"我的写法和我的
+读法对得上"，而不是"读侧能吃下**生产写出来的**那种文件"。这类往返用例要改成直接造**生产形态**
+的输入。
+
+**验证**：全量 `1164 tests / 143 suites / 1163 PASSED / 0 FAILED / 1 SKIPPED`
+（基线 1158/142，本次 +6 条用例，全部是"先红后绿"的回归网），
+`make format-check` **211 个文件 0 残留**，`make -k` 无传递包含断裂。
 
 ---
 

@@ -317,6 +317,52 @@ TEST_F(SolverRegressionTest, SonameEscapingLibDirIsNotLinked)
     EXPECT_TRUE(fs::is_symlink(libdir / "libgood.so.1")) << "合法 SONAME 链接没建";
 }
 
+TEST_F(SolverRegressionTest, SonameWithSlashCannotEscapeThroughIntermediateSymlink)
+{
+    // 上一条只覆盖**绝对路径 SONAME**（`lib_dir / "/abs"` 被词法判据直接拒掉）。
+    // 这一条覆盖**词法上看不出问题**的那一半：SONAME 带 `/`（如 `sub/EVIL.so`）+ 包里同时
+    // 发一条 `usr/lib/sub -> <lib_dir 之外>` 的符号链接（`write_symlink_entry` 对链接目标
+    // **不做任何校验**）⇒ `path_within(lib_dir/sub/EVIL.so, lib_dir)` **词法上完全成立**，
+    // 而 `fs::create_symlink` 会穿过中间段的 `sub`，把链接建到 lib_dir 之外。
+    //
+    // 两个调用点（`trigger.cpp` 的目标 root、`builder.cpp` 的 staging）在 2026-10-03 加了
+    // `path_resolves_within(lib_dir, root)` —— 但那道守卫只护 `lib_dir` **自身**，
+    // 护不到 `lib_dir` 的**子项**：同族判据只推了一条分支。
+    if (!gcc_available()) GTEST_SKIP() << "gcc 不可用";
+    const fs::path libdir = test_root / "usr/lib/sonametest_sub";
+    fs::create_directories(libdir);
+    const fs::path outside = suite_work_dir / "outside_libdir";  // lib_dir 之外
+    fs::create_directories(outside);
+    fs::create_directory_symlink(outside, libdir / "sub");
+
+    const fs::path src = suite_work_dir / "soname_slash_probe.c";
+    std::ofstream(src) << "int probe(void){return 1;}\n";
+    const fs::path evil_so = libdir / "libevil.so.1.0";
+    const std::string cmd = "gcc -shared -fPIC -Wl,-soname,sub/EVIL.so -o " + evil_so.string() +
+                            " " + src.string() + " 2>/dev/null";
+    if (std::system(cmd.c_str()) != 0) GTEST_SKIP() << "无法编译测试用共享库";
+
+    apply_soname_links(libdir);
+
+    // ⚠️ 断言必须用 `is_symlink`（lstat 语义）：`create_symlink` 建出的链接指向**同目录裸
+    // 文件名**，在 `outside/` 下它是**悬空**的 —— `fs::exists()` 对悬空链接返回 false，
+    // 拿它当判据的话，链接**建没建出来都判 false**，是一条恒真废话（实测：is_symlink=true
+    // 而 exists=false）。
+    EXPECT_FALSE(fs::is_symlink(outside / "EVIL.so"))
+        << "SONAME 里的 '/' 让链接穿过了中间段符号链接，写到 lib_dir 之外：" << outside / "EVIL.so";
+    EXPECT_FALSE(fs::is_symlink(outside / "libevil.so.1.0"))
+        << "同一条链路的绝对目标形态也必须在 lib_dir 之外被拦下";
+
+    // 正向对照：普通裸 SONAME 仍必须在 lib_dir 内建链接（守卫过严会连合法链接一起拒掉）
+    const fs::path good_so = libdir / "libgood.so.1.0";
+    const std::string cmd2 = "gcc -shared -fPIC -Wl,-soname,libgood.so.1 -o " + good_so.string() +
+                             " " + src.string() + " 2>/dev/null";
+    ASSERT_EQ(std::system(cmd2.c_str()), 0);
+    apply_soname_links(libdir);
+    EXPECT_TRUE(fs::is_symlink(libdir / "libgood.so.1"))
+        << "合法的裸 SONAME 链接没建出来 —— 守卫把正常路径也拒了";
+}
+
 // ============================================================================
 // X4：包名/版本号来自不可信元数据，绝不能当路径分量用
 // ============================================================================

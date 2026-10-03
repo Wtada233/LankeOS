@@ -58,8 +58,9 @@ void TriggerManager::load_config()
     // 所以必须告警——但只告警一次（每次 check_file 都打印会淹没输出），
     // 且**不能置 config_loaded**：调用方可能在之后才创建该文件（首次安装/测试即是），
     // 置位会让它永远不被加载。
-    // 判定用**不抛谓词族**（见 base/utils.hpp）：`fs::exists` 在中间段成环（ELOOP）时会抛，
-    // 判定类调用不该有能力打断命令。用 follow 语义：配置文件是符号链接时按**目标**判定 ——
+    // 判定用**不抛谓词族**（见 base/path_predicates.hpp）：`fs::exists`
+    // 在中间段成环（ELOOP）时会抛， 判定类调用不该有能力打断命令。用 follow
+    // 语义：配置文件是符号链接时按**目标**判定 ——
     // 悬空链接视同缺失（否则会静默跳过加载、所有触发器失效）。
     //
     // "配置不可用"有**两种**：文件缺失，与文件存在却打不开。两种的用户可见后果完全一样
@@ -169,7 +170,7 @@ void TriggerManager::run_all()
             // 包发的 `usr/lib -> <root 外>` 链接是**有意**放行的（§5.4 不变量 6 只解析父目录）
             // ⇒ 不挡就是"提交之后在宿主的那个目录里建/删链接"。
             // 这里**只告警不抛**：触发器跑在批次提交之后，抛了等于"包已装好却报命令失败"
-            // （与其余触发器失败的处置一致）；判据见 `base/utils.hpp::path_resolves_within`。
+            // （与其余触发器失败的处置一致）；判据见 `base/path_safety.hpp::path_resolves_within`。
             const std::filesystem::path soname_dir = Config::instance().root_dir() / "usr/lib";
             if (!path_resolves_within(soname_dir, Config::instance().root_dir())) {
                 log_warning(string_format("warning.soname_dir_outside_root", soname_dir.string()));

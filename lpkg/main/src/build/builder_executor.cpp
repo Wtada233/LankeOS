@@ -660,7 +660,7 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
 fs::path detect_source_tree(const fs::path& work_root)
 {
     // 不抛判定：work_root 下就是解压出来的**上游源码树**，里面可能有符号链接环；
-    // 判定类调用不该有能力把构建打死（见 base/utils.hpp 的谓词族）。
+    // 判定类调用不该有能力把构建打死（见 base/path_predicates.hpp 的谓词族）。
     if (!is_directory_follow(work_root)) {
         return work_root;
     }

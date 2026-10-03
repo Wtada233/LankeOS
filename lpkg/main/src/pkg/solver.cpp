@@ -676,39 +676,4 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
     return result;
 }
 
-std::set<std::string> repo_revrequires(const Repository& repo, const std::string& target)
-{
-    std::set<std::string> result;
-    // target 被谁依赖：deps 指名 target，或 needed_so 由 target 提供（repo 权威 provider 源）
-    for (const auto& [name, versions] : repo.packages()) {
-        if (name == target) continue;
-        bool hit = false;
-        for (const auto& pkg : versions) {
-            for (const auto& dep : pkg.dependencies)
-                if (dep.name == target) {
-                    hit = true;
-                    break;
-                }
-            if (hit) break;
-            for (const auto& so : pkg.needed_so) {
-                // 不能只问 find_provider（它返回**第一个**提供者）：同一 SONAME 可能有
-                // 多个提供者（捆绑/私有 .so），只取第一个会漏掉 target 是提供者的情形
-                const auto tp = repo.packages().find(target);
-                if (tp != repo.packages().end()) {
-                    for (const auto& tv : tp->second) {
-                        if (std::ranges::find(tv.provides, so) != tv.provides.end()) {
-                            hit = true;
-                            break;
-                        }
-                    }
-                }
-                if (hit) break;
-            }
-            if (hit) break;
-        }
-        if (hit) result.insert(name);
-    }
-    return result;
-}
-
 }  // namespace solv

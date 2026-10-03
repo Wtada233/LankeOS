@@ -92,28 +92,30 @@ TEST_F(UtilsTest, EnsureFileExists_AlreadyExists)
     EXPECT_TRUE(fs::exists(f));
 }
 
-TEST_F(UtilsTest, ReadWriteSetToFile)
+TEST_F(UtilsTest, ReadSetFromFile)
 {
-    std::unordered_set<std::string> data = {"foo", "bar", "baz"};
-    fs::path f = test_dir / "set.txt";
-
-    write_set_to_file(f, data);
-    EXPECT_TRUE(fs::exists(f));
-
-    auto loaded = read_set_from_file(f);
-    EXPECT_EQ(loaded, data);
+    // 直接用 ofstream 造文件 —— 不经过任何"写集合"的助手：生产侧写集合文件的是
+    // `Cache` 自己的 `ofstream + fsync_and_rename`，曾经那个 `write_set_to_file()`
+    // 生产零调用（2026-10-03 删），留着它只会让这条用例变成"自己写、自己读"的往返，
+    // 证明不了读侧对**真实文件格式**的处理。
+    const fs::path f = test_dir / "set.txt";
+    {
+        std::ofstream of(f);
+        of << "foo\nbar\nbaz\n";  // 每行一个元素；末尾换行是生产写侧的形态
+    }
+    const std::unordered_set<std::string> expected = {"foo", "bar", "baz"};
+    EXPECT_EQ(read_set_from_file(f), expected);
 }
 
-TEST_F(UtilsTest, ReadWriteSetToFile_Empty)
+TEST_F(UtilsTest, ReadSetFromFile_Empty)
 {
-    std::unordered_set<std::string> empty;
-    fs::path f = test_dir / "empty_set.txt";
-
-    write_set_to_file(f, empty);
-    EXPECT_TRUE(fs::exists(f));
-
-    auto loaded = read_set_from_file(f);
-    EXPECT_TRUE(loaded.empty());
+    const fs::path f = test_dir / "empty_set.txt";
+    {
+        std::ofstream of(f);  // 存在但为空
+    }
+    // "存在但空" ≠ "缺失"：后者按策略抛（见 ReadSetFromFile_NotFound），前者是合法空集
+    EXPECT_TRUE(read_set_from_file(f).empty());
+    EXPECT_TRUE(read_set_from_file(f, MissingSetFilePolicy::Empty).empty());
 }
 
 TEST_F(UtilsTest, ReadSetFromFile_NotFound)

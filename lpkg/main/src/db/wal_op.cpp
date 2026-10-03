@@ -294,7 +294,8 @@ constexpr int DB_BAK = -1;
 /// 表里一格的路径引用：取哪个字段 + 取用时是否剥尾斜杠
 struct ArgRef {
     int field = 0;       ///< 0 = 本行没有这一侧
-    bool strip = false;  ///< 目录键 / 归档目录条目形态（见 base/utils.hpp）
+    bool strip = false;  ///< 目录键 / 归档目录条目形态（见 base/path_predicates.hpp 的
+                         ///< strip_trailing_slash）
 
     constexpr bool present() const
     {
@@ -424,7 +425,7 @@ constexpr UndoRow UNDO_TABLE[] = {
     //
     // **原位侧剥尾斜杠、审计行仍记 WAL 里的原样字面**：`/etc` 的目录条目形态由调用点传入
     // （`un_stash(rec.bak, physical_path)`，physical_path 可能是目录键形态）；判定类调用
-    // 落到链接目标上的坑见 base/utils.hpp。
+    // 落到链接目标上的坑见 base/path_predicates.hpp。
     // 审计记录的是**实际动作**（orig → bak，即"再搬进 stash"），不是"还原"——所以两侧的
     // 方向与 BACKUP 的 RESTORE_FILE 行恰好相反。两行的审计列字面相同（都是 arg2 → arg1）
     // 纯属参数顺序对调：**方向由 `undo` 列定义**，审计列只是把同一次 rename 渲染成源 → 宿。
@@ -470,7 +471,7 @@ constexpr UndoRow UNDO_TABLE[] = {
     // 任何"新版本改了某个已存在目录的 mode"的批次失败都会踩到。
     // 三个格的要点：
     //   · `strip = true`：路径来自目录条目（可能带尾斜杠），尾斜杠会让 lchown/chmod
-    //     **穿透**到末段符号链接的**目标**上（见 base/utils.hpp 的谓词说明）。
+    //     **穿透**到末段符号链接的**目标**上（见 base/path_predicates.hpp 的谓词说明）。
     //   · `Guard::RealDir`：只回写真正还是目录的那些 —— 目录已被更晚的逆操作删掉时跳过，
     //     **不重建**（重建会造出一个本不该存在的路径；那不是本行的职责，`DIR_RM` 才有）。
     //   · `Stat::None`：**不计进 `dirs_recreated`** —— 本行没有重建任何目录，混进那个计数器
@@ -1228,7 +1229,8 @@ fs::path stash_root_of_bak(const fs::path& bak_in)
     // 变成灾难。剥掉不改变任何今天的答案（判据本来就要求末段是那个 stash 目录名）。
     const fs::path bak = strip_trailing_slash(bak_in);
     const fs::path par = bak.parent_path();
-    return par.filename().string().rfind(".lpkg_bak_", 0) == 0 ? par : bak;
+    // 判据的唯一实现见 `base::is_stash_dir_name()`（此前这里是与它逐字重复的裸字面量）
+    return is_stash_dir_name(par.filename().string()) ? par : bak;
 }
 
 void purge_consumed_stashes(const std::vector<WALOp>& ops)

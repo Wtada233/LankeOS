@@ -773,9 +773,12 @@ TEST_F(ConfigThreeWayHashTest, BatchRollbackRestoresConfigAndHashDb)
     //    `write_batch_db`），所以中途**盘上**的 confhashes.db **故意**还是批次前的内容 ——
     //    "记录已更新"这件事必须改从**内存 Cache** 取证（批次内的判定本来就走它）。
     //    盘上那份不变本身也是新语义的一部分，下面顺带把它一起钉住。
+    // 取证问的是"**c3ra 在这个路径上**的记录"，用 per-pkg 的 `get_conf_hash(path, pkg)` ——
+    // 比"这个路径上有任何记录"更紧（旧的 `conf_hashes_for_path()` 只答后者，且生产零调用，
+    // 2026-10-03 已删除：它唯一的价值是让本用例能少写一个包名，而那正是它答不准的地方）。
     const auto inmem_conf_record = [] {
-        const auto recs = Cache::instance().conf_hashes_for_path("/etc/c3ra.conf");
-        return recs.empty() ? std::string("<none>") : *recs.begin();
+        const std::string rec = Cache::instance().get_conf_hash("/etc/c3ra.conf", "c3ra");
+        return rec.empty() ? std::string("<none>") : rec;
     };
     const std::string inmem_before = inmem_conf_record();
     ASSERT_NE(inmem_before, "<none>") << "批次前内存里就该有 c3ra.conf 的记录";
@@ -858,7 +861,7 @@ TEST_F(ConfigThreeWayHashTest, BatchRollbackDropsHashRecordThatDidNotExistBefore
         mid_db = conf_db_bytes();
         // 2026-10-03 起 DB 只在**批次末尾**落盘一次 ⇒ "记录已建起来"从**内存**取证
         // （批次内的判定本来就走内存 Cache；盘上那份此刻**故意**还没变）
-        mid_inmem_has_record = !Cache::instance().conf_hashes_for_path("/etc/c3rc.conf").empty();
+        mid_inmem_has_record = !Cache::instance().get_conf_hash("/etc/c3rc.conf", "c3rc").empty();
         throw LpkgException("injected failure: 批次中途失败");
     });
 

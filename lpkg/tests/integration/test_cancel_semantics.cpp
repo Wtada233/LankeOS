@@ -169,7 +169,12 @@ TEST_F(CancelSemanticsTest, UserSaysNoToInstallIsACancelNotACompletion)
 
     EXPECT_EQ(r.code, 1) << r.all();
     EXPECT_NE(r.all().find(get_string("info.user_aborted")), std::string::npos) << r.all();
-    EXPECT_EQ(r.all().find(get_string("info.install_complete")), std::string::npos) << r.all();
+    // 这里原本还有一条 `EXPECT_EQ(r.all().find(get_string("info.install_complete")), npos)` ——
+    // 那个键**根本不存在**（两份 l10n 里都没有），`get_string` 对未知键返回
+    // `[MISSING_STRING: info.install_complete]`，而 CLI 输出里永远不可能出现这个占位符
+    // ⇒ `find` 恒为 npos ⇒ 是一条**恒真断言**（0 区分力，看起来在测"取消后没有完成提示"，
+    // 实际什么都没测）。真正钉住同一件事的是下面那条：用**存在**的键
+    // `info.install_summary`（成功安装时的汇总行）断言它不出现。
     EXPECT_EQ(r.all().find(string_format("info.install_summary", 1, "")), std::string::npos)
         << "取消之后不该出现安装 summary：\n"
         << r.all();

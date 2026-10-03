@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -31,6 +32,31 @@ class Repository
 public:
     /** 加载并解析仓库索引文件 */
     void load_index();
+    /**
+     * 解析**指定的**索引文件（按路径），**绝不下载**、**不发任何告警**。
+     *
+     * ⚠️ **本函数只报告结果，不决定策略** —— 两个消费者的策略**有意不同**，别把它们烘进来：
+     *   · `load_index()`（安装/升级依赖解析）：读不出内容 ⇒ **降级成空仓库 + 告警**
+     *     （离线装本地 `.lpkg` 是常见用法，仓库坏掉不该让命令失败）；
+     *   · 反向依赖图（`depend remove` / `depend abibreak`）：读不出内容 ⇒ **fail-closed 抛错**
+     *     （静默当空会让它报出"无受影响包"这个**错误答案**，用户据此删包）。
+     * 2026-10-03 第一版把这个选择写进了本函数（读错误一律抛），当场把
+     * `AggregatedIndexTest.DirectoryIndexIsReportedNotEmptyRepo` 打红 —— 它钉的正是
+     * "索引用一个**目录**占住时，`load_index()` 要落 `warning.repo_index_empty`"这条实测契约。
+     *
+     * 调用方是那些**已经有确定路径**、且不该触发下载的场景 —— 反向依赖图就是：它优先读
+     * `tmp` 里那份已下载的缓存副本，没有就回退本地镜像路径；**绝不能**在这里顺手
+     * `load_index()` —— 那会对远程镜像发起一次下载，把"没有索引 ⇒ 空图"变成"偷偷联网"。
+     *
+     * 语义与 `load_index()` 的解析部分逐字一致：先清空、逐行 `absorb_index_line`、
+     * 最后按版本号升序排序（`versions.back()` 即最新版）。
+     *
+     * @return true = 读到 EOF 且流状态干净；false = **读中途出错**（`badbit`，包表可能是
+     *         **残缺**的）—— 调用方按自己的策略处理（降级 / 抛错）。
+     * @throws LpkgException `error.open_file_failed` —— 文件**打不开**（含目录以外的怪对象）；
+     *         这是"根本没法开始读"，与"读到一半坏掉"不同类，两个消费者都当硬失败。
+     */
+    bool load_index_from_file(const std::filesystem::path& index_path);
     /** 更新或添加包信息到索引 */
     void update_package_info(const std::string& name, const std::string& version,
                              const std::vector<DependencyInfo>& deps,
@@ -58,6 +84,8 @@ public:
 private:
     /** 吸收索引里的一行（该行的**全部**版本块）到包表与 provider 表 */
     void absorb_index_line(std::string_view line);
+    /** 每个包的版本列表按版本号**升序**排（`versions.back()` = 最新版）—— 两个加载入口共用 */
+    void sort_package_versions();
 
     std::unordered_map<std::string, std::vector<PackageInfo>> packages_;  // 包名 -> 版本列表
     std::unordered_map<std::string, std::vector<std::string>>

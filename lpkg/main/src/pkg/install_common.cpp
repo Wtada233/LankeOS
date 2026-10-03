@@ -158,7 +158,7 @@ fs::path stash_bak_target(const fs::path& phys, std::string_view pkg)
         fs::path bak = dir / (base + std::string(constants::SUFFIX_LPKG_BAK) + std::string(pkg) +
                               "_" + random_suffix());
         // 判"这个名字空不空"必须用 **lstat 语义**（exists_no_follow）：`fs::exists` 在符号
-        // 链接环上会抛（见 base/utils.hpp 的谓词说明），而这里被占的名字可以是任何形态的
+        // 链接环上会抛（见 base/path_predicates.hpp 的谓词说明），而这里被占的名字可以是任何形态的
         // 残留物 —— 悬空/自环链接同样占着这个名字，rename 上去会把它顶掉。
         if (!exists_no_follow(bak)) return bak;
     }
@@ -311,7 +311,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
 
     const fs::path hook_path = Config::instance().hooks_dir() / pkg_name / hook_name;
     // 判定不抛（ELOOP 会让 fs::exists 抛 → 一个含符号链接环的 hook 路径会把安装/卸载打断，
-    // 见 base/utils.hpp 的谓词说明）。exists_follow 为假时短路，后面的 is_regular_file
+    // 见 base/path_predicates.hpp 的谓词说明）。exists_follow 为假时短路，后面的 is_regular_file
     // 不会跑到（它同样是"跟随"的判定，对解不开的路径会抛）。
     if (!exists_follow(hook_path) || !fs::is_regular_file(hook_path)) return;
 
@@ -334,7 +334,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
     if (use_chroot) {
         // 钩子由 BIN_BASH 执行，chroot 后按 /bin/bash 解析——必须检查 bash 而非 sh
         const fs::path bash_rel = std::string(constants::BIN_BASH).substr(1);  // "bin/bash"
-        // 判定不抛（ELOOP 会让 fs::exists 抛，见 base/utils.hpp 的谓词说明）
+        // 判定不抛（ELOOP 会让 fs::exists 抛，见 base/path_predicates.hpp 的谓词说明）
         if (!exists_follow(Config::instance().root_dir() / bash_rel)) {
             line.finish(ui::skipped());  // 目标 root 里没有 bash：明确告诉用户"跳过了"
             log_warning(string_format("warning.hook_failed_setup", std::string(hook_name),

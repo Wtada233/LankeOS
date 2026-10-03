@@ -195,7 +195,7 @@ void OpSink::dir_meta(const fs::path& phys, mode_t mode, uid_t uid, gid_t gid, b
 {
     if (!confined(phys)) return;  // 目录状态也是"就地改活对象"，越界一律不碰
     // 目录键带尾斜杠 → 先规范化：lstat/lchown/chmod 对带尾斜杠的路径会**穿透**末段符号
-    // 链接落到目标上（见 base/utils.hpp 的谓词说明），而 WAL 行记的必须是"我们真正动了
+    // 链接落到目标上（见 base/path_predicates.hpp 的谓词说明），而 WAL 行记的必须是"我们真正动了
     // 哪个对象"。
     const fs::path target = strip_trailing_slash(phys);
 
@@ -378,7 +378,7 @@ DirRemoval OpSink::remove_empty_dir(const fs::path& phys)
     // 告警在**本方法内部**打，而不是把错误信息回传给调用方：生产端**只有一处**调用点
     // （`install_common.cpp:238`，移除空目录那一趟），它只按 `SkippedMountPoint` 分流；
     // 加一个带消息的返回值意味着"调用方要记得判"，而漏判的后果正是这次要修的静默。
-    // 本文件的 include 里已有日志设施（base/utils.hpp）。
+    // 本文件的 include 里已有日志设施（聚合头 base/utils.hpp → base/process.hpp）。
     // （订正 2026-10-03：原文写"两个调用点都只看 SkippedMountPoint"—— `grep -rn
     //   remove_empty_dir main/src` 实测生产端调用点只有那一处。）
     if (ec) log_warning(string_format("warning.dir_remove_failed", target.string(), ec.message()));

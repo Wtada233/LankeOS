@@ -743,7 +743,7 @@ protected:
 
 TEST_F(RecursiveRemoveCleanupTest, DepNeededSoManHooksCleanedOnRecursiveRemove)
 {
-    // Bug 2 回归：remove_package_recursive 遗漏 DBRM 清理
+    // Bug 2 回归：remove_packages_recursive 遗漏 DBRM 清理
     // 创建 libA: 有 needed_so, man 页，hooks
     // （hooks 必须**真的有**：早先这里用 create_pkg 的默认参数打了一个不含 hooks 的包，
     //   而下面 `EXPECT_FALSE(fs::exists(hk_d))` 对"压根没建过的目录"恒真 —— 断言是死的。
@@ -776,7 +776,7 @@ TEST_F(RecursiveRemoveCleanupTest, DepNeededSoManHooksCleanedOnRecursiveRemove)
         << "fixture 自检：libA 的 hook 没装上 —— 下面'hooks 目录应被清理'会退化成恒真";
 
     // 递归移除 libA（连带 appB）
-    remove_package_recursive("libA", true);
+    remove_packages_recursive({"libA"}, true);
 
     // libA 和 appB 都应被移除
     EXPECT_TRUE(Cache::instance().get_installed_version("libA").empty());

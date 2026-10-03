@@ -75,7 +75,7 @@ std::set<fs::path> referenced_stash_roots()
  * 而 recover_packages 对两者都直接返回。
  *
  * 判定不抛：WAL 路径被符号链接环占着时 `fs::exists` 会抛 —— 而这是在**崩溃恢复**的入口上，
- * 抛出去等于恢复永远跑不完（见 base/utils.hpp 的谓词说明）。
+ * 抛出去等于恢复永远跑不完（见 base/path_predicates.hpp 的谓词说明）。
  */
 static std::optional<std::vector<std::string>> read_wal_lines(const std::string& wpath)
 {
@@ -233,13 +233,13 @@ static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
         // 判据用**名字**而不是"落在 root 内"：生产形态 `root=="/"` 下包含判定**恒真**、拦不住
         // 任何东西（那正是最该防的形态），而名字判据与 root 无关。名字不匹配 → 跳过并告警，
         // **绝不抛**（恢复路径上的判定不能有能力打断事务）。
-        if (root.filename().string().rfind(constants::SUFFIX_LPKG_BAK, 0) != 0) {
+        if (!is_stash_dir_name(root.filename().string())) {
             log_warning(string_format("warning.cleanup_skipped_not_stash", root.string()));
             continue;
         }
         // lstat 语义：**任何**占着这个名字的东西（含悬空/自环符号链接）都要 remove_all ——
         // 原来写成 `fs::exists || fs::is_symlink`，那在符号链接环上会抛 filesystem_error
-        // （见 base/utils.hpp 的谓词说明），把 post-commit 清理打断。
+        // （见 base/path_predicates.hpp 的谓词说明），把 post-commit 清理打断。
         if (!exists_no_follow(root)) continue;
         std::error_code ec;
         fs::remove_all(root, ec);
@@ -369,8 +369,8 @@ void recover_packages()
  *
  * lstat 语义（exists_no_follow），**不是** `fs::exists || fs::is_symlink`：行里的 bak 路径
  * 可能正是**符号链接环**（原路径是环，被 rename 进 stash 后依然是个环）—— 那条写法在它上面
- * 抛 filesystem_error，于是**每次启动的 trim 都失败**、WAL 永远裁剪不掉（见 base/utils.hpp
- * 的谓词说明）。判据本身不变。
+ * 抛 filesystem_error，于是**每次启动的 trim 都失败**、WAL 永远裁剪不掉（见
+ * base/path_predicates.hpp 的谓词说明）。判据本身不变。
  */
 static bool post_commit_cleanup_pending(const std::vector<std::string>& lines)
 {
@@ -422,7 +422,7 @@ static void rewrite_wal_tail(const std::string& wpath, const std::vector<std::st
 void trim_completed()
 {
     const std::string wpath = wal::wal_log_path();
-    auto maybe_lines = read_wal_lines(wpath);  // 判定不抛；见 base/utils.hpp 的谓词说明
+    auto maybe_lines = read_wal_lines(wpath);  // 判定不抛；见 base/path_predicates.hpp 的谓词说明
     if (!maybe_lines) return;
 
     const std::vector<std::string>& lines = *maybe_lines;
@@ -541,8 +541,8 @@ void cleanup_db_backups()
     //     一次遍历错误就把"装好了"报成"命令失败"。改用显式 `increment(ec)`。
     //   · 删除失败的备份**保留**（下次再试），只记一条警告。
     for (const fs::path& base : {Config::instance().state_dir(), Config::instance().docs_dir()}) {
-        // 判定不抛（ELOOP 会让 fs::exists 抛，见 base/utils.hpp 的谓词说明）；仍用**跟随**
-        // 语义（原来是 exists + is_directory），状态目录可以是符号链接。
+        // 判定不抛（ELOOP 会让 fs::exists 抛，见 base/path_predicates.hpp
+        // 的谓词说明）；仍用**跟随** 语义（原来是 exists + is_directory），状态目录可以是符号链接。
         if (!is_directory_follow(base)) continue;
 
         std::error_code walk_ec;

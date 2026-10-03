@@ -426,13 +426,6 @@ std::map<std::string, std::unordered_set<std::string>, std::less<>> Cache::snaps
     return file_db;
 }
 
-std::unordered_set<std::string> Cache::conf_hashes_for_path(std::string_view path)
-{
-    std::lock_guard<std::mutex> lock(mtx);
-    const auto it = conf_hashes.find(path);
-    return (it == conf_hashes.end()) ? std::unordered_set<std::string>{} : it->second;
-}
-
 void Cache::load(bool tolerate_missing_set_files)
 {
     std::lock_guard<std::mutex> lock(mtx);
@@ -454,7 +447,7 @@ void Cache::load(bool tolerate_missing_set_files)
     auto read_set = [&](const fs::path& path) {
         if (!tolerate_missing_set_files) return read_set_from_file(path);
         // 判定不抛：集合文件路径被符号链接环占着时 `fs::exists` 会抛，而这里要的只是
-        // "文件在不在"（见 base/utils.hpp 的谓词说明）。判成"不在"是安全的：后面的
+        // "文件在不在"（见 base/path_predicates.hpp 的谓词说明）。判成"不在"是安全的：后面的
         // read_set_from_file 会在"存在却打不开"时硬报错（ELOOP 走那条路）。
         if (!exists_follow(path))
             log_warning(string_format("warning.db_set_file_missing", path.string()));
@@ -708,7 +701,7 @@ void Cache::write_db_file_wal(
     // lstat 语义（exists_no_follow）：**任何**占着这个名字的东西（含悬空/自环符号
     // 链接）都算"库文件在"→ 走 DB/备份路径（先把占位物 rename 成备份，回滚再还原），
     // 而不是判成"新建"（DBNEW 的逆操作是**删除**，会把用户/残留物静默删掉）。
-    // 顺带把 ELOOP 抛异常挡在库写入之外（见 base/utils.hpp 的谓词说明）。
+    // 顺带把 ELOOP 抛异常挡在库写入之外（见 base/path_predicates.hpp 的谓词说明）。
     const bool is_new = !exists_no_follow(db_path);
 
     // 1. WAL 行 — 新建文件使用 DBNEW（确保回滚时删除），已存在文件使用调用者指定的类型

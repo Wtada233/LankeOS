@@ -273,7 +273,7 @@ TEST_F(ConfigSaveOnRemoveTest, ExistingLpkgsaveIsShiftedNotOverwritten)
 }
 
 // ============================================================================
-// 5) remove -r（remove_package_recursive）：旧实现完全没有 /etc 覆盖，且硬编 force=true
+// 5) remove -r（remove_packages_recursive）：旧实现完全没有 /etc 覆盖，且硬编 force=true
 // ============================================================================
 
 TEST_F(ConfigSaveOnRemoveTest, RecursiveRemoveKeepsConfigAsLpkgsave)
@@ -286,7 +286,7 @@ TEST_F(ConfigSaveOnRemoveTest, RecursiveRemoveKeepsConfigAsLpkgsave)
     const fs::path saved = test_root / "etc/cs_rec.conf.lpkgsave";
     ASSERT_TRUE(fs::exists(conf));
 
-    remove_package_recursive("cs_rec", /*force=*/false);
+    remove_packages_recursive({"cs_rec"}, /*force=*/false);
 
     EXPECT_TRUE(Cache::instance().get_installed_version("cs_rec").empty());
     EXPECT_FALSE(fs::exists(test_root / "usr/bin/cs_rec")) << "普通文件照旧真删";
@@ -300,7 +300,7 @@ TEST_F(ConfigSaveOnRemoveTest, RecursiveRemoveKeepsConfigAsLpkgsave)
     install_packages({pkg2}, "", false);
     ASSERT_TRUE(fs::exists(test_root / "etc/cs_rec2.conf"));
 
-    remove_package_recursive("cs_rec2", /*force=*/false, /*purge_config=*/true);
+    remove_packages_recursive({"cs_rec2"}, /*force=*/false, /*purge_config=*/true);
 
     EXPECT_FALSE(fs::exists(test_root / "etc/cs_rec2.conf"));
     EXPECT_FALSE(fs::exists(test_root / "etc/cs_rec2.conf.lpkgsave"));

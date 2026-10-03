@@ -167,14 +167,6 @@ public:
      */
     std::map<std::string, std::unordered_set<std::string>, std::less<>> snapshot_file_ownership();
 
-    /**
-     * 某路径上的**全部**配置哈希记录（`<pkg>:<sha256>` 集合）快照。
-     *
-     * `get_conf_hash(path, pkg)` 是"这一对有没有记录"，答不了"这个路径上有没有**任何**
-     * 记录" —— 而后者正是"批次前就没有记录 ⇒ 回滚后也必须没有"那类断言要问的。
-     */
-    std::unordered_set<std::string> conf_hashes_for_path(std::string_view path);
-
     Cache();
 
     // 文件归属数据库（路径 -> 包名集合）

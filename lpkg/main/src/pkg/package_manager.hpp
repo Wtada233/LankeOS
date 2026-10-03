@@ -274,8 +274,6 @@ void query_file(const std::string& filename);
 void show_man_page(const std::string& pkg_name);
 void write_cache();
 void remove_package_files(const std::string& pkg_name);
-void remove_package_recursive(const std::string& pkg_name, bool force = false,
-                              bool purge_config = false);
 /// 递归移除多个包：**单批次原子**（多参数命令必须走它，逐参数调用会失去跨参数回滚）。
 /// @return 实际移除的包数（与 `remove_packages` 同一约定；"没什么可删"的早退返回 0）。
 size_t remove_packages_recursive(const std::vector<std::string>& pkg_names, bool force = false,
