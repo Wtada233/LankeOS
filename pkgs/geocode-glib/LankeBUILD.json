@@ -4,13 +4,13 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libjson-glib-1.0.so.0",
-    "libm.so.6",
+    "libjson-glib-1.0.so.0@libjson-glib-1.0.so.0",
+    "libm.so.6@GLIBC_2.2.5",
     "libsoup-3.0.so.0"
   ],
   "provides_soname": [

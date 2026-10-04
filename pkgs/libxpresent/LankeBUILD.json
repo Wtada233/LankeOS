@@ -10,7 +10,7 @@
     "libXext.so.6",
     "libXfixes.so.3",
     "libXrandr.so.2",
-    "libc.so.6"
+    "libc.so.6@GLIBC_2.2.5"
   ],
   "provides_soname": [
     "libXpresent.so",

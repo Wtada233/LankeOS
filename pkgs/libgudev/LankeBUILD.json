@@ -4,10 +4,10 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.33,GLIBC_2.38}",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libudev.so.1"
+    "libudev.so.1@{LIBUDEV_183,LIBUDEV_199,LIBUDEV_247}"
   ],
   "provides_soname": [
     "libgudev-1.0.so",

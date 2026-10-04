@@ -6,14 +6,14 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libz.so.1"
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
+    "libz.so.1@ZLIB_1.2.3.4"
   ],
   "provides_soname": [
-    "libpng.so",
-    "libpng16.so",
-    "libpng16.so.16"
+    "libpng.so@PNG16_0",
+    "libpng16.so.16@PNG16_0",
+    "libpng16.so@PNG16_0"
   ],
   "build_deps": [
     "base-devel",

@@ -4,22 +4,22 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Network.so.6",
-    "libQt6Positioning.so.6",
-    "libQt6PositioningQuick.so.6",
-    "libQt6Qml.so.6",
-    "libQt6QmlModels.so.6",
-    "libQt6Quick.so.6",
-    "libQt6QuickShapes.so.6",
-    "libc.so.6",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Network.so.6@Qt_6",
+    "libQt6Positioning.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6PositioningQuick.so.6@Qt_6_PRIVATE_API",
+    "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6QmlModels.so.6@Qt_6_PRIVATE_API",
+    "libQt6Quick.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6QuickShapes.so.6@Qt_6_PRIVATE_API",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.38}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
-    "libQt6Location.so",
-    "libQt6Location.so.6"
+    "libQt6Location.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Location.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}"
   ],
   "build_deps": [
     "base-devel",

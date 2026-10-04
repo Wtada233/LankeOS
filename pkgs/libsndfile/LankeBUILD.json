@@ -4,15 +4,15 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libasound.so.2",
-    "libc.so.6",
-    "libm.so.6",
+    "libasound.so.2@{ALSA_0.9,ALSA_0.9.0rc4}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.38}",
     "libmp3lame.so.0",
     "libmpg123.so.0"
   ],
   "provides_soname": [
-    "libsndfile.so",
-    "libsndfile.so.1"
+    "libsndfile.so.1@libsndfile.so.1.0",
+    "libsndfile.so@libsndfile.so.1.0"
   ],
   "build_deps": [
     "alsa-lib",

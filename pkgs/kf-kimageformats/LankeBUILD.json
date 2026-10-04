@@ -5,18 +5,18 @@
   "deps": [],
   "needed_so": [
     "libKF6Archive.so.6",
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6PrintSupport.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6PrintSupport.so.6@Qt_6",
     "libavif.so.16",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libjxl.so.0.12",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_12.0.0",
+    "libjxl.so.0.12@JXL_0",
     "libjxl_cms.so.0.12",
-    "libjxl_threads.so.0.12",
-    "libm.so.6",
+    "libjxl_threads.so.0.12@JXL_0",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
     "libopenjp2.so.7",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.14,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [],
   "build_deps": [

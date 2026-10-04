@@ -9,16 +9,16 @@
   "needed_so": [
     "libEGL.so.1",
     "libGLESv2.so.2",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libdisplay-info.so.3",
     "libdrm.so.2",
     "libgbm.so.1",
-    "libinput.so.10",
+    "libinput.so.10@{LIBINPUT_0.12.0,LIBINPUT_0.20.0,LIBINPUT_0.21.0,LIBINPUT_1.19,LIBINPUT_1.2,LIBINPUT_1.26,LIBINPUT_1.3,LIBINPUT_1.4,LIBINPUT_1.7}",
     "liblcms2.so.2",
-    "libm.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29}",
     "libpixman-1.so.0",
     "libseat.so.1",
-    "libudev.so.1",
+    "libudev.so.1@LIBUDEV_183",
     "libvulkan.so.1",
     "libwayland-client.so.0",
     "libwayland-server.so.0",
@@ -29,7 +29,7 @@
     "libxcb-res.so.0",
     "libxcb-xfixes.so.0",
     "libxcb.so.1",
-    "libxkbcommon.so.0"
+    "libxkbcommon.so.0@V_0.5.0"
   ],
   "provides_soname": [
     "libwlroots-0.20.so"

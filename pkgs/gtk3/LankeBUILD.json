@@ -17,7 +17,7 @@
     "libXrandr.so.2",
     "libatk-1.0.so.0",
     "libatk-bridge-2.0.so.0",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libcairo-gobject.so.2",
     "libcairo.so.2",
     "libcolord.so.2",
@@ -31,14 +31,14 @@
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",
     "libharfbuzz.so.0",
-    "libm.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.38}",
     "libpango-1.0.so.0",
     "libpangocairo-1.0.so.0",
     "libpangoft2-1.0.so.0",
     "libwayland-client.so.0",
     "libwayland-cursor.so.0",
     "libwayland-egl.so.1",
-    "libxkbcommon.so.0"
+    "libxkbcommon.so.0@V_0.5.0"
   ],
   "provides_soname": [
     "libgailutil-3.so",

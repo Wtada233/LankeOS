@@ -4,10 +4,10 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libhdf5.so.320",
-    "libm.so.6",
-    "libz.so.1"
+    "libm.so.6@GLIBC_2.2.5",
+    "libz.so.1@ZLIB_1.2.0"
   ],
   "provides_soname": [
     "libmatio.so",

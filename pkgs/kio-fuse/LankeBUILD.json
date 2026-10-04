@@ -6,11 +6,11 @@
   "needed_so": [
     "libKF6CoreAddons.so.6",
     "libKF6KIOCore.so.6",
-    "libQt6Core.so.6",
-    "libQt6DBus.so.6",
-    "libc.so.6",
-    "libfuse3.so.4",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6DBus.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34}",
+    "libfuse3.so.4@{FUSE_3.0,FUSE_3.12,FUSE_3.17}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.14,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.29,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [],
   "build_deps": [

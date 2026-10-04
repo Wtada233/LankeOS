@@ -6,25 +6,25 @@
     "qt6-multimedia"
   ],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Qml.so.6",
-    "libQt6Quick.so.6",
-    "libQt6Svg.so.6",
-    "libc.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",
+    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Quick.so.6@Qt_6",
+    "libQt6Svg.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libhunspell-1.7.so.0",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.35}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
-    "libQt6HunspellInputMethod.so",
-    "libQt6HunspellInputMethod.so.6",
-    "libQt6VirtualKeyboard.so",
-    "libQt6VirtualKeyboard.so.6",
-    "libQt6VirtualKeyboardQml.so",
-    "libQt6VirtualKeyboardQml.so.6",
-    "libQt6VirtualKeyboardSettings.so",
-    "libQt6VirtualKeyboardSettings.so.6"
+    "libQt6HunspellInputMethod.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6HunspellInputMethod.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6VirtualKeyboard.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6VirtualKeyboard.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6VirtualKeyboardQml.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6VirtualKeyboardQml.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6VirtualKeyboardSettings.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6VirtualKeyboardSettings.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}"
   ],
   "build_deps": [
     "base-devel",

@@ -4,11 +4,12 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libresolv.so.2"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libresolv.so.2@GLIBC_2.9"
   ],
   "provides_soname": [
-    "libkeyutils.so.1"
+    "libkeyutils.so.1@{KEYUTILS_0.3,KEYUTILS_1.0,KEYUTILS_1.10,KEYUTILS_1.3,KEYUTILS_1.4,KEYUTILS_1.5,KEYUTILS_1.6,KEYUTILS_1.7,KEYUTILS_1.8,KEYUTILS_1.9}",
+    "libkeyutils.so@{KEYUTILS_0.3,KEYUTILS_1.0,KEYUTILS_1.10,KEYUTILS_1.3,KEYUTILS_1.4,KEYUTILS_1.5,KEYUTILS_1.6,KEYUTILS_1.7,KEYUTILS_1.8,KEYUTILS_1.9}"
   ],
   "build_deps": [
     "base-devel"

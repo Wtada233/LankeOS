@@ -6,13 +6,13 @@
     "sysprof"
   ],
   "needed_so": [
-    "libatomic.so.1",
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libatomic.so.1@LIBATOMIC_1.0",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "liburing.so.2"
+    "liburing.so.2@{LIBURING_2.0,LIBURING_2.2}"
   ],
   "provides_soname": [
     "libdex-1.so",

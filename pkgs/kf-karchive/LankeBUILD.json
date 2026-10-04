@@ -4,12 +4,12 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
     "libbz2.so.1.0",
-    "libc.so.6",
-    "libcrypto.so.3",
-    "liblzma.so.5",
-    "libstdc++.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libcrypto.so.3@OPENSSL_3.0.0",
+    "liblzma.so.5@{XZ_5.0,XZ_5.4}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}",
     "libz.so.1",
     "libzstd.so.1"
   ],

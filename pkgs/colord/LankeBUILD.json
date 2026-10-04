@@ -4,20 +4,20 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",
     "libgudev-1.0.so.0",
-    "libgusb.so.2",
+    "libgusb.so.2@{LIBGUSB_0.1.0,LIBGUSB_0.1.1,LIBGUSB_0.2.2}",
     "liblcms2.so.2",
-    "libm.so.6",
+    "libm.so.6@GLIBC_2.29",
     "libpolkit-gobject-1.so.0",
     "libsqlite3.so.0",
-    "libsystemd.so.0",
-    "libudev.so.1"
+    "libsystemd.so.0@LIBSYSTEMD_209",
+    "libudev.so.1@{LIBUDEV_183,LIBUDEV_196}"
   ],
   "provides_soname": [
     "libcolord.so",

@@ -4,14 +4,14 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.34,GLIBC_2.38}",
     "libgmp.so.10"
   ],
   "provides_soname": [
-    "libhogweed.so",
-    "libhogweed.so.7",
-    "libnettle.so",
-    "libnettle.so.9"
+    "libhogweed.so.7@{HOGWEED_7,HOGWEED_INTERNAL_7_0}",
+    "libhogweed.so@{HOGWEED_7,HOGWEED_INTERNAL_7_0}",
+    "libnettle.so.9@{NETTLE_9,NETTLE_INTERNAL_9_0}",
+    "libnettle.so@{NETTLE_9,NETTLE_INTERNAL_9_0}"
   ],
   "build_deps": [
     "base-devel",

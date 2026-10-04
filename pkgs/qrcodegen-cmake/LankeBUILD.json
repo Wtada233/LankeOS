@@ -3,10 +3,10 @@
   "version": "1.8.0",
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}",
+    "libgcc_s.so.1@GCC_3.0",
     "libm.so.6",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,GLIBCXX_3.4,GLIBCXX_3.4.15,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
     "libqrcodegen.so",

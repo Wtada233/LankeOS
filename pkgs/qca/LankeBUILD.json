@@ -4,15 +4,15 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Core5Compat.so.6",
-    "libc.so.6",
-    "libcrypto.so.3",
-    "libgcc_s.so.1",
-    "libgcrypt.so.20",
-    "libnss3.so",
-    "libssl.so.3",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core5Compat.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libgcc_s.so.1@GCC_3.0",
+    "libgcrypt.so.20@GCRYPT_1.6",
+    "libnss3.so@{NSS_3.2,NSS_3.3}",
+    "libssl.so.3@OPENSSL_3.0.0",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.15,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "libqca-qt6.so",

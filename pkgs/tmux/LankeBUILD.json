@@ -4,12 +4,12 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.26,GLIBC_2.27,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.42,GLIBC_2.8}",
     "libevent_core-2.1.so.7",
-    "libm.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.38}",
     "libncursesw.so.6",
-    "libresolv.so.2",
-    "libsystemd.so.0"
+    "libresolv.so.2@GLIBC_2.2.5",
+    "libsystemd.so.0@{LIBSYSTEMD_209,LIBSYSTEMD_220,LIBSYSTEMD_221,LIBSYSTEMD_237}"
   ],
   "provides_soname": [],
   "build_deps": [

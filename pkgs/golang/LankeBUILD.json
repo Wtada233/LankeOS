@@ -4,9 +4,9 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libstdc++.so.6",
-    "libtiff.so.6"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.34,GLIBC_2.4}",
+    "libstdc++.so.6@{CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
+    "libtiff.so.6@LIBTIFF_4.0"
   ],
   "provides_soname": [],
   "build_deps": [

@@ -4,21 +4,21 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
     "libncursesw.so.6",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
     "libcdio++.so",
     "libcdio++.so.2",
-    "libcdio.so",
-    "libcdio.so.21",
+    "libcdio.so.21@CDIO_21",
+    "libcdio.so@CDIO_21",
     "libiso9660++.so",
     "libiso9660++.so.1",
-    "libiso9660.so",
-    "libiso9660.so.13",
+    "libiso9660.so.13@ISO9660_13",
+    "libiso9660.so@ISO9660_13",
     "libudf.so",
     "libudf.so.0"
   ],

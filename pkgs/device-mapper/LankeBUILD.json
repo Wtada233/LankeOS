@@ -5,16 +5,16 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libudev.so.1"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.22,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libm.so.6@GLIBC_2.2.5",
+    "libudev.so.1@LIBUDEV_183"
   ],
   "provides_soname": [
-    "libdevmapper-event.so",
-    "libdevmapper-event.so.1.02",
-    "libdevmapper.so",
-    "libdevmapper.so.1.02"
+    "libdevmapper-event.so.1.02@Base",
+    "libdevmapper-event.so@Base",
+    "libdevmapper.so.1.02@{Base,DM_1_02_100,DM_1_02_101,DM_1_02_103,DM_1_02_104,DM_1_02_105,DM_1_02_106,DM_1_02_107,DM_1_02_110,DM_1_02_113,DM_1_02_124,DM_1_02_128,DM_1_02_129,DM_1_02_131,DM_1_02_133,DM_1_02_135,DM_1_02_138,DM_1_02_141,DM_1_02_147,DM_1_02_172,DM_1_02_181,DM_1_02_197,DM_1_02_202,DM_1_02_213,DM_1_02_214,DM_1_02_216,DM_1_02_97,DM_1_02_98,DM_1_02_99}",
+    "libdevmapper.so@{Base,DM_1_02_100,DM_1_02_101,DM_1_02_103,DM_1_02_104,DM_1_02_105,DM_1_02_106,DM_1_02_107,DM_1_02_110,DM_1_02_113,DM_1_02_124,DM_1_02_128,DM_1_02_129,DM_1_02_131,DM_1_02_133,DM_1_02_135,DM_1_02_138,DM_1_02_141,DM_1_02_147,DM_1_02_172,DM_1_02_181,DM_1_02_197,DM_1_02_202,DM_1_02_213,DM_1_02_214,DM_1_02_216,DM_1_02_97,DM_1_02_98,DM_1_02_99}"
   ],
   "build_deps": [
     "base-devel"

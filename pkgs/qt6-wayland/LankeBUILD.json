@@ -5,24 +5,24 @@
   "needed_so": [
     "libEGL.so.1",
     "libOpenGL.so.0",
-    "libQt6Core.so.6",
-    "libQt6DBus.so.6",
-    "libQt6Gui.so.6",
-    "libQt6OpenGL.so.6",
-    "libQt6Svg.so.6",
-    "libQt6WaylandClient.so.6",
-    "libc.so.6",
-    "libm.so.6",
-    "libstdc++.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",
+    "libQt6DBus.so.6@Qt_6",
+    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6OpenGL.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Svg.so.6@Qt_6",
+    "libQt6WaylandClient.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@GLIBC_2.2.5",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.20,GLIBCXX_3.4.30}",
     "libwayland-client.so.0",
     "libwayland-server.so.0",
-    "libxkbcommon.so.0"
+    "libxkbcommon.so.0@V_0.5.0"
   ],
   "provides_soname": [
-    "libQt6WaylandCompositor.so",
-    "libQt6WaylandCompositor.so.6",
-    "libQt6WaylandEglCompositorHwIntegration.so",
-    "libQt6WaylandEglCompositorHwIntegration.so.6"
+    "libQt6WaylandCompositor.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6WaylandCompositor.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6WaylandEglCompositorHwIntegration.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6WaylandEglCompositorHwIntegration.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}"
   ],
   "build_deps": [
     "base-devel",

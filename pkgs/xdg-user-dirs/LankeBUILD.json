@@ -3,7 +3,7 @@
   "version": "0.20",
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.33,GLIBC_2.34}"
   ],
   "provides_soname": [],
   "build_deps": [

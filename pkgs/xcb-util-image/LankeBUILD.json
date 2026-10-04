@@ -4,7 +4,7 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}",
     "libxcb-shm.so.0",
     "libxcb-util.so.1",
     "libxcb.so.1"

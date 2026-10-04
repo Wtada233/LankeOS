@@ -4,8 +4,8 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libsystemd.so.0"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.4}",
+    "libsystemd.so.0@{LIBSYSTEMD_209,LIBSYSTEMD_213,LIBSYSTEMD_221,LIBSYSTEMD_237,LIBSYSTEMD_238}"
   ],
   "provides_soname": [
     "libseat.so",

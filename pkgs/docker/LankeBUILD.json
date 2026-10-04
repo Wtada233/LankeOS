@@ -10,9 +10,9 @@
     "nftables"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.2,GLIBC_2.32,GLIBC_2.34}",
     "libresolv.so.2",
-    "libsystemd.so.0"
+    "libsystemd.so.0@LIBSYSTEMD_209"
   ],
   "provides_soname": [],
   "build_deps": [

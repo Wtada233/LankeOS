@@ -7,24 +7,24 @@
     "python"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.36,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6,GLIBC_ABI_DT_RELR}",
     "libcurl.so.4",
     "libedit.so.0",
-    "libffi.so.8",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libstdc++.so.6",
+    "libffi.so.8@LIBFFI_BASE_8.0",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.38,GLIBC_2.44}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.3,CXXABI_1.3.5,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.9}",
     "libxml2.so.16",
-    "libz.so.1"
+    "libz.so.1@ZLIB_1.2.0"
   ],
   "provides_soname": [
-    "LLVMgold.so",
-    "libLLVM-23.so",
-    "libLLVM.so",
-    "libLLVM.so.23.1",
-    "libLTO.so",
-    "libLTO.so.23.1",
+    "LLVMgold.so@LLVM_23.1",
+    "libLLVM-23.so@LLVM_23.1",
+    "libLLVM.so.23.1@LLVM_23.1",
+    "libLLVM.so@LLVM_23.1",
+    "libLTO.so.23.1@LLVM_23.1",
+    "libLTO.so@LLVM_23.1",
     "libRemarks.so",
     "libRemarks.so.23.1"
   ],

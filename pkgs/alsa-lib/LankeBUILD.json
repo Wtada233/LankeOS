@@ -4,15 +4,15 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libm.so.6"
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.43}"
   ],
   "provides_soname": [
-    "libasound.so",
-    "libasound.so.2",
-    "libatopology.so",
-    "libatopology.so.2"
+    "libasound.so.2@{ALSA_0.9,ALSA_0.9.0,ALSA_0.9.0rc4,ALSA_0.9.0rc8,ALSA_0.9.3,ALSA_0.9.5,ALSA_0.9.7,ALSA_1.1.6,ALSA_1.2.10,ALSA_1.2.13,ALSA_1.2.15,ALSA_1.2.6,ALSA_1.2.9}",
+    "libasound.so@{ALSA_0.9,ALSA_0.9.0,ALSA_0.9.0rc4,ALSA_0.9.0rc8,ALSA_0.9.3,ALSA_0.9.5,ALSA_0.9.7,ALSA_1.1.6,ALSA_1.2.10,ALSA_1.2.13,ALSA_1.2.15,ALSA_1.2.6,ALSA_1.2.9}",
+    "libatopology.so.2@ALSA_0.9",
+    "libatopology.so@ALSA_0.9"
   ],
   "build_deps": [
     "base-devel"

@@ -4,9 +4,9 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libmvec.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.43}",
+    "libmvec.so.1@{GLIBC_2.22,GLIBC_2.35}",
     "libogg.so.0"
   ],
   "provides_soname": [

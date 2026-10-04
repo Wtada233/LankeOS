@@ -4,7 +4,7 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.38}",
     "libxcb-image.so.0",
     "libxcb-render-util.so.0",
     "libxcb-render.so.0",

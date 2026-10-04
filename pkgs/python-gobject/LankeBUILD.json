@@ -7,10 +7,10 @@
     "python-cairo"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
     "libcairo-gobject.so.2",
     "libcairo.so.2",
-    "libffi.so.8",
+    "libffi.so.8@LIBFFI_BASE_8.0",
     "libgirepository-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0"

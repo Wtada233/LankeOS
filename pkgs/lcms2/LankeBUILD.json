@@ -4,10 +4,10 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libjpeg.so.62",
-    "libm.so.6",
-    "libtiff.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.34,GLIBC_2.38}",
+    "libjpeg.so.62@LIBJPEG_6.2",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.43}",
+    "libtiff.so.6@LIBTIFF_4.0",
     "libz.so.1"
   ],
   "provides_soname": [

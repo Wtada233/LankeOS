@@ -6,11 +6,11 @@
     "python"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "ld-linux-x86-64.so.2@{GLIBC_2.2.5,GLIBC_2.3}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0,GCC_4.3.0}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.23,GLIBC_2.29}",
+    "libstdc++.so.6@{CXXABI_1.3,GLIBCXX_3.4}"
   ],
   "provides_soname": [],
   "build_deps": [

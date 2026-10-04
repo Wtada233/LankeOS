@@ -6,16 +6,16 @@
     "openssh"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
-    "libgnutls.so.30",
+    "libgnutls.so.30@{GNUTLS_3_4,GNUTLS_3_6_13,GNUTLS_3_6_3,GNUTLS_3_8_2}",
     "libgobject-2.0.so.0",
     "libgtk-4.so.1",
-    "libp11-kit.so.0",
+    "libp11-kit.so.0@LIBP11_KIT_1.0",
     "libpango-1.0.so.0",
     "libsecret-1.so.0",
-    "libsystemd.so.0"
+    "libsystemd.so.0@LIBSYSTEMD_209"
   ],
   "provides_soname": [
     "libgck-2.so",

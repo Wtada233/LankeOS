@@ -4,16 +4,16 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6DBus.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Network.so.6",
-    "libQt6Qml.so.6",
-    "libQt6Quick.so.6",
-    "libQt6WebSockets.so.6",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
+    "libQt6DBus.so.6@Qt_6",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Network.so.6@Qt_6",
+    "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Quick.so.6@Qt_6",
+    "libQt6WebSockets.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.14,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
     "libQCoro6Core.so",

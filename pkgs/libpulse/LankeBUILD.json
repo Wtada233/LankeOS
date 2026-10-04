@@ -7,21 +7,21 @@
     "xwayland"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libdbus-1.so.3",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.9}",
+    "libdbus-1.so.3@LIBDBUS_1_3",
     "libglib-2.0.so.0",
-    "libm.so.6",
-    "libsndfile.so.1",
-    "libsystemd.so.0",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
+    "libsndfile.so.1@libsndfile.so.1.0",
+    "libsystemd.so.0@LIBSYSTEMD_209",
     "libxcb.so.1"
   ],
   "provides_soname": [
-    "libpulse-mainloop-glib.so",
-    "libpulse-mainloop-glib.so.0",
-    "libpulse-simple.so",
-    "libpulse-simple.so.0",
-    "libpulse.so",
-    "libpulse.so.0"
+    "libpulse-mainloop-glib.so.0@PULSE_0",
+    "libpulse-mainloop-glib.so@PULSE_0",
+    "libpulse-simple.so.0@PULSE_0",
+    "libpulse-simple.so@PULSE_0",
+    "libpulse.so.0@PULSE_0",
+    "libpulse.so@PULSE_0"
   ],
   "build_deps": [
     "alsa-lib",

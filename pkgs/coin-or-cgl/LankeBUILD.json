@@ -12,14 +12,14 @@
     "libamd.so.3",
     "libblas.so.3",
     "libbz2.so.1.0",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libcholmod.so.5",
     "libcoinasl.so.2",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@GCC_3.0",
     "libglpk.so.40",
     "liblapack.so.3",
-    "libm.so.6",
-    "libstdc++.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libz.so.1"
   ],
   "provides_soname": [

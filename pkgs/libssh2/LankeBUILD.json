@@ -4,8 +4,8 @@
   "release": 7,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libcrypto.so.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.16,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libcrypto.so.3@OPENSSL_3.0.0",
     "libz.so.1"
   ],
   "provides_soname": [

@@ -4,12 +4,12 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.38}",
     "libfontconfig.so.1",
     "libfreetype.so.6",
     "libfribidi.so.0",
     "libharfbuzz.so.0",
-    "libm.so.6"
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}"
   ],
   "provides_soname": [
     "libass.so",

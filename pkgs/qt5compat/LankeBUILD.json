@@ -3,19 +3,19 @@
   "version": "6.12.0",
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Qml.so.6",
-    "libQt6Quick.so.6",
-    "libQt6ShaderTools.so.6",
-    "libc.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",
+    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Quick.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6ShaderTools.so.6@Qt_6_PRIVATE_API",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libicuuc.so.78",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
-    "libQt6Core5Compat.so",
-    "libQt6Core5Compat.so.6"
+    "libQt6Core5Compat.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Core5Compat.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}"
   ],
   "build_deps": [
     "base-devel",

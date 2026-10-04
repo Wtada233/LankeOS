@@ -4,12 +4,12 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.34}",
     "libunistring.so.5"
   ],
   "provides_soname": [
-    "libidn2.so",
-    "libidn2.so.0"
+    "libidn2.so.0@{IDN2_0.0.0,IDN2_2.1.0,IDN2_2.3.5}",
+    "libidn2.so@{IDN2_0.0.0,IDN2_2.1.0,IDN2_2.3.5}"
   ],
   "build_deps": [
     "base-devel",

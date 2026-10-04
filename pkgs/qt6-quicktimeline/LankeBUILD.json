@@ -4,18 +4,18 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Qml.so.6",
-    "libQt6Quick.so.6",
-    "libc.so.6",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Quick.so.6@Qt_6_PRIVATE_API",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [
-    "libQt6QuickTimeline.so",
-    "libQt6QuickTimeline.so.6",
-    "libQt6QuickTimelineBlendTrees.so",
-    "libQt6QuickTimelineBlendTrees.so.6"
+    "libQt6QuickTimeline.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6QuickTimeline.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6QuickTimelineBlendTrees.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6QuickTimelineBlendTrees.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}"
   ],
   "build_deps": [
     "base-devel",

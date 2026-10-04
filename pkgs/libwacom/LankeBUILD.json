@@ -4,16 +4,16 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libevdev.so.2",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libevdev.so.2@{LIBEVDEV_1,LIBEVDEV_1_7}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libgudev-1.0.so.0"
   ],
   "provides_soname": [
-    "libwacom.so",
-    "libwacom.so.9"
+    "libwacom.so.9@{LIBWACOM_2.0,LIBWACOM_2.12,LIBWACOM_2.14,LIBWACOM_2.15,LIBWACOM_2.18,LIBWACOM_2.19,LIBWACOM_2.9}",
+    "libwacom.so@{LIBWACOM_2.0,LIBWACOM_2.12,LIBWACOM_2.14,LIBWACOM_2.15,LIBWACOM_2.18,LIBWACOM_2.19,LIBWACOM_2.9}"
   ],
   "build_deps": [
     "base-devel",

@@ -4,7 +4,7 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.34,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libcairo.so.2",
     "libcolord.so.2",
     "libgdk-3.so.0",

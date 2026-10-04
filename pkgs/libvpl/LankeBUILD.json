@@ -5,14 +5,14 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4}",
+    "libgcc_s.so.1@GCC_3.0",
     "libm.so.6",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.31}"
   ],
   "provides_soname": [
-    "libvpl.so",
-    "libvpl.so.2"
+    "libvpl.so.2@{LIBVPL_2.0,LIBVPL_2.1}",
+    "libvpl.so@{LIBVPL_2.0,LIBVPL_2.1}"
   ],
   "build_deps": [
     "base-devel",

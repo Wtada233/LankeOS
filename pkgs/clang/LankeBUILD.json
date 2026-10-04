@@ -9,15 +9,15 @@
   "provides_soname": [
     "libclang-cpp.so",
     "libclang-cpp.so.23.1",
-    "libclang.so",
-    "libclang.so.23.1"
+    "libclang.so.23.1@{LLVM_13,LLVM_16,LLVM_17,LLVM_19,LLVM_20,LLVM_21,LLVM_23}",
+    "libclang.so@{LLVM_13,LLVM_16,LLVM_17,LLVM_19,LLVM_20,LLVM_21,LLVM_23}"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libLLVM.so.23.1",
-    "libc.so.6",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libLLVM.so.23.1@LLVM_23.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.38}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.3,CXXABI_1.3.5,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.9}"
   ],
   "build_deps": [
     "base-devel",

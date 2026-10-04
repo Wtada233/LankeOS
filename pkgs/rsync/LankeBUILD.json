@@ -6,12 +6,12 @@
     "bash"
   ],
   "needed_so": [
-    "libacl.so.1",
-    "libc.so.6",
-    "libcrypto.so.3",
-    "libidn2.so.0",
+    "libacl.so.1@{ACL_1.0,ACL_1.3}",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8}",
+    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libidn2.so.0@IDN2_0.0.0",
     "liblz4.so.1",
-    "libpopt.so.0",
+    "libpopt.so.0@LIBPOPT_0",
     "libz.so.1",
     "libzstd.so.1"
   ],

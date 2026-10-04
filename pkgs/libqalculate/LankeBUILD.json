@@ -4,17 +4,17 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.9}",
     "libcurl.so.4",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@GCC_3.0",
     "libgmp.so.10",
     "libhistory.so.8",
     "libicuuc.so.78",
-    "libm.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
     "libmpfr.so.6",
     "libncursesw.so.6",
     "libreadline.so.8",
-    "libstdc++.so.6",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.5,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.15,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.29,GLIBCXX_3.4.31,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libxml2.so.16"
   ],
   "provides_soname": [

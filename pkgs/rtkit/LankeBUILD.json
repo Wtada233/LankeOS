@@ -4,10 +4,10 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7}",
     "libcap.so.2",
-    "libdbus-1.so.3",
-    "libsystemd.so.0"
+    "libdbus-1.so.3@LIBDBUS_1_3",
+    "libsystemd.so.0@LIBSYSTEMD_209"
   ],
   "provides_soname": [],
   "build_deps": [

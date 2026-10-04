@@ -4,15 +4,15 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libblkid.so.1",
-    "libc.so.6",
-    "libcryptsetup.so.12",
+    "libblkid.so.1@BLKID_1.0",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libcryptsetup.so.12@CRYPTSETUP_2.0",
     "libglib-2.0.so.0",
-    "libgpgme.so.45",
+    "libgpgme.so.45@{GPGME_1.0,GPGME_1.1}",
     "libnspr4.so",
-    "libnss3.so",
+    "libnss3.so@{NSS_3.2,NSS_3.3}",
     "libplc4.so",
-    "libsmime3.so"
+    "libsmime3.so@{NSS_3.2,NSS_3.4}"
   ],
   "provides_soname": [
     "libvolume_key.so",

@@ -8,27 +8,27 @@
     "ppp"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.12,GLIBC_2.14,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.26,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.42,GLIBC_2.5,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
     "libcurl.so.4",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
-    "libgnutls.so.30",
+    "libgnutls.so.30@GNUTLS_3_4",
     "libgobject-2.0.so.0",
     "libmm-glib.so.0",
     "libndp.so.0",
-    "libnewt.so.0.52",
+    "libnewt.so.0.52@{NEWT_0.52,NEWT_0.52.13,NEWT_0.52.6,NEWT_0.52.9}",
     "libpsl.so.5",
     "libreadline.so.8",
-    "libslang.so.2",
-    "libsystemd.so.0",
-    "libudev.so.1"
+    "libslang.so.2@SLANG2",
+    "libsystemd.so.0@LIBSYSTEMD_209",
+    "libudev.so.1@LIBUDEV_183"
   ],
   "provides_soname": [
-    "libnm.so",
-    "libnm.so.0"
+    "libnm.so.0@{libnm_1_0_0,libnm_1_0_4,libnm_1_0_6,libnm_1_10_0,libnm_1_10_14,libnm_1_10_2,libnm_1_12_0,libnm_1_12_2,libnm_1_14_0,libnm_1_14_8,libnm_1_16_0,libnm_1_18_0,libnm_1_20_0,libnm_1_20_6,libnm_1_22_0,libnm_1_22_2,libnm_1_22_8,libnm_1_24_0,libnm_1_26_0,libnm_1_26_4,libnm_1_28_0,libnm_1_2_0,libnm_1_2_4,libnm_1_30_0,libnm_1_30_8,libnm_1_32_0,libnm_1_32_4,libnm_1_34_0,libnm_1_36_0,libnm_1_38_0,libnm_1_40_0,libnm_1_40_20_bondp,libnm_1_40_4,libnm_1_42_0,libnm_1_42_2,libnm_1_44_0,libnm_1_46_0,libnm_1_46_8,libnm_1_48_0,libnm_1_48_18,libnm_1_4_0,libnm_1_50_0,libnm_1_50_4,libnm_1_52_0,libnm_1_52_2,libnm_1_54_0,libnm_1_54_2,libnm_1_54_3,libnm_1_56_0,libnm_1_58_0,libnm_1_6_0,libnm_1_8_0}",
+    "libnm.so@{libnm_1_0_0,libnm_1_0_4,libnm_1_0_6,libnm_1_10_0,libnm_1_10_14,libnm_1_10_2,libnm_1_12_0,libnm_1_12_2,libnm_1_14_0,libnm_1_14_8,libnm_1_16_0,libnm_1_18_0,libnm_1_20_0,libnm_1_20_6,libnm_1_22_0,libnm_1_22_2,libnm_1_22_8,libnm_1_24_0,libnm_1_26_0,libnm_1_26_4,libnm_1_28_0,libnm_1_2_0,libnm_1_2_4,libnm_1_30_0,libnm_1_30_8,libnm_1_32_0,libnm_1_32_4,libnm_1_34_0,libnm_1_36_0,libnm_1_38_0,libnm_1_40_0,libnm_1_40_20_bondp,libnm_1_40_4,libnm_1_42_0,libnm_1_42_2,libnm_1_44_0,libnm_1_46_0,libnm_1_46_8,libnm_1_48_0,libnm_1_48_18,libnm_1_4_0,libnm_1_50_0,libnm_1_50_4,libnm_1_52_0,libnm_1_52_2,libnm_1_54_0,libnm_1_54_2,libnm_1_54_3,libnm_1_56_0,libnm_1_58_0,libnm_1_6_0,libnm_1_8_0}"
   ],
   "build_deps": [
     "base-devel",

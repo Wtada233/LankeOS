@@ -5,16 +5,16 @@
   "deps": [],
   "needed_so": [
     "libFcitx5Utils.so.2",
-    "libQt6Core.so.6",
-    "libQt6DBus.so.6",
-    "libQt6Gui.so.6",
-    "libQt6WaylandClient.so.6",
-    "libQt6Widgets.so.6",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libstdc++.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
+    "libQt6DBus.so.6@Qt_6",
+    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6WaylandClient.so.6@Qt_6_PRIVATE_API",
+    "libQt6Widgets.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libxcb.so.1",
-    "libxkbcommon.so.0"
+    "libxkbcommon.so.0@V_0.5.0"
   ],
   "provides_soname": [
     "libFcitx5Qt6DBusAddons.so",

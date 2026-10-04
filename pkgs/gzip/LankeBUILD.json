@@ -6,7 +6,7 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8}"
   ],
   "provides_soname": [],
   "build_deps": [

@@ -9,7 +9,7 @@
     "libX11.so.6",
     "libXfixes.so.3",
     "libXrender.so.1",
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.38}"
   ],
   "provides_soname": [
     "libXcursor.so",

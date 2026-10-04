@@ -4,10 +4,10 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.38}",
+    "libstdc++.so.6@CXXABI_1.3"
   ],
   "provides_soname": [
     "liblua++.so",

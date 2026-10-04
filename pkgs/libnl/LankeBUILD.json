@@ -4,23 +4,23 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.6}"
   ],
   "provides_soname": [
-    "libnl-3.so",
-    "libnl-3.so.200",
-    "libnl-cli-3.so",
-    "libnl-cli-3.so.200",
-    "libnl-genl-3.so",
-    "libnl-genl-3.so.200",
-    "libnl-idiag-3.so",
-    "libnl-idiag-3.so.200",
-    "libnl-nf-3.so",
-    "libnl-nf-3.so.200",
-    "libnl-route-3.so",
-    "libnl-route-3.so.200",
-    "libnl-xfrm-3.so",
-    "libnl-xfrm-3.so.200"
+    "libnl-3.so.200@{libnl_3,libnl_3_10,libnl_3_11,libnl_3_12,libnl_3_2_26,libnl_3_2_27,libnl_3_2_28,libnl_3_2_29,libnl_3_5,libnl_3_6}",
+    "libnl-3.so@{libnl_3,libnl_3_10,libnl_3_11,libnl_3_12,libnl_3_2_26,libnl_3_2_27,libnl_3_2_28,libnl_3_2_29,libnl_3_5,libnl_3_6}",
+    "libnl-cli-3.so.200@{libnl_3,libnl_3_2_28,libnl_3_8}",
+    "libnl-cli-3.so@{libnl_3,libnl_3_2_28,libnl_3_8}",
+    "libnl-genl-3.so.200@libnl_3",
+    "libnl-genl-3.so@libnl_3",
+    "libnl-idiag-3.so.200@libnl_3",
+    "libnl-idiag-3.so@libnl_3",
+    "libnl-nf-3.so.200@{libnl_3,libnl_3_6}",
+    "libnl-nf-3.so@{libnl_3,libnl_3_6}",
+    "libnl-route-3.so.200@{libnl_3,libnl_3_10,libnl_3_11,libnl_3_12,libnl_3_2_26,libnl_3_2_27,libnl_3_2_28,libnl_3_2_29,libnl_3_4,libnl_3_5,libnl_3_6,libnl_3_7,libnl_3_8,libnl_3_9}",
+    "libnl-route-3.so@{libnl_3,libnl_3_10,libnl_3_11,libnl_3_12,libnl_3_2_26,libnl_3_2_27,libnl_3_2_28,libnl_3_2_29,libnl_3_4,libnl_3_5,libnl_3_6,libnl_3_7,libnl_3_8,libnl_3_9}",
+    "libnl-xfrm-3.so.200@{libnl_3,libnl_3_12,libnl_3_6}",
+    "libnl-xfrm-3.so@{libnl_3,libnl_3_12,libnl_3_6}"
   ],
   "build_deps": [
     "base-devel",

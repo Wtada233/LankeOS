@@ -4,13 +4,13 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.38}",
     "librevenge-0.0.so.0",
     "librevenge-generators-0.0.so.0",
     "librevenge-stream-0.0.so.0",
-    "libstdc++.so.6",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libz.so.1"
   ],
   "provides_soname": [

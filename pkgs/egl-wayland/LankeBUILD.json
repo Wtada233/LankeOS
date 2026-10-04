@@ -6,7 +6,7 @@
     "eglexternalplatform"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libdrm.so.2",
     "libwayland-client.so.0",
     "libwayland-server.so.0"

@@ -4,9 +4,9 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libz.so.1"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29}",
+    "libz.so.1@ZLIB_1.2.0"
   ],
   "provides_soname": [
     "libhdf5.so",

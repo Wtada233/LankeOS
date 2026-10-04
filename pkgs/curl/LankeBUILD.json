@@ -7,13 +7,13 @@
   ],
   "needed_so": [
     "libbrotlidec.so.1",
-    "libc.so.6",
-    "libcrypto.so.3",
-    "libidn2.so.0",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.15,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.43,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libidn2.so.0@IDN2_0.0.0",
     "libnghttp2.so.14",
     "libpsl.so.5",
-    "libssl.so.3",
-    "libz.so.1",
+    "libssl.so.3@{OPENSSL_3.0.0,OPENSSL_3.2.0}",
+    "libz.so.1@ZLIB_1.2.3.4",
     "libzstd.so.1"
   ],
   "provides_soname": [

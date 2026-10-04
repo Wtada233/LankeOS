@@ -5,12 +5,12 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libmnl.so.0",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
+    "libmnl.so.0@LIBMNL_1.0",
     "libnetfilter_conntrack.so.3",
-    "libnfnetlink.so.0",
-    "libnftnl.so.11",
+    "libnfnetlink.so.0@NFNETLINK_1.0.1",
+    "libnftnl.so.11@{LIBNFTNL_11,LIBNFTNL_12,LIBNFTNL_13}",
     "libpcap.so.1"
   ],
   "provides_soname": [

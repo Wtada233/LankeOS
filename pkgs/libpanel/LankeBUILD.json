@@ -4,8 +4,8 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libadwaita-1.so.0",
-    "libc.so.6",
+    "libadwaita-1.so.0@LIBADWAITA_1_0",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libcairo.so.2",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",

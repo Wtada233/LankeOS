@@ -3,12 +3,12 @@
   "version": "1.3.2",
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libmnl.so.0"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
+    "libmnl.so.0@LIBMNL_1.0"
   ],
   "provides_soname": [
-    "libnftnl.so",
-    "libnftnl.so.11"
+    "libnftnl.so.11@{LIBNFTNL_11,LIBNFTNL_12,LIBNFTNL_13,LIBNFTNL_14,LIBNFTNL_15,LIBNFTNL_16,LIBNFTNL_17,LIBNFTNL_18,LIBNFTNL_19}",
+    "libnftnl.so@{LIBNFTNL_11,LIBNFTNL_12,LIBNFTNL_13,LIBNFTNL_14,LIBNFTNL_15,LIBNFTNL_16,LIBNFTNL_17,LIBNFTNL_18,LIBNFTNL_19}"
   ],
   "build_deps": [
     "base-devel",

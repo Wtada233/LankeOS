@@ -3,16 +3,16 @@
   "version": "1.1.7",
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.22,GLIBC_2.27,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libgmp.so.10",
-    "libjansson.so.4",
-    "libmnl.so.0",
-    "libnftnl.so.11",
+    "libjansson.so.4@libjansson.so.4",
+    "libmnl.so.0@LIBMNL_1.0",
+    "libnftnl.so.11@{LIBNFTNL_11,LIBNFTNL_13,LIBNFTNL_14,LIBNFTNL_15,LIBNFTNL_16,LIBNFTNL_18,LIBNFTNL_19}",
     "libreadline.so.8"
   ],
   "provides_soname": [
-    "libnftables.so",
-    "libnftables.so.1"
+    "libnftables.so.1@{LIBNFTABLES_1,LIBNFTABLES_2,LIBNFTABLES_3,LIBNFTABLES_4}",
+    "libnftables.so@{LIBNFTABLES_1,LIBNFTABLES_2,LIBNFTABLES_3,LIBNFTABLES_4}"
   ],
   "build_deps": [
     "base-devel",

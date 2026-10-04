@@ -6,11 +6,11 @@
     "libssh2"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libcrypto.so.3",
-    "libpcre2-8.so.0",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libpcre2-8.so.0@PCRE2_10.47",
     "libssh2.so.1",
-    "libssl.so.3",
+    "libssl.so.3@OPENSSL_3.0.0",
     "libz.so.1"
   ],
   "provides_soname": [

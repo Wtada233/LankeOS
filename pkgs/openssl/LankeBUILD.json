@@ -6,13 +6,13 @@
     "perl"
   ],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.12,GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
-    "libcrypto.so",
-    "libcrypto.so.3",
-    "libssl.so",
-    "libssl.so.3"
+    "libcrypto.so.3@{OPENSSL_3.0.0,OPENSSL_3.0.3,OPENSSL_3.0.8,OPENSSL_3.0.9,OPENSSL_3.1.0,OPENSSL_3.2.0,OPENSSL_3.3.0,OPENSSL_3.4.0,OPENSSL_3.5.0,OPENSSL_3.6.0}",
+    "libcrypto.so@{OPENSSL_3.0.0,OPENSSL_3.0.3,OPENSSL_3.0.8,OPENSSL_3.0.9,OPENSSL_3.1.0,OPENSSL_3.2.0,OPENSSL_3.3.0,OPENSSL_3.4.0,OPENSSL_3.5.0,OPENSSL_3.6.0}",
+    "libssl.so.3@{OPENSSL_3.0.0,OPENSSL_3.2.0,OPENSSL_3.3.0,OPENSSL_3.4.0,OPENSSL_3.5.0}",
+    "libssl.so@{OPENSSL_3.0.0,OPENSSL_3.2.0,OPENSSL_3.3.0,OPENSSL_3.4.0,OPENSSL_3.5.0}"
   ],
   "build_deps": [
     "base-devel"

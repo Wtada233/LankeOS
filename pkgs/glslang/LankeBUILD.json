@@ -4,12 +4,12 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libSPIRV-Tools-opt.so",
     "libSPIRV-Tools.so",
-    "libc.so.6",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.44}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.5,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "libSPIRV.so",

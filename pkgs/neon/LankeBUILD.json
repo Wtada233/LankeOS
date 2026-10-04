@@ -4,15 +4,15 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libcrypto.so.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libcrypto.so.3@OPENSSL_3.0.0",
     "libexpat.so.1",
-    "libssl.so.3",
+    "libssl.so.3@OPENSSL_3.0.0",
     "libz.so.1"
   ],
   "provides_soname": [
-    "libneon.so",
-    "libneon.so.27"
+    "libneon.so.27@{NEON_0_29,NEON_0_30,NEON_0_31,NEON_0_32,NEON_0_33,NEON_0_34,NEON_0_35,NEON_0_36,NEON_0_37}",
+    "libneon.so@{NEON_0_29,NEON_0_30,NEON_0_31,NEON_0_32,NEON_0_33,NEON_0_34,NEON_0_35,NEON_0_36,NEON_0_37}"
   ],
   "build_deps": [
     "base-devel",

@@ -3,7 +3,7 @@
   "version": "2.6.1",
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.34,GLIBC_2.38}"
   ],
   "provides_soname": [
     "libseccomp.so",

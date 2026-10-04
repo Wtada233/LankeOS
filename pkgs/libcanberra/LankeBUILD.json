@@ -5,8 +5,8 @@
   "deps": [],
   "needed_so": [
     "libX11.so.6",
-    "libasound.so.2",
-    "libc.so.6",
+    "libasound.so.2@{ALSA_0.9,ALSA_0.9.0rc4}",
+    "libc.so.6@{GLIBC_2.16,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libgdk-3.so.0",
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
@@ -14,16 +14,16 @@
     "libgstreamer-1.0.so.0",
     "libgtk-3.so.0",
     "libltdl.so.7",
-    "libpulse.so.0",
-    "libtdb.so.1",
-    "libudev.so.1",
+    "libpulse.so.0@PULSE_0",
+    "libtdb.so.1@TDB_1.2.1",
+    "libudev.so.1@LIBUDEV_183",
     "libvorbisfile.so.3"
   ],
   "provides_soname": [
     "libcanberra-gtk3.so",
     "libcanberra-gtk3.so.0",
-    "libcanberra.so",
-    "libcanberra.so.0"
+    "libcanberra.so.0@CANBERRA_0",
+    "libcanberra.so@CANBERRA_0"
   ],
   "build_deps": [
     "alsa-lib",

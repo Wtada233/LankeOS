@@ -6,10 +6,10 @@
     "python"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.3.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8}",
     "libcap.so.2",
-    "libelf.so.1",
-    "libm.so.6"
+    "libelf.so.1@ELFUTILS_1.0",
+    "libm.so.6@GLIBC_2.29"
   ],
   "provides_soname": [],
   "build_deps": [

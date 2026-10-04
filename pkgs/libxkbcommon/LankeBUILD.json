@@ -4,19 +4,19 @@
   "release": 5,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7}",
     "libwayland-client.so.0",
     "libxcb-xkb.so.1",
     "libxcb.so.1",
     "libxml2.so.16"
   ],
   "provides_soname": [
-    "libxkbcommon-x11.so",
-    "libxkbcommon-x11.so.0",
-    "libxkbcommon.so",
-    "libxkbcommon.so.0",
-    "libxkbregistry.so",
-    "libxkbregistry.so.0"
+    "libxkbcommon-x11.so.0@V_0.5.0",
+    "libxkbcommon-x11.so@V_0.5.0",
+    "libxkbcommon.so.0@{V_0.5.0,V_0.6.0,V_0.7.0,V_0.8.0,V_1.0.0,V_1.10.0,V_1.11.0,V_1.12.0,V_1.6.0,V_1.9.0}",
+    "libxkbcommon.so@{V_0.5.0,V_0.6.0,V_0.7.0,V_0.8.0,V_1.0.0,V_1.10.0,V_1.11.0,V_1.12.0,V_1.6.0,V_1.9.0}",
+    "libxkbregistry.so.0@{V_1.0.0,V_1.11.0}",
+    "libxkbregistry.so@{V_1.0.0,V_1.11.0}"
   ],
   "build_deps": [
     "base-devel",

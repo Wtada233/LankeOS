@@ -4,10 +4,10 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@GLIBC_2.2.5",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libm.so.6"
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.43}"
   ],
   "provides_soname": [
     "libgraphene-1.0.so",

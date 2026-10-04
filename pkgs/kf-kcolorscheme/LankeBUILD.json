@@ -4,15 +4,15 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libKF6ConfigCore.so.6",
     "libKF6ConfigGui.so.6",
     "libKF6GuiAddons.so.6",
     "libKF6I18n.so.6",
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libc.so.6",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
+    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_ABI_DT_RELR}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [
     "libKF6ColorScheme.so",

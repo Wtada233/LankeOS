@@ -4,13 +4,13 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Gui.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libm.so.6@GLIBC_2.2.5",
     "libraw.so.25",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [
     "libKDcrawQt6.so",

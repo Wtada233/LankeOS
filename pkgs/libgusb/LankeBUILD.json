@@ -4,17 +4,17 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libjson-glib-1.0.so.0",
+    "libjson-glib-1.0.so.0@libjson-glib-1.0.so.0",
     "libusb-1.0.so.0"
   ],
   "provides_soname": [
-    "libgusb.so",
-    "libgusb.so.2"
+    "libgusb.so.2@{LIBGUSB_0.1.0,LIBGUSB_0.1.1,LIBGUSB_0.1.7,LIBGUSB_0.2.11,LIBGUSB_0.2.2,LIBGUSB_0.2.4,LIBGUSB_0.2.5,LIBGUSB_0.2.8,LIBGUSB_0.2.9,LIBGUSB_0.3.1,LIBGUSB_0.3.10,LIBGUSB_0.3.3,LIBGUSB_0.3.5,LIBGUSB_0.3.6,LIBGUSB_0.3.8,LIBGUSB_0.4.0,LIBGUSB_0.4.1,LIBGUSB_0.4.3,LIBGUSB_0.4.4,LIBGUSB_0.4.5,LIBGUSB_0.4.7}",
+    "libgusb.so@{LIBGUSB_0.1.0,LIBGUSB_0.1.1,LIBGUSB_0.1.7,LIBGUSB_0.2.11,LIBGUSB_0.2.2,LIBGUSB_0.2.4,LIBGUSB_0.2.5,LIBGUSB_0.2.8,LIBGUSB_0.2.9,LIBGUSB_0.3.1,LIBGUSB_0.3.10,LIBGUSB_0.3.3,LIBGUSB_0.3.5,LIBGUSB_0.3.6,LIBGUSB_0.3.8,LIBGUSB_0.4.0,LIBGUSB_0.4.1,LIBGUSB_0.4.3,LIBGUSB_0.4.4,LIBGUSB_0.4.5,LIBGUSB_0.4.7}"
   ],
   "build_deps": [
     "base-devel",

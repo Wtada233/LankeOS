@@ -4,15 +4,15 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libcrypt.so.2",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.27,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libcrypt.so.2@XCRYPT_2.0",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libjson-c.so.5",
+    "libjson-c.so.5@{JSONC_0.14,JSONC_0.15}",
     "libpolkit-gobject-1.so.0",
-    "libsystemd.so.0"
+    "libsystemd.so.0@LIBSYSTEMD_209"
   ],
   "provides_soname": [
     "libaccountsservice.so",

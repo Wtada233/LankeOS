@@ -4,16 +4,16 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libcrypto.so.3",
-    "libgnutls.so.30",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libcrypto.so.3@{OPENSSL_3.0.0,OPENSSL_3.3.0,OPENSSL_3.4.0}",
+    "libgnutls.so.30@{GNUTLS_3_4,GNUTLS_3_6_0,GNUTLS_3_6_13,GNUTLS_3_8_2,GNUTLS_3_8_4}",
     "libltdl.so.7",
     "libnspr4.so",
-    "libnss3.so",
-    "libnssutil3.so",
-    "libsmime3.so",
+    "libnss3.so@{NSS_3.10,NSS_3.11.2,NSS_3.12,NSS_3.12.3,NSS_3.13,NSS_3.15,NSS_3.2,NSS_3.3,NSS_3.34,NSS_3.4,NSS_3.58,NSS_3.59,NSS_3.6,NSS_3.7,NSS_3.8,NSS_3.9}",
+    "libnssutil3.so@{NSSUTIL_3.12,NSSUTIL_3.12.3}",
+    "libsmime3.so@{NSS_3.10,NSS_3.2,NSS_3.4}",
     "libxml2.so.16",
-    "libxslt.so.1"
+    "libxslt.so.1@{LIBXML2_1.0.11,LIBXML2_1.0.22}"
   ],
   "provides_soname": [
     "libxmlsec1-gnutls.so",

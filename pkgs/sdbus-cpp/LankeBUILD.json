@@ -4,12 +4,12 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.32,GLIBC_2.34,GLIBC_2.7}",
+    "libgcc_s.so.1@GCC_3.0",
     "libm.so.6",
-    "libstdc++.so.6",
-    "libsystemd.so.0"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.31}",
+    "libsystemd.so.0@{LIBSYSTEMD_209,LIBSYSTEMD_221,LIBSYSTEMD_222,LIBSYSTEMD_236,LIBSYSTEMD_237,LIBSYSTEMD_238,LIBSYSTEMD_240,LIBSYSTEMD_241,LIBSYSTEMD_243,LIBSYSTEMD_245,LIBSYSTEMD_246}"
   ],
   "provides_soname": [
     "libsdbus-c++.so",

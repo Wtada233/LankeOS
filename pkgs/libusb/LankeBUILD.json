@@ -4,9 +4,9 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libudev.so.1"
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libudev.so.1@LIBUDEV_183"
   ],
   "provides_soname": [
     "libusb-1.0.so",

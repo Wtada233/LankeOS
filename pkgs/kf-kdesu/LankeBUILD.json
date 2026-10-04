@@ -8,10 +8,10 @@
     "libKF6CoreAddons.so.6",
     "libKF6I18n.so.6",
     "libKF6Pty.so.6",
-    "libQt6Core.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
     "libX11.so.6",
-    "libc.so.6",
-    "libstdc++.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [
     "libKF6Su.so",

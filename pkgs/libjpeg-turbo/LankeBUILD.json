@@ -4,15 +4,15 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libm.so.6"
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.34,GLIBC_2.38}",
+    "libm.so.6@GLIBC_2.2.5"
   ],
   "provides_soname": [
-    "libjpeg.so",
-    "libjpeg.so.62",
-    "libturbojpeg.so",
-    "libturbojpeg.so.0"
+    "libjpeg.so.62@{LIBJPEGTURBO_6.2,LIBJPEG_6.2}",
+    "libjpeg.so@{LIBJPEGTURBO_6.2,LIBJPEG_6.2}",
+    "libturbojpeg.so.0@{TURBOJPEG_1.0,TURBOJPEG_1.1,TURBOJPEG_1.2,TURBOJPEG_1.4,TURBOJPEG_2.0,TURBOJPEG_3,TURBOJPEG_3.1,TURBOJPEG_3.2}",
+    "libturbojpeg.so@{TURBOJPEG_1.0,TURBOJPEG_1.1,TURBOJPEG_1.2,TURBOJPEG_1.4,TURBOJPEG_2.0,TURBOJPEG_3,TURBOJPEG_3.1,TURBOJPEG_3.2}"
   ],
   "build_deps": [
     "base-devel",

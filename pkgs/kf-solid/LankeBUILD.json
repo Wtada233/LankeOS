@@ -7,14 +7,14 @@
     "upower"
   ],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6DBus.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Xml.so.6",
-    "libc.so.6",
-    "libmount.so.1",
-    "libstdc++.so.6",
-    "libudev.so.1"
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6DBus.so.6@Qt_6",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Xml.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libmount.so.1@{MOUNT_2.19,MOUNT_2.26}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
+    "libudev.so.1@LIBUDEV_183"
   ],
   "provides_soname": [
     "libKF6Solid.so",

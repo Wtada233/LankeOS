@@ -3,9 +3,9 @@
   "version": "0.13.0",
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9}",
     "libcap.so.2",
-    "libgcc_s.so.1"
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}"
   ],
   "provides_soname": [],
   "build_deps": [

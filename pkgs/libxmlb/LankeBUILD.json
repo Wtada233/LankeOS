@@ -3,17 +3,17 @@
   "version": "0.3.29",
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.34,GLIBC_2.4}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "liblzma.so.5",
-    "libstemmer.so.0",
+    "liblzma.so.5@XZ_5.0",
+    "libstemmer.so.0@SB_STEMMER_0",
     "libzstd.so.1"
   ],
   "provides_soname": [
-    "libxmlb.so",
-    "libxmlb.so.2"
+    "libxmlb.so.2@{LIBXMLB_0.1.0,LIBXMLB_0.1.1,LIBXMLB_0.1.11,LIBXMLB_0.1.12,LIBXMLB_0.1.13,LIBXMLB_0.1.15,LIBXMLB_0.1.2,LIBXMLB_0.1.3,LIBXMLB_0.1.4,LIBXMLB_0.1.5,LIBXMLB_0.1.6,LIBXMLB_0.1.7,LIBXMLB_0.2.0,LIBXMLB_0.3.0,LIBXMLB_0.3.1,LIBXMLB_0.3.19,LIBXMLB_0.3.27,LIBXMLB_0.3.4}",
+    "libxmlb.so@{LIBXMLB_0.1.0,LIBXMLB_0.1.1,LIBXMLB_0.1.11,LIBXMLB_0.1.12,LIBXMLB_0.1.13,LIBXMLB_0.1.15,LIBXMLB_0.1.2,LIBXMLB_0.1.3,LIBXMLB_0.1.4,LIBXMLB_0.1.5,LIBXMLB_0.1.6,LIBXMLB_0.1.7,LIBXMLB_0.2.0,LIBXMLB_0.3.0,LIBXMLB_0.3.1,LIBXMLB_0.3.19,LIBXMLB_0.3.27,LIBXMLB_0.3.4}"
   ],
   "build_deps": [
     "base-devel",

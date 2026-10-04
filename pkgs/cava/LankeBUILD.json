@@ -4,16 +4,16 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libasound.so.2",
-    "libc.so.6",
+    "libasound.so.2@{ALSA_0.9,ALSA_0.9.0rc4}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.7}",
     "libfftw3.so.3",
     "libiniparser.so.4",
     "libjack.so.0",
-    "libm.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.35}",
     "libncursesw.so.6",
     "libpipewire-0.3.so.0",
-    "libpulse-simple.so.0",
-    "libpulse.so.0"
+    "libpulse-simple.so.0@PULSE_0",
+    "libpulse.so.0@PULSE_0"
   ],
   "provides_soname": [],
   "build_deps": [

@@ -3,10 +3,10 @@
   "version": "2.1.1788856981.c6ffc14",
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6"
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.38,GLIBC_2.44}"
   ],
   "provides_soname": [
     "libluajit-5.1.so",

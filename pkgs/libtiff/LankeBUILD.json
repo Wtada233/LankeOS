@@ -4,20 +4,20 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.38}",
     "libgcc_s.so.1",
-    "libjpeg.so.62",
-    "liblzma.so.5",
-    "libm.so.6",
-    "libstdc++.so.6",
+    "libjpeg.so.62@LIBJPEG_6.2",
+    "liblzma.so.5@XZ_5.0",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
+    "libstdc++.so.6@{GLIBCXX_3.4,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libz.so.1",
     "libzstd.so.1"
   ],
   "provides_soname": [
-    "libtiff.so",
-    "libtiff.so.6",
-    "libtiffxx.so",
-    "libtiffxx.so.6"
+    "libtiff.so.6@{LIBTIFF_4.0,LIBTIFF_4.1,LIBTIFF_4.2,LIBTIFF_4.3,LIBTIFF_4.4,LIBTIFF_4.5,LIBTIFF_4.6.1,LIBTIFF_4.7.1,LIBTIFF_4.7.2}",
+    "libtiff.so@{LIBTIFF_4.0,LIBTIFF_4.1,LIBTIFF_4.2,LIBTIFF_4.3,LIBTIFF_4.4,LIBTIFF_4.5,LIBTIFF_4.6.1,LIBTIFF_4.7.1,LIBTIFF_4.7.2}",
+    "libtiffxx.so.6@LIBTIFFXX_4.0",
+    "libtiffxx.so@LIBTIFFXX_4.0"
   ],
   "build_deps": [
     "base-devel",

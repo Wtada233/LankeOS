@@ -4,13 +4,13 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libgomp.so.1",
-    "libjpeg.so.62",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libgomp.so.1@{GOMP_1.0,GOMP_4.0,GOMP_4.5,OMP_1.0}",
+    "libjpeg.so.62@{LIBJPEGTURBO_6.2,LIBJPEG_6.2}",
     "liblcms2.so.2",
-    "libm.so.6",
-    "libstdc++.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.43}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.30}",
     "libz.so.1"
   ],
   "provides_soname": [

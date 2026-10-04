@@ -7,13 +7,13 @@
     "python-setuptools"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libffi.so.8",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.34,GLIBC_2.7}",
+    "libffi.so.8@{LIBFFI_BASE_8.0,LIBFFI_CLOSURE_8.0}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libm.so.6"
+    "libm.so.6@GLIBC_2.29"
   ],
   "provides_soname": [
     "libgirepository-1.0.so",

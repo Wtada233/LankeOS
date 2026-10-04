@@ -4,8 +4,8 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libm.so.6@GLIBC_2.2.5",
+    "libstdc++.so.6@{GLIBCXX_3.4,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "libImath-3_2.so",

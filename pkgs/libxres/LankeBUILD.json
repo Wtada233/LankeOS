@@ -8,7 +8,7 @@
   "needed_so": [
     "libX11.so.6",
     "libXext.so.6",
-    "libc.so.6"
+    "libc.so.6@GLIBC_2.2.5"
   ],
   "provides_soname": [
     "libXRes.so",

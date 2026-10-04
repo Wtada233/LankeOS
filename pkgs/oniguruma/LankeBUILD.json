@@ -6,7 +6,7 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}"
   ],
   "provides_soname": [
     "libonig.so",

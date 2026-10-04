@@ -4,14 +4,14 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libm.so.6",
-    "libpng16.so.16",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.42}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43,GLIBC_2.44}",
+    "libpng16.so.16@PNG16_0",
     "libz.so.1"
   ],
   "provides_soname": [
-    "libslang.so",
-    "libslang.so.2"
+    "libslang.so.2@{SLANG2,SLANG2.1.0,SLANG2.1.1,SLANG2.2.0,SLANG2.2.1,SLANG2.2.3,SLANG2.3.0}",
+    "libslang.so@{SLANG2,SLANG2.1.0,SLANG2.1.1,SLANG2.2.0,SLANG2.2.1,SLANG2.2.3,SLANG2.3.0}"
   ],
   "build_deps": [
     "base-devel",

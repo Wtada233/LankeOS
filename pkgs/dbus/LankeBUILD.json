@@ -8,13 +8,13 @@
   ],
   "needed_so": [
     "libX11.so.6",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.15,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.28,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
     "libexpat.so.1",
-    "libsystemd.so.0"
+    "libsystemd.so.0@LIBSYSTEMD_209"
   ],
   "provides_soname": [
-    "libdbus-1.so",
-    "libdbus-1.so.3"
+    "libdbus-1.so.3@{LIBDBUS_1_3,LIBDBUS_PRIVATE_1.16.2}",
+    "libdbus-1.so@{LIBDBUS_1_3,LIBDBUS_PRIVATE_1.16.2}"
   ],
   "build_deps": [
     "base-devel",

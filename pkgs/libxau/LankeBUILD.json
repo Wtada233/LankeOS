@@ -6,7 +6,7 @@
     "xorgproto"
   ],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.33}"
   ],
   "provides_soname": [
     "libXau.so",

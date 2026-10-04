@@ -4,7 +4,7 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libm.so.6"
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.43}"
   ],
   "provides_soname": [
     "libglm.so"

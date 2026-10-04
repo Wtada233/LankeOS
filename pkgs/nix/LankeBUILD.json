@@ -6,7 +6,7 @@
     "nlohmann-json"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libarchive.so.13",
     "libblake3.so.0",
     "libboost_context.so.1.92.0",
@@ -14,17 +14,17 @@
     "libboost_url.so.1.92.0",
     "libbrotlidec.so.1",
     "libbrotlienc.so.1",
-    "libc.so.6",
-    "libcrypto.so.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.36,GLIBC_2.38,GLIBC_2.4,GLIBC_2.5,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libcrypto.so.3@OPENSSL_3.0.0",
     "libcurl.so.4",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3}",
     "libgit2.so.1.9",
-    "libm.so.6",
+    "libm.so.6@GLIBC_2.29",
     "libreadline.so.8",
     "libseccomp.so.2",
     "libsodium.so.26",
     "libsqlite3.so.0",
-    "libstdc++.so.6",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.2,CXXABI_1.3.3,CXXABI_1.3.5,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.28,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libzstd.so.1"
   ],
   "provides_soname": [

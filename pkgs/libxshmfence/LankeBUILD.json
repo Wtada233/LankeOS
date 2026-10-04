@@ -4,7 +4,7 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.38,GLIBC_2.7}"
   ],
   "provides_soname": [
     "libxshmfence.so",

@@ -6,9 +6,9 @@
     "openssh"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libfuse3.so.4",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libfuse3.so.4@{FUSE_3.0,FUSE_3.12,FUSE_3.17,FUSE_3.17.3,FUSE_3.2}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgcr-4.so.4",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
@@ -17,7 +17,7 @@
     "libpolkit-gobject-1.so.0",
     "libsecret-1.so.0",
     "libsoup-3.0.so.0",
-    "libsystemd.so.0",
+    "libsystemd.so.0@LIBSYSTEMD_209",
     "libudisks2.so.0",
     "libxml2.so.16"
   ],

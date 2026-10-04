@@ -4,9 +4,9 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libstdc++.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libstdc++.so.6@{CXXABI_1.3,GLIBCXX_3.4,GLIBCXX_3.4.20}"
   ],
   "provides_soname": [
     "libINIReader.so",

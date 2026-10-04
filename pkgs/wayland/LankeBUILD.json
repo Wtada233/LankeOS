@@ -4,9 +4,9 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.30,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9}",
     "libexpat.so.1",
-    "libffi.so.8",
+    "libffi.so.8@LIBFFI_BASE_8.0",
     "libxml2.so.16"
   ],
   "provides_soname": [

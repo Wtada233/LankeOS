@@ -6,23 +6,23 @@
     "bash"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.28,GLIBC_2.29,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.39,GLIBC_2.7,GLIBC_2.9}",
     "libcairo.so.2",
     "libdisplay-info.so.3",
     "libgbm.so.1",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libinput.so.10",
-    "libm.so.6",
+    "libinput.so.10@{LIBINPUT_0.12.0,LIBINPUT_0.14.0,LIBINPUT_0.19.0,LIBINPUT_0.20.0,LIBINPUT_0.21.0,LIBINPUT_1.1,LIBINPUT_1.15,LIBINPUT_1.19,LIBINPUT_1.2,LIBINPUT_1.21,LIBINPUT_1.3,LIBINPUT_1.30,LIBINPUT_1.5,LIBINPUT_1.7}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.43,GLIBC_2.44}",
     "libpango-1.0.so.0",
     "libpangocairo-1.0.so.0",
     "libpipewire-0.3.so.0",
     "libpixman-1.so.0",
     "libseat.so.1",
-    "libudev.so.1",
-    "libxkbcommon.so.0"
+    "libudev.so.1@LIBUDEV_183",
+    "libxkbcommon.so.0@V_0.5.0"
   ],
   "provides_soname": [],
   "build_deps": [

@@ -4,9 +4,9 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libacl.so.1",
-    "libattr.so.1",
-    "libc.so.6"
+    "libacl.so.1@ACL_1.0",
+    "libattr.so.1@{ATTR_1.1,ATTR_1.3}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.16,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7}"
   ],
   "provides_soname": [],
   "build_deps": [

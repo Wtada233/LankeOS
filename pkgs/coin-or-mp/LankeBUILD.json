@@ -6,10 +6,10 @@
   "needed_so": [
     "libCbc.so.3",
     "libCbcSolver.so.3",
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
     "libm.so.6",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "libCoinMP.so",

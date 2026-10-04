@@ -4,14 +4,14 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "liblcms2.so.2",
-    "libm.so.6"
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.38,GLIBC_2.43}"
   ],
   "provides_soname": [
-    "libbabl-0.1.so",
-    "libbabl-0.1.so.0"
+    "libbabl-0.1.so.0@V0_1_0",
+    "libbabl-0.1.so@V0_1_0"
   ],
   "build_deps": [
     "base-devel",

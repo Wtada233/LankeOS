@@ -4,13 +4,13 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.15,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.36,GLIBC_2.38,GLIBC_2.4,GLIBC_2.42,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libncursesw.so.6"
   ],
   "provides_soname": [
-    "libproc2.so",
-    "libproc2.so.1"
+    "libproc2.so.1@{LIBPROC_2,LIBPROC_2.1,LIBPROC_2.2}",
+    "libproc2.so@{LIBPROC_2,LIBPROC_2.1,LIBPROC_2.2}"
   ],
   "build_deps": [
     "base-devel",

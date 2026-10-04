@@ -6,15 +6,15 @@
     "bash"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libffi.so.8",
-    "libtasn1.so.6"
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.2.5,GLIBC_2.26,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.6,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libffi.so.8@{LIBFFI_BASE_8.0,LIBFFI_CLOSURE_8.0}",
+    "libtasn1.so.6@LIBTASN1_0_3"
   ],
   "provides_soname": [
-    "libp11-kit.so",
-    "libp11-kit.so.0",
-    "p11-kit-proxy.so"
+    "libp11-kit.so.0@LIBP11_KIT_1.0",
+    "libp11-kit.so@LIBP11_KIT_1.0",
+    "p11-kit-proxy.so@LIBP11_KIT_1.0"
   ],
   "build_deps": [
     "base-devel",

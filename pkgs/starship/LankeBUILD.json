@@ -4,9 +4,9 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
-    "libm.so.6"
+    "libc.so.6@{GLIBC_2.13,GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.28,GLIBC_2.29,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.39,GLIBC_2.4,GLIBC_2.9}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
+    "libm.so.6@GLIBC_2.29"
   ],
   "provides_soname": [],
   "build_deps": [

@@ -6,15 +6,15 @@
     "python"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7}",
     "libcap.so.2",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libm.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
     "libunwind.so.8"
   ],
   "provides_soname": [

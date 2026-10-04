@@ -5,22 +5,22 @@
   "deps": [],
   "needed_so": [
     "libatk-1.0.so.0",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.34,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libcairo.so.2",
     "libfribidi.so.0",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgdk-3.so.0",
     "libgdk_pixbuf-2.0.so.0",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libgtk-3.so.0",
-    "libm.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
     "libpango-1.0.so.0"
   ],
   "provides_soname": [
-    "libhandy-1.so",
-    "libhandy-1.so.0"
+    "libhandy-1.so.0@LIBHANDY_1_0",
+    "libhandy-1.so@LIBHANDY_1_0"
   ],
   "build_deps": [
     "at-spi2-core",

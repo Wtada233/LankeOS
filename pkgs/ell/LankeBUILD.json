@@ -4,11 +4,11 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.11,GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9}"
   ],
   "provides_soname": [
-    "libell.so",
-    "libell.so.0"
+    "libell.so.0@ELL_0.10",
+    "libell.so@ELL_0.10"
   ],
   "build_deps": [
     "base-devel",

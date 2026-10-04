@@ -5,8 +5,8 @@
   "deps": [],
   "needed_so": [
     "libICE.so.6",
-    "libc.so.6",
-    "libuuid.so.1"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}",
+    "libuuid.so.1@UUID_1.0"
   ],
   "provides_soname": [
     "libSM.so",

@@ -4,13 +4,13 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.36,GLIBC_2.38}",
     "libm.so.6"
   ],
   "provides_soname": [
-    "libjson-c.so",
-    "libjson-c.so.5"
+    "libjson-c.so.5@{JSONC_0.14,JSONC_0.15,JSONC_0.16,JSONC_0.17,JSONC_0.18,JSONC_0.19,JSONC_PRIVATE}",
+    "libjson-c.so@{JSONC_0.14,JSONC_0.15,JSONC_0.16,JSONC_0.17,JSONC_0.18,JSONC_0.19,JSONC_PRIVATE}"
   ],
   "build_deps": [
     "base-devel",

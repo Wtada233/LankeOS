@@ -8,9 +8,9 @@
   "needed_so": [
     "libbrotlidec.so.1",
     "libbz2.so.1.0",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.33,GLIBC_2.38}",
     "libharfbuzz.so.0",
-    "libpng16.so.16",
+    "libpng16.so.16@PNG16_0",
     "libz.so.1"
   ],
   "provides_soname": [

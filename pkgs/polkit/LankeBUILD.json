@@ -4,14 +4,14 @@
   "release": 4,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libduktape.so.207",
     "libexpat.so.1",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libpam.so.0",
-    "libsystemd.so.0"
+    "libpam.so.0@LIBPAM_1.0",
+    "libsystemd.so.0@{LIBSYSTEMD_209,LIBSYSTEMD_213,LIBSYSTEMD_253}"
   ],
   "provides_soname": [
     "libpolkit-agent-1.so",

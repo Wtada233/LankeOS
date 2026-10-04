@@ -6,7 +6,7 @@
     "perl-file-sharedir"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.38,GLIBC_2.4}",
     "libexpat.so.1"
   ],
   "provides_soname": [],

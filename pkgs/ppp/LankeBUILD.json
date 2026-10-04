@@ -4,13 +4,13 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libcrypt.so.2",
-    "libcrypto.so.3",
-    "libpam.so.0",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libcrypt.so.2@XCRYPT_2.0",
+    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libpam.so.0@LIBPAM_1.0",
     "libpcap.so.1",
-    "libssl.so.3",
-    "libsystemd.so.0"
+    "libssl.so.3@OPENSSL_3.0.0",
+    "libsystemd.so.0@LIBSYSTEMD_209"
   ],
   "provides_soname": [],
   "build_deps": [

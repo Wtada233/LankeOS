@@ -4,12 +4,12 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libglib-2.0.so.0"
   ],
   "provides_soname": [
-    "libslirp.so",
-    "libslirp.so.0"
+    "libslirp.so.0@{SLIRP_4.0,SLIRP_4.1,SLIRP_4.2,SLIRP_4.5,SLIRP_4.7,SLIRP_4.9}",
+    "libslirp.so@{SLIRP_4.0,SLIRP_4.1,SLIRP_4.2,SLIRP_4.5,SLIRP_4.7,SLIRP_4.9}"
   ],
   "build_deps": [
     "base-devel",

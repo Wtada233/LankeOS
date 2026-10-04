@@ -6,13 +6,13 @@
     "shared-mime-info"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libglycin-2.so.0",
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libm.so.6"
+    "libm.so.6@GLIBC_2.2.5"
   ],
   "provides_soname": [
     "libgdk_pixbuf-2.0.so",

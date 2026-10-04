@@ -7,7 +7,7 @@
     "p11-kit"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libnspr4.so",
     "libplc4.so",
     "libplds4.so",
@@ -15,14 +15,14 @@
     "libz.so.1"
   ],
   "provides_soname": [
-    "libfreebl3.so",
-    "libfreeblpriv3.so",
-    "libnss3.so",
-    "libnsssysinit.so",
-    "libnssutil3.so",
-    "libsmime3.so",
-    "libsoftokn3.so",
-    "libssl3.so"
+    "libfreebl3.so@{NSSRAWHASH_3.12.3,NSSprivate_3.11}",
+    "libfreeblpriv3.so@{NSSprivate_3.11,NSSprivate_3.16}",
+    "libnss3.so@{NSS_3.10,NSS_3.10.2,NSS_3.101,NSS_3.107,NSS_3.11,NSS_3.11.1,NSS_3.11.2,NSS_3.11.7,NSS_3.11.9,NSS_3.110,NSS_3.113,NSS_3.115,NSS_3.116,NSS_3.117,NSS_3.12,NSS_3.12.1,NSS_3.12.10,NSS_3.12.3,NSS_3.12.4,NSS_3.12.5,NSS_3.12.6,NSS_3.12.7,NSS_3.12.9,NSS_3.126,NSS_3.13,NSS_3.13.2,NSS_3.14,NSS_3.14.1,NSS_3.14.3,NSS_3.15,NSS_3.15.4,NSS_3.16.1,NSS_3.16.2,NSS_3.18,NSS_3.19,NSS_3.19.1,NSS_3.2,NSS_3.2.1,NSS_3.21,NSS_3.22,NSS_3.3,NSS_3.3.1,NSS_3.30,NSS_3.31,NSS_3.33,NSS_3.34,NSS_3.39,NSS_3.4,NSS_3.43,NSS_3.44,NSS_3.45,NSS_3.47,NSS_3.5,NSS_3.52,NSS_3.53,NSS_3.55,NSS_3.58,NSS_3.59,NSS_3.6,NSS_3.62,NSS_3.65,NSS_3.66,NSS_3.7,NSS_3.7.1,NSS_3.77,NSS_3.79,NSS_3.8,NSS_3.9,NSS_3.9.2,NSS_3.9.3}",
+    "libnsssysinit.so@NSS_3.15",
+    "libnssutil3.so@{NSSUTIL_3.101,NSSUTIL_3.108,NSSUTIL_3.117,NSSUTIL_3.12,NSSUTIL_3.12.3,NSSUTIL_3.12.5,NSSUTIL_3.12.7,NSSUTIL_3.13,NSSUTIL_3.130,NSSUTIL_3.14,NSSUTIL_3.15,NSSUTIL_3.17.1,NSSUTIL_3.21,NSSUTIL_3.24,NSSUTIL_3.25,NSSUTIL_3.31,NSSUTIL_3.33,NSSUTIL_3.38,NSSUTIL_3.39,NSSUTIL_3.59,NSSUTIL_3.82,NSSUTIL_3.90,NSSUTIL_3.94}",
+    "libsmime3.so@{NSS_3.10,NSS_3.101,NSS_3.12.10,NSS_3.12.2,NSS_3.13,NSS_3.130,NSS_3.15,NSS_3.16,NSS_3.18,NSS_3.2,NSS_3.2.1,NSS_3.3,NSS_3.4,NSS_3.4.1,NSS_3.6,NSS_3.7,NSS_3.7.2,NSS_3.8,NSS_3.89,NSS_3.9,NSS_3.9.3,NSS_3.99}",
+    "libsoftokn3.so@{NSS_3.4,NSS_3.52}",
+    "libssl3.so@{NSS_3.11.4,NSS_3.11.8,NSS_3.12.10,NSS_3.12.6,NSS_3.13,NSS_3.13.2,NSS_3.14,NSS_3.15,NSS_3.15.4,NSS_3.2,NSS_3.2.1,NSS_3.20,NSS_3.21,NSS_3.22,NSS_3.23,NSS_3.24,NSS_3.27,NSS_3.28,NSS_3.30,NSS_3.30.0.1,NSS_3.33,NSS_3.4,NSS_3.7.4,NSS_3.77,NSS_3.80}"
   ],
   "build_deps": [
     "base-devel",

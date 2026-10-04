@@ -7,11 +7,11 @@
     "python"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.26,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4}",
     "libfreetype.so.6",
-    "libfuse3.so.4",
-    "liblzma.so.5",
-    "libtasn1.so.6"
+    "libfuse3.so.4@FUSE_3.17",
+    "liblzma.so.5@XZ_5.0",
+    "libtasn1.so.6@LIBTASN1_0_3"
   ],
   "provides_soname": [],
   "build_deps": [

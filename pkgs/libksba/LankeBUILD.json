@@ -4,12 +4,12 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgpg-error.so.0"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libgpg-error.so.0@GPG_ERROR_1.0"
   ],
   "provides_soname": [
-    "libksba.so",
-    "libksba.so.8"
+    "libksba.so.8@{KSBA_0.9,KSBA_PRIVATE_TESTS}",
+    "libksba.so@{KSBA_0.9,KSBA_PRIVATE_TESTS}"
   ],
   "build_deps": [
     "base-devel",

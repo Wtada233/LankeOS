@@ -4,7 +4,7 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.42,GLIBC_2.43}",
     "libcrypt.so.2",
     "libncursesw.so.6",
     "libreadline.so.8"

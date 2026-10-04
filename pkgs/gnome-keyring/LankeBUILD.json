@@ -11,18 +11,18 @@
     "p11-kit"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libcap-ng.so.0",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgck-1.so.0",
     "libgcr-base-3.so.1",
-    "libgcrypt.so.20",
+    "libgcrypt.so.20@GCRYPT_1.6",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libpam.so.0",
-    "libsystemd.so.0"
+    "libpam.so.0@LIBPAM_1.0",
+    "libsystemd.so.0@LIBSYSTEMD_209"
   ],
   "provides_soname": [],
   "build_deps": [

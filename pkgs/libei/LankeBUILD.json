@@ -4,11 +4,11 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libevdev.so.2",
-    "libgcc_s.so.1",
-    "libsystemd.so.0",
-    "libxkbcommon.so.0"
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libevdev.so.2@LIBEVDEV_1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libsystemd.so.0@{LIBSYSTEMD_221,LIBSYSTEMD_237}",
+    "libxkbcommon.so.0@V_0.5.0"
   ],
   "provides_soname": [
     "libei.so",

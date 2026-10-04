@@ -4,10 +4,10 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
-    "libgnutls.so.30",
+    "libgnutls.so.30@{GNUTLS_3_4,GNUTLS_3_6_13,GNUTLS_3_6_3,GNUTLS_3_8_2}",
     "libgobject-2.0.so.0"
   ],
   "provides_soname": [

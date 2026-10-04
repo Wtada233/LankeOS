@@ -4,12 +4,12 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libm.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@GLIBC_2.2.5"
   ],
   "provides_soname": [
-    "libevdev.so",
-    "libevdev.so.2"
+    "libevdev.so.2@{LIBEVDEV_1,LIBEVDEV_1_10,LIBEVDEV_1_3,LIBEVDEV_1_6,LIBEVDEV_1_7}",
+    "libevdev.so@{LIBEVDEV_1,LIBEVDEV_1_10,LIBEVDEV_1_3,LIBEVDEV_1_6,LIBEVDEV_1_7}"
   ],
   "build_deps": [
     "base-devel",

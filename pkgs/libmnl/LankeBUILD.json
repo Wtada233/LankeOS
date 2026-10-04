@@ -3,11 +3,11 @@
   "version": "1.0.5",
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3}"
   ],
   "provides_soname": [
-    "libmnl.so",
-    "libmnl.so.0"
+    "libmnl.so.0@{LIBMNL_1.0,LIBMNL_1.1,LIBMNL_1.2}",
+    "libmnl.so@{LIBMNL_1.0,LIBMNL_1.1,LIBMNL_1.2}"
   ],
   "build_deps": [
     "base-devel"

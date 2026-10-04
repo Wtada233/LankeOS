@@ -4,7 +4,7 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libmd4c-html.so",

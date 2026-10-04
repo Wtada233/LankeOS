@@ -4,12 +4,12 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Widgets.so.6",
-    "libc.so.6",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Widgets.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.38}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [
     "libKF6Plotting.so",

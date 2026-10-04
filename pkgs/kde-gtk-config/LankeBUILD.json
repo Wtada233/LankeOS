@@ -10,11 +10,11 @@
     "libKF6DBusAddons.so.6",
     "libKF6GuiAddons.so.6",
     "libKF6WindowSystem.so.6",
-    "libQt6Core.so.6",
-    "libQt6DBus.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Svg.so.6",
-    "libc.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6DBus.so.6@Qt_6",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Svg.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
     "libgdk-3.so.0",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
@@ -22,7 +22,7 @@
     "libgtk-3.so.0",
     "libkdecorations3.so.6",
     "libkdecorations3private.so.2",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [],
   "build_deps": [

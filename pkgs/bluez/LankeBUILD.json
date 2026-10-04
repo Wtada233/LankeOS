@@ -4,16 +4,16 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libasound.so.2",
-    "libc.so.6",
-    "libdbus-1.so.3",
+    "libasound.so.2@ALSA_0.9",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.42,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9}",
+    "libdbus-1.so.3@LIBDBUS_1_3",
     "libglib-2.0.so.0",
     "libical.so.4.0",
     "libicalvcal.so.4.0",
-    "libjson-c.so.5",
+    "libjson-c.so.5@JSONC_0.14",
     "libreadline.so.8",
-    "libsystemd.so.0",
-    "libudev.so.1"
+    "libsystemd.so.0@LIBSYSTEMD_209",
+    "libudev.so.1@{LIBUDEV_183,LIBUDEV_196}"
   ],
   "provides_soname": [
     "libbluetooth.so",

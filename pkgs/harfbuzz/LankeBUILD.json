@@ -4,16 +4,16 @@
   "release": 4,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libcairo.so.2",
     "libfreetype.so.6",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libgraphite2.so.3",
     "libicuuc.so.78",
-    "libm.so.6",
-    "libpng16.so.16",
-    "libstdc++.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43}",
+    "libpng16.so.16@PNG16_0",
+    "libstdc++.so.6@{CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.30}",
     "libz.so.1"
   ],
   "provides_soname": [

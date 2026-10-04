@@ -4,13 +4,13 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Qml.so.6",
-    "libQt6WaylandClient.so.6",
-    "libc.so.6",
-    "libstdc++.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
+    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Qml.so.6@Qt_6",
+    "libQt6WaylandClient.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11}",
     "libwayland-client.so.0"
   ],
   "provides_soname": [

@@ -4,12 +4,12 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libcurl.so.4",
     "libicuuc.so.78",
     "libm.so.6",
     "libxml2.so.16",
-    "libxslt.so.1"
+    "libxslt.so.1@{LIBXML2_1.0.11,LIBXML2_1.0.18,LIBXML2_1.0.22,LIBXML2_1.0.24}"
   ],
   "provides_soname": [
     "libraptor2.so",

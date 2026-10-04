@@ -4,9 +4,9 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libc.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Gui.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libKF6BreezeIcons.so",

@@ -6,15 +6,15 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libkmod.so.2",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
+    "libkmod.so.2@LIBKMOD_5",
     "libresolv.so.2",
-    "libudev.so.1",
+    "libudev.so.1@{LIBUDEV_183,LIBUDEV_196}",
     "libz.so.1"
   ],
   "provides_soname": [
-    "libpci.so",
-    "libpci.so.3"
+    "libpci.so.3@{LIBPCI_3.0,LIBPCI_3.1,LIBPCI_3.13,LIBPCI_3.15,LIBPCI_3.2,LIBPCI_3.3,LIBPCI_3.4,LIBPCI_3.5,LIBPCI_3.6,LIBPCI_3.7,LIBPCI_3.8}",
+    "libpci.so@{LIBPCI_3.0,LIBPCI_3.1,LIBPCI_3.13,LIBPCI_3.15,LIBPCI_3.2,LIBPCI_3.3,LIBPCI_3.4,LIBPCI_3.5,LIBPCI_3.6,LIBPCI_3.7,LIBPCI_3.8}"
   ],
   "build_deps": [
     "base-devel",

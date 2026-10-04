@@ -11,17 +11,17 @@
   "needed_so": [
     "libXau.so.6",
     "libaccountsservice.so.1",
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.28,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libgudev-1.0.so.0",
-    "libjson-glib-1.0.so.0",
-    "libkeyutils.so.1",
-    "libpam.so.0",
+    "libjson-glib-1.0.so.0@libjson-glib-1.0.so.0",
+    "libkeyutils.so.1@{KEYUTILS_0.3,KEYUTILS_1.5}",
+    "libpam.so.0@LIBPAM_1.0",
     "libpolkit-gobject-1.so.0",
-    "libsystemd.so.0"
+    "libsystemd.so.0@{LIBSYSTEMD_209,LIBSYSTEMD_213,LIBSYSTEMD_221,LIBSYSTEMD_226,LIBSYSTEMD_254,LIBSYSTEMD_257}"
   ],
   "provides_soname": [
     "libgdm.so",

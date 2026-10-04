@@ -4,15 +4,15 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libcom_err.so.2",
-    "libgssapi_krb5.so.2",
+    "libgssapi_krb5.so.2@gssapi_krb5_2_MIT",
     "libk5crypto.so.3",
     "libkrb5.so.3"
   ],
   "provides_soname": [
-    "libtirpc.so",
-    "libtirpc.so.3"
+    "libtirpc.so.3@{TIRPC_0.3.0,TIRPC_0.3.1,TIRPC_0.3.2,TIRPC_0.3.3,TIRPC_1.3.7,TIRPC_PRIVATE}",
+    "libtirpc.so@{TIRPC_0.3.0,TIRPC_0.3.1,TIRPC_0.3.2,TIRPC_0.3.3,TIRPC_1.3.7,TIRPC_PRIVATE}"
   ],
   "build_deps": [
     "base-devel",

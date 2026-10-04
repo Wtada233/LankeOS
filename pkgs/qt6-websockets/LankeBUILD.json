@@ -6,14 +6,14 @@
     "qt6-base"
   ],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Network.so.6",
-    "libc.so.6",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",
+    "libQt6Network.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [
-    "libQt6WebSockets.so",
-    "libQt6WebSockets.so.6"
+    "libQt6WebSockets.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6WebSockets.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}"
   ],
   "build_deps": [
     "base-devel",

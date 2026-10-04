@@ -4,17 +4,17 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Test.so.6",
-    "libQt6Xml.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Test.so.6@Qt_6",
+    "libQt6Xml.so.6@Qt_6",
     "libaccounts-glib.so.0",
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.34}",
+    "libgcc_s.so.1@GCC_3.0",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libm.so.6",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [
     "libaccounts-qt6.so",

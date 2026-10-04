@@ -4,15 +4,15 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libcrypto.so.3",
-    "liblzma.so.5",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4}",
+    "libcrypto.so.3@OPENSSL_3.0.0",
+    "liblzma.so.5@XZ_5.0",
     "libz.so.1",
     "libzstd.so.1"
   ],
   "provides_soname": [
-    "libkmod.so",
-    "libkmod.so.2"
+    "libkmod.so.2@{LIBKMOD_22,LIBKMOD_30,LIBKMOD_33,LIBKMOD_5,LIBKMOD_6}",
+    "libkmod.so@{LIBKMOD_22,LIBKMOD_30,LIBKMOD_33,LIBKMOD_5,LIBKMOD_6}"
   ],
   "build_deps": [
     "base-devel",

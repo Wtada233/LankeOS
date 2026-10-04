@@ -4,17 +4,17 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Multimedia.so.6",
-    "libQt6Qml.so.6",
-    "libQt6Quick.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Multimedia.so.6@Qt_6",
+    "libQt6Qml.so.6@Qt_6",
+    "libQt6Quick.so.6@Qt_6",
     "libZXing.so.4",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.32,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libdmtx.so.0",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@GCC_3.0",
     "libqrencode.so.4",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.21,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
     "libKF6Prison.so",

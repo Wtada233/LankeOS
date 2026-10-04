@@ -18,11 +18,11 @@
     "liblldWasm.so.23.1"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libLLVM.so.23.1",
-    "libc.so.6",
-    "libstdc++.so.6",
-    "libz.so.1"
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libLLVM.so.23.1@LLVM_23.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.3,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.30}",
+    "libz.so.1@ZLIB_1.2.2"
   ],
   "build_deps": [
     "base-devel",

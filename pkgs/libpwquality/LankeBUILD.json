@@ -4,13 +4,13 @@
   "release": 7,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libcrack.so.2",
-    "libpam.so.0"
+    "libpam.so.0@{LIBPAM_1.0,LIBPAM_EXTENSION_1.0,LIBPAM_EXTENSION_1.1.1,LIBPAM_MODUTIL_1.4.1}"
   ],
   "provides_soname": [
-    "libpwquality.so",
-    "libpwquality.so.1"
+    "libpwquality.so.1@LIBPWQUALITY_1.0",
+    "libpwquality.so@LIBPWQUALITY_1.0"
   ],
   "build_deps": [
     "base-devel",

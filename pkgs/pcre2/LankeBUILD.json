@@ -6,17 +6,17 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
-    "libpcre2-16.so",
-    "libpcre2-16.so.0",
-    "libpcre2-32.so",
-    "libpcre2-32.so.0",
-    "libpcre2-8.so",
-    "libpcre2-8.so.0",
-    "libpcre2-posix.so",
-    "libpcre2-posix.so.3"
+    "libpcre2-16.so.0@{PCRE2_10.47,PCRE2_10.48,PCRE2_10.49}",
+    "libpcre2-16.so@{PCRE2_10.47,PCRE2_10.48,PCRE2_10.49}",
+    "libpcre2-32.so.0@{PCRE2_10.47,PCRE2_10.48,PCRE2_10.49}",
+    "libpcre2-32.so@{PCRE2_10.47,PCRE2_10.48,PCRE2_10.49}",
+    "libpcre2-8.so.0@{PCRE2_10.47,PCRE2_10.48,PCRE2_10.49}",
+    "libpcre2-8.so@{PCRE2_10.47,PCRE2_10.48,PCRE2_10.49}",
+    "libpcre2-posix.so.3@{PCRE2_10.47,PCRE2_10.48,PCRE2_10.49}",
+    "libpcre2-posix.so@{PCRE2_10.47,PCRE2_10.48,PCRE2_10.49}"
   ],
   "build_deps": [
     "base-devel"

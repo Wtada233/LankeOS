@@ -3,11 +3,11 @@
   "version": "1.0.2",
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}"
   ],
   "provides_soname": [
-    "libnfnetlink.so",
-    "libnfnetlink.so.0"
+    "libnfnetlink.so.0@NFNETLINK_1.0.1",
+    "libnfnetlink.so@NFNETLINK_1.0.1"
   ],
   "build_deps": [
     "base-devel"

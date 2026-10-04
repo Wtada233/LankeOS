@@ -9,7 +9,7 @@
     "libX11.so.6",
     "libXext.so.6",
     "libXrender.so.1",
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libXrandr.so",

@@ -6,8 +6,8 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6",
-    "libpcre2-8.so.0"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.16,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.5}",
+    "libpcre2-8.so.0@PCRE2_10.47"
   ],
   "provides_soname": [],
   "build_deps": [

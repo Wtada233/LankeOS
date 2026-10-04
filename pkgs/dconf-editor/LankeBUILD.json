@@ -4,14 +4,14 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34}",
     "libdconf.so.1",
     "libgdk-3.so.0",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libgtk-3.so.0",
-    "libhandy-1.so.0"
+    "libhandy-1.so.0@LIBHANDY_1_0"
   ],
   "provides_soname": [],
   "build_deps": [

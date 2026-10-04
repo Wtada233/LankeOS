@@ -5,8 +5,8 @@
   "deps": [],
   "needed_so": [
     "libFLAC.so.14",
-    "libasound.so.2",
-    "libc.so.6",
+    "libasound.so.2@{ALSA_0.9,ALSA_0.9.0rc4}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.2,GLIBC_2.32,GLIBC_2.34}",
     "libresolv.so.2"
   ],
   "provides_soname": [],

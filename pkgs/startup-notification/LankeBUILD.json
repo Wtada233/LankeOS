@@ -6,7 +6,7 @@
   "needed_so": [
     "libX11-xcb.so.1",
     "libX11.so.6",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libxcb-util.so.1",
     "libxcb.so.1"
   ],

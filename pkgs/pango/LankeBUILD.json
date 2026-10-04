@@ -4,7 +4,7 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libcairo.so.2",
     "libfontconfig.so.1",
     "libfreetype.so.6",
@@ -13,7 +13,7 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libharfbuzz.so.0",
-    "libm.so.6"
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.35}"
   ],
   "provides_soname": [
     "libpango-1.0.so",

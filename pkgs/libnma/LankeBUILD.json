@@ -4,9 +4,9 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libcairo.so.2",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgck-2.so.2",
     "libgcr-4.so.4",
     "libgdk-3.so.0",
@@ -15,13 +15,13 @@
     "libgobject-2.0.so.0",
     "libgtk-3.so.0",
     "libgtk-4.so.1",
-    "libnm.so.0"
+    "libnm.so.0@{libnm_1_0_0,libnm_1_2_0,libnm_1_6_0,libnm_1_8_0}"
   ],
   "provides_soname": [
-    "libnma-gtk4.so",
-    "libnma-gtk4.so.0",
-    "libnma.so",
-    "libnma.so.0"
+    "libnma-gtk4.so.0@{libnma_1_2_0,libnma_1_8_0,libnma_1_8_12,libnma_1_8_20,libnma_1_8_22,libnma_1_8_28,libnma_1_8_36}",
+    "libnma-gtk4.so@{libnma_1_2_0,libnma_1_8_0,libnma_1_8_12,libnma_1_8_20,libnma_1_8_22,libnma_1_8_28,libnma_1_8_36}",
+    "libnma.so.0@{libnma_1_2_0,libnma_1_8_0,libnma_1_8_12,libnma_1_8_20,libnma_1_8_22,libnma_1_8_28,libnma_1_8_36}",
+    "libnma.so@{libnma_1_2_0,libnma_1_8_0,libnma_1_8_12,libnma_1_8_20,libnma_1_8_22,libnma_1_8_28,libnma_1_8_36}"
   ],
   "build_deps": [
     "base-devel",

@@ -7,17 +7,17 @@
     "lld"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libLLVM.so.23.1",
-    "libc.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libLLVM.so.23.1@LLVM_23.1",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.27,GLIBC_2.28,GLIBC_2.29,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.39,GLIBC_2.4,GLIBC_2.5,GLIBC_2.6,GLIBC_2.7,GLIBC_2.9}",
     "libcurl.so.4",
-    "libgcc_s.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
     "libgit2.so.1.9",
-    "libm.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.43}",
     "libsqlite3.so.0",
     "libssh2.so.1",
-    "libssl.so.3",
-    "libstdc++.so.6"
+    "libssl.so.3@OPENSSL_3.0.0",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.21,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "librustc_driver-2a0a3ddadc1a6b23.so"

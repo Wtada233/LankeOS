@@ -9,7 +9,7 @@
     "libICE.so.6",
     "libSM.so.6",
     "libX11.so.6",
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.26,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.33,GLIBC_2.38}"
   ],
   "provides_soname": [
     "libXt.so",

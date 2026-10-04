@@ -3,11 +3,11 @@
   "version": "2.15.1",
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.38}"
   ],
   "provides_soname": [
-    "libjansson.so",
-    "libjansson.so.4"
+    "libjansson.so.4@libjansson.so.4",
+    "libjansson.so@libjansson.so.4"
   ],
   "build_deps": [
     "base-devel"

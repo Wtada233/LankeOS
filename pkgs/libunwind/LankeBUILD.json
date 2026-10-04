@@ -4,9 +4,9 @@
   "release": 4,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "liblzma.so.5",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "liblzma.so.5@XZ_5.0",
     "libz.so.1"
   ],
   "provides_soname": [

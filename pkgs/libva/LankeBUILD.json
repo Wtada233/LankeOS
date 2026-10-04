@@ -11,7 +11,7 @@
     "libX11.so.6",
     "libXext.so.6",
     "libXfixes.so.3",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
     "libdrm.so.2",
     "libwayland-client.so.0",
     "libxcb-dri3.so.0",
@@ -26,8 +26,8 @@
     "libva-wayland.so.2",
     "libva-x11.so",
     "libva-x11.so.2",
-    "libva.so",
-    "libva.so.2"
+    "libva.so.2@{VA_API_0.32.0,VA_API_0.33.0}",
+    "libva.so@{VA_API_0.32.0,VA_API_0.33.0}"
   ],
   "build_deps": [
     "base-devel",

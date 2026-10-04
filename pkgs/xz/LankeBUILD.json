@@ -6,11 +6,11 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
-    "liblzma.so",
-    "liblzma.so.5"
+    "liblzma.so.5@{XZ_5.0,XZ_5.1.2alpha,XZ_5.2,XZ_5.2.2,XZ_5.4,XZ_5.6.0,XZ_5.8}",
+    "liblzma.so@{XZ_5.0,XZ_5.1.2alpha,XZ_5.2,XZ_5.2.2,XZ_5.4,XZ_5.6.0,XZ_5.8}"
   ],
   "build_deps": [
     "base-devel",

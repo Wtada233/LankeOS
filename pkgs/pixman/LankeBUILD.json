@@ -4,9 +4,9 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libm.so.6"
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.43}"
   ],
   "provides_soname": [
     "libpixman-1.so",

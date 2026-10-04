@@ -4,16 +4,16 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libblkid.so.1",
-    "libc.so.6",
-    "libdevmapper.so.1.02",
+    "libblkid.so.1@{BLKID_2.15,BLKID_2.17}",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libdevmapper.so.1.02@{Base,DM_1_02_197,DM_1_02_97}",
     "libncursesw.so.6",
     "libreadline.so.8",
-    "libuuid.so.1"
+    "libuuid.so.1@UUID_1.0"
   ],
   "provides_soname": [
-    "libparted-fs-resize.so",
-    "libparted-fs-resize.so.0",
+    "libparted-fs-resize.so.0@LIBPARTED_FS_RESIZE_0.0.0",
+    "libparted-fs-resize.so@LIBPARTED_FS_RESIZE_0.0.0",
     "libparted.so",
     "libparted.so.2"
   ],

@@ -4,13 +4,13 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.34,GLIBC_2.38}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.4}",
     "libglslang-default-resource-limits.so.16",
     "libglslang.so.16",
     "liblcms2.so.2",
-    "libm.so.6",
-    "libstdc++.so.6",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.43}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.15,GLIBCXX_3.4.29}",
     "libvulkan.so.1"
   ],
   "provides_soname": [

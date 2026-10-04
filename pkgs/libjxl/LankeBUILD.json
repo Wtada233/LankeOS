@@ -4,22 +4,22 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libbrotlidec.so.1",
     "libbrotlienc.so.1",
-    "libc.so.6",
-    "libhwy.so.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
+    "libhwy.so.1@HWY_0",
     "liblcms2.so.2",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.22,GLIBCXX_3.4.29,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
-    "libjxl.so",
-    "libjxl.so.0.12",
+    "libjxl.so.0.12@JXL_0",
+    "libjxl.so@JXL_0",
     "libjxl_cms.so",
     "libjxl_cms.so.0.12",
-    "libjxl_threads.so",
-    "libjxl_threads.so.0.12"
+    "libjxl_threads.so.0.12@JXL_0",
+    "libjxl_threads.so@JXL_0"
   ],
   "build_deps": [
     "base-devel",

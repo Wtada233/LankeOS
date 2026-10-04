@@ -4,13 +4,13 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6",
-    "libQt6DBus.so.6",
-    "libQt6Gui.so.6",
-    "libc.so.6",
-    "libpulse-mainloop-glib.so.0",
-    "libpulse.so.0",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6DBus.so.6@Qt_6",
+    "libQt6Gui.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
+    "libpulse-mainloop-glib.so.0@PULSE_0",
+    "libpulse.so.0@PULSE_0",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.14}"
   ],
   "provides_soname": [
     "libKF6PulseAudioQt.so",

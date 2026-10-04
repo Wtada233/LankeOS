@@ -6,23 +6,23 @@
     "bash"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libblkid.so.1",
-    "libc.so.6",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libblkid.so.1@{BLKID_1.0,BLKID_2.15,BLKID_2.17}",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.26,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.5,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8}",
     "libcom_err.so.2",
     "libext2fs.so.2",
-    "libudev.so.1",
-    "libuuid.so.1",
-    "libz.so.1",
+    "libudev.so.1@LIBUDEV_183",
+    "libuuid.so.1@UUID_1.0",
+    "libz.so.1@ZLIB_1.2.0",
     "libzstd.so.1"
   ],
   "provides_soname": [
-    "libbtrfs.so",
-    "libbtrfs.so.0",
-    "libbtrfs.so.0.1",
-    "libbtrfsutil.so",
-    "libbtrfsutil.so.1",
-    "libbtrfsutil.so.1.4"
+    "libbtrfs.so.0.1@LIBBTRFS_0.1",
+    "libbtrfs.so.0@LIBBTRFS_0.1",
+    "libbtrfs.so@LIBBTRFS_0.1",
+    "libbtrfsutil.so.1.4@{LIBBTRFSUTIL_1.1,LIBBTRFSUTIL_1.2,LIBBTRFSUTIL_1.3,LIBBTRFSUTIL_1.4}",
+    "libbtrfsutil.so.1@{LIBBTRFSUTIL_1.1,LIBBTRFSUTIL_1.2,LIBBTRFSUTIL_1.3,LIBBTRFSUTIL_1.4}",
+    "libbtrfsutil.so@{LIBBTRFSUTIL_1.1,LIBBTRFSUTIL_1.2,LIBBTRFSUTIL_1.3,LIBBTRFSUTIL_1.4}"
   ],
   "build_deps": [
     "base-devel",

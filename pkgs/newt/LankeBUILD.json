@@ -6,16 +6,16 @@
     "python"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
     "libm.so.6",
-    "libpopt.so.0",
+    "libpopt.so.0@LIBPOPT_0",
     "libpython3.14.so.1.0",
-    "libslang.so.2",
+    "libslang.so.2@SLANG2",
     "libtcl8.6.so"
   ],
   "provides_soname": [
-    "libnewt.so",
-    "libnewt.so.0.52",
+    "libnewt.so.0.52@{NEWT_0.52,NEWT_0.52.11,NEWT_0.52.13,NEWT_0.52.16,NEWT_0.52.17,NEWT_0.52.6,NEWT_0.52.9}",
+    "libnewt.so@{NEWT_0.52,NEWT_0.52.11,NEWT_0.52.13,NEWT_0.52.16,NEWT_0.52.17,NEWT_0.52.6,NEWT_0.52.9}",
     "whiptcl.so"
   ],
   "build_deps": [

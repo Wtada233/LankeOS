@@ -4,11 +4,11 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
-    "libffi.so",
-    "libffi.so.8"
+    "libffi.so.8@{LIBFFI_BASE_8.0,LIBFFI_BASE_8.1,LIBFFI_CALL_PLAN_8.4,LIBFFI_CALL_PLAN_8.5,LIBFFI_CLOSURE_8.0,LIBFFI_COMPLEX_8.0,LIBFFI_GO_CLOSURE_8.0,LIBFFI_INT128_8.3}",
+    "libffi.so@{LIBFFI_BASE_8.0,LIBFFI_BASE_8.1,LIBFFI_CALL_PLAN_8.4,LIBFFI_CALL_PLAN_8.5,LIBFFI_CLOSURE_8.0,LIBFFI_COMPLEX_8.0,LIBFFI_GO_CLOSURE_8.0,LIBFFI_INT128_8.3}"
   ],
   "build_deps": [
     "base-devel",

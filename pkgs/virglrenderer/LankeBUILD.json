@@ -7,15 +7,15 @@
   ],
   "needed_so": [
     "libX11.so.6",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libdrm.so.2",
     "libdrm_amdgpu.so.1",
     "libepoxy.so.0",
     "libgbm.so.1",
-    "libgcc_s.so.1",
-    "libm.so.6",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libm.so.6@{GLIBC_2.27,GLIBC_2.29}",
     "libva-drm.so.2",
-    "libva.so.2"
+    "libva.so.2@VA_API_0.33.0"
   ],
   "provides_soname": [
     "libvirglrenderer.so",

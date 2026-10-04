@@ -12,14 +12,14 @@
     "libKF6KCMUtilsQuick.so.6",
     "libKF6KIOCore.so.6",
     "libKF6Wallet.so.6",
-    "libQt6Core.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Qml.so.6",
-    "libQt6Widgets.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Qml.so.6@Qt_6",
+    "libQt6Widgets.so.6@Qt_6",
     "libaccounts-qt6.so.1",
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
     "libsignon-qt6.so.1",
-    "libstdc++.so.6"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
     "libkaccounts6.so",

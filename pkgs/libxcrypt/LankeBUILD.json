@@ -4,11 +4,11 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.36,GLIBC_2.38,GLIBC_2.43}"
   ],
   "provides_soname": [
-    "libcrypt.so",
-    "libcrypt.so.2"
+    "libcrypt.so.2@{XCRYPT_2.0,XCRYPT_4.3,XCRYPT_4.4}",
+    "libcrypt.so@{XCRYPT_2.0,XCRYPT_4.3,XCRYPT_4.4}"
   ],
   "build_deps": [
     "base-devel"

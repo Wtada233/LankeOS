@@ -4,11 +4,11 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.43}"
   ],
   "provides_soname": [
-    "libacl.so",
-    "libacl.so.1"
+    "libacl.so.1@{ACL_1.0,ACL_1.1,ACL_1.2,ACL_1.3}",
+    "libacl.so@{ACL_1.0,ACL_1.1,ACL_1.2,ACL_1.3}"
   ],
   "build_deps": [
     "attr",

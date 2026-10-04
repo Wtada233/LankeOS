@@ -4,11 +4,11 @@
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4}"
   ],
   "provides_soname": [
-    "libsbc.so",
-    "libsbc.so.1"
+    "libsbc.so.1@{SBC_1.0,SBC_1.1,SBC_1.2,SBC_1.3}",
+    "libsbc.so@{SBC_1.0,SBC_1.1,SBC_1.2,SBC_1.3}"
   ],
   "build_deps": [
     "base-devel",

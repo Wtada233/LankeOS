@@ -4,7 +4,7 @@
   "release": 3,
   "deps": [],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libKF6Archive.so.6",
     "libKF6BreezeIcons.so.6",
     "libKF6ColorScheme.so.6",
@@ -12,15 +12,15 @@
     "libKF6ConfigGui.so.6",
     "libKF6I18n.so.6",
     "libKF6WidgetsAddons.so.6",
-    "libQt6Core.so.6",
-    "libQt6DBus.so.6",
-    "libQt6Gui.so.6",
-    "libQt6Qml.so.6",
-    "libQt6Quick.so.6",
-    "libQt6Widgets.so.6",
-    "libc.so.6",
-    "libm.so.6",
-    "libstdc++.so.6"
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
+    "libQt6DBus.so.6@Qt_6",
+    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Qml.so.6@Qt_6",
+    "libQt6Quick.so.6@Qt_6",
+    "libQt6Widgets.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@GLIBC_2.27",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.7,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.30}"
   ],
   "provides_soname": [
     "libKF6IconThemes.so",

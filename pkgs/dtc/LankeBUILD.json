@@ -6,12 +6,12 @@
     "bash"
   ],
   "needed_so": [
-    "libc.so.6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
     "libyaml-0.so.2"
   ],
   "provides_soname": [
-    "libfdt.so",
-    "libfdt.so.1"
+    "libfdt.so.1@LIBFDT_1.2",
+    "libfdt.so@LIBFDT_1.2"
   ],
   "build_deps": [
     "base-devel",

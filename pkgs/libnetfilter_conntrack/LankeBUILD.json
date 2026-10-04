@@ -3,9 +3,9 @@
   "version": "1.1.1",
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libmnl.so.0",
-    "libnfnetlink.so.0"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.38}",
+    "libmnl.so.0@{LIBMNL_1.0,LIBMNL_1.1}",
+    "libnfnetlink.so.0@NFNETLINK_1.0.1"
   ],
   "provides_soname": [
     "libnetfilter_conntrack.so",

@@ -6,27 +6,27 @@
     "perl"
   ],
   "needed_so": [
-    "ld-linux-x86-64.so.2",
-    "libc.so.6",
-    "libgcc_s.so.1",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.15,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
     "libm.so.6",
-    "libstdc++.so.6",
-    "libz.so.1",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.15,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.21,GLIBCXX_3.4.30,GLIBCXX_3.4.32}",
+    "libz.so.1@{ZLIB_1.2.0,ZLIB_1.2.9}",
     "libzstd.so.1"
   ],
   "provides_soname": [
     "libbfd-2.47.20260726.so",
     "libbfd.so",
-    "libctf-nobfd.so",
-    "libctf-nobfd.so.0",
-    "libctf.so",
-    "libctf.so.0",
+    "libctf-nobfd.so.0@{LIBCTF_1.0,LIBCTF_1.1,LIBCTF_1.2,LIBCTF_1.3}",
+    "libctf-nobfd.so@{LIBCTF_1.0,LIBCTF_1.1,LIBCTF_1.2,LIBCTF_1.3}",
+    "libctf.so.0@{LIBCTF_1.0,LIBCTF_1.1,LIBCTF_1.2,LIBCTF_1.3}",
+    "libctf.so@{LIBCTF_1.0,LIBCTF_1.1,LIBCTF_1.2,LIBCTF_1.3}",
     "libgprofng.so",
     "libgprofng.so.0",
     "libopcodes-2.47.20260726.so",
     "libopcodes.so",
-    "libsframe.so",
-    "libsframe.so.3"
+    "libsframe.so.3@{LIBSFRAME_0.0,LIBSFRAME_3.0}",
+    "libsframe.so@{LIBSFRAME_0.0,LIBSFRAME_3.0}"
   ],
   "build_deps": [
     "base-devel",

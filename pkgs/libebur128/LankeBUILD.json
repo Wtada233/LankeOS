@@ -4,8 +4,8 @@
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6",
-    "libm.so.6"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}"
   ],
   "provides_soname": [
     "libebur128.so",
