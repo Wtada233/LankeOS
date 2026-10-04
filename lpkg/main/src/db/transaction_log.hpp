@@ -36,19 +36,16 @@ public:
 
     WalWriter(const WalWriter&) = delete;
     WalWriter& operator=(const WalWriter&) = delete;
-    WalWriter(WalWriter&& other) noexcept : fd_(other.fd_), lines_(other.lines_)
+    WalWriter(WalWriter&& other) noexcept : fd_(other.fd_)
     {
         other.fd_ = -1;
-        other.lines_ = 0;
     }
     WalWriter& operator=(WalWriter&& other) noexcept
     {
         if (this != &other) {
             if (fd_ >= 0) ::close(fd_);
             fd_ = other.fd_;
-            lines_ = other.lines_;
             other.fd_ = -1;
-            other.lines_ = 0;
         }
         return *this;
     }
@@ -62,15 +59,8 @@ public:
     /// 失败时静默返回
     void log_no_fsync(std::string_view line);
 
-    /// 获取当前写入的行数
-    size_t lines_written() const
-    {
-        return lines_;
-    }
-
 private:
     int fd_ = -1;
-    size_t lines_ = 0;
 };
 
 // ── 便捷函数 ────────────────────────────────────────────────────────────

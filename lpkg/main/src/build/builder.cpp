@@ -234,9 +234,8 @@ void finalize_staging(const fs::path& staging_root, bool no_strip)
  * 若这里抛异常，就会在栈展开中顶替（甚至 terminate 掉）正在传播的构建异常，真实失败
  * 原因（编译错误等）被吞。清理失败只告警（沿用 warning.cleanup_failed 的既有语义）。
  */
-void cleanup_build([[maybe_unused]] const fs::path& build_dir, const fs::path& work_root,
-                   const fs::path& staging_root, const fs::path& staging_hooks,
-                   const std::vector<fs::path>& downloaded_files)
+void cleanup_build(const fs::path& work_root, const fs::path& staging_root,
+                   const fs::path& staging_hooks, const std::vector<fs::path>& downloaded_files)
 {
     log_info(get_string("info.cleaning_up_build"));
     for (const auto& dir : {work_root, staging_root, staging_hooks}) {
@@ -554,10 +553,10 @@ void run_build(const fs::path& build_dir)
         // 异常路径也必须清理：否则 <dir>/build 下会残留 work/content/hooks 与已下载的源码
         // （可达数百 MB）。cleanup_build 内部不抛、失败只告警，所以既不会掩盖这里的异常，
         // 也不会在栈展开中 terminate。清理完再把原异常继续抛出去。
-        cleanup_build(build_dir, work_root, staging_root, staging_hooks, downloaded);
+        cleanup_build(work_root, staging_root, staging_hooks, downloaded);
         throw;
     }
 
     // 8. 清理（成功路径）
-    cleanup_build(build_dir, work_root, staging_root, staging_hooks, downloaded);
+    cleanup_build(work_root, staging_root, staging_hooks, downloaded);
 }

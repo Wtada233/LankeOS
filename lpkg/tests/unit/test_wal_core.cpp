@@ -986,8 +986,9 @@ TEST_F(WalCoreTest, WalWriterLogAndFsync)
 
 TEST_F(WalCoreTest, BeginBatchAndCommitBatch)
 {
-    auto writer = wal::begin_batch();
-    EXPECT_GT(writer.lines_written(), 0);
+    // 打开批次即写下一行 BEGIN_PKGS（其存在由下方文件内容断言覆盖；此前这里靠
+    // WalWriter::lines_written() 计数，该访问器生产代码零调用，已随死代码一并删除）。
+    [[maybe_unused]] auto writer = wal::begin_batch();
 
     wal::commit_batch();
 

@@ -39,7 +39,7 @@ English | [中文](README.md)
 -   **rpm version semantics**: Version strings are plain rpm `[epoch:]version[-release]`, with exactly one comparison implementation (libsolv's EVR comparison) — multi-segment revisions (`6.16.1 > 6.6.1`), prereleases (`1.0~rc1 < 1.0`), release revisions (`1.0-1 > 1.0`) and compound range constraints (`>= 2.0.0 < 3.0.0`).
 -   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their respective hashes, deps, provides, provides_soname, and needed_so.
 -   **Embedded metadata**: All metadata (name, version, dependencies, virtual provides, exported SONAMEs, needed SONAMEs, man page) is stored in a `metadata.json` inside each package.
--   **Auto dependency generation**: The build farm (`farm/`, Rust) scans ELF DT_NEEDED SONAMEs after packaging to generate `needed_so`, then resolves provider package names into `deps`, eliminating manual version constraint maintenance.
+-   **Auto SONAME scanning**: The build farm (`farm/`, Rust) scans each ELF's DT_NEEDED SONAMEs (plus `.gnu.version_d` / `.gnu.version_r` symbol versions) after packaging to produce `needed_so` and `provides_soname`. `deps` is **not** derived by the farm scanner — it is declared in the package recipe.
 -   **Layout-as-content**: The `content/` directory layout maps directly to the root filesystem.
 -   **Automated operations**: Includes `lrepo-mgr.py` for publishing to S3-compatible storage or SCP remote servers. The `--path` flag enables local filesystem repositories for offline testing.
 -   **Highly compatible static builds**: Built-in automatic detection of system CA certificate paths ensures statically compiled binaries work across different Linux distributions.
@@ -157,7 +157,7 @@ hooks/                # Hook scripts (optional)
 |-------|-------------|
 | `name` | Package name |
 | `version` | Version string |
-| `deps` | Dependency package names (no version constraints; auto-resolved from needed_so by the build farm) |
+| `deps` | Dependency package names (declared in the recipe; the farm does **not** derive them from `needed_so`) |
 | `provides` | **Virtual capabilities** this package provides (e.g. `java-runtime`; unrelated to `.so`) |
 | `provides_soname` | SONAMEs this package **exports** (scanned from the built ELF by the farm; may carry symbol versions, see below) |
 | `needed_so` | DT_NEEDED SONAME list from the package's ELF files (ground truth for runtime deps) |

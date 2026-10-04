@@ -54,7 +54,10 @@ bool path_within_resolved(const std::filesystem::path& p, const std::filesystem:
 bool path_resolves_within(const std::filesystem::path& dir, const std::filesystem::path& root);
 
 /**
- * 单个路径分量是否安全：非空、不含 '/' 与 NUL、不是 "." / ".."。
+ * 单个路径分量是否安全。**拒绝**：空串、"."、".."、含 '/' 或 NUL，以及**分帧/空白字符**
+ * —— `|` `;` `,` `:`（包名/版本会被写进 `pkgs`、索引行、`files.db` 等"行式 + 分隔符"
+ * 状态文件，带进去就把一条记录重新分帧成另一条）与空格 / TAB / LF / CR（会破坏 WAL 的
+ * 空格分帧里程碑字段）。完整判据与理由见 `base/utils.cpp` 的 `is_safe_path_component()`。
  *
  * 包名与版本号来自**不可信来源**（远端索引、.lpkg 内的 metadata.json），而它们会被
  * 直接当成路径分量拼进 tmp_pkg_dir() / dep_dir() / docs_dir() / 下载 URL，

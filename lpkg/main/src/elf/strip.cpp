@@ -429,7 +429,6 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
     struct KeptSection {
         GElf_Shdr shdr;
         size_t old_index;
-        size_t new_index;
     };
 
     // ⚠️ `e_ehsize` 是**输入可控**的字段，而下面 `write_ehdr` 会无条件写入**整个**
@@ -447,7 +446,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
     std::vector<KeptSection> kept_sections;
     std::map<size_t, size_t> el_idx_map;
 
-    kept_sections.push_back({{}, 0, 0});
+    kept_sections.push_back({{}, 0});
     el_idx_map[0] = 0;
     el_idx_map[SHN_ABS] = SHN_ABS;
     el_idx_map[SHN_COMMON] = SHN_COMMON;
@@ -476,7 +475,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
             keep = false;
 
         if (keep) {
-            kept_sections.push_back({shdr, old_idx, current_new_idx});
+            kept_sections.push_back({shdr, old_idx});
             el_idx_map[old_idx] = current_new_idx;
             current_new_idx++;
 

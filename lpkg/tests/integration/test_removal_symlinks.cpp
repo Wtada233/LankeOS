@@ -1,5 +1,5 @@
 /**
- * test_removal_and_symlinks.cpp
+ * test_removal_symlinks.cpp
  *
  * Comprehensive test suite for package removal, directory symlink handling,
  * file ownership tracking, and the shared-file check logic.

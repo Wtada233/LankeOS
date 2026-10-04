@@ -75,8 +75,6 @@ void WalWriter::log(std::string_view line)
     // 要去掉 fsync 请**显式**用 log_no_fsync()，别让它取决于一个全局开关。
     if (::fsync(fd_) != 0)
         throw LpkgException(string_format("error.wal_fsync_failed", wal_log_path()));
-
-    ++lines_;
 }
 
 void WalWriter::log_no_fsync(std::string_view line)
@@ -84,10 +82,9 @@ void WalWriter::log_no_fsync(std::string_view line)
     if (fd_ < 0) return;
 
     std::string l = std::string(line) + "\n";
-    // 与 log() 同：write 失败必须报错，不能写完照旧 ++lines_（那会让调用方以为行已落盘）。
+    // 与 log() 同：write 失败必须报错，不能静默返回（那会让调用方以为行已落盘）。
     if (::write(fd_, l.data(), l.size()) != static_cast<ssize_t>(l.size()))
         throw LpkgException(string_format("error.wal_write_failed", wal_log_path()));
-    ++lines_;
 }
 
 // ============================================================================

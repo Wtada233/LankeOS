@@ -468,12 +468,17 @@ TEST_F(StripTest, StripUnknownFileType)
         f << "This is not an ELF file at all.\n";
     }
 
+    // 必须在 strip_file() **之前**初始化：否则 strip_file 里 get_string 只拿到
+    // [MISSING_STRING]，与这行之后再 init 得到的真实文案不等，断言会假红。
+    init_localization();
     std::string error_msg;
     bool result = strip_file(test_file, error_msg);
     EXPECT_FALSE(result);
-    // 应返回 unknown type 相关错误，而不是文件不存在
-    EXPECT_TRUE(error_msg.find("unknown") != std::string::npos ||
-                error_msg.find("unknown") != std::string::npos || !error_msg.empty());
+    // 非 ELF → identify_file_type 判 Unknown → default 分支，必须点名"未知/不支持的文件类型"，
+    // 而不是"文件不存在"那一支。订正 2026-10-05：此行原为
+    //   `find("unknown") != npos || find("unknown") != npos || !error_msg.empty()`
+    // —— 前两项逐字重复、第三项让整条退化成"错误串非空"，恒真，什么都没钉住。
+    EXPECT_EQ(error_msg, get_string("error.strip_unknown_type"));
 }
 
 TEST_F(StripTest, ArchiveWithObjectMembers)

@@ -39,7 +39,7 @@
 -   **rpm 版本语义**：版本串就是 rpm 的 `[epoch:]version[-release]`，判据只有一份（libsolv 的 EVR 比较）—— 支持多位修订号（`6.16.1 > 6.6.1`）、预发布（`1.0~rc1 < 1.0`）、发行修订号（`1.0-1 > 1.0`）与复合区间约束（`>= 2.0.0 < 3.0.0`）。
 -   **聚合索引**：采用 `index.txt` 聚合格式，一行即可记录包的所有版本及各自的哈希、依赖、provides、provides_soname、needed_so。
 -   **包内嵌元数据**：采用 `metadata.json` 嵌入包内，统一存储名称、版本、依赖、虚拟提供（`provides`）、导出的 SONAME（`provides_soname`）、需要的 SONAME（`needed_so`）、手册页等元数据。
--   **自动依赖推导**：构建农场（`farm/`，Rust）在打包后扫描 ELF 的 DT_NEEDED SONAME 生成 `needed_so`，并据此解析提供者包名作为 `deps`，无需手动维护版本约束。
+-   **自动 SONAME 扫描**：构建农场（`farm/`，Rust）在打包后扫描每个 ELF 的 DT_NEEDED SONAME（以及 `.gnu.version_d` / `.gnu.version_r` 符号版本）生成 `needed_so` 与 `provides_soname`。`deps` **不由**农场扫描推导 —— 它声明在包配方里。
 -   **内容即文件布局**：包的 `content/` 目录结构直接对应根目录文件布局。
 -   **自动化运维**：提供 `lrepo-mgr.py` 工具，支持一键推送到 S3 兼容存储或 SCP 远程服务器。新增 `--path` 参数支持本地文件系统仓库，便于离线测试。
 -   **高兼容性静态构建**：内置系统 CA 证书路径自动探测，确保静态编译版本在不同 Linux 发行版上都能正常联网。
@@ -156,7 +156,7 @@ hooks/                # 钩子脚本（可选）
 |------|------|
 | `name` | 包名 |
 | `version` | 版本号 |
-| `deps` | 依赖包名列表（无版本约束，由构建农场扫描 needed_so 自动解析生成） |
+| `deps` | 依赖包名列表（声明在配方里；农场**不**从 `needed_so` 推导） |
 | `provides` | 本包提供的**虚拟能力**列表（如 `java-runtime`；与 `.so` 无关） |
 | `provides_soname` | 本包**导出**的 SONAME 列表（由构建农场扫描产物 ELF 生成；可带符号版本，见下） |
 | `needed_so` | 本包 ELF 文件声明的 DT_NEEDED SONAME 列表（运行时依赖的原始真相；可带符号版本） |

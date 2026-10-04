@@ -1,11 +1,12 @@
 /**
- * test_version_bridge_solver.cpp — 版本桥在**端到端安装**里的语义
+ * test_version_bridge_solver.cpp — **求解器选版本**在端到端安装里的后果
  *
- * 单测那道矩阵闸门（`tests/unit/test_vercmp_libsolv_bridge.cpp`）钉的是"libsolv 的依赖匹配
- * == lpkg 的 version_satisfies"；这里钉的是它在真实安装流程里的后果：**求解器选出来的版本，
- * 必须正是 lpkg 语义下该选的那个**，而且装完不再被安装期判据推翻。
+ * 钉的是：求解器选出来的版本，必须正是 lpkg 语义下该选的那个，装完不再被安装期判据推翻。
  *
- * 每一格都对应 2026-10-03 之前那套编码（`+release` 进 libsolv 的 release 槽位）的一个错误：
+ * ⚠️ 文件名里的 "bridge" 是历史：8.0.0 起版本语义直接采用 rpm EVR，那套"编码桥"
+ * （`to_libsolv_evr` / `^^` 分隔符）已整套删除（见 `vercmp/version.hpp`），求解器与安装期
+ * 从此共用同一份判据。用例里的 `1.0+1` 只是普通版本号（`+` 无特殊含义），下面各格标注的
+ * "旧"指 8.0.0 之前那套语义：
  *   · `= 1.0`     —— 旧：libsolv 认为 `1.0+1` 也满足 ⇒ 选中它 ⇒ 安装期判据拒绝 ⇒ 整批失败；
  *   · `> 1.0`     —— 旧：libsolv 认为**没有任何**版本满足（`1.0+1` 被当成"只差 release"）⇒
  * 事务无解； · `>= 1.0+1`  —— 旧：libsolv 认为 `1.0` 也满足（release 缺失即通配）⇒ 可能选中更旧的；
@@ -152,12 +153,15 @@ TEST_F(VersionBridgeSolverTest, GreaterOrEqualWithReleaseForcesUpgradeOfTheInsta
         << "已装的 `1.0` 不满足 `>= 1.0+1`，求解器必须把 lib 升上去";
 }
 
-TEST_F(VersionBridgeSolverTest, ConflictMessageDoesNotLeakTheInternalEvrEncoding)
+TEST_F(VersionBridgeSolverTest, ConflictMessageNamesTheRealVersions)
 {
-    // libsolv 自己拼的冲突消息（`solver_ruleinfo2str`）里带的是**池里的 EVR = 我们的编码串**
-    // ⇒ 不处理就会打出 `cannot install both lib-2.0^^1 and lib-1.0^^1`。真实索引 861 个版本里
-    // 807 个带 `+`，所以这几乎影响每一条冲突消息；用户拿 `^^` 既 grep 不到仓库版本，也对应不
-    // 回"哪两个版本冲突了"。修法见 `solver.cpp` 的 `decode_libsolv_message`。
+    // 用户可见的冲突消息必须让用户直接对上仓库里的版本号。libsolv 自己拼的规则描述
+    // （`solver_ruleinfo2str`）会带池里的内部名 —— 今天是 `so:` SONAME 前缀，由
+    // `solver.cpp` 的 `decode_libsolv_message` 剥掉；版本那一侧则由这里钉住：消息里必须
+    // 出现**真实的版本串**，用户据此能 grep 到仓库。
+    //
+    // （8.0.0 之前版本串进池前被编码成 `X^^N`，那时还要断言 `^^` 不泄漏；桥删除后版本串
+    //  原样进池，`^^` 已不可能出现，那条断言退化成恒真，故删。）
     create_pkg("lib", "1.0+1");
     create_pkg("lib", "2.0+1");
     create_pkg("appA", "1.0", {"lib = 1.0+1"});
@@ -172,10 +176,8 @@ TEST_F(VersionBridgeSolverTest, ConflictMessageDoesNotLeakTheInternalEvrEncoding
         FAIL() << "两个 app 要求同一个包的两个互斥版本，必须拒绝";
     } catch (const LpkgException& e) {
         const std::string msg = e.what();
-        EXPECT_EQ(msg.find("^^"), std::string::npos)
-            << "冲突消息里泄漏了内部 EVR 编码（用户拿它 grep 不到仓库版本）: " << msg;
         EXPECT_NE(msg.find("1.0+1"), std::string::npos)
-            << "冲突消息应把版本还原成 lpkg 版本域（`1.0+1`）: " << msg;
+            << "冲突消息应点名真实版本串（`1.0+1`），用户才能对回仓库: " << msg;
     }
 }
 

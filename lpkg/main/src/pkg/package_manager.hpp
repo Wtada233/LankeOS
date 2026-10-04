@@ -73,10 +73,10 @@ namespace detail
  * —— 按 **lpkg 语义**（`version_satisfies_all`），不是 libsolv 的匹配语义。不满足则抛
  * `error.dep_version_mismatch`（点名依赖名、计划版本、发起包）。**唯一实现**。
  *
- * 为什么它还在（2026-10-03 起是**纵深防御**）：桥接修好之前，libsolv 的 EVR 匹配把"要求侧
- * 缺 release"当通配，会选出 lpkg 认为不满足的版本，这道复核是唯一拦得住的地方（当时的用例
- * 只能借"求解器产出违规计划"来触达它）。桥接修好之后（等价性矩阵见
- * `tests/unit/test_vercmp_libsolv_bridge.cpp`）求解器不再产出这种计划 ⇒ 正常路径上这里
+ * 为什么它还在（2026-10-03 起是**纵深防御**）：在 8.0.0 把版本语义换成 rpm EVR 之前，libsolv
+ * 的 EVR 匹配把"要求侧缺 release"当通配，会选出 lpkg 认为不满足的版本，这道复核是唯一拦得住
+ * 的地方（当时的用例只能借"求解器产出违规计划"来触达它）。8.0.0 之后版本串原样进池、求解器与
+ * 安装期共用同一份判据（见 `vercmp/version.hpp`）⇒ 正常路径上这里
  * **不会触发**。留着的理由是：求解器选版本与 lpkg 判据是**两条独立实现路径**，任一侧将来
  * 改动（换编码、升 libsolv、改 `version_satisfies`）都可能让它们重新分叉，而分叉的代价是
  * "装出坏系统"。⇒ 它的用例**直接喂手搓的计划**（`tests/unit/test_plan_dep_version_check.cpp`），
