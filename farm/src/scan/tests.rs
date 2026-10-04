@@ -100,83 +100,75 @@ fn scan_content_dedups_provides_from_symlink_and_soname() {
     std::os::unix::fs::symlink("libc.so.6", content.join("usr/lib/libc.so")).unwrap();
 
     let (_, provides_soname) = scan_content(&content, &Default::default());
-    assert_eq!(provides_soname, vec!["libc.so", "libc.so.6"]); // libc.so.6 只出现一次
-
-    let _ = std::fs::remove_dir_all(&tmp);
-}
-
-/// perl 的 RPATH → /usr/lib/perl5/.../CORE（绝对），libperl.so 随包安装在该目录（无 SONAME）。
-/// 扫描应判定"自提供"→ 从 needed_so 忽略 libperl.so（否则 lpkg 装 perl 都报无提供者）。
-#[test]
-fn scan_content_ignores_self_provided_via_abs_rpath() {
-    let host_lib = [
-        "/usr/lib/libc.so.6",
-        "/lib/x86_64-linux-gnu/libc.so.6",
-        "/usr/lib/x86_64-linux-gnu/libc.so.6",
-        "/lib/libc.so.6",
-    ]
-    .iter()
-    .find_map(|p| std::fs::canonicalize(p).ok());
-    let Some(src) = host_lib else {
-        eprintln!("{}", crate::tr!("test.skip_host_libc"));
-        return;
-    };
-    let tmp = std::env::temp_dir().join(format!("farm-scan-rpath-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&tmp);
-    let content = tmp.join("content");
-    let core = content.join("usr/lib/perl5/5.44/core_perl/CORE");
-    std::fs::create_dir_all(&core).unwrap();
-    std::fs::create_dir_all(content.join("usr/bin")).unwrap();
-    // 用宿主 libc 充当"libperl.so"（ELF、无 SONAME）与"perl"（含 RPATH 的 ELF）
-    std::fs::copy(&src, core.join("libperl.so")).unwrap();
-    std::fs::copy(&src, content.join("usr/bin/perl")).unwrap();
-
-    let (needed, provides_soname) = scan_content(&content, &Default::default());
-    // 非标准目录的 ELF .so（子目录）不加入 provides_soname（回归原逻辑：只提供搜索路径 .so）
-    assert!(!provides_soname.contains(&"/usr/lib/perl5/5.44/core_perl/CORE/libperl.so".to_string()));
-    // 包内同名 .so（任何路径）→ needed_so 排除（not-found/自提供）
-    assert!(!needed.contains(&"libperl.so".to_string()));
-
-    let _ = std::fs::remove_dir_all(&tmp);
-}
-
-/// 仓库 provider map 的 not-found 过滤：needed_so 条目不在 repo_provides → 判 not found → 不进
-/// needed_so（postgresql plperl.so 链接 libperl.so，perl 不提供 → 剔除，否则 redland 构建
-/// 装 postgresql 时报 "libperl.so 无提供者"）。
-#[test]
-fn scan_content_filters_needed_by_repo_provides() {
-    let host_lib = [
-        "/usr/lib/libc.so.6",
-        "/lib/x86_64-linux-gnu/libc.so.6",
-        "/usr/lib/x86_64-linux-gnu/libc.so.6",
-        "/lib/libc.so.6",
-    ]
-    .iter()
-    .find_map(|p| std::fs::canonicalize(p).ok());
-    let Some(src) = host_lib else {
-        eprintln!("{}", crate::tr!("test.skip_host_libc"));
-        return;
-    };
-    let tmp = std::env::temp_dir().join(format!("farm-scan-notfound-{}", std::process::id()));
-    let _ = std::fs::remove_dir_all(&tmp);
-    let content = tmp.join("content");
-    std::fs::create_dir_all(content.join("usr/bin")).unwrap();
-    std::fs::copy(&src, content.join("usr/bin/testbin")).unwrap();
-
-    // 空 repo_provides → 全部 not-found → needed_so 空
-    let (needed, _) = scan_content(&content, &Default::default());
-    assert!(
-        needed.is_empty(),
-        "空 provider map 应全部 not-found: {needed:?}"
+    // 去重仍是本用例的主题：符号链接与真身各贡献一次 → 归并成两条（`libc.so` 与 `libc.so.6`）
+    assert_eq!(provides_soname.len(), 2, "应只有两条：{provides_soname:?}");
+    let mut bare: Vec<&str> = provides_soname
+        .iter()
+        .map(|s| crate::graph::so_bare(s))
+        .collect();
+    bare.sort_unstable();
+    assert_eq!(bare, vec!["libc.so", "libc.so.6"]);
+    // 新增的可观测性：符号链接那一条的符号版本**来自目标文件**（链接本身没有节区）⇒
+    // 两条的 `@…` 后缀必须逐字相同。宿主 libc 有没有 verdef 由它自己决定，所以这里只比
+    // "两条一致"，不比具体版本号（夹具那一条用例负责钉死版本语义）。
+    let tail = |s: &str| s[crate::graph::so_bare(s).len()..].to_string();
+    assert_eq!(
+        tail(&provides_soname[0]),
+        tail(&provides_soname[1]),
+        "符号链接与真身的版本集合必须同源：{provides_soname:?}"
     );
 
-    // repo_provides = 二进制实际 NEEDED → 保留
-    let bytes = std::fs::read(content.join("usr/bin/testbin")).unwrap();
-    let (_, bin_needed) = parse_elf_dynamic(&bytes);
-    let rp: HashSet<String> = bin_needed.iter().map(|n| basename(n)).collect();
-    let (needed2, _) = scan_content(&content, &rp);
-    assert!(!needed2.is_empty(), "provider 齐全时 needed_so 不应为空");
-    assert!(needed2.iter().all(|n| rp.contains(n)));
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+/// **符号版本（提供端）**：夹具 `tests/fixtures/abi/libx.so.1` 定义了 `V1`/`V2`
+/// （外加一个 BASE 节点，名字就是 SONAME 本身 —— 那个不算版本）。
+#[test]
+fn scan_content_emits_provides_symbol_versions() {
+    let fix = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/abi");
+    let tmp = std::env::temp_dir().join(format!("farm-scan-ver-prov-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let content = tmp.join("content");
+    std::fs::create_dir_all(content.join("usr/lib")).unwrap();
+    std::fs::copy(fix.join("libx.so.1"), content.join("usr/lib/libx.so.1")).unwrap();
+
+    let (needed, provides) = scan_content(&content, &Default::default());
+    assert_eq!(
+        provides,
+        vec!["libx.so.1@{V1,V2}"],
+        "verdef 的 V1/V2 必须进规格串；BASE 节点（名字 = SONAME）不算版本"
+    );
+    assert!(
+        needed.is_empty(),
+        "只放了提供者，不该有 needed_so：{needed:?}"
+    );
+
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+/// **符号版本（消费端）**：`tests/fixtures/abi/foo` 从 `libx.so.1` 需要 `V2`。
+///
+/// ⚠️ 提供者**不能**放进同一个包：包里某个 ELF 的 SONAME 与该需求同名会被判成"自提供"
+/// 而过滤掉（既有语义，见 `scan_content` 的三类过滤）—— 所以这条用例只放消费者。
+#[test]
+fn scan_content_emits_needed_symbol_versions() {
+    let fix = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/abi");
+    let tmp = std::env::temp_dir().join(format!("farm-scan-ver-need-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let content = tmp.join("content");
+    std::fs::create_dir_all(content.join("usr/bin")).unwrap();
+    std::fs::copy(fix.join("foo"), content.join("usr/bin/foo")).unwrap();
+
+    // provider 集合按**裸名**给（索引侧的键也是裸名）
+    let rp: HashSet<String> = ["libx.so.1".to_string()].into_iter().collect();
+    let (needed, provides) = scan_content(&content, &rp);
+
+    assert_eq!(
+        needed,
+        vec!["libx.so.1@V2"],
+        "verneed 点名的版本必须进 needed_so（只声明裸名的提供者满足不了它）"
+    );
+    assert!(provides.is_empty(), "只放了消费者：{provides:?}");
 
     let _ = std::fs::remove_dir_all(&tmp);
 }

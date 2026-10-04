@@ -11,6 +11,8 @@
 #include "archive/downloader.hpp"
 #include "base/constants.hpp"
 #include "base/exception.hpp"
+#include "base/process.hpp"
+#include "base/so_spec.hpp"
 #include "base/utils.hpp"
 #include "config/config.hpp"
 #include "i18n/localization.hpp"
@@ -34,13 +36,14 @@ static std::vector<std::string> split_dep_field(std::string_view deps_sv)
         return !s.empty() && (s[0] == '<' || s[0] == '>' || s[0] == '=' || s[0] == '!');
     };
     std::vector<std::string> dep_strs;
-    for (auto piece_sv : split_string_view(deps_sv, constants::COMMA_CHAR)) {
-        const std::string piece = trim_copy(piece_sv);
-        if (piece.empty()) continue;  // 空片段（尾随/连续逗号）不成依赖
+    // 切分走 `split_so_list`（**花括号感知**的空段/空白清洗与它取代的那套清洗逐条一致）：
+    // 同一行里 `provides_soname` 可能带 `X@{A,B}`，而那个逗号**不是**字段分隔符 ——
+    // 一行里四处列表字段共用同一条切分规则，才不会出现"这一列按逗号切、那一列按花括号切"。
+    for (auto& piece : split_so_list(deps_sv)) {
         if (starts_with_operator(piece) && !dep_strs.empty())
             dep_strs.back() += ", " + piece;  // 复合约束的续接
         else
-            dep_strs.push_back(piece);
+            dep_strs.push_back(std::move(piece));
     }
     return dep_strs;
 }
@@ -89,25 +92,6 @@ static std::optional<std::filesystem::path> resolve_index_path()
     }
 }
 
-/**
- * 逗号分隔字段 → **非空** token 列表（去首尾空白、丢空片段）。
- *
- * `split_string_view` **总是**产出尾随一段（`"a,"` → `["a", ""]`），而索引里的
- * `provides`/`needed_so` 用 `,` 连接。不处理空 token / 前导空白会把**空串**当成一个
- * capability 收进 libsolv 的 pool：它是 `STRID_EMPTY`，无人提供，而 `collect_problems`
- * 又因为 `dep_name` 为空而跳过它 —— 用户只看到一条无从定位的 "solve failed"
- * （2026-10-02 修）。`deps` 字段早有 `split_dep_field` 做同样的清洗，这里补齐另两个字段。
- */
-static std::vector<std::string> split_comma_list(std::string_view sv)
-{
-    std::vector<std::string> out;
-    for (auto piece : split_string_view(sv, constants::COMMA_CHAR)) {
-        std::string s = trim_copy(piece);
-        if (!s.empty()) out.push_back(std::move(s));
-    }
-    return out;
-}
-
 /** 索引里的一个版本块 → PackageInfo（deps 串含复合约束，交给 split_dep_field 合并） */
 static PackageInfo make_package_info(const RepoIndexVersionBlock& b)
 {
@@ -118,10 +102,34 @@ static PackageInfo make_package_info(const RepoIndexVersionBlock& b)
     // b.deps 为空时 split_dep_field 会切出空片段，必须在调用前挡住（同
     // provides/provides_soname/needed_so）
     if (!b.deps.empty()) pkg.dependencies = detail::parse_dep_strings(split_dep_field(b.deps));
-    pkg.provides = split_comma_list(b.provides);
-    pkg.provides_soname = split_comma_list(b.provides_soname);
-    pkg.needed_so = split_comma_list(b.needed_so);
+    pkg.provides = split_so_list(b.provides);
+    pkg.provides_soname = split_so_list(b.provides_soname);
+    pkg.needed_so = split_so_list(b.needed_so);
     return pkg;
+}
+
+/**
+ * 索引块里两个 SONAME 字段的**规格校验**（`base/so_spec.hpp` 的语法）。
+ *
+ * **非法即整块跳过**（不是整仓失败）：与"版本块字段数不对就跳过该块"（`base/utils.cpp`）
+ * 同一取向 —— 一行坏数据不该让整个仓库不可用；但也绝不**半登记**（半登记会让"这个 SONAME
+ * 有人提供"变成假答案，比报错更难查）。
+ */
+static bool soname_specs_wellformed(const RepoIndexVersionBlock& b)
+{
+    const auto check = [&](std::string_view field, const std::string& value) {
+        if (so_spec_wellformed(value)) return true;
+        log_warning(
+            string_format("warning.bad_soname_spec_in_index", b.name, std::string(field), value));
+        return false;
+    };
+    for (const auto& v : split_so_list(b.provides_soname)) {
+        if (!check(constants::J_PROVIDES_SONAME, v)) return false;
+    }
+    for (const auto& v : split_so_list(b.needed_so)) {
+        if (!check(constants::J_NEEDED_SO, v)) return false;
+    }
+    return true;
 }
 
 /**
@@ -133,16 +141,17 @@ static PackageInfo make_package_info(const RepoIndexVersionBlock& b)
 void Repository::absorb_index_line(std::string_view line)
 {
     for (const auto& b : parse_repo_index_line(line)) {
-        // 走 `split_comma_list`（与 make_package_info 同一清洗）：空 token 不能进表，
+        if (!soname_specs_wellformed(b)) continue;  // 已告警；整块不登记
+        // 走 `split_so_list`（与 make_package_info 同一清洗）：空 token 不能进表，
         // 否则 `find_provider("")` / 依赖判定会拿到脏结果。
         // **两个字段进两张表** —— 混进同一张就回到了 8.0.0 拆分前的串味。
-        for (const auto& prov : split_comma_list(b.provides)) {
+        for (const auto& prov : split_so_list(b.provides)) {
             auto& pv = providers_[prov];
             if (pv.empty() || pv.back() != b.name) {
                 pv.push_back(b.name);
             }
         }
-        for (const auto& so : split_comma_list(b.provides_soname)) {
+        for (const auto& so : split_so_list(b.provides_soname)) {
             auto& sv = soname_providers_[so];
             if (sv.empty() || sv.back() != b.name) {
                 sv.push_back(b.name);
@@ -182,6 +191,8 @@ bool Repository::load_index_from_file(const std::filesystem::path& index_path)
 {
     packages_.clear();
     providers_.clear();
+    soname_providers_.clear();  // ⚠️ 此前漏清：重复 load 时旧包的 SONAME 提供者会残留成幽灵
+    soname_specs_.clear();
 
     std::ifstream file(index_path);
     if (!file.is_open()) {
@@ -195,6 +206,7 @@ bool Repository::load_index_from_file(const std::filesystem::path& index_path)
     // 读中途失败。**不抛**：调用方要先决定"这算不算致命"（见头文件的两条策略）。
     const bool clean = !file.bad();
     sort_package_versions();
+    rebuild_soname_spec_index();  // 派生索引在**整表加载完**之后建（不是逐行）
     return clean;
 }
 
@@ -208,6 +220,8 @@ void Repository::load_index()
 {
     packages_.clear();
     providers_.clear();
+    soname_providers_.clear();  // ⚠️ 此前漏清：重复 load 时旧包的 SONAME 提供者会残留成幽灵
+    soname_specs_.clear();
 
     const auto index_path = resolve_index_path();
     if (!index_path) return;  // 告警已由 resolve_index_path 按各自的失败原因发出
@@ -281,20 +295,40 @@ std::optional<PackageInfo> Repository::find_provider(const std::string& capabili
  * 一个参数选字段，而这两条查询在调用点上是**不同语义**（虚拟能力 vs SONAME），
  * 一旦谁误用另一条，8.0.0 拆分想根除的串味就会从调用点重新长回来。
  */
-std::optional<PackageInfo> Repository::find_soname_provider(const std::string& soname) const
+std::optional<PackageInfo> Repository::find_soname_provider(const std::string& need) const
 {
-    auto it = soname_providers_.find(soname);
-    if (it == soname_providers_.end() || it->second.empty()) return std::nullopt;
-    for (const auto& pkg_name : it->second) {
-        auto pit = packages_.find(pkg_name);
-        if (pit == packages_.end() || pit->second.empty()) continue;
-        for (auto rit = pit->second.rbegin(); rit != pit->second.rend(); ++rit) {
-            for (const auto& so : rit->provides_soname) {
-                if (so == soname) return *rit;
+    // ① 按**裸 SONAME** 取候选规格（`X@{A,B}` 与 `X@A` 是同一个库的两个规格）；
+    // ② 用**唯一的**包含谓词筛出"整体满足这个 need"的规格；
+    // ③ 在满足的规格里按（候选规格、提供者包名）的**排序**取第一个有该版本的包 ——
+    //    排序在 `rebuild_soname_spec_index()` 里做，所以结果与索引文件的书写顺序无关。
+    const auto cands = soname_specs_.find(so_spec_key(need));
+    if (cands == soname_specs_.end()) return std::nullopt;
+    for (const auto& spec : cands->second) {
+        if (!so_spec_satisfies(spec, need)) continue;
+        const auto it = soname_providers_.find(spec);
+        if (it == soname_providers_.end() || it->second.empty()) continue;
+        for (const auto& pkg_name : it->second) {
+            const auto pit = packages_.find(pkg_name);
+            if (pit == packages_.end() || pit->second.empty()) continue;
+            for (auto rit = pit->second.rbegin(); rit != pit->second.rend(); ++rit) {
+                for (const auto& so : rit->provides_soname) {
+                    if (so_spec_satisfies(so, need)) return *rit;
+                }
             }
         }
     }
     return std::nullopt;
+}
+
+void Repository::rebuild_soname_spec_index()
+{
+    soname_specs_.clear();
+    for (auto& [spec, pkgs] : soname_providers_) {
+        std::ranges::sort(pkgs);  // 候选包名排序 ⇒ "取第一个提供者"与加载顺序无关
+        if (pkgs.empty()) continue;
+        soname_specs_[so_spec_key(spec)].push_back(spec);
+    }
+    for (auto& [bare, specs] : soname_specs_) std::ranges::sort(specs);
 }
 
 void Repository::refresh_provider_map(ProviderMap& map, const std::string& pkg_name,
@@ -368,6 +402,7 @@ void Repository::update_package_info(const std::string& name, const std::string&
     // 两张表各自增量重建 —— **共用同一份实现**（`refresh_provider_map`），只是选不同的字段。
     refresh_provider_map(providers_, name, versions, &PackageInfo::provides);
     refresh_provider_map(soname_providers_, name, versions, &PackageInfo::provides_soname);
+    rebuild_soname_spec_index();
 }
 
 /** 按包名查找最新版本 */

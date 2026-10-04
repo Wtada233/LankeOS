@@ -10,7 +10,7 @@
 //! 扫描与 repack 共用一次解包（§6：单包单趟，避免二次解压）。扫描只读，不落库。
 
 use crate::error::FarmError;
-use std::collections::HashSet;
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -128,13 +128,16 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
     collect_files(content_dir, &mut files);
 
     let mut all_sonames: HashSet<String> = HashSet::new();
-    let mut needs: HashSet<String> = HashSet::new();
+    // **名字 → 需要的符号版本**（verneed）。空集合 = 裸需求（大多数库没有版本表）。
+    // 用 map 而不是 set：同一 SONAME 会被包里多个二进制引用，版本集合要**并**起来。
+    let mut needs: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     // 包内所有 .so* 文件 basename（任何路径）——not-found 判定用：包内同名 .so → 二进制经
     // RPATH 用自带库（标准搜索视为 not found）→ 该 NEEDED 不进 needed_so。
     let mut all_so_basenames: HashSet<String> = HashSet::new();
     // HashSet 去重：同一 SONAME 常被符号链接分支（文件名）和 ELF 分支（SONAME）各贡献一次，
     // 如 libmagic 的 usr/lib/libmagic.so.1 符号链接 + libmagic.so.1.0.0 的 SONAME。
-    let mut provides_soname: HashSet<String> = HashSet::new();
+    // **名字 → 导出的符号版本**（verdef）。空集合 = 裸声明。
+    let mut provides_soname: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
 
     for fpath in &files {
         if let Some(n) = fpath.file_name().and_then(|n| n.to_str()) {
@@ -157,7 +160,16 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
                 let resolved = resolved.canonicalize().unwrap_or(resolved);
                 if is_elf(&resolved) {
                     if let Some(n) = fpath.file_name().and_then(|n| n.to_str()) {
-                        provides_soname.insert(n.to_string());
+                        // 版本表在**目标文件**里：符号链接 `libx.so.1 → libx.so.1.2.3` 也是
+                        // 消费者 DT_NEEDED 的字面量，它导出的版本要从目标读出来，否则
+                        // "需要 libx.so.1@V2" 会因为这里只登记了裸名而找不到提供者。
+                        let versions = fs::read(&resolved)
+                            .map(|b| parse_elf_versions_only(&b))
+                            .unwrap_or_default();
+                        provides_soname
+                            .entry(n.to_string())
+                            .or_default()
+                            .extend(versions);
                     }
                 }
             }
@@ -167,23 +179,34 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
             continue;
         }
         let Ok(bytes) = fs::read(fpath) else { continue };
-        let (sonames, needed) = parse_elf_dynamic(&bytes);
-        for sn in &sonames {
+        let dyninfo = parse_elf_dynamic(&bytes);
+        for sn in &dyninfo.sonames {
             all_sonames.insert(sn.clone());
         }
         let in_lib = in_system_lib_dir(fpath, content_dir);
-        if !sonames.is_empty() && in_lib {
-            provides_soname.extend(sonames);
+        if !dyninfo.sonames.is_empty() && in_lib {
+            for sn in &dyninfo.sonames {
+                provides_soname
+                    .entry(sn.clone())
+                    .or_default()
+                    .extend(dyninfo.versions.defined.iter().cloned());
+            }
         } else if in_lib {
             // 无 SONAME 回退：文件名本身是其他包的 DT_NEEDED 目标
             if let Some(n) = fpath.file_name().and_then(|n| n.to_str()) {
                 if n.contains(".so") {
-                    provides_soname.insert(n.to_string());
+                    provides_soname
+                        .entry(n.to_string())
+                        .or_default()
+                        .extend(dyninfo.versions.defined.iter().cloned());
                 }
             }
         }
-        for n in needed {
-            needs.insert(basename(&n));
+        for n in &dyninfo.needed {
+            // 版本需求按 **DT_NEEDED 原样的名字**去 verneed 表里取（`vn_file` 就是那个串），
+            // 落到索引里用 basename（与旧行为一致）。
+            let vers = dyninfo.versions.needed.get(n).cloned().unwrap_or_default();
+            needs.entry(basename(n)).or_default().extend(vers);
         }
     }
 
@@ -194,14 +217,19 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
     //  3) 仓库无 provider（repo_provides 不含该 SONAME）→ not found → 忽略
     //     （postgresql 的 plperl.so 链接 libperl.so，perl 不提供 → 无 provider → 不进 needed）。
     // 不做 RPATH/RUNPATH 解析——扫描器没有完整运行时系统状态，RPATH 指向他包库会误判，本质无解。
+    // 三个过滤都按**裸名**判（`so_bare`：索引里的 repo_provides 也是裸名键）
     let mut needed_so: Vec<String> = needs
-        .difference(&all_sonames)
-        .filter(|&s| !all_so_basenames.contains(s))
-        .filter(|&s| repo_provides.contains(s))
-        .cloned()
+        .into_iter()
+        .filter(|(name, _)| !all_sonames.contains(name.as_str()))
+        .filter(|(name, _)| !all_so_basenames.contains(name.as_str()))
+        .filter(|(name, _)| repo_provides.contains(name.as_str()))
+        .map(|(name, vers)| format_soname(&name, &vers))
         .collect();
     needed_so.sort();
-    let mut provides_soname: Vec<String> = provides_soname.into_iter().collect();
+    let mut provides_soname: Vec<String> = provides_soname
+        .into_iter()
+        .map(|(name, vers)| format_soname(&name, &vers))
+        .collect();
     provides_soname.sort();
     (needed_so, provides_soname)
 }
@@ -266,31 +294,129 @@ pub(crate) fn strip_lib_dir(abs: &Path) -> Option<PathBuf> {
 }
 
 /// 解析 ELF .dynamic：返回 (sonames, needed)。解析失败按空处理（对齐 gen_deps 的 try/except）。
-fn parse_elf_dynamic(bytes: &[u8]) -> (Vec<String>, Vec<String>) {
+/// 一个 ELF 的**符号版本**信息（`needed_so` / `provides_soname` 的 `@…` 部分从哪来）。
+///
+/// 只读 `.gnu.version_d`（verdef：本库**定义**了哪些版本）与 `.gnu.version_r`（verneed：
+/// 从**哪个**库需要哪些版本）**两张表**，**不做** `dynsym × .gnu.version` 的逐符号 join ——
+/// 索引要的是"库级"的版本集合，符号级 join 是 `custom_checks/abi.rs` 那个审计要的东西
+/// （它反过来还要 versym 才知道每个符号属于哪个版本）。两份读的是同一批节区、**粒度不同**，
+/// 改这里或那里之前先看一眼对方，别把它当成"又一份实现"。
+#[derive(Default, Debug, PartialEq, Eq)]
+pub struct ElfVersions {
+    /// 本文件**定义**的版本名（verdef）。**不含 BASE 节点** —— 那个节点的名字就是 SONAME 本身
+    /// （readelf 里 `Flags: BASE 名称：libx.so.1`），它是"版本表的基名"而不是任何消费者会请求的版本。
+    pub defined: BTreeSet<String>,
+    /// 本文件**需要**的版本：`DT_NEEDED 名 → 版本名集合`（verneed 按 `vn_file` 分组）。
+    pub needed: BTreeMap<String, BTreeSet<String>>,
+}
+
+/// ELF 的 `DT_NEEDED` / `DT_SONAME` + 上面那份版本表（一次 parse，三样一起取）。
+#[derive(Default, Debug)]
+struct ElfDynamic {
+    sonames: Vec<String>,
+    needed: Vec<String>,
+    versions: ElfVersions,
+}
+
+/// 版本名是否落在 lpkg 允许的字符集内（`base/so_spec.cpp` 的 `valid_symbol`）。
+///
+/// **扫出来的东西必须能被 lpkg 接受**：lpkg 的读入处对非法规格是"索引里整块跳过 / 元数据里
+/// 直接拒装"，所以这里宁可**少声明**（丢掉这个怪版本名）也不能写进去一个它不认的串。
+/// 实测真实世界的版本名（GLIBC_2.40 / GLIBCXX_3.4.30 / Qt_6_PRIVATE_API / OPENSSL_3.0.0 /
+/// XZ_5.2）全部落在这个集合里。
+fn version_name_ok(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'+' | b'-'))
+}
+
+fn parse_elf_dynamic(bytes: &[u8]) -> ElfDynamic {
     use goblin::elf::dynamic::{DT_NEEDED, DT_SONAME};
     let Ok(elf) = goblin::elf::Elf::parse(bytes) else {
-        return (Vec::new(), Vec::new());
+        return ElfDynamic::default();
     };
-    let mut sonames = Vec::new();
-    let mut needed = Vec::new();
+    let mut out = ElfDynamic::default();
     if let Some(dynsec) = &elf.dynamic {
         for d in &dynsec.dyns {
             match d.d_tag {
                 DT_NEEDED => {
                     if let Some(s) = elf.dynstrtab.get_at(d.d_val as usize) {
-                        needed.push(s.to_string());
+                        out.needed.push(s.to_string());
                     }
                 }
                 DT_SONAME => {
                     if let Some(s) = elf.dynstrtab.get_at(d.d_val as usize) {
-                        sonames.push(s.to_string());
+                        out.sonames.push(s.to_string());
                     }
                 }
                 _ => {}
             }
         }
     }
-    (sonames, needed)
+    // verdef：本库定义的版本（跳过 BASE 节点、过字符集闸）
+    if let Some(verdef) = &elf.verdef {
+        for d in verdef.iter() {
+            const VER_FLG_BASE: u16 = 0x1;
+            if d.vd_flags & VER_FLG_BASE != 0 {
+                continue;
+            }
+            if let Some(name) = d
+                .iter()
+                .next()
+                .and_then(|a| elf.dynstrtab.get_at(a.vda_name))
+            {
+                if version_name_ok(name) {
+                    out.versions.defined.insert(name.to_string());
+                }
+            }
+        }
+    }
+    // verneed：从某个 DT_NEEDED 库需要的版本（`vn_file` 就是 DT_NEEDED 里的那个名字）
+    if let Some(verneed) = &elf.verneed {
+        for n in verneed.iter() {
+            // ⚠️ `vn_file` 是 **dynstr 偏移**（本版 goblin 里是 `usize`），不是字符串 —— 直接 `to_string()` 会得到
+            // 一个数字当库名（实测踩过：`{"11": {"V2"}}`，随后被 repo_provides 过滤成静默的
+            // 空版本需求）。必须过 dynstrtab 解引用。
+            let Some(file) = elf.dynstrtab.get_at(n.vn_file) else {
+                continue;
+            };
+            for a in n.iter() {
+                let Some(name) = elf.dynstrtab.get_at(a.vna_name) else {
+                    continue;
+                };
+                if !version_name_ok(name) {
+                    continue;
+                }
+                out.versions
+                    .needed
+                    .entry(file.to_string())
+                    .or_default()
+                    .insert(name.to_string());
+            }
+        }
+    }
+    out
+}
+
+/// 只取 verdef（符号链接分支用：链接本身没有节区，版本表在目标文件里）。
+fn parse_elf_versions_only(bytes: &[u8]) -> BTreeSet<String> {
+    parse_elf_dynamic(bytes).versions.defined
+}
+
+/// 版本名集合 → 规格串（`X` / `X@V` / `X@{V1,V2}`）。
+///
+/// ⚠️ **与 lpkg 的 `format_so_spec()`（`base/so_spec.cpp`）同形**：集合已排序去重，
+/// 单个不加花括号。两侧的产物会直接对着比（归档 metadata ↔ 索引），形状不一致就是假漂移。
+fn format_soname(name: &str, versions: &BTreeSet<String>) -> String {
+    match versions.len() {
+        0 => name.to_string(),
+        1 => format!("{name}@{}", versions.iter().next().unwrap()),
+        _ => {
+            let joined = versions.iter().cloned().collect::<Vec<_>>().join(",");
+            format!("{name}@{{{joined}}}")
+        }
+    }
 }
 
 #[cfg(test)]

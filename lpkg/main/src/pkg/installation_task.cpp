@@ -43,6 +43,7 @@
 #include "archive.hpp"
 #include "base/constants.hpp"
 #include "base/exception.hpp"
+#include "base/so_spec.hpp"
 #include "base/utils.hpp"
 #include "config/config.hpp"
 #include "crypto/hash.hpp"
@@ -327,11 +328,12 @@ bool plan_provides(const InstallContext& ctx, const std::string& name)
  * 再共用就会让"计划里有包提供这个 SONAME"**永远为假** ⇒ 依赖该 SONAME 的包被判缺依赖、
  * 整批回滚。
  */
-bool plan_provides_soname(const InstallContext& ctx, const std::string& soname)
+bool plan_provides_soname(const InstallContext& ctx, const std::string& need)
 {
+    // 判定走**唯一的**包含谓词（带符号版本的需求要"整体覆盖"才算满足；裸需求照旧）
     for (const auto& [pn, plan_pkg] : ctx.plan)
         for (const auto& so : plan_pkg.provides_soname)
-            if (so == soname) return true;
+            if (so_spec_satisfies(so, need)) return true;
     return false;
 }
 
@@ -410,7 +412,7 @@ bool unclaimed_repo_provider(const InstallContext& ctx, const std::string& sonam
     // ⚠️ 核验要查 **provides_soname**（不是 `provides` —— 那是虚拟表）：查错表会让本函数
     // **永远返回 false** ⇒ "仓库里其它版本的提供者不能算数"这条版本锁定判据被静默废掉。
     for (const auto& so : prov_pkg->provides_soname) {
-        if (so == soname) return true;
+        if (so_spec_satisfies(so, soname)) return true;
     }
     return false;
 }
@@ -428,8 +430,12 @@ bool soname_satisfied(const InstallContext& ctx, const std::string& soname)
     if (installed_provider_available(ctx, soname)) return true;
     if (unclaimed_repo_provider(ctx, soname)) return true;
 
+    // `--use-system-soname` 查的是"`<root>/usr/lib/<名字>` 这个文件在不在"，**只能传裸名**：
+    // 把 `X@V` 整串传进去会去找一个带 `@` 的文件名 ⇒ 永远不存在 ⇒ 静默不满足。
+    // ⚠️ 本次**不**校验系统库的符号版本（lpkg 没有 ELF 版本节解析）—— 这是有意的边界，
+    // 写在这里免得下一个人以为"顺手把裸名换成整串"是修 bug。
     return Config::instance().use_system_soname_mode() &&
-           Config::instance().has_system_soname(soname);
+           Config::instance().has_system_soname(so_spec_key(soname));
 }
 
 }  // namespace

@@ -20,6 +20,7 @@
 #undef requires
 
 #include "../base/constants.hpp"
+#include "../base/so_spec.hpp"
 #include "../base/utils.hpp"
 #include "../i18n/localization.hpp"
 #include "../repo/repository.hpp"
@@ -132,11 +133,39 @@ void add_provides(Solvable* s, Pool* pool, const std::vector<std::string>& provi
     }
 }
 
-/// 登记**导出的 SONAME**（`provides_soname` 字段）—— 走 `so:` 空间，只有 `needed_so` 需求认它。
-void add_provides_soname(Solvable* s, Pool* pool, const std::vector<std::string>& sonames)
+/**
+ * 池里**所有"带符号版本"的 need**（规范化整串，如 `libc.so.6@{GLIBC_2.39,GLIBC_2.40}`）。
+ *
+ * 它只为回答一个问题：「哪些 need id 需要被登记成 provides」。见下面的 ②。
+ */
+using SoNeedSet = std::set<std::string>;
+
+/**
+ * 登记**导出的 SONAME**（`provides_soname` 字段）—— 走 `so:` 空间，只有 `needed_so` 需求认它。
+ *
+ * ── 符号版本（symbol version）的两条规则 ─────────────────────────────────────
+ * ① 裸 id `so:X` **永远登记**（只要声明了 `X…`）：`needed_so: X` 认它。少了它，一个"声明得
+ *    更细"的 provider 反倒会把所有裸 need 打破。
+ * ② 带符号版本的条目**只登记它整体满足的那些 need 的 id**（`versioned_needs`）——
+ *    **不是**逐个符号登记。`needed_so: X@{A,B}` 的语义是"**某一个** provider 必须同时给出
+ *    A 与 B"（ELF 里消费方链的是**一个**库文件）。而 libsolv 的多条 requires 是 AND、却允许
+ *    被**不同** solvable 分别满足 —— 逐符号登记会造出"P1 给 A、P2 给 B ⇒ 求解器说能装"而
+ *    安装期按单 provider 判**必失败**的分叉。need 侧登记整串 id + provider 侧只登记整体满足
+ *    的那些 id，两边就**字面一致**：池里能匹配 ⟺ `so_spec_satisfies()` 成立。
+ */
+void add_provides_soname(Solvable* s, Pool* pool, const std::vector<std::string>& sonames,
+                         const SoNeedSet& versioned_needs)
 {
     for (const auto& so : sonames) {
-        solvable_add_deparray(s, SOLVABLE_PROVIDES, scoped_soname(pool, so), 0);
+        const SoSpec spec = parse_so_spec(so);
+        if (spec.soname.empty()) continue;
+        solvable_add_deparray(s, SOLVABLE_PROVIDES, scoped_soname(pool, spec.soname), 0);
+        if (spec.symbols.empty()) continue;  // 裸声明：到此为止（保守语义：拿不出符号版本）
+        for (const auto& need : versioned_needs) {
+            if (so_spec_satisfies(so, need)) {
+                solvable_add_deparray(s, SOLVABLE_PROVIDES, scoped_soname(pool, need), 0);
+            }
+        }
     }
 }
 
@@ -170,7 +199,11 @@ void add_requires(Solvable* s, Pool* pool, const std::vector<DependencyInfo>& de
         // 满足（`add_provides_soname` 在那边登记），**包名永远进不来**。不加这层隔离时，`needed_so:
         // o` 会被一个
         // **名叫 `o` 的包**满足（靠它的自提供）—— 实测复现过。
-        solvable_add_deparray(s, SOLVABLE_REQUIRES, scoped_soname(pool, soname), 0);
+        // **带符号版本时登记整串（规范化后）的 id**，不逐符号 —— 与 `add_provides_soname`
+        // 的 ② 配套：只有"整体覆盖这个 need"的 provider 才登记这个 id。
+        const SoSpec spec = parse_so_spec(soname);
+        if (spec.soname.empty()) continue;
+        solvable_add_deparray(s, SOLVABLE_REQUIRES, scoped_soname(pool, format_so_spec(spec)), 0);
     }
 }
 
@@ -433,12 +466,31 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
 {
     PoolState ps;
     ps.pool = pool_create();
+
+    // ── 预扫：池里所有"带符号版本"的 need（见 `add_provides_soname` 的 ②）──────────────
+    // 三处来源都要扫：avail（候选）/ local（本地 .lpkg）/ installed（**已装消费者** ——
+    // "已装的老二进制要求某符号版本、而仓库里的 provider 得能覆盖它"正是要抓的那类）。
+    // 成本与**真实出现的 distinct need 数**成正比：今天全是裸 need ⇒ 集合为空、后面那段
+    // 循环一次都不跑。
+    SoNeedSet versioned_needs;
+    const auto collect_needs = [&versioned_needs](const std::vector<std::string>& needed) {
+        for (const auto& raw : needed) {
+            const SoSpec spec = parse_so_spec(raw);
+            if (!spec.symbols.empty()) versioned_needs.insert(format_so_spec(spec));
+        }
+    };
     // 不设 pool arch：LankeOS 单 arch，solver 不关心 arch。
     // 注意：pool_setarch("x86_64") + arch-less solvable 会让 SOLVER_SOLVABLE_NAME
     // 找不到任何包（whatprovides 按 arch 过滤，全空）——arch 要么都不设要么都设，不能混合。
 
     // available repo：权威 provider 源（needed_so/provides/deps）
     ps.avail = repo_create(ps.pool, "available");
+    for (const auto& [name, versions] : repo.packages()) {
+        for (const auto& pkg : versions) collect_needs(pkg.needed_so);
+    }
+    for (const auto& pkg : local) collect_needs(pkg.needed_so);
+    for (const auto& [name, pkg] : installed) collect_needs(pkg.needed_so);
+
     for (const auto& [name, versions] : repo.packages()) {
         for (const auto& pkg : versions) {
             Id sid = repo_add_solvable(ps.avail);
@@ -452,7 +504,7 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
             solvable_add_deparray(s, SOLVABLE_PROVIDES,
                                   pool_rel2id(ps.pool, s->name, s->evr, REL_EQ, 1), 0);
             add_provides(s, ps.pool, pkg.provides);
-            add_provides_soname(s, ps.pool, pkg.provides_soname);
+            add_provides_soname(s, ps.pool, pkg.provides_soname, versioned_needs);
             // --no-deps：不建模候选包的 requires → solver 不会拉依赖（只装目标自身）。
             // installed repo 的 requires 仍保留（"不破坏已装依赖"的一致性照旧）。
             if (!opts.no_deps) add_requires(s, ps.pool, pkg.dependencies, pkg.needed_so);
@@ -467,7 +519,7 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
         solvable_add_deparray(s, SOLVABLE_PROVIDES,
                               pool_rel2id(ps.pool, s->name, s->evr, REL_EQ, 1), 0);
         add_provides(s, ps.pool, pkg.provides);
-        add_provides_soname(s, ps.pool, pkg.provides_soname);
+        add_provides_soname(s, ps.pool, pkg.provides_soname, versioned_needs);
         if (!opts.no_deps) add_requires(s, ps.pool, pkg.dependencies, pkg.needed_so);
     }
 
@@ -484,7 +536,7 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
         solvable_add_deparray(s, SOLVABLE_PROVIDES,
                               pool_rel2id(ps.pool, s->name, s->evr, REL_EQ, 1), 0);
         add_provides(s, ps.pool, pkg.provides);
-        add_provides_soname(s, ps.pool, pkg.provides_soname);
+        add_provides_soname(s, ps.pool, pkg.provides_soname, versioned_needs);
         add_requires(s, ps.pool, pkg.deps, pkg.needed_so);
     }
 
@@ -494,13 +546,13 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
         Id sid = repo_add_solvable(inst);
         Solvable* s = pool_id2solvable(ps.pool, sid);
         s->name = pool_str2id(ps.pool, "@system-sonames", 1);
-        add_provides_soname(s, ps.pool, opts.system_sonames);
+        add_provides_soname(s, ps.pool, opts.system_sonames, versioned_needs);
     }
     if (!extra_provides.empty()) {
         Id sid = repo_add_solvable(inst);
         Solvable* s = pool_id2solvable(ps.pool, sid);
         s->name = pool_str2id(ps.pool, "@missing-tolerated", 1);
-        add_provides_soname(s, ps.pool, extra_provides);
+        add_provides_soname(s, ps.pool, extra_provides, versioned_needs);
     }
 
     pool_createwhatprovides(ps.pool);

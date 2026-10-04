@@ -11,6 +11,7 @@
 #include <string>
 
 #include "base/exception.hpp"
+#include "base/so_spec.hpp"
 #include "base/utils.hpp"
 #include "db/test_breakpoints.hpp"
 #include "i18n/localization.hpp"
@@ -391,6 +392,25 @@ void reject_unsafe_metadata_tokens(const std::vector<std::string>& values, std::
     }
 }
 
+/**
+ * 校验两个 SONAME 字段的**规格语法**（`base/so_spec.hpp`）。
+ *
+ * 与它上面的 `reject_unsafe_metadata_tokens` 是**两件事**：那个管"分帧字符会不会伪造记录"，
+ * 这个管"这个 SONAME 规格写不写得通"。都放在**读入处**：规格一旦写歪（少个花括号、冒号后
+ * 空着、花括号里带空格），宽容解析会把它整串当裸名，于是它**永远匹配不上任何提供者** ——
+ * 静默的错误答案，比报错难查得多。
+ */
+void reject_bad_soname_specs(const std::vector<std::string>& values, std::string_view field,
+                             const fs::path& meta_path)
+{
+    for (const auto& v : values) {
+        if (so_spec_wellformed(v)) continue;
+        // 实参顺序与 l10n 文案一致：`{} {} {}` = 元数据文件、字段名、原值。
+        throw LpkgException(
+            string_format("error.bad_soname_spec", meta_path.string(), std::string(field), v));
+    }
+}
+
 /** 从已解压的包目录读取 metadata.json，提取包名、版本、依赖等信息 */
 void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::string& version,
                            std::vector<std::string>& deps, std::vector<std::string>& provides,
@@ -428,6 +448,8 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
     reject_unsafe_metadata_tokens(provides, constants::J_PROVIDES, meta_path);
     reject_unsafe_metadata_tokens(provides_soname, constants::J_PROVIDES_SONAME, meta_path);
     reject_unsafe_metadata_tokens(needed_so, constants::J_NEEDED_SO, meta_path);
+    reject_bad_soname_specs(provides_soname, constants::J_PROVIDES_SONAME, meta_path);
+    reject_bad_soname_specs(needed_so, constants::J_NEEDED_SO, meta_path);
     man = meta.value(std::string(constants::J_MAN), "");
 }
 
@@ -611,6 +633,13 @@ void resolve_with_solver(InstallContext& ctx)
         pi.provides_soname =
             meta.value(std::string(constants::J_PROVIDES_SONAME), std::vector<std::string>{});
         pi.needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
+        // ⚠️ 这条路（本地 `.lpkg` 候选）走的是 `read_archive_metadata`，**绕过了**
+        // `read_package_metadata` —— 于是它此前两道校验都没有：控制字符能伪造状态文件里的
+        // 记录，非法规格能变成"永远匹配不上的裸名"。这里补齐（与主读入点同一对判据）。
+        reject_unsafe_metadata_tokens(pi.provides_soname, constants::J_PROVIDES_SONAME, path);
+        reject_unsafe_metadata_tokens(pi.needed_so, constants::J_NEEDED_SO, path);
+        reject_bad_soname_specs(pi.provides_soname, constants::J_PROVIDES_SONAME, path);
+        reject_bad_soname_specs(pi.needed_so, constants::J_NEEDED_SO, path);
         local_pkgs.push_back(std::move(pi));
         local_paths[name] = path;
     }

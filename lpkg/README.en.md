@@ -34,7 +34,7 @@ English | [中文](README.md)
 ## Features
 
 -   **Full lifecycle management**: Install, uninstall, upgrade, and reinstall packages.
--   **needed_so verification**: Automatically validates every ELF DT_NEEDED SONAME against the repository before installation. Rejects packages with unresolvable SONAMEs, preventing the "empty provides still installs" class of bugs.
+-   **needed_so verification + symbol versions**: Automatically validates every ELF DT_NEEDED SONAME against the repository before installation. Rejects packages with unresolvable SONAMEs, preventing the "empty provides still installs" class of bugs. A SONAME may carry **ELF symbol versions** (`libc.so.6@GLIBC_2.40` or `libc.so.6@{GLIBC_2.40,GLIBC_2.39}`): a versioned requirement can only be satisfied by a provider that declares it too and covers it (conservative rule — a bare SONAME declaration does not count), which catches "this new binary needs a newer glibc symbol version" ABI breaks that plain SONAME checks cannot see.
 -   **SIGINT graceful shutdown**: Ctrl+C sets a graceful-shutdown flag; the current operation (including any required rollback) runs to completion before exiting. There is no force-terminate — rollback is never interrupted mid-flight.
 -   **rpm version semantics**: Version strings are plain rpm `[epoch:]version[-release]`, with exactly one comparison implementation (libsolv's EVR comparison) — multi-segment revisions (`6.16.1 > 6.6.1`), prereleases (`1.0~rc1 < 1.0`), release revisions (`1.0-1 > 1.0`) and compound range constraints (`>= 2.0.0 < 3.0.0`).
 -   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their respective hashes, deps, provides, provides_soname, and needed_so.
@@ -159,7 +159,7 @@ hooks/                # Hook scripts (optional)
 | `version` | Version string |
 | `deps` | Dependency package names (no version constraints; auto-resolved from needed_so by the build farm) |
 | `provides` | **Virtual capabilities** this package provides (e.g. `java-runtime`; unrelated to `.so`) |
-| `provides_soname` | SONAMEs this package **exports** (scanned from the built ELF by the farm) |
+| `provides_soname` | SONAMEs this package **exports** (scanned from the built ELF by the farm; may carry symbol versions, see below) |
 | `needed_so` | DT_NEEDED SONAME list from the package's ELF files (ground truth for runtime deps) |
 | `man` | Inline man page content (optional) |
 
@@ -208,7 +208,7 @@ leaving them out means "use the configured default":
 ### Directory Structure
 ```text
 /x86_64
-  ├── index.txt           # Core index: name|ver:hash:deps:provides:needed_so;...|
+  ├── index.txt           # Core index: name|ver:hash:deps:provides:provides_soname:needed_so;...|
   └── bash/
       ├── 5.3.lpkg        # Actual tar.zst compressed package
       └── 5.4.lpkg
@@ -216,9 +216,27 @@ leaving them out means "use the configured default":
 
 ### Index Line Example
 ```text
-# provides/needed_so are per-version (inside the version block, fields 4 and 5)
-curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash:libcurl.so.4:libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1|
+# A version block has exactly 6 colon-separated fields: ver:hash:deps:provides:provides_soname:needed_so
+curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash::libcurl.so.4:libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1|
 ```
+
+### SONAME specs (symbol versions)
+```text
+libc.so.6                         # bare SONAME (no symbol versions declared)
+libc.so.6@GLIBC_2.40              # a single symbol version
+libc.so.6@{GLIBC_2.40,GLIBC_2.39} # several (symbol charset [A-Za-z0-9_.+-]; whitespace is not allowed)
+```
+-   **Matching (conservative)**: a versioned requirement can only be satisfied by a provider that
+    also declares symbol versions **and covers it**. A provider declaring only the bare `libc.so.6`
+    does **not** count (otherwise the feature would be a no-op). Bare requirements are unchanged:
+    any provider of that SONAME counts, so declaring more never breaks a bare requirement.
+-   **Storage**: `metadata.json` and `index.txt` keep the `{...}` spelling verbatim (no expansion);
+    expansion into pool capabilities happens only when feeding libsolv. The list separator inside an
+    index field is **still a comma** — splitting is **brace-aware** (a comma inside braces is not a
+    separator).
+-   **Who produces them**: the **build farm does** (it scans each ELF's `.gnu.version_d` /
+    `.gnu.version_r`); they can also be hand-written. The farm additionally normalises these fields
+    to bare SONAMEs for comparison, so it never erases existing specs.
 
 ## Source Architecture
 

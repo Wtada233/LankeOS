@@ -112,9 +112,23 @@ private:
                                      const std::vector<PackageInfo>& versions,
                                      const std::vector<std::string> PackageInfo::* field);
 
+    /**
+     * 重建"**裸 SONAME** → 候选规格"索引（`soname_providers_` 的派生索引），并顺手把
+     * `soname_providers_` 的候选列表排序。
+     *
+     * 为什么是"派生 + 重建"而不是增量维护：它的变更来源只有两处（整表加载、单包刷新），
+     * 重建是 O(#规格)（真实仓库几千条）；而在两处各维护一遍"该加该删"正是本仓库反复出事的
+     * 那种第二实现。顺带解决一个既有问题：`absorb_index_line` 路径不排序，于是"取哪个提供者"
+     * 依赖索引文件里的书写顺序（`refresh_provider_map` 那条路会排）—— 排序把它变成确定的。
+     */
+    void rebuild_soname_spec_index();
+
     std::unordered_map<std::string, std::vector<PackageInfo>> packages_;  // 包名 -> 版本列表
     ProviderMap providers_;         // **虚拟能力** -> 提供者包名（来自 `provides`）
-    ProviderMap soname_providers_;  // **SONAME**    -> 提供者包名（来自 `provides_soname`）
+    ProviderMap soname_providers_;  // **规格串**（`X` / `X@V` / `X@{V1,V2}`）-> 提供者包名
+    /// 裸 SONAME（`so_spec_key()`）-> 该库的候选规格串（已排序）。查询按裸名取候选，
+    /// 再用唯一的包含谓词 `so_spec_satisfies()` 筛 —— 见 `find_soname_provider()`。
+    std::unordered_map<std::string, std::vector<std::string>> soname_specs_;
 };
 
 /**

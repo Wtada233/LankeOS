@@ -227,6 +227,82 @@ libsolv 的 EVR 比较（`vercmp/version.cpp` 的 `evr_cmp` → `pool_evrcmp_str
 > ⚠️ 顺带修正一处**既有误判**：`ncurses=6.5-20250809` 在上游是"6.5 的补丁快照"（**更新**），
 > 旧语义把 `-` 当预发布 ⇒ 判它**旧于** `6.5` ✗；rpm 语义下它是 `6.5` 的 release ⇒ **更新** ✓。
 
+### 1.9 SONAME 规格（symbol version，2026-10-05）
+
+`provides_soname` 与 `needed_so` 的**条目**可以带 ELF 符号版本：
+
+```text
+libc.so.6                         裸 SONAME（不声明任何符号版本）
+libc.so.6@GLIBC_2.40              单个符号版本
+libc.so.6@{GLIBC_2.40,GLIBC_2.39} 多个（花括号只能在末尾、只出现一次、不许嵌套）
+```
+
+- **唯一实现**是 `base/so_spec.{hpp,cpp}`（`parse_so_spec` / `so_spec_wellformed` /
+  `split_so_list` / `so_spec_satisfies` / `expand_so_spec` / `format_so_spec`）。
+  **其它任何地方都不许再写一份匹配判据** —— 这是本仓库的头号缺陷形态（"第二实现必漂移"）。
+- **匹配是保守的**：带符号版本的需求**只能**被"也声明了符号版本、且**覆盖**它"的提供者满足；
+  只声明裸 `X` 的提供者**不算**（今天全部 861 个包都是裸的，放行 = 特性形同虚设）。
+  裸需求不受影响：任何声明了 `X…` 的提供者都可以，**声明得更细不会打破裸需求**。
+- **符号集合规范化 = 去重 + 字典序**：`X@{A,B}` 与 `X@{B,A}` 是同一个规格。规范化只用于
+  **比较与池内 id**（`format_so_spec`），**存储一律原样**：`metadata.json`、`index.txt`、
+  `provides_soname.db` 里保留用户写法。
+- **校验在读入处**：元数据（`read_package_metadata` 与本地候选那条路）非法即**抛**
+  （`error.bad_soname_spec`，点名文件/字段/原值）；索引里的非法块**整块跳过 + 告警**
+  （`warning.bad_soname_spec_in_index`），与"字段数不对的版本块跳过"同一取向 ——
+  一行坏数据不该让整个仓库不可用，但也绝不**半登记**。
+- **规格里不许有空白**：这两个字段在索引里是逗号分隔的表，而索引行今天**零空白**
+  （实测 7412 个条目里没有任何空白字符；`wc -w` / 无参 `split()` / `awk '{print $k}'` 都靠它）。
+  校验直接拒空白，把这条从"碰巧成立"变成**可执行的不变量**。字符集：SONAME 部分
+  `[A-Za-z0-9._+-]` 且不含 `@ { } , | ; :`；符号名同上。
+- **索引切分是花括号感知的**：花括号里的逗号与字段分隔符是同一个字符，所以
+  `split_so_list()`（C++）与 `farm/src/graph.rs` 的 `split_brace_aware()`（Rust）实现**同一条
+  规则**，两侧由 `main/scripts/check_index_conformance.py` + `tests/unit/test_repo_index_conformance.cpp`
+  的同一份 fixture 钉住。**写入者不需要任何改动**（元素里带花括号也照 join）。
+
+#### 灌 libsolv 池的建模（为什么不是"逐符号登记"）
+
+`needed_so: X@{A,B}` 的语义是"**某一个** provider 必须同时给出 A 与 B"（ELF 里消费方链的是
+**一个**库文件）。而 libsolv 的多条 `SOLVABLE_REQUIRES` 是 AND、却允许被**不同** solvable
+分别满足 —— 逐符号登记会造出"P1 给 A、P2 给 B ⇒ 求解器说能装"而安装期按单 provider 判
+**必失败**的分叉（本仓库最忌讳的那类）。
+
+所以池里这样建模（`solver.cpp::build_pool`）：
+
+1. **预扫**池里所有带符号版本的 need，规范化成整串（`X@{A,B}`），收进 `versioned_needs`；
+2. **need 侧**只登记**整串** id（`so:X@{A,B}`；裸 need 仍是 `so:X`）；
+3. **provider 侧**：裸 id `so:X` 永远登记；带符号版本的条目只登记**它整体满足的那些 need**
+   的 id（`so_spec_satisfies()` 逐个判）。
+
+于是"池里能匹配 ⟺ `so_spec_satisfies()` 成立"是**字面一致**，不是"两处写得一样"。
+代价与**真实出现的 distinct need 数**成正比 —— 今天全是裸 need ⇒ 预扫集合为空、
+provider 侧那段循环一次都不跑（零成本）。
+
+#### 索引/DB 侧的键
+
+- `Repository`：`soname_providers_` 仍以**规格串**为键（登记/注销用），另建一张派生表
+  `soname_specs_`（**裸 SONAME** → 候选规格，排序）；`find_soname_provider(need)` = 按裸名取
+  候选 → `so_spec_satisfies()` 过滤 → 逐包版本倒序取第一个。派生表在**整表加载完**与
+  **单包刷新后**重建（不在两处各维护一遍增量）。
+  ⚠️ 顺带修了两个既有缺陷：`load_index_from_file`/`load_index` 此前**漏清** `soname_providers_`
+  （重复加载会留下幽灵提供者）；`absorb_index_line` 路径不排序 ⇒ "取哪个提供者"依赖索引里的
+  书写顺序（现在派生索引统一排序）。
+- `Cache`：`provides_soname.db` 的行格式**不变**（`<规格串>	<包名,包名>`；包名不允许含 `,`）；
+  `soname_specs_by_name`（裸名 → 规格）按需重建（`soname_specs_dirty`）。
+  `get_soname_providers(need)` 的语义是"**谁满足这个需求**"（以前是"谁的键等于这个串"）。
+- `depend_scanner` / `revdep` / 安装期四个来源 / 移除阻止 / autoremove 全部走同一批入口，
+  不再有任何"整串相等"的 SONAME 判定。
+
+#### 已知边界（有意）
+
+- **farm 产出 + 基线归一**（2026-10-05）：farm 扫 ELF 的 `.gnu.version_d`（verdef，跳过 BASE 节点）/
+  `.gnu.version_r`（verneed）自动写出这两个字段，同时对这些字段做**基线归一**
+  （`so_bare()`：剥掉 `@…` 再比较/建索引）—— 不归一的话手写规格会被 `verify` 判成漂移、被
+  repack **静默涂掉**，`abi` 那一侧还会误报断裂。实测产出：glibc 的 `libc.so.6` 46 个 `GLIBC_*`、
+  gcc 的 `libgcc_s.so.1@{GCC_3.0,…}`、python 消费侧的 `libcrypto.so.3@{OPENSSL_3.0.0,3.3.0,3.4.0}`。
+- **系统库不校验符号版本**（`--use-system-soname`）：`Config::has_system_soname()` 查的是
+  `<root>/usr/lib/<名字>` 这个文件在不在，所以那里**只能传裸 SONAME** —— 传整串会去找一个带
+  `@` 的文件名、永远不存在（`installation_task.cpp` 里已写明）。
+
 ---
 
 ## 2. WAL 2.0 协议

@@ -41,6 +41,19 @@ pub struct Index {
     soname_index: HashMap<String, Vec<String>>,
 }
 
+/// 规格串 → **裸 SONAME**（`X@{A,B}` / `X@A` → `X`）。
+///
+/// farm 侧只做**基线归一**：它不判定符号版本语义（那是 lpkg 的判据，见 `base/so_spec.hpp`），
+/// 但**必须按裸名比较**。否则手写的 `X@{A}` 会被当成"与扫描结果 `X` 不同的 SONAME" ⇒
+/// `verify` 判漂移 ⇒ repack 把符号版本**静默涂掉**（`abi` 那一侧更糟：会误报 ABI 断裂并
+/// 触发传播重建）。
+pub fn so_bare(s: &str) -> &str {
+    match s.find('@') {
+        Some(i) => &s[..i],
+        None => s,
+    }
+}
+
 /// 是否为版本化 SONAME（ABI 面）：`libfoo.so.1`。
 /// 排除裸 dev 链接 `libfoo.so` 与虚拟提供（`rustc`、`golang` 等）。
 pub fn is_soname_versioned(s: &str) -> bool {
@@ -66,14 +79,16 @@ pub fn is_soname_versioned(s: &str) -> bool {
 /// 排除：
 /// - dev symlink（libfoo.so 指向 libfoo.so.1，同包必有版本化兄弟项）
 pub fn soname_provides_of(soname_list: &[String]) -> HashSet<String> {
-    let versioned: Vec<&String> = soname_list
+    // 形状判据只认**裸名**（`X@{A,B}` 的 `{A,B}` 里没有 `.so`，不剥掉会把它判成"非版本化"）
+    let versioned: Vec<&str> = soname_list
         .iter()
+        .map(|p| so_bare(p))
         .filter(|p| is_soname_versioned(p))
         .collect();
     soname_list
         .iter()
+        .map(|p| so_bare(p))
         .filter(|p| {
-            let p = p.as_str();
             if is_soname_versioned(p) {
                 return true;
             }
@@ -83,19 +98,46 @@ pub fn soname_provides_of(soname_list: &[String]) -> HashSet<String> {
                     .iter()
                     .any(|v| v.strip_prefix(bare).is_some_and(|r| r.starts_with(".so.")))
         })
-        .cloned()
+        .map(String::from)
         .collect()
 }
 
+/// 字段内的列表切分：**花括号感知**的逗号切分。
+///
+/// `provides_soname` / `needed_so` 的条目可以是 `libc.so.6@{GLIBC_2.40,GLIBC_2.39}`，
+/// 而花括号里的逗号**不是**字段分隔符。lpkg 侧的 `split_so_list()`（`base/so_spec.cpp`）
+/// 是同一条规则的 C++ 实现 —— 两边由 `main/scripts/check_index_conformance.py` 与 lpkg 的
+/// C++ 孪生测试同一份 fixture 钉住。改写这里之前先看那份 fixture。
+///
+/// 花括号不配对时退化成普通逗号切分（lpkg 的读入处会先把这种块整块跳过并告警，
+/// 所以 farm 这边只需要"有界、确定"即可）。
 fn split_field(field: Option<&str>) -> Vec<String> {
-    field
-        .map(|s| {
-            s.split(',')
-                .filter(|x| !x.is_empty())
-                .map(|x| x.to_string())
-                .collect()
-        })
-        .unwrap_or_default()
+    field.map(split_brace_aware).unwrap_or_default()
+}
+
+fn split_brace_aware(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut start = 0usize;
+    let mut depth: i32 = 0;
+    for (i, b) in s.bytes().enumerate() {
+        match b {
+            b'{' => depth += 1,
+            b'}' => depth = (depth - 1).max(0),
+            b',' if depth == 0 => {
+                let piece = s[start..i].trim();
+                if !piece.is_empty() {
+                    out.push(piece.to_string());
+                }
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    let tail = s[start..].trim();
+    if !tail.is_empty() {
+        out.push(tail.to_string());
+    }
+    out
 }
 
 impl Index {
@@ -141,11 +183,14 @@ impl Index {
     }
 
     pub fn from_packages(packages: HashMap<String, PkgInfo>) -> Index {
+        // 键是**裸 SONAME**（`so_bare`）：`X@{A,B}` 与 `X@A` 是同一个库的两个规格，
+        // 按原样串建表会让"消费者需要 X@A、提供者声明 X@{A,B}"查不到 provider。
+        // 原始规格串仍逐字保留在 `PkgInfo.provides_soname` 里（farm 只转录、不改写）。
         let mut soname_index: HashMap<String, Vec<String>> = HashMap::new();
         for info in packages.values() {
             for soname in &info.provides_soname {
                 soname_index
-                    .entry(soname.clone())
+                    .entry(so_bare(soname).to_string())
                     .or_default()
                     .push(info.name.clone());
             }
@@ -164,10 +209,11 @@ impl Index {
             .unwrap_or_default()
     }
 
-    /// needed_so 条目 → provider 包（供前向链接与校验）。按 **SONAME** 查（`provides_soname`）。
+    /// needed_so 条目 → provider 包（供前向链接与校验）。按**裸 SONAME** 查
+    /// （`provides_soname` 的基线归一形 —— 见 `so_bare()`）。
     pub fn providers_of(&self, soname: &str) -> &[String] {
         self.soname_index
-            .get(soname)
+            .get(so_bare(soname))
             .map(Vec::as_slice)
             .unwrap_or(&[])
     }
@@ -210,14 +256,21 @@ impl RevMap {
         let mut m: HashMap<String, Vec<String>> = HashMap::new();
         for info in index.packages.values() {
             for soname in &info.needed_so {
-                m.entry(soname.clone()).or_default().push(info.name.clone());
+                // 裸名（与 `soname_index` 同一套键，见 `so_bare()`）
+                m.entry(so_bare(soname).to_string())
+                    .or_default()
+                    .push(info.name.clone());
             }
         }
         RevMap(m)
     }
 
+    /// 需要某 SONAME 的包（**裸名**查，与 `RevMap::build` 的键一致）
     pub fn needers(&self, soname: &str) -> &[String] {
-        self.0.get(soname).map(Vec::as_slice).unwrap_or(&[])
+        self.0
+            .get(so_bare(soname))
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
     }
 }
 

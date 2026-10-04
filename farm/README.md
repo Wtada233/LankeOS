@@ -35,6 +35,7 @@
 
 ## 功能特性
 
+- **SONAME 规格（symbol version）** — `needed_so`/`provides_soname` 的条目可带 ELF 符号版本（`libc.so.6@GLIBC_2.40`、`libc.so.6@{GLIBC_2.40,GLIBC_2.39}`），语法与匹配语义归 lpkg（见 `lpkg/README.md` 的"SONAME 规格"一节）。farm **会从 ELF 的 `.gnu.version_d`/`.gnu.version_r` 产出**符号版本（写进 `needed_so`/`provides_soname`），同时按裸 SONAME 做基线归一（不会把已有的规格当漂移）。
 - **ABI 驱动增量构建** — 只构建配方版本与本地仓库不一致的包，或 ABI 断裂的受害者。用旧索引的 `needed_so`/`provides_soname` 计算 removed SONAME，直连受害者，不做树状闭包。
 - **容器隔离构建** — 所有构建在 fresh Docker 容器内进行，`--image` 必填，禁止主机构建污染宿主环境。
 - **确定性构建序** — 拓扑排序，同级按包名升序固定顺序，绝无随机（有回归测试保证）。

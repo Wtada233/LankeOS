@@ -22,6 +22,7 @@
 #include "archive.hpp"
 #include "base/constants.hpp"
 #include "base/exception.hpp"
+#include "base/so_spec.hpp"
 #include "base/utils.hpp"
 #include "config/config.hpp"
 #include "crypto/hash.hpp"
@@ -884,10 +885,14 @@ static bool removal_allowed(const std::string& pkg_name, bool force,
     if (refused(pkg_name)) return false;
     for (const auto& cap : cache.get_package_provides(pkg_name))
         if (refused(cap)) return false;
-    // **SONAME 归属同样算"它动了谁会坏"**：别的包的 needed_so 反向依赖挂在 SONAME 上，
-    // 漏了这一格 ⇒ 删掉一个导出 SONAME 的包不会被阻止（依赖它的包运行期炸）。
-    for (const auto& so : cache.get_package_provides_soname(pkg_name))
-        if (refused(so)) return false;
+    // ⚠️ **订正 2026-10-05**：这里原先还有一段 `for (so : get_package_provides_soname(pkg))
+    // if (refused(so)) ...`，注释写着"SONAME 归属同样算它动了谁会坏"。**它是死代码**：
+    // `reverse_deps` 的键只有两类 —— 依赖名/能力名（来自 `deps/`）与**提供者包名**（来自
+    // `needed_so/`，见 `Cache::ensure_reverse_deps`）。SONAME 字符串从来不是键，`refused(so)`
+    // 必然查空 ⇒ 恒返回 false。
+    // SONAME 那一路的保护**是真的**，只是走的是第一条 `refused(pkg_name)`：删包 P 时
+    // `get_reverse_deps(P)` 里就有"需要 P 导出的 SONAME 的包"（边由提供者**包名**建）。
+    // 删掉这段是为了别让下一个人以为"SONAME 的反向依赖挂在 SONAME 键上"。
     return true;
 }
 
@@ -1344,6 +1349,20 @@ std::map<std::string, std::string> metadata_view(const std::string& name,
         }
         return s;
     };
+    // SONAME 两个字段：排序后**再规范化**（`X@{B,A}` 与 `X@{A,B}` 是同一个规格，去重同理）。
+    // 不规范化的话，"归档写一种次序、索引写另一种"会被判成 `error.metadata_mismatch` 而拒装
+    // —— 一条纯书写次序差异造成的假拒绝（`{...}` 里的次序对语义没有任何影响）。
+    const auto canon_sonames = [](std::vector<std::string> v) {
+        for (auto& x : v) x = format_so_spec(parse_so_spec(x));
+        std::ranges::sort(v);
+        v.erase(std::unique(v.begin(), v.end()), v.end());
+        std::string s;
+        for (const auto& x : v) {
+            if (!s.empty()) s += ", ";
+            s += x;
+        }
+        return s;
+    };
     std::vector<std::string> dep_keys;
     dep_keys.reserve(deps.size());
     for (const auto& d : deps) {
@@ -1356,8 +1375,8 @@ std::map<std::string, std::string> metadata_view(const std::string& name,
         {"version", version},
         {"deps", join(std::move(dep_keys))},
         {"provides", join(provides)},
-        {"provides_soname", join(provides_soname)},
-        {"needed_so", join(needed_so)},
+        {"provides_soname", canon_sonames(provides_soname)},
+        {"needed_so", canon_sonames(needed_so)},
     };
 }
 

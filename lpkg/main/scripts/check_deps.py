@@ -18,6 +18,65 @@ import argparse
 from collections import defaultdict
 
 
+# ── SONAME 规格（symbol version）的 Python 侧镜像 ──────────────────────────────
+#
+# **必须与 C++ 侧 `base/so_spec.cpp` 的判据同语义**（那是唯一实现）：
+#   · `so_parse()`   ↔ `parse_so_spec()`：宽容解析（畸形 → 整串当裸 SONAME）；
+#   · `so_satisfies()` ↔ `so_spec_satisfies()`：**保守**包含（need 带符号版本时，provider
+#     必须也声明了符号版本且覆盖它；裸 provider 不算）。
+#
+# 两侧对着**同一组向量**各自断言（与 `dependency_name_of()` 同一套做法）：
+#   · C++   ：tests/unit/test_so_spec.cpp
+#   · Python：main/scripts/check_index_conformance.py 的 SO_SPEC_VECTORS
+# 改这里之前先看那两组向量 —— 它们就是"镜像没漂移"的证据。
+_SO_ASCII = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_.+-")
+
+
+def so_parse(spec):
+    """规格串 → (裸 SONAME, 符号版本集合)。合法写法见 lpkg/README.md 的"SONAME 规格"一节。"""
+    at = spec.find('@')
+    if at < 0:
+        return spec, frozenset()
+    name, ver = spec[:at], spec[at + 1:]
+
+    def sym_ok(tok):
+        return bool(tok) and all(c in _SO_ASCII for c in tok)
+
+    if not name or not ver:
+        return spec, frozenset()  # 畸形 → 整串当裸名（与 C++ 的宽容分支一致）
+    if ver.startswith('{'):
+        if len(ver) < 3 or not ver.endswith('}'):
+            return spec, frozenset()
+        inner = ver[1:-1]
+        if '{' in inner or '}' in inner:
+            return spec, frozenset()
+        toks = inner.split(',')
+        if not all(sym_ok(t) for t in toks):
+            return spec, frozenset()
+        return name, frozenset(toks)
+    if '{' in ver or '}' in ver or not sym_ok(ver):
+        return spec, frozenset()
+    return name, frozenset([ver])
+
+
+def so_bare(spec):
+    """规格串 → 裸 SONAME（按名建索引/查表用）。"""
+    return so_parse(spec)[0]
+
+
+def so_satisfies(provided, needed):
+    """provider 的声明是否满足 need（**保守**语义，与 C++ `so_spec_satisfies()` 逐条一致）。"""
+    p_name, p_syms = so_parse(provided)
+    n_name, n_syms = so_parse(needed)
+    if p_name != n_name:
+        return False
+    if not n_syms:
+        return True  # 裸需求：库在就行
+    if not p_syms:
+        return False  # 保守：provider 没声明符号版本 ⇒ 拿不出任何符号版本
+    return n_syms <= p_syms
+
+
 def dependency_name_of(line):
     """
     一行 `deps` 元数据 → 依赖**包名**（去掉版本约束）。
@@ -137,19 +196,22 @@ def main():
     print('=' * 60)
     print('2️⃣  SONAME 提供者检查')
     print('=' * 60)
+    # 按**裸 SONAME** 建表（`X@{A,B}` 与 `X@A` 是同一个库的两个规格），
+    # 再用保守包含判据筛 —— 自己精确查表会把"声明了符号版本"判成"无提供者"。
     pmap = {}
     for name, info in packages.items():
         if 'error' in info:
             continue
         for p in info['provides_soname']:
-            pmap.setdefault(p, set()).add(name)
+            pmap.setdefault(so_bare(p), []).append((p, name))
 
     missing_so = []
     for name, info in sorted(packages.items()):
         if 'error' in info:
             continue
         for sn in info['needed_so']:
-            if not pmap.get(sn):
+            cands = pmap.get(so_bare(sn), [])
+            if not any(so_satisfies(spec, sn) for spec, _owner in cands):
                 missing_so.append((name, sn, info['lpkg']))
 
     if missing_so:

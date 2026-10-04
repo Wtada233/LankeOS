@@ -1171,3 +1171,115 @@ TEST_F(NeededSoTest, DependencyCheckIsSilentOnSuccess)
         << "依赖一致性检查成功时必须静默（它是校验，不是解析的一步）：\n"
         << out;
 }
+
+// ============================================================================
+// SONAME 规格（symbol version）：`libfoo.so.6@GLIBC_2.40` / `@{GLIBC_2.40,GLIBC_2.39}`
+// ============================================================================
+//
+// 语义（维护者拍板的**保守**版本，唯一判据是 `base/so_spec.cpp` 的 `so_spec_satisfies()`）：
+//   · need 带符号版本 ⇒ provider **必须也声明**且覆盖它；
+//   · need 裸 ⇒ 任何声明了该 SONAME 的包都算（符号版本是附加信息）；
+//   · provider 声明带版本时，**裸需求照旧被满足**（它同样登记裸能力）。
+// 下面四条把这张表在**端到端**上钉死；单测矩阵在 `tests/unit/test_so_spec.cpp`。
+
+// ① provider 声明了符号版本、need 要其中一个 → 装得上
+TEST_F(NeededSoTest, SymbolVersionNeedIsSatisfiedByProviderDeclaringIt)
+{
+    create_pkg("libsv", "1.0", {}, {}, {"libsv.so.1@{SYMV_A,SYMV_B}"});
+    create_pkg("svapp", "1.0", {}, {}, {}, {"libsv.so.1@SYMV_A"});
+    update_index({
+        {"svapp", "1.0", "", "", "", "libsv.so.1@SYMV_A"},
+        {"libsv", "1.0", "", "", "libsv.so.1@{SYMV_A,SYMV_B}", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"svapp"}));
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("svapp"));
+    EXPECT_TRUE(Cache::instance().is_installed("libsv"));
+    // 归属表里存的仍是**原样规格串**（不展开、不改写用户写法）
+    EXPECT_TRUE(Cache::instance().get_package_provides_soname("libsv").contains(
+        "libsv.so.1@{SYMV_A,SYMV_B}"));
+}
+
+// ② provider 拿不出那个符号版本 → 拒绝，且报错**点名**那条 need
+TEST_F(NeededSoTest, MissingSymbolVersionIsRefused)
+{
+    create_pkg("libsv2", "1.0", {}, {}, {"libsv2.so.1@{SYMV_A}"});
+    create_pkg("svapp2", "1.0", {}, {}, {}, {"libsv2.so.1@SYMV_C"});
+    update_index({
+        {"svapp2", "1.0", "", "", "", "libsv2.so.1@SYMV_C"},
+        {"libsv2", "1.0", "", "", "libsv2.so.1@{SYMV_A}", ""},
+    });
+
+    try {
+        install_packages({"svapp2"});
+        FAIL() << "provider 只声明了 SYMV_A，装不出 SYMV_C —— 必须拒绝";
+    } catch (const LpkgException& e) {
+        const std::string msg = e.what();
+        EXPECT_NE(msg.find("libsv2.so.1@SYMV_C"), std::string::npos)
+            << "报错必须点名那条需要：" << msg;
+    }
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("svapp2"));
+    EXPECT_FALSE(Cache::instance().is_installed("libsv2"));
+}
+
+// ③ 裸 need 仍被"声明了符号版本"的 provider 满足（库在就行）
+TEST_F(NeededSoTest, BareNeedIsSatisfiedBySymbolVersionedProvider)
+{
+    create_pkg("libsv3", "1.0", {}, {}, {"libsv3.so.1@{SYMV_A,SYMV_B}"});
+    create_pkg("svapp3", "1.0", {}, {}, {}, {"libsv3.so.1"});
+    update_index({
+        {"svapp3", "1.0", "", "", "", "libsv3.so.1"},
+        {"libsv3", "1.0", "", "", "libsv3.so.1@{SYMV_A,SYMV_B}", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"svapp3"}))
+        << "provider 声明得更细不该把裸 need 打破（它同时提供裸 SONAME）";
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("svapp3"));
+}
+
+// ④ **保守语义的端到端钉子**：只声明裸 SONAME 的 provider 满足不了带符号版本的 need。
+//    缺了这条，整个特性可以在"裸 provider 一律放行"下静默失效而不被察觉。
+TEST_F(NeededSoTest, NeededSymbolVersionIsNotSatisfiedByBareProvider)
+{
+    create_pkg("libsv4", "1.0", {}, {}, {"libsv4.so.1"});
+    create_pkg("svapp4", "1.0", {}, {}, {}, {"libsv4.so.1@SYMV_A"});
+    update_index({
+        {"svapp4", "1.0", "", "", "", "libsv4.so.1@SYMV_A"},
+        {"libsv4", "1.0", "", "", "libsv4.so.1", ""},
+    });
+
+    try {
+        install_packages({"svapp4"});
+        FAIL() << "provider 只声明裸 SONAME、没声明任何符号版本 —— 保守语义下必须拒绝";
+    } catch (const LpkgException& e) {
+        EXPECT_NE(std::string(e.what()).find("libsv4.so.1@SYMV_A"), std::string::npos)
+            << "报错必须点名：" << e.what();
+    }
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("svapp4"));
+}
+
+// ⑤ 反向依赖按**包含判据**建：移除"导出符号版本"的 provider 会被依赖它的包拦住
+TEST_F(NeededSoTest, SymbolVersionedReverseDepBlocksRemoval)
+{
+    create_pkg("libsv5", "1.0", {}, {}, {"libsv5.so.1@{SYMV_A,SYMV_B}"});
+    create_pkg("svapp5", "1.0", {}, {}, {}, {"libsv5.so.1@SYMV_B"});
+    update_index({
+        {"svapp5", "1.0", "", "", "", "libsv5.so.1@SYMV_B"},
+        {"libsv5", "1.0", "", "", "libsv5.so.1@{SYMV_A,SYMV_B}", ""},
+    });
+
+    EXPECT_NO_THROW(install_packages({"libsv5"}));
+    Cache::instance().load();
+    EXPECT_NO_THROW(install_packages({"svapp5"}));
+    Cache::instance().load();
+    ASSERT_TRUE(Cache::instance().is_installed("svapp5"));
+    EXPECT_TRUE(Cache::instance().get_reverse_deps("libsv5").contains("svapp5"))
+        << "带符号版本的 need 必须把反向依赖边建到 provider **包名**上（否则移除不会被阻止）";
+
+    remove_package("libsv5", /*force=*/false);
+    EXPECT_TRUE(Cache::instance().is_installed("libsv5")) << "移除必须被反向依赖阻止";
+}

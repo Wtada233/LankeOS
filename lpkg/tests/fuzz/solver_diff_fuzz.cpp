@@ -18,8 +18,10 @@
 //     等价性判据**全部复用生产函数**：版本约束用 `version_satisfies_all`（它同时是求解器
 //     与安装期验收共用的那一个）—— 本 harness **一行版本比较都不自己写**。
 //     满足关系照 8.0.0 的两套**隔离命名空间**建模（字段显式分开，不再靠字符串形状猜）：
-//       · `needed_so: X` → 走 `so:` 空间 ⇒ **只**能被 `provides_soname` 里的 X 满足
-//         （包名与虚拟 provides 都够不着它）；
+//       · `needed_so: X` → 走 `so:` 空间 ⇒ **只**能被 `provides_soname` 满足
+//         （包名与虚拟 provides 都够不着它）。带符号版本（`X@V` / `X@{V1,V2}`）时按**保守**
+//         语义：只有"也声明了符号版本且覆盖它"的 provider 才算 —— 判据直接用生产的
+//         `so_spec_satisfies()`；
 //       · `deps: X` → 走裸名空间 ⇒ 匹配**包名**（自提供 `name = evr`，须满足版本约束）
 //         或**虚拟 provides**（不带版本 ⇒ 通配任何约束）。
 //     ⚠️ **目标包被钉在"最新版"**：本 harness 传的 target 是 `(name, "latest")`，而 lpkg 的
@@ -44,7 +46,8 @@
 // ── 输入语法（每行一条，`-` 表示空表）────────────────────────────────────────
 //   T <target-name>                                      （目标，≤ kMaxPkgs 个）
 //   P <name> <ver> <provides> <provides_soname> <needed_so> <deps>
-//     六个字段以空格分隔；`provides`/`provides_soname`/`needed_so`/`deps` 是逗号分隔表。
+//     六个字段以空格分隔；`provides`/`provides_soname`/`needed_so`/`deps` 是 **`;` 分隔**的
+//     表（`-` = 空表）。**不能用逗号**：`X@{A,B}` 里的逗号属于符号版本列表。
 //
 // ── 求解器对输入的前提（本 harness **逐条过滤**；这几条都是**实测撞出来的**，不是预防）────
 // 求解器内部全走 libsolv 的池，而池里的名字/版本都是 **C 串**（8.0.0 起版本**原样**进池，
@@ -65,6 +68,7 @@
 #include <vector>
 
 #include "base/constants.hpp"
+#include "base/so_spec.hpp"
 #include "fuzz_common.hpp"
 #include "pkg/solver.hpp"
 #include "vercmp/dep_parser.hpp"
@@ -86,19 +90,23 @@ void report_outcomes()
                  g_unsatisfiable);
 }
 
-/// 逗号分隔（`-` 表示空表）
+/// 表项分隔符 = **`;`**（`-` 表示空表）。
+///
+/// ⚠️ **不能用逗号**：`provides_soname` / `needed_so` 的条目现在可以是
+/// `libc.so.6@{GLIBC_2.40,GLIBC_2.39}` —— 花括号里的逗号不是分隔符（索引那边用
+/// 花括号感知切分解决同一个冲突，这里换成 `;` 最省事，也让输入本身没有歧义）。
 std::vector<std::string> split_tokens(std::string_view s)
 {
     std::vector<std::string> out;
     if (s == "-") return out;
     std::size_t start = 0;
     while (start <= s.size() && out.size() < kMaxTokens) {
-        const auto comma = s.find(',', start);
+        const auto sep = s.find(';', start);
         const std::string_view piece =
-            (comma == std::string_view::npos) ? s.substr(start) : s.substr(start, comma - start);
+            (sep == std::string_view::npos) ? s.substr(start) : s.substr(start, sep - start);
         if (!piece.empty()) out.emplace_back(piece);
-        if (comma == std::string_view::npos) break;
-        start = comma + 1;
+        if (sep == std::string_view::npos) break;
+        start = sep + 1;
     }
     return out;
 }
@@ -136,11 +144,16 @@ bool provides_capability(const PackageInfo& q, const std::string& cap)
     return provides_virtual(q, cap);
 }
 
-/// 这个包是否**导出**了 SONAME `so`（`so:` 空间）？`needed_so` 的需求**只**能由它满足。
-bool provides_soname_of(const PackageInfo& q, const std::string& so)
+/// 这个包是否满足了 SONAME 需求 `need`？
+///
+/// ⚠️ **必须调生产的 `so_spec_satisfies()`**（`base/so_spec.hpp`）—— 池里的注册就是从它
+/// 派生的（`solver.cpp::add_provides_soname`：provider 只登记它**整体**满足的那些 need 的 id）。
+/// 在这里自己写第二份判据（例如"整串相等"或"逐符号匹配"）就是本 harness 反复吃过的那种
+/// 假分叉：**同族判据只推了一条分支**。
+bool provides_soname_of(const PackageInfo& q, const std::string& need)
 {
     for (const auto& s : q.provides_soname) {
-        if (s == so) return true;
+        if (so_spec_satisfies(s, need)) return true;
     }
     return false;
 }

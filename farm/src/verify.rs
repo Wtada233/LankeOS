@@ -10,6 +10,7 @@
 //! **`deps` 不参与比较**：deps 由 gen_deps/deprules 规则生成，farm 不扫不比（repack.rs 同
 //! 契约"deps 不读不改"）。`ScanResult.deps` 保留以表达扫描输出形状，但 decide 不读它。
 
+use crate::graph::so_bare;
 use std::collections::HashSet;
 
 /// 构建后扫描结果 / 期望元数据 —— **全库唯一来源**。
@@ -96,8 +97,14 @@ pub enum VerifyAction {
 /// 决策：实际扫描 vs 期望 metadata。
 /// provides_soname 漂移优先（ABI 面变化是最高信号）。deps/provides 不比较（见模块头注释）。
 pub fn decide(actual: &ScanResult, meta: &ScanResult) -> VerifyAction {
-    let needed_drift = sorted(&actual.needed_so) != sorted(&meta.needed_so);
-    let provides_drift = set(&actual.provides_soname) != set(&meta.provides_soname);
+    // ⚠️ 比较走**裸 SONAME**（`graph::so_bare`）：扫描侧只会产出裸名，而 metadata 里可能是
+    // 手写的 `X@{A,B}` —— 逐字比较会把"声明了符号版本"判成漂移，repack 随即把符号版本
+    // **静默涂掉**。farm 不做符号版本语义（那是 lpkg 的判据），只做基线归一。
+    let need_bare =
+        |v: &[String]| -> Vec<String> { v.iter().map(|x| so_bare(x).to_string()).collect() };
+    let needed_drift = sorted(&need_bare(&actual.needed_so)) != sorted(&need_bare(&meta.needed_so));
+    let provides_drift =
+        set(&need_bare(&actual.provides_soname)) != set(&need_bare(&meta.provides_soname));
     if provides_drift {
         VerifyAction::AbiBreak
     } else if needed_drift {
@@ -119,3 +126,36 @@ fn set(v: &[String]) -> HashSet<&str> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod symbol_version_tests {
+    use super::*;
+
+    /// **基线归一**（符号版本）：扫描侧只有裸名，metadata 里可能手写着规格 ——
+    /// 这不算漂移（否则 repack 会把符号版本涂掉）。
+    #[test]
+    fn hand_written_specs_are_not_seen_as_drift() {
+        let actual = ScanResult {
+            needed_so: vec!["libc.so.6".into(), "libm.so.6".into()],
+            provides_soname: vec!["libx.so.1".into()],
+            ..Default::default()
+        };
+        let meta = ScanResult {
+            needed_so: vec!["libc.so.6@GLIBC_2.40".into(), "libm.so.6".into()],
+            provides_soname: vec!["libx.so.1@{LIBX_1.0,LIBX_1.1}".into()],
+            ..Default::default()
+        };
+        assert_eq!(decide(&actual, &meta), VerifyAction::Unchanged);
+
+        // 对照：**真的**换了 SONAME 仍必须被发现（归一不能把真信号一起吃掉）
+        let mut broken = meta.clone();
+        broken.provides_soname = vec!["libx.so.2".into()];
+        assert_eq!(decide(&actual, &broken), VerifyAction::AbiBreak);
+        let mut drift = meta.clone();
+        drift.needed_so = vec!["libz.so.1".into()];
+        assert_eq!(
+            decide(&actual, &drift),
+            VerifyAction::Repack { needed_drift: true }
+        );
+    }
+}

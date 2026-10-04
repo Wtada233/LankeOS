@@ -1,0 +1,3 @@
+P gprov 1.0 - libc.so.6@{GLIBC_2.40,GLIBC_2.39} -
+P gcons 1.0 - - libc.so.6@GLIBC_2.40 -
+T gcons

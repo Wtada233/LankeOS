@@ -41,7 +41,9 @@ constexpr const char* kFixture =
     "foo|1.0:aaaa:dep1,dep2:libssl:libfoo.so.1:libc.so.6|\n"  // 常规：6 字段齐全
     "bar|2.0:bbbb:::libbar.so.2:|\n"                          // 各字段可为空
     "multi|1.0:aaaa:::libm.so.1:;2.0:bbbb::::libm.so.2|\n"    // 版本块间 `;`，共享包名
-    "qux|4.0\n";  // 字段数不是 6 → 整块跳过（不做兼容读取）
+    "qux|4.0\n"  // 字段数不是 6 → 整块跳过（不做兼容读取）
+    // SONAME 规格：花括号里的逗号**不是**字段分隔符（两侧都必须原样保留）
+    "ver|3.0:cccc:::libc.so.6@{GLIBC_2.40,GLIBC_2.39}:libm.so.6@GLIBC_2.2.5|\n";
 
 struct Fields {
     std::string sha256, deps, provides, provides_soname, needed_so;
@@ -55,6 +57,8 @@ const std::map<std::string, std::map<std::string, Fields>>& expected()
         {"bar", {{"2.0", {"bbbb", "", "", "libbar.so.2", ""}}}},
         {"multi",
          {{"1.0", {"aaaa", "", "", "libm.so.1", ""}}, {"2.0", {"bbbb", "", "", "", "libm.so.2"}}}},
+        {"ver",
+         {{"3.0", {"cccc", "", "", "libc.so.6@{GLIBC_2.40,GLIBC_2.39}", "libm.so.6@GLIBC_2.2.5"}}}},
     };
     return kExpected;
 }

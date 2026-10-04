@@ -32,6 +32,14 @@ inline constexpr char COMMA_CHAR = ',';
 inline constexpr char COLON_CHAR = ':';
 inline constexpr char SEMICOLON_CHAR = ';';
 
+// SONAME 规格（symbol version）的元字符 —— 见 `base/so_spec.hpp`：
+//   `libc.so.6`（裸）、`libc.so.6@GLIBC_2.40`（单）、`libc.so.6@{GLIBC_2.40,GLIBC_2.39}`（多）
+// ⚠️ 花括号里的逗号与 `COMMA_CHAR`（索引字段内的列表分隔符）是**同一个字符** ⇒ 切分必须
+// 花括号感知（`split_so_list`）。这两个字段**不许含空白**，为的是保住"索引行零空白"。
+inline constexpr char SO_SYMBOL_SEP = '@';
+inline constexpr char SO_BRACE_OPEN = '{';
+inline constexpr char SO_BRACE_CLOSE = '}';
+
 // 包元数据 JSON 键名
 inline constexpr std::string_view J_NAME = "name";
 inline constexpr std::string_view J_VERSION = "version";

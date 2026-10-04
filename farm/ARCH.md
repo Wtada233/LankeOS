@@ -70,6 +70,22 @@ src/
 farm 只扫/比 `needed_so` + `provides_soname`（`build/repo.rs` 规则 3：`deps`/`provides` 不读不改；`deps` 不参与构建序、`build_deps` **无条件参与**（仅限本轮 targets 内）——见 §4）。
 
 > 字段次序全仓统一：**`deps, provides, provides_soname, needed_so`**。
+> **SONAME 规格（symbol version）**：这两个字段的条目可以带 ELF 符号版本
+> （`libc.so.6@GLIBC_2.40` / `libc.so.6@{GLIBC_2.40,GLIBC_2.39}`，**语法与语义归 lpkg**，
+> 见 `lpkg/ARCH.md` §1.9）。farm 侧**只做基线归一**：`graph::so_bare()` 剥掉 `@…` 之后才建
+> 索引/查表/比较 —— 因为扫描只会产出裸名，而 metadata 里可能是手写的规格；逐字比较会把
+> "声明了符号版本"判成漂移（`verify` 会 repack 把它涂掉，`abi` 会误报断裂并触发传播重建）。
+> farm **会产出**符号版本（2026-10-05 起）：`scan.rs` 读每个 ELF 的 `.gnu.version_d`（verdef：
+> 本库定义哪些版本，**跳过 BASE 节点**）与 `.gnu.version_r`（verneed：从哪个库需要哪些版本），
+> 汇总成规格串写进 `needed_so`/`provides_soname`。⚠️ `Verneed::vn_file` 是 **dynstr 偏移**不是
+> 字符串（实测踩过：直接 `to_string()` 得到 `{"11": …}`，随后被 provider 过滤成静默的空版本需求）。
+> 版本名先过字符集闸（`[A-Za-z0-9_.+-]`）——**扫出来的东西必须能被 lpkg 接受**（lpkg 对非法规格
+> 是"索引里整块跳过 / 元数据里拒装"），宁可少声明也不写它不认的串。
+> 实测（2026-10-05，真实 `out/pre-8.0.0` 产物）：glibc 的 `libc.so.6` 46 个 `GLIBC_*`、
+> gcc 的 `libgcc_s.so.1@{GCC_3.0,…}`、Qt 的 `libQt6Core.so.6@{NonQt,Qt_6,…,Qt_6_PRIVATE_API}`；
+> 消费侧 python 得到 `libcrypto.so.3@{OPENSSL_3.0.0,OPENSSL_3.3.0,OPENSSL_3.4.0}` /
+> `liblzma.so.5@XZ_5.0`（单版本不加花括号）、bash 得到 `libc.so.6@{…}`。
+> 原始规格串（来自 metadata 的写法）逐字保留、不改写。
 > 历史：`provides` 与 SONAME 原是同一条目——两处全量覆写（`update_lankebuild_metadata` / `repack_with_metadata`）把扫描结果直接盖上手写值，于是**虚拟 provider 永远存不下来**（真实仓库 861 个包的 `provides` 曾 100% 是 SONAME）。拆分后扫描只写 `needed_so`/`provides_soname`，`provides` 原样保留。
 
 ## 4. build 调度（run_build）

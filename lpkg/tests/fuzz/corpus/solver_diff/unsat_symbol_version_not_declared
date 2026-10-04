@@ -1,0 +1,3 @@
+P bprov 1.0 - libc.so.6 -
+P bcons 1.0 - - libc.so.6@GLIBC_2.40 -
+T bcons

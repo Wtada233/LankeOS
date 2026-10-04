@@ -14,6 +14,7 @@
 #include "config.hpp"
 #include "exception.hpp"
 #include "localization.hpp"
+#include "so_spec.hpp"
 #include "transaction_log.hpp"
 #include "utils.hpp"
 #include "vercmp/dep_parser.hpp"  // detail::dependency_name_of（`deps/` 行 → 包名，唯一实现）
@@ -341,6 +342,7 @@ void Cache::add_soname_provider(std::string_view soname, std::string_view pkg)
 {
     std::lock_guard<std::mutex> lock(mtx);
     provides_soname[std::string(soname)].insert(std::string(pkg));
+    soname_specs_dirty = true;
     dirty = true;
 }
 
@@ -351,15 +353,42 @@ void Cache::remove_soname_provider(std::string_view soname, std::string_view pkg
     if (it != provides_soname.end()) {
         it->second.erase(std::string(pkg));
         if (it->second.empty()) provides_soname.erase(it);
+        soname_specs_dirty = true;
         dirty = true;
     }
 }
 
-std::unordered_set<std::string> Cache::get_soname_providers(std::string_view soname)
+void Cache::ensure_soname_spec_index_locked()
+{
+    if (!soname_specs_dirty) return;
+    soname_specs_by_name.clear();
+    for (const auto& [spec, pkgs] : provides_soname) {
+        if (pkgs.empty()) continue;
+        soname_specs_by_name[so_spec_key(spec)].push_back(spec);
+    }
+    for (auto& [bare, specs] : soname_specs_by_name) std::ranges::sort(specs);
+    soname_specs_dirty = false;
+}
+
+std::unordered_set<std::string> Cache::get_soname_providers_locked(std::string_view need)
+{
+    ensure_soname_spec_index_locked();
+    std::unordered_set<std::string> out;
+    const auto cands = soname_specs_by_name.find(so_spec_key(need));
+    if (cands == soname_specs_by_name.end()) return out;
+    for (const auto& spec : cands->second) {
+        if (!so_spec_satisfies(spec, need)) continue;
+        const auto it = provides_soname.find(spec);
+        if (it == provides_soname.end()) continue;
+        out.insert(it->second.begin(), it->second.end());
+    }
+    return out;
+}
+
+std::unordered_set<std::string> Cache::get_soname_providers(std::string_view need)
 {
     std::lock_guard<std::mutex> lock(mtx);
-    auto it = provides_soname.find(soname);
-    return (it != provides_soname.end()) ? it->second : std::unordered_set<std::string>{};
+    return get_soname_providers_locked(need);
 }
 
 void Cache::remove_provider(std::string_view capability, std::string_view pkg)
@@ -471,6 +500,7 @@ void Cache::load(bool tolerate_missing_set_files)
     file_db = read_db_uncached(Config::instance().files_db());
     providers = read_db_uncached(Config::instance().provides_db());
     provides_soname = read_db_uncached(Config::instance().provides_soname_db());
+    soname_specs_dirty = true;  // 整表换了：派生索引按需重建（见 ensure_soname_spec_index_locked）
     // 老 DB（本特性之前装的包）没有这个文件 → 空表。**这不是错误**：升级时拿不到
     // hash_orig 的路径按"三者互异"保守处理（保留原文件 + .lpkgnew），与老行为一致。
     conf_hashes = read_db_uncached(Config::instance().conf_hashes_db());
@@ -562,9 +592,10 @@ void Cache::ensure_reverse_deps()
                 // **查 SONAME 归属表**（不是虚拟 provider 表）：8.0.0 拆分后 SONAME 不再
                 // 存在 `providers` 里，查错表会让"纯 SONAME 链路"的反向依赖整条失效
                 // （移除阻止 / autoremove 会把 provider 当孤儿删掉）。
-                auto prov_it = provides_soname.find(so);
-                if (prov_it == provides_soname.end()) continue;
-                for (const auto& prov : prov_it->second)
+                // 走**同一份**查询（含符号版本的包含谓词），不要再自己精确查表：
+                // `needed_so` 里可能写着 `X@V` / `X@{V1,V2}`，精确查表会让整条边消失
+                // （移除阻止 / autoremove 都会因此判错）。
+                for (const auto& prov : get_soname_providers_locked(so))
                     if (prov != pkg_name) reverse_deps[prov].insert(pkg_name);  // 不自引用
             }
         }

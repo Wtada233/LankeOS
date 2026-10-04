@@ -34,7 +34,7 @@
 ## 功能特性
 
 -   **全生命周期管理**：安装、卸载、升级、重装软件包。
--   **needed_so 依赖校验**：安装前自动验证每个 ELF DT_NEEDED 声明的 SONAME 在仓库中有对应的提供者包，无提供者则拒绝安装，杜绝"空 provides 还能装"的漏洞。
+-   **needed_so 依赖校验 + 符号版本**：安装前自动验证每个 ELF DT_NEEDED 声明的 SONAME 在仓库中有对应的提供者包，无提供者则拒绝安装，杜绝"空 provides 还能装"的漏洞。SONAME 可带 **ELF 符号版本**（`libc.so.6@GLIBC_2.40` 或 `libc.so.6@{GLIBC_2.40,GLIBC_2.39}`）：**带符号版本的需求只能被同样声明了它、且覆盖它的提供者满足**（保守语义 —— 只写裸 SONAME 的包不算数），用于抓"新二进制要求新 glibc 符号版本"这类光看 SONAME 看不见的 ABI 断裂。
 -   **SIGINT 优雅退出**：Ctrl+C 设置优雅退出标志，当前操作（含必要回滚）完整执行完毕后退出，防止事务中断导致系统不一致。不提供强制终止——确保回滚永不被打断。
 -   **rpm 版本语义**：版本串就是 rpm 的 `[epoch:]version[-release]`，判据只有一份（libsolv 的 EVR 比较）—— 支持多位修订号（`6.16.1 > 6.6.1`）、预发布（`1.0~rc1 < 1.0`）、发行修订号（`1.0-1 > 1.0`）与复合区间约束（`>= 2.0.0 < 3.0.0`）。
 -   **聚合索引**：采用 `index.txt` 聚合格式，一行即可记录包的所有版本及各自的哈希、依赖、provides、provides_soname、needed_so。
@@ -158,8 +158,8 @@ hooks/                # 钩子脚本（可选）
 | `version` | 版本号 |
 | `deps` | 依赖包名列表（无版本约束，由构建农场扫描 needed_so 自动解析生成） |
 | `provides` | 本包提供的**虚拟能力**列表（如 `java-runtime`；与 `.so` 无关） |
-| `provides_soname` | 本包**导出**的 SONAME 列表（由构建农场扫描产物 ELF 生成） |
-| `needed_so` | 本包 ELF 文件声明的 DT_NEEDED SONAME 列表（运行时依赖的原始真相） |
+| `provides_soname` | 本包**导出**的 SONAME 列表（由构建农场扫描产物 ELF 生成；可带符号版本，见下） |
+| `needed_so` | 本包 ELF 文件声明的 DT_NEEDED SONAME 列表（运行时依赖的原始真相；可带符号版本） |
 | `man` | 内联手册页内容（可选） |
 
 `content/` 目录下的文件布局直接对应目标根目录（`/`）。
@@ -205,7 +205,7 @@ MAKEFLAGS="-j$(nproc)"                          # $(nproc) 自动展开为逻辑
 ### 目录结构
 ```text
 /x86_64
-  ├── index.txt           # 核心索引：包名|版本:哈希:依赖:提供:needed_so;...|
+  ├── index.txt           # 核心索引：包名|版本:哈希:依赖:provides:provides_soname:needed_so;...|
   └── bash/
       ├── 5.3.lpkg        # 实际的 tar.zst 压缩包
       └── 5.4.lpkg
@@ -216,6 +216,21 @@ MAKEFLAGS="-j$(nproc)"                          # $(nproc) 自动展开为逻辑
 # 版本块恰好 6 个冒号字段：版本:哈希:依赖:provides:provides_soname:needed_so
 curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash::libcurl.so.4:libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1|
 ```
+
+### SONAME 规格（symbol version）
+```text
+libc.so.6                        # 裸 SONAME（不声明符号版本）
+libc.so.6@GLIBC_2.40             # 单个符号版本
+libc.so.6@{GLIBC_2.40,GLIBC_2.39} # 多个（符号名字符集 [A-Za-z0-9_.+-]；**规格里不许有空白**）
+```
+- **匹配（保守）**：带符号版本的需求**只能**被"也声明了符号版本、且覆盖它"的提供者满足；
+  只声明裸 `libc.so.6` 的提供者**不算**（否则这个特性形同虚设）。裸需求照旧 —— 任何声明了该
+  SONAME 的提供者都算，声明得更细不会把裸需求打破。
+- **存储**：`metadata.json` 与 `index.txt` 里**原样保留** `{}` 写法（不展开）；只有灌 libsolv
+  时才展开成池里的能力。索引字段里的列表分隔符**仍是逗号** —— 切分是**花括号感知**的
+  （花括号内的逗号不是分隔符）。
+- **谁产出**：**构建农场自动产出**（扫 ELF 的 `.gnu.version_d` / `.gnu.version_r`），也可手写；
+  farm 同时按裸 SONAME 做基线归一，不会把已有的规格当漂移抹掉。
 
 ## 源码架构
 

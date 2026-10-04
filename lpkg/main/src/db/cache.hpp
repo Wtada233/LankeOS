@@ -130,8 +130,15 @@ public:
     void add_soname_provider(std::string_view soname, std::string_view pkg);
     /** 移除 SONAME 归属 */
     void remove_soname_provider(std::string_view soname, std::string_view pkg);
-    /** 谁提供了这个 SONAME */
-    std::unordered_set<std::string> get_soname_providers(std::string_view soname);
+    /**
+     * 谁**满足**这个 SONAME 需求。
+     *
+     * ⚠️ 参数是**需求串**（`X` / `X@V` / `X@{V1,V2}`，即 `needed_so` 里的写法），不是
+     * "某条 provides_soname 声明的原样串"：判定走唯一的 `so_spec_satisfies()`（**保守**：
+     * 带符号版本的需求只有"也声明了符号版本且覆盖它"的提供者才算数）。
+     * 传裸 `X` 时行为与 8.0.0 之前一致 —— 任何声明了 `X…` 的包都算提供者。
+     */
+    std::unordered_set<std::string> get_soname_providers(std::string_view need);
 
     /** 添加反向依赖记录 */
     void add_reverse_dep(std::string_view dep, std::string_view pkg);
@@ -190,8 +197,13 @@ private:
     std::map<std::string, std::unordered_set<std::string>, std::less<>> xattr_keys;
     // providers 数据库（**虚拟能力** -> 包名集合）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> providers;
-    // SONAME 归属数据库（**SONAME** -> 包名集合）
+    // SONAME 归属数据库（**规格串** -> 包名集合；规格串原样存用户写法：`X` / `X@V` / `X@{V1,V2}`）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> provides_soname;
+    // 上面那张表的**派生索引**：裸 SONAME（`so_spec_key()`）-> 该库的候选规格串（已排序）。
+    // 按需重建（`soname_specs_dirty`）：它只有两种变更来源（整表加载 / 加删一条），
+    // 重建一次是 O(#规格)，比在两个地方各维护一遍"该增该删"便宜且不会漂移。
+    std::map<std::string, std::vector<std::string>, std::less<>> soname_specs_by_name;
+    bool soname_specs_dirty = true;
     // 已安装包（包名 -> 版本）
     std::map<std::string, std::string, std::less<>> installed_pkgs;
     // 锁定包名集合
@@ -225,6 +237,11 @@ public:
     void write_providers();
     /** 直接写入 SONAME 归属数据库 */
     void write_provides_soname();
+
+    /// 重建 SONAME 派生索引（**调用方必须已持 `mtx`**）。
+    void ensure_soname_spec_index_locked();
+    /// `get_soname_providers()` 的**持锁版本**（`ensure_reverse_deps` 在锁内要用）。
+    std::unordered_set<std::string> get_soname_providers_locked(std::string_view need);
 
     /** 从 installed_pkgs 构建 set 格式数据 */
     std::unordered_set<std::string> build_pkgs_set() const;
