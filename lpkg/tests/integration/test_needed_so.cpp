@@ -1283,3 +1283,40 @@ TEST_F(NeededSoTest, SymbolVersionedReverseDepBlocksRemoval)
     remove_package("libsv5", /*force=*/false);
     EXPECT_TRUE(Cache::instance().is_installed("libsv5")) << "移除必须被反向依赖阻止";
 }
+
+// ⑥ **部分覆盖必须拒绝**（provider ⊂ need 的非对称格子）：提供者只声明 `{2.40}`，而需求要
+//    `{2.40,2.39}` —— 缺一个就不算满足。这条格子最容易写错（写成"任一个满足即放行"就漏），
+//    所以配一条**正面对照**（同样两个符号都声明 ⇒ 放行），两条一起才有区分力。
+TEST_F(NeededSoTest, PartiallyCoveringProviderIsRefusedAndFullCoverageIsAccepted)
+{
+    // 反面：provider 只声明 GLIBC_2.40
+    create_pkg("libc", "1.0", {}, {}, {"libc.so.6@{GLIBC_2.40}"});
+    create_pkg("liba", "1.0", {}, {}, {}, {"libc.so.6@{GLIBC_2.40,GLIBC_2.39}"});
+    update_index({
+        {"liba", "1.0", "", "", "", "libc.so.6@{GLIBC_2.40,GLIBC_2.39}"},
+        {"libc", "1.0", "", "", "libc.so.6@{GLIBC_2.40}", ""},
+    });
+    try {
+        install_packages({"liba"});
+        FAIL() << "provider 只声明 GLIBC_2.40，而需求要 {GLIBC_2.40,GLIBC_2.39} —— 必须拒绝";
+    } catch (const LpkgException& e) {
+        const std::string msg = e.what();
+        // 报错要点名**那条需求**（按规范化后的整串：符号排序 ⇒ 2.39 在前）
+        EXPECT_NE(msg.find("libc.so.6@{GLIBC_2.39,GLIBC_2.40}"), std::string::npos)
+            << "报错必须点名缺的那条需求：" << msg;
+    }
+    Cache::instance().load();
+    EXPECT_FALSE(Cache::instance().is_installed("liba")) << "被拒的批次不得落盘";
+    EXPECT_FALSE(Cache::instance().is_installed("libc"));
+
+    // 正面对照：提供者把两个都声明了 ⇒ 放行（证明上面那条不是"凡是带版本就拒"）
+    create_pkg("libc", "1.1", {}, {}, {"libc.so.6@{GLIBC_2.40,GLIBC_2.39}"});
+    update_index({
+        {"liba", "1.0", "", "", "", "libc.so.6@{GLIBC_2.40,GLIBC_2.39}"},
+        {"libc", "1.1", "", "", "libc.so.6@{GLIBC_2.40,GLIBC_2.39}", ""},
+    });
+    EXPECT_NO_THROW(install_packages({"liba"})) << "两个符号都声明了，必须放行";
+    Cache::instance().load();
+    EXPECT_TRUE(Cache::instance().is_installed("liba"));
+    EXPECT_TRUE(Cache::instance().is_installed("libc"));
+}
