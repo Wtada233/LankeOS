@@ -13,7 +13,7 @@
     "libhunspell-1.7.so.0",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6SonnetCore.so",
     "libKF6SonnetCore.so.6",
     "libKF6SonnetUi.so",

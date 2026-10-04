@@ -150,9 +150,9 @@ fn version_change_script_decides_by_minor() {
         .version_victims_ctx("perl", "5.44.0", "5.44.1", &all, None)
         .unwrap();
     assert!(v.is_empty(), "patch 升级不应触发 perl-* 重建: {v:?}");
-    // release 修订（5.44.0+1→5.44.0+2）也不算 minor 变化
+    // release 修订（5.44.0-1→5.44.0-2，8.0.0 起 release 用 `-`）也不算 minor 变化
     let v = g
-        .version_victims_ctx("perl", "5.44.0+1", "5.44.0+2", &all, None)
+        .version_victims_ctx("perl", "5.44.0-1", "5.44.0-2", &all, None)
         .unwrap();
     assert!(v.is_empty());
     // 未注册的 on 包 → 空

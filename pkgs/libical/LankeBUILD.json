@@ -13,7 +13,7 @@
     "libstdc++.so.6",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libical-glib.so",
     "libical-glib.so.4.0",
     "libical.so",

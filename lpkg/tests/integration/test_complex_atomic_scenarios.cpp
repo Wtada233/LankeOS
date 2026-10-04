@@ -100,8 +100,9 @@ TEST_F(ComplexAtomicTest, BatchInstallLocalPackagesWithInterDependency)
     // （2026-10-02 订正：原名 `MetadataDriftDuringInstall`，测的是已删除的"动态重解析"；
     //   那套行为不再存在 —— 索引与归档不一致一律拒绝安装。）
 
-    std::string pA = create_pkg("md_drift_A", "1.0", {}, {"libA_drift.so.1"});
-    std::string pB = create_pkg("md_drift_B", "1.0", {"md_drift_A"}, {"libB_drift.so.1"});
+    std::string pA = create_pkg("md_drift_A", "1.0", {}, {}, {"libA_drift.so.1"});
+    std::string pB = create_pkg("md_drift_B", "1.0", {"md_drift_A"}, {}, {"libB_drift.so.1"});
+    // （SONAME 在第 5 参 → `provides_soname`；下面对应的查表也走 soname 那本账。）
 
     // B 的依赖 md_drift_A 通过本地文件路径提供
     install_packages({pB, pA});
@@ -109,9 +110,9 @@ TEST_F(ComplexAtomicTest, BatchInstallLocalPackagesWithInterDependency)
     EXPECT_FALSE(Cache::instance().get_installed_version("md_drift_A").empty());
     EXPECT_FALSE(Cache::instance().get_installed_version("md_drift_B").empty());
 
-    // 验证 provides 正确注册
-    EXPECT_TRUE(Cache::instance().get_providers("libA_drift.so.1").contains("md_drift_A"));
-    EXPECT_TRUE(Cache::instance().get_providers("libB_drift.so.1").contains("md_drift_B"));
+    // 验证 provides_soname 正确注册
+    EXPECT_TRUE(Cache::instance().get_soname_providers("libA_drift.so.1").contains("md_drift_A"));
+    EXPECT_TRUE(Cache::instance().get_soname_providers("libB_drift.so.1").contains("md_drift_B"));
 }
 
 // ============================================================================
@@ -123,8 +124,8 @@ TEST_F(ComplexAtomicTest, UpgradeAbiBreakRollback)
     setup_local_mirror();
 
     // 安装 lib v1 + app（app 依赖 lib v1 的 libABI.so.1）
-    std::string pLibV1 = create_pkg("abi_lib", "1.0", {}, {"libABI.so.1"});
-    std::string pApp = create_pkg("abi_app", "1.0", {"abi_lib"}, {}, {"libABI.so.1"});
+    std::string pLibV1 = create_pkg("abi_lib", "1.0", {}, {}, {"libABI.so.1"});
+    std::string pApp = create_pkg("abi_app", "1.0", {"abi_lib"}, {}, {}, {"libABI.so.1"});
     add_to_mirror("abi_lib", "1.0");
     add_to_mirror("abi_app", "1.0");
 
@@ -143,15 +144,15 @@ TEST_F(ComplexAtomicTest, UpgradeAbiBreakRollback)
             f << R"({"name":"abi_lib","version":"2.0","deps":[],"provides":["libABI.so.2"],"needed_so":[]})";
         }
         std::string v2path = (pkg_dir / "abi_lib-2.0.lpkg").string();
-        pack_package(v2path, work.string(), "abi_lib", "2.0", {}, {"libABI.so.2"});
+        pack_package(v2path, work.string(), "abi_lib", "2.0", {}, {}, {"libABI.so.2"});
 
         fs::path mirror = suite_work_dir / "mirror" / "x86_64";
         fs::create_directories(mirror / "abi_lib");
         fs::copy(v2path, mirror / "abi_lib" / "2.0.lpkg");
         {
             std::ofstream idx(mirror / "index.txt");
-            idx << "abi_lib|1.0:::libABI.so.1:;2.0:::libABI.so.2:|\n"
-                << "abi_app|1.0::abi_lib::libABI.so.1|\n";
+            idx << "abi_lib|1.0::::libABI.so.1:;2.0::::libABI.so.2:|\n"
+                << "abi_app|1.0::abi_lib:::libABI.so.1|\n";
         }
     }
 
@@ -198,9 +199,9 @@ TEST_F(ComplexAtomicTest, ForceOverwriteRollbackRestoresOwnership)
 TEST_F(ComplexAtomicTest, TripleInstallRollbackOnLastFailure)
 {
     // 构造 3 个包，C 的 needed_so 指向不存在的 SONAME
-    std::string pA = create_pkg("tri_A", "1.0", {}, {"triA.so.1"});
-    std::string pB = create_pkg("tri_B", "1.0", {"tri_A"}, {"triB.so.1"});
-    std::string pC = create_pkg("tri_C", "1.0", {"tri_B"}, {}, {"ghost_tri.so.1"});
+    std::string pA = create_pkg("tri_A", "1.0", {}, {}, {"triA.so.1"});
+    std::string pB = create_pkg("tri_B", "1.0", {"tri_A"}, {}, {"triB.so.1"});
+    std::string pC = create_pkg("tri_C", "1.0", {"tri_B"}, {}, {}, {"ghost_tri.so.1"});
 
     // C 有不可解析的 needed_so → 安装应失败，回滚 A 和 B
     EXPECT_THROW(install_packages({pC, pB, pA}), LpkgException);
@@ -224,7 +225,7 @@ TEST_F(ComplexAtomicTest, TripleInstallRollbackOnLastFailure)
 TEST_F(ComplexAtomicTest, FullLifecycleInstallReinstallRemove)
 {
     // 安装
-    std::string p1 = create_pkg("lifecycle", "1.0", {}, {"lifecycle.so.1"});
+    std::string p1 = create_pkg("lifecycle", "1.0", {}, {}, {"lifecycle.so.1"});
     install_packages({p1});
     EXPECT_EQ(Cache::instance().get_installed_version("lifecycle"), "1.0");
     EXPECT_TRUE(fs::exists(test_root / "usr/bin/lifecycle"));
@@ -234,7 +235,7 @@ TEST_F(ComplexAtomicTest, FullLifecycleInstallReinstallRemove)
     EXPECT_FALSE(files.empty());
 
     // 重装
-    std::string p2 = create_pkg("lifecycle", "1.0", {}, {"lifecycle.so.1"});
+    std::string p2 = create_pkg("lifecycle", "1.0", {}, {}, {"lifecycle.so.1"});
     install_packages({p2}, "", true);
     EXPECT_EQ(Cache::instance().get_installed_version("lifecycle"), "1.0");
 
@@ -333,7 +334,7 @@ TEST_F(ComplexAtomicTest, SequentialUpgrades)
     setup_local_mirror();
 
     // 安装 v1
-    std::string pV1 = create_pkg("seq_lib", "1.0", {}, {"seq.so.1"});
+    std::string pV1 = create_pkg("seq_lib", "1.0", {}, {}, {"seq.so.1"});
     add_to_mirror("seq_lib", "1.0");
     install_packages({pV1});
     EXPECT_EQ(Cache::instance().get_installed_version("seq_lib"), "1.0");
@@ -348,14 +349,14 @@ TEST_F(ComplexAtomicTest, SequentialUpgrades)
             f << R"({"name":"seq_lib","version":"2.0","deps":[],"provides":["seq.so.2"],"needed_so":[]})";
         }
         std::string v2path = (pkg_dir / "seq_lib-2.0.lpkg").string();
-        pack_package(v2path, work.string(), "seq_lib", "2.0", {}, {"seq.so.2"});
+        pack_package(v2path, work.string(), "seq_lib", "2.0", {}, {}, {"seq.so.2"});
 
         fs::path mirror = suite_work_dir / "mirror" / "x86_64";
         fs::create_directories(mirror / "seq_lib");
         fs::copy(v2path, mirror / "seq_lib" / "2.0.lpkg");
         {
             std::ofstream idx(mirror / "index.txt");
-            idx << "seq_lib|1.0:::seq.so.1:;2.0:::seq.so.2:|\n";
+            idx << "seq_lib|1.0::::seq.so.1:;2.0::::seq.so.2:|\n";
         }
     }
 
@@ -372,13 +373,13 @@ TEST_F(ComplexAtomicTest, SequentialUpgrades)
             f << R"({"name":"seq_lib","version":"3.0","deps":[],"provides":["seq.so.3"],"needed_so":[]})";
         }
         std::string v3path = (pkg_dir / "seq_lib-3.0.lpkg").string();
-        pack_package(v3path, work.string(), "seq_lib", "3.0", {}, {"seq.so.3"});
+        pack_package(v3path, work.string(), "seq_lib", "3.0", {}, {}, {"seq.so.3"});
 
         fs::path mirror = suite_work_dir / "mirror" / "x86_64" / "seq_lib";
         fs::copy(v3path, mirror / "3.0.lpkg");
         {
             std::ofstream idx(suite_work_dir / "mirror" / "x86_64" / "index.txt");
-            idx << "seq_lib|1.0:::seq.so.1:;2.0:::seq.so.2:;3.0:::seq.so.3:|\n";
+            idx << "seq_lib|1.0::::seq.so.1:;2.0::::seq.so.2:;3.0::::seq.so.3:|\n";
         }
     }
 
@@ -436,7 +437,7 @@ TEST_F(ComplexAtomicTest, AutoAddToPlanSatisfiesConstraint)
 
 TEST_F(ComplexAtomicTest, ReverseDependencyUpdateAfterRemove)
 {
-    std::string pLib = create_pkg("rdep_lib", "1.0", {}, {"rdep_lib.so.1"});
+    std::string pLib = create_pkg("rdep_lib", "1.0", {}, {}, {"rdep_lib.so.1"});
     std::string pApp = create_pkg("rdep_app", "1.0", {"rdep_lib"});
 
     install_packages({pApp, pLib});
@@ -502,8 +503,8 @@ TEST_F(ComplexAtomicTest, SigintGracefulDuringInstall)
 
 TEST_F(ComplexAtomicTest, ComplexProvidesChain)
 {
-    std::string pA = create_pkg("prov_A", "1.0", {}, {"pkg-config-A", "libA.so.1"});
-    std::string pB = create_pkg("prov_B", "2.0", {}, {"pkg-config-B", "libB.so.2"});
+    std::string pA = create_pkg("prov_A", "1.0", {}, {"pkg-config-A"}, {"libA.so.1"});
+    std::string pB = create_pkg("prov_B", "2.0", {}, {"pkg-config-B"}, {"libB.so.2"});
     std::string pC = create_pkg("prov_C", "1.0", {"pkg-config-A", "pkg-config-B"});
 
     install_packages({pC, pB, pA});

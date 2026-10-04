@@ -65,7 +65,7 @@ protected:
         fs::create_directories(work / "content/usr/bin");
         std::ofstream(work / "content/usr/bin" / name) << name << " " << ver << "\n";
         const std::string path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
-        pack_package(path, work.string(), name, ver, deps, {}, "man " + name, {});
+        pack_package(path, work.string(), name, ver, deps, {}, {}, "man " + name, {});
         return path;
     }
 

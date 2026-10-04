@@ -7,7 +7,7 @@
     "libc.so.6",
     "libunistring.so.5"
   ],
-  "provides": [
+  "provides_soname": [
     "libidn2.so",
     "libidn2.so.0"
   ],

@@ -10,7 +10,7 @@
     "libmp3lame.so.0",
     "libmpg123.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libsndfile.so",
     "libsndfile.so.1"
   ],

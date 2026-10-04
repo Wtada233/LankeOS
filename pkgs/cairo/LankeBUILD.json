@@ -24,7 +24,7 @@
     "libxcb.so.1",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libcairo-gobject.so",
     "libcairo-gobject.so.2",
     "libcairo-script-interpreter.so",

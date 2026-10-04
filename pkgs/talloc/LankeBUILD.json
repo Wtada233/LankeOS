@@ -8,7 +8,7 @@
     "libm.so.6",
     "libpython3.14.so.1.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libpytalloc-util.cpython-314-x86-64-linux-gnu.so",
     "libpytalloc-util.cpython-314-x86-64-linux-gnu.so.2",
     "libtalloc.so",

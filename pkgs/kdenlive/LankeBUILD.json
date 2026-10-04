@@ -68,7 +68,7 @@
     "libstdc++.so.6",
     "libswresample.so.7"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "cmake",

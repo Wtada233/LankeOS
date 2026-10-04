@@ -13,7 +13,7 @@
     "libsoup-3.0.so.0",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "librest-1.0.so",
     "librest-1.0.so.0",
     "librest-extras-1.0.so",

@@ -60,10 +60,11 @@ protected:
 
     // ---- repo index helpers ----
     // 重构后 scan_remove/scan_abibreak 恒用 build_repo_revdep_map()：从仓库 index 的
-    // needed_so → provides 建反向依赖（不再读本地 Cache 的 reverse_dep）。故测试必须写
-    // 仓库 index（Config::get_tmp_dir()/repo_index.txt），格式 name|ver:hash::provides:needed_so:
+    // needed_so → provides_soname 建反向依赖（不再读本地 Cache 的 reverse_dep）。故测试必须写
+    // 仓库 index（Config::get_tmp_dir()/repo_index.txt），格式
+    // name|ver:hash:deps:provides:provides_soname:needed_so（恰好 6 字段）。
     struct IndexEntry {
-        std::string provides;
+        std::string provides_soname;
         std::string needed_so;
     };
     std::map<std::string, IndexEntry> index_entries_;
@@ -72,8 +73,8 @@ protected:
     void add_provider_so(const std::string& pkg, const std::string& soname)
     {
         auto& e = index_entries_[pkg];
-        if (!e.provides.empty()) e.provides += ",";
-        e.provides += soname;
+        if (!e.provides_soname.empty()) e.provides_soname += ",";
+        e.provides_soname += soname;
     }
 
     void add_needed_so(const std::string& pkg, const std::string& soname)
@@ -92,7 +93,9 @@ protected:
         for (const auto& [name, e] : index_entries_) {
             auto it = index_versions_.find(name);
             std::string ver = (it != index_versions_.end()) ? it->second : "1.0";
-            f << name << "|" << ver << ":hash::" << e.provides << ":" << e.needed_so << ":\n";
+            // deps / provides 留空；SONAME 放 provides_soname（第 5 字段）、needed_so（第 6 字段）
+            f << name << "|" << ver << ":hash:::" << e.provides_soname << ":" << e.needed_so
+              << "\n";
         }
     }
 

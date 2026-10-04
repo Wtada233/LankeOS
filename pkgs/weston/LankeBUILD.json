@@ -38,7 +38,7 @@
     "libxcb.so.1",
     "libxkbcommon.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libweston-16.so",
     "libweston-16.so.0"
   ],

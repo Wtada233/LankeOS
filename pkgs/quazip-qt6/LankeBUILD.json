@@ -12,7 +12,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libquazip1-qt6.so",
     "libquazip1-qt6.so.1.7"
   ],

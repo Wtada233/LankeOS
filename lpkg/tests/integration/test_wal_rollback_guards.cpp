@@ -77,7 +77,7 @@ protected:
         std::ofstream(work / "content" / "usr" / "bin" / name)
             << "#!/bin/sh\necho " << name << "\n";
         const std::string path = (pkg_dir / (name + "-" + version + ".lpkg")).string();
-        pack_package(path, work.string(), name, version, deps, {}, "man " + name, {});
+        pack_package(path, work.string(), name, version, deps, {}, {}, "man " + name, {});
         return path;
     }
 

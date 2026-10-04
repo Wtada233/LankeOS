@@ -6,7 +6,7 @@
     "libc.so.6",
     "libmnl.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libnftnl.so",
     "libnftnl.so.11"
   ],

@@ -13,7 +13,7 @@
     "libssl.so.3",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libgit2.so",
     "libgit2.so.1.9"
   ],

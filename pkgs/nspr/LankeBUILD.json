@@ -8,7 +8,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libnspr4.so",
     "libplc4.so",
     "libplds4.so"

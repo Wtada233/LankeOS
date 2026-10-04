@@ -11,7 +11,7 @@
     "libstdc++.so.6",
     "libtiff.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libopenjph.so",
     "libopenjph.so.0.32"
   ],

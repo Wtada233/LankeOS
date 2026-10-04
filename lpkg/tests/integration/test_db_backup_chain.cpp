@@ -114,7 +114,7 @@ protected:
         // 内容带版本号：升级批次里这份配置**真的会变**（走 ① 静默替换），不是恒等不动
         std::ofstream(work / "content/etc" / (name + ".conf")) << name << "-conf " << ver << "\n";
         const std::string path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
-        pack_package(path, work.string(), name, ver, deps, {}, "man " + name, {});
+        pack_package(path, work.string(), name, ver, deps, {}, {}, "man " + name, {});
         return path;
     }
 

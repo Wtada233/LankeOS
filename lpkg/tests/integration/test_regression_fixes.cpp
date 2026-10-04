@@ -107,7 +107,8 @@ TEST_F(RegressionFixTest, SymlinkOverDirectoryRejected)
     fs::create_directories(work / "content" / "usr" / "lib");
     fs::create_symlink("/usr/lib/sometarget", work / "content" / "usr" / "lib" / "fxsym");
     std::string pkg_path = (pkg_dir / "fxsym-1.0.lpkg").string();
-    pack_package(pkg_path, work.string(), "fxsym", "1.0", {}, {"fxsym"}, "Man page for fxsym", {});
+    pack_package(pkg_path, work.string(), "fxsym", "1.0", {}, {"fxsym"}, {}, "Man page for fxsym",
+                 {});
 
     // 必须作为文件冲突拒绝，而不是静默删除目录
     EXPECT_THROW(install_packages({pkg_path}), LpkgException);
@@ -153,8 +154,8 @@ TEST_F(RegressionFixTest, InstallVirtualCapabilityNameDoesNotCrash)
 TEST_F(RegressionFixTest, ForceSolveInNonInteractiveModeThrows)
 {
     // 构造一个 needed_so 在**仓库**中无人提供的已装包
-    auto pP = create_pkg("fxs_prov", "1.0", {}, {"libprov.so.1"});
-    auto pQ = create_pkg("fxs_need", "1.0", {}, {}, {"libprov.so.1"});
+    auto pP = create_pkg("fxs_prov", "1.0", {}, {}, {"libprov.so.1"});
+    auto pQ = create_pkg("fxs_need", "1.0", {}, {}, {}, {"libprov.so.1"});
     install_packages({pP, pQ});
 
     // 索引必须**非空**：force_solve_conflict 现在有一条"索引为空 → 拒绝"的守卫
@@ -162,7 +163,7 @@ TEST_F(RegressionFixTest, ForceSolveInNonInteractiveModeThrows)
     // 本用例要走到的是"非交互模式"那道检查，所以给一个非空、但不提供 libprov.so.1 的索引。
     {
         std::ofstream idx(suite_work_dir / "mirror" / "x86_64" / "index.txt");
-        idx << "fxs_unrelated|1.0:::|\n";
+        idx << "fxs_unrelated|1.0:::::|\n";
     }
 
     // 非交互模式（IntegrationTestBase 已设 YES）→ 直接抛错而非读 stdin
@@ -180,8 +181,8 @@ TEST_F(RegressionFixTest, ForceSolveInNonInteractiveModeThrows)
 
 TEST_F(RegressionFixTest, ForceSolveRefusesWhenRepoIndexEmpty)
 {
-    auto pP = create_pkg("fxs2_prov", "1.0", {}, {"libprov2.so.1"});
-    auto pQ = create_pkg("fxs2_need", "1.0", {}, {}, {"libprov2.so.1"});
+    auto pP = create_pkg("fxs2_prov", "1.0", {}, {}, {"libprov2.so.1"});
+    auto pQ = create_pkg("fxs2_need", "1.0", {}, {}, {}, {"libprov2.so.1"});
     install_packages({pP, pQ});
 
     // 镜像里没有 index.txt（→ 解析出 0 个包）。此前会把两个包都判成 broken 并提议删除。
@@ -226,7 +227,7 @@ TEST_F(RegressionFixTest, RemovingFilelessPackageClearsItsProvides)
     const fs::path work = suite_work_dir / "_pkg_fxp_meta";
     fs::create_directories(work / "content");
     const std::string pkg_path = (pkg_dir / "fxp_meta-1.0.lpkg").string();
-    pack_package(pkg_path, work.string(), "fxp_meta", "1.0", {}, {"capX"}, "", {});
+    pack_package(pkg_path, work.string(), "fxp_meta", "1.0", {}, {"capX"}, {}, "", {});
 
     install_packages({pkg_path});
     Cache::instance().load();
@@ -271,8 +272,8 @@ TEST_F(RegressionFixTest, HashWithMultipleLocalPackagesRejected)
 
 TEST_F(RegressionFixTest, RemoveCleansNeededSoReverseDeps)
 {
-    auto pP = create_pkg("m2_prov", "1.0", {}, {"libm2.so.1"});
-    auto pQ = create_pkg("m2_need", "1.0", {}, {}, {"libm2.so.1"});
+    auto pP = create_pkg("m2_prov", "1.0", {}, {}, {"libm2.so.1"});
+    auto pQ = create_pkg("m2_need", "1.0", {}, {}, {}, {"libm2.so.1"});
     install_packages({pP, pQ});
 
     // 安装后：m2_need 的 needed_so 派生边存在（m2_prov 的反向依赖含 m2_need）
@@ -316,8 +317,8 @@ TEST_F(RegressionFixTest, ReinstallAlsoRefusesMetadataMismatch)
     add_to_mirror("fxi_app", "1.0");
     {
         std::ofstream idx(suite_work_dir / "mirror" / "x86_64" / "index.txt");
-        idx << "fxi_app|1.0:::|\n";  // 故意漏掉 deps=libz
-        idx << "libz|1.0:::|\n";
+        idx << "fxi_app|1.0:::::|\n";  // 故意漏掉 deps=libz
+        idx << "libz|1.0:::::|\n";
     }
 
     try {
@@ -334,24 +335,29 @@ TEST_F(RegressionFixTest, ReinstallAlsoRefusesMetadataMismatch)
 }
 
 /**
- * 约束违反的批次必须**拒绝**：`vdapp` 要求 `vdlib <= 1.0`，而同一批次又显式要求装 `vdlib 1.0+1`。
+ * 约束违反的批次必须**拒绝**：`vdapp` 要求 `vdlib <= 1.0`，而同一批次又显式要求装 `vdlib 2.0`。
  *
- * **订正 2026-10-03（版本桥接修好后）**：此前 libsolv 的 EVR 匹配把"要求侧缺 release"当通配，
- * 会**接受**这个计划，靠安装期的版本复核（`error.dep_version_mismatch`）才拦下来 —— 本用例
- * 原先断言的就是那条报错。桥接修好后（`to_libsolv_evr` 改用 caret 分隔 release，见
- * `tests/unit/test_vercmp_libsolv_bridge.cpp` 的等价性矩阵）求解器**自己**就拒绝这个批次，
- * 报错换成"依赖无解"。⇒ 这里只钉"必须拒绝 + 整批回滚"这条不变量，**不再钉具体文案**；
- * 那道复核判据本身改由 `tests/unit/test_plan_dep_version_check.cpp` 直接喂手搓计划来钉
- * （否则它就成了"永远走不到的分支上写的假绿用例"）。
+ * **订正 2026-10-03**：此前 libsolv 的 EVR 匹配把"要求侧缺 release"当通配，会**接受**这个
+ * 计划，靠安装期的版本复核（`error.dep_version_mismatch`）才拦下来 —— 本用例原先断言的就是
+ * 那条报错。修好之后求解器**自己**就拒绝这个批次，报错换成"依赖无解"。⇒ 这里只钉"必须拒绝 +
+ * 整批回滚"这条不变量，**不再钉具体文案**；那道复核判据本身改由
+ * `tests/unit/test_plan_dep_version_check.cpp` 直接喂手搓计划来钉（否则它就成了"永远走不到
+ * 的分支上写的假绿用例"）。
+ *
+ * **订正 2026-10-04（8.0.0）**：本用例的动作元/版本字面量原先是 `1.0+1`（旧的自有语义里
+ * "+N = 发行修订号"）。版本语义换成 rpm 之后 `+N` 只是普通字符、而 **release 要写 `-`**，
+ * 且 `1.0-1` 是**满足** `<= 1.0` 的（rpm 的"没写 release = 通配"，实测见
+ * `test_version.cpp::ReleaseIsAWildcardInDependencyMatching`）—— 用 `1.0-1` 就不再是违规。
+ * 所以改成干净的 `2.0`：违规与 rpm 版本语法无关，用例想守的东西一个字没变。
  */
 TEST_F(RegressionFixTest, PlanVersionViolatingDependencyConstraintIsRejected)
 {
-    const std::string lib = create_pkg("vdlib", "1.0+1");
+    const std::string lib = create_pkg("vdlib", "2.0");
     const std::string app = create_pkg("vdapp", "1.0", {"vdlib<=1.0"});
 
     try {
         install_packages({app, lib});
-        FAIL() << "计划把依赖解析到违反约束的版本（1.0+1 不满足 <= 1.0），必须拒绝";
+        FAIL() << "计划把依赖解析到违反约束的版本（2.0 不满足 <= 1.0），必须拒绝";
     } catch (const LpkgException& e) {
         EXPECT_NE(std::string(e.what()).find("vdlib"), std::string::npos)
             << "报错必须点名那个依赖：" << e.what();
@@ -369,6 +375,9 @@ TEST_F(RegressionFixTest, PlanVersionViolatingDependencyConstraintIsRejected)
  * **订正 2026-10-03**：桥接修好后求解器自己就会拒这个批次（不再产出"计划版本违规"的方案），
  * 所以这里同样只钉"必须拒绝 + 整批回滚"；那道复核判据的每一格（含"计划版本 vs 盘上版本"
  * 的取舍）改由 `tests/unit/test_plan_dep_version_check.cpp` 直接喂手搓计划钉。
+ *
+ * **订正 2026-10-04（8.0.0）**：版本字面量从 `1.0+1` 改成 `2.0` —— 理由同上一条用例
+ * （rpm 语义下 `1.0-1` 满足 `<= 1.0`，不再是违规；`+N` 也不再是发行修订号）。
  */
 TEST_F(RegressionFixTest, VersionRecheckIsNotShortCircuitedBySatisfiedOnDiskVersion)
 {
@@ -379,9 +388,9 @@ TEST_F(RegressionFixTest, VersionRecheckIsNotShortCircuitedBySatisfiedOnDiskVers
     ASSERT_TRUE(Cache::instance().is_installed("vslib"));
     ASSERT_EQ(Cache::instance().get_installed_version("vslib"), "1.0");
 
-    // ② 同一批次里把 vslib 换成 1.0+1、并装 vsapp（dep: vslib<=1.0）。盘上那份（1.0）满足，
-    //    但计划版本（1.0+1）不满足 —— 必须拒绝，且整批回滚。
-    const std::string libNew = create_pkg("vslib", "1.0+1");
+    // ② 同一批次里把 vslib 换成 2.0、并装 vsapp（dep: vslib<=1.0）。盘上那份（1.0）满足，
+    //    但计划版本（2.0）不满足 —— 必须拒绝，且整批回滚。
+    const std::string libNew = create_pkg("vslib", "2.0");
     const std::string app = create_pkg("vsapp", "1.0", {"vslib<=1.0"});
     EXPECT_THROW(install_packages({app, libNew}), LpkgException)
         << "计划把「已装且满足约束」的依赖升级到违反约束的版本，必须拒绝";

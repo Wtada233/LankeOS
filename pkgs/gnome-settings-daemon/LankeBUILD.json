@@ -36,7 +36,7 @@
     "libsystemd.so.0",
     "libupower-glib.so.3"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "alsa-lib",
     "base-devel",

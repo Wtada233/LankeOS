@@ -9,7 +9,7 @@
     "libdbus-1.so.3",
     "libgcc_s.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libnvme-mi.so",
     "libnvme-mi.so.1",
     "libnvme.so",

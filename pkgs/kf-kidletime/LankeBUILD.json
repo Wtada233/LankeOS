@@ -18,7 +18,7 @@
     "libxcb-sync.so.1",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6IdleTime.so",
     "libKF6IdleTime.so.6"
   ],

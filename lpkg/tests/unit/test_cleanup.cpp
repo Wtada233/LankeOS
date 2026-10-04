@@ -748,7 +748,8 @@ TEST_F(RecursiveRemoveCleanupTest, DepNeededSoManHooksCleanedOnRecursiveRemove)
     // （hooks 必须**真的有**：早先这里用 create_pkg 的默认参数打了一个不含 hooks 的包，
     //   而下面 `EXPECT_FALSE(fs::exists(hk_d))` 对"压根没建过的目录"恒真 —— 断言是死的。
     //   故补上 postinst.sh，并在移除前先自检它确实装上了。）
-    std::string pA = create_pkg("libA", "1.0", {}, {"libA.so.1"}, {"libA.so.1"}, {"postinst.sh"});
+    std::string pA =
+        create_pkg("libA", "1.0", {}, {}, {"libA.so.1"}, {"libA.so.1"}, {"postinst.sh"});
     // 创建 appB: 依赖 libA
     std::string pB = create_pkg("appB", "1.0", {"libA"});
 
@@ -792,7 +793,7 @@ TEST_F(RecursiveRemoveCleanupTest, DepNeededSoManHooksCleanedOnRecursiveRemove)
 TEST_F(RecursiveRemoveCleanupTest, DepFilesRestoredOnRollback)
 {
     // Bug 2 延伸验证：递归移除回滚时 DBRM 文件应恢复
-    std::string pA = create_pkg("libA", "1.0", {}, {"libA.so.1"}, {"libA.so.1"});
+    std::string pA = create_pkg("libA", "1.0", {}, {}, {"libA.so.1"}, {"libA.so.1"});
     std::string pB = create_pkg("appB", "1.0", {"libA"});
 
     auto mirror = setup_local_mirror();

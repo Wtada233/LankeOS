@@ -79,18 +79,19 @@ protected:
         return pkg_path;
     }
 
-    void update_index(
-        const std::vector<std::tuple<std::string, std::string, std::string, std::string>>& entries)
+    void update_index(const std::vector<std::tuple<std::string, std::string, std::string,
+                                                   std::string, std::string>>& entries)
     {
         std::ofstream index(mirror_dir / "index.txt");
-        for (const auto& [name, ver, deps, provides] : entries) {
+        for (const auto& [name, ver, deps, provides, provides_soname] : entries) {
             std::string pkg_filename = std::format("{}-{}.lpkg", name, ver);
             std::string pkg_path = (pkg_dir / pkg_filename).string();
             std::string hash = "unknown";
             if (fs::exists(pkg_path)) {
                 hash = calculate_sha256(pkg_path);
             }
-            index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":|\n";
+            index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
+                  << provides_soname << ":|\n";
         }
     }
 };
@@ -109,7 +110,8 @@ TEST_F(DynamicResolutionTest, IndexDependencyMismatchIsRefused)
     create_pkg("libA", "1.0");
     create_pkg("libB", "1.0");
     create_pkg("app", "1.0", {"libB"});
-    update_index({{"app", "1.0", "libA", ""}, {"libA", "1.0", "", ""}, {"libB", "1.0", "", ""}});
+    update_index(
+        {{"app", "1.0", "libA", "", ""}, {"libA", "1.0", "", "", ""}, {"libB", "1.0", "", "", ""}});
 
     try {
         install_packages({"app"});
@@ -134,9 +136,9 @@ TEST_F(DynamicResolutionTest, IndexProviderMismatchIsRefused)
     create_pkg("provB", "1.0", {}, {"virtual-pkg"});
     create_pkg("app", "1.0", {"virtual-pkg"});
 
-    update_index({{"app", "1.0", "virtual-pkg", ""},
-                  {"provA", "1.0", "", "virtual-pkg"},
-                  {"provB", "1.0", "", "virtual-pkg"}});
+    update_index({{"app", "1.0", "virtual-pkg", "", ""},
+                  {"provA", "1.0", "", "virtual-pkg", ""},
+                  {"provB", "1.0", "", "virtual-pkg", ""}});
 
     try {
         install_packages({"app"});
@@ -175,8 +177,8 @@ TEST_F(DynamicResolutionTest, UnresolvableDriftFailure)
                                : "unknown";
     {
         std::ofstream index(mirror_dir / "index.txt");
-        index << "app|1.0:" << hash << ":lib-old|\n";
-        index << "lib-old|1.0:" << lib_hash << ":|\n";
+        index << "app|1.0:" << hash << ":lib-old:::|\n";
+        index << "lib-old|1.0:" << lib_hash << "::::|\n";
     }
 
     // 拒绝：metadata 与索引不一致（lib-new 是否存在都一样）
@@ -189,7 +191,7 @@ TEST_F(DynamicResolutionTest, UndeclaredDependencyIsRefused)
 {
     create_pkg("lib-extra", "1.0");
     create_pkg("app", "1.0", {"lib-extra"});
-    update_index({{"app", "1.0", "", ""}, {"lib-extra", "1.0", "", ""}});
+    update_index({{"app", "1.0", "", "", ""}, {"lib-extra", "1.0", "", "", ""}});
 
     try {
         install_packages({"app"});
@@ -218,7 +220,7 @@ TEST_F(DynamicResolutionTest, AtomicRollbackOnFailedDep)
                                ? calculate_sha256(pkg_dir / "app-1.0.lpkg")
                                : "unknown";
         std::ofstream index(mirror_dir / "index.txt");
-        index << "app|1.0:" << hash << ":|\n";
+        index << "app|1.0:" << hash << "::::|\n";
         // broken-dep is NOT in the index — it will fail resolution
     }
 
@@ -241,7 +243,7 @@ TEST_F(DynamicResolutionTest, ArchiveVersionMismatchIsRefused)
         // 索引里的哈希对着**这个文件**（于是哈希校验会过，只有 metadata 字段对不上）
         const std::string hash = calculate_sha256(real);
         std::ofstream idx(mirror_dir / "index.txt");
-        idx << "app|1.0:" << hash << ":::|\n";
+        idx << "app|1.0:" << hash << "::::|\n";
     }
 
     try {

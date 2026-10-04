@@ -16,7 +16,7 @@
     "libxml2.so.16",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libe-book-0.1.so",
     "libe-book-0.1.so.1"
   ],

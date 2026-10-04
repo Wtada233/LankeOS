@@ -9,7 +9,7 @@
     "libdav1d.so.7",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libavif.so",
     "libavif.so.16"
   ],

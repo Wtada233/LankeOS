@@ -10,7 +10,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Attica.so",
     "libKF6Attica.so.6"
   ],

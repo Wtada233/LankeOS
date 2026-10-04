@@ -36,9 +36,9 @@ English | [中文](README.md)
 -   **Full lifecycle management**: Install, uninstall, upgrade, and reinstall packages.
 -   **needed_so verification**: Automatically validates every ELF DT_NEEDED SONAME against the repository before installation. Rejects packages with unresolvable SONAMEs, preventing the "empty provides still installs" class of bugs.
 -   **SIGINT graceful shutdown**: Ctrl+C sets a graceful-shutdown flag; the current operation (including any required rollback) runs to completion before exiting. There is no force-terminate — rollback is never interrupted mid-flight.
--   **Smart version parsing**: Supports multi-segment revision numbers (e.g. `1.0.0.1`) with a rigorous comparison algorithm that correctly handles cases like `6.16.1 > 6.6.1`. Supports compound range constraints (e.g. `>= 2.0.0 < 3.0.0`).
--   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their respective hashes, deps, provides, and needed_so.
--   **Embedded metadata**: All metadata (name, version, dependencies, needed_so, virtual provides, man page) is stored in a `metadata.json` inside each package.
+-   **rpm version semantics**: Version strings are plain rpm `[epoch:]version[-release]`, with exactly one comparison implementation (libsolv's EVR comparison) — multi-segment revisions (`6.16.1 > 6.6.1`), prereleases (`1.0~rc1 < 1.0`), release revisions (`1.0-1 > 1.0`) and compound range constraints (`>= 2.0.0 < 3.0.0`).
+-   **Aggregated index**: Uses a compact `index.txt` format where a single line records all versions and their respective hashes, deps, provides, provides_soname, and needed_so.
+-   **Embedded metadata**: All metadata (name, version, dependencies, virtual provides, exported SONAMEs, needed SONAMEs, man page) is stored in a `metadata.json` inside each package.
 -   **Auto dependency generation**: The build farm (`farm/`, Rust) scans ELF DT_NEEDED SONAMEs after packaging to generate `needed_so`, then resolves provider package names into `deps`, eliminating manual version constraint maintenance.
 -   **Layout-as-content**: The `content/` directory layout maps directly to the root filesystem.
 -   **Automated operations**: Includes `lrepo-mgr.py` for publishing to S3-compatible storage or SCP remote servers. The `--path` flag enables local filesystem repositories for offline testing.
@@ -146,7 +146,8 @@ hooks/                # Hook scripts (optional)
   "name": "curl",
   "version": "8.11.1",
   "deps": ["glibc", "openssl", "zlib", "zstd", "bash"],
-  "provides": ["libcurl.so.4"],
+  "provides": [],
+  "provides_soname": ["libcurl.so.4"],
   "needed_so": ["libc.so.6", "libssl.so.3", "libcrypto.so.3", "libz.so.1", "libzstd.so.1"],
   "man": "curl(1) - transfer a URL\n..."
 }
@@ -157,7 +158,8 @@ hooks/                # Hook scripts (optional)
 | `name` | Package name |
 | `version` | Version string |
 | `deps` | Dependency package names (no version constraints; auto-resolved from needed_so by the build farm) |
-| `provides` | SONAMEs and virtual capabilities this package provides |
+| `provides` | **Virtual capabilities** this package provides (e.g. `java-runtime`; unrelated to `.so`) |
+| `provides_soname` | SONAMEs this package **exports** (scanned from the built ELF by the farm) |
 | `needed_so` | DT_NEEDED SONAME list from the package's ELF files (ground truth for runtime deps) |
 | `man` | Inline man page content (optional) |
 

@@ -11,7 +11,7 @@
     "libstemmer.so.0",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libxmlb.so",
     "libxmlb.so.2"
   ],

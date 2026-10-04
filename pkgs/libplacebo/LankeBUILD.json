@@ -13,7 +13,7 @@
     "libstdc++.so.6",
     "libvulkan.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libplacebo.so",
     "libplacebo.so.360"
   ],

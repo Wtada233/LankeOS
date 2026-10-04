@@ -22,7 +22,7 @@
     "libsystemd.so.0",
     "libuuid.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libudisks2.so",
     "libudisks2.so.0"
   ],

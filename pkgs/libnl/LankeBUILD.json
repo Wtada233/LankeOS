@@ -6,7 +6,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libnl-3.so",
     "libnl-3.so.200",
     "libnl-cli-3.so",

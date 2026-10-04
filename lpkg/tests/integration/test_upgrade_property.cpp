@@ -1613,7 +1613,7 @@ protected:
         for (const auto& [path, data] : extra_files) write_text(content / path, data);
 
         const std::string out = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
-        pack_package(out, work.string(), name, ver, {}, {}, "man " + name, {});
+        pack_package(out, work.string(), name, ver, {}, {}, {}, "man " + name, {});
         return out;
     }
 

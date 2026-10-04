@@ -21,7 +21,7 @@
     "libxxhash.so.0",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libinproctrace.so"
   ],
   "build_deps": [

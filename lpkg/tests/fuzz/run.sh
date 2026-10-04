@@ -14,6 +14,9 @@ BUILD="${FUZZ_BUILD:-build-fuzz}"
 FLAGS="${FUZZ_FLAGS:--fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer -g -O1 -Wno-error}"
 TIME_ELF="${FUZZ_TIME_ELF:-60}"
 TIME_ARCHIVE="${FUZZ_TIME_ARCHIVE:-60}"
+# 文本形态的解析器（WAL 行 / 依赖串 / 索引行 / DB 行 / 求解器差分 / soname 目录）：
+# 单轮成本低，但 harness 数量多 —— 给它们一组自己的时限，免得默认 `make fuzz` 被拉长。
+TIME_TEXT="${FUZZ_TIME_TEXT:-30}"
 ONLY="${FUZZ_ONLY:-}"
 SCRATCH=/tmp/lpkg-fuzz-corpus
 ARTIFACTS=/app/fuzz-artifacts
@@ -25,6 +28,12 @@ rm -rf "$BUILD"
 # 暂存语料目录**按 harness 名派生**（与下面的构建目标同一套推导）：加 harness 不必回来改这里。
 # （libFuzzer 要求"第一个语料目录"必须存在，否则直接报 `required directory ... does not exist`
 # 并退出 —— 实测就是这么发现漏建的。）
+# **每次跑先清空容器内的产物目录**（2026-10-04 加）。理由：`docker cp` 是整目录拷贝，
+# 而 `lpkg-builder` 容器是长期存活的 —— 不清的话上一轮的崩溃样本会被留在那儿，
+# 于是 ① `fuzz-collect` 的"有崩溃样本"**被旧文件误触发**（看起来本轮又红了，其实没有），
+# ② 旧 reproducer 会一直堆着、没人知道它对应哪一轮。产物本来就是**一次性**的
+# （"逐个转成 gtest 回归用例后删掉"），所以每次重来一遍是对的。
+rm -rf "$ARTIFACTS"
 mkdir -p "$ARTIFACTS"
 for src in tests/fuzz/*_fuzz.cpp; do
     mkdir -p "$SCRATCH/$(basename "$src" _fuzz.cpp)"
@@ -72,6 +81,13 @@ run_one strip_archive_fuzz "$TIME_ELF" -max_len=262144
 run_one vercmp_fuzz "$TIME_ELF" -max_len=1024
 run_one elf_soname_fuzz "$TIME_ELF" -max_len=262144
 run_one archive_name_fuzz "$TIME_ARCHIVE" -max_len=4096
+# 文本形态（`TIME_TEXT`）：输入都是小文本/小脚本，`-max_len` 给足形态即可
+run_one wal_line_fuzz "$TIME_TEXT" -max_len=4096
+run_one dep_string_fuzz "$TIME_TEXT" -max_len=1024
+run_one index_line_fuzz "$TIME_TEXT" -max_len=1024
+run_one db_line_fuzz "$TIME_TEXT" -max_len=4096
+run_one solver_diff_fuzz "$TIME_TEXT" -max_len=1024
+run_one soname_dir_fuzz "$TIME_TEXT" -max_len=4096
 
 echo "fuzz: 跑完（rc=$rc）"
 exit $rc

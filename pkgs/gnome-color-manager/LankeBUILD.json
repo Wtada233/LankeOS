@@ -18,7 +18,7 @@
     "libm.so.6",
     "libpango-1.0.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "cairo",

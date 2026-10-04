@@ -14,7 +14,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Contacts.so",
     "libKF6Contacts.so.6"
   ],

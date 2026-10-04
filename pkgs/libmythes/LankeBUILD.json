@@ -9,7 +9,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libmythes-1.2.so",
     "libmythes-1.2.so.0"
   ],

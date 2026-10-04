@@ -30,7 +30,7 @@
     "libudev.so.1",
     "libusb-1.0.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libKInfoCenterInternal.so"
   ],
   "build_deps": [

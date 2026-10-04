@@ -301,7 +301,7 @@ void InstallationTask::extract_and_validate_package()
 
     std::string meta_name, meta_version;
     detail::read_package_metadata(tmp_pkg_dir_, meta_name, meta_version, deps_, provides_,
-                                  needed_so_, man_content_);
+                                  provides_soname_, needed_so_, man_content_);
     if (meta_name != pkg_name_) {
         log_warning(string_format("warning.package_name_mismatch", pkg_name_, meta_name));
     }
@@ -310,12 +310,28 @@ void InstallationTask::extract_and_validate_package()
 namespace
 {
 
-/** 计划中是否有包提供该名字（能力名≠包名时，libsolv 已按能力解析过） */
+/** 计划中是否有包**提供该虚拟能力**（能力名≠包名时，libsolv 已按能力解析过） */
 bool plan_provides(const InstallContext& ctx, const std::string& name)
 {
     for (const auto& [pn, plan_pkg] : ctx.plan)
         for (const auto& prov : plan_pkg.provides)
             if (prov == name) return true;
+    return false;
+}
+
+/**
+ * 计划中是否有包**导出该 SONAME**。
+ *
+ * ⚠️ 与 `plan_provides()` **各查一个字段**：`provides` 是虚拟 provider、`provides_soname` 是
+ * SONAME。此前两者共用一个函数（都查 `provides`）—— 8.0.0 拆分后 SONAME 不再进 `provides`，
+ * 再共用就会让"计划里有包提供这个 SONAME"**永远为假** ⇒ 依赖该 SONAME 的包被判缺依赖、
+ * 整批回滚。
+ */
+bool plan_provides_soname(const InstallContext& ctx, const std::string& soname)
+{
+    for (const auto& [pn, plan_pkg] : ctx.plan)
+        for (const auto& so : plan_pkg.provides_soname)
+            if (so == soname) return true;
     return false;
 }
 
@@ -374,7 +390,7 @@ void resolve_unmet_dep(InstallContext& ctx, const std::string& dep_name,
  */
 bool installed_provider_available(const InstallContext& ctx, const std::string& soname)
 {
-    for (const auto& p : Cache::instance().get_providers(soname)) {
+    for (const auto& p : Cache::instance().get_soname_providers(soname)) {
         if (Cache::instance().is_installed(p) && !ctx.plan.contains(p)) return true;
     }
     return false;
@@ -387,12 +403,14 @@ bool installed_provider_available(const InstallContext& ctx, const std::string& 
  */
 bool unclaimed_repo_provider(const InstallContext& ctx, const std::string& soname)
 {
-    auto prov_pkg = ctx.repo.find_provider(soname);
+    auto prov_pkg = ctx.repo.find_soname_provider(soname);  // SONAME 语义 → 查 provides_soname
     if (!prov_pkg) return false;
     if (ctx.plan.contains(prov_pkg->name) || Cache::instance().is_installed(prov_pkg->name))
         return false;
-    for (const auto& prov : prov_pkg->provides) {
-        if (prov == soname) return true;
+    // ⚠️ 核验要查 **provides_soname**（不是 `provides` —— 那是虚拟表）：查错表会让本函数
+    // **永远返回 false** ⇒ "仓库里其它版本的提供者不能算数"这条版本锁定判据被静默废掉。
+    for (const auto& so : prov_pkg->provides_soname) {
+        if (so == soname) return true;
     }
     return false;
 }
@@ -406,7 +424,7 @@ bool unclaimed_repo_provider(const InstallContext& ctx, const std::string& sonam
  */
 bool soname_satisfied(const InstallContext& ctx, const std::string& soname)
 {
-    if (plan_provides(ctx, soname)) return true;
+    if (plan_provides_soname(ctx, soname)) return true;
     if (installed_provider_available(ctx, soname)) return true;
     if (unclaimed_repo_provider(ctx, soname)) return true;
 

@@ -13,7 +13,7 @@
     "libgraphene-1.0.so.0",
     "libgtk-4.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libpanel-1.so",
     "libpanel-1.so.1"
   ],

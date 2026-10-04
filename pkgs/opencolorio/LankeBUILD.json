@@ -14,7 +14,7 @@
     "libstdc++.so.6",
     "libyaml-cpp.so.0.9"
   ],
-  "provides": [
+  "provides_soname": [
     "libOpenColorIO.so",
     "libOpenColorIO.so.2.6"
   ],

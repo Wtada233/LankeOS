@@ -16,7 +16,7 @@
     "libwayland-client.so.0",
     "libxkbcommon.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "glib",

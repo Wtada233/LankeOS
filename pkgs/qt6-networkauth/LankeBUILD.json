@@ -10,7 +10,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6NetworkAuth.so",
     "libQt6NetworkAuth.so.6"
   ],

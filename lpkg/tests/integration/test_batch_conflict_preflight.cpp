@@ -107,7 +107,7 @@ protected:
             for (const auto& h : hooks) std::ofstream(work / "hooks" / h) << "#!/bin/sh\nexit 0\n";
         }
         const std::string path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
-        pack_package(path, work.string(), name, ver, deps, {}, "man " + name, {});
+        pack_package(path, work.string(), name, ver, deps, {}, {}, "man " + name, {});
         return path;
     }
 
@@ -428,8 +428,9 @@ TEST_F(BatchConflictPreflightTest, UpgradeBatchIsGatedToo)
         const fs::path built = pkg_dir / std::format("{}-{}.lpkg", n, v);
         fs::create_directories(mirror / n);
         fs::copy(built, mirror / n / (v + ".lpkg"), fs::copy_options::overwrite_existing);
+        // 6 段：`ver:hash:deps:provides:provides_soname:needed_so`（此处只有 deps 非空）。
         index << n << "|" << v << ":" << calculate_sha256(built) << ":"
-              << (n == "uvictim" ? "ualpha >= 2.0" : "") << "::\n";
+              << (n == "uvictim" ? "ualpha >= 2.0" : "") << ":::\n";
     }
     index.close();
 

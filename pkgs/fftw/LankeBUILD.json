@@ -9,7 +9,7 @@
     "libc.so.6",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libfftw3.so",
     "libfftw3.so.3",
     "libfftw3_threads.so",

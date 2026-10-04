@@ -29,7 +29,7 @@
     "libwebpdemux.so.2",
     "libxml2.so.16"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "exempi",

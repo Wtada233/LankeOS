@@ -23,7 +23,7 @@
     "libstdc++.so.6",
     "libxkbcommon.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libFcitx5GClient.so",
     "libFcitx5GClient.so.2"
   ],

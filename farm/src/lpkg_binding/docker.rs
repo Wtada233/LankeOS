@@ -626,7 +626,11 @@ impl LpkgBinding for RealBinding {
             Ok(scan) => BuildOutcome {
                 ok: true,
                 needed_so: scan.needed_so,
-                provides: scan.provides,
+                // 虚拟 provider 是手写值（LankeBUILD.json），扫描不产出 → 从配方读，farm 不改不盖。
+                provides: crate::build::read_lankebuild(&self.repo_dir, pkg)
+                    .map(|b| b.provides)
+                    .unwrap_or_default(),
+                provides_soname: scan.provides_soname,
                 // scan_lpkg 从 .lpkg 的 metadata.json 转述真实运行时依赖；之前丢成空 Vec
                 // 导致 index.txt deps 恒空，容器 lpkg 无法解析运行时依赖（如 build→pyproject-hooks）。
                 deps: scan.deps,

@@ -7,7 +7,7 @@
     "libc.so.6",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libvpx.so",
     "libvpx.so.12",
     "libvpx.so.12.1"

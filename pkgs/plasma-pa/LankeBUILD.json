@@ -34,7 +34,7 @@
     "libpulse.so.0",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libplasma-volume.so.6"
   ],
   "build_deps": [

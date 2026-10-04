@@ -92,7 +92,7 @@ protected:
         for (const auto& rel : empty_dirs) fs::create_directories(base / rel);
 
         const fs::path pkg_file = pkg_dir / (name + "-" + ver + ".lpkg");
-        pack_package(pkg_file.string(), work.string(), name, ver, /*deps=*/{}, /*provides=*/{},
+        pack_package(pkg_file.string(), work.string(), name, ver, /*deps=*/{}, /*provides=*/{}, {},
                      /*man_content=*/"Man page for " + name, /*needed_so=*/{});
         return pkg_file.string();
     }

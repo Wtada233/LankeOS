@@ -36,7 +36,7 @@
     "libtinysparql-3.0.so.0",
     "libwayland-client.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libnautilus-extension.so",
     "libnautilus-extension.so.4"
   ],

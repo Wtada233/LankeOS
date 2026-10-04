@@ -19,7 +19,7 @@
     "libsystemd.so.0",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libcups.so",
     "libcups.so.2",
     "libcupsimage.so",

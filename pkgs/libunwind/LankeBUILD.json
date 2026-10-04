@@ -9,7 +9,7 @@
     "liblzma.so.5",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libunwind-coredump.so",
     "libunwind-coredump.so.0",
     "libunwind-generic.so",

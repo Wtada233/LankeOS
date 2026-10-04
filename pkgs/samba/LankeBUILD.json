@@ -40,7 +40,7 @@
     "liburing.so.2",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libdcerpc-binding.so",
     "libdcerpc-binding.so.0",
     "libdcerpc-server-core.so",

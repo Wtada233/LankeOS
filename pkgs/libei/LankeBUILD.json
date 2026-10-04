@@ -10,7 +10,7 @@
     "libsystemd.so.0",
     "libxkbcommon.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libei.so",
     "libei.so.1",
     "libeis.so",

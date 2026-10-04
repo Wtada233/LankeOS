@@ -19,7 +19,7 @@
     "xdg-user-dirs-gtk"
   ],
   "needed_so": [],
-  "provides": [],
+  "provides_soname": [],
   "sources": [],
   "work_sources": []
 }

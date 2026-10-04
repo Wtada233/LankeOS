@@ -11,7 +11,7 @@
     "libm.so.6",
     "libswscale.so.10"
   ],
-  "provides": [
+  "provides_soname": [
     "libx264.so",
     "libx264.so.165"
   ],

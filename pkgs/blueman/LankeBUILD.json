@@ -12,7 +12,7 @@
     "libglib-2.0.so.0",
     "libgthread-2.0.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "bluez",

@@ -12,7 +12,7 @@
     "libpolkit-gobject-1.so.0",
     "libudev.so.1"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "glib",

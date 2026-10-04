@@ -14,7 +14,7 @@
     "libresolv.so.2",
     "libsystemd.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "cmake",

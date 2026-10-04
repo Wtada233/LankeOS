@@ -14,7 +14,7 @@
     "libstdc++.so.6",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libvisio-0.1.so",
     "libvisio-0.1.so.1"
   ],

@@ -12,7 +12,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libicudata.so",
     "libicudata.so.78",
     "libicui18n.so",

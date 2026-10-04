@@ -7,7 +7,7 @@
     "libc.so.6",
     "libncursesw.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libedit.so",
     "libedit.so.0"
   ],

@@ -12,7 +12,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libixion-0.20.so",
     "libixion-0.20.so.0"
   ],

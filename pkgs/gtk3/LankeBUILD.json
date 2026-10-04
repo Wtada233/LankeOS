@@ -40,7 +40,7 @@
     "libwayland-egl.so.1",
     "libxkbcommon.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libgailutil-3.so",
     "libgailutil-3.so.0",
     "libgdk-3.so",

@@ -8,7 +8,7 @@
     "libm.so.6",
     "libpng16.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libzint.so",
     "libzint.so.2.16"
   ],

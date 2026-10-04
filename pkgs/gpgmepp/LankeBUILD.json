@@ -11,7 +11,7 @@
     "libgpgme.so.45",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libgpgmepp.so",
     "libgpgmepp.so.7"
   ],

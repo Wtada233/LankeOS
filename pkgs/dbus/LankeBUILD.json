@@ -12,7 +12,7 @@
     "libexpat.so.1",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libdbus-1.so",
     "libdbus-1.so.3"
   ],

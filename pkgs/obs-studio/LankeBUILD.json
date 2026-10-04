@@ -67,7 +67,7 @@
     "libxkbcommon.so.0",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libobs-frontend-api.so",
     "libobs-frontend-api.so.0",
     "libobs-frontend-api.so.30",

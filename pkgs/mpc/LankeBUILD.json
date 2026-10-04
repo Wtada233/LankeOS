@@ -9,7 +9,7 @@
     "libm.so.6",
     "libmpfr.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libmpc.so",
     "libmpc.so.3"
   ],

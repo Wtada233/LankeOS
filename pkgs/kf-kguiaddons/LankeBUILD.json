@@ -15,7 +15,7 @@
     "libstdc++.so.6",
     "libwayland-client.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6GuiAddons.so",
     "libKF6GuiAddons.so.6"
   ],

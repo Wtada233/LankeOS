@@ -1,0 +1,3 @@
+DIR_META /usr/share/foo 1777 0 0
+NEW_DIR /usr/share/foo/ 0755 0 0
+DIR_RM /usr/share/foo 0755 0 0

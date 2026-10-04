@@ -98,7 +98,7 @@ protected:
         // 归档文件名不能用版本号拼（带 `\n` 的名字连构造都失败）—— 用固定名，版本只在
         // metadata.json 里（与"远端索引/本地包各自带版本"的实际形态一致）。
         const std::string path = (pkg_dir / (name + ".lpkg")).string();
-        pack_package(path, work.string(), name, ver, {}, {}, "man " + name, {});
+        pack_package(path, work.string(), name, ver, {}, {}, {}, "man " + name, {});
         return path;
     }
 

@@ -17,7 +17,7 @@
     "libpolkit-gobject-1.so.0",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libpolkit-qt6-agent-1.so",
     "libpolkit-qt6-agent-1.so.1",
     "libpolkit-qt6-core-1.so",

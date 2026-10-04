@@ -20,7 +20,7 @@
     "libsystemd.so.0",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libostree-1.so",
     "libostree-1.so.1"
   ],

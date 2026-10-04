@@ -6,7 +6,7 @@
     "compiler-rt",
     "python"
   ],
-  "provides": [
+  "provides_soname": [
     "libclang-cpp.so",
     "libclang-cpp.so.23.1",
     "libclang.so",

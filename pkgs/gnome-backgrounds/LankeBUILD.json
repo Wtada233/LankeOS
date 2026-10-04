@@ -6,7 +6,7 @@
     "libjxl"
   ],
   "needed_so": [],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "glib",

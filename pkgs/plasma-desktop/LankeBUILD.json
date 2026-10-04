@@ -90,7 +90,7 @@
     "libxkbfile.so.1",
     "libxkbregistry.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libkglobalaccelmodel.so.6"
   ],
   "build_deps": [

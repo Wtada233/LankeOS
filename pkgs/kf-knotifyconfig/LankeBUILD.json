@@ -15,7 +15,7 @@
     "libcanberra.so.0",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6NotifyConfig.so",
     "libKF6NotifyConfig.so.6"
   ],

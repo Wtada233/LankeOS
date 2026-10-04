@@ -9,7 +9,7 @@
     "libsass.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "libsass"

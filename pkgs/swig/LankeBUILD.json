@@ -11,7 +11,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "boost",

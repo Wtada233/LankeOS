@@ -11,7 +11,7 @@
     "libglslang.so.16",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libshaderc_shared.so",
     "libshaderc_shared.so.1"
   ],

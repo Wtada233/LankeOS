@@ -31,7 +31,7 @@
     "which"
   ],
   "needed_so": [],
-  "provides": [],
+  "provides_soname": [],
   "sources": [],
   "work_sources": []
 }

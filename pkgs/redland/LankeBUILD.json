@@ -12,7 +12,7 @@
     "librasqal.so.3",
     "libsqlite3.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "librdf.so",
     "librdf.so.0"
   ],

@@ -12,7 +12,7 @@
     "libraw.so.25",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKDcrawQt6.so",
     "libKDcrawQt6.so.5"
   ],

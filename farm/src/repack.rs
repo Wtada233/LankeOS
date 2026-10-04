@@ -16,7 +16,8 @@
 //! repack 有效性由构建不变量保证（§6：构建成功 ⇒ needed_so 的 provider 当时都在 local repo），
 //! 无需额外 guard。
 //!
-//! repack 只改 `needed_so`/`provides`（用户明确：deps 不动，由 gen_deps/deprules 规则生成）。
+//! repack 只改 `needed_so`/`provides_soname`（用户明确：deps 不动，由 gen_deps/deprules 规则生成；
+//! **`provides`（虚拟 provider）是手写值，farm 原样保留、绝不覆盖**）。
 //! **同时返回 LankeBUILD.json 需要的字段**（`update_lankebuild` 在调用方），确保仓库源定义
 //! 与包内 metadata 一致（§6：把漂移 diff 落回仓库，源定义是真相）。
 
@@ -46,13 +47,14 @@ impl Drop for TmpGuard {
     }
 }
 
-/// 解包（若未解包）→ 改 metadata.json 的 needed_so/provides → 重打覆盖 .lpkg。
+/// 解包（若未解包）→ 改 metadata.json 的 needed_so/provides_soname → 重打覆盖 .lpkg。
+/// **`provides`（虚拟 provider）原样保留、绝不触碰**——它是手写值，扫描不产出。
 /// `extract_dir` 复用 scan 的解包目录（单包单趟）。
 pub fn repack_with_metadata(
     lpkg_path: &Path,
     extract_dir: &Path,
     new_needed_so: &[String],
-    new_provides: &[String],
+    new_provides_soname: &[String],
 ) -> Result<(), FarmError> {
     if !extract_dir.join("metadata.json").exists() {
         scan::extract_lpkg(lpkg_path, extract_dir)?;
@@ -66,8 +68,8 @@ pub fn repack_with_metadata(
             .map(|s| serde_json::Value::String(s.clone()))
             .collect(),
     );
-    meta["provides"] = serde_json::Value::Array(
-        new_provides
+    meta["provides_soname"] = serde_json::Value::Array(
+        new_provides_soname
             .iter()
             .map(|s| serde_json::Value::String(s.clone()))
             .collect(),

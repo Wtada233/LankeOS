@@ -10,7 +10,7 @@
     "libnftnl.so.11",
     "libreadline.so.8"
   ],
-  "provides": [
+  "provides_soname": [
     "libnftables.so",
     "libnftables.so.1"
   ],

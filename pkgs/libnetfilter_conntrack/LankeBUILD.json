@@ -7,7 +7,7 @@
     "libmnl.so.0",
     "libnfnetlink.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libnetfilter_conntrack.so",
     "libnetfilter_conntrack.so.3"
   ],

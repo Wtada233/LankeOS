@@ -10,7 +10,7 @@
     "libm.so.6",
     "libudev.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libdevmapper-event.so",
     "libdevmapper-event.so.1.02",
     "libdevmapper.so",

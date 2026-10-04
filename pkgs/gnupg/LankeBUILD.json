@@ -16,7 +16,7 @@
     "libsqlite3.so.0",
     "libz.so.1"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "gnutls",

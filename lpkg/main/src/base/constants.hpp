@@ -39,6 +39,7 @@ inline constexpr std::string_view J_RELEASE = "release";
 inline constexpr std::string_view J_MAN = "man";
 inline constexpr std::string_view J_DEPS = "deps";
 inline constexpr std::string_view J_PROVIDES = "provides";
+inline constexpr std::string_view J_PROVIDES_SONAME = "provides_soname";
 inline constexpr std::string_view J_NEEDED_SO = "needed_so";
 inline constexpr std::string_view J_NO_STRIP = "no_strip";
 inline constexpr std::string_view J_SOURCES = "sources";
@@ -98,19 +99,6 @@ inline constexpr std::string_view EXT_LPKG = ".lpkg";
 inline constexpr std::string_view EXT_ZST = ".zst";
 inline constexpr std::string_view EXT_LA = ".la";
 inline constexpr std::string_view SUFFIX_LPKG_NEW = ".lpkgnew";
-/// lpkg 版本 → libsolv EVR 的**发行修订号分隔符**（`+release` 在 EVR 里写成 `^^release`）。
-/// 为什么是 `^`：libsolv 的 rpm 比较器把 caret 定义为"比基础版新、比任何真实下一段旧"，
-/// 正是发行修订号的语义；且全串不含 `-` ⇒ libsolv 的 release 槽位永远为空、依赖匹配用的
-/// `EVRCMP_MATCH_RELEASE` 特例分支不可能触发。**完整论证见 `vercmp/version.hpp`。**
-inline constexpr std::string_view EVR_RELEASE_SEP = "^^";
-/// 版本域里**不允许**出现的字符 —— 它们对 libsolv 的 EVR 解析都有特殊含义，混进 lpkg 版本
-/// 就会让桥接的"编码 ↔ 解码"不再是一一对应（或让比较语义悄悄错位）：
-///   `^` caret（本仓库拿它当 `+release` 的分隔符，见 `EVR_RELEASE_SEP`）；
-///   `~` 预发布（lpkg 用 `-` 表达；`to_libsolv_evr` 会把 `-` 映射成它 ⇒ 原生的 `~` 会歧义）；
-///   `:` epoch（libsolv 会把它前面当 epoch 切出去）。
-/// 实测：真实索引 678 个版本里这三个字符**一个都没有**，所以拒它们不误伤任何现存包。
-/// 落点校验（`is_safe_path_component`）与桥接（`to_libsolv_evr`）两处都拒。
-inline constexpr std::string_view EVR_RESERVED_CHARS = "^~:";
 /// 安装期"先写临时文件再 rename 到位"用的后缀（`<dst>.lpkgtmp`）。**唯一出处** ——
 /// 此前它是 `archive.cpp` 的局部常量 + 两处裸字面量，正是"同一件事三处表达"的形态。
 inline constexpr std::string_view SUFFIX_LPKG_TMP = ".lpkgtmp";
@@ -156,6 +144,22 @@ inline constexpr ReservedMemberName RESERVED_MEMBER_NAMES[] = {
 /// confhashes.db 取值列里 `<包名>` 与 `<sha256>` 之间的分隔符
 /// （见 `Config::conf_hashes_db()`：键是逻辑路径，取值是 `"<pkg>:<sha256>"`）
 inline constexpr std::string_view CONF_HASH_SEP = ":";
+
+/// **SONAME 空间**的内部前缀：`needed_so` 的每条需求、以及每条 `provides_soname`，都带它。
+///
+/// 为什么需要命名空间（2026-10-04，维护者拍板）：libsolv 的池里每个包都有一条**自提供**
+/// （`<包名> = evr`），而"**不带版本的 provide 能满足任意 requires**"。若 SONAME 与包名
+/// 共用一个命名空间，就会互相串 —— 实测复现过 `needed_so: o` 被**名叫 `o` 的包**满足。
+///
+/// 池里因此只有**两个**命名空间，与两个字段一一对应（**全程零字符串形状判断**）：
+///   · **裸名** —— 「包名 + 虚拟能力」：包的自提供、以及 `provides` 的每一条。
+///     `deps` 的需求走这一路 ⇒ 既能匹配**包名**、也能匹配**虚拟 provides**（虚拟包语义）。
+///   · **`so:`** —— 「SONAME」：`needed_so` 的需求与 `provides_soname` 的每一条。
+///     ⇒ `needed_so` 只能被 `provides_soname` 满足，包名永远进不来；反之亦然。
+/// **包名不可能含 `:`**（`is_safe_path_component` 把 `:` 当**分帧字符**拒掉），
+/// 所以裸名永远撞不进 `so:` 空间。
+/// ⚠️ 它是**内部编码**：进了用户可见的冲突消息必须先剥掉（见 `decode_libsolv_message`）。
+inline constexpr std::string_view POOL_SONAME_PREFIX = "so:";
 
 // CLI 命令名
 inline constexpr std::string_view CMD_INSTALL = "install";

@@ -7,7 +7,7 @@
     "libc.so.6",
     "libtraceevent.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libtracefs.so",
     "libtracefs.so.1"
   ],

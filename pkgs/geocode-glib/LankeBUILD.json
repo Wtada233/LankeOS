@@ -13,7 +13,7 @@
     "libm.so.6",
     "libsoup-3.0.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libgeocode-glib-2.so",
     "libgeocode-glib-2.so.0"
   ],

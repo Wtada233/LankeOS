@@ -9,7 +9,7 @@
     "libmpfr.so.6",
     "libpcre2-8.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libbytesize.so",
     "libbytesize.so.1"
   ],

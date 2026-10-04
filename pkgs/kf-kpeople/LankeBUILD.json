@@ -19,7 +19,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6People.so",
     "libKF6People.so.6",
     "libKF6PeopleBackend.so",

@@ -7,7 +7,7 @@
     "ld-linux-x86-64.so.2",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libcmocka.so",
     "libcmocka.so.0"
   ],

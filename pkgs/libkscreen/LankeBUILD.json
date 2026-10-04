@@ -17,7 +17,7 @@
     "libxcb-randr.so.0",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Screen.so",
     "libKF6Screen.so.8",
     "libKF6ScreenDpms.so",

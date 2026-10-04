@@ -13,7 +13,7 @@
     "libgtk-3.so.0",
     "libhandy-1.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "dconf",

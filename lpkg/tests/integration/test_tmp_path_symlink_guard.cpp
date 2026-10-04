@@ -114,7 +114,7 @@ protected:
         fs::create_directories(work / "content");
         fill(work, work / "content");
         const std::string path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
-        pack_package(path, work.string(), name, ver, {}, {}, "man " + name, {});
+        pack_package(path, work.string(), name, ver, {}, {}, {}, "man " + name, {});
         return path;
     }
 
@@ -270,7 +270,7 @@ TEST_F(TmpPathSymlinkGuardTest, HookSymlinkEscapingThePackageIsRefused)
     ASSERT_TRUE(fs::is_symlink(work / "hooks" / "postinst.sh"));
 
     const std::string pkg_path = (pkg_dir / (pkg + "-1.0.lpkg")).string();
-    pack_package(pkg_path, work.string(), pkg, "1.0", {}, {}, "man " + pkg, {});
+    pack_package(pkg_path, work.string(), pkg, "1.0", {}, {}, {}, "man " + pkg, {});
 
     std::string msg;
     try {
@@ -301,7 +301,7 @@ TEST_F(TmpPathSymlinkGuardTest, HookSymlinkInsideThePackageStillWorks)
     fs::create_symlink("real.sh", work / "hooks" / "postinst.sh");  // 包内互指
 
     const std::string pkg_path = (pkg_dir / (pkg + "-1.0.lpkg")).string();
-    pack_package(pkg_path, work.string(), pkg, "1.0", {}, {}, "man " + pkg, {});
+    pack_package(pkg_path, work.string(), pkg, "1.0", {}, {}, {}, "man " + pkg, {});
 
     std::string msg;
     try {

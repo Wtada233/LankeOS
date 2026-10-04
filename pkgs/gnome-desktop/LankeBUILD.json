@@ -24,7 +24,7 @@
     "libudev.so.1",
     "libxkbregistry.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libgnome-bg-4.so",
     "libgnome-bg-4.so.2",
     "libgnome-desktop-3.so",

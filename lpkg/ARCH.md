@@ -175,34 +175,57 @@
 - 建后 `lstat` 复核"真目录 + 属主 == euid"是**纵深防御**：将来谁改回 `create_directories`，
   这一行会立刻失败，而不是静默用上别人预建的目录。
 
-### 1.8 版本语义与 libsolv 桥接（2026-10-03）
+### 1.8 版本语义：**就是 rpm 的 EVR**（2026-10-04，8.0.0 破坏性重写）
 
-**不变量**：求解器（libsolv）认为"这个约束被那个版本满足"，必须与 lpkg 自己的
-`version_satisfies()` 说的一致。两条判据分属两套实现，一旦分叉，后果是**假不满足**
-（事务无解，明明装得上却报缺依赖）或**假满足**（装出坏系统 / 计划被安装期判据推翻后整批回滚）。
+**一句话**：lpkg 的版本语义 = rpm 的 `[epoch:]version[-release]`，判据**只有一份** ——
+libsolv 的 EVR 比较（`vercmp/version.cpp` 的 `evr_cmp` → `pool_evrcmp_str(…, EVRCMP_COMPARE)`），
+版本串**原样**进池。那条"两套判据必须手动保持一致"的桥**没了**。
 
-**编码**（`vercmp/version.hpp` 的 `to_libsolv_evr()`，唯一入口）：
-`norm = `-`→`~`（lpkg 的预发布标记 → rpm 的 tilde）；`[V,R]` 在第一个 `+` 处切；
-`enc = V`（R 空）或 `V + "^^" + R`（R 非空）。
-
-- **为什么不能用 `-` 承 release**（2026-10-03 前的做法）：libsolv 的依赖匹配走
-  `EVRCMP_MATCH_RELEASE`（`src/pooldep.c` 的 `pool_intersect_evrs`），它把"有一侧没有
-  release"当**通配** ⇒ `= 1.0` 会匹配 `1.0+1`（假满足），`> 1.0+1` 反过来匹配 `1.0`，
-  而 `> 1.0` 又不匹配 `1.0+1`（假不满足）。实测在 (候选×约束) 4032 组合的矩阵上差 **78 处**。
-- **为什么 `^` 对**：libsolv 的 rpm 比较器把 caret 定义为"比基础版新、比任何真实下一段旧"，
-  正是发行修订号的语义；而且全串**不含 `-`** ⇒ libsolv 切出的 release 恒为空 ⇒ 上述 ±2 特例
-  分支不可能触发。同一矩阵上不一致数 **0**。
-- **保留字符**：`^` `~` `:` 一律不许出现在 lpkg 的包名/版本里（`is_safe_path_component` 拒、
-  `to_libsolv_evr` 也拒）。实测真实索引 678 个版本里一个都没有。
-- **全量实测**（2026-10-03，一次性跑，不进套件）：拿真实索引的 **678 个版本两两比 459,684 对**，
-  `lpkg evr_cmp` 的符号与 libsolv 对**编码后**串的 `solv_vercmp` 符号 **0 处分叉** ——
-  即编码在真实数据上是一个保序同构（旧编码在同一批数据上就会分叉）。
-- **闸门**：`tests/unit/test_vercmp_libsolv_bridge.cpp`（同一矩阵，逐个比对 libsolv 的
-  `pool_whatprovides` 与 `version_satisfies`；换编码/升 libsolv 都会红）；
-  端到端行为见 `tests/integration/test_version_bridge_solver.cpp`。
-- **计划版本复核**（`detail::check_planned_dep_version`，§6.2 的安装校验里调用）：
-  桥接修好后它已是**纵深防御**（求解器不再产出违规计划），用例直接喂手搓计划
+- **"最新版"**：`version_compare()` 的实现**就是** libsolv 的 EVR 比较（`repository.cpp`
+  拿它当 `ranges::sort` 的比较器 ⇒ 升序 ⇒ 最后一版最新），求解器选 `latest` 用的是**同一个**
+  函数 ⇒ 结构上不存在"两边判序相反"。
+- **build 的 `release:`**：按 rpm 语义拼成 `<version>-<release>`（`builder.cpp`；
+  8.0.0 之前是 `<version>+<release>`）。
+- **保留字符**：`is_safe_path_component` 仍拒 `:`，但理由换成了**分帧**（`pkgs` 的
+  `name:version`、索引版本块的 `<ver>:<hash>:…`），与版本语义无关；`^` / `~` **已放行**
+  （`~` 是 rpm 的预发布标记：`1.0~rc1 < 1.0`）。lpkg **不用 epoch**（`:` 不在版本里）。
+- **release 是否参与依赖匹配**（⚠️ **这一步比"同一个比较器"更微妙，务必读完**）：
+  `version_satisfies()` 用的是 libsolv 的**依赖匹配**模式 `EVRCMP_MATCH_RELEASE`
+  （= `pooldep.c` 里 `EVRCMP_DEPCMP` 在 RPM disttype 下的取值），**不是**排序模式
+  `EVRCMP_COMPARE`。两者对"一侧有 release、另一侧没写"的处置不同 —— 匹配模式按 rpm 的
+  规则把**没写 release 当通配**（`evr.c` 在 MATCH_RELEASE 下返回 ±2），于是：
+  - 候选 `1.0-5`、约束 `= 1.0` → **满足**；约束 `> 1.0` → **不**满足；`>= 1.0`/`<= 1.0` → 满足；
+  - 候选 `1.0`（无 release）、约束 `> 1.0-5` → **满足**（`!=` 也满足）。
+  这张三元表**逐条对应** `pooldep.c` 的 `pool_match_nevr_rel()` —— 也就是 libsolv 判定
+  "某个 solvable 是否满足某条依赖"用的那一份，`pool_whatprovides` 同一份。所以"求解器说
+  能装、安装期说不满足"这类分叉**结构上不存在**，而不是"靠两边写得一样"。
+  上面那几条**反直觉**的结论是实测的（容器里的 libsolv 直接给答案），并已钉进
+  `tests/unit/test_version.cpp` 的 `ReleaseIsAWildcardInDependencyMatching`。
+- **`version_compare()` 与 `version_satisfies()` 用的是两种模式**，别把它们当成一个：
+  `version_compare`（排序、"谁更新"）走 `EVRCMP_COMPARE`（有 release 者更大），
+  `version_satisfies`（依赖、"谁满足约束"）走 `EVRCMP_MATCH_RELEASE`。这与 rpm 本身的分工
+  一致（排序与依赖匹配本来就是两套规则）。
+- **计划版本复核**（`detail::check_planned_dep_version`，§6.2）：桥没了之后它依旧是**纵深
+  防御**（求解器与安装期是同一个判据 ⇒ 结构上不可能分叉），用例直接喂手搓计划
   （`tests/unit/test_plan_dep_version_check.cpp`）。
+
+> **历史（已被推翻，2026-10-04）** —— 旧设计与此前的修法，**别当现行规范读**：
+> 此前 lpkg 有**自己的**一套版本语义（`-` = 预发布、`+N` = 发行修订号），并用
+> `to_libsolv_evr()` / `from_libsolv_evr()` 在两者之间**编解码**（`-`→`~`、
+> `+release`→`^^release`），因为 libsolv 只认 rpm。**代价是两套判据必须逐条一致，而它们
+> 不一致过**：2026-10-03 在 (候选 × 约束) 的 4032 组合矩阵上差 **78 处、两个方向都有**
+> （`= 1.0` 匹配 `1.0+1` ⇒ 假满足；`> 1.0` 不匹配 `1.0+1` ⇒ 假不满足）。当时的修法是换一个
+> **更冷门的编码**（`^` caret 当 release 分隔符，依据是 libsolv 把 caret 定义成"比基础版新、
+> 比任何真实下一段旧"）+ 一份保留字符黑名单（`^`/`~`/`:`）+ 一张等价性矩阵闸门 —— 那是
+> **治标**：只要还存在第二套语义，就得靠"手动保持一致"活着。
+> 8.0.0 取消了第二套语义，于是 `EVR_RELEASE_SEP` / `EVR_RESERVED_CHARS` /
+> `to_libsolv_evr` / `from_libsolv_evr` **全部删除**；`tests/unit/test_vercmp_libsolv_bridge.cpp`
+> （矩阵差分，正是为这座桥建的）**一并删除**。
+> `tests/fuzz/vercmp_fuzz.cpp` **保留但换了守的东西**：它不再能发现"比较器分叉"（两边已是
+> 同一个函数），但仍在守**算子映射**（`version_op_flags` —— 求解器灌依赖与安装期判定共用
+> 的唯一实现）与**那张 ±2 通配表**，两者写错的后果与当年一样重。它的文件头已按此重写。
+> ⚠️ 顺带修正一处**既有误判**：`ncurses=6.5-20250809` 在上游是"6.5 的补丁快照"（**更新**），
+> 旧语义把 `-` 当预发布 ⇒ 判它**旧于** `6.5` ✗；rpm 语义下它是 `6.5` 的 release ⇒ **更新** ✓。
 
 ---
 
@@ -916,7 +939,7 @@ WAL 中的 DB 条目（安装 [A, B, C] 的批次，B 失败）：
 ```
 
 **批次开头那 6 条 `:batch-start` 条目**（`Cache::write(":batch-start")` 对
-`pkgs`/`files.db`/`provides.db`/`confhashes.db`/`xattrkeys.db`/`holdpkgs` 各写一次，
+`pkgs`/`files.db`/`provides.db`/`provides_soname.db`/`confhashes.db`/`xattrkeys.db`/`holdpkgs` 各写一次，
 见 `cache.cpp`）—— 它们在逆序里排在最后（写得最早），跑到的判据见 §10.2：正式文件**仍在位
 且非空**（= 已被更晚的各里程碑逆操作带回批次起点内容）就跳过；不在位则从该里程碑备份还原；
 **"在位但为空"时要看备份**（订正 2026-09-26：原文只写了"在位且非空 → 跳过 / 不在位或为空 →
@@ -1143,7 +1166,7 @@ install_packages(args)
 
 ### 6.2 包级安装
 
-**metadata 的三个"分帧敏感"字段要消毒**（2026-10-03 新增）：`deps` / `provides` / `needed_so`
+**metadata 的"分帧敏感"字段要消毒**（2026-10-03 新增，2026-10-04 加 `provides_soname`）：`deps` / `provides` / `provides_soname` / `needed_so`
 的每一条必须是**单行、无控制字符**（`\0` `\n` `\r` `\t`），否则**整包拒绝**
 （`error.unsafe_metadata_field`，点名文件/字段/偏移）。理由与归档**成员名**消毒同款，只是
 作用于**内容**而不是名字：`deps/<pkg>`、`needed_so/<pkg>` 一行一条（`\n` 注入 ⇒ 读回时凭空
@@ -2147,7 +2170,7 @@ void recover_packages() {          // db/recover.cpp
 | 设计点 | 决策 | 理由 |
 |--------|------|------|
 | 是否跳过 RESTORE_* 行 | ✅ 跳过 | RESTORE_* 是 rollback 的产物，再次逆序会重做正向操作 |
-| 是否处理 :batch-start DB 标记 | ⚠️ **有条件跳过**：正式文件仍在**且非空**才跳过，否则从该里程碑备份还原（`batch_start_db_still_in_place()`，`wal_op.cpp`） | "最终状态"只在该状态确实还在盘上时成立。`write_db_file_wal`/`write_set_file_wal` 的 rename 窗口里正式名已消失（`init_filesystem()` 之后则是"存在但 0 字节"），此时那份备份是唯一还原依据；无条件跳过 = 它永远无人消费，且 `cleanup_db_backups()` 随后把唯一备份删掉（`pkgs`/`holdpkgs` 缺失让恢复整体失败，`files.db`/`provides.db`/`confhashes.db` 静默归零，均不可逆）。现场复现：`test_db_batch_start_recovery.cpp` |
+| 是否处理 :batch-start DB 标记 | ⚠️ **有条件跳过**：正式文件仍在**且非空**才跳过，否则从该里程碑备份还原（`batch_start_db_still_in_place()`，`wal_op.cpp`） | "最终状态"只在该状态确实还在盘上时成立。`write_db_file_wal`/`write_set_file_wal` 的 rename 窗口里正式名已消失（`init_filesystem()` 之后则是"存在但 0 字节"），此时那份备份是唯一还原依据；无条件跳过 = 它永远无人消费，且 `cleanup_db_backups()` 随后把唯一备份删掉（`pkgs`/`holdpkgs` 缺失让恢复整体失败，`files.db`/`provides.db`/`provides_soname.db`/`confhashes.db` 静默归零，均不可逆）。现场复现：`test_db_batch_start_recovery.cpp` |
 | 是否写 RESTORE_* 审计 | ✅ 是 | rec 的 reverse_execute 应该与 batch_rollback 行为一致 |
 | 旧版二进制写入的"批次内 CLEANUP"WAL | ❌ **不支持** | lpkg 经 lpkg 升级时，**旧二进制**会先跑 `recover_packages()` 处理掉遗留 WAL，新二进制才上线；因此更新后不存在需要兼容的旧形状事务。**手工替换 lpkg 二进制不受支持**（若此时正躺着一个被中断的 remove WAL，回滚会让 DB 回到"已安装"而文件已删 —— 遇到时用 `lpkg rec` 前先人工核对） |
 | 是否检测 CLEANUP 分岔 | ❌ 不再需要 | CLEANUP 只出现在事务之外（post-commit），事务内不可能有 → 未提交批次一律 `reverse_execute`。post-commit 的残留清理由 `continue_post_commit_cleanup` 负责（**§11.2 步骤 1.5**） |
@@ -2224,7 +2247,7 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 
 - **2.1 `run_batch_transaction`** — 模板定义于 `batch_transaction.hpp`。函数第一行先 `trim_completed()`。正向：`BEGIN_PKGS` → `Cache::write(":batch-start")` → 逐包执行 → `wal::commit_batch()`（写 `COMMIT_PKGS`）。异常路径：catch → `batch_rollback` →（返回 true 才）`cleanup_db_backups()` + `trim_completed()` → rethrow。
 - **2.2 `install_packages`** — 重构于 `package_manager.cpp`。**四个阶段**（2026-10-03）：
-  `download_batch()`（`:: 下载`；下载 + sha256 + **逐字段**核对归档 `metadata.json` 与索引 —— name / version / deps / provides / needed_so，见 `metadata_view()`；**任何字段不符即抛 `error.metadata_mismatch`**，错误里逐条列 `字段: '索引值' → '归档值'`，此刻**什么都没落盘**）、
+  `download_batch()`（`:: 下载`；下载 + sha256 + **逐字段**核对归档 `metadata.json` 与索引 —— name / version / deps / provides / provides_soname / needed_so，见 `metadata_view()`；**任何字段不符即抛 `error.metadata_mismatch`**，错误里逐条列 `字段: '索引值' → '归档值'`，此刻**什么都没落盘**）、
   `extract_batch()`（`:: 解压`；解压 + 置 `content_ready`，末尾跑整批文件冲突预检）、
   `run_batch_transaction()`（`:: 安装`）、
   提交后 `finish_committed_batch()` → `run_post_install_hooks()`（`:: 运行安装后钩子`）→ `finish_post_commit_cleanup()` → `TriggerManager::run_all()`，
@@ -2287,7 +2310,7 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 - **6.2 幂等性** — `tests/unit/test_wal_core.cpp`（68 tests）。覆盖所有操作类型的 `reverse_execute` 幂等性（NULL→跳过、重复→跳过）。
 - **6.3 里程碑链式恢复** — `test_wal_core.cpp` + `test_breakpoints.cpp` + `tests/integration/test_db_backup_chain.cpp` / `test_db_batch_start_recovery.cpp`。验证 DB 备份链 `batch-start ← A:installed ← B:installed` 的正确逆序恢复。
 - **6.4 二次回滚幂等** — `test_breakpoints.cpp`。验证 rollback 各阶段中断后 `recover_packages` 能正确继续。
-- **6.5 集成测试** — 多个测试文件覆盖：批量安装/移除/升级、依赖链、provides 解析、版本约束、config 保护、SIGINT 保护、并发锁、autoremove、recursive remove。
+- **6.5 集成测试** — 多个测试文件覆盖：批量安装/移除/升级、依赖链、provides（虚拟 provider）与 provides_soname（SONAME）解析、版本约束、config 保护、SIGINT 保护、并发锁、autoremove、recursive remove。
 - **6.6 CLEANUP 阶段测试** — `tests/unit/test_cleanup.cpp`（26 tests）。覆盖 CLEANUP 解析与不可逆性、stash / `DIR_RM` 恢复、随机后缀唯一性、rec CLEANUP 续传、安全检查、现有行为回归。
 - **6.7 双重回滚回归（2026-08-03）** — `tests/integration/test_active_rollback.cpp`。升级中途 COPY 失败 / COMMIT 后失败 → 旧文件必须保留（曾双重回滚删旧文件）；CLEANUP write-ahead 崩溃窗口 → 整批可恢复。
 - **6.8 全量** — 当前全量运行读数：**1164 tests / 143 suites / 1163 PASSED / 0 FAILED**（docker 容器 `make test`，2026-10-03 第五批之后）。同一时点现数的宏数也是 **1164 / 143 suites**（`grep -rhE 'TEST(_F|_P)?\(' tests/ | wc -l`）。1 SKIPPED = `UpgradePropertyTest.SingleSeedReplay`，它是需要显式指定种子的复现入口。覆盖上述全部章节。**该数字随加测试而变，别当契约** —— 要引用它请现数一次；`tests/` 才是唯一事实来源。
@@ -2623,7 +2646,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 1. 暂存目录改为 `mkdtemp` 原子创建 + `0700`（§1.7）—— 修"本地无权用户可劫持 root 暂存目录"。
 2. 落位/让开目标的**祖先链**约束：`detail::confine_target_path()`（§5.4 不变量 6）——
    `--root` 下不再可能经中间段符号链接写到 root 之外。
-3. metadata 的 `deps`/`provides`/`needed_so` 拒控制字符（§6.2）—— 修状态文件的分帧注入。
+3. metadata 的 `deps`/`provides`/`provides_soname`/`needed_so` 拒控制字符（§6.2）—— 修状态文件的分帧注入。
 4. 包名/版本号额外拒 `,` / `|` / `;`（`base/utils.cpp` 的 `is_safe_path_component`）——
    修"包名含 `,` ⇒ `files.db` 属主集合读回成两个幽灵属主、真实包误含它的文件"。
 

@@ -15,7 +15,7 @@
     "libmpfr.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libamd.so",
     "libamd.so.3",
     "libbtf.so",

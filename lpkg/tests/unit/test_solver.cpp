@@ -17,6 +17,7 @@ protected:
     void add(const std::string& name, const std::string& ver,
              const std::vector<std::string>& deps = {},
              const std::vector<std::string>& provides = {},
+             const std::vector<std::string>& provides_soname = {},
              const std::vector<std::string>& needed_so = {})
     {
         std::vector<DependencyInfo> dep_infos;
@@ -25,7 +26,7 @@ protected:
             di.name = d;
             dep_infos.push_back(std::move(di));
         }
-        repo.update_package_info(name, ver, dep_infos, provides, needed_so);
+        repo.update_package_info(name, ver, dep_infos, provides, provides_soname, needed_so);
     }
 
     SolveResult solve(const std::vector<std::pair<std::string, std::string>>& targets,
@@ -45,8 +46,8 @@ protected:
 // 基本：装 appB（needed_so liba）→ libA 被自动拉入
 TEST_F(SolverTest, PullsProviderViaNeededSo)
 {
-    add("libA", "1.0", {}, {"liba.so.1"}, {});
-    add("appB", "2.0", {}, {}, {"liba.so.1"});
+    add("libA", "1.0", {}, {}, {"liba.so.1"}, {});
+    add("appB", "2.0", {}, {}, {}, {"liba.so.1"});
 
     auto r = solve({{"appB", "latest"}});
     ASSERT_TRUE(r.ok()) << "problems: " << [&r] {
@@ -68,8 +69,8 @@ TEST_F(SolverTest, PullsProviderViaNeededSo)
 // 基本：装 appB（deps 指名 libA）→ libA 被自动拉入
 TEST_F(SolverTest, PullsDepsByName)
 {
-    add("libA", "1.0", {}, {"liba.so.1"}, {});
-    add("appB", "2.0", {"libA"}, {}, {});
+    add("libA", "1.0", {}, {}, {"liba.so.1"}, {});
+    add("appB", "2.0", {"libA"}, {}, {}, {});
 
     auto r = solve({{"appB", "latest"}});
     ASSERT_TRUE(r.ok());
@@ -79,10 +80,10 @@ TEST_F(SolverTest, PullsDepsByName)
 // qt6-base 场景：已装 sqlite 提供 libsqlite3.so（available repo 也有）→ 重装 qt6-base 成功
 TEST_F(SolverTest, InstalledProviderSatisfiesSoname)
 {
-    add("sqlite", "3.53.4", {}, {"libsqlite3.so"}, {});
-    add("qt6-base", "6.11.1", {}, {}, {"libsqlite3.so"});
+    add("sqlite", "3.53.4", {}, {}, {"libsqlite3.so"}, {});
+    add("qt6-base", "6.11.1", {}, {}, {}, {"libsqlite3.so"});
     installed["sqlite"] = {
-        "3.53.4", {}, {}, {}};  // 已装（即使无 Cache provider 记录，available repo 兜底）
+        "3.53.4", {}, {}, {}, {}};  // 已装（即使无 Cache provider 记录，available repo 兜底）
 
     auto r = solve({{"qt6-base", "latest"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
@@ -93,7 +94,7 @@ TEST_F(SolverTest, InstalledProviderSatisfiesSoname)
 // 缺 provider 且非容忍 → 报错（缺 SONAME 在 problems 里）
 TEST_F(SolverTest, MissingProviderErrorsByDefault)
 {
-    add("appB", "2.0", {}, {}, {"libmissing.so"});
+    add("appB", "2.0", {}, {}, {}, {"libmissing.so"});
 
     auto r = solve({{"appB", "latest"}});
     EXPECT_FALSE(r.ok());
@@ -103,7 +104,7 @@ TEST_F(SolverTest, MissingProviderErrorsByDefault)
 // 缺 provider 且 --missing-so-no-error → 注入伪提供者，求解成功
 TEST_F(SolverTest, MissingProviderTolerated)
 {
-    add("appB", "2.0", {}, {}, {"libmissing.so"});
+    add("appB", "2.0", {}, {}, {}, {"libmissing.so"});
 
     SolveOptions opts;
     opts.missing_so_no_error = true;
@@ -115,7 +116,7 @@ TEST_F(SolverTest, MissingProviderTolerated)
 // M1 回归：缺失**命名依赖**（非 SONAME）默认即报错
 TEST_F(SolverTest, MissingNamedDepErrorsByDefault)
 {
-    add("appB", "2.0", {"libgone"}, {}, {});
+    add("appB", "2.0", {"libgone"}, {}, {}, {});
 
     auto r = solve({{"appB", "latest"}});
     EXPECT_FALSE(r.ok()) << "缺失命名依赖应报错，而非静默装上";
@@ -125,7 +126,7 @@ TEST_F(SolverTest, MissingNamedDepErrorsByDefault)
 // M1 回归：--missing-so-no-error **只**容忍缺失 needed_so（SONAME），缺失命名依赖仍报错
 TEST_F(SolverTest, MissingNamedDepNotToleratedBySoFlag)
 {
-    add("appB", "2.0", {"libgone"}, {}, {});
+    add("appB", "2.0", {"libgone"}, {}, {}, {});
 
     SolveOptions opts;
     opts.missing_so_no_error = true;
@@ -137,9 +138,9 @@ TEST_F(SolverTest, MissingNamedDepNotToleratedBySoFlag)
 // 传递闭包：C → B → A，装 C 全部拉入
 TEST_F(SolverTest, TransitiveClosure)
 {
-    add("libA", "1.0", {}, {"liba.so.1"}, {});
-    add("libB", "1.0", {}, {"libb.so.1"}, {"liba.so.1"});
-    add("appC", "1.0", {}, {}, {"libb.so.1"});
+    add("libA", "1.0", {}, {}, {"liba.so.1"}, {});
+    add("libB", "1.0", {}, {}, {"libb.so.1"}, {"liba.so.1"});
+    add("appC", "1.0", {}, {}, {}, {"libb.so.1"});
 
     auto r = solve({{"appC", "latest"}});
     ASSERT_TRUE(r.ok());
@@ -152,13 +153,13 @@ TEST_F(SolverTest, TransitiveClosure)
 // 且已装 app 依赖旧 libxml2.so.2 → 自动升级 libxml2 + 连带升级 app
 TEST_F(SolverTest, AutoUpgradesReverseDepsForSoname)
 {
-    add("libxml2", "2.0", {}, {"libxml2.so.2"}, {});
-    add("libxml2", "3.0", {}, {"libxml2.so.16"}, {});  // 新版丢 libxml2.so.2
-    add("app", "1.0", {}, {}, {"libxml2.so.2"});       // 旧 app 依赖旧 soname
-    add("app", "2.0", {}, {}, {"libxml2.so.16"});      // 新 app 依赖新 soname
-    add("chromium", "1.0", {}, {}, {"libxml2.so.16"});
-    installed["libxml2"] = {"2.0", {}, {}, {"libxml2.so.2"}};  // 已装旧版提供旧 soname
-    installed["app"] = {"1.0", {}, {"libxml2.so.2"}, {}};      // 已装 app 依赖旧 soname
+    add("libxml2", "2.0", {}, {}, {"libxml2.so.2"}, {});
+    add("libxml2", "3.0", {}, {}, {"libxml2.so.16"}, {});  // 新版丢 libxml2.so.2
+    add("app", "1.0", {}, {}, {}, {"libxml2.so.2"});       // 旧 app 依赖旧 soname
+    add("app", "2.0", {}, {}, {}, {"libxml2.so.16"});      // 新 app 依赖新 soname
+    add("chromium", "1.0", {}, {}, {}, {"libxml2.so.16"});
+    installed["libxml2"] = {"2.0", {}, {}, {"libxml2.so.2"}, {}};  // 已装旧版提供旧 soname
+    installed["app"] = {"1.0", {}, {}, {}, {"libxml2.so.2"}};      // 已装 app 依赖旧 soname
 
     auto r = solve({{"chromium", "latest"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
@@ -180,12 +181,12 @@ TEST_F(SolverTest, AutoUpgradesReverseDepsForSoname)
 // 冲突变体：app 没有可升级的新版本 → 装 chromium 会破坏已装 app → 硬报错
 TEST_F(SolverTest, ReverseDepWithoutNewVersionConflicts)
 {
-    add("libxml2", "2.0", {}, {"libxml2.so.2"}, {});
-    add("libxml2", "3.0", {}, {"libxml2.so.16"}, {});
-    add("app", "1.0", {}, {}, {"libxml2.so.2"});  // 只有旧版，无新版可升
-    add("chromium", "1.0", {}, {}, {"libxml2.so.16"});
-    installed["libxml2"] = {"2.0", {}, {}, {"libxml2.so.2"}};
-    installed["app"] = {"1.0", {}, {"libxml2.so.2"}, {}};
+    add("libxml2", "2.0", {}, {}, {"libxml2.so.2"}, {});
+    add("libxml2", "3.0", {}, {}, {"libxml2.so.16"}, {});
+    add("app", "1.0", {}, {}, {}, {"libxml2.so.2"});  // 只有旧版，无新版可升
+    add("chromium", "1.0", {}, {}, {}, {"libxml2.so.16"});
+    installed["libxml2"] = {"2.0", {}, {}, {"libxml2.so.2"}, {}};
+    installed["app"] = {"1.0", {}, {}, {}, {"libxml2.so.2"}};
 
     auto r = solve({{"chromium", "latest"}});
     EXPECT_FALSE(r.ok()) << "app 无新版可升时应报冲突，而非硬装破坏它";
@@ -194,8 +195,8 @@ TEST_F(SolverTest, ReverseDepWithoutNewVersionConflicts)
 // --no-deps：只装目标自身，不拉依赖
 TEST_F(SolverTest, NoDepsSkipsDependencyPulling)
 {
-    add("libA", "1.0", {}, {"liba.so.1"}, {});
-    add("appB", "2.0", {"libA"}, {}, {"liba.so.1"});
+    add("libA", "1.0", {}, {}, {"liba.so.1"}, {});
+    add("appB", "2.0", {"libA"}, {}, {}, {"liba.so.1"});
 
     SolveOptions opts;
     opts.no_deps = true;
@@ -208,8 +209,8 @@ TEST_F(SolverTest, NoDepsSkipsDependencyPulling)
 // 回归测试：指定特定版本安装（lpkg install pkg:1.0）
 TEST_F(SolverTest, InstallSpecifiedVersion)
 {
-    add("appX", "1.0", {}, {}, {});
-    add("appX", "2.0", {}, {}, {});
+    add("appX", "1.0", {}, {}, {}, {});
+    add("appX", "2.0", {}, {}, {}, {});
 
     auto r = solve({{"appX", "1.0"}});
     ASSERT_TRUE(r.ok());
@@ -227,8 +228,8 @@ TEST_F(SolverTest, NotEqualOperatorMapping)
     dep.constraints.push_back({"!=", "1.0"});
     repo.update_package_info("appY", "1.0", {dep}, {}, {});
 
-    add("libK", "1.0", {}, {}, {});
-    add("libK", "2.0", {}, {}, {});
+    add("libK", "1.0", {}, {}, {}, {});
+    add("libK", "2.0", {}, {}, {}, {});
 
     auto r = solve({{"appY", "latest"}});
     ASSERT_TRUE(r.ok());
@@ -249,8 +250,8 @@ TEST_F(SolverTest, NotEqualOperatorMapping)
 // （不是查询期再 skip 一次 —— 那样两个消费者都得各写一遍）。
 TEST_F(SolverTest, ReverseDependencyMapExcludesSelf)
 {
-    add("glibc", "2.34", {}, {"libc.so.6"}, {"libc.so.6"});
-    add("appZ", "1.0", {}, {}, {"libc.so.6"});
+    add("glibc", "2.34", {}, {}, {"libc.so.6"}, {"libc.so.6"});
+    add("appZ", "1.0", {}, {}, {}, {"libc.so.6"});
 
     const auto rev = build_reverse_dependency_map(repo, RevdepEdges::DepsAndSoname);
     ASSERT_TRUE(rev.contains("glibc")) << "appZ 链接了 glibc 提供的 libc.so.6，必须有反向依赖";
@@ -262,8 +263,8 @@ TEST_F(SolverTest, ReverseDependencyMapExcludesSelf)
 // （老实现靠查询期的 `name == target` 跳过；新实现把自环挡在构建期，两条边都要挡。）
 TEST_F(SolverTest, ReverseDependencyMapExcludesSelfDeclaredDependency)
 {
-    add("appSelf", "1.0", {"appSelf"}, {}, {});
-    add("appOther", "1.0", {"appSelf"}, {}, {});
+    add("appSelf", "1.0", {"appSelf"}, {}, {}, {});
+    add("appOther", "1.0", {"appSelf"}, {}, {}, {});
 
     const auto rev = build_reverse_dependency_map(repo, RevdepEdges::DepsAndSoname);
     ASSERT_TRUE(rev.contains("appSelf"));
@@ -274,8 +275,8 @@ TEST_F(SolverTest, ReverseDependencyMapExcludesSelfDeclaredDependency)
 // S1 回归：裸名 install 已装最新版 → no-op（既有语义，防回归）
 TEST_F(SolverTest, InstallLatestAlreadyInstalledIsNoop)
 {
-    add("pkgA", "1.0", {}, {}, {});
-    installed["pkgA"] = {"1.0", {}, {}, {}};
+    add("pkgA", "1.0", {}, {}, {}, {});
+    installed["pkgA"] = {"1.0", {}, {}, {}, {}};
 
     auto r = solve({{"pkgA", "latest"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
@@ -285,8 +286,8 @@ TEST_F(SolverTest, InstallLatestAlreadyInstalledIsNoop)
 // S1 回归：指定版本（本地文件/`pkg:ver`）已装同版本 → no-op，而非 REINSTALL 重装计划
 TEST_F(SolverTest, InstallSpecifiedVersionAlreadyInstalledIsNoop)
 {
-    add("pkgA", "1.0", {}, {}, {});
-    installed["pkgA"] = {"1.0", {}, {}, {}};
+    add("pkgA", "1.0", {}, {}, {}, {});
+    installed["pkgA"] = {"1.0", {}, {}, {}, {}};
 
     auto r = solve({{"pkgA", "1.0"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
@@ -297,8 +298,8 @@ TEST_F(SolverTest, InstallSpecifiedVersionAlreadyInstalledIsNoop)
 // S1 变体：--force 时同版本仍要重装（reinstall 语义保留）
 TEST_F(SolverTest, ForceReinstallSameVersionProducesPlan)
 {
-    add("pkgA", "1.0", {}, {}, {});
-    installed["pkgA"] = {"1.0", {}, {}, {}};
+    add("pkgA", "1.0", {}, {}, {}, {});
+    installed["pkgA"] = {"1.0", {}, {}, {}, {}};
 
     SolveOptions opts;
     opts.force_reinstall = true;
@@ -307,37 +308,39 @@ TEST_F(SolverTest, ForceReinstallSameVersionProducesPlan)
     EXPECT_TRUE(order_has(r, "pkgA")) << "--force 重装应保留计划";
 }
 
-// S2 回归：latest 必须用 lpkg 版本语义（预发布 -rc 比稳定版旧），已装 rc 应升到稳定版
+// S2 回归：latest 要在预发布与稳定版之间选对 —— rpm 里**预发布是 `~`**（`1.0~rc1 < 1.0`），
+// 已装预发布应升到稳定版。
+// ⚠️ 8.0.0 起 `-rc1` 是 **release**（`1.0-rc1 > 1.0`），所以这里必须写 `~` ——
+// 旧用例写的是 `1.0-rc1`，那条在 rpm 语义下**本来就该**选 rc（它更新），不是缺陷。
 TEST_F(SolverTest, LatestPrefersStableOverPrerelease)
 {
-    add("pkgB", "1.0", {}, {}, {});
-    add("pkgB", "1.0-rc1", {}, {}, {});
-    installed["pkgB"] = {"1.0-rc1", {}, {}, {}};
+    add("pkgB", "1.0", {}, {}, {}, {});
+    add("pkgB", "1.0~rc1", {}, {}, {}, {});
+    installed["pkgB"] = {"1.0~rc1", {}, {}, {}, {}};
 
     auto r = solve({{"pkgB", "latest"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
     ASSERT_EQ(r.order.size(), 1u);
     EXPECT_EQ(r.order[0].name, "pkgB");
-    EXPECT_EQ(r.order[0].version, "1.0")
-        << "lpkg 语义下 1.0 > 1.0-rc1，latest 应选稳定版（回归 S2，EVRCMP 会选错 rc）";
+    EXPECT_EQ(r.order[0].version, "1.0") << "1.0~rc1 < 1.0，latest 应选稳定版";
 }
 
-// S2 变体：已装稳定版，仓库只有预发布 → 不应降级到 rc
+// S2 变体：已装稳定版，仓库只有预发布 → 不应降级
 TEST_F(SolverTest, LatestDoesNotDowngradeToPrerelease)
 {
-    add("pkgB", "1.0-rc1", {}, {}, {});
-    installed["pkgB"] = {"1.0", {}, {}, {}};
+    add("pkgB", "1.0~rc1", {}, {}, {}, {});
+    installed["pkgB"] = {"1.0", {}, {}, {}, {}};
 
     auto r = solve({{"pkgB", "latest"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
-    EXPECT_TRUE(r.order.empty()) << "已装 1.0 而仓库只有 1.0-rc1，不得降级到预发布";
+    EXPECT_TRUE(r.order.empty()) << "已装 1.0 而仓库只有 1.0~rc1，不得降级到预发布";
 }
 
 // S3 回归：真包但指定版本不存在 → 明确报错（不再静默"已安装"）
 TEST_F(SolverTest, InstallNonexistentVersionErrors)
 {
-    add("pkgC", "1.0", {}, {}, {});
-    add("pkgC", "2.0", {}, {}, {});
+    add("pkgC", "1.0", {}, {}, {}, {});
+    add("pkgC", "2.0", {}, {}, {}, {});
 
     auto r = solve({{"pkgC", "9.9.9"}});
     EXPECT_FALSE(r.ok()) << "真包版本不存在应报错，而非静默'已安装'（回归 S3）";
@@ -347,7 +350,7 @@ TEST_F(SolverTest, InstallNonexistentVersionErrors)
 // S3 回归：能力名 + 指定版本 → 回退 capability 装提供者（不再静默"已安装"）
 TEST_F(SolverTest, InstallCapabilityWithVersionFallsBackToProvider)
 {
-    add("provPkg", "1.0", {}, {"somecap"}, {});
+    add("provPkg", "1.0", {}, {"somecap"}, {}, {});
 
     auto r = solve({{"somecap", "1.0"}});
     ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
@@ -375,7 +378,7 @@ TEST_F(SolverTest, InstallNonexistentPackageReportsNotFound)
 // 回归：传递**命名依赖**缺失 → 仍报"依赖无提供者"（不被误判为包未找到）
 TEST_F(SolverTest, MissingTransitiveNamedDepReportsDependency)
 {
-    add("appB", "2.0", {"libgone"}, {}, {});
+    add("appB", "2.0", {"libgone"}, {}, {}, {});
     auto r = solve({{"appB", "latest"}});
     ASSERT_FALSE(r.ok());
     ASSERT_FALSE(r.problems.empty());
@@ -390,7 +393,7 @@ TEST_F(SolverTest, MissingTransitiveNamedDepReportsDependency)
 // flag 开：纯缺 SONAME（nothing-provides）→ 容忍，计划成功
 TEST_F(SolverTest, MissingSoToleratedWhenFlagSet)
 {
-    add("app", "1.0", {}, {}, {"libgone.so.1"});
+    add("app", "1.0", {}, {}, {}, {"libgone.so.1"});
     SolveOptions o;
     o.missing_so_no_error = true;
     auto r = solve({{"app", "latest"}}, o);
@@ -401,7 +404,7 @@ TEST_F(SolverTest, MissingSoToleratedWhenFlagSet)
 // flag 关：同样缺 SONAME → 报 error.unresolved_soname
 TEST_F(SolverTest, MissingSoRejectedWithoutFlag)
 {
-    add("app", "1.0", {}, {}, {"libgone.so.1"});
+    add("app", "1.0", {}, {}, {}, {"libgone.so.1"});
     auto r = solve({{"app", "latest"}});
     ASSERT_FALSE(r.ok());
     ASSERT_FALSE(r.problems.empty());
@@ -412,8 +415,8 @@ TEST_F(SolverTest, MissingSoRejectedWithoutFlag)
 // flag 开 → 容忍叶子缺失，整链可解（伪提供者注入后 bar 仍先于 app）。
 TEST_F(SolverTest, MissingSoDeepChainToleratedWhenFlagSet)
 {
-    add("bar", "1.0", {}, {"libbar.so.1"}, {"libmissing.so.1"});
-    add("app", "1.0", {}, {}, {"libbar.so.1"});
+    add("bar", "1.0", {}, {}, {"libbar.so.1"}, {"libmissing.so.1"});
+    add("app", "1.0", {}, {}, {}, {"libbar.so.1"});
     SolveOptions o;
     o.missing_so_no_error = true;
     auto r = solve({{"app", "latest"}}, o);
@@ -431,9 +434,9 @@ TEST_F(SolverTest, MissingSoDeepChainToleratedWhenFlagSet)
 // 3 层深链：app→p1→p2→(libgone.so.1 叶子缺失)。flag 开 → 容忍，提供者链先于依赖者
 TEST_F(SolverTest, MissingSoThreeLevelChainToleratedWhenFlagSet)
 {
-    add("p1", "1.0", {}, {"libp1.so.1"}, {"libp2.so.1"});
-    add("p2", "1.0", {}, {"libp2.so.1"}, {"libgone.so.1"});
-    add("app", "1.0", {}, {}, {"libp1.so.1"});
+    add("p1", "1.0", {}, {}, {"libp1.so.1"}, {"libp2.so.1"});
+    add("p2", "1.0", {}, {}, {"libp2.so.1"}, {"libgone.so.1"});
+    add("app", "1.0", {}, {}, {}, {"libp1.so.1"});
     SolveOptions o;
     o.missing_so_no_error = true;
     auto r = solve({{"app", "latest"}}, o);
@@ -453,10 +456,10 @@ TEST_F(SolverTest, MissingSoThreeLevelChainToleratedWhenFlagSet)
 // 4 层深链：app→p1→p2→p3→(libgone.so.1 叶子缺失)。flag 开 → 容忍，全链可解
 TEST_F(SolverTest, MissingSoFourLevelChainToleratedWhenFlagSet)
 {
-    add("p1", "1.0", {}, {"libp1.so.1"}, {"libp2.so.1"});
-    add("p2", "1.0", {}, {"libp2.so.1"}, {"libp3.so.1"});
-    add("p3", "1.0", {}, {"libp3.so.1"}, {"libgone.so.1"});
-    add("app", "1.0", {}, {}, {"libp1.so.1"});
+    add("p1", "1.0", {}, {}, {"libp1.so.1"}, {"libp2.so.1"});
+    add("p2", "1.0", {}, {}, {"libp2.so.1"}, {"libp3.so.1"});
+    add("p3", "1.0", {}, {}, {"libp3.so.1"}, {"libgone.so.1"});
+    add("app", "1.0", {}, {}, {}, {"libp1.so.1"});
     SolveOptions o;
     o.missing_so_no_error = true;
     auto r = solve({{"app", "latest"}}, o);
@@ -475,7 +478,7 @@ TEST_F(SolverTest, MissingSoFourLevelChainToleratedWhenFlagSet)
 // M1 回归：flag 只容忍 SONAME；缺失**命名**依赖仍报 error.unresolved_dependency
 TEST_F(SolverTest, MissingNamingDepStillRejectedUnderMissingFlag)
 {
-    add("app", "1.0", {"libfoo-pkg"}, {}, {});
+    add("app", "1.0", {"libfoo-pkg"}, {}, {}, {});
     SolveOptions o;
     o.missing_so_no_error = true;
     auto r = solve({{"app", "latest"}}, o);
@@ -498,7 +501,7 @@ TEST_F(SolverTest, MissingTopLevelTargetStillRejectedUnderMissingFlag)
 // 回归锁：**真冲突** + flag 开 → 仍报错（容忍只救缺 SONAME 提供者，绝不吞版本冲突）
 TEST_F(SolverTest, GenuineConflictStillRejectedUnderMissingFlag)
 {
-    add("lib", "1.0", {}, {}, {});  // 仓库里 lib 只到 1.0
+    add("lib", "1.0", {}, {}, {}, {});  // 仓库里 lib 只到 1.0
     DependencyInfo dep;
     dep.name = "lib";
     Constraint c;
@@ -512,4 +515,80 @@ TEST_F(SolverTest, GenuineConflictStillRejectedUnderMissingFlag)
     auto r = solve({{"app", "latest"}}, o);
     EXPECT_FALSE(r.ok()) << "版本冲突不是缺 SONAME，flag 下也必须报错";
     EXPECT_FALSE(r.problems.empty());
+}
+
+// ============================================================================
+// 能力命名空间（8.0.0 字段拆分后的最终语义）：**两个方向都不许串**
+//
+// 池里有两套彼此隔离的命名空间：
+//   · 裸名空间（能力）：包的**自提供**（`<名> = evr`）、`deps` 的需求、虚拟 `provides`、
+//     以及"按能力名安装"的 target —— 都在这一侧；
+//   · `so:` 空间（SONAME）：`provides_soname` 的导出、`needed_so` 的需求 —— 只在
+//     `solver.cpp` 的 `scoped_soname()` 那一侧。
+// 于是（维护者 2026-10-04 拍板）：
+//   · `deps: X`  ⇒ 匹配**包名**（自提供）或**虚拟 provides**；
+//   · `needed_so: X` ⇒ **只**匹配 `provides_soname`（包名与虚拟 provides 都不行）。
+// ============================================================================
+
+TEST_F(SolverTest, NeededSoIsNotSatisfiedByPackageName)
+{
+    // 池里没有任何包 provide_soname `o`；只有一个包**叫** `o`
+    add("o", "1.0", {}, {}, {}, {});
+    add("appZ", "1.0", {}, {}, {}, {"o"});
+
+    auto r = solve({{"appZ", "latest"}});
+    EXPECT_FALSE(r.ok()) << "needed_so 是 SONAME 语义，不该被『名字刚好等于这个 SONAME 的包』满足";
+}
+
+TEST_F(SolverTest, DepIsNotSatisfiedByProvidesSoname)
+{
+    // libA 导出 SONAME `dep_so.so.1`，但池里**没有**叫 `dep_so.so.1` 的包
+    add("libA", "1.0", {}, {}, {"dep_so.so.1"}, {});
+    add("appB", "1.0", {"dep_so.so.1"}, {}, {}, {});
+
+    auto r = solve({{"appB", "latest"}});
+    EXPECT_FALSE(r.ok())
+        << "deps 是包名/虚拟能力语义，不该被『provides_soname』满足（那是 needed_so 的域）";
+}
+
+// ── 正面对照：几条**该走通**的路必须照旧走通（免得收紧成把功能砍掉）──
+TEST_F(SolverTest, NeededSoIsSatisfiedByProvidesSoname)
+{
+    add("libA", "1.0", {}, {}, {"liba.so.1"}, {});
+    add("appZ", "1.0", {}, {}, {}, {"liba.so.1"});
+
+    auto r = solve({{"appZ", "latest"}});
+    ASSERT_TRUE(r.ok()) << "needed_so 由 provides_soname 满足是**正路**";
+    EXPECT_TRUE(order_has(r, "libA"));
+}
+
+TEST_F(SolverTest, DepIsStillSatisfiedByPackageName)
+{
+    add("libA", "1.0", {}, {}, {}, {});
+    add("appB", "1.0", {"libA"}, {}, {}, {});
+
+    auto r = solve({{"appB", "latest"}});
+    ASSERT_TRUE(r.ok()) << "deps 按包名匹配是**正路**";
+    EXPECT_TRUE(order_has(r, "libA"));
+}
+
+TEST_F(SolverTest, DepIsSatisfiedByVirtualProvides)
+{
+    // 虚拟包语义：`deps: foo` 由**虚拟 provides** `foo` 满足（没有名叫 foo 的包）
+    add("libA", "1.0", {}, {"foo"}, {}, {});
+    add("appB", "1.0", {"foo"}, {}, {}, {});
+
+    auto r = solve({{"appB", "latest"}});
+    ASSERT_TRUE(r.ok()) << "deps 由虚拟 provides 满足是虚拟包语义的**正路**";
+    EXPECT_TRUE(order_has(r, "libA"));
+}
+
+TEST_F(SolverTest, CapabilityTargetStillInstallsItsProvider)
+{
+    // `install <能力名>` 这条 target 路径走**裸名空间**（与 deps/虚拟 provides 同一侧）。
+    add("libA", "1.0", {}, {"pkg-config-A"}, {}, {});
+
+    auto r = solve({{"pkg-config-A", "latest"}});
+    ASSERT_TRUE(r.ok()) << "按能力名安装提供者这条路径不能被破坏";
+    EXPECT_TRUE(order_has(r, "libA"));
 }

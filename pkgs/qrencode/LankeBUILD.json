@@ -7,7 +7,7 @@
     "libc.so.6",
     "libpng16.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libqrencode.so",
     "libqrencode.so.4"
   ],

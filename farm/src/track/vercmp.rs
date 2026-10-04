@@ -1,89 +1,40 @@
-//! 版本比较（对齐 lpkg `vercmp/version.cpp` 语义）。
+//! 版本比较（**rpm 语义**：`[epoch:]version[-release]`）。
 //!
-//! 格式：`主版本号[补丁后缀][-预发布][+发行修订号]`
-//!   - 主版本号: `(\d+)(\.\d+)*`
-//!   - 补丁后缀: `[a-zA-Z]\d*`（如 `p2`、`b`，最高）
-//!   - 发行修订号: `+[0-9A-Za-z]+(\.[0-9A-Za-z]+)*`（LankeOS release，高于基础版）
-//!   - 预发布: `-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*`（低于基础版）
+//! ## 为什么是这一份实现
 //!
-//! 比较优先级（主版本号相等时）：补丁后缀 > 发行修订号 > 基础版 > 预发布。
-//! 与 lpkg 一致：`1.0 > 1.0-rc1`、`2.3.2+2 > 2.3.2`、`1.0p2 > 1.0`。
+//! lpkg 从 8.0.0 起**原生就是 rpm 的 EVR**：它把版本串**原样**交给 libsolv 的
+//! `pool_evrcmp_str()`，再没有"自己的语义 + 编码桥"（见 lpkg `vercmp/version.hpp` 的订正块）。
+//! farm 这边没有 libsolv 绑定（Rust + 静态链接的 C 库不便），所以这里**移植** libsolv 的
+//! 同一套算法 —— 移植的是 `evr.c` 的 `solv_vercmp_rpm()` 与 `pool_evrcmp_str()` 的
+//! COMPARE 分支（epoch 处理、**最后一个** `-` 切 release、"有 release 者更大"）。
 //!
-//! 本实现比 lpkg 宽松（不抛格式校验异常）——上游版本五花八门，track 取宽松解析。
+//! ⚠️ **这份是"移植"，不是"另一个实现"** —— 判据来自外部（libsolv/rpm），本文件只负责
+//! 逐值对齐。对齐不是靠嘴说的：`tests/fixtures/vercmp_rpm.txt` 里每一条期望值都是**用
+//! 容器里的真 libsolv 算出来的**（含全部真实包版本两两组合的抽样 + 边界形态），下面的
+//! `diff_against_real_libsolv_fixture` 逐条比对。改这个文件时那条用例必须仍然绿。
+//!
+//! ## 语义（与 rpm 一致）
+//!
+//! - `~` 是**预发布**：`1.0~rc1 < 1.0`；
+//! - `-` 之后是 **release**（最后一个 `-` 切分）：`1.0-1 > 1.0`、`1.0-1 < 1.0-2`；
+//! - `^` 介于"基础版"与"任何真实下一段"之间（rpm 的 caret 语义）；
+//! - 段按数字比大小、数字段 > 字母段、字母段按字典序；数字段去掉前导 0 再比位数；
+//! - 有 epoch 且非 0 者更大；`0:` 与无 epoch 等价。
+//!
+//! ⚠️ **旧实现（`主版本[补丁后缀][-预发布][+发行修订号]`）已删除** —— 那是 lpkg 旧语义的
+//! 影子（`-` 当预发布、`+N` 当发行修订号），随 lpkg 的破坏性改动一起作废。farm 写进
+//! `LankeBUILD.json` 的版本也不再拼 `<ver>+<release>`，而是 `<ver>-<release>`
+//! （`build/repo.rs` 的 `effective_version`）。
 
 use std::cmp::Ordering;
 
-#[derive(Debug, Default)]
-struct Version {
-    main_part: Vec<u64>,
-    patch_suffix: String,
-    /// git 修订/纯字母后缀（如 `1.0beta`、`0a1b2`→`a1b2`）；非空 > 基础版，字典序比较
-    alpha_suffix: String,
-    release_part: Vec<String>,
-    pre_release_part: Vec<String>,
-}
-
-impl Version {
-    fn parse(s: &str) -> Version {
-        let pre_pos = s.find('-');
-        let build_pos = s.find('+');
-        let main_end = match (pre_pos, build_pos) {
-            (Some(p), Some(b)) => p.min(b),
-            (Some(p), None) => p,
-            (None, Some(b)) => b,
-            (None, None) => s.len(),
-        };
-        let main_str = &s[..main_end];
-
-        let mut v = Version::default();
-        let segs: Vec<&str> = main_str.split('.').collect();
-        for (i, seg) in segs.iter().enumerate() {
-            if i + 1 < segs.len() {
-                v.main_part.push(seg.parse().unwrap_or(0));
-            } else {
-                // 最后一段：数字 + 可选补丁后缀（如 "17p2" → 17 + "p2"）
-                let mut num_end = 0;
-                while num_end < seg.len() && seg.as_bytes()[num_end].is_ascii_digit() {
-                    num_end += 1;
-                }
-                v.main_part.push(seg[..num_end].parse().unwrap_or(0));
-                let tail = &seg[num_end..];
-                let is_patch = !tail.is_empty()
-                    && tail.as_bytes()[0].is_ascii_alphabetic()
-                    && tail[1..].bytes().all(|b| b.is_ascii_digit());
-                if is_patch {
-                    v.patch_suffix = tail.to_string();
-                } else if !tail.is_empty() && tail.as_bytes()[0].is_ascii_alphabetic() {
-                    // git 修订/纯字母后缀（"beta"、"a1b2"）：曾整个丢弃 → `1.0beta` 与
-                    // `1.0` 被误判相等。与 lpkg 对齐：非空 > 基础版，字典序比较。
-                    v.alpha_suffix = tail.to_string();
-                }
-            }
-        }
-
-        if let Some(p) = pre_pos {
-            let end = build_pos.filter(|b| *b > p).unwrap_or(s.len());
-            v.pre_release_part = s[p + 1..end]
-                .split('.')
-                .filter(|x| !x.is_empty())
-                .map(String::from)
-                .collect();
-        }
-        if let Some(b) = build_pos {
-            let end = pre_pos.filter(|p| *p > b).unwrap_or(s.len());
-            v.release_part = s[b + 1..end]
-                .split('.')
-                .filter(|x| !x.is_empty())
-                .map(String::from)
-                .collect();
-        }
-        v
-    }
-}
-
-/// 比较两个版本字符串。
+/// 比较两个版本字符串（rpm EVR 语义）。
 pub fn cmp_version(a: &str, b: &str) -> Ordering {
-    compare(&Version::parse(a), &Version::parse(b))
+    match evr_cmp(a, b) {
+        r if r < 0 => Ordering::Less,
+        0 => Ordering::Equal,
+        _ => Ordering::Greater,
+    }
 }
 
 /// `a` 是否比 `b` 新（严格大于）。
@@ -91,106 +42,176 @@ pub fn is_newer(a: &str, b: &str) -> bool {
     cmp_version(a, b) == Ordering::Greater
 }
 
-fn compare(a: &Version, b: &Version) -> Ordering {
-    let n = a.main_part.len().max(b.main_part.len());
-    for i in 0..n {
-        let na = a.main_part.get(i).copied().unwrap_or(0);
-        let nb = b.main_part.get(i).copied().unwrap_or(0);
-        if na != nb {
-            return na.cmp(&nb);
+/// `solv_vercmp_rpm()` 的移植：比较两段**不含 epoch/release 语义**的字符串（version 段或
+/// release 段），返回 <0 / 0 / >0。
+fn vercmp_rpm(s1: &[u8], s2: &[u8]) -> i32 {
+    let (mut i, mut j) = (0usize, 0usize);
+    let is_digit = |c: u8| c.is_ascii_digit();
+    let is_alpha = |c: u8| c.is_ascii_alphabetic();
+    loop {
+        // 跳过分隔符（但 `~`/`^` 不是分隔符，它们有语义）
+        while i < s1.len() && !is_digit(s1[i]) && !is_alpha(s1[i]) && s1[i] != b'~' && s1[i] != b'^'
+        {
+            i += 1;
+        }
+        while j < s2.len() && !is_digit(s2[j]) && !is_alpha(s2[j]) && s2[j] != b'~' && s2[j] != b'^'
+        {
+            j += 1;
+        }
+        if i < s1.len() && s1[i] == b'~' {
+            if j < s2.len() && s2[j] == b'~' {
+                i += 1;
+                j += 1;
+                continue;
+            }
+            return -1;
+        }
+        if j < s2.len() && s2[j] == b'~' {
+            return 1;
+        }
+        if i < s1.len() && s1[i] == b'^' {
+            if j < s2.len() && s2[j] == b'^' {
+                i += 1;
+                j += 1;
+                continue;
+            }
+            return if j < s2.len() { -1 } else { 1 };
+        }
+        if j < s2.len() && s2[j] == b'^' {
+            return if i < s1.len() { 1 } else { -1 };
+        }
+        if i >= s1.len() || j >= s2.len() {
+            break;
+        }
+        if is_digit(s1[i]) || is_digit(s2[j]) {
+            // 数字段：去前导 0（至少留一位），先比位数、再逐字符比
+            while s1[i] == b'0' && i + 1 < s1.len() && is_digit(s1[i + 1]) {
+                i += 1;
+            }
+            while s2[j] == b'0' && j + 1 < s2.len() && is_digit(s2[j + 1]) {
+                j += 1;
+            }
+            let mut e1 = i;
+            while e1 < s1.len() && is_digit(s1[e1]) {
+                e1 += 1;
+            }
+            let mut e2 = j;
+            while e2 < s2.len() && is_digit(s2[e2]) {
+                e2 += 1;
+            }
+            let r = (e1 - i) as i32 - (e2 - j) as i32;
+            if r != 0 {
+                return if r > 0 { 1 } else { -1 };
+            }
+            let c = s1[i..e1].cmp(&s2[j..e2]);
+            if c != Ordering::Equal {
+                return if c == Ordering::Greater { 1 } else { -1 };
+            }
+            i = e1;
+            j = e2;
+        } else {
+            // 字母段：短的那段是长的前缀时，**长的大**
+            let mut e1 = i;
+            while e1 < s1.len() && is_alpha(s1[e1]) {
+                e1 += 1;
+            }
+            let mut e2 = j;
+            while e2 < s2.len() && is_alpha(s2[e2]) {
+                e2 += 1;
+            }
+            let len1 = (e1 - i) as i32;
+            let len2 = (e2 - j) as i32;
+            if len1 > len2 {
+                let c = s1[i..i + (len2 as usize)].cmp(&s2[j..e2]);
+                return if c != Ordering::Less { 1 } else { -1 };
+            }
+            if len1 < len2 {
+                let c = s1[i..e1].cmp(&s2[j..j + (len1 as usize)]);
+                return if c != Ordering::Greater { -1 } else { 1 };
+            }
+            let c = s1[i..e1].cmp(&s2[j..e2]);
+            if c != Ordering::Equal {
+                return if c == Ordering::Greater { 1 } else { -1 };
+            }
+            i = e1;
+            j = e2;
         }
     }
-    let ord = cmp_patch(&a.patch_suffix, &b.patch_suffix);
-    if ord != Ordering::Equal {
-        return ord;
+    if i < s1.len() {
+        1
+    } else if j < s2.len() {
+        -1
+    } else {
+        0
     }
-    // alpha/git 后缀（"1.0beta"、"0a1b2"）：非空 > 基础版，字典序（与 lpkg version.cpp 对齐）
-    let a_alpha = !a.alpha_suffix.is_empty();
-    let b_alpha = !b.alpha_suffix.is_empty();
-    if a_alpha && !b_alpha {
-        return Ordering::Greater;
-    }
-    if !a_alpha && b_alpha {
-        return Ordering::Less;
-    }
-    if a_alpha && b_alpha {
-        let ord = a.alpha_suffix.cmp(&b.alpha_suffix);
-        if ord != Ordering::Equal {
-            return ord;
-        }
-    }
-    let a_rel = !a.release_part.is_empty();
-    let b_rel = !b.release_part.is_empty();
-    if a_rel && !b_rel {
-        return Ordering::Greater;
-    }
-    if !a_rel && b_rel {
-        return Ordering::Less;
-    }
-    if a_rel && b_rel {
-        let ord = compare_segments(&a.release_part, &b.release_part);
-        if ord != Ordering::Equal {
-            return ord;
-        }
-    }
-    let a_pre = !a.pre_release_part.is_empty();
-    let b_pre = !b.pre_release_part.is_empty();
-    if !a_pre && b_pre {
-        return Ordering::Greater;
-    }
-    if a_pre && !b_pre {
-        return Ordering::Less;
-    }
-    if a_pre && b_pre {
-        return compare_segments(&a.pre_release_part, &b.pre_release_part);
-    }
-    Ordering::Equal
 }
 
-fn cmp_patch(a: &str, b: &str) -> Ordering {
-    match (a.is_empty(), b.is_empty()) {
-        (true, false) => return Ordering::Less,
-        (false, true) => return Ordering::Greater,
-        (false, false) => {
-            let ca = a.as_bytes()[0];
-            let cb = b.as_bytes()[0];
-            if ca != cb {
-                return ca.cmp(&cb);
-            }
-            let na: u64 = a[1..].parse().unwrap_or(0);
-            let nb: u64 = b[1..].parse().unwrap_or(0);
-            if na != nb {
-                return na.cmp(&nb);
-            }
-        }
-        (true, true) => {}
+/// `pool_evrcmp_str(..., EVRCMP_COMPARE)` 的移植（RPM disttype、`promoteepoch=false`）。
+fn evr_cmp(evr1: &str, evr2: &str) -> i32 {
+    if evr1 == evr2 {
+        return 0;
     }
-    Ordering::Equal
-}
+    let e1 = evr1.as_bytes();
+    let e2 = evr2.as_bytes();
 
-/// 分段比较（语义化规范）：数字段按数值，数字 < 字母，更多分段更高。
-fn compare_segments(a: &[String], b: &[String]) -> Ordering {
-    let n = a.len().min(b.len());
-    for i in 0..n {
-        let ai = a[i].as_str();
-        let bi = b[i].as_str();
-        let a_num = !ai.is_empty() && ai.bytes().all(|c| c.is_ascii_digit());
-        let b_num = !bi.is_empty() && bi.bytes().all(|c| c.is_ascii_digit());
-        let ord = match (a_num, b_num) {
-            (true, true) => {
-                let na: u128 = ai.parse().unwrap_or(0);
-                let nb: u128 = bi.parse().unwrap_or(0);
-                na.cmp(&nb)
-            }
-            (true, false) => Ordering::Less,
-            (false, true) => Ordering::Greater,
-            (false, false) => ai.cmp(bi),
-        };
-        if ord != Ordering::Equal {
-            return ord;
-        }
+    // ── epoch ────────────────────────────────────────────────────────────────
+    let mut s1 = 0usize;
+    while s1 < e1.len() && e1[s1].is_ascii_digit() {
+        s1 += 1;
     }
-    a.len().cmp(&b.len())
+    let mut s2 = 0usize;
+    while s2 < e2.len() && e2[s2].is_ascii_digit() {
+        s2 += 1;
+    }
+    let ep1 = s1 != 0 && s1 < e1.len() && e1[s1] == b':';
+    let ep2 = s2 != 0 && s2 < e2.len() && e2[s2] == b':';
+    let (mut v1, mut v2) = (0usize, 0usize); // version 起点（跳过 epoch）
+    if ep1 && ep2 {
+        let r = vercmp_rpm(&e1[..s1], &e2[..s2]);
+        if r != 0 {
+            return r;
+        }
+        v1 = s1 + 1;
+        v2 = s2 + 1;
+    } else if ep1 {
+        // 只有一侧有 epoch：全 0 的 epoch 等价于没有；非 0 → 这一侧更大
+        let mut p = 0usize;
+        while p < e1.len() && e1[p] == b'0' {
+            p += 1;
+        }
+        if p >= e1.len() || e1[p] != b':' {
+            return 1;
+        }
+        v1 = p + 1;
+    } else if ep2 {
+        let mut p = 0usize;
+        while p < e2.len() && e2[p] == b'0' {
+            p += 1;
+        }
+        if p >= e2.len() || e2[p] != b':' {
+            return -1;
+        }
+        v2 = p + 1;
+    }
+
+    // ── version / release：在**最后一个** `-` 处切 ─────────────────────────────
+    let dash1 = e1[v1..].iter().rposition(|&c| c == b'-').map(|p| v1 + p);
+    let dash2 = e2[v2..].iter().rposition(|&c| c == b'-').map(|p| v2 + p);
+    let end1 = dash1.unwrap_or(e1.len());
+    let end2 = dash2.unwrap_or(e2.len());
+
+    let r = vercmp_rpm(&e1[v1..end1], &e2[v2..end2]);
+    if r != 0 {
+        return r;
+    }
+    // COMPARE 模式：有 release 的**更大**（`1.0-1 > 1.0`）
+    match (dash1, dash2) {
+        (None, Some(_)) => return -1,
+        (Some(_), None) => return 1,
+        (None, None) => return 0,
+        (Some(_), Some(_)) => {}
+    }
+    vercmp_rpm(&e1[dash1.unwrap() + 1..], &e2[dash2.unwrap() + 1..])
 }
 
 #[cfg(test)]
@@ -208,55 +229,117 @@ mod tests {
     }
 
     #[test]
-    fn trailing_zero_segments_equal() {
-        assert_eq!(cmp_version("1.2", "1.2.0"), Ordering::Equal);
+    fn trailing_zero_segments_are_not_equal() {
+        // ⚠️ rpm **不补段**：`1.2` 与 `1.2.0` 是不同版本（后者更大）。旧实现按"尾随 0 段
+        // 相等"处理，那条随语义切换一起废掉了。
+        assert_eq!(cmp_version("1.2", "1.2.0"), Ordering::Less);
+        assert_eq!(cmp_version("1.2.0", "1.2"), Ordering::Greater);
         assert_eq!(cmp_version("1.2.3", "1.2"), Ordering::Greater);
     }
 
     #[test]
-    fn prerelease_lower_than_release() {
-        assert_eq!(cmp_version("1.0", "1.0-rc1"), Ordering::Greater);
-        assert_eq!(cmp_version("261", "261-rc4"), Ordering::Greater);
-        assert_eq!(cmp_version("1.0-rc1", "1.0"), Ordering::Less);
+    fn prerelease_is_tilde() {
+        // `~` = 预发布（旧写法的 `-rc1` 现在是 release，比基础版**新**）
+        assert_eq!(cmp_version("1.0~rc1", "1.0"), Ordering::Less);
+        assert_eq!(cmp_version("1.0", "1.0~rc1"), Ordering::Greater);
+        assert_eq!(cmp_version("1.0~rc1", "1.0~rc2"), Ordering::Less);
+        assert_eq!(cmp_version("1.0~alpha", "1.0~beta"), Ordering::Less);
+        assert_eq!(cmp_version("261~rc4", "261"), Ordering::Less);
     }
 
     #[test]
-    fn prerelease_segments() {
-        assert_eq!(cmp_version("1.0-rc1", "1.0-rc2"), Ordering::Less);
-        assert_eq!(cmp_version("1.0-rc2", "1.0-rc1"), Ordering::Greater);
-        assert_eq!(cmp_version("1.0-alpha1", "1.0-alpha1.1"), Ordering::Less);
-        assert_eq!(cmp_version("1.0-1", "1.0-alpha"), Ordering::Less);
+    fn release_is_dash() {
+        assert_eq!(cmp_version("1.0-1", "1.0"), Ordering::Greater);
+        assert_eq!(cmp_version("1.0", "1.0-1"), Ordering::Less);
+        assert_eq!(cmp_version("1.0-1", "1.0-2"), Ordering::Less);
+        assert_eq!(cmp_version("1.0~rc1", "1.0-1"), Ordering::Less);
+        // 版本升级主导 release
+        assert_eq!(cmp_version("261-3", "261.2-3"), Ordering::Less);
+        assert_eq!(cmp_version("1.0-9", "1.0.1"), Ordering::Less);
+        assert_eq!(cmp_version("3.7-2", "3.7b-2"), Ordering::Less);
     }
 
     #[test]
-    fn release_revision_higher() {
-        assert_eq!(cmp_version("2.3.2+2", "2.3.2"), Ordering::Greater);
-        assert_eq!(cmp_version("2.3.2", "2.3.2+1"), Ordering::Less);
-        assert_eq!(cmp_version("2.3.2+2", "2.3.2+1"), Ordering::Greater);
+    fn caret_sits_between() {
+        // rpm 的 `^`："比基础版新、比任何真实下一段旧"
+        assert_eq!(cmp_version("1.0^git1", "1.0"), Ordering::Greater);
+        assert_eq!(cmp_version("1.0^git1", "1.0.1"), Ordering::Less);
     }
 
     #[test]
-    fn patch_suffix() {
+    fn alpha_and_patch_suffixes() {
         assert_eq!(cmp_version("1.0p2", "1.0"), Ordering::Greater);
         assert_eq!(cmp_version("3.7b", "3.7"), Ordering::Greater);
         assert_eq!(cmp_version("3.7b", "3.8"), Ordering::Less);
-    }
-
-    #[test]
-    fn alpha_segments() {
-        assert_eq!(cmp_version("1.0.a", "1.0.b"), Ordering::Less);
-    }
-
-    #[test]
-    fn alpha_suffix_greater_than_base() {
-        // 回归：`1.0beta` 曾解析为 [1,0] 与 `1.0` 判等——纯字母后缀必须保留且高于基础版
+        assert_eq!(cmp_version("1.9.17", "1.9.17p2"), Ordering::Less);
+        assert_eq!(cmp_version("1.0p1", "1.0p2"), Ordering::Less);
+        assert_eq!(cmp_version("1.0p1", "1.0p10"), Ordering::Less); // 数字段按位数/值，不是字典序
         assert_eq!(cmp_version("1.0beta", "1.0"), Ordering::Greater);
-        assert_eq!(cmp_version("1.0", "1.0beta"), Ordering::Less);
-        assert_eq!(cmp_version("1.0beta", "1.0alpha"), Ordering::Greater); // 字典序
-                                                                           // 补丁后缀（pN）仍优先于 alpha 后缀（与 lpkg 一致）
-        assert_eq!(cmp_version("1.0p2", "1.0beta"), Ordering::Greater);
-        // git 修订式 alpha（0a1b2）不相等
-        assert_eq!(cmp_version("0.1a1b2", "0.1"), Ordering::Greater);
-        assert_ne!(cmp_version("0.1a1b2", "0.1a1c3"), Ordering::Equal);
+        assert_eq!(cmp_version("1.0beta", "1.0alpha"), Ordering::Greater);
+    }
+
+    #[test]
+    fn epoch_beats_absent_and_zero_epoch_is_absent() {
+        assert_eq!(cmp_version("1:2.0", "2.0"), Ordering::Greater);
+        assert_eq!(cmp_version("2.0", "1:2.0"), Ordering::Less);
+        assert_eq!(cmp_version("0:1.0", "1.0"), Ordering::Equal);
+        assert_eq!(cmp_version("1:1.0", "2:1.0"), Ordering::Less);
+    }
+
+    #[test]
+    fn is_newer_helper() {
+        assert!(is_newer("1.0-2", "1.0-1"));
+        assert!(!is_newer("1.0-1", "1.0-2"));
+        assert!(!is_newer("1.0", "1.0"));
+    }
+
+    /// **对齐闸门**：逐条比对真 libsolv 算出来的期望值。
+    ///
+    /// 期望值的生成方式（fixture 头部也写着）：把真实仓库的全部包版本两两抽样、再补一批
+    /// 边界形态（`~`/`^`/epoch/前导 0/字母段/多段 release），喂给容器里的
+    /// `pool_evrcmp_str(pool, a, b, EVRCMP_COMPARE)` 取符号。因此**这份 fixture 是"移植
+    /// 是否忠实"的唯一证据** —— 只改本文件而不重算 fixture，这条用例就会红。
+    #[test]
+    fn diff_against_real_libsolv_fixture() {
+        let fixture = include_str!("../../tests/fixtures/vercmp_rpm.txt");
+        let mut checked = 0usize;
+        for (lineno, line) in fixture.lines().enumerate() {
+            if line.starts_with('#') || line.trim().is_empty() {
+                continue;
+            }
+            let mut it = line.split('\t');
+            let (a, b, want) = match (it.next(), it.next(), it.next()) {
+                (Some(a), Some(b), Some(w)) => (a, b, w.parse::<i32>().expect("cmp 必须是 -1/0/1")),
+                _ => panic!("fixture 第 {} 行不是 a<TAB>b<TAB>cmp：{}", lineno + 1, line),
+            };
+            let got = match cmp_version(a, b) {
+                Ordering::Less => -1,
+                Ordering::Equal => 0,
+                Ordering::Greater => 1,
+            };
+            assert_eq!(
+                got,
+                want,
+                "第 {} 行与真 libsolv 不一致：cmp({a:?}, {b:?}) = {got}，libsolv 说 {want}",
+                lineno + 1
+            );
+            // 反对称性：反向必须取反（顺带证明判据不是"恒返回某个值"）
+            let rev = match cmp_version(b, a) {
+                Ordering::Less => -1,
+                Ordering::Equal => 0,
+                Ordering::Greater => 1,
+            };
+            assert_eq!(
+                rev, -want,
+                "反向比较不对称：cmp({b:?}, {a:?}) = {rev}，应为 {}",
+                -want
+            );
+            checked += 1;
+        }
+        assert!(
+            checked > 500,
+            "fixture 太小（{} 条），对齐闸门形同虚设",
+            checked
+        );
     }
 }

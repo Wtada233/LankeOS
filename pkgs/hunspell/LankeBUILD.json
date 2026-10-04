@@ -12,7 +12,7 @@
     "libreadline.so.8",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libhunspell-1.7.so",
     "libhunspell-1.7.so.0"
   ],

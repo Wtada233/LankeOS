@@ -20,7 +20,7 @@
     "libsqlite3.so.0",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libpackagekit-glib2.so",
     "libpackagekit-glib2.so.18"
   ],

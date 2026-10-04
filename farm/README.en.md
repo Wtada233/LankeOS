@@ -29,13 +29,13 @@ English | [中文](README.md)
   <img src="https://img.shields.io/badge/Claude_Code-D97757?style=flat&logo=claude&logoColor=white" alt="Claude Code" />
 </p>
 
-`lankefarm` is the **ABI-driven incremental package build system** for LankeOS (written in Rust). It builds a link dependency graph from every package's `needed_so`/`provides`, detects upstream ABI breaks, rebuilds only the smallest affected set, and runs all builds inside isolated Docker containers.
+`lankefarm` is the **ABI-driven incremental package build system** for LankeOS (written in Rust). It builds a link dependency graph from every package's `needed_so`/`provides_soname`, detects upstream ABI breaks, rebuilds only the smallest affected set, and runs all builds inside isolated Docker containers.
 
 > For the detailed architecture specification, see [ARCH.md](ARCH.md). It is written from the actual code and describes the real behavior of the current implementation — in case of conflict, the code wins.
 
 ## Features
 
-- **ABI-driven incremental builds** — Only builds packages whose recipe version differs from the local repository, plus the victims of ABI breaks. Removed SONAMEs are computed from the old index's `needed_so`/`provides` and linked straight to the victims — no tree closure.
+- **ABI-driven incremental builds** — Only builds packages whose recipe version differs from the local repository, plus the victims of ABI breaks. Removed SONAMEs are computed from the old index's `needed_so`/`provides_soname` and linked straight to the victims — no tree closure.
 - **Container-isolated builds** — Every build runs in a fresh Docker container; `--image` is mandatory. Host builds are forbidden to avoid polluting the host environment.
 - **Deterministic build order** — Topological sort with a fixed tie-break (package names in ascending order). No randomness, guaranteed by regression tests.
 - **Build plan confirmation** — Lists the topo order for operator confirmation before starting; source pre-download only targets the confirmed set.
@@ -204,7 +204,7 @@ farm/
 │   ├── build/           # scheduler: incremental selection, topo sort, plan preview, pre-download
 │   ├── abi.rs           # removed_sonames / detect_abi_breaks / propagate
 │   ├── graph.rs         # index.txt parsing + link dependency graph
-│   ├── scan.rs          # .lpkg extraction + ELF needed_so/provides scanning
+│   ├── scan.rs          # .lpkg extraction + ELF needed_so/provides_soname scanning
 │   ├── repack.rs        # metadata.json drift fix + repacking
 │   ├── verify.rs        # three-way verdict of build output vs expected metadata
 │   ├── lpkg_binding.rs  # the only seam that touches lpkg (docker orchestration + ABI backup injection)

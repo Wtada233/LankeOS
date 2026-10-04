@@ -99,8 +99,8 @@ fn scan_content_dedups_provides_from_symlink_and_soname() {
     std::os::unix::fs::symlink("../usr/lib/libc.so.6", content.join("lib/libc.so.6")).unwrap();
     std::os::unix::fs::symlink("libc.so.6", content.join("usr/lib/libc.so")).unwrap();
 
-    let (_, provides) = scan_content(&content, &Default::default());
-    assert_eq!(provides, vec!["libc.so", "libc.so.6"]); // libc.so.6 只出现一次
+    let (_, provides_soname) = scan_content(&content, &Default::default());
+    assert_eq!(provides_soname, vec!["libc.so", "libc.so.6"]); // libc.so.6 只出现一次
 
     let _ = std::fs::remove_dir_all(&tmp);
 }
@@ -131,9 +131,9 @@ fn scan_content_ignores_self_provided_via_abs_rpath() {
     std::fs::copy(&src, core.join("libperl.so")).unwrap();
     std::fs::copy(&src, content.join("usr/bin/perl")).unwrap();
 
-    let (needed, provides) = scan_content(&content, &Default::default());
-    // 非标准目录的 ELF .so（子目录）不加入 provides（回归原逻辑：只提供搜索路径 .so）
-    assert!(!provides.contains(&"/usr/lib/perl5/5.44/core_perl/CORE/libperl.so".to_string()));
+    let (needed, provides_soname) = scan_content(&content, &Default::default());
+    // 非标准目录的 ELF .so（子目录）不加入 provides_soname（回归原逻辑：只提供搜索路径 .so）
+    assert!(!provides_soname.contains(&"/usr/lib/perl5/5.44/core_perl/CORE/libperl.so".to_string()));
     // 包内同名 .so（任何路径）→ needed_so 排除（not-found/自提供）
     assert!(!needed.contains(&"libperl.so".to_string()));
 

@@ -44,7 +44,7 @@
     "libswscale.so.10",
     "libva.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6Multimedia.so",
     "libQt6Multimedia.so.6",
     "libQt6MultimediaQuick.so",

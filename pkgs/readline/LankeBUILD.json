@@ -7,7 +7,7 @@
     "libc.so.6",
     "libncursesw.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libhistory.so",
     "libhistory.so.8",
     "libreadline.so",

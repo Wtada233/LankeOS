@@ -12,7 +12,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Package.so",
     "libKF6Package.so.6"
   ],

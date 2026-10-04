@@ -12,7 +12,7 @@
     "libstdc++.so.6",
     "libwayland-client.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libKWaylandClient.so",
     "libKWaylandClient.so.6"
   ],

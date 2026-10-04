@@ -59,6 +59,7 @@ protected:
     std::string create_pkg(const std::string& name, const std::string& ver,
                            const std::vector<std::pair<std::string, std::string>>& deps = {},
                            const std::vector<std::string>& provides = {},
+                           const std::vector<std::string>& provides_soname = {},
                            const std::vector<std::pair<std::string, std::string>>& files = {})
     {
         fs::path work_dir = test_root / ("work_" + name);
@@ -78,7 +79,7 @@ protected:
         }
 
         std::string pkg_path = (repo_dir / (name + "-" + ver + ".lpkg")).string();
-        pack_package(pkg_path, work_dir.string(), name, ver, deps_list, provides,
+        pack_package(pkg_path, work_dir.string(), name, ver, deps_list, provides, provides_soname,
                      name + " man page");
         return pkg_path;
     }
@@ -100,7 +101,7 @@ TEST_F(RealWorldScenarioTest, VirtualPackageProviderSelection)
 
 TEST_F(RealWorldScenarioTest, BlockRemovalOfProvider)
 {
-    std::string p1 = create_pkg("openssl", "1.1", {}, {"libssl"}, {{"usr/lib/libssl.so", "/"}});
+    std::string p1 = create_pkg("openssl", "1.1", {}, {"libssl"}, {}, {{"usr/lib/libssl.so", "/"}});
     std::string cons = create_pkg("curl", "7.0", {{"libssl", ">= 1.0"}});
 
     install_packages({p1, cons});
@@ -113,7 +114,7 @@ TEST_F(RealWorldScenarioTest, BlockRemovalOfProvider)
 
 TEST_F(RealWorldScenarioTest, ManualFileClobbering)
 {
-    std::string pkg = create_pkg("clobber", "1.0", {}, {}, {{"usr/bin/tool", "/"}});
+    std::string pkg = create_pkg("clobber", "1.0", {}, {}, {}, {{"usr/bin/tool", "/"}});
 
     fs::path target = Config::instance().root_dir() / "usr/bin/tool";
     ensure_dir_exists(target.parent_path());
@@ -137,7 +138,7 @@ TEST_F(RealWorldScenarioTest, ManualFileClobbering)
 
 TEST_F(RealWorldScenarioTest, ReinstallFromNewSource)
 {
-    std::string pkg_v1 = create_pkg("myapp", "1.0", {}, {}, {{"usr/bin/app", "/"}});
+    std::string pkg_v1 = create_pkg("myapp", "1.0", {}, {}, {}, {{"usr/bin/app", "/"}});
     install_packages({pkg_v1});
 
     fs::path work_dir = test_root / "work_myapp_new";
@@ -149,7 +150,7 @@ TEST_F(RealWorldScenarioTest, ReinstallFromNewSource)
     }
 
     std::string pkg_v1_fixed = (test_root / "myapp-1.0-fixed.lpkg").string();
-    pack_package(pkg_v1_fixed, work_dir.string(), "myapp", "1.0", {}, {}, "man");
+    pack_package(pkg_v1_fixed, work_dir.string(), "myapp", "1.0", {}, {}, {}, "man");
 
     reinstall_package(pkg_v1_fixed);
 

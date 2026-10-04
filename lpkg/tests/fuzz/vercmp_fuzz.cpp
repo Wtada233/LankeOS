@@ -1,18 +1,25 @@
-// harness #3：版本桥的**差分 fuzz** —— libsolv 的依赖匹配 vs `version_satisfies()`。
+// harness #3：版本约束判定的**差分 fuzz** —— libsolv 的依赖匹配 vs `version_satisfies()`。
 //
-// 为什么是它：这条桥保证"**求解器按 libsolv 出方案、安装期按 lpkg 的判据验收**"两边一致。
-// 不一致的后果是实打实的：假不满足 ⇒ 明明装得上却报缺依赖（事务无解）；假满足 ⇒ 求解器选了
-// 一个 lpkg 认为不满足的版本，装到一半被拒、整批回滚，或更糟。**它已经真出过事**：当年
-// `+release` 被映射进 libsolv 的 release 槽位，在**手工枚举**的 4032 组合矩阵上差 **78 处、
-// 两个方向都有**（`= 1.0` 匹配 `1.0+1`；`> 1.0+1` 反过来匹配 `1.0`）。
+// 为什么是它：历史上这一族真出过事。lpkg 曾有**自己的一套**版本语义（`-` = 预发布、
+// `+N` = 发行修订号）并用编码桥把它映射进 libsolv 的 rpm 语义，两套判据在手工枚举的
+// 4032 组合矩阵上差 **78 处、两个方向都有**（`= 1.0` 匹配 `1.0+1` 是假满足 ⇒ 装出坏系统；
+// `> 1.0+1` 反过来匹配 `1.0` 是假不满足 ⇒ 事务无解）。**假满足与假不满足都是实打实的
+// 事故**，而那个矩阵是**枚举**的，覆盖不到形态空间。
 //
-// 那个矩阵是**枚举**的（`tests/unit/test_vercmp_libsolv_bridge.cpp`，24 个版本 × 7 算子）；
-// 这里把**同一套判据**搬进 fuzzer，让**版本串本身**去变异 —— 多段、`~`/`^`/`:`、超长数字段、
-// 退化串（`1.0+`）、混合分隔符这些枚举覆盖不到的形态才有机会被走到。
+// 8.0.0 取消了第二套语义：lpkg 原生用 rpm 的 EVR，版本串**原样**进池。本 harness 因此
+// 不再测"编码往返"（那个 API 已删），只留**差分** —— 它现在守的是**剩下的那层判据**：
 //
-// 输入 = 若干版本串（换行分隔，最多 8 个）。差分机制与那个测试文件**逐字同款**：
-// 建池 → 每个版本一个 solvable、**自提供 `name = evr`**（自提供不带版本会让 `>= 2.0` 被 1.0 满足）
-// → `pool_whatprovides_ptr` 问 libsolv"谁满足这个依赖" → 与 `version_satisfies` 逐格对。
+//   1. 算子映射（`version_op_flags`，`solver.cpp` 灌依赖用的就是它）；
+//   2. "缺 release = 通配"那张 ±2 三元表（`version.cpp` 的 `version_satisfies`，
+//      逐条对应 `pooldep.c` 的 `pool_match_nevr_rel`）。
+//
+// 两侧的**比较器**如今是同一个（`pool_evrcmp_str`），所以这个 harness **不再**能发现
+// "比较器分叉"（那类缺陷已从根上不存在），但仍然能抓住上面两层里任何一处写错 ——
+// 而写错的后果与当年一样重。别再把它读成"桥的回归闸门"。
+//
+// 输入 = 若干版本串（换行分隔，最多 8 个）。差分机制：建池 → 每个版本一个 solvable、
+// **自提供 `name = evr`**（自提供不带版本会让 `>= 2.0` 被 1.0 满足）→
+// `pool_whatprovides_ptr` 问 libsolv"谁满足这个依赖" → 与 `version_satisfies` 逐格对。
 
 // libsolv 的 `Solvable` 有 `requires` 字段，而它在 C++20 里是关键字 → 宏改名绕开。
 // **必须在 libsolv 头之后立刻 `#undef`**：这宏一旦泄漏到 C++ 标准库头里就炸
@@ -35,7 +42,9 @@
 namespace
 {
 
-/// 算子表：`flags` 与 `solver.cpp` 的 `rel_op()` 逐条对应（照抄桥接测试）。
+/// 算子表：`flags` 就是 `version_op_flags()` 的产物（这里**再写一遍**是有意的：
+/// 若哪天有人改了 `version_op_flags` 的映射却不改池侧的期望，这张表与它的不一致
+/// 就会以"分叉"的形式炸出来 —— 它不是第二份实现，是本 harness 的期望值）。
 struct RelOp {
     const char* text;
     int flags;
@@ -53,13 +62,27 @@ const std::vector<RelOp>& ops()
 /// 每次迭代最多参与比对的版本数：够表达形态，又让池保持小（差分是 O(算子数 × n²)）。
 constexpr std::size_t kMaxVersions = 8;
 
+std::size_t g_checks = 0;
+std::size_t g_wildcard_side = 0;  ///< 命中"缺 release"那一侧的次数（证明危险形态真被走到）
+
 [[noreturn]] void oracle_violation(const std::string& why)
 {
-    std::fprintf(stderr, "[fuzz] 版本桥分叉: %s\n", why.c_str());
+    std::fprintf(stderr, "[fuzz] 版本判定分叉: %s\n", why.c_str());
     __builtin_trap();
 }
 
 }  // namespace
+
+extern "C" int LLVMFuzzerInitialize(int*, char***)
+{
+    std::atexit([] {
+        std::fprintf(stderr,
+                     "[fuzz] vercmp: 比对 %zu 格 / 其中两侧 release 形态不同（±2 通配那侧）"
+                     "%zu 格\n",
+                     g_checks, g_wildcard_side);
+    });
+    return 0;
+}
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 {
@@ -91,30 +114,17 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     if (!cur.empty() && vers.size() < kMaxVersions) vers.push_back(cur);
     if (vers.size() < 2) return 0;
 
-    // 编码可能**有意**抛异常：`^`（release 分隔符）/`~`（预发布）/`:`（epoch）是版本域的保留
-    // 字符，`to_libsolv_evr` 拒它们是有据可查的行为（真实索引 678 个版本里这三者一个都没有）
-    // —— 那是"拒绝"，不是缺陷，所以整包跳过。
-    std::vector<std::string> evrs;
-    evrs.reserve(vers.size());
-    for (const auto& v : vers) {
-        try {
-            evrs.push_back(to_libsolv_evr(v));
-        } catch (const std::exception&) {
-            return 0;
-        }
-    }
-
     Pool* pool = pool_create();
     pool_setdisttype(pool, DISTTYPE_RPM);  // libsolv 的默认 disttype 就是 RPM，与 lpkg 实际一致
     Repo* repo = repo_create(pool, "fuzz");
     const Id name = pool_str2id(pool, "fuzz-pkg", 1);
 
     std::vector<Id> evr_ids;
-    evr_ids.reserve(evrs.size());
-    for (const auto& e : evrs) {
+    evr_ids.reserve(vers.size());
+    for (const auto& e : vers) {
         Solvable* s = pool_id2solvable(pool, repo_add_solvable(repo));
         s->name = name;
-        s->evr = pool_str2id(pool, e.c_str(), 1);
+        s->evr = pool_str2id(pool, e.c_str(), 1);  // 8.0.0 起版本串**原样**进池，无编码
         solvable_add_deparray(s, SOLVABLE_PROVIDES, pool_rel2id(pool, s->name, s->evr, REL_EQ, 1),
                               0);
         evr_ids.push_back(s->evr);
@@ -135,6 +145,13 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
             }
 
             for (std::size_t i = 0; i < vers.size(); ++i) {
+                ++g_checks;
+                // 统计"一侧有 release、另一侧没有"的格数：那正是 ±2 通配规则的适用面，
+                // 也是真实仓库里可达的形态（如候选 `6.5-20250809` 对约束 `>= 6.5`）。
+                const bool a_has_rel = vers[i].find('-') != std::string::npos;
+                const bool b_has_rel = vers[d].find('-') != std::string::npos;
+                if (a_has_rel != b_has_rel) ++g_wildcard_side;
+
                 const bool libsolv_says = matched[i];
                 const bool lpkg_says = version_satisfies(vers[i], op.text, vers[d]);
                 if (libsolv_says != lpkg_says) {

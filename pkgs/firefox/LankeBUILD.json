@@ -42,7 +42,7 @@
     "libwebpdemux.so.2",
     "libz.so.1"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "alsa-lib",
     "at-spi2-core",

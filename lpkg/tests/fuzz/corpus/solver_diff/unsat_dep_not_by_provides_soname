@@ -1,0 +1,3 @@
+P libA 1.0 - cap.so.1 - -
+P appB 1.0 - - - cap.so.1
+T appB

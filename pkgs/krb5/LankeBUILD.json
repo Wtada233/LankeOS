@@ -14,7 +14,7 @@
     "libss.so.2",
     "libssl.so.3"
   ],
-  "provides": [
+  "provides_soname": [
     "libgssapi_krb5.so",
     "libgssapi_krb5.so.2",
     "libgssrpc.so",

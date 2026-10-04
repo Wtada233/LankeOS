@@ -15,7 +15,7 @@
     "libgobject-2.0.so.0",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libgirepository-1.0.so",
     "libgirepository-1.0.so.1"
   ],

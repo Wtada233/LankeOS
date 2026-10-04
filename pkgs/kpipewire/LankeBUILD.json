@@ -26,7 +26,7 @@
     "libva-drm.so.2",
     "libva.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libKPipeWire.so",
     "libKPipeWire.so.6",
     "libKPipeWireDmaBuf.so",

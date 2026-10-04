@@ -15,7 +15,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libzmf-0.0.so",
     "libzmf-0.0.so.0"
   ],

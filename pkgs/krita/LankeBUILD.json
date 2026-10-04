@@ -75,7 +75,7 @@
     "libxkbcommon.so.0",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libkritabasicflakes.so",
     "libkritabasicflakes.so.21",
     "libkritacommand.so",

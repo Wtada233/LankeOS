@@ -19,7 +19,7 @@
     "libpackagekitqt6.so.2",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Style.so",
     "libKF6Style.so.6"
   ],

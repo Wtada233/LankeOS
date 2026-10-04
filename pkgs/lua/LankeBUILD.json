@@ -9,7 +9,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "liblua++.so",
     "liblua++.so.5.5",
     "liblua++5.5.so",

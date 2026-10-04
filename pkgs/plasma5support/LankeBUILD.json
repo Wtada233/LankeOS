@@ -35,7 +35,7 @@
     "libprocesscore.so.11",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libPlasma5Support.so",
     "libPlasma5Support.so.6",
     "libplasma-geolocation-interface.so",

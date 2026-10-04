@@ -19,7 +19,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libClp.so",
     "libClp.so.1",
     "libClpSolver.so",

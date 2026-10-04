@@ -46,7 +46,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libdolphinprivate.so.6",
     "libdolphinvcs.so",
     "libdolphinvcs.so.6"

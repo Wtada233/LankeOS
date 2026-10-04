@@ -10,18 +10,19 @@
  * @brief BuildConfig — 从 LankeBUILD.json 中提取的构建元数据
  */
 struct BuildConfig {
-    std::string name;                       ///< 包名
-    std::string version;                    ///< 版本号
-    std::vector<std::string> sources;       ///< 源码包下载地址列表
-    std::vector<std::string> work_sources;  ///< 工作区源码路径列表
-    bool no_strip = false;                  ///< 是否禁用 strip
-    bool keep_fs_layout = false;            ///< 是否保留 usr-merge 兼容符号链接（不打包前删除）
-    std::vector<std::string> deps;          ///< 构建依赖
-    std::vector<std::string> build_deps;    ///< 构建依赖（build-time only）
-    std::vector<std::string> provides;      ///< 提供的虚拟包
-    std::vector<std::string> needed_so;     ///< 运行时 SO 依赖
-    std::string man_content;                ///< 帮助文档内容
-    int release = 0;                        ///< 发行修订号（构建时附加 +N 到版本号）
+    std::string name;                          ///< 包名
+    std::string version;                       ///< 版本号
+    std::vector<std::string> sources;          ///< 源码包下载地址列表
+    std::vector<std::string> work_sources;     ///< 工作区源码路径列表
+    bool no_strip = false;                     ///< 是否禁用 strip
+    bool keep_fs_layout = false;               ///< 是否保留 usr-merge 兼容符号链接（不打包前删除）
+    std::vector<std::string> deps;             ///< 构建依赖
+    std::vector<std::string> build_deps;       ///< 构建依赖（build-time only）
+    std::vector<std::string> provides;         ///< 提供的虚拟 provider
+    std::vector<std::string> provides_soname;  ///< 本包导出的 SONAME
+    std::vector<std::string> needed_so;        ///< 运行时 SO 依赖（需要的 SONAME）
+    std::string man_content;                   ///< 帮助文档内容
+    int release = 0;                           ///< 发行修订号（构建时按 rpm 语义附加 `-N`）
 
     // ── 编译/链接标志覆盖（空字符串 = 使用 build_defaults 默认值）──────
     std::string cflags;     ///< 覆盖 CFLAGS（如 "-O3 -march=x86-64-v3"）

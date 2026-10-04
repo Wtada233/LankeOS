@@ -1,0 +1,7 @@
+RM_BEGIN mypkg 2.5.1
+BACKUP /etc/foo.conf → /etc/foo.conf.lpkg_bak_mypkg
+SAVE_CONF /etc/foo.conf → /etc/foo.conf.lpkgsave
+DIR_RM /usr/share/foo 0755 0 0
+DBRM /var/lpkg/deps/mypkg
+RM_COMMIT mypkg 2.5.1
+RM_END mypkg 2.5.1

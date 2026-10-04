@@ -10,7 +10,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libabsl_base.so",
     "libabsl_base.so.2608.0.0",
     "libabsl_base_cpu_detect.so",

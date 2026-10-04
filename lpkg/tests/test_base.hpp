@@ -18,7 +18,8 @@
 namespace fs = std::filesystem;
 
 /**
- * "DB 一族"的文件清单：pkgs / files.db / provides.db / confhashes.db / xattrkeys.db / holdpkgs。
+ * "DB 一族"的文件清单：pkgs / files.db / provides.db / provides_soname.db / confhashes.db /
+ * xattrkeys.db / holdpkgs。
  *
  * 这 **6** 个是同一族：`Cache::write(milestone)` 对它们逐个做"WAL 行 → 备份原文件 → 全量重写"
  * （cache.cpp，里程碑 `:batch-start` 与 `<pkg>:installed` 各写一次），于是"每里程碑一份
@@ -38,7 +39,7 @@ namespace fs = std::filesystem;
 inline std::vector<fs::path> db_family_files()
 {
     auto& cfg = Config::instance();
-    return {cfg.pkgs_file(),      cfg.files_db(),      cfg.provides_db(),
+    return {cfg.pkgs_file(),      cfg.files_db(),      cfg.provides_db(),  cfg.provides_soname_db(),
             cfg.conf_hashes_db(), cfg.xattr_keys_db(), cfg.holdpkgs_file()};
 }
 
@@ -83,10 +84,17 @@ protected:
         fs::remove_all(suite_work_dir);
     }
 
-    /** 创建包含一个空 bin 文件的虚拟包 */
+    /**
+     * 创建包含一个空 bin 文件的虚拟包。
+     *
+     * 字段次序全仓统一（8.0.0 拆分）：`provides`（虚拟 provider）→ `provides_soname`
+     * （本包**导出**的 SONAME）→ `needed_so`（本包**需要**的 SONAME）。参数都有默认值，
+     * 所以插在中间会让旧调用**静默错位** —— 改签名时要连每个传了 ≥5 个实参的调用点一起改。
+     */
     std::string create_pkg(const std::string& name, const std::string& version,
                            const std::vector<std::string>& deps = {},
                            const std::vector<std::string>& provides = {},
+                           const std::vector<std::string>& provides_soname = {},
                            const std::vector<std::string>& needed_so = {},
                            const std::vector<std::string>& hooks = {})
     {
@@ -107,7 +115,7 @@ protected:
 
         std::string pkg_file = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_file).string();
-        pack_package(pkg_path, work_dir.string(), name, version, deps, provides,
+        pack_package(pkg_path, work_dir.string(), name, version, deps, provides, provides_soname,
                      "Man page for " + name, needed_so);
         return pkg_path;
     }

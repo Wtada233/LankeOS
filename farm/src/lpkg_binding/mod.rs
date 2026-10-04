@@ -18,7 +18,10 @@ use std::path::PathBuf;
 pub struct BuildOutcome {
     pub ok: bool,
     pub needed_so: Vec<String>,
+    /// 纯虚拟 provider（手写在 LankeBUILD.json；RealBinding 从配方读取，farm 不改）。
     pub provides: Vec<String>,
+    /// 本包导出的 SONAME（ELF 扫描产物）。
+    pub provides_soname: Vec<String>,
     pub deps: Vec<String>,
     pub failure_stage: Option<String>,
     /// 构建产物 .lpkg 的路径（RealBinding 填充；StubBinding 为 None）。
@@ -27,11 +30,13 @@ pub struct BuildOutcome {
 }
 
 impl BuildOutcome {
-    pub fn success(needed_so: &[&str], provides: &[&str], deps: &[&str]) -> Self {
+    /// `provides_soname` = 扫描出的 SONAME（第二参数）。虚拟 provider 默认空（手写值由调用方补）。
+    pub fn success(needed_so: &[&str], provides_soname: &[&str], deps: &[&str]) -> Self {
         BuildOutcome {
             ok: true,
             needed_so: needed_so.iter().map(|s| s.to_string()).collect(),
-            provides: provides.iter().map(|s| s.to_string()).collect(),
+            provides: Vec::new(),
+            provides_soname: provides_soname.iter().map(|s| s.to_string()).collect(),
             deps: deps.iter().map(|s| s.to_string()).collect(),
             failure_stage: None,
             lpkg_path: None,
@@ -98,8 +103,12 @@ mod tests {
 
         assert!(b.build("llvm").ok);
         assert_eq!(
-            b.build("llvm").provides,
+            b.build("llvm").provides_soname,
             vec!["libLLVM.so", "libLLVM.so.18"]
+        );
+        assert!(
+            b.build("llvm").provides.is_empty(),
+            "success() 不写虚拟 provider"
         );
         assert!(!b.build("bad").ok);
         assert_eq!(

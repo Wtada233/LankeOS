@@ -14,7 +14,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libarchive.so",
     "libarchive.so.13"
   ],

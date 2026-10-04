@@ -21,7 +21,7 @@
     "libsignon-qt6.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libkaccounts6.so",
     "libkaccounts6.so.2"
   ],

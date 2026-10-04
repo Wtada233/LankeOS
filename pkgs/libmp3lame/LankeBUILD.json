@@ -9,7 +9,7 @@
     "libmpg123.so.0",
     "libncursesw.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libmp3lame.so",
     "libmp3lame.so.0"
   ],

@@ -11,7 +11,7 @@
     "libstdc++.so.6",
     "libzint.so.2.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libZXing.so",
     "libZXing.so.4"
   ],

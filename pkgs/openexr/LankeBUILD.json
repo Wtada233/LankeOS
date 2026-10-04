@@ -15,7 +15,7 @@
     "libstdc++.so.6",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libIex-3_5.so",
     "libIex-3_5.so.34",
     "libIex.so",

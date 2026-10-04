@@ -10,7 +10,7 @@
     "libgobject-2.0.so.0",
     "libwayland-client.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "cairo",

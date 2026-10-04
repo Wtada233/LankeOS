@@ -72,7 +72,7 @@ protected:
         for (int i = 0; i < file_count; ++i)
             std::ofstream(files_dir / ("f" + std::to_string(i))) << "x\n";
         const std::string path = (pkg_dir / (name + "-" + version + ".lpkg")).string();
-        pack_package(path, work.string(), name, version, deps, {}, "man " + name, {});
+        pack_package(path, work.string(), name, version, deps, {}, {}, "man " + name, {});
         return path;
     }
 

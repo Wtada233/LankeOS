@@ -13,7 +13,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6DAV.so",
     "libKF6DAV.so.6"
   ],

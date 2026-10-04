@@ -4,11 +4,11 @@
 
 ## 1. 总览
 
-LankeOS build farm 是一个 **ABI 驱动的增量包构建系统**：基于 `needed_so`/`provides` 的链接依赖图，检测上游 ABI 断裂，只重建受影响的最小集合。
+LankeOS build farm 是一个 **ABI 驱动的增量包构建系统**：基于 `needed_so`/`provides_soname` 的链接依赖图，检测上游 ABI 断裂，只重建受影响的最小集合。
 
 - **增量**：只构建配方版本与本地 repo 不一致的包，或 ABI 断裂的受害者
 - **容器隔离**：所有构建在 fresh docker 容器内进行（禁止主机构建，`--image` 必填）
-- **ABI 精确**：用旧索引的 needed_so/provides 算 removed SONAME → 直连受害者，不做树状闭包
+- **ABI 精确**：用旧索引的 needed_so/provides_soname 算 removed SONAME → 直连受害者，不做树状闭包
 - **单一真源**：`out/<arch>/index.txt` 含**完整 needed_so**，同时供容器可见索引与 farm 的 ABI 传播
 - **ABI 过渡备份**：检测到 SONAME 断裂时把旧 SONAME 的 .so 备份到 `out/backups/`（**扁平**，不按包分子目录——同一 SONAME 文件被两个包同时提供本就冲突，跨包同名覆盖无害），每个构建容器内恢复 + ldconfig，让旧二进制在过渡期存活；**整个 build 完成后**清理
 - **确定性构建序**：拓扑排序同级包按名字升序固定顺序，绝无随机（有回归测试）
@@ -42,7 +42,7 @@ src/
     repo.rs        版本判定/漂移 repack/上传/index 更新/备份清理/配方读写
   abi.rs           removed_sonames / direct_victims（传播循环内联在 build::run_build）
   graph.rs         index.txt 解析 + Index/RevMap + link_deps
-  scan.rs          .lpkg 解包 + ELF needed_so/provides 扫描
+  scan.rs          .lpkg 解包 + ELF needed_so/provides_soname 扫描
   repack.rs        metadata.json 漂移修正 + 重打
   seed.rs          冷启动播种
   serve.rs         静态 HTTP 服务器
@@ -58,15 +58,19 @@ src/
 
 分层：`cli`（参数/命令）→ `build`（调度编排）→ `abi`/`graph`/`scan`/`repack`（逻辑）→ `lpkg_binding`（容器接口）。逻辑层不碰 lpkg，所有 lpkg 交互收敛在 `LpkgBinding` trait（`lpkg_binding.rs`，唯一碰 lpkg 的接缝）。
 
-## 3. 三个依赖字段
+## 3. 依赖字段
 
-每个包的 LankeBUILD.json / repo index 有三类依赖元数据（语义对齐 gen_deps）：
+每个包的 LankeBUILD.json / repo index 有四类依赖元数据（语义对齐 gen_deps）：
 
 - **`needed_so`**：DT_NEEDED 的 SONAME 列表（运行时链接库，如 `libc.so.6`）
-- **`provides`**：本包提供的 SONAME/能力（如 `libmagic.so.1`）
+- **`provides`**：**纯虚拟 provider**（与 `.so` 无关，如 `rustc`、`golang`），**由人手写在 LankeBUILD.json**，farm 不扫不改
+- **`provides_soname`**：本包**导出的 SONAME**（如 `libmagic.so.1`），与 `needed_so` 一样是 **farm 的 ELF 扫描产物**
 - **`deps`**：包级运行时依赖（由 gen_deps/deprules 规则生成，**farm 不扫不比**）
 
-farm 只扫/比 `needed_so` + `provides`（`build/repo.rs` 规则 3：`deps` 不读不改；`deps` 不参与构建序、`build_deps` **无条件参与**（仅限本轮 targets 内）——见 §4）。
+farm 只扫/比 `needed_so` + `provides_soname`（`build/repo.rs` 规则 3：`deps`/`provides` 不读不改；`deps` 不参与构建序、`build_deps` **无条件参与**（仅限本轮 targets 内）——见 §4）。
+
+> 字段次序全仓统一：**`deps, provides, provides_soname, needed_so`**。
+> 历史：`provides` 与 SONAME 原是同一条目——两处全量覆写（`update_lankebuild_metadata` / `repack_with_metadata`）把扫描结果直接盖上手写值，于是**虚拟 provider 永远存不下来**（真实仓库 861 个包的 `provides` 曾 100% 是 SONAME）。拆分后扫描只写 `needed_so`/`provides_soname`，`provides` 原样保留。
 
 ## 4. build 调度（run_build）
 
@@ -80,6 +84,12 @@ farm **不再 spawn `sudo`/`tar`/`zstd` CLI**——解包走 `zstd`+`tar` Rust c
 
 1. **旧索引基线**：`load_old_index` 读 `out/<arch>/index.txt`（**完整 needed_so**，单一真源）。缺失/为空 → 报错（**禁止无基线构建**，`farm seed` 是唯一入口）；旧索引全零 needed_so → 警告重新 seed，否则 ABI 传播失明。
 2. **增量选择**：`--all` 时用 `needs_build`（配方 effective_version vs 旧索引）跳过一致的包；指定 `pkg` 强制重建。
+
+> **有效版本的拼法**（`build/repo.rs` 的 `effective_version`）：`version` 有 `release` 时拼成
+> **`<version>-<release>`** —— 8.0.0 起分隔符是 `-`（rpm 的 release 语义），**不再是 `+`**。
+> lpkg 现在把版本串原样交给 libsolv，`+N` 在 rpm 里只是普通字符（会被当成"版本里多了一段"），
+> 排序与 release 语义都会错。farm 侧的版本比较（`track/vercmp.rs`）也同步换成了 **rpm EVR
+> 语义的 libsolv 移植**，用 `tests/fixtures/vercmp_rpm.txt`（期望值由真 libsolv 生成）逐值对齐。
 3. **拓扑排序**：`sched::topo_order` 按 **needed_so 链接边 ∪ 声明式重建组边（victim → on）∪ build_deps 边** 做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps` 不参与排序；`build_deps` **无条件进边（仅限本轮 targets 内）**——构建期需要另一个包先产出时必须等它先建（如 python-bar 要 python-foo 本轮重建的产物、gjs 要同轮首建的 sysprof）；指向本轮不重建的包 → 边丢弃。组边保证"不链 libpython 的 python-* 包"也排在 python 之后（见 §4 声明式组）。**切环偏好**：出现环时按 **build_deps → 组边 → needed_so 链接边** 挑边切断——无条件进边会引入"构建工具伪环"（如 glibc ← python/cmake 的 build_deps），这些边正是**该被切**的那类，链接序不会因此被破坏。
 4. **计划预览 + 确认**（2.5）：交互模式（stdin 是 tty）列出 topo 顺序（包 + 版本）并让 operator 确认（回车继续 / n 取消）；非交互（CI/测试/脚本）直接开始。
 5. **预下载拆分**：确认后**只给确认集** bulk 预下载全部源；ABI 受害者动态入队**不预下载**（构建时由 lpkg build 自己下载）。批量预下载失败不阻塞——循环里每个确认集包会再走一次源就绪门（带交互接管）。
@@ -157,14 +167,16 @@ extract 后 `grep -rla "Qt_6_PRIVATE_API"` 命中即 echo 包名。这覆盖 **Q
 
 `verify::decide(actual_scan, expected_meta)`（`build/repo.rs::repack_if_drift` 复用，单一判定源）：
 
-- **Unchanged**：needed_so/provides 全一致 → 直接进 repo
+- **Unchanged**：needed_so/provides_soname 全一致 → 直接进 repo
 - **Repack**（needed_so 漂移）：二进制未变只元数据错 → repack（不 rebuild）
-- **AbiBreak**（provides 漂移）：ABI 面变化 → repack 修正 + 传播重建依赖者
+- **AbiBreak**（provides_soname 漂移）：ABI 面变化 → repack 修正 + 传播重建依赖者
 
-provides 漂移优先（ABI 面是最高信号）。
+provides_soname 漂移优先（ABI 面是最高信号）。
 
-**`deps` 不参与判定**：deps 由 gen_deps/deprules 规则生成，farm 不扫不比（`BuildOutcome.deps` 恒空，
-`ScanResult.deps` 保留但 `decide` 不读）。
+**`provides`（虚拟 provider）不参与判定**：它由人手写在 LankeBUILD.json，farm 不扫不比、原样保留
+（`repack_with_metadata` / `update_lankebuild_metadata` 只写 `needed_so`/`provides_soname`）。
+
+**`deps` 不参与判定**：deps 由 gen_deps/deprules 规则生成，farm 不扫不比（`ScanResult.deps` 保留但 `decide` 不读）。
 
 **xattr 保留：做**（原"明确不做"的决策已作废——它假定 tar 的 Builder 不能写 PAX xattr，而
 `Builder::append_pax_extensions` 就在 `tar::pax` 里且无 feature 门控）。两侧对称：打包
@@ -186,17 +198,17 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 
 ## 7. ABI 检测与传播（abi.rs）
 
-- **`removed_sonames(old, pkg, new_provides)`**：旧索引 provides − 新扫描 provides（ABI 面 = 版本化 `.so.*` **+ 无 SONAME 实体库**如 tcl 的 `libtcl8.6.so`/expect 的 `libexpect5.45.4.so`；dev symlink 与虚拟提供排除）→ 被移除的 SONAME（ABI 断裂信号）
+- **`removed_sonames(old, pkg, new_provides_soname)`**：旧索引 provides_soname − 新扫描 provides_soname（ABI 面 = 版本化 `.so.*` **+ 无 SONAME 实体库**如 tcl 的 `libtcl8.6.so`/expect 的 `libexpect5.45.4.so`；dev symlink 排除）→ 被移除的 SONAME（ABI 断裂信号）
 - **`RevMap`**（graph.rs）：soname → 需要它的包（旧索引 needed_so 反图）
 - **`direct_victims(revmap, removed)`**：直接链接被移除 SONAME 的包
 - **`groups.victims_for(on, all_pkgs)`**：data/build/*.yaml 声明式重建组（不链但 ABI 敏感，见 §4）
-- **传播**：只有 SONAME 变化才触发；受害者 = `direct_victims` ∪ `groups.victims_for`（并集、去重、排序）；受害者 release bump + 入队重建；受害者自身的 provides 变化再级联（固定点）
+- **传播**：只有 SONAME 变化才触发；受害者 = `direct_victims` ∪ `groups.victims_for`（并集、去重、排序）；受害者 release bump + 入队重建；受害者自身的 provides_soname 变化再级联（固定点）
 
-**index.txt 是单一真源**：完整 needed_so/provides 同时供容器可见索引与 farm 传播（removed_sonames / revmap / link_deps / 备份清理）。lpkg 的 SONAME 检查在容器里真实运行，过渡期由 `--missing-so-no-error` / `--use-system-soname` 显式容忍（见 §5）。
+**index.txt 是单一真源**：完整 needed_so/provides_soname 同时供容器可见索引与 farm 传播（removed_sonames / revmap / link_deps / 备份清理）。格式 `name|ver:hash:deps:provides:provides_soname:needed_so|`（每行 3 个 `|` 段、每版本块 6 个冒号字段；`provides` 为虚拟 provider、`provides_soname` 为导出的 SONAME）。lpkg 的 SONAME 检查在容器里真实运行，过渡期由 `--missing-so-no-error` / `--use-system-soname` 显式容忍（见 §5）。
 
 ### ABI 过渡备份机制
 
-- **触发（`backup_removed_sonames`）**：`place_in_repo` 取代旧 .lpkg 时，计算 `removed = 旧 provides − 新 provides`（**只备份旧提供、新打包消失的 SONAME**），从旧包中把属于这些 SONAME 的文件备份到 `out/backups/`：版本化 `.so.*`（SONAME 本体 + 实体；精确 `r.` 前缀匹配，不误吞 `libfoo.so.20`）+ **无 SONAME 的运行时库**（如 tcl 的 `libtcl8.6.so`、expect 的 `libexpect5.45.4.so`，文件名即身份）。**符号链接保留本身**（ldconfig 要求版本化 SONAME 是符号链接，否则报 dirty），并**复刻目录树**备份其指向的实体：`/usr/lib/xxx.so.x → xxx/xxx.so.x.x` ⇒ `out/backups/xxx.so.x`（symlink）+ `out/backups/xxx/xxx.so.x.x`（实体）。**绝对目标容错**：指向 `/usr/lib/xxx`（或 lib/usr/lib64/lib64）时在 archive 里定位（content/ → /），符号链接转为相对路径（相对备份树根 /usr/lib）。dev symlink（`xxx.so` 指向版本化文件）归新包，不备份。扫全部系统库目录（usr/lib、lib、usr/lib64、lib64），同名覆盖去重。
+- **触发（`backup_removed_sonames`）**：`place_in_repo` 取代旧 .lpkg 时，计算 `removed = 旧 provides_soname − 新 provides_soname`（**只备份旧提供、新打包消失的 SONAME**），从旧包中把属于这些 SONAME 的文件备份到 `out/backups/`：版本化 `.so.*`（SONAME 本体 + 实体；精确 `r.` 前缀匹配，不误吞 `libfoo.so.20`）+ **无 SONAME 的运行时库**（如 tcl 的 `libtcl8.6.so`、expect 的 `libexpect5.45.4.so`，文件名即身份）。**符号链接保留本身**（ldconfig 要求版本化 SONAME 是符号链接，否则报 dirty），并**复刻目录树**备份其指向的实体：`/usr/lib/xxx.so.x → xxx/xxx.so.x.x` ⇒ `out/backups/xxx.so.x`（symlink）+ `out/backups/xxx/xxx.so.x.x`（实体）。**绝对目标容错**：指向 `/usr/lib/xxx`（或 lib/usr/lib64/lib64）时在 archive 里定位（content/ → /），符号链接转为相对路径（相对备份树根 /usr/lib）。dev symlink（`xxx.so` 指向版本化文件）归新包，不备份。扫全部系统库目录（usr/lib、lib、usr/lib64、lib64），同名覆盖去重。
 - **注入（`lpkg_binding`）**：每个构建容器启动后把备份 cp 进 `/usr/lib` 并 `ldconfig` 刷新缓存——dev symlink 仍指向新 so，新构建链新 so，旧二进制链旧 so 且能按 SONAME 命中 ld.so.cache。
 - **清理（`cleanup_backups`）**：**整个 build 完成**后扫描 `out/backups/`（只清扁平 `<soname>.so.*` 文件），某备份的 SONAME 已无任何包 needed_so 引用 → 删除（含空根）；仍有引用（有包跳过/BLOCKED）→ 保留。index.txt 不可读/为空/全零 needed_so → 保守保留，绝不误删。
 
@@ -317,7 +329,7 @@ SQLite（`out/farm-state.db`，可选 `--state`）：
 
 ```
 seed ──> out/<arch>/
-           index.txt   (完整 needed_so/provides/deps，单一真源)
+           index.txt   (完整 needed_so/provides_soname/deps，单一真源；provides 为虚拟 provider)
            <pkg>/<ver>.lpkg  (完整 metadata，含 needed_so)
            backups/    (ABI 断裂备份的旧 .so，扁平 <soname>.so.*，整个 build 后清理)
 
@@ -340,7 +352,7 @@ build --all ──> run_build
   `docker_binding_sequence.rs`（假 docker 影子脚本锁定 docker 子命令序列，拆步重构的行为不变证据）
 
 **285 个测试全绿**（252 lib + 33 集成/二进制——`cargo test` 实测 2026-09-25）。
-> 这个数字随每次加测试而变；写死只代表当时状态，别当契约。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**、**注释掉的 hook 调用 / QML import 不误判**、**docker 拆步后子命令序列不变**、**HTTP 读超时（无应答连接秒级失败）**。
+> 这个数字随每次加测试而变；写死只代表当时状态，别当契约。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**、**vercmp 与真 libsolv 的逐值对齐（`tests/fixtures/vercmp_rpm.txt`，3944 对）**、**注释掉的 hook 调用 / QML import 不误判**、**docker 拆步后子命令序列不变**、**HTTP 读超时（无应答连接秒级失败）**。
 
 ## 16. ABI 符号/版本审计（`custom_checks/abi`，`farm chk abi`）
 
@@ -378,7 +390,7 @@ build --all ──> run_build
   **被别的 build_dep 传递满足也不算**（`needed_so` 是直接链接依赖，build_deps 要写全）；
   `base`/`base-devel` 的**直接** `deps` 并集覆盖的提供者视为满足（铁律：这些包不该写进 build_deps）。
   自提供、仓库内无 provider 的 SONAME 跳过（后者归 `farm abifix`）。**只读配方 `LankeBUILD.json`**
-  （SONAME→provider 关系取自各包 `provides` 字段，不扫 `.lpkg`），因此**不占缓存**。
+  （SONAME→provider 关系取自各包 `provides_soname` 字段，不扫 `.lpkg`），因此**不占缓存**。
 - pycachechk：包内不得含 Python 字节码——① `__pycache__` 目录（**按目录报**：`file` = 该目录，附条目数；
   一个目录里动辄上百 `.pyc`，逐文件报会刷屏，且删除单位就是目录；**遍历目录而非只扫文件**，空的
   `__pycache__` 也算，tar 保留空目录）；② `__pycache__` 之外的**散落 `.pyc`/`.pyo`**（旧式布局，

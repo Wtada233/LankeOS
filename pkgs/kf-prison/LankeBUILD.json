@@ -16,7 +16,7 @@
     "libqrencode.so.4",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Prison.so",
     "libKF6Prison.so.6",
     "libKF6PrisonScanner.so",

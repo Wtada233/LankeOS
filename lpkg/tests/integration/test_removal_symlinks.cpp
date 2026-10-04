@@ -126,7 +126,7 @@ protected:
         std::string pkg_filename = name + "-" + version + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_filename).string();
 
-        pack_package(pkg_path, work_dir.string(), name, version, deps, provides,
+        pack_package(pkg_path, work_dir.string(), name, version, deps, provides, {},
                      "Man page for " + name, needed_so);
         fs::remove_all(work_dir);
         return pkg_path;
@@ -1008,8 +1008,8 @@ TEST_F(RemovalSymlinkTest, SolverRejectsVersionDowngradeBreakingInstalled)
     c.version = "2.0";
     dep.constraints.push_back(c);
     std::map<std::string, solv::InstalledPkg> installed;
-    installed["app"] = {"1.0", {dep}, {}, {}};
-    installed["lib"] = {"2.0", {}, {}, {}};  // 已装 lib 2.0（自提供 lib=2.0 满足 app 约束）
+    installed["app"] = {"1.0", {dep}, {}, {}, {}};
+    installed["lib"] = {"2.0", {}, {}, {}, {}};  // 已装 lib 2.0（自提供 lib=2.0 满足 app 约束）
 
     solv::SolveOptions opts;
     auto r = solv::solve_install(repo, {}, installed, {{"lib", "1.0"}}, opts);
@@ -1029,7 +1029,7 @@ TEST_F(RemovalSymlinkTest, SolverAllowsSatisfyingVersion)
     c.version = "2.0";
     dep.constraints.push_back(c);
     std::map<std::string, solv::InstalledPkg> installed;
-    installed["app"] = {"1.0", {dep}, {}, {}};
+    installed["app"] = {"1.0", {dep}, {}, {}, {}};
 
     solv::SolveOptions opts;
     auto r = solv::solve_install(repo, {}, installed, {{"lib", "2.0"}}, opts);
@@ -1044,8 +1044,8 @@ TEST_F(RemovalSymlinkTest, SolverHandlesBothInPlan)
     repo.update_package_info("lib", "2.0", {}, {"lib.so"}, {});
     repo.update_package_info("app", "1.0", {}, {}, {});
     std::map<std::string, solv::InstalledPkg> installed;
-    installed["app"] = {"1.0", {}, {}, {}};
-    installed["lib"] = {"1.0", {}, {}, {}};
+    installed["app"] = {"1.0", {}, {}, {}, {}};
+    installed["lib"] = {"1.0", {}, {}, {}, {}};
 
     solv::SolveOptions opts;
     auto r = solv::solve_install(repo, {}, installed, {{"app", "1.0"}, {"lib", "2.0"}}, opts);
@@ -1060,8 +1060,8 @@ TEST_F(RemovalSymlinkTest, SolverDetectsDroppedSoname)
     Repository repo;
     repo.update_package_info("glibc", "3.0", {}, {}, {});
     std::map<std::string, solv::InstalledPkg> installed;
-    installed["app"] = {"1.0", {}, {"libc.so.6"}, {}};
-    installed["glibc"] = {"2.0", {}, {"libc.so.6"}, {"libc.so.6"}};
+    installed["app"] = {"1.0", {}, {}, {}, {"libc.so.6"}};
+    installed["glibc"] = {"2.0", {}, {}, {"libc.so.6"}, {"libc.so.6"}};
 
     solv::SolveOptions opts;
     auto r = solv::solve_install(repo, {}, installed, {{"glibc", "3.0"}}, opts);
@@ -1074,7 +1074,7 @@ TEST_F(RemovalSymlinkTest, SolverOkWhenSonameKept)
     Repository repo;
     repo.update_package_info("glibc", "3.0", {}, {"libc.so.6"}, {});
     std::map<std::string, solv::InstalledPkg> installed;
-    installed["app"] = {"1.0", {}, {"libc.so.6"}, {}};
+    installed["app"] = {"1.0", {}, {}, {}, {"libc.so.6"}};
 
     solv::SolveOptions opts;
     auto r = solv::solve_install(repo, {}, installed, {{"glibc", "3.0"}}, opts);
@@ -1224,9 +1224,9 @@ TEST_F(RemovalSymlinkTest, RepoProviderDedupOnDuplicateIndexEntries)
     fs::create_directories(repo_dir / "x86_64");
     {
         std::ofstream idx(repo_dir / "x86_64" / "index.txt");
-        // Format: pkg|ver:hash:deps:provides:needed_so
-        // Note: provides "libssl.so.1" appears only once for this pkg+ver
-        idx << "openssl|3.0.0:abc123::libssl.so.1,libcrypto.so.1:\n";
+        // Format: pkg|ver:hash:deps:provides:provides_soname:needed_so
+        // Note: soname "libssl.so.1" appears only once for this pkg+ver
+        idx << "openssl|3.0.0:abc123:::libssl.so.1,libcrypto.so.1:|\n";
         // Adding duplicate for same pkg+ver — should be deduped
         // (cannot truly duplicate in flat index, but test that
         //  update_package_info doesn't double-count)
@@ -1242,17 +1242,21 @@ TEST_F(RemovalSymlinkTest, RepoProviderDedupOnDuplicateIndexEntries)
     Repository repo;
     ASSERT_NO_THROW(repo.load_index());
 
-    // find_provider should work (dedup means entry exists once)
-    auto prov = repo.find_provider("libssl.so.1");
+    // find_soname_provider should work (dedup means entry exists once)
+    auto prov = repo.find_soname_provider("libssl.so.1");
     ASSERT_TRUE(prov.has_value()) << "should find provider for libssl.so.1";
     EXPECT_EQ(prov->name, "openssl");
     EXPECT_EQ(prov->version, "3.0.0");
 
     // update_package_info with same info should not double count
+    // 两个 SONAME 必须走 **provides_soname**（第 5 参）—— 8.0.0 起 `provides` 是纯虚拟
+    // provider 空间，把它当 SONAME 登记会让增量重建**丢掉** SONAME 提供者（本用例第一版
+    // 就是这样红的：重建后 find_soname_provider 返回空）。
     std::vector<DependencyInfo> deps;
-    repo.update_package_info("openssl", "3.0.0", deps, {"libssl.so.1", "libcrypto.so.1"}, {});
+    repo.update_package_info("openssl", "3.0.0", deps, /*provides=*/{},
+                             /*provides_soname=*/{"libssl.so.1", "libcrypto.so.1"});
 
     // Should still find the provider (not lost after incremental rebuild)
-    prov = repo.find_provider("libssl.so.1");
+    prov = repo.find_soname_provider("libssl.so.1");
     ASSERT_TRUE(prov.has_value()) << "provider should survive incremental rebuild";
 }

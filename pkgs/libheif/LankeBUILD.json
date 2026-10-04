@@ -23,7 +23,7 @@
     "libx264.so.165",
     "libx265.so.216"
   ],
-  "provides": [
+  "provides_soname": [
     "libheif.so",
     "libheif.so.1"
   ],

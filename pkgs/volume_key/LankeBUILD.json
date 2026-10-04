@@ -14,7 +14,7 @@
     "libplc4.so",
     "libsmime3.so"
   ],
-  "provides": [
+  "provides_soname": [
     "libvolume_key.so",
     "libvolume_key.so.1"
   ],

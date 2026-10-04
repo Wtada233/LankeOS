@@ -27,7 +27,7 @@
     "libsystemd.so.0",
     "libunwind.so.8"
   ],
-  "provides": [
+  "provides_soname": [
     "libsysprof-6.so",
     "libsysprof-6.so.6",
     "libsysprof-memory-6.so",

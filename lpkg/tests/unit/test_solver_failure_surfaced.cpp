@@ -56,6 +56,7 @@ protected:
     void add(const std::string& name, const std::string& ver,
              const std::vector<std::string>& deps = {},
              const std::vector<std::string>& provides = {},
+             const std::vector<std::string>& provides_soname = {},
              const std::vector<std::string>& needed_so = {})
     {
         std::vector<DependencyInfo> dep_infos;
@@ -64,7 +65,7 @@ protected:
             di.name = d;
             dep_infos.push_back(std::move(di));
         }
-        repo.update_package_info(name, ver, dep_infos, provides, needed_so);
+        repo.update_package_info(name, ver, dep_infos, provides, provides_soname, needed_so);
     }
 
     /// 不变量：任何"求解失败"都必须带着**非空**的 problems 回来
@@ -84,7 +85,7 @@ protected:
 // ① 缺失的**命名依赖**（非 SONAME）
 TEST_F(SolverFailureSurfacedTest, MissingNamedDepIsVisible)
 {
-    add("appB", "2.0", {"libgone"}, {}, {});
+    add("appB", "2.0", {"libgone"}, {}, {}, {});
     expect_failure_visible(solve_install(repo, {}, installed, {{"appB", "latest"}}, {}),
                            "缺失命名依赖");
 }
@@ -92,7 +93,7 @@ TEST_F(SolverFailureSurfacedTest, MissingNamedDepIsVisible)
 // ① 缺失的 SONAME 提供者（默认不容忍）
 TEST_F(SolverFailureSurfacedTest, MissingSonameIsVisible)
 {
-    add("appB", "2.0", {}, {}, {"libmissing.so.1"});
+    add("appB", "2.0", {}, {}, {}, {"libmissing.so.1"});
     expect_failure_visible(solve_install(repo, {}, installed, {{"appB", "latest"}}, {}),
                            "缺失 SONAME");
 }
@@ -107,8 +108,8 @@ TEST_F(SolverFailureSurfacedTest, MissingTargetIsVisible)
 // ① 指定版本不在仓库（真包存在但该版本没有）
 TEST_F(SolverFailureSurfacedTest, MissingRequestedVersionIsVisible)
 {
-    add("libA", "1.0", {}, {}, {});
-    add("libA", "2.0", {}, {}, {});
+    add("libA", "1.0", {}, {}, {}, {});
+    add("libA", "2.0", {}, {}, {}, {});
     auto r = solve_install(repo, {}, installed, {{"libA", "9.9"}}, {});
     expect_failure_visible(r, "指定版本不存在");
     EXPECT_NE(join_problems(r).find("9.9"), std::string::npos)
@@ -118,16 +119,16 @@ TEST_F(SolverFailureSurfacedTest, MissingRequestedVersionIsVisible)
 // ① 升级破坏已装依赖（libsolv 的反向一致性）
 TEST_F(SolverFailureSurfacedTest, DowngradeBreakingInstalledIsVisible)
 {
-    add("lib", "1.0", {}, {"lib.so"}, {});
-    add("lib", "2.0", {}, {"lib.so"}, {});
+    add("lib", "1.0", {}, {}, {"lib.so"}, {});
+    add("lib", "2.0", {}, {}, {"lib.so"}, {});
     DependencyInfo dep;
     dep.name = "lib";
     Constraint c;
     c.op = ">=";
     c.version = "2.0";
     dep.constraints.push_back(c);
-    installed["app"] = {"1.0", {dep}, {}, {}};
-    installed["lib"] = {"2.0", {}, {}, {}};
+    installed["app"] = {"1.0", {dep}, {}, {}, {}};
+    installed["lib"] = {"2.0", {}, {}, {}, {}};
 
     expect_failure_visible(solve_install(repo, {}, installed, {{"lib", "1.0"}}, {}),
                            "降级破坏已装依赖");
@@ -136,7 +137,7 @@ TEST_F(SolverFailureSurfacedTest, DowngradeBreakingInstalledIsVisible)
 // ① 可容忍的缺 SONAME 也必须**有输出**：注入伪提供者后重解，不允许静默空事务
 TEST_F(SolverFailureSurfacedTest, ToleratedMissingSonameStillProducesTheTarget)
 {
-    add("appB", "2.0", {}, {}, {"libmissing.so.1"});
+    add("appB", "2.0", {}, {}, {}, {"libmissing.so.1"});
     SolveOptions opts;
     opts.missing_so_no_error = true;
     auto r = solve_install(repo, {}, installed, {{"appB", "latest"}}, opts);
@@ -149,7 +150,7 @@ TEST_F(SolverFailureSurfacedTest, ToleratedMissingSonameStillProducesTheTarget)
 // ① 容错模式**不得**把缺失命名依赖一起吞掉
 TEST_F(SolverFailureSurfacedTest, ToleratedModeStillFailsOnNamedDep)
 {
-    add("appB", "2.0", {"libgone"}, {}, {});
+    add("appB", "2.0", {"libgone"}, {}, {}, {});
     SolveOptions opts;
     opts.missing_so_no_error = true;
     expect_failure_visible(solve_install(repo, {}, installed, {{"appB", "latest"}}, opts),

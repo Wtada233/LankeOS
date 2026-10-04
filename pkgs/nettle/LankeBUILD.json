@@ -7,7 +7,7 @@
     "libc.so.6",
     "libgmp.so.10"
   ],
-  "provides": [
+  "provides_soname": [
     "libhogweed.so",
     "libhogweed.so.7",
     "libnettle.so",

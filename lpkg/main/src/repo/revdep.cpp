@@ -13,7 +13,7 @@ std::unordered_map<std::string, std::unordered_set<std::string>> build_reverse_d
     std::unordered_map<std::string, std::unordered_set<std::string>> soname_provider;
     for (const auto& [name, versions] : repo.packages()) {
         if (versions.empty()) continue;
-        for (const auto& prov : versions.back().provides) {
+        for (const auto& prov : versions.back().provides_soname) {  // 8.0.0：SONAME 走新字段
             soname_provider[prov].insert(name);
         }
     }

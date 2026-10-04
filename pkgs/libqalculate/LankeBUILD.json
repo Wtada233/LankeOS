@@ -17,7 +17,7 @@
     "libstdc++.so.6",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libqalculate.so",
     "libqalculate.so.23"
   ],

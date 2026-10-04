@@ -10,7 +10,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libclucene-contribs-lib.so",
     "libclucene-contribs-lib.so.1",
     "libclucene-core.so",

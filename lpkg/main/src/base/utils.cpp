@@ -365,14 +365,13 @@ bool is_safe_path_component(std::string_view s)
     // 2026-10-03 审计实测的后果（`coreutils,evil` 这种名字）：`files.db` 读回变成两个幽灵
     // 属主 ⇒ 该包能"卸载成功"（退 0）却把文件与归属全留下，而真实包 `coreutils` 会**误含**
     // 它的文件（autoremove / remove -r / force-solve 这些内部 force 路径会把文件搬走删掉）。
-    // `^` / `~` / `:` 是**版本桥接的保留字符**（对 libsolv 的 EVR 解析各有特殊含义，
-    // 见 vercmp/version.hpp）：混进版本号会让求解器看到的语义悄悄错位。实测真实索引
-    // 678 个版本里这三个字符一个都没有，所以拒它们不误伤任何现存包。
+    // `:` 也是**分帧**字符（上面已列：`pkgs` 的 `name:version`、索引版本块的
+    // `<ver>:<hash>:…`）。⚠️ **订正 2026-10-04（8.0.0）**：本条此前还拒 `^` / `~`，理由是
+    // "版本桥接的保留字符" —— 桥已拆掉（见 vercmp/version.hpp），`~` 现在是**合法的预发布
+    // 标记**（rpm 语义）、`^` 无特殊含义，两者都**放行**。
     // 本函数只用于包名与版本号，不用于内容文件路径，所以不会误伤合法文件名。
     for (const char c : s)
-        if (c == '|' || c == ';' || c == ',' ||
-            constants::EVR_RESERVED_CHARS.find(c) != std::string_view::npos)
-            return false;
+        if (c == '|' || c == ';' || c == ',' || c == ':') return false;
     // 空白也必须拒绝：包名会进入 WAL 的**里程碑**字段（`DB <path> <pkg>:<state>`），
     // 而 WAL 是空格分帧的（尾字段从右锚定）——带空格的里程碑会让 reverse_execute 推出的
     // 备份名与实际不符 → DB 回滚被静默跳过、备份随后被 cleanup_db_backups 删掉。
@@ -686,24 +685,30 @@ std::vector<RepoIndexVersionBlock> parse_repo_index_line(std::string_view line)
     if (parts.size() < 2) return blocks;
 
     const std::string pkg_name(parts[0]);
-    // 包级 provides（行内第 3 段）：版本级为空时回退到这里。旧格式/部分写入器把 provides
-    // 写在这一级，此前该字段被完全忽略 → 能力解析报"无提供者"。
-    const std::string_view pkg_level_provides = (parts.size() > 2) ? parts[2] : std::string_view{};
+    // ⚠️ **行内第 3 段（包级 provides）已废除**（2026-10-04，8.0.0）：`provides_soname` 拆出来之后
+    // 版本块的字段数固定为 6，再留一个"包级兜底"只会让"某个字段没写"变成静默的另一种解释。
+    // 这里**只读前两段**，第 3 段及之后一律忽略。
 
     for (auto version_info_sv : split_string_view(parts[1], constants::SEMICOLON_CHAR)) {
         if (version_info_sv.empty()) continue;
 
         const auto vh = split_string_view(version_info_sv, constants::COLON_CHAR);
-        if (vh.empty() || vh[0].empty()) continue;  // 畸形短块（`名|:哈希:`）不成版本
+        // **恰好 6 个字段**：`版本:哈希:依赖:provides:provides_soname:needed_so`。
+        // 旧格式（4/5 字段）在这里被**拒绝**而不是被误读 —— 否则"少一个字段"会让后面的字段
+        // 整体错位（例如把 provides 当成 needed_so），那正是当年两份解析器字段数不一致
+        // 制造静默错误答案的老路。拒绝的后果是索引解析出 0 个包 → 落
+        // `warning.repo_index_empty`，响亮地失败。
+        if (vh.size() != 6) continue;
+        if (vh[0].empty()) continue;  // 版本号为空的畸形块不成版本
 
         RepoIndexVersionBlock b;
         b.name = pkg_name;
         b.version = std::string(vh[0]);
-        b.hash = (vh.size() > 1) ? std::string(vh[1]) : std::string{};
-        b.deps = (vh.size() > 2) ? std::string(vh[2]) : std::string{};
-        b.provides = (vh.size() > 3) ? std::string(vh[3]) : std::string{};
-        if (b.provides.empty()) b.provides = std::string(pkg_level_provides);
-        b.needed_so = (vh.size() > 4) ? std::string(vh[4]) : std::string{};
+        b.hash = std::string(vh[1]);
+        b.deps = std::string(vh[2]);
+        b.provides = std::string(vh[3]);
+        b.provides_soname = std::string(vh[4]);
+        b.needed_so = std::string(vh[5]);
         blocks.push_back(std::move(b));
     }
     return blocks;

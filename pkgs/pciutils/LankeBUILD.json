@@ -12,7 +12,7 @@
     "libudev.so.1",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libpci.so",
     "libpci.so.3"
   ],

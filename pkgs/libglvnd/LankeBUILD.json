@@ -7,7 +7,7 @@
     "libX11.so.6",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libEGL.so",
     "libEGL.so.1",
     "libGL.so",

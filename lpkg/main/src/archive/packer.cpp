@@ -138,7 +138,8 @@ void add_dir_recursive(struct archive* a, const fs::path& dir, const std::string
 void pack_package(const std::string& output_filename, const std::string& source_dir,
                   const std::string& pkg_name, const std::string& pkg_version,
                   const std::vector<std::string>& deps, const std::vector<std::string>& provides,
-                  const std::string& man_content, const std::vector<std::string>& needed_so)
+                  const std::vector<std::string>& provides_soname, const std::string& man_content,
+                  const std::vector<std::string>& needed_so)
 {
     fs::path base_dir = source_dir;
     fs::path root_dir = base_dir / constants::DIR_CONTENT;
@@ -177,6 +178,7 @@ void pack_package(const std::string& output_filename, const std::string& source_
             meta[std::string(constants::J_VERSION)] = pkg_version;
             meta[std::string(constants::J_DEPS)] = deps;
             meta[std::string(constants::J_PROVIDES)] = provides;
+            meta[std::string(constants::J_PROVIDES_SONAME)] = provides_soname;
             meta[std::string(constants::J_NEEDED_SO)] = needed_so;
             meta[std::string(constants::J_MAN)] = man_content;
 

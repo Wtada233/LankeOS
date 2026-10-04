@@ -48,7 +48,7 @@
     "libqt6keychain.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libplasmanm_cellular.so",
     "libplasmanm_editor.so",
     "libplasmanm_internal.so"

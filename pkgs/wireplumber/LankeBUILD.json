@@ -15,7 +15,7 @@
     "libpipewire-0.3.so.0",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libwireplumber-0.5.so",
     "libwireplumber-0.5.so.0"
   ],

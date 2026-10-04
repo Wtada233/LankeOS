@@ -9,7 +9,7 @@
     "libm.so.6",
     "libtalloc.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libtevent.so",
     "libtevent.so.0"
   ],

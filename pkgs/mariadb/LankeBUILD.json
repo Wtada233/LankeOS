@@ -34,7 +34,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libmariadb.so",
     "libmariadb.so.3",
     "libmariadbd.so",

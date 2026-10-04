@@ -61,7 +61,7 @@
     "libxkbcommon.so.0",
     "libxkbregistry.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libmutter-51.so",
     "libmutter-51.so.0"
   ],

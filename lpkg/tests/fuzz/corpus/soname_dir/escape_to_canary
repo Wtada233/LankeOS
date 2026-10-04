@@ -1,0 +1,3 @@
+F notelf
+S sub /lpkgfuzz/soname/canary
+L libevil.so.1.0 sub/EVIL.so

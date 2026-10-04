@@ -29,13 +29,13 @@
   <img src="https://img.shields.io/badge/Claude_Code-D97757?style=flat&logo=claude&logoColor=white" alt="Claude Code" />
 </p>
 
-`lankefarm` 是 LankeOS 的 **ABI 驱动增量包构建系统**（Rust 编写）。它基于每个软件包的 `needed_so`/`provides` 构建链接依赖图，检测上游 ABI 断裂，只重建受影响的最小集合，并在隔离的 Docker 容器内完成所有构建。
+`lankefarm` 是 LankeOS 的 **ABI 驱动增量包构建系统**（Rust 编写）。它基于每个软件包的 `needed_so`/`provides_soname` 构建链接依赖图，检测上游 ABI 断裂，只重建受影响的最小集合，并在隔离的 Docker 容器内完成所有构建。
 
 > 详细架构规范见 [ARCH.md](ARCH.md)。该文档由实际代码编写，描述当前实现的真实行为，若与代码冲突以代码为准。
 
 ## 功能特性
 
-- **ABI 驱动增量构建** — 只构建配方版本与本地仓库不一致的包，或 ABI 断裂的受害者。用旧索引的 `needed_so`/`provides` 计算 removed SONAME，直连受害者，不做树状闭包。
+- **ABI 驱动增量构建** — 只构建配方版本与本地仓库不一致的包，或 ABI 断裂的受害者。用旧索引的 `needed_so`/`provides_soname` 计算 removed SONAME，直连受害者，不做树状闭包。
 - **容器隔离构建** — 所有构建在 fresh Docker 容器内进行，`--image` 必填，禁止主机构建污染宿主环境。
 - **确定性构建序** — 拓扑排序，同级按包名升序固定顺序，绝无随机（有回归测试保证）。
 - **构建计划确认** — 开始前列出 topo 顺序供 operator 确认；源预下载只针对"确认集"。
@@ -204,7 +204,7 @@ farm/
 │   ├── build/           # 调度层: 增量选择、拓扑排序、计划预览、源预下载
 │   ├── abi.rs           # removed_sonames / detect_abi_breaks / propagate
 │   ├── graph.rs         # index.txt 解析 + 链接依赖图
-│   ├── scan.rs          # .lpkg 解包 + ELF needed_so/provides 扫描
+│   ├── scan.rs          # .lpkg 解包 + ELF needed_so/provides_soname 扫描
 │   ├── repack.rs        # metadata.json 漂移修正 + 重打
 │   ├── verify.rs        # 构建产物 vs 期望 metadata 的三分支判定
 │   ├── lpkg_binding.rs  # 唯一碰 lpkg 的接缝（docker 编排 + ABI 过渡备份注入）

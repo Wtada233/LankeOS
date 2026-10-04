@@ -13,7 +13,7 @@
     "libpolkit-qt6-core-1.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6AuthCore.so",
     "libKF6AuthCore.so.6"
   ],

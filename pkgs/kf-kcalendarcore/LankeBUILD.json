@@ -13,7 +13,7 @@
     "libicalvcal.so.4.0",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6CalendarCore.so",
     "libKF6CalendarCore.so.6"
   ],

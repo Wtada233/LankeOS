@@ -13,7 +13,7 @@
     "libslang.so.2",
     "libtcl8.6.so"
   ],
-  "provides": [
+  "provides_soname": [
     "libnewt.so",
     "libnewt.so.0.52",
     "whiptcl.so"

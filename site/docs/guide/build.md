@@ -73,9 +73,10 @@ pkgs/<package>/
   "sources": ["https://upstream.example.com/pkg-1.2.3.tar.gz"],
   "work_sources": [],
   "build_deps": ["base-devel"],
-  "needed_so": ["libc.so.6"],
-  "provides": ["libfoo.so.1"],
-  "deps": []
+  "deps": [],
+  "provides": [],
+  "provides_soname": ["libfoo.so.1"],
+  "needed_so": ["libc.so.6"]
 }
 ```
 
@@ -85,8 +86,9 @@ pkgs/<package>/
 | `work_sources` | 辅助源（补丁、数据文件、字体等非归档文件） |
 | `build_deps` | **构建时**依赖，必须写全（构建容器只装 `build_deps`）。含 `base-devel` 作为锚点 |
 | `deps` | **运行时**依赖。通常留空——由 farm 从 `needed_so` 反查生成；只有 dlopen / QML / D-Bus 这类扫描不出的隐式依赖才手写 |
-| `needed_so` / `provides` | 由 farm 扫描构建产物的 ELF 自动写入，**不要手编** |
-| `release` | 打包修订号，发行版内部重建时递增（成品版本形如 `1.2.3+1`） |
+| `provides` | **纯虚拟 provider**（与 `.so` 无关，如 `rustc`）。**手写**，farm 不扫不改 |
+| `provides_soname` / `needed_so` | 由 farm 扫描构建产物的 ELF 自动写入，**不要手编** |
+| `release` | 打包修订号，发行版内部重建时递增（成品版本形如 `1.2.3-1` —— rpm 的 release，8.0.0 起用 `-` 而不是 `+`） |
 | `no_strip` | 跳过 ELF strip（解释器、编译器、`linux` 等） |
 
 ### LankeBUILD 脚本
@@ -176,7 +178,7 @@ sudo lankefarm build bash curl --image wtada233/lankeos:latest
 
 #### ABI 驱动的增量（farm 与普通构建脚本的核心区别）
 
-某个包重建后，若它不再提供旧的 SONAME，farm 会用**旧索引的 `needed_so`/`provides`** 算出被移除的 SONAME 集合，直接查出消费者包并一并重建——不做树状闭包，因此 `libxml2` 断裂只重建 `llvm`，而 `llvm` 重建后 ABI 未变则 `rust` 不动。`data/build/*.yaml` 里的声明式重建组负责补上"不链该库但 ABI 敏感"的包（Python 生态；Qt 私有 API 的消费者则由脚本扫 ELF 里的版本字符串动态判定）。
+某个包重建后，若它不再提供旧的 SONAME，farm 会用**旧索引的 `needed_so`/`provides_soname`** 算出被移除的 SONAME 集合，直接查出消费者包并一并重建——不做树状闭包，因此 `libxml2` 断裂只重建 `llvm`，而 `llvm` 重建后 ABI 未变则 `rust` 不动。`data/build/*.yaml` 里的声明式重建组负责补上"不链该库但 ABI 敏感"的包（Python 生态；Qt 私有 API 的消费者则由脚本扫 ELF 里的版本字符串动态判定）。
 
 重建期间，被移除的旧 `.so` 会备份到 `out/backups/` 并在每个构建容器里恢复 + `ldconfig`，让尚未重建的旧二进制在过渡期继续工作；整个构建结束后确认无人再引用才清理。
 

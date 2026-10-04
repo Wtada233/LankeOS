@@ -3,7 +3,7 @@
   "version": "23.1.2",
   "release": 1,
   "deps": [],
-  "provides": [
+  "provides_soname": [
     "liblldCOFF.so",
     "liblldCOFF.so.23.1",
     "liblldCommon.so",

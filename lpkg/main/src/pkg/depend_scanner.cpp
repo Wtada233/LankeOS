@@ -118,7 +118,7 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
     std::vector<DependencyInfo> deps = pkg_info->dependencies;
     if (!Config::instance().no_deps_mode()) {
         for (const auto& soname : pkg_info->needed_so) {
-            if (auto prov = repo.find_provider(soname)) {
+            if (auto prov = repo.find_soname_provider(soname)) {  // needed_so → SONAME 空间
                 if (prov->name == pkg_info->name) continue;
                 bool dup = false;
                 for (const auto& d : deps)

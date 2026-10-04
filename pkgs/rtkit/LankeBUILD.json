@@ -9,7 +9,7 @@
     "libdbus-1.so.3",
     "libsystemd.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "dbus",

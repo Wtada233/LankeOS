@@ -77,29 +77,44 @@ void expect_refused(const std::string& dep_string, const std::string& planned,
 
 }  // namespace
 
-TEST_F(PlanDepVersionCheckTest, ReleaseOnlyVersionDoesNotSatisfyAnExactConstraint)
+TEST_F(PlanDepVersionCheckTest, DifferentReleaseDoesNotSatisfyAnExactConstraint)
 {
-    // `= 1.0` 与计划版本 `1.0+1`：**不**满足（release 让版本更大）。这正是旧桥接
-    // （libsolv 把"要求侧缺 release"当通配）会产出的违规计划 —— 这道判据是当时唯一的拦截点。
-    expect_refused("lib = 1.0", "1.0+1", "app");
+    // `= 1.0-2` 与计划版本 `1.0-5`：两端都写了 release → 常规比较 → 不满足。
+    // ⚠️ 8.0.0 起 `= 1.0` 与 `1.0-5` **是**满足的（rpm 把"没写 release"当通配，与求解器
+    // 同一判据）—— 那条现在是**放行**用例，见本文件末尾的 ReleaseWildcardCasesAreNotRefused。
+    expect_refused("lib = 1.0-2", "1.0-5", "app");
 }
 
-TEST_F(PlanDepVersionCheckTest, ReleaseOnlyVersionDoesNotSatisfyUpperBoundWithoutRelease)
+TEST_F(PlanDepVersionCheckTest, ReleaseAboveTheUpperBoundIsRefused)
 {
-    // `<= 1.0` 与 `1.0+1`：不满足（`1.0+1 > 1.0`）。
-    expect_refused("lib <= 1.0", "1.0+1", "app");
+    // `<= 1.0-2` 与 `1.0-5`：不满足（1.0-5 > 1.0-2）。
+    expect_refused("lib <= 1.0-2", "1.0-5", "app");
 }
 
-TEST_F(PlanDepVersionCheckTest, BaseVersionDoesNotSatisfyLowerBoundWithRelease)
+TEST_F(PlanDepVersionCheckTest, LowerVersionIsRefusedWhenBothSidesCarryARelease)
 {
-    // `>= 1.0+1` 与 `1.0`：不满足。
-    expect_refused("lib >= 1.0+1", "1.0", "app");
+    // `>= 1.0-5` 与 `1.0-2`：不满足。
+    expect_refused("lib >= 1.0-5", "1.0-2", "app");
 }
 
 TEST_F(PlanDepVersionCheckTest, PrereleaseDoesNotSatisfyTheBaseVersionConstraint)
 {
-    // `= 1.0` 与 `1.0-rc1`：不满足（预发布旧于基础版）。
-    expect_refused("lib = 1.0", "1.0-rc1", "app");
+    // `= 1.0` 与 `1.0~rc1`：不满足（**预发布用 `~`**；`-rc1` 在 rpm 里是 release，比 1.0 新）。
+    expect_refused("lib = 1.0", "1.0~rc1", "app");
+}
+
+TEST_F(PlanDepVersionCheckTest, ReleaseWildcardCasesAreNotRefused)
+{
+    // 与上面几组成对：**约束没写 release** 时按 rpm 规则是通配 —— `= 1.0` 与计划版本
+    // `1.0-5` 满足；而计划版本 `1.0`（不带 release）反过来满足 `> 1.0-5`。这几条**必须**
+    // 放行：求解器用的就是同一判据，拒掉它们等于"自己人打自己人"（这正是 2026-10-03 那 78
+    // 处分叉的形态，只是方向反过来）。
+    const std::map<std::string, InstallPlan> plan{{"lib", plan_with("lib", "1.0-5")}};
+    EXPECT_NO_THROW(detail::check_planned_dep_version(dep_of("lib = 1.0"), plan, "app"));
+    EXPECT_NO_THROW(detail::check_planned_dep_version(dep_of("lib >= 1.0"), plan, "app"));
+
+    const std::map<std::string, InstallPlan> plan_no_rel{{"lib", plan_with("lib", "1.0")}};
+    EXPECT_NO_THROW(detail::check_planned_dep_version(dep_of("lib > 1.0-5"), plan_no_rel, "app"));
 }
 
 TEST_F(PlanDepVersionCheckTest, SatisfyingPlanIsAccepted)

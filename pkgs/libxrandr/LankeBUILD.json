@@ -11,7 +11,7 @@
     "libXrender.so.1",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libXrandr.so",
     "libXrandr.so.2"
   ],

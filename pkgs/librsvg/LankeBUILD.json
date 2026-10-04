@@ -22,7 +22,7 @@
     "libpangocairo-1.0.so.0",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "librsvg-2.so",
     "librsvg-2.so.2"
   ],

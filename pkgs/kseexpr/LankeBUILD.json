@@ -13,7 +13,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKSeExpr.so",
     "libKSeExpr.so.6",
     "libKSeExprUI.so",

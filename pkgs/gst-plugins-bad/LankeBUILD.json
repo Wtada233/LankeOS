@@ -60,7 +60,7 @@
     "libxkbcommon.so.0",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libgstadaptivedemux-1.0.so",
     "libgstadaptivedemux-1.0.so.0",
     "libgstanalytics-1.0.so",

@@ -12,7 +12,7 @@
     "libkrb5.so.3",
     "libpam.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libsasl2.so",
     "libsasl2.so.3"
   ],

@@ -24,7 +24,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libCbc.so",
     "libCbc.so.3",
     "libCbcSolver.so",

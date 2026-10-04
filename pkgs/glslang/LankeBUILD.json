@@ -11,7 +11,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libSPIRV.so",
     "libSPIRV.so.16",
     "libglslang-default-resource-limits.so",

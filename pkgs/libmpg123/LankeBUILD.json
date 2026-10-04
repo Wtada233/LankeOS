@@ -11,7 +11,7 @@
     "libpulse-simple.so.0",
     "libpulse.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libmpg123.so",
     "libmpg123.so.0",
     "libout123.so",

@@ -77,21 +77,22 @@ protected:
             f << content;
         }
         std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
-        pack_package(pkg_path, work_dir.string(), name, ver, deps, {}, "Man page for " + name, {});
+        pack_package(pkg_path, work_dir.string(), name, ver, deps, {}, {}, "Man page for " + name,
+                     {});
         fs::remove_all(work_dir);
         return pkg_path;
     }
 
     /** 写仓库索引：name|ver:sha256:deps:provides:needed_so */
     void update_index(const std::vector<std::tuple<std::string, std::string, std::string,
-                                                   std::string, std::string>>& entries)
+                                                   std::string, std::string, std::string>>& entries)
     {
         std::ofstream index(mirror_dir / "index.txt");
-        for (const auto& [name, ver, deps, provides, needed_so] : entries) {
+        for (const auto& [name, ver, deps, provides, provides_soname, needed_so] : entries) {
             const std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
             const std::string hash = fs::exists(pkg_path) ? calculate_sha256(pkg_path) : "unknown";
             index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
-                  << needed_so << "|\n";
+                  << provides_soname << ":" << needed_so << "|\n";
         }
     }
 
@@ -318,7 +319,7 @@ TEST_F(ConfigSaveOnRemoveTest, AutoremoveKeepsConfigAsLpkgsave)
     (void)lib;
     add_to_mirror("cs_lib", "1.0");
     add_to_mirror("cs_app", "1.0");
-    update_index({{"cs_lib", "1.0", "", "", ""}, {"cs_app", "1.0", "cs_lib", "", ""}});
+    update_index({{"cs_lib", "1.0", "", "", "", ""}, {"cs_app", "1.0", "cs_lib", "", "", ""}});
 
     install_packages({"cs_app"});
     ASSERT_TRUE(Cache::instance().is_installed("cs_lib")) << "依赖没被拉进来，autoremove 无从谈起";

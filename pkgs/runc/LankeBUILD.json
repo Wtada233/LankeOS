@@ -10,7 +10,7 @@
     "libpathrs.so",
     "libseccomp.so.2"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "git",

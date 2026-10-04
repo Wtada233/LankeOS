@@ -14,7 +14,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6ColorScheme.so",
     "libKF6ColorScheme.so.6"
   ],

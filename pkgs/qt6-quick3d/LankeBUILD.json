@@ -23,7 +23,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6Quick3D.so",
     "libQt6Quick3D.so.6",
     "libQt6Quick3DAssetImport.so",

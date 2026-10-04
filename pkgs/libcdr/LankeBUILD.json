@@ -16,7 +16,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libcdr-0.1.so",
     "libcdr-0.1.so.1"
   ],

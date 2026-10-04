@@ -19,7 +19,7 @@
     "libudev.so.1",
     "libupower-glib.so.3"
   ],
-  "provides": [
+  "provides_soname": [
     "libgnome-bluetooth-3.0.so",
     "libgnome-bluetooth-3.0.so.13",
     "libgnome-bluetooth-ui-3.0.so",

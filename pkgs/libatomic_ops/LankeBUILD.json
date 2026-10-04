@@ -6,7 +6,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libatomic_ops.so",
     "libatomic_ops.so.1",
     "libatomic_ops_gpl.so",

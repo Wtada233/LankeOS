@@ -22,7 +22,7 @@
     "libportal.so.1",
     "libvte-2.91-gtk4.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "appstream",
     "base-devel",

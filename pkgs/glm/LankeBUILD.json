@@ -6,7 +6,7 @@
   "needed_so": [
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libglm.so"
   ],
   "build_deps": [

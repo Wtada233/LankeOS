@@ -13,7 +13,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libmwaw-0.3.so",
     "libmwaw-0.3.so.3"
   ],

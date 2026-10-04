@@ -13,7 +13,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libraw.so",
     "libraw.so.25",
     "libraw_r.so",

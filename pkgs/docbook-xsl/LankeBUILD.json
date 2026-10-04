@@ -6,7 +6,7 @@
     "docbook-xml"
   ],
   "needed_so": [],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "docbook-xml"

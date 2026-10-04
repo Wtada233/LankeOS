@@ -17,7 +17,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libsignon-extension.so",
     "libsignon-extension.so.1",
     "libsignon-extension.so.1.0",

@@ -10,7 +10,7 @@
     "libxcb-util.so.1",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libstartup-notification-1.so",
     "libstartup-notification-1.so.0"
   ],

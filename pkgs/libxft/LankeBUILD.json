@@ -12,7 +12,7 @@
     "libfontconfig.so.1",
     "libfreetype.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libXft.so",
     "libXft.so.2"
   ],

@@ -32,7 +32,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKirigamiAddonsComponents.so",
     "libKirigamiAddonsComponents.so.6",
     "libKirigamiAddonsStatefulApp.so",

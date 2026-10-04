@@ -16,7 +16,7 @@
     "libxcb.so.1",
     "libxkbcommon.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libFcitx5Qt6DBusAddons.so",
     "libFcitx5Qt6DBusAddons.so.1",
     "libFcitx5Qt6WidgetsAddons.so",

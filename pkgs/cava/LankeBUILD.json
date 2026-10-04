@@ -15,7 +15,7 @@
     "libpulse-simple.so.0",
     "libpulse.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "alsa-lib",
     "base-devel",

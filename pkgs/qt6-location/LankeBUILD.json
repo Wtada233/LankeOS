@@ -17,7 +17,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6Location.so",
     "libQt6Location.so.6"
   ],

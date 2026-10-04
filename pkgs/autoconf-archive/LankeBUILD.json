@@ -3,7 +3,7 @@
   "version": "2024.10.16",
   "deps": [],
   "needed_so": [],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel"
   ],

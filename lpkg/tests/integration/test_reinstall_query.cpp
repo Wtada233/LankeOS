@@ -84,9 +84,12 @@ protected:
 
         std::string hash = calculate_sha256(pkg_path);
 
-        // Update index.txt with new format: name|v:h:deps|provides
+        // 索引行：`name|ver:hash:deps:provides:provides_soname:needed_so|`（**恰好 6 段**）。
+        // 8.0.0 起非 6 段的版本块被**两侧一致跳过**（见 base/utils.cpp 的严格解析）——
+        // 这里曾写成两段 `ver:hash`，于是整行被丢掉、镜像解析出 0 个包，`reinstall` 就撞上
+        // "计划里的包不在索引里"的硬报错。
         std::ofstream index(suite_work_dir / "mirror" / "x86_64" / "index.txt", std::ios::app);
-        index << name << "|" << ver << ":" << hash << ":|" << std::endl;
+        index << name << "|" << ver << ":" << hash << "::::\n";
 
         fs::remove_all(work_dir);
         return pkg_path;

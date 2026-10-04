@@ -20,7 +20,7 @@ fn make_lpkg(path: &PathBuf) {
     .unwrap();
     fs::write(
         src.join("metadata.json"),
-        r#"{"name":"demo","version":"1.0","deps":[],"provides":["libdemo.so.1"],"needed_so":[]}"#,
+        r#"{"name":"demo","version":"1.0","deps":[],"provides":[],"provides_soname":["libdemo.so.1"],"needed_so":[]}"#,
     )
     .unwrap();
     let f = fs::File::create(path).unwrap();

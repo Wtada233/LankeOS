@@ -8,7 +8,7 @@
     "libgcc_s.so.1",
     "libpcre2-8.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "pcre2",

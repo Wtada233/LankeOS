@@ -8,7 +8,7 @@
     "libc.so.6",
     "libudev.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libusb-1.0.so",
     "libusb-1.0.so.0"
   ],

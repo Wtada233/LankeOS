@@ -7,7 +7,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libmbedcrypto.so.16",
     "libmbedcrypto.so.3.6.7",
     "libmbedtls.so.21",

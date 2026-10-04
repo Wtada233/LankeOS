@@ -6,7 +6,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libogg.so",
     "libogg.so.0"
   ],

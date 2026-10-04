@@ -17,22 +17,64 @@ struct Constraint {
     }
 };
 
+// ============================================================================
+// 版本语义：**就是 rpm 的 EVR**（`[epoch:]version[-release]`），8.0.0 起
+// ============================================================================
+//
+// 判据只有一份：libsolv 的 EVR 比较（`vercmp/version.cpp` 的 `evr_cmp`），版本串**原样**进。
+// 求解器内部的比较用的也是它，所以"求解器按 X 判、安装期按 Y 判"这类不一致**从根上不存在**。
+//
+// 段按数值比（`6.16.1 > 6.6.1`）；`1.0` 与 `1.0.0` 是**不同**版本（不补 0）；
+// `~` 是**预发布**（`1.0~rc1 < 1.0`）；`-` 之后是 **release**（`1.0-1 > 1.0`，revision 语义）。
+//
+// ⚠️ **订正 2026-10-04（8.0.0，破坏性）—— 这条"桥"被拆掉了，别再照着旧设计写代码：**
+// 此前 lpkg 有**自己的一套**版本语义（`-` = 预发布、`+N` = 发行修订号），并用
+// `to_libsolv_evr()` / `from_libsolv_evr()` 在两者之间**编解码**（`-`→`~`、
+// `+release`→`^^release`），因为 libsolv 只认 rpm 语义。那座桥的代价是：
+// **两套判据必须逐条一致，而它们不一致过** —— 2026-10-03 在 4032 组合的
+// (候选 × 约束) 矩阵上差 **78 处、两个方向都有**（`= 1.0` 匹配 `1.0+1` 是假满足 ⇒ 装出坏
+// 系统；`> 1.0` 不匹配 `1.0+1` 是假不满足 ⇒ 事务无解）。当时的修法是换一个**更冷门的
+// 编码**（`^` caret 当 release 分隔符）并配一份保留字符黑名单 —— 治标不治本：只要还存在
+// 两套语义，就得靠"手动保持一致"活着。
+//
+// **8.0.0 的做法是取消第二套语义**：lpkg 直接采用 rpm 的 EVR，
+// `to_libsolv_evr`/`from_libsolv_evr`/`EVR_RELEASE_SEP`/`EVR_RESERVED_CHARS` **全部删除**，
+// 版本串原样进池。于是桥、黑名单、等价性矩阵这一整套**都不需要了**。
+// 连带的行为变化（**有意为之**，不是回归）：
+//   · build 的 `release:` 从"版本串后接 `+N`"改成 rpm 的 `-N`（`builder.cpp`）；
+//   · 约束与候选的**release 是否参与匹配**改由 rpm 的规则定 —— 例如 `= 1.0` 会匹配
+//     `1.0-5`（rpm 里"没写 release"= 任何 release）。这正是 rpm 的语义，且**两边同一份
+//     实现**，所以不再有"求解器与安装期打架"这回事；
+//   · `is_safe_path_component` 不再拒 `^`/`~`（它们已经不是保留字符）；`:` 仍然拒，
+//     但理由换成了**分帧**（`pkgs` 是 `name:version`、索引版本块是 `<ver>:<hash>:…`），
+//     与版本语义无关。
+
 /**
- * 比较两个版本号字符串（libsolv EVRCMP/rpm 语义 + `-`→`~` 归一化）。
- * v1 < v2 返回 true，否则返回 false。
+ * 比较两个版本号字符串（libsolv EVR / rpm 语义）。`v1 < v2` 返回 true。
  *
- * 语义（与 rpm 一致，lpkg 不再自研补段）：
- *   - 段按数值比较（6.16.1 > 6.6.1）；
- *   - `1.0` 与 `1.0.0` 视为**不同版本**（段数不同即不等，不做缺失段补 0）；
- *   - 预发布 `1.0-rc1` 归一化为 `1.0~rc1` 后，**旧于** `1.0`（rpm 的 `~` = 预发布）；
- *   - `+N` 是发行修订号，**先拆出版本比较、版本相同再比 release**（261.2+3 > 261+3；
- *     若整串丢给 rpm 段比较，release 会与版本段混比导致错排）。
+ * 实现见 `vercmp/version.cpp` 的 `evr_cmp`（唯一判据）。"最新版"的判定也用它
+ * （`repository.cpp` 拿它当 `ranges::sort` 的比较器 ⇒ 升序 ⇒ 最后一版最新）。
  */
 bool version_compare(const std::string& v1_str, const std::string& v2_str);
 
 /**
+ * 约束算子 → libsolv 的 REL 标志位（`REL_GT`=1 / `REL_EQ`=2 / `REL_LT`=4）。
+ *
+ * **唯一实现**：`solver.cpp` 往池里灌依赖时用的就是它 —— 于是"求解器怎么理解 `>=`"与
+ * "安装期怎么理解 `>=`"在**算子这一层**也不可能有第二份判据。未知算子三者全置（宽松
+ * 兜底：宁可判满足也不误报冲突）。
+ */
+int version_op_flags(const std::string& op);
+
+/**
  * 检查版本号是否满足指定的版本约束。
- * op: = == != < <= > >=
+ * op: = == != < <= > >=（其它值抛 `error.invalid_version_format`）
+ *
+ * ⚠️ **用的是 libsolv 的"依赖匹配"语义**（`EVRCMP_MATCH_RELEASE`），不是排序语义 ——
+ * 两者对"候选有 release、约束没写 release"的处置不同：匹配语义把**缺 release 当通配**
+ * （rpm 的规则，与 `pooldep.c` 的 `pool_match_nevr_rel()` 逐条一致）。所以
+ * `version_satisfies("1.0-5", "=", "1.0") == true`，而 `> 1.0` 对它**不**成立。
+ * 详情见 `version.cpp` 里 `version_satisfies` 的注释。
  */
 bool version_satisfies(const std::string& current_version, const std::string& op,
                        const std::string& required_version);
@@ -44,41 +86,3 @@ bool version_satisfies(const std::string& current_version, const std::string& op
  */
 bool version_satisfies_all(const std::string& current_version,
                            const std::vector<Constraint>& constraints);
-
-/**
- * lpkg 版本 → libsolv EVR 字符串（**桥接的唯一入口**）。
- *
- * **要求：libsolv 的依赖匹配必须与 lpkg 的 `version_satisfies()` 逐条一致** —— 求解器按前者
- * 出方案、安装期按后者验收，两者不一致就会出现"求出来的方案被自己拒掉"（假不满足 ⇒ 事务
- * 无解）或"装出来才发现不满足"（假满足 ⇒ 坏系统）。
- *
- * 编码规则（`norm` = `-`→`~`，即把 lpkg 的预发布标记换成 rpm 的 tilde）：
- *   `[V, R]` = 在第一个 `+` 处切；`enc = V`（R 空）或 `V + "^^" + R`（R 非空）。
- *
- * **为什么不是"把 `+` 换成 `-` 交给 libsolv 当 release"**（2026-10-03 之前就是这么做的）：
- * libsolv 的依赖匹配走 `EVRCMP_MATCH_RELEASE`（`src/pooldep.c` 的 `pool_intersect_evrs`），
- * 它把"有一侧没有 release"当**通配**（`pool_evrcmp` 返回 ±2 的两个特例分支）⇒ 实测
- * `foo = 1.0` 会匹配 `1.0+1`/`1.0+2`，而 `foo > 1.0+1` 反过来会匹配 `1.0`，
- * `foo >= 1.0` 又不匹配 `1.0+1`。在一份 4032 组合的 (候选版本 × 约束) 矩阵上，它与
- * `version_satisfies` 差 **78 处**，**两个方向都有**。详见
- * `tests/unit/test_vercmp_libsolv_bridge.cpp`（同一矩阵，是这道桥的回归闸门）。
- *
- * **为什么 `^` 对**：libsolv 的 rpm 比较器把 caret 定义为"**比基础版新、比任何真实下一段
- * 旧**"（`1.0^post > 1.0` 且 `1.0^post < 1.0.1`）—— 正是发行修订号的语义；而且全串**不含
- * `-`** ⇒ libsolv 切出的 release 永远为空 ⇒ 上面那些 ±2 特例分支**不可能触发**。同一矩阵
- * 上不一致数 = 0。
- *
- * **因此 `^` 是版本域里的保留字符**：lpkg 版本/包名里不允许出现（`is_safe_path_component`
- * 拒、本函数也抛）。实测真实索引 678 个版本里 0 个含 `^`。
- *
- * @throws LpkgException 版本含保留字符 `^`
- */
-std::string to_libsolv_evr(const std::string& v);
-
-/**
- * libsolv EVR 字符串 → lpkg 版本（`to_libsolv_evr` 的**无损**逆）。
- *
- * `~` 还原为 `-`；分隔符是**唯一的** `^^`（版本部分不许含 `^`，所以第一个 `^^` 一定是
- * 分隔符）→ 还原为 `+`。旧实现按"最后一个 `-`"切分，在版本/release 含 `~` 时会还原错。
- */
-std::string from_libsolv_evr(const std::string& v);

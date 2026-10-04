@@ -6,7 +6,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libxshmfence.so",
     "libxshmfence.so.1"
   ],

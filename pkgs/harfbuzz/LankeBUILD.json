@@ -16,7 +16,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libharfbuzz-cairo.so",
     "libharfbuzz-cairo.so.0",
     "libharfbuzz-gobject.so",

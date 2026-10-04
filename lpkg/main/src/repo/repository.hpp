@@ -17,9 +17,10 @@ struct PackageInfo {
     std::string name;                          // 包名
     std::string version;                       // 版本号
     std::string sha256;                        // 包文件 SHA256 校验值
-    std::vector<DependencyInfo> dependencies;  // 依赖列表
-    std::vector<std::string> provides;         // 提供的能力列表（含 SONAME、虚拟包等）
-    std::vector<std::string> needed_so;        // 包声明的 DT_NEEDED SONAME 列表
+    std::vector<DependencyInfo> dependencies;  // 依赖列表（**包名/虚拟能力**语义）
+    std::vector<std::string> provides;         // **虚拟 provider**（与 .so 无关）
+    std::vector<std::string> provides_soname;  // 本包**导出**的 SONAME
+    std::vector<std::string> needed_so;        // 本包**需要**的 SONAME（DT_NEEDED）
 };
 
 /**
@@ -57,10 +58,11 @@ public:
      *         这是"根本没法开始读"，与"读到一半坏掉"不同类，两个消费者都当硬失败。
      */
     bool load_index_from_file(const std::filesystem::path& index_path);
-    /** 更新或添加包信息到索引 */
+    /** 更新或添加包信息到索引（字段次序全仓统一：`deps, provides, provides_soname, needed_so`） */
     void update_package_info(const std::string& name, const std::string& version,
                              const std::vector<DependencyInfo>& deps,
                              const std::vector<std::string>& provides,
+                             const std::vector<std::string>& provides_soname = {},
                              const std::vector<std::string>& needed_so = {});
     /** 查找包（不指定版本时返回最新版本） */
     std::optional<PackageInfo> find_package(const std::string& name);
@@ -73,8 +75,15 @@ public:
     /** 查找满足复合版本约束的最佳匹配版本（支持区间，如 >= 2.0.0 < 3.0.0） */
     std::optional<PackageInfo> find_best_matching_version(
         const std::string& name, const std::vector<Constraint>& constraints);
-    /** 查找提供某能力的包 */
+    /** 查找提供某**虚拟能力**的包（`provides` 语义；**不**看 `provides_soname`） */
     std::optional<PackageInfo> find_provider(const std::string& capability) const;
+    /**
+     * 查找提供某 **SONAME** 的包（`provides_soname` 语义）。
+     *
+     * 与 `find_provider()` 是**两个查询、两套数据**，**故意不合并**：合并了就会让"依赖包名/
+     * 虚拟能力"与"需要 SONAME"互相误匹配（那正是 8.0.0 拆分要根除的毛病）。
+     */
+    std::optional<PackageInfo> find_soname_provider(const std::string& soname) const;
     /** 全部包（包名 -> 版本列表；供 solver 构建 libsolv pool） */
     const std::unordered_map<std::string, std::vector<PackageInfo>>& packages() const
     {
@@ -82,14 +91,30 @@ public:
     }
 
 private:
-    /** 吸收索引里的一行（该行的**全部**版本块）到包表与 provider 表 */
+    /** 吸收索引里的一行（该行的**全部**版本块）到包表与两张 provider 表 */
     void absorb_index_line(std::string_view line);
     /** 每个包的版本列表按版本号**升序**排（`versions.back()` = 最新版）—— 两个加载入口共用 */
     void sort_package_versions();
 
+    /// 一张「提供者表」（提供物 → 包名列表）。两张表的键空间**互不相通**：
+    /// `providers_` 收 `provides`（虚拟能力），`soname_providers_` 收 `provides_soname`。
+    using ProviderMap = std::unordered_map<std::string, std::vector<std::string>>;
+
+    /**
+     * 增量重建**一张**提供者表：先移除本包的旧记录，再按当前版本列表重新加入，最后对受影响的
+     * 键排序（保证 `find_provider` / `find_soname_provider` 返回"第一个提供者"的结果**确定**；
+     * 整表重建会遍历 `unordered_map`，顺序不确定）。
+     *
+     * `field` 选 `&PackageInfo::provides` 或 `&PackageInfo::provides_soname` —— 两张表**共用这一份
+     * 实现**，规则若有改动只需改一处。
+     */
+    static void refresh_provider_map(ProviderMap& map, const std::string& pkg_name,
+                                     const std::vector<PackageInfo>& versions,
+                                     const std::vector<std::string> PackageInfo::* field);
+
     std::unordered_map<std::string, std::vector<PackageInfo>> packages_;  // 包名 -> 版本列表
-    std::unordered_map<std::string, std::vector<std::string>>
-        providers_;  // 能力 -> 提供该能力的包名列表
+    ProviderMap providers_;         // **虚拟能力** -> 提供者包名（来自 `provides`）
+    ProviderMap soname_providers_;  // **SONAME**    -> 提供者包名（来自 `provides_soname`）
 };
 
 /**

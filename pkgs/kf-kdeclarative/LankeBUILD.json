@@ -18,7 +18,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6CalendarEvents.so",
     "libKF6CalendarEvents.so.6",
     "libkquickcontrolsprivate.so.0"

@@ -136,6 +136,7 @@ void Config::rebase_paths()
     build_conf_ = config_dir_ / "build.conf";
     files_db_ = state_dir_ / "files.db";
     provides_db_ = state_dir_ / "provides.db";
+    provides_soname_db_ = state_dir_ / "provides_soname.db";
     conf_hashes_db_ = state_dir_ / "confhashes.db";
     xattr_keys_db_ = state_dir_ / "xattrkeys.db";
     lock_file_ = lock_dir_ / "db.lck";
@@ -362,7 +363,9 @@ void Config::init_filesystem()
     ensure_file_exists(essential_file_);
     ensure_file_exists(files_db_);
     ensure_file_exists(provides_db_);
-    // 与兄弟库同一口径：DB 一族（pkgs/holdpkgs/files.db/provides.db/confhashes.db/xattrkeys.db）
+    ensure_file_exists(provides_soname_db_);
+    // 与兄弟库同一口径：DB
+    // 一族（pkgs/holdpkgs/files.db/provides.db/provides_soname.db/confhashes.db/xattrkeys.db）
     // 要么都预建、要么都不建。两个具体理由：
     //   · 备份链：`Cache::write(milestone)` 对一族逐个"备份原文件 + 全量重写"，而
     //     write_db_file_wal 对**不存在**的文件走 DBNEW、**不产生** :batch-start 备份 ——

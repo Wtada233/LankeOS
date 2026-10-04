@@ -41,7 +41,7 @@
     "xdg-desktop-portal-kde"
   ],
   "needed_so": [],
-  "provides": [],
+  "provides_soname": [],
   "sources": [],
   "work_sources": []
 }

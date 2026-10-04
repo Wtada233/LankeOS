@@ -10,7 +10,7 @@
     "libk5crypto.so.3",
     "libkrb5.so.3"
   ],
-  "provides": [
+  "provides_soname": [
     "libtirpc.so",
     "libtirpc.so.3"
   ],

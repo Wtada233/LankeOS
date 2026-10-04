@@ -50,7 +50,7 @@
     "libqt6keychain.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libkateprivate.so.26.08.1"
   ],
   "build_deps": [

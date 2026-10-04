@@ -10,7 +10,7 @@
     "libgcc_s.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6TextTemplate.so",
     "libKF6TextTemplate.so.6"
   ],

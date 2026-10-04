@@ -18,7 +18,7 @@
     "libp11-kit.so.0",
     "libpango-1.0.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libgck-1.so",
     "libgck-1.so.0",
     "libgcr-base-3.so",

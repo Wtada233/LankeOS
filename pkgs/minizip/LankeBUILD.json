@@ -7,7 +7,7 @@
     "libc.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libminizip.so",
     "libminizip.so.1"
   ],

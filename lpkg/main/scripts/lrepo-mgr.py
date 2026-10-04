@@ -9,7 +9,7 @@ lrepo-mgr.py — LankeOS 仓库管理（**纯本地模式**）
 
 索引行格式：
 
-    name|ver:sha256:deps:provides:needed_so;ver2:...|
+    name|ver:sha256:deps:provides:provides_soname:needed_so;ver2:...|
 
 用法：
 
@@ -67,12 +67,13 @@ def read_metadata_from_archive(archive_path):
 
 
 def extract_metadata(archive_path):
-    """返回 (deps, provides, needed_so)，均为逗号连接的字符串。"""
+    """返回 (deps, provides, provides_soname, needed_so)，均为逗号连接的字符串。"""
     meta = _read_archive_metadata(archive_path)
     if meta is None:
-        return "", "", ""
+        return "", "", "", ""
     return (",".join(meta.get('deps', [])),
             ",".join(meta.get('provides', [])),
+            ",".join(meta.get('provides_soname', [])),
             ",".join(meta.get('needed_so', [])))
 
 
@@ -156,22 +157,25 @@ class RepoManager:
                 blocks = []
                 for v, vinfo in info["versions"].items():
                     blocks.append(f"{v}:{vinfo['sha256']}:{vinfo['deps']}:"
-                                  f"{vinfo.get('provides', '')}:{vinfo.get('needed_so', '')}")
+                                  f"{vinfo.get('provides', '')}:"
+                                  f"{vinfo.get('provides_soname', '')}:"
+                                  f"{vinfo.get('needed_so', '')}")
                 f.write(f"{name}|{';'.join(blocks)}|\n")
         os.replace(tmp, path)
 
     @staticmethod
     def parse_aggregated_index(content):
         """
-        格式: name|ver:hash:deps:provides:needed_so;ver2:...|row_level_provides
+        格式: name|ver:hash:deps:provides:provides_soname:needed_so;ver2:...|
 
         **必须与 C++ 侧的 `parse_repo_index_line()`（main/src/base/utils.cpp）逐条同语义** ——
         本函数的结果会被 `push` 用来**读-改-写整份索引**、被 `cleanup` 用来决定删哪些包文件，
         所以"少读一条"不是显示问题而是**数据丢失 + 删掉仍被引用的文件**。
 
-        两处曾与 C++ 不一致、2026-10-03 对齐：
-          · 版本级 provides 为空时应**回退到行级**（`parts[2]`）—— 原先完全忽略；
-          · 只含版本号、没有冒号的版本块**是合法的**（hash/deps/... 为空）—— 原先整块丢弃。
+        ⚠️ **订正 2026-10-04（8.0.0，破坏性）**：这里此前有两处**兼容分叉** —— 版本级 provides
+        为空时回退到**行级 provides**（`parts[2]`）、以及容忍 4/5 字段的版本块。两者都已废除：
+        版本块**恰好 6 个字段**、**没有行级 provides**（第 3 个 `|` 段不再定义）。旧格式的块在这里
+        被**跳过**（不是被误读），与 C++ 侧同判据。**不做任何兼容读取**（维护者 repack 全部包）。
 
         契约由同一份 fixture + 同一份期望维持，两侧各自断言：
           · 本侧：main/scripts/check_index_conformance.py
@@ -186,21 +190,20 @@ class RepoManager:
             if len(parts) < 2:
                 continue
             name = parts[0]
-            # 行级 provides：版本级为空时的回退（与 C++ 的 pkg_level_provides 同义）
-            row_provides = parts[2] if len(parts) > 2 else ""
+            # **没有行级 provides**：第 3 个 `|` 段已废除（见 docstring 的订正）。
             for v_block in parts[1].split(';'):
                 v_info = v_block.split(':')
                 if not v_info[0]:
                     continue  # 空块（`;;` 之间）不是版本
-                provides = v_info[3] if len(v_info) > 3 else ""
-                if not provides:
-                    provides = row_provides
+                if len(v_info) != 6:
+                    continue  # 旧格式（4/5 字段）**跳过**，与 C++ 侧同判据
                 data.setdefault(name, {"versions": {}})
                 data[name]["versions"][v_info[0]] = {
-                    "sha256": v_info[1] if len(v_info) > 1 else "",
-                    "deps": v_info[2] if len(v_info) > 2 else "",
-                    "provides": provides,
-                    "needed_so": v_info[4] if len(v_info) > 4 else "",
+                    "sha256": v_info[1],
+                    "deps": v_info[2],
+                    "provides": v_info[3],
+                    "provides_soname": v_info[4],
+                    "needed_so": v_info[5],
                 }
         return data
 
@@ -233,7 +236,7 @@ class RepoManager:
 
             # 先按包内容算哈希，再落盘/写索引：索引里的 sha256 必须对应真实的包内容
             sha256 = calculate_sha256(f)
-            deps, provides, needed_so = extract_metadata(f)
+            deps, provides, provides_soname, needed_so = extract_metadata(f)
 
             print(f"Publishing {name} {version} -> {dest}")
             if path.resolve() != dest.resolve():
@@ -242,7 +245,8 @@ class RepoManager:
             index_data.setdefault(name, {"versions": {}})
             index_data[name]["versions"][version] = {
                 "sha256": sha256, "deps": deps,
-                "provides": provides, "needed_so": needed_so,
+                "provides": provides, "provides_soname": provides_soname,
+                "needed_so": needed_so,
             }
             pushed += 1
 

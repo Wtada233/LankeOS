@@ -12,7 +12,7 @@
     "libpopt.so.0",
     "libuuid.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libcryptsetup.so",
     "libcryptsetup.so.12"
   ],

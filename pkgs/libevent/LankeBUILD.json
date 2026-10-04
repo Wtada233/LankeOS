@@ -9,7 +9,7 @@
     "libcrypto.so.3",
     "libssl.so.3"
   ],
-  "provides": [
+  "provides_soname": [
     "libevent-2.1.so.7",
     "libevent.so",
     "libevent_core-2.1.so.7",

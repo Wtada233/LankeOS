@@ -23,7 +23,7 @@
     "libpolkit-gobject-1.so.0",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libgdm.so",
     "libgdm.so.1"
   ],

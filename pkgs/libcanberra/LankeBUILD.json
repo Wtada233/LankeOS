@@ -19,7 +19,7 @@
     "libudev.so.1",
     "libvorbisfile.so.3"
   ],
-  "provides": [
+  "provides_soname": [
     "libcanberra-gtk3.so",
     "libcanberra-gtk3.so.0",
     "libcanberra.so",

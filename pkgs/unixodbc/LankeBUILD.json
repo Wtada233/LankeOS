@@ -8,7 +8,7 @@
     "libltdl.so.7",
     "libreadline.so.8"
   ],
-  "provides": [
+  "provides_soname": [
     "libodbc.so",
     "libodbc.so.2",
     "libodbccr.so",

@@ -22,7 +22,7 @@
     "librsvg-2.so.2",
     "libseccomp.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libglycin-2.so",
     "libglycin-2.so.0",
     "libglycin-gtk4-2.so",

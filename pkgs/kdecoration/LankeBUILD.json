@@ -10,7 +10,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libkdecorations3.so",
     "libkdecorations3.so.6",
     "libkdecorations3private.so",

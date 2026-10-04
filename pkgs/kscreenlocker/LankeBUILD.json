@@ -40,7 +40,7 @@
     "libxcb-keysyms.so.1",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libKScreenLocker.so",
     "libKScreenLocker.so.6"
   ],

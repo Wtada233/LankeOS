@@ -421,7 +421,7 @@ TEST_F(SymlinkLoopPathsTest, RemovePackageFormingSymlinkLoopWithAnother)
         std::ofstream(work / "content" / "usr" / "lib" / ("lib" + name + ".so.1")) << "elf";
         fs::create_symlink(link_target, work / "content" / "usr" / "lib" / link_name);
         const std::string pkg = (suite_work_dir / (name + "-1.0.lpkg")).string();
-        pack_package(pkg, work.string(), name, "1.0", {}, {}, "man", {});
+        pack_package(pkg, work.string(), name, "1.0", {}, {}, {}, "man", {});
         return pkg;
     };
     const std::string pkgA = make_side("loopa", "la", "lb");

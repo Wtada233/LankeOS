@@ -9,7 +9,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6DNSSD.so",
     "libKF6DNSSD.so.6"
   ],

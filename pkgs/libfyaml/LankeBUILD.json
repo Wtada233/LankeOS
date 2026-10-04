@@ -8,7 +8,7 @@
     "libc.so.6",
     "libclang.so.23.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libfyaml.so",
     "libfyaml.so.0"
   ],

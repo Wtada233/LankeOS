@@ -15,7 +15,7 @@
     "libnotify.so.4",
     "libsoup-3.0.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libgeoclue-2.so",
     "libgeoclue-2.so.0"
   ],

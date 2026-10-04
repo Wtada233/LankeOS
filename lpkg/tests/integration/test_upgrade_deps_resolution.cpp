@@ -71,11 +71,12 @@ protected:
         fs::remove_all(suite_work_dir);
     }
 
-    /** 创建虚拟包，支持自定义文件列表 */
+    /** 创建虚拟包，支持自定义文件列表（字段次序：deps → provides → provides_soname → needed_so） */
     std::string create_pkg(const std::string& name, const std::string& ver,
                            const std::vector<std::pair<std::string, std::string>>& files,
                            const std::vector<std::string>& deps = {},
                            const std::vector<std::string>& provides = {},
+                           const std::vector<std::string>& provides_soname = {},
                            const std::vector<std::string>& needed_so = {})
     {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name + "_" + ver);
@@ -92,8 +93,8 @@ protected:
 
         std::string pkg_file = std::format("{}-{}.lpkg", name, ver);
         std::string pkg_path = (pkg_dir / pkg_file).string();
-        pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, "man " + name,
-                     needed_so);
+        pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, provides_soname,
+                     "man " + name, needed_so);
 
         fs::remove_all(work_dir);
         return pkg_path;
@@ -110,15 +111,15 @@ protected:
 
     /** 更新仓库索引 */
     void update_index(const std::vector<std::tuple<std::string, std::string, std::string,
-                                                   std::string, std::string>>& entries)
+                                                   std::string, std::string, std::string>>& entries)
     {
         std::ofstream index(mirror_dir / "index.txt");
-        for (const auto& [name, ver, deps, provides, needed_so] : entries) {
+        for (const auto& [name, ver, deps, provides, provides_soname, needed_so] : entries) {
             std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
             std::string hash = "unknown";
             if (fs::exists(pkg_path)) hash = calculate_sha256(pkg_path);
             index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
-                  << needed_so << "\n";
+                  << provides_soname << ":" << needed_so << "\n";
         }
     }
 };
@@ -142,14 +143,14 @@ TEST_F(UpgradeDepsResolutionTest, UpgradeDiscoversNewDependency)
     create_pkg("app", "2.0", {{"usr/bin/app", "app v2"}}, {"libprovider"});
 
     // libprovider v1：独立的依赖包
-    create_pkg("libprovider", "1.0", {{"usr/lib/libhelper.so.1", "helper from provider\n"}}, {},
+    create_pkg("libprovider", "1.0", {{"usr/lib/libhelper.so.1", "helper from provider\n"}}, {}, {},
                {"libhelper.so.1"});
 
     add_to_mirror("app", "2.0");
     add_to_mirror("libprovider", "1.0");
     update_index({
-        {"app", "2.0", "libprovider", "", ""},
-        {"libprovider", "1.0", "", "libhelper.so.1", ""},
+        {"app", "2.0", "libprovider", "", "", ""},
+        {"libprovider", "1.0", "", "", "libhelper.so.1", ""},
     });
 
     // ── 第3步：执行升级 ─────────────────────────────────────────
@@ -176,8 +177,8 @@ TEST_F(UpgradeDepsResolutionTest, BundledLibTransitionsToExternalDep)
     std::string p1 = create_pkg(
         "app", "1.0",
         {{"usr/bin/app", "#!/bin/sh\necho app\n"}, {"usr/lib/libhelper.so.1", "helper lib v1"}},
-        {},                   // 无依赖
-        {"libhelper.so.1"});  // 提供 libhelper.so.1
+        {},                       // 无依赖
+        {}, {"libhelper.so.1"});  // 提供 libhelper.so.1
     ASSERT_NO_THROW(install_packages({p1}));
 
     Cache::instance().load();
@@ -190,14 +191,14 @@ TEST_F(UpgradeDepsResolutionTest, BundledLibTransitionsToExternalDep)
     create_pkg("app", "2.0", {{"usr/bin/app", "#!/bin/sh\necho app v2\n"}}, {"libprovider"});
 
     // libprovider v1：提供 libhelper.so.1
-    create_pkg("libprovider", "1.0", {{"usr/lib/libhelper.so.1", "helper from provider\n"}}, {},
+    create_pkg("libprovider", "1.0", {{"usr/lib/libhelper.so.1", "helper from provider\n"}}, {}, {},
                {"libhelper.so.1"});
 
     add_to_mirror("app", "2.0");
     add_to_mirror("libprovider", "1.0");
     update_index({
-        {"app", "2.0", "libprovider", "", ""},
-        {"libprovider", "1.0", "", "libhelper.so.1", ""},
+        {"app", "2.0", "libprovider", "", "", ""},
+        {"libprovider", "1.0", "", "", "libhelper.so.1", ""},
     });
 
     // ── 第3步：执行升级 ─────────────────────────────────────────
@@ -232,7 +233,7 @@ TEST_F(UpgradeDepsResolutionTest, NoopWhenDepAlreadyInstalled)
 {
     // ── 第1步：安装 libprovider 和 app v1（不捆绑 lib） ──────
     std::string libpkg = create_pkg("libprovider", "1.0", {{"usr/lib/libhelper.so.1", "helper"}},
-                                    {}, {"libhelper.so.1"});
+                                    {}, {}, {"libhelper.so.1"});
     ASSERT_NO_THROW(install_packages({libpkg}));
 
     std::string p1 = create_pkg("app", "1.0", {{"usr/bin/app", "app v1"}});  // app 不捆绑 lib
@@ -247,8 +248,8 @@ TEST_F(UpgradeDepsResolutionTest, NoopWhenDepAlreadyInstalled)
     create_pkg("app", "2.0", {{"usr/bin/app", "app v2"}}, {"libprovider"});
     add_to_mirror("app", "2.0");
     update_index({
-        {"app", "2.0", "libprovider", "", ""},
-        {"libprovider", "1.0", "", "libhelper.so.1", ""},
+        {"app", "2.0", "libprovider", "", "", ""},
+        {"libprovider", "1.0", "", "", "libhelper.so.1", ""},
     });
 
     // ── 第3步：升级 ─────────────────────────────────────────────
@@ -276,7 +277,7 @@ TEST_F(UpgradeDepsResolutionTest, SameVersionSkipsUpgrade)
     create_pkg("app", "1.0", {{"usr/bin/app", "app v1 rebuilt"}},
                {"libprovider"});  // 索引说依赖 libprovider
     add_to_mirror("app", "1.0");
-    update_index({{"app", "1.0", "libprovider", "", ""}});
+    update_index({{"app", "1.0", "libprovider", "", "", ""}});
 
     EXPECT_NO_THROW(upgrade_packages());
     Cache::instance().load();
@@ -301,18 +302,18 @@ TEST_F(UpgradeDepsResolutionTest, MultipleUpgradesWithNewDeps)
 
     create_pkg("appA", "2.0", {{"usr/bin/appA", "A v2"}}, {"libX"});
     create_pkg("appB", "2.0", {{"usr/bin/appB", "B v2"}}, {"libY"});
-    create_pkg("libX", "1.0", {{"usr/lib/libX.so.1", "X"}}, {}, {"libX.so.1"});
-    create_pkg("libY", "1.0", {{"usr/lib/libY.so.1", "Y"}}, {}, {"libY.so.1"});
+    create_pkg("libX", "1.0", {{"usr/lib/libX.so.1", "X"}}, {}, {}, {"libX.so.1"});
+    create_pkg("libY", "1.0", {{"usr/lib/libY.so.1", "Y"}}, {}, {}, {"libY.so.1"});
 
     add_to_mirror("appA", "2.0");
     add_to_mirror("appB", "2.0");
     add_to_mirror("libX", "1.0");
     add_to_mirror("libY", "1.0");
     update_index({
-        {"appA", "2.0", "libX", "", ""},
-        {"appB", "2.0", "libY", "", ""},
-        {"libX", "1.0", "", "libX.so.1", ""},
-        {"libY", "1.0", "", "libY.so.1", ""},
+        {"appA", "2.0", "libX", "", "", ""},
+        {"appB", "2.0", "libY", "", "", ""},
+        {"libX", "1.0", "", "", "libX.so.1", ""},
+        {"libY", "1.0", "", "", "libY.so.1", ""},
     });
 
     EXPECT_NO_THROW(upgrade_packages());
@@ -337,7 +338,7 @@ TEST_F(UpgradeDepsResolutionTest, MissingDepThrows)
 
     create_pkg("app", "2.0", {{"usr/bin/app", "app v2"}}, {"missing-dep"});
     add_to_mirror("app", "2.0");
-    update_index({{"app", "2.0", "missing-dep", "", ""}});
+    update_index({{"app", "2.0", "missing-dep", "", "", ""}});
 
     EXPECT_THROW(upgrade_packages(), LpkgException);
 }
@@ -357,7 +358,7 @@ TEST_F(UpgradeDepsResolutionTest, HoldPreservedAfterUpgrade)
 
     create_pkg("app", "2.0", {{"usr/bin/app", "app v2"}});
     add_to_mirror("app", "2.0");
-    update_index({{"app", "2.0", "", "", ""}});
+    update_index({{"app", "2.0", "", "", "", ""}});
 
     EXPECT_NO_THROW(upgrade_packages());
 
@@ -376,7 +377,7 @@ TEST_F(UpgradeDepsResolutionTest, NewDepAlreadyInstalledManually)
 
     // 提前手动安装 libprovider
     std::string libpkg = create_pkg("libprovider", "1.0", {{"usr/lib/libhelper.so.1", "helper"}},
-                                    {}, {"libhelper.so.1"});
+                                    {}, {}, {"libhelper.so.1"});
     ASSERT_NO_THROW(install_packages({libpkg}));
     Cache::instance().load();
     ASSERT_TRUE(Cache::instance().is_installed("app"));
@@ -386,8 +387,8 @@ TEST_F(UpgradeDepsResolutionTest, NewDepAlreadyInstalledManually)
     add_to_mirror("app", "2.0");
     add_to_mirror("libprovider", "1.0");
     update_index({
-        {"app", "2.0", "libprovider", "", ""},
-        {"libprovider", "1.0", "", "libhelper.so.1", ""},
+        {"app", "2.0", "libprovider", "", "", ""},
+        {"libprovider", "1.0", "", "", "libhelper.so.1", ""},
     });
 
     EXPECT_NO_THROW(upgrade_packages());

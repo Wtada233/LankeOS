@@ -19,7 +19,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKQuickImageEditor.so",
     "libKQuickImageEditor.so.1"
   ],

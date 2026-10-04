@@ -13,7 +13,7 @@
     "libmbim-glib.so.4",
     "libqrtr-glib.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libqmi-glib.so",
     "libqmi-glib.so.5"
   ],

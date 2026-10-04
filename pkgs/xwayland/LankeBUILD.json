@@ -19,7 +19,7 @@
     "libxcvt.so.0",
     "libxshmfence.so.1"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "libdrm",

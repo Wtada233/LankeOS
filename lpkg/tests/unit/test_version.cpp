@@ -45,28 +45,34 @@ TEST(VersionCompare, DifferentLength)
 
 TEST(VersionCompare, PreRelease)
 {
-    // beta < release
-    EXPECT_TRUE(version_compare("1.0-beta", "1.0"));   // beta < release → true
-    EXPECT_FALSE(version_compare("1.0", "1.0-beta"));  // release < beta → false
+    // rpm 的**预发布标记是 `~`**：`1.0~beta < 1.0`。
+    // ⚠️ 8.0.0 起 `-` 之后是 **release**（修订号），不再是预发布 —— `1.0-beta` 现在意为
+    // "1.0 的第 beta 号修订"，**大于** 1.0。旧的"`-` = 预发布"语义随版本桥一起删除。
+    EXPECT_TRUE(version_compare("1.0~beta", "1.0"));
+    EXPECT_FALSE(version_compare("1.0", "1.0~beta"));
 
     // alpha < beta
-    EXPECT_TRUE(version_compare("1.0-alpha", "1.0-beta"));
-    EXPECT_FALSE(version_compare("1.0-beta", "1.0-alpha"));
+    EXPECT_TRUE(version_compare("1.0~alpha", "1.0~beta"));
+    EXPECT_FALSE(version_compare("1.0~beta", "1.0~alpha"));
 
     // beta.1 < beta.2
-    EXPECT_TRUE(version_compare("1.0-beta.1", "1.0-beta.2"));
-    EXPECT_FALSE(version_compare("1.0-beta.2", "1.0-beta.1"));
+    EXPECT_TRUE(version_compare("1.0~beta.1", "1.0~beta.2"));
+    EXPECT_FALSE(version_compare("1.0~beta.2", "1.0~beta.1"));
 
-    // rc > beta → beta < rc
-    EXPECT_TRUE(version_compare("1.0-beta", "1.0-rc"));
-    EXPECT_FALSE(version_compare("1.0-rc", "1.0-beta"));
+    // beta < rc
+    EXPECT_TRUE(version_compare("1.0~beta", "1.0~rc"));
+    EXPECT_FALSE(version_compare("1.0~rc", "1.0~beta"));
+
+    // 对照（语义变化的钉子）：`-rc1` 是 release ⇒ **新于**基础版
+    EXPECT_FALSE(version_compare("1.0-rc1", "1.0"));
+    EXPECT_TRUE(version_compare("1.0", "1.0-rc1"));
 }
 
 TEST(VersionCompare, PreReleaseMultipleIdentifiers)
 {
-    EXPECT_TRUE(version_compare("1.0-alpha", "1.0-alpha.1"));
-    EXPECT_TRUE(version_compare("1.0-beta.1", "1.0-beta.2"));
-    EXPECT_TRUE(version_compare("1.0-rc.2", "1.0-rc.3"));
+    EXPECT_TRUE(version_compare("1.0~alpha", "1.0~alpha.1"));
+    EXPECT_TRUE(version_compare("1.0~beta.1", "1.0~beta.2"));
+    EXPECT_TRUE(version_compare("1.0~rc.2", "1.0~rc.3"));
 }
 
 // 不再自研格式校验：比较完全委托 libsolv EVRCMP，异常/哨兵格式不抛异常（宽容比较）。
@@ -113,7 +119,8 @@ TEST(VersionSatisfies, GreaterThanOrEqual)
     EXPECT_FALSE(version_satisfies("1.0", ">=", "2.0"));
     EXPECT_TRUE(version_satisfies("1.0.1", ">=", "1.0"));
 
-    // 2.0.0（release）>= 2.0.0-rc1 → true（release > rc）
+    // `2.0.0`（候选不带 release）对 `>= 2.0.0-rc1` 成立 —— rpm 的匹配语义把"候选没写
+    // release"当通配（见下面 ReleaseIsAWildcardInDependencyMatching）。
     EXPECT_TRUE(version_satisfies("2.0.0", ">=", "2.0.0-rc1"));
 }
 
@@ -134,10 +141,31 @@ TEST(VersionSatisfies, LessThanOrEqual)
 
 TEST(VersionSatisfies, PreReleaseConstraints)
 {
-    EXPECT_TRUE(version_satisfies("1.0-rc1", ">=", "1.0-alpha1"));
-    EXPECT_FALSE(version_satisfies("1.0-rc1", ">=", "1.0"));
-    EXPECT_TRUE(version_satisfies("1.0", ">=", "1.0-rc1"));
-    // 1.0-rc1（pre-release）< 1.0（release），所以 >= 不满足
+    // 预发布用 `~` 写
+    EXPECT_TRUE(version_satisfies("1.0~rc1", ">=", "1.0~alpha1"));
+    EXPECT_FALSE(version_satisfies("1.0~rc1", ">=", "1.0"));  // 预发布旧于基础版
+    EXPECT_TRUE(version_satisfies("1.0", ">=", "1.0~rc1"));
+}
+
+// 约束判定用的是 **rpm 的依赖匹配语义**（`EVRCMP_MATCH_RELEASE`，与 libsolv 求解器判
+// "谁满足这条依赖"是同一份代码），不是排序语义 —— 两者对"一侧有 release、另一侧没写"的
+// 处置不同：rpm 把**没写 release 当通配**。下面每一条都是**实测**的（容器里的 libsolv
+// 直接给答案），看着怪，但它们正是"求解器说能装、安装期说不满足"那类事故的防线本身。
+TEST(VersionSatisfies, ReleaseIsAWildcardInDependencyMatching)
+{
+    // 候选有 release、约束没写 → 匹配 `=`/`>=`/`<=`，但**不**匹配 `>`/`<`
+    EXPECT_TRUE(version_satisfies("1.0-5", "=", "1.0"));
+    EXPECT_FALSE(version_satisfies("1.0-5", ">", "1.0"));
+    EXPECT_TRUE(version_satisfies("1.0-5", ">=", "1.0"));
+    EXPECT_TRUE(version_satisfies("1.0-5", "<=", "1.0"));
+    // 候选没写 release、约束有 → 反过来匹配**一切**（含 `>`/`<`/`!=`）
+    EXPECT_TRUE(version_satisfies("1.0", "=", "1.0-5"));
+    EXPECT_TRUE(version_satisfies("1.0", ">", "1.0-5"));
+    EXPECT_TRUE(version_satisfies("1.0", "!=", "1.0-5"));
+    // 两端都写了 release → 常规比较
+    EXPECT_TRUE(version_satisfies("1.0-5", "=", "1.0-5"));
+    EXPECT_TRUE(version_satisfies("1.0-5", ">", "1.0-3"));
+    EXPECT_FALSE(version_satisfies("1.0-3", ">", "1.0-5"));
 }
 
 TEST(VersionSatisfies, ComplexScenarios)
@@ -146,106 +174,85 @@ TEST(VersionSatisfies, ComplexScenarios)
     EXPECT_TRUE(version_satisfies("2.0.0", ">=", "2.0.0"));
     EXPECT_FALSE(version_satisfies("1.0.0", ">=", "2.0.0"));
 
-    // release > pre-release
-    EXPECT_TRUE(version_satisfies("2.0.0", ">=", "2.0.0-rc1"));
-    EXPECT_FALSE(version_satisfies("2.0.0-rc1", ">=", "2.0.0"));
+    // 稳定版 > 预发布版
+    EXPECT_TRUE(version_satisfies("2.0.0", ">=", "2.0.0~rc1"));
+    EXPECT_FALSE(version_satisfies("2.0.0~rc1", ">=", "2.0.0"));
 
-    // pre-release vs pre-release
-    EXPECT_TRUE(version_satisfies("2.0.0-rc2", ">", "2.0.0-rc1"));
+    // 预发布之间
+    EXPECT_TRUE(version_satisfies("2.0.0~rc2", ">", "2.0.0~rc1"));
 }
 
-// ===== Release revision (+) 测试 =====
-// +后缀作为发行修订号，有修订号的版本 > 无后缀版本
+// ===== 发行修订号（release，`-N`）测试 =====
+// 8.0.0 起 `-` 之后就是 rpm 的 **release**（revision）：`1.0-1 > 1.0`。
+// 旧写法（`1.0+1`，自有语义 + 编码桥）随桥一起删除，见 vercmp/version.hpp 的订正块。
 
 TEST(VersionCompare, ReleaseSuffix)
 {
-    // 有 +N > 无后缀
-    EXPECT_FALSE(version_compare("22.1.7+2", "22.1.7"));  // 22.1.7+2 < 22.1.7 → false
-    EXPECT_TRUE(version_compare("22.1.7", "22.1.7+2"));   // 22.1.7 < 22.1.7+2 → true
-    EXPECT_FALSE(version_compare("1.0+1", "1.0"));        // 1.0+1 < 1.0 → false
+    // 有 release > 无 release
+    EXPECT_FALSE(version_compare("22.1.7-2", "22.1.7"));
+    EXPECT_TRUE(version_compare("22.1.7", "22.1.7-2"));
+    EXPECT_FALSE(version_compare("1.0-1", "1.0"));
 
-    // +N 数值比较
-    EXPECT_TRUE(version_compare("22.1.7+1", "22.1.7+2"));  // +1 < +2 → true
-    EXPECT_FALSE(version_compare("22.1.7+2", "22.1.7+1"));
+    // release 数值比较；release 也可以是多段
+    EXPECT_TRUE(version_compare("22.1.7-1", "22.1.7-2"));
+    EXPECT_FALSE(version_compare("22.1.7-2", "22.1.7-1"));
+    EXPECT_TRUE(version_compare("1.0-2", "1.0-3"));
+    EXPECT_TRUE(version_compare("1.0-2", "1.0-2.1"));
 
-    // +N > -pre-release
-    EXPECT_FALSE(version_compare("1.0+1", "1.0-rc1"));  // +1 < -rc1 → false (release > pre)
-    EXPECT_TRUE(version_compare("1.0-rc1", "1.0+1"));   // -rc1 < +1 → true
-
-    // 完整排序链：-pre < base < +1 < +2
-    EXPECT_TRUE(version_compare("1.0-rc1", "1.0"));
-    EXPECT_TRUE(version_compare("1.0", "1.0+1"));
-    EXPECT_TRUE(version_compare("1.0+1", "1.0+2"));
-    // 链式确认
-    EXPECT_TRUE(version_compare("1.0-rc1", "1.0+1"));
-    EXPECT_FALSE(version_compare("1.0+1", "1.0-rc1"));
-
-    // 多段 +N（如 +2.1）
-    EXPECT_TRUE(version_compare("1.0+2", "1.0+2.1"));
-    EXPECT_FALSE(version_compare("1.0+2.1", "1.0+2"));
-    EXPECT_TRUE(version_compare("1.0+2.0", "1.0+2.1"));
+    // 完整排序链（rpm）：pre-release(`~`) < base < release-1 < release-2
+    EXPECT_TRUE(version_compare("1.0~rc1", "1.0"));
+    EXPECT_TRUE(version_compare("1.0", "1.0-1"));
+    EXPECT_TRUE(version_compare("1.0-1", "1.0-2"));
+    EXPECT_TRUE(version_compare("1.0~rc1", "1.0-1"));
+    EXPECT_FALSE(version_compare("1.0-1", "1.0~rc1"));
 }
 
-// 回归：版本升级必须主导 release（systemd 261+3 → 261.2+3、tmux 3.7+2 → 3.7b+2）。
-// 此前整串丢给 rpm 段比较，release 数字被压进版本段与版本竞争：
-//   `261.2+3` → [261,2,3] vs `261+3` → [261,3]，第二段 2 < 3 → 判 261.2+3 < 261+3，
-// 导致 `lpkg upgrade` 误报"已是最新"。evr_cmp 分离 release 后版本优先比较。
+// 回归：版本升级必须主导 release（systemd 261-3 → 261.2-3、tmux 3.7-2 → 3.7b-2）。
+// 版本串**原样**交给 libsolv 的 rpm 比较器，它本身就按 epoch → version → release 分域比：
+// 版本段不同时 release 根本不参与，于是版本升级必然主导 release 数字。
+// （`1.0-9 < 1.0.1` 与旧实现的结论一致，但现在是别人的判据给的。）
 TEST(VersionCompare, VersionBumpDominatesRelease)
 {
-    // systemd：261（release 3）应升级到 261.2（release 3）
-    EXPECT_TRUE(version_compare("261+3", "261.2+3"));
-    EXPECT_FALSE(version_compare("261.2+3", "261+3"));
-    // tmux：3.7（release 2）应升级到 3.7b（release 2）
-    EXPECT_TRUE(version_compare("3.7+2", "3.7b+2"));
-    EXPECT_FALSE(version_compare("3.7b+2", "3.7+2"));
-    // 版本升级主导任何 release 数：1.0+9 < 1.0.1
-    EXPECT_TRUE(version_compare("1.0+9", "1.0.1"));
-    EXPECT_FALSE(version_compare("1.0.1", "1.0+9"));
-    // release 比较在版本相等时才生效（不变）
-    EXPECT_TRUE(version_compare("261.2+1", "261.2+3"));
-    EXPECT_FALSE(version_compare("261.2+3", "261.2+1"));
+    EXPECT_TRUE(version_compare("261-3", "261.2-3"));
+    EXPECT_FALSE(version_compare("261.2-3", "261-3"));
+    EXPECT_TRUE(version_compare("3.7-2", "3.7b-2"));
+    EXPECT_FALSE(version_compare("3.7b-2", "3.7-2"));
+    EXPECT_TRUE(version_compare("1.0-9", "1.0.1"));
+    EXPECT_FALSE(version_compare("1.0.1", "1.0-9"));
+    // release 比较只在版本相等时才生效
+    EXPECT_TRUE(version_compare("261.2-1", "261.2-3"));
+    EXPECT_FALSE(version_compare("261.2-3", "261.2-1"));
 }
 
 // ===== 补丁后缀 (pN) 测试 =====
-// pN 作为补丁后缀，有补丁 > 无补丁，优先级最高
+// pN 跟在**版本段**末尾（`1.9.17p2` 的版本段就是 `17p2`），所以比基础版新；
+// release（`-1`）排在基础版**之后**、补丁版**之前**（实测的 rpm 段语义）。
 
 TEST(VersionCompare, PatchSuffix)
 {
-    // 有 pN > 无后缀
-    EXPECT_FALSE(version_compare("1.9.17p2", "1.9.17"));  // p2 < 1.9.17 → false
-    EXPECT_TRUE(version_compare("1.9.17", "1.9.17p2"));   // 1.9.17 < p2 → true
-    EXPECT_FALSE(version_compare("1.0p", "1.0"));         // p < 1.0 → false
+    EXPECT_FALSE(version_compare("1.9.17p2", "1.9.17"));
+    EXPECT_TRUE(version_compare("1.9.17", "1.9.17p2"));
 
-    // pN 数值比较
+    // pN 数值比较（非字典序）
     EXPECT_TRUE(version_compare("1.0p1", "1.0p2"));
     EXPECT_FALSE(version_compare("1.0p2", "1.0p1"));
-    EXPECT_TRUE(version_compare("1.0p1", "1.0p10"));  // 数值比较，非字典序
+    EXPECT_TRUE(version_compare("1.0p1", "1.0p10"));
     EXPECT_FALSE(version_compare("1.0p10", "1.0p1"));
 
-    // pN 字母序比较
+    // 字母序比较
     EXPECT_TRUE(version_compare("1.0a", "1.0p"));
     EXPECT_FALSE(version_compare("1.0p", "1.0a"));
 
-    // pN 无数字 vs 有数字
-    EXPECT_TRUE(version_compare("1.0p", "1.0p2"));  // p < p2（无数字视为 0）
+    // 无数字 vs 有数字（无数字视为 0）
+    EXPECT_TRUE(version_compare("1.0p", "1.0p2"));
     EXPECT_FALSE(version_compare("1.0p2", "1.0p"));
 
-    // pN 与 +N 相对顺序：base < +N < pN。
-    // `+N` 是发行修订号，evr_cmp 先拆出 release 再比版本（见下 regression）——版本
-    // 1.0p1（补丁版本）高于基础版 1.0，故 1.0p1 > 1.0+1。此前的 rpm 平铺段比较
-    // 给出 p1 < +1，但那正是让 `261.2+3 < 261+3` 错排的根源，已随分离模型修正。
-    EXPECT_FALSE(version_compare("1.0p1", "1.0+1"));  // p1 < +1 → false
-    EXPECT_TRUE(version_compare("1.0+1", "1.0p1"));   // +1 < p1 → true
-
-    // pN > -pre-release
-    EXPECT_FALSE(version_compare("1.0p1", "1.0-rc1"));  // p1 < -rc1 → false
-    EXPECT_TRUE(version_compare("1.0-rc1", "1.0p1"));
-
-    // 完整排序链：-pre < base < +N < pN
-    EXPECT_TRUE(version_compare("1.0-rc1", "1.0"));
-    EXPECT_TRUE(version_compare("1.0", "1.0+1"));
-    EXPECT_TRUE(version_compare("1.0+1", "1.0+2"));
-    EXPECT_TRUE(version_compare("1.0+2", "1.0p1"));
+    // 与 release 的相对顺序（实测）：base < release < patch
+    EXPECT_TRUE(version_compare("1.0", "1.0-1"));
+    EXPECT_TRUE(version_compare("1.0-1", "1.0p1"));
+    EXPECT_FALSE(version_compare("1.0p1", "1.0-1"));
+    // 预发布仍排在这一切之前
+    EXPECT_TRUE(version_compare("1.0~rc1", "1.0-1"));
 }
 
 // 回归测试：git hash 版本号（gn: 0.2385.9ece3f52+1）
@@ -297,28 +304,6 @@ TEST(VersionCompare, EqualConstraintUsesSemanticComparison)
     // 其它运算符：1.0 < 1.0.0
     EXPECT_TRUE(version_satisfies("1.0", "<=", "1.0.0"));
     EXPECT_TRUE(version_satisfies("1.0.0", ">=", "1.0"));
-}
-
-// to_libsolv_evr / from_libsolv_evr 往返 + 归一化使 EVRCMP 与 lpkg 语义一致
-TEST(VersionCompare, LibsolvEvrRoundTrip)
-{
-    EXPECT_EQ(to_libsolv_evr("1.0-rc1"), "1.0~rc1");
-    EXPECT_EQ(to_libsolv_evr("1.0"), "1.0");
-    // `+release` → `^^`（caret 分隔）。**不能用 `-`**：那是 libsolv 的 release 槽位，而它的
-    // 依赖匹配走 EVRCMP_MATCH_RELEASE，把"有一侧没有 release"当**通配** —— 实测会让
-    // `= 1.0` 匹配 `1.0+1`、`> 1.0+1` 匹配 `1.0`。等价性矩阵见
-    // tests/unit/test_vercmp_libsolv_bridge.cpp（那道闸门才是这条断言的依据）。
-    EXPECT_EQ(to_libsolv_evr("6.0.0+3.lpkg"), "6.0.0^^3.lpkg");
-    EXPECT_EQ(to_libsolv_evr("261.2+3"), "261.2^^3");
-    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("1.0-rc1")), "1.0-rc1");
-    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("22.1.7+2")), "22.1.7+2");
-    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("261.2+3")), "261.2+3");
-    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("0.2385.9ece3f52+1")), "0.2385.9ece3f52+1");
-    // 预发布 + release 同时存在：旧解码（按最后一个 `-` 切）在这类串上会还原错
-    EXPECT_EQ(from_libsolv_evr(to_libsolv_evr("1.0-rc1+2")), "1.0-rc1+2");
-    // 归一化后：rc 旧于基础版
-    EXPECT_TRUE(version_compare("1.0-rc1", "1.0"));
-    EXPECT_FALSE(version_compare("1.0", "1.0-rc1"));
 }
 
 // 回归测试：parse_dep_strings 应当按字符串中出现的物理顺序匹配操作符，而非 ops 数组索引顺序

@@ -27,7 +27,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6KCMUtils.so",
     "libKF6KCMUtils.so.6",
     "libKF6KCMUtilsCore.so",

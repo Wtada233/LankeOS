@@ -27,7 +27,7 @@
     "libstdc++.so.6",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libnixcmd.so",
     "libnixcmd.so.2.35.2",
     "libnixexpr.so",

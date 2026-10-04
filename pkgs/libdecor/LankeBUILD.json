@@ -17,7 +17,7 @@
     "libwayland-client.so.0",
     "libwayland-cursor.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libdecor-0.so",
     "libdecor-0.so.0"
   ],

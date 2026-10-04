@@ -16,7 +16,7 @@
     "libgtk-4.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libportal-gtk3.so",
     "libportal-gtk3.so.1",
     "libportal-gtk4.so",

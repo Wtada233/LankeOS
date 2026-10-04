@@ -41,7 +41,7 @@ TEST_F(ActiveRollbackTest, CopyBreakpointTriggersRollback)
         throw LpkgException("injected failure: disk full during copy");
     });
 
-    std::string pA = create_pkg("bp_cr_A", "1.0", {}, {"bp_cr_A.so.1"});
+    std::string pA = create_pkg("bp_cr_A", "1.0", {}, {}, {"bp_cr_A.so.1"});
     std::string pB = create_pkg("bp_cr_B", "1.0", {"bp_cr_A"});
 
     EXPECT_THROW(install_packages({pB, pA}), LpkgException);
@@ -63,7 +63,7 @@ TEST_F(ActiveRollbackTest, AfterCommitBreakpointRollsBackWholeBatch)
     BreakpointManager::instance().set("after_commit_bp_B2",
                                       [] { throw LpkgException("injected crash after commit"); });
 
-    std::string pA = create_pkg("bp_A2", "1.0", {}, {"bpA2.so.1"});
+    std::string pA = create_pkg("bp_A2", "1.0", {}, {}, {"bpA2.so.1"});
     std::string pB = create_pkg("bp_B2", "1.0", {"bp_A2"});
 
     EXPECT_THROW(install_packages({pB, pA}), LpkgException);
@@ -115,7 +115,7 @@ TEST_F(ActiveRollbackTest, UpgradeBreakpointPreservesOldVersion)
 {
     setup_local_mirror();
 
-    std::string pV1 = create_pkg("bp_upg", "1.0", {}, {"bp_upg.so.1"});
+    std::string pV1 = create_pkg("bp_upg", "1.0", {}, {}, {"bp_upg.so.1"});
     add_to_mirror("bp_upg", "1.0");
     install_packages({pV1});
     EXPECT_EQ(Cache::instance().get_installed_version("bp_upg"), "1.0");
@@ -128,12 +128,12 @@ TEST_F(ActiveRollbackTest, UpgradeBreakpointPreservesOldVersion)
         std::ofstream(work / "metadata.json")
             << R"({"name":"bp_upg","version":"2.0","deps":[],"provides":["bp_upg.so.2"],"needed_so":[]})";
         std::string v2 = (pkg_dir / "bp_upg-2.0.lpkg").string();
-        pack_package(v2, work.string(), "bp_upg", "2.0", {}, {"bp_upg.so.2"});
+        pack_package(v2, work.string(), "bp_upg", "2.0", {}, {}, {"bp_upg.so.2"});
         auto m = suite_work_dir / "mirror" / "x86_64";
         fs::create_directories(m / "bp_upg");
         fs::copy(v2, m / "bp_upg" / "2.0.lpkg");
         std::ofstream idx(m / "index.txt");
-        idx << "bp_upg|1.0:::bp_upg.so.1:;2.0:::bp_upg.so.2:|\n";
+        idx << "bp_upg|1.0::::bp_upg.so.1:;2.0::::bp_upg.so.2:|\n";
     }
 
     // 断点：升级 bp_upg 时 BACKUP 后抛异常
@@ -157,9 +157,9 @@ TEST_F(ActiveRollbackTest, ThirdPackageFailsRollsBackPreviousTwo)
     BreakpointManager::instance().set(
         "copy_after_wal_bp_C3", [] { throw LpkgException("injected copy failure on 3rd pkg"); });
 
-    std::string pA = create_pkg("bp_A3", "1.0", {}, {"bpA3.so.1"});
-    std::string pB = create_pkg("bp_B3", "1.0", {"bp_A3"}, {"bpB3.so.1"});
-    std::string pC = create_pkg("bp_C3", "1.0", {"bp_B3"}, {}, {"ghost_bp3.so"});
+    std::string pA = create_pkg("bp_A3", "1.0", {}, {}, {"bpA3.so.1"});
+    std::string pB = create_pkg("bp_B3", "1.0", {"bp_A3"}, {}, {"bpB3.so.1"});
+    std::string pC = create_pkg("bp_C3", "1.0", {"bp_B3"}, {}, {}, {"ghost_bp3.so"});
 
     EXPECT_THROW(install_packages({pC, pB, pA}), LpkgException);
 
@@ -376,7 +376,7 @@ TEST_F(ActiveRollbackTest, UpgradeCopyFailPreservesOldFile)
         fs::create_directories(m / "du");
         fs::copy(v2, m / "du" / "2.0.lpkg");
         std::ofstream idx(m / "index.txt");
-        idx << "du|1.0:::;2.0:::|\n";
+        idx << "du|1.0:::::;2.0:::::|\n";
     }
 
     // 断点：COPY WAL 写入后、rename 前抛异常 —— 此时文件 du 已被 BACKUP
@@ -427,7 +427,7 @@ TEST_F(ActiveRollbackTest, UpgradeCommitFailPreservesOldFilesAndDb)
         fs::create_directories(m / "du2");
         fs::copy(v2, m / "du2" / "2.0.lpkg");
         std::ofstream idx(m / "index.txt");
-        idx << "du2|1.0:::;2.0:::|\n";
+        idx << "du2|1.0:::::;2.0:::::|\n";
     }
 
     // 断点：COMMIT 写入后、END 前抛异常（所有文件已复制、register 已完成）

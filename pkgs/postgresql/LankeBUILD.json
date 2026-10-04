@@ -28,7 +28,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libecpg.so",
     "libecpg.so.6",
     "libecpg_compat.so",

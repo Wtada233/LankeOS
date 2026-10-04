@@ -49,7 +49,7 @@
     "libsoup-3.0.so.0",
     "libsystemd.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "accountsservice",
     "at-spi2-core",

@@ -10,7 +10,7 @@
     "libXdmcp.so.6",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libxcb-composite.so",
     "libxcb-composite.so.0",
     "libxcb-damage.so",

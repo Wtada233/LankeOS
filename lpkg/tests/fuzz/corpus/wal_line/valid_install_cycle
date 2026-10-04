@@ -1,0 +1,7 @@
+BEGIN_PKGS
+BEGIN mypkg 1.0
+BACKUP /usr/bin/foo → /usr/bin/foo.lpkg_bak_mypkg
+COPY /tmp/foo.lpkgtmp → /usr/bin/foo
+DB /var/lpkg/files.db mypkg:installed
+COMMIT mypkg 1.0
+COMMIT_PKGS

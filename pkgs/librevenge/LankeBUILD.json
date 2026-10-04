@@ -10,7 +10,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "librevenge-0.0.so",
     "librevenge-0.0.so.0",
     "librevenge-generators-0.0.so",

@@ -40,7 +40,7 @@
     "libxcb.so.1",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libgstallocators-1.0.so",
     "libgstallocators-1.0.so.0",
     "libgstapp-1.0.so",

@@ -9,7 +9,7 @@
     "libgobject-2.0.so.0",
     "libudev.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libgudev-1.0.so",
     "libgudev-1.0.so.0"
   ],

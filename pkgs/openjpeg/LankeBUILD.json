@@ -12,7 +12,7 @@
     "libtiff.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libopenjp2.so",
     "libopenjp2.so.7"
   ],

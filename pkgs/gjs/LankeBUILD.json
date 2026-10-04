@@ -18,7 +18,7 @@
     "libreadline.so.8",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libgjs.so",
     "libgjs.so.0"
   ],

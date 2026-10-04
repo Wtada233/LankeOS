@@ -13,7 +13,7 @@
     "libmpfr.so.6",
     "libreadline.so.8"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "gmp",

@@ -48,7 +48,7 @@
     "libxkbcommon.so.0",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libmpv.so",
     "libmpv.so.2"
   ],

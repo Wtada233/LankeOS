@@ -10,7 +10,7 @@
     "libm.so.6",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libexslt.so",
     "libexslt.so.0",
     "libxslt.so",

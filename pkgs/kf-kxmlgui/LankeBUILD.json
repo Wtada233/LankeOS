@@ -24,7 +24,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6XmlGui.so",
     "libKF6XmlGui.so.6"
   ],

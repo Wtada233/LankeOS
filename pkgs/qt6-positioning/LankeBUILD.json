@@ -14,7 +14,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6Positioning.so",
     "libQt6Positioning.so.6",
     "libQt6PositioningQuick.so",

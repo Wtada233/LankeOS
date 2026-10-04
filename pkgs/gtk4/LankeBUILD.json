@@ -50,7 +50,7 @@
     "libwayland-egl.so.1",
     "libxkbcommon.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libgtk-4.so",
     "libgtk-4.so.1"
   ],

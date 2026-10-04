@@ -16,7 +16,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libaccounts-qt6.so",
     "libaccounts-qt6.so.1",
     "libaccounts-qt6.so.1.5"

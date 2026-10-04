@@ -57,8 +57,8 @@ protected:
 TEST_F(AggregatedIndexTest, SingleVersionPerLine)
 {
     write_index(
-        "zlib|1.2.13:abc123::|\n"
-        "libfoo|2.0:def456:glibc::|\n");
+        "zlib|1.2.13:abc123::::|\n"
+        "libfoo|2.0:def456:glibc:::|\n");
 
     Repository repo;
     repo.load_index();
@@ -80,8 +80,8 @@ TEST_F(AggregatedIndexTest, MultipleVersionsOneLine)
 {
     // New aggregated format: ver1:hash1:deps;ver2:hash2:deps
     write_index(
-        "zlib|1.2.13:abc123::;1.3:def456::|\n"
-        "libfoo|2.0:aaa111:glibc>=2.35:;2.1:bbb222:ncurses,glibc>=2.35:|\n");
+        "zlib|1.2.13:abc123::::;1.3:def456::::|\n"
+        "libfoo|2.0:aaa111:glibc>=2.35:::;2.1:bbb222:ncurses,glibc>=2.35:::|\n");
 
     Repository repo;
     repo.load_index();
@@ -115,7 +115,7 @@ TEST_F(AggregatedIndexTest, MultipleVersionsOneLine)
 
 TEST_F(AggregatedIndexTest, BestMatchingVersion)
 {
-    write_index("zlib|1.0:aaaa::;1.5:bbbb::;2.0:cccc::|\n");
+    write_index("zlib|1.0:aaaa::::;1.5:bbbb::::;2.0:cccc::::|\n");
 
     Repository repo;
     repo.load_index();
@@ -139,9 +139,9 @@ TEST_F(AggregatedIndexTest, BestMatchingVersion)
 TEST_F(AggregatedIndexTest, ProvidesParsedCorrectly)
 {
     write_index(
-        "vim|9.1:aaa:glibc:editor:|\n"
-        "busybox|1.36:bbb::sh,shell:|\n"
-        "zlib|1.2:ccc::|\n");
+        "vim|9.1:aaa:glibc:editor::|\n"
+        "busybox|1.36:bbb::sh,shell::|\n"
+        "zlib|1.2:ccc::::|\n");
 
     Repository repo;
     repo.load_index();
@@ -161,10 +161,10 @@ TEST_F(AggregatedIndexTest, MixedAggregatedAndSimpleLines)
 {
     // Mix: some packages single-version, some multi-version
     write_index(
-        "zlib|1.2.13:a1::|\n"
-        "glibc|2.35:b1::;2.36:b2::|\n"
-        "coreutils|9.0:c1::|\n"
-        "libfoo|1.0:d1:ncurses:;2.0:d2:ncurses,glibc:|\n");
+        "zlib|1.2.13:a1::::|\n"
+        "glibc|2.35:b1::::;2.36:b2::::|\n"
+        "coreutils|9.0:c1::::|\n"
+        "libfoo|1.0:d1:ncurses:::;2.0:d2:ncurses,glibc:::|\n");
 
     Repository repo;
     repo.load_index();
@@ -187,7 +187,7 @@ TEST_F(AggregatedIndexTest, MixedAggregatedAndSimpleLines)
 TEST_F(AggregatedIndexTest, ProvidesWithAggregatedVersions)
 {
     write_index(
-        "vim|9.0:aaa:ncurses:editor,text-editor:;9.1:bbb:ncurses,glibc:editor,text-editor:|\n");
+        "vim|9.0:aaa:ncurses:editor,text-editor::;9.1:bbb:ncurses,glibc:editor,text-editor::|\n");
 
     Repository repo;
     repo.load_index();
@@ -219,9 +219,9 @@ TEST_F(AggregatedIndexTest, CommentLines)
 {
     write_index(
         "# this is a comment\n"
-        "zlib|1.0:a::|\n"
+        "zlib|1.0:a::::|\n"
         "# another comment\n"
-        "libfoo|2.0:b::|\n");
+        "libfoo|2.0:b::::|\n");
 
     Repository repo;
     repo.load_index();
@@ -232,7 +232,7 @@ TEST_F(AggregatedIndexTest, CommentLines)
 
 TEST_F(AggregatedIndexTest, VersionSortingAcrossAggregatedLine)
 {
-    write_index("zlib|1.0:a:;1.5:b:;0.9:c:\n");
+    write_index("zlib|1.0:a::::;1.5:b::::;0.9:c::::|\n");
 
     Repository repo;
     repo.load_index();
@@ -243,28 +243,28 @@ TEST_F(AggregatedIndexTest, VersionSortingAcrossAggregatedLine)
     EXPECT_EQ(pkg->version, "1.5");
 }
 
-// 回归：find_provider 必须返回真正提供该 capability 的版本。
+// 回归：find_soname_provider 必须返回真正提供该 SONAME 的版本。
 // 曾直接返回 find_package(name)（最新版）——旧版提供、最新版不提供的
-// capability 会被误判为"无提供者"，导致假"未解析 SONAME"失败。
-TEST_F(AggregatedIndexTest, FindProviderReturnsVersionThatActuallyProvides)
+// SONAME 会被误判为"无提供者"，导致假"未解析 SONAME"失败。
+TEST_F(AggregatedIndexTest, FindSonameProviderReturnsVersionThatActuallyProvides)
 {
-    write_index("libfoo|1.0:aaa::libold.so.1:libc.so.6;2.0:bbb::libnew.so.1:libc.so.6|\n");
+    write_index("libfoo|1.0:aaa:::libold.so.1:libc.so.6;2.0:bbb:::libnew.so.1:libc.so.6|\n");
 
     Repository repo;
     repo.load_index();
 
     // libold.so.1 只有 v1.0 提供 → 必须返回 v1.0，而不是最新版 v2.0
-    auto old_prov = repo.find_provider("libold.so.1");
+    auto old_prov = repo.find_soname_provider("libold.so.1");
     ASSERT_TRUE(old_prov.has_value());
     EXPECT_EQ(old_prov->version, "1.0");
 
     // libnew.so.1 由最新版提供 → 返回 v2.0
-    auto new_prov = repo.find_provider("libnew.so.1");
+    auto new_prov = repo.find_soname_provider("libnew.so.1");
     ASSERT_TRUE(new_prov.has_value());
     EXPECT_EQ(new_prov->version, "2.0");
 
     // 无提供者 → nullopt
-    EXPECT_FALSE(repo.find_provider("libmissing.so.1").has_value());
+    EXPECT_FALSE(repo.find_soname_provider("libmissing.so.1").has_value());
 }
 
 // ============================================================================
@@ -278,7 +278,7 @@ TEST_F(AggregatedIndexTest, FindProviderReturnsVersionThatActuallyProvides)
 
 TEST_F(AggregatedIndexTest, CompoundConstraintInDepsFieldStaysOneDependency)
 {
-    write_index("libfoo|1.0:aaa:cmake >= 3.20, < 4.0::|\n");
+    write_index("libfoo|1.0:aaa:cmake >= 3.20, < 4.0:::|\n");
 
     Repository repo;
     repo.load_index();
@@ -295,7 +295,7 @@ TEST_F(AggregatedIndexTest, CompoundConstraintInDepsFieldStaysOneDependency)
 
 TEST_F(AggregatedIndexTest, CompoundConstraintMixedWithPlainDeps)
 {
-    write_index("app|1.0:aaa:glibc, cmake >= 3.20, < 4.0, ncurses::|\n");
+    write_index("app|1.0:aaa:glibc, cmake >= 3.20, < 4.0, ncurses:::|\n");
 
     Repository repo;
     repo.load_index();
@@ -312,7 +312,7 @@ TEST_F(AggregatedIndexTest, CompoundConstraintMixedWithPlainDeps)
 
 TEST_F(AggregatedIndexTest, EmptyAndTrailingCommasProduceNoDependencies)
 {
-    write_index("empty1|1.0:aaa:,::|\nempty2|1.0:aaa:glibc,,::|\n");
+    write_index("empty1|1.0:aaa:,:::|\nempty2|1.0:aaa:glibc,,:::|\n");
 
     Repository repo;
     repo.load_index();
@@ -376,18 +376,21 @@ TEST_F(AggregatedIndexTest, EmptyTokensInProvidesAndNeededSoAreDropped)
 {
     // 索引行里的尾随/连续逗号会切出空 token。空串进 libsolv 就是 `STRID_EMPTY`（一个无人
     // 提供的 capability），而 `collect_problems` 又因 `dep_name` 为空而跳过它 —— 用户只看到
-    // 一条无从定位的 "solve failed"。`provides`/`needed_so` 必须与 `deps` 一样清洗
-    // （trim + 丢空片段，2026-10-02 修）。
-    write_index("libfoo|1.0:abc123::libx.so.1,,liby.so.2,:liba.so.1,|\n");
+    // 一条无从定位的 "solve failed"。`provides`/`provides_soname`/`needed_so` 三个字段都必须
+    // 与 `deps` 一样清洗（trim + 丢空片段，2026-10-02 修）。
+    write_index("libfoo|1.0:abc123::cap1,,cap2:so1.so,,so2.so:so3.so,|\n");
     Repository repo;
     repo.load_index();
 
     const auto pkg = repo.find_package("libfoo");
     ASSERT_TRUE(pkg.has_value());
-    EXPECT_EQ(pkg->provides, (std::vector<std::string>{"libx.so.1", "liby.so.2"}));
-    EXPECT_EQ(pkg->needed_so, (std::vector<std::string>{"liba.so.1"}));
+    EXPECT_EQ(pkg->provides, (std::vector<std::string>{"cap1", "cap2"}));
+    EXPECT_EQ(pkg->provides_soname, (std::vector<std::string>{"so1.so", "so2.so"}));
+    EXPECT_EQ(pkg->needed_so, (std::vector<std::string>{"so3.so"}));
 
-    // providers_ 表也必须只记非空 capability
-    EXPECT_TRUE(repo.find_provider("libx.so.1").has_value());
+    // 两张 provider 表都必须只记非空条目
+    EXPECT_TRUE(repo.find_provider("cap1").has_value());
+    EXPECT_TRUE(repo.find_soname_provider("so1.so").has_value());
     EXPECT_FALSE(repo.find_provider("").has_value());
+    EXPECT_FALSE(repo.find_soname_provider("").has_value());
 }

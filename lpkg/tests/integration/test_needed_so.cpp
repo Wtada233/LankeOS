@@ -72,6 +72,7 @@ protected:
     std::string create_pkg(const std::string& name, const std::string& ver,
                            const std::vector<std::string>& deps = {},
                            const std::vector<std::string>& provides = {},
+                           const std::vector<std::string>& provides_soname = {},
                            const std::vector<std::string>& needed_so = {})
     {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
@@ -80,7 +81,8 @@ protected:
 
         std::string pkg_filename = std::format("{}-{}.lpkg", name, ver);
         std::string pkg_path = (pkg_dir / pkg_filename).string();
-        pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, "", needed_so);
+        pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, provides_soname, "",
+                     needed_so);
 
         // Put in mirror
         fs::path mirror_pkg_dir = mirror_dir / name;
@@ -93,10 +95,10 @@ protected:
     }
 
     void update_index(const std::vector<std::tuple<std::string, std::string, std::string,
-                                                   std::string, std::string>>& entries)
+                                                   std::string, std::string, std::string>>& entries)
     {
         std::ofstream index(mirror_dir / "index.txt");
-        for (const auto& [name, ver, deps, provides, needed_so] : entries) {
+        for (const auto& [name, ver, deps, provides, provides_soname, needed_so] : entries) {
             std::string pkg_filename = std::format("{}-{}.lpkg", name, ver);
             std::string pkg_path = (pkg_dir / pkg_filename).string();
             std::string hash = "unknown";
@@ -104,7 +106,7 @@ protected:
                 hash = calculate_sha256(pkg_path);
             }
             index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
-                  << needed_so << "\n";
+                  << provides_soname << ":" << needed_so << "\n";
         }
     }
 };
@@ -115,11 +117,11 @@ protected:
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, ResolvedFromRepoIndex)
 {
-    create_pkg("libA", "1.0", {}, {"libA.so.1"});
-    create_pkg("app", "1.0", {"libA"}, {}, {"libA.so.1"});
+    create_pkg("libA", "1.0", {}, {}, {"libA.so.1"});
+    create_pkg("app", "1.0", {"libA"}, {}, {}, {"libA.so.1"});
     update_index({
-        {"app", "1.0", "libA", "", "libA.so.1"},
-        {"libA", "1.0", "", "libA.so.1", ""},
+        {"app", "1.0", "libA", "", "", "libA.so.1"},
+        {"libA", "1.0", "", "", "libA.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -135,11 +137,11 @@ TEST_F(NeededSoTest, ResolvedFromRepoIndex)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, ResolvedFromPlan)
 {
-    create_pkg("libB", "1.0", {}, {"libB.so.1"});
-    create_pkg("app", "1.0", {"libB"}, {}, {"libB.so.1"});
+    create_pkg("libB", "1.0", {}, {}, {"libB.so.1"});
+    create_pkg("app", "1.0", {"libB"}, {}, {}, {"libB.so.1"});
     update_index({
-        {"app", "1.0", "libB", "", "libB.so.1"},
-        {"libB", "1.0", "", "libB.so.1", ""},
+        {"app", "1.0", "libB", "", "", "libB.so.1"},
+        {"libB", "1.0", "", "", "libB.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -155,9 +157,9 @@ TEST_F(NeededSoTest, ResolvedFromPlan)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, ResolvedFromInstalledCache)
 {
-    create_pkg("libC", "1.0", {}, {"libC.so.1"});
+    create_pkg("libC", "1.0", {}, {}, {"libC.so.1"});
     update_index({
-        {"libC", "1.0", "", "libC.so.1", ""},
+        {"libC", "1.0", "", "", "libC.so.1", ""},
     });
 
     // 先安装 libC 使其进入缓存
@@ -166,10 +168,10 @@ TEST_F(NeededSoTest, ResolvedFromInstalledCache)
     ASSERT_TRUE(Cache::instance().is_installed("libC"));
 
     // app 需要 libC.so.1，libC 已安装 → 应通过
-    create_pkg("app", "1.0", {}, {}, {"libC.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libC.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libC.so.1"},
-        {"libC", "1.0", "", "libC.so.1", ""},
+        {"app", "1.0", "", "", "", "libC.so.1"},
+        {"libC", "1.0", "", "", "libC.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -183,9 +185,9 @@ TEST_F(NeededSoTest, ResolvedFromInstalledCache)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, NoProviderThrows)
 {
-    create_pkg("app", "1.0", {}, {}, {"ghost.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"ghost.so.1"});
     update_index({
-        {"app", "1.0", "", "", "ghost.so.1"},
+        {"app", "1.0", "", "", "", "ghost.so.1"},
     });
 
     EXPECT_THROW(install_packages({"app"}), LpkgException);
@@ -197,9 +199,9 @@ TEST_F(NeededSoTest, NoProviderThrows)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, SelfProvidedOk)
 {
-    create_pkg("foo", "1.0", {}, {"foo.so.1"}, {"foo.so.1"});
+    create_pkg("foo", "1.0", {}, {}, {"foo.so.1"}, {"foo.so.1"});
     update_index({
-        {"foo", "1.0", "", "foo.so.1", "foo.so.1"},
+        {"foo", "1.0", "", "", "foo.so.1", "foo.so.1"},
     });
 
     EXPECT_NO_THROW(install_packages({"foo"}));
@@ -214,7 +216,7 @@ TEST_F(NeededSoTest, EmptyNeededSoSkipsCheck)
 {
     create_pkg("data", "1.0");
     update_index({
-        {"data", "1.0", "", "", ""},
+        {"data", "1.0", "", "", "", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"data"}));
@@ -228,15 +230,16 @@ TEST_F(NeededSoTest, EmptyNeededSoSkipsCheck)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, MultipleAllResolved)
 {
-    create_pkg("libA", "1.0", {}, {"libA.so.1"});
-    create_pkg("libB", "1.0", {}, {"libB.so.1"});
-    create_pkg("libC", "1.0", {}, {"libC.so.1"});
-    create_pkg("app", "1.0", {"libA", "libB", "libC"}, {}, {"libA.so.1", "libB.so.1", "libC.so.1"});
+    create_pkg("libA", "1.0", {}, {}, {"libA.so.1"});
+    create_pkg("libB", "1.0", {}, {}, {"libB.so.1"});
+    create_pkg("libC", "1.0", {}, {}, {"libC.so.1"});
+    create_pkg("app", "1.0", {"libA", "libB", "libC"}, {}, {},
+               {"libA.so.1", "libB.so.1", "libC.so.1"});
     update_index({
-        {"app", "1.0", "libA,libB,libC", "", "libA.so.1,libB.so.1,libC.so.1"},
-        {"libA", "1.0", "", "libA.so.1", ""},
-        {"libB", "1.0", "", "libB.so.1", ""},
-        {"libC", "1.0", "", "libC.so.1", ""},
+        {"app", "1.0", "libA,libB,libC", "", "", "libA.so.1,libB.so.1,libC.so.1"},
+        {"libA", "1.0", "", "", "libA.so.1", ""},
+        {"libB", "1.0", "", "", "libB.so.1", ""},
+        {"libC", "1.0", "", "", "libC.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -252,11 +255,11 @@ TEST_F(NeededSoTest, MultipleAllResolved)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, OneOfManyMissingThrows)
 {
-    create_pkg("libD", "1.0", {}, {"libD.so.1"});
-    create_pkg("app", "1.0", {"libD"}, {}, {"libD.so.1", "ghost.so.1"});  // ghost.so.1 无提供者
+    create_pkg("libD", "1.0", {}, {}, {"libD.so.1"});
+    create_pkg("app", "1.0", {"libD"}, {}, {}, {"libD.so.1", "ghost.so.1"});  // ghost.so.1 无提供者
     update_index({
-        {"app", "1.0", "libD", "", "libD.so.1,ghost.so.1"},
-        {"libD", "1.0", "", "libD.so.1", ""},
+        {"app", "1.0", "libD", "", "", "libD.so.1,ghost.so.1"},
+        {"libD", "1.0", "", "", "libD.so.1", ""},
     });
 
     EXPECT_THROW(install_packages({"app"}), LpkgException);
@@ -271,8 +274,8 @@ TEST_F(NeededSoTest, OneOfManyMissingThrows)
 TEST_F(NeededSoTest, MissingSoWarningFiresEvenWhenPackageHasNoNamedDeps)
 {
     Config::instance().set_missing_so_no_error_mode(true);
-    create_pkg("needy", "1.0", /*deps=*/{}, /*provides=*/{}, /*needed_so=*/{"ghost.so.1"});
-    update_index({{"needy", "1.0", "", "", "ghost.so.1"}});
+    create_pkg("needy", "1.0", /*deps=*/{}, /*provides=*/{}, {}, /*needed_so=*/{"ghost.so.1"});
+    update_index({{"needy", "1.0", "", "", "", "ghost.so.1"}});
     const std::string pkg = (pkg_dir / "needy-1.0.lpkg").string();
 
     testing::internal::CaptureStderr();
@@ -301,17 +304,17 @@ TEST_F(NeededSoTest, MissingSoWarningFiresEvenWhenPackageHasNoNamedDeps)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, IndexNeededSoMismatchIsRefused)
 {
-    create_pkg("libA", "1.0", {}, {"libA.so.1"});
-    create_pkg("libE", "1.0", {}, {"libE.so.1"});
+    create_pkg("libA", "1.0", {}, {}, {"libA.so.1"});
+    create_pkg("libE", "1.0", {}, {}, {"libE.so.1"});
 
     // app 实际 metadata 依赖 libE，needed_so=libE.so.1
-    create_pkg("app", "1.0", {"libE"}, {}, {"libE.so.1"});
+    create_pkg("app", "1.0", {"libE"}, {}, {}, {"libE.so.1"});
 
     // index 却说 app 依赖 libA（误导），且 libA 的 index provides 有 libA.so.1
     update_index({
-        {"app", "1.0", "libA", "", "libA.so.1"},
-        {"libA", "1.0", "", "libA.so.1", ""},
-        {"libE", "1.0", "", "libE.so.1", ""},
+        {"app", "1.0", "libA", "", "", "libA.so.1"},
+        {"libA", "1.0", "", "", "libA.so.1", ""},
+        {"libE", "1.0", "", "", "libE.so.1", ""},
     });
 
     EXPECT_THROW(install_packages({"app"}), LpkgException);
@@ -329,13 +332,13 @@ TEST_F(NeededSoTest, IndexNeededSoMismatchIsRefused)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, IndexMismatchFailsEvenWhenNeededSoIsMissing)
 {
-    create_pkg("libA", "1.0", {}, {"libA.so.1"});
+    create_pkg("libA", "1.0", {}, {}, {"libA.so.1"});
     // app 实际 metadata 依赖并需要 ghost.so.1（不存在）
-    create_pkg("app", "1.0", {"lib-new"}, {}, {"ghost.so.1"});
+    create_pkg("app", "1.0", {"lib-new"}, {}, {}, {"ghost.so.1"});
 
     update_index({
-        {"app", "1.0", "libA", "", "libA.so.1"},
-        {"libA", "1.0", "", "libA.so.1", ""},
+        {"app", "1.0", "libA", "", "", "libA.so.1"},
+        {"libA", "1.0", "", "", "libA.so.1", ""},
     });
 
     EXPECT_THROW(install_packages({"app"}), LpkgException);
@@ -352,7 +355,7 @@ TEST_F(NeededSoTest, IndexMismatchFailsEvenWhenNeededSoIsMissing)
 TEST_F(NeededSoTest, LocalFileInstallRejectsMissingProvider)
 {
     // 创建本地包，needed_so 指向 ghost.so.1
-    create_pkg("local-app", "1.0", {}, {}, {"ghost.so.1"});
+    create_pkg("local-app", "1.0", {}, {}, {}, {"ghost.so.1"});
     // 不写入 index（本地包不需要 index）
 
     std::string local_pkg = (pkg_dir / "local-app-1.0.lpkg").string();
@@ -368,19 +371,19 @@ TEST_F(NeededSoTest, LocalFileInstallRejectsMissingProvider)
 TEST_F(NeededSoTest, InstalledPackageBypassesEmptyIndexProvides)
 {
     // 先安装 libF（将 libF.so.1 写入缓存）
-    create_pkg("libF", "1.0", {}, {"libF.so.1"});
-    update_index({{"libF", "1.0", "", "libF.so.1", ""}});
+    create_pkg("libF", "1.0", {}, {}, {"libF.so.1"});
+    update_index({{"libF", "1.0", "", "", "libF.so.1", ""}});
     ASSERT_NO_THROW(install_packages({"libF"}));
     Cache::instance().load();
 
     // 清空 index 中 libF 的 provides
-    update_index({{"libF", "1.0", "", "", ""}});
+    update_index({{"libF", "1.0", "", "", "", ""}});
 
     // app 需要 libF.so.1，libF 已安装（不在 plan 中）→ 通过
-    create_pkg("app", "1.0", {}, {}, {"libF.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libF.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libF.so.1"},
-        {"libF", "1.0", "", "", ""},
+        {"app", "1.0", "", "", "", "libF.so.1"},
+        {"libF", "1.0", "", "", "", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -393,11 +396,11 @@ TEST_F(NeededSoTest, InstalledPackageBypassesEmptyIndexProvides)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, NeededSoFilePersisted)
 {
-    create_pkg("libP", "1.0", {}, {"libP.so.1", "libQ.so.1"});
-    create_pkg("app", "1.0", {"libP"}, {}, {"libP.so.1", "libQ.so.1"});
+    create_pkg("libP", "1.0", {}, {}, {"libP.so.1", "libQ.so.1"});
+    create_pkg("app", "1.0", {"libP"}, {}, {}, {"libP.so.1", "libQ.so.1"});
     update_index({
-        {"app", "1.0", "libP", "", "libP.so.1,libQ.so.1"},
-        {"libP", "1.0", "", "libP.so.1,libQ.so.1", ""},
+        {"app", "1.0", "libP", "", "", "libP.so.1,libQ.so.1"},
+        {"libP", "1.0", "", "", "libP.so.1,libQ.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -422,11 +425,11 @@ TEST_F(NeededSoTest, NeededSoFilePersisted)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, ProviderNameInDepsFile)
 {
-    create_pkg("libR", "1.0", {}, {"libR.so.1"});
-    create_pkg("app", "1.0", {"libR"}, {}, {"libR.so.1"});
+    create_pkg("libR", "1.0", {}, {}, {"libR.so.1"});
+    create_pkg("app", "1.0", {"libR"}, {}, {}, {"libR.so.1"});
     update_index({
-        {"app", "1.0", "libR", "", "libR.so.1"},
-        {"libR", "1.0", "", "libR.so.1", ""},
+        {"app", "1.0", "libR", "", "", "libR.so.1"},
+        {"libR", "1.0", "", "", "libR.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -449,11 +452,11 @@ TEST_F(NeededSoTest, ProviderNameInDepsFile)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, ReverseDepBlocksRemoval)
 {
-    create_pkg("libS", "1.0", {}, {"libS.so.1"});
-    create_pkg("app", "1.0", {}, {}, {"libS.so.1"});
+    create_pkg("libS", "1.0", {}, {}, {"libS.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libS.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libS.so.1"},
-        {"libS", "1.0", "", "libS.so.1", ""},
+        {"app", "1.0", "", "", "", "libS.so.1"},
+        {"libS", "1.0", "", "", "libS.so.1", ""},
     });
 
     // 分步安装：先装提供者使缓存有 provides，再装依赖者触发 needed_so 解析
@@ -476,11 +479,11 @@ TEST_F(NeededSoTest, ReverseDepBlocksRemoval)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, ForceRemoveBypassesReverseDep)
 {
-    create_pkg("libT", "1.0", {}, {"libT.so.1"});
-    create_pkg("app", "1.0", {}, {}, {"libT.so.1"});
+    create_pkg("libT", "1.0", {}, {}, {"libT.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libT.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libT.so.1"},
-        {"libT", "1.0", "", "libT.so.1", ""},
+        {"app", "1.0", "", "", "", "libT.so.1"},
+        {"libT", "1.0", "", "", "libT.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"libT"}));
@@ -500,13 +503,13 @@ TEST_F(NeededSoTest, ForceRemoveBypassesReverseDep)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, MultipleNeededSoMultipleReverseDeps)
 {
-    create_pkg("libU", "1.0", {}, {"libU.so.1"});
-    create_pkg("libV", "1.0", {}, {"libV.so.2"});
-    create_pkg("app", "1.0", {}, {}, {"libU.so.1", "libV.so.2"});
+    create_pkg("libU", "1.0", {}, {}, {"libU.so.1"});
+    create_pkg("libV", "1.0", {}, {}, {"libV.so.2"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libU.so.1", "libV.so.2"});
     update_index({
-        {"app", "1.0", "", "", "libU.so.1,libV.so.2"},
-        {"libU", "1.0", "", "libU.so.1", ""},
-        {"libV", "1.0", "", "libV.so.2", ""},
+        {"app", "1.0", "", "", "", "libU.so.1,libV.so.2"},
+        {"libU", "1.0", "", "", "libU.so.1", ""},
+        {"libV", "1.0", "", "", "libV.so.2", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"libU", "libV"}));
@@ -523,11 +526,11 @@ TEST_F(NeededSoTest, MultipleNeededSoMultipleReverseDeps)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, SelfNeededSoNoSelfReverseDep)
 {
-    create_pkg("libW", "1.0", {}, {"libW.so.1"}, {"libW.so.1"});
-    create_pkg("app", "1.0", {"libW"}, {}, {"libW.so.1"});
+    create_pkg("libW", "1.0", {}, {}, {"libW.so.1"}, {"libW.so.1"});
+    create_pkg("app", "1.0", {"libW"}, {}, {}, {"libW.so.1"});
     update_index({
-        {"app", "1.0", "libW", "", "libW.so.1"},
-        {"libW", "1.0", "", "libW.so.1", "libW.so.1"},
+        {"app", "1.0", "libW", "", "", "libW.so.1"},
+        {"libW", "1.0", "", "", "libW.so.1", "libW.so.1"},
     });
 
     EXPECT_NO_THROW(install_packages({"app", "libW"}));
@@ -543,11 +546,11 @@ TEST_F(NeededSoTest, SelfNeededSoNoSelfReverseDep)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, AutoremoveKeepsNeededSoDep)
 {
-    create_pkg("libX", "1.0", {}, {"libX.so.1"});
-    create_pkg("app", "1.0", {"libX"}, {}, {"libX.so.1"});
+    create_pkg("libX", "1.0", {}, {}, {"libX.so.1"});
+    create_pkg("app", "1.0", {"libX"}, {}, {}, {"libX.so.1"});
     update_index({
-        {"app", "1.0", "libX", "", "libX.so.1"},
-        {"libX", "1.0", "", "libX.so.1", ""},
+        {"app", "1.0", "libX", "", "", "libX.so.1"},
+        {"libX", "1.0", "", "", "libX.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -566,11 +569,11 @@ TEST_F(NeededSoTest, AutoremoveKeepsNeededSoDep)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, AutoremoveKeepsSonameOnlyProvider)
 {
-    create_pkg("libY", "1.0", {}, {"libY.so.1"});
-    create_pkg("app", "1.0", {}, {}, {"libY.so.1"});  // 只有 SONAME，无命名 dep
+    create_pkg("libY", "1.0", {}, {}, {"libY.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libY.so.1"});  // 只有 SONAME，无命名 dep
     update_index({
-        {"app", "1.0", "", "", "libY.so.1"},
-        {"libY", "1.0", "", "libY.so.1", ""},
+        {"app", "1.0", "", "", "", "libY.so.1"},
+        {"libY", "1.0", "", "", "libY.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -589,11 +592,11 @@ TEST_F(NeededSoTest, AutoremoveKeepsSonameOnlyProvider)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, DepsFileExcludesSonameProviders)
 {
-    create_pkg("libZ", "1.0", {}, {"libZ.so.1"});
-    create_pkg("app", "1.0", {}, {}, {"libZ.so.1"});
+    create_pkg("libZ", "1.0", {}, {}, {"libZ.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libZ.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libZ.so.1"},
-        {"libZ", "1.0", "", "libZ.so.1", ""},
+        {"app", "1.0", "", "", "", "libZ.so.1"},
+        {"libZ", "1.0", "", "", "libZ.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -631,11 +634,11 @@ TEST_F(NeededSoTest, DepsFileExcludesSonameProviders)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, NeededSoPullsUninstalledProvider)
 {
-    create_pkg("libZ", "1.0", {}, {"libZ.so.1"});
-    create_pkg("app", "1.0", {}, {}, {"libZ.so.1"});
+    create_pkg("libZ", "1.0", {}, {}, {"libZ.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libZ.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libZ.so.1"},
-        {"libZ", "1.0", "", "libZ.so.1", ""},
+        {"app", "1.0", "", "", "", "libZ.so.1"},
+        {"libZ", "1.0", "", "", "libZ.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -656,13 +659,13 @@ TEST_F(NeededSoTest, NeededSoPullsUninstalledProvider)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, NeededSoTransitivePullsProviders)
 {
-    create_pkg("libA", "1.0", {}, {"libA.so.1"}, {"libB.so.1"});
-    create_pkg("libB", "1.0", {}, {"libB.so.1"});
-    create_pkg("app", "1.0", {}, {}, {"libA.so.1"});
+    create_pkg("libA", "1.0", {}, {}, {"libA.so.1"}, {"libB.so.1"});
+    create_pkg("libB", "1.0", {}, {}, {"libB.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libA.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libA.so.1"},
-        {"libA", "1.0", "", "libA.so.1", "libB.so.1"},
-        {"libB", "1.0", "", "libB.so.1", ""},
+        {"app", "1.0", "", "", "", "libA.so.1"},
+        {"libA", "1.0", "", "", "libA.so.1", "libB.so.1"},
+        {"libB", "1.0", "", "", "libB.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -680,11 +683,11 @@ TEST_F(NeededSoTest, NeededSoTransitivePullsProviders)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, AutoremoveKeepsAutoPulledNeededSoProvider)
 {
-    create_pkg("libY", "1.0", {}, {"libY.so.1"});
-    create_pkg("app", "1.0", {}, {}, {"libY.so.1"});
+    create_pkg("libY", "1.0", {}, {}, {"libY.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libY.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libY.so.1"},
-        {"libY", "1.0", "", "libY.so.1", ""},
+        {"app", "1.0", "", "", "", "libY.so.1"},
+        {"libY", "1.0", "", "", "libY.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -707,11 +710,11 @@ TEST_F(NeededSoTest, UseSystemSonamePrefersSystemSo)
     fs::create_directories(test_root / fs::path(constants::USR_LIB));
     ensure_file_exists(test_root / fs::path(constants::USR_LIB) / "libsys.so.1");
 
-    create_pkg("pkg-sys", "1.0", {}, {"libsys.so.1"});
-    create_pkg("app", "1.0", {}, {}, {"libsys.so.1"});
+    create_pkg("pkg-sys", "1.0", {}, {}, {"libsys.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libsys.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libsys.so.1"},
-        {"pkg-sys", "1.0", "", "libsys.so.1", ""},
+        {"app", "1.0", "", "", "", "libsys.so.1"},
+        {"pkg-sys", "1.0", "", "", "libsys.so.1", ""},
     });
 
     Config::instance().set_use_system_soname_mode(true);
@@ -733,11 +736,11 @@ TEST_F(NeededSoTest, DefaultPathStillPullsProviderEvenWithSystemSo)
     fs::create_directories(test_root / fs::path(constants::USR_LIB));
     ensure_file_exists(test_root / fs::path(constants::USR_LIB) / "libsys.so.1");
 
-    create_pkg("pkg-sys", "1.0", {}, {"libsys.so.1"});
-    create_pkg("app", "1.0", {}, {}, {"libsys.so.1"});
+    create_pkg("pkg-sys", "1.0", {}, {}, {"libsys.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libsys.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libsys.so.1"},
-        {"pkg-sys", "1.0", "", "libsys.so.1", ""},
+        {"app", "1.0", "", "", "", "libsys.so.1"},
+        {"pkg-sys", "1.0", "", "", "libsys.so.1", ""},
     });
 
     Config::instance().set_use_system_soname_mode(false);
@@ -777,13 +780,13 @@ TEST_F(NeededSoTest, DefaultPathStillPullsProviderEvenWithSystemSo)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, MultiVersionLatestProvidesSoname)
 {
-    create_pkg("libA", "1.0", {}, {"libA.so.1"});
-    create_pkg("libA", "2.0", {}, {"libA.so.2"});
-    create_pkg("app", "1.0", {"libA"}, {}, {"libA.so.2"});
+    create_pkg("libA", "1.0", {}, {}, {"libA.so.1"});
+    create_pkg("libA", "2.0", {}, {}, {"libA.so.2"});
+    create_pkg("app", "1.0", {"libA"}, {}, {}, {"libA.so.2"});
     update_index({
-        {"app", "1.0", "libA", "", "libA.so.2"},
-        {"libA", "1.0", "", "libA.so.1", ""},
-        {"libA", "2.0", "", "libA.so.2", ""},
+        {"app", "1.0", "libA", "", "", "libA.so.2"},
+        {"libA", "1.0", "", "", "libA.so.1", ""},
+        {"libA", "2.0", "", "", "libA.so.2", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -804,15 +807,15 @@ TEST_F(NeededSoTest, MultiVersionLatestProvidesSoname)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, MultiVersionConstraintPicksVersionProvidingSoname)
 {
-    create_pkg("libB", "1.0", {}, {"libB.so.1"});
-    create_pkg("libB", "2.0", {}, {"libB.so.1", "libB.so.2"});
-    create_pkg("libB", "3.0", {}, {"libB.so.3"});
-    create_pkg("app", "1.0", {"libB >= 2.0 < 3.0"}, {}, {"libB.so.1"});
+    create_pkg("libB", "1.0", {}, {}, {"libB.so.1"});
+    create_pkg("libB", "2.0", {}, {}, {"libB.so.1", "libB.so.2"});
+    create_pkg("libB", "3.0", {}, {}, {"libB.so.3"});
+    create_pkg("app", "1.0", {"libB >= 2.0 < 3.0"}, {}, {}, {"libB.so.1"});
     update_index({
-        {"app", "1.0", "libB >= 2.0 < 3.0", "", "libB.so.1"},
-        {"libB", "1.0", "", "libB.so.1", ""},
-        {"libB", "2.0", "", "libB.so.1,libB.so.2", ""},
-        {"libB", "3.0", "", "libB.so.3", ""},
+        {"app", "1.0", "libB >= 2.0 < 3.0", "", "", "libB.so.1"},
+        {"libB", "1.0", "", "", "libB.so.1", ""},
+        {"libB", "2.0", "", "", "libB.so.1,libB.so.2", ""},
+        {"libB", "3.0", "", "", "libB.so.3", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -831,18 +834,18 @@ TEST_F(NeededSoTest, MultiVersionConstraintPicksVersionProvidingSoname)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, VersionConstraintForcesUpgradeForSoname)
 {
-    create_pkg("libC", "1.0", {}, {"libC.so.1"});
-    update_index({{"libC", "1.0", "", "libC.so.1", ""}});
+    create_pkg("libC", "1.0", {}, {}, {"libC.so.1"});
+    update_index({{"libC", "1.0", "", "", "libC.so.1", ""}});
     ASSERT_NO_THROW(install_packages({"libC"}));
     Cache::instance().load();
     ASSERT_EQ(Cache::instance().get_installed_version("libC"), "1.0");
 
-    create_pkg("libC", "2.0", {}, {"libC.so.2"});
-    create_pkg("app", "1.0", {"libC >= 2.0"}, {}, {"libC.so.2"});
+    create_pkg("libC", "2.0", {}, {}, {"libC.so.2"});
+    create_pkg("app", "1.0", {"libC >= 2.0"}, {}, {}, {"libC.so.2"});
     update_index({
-        {"app", "1.0", "libC >= 2.0", "", "libC.so.2"},
-        {"libC", "1.0", "", "libC.so.1", ""},
-        {"libC", "2.0", "", "libC.so.2", ""},
+        {"app", "1.0", "libC >= 2.0", "", "", "libC.so.2"},
+        {"libC", "1.0", "", "", "libC.so.1", ""},
+        {"libC", "2.0", "", "", "libC.so.2", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -863,15 +866,15 @@ TEST_F(NeededSoTest, VersionConstraintForcesUpgradeForSoname)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, VersionRangeAndSonameCombineCorrectly)
 {
-    create_pkg("libD", "2.5", {}, {"libD.so.2"});
-    create_pkg("libD", "2.6", {}, {"libD.so.3"});
-    create_pkg("libD", "3.0", {}, {"libD.so.4"});
-    create_pkg("app", "1.0", {"libD >= 2.0 < 3.0"}, {}, {"libD.so.3"});
+    create_pkg("libD", "2.5", {}, {}, {"libD.so.2"});
+    create_pkg("libD", "2.6", {}, {}, {"libD.so.3"});
+    create_pkg("libD", "3.0", {}, {}, {"libD.so.4"});
+    create_pkg("app", "1.0", {"libD >= 2.0 < 3.0"}, {}, {}, {"libD.so.3"});
     update_index({
-        {"app", "1.0", "libD >= 2.0 < 3.0", "", "libD.so.3"},
-        {"libD", "2.5", "", "libD.so.2", ""},
-        {"libD", "2.6", "", "libD.so.3", ""},
-        {"libD", "3.0", "", "libD.so.4", ""},
+        {"app", "1.0", "libD >= 2.0 < 3.0", "", "", "libD.so.3"},
+        {"libD", "2.5", "", "", "libD.so.2", ""},
+        {"libD", "2.6", "", "", "libD.so.3", ""},
+        {"libD", "3.0", "", "", "libD.so.4", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -891,17 +894,17 @@ TEST_F(NeededSoTest, VersionRangeAndSonameCombineCorrectly)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, MultipleDepsEachSelectCorrectVersionForSoname)
 {
-    create_pkg("libE", "1.0", {}, {"libE.so.1"});
-    create_pkg("libE", "2.0", {}, {"libE.so.2"});
-    create_pkg("libF", "1.0", {}, {"libF.so.1"});
-    create_pkg("libF", "2.0", {}, {"libF.so.2"});
-    create_pkg("app", "1.0", {"libE", "libF >= 1.0 < 2.0"}, {}, {"libE.so.2", "libF.so.1"});
+    create_pkg("libE", "1.0", {}, {}, {"libE.so.1"});
+    create_pkg("libE", "2.0", {}, {}, {"libE.so.2"});
+    create_pkg("libF", "1.0", {}, {}, {"libF.so.1"});
+    create_pkg("libF", "2.0", {}, {}, {"libF.so.2"});
+    create_pkg("app", "1.0", {"libE", "libF >= 1.0 < 2.0"}, {}, {}, {"libE.so.2", "libF.so.1"});
     update_index({
-        {"app", "1.0", "libE,libF >= 1.0 < 2.0", "", "libE.so.2,libF.so.1"},
-        {"libE", "1.0", "", "libE.so.1", ""},
-        {"libE", "2.0", "", "libE.so.2", ""},
-        {"libF", "1.0", "", "libF.so.1", ""},
-        {"libF", "2.0", "", "libF.so.2", ""},
+        {"app", "1.0", "libE,libF >= 1.0 < 2.0", "", "", "libE.so.2,libF.so.1"},
+        {"libE", "1.0", "", "", "libE.so.1", ""},
+        {"libE", "2.0", "", "", "libE.so.2", ""},
+        {"libF", "1.0", "", "", "libF.so.1", ""},
+        {"libF", "2.0", "", "", "libF.so.2", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -922,15 +925,15 @@ TEST_F(NeededSoTest, MultipleDepsEachSelectCorrectVersionForSoname)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, TransitiveDepSonameDrivesVersionSelection)
 {
-    create_pkg("libH", "1.0", {}, {"libH.so.1"});
-    create_pkg("libH", "2.0", {}, {"libH.so.2"});
-    create_pkg("libG", "2.0", {"libH"}, {}, {"libH.so.2"});
+    create_pkg("libH", "1.0", {}, {}, {"libH.so.1"});
+    create_pkg("libH", "2.0", {}, {}, {"libH.so.2"});
+    create_pkg("libG", "2.0", {"libH"}, {}, {}, {"libH.so.2"});
     create_pkg("app", "1.0", {"libG"});
     update_index({
-        {"app", "1.0", "libG", "", ""},
-        {"libG", "2.0", "libH", "", "libH.so.2"},
-        {"libH", "1.0", "", "libH.so.1", ""},
-        {"libH", "2.0", "", "libH.so.2", ""},
+        {"app", "1.0", "libG", "", "", ""},
+        {"libG", "2.0", "libH", "", "", "libH.so.2"},
+        {"libH", "1.0", "", "", "libH.so.1", ""},
+        {"libH", "2.0", "", "", "libH.so.2", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -952,13 +955,13 @@ TEST_F(NeededSoTest, TransitiveDepSonameDrivesVersionSelection)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, VersionConstraintExcludesSonameProvider)
 {
-    create_pkg("libR", "1.0", {}, {"libR.so.1"});
-    create_pkg("libR", "2.0", {}, {"libR.so.2"});
-    create_pkg("app", "1.0", {"libR >= 2.0"}, {}, {"libR.so.1"});
+    create_pkg("libR", "1.0", {}, {}, {"libR.so.1"});
+    create_pkg("libR", "2.0", {}, {}, {"libR.so.2"});
+    create_pkg("app", "1.0", {"libR >= 2.0"}, {}, {}, {"libR.so.1"});
     update_index({
-        {"app", "1.0", "libR >= 2.0", "", "libR.so.1"},
-        {"libR", "1.0", "", "libR.so.1", ""},
-        {"libR", "2.0", "", "libR.so.2", ""},
+        {"app", "1.0", "libR >= 2.0", "", "", "libR.so.1"},
+        {"libR", "1.0", "", "", "libR.so.1", ""},
+        {"libR", "2.0", "", "", "libR.so.2", ""},
     });
 
     EXPECT_THROW(install_packages({"app"}), LpkgException);
@@ -966,20 +969,20 @@ TEST_F(NeededSoTest, VersionConstraintExcludesSonameProvider)
 
 // -----------------------------------------------------------------------
 // 8. 同一 SONAME 由多个包的不同版本提供 → 选择正确的提供者
-//    libJ 和 libK 都提供 "crypto-core"
-//    app 显式依赖 libJ，需要 "crypto-core"
+//    libJ 和 libK 都导出 "shared.so.1"
+//    app 显式依赖 libJ，需要 "shared.so.1"
 //    → 应选择 libJ（app 声明的依赖），而非 libK
 //    （验证 needed_so 的提供者查找不会"跨包抢用"）
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, SonameFromMultipleProvidersChoosesCorrectPackage)
 {
-    create_pkg("libJ", "1.0", {}, {"crypto-core", "libJ.so.1"});
-    create_pkg("libK", "1.0", {}, {"crypto-core", "libK.so.1"});
-    create_pkg("app", "1.0", {"libJ"}, {}, {"crypto-core"});
+    create_pkg("libJ", "1.0", {}, {}, {"shared.so.1"});
+    create_pkg("libK", "1.0", {}, {}, {"shared.so.1"});
+    create_pkg("app", "1.0", {"libJ"}, {}, {}, {"shared.so.1"});
     update_index({
-        {"app", "1.0", "libJ", "", "crypto-core"},
-        {"libJ", "1.0", "", "crypto-core,libJ.so.1", ""},
-        {"libK", "1.0", "", "crypto-core,libK.so.1", ""},
+        {"app", "1.0", "libJ", "", "", "shared.so.1"},
+        {"libJ", "1.0", "", "", "shared.so.1", ""},
+        {"libK", "1.0", "", "", "shared.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -1000,16 +1003,16 @@ TEST_F(NeededSoTest, SonameFromMultipleProvidersChoosesCorrectPackage)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, SonameChangeInUpgradeBreaksDependents)
 {
-    create_pkg("libM", "1.0", {}, {"libM.so.1"});
-    update_index({{"libM", "1.0", "", "libM.so.1", ""}});
+    create_pkg("libM", "1.0", {}, {}, {"libM.so.1"});
+    update_index({{"libM", "1.0", "", "", "libM.so.1", ""}});
     ASSERT_NO_THROW(install_packages({"libM"}));
     Cache::instance().load();
     ASSERT_EQ(Cache::instance().get_installed_version("libM"), "1.0");
 
-    create_pkg("app", "1.0", {"libM"}, {}, {"libM.so.1"});
+    create_pkg("app", "1.0", {"libM"}, {}, {}, {"libM.so.1"});
     update_index({
-        {"app", "1.0", "libM", "", "libM.so.1"},
-        {"libM", "1.0", "", "libM.so.1", ""},
+        {"app", "1.0", "libM", "", "", "libM.so.1"},
+        {"libM", "1.0", "", "", "libM.so.1", ""},
     });
     ASSERT_NO_THROW(install_packages({"app"}));
     Cache::instance().load();
@@ -1026,11 +1029,11 @@ TEST_F(NeededSoTest, SonameChangeInUpgradeBreaksDependents)
     }
 
     // 加入 libM-2.0 并升级 libM
-    create_pkg("libM", "2.0", {}, {"libM.so.2"});
+    create_pkg("libM", "2.0", {}, {}, {"libM.so.2"});
     update_index({
-        {"libM", "1.0", "", "libM.so.1", ""},
-        {"libM", "2.0", "", "libM.so.2", ""},
-        {"app", "1.0", "libM", "", "libM.so.1"},
+        {"libM", "1.0", "", "", "libM.so.1", ""},
+        {"libM", "2.0", "", "", "libM.so.2", ""},
+        {"app", "1.0", "libM", "", "", "libM.so.1"},
     });
 
     // 一致性检查检测到升级会破坏 app → 新版语义：**硬报错**，不再自动移除 app
@@ -1053,11 +1056,11 @@ TEST_F(NeededSoTest, SonameChangeInUpgradeBreaksDependents)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, InstalledVersionLacksSonameButPackageLevelCheckPasses)
 {
-    create_pkg("libN", "1.0", {}, {"libN.so.1"});
-    create_pkg("libN", "2.0", {}, {"libN.so.2"});
+    create_pkg("libN", "1.0", {}, {}, {"libN.so.1"});
+    create_pkg("libN", "2.0", {}, {}, {"libN.so.2"});
     update_index({
-        {"libN", "1.0", "", "libN.so.1", ""},
-        {"libN", "2.0", "", "libN.so.2", ""},
+        {"libN", "1.0", "", "", "libN.so.1", ""},
+        {"libN", "2.0", "", "", "libN.so.2", ""},
     });
     ASSERT_NO_THROW(install_packages({"libN"}));
     Cache::instance().load();
@@ -1065,11 +1068,11 @@ TEST_F(NeededSoTest, InstalledVersionLacksSonameButPackageLevelCheckPasses)
 
     // app 无 deps，仅 needed_so 引用 libN.so.1
     // 版本级检查会拒绝，因为 libN-2.0 不提供 libN.so.1
-    create_pkg("app", "1.0", {}, {}, {"libN.so.1"});
+    create_pkg("app", "1.0", {}, {}, {}, {"libN.so.1"});
     update_index({
-        {"app", "1.0", "", "", "libN.so.1"},
-        {"libN", "1.0", "", "libN.so.1", ""},
-        {"libN", "2.0", "", "libN.so.2", ""},
+        {"app", "1.0", "", "", "", "libN.so.1"},
+        {"libN", "1.0", "", "", "libN.so.1", ""},
+        {"libN", "2.0", "", "", "libN.so.2", ""},
     });
 
     EXPECT_THROW(install_packages({"app"}), LpkgException);
@@ -1083,16 +1086,16 @@ TEST_F(NeededSoTest, InstalledVersionLacksSonameButPackageLevelCheckPasses)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, MultiVersionAutoremovePreservesSonameProvider)
 {
-    create_pkg("libO", "1.0", {}, {"libO.so.1"});
-    update_index({{"libO", "1.0", "", "libO.so.1", ""}});
+    create_pkg("libO", "1.0", {}, {}, {"libO.so.1"});
+    update_index({{"libO", "1.0", "", "", "libO.so.1", ""}});
     ASSERT_NO_THROW(install_packages({"libO"}));
     Cache::instance().load();
     ASSERT_TRUE(Cache::instance().is_installed("libO"));
 
-    create_pkg("app", "1.0", {"libO"}, {}, {"libO.so.1"});
+    create_pkg("app", "1.0", {"libO"}, {}, {}, {"libO.so.1"});
     update_index({
-        {"app", "1.0", "libO", "", "libO.so.1"},
-        {"libO", "1.0", "", "libO.so.1", ""},
+        {"app", "1.0", "libO", "", "", "libO.so.1"},
+        {"libO", "1.0", "", "", "libO.so.1", ""},
     });
 
     EXPECT_NO_THROW(install_packages({"app"}));
@@ -1115,11 +1118,11 @@ TEST_F(NeededSoTest, MultiVersionAutoremovePreservesSonameProvider)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, LocalPackageMultiVersionSonameResolution)
 {
-    create_pkg("libP", "1.0", {}, {"libP.so.1"});
-    create_pkg("libP", "2.0", {}, {"libP.so.2"});
+    create_pkg("libP", "1.0", {}, {}, {"libP.so.1"});
+    create_pkg("libP", "2.0", {}, {}, {"libP.so.2"});
     update_index({
-        {"libP", "1.0", "", "libP.so.1", ""},
-        {"libP", "2.0", "", "libP.so.2", ""},
+        {"libP", "1.0", "", "", "libP.so.1", ""},
+        {"libP", "2.0", "", "", "libP.so.2", ""},
     });
 
     // 创建本地 app.lpkg（元数据中依赖 libP，需要 libP.so.2）
@@ -1127,7 +1130,8 @@ TEST_F(NeededSoTest, LocalPackageMultiVersionSonameResolution)
     fs::create_directories(work_dir / "content" / "usr" / "bin");
     std::ofstream(work_dir / "content" / "usr" / "bin" / "local-app").close();
     std::string local_pkg = (pkg_dir / "local-app-1.0.lpkg").string();
-    pack_package(local_pkg, work_dir.string(), "local-app", "1.0", {"libP"}, {}, "", {"libP.so.2"});
+    pack_package(local_pkg, work_dir.string(), "local-app", "1.0", {"libP"}, {}, {}, "",
+                 {"libP.so.2"});
     fs::remove_all(work_dir);
 
     ASSERT_TRUE(fs::exists(local_pkg));
@@ -1148,11 +1152,11 @@ TEST_F(NeededSoTest, LocalPackageMultiVersionSonameResolution)
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, DependencyCheckIsSilentOnSuccess)
 {
-    create_pkg("libso2", "1.0", {}, {"libso2.so.1"});
-    update_index({{"libso2", "1.0", "", "libso2.so.1", ""}});
+    create_pkg("libso2", "1.0", {}, {}, {"libso2.so.1"});
+    update_index({{"libso2", "1.0", "", "", "libso2.so.1", ""}});
     ASSERT_NO_THROW(install_packages({"libso2"}));
 
-    create_pkg("silent-so", "1.0", /*deps=*/{}, /*provides=*/{}, /*needed_so=*/{"libso2.so.1"});
+    create_pkg("silent-so", "1.0", /*deps=*/{}, /*provides=*/{}, {}, /*needed_so=*/{"libso2.so.1"});
     const std::string pkg = (pkg_dir / "silent-so-1.0.lpkg").string();
 
     testing::internal::CaptureStdout();

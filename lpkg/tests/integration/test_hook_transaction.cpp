@@ -105,6 +105,7 @@ protected:
                                 const std::vector<std::pair<std::string, std::string>>& hooks,
                                 const std::vector<std::string>& extra_content = {},
                                 const std::vector<std::string>& provides = {},
+                                const std::vector<std::string>& provides_soname = {},
                                 const std::vector<std::string>& needed_so = {})
     {
         const fs::path work = suite_work_dir / ("_hk_" + name + "_" + ver);
@@ -118,7 +119,7 @@ protected:
         for (const auto& [file, content] : hooks) std::ofstream(work / "hooks" / file) << content;
 
         const std::string path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
-        pack_package(path, work.string(), name, ver, {}, provides, "", needed_so);
+        pack_package(path, work.string(), name, ver, {}, provides, provides_soname, "", needed_so);
         return path;
     }
 
@@ -308,11 +309,11 @@ TEST_F(HookTransactionTest, SuccessfulRemovalRunsPrerm)
 /**
  * 现场构造（每一步都由公开 API 产生，且是真实可达的状态）：
  *
- *   1. ua 1.0 已装（provides `libua.so.1`、带 hooks/postinst.sh）——盘上 hooks 目录在。
- *   2. **盘上那份已装记录的 provides 过期**：删掉 provides_db 里 ua 提供 libua.so.1 的
- *      条目。真实来源：老 lpkg 装的包（当时不记 provides）、DB 迁移/损坏后重放、
+ *   1. ua 1.0 已装（provides_soname `libua.so.1`、带 hooks/postinst.sh）——盘上 hooks 目录在。
+ *   2. **盘上那份已装记录的 provides_soname 过期**：删掉 provides_soname.db 里 ua 提供
+ *      libua.so.1 的条目。真实来源：老 lpkg 装的包（当时不记 provides）、DB 迁移/损坏后重放、
  *      数据库被手工编辑。步骤 3 的前提正是这个"已装世界表达不出的能力"。
- *   3. 装 ub 1.0（needed_so `libua.so.1`，仓库索引里 ua 1.0 仍声明该 provides）。
+ *   3. 装 ub 1.0（needed_so `libua.so.1`，仓库索引里 ua 1.0 仍声明该 provides_soname）。
  *      libsolv 无法用**已装的** ua 满足这条 requires（已装记录里没有它），唯一可行解是
  *      **装 avail 的同名同版本 ua** —— 于是 ua 1.0 以 `SOLVER_TRANSACTION_REINSTALL`
  *      步骤进计划（它只 obsoletes 那个已装 solvable），且它不是用户显式目标
@@ -328,22 +329,23 @@ TEST_F(HookTransactionTest, AlreadyInstalledBatchMemberKeepsItsHooks)
 
     // 1. ua 1.0 已装（本地文件装，与镜像无关）
     const std::string ua =
-        pack_with_hooks("ua", "1.0", {{"postinst.sh", HOOK_A}}, {}, {"libua.so.1"});
+        pack_with_hooks("ua", "1.0", {{"postinst.sh", HOOK_A}}, {}, {}, {"libua.so.1"});
     ASSERT_NO_THROW(install_packages({ua}));
     const fs::path hd = hooks_of("ua");
     ASSERT_EQ(read_text(hd / "postinst.sh"), HOOK_A)
         << "fixture 自检：ua 的 hook 没装上，下面的断言会退化成恒真";
 
-    // 2. 已装记录的 provides 过期（模型见上）
-    Cache::instance().remove_provider("libua.so.1", "ua");
+    // 2. 已装记录的 provides_soname 过期（模型见上）
+    Cache::instance().remove_soname_provider("libua.so.1", "ua");
     Cache::instance().write();
 
-    // 3. 镜像：ua 1.0（声明 provides）+ ub 1.0（需要它）
-    pack_with_hooks("ub", "1.0", {}, {}, {}, {"libua.so.1"});
+    // 3. 镜像：ua 1.0（声明 provides_soname）+ ub 1.0（needed_so 需要它）
+    pack_with_hooks("ub", "1.0", {}, {}, {}, {}, {"libua.so.1"});
     const fs::path mirror = suite_work_dir / "mirror" / "x86_64";
     {
         std::ofstream index(mirror / "index.txt");
-        for (const auto& [n, v, prov, nso] :
+        // 6 段：`ver:hash:deps:provides:provides_soname:needed_so`
+        for (const auto& [n, v, pso, nso] :
              {std::tuple<std::string, std::string, std::string, std::string>{"ua", "1.0",
                                                                              "libua.so.1", ""},
               std::tuple<std::string, std::string, std::string, std::string>{"ub", "1.0", "",
@@ -351,7 +353,7 @@ TEST_F(HookTransactionTest, AlreadyInstalledBatchMemberKeepsItsHooks)
             const fs::path built = pkg_dir / std::format("{}-{}.lpkg", n, v);
             fs::create_directories(mirror / n);
             fs::copy(built, mirror / n / (v + ".lpkg"), fs::copy_options::overwrite_existing);
-            index << n << "|" << v << ":" << calculate_sha256(built) << "::" << prov << ":" << nso
+            index << n << "|" << v << ":" << calculate_sha256(built) << ":::" << pso << ":" << nso
                   << "|\n";
         }
     }

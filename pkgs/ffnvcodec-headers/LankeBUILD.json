@@ -3,7 +3,7 @@
   "version": "13.1.15.0",
   "deps": [],
   "needed_so": [],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "git"

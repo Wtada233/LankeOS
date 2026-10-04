@@ -33,7 +33,7 @@
     "libvolume_key.so.1",
     "libyaml-0.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libbd_btrfs.so",
     "libbd_btrfs.so.3",
     "libbd_crypto.so",

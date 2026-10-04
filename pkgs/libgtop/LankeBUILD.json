@@ -9,7 +9,7 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libgtop-2.0.so",
     "libgtop-2.0.so.11"
   ],

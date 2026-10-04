@@ -17,7 +17,7 @@
     "libxcb-dri3.so.0",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libva-drm.so",
     "libva-drm.so.2",
     "libva-glx.so",

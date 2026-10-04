@@ -6,7 +6,7 @@
   "needed_so": [
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libmd4c-html.so",
     "libmd4c-html.so.0",
     "libmd4c.so",

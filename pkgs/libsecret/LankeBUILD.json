@@ -10,7 +10,7 @@
     "libgnutls.so.30",
     "libgobject-2.0.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libsecret-1.so",
     "libsecret-1.so.0"
   ],

@@ -8,7 +8,7 @@
     "libc.so.6",
     "libuuid.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libSM.so",
     "libSM.so.6"
   ],

@@ -111,6 +111,11 @@ public:
     {
         return provides_db_;
     }
+    /// **SONAME → 属主包** 的归属库（与 `provides.db` 并列的另一张表，见 8.0.0 的字段拆分）
+    const std::filesystem::path& provides_soname_db() const noexcept
+    {
+        return provides_soname_db_;
+    }
     /**
      * 配置文件哈希数据库（逻辑路径 → `"<pkg>:<sha256>"` 集合）。
      *
@@ -267,19 +272,20 @@ private:
     std::filesystem::path hooks_dir_;   // 钩子目录
 
     // 派生路径（由 rebase_paths() 重新计算）
-    std::filesystem::path dep_dir_;         // 依赖信息目录
-    std::filesystem::path needed_so_dir_;   // needed_so SONAME 列表目录
-    std::filesystem::path pkgs_file_;       // 已安装包列表文件
-    std::filesystem::path holdpkgs_file_;   // 锁定包列表文件
-    std::filesystem::path essential_file_;  // 核心包列表文件
-    std::filesystem::path mirror_conf_;     // 镜像配置文件
-    std::filesystem::path triggers_conf_;   // 触发器配置文件
-    std::filesystem::path build_conf_;      // 构建默认标志配置文件
-    std::filesystem::path files_db_;        // 文件归属数据库
-    std::filesystem::path provides_db_;     // providers 数据库
-    std::filesystem::path conf_hashes_db_;  // 配置文件哈希数据库（升级三哈希分流的 hash_orig）
-    std::filesystem::path xattr_keys_db_;   // xattr 键归属数据库（撤销"本包不再声明"的键）
-    std::filesystem::path lock_file_;       // 互斥锁文件
+    std::filesystem::path dep_dir_;             // 依赖信息目录
+    std::filesystem::path needed_so_dir_;       // needed_so SONAME 列表目录
+    std::filesystem::path pkgs_file_;           // 已安装包列表文件
+    std::filesystem::path holdpkgs_file_;       // 锁定包列表文件
+    std::filesystem::path essential_file_;      // 核心包列表文件
+    std::filesystem::path mirror_conf_;         // 镜像配置文件
+    std::filesystem::path triggers_conf_;       // 触发器配置文件
+    std::filesystem::path build_conf_;          // 构建默认标志配置文件
+    std::filesystem::path files_db_;            // 文件归属数据库
+    std::filesystem::path provides_db_;         // 虚拟 provider 数据库
+    std::filesystem::path provides_soname_db_;  // SONAME 归属数据库
+    std::filesystem::path conf_hashes_db_;      // 配置文件哈希数据库（升级三哈希分流的 hash_orig）
+    std::filesystem::path xattr_keys_db_;       // xattr 键归属数据库（撤销"本包不再声明"的键）
+    std::filesystem::path lock_file_;           // 互斥锁文件
 
     // --- 模式成员 ---------------------------------------------------------
     NonInteractiveMode non_interactive_mode_{NonInteractiveMode::INTERACTIVE};  // 非交互模式

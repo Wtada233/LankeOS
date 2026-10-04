@@ -27,7 +27,7 @@
     "libwebp.so.7",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libcdt.so",
     "libcdt.so.6",
     "libcgraph.so",

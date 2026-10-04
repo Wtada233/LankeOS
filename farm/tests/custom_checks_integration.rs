@@ -107,7 +107,7 @@ impl Repo {
         let mut lines = Vec::new();
         for (n, deps) in &self.entries {
             let deps = deps.join(",");
-            lines.push(format!("{n}|1.0:h:{deps}::|"));
+            lines.push(format!("{n}|1.0:h:{deps}:::|"));
         }
         lines.sort();
         let mut s = lines.join("\n");
@@ -504,7 +504,7 @@ fn build_depschk_flags_missing_provider_and_honors_ignore_flag() {
         std::fs::create_dir_all(pkgs.join(name)).unwrap();
         let mut m = serde_json::json!({
             "name": name, "version": "1.0",
-            "provides": provides, "needed_so": needed, "build_deps": bd
+            "provides_soname": provides, "needed_so": needed, "build_deps": bd
         });
         if !flags.is_empty() {
             m["farm_flags"] = serde_json::json!(flags);

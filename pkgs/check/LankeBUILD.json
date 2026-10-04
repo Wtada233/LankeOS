@@ -8,7 +8,7 @@
     "libgcc_s.so.1",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libcheck.so",
     "libcheck.so.0"
   ],

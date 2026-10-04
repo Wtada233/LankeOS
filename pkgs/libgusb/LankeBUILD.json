@@ -12,7 +12,7 @@
     "libjson-glib-1.0.so.0",
     "libusb-1.0.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libgusb.so",
     "libgusb.so.2"
   ],

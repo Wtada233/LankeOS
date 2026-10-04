@@ -14,7 +14,7 @@
     "libgtk-3.so.0",
     "libgtk-4.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libcolord-gtk.so",
     "libcolord-gtk.so.1",
     "libcolord-gtk4.so",

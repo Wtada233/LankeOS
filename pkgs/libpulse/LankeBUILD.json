@@ -15,7 +15,7 @@
     "libsystemd.so.0",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libpulse-mainloop-glib.so",
     "libpulse-mainloop-glib.so.0",
     "libpulse-simple.so",

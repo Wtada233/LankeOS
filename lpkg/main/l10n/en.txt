@@ -133,7 +133,6 @@ error.unsafe_member_arrow=Refusing archive {}: member name contains a literal " 
 error.unsafe_member_control=Refusing archive {}: member name contains a control character (newline/CR/NUL/TAB) and would forge WAL lines or corrupt the tab-delimited database: {}
 error.unsafe_member_suffix=Refusing archive {}: member name uses one of lpkg's reserved names (.lpkgtmp / .lpkgnew / .lpkgsave suffixes, or the .lpkg_bak_ stash prefix) and would collide with lpkg's own rename/placement/cleanup steps: {}
 error.unsafe_path_component=Unsafe {} in package metadata (path traversal?): {}
-error.version_reserved_char=Invalid version '{}': reserved character '{}' for lpkg's libsolv version bridge (^ separates the +release part, ~ is the prerelease marker, : is the epoch)
 error.wal_fsync_failed=Failed to fsync WAL transaction log: {}
 error.wal_open_failed=Failed to open WAL transaction log: {}
 error.wal_write_failed=Failed to write to WAL transaction log: {}

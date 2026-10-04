@@ -12,7 +12,7 @@
     "libstdc++.so.6",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libodfgen-0.1.so",
     "libodfgen-0.1.so.1"
   ],

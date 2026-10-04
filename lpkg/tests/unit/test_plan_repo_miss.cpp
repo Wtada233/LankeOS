@@ -116,7 +116,7 @@ protected:
         fs::create_directories(work / "content" / "usr" / "bin");
         std::ofstream(work / "content" / "usr" / "bin" / name) << "#!/bin/sh\n";
         const std::string path = (suite_work_dir / (name + "-" + version + ".lpkg")).string();
-        pack_package(path, work.string(), name, version, {}, {}, "man", {});
+        pack_package(path, work.string(), name, version, {}, {}, {}, "man", {});
         return path;
     }
 };
@@ -125,7 +125,7 @@ protected:
 TEST_F(PlanRepoMissTest, PlanEntryMissingFromRepoIndexIsHardError)
 {
     // 索引里只有 present；Cache 说 ghost 1.0 已装（但仓库索引里没有它）
-    write_index("present|1.0:deadbeefcafe::libpresent.so.1:\n");
+    write_index("present|1.0:deadbeefcafe:::libpresent.so.1:|\n");
     Cache::instance().add_installed("ghost", "1.0", true);
 
     Repository repo;
@@ -156,7 +156,7 @@ TEST_F(PlanRepoMissTest, PlanEntryMissingFromRepoIndexIsHardError)
 // ── 对照：索引里有的目标照常建计划，且 sha256 来自索引 ────────────────────────────
 TEST_F(PlanRepoMissTest, RepoResidentTargetKeepsIndexHash)
 {
-    write_index("present|1.0:deadbeefcafe::libpresent.so.1:\n");
+    write_index("present|1.0:deadbeefcafe:::libpresent.so.1:|\n");
 
     Repository repo;
     repo.load_index();

@@ -17,7 +17,7 @@
     "libva-drm.so.2",
     "libva.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libvirglrenderer.so",
     "libvirglrenderer.so.1"
   ],

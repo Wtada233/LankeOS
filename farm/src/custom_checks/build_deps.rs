@@ -12,7 +12,8 @@
 //!   的领域，不是 build_deps 漏写）。
 //!
 //! **只读配方 `LankeBUILD.json`，不扫 `.lpkg`**——无需解包，因此不用缓存、不占 `--source`。
-//! SONAME→provider 关系完全来自各包配方的 `provides` 字段（不是扫包）。
+//! SONAME→provider 关系完全来自各包配方的 `provides_soname` 字段（farm 扫描产物；不是扫包，
+//! 也不看纯虚拟 `provides`）。
 
 use super::{ChkOpts, Finding, Report, Severity};
 use crate::error::FarmError;
@@ -20,15 +21,15 @@ use crate::tr;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::path::Path;
 
-/// SONAME → provider 包名集合（从全部配方的 `provides` 建立；确定性排序）。
+/// SONAME → provider 包名集合（从全部配方的 `provides_soname` 建立；确定性排序）。
 fn provider_map(pkgs_dir: &Path, pkgs: &[String]) -> BTreeMap<String, BTreeSet<String>> {
     let mut map: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
     for pkg in pkgs {
         let Some(b) = crate::build::read_lankebuild(pkgs_dir, pkg) else {
             continue;
         };
-        for cap in &b.provides {
-            map.entry(cap.clone()).or_default().insert(pkg.clone());
+        for soname in &b.provides_soname {
+            map.entry(soname.clone()).or_default().insert(pkg.clone());
         }
     }
     map
@@ -69,7 +70,7 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
         };
         report.checked += 1;
         let bd: HashSet<&str> = b.build_deps.iter().map(String::as_str).collect();
-        let own: HashSet<&str> = b.provides.iter().map(String::as_str).collect();
+        let own: HashSet<&str> = b.provides_soname.iter().map(String::as_str).collect();
         let mut items: Vec<Finding> = Vec::new();
         for soname in &b.needed_so {
             if own.contains(soname.as_str()) {
@@ -103,7 +104,8 @@ pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
 mod tests {
     use super::*;
 
-    /// 造一个只有配方的假 pkgs 目录（本检則不需要 .lpkg）。
+    /// 造一个只有配方的假 pkgs 目录（本检則不需要 .lpkg）。`provides` 参数写进 `provides_soname`
+    /// ——本检則按 SONAME 找 provider，虚拟 provides 不参与。
     fn write_pkg(dir: &Path, name: &str, provides: &[&str], needed: &[&str], bd: &[&str]) {
         let p = dir.join(name);
         std::fs::create_dir_all(&p).unwrap();
@@ -111,7 +113,7 @@ mod tests {
             p.join("LankeBUILD.json"),
             serde_json::to_string(&serde_json::json!({
                 "name": name, "version": "1.0",
-                "provides": provides, "needed_so": needed, "build_deps": bd
+                "provides_soname": provides, "needed_so": needed, "build_deps": bd
             }))
             .unwrap(),
         )

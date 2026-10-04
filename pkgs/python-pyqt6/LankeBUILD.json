@@ -41,7 +41,7 @@
     "libpython3.14.so.1.0",
     "libstdc++.so.6"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "python-pyqt-builder",
     "python-pyqt6-sip",

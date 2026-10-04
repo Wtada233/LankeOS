@@ -334,6 +334,34 @@ void Cache::add_provider(std::string_view capability, std::string_view pkg)
     dirty = true;
 }
 
+// ── SONAME 归属：与上面几个函数**逐字同构**，只是换了表与 DB 文件 ──────────────────────
+// 两张表故意各写一份（不合并成"带参数选表"的写法）：这两组操作在调用点上是**不同语义**
+// （虚拟能力 vs SONAME），谁误用另一张表，8.0.0 拆分想根除的串味就会从调用点长回来。
+void Cache::add_soname_provider(std::string_view soname, std::string_view pkg)
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    provides_soname[std::string(soname)].insert(std::string(pkg));
+    dirty = true;
+}
+
+void Cache::remove_soname_provider(std::string_view soname, std::string_view pkg)
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    auto it = provides_soname.find(soname);
+    if (it != provides_soname.end()) {
+        it->second.erase(std::string(pkg));
+        if (it->second.empty()) provides_soname.erase(it);
+        dirty = true;
+    }
+}
+
+std::unordered_set<std::string> Cache::get_soname_providers(std::string_view soname)
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    auto it = provides_soname.find(soname);
+    return (it != provides_soname.end()) ? it->second : std::unordered_set<std::string>{};
+}
+
 void Cache::remove_provider(std::string_view capability, std::string_view pkg)
 {
     std::lock_guard<std::mutex> lock(mtx);
@@ -404,6 +432,17 @@ std::unordered_set<std::string> Cache::get_package_provides(std::string_view pkg
     return result;
 }
 
+std::unordered_set<std::string> Cache::get_package_provides_soname(std::string_view pkg)
+{
+    std::lock_guard<std::mutex> lock(mtx);
+    std::string pkg_str(pkg);
+    std::unordered_set<std::string> result;
+    for (const auto& [so, owners] : provides_soname) {
+        if (owners.contains(pkg_str)) result.insert(so);
+    }
+    return result;
+}
+
 // ── 值语义快照（2026-10-03：替代原先的 `get_mutex()` + 两个引用返回的访问器）──────
 // 契约只有一条：**持锁拷一份出去**，调用方拿到快照后不需要、也不该持有锁。
 // 这些方法都是"读一整块状态"，逐个走加锁方法既做不到原子、又会退化成 O(n²)。
@@ -431,6 +470,7 @@ void Cache::load(bool tolerate_missing_set_files)
     std::lock_guard<std::mutex> lock(mtx);
     file_db = read_db_uncached(Config::instance().files_db());
     providers = read_db_uncached(Config::instance().provides_db());
+    provides_soname = read_db_uncached(Config::instance().provides_soname_db());
     // 老 DB（本特性之前装的包）没有这个文件 → 空表。**这不是错误**：升级时拿不到
     // hash_orig 的路径按"三者互异"保守处理（保留原文件 + .lpkgnew），与老行为一致。
     conf_hashes = read_db_uncached(Config::instance().conf_hashes_db());
@@ -519,8 +559,11 @@ void Cache::ensure_reverse_deps()
             while (std::getline(f, so)) {
                 if (so.empty()) continue;
                 if (so.back() == '\r') so.pop_back();
-                auto prov_it = providers.find(so);
-                if (prov_it == providers.end()) continue;
+                // **查 SONAME 归属表**（不是虚拟 provider 表）：8.0.0 拆分后 SONAME 不再
+                // 存在 `providers` 里，查错表会让"纯 SONAME 链路"的反向依赖整条失效
+                // （移除阻止 / autoremove 会把 provider 当孤儿删掉）。
+                auto prov_it = provides_soname.find(so);
+                if (prov_it == provides_soname.end()) continue;
                 for (const auto& prov : prov_it->second)
                     if (prov != pkg_name) reverse_deps[prov].insert(pkg_name);  // 不自引用
             }
@@ -555,6 +598,7 @@ void Cache::write()
     if (dirty) {
         write_file_db();
         write_providers();
+        write_provides_soname();
         write_conf_hashes();
         write_xattr_keys();
         write_pkgs();
@@ -576,6 +620,7 @@ void Cache::write(const std::string& milestone)
     write_set_file_wal(config.pkgs_file(), pkgs_data, milestone, "DB");
     write_db_file_wal(config.files_db(), file_db, milestone, "DB");
     write_db_file_wal(config.provides_db(), providers, milestone, "DB");
+    write_db_file_wal(config.provides_soname_db(), provides_soname, milestone, "DB");
     // 配置文件哈希与 files.db 同族（同样走 WAL + 备份）：批次回滚时由 reverse_execute 的
     // DB 分支还原到批次前 —— "静默替换配置"能成立的前提之一（改得动，也撤得回）。
     write_db_file_wal(config.conf_hashes_db(), conf_hashes, milestone, "DB");
@@ -627,6 +672,11 @@ void Cache::write_xattr_keys()
 void Cache::write_providers()
 {
     write_db_file_direct(Config::instance().provides_db(), providers);
+}
+
+void Cache::write_provides_soname()
+{
+    write_db_file_direct(Config::instance().provides_soname_db(), provides_soname);
 }
 
 void Cache::write_db_file_direct(

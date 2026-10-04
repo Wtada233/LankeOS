@@ -8,7 +8,7 @@
     "libxcb-render.so.0",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libxcb-render-util.so",
     "libxcb-render-util.so.0"
   ],

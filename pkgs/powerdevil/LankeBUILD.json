@@ -41,7 +41,7 @@
     "libwayland-client.so.0",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libpowerdevilcore.so",
     "libpowerdevilcore.so.2"
   ],

@@ -26,7 +26,7 @@
     "libstdc++.so.6",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6Designer.so",
     "libQt6Designer.so.6",
     "libQt6DesignerComponents.so",

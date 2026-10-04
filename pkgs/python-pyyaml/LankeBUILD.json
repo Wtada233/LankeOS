@@ -9,7 +9,7 @@
     "libc.so.6",
     "libyaml-0.so.2"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "python-build",

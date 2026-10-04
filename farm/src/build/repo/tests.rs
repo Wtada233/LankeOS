@@ -59,7 +59,8 @@ fn repack_if_drift_errors_when_metadata_missing() {
     let outcome = BuildOutcome {
         ok: true,
         needed_so: vec![],
-        provides: vec!["liba.so.1".into()],
+        provides: vec![],
+        provides_soname: vec!["liba.so.1".into()],
         deps: vec![],
         failure_stage: None,
         lpkg_path: Some(lpkg),
@@ -85,15 +86,69 @@ fn update_repo_index_writes_deps() {
         "1.0",
         "hash123",
         &["glibc>=2.34".to_string(), "bash".to_string()],
+        &["virtualcap".to_string()],
         &["libmypkg.so.1".to_string()],
         &["libc.so.6".to_string()],
     )
     .unwrap();
 
     let content = fs::read_to_string(arch_dir.join("index.txt")).unwrap();
+    // 新格式：6 冒号字段 + 3 个 `|` 段（虚拟 provides 与 provides_soname 各占一列）
     assert!(
-        content.contains("mypkg|1.0:hash123:glibc>=2.34,bash:libmypkg.so.1:libc.so.6|"),
-        "index.txt 应包含转述的 deps: {content}"
+        content.contains("mypkg|1.0:hash123:glibc>=2.34,bash:virtualcap:libmypkg.so.1:libc.so.6|"),
+        "index.txt 应包含新格式行（deps/provides/provides_soname/needed_so）: {content}"
     );
+    // 写侧产出的行必须能被读侧吃回（往返）
+    let idx = crate::graph::Index::parse(&content);
+    let p = &idx.packages["mypkg"];
+    assert_eq!(p.deps, vec!["glibc>=2.34", "bash"]);
+    assert_eq!(p.provides, vec!["virtualcap"]);
+    assert_eq!(p.provides_soname, vec!["libmypkg.so.1"]);
+    assert_eq!(p.needed_so, vec!["libc.so.6"]);
     fs::remove_dir_all(&out).ok();
+}
+
+/// **行为变更的钉子**：元数据双写只更新 needed_so/provides_soname，**绝不触碰手写的虚拟
+/// provides**（旧实现把扫描结果直接盖上去，真实仓库 100% 的虚拟 provider 因此永久丢失）。
+#[test]
+fn update_lankebuild_metadata_preserves_handwritten_provides() {
+    let dir = std::env::temp_dir().join(format!("farm-lb-preserve-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&dir);
+    let pkg_dir = dir.join("p");
+    fs::create_dir_all(&pkg_dir).unwrap();
+    fs::write(
+        pkg_dir.join("LankeBUILD.json"),
+        r#"{"name":"p","version":"1.0","provides":["virtualcap"],"provides_soname":[],"needed_so":[]}"#,
+    )
+    .unwrap();
+
+    let outcome = BuildOutcome {
+        ok: true,
+        needed_so: vec!["libc.so.6".into(), "libm.so.6".into()],
+        provides: vec!["virtualcap".into()],
+        provides_soname: vec!["libp.so.1".into()],
+        deps: vec![],
+        failure_stage: None,
+        lpkg_path: None,
+    };
+    update_lankebuild_metadata(&dir, "p", &outcome);
+
+    let v: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(pkg_dir.join("LankeBUILD.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        v["provides"],
+        serde_json::json!(["virtualcap"]),
+        "手写虚拟 provides 不得被扫描结果覆盖"
+    );
+    assert_eq!(
+        v["provides_soname"],
+        serde_json::json!(["libp.so.1"]),
+        "provides_soname 应写为扫描实际值"
+    );
+    assert_eq!(
+        v["needed_so"],
+        serde_json::json!(["libc.so.6", "libm.so.6"])
+    );
+    fs::remove_dir_all(&dir).ok();
 }

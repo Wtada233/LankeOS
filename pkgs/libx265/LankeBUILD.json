@@ -10,7 +10,7 @@
     "libmvec.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libx265.so",
     "libx265.so.216"
   ],

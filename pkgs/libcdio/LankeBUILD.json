@@ -10,7 +10,7 @@
     "libncursesw.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libcdio++.so",
     "libcdio++.so.2",
     "libcdio.so",

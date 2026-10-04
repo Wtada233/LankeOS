@@ -1,0 +1,7 @@
+BEGIN_PKGS
+RESTORE_FILE /usr/bin/foo
+RESTORE_DB /var/lpkg/files.db
+RESTORE_DIR /usr/share/foo
+RESTORE_FILE_RM /usr/share/foo.lpkgnew
+RESTORE_DIRSTATE /usr/share/foo 1777 0 0
+CLEANUP /usr/bin/foo.lpkg_bak_mypkg

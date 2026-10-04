@@ -12,7 +12,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6TextToSpeech.so",
     "libQt6TextToSpeech.so.6"
   ],

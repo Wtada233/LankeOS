@@ -43,7 +43,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libEGL_mesa.so",
     "libEGL_mesa.so.0",
     "libGLX_mesa.so",

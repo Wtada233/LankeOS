@@ -59,10 +59,12 @@ TEST_F(AtomicBatchTest, InstallChainOfThree)
 
 TEST_F(AtomicBatchTest, InstallWithProvides)
 {
-    std::string pLib = create_pkg("libProv", "1.0", {}, {"custom-lib.so.1", "custom-lib.so.2"});
+    // SONAME 走**第 5 个参数**（`provides_soname`）与 `provides_soname.db` —— 8.0.0 起
+    // `provides` 是纯虚拟 provider 空间，不登记 .so（见 CLAUDE.md 的 provides 拆分那一节）。
+    std::string pLib = create_pkg("libProv", "1.0", {}, {}, {"custom-lib.so.1", "custom-lib.so.2"});
     install_packages({pLib});
-    EXPECT_TRUE(Cache::instance().get_providers("custom-lib.so.1").contains("libProv"));
-    EXPECT_TRUE(Cache::instance().get_providers("custom-lib.so.2").contains("libProv"));
+    EXPECT_TRUE(Cache::instance().get_soname_providers("custom-lib.so.1").contains("libProv"));
+    EXPECT_TRUE(Cache::instance().get_soname_providers("custom-lib.so.2").contains("libProv"));
 }
 
 TEST_F(AtomicBatchTest, InstallVirtualProviderResolution)
@@ -148,7 +150,7 @@ protected:
 
 TEST_F(AtomicAutoremoveTest, AutoremoveCleansOrphans)
 {
-    std::string pMain = create_pkg("mainPkg", "1.0", {}, {}, {});
+    std::string pMain = create_pkg("mainPkg", "1.0", {}, {}, {}, {});
     install_packages({pMain});
 
     std::string pOrphan = create_pkg("orphan", "1.0");
@@ -194,7 +196,7 @@ TEST_F(AtomicReinstallBatchTest, ReinstallExistingPackage)
 
 TEST_F(AtomicBatchTest, FileOwnershipAfterInstall)
 {
-    std::string p = create_pkg("ownerCheck", "1.0", {}, {"libowner.so.1"});
+    std::string p = create_pkg("ownerCheck", "1.0", {}, {}, {"libowner.so.1"});
     install_packages({p});
 
     auto owners = Cache::instance().get_file_owners("/usr/bin/ownerCheck");

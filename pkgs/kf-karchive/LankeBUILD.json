@@ -13,7 +13,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Archive.so",
     "libKF6Archive.so.6"
   ],

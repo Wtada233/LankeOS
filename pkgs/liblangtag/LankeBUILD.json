@@ -9,7 +9,7 @@
     "libgobject-2.0.so.0",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "liblangtag-gobject.so",
     "liblangtag-gobject.so.0",
     "liblangtag.so",

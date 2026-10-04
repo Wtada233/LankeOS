@@ -9,7 +9,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libopenh264.so",
     "libopenh264.so.8"
   ],

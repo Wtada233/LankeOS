@@ -11,7 +11,7 @@
     "libcrypto.so.3",
     "libgmp.so.10"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "acl",
     "attr",

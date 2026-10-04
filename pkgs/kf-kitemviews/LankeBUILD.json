@@ -10,7 +10,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6ItemViews.so",
     "libKF6ItemViews.so.6"
   ],

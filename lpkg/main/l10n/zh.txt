@@ -133,7 +133,6 @@ error.unsafe_member_arrow=拒绝归档 {}：成员名含字面 " → "，会破�
 error.unsafe_member_control=拒绝归档 {}：成员名含控制字符（换行/回车/NUL/TAB），会伪造 WAL 行或破坏制表符分隔的数据库: {}
 error.unsafe_member_suffix=拒绝归档 {}：成员名使用了 lpkg 自用命名空间（后缀 .lpkgtmp/.lpkgnew/.lpkgsave，或 stash 前缀 .lpkg_bak_），会与 lpkg 自己的 rename/落位/清理撞名: {}
 error.unsafe_path_component=包元数据中的 {} 不安全（路径穿越？）: {}
-error.version_reserved_char=版本号 '{}' 非法：字符 '{}' 是 lpkg 的 libsolv 版本桥接保留字符（^ 分隔 +release、~ 是预发布标记、: 是 epoch）
 error.wal_fsync_failed=无法同步 WAL 事务日志: {}
 error.wal_open_failed=无法打开 WAL 事务日志: {}
 error.wal_write_failed=无法写入 WAL 事务日志: {}

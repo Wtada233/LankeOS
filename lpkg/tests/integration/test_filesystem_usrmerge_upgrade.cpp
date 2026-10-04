@@ -100,7 +100,7 @@ protected:
         }
 
         std::string pkg_path = (pkg_dir / (name + "-" + version + ".lpkg")).string();
-        pack_package(pkg_path, work_dir.string(), name, version, {}, {}, "man " + name, {});
+        pack_package(pkg_path, work_dir.string(), name, version, {}, {}, {}, "man " + name, {});
         fs::remove_all(work_dir);
         return pkg_path;
     }

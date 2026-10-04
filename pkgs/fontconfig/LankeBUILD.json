@@ -8,7 +8,7 @@
     "libfreetype.so.6",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libfontconfig.so",
     "libfontconfig.so.1"
   ],

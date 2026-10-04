@@ -280,7 +280,8 @@ BuildMetadata resolve_build_metadata(const fs::path& build_dir)
     // 计算有效版本号：如有 release 修订号，附加到版本号后
     std::string effective_version = cfg.version;
     if (cfg.release > 0) {
-        effective_version = cfg.version + "+" + std::to_string(cfg.release);
+        effective_version =
+            cfg.version + "-" + std::to_string(cfg.release);  // rpm 语义：release 用 `-`
     }
     log_info(string_format("info.building_package", cfg.name, effective_version));
 
@@ -547,7 +548,7 @@ void run_build(const fs::path& build_dir)
         log_info(get_string("info.packing_built_pkg"));
         const std::string output_filename = output_package_filename(cfg, meta.effective_version);
         pack_package(output_filename, build_dir.string(), cfg.name, meta.effective_version,
-                     cfg.deps, cfg.provides, cfg.man_content, cfg.needed_so);
+                     cfg.deps, cfg.provides, cfg.provides_soname, cfg.man_content, cfg.needed_so);
         log_info(string_format("info.build_success", output_filename));
     } catch (...) {
         // 异常路径也必须清理：否则 <dir>/build 下会残留 work/content/hooks 与已下载的源码

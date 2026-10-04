@@ -21,7 +21,7 @@ hero:
 
 features:
   - title: ↻ ABI 驱动的增量构建
-    details: 构建农场 lankefarm 从旧索引的 needed_so / provides 算出被移除的 SONAME，直连查出消费者包——不做树状闭包。libxml2 断裂只重建 llvm，llvm 的 ABI 未变则 rust 不动。重建集合恰好等于语义上必须重建的那一批。
+    details: 构建农场 lankefarm 从旧索引的 needed_so / provides_soname 算出被移除的 SONAME，直连查出消费者包——不做树状闭包。libxml2 断裂只重建 llvm，llvm 的 ABI 未变则 rust 不动。重建集合恰好等于语义上必须重建的那一批。
   - title: ⇄ ABI 过渡备份
     details: 某个库的 SONAME 变化时，旧 .so 被自动备份并注入每个构建容器，新旧 ABI 在整个重建期间并行存活。已安装的旧二进制不会因为一次库升级而断链。
   - title: ▲ 声明式上游版本追踪

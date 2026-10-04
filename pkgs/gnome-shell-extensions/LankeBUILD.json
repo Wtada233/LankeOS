@@ -6,7 +6,7 @@
     "gnome-shell"
   ],
   "needed_so": [],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "gnome-shell",

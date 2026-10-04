@@ -16,7 +16,7 @@
     "libncursesw.so.6",
     "libpanelw.so.6"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "alsa-lib",
     "base-devel",

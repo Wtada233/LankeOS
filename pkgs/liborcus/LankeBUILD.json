@@ -14,7 +14,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "liborcus-0.21.so",
     "liborcus-0.21.so.0",
     "liborcus-mso-0.21.so",

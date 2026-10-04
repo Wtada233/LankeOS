@@ -8,7 +8,7 @@
     "libgcc_s.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libhwy.so",
     "libhwy.so.1"
   ],

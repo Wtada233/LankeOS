@@ -14,7 +14,7 @@
     "libgobject-2.0.so.0",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libgdk_pixbuf-2.0.so",
     "libgdk_pixbuf-2.0.so.0"
   ],

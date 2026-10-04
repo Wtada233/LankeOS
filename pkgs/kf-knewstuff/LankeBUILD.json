@@ -29,7 +29,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6NewStuffCore.so",
     "libKF6NewStuffCore.so.6",
     "libKF6NewStuffWidgets.so",

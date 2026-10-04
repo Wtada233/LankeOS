@@ -10,7 +10,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libde265.so",
     "libde265.so.0"
   ],

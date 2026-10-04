@@ -7,7 +7,7 @@
     "libc.so.6",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libseat.so",
     "libseat.so.1"
   ],

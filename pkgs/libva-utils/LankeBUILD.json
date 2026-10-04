@@ -18,7 +18,7 @@
     "libva.so.2",
     "libwayland-client.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "libdrm",

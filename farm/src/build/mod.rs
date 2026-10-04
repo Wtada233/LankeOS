@@ -92,8 +92,12 @@ pub struct LankeBuild {
     pub release: Option<u32>,
     #[serde(default)]
     pub deps: Vec<String>,
+    /// 纯虚拟 provider（手写；farm 不扫不比、原样保留）。
     #[serde(default)]
     pub provides: Vec<String>,
+    /// 本包导出的 SONAME（farm ELF 扫描产物，与 needed_so 同源）。
+    #[serde(default)]
+    pub provides_soname: Vec<String>,
     #[serde(default)]
     pub needed_so: Vec<String>,
     #[serde(default)]
@@ -169,20 +173,20 @@ pub(crate) fn mark_build_ok(pkgs_dir: &Path, pkg: &str) -> std::io::Result<()> {
 
 /// abifix 修复清单：扫描 pkgs/ 的 LankeBUILD.json，返回 `needed_so` 引用「仓库 index 无任何
 /// 包提供」的 SONAME 的包及其缺失清单（`(pkg, missing)`）。自提供不算缺失（scan 语义——
-/// 包自身 SONAME 已从 needed_so 扣除）。判定以旧索引 `all_provided_capabilities` 为仓库能力
+/// 包自身 SONAME 已从 needed_so 扣除）。判定以旧索引 `all_provided_sonames` 为仓库能力
 /// 真源（与 scan 的 not-found 过滤 / ABI 传播同源）。
 ///
 /// 调用方（farm abifix）据此 bump release 后强制重建：重建时容器按当前仓库 provider 装依赖，
 /// 孤儿 needed_so 若不再链接则重扫后自动消失；若仍真需要则构建失败（BLOCKED）→ 提示先更新
 /// provider 配方（如 display-info 上游 soversion 变、下游还没跟上）。
 pub(crate) fn abifix_targets(pkgs_dir: &Path, old: &Index) -> Vec<(String, Vec<String>)> {
-    let provided = old.all_provided_capabilities();
+    let provided = old.all_provided_sonames();
     let mut out = Vec::new();
     for pkg in sorted_pkg_names(pkgs_dir) {
         let Some(b) = read_lankebuild(pkgs_dir, &pkg) else {
             continue;
         };
-        let own: HashSet<&str> = b.provides.iter().map(String::as_str).collect();
+        let own: HashSet<&str> = b.provides_soname.iter().map(String::as_str).collect();
         let missing: Vec<String> = b
             .needed_so
             .iter()
@@ -229,7 +233,7 @@ fn refresh_repo_provides(binding: &mut dyn LpkgBinding, out_dir: &Path, arch: &s
     let Some(idx) = repo::read_index(out_dir, arch) else {
         return;
     };
-    binding.set_repo_provides(idx.all_provided_capabilities());
+    binding.set_repo_provides(idx.all_provided_sonames());
 }
 
 /// 单包事务失败归类到的构建阶段（state.failure_stage 的稳定 token；operator/读端据此排查）。
@@ -313,7 +317,7 @@ fn build_plan(
     all_pkgs: &[String],
 ) -> (VecDeque<(String, bool)>, HashSet<String>) {
     // 2. 增量选择（用户规则）：effective_version 与本地 repo 旧索引一致的包跳过构建。
-    //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version+release（如 1.1+2）。
+    //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version-release（如 1.1-2）。
     //    validate 模式：选择改为"所有没有 `.build_ok` 标记的包"（成功构建才会写标记，
     //    跳过/blocked 不写 → 下次 validate 重试）。排序仍走同一 topo_order。
     let initial: Vec<String> = if opts.targets.is_empty() {
@@ -446,13 +450,13 @@ pub fn run_build(
     // 仓库全部提供能力 → binding 扫描 not-found 判定（needed_so 无 provider → 不进 needed_so）。
     // **这是活跃集，随每包 index 更新而刷新**（见 refresh_repo_provides）——否则同一次 run 里
     // 先构建包新加入的 SONAME 对后构建包不可见。
-    binding.set_repo_provides(old.all_provided_capabilities());
+    binding.set_repo_provides(old.all_provided_sonames());
     let revmap = RevMap::build(&old);
     // 声明式重建组（data/build/*.yaml）：不链但 ABI 敏感的包（python 生态等）。
     let groups = RebuildGroups::load(&opts.build_data_dir);
 
     // 2. 增量选择（用户规则）：effective_version 与本地 repo 旧索引一致的包跳过构建。
-    //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version+release（如 1.1+2）。
+    //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version-release（如 1.1-2）。
     //    validate 模式：选择改为"所有没有 `.build_ok` 标记的包"（成功构建才会写标记，
     //    跳过/blocked 不写 → 下次 validate 重试）。排序仍走同一 topo_order。
     let all_pkgs = sorted_pkg_names(&opts.pkgs_dir);
@@ -608,6 +612,7 @@ pub fn run_build(
             &hash,
             &outcome.deps,
             &outcome.provides,
+            &outcome.provides_soname,
             &outcome.needed_so,
         ) {
             eprintln!("{}", tr!("build.index_fail", pkg, e));
@@ -647,7 +652,7 @@ pub fn run_build(
         //     与旧索引不同时，按 version-change-script 判定（OLD_VER/NEW_VER，如 minor 变才重建），
         //     独立于 ABI 断裂——不再有"任何重建都触发"的 script_interpreter 回退（patch 升级会
         //     无谓拖垮整个组，已删）。
-        let removed = abi::removed_sonames(&old, &pkg, &outcome.provides);
+        let removed = abi::removed_sonames(&old, &pkg, &outcome.provides_soname);
         let group_trigger = !removed.is_empty();
         if !removed.is_empty() {
             report.abi_broken.push(pkg.clone());
@@ -695,6 +700,6 @@ pub fn run_build(
 }
 
 /// repack .lpkg 的 metadata.json + 双写 LankeBUILD.json（规则 2）。共用一次解包。
-/// 有效版本：LankeBUILD.json 的 version 是 raw；有 release 字段拼 version+release（如 1.1+2）。
+/// 有效版本：LankeBUILD.json 的 version 是 raw；有 release 字段拼 version-release（如 1.1-2）。
 #[cfg(test)]
 mod tests;

@@ -29,7 +29,7 @@
     "libsecret-1.so.0",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Wallet.so",
     "libKF6Wallet.so.6",
     "libKF6WalletBackend.so.6"

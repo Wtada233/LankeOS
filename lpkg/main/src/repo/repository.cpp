@@ -115,9 +115,11 @@ static PackageInfo make_package_info(const RepoIndexVersionBlock& b)
     pkg.name = b.name;
     pkg.version = b.version;
     pkg.sha256 = b.hash;
-    // b.deps 为空时 split_dep_field 会切出空片段，必须在调用前挡住（同 provides/needed_so）
+    // b.deps 为空时 split_dep_field 会切出空片段，必须在调用前挡住（同
+    // provides/provides_soname/needed_so）
     if (!b.deps.empty()) pkg.dependencies = detail::parse_dep_strings(split_dep_field(b.deps));
     pkg.provides = split_comma_list(b.provides);
+    pkg.provides_soname = split_comma_list(b.provides_soname);
     pkg.needed_so = split_comma_list(b.needed_so);
     return pkg;
 }
@@ -125,19 +127,25 @@ static PackageInfo make_package_info(const RepoIndexVersionBlock& b)
 /**
  * 吸收索引里的一行（该行的**全部**版本块）。
  *
- * 每块先记 providers_（provides —— 版本级优先，解析器已回退到包级），再把 PackageInfo
- * 追加进 packages_ 的该包版本列表。两处顺序与逐行内联时一致，不要调换。
+ * 每块先记两张提供者表（`provides` → `providers_`、`provides_soname` → `soname_providers_`），
+ * 再把 PackageInfo 追加进 packages_ 的该包版本列表。两处顺序与逐行内联时一致，不要调换。
  */
 void Repository::absorb_index_line(std::string_view line)
 {
     for (const auto& b : parse_repo_index_line(line)) {
-        // 记录提供者（provides）——版本级优先，解析器已回退到包级。
-        // 走 `split_comma_list`（与 make_package_info 同一清洗）：空 token 不能进 providers_，
+        // 走 `split_comma_list`（与 make_package_info 同一清洗）：空 token 不能进表，
         // 否则 `find_provider("")` / 依赖判定会拿到脏结果。
+        // **两个字段进两张表** —— 混进同一张就回到了 8.0.0 拆分前的串味。
         for (const auto& prov : split_comma_list(b.provides)) {
             auto& pv = providers_[prov];
             if (pv.empty() || pv.back() != b.name) {
                 pv.push_back(b.name);
+            }
+        }
+        for (const auto& so : split_comma_list(b.provides_soname)) {
+            auto& sv = soname_providers_[so];
+            if (sv.empty() || sv.back() != b.name) {
+                sv.push_back(b.name);
             }
         }
         // 先构造再索引（两步分开写，避免"索引表已被插入空壳、构造却抛了"这种副作用顺序差）
@@ -267,25 +275,77 @@ std::optional<PackageInfo> Repository::find_provider(const std::string& capabili
     return std::nullopt;
 }
 
+/**
+ * 与 `find_provider()` **逐字同构**，只把数据源从 `provides` 换成 `provides_soname`
+ * （以及对应的 `soname_providers_` 表）。两者**故意各写一份而不合并**：合并的写法必然要靠
+ * 一个参数选字段，而这两条查询在调用点上是**不同语义**（虚拟能力 vs SONAME），
+ * 一旦谁误用另一条，8.0.0 拆分想根除的串味就会从调用点重新长回来。
+ */
+std::optional<PackageInfo> Repository::find_soname_provider(const std::string& soname) const
+{
+    auto it = soname_providers_.find(soname);
+    if (it == soname_providers_.end() || it->second.empty()) return std::nullopt;
+    for (const auto& pkg_name : it->second) {
+        auto pit = packages_.find(pkg_name);
+        if (pit == packages_.end() || pit->second.empty()) continue;
+        for (auto rit = pit->second.rbegin(); rit != pit->second.rend(); ++rit) {
+            for (const auto& so : rit->provides_soname) {
+                if (so == soname) return *rit;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+void Repository::refresh_provider_map(ProviderMap& map, const std::string& pkg_name,
+                                      const std::vector<PackageInfo>& versions,
+                                      const std::vector<std::string> PackageInfo::* field)
+{
+    // 记录更新前该包（跨所有版本）对外提供的东西，用于计算受影响集合
+    std::set<std::string> affected;
+    for (const auto& pkg : versions) {
+        for (const auto& x : pkg.*field) affected.insert(x);
+    }
+
+    // a) 从所有候选列表中移除本包名
+    for (auto it = map.begin(); it != map.end();) {
+        auto& vec = it->second;
+        vec.erase(std::remove(vec.begin(), vec.end(), pkg_name), vec.end());
+        if (vec.empty()) {
+            it = map.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    // b) 重新加入本包当前提供的东西
+    for (const auto& pkg : versions) {
+        for (const auto& x : pkg.*field) {
+            auto& pv = map[x];
+            if (std::find(pv.begin(), pv.end(), pkg_name) == pv.end()) pv.push_back(pkg_name);
+        }
+    }
+    // c) 受影响键的候选按包名字典序排序 → 查询结果确定
+    for (const auto& x : affected) {
+        auto it = map.find(x);
+        if (it != map.end()) std::ranges::sort(it->second);
+    }
+}
+
 /** 更新（或新增）某包某版本的元数据 */
 void Repository::update_package_info(const std::string& name, const std::string& version,
                                      const std::vector<DependencyInfo>& deps,
                                      const std::vector<std::string>& provides,
+                                     const std::vector<std::string>& provides_soname,
                                      const std::vector<std::string>& needed_so)
 {
     auto& versions = packages_[name];
-
-    // 记录更新前该包（跨所有版本）提供的 capability，用于计算受影响集合
-    std::set<std::string> old_provs;
-    for (const auto& pkg : versions) {
-        for (const auto& p : pkg.provides) old_provs.insert(p);
-    }
 
     bool found = false;
     for (auto& pkg : versions) {
         if (pkg.version == version) {
             pkg.dependencies = deps;
             pkg.provides = provides;
+            pkg.provides_soname = provides_soname;
             pkg.needed_so = needed_so;
             found = true;
             break;
@@ -297,6 +357,7 @@ void Repository::update_package_info(const std::string& name, const std::string&
         pkg.version = version;
         pkg.dependencies = deps;
         pkg.provides = provides;
+        pkg.provides_soname = provides_soname;
         pkg.needed_so = needed_so;
         versions.push_back(std::move(pkg));
         std::ranges::sort(versions, [](const PackageInfo& a, const PackageInfo& b) {
@@ -304,39 +365,9 @@ void Repository::update_package_info(const std::string& name, const std::string&
         });
     }
 
-    // 增量更新 providers_：只处理本包，不再整表重建。整表重建遍历 unordered_map
-    // 的 packages_（迭代顺序不确定），会破坏 find_provider 返回的"第一个提供者"
-    // 的确定性。这里只移除本包名、按当前 provides 重新加入，并只对受影响
-    // capability 的候选列表按包名字典序排序，保证结果确定。
-    std::set<std::string> affected = old_provs;
-    for (const auto& pkg : versions) {
-        for (const auto& p : pkg.provides) affected.insert(p);
-    }
-
-    // a) 从所有 capability 的候选列表中移除本包名
-    for (auto it = providers_.begin(); it != providers_.end();) {
-        auto& vec = it->second;
-        vec.erase(std::remove(vec.begin(), vec.end(), name), vec.end());
-        if (vec.empty()) {
-            it = providers_.erase(it);
-        } else {
-            ++it;
-        }
-    }
-    // b) 重新加入本包当前提供的 capability
-    for (const auto& pkg : versions) {
-        for (const auto& prov : pkg.provides) {
-            auto& pv = providers_[prov];
-            if (std::find(pv.begin(), pv.end(), name) == pv.end()) {
-                pv.push_back(name);
-            }
-        }
-    }
-    // c) 受影响 capability 的候选按包名字典序排序 → find_provider 结果确定
-    for (const auto& cap : affected) {
-        auto it = providers_.find(cap);
-        if (it != providers_.end()) std::ranges::sort(it->second);
-    }
+    // 两张表各自增量重建 —— **共用同一份实现**（`refresh_provider_map`），只是选不同的字段。
+    refresh_provider_map(providers_, name, versions, &PackageInfo::provides);
+    refresh_provider_map(soname_providers_, name, versions, &PackageInfo::provides_soname);
 }
 
 /** 按包名查找最新版本 */

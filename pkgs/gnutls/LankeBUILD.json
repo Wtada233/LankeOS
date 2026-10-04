@@ -15,7 +15,7 @@
     "libstdc++.so.6",
     "libtasn1.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libgnutls.so",
     "libgnutls.so.30",
     "libgnutlsxx.so",

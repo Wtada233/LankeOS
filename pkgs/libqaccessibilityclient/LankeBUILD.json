@@ -10,7 +10,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libqaccessibilityclient-qt6.so",
     "libqaccessibilityclient-qt6.so.0"
   ],

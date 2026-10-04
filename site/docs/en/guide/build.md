@@ -73,9 +73,10 @@ pkgs/<package>/
   "sources": ["https://upstream.example.com/pkg-1.2.3.tar.gz"],
   "work_sources": [],
   "build_deps": ["base-devel"],
-  "needed_so": ["libc.so.6"],
-  "provides": ["libfoo.so.1"],
-  "deps": []
+  "deps": [],
+  "provides": [],
+  "provides_soname": ["libfoo.so.1"],
+  "needed_so": ["libc.so.6"]
 }
 ```
 
@@ -85,8 +86,9 @@ pkgs/<package>/
 | `work_sources` | Auxiliary sources (patches, data files, fonts — non-archive files) |
 | `build_deps` | **Build-time** dependencies, must be complete (the build container only installs `build_deps`). Includes `base-devel` as the anchor |
 | `deps` | **Runtime** dependencies. Normally empty — farm derives them from `needed_so`; only implicit dependencies invisible to ELF scanning (dlopen / QML / D-Bus) are written by hand |
-| `needed_so` / `provides` | Written automatically by farm after scanning the built ELF files — **do not edit manually** |
-| `release` | Packaging revision, bumped for in-distribution rebuilds (final version looks like `1.2.3+1`) |
+| `provides` | **Pure virtual providers** (unrelated to `.so`, e.g. `rustc`). **Hand-written**; farm never scans or overwrites it |
+| `provides_soname` / `needed_so` | Written automatically by farm after scanning the built ELF files — **do not edit manually** |
+| `release` | Packaging revision, bumped for in-distribution rebuilds (final version looks like `1.2.3-1` — rpm release, `-` not `+` since 8.0.0) |
 | `no_strip` | Skip ELF stripping (interpreters, compilers, `linux`, etc.) |
 
 ### LankeBUILD Script
@@ -176,7 +178,7 @@ sudo lankefarm build bash curl --image wtada233/lankeos:latest
 
 #### ABI-driven increments (what sets farm apart)
 
-After a package is rebuilt, if it no longer provides an old SONAME, farm computes the set of removed SONAMEs from the **old index's `needed_so`/`provides`** and rebuilds the packages that consume them directly — no transitive closure, so a `libxml2` break rebuilds `llvm` only, and if `llvm`'s ABI is unchanged afterwards `rust` stays put. Declarative rebuild groups in `data/build/*.yaml` cover packages that are ABI-sensitive without linking the library (the Python ecosystem; Qt private-API consumers are detected dynamically by a script that greps ELF version strings).
+After a package is rebuilt, if it no longer provides an old SONAME, farm computes the set of removed SONAMEs from the **old index's `needed_so`/`provides_soname`** and rebuilds the packages that consume them directly — no transitive closure, so a `libxml2` break rebuilds `llvm` only, and if `llvm`'s ABI is unchanged afterwards `rust` stays put. Declarative rebuild groups in `data/build/*.yaml` cover packages that are ABI-sensitive without linking the library (the Python ecosystem; Qt private-API consumers are detected dynamically by a script that greps ELF version strings).
 
 During the rebuild, removed `.so` files are backed up to `out/backups/` and restored plus `ldconfig`-ed inside every build container, so binaries that have not been rebuilt yet keep working through the transition; the backups are only cleaned up once the whole build finishes and nothing references them.
 

@@ -21,7 +21,7 @@
     "libstdc++.so.6",
     "libtag.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6FileMetaData.so",
     "libKF6FileMetaData.so.3"
   ],

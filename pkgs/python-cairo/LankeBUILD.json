@@ -9,7 +9,7 @@
     "libc.so.6",
     "libcairo.so.2"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "cairo",

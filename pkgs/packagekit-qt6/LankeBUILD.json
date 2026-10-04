@@ -10,7 +10,7 @@
     "libgcc_s.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libpackagekitqt6.so",
     "libpackagekitqt6.so.2"
   ],

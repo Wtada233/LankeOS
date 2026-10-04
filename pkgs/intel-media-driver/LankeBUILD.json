@@ -11,7 +11,7 @@
     "libstdc++.so.6",
     "libva.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libigfxcmrt.so",
     "libigfxcmrt.so.7"
   ],

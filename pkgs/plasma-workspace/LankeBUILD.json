@@ -133,7 +133,7 @@
     "libxcb.so.1",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libbatterycontrol.so",
     "libbatterycontrol.so.6",
     "libkfontinst.so",

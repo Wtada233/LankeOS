@@ -78,7 +78,7 @@ deps-check:
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 7.2.0
+VERSION ?= 8.0.0
 
 BUILD_DIR = build
 MAIN_DIR = main
@@ -374,8 +374,15 @@ FUZZ_FLAGS ?= -fsanitize=fuzzer,address,undefined -fno-omit-frame-pointer -g -O1
 # 默认限时，保证 `make fuzz` 会结束；要长跑：`make fuzz FUZZ_TIME_ELF=600`
 FUZZ_TIME_ELF ?= 60
 FUZZ_TIME_ARCHIVE ?= 60
+# 文本形态的解析器（WAL 行 / 依赖串 / 索引行 / DB 行 / 求解器差分 / soname 目录）：
+# 单轮成本低但 harness 数量多，给它们各自的时限，免得默认 `make fuzz` 被拉长。
+FUZZ_TIME_TEXT ?= 30
 FUZZ_ONLY ?=
-FUZZ_NAMES = elf_strip_fuzz archive_name_fuzz strip_archive_fuzz vercmp_fuzz elf_soname_fuzz
+# ⚠️ 这里**没有**"harness 清单"这种变量，加 harness 也**不需要**改 Makefile：
+# 构建目标由 `$(wildcard $(FUZZ_DIR)/*.cpp)`（见下面的 FUZZ_OBJS）与 run.sh 里
+# 从 `tests/fuzz/*_fuzz.cpp` 推导的那行共同决定。曾经这里有个 `FUZZ_NAMES = ...`
+# 常量，**全文件零引用**、而且只列了当时那 5 个 —— 名字看起来像"清单"，加 harness 的人
+# 会以为必须改它（2026-10-04 删，与 `constants::TAB` 同类的死代码）。
 
 # ⚠️ harness 的 `.o` **必须**也纳入头依赖追踪。它们走的是通用的
 # `$(BUILD_DIR)/tests/%.o` 规则，而 `TEST_SRCS`（:162）只收 `tests/main.cpp` + `unit/` +
@@ -405,11 +412,16 @@ fuzz: docker-env
 	   -e FUZZ_FLAGS='$(FUZZ_FLAGS)' \
 	   -e FUZZ_TIME_ELF='$(FUZZ_TIME_ELF)' \
 	   -e FUZZ_TIME_ARCHIVE='$(FUZZ_TIME_ARCHIVE)' \
+	   -e FUZZ_TIME_TEXT='$(FUZZ_TIME_TEXT)' \
 	   -e FUZZ_ONLY='$(FUZZ_ONLY)' \
 	   $(DOCKER_ENV_CONTAINER) sh $(FUZZ_DIR)/run.sh; rc=$$?; \
 	 $(MAKE) fuzz-collect; exit $$rc
 
 fuzz-collect:
+	@# **先清空宿主的产物目录**（2026-10-04 加）：`docker cp` 是整目录覆盖式拷贝，不清的话
+	@# 上一轮留在宿主的旧样本会混在本轮里 —— 下面那句"有崩溃样本"就会**被旧文件误报**，
+	@# 而且没人分得清哪个 reproducer 属于哪一轮。容器侧另有一份清理（见 tests/fuzz/run.sh）。
+	@rm -rf $(FUZZ_ARTIFACTS_DIR)
 	@mkdir -p $(FUZZ_ARTIFACTS_DIR)
 	@docker cp $(DOCKER_ENV_CONTAINER):/app/$(FUZZ_ARTIFACTS_DIR)/. $(FUZZ_ARTIFACTS_DIR)/ 2>/dev/null || true
 	@if ls $(FUZZ_ARTIFACTS_DIR)/* >/dev/null 2>&1; then \

@@ -13,7 +13,7 @@
     "liblzma.so.5",
     "libtasn1.so.6"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "freetype",

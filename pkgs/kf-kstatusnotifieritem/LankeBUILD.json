@@ -12,7 +12,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6StatusNotifierItem.so",
     "libKF6StatusNotifierItem.so.6"
   ],

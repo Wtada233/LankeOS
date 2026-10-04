@@ -15,7 +15,7 @@
     "libxml2.so.16",
     "libxslt.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6DocTools.so",
     "libKF6DocTools.so.6"
   ],

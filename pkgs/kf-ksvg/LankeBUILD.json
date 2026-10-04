@@ -19,7 +19,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Svg.so",
     "libKF6Svg.so.6"
   ],

@@ -14,7 +14,7 @@
     "libssl.so.3",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libqca-qt6.so",
     "libqca-qt6.so.2"
   ],

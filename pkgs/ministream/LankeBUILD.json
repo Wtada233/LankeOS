@@ -8,7 +8,7 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libministream.so",
     "libministream.so.1"
   ],

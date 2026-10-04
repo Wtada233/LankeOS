@@ -7,7 +7,7 @@
     "libc.so.6",
     "libpciaccess.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libdrm.so",
     "libdrm.so.2",
     "libdrm_amdgpu.so",

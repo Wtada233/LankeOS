@@ -11,7 +11,7 @@
     "libxml2.so.16",
     "libxslt.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libraptor2.so",
     "libraptor2.so.0"
   ],

@@ -67,7 +67,7 @@ protected:
                                 " " + src.string() + " 2>/dev/null";
         if (std::system(cmd.c_str()) != 0 || !fs::exists(out)) return false;
         pack_package((pkg_dir / (name + "-" + pkg_ver + ".lpkg")).string(), work.string(), name,
-                     pkg_ver, {}, {}, "", {});
+                     pkg_ver, {}, {}, {}, "", {});
         return true;
     }
 };

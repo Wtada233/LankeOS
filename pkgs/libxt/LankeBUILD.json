@@ -11,7 +11,7 @@
     "libX11.so.6",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libXt.so",
     "libXt.so.6"
   ],

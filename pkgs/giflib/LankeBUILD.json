@@ -7,7 +7,7 @@
     "libc.so.6",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libgif.so",
     "libgif.so.7"
   ],

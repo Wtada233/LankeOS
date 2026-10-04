@@ -87,6 +87,7 @@ protected:
     std::string create_pkg(const std::string& name, const std::string& ver,
                            const std::vector<std::string>& deps = {},
                            const std::vector<std::string>& provides = {},
+                           const std::vector<std::string>& provides_soname = {},
                            bool with_postinst = false)
     {
         const fs::path work = suite_work_dir / ("_pkg_" + name + "-" + ver);
@@ -102,7 +103,8 @@ protected:
                 << "#!/bin/sh\ntrue\n";
         }
         const std::string path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
-        pack_package(path, work.string(), name, ver, deps, provides, "man " + name, {});
+        pack_package(path, work.string(), name, ver, deps, provides, provides_soname, "man " + name,
+                     {});
         fs::remove_all(work);
         return path;
     }
@@ -115,14 +117,15 @@ protected:
     }
 
     /** 索引行：`name|ver:hash:deps:provides:needed_so;ver2:…|` */
-    void update_index(
-        const std::vector<std::tuple<std::string, std::string, std::string, std::string>>& entries)
+    void update_index(const std::vector<std::tuple<std::string, std::string, std::string,
+                                                   std::string, std::string>>& entries)
     {
         std::ofstream index(mirror_dir / "index.txt");
-        for (const auto& [name, ver, deps, provides] : entries) {
+        for (const auto& [name, ver, deps, provides, provides_soname] : entries) {
             const fs::path p = pkg_dir / (std::format("{}-{}.lpkg", name, ver));
             const std::string hash = fs::exists(p) ? calculate_sha256(p) : "unknown";
-            index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":|\n";
+            index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
+                  << provides_soname << ":|\n";
         }
     }
 
@@ -158,11 +161,11 @@ protected:
 
 TEST_F(PhaseSectionTest, SectionsAppearInOrderAndOneSummaryAtTheEnd)
 {
-    create_pkg("ps_lib", "1.0", {}, {"libps.so.1"});
+    create_pkg("ps_lib", "1.0", {}, {}, {"libps.so.1"});
     create_pkg("ps_app", "1.0", {"ps_lib"}, {});
     add_to_mirror("ps_lib", "1.0");
     add_to_mirror("ps_app", "1.0");
-    update_index({{"ps_lib", "1.0", "", "libps.so.1"}, {"ps_app", "1.0", "ps_lib", ""}});
+    update_index({{"ps_lib", "1.0", "", "", "libps.so.1"}, {"ps_app", "1.0", "ps_lib", "", ""}});
 
     CaptureOut cap;
     ASSERT_NO_THROW(install_packages({"ps_app"}));
@@ -197,7 +200,7 @@ TEST_F(PhaseSectionTest, PostInstallSectionOnlyWhenAPackageShipsOne)
     // ② 不带 hooks 的包：**不出**"运行安装后钩子"这一节
     create_pkg("ps_nohook", "1.0");
     add_to_mirror("ps_nohook", "1.0");
-    update_index({{"ps_nohook", "1.0", "", ""}});
+    update_index({{"ps_nohook", "1.0", "", "", ""}});
 
     CaptureOut cap1;
     ASSERT_NO_THROW(install_packages({"ps_nohook"}));
@@ -207,9 +210,9 @@ TEST_F(PhaseSectionTest, PostInstallSectionOnlyWhenAPackageShipsOne)
         << cap1.out;
 
     // 带 postinst 的包：出现该阶段，且钩子行落在它之后
-    create_pkg("ps_hook", "1.0", {}, {}, /*with_postinst=*/true);
+    create_pkg("ps_hook", "1.0", {}, {}, {}, /*with_postinst=*/true);
     add_to_mirror("ps_hook", "1.0");
-    update_index({{"ps_nohook", "1.0", "", ""}, {"ps_hook", "1.0", "", ""}});
+    update_index({{"ps_nohook", "1.0", "", "", ""}, {"ps_hook", "1.0", "", "", ""}});
 
     CaptureOut cap2;
     ASSERT_NO_THROW(install_packages({"ps_hook"}));
@@ -228,7 +231,8 @@ TEST_F(PhaseSectionTest, MetadataMismatchAbortsBeforeTheTransactionStarts)
     create_pkg("ps_drift", "1.0", {"ps_dep"});
     add_to_mirror("ps_dep", "1.0");
     add_to_mirror("ps_drift", "1.0");
-    update_index({{"ps_dep", "1.0", "", ""}, {"ps_drift", "1.0", "", ""}});  // deps 故意写空
+    update_index(
+        {{"ps_dep", "1.0", "", "", ""}, {"ps_drift", "1.0", "", "", ""}});  // deps 故意写空
 
     bool began = false;
     BreakpointManager::instance().set("install_after_begin_ps_drift", [&] { began = true; });

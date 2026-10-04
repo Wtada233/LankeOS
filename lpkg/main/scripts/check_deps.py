@@ -91,7 +91,9 @@ def main():
             'version': meta.get('version', '?'),
             'deps': set(meta.get('deps', []) or []),
             'needed_so': set(meta.get('needed_so', []) or []),
+            # 8.0.0 拆分：SONAME 提供者看 **provides_soname**（provides 是虚拟 provider）
             'provides': set(meta.get('provides', []) or []),
+            'provides_soname': set(meta.get('provides_soname', []) or []),
         }
 
     all_names = set(packages.keys())
@@ -139,7 +141,7 @@ def main():
     for name, info in packages.items():
         if 'error' in info:
             continue
-        for p in info['provides']:
+        for p in info['provides_soname']:
             pmap.setdefault(p, set()).add(name)
 
     missing_so = []

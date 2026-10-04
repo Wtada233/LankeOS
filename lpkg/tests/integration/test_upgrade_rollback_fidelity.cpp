@@ -193,7 +193,7 @@ protected:
         fill(work / "content");
         const std::string path = (pkg_dir / (name + "-" + ver + "-" + tag + ".lpkg")).string();
         // man 内容对 v1/v2 相同 → 不进 fast 快照的差异集，避免噪音
-        pack_package(path, work.string(), name, ver, deps, provides, "man " + name, needed_so);
+        pack_package(path, work.string(), name, ver, deps, provides, {}, "man " + name, needed_so);
         return path;
     }
 

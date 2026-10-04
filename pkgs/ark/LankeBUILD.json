@@ -38,7 +38,7 @@
     "libgcc_s.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libkerfuffle.so.26"
   ],
   "build_deps": [

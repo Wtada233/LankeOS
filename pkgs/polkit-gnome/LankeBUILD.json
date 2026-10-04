@@ -12,7 +12,7 @@
     "libpolkit-agent-1.so.0",
     "libpolkit-gobject-1.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "gtk3",

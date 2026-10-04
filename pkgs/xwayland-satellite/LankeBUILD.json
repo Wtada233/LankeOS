@@ -13,7 +13,7 @@
     "libxcb-cursor.so.0",
     "libxcb.so.1"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "libxcb",

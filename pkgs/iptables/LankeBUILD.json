@@ -13,7 +13,7 @@
     "libnftnl.so.11",
     "libpcap.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libip4tc.so",
     "libip4tc.so.2",
     "libip6tc.so",

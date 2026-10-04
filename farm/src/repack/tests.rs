@@ -15,7 +15,7 @@ fn make_fake_lpkg() -> (PathBuf, PathBuf) {
     fs::create_dir_all(src.join("content")).unwrap();
     fs::write(
             src.join("metadata.json"),
-            r#"{"name":"fake","version":"1.0","needed_so":["libc.so.6"],"provides":["libfoo.so","libfoo.so.1"]}"#,
+            r#"{"name":"fake","version":"1.0","needed_so":["libc.so.6"],"provides":["virtualcap"],"provides_soname":["libfoo.so","libfoo.so.1"]}"#,
         )
         .unwrap();
     fs::write(
@@ -51,7 +51,13 @@ fn repack_updates_metadata_and_roundtrips() {
     let meta = crate::scan::read_metadata_json(&extract.join("metadata.json")).unwrap();
     assert_eq!(meta["name"], "fake");
     assert_eq!(meta["needed_so"][1], "libm.so.6");
-    assert_eq!(meta["provides"][1], "libfoo.so.1");
+    assert_eq!(meta["provides_soname"][1], "libfoo.so.1");
+    // **关键行为**：虚拟 provides 是手写值，repack 绝不覆盖（这就是"虚拟 provider 存不下来"的修复）
+    assert_eq!(
+        meta["provides"],
+        serde_json::json!(["virtualcap"]),
+        "repack 不得触碰虚拟 provides"
+    );
 
     // 重打的 .lpkg 仍可解包（round-trip 完整），扫描出的 name/version 正确
     let scan = crate::scan::scan_lpkg(&lpkg, &extract, &Default::default()).unwrap();

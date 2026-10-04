@@ -9,7 +9,7 @@
     "libmpfr.so.6",
     "libraptor2.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "librasqal.so",
     "librasqal.so.3"
   ],

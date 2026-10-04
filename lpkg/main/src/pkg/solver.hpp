@@ -44,8 +44,9 @@ struct SolveOptions {
 struct InstalledPkg {
     std::string version;
     std::vector<DependencyInfo> deps;
-    std::vector<std::string> needed_so;
-    std::vector<std::string> provides;
+    std::vector<std::string> provides;         // 虚拟 provider
+    std::vector<std::string> provides_soname;  // 导出的 SONAME
+    std::vector<std::string> needed_so;        // 需要的 SONAME
 };
 
 /// 用 libsolv 求解安装/升级/重装计划。

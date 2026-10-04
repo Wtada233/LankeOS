@@ -1,0 +1,2 @@
+S sub /tmp/lpkgfuzz-canary
+L libevil.so.1.0 sub/EVIL.so

@@ -15,7 +15,7 @@
     "libgcc_s.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libQCoro6Core.so",
     "libQCoro6Core.so.0",
     "libQCoro6DBus.so",

@@ -39,10 +39,12 @@ void expect_refused_naming(const fs::path& meta_dir, const char* field)
     std::string version;
     std::vector<std::string> deps;
     std::vector<std::string> provides;
+    std::vector<std::string> provides_soname;
     std::vector<std::string> needed_so;
     std::string man;
     try {
-        detail::read_package_metadata(meta_dir, name, version, deps, provides, needed_so, man);
+        detail::read_package_metadata(meta_dir, name, version, deps, provides, provides_soname,
+                                      needed_so, man);
         FAIL() << "含控制字符的 " << field << " 必须被拒：" << meta_dir;
     } catch (const LpkgException& e) {
         const std::string msg = e.what();
@@ -98,9 +100,9 @@ TEST_F(MetadataTokenSafetyTest, CommaInDependencyStringIsStillAccepted)
         suite_work_dir / "meta_comma",
         {{"name", "tokencomma"}, {"version", "1.0"}, {"deps", {"cmake >= 3.20, < 4.0"}}});
     std::string name, version, man;
-    std::vector<std::string> deps, provides, needed_so;
-    ASSERT_NO_THROW(
-        detail::read_package_metadata(d, name, version, deps, provides, needed_so, man));
+    std::vector<std::string> deps, provides, provides_soname, needed_so;
+    ASSERT_NO_THROW(detail::read_package_metadata(d, name, version, deps, provides, provides_soname,
+                                                  needed_so, man));
     ASSERT_EQ(deps.size(), 1u);
     EXPECT_EQ(deps[0], "cmake >= 3.20, < 4.0");
 }
@@ -126,7 +128,7 @@ TEST_F(MetadataTokenSafetyTest, CleanPackageStillInstalls)
     // 对照：同样的 fixture、同样的路径，只是字段干净 → 必须装上。
     // 没有这一条，上面几条在"本地包根本装不上"时会一起假绿。
     // （`deps` 留空：沙箱里没有 `alpha` 的提供者，带上它会被求解器拒 —— 那是另一条判据。）
-    const std::string pkg = create_pkg("tokenclean", "1.0", {}, {}, {});
+    const std::string pkg = create_pkg("tokenclean", "1.0", {}, {}, {}, {});
     ASSERT_NO_THROW(install_packages({pkg}, "")) << "干净的包必须照常安装";
     EXPECT_TRUE(fs::exists(test_root / "usr/bin/tokenclean"));
 }

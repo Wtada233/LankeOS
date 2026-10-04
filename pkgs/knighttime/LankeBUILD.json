@@ -15,7 +15,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKNightTime.so",
     "libKNightTime.so.0"
   ],

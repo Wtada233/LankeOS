@@ -52,7 +52,8 @@ protected:
     std::string create_pkg(const std::string& name, const std::string& ver,
                            const std::vector<std::pair<std::string, std::string>>& files,
                            const std::vector<std::string>& deps = {},
-                           const std::vector<std::string>& provides = {})
+                           const std::vector<std::string>& provides = {},
+                           const std::vector<std::string>& provides_soname = {})
     {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name + "_" + ver);
         fs::remove_all(work_dir);
@@ -69,7 +70,8 @@ protected:
         std::string pkg_name = name + "-" + ver + ".lpkg";
         std::string pkg_path = (pkg_dir / pkg_name).string();
 
-        pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, "man " + name);
+        pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, provides_soname,
+                     "man " + name);
 
         fs::remove_all(work_dir);
         return pkg_path;

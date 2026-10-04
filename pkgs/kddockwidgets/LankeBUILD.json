@@ -15,7 +15,7 @@
     "libspdlog.so.1.17",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libkddockwidgets-qt6.so",
     "libkddockwidgets-qt6.so.3"
   ],

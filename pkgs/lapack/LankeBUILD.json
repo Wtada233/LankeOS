@@ -10,7 +10,7 @@
     "libm.so.6",
     "libmvec.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libblas.so",
     "libblas.so.3",
     "libcblas.so",

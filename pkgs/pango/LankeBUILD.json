@@ -15,7 +15,7 @@
     "libharfbuzz.so.0",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libpango-1.0.so",
     "libpango-1.0.so.0",
     "libpangocairo-1.0.so",

@@ -18,7 +18,7 @@
     "libxcb-res.so.0",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6WindowSystem.so",
     "libKF6WindowSystem.so.6"
   ],

@@ -1,12 +1,11 @@
-//! scan.rs — 原生解包 .lpkg + ELF needed_so/provides 扫描（§6，Tier-0 输入）。
+//! scan.rs — 原生解包 .lpkg + ELF needed_so/provides_soname 扫描（§6，Tier-0 输入）。
 //!
-//! 替代 gen_deps.py 的 needed_so/provides 生成（**只这两部分**；deps 由 gen_deps/deprules
+//! 替代 gen_deps.py 的 needed_so/provides_soname 生成（**只这两部分**；deps 由 gen_deps/deprules
 //! 规则生成，farm 不扫）。语义对齐 gen_deps.py `scan_package`：
 //!
 //! - `needed_so` = 包内所有 ELF 的 DT_NEEDED（去路径取 basename）− 包自身 SONAME（自提供跳过，
 //!   如 firefox 捆绑 libnss3.so 不得依赖系统 nss 包）；
-//! - `provides`  = 系统标准库路径（`usr/lib`、`lib`、`usr/lib64`、`lib64`）下的 SONAME
-//!   + `.so` 文件名回退（老库不设 SONAME 但文件名就是 DT_NEEDED 目标）。
+//! - `provides_soname` = 系统标准库路径（`usr/lib`、`lib`、`usr/lib64`、`lib64`）下的 SONAME + `.so` 文件名回退（老库不设 SONAME 但文件名就是 DT_NEEDED 目标）；纯虚拟 provider 不在此列（它由人手写在 LankeBUILD.json，扫描不产出）。
 //!
 //! 扫描与 repack 共用一次解包（§6：单包单趟，避免二次解压）。扫描只读，不落库。
 
@@ -23,7 +22,7 @@ pub use crate::verify::ScanResult;
 
 /// 解包 .lpkg（zstd 压缩 PAX tar）到 `extract_dir`，然后扫描 content/。
 /// `extract_dir` 由调用方给出（确定性路径，非 /tmp——NOSUID，见 §6）。
-/// `repo_provides` = 仓库全部提供能力（SONAME/虚拟提供）：needed_so 条目不在其中 → 无 provider
+/// `repo_provides` = 仓库全部 **SONAME**（`provides_soname`）：needed_so 条目不在其中 → 无 provider
 /// → 判 not found → 不进 needed_so（如 perl 不提供 libperl.so，postgresql 的 plperl.so 链接它
 /// 但标准搜索无提供者，运行期靠 RPATH → 扫描无完整系统状态，不猜，直接 not-found 忽略）。
 pub fn scan_lpkg(
@@ -43,8 +42,8 @@ pub fn scan_lpkg(
                 .collect()
         })
         .unwrap_or_default();
-    let (needed_so, provides) = scan_content(&extract_dir.join("content"), repo_provides);
-    Ok(ScanResult::from_parts(needed_so, provides, deps).with_name(name, version))
+    let (needed_so, provides_soname) = scan_content(&extract_dir.join("content"), repo_provides);
+    Ok(ScanResult::from_parts(needed_so, provides_soname, deps).with_name(name, version))
 }
 
 /// 进程是否以 root 运行（farm 解包/重打包需读写 root 属主文件与 SUID，操作命令强制 root）。
@@ -123,7 +122,7 @@ pub fn read_lpkg_metadata(lpkg_path: &Path) -> Result<serde_json::Value, FarmErr
     Err(format!("{lpkg_path:?} 内无 metadata.json").into())
 }
 
-/// 遍历 content/，扫 ELF → (needed_so, provides)。
+/// 遍历 content/，扫 ELF → (needed_so, provides_soname)。
 fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<String>, Vec<String>) {
     let mut files: Vec<PathBuf> = Vec::new();
     collect_files(content_dir, &mut files);
@@ -135,7 +134,7 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
     let mut all_so_basenames: HashSet<String> = HashSet::new();
     // HashSet 去重：同一 SONAME 常被符号链接分支（文件名）和 ELF 分支（SONAME）各贡献一次，
     // 如 libmagic 的 usr/lib/libmagic.so.1 符号链接 + libmagic.so.1.0.0 的 SONAME。
-    let mut provides: HashSet<String> = HashSet::new();
+    let mut provides_soname: HashSet<String> = HashSet::new();
 
     for fpath in &files {
         if let Some(n) = fpath.file_name().and_then(|n| n.to_str()) {
@@ -158,7 +157,7 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
                 let resolved = resolved.canonicalize().unwrap_or(resolved);
                 if is_elf(&resolved) {
                     if let Some(n) = fpath.file_name().and_then(|n| n.to_str()) {
-                        provides.insert(n.to_string());
+                        provides_soname.insert(n.to_string());
                     }
                 }
             }
@@ -174,12 +173,12 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
         }
         let in_lib = in_system_lib_dir(fpath, content_dir);
         if !sonames.is_empty() && in_lib {
-            provides.extend(sonames);
+            provides_soname.extend(sonames);
         } else if in_lib {
             // 无 SONAME 回退：文件名本身是其他包的 DT_NEEDED 目标
             if let Some(n) = fpath.file_name().and_then(|n| n.to_str()) {
                 if n.contains(".so") {
-                    provides.insert(n.to_string());
+                    provides_soname.insert(n.to_string());
                 }
             }
         }
@@ -202,9 +201,9 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
         .cloned()
         .collect();
     needed_so.sort();
-    let mut provides: Vec<String> = provides.into_iter().collect();
-    provides.sort();
-    (needed_so, provides)
+    let mut provides_soname: Vec<String> = provides_soname.into_iter().collect();
+    provides_soname.sort();
+    (needed_so, provides_soname)
 }
 
 /// 递归收集叶子成员（含符号链接）到 `out`；只对**目录**递归。

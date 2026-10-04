@@ -1,0 +1,4 @@
+P libX 1.0 - libx.so.2 - -
+P libY 1.0 - libx.so.2 - -
+P appZ 1.0 - - libx.so.2 -
+T appZ

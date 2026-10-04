@@ -23,7 +23,7 @@
     "libxcb-xkb.so.1",
     "libxcb.so.1"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "extra-cmake-modules",

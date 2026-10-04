@@ -7,7 +7,7 @@
     "libc.so.6",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libnauty-2.9.3.so",
     "libnauty.so",
     "libnauty1-2.9.3.so",

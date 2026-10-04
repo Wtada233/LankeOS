@@ -12,7 +12,7 @@
     "libXrandr.so.2",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libXpresent.so",
     "libXpresent.so.1"
   ],

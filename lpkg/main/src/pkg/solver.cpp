@@ -35,64 +35,108 @@ namespace solv
 namespace
 {
 
-// lpkg 约束 op → libsolv REL 标志（REL_GT=1, REL_EQ=2, REL_LT=4；GE=EQ|GT, LE=EQ|LT）
-// 注：dep_parser 原样保留 "=="（lpkg 的 == 即精确等于），必须与 "=" 同样映射 REL_EQ，
-// 否则 "lib == 1.0" 落到 fallback 会变成"不等于"语义，装 2.0 反而满足。
-int rel_op(const std::string& op)
-{
-    if (op == ">=") return REL_EQ | REL_GT;
-    if (op == "<=") return REL_EQ | REL_LT;
-    if (op == ">") return REL_GT;
-    if (op == "<") return REL_LT;
-    if (op == "==" || op == "=") return REL_EQ;
-    if (op == "!=") return REL_GT | REL_LT;
-    // 未知 op 兜底——宽松处理避免误判冲突，比卡死更安全。
-    return REL_EQ | REL_GT | REL_LT;
-}
-
 // 判定依赖名是否为 SONAME（needed_so）：".so" 后紧跟数字/点或结尾。
-// 曾用 strstr(name, ".so") 的宽松判定——包名中间含 ".so" 子串（如 libfoo.so-dev）
-// 会被误判为 SONAME：collect_problems 会把缺失的该**命名依赖**送进 missing_so
-// （--missing-so-no-error 会静默容忍本应报错的依赖），order_by_dependencies 也会
-// 给它造一条 ABI 排序边。
-bool looks_like_soname(const char* name)
-{
-    const char* so = name ? strstr(name, ".so") : nullptr;
-    if (!so) return false;
-    const char after = so[3];
-    return after == '\0' || after == '.' || (after >= '0' && after <= '9');
-}
+//
+// ⚠️ **已删除（2026-10-04，维护者拍板）**：这里曾有一个**按字符串形状猜**的
+// `looks_like_soname()`。它存在的前提是"`deps` 与 `needed_so` 被压进同一个命名空间"
+// —— 于是拿到一个池里的 Id 时，代码**分不清**它来自哪个字段，只能猜形状。而这个启发式
+// **本来就不可靠**（它自己的旧注释就记着：`libfoo.so-dev` 这类包名中间含 `.so` 会被误判，
+// 于是"缺失的命名依赖"被静默容忍、还多出一条 ABI 排序边）。
+//
+// **类型信息在源头就有**：`needed_so` 与 `provides` 在 `index.txt` / `metadata.json` 里是
+// **两个独立字段**，从来不是"需要猜"的东西 —— 是池化时被压平才丢的。现在
+// `add_requires` 把 `needed_so` 的需求登记进 **`so:` 空间**（`POOL_SONAME_PREFIX`），
+// 类型随名字回来了：**带前缀 ⟺ 来自 `needed_so` 字段 ⟺ 按定义就是 SONAME**。
+// 所以三处判定全部换成下面这个**精确谓词**，形状猜测整个消失。
 
 /**
- * 把 libsolv **自己拼出来的字符串**解回 lpkg 版本域。
+ * 把 libsolv **自己拼出来的字符串**处理成用户能看的形态。
  *
- * 为什么需要（2026-10-03，实测的泄漏）：`solver_ruleinfo2str()`（以及它内部用的
- * `pool_solvid2str` / `pool_dep2str`）打印的是池里的 **EVR 原样**，也就是我们的编码串。
- * 直接打给用户等于把内部编码暴露出去 —— 而真实索引 861 个版本里 **807 个带 `+`**，
- * 于是几乎每条冲突消息都长这样：
- *     `cannot install both lib-2.0^^1 and lib-1.0^^1`
- * 用户拿它既 grep 不到仓库里的版本，也对应不回"到底哪两个版本冲突了"。
- * （`1.0-rc1` 这类预发布更早就显示成 `1.0~rc1`。）
- *
- * 替换是**安全**的：`^` / `~` / `:` 都是版本域保留字符（包名/版本里不许出现，
- * 见 `vercmp/version.hpp` 与 `is_safe_path_component`），所以消息里出现的它们只可能来自编码。
+ * ⚠️ **订正 2026-10-04（8.0.0）——本函数只剩一件事做。** 它此前还要把**编码过的 EVR**
+ * 解回 lpkg 版本域（`^^`→`+`、`~`→`-`），因为池里那份是桥的编码串，而用户拿编码串既
+ * grep 不到仓库里的版本、也对应不回"到底哪两个版本冲突了"（那时 861 个版本里 807 个带
+ * `+`，几乎每条冲突消息都长这样：`cannot install both lib-2.0^^1 and lib-1.0^^1`）。
+ * **桥拆掉之后版本串原样进池**，libsolv 打出来的就是 lpkg 自己的版本 ⇒ 那两步不但多余，
+ * 而且**有害**（`~` 现在是合法的预发布标记，再把它换成 `-` 会把版本改错）。
+ * 现在只剩"剥掉池里的内部前缀"。
  */
 std::string decode_libsolv_message(std::string msg)
 {
-    // `^^` → `+`（release 分隔符）；再把残余 `~` → `-`（预发布）。
-    // 顺序有讲究：先把两字符分隔符处理掉，再处理单字符，免得把 `^^` 拆坏。
-    for (std::size_t pos = msg.find(constants::EVR_RELEASE_SEP); pos != std::string::npos;
-         pos = msg.find(constants::EVR_RELEASE_SEP, pos))
-        msg.replace(pos, constants::EVR_RELEASE_SEP.size(), "+");
-    std::replace(msg.begin(), msg.end(), '~', '-');
+    // `so:` 是**SONAME 空间**的内部标记（见 constants::POOL_SONAME_PREFIX）：它会出现在
+    // libsolv 拼的规则描述里（`nothing provides so:libc.so.6 needed by …`），而用户该看到的
+    // 是裸的 SONAME。
+    //
+    // ⚠️ **订正 2026-10-04（8.0.0）**：这里此前还要把**编码过的 EVR** 解回 lpkg 版本域
+    // （`^^`→`+`、`~`→`-`），因为池里那份是编码串。桥拆掉之后版本串**原样进池**，
+    // libsolv 打出来的就是 lpkg 自己的版本 ⇒ 那两步不但多余，而且**有害**
+    // （`~` 现在是合法的预发布标记，再把它换成 `-` 会把版本改错）。
+    for (std::size_t pos = msg.find(constants::POOL_SONAME_PREFIX); pos != std::string::npos;
+         pos = msg.find(constants::POOL_SONAME_PREFIX, pos))
+        msg.erase(pos, constants::POOL_SONAME_PREFIX.size());
     return msg;
 }
 
+/**
+ * SONAME → 池里的 **`so:` 空间 Id**（见 `constants::POOL_SONAME_PREFIX`）。
+ *
+ * **凡是与 SONAME 打交道的地方都必须用这个入口**：`provides_soname` 的登记与 `needed_so` 的
+ * 需求。直接 `pool_str2id(pool, soname)` 拿到的是**包名/虚拟能力空间**里的 id ——
+ * 两个空间不通用，混用就会让 `needed_so: liba.so` 被一个**名叫 `liba.so` 的包**满足
+ * （8.0.0 拆分要根除的正是这个）。
+ */
+Id scoped_soname(Pool* pool, const std::string& soname)
+{
+    const std::string scoped = std::string(constants::POOL_SONAME_PREFIX) + soname;
+    return pool_str2id(pool, scoped.c_str(), 1);
+}
+
+/**
+ * 池里的名字 → lpkg 的裸名（剥掉 `constants::POOL_SONAME_PREFIX`）。
+ *
+ * 与 `scoped_soname()` 是**一对**：一个进池、一个出池，各只有这一处实现。
+ *
+ * ⚠️ **凡是把池里的 requires/provides 名字读回来**用于判定或拼消息的地方都必须过它 ——
+ * 否则 `so:` 会漏进用户可见的报错。**改编码就要连"所有读回它的地方"一起数。**
+ */
+std::string unscoped_soname(const char* pool_name)
+{
+    std::string s = pool_name ? pool_name : "";
+    const std::string_view prefix = constants::POOL_SONAME_PREFIX;
+    if (s.size() >= prefix.size() && std::string_view(s).substr(0, prefix.size()) == prefix)
+        s.erase(0, prefix.size());
+    return s;
+}
+
+/**
+ * 这个池里的需求名是不是**来自 `needed_so` 字段的那一类**（带 `constants::POOL_SONAME_PREFIX`）？
+ *
+ * **精确分类，不做任何形状猜测** —— 这就是取代 `looks_like_soname()` 的那个谓词。
+ * `so:` 前缀只由 `add_requires()` 的 `needed_so` 那一支产生，所以：
+ *   带 `so:` ⟺ 这条需求来自 `needed_so` ⟺ 它按定义就是一个 **SONAME**；
+ *   裸名 ⟺ 来自 `deps`（或 capability 型 target）⟺ **包名/虚拟能力语义**
+ *   （永远不是 SONAME，哪怕名字里有 `.so`）。
+ */
+bool is_soname_requirement(const char* pool_name)
+{
+    if (pool_name == nullptr) return false;
+    const std::string_view prefix = constants::POOL_SONAME_PREFIX;
+    const std::string_view name = pool_name;
+    return name.size() >= prefix.size() && name.substr(0, prefix.size()) == prefix;
+}
+
+/// 登记**虚拟 provider**（`provides` 字段）—— 裸名（无版本），与 `deps` 的裸需求同一个命名空间。
 void add_provides(Solvable* s, Pool* pool, const std::vector<std::string>& provides)
 {
     for (const auto& cap : provides) {
-        // 裸 provides（无版本）：直接 push 名字 id 即"提供 cap"（匹配任何 requires cap）
         solvable_add_deparray(s, SOLVABLE_PROVIDES, pool_str2id(pool, cap.c_str(), 1), 0);
+    }
+}
+
+/// 登记**导出的 SONAME**（`provides_soname` 字段）—— 走 `so:` 空间，只有 `needed_so` 需求认它。
+void add_provides_soname(Solvable* s, Pool* pool, const std::vector<std::string>& sonames)
+{
+    for (const auto& so : sonames) {
+        solvable_add_deparray(s, SOLVABLE_PROVIDES, scoped_soname(pool, so), 0);
     }
 }
 
@@ -100,22 +144,33 @@ void add_requires(Solvable* s, Pool* pool, const std::vector<DependencyInfo>& de
                   const std::vector<std::string>& needed_so)
 {
     for (const auto& dep : deps) {
-        Id nid = pool_str2id(pool, dep.name.c_str(), 1);
+        // `deps` 走**能力命名空间**（`cap:`）：于是它既能匹配**包名**（靠包的 `cap:<名> = evr`
+        // 自提供），也能匹配**虚拟 provides**（虚拟包语义）。
+        const Id nid = pool_str2id(pool, dep.name.c_str(), 1);
         if (dep.constraints.empty()) {
             solvable_add_deparray(s, SOLVABLE_REQUIRES, nid, 0);
         } else {
             // 复合约束（如 ">=2 <3"）→ 每个约束一个 requires（libsolv 全部满足 = AND）。
-            // 约束版本串归一化到 libsolv EVR（`-预发布`→`~`），否则 EVRCMP 会把 `-` 后当
-            // release 误判（如 `>= 1.0` 被 `1.0-rc1` 满足）。
+            // 版本串**原样**进池（8.0.0 起无编码）——`version_satisfies()` 那边走的是同一个
+            // libsolv EVR 比较，所以"求解器判的"与"安装期验的"不可能不一致。
+            //
+            // ⚠️ **订正 2026-10-04**：本行原写"约束版本串要归一化（`-预发布`→`~`），否则
+            // EVRCMP 会把 `-` 后当 release 误判（`>= 1.0` 被 `1.0-rc1` 满足）"。那**两半都不再
+            // 成立**：归一化已删；而 `1.0-rc1` 在 rpm 语义里就是"1.0 的 release rc1"，
+            // `>= 1.0` 匹配它**是正确语义**（未指定 release = 任何 release），不是误判。
             for (const auto& c : dep.constraints) {
-                Id evr = pool_str2id(pool, to_libsolv_evr(c.version).c_str(), 1);
+                Id evr = pool_str2id(pool, c.version.c_str(), 1);
                 solvable_add_deparray(s, SOLVABLE_REQUIRES,
-                                      pool_rel2id(pool, nid, evr, rel_op(c.op), 1), 0);
+                                      pool_rel2id(pool, nid, evr, version_op_flags(c.op), 1), 0);
             }
         }
     }
     for (const auto& soname : needed_so) {
-        solvable_add_deparray(s, SOLVABLE_REQUIRES, pool_str2id(pool, soname.c_str(), 1), 0);
+        // SONAME 需求走**独立的 `so:` 空间**：它只能被 `provides_soname`
+        // 满足（`add_provides_soname` 在那边登记），**包名永远进不来**。不加这层隔离时，`needed_so:
+        // o` 会被一个
+        // **名叫 `o` 的包**满足（靠它的自提供）—— 实测复现过。
+        solvable_add_deparray(s, SOLVABLE_REQUIRES, scoped_soname(pool, soname), 0);
     }
 }
 
@@ -151,27 +206,27 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
             SolverRuleinfo info = solver_ruleinfo(solv, rules.elements[ri], &from, &to, &dep);
             if (info == SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP ||
                 info == SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP) {
-                const char* dep_name = dep ? pool_id2str(pool, dep) : "";
-                if (dep_name && *dep_name) {
-                    // **先看 JOB/PKG，再看名字形状**：顶层请求（JOB）即使形似 SONAME
-                    // 也是"用户要的包/能力不存在"，必须硬报错；此前先判形状 → 形似 SONAME
-                    // 的顶层目标被归入可容忍的 missing_so，配 --missing-so-no-error 就
-                    // "求解成功但事务为空"（历史 TODO D5，落点已由 D3 的兜底拦住，但诊断仍是错的）
+                const char* raw_dep = dep ? pool_id2str(pool, dep) : nullptr;
+                const std::string dep_name = unscoped_soname(raw_dep);
+                if (!dep_name.empty()) {
+                    // **先看 JOB/PKG，再看它来自哪个字段**：顶层请求（JOB）是"用户要的包/能力
+                    // 不存在"，必须硬报错（此前先判形状 → 形似 SONAME 的顶层目标被归入可容忍的
+                    // missing_so，配 --missing-so-no-error 就"求解成功但事务为空"）。
                     if (info == SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP)
                         missing_target.emplace_back(dep_name);  // 直接请求的包/能力
-                    else if (looks_like_soname(dep_name))
-                        missing_so.emplace_back(dep_name);
+                    else if (is_soname_requirement(raw_dep))
+                        missing_so.emplace_back(dep_name);  // 来自 needed_so ⇒ 就是 SONAME
                     else
-                        missing_dep.emplace_back(dep_name);  // 传递依赖
+                        missing_dep.emplace_back(dep_name);  // 来自 deps ⇒ 包名依赖
                 }
             } else if (info == SOLVER_RULE_JOB_UNKNOWN_PACKAGE) {
                 // 请求的包不存在 → 真错误（走 l10n）。**必须点名包**：libsolv 的 job 规则里
                 // `dep` 就是 job 的选择 Id（包名）—— 不带名字的 "does not exist" 让人查不出
                 // 是哪个包。注：lpkg 的 job 全用真实 solvable / 名字 id 构造，这条分支当前
                 // **不可达**（纵深防御）；一旦 libsolv 改了规则分类，这里也要能定位。
-                const char* unknown = dep ? pool_id2str(pool, dep) : nullptr;
-                fatal.emplace_back(
-                    string_format("error.requested_package_not_exist", unknown ? unknown : "?"));
+                const std::string unknown = unscoped_soname(dep ? pool_id2str(pool, dep) : nullptr);
+                fatal.emplace_back(string_format("error.requested_package_not_exist",
+                                                 unknown.empty() ? "?" : unknown));
 
             } else if ((info & SOLVER_RULE_TYPEMASK) == SOLVER_RULE_PKG) {
                 // PKG 规则。判据用**类型掩码**：曾写成
@@ -182,8 +237,9 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                 // 若 dep 是 SONAME 且全池确无提供者 → libsolv 把它当冲突报
                 // （qt6-base requires libgbm.so.1 之类），归 soname_conflicts 供容忍；
                 // 否则才是真冲突（版本不符/CONFLICTS/SAME_NAME/OBSOLETES...）。
-                const char* dn = dep ? pool_id2str(pool, dep) : nullptr;
-                if (dn && looks_like_soname(dn)) {
+                const char* raw_dn = dep ? pool_id2str(pool, dep) : nullptr;
+                const std::string dn = unscoped_soname(raw_dn);
+                if (!dn.empty() && is_soname_requirement(raw_dn)) {
                     const Id* w = pool_whatprovides_ptr(pool, dep);
                     if (!w || !*w) {
                         soname_conflicts.emplace_back(dn);
@@ -197,8 +253,8 @@ void collect_problems(Solver* solv, Pool* pool, std::vector<std::string>& missin
                 // 所以它**没有对应用例 —— 这是有意的，不是漏测**。保留是纵深防御：
                 // `solver_ruleinfo2str` 的契约允许返回 NULL，直接解引用会崩。
                 const char* desc = solver_ruleinfo2str(solv, info, from, to, dep);
-                // `desc` 是 libsolv 拼的串，里面的 EVR 是**编码串**（`1.0^^1`）—— 它是用户
-                // 可见的冲突原因，必须先解回 lpkg 版本域（见 decode_libsolv_message）。
+                // `desc` 是 libsolv 拼的串。8.0.0 起池里的版本串**原样**就是 lpkg 版本，
+                // 所以只需剥掉内部前缀（见 decode_libsolv_message）。
                 fatal.emplace_back(desc ? decode_libsolv_message(desc)
                                         : get_string("info.solver_rule_conflict"));
             }
@@ -318,8 +374,10 @@ void order_by_dependencies(Pool* pool, const std::vector<Id>& sids, std::vector<
         for (Offset o = s->solv_requires; data[o]; ++o) {
             Id req = data[o];
             if (ISRELDEP(req)) continue;  // 带版本约束的命名依赖，不用于 ABI 排序
-            const char* rn = pool_id2str(pool, req);
-            if (!rn || !looks_like_soname(rn)) continue;  // 只保留 needed_so（SONAME）
+            // 只保留 `needed_so` 的边（= 能力需求）。**精确判据**：带前缀 ⟺ 来自该字段。
+            // 此前按名字形状猜（`looks_like_soname`），会把包名里含 `.so` 的**命名依赖**
+            // 也造一条 ABI 排序边。
+            if (!is_soname_requirement(pool_id2str(pool, req))) continue;
             Id* dp = pool_whatprovides_ptr(pool, req);
             for (; *dp; dp++) {
                 Solvable* prov = pool_id2solvable(pool, *dp);
@@ -386,12 +444,15 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
             Id sid = repo_add_solvable(ps.avail);
             Solvable* s = pool_id2solvable(ps.pool, sid);
             s->name = pool_str2id(ps.pool, pkg.name.c_str(), 1);
-            s->evr = pool_str2id(ps.pool, to_libsolv_evr(pkg.version).c_str(), 1);
-            // 自提供名字必须带版本（provides name = evr）——plain 无版本 provide 会被
-            // libsolv 视为满足任意版本 requires（"lib >= 2.0" 会被 lib 1.0 误满足）
+            s->evr = pool_str2id(ps.pool, pkg.version.c_str(), 1);
+            // 自提供必须**带版本**（`<名> = evr`）—— plain 无版本 provide 会被 libsolv
+            // 视为满足任意版本 requires（"lib >= 2.0" 会被 lib 1.0 误满足）。
+            // ⚠️ 名字走**能力命名空间**（`cap:<包名>`）：`deps` 的需求也在那一侧，于是
+            // "按包名依赖"照旧成立；而 `needed_so` 在 `so:` 那侧，包名**够不着**它。
             solvable_add_deparray(s, SOLVABLE_PROVIDES,
                                   pool_rel2id(ps.pool, s->name, s->evr, REL_EQ, 1), 0);
             add_provides(s, ps.pool, pkg.provides);
+            add_provides_soname(s, ps.pool, pkg.provides_soname);
             // --no-deps：不建模候选包的 requires → solver 不会拉依赖（只装目标自身）。
             // installed repo 的 requires 仍保留（"不破坏已装依赖"的一致性照旧）。
             if (!opts.no_deps) add_requires(s, ps.pool, pkg.dependencies, pkg.needed_so);
@@ -402,10 +463,11 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
         Id sid = repo_add_solvable(ps.avail);
         Solvable* s = pool_id2solvable(ps.pool, sid);
         s->name = pool_str2id(ps.pool, pkg.name.c_str(), 1);
-        s->evr = pool_str2id(ps.pool, to_libsolv_evr(pkg.version).c_str(), 1);
+        s->evr = pool_str2id(ps.pool, pkg.version.c_str(), 1);
         solvable_add_deparray(s, SOLVABLE_PROVIDES,
                               pool_rel2id(ps.pool, s->name, s->evr, REL_EQ, 1), 0);
         add_provides(s, ps.pool, pkg.provides);
+        add_provides_soname(s, ps.pool, pkg.provides_soname);
         if (!opts.no_deps) add_requires(s, ps.pool, pkg.dependencies, pkg.needed_so);
     }
 
@@ -418,10 +480,11 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
         Id sid = repo_add_solvable(inst);
         Solvable* s = pool_id2solvable(ps.pool, sid);
         s->name = pool_str2id(ps.pool, name.c_str(), 1);
-        s->evr = pool_str2id(ps.pool, to_libsolv_evr(pkg.version).c_str(), 1);
+        s->evr = pool_str2id(ps.pool, pkg.version.c_str(), 1);
         solvable_add_deparray(s, SOLVABLE_PROVIDES,
                               pool_rel2id(ps.pool, s->name, s->evr, REL_EQ, 1), 0);
         add_provides(s, ps.pool, pkg.provides);
+        add_provides_soname(s, ps.pool, pkg.provides_soname);
         add_requires(s, ps.pool, pkg.deps, pkg.needed_so);
     }
 
@@ -431,13 +494,13 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
         Id sid = repo_add_solvable(inst);
         Solvable* s = pool_id2solvable(ps.pool, sid);
         s->name = pool_str2id(ps.pool, "@system-sonames", 1);
-        add_provides(s, ps.pool, opts.system_sonames);
+        add_provides_soname(s, ps.pool, opts.system_sonames);
     }
     if (!extra_provides.empty()) {
         Id sid = repo_add_solvable(inst);
         Solvable* s = pool_id2solvable(ps.pool, sid);
         s->name = pool_str2id(ps.pool, "@missing-tolerated", 1);
-        add_provides(s, ps.pool, extra_provides);
+        add_provides_soname(s, ps.pool, extra_provides);
     }
 
     pool_createwhatprovides(ps.pool);
@@ -470,22 +533,22 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                 // SOLVER_SOLVABLE|INSTALL 精确指定（新装=装它，已装且更高=升级到它）；
                 // 无同名包时当 capability 处理（SOLVER_SOLVABLE_PROVIDES|INSTALL——
                 // 已装满足则 no-op，否则装 provider，缺则报错）。
-                // "latest" 必须用 lpkg 的版本语义（version_compare），不能用 libsolv 的
-                // EVRCMP：两者对预发布判序相反（如 1.0-rc1 vs 1.0，EVRCMP 把 rc 当最新，
-                // lpkg 把 -预发布 当旧版），用 EVRCMP 选"最新"会选错版本/升不到稳定版（回归 S2）。
+                // "最新"用 `version_compare()` 选。
+                // ⚠️ **订正 2026-10-04（8.0.0）**：这条注释此前写着"必须用 lpkg 的版本语义
+                // （version_compare），**不能**用 libsolv 的 EVRCMP —— 两者对预发布判序相反
+                // （`1.0-rc1` vs `1.0`）"。**那个前提已经不存在**：桥拆掉之后
+                // `version_compare()` 的实现**就是** libsolv 的 EVR 比较，两边是同一个判据，
+                // 不可能"选错版本/升不到稳定版"（原回归 S2 的场景随桥一起消失）。
                 Id best = 0;
                 int pi;
                 Solvable* sa;
                 FOR_REPO_SOLVABLES(ps.avail, pi, sa)
                 {
                     if (sa->name != nid) continue;
-                    // pool 内 evr 是归一化后的 libsolv EVR（`-预发布`→`~`、`+release`→`^^`，见
-                    // vercmp/version.hpp）， 用 version_compare 前须 from_libsolv_evr 还原回 lpkg
-                    // 版本域。
+                    // 版本串**原样**进池（8.0.0 起不再有编码），所以直接拿池里的 EVR 去比即可。
                     if (!best ||
-                        version_compare(from_libsolv_evr(pool_id2str(
-                                            ps.pool, pool_id2solvable(ps.pool, best)->evr)),
-                                        from_libsolv_evr(pool_id2str(ps.pool, sa->evr))))
+                        version_compare(pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr),
+                                        pool_id2str(ps.pool, sa->evr)))
                         best = pi;  // 当前 best 版本 < sa 版本 → sa 更新为 best
                 }
                 // 已装版本 >= available 最高版本时不降级（仓库暂缺该新版本 / 已最新）
@@ -495,13 +558,12 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                     Solvable* is;
                     FOR_REPO_SOLVABLES(ir, ip, is)
                     if (is->name == nid) {
-                        installed_ver = from_libsolv_evr(pool_id2str(ps.pool, is->evr));
+                        installed_ver = pool_id2str(ps.pool, is->evr);
                         break;
                     }
                 }
                 const std::string best_ver =
-                    best ? from_libsolv_evr(
-                               pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr))
+                    best ? pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr)
                          : std::string{};
                 if (best && (installed_ver.empty() || version_compare(installed_ver, best_ver)))
                     queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, best);  // 新装 / 升级
@@ -509,8 +571,10 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                     queue_push2(&jobs, SOLVER_SOLVABLE_NAME | SOLVER_INSTALL,
                                 nid);  // 已装同版/更高 → no-op
                 else
-                    queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL,
-                                nid);  // capability
+                    // capability —— ⚠️ 用**带命名空间前缀**的 id（能力与包名不共用命名空间，
+                    // 见 constants::POOL_SONAME_PREFIX）。这里 `nid` 是裸包名，不能直接拿来问
+                    // "谁提供这个能力"。
+                    queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL, nid);
             } else {
                 // 指定版本（`pkg:版本` / 本地 .lpkg）。libsolv 对"已装 identical"的
                 // SOLVER_SOLVABLE|INSTALL 会产出 REINSTALL 步骤，导致非 --force 的
@@ -518,7 +582,7 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                 //   已装同版本且非 force → 不发 job（上层报"已安装"）；
                 //   真包但版本不在 avail → 明确报错，附可用版本（回归 S3）；
                 //   无同名包 → 当 capability 处理（同 latest 分支：装提供者/缺则报错）。
-                Id evr = pool_str2id(ps.pool, to_libsolv_evr(vspec).c_str(), 1);
+                Id evr = pool_str2id(ps.pool, vspec.c_str(), 1);
                 Id target_sid = 0;
                 bool name_exists = false;
                 std::string avail_versions;
@@ -530,7 +594,7 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                         if (sa2->name != nid) continue;
                         name_exists = true;
                         if (!avail_versions.empty()) avail_versions += ", ";
-                        avail_versions += from_libsolv_evr(pool_id2str(ps.pool, sa2->evr));
+                        avail_versions += pool_id2str(ps.pool, sa2->evr);
                         if (sa2->evr == evr) target_sid = pi2;
                     }
                 }
@@ -646,8 +710,8 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
             if (type == SOLVER_TRANSACTION_ERASE) continue;  // 兜底
             ResolvedPkg r;
             r.name = pool_id2str(ps.pool, s->name);
-            // pool 内 evr 是归一化后的 libsolv EVR（`-预发布`→`~`），读回时反归一化成 lpkg 版本
-            r.version = from_libsolv_evr(pool_id2str(ps.pool, s->evr));
+            // pool 内 evr **原样**就是 lpkg 版本（8.0.0 起无编码），直接读回即可
+            r.version = pool_id2str(ps.pool, s->evr);
             r.is_install = (type == SOLVER_TRANSACTION_INSTALL);
             result.order.push_back(std::move(r));
             order_sids.push_back(step);

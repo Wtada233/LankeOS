@@ -9,7 +9,7 @@
     "libncursesw.so.6",
     "libreadline.so.8"
   ],
-  "provides": [
+  "provides_soname": [
     "libgdbm.so",
     "libgdbm.so.6",
     "libgdbm_compat.so",

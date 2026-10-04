@@ -9,7 +9,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6ItemModels.so",
     "libKF6ItemModels.so.6"
   ],

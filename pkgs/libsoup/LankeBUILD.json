@@ -14,7 +14,7 @@
     "libz.so.1",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libsoup-3.0.so",
     "libsoup-3.0.so.0"
   ],

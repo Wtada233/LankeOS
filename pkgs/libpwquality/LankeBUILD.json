@@ -8,7 +8,7 @@
     "libcrack.so.2",
     "libpam.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libpwquality.so",
     "libpwquality.so.1"
   ],

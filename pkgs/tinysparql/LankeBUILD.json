@@ -19,7 +19,7 @@
     "libstemmer.so.0",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libtinysparql-3.0.so",
     "libtinysparql-3.0.so.0",
     "libtracker-sparql-3.0.so",

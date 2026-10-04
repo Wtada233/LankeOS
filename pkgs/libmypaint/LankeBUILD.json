@@ -12,7 +12,7 @@
     "libjson-c.so.5",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libmypaint-gegl.so",
     "libmypaint-gegl.so.0",
     "libmypaint.so",

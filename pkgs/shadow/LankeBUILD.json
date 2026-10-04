@@ -13,7 +13,7 @@
     "libpam_misc.so.0",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libsubid.so",
     "libsubid.so.6"
   ],

@@ -15,7 +15,7 @@
     "libministream.so.1",
     "libpango-1.0.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libadwaita-1.so",
     "libadwaita-1.so.0"
   ],

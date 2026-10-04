@@ -34,7 +34,7 @@
     "libstdc++.so.6",
     "libudev.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libKSysGuardFormatter.so",
     "libKSysGuardFormatter.so.2",
     "libKSysGuardSensorFaces.so",

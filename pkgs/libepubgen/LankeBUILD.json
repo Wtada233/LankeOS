@@ -10,7 +10,7 @@
     "librevenge-0.0.so.0",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libepubgen-0.1.so",
     "libepubgen-0.1.so.1"
   ],

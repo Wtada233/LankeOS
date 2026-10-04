@@ -22,7 +22,7 @@
     "libudev.so.1",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libblkid.so",
     "libblkid.so.1",
     "libfdisk.so",

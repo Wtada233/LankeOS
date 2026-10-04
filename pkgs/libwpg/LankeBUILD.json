@@ -13,7 +13,7 @@
     "libstdc++.so.6",
     "libwpd-0.10.so.10"
   ],
-  "provides": [
+  "provides_soname": [
     "libwpg-0.3.so",
     "libwpg-0.3.so.3"
   ],

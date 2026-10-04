@@ -21,7 +21,7 @@
     "liblmdb.so.1",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6Baloo.so",
     "libKF6Baloo.so.6",
     "libKF6BalooEngine.so.6"

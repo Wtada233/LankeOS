@@ -20,7 +20,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKirigamiActionCollection.so",
     "libKirigamiActionCollection.so.6"
   ],

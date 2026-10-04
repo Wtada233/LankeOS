@@ -14,7 +14,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libexiv2.so",
     "libexiv2.so.28"
   ],

@@ -8,7 +8,7 @@
     "libc.so.6",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libasound.so",
     "libasound.so.2",
     "libatopology.so",

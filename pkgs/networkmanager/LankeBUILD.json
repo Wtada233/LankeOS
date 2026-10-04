@@ -26,7 +26,7 @@
     "libsystemd.so.0",
     "libudev.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libnm.so",
     "libnm.so.0"
   ],

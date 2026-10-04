@@ -611,7 +611,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
             std::string soname;
             while (std::getline(f, soname)) {
                 if (soname.empty()) continue;
-                for (const auto& prov_pkg : cache.get_providers(soname))
+                for (const auto& prov_pkg : cache.get_soname_providers(soname))
                     cache.remove_reverse_dep(prov_pkg, pkg_name);
             }
             if (f.bad())
@@ -884,6 +884,10 @@ static bool removal_allowed(const std::string& pkg_name, bool force,
     if (refused(pkg_name)) return false;
     for (const auto& cap : cache.get_package_provides(pkg_name))
         if (refused(cap)) return false;
+    // **SONAME 归属同样算"它动了谁会坏"**：别的包的 needed_so 反向依赖挂在 SONAME 上，
+    // 漏了这一格 ⇒ 删掉一个导出 SONAME 的包不会被阻止（依赖它的包运行期炸）。
+    for (const auto& so : cache.get_package_provides_soname(pkg_name))
+        if (refused(so)) return false;
     return true;
 }
 
@@ -1124,6 +1128,10 @@ void remove_package_files(const std::string& pkg_name)
     for (const auto& cap : cache.get_package_provides(pkg_name)) {
         cache.remove_provider(cap, pkg_name);
     }
+    // 同理：SONAME 归属表也要清（否则删除后仍有人"提供"着那个 SONAME）
+    for (const auto& so : cache.get_package_provides_soname(pkg_name)) {
+        cache.remove_soname_provider(so, pkg_name);
+    }
 
     auto owned_entries = cache.get_package_files(pkg_name);
     if (owned_entries.empty()) return;
@@ -1324,6 +1332,7 @@ std::map<std::string, std::string> metadata_view(const std::string& name,
                                                  const std::string& version,
                                                  const std::vector<DependencyInfo>& deps,
                                                  const std::vector<std::string>& provides,
+                                                 const std::vector<std::string>& provides_soname,
                                                  const std::vector<std::string>& needed_so)
 {
     const auto join = [](std::vector<std::string> v) {
@@ -1347,6 +1356,7 @@ std::map<std::string, std::string> metadata_view(const std::string& name,
         {"version", version},
         {"deps", join(std::move(dep_keys))},
         {"provides", join(provides)},
+        {"provides_soname", join(provides_soname)},
         {"needed_so", join(needed_so)},
     };
 }
@@ -1363,15 +1373,16 @@ void verify_package_metadata(InstallPlan& p)
 
     // **逐字段**比对归档 metadata.json 与索引（不是只比依赖面）：任何字段不符 → 拒绝安装。
     const json meta = detail::read_archive_metadata(check_task.archive_path());
-    const auto from_archive =
-        metadata_view(meta.value(std::string(constants::J_NAME), std::string{}),
-                      meta.value(std::string(constants::J_VERSION), std::string{}),
-                      detail::parse_dep_strings(
-                          meta.value(std::string(constants::J_DEPS), std::vector<std::string>{})),
-                      meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{}),
-                      meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{}));
-    const auto from_index =
-        metadata_view(p.name, p.actual_version, p.dependencies, p.provides, p.needed_so);
+    const auto from_archive = metadata_view(
+        meta.value(std::string(constants::J_NAME), std::string{}),
+        meta.value(std::string(constants::J_VERSION), std::string{}),
+        detail::parse_dep_strings(
+            meta.value(std::string(constants::J_DEPS), std::vector<std::string>{})),
+        meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{}),
+        meta.value(std::string(constants::J_PROVIDES_SONAME), std::vector<std::string>{}),
+        meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{}));
+    const auto from_index = metadata_view(p.name, p.actual_version, p.dependencies, p.provides,
+                                          p.provides_soname, p.needed_so);
 
     std::string diffs;
     for (const auto& [field, actual] : from_archive) {
@@ -1597,7 +1608,7 @@ void force_solve_conflict(bool purge_config)
                 std::string soname;
                 while (std::getline(f, soname)) {
                     if (soname.empty()) continue;
-                    if (!repo.find_provider(soname)) {
+                    if (!repo.find_soname_provider(soname)) {  // needed_so 断裂 → SONAME 空间
                         broken.insert(pkg);
                         break;
                     }
@@ -1840,6 +1851,11 @@ std::unordered_set<std::string> collect_recursive_remove_set(const std::string& 
         for (const auto& cap : Cache::instance().get_package_provides(current)) {
             auto cap_rdeps = Cache::instance().get_reverse_deps(cap);
             rdeps.insert(cap_rdeps.begin(), cap_rdeps.end());
+        }
+        // 它导出的 SONAME 也一样：链在 SONAME 上的包也是"被它牵连"的
+        for (const auto& so : Cache::instance().get_package_provides_soname(current)) {
+            auto so_rdeps = Cache::instance().get_reverse_deps(so);
+            rdeps.insert(so_rdeps.begin(), so_rdeps.end());
         }
         for (const auto& rdep : rdeps) {
             if (rdep != current && !visited.contains(rdep)) queue.push_back(rdep);

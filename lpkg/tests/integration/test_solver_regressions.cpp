@@ -63,16 +63,16 @@ protected:
         IntegrationTestBase::TearDown();
     }
 
-    /** 写仓库索引：name|ver:sha256:deps:provides:needed_so */
+    /** 写仓库索引：name|ver:sha256:deps:provides:provides_soname:needed_so（恰好 6 段） */
     void update_index(const std::vector<std::tuple<std::string, std::string, std::string,
-                                                   std::string, std::string>>& entries)
+                                                   std::string, std::string, std::string>>& entries)
     {
         std::ofstream index(mirror_dir / "index.txt");
-        for (const auto& [name, ver, deps, provides, needed_so] : entries) {
+        for (const auto& [name, ver, deps, provides, provides_soname, needed_so] : entries) {
             const std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
             const std::string hash = fs::exists(pkg_path) ? calculate_sha256(pkg_path) : "unknown";
             index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
-                  << needed_so << "|\n";
+                  << provides_soname << ":" << needed_so << "|\n";
         }
     }
 
@@ -97,7 +97,7 @@ protected:
                                 out.string() + " " + src.string() + " 2>/dev/null";
         if (std::system(cmd.c_str()) != 0 || !fs::exists(out)) return false;
         pack_package((pkg_dir / std::format("{}-{}.lpkg", name, ver)).string(), work.string(), name,
-                     ver, {}, {}, "", {});
+                     ver, {}, {}, {}, "", {});
         return true;
     }
 
@@ -111,7 +111,7 @@ protected:
         fs::create_directories(work / "hooks");
         for (const auto& h : hooks) std::ofstream(work / "hooks" / h) << "#!/bin/sh\nexit 0\n";
         const std::string path = (pkg_dir / (name + "-" + version + ".lpkg")).string();
-        pack_package(path, work.string(), name, version, {}, {}, "", {});
+        pack_package(path, work.string(), name, version, {}, {}, {}, "", {});
         return path;
     }
 
@@ -130,7 +130,7 @@ protected:
             }
         }
         const std::string path = (pkg_dir / (name + "-" + version + ".lpkg")).string();
-        pack_package(path, work.string(), name, version, {}, {}, "", {});
+        pack_package(path, work.string(), name, version, {}, {}, {}, "", {});
         return path;
     }
 
@@ -158,7 +158,7 @@ TEST_F(SolverRegressionTest, AlreadyInstalledTargetStillReportsUpToDate)
     // 正向对照：目标确实已装时，必须仍然走"所有包都已安装"（不能误报错误）
     create_pkg("wa", "1.0");
     add_to_mirror("wa", "1.0");
-    update_index({{"wa", "1.0", "", "", ""}});
+    update_index({{"wa", "1.0", "", "", "", ""}});
 
     install_packages({"wa"});
     ASSERT_TRUE(Cache::instance().is_installed("wa"));
@@ -175,7 +175,7 @@ TEST_F(SolverRegressionTest, ForceReinstallMixedTargetsReinstallsCurrentPackage)
     create_pkg("wb", "1.0");
     add_to_mirror("wa", "1.0");
     add_to_mirror("wb", "1.0");
-    update_index({{"wa", "1.0", "", "", ""}, {"wb", "1.0", "", "", ""}});
+    update_index({{"wa", "1.0", "", "", "", ""}, {"wb", "1.0", "", "", "", ""}});
 
     install_packages({"wa"});
     ASSERT_TRUE(Cache::instance().is_installed("wa"));
@@ -198,11 +198,14 @@ TEST_F(SolverRegressionTest, ForceReinstallMixedTargetsReinstallsCurrentPackage)
 
 TEST_F(SolverRegressionTest, CapabilityTargetIsExplicitAndSurvivesAutoremove)
 {
-    create_pkg("prov", "1.0", {}, {"libcap.so.1"});
+    // 按**虚拟能力**名安装（`provides`，裸名字空间）。⚠️ 不能再用 SONAME 当 target：
+    // 8.0.0 起 SONAME 活在独立的 `so:` 空间，而 `install <名字>` 只走"包名 / 虚拟 provides"
+    // —— 维护者明确要求 install **不做任何 soname 特判**（找不到就按"未找到包"报错）。
+    create_pkg("prov", "1.0", {}, {"libcap-api"}, {});
     add_to_mirror("prov", "1.0");
-    update_index({{"prov", "1.0", "", "libcap.so.1", ""}});
+    update_index({{"prov", "1.0", "", "libcap-api", "", ""}});
 
-    install_packages({"libcap.so.1"});  // 按能力名安装
+    install_packages({"libcap-api"});  // 按能力名安装
     ASSERT_TRUE(Cache::instance().is_installed("prov")) << "能力目标没有解析到提供者";
 
     EXPECT_TRUE(Cache::instance().is_held("prov"))
@@ -222,7 +225,7 @@ TEST_F(SolverRegressionTest, AutoremoveNeverRemovesEssentialPackages)
     create_pkg("app", "1.0", {"corelib"});
     add_to_mirror("corelib", "1.0");
     add_to_mirror("app", "1.0");
-    update_index({{"corelib", "1.0", "", "", ""}, {"app", "1.0", "corelib", "", ""}});
+    update_index({{"corelib", "1.0", "", "", "", ""}, {"app", "1.0", "corelib", "", "", ""}});
 
     install_packages({"app"});  // corelib 作为依赖被拉入 → 不 hold
     ASSERT_TRUE(Cache::instance().is_installed("corelib"));
@@ -249,7 +252,7 @@ TEST_F(SolverRegressionTest, UpgradeFlushesTriggersAndRegeneratesSonameLinks)
     if (!create_lib_pkg("libtrig", "1.0")) GTEST_SKIP() << "无法编译测试用共享库";
 
     add_to_mirror("libtrig", "1.0");
-    update_index({{"libtrig", "1.0", "", "", ""}});
+    update_index({{"libtrig", "1.0", "", "", "", ""}});
     install_packages({"libtrig"});
 
     const fs::path link = test_root / "usr/lib/libtrig.so.1";
@@ -264,7 +267,7 @@ TEST_F(SolverRegressionTest, UpgradeFlushesTriggersAndRegeneratesSonameLinks)
 
     ASSERT_TRUE(create_lib_pkg("libtrig", "2.0"));
     add_to_mirror("libtrig", "2.0");
-    update_index({{"libtrig", "2.0", "", "", ""}});
+    update_index({{"libtrig", "2.0", "", "", "", ""}});
     upgrade_packages();
 
     Cache::instance().load();
@@ -376,7 +379,7 @@ TEST_F(SolverRegressionTest, TraversingPackageNameIsRejected)
     fs::create_directories(work / "content/usr/bin");
     std::ofstream(work / "content/usr/bin/evil") << "x";
     const std::string evil = (pkg_dir / "evil-name.lpkg").string();
-    pack_package(evil, work.string(), "../../../evilpkg", "1.0", {}, {}, "", {});
+    pack_package(evil, work.string(), "../../../evilpkg", "1.0", {}, {}, {}, "", {});
 
     EXPECT_THROW(install_packages({evil}), LpkgException);
     // 逃逸落点必须没有被创建（dep_dir() 是 <root>/var/lib/lpkg/deps → 上一级是 <root>/var/lib）
@@ -393,7 +396,7 @@ TEST_F(SolverRegressionTest, TraversingVersionFromRepoIndexIsRejected)
     add_to_mirror("wa", "1.0");
     // 索引里把版本写成穿越串（模拟被污染的镜像索引）
     std::ofstream index(mirror_dir / "index.txt");
-    index << "wa|../../../../tmp/evilver:deadbeef::|\n";
+    index << "wa|../../../../tmp/evilver:deadbeef::::|\n";
     index.close();
 
     EXPECT_THROW(install_packages({"wa"}), LpkgException);
@@ -414,7 +417,7 @@ TEST_F(SolverRegressionTest, MultiPackageRemoveRollsBackAllWhenInterrupted)
     create_pkg("mb", "1.0");
     add_to_mirror("ma", "1.0");
     add_to_mirror("mb", "1.0");
-    update_index({{"ma", "1.0", "", "", ""}, {"mb", "1.0", "", "", ""}});
+    update_index({{"ma", "1.0", "", "", "", ""}, {"mb", "1.0", "", "", "", ""}});
     install_packages({"ma", "mb"});
     ASSERT_TRUE(Cache::instance().is_installed("ma"));
 
@@ -449,9 +452,9 @@ TEST_F(SolverRegressionTest, MultiPackageRemoveRefusedRemovesNothing)
     add_to_mirror("good", "1.0");
     add_to_mirror("needed", "1.0");
     add_to_mirror("dependent", "1.0");
-    update_index({{"good", "1.0", "", "", ""},
-                  {"needed", "1.0", "", "", ""},
-                  {"dependent", "1.0", "needed", "", ""}});
+    update_index({{"good", "1.0", "", "", "", ""},
+                  {"needed", "1.0", "", "", "", ""},
+                  {"dependent", "1.0", "needed", "", "", ""}});
     install_packages({"good", "dependent"});  // dependent 把 needed 作为依赖拉进来
     ASSERT_TRUE(Cache::instance().is_installed("good"));
     ASSERT_TRUE(Cache::instance().is_installed("needed"));
@@ -525,7 +528,7 @@ TEST_F(SolverRegressionTest, ReinstallGroupIsOneBatch)
     create_pkg("rnb", "1.0");
     add_to_mirror("rna", "1.0");
     add_to_mirror("rnb", "1.0");
-    update_index({{"rna", "1.0", "", "", ""}, {"rnb", "1.0", "", "", ""}});
+    update_index({{"rna", "1.0", "", "", "", ""}, {"rnb", "1.0", "", "", "", ""}});
     install_packages({"rna", "rnb"});
 
     // 模拟 rna 装坏了（文件丢失）：重装的目的正是把它补回来。旧实现下"补回来"这个
@@ -579,7 +582,7 @@ TEST_F(SolverRegressionTest, RecursiveRemoveGroupIsOneBatch)
     create_pkg("rrb", "1.0");
     add_to_mirror("rra", "1.0");
     add_to_mirror("rrb", "1.0");
-    update_index({{"rra", "1.0", "rrb", "", ""}, {"rrb", "1.0", "", "", ""}});
+    update_index({{"rra", "1.0", "rrb", "", "", ""}, {"rrb", "1.0", "", "", "", ""}});
     install_packages({"rra", "rrb"});
     ASSERT_TRUE(fs::exists(test_root / "usr/bin/rra"));
     ASSERT_TRUE(fs::exists(test_root / "usr/bin/rrb"));
@@ -618,8 +621,9 @@ TEST_F(SolverRegressionTest, AutoremoveRollsBackAllPackagesWhenInterrupted)
     add_to_mirror("d1", "1.0");
     add_to_mirror("d2", "1.0");
     add_to_mirror("app", "1.0");
-    update_index(
-        {{"d1", "1.0", "", "", ""}, {"d2", "1.0", "", "", ""}, {"app", "1.0", "d1,d2", "", ""}});
+    update_index({{"d1", "1.0", "", "", "", ""},
+                  {"d2", "1.0", "", "", "", ""},
+                  {"app", "1.0", "d1,d2", "", "", ""}});
 
     install_packages({"app"});
     ASSERT_TRUE(Cache::instance().is_installed("d1"));
@@ -655,7 +659,7 @@ TEST_F(SolverRegressionTest, UpgradeFromFileToDirectorySucceeds)
 
     create_layout_pkg("fd", "2.0", {"usr/share/foo/", "usr/share/foo/inner.txt"});
     add_to_mirror("fd", "2.0");
-    update_index({{"fd", "2.0", "", "", ""}});
+    update_index({{"fd", "2.0", "", "", "", ""}});
 
     try {
         upgrade_packages();
@@ -680,7 +684,7 @@ TEST_F(SolverRegressionTest, UpgradePrunesHooksDroppedByNewVersion)
 
     create_pkg_with_hooks("hkpkg", "2.0", {"postinst.sh"});
     add_to_mirror("hkpkg", "2.0");
-    update_index({{"hkpkg", "2.0", "", "", ""}});
+    update_index({{"hkpkg", "2.0", "", "", "", ""}});
     upgrade_packages();
 
     EXPECT_TRUE(fs::exists(hd / "postinst.sh")) << "新版本仍提供的 hook 不该被删";
@@ -698,7 +702,7 @@ TEST_F(SolverRegressionTest, RemoveInterruptedBeforeCommitRollsBackEverything)
     create_pkg("mb", "1.0");
     add_to_mirror("ma", "1.0");
     add_to_mirror("mb", "1.0");
-    update_index({{"ma", "1.0", "", "", ""}, {"mb", "1.0", "", "", ""}});
+    update_index({{"ma", "1.0", "", "", "", ""}, {"mb", "1.0", "", "", "", ""}});
     install_packages({"ma", "mb"});
     ASSERT_TRUE(Cache::instance().is_installed("ma"));
 

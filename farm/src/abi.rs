@@ -8,10 +8,10 @@ use std::collections::HashSet;
 
 use crate::graph::{soname_provides_of, Index, RevMap};
 
-/// pkg 相对 `new_provides` 被移除的版本化 SONAME（ABI 断裂信号）。
-pub fn removed_sonames(old: &Index, pkg: &str, new_provides: &[String]) -> Vec<String> {
+/// pkg 相对 `new_provides_soname` 被移除的版本化 SONAME（ABI 断裂信号）。
+pub fn removed_sonames(old: &Index, pkg: &str, new_provides_soname: &[String]) -> Vec<String> {
     let old_s = old.soname_provides(pkg);
-    let new_s = soname_provides_of(new_provides);
+    let new_s = soname_provides_of(new_provides_soname);
     let mut v: Vec<String> = old_s.difference(&new_s).cloned().collect();
     v.sort();
     v

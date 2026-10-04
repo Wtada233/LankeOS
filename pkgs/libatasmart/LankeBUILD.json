@@ -7,7 +7,7 @@
     "libc.so.6",
     "libudev.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libatasmart.so",
     "libatasmart.so.4"
   ],

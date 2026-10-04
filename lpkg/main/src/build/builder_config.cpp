@@ -39,6 +39,8 @@ BuildConfig parse_build_config(const fs::path& json_path)
         cfg.build_deps =
             meta.value(std::string(constants::J_BUILD_DEPS), std::vector<std::string>{});
         cfg.provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+        cfg.provides_soname =
+            meta.value(std::string(constants::J_PROVIDES_SONAME), std::vector<std::string>{});
         cfg.needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
         cfg.man_content = meta.value(std::string(constants::J_MAN), "");
         cfg.release = meta.value(std::string(constants::J_RELEASE), 0);

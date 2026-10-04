@@ -14,7 +14,7 @@
     "libssl.so.3",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libdatachannel.so",
     "libdatachannel.so.0.24"
   ],

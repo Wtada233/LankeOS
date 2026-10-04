@@ -9,7 +9,7 @@
     "libmvec.so.1",
     "libogg.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libvorbis.so",
     "libvorbis.so.0",
     "libvorbisenc.so",

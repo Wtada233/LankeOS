@@ -14,7 +14,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libfreehand-0.1.so",
     "libfreehand-0.1.so.1"
   ],

@@ -7,7 +7,7 @@
     "libc.so.6",
     "libgpg-error.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libassuan.so",
     "libassuan.so.9"
   ],

@@ -13,7 +13,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libjxl.so",
     "libjxl.so.0.12",
     "libjxl_cms.so",

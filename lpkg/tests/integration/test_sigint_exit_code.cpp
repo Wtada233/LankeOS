@@ -100,7 +100,7 @@ protected:
         std::ofstream(work_dir / "content/usr/bin" / name) << content << "\n";
 
         const std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
-        pack_package(pkg_path, work_dir.string(), name, ver, {}, {}, "man " + name, {});
+        pack_package(pkg_path, work_dir.string(), name, ver, {}, {}, {}, "man " + name, {});
         fs::remove_all(work_dir);
         return pkg_path;
     }
@@ -121,7 +121,7 @@ protected:
         for (const auto& [name, ver, deps] : entries) {
             const fs::path pkg = pkg_dir / (std::format("{}-{}.lpkg", name, ver));
             const std::string hash = fs::exists(pkg) ? calculate_sha256(pkg) : "unknown";
-            index << name << "|" << ver << ":" << hash << ":" << deps << "::\n";
+            index << name << "|" << ver << ":" << hash << ":" << deps << ":::\n";
         }
     }
 

@@ -11,7 +11,7 @@
     "libreadline.so.8",
     "libuuid.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libparted-fs-resize.so",
     "libparted-fs-resize.so.0",
     "libparted.so",

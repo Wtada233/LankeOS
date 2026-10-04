@@ -26,7 +26,7 @@
     "libxcb-xkb.so.1",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libKGlobalAccelD.so.0"
   ],
   "build_deps": [

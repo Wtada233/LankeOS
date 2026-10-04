@@ -106,7 +106,7 @@ TEST_F(PackageManagerEdgeTest, PackageVersionFormat)
     // 写入 index.txt（hash 留空，跳过哈希校验）
     {
         std::ofstream idx(mirror_dir / "index.txt");
-        idx << "ver-pkg|2.0.0:::|\n";
+        idx << "ver-pkg|2.0.0:::::|\n";
     }
 
     // 写入 mirror.conf
@@ -152,7 +152,7 @@ TEST_F(PackageManagerEdgeTest, VersionConstraintInstall)
 
     {
         std::ofstream idx(mirror_dir / "index.txt");
-        idx << "constraint-pkg|1.0:::;2.0:::;3.0:::|\n";
+        idx << "constraint-pkg|1.0:::::;2.0:::::;3.0:::::|\n";
     }
     {
         std::ofstream mc(Config::instance().mirror_conf());

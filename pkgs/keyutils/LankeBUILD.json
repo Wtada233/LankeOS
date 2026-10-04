@@ -7,7 +7,7 @@
     "libc.so.6",
     "libresolv.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libkeyutils.so.1"
   ],
   "build_deps": [

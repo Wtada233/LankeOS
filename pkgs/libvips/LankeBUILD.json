@@ -43,7 +43,7 @@
     "libwebpmux.so.3",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libvips-cpp.so",
     "libvips-cpp.so.42",
     "libvips.so",

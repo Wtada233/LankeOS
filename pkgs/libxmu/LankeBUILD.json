@@ -11,7 +11,7 @@
     "libXt.so.6",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libXmu.so",
     "libXmu.so.6",
     "libXmuu.so",

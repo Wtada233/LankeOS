@@ -9,7 +9,7 @@
     "libc.so.6",
     "libyaml-0.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libfdt.so",
     "libfdt.so.1"
   ],

@@ -42,16 +42,16 @@ protected:
 
 TEST_F(AtomicInstallTest, SinglePackageInstall)
 {
-    std::string p = create_pkg("testpkg", "1.0", {}, {"libtest.so.1"});
+    std::string p = create_pkg("testpkg", "1.0", {}, {}, {"libtest.so.1"});
     install_packages({p});
     EXPECT_FALSE(Cache::instance().get_installed_version("testpkg").empty());
 }
 
 TEST_F(AtomicInstallTest, BatchInstallWithDepsViaLocalFiles)
 {
-    std::string pA = create_pkg("pkgA", "1.0", {}, {"libA.so.1"});
-    std::string pB = create_pkg("pkgB", "1.0", {"pkgA"}, {"libB.so.1"});
-    std::string pC = create_pkg("pkgC", "1.0", {"pkgB"}, {"libC.so.1"});
+    std::string pA = create_pkg("pkgA", "1.0", {}, {}, {"libA.so.1"});
+    std::string pB = create_pkg("pkgB", "1.0", {"pkgA"}, {}, {"libB.so.1"});
+    std::string pC = create_pkg("pkgC", "1.0", {"pkgB"}, {}, {"libC.so.1"});
 
     install_packages({pC, pB, pA});
 
@@ -71,10 +71,11 @@ TEST_F(AtomicInstallTest, FileOwnershipTracking)
 
 TEST_F(AtomicInstallTest, ProvidesRegistration)
 {
-    std::string p = create_pkg("libpkg", "1.0", {}, {"libtest.so.1", "libtest.so.2"});
+    // SONAME 走 `provides_soname`（第 5 参）与 `provides_soname.db`（8.0.0 拆分）。
+    std::string p = create_pkg("libpkg", "1.0", {}, {}, {"libtest.so.1", "libtest.so.2"});
     install_packages({p});
 
-    auto providers = Cache::instance().get_providers("libtest.so.1");
+    auto providers = Cache::instance().get_soname_providers("libtest.so.1");
     EXPECT_TRUE(providers.contains("libpkg"));
 }
 
@@ -90,7 +91,7 @@ protected:
         IntegrationTestBase::SetUp();
         trim_completed();
 
-        std::string p = create_pkg("removepkg", "1.0", {}, {"libremove.so.1"});
+        std::string p = create_pkg("removepkg", "1.0", {}, {}, {"libremove.so.1"});
         install_packages({p});
     }
 };
@@ -137,7 +138,7 @@ protected:
         IntegrationTestBase::SetUp();
         trim_completed();
 
-        std::string p = create_pkg("reinstpkg", "1.0", {}, {"libreinst.so.1"});
+        std::string p = create_pkg("reinstpkg", "1.0", {}, {}, {"libreinst.so.1"});
         install_packages({p});
     }
 };
@@ -147,7 +148,7 @@ TEST_F(AtomicReinstallTest, ReinstallPreservesFiles)
     EXPECT_EQ(Cache::instance().get_installed_version("reinstpkg"), "1.0");
 
     // 重装（使用原始包文件）
-    std::string p = create_pkg("reinstpkg", "1.0", {}, {"libreinst.so.1"});
+    std::string p = create_pkg("reinstpkg", "1.0", {}, {}, {"libreinst.so.1"});
     install_packages({p}, "", true);
 
     EXPECT_EQ(Cache::instance().get_installed_version("reinstpkg"), "1.0");
@@ -173,7 +174,7 @@ TEST_F(AtomicUpgradeTest, UpgradeToNewerVersion)
     setup_local_mirror();
 
     // 安装旧版本
-    std::string p1 = create_pkg("upgpkg", "1.0", {}, {"libupg.so.1"});
+    std::string p1 = create_pkg("upgpkg", "1.0", {}, {}, {"libupg.so.1"});
     add_to_mirror("upgpkg", "1.0");
     install_packages({p1});
     EXPECT_EQ(Cache::instance().get_installed_version("upgpkg"), "1.0");
@@ -187,14 +188,14 @@ TEST_F(AtomicUpgradeTest, UpgradeToNewerVersion)
             << R"({"name":"upgpkg","version":"2.0","deps":[],"provides":["libupg.so.2"],"needed_so":[]})";
 
         std::string v2path = (pkg_dir / "upgpkg-2.0.lpkg").string();
-        pack_package(v2path, work.string(), "upgpkg", "2.0", {}, {"libupg.so.2"});
+        pack_package(v2path, work.string(), "upgpkg", "2.0", {}, {}, {"libupg.so.2"});
 
         fs::path mirror = suite_work_dir / "mirror" / "x86_64";
         fs::create_directories(mirror / "upgpkg");
         fs::copy(v2path, mirror / "upgpkg" / "2.0.lpkg");
         {
             std::ofstream idx(mirror / "index.txt");
-            idx << "upgpkg|1.0:::libupg.so.1:;2.0:::libupg.so.2:|\n";
+            idx << "upgpkg|1.0::::libupg.so.1:;2.0::::libupg.so.2:|\n";
         }
     }
 
@@ -211,7 +212,7 @@ TEST_F(AtomicUpgradeTest, PlanConsistencyCheckBlocksConflict)
     setup_local_mirror();
 
     // lib v1 + app（依赖 lib >= 1.0 < 2.0）
-    std::string pLib = create_pkg("lib2", "1.0", {}, {"libfoo.so.1"});
+    std::string pLib = create_pkg("lib2", "1.0", {}, {}, {"libfoo.so.1"});
     add_to_mirror("lib2", "1.0");
     install_packages({pLib});
 
@@ -228,15 +229,15 @@ TEST_F(AtomicUpgradeTest, PlanConsistencyCheckBlocksConflict)
             << R"({"name":"lib2","version":"2.0","deps":[],"provides":["libfoo.so.2"],"needed_so":[]})";
 
         std::string v2path = (pkg_dir / "lib2-2.0.lpkg").string();
-        pack_package(v2path, work.string(), "lib2", "2.0", {}, {"libfoo.so.2"});
+        pack_package(v2path, work.string(), "lib2", "2.0", {}, {}, {"libfoo.so.2"});
 
         fs::path mirror = suite_work_dir / "mirror" / "x86_64";
         fs::create_directories(mirror / "lib2");
         fs::copy(v2path, mirror / "lib2" / "2.0.lpkg");
         {
             std::ofstream idx(mirror / "index.txt");
-            idx << "lib2|1.0:::libfoo.so.1:;2.0:::libfoo.so.2:|\n"
-                << "app2|1.0::lib2 >= 1.0 < 2.0::|\n";
+            idx << "lib2|1.0::::libfoo.so.1:;2.0::::libfoo.so.2:|\n"
+                << "app2|1.0::lib2 >= 1.0 < 2.0:::|\n";
         }
     }
 

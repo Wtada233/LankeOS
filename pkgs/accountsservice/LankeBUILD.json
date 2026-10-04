@@ -14,7 +14,7 @@
     "libpolkit-gobject-1.so.0",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libaccountsservice.so",
     "libaccountsservice.so.1"
   ],

@@ -13,7 +13,7 @@
     "libpam.so.0",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libpolkit-agent-1.so",
     "libpolkit-agent-1.so.0",
     "libpolkit-gobject-1.so",

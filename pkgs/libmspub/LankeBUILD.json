@@ -14,7 +14,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libmspub-0.1.so",
     "libmspub-0.1.so.1"
   ],

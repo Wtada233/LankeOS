@@ -9,7 +9,7 @@
     "libsasl2.so.3",
     "libssl.so.3"
   ],
-  "provides": [
+  "provides_soname": [
     "liblber.so",
     "liblber.so.2",
     "libldap.so",

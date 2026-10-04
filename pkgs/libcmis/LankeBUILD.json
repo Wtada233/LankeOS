@@ -12,7 +12,7 @@
     "libstdc++.so.6",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libcmis-0.6.so",
     "libcmis-0.6.so.6",
     "libcmis-c-0.6.so",

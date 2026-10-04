@@ -94,7 +94,7 @@ protected:
         for (const auto& [name, ver, deps] : entries) {
             const std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
             index << name << "|" << ver << ":" << calculate_sha256(pkg_path) << ":" << deps
-                  << "::|\n";
+                  << ":::|\n";
         }
     }
 

@@ -394,6 +394,7 @@ void reject_unsafe_metadata_tokens(const std::vector<std::string>& values, std::
 /** 从已解压的包目录读取 metadata.json，提取包名、版本、依赖等信息 */
 void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::string& version,
                            std::vector<std::string>& deps, std::vector<std::string>& provides,
+                           std::vector<std::string>& provides_soname,
                            std::vector<std::string>& needed_so, std::string& man)
 {
     fs::path meta_path = tmp_pkg_dir / constants::PKG_METADATA_FILE;
@@ -419,10 +420,13 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
     version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
     deps = meta.value(std::string(constants::J_DEPS), std::vector<std::string>{});
     provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+    provides_soname =
+        meta.value(std::string(constants::J_PROVIDES_SONAME), std::vector<std::string>{});
     needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
     // 这三个字段会进行式/制表符分帧的状态文件 —— 控制字符会**伪造出额外记录**（见上方注释）。
     reject_unsafe_metadata_tokens(deps, constants::J_DEPS, meta_path);
     reject_unsafe_metadata_tokens(provides, constants::J_PROVIDES, meta_path);
+    reject_unsafe_metadata_tokens(provides_soname, constants::J_PROVIDES_SONAME, meta_path);
     reject_unsafe_metadata_tokens(needed_so, constants::J_NEEDED_SO, meta_path);
     man = meta.value(std::string(constants::J_MAN), "");
 }
@@ -520,6 +524,8 @@ static void collect_installed_requires(const std::string& name, solv::InstalledP
             if (!so.empty()) p.needed_so.push_back(so);
     }
     for (const auto& cap : Cache::instance().get_package_provides(name)) p.provides.push_back(cap);
+    for (const auto& so : Cache::instance().get_package_provides_soname(name))
+        p.provides_soname.push_back(so);
 }
 
 /**
@@ -602,6 +608,8 @@ void resolve_with_solver(InstallContext& ctx)
         pi.dependencies = parse_dep_strings(
             meta.value(std::string(constants::J_DEPS), std::vector<std::string>{}));
         pi.provides = meta.value(std::string(constants::J_PROVIDES), std::vector<std::string>{});
+        pi.provides_soname =
+            meta.value(std::string(constants::J_PROVIDES_SONAME), std::vector<std::string>{});
         pi.needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
         local_pkgs.push_back(std::move(pi));
         local_paths[name] = path;
@@ -674,6 +682,7 @@ void resolve_with_solver(InstallContext& ctx)
         if (lp != local_paths.end()) p.local_path = lp->second;
         p.dependencies = info.dependencies;
         p.provides = info.provides;
+        p.provides_soname = info.provides_soname;
         p.needed_so = info.needed_so;
         p.force_reinstall = (ctx.force_reinstall && p.is_explicit);
         ctx.plan[rp.name] = std::move(p);
@@ -732,28 +741,23 @@ std::unordered_set<std::string> get_all_required_packages()
             std::string so;
             while (std::getline(nf, so)) {
                 if (so.empty()) continue;
-                for (const auto& prov : cache.get_providers(so)) check_and_add(prov);
+                for (const auto& prov : cache.get_soname_providers(so)) check_and_add(prov);
             }
         }
     }
     return req;
 }
 
-/**
- * 向前 needed_so 完整性校验。
- *
- * 对计划中的每个包，检查其每个 SONAME 的提供链：
- *   plan（版本精准）→ 已安装缓存 → repo（版本精准）
- *
- * 版本精准的含义：
- *   - plan 中同时升级的包以新版本计算 provides
- *   - 缓存中的包以当前安装版本计算
- *   - repo 中只取实际提供该 SONAME 的版本（find_provider 返回的版本必须提供该
- * SONAME）
- */
 // ============================================================================
 // 从 `installation_task.cpp` 拆出的共用纯函数（正文逐字搬移，未改一行）
 // ============================================================================
+//
+// ⚠️ **订正 2026-10-04**：这里原先挂着一份**没有函数体**的 doxygen 块（"向前 needed_so
+// 完整性校验"，还点名了 `find_provider`）。它描述的手写校验早就被**求解器的原生判据**
+// 取代（`solver.cpp` 把 needed_so 灌进 `so:` 空间、由 libsolv 判定；见
+// `package_manager.cpp` 里"取代旧的手动 check_plan_consistency / check_needed_so_consistency
+// / check_forward_soname_integrity"那段）。那份文档块已删除 —— 留着它只会让下一个人去
+// 找那个不存在的函数。
 
 /**
  * `.lpkgtmp` 落位前的最后一道闸：tmp 路径是**符号链接**时拒绝写入（失败要响）。

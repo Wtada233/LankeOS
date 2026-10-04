@@ -17,7 +17,7 @@
     "libgtk-4.so.1",
     "libnm.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libnma-gtk4.so",
     "libnma-gtk4.so.0",
     "libnma.so",

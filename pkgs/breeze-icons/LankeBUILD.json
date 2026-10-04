@@ -8,7 +8,7 @@
     "libQt6Gui.so.6",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6BreezeIcons.so",
     "libKF6BreezeIcons.so.6"
   ],

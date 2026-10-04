@@ -14,7 +14,7 @@
     "libgobject-2.0.so.0",
     "liburing.so.2"
   ],
-  "provides": [
+  "provides_soname": [
     "libdex-1.so",
     "libdex-1.so.1"
   ],

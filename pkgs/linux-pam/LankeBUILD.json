@@ -12,7 +12,7 @@
     "libgdbm.so.6",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libpam.so",
     "libpam.so.0",
     "libpam_misc.so",

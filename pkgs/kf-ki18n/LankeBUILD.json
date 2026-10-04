@@ -9,7 +9,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6I18n.so",
     "libKF6I18n.so.6",
     "libKF6I18nLocaleData.so",

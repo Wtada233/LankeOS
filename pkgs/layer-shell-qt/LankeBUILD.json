@@ -13,7 +13,7 @@
     "libstdc++.so.6",
     "libwayland-client.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libLayerShellQtInterface.so",
     "libLayerShellQtInterface.so.6"
   ],

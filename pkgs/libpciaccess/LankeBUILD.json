@@ -7,7 +7,7 @@
     "libc.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libpciaccess.so",
     "libpciaccess.so.0"
   ],

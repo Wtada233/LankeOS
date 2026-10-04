@@ -12,7 +12,7 @@
     "librevenge-stream-0.0.so.0",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libwps-0.4.so",
     "libwps-0.4.so.4"
   ],

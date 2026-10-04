@@ -11,7 +11,7 @@
     "libwayland-client.so.0",
     "libwayland-server.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libnvidia-egl-wayland.so",
     "libnvidia-egl-wayland.so.1"
   ],

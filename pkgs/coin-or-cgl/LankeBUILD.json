@@ -22,7 +22,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libCgl.so",
     "libCgl.so.1"
   ],

@@ -32,7 +32,7 @@
     "libsecret-1.so.0",
     "libstdc++.so.6"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "extra-cmake-modules",

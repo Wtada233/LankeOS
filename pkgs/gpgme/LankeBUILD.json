@@ -12,7 +12,7 @@
     "libgpg-error.so.0",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libgpgme.so",
     "libgpgme.so.45"
   ],

@@ -46,7 +46,7 @@
     "libxcb-render.so.0",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libPlasma.so",
     "libPlasma.so.7",
     "libPlasmaQuick.so",

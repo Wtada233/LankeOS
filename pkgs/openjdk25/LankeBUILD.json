@@ -25,7 +25,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "alsa-lib",
     "base-devel",

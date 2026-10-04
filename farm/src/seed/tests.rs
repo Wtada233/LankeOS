@@ -23,7 +23,7 @@ fn keep_only_current_lpkg_removes_stale_versions() {
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
     let old = dir.join("1.0.lpkg");
-    let cur = dir.join("1.1+2.lpkg");
+    let cur = dir.join("1.1-2.lpkg");
     let unrelated = dir.join("readme.txt");
     fs::write(&old, b"x").unwrap();
     fs::write(&cur, b"x").unwrap();
@@ -40,10 +40,10 @@ fn keep_only_current_lpkg_removes_stale_versions() {
 #[test]
 fn parse_keeps_full_needed_so() {
     // seed 不再剥 needed_so：Index::parse 直接拿到完整 SONAME（ABI 传播的单一真源）
-    let idx = Index::parse("pkg|1.0:h:deps:liba.so.1,libb.so:libc.so.6,libm.so.6\n");
+    let idx = Index::parse("pkg|1.0:h:deps::liba.so.1,libb.so:libc.so.6,libm.so.6|\n");
     let p = &idx.packages["pkg"];
     assert_eq!(p.needed_so, vec!["libc.so.6", "libm.so.6"]);
-    assert_eq!(p.provides, vec!["liba.so.1", "libb.so"]);
+    assert_eq!(p.provides_soname, vec!["liba.so.1", "libb.so"]);
     assert_eq!(p.sha256, "h");
 }
 
@@ -74,6 +74,7 @@ fn pkg_info(sha256: &str) -> crate::graph::PkgInfo {
         sha256: sha256.into(),
         deps: vec![],
         provides: vec![],
+        provides_soname: vec![],
         needed_so: vec![],
     }
 }

@@ -95,6 +95,11 @@ void InstallationTask::register_package()
         for (const auto& cap : cache.get_package_provides(pkg_name_)) {
             cache.remove_provider(cap, pkg_name_);
         }
+        // **SONAME 归属是另一张表**：只撤 `provides` 会让升级后旧版本的 SONAME 归属
+        // 永远留在 `provides_soname.db` 里（后续"谁提供这个 SONAME"给出幽灵答案）。
+        for (const auto& so : cache.get_package_provides_soname(pkg_name_)) {
+            cache.remove_soname_provider(so, pkg_name_);
+        }
         // 旧 needed_so 文件不在此处删除——由下方的 write_string_file_wal 备份后
         // 覆盖（回滚时可恢复旧版 needed_so 元数据）。
     }
@@ -106,7 +111,7 @@ void InstallationTask::register_package()
     }
 
     for (const auto& soname : needed_so_) {
-        auto providers = cache.get_providers(soname);
+        auto providers = cache.get_soname_providers(soname);
         for (const auto& prov_pkg : providers) {
             if (prov_pkg != pkg_name_ && cache.is_installed(prov_pkg)) {
                 // 只记反向依赖（移除时阻止误删），不把 SONAME 提供者写进 deps/：
@@ -160,6 +165,9 @@ void InstallationTask::register_package()
 
     for (const auto& cap : provides_) {
         cache.add_provider(cap, pkg_name_);
+    }
+    for (const auto& so : provides_soname_) {
+        cache.add_soname_provider(so, pkg_name_);
     }
     cache.add_installed(pkg_name_, actual_version_, explicit_install_);
 }

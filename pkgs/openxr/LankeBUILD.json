@@ -9,7 +9,7 @@
     "libjsoncpp.so.27",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libXrApiLayer_api_dump.so",
     "libXrApiLayer_best_practices_validation.so",
     "libXrApiLayer_core_validation.so",

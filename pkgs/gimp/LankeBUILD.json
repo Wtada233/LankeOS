@@ -61,7 +61,7 @@
     "libwebpmux.so.3",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libgimp-3.0.so",
     "libgimp-3.0.so.0",
     "libgimp-scriptfu-3.0.so",

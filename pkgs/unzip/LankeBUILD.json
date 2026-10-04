@@ -9,7 +9,7 @@
     "libbz2.so.1.0",
     "libc.so.6"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "bzip2"

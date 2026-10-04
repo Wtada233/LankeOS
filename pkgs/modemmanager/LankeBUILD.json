@@ -17,7 +17,7 @@
     "libqrtr-glib.so.0",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libmm-glib.so",
     "libmm-glib.so.0"
   ],

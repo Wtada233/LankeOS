@@ -36,9 +36,9 @@
 -   **全生命周期管理**：安装、卸载、升级、重装软件包。
 -   **needed_so 依赖校验**：安装前自动验证每个 ELF DT_NEEDED 声明的 SONAME 在仓库中有对应的提供者包，无提供者则拒绝安装，杜绝"空 provides 还能装"的漏洞。
 -   **SIGINT 优雅退出**：Ctrl+C 设置优雅退出标志，当前操作（含必要回滚）完整执行完毕后退出，防止事务中断导致系统不一致。不提供强制终止——确保回滚永不被打断。
--   **智能版本解析**：支持多位修订号（如 `1.0.0.1`），内置严谨的比较算法，确保 `6.16.1 > 6.6.1`。支持复合区间约束（如 `>= 2.0.0 < 3.0.0`）。
--   **聚合索引**：采用 `index.txt` 聚合格式，一行即可记录包的所有版本及各自的哈希、依赖、provides、needed_so。
--   **包内嵌元数据**：采用 `metadata.json` 嵌入包内，统一存储名称、版本、依赖、needed_so、虚拟提供、手册页等元数据。
+-   **rpm 版本语义**：版本串就是 rpm 的 `[epoch:]version[-release]`，判据只有一份（libsolv 的 EVR 比较）—— 支持多位修订号（`6.16.1 > 6.6.1`）、预发布（`1.0~rc1 < 1.0`）、发行修订号（`1.0-1 > 1.0`）与复合区间约束（`>= 2.0.0 < 3.0.0`）。
+-   **聚合索引**：采用 `index.txt` 聚合格式，一行即可记录包的所有版本及各自的哈希、依赖、provides、provides_soname、needed_so。
+-   **包内嵌元数据**：采用 `metadata.json` 嵌入包内，统一存储名称、版本、依赖、虚拟提供（`provides`）、导出的 SONAME（`provides_soname`）、需要的 SONAME（`needed_so`）、手册页等元数据。
 -   **自动依赖推导**：构建农场（`farm/`，Rust）在打包后扫描 ELF 的 DT_NEEDED SONAME 生成 `needed_so`，并据此解析提供者包名作为 `deps`，无需手动维护版本约束。
 -   **内容即文件布局**：包的 `content/` 目录结构直接对应根目录文件布局。
 -   **自动化运维**：提供 `lrepo-mgr.py` 工具，支持一键推送到 S3 兼容存储或 SCP 远程服务器。新增 `--path` 参数支持本地文件系统仓库，便于离线测试。
@@ -145,7 +145,8 @@ hooks/                # 钩子脚本（可选）
   "name": "curl",
   "version": "8.11.1",
   "deps": ["glibc", "openssl", "zlib", "zstd", "bash"],
-  "provides": ["libcurl.so.4"],
+  "provides": [],
+  "provides_soname": ["libcurl.so.4"],
   "needed_so": ["libc.so.6", "libssl.so.3", "libcrypto.so.3", "libz.so.1", "libzstd.so.1"],
   "man": "curl(1) - transfer a URL\n..."
 }
@@ -156,7 +157,8 @@ hooks/                # 钩子脚本（可选）
 | `name` | 包名 |
 | `version` | 版本号 |
 | `deps` | 依赖包名列表（无版本约束，由构建农场扫描 needed_so 自动解析生成） |
-| `provides` | 本包提供的 SONAME 及虚拟能力列表 |
+| `provides` | 本包提供的**虚拟能力**列表（如 `java-runtime`；与 `.so` 无关） |
+| `provides_soname` | 本包**导出**的 SONAME 列表（由构建农场扫描产物 ELF 生成） |
 | `needed_so` | 本包 ELF 文件声明的 DT_NEEDED SONAME 列表（运行时依赖的原始真相） |
 | `man` | 内联手册页内容（可选） |
 
@@ -211,8 +213,8 @@ MAKEFLAGS="-j$(nproc)"                          # $(nproc) 自动展开为逻辑
 
 ### 索引行示例
 ```text
-# provides/needed_so 在版本块内（第 4、5 字段），每个版本独立
-curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash:libcurl.so.4:libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1|
+# 版本块恰好 6 个冒号字段：版本:哈希:依赖:provides:provides_soname:needed_so
+curl|8.11.1:hash:glibc,openssl,zlib,zstd,bash::libcurl.so.4:libc.so.6,libssl.so.3,libz.so.1,libzstd.so.1|
 ```
 
 ## 源码架构

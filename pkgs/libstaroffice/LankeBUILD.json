@@ -13,7 +13,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libstaroffice-0.0.so",
     "libstaroffice-0.0.so.0"
   ],

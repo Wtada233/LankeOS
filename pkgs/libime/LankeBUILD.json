@@ -11,7 +11,7 @@
     "libstdc++.so.6",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libIMECore.so",
     "libIMECore.so.0",
     "libIMEPinyin.so",

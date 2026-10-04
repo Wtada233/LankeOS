@@ -16,7 +16,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6HunspellInputMethod.so",
     "libQt6HunspellInputMethod.so.6",
     "libQt6VirtualKeyboard.so",

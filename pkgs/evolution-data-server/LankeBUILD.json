@@ -39,7 +39,7 @@
     "libxml2.so.16",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libcamel-1.2.so",
     "libcamel-1.2.so.68",
     "libebackend-1.2.so",

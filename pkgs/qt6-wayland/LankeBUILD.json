@@ -18,7 +18,7 @@
     "libwayland-server.so.0",
     "libxkbcommon.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6WaylandCompositor.so",
     "libQt6WaylandCompositor.so.6",
     "libQt6WaylandEglCompositorHwIntegration.so",

@@ -21,29 +21,32 @@ import pathlib
 import sys
 
 # ── 与 C++ 侧逐字相同的 fixture ──────────────────────────────────────────────
-# 覆盖四种形态，其中**前两种**正是两侧历史上不一致的地方：
+# ⚠️ **订正 2026-10-04（8.0.0，破坏性）**：此前这里覆盖两种**兼容形态** —— 版本级 provides 为空时
+# 回退到**行级**（第 3 个 `|` 段），以及容忍 4/5 字段的版本块。两者都已**废除**：版本块**恰好
+# 6 个字段**、**没有行级 provides**。旧格式的块被**跳过**（不是被误读），与 C++ 侧同判据。
 FIXTURE = (
     "# 注释行与空行应被两侧同样忽略\n"
     "\n"
-    # ① 常规：5 字段齐全
-    "foo|1.0:aaaa:dep1,dep2:libfoo.so.1:libc.so.6|\n"
-    # ② 版本级 provides 为空、**行级** provides 非空 → C++ 回退到行级；Python 曾经完全忽略
-    #    注意：行级 provides 是**第 3 个 `|` 字段**（不是版本块里的冒号字段）
-    "bar|2.0:bbbb::|libbar.so.2\n"
-    # ③ 只有版本号、**没有冒号**的版本块 → C++ 接受（hash 为空）；Python 曾经整块丢弃
-    "baz|3.0\n"
-    # ④ 4 字段、行级也为空 → 两侧都应给出空 provides
-    "qux|4.0:dddd::\n"
+    # ① 常规：6 字段齐全（deps / provides / provides_soname / needed_so）
+    "foo|1.0:aaaa:dep1,dep2:libssl:libfoo.so.1:libc.so.6|\n"
+    # ② 各字段可为空（尾随空字段照样算一个字段）
+    "bar|2.0:bbbb:::libbar.so.2:|\n"
+    # ③ 版本块之间用 `;`；同一行两个版本共享包名
+    "multi|1.0:aaaa:::libm.so.1:;2.0:bbbb::::libm.so.2|\n"
+    # ④ 只有版本号、字段数**不是 6** → **整块跳过**（不做兼容读取）
+    "qux|4.0\n"
 )
 
 # ── 与 C++ 侧逐字相同的期望 ─────────────────────────────────────────────────
 EXPECTED = {
-    "foo": {"1.0": {"sha256": "aaaa", "deps": "dep1,dep2",
-                    "provides": "libfoo.so.1", "needed_so": "libc.so.6"}},
-    "bar": {"2.0": {"sha256": "bbbb", "deps": "",
-                    "provides": "libbar.so.2", "needed_so": ""}},
-    "baz": {"3.0": {"sha256": "", "deps": "", "provides": "", "needed_so": ""}},
-    "qux": {"4.0": {"sha256": "dddd", "deps": "", "provides": "", "needed_so": ""}},
+    "foo": {"1.0": {"sha256": "aaaa", "deps": "dep1,dep2", "provides": "libssl",
+                    "provides_soname": "libfoo.so.1", "needed_so": "libc.so.6"}},
+    "bar": {"2.0": {"sha256": "bbbb", "deps": "", "provides": "",
+                    "provides_soname": "libbar.so.2", "needed_so": ""}},
+    "multi": {"1.0": {"sha256": "aaaa", "deps": "", "provides": "",
+                      "provides_soname": "libm.so.1", "needed_so": ""},
+              "2.0": {"sha256": "bbbb", "deps": "", "provides": "",
+                      "provides_soname": "", "needed_so": "libm.so.2"}},
 }
 
 

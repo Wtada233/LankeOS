@@ -10,7 +10,7 @@
     "libidn2.so.0",
     "libunistring.so.5"
   ],
-  "provides": [
+  "provides_soname": [
     "libpsl.so",
     "libpsl.so.5"
   ],

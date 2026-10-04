@@ -255,11 +255,12 @@ static void run_pack_command(const cxxopts::ParseResult& result)
     // 从源目录读取 metadata.json
     const std::string source_dir = result["directory"].as<std::string>();
     std::string pkg_name, pkg_ver, man;
-    std::vector<std::string> deps, provides, needed_so;
-    detail::read_package_metadata(source_dir, pkg_name, pkg_ver, deps, provides, needed_so, man);
+    std::vector<std::string> deps, provides, provides_soname, needed_so;
+    detail::read_package_metadata(source_dir, pkg_name, pkg_ver, deps, provides, provides_soname,
+                                  needed_so, man);
 
     pack_package(result["output"].as<std::string>(), source_dir, pkg_name, pkg_ver, deps, provides,
-                 man, needed_so);
+                 provides_soname, man, needed_so);
 }
 
 /** 本函数负责 `lpkg build`：至多一个目录参数（多给报错，别假装成功）→ 就地构建。 */

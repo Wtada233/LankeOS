@@ -1,0 +1,4 @@
+P libC 1.0 - libc.so.1 - -
+P libB 1.0 - libb.so.1 libc.so.1 -
+P appA 1.0 - - libb.so.1 -
+T appA

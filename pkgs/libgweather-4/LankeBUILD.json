@@ -17,7 +17,7 @@
     "libsoup-3.0.so.0",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libgweather-4.so",
     "libgweather-4.so.0"
   ],

@@ -7,7 +7,7 @@
     "libc.so.6",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libxcb-util.so",
     "libxcb-util.so.1"
   ],

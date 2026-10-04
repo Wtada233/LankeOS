@@ -115,7 +115,7 @@
     "libzmf-0.0.so.0",
     "libzstd.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "liblibreofficekitgtk.so"
   ],
   "build_deps": [

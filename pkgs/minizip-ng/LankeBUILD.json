@@ -10,7 +10,7 @@
     "liblzma.so.5",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libminizip-ng.so",
     "libminizip-ng.so.1"
   ],

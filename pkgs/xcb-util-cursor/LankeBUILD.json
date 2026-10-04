@@ -11,7 +11,7 @@
     "libxcb-shm.so.0",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libxcb-cursor.so",
     "libxcb-cursor.so.0"
   ],

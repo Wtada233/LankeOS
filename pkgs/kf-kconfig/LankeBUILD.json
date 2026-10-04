@@ -14,7 +14,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6ConfigCore.so",
     "libKF6ConfigCore.so.6",
     "libKF6ConfigGui.so",

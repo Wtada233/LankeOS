@@ -10,7 +10,7 @@
     "libXfixes.so.3",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libXdamage.so",
     "libXdamage.so.1"
   ],

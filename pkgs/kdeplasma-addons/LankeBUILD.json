@@ -54,7 +54,7 @@
     "libstdc++.so.6",
     "libudev.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libplasmapotdprovidercore.so",
     "libplasmapotdprovidercore.so.2",
     "libplasmaweatherdata.so",

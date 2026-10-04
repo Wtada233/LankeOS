@@ -16,7 +16,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libCoinUtils.so",
     "libCoinUtils.so.3"
   ],

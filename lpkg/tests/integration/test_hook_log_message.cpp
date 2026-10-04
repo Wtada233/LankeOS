@@ -79,7 +79,7 @@ protected:
         std::ofstream(work / "hooks" / std::string(constants::POSTINST_SH)) << "#!/bin/sh\ntrue\n";
         std::ofstream(work / "hooks" / std::string(constants::PRERM_SH)) << "#!/bin/sh\ntrue\n";
         const std::string path = (pkg_dir / (name + "-1.0.lpkg")).string();
-        pack_package(path, work.string(), name, "1.0", {}, {}, "man " + name, {});
+        pack_package(path, work.string(), name, "1.0", {}, {}, {}, "man " + name, {});
         return path;
     }
 

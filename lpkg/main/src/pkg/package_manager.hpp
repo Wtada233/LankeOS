@@ -17,10 +17,11 @@ struct InstallPlan {
     bool is_explicit = false;  ///< 用户显式指定安装
     std::filesystem::path local_path;
     std::vector<DependencyInfo> dependencies;
-    std::vector<std::string> provides;
-    std::vector<std::string> needed_so;
-    bool force_reinstall = false;    ///< 强制重新安装
-    bool metadata_verified = false;  ///< 是否已验证元数据
+    std::vector<std::string> provides;         // 虚拟 provider
+    std::vector<std::string> provides_soname;  // 导出的 SONAME
+    std::vector<std::string> needed_so;        // 需要的 SONAME
+    bool force_reinstall = false;              ///< 强制重新安装
+    bool metadata_verified = false;            ///< 是否已验证元数据
     /**
      * 该包的 content/ 是否已由**整批文件冲突预检**下载解压到标准临时目录
      * （check_batch_file_conflicts 置位）。
@@ -120,6 +121,10 @@ public:
     {
         return provides_;
     }
+    const std::vector<std::string>& provides_soname() const
+    {
+        return provides_soname_;
+    }
     const std::filesystem::path& archive_path() const
     {
         return archive_path_;
@@ -184,6 +189,7 @@ private:
     bool content_ready_ = false;
     std::vector<std::string> deps_;
     std::vector<std::string> provides_;
+    std::vector<std::string> provides_soname_;
     std::vector<std::string> needed_so_;
     std::string man_content_;
 

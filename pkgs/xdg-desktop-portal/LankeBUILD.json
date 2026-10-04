@@ -16,7 +16,7 @@
     "libpipewire-0.3.so.0",
     "libsystemd.so.0"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "bubblewrap",

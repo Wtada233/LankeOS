@@ -15,7 +15,7 @@
     "libxml2.so.16",
     "libxslt.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libxmlsec1-gnutls.so",
     "libxmlsec1-gnutls.so.10312",
     "libxmlsec1-nss.so",

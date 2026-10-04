@@ -12,7 +12,7 @@
     "libwebpdemux.so.2",
     "libwebpmux.so.3"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "cmake",

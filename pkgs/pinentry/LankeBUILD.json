@@ -9,7 +9,7 @@
     "libgpg-error.so.0",
     "libncursesw.so.6"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "libassuan",

@@ -84,6 +84,7 @@ protected:
     std::string create_pkg(const std::string& name, const std::string& ver,
                            const std::vector<std::string>& deps = {},
                            const std::vector<std::string>& provides = {},
+                           const std::vector<std::string>& provides_soname = {},
                            const std::vector<std::string>& needed_so = {})
     {
         fs::path work_dir = suite_work_dir / ("pkg_work_" + name);
@@ -91,7 +92,8 @@ protected:
         std::ofstream(work_dir / "content" / "usr" / "bin" / name).close();
 
         const std::string pkg_path = (pkg_dir / std::format("{}-{}.lpkg", name, ver)).string();
-        pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, "", needed_so);
+        pack_package(pkg_path, work_dir.string(), name, ver, deps, provides, provides_soname, "",
+                     needed_so);
 
         fs::path mirror_pkg_dir = mirror_dir / name;
         fs::create_directories(mirror_pkg_dir);
@@ -102,15 +104,15 @@ protected:
     }
 
     void update_index(const std::vector<std::tuple<std::string, std::string, std::string,
-                                                   std::string, std::string>>& entries)
+                                                   std::string, std::string, std::string>>& entries)
     {
         std::ofstream index(mirror_dir / "index.txt");
-        for (const auto& [name, ver, deps, provides, needed_so] : entries) {
+        for (const auto& [name, ver, deps, provides, provides_soname, needed_so] : entries) {
             std::string hash = "unknown";
             const fs::path pkg_path = pkg_dir / (std::format("{}-{}.lpkg", name, ver));
             if (fs::exists(pkg_path)) hash = calculate_sha256(pkg_path);
             index << name << "|" << ver << ":" << hash << ":" << deps << ":" << provides << ":"
-                  << needed_so << "\n";
+                  << provides_soname << ":" << needed_so << "\n";
         }
     }
 
@@ -142,11 +144,11 @@ protected:
     /** 建仓库：app 需要 soname，pkg-prov 提供它 */
     void setup_repo_with_provider(const std::string& soname)
     {
-        create_pkg("pkg-prov", "1.0", {}, {soname});
-        create_pkg("app", "1.0", {}, {}, {soname});
+        create_pkg("pkg-prov", "1.0", {}, {}, {soname});
+        create_pkg("app", "1.0", {}, {}, {}, {soname});
         update_index({
-            {"app", "1.0", "", "", soname},
-            {"pkg-prov", "1.0", "", soname, ""},
+            {"app", "1.0", "", "", "", soname},
+            {"pkg-prov", "1.0", "", "", soname, ""},
         });
     }
 };

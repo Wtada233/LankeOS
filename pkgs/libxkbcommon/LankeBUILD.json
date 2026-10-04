@@ -10,7 +10,7 @@
     "libxcb.so.1",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libxkbcommon-x11.so",
     "libxkbcommon-x11.so.0",
     "libxkbcommon.so",

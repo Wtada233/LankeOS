@@ -41,7 +41,7 @@
     "libstdc++.so.6",
     "libxml2.so.16"
   ],
-  "provides": [
+  "provides_soname": [
     "libKF6KIOCore.so",
     "libKF6KIOCore.so.6",
     "libKF6KIOFileWidgets.so",

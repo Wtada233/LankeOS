@@ -17,7 +17,7 @@
     "libm.so.6",
     "libunwind.so.8"
   ],
-  "provides": [
+  "provides_soname": [
     "libgstbase-1.0.so",
     "libgstbase-1.0.so.0",
     "libgstcheck-1.0.so",

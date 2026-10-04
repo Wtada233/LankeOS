@@ -9,7 +9,7 @@
     "libxcb-util.so.1",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libxcb-image.so",
     "libxcb-image.so.0"
   ],

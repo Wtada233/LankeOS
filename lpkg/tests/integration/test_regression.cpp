@@ -75,7 +75,8 @@ protected:
                       fs::copy_options::overwrite_existing);
         std::string hash = calculate_sha256(pkg_path);
         std::ofstream index(suite_work_dir / "mirror" / "x86_64" / "index.txt", std::ios::app);
-        index << name << "|" << ver << ":" << hash << ":|" << std::endl;
+        // 6 段版本块（非 6 段会被严格解析整行跳过 → 镜像解析出 0 个包）。
+        index << name << "|" << ver << ":" << hash << "::::\n";
         fs::remove_all(work_dir);
         return pkg_path;
     }

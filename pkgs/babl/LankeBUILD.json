@@ -9,7 +9,7 @@
     "liblcms2.so.2",
     "libm.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libbabl-0.1.so",
     "libbabl-0.1.so.0"
   ],

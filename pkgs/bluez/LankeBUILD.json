@@ -15,7 +15,7 @@
     "libsystemd.so.0",
     "libudev.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libbluetooth.so",
     "libbluetooth.so.3"
   ],

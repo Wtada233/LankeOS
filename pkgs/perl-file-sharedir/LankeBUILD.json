@@ -7,7 +7,7 @@
     "perl-class-inspector"
   ],
   "needed_so": [],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "perl-class-inspector",

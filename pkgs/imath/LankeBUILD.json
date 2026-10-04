@@ -7,7 +7,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libImath-3_2.so",
     "libImath-3_2.so.30",
     "libImath.so"

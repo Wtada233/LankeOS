@@ -119,7 +119,8 @@ protected:
             f << content;
         }
         std::string pkg_path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
-        pack_package(pkg_path, work_dir.string(), name, ver, {}, {}, "Man page for " + name, {});
+        pack_package(pkg_path, work_dir.string(), name, ver, {}, {}, {}, "Man page for " + name,
+                     {});
         fs::remove_all(work_dir);
         return pkg_path;
     }
@@ -147,7 +148,8 @@ protected:
             fs::create_symlink(target, p);
         }
         std::string pkg_path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
-        pack_package(pkg_path, work_dir.string(), name, ver, {}, {}, "Man page for " + name, {});
+        pack_package(pkg_path, work_dir.string(), name, ver, {}, {}, {}, "Man page for " + name,
+                     {});
         fs::remove_all(work_dir);
         return pkg_path;
     }

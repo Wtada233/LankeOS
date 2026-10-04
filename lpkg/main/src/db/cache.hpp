@@ -116,12 +116,22 @@ public:
      */
     std::vector<std::pair<std::string, std::string>> get_package_xattr_keys(std::string_view pkg);
 
-    /** 添加 provider（能力名称 -> 包名） */
+    /** 添加**虚拟 provider**（能力名称 -> 包名） */
     void add_provider(std::string_view capability, std::string_view pkg);
-    /** 移除 provider */
+    /** 移除虚拟 provider */
     void remove_provider(std::string_view capability, std::string_view pkg);
     /** 查询提供某能力的包集合 */
     std::unordered_set<std::string> get_providers(std::string_view capability);
+
+    // ── SONAME 归属（**另一张表**，与上面的虚拟 provider 表并列）──────────────────────────
+    // 两张表**故意不合并**：合并了就会让"依赖包名/虚拟能力"与"需要 SONAME"互相误匹配 ——
+    // 那正是 8.0.0 字段拆分要根除的毛病（`provides_soname.db` ↔ `provides.db`）。
+    /** 添加 SONAME 归属（SONAME -> 包名） */
+    void add_soname_provider(std::string_view soname, std::string_view pkg);
+    /** 移除 SONAME 归属 */
+    void remove_soname_provider(std::string_view soname, std::string_view pkg);
+    /** 谁提供了这个 SONAME */
+    std::unordered_set<std::string> get_soname_providers(std::string_view soname);
 
     /** 添加反向依赖记录 */
     void add_reverse_dep(std::string_view dep, std::string_view pkg);
@@ -141,6 +151,8 @@ public:
     std::unordered_set<std::string> get_package_files(std::string_view pkg);
     /** 获取某包提供的所有能力 */
     std::unordered_set<std::string> get_package_provides(std::string_view pkg);
+    /** 这个包**导出**了哪些 SONAME */
+    std::unordered_set<std::string> get_package_provides_soname(std::string_view pkg);
 
     // ===== 迭代支持：**一律值语义快照**（2026-10-03 收紧） =====
     //
@@ -176,8 +188,10 @@ private:
     std::map<std::string, std::unordered_set<std::string>, std::less<>> conf_hashes;
     // xattr 键归属数据库（`<逻辑路径>\x1f<base64 键>` -> 属主包名集合；见 xattr_keys_db()）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> xattr_keys;
-    // providers 数据库（能力 -> 包名集合）
+    // providers 数据库（**虚拟能力** -> 包名集合）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> providers;
+    // SONAME 归属数据库（**SONAME** -> 包名集合）
+    std::map<std::string, std::unordered_set<std::string>, std::less<>> provides_soname;
     // 已安装包（包名 -> 版本）
     std::map<std::string, std::string, std::less<>> installed_pkgs;
     // 锁定包名集合
@@ -209,6 +223,8 @@ public:
     void write_xattr_keys();
     /** 直接写入 providers 数据库 */
     void write_providers();
+    /** 直接写入 SONAME 归属数据库 */
+    void write_provides_soname();
 
     /** 从 installed_pkgs 构建 set 格式数据 */
     std::unordered_set<std::string> build_pkgs_set() const;

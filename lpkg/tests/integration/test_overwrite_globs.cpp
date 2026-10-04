@@ -76,7 +76,7 @@ protected:
         fs::create_directories(work / "content");
         fill(work / "content");
         const std::string path = (pkg_dir / (name + "-" + ver + ".lpkg")).string();
-        pack_package(path, work.string(), name, ver, deps, {}, "man " + name, {});
+        pack_package(path, work.string(), name, ver, deps, {}, {}, "man " + name, {});
         return path;
     }
 

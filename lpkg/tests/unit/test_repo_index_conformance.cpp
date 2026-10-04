@@ -1,7 +1,7 @@
 /**
  * test_repo_index_conformance.cpp — 索引格式的**跨语言契约**（C++ 侧）
  *
- * 索引格式 `name|ver:hash:deps:provides:needed_so;ver2:…|包级提供` 有两份读者：
+ * 索引格式 `name|ver:hash:deps:provides:provides_soname:needed_so;ver2:…|` 有两份读者：
  *   · **C++**：`base/utils.cpp` 的 `parse_repo_index_line()`（lpkg 唯一的解析器，
  *     `repository.cpp` 与 `depend_scanner.cpp` 共用）
  *   · **Python**：`main/scripts/lrepo-mgr.py` 的 `parse_aggregated_index()` —— 它的结果会被
@@ -14,9 +14,10 @@
  *   · Python 侧：`main/scripts/check_index_conformance.py`（`make check-index-format`）
  * 任一侧漂移，都会被其中一边抓住。
  *
- * 本 fixture 的**前两条**正是历史上两侧不一致的地方（2026-10-03 对齐）：
- *   ① 版本级 provides 为空 ⇒ **回退到行级**（Python 原先完全忽略）
- *   ② 只含版本号、**没有冒号**的版本块是合法的（Python 原先整块丢弃）
+ * ⚠️ **订正 2026-10-04（8.0.0，破坏性）**：本 fixture 曾覆盖两种**兼容形态** —— 版本级
+ * provides 为空时回退到**行级**（第 3 个 `|` 段），以及容忍 4/5 字段的版本块。两者都已
+ * **废除**：版本块**恰好 6 个字段**、**没有行级 provides**。旧格式的块被**跳过**（不是被
+ * 误读），与 Python 侧同判据。原有两条点名这些兼容行为的用例已随之删除/改写。
  *
  * ⚠️ 改本文件的 fixture 或期望时，**必须同时改** `check_index_conformance.py` 里那一份 ——
  *    两处逐字相同是这套契约的**全部**机制（没有生成器，也不建依赖）。
@@ -37,23 +38,23 @@ namespace
 constexpr const char* kFixture =
     "# 注释行与空行应被两侧同样忽略\n"
     "\n"
-    "foo|1.0:aaaa:dep1,dep2:libfoo.so.1:libc.so.6|\n"  // 常规：5 字段齐全
-    "bar|2.0:bbbb::|libbar.so.2\n"                     // 行级 provides 回退
-    "baz|3.0\n"                                        // 1 字段版本块
-    "qux|4.0:dddd::\n";                                // 4 字段、行级也为空
+    "foo|1.0:aaaa:dep1,dep2:libssl:libfoo.so.1:libc.so.6|\n"  // 常规：6 字段齐全
+    "bar|2.0:bbbb:::libbar.so.2:|\n"                          // 各字段可为空
+    "multi|1.0:aaaa:::libm.so.1:;2.0:bbbb::::libm.so.2|\n"    // 版本块间 `;`，共享包名
+    "qux|4.0\n";  // 字段数不是 6 → 整块跳过（不做兼容读取）
 
 struct Fields {
-    std::string sha256, deps, provides, needed_so;
+    std::string sha256, deps, provides, provides_soname, needed_so;
 };
 
 /// 与 check_index_conformance.py 的 EXPECTED **逐字对应**
 const std::map<std::string, std::map<std::string, Fields>>& expected()
 {
     static const std::map<std::string, std::map<std::string, Fields>> kExpected = {
-        {"foo", {{"1.0", {"aaaa", "dep1,dep2", "libfoo.so.1", "libc.so.6"}}}},
-        {"bar", {{"2.0", {"bbbb", "", "libbar.so.2", ""}}}},
-        {"baz", {{"3.0", {"", "", "", ""}}}},
-        {"qux", {{"4.0", {"dddd", "", "", ""}}}},
+        {"foo", {{"1.0", {"aaaa", "dep1,dep2", "libssl", "libfoo.so.1", "libc.so.6"}}}},
+        {"bar", {{"2.0", {"bbbb", "", "", "libbar.so.2", ""}}}},
+        {"multi",
+         {{"1.0", {"aaaa", "", "", "libm.so.1", ""}}, {"2.0", {"bbbb", "", "", "", "libm.so.2"}}}},
     };
     return kExpected;
 }
@@ -70,9 +71,10 @@ TEST(RepoIndexConformanceTest, CParserMatchesTheSharedContract)
         p = nl ? nl + 1 : p + std::strlen(p);
 
         const auto blocks = parse_repo_index_line(line);
-        if (blocks.empty()) continue;  // 注释行 / 空行
+        if (blocks.empty()) continue;  // 注释行 / 空行 / 字段数不是 6 的块
         for (const auto& b : blocks) {
-            got[b.name][b.version] = Fields{b.hash, b.deps, b.provides, b.needed_so};
+            got[b.name][b.version] =
+                Fields{b.hash, b.deps, b.provides, b.provides_soname, b.needed_so};
         }
     }
 
@@ -89,24 +91,31 @@ TEST(RepoIndexConformanceTest, CParserMatchesTheSharedContract)
             const Fields& have = got.at(name).at(ver);
             EXPECT_EQ(have.sha256, want.sha256) << name << " " << ver << " 的 sha256";
             EXPECT_EQ(have.deps, want.deps) << name << " " << ver << " 的 deps";
-            EXPECT_EQ(have.provides, want.provides) << name << " " << ver
-                                                    << " 的 provides"
-                                                       "（版本级为空时应回退到**行级**第 3 段）";
+            EXPECT_EQ(have.provides, want.provides) << name << " " << ver << " 的 provides";
+            EXPECT_EQ(have.provides_soname, want.provides_soname)
+                << name << " " << ver << " 的 provides_soname";
             EXPECT_EQ(have.needed_so, want.needed_so) << name << " " << ver << " 的 needed_so";
         }
     }
 }
 
-/** 正面点名两条历史分叉 —— 上面那套遍历若被改写，这两条仍会独立地把它钉住。 */
-TEST(RepoIndexConformanceTest, RowLevelProvidesFallbackAndOneFieldBlock)
+/**
+ * 正面点名两条 8.0.0 判据（上面那套遍历若被改写，这两条仍会独立地把它钉住）：
+ *   ① 版本块**恰好 6 字段**：4/5 字段的旧块整块跳过（不再误读、也没有行级回退）；
+ *   ② `;` 分隔的第二个版本块照常解析（与第一个共享包名）。
+ */
+TEST(RepoIndexConformanceTest, SixFieldBlocksOnlyAndAggregatedVersions)
 {
-    const auto bar = parse_repo_index_line("bar|2.0:bbbb::|libbar.so.2");
-    ASSERT_EQ(bar.size(), 1u);
-    EXPECT_EQ(bar[0].provides, "libbar.so.2") << "版本级 provides 为空时必须回退到行级（Python "
-                                                 "侧曾忽略它，见 check_index_conformance.py）";
+    // 4 字段（旧写入器把 provides 写在 vh[3]）→ 跳过；5 字段同理
+    EXPECT_TRUE(parse_repo_index_line("qux|4.0\n").empty())
+        << "4 字段（只有版本号）的块必须整块跳过，不做兼容读取";
+    EXPECT_TRUE(parse_repo_index_line("old|1.0:aaaa:dep1:libfoo.so.1\n").empty())
+        << "5 字段的旧块必须整块跳过（少一个字段会让后面整体错位）";
 
-    const auto baz = parse_repo_index_line("baz|3.0");
-    ASSERT_EQ(baz.size(), 1u) << "只含版本号的版本块**是合法的**，不该整块丢弃";
-    EXPECT_EQ(baz[0].version, "3.0");
-    EXPECT_TRUE(baz[0].hash.empty()) << "没有哈希字段就该是空串，不是解析失败";
+    const auto multi = parse_repo_index_line("multi|1.0:aaaa:::libm.so.1:;2.0:bbbb::::libm.so.2|");
+    ASSERT_EQ(multi.size(), 2u);
+    EXPECT_EQ(multi[0].version, "1.0");
+    EXPECT_EQ(multi[0].provides_soname, "libm.so.1");
+    EXPECT_EQ(multi[1].version, "2.0");
+    EXPECT_EQ(multi[1].needed_so, "libm.so.2");
 }

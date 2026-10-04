@@ -15,7 +15,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libOsi.so",
     "libOsi.so.1",
     "libOsiCommonTests.so",

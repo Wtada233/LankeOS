@@ -10,7 +10,7 @@
     "libm.so.6",
     "libtcl8.6.so"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel"
   ],

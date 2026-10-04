@@ -14,7 +14,7 @@
     "libsqlite3.so.0",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libfreebl3.so",
     "libfreeblpriv3.so",
     "libnss3.so",

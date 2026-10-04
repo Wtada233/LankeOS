@@ -17,7 +17,7 @@
     "libm.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6LabsAnimation.so",
     "libQt6LabsAnimation.so.6",
     "libQt6LabsFolderListModel.so",

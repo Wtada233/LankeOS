@@ -21,7 +21,7 @@ hero:
 
 features:
   - title: ↻ ABI-Driven Incremental Builds
-    details: The lankefarm build farm computes removed SONAMEs from the old index's needed_so / provides and locates the consuming packages directly — no transitive closure. A libxml2 break rebuilds llvm only; if llvm's ABI is unchanged, rust stays put. The rebuild set is exactly the set that must be rebuilt.
+    details: The lankefarm build farm computes removed SONAMEs from the old index's needed_so / provides_soname and locates the consuming packages directly — no transitive closure. A libxml2 break rebuilds llvm only; if llvm's ABI is unchanged, rust stays put. The rebuild set is exactly the set that must be rebuilt.
   - title: ⇄ ABI Transition Backups
     details: When a library's SONAME changes, the old .so is backed up automatically and injected into every build container, so both ABIs coexist throughout the rebuild. Already-installed binaries never break because of a library upgrade.
   - title: ▲ Declarative Upstream Tracking

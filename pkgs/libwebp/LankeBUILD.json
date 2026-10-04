@@ -12,7 +12,7 @@
     "libtiff.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libsharpyuv.so",
     "libsharpyuv.so.0",
     "libwebp.so",

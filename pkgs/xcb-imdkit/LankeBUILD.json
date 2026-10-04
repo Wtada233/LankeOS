@@ -11,7 +11,7 @@
     "libxcb-util.so.1",
     "libxcb.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libxcb-imdkit.so",
     "libxcb-imdkit.so.1"
   ],

@@ -34,7 +34,7 @@
     "libtiff.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libpoppler-cpp.so",
     "libpoppler-cpp.so.3",
     "libpoppler-glib.so",

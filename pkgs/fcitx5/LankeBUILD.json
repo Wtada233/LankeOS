@@ -40,7 +40,7 @@
     "libyogacore.so",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libFcitx5Config.so",
     "libFcitx5Config.so.6",
     "libFcitx5Core.so",

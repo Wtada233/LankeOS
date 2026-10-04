@@ -10,7 +10,7 @@
     "libXmuu.so.1",
     "libc.so.6"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "libx11",

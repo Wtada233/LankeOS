@@ -12,7 +12,7 @@
     "libstdc++.so.6",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "libmozjs-140.so"
   ],
   "build_deps": [

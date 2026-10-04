@@ -10,7 +10,7 @@
     "libX11.so.6",
     "libc.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libXcomposite.so",
     "libXcomposite.so.1"
   ],

@@ -10,10 +10,13 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// 有效版本 = `version` [`-release`]。⚠️ **8.0.0 起分隔符是 `-`（rpm 的 release 语义），
+/// 不再是 `+`** —— lpkg 那边版本串原样进 libsolv，`+N` 在 rpm 里只是普通字符，拼出来会
+/// 变成"版本里多了个 +N 段"（既不是 release，排序也错）。见 lpkg `vercmp/version.hpp`。
 pub(crate) fn effective_version(pkgs_dir: &Path, pkg: &str) -> Option<String> {
     let b = read_lankebuild(pkgs_dir, pkg)?;
     Some(if let Some(r) = b.release {
-        format!("{}+{r}", b.version)
+        format!("{}-{r}", b.version)
     } else {
         b.version
     })
@@ -57,7 +60,7 @@ pub(crate) fn repack_if_drift(
     // actual.deps 恒空：farm 不扫 deps（gen_deps 生成，decide 不比较）
     let actual = crate::verify::ScanResult::from_parts(
         outcome.needed_so.clone(),
-        outcome.provides.clone(),
+        outcome.provides_soname.clone(),
         Vec::new(),
     );
     // 期望值 = .lpkg 内 metadata.json（由 lpkg build 从 LankeBUILD.json 写入）；
@@ -67,7 +70,9 @@ pub(crate) fn repack_if_drift(
         crate::verify::decide(&actual, &expected) != crate::verify::VerifyAction::Unchanged;
     // 无条件重打（level 22 + mtime 1970；漂移时顺带修正 metadata.json），复用 scan 的解包目录。
     // metadata 重写幂等 → 无漂移路径只是重新编码/归一化，产出字节确定。
-    match repack::repack_with_metadata(lpkg, &extract, &outcome.needed_so, &outcome.provides) {
+    // 只写 needed_so/provides_soname；`provides`（虚拟 provider）原样保留。
+    match repack::repack_with_metadata(lpkg, &extract, &outcome.needed_so, &outcome.provides_soname)
+    {
         Ok(()) => Ok(drifted),
         Err(e) => Err(format!("repack {} 失败: {e}", pkg).into()),
     }
@@ -98,12 +103,14 @@ pub(crate) fn place_in_repo(
         for e in rd.flatten() {
             let p = e.path();
             if p.extension().and_then(|x| x.to_str()) == Some("lpkg") && p != dest {
-                backup_removed_sonames(&opts.out_dir, &p, pkg, &outcome.provides).map_err(|e| {
-                    format!(
-                        "备份 {} 的旧 SONAME 失败（{e}），保留旧版本不删除",
-                        p.display()
-                    )
-                })?;
+                backup_removed_sonames(&opts.out_dir, &p, pkg, &outcome.provides_soname).map_err(
+                    |e| {
+                        format!(
+                            "备份 {} 的旧 SONAME 失败（{e}），保留旧版本不删除",
+                            p.display()
+                        )
+                    },
+                )?;
                 fs::remove_file(&p).map_err(|e| format!("删除旧版本 {:?} 失败: {e}", p))?;
             }
         }
@@ -116,8 +123,8 @@ pub(crate) fn place_in_repo(
 /// 容器构建时 cp 进 /usr/lib（见 lpkg_binding），旧二进制（链旧 SONAME，如 gettext 链
 /// libxml2.so.2）在过渡期能加载旧 .so；新构建用新 .so。
 ///
-/// **只备份旧 provides 有、新打包消失的 ABI 面 SONAME**（与检测端 `removed_sonames` **共用**
-/// `soname_provides_of`：`removed = ABI(old) − ABI(new)`，保证备份与 ABI 检查逻辑完全对称）：
+/// **只备份旧 `provides_soname` 有、新打包消失的 ABI 面 SONAME**（与检测端 `removed_sonames`
+/// **共用** `soname_provides_of`：`removed = ABI(old) − ABI(new)`，保证备份与 ABI 检查逻辑完全对称）：
 /// - 版本化 `.so.*`：SONAME 本体 + 实体（libfoo.so.1 / libfoo.so.1.2.3）
 /// - 无 SONAME 的运行时库（如 tcl 的 libtcl8.6.so、expect 的 libexpect5.45.4.so）：文件名即身份
 /// - 符号链接**保留本身**（ldconfig 要求版本化 SONAME 是符号链接，否则报 dirty），并**复刻目录树**
@@ -133,12 +140,12 @@ pub(crate) fn backup_removed_sonames(
     out_dir: &Path,
     old_lpkg: &Path,
     pkg: &str,
-    new_provides: &[String],
+    new_provides_soname: &[String],
 ) -> Result<(), FarmError> {
     let Ok(meta) = crate::scan::read_lpkg_metadata(old_lpkg) else {
         return Ok(());
     };
-    let old_provides: Vec<String> = meta["provides"]
+    let old_provides_soname: Vec<String> = meta["provides_soname"]
         .as_array()
         .map(|a| {
             a.iter()
@@ -147,10 +154,10 @@ pub(crate) fn backup_removed_sonames(
         })
         .unwrap_or_default();
     // ABI 面 SONAME 差集（与检测端 removed_sonames 共用 soname_provides_of，保证对称）：
-    // 版本化 .so.* + 无 SONAME 实体库；dev symlink / 虚拟提供不算 ABI 面，不进入备份。
+    // 版本化 .so.* + 无 SONAME 实体库；dev symlink 不算 ABI 面，不进入备份。
     let removed_set: std::collections::HashSet<String> = {
-        let old_s = crate::graph::soname_provides_of(&old_provides);
-        let new_s = crate::graph::soname_provides_of(new_provides);
+        let old_s = crate::graph::soname_provides_of(&old_provides_soname);
+        let new_s = crate::graph::soname_provides_of(new_provides_soname);
         old_s.difference(&new_s).cloned().collect()
     };
     if removed_set.is_empty() {
@@ -435,10 +442,13 @@ fn abs_target_rel(target: &Path) -> PathBuf {
     crate::scan::strip_lib_dir(abs).unwrap_or_else(|| abs.to_path_buf())
 }
 
-/// 更新本地 repo index.txt：替换该包的版本块（写入 metadata.json 转述的 deps；新 version/hash/provides）。
+/// 更新本地 repo index.txt：替换该包的版本块（写入 metadata.json 转述的 deps；新 version/hash/
+/// provides/provides_soname）。
 /// **写回完整 needed_so**——index.txt 是唯一真源（容器可见索引与 farm 的 ABI 传播共用，
 /// 不再剥 needed_so、不再有第二份 .abi.json）。
-#[allow(clippy::too_many_arguments)] // 8 个异构参数（路径/名/版本/哈希/三个依赖切片），分组结构体反而绕
+/// 新格式：`name|ver:hash:deps:provides:provides_soname:needed_so|`（每行 3 个 `|` 段、
+/// 每版本块 6 个冒号字段）。
+#[allow(clippy::too_many_arguments)] // 9 个异构参数（路径/名/版本/哈希/四个切片），分组结构体反而绕
 pub(crate) fn update_repo_index(
     out_dir: &Path,
     arch: &str,
@@ -447,6 +457,7 @@ pub(crate) fn update_repo_index(
     hash: &str,
     deps: &[String],
     provides: &[String],
+    provides_soname: &[String],
     needed_so: &[String],
 ) -> Result<(), FarmError> {
     let path = out_dir.join(arch).join("index.txt");
@@ -463,26 +474,24 @@ pub(crate) fn update_repo_index(
             lines.push(line.to_string());
             continue;
         }
-        // 替换该包的行：写入转述的 deps
-        let mut parts = line.splitn(3, '|');
-        let _ = parts.next();
-        let _rest = parts.next().unwrap_or("");
-        let pkg_level = parts.next().unwrap_or("").to_string();
+        // 替换该包的行：写入转述的 deps + 虚拟 provides + 扫描 provides_soname + 完整 needed_so
         let new_line = format!(
-            "{pkg}|{version}:{hash}:{}:{}:{}|{pkg_level}",
+            "{pkg}|{version}:{hash}:{}:{}:{}:{}|",
             deps.join(","),
             provides.join(","),
+            provides_soname.join(","),
             needed_so.join(",")
         );
         lines.push(new_line);
         found = true;
     }
     if !found {
-        // 新包：追加一行（写转述的 deps + 完整 provides + needed_so）
+        // 新包：追加一行（写转述的 deps + 虚拟 provides + 扫描 provides_soname + 完整 needed_so）
         lines.push(format!(
-            "{pkg}|{version}:{hash}:{deps}:{provides}:{needed_so}|",
+            "{pkg}|{version}:{hash}:{deps}:{provides}:{provides_soname}:{needed_so}|",
             deps = deps.join(","),
             provides = provides.join(","),
+            provides_soname = provides_soname.join(","),
             needed_so = needed_so.join(",")
         ));
     }
@@ -512,7 +521,9 @@ pub(crate) fn bump_release(pkgs_dir: &Path, pkg: &str) {
     }
 }
 
-/// 元数据漂移双写：LankeBUILD.json 的 needed_so/provides 同步为扫描实际值（规则 2）。
+/// 元数据漂移双写：LankeBUILD.json 的 needed_so/provides_soname 同步为扫描实际值（规则 2）。
+/// **`provides`（纯虚拟 provider）是手写值，farm 原样保留、绝不触碰**——这正是"虚拟 provider
+/// 永远存不下来"的根因修复（旧实现把扫描结果直接盖上手写值，真实仓库 100% 被 SONAME 覆盖）。
 pub(crate) fn update_lankebuild_metadata(pkgs_dir: &Path, pkg: &str, outcome: &BuildOutcome) {
     let path = super::recipe_json_path(pkgs_dir, pkg);
     let Ok(content) = fs::read_to_string(&path) else {
@@ -528,9 +539,9 @@ pub(crate) fn update_lankebuild_metadata(pkgs_dir: &Path, pkg: &str, outcome: &B
             .map(|s| serde_json::Value::String(s.clone()))
             .collect(),
     );
-    v["provides"] = serde_json::Value::Array(
+    v["provides_soname"] = serde_json::Value::Array(
         outcome
-            .provides
+            .provides_soname
             .iter()
             .map(|s| serde_json::Value::String(s.clone()))
             .collect(),

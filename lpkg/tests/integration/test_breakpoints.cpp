@@ -50,7 +50,7 @@ TEST_F(BreakpointTest, InstallFailsOnUnresolvableDep)
 {
     // C 需要不存在的 SONAME → 安装应失败，整批回滚
     std::string pA = create_pkg("bf_A", "1.0");
-    std::string pBad = create_pkg("bf_bad", "1.0", {"bf_A"}, {}, {"ghost.needed.so"});
+    std::string pBad = create_pkg("bf_bad", "1.0", {"bf_A"}, {}, {}, {"ghost.needed.so"});
 
     EXPECT_THROW(install_packages({pBad, pA}), LpkgException);
 
@@ -66,8 +66,8 @@ TEST_F(BreakpointTest, UpgradeAbiBreakPreventsUpgrade)
 {
     setup_local_mirror();
 
-    std::string pLib = create_pkg("bk_lib", "1.0", {}, {"bk.so.1"});
-    std::string pApp = create_pkg("bk_app", "1.0", {"bk_lib"}, {}, {"bk.so.1"});
+    std::string pLib = create_pkg("bk_lib", "1.0", {}, {}, {"bk.so.1"});
+    std::string pApp = create_pkg("bk_app", "1.0", {"bk_lib"}, {}, {}, {"bk.so.1"});
     add_to_mirror("bk_lib", "1.0");
     add_to_mirror("bk_app", "1.0");
 
@@ -81,12 +81,12 @@ TEST_F(BreakpointTest, UpgradeAbiBreakPreventsUpgrade)
         std::ofstream(work / "metadata.json")
             << R"({"name":"bk_lib","version":"2.0","deps":[],"provides":["bk.so.2"],"needed_so":[]})";
         std::string v2 = (pkg_dir / "bk_lib-2.0.lpkg").string();
-        pack_package(v2, work.string(), "bk_lib", "2.0", {}, {"bk.so.2"});
+        pack_package(v2, work.string(), "bk_lib", "2.0", {}, {}, {"bk.so.2"});
         auto mirror = suite_work_dir / "mirror" / "x86_64";
         fs::create_directories(mirror / "bk_lib");
         fs::copy(v2, mirror / "bk_lib" / "2.0.lpkg");
         std::ofstream idx(mirror / "index.txt");
-        idx << "bk_lib|1.0:::bk.so.1:;2.0:::bk.so.2:|\nbk_app|1.0::bk_lib::bk.so.1|\n";
+        idx << "bk_lib|1.0::::bk.so.1:;2.0::::bk.so.2:|\nbk_app|1.0::bk_lib:::bk.so.1|\n";
     }
 
     EXPECT_THROW(upgrade_packages(), LpkgException);
@@ -105,7 +105,7 @@ TEST_F(BreakpointTest, UpgradeCleansLpkgBakAfterSuccess)
     setup_local_mirror();
 
     // 安装 v1
-    std::string p1 = create_pkg("upg_clean", "1.0", {}, {"upg_clean.so.1"});
+    std::string p1 = create_pkg("upg_clean", "1.0", {}, {}, {"upg_clean.so.1"});
     add_to_mirror("upg_clean", "1.0");
     install_packages({p1});
     EXPECT_TRUE(fs::exists(test_root / "usr/bin/upg_clean"));
@@ -118,12 +118,12 @@ TEST_F(BreakpointTest, UpgradeCleansLpkgBakAfterSuccess)
         std::ofstream(work / "metadata.json")
             << R"({"name":"upg_clean","version":"2.0","deps":[],"provides":["upg_clean.so.2"],"needed_so":[]})";
         std::string v2 = (pkg_dir / "upg_clean-2.0.lpkg").string();
-        pack_package(v2, work.string(), "upg_clean", "2.0", {}, {"upg_clean.so.2"});
+        pack_package(v2, work.string(), "upg_clean", "2.0", {}, {}, {"upg_clean.so.2"});
         auto mirror = suite_work_dir / "mirror" / "x86_64";
         fs::create_directories(mirror / "upg_clean");
         fs::copy(v2, mirror / "upg_clean" / "2.0.lpkg");
         std::ofstream idx(mirror / "index.txt");
-        idx << "upg_clean|1.0:::upg_clean.so.1:;2.0:::upg_clean.so.2:|\n";
+        idx << "upg_clean|1.0::::upg_clean.so.1:;2.0::::upg_clean.so.2:|\n";
     }
 
     upgrade_packages();
@@ -698,7 +698,7 @@ TEST_F(BreakpointTest, SymlinkToDirIsBackedUpAndRestoredOnRollback)
         f << "new file\n";
     }
     std::string pA = (pkg_dir / "sl_a-1.0.lpkg").string();
-    pack_package(pA, work.string(), "sl_a", "1.0", {}, {}, "", {});
+    pack_package(pA, work.string(), "sl_a", "1.0", {}, {}, {}, "", {});
 
     BreakpointManager::instance().set("copy_after_wal_sl_a",
                                       [] { throw LpkgException("injected copy failure"); });

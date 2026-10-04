@@ -8,7 +8,7 @@
     "libc.so.6",
     "libgmp.so.10"
   ],
-  "provides": [
+  "provides_soname": [
     "libmpfr.so",
     "libmpfr.so.6"
   ],

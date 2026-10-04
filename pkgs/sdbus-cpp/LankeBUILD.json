@@ -11,7 +11,7 @@
     "libstdc++.so.6",
     "libsystemd.so.0"
   ],
-  "provides": [
+  "provides_soname": [
     "libsdbus-c++.so",
     "libsdbus-c++.so.2"
   ],

@@ -1,0 +1,3 @@
+S a b
+S b a
+L libc.so.1.0 a/x

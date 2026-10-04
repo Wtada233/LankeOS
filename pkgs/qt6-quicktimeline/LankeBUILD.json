@@ -11,7 +11,7 @@
     "libc.so.6",
     "libstdc++.so.6"
   ],
-  "provides": [
+  "provides_soname": [
     "libQt6QuickTimeline.so",
     "libQt6QuickTimeline.so.6",
     "libQt6QuickTimelineBlendTrees.so",

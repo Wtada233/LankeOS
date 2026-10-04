@@ -85,17 +85,19 @@ fn name_version_do_not_affect_decide() {
 fn from_metadata_json_handles_missing_fields() {
     let full = serde_json::json!({
         "name": "p", "version": "1.0",
-        "needed_so": ["libc.so.6"], "provides": ["libp.so.1"], "deps": ["bash"],
+        "needed_so": ["libc.so.6"], "provides_soname": ["libp.so.1"], "deps": ["bash"],
     });
     let s = ScanResult::from_metadata_json(&full);
     assert_eq!(s.name, "p");
     assert_eq!(s.version, "1.0");
     assert_eq!(s.needed_so, vec!["libc.so.6"]);
-    assert_eq!(s.provides, vec!["libp.so.1"]);
+    assert_eq!(s.provides_soname, vec!["libp.so.1"]);
     assert_eq!(s.deps, vec!["bash"]);
     // 缺字段 → 空（不 panic）
     let empty = ScanResult::from_metadata_json(&serde_json::json!({}));
-    assert!(empty.needed_so.is_empty() && empty.provides.is_empty() && empty.deps.is_empty());
+    assert!(
+        empty.needed_so.is_empty() && empty.provides_soname.is_empty() && empty.deps.is_empty()
+    );
     assert_eq!(empty.name, "");
 }
 

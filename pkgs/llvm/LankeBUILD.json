@@ -18,7 +18,7 @@
     "libxml2.so.16",
     "libz.so.1"
   ],
-  "provides": [
+  "provides_soname": [
     "LLVMgold.so",
     "libLLVM-23.so",
     "libLLVM.so",

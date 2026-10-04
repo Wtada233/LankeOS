@@ -9,7 +9,7 @@
     "libc.so.6",
     "libexpat.so.1"
   ],
-  "provides": [],
+  "provides_soname": [],
   "build_deps": [
     "base-devel",
     "expat",

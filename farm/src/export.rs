@@ -102,7 +102,7 @@ mod tests {
         .unwrap();
         let meta = serde_json::json!({
             "name": name, "version": version,
-            "deps": [], "provides": [], "needed_so": [],
+            "deps": [], "provides": [], "provides_soname": [], "needed_so": [],
         });
         fs::write(
             src.join("metadata.json"),
@@ -155,18 +155,18 @@ mod tests {
         let output = tmp.join("export");
         let pkgdir = input.join("x86_64").join("demo");
         fs::create_dir_all(&pkgdir).unwrap();
-        make_lpkg(&pkgdir.join("1.0+1.lpkg"), "demo", "1.0+1");
+        make_lpkg(&pkgdir.join("1.0-1.lpkg"), "demo", "1.0-1");
 
         let report = export(&input, &output, "x86_64").unwrap();
-        assert_eq!(report.exported, vec!["demo-1.0+1"]);
+        assert_eq!(report.exported, vec!["demo-1.0-1"]);
         assert!(report.failed.is_empty());
 
         // 输出 = 仓库 .lpkg 的**字节副本**（只扁平化，不重打包）
-        let out = output.join("demo-1.0+1.lpkg");
+        let out = output.join("demo-1.0-1.lpkg");
         assert!(out.exists());
         assert_eq!(
             fs::read(&out).unwrap(),
-            fs::read(pkgdir.join("1.0+1.lpkg")).unwrap(),
+            fs::read(pkgdir.join("1.0-1.lpkg")).unwrap(),
             "export 应原样复制，不改字节"
         );
         // 仍是合法 .lpkg，可正常解包（round-trip）
