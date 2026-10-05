@@ -290,10 +290,19 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
     if idx.packages.is_empty() || idx.packages.values().all(|p| p.needed_so.is_empty()) {
         return; // 索引里没有任何 needed_so → 引用无从判断，保守保留（宁留不删）
     }
+    // ⚠️ 归一到**裸 SONAME**（`graph::so_bare`）：索引里的 `needed_so` 现在是规格串
+    // （`libc.so.6@{GLIBC_2.2.5,…}`），而下面两处比的是**裸文件名 / 派生的 SONAME**。
+    // 不归一 ⇒ 带版本的引用永远匹配不上 ⇒ 仍被引用的 ABI 过渡备份被当"无人引用"删掉
+    // （备份删了就不可恢复，下游未重建的包直接断链）。同文件的 `backup_removed_sonames`
+    // 一直是对的 —— 只有清理这一侧漏了归一。
     let referenced: std::collections::HashSet<String> = idx
         .packages
         .values()
-        .flat_map(|p| p.needed_so.iter().cloned())
+        .flat_map(|p| {
+            p.needed_so
+                .iter()
+                .map(|s| crate::graph::so_bare(s).to_string())
+        })
         .collect();
     let mut any_removed = false;
 
@@ -347,7 +356,7 @@ fn collect_referenced_link_targets(
                     } else {
                         p.parent().unwrap_or(dir).join(&target)
                     };
-                    protected.insert(normalize_lexically(&resolved));
+                    protected.insert(crate::scan::normalize_lexically(&resolved));
                 }
             }
         }
@@ -393,7 +402,8 @@ fn walk(
         }
         // 实体文件：自身派生 SONAME 未被引用，但仍被引用的符号链接指向它
         // （符号链接名与实体文件名 SONAME 不一致）→ 保留，否则该 SONAME 链接 dangling。
-        if !ft.file_type().is_symlink() && protected.contains(&normalize_lexically(&p)) {
+        if !ft.file_type().is_symlink() && protected.contains(&crate::scan::normalize_lexically(&p))
+        {
             continue;
         }
         if fs::remove_file(&p).is_ok() {
@@ -417,22 +427,6 @@ fn soname_of(filename: &str) -> Option<&str> {
     }
     let len = a.len() + 1 + 2 + 1 + c.len();
     filename.get(..len)
-}
-
-/// 词法规范化路径（不触碰文件系统）：消解 `.`/`..` 段。仅用于清理阶段的集合比对。
-fn normalize_lexically(p: &Path) -> PathBuf {
-    use std::path::Component;
-    let mut out = PathBuf::new();
-    for c in p.components() {
-        match c {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                out.pop();
-            }
-            other => out.push(other.as_os_str()),
-        }
-    }
-    out
 }
 
 /// 绝对符号链接目标 → 备份树内相对路径（备份树根对应 /usr/lib）。

@@ -43,15 +43,119 @@ pub struct Index {
 
 /// 规格串 → **裸 SONAME**（`X@{A,B}` / `X@A` → `X`）。
 ///
-/// farm 侧只做**基线归一**：它不判定符号版本语义（那是 lpkg 的判据，见 `base/so_spec.hpp`），
-/// 但**必须按裸名比较**。否则手写的 `X@{A}` 会被当成"与扫描结果 `X` 不同的 SONAME" ⇒
-/// `verify` 判漂移 ⇒ repack 把符号版本**静默涂掉**（`abi` 那一侧更糟：会误报 ABI 断裂并
-/// 触发传播重建）。
+/// farm 在**建索引 / 查表 / 图比较**这一层只按裸名：`soname_index` 的键、`link_deps` 的比对、
+/// `RevMap` 的查询都用它 —— 同一个库的多个规格必须归到同一条边。
+///
+/// ⚠️ **订正 2026-10-05**：原文写"farm 侧只做**基线归一**：它**不判定符号版本语义**（那是
+/// lpkg 的判据，见 `base/so_spec.hpp`），但必须按裸名比较；否则手写的 `X@{A}` 会被当成不同的
+/// SONAME ⇒ `verify` 判漂移 ⇒ repack 把符号版本静默涂掉"。**那个前提已被推翻**：
+/// `needed_so` / `provides_soname` 现由 **farm 生成**（`scan.rs` 读 ELF 的 verdef/verneed），
+/// 漂移判定在 `verify::decide()` 里是**版本级**的 —— 规格按 `(裸名, 去重排序的版本集)`
+/// （`canon_specs`）比较：`provides_soname` 少一个版本节点 → `AbiBreak`，多出来 → `Repack`，
+/// `needed_so` 任一方向的规格变化 → `Repack`，`Repack` 会**写回 `LankeBUILD.json`（写扫描值）**。
+/// `so_bare()` 仍只在**上面那层**（裸名索引 / 图）沿用 —— 别再把它读成"farm 忽略符号版本"。
 pub fn so_bare(s: &str) -> &str {
     match s.find('@') {
         Some(i) => &s[..i],
         None => s,
     }
+}
+
+/// 规格串 → `(裸 SONAME, 规范化版本集合)`。
+///
+/// **与 lpkg `base/so_spec.cpp` 的 `parse_so_spec()` 同规则**（宽容解析：畸形 → 整串当裸名；
+/// 版本**去重 + 字典序**）。跨语言契约 —— 真值表见 `lpkg/tests/unit/test_so_spec.cpp` 与
+/// `lpkg/main/scripts/check_index_conformance.py` 的 `SO_SPEC_VECTORS`，本文件 tests 里有同一份镜像。
+pub fn parse_so_spec(s: &str) -> (String, Vec<String>) {
+    let Some(at) = s.find('@') else {
+        return (s.to_string(), Vec::new());
+    };
+    let (name, ver) = (&s[..at], &s[at + 1..]);
+    // 版本段字符集（与 lpkg 的 `symbol_ok` 同）
+    let ok = |t: &str| {
+        !t.is_empty()
+            && t.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'+' | b'-'))
+    };
+    // **名字段也要校验**（与 lpkg 的 `soname_ok` 同）：非空、不含空白/控制字符、不含结构字符
+    // `@ { } , | ; :`。⚠️ 这条是"镜像向量"抓出来的 —— 我第一版只校验了版本段，于是 `"X @A"`
+    // 被解析成裸名 `"X "` + 版本 `A`（lpkg 那边判畸形）⇒ 两侧对同一串给出相反结论。
+    let name_ok = |t: &str| {
+        !t.is_empty()
+            && t.bytes().all(|b| {
+                b > 0x20
+                    && b != 0x7f
+                    && !matches!(b, b'@' | b'{' | b'}' | b',' | b'|' | b';' | b':')
+            })
+    };
+    if !name_ok(name) {
+        return (s.to_string(), Vec::new()); // 畸形 → 整串当裸名
+    }
+    let mut syms: Vec<String> = Vec::new();
+    if name.is_empty() || ver.is_empty() {
+        return (s.to_string(), Vec::new()); // 畸形 → 整串当裸名
+    } else if let Some(inner) = ver.strip_prefix('{') {
+        let Some(inner) = inner.strip_suffix('}') else {
+            return (s.to_string(), Vec::new());
+        };
+        if inner.contains('{') || inner.contains('}') || inner.is_empty() {
+            return (s.to_string(), Vec::new());
+        }
+        for t in inner.split(',') {
+            if !ok(t) {
+                return (s.to_string(), Vec::new());
+            }
+            syms.push(t.to_string());
+        }
+    } else {
+        if ver.contains('{') || ver.contains('}') || !ok(ver) {
+            return (s.to_string(), Vec::new());
+        }
+        syms.push(ver.to_string());
+    }
+    syms.sort();
+    syms.dedup();
+    (name.to_string(), syms)
+}
+
+/// provider 的声明是否**覆盖**某条 need（**保守**，与 lpkg 的 `so_spec_satisfies()` 同规则）：
+/// SONAME 必须相同；need 裸 ⇒ 库在就行；need 带版本 ⇒ provider 必须**也声明**且覆盖**全部**版本。
+pub fn so_covers(provided: &str, needed: &str) -> bool {
+    let (pn, pv) = parse_so_spec(provided);
+    let (nn, nv) = parse_so_spec(needed);
+    if pn != nn {
+        return false;
+    }
+    if nv.is_empty() {
+        return true;
+    }
+    if pv.is_empty() {
+        return false;
+    }
+    nv.iter().all(|v| pv.contains(v))
+}
+
+/// 从 old/new 两份 `provides_soname` 算"**不再提供的版本**"（`X@V` 串，排序）：
+/// 只报"**库还在、某个版本没了**"；整个 SONAME 消失由 `removed_sonames()` 表达（那条走裸名）。
+pub fn removed_provided_versions(old_specs: &[String], new_specs: &[String]) -> Vec<String> {
+    let offer = |specs: &[String]| -> std::collections::BTreeSet<String> {
+        let mut set = std::collections::BTreeSet::new();
+        for s in specs {
+            let (name, syms) = parse_so_spec(s);
+            for v in syms {
+                set.insert(format!("{name}@{v}"));
+            }
+        }
+        set
+    };
+    let (old, new) = (offer(old_specs), offer(new_specs));
+    // 版本级的"消失"只在该 SONAME **整体还在**时才算（整体消失由裸名那条边负责，不重复报）
+    let new_names: std::collections::HashSet<String> =
+        new_specs.iter().map(|s| parse_so_spec(s).0).collect();
+    old.difference(&new)
+        .filter(|k| new_names.contains(&parse_so_spec(k).0))
+        .cloned()
+        .collect()
 }
 
 /// 是否为版本化 SONAME（ABI 面）：`libfoo.so.1`。
@@ -109,8 +213,12 @@ pub fn soname_provides_of(soname_list: &[String]) -> HashSet<String> {
 /// 是同一条规则的 C++ 实现 —— 两边由 `main/scripts/check_index_conformance.py` 与 lpkg 的
 /// C++ 孪生测试同一份 fixture 钉住。改写这里之前先看那份 fixture。
 ///
-/// 花括号不配对时退化成普通逗号切分（lpkg 的读入处会先把这种块整块跳过并告警，
-/// 所以 farm 这边只需要"有界、确定"即可）。
+/// 花括号**未闭合**时**不会**退化成普通逗号切分：`depth` 是计数器，未配对的 `{` 会让其后所有
+/// 逗号**都不切**（整段留成一条）；只有**多余的 `}`** 因为 `depth` 被 clamp 在 0 才退化回普通
+/// 逗号切分。lpkg 的读入处会把这种畸形块整块跳过并告警，所以 farm 这边只需要"有界、确定"即可。
+///
+/// ⚠️ **订正 2026-10-05**：原文笼统写"花括号不配对时退化成普通逗号切分"—— **对未闭合的 `{`
+/// 不成立**（实测：`a{b,c` 切成一条 `a{b,c`；`a}b,c` 才切成 `a}b` 与 `c`）。
 fn split_field(field: Option<&str>) -> Vec<String> {
     field.map(split_brace_aware).unwrap_or_default()
 }
@@ -209,6 +317,27 @@ impl Index {
             .unwrap_or_default()
     }
 
+    /// 裸 SONAME → 索引里**声明过**的全部规格串（`provides_soname` 原样；供 `abifix` 做版本级覆盖判定）。
+    pub fn soname_specs(&self, soname: &str) -> Vec<&str> {
+        let bare = so_bare(soname);
+        let mut out: Vec<&str> = self
+            .soname_index
+            .get(bare)
+            .map(|owners| {
+                owners
+                    .iter()
+                    .filter_map(|p| self.packages.get(p))
+                    .flat_map(|i| i.provides_soname.iter())
+                    .map(String::as_str)
+                    .filter(|spec| so_bare(spec) == bare)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        out.sort_unstable();
+        out.dedup();
+        out
+    }
+
     /// needed_so 条目 → provider 包（供前向链接与校验）。按**裸 SONAME** 查
     /// （`provides_soname` 的基线归一形 —— 见 `so_bare()`）。
     pub fn providers_of(&self, soname: &str) -> &[String] {
@@ -249,26 +378,47 @@ impl Index {
 /// SONAME → 需要它的包集合（ABI 反图的基础）。
 /// 只从 `needed_so` 构建；**不用 `deps`**（deps 是运行时脚本/Protocol 边）。
 #[derive(Debug, Default)]
-pub struct RevMap(pub HashMap<String, Vec<String>>);
+pub struct RevMap {
+    /// 裸 SONAME → 需要它的包（既有语义：`X` 与 `X@V` 都登记到这里）
+    bare: HashMap<String, Vec<String>>,
+    /// `裸 SONAME@版本` → 需要**那个版本**的包（need 声明里的每个版本各登记一次）
+    versions: HashMap<String, Vec<String>>,
+}
 
 impl RevMap {
     pub fn build(index: &Index) -> RevMap {
-        let mut m: HashMap<String, Vec<String>> = HashMap::new();
+        let mut bare: HashMap<String, Vec<String>> = HashMap::new();
+        let mut versions: HashMap<String, Vec<String>> = HashMap::new();
         for info in index.packages.values() {
             for soname in &info.needed_so {
-                // 裸名（与 `soname_index` 同一套键，见 `so_bare()`）
-                m.entry(so_bare(soname).to_string())
+                bare.entry(so_bare(soname).to_string())
                     .or_default()
                     .push(info.name.clone());
+                // 版本级：need 带版本时，**每个**版本各登记一次（`X@{A,B}` ⇒ X@A 与 X@B）
+                let (name, syms) = parse_so_spec(soname);
+                for v in syms {
+                    versions
+                        .entry(format!("{name}@{v}"))
+                        .or_default()
+                        .push(info.name.clone());
+                }
             }
         }
-        RevMap(m)
+        RevMap { bare, versions }
     }
 
-    /// 需要某 SONAME 的包（**裸名**查，与 `RevMap::build` 的键一致）
+    /// 需要某 SONAME 的包（**裸名**查）
     pub fn needers(&self, soname: &str) -> &[String] {
-        self.0
+        self.bare
             .get(so_bare(soname))
+            .map(Vec::as_slice)
+            .unwrap_or(&[])
+    }
+
+    /// 需要某**具体版本**（`X@V`）的包。版本级的 ABI 断裂用它定位受害者。
+    pub fn version_needers(&self, soname_at_version: &str) -> &[String] {
+        self.versions
+            .get(soname_at_version)
             .map(Vec::as_slice)
             .unwrap_or(&[])
     }

@@ -135,3 +135,110 @@ fn so_bare_strips_only_the_symbol_version_suffix() {
     assert_eq!(so_bare("libc.so.6@GLIBC_2.40"), "libc.so.6");
     assert_eq!(so_bare("libc.so.6@{GLIBC_2.40,GLIBC_2.39}"), "libc.so.6");
 }
+
+/// **规格解析 / 覆盖**：与 lpkg 同一份真值表（`lpkg/tests/unit/test_so_spec.cpp` +
+/// `check_index_conformance.py` 的 `SO_SPEC_VECTORS`）—— 跨语言契约，两边各钉一份。
+#[test]
+fn so_spec_vectors_match_lpkg() {
+    // 解析：裸 / 单版本 / 花括号（**排序去重**）
+    assert_eq!(
+        parse_so_spec("libc.so.6"),
+        ("libc.so.6".to_string(), vec![])
+    );
+    assert_eq!(
+        parse_so_spec("libc.so.6@GLIBC_2.40"),
+        ("libc.so.6".to_string(), vec!["GLIBC_2.40".to_string()])
+    );
+    assert_eq!(
+        parse_so_spec("X@{B,A,A}"),
+        ("X".to_string(), vec!["A".to_string(), "B".to_string()])
+    );
+    // 畸形一律整串当裸名（与 lpkg 的宽容分支同口径）
+    for bad in [
+        "", "@A", "X@", "X@{}", "X@{A,}", "X@{,A}", "X@{A", "X@A}", "X@{A}{B}", "X@{A{B}}", "X@@A",
+        "X@{A, B}", "X @A", "X@A B",
+    ] {
+        assert_eq!(
+            parse_so_spec(bad),
+            (bad.to_string(), vec![]),
+            "畸形判定不符：{bad:?}"
+        );
+    }
+    // 覆盖（保守）
+    for (p, n) in [
+        ("X", "X"),
+        ("X@{A,B}", "X"),
+        ("X@{A,B}", "X@A"),
+        ("X@{A,B}", "X@{A,B}"),
+        ("X@{A,B}", "X@{B,A}"), // 集合语义，与次序无关
+        ("X@{A,B", "X@{A,B"),   // 畸形 → 整串相等才算
+    ] {
+        assert!(so_covers(p, n), "{p} 应覆盖 {n}");
+    }
+    for (p, n) in [
+        ("X@{A,B}", "X@{A,C}"), // 缺 C
+        ("X", "X@A"),           // **保守**：裸 provider 不算
+        ("X@A", "X@B"),
+        ("X@{A}", "Y@A"), // SONAME 不同
+        ("X", "X@{A,B"),
+        ("X@{A,B", "X"),
+    ] {
+        assert!(!so_covers(p, n), "{p} 不应覆盖 {n}");
+    }
+}
+
+/// 版本级移除只报"**库还在、版本没了**"；整个 SONAME 消失归 `removed_sonames()`（裸名那条）。
+#[test]
+fn removed_provided_versions_only_reports_surviving_sonames() {
+    let old = vec![
+        "libc.so.6@{GLIBC_2.39,GLIBC_2.40}".to_string(),
+        "libgone.so.1@V1".to_string(),
+    ];
+    let new = vec!["libc.so.6@GLIBC_2.40".to_string()];
+    assert_eq!(
+        removed_provided_versions(&old, &new),
+        vec!["libc.so.6@GLIBC_2.39"]
+    );
+    // 整个 SONAME 消失 ⇒ 不在这里重复报
+    assert!(removed_provided_versions(&["libgone.so.1@V1".to_string()], &[]).is_empty());
+    // 新增版本 / 不变 ⇒ 无移除
+    assert!(removed_provided_versions(
+        &["libc.so.6@A".to_string()],
+        &["libc.so.6@{A,B}".to_string()]
+    )
+    .is_empty());
+}
+
+/// 反图的**版本级**查询：need 声明里的每个版本各登记一次。
+#[test]
+fn revmap_indexes_needed_versions() {
+    let idx = Index::parse(
+        "prov|1.0:h:::libx.so.1@{V1,V2}:|\n\
+         a|1.0:h::::libx.so.1@{V1,V2}|\n\
+         b|1.0:h::::libx.so.1@V2|\n\
+         c|1.0:h::::libx.so.1|\n",
+    );
+    let rev = RevMap::build(&idx);
+    // 顺序未定义（HashMap 遍历序）⇒ 只比集合
+    let v1: Vec<&str> = rev
+        .version_needers("libx.so.1@V1")
+        .iter()
+        .map(String::as_str)
+        .collect();
+    assert_eq!(v1, vec!["a"]);
+    let mut v2: Vec<&str> = rev
+        .version_needers("libx.so.1@V2")
+        .iter()
+        .map(String::as_str)
+        .collect();
+    v2.sort_unstable();
+    assert_eq!(v2, vec!["a", "b"]);
+    // 裸名查询含所有需要它的人（含只声明裸名的 c）—— 顺序未定义（HashMap 遍历序），比集合
+    let mut bare: Vec<&str> = rev
+        .needers("libx.so.1")
+        .iter()
+        .map(String::as_str)
+        .collect();
+    bare.sort_unstable();
+    assert_eq!(bare, vec!["a", "b", "c"]);
+}

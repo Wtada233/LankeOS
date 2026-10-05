@@ -1761,7 +1761,13 @@ fn abifix_targets_flags_orphan_soname_only() {
     let t = abifix_targets(&pkgs, &idx);
     assert_eq!(
         t,
-        vec![("c1".to_string(), vec!["libfoo.so.2".to_string()])],
+        vec![(
+            "c1".to_string(),
+            vec![AbifixMiss {
+                needed: "libfoo.so.2".to_string(),
+                reason: AbifixReason::NoProvider,
+            }]
+        )],
         "只有引用无 provider SONAME 的包应命中，自提供不算孤儿: {t:?}"
     );
     fs::remove_dir_all(&pkgs).ok();
@@ -1787,7 +1793,16 @@ fn abifix_targets_index_is_authoritative() {
     let idx = Index::parse(&fs::read_to_string(out.join("x86_64/index.txt")).unwrap());
 
     let t = abifix_targets(&pkgs, &idx);
-    assert_eq!(t, vec![("c1".to_string(), vec!["libfoo.so.2".to_string()])]);
+    assert_eq!(
+        t,
+        vec![(
+            "c1".to_string(),
+            vec![AbifixMiss {
+                needed: "libfoo.so.2".to_string(),
+                reason: AbifixReason::NoProvider,
+            }]
+        )]
+    );
     fs::remove_dir_all(&pkgs).ok();
     fs::remove_dir_all(&out).ok();
 }
@@ -2031,6 +2046,58 @@ fn backup_kept_when_soname_still_referenced() {
     assert!(
         out.join("backups/libxml2.so.2").exists(),
         "仍有引用的备份应保留（过渡未完成）"
+    );
+    fs::remove_dir_all(&dir).ok();
+    fs::remove_dir_all(&out).ok();
+}
+
+#[test]
+fn backup_kept_when_versioned_soname_still_referenced() {
+    // **H2**：索引里的 needed_so 现在是**带符号版本**的规格串
+    // （`libxml2.so.2@{LIBXML2_2.9.0}`）。`cleanup_backups` 的 `referenced` 集合必须**归一到
+    // 裸 SONAME**（`graph::so_bare`）才能与备份文件名/派生 SONAME 比对。
+    //
+    // **修前为什么红**：旧实现直接把索引里的原样规格串塞进 `contains` ⇒ 拿
+    // `libxml2.so.2@{LIBXML2_2.9.0}` 去比 `libxml2.so.2` **恒不相等** ⇒ 仍被引用的过渡备份
+    // 被当"无人引用"删掉（备份删了不可恢复，未重建的下游直接断链）。
+    // 对照：`backup_kept_when_soname_still_referenced` 用的是**裸** needed_so，抓不到本缺陷。
+    let dir = temp_dir("farm-backup-verkeep");
+    let out = temp_dir("farm-backup-verkeep-out");
+    // gettext 的 needed_so 是带符号版本的规格串；libxml2 尚未重建 → 索引仍引用它
+    write_baseline(
+        &out,
+        "gettext|1.0:h:::libgettext.so:libxml2.so.2@{LIBXML2_2.9.0}|\n",
+    );
+    write_pkg(
+        &dir,
+        "gettext",
+        &["libgettext.so"],
+        &["libxml2.so.2@{LIBXML2_2.9.0}", "libc.so.6"],
+        &[],
+    );
+    fs::create_dir_all(out.join("backups")).unwrap();
+    fs::write(out.join("backups/libxml2.so.2"), b"").unwrap();
+
+    let mut binding = StubBinding::new(HashMap::new());
+    let opts = BuildOptions {
+        pkgs_dir: dir.clone(),
+        out_dir: out.clone(),
+        targets: vec![],
+        arch: "x86_64".into(),
+        image: String::new(),
+        download_retries: 3,
+        interactive: false,
+        build_data_dir: std::path::PathBuf::from("data/build"),
+        validate: false,
+        manual_sort: false,
+    };
+    let _ = run_build(&opts, &mut binding, None).unwrap();
+    assert!(
+        out.join("backups/libxml2.so.2").exists(),
+        "带版本的 needed_so 仍引用裸 SONAME libxml2.so.2 → 备份必须保留；\
+         修前裸串比对恒 false ⇒ 误删。实得 backups/ 内容: {:?}",
+        fs::read_dir(out.join("backups"))
+            .map(|rd| rd.flatten().map(|e| e.file_name()).collect::<Vec<_>>())
     );
     fs::remove_dir_all(&dir).ok();
     fs::remove_dir_all(&out).ok();
@@ -2948,10 +3015,129 @@ fn abifix_targets_matches_versioned_needs_by_bare_soname() {
     let t = abifix_targets(&pkgs, &idx);
     assert_eq!(
         t,
-        vec![("orphan".to_string(), vec!["libmissing.so.9@V9".to_string()])],
-        "带版本的 need 要按裸名判有无 provider：`libbar.so.1` 有提供者 ⇒ 不报；\
+        vec![(
+            "orphan".to_string(),
+            vec![AbifixMiss {
+                needed: "libmissing.so.9@V9".to_string(),
+                reason: AbifixReason::NoProvider,
+            }]
+        )],
+        "带版本的 need 要按裸名判有无 provider：`libbar.so.1` 有提供者（且覆盖 V1）⇒ 不报；\
          `libmissing.so.9` 没有 ⇒ 报（含原样的 needed 串）: {t:?}"
     );
     fs::remove_dir_all(&pkgs).ok();
+    fs::remove_dir_all(&out).ok();
+}
+
+/// **abifix 的版本级定位**：provider 在（裸名对得上），但它**不覆盖** need 要的版本 ⇒ 必须报，
+/// 且**点名缺的版本** —— 这正是不接符号版本体系就发现不了的那一类（旧判据只按裸名 ⇒ 静默放过）。
+#[test]
+fn abifix_flags_version_gap_with_missing_versions() {
+    let pkgs = temp_dir("farm-abifix-vergap-pkgs");
+    let out = temp_dir("farm-abifix-vergap-out");
+    // 索引里 provider 只声明 V1
+    write_baseline(&out, "libp|1.0:h:::libp.so.1@{V1}:|\n");
+    write_pkg_ver(&pkgs, "needv2", "1.0", &["libn.so"], &["libp.so.1@V2"], &[]);
+    write_pkg_ver(&pkgs, "needv1", "1.0", &["libm.so"], &["libp.so.1@V1"], &[]);
+    write_pkg_ver(&pkgs, "needbare", "1.0", &["libl.so"], &["libp.so.1"], &[]);
+    let idx = Index::parse(&fs::read_to_string(out.join("x86_64/index.txt")).unwrap());
+
+    let t = abifix_targets(&pkgs, &idx);
+    assert_eq!(
+        t,
+        vec![(
+            "needv2".to_string(),
+            vec![AbifixMiss {
+                needed: "libp.so.1@V2".to_string(),
+                reason: AbifixReason::VersionsNotCovered(vec!["V2".to_string()]),
+            }]
+        )],
+        "只有要 V2 的那个包该被报，且点名缺的版本：{t:?}"
+    );
+    fs::remove_dir_all(&pkgs).ok();
+    fs::remove_dir_all(&out).ok();
+}
+
+/// **版本级 ABI 断裂的传播**：SONAME 不变（`libfoo.so.1`），但 provider 的新扫描**少导出一个版本**
+/// （`@{V1,V2}` → `@{V1}`）⇒ 需要 `V2` 的消费者必须重建，而只需要 `V1` 的**不**重建。
+/// 修前（只比裸名）这一整类断裂被静默放过。
+#[test]
+fn version_drop_rebuilds_only_consumers_needing_that_version() {
+    let dir = temp_dir("farm-build-abiver");
+    let out = temp_dir("farm-build-abiver-out");
+    write_baseline(
+        &out,
+        "a|1.0:h:::libfoo.so.1@{V1,V2}:|\n\
+         b|1.0:h::::libfoo.so.1@V2|\n\
+         c|1.0:h::::libfoo.so.1@V1|\n",
+    );
+    write_pkg_ver(&dir, "a", "1.0", &["libfoo.so.1@{V1,V2}"], &[], &[]);
+    write_pkg_ver(&dir, "b", "1.0", &["libb.so"], &["libfoo.so.1@V2"], &["a"]);
+    write_pkg_ver(&dir, "c", "1.0", &["libc.so"], &["libfoo.so.1@V1"], &["a"]);
+
+    // a 重建后**只**导出 V1（V2 消失，但 SONAME 没变）
+    let a_lpkg = stage_lpkg(&out, "a", "1.0", &["libc.so.6"], &["libfoo.so.1@V1"]);
+    // b 的 staging 产物（重建后按当前 ABI 扫）
+    let b_lpkg = stage_lpkg(
+        &out,
+        "b",
+        "1.0",
+        &["libfoo.so.1@V1", "libc.so.6"],
+        &["libb.so"],
+    );
+    let mut outcomes = HashMap::new();
+    outcomes.insert(
+        "a".into(),
+        BuildOutcome {
+            ok: true,
+            needed_so: vec!["libc.so.6".into()],
+            provides: vec![],
+            provides_soname: vec!["libfoo.so.1@V1".into()],
+            deps: vec![],
+            failure_stage: None,
+            lpkg_path: Some(a_lpkg),
+        },
+    );
+    outcomes.insert(
+        "b".into(),
+        BuildOutcome {
+            ok: true,
+            needed_so: vec!["libfoo.so.1@V1".into(), "libc.so.6".into()],
+            provides: vec![],
+            provides_soname: vec!["libb.so".into()],
+            deps: vec![],
+            failure_stage: None,
+            lpkg_path: Some(b_lpkg),
+        },
+    );
+    let mut binding = StubBinding::new(outcomes);
+    let opts = BuildOptions {
+        pkgs_dir: dir.clone(),
+        out_dir: out.clone(),
+        targets: vec!["a".into()],
+        arch: "x86_64".into(),
+        image: String::new(),
+        download_retries: 3,
+        interactive: false,
+        build_data_dir: std::path::PathBuf::from("data/build"),
+        validate: false,
+        manual_sort: false,
+    };
+    let report = run_build(&opts, &mut binding, None).unwrap();
+    assert!(
+        report.abi_broken.contains(&"a".to_string()),
+        "少导出版本应记成 ABI 断裂"
+    );
+    assert!(
+        report.built.contains(&"b".to_string()),
+        "需要 V2 的消费者必须重建：{:?}",
+        report.built
+    );
+    assert!(
+        !report.built.contains(&"c".to_string()),
+        "只需要 V1 的消费者不该被重建（版本级受害者要精确）：{:?}",
+        report.built
+    );
+    fs::remove_dir_all(&dir).ok();
     fs::remove_dir_all(&out).ok();
 }

@@ -172,3 +172,106 @@ fn scan_content_emits_needed_symbol_versions() {
 
     let _ = std::fs::remove_dir_all(&tmp);
 }
+
+/// **H1（承重）**：绝对符号链接目标必须映射回**包内** content 根（归档里的 `/` == content/），
+/// **绝不落到宿主机**。
+///
+/// 场景：`content/usr/lib/libzzz.so -> /usr/lib/libzzz.so.1`（绝对），真身 ELF 在
+/// `content/usr/lib/libzzz.so.1`（夹具 `libx.so.1`，定义 V1/V2）。
+///
+/// **修前为什么红**：旧实现把绝对目标原样 `canonicalize` ⇒ 解析到**宿主**
+/// `/usr/lib/libzzz.so.1`（该文件不存在）⇒ `is_elf` false ⇒ 该符号链接静默丢条目，
+/// 版本集合读不到。真实实例：keyutils 的
+/// `content/usr/lib/libkeyutils.so -> /lib/libkeyutils.so.1`（该包不含 `content/lib/`）。
+/// 修后 `resolve_link_within_content` 把 `/usr/lib/libzzz.so.1` 拼成
+/// `content/usr/lib/libzzz.so.1` ⇒ 读到真身 ⇒ 产出 `libzzz.so@…`。
+#[test]
+fn scan_content_resolves_absolute_symlink_within_content() {
+    let fix = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/abi");
+    let tmp = std::env::temp_dir().join(format!("farm-scan-abs-in-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let content = tmp.join("content");
+    std::fs::create_dir_all(content.join("usr/lib")).unwrap();
+    // 真身放在包内 —— 正是绝对链接 `/usr/lib/libzzz.so.1` 应映射到的位置
+    std::fs::copy(fix.join("libx.so.1"), content.join("usr/lib/libzzz.so.1")).unwrap();
+    std::os::unix::fs::symlink("/usr/lib/libzzz.so.1", content.join("usr/lib/libzzz.so")).unwrap();
+
+    // 先钉住解析本身的语义（词法映射，不碰宿主机）
+    let resolved =
+        resolve_link_within_content(&content.join("usr/lib/libzzz.so"), &content).unwrap();
+    assert_eq!(
+        resolved,
+        content.join("usr/lib/libzzz.so.1"),
+        "绝对目标 `/usr/lib/libzzz.so.1` 必须映射回 content/usr/lib/（而非宿主 /usr/lib/）"
+    );
+
+    let (_, provides) = scan_content(&content, &Default::default());
+    assert!(
+        provides.iter().any(|s| s == "libzzz.so@{V1,V2}"),
+        "绝对链接目标映回包内后，`libzzz.so` 的版本集合必须从真身读到（V1/V2）；\
+         修前 canonicalize 落到宿主 /usr/lib/libzzz.so.1 ⇒ 条目静默消失。实得: {provides:?}"
+    );
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+/// **H1（密闭性）**：绝对链接目标落在 **content 之外** 时**绝不读取** content 外的文件
+/// （宿主 / 仓库外）。
+///
+/// 真实实例：keyutils 的 `content/usr/lib/libkeyutils.so -> /lib/libkeyutils.so.1`，而该包
+/// **不含** `content/lib/`。修前把绝对目标原样 `canonicalize` ⇒ 读 content 外的同名库，把
+/// **它的版本集合**烤进产物；content 外没有那个文件时反而静默丢条目 —— 同一缺陷的两个方向。
+///
+/// 诱饵用**明确存在的 content 外文件**（`<tmp>/outside/usr/lib/libyyy.so.1`，内容 = 夹具
+/// `libx.so.1`），而不是钉死 `/usr/lib/libyyy.so.1`：后者在没装该库的宿主上修前也读不到 ⇒
+/// 断言会退化成恒真。用一个**确定存在**的 content 外文件，才能确定性地证明"绝对目标不许
+/// 穿透 content 根"。
+#[test]
+fn scan_content_never_reads_absolute_target_outside_content() {
+    let fix = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/abi");
+    let tmp = std::env::temp_dir().join(format!("farm-scan-abs-out-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let content = tmp.join("content");
+    std::fs::create_dir_all(content.join("usr/lib")).unwrap();
+    // content 之外的“宿主/仓库外”文件（绝对目标会指向它）
+    let outside = tmp.join("outside/usr/lib");
+    std::fs::create_dir_all(&outside).unwrap();
+    let decoy = outside.join("libyyy.so.1");
+    std::fs::copy(fix.join("libx.so.1"), &decoy).unwrap();
+    // 绝对目标指向 content 之外（模拟宿主 /lib/libyyy.so.1）；包内**没有** libyyy.so.1
+    std::os::unix::fs::symlink(&decoy, content.join("usr/lib/libyyy.so")).unwrap();
+
+    let (_, provides) = scan_content(&content, &Default::default());
+    assert!(
+        !provides
+            .iter()
+            .any(|s| crate::graph::so_bare(s) == "libyyy.so"),
+        "绝对链接目标落在 content 之外，绝不能被读到；\
+         修前 canonicalize 会读它并把版本集合(V1/V2)烤进产物。实得: {provides:?}"
+    );
+    let _ = std::fs::remove_dir_all(&tmp);
+}
+
+/// **H1（单元）**：`normalize_lexically` 只做词法归一（消 `.`/`..`），不碰文件系统。
+#[test]
+fn normalize_lexically_collapses_dot_segments() {
+    assert_eq!(
+        normalize_lexically(std::path::Path::new("/a/b/../c/./d")),
+        std::path::PathBuf::from("/a/c/d")
+    );
+}
+
+/// **H1（单元）**：相对目标借 `..` 逃出 content 根 → `None`（绝不越界解析）。
+#[test]
+fn resolve_link_within_content_rejects_escape() {
+    let tmp = std::env::temp_dir().join(format!("farm-scan-escape-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let content = tmp.join("content");
+    std::fs::create_dir_all(content.join("usr/lib")).unwrap();
+    std::os::unix::fs::symlink("../../../../../etc/passwd", content.join("usr/lib/esc.so"))
+        .unwrap();
+    assert!(
+        resolve_link_within_content(&content.join("usr/lib/esc.so"), &content).is_none(),
+        "借 .. 逃出 content 根必须返回 None（绝不越界解析）"
+    );
+    let _ = std::fs::remove_dir_all(&tmp);
+}

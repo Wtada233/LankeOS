@@ -30,6 +30,38 @@ fn real_index_smoke() {
     assert!(graph::link_deps(&old, "systemd").contains(&"glibc".to_string()));
 }
 
+/// 真实索引冒烟 —— **8.0.0 后的现行格式**。
+///
+/// `real-index.txt` 是 8.0.0 **之前**的快照（实测：`@` 出现 **0** 次、`+N` release 形态
+/// **317** 行），拿它冒烟已不再验证现行索引格式。本夹具 `real-index-v8.txt` 取自真实
+/// `out/x86_64/index.txt` 的前 30 行，含 `X@{A,B}`（符号版本）与 `<version>-<release>`
+/// （rpm release）两种现行形态。**旧用例 `real_index_smoke` 保留不动**（只加不删）。
+#[test]
+fn real_index_v8_smoke() {
+    let idx = fixture("real-index-v8.txt");
+    assert_eq!(idx.len(), 30, "夹具应解析出全部 30 个包（无行被跳过）");
+
+    // 现行格式的核心：`needed_so` / `provides_soname` 条目带符号版本 `X@{A,B}`。
+    assert!(
+        idx.packages.values().any(|p| {
+            p.needed_so
+                .iter()
+                .chain(p.provides_soname.iter())
+                .any(|s| s.split_once('@').is_some_and(|(_, v)| v.starts_with('{')))
+        }),
+        "真实 v8 索引里应有带 `@{{…}}` 的 SONAME 规格"
+    );
+    // rpm 语义的 release（`<version>-<release>`）——夹具里应普遍如此。
+    assert!(
+        idx.packages
+            .values()
+            .filter(|p| p.version.contains('-'))
+            .count()
+            >= 20,
+        "真实 v8 索引的版本串应普遍带 `-N` release"
+    );
+}
+
 /// 端到端：`farm track --all -j N` 并行探测必须保序——
 /// `beta`（after: alpha + 条目级 same-version: alpha）必须读到 alpha **本轮解析出的新版本** 2.0，
 /// 而非 LankeBUILD.json 的旧版本 1.0（保序 + resolved 传播）。

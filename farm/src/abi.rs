@@ -17,6 +17,36 @@ pub fn removed_sonames(old: &Index, pkg: &str, new_provides_soname: &[String]) -
     v
 }
 
+/// pkg 相对新扫描**不再提供的 SONAME 版本**（`X@V` 串，排序）—— 库还在、**那个版本没了**。
+///
+/// 与 `removed_sonames()`（整个 SONAME 消失）是**两条互补的边**：那条走裸名、这条走版本，
+/// 合起来才是"ABI 面到底少了什么"。版本串的规范化（去重 + 字典序）在 `graph::parse_so_spec()`。
+pub fn removed_soname_versions(
+    old: &Index,
+    pkg: &str,
+    new_provides_soname: &[String],
+) -> Vec<String> {
+    let old_specs = old
+        .packages
+        .get(pkg)
+        .map(|i| i.provides_soname.as_slice())
+        .unwrap_or(&[]);
+    crate::graph::removed_provided_versions(old_specs, new_provides_soname)
+}
+
+/// 需要任一 `removed` **版本**的包（版本级直连受害者；反图来自旧索引）。
+pub(crate) fn version_victims(revmap: &RevMap, removed_versions: &[String]) -> Vec<String> {
+    let mut set = HashSet::new();
+    for key in removed_versions {
+        for needer in revmap.version_needers(key) {
+            set.insert(needer.clone());
+        }
+    }
+    let mut v: Vec<String> = set.into_iter().collect();
+    v.sort();
+    v
+}
+
 /// 需要任一 `removed` SONAME 的包（直连受害者；反图来自旧索引）。
 pub(crate) fn direct_victims(revmap: &RevMap, removed: &[String]) -> Vec<String> {
     let mut set = HashSet::new();

@@ -28,8 +28,9 @@ pub struct RealBinding {
     pub repo_port: u16,
     /// Ctrl+C 中断清理共享状态：当前在途容器/包（信号处理器据此删容器、删 DB 条目）。
     pub cleanup: Arc<Mutex<CleanupState>>,
-    /// 仓库全部提供能力（SONAME/虚拟提供）：扫描 not-found 判定用——
-    /// needed_so 条目无 provider → not found → 不进 needed_so。构建开始前从旧索引填充。
+    /// 仓库全部提供的 **SONAME**（只含 `provides_soname`；虚拟 `provides` 是另一个字段，
+    /// 不在这里）：扫描 not-found 判定用——needed_so 条目无 provider → not found → 不进
+    /// needed_so。构建开始前从旧索引填充。
     pub repo_provides: HashSet<String>,
 }
 

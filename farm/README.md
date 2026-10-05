@@ -35,7 +35,7 @@
 
 ## 功能特性
 
-- **SONAME 规格（symbol version）** — `needed_so`/`provides_soname` 的条目可带 ELF 符号版本（`libc.so.6@GLIBC_2.40`、`libc.so.6@{GLIBC_2.40,GLIBC_2.39}`），语法与匹配语义归 lpkg（见 `lpkg/README.md` 的"SONAME 规格"一节）。farm **会从 ELF 的 `.gnu.version_d`/`.gnu.version_r` 产出**符号版本（写进 `needed_so`/`provides_soname`），同时按裸 SONAME 做基线归一（不会把已有的规格当漂移）。
+- **SONAME 规格（symbol version）** — `needed_so`/`provides_soname` 的条目可带 ELF 符号版本（`libc.so.6@GLIBC_2.40`、`libc.so.6@{GLIBC_2.40,GLIBC_2.39}`），语法与匹配语义归 lpkg（见 `lpkg/README.md` 的"SONAME 规格"一节）。farm **会从 ELF 的 `.gnu.version_d`/`.gnu.version_r` 产出**符号版本（写进 `needed_so`/`provides_soname` —— **这两个字段是 farm 生成的，别手编**）。farm 按**裸 SONAME 建索引 / 查表**，但**漂移判定是版本级的**：`verify` 按 `(裸名, 去重排序的版本集)` 比规格 —— 少一个版本节点 → `AbiBreak`，多出来 / `needed_so` 规格变化 → `Repack`（写回 `LankeBUILD.json`，写扫描值）。（订正 2026-10-05：旧文写"按裸 SONAME 做基线归一（不会把已有的规格当漂移）"—— 那已不成立。）
 - **ABI 驱动增量构建** — 只构建配方版本与本地仓库不一致的包，或 ABI 断裂的受害者。用旧索引的 `needed_so`/`provides_soname` 计算 removed SONAME，直连受害者，不做树状闭包。
 - **容器隔离构建** — 所有构建在 fresh Docker 容器内进行，`--image` 必填，禁止主机构建污染宿主环境。
 - **确定性构建序** — 拓扑排序，同级按包名升序固定顺序，绝无随机（有回归测试保证）。
@@ -164,7 +164,7 @@ cargo build --release        # 产物: target/release/lankefarm
 | `build <pkg>...\|--all --image <img>` | 增量、ABI 感知的构建，带计划预览（仅容器构建，`--image` 必填） |
 | `validate --image <img>` | 重建所有缺少 `.build_ok` 标记的包 |
 | `export --output <dir>` | 将构建仓库扁平化复制为发行格式 `<pkg>-<ver>.lpkg`（不重打包） |
-| `chk <kind> --source <repo> [--pkgs …]` | 维护期实用检則工具集（**非稳定接口**，可能因技术变迁移除）：`qml`（QML import 依赖）/ `pkgconf`（.pc Requires 依赖）/ `pkg-err`（usr/etc|usr/var、.la、.a）/ `hook`（sysusers/tmpfiles → postinst 自动跑）/ `abi`（全 ABI 符号@版本审计）/ `full`（一键全跑）。共享 `--source/--arch/--pkgs-dir/--cache/--pkg/--full-rescan`；非 root、只读 |
+| `chk <kind> --source <repo> [--pkgs …]` | 维护期实用检則工具集（**非稳定接口**，可能因技术变迁移除）：`qml`（QML import 依赖）/ `pkgconf`（.pc Requires 依赖）/ `pkg-err`（usr/etc|usr/var、.la、.a）/ `introspection`（装 `.gir` 的包须声明 `gobject-introspection` 构建依赖）/ `vapi`（装 `.vapi` 的包须声明 `vala` 构建依赖）/ `build-deps`（每个 `needed_so` 的 SONAME 提供者须直接在本包 `build_deps`）/ `pycache`（包内不得含 `__pycache__`）/ `hook`（sysusers/tmpfiles → postinst 自动跑）/ `abi`（全 ABI 符号@版本审计）/ `full`（一键全跑）。共享 `--source/--arch/--pkgs-dir/--cache/--pkg/--full-rescan`；非 root、只读 |
 | `track <pkg>\|--all [--run]` | 探测上游版本（默认只读提案，`--run` 应用） |
 | `gen-trackers` | 批量调用 LLM 生成 tracker yaml |
 | `seed --remote <url>` | 冷启动播种远程仓库（并行下载 + SHA-256 校验） |

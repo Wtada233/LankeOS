@@ -146,30 +146,32 @@ fn scan_content(content_dir: &Path, repo_provides: &HashSet<String>) -> (Vec<Str
             }
         }
         // 符号链接：系统库路径下 `.so` 且指向 ELF → 注册文件名作提供者
-        if let Ok(target) = fs::read_link(fpath) {
+        if fs::read_link(fpath).is_ok() {
             let is_so = fpath
                 .file_name()
                 .and_then(|n| n.to_str())
                 .is_some_and(|n| n.contains(".so"));
             if is_so && in_system_lib_dir(fpath, content_dir) {
-                let resolved = if target.is_absolute() {
-                    target
-                } else {
-                    fpath.parent().unwrap_or(Path::new("")).join(target)
-                };
-                let resolved = resolved.canonicalize().unwrap_or(resolved);
-                if is_elf(&resolved) {
-                    if let Some(n) = fpath.file_name().and_then(|n| n.to_str()) {
-                        // 版本表在**目标文件**里：符号链接 `libx.so.1 → libx.so.1.2.3` 也是
-                        // 消费者 DT_NEEDED 的字面量，它导出的版本要从目标读出来，否则
-                        // "需要 libx.so.1@V2" 会因为这里只登记了裸名而找不到提供者。
-                        let versions = fs::read(&resolved)
-                            .map(|b| parse_elf_versions_only(&b))
-                            .unwrap_or_default();
-                        provides_soname
-                            .entry(n.to_string())
-                            .or_default()
-                            .extend(versions);
+                // 版本表在**目标文件**里：符号链接 `libx.so.1 → libx.so.1.2.3` 也是
+                // 消费者 DT_NEEDED 的字面量，它导出的版本要从目标读出来，否则
+                // "需要 libx.so.1@V2" 会因为这里只登记了裸名而找不到提供者。
+                //
+                // ⚠️ 目标**必须限在 content 根内**解析（`resolve_link_within_content`）：
+                // 绝对目标是**归档内**的 `/`，要映射回 content/，绝不能落到**宿主机**。
+                // 旧实现把绝对目标原样 `canonicalize` ⇒ 读宿主的同名库 ⇒ 扫描不密闭：
+                // keyutils 的 `usr/lib/libkeyutils.so -> /lib/libkeyutils.so.1` 会取宿主那份库的
+                // 版本集合；宿主没装该库时条目**静默消失** ⇒ verify 误判 ABI 断裂。
+                if let Some(resolved) = resolve_link_within_content(fpath, content_dir) {
+                    if is_elf(&resolved) {
+                        if let Some(n) = fpath.file_name().and_then(|n| n.to_str()) {
+                            let versions = fs::read(&resolved)
+                                .map(|b| parse_elf_versions_only(&b))
+                                .unwrap_or_default();
+                            provides_soname
+                                .entry(n.to_string())
+                                .or_default()
+                                .extend(versions);
+                        }
                     }
                 }
             }
@@ -261,6 +263,54 @@ fn is_elf(path: &Path) -> bool {
         return false;
     };
     n == 4 && magic == [0x7f, b'E', b'L', b'F']
+}
+
+/// 逐跳解析符号链接，**始终限制在 `content_dir` 之内**（绝不落到宿主机）。
+///
+/// - 相对目标 → 相对上一跳所在目录；
+/// - 绝对目标 → **一律拼包 root**（`content/` 即归档里的 `/`）：绝对符号链接指向的是
+///   **目标系统**里的路径，映射回归档就是"把包 root 当 `/`"。**不做 usr-merge 之类的额外
+///   映射** —— 那是发行版决策（`/lib -> usr/lib` 随时可能改），不是扫描器该假设的事；
+/// - **词法**归一，绝不调 `fs::canonicalize` —— 后者对绝对目标会解析到**宿主机**，那正是
+///   "扫描不密闭"的来源；
+/// - 越出 content 根 / 断链 / 成环 → `None`。
+fn resolve_link_within_content(link: &Path, content_dir: &Path) -> Option<PathBuf> {
+    const MAX_HOPS: usize = 32;
+    let mut cur = link.to_path_buf();
+    for _ in 0..MAX_HOPS {
+        let Ok(target) = fs::read_link(&cur) else {
+            return Some(cur); // 不是符号链接（或读不到）→ 它就是终点
+        };
+        let next = if target.is_absolute() {
+            content_dir.join(target.strip_prefix("/").unwrap_or(&target))
+        } else {
+            cur.parent().unwrap_or(Path::new("")).join(&target)
+        };
+        let next = normalize_lexically(&next);
+        if !next.starts_with(content_dir) {
+            return None; // 借 `..` 逃出 content 根
+        }
+        cur = next;
+    }
+    None // 成环
+}
+
+/// 词法路径归一（消掉 `.` 与 `..`，**不碰文件系统**）。
+///
+/// `build/repo.rs` 的备份路径判定共用这一份（原先是那里的私有副本）。
+pub(crate) fn normalize_lexically(p: &Path) -> PathBuf {
+    use std::path::Component;
+    let mut out = PathBuf::new();
+    for c in p.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                out.pop();
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 /// 是否系统标准库路径（gen_deps `_in_system_lib_dir`）：

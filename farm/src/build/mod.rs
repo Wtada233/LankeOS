@@ -16,7 +16,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::abi;
-use crate::graph::{so_bare, Index, RevMap};
+use crate::graph::{self, Index, RevMap};
 use crate::lpkg_binding::{BuildOutcome, LpkgBinding};
 use crate::state::{JobStatus, State};
 use crate::tr;
@@ -179,33 +179,75 @@ pub(crate) fn mark_build_ok(pkgs_dir: &Path, pkg: &str) -> std::io::Result<()> {
 /// 调用方（farm abifix）据此 bump release 后强制重建：重建时容器按当前仓库 provider 装依赖，
 /// 孤儿 needed_so 若不再链接则重扫后自动消失；若仍真需要则构建失败（BLOCKED）→ 提示先更新
 /// provider 配方（如 display-info 上游 soversion 变、下游还没跟上）。
-pub(crate) fn abifix_targets(pkgs_dir: &Path, old: &Index) -> Vec<(String, Vec<String>)> {
-    let provided = old.all_provided_sonames();
+/// abifix 命中一条 needed 时的**原因**（要能把操作者指到"符号版本需求没人提供"这一层）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AbifixReason {
+    /// 该 SONAME 在索引里**没有任何** provider（裸名级缺口，原有语义）
+    NoProvider,
+    /// 有 provider，但**没有任何单一** provider 覆盖 need 声明的版本；
+    /// 列出"所有提供者都没覆盖"的版本（若每个版本单独有人提供、只是没有单一提供者全包，则列出整条 need 的版本集合）。
+    VersionsNotCovered(Vec<String>),
+}
+
+/// abifix 的一条命中：`needed` 原样（可能带符号版本）+ 原因。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AbifixMiss {
+    pub needed: String,
+    pub reason: AbifixReason,
+}
+
+pub(crate) fn abifix_targets(pkgs_dir: &Path, old: &Index) -> Vec<(String, Vec<AbifixMiss>)> {
     let mut out = Vec::new();
     for pkg in sorted_pkg_names(pkgs_dir) {
         let Some(b) = read_lankebuild(pkgs_dir, &pkg) else {
             continue;
         };
-        // ⚠️ **两侧都必须归一到裸名**（`provided` 的键本来就是裸名）。
-        // 2026-10-05 修：此前 `own`/`needed_so` 用的是**规格整串**，而 `provided` 是裸名集合 ⇒
-        // 带符号版本的 need（`X@{V1,V2}`）**永远查不到** ⇒ 实测**误报 734 个包 / 3233 条 needed**
-        // （正是全部带版本的那些），`farm abifix` 会给它们白 bump release + 强制重建。
-        // 归一后同口径：0 条。**farm 的判据只到裸名这一层**（"这个库有没有人提供"）——
-        // "提供者拿不出那个符号版本"是 lpkg 安装期的判定（`so_spec_satisfies`），不在 farm 这层。
-        let own: HashSet<String> = b
-            .provides_soname
-            .iter()
-            .map(|s| so_bare(s).to_string())
-            .collect();
-        let missing: Vec<String> = b
-            .needed_so
-            .iter()
-            .filter(|s| {
-                let bare = so_bare(s);
-                !provided.contains(bare) && !own.contains(bare)
-            })
-            .cloned()
-            .collect();
+        let own_specs: Vec<&str> = b.provides_soname.iter().map(String::as_str).collect();
+        let mut missing: Vec<AbifixMiss> = Vec::new();
+        for needed in &b.needed_so {
+            let bare = graph::so_bare(needed);
+            // 自提供（裸名级）与任何仓库声明的**裸名**都要先认得出来 —— 版本覆盖另算
+            let own_has_bare = own_specs.iter().any(|x| graph::so_bare(x) == bare);
+            let idx_specs = old.soname_specs(needed);
+            // 覆盖判据：**任何单一**声明覆盖整条 need 即可（保守包含，与 lpkg `so_spec_satisfies` 同规则）
+            let covered = own_specs
+                .iter()
+                .chain(idx_specs.iter())
+                .any(|spec| graph::so_covers(spec, needed));
+            if covered {
+                continue;
+            }
+            if !own_has_bare && idx_specs.is_empty() {
+                missing.push(AbifixMiss {
+                    needed: needed.clone(),
+                    reason: AbifixReason::NoProvider,
+                });
+                continue;
+            }
+            // 有 provider，但**没有单一** provider 覆盖 need 声明的版本 ⇒ 定位到缺哪些版本
+            let (_, need_syms) = graph::parse_so_spec(needed);
+            let uncovered: Vec<String> = need_syms
+                .iter()
+                .filter(|v| {
+                    let one = format!("{bare}@{v}");
+                    !own_specs
+                        .iter()
+                        .chain(idx_specs.iter())
+                        .any(|spec| graph::so_covers(spec, &one))
+                })
+                .cloned()
+                .collect();
+            // 每个版本单独看都有人提供、但没有**单一**提供者全包 ⇒ 报整条 need 的版本集合
+            let versions = if uncovered.is_empty() {
+                need_syms
+            } else {
+                uncovered
+            };
+            missing.push(AbifixMiss {
+                needed: needed.clone(),
+                reason: AbifixReason::VersionsNotCovered(versions),
+            });
+        }
         if !missing.is_empty() {
             out.push((pkg, missing));
         }
@@ -225,10 +267,16 @@ pub fn abifix_plan(pkgs_dir: &Path, out_dir: &Path, arch: &str) -> Result<Vec<St
     }
     println!("{}", tr!("abifix.title", targets.len()));
     for (pkg, missing) in &targets {
-        println!(
-            "  {}",
-            ux::yellow(&tr!("abifix.target", pkg, missing.join(", ")))
-        );
+        for m in missing {
+            // 两类原因分开报：裸名级缺口（原有）与**版本缺口**（新：库还在、但没人提供要的版本）
+            let line = match &m.reason {
+                AbifixReason::NoProvider => tr!("abifix.target", pkg, m.needed.clone()),
+                AbifixReason::VersionsNotCovered(v) => {
+                    tr!("abifix.target_ver", pkg, m.needed.clone(), v.join(", "))
+                }
+            };
+            println!("  {}", ux::yellow(&line));
+        }
     }
     // bump release = 重建信号（与 ABI 传播 victim 的 bump 规则一致），重建重扫 needed_so
     for (pkg, _) in &targets {
@@ -666,12 +714,18 @@ pub fn run_build(
         //     独立于 ABI 断裂——不再有"任何重建都触发"的 script_interpreter 回退（patch 升级会
         //     无谓拖垮整个组，已删）。
         let removed = abi::removed_sonames(&old, &pkg, &outcome.provides_soname);
+        // **版本级**断裂：整个 SONAME 还在，但它不再导出某个版本 ⇒ 需要**那个版本**的消费者
+        // 同样是 ABI 受害者（lpkg 装它们会在安装期被 `so_spec_satisfies` 拒掉）。
+        let removed_versions = abi::removed_soname_versions(&old, &pkg, &outcome.provides_soname);
+        // ⚠️ `group_trigger`（abichange 组）仍只认**整个 SONAME** 断裂 —— 那是既有语义
+        // （"不链该库但 ABI 敏感的包"），版本级缺口由直连受害者覆盖（见下）。
         let group_trigger = !removed.is_empty();
-        if !removed.is_empty() {
+        if !removed.is_empty() || !removed_versions.is_empty() {
             report.abi_broken.push(pkg.clone());
         }
-        // 直连受害者（链接被移除 SONAME 的包，只在真 ABI 断裂时）∪ 声明式重建组受害者 ∪ version-change 受害者
+        // 直连受害者（链接被移除 SONAME 的包 ∪ 需要被移除**版本**的包）∪ 声明式重建组 ∪ version-change
         let mut victims = abi::direct_victims(&revmap, &removed);
+        victims.extend(abi::version_victims(&revmap, &removed_versions));
         if group_trigger {
             victims.extend(groups.victims_for(&pkg, &all_pkgs));
         }
@@ -684,7 +738,17 @@ pub fn run_build(
                 if !seen.contains(&v) {
                     println!(
                         "  {}",
-                        ux::yellow(&tr!("build.abi", pkg, removed.join(", "), v))
+                        ux::yellow(&tr!(
+                            "build.abi",
+                            pkg,
+                            removed
+                                .iter()
+                                .chain(removed_versions.iter())
+                                .cloned()
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                            v
+                        ))
                     );
                     queue.push_back((v, true)); // 传播重建 → 触发 release bump
                 }

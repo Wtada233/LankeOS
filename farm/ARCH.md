@@ -72,9 +72,18 @@ farm 只扫/比 `needed_so` + `provides_soname`（`build/repo.rs` 规则 3：`de
 > 字段次序全仓统一：**`deps, provides, provides_soname, needed_so`**。
 > **SONAME 规格（symbol version）**：这两个字段的条目可以带 ELF 符号版本
 > （`libc.so.6@GLIBC_2.40` / `libc.so.6@{GLIBC_2.40,GLIBC_2.39}`，**语法与语义归 lpkg**，
-> 见 `lpkg/ARCH.md` §1.9）。farm 侧**只做基线归一**：`graph::so_bare()` 剥掉 `@…` 之后才建
-> 索引/查表/比较 —— 因为扫描只会产出裸名，而 metadata 里可能是手写的规格；逐字比较会把
-> "声明了符号版本"判成漂移（`verify` 会 repack 把它涂掉，`abi` 会误报断裂并触发传播重建）。
+> 见 `lpkg/ARCH.md` §1.9）。farm 在**建索引 / 查表 / 图比较**这一层只按裸名：`graph::so_bare()`
+> 剥掉 `@…` 之后才建 `soname_index` 的键、做 `link_deps` 的比对。**漂移判定则是版本级的**
+> （`verify::decide()` 按 `(裸名, 去重排序的版本集)` 比规格，即 `canon_specs`）：
+> `provides_soname` **少一个版本节点** → `AbiBreak`（真断裂，触发消费者重建）；**多出来** →
+> `Repack`（向后兼容、不是断裂，但配方陈旧要写回）；`needed_so` **任一方向**的规格变化 →
+> `Repack`。`Repack` 会用**扫描值**写回 `LankeBUILD.json`。
+>
+> ⚠️ **订正 2026-10-05**：原文写"farm 侧**只做基线归一**：`graph::so_bare()` 剥掉 `@…` 之后才建
+> 索引/查表/比较 —— 因为**扫描只会产出裸名**，而 metadata 里可能是手写的规格；逐字比较会把
+> '声明了符号版本'判成漂移（`verify` 会 repack 把它涂掉，`abi` 会误报断裂并触发传播重建）"。
+> **该前提已被推翻**：扫描**会产出**符号版本（见下一段），`needed_so`/`provides_soname` 是
+> farm 生成的；漂移判定已改为**版本级**（见上）。
 > farm **会产出**符号版本（2026-10-05 起）：`scan.rs` 读每个 ELF 的 `.gnu.version_d`（verdef：
 > 本库定义哪些版本，**跳过 BASE 节点**）与 `.gnu.version_r`（verneed：从哪个库需要哪些版本），
 > 汇总成规格串写进 `needed_so`/`provides_soname`。⚠️ `Verneed::vn_file` 是 **dynstr 偏移**不是
