@@ -235,8 +235,12 @@ libc.so.6@{GLIBC_2.40,GLIBC_2.39} # several (symbol charset [A-Za-z0-9_.+-]; whi
     index field is **still a comma** — splitting is **brace-aware** (a comma inside braces is not a
     separator).
 -   **Who produces them**: the **build farm does** (it scans each ELF's `.gnu.version_d` /
-    `.gnu.version_r`); they can also be hand-written. The farm additionally normalises these fields
-    to bare SONAMEs for comparison, so it never erases existing specs.
+    `.gnu.version_r`) — **these two fields are farm-generated** (hand-written values get overwritten
+    by the scanned ones). The farm indexes/looks up by **bare SONAME**, but **drift detection is
+    version-level** (`verify` compares `(bare name, deduped sorted version set)`: losing a version
+    node → `AbiBreak`; gaining one or any `needed_so` spec change → `Repack`).
+    > Correction 2026-10-05: the old text said "the farm additionally normalises these fields to bare
+    > SONAMEs for comparison, so it never erases existing specs" — that no longer holds.
 
 ## Source Architecture
 

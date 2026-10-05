@@ -294,11 +294,17 @@ provider 侧那段循环一次都不跑（零成本）。
 
 #### 已知边界（有意）
 
-- **farm 产出 + 基线归一**（2026-10-05）：farm 扫 ELF 的 `.gnu.version_d`（verdef，跳过 BASE 节点）/
-  `.gnu.version_r`（verneed）自动写出这两个字段，同时对这些字段做**基线归一**
-  （`so_bare()`：剥掉 `@…` 再比较/建索引）—— 不归一的话手写规格会被 `verify` 判成漂移、被
-  repack **静默涂掉**，`abi` 那一侧还会误报断裂。实测产出：glibc 的 `libc.so.6` 46 个 `GLIBC_*`、
+- **farm 产出**（2026-10-05）：farm 扫 ELF 的 `.gnu.version_d`（verdef，跳过 BASE 节点）/
+  `.gnu.version_r`（verneed）自动写出这两个字段（**这两个字段由 farm 生成**，别手编）。farm 按
+  **裸 SONAME 建索引/查表/图比较**（`so_bare()`：剥掉 `@…` 再比），但**漂移判定是版本级的** ——
+  `farm/src/verify.rs::decide()` 按 `(裸名, 去重排序的版本集)` 比规格：`provides_soname` 少一个
+  版本节点 → `AbiBreak`；多出来 / `needed_so` 规格变化 → `Repack`（用**扫描值**写回
+  `LankeBUILD.json`）。实测产出：glibc 的 `libc.so.6` 46 个 `GLIBC_*`、
   gcc 的 `libgcc_s.so.1@{GCC_3.0,…}`、python 消费侧的 `libcrypto.so.3@{OPENSSL_3.0.0,3.3.0,3.4.0}`。
+  > ⚠️ **订正 2026-10-05**：本条原写"farm 产出 + **基线归一**……对这些字段做**基线归一**
+  > （不归一的话手写规格会被 `verify` 判成漂移、被 repack 静默涂掉，`abi` 那一侧还会误报断裂）"。
+  > **该前提已被维护者推翻**：`provides_soname` 侧就是按版本级判漂移的，漂移时会用扫描值覆盖
+  > 配方；`so_bare()` 只保留在"裸名建索引/查表/图比较"那一层。
 - **系统库不校验符号版本**（`--use-system-soname`）：`Config::has_system_soname()` 查的是
   `<root>/usr/lib/<名字>` 这个文件在不在，所以那里**只能传裸 SONAME** —— 传整串会去找一个带
   `@` 的文件名、永远不存在（`installation_task.cpp` 里已写明）。

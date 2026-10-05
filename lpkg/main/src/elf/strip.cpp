@@ -1114,17 +1114,28 @@ static std::vector<uint8_t> serialize_ar_offsets(bool sym64, const std::vector<u
 static std::vector<uint8_t> build_gnu_ar_index(bool sym64, const std::vector<ArIndexEntry>& entries,
                                                const std::vector<uint64_t>& offsets)
 {
-    std::vector<uint8_t> d;
-    const uint32_t n = static_cast<uint32_t>(entries.size());
-    d.push_back(static_cast<uint8_t>((n >> 24) & 0xff));
-    d.push_back(static_cast<uint8_t>((n >> 16) & 0xff));
-    d.push_back(static_cast<uint8_t>((n >> 8) & 0xff));
-    d.push_back(static_cast<uint8_t>(n & 0xff));
+    // 先算总长、一次性分配、按偏移写入 —— 与"反复 push_back/insert 增长"逐字节等价，
+    // 但**不触发 gcc 13 的 `-Wstringop-overflow` 误报**：`_GLIBCXX_ASSERTIONS`（build.conf
+    // 默认带）会把 vector 的 insert/push_back 内联成检查版，gcc 13.2.1 据此算出"往大小为 0
+    // 的区域写 2..SIZE_MAX 字节"的伪告警（实测：同一份源码 gcc 13.2.1 报错、gcc 16.2.0 干净；
+    // 单独 `-D_GLIBCXX_ASSERTIONS` 即可触发，`-Werror` 下变成硬失败）。
     const std::vector<uint8_t> offs = serialize_ar_offsets(sym64, offsets);
-    d.insert(d.end(), offs.begin(), offs.end());
+    const uint32_t n = static_cast<uint32_t>(entries.size());
+    std::size_t total = 4 + offs.size();
+    for (const auto& e : entries) total += e.name.size() + 1;
+
+    std::vector<uint8_t> d(total);
+    std::size_t p = 0;
+    d[p++] = static_cast<uint8_t>((n >> 24) & 0xff);
+    d[p++] = static_cast<uint8_t>((n >> 16) & 0xff);
+    d[p++] = static_cast<uint8_t>((n >> 8) & 0xff);
+    d[p++] = static_cast<uint8_t>(n & 0xff);
+    std::copy(offs.begin(), offs.end(), d.data() + p);
+    p += offs.size();
     for (const auto& e : entries) {
-        d.insert(d.end(), e.name.begin(), e.name.end());
-        d.push_back(0);
+        std::copy(e.name.begin(), e.name.end(), d.data() + p);
+        p += e.name.size();
+        d[p++] = 0;
     }
     return d;
 }
