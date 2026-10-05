@@ -29,6 +29,15 @@
 //
 // 另外统计三类结局（建出链接数 / 被拒/跳过数 / 异常数）并在退出时打印：证明 harness
 // 真的走到了**建链接**那条路，而不是每轮都在空转。
+//
+// ── 已知边界（2026-10-05）─────────────────────────────────────────────
+// **夹具自己曾经越界，导致 oracle 1 每跑必红**：记录解释器用 `ofstream` 落地 `L`/`F`，而它会
+// **跟随**先前的 `S` 记录留下的符号链接 —— `S x /out` + `L x <soname>` 就把 512 字节的 ELF
+// 写到了沙箱之外（最小复现 4 字节输入）。**那与本 harness 要测的函数无关**：`apply_soname_links`
+// 只会 `create_symlink`，从不写 512 字节的普通文件 —— 越界物的**类型与大小**就是区分"夹具越界"
+// 与"产品越界"的判据。`write_bytes()` 现在先摘链接再写（与真实安装路径的
+// `.lpkgtmp` + rename 同语义），`corpus/soname_dir/fixture_symlink_then_write` 是它的回归种子。
+// 这一条与仓库里记过的"新 harness 第一次跑报的红，全是 oracle 自己的错"是同一家族。
 
 #include <elf.h>
 #include <unistd.h>
@@ -167,6 +176,19 @@ std::vector<uint8_t> crafted_elf(const std::string& soname_in)
 
 bool write_bytes(const fs::path& p, const std::vector<uint8_t>& bytes)
 {
+    // ⚠️ **先摘掉同名符号链接**（2026-10-05 实测踩到，最小复现 4 个字节的输入就够）：
+    // 下面的 `ofstream` 会**跟随**链接。于是记录序列
+    //     `S x /.EVILPROBE`   →  建出 `lib/x -> /.EVILPROBE`
+    //     `L x libfoo.so.1`   →  把 512 字节的 ELF **写到了沙箱之外**
+    // 时，越界的是**本 harness 自己的夹具**，不是 `apply_soname_links`（它只会
+    // `create_symlink`，从不会写 512 字节文件 —— 正是"越界物是 512 字节普通文件"这一点
+    // 把两种可能区分开的）。而 oracle 1 是"`/` 顶层一个条目都不许变"，于是**每跑必红**。
+    //
+    // 真实安装路径不会跟随链接（`.lpkgtmp` + rename，且 `refuse_symlink_tmp_path` 专门挡这个），
+    // 所以夹具按同样语义：链接先删掉，再原地落地成一个普通文件。
+    // 用 `symlink_status`（lstat 语义、带 ec）而不是 `fs::exists` —— 后者对悬空链接返回 false。
+    std::error_code ec;
+    if (fs::is_symlink(fs::symlink_status(p, ec))) fs::remove(p, ec);
     std::ofstream f(p, std::ios::binary | std::ios::trunc);
     if (!f) return false;
     f.write(reinterpret_cast<const char*>(bytes.data()),

@@ -24,6 +24,8 @@
 #include <string_view>
 #include <vector>
 
+#include "base/fs_atomic.hpp"        // fsync_and_rename（原子落位只此一处，见 process_elf）
+#include "base/path_predicates.hpp"  // is_symlink_no_follow（暂存路径的守卫，不抛）
 #include "base/utils.hpp"
 #include "i18n/localization.hpp"
 #include "lib_utils.hpp"
@@ -214,7 +216,7 @@ FileType identify_file_type(const fs::path& path)
  */
 static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrndx, int elf_class,
                                  std::vector<uint8_t>& output_data, std::string& error_msg,
-                                 size_t input_size)
+                                 size_t input_size, const std::string& source_path)
 {
     Fd out_fd(memfd_create("strip_out", 0));
     if (!out_fd.ok()) {
@@ -248,6 +250,8 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
     // 被保留、且**带数据**的节区的累计字节数 —— 下面对每个这样的节区各复制一份自有缓冲
     // （`owned_data`），`elf_update` 还会再按 `sh_size` 布局输出。封顶判据在下面 `keep` 分支里。
     size_t retained_data_total = 0;
+    // 被保留节区的 `sh_addralign` 之和 —— 见下面 `keep` 分支里"对齐填充"那条封顶。
+    size_t retained_align_total = 0;
 
     while ((scn = elf_nextscn(in_elf, scn)) != nullptr) {
         size_t old_idx = elf_ndxscn(scn);
@@ -307,6 +311,29 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
                 }
                 retained_data_total += shdr.sh_size;
             }
+            // **对齐填充的聚合封顶（2026-10-05 修）—— A3 的本体。**
+            //
+            // 上面每条判据都只盯**单个**输入可控的量：逐节区的 `sh_offset`/`sh_size` 要落在
+            // 文件内、`sh_addralign ≤ input_size`、被保留节区的 `sh_size` 之和 ≤ input_size。
+            // 而 `elf_update` 会**按 `sh_addralign` 对齐每个节区的落点** ⇒ N 个各自
+            // `sh_addralign ≤ input_size`（逐节区守卫恰好放行）、`sh_size = 1`（聚合守卫也恰好
+            // 放行）的节区就能把产物撑到 ~N × input_size：**64 KiB 输入产出 4 MiB 填充**
+            // （1000 个 align=4096 的节区，见 tests/unit/test_elf_stripping.cpp 的
+            // `RelAlignmentPaddingAmplificationIsRefusedNotMaterialized`）；输入再大就是 GB 级。
+            //
+            // ⚠️ **这条判据必须在 `elf_update` 之前。** 放大发生在 `elf_update` **内部**
+            // （它按这些对齐值 ftruncate 那个 memfd / 铺出全部填充），等拿到产物尺寸再判已经晚
+            // 了 —— 那时内存（memfd 是 shmem）已经被吃掉，正是本缺陷"strip 放大到 OOM"的现场。
+            // 判据与上面 `retained_data_total` **同形**（输入可控字段的聚合上界），量级取
+            // **输入大小**：合法文件的对齐值之和远小于文件本身（实测 128 个真实 `.o` —— 本仓库
+            // 构建树的测试目标 + 若干 gcc 产物：`Σsh_addralign / 文件大小` 最大 **2.0%**、
+            // 中位 **0.8%**），而放大形态需要它 ≫ 输入。`sh_addralign` 的逐节区
+            // 守卫已保证每项 ≤ input_size ⇒ 这个减法不回绕。
+            if (shdr.sh_addralign > input_size - retained_align_total) {
+                error_msg = get_string("error.strip_malformed_elf");
+                return false;
+            }
+            retained_align_total += shdr.sh_addralign;
             to_keep.push_back({scn, shdr, name, old_idx});
             idx_map[old_idx] = new_idx++;
         }
@@ -401,6 +428,34 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
     const off_t size = lseek(out_fd.get(), 0, SEEK_END);
     if (size < 0) {
         error_msg = get_string("error.strip_object_failed");
+        return false;
+    }
+    // **产物尺寸复核（2026-10-05 修）—— 纵深防御，主判据是上面那条对齐聚合封顶。**
+    //
+    // 产物 = ELF 头 + 节区表 + 各保留节区的数据 + **对齐填充**。前两项与第三项我们都有
+    // 确切值（`retained_data_total`），于是这条复核等价于"**对齐填充不得超过输入文件本身**"
+    // —— 合法文件里填充只占千分之几（实测同上），放大形态则是输入的几十倍。
+    //
+    // ⚠️ **为什么它只能当第二道**：判据在 `elf_update` **之后**，而放大恰恰发生在
+    // `elf_update` **内部**（它按对齐值铺出全部填充、把 memfd ftruncate 到那个尺寸）——
+    // 走到这里时内存已经被吃掉，正是本缺陷的现场。**真正拦住它的是上面那条 pre-update 的
+    // 对齐聚合封顶**，这里再核一遍产物，防的是"判据没想到的第三种放大向量"。
+    //
+    // ⚠️ 判据**不能**写成朴素的 `size > input_size`（2026-10-05 实测**不成立**）：良构
+    // ELF 里节区数据可以与被保留的其它区域重叠，重建后 libelf 把每个节区各铺一份 ⇒ 产物合法
+    // 地变大。实测 `CraftedElfTest.RelSectionsWithinFileStillStrip` 的输入 **512** 字节、
+    // 产物 **592** 字节（那条用例正是"正常形态必须照常 strip"的正面控制）。所以上界里必须
+    // 带上"头 + 节区表 + 节区数据"这三项已知量。
+    const size_t header_bytes =
+        ((elf_class == ELFCLASS64) ? sizeof(Elf64_Ehdr) : sizeof(Elf32_Ehdr)) +
+        to_keep.size() * ((elf_class == ELFCLASS64) ? sizeof(Elf64_Shdr) : sizeof(Elf32_Shdr));
+    if (static_cast<size_t>(size) > input_size + header_bytes + retained_data_total) {
+        // 这里在 `strip_elf_data` 之下，**拿不到路径**（它自己也没有）—— 所以路径由调用方
+        // 一路传下来（`source_path`），只为让这条错误点名文件（`strip_binary` 的告警判据是
+        // "失败且 error_msg 非空"，不点名等于没报）。`elf_strip_fuzz` 走 3 参重载时它是空串
+        // （fuzz 不消费 error_msg）。
+        error_msg = string_format("error.strip_output_grew", source_path, static_cast<size_t>(size),
+                                  input_size);
         return false;
     }
     output_data.resize(static_cast<size_t>(size));
@@ -668,7 +723,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
  * 根据 ELF 类型分派到对应的子函数
  */
 bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>& output_data,
-                    std::string& error_msg)
+                    std::string& error_msg, const std::string& source_path)
 {
     // 本函数**每个失败分支都必须填 `error_msg`** —— 消费者的判据是
     // `!strip_file(...) && !error_msg.empty()`（`strip_binary`），空串 = 拒绝得一声不响
@@ -731,13 +786,17 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
     bool result = false;
     if (ehdr.e_type == ET_REL) {
         result = strip_elf_rel_object(in_elf, ehdr, shstrndx, elf_class, output_data, error_msg,
-                                      input_data.size());
+                                      input_data.size(), source_path);
     } else {
         result = strip_elf_exec_dyn(in_elf, ehdr, shstrndx, elf_class, input_data, output_data,
                                     error_msg);
     }
     return result;  // `in_elf` 由 RAII 收尾
 }
+
+// ⚠️ 这里曾有一个 **3 参重载**（只为当时不能改动的 `tests/fuzz/elf_strip_fuzz.cpp` 转发）。
+// 2026-10-05 把那个 harness 的声明同步到上面这个 4 参签名后**已删除** —— 同一件事不留第二个
+// 签名，否则下次改签名又会漏掉一边（"第二份实现必然漂移"）。
 
 /** 读取 ELF 文件内容，调用 strip_elf_data 处理后写回原文件 */
 bool process_elf(const fs::path& path, std::string& error_msg)
@@ -766,23 +825,85 @@ bool process_elf(const fs::path& path, std::string& error_msg)
     is.close();
 
     std::vector<uint8_t> output_buffer;
-    if (!strip_elf_data(buffer, output_buffer, error_msg)) return false;
+    if (!strip_elf_data(buffer, output_buffer, error_msg, path.string())) return false;
 
-    std::ofstream os(path, std::ios::binary | std::ios::trunc);
-    // ⚠️ 每个失败分支**都要填 `error_msg`** —— 唯一的消费者是 `strip_binary` 里的
-    // `if (!strip_file(...) && !error_msg.empty())`（本文件末尾的 `strip_binary`；订正
-    // 2026-10-03：这里原写 `strip.cpp:847`，那行号早已漂移，改成不依赖行号的表述）：空串 =
-    // 检测到了也一声不响。`process_archive` 一直填，这里此前（含我最初只补返回值的那版）没填，
-    // 是两处不一致。
-    if (!os) {
-        error_msg = string_format("error.open_file_failed", path.string());
+    // **原子落位（2026-10-05 修）**：此前这里是
+    // `std::ofstream os(path, std::ios::binary | std::ios::trunc);` —— **打开的那一刻原内容
+    // 就没了**（`trunc` 是打开时生效的，与后面写不写得进去无关），而随后写入失败
+    // （ENOSPC/EIO）只让本函数返回 false，调用方 `strip_binary` 又只把它降级成一条告警
+    // ⇒ staging 里留着一个**被截断的 `.so`**，照样被打进 `.lpkg`。
+    // **实测**（`StripTest.ElfOriginalStaysIntactWhenTheTmpWriteCannotEvenStart` 的修前跑）：
+    // 写不进去时本函数照样返回 **true**、且原文件**已被就地重写**（内容与 strip 前不同）。
+    //
+    // 现在与同文件的 `process_archive` 统一：先写暂存文件 → 检查每一次写 → `fsync_and_rename`
+    // 收尾（`base/fs_atomic.hpp` 明令："所有 `.tmp + fsync + rename` 的写入路径都必须走这里，
+    // 不要各写一套"）。**成功 rename 之前原文件一个字节都不动** —— 这是本条修复的全部意义。
+    //
+    // 注：原子替换会把原 inode 换成新文件，所以**权限位必须显式带过去**（见下面 `orig_perms`），
+    // 否则一个 0755 的可执行文件 strip 完就变成 0644、打进包里不可执行。`.a` 那条腿只处理
+    // 静态库（惯例 0644），所以此前没暴露这个问题。
+    //
+    // ⚠️ **已知取舍（2026-10-05，有意保留）**：换 inode 也意味着**扩展属性不随行** ——
+    // 尤其 `security.capability`（file capabilities），以及硬链接关系（新文件与别人不再共享
+    // inode）。两条都不处理，理由：
+    //   · 本函数只跑在**构建期的 staging 树**上（`builder.cpp` 对刚编译出来的产物调
+    //     `strip_binary`），那一刻的产物不会有 `security.capability` —— 那份属性是**安装期**
+    //     由配方/包内容带进去的，而 strip 根本不碰那里（安装期的可执行位/SUID 走
+    //     `ARCHIVE_EXTRACT_PERM`，与这里无关）；
+    //   · 本仓库的打包器**不编码硬链接**（配方一律用相对软链），`archive_strip_scan` 那条腿
+    //     也早有同样取舍。
+    // 真要保留 xattr，正确做法是在 rename 前把原文件的 xattr 逐个复制到暂存文件 —— 但那要
+    // 处理 `security.*` 的权限与命名空间失败，而当前收益为零。**如果将来 strip 被用到构建树
+    // 之外（例如对已安装的文件跑），这条必须重新评估。**
+    const fs::path tmp_path = path.string() + ".lpkgtmp";
+    // 暂存路径若是**符号链接**，`ofstream` 会**跟随**它把内容写进链接目标（构建树里的
+    // `<文件>.lpkgtmp` 可以是上游/组件留下的任意链接，而本进程是 root）。仓库对 `.lpkgtmp`
+    // 有同款守卫（`pkg/install_common.cpp` 的 `refuse_symlink_tmp_path`）—— 这里不去 include
+    // pkg/ 的头（分层倒置），用 base 层的不抛谓词自己判（父链成环时也不抛）。
+    if (is_symlink_no_follow(tmp_path)) {
+        error_msg = string_format("error.strip_tmp_symlink", tmp_path.string());
         return false;
     }
-    os.write(reinterpret_cast<const char*>(output_buffer.data()), output_buffer.size());
-    // `ofstream` 不抛：短写 / ENOSPC / EIO 只置 badbit。不检查就会把**截断的**产物当成
-    // strip 成功；而文件已用 trunc 打开 —— 此刻原内容已经没了，失败必须报出来（带路径）。
-    os.flush();
-    if (!os) {
+    std::error_code perm_ec;
+    const fs::perms orig_perms = fs::status(path, perm_ec).permissions();
+    if (perm_ec) {
+        error_msg = string_format("error.file_read_failed", path.string());
+        return false;
+    }
+
+    {
+        std::ofstream os(tmp_path, std::ios::binary | std::ios::trunc);
+        // ⚠️ 每个失败分支**都要填 `error_msg`** —— 唯一的消费者是 `strip_binary` 里的
+        // `if (!strip_file(...) && !error_msg.empty())`：空串 = 检测到了也一声不响。
+        if (!os) {
+            error_msg = string_format("error.open_file_failed", tmp_path.string());
+            return false;
+        }
+        os.write(reinterpret_cast<const char*>(output_buffer.data()), output_buffer.size());
+        // `ofstream` 不抛：短写 / ENOSPC / EIO 只置 badbit。不检查就会把**截断的**产物
+        // rename 进正式位置。此刻原文件仍然完好（改动只落在暂存文件上），所以这里丢掉暂存、
+        // 报错即可 —— 与修前的"原内容已毁"是本质区别。
+        os.flush();
+        if (!os) {
+            os.close();
+            error_msg = string_format("error.strip_write_failed", tmp_path.string());
+            fs::remove(tmp_path);
+            return false;
+        }
+    }
+    // 新 inode 的权限位要显式恢复（理由见上面 `orig_perms`）。
+    fs::permissions(tmp_path, orig_perms, perm_ec);
+    if (perm_ec) {
+        fs::remove(tmp_path);
+        error_msg = string_format("error.strip_write_failed", path.string());
+        return false;
+    }
+    try {
+        fsync_and_rename(tmp_path, path);
+    } catch (const std::exception&) {
+        // fsync / rename 失败：原文件此刻仍是**完整的旧内容**（原子写的意义），丢掉暂存并
+        // 报出来（调用方只告警，但至少点名了文件）。
+        fs::remove(tmp_path);
         error_msg = string_format("error.strip_write_failed", path.string());
         return false;
     }
@@ -893,7 +1014,7 @@ static int archive_strip_scan(const fs::path& path, std::string& error_msg,
         if (std::string_view(name).ends_with(".o")) {
             std::vector<uint8_t> stripped;
             std::string inner;
-            if (strip_elf_data(data, stripped, inner) && stripped.size() != size) {
+            if (strip_elf_data(data, stripped, inner, path.string()) && stripped.size() != size) {
                 result = 1;
                 break;  // 已足以判定"要重写"，不必读完
             }
@@ -1265,9 +1386,28 @@ bool process_archive(const fs::path& path, std::string& error_msg)
     archive_write_set_format_ar_svr4(out);
 
     fs::path temp_path = path.string() + ".tmp";
+    // **暂存路径不得是符号链接（2026-10-05 修）**：`archive_write_open_filename` 走的是
+    // `open(O_CREAT|O_WRONLY|O_TRUNC)`，**跟随**末段链接 —— 构建树里若有一个
+    // `usr/lib/libfoo.a.tmp` 指向别处（上游产物、配方留下的链接、上一次构建的残留都可能），
+    // 本进程（root）会把整份新归档写进那个链接的**目标**；随后收尾的
+    // `safe_rename(temp_path, path)` 又把**链接本身**改名成 `.a`。实测（修前跑
+    // `StripTest.ArchiveTmpPathSymlinkIsRefusedNotFollowed`）：链接目标里赫然是
+    // `!<arch>\n…` 整份归档，而 `fs::is_symlink(<lib>.a)` 为真。仓库对
+    // `.lpkgtmp` 有同款守卫（`pkg/install_common.cpp` 的 `refuse_symlink_tmp_path`）——
+    // 这里不去 include pkg/ 的头（分层倒置），用 base 层的不抛谓词自己判（中间段成环也不抛）。
+    if (is_symlink_no_follow(temp_path)) {
+        archive_read_free(a);
+        archive_write_free(out);
+        error_msg = string_format("error.strip_tmp_symlink", temp_path.string());
+        return false;
+    }
     if (archive_write_open_filename(out, temp_path.c_str()) != ARCHIVE_OK) {
         archive_read_free(a);
         archive_write_free(out);
+        // 此前这里**不填 `error_msg`** ⇒ 调用方（`strip_binary`）的告警判据
+        // `!strip_file(...) && !error_msg.empty()` 不成立 ⇒ 打不开暂存文件时一声不响。
+        // 与同族其它分支（`error.strip_archive_open` 等）和本文件"失败必点名"的纪律对齐。
+        error_msg = string_format("error.open_file_failed", temp_path.string());
         return false;
     }
 
@@ -1346,7 +1486,7 @@ bool process_archive(const fs::path& path, std::string& error_msg)
         if (nm.ends_with(".o")) {
             std::vector<uint8_t> stripped_data;
             std::string inner_error_msg;
-            if (strip_elf_data(data, stripped_data, inner_error_msg)) {
+            if (strip_elf_data(data, stripped_data, inner_error_msg, path.string())) {
                 archive_entry_set_size(entry, stripped_data.size());
                 if (archive_write_header(out, entry) != ARCHIVE_OK) return bail();
                 const ssize_t written =

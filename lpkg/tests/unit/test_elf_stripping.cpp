@@ -39,6 +39,12 @@ protected:
         fs::remove(test_file.string() + ".c", ec);
         fs::remove(test_file.string() + ".cpp", ec);
         fs::remove_all(fs::current_path() / "strip_two_members", ec);
+        // strip 的暂存/临时产物与暂存路径守卫用例留下的一次性文件（2026-10-05 新增的
+        // 三条用例）：这里一并清掉，以免某条用例在中途 ASSERT 失败后把残留喂给下一条。
+        fs::remove_all(test_file.string() + ".lpkgtmp", ec);
+        fs::remove_all(test_file.string() + ".a", ec);
+        fs::remove_all(test_file.string() + ".a.tmp", ec);
+        fs::remove(test_file.string() + ".victim", ec);
     }
 
     /** 使用系统 gcc 编译一个最小的 C 源文件为 .o 目标文件 */
@@ -1785,7 +1791,7 @@ namespace
  * 与真实 gcc `.o` 同形，避免走到 libelf 对"名表索引指向非 strtab"的行为上去。
  */
 void write_crafted_rel(const fs::path& p, const std::vector<std::pair<uint64_t, uint64_t>>& secs,
-                       size_t file_size)
+                       size_t file_size, const std::vector<uint64_t>& aligns = {})
 {
     constexpr uint64_t kNamesOff = 64;
     const char kNames[] = "\0.shstrtab";  // [0]=NUL（空名的 offset 0），[1]=".shstrtab"
@@ -1819,6 +1825,9 @@ void write_crafted_rel(const fs::path& p, const std::vector<std::pair<uint64_t, 
         sh[i + 2].sh_type = SHT_PROGBITS;
         sh[i + 2].sh_offset = secs[i].first;
         sh[i + 2].sh_size = secs[i].second;
+        // `sh_addralign` 逐节区可给：A3 那条"对齐填充放大"的输入靠它构造（缺省 0，
+        // 与既有用例逐字节一致）。
+        if (i < aligns.size()) sh[i + 2].sh_addralign = aligns[i];
     }
     std::memcpy(buf.data() + kShdrOff, sh.data(), sh.size() * sizeof(Elf64_Shdr));
 
@@ -1857,4 +1866,193 @@ TEST_F(CraftedElfTest, RelOverlappingSectionsAggregateBeyondFileIsRejected)
         << "两个各占满整个文件（且指向同一片）的节区，尺寸之和 1024 > 512 ⇒ 必须拒绝";
     EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
     EXPECT_EQ(fs::file_size(test_file), 512u) << "拒绝时不许改写原文件";
+}
+
+TEST_F(CraftedElfTest, RelAlignmentPaddingAmplificationIsRefusedNotMaterialized)
+{
+    // **回归（2026-10-05）—— A3：聚合封顶只累加 `sh_size`，漏了 `elf_update` 的**对齐填充**。**
+    //
+    // 修前 `strip_elf_rel_object` 的量级封顶全在"单个输入可控字段"上：逐节区的
+    // `sh_offset`/`sh_size` 必须落在文件内、`sh_addralign ≤ input_size`、以及被保留节区的
+    // `sh_size` 之和 ≤ input_size。而 `elf_update` 会**按 `sh_addralign` 对齐每个节区的落点**
+    // —— N 个各自 `sh_addralign ≤ input_size`（逐节区守卫恰好放行）、`sh_size = 1`（聚合守卫
+    // 也恰好放行）的节区，能把产物撑到 ~N × input_size。
+    //
+    // 本用例：64 KiB 输入（节区表占 1002 × 64 字节）、1000 个 `sh_addralign = 4096` 的节区
+    // ⇒ **修前**产物约 4 MiB（比输入大 ~64 倍），而且节区数越多放大越狠（输入 N×64 字节 →
+    // 产物 ~N×align，align 上界就是输入大小 ⇒ **平方级**）。量级刻意取小（4 MiB）：判据若被
+    // 改坏，测试只会**失败**，不会把跑测试的机器打爆。
+    //
+    // 判据（修后）：**被保留节区的 `sh_addralign` 之和 ≤ 输入大小**（`strip_elf_rel_object`
+    // 的 pre-update 聚合封顶，与同函数里 `retained_data_total` 那条**同形**）——
+    // 对齐填充是布局的副产物，它的总量不可能超过整个文件；合法文件里它只占千分之几。
+    // 本用例修后**被拒**（原文件一个字节不动），断言因此落在"产物尺寸 ≤ 输入"这条不变量上。
+    //
+    // ⚠️ 顺带钉住一件事：**判据不能写成朴素的 `size > input_size`**。实测
+    // `CraftedElfTest.RelSectionsWithinFileStillStrip` 的输入 512 字节、产物 592 字节 ——
+    // 良构 ELF 的重建**合法地**会变大（节区数据与其它区域重叠时 libelf 各铺一份）。
+    constexpr size_t kFileSize = 65536;
+    constexpr uint64_t kAlign = 4096;
+    constexpr size_t kSections = 1000;
+    std::vector<std::pair<uint64_t, uint64_t>> secs(kSections, {0, 1});
+    std::vector<uint64_t> aligns(kSections, kAlign);
+    write_crafted_rel(test_file, secs, kFileSize, aligns);
+
+    const auto before = fs::file_size(test_file);
+    ASSERT_EQ(before, kFileSize);
+
+    std::string error_msg;
+    const bool ok = strip_file(test_file, error_msg);
+    const auto after = fs::file_size(test_file);
+
+    EXPECT_LE(after, before)
+        << "strip 产物不得大于输入（实测修前产出约 4 MiB，输入只有 64 KiB）—— 对齐填充没有"
+           "被任何判据覆盖";
+    if (!ok) {
+        EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
+    }
+}
+
+// ============================================================================
+// strip 的暂存文件与原子落位（2026-10-05）
+//
+// 两条同族的暂存路径守卫：
+//   · A4 `process_archive` 的 `<lib>.a.tmp`（`archive_write_open_filename` 跟随末段链接）
+//   · A5 `process_elf` 的 `<file>.lpkgtmp`（`ofstream` 跟随末段链接）
+// 外加 A5 的实质：**原文件在成功 rename 之前一个字节都不动** —— 修前是
+// `ofstream(path, trunc)`，打开即毁掉原内容，写失败只降级成一条告警 ⇒ 截断的 `.so` 照样
+// 打进 `.lpkg`。
+// ============================================================================
+
+/** 造一份哨兵内容，并把 link_path 建成一条指向它的符号链接（先清掉旧物）。 */
+static void make_symlink_guard(const fs::path& link_path, const fs::path& victim_path)
+{
+    std::ofstream v(victim_path, std::ios::binary | std::ios::trunc);
+    v << "DO NOT TOUCH";
+    v.close();
+    std::error_code ec;
+    fs::remove_all(link_path, ec);
+    ec.clear();
+    fs::create_symlink(victim_path, link_path, ec);
+    EXPECT_FALSE(ec) << "建符号链接失败: " << ec.message();
+}
+
+/** 读整个文件为字符串（不存在则返回空串）。 */
+static std::string read_all(const fs::path& p)
+{
+    std::ifstream in(p, std::ios::binary);
+    if (!in) return {};
+    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+
+TEST_F(StripTest, ElfTmpPathSymlinkIsRefusedNotFollowed)
+{
+    // A5：`process_elf` 现在先写 `<file>.lpkgtmp` 再原子 rename。暂存路径若是**符号链接**，
+    // `ofstream` 会跟随它把内容写进链接目标（本进程是 root ⇒ 目标可以是任何东西）。
+    // 修前根本不看这个路径：strip 就地成功、原文件被换掉、链接目标没人碰（但隐患已成立）。
+    if (!compile_test_object_with_debug()) GTEST_SKIP() << "gcc not available";
+
+    const fs::path tmp = test_file.string() + ".lpkgtmp";
+    const fs::path victim = test_file.string() + ".victim";
+    make_symlink_guard(tmp, victim);
+
+    std::string error_msg;
+    const bool ok = strip_file(test_file, error_msg);
+
+    EXPECT_FALSE(ok) << "暂存路径是符号链接时必须拒绝，而不是（跟随它）往里写";
+    EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
+    EXPECT_EQ(read_all(victim), "DO NOT TOUCH") << "链接目标被跟随写入（守卫没生效）";
+
+    std::error_code ec;
+    fs::remove(tmp, ec);
+    fs::remove(victim, ec);
+}
+
+TEST_F(StripTest, ElfOriginalStaysIntactWhenTheTmpWriteCannotEvenStart)
+{
+    // A5 的实质：**写入失败时原文件必须逐字节不变**。修前 `ofstream(path, … | trunc)` 在
+    // 打开的那一刻就把原内容毁掉了，之后无论成败原文件都已经是"被截断/被写过"的形态。
+    // 这里用一个**目录**占住 `<file>.lpkgtmp` 让 `ofstream` 打不开（比伪造 ENOSPC 稳，
+    // 且两种触发走的是同一条"写不进去"分支）。
+    if (!compile_test_object_with_debug()) GTEST_SKIP() << "gcc not available";
+
+    const fs::path tmp = test_file.string() + ".lpkgtmp";
+    std::error_code ec;
+    fs::remove_all(tmp, ec);
+    ec.clear();
+    fs::create_directory(tmp, ec);
+    ASSERT_FALSE(ec) << "无法在暂存路径建目录: " << ec.message();
+
+    const std::string before = read_all(test_file);
+    ASSERT_FALSE(before.empty());
+
+    std::string error_msg;
+    const bool ok = strip_file(test_file, error_msg);
+
+    EXPECT_FALSE(ok) << "写不进暂存文件时必须报失败，而不是照常覆盖原文件";
+    EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
+    EXPECT_EQ(read_all(test_file), before)
+        << "写入失败时原文件必须逐字节不变（修前：已被就地截断/覆盖）";
+
+    fs::remove_all(tmp, ec);
+}
+
+TEST_F(StripTest, AtomicReplaceKeepsTheExecutableBit)
+{
+    // 原子落位的**副作用**守卫（2026-10-05）：rename 会把原 inode 换成新文件，而 ofstream
+    // 建出来的新文件带的是默认权限 —— 不显式把权限位带过去的话，一个 0755 的可执行文件
+    // strip 完就变成 0644，打进 `.lpkg` 就是"不可执行"（这一条是**新引入**的风险，
+    // 不是既有缺陷：修前是就地 trunc，inode 不变、权限天然保留）。
+    if (!compile_test_object_with_debug()) GTEST_SKIP() << "gcc not available";
+
+    fs::permissions(test_file, fs::perms::owner_read | fs::perms::owner_write |
+                                   fs::perms::owner_exec | fs::perms::group_read |
+                                   fs::perms::group_exec | fs::perms::others_read |
+                                   fs::perms::others_exec);
+    const auto before_perms = fs::status(test_file).permissions();
+    ASSERT_NE(before_perms & fs::perms::owner_exec, fs::perms::none);
+
+    std::string error_msg;
+    ASSERT_TRUE(strip_file(test_file, error_msg)) << error_msg;
+    EXPECT_EQ(fs::status(test_file).permissions(), before_perms)
+        << "原子替换后权限位必须原样带过来（0755 掉成 0644 = 装出来不可执行）";
+
+    std::error_code ec;
+    fs::remove(test_file.string() + ".lpkgtmp", ec);
+}
+
+TEST_F(StripTest, ArchiveTmpPathSymlinkIsRefusedNotFollowed)
+{
+    // A4：`process_archive` 的暂存路径 `<lib>.a.tmp`。修前 `archive_write_open_filename` 会
+    // **跟随**这条链接，把整份新归档写进链接目标（本进程是 root），随后 `safe_rename` 又把
+    // **链接本身**改名成 `.a` —— 库变成一条指向别处的链接、目标被覆盖。
+    if (!compile_test_object()) GTEST_SKIP() << "gcc not available";
+
+    const fs::path archive_file = test_file.string() + ".a";
+    std::error_code ec;
+    fs::remove(archive_file, ec);
+    const std::string cmd =
+        "ar rcs " + archive_file.string() + " " + test_file.string() + " 2>/dev/null";
+    if (std::system(cmd.c_str()) != 0 || !fs::exists(archive_file)) {
+        GTEST_SKIP() << "ar not available";
+    }
+    const auto archive_before = fs::file_size(archive_file);
+    ASSERT_GT(archive_before, 0);
+
+    const fs::path tmp = archive_file.string() + ".tmp";
+    const fs::path victim = test_file.string() + ".victim";
+    make_symlink_guard(tmp, victim);
+
+    std::string error_msg;
+    const bool ok = strip_file(archive_file, error_msg);
+
+    EXPECT_FALSE(ok) << "暂存路径是符号链接时必须拒绝，而不是（跟随它）把归档写进链接目标";
+    EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
+    EXPECT_EQ(read_all(victim), "DO NOT TOUCH") << "链接目标被跟随写入（守卫没生效）";
+    EXPECT_FALSE(fs::is_symlink(archive_file)) << "拒绝时不许把原库换成一条链接";
+    EXPECT_EQ(fs::file_size(archive_file), archive_before) << "拒绝时不许改写原库";
+
+    fs::remove(tmp, ec);
+    fs::remove(victim, ec);
+    fs::remove(archive_file, ec);
 }

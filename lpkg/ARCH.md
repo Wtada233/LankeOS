@@ -29,8 +29,9 @@
 18. [2026-10-03 第三批修复](#18-2026-10-03-第三批修复行为--不变量变更)
 19. [2026-10-03 第四批修复（四路子 agent 复审后的收口）](#19-2026-10-03-第四批修复四路子-agent-复审后的收口)
 20. [2026-10-03 第五批：两条中危缺陷 + 保留命名空间表 + 反向依赖收敛 + `utils.hpp` 拆分](#20-2026-10-03-第五批两条中危缺陷--保留命名空间表--反向依赖收敛--utilshpp-拆分)
-21. [附录：完整 WAL 示例总结](#附录完整-wal-示例总结)
-22. [附录 B：代码注释里的 `历史 TODO.md <编号>` 是什么](#附录-b代码注释里的-历史-todomd-编号-是什么)
+21. [2026-10-05 第六批：畸形 tar 守卫 + `so:` 命名空间不变量订正](#21-2026-10-05-第六批畸形-tar-守卫--so-命名空间不变量订正)
+22. [附录：完整 WAL 示例总结](#附录完整-wal-示例总结)
+23. [附录 B：代码注释里的 `历史 TODO.md <编号>` 是什么](#附录-b代码注释里的-历史-todomd-编号-是什么)
 
 ---
 
@@ -2987,7 +2988,159 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 
 ---
 
-## 附录：完整 WAL 示例总结
+## 21. 2026-10-05 第六批：畸形 tar 守卫 + `so:` 命名空间不变量订正
+
+### 21.1 新增 `archive/tar_guard.{hpp,cpp}` —— 结构性畸形一律整包拒绝
+
+tar 是**纯顺序**格式：没有中央目录、没有成员索引、没有一个字段被强制校验，于是下面这些形态
+在格式上**完全合法**、只能由消费者自己拒。判据实现于 `TarGuard`（`archive/tar_guard.cpp`），
+接在 `extract_tar_zst` 的成员循环里（`member_path_relative` 之后、`archive_write_header` 之前），
+违规抛 `UnsafeArchiveException`。
+
+| # | 形态 | 判据 |
+|---|---|---|
+| 1 | **重名成员** | 归一化后的相对路径进 `seen_` 集合，第二次即拒 |
+| 2 | **控制字符**（`\n\r\t\0` 之外的，最典型是 ESC） | 逐字节判 `< 0x20 \|\| == 0x7f` |
+| 3 | **超长名字 / 超长分量** | > 4096 字节 / 任一分量 > 255 字节（libarchive 已知在超长路径上绕过自己的符号链接检查，issue #744/#745） |
+| 4 | **`..` 分量** | 归一化后首分量是 `..` 即拒。**`.` 放行**（`./usr/bin/foo` 是正常打包产物） |
+| 5 | **符号链接目标逃出根** | 绝对目标放行；相对目标按"符号所在目录 + 目标"词法归一化后判首分量 |
+
+#### ⚠️ 一劳永逸的教训：通用加固清单必须先在**真实产物**上跑一遍
+
+"反斜杠一律拒"排在通用 zip-slip 清单的很前面，本模块**第一版就是这么写的** —— 然后在
+**真实仓库全量扫描**上撞出误报：
+
+```
+systemd/262-11.lpkg → content/usr/lib/systemd/system/system-systemd\x2dmute\x2dconsole.slice
+```
+
+systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜杠**。全仓 861 个包扫下来
+**仅此一例**，而它恰好是 **base 包**：拒了它整个发行版都装不上、也修不回来。判据当天删除，
+改成绊线用例 `LiteralBackslashInMemberNameIsLegalSystemdUsesIt`（它红 = 有人把这条加回来了，
+那时先去扫真实仓库）。
+
+**同一轮扫描还确认了其余判据零误报**（861 个包逐条过）：重名 **0**、控制字符 **0**、
+超长 **0**、`..` 分量 **0**、链接目标逃逸 **0**。也就是说"判据先拿已知好和已知坏各跑一遍"
+这条纪律**真的挡下了一次会打崩发行版的改动**，不是形式主义。
+
+**重名成员是这次的核心**：`extract_file_from_archive`（流式读）命中即返回**第一份**，
+而安装用的是**解压后**的那份（`ARCHIVE_EXTRACT_UNLINK` 让后一份覆盖前一份）——
+一份"照索引写的" `metadata.json` 加一份 payload，就能同时骗过校验与使用。
+修前实测（`ArchiveMalformedGuardTest.DuplicateMemberCannotSmuggleASecondMetadataJson`，
+临时关掉守卫复现）：盘上留下的是 `{"name":"good","version":"9.9","provides":["so:libfoo.so.1"]}`
+—— **payload 被装了进去**。
+
+**为什么只守解压这一条路**：安装流程里每个包都要经 `extract_tar_zst` 解压，而这里是整包拒绝，
+两个方向（第一份说谎 / 第二份说谎）都到不了"装了个没校验过的东西"。把守卫也接进
+`extract_file_from_archive` 需要它**扫到 EOF** 才能发现后面的重名成员 —— 而 `metadata.json`
+是包内**第一个**成员，那等于让每次元数据读取都把整包解压一遍（861 个包里最大 164 MiB）。
+**宁可少一层冗余，也不要一条在热路径上悄悄变慢的检查。**
+
+#### 三条"看着该判、实测不可达"的判据 —— 已删，只留绊线用例
+
+| 形态 | 为什么删 |
+|---|---|
+| **尾斜杠与类型不一致** | libarchive **按尾斜杠自己判定类型**：`typeflag='0'` 但名字以 `/` 结尾的成员读回来就是 `AE_IFDIR`，冲突到不了本层。绊线：`TrailingSlashIsNormalizedByLibarchive` |
+| **声明尺寸 ≠ 实际数据** | libarchive 在 `archive_read_data_block` 上直接返 **FATAL**（`Truncated tar archive detected`），上层 `r < ARCHIVE_WARN` 分支先抛了。绊线：`TruncatedMemberIsRejectedByLibarchive`（断言落在 `error.extract_failed` 上） |
+| **无名成员** | 调用点在本函数**之前**就有 `if (member.empty()) continue;`（`.`、`./` 这类），空名进不来 |
+
+按本仓库纪律（§7.4：不为走不到的分支写断言），这些**不留判据、不留断言**，只留记录它们
+"不可达"的绊线用例 —— 绊线红 = 第三方行为变了，那时才需要补判据。
+
+#### 明确**不采纳**的通用加固建议（每条都有实测依据，别照着通用清单"补全"）
+
+| 通用建议 | 不采纳的理由 |
+|---|---|
+| **拒反斜杠** | 通用清单里的常客，但**误伤真实包**（systemd 的 `\x2d` unit 名，见上）—— 判据已删，只留绊线 |
+| 剥/拒 setuid、setgid | **实测真实包依赖它**：`dbus-daemon-launch-helper`、`unix_chkpwd`、`passwd`、`sudo`、`su`、`mount`、`chfn/chsh`、`newuidmap/newgidmap`、`wall`(setgid) 全是。剥掉 = 系统坏掉 |
+| 拒绝对目标的符号链接 | `--root` 下包发 `<root>/usr/bin/foo -> /etc/foo` 合法且必要 |
+| 文件类型黑名单 → 白名单 | 本函数同时服务**源码 tarball** 解压，某些 tar 变体的 `filetype` 可能是 0 或不认识的值，白名单会误伤合法源码包（`archive.cpp` 里原有的论证成立） |
+| 拒非 UTF-8 名字 | 上游源码 tarball 里带 Latin-1 等历史编码的文件名真实存在；只拒**控制字符** |
+| 资源上界（成员数 / 解压比 / 累计尺寸） | 维护者 2026-10-05 明确拍板不加 |
+| 用 `SECURE_NOOVERWRITE` 替代 `UNLINK` | `UNLINK` 是"重装/升级时往非空临时目录里再解一次"所必需的；重名已由判据 1 拦掉 |
+
+**不可实现、只记录为已知边界**（不为它们写判据、更不写用例）：**内嵌 NUL**
+（`archive_entry_pathname()` 返回 C 串，NUL 之后的字节在 API 层面观测不到）；
+**PAX/GNU 扩展头与 ustar 头不一致**（libarchive 已把 PAX 合并进 entry，两个原始值都拿不到）。
+
+#### 有意的粒度变更：硬链接目标越界 由「跳过 + 告警」升为「整包拒绝」
+
+`extract_tar_zst` 里原有的 `log_warning(...); continue;` 改为抛 `UnsafeArchiveException`，
+与成员名守卫、特殊文件类型守卫、`tar_guard` 其余判据统一。既有用例
+`HardlinkTargetOutsideRootIsSkipped` 随之改名为 `HardlinkTargetOutsideRootIsRejected` 并改写
+断言（注释里写明这是**粒度变更、不是缺陷修复**）。理由：畸形归档是**结构性**问题，
+留"跳过"的口子等于让用户拿到一个装了一半、某文件莫名消失的包。
+
+### 21.2 `so:` 命名空间的不变量订正（A1）
+
+`base/constants.hpp` 原文断言「包名不可能含 `:`（`is_safe_path_component` 拒掉），所以裸名
+永远撞不进 `so:` 空间」—— **不成立**。那条论证只覆盖**包名**，而 `provides` 的每一项走的是
+**同一条裸名路径**、且当时**任何地方都没校验过 `:`**（`reject_unsafe_metadata_tokens` 只拒
+`\0\n\r\t`）。于是 `provides: ["so:libfoo.so.1"]` 与 `needed_so: ["libfoo.so.1"]` 灌出**同一个
+pool id**：求解器当 SONAME 接受，安装期 `soname_satisfied()`（只看 `provides_soname`）拒绝 ——
+**正是 8.0.0 专门根除过的"求解器说能装、安装期拒装"分叉**。
+
+**修法**：在 metadata 解析的**唯一出口**加 `reject_reserved_provides_prefix()`
+（`pkg/install_common.cpp`），拒 `provides` 里以 `POOL_SONAME_PREFIX` 开头的项。**不在求解器里
+判** —— libsolv 的多条 requires 是 **AND** 语义，表达不了"包名 **或** 能力"，给虚拟能力再加一套
+前缀会破坏 `deps` 的匹配语义，所以只能在输入边界拒。
+
+**可达性**（如实记录，别写成比实际严重）：**仓库来源的包撞不到** —— 索引版本块是"恰好 6 个
+冒号字段"，`provides` 带 `:` 会让字段数变 7、整个版本块被丢弃；且 `verify_package_metadata`
+逐字段比对归档与索引。**真正可达的是本地 `.lpkg`**（计划字段与校验读同一份 ⇒ 比对恒等 ⇒ 放行），
+以及它写进 `provides.db` 之后的持久幽灵提供者。
+
+**顺带补的一格**：本地 `.lpkg` 候选那条路上 `provides` 此前**连分帧字符校验都没有**
+（上一轮只补了两个 SONAME 字段）—— 又一个"同族判据只推了一条分支"。已补齐。
+
+### 21.3 本批的实测数据（用于确认判据不会误伤真实包）
+
+| 事实 | 数值 |
+|---|---|
+| 真实仓库（`farm/out/x86_64`）包数 | 861 |
+| 含**重名成员**的包 | **0**（逐包 `tar -tf \| sort \| uniq -d` 全扫） |
+| 最大成员数 | 43,974（libreoffice） |
+| 最大解压比 | 4.9×（164 MiB → 811 MiB，libreoffice） |
+| 含 setuid/setgid 的包 | **有**（dbus / linux-pam / shadow / util-linux / sudo）—— 见 §21.1 的"不采纳"表 |
+
+### 21.4 strip 的三条（A3 / A4 / A5）—— 其中 A3 的**方案被实测推翻**
+
+**A4**（`process_archive` 写 `<file>.a.tmp` 不拒符号链接）与 **A5**（`process_elf` 先原地
+`trunc` 再写、失败只降级为告警）都按计划做：A4 在落位前用 `is_symlink_no_follow` 拒绝并补上
+`error_msg`；A5 改成 `<file>.lpkgtmp` → 检查每次写 → **显式恢复原权限位** → `fsync_and_rename`，
+成功 rename 之前原文件一个字节不动。A5 修前实测：链接目标被整份归档覆盖、`safe_rename` 又把
+链接本身改名成了 `.a`。
+
+> ⚠️ **A5 的已知取舍（有意保留）**：原子替换换 inode ⇒ **扩展属性不随行**（`security.capability`），
+> 硬链接关系亦然。不处理的理由写在 `strip.cpp` 的现场注释里：本函数只跑在**构建期的 staging 树**
+> 上（那一刻的产物不会有 file capabilities），且本仓库打包器不编码硬链接。**若将来 strip 被用到
+> 构建树之外，这条必须重新评估。**
+
+**A3**（ET_REL 对齐填充不在聚合上界内 ⇒ 产物 ≈ N×输入 ⇒ OOM）**批准的方案没能成立**，落地的是
+另一套判据：
+
+| 原方案 | 实测结果 |
+|---|---|
+| 在 `elf_update` **之后**判 `size > input_size` | ① **判据本身不成立**：良构 ELF 重建会**合法地变大**（既有正面控制 `RelSectionsWithinFileStillStrip`：输入 **512** 字节 → 产物 **592** 字节），朴素判据会把正常 `.o` 拒掉；② **拦不住 OOM**：放大发生在 `elf_update` **内部**（按对齐值 `ftruncate` 那个 memfd），等拿到 `size` 时内存已经被吃掉 |
+
+**实际落地**：主判据前置到 `elf_update` **之前** —— 与 `retained_data_total` 同形的聚合封顶
+`Σsh_addralign ≤ input_size`（对齐值是**输入可控**字段，放大形态需要它 ≫ 输入；实测 128 个真实
+`.o` 的 `Σalign / 文件大小` 最大 **2.0%**、中位 **0.8%**，余量 50×）。原方案保留为**第二道**
+（`error.strip_output_grew`），上界改成结构化的 `input_size + 头 + 节区表 + retained_data_total`。
+修前实测放大：输入 **64 KiB**（1000 个 `align=4096` 的节区）→ 产物 **4,160,136** 字节，**63.5×**。
+
+**教训**：这是"方案里'重构会让 X 全部移动'这类断言是预测、落地后要用实测校正"（§1.4 第 6 条）
+的又一例 —— 而且这次是**我批准的方案本身**被推翻。判据能不能拦住缺陷，取决于它**跑在哪一刻**：
+同一个不变量写在 `elf_update` 之后是"事后验尸"，写在之前才是"拦截"。
+
+### 21.5 本批收口数字
+
+`make test` **1216 用例 / 144 套件 / 1215 通过 / 0 失败 / 1 跳过**（基线 1186/143）；
+`make format-check` **222 文件 0 残留**；`make fuzz FUZZ_ONLY=elf_strip_fuzz` 编得过、跑得干净
+（31.7 万次迭代 `rc=0`）。
+
+---
+
 
 ```
 成功安装:

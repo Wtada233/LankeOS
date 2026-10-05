@@ -129,6 +129,13 @@ int transfer_progress_cb(const git_indexer_progress* stats, void* payload)
     return 0;
 }
 
+/** 取 libgit2 最后一条错误消息；没有则回落到通用文案（绝不吐空串）。 */
+std::string last_git_error()
+{
+    const git_error* e = git_error_last();
+    return (e && e->message) ? e->message : get_string("error.unknown");
+}
+
 /** 在 remote 上拉取 refspec。depth>0 浅拉、0 完整拉。失败时把真实错误记进 prog->err（不吞错）。 */
 int fetch_refspecs(git_remote* remote, const git_strarray* refspecs, int depth, GitProgress* prog)
 {
@@ -138,8 +145,8 @@ int fetch_refspecs(git_remote* remote, const git_strarray* refspecs, int depth, 
     fo.depth = depth;
     int err = git_remote_fetch(remote, refspecs, &fo, nullptr);
     if (err != 0) {
-        const git_error* e = git_error_last();
-        prog->err = (e && e->message) ? e->message : get_string("error.unknown");
+        // 内联复制过 4 份 —— 收敛到唯一的 `last_git_error()`（同族判据只推一条分支的老问题）。
+        prog->err = last_git_error();
     }
     return err;
 }
@@ -218,8 +225,8 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
     git_submodule* sm = nullptr;
     int err = git_submodule_lookup(&sm, parent, name.c_str());
     if (err != 0) {
-        const git_error* e = git_error_last();
-        prog->err = (e && e->message) ? e->message : get_string("error.unknown");
+        // 内联复制过 4 份 —— 收敛到唯一的 `last_git_error()`（同族判据只推一条分支的老问题）。
+        prog->err = last_git_error();
         return err;
     }
     const char* url = git_submodule_url(sm);
@@ -296,8 +303,8 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
         // （lpkg/CLAUDE.md §7.4）：走到这里要求"子模块的锁定 commit 已解析成功、却 checkout
         // 不出来"，实践中构造不出。保留是因为 libgit2 的返回值必须处理，且 `err` 还兜住上面
         // revparse 失败那一格（`err = -1`）。
-        const git_error* e = git_error_last();
-        prog->err = (e && e->message) ? e->message : get_string("error.unknown");
+        // 内联复制过 4 份 —— 收敛到唯一的 `last_git_error()`（同族判据只推一条分支的老问题）。
+        prog->err = last_git_error();
     }
     git_repository_free(sub);
     git_submodule_free(sm);
@@ -318,8 +325,8 @@ int update_submodules(git_repository* repo, GitProgress* prog)
         },
         &names);
     if (err != 0) {
-        const git_error* e = git_error_last();
-        prog->err = (e && e->message) ? e->message : get_string("error.unknown");
+        // 内联复制过 4 份 —— 收敛到唯一的 `last_git_error()`（同族判据只推一条分支的老问题）。
+        prog->err = last_git_error();
         return err;
     }
     for (const auto& n : names) {
@@ -333,13 +340,6 @@ int update_submodules(git_repository* repo, GitProgress* prog)
 
 // ── clone_git_source 的零件（2026-09-26 从 128 行的函数里按自然缝抽出）──────────
 // 全都是**纯搬移 + 参数化**：语义、调用顺序、资源释放顺序与抽之前逐行一致。
-
-/** 取 libgit2 最后一条错误消息；没有则回落到通用文案（绝不吐空串）。 */
-std::string last_git_error()
-{
-    const git_error* e = git_error_last();
-    return (e && e->message) ? e->message : get_string("error.unknown");
-}
 
 /** 上报用文案：prog->err 为空时回落到通用文案。 */
 std::string clone_error_detail(const GitProgress& prog)

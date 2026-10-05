@@ -24,10 +24,14 @@
 #include "fuzz_common.hpp"  // mem_trace（LPKG_FUZZ_MEM_TRACE=1 时开）
 
 // `strip_elf_data` 是**外部链接**的（`strip.cpp:612`），但任何头文件里都没有声明
-// （`strip.hpp` 只导出 `strip_file` / `strip_binary`）。本批的硬要求是 `main/src/` 零改动，
-// 所以在这里自己声明一次。**签名必须与 strip.cpp:612 逐字一致**，改那边要同步这里。
+// （`strip.hpp` 只导出 `strip_file` / `strip_binary`），所以在这里自己声明一次。
+// **签名必须与 strip.cpp 里那份逐字一致**，改那边要同步这里。
+//
+// ⚠️ 2026-10-05：新增第 4 个参数 `source_path`（只为让 `error.strip_output_grew` 这条
+// 错误能点名文件）。此前 main/src 不允许改动，这里只能声明 3 参、由 strip.cpp 侧保留一个
+// 3 参重载转发；现在两边**同步到同一个签名**，重载已删 —— 别再留第二个签名。
 bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>& output_data,
-                    std::string& error_msg);
+                    std::string& error_msg, const std::string& source_path);
 
 namespace
 {
@@ -78,7 +82,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     std::vector<uint8_t> output;
     std::string error_msg;
 
-    if (!strip_elf_data(input, output, error_msg)) {
+    // 路径只影响错误消息的措辞（本 harness 不读 error_msg），给个固定名即可。
+    if (!strip_elf_data(input, output, error_msg, "<fuzz-input>")) {
         // 拒绝是正常结局。注意**不能**在这里断言 error_msg 非空：`strip.cpp:663`
         // （`shnum == 0`）是有意的静默跳过，false 时 error_msg 就是空的。
         return 0;

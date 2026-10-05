@@ -97,7 +97,10 @@ void TriggerManager::load_config()
                 try {
                     custom_triggers.push_back({std::regex(pattern), command});
                 } catch (const std::regex_error& e) {
-                    log_warning(string_format("warning.invalid_trigger_regex", pattern.c_str()));
+                    // `e.what()` 才是能定位的那半句（"unmatched (" 之类）—— 丢掉它就只剩
+                    // "正则无效"，用户还得自己去猜写坏了哪个括号。
+                    log_warning(
+                        string_format("warning.invalid_trigger_regex", pattern.c_str(), e.what()));
                 }
             }
         }

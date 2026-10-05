@@ -166,6 +166,43 @@ TEST_F(SolverRegressionTest, AlreadyInstalledTargetStillReportsUpToDate)
 }
 
 // ============================================================================
+// A6：`install pkg:版本` 的同名包**已装**、而仓库索引里**没有**这个包名时，
+// 请求的版本曾被静默丢弃（D3 的兄弟形态，落点相同：打印"所有包都已安装"、exit 0）。
+// ============================================================================
+
+TEST_F(SolverRegressionTest, VersionedInstallOfInstalledButRemovedPackageIsNotSilentSuccess)
+{
+    // 造一个"索引里已下架、但本地已装"的包（等价于它是本地 .lpkg 装的、或仓库下架了它）
+    create_pkg("va", "2.0");
+    add_to_mirror("va", "2.0");
+    update_index({{"va", "2.0", "", "", "", ""}});
+    install_packages({"va"});
+    ASSERT_EQ(Cache::instance().get_installed_version("va"), "2.0");
+
+    update_index({});  // 把 va 从仓库索引摘掉 → avail 里没有 va
+
+    EXPECT_THROW(install_packages({"va:1.0"}), LpkgException)
+        << "仓库无 va，用户请求的 1.0 不得被静默丢弃（曾报'所有包都已安装'、exit 0）";
+    Cache::instance().load();
+    EXPECT_EQ(Cache::instance().get_installed_version("va"), "2.0") << "报错 = 什么都没做";
+}
+
+// 对照（别改坏）：请求的版本**正是已装版本**、且仓库里已无该包名 → 幂等，不报错。
+TEST_F(SolverRegressionTest, VersionedInstallOfExactInstalledVersionWithoutRepoEntryIsNoop)
+{
+    create_pkg("vb", "1.0");
+    add_to_mirror("vb", "1.0");
+    update_index({{"vb", "1.0", "", "", "", ""}});
+    install_packages({"vb"});
+    ASSERT_EQ(Cache::instance().get_installed_version("vb"), "1.0");
+
+    update_index({});  // 仓库里没有 vb 了，但请求的正是已装版本
+
+    EXPECT_NO_THROW(install_packages({"vb:1.0"}))
+        << "请求的版本 == 已装版本 ⇒ 幂等'已安装'，不得翻成错误";
+}
+
+// ============================================================================
 // E1：--force 在混合目标下也必须重装"已是最新版本"的包
 // ============================================================================
 

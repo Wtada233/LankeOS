@@ -123,7 +123,20 @@ TEST_F(ArchiveConfinementTest, DotDotMemberDoesNotEscape)
     EXPECT_FALSE(fs::exists(suite_dir / "ESCAPED_DOTDOT.txt")) << "`..` 成员逃到了解压根的父目录";
 }
 
-TEST_F(ArchiveConfinementTest, HardlinkTargetOutsideRootIsSkipped)
+/**
+ * 硬链接目标逃出解压根 ⇒ **整包拒绝**。
+ *
+ * ⚠️ **订正 2026-10-05（有意变更的粒度，不是缺陷修复）**：本用例原名
+ * `HardlinkTargetOutsideRootIsSkipped`，钉的是"**跳过该成员 + 告警**、其余成员照常解出"
+ * （`EXPECT_NO_THROW` + 只断言逃逸成员没落地）。维护者在 2026-10-05 把安全类违规统一为
+ * **整包拒绝**（与成员名守卫、特殊文件类型守卫、以及新的 `archive/tar_guard` 全部判据同
+ * 粒度），这条随之升级：留着"跳过"的口子等于让用户拿到一个装了一半、某文件莫名消失的包，
+ * 而畸形归档是**结构性**问题、不是单个成员的偶发问题。
+ *
+ * 断言随之改成三个锚点：抛 `UnsafeArchiveException`（不是普通失败 —— 构建期不会吞它）/
+ * 点名归档 / 点名成员。**没有**再断言"其余成员照常解出"，因为那正是被否掉的旧行为。
+ */
+TEST_F(ArchiveConfinementTest, HardlinkTargetOutsideRootIsRejected)
 {
     // 先造一个"系统里已有"的目标文件（模拟 /etc/shadow 这类），再让归档给它起别名
     const fs::path secret = escape_dir / "secret.txt";
@@ -136,10 +149,15 @@ TEST_F(ArchiveConfinementTest, HardlinkTargetOutsideRootIsSkipped)
         {"content/ok.txt", "ok", "", "", false},
     });
 
-    EXPECT_NO_THROW(
-        extract_tar_zst(pkg, out_dir, pkg.filename().string()));  // 逃逸成员被跳过，不影响其余成员
-    EXPECT_FALSE(fs::exists(out_dir / "content/evil_link")) << "根外硬链接目标未被拒绝";
-    EXPECT_TRUE(fs::exists(out_dir / "content/ok.txt"));
+    std::string err;
+    try {
+        extract_tar_zst(pkg, out_dir, pkg.filename().string());
+    } catch (const UnsafeArchiveException& e) {
+        err = e.what();
+    }
+    EXPECT_FALSE(err.empty()) << "根外硬链接目标必须整包拒绝（UnsafeArchiveException）";
+    EXPECT_NE(err.find(pkg.string()), std::string::npos) << "必须点名是哪个归档：" << err;
+    EXPECT_NE(err.find("evil_link"), std::string::npos) << "必须点名是哪个成员：" << err;
 }
 
 TEST_F(ArchiveConfinementTest, LegitimateHardlinkInsideRootStillWorks)

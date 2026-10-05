@@ -164,8 +164,17 @@ inline constexpr std::string_view CONF_HASH_SEP = ":";
 ///     `deps` 的需求走这一路 ⇒ 既能匹配**包名**、也能匹配**虚拟 provides**（虚拟包语义）。
 ///   · **`so:`** —— 「SONAME」：`needed_so` 的需求与 `provides_soname` 的每一条。
 ///     ⇒ `needed_so` 只能被 `provides_soname` 满足，包名永远进不来；反之亦然。
-/// **包名不可能含 `:`**（`is_safe_path_component` 把 `:` 当**分帧字符**拒掉），
-/// 所以裸名永远撞不进 `so:` 空间。
+/// 裸名撞不进 `so:` 空间这件事由**两处**共同保证，缺一不可：
+///   · **包名**不可能含 `:` —— `is_safe_path_component` 把 `:` 当**分帧字符**拒掉；
+///   · **`provides` 的每一项**由读入处校验（`reject_reserved_provides_prefix`，
+///     `pkg/install_common.cpp`）。
+/// ⚠️ **订正 2026-10-05**：这里原文只写了第一条，并据此断言"所以裸名永远撞不进 `so:` 空间"
+/// —— **不成立**。`provides` 的项与包名走**同一条裸名路径**，而它当时在**任何地方**都没被
+/// 校验过（`reject_unsafe_metadata_tokens` 只拒 `\0\n\r\t`，不拒 `:`），于是一条
+/// `provides: ["so:libfoo.so.1"]` 就能与 `needed_so: ["libfoo.so.1"]` 灌出同一个 pool id：
+/// 求解器当 SONAME 接受，安装期的 `soname_satisfied()`（只看 `provides_soname`）拒绝 ——
+/// 重现了"求解器说能装、安装期拒装"的分叉。这就是把"包名"的性质当成"裸名命名空间"的性质
+/// 来论证的典型错误：**论证的作用域比结论窄**。
 /// ⚠️ 它是**内部编码**：进了用户可见的冲突消息必须先剥掉（见 `decode_libsolv_message`）。
 inline constexpr std::string_view POOL_SONAME_PREFIX = "so:";
 

@@ -411,6 +411,37 @@ void reject_bad_soname_specs(const std::vector<std::string>& values, std::string
     }
 }
 
+/**
+ * 校验 `provides` 的每一项**没有使用求解器内部的 SONAME 命名空间前缀**（`so:`）。
+ *
+ * 为什么需要它：池里只有两个命名空间，`deps`/`provides` 走**裸名**、`needed_so`/
+ * `provides_soname` 走 `so:`。`constants.hpp` 里那句"包名不可能含 `:`，所以裸名永远撞不进
+ * `so:` 空间"**只对包名成立** —— `provides` 的项走的是同一条裸名路径，而 `is_safe_path_component`
+ * 管不到它、`reject_unsafe_metadata_tokens` 也只拒 `\0\n\r\t`。于是
+ * `provides: ["so:libfoo.so.1"]` 与 `needed_so: ["libfoo.so.1"]` 会灌出**同一个 pool id**：
+ * 求解器认为 SONAME 需求已被满足，而安装期的 `soname_satisfied()`（只查 `provides_soname` /
+ * `provides_soname.db` / 仓库提供者 / 系统库，四条都不看虚拟 provides）会拒绝 ——
+ * 正是"求解器说能装、安装期拒装"那个分叉。
+ *
+ * **可达性**（别把它写成比实际更严重）：仓库来源的包撞不到 —— 索引版本块是"恰好 6 个冒号
+ * 字段"，`provides` 带 `:` 会让字段数变 7、整个版本块被丢弃；且 `verify_package_metadata`
+ * 会逐字段比对归档与索引。**真正可达的是本地 `.lpkg`**（`install ./x.lpkg`：计划字段与校验
+ * 读的是同一份 ⇒ 比对恒等 ⇒ 放行），以及它写进 `provides.db` 之后留下的**持久幽灵提供者**。
+ *
+ * **为什么不在求解器里判**：libsolv 的多条 requires 是 **AND** 语义、却允许被不同 solvable
+ * 分别满足，表达能力上就写不出"包名 **或** 能力"——给虚拟能力再加一套前缀会破坏 `deps`
+ * 的匹配语义。所以只能在**输入边界**拒绝（此处，metadata 解析的唯一出口）。
+ */
+void reject_reserved_provides_prefix(const std::vector<std::string>& provides,
+                                     const fs::path& meta_path)
+{
+    for (const auto& capability : provides) {
+        if (!capability.starts_with(constants::POOL_SONAME_PREFIX)) continue;
+        throw LpkgException(string_format("error.provides_reserved_prefix", meta_path.string(),
+                                          capability, std::string(constants::POOL_SONAME_PREFIX)));
+    }
+}
+
 /** 从已解压的包目录读取 metadata.json，提取包名、版本、依赖等信息 */
 void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::string& version,
                            std::vector<std::string>& deps, std::vector<std::string>& provides,
@@ -434,7 +465,16 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
         std::ifstream f(meta_path);
         if (!f.is_open())
             throw LpkgException(string_format("error.open_file_failed", meta_path.string()));
-        f >> meta;
+        // nlohmann 的解析异常只带行/列，**不说是哪个文件**。这里按路径包一层，与
+        // `build/builder_config.cpp` 的 `error.lankebuild_parse_failed` 同一做法 ——
+        // 否则坏 JSON 会一路逸出到 `main_cli.cpp` 的 `error.unexpected_error`，
+        // 用户看到的是一句带行号的 "parse error"，却不知道该去看哪个包的哪份元数据。
+        try {
+            f >> meta;
+        } catch (const std::exception& e) {
+            throw LpkgException(
+                string_format("error.metadata_parse_failed", meta_path.string(), e.what()));
+        }
     }
     name = meta.at(std::string(constants::J_NAME)).get<std::string>();
     version = meta.at(std::string(constants::J_VERSION)).get<std::string>();
@@ -448,6 +488,8 @@ void read_package_metadata(const fs::path& tmp_pkg_dir, std::string& name, std::
     reject_unsafe_metadata_tokens(provides, constants::J_PROVIDES, meta_path);
     reject_unsafe_metadata_tokens(provides_soname, constants::J_PROVIDES_SONAME, meta_path);
     reject_unsafe_metadata_tokens(needed_so, constants::J_NEEDED_SO, meta_path);
+    // `provides` 还必须避开求解器的 SONAME 命名空间前缀（判据与理由见函数抬头）。
+    reject_reserved_provides_prefix(provides, meta_path);
     reject_bad_soname_specs(provides_soname, constants::J_PROVIDES_SONAME, meta_path);
     reject_bad_soname_specs(needed_so, constants::J_NEEDED_SO, meta_path);
     man = meta.value(std::string(constants::J_MAN), "");
@@ -640,6 +682,12 @@ void resolve_with_solver(InstallContext& ctx)
         reject_unsafe_metadata_tokens(pi.needed_so, constants::J_NEEDED_SO, path);
         reject_bad_soname_specs(pi.provides_soname, constants::J_PROVIDES_SONAME, path);
         reject_bad_soname_specs(pi.needed_so, constants::J_NEEDED_SO, path);
+        // 2026-10-05：`provides` 此前**在这条路上完全没有校验** —— 上面那四行是上一轮补的，
+        // 而"同族判据只推了一条分支"正是本仓库反复踩的形态：SONAME 两个字段补了，`provides`
+        // 漏了。它既缺分帧字符检查（控制字符能伪造 `provides.db` 记录 ⇒ 幽灵提供者 ⇒ 假满足
+        // 依赖），也缺 SONAME 命名空间前缀检查（见 `reject_reserved_provides_prefix`）。
+        reject_unsafe_metadata_tokens(pi.provides, constants::J_PROVIDES, path);
+        reject_reserved_provides_prefix(pi.provides, path);
         local_pkgs.push_back(std::move(pi));
         local_paths[name] = path;
     }

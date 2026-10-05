@@ -26,6 +26,18 @@ std::string member_name_rejection_message(std::string_view member,
                                           const std::string& container_path);
 
 /**
+ * @brief 把成员名里的不可见字节渲染成可见形式（`\xHH`），供**异常消息**使用。
+ *
+ * 危险名字**本身就是攻击载荷**，不能原样进消息：含 ANSI 转义的名字会再污染一份终端，
+ * 含 `\n` 的名字会把异常消息**自己**切成两行 —— 错误消息被行式消费的地方（日志、CLI
+ * 输出）就重演了这里正在修的同一个 bug。
+ *
+ * 2026-10-05 起对外可见（原本是 `archive.cpp` 的 `static`）：`archive/tar_guard.cpp`
+ * 也要用它，而"同一件事的第二份实现"正是这个仓库反复踩的坑。
+ */
+std::string escape_member_name(std::string_view name);
+
+/**
  * @brief 解压 .tar.zst 存档到指定目录
  * @param archive_path 存档文件路径
  * @param output_dir   输出目录

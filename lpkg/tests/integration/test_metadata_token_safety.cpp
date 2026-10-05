@@ -118,9 +118,74 @@ TEST_F(MetadataTokenSafetyTest, CorruptedProvidesIsRefusedOnTheRealInstallPath)
         FAIL() << "含 TAB 的 provides 必须整包拒绝";
     } catch (const LpkgException& e) {
         const std::string msg = e.what();
-        EXPECT_NE(msg.find("metadata.json"), std::string::npos) << msg;
+        // ⚠️ **订正 2026-10-05**：本行原断言消息里含字面量 `metadata.json`。2026-10-05 给
+        // 本地 `.lpkg` 候选那条路补上 `provides` 的分帧字符校验后（它此前**只有**两个 SONAME
+        // 字段被校验过），拒绝点从"安装期读解压后的 metadata.json"**前移**到了"读归档里的
+        // 元数据"——于是消息点名的是**用户交上来的那个 `.lpkg` 文件**，不再出现 `metadata.json`
+        // 这个字面量。**不变量的实质没变**（报错仍然点名"是哪个文件的哪一段"），变的是被钉住的
+        // 那个字符串。按仓库纪律先问过"是它 pin 了缺陷还是我改错了"：是后者，故改用例而不改产品。
+        EXPECT_NE(msg.find(pkg), std::string::npos)
+            << "报错必须点名用户交上来的那个包文件：" << msg;
         EXPECT_NE(msg.find("provides"), std::string::npos) << msg;
     }
+}
+
+/**
+ * `provides` 不得使用求解器内部的 SONAME 命名空间前缀（`so:`）。
+ *
+ * 池里只有两个命名空间：`deps`/`provides` 走**裸名**、`needed_so`/`provides_soname` 走
+ * `so:`。`constants.hpp` 原先断言"包名不可能含 `:`，所以裸名撞不进 `so:` 空间" —— 那句话
+ * **只对包名成立**，`provides` 的项走的是同一条裸名路径、却没有任何地方校验过 `:`。
+ * 于是 `provides: ["so:libfoo.so.1"]` 与 `needed_so: ["libfoo.so.1"]` 会灌出**同一个 pool id**：
+ * 求解器当 SONAME 接受，而安装期的 `soname_satisfied()`（只看 `provides_soname`）拒绝 ——
+ * 正是"求解器说能装、安装期拒装"那个分叉（本仓库 8.0.0 专门根除过的形态）。
+ */
+TEST_F(MetadataTokenSafetyTest, ProvideUsingTheSolverSonameNamespaceIsRefused)
+{
+    const fs::path d = write_metadata(
+        suite_work_dir / "meta_so_ns",
+        {{"name", "sonsprov"}, {"version", "1.0"}, {"provides", {"so:libfoo.so.1"}}});
+    std::string name, version, man;
+    std::vector<std::string> deps, provides, provides_soname, needed_so;
+    try {
+        detail::read_package_metadata(d, name, version, deps, provides, provides_soname, needed_so,
+                                      man);
+        FAIL() << "provides 用了 `so:` 前缀，必须被拒";
+    } catch (const LpkgException& e) {
+        const std::string msg = e.what();
+        EXPECT_NE(msg.find("metadata.json"), std::string::npos) << msg;
+        EXPECT_NE(msg.find("so:libfoo.so.1"), std::string::npos)
+            << "报错必须点名是哪一条能力：" << msg;
+    }
+}
+
+/**
+ * 端到端：**本地 `.lpkg` 那条路**才是这个缺陷真正可达的地方。
+ *
+ * 仓库来源的包撞不到 —— 索引版本块是"恰好 6 个冒号字段"，`provides` 带 `:` 会让字段数变 7、
+ * 整个版本块被丢弃；而本地 `.lpkg` 的计划字段与校验读的是同一份 ⇒ 比对恒等 ⇒ 放行。
+ */
+TEST_F(MetadataTokenSafetyTest, ReservedProvidesPrefixIsRefusedOnTheLocalPackagePath)
+{
+    const std::string pkg = create_pkg("sonns_e2e", "1.0", {}, {"so:libfoo.so.1"});
+    try {
+        install_packages({pkg}, "");
+        FAIL() << "本地 .lpkg 的 provides 用了 `so:` 前缀，必须整包拒绝";
+    } catch (const LpkgException& e) {
+        const std::string msg = e.what();
+        EXPECT_NE(msg.find(pkg), std::string::npos)
+            << "报错必须点名用户交上来的那个包文件：" << msg;
+        EXPECT_NE(msg.find("so:libfoo.so.1"), std::string::npos)
+            << "报错必须点名是哪一条能力：" << msg;
+    }
+}
+
+/// 对照：**普通的虚拟能力**照常接受并安装 —— 别把正常的 `provides` 一起拒了。
+TEST_F(MetadataTokenSafetyTest, OrdinaryVirtualCapabilityIsStillAccepted)
+{
+    const std::string pkg = create_pkg("vcap_ok", "1.0", {}, {"java-runtime"});
+    ASSERT_NO_THROW(install_packages({pkg}, "")) << "普通虚拟能力必须照常安装";
+    EXPECT_TRUE(fs::exists(test_root / "usr/bin/vcap_ok"));
 }
 
 TEST_F(MetadataTokenSafetyTest, CleanPackageStillInstalls)

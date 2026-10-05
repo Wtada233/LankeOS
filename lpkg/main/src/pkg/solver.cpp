@@ -631,9 +631,10 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                 // 指定版本（`pkg:版本` / 本地 .lpkg）。libsolv 对"已装 identical"的
                 // SOLVER_SOLVABLE|INSTALL 会产出 REINSTALL 步骤，导致非 --force 的
                 // 同版本安装也进计划（回归 S1）。这里在 job 层做策略：
-                //   已装同版本且非 force → 不发 job（上层报"已安装"）；
+                //   已装**请求的版本**（且非 force）→ 不发 job（上层报"已安装"）；
                 //   真包但版本不在 avail → 明确报错，附可用版本（回归 S3）；
-                //   无同名包 → 当 capability 处理（同 latest 分支：装提供者/缺则报错）。
+                //   已装同名包但版本不符、且 avail 里根本没有该名字 → 明确报错（缺陷 A6）；
+                //   无同名包（也没装）→ 当 capability 处理（同 latest 分支：装提供者/缺则报错）。
                 Id evr = pool_str2id(ps.pool, vspec.c_str(), 1);
                 Id target_sid = 0;
                 bool name_exists = false;
@@ -650,26 +651,49 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
                         if (sa2->evr == evr) target_sid = pi2;
                     }
                 }
-                if (target_sid) {
-                    bool same_installed = false;
-                    if (Repo* ir = ps.pool->installed) {
-                        int ip;
-                        Solvable* is;
-                        FOR_REPO_SOLVABLES(ir, ip, is)
-                        if (is->name == nid && is->evr == evr) {
-                            same_installed = true;
-                            break;
-                        }
+                // 已装同名包的 evr（0 = 没装）。**必须单独取**：上面的 avail 扫描只覆盖
+                // available repo，而同名包完全可能**已装却不在 avail 里**（本地 .lpkg 装的、
+                // 索引下架、索引加载失败）。缺陷 A6 的全部机制都藏在这条缝里。
+                Id installed_evr = 0;
+                if (Repo* ir = ps.pool->installed) {
+                    int ip;
+                    Solvable* is;
+                    FOR_REPO_SOLVABLES(ir, ip, is)
+                    if (is->name == nid) {
+                        installed_evr = is->evr;
+                        break;
                     }
-                    if (!same_installed || opts.force_reinstall)
+                }
+                // "请求的版本已装"= 幂等判据（直接比 evr id：同一 pool 下同串同 id）。
+                const bool req_already_installed = (installed_evr != 0 && installed_evr == evr);
+                if (target_sid) {
+                    // 请求的版本就在 avail 里：已装该版本（且非 --force）时不发 job，否则
+                    // libsolv 会产出 REINSTALL 步骤、把同版本安装也算进计划（回归 S1）。
+                    if (!req_already_installed || opts.force_reinstall)
                         queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, target_sid);
+                } else if (req_already_installed) {
+                    // 请求的版本**已装**、只是当前不在 avail 里 → 幂等 no-op（上层报"已安装"）。
+                    // 与 S1 同一语义：`install pkg:ver` 要求的是"系统处于该版本"，不是"仓库里
+                    // 现在能装到它"。**不得**因为 avail 里正好没有就报错，更不得丢版本。
                 } else if (name_exists) {
                     // 真包存在但指定版本不在 avail → 报错，附可用版本（不再静默"已安装"）
                     result.problems.push_back(string_format("error.package_version_not_found", name,
                                                             vspec, avail_versions));
+                } else if (installed_evr != 0) {
+                    // 缺陷 A6：avail 里根本没有这个名字，而**同名包已装**且版本与请求不符。
+                    // 此前这里落到下面的 capability 回退：按**裸包名**入队，而 libsolv 认为
+                    // installed repo 里的同名 solvable 自提供 `名字 = evr`，正好满足这个裸
+                    // 能力 ⇒ **空事务** ⇒ 上层 `first_unreached_target` 因
+                    // `cache.is_installed(名字)` 为真而放行 ⇒ 打印"所有包都已安装"、退出码 0，
+                    // 用户明确请求的版本被**静默丢弃**。这里显式报错（点名请求版本与已装
+                    // 版本），与上一条同样"绝不静默"。
+                    result.problems.push_back(string_format("error.installed_version_mismatch",
+                                                            name, vspec,
+                                                            pool_id2str(ps.pool, installed_evr)));
                 } else {
-                    // 无同名真实包 → capability 回退：提供者由 libsolv 选（同 latest 分支），
-                    // 无提供者时产生 SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP → collect_problems 报错。
+                    // 无同名真实包（也没装）→ capability 回退：提供者由 libsolv 选（同 latest
+                    // 分支），无提供者时产生 SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP →
+                    // collect_problems 报错。
                     // 指定版本对能力无意义——提示找不到同名包、忽略版本约束，仍装提供者。
                     log_warning(string_format("warning.capability_version_ignored", name, vspec));
                     queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL, nid);

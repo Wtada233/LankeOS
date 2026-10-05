@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 
+#include "archive/tar_guard.hpp"
 #include "base/constants.hpp"
 #include "base/exception.hpp"
 #include "base/utils.hpp"
@@ -43,14 +44,9 @@ using ArchiveWriteHandle = std::unique_ptr<struct archive, ArchiveWriteDeleter>;
 /// lpkg 自用的临时落位后缀（`.lpkgtmp`）。2026-10-03 起它是 `constants::SUFFIX_LPKG_TMP`
 /// —— 此前这里有一份局部常量、另外两处是裸字面量（同一件事三处表达），现已收敛到常量头。
 
-/**
- * 把成员名里的不可见字节渲染成可见形式（供异常消息用）。
- *
- * 危险名字**本身就是攻击载荷**，不能原样进消息：含 ANSI 转义的名字会再污染一份终端，
- * 含 `\n` 的名字会把异常消息**自己**切成两行 —— 错误消息被行式消费的地方（日志、CLI
- * 输出）就重演了这里正在修的同一个 bug。故一律转义后再进消息。
- */
-static std::string escape_member_name(std::string_view name)
+// 渲染可见形式的成员名（`\xHH`）。判据与理由见 `archive.hpp` 的声明 —— 2026-10-05 起
+// 对外可见，`tar_guard.cpp` 共用同一份（别在那边再写一遍）。
+std::string escape_member_name(std::string_view name)
 {
     static constexpr char HEX[] = "0123456789abcdef";
     std::string out;
@@ -258,6 +254,11 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
         line.progress(100.0 * static_cast<double>(done) / static_cast<double>(total_bytes),
                       ui::human_size(done) + " / " + ui::human_size(total_bytes));
     };
+    // 畸形/敌意 tar 的结构性守卫（重名成员、`..`、链接目标、控制字符、反斜杠、超长路径、
+    // 类型与尾斜杠不一致、尺寸说谎）。**跨成员有状态**，故在循环外建一次。
+    // 判据本体与"哪些通用加固建议不采纳"的完整清单见 `archive/tar_guard.hpp`。
+    TarGuard guard;
+
     while (true) {
         r = archive_read_next_header(a.get(), &entry);
         if (r == ARCHIVE_EOF) break;
@@ -281,6 +282,9 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
         // 后缀）在这里**整包拒绝** —— 见 member_path_relative 的说明。
         const std::string member = member_path_relative(current_path, archive_path);
         if (member.empty()) continue;  // "." 之类不产生文件的成员
+        // 畸形 tar 守卫（整包拒绝）。放在 `member.empty()` 之后：`.`
+        // 这类归一化成空、本来就不落盘的成员不该进重名判据。
+        guard.check(entry, current_path, member, archive_path);
         fs::path dest_path = output_dir / member;
         archive_entry_set_pathname(entry, dest_path.c_str());
 
@@ -325,8 +329,15 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
             const fs::path hl_norm =
                 (root_n / member_path_relative(hardlink, archive_path)).lexically_normal();
             if (fs::path(hardlink).is_absolute() || !path_within(hl_norm, root_n)) {
-                log_warning(string_format("warning.archive_unsafe_member", hardlink));
-                continue;
+                // 2026-10-05：粒度由「跳过该成员 + 告警」升为**整包拒绝** —— 与成员名守卫、
+                // 特殊文件类型守卫、以及 `tar_guard` 的全部判据同一粒度。留给"跳过"的口子
+                // 等于让用户拿到一个装了一半、某文件莫名消失的包，而归档的畸形是**结构性**
+                // 的、不是单个成员的偶发问题（见 archive/tar_guard.hpp 抬头）。
+                // 归一化仍走 `member_path_relative`（那是"成员名 → 根内相对路径"的唯一实现），
+                // 所以这条判断留在调用点、不搬进 guard：guard 拿不到归一化函数。
+                throw UnsafeArchiveException(
+                    string_format("error.archive_malformed_link_target", archive_path.string(),
+                                  escape_member_name(member), escape_member_name(hardlink)));
             }
             archive_entry_set_hardlink(entry, hl_norm.c_str());
         }
@@ -366,6 +377,10 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
                         (err ? err : get_string("error.data_block_write")));
                 }
             }
+            // ⚠️ 这里**没有**"声明尺寸 vs 实际字节数"的复核 —— 它不可达，已删（2026-10-05
+            // 实测）：头声明 4096、实际只给 5 时，libarchive 在 `archive_read_data_block`
+            // 上直接返 FATAL（"Truncated tar archive detected"），上面那个 `r < ARCHIVE_WARN`
+            // 分支先一步抛了。即该向量已由 libarchive 覆盖，再判一次就是第二份实现。
             // finish_entry 的返回值此前被丢弃：它可能因磁盘满/EIO 失败（写盘失败），
             // 而这里若静默吞掉，解压会报成功、盘上却是截断的内容（2026-10-02 修）。
             const int fe = archive_write_finish_entry(ext.get());

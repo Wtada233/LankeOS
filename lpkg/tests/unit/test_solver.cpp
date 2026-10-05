@@ -364,6 +364,78 @@ TEST_F(SolverTest, InstallNonexistentPackageWithVersionErrors)
     EXPECT_FALSE(r.ok()) << "不存在的包+版本应报错（回归 S3）";
 }
 
+// ============================================================================
+// A6 回归：`install pkg:版本` 在**同名包已装**、而仓库(avail)里根本没有这个包名时
+// 曾被静默丢弃。
+//
+// 机制：avail 扫描（`name_exists`）只扫 available repo，已装包不在其中。于是请求落到
+// "无同名包 → capability 回退"分支：按**裸包名**入队。而 libsolv 认为每个 solvable
+// 自提供 `名字 = evr`，installed repo 里同名的旧版本正好满足这个裸能力 ⇒ **空事务** ⇒
+// 上层 `first_unreached_target` 因 `cache.is_installed(名字)` 为真而放行 ⇒ 打印
+// "所有包都已安装"、退出码 0。用户明确请求的版本被静默丢弃。
+// ============================================================================
+
+// A6 主格：已装 pkgA 2.0、avail 里没有 pkgA、请求 pkgA:1.0 → 必须报错（点名两版本）
+TEST_F(SolverTest, RequestedVersionDiffersFromInstalledAndRepoLacksPackageErrors)
+{
+    installed["pkgA"] = {"2.0", {}, {}, {}, {}};  // 已装 2.0；avail 里根本没有 pkgA
+
+    auto r = solve({{"pkgA", "1.0"}});
+    EXPECT_FALSE(r.ok())
+        << "用户明确请求 1.0、已装 2.0、仓库里没有 pkgA —— 版本被静默丢弃（缺陷 A6）";
+    ASSERT_FALSE(r.problems.empty());
+    // 与 solve_install 内部同一调用点产出同一字符串，对 l10n 加载与否均健壮
+    EXPECT_EQ(r.problems[0],
+              string_format("error.installed_version_mismatch", "pkgA", "1.0", "2.0"))
+        << "报错必须点名请求版本与已装版本，用户才知道差在哪";
+}
+
+// 对照（别改坏）：请求的版本**正是已装版本**、仓库里也没有该包名 → 幂等 no-op，不是错误。
+// 这是 A6 的相反一侧：同名包已装，但版本对得上 ⇒ 本来就走不到"丢版本"。
+TEST_F(SolverTest, RequestedVersionAlreadyInstalledWithoutRepoEntryIsNoop)
+{
+    installed["pkgA"] = {"1.0", {}, {}, {}, {}};
+
+    auto r = solve({{"pkgA", "1.0"}});
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(r.order.empty()) << "已装请求的版本 → 空计划（上层报'已安装'），不得报错";
+}
+
+// 边界：请求的版本已装、但 avail 里同名包**只有别的版本** → 仍应幂等。
+// 规则统一为"请求的版本已装即满足"（与 S1 的 `InstallSpecifiedVersionAlreadyInstalledIsNoop`
+// 同一语义），不因"该版本当前不在仓库里"而翻脸报错。
+TEST_F(SolverTest, RequestedVersionInstalledButRepoHasOtherVersionIsNoop)
+{
+    add("pkgA", "2.0", {}, {}, {}, {});
+    installed["pkgA"] = {"1.0", {}, {}, {}, {}};
+
+    auto r = solve({{"pkgA", "1.0"}});
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(r.order.empty()) << "已装 1.0 而仓库只有 2.0：请求 1.0 是幂等，不得报错";
+}
+
+// 对照（别改坏）：`install pkg`（无版本）而已装、且仓库里没有该包名 → 行为不变（空计划）。
+TEST_F(SolverTest, InstallLatestWhenInstalledButAbsentFromRepoIsNoop)
+{
+    installed["pkgA"] = {"2.0", {}, {}, {}, {}};
+
+    auto r = solve({{"pkgA", "latest"}});
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(r.order.empty()) << "latest + 已装 + 仓库无此包 → 空计划，行为不变";
+}
+
+// 对照（既有语义，别改坏）：按**能力**名安装（请求名不是任何包名），即便系统里装着
+// 无关的包，也必须忽略版本约束、照装提供者 —— 新增的"已装同名"判据不得误伤能力目标。
+TEST_F(SolverTest, CapabilityTargetWithVersionIgnoresVersionWithUnrelatedInstalledPkg)
+{
+    add("provPkg", "1.0", {}, {"somecap"}, {}, {});
+    installed["unrelated"] = {"9.9", {}, {}, {}, {}};
+
+    auto r = solve({{"somecap", "1.0"}});
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+    EXPECT_TRUE(order_has(r, "provPkg")) << "能力目标不该被'已装同名包'判据拦下（回归 S3）";
+}
+
 // 回归：`install ghost`（仓库无此包）→ 报"仓库中未找到软件包"，而非"依赖 ... 无提供者"
 // （曾把顶层请求缺失也归类为依赖，措辞误导用户）
 TEST_F(SolverTest, InstallNonexistentPackageReportsNotFound)
