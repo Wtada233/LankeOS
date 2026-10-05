@@ -2922,3 +2922,36 @@ fn unchanged_soname_set_is_not_abi_break() {
     fs::remove_dir_all(&dir).ok();
     fs::remove_dir_all(&out).ok();
 }
+
+/// **符号版本**：`needed_so` 带版本时，abifix 的"有无 provider"判定必须仍按**裸名**工作 ——
+/// 修前（只归一了集合侧、没归一比较侧）这里会误报，实测全仓触发 734 个包 / 3233 条。
+#[test]
+fn abifix_targets_matches_versioned_needs_by_bare_soname() {
+    let pkgs = temp_dir("farm-abifix-ver-pkgs");
+    let out = temp_dir("farm-abifix-ver-out");
+    // 索引里的 provider 声明带符号版本；消费者要求其中一部分版本。
+    // ⚠️ 索引行是 `name|ver:hash:deps:provides:provides_soname:needed_so|` —— **两个竖线都要**
+    //（少结尾那个 ⇒ `parts.len() != 3` ⇒ 整行被跳过；我第一版就这么写的，调试输出里
+    // `provided = {}` 才看出来 —— 又一次"判据/夹具的锅"）。
+    write_baseline(&out, "libbar|1.0:h:::libbar.so.1@{V1,V2}:|\n");
+    write_pkg_ver(&pkgs, "ok", "1.0", &["libok.so"], &["libbar.so.1@V1"], &[]);
+    write_pkg_ver(
+        &pkgs,
+        "orphan",
+        "1.0",
+        &["libor.so"],
+        &["libmissing.so.9@V9"],
+        &[],
+    );
+    let idx = Index::parse(&fs::read_to_string(out.join("x86_64/index.txt")).unwrap());
+
+    let t = abifix_targets(&pkgs, &idx);
+    assert_eq!(
+        t,
+        vec![("orphan".to_string(), vec!["libmissing.so.9@V9".to_string()])],
+        "带版本的 need 要按裸名判有无 provider：`libbar.so.1` 有提供者 ⇒ 不报；\
+         `libmissing.so.9` 没有 ⇒ 报（含原样的 needed 串）: {t:?}"
+    );
+    fs::remove_dir_all(&pkgs).ok();
+    fs::remove_dir_all(&out).ok();
+}

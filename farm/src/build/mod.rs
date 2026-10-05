@@ -16,7 +16,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::abi;
-use crate::graph::{Index, RevMap};
+use crate::graph::{so_bare, Index, RevMap};
 use crate::lpkg_binding::{BuildOutcome, LpkgBinding};
 use crate::state::{JobStatus, State};
 use crate::tr;
@@ -186,11 +186,24 @@ pub(crate) fn abifix_targets(pkgs_dir: &Path, old: &Index) -> Vec<(String, Vec<S
         let Some(b) = read_lankebuild(pkgs_dir, &pkg) else {
             continue;
         };
-        let own: HashSet<&str> = b.provides_soname.iter().map(String::as_str).collect();
+        // ⚠️ **两侧都必须归一到裸名**（`provided` 的键本来就是裸名）。
+        // 2026-10-05 修：此前 `own`/`needed_so` 用的是**规格整串**，而 `provided` 是裸名集合 ⇒
+        // 带符号版本的 need（`X@{V1,V2}`）**永远查不到** ⇒ 实测**误报 734 个包 / 3233 条 needed**
+        // （正是全部带版本的那些），`farm abifix` 会给它们白 bump release + 强制重建。
+        // 归一后同口径：0 条。**farm 的判据只到裸名这一层**（"这个库有没有人提供"）——
+        // "提供者拿不出那个符号版本"是 lpkg 安装期的判定（`so_spec_satisfies`），不在 farm 这层。
+        let own: HashSet<String> = b
+            .provides_soname
+            .iter()
+            .map(|s| so_bare(s).to_string())
+            .collect();
         let missing: Vec<String> = b
             .needed_so
             .iter()
-            .filter(|s| !provided.contains(s.as_str()) && !own.contains(s.as_str()))
+            .filter(|s| {
+                let bare = so_bare(s);
+                !provided.contains(bare) && !own.contains(bare)
+            })
             .cloned()
             .collect();
         if !missing.is_empty() {
