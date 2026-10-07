@@ -23,6 +23,7 @@
     "libevdev",
     "libxkbcommon",
     "meson",
+    "ninja",
     "python-jinja"
   ],
   "sources": [

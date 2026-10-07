@@ -43,6 +43,7 @@
     "libxml2",
     "libxslt",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

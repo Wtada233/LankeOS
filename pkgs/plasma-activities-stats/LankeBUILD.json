@@ -18,8 +18,10 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kconfig",
+    "ninja",
     "plasma-activities",
     "qt6-base",
     "qt6-tools"

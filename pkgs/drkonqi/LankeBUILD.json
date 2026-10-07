@@ -35,6 +35,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "elfutils",
     "extra-cmake-modules",
     "gdb",
@@ -54,6 +55,7 @@
     "kf-kwidgetsaddons",
     "kf-kwindowsystem",
     "kf-syntax-highlighting",
+    "ninja",
     "polkit-qt",
     "python-psutil",
     "python-pygdbmi",

@@ -17,6 +17,7 @@
     "cups",
     "glib",
     "meson",
+    "ninja",
     "polkit"
   ],
   "sources": [

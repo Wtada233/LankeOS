@@ -14,7 +14,9 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
+    "ninja",
     "python-lxml",
     "qt6-base"
   ],

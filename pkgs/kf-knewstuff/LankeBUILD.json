@@ -37,6 +37,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "kf-attica",
@@ -49,6 +50,7 @@
     "kf-kpackage",
     "kf-kwidgetsaddons",
     "kf-syndication",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-tools"

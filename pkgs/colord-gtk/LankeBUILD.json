@@ -30,6 +30,7 @@
     "gtk3",
     "gtk4",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

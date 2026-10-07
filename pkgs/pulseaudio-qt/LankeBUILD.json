@@ -18,8 +18,10 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "libpulse",
+    "ninja",
     "qt6-base"
   ],
   "sources": [

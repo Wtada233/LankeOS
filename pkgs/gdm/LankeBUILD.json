@@ -42,6 +42,7 @@
     "libxcb",
     "linux-pam",
     "meson",
+    "ninja",
     "polkit",
     "upower"
   ],

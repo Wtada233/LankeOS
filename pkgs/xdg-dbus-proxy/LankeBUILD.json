@@ -15,7 +15,8 @@
     "base-devel",
     "docbook-xsl",
     "glib",
-    "meson"
+    "meson",
+    "ninja"
   ],
   "sources": [
     "https://github.com/flatpak/xdg-dbus-proxy/archive/refs/tags/0.1.9.tar.gz"

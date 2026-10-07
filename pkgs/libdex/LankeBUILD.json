@@ -24,6 +24,7 @@
     "gobject-introspection",
     "liburing",
     "meson",
+    "ninja",
     "sysprof",
     "vala"
   ],

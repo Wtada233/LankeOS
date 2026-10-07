@@ -1,6 +1,6 @@
 {
   "name": "xorgproto",
-  "version": "2025.1",
+  "version": "2026.1",
   "release": 3,
   "deps": [
     "libxau",
@@ -15,7 +15,7 @@
     "util-macros"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-2025.1.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/proto/xorgproto-2026.1.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

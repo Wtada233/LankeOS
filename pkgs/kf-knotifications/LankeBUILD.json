@@ -19,10 +19,12 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "kf-kconfig",
     "libcanberra",
+    "ninja",
     "python-build",
     "python-setuptools",
     "qt6-base",

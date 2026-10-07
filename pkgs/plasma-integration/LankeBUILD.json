@@ -39,6 +39,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kcolorscheme",
     "kf-kconfig",
@@ -55,6 +56,7 @@
     "kf-qqc2-desktop-style",
     "libxcb",
     "libxcursor",
+    "ninja",
     "plasma-wayland-protocol",
     "qqc2-breeze-style",
     "qt6-base",

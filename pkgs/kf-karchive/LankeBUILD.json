@@ -20,8 +20,10 @@
   "build_deps": [
     "base-devel",
     "bzip2",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
+    "ninja",
     "qt6-base",
     "qt6-tools",
     "xz",

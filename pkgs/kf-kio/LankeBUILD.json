@@ -55,6 +55,7 @@
   "build_deps": [
     "base-devel",
     "acl",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "kf-karchive",
@@ -78,6 +79,7 @@
     "kf-solid",
     "libxml2",
     "libxslt",
+    "ninja",
     "qt6-base",
     "qt6-tools"
   ],

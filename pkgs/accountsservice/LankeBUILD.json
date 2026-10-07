@@ -27,6 +27,7 @@
     "json-c",
     "libxcrypt",
     "meson",
+    "ninja",
     "polkit",
     "vala",
     "xmlto"

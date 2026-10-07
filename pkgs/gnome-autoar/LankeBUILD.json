@@ -21,6 +21,7 @@
     "gobject-introspection",
     "libarchive",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

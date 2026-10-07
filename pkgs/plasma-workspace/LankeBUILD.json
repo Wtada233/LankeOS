@@ -156,6 +156,7 @@
   "build_deps": [
     "appstream",
     "base-devel",
+    "cmake",
     "dbus",
     "extra-cmake-modules",
     "fontconfig",
@@ -230,6 +231,7 @@
     "libxft",
     "libxtst",
     "milou",
+    "ninja",
     "ocean-sound-theme",
     "packagekit-qt6",
     "plasma-activities",

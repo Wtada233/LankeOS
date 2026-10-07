@@ -64,6 +64,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "corrosion",
     "extra-cmake-modules",
     "icu",
@@ -97,6 +98,7 @@
     "kirigami-addons",
     "kwin",
     "libplasma",
+    "ninja",
     "plasma-workspace",
     "qt5compat",
     "qt6-base",

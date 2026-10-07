@@ -96,6 +96,7 @@
   "build_deps": [
     "base-devel",
     "breeze",
+    "cmake",
     "extra-cmake-modules",
     "kdecoration",
     "kf-kauth",
@@ -143,6 +144,7 @@
     "libxkbcommon",
     "mesa",
     "milou",
+    "ninja",
     "pipewire",
     "plasma-activities",
     "plasma-wayland-protocol",

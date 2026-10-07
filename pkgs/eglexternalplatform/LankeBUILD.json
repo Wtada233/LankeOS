@@ -8,7 +8,8 @@
   "build_deps": [
     "base-devel",
     "libglvnd",
-    "meson"
+    "meson",
+    "ninja"
   ],
   "sources": [
     "https://github.com/NVIDIA/eglexternalplatform/archive/refs/tags/1.2.1.tar.gz"

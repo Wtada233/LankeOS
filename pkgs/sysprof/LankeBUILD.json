@@ -48,6 +48,7 @@
     "libpanel",
     "libunwind",
     "meson",
+    "ninja",
     "pango",
     "polkit"
   ],

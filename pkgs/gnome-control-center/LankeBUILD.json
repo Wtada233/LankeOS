@@ -98,6 +98,7 @@
     "meson",
     "modemmanager",
     "networkmanager",
+    "ninja",
     "pango",
     "polkit",
     "samba",

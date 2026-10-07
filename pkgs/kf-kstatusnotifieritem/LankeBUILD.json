@@ -18,9 +18,11 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "kf-kwindowsystem",
+    "ninja",
     "python-build",
     "python-setuptools",
     "qt6-base",

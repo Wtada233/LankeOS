@@ -31,6 +31,7 @@
   "build_deps": [
     "base-devel",
     "breeze-icons",
+    "cmake",
     "extra-cmake-modules",
     "kdecoration",
     "kf-frameworkintegration",
@@ -44,6 +45,7 @@
     "kf-kirigami",
     "kf-kwidgetsaddons",
     "kf-kwindowsystem",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-svg"

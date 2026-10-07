@@ -37,6 +37,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "hicolor-icon-theme",
     "intltool",
@@ -52,6 +53,7 @@
     "kf-kservice",
     "kf-prison",
     "libaccounts-qt",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-tools"

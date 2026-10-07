@@ -30,6 +30,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kcmutils",
     "kf-kcompletion",
@@ -44,6 +45,7 @@
     "kf-kservice",
     "kf-kwidgetsaddons",
     "kf-kwindowsystem",
+    "ninja",
     "qt6-base",
     "qt6-svg"
   ],

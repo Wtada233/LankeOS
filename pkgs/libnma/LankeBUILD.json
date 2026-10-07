@@ -37,6 +37,7 @@
     "meson",
     "mobile-broadband-provider-info",
     "networkmanager",
+    "ninja",
     "vala"
   ],
   "sources": [

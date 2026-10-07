@@ -36,6 +36,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "ffmpeg",
     "kf-kcoreaddons",
@@ -44,6 +45,7 @@
     "libepoxy",
     "libva",
     "mesa",
+    "ninja",
     "pipewire",
     "qt6-base",
     "qt6-declarative"

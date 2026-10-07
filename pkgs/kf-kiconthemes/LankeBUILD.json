@@ -31,6 +31,7 @@
   "build_deps": [
     "base-devel",
     "breeze-icons",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "kf-karchive",
@@ -38,6 +39,7 @@
     "kf-kconfig",
     "kf-ki18n",
     "kf-kwidgetsaddons",
+    "ninja",
     "qt6-base",
     "qt6-svg",
     "qt6-tools",

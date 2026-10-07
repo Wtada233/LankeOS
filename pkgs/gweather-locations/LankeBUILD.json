@@ -8,6 +8,7 @@
   "build_deps": [
     "base-devel",
     "meson",
+    "ninja",
     "python-gobject"
   ],
   "sources": [

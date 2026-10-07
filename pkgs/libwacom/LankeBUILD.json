@@ -21,7 +21,8 @@
     "libevdev",
     "libgudev",
     "libxml2",
-    "meson"
+    "meson",
+    "ninja"
   ],
   "sources": [
     "https://github.com/linuxwacom/libwacom/releases/download/libwacom-2.20.0/libwacom-2.20.0.tar.xz"

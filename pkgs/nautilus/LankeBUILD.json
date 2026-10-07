@@ -64,6 +64,7 @@
     "libx11",
     "localsearch",
     "meson",
+    "ninja",
     "pango",
     "tinysparql",
     "wayland",

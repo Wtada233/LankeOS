@@ -30,6 +30,7 @@
     "libffi",
     "libx11",
     "meson",
+    "ninja",
     "readline",
     "spidermonkey",
     "sysprof"

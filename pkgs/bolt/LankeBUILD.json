@@ -17,6 +17,7 @@
     "base-devel",
     "glib",
     "meson",
+    "ninja",
     "polkit"
   ],
   "sources": [

@@ -54,6 +54,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kcolorscheme",
     "kf-kconfig",
@@ -73,6 +74,7 @@
     "libglvnd",
     "libx11",
     "libxcb",
+    "ninja",
     "plasma-activities",
     "plasma-wayland-protocol",
     "qt5compat",

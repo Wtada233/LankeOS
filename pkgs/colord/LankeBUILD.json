@@ -40,6 +40,7 @@
     "libgudev",
     "libgusb",
     "meson",
+    "ninja",
     "polkit",
     "sqlite",
     "vala"

@@ -35,6 +35,7 @@
     "libadwaita",
     "libnotify",
     "meson",
+    "ninja",
     "upower"
   ],
   "sources": [

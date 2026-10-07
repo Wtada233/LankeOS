@@ -1,6 +1,6 @@
 {
   "name": "chromium",
-  "version": "153.0.8010.52",
+  "version": "155.0.8059.39",
   "release": 5,
   "deps": [
     "desktop-file-utils",
@@ -57,7 +57,7 @@
     "libopus.so.0",
     "libpango-1.0.so.0",
     "libpulse.so.0@PULSE_0",
-    "libsmime3.so@{NSS_3.10,NSS_3.2}",
+    "libsmime3.so@{NSS_3.10,NSS_3.18,NSS_3.2,NSS_3.8}",
     "libstdc++.so.6@{CXXABI_1.3.9,GLIBCXX_3.4}",
     "libudev.so.1@LIBUDEV_183",
     "libwebp.so.7",
@@ -128,7 +128,7 @@
     "zstd"
   ],
   "sources": [
-    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-153.0.8010.52-lite.tar.xz",
+    "https://commondatastorage.googleapis.com/chromium-browser-official/chromium-155.0.8059.39-lite.tar.xz",
     "https://github.com/foutrelis/chromium-launcher/archive/v8/chromium-launcher-8.tar.gz"
   ],
   "work_sources": []

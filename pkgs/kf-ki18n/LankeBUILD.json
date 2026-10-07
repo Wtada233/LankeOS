@@ -19,9 +19,11 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "iso-codes",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-tools"

@@ -36,6 +36,7 @@
     "libstemmer",
     "libxml2",
     "meson",
+    "ninja",
     "sqlite",
     "vala"
   ],

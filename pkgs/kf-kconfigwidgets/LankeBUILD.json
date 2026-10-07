@@ -24,6 +24,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "kf-kcodecs",
@@ -32,6 +33,7 @@
     "kf-kcoreaddons",
     "kf-ki18n",
     "kf-kwidgetsaddons",
+    "ninja",
     "qt6-base",
     "qt6-tools"
   ],

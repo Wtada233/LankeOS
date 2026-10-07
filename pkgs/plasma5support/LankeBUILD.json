@@ -45,6 +45,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kconfig",
     "kf-kcoreaddons",
@@ -62,6 +63,7 @@
     "libksysguard",
     "libx11",
     "libxfixes",
+    "ninja",
     "plasma-activities",
     "qt6-base",
     "qt6-declarative"

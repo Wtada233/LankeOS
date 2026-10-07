@@ -19,9 +19,11 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kconfig",
     "kf-kcoreaddons",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-tools"

@@ -1,14 +1,15 @@
 {
   "name": "poppler",
-  "version": "26.09.0",
+  "version": "26.10.0",
   "release": 2,
   "deps": [
     "poppler-data"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
+    "libbrotlidec.so.1",
     "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libcairo.so.2",
     "libcurl.so.4",
@@ -41,8 +42,8 @@
     "libpoppler-glib.so.8",
     "libpoppler-qt6.so",
     "libpoppler-qt6.so.3",
-    "libpoppler.so.164@POPPLER_164",
-    "libpoppler.so@POPPLER_164"
+    "libpoppler.so.165@POPPLER_165",
+    "libpoppler.so@POPPLER_165"
   ],
   "build_deps": [
     "base-devel",
@@ -70,7 +71,7 @@
     "zlib"
   ],
   "sources": [
-    "https://poppler.freedesktop.org/poppler-26.09.0.tar.xz"
+    "https://poppler.freedesktop.org/poppler-26.10.0.tar.xz"
   ],
   "work_sources": []
 }

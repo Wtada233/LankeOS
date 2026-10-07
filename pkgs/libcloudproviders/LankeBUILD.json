@@ -19,6 +19,7 @@
     "glib",
     "gobject-introspection",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

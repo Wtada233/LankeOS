@@ -15,10 +15,7 @@ lankebuild_prepare() {
     ln -sf "$PWD/nss/lib/ckfw/builtins/certdata.txt" certs/
     ln -sf "$PWD/nss/lib/ckfw/builtins/nssckbi.h" certs/
 
-    # --system-nspr 下生成 nss.pc 的修复（Arch 同款补丁）：build.sh 会去读本地的
-    # $obj_dir/lib/pkgconfig/nspr.pc，用系统 nspr 时该文件不存在 → sed 退出码 2。
     cd nss
-    patch -Np1 -i "$_BD/0001-Fix-generating-nss.pc-with-system-nspr.patch"
 }
 
 lankebuild_build() {

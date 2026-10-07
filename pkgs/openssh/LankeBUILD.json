@@ -1,6 +1,6 @@
 {
   "name": "openssh",
-  "version": "10.5p1",
+  "version": "10.6p1",
   "release": 3,
   "deps": [
     "glibc",
@@ -33,7 +33,7 @@
     "zlib"
   ],
   "sources": [
-    "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.5p1.tar.gz"
+    "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.6p1.tar.gz"
   ],
   "work_sources": []
 }

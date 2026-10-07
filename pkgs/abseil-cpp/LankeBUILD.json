@@ -202,7 +202,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "cmake"
+    "cmake",
+    "ninja"
   ],
   "sources": [
     "https://github.com/abseil/abseil-cpp/archive/20260817.0/abseil-cpp-20260817.0.tar.gz"

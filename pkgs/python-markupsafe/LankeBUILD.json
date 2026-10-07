@@ -1,12 +1,12 @@
 {
   "name": "python-markupsafe",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "release": 1,
   "deps": [
     "python"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [],
   "build_deps": [
@@ -18,7 +18,7 @@
     "python-wheel"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/7e/99/7690b6d4034fffd95959cbe0c02de8deb3098cc577c67bb6a24fe5d7caa7/markupsafe-3.0.3.tar.gz"
+    "https://files.pythonhosted.org/packages/38/9b/e422a865e1d5d57d0e509b4e0bf1c1a70a7f6382c29a5aa428df994c8bc8/markupsafe-3.0.4.tar.gz"
   ],
   "work_sources": []
 }

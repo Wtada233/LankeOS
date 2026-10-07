@@ -51,6 +51,7 @@
     "libwebp",
     "libxml2",
     "meson",
+    "ninja",
     "poppler",
     "tinysparql",
     "upower"

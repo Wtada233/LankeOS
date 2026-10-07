@@ -39,6 +39,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kauth",
     "kf-kcmutils",
@@ -60,6 +61,7 @@
     "kf-kwidgetsaddons",
     "kf-kwindowsystem",
     "kf-kxmlgui",
+    "ninja",
     "plasma-activities",
     "qt6-base",
     "qt6-declarative"

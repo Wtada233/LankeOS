@@ -35,6 +35,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "glib",
     "kf-kconfig",
@@ -48,6 +49,7 @@
     "kirigami-addons",
     "kirigami-app-components",
     "libsecret",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-svg"

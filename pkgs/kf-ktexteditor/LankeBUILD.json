@@ -42,6 +42,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "editorconfig-core-c",
     "extra-cmake-modules",
@@ -62,6 +63,7 @@
     "kf-kxmlgui",
     "kf-sonnet",
     "kf-syntax-highlighting",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-speech",

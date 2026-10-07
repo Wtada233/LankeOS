@@ -20,6 +20,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kconfig",
     "kf-kcoreaddons",
@@ -28,6 +29,7 @@
     "kf-krunner",
     "kf-ksvg",
     "libplasma",
+    "ninja",
     "qt6-base",
     "qt6-declarative"
   ],

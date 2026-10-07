@@ -36,6 +36,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "glib",
@@ -53,6 +54,7 @@
     "kf-kwindowsystem",
     "libgcrypt",
     "libsecret",
+    "ninja",
     "qca",
     "qt6-base",
     "qt6-tools"

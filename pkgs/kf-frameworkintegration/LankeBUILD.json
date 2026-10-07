@@ -26,6 +26,7 @@
   "build_deps": [
     "base-devel",
     "appstream",
+    "cmake",
     "extra-cmake-modules",
     "kf-kcolorscheme",
     "kf-kconfig",
@@ -34,6 +35,7 @@
     "kf-knewstuff",
     "kf-knotifications",
     "kf-kwidgetsaddons",
+    "ninja",
     "packagekit-qt6",
     "qt6-base",
     "qt6-tools"

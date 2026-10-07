@@ -56,6 +56,7 @@
     "libxau",
     "libxml2",
     "meson",
+    "ninja",
     "ostree",
     "polkit",
     "python-gobject",

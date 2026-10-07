@@ -28,6 +28,7 @@
     "libgudev",
     "libnotify",
     "meson",
+    "ninja",
     "pango",
     "python-gobject"
   ],

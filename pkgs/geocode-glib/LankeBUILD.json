@@ -24,7 +24,8 @@
     "gtk-doc",
     "json-glib",
     "libsoup",
-    "meson"
+    "meson",
+    "ninja"
   ],
   "sources": [
     "https://download.gnome.org/sources/geocode-glib/3.26/geocode-glib-3.26.4.tar.xz"

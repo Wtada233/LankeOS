@@ -17,7 +17,9 @@
   "build_deps": [
     "at-spi2-core",
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
+    "ninja",
     "qt6-base"
   ],
   "sources": [

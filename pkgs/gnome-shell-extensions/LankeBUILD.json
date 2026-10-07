@@ -10,7 +10,8 @@
   "build_deps": [
     "base-devel",
     "gnome-shell",
-    "meson"
+    "meson",
+    "ninja"
   ],
   "sources": [
     "https://download.gnome.org/sources/gnome-shell-extensions/51/gnome-shell-extensions-51.0.tar.xz"

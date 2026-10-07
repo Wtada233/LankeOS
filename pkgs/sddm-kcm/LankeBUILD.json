@@ -28,6 +28,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-karchive",
     "kf-kauth",
@@ -41,6 +42,7 @@
     "kf-knewstuff",
     "kf-kservice",
     "kf-kwidgetsaddons",
+    "ninja",
     "qt6-base",
     "qt6-declarative"
   ],

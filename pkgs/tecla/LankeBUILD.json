@@ -24,6 +24,7 @@
     "libadwaita",
     "libxkbcommon",
     "meson",
+    "ninja",
     "pango",
     "wayland"
   ],

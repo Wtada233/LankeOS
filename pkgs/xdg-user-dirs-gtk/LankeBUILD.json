@@ -15,6 +15,7 @@
     "glib",
     "gtk3",
     "meson",
+    "ninja",
     "xdg-user-dirs"
   ],
   "sources": [

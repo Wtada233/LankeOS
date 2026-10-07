@@ -1,6 +1,6 @@
 {
   "name": "gn",
-  "version": "20261001.841e072b",
+  "version": "20261006.f9eca75a",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -11,11 +11,11 @@
   "build_deps": [
     "base-devel",
     "git",
-    "llvm",
+    "clang",
     "ninja"
   ],
   "sources": [
-    "https://gn.googlesource.com/gn/+archive/841e072bef419ae1116477dc75e8c5a662c0212c.tar.gz"
+    "https://gn.googlesource.com/gn/+archive/f9eca75ae5549af4a6d4a2e2a912c652590de9da.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

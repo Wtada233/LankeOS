@@ -95,6 +95,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "intltool",
     "kaccounts-integration",
@@ -149,6 +150,7 @@
     "libxi",
     "libxkbcommon",
     "libxkbfile",
+    "ninja",
     "packagekit-qt6",
     "plasma-activities",
     "plasma-activities-stats",

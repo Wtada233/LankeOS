@@ -18,6 +18,7 @@
     "gobject-introspection",
     "lcms2",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

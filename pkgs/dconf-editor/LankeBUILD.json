@@ -22,6 +22,7 @@
     "gtk3",
     "libhandy",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

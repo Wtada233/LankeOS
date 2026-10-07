@@ -21,6 +21,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "kf-kconfig",
@@ -29,6 +30,7 @@
     "kf-ki18n",
     "kf-kitemmodels",
     "kf-kwindowsystem",
+    "ninja",
     "qt6-base",
     "qt6-tools"
   ],

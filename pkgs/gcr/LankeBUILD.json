@@ -37,6 +37,7 @@
     "libgcrypt",
     "libxslt",
     "meson",
+    "ninja",
     "openssh",
     "p11-kit",
     "pango",

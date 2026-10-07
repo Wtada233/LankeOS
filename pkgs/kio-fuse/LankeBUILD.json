@@ -15,10 +15,12 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "fuse3",
     "kf-kcoreaddons",
     "kf-kio",
+    "ninja",
     "qt6-base"
   ],
   "sources": [

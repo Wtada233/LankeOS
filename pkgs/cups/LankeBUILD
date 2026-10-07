@@ -1,22 +1,133 @@
 lankebuild_prepare() {
+    # 归档自带 configure，但 cups-directories.m4 是 autoconf 的输入：打了 statedir 补丁后
+    # 必须重新生成 configure 才生效（做法与 Arch 一致）。aclocal/autoconf 由 base-devel 提供。
+    #
+    # 容错：patch -N 对"已应用"返回非 0。forward 失败 + 反向 dry-run 成功 = 已应用 → 跳过；
+    # 两者都失败才报错。上游将来纳入这些修复后，补丁自动变 no-op。
+    _apply_patch() {
+        patch -Np1 -i "$1" && return 0
+        if patch -R --dry-run -p1 -i "$1" >/dev/null 2>&1; then
+            echo ":: 补丁已应用，跳过：$1"
+            return 0
+        fi
+        echo ":: 补丁应用失败：$1" >&2
+        return 1
+    }
+
+    # /var/run → /run：cupsd 的 pid / keepalive 等瞬态状态落 /run/cups
+    _apply_patch "{WORK_DIR}/../cups-2.4.0-statedir.patch"
+    # 上游 #53：cupsd 要能绑定"此刻尚不存在"的 IP（IP_FREEBIND）
+    _apply_patch "{WORK_DIR}/../cups-freebind.patch"
+    # FS#56818：initgroups()，让过滤器/后端进程继承附属组，否则 lp 组权限失效
+    _apply_patch "{WORK_DIR}/../guid.patch"
+    # 上游 2.4.20 的回归（2.4.x 分支刚修、尚未发版）：未启用 DNS-SD 时 cups/dest.c 编不过
+    # —— _cups_getdata_t 缺 cups_enum_dests 用到的 num_local/local_dests。
+    # LankeOS 无 avahi ⇒ 走的就是这条分支，必须带此修复。
+    # 上游 commit 23a183b63a4c "Fix destination enumeration without DNS-SD" (Fixes #1739)
+    _apply_patch "{WORK_DIR}/../cups-2.4.20-fix-enum-without-dnssd.patch"
+
+    aclocal -I config-scripts
+    autoconf -I config-scripts
+}
+
+lankebuild_build() {
+    # cups 的构建系统只用 DSOFLAGS、不用 LDFLAGS 链接共享库，显式转过去。
+    # 占位符前不加 $：lpkg 先做字面替换，残留的 $ 会被容器二次处理成坏字符。
+    export DSOFLAGS="{LDFLAGS}"
+
+    # 对齐 Arch 打包参数。差异：
+    #   - 无 avahi 包 → 不启用 DNS-SD（configure 探测不到即自动关闭）
+    #   - CFLAGS 传 LankeOS 的 {CFLAGS}，而非 Arch 外壳的 $CFLAGS
     ./configure \
         --prefix={PREFIX} \
         --sysconfdir={SYSCONFDIR} \
         --localstatedir={LOCALSTATEDIR} \
-        --disable-static
-}
-
-lankebuild_build() {
-    cd "{SRC_DIR}"
+        --sbindir={SBINDIR} \
+        --libdir={LIBDIR} \
+        --with-logdir=/var/log/cups \
+        --with-docdir={DATADIR}/cups/doc \
+        --with-exe-file-perm=0755 \
+        --with-cups-user=209 \
+        --with-cups-group=209 \
+        --with-max-log-size=0 \
+        --enable-pam=yes \
+        --enable-raw-printing \
+        --enable-dbus=yes \
+        --with-tls=gnutls \
+        --with-dbusdir={DATADIR}/dbus-1 \
+        --enable-relro \
+        --enable-libpaper \
+        --with-optim="{CFLAGS}"
     make -j$(nproc)
 }
 
 lankebuild_package() {
     cd "{SRC_DIR}"
+    # LankeOS 不拆 libcups/cups（Arch 拆两个包），所以一次 install 全装
+    # （install = install-data + install-headers + install-libs + install-exec），
+    # cups-config 也留在本包，不按 Arch 挪去 libcups。
     make DESTDIR="{STAGING_ROOT}" install
 
-    # 不装 /var/run：发行版布局里它是 `-> ../run` 的符号链接（tmpfs），包提供实体目录会与
-    # 目录符号链接语义冲突（lpkg 现在按 pacman 语义：symlink→目录 算文件，目录条目撞上即判
-    # 冲突、整批中止）。运行期需要的子目录交给 tmpfiles.d。
-    rm -rf "{STAGING_ROOT}/var/run"
+    # ---- 以下对齐 Arch package_cups 的收尾处理 ----
+
+    # 清掉上游的 SysV / xinetd 遗留（LankeOS 用 systemd）
+    rm -rf "{STAGING_ROOT}"/etc/rc*.d
+    rm -rf "{STAGING_ROOT}"/etc/init.d
+    rm -rf "{STAGING_ROOT}"/etc/xinetd.d
+
+    # PAM / logrotate / sysusers 配置随包目录分发（上游不带 sysusers，
+    # PAM 栈换成 LankeOS 的本地约定）
+    install -Dm644 "{WORK_DIR}/../cups.logrotate" "{STAGING_ROOT}{SYSCONFDIR}/logrotate.d/cups"
+    install -Dm644 "{WORK_DIR}/../cups.pam" "{STAGING_ROOT}{SYSCONFDIR}/pam.d/cups"
+    install -Dm644 "{WORK_DIR}/../cups.sysusers" "{STAGING_ROOT}{LIBDIR}/sysusers.d/cups.conf"
+
+    chmod 755 "{STAGING_ROOT}/var/spool" "{STAGING_ROOT}/etc"
+
+    # 让 cupsd 以 cups:lp（数值 209）跑过滤器/后端：取消 cups-files.conf 里的注释
+    sed -i "s:#User 209:User 209:" "{STAGING_ROOT}{SYSCONFDIR}"/cups/cups-files.conf{,.default}
+    sed -i "s:#Group 209:Group 209:" "{STAGING_ROOT}{SYSCONFDIR}"/cups/cups-files.conf{,.default}
+
+    # SSL 证书目录：cupsd 首次生成证书前必须存在（0700、组 cups）
+    install -dm700 -g 209 "{STAGING_ROOT}{SYSCONFDIR}/cups/ssl"
+
+    # /run 不进包：它是 tmpfs 上的运行期状态，实体目录会与 /var/run → ../run 的
+    # 符号链接语义冲突；cupsd 启动时会自建 StateDir（/run/cups）。
+    rm -rf "{STAGING_ROOT}/run"
+
+    # cupsd 运行期填充的配置文件
+    touch "{STAGING_ROOT}{SYSCONFDIR}/cups/printers.conf"
+    touch "{STAGING_ROOT}{SYSCONFDIR}/cups/classes.conf"
+    touch "{STAGING_ROOT}{SYSCONFDIR}/cups/subscriptions.conf"
+    chgrp -R 209 "{STAGING_ROOT}{SYSCONFDIR}/cups"
+
+    # .desktop 的 Exec 从 htmlview（Fedora 的包装）换成 xdg-open
+    sed -i 's|^Exec=htmlview http://localhost:631/|Exec=xdg-open http://localhost:631/|g' \
+        "{STAGING_ROOT}{DATADIR}/applications/cups.desktop"
+
+    # 驱动文件压缩：`-n` 不写时间戳（可复现），`-r` 防空输入时 gzip 挂起等 stdin
+    find "{STAGING_ROOT}{DATADIR}/cups/model" -name "*.ppd" -print0 | xargs -0 -r gzip -n9f
+
+    # client.conf(5) 属于 cups-filters，本包不该带
+    rm -f "{STAGING_ROOT}{DATADIR}/man/man5/client.conf.5"
+
+    # 注释掉已迁往 cups-filters 的过滤器
+    perl -p -i -e 's:^(.*\s+bannertops\s*)$:#\1:' "{STAGING_ROOT}{DATADIR}/cups/mime/mime.convs"
+
+    # PageLogFormat 已废弃
+    sed -i -e 's:PageLogFormat:#PageLogFormat:' "{STAGING_ROOT}{SYSCONFDIR}"/cups/cupsd.conf*
+
+    # 许可证
+    install -m644 -Dt "{STAGING_ROOT}{DATADIR}/licenses/cups" LICENSE NOTICE
+
+    # usr/lib/sysusers.d/cups.conf 需要 systemd-sysusers 落位（cups 用户/组，uid/gid 209）。
+    # 后面几行是 Arch cups.install 里 post_install 的提示；其 post_upgrade 的 vercmp 迁移
+    # （2.2.6 属主、2.3.3 unit 改名）是 Arch 从旧版升上来的历史包袱，LankeOS 无此旧版本，不移植。
+    cat >> "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+systemd-sysusers
+echo ">> If you use an HTTPS connection to CUPS, the first time you access"
+echo ">> the interface it may take a very long time before the site comes up."
+echo ">> The first request triggers generation of the CUPS SSL certificates,"
+echo ">> which can be a very time-consuming job."
+exit 0
+EOF
 }

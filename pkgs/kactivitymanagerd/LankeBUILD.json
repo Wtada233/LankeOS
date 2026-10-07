@@ -26,6 +26,7 @@
   "build_deps": [
     "base-devel",
     "boost",
+    "cmake",
     "extra-cmake-modules",
     "kf-kconfig",
     "kf-kcoreaddons",
@@ -35,6 +36,7 @@
     "kf-kio",
     "kf-kservice",
     "kf-kxmlgui",
+    "ninja",
     "qt6-base"
   ],
   "sources": [

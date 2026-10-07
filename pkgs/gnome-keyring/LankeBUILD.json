@@ -36,6 +36,7 @@
     "libxslt",
     "linux-pam",
     "meson",
+    "ninja",
     "p11-kit"
   ],
   "sources": [

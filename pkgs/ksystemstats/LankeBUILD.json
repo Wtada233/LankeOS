@@ -26,6 +26,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kcoreaddons",
     "kf-kcrash",
@@ -36,6 +37,7 @@
     "libksysguard",
     "libnl",
     "lm_sensors",
+    "ninja",
     "qt6-base"
   ],
   "sources": [

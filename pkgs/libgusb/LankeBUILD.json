@@ -23,6 +23,7 @@
     "json-glib",
     "libusb",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

@@ -1,16 +1,17 @@
 {
   "name": "fast_float",
-  "version": "8.3.0",
+  "version": "8.3.1",
   "release": 1,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],
   "build_deps": [
     "base-devel",
-    "cmake"
+    "cmake",
+    "ninja"
   ],
   "sources": [
-    "https://github.com/fastfloat/fast_float/archive/refs/tags/v8.3.0.tar.gz"
+    "https://github.com/fastfloat/fast_float/archive/refs/tags/v8.3.1.tar.gz"
   ],
   "work_sources": []
 }

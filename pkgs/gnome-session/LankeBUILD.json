@@ -24,6 +24,7 @@
     "gnome-desktop",
     "libxslt",
     "meson",
+    "ninja",
     "xmlto"
   ],
   "sources": [

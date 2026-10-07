@@ -17,7 +17,8 @@
   "build_deps": [
     "base-devel",
     "libglvnd",
-    "meson"
+    "meson",
+    "ninja"
   ],
   "sources": [
     "https://archive.mesa3d.org/glu/glu-9.0.3.tar.xz"

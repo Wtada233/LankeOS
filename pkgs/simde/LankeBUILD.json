@@ -6,7 +6,8 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
-    "meson"
+    "meson",
+    "ninja"
   ],
   "sources": [
     "https://github.com/simd-everywhere/simde/archive/refs/tags/v0.8.2.tar.gz"

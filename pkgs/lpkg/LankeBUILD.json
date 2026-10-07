@@ -1,7 +1,7 @@
 {
   "name": "lpkg",
   "version": "8.0.0",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],
@@ -10,7 +10,7 @@
     "docker"
   ],
   "sources": [
-    "https://github.com/Wtada233/LankeOS/archive/5e9934381b00814affd10f0e999d3121be0fd7b9.zip"
+    "https://github.com/Wtada233/LankeOS/archive/7851b9988827eb30ca9916766d62832866e1f8ba.zip"
   ],
   "work_sources": [],
   "no_strip": true

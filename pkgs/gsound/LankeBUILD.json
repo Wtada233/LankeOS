@@ -21,6 +21,7 @@
     "gtk-doc",
     "libcanberra",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

@@ -46,6 +46,7 @@
     "libtiff",
     "libwebp",
     "meson",
+    "ninja",
     "pango",
     "poppler",
     "vala"

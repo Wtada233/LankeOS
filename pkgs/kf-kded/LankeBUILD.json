@@ -19,6 +19,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kconfig",
     "kf-kcoreaddons",
@@ -26,6 +27,7 @@
     "kf-kdbusaddons",
     "kf-kdoctools",
     "kf-kservice",
+    "ninja",
     "qt6-base"
   ],
   "sources": [

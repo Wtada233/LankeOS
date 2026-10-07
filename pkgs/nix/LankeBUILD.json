@@ -67,6 +67,7 @@
     "libseccomp",
     "libsodium",
     "meson",
+    "ninja",
     "nlohmann-json",
     "readline",
     "sqlite",

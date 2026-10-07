@@ -1,6 +1,6 @@
 {
   "name": "hunspell",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -10,7 +10,7 @@
     "libm.so.6",
     "libncursesw.so.6",
     "libreadline.so.8",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.5,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.9}"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.5,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "libhunspell-1.7.so",
@@ -22,7 +22,7 @@
     "readline"
   ],
   "sources": [
-    "https://github.com/hunspell/hunspell/releases/download/v1.7.4/hunspell-1.7.4.tar.gz"
+    "https://github.com/hunspell/hunspell/releases/download/v1.7.5/hunspell-1.7.5.tar.gz"
   ],
   "work_sources": []
 }

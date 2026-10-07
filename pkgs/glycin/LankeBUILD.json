@@ -1,6 +1,6 @@
 {
   "name": "glycin",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "release": 1,
   "deps": [
     "bubblewrap"
@@ -43,11 +43,12 @@
     "libseccomp",
     "llvm",
     "meson",
+    "ninja",
     "rust",
     "vala"
   ],
   "sources": [
-    "https://download.gnome.org/sources/glycin/2.2/glycin-2.2.1.tar.xz"
+    "https://download.gnome.org/sources/glycin/2.2/glycin-2.2.2.tar.xz"
   ],
   "work_sources": []
 }

@@ -48,6 +48,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kauth",
     "kf-kconfig",
@@ -65,6 +66,7 @@
     "libnl",
     "libpcap",
     "lm_sensors",
+    "ninja",
     "qt5compat",
     "qt6-base",
     "qt6-declarative",

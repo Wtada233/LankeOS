@@ -20,11 +20,13 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "kf-kcoreaddons",
     "kf-knotifications",
     "kf-kwidgetsaddons",
+    "ninja",
     "python-build",
     "python-setuptools",
     "qt6-base",

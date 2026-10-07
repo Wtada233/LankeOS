@@ -16,7 +16,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "meson"
+    "meson",
+    "ninja"
   ],
   "sources": [
     "https://github.com/open-source-parsers/jsoncpp/archive/1.9.8/jsoncpp-1.9.8.tar.gz"

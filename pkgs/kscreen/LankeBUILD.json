@@ -34,6 +34,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kcmutils",
     "kf-kconfig",
@@ -52,6 +53,7 @@
     "libx11",
     "libxcb",
     "libxi",
+    "ninja",
     "plasma5support",
     "qt6-base",
     "qt6-declarative",

@@ -21,9 +21,11 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "libx11",
+    "ninja",
     "plasma-wayland-protocol",
     "python-build",
     "python-setuptools",

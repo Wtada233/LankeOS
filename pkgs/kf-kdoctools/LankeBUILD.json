@@ -21,6 +21,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "docbook-xsl",
     "doxygen",
     "extra-cmake-modules",
@@ -28,6 +29,7 @@
     "kf-ki18n",
     "libxml2",
     "libxslt",
+    "ninja",
     "perl-uri",
     "qt6-base",
     "qt6-tools"

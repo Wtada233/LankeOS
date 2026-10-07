@@ -25,8 +25,10 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "libxcb",
+    "ninja",
     "plasma-wayland-protocol",
     "qt6-base",
     "qt6-tools",

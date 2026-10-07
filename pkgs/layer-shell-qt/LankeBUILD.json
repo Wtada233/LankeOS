@@ -19,7 +19,9 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "wayland",

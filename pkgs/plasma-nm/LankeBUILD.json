@@ -55,6 +55,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "glib",
     "kf-kcmutils",
@@ -80,6 +81,7 @@
     "kf-solid",
     "kirigami-addons",
     "libplasma",
+    "ninja",
     "plasma-workspace",
     "qcoro",
     "qt6-base",

@@ -37,6 +37,7 @@
     "libusb",
     "libxml2",
     "meson",
+    "ninja",
     "polkit",
     "udisks2"
   ],

@@ -39,6 +39,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "glib",
     "kf-kcmutils",
@@ -57,6 +58,7 @@
     "libcanberra",
     "libplasma",
     "libpulse",
+    "ninja",
     "plasma-workspace",
     "pulseaudio-qt",
     "qt6-base",

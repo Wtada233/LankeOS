@@ -1,21 +1,20 @@
 {
   "name": "cups",
-  "version": "2.4.19",
+  "version": "2.4.20",
   "release": 2,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "libacl.so.1@ACL_1.0",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.36,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
-    "libcrypt.so.2",
-    "libcrypto.so.3@OPENSSL_3.0.0",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.36,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libdbus-1.so.3@LIBDBUS_1_3",
     "libgcc_s.so.1@GCC_3.0",
+    "libgnutls.so.30@GNUTLS_3_4",
     "libm.so.6@GLIBC_2.38",
     "libpam.so.0@LIBPAM_1.0",
-    "libssl.so.3@OPENSSL_3.0.0",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.8,GLIBCXX_3.4}",
+    "libpaper.so.2",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4}",
     "libsystemd.so.0@LIBSYSTEMD_209",
     "libz.so.1@ZLIB_1.2.0"
   ],
@@ -30,12 +29,13 @@
     "base-devel",
     "dbus",
     "gnutls",
+    "libpaper",
     "libxcrypt",
     "linux-pam",
     "zlib"
   ],
   "sources": [
-    "https://github.com/OpenPrinting/cups/releases/download/v2.4.19/cups-2.4.19-source.tar.gz"
+    "https://github.com/OpenPrinting/cups/releases/download/v2.4.20/cups-2.4.20-source.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

@@ -21,11 +21,13 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-karchive",
     "libavif",
     "libheif",
     "libjxl",
+    "ninja",
     "openjpeg",
     "qt6-base"
   ],

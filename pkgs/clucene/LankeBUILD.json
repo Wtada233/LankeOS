@@ -22,6 +22,7 @@
     "base-devel",
     "cmake",
     "boost",
+    "ninja",
     "zlib"
   ],
   "sources": [

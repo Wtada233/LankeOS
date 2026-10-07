@@ -26,6 +26,7 @@
     "gtk4",
     "libadwaita",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

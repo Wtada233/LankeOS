@@ -14,7 +14,8 @@
   ],
   "build_deps": [
     "base-devel",
-    "cmake"
+    "cmake",
+    "ninja"
   ],
   "sources": [
     "https://github.com/mity/md4c/archive/release-0.5.3.tar.gz"

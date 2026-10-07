@@ -20,8 +20,10 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "llvm",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-svg",

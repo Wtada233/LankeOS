@@ -21,6 +21,7 @@
     "glib",
     "gtk-doc",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

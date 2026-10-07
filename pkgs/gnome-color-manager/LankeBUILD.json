@@ -29,6 +29,7 @@
     "itstool",
     "lcms2",
     "meson",
+    "ninja",
     "pango"
   ],
   "sources": [

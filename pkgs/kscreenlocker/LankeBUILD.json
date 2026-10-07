@@ -46,6 +46,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kcmutils",
     "kf-kconfig",
@@ -70,6 +71,7 @@
     "libxcb",
     "libxi",
     "linux-pam",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "wayland",

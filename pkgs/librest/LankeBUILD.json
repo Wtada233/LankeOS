@@ -27,6 +27,7 @@
     "libsoup",
     "libxml2",
     "meson",
+    "ninja",
     "vala"
   ],
   "sources": [

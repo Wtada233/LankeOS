@@ -1,6 +1,6 @@
 {
   "name": "krita",
-  "version": "6.0.4",
+  "version": "6.0.4.1",
   "release": 5,
   "deps": [],
   "needed_so": [
@@ -194,7 +194,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.kde.org/stable/krita/6.0.4/krita-6.0.4.tar.xz"
+    "https://download.kde.org/stable/krita/6.0.4.1/krita-6.0.4.1.tar.xz"
   ],
   "work_sources": [],
   "farm_flags": [

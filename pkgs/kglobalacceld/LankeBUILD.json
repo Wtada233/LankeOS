@@ -31,6 +31,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kconfig",
     "kf-kcoreaddons",
@@ -43,6 +44,7 @@
     "kf-kwindowsystem",
     "libx11",
     "libxcb",
+    "ninja",
     "qt6-base",
     "xcb-util-keysyms"
   ],

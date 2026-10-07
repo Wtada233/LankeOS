@@ -1,6 +1,6 @@
 {
   "name": "kirigami-app-components",
-  "version": "1.0.2",
+  "version": "1.1.1",
   "release": 4,
   "deps": [
     "kf-kcoreaddons",
@@ -26,17 +26,19 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kconfig",
     "kf-kguiaddons",
     "kf-ki18n",
     "kf-kirigami",
     "kf-kitemmodels",
+    "ninja",
     "qt6-base",
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/kirigami-app-components/kirigami-app-components-1.0.2.tar.xz"
+    "https://download.kde.org/stable/kirigami-app-components/kirigami-app-components-1.1.1.tar.xz"
   ],
   "work_sources": []
 }

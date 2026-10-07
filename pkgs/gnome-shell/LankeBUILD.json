@@ -85,6 +85,7 @@
     "meson",
     "mutter",
     "networkmanager",
+    "ninja",
     "pango",
     "pipewire",
     "polkit",

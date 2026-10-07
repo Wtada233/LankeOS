@@ -23,6 +23,7 @@
     "glib",
     "gobject-introspection",
     "meson",
+    "ninja",
     "python-gobject",
     "vala"
   ],

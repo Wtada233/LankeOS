@@ -24,11 +24,13 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "libx11",
     "libxcb",
     "libxfixes",
+    "ninja",
     "plasma-wayland-protocol",
     "qt6-base",
     "qt6-declarative",

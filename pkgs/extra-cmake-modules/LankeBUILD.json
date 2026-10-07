@@ -4,6 +4,7 @@
   "release": 3,
   "deps": [
     "bash",
+    "cmake",
     "python"
   ],
   "needed_so": [],

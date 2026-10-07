@@ -18,6 +18,7 @@
     "glib",
     "libgudev",
     "meson",
+    "ninja",
     "polkit",
     "upower"
   ],

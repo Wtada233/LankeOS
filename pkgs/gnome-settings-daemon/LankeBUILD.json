@@ -63,6 +63,7 @@
     "meson",
     "modemmanager",
     "networkmanager",
+    "ninja",
     "p11-kit",
     "polkit",
     "upower"

@@ -33,6 +33,7 @@
     "gtk3",
     "gtk4",
     "meson",
+    "ninja",
     "qt6-base",
     "vala"
   ],

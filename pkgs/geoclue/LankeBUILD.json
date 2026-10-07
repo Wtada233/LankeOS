@@ -29,6 +29,7 @@
     "libsoup",
     "meson",
     "modemmanager",
+    "ninja",
     "vala"
   ],
   "sources": [

@@ -26,10 +26,12 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "libxau",
     "libxcb",
     "linux-pam",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-tools",

@@ -1,20 +1,18 @@
 {
   "name": "libqalculate",
-  "version": "5.12.0",
+  "version": "5.13.1",
   "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.9}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
     "libcurl.so.4",
     "libgcc_s.so.1@GCC_3.0",
     "libgmp.so.10",
-    "libhistory.so.8",
     "libicuuc.so.78",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
     "libmpfr.so.6",
-    "libncursesw.so.6",
     "libreadline.so.8",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.5,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.15,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.29,GLIBCXX_3.4.31,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.5,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.15,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libxml2.so.16"
   ],
   "provides_soname": [
@@ -35,6 +33,7 @@
     "readline"
   ],
   "sources": [
-    "https://github.com/Qalculate/libqalculate/releases/download/v5.12.0/libqalculate-5.12.0.tar.gz"
-  ]
+    "https://github.com/Qalculate/libqalculate/releases/download/v5.13.1/libqalculate-5.13.1.tar.gz"
+  ],
+  "work_sources": []
 }

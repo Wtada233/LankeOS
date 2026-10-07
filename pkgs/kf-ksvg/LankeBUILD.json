@@ -25,6 +25,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "doxygen",
     "extra-cmake-modules",
     "kf-karchive",
@@ -33,6 +34,7 @@
     "kf-kcoreaddons",
     "kf-kguiaddons",
     "kf-kirigami",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "qt6-svg",

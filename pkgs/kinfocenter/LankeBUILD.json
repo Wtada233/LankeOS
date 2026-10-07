@@ -35,6 +35,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "glu",
     "iproute2",
@@ -54,6 +55,7 @@
     "libpulse",
     "libusb",
     "lm_sensors",
+    "ninja",
     "qt6-base",
     "qt6-declarative",
     "systemsettings",

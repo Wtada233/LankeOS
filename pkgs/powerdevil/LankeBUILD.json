@@ -47,6 +47,7 @@
   ],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kauth",
     "kf-kcmutils",
@@ -68,6 +69,7 @@
     "libkscreen",
     "libplasma",
     "libxcb",
+    "ninja",
     "plasma-activities",
     "plasma-wayland-protocol",
     "plasma-workspace",

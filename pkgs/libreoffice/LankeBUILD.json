@@ -1,14 +1,13 @@
 {
   "name": "libreoffice",
-  "version": "26.8.0.3",
-  "release": 6,
+  "version": "26.8.1.1",
+  "release": 7,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libCbcSolver.so.3",
     "libCoinMP.so.1",
     "libICE.so.6",
-    "libKF6ConfigCore.so.6",
     "libKF6KIOFileWidgets.so.6",
     "libQt6Core.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
@@ -90,7 +89,7 @@
     "libpangocairo-1.0.so.0",
     "libplc4.so",
     "libpng16.so.16@PNG16_0",
-    "libpoppler.so.164@POPPLER_164",
+    "libpoppler.so.165@POPPLER_165",
     "libpq.so.5",
     "libpython3.14.so.1.0",
     "libqxp-0.0.so.0",
@@ -236,9 +235,9 @@
     "zstd"
   ],
   "sources": [
-    "https://download.documentfoundation.org/libreoffice/src/26.8.0/libreoffice-26.8.0.3.tar.xz",
-    "https://download.documentfoundation.org/libreoffice/src/26.8.0/libreoffice-help-26.8.0.3.tar.xz",
-    "https://download.documentfoundation.org/libreoffice/src/26.8.0/libreoffice-translations-26.8.0.3.tar.xz"
+    "https://download.documentfoundation.org/libreoffice/src/26.8.1/libreoffice-26.8.1.1.tar.xz",
+    "https://download.documentfoundation.org/libreoffice/src/26.8.1/libreoffice-help-26.8.1.1.tar.xz",
+    "https://download.documentfoundation.org/libreoffice/src/26.8.1/libreoffice-translations-26.8.1.1.tar.xz"
   ],
   "work_sources": [
     "https://dev-www.libreoffice.org/src/a7983f859eafb2677d7ff386a023bc40-xsltml_2.1.2.zip",

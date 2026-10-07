@@ -13,6 +13,7 @@
     "base-devel",
     "glib",
     "meson",
+    "ninja",
     "python-gobject"
   ],
   "sources": [

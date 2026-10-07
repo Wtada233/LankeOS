@@ -15,12 +15,14 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "cmake",
     "extra-cmake-modules",
     "kf-kcoreaddons",
     "kf-kdbusaddons",
     "kf-kdoctools",
     "kf-knotifications",
     "kf-kpty",
+    "ninja",
     "qt6-base"
   ],
   "sources": [

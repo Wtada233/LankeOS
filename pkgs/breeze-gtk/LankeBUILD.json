@@ -8,7 +8,9 @@
   "build_deps": [
     "base-devel",
     "breeze",
+    "cmake",
     "extra-cmake-modules",
+    "ninja",
     "python-cairo",
     "sassc"
   ],

@@ -1,6 +1,6 @@
 {
   "name": "linux",
-  "version": "7.2.8",
+  "version": "7.2.9",
   "release": 4,
   "deps": [],
   "needed_so": [],
@@ -17,7 +17,7 @@
     "zstd"
   ],
   "sources": [
-    "https://www.kernel.org/pub/linux/kernel/v7.x/linux-7.2.8.tar.gz"
+    "https://www.kernel.org/pub/linux/kernel/v7.x/linux-7.2.9.tar.gz"
   ],
   "work_sources": [],
   "no_strip": true
