@@ -853,6 +853,87 @@ TEST_F(StripTest, ArchiveWithUnreferencedLongNameTableIsNotLeftWithStaleIndex)
 }
 
 /**
+ * **回归（2026-10-07）**：带长名成员的静态库必须**按成员顺序一致地**走"有意跳过"那条路 ——
+ * 不剥、**静默**（不告警）、一个字节不动。
+ *
+ * 病因是判据**与成员顺序相关**：>15 字节的成员名在归档里存成 `//` 长名表 + `/N` 引用，真名要
+ * 经 libarchive 解析之后才看得见；而 `archive_strip_scan` 一发现"某个 `.o` strip 后会变短"就
+ * 直接收工（当时只为省掉一次全量预扫）⇒ **短名 `.o` 排在长名成员之前**的库会漏判，一路走到
+ * `process_archive` 的原始布局扫描（`scan_ar_raw_layout`），那里又把 `/N` 当成"不是我们认得的
+ * 形态" ⇒ 填 `error.strip_archive_broken`（"Static library is malformed…"）⇒ 调用方**告警**。
+ *
+ * 实测命中（2026-10-07）：llvm 的 `libLLVMSupport.a`（第 3 个成员是短名 `blake3.c.o`）与
+ * `libLLVMDemangle.a`（`Demangle.cpp.o`）每次构建各刷一条假警告；同族的 `libLLVMTableGen.a`
+ * 第 3 个成员就是 `/0`（真名 `DetailedRecordsBackend.cpp.o`，27 字节）⇒ 预扫期就静默跳过。
+ * **同一个包、同一种库，差别只在成员排列。**
+ *
+ * 期望：两种排列都（a）不剥 —— libarchive 的 ar 写入器写不了 >15 字节的名字，长名归档是 lpkg
+ * **有意不支持**的形态；（b）**静默**；（c）原样留着。
+ */
+TEST_F(StripTest, LongNameMemberIsSkippedSilentlyRegardlessOfMemberOrder)
+{
+    init_localization();  // 下面失败时要把 `error_msg` 的**原文**打出来，不是 [MISSING_STRING]
+    if (!compile_test_object()) GTEST_SKIP() << "gcc not available";
+
+    // **前置条件**：这份 `.o` 在 lpkg 手里确实会变短 —— 否则预扫不会提前收工，这条用例就测
+    // 不到"顺序"这个变量（修前也是绿的 = 一条恒真断言）。
+    {
+        const off_t size_before = fs::file_size(test_file);
+        std::string msg;
+        ASSERT_TRUE(strip_file(test_file, msg)) << msg;
+        ASSERT_LT(fs::file_size(test_file), size_before)
+            << "前置条件：构造用的 .o 必须 strip 后变短（否则判据没有区分力）";
+    }
+    ASSERT_TRUE(compile_test_object());  // 重新编一份，作为归档成员的内容
+    std::ifstream obj_stream(test_file, std::ios::binary);
+    const std::string obj((std::istreambuf_iterator<char>(obj_stream)),
+                          std::istreambuf_iterator<char>());
+    ASSERT_FALSE(obj.empty());
+
+    // 长名成员的真名放进 `//` 长名表，成员头里只写 `/0`（GNU/SVR4 的长名引用写法）。
+    const auto build = [&](bool long_name_first) {
+        std::vector<ArMember> members = {ArMember{"/", make_ar_index(0)},
+                                         ArMember{"//", "very_long_member_name.cpp.o/\n"}};
+        const ArMember short_member{"short.cpp.o", obj};
+        const ArMember long_member{"/0", "not an elf"};
+        members.push_back(long_name_first ? long_member : short_member);
+        members.push_back(long_name_first ? short_member : long_member);
+        const auto offs = ar_member_offsets(members);
+        // 索引指向那个会变短的短名成员 —— 修前正是它让预扫提前收工
+        members[0].data = make_ar_index(offs[long_name_first ? 3 : 2]);
+        return build_ar(members);
+    };
+
+    for (const bool long_name_first : {false, true}) {
+        const std::string label = long_name_first ? "长名在前" : "长名在后";
+        const fs::path archive_file =
+            test_file.string() + (long_name_first ? "_ln_first.a" : "_ln_last.a");
+        const std::string original = build(long_name_first);
+        ASSERT_FALSE(original.empty()) << label;
+        write_file(archive_file, original);
+
+        std::string error_msg;
+        const bool stripped = strip_file(archive_file, error_msg);
+
+        EXPECT_FALSE(stripped) << label << "：长名成员 ∈ lpkg 有意不支持的形态 ⇒ 整个库不剥";
+        EXPECT_TRUE(error_msg.empty())
+            << label
+            << "：有意跳过必须**静默**（调用方只在 error_msg 非空时告警）—— 长名在后的排列"
+               "此前拿到的是 error.strip_archive_broken（\"Static library is malformed…\"），"
+               "对一份完全正常的 GNU ar 是假指控： "
+            << error_msg;
+        std::ifstream after_stream(archive_file, std::ios::binary);
+        const std::string after((std::istreambuf_iterator<char>(after_stream)),
+                                std::istreambuf_iterator<char>());
+        EXPECT_EQ(after, original) << label << "：有意跳过的库必须原样留着（一个字节都不许动）";
+        EXPECT_FALSE(fs::exists(archive_file.string() + ".tmp")) << label << "：不得留下暂存产物";
+
+        std::error_code rm_ec;
+        fs::remove(archive_file, rm_ec);
+    }
+}
+
+/**
  * **回归（2026-10-03）**：BSD `__.SYMDEF`（ranlib 表）**认不出来就整个库不剥** ——
  * 维护者定的原则是"lpkg 不产出错误产物"。它记录的也是"符号 → 字节偏移"，成员一变短就失效；
  * 而它的数值字段是**宿主字节序**（bfd 自己的注释："Probably we're using the wrong byte

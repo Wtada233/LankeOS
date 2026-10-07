@@ -954,6 +954,17 @@ static bool ar_member_declared_size_ok(la_int64_t declared, uint64_t archive_siz
  * 而且**继续写下去的成员会被静默丢掉**（实测：长名成员在输出里整个消失，只剩后面的）。
  * 这种库我们不碰、原样留着。这是**工具的固有限制**而不是错误，所以不告警（否则 llvm 那种
  * 一堆 `libclang_rt.*.a`（成员名如 `asan_preinit.cpp.o`）每次构建都会刷屏）。
+ *
+ * ⚠️ **这条判据必须与成员顺序无关**（2026-10-07 修）。>15 字节的名字在归档里是 `//` 长名表
+ * + `/N` 引用，**真名要经 libarchive 解析之后才看得见** ⇒ 提前收工绝不能发生在还没看完所有
+ * 名字的时候。此前"判定要重写"时直接 `break`，于是"短名 `.o` 排在长名成员**之前**"的库会
+ * 漏判：它带着 `//` 表继续走到 `process_archive`（判 `index_invalid`）→ 原始布局扫描
+ * `scan_ar_raw_layout` → 那里把 `/N` 当成"认不出的形态" ⇒ 填
+ * `error.strip_archive_broken`（"Static library is malformed…"）⇒ 调用方**告警**。
+ * 实测：llvm 的 `libLLVMSupport.a`（第 3 个成员是短名 `blake3.c.o`）与 `libLLVMDemangle.a`
+ * （`Demangle.cpp.o`）每次构建各刷一条假警告，而同族的 `libLLVMTableGen.a` 第 3 个成员就是
+ * `/0`（真名 `DetailedRecordsBackend.cpp.o`）⇒ 静默跳过 —— **同一个包、同一种库，只差排列**。
+ * 现在已知"要重写"后仍走完成员表，但只查名字（`archive_read_data_skip`，不读数据、不再试剥）。
  */
 static int archive_strip_scan(const fs::path& path, std::string& error_msg,
                               bool& has_long_name_table)
@@ -996,6 +1007,12 @@ static int archive_strip_scan(const fs::path& path, std::string& error_msg,
             result = -1;  // 写不出来 → 整个库放弃（有意，不告警：见函数注释）
             break;
         }
+        // 已经判定"要重写"：剩下成员**只需要继续查名字**（上面那条长名判据），不必再读数据、
+        // 也不必再试剥 —— 判据必须与成员顺序无关，见函数头那段。跳过数据而不是读出来。
+        if (result == 1) {
+            archive_read_data_skip(a);
+            continue;
+        }
         // 归档自报尺寸是**不可信输入**：先在分配之前判掉（见 `ar_member_declared_size_ok`）。
         const la_int64_t declared = archive_entry_size(entry);
         if (!ar_member_declared_size_ok(declared, archive_size)) {
@@ -1015,8 +1032,8 @@ static int archive_strip_scan(const fs::path& path, std::string& error_msg,
             std::vector<uint8_t> stripped;
             std::string inner;
             if (strip_elf_data(data, stripped, inner, path.string()) && stripped.size() != size) {
+                // 不 `break`：还要走完剩下的成员名（长名判据必须与成员顺序无关，见函数头）。
                 result = 1;
-                break;  // 已足以判定"要重写"，不必读完
             }
         }
     }
@@ -1110,7 +1127,14 @@ struct ArRawLayout {
  * @brief 按 60 字节成员头线性走一遍原归档（不读内容成员，只读索引成员的数据）。
  *
  * 走完必须**恰好**落在文件末尾（`pos == file_size`）才算 `ok` —— 尾部有残留说明布局不是
- * 我们认得的形态（长名引用 `/123`、非标准填充……），此时索引偏移不可信，宁可退回丢弃。
+ * 我们认得的形态（非标准填充之类），此时索引偏移不可信，宁可退回丢弃。
+ *
+ * ⚠️ **`/N` 长名引用不再算"认不出的形态"**（2026-10-07 订正：原文把它与"非标准填充"并列，
+ * 那是错的 —— `/N` 是 GNU/SVR4 ar 的**标准**长名引用写法，只是本函数按 `name` 字面量判而已，
+ * 各成员头的 60 字节布局与它无关）。合法归档里它到不了这里：`archive_strip_scan` 会在**所有**
+ * 成员上判完 >15 字节的长名（判据与顺序无关，见那里的说明），命中的库整库静默跳过。
+ * 于是走到这里只可能是那张 `//` 表**解析不出真名**（悬空/损坏的引用）—— 那种库确实是畸形，
+ * 调用方的"Static library is malformed"是**如实**的。
  */
 static ArRawLayout scan_ar_raw_layout(const fs::path& path, uint64_t file_size)
 {
@@ -1133,7 +1157,10 @@ static ArRawLayout scan_ar_raw_layout(const fs::path& path, uint64_t file_size)
         if (name.size() > 1 && name.back() == '/' && name.front() != '/') name.pop_back();
         if (!name.empty() && name.front() == '/' && name != kArIndexName &&
             name != kArIndex64Name && name != kArLongNameTable)
-            return out;  // `/123`（长名表引用）之类：不是我们认得的形态
+            // `/N` = `//` 长名表里的偏移引用（标准写法，见函数头）。libarchive 解析得出真名的
+            // 归档在预扫期就按"长名 → 有意跳过"处理掉了，走到这里的是**解析不出真名**的悬空
+            // 引用 ⇒ 畸形归档，如实拒绝。
+            return out;
 
         uint64_t size = 0;
         for (int i = 48; i < 58; ++i) {

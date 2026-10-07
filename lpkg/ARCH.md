@@ -2524,6 +2524,8 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
 ③ 成员名 > 15 字节 ⇒ GNU/SVR4 ar 的名字字段装不下、libarchive 的 ar 写入器写不出来
 （实测它会让 `archive_write_header` 失败，**且继续写下去的成员会被静默丢掉**），
 整个库**有意放弃、原样保留**且**不告警**（llvm 那种一堆 `libclang_rt.*.a` 否则每次构建刷屏）。
+> ⚠️ **订正 2026-10-07**：上面 ③ 的**实现**当时与**成员顺序**相关（短名 `.o` 排在长名成员之前
+> 就漏判、进而报"malformed"），已在 §22 修掉。规则本身没变 —— 变的是它现在**真的**成立。
 顺带：`process_archive` 的 `error_msg` 此前是 `[[maybe_unused]]`、**任何失败都不出声**
 （`strip_binary` 的告警判据是 `!strip_file(...) && !error_msg.empty()`）—— 现在真失败都会填。
 
@@ -3181,6 +3183,63 @@ rollback 自身断电:
   → rec: 跳过全部 RESTORE_* 行, 只按"备份/目标还在不在"继续逆向其余正向行
   → COMMIT_PKGS
 ```
+
+---
+
+## 22. 2026-10-07：静态库"长名成员"判据必须与**成员顺序无关**
+
+**症状**（用户报告）：`llvm` 每次构建刷两条假警告 ——
+
+```
+Warning: Failed to strip file …/libLLVMSupport.a: Static library is malformed, or cannot be read/rewritten
+Warning: Failed to strip file …/libLLVMDemangle.a: Static library is malformed, or cannot be read/rewritten
+```
+
+而这两个库完全正常：标准 GNU/SVR4 ar（`llvm-ar` 写的，`//` 长名表 + `/0` 偏移引用 —— LLVM 的
+源文件名超过 ar 的 15 字节上限）。同族的 `libLLVMTableGen.a` / `libLLVMHTTP.a` / `libLLVMDebuginfod.a`
+同样含长名成员，却**一声不响**。
+
+**根因**：同一条策略在**两条腿上判**，其中一条漏判（详见 §15(a) ③ 的订正块）：
+
+1. `archive_strip_scan` 判长名 —— 但 >15 字节的名字在归档里是 `//` 长名表 + `/N` 引用，**真名要
+   经 libarchive 解析之后才看得见**；而它一发现"某个 `.o` strip 后会变短"就 `break` 收工（当时
+   只为省掉一次全量预扫）。于是"短名 `.o` 排在长名成员**之前**"的库，从头到尾没见过那个长名：
+   `libLLVMSupport.a` 第 3 个成员是短名 `blake3.c.o`、`libLLVMDemangle.a` 是 `Demangle.cpp.o`
+   ⇒ 预扫在**那里**收工；而 `libLLVMTableGen.a` 第 3 个成员就是 `/0`（真名
+   `DetailedRecordsBackend.cpp.o`，27 字节）⇒ 预扫期就静默跳过。**差别只在成员排列。**
+2. 漏判之后，归档带着 `//` 表进 `process_archive`（判 `index_invalid`）⇒ 原始布局扫描
+   `scan_ar_raw_layout` ⇒ 它把 `/N` 当成"不是我们认得的形态"而 `return out` ⇒
+   `error.strip_archive_broken` ⇒ 调用方**告警**。而那份归档**一个字节都没被动过**（拒绝发生在
+   写任何东西之前），实际代价只是"没剥"。
+
+**现行规则（两处改动）**：
+
+- **长名判据与成员顺序无关**：已知"要重写"后**仍走完成员表**，但只查名字
+  （`archive_read_data_skip` —— 不读数据、不再试剥）。
+- `scan_ar_raw_layout` 里对 `/N` 的**拒绝保留**（lpkg **有意不处理**长名归档，libarchive 的 ar
+  写入器写不了 >15 字节的名字 —— 别去"扩展支持"它），但注释改成**如实**表述：合法归档到不了
+  那里（预扫已按长名跳过），能到那里的只可能是那张 `//` 表**解析不出真名**（悬空/损坏的引用）
+  ⇒ 那种库确实是畸形，那句 "malformed" 是**如实**的。
+
+**实测**（2026-10-07，把真实产物喂给修后的 `strip_file`，链接 `build/main/*.o` 的一次性探针）：
+
+| 库 | 修前 | 修后 |
+|---|---|---|
+| `libLLVMSupport.a` | 假告警（malformed） | 静默跳过，sha256 不变 |
+| `libLLVMDemangle.a` | 假告警（malformed） | 静默跳过，sha256 不变 |
+| `libLLVMTableGen.a` / `libLLVMHTTP.a` | 静默跳过 | 静默跳过（不变） |
+
+不剥的代价：这两个库的成员**没有任何 `.debug*` 节区**（Support 180 个 / Demangle 6 个全为 0），
+只有 `.comment`（每个约 96 字节）⇒ 合计约 17 KB / 0.5 KB。同形态的库本机还有一批
+（`libQt6Qml*.a`、`libaom.a`、`libimagequant.a` …），都走静默跳过那条腿。
+
+**测试**：`StripTest.LongNameMemberIsSkippedSilentlyRegardlessOfMemberOrder` —— 同一种库造**两种
+成员排列**，断言两者都（a）不剥、（b）`error_msg` 为空、（c）字节不变；并先钉住**前置条件**
+（构造用的 `.o` 必须 strip 后变短，否则这条用例测不到"顺序"这个变量 = 恒真断言）。修前实测红在
+"长名在后"那一格（`error.strip_archive_broken`），修后两格皆绿。
+
+**收口数字**：`make test` **1217 用例 / 144 套件 / 1216 通过 / 0 失败 / 1 跳过**（基线 1216/144，
++1 即本条用例），`make format-check` 222 文件 0 残留。
 
 ---
 
