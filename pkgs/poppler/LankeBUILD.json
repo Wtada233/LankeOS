@@ -48,6 +48,7 @@
   "build_deps": [
     "base-devel",
     "boost",
+    "brotli",
     "cairo",
     "cmake",
     "curl",
