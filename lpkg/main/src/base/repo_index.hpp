@@ -16,16 +16,12 @@
  * **两个消费者必须共用这一个解析器**：`repo/repository.cpp`（建包表）与
  * `pkg/depend_scanner.cpp`（建 needed_so 反图）。
  *
- * ⚠️ **订正 2026-10-04（8.0.0，破坏性）**：这里曾有两处兼容分叉 —— ① 行内第 3 段是
- * **包级 provides**，版本级为空时回退到它；② 版本块**容忍 4/5 字段**（旧写入器把 provides
- * 写在 `vh[3]`、不写 needed_so）。两者都已**删除**：字段现在是**恰好 6 个**，第 3 段没有了。
- * 保留这段历史的理由：当年正是"两份解析器字段数不一致"制造过一整类静默错误答案
- * （4 字段的行在 `depend remove` 侧被整行丢掉 → 反图缺边 → 报"无受影响包"）。
- * **不对旧格式做任何兼容读取**（维护者会 repack 全部包）——旧行会因为块字段数不是 6 而被
- * **拒绝**（不是被误读），索引因此解析出 0 个包、落 `warning.repo_index_empty`，**响亮地失败**。
+ * ⚠️ 版本块**恰好 6 个字段**（`ver:hash:deps:provides:provides_soname:needed_so`）。
+ * 不对旧格式做兼容读取 —— 旧行因字段数不是 6 被**拒绝**（不是被误读），索引解析出 0 个包、
+ * 落 `warning.repo_index_empty`，**响亮地失败**。
  */
 struct RepoIndexVersionBlock {
-    std::string name;             ///< 行首的包名
+    std::string name;
     std::string version;          ///< vh[0]
     std::string hash;             ///< vh[1]，可为空（LankeBUILD 直出的索引不带哈希）
     std::string deps;             ///< vh[2] 原始串：逗号连接，复合约束需调用方再合并

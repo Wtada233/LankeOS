@@ -1,5 +1,5 @@
 /**
- * test_soname_remove_refresh.cpp — 升级/删除后 SONAME 链接必须跟着变（缺陷 ④ 的集成侧）
+ * test_soname_remove_refresh.cpp — 升级/删除后 SONAME 链接必须跟着变
  *
  * 两条链路缺一不可：
  *   升级：同 SONAME、不同文件名（libfoo.so.1.2.3 → libfoo.so.1.4.5）时，旧链接指向的

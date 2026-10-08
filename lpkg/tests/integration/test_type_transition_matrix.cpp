@@ -22,10 +22,9 @@
  * 语义搅成"这格的差异来自类型转换还是来自 /etc 政策"。`/etc` 的差异行为在本文件末尾单独记录：
  *   · file → dir   （EtcFileToDirKeepsLpkgsave）、file → symlink（EtcFileToSymlinkGoesToLpkgnew）
  *   · dir → file / dir → symlink（EtcDirToFileKeepsLpkgsaveDir / EtcDirToSymlinkKeepsLpkgsaveDir）
- *     这两格曾经是**实测出来的缺陷**：`/etc` 的 dir → 非目录 根本装不上（详见那两条用例的注释）。
+ *     这两格曾经是**缺陷**：`/etc` 的 dir → 非目录 根本装不上（详见那两条用例的注释）。
  *     已于 `9e91f2ba` 修好（决策表给这一格 `let_go = SaveConfig` + `write = WriteInPlace`），
- *     两条用例现在**是绿的**。（订正 2026-09-26：本行此前写"它们目前是红的，红即缺陷仍在"
- *     —— 那是修好之前的记录，别再照着它判断现状。）
+ *     两条用例现在**是绿的**。
  *
  * ── 为什么每格的 v2 都额外带一个普通文件 `usr/share/companion.txt` ─────────────
  * 断点 `copy_after_wal_<pkg>` 只挂在**普通文件**的 COPY 分支上（installation_task.cpp 的
@@ -34,9 +33,9 @@
  * 于是"v2 新形态只有符号链接"的格子（FileToSymlink / SymlinkToSymlink）根本够不到这个断点
  * —— 那不是被测语义失败，而是"这一格的失败注入没生效"，会把测试变成假红。
  * 让每个 v2 都带一个必然走 COPY 分支的普通文件，9 格才在**同一套注入手法**下可比。
- * （**订正 2026-09-26**：这里原记"符号链接条目的落位没有任何断点，该窗口不可测"—— 第③步已补
- *   `symlink_after_wal_<pkg>`（`NEW` 行已落、`create_symlink` 未做）与 `newdir_after_wal_<pkg>`，
- *   覆盖它们的用例见 `tests/integration/test_unstash_primitive.cpp`。）
+ * （符号链接 / 目录的落位窗口另有 `symlink_after_wal_<pkg>`（`NEW` 行已落、`create_symlink`
+ *   未做）与 `newdir_after_wal_<pkg>` 断点，用例见
+ * `tests/integration/test_unstash_primitive.cpp`。）
  *
  * ── dir → 非目录（DirToFile / DirToSymlink）的**放行条件** ────────────────────
  * 归档条目是**非目录**、盘上是**真目录**时，`collect_content_conflicts` 的类型变更分支走
@@ -53,7 +52,7 @@
  * `a.txt` 的内容）—— 那才是在考**类型转换本身**。"目录里有无主内容 → 拒绝"是反方向的语义，
  * 由本文件 `DirToFileWithUnownedContentIsRefused` /
  * `DirToFileWithForeignPackageContentIsRefused` 两格单独钉（同方向的 DirToFile 已由
- * test_dir_entry_over_symlink.cpp 的 OwnDirReplacedByFileTakesOverWithWalBackup 钉住）。
+ * test_dir_entry_over_symlink.cpp 的 OwnDirReplacedByFileTakesOverWithWalBackup 覆盖）。
  */
 
 #include <gtest/gtest.h>
@@ -384,7 +383,7 @@ TEST_F(TypeTransitionMatrixTest, FileToFile)
 }
 
 /**
- * file → dir（历史 TODO E4 的正方向；usr 与 /etc 两腿已分别由 test_dir_entry_over_symlink.cpp /
+ * file → dir（usr 与 /etc 两腿已分别由 test_dir_entry_over_symlink.cpp /
  * test_etc_dir_upgrade.cpp 覆盖）。这里补的是**回滚**维度：挡路文件已进 stash、目录已建、
  * 新文件正落位时失败 —— 旧文件必须逐字节回到原位，而不是"目录没了、文件也没了"。
  */
@@ -714,7 +713,7 @@ TEST_F(TypeTransitionMatrixTest, EtcFileToDirKeepsLpkgsave)
  * `/etc` 的 **file → symlink**：**类型变化** → 原物整份改名成 `/etc/foo.lpkgsave`，
  * 新链接**就地**落 `/etc/foo`。
  *
- * ── 本格 2026-09-26 换了语义（与 9 格里的同名迁移**现在一致了**）──────────────────
+ * ── 本格换了语义（与 9 格里的同名迁移**现在一致了**）──────────────────
  * 改前：链接条目"一律按配置冲突处理"—— 不接管 `/etc/foo`，用户那份普通文件**留原样**，
  * 新链接退到 `/etc/foo.lpkgnew` 等审阅（旧用例名 `EtcFileToSymlinkGoesToLpkgnew`）。
  * 那条规则的理由是"`is_directory` 会跟随链接，不管住就会绕过整段配置保护"—— 防的是
@@ -901,7 +900,7 @@ TEST_F(TypeTransitionMatrixTest, EtcSymlinkToSymlinkStaysLpkgnew)
 
 /**
  * **目标逐字节相同**的 symlink → symlink：盘上那份就是我们要的 ⇒ **一个字节都不碰**，
- * 连 `.lpkgnew` 都不产生（2026-10-02 修）。
+ * 连 `.lpkgnew` 都不产生。
  *
  * 上面那条用例钉"目标**不同** ⇒ 退 `.lpkgnew`"，这一条钉它的**边界**。旧实现**不看目标**、
  * 一律退 `.lpkgnew` —— 于是**链接压根没变的升级也吐一份同内容副本**，反复升级/重装就在
@@ -938,14 +937,14 @@ TEST_F(TypeTransitionMatrixTest, EtcSymlinkToSymlinkWithIdenticalTargetIsUntouch
 /**
  * **升级后新版本不再提供**该 `/etc` 配置 → 原物改名成 `.lpkgsave`（不再是"留原位不动"）。
  *
- * ── 本格 2026-09-26 换了语义（`DropOwnership` → `SaveConfigObsolete`）────────────────
+ * ── 本格换了语义（`DropOwnership` → `SaveConfigObsolete`）────────────────
  * 改前：废弃的 `/etc` 条目只撤所有权 + 撤配置哈希记录，**文件原地不动**（`DropOwnership`，
  * 决策表里那格注释写着"这正是 `/etc` 路径天然无法满足『盘面 == 新版本形态』的原因"）。
  * 改后：**只要一条路径会被彻底放弃，就把原物留成 `.lpkgsave`** —— 与"移除整包"侧
  * （`rm_save_conf_after_wal_`）和"类型变化"侧统一到同一条规则：`/etc` 下的东西
  * 永远不会被 lpkg 无声丢掉，也永远不会占着"新版本该用的那个名字"。
  *
- * 有意的**例外**：`/etc` 的废弃**目录**仍只撤所有权、不碰盘（维护者明确的范围是"要彻底删
+ * 有意的**例外**：`/etc` 的废弃**目录**仍只撤所有权、不碰盘（范围是"要彻底删
  * 一个**文件**的路径"；且移除侧对 `/etc` 目录本来就有意的"`<dir>.lpkgsave` 会把不知名的
  * 目录整个搬走，宁可不碰（只告警）"）。由 `EtcObsoleteDirIsLeftInPlace` 单独钉。
  */
@@ -1043,7 +1042,7 @@ TEST_F(TypeTransitionMatrixTest, EtcObsoleteDirIsLeftInPlace)
 // ============================================================================
 // `/etc` 的 dir → 非目录（反方向：盘上是**真目录**、新版本发文件/符号链接）
 //
-// ── 实测（2026-09-25，本文件加入这两格当天）：**两条腿都装不上** ─────────────────
+// ── **两条腿都装不上** ─────────────────
 //   · dir → file     ：`safe_rename failed: Is a directory`（EISDIR）—— 挡路目录没人让开，
 //                      `.lpkgtmp` 被 rename 到那个**目录**上。
 //   · dir → symlink  ：`Cannot replace a directory with a symlink.`
@@ -1114,7 +1113,7 @@ TEST_F(TypeTransitionMatrixTest, EtcDirToFileKeepsLpkgsaveDir)
     if (!e3.empty()) std::cerr << "[type-matrix] " << pkg << " 步骤④ 异常：" << e3 << "\n";
     EXPECT_EQ(shape_of(test_root / "etc/foo"), "file") << "④ /etc/foo 应被接管成普通文件";
     // 读之前必须先判形态：对**目录**路径开 ifstream 会抛 basic_filebuf::underflow 异常，
-    // 把测试从这一行直接打断，后面几条更有信息量的断言就再也不执行（实测踩过）。
+    // 把测试从这一行直接打断，后面几条更有信息量的断言就再也不执行（踩过）。
     // 花括号不能省：gtest 的 EXPECT_EQ 展开成 if/else，裸写会被 -Werror=dangling-else 拦下
     if (fs::is_regular_file(test_root / "etc/foo")) {
         EXPECT_EQ(read_file(test_root / "etc/foo"), "v2 file\n");
@@ -1136,7 +1135,7 @@ TEST_F(TypeTransitionMatrixTest, EtcDirToFileKeepsLpkgsaveDir)
  * `/etc` 的 **dir → symlink**：与上一格同一判据、同一落点政策，只是新形态是符号链接。
  *
  * 链接条目在 `copy_package_files` 里没有故障注入断点（文件头记录的已知缺口），所以 v2 另带一个
- * 必然走 COPY 的 `etc/foo.conf`；不过**本格实测的失败点更早**（见下），断点是否命中不作断言，
+ * 必然走 COPY 的 `etc/foo.conf`；不过**本格的失败点更早**（见下），断点是否命中不作断言，
  * 只打印。
  */
 TEST_F(TypeTransitionMatrixTest, EtcDirToSymlinkKeepsLpkgsaveDir)
@@ -1205,8 +1204,8 @@ TEST_F(TypeTransitionMatrixTest, EtcDirToSymlinkKeepsLpkgsaveDir)
 /**
  * dir → file：树里那条**别的包持有的符号链接**，其**解析目标**归本包 —— 必须**拒绝**。
  *
- * 这是 `dir_tree_entirely_ours()` 的判据被 `fs::relative` **解析符号链接**打穿的形态
- * （2026-09-26 修）：算条目的 DB 键时若解析了链接，查到的是**目标**（`usr/share/other.txt`，
+ * 这是 `dir_tree_entirely_ours()` 的判据被 `fs::relative` **解析符号链接**打穿的形态：
+ * 算条目的 DB 键时若解析了链接，查到的是**目标**（`usr/share/other.txt`，
  * 归本包）而不是这个名字（`usr/share/thing/link`，归合租包）⇒ 判「整树都是我们的」⇒
  * 整树搬进 stash ⇒ 提交后 stash 被 `remove_all` ⇒ **合租包那份链接永久消失，而它的 DB
  * 归属还在原位**（所有权脱节 —— 正是这个判据存在的唯一意义）。

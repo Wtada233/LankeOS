@@ -17,9 +17,9 @@
 #    正确做法是像 Arch 那样额外建 libbz2.so.1 软链（下方 package() 已做）。
 #  - mageia/bzip2-1.0.8-makefile.patch：Mageia 专属的 Makefile 重构（要它的 config.in）。
 #  - Mageia 自带的 bzgrep/bzme/bzme.1 源文件：发行版自加内容，非上游。
-#  - 原先那个 bzip2-1.0.8-install_docs-1.patch（LFS）已删除：它给 Makefile 的 install
+#  - bzip2-1.0.8-install_docs-1.patch（LFS）：它给 Makefile 的 install
 #    目标加文档安装，而本配方从不跑 make install（全是手工 install），manual.html/pdf/ps
-#    也从不构建 —— 是彻底的死代码。
+#    也从不构建 —— 是彻底的死代码，不取。
 
 _BD=$(dirname {WORK_DIR})
 
@@ -45,7 +45,7 @@ lankebuild_build() {
     # 0010 把两个 Makefile 里的硬编 CFLAGS/LDFLAGS 删掉了（Fedora 的设计：flag 由构建者提供），
     # 所以这里必须自己补全，否则：
     #   - 共享库目标缺 -fpic -fPIC → 编出非 PIC 目标，.so 链接直接失败；
-    #   - -D_FILE_OFFSET_BITS=64 原本来自被删掉的 BIGFILES 变量。
+    #   - -D_FILE_OFFSET_BITS=64：上游 Makefile 由 BIGFILES 变量给出，0010 删掉后要自己补。
     # CFLAGS/LDFLAGS 走 make 命令行覆盖（命令行变量优先于 Makefile 内的赋值）。
     make -f Makefile-libbz2_so CC=gcc \
         CFLAGS="-fpic -fPIC -D_FILE_OFFSET_BITS=64 {CFLAGS}" \

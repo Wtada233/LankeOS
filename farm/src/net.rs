@@ -40,7 +40,7 @@ pub fn http_agent() -> &'static ureq::Agent {
 /// （hdf5 事故：`/repos/HDFGroup/hdf5/tags` 首页 30 个全是老 tag，`max` 够不到 2.2.0）。
 /// ref advertisement 一次给全，与 tag 数量无关（不需要猜 per_page 要多大）。
 ///
-/// 凭据策略（用户规则）：**有 token 就用，没有就走匿名**——不用凭据助手、不做其它 fallback：
+/// 凭据策略：**有 token 就用，没有就走匿名**——不用凭据助手、不做其它 fallback：
 /// - `token = Some(_)`：设凭据回调，服务端要认证时用 PAT（`USER_PASS_PLAINTEXT`，用户名任意：
 ///   GitHub 惯用 `x-access-token`、GitLab 用 `oauth2`）；**服务端允许匿名时 libgit2 不会调它**，
 ///   所以 public 仓库带不带 token 都正常走。
@@ -149,7 +149,7 @@ fn url_path(url: &str) -> &str {
 ///   或 path 以 `/api/v4/` 开头（自托管实例 API，如 invent.kde.org）→ GitLab token；
 /// - 其余无。
 ///
-/// 历史：曾 `url.contains("gitlab")` 过宽——镜像站 URL 里出现 "gitlab" 字样
+/// ⚠️ 不能只做子串匹配（`url.contains("gitlab")`）——镜像站 URL 里出现 "gitlab" 字样
 /// （如 `https://mirror.x/gitlab/foo.tar.gz`）会被误加 GitLab token（把 token 泄露给第三方）。
 pub fn bearer_token_for<'a>(
     url: &str,
@@ -472,7 +472,7 @@ mod tests {
         assert!(res.is_err(), "无应答连接应因读超时报错");
         assert!(
             start.elapsed() < Duration::from_secs(5),
-            "应在秒级超时而非挂起（实测 {:?}）",
+            "应在秒级超时而非挂起（用时 {:?}）",
             start.elapsed()
         );
     }

@@ -55,13 +55,13 @@ namespace fs = std::filesystem;
 //   升级       upgrade_packages / force_solve_conflict
 //   查询与文档 query_package / query_file / show_man_page
 //
-// **为什么没像 `installation_task.cpp` 那样拆成多个 TU**：本文件是"扁平入口清单"，每个函数
+// 没像 `installation_task.cpp` 那样拆成多个 TU 的原因：本文件是"扁平入口清单"，每个函数
 // 自成一件事、函数名就是缝；而 `installation_task.cpp` 的难导航来自**三趟交织**（让开/写入/
 // 注册共用一套决策表与 WAL 契约），拆开才真正降复杂度。拆本文件还得为 4 个跨入口的共用工具
 // 新开一个内部头文件 —— 那是拿"多一层间接"换"行数下降"，不划算。**新增入口请按上面分组就近放。**
 // ============================================================================
 
-/** 定义在 `main_cli.cpp`（从 main.cpp 搬来，2026-09-26），由 SIGINT 信号处理函数设置。
+/** 定义在 `main_cli.cpp`，由 SIGINT 信号处理函数设置。
  *  非 static：安装/移除诸路径也读它。 */
 extern std::atomic<bool> sigint_graceful;
 
@@ -109,8 +109,7 @@ void log_summary(const char* l10n_key,
  * 这里前置声明，是因为 **install / upgrade / reinstall 三条路径共用它**
  * （reinstall 经 `install_packages` 走到）。
  *
- * 不一致即**抛异常**。它曾做的是"重解计划 + 批次游标复位重跑"—— 2026-10-02 删除，
- * 理由见函数定义处的长注释。
+ * 不一致即**抛异常**（理由见函数定义处的长注释）。
  */
 void verify_package_metadata(InstallPlan& p);
 }  // namespace
@@ -122,11 +121,9 @@ void verify_package_metadata(InstallPlan& p);
 /**
  * 清理一批 stash 目录（CLEANUP 阶段，不可回滚）。备份现存放于每文件系统的隔离 stash
  * （`<fsroot>/.lpkg_bak_<pkg>_<pid>`），清理 = 对每个 stash 根 `remove_all`。
- * （订正 2026-09-26：原文本行以"TODO："开头，但后面描述的其实是**现行**形态、不是待办 ——
- *   这个前缀会让人以为这里还欠一件事。）
  *
  * **write-ahead 顺序：先写 CLEANUP WAL 行（一行 = 一个 stash 根），再物理删除。**
- * 崩溃语义与旧 cleanup_baks 相同：
+ * 崩溃语义：
  *   - 崩溃在"日志后、删除前"→ 恢复看到 CLEANUP → continue_post_commit_cleanup 续删 → 一致
  *   - 崩溃在"删除后、下一条日志前"→ 已有 CLEANUP 行 → 同上续删 → 一致
  *   - 崩溃在首条 CLEANUP 前 → 清理尚未开始 → stash 仍在（recover 的 post-commit 阶段会收掉）
@@ -155,7 +152,7 @@ void cleanup_stashes(std::vector<fs::path>& stashes)
     paths.erase(last, paths.end());
 
     for (const auto& p : paths) {
-        // 两个判据**都**是抛型（2026-09-26 修）：`!fs::exists(p) && !fs::is_symlink(p)` 在
+        // 两个判据**都**是抛型：`!fs::exists(p) && !fs::is_symlink(p)` 在
         // 中间段成环的路径上必抛 ELOOP（`fs::exists` 抛型对环不返回 false），而这一段跑在
         // **post-commit 清理**上 —— 一次抛就是"包已落地、DB 已提交、命令却报失败"。
         // `exists_no_follow` 就是这条表达式想要的语义（lstat 成功 = 名字被占，含悬空链接与
@@ -171,8 +168,7 @@ void cleanup_stashes(std::vector<fs::path>& stashes)
 
         // 失败由 `remove_stash_dir` **自己**打 `warning.cleanup_failed`（不抛：调用点在"批次
         // 已提交"之后的收尾路径上，抛了会把"安装已成功"报成命令失败）—— 这里**不需要**、
-        // 也**不该**再补一层告警。（订正 2026-10-03：原注释写"失败仅告警语义在上层？此处静默"，
-        // 两处都不实 —— 它不静默、也不靠上层；照那句去"补上层告警"会造成同一次失败重复告警。）
+        // 也**不该**再补一层告警（它既不静默、也不靠上层；补上层告警会让同一次失败重复告警）。
         detail::remove_stash_dir(p);
     }
 }
@@ -187,7 +183,7 @@ void write_cache()
  * 批次末尾的 DB 落盘 —— install / upgrade / remove **三条路径共用**，全批次只调一次。
  *
  * 曾经是**逐包** `Cache::write(pkg + ":installed")`：每包把 DB 一族的 6 个文件全量重写一遍、
- * 各留一份全量备份。本机实测 `files.db` 19.8 MB（744 包装机）⇒ 100 包批次落下 ~2 GB 临时
+ * 各留一份全量备份。本机 `files.db` 19.8 MB（744 包装机）⇒ 100 包批次落下 ~2 GB 临时
  * 备份、整仓升级 ~15 GB。改为一次的依据（都是查实的，见 `db/batch_transaction.hpp`）：
  * ① 批次进行中**没有任何读取器**读盘上的 DB（`Cache::load()` 的调用点全在批次之外）；
  * ② 未提交批次**一律整体回滚**，中途的盘上状态既不可观测也不可能成为最终状态。
@@ -215,7 +211,7 @@ static void write_batch_db(const std::vector<std::string>& success)
  *
  * 兜底用途：畸形依赖（空名 → libsolv ID_EMPTY）等原因会让 solver 把请求静默丢掉、
  * 产出**空事务**，落点是 plan.empty() 的"所有包都已安装"分支——用户看到成功、
- * 实际什么都没装（历史 TODO.md D3）。能力目标（SONAME 等）与真实包名不同，故必须
+ * 实际什么都没装。能力目标（SONAME 等）与真实包名不同，故必须
  * 同时匹配 provides 与"已装包提供的能力"。
  */
 static std::string first_unreached_target(
@@ -318,7 +314,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
 
     // 解析安装计划。计划一旦解出就**不再变动**：元数据一致性在批次循环内逐包校验
     // （`verify_package_metadata`），不一致即抛错、整批回滚 —— 没有外层重试循环，
-    // 也没有"批次中途重解"（2026-10-02 起，见该函数的说明）。
+    // 也没有"批次中途重解"（见该函数的说明）。
     plan.clear();
     order.clear();
 
@@ -335,7 +331,7 @@ void install_packages(const std::vector<std::string>& pkg_args, const std::strin
     }
 
     // 请求的目标必须真的进了计划（或已装/已由计划包或已装包提供该能力）。
-    // 否则是"求解成功但什么都没装"——绝不能报"所有包都已安装"（历史 TODO.md D3）。
+    // 否则是"求解成功但什么都没装"——绝不能报"所有包都已安装"。
     if (const std::string unreached = first_unreached_target(targets, plan); !unreached.empty()) {
         throw LpkgException(string_format("error.target_missing_from_plan", unreached));
     }
@@ -491,7 +487,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
         // 判定一律走**不抛**的形态：包自己的内容里可以有**符号链接环**（`a -> a`，或中间段
         // 成环），而 `fs::exists` / `fs::is_directory` 的抛异常重载遇到 ELOOP 是**抛**（不是
         // 返回 false）—— 一个这样的条目就让整批卸载中止并回滚，那个包**永远卸不掉**
-        // （实测：`fs::exists` 在自环上抛 "Too many levels of symbolic links"）。
+        // （`fs::exists` 在自环上抛 "Too many levels of symbolic links"）。
         // 语义不变：`exists_no_follow`（lstat）对自环为真 —— 正是这里要的"该路径上有东西、
         // 得搬走"；中间段成环时判否，按"盘上本来就没有"跳过（与"包记了这个路径、盘上已不存在"
         // 同路）。详见 base/path_predicates.hpp 里那组 `*_no_follow` 的说明。
@@ -522,7 +518,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
 
     if (file_count > 0) log_info(string_format("info.files_removed", file_count));
 
-    // 目录 xattr 的撤销（2026-09-26 补）：本包声明过的键**逐键**撤 —— 判据是"这个**键**还有
+    // 目录 xattr 的撤销：本包声明过的键**逐键**撤 —— 判据是"这个**键**还有
     // 没有别的属主"（不是"这个目录还有没有别的属主"：xattr 按目录共用，一个目录被多个包
     // 持有是常态，按目录判会撤掉别人的键）。
     // ⚠️ 与 `purge_config` **无关**：那个开关管的是 `/etc` 那份**配置文件**的处置
@@ -563,7 +559,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
     // DBRM 清理
     auto cleanup_with_dbr = [&](const fs::path& fpath) {
         // 判定走**不抛**的 `exists_follow`（与 `fs::exists` 同义：跟随末段链接）——`fpath` 是
-        // lpkg 状态目录下**以被移除包名命名**的文件（DB 键派生的路径，见 lpkg/CLAUDE.md §6），
+        // lpkg 状态目录下**以被移除包名命名**的文件（DB 键派生的路径），
         // 环/不可达时 `fs::exists` 抛的是 raw `filesystem_error`，会把一次干净的卸载变成
         // 未本地化的崩溃（与 `cleanup_stashes` 同款理由）。
         if (exists_follow(fpath)) {
@@ -586,8 +582,8 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
             throw LpkgException(string_format("error.open_file_failed", dep_file.string()));
         std::string l;
         while (std::getline(f, l)) {
-            // 键提取走 `vercmp/dep_parser` 的**唯一实现**（2026-10-03 修）：这里原先自己
-            // `ss >> dn` 按空白切，对约束**紧贴包名**的写法（`provb>=2.0`）会切出整串
+            // 键提取走 `vercmp/dep_parser` 的**唯一实现**：自己
+            // `ss >> dn` 按空白切的话，对约束**紧贴包名**的写法（`provb>=2.0`）会切出整串
             // `provb>=2.0`，而重建侧（`ensure_reverse_deps`）用 `dependency_name_of` 得到的是
             // `provb` ⇒ **摘不掉**，内存里留下"已删包仍在反向依赖表里"的陈旧边
             // （`test_reverse_dep_key_consistency.cpp` 记录过：两处"一致地错"时互相抵消，
@@ -595,7 +591,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
             const std::string dn = detail::dependency_name_of(l);
             if (!dn.empty()) cache.remove_reverse_dep(dn, pkg_name);
         }
-        // 非 EOF 收尾且 `bad`（实测：目录 = open 成功 + badbit；空文件是干净的 eof）⇒
+        // 非 EOF 收尾且 `bad`（目录 = open 成功 + badbit；空文件是干净的 eof）⇒
         // 读中途失败，不能静默当空。
         if (f.bad())
             throw LpkgException(string_format("error.read_file_failed", dep_file.string()));
@@ -626,7 +622,7 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
 
     // 注：hooks_dir/<pkg> 的删除**不在这里**——它无 WAL 记录，放在可回滚的批次内会让
     // 批次回滚后钩子永久丢失（之后 remove/upgrade 静默跳过钩子）。改由提交后的
-    // finish_committed_batch() 删除（历史 TODO.md Z7）。
+    // finish_committed_batch() 删除。
     cache.remove_installed(pkg_name);
 
     if (sigint_graceful.load()) throw UserAbort(get_string("info.sigint_aborted"));
@@ -645,13 +641,13 @@ void do_remove_package(const std::string& pkg_name, bool purge_config, const std
  * 批次**提交后**收尾（第一段）：清本批 stash → 删被移除包的 hook 目录 → **剪枝** hook 文件。
  *
  * **不含 postinst，也不含 trim / DB 备份回收** —— 那两段分别是 `run_post_install_hooks()`
- * 与 `finish_post_commit_cleanup()`（2026-10-03 按阶段拆开，顺序见上面的前置声明）。
+ * 与 `finish_post_commit_cleanup()`（顺序见上面的前置声明）。
  *
  * 清理失败**不算批次失败**（批次已提交、DB 一致）：只告警并保留 CLEANUP 记录，
  * 由下次 recover_packages 续传。
  *
  * 被移除包的 hooks 与"新版本不再提供"的 hook 文件都在**提交后**才删：批次若回滚，旧 hook
- * 必须完好无损（Z7）。剪枝放在 postinst **之前**是承重的：跑的时候 hooks_dir/<pkg>/ 里
+ * 必须完好无损。剪枝放在 postinst **之前**是承重的：跑的时候 hooks_dir/<pkg>/ 里
  * 就是本版本最终的那份脚本。
  */
 void finish_committed_batch(
@@ -663,7 +659,7 @@ void finish_committed_batch(
     } catch (const std::exception& e) {
         log_warning(string_format("warning.cleanup_deferred", e.what()));
     }
-    // 被移除包的 hooks 在**提交后**删除：移除已是最终态；批次若回滚则钩子完好无损（Z7）
+    // 被移除包的 hooks 在**提交后**删除：移除已是最终态；批次若回滚则钩子完好无损
     for (const auto& p : removed_pkgs) {
         std::error_code ec;
         const fs::path d = Config::instance().hooks_dir() / p;
@@ -671,7 +667,7 @@ void finish_committed_batch(
         if (ec) log_warning(string_format("warning.hook_prune_failed", d.string(), ec.message()));
     }
     // 安装/升级：剪枝新版本**不再提供**的 hook 文件。同样放在提交后——批次回滚时
-    // 旧 hook 必须完好（与 Z7 同一理由）。若新版本完全没有 hooks，整目录清掉。
+    // 旧 hook 必须完好（与上面同一理由）。若新版本完全没有 hooks，整目录清掉。
     for (const auto& [pkg, files] : hook_sets) {
         const fs::path dir = Config::instance().hooks_dir() / pkg;
         std::error_code ec;
@@ -683,8 +679,8 @@ void finish_committed_batch(
         }
         // **先收集再删**：边遍历 `directory_iterator` 边 `fs::remove` 会让 readdir 跳过条目
         // （POSIX 下这是未定义/实现相关的），残留的旧 hook 脚本会让之后的 remove/upgrade
-        // 跑错版本（2026-10-02 修）。
-        // **用显式 `increment(ec)`，不用 range-for**（2026-10-03 修）：range-for 展开成
+        // 跑错版本。
+        // **用显式 `increment(ec)`，不用 range-for**：range-for 展开成
         // `operator++()`（**抛型**重载），遍历中途出错会抛出去 —— 而这里已在 `COMMIT_PKGS`
         // 之后、外层没有 try/catch，抛出去会让"**已提交**的批次"报 `Error:` + 退出码 1，
         // 脚本/farm 会误读成"什么都没发生"（`cache.cpp` 的 `cleanup_db_backups` 早就是这个形态）。
@@ -751,7 +747,7 @@ void run_post_install_hooks(
  *
  * 与 `cleanup_stashes` 同属"提交后的清理"：失败**不算批次失败**（批次已提交、DB 一致），
  * 只告警、留给下次 recover/trim 续传。此前它们裸露在 `finish_committed_batch` 里 ——
- * `cleanup_db_backups` 的遍历错误会把"安装已成功"报成命令失败（2026-10-02 修）。
+ * `cleanup_db_backups` 的遍历错误会把"安装已成功"报成命令失败。
  *
  * ⚠️ **每个调用 `finish_committed_batch()` 的地方都必须调它**（install / upgrade / remove /
  * 递归移除四条路径）：漏掉 = 不再 trim WAL、不再回收 DB 备份，静默地越积越多。
@@ -857,7 +853,7 @@ void extract_batch(std::map<std::string, InstallPlan>& plan, const std::vector<s
  * 任一项不通过 → 返回 false 并已打印原因：这是**拒绝**（log + return）而不是报错，
  * 保持既有 CLI 语义（`lpkg remove <essential>` 不抛异常）。
  *
- * ⚠️ `batch` 是**本批次要一起移除**的包名集合（2026-10-02 修）：反向依赖检查必须把
+ * ⚠️ `batch` 是**本批次要一起移除**的包名集合：反向依赖检查必须把
  * 它们排除掉 —— 否则 `lpkg remove a b`（b 依赖 a）会被判成"a 还有依赖者 b"而**整批拒绝**，
  * 一个包都删不掉。pacman 不是这样：`alpm_checkdeps`（`lib/libalpm/deps.c`）先把包库分成
  * "本次要移走的"(rem) 与 "留下的"(dblist) 两桶，**只遍历留下的那些**报冲突 —— 集合**内部**
@@ -885,13 +881,12 @@ static bool removal_allowed(const std::string& pkg_name, bool force,
     if (refused(pkg_name)) return false;
     for (const auto& cap : cache.get_package_provides(pkg_name))
         if (refused(cap)) return false;
-    // ⚠️ **订正 2026-10-05**：这里原先还有一段 `for (so : get_package_provides_soname(pkg))
-    // if (refused(so)) ...`，注释写着"SONAME 归属同样算它动了谁会坏"。**它是死代码**：
-    // `reverse_deps` 的键只有两类 —— 依赖名/能力名（来自 `deps/`）与**提供者包名**（来自
-    // `needed_so/`，见 `Cache::ensure_reverse_deps`）。SONAME 字符串从来不是键，`refused(so)`
-    // 必然查空 ⇒ 恒返回 false。
     // SONAME 那一路的保护**是真的**，只是走的是第一条 `refused(pkg_name)`：删包 P 时
     // `get_reverse_deps(P)` 里就有"需要 P 导出的 SONAME 的包"（边由提供者**包名**建）。
+    // 再写一段 `for (so : get_package_provides_soname(pkg)) refused(so)` 是**死代码**：
+    // `reverse_deps` 的键只有两类 —— 依赖名/能力名（来自 `deps/`）与**提供者包名**（来自
+    // `needed_so/`，见 `Cache::ensure_reverse_deps`），SONAME 字符串从来不是键，
+    // `refused(so)` 必然查空 ⇒ 恒返回 false。
     // 删掉这段是为了别让下一个人以为"SONAME 的反向依赖挂在 SONAME 键上"。
     return true;
 }
@@ -899,13 +894,13 @@ static bool removal_allowed(const std::string& pkg_name, bool force,
 /**
  * 移除前的**批次级**安全检查：共享文件 + "DB 文件键所指路径在盘上已是实体目录"。
  *
- * **为什么整体前移到任何 prerm 之前**：这两项原先在 do_remove_package 里**逐包、批次内**
+ * 整体前移到任何 prerm 之前的原因：这两项原先在 do_remove_package 里**逐包、批次内**
  * 检查 —— 那时批次里前面的包已经跑过 prerm 了。后面的包一旦被检查拒绝，整批回滚能撤销文件
  * 与 DB，却撤不回 prerm 的副作用（停服务、摘掉共享配置里的登记项）。前移到批次入口后，
  * 拒绝时一个 prerm 都还没跑，整批"什么都没发生"（而且**根本不开启事务**，WAL 里不留
- * ROLLBACK 痕迹）。判据本身与原先逐字一致，只是检查时机提前。
+ * ROLLBACK 痕迹）。
  *
- * **prerm 为什么不干脆也挪到提交后**：prerm 按定义要在文件被删之前跑（"停掉依赖这些文件的
+ * prerm 不干脆也挪到提交后的原因：prerm 按定义要在文件被删之前跑（"停掉依赖这些文件的
  * 服务、把包在共享配置里登记的条目摘掉"必须先于文件消失），挪到提交后等于把它静默变成
  * postrm —— 那是语义变化，不是修 bug。代价与上游一致：**检查**保证都在 prerm 之前跑完，
  * 但 prerm 之后仍可能因 I/O 错误或 Ctrl+C 失败 —— 那种窗口里文件/DB 由整批回滚还原，
@@ -945,7 +940,7 @@ static void check_removal_preconditions(const std::vector<std::string>& pkgs, bo
         // 陈旧文件键检查（先检后动，拒绝即整批中止，什么都不改）。
         //   DB 把某个路径记成本包的**文件**、盘上却已经是**实体目录** —— 这个路径早就不属于本包这个
         //   "文件"了（被别的包用目录接管，或被外部改成了目录）。移除时若把它 rename 进 stash，
-        //   批次提交后的 remove_all 会连带删掉目录里的全部内容（实测：先装带目录 `usr/share/foo/`
+        //   批次提交后的 remove_all 会连带删掉目录里的全部内容（先装带目录 `usr/share/foo/`
         //   的包、再 remove 曾拥有文件 `usr/share/foo` 的旧包 → 前者内容永久丢失，全程无报错）。
         //   不确定就不动：默认**拒绝**并列出目录当前持有者，交给使用者决定；`--force` 才继续，
         //   且那时也只跳过（见阶段 A），绝不把别人的目录搬进 stash。
@@ -956,7 +951,7 @@ static void check_removal_preconditions(const std::vector<std::string>& pkgs, bo
             if (entry.starts_with(std::string(constants::DIR_ETC_PREFIX))) continue;
             const fs::path phys = strip_trailing_slash(Config::instance().root_dir() /
                                                        fs::path(entry).relative_path());
-            // 右操作数是**抛型**（2026-09-26 修）：`fs::is_directory(phys, ec)` 为假时
+            // 右操作数是**抛型**：`fs::is_directory(phys, ec)` 为假时
             // `||` 必然求值它，而它对中间段成环抛 ELOOP。`is_symlink_no_follow` 不抛。
             if (!is_real_directory(phys)) continue;
             std::string holders;
@@ -1030,10 +1025,8 @@ static void remove_packages_in_one_batch(const std::vector<std::string>& pkgs, b
  *
  * **所有多包移除都汇到 `remove_packages_in_one_batch`**（本函数是其中带筛选/收尾的那条入口，
  * 覆盖 `remove a b c` / autoremove；`remove_packages_recursive` 自带闭包筛选后**直接调它**，
- * 不经过本函数）：曾逐包各自 `remove_package()`，等于每包一批，中途 Ctrl+C 只回滚当前包
- * 那个批次——用户实测到"删掉几个包、其余不恢复"。
- * （2026-09-25 订正：原文写"所有多包移除都必须走这里"并把递归闭包算进来，与调用链不符；
- *  行为（一个批次、跨包原子）一直是错的不是这条，只是落点写错了。）
+ * 不经过本函数）：逐包各自 `remove_package()` 等于每包一批，中途 Ctrl+C 只回滚当前包
+ * 那个批次 —— 结果是"删掉几个包、其余不恢复"。
  *
  * **筛选整体前置，拒绝即全或无**：只要有任何一个包被安全检查拒绝，就一个包都不删
  * （见下面 refused_any 处的注释）。这与"多包一个批次"是同一条不变量的两个面：
@@ -1066,8 +1059,8 @@ static size_t remove_packages_checked(const std::vector<std::string>& pkgs, bool
     }
     // **全或无**：整个列表先检完，任一不通过即中止、一个都不删（pacman 的 `-R a b` 同义）。
     // 旧实现是"被拒的 continue 掉、其余照删，最后才因 refused 抛错" → 落点"部分包已删 +
-    // 非零退出码"，而调用方（脚本/farm）拿非零退出码判断的是"什么都没发生"（历史 TODO G4 正是
-    // 为这个语义加的），盘面却已经少了几个包。拒绝必须发生在**任何文件操作之前** ——
+    // 非零退出码"，而调用方（脚本/farm）拿非零退出码判断的是"什么都没发生"，盘面却已经少了
+    // 几个包。拒绝必须发生在**任何文件操作之前** ——
     // 走到这里时连事务都还没开（remove_packages_in_one_batch 都没被调用），WAL 里不留
     // RM_BEGIN，也就不存在"删一半"的中间态。
     if (refused_any) {
@@ -1098,9 +1091,8 @@ static size_t remove_packages_checked(const std::vector<std::string>& pkgs, bool
 }  // anonymous namespace
 
 /**
- * 移除已安装的包
- * 检查是否为 essential 包、是否有其他包依赖它、是否有包依赖其提供的虚拟包名
- * force 模式下跳过所有安全检查（purge_config 与 force 正交：见头文件）
+ * 安全检查：essential / 反向依赖 / 虚拟能力反向依赖。
+ * `force` 跳过全部检查（purge_config 与 force 正交，见头文件）。
  */
 void remove_package(const std::string& pkg_name, bool force, bool /*wrap_in_txn*/,
                     bool purge_config)
@@ -1113,7 +1105,7 @@ size_t remove_packages(const std::vector<std::string>& pkg_names, bool force, bo
 {
     if (pkg_names.empty()) return 0;
     // CLI 边界（main 的 `remove a b c` 走这里）：**被安全检查拒绝 → 报错**，
-    // 让脚本/farm 凭退出码区分"删掉了"与"被拒绝"（历史 TODO G4）。库层 remove_package
+    // 让脚本/farm 凭退出码区分"删掉了"与"被拒绝"。库层 remove_package
     // 保持"打印原因后返回"的友好语义（测试与内部调用依赖它）。
     bool refused = false;
     const size_t removed = remove_packages_checked(pkg_names, force, purge_config, &refused);
@@ -1127,8 +1119,8 @@ void remove_package_files(const std::string& pkg_name)
 
     // **先撤能力（provides），且必须在下面的早退之前**：一个"声明了 provides、却没有任何
     // 文件"的包（纯能力/元包，`content/` 为空）会在下一行直接 `return` —— 若把撤能力放在
-    // 函数末尾，它的 provider 记录就永远留在 `provides.db` 里（2026-10-02 前实测：移除后
-    // `get_providers("capX")` 仍返回该包）。而 `dep_satisfied_on_disk()` 只看"providers
+    // 函数末尾，它的 provider 记录就永远留在 `provides.db` 里（不移除的话，包删掉之后
+    // `get_providers("capX")` 仍返回它）。而 `dep_satisfied_on_disk()` 只看"providers
     // 非空"、**不看 is_installed**，于是后续安装依赖该能力的东西会被"假满足"放行。
     for (const auto& cap : cache.get_package_provides(pkg_name)) {
         cache.remove_provider(cap, pkg_name);
@@ -1188,7 +1180,7 @@ void autoremove(bool purge_config)
     }
     // 核心包永不自动移除：下面走的是 force 的批量移除，会跳过
     // is_essential 检查（force 的语义是"无视反向依赖"，不该顺带无视核心包保护）。
-    // 必须在锁外调用（is_essential 自己会加同一把锁，历史 TODO.md E3）。
+    // 必须在锁外调用（is_essential 自己会加同一把锁）。
     std::erase_if(to_rem, [&](const std::string& n) {
         if (!cache.is_essential(n)) return false;
         log_info(string_format("info.autoremove_skip_essential", n));
@@ -1204,10 +1196,10 @@ void autoremove(bool purge_config)
         // force=true 是**内部**的（孤儿本就没有反向依赖者，无需再查），它不代表"可以丢配置"：
         // 配置文件按 purge_config（CLI 的 --purge-config，默认 false）改名保留。
         //
-        // ⚠️ **这一句外面绝不能套 `catch (const std::exception&)`**（2026-10-02 修）：那会把
+        // ⚠️ **这一句外面绝不能套 `catch (const std::exception&)`**：那会把
         // `UserAbort`（Ctrl+C / 取消）和**任何真实的批次失败**一起降级成"打条警告就返回"，
         // 于是 `lpkg autoremove` **退出码仍是 0** —— 脚本/farm 据此判断"删成功了"，而实际上
-        // 一个包都没删。e842e6a8 立的规矩是"取消 ≠ 完成：凭退出码区分"，这里曾经是唯一
+        // 一个包都没删。本仓库的规矩是"取消 ≠ 完成：凭退出码区分"，这里曾经是唯一
         // 漏网的那条路（全仓只有 `main_cli` 接 `UserAbort`）。批次的回滚在
         // `remove_packages_checked` 内部已经做完，异常照常上抛即可 —— `run_cli` 会给
         // `UserAbort` 打取消消息、给其它异常打 `Error:` 前缀，两者都是非零退出码。
@@ -1302,9 +1294,9 @@ std::string build_upgrade_prompt(const std::vector<std::string>& order,
  * 三条安装路径共用：`install_packages` / `upgrade_packages` / `reinstall_packages`
  * （reinstall 经 `install_packages` 走到）。校验点在每个包的 `task.run()`（写盘）**之前**。
  *
- * ⚠️⚠️ 这里**曾经**做的是"重解计划"：用归档里的真实 metadata 覆盖索引 → 清空
- *      `plan`/`install_order` → `resolve_with_solver` → 调用方把批次游标复位到 0 重跑。
- *      **2026-10-02 删除，且明确不准备再次加入。** 原因：
+ * ⚠️⚠️ 这里**不做**"重解计划"（用归档里的真实 metadata 覆盖索引 → 清空
+ *      `plan`/`install_order` → `resolve_with_solver` → 调用方把批次游标复位到 0 重跑），
+ *      **明确不准备再次引入**。原因：
  *   · 它是 **lpkg 手动解析依赖时代**的产物 —— 当时依赖是逐包现场递归解析的，索引里的
  *     `deps` 不可信，只能"下到包、读到真 metadata、再解一遍"。
  *   · 引入 **libsolv** 之后，计划是**一次性整体求解**出来的：安装顺序（拓扑排序）、
@@ -1483,8 +1475,8 @@ void upgrade_packages()
 
     // ── 索引可用性守卫 ────────────────────────────────────────────────
     // 索引为空 ⇒ 一个"可升级目标"都找不出来，而下面的早退会把这种情况报成
-    // "所有包都已是最新版本" + exit 0 —— 把"升不了"伪装成"不用升"（历史 TODO D4）。有已装包
-    // 却读不到任何索引内容时**响亮失败**（2026-10-02 修）。已装包本身为空时不做判断
+    // "所有包都已是最新版本" + exit 0 —— 把"升不了"伪装成"不用升"。有已装包
+    // 却读不到任何索引内容时**响亮失败**。已装包本身为空时不做判断
     // （那种情况下"无事可做"是真的）。
     if (repo.packages().empty() && !installed.empty()) {
         throw LpkgException(string_format("error.repo_index_empty", repo.packages().size()));
@@ -1574,7 +1566,7 @@ void upgrade_packages()
     // 与 install_packages 对称：升级同样会产生待执行触发器（copy_package_files 里
     // check_file() 照常累积），漏掉这一行会让 glib-compile-schemas /
     // systemctl daemon-reload / gtk-update-icon-cache 在升级后**一次都不跑**
-    // （schema 不可见、unit 不生效、图标缓存陈旧，历史 TODO.md F1）。
+    // （schema 不可见、unit 不生效、图标缓存陈旧）。
     TriggerManager::instance().run_all();
 
     // 两行上限：真升级的 / 本次顺带新拉进来的依赖（`upgrade` 会拉依赖，别把它们算成"升级"）。
@@ -1603,7 +1595,7 @@ void force_solve_conflict(bool purge_config)
     repo.load_index();
 
     // 索引为空/不可用 ⇒ 每个 SONAME 都"无人提供"、每条约束都"无法满足"，会把**全部**
-    // 已装包判成 broken 并提议删光。这比"什么都不做"危险得多 —— 直接拒绝（2026-10-02 修）。
+    // 已装包判成 broken 并提议删光。这比"什么都不做"危险得多 —— 直接拒绝。
     if (repo.packages().empty()) {
         throw LpkgException(string_format("error.repo_index_empty", repo.packages().size()));
     }
@@ -1748,7 +1740,6 @@ void reinstall_package(const std::string& arg)
     reinstall_packages({arg});
 }
 
-/** 查询指定包安装的所有文件列表 */
 void query_package(const std::string& pkg_name)
 {
     if (Cache::instance().get_installed_version(pkg_name).empty()) {
@@ -1767,7 +1758,6 @@ void query_package(const std::string& pkg_name)
     }
 }
 
-/** 查询指定文件属于哪个包 */
 void query_file(const std::string& filename)
 {
     auto& cache = Cache::instance();
@@ -1777,7 +1767,7 @@ void query_file(const std::string& filename)
     if (owners.empty()) {
         try {
             const fs::path p(filename);
-            // 不抛谓词（2026-09-26 修）：`p` 来自命令行/依赖文件的文本，其父链可能在盘上
+            // 不抛谓词：`p` 来自命令行/依赖文件的文本，其父链可能在盘上
             // 是环 —— `fs::is_symlink` 对中间段成环抛 ELOOP，而这里在**纯查询**路径上，
             // 抛出去就是一个"查一下归属"的命令报 filesystem_error。
             if (!is_symlink_no_follow(p)) {
@@ -1786,7 +1776,7 @@ void query_file(const std::string& filename)
                 // 且 root=="/" 必须成立——见 path_within
                 const bool in_root = path_within(abs_p, Config::instance().root_dir());
                 if (in_root) {
-                    // `lexically_relative`（2026-09-26 修）：`fs::relative` 会解析符号链接，
+                    // `lexically_relative`：`fs::relative` 会解析符号链接，
                     // 而这个键要用来查 DB 归属 —— 解析过的键与登记的键对不上就是"无主"的假答案
                     // （`scan/scanner.cpp` 的 `scan_orphans` 里是同一处修法与理由）。上面那条
                     // `path_within` 也是词法判据，两处口径因此一致。
@@ -1804,7 +1794,7 @@ void query_file(const std::string& filename)
 
     // 目录是以**尾斜杠**注册的（scan_content_files 的约定：`/usr/bin/` 才是目录键，
     // 普通文件不带斜杠），所以查询目录时要再试一次带斜杠的形式：
-    // 否则 `lpkg query /usr/bin` 报"不属于任何包"，而 `/usr/bin/` 才查得到（历史 TODO.md G1）。
+    // 否则 `lpkg query /usr/bin` 报"不属于任何包"，而 `/usr/bin/` 才查得到。
     if (owners.empty() && !target.ends_with('/')) {
         std::string with_slash = target + "/";
         auto dir_owners = cache.get_file_owners(with_slash);
@@ -1821,9 +1811,9 @@ void query_file(const std::string& filename)
     }
 
     if (owners.empty()) {
-        // 与 `query -p`（本文件上面的 `query_package`）口径统一（2026-10-03）：两条查询腿
-        // 同是"查不到"，此前一条抛错退 1（`query -p <未安装>`）、一条打 info 退 0（本处），
-        // 脚本无法用统一判据识别"查询未命中"。现在都抛 `LpkgException` → `run_cli` 落退出码 1。
+        // 与 `query -p`（本文件上面的 `query_package`）口径统一：两条查询腿同是"查不到"，
+        // 若一条抛错退 1（`query -p <未安装>`）、另一条打 info 退 0（本处），脚本就无法用统一
+        // 判据识别"查询未命中"。两条都抛 `LpkgException` → `run_cli` 落退出码 1。
         // 用 **query 语境自己的键**：`info.file_not_owned`（"…is not owned by any package"）是
         // 正常结果语气的 info 文案，留在别处（如扫描/诊断）继续用，别把它当错误文案复用。
         throw LpkgException(string_format("error.query_file_not_owned", filename));
@@ -1853,7 +1843,6 @@ std::string generate_code(size_t len = 6)
     return code;
 }
 
-/** 获取某包及其传递反向依赖的集合 */
 std::unordered_set<std::string> collect_recursive_remove_set(const std::string& pkg_name)
 {
     std::unordered_set<std::string> result;

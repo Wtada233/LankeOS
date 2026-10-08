@@ -7,7 +7,7 @@
 //! - 带约束（`major-version-lock` / `max-version` / `exclude` / `stable-minor`）时改在
 //!   `releases` 里按 `VersionFilter` 挑选——单条 `info.version` 表达不了那些约束。
 //!
-//! **预发布不需要本模板操心**：PyPI 的 `info.version` 本身就优先**稳定版**（实测 cython 有
+//! **预发布不需要本模板操心**：PyPI 的 `info.version` 本身就优先**稳定版**（cython 有
 //! `3.3.0b1` 时 `info.version` 仍是 `3.3.0`），所以不必在这里另写一套 PEP 440 判定。
 
 use crate::error::FarmError;

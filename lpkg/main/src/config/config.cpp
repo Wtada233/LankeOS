@@ -44,7 +44,7 @@ int match_overwrite_pattern(const std::vector<std::string>& patterns, const std:
         if (inverted || (!pat.empty() && pat.front() == '\\')) pat.remove_prefix(1);
         const auto first = pat.find_first_not_of('/');
         pat = (first == std::string_view::npos) ? std::string_view{} : pat.substr(first);
-        // **尾斜杠也要剥**（2026-10-03 修）：路径侧在 `overwrite_allows` 里已经统一成"裸形态"
+        // **尾斜杠也要剥**：路径侧在 `overwrite_allows` 里已经统一成"裸形态"
         // （归档目录条目带尾斜杠，不该影响判定），模式侧此前只剥前导斜杠 —— 于是
         // `--overwrite=usr/lib/foo/` 这种写法会**静默不匹配**（fnmatch 拿 `usr/lib/foo/` 去
         // 比 `usr/lib/foo` 永远失败），而上面那段注释声明的是"两侧做同一件事"。
@@ -56,7 +56,7 @@ int match_overwrite_pattern(const std::vector<std::string>& patterns, const std:
         //
         // ⚠️ **剥尾必须落成真实串**：`fnmatch(3)` 只吃 C 串（没有长度参数），而 view 的"余下
         // 部分一直读到 NUL"这个技巧**只对剥前缀成立** —— 剪掉尾巴时 NUL 还在被剪掉的那段之后，
-        // fnmatch 照样看得见它（第一版就是这么写的：`usr/lib/foo/` 依旧不匹配，是**假修**）。
+        // fnmatch 照样看得见它（`usr/lib/foo/` 因此依旧不匹配）。
         std::string pat_owned;
         if (!pat.empty() && pat.back() == '/') {
             std::string_view stripped = pat;
@@ -77,9 +77,6 @@ int match_overwrite_pattern(const std::vector<std::string>& patterns, const std:
 }
 }  // namespace
 
-/**
- * 获取 Config 单例实例
- */
 Config& Config::instance()
 {
     static Config cfg;
@@ -87,12 +84,8 @@ Config& Config::instance()
 }
 
 /**
- * 构造函数：只初始化基础路径成员，派生路径通过 rebase_paths() 统一计算
- *
- * 设计说明：
- *   hooks_dir_ / dep_dir_ / pkgs_file_ 等"派生路径"不应在本阶段硬编码赋值，
- *   而是全部交由 rebase_paths() 根据基础路径统一推导，避免两处逻辑不一致。
- *   当需要新增派生路径时，只需在 rebase_paths() 中添加，无需修改构造函数。
+ * 只初始化基础路径成员：hooks_dir_ / dep_dir_ / pkgs_file_ 等派生路径一律交给
+ * rebase_paths() 统一推导，避免两处逻辑不一致（新增派生路径只需改 rebase_paths()）。
  */
 Config::Config()
     : root_dir_("/"),
@@ -105,10 +98,7 @@ Config::Config()
     rebase_paths();  // 统一计算所有派生路径（hooks、dep、pkgs 等）
 }
 
-/**
- * 重新计算所有路径，将相对路径改为相对于 root_dir_ 的绝对路径
- * 在设置了新的根目录后调用此方法
- */
+/// 把各路径重定位到当前 root_dir_ 之下（设置新根目录后调用）。
 void Config::rebase_paths()
 {
     auto rebase = [&](const std::string& default_path) -> fs::path {
@@ -142,9 +132,6 @@ void Config::rebase_paths()
     lock_file_ = lock_dir_ / "db.lck";
 }
 
-/**
- * 设置软件包安装根目录，并重新计算所有派生路径
- */
 void Config::set_root_path(const std::string& root_path)
 {
     std::lock_guard<std::mutex> lock(config_mutex_);
@@ -158,10 +145,10 @@ namespace
 /**
  * 确保暂存根**此刻可用**：真目录（lstat 语义）+ 属主是本进程 + mode `0700`。
  *
- * 为什么每次用之前都要复核（2026-10-03，全量测试里实测出来的）：`get_tmp_dir()` 的 `mkdtemp`
+ * 为什么每次用之前都要复核：`get_tmp_dir()` 的 `mkdtemp`
  * 只管**第一次**创建。而 `~TmpDirManager()` 会 `remove_all` 掉这个根（同一进程内的生命周期
  * 管理），之后任何一句 `create_directories(<根>/<pkg>/…)` 都会把根**重新建出来 —— 用
- * `0777 & ~umask`（实测 0755）**，于是 §1.7 的加固在进程活着的中途就悄悄没了；更要紧的是，
+ * `0777 & ~umask`（0755）**，于是 §1.7 的加固在进程活着的中途就悄悄没了；更要紧的是，
  * 那一格又回到了"静默接受一个已存在的同名路径"（= 最初那条可劫持缺陷的形态）。
  *
  * 所以：不存在 → `mkdir(2)` 原子建（`EEXIST` 说明有人抢先，走下面的复核，**绝不"接管"**别人
@@ -197,7 +184,7 @@ fs::path Config::get_tmp_dir()
         // 83）。`mkdtemp` 只把结尾的 `XXXXXX` 换成随机串，`lpkg_<pid>_` 前缀原样保留 ⇒ 清理
         // 逻辑一行都不用改。
         //
-        // **必须是原子创建**（2026-10-03 修）：此前是
+        // **必须是原子创建**：此前是
         // `exists()` 探测 + `fs::create_directories()`，那是 TOCTOU —— 本地无权用户可以在
         // 探测与创建之间预建同名路径（一个他拥有的目录，或一个指向 `/etc` 的符号链接），
         // root 随后把包内容/索引解压进去、再拷进系统 ⇒ 任意内容以 root 安装。
@@ -320,7 +307,7 @@ void Config::set_testing_mode(bool v) noexcept
  *
  * 为什么需要它：这些字段挂在**进程级单例**上，一个用例改了、它后面**每一个**用例都看得见，
  * 只有当"负责复位的那个用例"恰好也在本次过滤范围内时才会被清掉 —— 症状就是**单跑绿、全量红**。
- * 本仓库实测撞过三次，前两次记在 `tests/test_hygiene.hpp` 顶部；第三次（2026-10-03）是
+ * 本仓库撞过三次，前两次记在 `tests/test_hygiene.hpp` 顶部；第三次是
  * `no_hooks_mode`：上一个用例在自己的 TearDown 里置 true，于是下一个用例里"运行安装后钩子"
  * 那一节整段静默 —— 更糟的是它那条"没有钩子就不该出现该阶段"的断言变成了**空转的绿**。
  *
@@ -344,10 +331,6 @@ void Config::reset_for_test()
     non_interactive_mode_ = NonInteractiveMode::YES;
 }
 
-/**
- * 初始化配置所需的文件系统结构
- * 创建所有必要的目录和空文件（如包数据库、锁定文件等）
- */
 void Config::init_filesystem()
 {
     ensure_dir_exists(config_dir_);
@@ -378,19 +361,13 @@ void Config::init_filesystem()
     ensure_file_exists(xattr_keys_db_);
 }
 
-/**
- * 覆盖系统的架构检测结果，强制使用指定架构
- */
 void Config::set_architecture(const std::string& arch)
 {
     std::lock_guard<std::mutex> lock(config_mutex_);
     architecture_override_ = arch;
 }
 
-/**
- * 获取当前系统的 CPU 架构
- * 如果未设置架构覆盖，通过 uname 系统调用获取
- */
+/// 有架构覆盖值时用覆盖值，否则取 uname 的 machine。
 std::string Config::get_architecture()
 {
     std::lock_guard<std::mutex> lock(config_mutex_);
@@ -405,10 +382,7 @@ std::string Config::get_architecture()
     return std::string(buf.machine);
 }
 
-/**
- * 从镜像配置文件中读取镜像源 URL
- * 确保 URL 末尾包含斜杠
- */
+/// 读 mirror.conf 首行；返回的 URL 末尾保证带斜杠。
 std::string Config::get_mirror_url()
 {
     std::ifstream mirror_file(mirror_conf_);

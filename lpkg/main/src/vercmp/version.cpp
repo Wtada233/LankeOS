@@ -22,7 +22,7 @@ namespace
  * **比较用的独立小池**：`pool_evrcmp_str()` 需要一个 `Pool` 去取 disttype，而 lpkg 的比较
  * 可能发生在任何地方（排序仓库版本、读配置、比较约束……），那里没有求解器的池。
  *
- * disttype = **RPM**（libsolv 的默认，也是 lpkg 从 8.0.0 起**采用**的版本语义）。
+ * disttype = **RPM**（libsolv 的默认，也是 lpkg **采用**的版本语义）。
  * 本池只用来解析字符串、不做 interning；但 libsolv 整体不是线程安全的，故仍串行化
  * （与 `pkg/solver.cpp` 同一取向）。
  */
@@ -39,13 +39,8 @@ const Pool* comparison_pool()
 /**
  * EVR 比较（rpm 语义：`[epoch:]version[-release]`）。返回 <0 / 0 / >0。
  *
- * ⚠️ **8.0.0 起不再有"桥"**（推翻了什么的订正痕迹在 `version.hpp`）。此前这里先把 lpkg 版本
- * 编码成 libsolv EVR（`-`→`~`、`+release`→`^^release`）再自己拆 release，为的是让
- * **libsolv 的依赖匹配**与 **lpkg 的 `version_satisfies()`** 逐条一致 —— 而这两套判据
- * **不一致过**：2026-10-03 在 4032 组合的 (候选 × 约束) 矩阵上差 **78 处、两个方向都有**
- * （`= 1.0` 匹配 `1.0+1` 是假满足；`> 1.0` 不匹配 `1.0+1` 是假不满足）。
- *
- * 现在只留**一份实现**：libsolv 自己的 EVR 比较，**版本串原样进**。求解器内部用的也是它
+ * ⚠️ **只有一份实现**：libsolv 自己的 EVR 比较，**版本串原样进**（没有 `-`→`~`、
+ * `+release`→`^^release` 那类编码）。求解器内部用的也是它
  * ⇒ "两边必须手动保持一致"这件事从根上不存在了。
  */
 int evr_cmp(const std::string& a, const std::string& b)

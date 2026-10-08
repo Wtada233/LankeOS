@@ -38,9 +38,8 @@ LankeOS is a Linux distribution built using the Linux From Scratch methodology. 
 
 > [!WARNING]
 > The vast majority of the source code in this project is generated using AI models.
-> This does not imply that the code quality is poor—there is human review and extensive testing as a safety net—but it may leave behind some comments/documentation artifacts.
-> For example, meaningless comments like "User requested..." or "0.18 fix" may appear. These are documentation issues, not code quality problems. If you encounter any, please file an issue or submit a PR to fix them.
-> As for the "AI Slop" bias, it does not directly characterize LankeOS. The project is more about extensively using AI for writing and maintenance, rather than being a pure pile of unmanaged, neglected spaghetti code.
+> This does not imply that the code quality is poor—there is human review and extensive testing as a safety net—but it can still cause problems.
+> LankeOS still needs polish. If you run into documentation or code problems caused by AI, please file an issue or submit a PR.
 
 ## Components
 

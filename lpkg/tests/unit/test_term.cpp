@@ -4,7 +4,7 @@
  * 核心不变量（对齐 pacman 的 `cb_progress` / `fill_progress`）：**每一帧都恰好占满整行**。
  * 只要每帧等宽，前几帧更长的部分**不可能**留在屏上；反之（"新帧比旧帧短就补空格"）在宽字符
  * （中文占 2 列）下会**少补**，于是出现 "MiB MiB" 这类叠字 —— 这正是 `compose_frame()`
- * 存在的理由，也是本文件要钉住的东西。
+ * 存在的理由，也是本文件要覆盖的东西。
  *
  * 测试环境**不是 TTY**（gtest 在容器里跑），所以 `Line` 的原地刷新分支走不到；
  * 能测的、也最该测的，是 `compose_frame` / `bar_text` / `visible_len` / `truncate_width`
@@ -89,7 +89,7 @@ TEST(TermTest, ComposeFrameAlwaysFillsExactlyTheLine)
 
 TEST(TermTest, ShorterFrameCannotLeaveResidueFromLongerFrame)
 {
-    // 这是用户实测报过的那类 bug：上一帧长、下一帧短 → 旧字符留在屏上。
+    // 上一帧长、下一帧短会让旧字符留在屏上（典型 bug）：
     // 只要两帧都恰好 total 列，就不可能发生。
     const std::size_t total = 60;
     const std::string long_frame = ui::compose_frame(
@@ -114,7 +114,7 @@ TEST(TermTest, ComposeFrameTruncatesLeftWithEllipsisBeforeTail)
 TEST(TermTest, ComposeFrameNeverOverflowsWhenTailLeavesNoRoomForEllipsis)
 {
     // 预算 keep = total_cols - tail_w ≤ 3 时放不下 "..."（占 3 列）。旧实现无条件补 "..."，
-    // 于是整帧 = 3 + tail_w > total_cols —— 又一次"旧帧留残影"。这里钉住"绝不超宽"。
+    // 于是整帧 = 3 + tail_w > total_cols —— 又一次"旧帧留残影"。这里断言"绝不超宽"。
     for (std::size_t total : {5u, 6u, 7u}) {  // tail "[OK]"=4 列 ⇒ keep = 1/2/3
         const std::string f = ui::compose_frame("==> a-very-long-package-name", "[OK]", total);
         EXPECT_EQ(ui::visible_len(f), total) << "total=" << total << " -> " << f;
@@ -172,7 +172,7 @@ TEST(TermTest, ProgressFrameNeverOverflowsWhenBudgetLeavesNoRoomForEllipsis)
 {
     // total=28 时 info_cols=16（被 total-kMinBarCols 钳住）、bar_cols=12。mid 较长则信息段
     // 留给左文本的预算 budget_for_left < 3（甚至为 0）——放不下 "..."。旧实现无条件补 "..."
-    // 会把信息段撑过 info_cols ⇒ 整帧超宽（进度条那侧固定，多出的列全在左边）。钉住"绝不超宽"。
+    // 会把信息段撑过 info_cols ⇒ 整帧超宽（进度条那侧固定，多出的列全在左边）。断言"绝不超宽"。
     const std::size_t total = 28;
     const std::string left = "==> Installing a-very-long-package-name";
     for (std::size_t mid_len : {13u, 14u, 15u, 16u}) {  // budget = 2/1/0/0
@@ -182,12 +182,12 @@ TEST(TermTest, ProgressFrameNeverOverflowsWhenBudgetLeavesNoRoomForEllipsis)
     }
 }
 
-// `Line::progress()` 的 `mid` **必须按值收**（2026-10-03 修，实测缺陷）。
+// `Line::progress()` 的 `mid` **必须按值收**。
 //
 // 缺陷形态：`finish_progress()` 会把自己的 `last_mid_` **当视图**再喂回 `progress()`，而
 // `progress()` 的第一句是把 mid 存回 `last_mid_` —— 如果形参是 `string_view`，这一存就会清掉
 // 它正在读的那块缓冲（首字节写 `\0`），随后 `progress_frame()` 读到的就是同一块已被改过的内存。
-// 实测症状（真机 pty，同一个 filesystem 包）：
+// 症状（真机 pty，同一个 filesystem 包）：
 //     修前 `==> 正在解压 filesystem   <NUL>63.3 KiB / 863.3 KiB [...] 100%`   ← 57 帧里 1 帧
 //     修后 57 帧全部完好（`863.3 KiB / 863.3 KiB`）
 // 长的 mid 才中招（> SSO 阈值 15 字节才走堆缓冲）：解压/下载的 `863.3 KiB / 863.3 KiB` 被写坏，

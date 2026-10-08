@@ -125,7 +125,7 @@ TEST_F(BuilderExecutorTest, DownloadPrepareSources_WorkSourcesCopy)
 TEST_F(BuilderExecutorTest, SameBasenameDifferentUrlsAreRejectedNotSilentlyReused)
 {
     // 两个**不同** URL 落成同一个 basename：`download_one` 的 `if (!fs::exists(dest))` 会让
-    // 第二个被静默跳过、复用第一个文件 —— 配方从**错源码**构建且毫无提示（2026-10-03 修）。
+    // 第二个被静默跳过、复用第一个文件 —— 配方从**错源码**构建且毫无提示。
     // 修法是显式报错、点名两个 URL。
     const fs::path a = test_dir / "dirA";
     const fs::path b = test_dir / "dirB";
@@ -258,11 +258,11 @@ TEST_F(BuilderExecutorTest, LoadBuildDefaults_ReadsConfigFile)
 }
 
 // ============================================================================
-// safe_name_from_url —— 源 URL → 安全目录/文件名（历史 TODO.md C1）
+// safe_name_from_url —— 源 URL → 安全目录/文件名
 //
 // 旧实现直接 `fs::path(url).filename()`：URL 以 `/..` 结尾得到 ".."，以 `/` 结尾得到 ""，
 // 调用方随后 `work_root / name` + `fs::remove_all(dest)` 会**删掉整个构建目录或整棵源码树**
-// （实测：remove_all(work/"..") 会清空父目录所有条目，含 LankeBUILD.json）。
+// （remove_all(work/"..") 会清空父目录所有条目，含 LankeBUILD.json）。
 // ============================================================================
 
 TEST_F(BuilderExecutorTest, SafeNameRejectsParentTraversalUrl)
@@ -349,7 +349,7 @@ TEST_F(BuilderExecutorTest, FailedSourceDownloadLeavesNoPartialFile)
 /**
  * `work_sources` 落位时：**悬空符号链接**既必须被让开、也绝不能把内容写到它指向的地方。
  *
- * 2026-09-26 修的两处跟随语义：判"这个名字空不空"原来用 `fs::exists`（**跟随**）⇒ 悬空链接
+ * 这里修过两处跟随语义：判"这个名字空不空"原来用 `fs::exists`（**跟随**）⇒ 悬空链接
  * 判 false（不让开），而紧接着的 `fs::copy_file` **也跟随** ⇒ 内容被写到**链接目标**上
  * （父目录存在时），也就是以 root 写到 `work_root` **之外**。可达路径：源码归档里一个悬空
  * 链接（`xxx.jar -> ../../etc/ld.so.preload`）+ 与它同名的 work_source。
@@ -386,8 +386,8 @@ TEST_F(BuilderExecutorTest, UnsafeSourceArchiveAbortsInsteadOfBeingTolerated)
 {
     // 源码归档成员名含控制字符 → 自动解压必须**抛**，而不是像"扩展名骗人"（`.tar.gz` 其实
     // 不是归档）那样只告警继续：安全拒绝发生在解压循环**中途**，源码树只解出了一半，
-    // 继续构建只会以离奇方式失败（2026-10-02 修：此前 `catch (const std::exception&)` 把它
-    // 一起吞了，与成员名消毒"整包拒绝"的契约矛盾）。
+    // 继续构建只会以离奇方式失败（早期实现曾用 `catch (const std::exception&)` 把它
+    // 一起吞掉，与成员名消毒"整包拒绝"的契约矛盾）。
     const fs::path src = test_dir / "danger.tar";
     {
         struct archive* a = archive_write_new();

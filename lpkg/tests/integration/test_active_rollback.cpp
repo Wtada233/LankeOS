@@ -257,7 +257,6 @@ TEST_F(ActiveRollbackTest, RecursiveRemoveSIGINTMidwayRestoresAll)
 
     install_packages({pRoot, pMid, pLeaf});
 
-    // 确认全部安装
     for (auto& n : {"rr_root", "rr_mid", "rr_leaf"}) {
         EXPECT_FALSE(Cache::instance().get_installed_version(n).empty());
         EXPECT_TRUE(fs::exists(test_root / "usr/bin" / n));
@@ -347,10 +346,10 @@ TEST_F(ActiveRollbackTest, DanglingSymlinkBakIsRestored)
 // ============================================================================
 // 回归：升级中途 COPY 失败 → 双重回滚防护（旧文件不得被二次删除）
 //
-// 曾有一个数据破坏 bug：失败包的 rollback_files() 先把 .lpkg_bak rename 回原位
-// （恢复旧文件），随后 batch_rollback 的 reverse_execute 又对该包的 COPY 行逆序
-// 执行（无条件删除 dst）→ 把刚恢复的旧文件删掉。reverse_execute 必须跳过
-// 已包级回滚（WAL 含 ROLLBACK 行）包的正向文件操作。
+// 失败包的 rollback_files() 先把 .lpkg_bak rename 回原位（恢复旧文件），若随后
+// batch_rollback 的 reverse_execute 再对该包的 COPY 行逆序执行（无条件删除 dst），
+// 就会把刚恢复的旧文件删掉 —— 故 reverse_execute 必须跳过已包级回滚（WAL 含 ROLLBACK 行）
+// 包的正向文件操作。
 // ============================================================================
 
 TEST_F(ActiveRollbackTest, UpgradeCopyFailPreservesOldFile)

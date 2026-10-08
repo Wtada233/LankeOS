@@ -41,11 +41,10 @@ struct ArchiveWriteDeleter {
 using ArchiveReadHandle = std::unique_ptr<struct archive, ArchiveReadDeleter>;
 using ArchiveWriteHandle = std::unique_ptr<struct archive, ArchiveWriteDeleter>;
 
-/// lpkg 自用的临时落位后缀（`.lpkgtmp`）。2026-10-03 起它是 `constants::SUFFIX_LPKG_TMP`
-/// —— 此前这里有一份局部常量、另外两处是裸字面量（同一件事三处表达），现已收敛到常量头。
+/// lpkg 自用的临时落位后缀（`.lpkgtmp`）：`constants::SUFFIX_LPKG_TMP`。
 
-// 渲染可见形式的成员名（`\xHH`）。判据与理由见 `archive.hpp` 的声明 —— 2026-10-05 起
-// 对外可见，`tar_guard.cpp` 共用同一份（别在那边再写一遍）。
+// 渲染可见形式的成员名（`\xHH`）。判据与理由见 `archive.hpp` 的声明 —— 对外可见，
+// `tar_guard.cpp` 共用同一份（别在那边再写一遍）。
 std::string escape_member_name(std::string_view name)
 {
     static constexpr char HEX[] = "0123456789abcdef";
@@ -87,12 +86,12 @@ std::string member_name_rejection_message(std::string_view member,
     // `constants::RESERVED_MEMBER_NAMES` 的说明）。合法包里不该出现这些名字。
     //
     // **清单只有一张**：`constants::RESERVED_MEMBER_NAMES` —— 本循环遍历它，不在这里另列一遍。
-    // 2026-10-03 的缺陷正是"常量头里有 `SUFFIX_LPKG_BAK`、这里只硬编码了另外三个"，而且那个
-    // token 是**前缀**形态（`.lpkg_bak_<pkg>_<pid>`），`ends_with` 结构上就抓不到它。
+    // 其中的 `SUFFIX_LPKG_BAK` 是**前缀**形态（`.lpkg_bak_<pkg>_<pid>`），`ends_with`
+    // 结构上抓不到。
     //
     // 判据：**任一路径分量**命中即拒（不是只看末段）。
     // 只看末段会漏掉 `content/usr/bin/bash.lpkgtmp/x` 这类成员 —— 它的**末段是 `x`**，
-    // 而 libarchive 的 disk writer 会为文件成员**自动补建缺失的父目录**（本仓库已实测），
+    // 而 libarchive 的 disk writer 会为文件成员**自动补建缺失的父目录**，
     // 于是包里合法地装出一个目录 `usr/bin/bash.lpkgtmp/`：此后别的包安装 `bash` 时，
     // `<dst>.lpkgtmp` 的落位路径正撞上它 —— 全新安装 `rename(目录 → 不存在路径)` 成功
     // （`usr/bin/bash` 变成**目录**而 lpkg 报成功）；升级 `rename(目录 → 已存在文件)` =
@@ -135,7 +134,7 @@ std::string member_name_rejection_message(std::string_view member,
  * 成员名是**不可信输入**（未校验的 .lpkg、无校验和的上游源码包）。`fs::path` 语义下
  * `output_dir / "/etc/x"` **等于 "/etc/x"**（绝对右值丢弃左值），所以绝对路径成员会写到
  * 解压根之外：安装期解压根是 /tmp 下的临时目录、构建期是源码树，两者都会污染/覆盖宿主
- * 文件，而且这类写入不进 file_db，`query` 看不到、`remove` 删不掉（历史 TODO.md X2）。
+ * 文件，而且这类写入不进 file_db，`query` 看不到、`remove` 删不掉。
  *
  * 只归一化**成员名**；符号链接的**目标内容**保持原样（包内绝对链接是合法的）。
  *
@@ -175,11 +174,9 @@ static std::string member_path_relative(const char* raw, const fs::path& archive
     //     十进制，511 = 八进制 0777），而回滚侧会照行里的**绝对路径** create_directories +
     //     chmod/lchown —— 崩溃恢复/回滚就会以 root 去 chmod/chown 任意绝对路径、
     //     `--root` 隔离失效。
-    //     （订正 2026-09-26：本条原先写"`reverse_execute()` 的 DIR_RM 分支**没有任何**路径
-    //      confinement"—— 那是当时的实况，现在**已经有**了（两级判据，见 ARCH §9.2）。
-    //     但**名字消毒仍然是必需的**：① confinement 只保证"不越出 root"，挡不住"落在 root 内
+    //     名字消毒仍然是必需的：① confinement 只保证"不越出 root"，挡不住"落在 root 内
     //     的**另一个**路径"（下面那条字面 `" → "` 破坏分帧就属这类，confinement 完全挡不住）；
-    //     ② 纵深防御 —— 输入端堵比让回滚侧拒绝更早、更省事。）
+    //     ② 纵深防御 —— 输入端堵比让回滚侧拒绝更早、更省事。
     //   · 名字里的字面 `" → "` 破坏箭头分帧：parse_op 把它当分界，非箭头类型的 arg1 被截断成
     //     前缀，回滚就作用到"前缀同名"的**别的路径**上。
     // 伤害都发生在**解压之后**（WAL 层无从分辨），唯一能挡的地方就是名字进入系统之前。
@@ -213,7 +210,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
                        ARCHIVE_EXTRACT_UNLINK);
     // 注：这里**不能**加 ARCHIVE_EXTRACT_SECURE_NOABSOLUTEPATHS —— 本实现是先把
     // "解压根 + 成员名"的绝对路径写回 entry 再交给 disk writer，该选项会因此拒绝
-    // 每一个成员（实测 "Path is absolute"）。绝对路径的防护由下面的 member_path_relative
+    // 每一个成员（"Path is absolute"）。绝对路径的防护由下面的 member_path_relative
     // 归一化承担：成员名先变成相对路径再拼根，绝无逃出 output_dir 的可能。
     // 已移除：archive_write_disk_set_standard_lookup(ext.get());
     // 该函数在静态链接的 chroot 环境下因 NSS 问题可能导致段错误
@@ -303,11 +300,11 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
         //   · **字符/块设备**：major/minor 可指向 `/dev/zero` 之类，随后的 `fs::copy`
         //     （pkg/installation_task_copy.cpp）会**无限读直到写满磁盘**。
         //   · **socket**：既非普通文件也非目录，同样不被任何下游逻辑预期。
-        //     ⚠️ **经 tar 到不了这条**（2026-10-03 实测）：tar/pax 的类型标志位里没有 socket
+        //     ⚠️ **经 tar 到不了这条**：tar/pax 的类型标志位里没有 socket
         //     （'0'..'6' 分别是普通/硬链接/符号链接/字符/块/目录/FIFO），libarchive 写出的
         //     socket 成员读回来也不是 `AE_IFSOCK`（解压**成功**）。所以这个 `AE_IFSOCK` 判断是
         //     **纵深防御**，**没有对应用例 —— 这是有意的，不是漏测**；别去补一个造不出来的
-        //     用例（见 lpkg/CLAUDE.md §7.4：不为走不到的分支写断言）。将来若支持别的归档格式，
+        //     用例。将来若支持别的归档格式，
         //     它自然生效。
         //
         // 用**黑名单**（只拒这四种），**不要**用白名单：本函数同时服务**源码 tarball** 解压
@@ -329,7 +326,7 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
             const fs::path hl_norm =
                 (root_n / member_path_relative(hardlink, archive_path)).lexically_normal();
             if (fs::path(hardlink).is_absolute() || !path_within(hl_norm, root_n)) {
-                // 2026-10-05：粒度由「跳过该成员 + 告警」升为**整包拒绝** —— 与成员名守卫、
+                // 粒度由「跳过该成员 + 告警」升为**整包拒绝** —— 与成员名守卫、
                 // 特殊文件类型守卫、以及 `tar_guard` 的全部判据同一粒度。留给"跳过"的口子
                 // 等于让用户拿到一个装了一半、某文件莫名消失的包，而归档的畸形是**结构性**
                 // 的、不是单个成员的偶发问题（见 archive/tar_guard.hpp 抬头）。
@@ -377,12 +374,12 @@ void extract_tar_zst(const fs::path& archive_path, const fs::path& output_dir,
                         (err ? err : get_string("error.data_block_write")));
                 }
             }
-            // ⚠️ 这里**没有**"声明尺寸 vs 实际字节数"的复核 —— 它不可达，已删（2026-10-05
-            // 实测）：头声明 4096、实际只给 5 时，libarchive 在 `archive_read_data_block`
+            // ⚠️ 这里**没有**"声明尺寸 vs 实际字节数"的复核 —— 它不可达，已删：头声明 4096、
+            // 实际只给 5 时，libarchive 在 `archive_read_data_block`
             // 上直接返 FATAL（"Truncated tar archive detected"），上面那个 `r < ARCHIVE_WARN`
             // 分支先一步抛了。即该向量已由 libarchive 覆盖，再判一次就是第二份实现。
             // finish_entry 的返回值此前被丢弃：它可能因磁盘满/EIO 失败（写盘失败），
-            // 而这里若静默吞掉，解压会报成功、盘上却是截断的内容（2026-10-02 修）。
+            // 而这里若静默吞掉，解压会报成功、盘上却是截断的内容。
             const int fe = archive_write_finish_entry(ext.get());
             if (fe < ARCHIVE_WARN) {
                 const char* err = archive_error_string(ext.get());
@@ -423,7 +420,7 @@ std::string extract_file_from_archive(const fs::path& archive_path,
     // 逐成员读到 EOF，**不要**用 `== ARCHIVE_OK` 作循环条件：那会在第一个 WARN/FATAL 处
     // 静默停下，于是"某个成员读不了"被当成"没有这个成员"、返回空串（调用方把空串读作
     // "metadata 缺失"，报的却是另一回事）。这里：真读错误（< WARN）抛；可恢复警告记一条
-    // 后继续找目标成员（2026-10-02 修）。
+    // 后继续找目标成员。
     while (true) {
         const int r = archive_read_next_header(a.get(), &entry);
         if (r == ARCHIVE_EOF) break;

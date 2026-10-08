@@ -54,7 +54,7 @@ fs::path confine_target_path(const fs::path& rel)
 }
 
 // ============================================================================
-// 每文件系统 sidecar stash + 目录元数据化删除（历史 TODO.md 第 2 节）
+// 每文件系统 sidecar stash + 目录元数据化删除
 // ============================================================================
 
 fs::path stash_parent_dir(const fs::path& phys)
@@ -73,13 +73,13 @@ fs::path stash_parent_dir(const fs::path& phys)
 
     fs::path cur = phys.has_parent_path() ? phys.parent_path() : phys;
 
-    // ── 先解析**父链上的符号链接**（2026-09-26）────────────────────────────────
+    // ── 先解析**父链上的符号链接** ────────────────────────────────────────────
     // 下面那段上溯是**词法**的（`parent_path()` 逐级 + `is_mount_point()` 拿 mountinfo
     // **精确匹配**），而 mountinfo 记的是**内核解析后**的路径。父链上只要有一级是符号链接、
     // 且指向**别的挂载**，词法父链与真实父链就不是同一条 → 上溯停在**错误的**文件系统顶层
     // → stash 与 phys 不同挂载 → `safe_rename` EXDEV → **该包永久无法 remove/upgrade**。
     //
-    // 实测（宿主机、真实 mountinfo）：`/var/run -> ../run`（tmpfs）而 mountinfo 里只有
+    // 宿主机（真实 mountinfo）：`/var/run -> ../run`（tmpfs）而 mountinfo 里只有
     // `/run` → `/var/run/foo` 的词法上溯停在 `/`（overlay），phys 真身在 `/run` → 不同设备。
     // stock 布局里只有 `/var/run` 这一个跨挂载链接（`/bin` `/lib` `/sbin` 都指向同一文件系统
     // 内），所以当前包集没炸（cups/qemu-x86-64/samba 在配方层 `rm -rf var/run` 绕过）——
@@ -140,7 +140,7 @@ fs::path ensure_stash_dir(const fs::path& phys, std::string_view pkg)
     }
     fs::create_directories(dir, ec);
     if (ec) {
-        // 创建失败必须**当场失败**（2026-10-03 修）：此前 `ec` 被丢弃、函数照样返回这个目录 ——
+        // 创建失败必须**当场失败**：丢弃 `ec` 的话函数会照样返回这个目录 ——
         // 后续的 `sink.backup` rename 会报一个与真实原因无关的错（ENOENT/误导性路径），
         // 而 `0700` 加固静默没生效（目录压根不存在）。对照 `base/utils.cpp` 的
         // `ensure_dir_exists`：那边一直是 fail-closed，这里漏了。
@@ -178,10 +178,6 @@ void remove_stash_dir(const fs::path& stash)
 
 /**
  * 撤销"本包对该目录 xattr 键的声明"，并在**没有别的属主**时把键从盘上删掉（改前值写 WAL）。
- *
- * 订正 2026-10-03：上面那段"删除本包独占、且此刻为空的 owned 目录"的函数文档原本**错位贴在
- * 本函数上** —— 它讲的是 `candidate_dir_keys` / `report` 两个参数与五条判据，属于下面的
- * `remove_empty_owned_dirs()`（那里已放回原位）。本函数签名里没有那两个参数，说明文档贴错了。
  */
 bool revoke_xattr_key_if_unowned(Cache& cache, const std::string& pkg, const std::string& logical,
                                  const std::string& key, OpSink& sink, const fs::path& root)
@@ -233,9 +229,6 @@ bool revoke_xattr_key_if_unowned(Cache& cache, const std::string& pkg, const std
  *                           保留"的那一支（`removed == false`）与真正要 rmdir 之前
  *                           （`removed == true`，**在 sink.remove_empty_dir 之前**，与调用点
  *                           原先自己打日志的时刻逐字一致）。它不参与任何判据。
- *
- * 订正 2026-10-03：本段函数文档原先**错位贴在**上面的 `revoke_xattr_key_if_unowned()` 上
- * （那份签名没有 `candidate_dir_keys` / `report`），已挪回这里。
  */
 void remove_empty_owned_dirs(Cache& cache, const std::string& pkg,
                              const std::vector<std::string>& candidate_dir_keys, OpSink& sink,
@@ -302,10 +295,7 @@ std::string hook_display_name(std::string_view hook_name)
 }
 }  // namespace
 
-/**
- * 执行包的钩子脚本（如 post-install、pre-remove）
- * 支持 chroot 环境下运行，使用 mount namespace 隔离
- */
+/// 支持 chroot 环境下运行，使用 mount namespace 隔离。
 void run_hook(std::string_view pkg_name, std::string_view hook_name)
 {
     if (Config::instance().no_hooks_mode()) return;
@@ -348,7 +338,7 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
     // 执行统一交给 run_shell_in_root：chroot/fork/exec/waitpid 只有那一份实现，
     // 与外部触发器（trigger.cpp）走同一条路径（此前这里有一份等价但独立的代码）。
     const std::string script =
-        // `lexically_relative`（2026-09-26 修）：chroot 内的路径必须是**这个名字**，
+        // `lexically_relative`：chroot 内的路径必须是**这个名字**，
         // 而在宿主上 `fs::relative` 会解析符号链接（chroot 内解析结果可能完全不同）。
         use_chroot ? "/" + hook_path.lexically_relative(Config::instance().root_dir()).string()
                    : fs::absolute(hook_path).string();
@@ -364,13 +354,13 @@ void run_hook(std::string_view pkg_name, std::string_view hook_name)
 /**
  * `deps` / `provides` / `needed_so` 的每一条都必须"单行、无控制字符"。
  *
- * **为什么非校验不可**（2026-10-03 审计）：归档**成员名**早就有消毒（`archive.cpp` 的
+ * 非校验不可的原因：归档**成员名**早就有消毒（`archive.cpp` 的
  * `member_name_rejection_message`），但这三个字段没有 —— 它们同样会被写进**行式 / 制表符
  * 分帧**的状态文件：
  *   · `deps/<pkg>`、`needed_so/<pkg>`：**一行一条**（`\n` 注入 ⇒ 凭空多出依赖 / 多出
  *     一条 SONAME 记录）；
  *   · `provides.db`：`<capability>\t<pkgs>`（`\t` 注入 ⇒ 键在重载时被截断、提供者串错位）。
- * 实测后果：`provides = ["a\ncapX\tE"]` 读回会变成幽灵提供者，而 `dep_satisfied_on_disk`
+ * 后果：`provides = ["a\ncapX\tE"]` 读回会变成幽灵提供者，而 `dep_satisfied_on_disk`
  * 只看"这个 capability 有没有提供者" ⇒ **假满足**依赖（装出一个坏系统）；`deps`/`needed_so`
  * 里的 `\n` 还会污染反向依赖图，**阻止**正常卸载（DoS）。仓库来源的包另有一道"与索引逐字段
  * 比对"，但本地 `.lpkg` 走不到那里 —— 校验放在这里（metadata 解析的唯一出口）才覆盖全。
@@ -428,7 +418,7 @@ void reject_bad_soname_specs(const std::vector<std::string>& values, std::string
  * 会逐字段比对归档与索引。**真正可达的是本地 `.lpkg`**（`install ./x.lpkg`：计划字段与校验
  * 读的是同一份 ⇒ 比对恒等 ⇒ 放行），以及它写进 `provides.db` 之后留下的**持久幽灵提供者**。
  *
- * **为什么不在求解器里判**：libsolv 的多条 requires 是 **AND** 语义、却允许被不同 solvable
+ * 不在求解器里判的原因：libsolv 的多条 requires 是 **AND** 语义、却允许被不同 solvable
  * 分别满足，表达能力上就写不出"包名 **或** 能力"——给虚拟能力再加一套前缀会破坏 `deps`
  * 的匹配语义。所以只能在**输入边界**拒绝（此处，metadata 解析的唯一出口）。
  */
@@ -520,7 +510,7 @@ std::vector<std::string> scan_content_files(const fs::path& content_dir)
     // 归档成员名消毒挡不住"把 `content` 本身做成符号链接"：`content -> /etc` 的归档能正常
     // 解压（libarchive 建的就是那条链接），而 `recursive_directory_iterator(content_dir)`
     // 会**跟随起点目录**去枚举链接目标 → 安装机上的任意文件被当成"包内容"登记、复制进目标
-    // root（2026-10-02 端到端实测复现）。正规包的 `content` 永远是解压出来的真目录，直接拒绝。
+    // root（正规包的 `content` 永远是解压出来的真目录，直接拒绝）。
     if (!is_real_directory(content_dir)) {
         throw LpkgException(string_format("error.content_not_directory", content_dir.string()));
     }
@@ -531,7 +521,7 @@ std::vector<std::string> scan_content_files(const fs::path& content_dir)
         // `entry.is_directory() && !entry.is_symlink()`：libstdc++ 的
         // `directory_entry::is_directory()` 对**符号链接**条目会走 `status()`（跟随），
         // 于是在**符号链接环**上抛 filesystem_error —— 一个自带自环链接的包**连打包/
-        // 安装扫描都过不去**（2026-09-25 实测：`ln -s self self` 的目录里迭代，
+        // 安装扫描都过不去**（`ln -s self self` 的目录里迭代，
         // `entry.is_directory()` 抛 code=40）。判据换成 lstat 后，符号链接（含环、含悬空）
         // 一律走"文件键"分支 —— 与"符号链接是包的产物、按文件登记"的既有约定一致。
         if (is_real_directory(entry.path())) {
@@ -542,20 +532,15 @@ std::vector<std::string> scan_content_files(const fs::path& content_dir)
             entries.push_back(rel);
         }
     }
-    // **排序：让遍历顺序确定**（2026-09-27 补）。此前直接返回 `recursive_directory_iterator`
+    // **排序：让遍历顺序确定**。不排序就是 `recursive_directory_iterator`
     // 的顺序 —— 那是 **readdir 顺序，由文件系统决定**（同一份包在不同机器/容器里可能不同）。
     // 这不只是"不好看"：安装/升级的**逐条目处理顺序**（进而 WAL 行序、stash 里的备份顺序）
     // 会跟着变，于是任何"在某一步观测盘面"的断言都可能变成**顺序依赖的 flaky**
-    // —— CI 上已经实打实挂过一次（该用例原名 `…ConfigIsStashedAwayWhenTheWritePassRuns`，
-    // 2026-09-27 改为与顺序无关的 `…UntilTheWritePassRestoresIt`，
-    // 同一个提交三跑两过一挂：success / failure / success）。
+    // —— CI 上已经实打实挂过（同一个提交三跑两过一挂：success / failure / success）。
     // 排序后同一份包在任何机器上都走同一个顺序。
     std::ranges::sort(entries);
     return entries;
 }
-
-/** 解析依赖字符串列表为 DependencyInfo 结构体，支持复合约束 */
-// 实现在 vercmp/dep_parser.cpp 中，此处仅为函数声明转发
 
 // 收集已装包的 requires（deps/ + needed_so/ 文件）与 provides（provides_db）用于建模
 // installed repo。provides 必须建模：libsolv 的 dontfix 反向一致性只强制"之前有已装
@@ -603,8 +588,7 @@ static void collect_installed_requires(const std::string& name, solv::InstalledP
  *
  * 曾经的偏离点：这里只要"名字像 `lib*.so*`"且 `is_symlink()` 为真就收，**不看链接目标在不在**。
  * 而 `has_system_soname` 用 `exists_follow(cand)`（**跟随**链接、**不抛**，`config.cpp`）→
- * 悬空链接判为"不满足"。（订正 2026-10-03：原文写 `fs::exists(cand)` —— 实际早已是不抛谓词
- * `exists_follow`；`fs::exists` 在环上会抛。）
+ * 悬空链接判为"不满足"。
  * 悬空链接是现实中真会出现的形态（升级/清理删掉真实 .so、只留下 SONAME 链接）。
  * 修法：存在性判据**直接复用 `has_system_soname`**，而不是在这里再写一份 `fs::exists` ——
  * 两处判据从此是同一个谓词，结构上不可能再次漂移。（`is_regular_file || is_symlink` 的
@@ -634,7 +618,7 @@ static std::vector<std::string> collect_system_sonames()
  *
  * 除同名匹配外必须一并匹配 **provides**：按能力/SONAME 安装时（`lpkg install libssl`
  * 由 openssl 提供）目标串是能力名、解析出的真实包名不同，只比包名会把用户显式请求
- * 记成"依赖"→ 不 hold → **紧接着一条 autoremove 就把它删掉**（历史 TODO.md E2）。
+ * 记成"依赖"→ 不 hold → **紧接着一条 autoremove 就把它删掉**。
  */
 static bool is_explicit_target(const std::vector<std::pair<std::string, std::string>>& targets,
                                const std::string& name, const std::vector<std::string>& provides)
@@ -676,16 +660,16 @@ void resolve_with_solver(InstallContext& ctx)
             meta.value(std::string(constants::J_PROVIDES_SONAME), std::vector<std::string>{});
         pi.needed_so = meta.value(std::string(constants::J_NEEDED_SO), std::vector<std::string>{});
         // ⚠️ 这条路（本地 `.lpkg` 候选）走的是 `read_archive_metadata`，**绕过了**
-        // `read_package_metadata` —— 于是它此前两道校验都没有：控制字符能伪造状态文件里的
-        // 记录，非法规格能变成"永远匹配不上的裸名"。这里补齐（与主读入点同一对判据）。
+        // `read_package_metadata` —— 所以两道校验要在这里自己补：不做的话，控制字符能伪造
+        // 状态文件里的记录，非法规格能变成"永远匹配不上的裸名"（与主读入点同一对判据）。
         reject_unsafe_metadata_tokens(pi.provides_soname, constants::J_PROVIDES_SONAME, path);
         reject_unsafe_metadata_tokens(pi.needed_so, constants::J_NEEDED_SO, path);
         reject_bad_soname_specs(pi.provides_soname, constants::J_PROVIDES_SONAME, path);
         reject_bad_soname_specs(pi.needed_so, constants::J_NEEDED_SO, path);
-        // 2026-10-05：`provides` 此前**在这条路上完全没有校验** —— 上面那四行是上一轮补的，
-        // 而"同族判据只推了一条分支"正是本仓库反复踩的形态：SONAME 两个字段补了，`provides`
-        // 漏了。它既缺分帧字符检查（控制字符能伪造 `provides.db` 记录 ⇒ 幽灵提供者 ⇒ 假满足
-        // 依赖），也缺 SONAME 命名空间前缀检查（见 `reject_reserved_provides_prefix`）。
+        // `provides` 同样要校验 —— "同族判据只推了一条分支"正是本仓库反复踩的形态：SONAME
+        // 两个字段补了、`provides` 漏了。它既缺分帧字符检查（控制字符能伪造 `provides.db`
+        // 记录 ⇒ 幽灵提供者 ⇒ 假满足依赖），也缺 SONAME 命名空间前缀检查
+        // （见 `reject_reserved_provides_prefix`）。
         reject_unsafe_metadata_tokens(pi.provides, constants::J_PROVIDES, path);
         reject_reserved_provides_prefix(pi.provides, path);
         local_pkgs.push_back(std::move(pi));
@@ -828,13 +812,6 @@ std::unordered_set<std::string> get_all_required_packages()
 // ============================================================================
 // 从 `installation_task.cpp` 拆出的共用纯函数（正文逐字搬移，未改一行）
 // ============================================================================
-//
-// ⚠️ **订正 2026-10-04**：这里原先挂着一份**没有函数体**的 doxygen 块（"向前 needed_so
-// 完整性校验"，还点名了 `find_provider`）。它描述的手写校验早就被**求解器的原生判据**
-// 取代（`solver.cpp` 把 needed_so 灌进 `so:` 空间、由 libsolv 判定；见
-// `package_manager.cpp` 里"取代旧的手动 check_plan_consistency / check_needed_so_consistency
-// / check_forward_soname_integrity"那段）。那份文档块已删除 —— 留着它只会让下一个人去
-// 找那个不存在的函数。
 
 /**
  * `.lpkgtmp` 落位前的最后一道闸：tmp 路径是**符号链接**时拒绝写入（失败要响）。
@@ -852,7 +829,7 @@ std::unordered_set<std::string> get_all_required_packages()
  */
 void refuse_symlink_tmp_path(const fs::path& tmp_path)
 {
-    // 不抛谓词（2026-09-26 修）：父链中间段成环时 `fs::is_symlink` 抛 ELOOP（raw
+    // 不抛谓词：父链中间段成环时 `fs::is_symlink` 抛 ELOOP（raw
     // `filesystem_error`，无 l10n 文案），而本守卫的职责是**给出干净的错误**而不是变成
     // 另一个错误。判否时继续往下走也是安全的（写 tmp 会撞 ELOOP 失败 = fail-closed）。
     if (is_symlink_no_follow(tmp_path))

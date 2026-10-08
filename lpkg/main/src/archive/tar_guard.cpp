@@ -15,8 +15,8 @@ namespace
 
 /// 成员名总长上限（字节）。取 PATH_MAX 量级 —— 超长路径是 libarchive 已知会绕过自己符号
 /// 链接检查的那一格（issue #744/#745），所以这里必须自己封。
-/// ⚠️ 这是**结构性**判据（名字长到不可能是合法 tar 成员），**不是**资源上界：维护者
-/// 2026-10-05 明确拍板不加成员数/解压比/累计尺寸那类限额，别把这条当成先例去补别的。
+/// ⚠️ 这是**结构性**判据（名字长到不可能是合法 tar 成员），**不是**资源上界：不加成员数/
+/// 解压比/累计尺寸那类限额，别把这条当成先例去补别的。
 constexpr std::size_t MAX_MEMBER_NAME_BYTES = 4096;
 
 /// 单个路径分量上限：POSIX 的 NAME_MAX。超过它任何文件系统都建不出来。
@@ -50,7 +50,7 @@ void TarGuard::check(struct archive_entry* entry, std::string_view raw_name,
     // 异常消息自己切成两行。故一律转义后再进消息（唯一实现在 archive.cpp）。
     const std::string shown = escape_member_name(raw_name);
 
-    // ⚠️ **没有**"无名成员"这条判据 —— 不可达，已删（2026-10-05）。`extract_tar_zst` 在
+    // ⚠️ **没有**"无名成员"这条判据 —— 不可达，已删。`extract_tar_zst` 在
     // 调用本函数**之前**就有 `if (member.empty()) continue;`（`.`、`./` 这类归一化成空、
     // 本来就不落盘的成员），空名字根本进不来。原判据是死代码。
 
@@ -65,7 +65,7 @@ void TarGuard::check(struct archive_entry* entry, std::string_view raw_name,
         }
     }
 
-    // ⚠️ **没有**"拒反斜杠"这条判据 —— **会误伤真实包**，已删（2026-10-05 实测）。
+    // ⚠️ **没有**"拒反斜杠"这条判据 —— **会误伤真实包**，已删。
     // 通用加固清单里"反斜杠 = 跨平台 zip-slip"排在很前面，但**本仓库的真实产物里有它**：
     // `systemd` 包的成员 `content/usr/lib/systemd/system/system-systemd\x2dmute\x2dconsole.slice`
     // —— systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜杠**（全仓 861 个包
@@ -103,8 +103,8 @@ void TarGuard::check(struct archive_entry* entry, std::string_view raw_name,
             string_format("error.archive_malformed_dot_component", arch, shown));
     }
 
-    // ⚠️ **没有**"尾斜杠与类型不一致"这条判据 —— 它**不可达**，已删（2026-10-05 实测）。
-    // 原本想拒"名字带尾斜杠却不是目录"的成员，实测发现 **libarchive 自己按尾斜杠判定类型**：
+    // ⚠️ **没有**"尾斜杠与类型不一致"这条判据 —— 它**不可达**，已删。
+    // 原本想拒"名字带尾斜杠却不是目录"的成员，发现 **libarchive 自己按尾斜杠判定类型**：
     // 一个 typeflag='0'、名字以 `/` 结尾的成员读回来 `archive_entry_filetype()` 就是
     // `AE_IFDIR`，冲突根本到不了本层（用例 `TrailingSlashIsNormalizedByLibarchive` 把这个
     // 行为钉住当绊线）。按仓库纪律，不为走不到的分支留判据。
@@ -138,10 +138,10 @@ void TarGuard::check(struct archive_entry* entry, std::string_view raw_name,
     }
 }
 
-// ⚠️ **没有** `check_data_complete()`（"声明尺寸与实际数据不符"）—— 它**不可达**，已删
-// （2026-10-05 实测）。头声明 4096 字节、实际只给 5 字节时，libarchive 在
-// `archive_read_data_block` 上直接返回 **FATAL**（"Truncated tar archive detected while
-// reading data"），`extract_tar_zst` 在到达任何比较之前就抛了 `error.extract_failed` ——
-// 也就是说这个向量**已经被 libarchive 覆盖**，本模块再写一份只是第二份实现。
-// 用例 `TruncatedMemberIsRejectedByLibarchive` 把这条行为钉住（它绿说明"整包拒绝"成立，
-// 红的时机是 libarchive 改了行为 —— 那时才需要在这里补判据）。
+// ⚠️ **没有** `check_data_complete()`（"声明尺寸与实际数据不符"）—— 它**不可达**，已删。头声明 4096
+// 字节、实际只给 5 字节时，libarchive 在 `archive_read_data_block` 上直接返回 **FATAL**（"Truncated
+// tar archive detected while reading data"），`extract_tar_zst` 在到达任何比较之前就抛了
+// `error.extract_failed` —— 也就是说这个向量**已经被 libarchive
+// 覆盖**，本模块再写一份只是第二份实现。 用例 `TruncatedMemberIsRejectedByLibarchive`
+// 把这条行为钉住（它绿说明"整包拒绝"成立， 红的时机是 libarchive 改了行为 ——
+// 那时才需要在这里补判据）。

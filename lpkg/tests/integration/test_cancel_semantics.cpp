@@ -1,7 +1,7 @@
 /**
  * test_cancel_semantics.cpp — **取消 ≠ 完成**（退出码与消息都要说清楚）
  *
- * 现象（2026-10-03 报）：`lpkg remove -r <pkg>` 输错验证码之后
+ * 现象：`lpkg remove -r <pkg>` 输错验证码之后
  *
  *     :: 验证码错误，递归移除已中止。
  *     :: 安装被用户中止。          ← ①措辞串了（这是**卸载**操作）
@@ -105,7 +105,7 @@ protected:
 
 TEST_F(CancelSemanticsTest, RemoveClaimsCompletionOnlyWhenSomethingWasActuallyRemoved)
 {
-    // 2026-10-03 修：`lpkg remove <从未安装过的包>` 此前**照样**打印 `info.uninstall_complete`
+    // `lpkg remove <从未安装过的包>` 此前**照样**打印 `info.uninstall_complete`
     // （"卸载完成"）—— 与 install 侧早就删掉的那条假消息同款，脚本/farm 会以为删掉了。
     // 两半都钉：没删东西时**不许**出现这句，真删了必须出现（否则"从未打印"也能让上半条绿）。
     Config::instance().set_non_interactive_mode(NonInteractiveMode::YES);
@@ -173,7 +173,7 @@ TEST_F(CancelSemanticsTest, UserSaysNoToInstallIsACancelNotACompletion)
     // 那个键**根本不存在**（两份 l10n 里都没有），`get_string` 对未知键返回
     // `[MISSING_STRING: info.install_complete]`，而 CLI 输出里永远不可能出现这个占位符
     // ⇒ `find` 恒为 npos ⇒ 是一条**恒真断言**（0 区分力，看起来在测"取消后没有完成提示"，
-    // 实际什么都没测）。真正钉住同一件事的是下面那条：用**存在**的键
+    // 实际什么都没测）。真正覆盖同一件事的是下面那条：用**存在**的键
     // `info.install_summary`（成功安装时的汇总行）断言它不出现。
     EXPECT_EQ(r.all().find(string_format("info.install_summary", 1, "")), std::string::npos)
         << "取消之后不该出现安装 summary：\n"

@@ -163,7 +163,6 @@ TEST_F(CleanupTest, ReverseExecuteSkipsCleanupAmongOtherOps)
 
 TEST_F(CleanupTest, BackupDirReverseRestore)
 {
-    // 模拟目录 BACKUP（整个目录 rename 为 .bak）
     fs::path dir = test_root / "usr/share/mydir";
     fs::path inner_file = dir / "README";
     fs::create_directories(dir);
@@ -273,8 +272,8 @@ TEST_F(CleanupTest, BackupDirReverseRestoreIdempotent)
 TEST_F(CleanupTest, UniqueBakPathReturnsNonExisting)
 {
     // 确保 unique_bak_path 返回的路径不存在
-    // 我们需要调用 package_manager.cpp 中的 unique_bak_path，但它是文件内 static。
-    // 在安装任务中也定义了同样的静态函数，但我们无法直接访问。
+    // 测试需要调用 package_manager.cpp 中的 unique_bak_path，但它是文件内 static。
+    // 在安装任务中也定义了同样的静态函数，但无法直接访问。
     // 测试 random_suffix 行为：验证 .lpkg_bak 后缀包含随机部分
     fs::path phys = test_root / "usr/bin/testfile";
     create_file("usr/bin/testfile");
@@ -345,8 +344,6 @@ TEST_F(CleanupTest, RecWithCleanupStillReversesUncommittedBatch)
 
 TEST_F(CleanupTest, RecWithoutCleanupReverseExecutes)
 {
-    // 模拟 rec 场景：WAL 中无 CLEANUP 条目
-    // rec 应对 BACKUP 做 reverse_execute（恢复文件）
     create_file("usr/share/doc/pkg/README");
     fs::path readme_path = test_root / "usr/share/doc/pkg/README";
     fs::path bak_path = test_root / "usr/share/doc/pkg/README.lpkg_bak_pkg_bbb";
@@ -625,8 +622,6 @@ TEST_F(CleanupTest, ReverseExecuteDbRestores)
 
 TEST_F(CleanupTest, BatchRollbackAbortsCorrectly)
 {
-    // 验证 batch_rollback 在 CLEANUP 条目不存在时正常工作
-    // 这测试 batch_rollback 调用路径不因 CLEANUP 的引入而损坏
     std::string wpath = wal::wal_log_path();
     {
         std::ofstream f(wpath);
@@ -649,7 +644,6 @@ TEST_F(CleanupTest, BatchRollbackAbortsCorrectly)
 
 TEST_F(CleanupTest, BatchRollbackSkipsCleanup)
 {
-    // 验证 batch_rollback 遇到 CLEANUP 条目时不崩溃
     std::string wpath = wal::wal_log_path();
     {
         std::ofstream f(wpath);
@@ -750,21 +744,17 @@ TEST_F(RecursiveRemoveCleanupTest, DepNeededSoManHooksCleanedOnRecursiveRemove)
     //   故补上 postinst.sh，并在移除前先自检它确实装上了。）
     std::string pA =
         create_pkg("libA", "1.0", {}, {}, {"libA.so.1"}, {"libA.so.1"}, {"postinst.sh"});
-    // 创建 appB: 依赖 libA
     std::string pB = create_pkg("appB", "1.0", {"libA"});
 
-    // 设置本地镜像
     auto mirror = setup_local_mirror();
     add_to_mirror("libA", "1.0");
     add_to_mirror("appB", "1.0");
 
-    // 安装
     install_packages({pA, pB});
 
     EXPECT_FALSE(Cache::instance().get_installed_version("libA").empty());
     EXPECT_FALSE(Cache::instance().get_installed_version("appB").empty());
 
-    // 验证 libA 的 dep/needed_so/man/hooks 文件存在
     auto dep_f = Config::instance().dep_dir() / "libA";
     auto nso_f = Config::instance().needed_so_dir() / "libA";
     auto man_f = Config::instance().docs_dir() / "libA.man";
@@ -858,7 +848,6 @@ TEST_F(CleanupTest, BatchRollbackRmBeginVersionExtraction)
     fs::path bak = tool;
     bak += ".lpkg_bak_pkg_x1";
 
-    // 准备：重命名文件以模拟 BACKUP
     fs::rename(tool, bak);
 
     {

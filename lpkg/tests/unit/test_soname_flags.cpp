@@ -90,8 +90,8 @@ TEST_F(SonameFlagTest, ForwardCheckToleratedUnderMissingSoNoError)
     // repo 提供 glibc(libc.so.6) + orphan（**需要** libfoo.so.1，无 provider）。
     // 6 段：`ver:hash:deps:provides:provides_soname:needed_so` —— glibc 的 libc.so.6 是它
     // **导出**的 SONAME（第 5 段）；orphan 的 libfoo.so.1 是它**需要**的（第 6 段）。
-    // ⚠️ 这两段的次序是 8.0.0 拆分 provides/provides_soname 的关键：写错位置就变成
-    // "orphan 提供了 libfoo.so.1"，孤儿 SONAME 那条腿**整条消失**（本用例第一版就是这样红的）。
+    // ⚠️ 这两段的次序是拆分 provides/provides_soname 的关键：写错位置就变成
+    // "orphan 提供了 libfoo.so.1"，孤儿 SONAME 那条腿**整条消失**（写错时本用例就会红）。
     std::ofstream(fs::path(work) / "mirror/x86_64/index.txt") << "glibc|2.39:abc:::libc.so.6:|\n"
                                                               << "orphan|1.0:abc::::libfoo.so.1|\n";
     std::ofstream(fs::path(work) / "root/etc/lpkg/mirror.conf")

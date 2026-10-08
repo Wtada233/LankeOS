@@ -17,12 +17,6 @@
  *   绝不误删不属于本包的东西（曾用"子树无其他包 owner 即可删"的递归规则把共享祖先下
  *   usr/share/lpkg/docs 等删掉，3 套测试回归，已否决）。
  *
- * 订正 2026-09-25：本注释原先描述的是 `detail::backup_dir_tree_whole`（逐目录**整树**
- *   rename 成单个 `.lpkg_bak`）。该函数**全仓已不存在**（`grep -rn backup_dir_tree_whole
- *   main/src/` = 0），现行实现是上文的"逐文件进 stash + 空目录 DIR_RM"。本文件 pin 的
- *   **不变量**（最深优先、非本包残留绝不删、嵌套第 2 层也要清掉）不随实现变化，故用例
- *   本身无需改；改的只是机制描述。
- *
  * 本文件 pin：
  *   upgrade/remove 各自：整棵 owned dist-info（含嵌套第 2 层）被清掉；
  *   深嵌套（>2 层）owned 目录被清掉；空 owned 目录被清掉；
@@ -349,7 +343,7 @@ TEST_F(UpgradeObsoleteDirCleanupTest, RemoveCleansDeepNestedOwnedDirs)
 }
 
 // ============================================================================
-// 8) 废弃搬运（`REMOVE_OLD`）的 write-ahead 窗口 —— 2026-09-26 补
+// 8) 废弃搬运（`REMOVE_OLD`）的 write-ahead 窗口
 // ============================================================================
 namespace
 {

@@ -5,7 +5,7 @@
 #include <string_view>
 
 /**
- * @brief 归档成员名"危险"判定 —— `pack`（写侧）与解压（读侧）**共用的唯一判据**。
+ * @brief 归档成员名"危险"判定 —— `pack`（写侧）与解压（读侧）共用的唯一判据。
  *
  * 成员名会变成 WAL 行的**字面内容**（`op + " " + src + " → " + bak`），而 WAL 是行式协议，
  * 两侧都不转义 —— 含 `\n` 的名字能伪造 WAL 行、含字面 `" → "` 的名字能破坏箭头分帧，
@@ -32,15 +32,13 @@ std::string member_name_rejection_message(std::string_view member,
  * 含 `\n` 的名字会把异常消息**自己**切成两行 —— 错误消息被行式消费的地方（日志、CLI
  * 输出）就重演了这里正在修的同一个 bug。
  *
- * 2026-10-05 起对外可见（原本是 `archive.cpp` 的 `static`）：`archive/tar_guard.cpp`
+ * 对外可见（原本是 `archive.cpp` 的 `static`）：`archive/tar_guard.cpp`
  * 也要用它，而"同一件事的第二份实现"正是这个仓库反复踩的坑。
  */
 std::string escape_member_name(std::string_view name);
 
 /**
  * @brief 解压 .tar.zst 存档到指定目录
- * @param archive_path 存档文件路径
- * @param output_dir   输出目录
  * @param label        被解压对象的**标签**，用于进度/完成日志点名（安装时是包名，
  *                     构建时是源码归档文件名）。多包批次里解压日志一个包接一个包地刷，
  *                     不带标签就分不清在解压谁。标签由调用方给（调用方知道自己在处理谁），
@@ -51,9 +49,6 @@ void extract_tar_zst(const std::filesystem::path& archive_path,
 
 /**
  * @brief 从存档中提取单个文件的内容（不完整解压）
- * @param archive_path  存档文件路径
- * @param internal_path 存档内的文件路径
- * @return 文件内容的字符串
  */
 std::string extract_file_from_archive(const std::filesystem::path& archive_path,
                                       const std::string& internal_path);

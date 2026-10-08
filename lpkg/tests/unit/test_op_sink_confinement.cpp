@@ -1,7 +1,7 @@
 /**
  * test_op_sink_confinement.cpp — 写入层原语的**祖先链闸**（`OpSink::confined`）
  *
- * 背景（2026-10-03 审计后的收口）：归档内容那条腿已经在 `detail::confine_target_path()` 上
+ * 背景：归档内容那条腿已经在 `detail::confine_target_path()` 上
  * 挡过"经祖先符号链接写到 root 之外"，但**由 DB 键派生的路径**走的是另一条腿 ——
  * 升级废弃文件、移除趟、空目录回收、xattr 撤销。那些路径取自 `files.db` 的键，若某个祖先
  * 目录此刻是一条**逃出 root 的符号链接**，`rename`/`rmdir`/`chmod`/`lremovexattr` 就会落到

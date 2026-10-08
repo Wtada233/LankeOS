@@ -383,7 +383,7 @@ impl RealBinding {
     /// `(cid, roll)`。`roll` 是 create 时读到的滚动计数，供 `run_upgrade_and_roll` 决定 commit 编号
     /// （**即便本次因 roll 镜像缺失回退过 base，也仍按这个值递增**——与拆分前一致）。
     /// `sh -c "mkdir -p /work && tail -f /dev/null"`：mkdir 必须在 docker cp 前就位——对不存在的
-    /// /work，`docker cp <dir> :/work/` 会把配方内容直接铺进 /work，而不是建 /work/<pkg>（实测）；
+    /// /work，`docker cp <dir> :/work/` 会把配方内容直接铺进 /work，而不是建 /work/<pkg>；
     /// tail -f 保活。DooD：挂宿主 docker socket（容器内可 docker run，docker 包 build tini 静态需要）。
     fn create_container(&self, pkg: &str) -> Result<(String, u32), FarmError> {
         let name = container_name(pkg);

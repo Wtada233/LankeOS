@@ -1,26 +1,24 @@
 /**
- * test_db_backup_chain.cpp — DB 批次内**只落盘一次**，快照恒两份（2026-10-03 改）
+ * test_db_backup_chain.cpp — DB 批次内**只落盘一次**，快照恒两份
  *
  * `Cache::write(milestone)` 对 **DB 一族的 6 个文件**（见 test_base.hpp 的 db_family_files：
  * pkgs / files.db / provides.db / confhashes.db / xattrkeys.db / holdpkgs）各做一次"备份原文件 +
  * 全量重写"。它现在每批次只被调**两次**：`BEGIN_PKGS` 之后的 `:batch-start`，以及提交之前的
  * `:batch-end` ⇒ N 包批次恒为 6×2 份副本，**与 N 无关**。
  *
- * ⚠️ **本文件 2026-10-03 有意推翻了自己原来的钉法**。原文把"每里程碑一份、副本数随批次增长"
- * 当**保守设计正面钉住**，理由是"收益（省 IO、少几个崩溃窗口）不抵代价（改动落在最难测的
- * 恢复路径上）"。推翻的不是**保证**，是**表示**：查实了两件事 ——
+ * ⚠️ 为什么每批次只落盘两次、而不是每里程碑一份 —— 查实了两件事：
  *   ① 批次进行中**没有任何读取器**读盘上的 DB（`Cache::load()` 的调用点全在批次之外，
  *      循环内一律走内存 `Cache`）；
  *   ② 未提交批次**一律整体回滚**，所以中途的盘上状态既不可观测、也不可能成为最终状态。
  * 于是"每包一个还原点"换不来任何可观测的东西，却让 100 包批次在 `/var/lib/lpkg` 落下
- * ~2 GB 临时备份（本机 `files.db` 实测 19.8 MB / 286k 行，整仓升级 ~15 GB）。
+ * ~2 GB 临时备份（本机 `files.db` 19.8 MB / 286k 行，整仓升级 ~15 GB）。
  * 现在唯一的还原点是 `:batch-start`，加一份提交前的 `:batch-end`。
  *
  * 清单**不在这里硬编码**：一族里加 confhashes.db / xattrkeys.db 时硬编码清单就是各自漏掉它
  * 的地方 —— 本文件三处计数/快照与 test_upgrade_rollback_fidelity.cpp 的 db_state() 都从
  * db_family_files() 取。
  *
- * 本文件钉住：
+ * 本文件覆盖：
  *   ① **副本数恒为 6×2**，批次中途只有 `:batch-start` 一份，**不随批次大小增长**；
  *      提交后清干净（0）。
  *   ② **批次中途盘上的 DB 停在批次前**，WAL 里**没有**包级 DB 行 —— "逐包写入已取消"的
@@ -184,8 +182,6 @@ protected:
 // ============================================================================
 // ① 副本数**与批次大小无关**：DB 每批次只落盘两次，峰值恒为 6×2。
 //    批次**中途**只有 `:batch-start` 一份（`:batch-end` 还没写），所以此刻是 6。
-//    （原用例名 PeakBackupCountGrowsWithBatchSize 断言峰值 = 6×(1+N) 且必须随批次增长 ——
-//      2026-10-03 有意推翻，理由见文件头。）
 // ============================================================================
 
 TEST_F(DbBackupChainTest, PeakBackupCountIsIndependentOfBatchSize)
@@ -232,8 +228,7 @@ TEST_F(DbBackupChainTest, PeakBackupCountIsIndependentOfBatchSize)
 
 // ============================================================================
 // ② 批次中途**没有**包级里程碑备份，也没有对应的 WAL DB 行
-//    （原用例 EveryMilestoneHasItsOwnBackupFile 钉的是"每个里程碑一份、与 WAL 行一一对应"
-//      —— 2026-10-03 有意推翻，理由见文件头）—— **整族 6 个库逐个枚举**（含 confhashes.db）
+//     —— **整族 6 个库逐个枚举**（含 confhashes.db）
 // ============================================================================
 
 TEST_F(DbBackupChainTest, NoPerPackageBackupOrWalRowMidBatch)
@@ -305,8 +300,6 @@ TEST_F(DbBackupChainTest, OnDiskDbStaysAtBatchStartUntilCommit)
 
 // ============================================================================
 // ③ `:batch-start` 那份备份的内容 = **批次前**的状态（唯一的还原点）
-//    （原用例 BackupContentsFormTheMilestoneChain 钉的是链式递进语义 —— 2026-10-03 有意
-//      推翻，理由见文件头）
 // ============================================================================
 
 TEST_F(DbBackupChainTest, BatchStartBackupHoldsThePreBatchState)
@@ -347,12 +340,7 @@ TEST_F(DbBackupChainTest, BatchStartBackupHoldsThePreBatchState)
 }
 
 // ============================================================================
-// ④ 升级批次同样每里程碑一份（整族 6 个 DB 文件都已存在 → 每包写完都落一份）
-// ============================================================================
-
-// ============================================================================
-// ④ 升级批次同样**不**留包级里程碑备份（原用例 UpgradeBatchKeepsPerPackageBackups
-//    断言相反的事 —— 2026-10-03 有意推翻）
+// ④ 升级批次同样**不**留包级里程碑备份
 // ============================================================================
 
 TEST_F(DbBackupChainTest, UpgradeBatchLeavesNoPerPackageBackups)
@@ -459,8 +447,6 @@ TEST_F(DbBackupChainTest, RecoverAfterMidBatchCrashRestoresByteIdenticalDb)
         << "cr1 确实装完了（崩溃点之前）";
 
     // 崩溃现场：每个 DB 文件都留着 `:batch-start` 那份 —— 它是 `rec` 唯一的回退依据。
-    // （2026-10-03 前这里断言的是"每个已装包的里程碑各留一份"；逐包落盘取消后不再有那些，
-    //   但**回退依据仍然在**，所以下面"逐字节回到批次前"的断言照旧成立。）
     for (const auto& db : db_files()) {
         EXPECT_TRUE(fs::exists(bak_of(db, ":batch-start")))
             << "崩溃现场缺少 :batch-start 备份（rec 就没有回退依据了）：" << db;
@@ -511,10 +497,9 @@ TEST_F(DbBackupChainTest, ActiveRollbackAlsoRestoresByteIdenticalDb)
 // ⑥'' **新窗口**：`:batch-end` 行已落、`COMMIT_PKGS` 未写时失败 ⇒ 整批（含这次 DB 写）
 //      逐字节退回批次前。
 //
-// 这个窗口是 2026-10-03 的改动**新引入**的：DB 改成批次末尾写一次之前，最后一个包的
-// COMMIT 之后就不再有 DB 写要撤。现在批次末尾多了一次 DB 落盘，而它**必须在 COMMIT_PKGS
+// 现在批次末尾多了一次 DB 落盘，而它**必须在 COMMIT_PKGS
 // 之前**完成 —— 否则崩溃留下"批次已提交、DB 还是旧的"，而**已提交批次不会被回滚**，
-// 没有任何机制能修回来。本用例把"它确实发生在提交之前（= 可回滚）"钉住：
+// 没有任何机制能修回来。本用例把"它确实发生在提交之前（= 可回滚）"固定下来：
 // 断点命中说明那次落盘真的执行到了，随后的关断说明**它被完整撤回了**。
 // ============================================================================
 

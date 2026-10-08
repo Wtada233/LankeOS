@@ -31,9 +31,9 @@ struct archive_entry;
  * 只会让用户拿到一个装了一半、某文件莫名消失的包；而 `UnsafeArchiveException` 是构建期
  * **不会**被"宽容普通失败"吞掉的那一类（见 `base/exception.hpp`）。
  *
- * ── 判据的接入点：只有 `extract_tar_zst`（2026-10-05 的取舍）──────────────────
+ * ── 判据的接入点：只有 `extract_tar_zst` ──────────────────────────────
  *
- * **为什么重名成员只需要守解压这一条路**：安装流程里**每个**包都要经 `extract_tar_zst`
+ * 重名成员只需守解压这一条路的原因：安装流程里**每个**包都要经 `extract_tar_zst`
  * 解压进 `tmp_pkg_dir_`，而这里是**整包拒绝**。于是"校验读第一份、安装用最后一份"这条链
  * 在**安装完成之前**就断了 —— 无论哪一份是伪造的：
  *   · 第一份说谎 ⇒ `verify_package_metadata`（逐字段比索引）当场拒；
@@ -41,7 +41,7 @@ struct archive_entry;
  * 两个方向都到不了"磁盘上装了个没校验过的东西"。
  *
  * 原本还打算把守卫接进 `extract_file_from_archive`（流式取 `metadata.json`），并让它
- * **扫到 EOF** 才能发现后面的重名成员。**实测代价后放弃**：`packer.cpp` 把 `metadata.json`
+ * **扫到 EOF** 才能发现后面的重名成员。**权衡代价后放弃**：`packer.cpp` 把 `metadata.json`
  * 写在**第一个**成员，所以该函数正常情况下读一个头就返回；改成扫到 EOF 会让**每次**元数据
  * 读取都把整个包解压一遍（本地 `.lpkg` 候选、索引校验各一次，随后真正的解压再一次）。
  * 861 个真实包里最大的是 164 MiB（libreoffice）—— 那是把每条安装路径的 I/O 翻倍的代价，
@@ -52,7 +52,7 @@ struct archive_entry;
  *
  * ── 明确**不采纳**的通用加固建议（每条都有理由，别照着通用清单"补全"）────────
  *
- * 1. **不剥 setuid/setgid**：本仓库的真实包**依赖它**（实测 `dbus`/`linux-pam`/`shadow`/
+ * 1. **不剥 setuid/setgid**：本仓库的真实包**依赖它**（`dbus`/`linux-pam`/`shadow`/
  *    `util-linux`/`sudo` 里的 `dbus-daemon-launch-helper`、`unix_chkpwd`、`passwd`、
  *    `sudo`、`su`、`mount`、`chfn/chsh`、`newuidmap/newgidmap`、`wall`(setgid) 全是
  *    setuid/setgid）。剥掉 = 系统坏掉。libarchive 的 `ARCHIVE_EXTRACT_PERM|OWNER` 原样恢复
@@ -71,7 +71,7 @@ struct archive_entry;
  *    误伤合法源码包。黑名单已覆盖 FIFO/字符/块/socket —— 保持不变。
  * 5. **不拒非 UTF-8 名字**：上游源码 tarball 里带 Latin-1 等历史编码的文件名真实存在；
  *    只拒**控制字符**（含 ESC），那才是日志/终端注入的载体。
- * 6. **不做资源上界**（成员数 / 解压比 / 累计尺寸）：维护者 2026-10-05 明确拍板不加。
+ * 6. **不做资源上界**（成员数 / 解压比 / 累计尺寸）。
  *
  * ── 已核实为**不可实现**的（写在这里，免得下轮当"漏了"再报一次）─────────────
  * · **内嵌 NUL**：`archive_entry_pathname()` 返回的是 **C 串**，NUL 之后的字节在 libarchive
@@ -86,7 +86,6 @@ public:
     /**
      * 单个成员的头级检查。头已读、尚未写盘时调用。
      *
-     * @param entry        libarchive 的成员
      * @param raw_name     成员的**原始**名字（未归一化；`archive_entry_pathname` 的返回值）
      * @param relative     `member_path_relative()` 归一化后的**根内相对路径**（目录条目带尾斜杠）
      * @param archive_path 仅用于错误消息：用户要知道是哪个归档被拒

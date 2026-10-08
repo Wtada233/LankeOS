@@ -1,5 +1,5 @@
 /**
- * test_dir_state_wal.cpp — 目录的"改前状态"必须进 WAL，且 xattr 键要有归属（2026-09-26 新增）
+ * test_dir_state_wal.cpp — 目录的"改前状态"必须进 WAL，且 xattr 键要有归属
  *
  * ── 两个缺陷（本文件各钉一组）──────────────────────────────────────────────────
  *
@@ -12,7 +12,7 @@
  * 修法：`OpSink::dir_meta()` / `set_xattr()` / `unset_xattr()`（write-ahead，行类型见下）。
  *
  * **② xattr 键"不再声明"时撤不掉（安全性质）**
- * 写入侧只写"我有的键"、从不删（`copy_xattrs` 的语义），于是新版本**撤掉**一个键时它留在
+ * 写入侧只写**它自己有的键**、从不删（`copy_xattrs` 的语义），于是新版本**撤掉**一个键时它留在
  * 盘上继续生效 —— 陈旧的 `system.posix_acl_default`（目录下新建文件的继承权限）会继续
  * 放权限，陈旧的 `security.selinux` 会继续打旧标签。修法：新增 `xattrkeys.db` 记
  * "**哪个包在哪个目录上声明过哪个键**"，升级/移除时按"这个**键**还有没有别的属主"撤。
@@ -142,7 +142,7 @@ protected:
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  ① 既有目录的元数据：回滚必须还原（缺陷 ① 的本体）
+//  ① 既有目录的元数据：回滚必须还原
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
@@ -184,13 +184,11 @@ TEST_F(DirStateWalTest, ExistingDirModeIsRestoredOnRollback)
  * 盘上 mode 与包内不一致时**必须留下可见告警**（`warning.dir_perm_mismatch`）：接下来那句
  * "已修正"是配套动作，不是它的替代品 —— 用户得能知道 lpkg 改了这个目录的权限。
  *
- * 为什么补这一条：这条告警此前**没有任何用例钉住**，于是"它到底响没响"只能靠翻日志猜，本轮
- * 就真出过一次误判 —— 拿**键名** `dir_perm_mismatch` 去 grep 整份全量日志得 **0 次**，被读成
- * "分支没跑"；实际 `log_warning(string_format(键, …))` 打的是 **l10n 渲染后的译文**，键名永远
- * 不出现在输出里（实测那里有恰好一次：`... permissions differ: current 700, package wants
- * 755 — corrected`）。**订正 2026-10-03**：mode 参数此后按**八进制**渲染 —— 这里原先记的
- * `448/493` 是**十进制**旧读数（同一批修复见 `ARCH.md` §17）。上面这条断言是动态取锚的，
- * 与进制无关，故仍然成立。
+ * 为什么补这一条：这条告警此前**没有任何用例覆盖**，于是"它到底响没响"只能靠翻日志猜 —— 而
+ * 拿**键名** `dir_perm_mismatch` 去 grep 整份全量日志会得 **0 次**，因为
+ * `log_warning(string_format(键, …))` 打的是 **l10n 渲染后的译文**，键名永远不出现在输出里。
+ * mode 参数按**八进制**渲染（`... permissions differ: current 700, package wants 755 —
+ * corrected`）。上面这条断言是动态取锚的，与进制无关，故仍然成立。
  *
  * 所以断言一律锚在**渲染文本**上，且取模板里第一个 `{}` 之前的前缀 ⇒ 与语言无关
  * （同 `tests/unit/test_repo_index_parsing.cpp` 的手法）。
@@ -298,7 +296,7 @@ TEST_F(DirStateWalTest, NewlyAddedKeyIsRemovedOnRollback)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * v1 声明 `user.old`，v2 不再声明 → 升级后该键**必须消失**（缺陷 ② 的本体）。
+ * v1 声明 `user.old`，v2 不再声明 → 升级后该键**必须消失**。
  *
  * 为什么这是安全性质：陈旧的 `system.posix_acl_default` 会继续决定该目录下新建文件的继承
  * 权限、陈旧的 `security.selinux` 会继续打旧标签 —— 上游删掉它是有意的。
@@ -431,7 +429,7 @@ TEST_F(DirStateWalTest, RemovedPackageRevokesItsKeys)
 
     // ⚠️ **这个前置是本用例的命门**：目录里必须有**无主内容**，否则移除时阶段 B 会把这个
     // "最后持有者 + 此刻为空"的目录整个 `rmdir` 掉 —— 键随着目录一起消失，**与撤销代码
-    // 毫无关系**。第一版用例就是那样写的，于是把撤销接线整段注释掉它**照样绿**（假绿）。
+    // 毫无关系**（把撤销接线整段注释掉，本用例照样绿 = 假绿）。
     // 加了无主文件之后目录会因"非空"被保留（安全边界：无主内容一律不碰），撤销代码才成为
     // 唯一能让那个键消失的东西。
     write_file(dir / "user-file.txt", "不属于任何包\n");
@@ -533,9 +531,9 @@ TEST_F(DirStateWalTest, XattrKeysDbIsPrecreatedWithTheRestOfTheFamily)
 /// ⚠️ 目标目录取**顶层**（`<root>/dswm`），不用 `usr/share/dswm`：归档里含**祖先目录
 /// 条目**（`usr/`、`usr/share/`），它们各自也会刷元数据、各写一行 `DIR_META` —— 而
 /// `BreakpointManager` 的断点是**一次性**的（头文件的契约："每个断点只触发一次，之后自动
-/// 清除"）。于是第一次命中（父目录）就把断点消耗掉了，目标那一格**永远轮不到**。
-/// 第一版用例就是这么写的：`hit` 为真、WAL 里也有 `DIR_META`（只是父目录那一行），而断言
-/// 找的是目标那一行 —— 实测把这个坑量了出来。顶层目录没有祖先条目，第一次命中就是它。
+/// 清除"）。于是第一次命中（父目录）就把断点消耗掉了，目标那一格**永远轮不到** —— 断点
+/// `hit` 为真、WAL 里也有 `DIR_META`（只是父目录那一行），而断言找的是目标那一行。
+/// 顶层目录没有祖先条目，第一次命中就是它。
 TEST_F(DirStateWalTest, DirMetaWindowWritesRowBeforeTouchingTheDisk)
 {
     const std::string pkg = "ds_wm";
@@ -651,8 +649,8 @@ TEST_F(DirStateWalTest, UnsetXattrWindowWritesRowBeforeTouchingTheDisk)
  * `xattrkeys.db` 的**归属记录本身**也要能回滚。
  *
  * 它走的是与 `confhashes.db` 逐字相同的 `write_db_file_wal` 里程碑链（`:batch-start` 备份 →
- * `reverse_execute` 的 DB 分支还原），但这条链**此前没有任何用例直接钉住** —— 只钉了
- * "盘上的键回来了"（那是 xattr 那一半）。这一条钉的是**表**。
+ * `reverse_execute` 的 DB 分支还原），但这条链**此前没有任何用例直接覆盖** —— 只覆盖了
+ * "盘上的键回来了"（那是 xattr 那一半）。这一条覆盖的是**表**。
  *
  * 现场：v1 声明 `user.k`（归属记下来）→ v2 撤掉它、改声明 `user.k2`，批次中途失败 →
  * 回滚后**归属表必须回到批次前**：`user.k` 仍属本包、`user.k2` 不属于任何人。
@@ -697,8 +695,8 @@ TEST_F(DirStateWalTest, XattrOwnershipTableIsRestoredOnRollback)
  * 入口**（`finish_committed_batch`，post-commit）的**可观察效果**来钉 —— 不为了覆盖率给它
  * 开一个测试缝（一个到不了那行的测试比没有更糟）。
  *
- * 为什么值得钉：这里正是 `exists_no_follow` 那条修复（原写法
- * `!fs::exists(p) && !fs::is_symlink(p)` 在**中间段成环**的路径上抛 ELOOP）与 `CLEANUP`
+ * 为什么值得钉：这里正是 `exists_no_follow` 那条修复（`!fs::exists(p) && !fs::is_symlink(p)`
+ * 这种写法在**中间段成环**的路径上抛 ELOOP）与 `CLEANUP`
  * write-ahead 唯一的落地处；而 `finish_committed_batch` 把它的异常吞成
  * `warning.cleanup_deferred` —— 也就是说**它失败是静默的**，只有"盘上有没有残留"能说话。
  */

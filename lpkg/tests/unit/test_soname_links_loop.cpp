@@ -1,18 +1,18 @@
 /**
  * test_soname_links_loop.cpp —— `apply_soname_links()` 必须能跳过符号链接环
  *
- * ── 缺陷（实测，2026-09-26）────────────────────────────────────────────────
+ * ── 缺陷 ──────────────────────────────────────────────────────────────────
  * `main/src/elf/lib_utils.cpp` 的扫描趟曾写 `if (!entry.is_regular_file()) continue;`，
  * 而 `directory_entry::is_regular_file()` 走 `status()`（**跟随**末段链接），对符号链接环
  * 抛 `filesystem_error code=40 (ELOOP)`（前提见 `tests/unit/test_symlink_loop_paths.cpp`
  * 的 Premise* 用例）。**它的两个调用点传的都是包内容**：
- *   · `trigger/trigger.cpp:117` → 目标 root 的 `<root>/usr/lib`（**提交之后**才跑）
- *   · `build/builder.cpp:169`   → 构建 staging 的 `<staging>/usr/lib`
+ *   · `trigger/trigger.cpp` → 目标 root 的 `<root>/usr/lib`（**提交之后**才跑）
+ *   · `build/builder.cpp`   → 构建 staging 的 `<staging>/usr/lib`
  * 后果不是"某个操作失败"，而是：盘上 `/usr/lib` 只要有一个环（两个包各出一个悬空链接互指
  * 就能造出来，无需 root 手工干预），任何提供 `<root>/usr/lib` 下共享库的包**装完之后**在触发器里抛
  * —— 包已落地、DB 已提交，命令却报失败。构建侧同理（打包时 staging 里的环）。
  *
- * ── 本文件钉两件事 ─────────────────────────────────────────────────────────
+ * ── 本文件覆盖两件事 ─────────────────────────────────────────────────────────
  *   ① 有环时**不抛**（回归项）；
  *   ② 有环时**扫描不中断**：同一个目录里那个正常的库仍要被处理、SONAME 链接仍要建出来。
  *      这一条防的是"用 lstat 语义一刀切"的过度修复 —— `libfoo.so -> libfoo.so.1.2.3`

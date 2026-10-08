@@ -1,7 +1,7 @@
 //! qmlchk — QML import 的运行时模块/路径依赖检查。
 //!
 //! LankeOS 约定：QML import 的归属包必须在本包运行时可达（binpkg `deps` ∪ `needed_so` 链接依赖），
-//! 否则报缺 deps。needed_so 扫不出 QML 绑定，所以这类必须显式 deps（CLAUDE.md KDE/Qt 规则）。
+//! 否则报缺 deps。needed_so 扫不出 QML 绑定，所以这类必须显式 deps。
 //!
 //! provider 两路：
 //! - **URI 模块**：内容 `usr/lib/qt6/qml/<模块路径>/qmldir` → 该目录归属包提供该 import 名（点化）。
@@ -214,7 +214,6 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     }))
 }
 
-/// 跑 qmlchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let walk = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
 

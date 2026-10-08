@@ -10,7 +10,7 @@
 #include "../main/src/trigger/trigger.hpp"
 
 /**
- * `sigint_graceful` 的**定义**在 `main/src/main_cli.cpp`（2026-09-26 从 `main.cpp` 下沉）：
+ * `sigint_graceful` 的**定义**在 `main/src/main_cli.cpp`（从 `main.cpp` 下沉）：
  * 该翻译单元在 `LPKG_OBJS` 里 ⇒ 测试二进制与 `build/lpkg` **共用同一份**定义
  * （此前测试二进制不链接 `main.o`，只能由 `tests/integration/test_sigint.cpp` 自己造一份，
  * 与生产那份互相独立 —— 于是测试置位它并不能真的影响生产的 CLI 路径）。这里只声明，
@@ -24,7 +24,7 @@ extern std::atomic<bool> sigint_graceful;
  * ## 为什么不能靠 fixture 的 TearDown
  * gtest 的 `TearDown` 只在**用例所属的那个 fixture** 里生效。本仓库有几处状态是**进程级**的
  * （跨 fixture、跨套件存活），于是一个"污染者"用例会把状态留给**它后面每一个**用例 ——
- * 只有当"负责把状态复位的那一个用例"恰好也在本次过滤范围内时才会被清掉。实测两种踩法：
+ * 只有当"负责把状态复位的那一个用例"恰好也在本次过滤范围内时才会被清掉。三种踩法：
  *
  *   1. `TriggerManager`（触发器规则表 + 粘性的 `config_loaded`）：一个端到端用例因它
  *      "单跑绿、全量红"，最后只能改成不依赖任何触发器来自保；
@@ -33,9 +33,9 @@ extern std::atomic<bool> sigint_graceful;
  *      跑完把它留在 `true`，而复位写在同一个套件的另一个用例里。于是
  *      `--gtest_filter="SigIntTest.AtomicRollbackOnSigInt:TypeTransitionMatrixTest.FileToFile"`
  *      里**后一条必然红** —— 报 `Installation aborted by user (SIGINT)`，看起来像被测代码坏了。
- *      （2026-09-26 实测复现：`3 tests ran / 1 PASSED / 2 FAILED`。这不是某个改动引入的，
+ *      （复现输出：`3 tests ran / 1 PASSED / 2 FAILED`。这不是某个改动引入的，
  *       改前改后一样。）
- *   3. `Config` 的各模式开关（2026-10-03 实测）：`test_hook_log_message` 在自己的 TearDown 里
+ *   3. `Config` 的各模式开关：`test_hook_log_message` 在自己的 TearDown 里
  *      `set_no_hooks_mode(true)`，于是**后面每个用例都跑在"钩子禁用"下**。症状有两种，第二种更阴：
  *      ① `PhaseSectionTest` 里"运行安装后钩子"那一节整段消失；
  *      ② 它那条"**没有**钩子的包不该出现该阶段"的断言因此变成**空转的绿**（两种情形都给绿）。

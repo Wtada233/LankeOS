@@ -1,10 +1,10 @@
-//! build.rs — farm build 调度（§4/6/7/8）。
+//! mod.rs — farm build 调度（§4/6/7/8）。
 //!
 //! 逻辑层：受影响集 → 拓扑分批（build_deps）→ 逐包 build → verify 三分支 →
 //! repack（元数据漂移）/ 传播（provides 漂移）。lpkg 交互经 `LpkgBinding` 接缝；
 //! .lpkg 解包/扫描（scan.rs）与重打（repack.rs）在本模块编排。
 //!
-//! 用户澄清的三条规则：
+//! 三条规则：
 //! 1. **传播重建先 bump release**：被 ABI 断裂波及的包，构建前先 `release + 1`（§7.2 重编语义）；
 //! 2. **元数据漂移双写**：既改 .lpkg 内 metadata.json（repack），也改仓库 LankeBUILD.json，
 //!    确保源定义（真相）与包内元数据一致；
@@ -40,7 +40,6 @@ pub(crate) use prompt::{prompt_blocked, PromptChoice};
 pub(crate) use sched::{reorder_queue, topo_order};
 pub(crate) use sources::pre_download_sources;
 
-/// farm build 输入。
 pub struct BuildOptions {
     pub pkgs_dir: PathBuf,
     pub out_dir: PathBuf,
@@ -82,7 +81,6 @@ enum BuildDone {
     Blocked,
 }
 
-/// 交互提示的用户选择。
 /// LankeBUILD.json 最小字段（build 调度用）。
 #[derive(serde::Deserialize, Clone)]
 pub struct LankeBuild {
@@ -118,7 +116,7 @@ pub fn read_lankebuild(pkgs_dir: &Path, pkg: &str) -> Option<LankeBuild> {
     serde_json::from_str(&content).ok()
 }
 
-/// 源就绪门（§8.6）：第一次安装计划中能确定的 http/https 源**必须全部下载**（用户规则）。
+/// 源就绪门（§8.6）：第一次安装计划中能确定的 http/https 源**必须全部下载**。
 ///
 /// - 交互模式：下载失败 → 开宿主 shell 让 operator 手动介入（放置源/修网络/改 URL），
 ///   退出后重试。**不许退出、不许跳过**——直到源就绪才放行。
@@ -377,7 +375,7 @@ fn build_plan(
     groups: &RebuildGroups,
     all_pkgs: &[String],
 ) -> (VecDeque<(String, bool)>, HashSet<String>) {
-    // 2. 增量选择（用户规则）：effective_version 与本地 repo 旧索引一致的包跳过构建。
+    // 2. 增量选择：effective_version 与本地 repo 旧索引一致的包跳过构建。
     //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version-release（如 1.1-2）。
     //    validate 模式：选择改为"所有没有 `.build_ok` 标记的包"（成功构建才会写标记，
     //    跳过/blocked 不写 → 下次 validate 重试）。排序仍走同一 topo_order。
@@ -516,7 +514,7 @@ pub fn run_build(
     // 声明式重建组（data/build/*.yaml）：不链但 ABI 敏感的包（python 生态等）。
     let groups = RebuildGroups::load(&opts.build_data_dir);
 
-    // 2. 增量选择（用户规则）：effective_version 与本地 repo 旧索引一致的包跳过构建。
+    // 2. 增量选择：effective_version 与本地 repo 旧索引一致的包跳过构建。
     //    LankeBUILD.json 的 version 是 raw；有 release 字段拼 version-release（如 1.1-2）。
     //    validate 模式：选择改为"所有没有 `.build_ok` 标记的包"（成功构建才会写标记，
     //    跳过/blocked 不写 → 下次 validate 重试）。排序仍走同一 topo_order。
@@ -532,7 +530,7 @@ pub fn run_build(
             println!("{}", tr!("build.plan_cancel"));
             return Ok(BuildReport::default());
         }
-        // 确认集全部 http/https 源**必须预下载**（用户规则）：任何失败都不允许跳过/标记 missing
+        // 确认集全部 http/https 源**必须预下载**：任何失败都不允许跳过/标记 missing
         // 继续——交互模式开宿主 shell 手动介入后重试，非交互则整个构建终止。
         for (pkg, _) in &queue {
             source_gate(pkg, opts, false)?;
@@ -548,7 +546,7 @@ pub fn run_build(
         }
         let ver = effective_version(&opts.pkgs_dir, &pkg).unwrap_or_else(|| "?".into());
         // 传播重建（被 ABI 断裂波及，is_victim）或 version-change 组预排受害者（开工前已定）
-        // → 先 bump release（用户规则 1），再构建
+        // → 先 bump release（规则 1），再构建
         if is_victim || version_planned_names.contains(&pkg) {
             bump_release(&opts.pkgs_dir, &pkg);
         }
@@ -568,7 +566,7 @@ pub fn run_build(
         }
 
         // 源预下载 + 构建 → 统一的进程内交互接管（§8.5，不退出进程）。
-        // 源预下载失败**不允许跳过 / 不允许标记 missing 继续**（用户规则）：交互模式开宿主
+        // 源预下载失败**不允许跳过 / 不允许标记 missing 继续**：交互模式开宿主
         // shell 手动介入后重试；非交互无 operator → 整个构建硬终止。
         // 构建失败仍走原菜单：1) 开 shell 修复 2) 跳过 3) 结束。
         let (done, end_build) = 'pkg: loop {
@@ -651,7 +649,7 @@ pub fn run_build(
         }
 
         // 上传本地仓库（取代旧版本）+ 更新 index.txt —— **breaking 包必须先进仓库**，
-        // 否则依赖它的包重建时仍用旧 ABI（用户规则：反哺仓库 / 中间上传流程）。
+        // 否则依赖它的包重建时仍用旧 ABI（反哺仓库 / 中间上传流程）。
         let final_lpkg = match place_in_repo(&outcome, opts, &pkg) {
             Ok(p) => p,
             Err(e) => {
@@ -707,7 +705,7 @@ pub fn run_build(
         // ABI 传播（§7.2）：removed SONAME → 直连受害者重建；声明式重建组（data/build/*.yaml）
         // 额外重建"不链但 ABI/运行时敏感"的包。变化的 SONAME 无包直接 need → 改好元数据进仓库。
         //
-        // 触发语义（用户规则）：
+        // 触发语义：
         //   - abichange 组（python…）：只在 SONAME 断裂时触发（removed 非空）
         //   - version-change 组（perl 等纯解释器，无 libperl.so 可断）：on 包本轮重建且有效版本
         //     与旧索引不同时，按 version-change-script 判定（OLD_VER/NEW_VER，如 minor 变才重建），

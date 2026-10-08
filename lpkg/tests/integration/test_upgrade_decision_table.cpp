@@ -6,28 +6,27 @@
  * ⑤ `commit_without_file_ops()`（注册 + 废弃清除）。**"同一个路径该由哪一趟处理"原先只写
  * 在三处的注释里**，于是长出过漏格：第②步曾写"仅真正的目录由目录逻辑处理、跳过"，而"目录
  * 逻辑"是跑在**拷贝之后**的第⑤步 —— "盘上是真目录、新条目是文件/符号链接"那一格没人让开，
- * `rename` 撞 EISDIR，整条升级路径被预检拒掉（见 lpkg/CLAUDE.md §1.2）。
+ * `rename` 撞 EISDIR，整条升级路径被预检拒掉。
  *
  * 第②步把"路径 → 动作"抽成**一个**函数 `detail::decide_path()`（`main/src/pkg/op_sink.hpp`），
  * 三趟都只经它决定"归谁、做什么"，并在入口处检查后置条件（**恰好认领一次**）。
  *
  * ── 本文件的两半 ─────────────────────────────────────────────────────────────
  *   A. **模型层**（`DecisionTableModelTest`）：直接驱动 `decide_path()`，穷举事实空间 +
- *      黄金表（§3.2 逐行对照）+ 合理性不变量。**"恰好认领一次"的覆盖性断言在这里** ——
+ *      黄金表（§6.3 逐行对照）+ 合理性不变量。**"恰好认领一次"的覆盖性断言在这里** ——
  *      它是纯函数，能穷举；而运行时那次检查只能覆盖"当次真的走过的格子"。
- *   B. **端到端**（`UpgradeDecisionTableTest`）：一个包 + 一次升级把 §3.2 的多行**一起**
+ *   B. **端到端**（`UpgradeDecisionTableTest`）：一个包 + 一次升级把 §6.3 的多行**一起**
  *      走一遍，断言每一行的盘面落点与决策表说的一致（模型说对了、盘面也要对）。
  *
- * ── `/etc` 的 dir→非目录 两腿（2026-09-25 修）────────────────────────────────
+ * ── `/etc` 的 dir→非目录 两腿 ────────────────────────────────────────────────
  * 这两格曾经**是坏的**：让开趟对 `/etc` 非目录条目一律早退（那条早退排在"真目录挡路"
  * 分支之前），盘上挡路的真目录没人让开 —— 普通文件条目 rename 撞 EISDIR、符号链接条目
  * 被 `error.dir_replaced_by_symlink` 守卫拒绝，升级**永远不可能成功**。
  *
- * 第②步（本文件落地的那次重构）**如实记录**了这个现状（黄金表里标【现状】两行、
- * 合理性不变量把那两格排除）；紧接着的第②步之后的一次**独立**改动修掉了它：
- * `/etc` 的非目录条目撞真目录时，让开趟先 `save_config` 把整树改名成 `<路径>.lpkgsave/`，
- * 写入趟再**就地**落位（普通文件与符号链接都是就地，**不**落 `.lpkgnew`；落点差异见
- * `ARCH.md` §6.3 的落点规则）。黄金表里那两行现在是**正常行**，合理性不变量不再排除任何格子。
+ * 现在的规则：`/etc` 的非目录条目撞真目录时，让开趟先 `save_config` 把整树改名成
+ * `<路径>.lpkgsave/`，写入趟再**就地**落位（普通文件与符号链接都是就地，**不**落
+ * `.lpkgnew`；落点差异见 `ARCH.md` §6.3 的落点规则）。黄金表里那两行是**正常行**，
+ * 合理性不变量不排除任何格子。
  */
 
 #include <gtest/gtest.h>
@@ -73,11 +72,11 @@ struct FactCell {
     bool obsolete = false;
     bool last_owner = false;
     bool new_dir_entry = false;
-    /// 盘上那份是**符号链接**（2026-09-26 新增）。
+    /// 盘上那份是**符号链接**。
     /// ⚠️ **必须留在最后**：本结构到处用**位置初始化**（`{true, false, true, true, false}`），
     /// 往中间插一个字段会让下面每一条 case 静默错位、而且错得很像"表算错了"。
     bool disk_is_symlink = false;
-    /// 归档条目与盘上那份都是符号链接、且**目标逐字节相同**（2026-10-02 新增）。
+    /// 归档条目与盘上那份都是符号链接、且**目标逐字节相同**。
     /// ⚠️ 同 `disk_is_symlink`：**必须留在最后**（本结构到处用位置初始化）。
     bool disk_symlink_matches_entry = false;
 };
@@ -275,7 +274,7 @@ TEST(DecisionTableModelTest, EveryFactCombinationIsClaimedExactlyOnce)
     //   `disk_is_symlink ⇒ disk_exists ∧ ¬disk_is_dir`（8 种里去掉 3 种 ⇒ 去掉 3/8）。
     // 前两条互不相交于第三条的维度之外，逐维相乘：
     //   16(自由维) × 3(条目维) × 4(盘面三维) × 3(cfg) = 576
-    // 2026-10-02：新增 `disk_symlink_matches_entry` 一维。它只在**两边都是符号链接**时才可能
+    // 新增 `disk_symlink_matches_entry` 一维。它只在**两边都是符号链接**时才可能
     // 为真，`for_each_cell` 也只在那里枚举它（其余组合下枚举它只是让空间翻倍而不增值）⇒
     // 多出的格子 = 16(自由维) × 1(条目维＝符号链接) × 1(盘面三维＝符号链接) × 3(cfg) = 48。
     // 故 576 + 48 = 624。
@@ -294,7 +293,7 @@ PathDecision decide_cell(const FactCell& c, bool in_archive, const char* what)
 }
 
 /**
- * **黄金表**：`ARCH.md` §6.3 的每一行（含 `/etc` 的落点规则）逐条钉住。
+ * **黄金表**：`ARCH.md` §6.3 的每一行（含 `/etc` 的落点规则）逐条覆盖。
  *
  * 这张表是"决策表 = 文档"的对照物：改了 `decide_path()` 的任何一格，这里必须一起改，
  * 改的时候就会被迫回答"文档是不是也要改"。**两格标了【现状】** —— 它们的值是**今天的行为**
@@ -311,14 +310,14 @@ TEST(DecisionTableModelTest, GoldenTableMatchesArchSection63)
         PathAction reg;
     };
     const Case cases[] = {
-        // ── §3.2 第 1 行：旧有、新也有（同类型）→ 搬进 stash（BACKUP）──────────────
+        // ── §6.3 决策表：旧有、新也有（同类型）→ 搬进 stash（BACKUP）──────────────
         {"归档普通文件撞盘上普通文件（同类型替换）",
          {false, false, false, true, false},
          true,
          PathAction::Stash,
          PathAction::WriteInPlace,
          PathAction::Unclaimed},
-        // ── §3.2 第 2 行：类型变更（file→dir / dir→file）→ 搬进 stash ─────────────
+        // ── §6.3 决策表：类型变更（file→dir / dir→file）→ 搬进 stash ─────────────
         {"归档目录撞盘上普通文件（file→dir，非 /etc）",
          {false, true, false, true, false},
          true,
@@ -337,7 +336,7 @@ TEST(DecisionTableModelTest, GoldenTableMatchesArchSection63)
          PathAction::Stash,
          PathAction::WriteInPlace,
          PathAction::Unclaimed},
-        // §3.2 第 8 行的 `/etc` 腿（§3.2.2 第一行）：整树改名 `<目录>.lpkgsave/`
+        // §6.3 决策表的 `/etc` 腿：整树改名 `<目录>.lpkgsave/`
         // （**不进 stash** —— 进 stash 会在提交后被 remove_all 连内容一起清掉），
         // 路径让开之后新条目**就地**落位、**不**退 `.lpkgnew`。
         {"归档普通文件撞盘上真目录（dir→file，/etc）→ 整树改名 .lpkgsave 后就地落位",
@@ -346,9 +345,8 @@ TEST(DecisionTableModelTest, GoldenTableMatchesArchSection63)
          PathAction::SaveConfig,
          PathAction::WriteInPlace,
          PathAction::Unclaimed},
-        // ── /etc 的**类型变化**：原物改名 .lpkgsave（2026-09-26 统一）──────────────
-        // 改前这一格是"符号链接一律按配置冲突处理"→ 原文件留原样、新链接退 .lpkgnew。
-        // 改后与"dir→非目录"、"非目录→dir"统一：**只要类型换了，原物就留副本、新物就位**。
+        // ── /etc 的**类型变化**：原物改名 .lpkgsave ──────────────
+        // 与"dir→非目录"、"非目录→dir"统一：**只要类型换了，原物就留副本、新物就位**。
         {"归档符号链接撞盘上普通文件（/etc，file→symlink）→ 原物 .lpkgsave + 就地落链接",
          {true, false, true, true, false},
          true,
@@ -370,7 +368,7 @@ TEST(DecisionTableModelTest, GoldenTableMatchesArchSection63)
          PathAction::WriteLpkgnew,
          PathAction::Unclaimed},
         // 同上，但**目标逐字节相同** ⇒ `KeepOnDisk`：连 `.lpkgnew` 都不产生。
-        // 旧行为不看目标、一律退 `.lpkgnew`，于是链接没变的重装也堆副本（2026-10-02 修）。
+        // 旧行为不看目标、一律退 `.lpkgnew`，于是链接没变的重装也堆副本。
         {"归档符号链接撞盘上符号链接（/etc，类型未变，**目标相同**）→ 盘上那份就是我们要的",
          {true, false, true, true, false, ConfigDisposition::InstallNew, false, false, false, true,
           true},
@@ -416,7 +414,7 @@ TEST(DecisionTableModelTest, GoldenTableMatchesArchSection63)
          PathAction::Noop,
          PathAction::WriteDirMetadata,
          PathAction::Unclaimed},
-        // ── §3.2 第 6/7 行：/etc 三哈希的两种"保留"结果 ───────────────────────────
+        // ── §6.3 决策表：/etc 三哈希的两种"保留"结果 ───────────────────────────
         // 第③步（改执行顺序）之后，这三行的**让开动作**从 `Noop` 变成 `Stash`：让开趟把
         // 盘上那份**先搬进 stash**（这是 `/etc` 配置家族"先搬空再写入"的形态），三哈希的
         // `hash_local` 因此改从 **stash 副本**读（`ARCH.md` §6.3），判为保留时写入趟用
@@ -440,7 +438,7 @@ TEST(DecisionTableModelTest, GoldenTableMatchesArchSection63)
          PathAction::Stash,
          PathAction::WriteLpkgnew,
          PathAction::Unclaimed},
-        // ── §3.2 第 3 行：非 /etc 的废弃条目 → 搬进 stash（REMOVE_OLD）─────────────
+        // ── §6.3 决策表：非 /etc 的废弃条目 → 搬进 stash（REMOVE_OLD）─────────────
         {"废弃普通文件（非 /etc、最后持有者、盘上还在）→ REMOVE_OLD 进 stash",
          {false, false, false, true, false, ConfigDisposition::InstallNew, true, true},
          false,
@@ -471,8 +469,8 @@ TEST(DecisionTableModelTest, GoldenTableMatchesArchSection63)
          PathAction::Unclaimed,
          PathAction::Unclaimed,
          PathAction::Noop},
-        // ── §3.2 第 4 行（2026-09-26 改）：/etc 的废弃**文件/链接** → 改名 .lpkgsave ────
-        // 改前"保持原位、只撤所有权"；改后与"类型变化"、移除整包统一 —— /etc 下的东西
+        // ── §6.3 决策表：/etc 的废弃**文件/链接** → 改名 .lpkgsave ────
+        // 与"类型变化"、移除整包统一 —— /etc 下的东西
         // 永远不会被无声丢掉，也永远不会占着"新版本该用的那个名字"。
         {"废弃 /etc 配置文件 → 改名 .lpkgsave + 撤所有权",
          {true, false, false, true, false, ConfigDisposition::InstallNew, true, true},
@@ -526,7 +524,7 @@ TEST(DecisionTableModelTest, GoldenTableMatchesArchSection63)
  *
  * 这一条正是"让开趟必须跑在写入趟之前"的可执行形式：让开动作若被推给跑在拷贝之后的第⑤步，
  * 上面两条立刻破。**全空间都要满足**（`/etc` 的 dir→非目录 两格曾是这个不变量的反例，
- * 2026-09-25 修掉后已归位；见文件头）。
+ * 修掉后已归位；见文件头）。
  */
 TEST(DecisionTableModelTest, LetGoActuallyClearsTheWay)
 {
@@ -560,7 +558,7 @@ TEST(DecisionTableModelTest, LetGoActuallyClearsTheWay)
             // 配错就是把盘上那份搬走了却没人搬回来（②）或没搬却去搬回（①）：
             //   ① `/etc` file→file 判为 `KeepLocal`（三哈希）→ 让开趟 `Stash` 走了，
             //      写入趟 `un_stash` 搬回（那个分支的 `stashed_bak` 有值）；
-            //   ② `/etc` symlink→symlink 且**目标逐字节相同**（2026-10-02 新增）→ 让开趟
+            //   ② `/etc` symlink→symlink 且**目标逐字节相同** → 让开趟
             //      `Noop`（压根没搬），写入趟因此也不该有搬运。
             if (d.write == PathAction::KeepOnDisk) {
                 if (c.entry_is_symlink) {
@@ -592,7 +590,7 @@ TEST(DecisionTableModelTest, LetGoActuallyClearsTheWay)
                 EXPECT_TRUE(c.obsolete) << "新版本仍提供的目录不该被 rmdir：" << ctx;
             }
             if (d.reg == PathAction::DropOwnership) {
-                // 2026-09-26 起收紧到**目录**：废弃的 /etc **文件/符号链接**改走
+                // 收紧到**目录**：废弃的 /etc **文件/符号链接**改走
                 // SaveConfigObsolete（改名 .lpkgsave），保持原位的只剩目录这一族
                 // （有意例外，见 decide_path 里那一格的说明）。
                 EXPECT_TRUE(c.is_config && c.obsolete && c.entry_is_dir)
@@ -611,7 +609,7 @@ TEST(DecisionTableModelTest, LetGoActuallyClearsTheWay)
 }  // namespace
 
 // ============================================================================
-// B. 端到端：一个包 + 一次升级，把 §3.2 的多行一起走一遍
+// B. 端到端：一个包 + 一次升级，把 §6.3 的多行一起走一遍
 // ============================================================================
 
 /**
@@ -624,8 +622,7 @@ TEST(DecisionTableModelTest, LetGoActuallyClearsTheWay)
  *   ⑥ /etc InstallNew（用户没改过 → 静默换新版）`etc/silent.conf`
  *   ⑦ /etc KeepLocal（包没改这个配置 → 保留用户那份、连 .lpkgnew 都没有）`etc/keep.conf`
  *   ⑧ /etc SaveLpkgnew（三者互异 → 落 .lpkgnew）`etc/newer.conf`
- *   ⑨ /etc 废弃**文件** → 改名 `etc/obsolete.conf.lpkgsave` + 撤所有权（2026-09-26 改；
- *      改前是"保持原位"）
+ *   ⑨ /etc 废弃**文件** → 改名 `etc/obsolete.conf.lpkgsave` + 撤所有权
  *   ⑩ /etc 的 **dir → file**  `etc/swap_f/` → `etc/swap_f`
  *      → 整树改名 `etc/swap_f.lpkgsave/`（**不进 stash**，提交后仍在），新文件**就地**落位
  *   ⑪ /etc 的 **dir → symlink** `etc/swap_s/` → `etc/swap_s`
@@ -771,7 +768,7 @@ TEST_F(UpgradeDecisionTableTest, OneUpgradeWalksEveryRowOfTheTable)
         << "用户改过的配置**永不**被静默覆盖（`ARCH.md` §5.4 不变量 4）";
     EXPECT_EQ(read_file(test_root / "etc/newer.conf.lpkgnew"), "N2\n")
         << "新版应落在 .lpkgnew 里等用户审阅";
-    // ── ⑨ /etc 废弃**文件**：改名 .lpkgsave + 撤所有权（2026-09-26 改；改前保持原位）──
+    // ── ⑨ /etc 废弃**文件**：改名 .lpkgsave + 撤所有权 ──
     EXPECT_EQ(shape_of(test_root / "etc/obsolete.conf"), "absent")
         << "废弃配置不该再占着原路径（它已经不是新版本的一部分）";
     EXPECT_EQ(read_file(test_root / "etc/obsolete.conf.lpkgsave"), "O1\n")
@@ -803,8 +800,8 @@ TEST_F(UpgradeDecisionTableTest, OneUpgradeWalksEveryRowOfTheTable)
  * 回滚维度：同一批路径上的**中途失败**必须把每一行都逐字节还原 —— 决策表说"搬进 stash"
  * 的那些让开动作都必须是可回滚的（`BACKUP`），`/etc` 的"保持原位"那格则**根本没碰过盘**。
  *
- * 断点 `copy_after_wal_<pkg>` 挂在普通文件的 COPY 上（符号链接/目录分支今天没有断点，
- * 见 lpkg/CLAUDE.md §2），v2 里 `usr/share/same.txt` 必然走到它。
+ * 断点 `copy_after_wal_<pkg>` 挂在普通文件的 COPY 上（符号链接/目录分支今天没有断点），
+ * v2 里 `usr/share/same.txt` 必然走到它。
  */
 TEST_F(UpgradeDecisionTableTest, InterruptedUpgradeRestoresEveryRow)
 {

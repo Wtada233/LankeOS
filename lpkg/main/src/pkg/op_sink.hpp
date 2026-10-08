@@ -19,7 +19,7 @@ enum class DirRemoval {
     NotRemoved,         ///< 其余。两种成因：① 目标本就不是真实目录 → 静默（无事可做）；
                         ///< ② rmdir 真的失败（EROFS/EACCES/竞态）→ **本方法内部已告警**
                         ///<    `warning.dir_remove_failed`（DIR_RM 行已写、盘面没删，
-                        ///<    属"行与盘面不一致"，必须可见 —— 2026-09-25 起不再静默）。
+                        ///<    属"行与盘面不一致"，必须可见）。
                         ///< 注意：此时 WAL 行**刻意保留**，它是回滚重建目录的依据；先 rmdir
                         ///< 后写行会把"行/盘面不一致"恶化成"目录没了、WAL 无记录"。
 };
@@ -34,10 +34,9 @@ enum class DirRemoval {
  * `is_symlink`/`is_empty`/`exists` 这类**判定**落到链接**目标**上，于是"我们按链接判、却按
  * 路径动手"，两侧理解的对象不是同一个。
  *
- * （2026-09-25 订正：原文写"实测把 `/var/run -> ../run` 指向的真实 `/run` 删掉"——**不成立**。
- *  实测 `rmdir("link/")` 与 `rmdir("link")` 一律 ENOTDIR（内核不跟随末段链接），真实发生的是
- *  ① 判定类调用落到目标上（决策错）；② `chmod`/`lchown` **穿过去**改坏目标目录的权限/属主。
- *  守卫仍然必要，只是后果要说准。）
+ * 尾斜杠的穿透面是：`chmod`/`lchown` **穿过去**改坏目标目录的权限/属主，以及上面那类判定
+ * 调用落到链接目标上（决策错）；而 `rmdir`/`rename` 对末段符号链接一律 ENOTDIR、不跟随。
+ * 剥尾斜杠防的就是前两者。
  *
  * 因此本类的契约是：
  *
@@ -51,16 +50,11 @@ enum class DirRemoval {
  *      save_config / un_stash / remove_empty_dir / commit_copy / dir_meta / set_xattr /
  *      unset_xattr）都在内部 `strip_trailing_slash()`（逐个核过 **9/9**；`backup` /
  *      `backup_obsolete` 共用 `backup_impl`，剥在那一处）。
- *      （订正 2026-10-03：原清单只列了前 6 个、写作 **6/6**，漏了后 3 个 —— `dir_meta`
- *       在 `op_sink.cpp:183`、`set_xattr` 在 `:230`、`unset_xattr` 在 `:265`，各自都
- *       `strip_trailing_slash()`。它们同样"碰文件系统"，同属本条契约。）
- *      ⚠️ **这一层是唯一保证，不是"防御性兜底"**。原文写"当前 **9** 个调用点都已各自剥过、
- *      判据必须在调用点（见 §3.6.1 第 1 条）"——实测**两个数都不对**：调用点实际是 **22** 个，
- *      其中**至少 5 个没有自剥**（`installation_task_letgo.cpp` 的 `backup(e.physical_path)`
- *      与 `un_stash(rec.bak, e.physical_path)`、`installation_task_copy.cpp` 的
- *      `save_config(e.physical_path)` 那几处）。它们今天安全，靠的**正是**这里 —— 所以
- *      调用点**可以**自剥（读起来更清楚），但**不许把正确性押在调用点自剥上**
- *      （2026-09-26 按实测订正；这正是本仓库 §0 铁律点名的那类"注释承诺的性质不成立"）。
+ *      ⚠️ **这一层是唯一保证，不是"防御性兜底"**：调用点是 **22** 个，其中**至少 5 个没有
+ *      自剥**（`installation_task_letgo.cpp` 的 `backup(e.physical_path)` 与
+ *      `un_stash(rec.bak, e.physical_path)`、`installation_task_copy.cpp` 的
+ *      `save_config(e.physical_path)` 那几处）—— 它们安全靠的**正是**这里。所以调用点
+ *      **可以**自剥（读起来更清楚），但**不许把正确性押在调用点自剥上**。
  *      **纯日志记录的方法**（new_file / new_dir）**按传入原样**记录 —— WAL 行是回滚侧的
  *      输入契约，字面形态不能在这里被"顺手规范化"掉（`NEW_DIR` 记的就是带尾斜杠的目录键）。
  *   3. **stash 记账内联**：备份落进每文件系统 stash 后，把该 stash 根记进调用方的向量
@@ -95,11 +89,10 @@ public:
      * 升级时"新版本不再包含"的废弃文件：WAL `REMOVE_OLD …` → 同上搬进 stash。
      *
      * @param after_wal_breakpoint 与 `backup()` 逐字同义（WAL 行已落、rename 未做之间命中）。
-     *        2026-09-26 补：此前**只有它**没有这个参数（`backup` / `save_config` / `un_stash` /
-     *        `commit_copy` / `dir_meta` / `set_xattr` / `unset_xattr` 七个都有）⇒ "废弃搬运的
-     *        WAL 已写、rename 未做"这个窗口**注入不进去**，是断点覆盖之外的一个洞。
-     *        命名照让开趟的既有风格按 **WAL 关键字**取（`backup_after_wal_` /
-     *        `conf_replace_after_wal_` 同理）：`remove_old_after_wal_<pkg>`。
+     *        没有它，"废弃搬运的 WAL 已写、rename 未做"这个窗口**注入不进去**（`backup` /
+     *        `save_config` / `un_stash` / `commit_copy` / `dir_meta` / `set_xattr` /
+     *        `unset_xattr` 七个都有）。命名照让开趟的既有风格按 **WAL 关键字**取：
+     *        `remove_old_after_wal_<pkg>`（同 `backup_after_wal_` / `conf_replace_after_wal_`）。
      */
     std::filesystem::path backup_obsolete(const std::filesystem::path& phys,
                                           std::string_view after_wal_breakpoint = {});
@@ -233,7 +226,7 @@ private:
      * （判据 = `base/utils.cpp::path_within_resolved`，只解析父目录 —— 末段是要处置的名字
      * 本身，且包发的绝对目标链接是合法的）。
      *
-     * **放在原语里而不是各调用点**（2026-10-03 审计后的收口）：归档内容那条腿已经在
+     * **放在原语里而不是各调用点**：归档内容那条腿已经在
      * `confine_target_path()` 上挡过，但**由 DB 键派生的路径**（升级废弃文件、移除趟、
      * 空目录回收、xattr 撤销）走的是另一条腿 —— 逐调用点补等于"每加一处都要记得"，而原语是
      * **唯一写盘入口**，闸放这里才是结构性的（任何将来的调用点自动被覆盖）。
@@ -262,7 +255,7 @@ private:
 // —— 而"同一个路径该由哪一趟处理"原先只写在三处的注释里。已经长出过漏格：
 // `installation_task.cpp` 第②步曾写"仅真正的目录由目录逻辑处理、跳过"，但"目录逻辑"
 // 是第⑤步、跑在**拷贝之后**，于是"盘上是真目录、新条目是文件/符号链接"这一格没人让开，
-// `rename` 撞 EISDIR，整条升级路径被预检拒掉（见 lpkg/CLAUDE.md §1.2）。
+// `rename` 撞 EISDIR，整条升级路径被预检拒掉。
 // 判据：同一批路径的处理分散在 N 处、且"谁负责"靠注释维持 ⇒ 漏格是必然而非偶然。
 //
 // 因此把"路径 → 动作"收成一个函数（`decide_path()`），三趟**都只经它**决定
@@ -307,7 +300,7 @@ enum class PathPass {
  *
  * `Noop` 与 `Unclaimed` 的区别是本层的要害：`Noop` = "本趟**考虑过**这个路径，决定不动"
  * （也是一次认领），`Unclaimed` = "本趟不管这个路径"。历史上的漏格正是把
- * "本该由我让开"错当成"别人会管"。
+ * "本该由本趟让开"错当成"别人会管"。
  */
 enum class PathAction {
     Unclaimed,           ///< 本趟对这个路径没有动作（没认领它）
@@ -329,8 +322,7 @@ enum class PathAction {
                        ///< 建
     DropOwnership,     ///< 只撤所有权（+ 配置哈希记录），**不碰盘**（`/etc` 的废弃**目录**）
     SaveConfigObsolete,  ///< 废弃的 `/etc` **文件/符号链接**：先 `sink.save_config()` 把原物改名
-                         ///< `<路径>.lpkgsave`（2026-09-26 起；此前是"原地不动"的
-                         ///< `DropOwnership`），再撤所有权 + 配置哈希记录。与"类型变化"和
+                         ///< `<路径>.lpkgsave`，再撤所有权 + 配置哈希记录。与"类型变化"和
                          ///< 移除整包三处**统一到同一条规则**：`/etc` 下的东西永远不会被 lpkg
                          ///< 无声丢掉，也永远不会占着"新版本该用的那个名字"。
     RemoveDir,           ///< `sink.remove_empty_dir()`：空目录 `rmdir` + 元数据（WAL `DIR_RM`）
@@ -339,7 +331,7 @@ enum class PathAction {
 /**
  * 决策表的输入：一个逻辑路径的**全部相关事实**（纯数据、无 I/O —— 由调用方 probe 后填入）。
  *
- * `logical` 用**归档条目 / DB 键的原始形态**（目录带尾斜杠，见 lpkg/CLAUDE.md §6）。
+ * `logical` 用**归档条目 / DB 键的原始形态**（目录带尾斜杠）。
  * 事实是**时间点相关**的。第②步只是把决策收拢到一处，没有消除这层时间点依赖；第③步
  * （改执行顺序）用两种手段消除它：
  *   · 让开趟把**旧版本的全部触碰面**先搬空 —— 写入趟看到的是"路径已空"，不再受"让开趟
@@ -359,20 +351,20 @@ struct PathFacts {
                                     ///< `.lpkgnew` 还是就地落位）
     bool disk_exists = false;       ///< lstat 语义：存在（符号链接算存在）
     bool disk_is_dir = false;       ///< lstat 语义：**真目录**（符号链接**不算**）
-    bool disk_is_symlink = false;   ///< lstat 语义：盘上那份是**符号链接**（2026-09-26 新增）。
-                                    ///< 只在 `disk_exists && !disk_is_dir` 时有意义。加它是因为
-                                    ///< `/etc` 的落点规则要按**类型是否变化**分流，而原来
-                                    ///< `disk_exists` + `disk_is_dir` 两个事实**区分不出**"盘上是
-                                    ///< 普通文件"与"盘上是符号链接"—— 这两种在旧表里落进了同一个
-                                    ///< 分支（三哈希 / `.lpkgnew`），正是类型矩阵没统一的原因。
+    bool disk_is_symlink = false;   ///< lstat 语义：盘上那份是**符号链接**。
+                                    ///< 只在 `disk_exists && !disk_is_dir` 时有意义。`/etc` 的
+                                    ///< 落点规则要按**类型是否变化**分流，而 `disk_exists` +
+                                    ///< `disk_is_dir` 两个事实**区分不出**"盘上是普通文件"与
+                                    ///< "盘上是符号链接"—— 这两种必须落进不同分支，否则类型
+                                    ///< 矩阵就统一不了。
     bool obsolete = false;          ///< 第⑤趟：新版本不再提供这个路径
     bool last_owner = false;        ///< 第⑤趟：摘掉本包归属后，该路径已无其他持有者
     bool new_dir_entry = false;     ///< 第⑤趟：新版本在 `<bare>/` 登记了**目录**条目
     ConfigDisposition cfg = ConfigDisposition::InstallNew;  ///< 仅 `/etc` 且盘上被占且非目录
 
-    /// 归档条目与盘上那份**都是符号链接**、且两者的目标逐字节相同（2026-10-02 新增）。
-    /// 只在 `entry_is_symlink && disk_is_symlink` 时有意义。加它是因为 `/etc` 的
-    /// symlink→symlink 那一格旧行为**不看目标**、一律退 `.lpkgnew` —— 链接压根没变的重装
+    /// 归档条目与盘上那份**都是符号链接**、且两者的目标逐字节相同。
+    /// 只在 `entry_is_symlink && disk_is_symlink` 时有意义。不加它的话，`/etc` 的
+    /// symlink→symlink 那一格就**不看目标**、一律退 `.lpkgnew` —— 链接压根没变的重装
     /// 也吐一份同内容副本，反复重装就在 `/etc` 上堆垃圾。判据是 `symlink_targets_equal()`
     /// （读不出就判"不同"，保守方向）。
     /// ⚠️ **新字段一律加在本结构末尾**：`tests/integration/test_upgrade_decision_table.cpp`

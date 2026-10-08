@@ -18,7 +18,7 @@ namespace fs = std::filesystem;
 // 造一个含 2 个 commit / 1 个轻量 tag / 1 个 annotated tag / 1 个分支的仓库，
 // 然后让 libgit2 从它克隆。
 //
-// 这些用例是 `clone_git_source` 拆分（2026-09-26）的**行为基线**：拆的是形状不是语义，
+// 这些用例是 `clone_git_source` 拆分的**行为基线**：拆的是形状不是语义，
 // 所以它们必须在拆分前后都绿。
 // ============================================================================
 
@@ -135,7 +135,7 @@ protected:
         must_run(git("commit -q -m c3"));
         must_run(git("checkout -q main"));
 
-        // 名字里带 '/' 的分支：钉住 parse_git_url 对含 '/' 的 ref 的解析（见下方用例）
+        // 名字里带 '/' 的分支：覆盖 parse_git_url 对含 '/' 的 ref 的解析（见下方用例）
         must_run(git("branch topic/slash v1.0"));
     }
 };
@@ -200,9 +200,9 @@ TEST_F(GitCloneSourceTest, CloneStripsGitSuffixFromDestinationName)
 
 // ── ② 目标已存在 ─────────────────────────────────────────────────────────────
 //
-// **实测语义（2026-09-26，与代码一致）**：`clone_git_source` 在克隆前对 `dest`
+// **语义（与代码一致）**：`clone_git_source` 在克隆前对 `dest`
 // 无条件 `fs::remove_all(dest)` —— 既不报错也不增量复用，而是**先清空再全新克隆**。
-// 下面两条按实测语义钉住：残留内容必须消失，而不是被保留/合并或让克隆失败。
+// 下面两条按这个语义断言：残留内容必须消失，而不是被保留/合并或让克隆失败。
 
 TEST_F(GitCloneSourceTest, ExistingDestinationDirectoryIsWipedAndRecloned)
 {
@@ -243,7 +243,7 @@ TEST_F(GitCloneSourceTest, NonexistentRepoFailsAndNamesTheUrl)
         const std::string msg = e.what();
         EXPECT_NE(msg.find(bad_url), std::string::npos)
             << "报错没有点名 URL（只有一句含糊的\"克隆失败\"）: " << msg;
-        // 顺带钉住 l10n 键存在：键缺失时 get_string 吐的是 "[MISSING_STRING: …]"，
+        // 顺带确认 l10n 键存在：键缺失时 get_string 吐的是 "[MISSING_STRING: …]"，
         // 那种报错对用户同样毫无信息量
         EXPECT_EQ(msg.find("[MISSING_STRING"), std::string::npos)
             << "l10n 缺少该报错键，报错成了占位符: " << msg;
@@ -275,7 +275,7 @@ TEST_F(GitCloneSourceTest, BranchNameWithSlashIsParsedAndCheckedOut)
     // 名字带 '/' 的分支（fixture 里的 `topic/slash`，从 v1.0 拉出）现在能被正确解析：
     // parse_git_url 以 `://` 之后第一个 '/'（权威段结束处）为界 —— `@topic/slash` 那个 '@'
     // 在分界**之后** ⇒ 判为 ref。旧判据"最后一个 '/' 之后"会把整串 `topic/slash` 吞进 URL、
-    // ref 回落 HEAD、静默克隆默认分支（`BranchNameWithSlashIsNotSupported` 曾把该错行为钉住）。
+    // ref 回落 HEAD、静默克隆默认分支（`BranchNameWithSlashIsNotSupported` 曾把该错行为固化）。
     clone_git_source("git+" + url_base + "@topic/slash", work_root);
 
     ASSERT_TRUE(fs::is_directory(dest())) << "克隆目标目录不存在: " << dest();
@@ -286,10 +286,10 @@ TEST_F(GitCloneSourceTest, BranchNameWithSlashIsParsedAndCheckedOut)
 
 TEST_F(GitCloneSourceTest, FailedCloneLeavesPartialRepoBehind)
 {
-    // ⚠️ **实测（2026-09-26）**：`clone_git_source` 失败时**不清理半成品目录** ——
+    // ⚠️ **语义**：`clone_git_source` 失败时**不清理半成品目录** ——
     // `prepare_repo` 每轮先 `remove_all(dest)` 再 `git_repository_init(dest)`，fetch 失败后
     // 直接返回错误码退出循环，那个刚 init 出来的空仓库（只有 `.git/`）**留在盘上**。
-    // 本用例只是把现状钉住（本轮纯搬移，语义不动）；**要不要清理另议** ——
+    // 本用例只是把现状固定下来（本轮纯搬移，语义不动）；**要不要清理另议** ——
     // 半成品是空仓库、下次同 URL 克隆会先被 remove_all 掉，所以不是"污染"级别的问题。
     try {
         clone_git_source("git+file://" + (root / "no-such-repo").string() + "@v1.0", work_root);
@@ -305,7 +305,7 @@ TEST_F(GitCloneSourceTest, FailedCloneLeavesPartialRepoBehind)
     EXPECT_FALSE(fs::exists(half / "file.txt")) << "失败的克隆竟然 checkout 出了文件";
 }
 
-// ── URL 解析（拆分时被抽出的纯函数，逐条钉住既有语义）────────────────────────
+// ── URL 解析（拆分时被抽出的纯函数，逐条覆盖既有语义）────────────────────────
 
 TEST(GitUrlParsingTest, DetectsGitScheme)
 {
@@ -340,8 +340,9 @@ TEST(GitUrlParsingTest, SplitsRefAtSchemeAuthorityBoundary)
     // ref 里**可以带 '/'**：分隔规则以 `://` 之后的第一个 '/'（权威段结束处）为界 ——
     // 凭据的 '@' 必在它之前（userinfo 段），ref 里的 '/' 必在它之后。于是
     // `repo.git@feature/x` 正确解析为 url=repo.git、ref=feature/x。
-    // ⚠️ 订正（2026-10-03）：旧判据"最后一个 '/' 之后"会把 `@feature/x` 判成"无 ref"
-    // （那个 '@' 在最后一个 '/' 之前）→ 整串落在 URL 上、ref 回落 HEAD、**静默克隆默认分支**。
+    // ⚠️ 判据取"最后一个 '@' 之后"，不能取"最后一个 '/' 之后"：后者会把 `@feature/x` 判成
+    // "无 ref"（那个 '@' 在最后一个 '/' 之前）→ 整串落在 URL 上、ref 回落 HEAD、
+    // **静默克隆默认分支**。
     parse_git_url("git+https://host/repo.git@feature/x", url, ref);
     EXPECT_EQ(url, "https://host/repo.git");
     EXPECT_EQ(ref, "feature/x");

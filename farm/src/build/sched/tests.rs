@@ -1,4 +1,4 @@
-//! `src/build/sched.rs` 的单元测试（从生产文件搬出：那里测试比生产还长，正文被淹没）。
+//! `src/build/sched.rs` 的单元测试。
 //! 仍是同一父模块的子模块 ⇒ `use super::*` 与 crate 内私有项照旧可用。
 
 use super::*;
@@ -50,7 +50,7 @@ fn cycle_cut_prefers_build_deps_over_link_edge() {
     assert_eq!(
         find_cycle_edge(&g, &d, &k),
         Some(("c".to_string(), "b".to_string())),
-        "切环必须优先挑 build_deps 边（用户规则：build_deps 优先级在 ABI 下面）"
+        "切环必须优先挑 build_deps 边（build_deps 优先级在 ABI 下面）"
     );
 }
 

@@ -297,7 +297,7 @@ TEST_F(RegressionFixTest, QueryFileSiblingPrefixIsNotMistakenForOwned)
     // 根内绝对路径正常：**已安装**的文件照常查得到，不抛
     EXPECT_NO_THROW(query_file((test_root / "usr" / "bin" / "fxq_a").string()));
     // root 前缀匹配但实际在外的路径（rootE/...）**既不能误归因**，也必须**出声**：
-    // 2026-10-03 起 `query <文件>` 查不到属主与 `query -p <未安装>` 口径统一 —— 抛
+    // `query <文件>` 查不到属主与 `query -p <未安装>` 口径统一 —— 抛
     // `LpkgException`（退出码 1），不再是"打条 info 然后退 0"。
     const std::string evil = test_root.string() + "E/usr/bin/fxq_a";
     EXPECT_THROW(query_file(evil), LpkgException);
@@ -337,18 +337,14 @@ TEST_F(RegressionFixTest, ReinstallAlsoRefusesMetadataMismatch)
 /**
  * 约束违反的批次必须**拒绝**：`vdapp` 要求 `vdlib <= 1.0`，而同一批次又显式要求装 `vdlib 2.0`。
  *
- * **订正 2026-10-03**：此前 libsolv 的 EVR 匹配把"要求侧缺 release"当通配，会**接受**这个
- * 计划，靠安装期的版本复核（`error.dep_version_mismatch`）才拦下来 —— 本用例原先断言的就是
- * 那条报错。修好之后求解器**自己**就拒绝这个批次，报错换成"依赖无解"。⇒ 这里只钉"必须拒绝 +
- * 整批回滚"这条不变量，**不再钉具体文案**；那道复核判据本身改由
+ * 求解器**自己**就拒绝这个批次（报"依赖无解"），所以这里只钉"必须拒绝 + 整批回滚"这条
+ * 不变量，**不钉具体文案**；安装期那道版本复核判据（`error.dep_version_mismatch`）由
  * `tests/unit/test_plan_dep_version_check.cpp` 直接喂手搓计划来钉（否则它就成了"永远走不到
  * 的分支上写的假绿用例"）。
  *
- * **订正 2026-10-04（8.0.0）**：本用例的动作元/版本字面量原先是 `1.0+1`（旧的自有语义里
- * "+N = 发行修订号"）。版本语义换成 rpm 之后 `+N` 只是普通字符、而 **release 要写 `-`**，
- * 且 `1.0-1` 是**满足** `<= 1.0` 的（rpm 的"没写 release = 通配"，实测见
- * `test_version.cpp::ReleaseIsAWildcardInDependencyMatching`）—— 用 `1.0-1` 就不再是违规。
- * 所以改成干净的 `2.0`：违规与 rpm 版本语法无关，用例想守的东西一个字没变。
+ * 动作元/版本字面量取干净的 `2.0`：rpm 语义下 `1.0-1` 是**满足** `<= 1.0` 的（"没写 release
+ * = 通配"，见 `test_version.cpp::ReleaseIsAWildcardInDependencyMatching`），用 `1.0-1` 就
+ * 不再是违规；`+N` 也只是普通字符，release 要写 `-`。违规与 rpm 版本语法无关。
  */
 TEST_F(RegressionFixTest, PlanVersionViolatingDependencyConstraintIsRejected)
 {
@@ -372,12 +368,12 @@ TEST_F(RegressionFixTest, PlanVersionViolatingDependencyConstraintIsRejected)
  * 版本复核**不能被"盘上那份满足"短路**：约束被**已装版本**满足、但计划要把该依赖换成
  * 违反约束的版本时，也必须拦下 —— 批次后生效的是**计划版本**，不是盘上那份。
  *
- * **订正 2026-10-03**：桥接修好后求解器自己就会拒这个批次（不再产出"计划版本违规"的方案），
- * 所以这里同样只钉"必须拒绝 + 整批回滚"；那道复核判据的每一格（含"计划版本 vs 盘上版本"
- * 的取舍）改由 `tests/unit/test_plan_dep_version_check.cpp` 直接喂手搓计划钉。
+ * 求解器自己就会拒这个批次（不产出"计划版本违规"的方案），所以这里同样只钉"必须拒绝 +
+ * 整批回滚"；那道复核判据的每一格（含"计划版本 vs 盘上版本"的取舍）由
+ * `tests/unit/test_plan_dep_version_check.cpp` 直接喂手搓计划钉。
  *
- * **订正 2026-10-04（8.0.0）**：版本字面量从 `1.0+1` 改成 `2.0` —— 理由同上一条用例
- * （rpm 语义下 `1.0-1` 满足 `<= 1.0`，不再是违规；`+N` 也不再是发行修订号）。
+ * 版本字面量取 `2.0`：rpm 语义下 `1.0-1` 满足 `<= 1.0`，不再是违规；`+N` 也不再是
+ * 发行修订号。
  */
 TEST_F(RegressionFixTest, VersionRecheckIsNotShortCircuitedBySatisfiedOnDiskVersion)
 {

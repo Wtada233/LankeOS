@@ -406,8 +406,6 @@ TEST_F(RemovalSymlinkTest, RemovePackageWithNoSharedFiles)
 TEST_F(RemovalSymlinkTest, RemoveSucceedsWhenNoReverseDeps)
 {
     // 单所有权：没有共享文件，remove 只检查逆向依赖。
-    // 订正 2026-10-03：本用例原名 `RemoveBlockedOnSharedRegularFile`，但正文（与语义）都是
-    // "无逆向依赖 → 移除**成功**"—— 名字与断言相反。按代码行为改名，而不是改代码去迁就名字。
     Cache::instance().add_file_owner("/usr/bin/a-only", "pkgA");
     Cache::instance().add_installed("pkgA", "1.0", true);
 
@@ -601,10 +599,10 @@ TEST_F(RemovalSymlinkTest, NoConflictWhenFileAlreadyOwnedBySelf)
 /**
  * 无主手工文件冲突：报错**不得**把占位文本 `error.unknown_manual_file`
  * （"unknown (manual file)"）当成**包名**塞进 `error.file_conflict_entry` 的持有者槽
- * ——那会渲染成 "File {} is owned by package unknown (manual file)"，语法破碎（2026-10-03 修）。
+ * ——那会渲染成 "File {} is owned by package unknown (manual file)"，语法破碎。
  * 改用配套措辞 `error.file_conflict_unowned`（只认文件路径）。
  *
- * 判定"抛了异常"不够：得钉住**措辞换了**且旧噪声**不再出现**，否则改回去也能绿。
+ * 判定"抛了异常"不够：得断言**措辞换了**且旧噪声**不再出现**，否则改回去也能绿。
  */
 TEST_F(RemovalSymlinkTest, UnownedManualFileConflictUsesDedicatedWording)
 {
@@ -1117,8 +1115,8 @@ TEST_F(RemovalSymlinkTest, DirPermWarningOnMismatch)
                 stderr_output.find("权限") != std::string::npos)
         << "Should warn about directory permission mismatch, got: " << stderr_output;
 
-    // 2026-10-03 订正：mode 必须以**八进制**渲染（盘上 0755、包内 0700）。改前传 int 走十进制，
-    // 0755 会显示成 493、0700 成 448 —— 与 `ls -l` / chmod 的口径不符，用户看不懂。
+    // mode 必须以**八进制**渲染（盘上 0755、包内 0700）—— 十进制会显示成 493、0700 成 448，
+    // 与 `ls -l` / chmod 的口径不符，用户看不懂。
     EXPECT_NE(stderr_output.find("755"), std::string::npos)
         << "盘上 0755 必须以八进制 755 出现在告警里（不是十进制 493）：\n"
         << stderr_output;
@@ -1167,12 +1165,12 @@ TEST_F(RemovalSymlinkTest, NoDirPermWarningWhenMatch)
 }
 
 /**
- * `/etc` 配置的 **file_perm_mismatch** 告警：mode 必须以**八进制**渲染（2026-10-03 订正）。
+ * `/etc` 配置的 **file_perm_mismatch** 告警：mode 必须以**八进制**渲染。
  *
  * 场景：装带 `etc/...` 的包 v1 → 用户 `chmod` 改权限（内容一字不动）→ 升到 v2。
  * 三哈希只看**内容**哈希，看不出"只改了权限" ⇒ 走静默换新版那条路；让开趟在搬进 stash
  * **之前**还看得见盘上那份，于是比对 mode 并告警（`warning.file_perm_mismatch`）。
- * 改前把 `st_mode` 直接当十进制传进告警，0644 会显示成 420 —— 本用例钉住八进制口径。
+ * 改前把 `st_mode` 直接当十进制传进告警，0644 会显示成 420 —— 本用例断言八进制口径。
  */
 TEST_F(RemovalSymlinkTest, FilePermWarningRendersModeAsOctal)
 {
@@ -1249,9 +1247,9 @@ TEST_F(RemovalSymlinkTest, RepoProviderDedupOnDuplicateIndexEntries)
     EXPECT_EQ(prov->version, "3.0.0");
 
     // update_package_info with same info should not double count
-    // 两个 SONAME 必须走 **provides_soname**（第 5 参）—— 8.0.0 起 `provides` 是纯虚拟
-    // provider 空间，把它当 SONAME 登记会让增量重建**丢掉** SONAME 提供者（本用例第一版
-    // 就是这样红的：重建后 find_soname_provider 返回空）。
+    // 两个 SONAME 必须走 **provides_soname**（第 5 参）—— `provides` 是纯虚拟
+    // provider 空间，把它当 SONAME 登记会让增量重建**丢掉** SONAME 提供者
+    // （重建后 find_soname_provider 返回空）。
     std::vector<DependencyInfo> deps;
     repo.update_package_info("openssl", "3.0.0", deps, /*provides=*/{},
                              /*provides_soname=*/{"libssl.so.1", "libcrypto.so.1"});

@@ -74,7 +74,7 @@ void InstallationTask::register_package()
     if (!old_version_to_replace_.empty()) {
         const fs::path old_dep_file = Config::instance().dep_dir() / pkg_name_;
         // 判定走**不抛**的 `exists_follow`（与 `fs::exists` 同义）：这是以包名命名的
-        // lpkg 状态文件（DB 键派生的路径，见 lpkg/CLAUDE.md §6），环/不可达时 `fs::exists`
+        // lpkg 状态文件（DB 键派生的路径），环/不可达时 `fs::exists`
         // 抛 raw `filesystem_error`，会让一次升级在"摘除旧反向依赖"这一步崩掉。
         if (exists_follow(old_dep_file)) {
             std::ifstream f(old_dep_file);
@@ -194,7 +194,7 @@ void InstallationTask::install_hook_files()
 {
     const fs::path hook_src = tmp_pkg_dir_ / constants::DIR_HOOKS;
     // 只接受**真目录**（lstat，不是符号链接）：`hooks -> /etc` 的归档会让 follow 语义放行，
-    // 随后 `fs::copy` 把宿主任意文件拷进 hooks_dir/<pkg>/ 并当 postinst 执行（2026-10-02 修）。
+    // 随后 `fs::copy` 把宿主任意文件拷进 hooks_dir/<pkg>/ 并当 postinst 执行。
     // 环/悬空/不存在一律判否 → 不抛、正常跳过（`is_real_directory` 不抛）。
     if (!is_real_directory(hook_src)) return;
 
@@ -202,19 +202,19 @@ void InstallationTask::install_hook_files()
     const fs::path dest_dir = Config::instance().hooks_dir() / pkg_name_;
     // 判定走**不抛**的 `exists_follow`（与 `fs::exists` 同义）：`dest_dir` 由包名拼出
     // （DB 键派生的路径），环/不可达时 `fs::exists` 抛 raw `filesystem_error` —— 与本文件
-    // 上面摘除旧反向依赖那处是同一类，判据要一致（2026-10-03）。
+    // 上面摘除旧反向依赖那处是同一类，判据要一致。
     if (!exists_follow(dest_dir)) {
         // 目录本体也进事务：NEW_DIR 的逆操作会删掉它，失败批次不在 hooks_dir 下留空壳
         sink.new_dir(dest_dir);
         ensure_dir_exists(dest_dir);
     }
     for (const auto& entry : fs::directory_iterator(hook_src)) {
-        // `directory_entry::is_regular_file()` 走 status() → 对环**抛**（谓词族的说明里有
-        // 实测记录）。用 ec 重载：环不是普通文件 → 跳过（原来会整批抛出去）。
+        // `directory_entry::is_regular_file()` 走 status() → 对环**抛**（见谓词族的说明）。
+        // 用 ec 重载：环不是普通文件 → 跳过（原来会整批抛出去）。
         std::error_code eec;
         if (!entry.is_regular_file(eec) || eec) continue;
 
-        // 包内 hook 的**符号链接**成员（2026-09-26 修）：`directory_entry::is_regular_file()`
+        // 包内 hook 的**符号链接**成员：`directory_entry::is_regular_file()`
         // 与下面的 `fs::copy` **都跟随末段链接** ⇒ `hooks/postinst.sh -> /etc/shadow` 会让
         // root 把**宿主那份文件的内容**拷成 `hooks_dir/<pkg>/postinst.sh`（mode 随源 + 执行位）
         // 并当 postinst **执行** —— 也就是"包内容读出了包外、还以 root 执行"。
@@ -222,10 +222,9 @@ void InstallationTask::install_hook_files()
         // 是合法用法、照旧跟随复制（这也是今天的行为，不改变它）；指到包外的整包拒绝
         // （与归档成员名消毒同款处置），错误**点名那个条目与它解析到的目标**（§8 第 7 条）。
         if (entry.is_symlink()) {
-            // 两次 weakly_canonical **各用一个 error_code**（2026-10-03 订正）：原先共用一个
-            // `rec_ec`，第二次调用会把第一次的错误清掉 —— 若解析 entry.path() 失败而解析
-            // pkg_root 成功，`rec_ec` 被清空 ⇒ 逃逸检查被静默放过。两个 ec 都判才算真的
-            // "两次都成功且 resolved 落在 pkg_root 之内"。
+            // 两次 weakly_canonical **各用一个 error_code**：共用同一个会被第二次调用清掉
+            // 第一次的错误 —— 若解析 entry.path() 失败而解析 pkg_root 成功，逃逸检查就被静默
+            // 放过。两个 ec 都判才算真的"两次都成功且 resolved 落在 pkg_root 之内"。
             std::error_code entry_ec;
             const fs::path resolved = fs::weakly_canonical(entry.path(), entry_ec);
             std::error_code root_ec;
@@ -243,10 +242,9 @@ void InstallationTask::install_hook_files()
 
         // hooks_dir/<pkg>/ 下的同名**实体目录**：不是本包能接管的东西。搬进 stash 会在提交后
         // 被 remove_all 连带删掉整棵树（ARCH §3.6：无主内容一律不碰），所以宁可直接失败、
-        // 让批次回滚 —— 这也与原实现一致（fs::copy 到目录目标会失败）。
-        // 一次 lstat 的真目录判据（2026-09-26 修）：`&&` 的右操作数原来是抛型的
-        // `fs::is_symlink`，中间段成环时必抛；`is_real_directory` 就是这条表达式的
-        // 不抛版（且只发一次 lstat）。
+        // 让批次回滚（`fs::copy` 到目录目标本来就会失败）。
+        // 一次 lstat 的真目录判据：`&&` 的右操作数用抛型的 `fs::is_symlink` 会在中间段成环时
+        // 必抛；`is_real_directory` 就是这条表达式的不抛版（且只发一次 lstat）。
         if (is_real_directory(dest)) {
             throw LpkgException(string_format("error.hook_path_is_dir", dest.string()));
         }

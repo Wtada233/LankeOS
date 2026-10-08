@@ -1,4 +1,4 @@
-//! `src/build/mod.rs` 的单元测试（从生产文件搬出：那里测试比生产还长，正文被淹没）。
+//! `src/build/mod.rs` 的单元测试。
 //! 仍是同一父模块的子模块 ⇒ `use super::*` 与 crate 内私有项照旧可用。
 
 use super::*;
@@ -257,7 +257,7 @@ fn pre_download_missing_url_is_source_missing() {
 
 #[test]
 fn source_missing_aborts_build_in_non_interactive() {
-    // 用户规则：http/https 源必须下载，**不允许 source-missing 继续**。
+    // http/https 源必须下载，**不允许 source-missing 继续**。
     // 非交互无 operator 介入 → run_build 整体硬终止（Err），而不是标记 missing 跳过继续。
     let dir = temp_dir("farm-src-missing-abort");
     let out = temp_dir("farm-src-missing-abort-out");
@@ -408,7 +408,7 @@ fn topo_order_breaks_cycle() {
 
 #[test]
 fn topo_order_group_victims_after_trigger() {
-    // 用户 bug 复现：`--all` 模式下 python-cairo（不链 libpython，无 needed_so 边）
+    // `--all` 模式下 python-cairo（不链 libpython，无 needed_so 边）
     // 必须排在触发包 python 之后——否则容器 upgrade 时本地 repo 还是旧 python。
     // 组边（victim → on）强制排序；python 不在 targets 则无约束。
     let dir = std::env::temp_dir().join("farm-build-topo-group");
@@ -490,7 +490,7 @@ fn build_deps_edge_orders_foo_before_bar_by_default() {
     // python-foo / python-bar 都会重建。python-bar 的 build_deps 含 python-foo →
     // **默认语义**（无需任何 flag）Kahn 排序就把 python-foo 排在 python-bar 前，否则容器里
     // 还没有 python-foo 本轮刚产出的产物，基于旧 foo 构建白跑。
-    // 注：原 `BUILD_AFTER_BUILD_DEPS` flag 已删除——这个行为现在就是默认。
+    // 注：这个行为就是默认语义（`BUILD_AFTER_BUILD_DEPS` 已不是 flag）。
     let dir = std::env::temp_dir().join("farm-build-after-builddeps");
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
@@ -852,7 +852,7 @@ fn repack_unconditional_reencodes_when_no_drift() {
 
 #[test]
 fn topo_order_siblings_name_ordered_and_deterministic() {
-    // 用户规则：构建顺序必须**确定**——同级包（无相互依赖）固定按名字升序；
+    // 构建顺序必须**确定**——同级包（无相互依赖）固定按名字升序；
     // 输入乱序不影响结果，且两次运行逐位一致（绝不允许随机）。
     let dir = std::env::temp_dir().join("farm-build-topo-siblings");
     let _ = fs::remove_dir_all(&dir);
@@ -881,8 +881,8 @@ fn topo_order_siblings_name_ordered_and_deterministic() {
 fn reorder_queue_puts_dependency_victims_first() {
     // 复现 appstream 痛点：appstream 的 build_deps 含 librsvg，两者都是 libxml2 受害者。
     // 字母序入队 appstream 先，但 appstream 需要重建后的 librsvg → 重排必须把被依赖者放前。
-    // （build_deps 只对「仓库缺失 + 本轮 targets」的依赖建边、无 BUILD_AFTER_BUILD_DEPS 时
-    // librsvg 已在仓库 → 不建边；这里改用 needed_so 的 librsvg-2.so.2 → librsvg 边。）
+    // （build_deps 只对「仓库缺失 + 本轮 targets」的依赖建边，librsvg 已在仓库 → 不建边；
+    // 这里改用 needed_so 的 librsvg-2.so.2 → librsvg 边。）
     let dir = std::env::temp_dir().join("farm-reorder-queue");
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).unwrap();
@@ -1269,7 +1269,7 @@ fn abi_break_rebuilds_direct_victim_and_bumps_release() {
 fn rebuild_group_victims_rebuilt_on_abi_change() {
     // data/build/*.yaml 声明式重建组：python 的 libpython SONAME 断裂时，强制重建
     // **不链 libpython** 的 python 生态包（python-*、blueman）——它们没有 needed_so 链接边，
-    // 不会进 direct_victims，必须靠声明式组传播（用户规则）。
+    // 不会进 direct_victims，必须靠声明式组传播。
     let dir = temp_dir("farm-group-abi");
     let out = temp_dir("farm-group-abi-out");
     let gdir = temp_dir("farm-group-abi-data");
@@ -1635,7 +1635,7 @@ fn build_requires_seeded_old_index() {
 
 #[test]
 fn abi_victim_skips_pre_download_confirmed_bulk_predownloaded() {
-    // 预下载拆分（用户规则）：确认集（初始 target）开始构建前 bulk 预下载全部源；
+    // 预下载拆分：确认集（初始 target）开始构建前 bulk 预下载全部源；
     // ABI 受害者动态入队，**不预下载**——构建时由 lpkg build 自己下载。
     // 复现 gettext/bootstrap 场景：victim b 的源 URL 故意不可达——若没跳过，b 会进
     // source-missing；跳过后 StubBinding 直接成功。
@@ -2053,7 +2053,7 @@ fn backup_kept_when_soname_still_referenced() {
 
 #[test]
 fn backup_kept_when_versioned_soname_still_referenced() {
-    // **H2**：索引里的 needed_so 现在是**带符号版本**的规格串
+    // 索引里的 needed_so 现在是**带符号版本**的规格串
     // （`libxml2.so.2@{LIBXML2_2.9.0}`）。`cleanup_backups` 的 `referenced` 集合必须**归一到
     // 裸 SONAME**（`graph::so_bare`）才能与备份文件名/派生 SONAME 比对。
     //
@@ -2150,7 +2150,7 @@ fn backup_kept_when_referenced_soname_is_full_versioned() {
 
 #[test]
 fn llvm_upgrade_keeps_backup_while_victim_unrebuilt() {
-    // 综合真实状态端到端（复现用户报告）：LLVM 22.1→23.1 升级 + rust 等受害者未重建。
+    // 综合真实状态端到端：LLVM 22.1→23.1 升级 + rust 等受害者未重建。
     //
     // 完整链路：
     //   1. 仓库里有旧 llvm 22.1.0.lpkg（真实内容：libLLVM.so.22.1 实体 + libLLVM.so /
@@ -2991,15 +2991,14 @@ fn unchanged_soname_set_is_not_abi_break() {
 }
 
 /// **符号版本**：`needed_so` 带版本时，abifix 的"有无 provider"判定必须仍按**裸名**工作 ——
-/// 修前（只归一了集合侧、没归一比较侧）这里会误报，实测全仓触发 734 个包 / 3233 条。
+/// 修前（只归一了集合侧、没归一比较侧）这里会误报，全仓触发 734 个包 / 3233 条。
 #[test]
 fn abifix_targets_matches_versioned_needs_by_bare_soname() {
     let pkgs = temp_dir("farm-abifix-ver-pkgs");
     let out = temp_dir("farm-abifix-ver-out");
     // 索引里的 provider 声明带符号版本；消费者要求其中一部分版本。
     // ⚠️ 索引行是 `name|ver:hash:deps:provides:provides_soname:needed_so|` —— **两个竖线都要**
-    //（少结尾那个 ⇒ `parts.len() != 3` ⇒ 整行被跳过；我第一版就这么写的，调试输出里
-    // `provided = {}` 才看出来 —— 又一次"判据/夹具的锅"）。
+    //（少结尾那个 ⇒ `parts.len() != 3` ⇒ 整行被跳过，表现为 `provided = {}`）。
     write_baseline(&out, "libbar|1.0:h:::libbar.so.1@{V1,V2}:|\n");
     write_pkg_ver(&pkgs, "ok", "1.0", &["libok.so"], &["libbar.so.1@V1"], &[]);
     write_pkg_ver(

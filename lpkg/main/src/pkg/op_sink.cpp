@@ -25,7 +25,7 @@ fs::path shifted_save_name(const fs::path& dst, unsigned n)
 }
 
 /// 移位搜索上限。pacman 用 INT_MAX；这里给个有限上界，免得病态目录把移除挂死。
-/// **为什么是 10000**：同一路径被移除/留存 N 次才会堆到 `.lpkgsave.<N>`，正常机器上一位数
+/// 取 10000 的来由：同一路径被移除/留存 N 次才会堆到 `.lpkgsave.<N>`，正常机器上一位数
 /// 就到顶；10000 远高于任何合理值（不会误伤真用户），又足够小、让极端情况下（目录里挤了
 /// 上万个同名存档，正常机器到不了）的循环在有限步内停下而不是挂死。到上限时**不覆盖已有
 /// 存档**，改为抛 `error.config_save_shift_exhausted` 让整批失败 —— 回滚会把配置还原回原位，
@@ -60,8 +60,8 @@ fs::path OpSink::backup_impl(const fs::path& phys, std::string_view op,
     // 尾斜杠会让**判定类**调用（`lstat`/`is_symlink`/`is_empty`/`exists`）落到末尾符号链接的
     // **目标**上，而 WAL 行记的必须是"我们真正动了哪个对象"——两侧理解不一致正是 §3.6.1 第 1 条
     // 那类事故的来源。规范化只在这里做一次，调用点不管。
-    // （2026-09-25 订正：原文把 `rename` 也算进"落到目标上"，实测不成立——`rename("link/","x")`
-    //  被内核以 ENOTDIR 拒绝，末段符号链接一律不跟随；穿透的只有 chmod/lchown 与判定类调用。）
+    // 尾斜杠的穿透面：`rename("link/","x")` 被内核以 ENOTDIR 拒绝，末段符号链接一律不跟随
+    // —— 穿透的只有 `chmod`/`lchown` 与判定类调用。
     const fs::path src = strip_trailing_slash(phys);
     const fs::path bak = stash_bak_target(src, pkg_);
 
@@ -114,7 +114,7 @@ fs::path OpSink::save_config(const fs::path& phys, std::string_view after_wal_br
     // 写下时**还不存在** —— 万一崩在 write-ahead 窗口（行已落、rename 未做），回滚侧对
     // 本条的反向 rename 找不到 dst，是 no-op。若反过来（先改本次名、再移位），回滚就会把
     // **上一次**留下的旧 .lpkgsave rename 到配置原位，用它盖掉真正的配置（数据丢失）。
-    // 判据一律用不抛的 `exists_no_follow`（2026-09-26 修）：`fs::exists(p, ec) ||
+    // 判据一律用不抛的 `exists_no_follow`：`fs::exists(p, ec) ||
     // fs::is_symlink(p)` 这条写法在**中间段**成环时必抛（`fs::exists` 带 ec 对 ELOOP 返回
     // false ⇒ `||` 必然求值抛型的右操作数），而 `exists_no_follow` 要的正是它想表达的语义
     // ——"这个名字被任何东西占着"（含悬空链接与环），且不抛。
@@ -315,8 +315,8 @@ DirRemoval OpSink::remove_empty_dir(const fs::path& phys)
     // 对 `/root/var/run/`（真实对象是 `var/run -> ../run`）会读到 /run 的 stat、S_ISDIR 通过，
     // 于是"按链接判、按路径动手"——判定落在目标上；而调用方那侧的 is_symlink 守卫同样假阴性。
     // 两条路都错，且错的是同一个对象。
-    // （2026-09-25 订正：原文写"最终 rmdir 把真实 /run 删掉"——**不成立**，实测 `rmdir` 对末段
-    //  符号链接一律 ENOTDIR、不跟随；不剥尾斜杠的真实后果是"该删的没删"（静默 no-op）。）
+    // 而 `rmdir` 对末段符号链接一律 ENOTDIR、不跟随 ⇒ 不剥尾斜杠的真实后果是"该删的没删"
+    // （静默 no-op），不是删到链接目标。
     const fs::path target = strip_trailing_slash(phys);
 
     // 前置校验：真实目录（lstat，不跟随末段）才继续。非目录 / 已消失 → 静默返回：
@@ -339,11 +339,11 @@ DirRemoval OpSink::remove_empty_dir(const fs::path& phys)
     // `NotRemoved`。两条例都在生产 root（`/`）下不触发。
     if (!confined(phys)) return DirRemoval::NotRemoved;  // 已告警（见 confined）
 
-    // **xattr 先记（2026-09-26 补）**：`DIR_RM` 行只带 mode/uid/gid，而回滚侧的
+    // **xattr 先记**：`DIR_RM` 行只带 mode/uid/gid，而回滚侧的
     // `Undo::RecreateDir` 只 `create_directories` + `lchown`/`chmod` ⇒ 被 rmdir 又在回滚里
     // 重建的目录**丢掉整份 xattr**（而目录 xattr 正是 POSIX ACL 与 SELinux 标签的存放处）。
-    // 与刚为目录元数据补的 `DIR_META` 是**同一族缺口**，只是长在**移除侧** ——
-    // 属性测试的 xattr 维度当场抓到这一格（实测 2/32 种子）。
+    // 与目录元数据的 `DIR_META` 是**同一族缺口**，只是长在**移除侧** —— 属性测试的 xattr
+    // 维度抓到这一格（2/32 种子）。
     //
     // **只记行、不动盘**：目录马上要被 rmdir，没有理由再 lsetxattr 一次（多余且可能失败）。
     // **行序是承重的**：`XATTR_SET…` 必须在 `DIR_RM` **之前** —— 逆序回滚时先撤 `DIR_RM`
@@ -376,11 +376,9 @@ DirRemoval OpSink::remove_empty_dir(const fs::path& phys)
     // EACCES / is_empty 与 rmdir 之间的 ENOTEMPTY 竞态这类**真错误**，必须让用户看见。
     //
     // 告警在**本方法内部**打，而不是把错误信息回传给调用方：生产端**只有一处**调用点
-    // （`install_common.cpp:238`，移除空目录那一趟），它只按 `SkippedMountPoint` 分流；
+    // （`install_common.cpp`，移除空目录那一趟），它只按 `SkippedMountPoint` 分流；
     // 加一个带消息的返回值意味着"调用方要记得判"，而漏判的后果正是这次要修的静默。
     // 本文件的 include 里已有日志设施（聚合头 base/utils.hpp → base/process.hpp）。
-    // （订正 2026-10-03：原文写"两个调用点都只看 SkippedMountPoint"—— `grep -rn
-    //   remove_empty_dir main/src` 实测生产端调用点只有那一处。）
     if (ec) log_warning(string_format("warning.dir_remove_failed", target.string(), ec.message()));
 
     return ec ? DirRemoval::NotRemoved : DirRemoval::Removed;
@@ -470,7 +468,7 @@ PathDecision decide_path_unchecked(const PathFacts& f)
             //     其余进 stash（单次 rename、回滚即 rename 回来）。
             //     ⚠️ 判据是 `!disk_is_dir`（lstat 语义），**不是** `fs::is_directory`：
             //        后者跟随符号链接，会把 `symlink→目录` 误判成"已是目录"而跳过让开，
-            //        随后 rename 撞 EEXIST（lpkg/CLAUDE.md §0 铁律第 1 条）。
+            //        随后 rename 撞 EEXIST。
             if (!f.disk_exists)
                 d.let_go = PathAction::MakeDir;
             else if (f.disk_is_dir)
@@ -483,32 +481,27 @@ PathDecision decide_path_unchecked(const PathFacts& f)
 
         if (f.is_config) {
             if (f.disk_is_dir) {
-                // `/etc` 的**非目录**条目撞盘上**真目录**（`ARCH.md` §6.3 的「类型变化」格，
-                // 即 §3.2.2 第一行）：让开趟必须**先把路清掉** —— 整树改名成
+                // `/etc` 的**非目录**条目撞盘上**真目录**（`ARCH.md` §6.3 的「类型变化」格）：
+                // 让开趟必须**先把路清掉** —— 整树改名成
                 // `<路径>.lpkgsave/`（内容一个不丢、`SAVE_CONF` 可回滚、**不进 stash** 所以
                 // 提交后不会被清掉），让开之后写入趟**就地**落位。
                 // 依据：目录不是"用户可能改过的那份**配置文件**"，把整棵树改名保留再就地安装
                 // 与 pacman 一致（`conflict.c` 在 `dir_belongsto_pkgs` 放行后也是就地写新条目）。
                 //
-                // ⚠️ 这一格原先**没人让开**：`backup_existing_files()` 的 `/etc` 早退排在
-                //    "真目录挡路"分支之前，那个分支里的 `save_config` 是**死代码** ——
-                //    后果是普通文件条目 rename 撞 EISDIR、符号链接条目被守卫拒绝，
-                //    这条升级路径**永远不可能成功**（2026-09-25 修）。
+                // ⚠️ 这一格**必须让开**：不让开的话，普通文件条目 rename 撞 EISDIR、符号链接
+                //    条目被守卫拒绝 —— 这条升级路径**永远不可能成功**。
                 d.let_go = PathAction::SaveConfig;
                 d.write = PathAction::WriteInPlace;
                 return d;
             }
             // ── `/etc` 的非目录条目 × 盘上的非目录物 ────────────────────────────────
-            // **类型变化 = 一条规则**（2026-09-26 统一）：符号链接 / 普通文件 两者互换，
+            // **类型变化 = 一条规则**：符号链接 / 普通文件 两者互换，
             // 一律"原物改名 `.lpkgsave`（可回滚、内容一个不丢）+ 新物**就地**落位"。
             // 与上面"盘上是真目录"那一格、以及 DB 旧键那侧的废弃清理由此**同一条政策**：
             // 只要一个路径要被彻底放弃，原物就留成 `.lpkgsave`。
             //
-            // 改前这一族是分裂的：`file → symlink` 走"链接一律按配置冲突处理"（用户那份
-            // 留原样、新链接退 `.lpkgnew`），`symlink → file` 走**三哈希**（拿链接目标的
-            // 内容当 `hash_local` 去和包内那份比）—— 后者尤其没道理：类型都换了，还谈
-            // "用户改没改过这份配置"。统一之后"类型变化"与"类型未变"成为两个清晰的分界，
-            // 而"类型未变"才谈用户改没改（见下面）。
+            // 分界是**类型变化**与**类型未变**：类型都换了就谈不上"用户改没改过这份配置"，
+            // 只有"类型未变"才谈用户改没改（见下面）。
             const bool type_changed = f.disk_exists && (f.entry_is_symlink != f.disk_is_symlink);
             if (type_changed) {
                 d.let_go = PathAction::SaveConfig;
@@ -593,7 +586,7 @@ PathDecision decide_path_unchecked(const PathFacts& f)
         return d;
     }
     if (f.is_config) {
-        // `/etc` 的废弃条目（2026-09-26 改）：
+        // `/etc` 的废弃条目：
         //   · **文件 / 符号链接** → `SaveConfigObsolete`：原物改名 `<路径>.lpkgsave`（内容
         //     一个不丢、可回滚）+ 撤所有权 + 撤配置哈希记录。与"类型变化"、移除整包
         //     （`rm_save_conf_after_wal_`）三处统一：`/etc` 下的东西永远不会被 lpkg 无声
@@ -602,7 +595,7 @@ PathDecision decide_path_unchecked(const PathFacts& f)
         //     占着那个名字，而"盘面 == 新版本形态"从此对 `/etc` 前缀永不成立。
         //   · **目录** → 仍是 `DropOwnership`（只撤记录、不碰盘）。这是**有意保留的例外**：
         //     移除侧对 `/etc` 目录本来就刻意"宁可不碰（只告警）"（`<dir>.lpkgsave` 会把
-        //     不知名的目录整个搬走），维护者划的范围也是"要彻底删一个**文件**的路径"。
+        //     不知名的目录整个搬走）—— 范围是"要彻底删一个**文件**的路径"。
         d.reg = f.entry_is_dir ? PathAction::DropOwnership : PathAction::SaveConfigObsolete;
         return d;
     }
@@ -619,7 +612,7 @@ PathDecision decide_path_unchecked(const PathFacts& f)
     if (f.disk_is_dir || f.new_dir_entry) {
         // 新版本把这个路径变成了**目录**（文件→目录 / 符号链接→目录升级）：内容已由写入趟
         // 接管，这里**绝不能**再把它当"废弃旧文件"搬进 stash —— 那会把刚建好的目录搬走，
-        // 升级"成功"而目录消失（实测，见 installation_task_letgo.cpp 的 REMOVE_OLD 阶段注释）。
+        // 升级"成功"而目录消失（见 installation_task_letgo.cpp 的 REMOVE_OLD 阶段注释）。
         d.reg = PathAction::Noop;
         return d;
     }

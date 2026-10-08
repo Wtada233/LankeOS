@@ -1,11 +1,11 @@
-//! custom_checks/abi — 全仓库 ABI 符号/版本审计（`farm chk abi`；原顶层 `abi_fullchk.rs`/`manual-abi-fullchk`）。
+//! custom_checks/abi — 全仓库 ABI 符号/版本审计（`farm chk abi`）。
 //!
 //! 与 qml/pkgconf/pkg_err/hook 同一个缓存框架：**整包 cache**（`super::walk_all`，key = 当前
 //! `.lpkg` 文件 sha256 + schema）——每包一个 `<cache>/<pkg>.json`，里面存**该包每个 ELF 文件**的
 //! 扫描信息（soname / needed / 导出版本符号 defined / 未定义引用 undef）。`.lpkg` 未变 → 跳过
 //! 解包与重扫（其它 chk 同款）；不再维护 per-SONAME 单文件缓存。
 //!
-//! 算法（两段式，镜像 python `/tmp/scan_elf_ver.py`）：
+//! 算法（两段式）：
 //! 1. provider 目录：遍历全部包的 cached analysis，收集带 SONAME 的 ELF 导出的 `sym@ver`；
 //!    同时收集**全仓库 ELF 提供的名字**（SONAME + 文件名——无 SONAME 的运行时库如
 //!    `libtcl8.6.so` 靠文件名被 DT_NEEDED 引用）；

@@ -1,5 +1,5 @@
 /**
- * test_hygiene.cpp — **钉住"跨用例复位"这个机制本身**
+ * test_hygiene.cpp — **覆盖"跨用例复位"这个机制本身**
  *
  * `tests/test_hygiene.hpp` 的全局 listener 在每个用例结束时无条件复位进程级状态
  * （`sigint_graceful` / `TriggerManager` / `Config` 的各模式开关与路径 / `BreakpointManager`）。

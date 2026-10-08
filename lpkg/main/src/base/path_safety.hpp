@@ -30,7 +30,7 @@ bool path_within(const std::filesystem::path& p, const std::filesystem::path& ro
  * `tests/integration/test_symlink_loop_install.cpp` 钉着）与"中间段尚未重建的 `DIR_RM`"。
  * 空 `p` / 空 `root` 一律放行（含义由调用方自己处理）。
  *
- * 2026-10-03：本函数是 `db/wal_op.cpp` 里那份 `path_within_root()`（参数顺序相反：这里是
+ * 本函数是 `db/wal_op.cpp` 里那份 `path_within_root()`（参数顺序相反：这里是
  * `(p, root)`）与"落位目标的祖先链约束"**共用**的唯一实现 —— 此前那两处各写了一套分量比较，
  * 只靠注释声明"用同一套剥离规则"，必然漂移。
  */
@@ -44,7 +44,7 @@ bool path_within_resolved(const std::filesystem::path& p, const std::filesystem:
  * 用于**跟随语义**使用该目录的场合（典型：`apply_soname_links()` 会在其中 `create_symlink` /
  * `fs::remove`，而它用 `is_directory_follow` 判定入参）。
  *
- * 为什么需要它（2026-10-03 审计）：`<root>/usr/lib` 本身可以是一条**包发的符号链接**
+ * 为什么需要它：`<root>/usr/lib` 本身可以是一条**包发的符号链接**
  * （末段不解析是有意的，见 §5.4 不变量 6），若它指向 root 之外，提交后的触发器就会在宿主的
  * 那个目录里建/删 SONAME 链接 —— `--root` 的隔离被"提交后阶段"穿透。
  *
@@ -61,6 +61,6 @@ bool path_resolves_within(const std::filesystem::path& dir, const std::filesyste
  *
  * 包名与版本号来自**不可信来源**（远端索引、.lpkg 内的 metadata.json），而它们会被
  * 直接当成路径分量拼进 tmp_pkg_dir() / dep_dir() / docs_dir() / 下载 URL，
- * 一个 `../` 就能以 root 写到这些目录之外（历史 TODO.md X4）。
+ * 一个 `../` 就能以 root 写到这些目录之外。
  */
 bool is_safe_path_component(std::string_view s);

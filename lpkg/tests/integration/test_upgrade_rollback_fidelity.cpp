@@ -25,13 +25,13 @@
  *      （installation_task.cpp 的 collect_content_conflicts 所有权分支）。
  *   其二：gamma 的"目录条目撞上 fshelper 的符号链接"要判冲突，又**必须不带 force**：类型变更
  *      分支的条件是 `!ours && !Config::instance().force_overwrite_mode()` —— force 把它
- *      整个豁免掉。实测（本文件 ForceOverwrite… 测试钉住）：force 下 gamma 会**接管**那个
+ *      整个豁免掉。本文件 ForceOverwrite… 测试覆盖：force 下 gamma 会**接管**那个
  *      符号链接（链接被 rename 进 stash、原路径建出实体目录），整批**成功**而非失败。
  * 于是拆成：① 类型变更冲突真触发的那一份（不带 force）—— 冲突由**整批预检**在进入事务之前
  * 拦下，因此这一份改钉"一个文件都没动"；② 带 force 的**三包**批次"两个包都已完全落地
  * （含跨包所有权接管）之后才失败"，失败点由**断点注入**给出（`install_after_begin_gamma`）
  * —— 这类"两个包已落地的中途证据"只有确定性注入才拿得到（类型变更冲突本身已经拦不到那么晚，
- * 见下）；③ 正向对照；④ 把 force 下类型变更被豁免的**现状**钉住，使这处与 ARCH §3.6.1 第
+ * 见下）；③ 正向对照；④ 把 force 下类型变更被豁免的**现状**固定下来，使这处与 ARCH §3.6.1 第
  * 3/4 条的偏差可见；⑤ 补"**失败的那个包自己**已经在文件操作中途"的维度
  * （`copy_after_wal_<pkg>`：backup_existing_files 已跑完、拷贝只做了一半），④⑤ 与 ② 一样
  * 覆盖"整批回滚"这条路径，① 覆盖"连事务都没进"那条。
@@ -54,7 +54,7 @@
  *     一个 postinst 都不跑；
  *   · **脚本文件**：hooks_dir/<pkg>/ 的脚本落位改走写入层原语（BACKUP + COPY，可回滚），
  *     回滚后目录里仍是旧版本的内容。
- * 由 tests/integration/test_hook_transaction.cpp 钉住（本文件的快照与此无关：fixture 的包
+ * 由 tests/integration/test_hook_transaction.cpp 覆盖（本文件的快照与此无关：fixture 的包
  * 都不带 `hooks/` 目录，hooks_dir 下没有它们的实体；SetUp 里的 no_hooks_mode 只额外关掉执行）。
  */
 
@@ -412,9 +412,8 @@ protected:
      * DB 的一部分，走 DBNEW/DBRM 回滚）。
      *
      * DB 一族的清单取自 test_base.hpp 的 db_family_files()（与 test_db_backup_chain.cpp
-     * 同一份）——一族有 **6** 个库（订正 2026-09-26：原文写 5 个；`xattrkeys.db`
-     * 加进来时清单没跟着加、 本文件因此盲掉了它，已修）。逐处硬编码清单正是漏掉新库的地方：
-     * 地方："回滚后逐字节回到批次前"这条不变量必须对**整族**成立。
+     * 同一份）——一族有 **6** 个库。逐处硬编码清单正是漏掉新库的地方：
+     * "回滚后逐字节回到批次前"这条不变量必须对**整族**成立。
      */
     std::map<std::string, std::string> db_state() const
     {
@@ -692,7 +691,7 @@ TEST_F(UpgradeRollbackFidelityTest, ThreePackageUpgradeFailureRollsBackFilesAndO
             mid["shared_owners"] = owners;
         }
         mid["v1_only_gone"] = fs::exists(test_root / "usr/share/alpha-v1-only.txt") ? "no" : "yes";
-        // 中途取证改从**内存 Cache** 取：2026-10-03 起 DB 只在**批次末尾**落盘一次
+        // 中途取证改从**内存 Cache** 取：DB 只在**批次末尾**落盘一次
         // （见 `write_batch_db`），所以此刻盘上的 DB **故意**还是批次前的内容 ——
         // 拿它当"中途确实变了"的证据必然不成立。真正的状态在内存里（批次内的判定一律走它）。
         mid["pkgs_inmem"] = Cache::instance().get_installed_version("beta");
@@ -727,7 +726,7 @@ TEST_F(UpgradeRollbackFidelityTest, ThreePackageUpgradeFailureRollsBackFilesAndO
     // (c) DB 保真（含 files.db 的所有权：接管只改了 Cache 内存，回滚必须连内存一起回到旧值）
     expect_same_snapshot(db_before, db_state(), "DB 文件");
     // 字节相同之外还要有**语义**：失败批次里的升级一点都没生效。
-    // （2026-10-03 起 DB 只在批次末尾写一次，所以一个**失败**批次根本不会去动盘上的 DB ——
+    // （DB 只在批次末尾写一次，所以一个**失败**批次根本不会去动盘上的 DB ——
     //   "回滚后逐字节等于批次前"于是是**构造上**成立的。真正会暴露问题的是：那次提交前的
     //   落盘有没有漏进已提交状态。下面两条直接查内存的最终值，不依赖"字节没变"。）
     for (const auto& n : {"alpha", "beta"})
@@ -740,7 +739,7 @@ TEST_F(UpgradeRollbackFidelityTest, ThreePackageUpgradeFailureRollsBackFilesAndO
     // (e) fshelper 的符号链接与目标目录**未被触碰**。这一条在本 case 里**不是**"被接管后再
     // 还原"：gamma_v2_clean 一次都没碰 `var/run` / `srv`，所以它证明的是"整批回滚没有波及
     // 无关的邻居"，以及"回滚不会把别人持有的链接/目录顺手搬来搬去"。
-    // （"链接真被接管"的现状由 ④ 钉住；"接管被拒绝"由 ① 钉住 —— 两者都不要在这里重复。）
+    // （"链接真被接管"的现状由 ④ 覆盖；"接管被拒绝"由 ① 覆盖 —— 两者都不要在这里重复。）
     expect_fshelper_layout_intact("三包批次失败回滚后");
     EXPECT_FALSE(fs::is_symlink(test_root / "srv")) << "fshelper 的实体目录被换成了符号链接";
     EXPECT_EQ(read_text(test_root / "srv" / "fshelper-srv.txt"), "srv dir content\n");
@@ -869,7 +868,7 @@ TEST_F(UpgradeRollbackFidelityTest, ForceOverwriteStillTakesOverForeignSymlinkDi
     //   `!Config::instance().force_overwrite_mode()`：带 --force-overwrite 时整段跳过，
     //   于是 gamma 的 `var/run/` 目录条目会**接管** fshelper 的符号链接 —— 链接被 rename
     //   进 stash（CLEANUP 时删掉）、原路径建出实体目录，正是 §3.6.1 开头描述的那起事故形态。
-    //   若维护者判定该豁免违反 ARCH 并收紧（force 也不放行类型变更），把本测试翻成
+    //   若该豁免被判定违反 ARCH 并收紧（force 也不放行类型变更），把本测试翻成
     //   EXPECT_THROW + expect_fshelper_layout_intact() 即可。
     Config::instance().set_force_overwrite_mode(true);
     ASSERT_NO_THROW(install_packages({a2, b2, g2}))
@@ -918,10 +917,7 @@ TEST_F(UpgradeRollbackFidelityTest, MidCopyFailureOfTheFailingPackageRollsBackWh
     // remove_obsolete_files）是先整阶段跑完的，所以 gamma 的 v1 文件（含 v2 不再发的废弃
     // 文件）此刻**一定**已不在原位；而断点卡在第一个文件的 rename 之前，所以 gamma 的 v2
     // 内容**一个都没落地**、盘上只多出 `.lpkgtmp`。三条合起来才是"断点落在拷贝中途"的
-    // 取证 —— **订正 2026-09-26（第③步）**：废弃文件的移除原先在 commit_without_ops、拷贝
-    // 之后，那时它"还在盘上"也是一条证据；重构把这一步**整体前移到写入之前**（
-    // 让开趟的
-    // ②b（`remove_obsolete_files()`）），那条证据因此反过来（此刻它已经不在），改由上面三条承担。
+    // 取证。
     std::map<std::string, std::string> mid;
     BreakpointManager::instance().set("copy_after_wal_gamma", [&] {
         mid["alpha_ver"] = Cache::instance().get_installed_version("alpha");

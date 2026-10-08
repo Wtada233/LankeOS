@@ -1,7 +1,7 @@
 /**
  * test_plan_repo_miss.cpp — 求解计划里的包在仓库索引里找不到时**必须硬报错**
  *
- * 缺口（CLAUDE.md §3「空 sha256 → 静默跳过哈希校验」）：
+ * 缺口（「空 sha256 → 静默跳过哈希校验」）：
  * `detail::resolve_with_solver`（pkg/install_common.cpp）把求解结果映射成 InstallPlan 时，
  * 非本地包从 `ctx.repo.find_package(name, version)` 取 PackageInfo；**未命中就什么都不做**，
  * `info` 保持默认构造 —— 其中 `sha256` 为空。空的 sha256 一路流到 installation_task 的
@@ -19,7 +19,7 @@
  * 未校验的包，修复后明确拒绝（fail-closed 是有意的取舍）。
  *
  * 边界的另一侧**不动**：本地 `.lpkg` 文件安装本来就允许没有哈希（离线安装），
- * 见 LocalPackageHasNoHashAndIsStillAllowed——它钉住"别把这条路一起打死"。
+ * 见 LocalPackageHasNoHashAndIsStillAllowed——它守住"别把这条路一起打死"。
  */
 
 #include <gtest/gtest.h>

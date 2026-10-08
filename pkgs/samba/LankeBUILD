@@ -3,7 +3,7 @@
 # 构建参数以 BLFS 为准；talloc/tevent/tdb/popt 取系统库（!list），ldb 仍内置（仓库无 ldb 包）。
 #
 # **AD DC 开着，走打包内置的 Heimdal**（Arch 与 Debian 默认构建的同款做法）：
-#   原先这里是 `--without-ad-dc --with-system-mitkrb5` —— 那不是"缺依赖所以关"，而是**上游逼出来的配对**：
+#   为什么不用 `--with-system-mitkrb5`：那不是"缺依赖所以关"，而是**上游逼出来的配对**：
 #   wscript:372-379 规定 `--with-system-mitkrb5` 必须配 `--without-ad-dc` 或 `--with-experimental-mit-ad-dc`，
 #   而后者上游 help 原文是 "Note that security patches are not issued for this configuration"（**不给安全补丁**）。
 #   所以要用 AD DC 就只能用内置 Heimdal：两个开关**都不传**即可 —— 不传时 wscript:345-346 定义
@@ -20,7 +20,7 @@
 # 默认配置照 Arch：/etc/pam.d/samba（PAM 认证必需，否则 smbd 的 auth 全废）、/etc/logrotate.d/samba、
 # /usr/lib/tmpfiles.d/samba.conf（+ postinst systemd-tmpfiles --create）、/etc/samba/private、/var/spool/samba；
 # 默认 /etc/samba/smb.conf **由本包自带**（pkgs/samba/smb.conf：最小 FHS 骨架）。Arch 不装这个
-# 文件；我们此前装的是上游 examples/smb.conf.default —— 那是"从源码装到 /usr/local/samba"的
+# 文件；上游 examples/smb.conf.default 是"从源码装到 /usr/local/samba"的
 # 场景示例，当发行版默认有三处不对（日志/私有目录指到 /usr/local/samba 与本发行版 --enable-fhs
 # 的编译期默认打架、默认带 [homes] 把家目录暴露出去、路径假设不一致），故改为自带骨架。
 

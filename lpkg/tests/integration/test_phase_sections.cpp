@@ -1,11 +1,11 @@
 /**
  * test_phase_sections.cpp — 四个阶段 + 一条 summary 的**可执行规格**
  *
- * 2026-10-03 把批次流水线拆成四段并对用户可见（`ui::section`）：
+ * 批次流水线分四段并对用户可见（`ui::section`）：
  *
  *     :: 下载 → :: 解压 → :: 安装 → :: 运行安装后钩子 → :: 系统触发器
  *
- * 本文件钉四件事：
+ * 本文件覆盖四件事：
  *   ① 阶段标题按这个**顺序**出现（且"准备"那个旧标题没了）；
  *   ② **不带 hooks 的包不出"运行安装后钩子"这一节** —— `hook_sets` 对每个被处理的包都会记一条
  *      （没 hook 的包记的是空表，而空表在下游是"本版本没有 hooks"的硬信号），所以判据必须是
@@ -172,7 +172,7 @@ TEST_F(PhaseSectionTest, SectionsAppearInOrderAndOneSummaryAtTheEnd)
     cap.stop();
     const std::string& out = cap.out;
 
-    // ① 四个阶段按序出现（"准备"那个旧标题已不存在 —— 它的 key 已删，编译期就钉住了）
+    // ① 四个阶段按序出现（"准备"那个旧标题已不存在 —— 它的 key 已删，编译期就固定住了）
     const auto at = [&](const char* key) { return out.find(section_line(key)); };
     const auto download = at("ui.section_download");
     const auto extract = at("ui.section_extract");

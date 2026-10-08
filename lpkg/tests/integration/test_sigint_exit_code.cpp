@@ -8,15 +8,15 @@
  * CLI 的 `run_cli()`（main/src/main_cli.cpp）里 `catch (const LpkgException&)` 打印后
  * `return 1`。本用例钉的就是这一处对齐。
  *
- * 本文件钉住两条：
+ * 本文件覆盖两条：
  *   ① 置位 sigint_graceful → `upgrade_packages()` **抛 LpkgException**（而不是返回），
  *      且异常文本就是 `info.sigint_aborted`（证明它来自这个分支，不是别的失败路径），
  *      并断言**没有任何包被改动**（旧版本仍在：中止要发生在动盘之前）；
  *   ② 正向对照：同一套仓库/索引，不置位 → 不抛、且真的升到新版本 ——
  *      否则"夹具本身就会抛/就没得升"也能让 ① 变绿（那 ① 就是假绿）。
  *
- * 注意：`sigint_graceful` 的**定义**在 main/src/main_cli.cpp（2026-09-26 从 main.cpp 下沉，
- * 随 LPKG_OBJS 进测试二进制），这里只 `extern` 引用、**不要**再定义一份
+ * 注意：`sigint_graceful` 的**定义**在 main/src/main_cli.cpp（随 LPKG_OBJS 进测试二进制），
+ * 这里只 `extern` 引用、**不要**再定义一份
  * （重复定义 → 链接错误）。tests/integration/test_solver_regressions.cpp 用的是同一手法。
  */
 

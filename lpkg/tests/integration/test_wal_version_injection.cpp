@@ -113,7 +113,7 @@ protected:
 /**
  * 直连 `InstallationTask`（确定性，不经求解器）：版本号带 `\n` 时必须在写 BEGIN 行**之前**被拒。
  *
- * 这条直接钉住被修的那一行；`actual_version_` 的来路与生产完全一致（`version_` 就是
+ * 这条直接覆盖被修的那一行；`actual_version_` 的来路与生产完全一致（`version_` 就是
  * package_manager 从 metadata.json 读出来喂给 InstallTask 的那个值）。
  */
 TEST_F(WalVersionInjectionTest, NewlineVersionIsRejectedBeforeBeginWalLine)

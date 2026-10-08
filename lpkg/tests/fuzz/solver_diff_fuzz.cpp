@@ -17,7 +17,7 @@
 //  1. **存在性一致**：暴力枚举"存在满足全部依赖的版本组合" ⟺ `SolveResult::ok()`。
 //     等价性判据**全部复用生产函数**：版本约束用 `version_satisfies_all`（它同时是求解器
 //     与安装期验收共用的那一个）—— 本 harness **一行版本比较都不自己写**。
-//     满足关系照 8.0.0 的两套**隔离命名空间**建模（字段显式分开，不再靠字符串形状猜）：
+//     满足关系照两套**隔离命名空间**建模（字段显式分开，不再靠字符串形状猜）：
 //       · `needed_so: X` → 走 `so:` 空间 ⇒ **只**能被 `provides_soname` 满足
 //         （包名与虚拟 provides 都够不着它）。带符号版本（`X@V` / `X@{V1,V2}`）时按**保守**
 //         语义：只有"也声明了符号版本且覆盖它"的 provider 才算 —— 判据直接用生产的
@@ -26,13 +26,12 @@
 //         或**虚拟 provides**（不带版本 ⇒ 通配任何约束）。
 //     ⚠️ **目标包被钉在"最新版"**：本 harness 传的 target 是 `(name, "latest")`，而 lpkg 的
 //     `latest` 是"装**最新**版"、**不回退到旧版**（装不上就是无解）。暴力枚举必须照这个语义
-//     走 —— 否则会把"另一个更宽松的旧版本能装"误判成求解器漏解（实测踩过，见下）。
+//     走 —— 否则会把"另一个更宽松的旧版本能装"误判成求解器漏解（见下）。
 //  2. **产出的方案本身必须自洽**（`ok()` 为真时）：每个 ResolvedPkg 的版本确实在池子里、
 //     **目标被满足**、方案内部所有 needed_so 与 deps 都被同一个方案满足。
 //     这一条覆盖"求解器说能装、但给出的清单其实不满足"那一侧。
 //     ⚠️ "目标被满足"同样**按能力语义**（见 oracle 1 底下那段）：池里没有同名包时，
-//     方案里装的是**提供者**，不是叫那个名字的包 —— 这条我在 oracle 1 里改了、忘了搬过来，
-//     又报了一次假分叉（**同族判据只推一条分支**）。
+//     方案里装的是**提供者**，不是叫那个名字的包 —— **同族判据只推一条分支**。
 //
 // ── 已知边界（有意不报的）──────────────────────────────────────────────────
 //  · 池子里含**同名多版本**且互相依赖时，语义仍由上面两条覆盖；不做"装哪个更优"的比较
@@ -49,13 +48,12 @@
 //     六个字段以空格分隔；`provides`/`provides_soname`/`needed_so`/`deps` 是 **`;` 分隔**的
 //     表（`-` = 空表）。**不能用逗号**：`X@{A,B}` 里的逗号属于符号版本列表。
 //
-// ── 求解器对输入的前提（本 harness **逐条过滤**；这几条都是**实测撞出来的**，不是预防）────
-// 求解器内部全走 libsolv 的池，而池里的名字/版本都是 **C 串**（8.0.0 起版本**原样**进池，
+// ── 求解器对输入的前提（本 harness **逐条过滤**；这几条都是**撞出来的**，不是预防）────
+// 求解器内部全走 libsolv 的池，而池里的名字/版本都是 **C 串**（版本**原样**进池，
 // 不再有 EVR 编解码桥），所以下面这些形态要么让它看到别的东西、要么被拒 —— 喂进去只会产生
-// "关于我的模型"的假分叉：
-//   ① **NUL**：`pool_str2id` 收 C 串 ⇒ 版本/名字被截断（首次跑就是这么红的）；
-//   ② **`version_compare(a, b)` 的语义是 `a < b`**（不是 a > b）—— 这条害我报过一整类假分叉，
-//      见 `pinned` 那里的注释。
+// 关于 oracle 模型的假分叉：
+//   ① **NUL**：`pool_str2id` 收 C 串 ⇒ 版本/名字被截断；
+//   ② **`version_compare(a, b)` 的语义是 `a < b`**（不是 a > b）—— 见 `pinned` 那里的注释。
 // 真实索引不会产出这些形态，所以过滤不损失覆盖。
 
 #include <cstddef>
@@ -117,17 +115,15 @@ std::vector<std::string> split_tokens(std::string_view s)
 /// `name = evr`。deps 与"池里没有同名包"的 capability 型 target 都问这一侧。
 /// ⚠️ **`needed_so` 不走这里** —— 它走 `so:` 空间，只认 `provides_soname`（见下）。
 ///
-/// **本 harness 里所有"裸名能力匹配"一律走这一个函数** —— 此前每个调用点各写一遍，于是
-/// 一处补了 `name`、另一处只查 `provides`，**连中两次假分叉**（2026-10-04）。
+/// **本 harness 里所有"裸名能力匹配"一律走这一个函数** —— 分两处写就会一处补了 `name`、
+/// 另一处只查 `provides`，给出不同答案。
 /// 这个包是否**声明了虚拟 provider** `cap`（只查 `provides`，**不含自己的名字**）。
 ///
 /// ⚠️ 依赖满足必须用这个，**不能**用上面那个：包对**自己名字**的提供是**带版本**的
-/// （`solver.cpp:448` 的 `name = evr`，那里的注释专门警告过 "plain 无版本 provide 会被
+/// （`solver.cpp` 的 `name = evr`，那里的注释专门警告过 "plain 无版本 provide 会被
 /// libsolv 视为满足任意版本 requires"），而虚拟 `provides` 是**不带版本**的 ⇒ libsolv 把
 /// 它当**通配**。两者对"带约束的依赖"的结论相反，混用就会把 `libA >= 2.0` 判成被
-/// `libA 1.0` 满足 —— 实测（2026-10-04）：`make fuzz` 拿这个池子当场撞出一次崩
-/// （"暴力枚举找到满足全部依赖的组合，而求解器说装不上"），**是 oracle 错，不是产品错**。
-/// 这是本 harness 的第 7 次 oracle 修正，形态还是那一条：**同族判据只推了一条分支**。
+/// `libA 1.0` 满足。
 bool provides_virtual(const PackageInfo& q, const std::string& cap)
 {
     for (const auto& p : q.provides) {
@@ -161,8 +157,8 @@ bool provides_soname_of(const PackageInfo& q, const std::string& need)
 /// 这个串"看起来像**真实版本域**里的版本"吗？字母表 = `[0-9A-Za-z.+-]`。
 ///
 /// 为什么要这条闸：喂进空格、高位字节、`!` 这类字节，池里的 EVRCMP 与 `version_satisfies`
-/// 对同一个垃圾串的解释可能不同，报出来的是"关于我的模型"的假分叉。实测（2026-10-04）：
-/// `P appB 1.0 - - libA>2 .0`（**约束里的版本含空格**）配 `libA 1\xeb`（**高位字节**）就报过。
+/// 对同一个垃圾串的解释可能不同，报出来的是关于 oracle 模型的假分叉。例：
+/// `P appB 1.0 - - libA>2 .0`（**约束里的版本含空格**）配 `libA 1\xeb`（**高位字节**）。
 /// 真实索引的版本全部落在这个字母表内，所以不损失覆盖。
 bool plausible_version(const std::string& v)
 {
@@ -239,7 +235,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         std::vector<DependencyInfo> deps;
         if (!deps_s.empty() && deps_s != "-") deps = detail::parse_dep_strings({deps_s});
         // 每个版本（包版本 + 依赖约束里的版本）都要"像版本"：垃圾字节上 EVRCMP 与
-        // `version_satisfies` 的解释可能不同，报出来只是"关于我的模型"的假分叉。
+        // `version_satisfies` 的解释可能不同，报出来只是 oracle 模型自己造的假分叉。
         for (const auto& d : deps) {
             for (const auto& c : d.constraints) {
                 if (!plausible_version(c.version)) bad = true;
@@ -276,12 +272,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
     // 每个包的候选：下标 0..n-1 = 装该版本，n = 不装
     std::vector<std::size_t> choice(names.size(), 0);
     bool satisfiable = false;
-    // **目标钉在"最新版"** —— 这条是 oracle 的核心，也是第一次跑就报假红的地方：
+    // **目标钉在"最新版"** —— 这条是 oracle 的核心：
     // 本 harness 传的 target 是 `(name, "latest")`（见下面 `solve_targets`），而 lpkg 的
     // `latest` 语义是**"装最新版"、不是"随便装一个能装的版本"**：最新版装不上就报无解，
-    // **不回退到旧版**。实测（2026-10-04）：`appB` 有两个版本 —— `1.0`（依赖 `libA>2`）与
-    // 另一个无依赖的版本，池里 `libA` 只有 `1.0` ⇒ 求解器报 `error.unresolved_dependency`；
-    // 而我的暴力枚举当时把 target 当通配、选了那个无依赖的版本，于是报了假分叉。
+    // **不回退到旧版**。例：`appB` 有两个版本 —— `1.0`（依赖 `libA>2`）与另一个无依赖的
+    // 版本，池里 `libA` 只有 `1.0` ⇒ 求解器报 `error.unresolved_dependency`；把 target 当
+    // 通配、选那个无依赖的版本就是错的。
     // "哪个是最新"用**同一个** `version_compare` 算（不自己写版本序 —— 那是第二实现）；
     // 版本序本身另有 `vercmp_fuzz` 对着 libsolv 差分守着。
     std::map<std::string, std::size_t> pinned;  // 目标包名 -> 最新版在 pkgs[name] 里的下标
@@ -294,8 +290,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
             // ⚠️ `version_compare(a, b)` 的语义是 **a < b**，不是 a > b —— 仓库里两处用法都
             // 钉死了它：`repository.cpp` 拿它当 `ranges::sort` 的比较器（升序 ⇒ 最后一版最新），
             // `solver.cpp` 的原话是"当前 best 版本 < sa 版本 → sa 更新为 best"。
-            // 我第一版按 a > b 用了它，于是 pin 出来的是**最旧版**，报了一整类假分叉
-            // （实测 2026-10-04）。**别信"这个 API 应该是这个语义"** —— 去看它的用法怎么读。
+            // 按 a > b 用会 pin 出**最旧版**。**别信"这个 API 应该是这个语义"** —— 去看它的
+            // 用法怎么读。
             if (version_compare(it->second[best].version, it->second[i].version)) best = i;
         }
         pinned[t] = best;
@@ -318,13 +314,13 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
             chosen.push_back(&versions[choice[i]]);
         }
         // 目标必须都满足 —— 但**按能力语义**，不是"必须有个叫这个名字的包"：
-        // `solver.cpp:476-513` 对目标分两条路：
+        // `solver.cpp` 对目标分两条路：
         //   · 池里有**同名真实包** → 取它的最高版本，用 `SOLVER_SOLVABLE|INSTALL` 精确指定
         //     （= 上面 `pinned` 做的事）；
         //   · **没有同名包** → 当 **capability** 处理（`SOLVER_SOLVABLE_PROVIDES|INSTALL`）
         //     ⇒ 任何**提供**这个名字的包都算满足。
-        // 实测（2026-10-04）：只按包名判时，"target 是个能力名、由某个包的 provides 提供"
-        // 的池被判成不可满足，报了假分叉 —— 与 `needs`/无约束 deps 是同一个族。
+        // 只按包名判时，"target 是个能力名、由某个包的 provides 提供"的池会被判成不可满足
+        // —— 与 `needs`/无约束 deps 是同一个族。
         for (const auto& t : targets) {
             const bool same_name_pkg_exists = pkgs.find(t) != pkgs.end();
             bool satisfied = false;
@@ -363,17 +359,17 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
                 for (const auto& dep : p->dependencies) {
                     bool satisfied = false;
                     for (const auto* q : chosen) {
-                        // **依赖满足的模型（照 `solver.cpp:102-116` 与 libsolv 的语义）**——
+                        // **依赖满足的模型（照 `solver.cpp` 与 libsolv 的语义）**——
                         // 两条路，任一成立即算满足：
                         //  ① 按**包名**：该包的自提供是**带版本**的（`name =
-                        //  evr`，`solver.cpp:392`）
+                        //  evr`，`solver.cpp`）
                         //     ⇒ 须同时满足版本约束；无约束时 `version_satisfies_all(v, {})` 恒真，
                         //     退化成"按名字匹配"。
                         //  ② 按**虚拟能力**：`add_provides` 注册的是**不带版本**的 capability
-                        //     （`solver.cpp:130`），而 **libsolv 把不带版本的 provide 当通配**
+                        //     （`solver.cpp`），而 **libsolv 把不带版本的 provide 当通配**
                         //     ⇒ 它能满足**任何**版本约束。⚠️ 这一条把"只在无约束时才走能力匹配"
                         //     的写法推翻了 ——
-                        //     实测（2026-10-04）带约束的能力依赖就是这么报假分叉的。
+                        //     带约束的能力依赖就是这么被误判的。
                         //     **只对虚拟 `provides` 成立**：包对自己名字的提供带版本，见下面那行。
                         const bool by_name = (q->name == dep.name &&
                                               version_satisfies_all(q->version, dep.constraints));
@@ -422,7 +418,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         ++g_unsatisfiable;
     }
 
-    // 诊断串（万一分叉，我要能当场判"是求解器错还是我错"）
+    // 诊断串（万一分叉，用来当场判"是求解器错还是 oracle 错"）
     std::string detail;
     for (const auto& [name, versions] : pkgs) {
         for (const auto& v : versions) {
@@ -472,9 +468,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         }
         // 目标必须在方案里 —— **按能力语义**，与上面那条存在性判据**同一套模型**
         // （池里有同名包 ⇒ 方案里要有那个包；没有同名包 ⇒ 方案里要有**提供该能力**的包）。
-        // ⚠️ 实测（2026-10-04）：我只在存在性那条里补了这个模型、忘了搬到这里，于是
-        // "target 是能力名、方案里装的是提供者"又报了一次假分叉 —— **同族判据只推了一条
-        // 分支**正是这个仓库的头号缺陷形态，写 oracle 时同样会犯。
+        // ⚠️ 目标判定必须与上面那条存在性判据**同一套模型**，否则 "target 是能力名、
+        // 方案里装的是提供者"会报假分叉 —— **同族判据只推了一条分支**正是这个仓库的
+        // 头号缺陷形态，写 oracle 时同样会犯。
         for (const auto& t : targets) {
             const bool same_name_pkg_exists = pkgs.find(t) != pkgs.end();
             bool satisfied = false;

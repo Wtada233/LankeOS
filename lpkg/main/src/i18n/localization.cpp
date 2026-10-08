@@ -22,10 +22,7 @@ std::unordered_map<std::string, std::string> missing_key_placeholders;
 /// 英文兜底表：<lang>.txt 存在但个别 key 缺失时用它，而不是直接吐 [MISSING_STRING]
 std::unordered_map<std::string, std::string> english_fallback;
 
-/**
- * 获取可执行文件所在的目录路径
- * 通过读取 /proc/self/exe 符号链接确定
- */
+/// 通过读 /proc/self/exe 符号链接确定；读不出则回退到当前工作目录。
 fs::path get_executable_dir()
 {
     std::array<char, PATH_MAX> result{};
@@ -43,9 +40,7 @@ fs::path get_executable_dir()
 }  // namespace
 
 /**
- * 加载指定语言的本地化字符串文件
- * 文件格式为 key=value，每行一个键值对
- * 加载失败时自动回退到英文
+ * 文件格式为 key=value，每行一个键值对；加载失败时自动回退到英文。
  */
 void load_strings(const std::string& lang, const fs::path& base_dir)
 {
@@ -73,9 +68,7 @@ void load_strings(const std::string& lang, const fs::path& base_dir)
 }
 
 /**
- * 初始化本地化系统
- * 读取 LANG 环境变量确定语言（支持中文和英文），
- * 按优先级依次搜索多个路径以定位 l10n 目录
+ * 读 LANG 环境变量确定语言（支持中文和英文），按优先级依次搜索多个路径定位 l10n 目录。
  */
 void init_localization()
 {

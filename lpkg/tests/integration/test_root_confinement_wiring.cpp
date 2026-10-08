@@ -1,8 +1,8 @@
 /**
  * test_root_confinement_wiring.cpp — `detail::confine_target_path()` 的**生产接线**
  *
- * 2026-10-03 给"落位 / 让开目标的**祖先链**"加了约束：`detail::confine_target_path()`
- * （定义在 `install_common.cpp`），两个生产调用点 —— 写入趟
+ * "落位 / 让开目标的**祖先链**"由 `detail::confine_target_path()`
+ * （定义在 `install_common.cpp`）约束，两个生产调用点 —— 写入趟
  * `installation_task_copy.cpp:copy_package_files()`、让开趟
  * `installation_task_letgo.cpp:backup_existing_files()`。此前用的是裸 `root_dir()/rel`，
  * 它只约束**词法**归属，而 `fs::copy` / `rename` / `create_symlink` 会**跟随中间段符号链接**
@@ -21,7 +21,7 @@
  *   · 用例 2（**同包升级**：v1 发链接、v2 在链接之下发文件）：靠 pacman 的 E4 豁免
  *     （`ours_exempts`，本包旧版本以非目录形态持有）天然放行预检，**不需要 --force**，
  *     且**没有任何其他闸**能解释拒绝 ⇒ 最强的接线证据；
- *   · 用例 3：**不加 force** 时 A/B 那条链实际被**冲突预检**拦下 —— 诚实钉住"是哪一道闸"，
+ *   · 用例 3：**不加 force** 时 A/B 那条链实际被**冲突预检**拦下 —— 诚实记录"是哪一道闸"，
  *     免得把"被预检拒绝"误当成"接线生效"。
  *
  * ── 断言的可区分性 ──
@@ -170,7 +170,7 @@ TEST_F(RootConfinementWiringTest, ForceOverwriteInstallThroughForeignSymlinkAnce
     EXPECT_EQ(msg.find(conflict_anchor()), std::string::npos)
         << "不该是文件冲突预检的报错（那就证明不了接线）：\n"
         << msg;
-    // ② 报错点名**相对路径**与 root（CLAUDE.md §8 第 7 条）
+    // ② 报错点名**相对路径**与 root
     EXPECT_NE(msg.find("usr/lib"), std::string::npos) << "报错没点名越界的相对路径：\n" << msg;
     EXPECT_NE(msg.find(test_root.string()), std::string::npos) << "报错没点名 root：\n" << msg;
 

@@ -172,10 +172,9 @@ class RepoManager:
         本函数的结果会被 `push` 用来**读-改-写整份索引**、被 `cleanup` 用来决定删哪些包文件，
         所以"少读一条"不是显示问题而是**数据丢失 + 删掉仍被引用的文件**。
 
-        ⚠️ **订正 2026-10-04（8.0.0，破坏性）**：这里此前有两处**兼容分叉** —— 版本级 provides
-        为空时回退到**行级 provides**（`parts[2]`）、以及容忍 4/5 字段的版本块。两者都已废除：
-        版本块**恰好 6 个字段**、**没有行级 provides**（第 3 个 `|` 段不再定义）。旧格式的块在这里
-        被**跳过**（不是被误读），与 C++ 侧同判据。**不做任何兼容读取**（维护者 repack 全部包）。
+        ⚠️ **版本块恰好 6 个字段**、**没有行级 provides**（第 3 个 `|` 段不再定义）。字段数不是 6
+        的版本块在这里被**跳过**（不是被误读），与 C++ 侧同判据。**不做任何兼容读取** —— 包随
+        版本一起重打包，旧格式的块因字段数不符被拒绝，而不是被读成别的意思。
 
         契约由同一份 fixture + 同一份期望维持，两侧各自断言：
           · 本侧：main/scripts/check_index_conformance.py
@@ -190,7 +189,7 @@ class RepoManager:
             if len(parts) < 2:
                 continue
             name = parts[0]
-            # **没有行级 provides**：第 3 个 `|` 段已废除（见 docstring 的订正）。
+            # **没有行级 provides**：第 3 个 `|` 段不再定义（见 docstring）。
             for v_block in parts[1].split(';'):
                 v_info = v_block.split(':')
                 if not v_info[0]:

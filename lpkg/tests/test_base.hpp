@@ -28,13 +28,11 @@ namespace fs = std::filesystem;
  * 清单只放这一份：凡是"对 DB 一族做整体断言"的测试（备份计数、逐字节快照、里程碑枚举）
  * 都从这里取。
  *
- * 订正 2026-09-26（第 6 个库）：原文写着"第 5 个库 confhashes.db 加进来时，几处各自硬编码的
- * 4 元素清单正好就是漏掉它的地方 —— 那是**口径分歧**"。**同一个分歧又发生了一次**：
- * `xattrkeys.db` 加进 `Cache::write(milestone)` 时，这个唯一的清单没跟着加，于是三个使用者
- * （备份计数 `test_db_backup_chain`、逐字节快照 `test_upgrade_rollback_fidelity`、
- * `test_ultimate_multipkg`）全都**盲掉了第 6 个库**（最后那个在本地用一行 `add_file(...)`
- * 绕过，现已删）。连"写在注释里的预言"都没能防住它 —— 所以这条订正痕迹留着：
- * **往这一族加库时，回来改这个函数**，别只改 cache.cpp。
+ * ⚠️ **往这一族加库时，回来改这个函数**，别只改 cache.cpp。
+ * 这个清单是唯一的一份，使用者（备份计数 `test_db_backup_chain`、逐字节快照
+ * `test_upgrade_rollback_fidelity`、`test_ultimate_multipkg`）全都从它取。
+ * 只要 `Cache::write(milestone)` 加了一个库而它没跟上，这些使用者就会**盲掉那个库** ——
+ * `confhashes.db`、`xattrkeys.db` 两次都是这么漏的（连"写在注释里的预言"都没能防住）。
  */
 inline std::vector<fs::path> db_family_files()
 {
@@ -57,8 +55,8 @@ protected:
         Config::instance().set_testing_mode(true);
         init_localization();
 
-        // 目录名带 **PID**：两个测试进程并发时会各自 `rm -rf` 对方的固定名目录（实测主会话
-        // 与另一进程同时跑时产生 58 条 SetUp 假失败：`cannot remove all: Directory not empty
+        // 目录名带 **PID**：两个测试进程并发时会各自 `rm -rf` 对方的固定名目录（两个进程
+        // 同时跑时产生 58 条 SetUp 假失败：`cannot remove all: Directory not empty
         // [/app/tmp_lpkg_itest]`）。同一进程内 getpid 不变 ⇒ 多次 SetUp/TearDown 仍复用同一
         // 路径，TearDown 照旧清理干净。
         suite_work_dir = fs::absolute("tmp_lpkg_itest_" + std::to_string(getpid()));
@@ -87,7 +85,7 @@ protected:
     /**
      * 创建包含一个空 bin 文件的虚拟包。
      *
-     * 字段次序全仓统一（8.0.0 拆分）：`provides`（虚拟 provider）→ `provides_soname`
+     * 字段次序全仓统一（拆分后）：`provides`（虚拟 provider）→ `provides_soname`
      * （本包**导出**的 SONAME）→ `needed_so`（本包**需要**的 SONAME）。参数都有默认值，
      * 所以插在中间会让旧调用**静默错位** —— 改签名时要连每个传了 ≥5 个实参的调用点一起改。
      */
@@ -120,7 +118,6 @@ protected:
         return pkg_path;
     }
 
-    /** 创建本地镜像仓库，返回 mirror 目录 */
     fs::path setup_local_mirror()
     {
         fs::path mirror = suite_work_dir / "mirror" / "x86_64";
@@ -132,7 +129,6 @@ protected:
         return mirror;
     }
 
-    /** 将已创建的包放入镜像 */
     void add_to_mirror(const std::string& name, const std::string& version)
     {
         fs::path mirror = suite_work_dir / "mirror" / "x86_64";

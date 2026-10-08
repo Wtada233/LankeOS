@@ -1,7 +1,7 @@
 /**
  * test_install_confinement.cpp — 落位目标的**祖先链约束**与路径判据的边角
  *
- * 钉的是 2026-10-03 审计查出的那条隔离缺陷：`--root <R>` 下 `root_dir()/rel` 只约束
+ * 钉的是这条隔离缺陷：`--root <R>` 下 `root_dir()/rel` 只约束
  * **词法**归属，而拷贝/让开都会**跟随中间段符号链接** —— 只要有包发过 `content/usr -> <外部>`
  * （绝对目标链接，成员名消毒**有意**放行），后续任何含 `usr/...` 的包都会被写到 root 之外，
  * `--no-hooks` 也挡不住（那条走的是文件拷贝）。
@@ -155,7 +155,7 @@ TEST(PathWithinResolvedTest, TrailingSlashOnRootIsEquivalent)
 
 TEST(PathWithinResolvedTest, EmptyOperandsPass)
 {
-    // 空路径/空 root 的语义由调用方处理（WAL 侧历史上就是"放行"）—— 这里钉住不放行才是错的。
+    // 空路径/空 root 的语义由调用方处理（WAL 侧历史上就是"放行"）—— 这里要求不放行才是错的。
     EXPECT_TRUE(path_within_resolved("", "/a"));
     EXPECT_TRUE(path_within_resolved("/a/b", ""));
 }

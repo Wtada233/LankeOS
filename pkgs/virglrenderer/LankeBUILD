@@ -37,7 +37,7 @@
 #   - python3：venus 的设备对象代码生成（src/venus/vkr_device_object.py）；解释器由 base-devel
 #     覆盖，但**还要 PyYAML** —— 树内 vendored 的 mesa gallium 辅助代码在 configure 阶段
 #     `import yaml` 生成格式表，缺了直接 `src/gallium/meson.build:72: python3 is missing
-#     modules: yaml`（实测踩过）。故 build_deps 里显式写 `python-pyyaml`（Arch 同款 python-yaml）。
+#     modules: yaml`。故 build_deps 里显式写 `python-pyyaml`（Arch 同款 python-yaml）。
 #   - 注意 venus 用的 Vulkan 头是**树内 vendored**（src/venus/venus-protocol/vulkan.h），
 #     不需要 vulkan-headers；vulkan-dload 默认 true → 运行时 dlopen libvulkan，
 #     编译期也不需要 vulkan-loader。

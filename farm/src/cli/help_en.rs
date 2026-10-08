@@ -1,7 +1,5 @@
 //! clap 帮助文本的英文覆盖表（纯数据；`LANG=en` 时替换中文 doc comment）。
 //!
-//! 从 `cli/mod.rs` 拆出（那里曾同时装 6 件事：日志设施 / clap schema /
-//! 共享 helper / track 引擎 / gen-trackers 子系统 / 帮助文本英化表）。
 //! `use super::*;` 拿到父模块的共享 helper（子模块可见祖先的私有项）。
 
 /// LANG=en 时把 clap 帮助文本（doc comment 是中文）覆盖为英文。builder 风格（消费 self 返回 Self）。

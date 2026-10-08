@@ -1,5 +1,5 @@
 /**
- * test_archive_confinement.cpp — 解压必须锁在目标目录内（历史 TODO.md X2）
+ * test_archive_confinement.cpp — 解压必须锁在目标目录内
  *
  * 归档成员名是**不可信输入**（未校验的 .lpkg、无校验和的上游源码包）。`fs::path` 语义下
  * `output_dir / "/abs/x"` **等于 "/abs/x"**（绝对右值丢弃左值），所以修复前一个绝对路径
@@ -126,15 +126,12 @@ TEST_F(ArchiveConfinementTest, DotDotMemberDoesNotEscape)
 /**
  * 硬链接目标逃出解压根 ⇒ **整包拒绝**。
  *
- * ⚠️ **订正 2026-10-05（有意变更的粒度，不是缺陷修复）**：本用例原名
- * `HardlinkTargetOutsideRootIsSkipped`，钉的是"**跳过该成员 + 告警**、其余成员照常解出"
- * （`EXPECT_NO_THROW` + 只断言逃逸成员没落地）。维护者在 2026-10-05 把安全类违规统一为
- * **整包拒绝**（与成员名守卫、特殊文件类型守卫、以及新的 `archive/tar_guard` 全部判据同
- * 粒度），这条随之升级：留着"跳过"的口子等于让用户拿到一个装了一半、某文件莫名消失的包，
- * 而畸形归档是**结构性**问题、不是单个成员的偶发问题。
+ * ⚠️ **安全类违规统一为整包拒绝**（成员名守卫、特殊文件类型守卫、以及
+ * `archive/tar_guard` 的全部判据同粒度）：留着"跳过该成员 + 告警"的口子等于让用户拿到一个
+ * 装了一半、某文件莫名消失的包，而畸形归档是**结构性**问题、不是单个成员的偶发问题。
  *
- * 断言随之改成三个锚点：抛 `UnsafeArchiveException`（不是普通失败 —— 构建期不会吞它）/
- * 点名归档 / 点名成员。**没有**再断言"其余成员照常解出"，因为那正是被否掉的旧行为。
+ * 断言有三个锚点：抛 `UnsafeArchiveException`（不是普通失败 —— 构建期不会吞它）/
+ * 点名归档 / 点名成员。**没有**断言"其余成员照常解出"，因为那正是被否掉的旧行为。
  */
 TEST_F(ArchiveConfinementTest, HardlinkTargetOutsideRootIsRejected)
 {
@@ -182,7 +179,7 @@ TEST_F(ArchiveConfinementTest, ContentRootSymlinkIsRefusedByScanner)
     // 成员的**名字**消毒挡不住"把 `content` 本身做成符号链接"：归档能正常解压（libarchive
     // 建的就是那条链接），而 `scan_content_files` 的 `recursive_directory_iterator(content_dir)`
     // 会**跟随起点目录**去枚举链接目标 —— 安装机上的任意文件会被当成"包内容"登记、复制
-    // （2026-10-02 前实测复现）。修法：content 根必须是**真目录**（lstat 语义）。
+    // （复现过）。修法：content 根必须是**真目录**（lstat 语义）。
     const fs::path outside = escape_dir / "victim";
     fs::create_directories(outside);
     {

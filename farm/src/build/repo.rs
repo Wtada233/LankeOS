@@ -10,8 +10,8 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// 有效版本 = `version` [`-release`]。⚠️ **8.0.0 起分隔符是 `-`（rpm 的 release 语义），
-/// 不再是 `+`** —— lpkg 那边版本串原样进 libsolv，`+N` 在 rpm 里只是普通字符，拼出来会
+/// 有效版本 = `version` [`-release`]。⚠️ **分隔符是 `-`（rpm 的 release 语义），不再是 `+`** ——
+/// lpkg 那边版本串原样进 libsolv，`+N` 在 rpm 里只是普通字符，拼出来会
 /// 变成"版本里多了个 +N 段"（既不是 release，排序也错）。见 lpkg `vercmp/version.hpp`。
 pub(crate) fn effective_version(pkgs_dir: &Path, pkg: &str) -> Option<String> {
     let b = read_lankebuild(pkgs_dir, pkg)?;
@@ -22,7 +22,7 @@ pub(crate) fn effective_version(pkgs_dir: &Path, pkg: &str) -> Option<String> {
     })
 }
 
-/// 增量判断（用户规则）：effective_version 与本地 repo 旧索引一致 → 跳过构建；
+/// 增量判断：effective_version 与本地 repo 旧索引一致 → 跳过构建；
 /// 除非后续有包 ABI breaking 导致该包依赖其需要重建（那会经传播入队，不受此限制）。
 pub(crate) fn needs_build(pkgs_dir: &Path, pkg: &str, old: &Index) -> bool {
     let Some(ver) = effective_version(pkgs_dir, pkg) else {
@@ -81,7 +81,7 @@ pub(crate) fn repack_if_drift(
 /// 上传本地仓库 `out/<arch>/<pkg>/`：把 staging 的 .lpkg 移入并**取代旧版本**。返回最终路径。
 ///
 /// 文件名必须精确匹配 lpkg 的下载 URL `<mirror>/<arch>/<pkg>/<version>.lpkg`
-/// （lpkg installation_task.cpp:380 硬编码拼 `<version>.lpkg`）——**不能用构建产物名
+/// （lpkg installation_task.cpp 硬编码拼 `<version>.lpkg`）——**不能用构建产物名
 /// `<pkg>-<version>.lpkg`**，否则 lpkg 拉依赖时 404（"文件名不对"）。
 pub(crate) fn place_in_repo(
     outcome: &BuildOutcome,
@@ -322,7 +322,7 @@ pub(crate) fn cleanup_backups(out_dir: &Path, arch: &str) {
     }
 }
 
-// ── cleanup_backups 的两个递归助手（原为内嵌 fn；提出后各自可测）──
+// ── cleanup_backups 的两个递归助手（各自可测）──
 
 /// SONAME 不一致（display-info 类：soversion=3、version=0.3.0 ⇒
 /// libdisplay-info.so.3 → libdisplay-info.so.0.3.0）。此时实体自身派生 SONAME

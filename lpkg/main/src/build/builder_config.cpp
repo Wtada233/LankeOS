@@ -14,7 +14,6 @@
 using json = nlohmann::json;
 namespace fs = std::filesystem;
 
-/** 解析 LankeBUILD.json 构建配置文件，返回 BuildConfig 结构体 */
 BuildConfig parse_build_config(const fs::path& json_path)
 {
     json meta;
@@ -54,7 +53,7 @@ BuildConfig parse_build_config(const fs::path& json_path)
     } catch (const std::exception& e) {
         // 缺 name/version、字段类型不对等：nlohmann 抛的是 `json::exception`（**不是**
         // LpkgException），此前会一路穿到 main 的兜底 catch —— 报错里也不点名是哪个
-        // LankeBUILD.json（2026-10-02 修）。
+        // LankeBUILD.json。
         throw LpkgException(
             string_format("error.lankebuild_parse_failed", json_path.string(), e.what()));
     }

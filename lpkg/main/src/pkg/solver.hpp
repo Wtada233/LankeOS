@@ -19,7 +19,7 @@ struct ResolvedPkg {
 };
 
 struct SolveResult {
-    std::vector<ResolvedPkg> order;     ///< 依赖先装的执行序
+    std::vector<ResolvedPkg> order;
     std::vector<std::string> problems;  ///< 致命错误（非容忍类）；空 = 求解成功
     bool ok() const
     {
@@ -44,9 +44,9 @@ struct SolveOptions {
 struct InstalledPkg {
     std::string version;
     std::vector<DependencyInfo> deps;
-    std::vector<std::string> provides;         // 虚拟 provider
-    std::vector<std::string> provides_soname;  // 导出的 SONAME
-    std::vector<std::string> needed_so;        // 需要的 SONAME
+    std::vector<std::string> provides;
+    std::vector<std::string> provides_soname;
+    std::vector<std::string> needed_so;
 };
 
 /// 用 libsolv 求解安装/升级/重装计划。
@@ -54,7 +54,7 @@ struct InstalledPkg {
 /// installed：已装包名 -> 版本+requires；targets：(包名, 版本说明)；"latest"=选最佳版本。
 // `struct PackageInfo`：它在 `repo/repository.hpp` 里是 **struct** —— 这里写 `class` 是
 // "elaborated type specifier 标签不一致"（clang-diagnostic-mismatched-tags，GCC 下无害、
-// MSVC ABI 下会变成链接错误）。是 `make tidy` 第一轮跑出来的真发现；顺带它会让 clang-tidy
+// MSVC ABI 下会变成链接错误）。顺带它会让 clang-tidy
 // 把整个 TU 判成"有编译错误"从而**一条都不分析**。
 SolveResult solve_install(const class Repository& repo,
                           const std::vector<struct PackageInfo>& local,
@@ -62,10 +62,8 @@ SolveResult solve_install(const class Repository& repo,
                           const std::vector<std::pair<std::string, std::string>>& targets,
                           const SolveOptions& opts);
 
-// 曾有两个同义入口：本头里的 `repo_revrequires()`（吃内存 Repository、两种边都看）与
-// `repo/revdep.hpp` 的 `build_reverse_dependency_map()`（生产用、当时只看 SONAME 边）。
-// 2026-10-03 收敛成**一份** —— `build_reverse_dependency_map()`，边种类由调用方选。
-// 前者的语义（两种边都看）成了 `RevdepEdges::DepsAndSoname`，它的"不包含自身"不变量
-// 改由构建期排自环保证（用例见 tests/unit/test_solver.cpp）。
+// 反向依赖图只有**一份**实现 —— `repo/revdep.hpp` 的 `build_reverse_dependency_map()`，
+// 边种类由调用方选（两种边都看 = `RevdepEdges::DepsAndSoname`）。它的"不包含自身"
+// 不变量由构建期排自环保证（用例见 tests/unit/test_solver.cpp）。
 
 }  // namespace solv

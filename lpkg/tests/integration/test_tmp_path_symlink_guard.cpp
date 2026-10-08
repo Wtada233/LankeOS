@@ -253,7 +253,7 @@ TEST_F(TmpPathSymlinkGuardTest, StaleRegularLpkgtmpIsStillOverwritten)
 /**
  * 包内 `hooks/` 的**符号链接**成员指向包外 ⇒ **整包拒绝**（并点名条目与它解析到的目标）。
  *
- * 2026-09-26 修：`directory_entry::is_regular_file()` 与随后的 `fs::copy` **都跟随末段
+ * `directory_entry::is_regular_file()` 与随后的 `fs::copy` **都跟随末段
  * 链接** ⇒ `hooks/postinst.sh -> /etc/shadow` 会让 root 把**宿主那份文件的内容**拷成
  * `hooks_dir/<pkg>/postinst.sh`（mode 随源 + 执行位）并当 postinst **执行** ——
  * 包内容读出了包外、还以 root 执行。边界取"解析后仍落在**本包解压目录**之内"：

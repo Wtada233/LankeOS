@@ -104,7 +104,6 @@ TEST_F(BreakpointTest, UpgradeCleansLpkgBakAfterSuccess)
 {
     setup_local_mirror();
 
-    // 安装 v1
     std::string p1 = create_pkg("upg_clean", "1.0", {}, {}, {"upg_clean.so.1"});
     add_to_mirror("upg_clean", "1.0");
     install_packages({p1});
@@ -130,7 +129,6 @@ TEST_F(BreakpointTest, UpgradeCleansLpkgBakAfterSuccess)
     EXPECT_EQ(Cache::instance().get_installed_version("upg_clean"), "2.0");
 
     // 升级应产生 .lpkg_bak（覆盖 v1 的文件）→ 批次成功后应清理
-    // 验证没有 .lpkg_bak 残留
     bool found_bak = false;
     std::error_code ec;
     for (const auto& e : fs::recursive_directory_iterator(test_root / "usr", ec)) {
@@ -143,7 +141,7 @@ TEST_F(BreakpointTest, UpgradeCleansLpkgBakAfterSuccess)
 }
 
 // ============================================================================
-// 手工构造: 历史 TODO.md §3 各断电点的 WAL 状态
+// 手工构造: §3 各断电点的 WAL 状态
 // ============================================================================
 
 // §3.2: WAL 先于 rename — 原文件还在
@@ -579,7 +577,6 @@ TEST_F(BreakpointTest, BatchRemoveCrashMidwayRestoresAllPackages)
 
     install_packages({pA, pB, pC});
 
-    // 验证安装完成
     for (auto& n : {"rmA_crash", "rmB_crash", "rmC_crash"}) {
         EXPECT_FALSE(Cache::instance().get_installed_version(n).empty())
             << n << " should be installed";
@@ -638,7 +635,6 @@ TEST_F(BreakpointTest, BatchRemoveCrashMidwayRestoresAllPackages)
         // 在此崩溃：rmA 的 BACKUP 写了但 RM_COMMIT 没写
     );
 
-    // 执行恢复
     recover_packages();
 
     // ── 验证包文件恢复 ──

@@ -1,13 +1,13 @@
 /**
  * test_tmp_dir_hardening.cpp — 进程暂存目录必须**只属于本进程**
  *
- * 2026-10-03 审计查出的高危候选：暂存目录（`/tmp/lpkg_<pid>_<rand>`）此前是
+ * 暂存目录（`/tmp/lpkg_<pid>_<rand>`）此前是
  * "`exists()` 探测 + `fs::create_directories()`"，而 `create_directories` 对**已存在**的路径
  * （攻击者预建的目录、或指向 `/etc` 的符号链接）**静默成功** ⇒ 本地无权用户可以劫持 root
  * 的暂存目录，root 把包内容解压进去、再拷进系统 ⇒ 任意内容以 root 安装。
  * 另：当时 mode 是 `0777 & ~umask`（umask 022 时 = **0755**，别人能读）。
  *
- * 修法是 `mkdtemp`（原子建、0700）+ 建后 lstat 复核。本文件钉**结果属性**，不钉实现：
+ * 修法是 `mkdtemp`（原子建、0700）+ 建后 lstat 复核。本文件断言**结果属性**，不断言实现：
  *   · 它必须是**真目录**（不是符号链接）—— 这条正是"预建符号链接"那条攻击路径的反面；
  *   · 属主必须是本进程 euid；
  *   · mode 必须是 **0700** —— 这一条对修前实现**必红**（0755），是本套件的主要证据；
@@ -65,8 +65,8 @@ TEST(TmpDirHardeningTest, SameProcessGetsTheSameDirectory)
 
 TEST(TmpDirHardeningTest, RecreationAfterRemovalIsStillPrivate)
 {
-    // **全量测试里实测出来的洞**：`~TmpDirManager()` 会 `remove_all` 掉这个根，而之后任何一句
-    // `create_directories(<根>/…)` 都会把它**重新建出来 —— 用 0777 & ~umask（实测 0755）**，
+    // **全量测试里暴露出来的洞**：`~TmpDirManager()` 会 `remove_all` 掉这个根，而之后任何一句
+    // `create_directories(<根>/…)` 都会把它**重新建出来 —— 用 0777 & ~umask（0755）**，
     // 于是加固在进程活着的中途就没了；更要紧的是那一格又回到"静默接受一个已存在的同名路径"
     // （= 最初那条可劫持缺陷的形态）。修法：`get_tmp_dir()` 每次取用都复核并修复（见 config.cpp）。
     const fs::path dir = Config::get_tmp_dir();
@@ -76,7 +76,7 @@ TEST(TmpDirHardeningTest, RecreationAfterRemovalIsStillPrivate)
     //    ⚠️ 前提是 umask 不放宽（测试容器 umask 022）：umask=077 时任何一种实现都会得到 0700，
     //    那种环境下本用例对这条分支没有区分力（下面还有"删掉"那一格，不依赖 umask）。
     // ① 真实事故形状：根被删掉、随后被**别处以 `create_directories` 重建**（= 0777 & ~umask）
-    //    —— 这一格走的才是 `ensure_tmp_dir_usable` 的 **chmod 回修**分支（全量测试里实测的洞）。
+    //    —— 这一格走的才是 `ensure_tmp_dir_usable` 的 **chmod 回修**分支（全量测试里暴露的洞）。
     //    ⚠️ 前提是 umask 不放宽（容器 umask 022）：umask=077 时旧实现也会得到 0700，那种环境下
     //    这一条没有区分力 —— 所以下面还留着不依赖 umask 的"整个删掉"那一格。
     std::error_code ec;

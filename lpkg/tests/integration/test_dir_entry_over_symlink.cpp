@@ -11,7 +11,7 @@
  *   · **symlink 一律算「非目录」**："We do not support treating symlinks to directories as
  *     directories. They are considered a file."（pacman-dev）
  *   · 类型不一致（归档目录 vs 盘上非目录、归档文件 vs 盘上真目录）→ **默认判冲突、整批
- *     中止**；只有"该路径由**本包旧版本**以另一形态持有"（文件→目录升级，历史 TODO E4）才放行 ——
+ *     中止**；只有"该路径由**本包旧版本**以另一形态持有"（文件→目录升级）才放行 ——
  *     pacman 的 "Check if the directory was a file in dbpkg"，`fileconflict00x.py` 钉的就是这条。
  *   · 删除侧：symlink 一律 unlink、绝不 rmdir 也不跟随（commit `b1e495b8`）；DB 记为文件键
  *     而盘上已是目录 → 拒绝（`--force` 才跳过，且仍然只跳过、不搬目录）。
@@ -258,7 +258,7 @@ TEST_F(DirEntryOverSymlinkTest, FileEntryOverRealDirIsRefused)
 }
 
 // ============================================================================
-// 安装侧：本包自己旧版本以另一形态持有 → 放行（pacman 的 dbpkg 豁免 = 历史 TODO E4）
+// 安装侧：本包自己旧版本以另一形态持有 → 放行（pacman 的 dbpkg 豁免）
 // ============================================================================
 
 TEST_F(DirEntryOverSymlinkTest, OwnedFileBecomesDirOnUpgrade)
@@ -405,23 +405,21 @@ TEST_F(DirEntryOverSymlinkTest, StashDirectorySymlinkIsRejected)
 // 无关），且目录是带 WAL `BACKUP` 行搬进 stash 的 → 可回滚。
 // ============================================================================
 //
-// 历史与订正（2026-09-25）：
-//   这条路径**曾经**被无条件拒绝，理由写的是"pacman 的 case 5 对任何持有者都不放行"。
-//   复核上游源码后这个理由**不成立**：`add.c` 那条 "extract: not overwriting dir with
-//   file" 是**解压层**的无条件拒绝，而 `conflict.c` 的**冲突层**（`dir_belongsto_pkgs`）
-//   在"目录里外全属于本包/本次要升级的包"时是**放行**的 —— pacman 先删旧包文件（含目录）
-//   再解压，解压时那个路径已经不存在，所以撞不到 add.c 那道闸。
+// pacman 的判据：`add.c` 的 "extract: not overwriting dir with file" 是**解压层**的无条件
+// 拒绝，而 `conflict.c` 的**冲突层**（`dir_belongsto_pkgs`）在"目录里外全属于本包/本次要
+// 升级的包"时是**放行**的 —— pacman 先删旧包文件（含目录）再解压，解压时那个路径已经不
+// 存在，所以撞不到 add.c 那道闸。
 //
-//   当年撞 EISDIR 崩溃的真实原因不是"不该放行"，而是**放行了却没先把目录让开**：第③步
-//   `rename(.lpkgtmp → 该路径)` 撞 EISDIR；崩在事务中途后，回滚的 COPY 逆操作对**空目录**
-//   `fs::remove` 会 rmdir 成功 → 盘面路径凭空消失、files.db 却仍声称持有它（且没有
-//   BACKUP 行可还原）。现在第②步 `backup_existing_files` 会先把挡路的真目录搬进 stash
-//   （写 `BACKUP` 行），路径让开后才写文件：崩溃点消失、回滚有依据、所有权不再脱节。
+// 放行后必须先把目录让开：第②步 `backup_existing_files` 把挡路的真目录搬进 stash（写
+// `BACKUP` 行），路径让开后才写文件；否则第③步 `rename(.lpkgtmp → 该路径)` 撞 EISDIR，
+// 崩在事务中途后回滚的 COPY 逆操作对**空目录** `fs::remove` 会 rmdir 成功 → 盘面路径凭空
+// 消失、files.db 却仍声称持有它（且没有 BACKUP 行可还原）。先让开后：崩溃点消失、回滚有
+// 依据、所有权不再脱节。
 //
-//   许可条件也比"本包持有"更严：`dir_tree_entirely_ours`（对齐 pacman 的
-//   `dir_belongsto_pkgs`）要求**整棵子树**都只属于本包或本批次升级的包 —— 目录键是累加
-//   持有者的，共享目录整树让开会搬走别人的文件。共享/无主目录仍被拒绝（见本文件
-//   `FileEntryOverRealDirIsRefused` 与 `test_overwrite_globs.cpp` 的对应用例）。
+// 许可条件也比"本包持有"更严：`dir_tree_entirely_ours`（对齐 pacman 的
+// `dir_belongsto_pkgs`）要求**整棵子树**都只属于本包或本批次升级的包 —— 目录键是累加
+// 持有者的，共享目录整树让开会搬走别人的文件。共享/无主目录仍被拒绝（见本文件
+// `FileEntryOverRealDirIsRefused` 与 `test_overwrite_globs.cpp` 的对应用例）。
 TEST_F(DirEntryOverSymlinkTest, OwnDirReplacedByFileTakesOverWithWalBackup)
 {
     const std::string v1 = pack("evolve-f2d", "1.0", [&](const fs::path& c) {

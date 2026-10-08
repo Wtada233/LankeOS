@@ -41,14 +41,14 @@
  * hash_local 记成 hash_orig，**下一次**升级就会满足 ①、"用户改过的配置"被静默换成新版 ——
  * 正好踩中底线。记 hash_pkg 则永远只声明"这个包的这个版本提供过什么"，于是用户文件在每次
  * 升级都继续被判为冲突。本文件 `UserModifiedConfigIsNeverOverwrittenOnEveryUpgrade` 的
- * v2→v3 一段钉住它，`DegenerateRecordNeverAuthorizesSilentOverwrite` 钉住退化路径那一段。
+ * v2→v3 一段覆盖它，`DegenerateRecordNeverAuthorizesSilentOverwrite` 覆盖退化路径那一段。
  *
  * ── 存储形态与回滚 ──────────────────────────────────────────────────────────
  * 新增一个 DB 文件 `<state_dir>/confhashes.db`（不塞进 files.db：那里的"值"是**属主包名集合**，
  * 被 `add_file_owner`（单一属主检查）、`get_file_owners` 当属主集合直接读，混入哈希会污染所有权
  * 语义）。它和 pkgs/files.db/provides.db 走**同一族写接口**（`Cache::write(milestone)` 里的
  * `write_db_file_wal`）：WAL 行 + 备份 + `.tmp` + rename + fsync，于是批次回滚时由
- * `reverse_execute` 的 DB 分支自动回到批次前（`BatchRollbackRestoresConfigAndHashDb` 钉住）。
+ * `reverse_execute` 的 DB 分支自动回到批次前（`BatchRollbackRestoresConfigAndHashDb` 覆盖）。
  *
  * 移除侧（`.lpkgsave`）与 `--force-overwrite` 的语义**不在本文件范围内**（另有专门文件）。
  *
@@ -318,7 +318,7 @@ TEST_F(ConfigThreeWayHashTest, UserModifiedConfigIsNeverOverwrittenOnEveryUpgrad
         << "新版内容必须落在 .lpkgnew 里供用户审阅";
 
     // 再升一次：用户**仍然**没动盘上那份（还是 USER-EDITED），必须**继续**保留 + 产生新版
-    // .lpkgnew。这一段钉住"记录的必须是**包内内容**的哈希而不是盘上当时的内容"——若记的是
+    // .lpkgnew。这一段覆盖"记录的必须是**包内内容**的哈希而不是盘上当时的内容"——若记的是
     // 盘上内容（USER-EDITED），这里就会满足"盘上 == 旧记录"而被静默覆盖。
     const std::string v3 = create_pkg_files(
         "c3m", "3.0", {{"etc/c3m.conf", "C3M-V3\n"}, {"usr/bin/c3m", "#!/bin/sh\n"}});
@@ -644,7 +644,7 @@ TEST_F(ConfigThreeWayHashTest, DegenerateRecordNeverAuthorizesSilentOverwrite)
     install_packages({v2}, "", false);
     Config::instance().set_force_overwrite_mode(false);
 
-    // 退化路径的**用户可见行为**（判定表不动，与本用例无关，先钉住现场）：原文件不动 +
+    // 退化路径的**用户可见行为**（判定表不动，与本用例无关，先固定现场）：原文件不动 +
     // 新版落 .lpkgnew（两份不一致 → 保守）
     ASSERT_EQ(read_file(conf), "USER-KEPT\n") << "用户手工放回的文件不得被静默覆盖";
     ASSERT_TRUE(fs::exists(conf_new));
@@ -678,7 +678,7 @@ TEST_F(ConfigThreeWayHashTest, DegenerateRecordNeverAuthorizesSilentOverwrite)
 //    `v1 装 → v2 丢掉该 /etc 文件（记录被删）→ v3 重新发它`
 //    —— **改前**：v2 只撤记录、用户那份仍**占着原路径**，v3 走"无旧记录 + 盘上有那份"的
 //    退化路径把盘上那份追认进 DB，v4 升级时 ① 成立 → 用户那份被静默覆盖。
-//    **改后（2026-09-26）**：v2 把那份改名 `.lpkgsave`，原路径变空 ⇒ v3 直接就地落位、
+//    **改后**：v2 把那份改名 `.lpkgsave`，原路径变空 ⇒ v3 直接就地落位、
 //    压根不经过退化路径，追认无从发生（用户那份仍留在 `.lpkgsave` 里）。
 //    本用例因此改钉**新终态**：丢弃留副本、重新发布就地处，且记录值永远是包内内容的哈希。
 //    "追认只发生一次"这个说法只对"记录不再被删"成立；记录按设计有三处会删（⑫ 的说明）——
@@ -695,7 +695,7 @@ TEST_F(ConfigThreeWayHashTest, ReshippedAfterDropLandsInPlaceAndKeepsUserCopy)
     user_edit(conf, "USER-KEPT\n");
 
     // v2 **不再提供**这个配置：/etc 条目被丢弃 → 归属与记录一并撤；盘上那份改名
-    // `<路径>.lpkgsave` **保留下来**（2026-09-26 起；改前是"原地不动、只撤所有权"）。
+    // `<路径>.lpkgsave` **保留下来**（改前是"原地不动、只撤所有权"）。
     // 与"类型变化"、移除整包统一到一条规则：/etc 下的东西永远不会被无声丢掉，
     // 也永远不会占着"新版本该用的那个名字"。
     const std::string v2 = create_pkg_files("c3y", "2.0", {{"usr/bin/c3y", "#!/bin/sh\n"}});
@@ -706,7 +706,7 @@ TEST_F(ConfigThreeWayHashTest, ReshippedAfterDropLandsInPlaceAndKeepsUserCopy)
     ASSERT_EQ(conf_db_bytes().find("/etc/c3y.conf"), std::string::npos)
         << "记录必须随归属一起撤：" << conf_db_bytes();
 
-    // ── 本条用例原先要钉的"追认被重新武装"在这个场景下**消失了**（2026-09-26）────────
+    // ── 本条用例原先要钉的"追认被重新武装"在这个场景下**消失了** ────────
     // 改前：v2 丢弃条目后用户那份仍**占着 `/etc/c3y.conf`**，于是 v3 重新发它时走的是
     // "无旧记录 + 盘上有那份"的**退化路径** —— 那条路会把盘上那份追认进 DB，v4 升级时
     // ① 成立 → 用户那份被**静默覆盖**。
@@ -771,13 +771,12 @@ TEST_F(ConfigThreeWayHashTest, BatchRollbackRestoresConfigAndHashDb)
 
     // 批次中途取证：a 已 COMMIT（配置已被静默换成 v2、内存里的哈希记录已更新）之后、b 失败之前
     //
-    // ⚠️ 2026-10-03：DB 现在**只在批次末尾**落盘一次（见 package_manager.cpp 的
+    // ⚠️ DB 现在**只在批次末尾**落盘一次（见 package_manager.cpp 的
     //    `write_batch_db`），所以中途**盘上**的 confhashes.db **故意**还是批次前的内容 ——
     //    "记录已更新"这件事必须改从**内存 Cache** 取证（批次内的判定本来就走它）。
-    //    盘上那份不变本身也是新语义的一部分，下面顺带把它一起钉住。
+    //    盘上那份不变本身也是新语义的一部分，下面顺带把它一并断言。
     // 取证问的是"**c3ra 在这个路径上**的记录"，用 per-pkg 的 `get_conf_hash(path, pkg)` ——
-    // 比"这个路径上有任何记录"更紧（旧的 `conf_hashes_for_path()` 只答后者，且生产零调用，
-    // 2026-10-03 已删除：它唯一的价值是让本用例能少写一个包名，而那正是它答不准的地方）。
+    // 比"这个路径上有任何记录"更紧（那种粗判据答不准"是哪个包的记录"）。
     const auto inmem_conf_record = [] {
         const std::string rec = Cache::instance().get_conf_hash("/etc/c3ra.conf", "c3ra");
         return rec.empty() ? std::string("<none>") : rec;
@@ -861,7 +860,7 @@ TEST_F(ConfigThreeWayHashTest, BatchRollbackDropsHashRecordThatDidNotExistBefore
     bool mid_inmem_has_record = false;
     BreakpointManager::instance().set("install_after_begin_c3rd", [&] {
         mid_db = conf_db_bytes();
-        // 2026-10-03 起 DB 只在**批次末尾**落盘一次 ⇒ "记录已建起来"从**内存**取证
+        // DB 只在**批次末尾**落盘一次 ⇒ "记录已建起来"从**内存**取证
         // （批次内的判定本来就走内存 Cache；盘上那份此刻**故意**还没变）
         mid_inmem_has_record = !Cache::instance().get_conf_hash("/etc/c3rc.conf", "c3rc").empty();
         throw LpkgException("injected failure: 批次中途失败");
@@ -1181,7 +1180,7 @@ TEST_F(ConfigThreeWayHashTest, SuccessfulUpgradeStillWritesLpkgnewSymlink)
 //    里读到一条它从未装过的 hash_orig —— 判定表可能就地从 ②/③ 落到 ①（盘上 == 那条外来
 //    记录 → 静默就地替换），正是本轮刚修掉的那类静默覆盖；而且它随即会被 B 自己的
 //    `set_conf_hash`（先删同包前缀）抹掉，纯粹是"投毒换零收益"。下面的第二个用例
-//    （TakeoverDoesNotInheritTheOldOwnersHashRecord）把这条选择钉住。
+//    （TakeoverDoesNotInheritTheOldOwnersHashRecord）把这条选择固定下来。
 // ============================================================================
 
 TEST_F(ConfigThreeWayHashTest, OverwriteTakeoverDropsPreviousOwnerHashRecord)
@@ -1288,12 +1287,12 @@ TEST_F(ConfigThreeWayHashTest, TakeoverDoesNotInheritTheOldOwnersHashRecord)
 // 三哈希判的是**内容哈希**（`hash_local` / `hash_orig` / `hash_pkg`），所以"用户只 chmod 过
 // 这份配置"在它眼里与"用户没动过"**不可区分** ⇒ 走 ① 静默换新版那条分支。而落位时
 // `stage_regular_file` 的 `lchown`/`chmod` 取自**包内条目**，于是用户改的权限被一并改回
-// 包内值。实测（2026-09-26）：盘上 0600 → 升级后 0644，**且没有任何输出**。
+// 包内值。盘上 0600 → 升级后 0644，**且没有任何输出**。
 // 目录那边至少有 `warning.dir_perm_mismatch`（目录元数据的改前值是 write-ahead 的，顺手能比），
 // 文件这边此前连告警都没有。
 //
-// 本用例钉的是 **route (b)：先告警、再纠正** —— 只把"静默"变"可见"，**不改语义**。
-// **策略已拍板（2026-09-26）：不保留用户改的 mode，包内值胜出**，要求只是「不静默」。
+// 本用例覆盖的是 **route (b)：先告警、再纠正** —— 只把"静默"变"可见"，**不改语义**。
+// **策略：不保留用户改的 mode，包内值胜出**，要求只是「不静默」。
 // 所以本用例的断言就是这条决定的体现：① 告警**必须出现**（否则退回静默）；② 权限**照样被**
 // **纠正**。将来若改成「保留用户 mode」，第 ② 条会红 —— 那时这条注释与断言一起改。
 // ============================================================================
@@ -1349,13 +1348,13 @@ TEST_F(ConfigThreeWayHashTest, ModeOnlyUserEditIsReportedNotSilentlyReverted)
 }
 
 // ============================================================================
-// ①d `.lpkgnew` 的 write-ahead 窗口（2026-09-27 补的断点）
+// ①d `.lpkgnew` 的 write-ahead 窗口
 //
 // 这一支（`WriteLpkgnew`）此前**一个 `after_wal_breakpoint` 都没传** ⇒ "`.lpkgnew` 的 COPY 行
 // 已写、rename 未做"这个窗口**注入不进去**（与 `backup_obsolete` 同类）。这不只是覆盖率问题：
 // CI 上那条 flaky 用例（原 `ConfigIsStashedAwayWhenTheWritePassRuns`）正是因为**本支没有断点**，
 // 才只能去借"另一个文件的 COPY 窗口"，从而变成**顺序依赖**（同一提交三跑两过一挂）。
-// 本用例钉三件事：断点**真命中** / 命中时刻 WAL 里**已有**那条指向 `.lpkgnew` 的 COPY 行 /
+// 本用例覆盖三件事：断点**真命中** / 命中时刻 WAL 里**已有**那条指向 `.lpkgnew` 的 COPY 行 /
 // 命中时刻落点**还没被改**。
 // ============================================================================
 TEST_F(ConfigThreeWayHashTest, LpkgnewWindowWritesRowBeforeRenaming)
@@ -1404,7 +1403,7 @@ TEST_F(ConfigThreeWayHashTest, LpkgnewWindowWritesRowBeforeRenaming)
 //     `lpkgnew_bak_after_wal_<pkg>` 断点此前**生产端接了线、tests 里 0 处使用**：
 //     `lpkgnew_after_wal_<pkg>`（①d）只覆盖"落新 `.lpkgnew`"那一半，而"目标已存在（上一次
 //     升级留下、用户还没审阅）→ 先把旧那份 BACKUP 进 stash"这半条腿从未被注入验证过。
-//     本用例钉四件事：断点**真命中** / 命中时刻 WAL 里**已有**那条 BACKUP 行 /
+//     本用例覆盖四件事：断点**真命中** / 命中时刻 WAL 里**已有**那条 BACKUP 行 /
 //     命中时刻旧 `.lpkgnew` **还没被改名**（盘面未变）/ 回滚后盘面 == 基线（旧的 `.lpkgnew`
 //     被还原回来，不是被删掉、也不是被新的盖住）。
 //

@@ -387,8 +387,7 @@ TEST_F(WalEdgeCaseTest, BatchRollbackEmptySuccessList)
         "BEGIN none 1.0\n"
         "BACKUP /a \xe2\x86\x92 /a.bak\n");
 
-    // 订正（2026-10-03）：原注释声明"空列表 → 应提前返回、WAL 应保留、不写 COMMIT_PKGS"，
-    // 与实现**不符** —— `batch_rollback` 的提前返回判据是 **`ops.empty()`**（WAL 里没有
+    // `batch_rollback` 的提前返回判据是 **`ops.empty()`**（WAL 里没有
     // 未提交批次），**不是** `successfully_installed.empty()`（见 wal_op.cpp `batch_rollback`
     // 开头与 wal_op.hpp 的返回值说明）。本用例的 WAL 有一个尚未配对的 `BEGIN_PKGS` ⇒ 批次
     // 仍开着 ⇒ 即便"已成功安装的包"列表为空，批次照样要被逆向执行 + 用 `COMMIT_PKGS` 封口。
@@ -457,7 +456,7 @@ TEST_F(WalEdgeCaseTest, ReferencedStashRootsStripsCarriageReturns)
     // 手写/外部工具产出的 CRLF WAL。此前 `referenced_stash_roots()` 用手写 getline、
     // **不剥** `\r`（`read_wal_lines` 剥）→ arg2 尾上粘 `\r` → 算出的 stash 根带 `\r`
     // → 它作为 confinement 白名单 / `cleanup_orphan_stashes` 的 keep 集时
-    // **漏保护真正的 stash 根**（2026-10-02 修）。
+    // **漏保护真正的 stash 根**。
     const std::string bak = (test_root / "usr/lib/.lpkg_bak_pkg_123").string();
     write_wal("BACKUP " + (test_root / "usr/lib/libx.so").string() + " \xe2\x86\x92 " + bak +
               "\r\n");

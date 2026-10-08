@@ -1,11 +1,11 @@
 /**
  * test_metadata_token_safety.cpp — metadata 的 `deps` / `provides` / `needed_so` 不得带控制字符
  *
- * 2026-10-03 审计：归档**成员名**早就有消毒（`archive.cpp` 的 `member_name_rejection_message`），
+ * 归档**成员名**早就有消毒（`archive.cpp` 的 `member_name_rejection_message`），
  * 但这三个字段没有 —— 而它们同样会进**行式 / 制表符分帧**的状态文件：
  *   · `deps/<pkg>`、`needed_so/<pkg>`：一行一条（`\n` 注入 ⇒ 读回时凭空多出一个依赖/SONAME）；
  *   · `provides.db`：`<capability>\t<pkgs>`（`\t` 注入 ⇒ 键被截断、提供者串错位）。
- * 实测后果：`provides = ["a\ncapX\tE"]` 会读回幽灵提供者，而 `dep_satisfied_on_disk()` 只看
+ * 后果：`provides = ["a\ncapX\tE"]` 会读回幽灵提供者，而 `dep_satisfied_on_disk()` 只看
  * "这个 capability 有没有提供者" ⇒ **假满足**依赖（装出坏系统）；`deps`/`needed_so` 里的 `\n`
  * 还会污染反向依赖图、**阻止**正常卸载（DoS）。
  *
@@ -111,19 +111,17 @@ TEST_F(MetadataTokenSafetyTest, CorruptedProvidesIsRefusedOnTheRealInstallPath)
 {
     // 端到端对照：`provides` 不参与求解 ⇒ 整包真的会走到解析那一步被拒（点名 metadata.json）。
     // 参考本文件顶部说明：deps/needed_so 会在更早的求解阶段被另一条判据拦下，所以那两格
-    // 用上面的直调形态钉住。
+    // 用上面的直调形态覆盖。
     const std::string pkg = create_pkg("tokenprov_e2e", "1.0", {}, {"capY\tZ"});
     try {
         install_packages({pkg}, "");
         FAIL() << "含 TAB 的 provides 必须整包拒绝";
     } catch (const LpkgException& e) {
         const std::string msg = e.what();
-        // ⚠️ **订正 2026-10-05**：本行原断言消息里含字面量 `metadata.json`。2026-10-05 给
-        // 本地 `.lpkg` 候选那条路补上 `provides` 的分帧字符校验后（它此前**只有**两个 SONAME
-        // 字段被校验过），拒绝点从"安装期读解压后的 metadata.json"**前移**到了"读归档里的
-        // 元数据"——于是消息点名的是**用户交上来的那个 `.lpkg` 文件**，不再出现 `metadata.json`
-        // 这个字面量。**不变量的实质没变**（报错仍然点名"是哪个文件的哪一段"），变的是被钉住的
-        // 那个字符串。按仓库纪律先问过"是它 pin 了缺陷还是我改错了"：是后者，故改用例而不改产品。
+        // ⚠️ 本地 `.lpkg` 候选这条路，`provides` 在读**归档里的元数据**时就被分帧字符校验
+        // 拦下（早于读解压后的 `metadata.json`）⇒ 报错点名的是**用户交上来的那个 `.lpkg`
+        // 文件**，不是 `metadata.json`。不变量没变（报错仍然点名"是哪个文件的哪一段"），
+        // 变的是被断言的那个字符串。
         EXPECT_NE(msg.find(pkg), std::string::npos)
             << "报错必须点名用户交上来的那个包文件：" << msg;
         EXPECT_NE(msg.find("provides"), std::string::npos) << msg;

@@ -48,7 +48,6 @@ protected:
         fs::remove_all(suite_dir);
     }
 
-    /// 写入 WAL 日志
     void write_wal(const std::string& content)
     {
         std::string wpath = wal::wal_log_path();
@@ -58,7 +57,6 @@ protected:
         f.close();
     }
 
-    /// 读取 WAL 日志
     std::string read_wal()
     {
         std::string wpath = wal::wal_log_path();
@@ -69,7 +67,6 @@ protected:
         return ss.str();
     }
 
-    /// 创建测试文件
     void create_file(const std::string& path, const std::string& content = "test")
     {
         fs::path p = test_root / path;
@@ -78,7 +75,6 @@ protected:
         f << content;
     }
 
-    /// 读取文件内容
     std::string read_file(const std::string& path)
     {
         fs::path p = test_root / path;
@@ -396,7 +392,6 @@ TEST_F(WalCoreTest, SkipInReverse)
 
 TEST_F(WalCoreTest, ReverseExecuteBackupRestore)
 {
-    // 创建文件 + 备份
     create_file("usr/bin/tool");
     fs::path phys = test_root / "usr/bin/tool";
     fs::path bak = test_root / "usr/bin/tool.lpkg_bak_tool";
@@ -542,7 +537,6 @@ TEST_F(WalCoreTest, ReverseExecuteCleanupSkipped)
 
 TEST_F(WalCoreTest, ReverseExecuteDbRestore)
 {
-    // 创建 DB 文件和备份
     fs::path db_path = Config::instance().state_dir() / "pkgs_test";
     fs::path bak_path = fs::path(db_path.string() + ".lpkg_db_bak_before:glibc:installed");
 
@@ -750,7 +744,7 @@ TEST_F(WalCoreTest, BatchStartMilestoneRowSkipsOnlyWhenOfficialFileIsStillInPlac
     // 仍持有批次起点内容 → 无需从备份还原"。旧断言
     // `EXPECT_GE(files_restored + files_cleaned + db_restored, 0)` 对**非负计数恒真** =
     // 什么都没断言；而且旧场景的路径（`/pkgs`、`dummy`）在沙盒 root 之外，会被 confinement
-    // 整行跳过，根本走不到里程碑逻辑。这条把两条腿都钉住。
+    // 整行跳过，根本走不到里程碑逻辑。这条把两条腿都覆盖。
     const fs::path db = test_root / "var/lpkg/pkgs";
     const fs::path bak = test_root / "var/lpkg/pkgs.lpkg_db_bak_before::batch-start";
 

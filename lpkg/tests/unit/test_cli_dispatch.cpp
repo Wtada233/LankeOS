@@ -134,9 +134,9 @@ TEST_F(CliDispatchTest, HelpExitsZeroAndPrintsUsageToStdout)
     const CliRun r = run_cli_captured({"lpkg", "--help"});
     // 锚点 1 = 退出码 0；锚点 2 = 用法正文真的打了（`info.commands` = "Commands:"）
     expect_code_and_message(r, 0, "Commands:");
-    // 2026-10-03 修：`--help` 是**正常输出** → stdout。此前全部走 stderr，于是
-    // `lpkg --help | less` / `| grep` 拿到的永远是空 —— 而本用例当时把"走 stderr"钉成了
-    // 正确行为（在 **pin 缺陷**）：断言方向已翻转。参数不合法时的用法仍走 stderr，
+    // `--help` 是**正常输出** → stdout：走到 stderr 的话 `lpkg --help | less` / `| grep` 拿到的
+    // 永远是空；本用例曾把"走 stderr"钉成正确行为，那是在 pin 缺陷，断言方向已翻转。
+    // 参数不合法时的用法仍走 stderr，
     // 由下面 `NoCommandPrintsUsageAndExitsOne` / `UnknownCommandPrintsUsageAndExitsOne`
     // 各钉两条（stderr **有** + stdout **无**）。
     EXPECT_NE(r.out.find("Commands:"), std::string::npos) << r.all();
@@ -239,7 +239,7 @@ TEST_F(CliDispatchTest, QueryRejectsWrongArgumentCount)
     const CliRun r = run_cli_captured({"lpkg", "query", "a", "b"});
     // 锚点 1 = 退出码 1；锚点 2 = error.invalid_arg_count 原文
     expect_code_and_message(r, 1, "Invalid number of arguments.");
-    // 顺带钉住 pre_operation_check 的"先打用法再报错"（这条路径的第二个可辨识特征）
+    // 顺带断言 pre_operation_check 的"先打用法再报错"（这条路径的第二个可辨识特征）
     EXPECT_NE(r.all().find("Commands:"), std::string::npos);
 }
 

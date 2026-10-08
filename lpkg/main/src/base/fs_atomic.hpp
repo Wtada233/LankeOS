@@ -17,7 +17,7 @@ void write_string_to_file(const std::filesystem::path& path, std::string_view co
  * fsync 才暴露；丢掉它就等于把截断内容 rename 进正式位置（DB 静默损坏、且下一轮
  * 还会把这个截断内容当成"备份"）。失败抛 LpkgException。
  *
- * 所有 `.tmp + fsync + rename` 的写入路径都必须走这里，不要各写一套（历史 TODO.md B1）。
+ * 所有 `.tmp + fsync + rename` 的写入路径都必须走这里，不要各写一套。
  */
 void fsync_and_rename(const std::filesystem::path& tmp, const std::filesystem::path& dst);
 
@@ -107,13 +107,11 @@ void fsync_parent_dir(const std::filesystem::path& child_path);
 /**
  * 安全重命名。
  *
- * 仅做 rename(2)，失败一律抛异常。曾对 overlayfs 的 EXDEV 做 copy+remove_all
- * 回退，但 copy_recursive 对"指向目录的符号链接"会跟随链接误判为目录，
- * 递归删除整棵被 rename 的目录树（升级 filesystem 包时 /usr/lib 全树被删）。
- * 开 redirect_dir 的 overlay 目录 rename 本就不返回 EXDEV；宁可失败也不破坏数据。
+ * 仅做 rename(2)，失败一律抛异常 —— **不做 copy+remove_all 回退**：copy_recursive 对
+ * "指向目录的符号链接"会跟随链接误判为目录，递归删除整棵被 rename 的目录树
+ * （升级 filesystem 包时 /usr/lib 全树被删）。开 redirect_dir 的 overlay 目录 rename
+ * 本就不返回 EXDEV；宁可失败也不破坏数据。
  *
- * @param from  源路径
- * @param to    目标路径
- * @throw       std::filesystem::filesystem_error  rename 失败时
+ * @throw std::filesystem::filesystem_error rename 失败时
  */
 void safe_rename(const std::filesystem::path& from, const std::filesystem::path& to);

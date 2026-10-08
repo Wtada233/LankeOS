@@ -29,8 +29,8 @@ pub fn detect_lang(lang_env: &str) -> Lang {
 }
 
 /// 纯函数：按 gettext/POSIX 优先级取生效 locale —— `LC_ALL` > `LC_MESSAGES` > `LANG`，空值视为未设。
-/// 历史：曾 `LANG.or_else(LC_ALL)`（优先级颠倒）——POSIX 里 `LC_ALL` 覆盖一切，
-/// `LC_ALL=en_US.UTF-8` + `LANG=zh_CN.UTF-8` 时旧实现错选中文。
+/// POSIX 里 `LC_ALL` 覆盖一切，所以颠倒成 `LANG.or_else(LC_ALL)` 会在
+/// `LC_ALL=en_US.UTF-8` + `LANG=zh_CN.UTF-8` 时错选中文。
 pub fn pick_locale<'a>(
     lc_all: Option<&'a str>,
     lc_messages: Option<&'a str>,

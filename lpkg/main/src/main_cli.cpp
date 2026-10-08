@@ -47,12 +47,9 @@ struct CurlGlobalInitializer {
 // ── SIGINT 防护（**单段式**）────────────────────────────────────────────
 //   一次 Ctrl+C → 设 graceful 标志，当前操作完成后退出（事务含回滚必须跑完）。
 //
-//   （订正 2026-09-26：横幅原写"**双段式**"、旁边还留着一个 `static std::atomic<bool>
-//     sigint_force` —— 但那个变量**全仓从未被读写**，第二段（"第 2 次 Ctrl+C 强制终止"）
-//     **没有实现**。handler 自己的注释早就说明了为什么：不设超时、不回退 `SIG_DFL`、
-//     不 `_Exit`，必须让当前事务（含回滚）完整执行完。所以这里如实改成单段式，并删掉那个
-//     死变量。若将来真要加第二段：WAL 对"硬杀"本身是安全的（崩溃恢复就是为它设计的），
-//     但要清楚它会把"优雅回滚"降级成"下次启动时恢复"。）
+//   handler 不设超时、不回退 `SIG_DFL`、不 `_Exit`：必须让当前事务（含回滚）完整执行完，
+//   不留下半残系统。若将来真要加第二段（"第 2 次 Ctrl+C 强制终止"）：WAL 对"硬杀"本身是
+//   安全的（崩溃恢复就是为它设计的），但要清楚它会把"优雅回滚"降级成"下次启动时恢复"。
 
 /** 优雅退出标志（`sigint_handler` 设、事务各阶段轮询）。**非 static**：`installation_task.cpp`
  *  等也读它（`sigint_graceful.load()`），所以它在进程内是共享状态。
@@ -90,7 +87,7 @@ struct SigIntGuard {
 /**
  * 帮助文本 —— **唯一构建处**。
  *
- * 为什么要有这个函数而不是直接往流里写（2026-10-03 修）：`--help` 是**正常输出**（约定走
+ * 为什么要有这个函数而不是直接往流里写：`--help` 是**正常输出**（约定走
  * stdout，否则 `lpkg --help | less`／`grep` 拿到的永远是空 —— 此前全部写 stderr），而
  * "参数数量不合法"时打用法是**错误输出**（约定走 stderr）。两者内容必须逐字一致，所以文本
  * 只在这里构建一次，由两个薄打印函数各自选流。
@@ -127,7 +124,6 @@ void print_usage(const cxxopts::Options& options)
 namespace fs = std::filesystem;
 using json = nlohmann::json;
 
-/** 检查命令行参数数量是否合法 */
 void pre_operation_check(const cxxopts::ParseResult& result,
                          const std::function<void()>& print_usage_func, size_t min,
                          std::optional<size_t> max = std::nullopt)
@@ -182,7 +178,7 @@ static void run_remove_command(const cxxopts::ParseResult& result,
         removed = remove_packages(pkgs, force, purge_config);
     }
     write_cache();
-    // **什么都没删就打"卸载完成"是假消息**（2026-10-03 修，与 install 侧同款取舍）：
+    // **什么都没删就打"卸载完成"是假消息**（与 install 侧同款取舍）：
     // `lpkg remove <从未安装过的包>` 此前照样打印这句 —— 脚本/farm 会以为删掉了。
     // 未安装/保护性跳过已经各自打过一条原因（`info.package_not_installed` /
     // `info.recursive_nothing_to_remove`），这里只在真删了东西时收尾。
@@ -349,7 +345,7 @@ static void run_rec_command()
  *   ① `handle_command` 的 if 链（真正的分派）；
  *   ② `is_known_command` —— 在本文件 `run_cli` 里**先于** `init_database_for` 拒掉未知命令。
  *
- * 为什么 `is_known_command` 必须存在（2026-10-03 补）：`init_database_for` 一进门就
+ * 为什么 `is_known_command` 必须存在：`init_database_for` 一进门就
  * `check_root()`，而它此前排在"判断命令是否认识"之前 ⇒ 非 root 用户敲一个拼错的命令
  * （`lpkg instal …`）得到的是 **"Root permission is required to run."** —— 一个与真实
  * 问题无关的错误，用户会去查权限而不是查拼写。现在未知命令在任何 root/锁/恢复动作之前
@@ -451,8 +447,8 @@ static void register_all_options(cxxopts::Options& options)
 
 /**
  * 应用与子命令无关的全局选项（root / 架构 / 各模式开关），返回 `--hash` 的值。
- * `apply_cli_config`（覆盖豁免 + durable fsync）也在这一步，时机与原先逐字相同：
- * 在 `--yes/--no` 落定**之前**、在任何 handler **之前**。
+ * `apply_cli_config`（覆盖豁免 + durable fsync）也在这一步，同样在 `--yes/--no` 落定
+ * **之前**、在任何 handler **之前**。
  */
 static std::string apply_global_options(const cxxopts::ParseResult& result)
 {
@@ -510,7 +506,7 @@ static std::unique_ptr<DBLock> init_database_for(const std::string& command)
  * 哪些命令启用 SIGINT 防护（首次 Ctrl+C 只设 graceful 标志、不打断当前动作）。
  *
  * 写操作（install/remove/autoremove/upgrade/reinstall/force-solve）自不必说；
- * **build / pack 也在内**（2026-10-03 补）：它们是长时操作（下载源码 + 编译），此前不在名单
+ * **build / pack 也在内**：它们是长时操作（下载源码 + 编译），此前不在名单
  * 里 ⇒ Ctrl+C 走 `SIG_DFL` **立刻杀进程**，`run_build` 的清理路径根本没机会跑，
  * `<dir>/build/work|content|hooks` 与已下载的源码整片留在盘上。挂上防护后：子进程（make/cc，
  * 同一前台进程组）照样收到 Ctrl+C 而死，本进程在**阶段边界**把它翻成 `UserAbort`
@@ -553,7 +549,7 @@ int run_cli(const std::vector<std::string>& argv)
         auto result = options.parse(argc, raw_argv.data());
 
         if (result.count("help")) {
-            // `--help` 是**正常输出** → stdout（2026-10-03 修）：此前写 stderr，
+            // `--help` 是**正常输出** → stdout：此前写 stderr，
             // `lpkg --help | less` / `| grep` 拿到的永远是空。参数不合法时的用法仍走 stderr
             // （`print_usage`），两者文本逐字相同（同一个 `usage_text()`）。
             std::cout << usage_text(options);

@@ -300,7 +300,7 @@ TEST_F(NeededSoTest, MissingSoWarningFiresEvenWhenPackageHasNoNamedDeps)
 // -----------------------------------------------------------------------
 // 9. 索引与归档的 needed_so 不一致 → **拒绝**（不再"重解析后满足"）
 //    index 说 app 依赖 libA、needs libA.so.1；归档里 app 实际依赖 libE、needs libE.so.1。
-//    2026-10-02 起：metadata 与索引不一致一律硬报错 error.metadata_mismatch，整批回滚。
+//    metadata 与索引不一致一律硬报错 error.metadata_mismatch，整批回滚。
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, IndexNeededSoMismatchIsRefused)
 {
@@ -1018,7 +1018,6 @@ TEST_F(NeededSoTest, SonameChangeInUpgradeBreaksDependents)
     Cache::instance().load();
     ASSERT_TRUE(Cache::instance().is_installed("app"));
 
-    // 确认 app 的 needed_so 文件记录了 libM.so.1
     {
         fs::path nso_file = Config::instance().needed_so_dir() / "app";
         std::ifstream f(nso_file);
@@ -1148,7 +1147,7 @@ TEST_F(NeededSoTest, LocalPackageMultiVersionSonameResolution)
 // 8d. 依赖一致性检查**成功时静默**
 //     它是**校验**（不是解析的一步）：只在出错时出声。曾打过 `info.checking_deps`，
 //     在批量输出里既吵又误导 —— 只带 SONAME 的包不打那行，看起来像"只有第一个包查了依赖"
-//     （实测 `reinstall rust nano`）。
+//     （`reinstall rust nano`）。
 // -----------------------------------------------------------------------
 TEST_F(NeededSoTest, DependencyCheckIsSilentOnSuccess)
 {
@@ -1176,7 +1175,7 @@ TEST_F(NeededSoTest, DependencyCheckIsSilentOnSuccess)
 // SONAME 规格（symbol version）：`libfoo.so.6@GLIBC_2.40` / `@{GLIBC_2.40,GLIBC_2.39}`
 // ============================================================================
 //
-// 语义（维护者拍板的**保守**版本，唯一判据是 `base/so_spec.cpp` 的 `so_spec_satisfies()`）：
+// 语义（**保守**版本，唯一判据是 `base/so_spec.cpp` 的 `so_spec_satisfies()`）：
 //   · need 带符号版本 ⇒ provider **必须也声明**且覆盖它；
 //   · need 裸 ⇒ 任何声明了该 SONAME 的包都算（符号版本是附加信息）；
 //   · provider 声明带版本时，**裸需求照旧被满足**（它同样登记裸能力）。

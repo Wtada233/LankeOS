@@ -17,10 +17,7 @@
  *   });
  *   install_packages({pkg}); // 会在该包 COMMIT 之后触发断点 → 回滚
  *
- * 断点名称约定（订正 2026-10-03：按生产端 `grep -rn 'hit(' main/src` 的**实际调用点**
- * 重写。原文列出的 `copy_pkg_file_3` / `backup_after_rename_<N>` / `copy_before_<N>` /
- * `copy_after_<N>` / `commit_before` / `file_<N>_of_<total>` 在生产端**一个都不存在**，
- * 只有 `hook_run_<hook>` 与（当时的）`backup_after_wal_<N>` 幸存下来）：
+ * 断点名称约定（**以生产端 `grep -rn 'hit(' main/src` 的实际调用点为准**）：
  *
  *   安装 / 升级（`installation_task{,_letgo,_copy}.cpp` 与 `op_sink.cpp`）：
  *   install_after_begin_<pkg>     BEGIN 行已落、安装动作未做
@@ -64,21 +61,15 @@ class BreakpointManager
 public:
     static BreakpointManager& instance();
 
-    /// 设置断点：当被调用时执行 action（通常抛异常）
-    /// 每个断点只触发一次，之后自动清除
     void set(const std::string& name, std::function<void()> action);
 
-    /// 触发断点（生产代码在关键路径调用）
-    /// 返回 true 表示断点被触发（action 已执行）
+    /// 返回 true = 命中了同名断点并执行了 action。
     bool hit(const std::string& name);
 
-    /// 移除指定断点
     void clear(const std::string& name);
 
-    /// 移除所有断点
     void clear_all();
 
-    /// 是否在 testing mode
     bool enabled() const;
 
 private:

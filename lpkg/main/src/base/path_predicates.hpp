@@ -7,21 +7,20 @@
 
 // ============ 文件系统工具 ============
 
-/** 确保目录存在，不存在则创建 */
 void ensure_dir_exists(const std::filesystem::path& path);
 
 // ============ 文件系统判定谓词（**不抛**版） ============
 //
 // `std::filesystem` 的**判定类**调用在"末段符号链接解不开"时不是判 not-found，而是**抛**
-// `filesystem_error`。2026-09-25 实测（libstdc++，`ln -s self self` 之后逐条调用）：
+// `filesystem_error`。（libstdc++，`ln -s self self` 之后逐条调用）
 //
 //     fs::exists(loop)        → 抛 filesystem_error  code=40 (ELOOP)
 //     fs::is_directory(loop)  → 抛 filesystem_error  code=40
 //     fs::is_empty(loop)      → 抛 filesystem_error  code=40
 //     fs::is_symlink(loop)    → 不抛（走 lstat）
 //
-// ⚠️ **订正 2026-09-26：上面那条 `is_symlink` 的结论只在"末段就是那个环"时成立。**
-// **中间段**成环时它照样抛（实测，同一套环境）：
+// `fs::is_symlink` 的"不抛"**只在"末段就是那个环"时成立**；**中间段**成环时它照样抛
+// （同一套 libstdc++ 环境）：
 //
 //     ln -s self self
 //     fs::is_symlink("self")      → true，不抛        （末段 = 环）
@@ -83,8 +82,8 @@ bool is_real_directory(const std::filesystem::path& p);
  * 末段是**符号链接**（lstat 语义，不跟随）→ true；解不开（**含中间段 ELOOP**）→ false。
  * **绝不抛。**
  *
- * 与 `fs::is_symlink` 的**唯一**区别就是"不抛"，而这条区别在两种形态上都成立（见上面订正
- * 的那段实测）：末段自环（`fs::is_symlink` 侥幸不抛）与**中间段成环**（它抛）。写
+ * 与 `fs::is_symlink` 的**唯一**区别就是"不抛"，而这条区别在两种形态上都成立（见上面那张
+ * 调用表）：末段自环（`fs::is_symlink` 侥幸不抛）与**中间段成环**（它抛）。写
  * `exists_no_follow(p) && !fs::is_symlink(p)` 这种**已经短路掉**的形态可以继续用抛版
  * （lstat 成功就说明没有 ELOOP），但只要右操作数有可能自己吃到环，就必须用本函数。
  */
@@ -118,22 +117,16 @@ bool is_regular_file_no_follow(const std::filesystem::path& p);
  * 链接被**解引用**。**哪一类调用会穿过去，彼此完全不同**：
  *   · **判定类**（`lstat` / `fs::is_symlink` / `fs::is_empty` / `fs::exists`）与
  *     **元数据类**（`chmod` / `chown` / `l*xattr`）**会**落到**目标**上 ⇒ 目录清理路径上
- *     "别动 symlink→目录"的守卫会**恒假**（实测 `lstat("link/")` 报的是**目录**）。
+ *     "别动 symlink→目录"的守卫会**恒假**（`lstat("link/")` 报的是**目录**）。
  *   · **删除/改名类**（`rmdir` / `rename` / `unlink`）**不会**跟随末段链接，一律 `ENOTDIR`。
- *   · 唯一的例外是 **`fs::remove_all(带尾斜杠的路径)`**：实测它**删光链接目标的全部内容**
+ *   · 唯一的例外是 **`fs::remove_all(带尾斜杠的路径)`**：它**删光链接目标的全部内容**
  *     并返回 `ENOTDIR`（`link -> real` 时 `real/` 里的条目全没了、链接原样留着）；不带尾斜杠
  *     则只删链接本身。**调用方拿它的返回值去删目录时必须先规范化。**
- *
- * **订正 2026-09-26**：本段原文写"`rmdir` 把 `/var/run -> ../run` 指向的真实 `/run` 删掉"，
- * 并据此把 `rmdir` 与 `chmod` 并列 —— **`rmdir` 那半实测不成立**（末段链接恒 `ENOTDIR`，
- * 连尾斜杠也救不了它）；真正危险的是上面第三条。同一处订正已在 `ARCH.md` 与 `op_sink.hpp`
- * 落过，只有这个文件没跟上。
  *
  * **任何针对物理路径的文件系统操作前先规范化**；DB 键本身保持带斜杠（那是键，不是路径）。
  */
 std::filesystem::path strip_trailing_slash(const std::filesystem::path& p);
 
-/** 确保文件存在，不存在则创建 */
 void ensure_file_exists(const std::filesystem::path& path);
 
 /**

@@ -23,7 +23,7 @@
 //     另加一条幂等：同一行解析两遍必须同结果（防解析器引入状态）。
 //
 // ── 关于输出噪音（不处理的话这个 harness 是没法跑的）──────────────────────────
-// `parse_op` 对**未知类型**会 `log_warning` 一次，而它走 `std::cerr`（`base/utils.cpp:120`）。
+// `parse_op` 对**未知类型**会 `log_warning` 一次，而它走 `std::cerr`（`base/utils.cpp`）。
 // fuzzer 每轮都在造未知类型 ⇒ 60 s 能写出几百 MB 日志、并把吞吐拖垮。处理办法是**只把 C++
 // 的 `std::cerr` 接到已被静音的 stdout**：
 //   · ASan/UBSan 的崩溃报告与 libFuzzer 自己的统计走**裸 fd 2**（C 层），**不受影响**；

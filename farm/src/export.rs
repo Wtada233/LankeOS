@@ -8,7 +8,6 @@ use crate::error::FarmError;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// export 报告。
 #[derive(Debug, Default)]
 pub struct ExportReport {
     pub exported: Vec<String>,

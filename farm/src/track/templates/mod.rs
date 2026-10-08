@@ -61,7 +61,6 @@ pub(crate) enum ProbeFn {
     Script(ScriptProbe),
 }
 
-/// 一个模板的注册项。
 #[derive(Debug)]
 pub(crate) struct TemplateSpec {
     pub name: &'static str,

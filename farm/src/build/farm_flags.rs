@@ -10,10 +10,9 @@
 //! { "farm_flags": ["IGNORE_CHK_QML"] }
 //! ```
 //!
-//! > **已删除：`BUILD_AFTER_BUILD_DEPS`**。它曾把该包的 `build_deps` **无条件**放进拓扑依赖边；
-//! > 该行为现在就是**默认语义**（见 `build/sched.rs::topo_order`：`build_deps` 无条件进边，
-//! > 仅限本轮 targets 内）。配方里若还写着它 → 走"未知 farm flag"告警（`parse_all`），
-//! > **不是**静默忽略——留着它没有意义，应删掉。
+//! > **`BUILD_AFTER_BUILD_DEPS` 已不是 flag**：`build_deps` **无条件**进拓扑依赖边已是**默认语义**
+//! > （见 `build/sched.rs::topo_order`，仅限本轮 targets 内）。配方里若还写着它 → 走"未知 farm flag"
+//! > 告警（`parse_all`），**不是**静默忽略——留着它没有意义，应删掉。
 //!
 //! - `IGNORE_CHK_ABI` / `IGNORE_CHK_QML` / `IGNORE_CHK_PKGCONF` / `IGNORE_CHK_PKGERR` /
 //!   `IGNORE_CHK_INTROSPECTION` / `IGNORE_CHK_VAPI` / `IGNORE_CHK_BUILDDEPS` / `IGNORE_CHK_PYCACHE` /

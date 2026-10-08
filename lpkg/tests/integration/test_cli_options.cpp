@@ -9,7 +9,7 @@
  * 异常都没有，纯粹静默。
  *
  * 本文件用**真实 argv 数组**驱动 `register_cli_options` + `apply_cli_config`（两者在
- * main/src/config/cli.cpp 里，见那里的"为什么单独一个翻译单元"注释），钉住：
+ * main/src/config/cli.cpp 里，见那里的"为什么单独一个翻译单元"注释），覆盖：
  *   ① 注册名与类型：`--overwrite` 是取值的向量选项、其余三个是布尔开关；
  *   ② 向量语义：同一次给逗号分隔的多个模式、重复给出累积（cxxopts 的
  *      CXXOPTS_VECTOR_DELIMITER 切分 + 逐次 append）；
@@ -19,11 +19,9 @@
  *
  * 覆盖边界（明确不测、别当已覆盖）：`--purge-config` → `remove_packages(..., purge_config)`
  * 的**派发**在 main/src/main_cli.cpp 的 handle_command 命令分支里。
- * （订正 2026-09-26：此处原写"测试二进制够不到，因为 main.cpp 有自己的 main()"—— 那个
- * 理由已不成立：分派路径随 main_cli.cpp 进了 LPKG_OBJS ⇒ 进了测试二进制，端到端的
- * 分派层用例在 tests/unit/test_cli_dispatch.cpp。本套件仍然只钉"能被解析、默认值可
- * 无条件读"——而这正是那行派发代码（`result["purge-config"].as<bool>()`，不带 count
- * 判断）的前提，两者互补不重复。）
+ * （分派路径随 main_cli.cpp 进了 LPKG_OBJS ⇒ 进了测试二进制，端到端的分派层用例在
+ * tests/unit/test_cli_dispatch.cpp。本套件仍然只钉"能被解析、默认值可无条件读"——而这正是
+ * 那行派发代码（`result["purge-config"].as<bool>()`，不带 count 判断）的前提，两者互补不重复。）
  *
  * 夹具：覆盖豁免模式与 durable fsync 都是**进程级**全局状态（别的套件依赖其默认值：
  * test_overwrite_globs.cpp 从"什么都不豁免"起、test_durable_fsync_db.cpp 依赖默认关），
@@ -209,7 +207,7 @@ TEST_F(CliOptionsTest, PurgeConfigIsRegisteredAndDefaultsToFalse)
 TEST_F(CliOptionsTest, MisspelledOptionIsRejectedAtParseTime)
 {
     // 本套件存在的理由：注册名 typo 必须在**解析层**炸出来，而不是"注册成一个没人引用的
-    // 名字、功能静默失效而全套测试仍绿"。这里用故意写错的 `--overwrit` 钉住该性质：
+    // 名字、功能静默失效而全套测试仍绿"。这里用故意写错的 `--overwrit` 覆盖该性质：
     // 只要 register_cli_options 里的名字对得上，未注册的名字就必然被拒。
     EXPECT_THROW(parse_cli({"lpkg", "--overwrit", "a"}), cxxopts::exceptions::no_such_option);
 }

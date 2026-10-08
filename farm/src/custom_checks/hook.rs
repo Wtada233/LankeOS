@@ -1,4 +1,4 @@
-//! hookchk — postinst hook 检测（CLAUDE.md sysusers/tmpfiles 铁律）：
+//! hookchk — postinst hook 检测：
 //! 内容含 `usr/lib/sysusers.d/*.conf` → postinst 必须调 `systemd-sysusers`；
 //! 含 `usr/lib/tmpfiles.d/*.conf` → postinst 必须调 `systemd-tmpfiles --create`。
 //! postinst 文本在 .lpkg 的 `hooks/postinst.sh`（不是 LankeBUILD.json）。只查"建了档案却没自动跑"，
@@ -13,7 +13,7 @@ use std::path::Path;
 const SCHEMA: u32 = 5;
 
 /// postinst 文本里是否存在**非注释行**包含 `needle`（行首可选空白后为 `#` 即整行注释）。
-/// 历史事故：旧实现 `postinst.contains(...)` 被注释里的字样骗过（如 `# 用 systemd-sysusers`）→
+/// ⚠️ 不能用 `postinst.contains(...)`：注释里的字样（如 `# 用 systemd-sysusers`）会骗过它 →
 /// 误判"已调用"→ 漏报（包建了 sysusers.d 却没自动建用户/目录）。
 /// 只处理**行首注释**：shell 的行内 `#` 与引号内 `#` 不做解析——配方约定 hook 命令独立成行。
 fn has_active_line(postinst: &str, needle: &str) -> bool {
@@ -48,7 +48,6 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     }))
 }
 
-/// 跑 hookchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let walk = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
 

@@ -75,7 +75,7 @@ TEST_F(LocalizationTest, NonExistentLocaleFallsBackToEnglish)
     // 原名 `NonExistentLocaleFallsBack` 与 `GetStringExistingKey` **逐字重复**、且从不触碰
     // locale（名不副实：它根本没测任何"降级"）。改为真的测「不存在的 locale」那条路：
     // LANG 既不以 "zh" 开头、也不是 "en" → init_localization 选英文语言包
-    // （localization.cpp:84 的 `lang = "en"` 默认），即"未知 locale 回退英文"，
+    // （localization.cpp 的 `lang = "en"` 默认），即"未知 locale 回退英文"，
     // 而不是吐 `[MISSING_STRING: …]`。
     const char* saved = std::getenv("LANG");
     const std::string saved_lang = saved ? std::string(saved) : std::string();

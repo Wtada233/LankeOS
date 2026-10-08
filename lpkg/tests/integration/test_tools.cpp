@@ -126,7 +126,7 @@ TEST_F(ToolsTest, ScanOrphansDoesNotIgnoreSiblingPrefixDirectories)
 {
     // 忽略前缀必须按**路径分量**匹配，不是字符串前缀：`usr/share/lpkgx` 不是 `usr/share/lpkg`。
     // 旧写法是字符串前缀比较（`path.compare(0, prefix.size(), prefix) == 0`），于是同级目录
-    // 下的孤儿被静默当成忽略目录、永不报出（2026-10-03 修）。
+    // 下的孤儿被静默当成忽略目录、永不报出。
     //
     // 钉子选 **`usr/share/lpkg`**（两份忽略清单里都有它），不用 `usr/man` / `var/log` 这类
     // —— 那些条目只存在于某一份清单里，换清单就会让这条用例红在与被测行为无关的地方。
@@ -148,9 +148,9 @@ TEST_F(ToolsTest, ScanOrphansDoesNotIgnoreSiblingPrefixDirectories)
 
 TEST_F(ToolsTest, ScanPrunesIgnoredDirectoriesInsteadOfOnlyFilteringThem)
 {
-    // "忽略前缀"必须让遍历**根本不走进去**，而不是"走进去、只是不报告"（2026-10-03 修）。
+    // "忽略前缀"必须让遍历**根本不走进去**，而不是"走进去、只是不报告"。
     //
-    // 为什么这不是洁癖：`recursive_directory_iterator` 走进**易变**目录时会失败 —— 实测本机
+    // 为什么这不是洁癖：`recursive_directory_iterator` 走进**易变**目录时会失败 —— 本机
     // 扫 `/` 时在 `/proc/<pid>/task/<pid>/net` 上拿到 EINVAL，而 `increment(ec)` 出错会
     // **把迭代器置为 end** ⇒ 整趟扫描静默截断，`/usr` 那 28 万个文件一个都没扫到，
     // 命令还打印"共扫描 389551 个文件"（看着挺大，其实是半棵树）。剪枝根治已知触发器。

@@ -234,8 +234,8 @@ void write_symlink_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
     // 没跑让开趟）由写入趟自己写这一行。
     if (rec == nullptr || decision.let_go != detail::PathAction::RegisterNew) sink.new_file(dest);
     // 断点：`NEW <dest>` 行已落、`create_symlink` 未做 —— write-ahead 窗口。
-    // （此前**符号链接分支没有断点**，只有普通文件的 COPY 有：lpkg/CLAUDE.md §2
-    //  记着"链接已写 WAL、尚未 create_symlink"这个中间态无法注入故障。补上之后
+    // （此前**符号链接分支没有断点**，只有普通文件的 COPY 有 —— "链接已写 WAL、
+    //  尚未 create_symlink"这个中间态注入不进故障。补上之后
     //  这一族才有"失败注入 → 回滚保真"的用例。）
     BreakpointManager::instance().hit("symlink_after_wal_" + pkg_name);
     fs::create_symlink(link_target, dest);
@@ -286,7 +286,7 @@ void write_dir_entry(const ContentEntry& e, const detail::ProbeLedger& ledger, d
     // 故整个元数据块跳过。
     //
     // 判据一律用**剥过尾斜杠**的 `probe`：`fs::is_symlink("link/")` 会**跟随**尾斜杠
-    // （实测返回 false，见 CLAUDE.md 的谓词说明），于是守卫在"链接→目录"这一格失效 ——
+    // （返回 false），于是守卫在"链接→目录"这一格失效 ——
     // 后面两处（元数据、xattr）**都**要用 `probe`，别用 `e.physical_path`。
     struct stat st;
     if (!is_symlink_no_follow(probe) && lstat(e.src_path.c_str(), &st) == 0) {
@@ -296,9 +296,8 @@ void write_dir_entry(const ContentEntry& e, const detail::ProbeLedger& ledger, d
             if (lstat(probe.c_str(), &dst_st) == 0) {
                 mode_t cur_mode = dst_st.st_mode & constants::PERM_MASK_ALL;
                 if (cur_mode != pkg_mode) {
-                    // mode 必须以**八进制**渲染（`{:o}`，2026-10-03 订正）：原先传 int 走默认
-                    // 十进制，0644 会显示成 420、0755 成 493 —— 与 `ls -l` / chmod 的口径不符，
-                    // 用户看不懂告警里那两个数。
+                    // mode 必须以**八进制**渲染（`{:o}`）：传 int 会走默认十进制，0644 显示成
+                    // 420、0755 成 493 —— 与 `ls -l` / chmod 的口径不符，用户看不懂告警里那两个数。
                     const std::string cur_o = std::format("{:o}", static_cast<unsigned>(cur_mode));
                     const std::string pkg_o = std::format("{:o}", static_cast<unsigned>(pkg_mode));
                     log_warning(
@@ -306,11 +305,10 @@ void write_dir_entry(const ContentEntry& e, const detail::ProbeLedger& ledger, d
                 }
             }
         }
-        // 元数据经 OpSink（2026-09-26）：**先把改前值写进 WAL（`DIR_META`）再动盘**。
-        // 此前这两行是裸 `lchown`/`chmod`，一个 WAL 行都不写 —— 注入失败回滚后目录会保留
-        // **新**版本的 mode/uid（目录是"就地改活对象"，不像普通文件那样有 BACKUP 保住旧
-        // inode），与不变量 3 冲突。这不是潜伏问题：任何"新版本改了某个已存在目录的 mode"
-        // 的批次失败都会踩到。
+        // 元数据经 OpSink：**先把改前值写进 WAL（`DIR_META`）再动盘**。裸 `lchown`/`chmod`
+        // 不写 WAL 行的话，注入失败回滚后目录会保留**新**版本的 mode/uid（目录是"就地改活
+        // 对象"，不像普通文件那样有 BACKUP 保住旧 inode），与不变量 3 冲突 —— 任何"新版本
+        // 改了某个已存在目录的 mode"的批次失败都会踩到。
         //
         // `record_previous`：只有当这个目录**在本次事务之前就存在**时才需要记 —— 本批次
         // 刚建出来的目录由 `NEW_DIR` 的逆操作（删除）收尾，记一行改前值纯属冗余。
@@ -503,7 +501,7 @@ void write_regular_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
             // 写入层原语**：内容先写进 .lpkgtmp（+ xattr + 属主/权限 + fsync），再
             // commit_copy 落位（WAL COPY）。
             // 守卫覆盖"BACKUP 旧 `.lpkgnew` → commit"这一段：BACKUP 那步失败时
-            // WAL 里只有 BACKUP 行、没有描述 tmp 的行，回滚不会碰它（实测残留）。
+            // WAL 里只有 BACKUP 行、没有描述 tmp 的行，回滚不会碰它（会残留）。
             const fs::path tmp_path = stage_regular_file(e.src_path, final_dest);
             detail::TmpStageGuard tmp_guard(tmp_path);
             // 目标已存在（上一次留下的 .lpkgnew，用户可能还没审阅）→ 先 BACKUP 进
@@ -511,13 +509,10 @@ void write_regular_entry(const ContentEntry& e, const detail::ProbeLedger& ledge
             // 一份与本批次无关、用户尚未处理的审阅文件（顺序也不可反：BACKUP 行
             // 必须先于 COPY 行，逆序回滚才会"先撤新那份、再还原旧那份"）。
             //
-            // ⚠️ **两处断点是 2026-09-27 补的**：此前整支**一个 `after_wal_breakpoint` 都没传**
-            // ⇒ "`.lpkgnew` 的 WAL 行已写、rename 未做"这个窗口**注入不进去**（与
-            // `backup_obsolete` 同类）。这不只是覆盖率问题：CI 上那条 flaky 用例
-            // （原名 `…ConfigIsStashedAwayWhenTheWritePassRuns`，2026-09-27 已改为顺序无关版）
-            // 正是因为**本支没有断点**，才只能去借
-            // "另一个文件的 COPY 窗口"，从而变成**顺序依赖**（同提交三跑两过一挂）。
-            // 补上之后，`.lpkgnew` 这一步可以被直接观测了。
+            // 两处断点（`lpkgnew_after_wal_` / `lpkgnew_bak_after_wal_`）覆盖"`.lpkgnew` 的
+            // WAL 行已写、rename 未做"这个窗口 —— 没有它们就注入不进去（与 `backup_obsolete`
+            // 同类），用例只能去借"另一个文件的 COPY 窗口"，从而变成**顺序依赖**（同提交三跑
+            // 两过一挂）。有了它们，`.lpkgnew` 这一步可以被直接观测。
             if (exists_no_follow(final_dest))
                 sink.backup(final_dest, "lpkgnew_bak_after_wal_" + pkg_name);
             sink.commit_copy(tmp_path, final_dest, "lpkgnew_after_wal_" + pkg_name);
@@ -592,7 +587,7 @@ void InstallationTask::copy_package_files()
         if (rel_f.is_absolute()) rel_f = rel_f.relative_path();
         const fs::path src_path = content_dir / f;
         // 落位目标走 `confine_target_path`（不是裸 `root_dir() / rel_f`）：后者只约束**词法**
-        // 归属，而拷贝会跟随中间段符号链接 —— `<root>/usr -> /` 时内容会写到宿主（2026-10-03）。
+        // 归属，而拷贝会跟随中间段符号链接 —— `<root>/usr -> /` 时内容会写到宿主。
         const fs::path physical_path = detail::confine_target_path(rel_f);
 
         // 判定走**不抛**的 `exists_no_follow`（lstat 语义 = 原来的 `exists || is_symlink`）：
@@ -602,15 +597,14 @@ void InstallationTask::copy_package_files()
         // tests/integration/test_symlink_loop_install.cpp。
         if (!exists_no_follow(src_path)) continue;
 
-        // 父目录**不在这里创建**（2026-10-03 删除了原先那段 `ensure_dir_exists` 父链补建）：
-        // 解压器（libarchive 的 disk writer）会为文件成员**自动补建**缺失的父目录 ——
-        // 实测：只含 `content/usr/bin/foo`、不含任何目录成员的归档，解压后
+        // 父目录**不在这里创建**：解压器（libarchive 的 disk writer）会为文件成员**自动补建**
+        // 缺失的父目录 —— 只含 `content/usr/bin/foo`、不含任何目录成员的归档，解压后
         // `content/usr`、`content/usr/bin` 都真实存在（lpkg 用的那套
         // `archive_write_disk_set_options` 逐字复刻验证过）。
         // 于是 `scan_content_files` 会把它们当**普通目录条目**扫到 → 让开趟照常写 `NEW_DIR`、
         // 注册趟照常登记归属 —— 与归档显式带了目录条目时**走完全同一条路**，结果确定。
-        // 原先那段补建是解压器行为的重复实现；真触发时它建出的目录反而**既没有 WAL 行、
-        // 也不进 files.db**（那才是"无主目录"的来源）。删掉它不改变任何可达情形的结果。
+        // 在这里自己补建父链是解压器行为的重复实现：真触发时它建出的目录反而**既没有 WAL 行、
+        // 也不进 files.db**（那才是"无主目录"的来源）。
         // 注：`pkg_name_` 在本循环里仍由三个 handler 使用，别以为它随这段一起没用了。
 
         const ContentEntry entry{f, src_path, physical_path};
@@ -631,7 +625,7 @@ void InstallationTask::copy_package_files()
             write_regular_entry(entry, probe_ledger_, sink, pkg_name_, has_config_conflicts_,
                                 silently_updated_configs);
         } catch (const UserAbort&) {
-            throw;  // 取消语义必须原样上抛 —— 宽 catch 会把它降级成普通错误（CLAUDE.md §1.7）
+            throw;  // 取消语义必须原样上抛 —— 宽 catch 会把它降级成普通错误
         } catch (const std::exception& e) {
             throw LpkgException(
                 string_format("error.copy_failed_rollback", f, physical_path.string(), e.what()));

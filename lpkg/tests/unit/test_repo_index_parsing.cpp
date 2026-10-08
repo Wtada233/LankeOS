@@ -268,7 +268,7 @@ TEST_F(AggregatedIndexTest, FindSonameProviderReturnsVersionThatActuallyProvides
 }
 
 // ============================================================================
-// 索引 deps 字段里的复合约束（历史 TODO.md D2）
+// 索引 deps 字段里的复合约束
 //
 // 索引用 ',' 连接各依赖，而依赖语法**本身**也用 ',' 表达复合约束
 // （`"cmake >= 3.20, < 4.0"` 是一个依赖）。旧解析直接按 ',' 拆再逐个解析，
@@ -330,23 +330,23 @@ TEST_F(AggregatedIndexTest, EmptyAndTrailingCommasProduceNoDependencies)
 /**
  * 索引路径**是个目录**（"存在但根本读不出内容"的一种）⇒ 仓库为空，但**必须留下可见告警**。
  *
- * ## 实测（2026-09-26）：目录**不会**让 `ifstream::open` 失败
- * 我原先按"造个目录就能命中 `repo_index_unreadable` 分支"写，**红**了 —— 捕获到的 stderr 是
+ * ## 目录**不会**让 `ifstream::open` 失败
+ * 直接按"造个目录就能命中 `repo_index_unreadable` 分支"写用例会**红**：捕获到的 stderr 是
  * `Warning: Repository index parsed to zero packages (empty or truncated?): …/index.txt`。
  * 原因：Linux 上 `std::ifstream` **打开目录是成功的**（失败的是随后的读），于是
  * `!file.is_open()` 那道闸不拦它，流程落到"解析出 0 个包"那条告警上。
- * ⇒ 源码里"文件存在但打不开（权限 / **竟是个目录**）"这句的**目录那半是错的**，已订正。
+ * ⇒ 源码里"文件存在但打不开（权限 / **竟是个目录**）"这句的**目录那半不成立**。
  *
  * ## 由此带出的更重要结论：`repo_index_unreadable` 分支**在真实条件下几乎不可达**
  * lpkg 永远以 root 跑 ⇒ 权限位挡不住它；目录又能被打开。要构造出 `open` 真失败得靠 FIFO/设备
  * 之类，属人为场景。**真正兜住"索引损坏/是目录/被截断"的是"解析出 0 个包"这条告警** ——
- * 它就是用户可见的那个"不静默"。所以本用例钉的是**那条**（可达、且是真实防线）。
+ * 它就是用户可见的那个"不静默"。所以本用例覆盖的是**那条**（可达、且是真实防线）。
  *
  * ## 为什么"不静默"是这里唯一能断言的行为差异
  * "静默当成空仓库"与"告警后当成空仓库"给出的 `packages()` **都是空** —— 只有告警能区分。
  * 而静默的后果不是"少几个包"，而是上层把"仓库为空"读成"一切正常"：`lpkg upgrade` 会打印
- * "所有包都已是最新版本"并 exit 0（D4 事故形态）。
- * `log_warning` 落 `std::cerr`（`base/utils.cpp:103`），故换 `rdbuf` 捕获
+ * "所有包都已是最新版本"并 exit 0（事故形态）。
+ * `log_warning` 落 `std::cerr`（`base/utils.cpp`），故换 `rdbuf` 捕获
  * （同 `tests/unit/test_cli_dispatch.cpp` 的手法）。
  */
 TEST_F(AggregatedIndexTest, DirectoryIndexIsReportedNotEmptyRepo)
@@ -377,7 +377,7 @@ TEST_F(AggregatedIndexTest, EmptyTokensInProvidesAndNeededSoAreDropped)
     // 索引行里的尾随/连续逗号会切出空 token。空串进 libsolv 就是 `STRID_EMPTY`（一个无人
     // 提供的 capability），而 `collect_problems` 又因 `dep_name` 为空而跳过它 —— 用户只看到
     // 一条无从定位的 "solve failed"。`provides`/`provides_soname`/`needed_so` 三个字段都必须
-    // 与 `deps` 一样清洗（trim + 丢空片段，2026-10-02 修）。
+    // 与 `deps` 一样清洗（trim + 丢空片段）。
     write_index("libfoo|1.0:abc123::cap1,,cap2:so1.so,,so2.so:so3.so,|\n");
     Repository repo;
     repo.load_index();

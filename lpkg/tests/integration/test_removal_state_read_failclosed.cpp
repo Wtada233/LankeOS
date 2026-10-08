@@ -1,7 +1,7 @@
 /**
  * test_removal_state_read_failclosed.cpp — 移除路径读「反向依赖状态文件」失败必须 fail-closed
  *
- * 背景（2026-10-03 改）：`remove_package_files`（`main/src/pkg/package_manager.cpp`）清理本包
+ * 背景：`remove_package_files`（`main/src/pkg/package_manager.cpp`）清理本包
  * 写下的**反向依赖边**时，要读两个以包名命名的状态文件：
  *   · `deps/<pkg>`      —— 本包声明的依赖（用于把它从别包的 reverse-dep 表里摘掉）；
  *   · `needed_so/<pkg>` —— 本包需要的 SONAME（用于把它从提供者的 reverse-dep 表里摘掉）。
@@ -12,7 +12,7 @@
  * 之后会错误地挡住别的包卸载）。这与**升级侧**读同一个文件做同一件事
  * （`installation_task_register.cpp` 摘除旧反向依赖）的处置必须一致。
  *
- * 现行为（本文件钉住）：fail-closed —— 点名**文件路径**报错
+ * 现行为（本文件覆盖）：fail-closed —— 点名**文件路径**报错
  * （`error.open_file_failed` 或 `error.read_file_failed`）、整批回滚、**包仍是已安装状态**。
  *
  * ── 每条断言"在什么缺陷下会红" ──
@@ -101,7 +101,7 @@ protected:
             << "报错没点名读状态文件的路径 " << file << "：\n"
             << msg;
         // 取**值**再取锚（`get_string` 返回引用、以字面量临时量调用它绑引用会撞 GCC 的
-        // `-Wdangling-reference` 误报 —— 见 installation_task.cpp 里同款订正）。
+        // `-Wdangling-reference` 误报 —— 见 installation_task.cpp 里同款写法）。
         const std::string open_tmpl = get_string("error.open_file_failed");
         const std::string read_tmpl = get_string("error.read_file_failed");
         const std::string open_anchor = longest_template_literal(open_tmpl);

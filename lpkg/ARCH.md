@@ -23,15 +23,14 @@
 12. [WAL Trim](#12-wal-trim)
 13. [实现清单](#13-实现清单)
 14. [终端输出（UX）](#14-终端输出ux)
-15. [2026-10-02 缺陷审计的修复](#15-2026-10-02-缺陷审计的修复行为--不变量变更)
-16. [2026-10-03 审计修复](#16-2026-10-03-审计修复行为--不变量变更)
-17. [2026-10-03 第二批审计修复](#17-2026-10-03-第二批审计修复行为--不变量变更)
-18. [2026-10-03 第三批修复](#18-2026-10-03-第三批修复行为--不变量变更)
-19. [2026-10-03 第四批修复（四路子 agent 复审后的收口）](#19-2026-10-03-第四批修复四路子-agent-复审后的收口)
-20. [2026-10-03 第五批：两条中危缺陷 + 保留命名空间表 + 反向依赖收敛 + `utils.hpp` 拆分](#20-2026-10-03-第五批两条中危缺陷--保留命名空间表--反向依赖收敛--utilshpp-拆分)
-21. [2026-10-05 第六批：畸形 tar 守卫 + `so:` 命名空间不变量订正](#21-2026-10-05-第六批畸形-tar-守卫--so-命名空间不变量订正)
-22. [附录：完整 WAL 示例总结](#附录完整-wal-示例总结)
-23. [附录 B：代码注释里的 `历史 TODO.md <编号>` 是什么](#附录-b代码注释里的-历史-todomd-编号-是什么)
+15. [缺陷审计的修复](#15-缺陷审计的修复行为--不变量变更)
+16. [审计修复](#16-审计修复行为--不变量变更)
+17. [第二批审计修复](#17-第二批审计修复行为--不变量变更)
+18. [第三批修复](#18-第三批修复行为--不变量变更)
+19. [第四批修复（四路子复审后的收口）](#19-第四批修复四路子复审后的收口)
+20. [第五批：两条中危缺陷 + 保留命名空间表 + 反向依赖收敛 + `utils.hpp` 拆分](#20-第五批两条中危缺陷--保留命名空间表--反向依赖收敛--utilshpp-拆分)
+21. [第六批：畸形 tar 守卫 + `so:` 命名空间不变量订正](#21-第六批畸形-tar-守卫--so-命名空间不变量订正)
+22. [静态库"长名成员"判据必须与成员顺序无关](#22-静态库长名成员判据必须与成员顺序无关)
 
 ---
 
@@ -45,8 +44,7 @@
   且批次事务**明令不可重入**（`wal_op.hpp`）。所以"多批次"只可能来自**多次命令**（含测试里
   在一个进程中连调两次 `install_packages()`），不存在一条命令内跑两批的情形。
 - **I-2**: 批次内每个包安装/移除完成后：`.lpkg_bak` 保留（延迟到 COMMIT_PKGS 后清理），`.lpkgtmp` 已清，内存 COMMIT 已写。
-  **订正 2026-10-03**：原文这一条还写着"DB 已落盘（带 WAL 保护）" —— 那是**逐包落盘**时代的
-  形态，**已取消**。DB 现在由**批次末尾**的一次 `Cache::write(":batch-end")` 统一写（§3.1）。
+  **DB 不在这一步落盘** —— DB 由**批次末尾**的一次 `Cache::write(":batch-end")` 统一写（§3.1）。
   包级的 `deps`/`needed_so`/`man` **元数据文件**仍是逐包写 —— 那是**另一套机制**
   （`write_string_file_wal`，单文件、几百字节、且批次中途确实要被读，见 §6.1），别与 DB 一族混为一谈。
 - **I-3**: 批次提交前（`COMMIT_PKGS` 未写），整个批次视为未完成，可整体回滚。
@@ -58,7 +56,7 @@
 - **I-6**: **批次回滚永不调用 `recover_packages()`**。批次回滚使用 `batch_rollback()` 只操作当前批次的 WAL 行。
 - **I-7**: 回滚在同一个 `BEGIN_PKGS`/`COMMIT_PKGS` 边界内执行。即：`COMMIT_PKGS` 既是成功完结的标记，也是回滚完结的标记。WAL 中不存在"回滚无 COMMIT_PKGS"的情况。
 - **I-8**: rollback 的每个逆向操作在文件系统生效后，立即写入 `RESTORE_*` WAL 审计行。若 rollback 中途崩溃，重启后的 `recover_packages()` 靠**每条逆操作自查"备份/目标还在不在"**幂等续传（已消费的备份 → 跳过）。
-  （订正 2026-09-25：原文后半句写"能通过 RESTORE 行判断哪些操作已完成" —— 现行实现把 RESTORE 行整类跳过（`skip_in_reverse()`），判断依据是文件系统状态而不是这些行，见 §10.3。）
+  （RESTORE 行整类被 `skip_in_reverse()` 跳过 —— 判断依据是文件系统状态而不是这些行，见 §10.3。）
 
 ### 1.3 备份清理纪律
 
@@ -66,19 +64,15 @@
 - **I-BAK-2**: 安装流程的 `.lpkg_bak` 清理统一在 `COMMIT_PKGS` 之后执行（调用方把
   `task.get_stashes()` 收进批次级向量，交给 `finish_committed_batch()` 的
   `cleanup_stashes()` 按 stash 根 `remove_all`）。批次内绝不提前清理，确保批量回滚时可恢复每个已安装包的文件。
-> **stash 根的派生必须先 `strip_trailing_slash`**（2026-09-26 第三轴审计补）：`stash_root_of_bak()`
-> 的返回值会被喂给 `fs::remove_all`，而实测 **`fs::remove_all("link/")` 会删光链接目标的全部内容**
+> **stash 根的派生必须先 `strip_trailing_slash`**：`stash_root_of_bak()`
+> 的返回值会被喂给 `fs::remove_all`，而 **`fs::remove_all("link/")` 会删光链接目标的全部内容**
 > （并返回 `ENOTDIR`）。今天它只靠"WAL 字面量恒不带尾斜杠"这条君子协定（bak 名由
 > `dir / (base + 后缀 + …)` 拼出），尾斜杠一旦出现就是灾难性的 —— 故在派生处显式剥一次。
-  （订正 2026-09-25：原文写的是"调用方收集 `task.get_backups()` 后 `fs::remove`" —— 没有
-  `get_backups()` 这个接口，备份早已改成每文件系统 stash、清理是按目录 `remove_all`
-  而不是逐文件 `fs::remove`。）
 - **I-BAK-3**: 移除流程的 `.lpkg_bak` 清理与安装**完全一致**：统一在 `COMMIT_PKGS` **之后**执行
   （`finish_committed_batch()`：写 `CLEANUP` 行 → 物理删除 stash → 剪枝 hooks → 执行 postinst → `trim_completed` → `cleanup_db_backups`）。
   stash 是移除的**唯一回滚来源**（装的是刚被删掉的文件），因此必须活到"批次已不可能回滚"为止——
   推论：**只要批次未提交，中途中断（Ctrl+C/失败）一律整批恢复**；`CLEANUP` 行位于事务之外
-  （trailing 记录），未清理完的部分由 `continue_post_commit_cleanup`（**§11.2 步骤 1.5**；原文写的
-  §10 是"RESTORE 审计"，不含这个话题）续传。
+  （trailing 记录），未清理完的部分由 `continue_post_commit_cleanup`（**§11.2 步骤 1.5**）续传。
 
 ### 1.4 WAL 语义
 
@@ -101,22 +95,19 @@
 > **I-FSYNC-1 与 I-FSYNC-2 的前两步（WAL 行 + fsync WAL）在任何模式下都成立**：
 > WAL 行的**三条**写入路径全部无条件 fsync —— `wal::log_wal_line`、`WalWriter::log`、
 > `wal_append_raw`（回滚审计行）。行的持久化是"行 = 一个已开始但可能未完成的操作"
-> 这条不变量的前提，丢了行会出现"操作做了、行没了"这种不可恢复组合。`WalWriter` 曾把
-> 自己的 fsync 挂在 `durable_fsync_enabled()` 上（默认关闭时静默不持久）—— 那是"实现
-> 弱于契约"，已去掉：要非持久的快路径请**显式**用 `WalWriter::log_no_fsync()`。
+> 这条不变量的前提，丢了行会出现"操作做了、行没了"这种不可恢复组合。要非持久的快路径请
+> **显式**用 `WalWriter::log_no_fsync()`。
 >
 > **WAL 文件自身的目录项 fsync 同样是恒生效的；"只在本次真的创建了文件时才做"这半句
 > 只适用于两条路径**：`wal::log_wal_line` 与 `wal_append_raw` 走
 > `wal::open_wal_append()`（`O_CREAT|O_EXCL` 原子判出是否新建），只有新建时才
 > `fsync_parent_dir()` —— 目录项只有创建那一刻需要落盘，而它们**每写一行**都走一次，
-> 恒做等于每条 WAL 行白付一次父目录 fsync（实测占全部 fsync 的 34%~40%）。
+> 恒做等于每条 WAL 行白付一次父目录 fsync（占全部 fsync 的 34%~40%）。
 > **`WalWriter` 构造是例外**：它走裸 `::open`（**无** `O_EXCL`、没有 created 判定），并且
 > **无条件** `fsync_parent_dir()`（每批一次，代价可忽略）。
-> ⚠️ 订正 2026-09-26：原文写"三条路径都用 `open_wal_append`、只有新建时才做"，
-> 与紧随其后的"`WalWriter` 保持原样（无条件）"自相矛盾 —— 按代码写准。
 >
 > **DB/元数据写（I-FSYNC-2 的 .tmp → fsync → rename → fsync 父目录、I-FSYNC-5）同样
-> **"这个名字空不空"一律用 lstat 语义**（2026-09-26 第三轴审计补）：`write_string_file_wal` 的
+> **"这个名字空不空"一律用 lstat 语义**：`write_string_file_wal` 的
 > `is_new = !fs::exists(p)` 曾用**跟随**语义 ⇒ 一个**悬空符号链接**被当成"没有旧内容" ⇒ 写
 > `DBNEW`（**无备份**）⇒ 回滚的 `Undo::RemoveFile` 把新文件 unlink，**原来的悬空链接永久消失**
 > （而不是"还原"）。改成 `exists_no_follow` 后，悬空链接算"名字被占" ⇒ 走有备份的那一支。
@@ -137,8 +128,6 @@
 >   `install_hook_files()` —— hook 脚本的 `.lpkgtmp`），以及 `fsync_and_rename()` 里那一次
 >   .tmp fsync（安装/升级路径上它的调用点都在守卫块内，今天只有 builder 的
 >   `write_string_to_file()` 会落进未受保护的分支）。
->   （订正 2026-09-26：原文把这两处都指成 `installation_task.cpp` —— 该文件已按趟拆成 4 个
->   TU，这两个块分别落在 `_copy.cpp` 与 `_register.cpp`。）
 > - **目录项 fsync**：`fsync_dir_internal()` —— 它是 `fsync_parent_dir()` 的**唯一**实现，
 >   而 `fsync_parent_dir()` 是 `safe_rename()` 的尾巴，**每一次 rename 都走它**。所以
 >   "rename 后 fsync 父目录"在默认模式下**一律不发生**（`.lpkg_bak` 搬进 stash、COPY 落位、
@@ -153,14 +142,10 @@
 > 代价对比：默认模式每个**文件**省下"内容 fsync + rename 父目录 fsync"（典型 2 次，
 > 目录项共享时更少），`--fsync` 才付这笔；WAL 行与 DB 写的 fsync 两种模式都在付
 > （200 文件安装：WAL 行本身就有 400+ 次）。
->
-> （2026-09-25 订正：原文说开关只影响"包内容/.lpkgtmp/.lpkgnew 的内容 fsync 与**这些文件**
-> rename 的父目录 fsync"，从而让 I-FSYNC-3 读起来像恒生效 —— 实际 `fsync_dir_internal` 是
-> **所有** `fsync_parent_dir` 的实现，默认模式下一次目录项 fsync 都不发。只改描述，不改行为。）
 
 ---
 
-### 1.7 进程暂存目录：**原子创建、0700**（2026-10-03）
+### 1.7 进程暂存目录：**原子创建、0700**
 
 `Config::get_tmp_dir()` = `/tmp/lpkg_<pid>_<后缀>`，由 **`mkdtemp`**（底层 `mkdir(2)`）创建。
 
@@ -176,7 +161,7 @@
 - 建后 `lstat` 复核"真目录 + 属主 == euid"是**纵深防御**：将来谁改回 `create_directories`，
   这一行会立刻失败，而不是静默用上别人预建的目录。
 
-### 1.8 版本语义：**就是 rpm 的 EVR**（2026-10-04，8.0.0 破坏性重写）
+### 1.8 版本语义：**就是 rpm 的 EVR**（破坏性重写）
 
 **一句话**：lpkg 的版本语义 = rpm 的 `[epoch:]version[-release]`，判据**只有一份** ——
 libsolv 的 EVR 比较（`vercmp/version.cpp` 的 `evr_cmp` → `pool_evrcmp_str(…, EVRCMP_COMPARE)`），
@@ -185,8 +170,7 @@ libsolv 的 EVR 比较（`vercmp/version.cpp` 的 `evr_cmp` → `pool_evrcmp_str
 - **"最新版"**：`version_compare()` 的实现**就是** libsolv 的 EVR 比较（`repository.cpp`
   拿它当 `ranges::sort` 的比较器 ⇒ 升序 ⇒ 最后一版最新），求解器选 `latest` 用的是**同一个**
   函数 ⇒ 结构上不存在"两边判序相反"。
-- **build 的 `release:`**：按 rpm 语义拼成 `<version>-<release>`（`builder.cpp`；
-  8.0.0 之前是 `<version>+<release>`）。
+- **build 的 `release:`**：按 rpm 语义拼成 `<version>-<release>`（`builder.cpp`）。
 - **保留字符**：`is_safe_path_component` 仍拒 `:`，但理由换成了**分帧**（`pkgs` 的
   `name:version`、索引版本块的 `<ver>:<hash>:…`），与版本语义无关；`^` / `~` **已放行**
   （`~` 是 rpm 的预发布标记：`1.0~rc1 < 1.0`）。lpkg **不用 epoch**（`:` 不在版本里）。
@@ -200,7 +184,7 @@ libsolv 的 EVR 比较（`vercmp/version.cpp` 的 `evr_cmp` → `pool_evrcmp_str
   这张三元表**逐条对应** `pooldep.c` 的 `pool_match_nevr_rel()` —— 也就是 libsolv 判定
   "某个 solvable 是否满足某条依赖"用的那一份，`pool_whatprovides` 同一份。所以"求解器说
   能装、安装期说不满足"这类分叉**结构上不存在**，而不是"靠两边写得一样"。
-  上面那几条**反直觉**的结论是实测的（容器里的 libsolv 直接给答案），并已钉进
+  上面那几条**反直觉**的结论由容器里的 libsolv 直接给出答案，并已钉进
   `tests/unit/test_version.cpp` 的 `ReleaseIsAWildcardInDependencyMatching`。
 - **`version_compare()` 与 `version_satisfies()` 用的是两种模式**，别把它们当成一个：
   `version_compare`（排序、"谁更新"）走 `EVRCMP_COMPARE`（有 release 者更大），
@@ -210,25 +194,24 @@ libsolv 的 EVR 比较（`vercmp/version.cpp` 的 `evr_cmp` → `pool_evrcmp_str
   防御**（求解器与安装期是同一个判据 ⇒ 结构上不可能分叉），用例直接喂手搓计划
   （`tests/unit/test_plan_dep_version_check.cpp`）。
 
-> **历史（已被推翻，2026-10-04）** —— 旧设计与此前的修法，**别当现行规范读**：
-> 此前 lpkg 有**自己的**一套版本语义（`-` = 预发布、`+N` = 发行修订号），并用
-> `to_libsolv_evr()` / `from_libsolv_evr()` 在两者之间**编解码**（`-`→`~`、
-> `+release`→`^^release`），因为 libsolv 只认 rpm。**代价是两套判据必须逐条一致，而它们
-> 不一致过**：2026-10-03 在 (候选 × 约束) 的 4032 组合矩阵上差 **78 处、两个方向都有**
-> （`= 1.0` 匹配 `1.0+1` ⇒ 假满足；`> 1.0` 不匹配 `1.0+1` ⇒ 假不满足）。当时的修法是换一个
+> **历史设计（已被推翻，别照做）**：lpkg 曾有自己的**第二套**版本语义（`-` = 预发布、
+> `+N` = 发行修订号），并用 `to_libsolv_evr()` / `from_libsolv_evr()` 在两者之间**编解码**
+> （`-`→`~`、`+release`→`^^release`），因为 libsolv 只认 rpm。**代价是两套判据必须逐条一致，
+> 而它们不一致过**：在 (候选 × 约束) 的 4032 组合矩阵上差 **78 处、两个方向都有**
+> （`= 1.0` 匹配 `1.0+1` ⇒ 假满足；`> 1.0` 不匹配 `1.0+1` ⇒ 假不满足）。曾试图换一个
 > **更冷门的编码**（`^` caret 当 release 分隔符，依据是 libsolv 把 caret 定义成"比基础版新、
 > 比任何真实下一段旧"）+ 一份保留字符黑名单（`^`/`~`/`:`）+ 一张等价性矩阵闸门 —— 那是
 > **治标**：只要还存在第二套语义，就得靠"手动保持一致"活着。
-> 8.0.0 取消了第二套语义，于是 `EVR_RELEASE_SEP` / `EVR_RESERVED_CHARS` /
+> 取消第二套语义后，`EVR_RELEASE_SEP` / `EVR_RESERVED_CHARS` /
 > `to_libsolv_evr` / `from_libsolv_evr` **全部删除**；`tests/unit/test_vercmp_libsolv_bridge.cpp`
 > （矩阵差分，正是为这座桥建的）**一并删除**。
 > `tests/fuzz/vercmp_fuzz.cpp` **保留但换了守的东西**：它不再能发现"比较器分叉"（两边已是
 > 同一个函数），但仍在守**算子映射**（`version_op_flags` —— 求解器灌依赖与安装期判定共用
 > 的唯一实现）与**那张 ±2 通配表**，两者写错的后果与当年一样重。它的文件头已按此重写。
-> ⚠️ 顺带修正一处**既有误判**：`ncurses=6.5-20250809` 在上游是"6.5 的补丁快照"（**更新**），
+> ⚠️ 顺带记一条**既有误判**：`ncurses=6.5-20250809` 在上游是"6.5 的补丁快照"（**更新**），
 > 旧语义把 `-` 当预发布 ⇒ 判它**旧于** `6.5` ✗；rpm 语义下它是 `6.5` 的 release ⇒ **更新** ✓。
 
-### 1.9 SONAME 规格（symbol version，2026-10-05）
+### 1.9 SONAME 规格（symbol version）
 
 `provides_soname` 与 `needed_so` 的**条目**可以带 ELF 符号版本：
 
@@ -252,7 +235,7 @@ libc.so.6@{GLIBC_2.40,GLIBC_2.39} 多个（花括号只能在末尾、只出现�
   （`warning.bad_soname_spec_in_index`），与"字段数不对的版本块跳过"同一取向 ——
   一行坏数据不该让整个仓库不可用，但也绝不**半登记**。
 - **规格里不许有空白**：这两个字段在索引里是逗号分隔的表，而索引行今天**零空白**
-  （实测 7412 个条目里没有任何空白字符；`wc -w` / 无参 `split()` / `awk '{print $k}'` 都靠它）。
+  （7412 个条目里没有任何空白字符；`wc -w` / 无参 `split()` / `awk '{print $k}'` 都靠它）。
   校验直接拒空白，把这条从"碰巧成立"变成**可执行的不变量**。字符集：SONAME 部分
   `[A-Za-z0-9._+-]` 且不含 `@ { } , | ; :`；符号名同上。
 - **索引切分是花括号感知的**：花括号里的逗号与字段分隔符是同一个字符，所以
@@ -295,17 +278,13 @@ provider 侧那段循环一次都不跑（零成本）。
 
 #### 已知边界（有意）
 
-- **farm 产出**（2026-10-05）：farm 扫 ELF 的 `.gnu.version_d`（verdef，跳过 BASE 节点）/
+- **farm 产出**：farm 扫 ELF 的 `.gnu.version_d`（verdef，跳过 BASE 节点）/
   `.gnu.version_r`（verneed）自动写出这两个字段（**这两个字段由 farm 生成**，别手编）。farm 按
   **裸 SONAME 建索引/查表/图比较**（`so_bare()`：剥掉 `@…` 再比），但**漂移判定是版本级的** ——
   `farm/src/verify.rs::decide()` 按 `(裸名, 去重排序的版本集)` 比规格：`provides_soname` 少一个
   版本节点 → `AbiBreak`；多出来 / `needed_so` 规格变化 → `Repack`（用**扫描值**写回
-  `LankeBUILD.json`）。实测产出：glibc 的 `libc.so.6` 46 个 `GLIBC_*`、
+  `LankeBUILD.json`）。产出：glibc 的 `libc.so.6` 46 个 `GLIBC_*`、
   gcc 的 `libgcc_s.so.1@{GCC_3.0,…}`、python 消费侧的 `libcrypto.so.3@{OPENSSL_3.0.0,3.3.0,3.4.0}`。
-  > ⚠️ **订正 2026-10-05**：本条原写"farm 产出 + **基线归一**……对这些字段做**基线归一**
-  > （不归一的话手写规格会被 `verify` 判成漂移、被 repack 静默涂掉，`abi` 那一侧还会误报断裂）"。
-  > **该前提已被维护者推翻**：`provides_soname` 侧就是按版本级判漂移的，漂移时会用扫描值覆盖
-  > 配方；`so_bare()` 只保留在"裸名建索引/查表/图比较"那一层。
 - **系统库不校验符号版本**（`--use-system-soname`）：`Config::has_system_soname()` 查的是
   `<root>/usr/lib/<名字>` 这个文件在不在，所以那里**只能传裸 SONAME** —— 传整串会去找一个带
   `@` 的文件名、永远不存在（`installation_task.cpp` 里已写明）。
@@ -332,7 +311,7 @@ provider 侧那段循环一次都不跑（零成本）。
 | | `UNSTASH <bak> → <orig>` | 把 stash 里那份**搬回原位**（第③步引入）；逆操作 = 再搬进 stash | 写后 fsync |
 | | `SAVE_CONF <src> → <dst>` | 配置文件改名保留（`dst = <src>.lpkgsave`，**不进 stash**）。三个入口：移除整包时（可被 `--purge-config` 改成真删）、升级时 `/etc` 条目**类型变化**、升级时 `/etc` **废弃条目**（文件/符号链接） | 写后 fsync |
 | **目录状态** | `DIR_META <path> <mode> <uid> <gid>` | 目录元数据的**改前**值（write-ahead：先写行再 `lchown`/`chmod`） | 写后 fsync |
-| （2026-09-26 新增） | `XATTR_SET <path> <b64_key> <b64_old>` | 该键**本来有值**、即将被覆盖或删除 —— 行里是**改前**值 | 写后 fsync |
+| | `XATTR_SET <path> <b64_key> <b64_old>` | 该键**本来有值**、即将被覆盖或删除 —— 行里是**改前**值 | 写后 fsync |
 | | `XATTR_NEW <path> <b64_key>` | 该键**本来不存在**、即将被写入 | 写后 fsync |
 | | `DIR_RM <path> <mode> <uid> <gid>` | 删除一个**空目录**（`rmdir`；元数据供回滚重建）。目录若带 xattr 则**先逐键写 `XATTR_SET`**（见 §3.6） | 写后 fsync |
 | **移除操作** | `RM_BEGIN <pkg> <ver>` | 移除开始 | 写后 fsync |
@@ -353,11 +332,7 @@ provider 侧那段循环一次都不跑（零成本）。
 
 上表是**当前可解析的全部行前缀 = 33 个**（`wal_op.cpp` 的 `TYPE_MAP`，不含只作哨兵的
 `INVALID`）。**数的是前缀个数，不是表格行数** —— `REMOVE_FILE` / `REMOVE_DIR` 那一行装了
-**两个**前缀（订正 2026-09-26：本句原先写"28 个"，那是数了**表格行**）。
-2026-09-25 订正：原文只列 24 行、且把 `REMOVE_FILE`/`REMOVE_DIR` 当成现行
-的写出行（实际是只解析的旧名），并漏掉了 `DIR_RM` 与三条 `RESTORE_*_RM`。
-2026-09-26 新增 4 个：`DIR_META` / `XATTR_SET` / `XATTR_NEW`（目录状态的**改前**值，
-见 §3.8）与审计行 `RESTORE_DIRSTATE`。
+**两个**前缀。
 （示例章节里 `BACKUP <src> → <dst>` 的 `dst` **落点**从简写成原位兄弟名；实际备份落在
 每文件系统 stash `<fsroot>/.lpkg_bak_<pkg>_<pid>/`，见 §3.6、§3.6.1 第 8 条。）
 
@@ -367,15 +342,13 @@ provider 侧那段循环一次都不跑（零成本）。
 > **WAL 文件自身的目录项**（父目录 dentry）只在"本次调用**创建**了该文件"时才多一次
 > `fsync_parent_dir()`（`wal::open_wal_append` 用 `O_CREAT|O_EXCL` 原子判定）—— 那也是
 > 恒生效（套 `DurableFsyncGuard`），但**不是每行都做**：文件已存在时目录项早在别处落过
-> 盘，每行再 fsync 一次父目录纯属白付（实测占全部 fsync 的 34%~40%）。
+> 盘，每行再 fsync 一次父目录纯属白付（占全部 fsync 的 34%~40%）。
 >
-> ⚠️ **订正 2026-09-26：上面这条"只有新建时才做"只适用于两条路径，不适用于 `WalWriter`。**
-> 三条写入路径里 ——
-> · `wal::log_wal_line`（`transaction_log.cpp`）与 `wal_append_raw`（`wal_op.cpp`）走
->   `open_wal_append()`（`O_CREAT|O_EXCL` ⇒ 原子判出是否新建）⇒ **只有新建时**才多一次父目录 fsync；
-> · **`WalWriter` 构造走的是裸 `::open(O_WRONLY|O_APPEND|O_CREAT|O_CLOEXEC)`**（无 `O_EXCL`、
->   没有 created 判定），并且**无条件** `fsync_parent_dir()`。原文那半句写在同段里紧跟着
->   "`WalWriter` 构造每批只走一次，保持原样（无条件）"，**自相矛盾** —— 现按代码写准。
+> **"只有新建时才做"这条只适用于两条路径** —— `wal::log_wal_line`（`transaction_log.cpp`）
+> 与 `wal_append_raw`（`wal_op.cpp`）走 `open_wal_append()`（`O_CREAT|O_EXCL` ⇒ 原子判出是否
+> 新建）⇒ **只有新建时**才多一次父目录 fsync。**`WalWriter` 构造是例外**：它走裸
+> `::open(O_WRONLY|O_APPEND|O_CREAT|O_CLOEXEC)`（无 `O_EXCL`、没有 created 判定），并且
+> **无条件** `fsync_parent_dir()`（每批一次，代价可忽略）。
 > 两者共同的、真正恒成立的那一半是：**套 `DurableFsyncGuard`、不受 `durable_fsync_enabled()`
 > 影响**。
 
@@ -386,12 +359,12 @@ provider 侧那段循环一次都不跑（零成本）。
 | 标签 | 含义 |
 |------|------|
 | `:batch-start` | 批次开始前的状态（**唯一**的还原点） |
-| `:batch-end` | 批次末尾、提交前的状态（2026-10-03 新增，每批次一次） |
+| `:batch-end` | 批次末尾、提交前的状态（每批次一次） |
 
-订正 2026-10-03：原表还有 `<pkg>:installed` 与 `<pkg>:removed`（逐包落盘的形态）——
-**"已取消"只对 DB 文件一族成立**（`pkgs` / `files.db` / `provides.db` / `confhashes.db` /
-`xattrkeys.db` / `holdpkgs`）：它们现在每批次只落盘两次（见 §3.1 的调用时机与 §4.3）。
-⚠️ **`<pkg>:installed` 与 `<pkg>:removed` 对包级元数据文件仍然在使用，并未取消** ——
+就 **DB 文件一族**（`pkgs` / `files.db` / `provides.db` / `confhashes.db` /
+`xattrkeys.db` / `holdpkgs`）而言，里程碑只有 `:batch-start` 与 `:batch-end` 两个，每批次只落盘
+两次（见 §3.1 的调用时机与 §4.3）—— **没有** `<pkg>:installed` / `<pkg>:removed` 这种逐包里程碑。
+⚠️ **但 `<pkg>:installed` 与 `<pkg>:removed` 对包级元数据文件仍在使用** ——
 `deps` / `needed_so` / `man` 是**另一套机制**（`wal::write_string_file_wal`，单文件、几百字节、
 批次中途会被读）：**安装/升级**时落盘用里程碑 `<pkg>:installed`
 （`installation_task_register.cpp` 的三个调用点），**卸载**时删除用 `<pkg>:removed`
@@ -409,8 +382,7 @@ provider 侧那段循环一次都不跑（零成本）。
 ```
 ^ 这个文件的内容是"**批次开始之前**的 pkgs 内容"。
 
-（订正 2026-10-03：原例写的是 `...:A:installed`，内容为"安装 A 之前" —— 那是逐包落盘时代的
-形态。就 **DB 一族**而言，现在每批次只产生 `:batch-start` 与 `:batch-end` 两个里程碑的备份。
+（就 **DB 一族**而言，每批次只产生 `:batch-start` 与 `:batch-end` 两个里程碑的备份。
 ⚠️ 同一套 `.lpkg_db_bak_before:<milestone>` 命名也被包级**元数据文件**（`deps`/`needed_so`/`man`）
 使用，它们的后缀仍是 `:<pkg>:installed` / `:<pkg>:removed`（见 §2.2）—— 别把这条当成"再没有
 元数据文件备份"。）
@@ -432,8 +404,6 @@ DB /var/lib/lpkg/files.db :batch-end
 DB /var/lib/lpkg/confhashes.db :batch-end  ←（见 §6.3）
 COMMIT_PKGS                          ← fsync
 ```
-> 订正 2026-10-03：原示例逐包写 `... curl:installed`（每库三条）。现在 DB 每批次只写
-> `:batch-start` 与 `:batch-end` 两轮（见 §3.1 的调用时机），所以示例里那三条变成了上面这样。
 
 **批量 [A, B] 中 B 失败 → 全批次回滚（含 RESTORE 审计）**：
 ```
@@ -482,9 +452,8 @@ ROLLBACK curl 8.11.1                   ← fsync
 END curl 8.11.1                        ← fsync
 COMMIT_PKGS                           ← fsync
 ```
-> 订正 2026-09-26：原文这一行写的是 `DB /var/lib/lpkg/pkgs curl:installed ← 恢复到安装状态`
-> —— **代码永远不会写那一行**（回滚期的 milestone 只有 `:batch-start` 一个值；`curl:installed`
-> 是**正向** DB 行的形态）。另外：本批若有 `DB`/`DBNEW`/`DBRM` 行，它们的逆操作会先产出
+> 回滚期写的 DB 行 milestone **恒为** `:batch-start` 这一个值（`curl:installed` 那样的值是
+> **正向** DB 行的形态，回滚期不会写）。另外：本批若有 `DB`/`DBNEW`/`DBRM` 行，它们的逆操作会先产出
 > `RESTORE_DB <path>.lpkg_db_bak_before:<milestone> → <path>` 审计行（本示例的批次里没有 DB 行，
 > 故不出现）。顺序按 `batch_rollback()` 的实现：`reverse_execute` → `purge_consumed_stashes`
 > → `cache.write(":batch-start")` → 逐包 `ROLLBACK`/`END` → `COMMIT_PKGS`。
@@ -512,12 +481,11 @@ COMMIT_PKGS
 ### 2.5 RESTORE 审计行在二次回滚中的作用
 
 > ⚠ 本节标题里的"作用"要按现行实现读：RESTORE 行**不参与恢复决策**（一律被跳过，§10.3），
-> 它们的价值是**审计与取证**；下面的例子演示的是"**靠正向行的备份是否还在**收敛"这个过程。
-> 2026-09-25 订正前的原文把 3/4 两步写成"遇到 RESTORE_DB 就跳过 / 遇到 BACKUP 就还原"，
-> 读起来像按行类型分流 —— 实际分流只由 `skip_in_reverse()` 做一次。
+> 它们的价值是**审计与取证**；下面的例子演示的是"**靠正向行的备份是否还在**收敛"这个过程
+> —— 分流只由 `skip_in_reverse()` 做一次，不按行类型各分一路。
 
 假设 rollback 中途崩溃（示例取"批次末尾那次 DB 写已落、提交前崩溃"这一轮，
-所以 WAL 里有 `:batch-end` 的 DB 行 —— 这是 2026-10-03 之后唯一会带 DB 行的正向场景）：
+所以 WAL 里有 `:batch-end` 的 DB 行 —— 这是唯一会带 DB 行的正向场景）：
 ```
 BEGIN_PKGS
 ... (install A, B fails) ...
@@ -548,12 +516,12 @@ RESTORE_DB /var/lib/lpkg/pkgs.lpkg_db_bak_before::batch-end → /var/lib/lpkg/pk
 
 **目标**：修改 DB 文件（如 pkgs、files.db、confhashes.db）
 
-> **调用时机（2026-10-03 改）**：每个**批次**只调它**两次** —— `BEGIN_PKGS` 之后的
+> **调用时机**：每个**批次**只调它**两次** —— `BEGIN_PKGS` 之后的
 > `Cache::write(":batch-start")`，以及提交之前的 `Cache::write(":batch-end")`
 > （`package_manager.cpp` 的 `write_batch_db`，install / upgrade / remove 三条路径共用）。
 > **曾经是逐包调用**（`Cache::write("<pkg>:installed")`）：每包把 6 个库全量重写一遍、
-> 各留一份全量备份 —— 本机实测 `files.db` 19.8 MB / 286k 行（744 包装机）⇒ 100 包批次
-> 在 `/var/lib/lpkg` 落下 ~2 GB 临时备份、整仓升级 ~15 GB。改成一次的依据有两条，都查实过：
+> 各留一份全量备份 —— 本机 `files.db` 19.8 MB / 286k 行（744 包装机）⇒ 100 包批次
+> 在 `/var/lib/lpkg` 落下 ~2 GB 临时备份、整仓升级 ~15 GB。改成一次的依据有两条：
 > ① 批次进行中**没有任何读取器**读盘上的 DB（`Cache::load()` 的调用点全在批次之外，
 > 循环内一律走内存 `Cache`）；② 未提交批次**一律整体回滚**，中途的盘上状态既不可观测、
 > 也不可能成为最终状态。
@@ -608,9 +576,6 @@ RESTORE_DB /var/lib/lpkg/pkgs.lpkg_db_bak_before::batch-end → /var/lib/lpkg/pk
   "回滚成功"分支、`recover_packages()`（没有未完成批次时，以及全部批次都恢复成功时）、
   `main_cli.cpp` 的 `lpkg rec` 分支。
 
-（2026-09-25 订正：本节原先是设计笔记口吻——"需要一个 `cleanup_db_backups()`……实现需要重写
-——旧实现已被删除"，且没提门控。函数早已落地，此处改为描述现行行为。）
-
 ### 3.2 文件 BACKUP 操作（install/remove 备份）
 
 **当前顺序（write-ahead）**——实现在 `detail::OpSink::backup_impl()`
@@ -633,21 +598,12 @@ RESTORE_DB /var/lib/lpkg/pkgs.lpkg_db_bak_before::batch-end → /var/lib/lpkg/pk
 会发生**"，所以"行在、备份不在"时回滚侧一律当作"还没做"（跳过即幂等），不存在"文件被搬走
 了、WAL 里却没人知道"的窗口。
 
-> **历史（已被本节自身推翻，勿再照做）**：本节原先描述的是"先 `rename`、后写 WAL"的顺序，
-> 并自己推导出该顺序的漏洞 —— 崩在两者之间时文件已进了 `.lpkg_bak`、WAL 里却没有 BACKUP
-> 条目，恢复引擎无从知道这个文件存在（原文件永久留在 bak 里）。当时的结论就是"文件操作也
-> 用 write-ahead"，现已落地为上面那份顺序；旧推演段保留在此仅作记录。
-> （另：旧文里 `.lpkg_bak_<pkg>` 是**原位兄弟名**，现行落点是每文件系统 stash
-> `<fsroot>/.lpkg_bak_<pkg>_<pid>/`，见 §2.1 表下的注与 §3.6.1 第 8 条。）
-
 ### 3.3 COPY 操作（install 复制文件）
 
 ```
  1. copy src → dst.lpkgtmp  （+ xattr/属主/权限）
  2. fsync：dst.lpkgtmp      —— `installation_task_copy.cpp` 的 `stage_regular_file()` 里显式的
-                              if 块，**受 --fsync 开关控制**（订正 2026-09-26：原文指成
-                              `installation_task.cpp`，该文件已按趟拆成 4 个 TU）
-                                （默认不 fsync；§1.6）
+                              if 块，**受 --fsync 开关控制**（默认不 fsync；§1.6）
  3. WAL：写入 COPY src → dst  （write-ahead：`OpSink::commit_copy` 内）
  4. fsync：WAL 行（恒生效）
  5. rename dst.lpkgtmp → dst
@@ -691,9 +647,8 @@ reverse_execute 遇到 NEW_DIR：
   → 非 symlink && 存在 && 是真目录 && 为空 → rmdir + RESTORE_DIR_RM
   → 其余情况一律跳过（不删）
 ```
-（订正 2026-09-25：原文只写"删除目录（仅当为空时）"，漏了"剥尾斜杠 + 非 symlink + 真目录"
-三道守卫；`wal_op.cpp` 的 NEW_DIR 分支有它们，回归测试见
-`tests/unit/test_wal_newdir_symlink_guard.cpp`。）
+（`wal_op.cpp` 的 NEW_DIR 分支有"剥尾斜杠 + 非 symlink + 真目录"三道守卫，
+回归测试见 `tests/unit/test_wal_newdir_symlink_guard.cpp`。）
 
 ### 3.6 目录的处置（取代旧的 RM_DIR / "目录 BACKUP"）
 
@@ -705,10 +660,10 @@ reverse_execute 遇到 NEW_DIR：
    **仅最后持有者**（`cache.get_file_owners(key)` 摘掉本包后为空）、**盘上是真目录**
    （`lstat` 语义，`!fs::is_symlink`）、**此刻为空**（`fs::is_empty`）。三条都过才调
    `OpSink::remove_empty_dir()`：WAL `DIR_RM <path> <mode> <uid> <gid>` → `rmdir`。
-   **目录若带 xattr，每一键先写一行 `XATTR_SET`（2026-09-26 补）**：`DIR_RM` 只带
+   **目录若带 xattr，每一键先写一行 `XATTR_SET`**：`DIR_RM` 只带
    mode/uid/gid，而回滚的 `RESTORE_DIR` 只重建目录 + 恢复元数据 ⇒ 重建出来的目录会**丢掉整份
    xattr**（而目录 xattr 正是 POSIX ACL 与 SELinux 标签的存放处）—— 与当初为目录元数据补
-   `DIR_META` 是**同一族缺口**，只是长在**移除侧**（属性测试的 xattr 维度实测命中 2/32 种子）。
+   `DIR_META` 是**同一族缺口**，只是长在**移除侧**（属性测试的 xattr 维度命中 2/32 种子）。
    **行序是承重的**：`XATTR_SET…` 必须在 `DIR_RM` **之前** —— 逆序回滚才会"先重建目录、
    **再**写回各键"，正好落在重建好的目录上；反了就会打在还不存在的路径上、被
    `Guard::RealDir` 判否跳过 ⇒ **行写了、值没回来**（比不记还坏）。
@@ -721,9 +676,7 @@ reverse_execute 遇到 NEW_DIR：
    - upgrade 侧：`installation_task_letgo.cpp` 的 `remove_obsolete_files()`：阶段 1
      （`obsolete_files_pass`，废弃文件）/ 阶段 2（`obsolete_dirs_pass`，废弃目录，内部按路径
      长度降序排序 = 最深优先）。**它跑在写入之前**（让开趟的②b），见 §6.2。
-     （订正 2026-09-26：原文写"`installation_task.cpp` 的 `commit_without_file_ops()` 阶段 1/2"
-     —— 文件与函数名都已移动：`commit_without_file_ops()` 现在只有注册 + hooks 两件事。）
-   - **upgrade 侧专有的第四道守卫（订正 2026-09-26 补）："新版本在该目录下仍有条目 → 跳过"。**
+   - **upgrade 侧专有的第四道守卫："新版本在该目录下仍有条目 → 跳过"。**
      因为这一趟现在跑在**写入之前**，而"此刻为空"的原判据（跑在写入**之后**时）会因新版本
      刚写进去的内容而非空 ⇒ 原口径下这种目录本就被跳过；提前看它还是空的，会被 `rmdir` 掉、
      紧接着又被写入趟重建（丢原 mode/uid、白写两条 WAL）。所以显式排除
@@ -745,20 +698,17 @@ reverse_execute 遇到 NEW_DIR：
 恒返回 EBUSY，因此在写 WAL **之前**就判掉（`is_mount_point`）并报告
 `SkippedMountPoint`，由调用方告警保留（对齐 pacman 对目录型 mountpoint 的语义）。
 
-> ⚠ **历史形态（已不存在，别再照做）**：本节原先描述的是"逐目录整树 `rename` 成单个
-> `.lpkg_bak`"，函数 `detail::backup_dir_tree_whole(dir, pkg, op, backups)`，配一套"目录此刻
-> 必须是**纯本包残留**"的判据（每个直接子项的文件名都带本包 `.lpkg_bak_<pkg>_` 标记）。
-> 该函数**已从全仓删除**（`pkg/install_common.{hpp,cpp}` 里没有它，`grep` 只剩本文档与
-> `tests/integration/test_upgrade_obsolete_dir_cleanup.cpp` 的一处头注释，那处注释同样待订正）。
-> 按本节旧描述去改代码会重新引入"整树 rename 掉共享祖先目录"的老缺陷。
-> **旧模型为什么被换掉**：整树 rename 依赖"直接子项全是本包 bak"这个判据，而它又依赖
-> "本包文件已全部先 rename 成 bak"；**升级**那段当时把目录删除混进了文件循环 + 单层
-> `is_empty` 判空 —— 刚 rename 的 bak 正占着目录，判"非空"必被跳过 → 嵌套第 2 层 owned
-> 目录（如 `dist-info/licenses/`）永远删不掉，下游构建一探测 site-packages 的 dist-info 就崩。
-> 换成"文件搬进 stash（不在原目录占位）→ 目录天然空 → 最深优先 rmdir"之后，这个嵌套空壳
-> 问题**从机制上**消失（`tests/integration/test_upgrade_obsolete_dir_cleanup.cpp` 钉住）。
+> ⚠ **别回到"逐目录整树 rename"的旧模型**：那套模型把目录整树 rename 成单个 `.lpkg_bak`
+> （函数 `detail::backup_dir_tree_whole`，配"目录此刻必须是**纯本包残留**"的判据 —— 每个直接
+> 子项的文件名都带本包 `.lpkg_bak_<pkg>_` 标记）。该函数**已从全仓删除**；按它去改代码会重新
+> 引入"整树 rename 掉共享祖先目录"的老缺陷。
+> **它为什么不行**：整树 rename 依赖"本包文件已全部先 rename 成 bak"，而**升级**那段曾把目录
+> 删除混进文件循环 + 单层 `is_empty` 判空 —— 刚 rename 的 bak 正占着目录，判"非空"必被跳过 ⇒
+> 嵌套第 2 层 owned 目录（如 `dist-info/licenses/`）永远删不掉，下游构建一探测 site-packages
+> 的 dist-info 就崩。换成"文件搬进 stash（不在原目录占位）→ 目录天然空 → 最深优先 rmdir"之后，
+> 这个嵌套空壳问题**从机制上**消失（`tests/integration/test_upgrade_obsolete_dir_cleanup.cpp` 钉住）。
 
-#### 3.6.1 目录与符号链接的判定（对齐 pacman，2026-09 起）
+#### 3.6.1 目录与符号链接的判定（对齐 pacman）
 
 事故背景：发行版布局 `/var/run -> ../run`，某包归档里带实体 `var/run/` 目录条目，
 reinstall 后符号链接被 rename 进 stash、再建出实体目录（系统布局被毁）。
@@ -774,8 +724,7 @@ reinstall 后符号链接被 rename 进 stash、再建出实体目录（系统�
    于是**判定类调用全部落到链接的目标上** —— `is_symlink` 对 `/x/link/` 恒假（尾斜杠强制
    解引用）、`is_empty`/`exists`/`fs::is_directory` 读的都是链接**目标**的状态，判据错在
    **对象**上，决策随之错（"链接目标恰好是空目录"会被当成"我们建的那个目录空了"）。
-   **订正（2026-09-25，以真实 syscall 实测为准）**：原文此处写"`rmdir` 也落到目标上、
-   实测会把 `/var/run` 指向的真实 `/run` 删掉"—— **不成立**。Linux 上 `rmdir("link/")`
+   Linux 上 `rmdir("link/")`
    与 `rmdir("link")` 都返回 **ENOTDIR**（内核拒绝，**不跟随**末段符号链接），
    `remove("link/")`（unlink 路径）同理；没有任何路径能让 `rmdir` 删掉符号链接的**目标**
    目录。真正会"穿过去"的是 **`chmod`/`lchown`**：`chmod("link/", 0700)` 成功且改的是
@@ -806,15 +755,15 @@ reinstall 后符号链接被 rename 进 stash、再建出实体目录（系统�
    （`alpm_trans_commit` 先 `_alpm_sync_check` 整笔 `trans->add`，"要么全不动要么全动"）
    同构；批次循环内逐包的 `check_for_file_conflicts` 保留为**第二道防线**（预检算漏的、
    预检之后中途状态变了的）。
-4. **豁免有两条（订正 2026-09-26：原文写"**唯一**豁免"，漏了反方向那一条）**：
+4. **豁免有两条**：
    **(a) 该路径由本包以另一形态持有**（旧版发文件/链接、新版发目录）→ 文件→目录升级
    （E4）照旧接管；对应 pacman 的 "Check if the directory was a file in dbpkg"。
    **(b) 盘上是真目录、归档是文件/符号链接（即第 3 条被拒的那一格）—— 当该目录整棵子树
    （递归）里的每个条目都属于"本包"或"本批次正在升级的包"时放行接管**：
    `dir_tree_entirely_ours()`（`installation_task.cpp`，对齐 pacman `conflict.c:
    dir_belongsto_pkgs`），判据是 `dir_takeover`，放行后**必须跳出**该路径后续的检查
-   （**⚠️ 它算条目的 DB 键必须用 `lexically_relative`，不能用 `fs::relative`**（2026-09-26 第三轴
-   审计修复）：后者**解析符号链接（含末段）** ⇒ 查的是**链接目标**的归属。后果一：树里有"别的包
+   （**⚠️ 它算条目的 DB 键必须用 `lexically_relative`，不能用 `fs::relative`**：后者**解析符号链接
+   （含末段）** ⇒ 查的是**链接目标**的归属。后果一：树里有"别的包
    持有、解析目标归本包"的链接 ⇒ 判"整树都是我们的" ⇒ 整树搬走 ⇒ 提交后 stash 被 `remove_all`
    ⇒ **别人那份文件永久消失而它的 DB 归属还在原位**（正是这个函数存在的唯一意义所在）。后果二：
    中间段是链接（usr-merge `/bin`→`usr/bin`）⇒ 键查不到 ⇒ 判"无主" ⇒ 拒绝本可放行的升级。
@@ -843,7 +792,7 @@ reinstall 后符号链接被 rename 进 stash、再建出实体目录（系统�
    解压只会把它建成一条链接（`SECURE_SYMLINKS` 拦的是"穿过链接去写"，不拦"创建这条链接"），
    而 `scan_content_files` 的 `recursive_directory_iterator(content_dir)` 会**跟随起点目录**
    去枚举链接目标，于是**安装机上**的文件被当成"包内容"登记、复制进目标 root
-   （2026-10-02 端到端复现：包 owning 外部目录里的文件）。判据：`extract_and_validate_package`
+   （端到端复现：包 owning 外部目录里的文件）。判据：`extract_and_validate_package`
    要求 `content` 是**真目录**、`metadata.json` 是**真文件**（lstat 语义），`scan_content_files`
    再兜一道（根不是真目录即抛 `error.content_not_directory`）。⚠️ 与"包内**成员**是绝对链接"
    区分：后者**合法**、照旧保留（见 §6.3 的 `AbsoluteSymlinkTargetIsPreservedAsIs`）。
@@ -858,21 +807,18 @@ reinstall 后符号链接被 rename 进 stash、再建出实体目录（系统�
    `remove_empty_dir`（`DIR_RM` → `rmdir`）、`commit_copy`（`COPY` → rename）、
    `un_stash`（`UNSTASH` → rename 回原位；第③步引入，逆向见 §9.2）。
    **新增"文件操作 + 它的 WAL 行"一律加在这里**，不要回到调用点写成对语句。
-   （订正 2026-09-25：原列表漏了 `save_config` —— 它同样是"WAL 行 + 物理 rename"成对的入口。）
-   （补充 2026-09-26：`un_stash` 同属此列；并且**凡碰文件系统的方法都在内部 `strip_trailing_slash`**
-   —— 这条契约现在 `save_config` 与 `un_stash` 也满足了。）
+   （`save_config` 同样是"WAL 行 + 物理 rename"成对的入口，`un_stash` 同属此列；并且**凡碰文件
+   系统的方法都在内部 `strip_trailing_slash`**。）
    （DB 一族 —— `DB`/`DBNEW`/`DBRM` 的 row + `safe_rename` —— 是**另一个**已文档化的入口点，
    分布在 `db/wal_op.cpp`、`db/cache.cpp` 与 `package_manager.cpp` 的 `cleanup_with_dbr`：
    它们没有 stash 记账、落点是与目标同级的 `.lpkg_db_bak_before:<milestone>` 兄弟名，
    形状与本层不同。要收拢它们得单开一层，别顺手塞进 `OpSink`。）
 
-> ⚠ **历史形态的另一半（同样已不存在）**：旧模型里还曾有一条**递归判据** ——"子树里没有
-> 其他包登记的内容即可删"。它会递归下探，把共享祖先下、包只作**普通目录持有者**的
-> `usr/share/lpkg/docs` 等 lpkg 自身状态目录当"无主空壳"删掉（`make test` 多处回归：
-> 保留 conffile / reinstall / SIGINT 三套用例一起炸）。**规则订正**：无主内容宁留不删 ——
-> 现行判据只看**该目录自己是否为空 + 本包是不是它的最后持有者**，绝不递归下探（见本节开头的
-> 三条判据）。升级侧原先另写一套"文件循环 + 单层 `is_empty` 判空"（就是嵌套 owned 目录删不掉
-> 的来源），现在与 remove 侧共用同一套阶段 ——"最深的统一"从承诺变成事实。
+> ⚠ **别用"递归判据"删目录**：曾有一条"子树里没有其他包登记的内容即可删"的递归判据，它会递归
+> 下探，把共享祖先下、包只作**普通目录持有者**的 `usr/share/lpkg/docs` 等 lpkg 自身状态目录
+> 当"无主空壳"删掉（`make test` 多处回归：保留 conffile / reinstall / SIGINT 三套用例一起炸）。
+> **现行规则：无主内容宁留不删** —— 只看**该目录自己是否为空 + 本包是不是它的最后持有者**，
+> 绝不递归下探（见本节开头的三条判据）。升级侧已与 remove 侧共用同一套阶段。
 
 ### 3.7 DBRM 操作
 
@@ -892,16 +838,16 @@ reinstall 后符号链接被 rename 进 stash、再建出实体目录（系统�
 - 3-4 之间：WAL 有记录，文件已 rename。恢复时找备份存在 → rename 回。**正确**。
 
 
-### 3.8 目录状态的改前值（2026-09-26 新增：`DIR_META` / `XATTR_SET` / `XATTR_NEW`）
+### 3.8 目录状态的改前值（`DIR_META` / `XATTR_SET` / `XATTR_NEW`）
 
 **为什么需要这三行**：目录是**就地改活对象** —— 与普通文件不同，没有"先写 `.lpkgtmp` 再
 rename"那层保护（旧文件的 inode 被 `BACKUP` 搬进 stash 保住了，新文件是**另一个** inode）。
 `write_dir_entry()` 与 `let_go_make_dir()` 直接对**活着的**目录调 `lchown`/`chmod`/
-`copy_xattrs`，在 2026-09-26 之前**一个 WAL 行都不写** ⇒ 注入失败回滚后该目录保持**新**的
+`copy_xattrs`，此前**一个 WAL 行都不写** ⇒ 注入失败回滚后该目录保持**新**的
 mode/uid/xattr，违反 §5.4 不变量 3（终态 == 事务开始时的盘面）。不是潜伏问题：任何"新版本改了
 某个已存在目录的 mode"的批次失败都会踩到。
 
-**字段解析必须是严格十进制**（2026-10-03 修）：`DIR_META` 的 mode/uid/gid 三个字段由
+**字段解析必须是严格十进制**：`DIR_META` 的 mode/uid/gid 三个字段由
 `wal_op.cpp` 的 `parse_decimal_strict()`（`from_chars`，整串必须都是数字、且不越界）解析，
 **不是** `std::stoul` —— 后者对这两类坏输入**都不抛**，于是"解析失败就留 `-1` 哨兵"这句注释
 形同虚设：`stoul("-1")` 回绕成 `ULONG_MAX`、`& 07777` 之后正好是 `07777`
@@ -937,7 +883,7 @@ mode/uid/xattr，违反 §5.4 不变量 3（终态 == 事务开始时的盘面�
 `symlink→目录`（`/lib64 -> usr/lib`、`/var/run -> ../run`）时内容要**穿过**链接写进真实目录，
 但目录条目的 uid/mode/xattr **不能**跟着穿过去（lchown/chmod/lsetxattr 在带尾斜杠时会落到
 **链接目标**上，把**别的包持有的**目录改成包内值）。判据一律用**剥过尾斜杠**的 `probe`：
-`fs::is_symlink("link/")` 会**跟随**尾斜杠（实测返回 false），用带斜杠的形态守卫会失效。
+`fs::is_symlink("link/")` 会**跟随**尾斜杠（返回 false），用带斜杠的形态守卫会失效。
 
 **窗口断点**：三个原语都收 `after_wal_breakpoint`，调用点传
 `dirmeta_after_wal_<pkg>` / `xattrset_after_wal_<pkg>` / `xattrrm_after_wal_<pkg>`（断点清单见
@@ -974,8 +920,7 @@ struct DbMilestone {
 
 ### 4.3 写入规则
 
-每次 `Cache::write(<milestone>)` 写的是 **6 个库**（订正 2026-09-26：原文没有这份清单，而
-"5 个"的说法散在全文各处 —— `xattrkeys.db` 于 2026-09-26 加入）：`pkgs`、`files.db`、
+每次 `Cache::write(<milestone>)` 写的是 **6 个库**：`pkgs`、`files.db`、
 `provides.db`、`confhashes.db`、**`xattrkeys.db`**（§6.3.1）、`holdpkgs`。
 每个库各写一条**同里程碑**的 `DB` 行（`write_db_file_wal` / `write_set_file_wal`）。
 
@@ -985,21 +930,19 @@ struct DbMilestone {
 | 批次末尾（提交前） | `Cache::write(":batch-end")` | "本批次全部改动已生效"的状态（**每批次一次**） |
 | 回滚后 | `Cache::write(":batch-start")` | 回到初始状态 |
 
-订正 2026-10-03：原表里的"安装完成包 A → `A:installed`"与"移除完成包 A → `A:removed`"
-**已取消** —— 但**仅指 DB 一族**（本表说的就是 `Cache::write` 写的 6 个库）：DB 不再逐包落盘
-（理由见 §3.1 的调用时机）。就 DB 而言里程碑名只剩 `:batch-start`（批次前）、`:batch-end`
-（批次末）与回滚后的 `:batch-start`。`DbMilestone::is_batch_start()`
+就 **DB 一族**（本表说的就是 `Cache::write` 写的 6 个库）而言，**没有** `<pkg>:installed` /
+`<pkg>:removed` 这种逐包里程碑：DB 不再逐包落盘（理由见 §3.1 的调用时机），里程碑名只剩
+`:batch-start`（批次前）、`:batch-end`（批次末）与回滚后的 `:batch-start`。
+`DbMilestone::is_batch_start()`
 只认 `batch-start`，所以 `:batch-end` 走的是**普通**处理路径（不是那条"在位即跳过"的判据）——
 这一点是承重的，别把它写成 `:batch-start`。
 ⚠️ **`<pkg>:installed` / `<pkg>:removed` 仍用于包级元数据文件**（`deps`/`needed_so`/`man`，
-经 `wal::write_string_file_wal`：安装/升级写 `installed`、卸载写 `removed`，见 §2.2），
-别把"已取消"套到它们身上。
+经 `wal::write_string_file_wal`：安装/升级写 `installed`、卸载写 `removed`，见 §2.2）——
+"DB 一族没有这两个里程碑"别套到它们身上。
 
 ### 4.4 链式恢复
 
-订正 2026-10-03：本节原先描述的是**逐包里程碑链**（`A:installed` / `B:installed` / … 每份
-备份保存"该里程碑**之前**"的状态，回滚时逐级回退）。DB 改成每批次落盘两次之后，链只剩**两个
-点**，但**回滚的写法与判据一字未改** —— 逆序执行，`DB` 行找它自己的
+DB 每批次落盘两次，链只剩**两个点**；回滚的写法 —— 逆序执行，`DB` 行找它自己的
 `.lpkg_db_bak_before:<milestone>` 还原：
 
 ```
@@ -1025,8 +968,7 @@ WAL 中的 DB 条目（安装 [A, B, C] 的批次，B 失败）：
 `pkgs`/`files.db`/`provides.db`/`provides_soname.db`/`confhashes.db`/`xattrkeys.db`/`holdpkgs` 各写一次，
 见 `cache.cpp`）—— 它们在逆序里排在最后（写得最早），跑到的判据见 §10.2：正式文件**仍在位
 且非空**（= 已被更晚的各里程碑逆操作带回批次起点内容）就跳过；不在位则从该里程碑备份还原；
-**"在位但为空"时要看备份**（订正 2026-09-26：原文只写了"在位且非空 → 跳过 / 不在位或为空 →
-还原"，把四分支压成了两分支）—— **文件空 + 备份也空 → 同样跳过**（两者等价，还省下一条
+**"在位但为空"时要看备份** —— **文件空 + 备份也空 → 同样跳过**（两者等价，还省下一条
 `RESTORE_DB` 审计行）；只有"文件空 + 备份非空"才真的要从备份还原。
 ### 4.5 关键：DB 恢复后必须重载 Cache
 
@@ -1056,9 +998,6 @@ OWNER_OVERRIDE 想在 WAL 中逐条记录"所有权被改了"，回滚时逐条�
   5. cache.write(":batch-start")   ← 写恢复后的状态（6 个库各一条 DB 行）
   6. ROLLBACK/END（每个已回滚包）+ COMMIT_PKGS
 
-（订正 2026-09-25：原文的步骤 2/3 之间漏了 purge_consumed_stashes，且没写"提取为空 →
-return false、不写 COMMIT_PKGS"这条 —— 后者决定调用方能不能清理 DB 备份，见 §9.1。）
-
 --overwrite 豁免的路径直接在内存接管所有权，批次成功则随 DB 写盘持久化，
 批次失败则 DB 恢复 + Cache 重载，所有权自动回到旧值，干净彻底。
 ```
@@ -1079,7 +1018,7 @@ return false、不写 COMMIT_PKGS"这条 —— 后者决定调用方能不能�
  *     BEGIN_PKGS → execute() → COMMIT_PKGS
  *     ├── Cache::write(":batch-start")    ← 批次开始快照（唯一还原点）
  *     ├── for each pkg:                   ← 逐包执行（**不落盘 DB**）
- *     ├── Cache::write(":batch-end")      ← 批次末尾一次（op 自己调，2026-10-03 改）
+ *     ├── Cache::write(":batch-end")      ← 批次末尾一次（op 自己调）
  *     ├── COMMIT_PKGS                     ← 批次完结标记
  *
  *   异常路径（catch）：
@@ -1102,7 +1041,7 @@ std::vector<std::string> run_batch_transaction(OpT&& op);
 ### 5.2 不变量（WAL / 批次级）
 
 - 进入 `run_batch_transaction` 时它自己先 `trim_completed()`（函数第一行；WAL 无未完成事务是它的前提，main 启动时已 `recover_packages()`）。
-- `BEGIN_PKGS` 写入 + fsync 后：异常路径保证 `COMMIT_PKGS` 一定被写入（catch 补写）——**例外有两条**（订正 2026-09-26：原文写"**唯一**例外是 `batch_rollback()` 返回 false"，漏了第二条）：
+- `BEGIN_PKGS` 写入 + fsync 后：异常路径保证 `COMMIT_PKGS` 一定被写入（catch 补写）——**例外有两条**：
   1. `batch_rollback()` 返回 **false**（WAL 里提不出未提交批次的行，比如尾部被写坏）；
   2. **回滚自身抛异常** —— `reverse_execute` 里的 `safe_rename` 失败、`wal_append_raw` 写不进去等都会抛穿 `batch_rollback`，而 `batch_transaction.hpp` 为它写了**专门的 `catch (...)`**：绝不清理 DB 备份、不 `trim_completed`，同样把未提交批次与全部 `.lpkg_db_bak_before:*` / `.lpkg_bak` 原样留给下次 `recover_packages()` 幂等续传。这条分支的存在本身就说明设计上承认"回滚可能失败"（§11.2 的未提交区域定义也以"前一批回滚失败后又开了新批次"为前提）。
   两条都不写 `COMMIT_PKGS`、都不清 DB 备份 —— 这正是"宁可留现场，不可删重试依据"。
@@ -1119,18 +1058,16 @@ std::vector<std::string> run_batch_transaction(OpT&& op);
 | 致命错误 | 整个批次 | 同异常路径 |
 | 断电 | 整个批次 | 下次启动 `recover_packages()` |
 
-> 订正 2026-09-26：第 2 行原文写"**前序已成功包**"，那是把回滚范围写小了一档。`batch_rollback()`
+> **回滚范围是整个批次**：`batch_rollback()`
 > 拿的是 `extract_current_batch_ops()` —— **整批**的行（从批次 `BEGIN_PKGS` 到 EOF），
 > `reverse_execute` 逆序处理**全部**行；`successfully_installed` 只用来决定给哪些包写
 > `ROLLBACK`/`END` **标记**。失败包**自己**那半截文件/DB 操作（它的 `BACKUP`/`COPY`/`NEW`/`DB` 行）
 > 同样必须被撤销 —— 而它的 `rollback_files()` 已经不碰文件系统（只写标记 + 清内存追踪，§6.5），
-> 所以撤销完全依赖 `batch_rollback`。写成"前序已成功包"会让人以为失败包的半成品不被撤。
-> （本条订正原先误插在表格中间、把表切成了两截，2026-09-26 挪到表后。）
+> 所以撤销完全依赖 `batch_rollback`。把它读成"只回滚前序已成功包"会漏掉失败包的半成品。
 
 ### 5.4 路径级不变量（安装/升级；编号 1–6，与上面 §5.2 的批次级不变量是两套）
 
-> **出处**：本节与 §5.5 原在 `REFACTOR-upgrade.md` §4 / §5，2026-09-26 随该文**拆解并入本文**
-> （该文已删除）。下面 **1–5 的编号在代码与测试注释里被按号引用**（形如"不变量 4"）——
+> **编号约定**：下面 **1–5 的编号在代码与测试注释里被按号引用**（形如"不变量 4"）——
 > **改号要连带改全仓引用**。
 
 1. 每个被触碰的路径**恰好被决策表认领一次**（无遗漏、无重复）。`check_decision_invariants()`
@@ -1146,7 +1083,7 @@ std::vector<std::string> run_batch_transaction(OpT&& op);
 5. 不属于本包的路径**永不被移动或删除**（含无主文件、其他包的文件、共享目录）。
    推论（判据见 §6.3 的整树让开许可）：要把一棵**目录树**整体让开/搬走，前提是那棵树里每个
    条目都属于本包或本批次升级的包；否则拒绝并点名**真实**持有者。
-6. **落位目标必须真的落在 root 之内**（2026-10-03 新增）：`root_dir()/rel` 只约束**词法**
+6. **落位目标必须真的落在 root 之内**：`root_dir()/rel` 只约束**词法**
    归属，而拷贝/让开都会**跟随中间段符号链接** —— `--root <R>` 下若盘上已有
    `<R>/usr -> /`（绝对目标链接，成员名消毒**有意**放行），含 `usr/…` 的包就会被写到宿主。
    判据 = `base/utils.cpp` 的 `path_within_resolved(p, root)`（**只解析父目录**，末段一律不
@@ -1156,18 +1093,12 @@ std::vector<std::string> run_batch_transaction(OpT&& op);
 
 ### 5.5 已明确的取舍
 
-- **升级期间被置换的 `/etc` 配置会短暂不在盘上。** 实测规模：本机 **363** 个被包持有的
+- **升级期间被置换的 `/etc` 配置会短暂不在盘上。** 规模：本机 **363** 个被包持有的
   `/etc` 文件；真正会被"进程启动时读"的是 `/etc/ld.so.cache`、`/etc/nsswitch.conf`（glibc）、
   `/etc/pam.d/*`（shadow/util-linux/linux-pam/cups）。失效方向均为 **fail-closed**
   （PAM 缺文件 → 认证失败而非放行），且 lpkg 全程不重启任何服务。这个窗口在让开趟前移
   **之前**就已存在于"用户没改过 → 静默换新版"那条路（同样先搬进 stash），前移只是把它扩展到
-  "用户改过"的两种结果。**已拍板接受。**
-
-> 订正 2026-09-26：原 `REFACTOR-upgrade.md` §5 还有第二条「**不引入**整树 rename
-> （`backup_dir_tree_whole` 那种）」—— **未并入**：那个函数全仓**已不存在**（有测试注释专门
-> 记过这一点），而移除侧的目录清除现在**确实**逐目录整树 rename 成单个 `.lpkg_bak`
-> （见 §3.6）。把它搬进现行规范等于带进一条过期断言，故丢弃。
-
+  "用户改过"的两种结果。**该取舍已被接受。**
 
 ---
 
@@ -1206,7 +1137,7 @@ install_packages(args)
 │   ├── for each pkg in order:
 │   │     task.run(&ctx)                ← 包内 prepare() 的 check_for_file_conflicts
 │   │                                     **第二道防线**（预检算漏的/中途状态变了的）
-│   │     success.push_back(pkg)        ← **不落盘 DB**（2026-10-03 改，见 §3.1）
+│   │     success.push_back(pkg)        ← **不落盘 DB**（见 §3.1）
 │   │
 │   ├── Cache::write(":batch-end")      ← 批次末尾**一次**（write_batch_db）
 │   ├── COMMIT_PKGS                     ← fsync
@@ -1232,35 +1163,31 @@ install_packages(args)
 └── log_summary()                            ← 一条 summary：`:: 已安装 2 个包: app 1.0, libdep 1.0`
 ```
 
-> **订正 2026-09-25**：原图在开头写了 `recover_packages()` / `trim_completed()` 两步、并在
-> 解析参数之后写了一个"一致性重试循环"。两处都与 `install_packages()` 的实际形态不符：
-> WAL 恢复**不在** `install_packages()` 里，而是进程启动时在 `main_cli.cpp` 做一次
+> **WAL 恢复不在 `install_packages()` 里** —— 它是进程启动时在 `main_cli.cpp` 做一次
 > （`init_filesystem()` → `recover_packages()` → `trim_completed()` →
 > `cleanup_orphan_stashes()`）；`trim_completed()` 在本函数里由
-> `run_batch_transaction()` 的第一行再跑一次。而"一致性重试"不是外层循环。
-> **订正 2026-10-03（阶段化）**：那次"在事务内整批回滚"如今也不适用了 —— 校验已移到
-> **事务之前**（阶段的"下载"里，`download_batch()`），不一致时连 `BEGIN_PKGS` 都还没写。
-> 代价是"已经是最新版、本批不会装的包"不再被校验（旧行为会，且可能因索引陈旧报错）。
-> **订正 2026-10-02**：核对结论原为"不一致就 `resolve_with_solver` 重解、`i = 0` 从游标头
-> 重来"，现改为**不一致即抛 `error.metadata_mismatch`**（不再重解 —— 那是手动
-> 解析依赖时代的产物，libsolv 之后批次中途换计划会造成重复安装/顺序倒置/所有权脱节；
-> 理由见 `package_manager.cpp` 的 `verify_package_metadata`）。另外这里写的是 6 个库
+> `run_batch_transaction()` 的第一行再跑一次。**没有**"一致性重试循环"。
+> **元数据校验在事务之前**（阶段的"下载"里，`download_batch()`）：不一致即抛
+> `error.metadata_mismatch`，连 `BEGIN_PKGS` 都还没写，**不重解计划**（重解是手动解析依赖
+> 时代的产物，libsolv 之后批次中途换计划会造成重复安装/顺序倒置/所有权脱节 —— 理由见
+> `package_manager.cpp` 的 `verify_package_metadata`）。代价是"已经是最新版、本批不会装的包"
+> 不再被校验（旧行为会，且可能因索引陈旧报错）。另外这里写的是 6 个库
 > （`pkgs`/`files.db`/`provides.db`/`confhashes.db`/`holdpkgs`），不是只有 `pkgs`。
 
 ### 6.2 包级安装
 
-**metadata 的"分帧敏感"字段要消毒**（2026-10-03 新增，2026-10-04 加 `provides_soname`）：`deps` / `provides` / `provides_soname` / `needed_so`
+**metadata 的"分帧敏感"字段要消毒**：`deps` / `provides` / `provides_soname` / `needed_so`
 的每一条必须是**单行、无控制字符**（`\0` `\n` `\r` `\t`），否则**整包拒绝**
 （`error.unsafe_metadata_field`，点名文件/字段/偏移）。理由与归档**成员名**消毒同款，只是
 作用于**内容**而不是名字：`deps/<pkg>`、`needed_so/<pkg>` 一行一条（`\n` 注入 ⇒ 读回时凭空
 多出一个依赖/一条 SONAME），`provides.db` 是 `<capability>\t<pkgs>`（`\t` 注入 ⇒ 键被截断、
-提供者串错位）。实测后果是**假满足依赖**（`dep_satisfied_on_disk()` 只看"这个 capability 有
+提供者串错位）。后果是**假满足依赖**（`dep_satisfied_on_disk()` 只看"这个 capability 有
 没有提供者"）与**反向依赖图污染**（阻止正常卸载）。校验点 = `read_package_metadata()`
 （metadata 解析的唯一出口）—— 仓库来源的包另有一道"与索引逐字段比对"，但本地 `.lpkg` 走不到
 那里。**只拒控制字符，不拒 `,`**：依赖串允许带约束（`"cmake >= 3.20, < 4.0"`，见
 `vercmp/dep_parser.cpp`）。
 
-> **第③步之后的两趟结构（2026-09-26）**：一次升级 = **先移除旧版本的全部触碰面**（让开趟：
+> **第③步之后的两趟结构**：一次升级 = **先移除旧版本的全部触碰面**（让开趟：
 > `backup_existing_files()` 处理归档条目 + `remove_obsolete_files()` 处理 DB 旧键）
 > **再安装新版本**（写入趟），同一个 WAL 批次内完成。让开趟与写入趟的"这个路径归谁处理、
 > 做什么"由**唯一一份决策表**决定：`detail::decide_path(const PathFacts&) → PathDecision`
@@ -1307,16 +1234,14 @@ InstallationTask::run(ctx)
 │   ├── 废弃目录，非 /etc（最深优先、仅最后持有者、必须已空 **+ 新版本在该目录下没有条目**）:
 │   │     WAL: DIR_RM <dir> <mode> <uid> <gid>  ← fsync → rmdir
 │   ├── /etc 的废弃**文件/符号链接**: WAL: SAVE_CONF <src> → <dst> ← fsync → rename 成
-│   │     `<路径>.lpkgsave`，**再**撤所有权 + 撤配置哈希记录（订正 2026-09-26：原文写
-│   │     "/etc 废弃条目只撤所有权、不搬不删"，那是**旧政策**；维护者已改成 `.lpkgsave`）
+│   │     `<路径>.lpkgsave`，**再**撤所有权 + 撤配置哈希记录
 │   ├── /etc 的废弃**目录**: **只撤所有权 + 撤记录，不搬、不删**（有意保留 —— 移除侧对
 │   │     `/etc` 目录本来也是"宁可不碰、只告警"；目录**里面**的文件按上一行改名）
 │   └── 撤销本包持有、且新版本不再声明的**目录 xattr 键**（WAL 先记旧值，§6.3 / §3.8）
 │
 ├── copy_package_files()
 │   ├── for each file:
-│   │     （/etc 条目的分流见 §6.3，现行规则是**按类型是否变化**分派 —— 订正 2026-09-26：
-│   │       原文这里只写了三哈希的三条路，那是"类型未变"那一半）
+│   │     （/etc 条目的分流见 §6.3，现行规则是**按类型是否变化**分派）
 │   │     ⚠️ 第③步之后：让开趟**已经**把要碰的旧路径清掉了（"先移除旧版本的全部触碰面"），
 │   │        所以 ②③ 两条"保留"路今天要先 `WAL: UNSTASH <bak> → <orig>` 把那份**搬回原位**
 │   │        （见 §9.2 操作表里的 `UNSTASH` 行）。类型变化与 `InstallNew` 则**就地**落新内容。
@@ -1326,9 +1251,8 @@ InstallationTask::run(ctx)
 │   │     rename dst.lpkgtmp → dst
 │   │     fsync 父目录（默认不生效，§1.6）
 │   │     （目录条目：元数据与 xattr 经 §3.8 的三个原语 —— **先写改前值再动盘**）
-│   └── ┌─ 异常（**②③④ + COMMIT + END** 整段的 try 块，订正 2026-09-26：原文写"整个阶段二/三"，
-│         │   实际 `installation_task.cpp` 的 try 从 `backup_existing_files()` 起、含注册趟与
-│         │   COMMIT/END —— 注册趟或 COMMIT 失败同样走这条）:
+│   └── ┌─ 异常（**②③④ + COMMIT + END** 整段的 try 块：从 `backup_existing_files()` 起、
+│         │   含注册趟与 COMMIT/END —— 注册趟或 COMMIT 失败同样走这条）:
 │         rollback_files(): WAL: ROLLBACK <pkg> <ver> + END <pkg> <ver>  ← fsync
 │           （**只写这两个标记**，不做任何文件系统撤销 —— 撤销统一由外层
 │              `batch_rollback` → `reverse_execute` 完成，见 §6.5）
@@ -1364,7 +1288,7 @@ InstallationTask::run(ctx)
 
 安装/升级一个 `/etc/` 条目时，pacman `add.c` 用**三份哈希**决定"用户改没改过这个配置文件"。
 
-⚠️ **先分清两个常量**（订正 2026-09-26：原文写"`constants::DIR_ETC`，与移除侧 §7.2.1 **同一判据**"，不成立）：
+⚠️ **先分清两个常量**：
 - `constants::DIR_ETC` = `"etc/"` —— **归档条目**的相对形态（`scan_content_files` 的返回值），
   本节判"这条归档条目是不是配置"用它；
 - `constants::DIR_ETC_PREFIX` = `"/etc/"` —— **逻辑路径**形态（DB 键、`/` 开头的绝对路径），
@@ -1382,8 +1306,8 @@ InstallationTask::run(ctx)
 
 分流（判定表只有一份：`classify_config_update()`，别在调用点再抄一遍）：
 
-> ⚠ **三哈希只覆盖"类型未变"里的 file→file 那一格**（订正 2026-09-26：原文把整节写成
-> "三哈希 + 符号链接条目走另一条分支"，那是**旧设计**；维护者已把 `/etc` 的落点规则改统一）。
+> ⚠ **三哈希只覆盖"类型未变"里的 file→file 那一格** —— `/etc` 的落点规则按"类型是否变化"
+> 统一，符号链接条目不再另走一条分支。
 
 **现行规则：按"类型是否变化"分派**（`decide_path()`，判据是新事实
 `PathFacts::disk_is_symlink` —— 只有 `disk_exists` + `disk_is_dir` 区分不出"盘上是普通文件"
@@ -1404,18 +1328,17 @@ InstallationTask::run(ctx)
 所以提交后不会被清掉），新物就地落位**；**类型没变**才走"用户改没改过"那套（三哈希 /
 `.lpkgnew` / 目录元数据）。这样"落点"只由一个更硬的判据决定，不用去猜用户有没有改过。
 
-> 历史（**已被推翻，别照做**）：此前是"`dir → 非目录` 走 `.lpkgsave`、`file → 符号链接`
-> 让原文件留原样 + 新链接退 `.lpkgnew`"两套不同规则，理由是"只有普通文件才是用户可能改过的
-> 那份配置"。维护者 2026-09-26 决定按类型变化统一（见 `CLAUDE.md` §8 第 4 条的订正）。两行旧规则当且仅当在**类型未变**时与现行规则等价
-> —— 类型一变就分道扬镳，这正是被推翻的那部分。
+> **历史规则（已被推翻，别照做）**：此前是"`dir → 非目录` 走 `.lpkgsave`、`file → 符号链接`
+> 让原文件留原样 + 新链接退 `.lpkgnew`"两套不同规则。两行旧规则当且仅当在**类型未变**时与
+> 现行规则等价 —— 类型一变就分道扬镳，这正是被推翻的那部分。
 
 > ⚠ **符号链接条目的两条腿**（类型未变时）：**不做三哈希、不调 `classify_config_update`、
 > 也不写 `set_conf_hash`**；目标路径已存在（**含符号链接** —— `fs::is_directory` 会跟随链接，
 > 故必须显式排掉）就把新链接落成 `<路径>.lpkgnew` + 告警。后果：**`/etc` 下的符号链接条目
 > 每次 reinstall 都会再落一份 `.lpkgnew`**（第一次装时目标不存在，落在本体；此后每次目标
 > 都在），与"用户改没改过"无关。
-> ⚠ **conf 记录随「键」废弃而撤，不随形态变化而撤**（2026-09-26 由两个独立 agent 各自撞见并
-> 在 HEAD 上复现，属**既存语义**、非本轮回归）：`remove_obsolete_files` 阶段 1 的废弃判据是
+> ⚠ **conf 记录随「键」废弃而撤，不随形态变化而撤**（属**既存语义**、非引入回归）：
+> `remove_obsolete_files` 阶段 1 的废弃判据是
 > `facts.obsolete = !new_set.contains(old_file)`，而 `new_set` 装的是**全部**归档条目 ——
 > 归档里的**符号链接按文件键登记**（`scan_content_files` 只有真目录才带尾斜杠）。于是
 > v1 的 `/etc/x`（普通文件）在 v2 变成**符号链接**时，键 `/etc/x` **仍在 `new_set`** ⇒ 不算废弃
@@ -1423,8 +1346,7 @@ InstallationTask::run(ctx)
 > 只有 v2 **不再提供**该路径、或把它变成**目录**（键变成 `/etc/x/`）时旧文件键才废弃 →
 > 撤销记录（`remove_conf_hash`）。**注意处置动作现在分两支**（见上方落点规则表）：
 > 废弃的 `/etc` **文件/符号链接**先改名 `<路径>.lpkgsave`（`SaveConfigObsolete`）**再**撤记录；
-> 废弃的 `/etc` **目录**是 `DropOwnership`（只撤记录、不碰盘）。（订正 2026-09-26：
-> 原文只写 `DropOwnership → remove_conf_hash`，那是文件那一支改政策之前的形态。）
+> 废弃的 `/etc` **目录**是 `DropOwnership`（只撤记录、不碰盘）。
 > 已知后果（**未证实为缺陷**，属性测试只跑两段版本序列故未覆盖）：三段序列
 > `file → symlink → file`（且内容回到旧值）时 `hash_orig == hash_pkg` 会判 `KeepLocal`，
 > 盘上仍是那个**符号链接**（"升级没生效"，**非数据丢失**；内容不同时走 `SaveLpkgnew`，安全）。
@@ -1451,15 +1373,15 @@ InstallationTask::run(ctx)
 **没有例外**），于是这条退化分支只可能进入一次：记录一旦建起来，下一次升级就回到上面的正常
 分流（⚠ 但"记录"本身会被删，那时又会进入 —— 见下）。
 
-> ⚠️ **三哈希看不见 mode —— "只改权限"会被静默纠正**（2026-09-26 实测，此前**完全静默**）：
+> ⚠️ **三哈希看不见 mode —— "只改权限"会被静默纠正**（此前**完全静默**）：
 > 三份都是**内容**哈希，所以"用户只 `chmod` 过这份配置"在它眼里与"用户没动过"**不可区分**
 > ⇒ 走 ① 静默换新版；而落位时 `stage_regular_file` 的 `lchown`/`chmod` 取自**包内条目**
-> ⇒ 用户改的权限被一并改回包内值（实测：盘上 0600 → 升级后 0644，**且没有任何输出**）。
+> ⇒ 用户改的权限被一并改回包内值（盘上 0600 → 升级后 0644，**且没有任何输出**）。
 > 目录那边至少有 `warning.dir_perm_mismatch`（目录元数据的改前值是 write-ahead 的、顺手能比），
 > 文件这边此前连告警都没有。**现行处置：加 `warning.file_perm_mismatch`，先告警、再纠正 ——
 > 只把"静默"变"可见"，语义不变**（判据取两侧 `lstat`、只比 mode；在**让开趟**报，因为那是
 > 唯一还看得见盘上那份的时刻 —— 写入趟落位时原位已被 `Stash` 清空）。
-> **「内容未变时该不该保留用户改的 mode」已拍板（2026-09-26）：不保留 —— 包内值胜出**，要求只是
+> **「内容未变时该不该保留用户改的 mode」：不保留 —— 包内值胜出**，要求只是
 > 「**不静默**」（即上面的告警）。因此**不另立 mode 记录**：`confhashes.db` 只记内容哈希，而既然
 > 结论是包内值胜出，「用户改过 mode」本就无需判定。
 
@@ -1512,9 +1434,8 @@ InstallationTask::run(ctx)
   不该取决于它是第几个加进来的库。
 - **记录随包走**：包被移除（`remove_package_files`）、或**该路径被 `--overwrite` 接管**（归属在
   安装期就被 `ConflictView::drop_owners` 摘走，见 §6.2 包级安装流程）、或新版本**不再提供该
-  文件**时删除 —— 最后这一支由让开趟的 `remove_obsolete_files()` 做（**订正 2026-09-26**：
-  原文写"`commit_without_file_ops` 的废弃 /etc 条目"，而废弃清除已在第③步整段前移到写入
-  **之前**，见 §6.2；`/etc` 条目现在还会先改名 `.lpkgsave`，见 §6.3 的落点规则表）。
+  文件**时删除 —— 最后这一支由让开趟的 `remove_obsolete_files()` 做（废弃清除跑在写入
+  **之前**，见 §6.2；`/etc` 条目还会先改名 `.lpkgsave`，见 §6.3 的落点规则表）。
   留着一条已不在册的包的记录 = 重新装回来的包会把"上一次装的哈希"当成旧记录，从而把一份它
   **并不拥有**的同名文件按"用户没改过"静默覆盖。与文件如何处置无关：`--purge-config`（真删）
   与 `.lpkgsave`（改名保留）都不影响它 —— 记录的内容从来不是"盘上有什么"，而是"我们装过什么"。
@@ -1543,7 +1464,7 @@ COPY  /etc/foo.lpkgtmp → /etc/foo                    ← OpSink::commit_copy�
 
 **顺序与崩溃收敛**：同一事务内**先替换配置（BACKUP+COPY）、后写哈希记录**（记录由
 `cache.write(":batch-end")` 落盘 —— 在**批次末尾**、`COMMIT_PKGS` 之前，见 §3.1/§4.3；
-2026-10-03 前是逐包写，改一次之后这个"后"更靠后，结论不变）。于是**不存在**
+此前是逐包写，改成每批次一次之后这个"后"更靠后，结论不变）。于是**不存在**
 "替换了但记录没写"的持久态：
 
 - 崩在"COPY 已做、`:batch-end` 未写"→ WAL 里没有 `COMMIT_PKGS` → 批次回滚（或下次
@@ -1561,7 +1482,7 @@ COPY  /etc/foo.lpkgtmp → /etc/foo                    ← OpSink::commit_copy�
 `.lpkgnew`。这是刻意选的一侧代价 —— 另一侧（追认盘上那份）会把用户文件当成我们装的，
 下一次升级静默覆盖它（见上方 ⚠）。
 
-### 6.3.1 目录 xattr 的**键归属表**（`xattrkeys.db`，2026-09-26 新增）
+### 6.3.1 目录 xattr 的**键归属表**（`xattrkeys.db`）
 
 目录的 xattr 有两件事与文件不同，所以需要一张**独立**的表：
 
@@ -1600,7 +1521,7 @@ COPY  /etc/foo.lpkgtmp → /etc/foo                    ← OpSink::commit_copy�
 ### 6.4 批次提交后的收尾（三段 + postinst 独立阶段）
 
 `run_batch_transaction` 返回后（`COMMIT_PKGS` 已落盘、批次不可能再回滚）由调用方依次执行
-**三段**（2026-10-03 从原来的单个 `finish_committed_batch()` 拆开，顺序承重）：
+**三段**（顺序承重）：
 
 | 段 | 函数 | 做什么 |
 |---|---|---|
@@ -1616,21 +1537,21 @@ COPY  /etc/foo.lpkgtmp → /etc/foo                    ← OpSink::commit_copy�
 ⚠️ 四个调用点（install / upgrade / `remove_packages_checked` / `remove_packages_recursive`）**都
 必须调 ③**：漏掉 = 不再 trim WAL、不再回收 DB 备份，静默地越积越多。
 
-- **postinst 只在提交之后执行，全仓唯一执行点**（原先在 `commit_without_file_ops()` 末尾 =
-  批次内）：批次是"全或无"，回滚能撤销文件与 DB，却撤不回钩子副作用（钩子以 root 跑
+- **postinst 只在提交之后执行，全仓唯一执行点**（**不在批次内**）：批次是"全或无"，回滚能撤销
+  文件与 DB，却撤不回钩子副作用（钩子以 root 跑
   `systemd-sysusers` / `tmpfiles --create` / `useradd`）。上游 libalpm 同理：POST hook 整段在
   "提交 / 中断"判定之后，提交失败一个都不跑。
 - **hook 脚本文件在事务内**：`install_hook_files()` 走写入层原语（BACKUP + COPY），因此回滚后
   `hooks_dir/<pkg>/` 里仍是**旧版本**的脚本内容。原先的 `fs::copy(overwrite_existing)` 不进
   WAL、覆盖即永久丢失 —— 回滚后包体是旧版本、钩子却是新版本，后续 remove/upgrade 跑错版本。
-- **hook 成员是符号链接时"限定在包内"**（2026-09-26 补，第三轴审计）：`directory_entry::
+- **hook 成员是符号链接时"限定在包内"**：`directory_entry::
   is_regular_file()` **跟随**末段链接，而 `fs::copy` **也跟随** —— 于是 `hooks/postinst.sh ->
   /etc/shadow` 会让 root 把**宿主**该文件的内容拷成 `hooks_dir/<pkg>/postinst.sh`（带 exec）并
   **当 postinst 执行**：包内容读出了包外。判据：解析后（`weakly_canonical`）必须仍落在**本包的解压
   目录之内** —— 包内互指（`hooks/postinst.sh -> ./real.sh`）**照旧跟随复制**（那是合法用法，
   今天的行为不变）；落到包外则**整包拒绝**（新键 `error.hook_symlink_escapes_package`，
   点名条目与它解析到的目标；与归档成员名消毒同款处置）。
-  实测确认打包侧**保留**链接成员（`archive_read_disk_set_symlink_physical`）⇒ 这条路径可达。
+  打包侧**保留**链接成员（`archive_read_disk_set_symlink_physical`）⇒ 这条路径可达。
 - 钩子执行失败只告警不抛（批次已提交、包确实装上了）；整段另套一层 `try/catch`，**保证 ③
   照跑**（一个 hook 路径上的异常不该把 trim/DB 备份回收带掉）。
 - **② 只在"真有包要跑 postinst"时开那一节**：`hook_sets` 对每个被处理的包都会记一条（没 hook
@@ -1657,7 +1578,7 @@ rollback_files()
 （成员名就是这三个向量；`hook_files_` **不**清 —— 它由批次级的 `hook_sets` 账本用
 `did_process()` 判读，清了会把"本包没被处理"误表示成"新版本没有 hooks"。）
 
-> **单撤销路径（2026-08-03 重构）**：所有正向操作的逆序执行统一由
+> **单撤销路径**：所有正向操作的逆序执行统一由
 > `batch_rollback` → `reverse_execute` 完成（所有 install/upgrade 都经
 > `run_batch_transaction`，包级失败必然触发批次回滚）。rollback_files 曾在此处
 > 恢复 `.lpkg_bak` 并写 RESTORE_* 审计，与 reverse_execute 形成**双重回滚**——
@@ -1665,8 +1586,6 @@ rollback_files()
 > 再次删除，升级中途失败的包丢失旧文件。撤销职责收拢后该问题消失，且
 > "rollback_files 删新文件失败"的残留也能由 reverse_execute 兜底重试。
 > 失败包的 ROLLBACK 标记由 rollback_files 写；成功包的由 batch_rollback 统一写。
-> （2026-09-25 订正：原图写的是 `backups_.clear()`，该成员在 stash 化改造后叫
-> `stashes_`（`package_manager.hpp`）；§13 2.3 的描述一直是对的。）
 
 ---
 
@@ -1708,12 +1627,9 @@ remove_packages_checked(pkgs, force, purge_config)
 的真删。旧实现把"删配置"绑在 `force` 上、且 `remove -r` / autoremove / force-solve-conflict
 内部硬编 `force=true` —— 用户不给 `--force` 也会丢配置。
 
-（2026-09-25 订正：原图写的是 `remove_package` 自己"`recover_packages() + trim_completed()`
-(if wrap_in_txn) → 版本检查 → `run_batch_transaction(1, …)` → `do_remove_package(pkg, force,
-purge_config)`"。现行实现里 `remove_package` 只是转调，`wrap_in_txn` 被忽略
-（`bool /*wrap_in_txn*/`）；WAL 恢复在进程启动时做一次（§6.1）；`do_remove_package` 的签名
-已变成 `(pkg_name, purge_config, ver, stashes)`，**不再收 force** —— 安全检查整体前移到了批次
-入口，批次内没有任何"跳过检查"的分支。）
+`remove_package` 只是转调，`wrap_in_txn` 被忽略（`bool /*wrap_in_txn*/`）；WAL 恢复在进程启动
+时做一次（§6.1）；`do_remove_package` 的签名是 `(pkg_name, purge_config, ver, stashes)`，
+**不收 force** —— 安全检查整体前移到了批次入口，批次内没有任何"跳过检查"的分支。
 
 ### 7.2 核心移除逻辑
 
@@ -1731,7 +1647,7 @@ do_remove_package(pkg_name, purge_config, ver, stashes)
 │     盘上是实体目录（DB 却记成文件键）→ **只跳过 + 告警**，绝不搬进 stash
 │       （非 force 时批次预检通常已拒绝整批 ⇒ 走不到这里；**但 `/etc` 键是例外** ——
 │         批次预检把 `/etc` 前缀的条目整条跳过（`package_manager.cpp`），所以非 force
-│         的移除照样走到这里、只告警 + 跳过。订正 2026-09-26：原文那句括号没写这个例外。）
+│         的移除照样走到这里、只告警 + 跳过。）
 │     if 是配置文件（路径前缀 /etc/）且非 purge_config:
 │       WAL: SAVE_CONF <phys> → <phys>.lpkgsave  ← fsync（write-ahead）
 │       （目标已存在 → 先把旧的移位成 .lpkgsave.1/.2…，那也是同类型的一条行）
@@ -1777,11 +1693,6 @@ do_remove_package(pkg_name, purge_config, ver, stashes)
 > 后面的包才被检查拒绝 —— 整批回滚撤得回文件与 DB，撤不回 prerm 的副作用。前移后拒绝的批次
 > 根本不开启事务。prerm 之后仍可能失败的只剩 I/O 错误与 Ctrl+C（上游 libalpm 的 pre_remove
 > 同样在事务内、删除之前跑，暴露面相同）。
->
-> （2026-09-25 订正：本图原先的目录段写的是"目录 BACKUP（取代旧 RM_DIR）→ 安全检查共用
-> `detail::backup_dir_tree_whole` → 整目录 rename 成 `.lpkg_bak`"—— 该函数已不存在；现行是
-> 上面的**阶段 B：`DIR_RM`**。同时把"hooks"从 DBRM 那一步移出（它从来不是 DBRM），
-> 并把"`CLEANUP` 见 §7.4"改为 **§6.4**——本文档没有 §7.4。）
 
 ### 7.2.1 配置文件：改名成 `<路径>.lpkgsave`（只有 `--purge-config` 才真删）
 
@@ -1841,10 +1752,6 @@ batch_rollback 对移除的逆向：
   → COMMIT_PKGS                          ← fsync
 ```
 
-（2026-09-25 订正：原图把目录的逆向写成 `BACKUP <dir> → <dir.lpkg_bak>` 的整树 rename 回来
-—— 现行算法里目录根本没有 `.lpkg_bak`，它是 `DIR_RM` 的元数据重建，见 §3.6。另补上
-`purge_consumed_stashes` / `Cache::load()` 两步与 `SAVE_CONF` 同分支。）
-
 ---
 
 ## 8. 升级流程
@@ -1853,9 +1760,8 @@ batch_rollback 对移除的逆向：
 
 同 install 流程，使用 `run_batch_transaction`。区别：
 - `InstallationTask` 设置了 `old_version_to_replace_`
-- **废弃清除走让开趟的 `remove_obsolete_files()`（跑在写入之前）**，不再在注册趟里（订正
-  2026-09-26：原文写"`commit_without_file_ops` 中处理旧版本废弃条目" —— 那是第③步重构**前**
-  的位置）：阶段 1 `REMOVE_OLD`（非 `/etc` 文件 → stash）/ `SAVE_CONF`（`/etc` 文件与符号
+- **废弃清除走让开趟的 `remove_obsolete_files()`（跑在写入之前）**，不在注册趟里：
+  阶段 1 `REMOVE_OLD`（非 `/etc` 文件 → stash）/ `SAVE_CONF`（`/etc` 文件与符号
   链接 → `.lpkgsave`）/ `DropOwnership`（`/etc` 目录 → 只撤所有权）、阶段 2 `DIR_RM`
   （非 `/etc` 目录，最深优先 / 仅最后持有者 / 必须已空 / **新版本在该目录下没有条目**，
   见 §3.6）；另撤销本包持有且新版本不再声明的目录 xattr 键（§6.3）。
@@ -1876,9 +1782,6 @@ WAL 内容（以 pkgs 为例；实际每个里程碑 6 个库各有行）:
   5. ROLLBACK libfoo 2.0 + END libfoo 2.0
   6. COMMIT_PKGS
 ```
-
-（2026-09-25 订正：第 2 步的审计行名现行是 `RESTORE_FILE_RM`（`REMOVE_FILE` 只是仍可解析的
-旧名，见 §2.1）；第 3 步的备份落点在每文件系统 stash，不在原位。）
 
 ---
 
@@ -1946,9 +1849,6 @@ bool batch_rollback(const std::vector<std::string> &success);
 } // namespace wal
 ```
 
-（2026-09-25 订正：本块原写 `extract_current_batch_ops()` 无参、`batch_rollback` 返回 void、
-且步骤 2 是"清理内存 cache" —— 三者都与 `wal_op.hpp` / `wal_op.cpp` 不符。）
-
 ### 9.2 reverse_execute 操作表
 
 | 操作类型 | 逆向操作 | fsync | RESTORE 条目 | 备份不存在时 |
@@ -1958,10 +1858,10 @@ bool batch_rollback(const std::vector<std::string> &success);
 | `SAVE_CONF` | 同上（**三型合一个分支**：`rename(arg2 → arg1)`，dst 不在 stash 里） | 同上 | `RESTORE_FILE <bak> → <orig>` | dst 不存在→跳过（幂等） |
 | `UNSTASH`（第③步引入） | **再搬进 stash**：`rename(arg2 → arg1)`（与 BACKUP 正好互为逆） | fsync 父目录 | `RESTORE_FILE <orig> → <bak>`（记**实际动作方向**） | orig 不存在 / bak 父目录不存在→跳过（幂等） |
 | ↑ 引入 `UNSTASH` 时**必须一并复核** `purge_consumed_stashes` 的"已消费"判据：被 `UNSTASH` 搬回原位的 bak **已被消费**，不该再被它 `remove_all` 掉；同一路径的 `BACKUP` 行在前、`UNSTASH` 行在后，回滚逆序才收敛回原点（两步 rename，幂等）。 | | | | |
-| `COPY` | remove(dst)；**并顺带清掉 `arg1` 的 `.lpkgtmp`**。⚠️ **删除那一支的判据不是"存在"而是 `Guard::TargetTakenNotDir`**（`exists_no_follow(orig) && !is_real_directory(orig)`）—— 落点是**真目录**时**绝不删**：`fs::remove` 对**空目录**会 `rmdir` 成功，那会把盘上原有的空目录删掉而 DB 仍声称持有（盘面/DB 脱节，且没有 BACKUP 行可还原；实测事故） | 不需要 | `RESTORE_FILE_RM <dst>` | 不存在→跳过 |
-| `DIR_META`（2026-09-26 新增，§3.8） | `lchown`+`chmod` 写回行内 mode/uid/gid | fsync 父目录 | `RESTORE_DIRSTATE <path>` | `Guard::RealDir`：**只回写真还是目录的**；目录已被更晚的逆操作删掉时跳过、**不重建**（重建是 `DIR_RM` 的职责） |
-| `XATTR_SET`（2026-09-26 新增） | `lsetxattr` 写回 `arg3` 的**旧值**（base64 解码后） | fsync 父目录 | `RESTORE_DIRSTATE <path>` | `Guard::RealDir`：**只回写真还是目录的** —— 与写入侧（`lstat`+`S_ISDIR`，**只描述真实目录**）逐字对齐。（订正 2026-09-26：原先用 `Guard::TakenNotSymlink`，它**普通文件/FIFO/设备也放行** ⇒ 回滚会在写入侧从不写的路径上 `lsetxattr` **造出一个键**；`DIR_META` 那一格本来就是 `RealDir`，只有这两格没对齐） |
-| `XATTR_NEW`（2026-09-26 新增） | `lremovexattr` 删掉 `arg2` 的键（base64 解码） | fsync 父目录 | `RESTORE_DIRSTATE <path>` | `Guard::RealDir` 同上 |
+| `COPY` | remove(dst)；**并顺带清掉 `arg1` 的 `.lpkgtmp`**。⚠️ **删除那一支的判据不是"存在"而是 `Guard::TargetTakenNotDir`**（`exists_no_follow(orig) && !is_real_directory(orig)`）—— 落点是**真目录**时**绝不删**：`fs::remove` 对**空目录**会 `rmdir` 成功，那会把盘上原有的空目录删掉而 DB 仍声称持有（盘面/DB 脱节，且没有 BACKUP 行可还原；真实事故） | 不需要 | `RESTORE_FILE_RM <dst>` | 不存在→跳过 |
+| `DIR_META`（§3.8） | `lchown`+`chmod` 写回行内 mode/uid/gid | fsync 父目录 | `RESTORE_DIRSTATE <path>` | `Guard::RealDir`：**只回写真还是目录的**；目录已被更晚的逆操作删掉时跳过、**不重建**（重建是 `DIR_RM` 的职责） |
+| `XATTR_SET` | `lsetxattr` 写回 `arg3` 的**旧值**（base64 解码后） | fsync 父目录 | `RESTORE_DIRSTATE <path>` | `Guard::RealDir`：**只回写真还是目录的** —— 与写入侧（`lstat`+`S_ISDIR`，**只描述真实目录**）逐字对齐。（用 `Guard::TakenNotSymlink` 的话它**普通文件/FIFO/设备也放行** ⇒ 回滚会在写入侧从不写的路径上 `lsetxattr` **造出一个键**） |
+| `XATTR_NEW` | `lremovexattr` 删掉 `arg2` 的键（base64 解码） | fsync 父目录 | `RESTORE_DIRSTATE <path>` | `Guard::RealDir` 同上 |
 | `NEW` | remove(path)（含 dangling symlink） | 不需要 | `RESTORE_FILE_RM <path>` | 不存在→跳过 |
 | `NEW_DIR` | rmdir（仅当"非 symlink + 是真目录 + 为空"） | 不需要 | `RESTORE_DIR_RM <path>` | 不存在→跳过 |
 | `DIR_RM` | 需要则 `create_directories` 重建 + 按行内 mode/uid/gid 恢复元数据（路径**先剥尾斜杠**，见 §3.6.1 第 1 条；不是真目录则跳过、**不** chmod/chown） | 不需要 | `RESTORE_DIR <path>` | 幂等口径是 `Guard::Always`：**目录已存在且是真目录也照样** `lchown`/`chmod` 写回并计一次 —— "已存在→跳过"**不存在**（目录缺失正是它要修的状态；"目录已存在"在回滚路径上反而是常态）。只有"不是真目录"才判否 |
@@ -1977,11 +1877,11 @@ bool batch_rollback(const std::vector<std::string> &success);
 > 目录，混进 `files_restored`/`dirs_recreated` 会让那两个计数器失去意义；
 > **`Confine`** 全部取 `Arg1Only`（理由见下方 confinement 一节的 ⚠️）。
 
-**路径 confinement（2026-09-26 增补）**：`reverse_execute` 回放前会校验 WAL 行里涉及的路径
+**路径 confinement**：`reverse_execute` 回放前会校验 WAL 行里涉及的路径
 是否落在允许范围内（`wal_line_paths_confined()`，`db/wal_op.cpp`）——**两级判据**：
 ① **词法**：规范化后必须是 `root_dir()` 的分量前缀（挡 `../`、挡"绝对路径就在 root 外"）；
 ② **canonical 复核，且只解析父目录**（挡 `<root>/evil -> /etc` 这类穿透；解不开 → 判不越界）。
-⚠️ **机制订正 2026-09-26：允许集对每一行都是同一个** —— `wal_line_paths_confined()` 里只有一个
+⚠️ **允许集对每一行都是同一个** —— `wal_line_paths_confined()` 里只有一个
 `ok()` 判定，内容是 `path_within_root(root, p) || ∃sr ∈ stash_roots: path_within_root(sr, p)`，
 **对所有行一视同仁**。逐行不同的是 `Confine::` 这个枚举，它**只决定查哪些字段**：
 
@@ -1991,11 +1891,8 @@ bool batch_rollback(const std::vector<std::string> &success);
 | `Arg1Only` | 只查 `arg1` | `NEW`/`NEW_DIR`/`DIR_RM`/`DB*`/**`DIR_META`**/**`XATTR_SET`**/**`XATTR_NEW`** |
 | `Arg1AndArg2` | 两个都查 | `BACKUP`/`REMOVE_OLD`/`SAVE_CONF`/`UNSTASH`/**`COPY`** |
 
-（订正：原文写"`BACKUP`/…/`UNSTASH` 查 root ∪ stash 根；`COPY`/`NEW`/… 查 root"，把"查哪些字段"
-说成了"查哪个允许根"，且把 `COPY` 归错了组 —— `COPY` 的 `confine` 是 `Arg1AndArg2`。
-原文还说 stash 落点"**可能不在 root 内**"，而代码注释说"后者在当前实现里**本就落在 root 之内**
-（`stash_parent_dir` 恒 clamp 在 root 内），把它单列是为了**不误拒**" —— 两边对现状的断言相反，
-以代码为准。）
+（`COPY` 的 `confine` 是 `Arg1AndArg2`（与 `BACKUP`/…/`UNSTASH` 同组）；stash 落点**本就落在
+root 之内**（`stash_parent_dir` 恒 clamp 在 root 内），把它单列是为了**不误拒**。）
 `stash_roots` 由 `referenced_stash_roots()` 从 WAL 行里推出（含 `UNSTASH` 的 stash 侧）。
 
 **`DIR_META`/`XATTR_*` 为什么必须是 `Arg1Only`**：它们的 `arg2`/`arg3` 是 **base64 编码的
@@ -2007,7 +1904,7 @@ xattr 键/值**，**不是路径** —— 若按 `Arg1AndArg2` 查，一串 base
 （任何绝对路径都在其内）；**末段不解析**，所以 `--root` 下包发的绝对目标链接
 （`<root>/usr/bin/foo -> /etc/foo`）不会被误判。
 
-（2026-09-25 订正：`SAVE_CONF` 行原表漏列 —— 它与 BACKUP/REMOVE_OLD 是**同一个分支**；
+（`SAVE_CONF` 与 BACKUP/REMOVE_OLD 是**同一个分支**；
 `REMOVE_FILE`/`REMOVE_DIR` 是只解析的旧名、不是现写的审计行，故归入"审计行"一类。
 未解析的行（`INVALID`，尾部半写等）也一律跳过 —— `skip_in_reverse()` 是"该不该逆向"的
 唯一判据。）
@@ -2037,10 +1934,6 @@ xattr 键/值**，**不是路径** —— 若按 `Arg1AndArg2` 查，一串 base
 （旧名 `REMOVE_FILE`/`REMOVE_DIR` 只用于**解析**老 WAL：解析成功后同样按审计行跳过，
 **不会**被当成"删除这个路径"执行 —— 见 §2.1 表末行。）
 
-（2026-09-25 订正：本节的原文写"遇到 RESTORE 行时：`RESTORE_FILE` 检查 bak 是否存在，
-存在就**重复执行 restore**（幂等）；`REMOVE_FILE <path>` 检查存在则删除" —— 两处都与现行实现
-相反：RESTORE 行既不重复执行，`REMOVE_FILE` 也不是现写/现执行的删除行。）
-
 ### 10.2 二次回滚的场景
 
 场景 A：rollback 在 RESTORE_DB 完成后、RESTORE_FILE 前崩溃
@@ -2057,9 +1950,8 @@ WAL 状态：
   reverse_execute 逆序（RESTORE_* 行全部跳过，只看正向操作行）：
     NEW /new/b（正向行）: 文件存在？A 的 copy 还在，所以 /new/b 存在→删除（安全）
     BACKUP /a → /bak（正向行）: /bak 存在→rename 回 /a（恢复旧版本 A）
-      ⚠️ 订正 2026-09-26：原文把参数顺序写成 `BACKUP /bak → /a`，**反了** —— 正向 `BACKUP` 行
-      记的是 `<原位> → <stash>`（`OpSink::backup` 写的就是这个方向），`/a` 才是原位。
-      （`RESTORE_FILE /bak → /a` 那些审计行方向是对的：它记的是**实际动作**方向。）
+      ⚠️ 正向 `BACKUP` 行记的是 `<原位> → <stash>`（`OpSink::backup` 写的就是这个方向），`/a`
+      才是原位。（`RESTORE_FILE /bak → /a` 那些审计行方向是对的：它记的是**实际动作**方向。）
     DB /pkgs A:installed（正向行）: .lpkg_db_bak_before:A:installed 不存在（已被第一次消费）→跳过（幂等）
   → 系统状态一致
 ```
@@ -2077,11 +1969,9 @@ WAL 状态：
   END A 1.0
   （COMMIT_PKGS 未写，崩溃在此）
 
-> ⚠️ 订正 2026-09-26：上面这三行的**顺序原文写反了**（原文是 `ROLLBACK`/`END` 在前、
-> `DB … :batch-start` 在后）。`batch_rollback()` 的实现顺序是：`reverse_execute` →
-> `purge_consumed_stashes` → **`cache.write(":batch-start")`（6 个库）** →
-> **逐包 `ROLLBACK`/`END`** → `COMMIT_PKGS`。§2.4 的示例与 §9.1 的步骤表本来就是对的，
-> 只有本节这份"现场清单"对调了两段 —— 而它是取证用的，顺序反了会误导复盘。
+> ⚠️ `batch_rollback()` 的实现顺序是：`reverse_execute` → `purge_consumed_stashes` →
+> **`cache.write(":batch-start")`（6 个库）** → **逐包 `ROLLBACK`/`END`** → `COMMIT_PKGS`
+> （即 `ROLLBACK`/`END` 在 `:batch-start` **之后**）。
 
 恢复：
   reverse_execute 逆序（RESTORE_* 行跳过；正向行各自按"备份/目标在不在"幂等处理）：
@@ -2097,12 +1987,9 @@ WAL 状态：
      `reverse_execute` 注释：正常路径下"逆序跑完整个批次"与"停在 :batch-start"逐字节同效）
 ```
 
-> **订正 2026-09-25**：本节原先把场景 B 结论写成"DB 错误地恢复成了 A 已安装的状态！→ BUG！"
-> —— 那条推演不成立（`:batch-start` 备份里是批次起点内容，不是"A:installed 内容"；两份
-> 里程碑的备份名也不同，不会互相覆盖）。现行代码甚至明确写着**不存在**"里程碑提前停止"
-> 机制，因为"逆序跑完"与"停在 :batch-start"在正常路径下等价。真正需要那条
-> `batch_start_db_still_in_place()` 判据的理由是**另一个**窗口（下面的 rename 窗口），
-> 与"恢复成 A 已安装"无关。
+> **不存在"里程碑提前停止"机制**：`reverse_execute` 的注释写着"逆序跑完整个批次"与"停在
+> :batch-start"在正常路径下逐字节同效，故不需要它。真正需要 `batch_start_db_still_in_place()`
+> 判据的理由是**另一个**窗口（下面的 rename 窗口）—— 与"最终 DB 状态"无关。
 
 **解决方案**：`reverse_execute` 在遇到 `DB /pkgs :batch-start` 时，**只在该正式文件仍在、
 且仍持有批次起点内容时才**把它当"最终状态标记"、跳过；否则（文件不在 / 已空）从该里程碑的
@@ -2185,9 +2072,8 @@ if (op.skip_in_reverse()) continue;   // !is_valid() || is_metadata() || is_rest
 - 这样 WAL 中 RESTORE 行的顺序记录了 rollback 的进度
 - rollback 崩溃后 restart 的 `recover_packages()` 中的 `reverse_execute` **跳过**这些行
 - **但"哪些逆向操作已完成"不靠这些行判断** —— 判据是**备份/目标是否还在盘上**（每条逆操作
-  自查，见 §10.2）。RESTORE 行是**审计痕迹**（取证、复盘、测试断言用），不是恢复的输入。
-  （2026-09-25 订正：原来这里写"RESTORE 行的存在/不存在帮助判断哪些逆向操作已完成"，与
-  实现相反 —— `skip_in_reverse()` 直接跳过它们，没有任何读取它们的判据。）
+  自查，见 §10.2）。RESTORE 行是**审计痕迹**（取证、复盘、测试断言用），不是恢复的输入 ——
+  `skip_in_reverse()` 直接跳过它们，没有任何读取它们的判据。
 
 ---
 
@@ -2234,19 +2120,12 @@ void recover_packages() {          // db/recover.cpp
     //           └── wal::commit_batch()  → 写 COMMIT_PKGS
     //    整段回滚抛异常 → 告警、**这一整段保持未提交**（WAL 与备份原样保留，下次 rec 可重试），
     //    并把 any_batch_failed 置位
-    //    ⚠️ 订正 2026-09-26：原文写"单个批次……**继续处理其余批次**"，而**现行没有"批次循环"** ——
-    //    rollback_uncommitted_region() 只被调用一次、覆盖整段未提交区域，内部也没有对"批次"
-    //    的循环；抛异常即告警 + 返回 true（失败）。"其余批次"没有承载它的控制流。
-    //    （本节第 4 步的标题自己写的就是"**一次逆序回滚整段**（可能横跨两个未提交批次）"，
-    //    与"逐个批次继续处理"本来就不相容。）
+    //    ⚠️ **没有"批次循环"**：rollback_uncommitted_region() 只被调用一次、覆盖整段未提交
+    //    区域，内部也没有对"批次"的循环；抛异常即告警 + 返回 true（失败）。
     // 5. cleanup_db_backups() —— **仅当没有批次失败**；而且它内部还有一道独立门控
     //    （WAL 里仍有未配对批次 → 一个都不删），见 §3.1 附注
 }
 ```
-
-（2026-09-25 订正：原状态机漏了 1.5 的续传清理，把"未完成事务"写成了可多个独立批次（现行是
-**一整段未提交区域**），漏了 `purge_consumed_stashes` / `tolerate_missing_set_files` / 失败批次
-保留现场，且把第 4 步写成无条件 `cleanup_db_backups()`。）
 
 ### 11.3 rec 的关键设计决策
 
@@ -2258,9 +2137,9 @@ void recover_packages() {          // db/recover.cpp
 | 旧版二进制写入的"批次内 CLEANUP"WAL | ❌ **不支持** | lpkg 经 lpkg 升级时，**旧二进制**会先跑 `recover_packages()` 处理掉遗留 WAL，新二进制才上线；因此更新后不存在需要兼容的旧形状事务。**手工替换 lpkg 二进制不受支持**（若此时正躺着一个被中断的 remove WAL，回滚会让 DB 回到"已安装"而文件已删 —— 遇到时用 `lpkg rec` 前先人工核对） |
 | 是否检测 CLEANUP 分岔 | ❌ 不再需要 | CLEANUP 只出现在事务之外（post-commit），事务内不可能有 → 未提交批次一律 `reverse_execute`。post-commit 的残留清理由 `continue_post_commit_cleanup` 负责（**§11.2 步骤 1.5**） |
 | 是否清理孤备份 | ⚠️ **有条件**：有批次恢复失败 → 不清理；WAL 里仍有未配对批次 → `cleanup_db_backups()` 自己也不清理（`wal_has_unpaired_batch()` 门控） | `.lpkg_db_bak_before:*` 是"重试还原 DB"的唯一依据。`main_cli.cpp` 的 `lpkg rec` 分支在 `recover_packages()` 之后**无条件**再调一次 `cleanup_db_backups()` —— 门控必须放在函数内部，否则刚被特意保留的还原点会被立刻删光，而 CLI 照打"恢复完成" |
-| 未提交区域怎么划 | **第一个**未配对 `BEGIN_PKGS` → EOF，**一次逆序回滚整段** | 一次崩溃可能留下两个未提交批次（前一批回滚失败后同进程又开新批次）。按"最后一个 BEGIN_PKGS"逐轮收敛是错的：已提交批次的行仍在 WAL 里，下一轮起点仍落在它上面，更早那批永远轮不到（实测两轮下来一个文件都没还原） |
-| 某个批次回滚失败怎么办 | 告警 + **保持未提交**（WAL/备份原样保留，下次可重试）+ 跳过 DB 备份清理 | 一条失败不该把整段恢复作废，也不该把重试依据删掉。⚠️ 订正 2026-09-26：原文在这行还写了"**继续处理其余批次**"，但现行实现里**没有批次循环**（整段一次回滚，见 §11.2 第 4 步的订正） |
-| `lpkg rec` 的退出码 | **恒为 0**（订正 2026-09-26 补）：`recover_packages()` 无返回值，某段回滚失败时只打 `warning.rollback_remove_failed`；`run_rec_command()` 不读任何失败信号，`handle_command()` 对 `CMD_REC` 恒 `return 0`。于是"回滚失败 + 备份被保留 + 打印恢复完成 + 退出码 0"是可能组合（DB 备份的内部门控保证不会误删，所以是**报告不准**而非数据丢失）。对照：`remove_packages()` 为"脚本凭退出码区分"专门抛 `error.removal_refused` —— 这一处的取向恰好相反，**别拿退出码判断恢复是否成功** |
+| 未提交区域怎么划 | **第一个**未配对 `BEGIN_PKGS` → EOF，**一次逆序回滚整段** | 一次崩溃可能留下两个未提交批次（前一批回滚失败后同进程又开新批次）。按"最后一个 BEGIN_PKGS"逐轮收敛是错的：已提交批次的行仍在 WAL 里，下一轮起点仍落在它上面，更早那批永远轮不到（两轮下来一个文件都没还原） |
+| 某个批次回滚失败怎么办 | 告警 + **保持未提交**（WAL/备份原样保留，下次可重试）+ 跳过 DB 备份清理 | 一条失败不该把整段恢复作废，也不该把重试依据删掉；**没有批次循环**（整段一次回滚，见 §11.2 第 4 步） |
+| `lpkg rec` 的退出码 | **恒为 0**：`recover_packages()` 无返回值，某段回滚失败时只打 `warning.rollback_remove_failed`；`run_rec_command()` 不读任何失败信号，`handle_command()` 对 `CMD_REC` 恒 `return 0`。于是"回滚失败 + 备份被保留 + 打印恢复完成 + 退出码 0"是可能组合（DB 备份的内部门控保证不会误删，所以是**报告不准**而非数据丢失）。对照：`remove_packages()` 为"脚本凭退出码区分"专门抛 `error.removal_refused` —— 这一处的取向恰好相反，**别拿退出码判断恢复是否成功** |
 
 ---
 
@@ -2271,8 +2150,7 @@ void recover_packages() {          // db/recover.cpp
 ```cpp
 void trim_completed() {              // db/recover.cpp
     // 1. WAL **不存在 / 读不出内容** → 直接返回，**不删任何东西**
-    //    （订正 2026-09-26：原文把这一支写成"删掉文件"，那是把"文件存在但为空"混了进来 ——
-    //     read_wal_lines 返回 nullopt（路径不存在/打不开）→ return；只有文件**存在且为空**
+    //    （read_wal_lines 返回 nullopt（路径不存在/打不开）→ return；只有文件**存在且为空**
     //     才 fs::remove(wpath)。与 §11.2 步骤 0 的写法对齐。）
     // 2. **前向 depth 记账**找"**第一个**未配对 BEGIN_PKGS"的位置：
     //    BEGIN_PKGS  → depth 0→1 的那个位置记下来；++depth
@@ -2287,18 +2165,14 @@ void trim_completed() {              // db/recover.cpp
     // 4. **没有**未配对区域（所有事务都已提交）时，**不无条件清空**：
     //    先扫一遍所有行 —— 只要有 BACKUP/REMOVE_OLD 的目标、或尾部 CLEANUP 行引用的
     //    stash 根**仍在盘上**（`exists_no_follow` —— lstat 语义，**等价于**
-    //    `fs::exists || fs::is_symlink` 但**不抛**；订正 2026-09-26：原文引的是后者的写法，
-    //    而它是**抛**的，行里的 bak 路径可能正是**符号链接环**（原路径是环、被 rename 进
-    //    stash 后依然是环）→ 那条写法在它上面抛 filesystem_error，于是**每次启动的 trim
-    //    都失败**、WAL 永远裁剪不掉），就说明 post-commit 清理还没
+    //    `fs::exists || fs::is_symlink` 但**不抛**（后者那种写法**抛**：行里的 bak 路径可能
+    //    正是**符号链接环**（原路径是环、被 rename 进 stash 后依然是环）→ 那条写法在它上面抛
+    //    filesystem_error，于是**每次启动的 trim 都失败**、WAL 永远裁剪不掉），就说明
+    //    post-commit 清理还没
     //    做完 → **保留整个文件**（BACKUP 上下文还在，`recover_packages` 会续传），
     //    什么都不裁；只有全都删干净了才 `trunc` 清空整个日志。
 }
 ```
-
-（2026-09-25 订正：原文写"最后一个未配对的 BEGIN_PKGS 及其所有行保留 / 如果没有未配对
-BEGIN_PKGS 清空整个日志"，两处都与现行实现不同 —— 取的是**第一个**未配对，且"无未配对"
-还要先过第 4 步的 pending 检查。）
 
 ### 12.2 与 RESTORE 审计行的交互
 
@@ -2308,7 +2182,6 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 **但它确实会看两类行的"落点"**：第 4 步要检查 `BACKUP`/`REMOVE_OLD` 的目标与 `CLEANUP`
 引用的 stash 根是否还在盘上 —— 那是"post-commit 清理完成没有"的唯一判据
 （`continue_post_commit_cleanup()` 用同一份信息续删）。
-（订正 2026-09-25：原文写"trim 不关心具体行内容，只跟踪 BATCH 边界"，与第 4 步不符。）
 
 ---
 
@@ -2319,25 +2192,25 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 ### 第 1 阶段：基础设施
 
 - **1.1 `DbMilestone`** — 定义于 `wal_op.hpp`。格式 `pkg:state`，`:batch-start` 表示批次开始前的 DB 快照。
-- **1.2 `Cache::write` write-ahead** — 实现于 `cache.cpp`。顺序：WAL → fsync → 备份（`.lpkg_db_bak_before:<milestone>`）→ fsync → .tmp → fsync → rename → fsync。`DB` / `DBRM` 的逆操作在备份不存在时跳过（原文件还在，安全）；⚠️ **`DBNEW` 不同**（订正 2026-09-26：原文把这条概括成"`reverse_execute` 遇到备份不存在时跳过"，对 `DBNEW` 不成立）—— `DBNEW` 是"该路径上原本**没有任何东西**"，所以它有**两支**：有备份则还原（`Guard::DbBakExists`），**没有备份则删除该文件**（逆操作 + `Guard::TargetExists`，审计行 `RESTORE_DB_RM`）。因为 `DBNEW` 里没有"原文件还在"这回事。
+- **1.2 `Cache::write` write-ahead** — 实现于 `cache.cpp`。顺序：WAL → fsync → 备份（`.lpkg_db_bak_before:<milestone>`）→ fsync → .tmp → fsync → rename → fsync。`DB` / `DBRM` 的逆操作在备份不存在时跳过（原文件还在，安全）；⚠️ **`DBNEW` 不同** —— `DBNEW` 是"该路径上原本**没有任何东西**"，所以它有**两支**：有备份则还原（`Guard::DbBakExists`），**没有备份则删除该文件**（逆操作 + `Guard::TargetExists`，审计行 `RESTORE_DB_RM`）。因为 `DBNEW` 里没有"原文件还在"这回事。
 - **1.3 `WalWriter`** — 实现于 `transaction_log.hpp/cpp`。每行 O_APPEND + write + fsync，带 move 语义。
-- **1.4 `parse_op`** — 实现于 `wal_op.cpp`。解析 **33 个行前缀**（`TYPE_MAP`，见 §2.1；订正 2026-09-26：原文写 28，那是数了表格**行**数 —— `REMOVE_FILE`/`REMOVE_DIR` 那一行装两个前缀，另有本轮新增的 4 个），支持 `→` 分隔符与从右往左的尾部字段分帧（路径可含空格）。未知类型 → `INVALID`（`is_valid()` 为假），**绝不借用真实类型当哨兵**。
-- **1.5 `reverse_execute`** — 实现于 `wal_op.cpp`。跳过未解析行/元数据行/RESTORE 审计行/CLEANUP（判据只有 `WALOp::skip_in_reverse()` 一处）；`:batch-start` DB 条目**只在正式文件仍在位且非空时**跳过，否则从该里程碑备份还原（`batch_start_db_still_in_place()`：四分支 —— 缺 / 非空 / 空+备份空 / 空+备份非空，见 §11.3 与 `test_db_batch_start_recovery.cpp`）。**已表驱动**（订正 2026-09-26：原文按"逐类型的 if/else"描述）：一张 `UNDO_TABLE`（现行 **16** 行）+ `apply_row()` —— 幂等判据 / 撤销动作 / 计数 + 审计行三件事各只剩一处施加点；表内容见 §9.2。每步逆向操作后写入 RESTORE_* 审计行（`write_audit=true` 时）。**没有**"里程碑提前停止"机制（正常路径下"逆序跑完整个批次"与"停在 :batch-start"逐字节同效，故不需要）。
+- **1.4 `parse_op`** — 实现于 `wal_op.cpp`。解析 **33 个行前缀**（`TYPE_MAP`，见 §2.1；数的是前缀个数 —— `REMOVE_FILE`/`REMOVE_DIR` 那一行装两个前缀），支持 `→` 分隔符与从右往左的尾部字段分帧（路径可含空格）。未知类型 → `INVALID`（`is_valid()` 为假），**绝不借用真实类型当哨兵**。
+- **1.5 `reverse_execute`** — 实现于 `wal_op.cpp`。跳过未解析行/元数据行/RESTORE 审计行/CLEANUP（判据只有 `WALOp::skip_in_reverse()` 一处）；`:batch-start` DB 条目**只在正式文件仍在位且非空时**跳过，否则从该里程碑备份还原（`batch_start_db_still_in_place()`：四分支 —— 缺 / 非空 / 空+备份空 / 空+备份非空，见 §11.3 与 `test_db_batch_start_recovery.cpp`）。**已表驱动**：一张 `UNDO_TABLE`（现行 **16** 行）+ `apply_row()` —— 幂等判据 / 撤销动作 / 计数 + 审计行三件事各只剩一处施加点；表内容见 §9.2。每步逆向操作后写入 RESTORE_* 审计行（`write_audit=true` 时）。**没有**"里程碑提前停止"机制（正常路径下"逆序跑完整个批次"与"停在 :batch-start"逐字节同效，故不需要）。
 - **1.6 `extract_current_batch_ops`** — 实现于 `wal_op.cpp`（签名收 `wal_path`）。**从文件末尾反向**找最后一个 `BEGIN_PKGS`，取它到文件末尾的有效行；若先遇到 `COMMIT_PKGS`（块已配对）→ 返回空。
-- **1.7 `batch_rollback`** — 实现于 `wal_op.cpp`，**返回 bool**。流程：`extract_current_batch_ops`（为空 → 告警 + `return false`，**不写 COMMIT_PKGS、保留现场**）→ `reverse_execute(ops, true)` → `purge_consumed_stashes(ops)` → `Cache::load()` 重载磁盘 DB → 写 DB `:batch-start`（6 个库）→ 写 ROLLBACK/END 标记（版本号从 WAL 的 BEGIN/RM_BEGIN 行取）→ `COMMIT_PKGS`。（原文的"清理内存 cache"这一步已不存在：曾逐包 `remove_installed`，随后必被 `load()` 覆盖，是死代码。）
+- **1.7 `batch_rollback`** — 实现于 `wal_op.cpp`，**返回 bool**。流程：`extract_current_batch_ops`（为空 → 告警 + `return false`，**不写 COMMIT_PKGS、保留现场**）→ `reverse_execute(ops, true)` → `purge_consumed_stashes(ops)` → `Cache::load()` 重载磁盘 DB → 写 DB `:batch-start`（6 个库）→ 写 ROLLBACK/END 标记（版本号从 WAL 的 BEGIN/RM_BEGIN 行取）→ `COMMIT_PKGS`。
 
 ### 第 2 阶段：安装事务
 
 - **2.1 `run_batch_transaction`** — 模板定义于 `batch_transaction.hpp`。函数第一行先 `trim_completed()`。正向：`BEGIN_PKGS` → `Cache::write(":batch-start")` → 逐包执行 → `wal::commit_batch()`（写 `COMMIT_PKGS`）。异常路径：catch → `batch_rollback` →（返回 true 才）`cleanup_db_backups()` + `trim_completed()` → rethrow。
-- **2.2 `install_packages`** — 重构于 `package_manager.cpp`。**四个阶段**（2026-10-03）：
+- **2.2 `install_packages`** — 重构于 `package_manager.cpp`。**四个阶段**：
   `download_batch()`（`:: 下载`；下载 + sha256 + **逐字段**核对归档 `metadata.json` 与索引 —— name / version / deps / provides / provides_soname / needed_so，见 `metadata_view()`；**任何字段不符即抛 `error.metadata_mismatch`**，错误里逐条列 `字段: '索引值' → '归档值'`，此刻**什么都没落盘**）、
   `extract_batch()`（`:: 解压`；解压 + 置 `content_ready`，末尾跑整批文件冲突预检）、
   `run_batch_transaction()`（`:: 安装`）、
   提交后 `finish_committed_batch()` → `run_post_install_hooks()`（`:: 运行安装后钩子`）→ `finish_post_commit_cleanup()` → `TriggerManager::run_all()`，
   末尾一条 `log_summary()`（`:: 已安装 N 个包: …`；逐包的"已成功安装!"已删）。
   跳过判据只有一份：`plan_member_skipped()`（阶段①②、冲突预检、`run()` 早退共判）。
-  **行为变化**：不一致现在是"事务之前就拒绝"（连 `BEGIN_PKGS` 都不写）；**已经是最新版、本批不会装的包不再被校验**（旧行为会，且可能因索引陈旧报错）。**只在出错时出声** —— 成功路径不打任何"正在检查依赖"之类的日志（它是**校验**，不是依赖解析的一步）。**订正 2026-10-02**：此前的行为是"重解计划 + 批次游标复位重跑"，已删除、且明确不准备再加回（理由：手动解析依赖时代的产物；libsolv 之后计划是一次性整体求解的，批次中途换计划会造成重复安装/顺序倒置/所有权脱节 —— 见 `package_manager.cpp` 的 `verify_package_metadata`）。install / upgrade / reinstall 三条路径共用同一校验（reinstall 经 install_packages）。实际安装封装在 `run_batch_transaction` 中，每包后 `Cache::write(pkg + ":installed")`。安装完成后把 `task.get_stashes()` 收进批次向量，交给 `finish_committed_batch()` 统一清理（`CLEANUP` → `remove_all`）。
-- **2.3 `InstallationTask`** — **已按"趟"拆成 4 个 TU**（订正 2026-09-26：原文写"重构于 `installation_task.cpp`"，而该文件现在只剩骨架 + 冲突引擎；`backup_existing_files` / `copy_package_files` / `commit_without_file_ops` 三个**都已不在**它里面）。现行分布：
+  **行为变化**：不一致现在是"事务之前就拒绝"（连 `BEGIN_PKGS` 都不写）；**已经是最新版、本批不会装的包不再被校验**（旧行为会，且可能因索引陈旧报错）。**只在出错时出声** —— 成功路径不打任何"正在检查依赖"之类的日志（它是**校验**，不是依赖解析的一步）。**"重解计划 + 批次游标复位重跑"已删除、且明确不准备再加回**（理由：手动解析依赖时代的产物；libsolv 之后计划是一次性整体求解的，批次中途换计划会造成重复安装/顺序倒置/所有权脱节 —— 见 `package_manager.cpp` 的 `verify_package_metadata`）。install / upgrade / reinstall 三条路径共用同一校验（reinstall 经 install_packages）。实际安装封装在 `run_batch_transaction` 中，每包后 `Cache::write(pkg + ":installed")`。安装完成后把 `task.get_stashes()` 收进批次向量，交给 `finish_committed_batch()` 统一清理（`CLEANUP` → `remove_all`）。
+- **2.3 `InstallationTask`** — **已按"趟"拆成 4 个 TU**（`installation_task.cpp` 现在只剩骨架 + 冲突引擎；`backup_existing_files` / `copy_package_files` / `commit_without_file_ops` 三个**都不在**它里面）。现行分布：
   - `installation_task.cpp` — 骨架：`run()`（写 WAL `BEGIN`/`COMMIT`/`ROLLBACK`/`END` 标记）、`prepare()`、`rollback_files()`、`download_and_verify_package()`、`extract_and_validate_package()`、`ensure_dependencies_satisfied()`、`check_for_file_conflicts()`，以及冲突引擎 `dir_tree_entirely_ours()` / `collect_content_conflicts()`。
   - `installation_task_letgo.cpp`（让开趟）— `backup_existing_files()`（`BACKUP`/`SAVE_CONF`/`NEW`/`NEW_DIR`，write-ahead）、`remove_obsolete_files()`（`REMOVE_OLD`/`DIR_RM`（升级废弃条目）/`SAVE_CONF`（废弃 `/etc` 条目）/`DropOwnership`，**跑在写入之前**，§6.2）、`revoke_undeclared_xattrs()`（§6.3）。
   - `installation_task_copy.cpp`（写入趟）— `copy_package_files()`（`COPY`；`/etc` 条目先走三哈希分流，§6.3；目录状态经 §3.8 的三个原语）。
@@ -2347,7 +2220,6 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 ### 第 3 阶段：移除事务
 
 - **3.1 移除的批次实现** — `package_manager.cpp` 的 `remove_packages_in_one_batch()` 是**所有**移除路径的汇合点（`do_remove_package` 的唯一调用点）：`remove_package`（单包）、`remove_packages`（`remove a b c`）、`autoremove`、`force_solve_conflict` 经 `remove_packages_checked`（筛选未安装/essential/反向依赖采用**全或无**：任一被拒则一个都不删、连事务都不开）进来，`remove_packages_recursive`（闭包）自带筛选后直接进来。先 `check_removal_preconditions()` 整批检查，再**整组一个批次**逐包 `do_remove_package`（`RM_BEGIN` → 阶段 A `SAVE_CONF`/`BACKUP` → `remove_package_files` → 阶段 B `DIR_RM` → `DBRM`（deps/needed_so/man）→ DB（6 个库）→ `RM_COMMIT` → `RM_END`），调用方随后 `finish_committed_batch()`（post-commit：`CLEANUP` 行 → 删 stash → 删被移除包的 hooks → 剪枝 hooks → postinst → trim → `cleanup_db_backups`）。逐包各开批次会失去跨包原子性（中途 Ctrl+C 只回滚当前包）。
-  （订正 2026-09-25：原文把这段记在 `remove_packages_checked` 名下、并称 `remove_package_recursive` 也经它 —— 后者实际直接调 `remove_packages_in_one_batch`；顺序里也漏了阶段 B 的 `DIR_RM`。）
 - **3.2 `remove_package_recursive`** — 重构于 `package_manager.cpp`（实现是 `remove_packages_recursive`）。算出依赖闭包后走 §3.1 的同一批次机制：闭包内所有包同一个 `run_batch_transaction`，任一失败整批回滚；闭包里的 essential 包剔除并告警。
 
 ### 第 4 阶段：升级事务
@@ -2359,8 +2231,7 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 - **5.1 `recover_packages`** — 实现于 `recover.cpp`。状态机（现行形态见 §11.2）：续传 post-commit 清理 → 前向 depth 记账划出**未提交区域**（第一个未配对 `BEGIN_PKGS` → EOF）→ `reverse_execute(ops, true)` → `purge_consumed_stashes` → `Cache::load(tolerate_missing_set_files=true)` → `wal::commit_batch()`（写 `COMMIT_PKGS`）；某段恢复失败则保留现场、跳过 DB 备份清理。`:batch-start` DB 条目**只在正式文件仍在且非空时**跳过，否则从该里程碑备份还原（`batch_start_db_still_in_place()`，§11.3）。通过 CLI `lpkg rec` 或启动时自动调用。
 - **5.2 `trim_completed`** — 实现于 `recover.cpp`。**前向** depth 记账找**第一个**未配对 `BEGIN_PKGS`，保留它及其后的行、删掉之前的已完成批次；全部已配对时还要先确认 post-commit 清理没有未完成的 bak（`post_commit_cleanup_pending()`），否则**整个文件保留**（§12.1）。
 
-> **recover 侧的四个函数名（订正 2026-09-26 补：全文此前从没出现过它们 —— 照 §11.2/§12.1
-> 去代码里找落点会找不到）**：
+> **recover 侧的四个函数名（照 §11.2/§12.1 去代码里找落点请认这些名字）**：
 > · **`scan_batch_pairing()`**（`recover.cpp`）—— "**第一个**未配对 `BEGIN_PKGS`"这条规则的
 >   **唯一实现**，四个消费者共用：`continue_post_commit_cleanup` / `recover_packages` /
 >   `trim_completed` / `wal_has_unpaired_batch`。§11.2 与 §12.1 各用一大段文字**复述**它，
@@ -2373,30 +2244,26 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 
 ### 第 6 阶段：测试
 
-- **6.1 断电模拟** — `tests/integration/test_breakpoints.cpp`（20 tests，2026-09-26 计数）。
-  断点总数 **21**（第③步补了"符号链接落位 / 目录落位 / `UNSTASH`"三个空档：`symlink_after_wal_<pkg>`、
-  `newdir_after_wal_<pkg>`、`unstash_after_wal_<pkg>`；2026-09-26 又补**目录状态**那三个窗口：
-  `dirmeta_after_wal_<pkg>` / `xattrset_after_wal_<pkg>` / `xattrrm_after_wal_<pkg>`，见 §3.8；
-  2026-09-26 再补**废弃搬运**那一个：`remove_old_after_wal_<pkg>`（`REMOVE_OLD` 行已落、
-  rename 未做 —— 此前只有 `backup_obsolete` 没有 `after_wal_breakpoint`，是断点覆盖之外的洞）；
-  2026-09-27 又补 **`.lpkgnew` 两个**：`lpkgnew_after_wal_<pkg>`（COPY 行已落、rename 未做）/
-  `lpkgnew_bak_after_wal_<pkg>`（BACKUP 行已落、rename 未做）—— `WriteLpkgnew` 那一支此前
-  **整支一个断点都没传**；
-  完整清单见 `CLAUDE.md` §2）——
+- **6.1 断电模拟** — `tests/integration/test_breakpoints.cpp`（20 tests）。
+  断点总数 **21**（`symlink_after_wal_<pkg>` / `newdir_after_wal_<pkg>` / `unstash_after_wal_<pkg>`
+  覆盖"符号链接落位 / 目录落位 / `UNSTASH`"三个窗口；`dirmeta_after_wal_<pkg>` /
+  `xattrset_after_wal_<pkg>` / `xattrrm_after_wal_<pkg>` 覆盖**目录状态**那三个窗口，见 §3.8；
+  `remove_old_after_wal_<pkg>` 覆盖"`REMOVE_OLD` 行已落、rename 未做"；
+  `lpkgnew_after_wal_<pkg>`（COPY 行已落、rename 未做）与
+  `lpkgnew_bak_after_wal_<pkg>`（BACKUP 行已落、rename 未做）覆盖 `WriteLpkgnew` 那一支）——
   第③步那三个由 `tests/integration/test_unstash_primitive.cpp` 的 `UnstashBreakpointTest`（6 tests）
   覆盖，WAL 行路径 confinement 由 `tests/integration/test_wal_confinement.cpp` 的
   `WalConfinementTest`（9 tests）覆盖，目录状态那三个由 `tests/integration/test_dir_state_wal.cpp`
   （16 tests）覆盖。
   覆盖断电窗口（按当前用例名）：文件 BACKUP 的 rename 前后两个窗口（`FileBackupPowerLoss_BeforeRename` / `_AfterRename`）、COPY 的 rename 前后两个窗口（`CopyPowerLoss_Completed` / `_BeforeRename`）、DB 写入的"备份在位 / 备份不在"（`DbWritePowerLoss_BackupExists` / `_NoBackup`）、`DbNewRmRecovery`（DBNEW/DBRM 恢复）、`MixedNewCopyBackupReverse`（NEW/COPY/BACKUP 混合逆序）、`CleanupIsIrreversible`，以及 rollback 中途崩溃的二次/三次续传（`SecondaryRollbackAfter*` / `TripleRecoverIdempotent`）。
-  （订正 2026-09-25：原文写"DB 写入（5 个断点）、文件 BACKUP（2 个断点）、COPY（2 个断点）"，与用例实际构成不符 —— 覆盖这些窗口的用例是**手工构造 WAL 状态**（该文件里有"手工构造"一节），不是 `BreakpointManager` 的断点；断点清单里也没有 DB 写入类的命名断点。
-  订正 2026-09-26：原文那句"覆盖 `TODO.md §3` 所有断电点"里的 `TODO.md §3` **指不到现行 `TODO.md` 的任何一节** —— 现行 `TODO.md`（7.1.1 恢复的那版）的"§3"是"暂缓（低危/需单独决策）"，里面没有断电点表；"§3 + 断电点表"只存在于**已删除**的那版 `TODO.md`（`git show 21dcd5d8:lpkg/TODO.md`）。此处改成按**用例名**列举，不再引用那个编号。）
+  （覆盖这些窗口的用例是**手工构造 WAL 状态**（该文件里有"手工构造"一节），不是 `BreakpointManager` 的断点；断点清单里也没有 DB 写入类的命名断点。）
 - **6.2 幂等性** — `tests/unit/test_wal_core.cpp`（68 tests）。覆盖所有操作类型的 `reverse_execute` 幂等性（NULL→跳过、重复→跳过）。
 - **6.3 里程碑链式恢复** — `test_wal_core.cpp` + `test_breakpoints.cpp` + `tests/integration/test_db_backup_chain.cpp` / `test_db_batch_start_recovery.cpp`。验证 DB 备份链 `batch-start ← A:installed ← B:installed` 的正确逆序恢复。
 - **6.4 二次回滚幂等** — `test_breakpoints.cpp`。验证 rollback 各阶段中断后 `recover_packages` 能正确继续。
 - **6.5 集成测试** — 多个测试文件覆盖：批量安装/移除/升级、依赖链、provides（虚拟 provider）与 provides_soname（SONAME）解析、版本约束、config 保护、SIGINT 保护、并发锁、autoremove、recursive remove。
 - **6.6 CLEANUP 阶段测试** — `tests/unit/test_cleanup.cpp`（26 tests）。覆盖 CLEANUP 解析与不可逆性、stash / `DIR_RM` 恢复、随机后缀唯一性、rec CLEANUP 续传、安全检查、现有行为回归。
-- **6.7 双重回滚回归（2026-08-03）** — `tests/integration/test_active_rollback.cpp`。升级中途 COPY 失败 / COMMIT 后失败 → 旧文件必须保留（曾双重回滚删旧文件）；CLEANUP write-ahead 崩溃窗口 → 整批可恢复。
-- **6.8 全量** — 当前全量运行读数：**1164 tests / 143 suites / 1163 PASSED / 0 FAILED**（docker 容器 `make test`，2026-10-03 第五批之后）。同一时点现数的宏数也是 **1164 / 143 suites**（`grep -rhE 'TEST(_F|_P)?\(' tests/ | wc -l`）。1 SKIPPED = `UpgradePropertyTest.SingleSeedReplay`，它是需要显式指定种子的复现入口。覆盖上述全部章节。**该数字随加测试而变，别当契约** —— 要引用它请现数一次；`tests/` 才是唯一事实来源。
+- **6.7 双重回滚回归** — `tests/integration/test_active_rollback.cpp`。升级中途 COPY 失败 / COMMIT 后失败 → 旧文件必须保留（曾双重回滚删旧文件）；CLEANUP write-ahead 崩溃窗口 → 整批可恢复。
+- **6.8 全量** — 当前全量运行读数：**1164 tests / 143 suites / 1163 PASSED / 0 FAILED**（docker 容器 `make test`）。同一时点现数的宏数也是 **1164 / 143 suites**（`grep -rhE 'TEST(_F|_P)?\(' tests/ | wc -l`）。1 SKIPPED = `UpgradePropertyTest.SingleSeedReplay`，它是需要显式指定种子的复现入口。覆盖上述全部章节。**该数字随加测试而变，别当契约** —— 要引用它请现数一次；`tests/` 才是唯一事实来源。
 
 ---
 
@@ -2411,7 +2278,7 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 
 **`==> ` 前缀**（`ui::step_prefix()`）只给 `ui::Line` 的"动作行"；`::` 给普通信息行 —— 两者一眼可分。
 **动态行一律经 `ui::Line`，不要自己拼 `\r`**（曾经 `builder_executor.cpp` 的 git 传输进度自己管
-`\r` + 按上一帧长度补空格，宽字符下少补 → 叠字；2026-10-03 改成 `ui::Line` + 对象数进度条）。
+`\r` + 按上一帧长度补空格，宽字符下少补 → 叠字；改成 `ui::Line` + 对象数进度条）。
 真要在 `ui::Line` 之外手工打一帧（如将来某个第三方回调只给字符串），也必须用
 `ui::step_prefix()` 并用 `ui::compose_frame()` 补到整行，别自己数 `size()`。
 
@@ -2431,7 +2298,7 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 
 **② 进度行的条等长**（`progress_frame`）：信息段固定 `max(60% 列数, 50)`、进度条固定占剩下的
 部分（pacman 的 `draw_pacman_progress_bar` 口径）—— 于是同一终端上**每一行的进度条起止列完全
-相同**。别再退回"条填满左文本之后的剩余空间"：那样每行条长都不同、右端参差（用户实测报过）。
+相同**。别再退回"条填满左文本之后的剩余空间"：那样每行条长都不同、右端参差（用户报过）。
 
 ⚠️ **别退回"新帧比旧帧短就补空格"**（`builder_executor` 的 git 进度曾这么做）：那个做法要记
 "上一帧多长"，而在**宽字符**下必然算错 —— 中文占 2 列而 `std::string::size()` 数的是字节，
@@ -2448,10 +2315,10 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
 ### 14.3 阶段分隔条与钩子/触发器
 
 - `ui::section("Install")` → **`:: Install`**（pacman 风格，走 `log_info`，与普通信息行同形同色；
-  早期版本打的是 `====== Install ======`，已按维护者要求换掉）。阶段边界：
+  早期版本打的是 `====== Install ======`，已换掉）。阶段边界：
   **`:: 下载` → `:: 解压` → `:: 安装`/`:: 升级` → `:: 运行安装后钩子` → `:: 系统触发器` →
   `:: 已安装 N 个包: …`**（卸载侧是 `:: 卸载` → `:: 系统触发器` → `:: 已卸载 N 个包: …`）。
-  2026-10-03 起"准备（下载+解压）"拆成前两段；postinst 从 `finish_committed_batch` 里抽出成
+  "准备（下载+解压）"已拆成前两段；postinst 从 `finish_committed_batch` 里抽出成
   独立一段（它仍**不在 WAL 里、也不原子** —— 那是有意的，见 §6.4）。
 - **批次 summary**：逐包的"X 已成功安装!"/"X 已成功移除"已删除，改为批次结束后**一条**
   `log_summary()`（数量 + 名单，按终端显示列截断）—— 300 包的升级因此从 ~900 行降到 ~300 行 + 1 行。
@@ -2472,7 +2339,7 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
   **退出码 1**；普通异常仍是 `Error: …` + 1。
 - 取消之后**不会再打"安装/卸载完成"，也不会有 summary** —— 脚本/farm 凭退出码区分
   "什么都没做（取消）"与"做好了"。
-  （2026-10-03 修：此前 install / upgrade / remove 三条取消路径是 `log_info(aborted); return;`，
+  （此前 install / upgrade / remove 三条取消路径是 `log_info(aborted); return;`，
   命令**继续走到完成行**且退出码 0；`remove -r` 输错验证码就是这个症状。）
 - ⚠️ 两条文案（`info.sigint_aborted` / `info.user_aborted`）必须**与操作无关** —— 它们被
   install / upgrade / remove 共用，别再写死"安装"（原先卸载操作会打"安装被用户中止"）。
@@ -2480,14 +2347,14 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
   `std::cin >> x` / `std::getline(std::cin, …)` 在输入期间**不可中断** —— glibc 的 handler 带
   `SA_RESTART`，被打断的 `read` 会被自动重启，于是 Ctrl+C 只置标志、进程仍卡着
   （用户看到"**Ctrl+C 无效，只能 kill -9**"）。回归测试 `tests/unit/test_prompt_interrupt.cpp`
-  钉住它；**修前实现下那条用例会挂住**（实测 `timeout` 退出码 124），不是简单地变红。
+  钉住它；**修前实现下那条用例会挂住**（`timeout` 退出码 124），不是简单地变红。
 
 ### 14.5 取消**与失败**一律非零退出
 
 上一条只讲了"取消"，同一条规矩对**真实失败**同样成立：任何路径都不许把异常吞成"打条警告就
 正常返回"——那等于告诉脚本"做成了"。
 
-- ⚠️ **`autoremove` 曾经是唯一漏网的那条路**（2026-10-02 修）：它用
+- ⚠️ **`autoremove` 曾是唯一漏网的那条路**：它用
   `catch (const std::exception&)` 包住 `remove_packages_checked`，于是 `UserAbort`（Ctrl+C /
   取消）**和任何真实的批次失败**一起被降级成 `warning`，`lpkg autoremove` **退出码 0**
   —— 脚本/farm 会以为删成功了，而一个包都没删。批次的回滚已经在 `remove_packages_checked`
@@ -2495,7 +2362,7 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
 - 同理：**请求的目标解析不出来就中止**，不能"打个错误、丢掉这个参数、继续报成功"
   （见 §15 (j)）。
 
-### 14.6 输出流与"完成消息"（2026-10-03 修）
+### 14.6 输出流与"完成消息"
 
 - **`--help` 走 stdout**：它是**正常输出**（`lpkg --help | less` / `| grep` 必须拿得到内容），
   此前全部写 stderr。参数不合法时打用法**仍走 stderr**；两者文本逐字相同（同一个
@@ -2508,24 +2375,24 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
 
 ---
 
-## 15. 2026-10-02 缺陷审计的修复（行为 / 不变量变更）
+## 15. 缺陷审计的修复（行为 / 不变量变更）
 
 起因：五路并行审计（装卸入口 / 安装趟与文件操作 / ELF 与归档 / WAL 与恢复 / 求解器与配置）。
 下面**只列行为或不变量真正变了的**那些；其余是纯内部修正（不抛谓词、错误点名、注释订正）。
 
 **(a) 静态库的符号索引（`elf/strip.cpp`）。** ar 归档的符号表成员 `/` 记录的是一串
 "符号 → 成员起始偏移"，而 strip 会让 `.o` 成员**变短**，其后每个成员的偏移都跟着前移 ——
-**照抄的索引于是全部失效**。实测后果不是"少个优化"而是链接**硬失败**
+**照抄的索引于是全部失效**。后果不是"少个优化"而是链接**硬失败**
 （`ld: error adding symbols: no more archived files`；本机 `bison`/`nspr`/`gcc` 三个包的
 `.a` 已被这样写坏，`ranlib` 可修）。
 **现行规则**：先**预扫**一遍（`archive_strip_scan`），
 ① 有成员会变短 ⇒ 重写并**丢掉 `/`**（`ld` 退化为顺序扫描，链接照常）；
 ② 没有成员变短 ⇒ 索引仍然有效，**照抄保留**；
 ③ 成员名 > 15 字节 ⇒ GNU/SVR4 ar 的名字字段装不下、libarchive 的 ar 写入器写不出来
-（实测它会让 `archive_write_header` 失败，**且继续写下去的成员会被静默丢掉**），
+（它会让 `archive_write_header` 失败，**且继续写下去的成员会被静默丢掉**），
 整个库**有意放弃、原样保留**且**不告警**（llvm 那种一堆 `libclang_rt.*.a` 否则每次构建刷屏）。
-> ⚠️ **订正 2026-10-07**：上面 ③ 的**实现**当时与**成员顺序**相关（短名 `.o` 排在长名成员之前
-> 就漏判、进而报"malformed"），已在 §22 修掉。规则本身没变 —— 变的是它现在**真的**成立。
+> ⚠️ 上面 ③ 的**实现**曾与**成员顺序**相关（短名 `.o` 排在长名成员之前就漏判、进而报
+> "malformed"），已在 §22 修掉。规则本身没变 —— 变的是它现在**真的**成立。
 顺带：`process_archive` 的 `error_msg` 此前是 `[[maybe_unused]]`、**任何失败都不出声**
 （`strip_binary` 的告警判据是 `!strip_file(...) && !error_msg.empty()`）—— 现在真失败都会填。
 
@@ -2555,7 +2422,7 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
 
 **(e) 批次预检的"已释放路径"不再对 `/etc` 一刀切。** `check_batch_file_conflicts` 模拟
 "前序成员腾空了这些路径"时，原先对**所有** `/etc` 键无条件 `continue`，注释理由是"`/etc`
-的废弃条目只撤所有权、文件留在盘上"。那是 **2026-09-26 之前**的语义：现在升级侧会把废弃的
+的废弃条目只撤所有权、文件留在盘上"。那是**此前**的语义：现在升级侧会把废弃的
 `/etc` **文件/符号链接**改名成 `<路径>.lpkgsave`（`SaveConfigObsolete`），路径**确实被腾空**。
 **现行规则**：只有废弃的 `/etc` **目录**才留在原地（那已由 `ends_with('/')` 覆盖）；
 非目录键与其他路径一样参与 `released` 模拟。
@@ -2602,7 +2469,7 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
 
 ---
 
-## 16. 2026-10-03 审计修复（行为 / 不变量变更）
+## 16. 审计修复（行为 / 不变量变更）
 
 第二轮五路并行审计（装卸入口 / 安装趟与文件操作 / ELF 与归档 / WAL 与恢复 / 求解器与配置）。
 下面**只列行为或不变量真正变了的**；纯内部修正（注释订正、错误点名、脚本修）不在此。
@@ -2639,7 +2506,7 @@ rename 成了 `<path>.lpkg_db_bak_before:<milestone>`（原位已空）；回滚
 
 **(e) 拒绝 strip 非本机端序的 ELF（`elf/strip.cpp`）。** 写出路径（`write_ehdr`/`write_shdr`）
 按**本机字节序**改写 ELF 头与节区表，节区数据却原样 `memcpy` ⇒ **大端**输入会被写成"头/节区表
-本机序、节区数据仍大端"的**混合端序**文件（静默损坏；实测修复前 `strip_file` 对结构合法的大端
+本机序、节区数据仍大端"的**混合端序**文件（静默损坏；修复前 `strip_file` 对结构合法的大端
 ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`，非本机端序 ⇒ 拒绝
 （新键 `error.strip_foreign_endian`），调用方降级为"跳过 strip + 告警"。不做端序转换
 （x86_64 发行版遇不到，不值得那套复杂度）。
@@ -2655,7 +2522,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 映射到不同 url ⇒ 报错（新键 `error.source_basename_collision`，点名两个 URL）。
 "上次运行留下的文件"（dest 在本次运行前就存在）行为不变。
 
-**(h) `depend`/`scan` 的树形输出走 l10n（`pkg/depend_scanner.cpp`）。** 状态标签与 reason 串原为
+**(h) `depend`/`scan` 的树形输出走 l10n（`pkg/depend_scanner.cpp`）。** 状态标签与 reason 串此前是
 **硬编码英文**，而这是用户可见输出、与 CLI 其余部分不一致。**现行规则**：`status_label` →
 `status_label_key`（返回 l10n 键，调用方 `get_string`），reason 串一律 `get_string`/`string_format`；
 新增 20 个 `info.depend_*` 键（en/zh 同步）。
@@ -2681,14 +2548,14 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 `strip_elf_rel_object` 为此**新增 `error_msg` 参数**（它此前压根没有这个出口）。
 ⚠️ **例外（有意静默）：`shnum == 0 || e_shoff == 0`（没有节区表）保持静默、不出声。**
 "没有节区表"是**正常形态**不是异常：被完整 strip 过的二进制就长这样 —— **本仓库自己的
-`make docker` 产物 `build/lpkg-docker` 实测 `readelf -h` 就是 `Number of section headers: 0`**
+`make docker` 产物 `build/lpkg-docker` 的 `readelf -h` 就是 `Number of section headers: 0`**
 （UPX 打包的二进制同理）。对它出声 = 每次构建都刷一行无意义的告警。判据：**没有可剥的东西
 ≠ 失败**。`StripTest.NoSectionHeaderTable` 显式钉住这条静默（`EXPECT_TRUE(error_msg.empty())`）。
 （本轮一度给它加了 `error.strip_no_sections` 告警，**已按上述理由撤回**——记在此处以免重犯。）
 
 ---
 
-## 17. 2026-10-03 第二批审计修复（行为 / 不变量变更）
+## 17. 第二批审计修复（行为 / 不变量变更）
 
 - **归档里的特殊文件成员整包拒绝**（`archive/archive.cpp` 的 `extract_tar_zst`）：成员
   `filetype ∈ {AE_IFIFO, AE_IFCHR, AE_IFBLK, AE_IFSOCK}` → 抛
@@ -2722,7 +2589,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 
 ---
 
-## 18. 2026-10-03 第三批修复（行为 / 不变量变更）
+## 18. 第三批修复（行为 / 不变量变更）
 
 起因：五路并行**只读**评审（定位 / 代码质量 / 严重缺陷 / 小缺陷 / 测试可信度）+ 之后的全量
 整修。下面只列**行为或不变量真的变了**的（纯注释订正、测试补强不在此列）。
@@ -2758,7 +2625,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 
 ---
 
-## 19. 2026-10-03 第四批修复（四路子 agent 复审后的收口）
+## 19. 第四批修复（四路子复审后的收口）
 
 起因：再派四路只读审计（版本桥专项 / 新防线 / 求解器与依赖语义 / 新增测试的验证力）。
 下面是**行为或可见输出真的变了**的那些：
@@ -2789,7 +2656,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 6. **`install_hook_files` 补 `TmpStageGuard`**（hook 脚本落位的 `.lpkgtmp` 残留）；守卫本体从
    `installation_task_copy.cpp` 的匿名 namespace 上移到 `install_common.hpp`（两个落位路径共用）。
 7. **退化写法 `1.0+`（空 release）** 现在与 `1.0` **同编**：不特判会编出 `1.0^^`，而它在
-   libsolv 里**大于** `1.0` ⇒ 桥在该边界不再保序（实测 6 对退化串分叉；真实版本不以 `+` 结尾）。
+   libsolv 里**大于** `1.0` ⇒ 桥在该边界不再保序（6 对退化串分叉；真实版本不以 `+` 结尾）。
 
 **写入层原语的祖先链闸（补 §19 的收口）**
 8. `OpSink::confined()`：DB 键派生的路径（升级废弃文件 / 移除趟 / 空目录回收 / xattr 撤销）
@@ -2812,16 +2679,15 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
    （坏行不许把目录改成 `07777`）、移除侧 `ifstream` fail-closed、`query` 退出码、
    `confine_target_path` 的**接线**（祖先逃逸时包被拒且 root 之外什么也没多出来）。
 
-**两处订正（同一轮内自己踩出来的）**
+**两处订正**
 - **剥尾斜杠必须落成真实串**：`fnmatch(3)` 只吃 C 串（无长度参数），而"view 剥前缀后余下一直
-  读到 NUL"这个技巧**只对剥前缀成立** —— 剪尾巴时 NUL 还在被剪掉的那段之后，fnmatch 照样看得见。
-  第 9 条的第一版就是这么写的（`usr/lib/foo/` 依旧不匹配 = **假修**），由新补的用例当场抓出。
+  读到 NUL"这个技巧**只对剥前缀成立** —— 剪尾巴时 NUL 还在被剪掉的那段之后，fnmatch 照样看得见
+  （写成 `usr/lib/foo/` 依旧不匹配 = **假修**）。
 - **`remove_empty_dir` 的判据顺序**：祖先链闸必须放在**挂载点守卫之后** —— 挂载点是更具体的
   "我们有意保留"理由（`SkippedMountPoint`），而它天然可能落在 root 之外（沙盒 root 的用例就是
   这样）。顺序反了会把前者盖成 `NotRemoved`（既有用例 `RemoveEmptyDirSkipsMountPoint` 当场红）。
 
-**关于 §19 第 2 条（`apply_soname_links`）与"祖先逃逸"的两处可达性订正**（由补测试的那一路实测/
-读码给出，取代我原先转述的审计链）：
+**关于 §19 第 2 条（`apply_soname_links`）与"祖先逃逸"的两处可达性订正**：
 - 无 `--force-overwrite` 时，"装 A（发 `usr/lib -> 外部`）再装 B（`usr/lib/libb.so`）"**够不到**
   `confine_target_path` —— B 的归档必然带目录条目 `usr/lib/`（解压器补建父目录 → `scan_content_files`
   扫到 → 排序在子文件之前），它在 `collect_content_conflicts` 里先撞上 A 持有的那个符号链接，
@@ -2833,9 +2699,9 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 
 ---
 
-## 20. 2026-10-03 第五批：两条中危缺陷 + 保留命名空间表 + 反向依赖收敛 + `utils.hpp` 拆分
+## 20. 第五批：两条中危缺陷 + 保留命名空间表 + 反向依赖收敛 + `utils.hpp` 拆分
 
-起因是一轮**全仓评估**（四路并行只读审计 + 全量测试 1158/142 实测全绿）。两路审计各报出
+起因是一轮**全仓评估**（四路并行只读审计 + 全量测试 1158/142 全绿）。两路审计各报出
 **新缺陷**，都是本仓库自己命名的缺陷形态（"同族判据只推了一条分支" / "第二实现必漂移"）。
 全程按纪律：**先写会红的测试、再改代码**（三条新用例各自红/绿的原始输出都留过档）。
 
@@ -2850,7 +2716,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
   于是 `lib_dir/sub/EVIL.so` **词法上完全在** lib_dir 内 ⇒ 放行 ⇒ `create_symlink` 穿过
   `sub`，在 `<root>` 之外建出链接。
 - **为什么是"同族判据只推了一条分支"**：两个调用点（`trigger/trigger.cpp` 的 ldconfig 触发器、
-  `build/builder.cpp` 的 staging）在 2026-10-03 已经加了 `path_resolves_within(lib_dir, root)`，
+  `build/builder.cpp` 的 staging）已经加了 `path_resolves_within(lib_dir, root)`，
   注释里连"包发的 `usr/lib -> <root 外>` 链接是有意放行的，不挡就是在宿主目录里建/删链接"都写明了 ——
   但那道守卫只护 `lib_dir` **自身**，护不到它的**子项**。
 - **修法**：判据换成 **`path_within_resolved()`**（词法级 + **只解析父目录**的 canonical 复核）。
@@ -2863,7 +2729,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
   （`tests/integration/test_solver_regressions.cpp`）。⚠️ 断言必须用 **`fs::is_symlink`（lstat 语义）**：
   `create_symlink` 建的是**悬空**链接（目标是同目录裸文件名），而 `fs::exists()` 对悬空链接
   返回 false —— **用它做断言的话，"链接建没建出来"都判 false**，是一条恒真废话
-  （实测：`is_symlink=true / exists=false`）。修前该用例的失败信息直接打出了逃逸出去的真实路径。
+  （`is_symlink=true / exists=false`）。修前该用例的失败信息直接打出了逃逸出去的真实路径。
 
 ### 20.2 归档成员名守卫漏了第四个自用命名空间 `.lpkg_bak_`（可达，静默删已装文件）
 
@@ -2878,7 +2744,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
   （`query` 说文件属于某包、盘上已经没了）。
 - **修法（含"防漂移"的结构改动）**：在 `base/constants.hpp` 立**唯一一张表**
   `RESERVED_MEMBER_NAMES[]`（`{token, starts_with}`），守卫**遍历它**，不再在守卫里另列一遍。
-  2026-10-03 的缺陷正是"常量头里有 `SUFFIX_LPKG_BAK`、守卫里只硬编码了另外三个"。
+  此前的缺陷正是"常量头里有 `SUFFIX_LPKG_BAK`、守卫里只硬编码了另外三个"。
   ⚠️ 判据语义**不许改成子串匹配**：`tests/unit/test_archive_member_name_safety.cpp` 有**明文
   正面对照**断言"若写成 `find() != npos` 就会误拒 `x.lpkgnewx` / `foo.lpkgtmp.txt` 这类合法名"。
 - **同一判据的三处重复一并收敛**：`base/utils.cpp`（裸字面量）、`db/wal_op.cpp`（裸字面量）、
@@ -2919,7 +2785,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
   `file.bad()` 时**抛** `error.read_file_failed`，于是**把两个消费者的不同策略烘进了共享函数** ——
   `AggregatedIndexTest.DirectoryIndexIsReportedNotEmptyRepo` 立刻变红：它钉的是"索引用一个
   **目录**占住时（Linux 下 `ifstream` 打开目录成功、随后的读才失败）`load_index()` 要落
-  `warning.repo_index_empty`"这条**实测契约**。两条策略**有意不同**（`load_index()`：读不出内容
+  `warning.repo_index_empty`"这条**契约**。两条策略**有意不同**（`load_index()`：读不出内容
   ⇒ 降级成空仓库 + 告警，因为离线装本地 `.lpkg` 是常见用法；反向依赖图：⇒ fail-closed 抛错，
   因为静默当空会让它报"无受影响包"这个**错误答案**）。修法是**让共享函数只报告结果**
   （返回 `bool clean`），**策略留给调用方**。
@@ -2955,11 +2821,11 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 | `tests/integration/test_cancel_semantics.cpp` | 断言输出不含 `info.install_complete`，而**该键根本不存在** ⇒ `get_string` 返回 `[MISSING_STRING: …]` ⇒ **恒真断言** | 删掉该行（下一行已用**存在**的键 `info.install_summary` 断言同一件事） |
 | `base/constants.hpp` | `constants::TAB` **零引用**（全仓生产/测试各 0 处） | 删 |
 
-> ⚠️ **一条被实测推翻、因而不改的审计结论**（留档免得下轮再报）：审计报
+> ⚠️ **一条被推翻、因而不改的审计结论**（留档免得下轮再报）：审计报
 > `elf/lib_utils.cpp` 第二遍清理悬空 SONAME 链接时的 `fs::exists(entry.path(), ec)`
 > **只判返回值不判 `ec`**，而姊妹点写的是 `!fs::exists(...) || ec`，属"同族判据只推一条分支"。
-> **实测不成立**：`fs::exists(p, ec)` 对**真悬空**（ENOENT）返回 false 且 **`ec` 被清成 0**；
-> 只有 ELOOP / EACCES / EIO 才让 `ec != 0`（实测 ELOOP → `ec=40`）。补 `|| ec` 会把**环链接**
+> **不成立**：`fs::exists(p, ec)` 对**真悬空**（ENOENT）返回 false 且 **`ec` 被清成 0**；
+> 只有 ELOOP / EACCES / EIO 才让 `ec != 0`（ELOOP → `ec=40`）。补 `|| ec` 会把**环链接**
 > 从"清理"变成"永久留下" —— 那不是修缺陷、是改语义（该函数的职责就是收尾解不开的 SONAME 链接）。
 > 而 `:106` 那个 `|| ec` 是**另一极性**的用途（判"链接是否正确"⇒ 判不出来就重建，是安全动作），
 > 两者不可互推。真正"判不出来"的只剩 EACCES/EIO，而 lpkg 恒以 root 跑、目标在自家 `usr/lib` 下
@@ -2980,7 +2846,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 **判据（可复用）**：一个只有测试在用的 API，如果它**只是通往生产行为的另一条门**
 （入口/包装/转发），那是死代码，删；如果它**是某条不变量唯一的观测点**，那它活着 ——
 "生产零调用"与"无用"不是一回事。反过来说也成立：**测试自己写、自己读的往返用例
-（`write_set_to_file` + `read_set_from_file`）什么也没证明** —— 它证明的是"我的写法和我的
+（`write_set_to_file` + `read_set_from_file`）什么也没证明** —— 它证明的是"自己的写法和自己的
 读法对得上"，而不是"读侧能吃下**生产写出来的**那种文件"。这类往返用例要改成直接造**生产形态**
 的输入。
 
@@ -2990,7 +2856,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 
 ---
 
-## 21. 2026-10-05 第六批：畸形 tar 守卫 + `so:` 命名空间不变量订正
+## 21. 第六批：畸形 tar 守卫 + `so:` 命名空间不变量订正
 
 ### 21.1 新增 `archive/tar_guard.{hpp,cpp}` —— 结构性畸形一律整包拒绝
 
@@ -3028,8 +2894,8 @@ systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜�
 **重名成员是这次的核心**：`extract_file_from_archive`（流式读）命中即返回**第一份**，
 而安装用的是**解压后**的那份（`ARCHIVE_EXTRACT_UNLINK` 让后一份覆盖前一份）——
 一份"照索引写的" `metadata.json` 加一份 payload，就能同时骗过校验与使用。
-修前实测（`ArchiveMalformedGuardTest.DuplicateMemberCannotSmuggleASecondMetadataJson`，
-临时关掉守卫复现）：盘上留下的是 `{"name":"good","version":"9.9","provides":["so:libfoo.so.1"]}`
+修前复现（`ArchiveMalformedGuardTest.DuplicateMemberCannotSmuggleASecondMetadataJson`，
+临时关掉守卫）：盘上留下的是 `{"name":"good","version":"9.9","provides":["so:libfoo.so.1"]}`
 —— **payload 被装了进去**。
 
 **为什么只守解压这一条路**：安装流程里每个包都要经 `extract_tar_zst` 解压，而这里是整包拒绝，
@@ -3038,7 +2904,7 @@ systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜�
 是包内**第一个**成员，那等于让每次元数据读取都把整包解压一遍（861 个包里最大 164 MiB）。
 **宁可少一层冗余，也不要一条在热路径上悄悄变慢的检查。**
 
-#### 三条"看着该判、实测不可达"的判据 —— 已删，只留绊线用例
+#### 三条"看着该判、实际不可达"的判据 —— 已删，只留绊线用例
 
 | 形态 | 为什么删 |
 |---|---|
@@ -3046,19 +2912,19 @@ systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜�
 | **声明尺寸 ≠ 实际数据** | libarchive 在 `archive_read_data_block` 上直接返 **FATAL**（`Truncated tar archive detected`），上层 `r < ARCHIVE_WARN` 分支先抛了。绊线：`TruncatedMemberIsRejectedByLibarchive`（断言落在 `error.extract_failed` 上） |
 | **无名成员** | 调用点在本函数**之前**就有 `if (member.empty()) continue;`（`.`、`./` 这类），空名进不来 |
 
-按本仓库纪律（§7.4：不为走不到的分支写断言），这些**不留判据、不留断言**，只留记录它们
+按本仓库纪律（不为走不到的分支写断言），这些**不留判据、不留断言**，只留记录它们
 "不可达"的绊线用例 —— 绊线红 = 第三方行为变了，那时才需要补判据。
 
-#### 明确**不采纳**的通用加固建议（每条都有实测依据，别照着通用清单"补全"）
+#### 明确**不采纳**的通用加固建议（每条都有依据，别照着通用清单"补全"）
 
 | 通用建议 | 不采纳的理由 |
 |---|---|
 | **拒反斜杠** | 通用清单里的常客，但**误伤真实包**（systemd 的 `\x2d` unit 名，见上）—— 判据已删，只留绊线 |
-| 剥/拒 setuid、setgid | **实测真实包依赖它**：`dbus-daemon-launch-helper`、`unix_chkpwd`、`passwd`、`sudo`、`su`、`mount`、`chfn/chsh`、`newuidmap/newgidmap`、`wall`(setgid) 全是。剥掉 = 系统坏掉 |
+| 剥/拒 setuid、setgid | **真实包依赖它**：`dbus-daemon-launch-helper`、`unix_chkpwd`、`passwd`、`sudo`、`su`、`mount`、`chfn/chsh`、`newuidmap/newgidmap`、`wall`(setgid) 全是。剥掉 = 系统坏掉 |
 | 拒绝对目标的符号链接 | `--root` 下包发 `<root>/usr/bin/foo -> /etc/foo` 合法且必要 |
 | 文件类型黑名单 → 白名单 | 本函数同时服务**源码 tarball** 解压，某些 tar 变体的 `filetype` 可能是 0 或不认识的值，白名单会误伤合法源码包（`archive.cpp` 里原有的论证成立） |
 | 拒非 UTF-8 名字 | 上游源码 tarball 里带 Latin-1 等历史编码的文件名真实存在；只拒**控制字符** |
-| 资源上界（成员数 / 解压比 / 累计尺寸） | 维护者 2026-10-05 明确拍板不加 |
+| 资源上界（成员数 / 解压比 / 累计尺寸） | 有意**不加** |
 | 用 `SECURE_NOOVERWRITE` 替代 `UNLINK` | `UNLINK` 是"重装/升级时往非空临时目录里再解一次"所必需的；重名已由判据 1 拦掉 |
 
 **不可实现、只记录为已知边界**（不为它们写判据、更不写用例）：**内嵌 NUL**
@@ -3073,14 +2939,13 @@ systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜�
 断言（注释里写明这是**粒度变更、不是缺陷修复**）。理由：畸形归档是**结构性**问题，
 留"跳过"的口子等于让用户拿到一个装了一半、某文件莫名消失的包。
 
-### 21.2 `so:` 命名空间的不变量订正（A1）
+### 21.2 `so:` 命名空间的不变量订正
 
-`base/constants.hpp` 原文断言「包名不可能含 `:`（`is_safe_path_component` 拒掉），所以裸名
-永远撞不进 `so:` 空间」—— **不成立**。那条论证只覆盖**包名**，而 `provides` 的每一项走的是
-**同一条裸名路径**、且当时**任何地方都没校验过 `:`**（`reject_unsafe_metadata_tokens` 只拒
-`\0\n\r\t`）。于是 `provides: ["so:libfoo.so.1"]` 与 `needed_so: ["libfoo.so.1"]` 灌出**同一个
-pool id**：求解器当 SONAME 接受，安装期 `soname_satisfied()`（只看 `provides_soname`）拒绝 ——
-**正是 8.0.0 专门根除过的"求解器说能装、安装期拒装"分叉**。
+**包名里的 `:` 挡不住 `so:` 空间**：`is_safe_path_component` 拒掉包名里的 `:`，但 `provides`
+的每一项走的是**同一条裸名路径**、且**任何地方都没校验过 `:`**（`reject_unsafe_metadata_tokens`
+只拒 `\0\n\r\t`）。于是 `provides: ["so:libfoo.so.1"]` 与 `needed_so: ["libfoo.so.1"]` 灌出
+**同一个 pool id**：求解器当 SONAME 接受，安装期 `soname_satisfied()`（只看 `provides_soname`）
+拒绝 —— **正是此前专门根除过的那类"求解器说能装、安装期拒装"分叉**。
 
 **修法**：在 metadata 解析的**唯一出口**加 `reject_reserved_provides_prefix()`
 （`pkg/install_common.cpp`），拒 `provides` 里以 `POOL_SONAME_PREFIX` 开头的项。**不在求解器里
@@ -3095,7 +2960,7 @@ pool id**：求解器当 SONAME 接受，安装期 `soname_satisfied()`（只看
 **顺带补的一格**：本地 `.lpkg` 候选那条路上 `provides` 此前**连分帧字符校验都没有**
 （上一轮只补了两个 SONAME 字段）—— 又一个"同族判据只推了一条分支"。已补齐。
 
-### 21.3 本批的实测数据（用于确认判据不会误伤真实包）
+### 21.3 本批的数据（用于确认判据不会误伤真实包）
 
 | 事实 | 数值 |
 |---|---|
@@ -3105,34 +2970,34 @@ pool id**：求解器当 SONAME 接受，安装期 `soname_satisfied()`（只看
 | 最大解压比 | 4.9×（164 MiB → 811 MiB，libreoffice） |
 | 含 setuid/setgid 的包 | **有**（dbus / linux-pam / shadow / util-linux / sudo）—— 见 §21.1 的"不采纳"表 |
 
-### 21.4 strip 的三条（A3 / A4 / A5）—— 其中 A3 的**方案被实测推翻**
+### 21.4 strip 的三条 —— 其中一条的**方案被推翻**
 
-**A4**（`process_archive` 写 `<file>.a.tmp` 不拒符号链接）与 **A5**（`process_elf` 先原地
-`trunc` 再写、失败只降级为告警）都按计划做：A4 在落位前用 `is_symlink_no_follow` 拒绝并补上
-`error_msg`；A5 改成 `<file>.lpkgtmp` → 检查每次写 → **显式恢复原权限位** → `fsync_and_rename`，
-成功 rename 之前原文件一个字节不动。A5 修前实测：链接目标被整份归档覆盖、`safe_rename` 又把
-链接本身改名成了 `.a`。
+**`process_archive` 写 `<file>.a.tmp` 不拒符号链接、`process_elf` 先原地 `trunc` 再写（失败只
+降级为告警）这两条都按计划做**：前者在落位前用 `is_symlink_no_follow` 拒绝并补上 `error_msg`；
+后者改成 `<file>.lpkgtmp` → 检查每次写 → **显式恢复原权限位** → `fsync_and_rename`，成功 rename
+之前原文件一个字节不动。后者修前：链接目标被整份归档覆盖、`safe_rename` 又把链接本身改名成了
+`.a`。
 
-> ⚠️ **A5 的已知取舍（有意保留）**：原子替换换 inode ⇒ **扩展属性不随行**（`security.capability`），
+> ⚠️ **`process_elf` 那条的已知取舍（有意保留）**：原子替换换 inode ⇒ **扩展属性不随行**（`security.capability`），
 > 硬链接关系亦然。不处理的理由写在 `strip.cpp` 的现场注释里：本函数只跑在**构建期的 staging 树**
 > 上（那一刻的产物不会有 file capabilities），且本仓库打包器不编码硬链接。**若将来 strip 被用到
 > 构建树之外，这条必须重新评估。**
 
-**A3**（ET_REL 对齐填充不在聚合上界内 ⇒ 产物 ≈ N×输入 ⇒ OOM）**批准的方案没能成立**，落地的是
+**ET_REL 对齐填充不在聚合上界内（⇒ 产物 ≈ N×输入 ⇒ OOM）这一条的原方案没能成立**，落地的是
 另一套判据：
 
-| 原方案 | 实测结果 |
+| 原方案 | 结果 |
 |---|---|
 | 在 `elf_update` **之后**判 `size > input_size` | ① **判据本身不成立**：良构 ELF 重建会**合法地变大**（既有正面控制 `RelSectionsWithinFileStillStrip`：输入 **512** 字节 → 产物 **592** 字节），朴素判据会把正常 `.o` 拒掉；② **拦不住 OOM**：放大发生在 `elf_update` **内部**（按对齐值 `ftruncate` 那个 memfd），等拿到 `size` 时内存已经被吃掉 |
 
 **实际落地**：主判据前置到 `elf_update` **之前** —— 与 `retained_data_total` 同形的聚合封顶
-`Σsh_addralign ≤ input_size`（对齐值是**输入可控**字段，放大形态需要它 ≫ 输入；实测 128 个真实
+`Σsh_addralign ≤ input_size`（对齐值是**输入可控**字段，放大形态需要它 ≫ 输入；128 个真实
 `.o` 的 `Σalign / 文件大小` 最大 **2.0%**、中位 **0.8%**，余量 50×）。原方案保留为**第二道**
 （`error.strip_output_grew`），上界改成结构化的 `input_size + 头 + 节区表 + retained_data_total`。
-修前实测放大：输入 **64 KiB**（1000 个 `align=4096` 的节区）→ 产物 **4,160,136** 字节，**63.5×**。
+修前放大：输入 **64 KiB**（1000 个 `align=4096` 的节区）→ 产物 **4,160,136** 字节，**63.5×**。
 
-**教训**：这是"方案里'重构会让 X 全部移动'这类断言是预测、落地后要用实测校正"（§1.4 第 6 条）
-的又一例 —— 而且这次是**我批准的方案本身**被推翻。判据能不能拦住缺陷，取决于它**跑在哪一刻**：
+**教训**：这是"方案里'重构会让 X 全部移动'这类断言是预测、落地后要拿真实结果校正"
+的又一例 —— 而且这次是**原方案本身**被推翻。判据能不能拦住缺陷，取决于它**跑在哪一刻**：
 同一个不变量写在 `elf_update` 之后是"事后验尸"，写在之前才是"拦截"。
 
 ### 21.5 本批收口数字
@@ -3150,7 +3015,7 @@ pool id**：求解器当 SONAME 接受，安装期 `soname_satisfied()`（只看
 
 成功移除（`remove a b c` / `autoremove` / `force-solve-conflict` 走 `remove_packages_checked()`；
 **`remove -r` 闭包不走它** —— `remove_packages_recursive()` 自己筛完直接调
-`remove_packages_in_one_batch()`（订正 2026-09-26：原文把闭包也算进 `remove_packages_checked()`）。
+`remove_packages_in_one_batch()`。
 四条路径的共同点是**整组一个批次**）:
   BEGIN_PKGS → [逐包: RM_BEGIN → (阶段A: SAVE_CONF/BACKUP...) → (阶段B: DIR_RM...) → DBRM...
                 → DB(6 个库)... → RM_COMMIT → RM_END] → COMMIT_PKGS
@@ -3167,12 +3032,10 @@ pool id**：求解器当 SONAME 接受，安装期 `soname_satisfied()`（只看
   BEGIN_PKGS → RM_BEGIN → BACKUP... → (异常)
   → RESTORE_FILE... / RESTORE_DIR(重建被 rmdir 的空目录) → DB :batch-start
   → ROLLBACK <pkg> <ver> → END <pkg> <ver> → COMMIT_PKGS
-  （⚠️ 订正 2026-09-26：原文漏了 `ROLLBACK`/`END` 两行 —— 移除失败时
-   `successfully_installed` = 本批已删完的包，`batch_rollback` 第 5 步会为每个包写
+  （移除失败时 `successfully_installed` = 本批已删完的包，`batch_rollback` 会为每个包写
    `ROLLBACK <pkg> <ver>` + `END <pkg> <ver>`（版本号从 `RM_BEGIN` 取）。
    已有回归用例钉住：`tests/unit/test_cleanup.cpp` 的 `BatchRollbackRmBeginVersionExtraction`
-   断言 WAL 里出现 `ROLLBACK mypkg 2.5.1` / `END mypkg 2.5.1`。
-   "安装失败回滚"那一段本来就是写全的，只有移除段漏了。）
+   断言 WAL 里出现 `ROLLBACK mypkg 2.5.1` / `END mypkg 2.5.1`。）
 
 安装时断电:
   BEGIN_PKGS → BEGIN A → BACKUP ... 断电
@@ -3186,9 +3049,9 @@ rollback 自身断电:
 
 ---
 
-## 22. 2026-10-07：静态库"长名成员"判据必须与**成员顺序无关**
+## 22. 静态库"长名成员"判据必须与**成员顺序无关**
 
-**症状**（用户报告）：`llvm` 每次构建刷两条假警告 ——
+**症状**：`llvm` 每次构建刷两条假警告 ——
 
 ```
 Warning: Failed to strip file …/libLLVMSupport.a: Static library is malformed, or cannot be read/rewritten
@@ -3199,7 +3062,7 @@ Warning: Failed to strip file …/libLLVMDemangle.a: Static library is malformed
 源文件名超过 ar 的 15 字节上限）。同族的 `libLLVMTableGen.a` / `libLLVMHTTP.a` / `libLLVMDebuginfod.a`
 同样含长名成员，却**一声不响**。
 
-**根因**：同一条策略在**两条腿上判**，其中一条漏判（详见 §15(a) ③ 的订正块）：
+**根因**：同一条策略在**两条腿上判**，其中一条漏判（详见 §15(a) ③）：
 
 1. `archive_strip_scan` 判长名 —— 但 >15 字节的名字在归档里是 `//` 长名表 + `/N` 引用，**真名要
    经 libarchive 解析之后才看得见**；而它一发现"某个 `.o` strip 后会变短"就 `break` 收工（当时
@@ -3221,7 +3084,7 @@ Warning: Failed to strip file …/libLLVMDemangle.a: Static library is malformed
   那里（预扫已按长名跳过），能到那里的只可能是那张 `//` 表**解析不出真名**（悬空/损坏的引用）
   ⇒ 那种库确实是畸形，那句 "malformed" 是**如实**的。
 
-**实测**（2026-10-07，把真实产物喂给修后的 `strip_file`，链接 `build/main/*.o` 的一次性探针）：
+**结果**（把真实产物喂给修后的 `strip_file`，链接 `build/main/*.o` 的一次性探针）：
 
 | 库 | 修前 | 修后 |
 |---|---|---|
@@ -3235,24 +3098,8 @@ Warning: Failed to strip file …/libLLVMDemangle.a: Static library is malformed
 
 **测试**：`StripTest.LongNameMemberIsSkippedSilentlyRegardlessOfMemberOrder` —— 同一种库造**两种
 成员排列**，断言两者都（a）不剥、（b）`error_msg` 为空、（c）字节不变；并先钉住**前置条件**
-（构造用的 `.o` 必须 strip 后变短，否则这条用例测不到"顺序"这个变量 = 恒真断言）。修前实测红在
+（构造用的 `.o` 必须 strip 后变短，否则这条用例测不到"顺序"这个变量 = 恒真断言）。修前红在
 "长名在后"那一格（`error.strip_archive_broken`），修后两格皆绿。
 
 **收口数字**：`make test` **1217 用例 / 144 套件 / 1216 通过 / 0 失败 / 1 跳过**（基线 1216/144，
 +1 即本条用例），`make format-check` 222 文件 0 残留。
-
----
-
-## 附录 B：代码注释里的 `历史 TODO.md <编号>` 是什么
-
-`main/src` 与 `tests` 里共 **68 处**注释写着 `历史 TODO.md A3` / `历史 TODO X6` 这样的编号。
-它们指向的是一份**已从仓库移除**的缺陷清单 `lpkg/TODO.md`（368 行，按 `A1…Z7` 编号的
-"已修/待修"台账），不是待办事项 —— **别按 TODO 去读**。
-
-- 取回全文：`git show 7c0d0194^:lpkg/TODO.md`（`7c0d0194` 是删掉它的那笔提交）。
-- 编号覆盖：代码里用到的 32 个编号全部能在那一版里找到。
-- 2026-10-03 给每处引用加了 `历史 ` 前缀 —— 之前这 68 处是**悬空引用**（文件不在树里，
-  引用却写成现在时），`grep -rn TODO` 只会把人引向死链。
-- 剩余的 `TODO` 字样只有 3 处是**普通行文**（"这不是待办，别再按 TODO 读"之类），不是编号。
-
-编号对应的**机制**早已写进正文各节；编号只是历史索引，不是规范。

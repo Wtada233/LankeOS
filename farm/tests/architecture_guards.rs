@@ -141,7 +141,7 @@ fn index_txt_is_read_in_one_module() {
 
 /// 测试代码不得住在生产文件里：生产文件的 `#[cfg(test)]` **只能**用于 `mod tests;` 声明
 /// （测试要么在 `X/tests.rs`，要么在文件末尾的内联 `mod tests`——两者都在 `#[cfg(test)]` 之后）。
-/// 反例（本轮清掉的）：`sources.rs` 里 `#[cfg(test)] pub fn sources_ready`——虽然不进二进制，
+/// 反例：`sources.rs` 里 `#[cfg(test)] pub fn sources_ready`——虽然不进二进制，
 /// 但它让"生产文件里混着测试专用代码"成为惯例，久了就分不清哪些是真 API。
 #[test]
 fn no_test_code_in_production_files() {

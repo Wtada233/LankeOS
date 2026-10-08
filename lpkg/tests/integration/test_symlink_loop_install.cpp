@@ -1,9 +1,9 @@
 /**
  * test_symlink_loop_install.cpp — **自带符号链接环的包必须能装上**，且环不得让事务收不了尾
  *
- * ── 缺口（CLAUDE.md §3「符号链接环（ELOOP）使包永久无法卸载」的安装侧一半）────────
+ * ── 缺口（「符号链接环（ELOOP）使包永久无法卸载」的安装侧一半）────────
  * `std::filesystem` 的**判定类**调用在"末段符号链接解不开"时不是判 not-found，而是**抛**
- * `filesystem_error`（实测记录与前提复现见 `tests/unit/test_symlink_loop_paths.cpp` 的
+ * `filesystem_error`（记录与前提复现见 `tests/unit/test_symlink_loop_paths.cpp` 的
  * `Premise*` 用例）。安装路径上还剩两个炸点：
  *
  *   ① `InstallationTask::copy_package_files()` 的第一行判定
@@ -25,8 +25,8 @@
  * ── 为什么本文件用"**一个包自带自环**"而不是"两个包互指" ─────────────────────────
  * `tests/unit/test_symlink_loop_paths.cpp` 的 `RemovePackageFormingSymlinkLoopWithAnother`
  * 走的是"两个包各出一半拼成环"的**绕道** —— 它当时的注释写明了理由：自带环的包装不上，
- * 所以只能绕过安装那一腿。安装侧修好之后，这条**直路**才是用户真会遇到、也最该钉住的形态。
- * 两者互补，不重复：那条钉"两个包互指 + 卸载"，本条钉"单包自带环 + 安装 + 回滚"。
+ * 所以只能绕过安装那一腿。安装侧修好之后，这条**直路**才是用户真会遇到、也最该覆盖的形态。
+ * 两者互补，不重复：那条覆盖"两个包互指 + 卸载"，本条覆盖"单包自带环 + 安装 + 回滚"。
  *
  * ── 两条用例分别是两个炸点的**红→绿**判别项 ─────────────────────────────────────
  *   ① 自带自环的包装得上、盘上留下那个环、随后卸得掉（判别 ①）；
@@ -109,10 +109,10 @@ TEST_F(SymlinkLoopInstallTest, PackageWithSelfLoopSymlinkInstallsAndCanBeRemoved
         // ⚠️ 刻意**不带** `usr/lib/**.so*`：那会激活 `triggers.conf` 的 ldconfig 规则，
         //    提交后跑 `apply_soname_links(<root>/usr/lib)` —— 它遍历该目录时用
         //    `directory_entry::is_regular_file()`（`elf/lib_utils.cpp`），对环**抛**
-        //    （实测异常原文：`filesystem error: status: Symbolic link loop
+        //    （异常原文：`filesystem error: status: Symbolic link loop
         //    [.../root/usr/lib/self]`）。 那是**另一处**缺口（`elf/*`
         //    不在本次改动的文件集内，已单独上报），不该把本用例
-        //    变成它的代言人：本用例钉的是**拷贝阶段**那条炸点。
+        //    变成它的代言人：本用例覆盖的是**拷贝阶段**那条炸点。
         //    此处若换成 `usr/lib/real.so`，本用例在"全量"里红、在"单跑"里绿 —— 因为
         //    ldconfig 规则来自 `TriggerManager` 这个进程级单例（`tests/unit/test_trigger_manager`
         //    跑过之后规则才在册），是测试隔离问题，不是被测语义问题。
@@ -140,7 +140,7 @@ TEST_F(SymlinkLoopInstallTest, PackageWithSelfLoopSymlinkInstallsAndCanBeRemoved
     EXPECT_TRUE(Cache::instance().is_file_owned_by("/usr/lib/self", pkg))
         << "环是**文件**（lstat 语义），DB 键不带尾斜杠";
 
-    // 卸得掉：环不得让"这个包永远卸不掉"（CLAUDE.md §3 那条缺口的另一半）
+    // 卸得掉：环不得让"这个包永远卸不掉"（上面那条缺口的另一半）
     EXPECT_NO_THROW(remove_package(pkg, /*force=*/true))
         << "持有环的包必须卸得掉（卸载路径对环同样不能抛）";
     Cache::instance().load();

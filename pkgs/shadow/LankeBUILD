@@ -13,7 +13,7 @@ lankebuild_prepare() {
     #    （上游 commit deef7d84c「nscd_flush_cache(): Define as static inline function」；它本意是
     #    消掉宏 `(0)` 当语句用的"statement with no effect"诊断，见上游 issue #1733）。
     #    而全仓 ~28 处调用都传 `char*`、外层**没有** `#ifdef USE_NSCD`，我们又是 `--without-nscd`
-    #    ⇒ 指针→整型。**GCC 14 起 -Wint-conversion 是默认 error**（实测 gcc 16.2：不带 -Werror
+    #    ⇒ 指针→整型。**GCC 14 起 -Wint-conversion 是默认 error**（gcc 16.2：不带 -Werror
     #    也退出码 2）⇒ 4.20.3 在新工具链上必炸；而 4.19.0–4.20.2 的宏只触发"语句无效果"，
     #    **仅在传 -Werror 时**才失败 —— 这就是"那三版都好、偏偏 4.20.3 挂"的原因。
     #    （master 至今未修、也无人报过这个新形态；4.20.3 的 release note 声称修了 #1733。）

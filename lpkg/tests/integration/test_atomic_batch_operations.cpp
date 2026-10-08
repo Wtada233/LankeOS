@@ -60,7 +60,7 @@ TEST_F(AtomicBatchTest, InstallChainOfThree)
 TEST_F(AtomicBatchTest, InstallWithProvides)
 {
     // SONAME 走**第 5 个参数**（`provides_soname`）与 `provides_soname.db` —— 8.0.0 起
-    // `provides` 是纯虚拟 provider 空间，不登记 .so（见 CLAUDE.md 的 provides 拆分那一节）。
+    // `provides` 是纯虚拟 provider 空间，不登记 .so。
     std::string pLib = create_pkg("libProv", "1.0", {}, {}, {"custom-lib.so.1", "custom-lib.so.2"});
     install_packages({pLib});
     EXPECT_TRUE(Cache::instance().get_soname_providers("custom-lib.so.1").contains("libProv"));

@@ -11,17 +11,17 @@
 #include "op_sink.hpp"
 #include "repo/repository.hpp"
 
-/// 安装计划：已解析完毕、待安装的包
+/// 已解析完毕、待安装的包
 struct InstallPlan {
     std::string name, actual_version, sha256;
     bool is_explicit = false;  ///< 用户显式指定安装
     std::filesystem::path local_path;
     std::vector<DependencyInfo> dependencies;
-    std::vector<std::string> provides;         // 虚拟 provider
-    std::vector<std::string> provides_soname;  // 导出的 SONAME
-    std::vector<std::string> needed_so;        // 需要的 SONAME
-    bool force_reinstall = false;              ///< 强制重新安装
-    bool metadata_verified = false;            ///< 是否已验证元数据
+    std::vector<std::string> provides;
+    std::vector<std::string> provides_soname;
+    std::vector<std::string> needed_so;
+    bool force_reinstall = false;
+    bool metadata_verified = false;
     /**
      * 该包的 content/ 是否已由**整批文件冲突预检**下载解压到标准临时目录
      * （check_batch_file_conflicts 置位）。
@@ -62,7 +62,7 @@ struct InstallContext {
     std::map<std::string, std::filesystem::path>& local_candidates;
     std::vector<std::pair<std::string, std::string>>& targets;
     bool force_reinstall;
-    bool top_level;                                   ///< 是否为顶级调用（非递归子调用）
+    bool top_level;                                   ///< 非递归子调用
     std::unordered_set<std::string> installed_set{};  ///< 本事务中已成功安装的包（O(1) 成员检查）
 };
 
@@ -71,16 +71,13 @@ namespace detail
 /**
  * **计划版本复核**：`dep`（带约束的依赖）若出现在 `plan` 里，其**计划版本**必须满足该约束
  * —— 按 **lpkg 语义**（`version_satisfies_all`），不是 libsolv 的匹配语义。不满足则抛
- * `error.dep_version_mismatch`（点名依赖名、计划版本、发起包）。**唯一实现**。
+ * `error.dep_version_mismatch`（点名依赖名、计划版本、发起包）。唯一实现。
  *
- * 为什么它还在（2026-10-03 起是**纵深防御**）：在 8.0.0 把版本语义换成 rpm EVR 之前，libsolv
- * 的 EVR 匹配把"要求侧缺 release"当通配，会选出 lpkg 认为不满足的版本，这道复核是唯一拦得住
- * 的地方（当时的用例只能借"求解器产出违规计划"来触达它）。8.0.0 之后版本串原样进池、求解器与
- * 安装期共用同一份判据（见 `vercmp/version.hpp`）⇒ 正常路径上这里
- * **不会触发**。留着的理由是：求解器选版本与 lpkg 判据是**两条独立实现路径**，任一侧将来
+ * 为什么它还在（**纵深防御**）：求解器选版本与 lpkg 判据是**两条独立实现路径**，任一侧将来
  * 改动（换编码、升 libsolv、改 `version_satisfies`）都可能让它们重新分叉，而分叉的代价是
- * "装出坏系统"。⇒ 它的用例**直接喂手搓的计划**（`tests/unit/test_plan_dep_version_check.cpp`），
- * 不再假装靠求解器触达（那种用例在修好之后是假绿）。
+ * "装出坏系统"。求解器与安装期共用同一份判据（见 `vercmp/version.hpp`）⇒ 正常路径上这里
+ * **不会触发**。⇒ 它的用例**直接喂手搓的计划**（`tests/unit/test_plan_dep_version_check.cpp`），
+ * 靠求解器触达的用例是假绿。
  */
 void check_planned_dep_version(const DependencyInfo& dep,
                                const std::map<std::string, InstallPlan>& plan,
@@ -229,7 +226,7 @@ private:
     bool processed_ = false;
     /**
      * 本 task 的「路径事实」记录表：让开趟 probe 一次并记事实，写入趟**逐字复用**，
-     * 记事实，写入趟**逐字复用**，两趟查决策表时看到同一份 `PathFacts`。
+     * 两趟查决策表时看到同一份 `PathFacts`。
      *
      * 刻意是**成员**而不是函数级静态表：生命周期 = 一个 task ⇒ 同一进程里先后处理同名包
      * （批量安装 / 依赖递归里重名 / 先卸后装）在结构上不可能互相清踩。详见 op_sink.hpp。
@@ -266,7 +263,7 @@ void remove_package(const std::string& pkg_name, bool force = false, bool wrap_i
                     bool purge_config = false);
 /// 移除多个包：**单批次原子**（多包命令必须走它，逐包调用会失去跨包回滚）。
 /// @return 实际移除的包数（"没装过"的不计）—— 调用方据此决定要不要打"卸载完成"
-///         （2026-10-03：此前 CLI 无条件打，`lpkg remove <未安装>` 会打印一条假完成消息）。
+///         （否则 `lpkg remove <未安装>` 会打印一条假完成消息）。
 size_t remove_packages(const std::vector<std::string>& pkg_names, bool force = false,
                        bool purge_config = false);
 void autoremove(bool purge_config = false);

@@ -17,7 +17,7 @@
 
 namespace fs = std::filesystem;
 
-// sigint_graceful 的**定义**在 main/src/main_cli.cpp（2026-09-26 从 main.cpp 下沉）：
+// sigint_graceful 的**定义**在 main/src/main_cli.cpp：
 // 那个翻译单元是 LPKG_OBJS 的一员 ⇒ 已经进测试二进制，所以这里**只能声明、不能再定义**
 // （重复定义 → 链接期报错）。package_manager.cpp / installation_task*.cpp 与
 // tests/test_hygiene.hpp 引用的都是同一份。

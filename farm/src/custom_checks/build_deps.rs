@@ -1,9 +1,9 @@
 //! build-deps chk — 配方的**构建依赖完整性**：每个包 `needed_so` 的 SONAME 提供者，必须出现在
 //! 它自己的 `build_deps` 里。
 //!
-//! 语义（用户规则，**勿"优化"成闭包判定**）：
+//! 语义（**勿"优化"成闭包判定**）：
 //! - `needed_so` 里写的是**直接**链接依赖 → 提供者必须**直接**写在 `build_deps`。
-//!   **即使该依赖能被别的 build_dep 传递满足，语义也不对**（CLAUDE.md 铁律：build_deps 要写全）。
+//!   **即使该依赖能被别的 build_dep 传递满足，语义也不对**。
 //!   所以本检則**不做**闭包/传递可达判定——这是刻意的。
 //! - `base` / `base-devel` 直接 `deps` 并集覆盖的 provider 视为满足（铁律：这些包本就不该写进
 //!   build_deps）。判定读 `pkgs/base/LankeBUILD.json` 与 `pkgs/base-devel/LankeBUILD.json` 的
@@ -27,7 +27,7 @@ use std::path::Path;
 /// ⚠️ 键必须走 `so_bare()`：`provides_soname` / `needed_so` 的条目是**规格串**
 /// （`libfoo.so.1@{V1,V2}`）。拿原样串当键、又用原样串查表，两侧几乎永远不相等
 /// （消费者的 `libfoo.so.1@{V1,V2}` ≠ 提供者的 `libfoo.so.1@{V1,V2,V3}`）⇒ 落到
-/// `else { continue }` 被当成"仓库内无 provider"**静默跳过**。实测全仓 6665 条 `needed_so`
+/// `else { continue }` 被当成"仓库内无 provider"**静默跳过**。全仓 6665 条 `needed_so`
 /// 里 **3173 条（47.6%）** 是这样被跳过的 —— 这条检則对带版本的依赖形同虚设。
 /// 版本是否真被满足交给 `so_covers()`（与 `build/mod.rs::abifix_targets` 同一条保守判据）。
 fn provider_map(pkgs_dir: &Path, pkgs: &[String]) -> BTreeMap<String, Vec<(String, String)>> {
@@ -46,7 +46,7 @@ fn provider_map(pkgs_dir: &Path, pkgs: &[String]) -> BTreeMap<String, Vec<(Strin
 }
 
 /// `base` / `base-devel` 的**直接** `deps` 并集 + 这两个包自身——这些提供者视为已满足
-/// （CLAUDE.md 铁律：不该写进 build_deps）。读 json 直接依赖，不展开闭包。
+/// （它们本就不该写进 build_deps）。读 json 直接依赖，不展开闭包。
 fn base_covered(pkgs_dir: &Path) -> HashSet<String> {
     let mut set: HashSet<String> = HashSet::new();
     for p in ["base", "base-devel"] {
@@ -58,7 +58,6 @@ fn base_covered(pkgs_dir: &Path) -> HashSet<String> {
     set
 }
 
-/// 跑 build-deps 检則。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let pkgs = crate::build::sorted_pkg_names(&opts.pkgs_dir);
     let providers = provider_map(&opts.pkgs_dir, &pkgs);
@@ -195,7 +194,7 @@ mod tests {
 
     #[test]
     fn transitive_availability_does_not_satisfy() {
-        // 用户规则：needed_so 是**直接**依赖，被别的 build_dep 传递满足也**不算**
+        // needed_so 是**直接**依赖，被别的 build_dep 传递满足也**不算**
         let d = tmp("trans");
         write_pkg(&d, "libfoo", &["libfoo.so.1"], &[], &["base-devel"]);
         write_pkg(
@@ -317,7 +316,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
-    /// **M1**：带符号版本的 `needed_so` 必须真的被检查。
+    /// 带符号版本的 `needed_so` 必须真的被检查。
     ///
     /// `libfoo` 声明 `provides_soname: ["libfoo.so.1@{V1,V2,V3}"]`，`app` 的
     /// `needed_so: ["libfoo.so.1@{V1,V2}"]`（provider 覆盖 V1/V2）且 `build_deps` 漏写 libfoo
@@ -325,7 +324,7 @@ mod tests {
     ///
     /// **修前为什么红**：`provider_map` 用**原样规格串**做键、查询也用原样串 ⇒
     /// `libfoo.so.1@{V1,V2}` 查不到键 `libfoo.so.1@{V1,V2,V3}` ⇒ 落到 `continue`，被当成
-    /// "仓库内无 provider"**静默跳过**（实测全仓 6665 条 needed_so 里 3173 条 / 47.6% 如此）。
+    /// "仓库内无 provider"**静默跳过**（全仓 6665 条 needed_so 里 3173 条 / 47.6% 如此）。
     /// 对照：`ok` 写全 `build_deps: ["libfoo"]` ⇒ 无 finding（修前修后都成立，排除误报）。
     #[test]
     fn versioned_need_is_checked_against_versioned_provider() {
@@ -364,7 +363,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
-    /// **M1（过度报错守卫）**：有同名 provider 但**版本覆盖不上**该 need → 不算 build_deps 漏写
+    /// **过度报错守卫**：有同名 provider 但**版本覆盖不上**该 need → 不算 build_deps 漏写
     /// （归 abifix），**不报**。
     ///
     /// 这条守的是修复里 `so_covers` 那道过滤：若把修复写成"只看裸名存在"就会在这里误报。

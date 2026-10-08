@@ -2,7 +2,7 @@
  * test_depend_scanner_index_parity.cpp —— `depend remove` / `depend abibreak` 必须与
  * `repository.cpp` 用**同一套**索引解析
  *
- * 缺口（CLAUDE.md §3「depend_scanner 有第二套索引解析器」）：`pkg/depend_scanner.cpp` 的
+ * 缺口（「depend_scanner 有第二套索引解析器」）：`pkg/depend_scanner.cpp` 的
  * `build_repo_revdep_map()` 曾自带一份索引行解析，要求版本块 **≥5 字段**，
  * 而 `repo/repository.cpp` 那份当时**有意**容忍更少字段 —— 两份判据不一致 ⇒ 同一行在
  * 反向依赖图里被整行丢掉。
@@ -15,11 +15,9 @@
  * 并把"取哪个版本"从"索引里的最后一块"改成**版本号最大者**（= repository.cpp 排序后
  * 的"最新版"；写入顺序不是版本序）。
  *
- * ⚠️ **订正 2026-10-04（8.0.0，破坏性）**：版本块从"容忍 4/5 字段 + 行级 provides 回退"
- * 收紧为**恰好 6 字段**（`版本:哈希:依赖:provides:provides_soname:needed_so`）、**没有**
- * 行级 provides。原先点名那两种兼容行为的用例（`FourFieldProviderLineStillRegistersProvider`
- * / `PackageLevelProvidesFallbackIsHonoured`）已**删除** —— 它们守的行为已废除。现在非 6
- * 字段的版本块被**两侧同样跳过**（parity 仍成立，只是"丢掉"的行本身就是畸形行）。
+ * ⚠️ 版本块现在是**恰好 6 字段**（`版本:哈希:依赖:provides:provides_soname:needed_so`）、
+ * **没有**行级 provides。现在非 6 字段的版本块被**两侧同样跳过**（parity 仍成立，只是
+ * "丢掉"的行本身就是畸形行）。
  */
 
 #include <gtest/gtest.h>
@@ -192,7 +190,7 @@ TEST_F(IndexParityTest, EmptyNeededSoCannotBeInferred)
 //
 // 反图此前只认 SONAME 边（needed_so → provides），**完全不看**行内的 deps 段。本仓库的
 // `deps` 绝大多数是 farm 从 needed_so 推导的（所以两种边通常重合、缺陷看不出来），但
-// CLAUDE.md 里那几类**例外**是手写的：纯 Python 包（`python-*`）、`xwayland`、以及
+// 例外是手写的：纯 Python 包（`python-*`）、`xwayland`、以及
 // **dlopen** 加载的依赖（`kf-networkmanager-qt` → `networkmanager`、`kf-kapidox` →
 // `python-jinja`）—— 它们编译期不链接、ELF 里没有 DT_NEEDED，deps 是**唯一**的依赖声明。
 //
@@ -233,7 +231,7 @@ TEST_F(IndexParityTest, AbibreakIgnoresExplicitDependencyEdge)
     EXPECT_EQ(abi.name, "libA") << "目标包自身是根节点";
 }
 
-// ── show_all 分支复用同一份仓库包名清单（缺陷 4）────────────────────────────────
+// ── show_all 分支复用同一份仓库包名清单 ────────────────────────────────
 TEST_F(IndexParityTest, RemoveShowAllStillListsUnaffectedRepoPackages)
 {
     // `scan_remove_tree` 曾把仓库包名清单算两遍（存在性判定一次、show_all 再一次），

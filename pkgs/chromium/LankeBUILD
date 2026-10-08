@@ -20,7 +20,7 @@ _SYSTEM_LIBS="brotli dav1d flac fontconfig freetype harfbuzz highway
 
 # 需要删除捆绑文件的目录名（libjpeg 映射为 libjpeg_turbo）
 # zlib 对应 --system-libraries 的 zlib（= 系统 zlib+minizip）：third_party/zlib 不存在
-# minizip/ 子目录（155 实测），写 minizip 会让 find 空跑、bundled 头文件留在树里，
+# minizip/ 子目录（155），写 minizip 会让 find 空跑、bundled 头文件留在树里，
 # 而库却是系统 libminizip → unz_file_info 结构体布局不一致。
 _UNWANTED_DIRS="brotli dav1d flac fontconfig freetype harfbuzz highway
                 libdrm libjpeg_turbo libwebp libxml libxslt
@@ -28,7 +28,7 @@ _UNWANTED_DIRS="brotli dav1d flac fontconfig freetype harfbuzz highway
 
 # --- 运行期集成依赖（写在 LankeBUILD.json 的 deps 里，不是 build_deps）---
 # 下面这些是 Chromium **运行时**通过 dlopen / exec / D-Bus 才用到的，编译期不链接 →
-# farm 的 needed_so 扫描永远查不到，只能手写进 deps（CLAUDE.md 的 dlopen 例外；
+# farm 的 needed_so 扫描永远查不到，只能手写进 deps（dlopen 例外；
 # 本包的 gtk3/xwayland 同理）。build_deps 只决定构建容器装什么，写那儿对运行期没用。
 #   gtk4         ui/gtk/gtk_compat.cc          DlOpen("libgtk-4.so.1")  → --gtk-version=4
 #   pipewire     webrtc modules/portal/pipewire_utils.cc

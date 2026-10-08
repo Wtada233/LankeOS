@@ -1,13 +1,13 @@
 /**
- * test_wal_rollback_guards.cpp — 含空格 root 下的批次回滚 + 回滚守卫（历史 TODO.md A1/A2/A3）
+ * test_wal_rollback_guards.cpp — 含空格 root 下的批次回滚 + 回滚守卫
  *
  * 三个真实缺陷的行为级回归：
- *   A1 WAL 非箭头行按空格切 → 路径含空格时 DB 里程碑被截断 → reverse_execute 算出的
+ *   WAL 非箭头行按空格切 → 路径含空格时 DB 里程碑被截断 → reverse_execute 算出的
  *      备份名不存在 → **静默跳过 DB 回滚**，文件回退了而 DB 仍写着"已安装"。
  *      本文件把 root 建成含空格的路径（`.../root with space`），使**所有** state/WAL
  *      路径天然含空格 —— 这正是 `lpkg --root "路径含空格"` 的真实形态。
- *   A2 破损尾部行冒充批次起点 → extract_current_batch_ops 返回空 → 整批不回滚。
- *   A3 回滚没做成时却无条件 cleanup_db_backups() → DB 备份被删，rec 永远还原不回来。
+ *   破损尾部行冒充批次起点 → extract_current_batch_ops 返回空 → 整批不回滚。
+ *   回滚没做成时却无条件 cleanup_db_backups() → DB 备份被删，rec 永远还原不回来。
  *
  * 断言都落在**用户可见状态**上：文件是否还原、DB 是否还原、备份是否还在。
  */
@@ -50,7 +50,7 @@ protected:
 
         suite_work_dir = fs::absolute("tmp_wal_guards_test_" + std::to_string(::getpid()));
         if (fs::exists(suite_work_dir)) fs::remove_all(suite_work_dir);
-        // 关键：root 路径含空格 → state_dir/WAL/DB 全部带空格（重现 A1 的必然触发条件）
+        // 关键：root 路径含空格 → state_dir/WAL/DB 全部带空格（重现该缺陷的必然触发条件）
         test_root = suite_work_dir / "root with space";
         pkg_dir = suite_work_dir / "pkgs";
         fs::create_directories(test_root);
@@ -121,7 +121,7 @@ TEST_F(WalRollbackGuardTest, SandboxPathsReallyContainSpaces)
 }
 
 // ============================================================================
-// A1：含空格路径下的批次回滚必须把文件与 DB 一起还原
+// 含空格路径下的批次回滚必须把文件与 DB 一起还原
 // ============================================================================
 
 TEST_F(WalRollbackGuardTest, FailedBatchRestoresBothFilesAndDbWhenRootHasSpaces)
@@ -196,7 +196,7 @@ TEST_F(WalRollbackGuardTest, DanglingSymlinkAtDepFileIsRestoredOnRollback)
 }
 
 // ============================================================================
-// A2：破损尾部行不得让整批回滚失效
+// 破损尾部行不得让整批回滚失效
 // ============================================================================
 
 TEST_F(WalRollbackGuardTest, BrokenWalTailStillRollsBackWholeBatch)
@@ -220,7 +220,7 @@ TEST_F(WalRollbackGuardTest, BrokenWalTailStillRollsBackWholeBatch)
 }
 
 // ============================================================================
-// A3：回滚没能执行时，绝不清理 DB 备份（否则 rec 永远还原不回来）
+// 回滚没能执行时，绝不清理 DB 备份（否则 rec 永远还原不回来）
 // ============================================================================
 
 TEST_F(WalRollbackGuardTest, UnclosableRollbackKeepsDbBackupsForRec)
@@ -264,17 +264,17 @@ TEST_F(WalRollbackGuardTest, NormalFailureConsumesAndCleansDbBackups)
 }
 
 // ============================================================================
-// X6：两个未提交批次时，恢复区域必须只覆盖**最近**一批
+// 两个未提交批次时，恢复区域必须只覆盖**最近**一批
 // ============================================================================
 
 TEST_F(WalRollbackGuardTest, TwoUncommittedBatchesConvergeInOnePass)
 {
-    // Z5 端到端：两个未提交批次（前一批回滚失败后同进程又开了新批次）+ 生产布局
+    // 端到端：两个未提交批次（前一批回滚失败后同进程又开了新批次）+ 生产布局
     // （stash 落在**文件系统顶层** = root_dir 直接子目录，正是孤儿回收的扫描范围，
     //  而被延迟批次的 pid 必然已死）。
     //
     // 曾有的错误：恢复区域起点取"**最后一个**未配对 BEGIN_PKGS"，于是每轮都在处理最近那批
-    // （其行仍在 WAL 里），更早那批永远轮不到 —— 实测两轮下来文件一次都没被还原。
+    // （其行仍在 WAL 里），更早那批永远轮不到 —— 两轮下来文件一次都没被还原。
     // 现在（区域起点 = 第一个未配对）一次逆序回滚整个未提交区域，**一轮收敛**。
     const fs::path orig = test_root / "usr/bin/from_batch1";
     fs::create_directories(orig.parent_path());
@@ -315,7 +315,3 @@ TEST_F(WalRollbackGuardTest, TwoUncommittedBatchesConvergeInOnePass)
             << "残留 stash: " << e.path();
     }
 }
-
-// （原 RecoveryOfLaterBatchKeepsEarlierBatchsBackups 已删除：它断言"恢复区域只覆盖
-//   最近一批、前一批保留待后续 pass"——那是区域起点取错的产物，现行语义是
-//   "一次逆序回滚整个未提交区域、一轮收敛"，由下方 TwoUncommittedBatchesConvergeInOnePass 覆盖。）

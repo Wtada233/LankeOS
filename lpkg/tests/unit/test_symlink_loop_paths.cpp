@@ -1,18 +1,17 @@
 /**
  * test_symlink_loop_paths.cpp —— 符号链接环（ELOOP）不得把判定类调用变成异常
  *
- * 缺口（CLAUDE.md §3「符号链接环（ELOOP）使包永久无法卸载」）：
+ * 缺口（「符号链接环（ELOOP）使包永久无法卸载」）：
  * `std::filesystem` 的**判定类**调用在"末段符号链接解不开"时不是判 not-found，而是**抛**
- * `filesystem_error`。这条断言不靠记忆 —— 本文件的 Premise* 用例就是它的实测复现
- * （2026-09-25，libstdc++）：
+ * `filesystem_error`。这条断言不靠记忆 —— 本文件的 Premise* 用例就是它的复现（libstdc++）：
  *
  *     fs::exists(loop)         → 抛 filesystem_error code=40 (ELOOP)
  *     fs::is_directory(loop)   → 抛 code=40
  *     fs::is_empty(loop)       → 抛 code=40
  *     fs::is_regular_file(loop)→ 抛 code=40
  *     fs::is_symlink(loop)     → 不抛（走 lstat）—— **但只在末段就是环时**：中间段成环
- *                                 （`self/x`、`self/x/`）时它照样抛 code=40（2026-09-26 补测，
- *                                 见 PremiseMiddleComponentLoopAlsoThrowsIsSymlink）
+ *                                 （`self/x`、`self/x/`）时它照样抛 code=40（见
+ *                                 PremiseMiddleComponentLoopAlsoThrowsIsSymlink）
  *     directory_entry::is_directory()（迭代器条目）→ 对 symlink 会走 status()，**抛**
  *
  * 于是一个无害的环（自环、两跳环、上游包自带的环）能让"这路径归谁 / 该不该删 / 这个
@@ -21,18 +20,17 @@
  *
  * 修法：`base/utils.{hpp,cpp}` 新增**不抛**的谓词族（exists_no_follow / exists_follow /
  * is_directory_follow / is_real_directory / **is_symlink_no_follow** /
- * **is_regular_file_no_follow** —— 后两个是 2026-09-26 补的，因为"中间段成环"那一片
+ * **is_regular_file_no_follow** —— 后两个是补上的，因为"中间段成环"那一片
  * 是靠 `fs::is_symlink`/`fs::is_regular_file` 判的，而它们对那种形态会抛）。
- * 本文件钉住它们的语义与在本仓库里的落点。
+ * 本文件覆盖它们的语义与在本仓库里的落点。
  * **逐个调用点判断**，不做全局替换：`fs::read_symlink`/`fs::canonical` 这类**取值**调用在
  * 不可达时就该失败。
  *
- * 卸载路径上的同类漏点（`pkg/package_manager.cpp` 的 `do_remove_package()` 阶段 A 原为
- * `if (fs::exists(phys) || fs::is_symlink(phys))`）已改用不抛谓词。
+ * 卸载路径上的同类漏点（`pkg/package_manager.cpp` 的 `do_remove_package()` 阶段 A）已改用
+ * 不抛谓词。
  *
- * ⚠️ **订正 2026-09-26**：本行原写"并由其用 ec 重载修掉"——**那句话当时并不成立**，
- * `fs::exists(p, ec) || fs::is_symlink(p)` 里的右操作数是**抛型**，在**中间段**成环时必被
- * 求值、必抛（见上面 Premise 用例）。真正修好它的是"换成不抛谓词"，不是"换成 ec 重载"。
+ * ⚠️ 修好它的是"换成不抛谓词"，不是"换成 ec 重载"：`fs::exists(p, ec) || fs::is_symlink(p)`
+ * 里的右操作数是**抛型**，在**中间段**成环时必被求值、必抛（见上面 Premise 用例）。
  * 端到端覆盖见文件末尾 RemovePackageFormingSymlinkLoopWithAnother（**硬断言**，不是 SKIP）。
  */
 
@@ -115,7 +113,7 @@ protected:
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  ① 前提实测：判定类调用在 ELOOP 上**抛**（本文件所有修复的立论基础）
+//  ① 前提：判定类调用在 ELOOP 上**抛**（本文件所有修复的立论基础）
 // ═══════════════════════════════════════════════════════════════════════════
 
 TEST_F(SymlinkLoopPathsTest, PremiseThrowingPredicatesThrowOnLoop)
@@ -134,11 +132,11 @@ TEST_F(SymlinkLoopPathsTest, PremiseThrowingPredicatesThrowOnLoop)
 }
 
 /**
- * ⚠️ **前提的补全（2026-09-26 新增，本轮才被发现）**：上面那条"`fs::is_symlink` 不抛"
+ * ⚠️ **前提的补全**：上面那条"`fs::is_symlink` 不抛"
  * **只在末段就是那个环时成立**。**中间段**成环时它照样抛，而且那才是真正危险的一种：
  * 判定"有没有环"的那个调用自己先炸了。
  *
- * 缺这条前提的后果（实测）：整片"中间段成环"的缺口在仓库里活了很久，因为**判据本身**
+ * 缺这条前提的后果：整片"中间段成环"的缺口在仓库里活了很久，因为**判据本身**
  * 只造了"末段是自环"一种形态、于是绿着 —— 一个不完整的前提比没有前提更坏（它给出虚假的
  * 安全感）。同类的"ec 版 + 抛版"**短路写法**（`fs::exists(p, ec) || fs::is_symlink(p)`）
  * 在中间段成环时**必然**求值抛型的右操作数（左边对 ELOOP 返回 false），必抛。
@@ -242,14 +240,14 @@ TEST_F(SymlinkLoopPathsTest, NoFollowPredicatesNeverThrowAndSayFalse)
     EXPECT_TRUE(is_real_directory(probe_dir / "realdir"));
     EXPECT_TRUE(is_real_directory(probe_dir / "emptydir"));
     // （没有 is_empty 的"不抛版"：handed-off 的几处空目录判定本来就走的 `fs::is_empty(p, ec)`
-    //   重载 —— ec 非零时返回 false，保守方向天然正确，不需要新谓词。这里只钉住
+    //   重载 —— ec 非零时返回 false，保守方向天然正确，不需要新谓词。这里只覆盖
     //   `is_real_directory` 对"空目录"也判 true。）
 
     // 符号链接指向真目录：**不是**真目录（不跟随末段链接），但 is_directory_follow 认它
     fs::create_directory_symlink("realdir", probe_dir / "link2dir");
     EXPECT_TRUE(exists_follow(probe_dir / "link2dir"));
     EXPECT_FALSE(is_real_directory(probe_dir / "link2dir"));
-    // 这两个谓词的分工必须在测试里钉住：把它们"统一"成一个就会踩两头 ——
+    // 这两个谓词的分工必须在测试里固定：把它们"统一"成一个就会踩两头 ——
     // 用 lstat 判决"目录存不存在"会让 usr-merge 的 /lib → usr/lib 直接报"不是目录"；
     // 用跟随判决"归档条目是不是目录"会让符号链接条目走 status()（对环抛 ELOOP）。
     EXPECT_TRUE(is_directory_follow(probe_dir / "link2dir"))
@@ -287,7 +285,7 @@ TEST_F(SymlinkLoopPathsTest, EnsureDirExistsOnLoopReportsPathNotFilesystemError)
 }
 
 // ensure_dir_exists 的判据**保持跟随语义**：symlink→目录 必须放行（usr-merge 的
-// `/lib -> usr/lib`、管理员搬走的 `/var/lib/lpkg` 都是这个形态）。这条钉住"别把
+// `/lib -> usr/lib`、管理员搬走的 `/var/lib/lpkg` 都是这个形态）。这条覆盖"别把
 // 谓词族无脑统一成 lstat 语义"。
 TEST_F(SymlinkLoopPathsTest, EnsureDirExistsAcceptsSymlinkToDirectory)
 {
@@ -387,28 +385,27 @@ TEST_F(SymlinkLoopPathsTest, TrimCompletedKeepsWalWithLoopSymlinkBackup)
 //  ⑥ 端到端：**两个包各出一半**拼出一个符号链接环，然后卸载其中一个
 //
 //  为什么用"两个包"而不是"一个自带环的包"：**一个包自己的 content/ 里带环，今天根本装不
-//  上** —— 扫描这一关（scan_content_files，本 agent 已修）过了，但安装的拷贝阶段会在
+//  上** —— 扫描这一关（scan_content_files）过了，但安装的拷贝阶段会在
 //  installation_task.cpp 的 `copy_package_files` 里用**会抛**的
 //  `if (!fs::exists(src_path) && !fs::is_symlink(src_path)) continue;` 判定源路径，
-//  `fs::exists` 对环抛 filesystem_error（2026-09-25 实测，异常原文见下）。那个文件不在本
-//  agent 的文件集内，故本用例走**今天真正可达**的形态：
+//  `fs::exists` 对环抛 filesystem_error（异常原文见下）。故本用例走**今天真正可达**的形态：
 //
 //      pkgA 装 `usr/lib/la -> lb`（悬空链接，装得进）
 //      pkgB 装 `usr/lib/lb -> la`（悬空链接，装得进）
 //      两个都装上之后：/usr/lib/la ⇄ /usr/lib/lb 互指成环 → 盘上出现 ELOOP
 //
-//  这就是现实里出现环的常见方式（两个包互相指、hook/用户后建的环），也是 CLAUDE.md §3
-//  那条"包永久无法卸载"的可达路径。
+//  这就是现实里出现环的常见方式（两个包互相指、hook/用户后建的环），也是"包永久无法
+//  卸载"那条缺口的可达路径。
 //
-//  卸载那一腿曾卡在**别人的**文件里（本 agent 只报不改）：
-//      pkg/package_manager.cpp — do_remove_package() 阶段 A 原为
+//  卸载那一腿曾卡在另一个文件里：
+//      pkg/package_manager.cpp — do_remove_package() 阶段 A
 //          `if (fs::exists(phys) || fs::is_symlink(phys))`
 //      phys 是环时 `fs::exists` 抛 filesystem_error → 整批回滚 → **这个包再也卸不掉**。
-//      **持有者已修**（换成 ec 重载 `fs::exists(phys, ec) || fs::is_symlink(phys, ec)`：
+//      现已改成不抛谓词（`fs::exists(phys, ec) || fs::is_symlink(phys, ec)`：
 //      环上 exists(ec) 判 false、is_symlink(ec) 走 lstat 判 true → 照常进 stash）。
 //
-//      所以本用例现在是**硬断言**：扫描 / 文件登记 / 卸载 / DB 与盘面收尾整条链一起钉住。
-//      任何一处回退（417 改回抛版本、scan 回退成 `entry.is_directory()`、谓词回退成抛版本）
+//      所以本用例现在是**硬断言**：扫描 / 文件登记 / 卸载 / DB 与盘面收尾整条链一起覆盖。
+//      任何一处回退（改回抛版本、scan 回退成 `entry.is_directory()`、谓词回退成抛版本）
 //      都会让它**响亮地红**，而不是悄悄跳过 —— 这正是当初用 SKIP 过渡时要避免的那件事。
 // ═══════════════════════════════════════════════════════════════════════════
 

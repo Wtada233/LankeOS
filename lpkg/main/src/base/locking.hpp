@@ -2,10 +2,7 @@
 
 // ============ 并发控制 ============
 
-/**
- * 数据库锁（RAII）
- * 构造时加锁，析构时自动解锁，防止并发操作数据库
- */
+/// RAII：构造时加锁、析构时自动解锁，防止并发操作数据库。
 class DBLock
 {
 public:
@@ -15,5 +12,5 @@ public:
     DBLock& operator=(const DBLock&) = delete;
 
 private:
-    int lock_fd = -1;  // 锁文件描述符
+    int lock_fd = -1;
 };

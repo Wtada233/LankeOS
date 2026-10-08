@@ -65,7 +65,7 @@ std::string constraint_text(const std::vector<Constraint>& cs)
  * 预览用的依赖版本解析。
  *
  * **约束存在但仓库里没有任何版本满足时必须返回 `nullopt`**（调用方告警 + 跳过），
- * **不能**回退到"最新版"（2026-10-03 修）：最新版正是约束排除掉的那个 ——
+ * **不能**回退到"最新版"：最新版正是约束排除掉的那个 ——
  * `lpkg install` 会拒绝这种依赖，预览却报"将装最新版"，预览与实做**相反**。
  * 同类处置在别处都是 fail-loud：`builder.cpp` 抛 `error.build_dep_unsatisfiable`、
  * `force_solve_conflict` 把 nullopt 当"被打破"。这里是唯一漏网处（只影响 `depend install`
@@ -133,7 +133,7 @@ void resolve_transitive_deps(const std::string& pkg_name, const std::string& ver
     plan[pkg_info->name] = {pkg_info->name, pkg_info->version, already, deps};
 
     // 曾在此处对"已安装的中间节点"直接 return、不再展开 → 它背后**未安装**的依赖
-    // 不会出现在 `depend install` 的树里，"将要装什么"因此不准（历史 TODO G3）。
+    // 不会出现在 `depend install` 的树里，"将要装什么"因此不准。
     // visited 已保证无环，继续展开即可。
 
     for (const auto& dep : deps) {
@@ -178,14 +178,13 @@ namespace
 /**
  * 从缓存的仓库索引文件构建反向依赖图：被依赖的包 → {直接依赖它的包}。
  *
- * **本函数不再有任何自己的解析/建图代码**（2026-10-03 收敛）：
+ * **本函数没有任何自己的解析/建图代码**，两件事都委托给唯一实现：
  *   · 索引解析 → `Repository::load_index_from_file()`（唯一索引解析入口，见 repository.cpp）；
  *   · 建反图 → `repo::build_reverse_dependency_map()`（唯一反向依赖实现，见 repo/revdep.hpp）。
- * 收敛前这里曾是一份**独立实现**，且**只看 SONAME 边、完全忽略显式 `deps`** —— 对手写 deps
- * 的包（纯 Python 包 / `xwayland` / **dlopen** 场景，见 CLAUDE.md 的 deps 例外清单）会漏掉
- * 整条边，让 `depend remove` / `depend abibreak` 给出**少算的清单**（静默的错误答案）。
- * 更早还自带过一套要求 ≥5 字段的解析器，会把 4 字段的索引行整行丢掉 —— 那类"第二实现必漂移"
- * 的形态在这里已经消灭两轮，别再长回来。
+ * 自己实现就会漂移：只看 SONAME 边、忽略显式 `deps` 会漏掉手写 deps 的包（纯 Python 包 /
+ * `xwayland` / **dlopen** 场景）的整条边，让 `depend remove` /
+ * `depend abibreak` 给出**少算的清单**（静默的错误答案）；自带一套要求 ≥5 字段的解析器则会把
+ * 4 字段的索引行整行丢掉。那类"第二实现必漂移"的形态在这里已经消灭两轮，别再长回来。
  *
  * **只按路径读、绝不下载**：优先读 `tmp` 里那份已下载的缓存副本，回退到本地镜像路径。
  * 这不是为了省流量，而是因为本函数在"索引不存在"时返回**空图**：若改成
@@ -350,7 +349,7 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
     // `warning.repo_index_load_failed`）。
     const std::vector<std::string> repo_names = repo_package_names();
     // 存在性判定：**仓库索引里有，或图上出现过**（并集，严格比"只看反向依赖表"宽松）。
-    // 只看反向依赖表时，没有任何依赖者的包会被误报成 "not found in repository"（历史 TODO G2）；
+    // 只看反向依赖表时，没有任何依赖者的包会被误报成 "not found in repository"；
     // 保留图上判定则覆盖索引读不到/被裁剪的场景，两者都不放过。
     if (std::ranges::find(repo_names, pkg_name) == repo_names.end() &&
         rev.find(pkg_name) == rev.end()) {
@@ -382,7 +381,7 @@ ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all)
 
     // show_all：与 build_install_tree 的 show_all 同义——不只显示受影响节点，
     // 把其余仓库包也作为"不受影响"列出（此前该形参被丢弃，`depend remove --all`
-    // 与不带 --all 完全一样，历史 TODO G2）
+    // 与不带 --all 完全一样）
     if (show_all) {
         for (const auto& name : repo_names) {
             if (already_shown.contains(name)) continue;
@@ -479,7 +478,7 @@ ScanNode scan_install_tree(const std::string& pkg_name, bool show_all)
     // ⚠️ `resolve_transitive_deps` 把计划按**解析后的包名**建键（能力名会经 `find_provider`
     // 落到提供者身上），所以这里**不能**直接 `plan.find(target_name)`：`lpkg depend install
     // libc.so.6` 这类能力目标会落成 `glibc`，`plan` 里根本没有 `"libc.so.6"` 这个键 ——
-    // `find` 返回 `end()`，解引用即 UB（实测：段错误，或读到垃圾包名/版本）。
+    // `find` 返回 `end()`，解引用即 UB（段错误，或读到垃圾包名/版本）。
     // 按**同一套**回退先把目标解析成包名再查；`build_install_tree` 同理（它内部也是
     // `plan.find(parent_name)`，传能力名会**立刻返回**、整棵树变成空的）。
     std::string resolved = target_name;
@@ -621,7 +620,6 @@ std::string_view status_label_key(ScanStatus s)
 namespace
 {
 
-/** 返回状态对应的 ANSI 颜色码 */
 std::string_view status_color(ScanStatus s)
 {
     switch (s) {
@@ -657,7 +655,6 @@ void print_subtree(const ScanNode& node, const std::string& prefix)
 
 }  // anonymous namespace
 
-/** 打印整棵依赖树（彩色 + unicode 框线） */
 void print_tree(const ScanNode& node)
 {
     std::cout << status_color(node.status) << node.name << " (" << node.version << ") "

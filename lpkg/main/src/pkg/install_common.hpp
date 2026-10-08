@@ -56,18 +56,18 @@ std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& de
 // ============================================================================
 
 /**
- * 配置文件升级时的**三哈希分流**判定表（pacman `add.c` 的三条分支 + 老 DB 的退化路径）。
- * 语义只有这一份，别在调用点再写一遍 —— 完整判定表见 .cpp 里的定义处。
- *
- * 输入：`hash_local`（盘上那份）/ `hash_orig`（confhashes 记的"上次我们装进去的"）/
- * `hash_pkg`（本次包里那份）。输出：`ConfigDisposition`（落点，见 op_sink.hpp）。
+ * 配置文件升级时的**三哈希分流**判定：由 `hash_local`（盘上那份）/ `hash_orig`
+ * （confhashes 记的"上次我们装进去的"）与 `hash_pkg`（本次包里那份）三份哈希决定落点
+ * `ConfigDisposition`（见 op_sink.hpp）。判定只有这一份实现，别在调用点再写一遍；
+ * 各分支的完整理由见 .cpp 的定义处。
  */
 ConfigDisposition classify_config_update(std::string_view hash_local, std::string_view hash_orig,
                                          std::string_view hash_pkg);
 
 /**
  * `.lpkgtmp` 落位前的最后一道闸：tmp 路径是**符号链接**时拒绝写入（抛 `LpkgException`）。
- * 判据只能是 `is_symlink` 不能是 `exists` —— 完整理由见 .cpp 里的定义处。
+ * 判据只能是 `is_symlink` 不能是 `exists` —— 上一轮崩溃留下的 `.lpkgtmp` **普通文件**是
+ * "先写 tmp 再 rename"的正常残留，必须照旧覆盖（拒绝它会让崩溃后的重装永久失败）。
  */
 void refuse_symlink_tmp_path(const std::filesystem::path& tmp_path);
 
@@ -105,7 +105,8 @@ using DirReporter = void (*)(const std::filesystem::path& phys, bool removed);
  *   · 升级侧 = 仅"新版本不再提供"的，且先排除"新版本在该目录下还有条目"的
  *     （那一趟跑在写入**之前**，判据要钉回与原来"写入之后"同一口径）。
  *
- * 判据（五条，逐条见 .cpp 的定义处）与"目录型挂载点保留 + 告警"都在本函数内。
+ * 判据五条：① 目录键剥尾斜杠 ② 最深优先 ③ 只删本包是最后持有者的 ④ 真目录（lstat 语义）
+ * ⑤ 此刻为空（含无主内容则整树保留）；"目录型挂载点保留 + 告警"也在本函数内。
  *
  * @param candidate_dir_keys 候选目录键（**DB 键的原始形态**，带尾斜杠）
  * @param report             逐目录报告回调（可空；只影响日志/追踪，不影响判据）
@@ -141,7 +142,7 @@ bool revoke_xattr_key_if_unowned(Cache& cache, const std::string& pkg, const std
                                  const std::filesystem::path& root);
 
 // ============================================================================
-// 每文件系统 sidecar stash（历史 TODO.md 第 2 节）
+// 每文件系统 sidecar stash
 // 「备份 + 它的 WAL 行」的成对写入在写入层原语 detail::OpSink（pkg/op_sink.hpp）里；
 // 这里只放 stash 自身的路径计算与清理。
 // ============================================================================
@@ -174,7 +175,7 @@ void remove_stash_dir(const std::filesystem::path& stash);
  * 落位/让开的目标路径：`root_dir()/rel`，并把**祖先链**约束在 root 之内 —— 越界即抛
  * （`error.install_escape_root`），解不开则放行。
  *
- * **为什么要有这一层**（2026-10-03 审计）：`root_dir()/rel` 只约束了**词法**归属，而
+ * 要有这一层的原因：`root_dir()/rel` 只约束了**词法**归属，而
  * `fs::copy` / `create_symlink` / rename 会**跟随中间段符号链接**。`--root <R>` 下若先有一个
  * 包发过 `content/usr -> /`（绝对目标链接 —— 成员名消毒是**有意**放行的），再装一个含
  * `content/usr/bin/x` 的包时，`<R>/usr` 解析成宿主 `/` ⇒ `.lpkgtmp` 写到宿主 `/bin/x`、
@@ -186,7 +187,7 @@ void remove_stash_dir(const std::filesystem::path& stash);
  *  · 包内条目自身的绝对目标链接（`<root>/usr/bin/foo -> /etc/foo`）→ **末段不解析**，不误伤；
  *  · 中间段解不开（ELOOP / 目录尚未建）→ 放行，与回滚侧的 confinement 同一条纪律。
  */
-/// `<dst>` 的暂存路径：`<dst>.lpkgtmp`（**唯一出处**：包内容落位与 hook 脚本落位共用）。
+/// `<dst>` 的暂存路径：`<dst>.lpkgtmp`（唯一出处：包内容落位与 hook 脚本落位共用）。
 std::filesystem::path staged_tmp_path(const std::filesystem::path& dst);
 
 /// 收掉我们自己刚写的 `<dst>.lpkgtmp`（失败只告警，绝不让正在传播的原异常被顶替）。
@@ -197,8 +198,8 @@ void drop_staged_tmp(const std::filesystem::path& tmp);
  *
  * 为什么需要：`COPY <tmp> → <dst>` 这一行是在 `commit_copy` 里才写的 —— 在它**之前**失败
  * （典型：`WriteLpkgnew` 先 `backup()` 旧的 `.lpkgnew` 那一步抛）时，WAL 里**没有任何一行**
- * 描述这个 tmp ⇒ 回滚不会碰它 ⇒ 目标树/状态目录里留下 `<dst>.lpkgtmp`（2026-10-03 断点注入
- * 实测：`/etc/x.conf.lpkgnew.lpkgtmp`）。
+ * 描述这个 tmp ⇒ 回滚不会碰它 ⇒ 目标树/状态目录里留下 `<dst>.lpkgtmp`（断点注入：
+ * `/etc/x.conf.lpkgnew.lpkgtmp`）。
  *
  * ⚠️ **只在 staging 成功之后接活**：`refuse_symlink_tmp_path()` 拒绝写入时，那个占名的符号
  * 链接是**用户的东西**，绝不能连带删掉（`TmpPathSymlinkGuardTest.InPlaceTmpSymlinkIsRefused`

@@ -32,7 +32,7 @@ fn real_index_smoke() {
 
 /// 真实索引冒烟 —— **8.0.0 后的现行格式**。
 ///
-/// `real-index.txt` 是 8.0.0 **之前**的快照（实测：`@` 出现 **0** 次、`+N` release 形态
+/// `real-index.txt` 是 8.0.0 **之前**的快照（`@` 出现 **0** 次、`+N` release 形态
 /// **317** 行），拿它冒烟已不再验证现行索引格式。本夹具 `real-index-v8.txt` 取自真实
 /// `out/x86_64/index.txt` 的前 30 行，含 `X@{A,B}`（符号版本）与 `<version>-<release>`
 /// （rpm release）两种现行形态。**旧用例 `real_index_smoke` 保留不动**（只加不删）。

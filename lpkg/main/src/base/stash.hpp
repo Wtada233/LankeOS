@@ -19,7 +19,7 @@
 bool is_stash_dir_name(std::string_view name);
 
 /**
- * 回收孤儿备份 stash（历史 TODO.md §5）：删除各文件系统根下、pid 已死的
+ * 回收孤儿备份 stash：删除各文件系统根下、pid 已死的
  * `.lpkg_bak_<pkg>_<pid>` 目录（崩溃/续传未覆盖的残留）。范围：root_dir 顶层 +
  * root_dir 内每个挂载点（= stash 的落点集合，见 mount_points）；/proc 不可用时降级为
  * root 顶层 + 顶层子挂载点。只认"存活进程已消失"（kill(pid,0) 返回 ESRCH）的，

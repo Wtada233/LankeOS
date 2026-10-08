@@ -11,7 +11,7 @@ pkg-name: libutempter
 # `1.2.3`，就再也检测不到 ALT 的重新打包了。
 #
 # URL 用**原始 tag**（`git+…@1.2.3-alt1`，与本包现有源一致），只对版本串做改写。
-# 「按正则改写版本串」模板表达不了（CLAUDE.md 例外表第①类），故用条目级 script。
+# 「按正则改写版本串」模板表达不了，故用条目级 script。
 sources:
   - tracker-template: script
     script: |

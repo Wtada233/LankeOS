@@ -15,7 +15,7 @@
  * 修复把守卫下沉进 `cleanup_db_backups()` 本身：`wal_has_unpaired_batch()` 为真则**直接
  * return**（该函数是 recover.cpp 里的文件内静态函数，只能从 cleanup_db_backups 的行为侧面钉）。
  *
- * 本文件钉住四条：
+ * 本文件覆盖四条：
  *   ① WAL 里有未配对 BEGIN_PKGS → 一处备份都不删（state_dir 与 docs_dir 两个扫描根同办）；
  *   ② 批次已配对（BEGIN_PKGS + COMMIT_PKGS）→ **必须放行**（否则备份永远清不掉、state_dir
  *      无限膨胀）—— 与 ① 成对，专门拆穿"WAL 非空就跳过"这种过宽实现；
@@ -137,7 +137,7 @@ TEST_F(DbBackupRetentionTest, MissingWalStillCleansDbBackups)
 // ── ⑤ CRLF WAL：守卫必须与 recover/trim 给出**同一个**答案（留备份） ──────
 TEST_F(DbBackupRetentionTest, CrlfWalStillRetainsDbBackups)
 {
-    // 缺陷（2026-09-26 实测）：`BEGIN_PKGS`/`COMMIT_PKGS` 是**裸行**（`begin_batch()` →
+    // 缺陷：`BEGIN_PKGS`/`COMMIT_PKGS` 是**裸行**（`begin_batch()` →
     // `w.log("BEGIN_PKGS")`，不带载荷），于是 CRLF 的 \r 粘在**类型 token** 上：
     // `parse_op("BEGIN_PKGS\r")` 按第一个空格切类型 —— 这里根本没有空格 —— 得到未知类型
     // → INVALID ⇒ 配对扫描一个批次都看不见 ⇒ 守卫判"没有未提交批次" ⇒ 备份被删光。
@@ -185,7 +185,7 @@ TEST_F(DbBackupRetentionTest, SecondUnpairedBatchAfterCommittedOneStillRetains)
     expect_backups_kept("第二批仍未配对（深度记账不能只看最后一行/最后一次 COMMIT_PKGS）");
 }
 
-// ── ⑦ **回滚没做全**时，重试依据也必须留着（2026-10-03 新增的失败信号）──────
+// ── ⑦ **回滚没做全**时，重试依据也必须留着（失败信号）──────────────────────
 //
 // 这是 `recover.cpp` 里那条**新分支**唯一的用例：`rollback_uncommitted_region` 跑完
 // `reverse_execute` 之后，若 `stats.failures > 0`（有撤销动作**真的没成功**）就**不 seal**

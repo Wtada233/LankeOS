@@ -1,13 +1,13 @@
 /**
- * test_solver_regressions.cpp — 求解 / 包管理行为的回归（历史 TODO.md D3/E1/E2/E3/F1/F2）
+ * test_solver_regressions.cpp — 求解 / 包管理行为的回归
  *
  * 每条都对应一个"命令照打就中、且结果是静默错误"的缺陷：
- *   D3 目标没进计划 → 曾打印"所有包都已安装"并 exit 0（实际什么都没装）
- *   E1 `install --force A B`（A 已当前版本）→ 曾静默漏掉 A 的强制重装
- *   E2 按能力/SONAME 安装 → 曾被记成"依赖"不 hold → 紧接着 autoremove 就删掉
- *   E3 autoremove 走 force → 曾绕过核心包保护，删掉 /etc/lpkg/essential 里的包
- *   F1 upgrade 不 flush 触发器 → 升级后 ldconfig/glib-compile-schemas/daemon-reload 全不跑
- *   F2 libelf 未初始化版本 → 安装期 ldconfig 触发器空转（一个 SONAME 链接都不建）
+ *   目标没进计划 → 曾打印"所有包都已安装"并 exit 0（实际什么都没装）
+ *   `install --force A B`（A 已当前版本）→ 曾静默漏掉 A 的强制重装
+ *   按能力/SONAME 安装 → 曾被记成"依赖"不 hold → 紧接着 autoremove 就删掉
+ *   autoremove 走 force → 曾绕过核心包保护，删掉 /etc/lpkg/essential 里的包
+ *   upgrade 不 flush 触发器 → 升级后 ldconfig/glib-compile-schemas/daemon-reload 全不跑
+ *   libelf 未初始化版本 → 安装期 ldconfig 触发器空转（一个 SONAME 链接都不建）
  */
 
 #include <gtest/gtest.h>
@@ -50,7 +50,7 @@ protected:
         Config::instance().set_no_hooks_mode(true);
         mirror_dir = setup_local_mirror();
         // 触发器规则是**文件驱动**的（/etc/lpkg/triggers.conf，缺失则所有触发器静默
-        // 失效）——沙盒 root 里必须显式提供，否则 F1/F2 的断言测不到东西
+        // 失效）——沙盒 root 里必须显式提供，否则触发器接线的断言测不到东西
         {
             std::ofstream(Config::instance().triggers_conf()) << "^/usr/lib/.*\\.so.*\tldconfig\n";
         }
@@ -141,7 +141,7 @@ protected:
 };
 
 // ============================================================================
-// D3：目标没进计划必须是错误，不能报"所有包都已安装"
+// 目标没进计划必须是错误，不能报"所有包都已安装"
 // ============================================================================
 
 TEST_F(SolverRegressionTest, UnreachableTargetIsAnErrorNotSilentSuccess)
@@ -166,8 +166,8 @@ TEST_F(SolverRegressionTest, AlreadyInstalledTargetStillReportsUpToDate)
 }
 
 // ============================================================================
-// A6：`install pkg:版本` 的同名包**已装**、而仓库索引里**没有**这个包名时，
-// 请求的版本曾被静默丢弃（D3 的兄弟形态，落点相同：打印"所有包都已安装"、exit 0）。
+// `install pkg:版本` 的同名包**已装**、而仓库索引里**没有**这个包名时，
+// 请求的版本曾被静默丢弃（上一条的兄弟形态，落点相同：打印"所有包都已安装"、exit 0）。
 // ============================================================================
 
 TEST_F(SolverRegressionTest, VersionedInstallOfInstalledButRemovedPackageIsNotSilentSuccess)
@@ -203,7 +203,7 @@ TEST_F(SolverRegressionTest, VersionedInstallOfExactInstalledVersionWithoutRepoE
 }
 
 // ============================================================================
-// E1：--force 在混合目标下也必须重装"已是最新版本"的包
+// --force 在混合目标下也必须重装"已是最新版本"的包
 // ============================================================================
 
 TEST_F(SolverRegressionTest, ForceReinstallMixedTargetsReinstallsCurrentPackage)
@@ -230,14 +230,14 @@ TEST_F(SolverRegressionTest, ForceReinstallMixedTargetsReinstallsCurrentPackage)
 }
 
 // ============================================================================
-// E2：按能力/SONAME 安装 = 用户显式请求（要 hold，否则被 autoremove 删）
+// 按能力/SONAME 安装 = 用户显式请求（要 hold，否则被 autoremove 删）
 // ============================================================================
 
 TEST_F(SolverRegressionTest, CapabilityTargetIsExplicitAndSurvivesAutoremove)
 {
     // 按**虚拟能力**名安装（`provides`，裸名字空间）。⚠️ 不能再用 SONAME 当 target：
-    // 8.0.0 起 SONAME 活在独立的 `so:` 空间，而 `install <名字>` 只走"包名 / 虚拟 provides"
-    // —— 维护者明确要求 install **不做任何 soname 特判**（找不到就按"未找到包"报错）。
+    // SONAME 活在独立的 `so:` 空间，而 `install <名字>` 只走"包名 / 虚拟 provides"
+    // —— install **不做任何 soname 特判**（找不到就按"未找到包"报错）。
     create_pkg("prov", "1.0", {}, {"libcap-api"}, {});
     add_to_mirror("prov", "1.0");
     update_index({{"prov", "1.0", "", "libcap-api", "", ""}});
@@ -253,7 +253,7 @@ TEST_F(SolverRegressionTest, CapabilityTargetIsExplicitAndSurvivesAutoremove)
 }
 
 // ============================================================================
-// E3：autoremove 永不删核心包
+// autoremove 永不删核心包
 // ============================================================================
 
 TEST_F(SolverRegressionTest, AutoremoveNeverRemovesEssentialPackages)
@@ -280,7 +280,7 @@ TEST_F(SolverRegressionTest, AutoremoveNeverRemovesEssentialPackages)
 }
 
 // ============================================================================
-// F1 + F2：触发器接线（安装与升级都要 flush；ldconfig 分支要真的建链接）
+// 触发器接线（安装与升级都要 flush；ldconfig 分支要真的建链接）
 // ============================================================================
 
 TEST_F(SolverRegressionTest, UpgradeFlushesTriggersAndRegeneratesSonameLinks)
@@ -316,7 +316,7 @@ TEST_F(SolverRegressionTest, UpgradeFlushesTriggersAndRegeneratesSonameLinks)
 
 TEST_F(SolverRegressionTest, GetElfSonameReadsRealSharedObject)
 {
-    // F2 的直接断言：不依赖"本进程先 strip 过"也能读出 SONAME
+    // 直接断言：不依赖"本进程先 strip 过"也能读出 SONAME
     if (!gcc_available()) GTEST_SKIP() << "gcc 不可用，跳过";
     ASSERT_TRUE(create_lib_pkg("libsoname", "1.0"));
     const fs::path so = test_root / "nope.so";  // 尚未安装，先解包目录里的原件更直接：
@@ -330,7 +330,7 @@ TEST_F(SolverRegressionTest, GetElfSonameReadsRealSharedObject)
 
 TEST_F(SolverRegressionTest, SonameEscapingLibDirIsNotLinked)
 {
-    // X3 回归：SONAME 取自被扫描的库文件（不可信）。绝对路径的 SONAME 曾让
+    // SONAME 取自被扫描的库文件（不可信）。绝对路径的 SONAME 曾让
     // `lib_dir / soname` 逃出 lib_dir，以 root 在任意位置建符号链接（如
     // /etc/ld.so.preload → 任意 .so，等于给下次进程启动注入代码）。
     if (!gcc_available()) GTEST_SKIP() << "gcc 不可用";
@@ -365,7 +365,7 @@ TEST_F(SolverRegressionTest, SonameWithSlashCannotEscapeThroughIntermediateSymli
     // **不做任何校验**）⇒ `path_within(lib_dir/sub/EVIL.so, lib_dir)` **词法上完全成立**，
     // 而 `fs::create_symlink` 会穿过中间段的 `sub`，把链接建到 lib_dir 之外。
     //
-    // 两个调用点（`trigger.cpp` 的目标 root、`builder.cpp` 的 staging）在 2026-10-03 加了
+    // 两个调用点（`trigger.cpp` 的目标 root、`builder.cpp` 的 staging）加了
     // `path_resolves_within(lib_dir, root)` —— 但那道守卫只护 `lib_dir` **自身**，
     // 护不到 `lib_dir` 的**子项**：同族判据只推了一条分支。
     if (!gcc_available()) GTEST_SKIP() << "gcc 不可用";
@@ -386,7 +386,7 @@ TEST_F(SolverRegressionTest, SonameWithSlashCannotEscapeThroughIntermediateSymli
 
     // ⚠️ 断言必须用 `is_symlink`（lstat 语义）：`create_symlink` 建出的链接指向**同目录裸
     // 文件名**，在 `outside/` 下它是**悬空**的 —— `fs::exists()` 对悬空链接返回 false，
-    // 拿它当判据的话，链接**建没建出来都判 false**，是一条恒真废话（实测：is_symlink=true
+    // 拿它当判据的话，链接**建没建出来都判 false**，是一条恒真废话（is_symlink=true
     // 而 exists=false）。
     EXPECT_FALSE(fs::is_symlink(outside / "EVIL.so"))
         << "SONAME 里的 '/' 让链接穿过了中间段符号链接，写到 lib_dir 之外：" << outside / "EVIL.so";
@@ -404,7 +404,7 @@ TEST_F(SolverRegressionTest, SonameWithSlashCannotEscapeThroughIntermediateSymli
 }
 
 // ============================================================================
-// X4：包名/版本号来自不可信元数据，绝不能当路径分量用
+// 包名/版本号来自不可信元数据，绝不能当路径分量用
 // ============================================================================
 
 TEST_F(SolverRegressionTest, TraversingPackageNameIsRejected)
@@ -441,7 +441,7 @@ TEST_F(SolverRegressionTest, TraversingVersionFromRepoIndexIsRejected)
 }
 
 // ============================================================================
-// 多包移除的跨包原子性（用户实测：autoremove 中途 Ctrl+C 只留下"删了几个包"的状态）
+// 多包移除的跨包原子性（autoremove 中途 Ctrl+C 只留下"删了几个包"的状态）
 //
 // 旧实现：`remove a b c`（main.cpp 逐包调用）与 autoremove（逐包 remove_package）都是
 // **每包一个批次** → 中途中断只回滚当前包那个批次，之前已提交的删除保持删除。
@@ -477,7 +477,7 @@ TEST_F(SolverRegressionTest, MultiPackageRemoveRollsBackAllWhenInterrupted)
 //
 // 旧实现：逐个跑 removal_allowed()，被拒的那几个 `continue` 掉、**其余照删**，删完才因
 // refused 抛错 —— 落点是"部分包已删 + 非零退出码"。而非零退出码对脚本/farm 的含义是
-// "什么都没发生"（历史 TODO G4 就是为这个语义加的），盘面却已经少了几个包。
+// "什么都没发生"（这个语义是刻意定义的），盘面却已经少了几个包。
 // pacman 的 `-R a b` 是整个列表先检完，任一不通过即中止、一个都不删。
 // ============================================================================
 
@@ -518,7 +518,7 @@ TEST_F(SolverRegressionTest, MultiPackageRemoveRefusedRemovesNothing)
     }
     BreakpointManager::instance().clear_all();
 
-    // 拒绝的理由：CLI 边界（remove_packages）在"被安全检查拒绝"时抛这条（历史 TODO G4）
+    // 拒绝的理由：CLI 边界（remove_packages）在"被安全检查拒绝"时抛这条
     EXPECT_NE(msg.find(get_string("error.removal_refused")), std::string::npos)
         << "拒绝信息不是'移除被拒'：" << msg;
     EXPECT_FALSE(good_removal_began)
@@ -574,7 +574,7 @@ TEST_F(SolverRegressionTest, ReinstallGroupIsOneBatch)
     ASSERT_TRUE(fs::exists(rna_bin));
     fs::remove(rna_bin);
 
-    // ── 顺序必须**钉住**：rna 先于 rnb ─────────────────────────────────────────
+    // ── 顺序必须**固定**：rna 先于 rnb ─────────────────────────────────────────
     // 本用例的全部判别力都建立在"rna 已经跑过、rnb 才失败"之上。顺序反过来（rnb 先）
     // 时，"rnb 失败前 rna 已经提交"这件事**根本没发生过** —— 下面那条 EXPECT_FALSE
     // 在旧实现下也会通过，判别力静默消失。所以顺序不能只靠"碰巧这么排"。
@@ -608,7 +608,7 @@ TEST_F(SolverRegressionTest, ReinstallGroupIsOneBatch)
 
 TEST_F(SolverRegressionTest, RecursiveRemoveGroupIsOneBatch)
 {
-    // ── 顺序必须**钉住**：rra 先于 rrb ─────────────────────────────────────────
+    // ── 顺序必须**固定**：rra 先于 rrb ─────────────────────────────────────────
     // rra **依赖** rrb → 反向依赖数 rra=0、rrb=1，而移除序按"反向依赖数升序（叶子先删）"
     // 排（`remove_packages_recursive`）。于是 rra 必定排在 rrb 之前。
     //
@@ -669,7 +669,7 @@ TEST_F(SolverRegressionTest, AutoremoveRollsBackAllPackagesWhenInterrupted)
     ASSERT_TRUE(Cache::instance().is_installed("d1"));
 
     // 第一个候选包删完后中断 → autoremove 必须整批回滚（旧实现逐包各一批，d1 会永久丢失），
-    // **且取消必须上抛**（2026-10-02 修）：此前 `autoremove` 用一个 `catch
+    // **且取消必须上抛**：此前 `autoremove` 用一个 `catch
     // (const std::exception&)` 把异常吞成"一条警告"，于是 `lpkg autoremove` 被 Ctrl+C
     // 之后**退出码仍是 0** —— 脚本/farm 会以为删成功了，而实际一个包都没删。取消（以及任何
     // 真实的批次失败）都该照常上抛，由 `run_cli` 翻成非零退出码（见 ARCH §14.4 取消 ≠ 完成）。
@@ -686,7 +686,7 @@ TEST_F(SolverRegressionTest, AutoremoveRollsBackAllPackagesWhenInterrupted)
 
 TEST_F(SolverRegressionTest, UpgradeFromFileToDirectorySucceeds)
 {
-    // E4：路径从**文件**变成**目录**（python 包 foo.py → foo/__init__.py 是真实场景）。
+    // 路径从**文件**变成**目录**（python 包 foo.py → foo/__init__.py 是真实场景）。
     // 此前 backup_existing_files 的目录分支只判 exists → 跳过（既不备份也不删除），
     // 随后 copy_package_files 的 ensure_dir_exists 抛 error.path_not_dir → **整批中止**，
     // 用户完全无法升级。现在按文件冲突处理：搬进 stash（可回滚）+ 删掉，让目录得以创建。
@@ -711,7 +711,7 @@ TEST_F(SolverRegressionTest, UpgradePrunesHooksDroppedByNewVersion)
 {
     // v1 带 postinst.sh + prerm.sh，v2 只带 postinst.sh → 升级后 prerm.sh 必须消失。
     // 陈旧的 prerm.sh 会被后续 remove/upgrade 继续执行（静默跑旧版本逻辑），
-    // 而剪枝必须发生在**提交后**：批次回滚时旧 hook 要完好（与 Z7 同一理由）。
+    // 而剪枝必须发生在**提交后**：批次回滚时旧 hook 要完好。
     const std::string v1 = create_pkg_with_hooks("hkpkg", "1.0", {"postinst.sh", "prerm.sh"});
     install_packages({v1});
 
@@ -731,7 +731,7 @@ TEST_F(SolverRegressionTest, UpgradePrunesHooksDroppedByNewVersion)
 
 TEST_F(SolverRegressionTest, RemoveInterruptedBeforeCommitRollsBackEverything)
 {
-    // 用户要求的核心语义：**只要批次未提交，中途中断一律整批恢复**。
+    // 核心语义：**只要批次未提交，中途中断一律整批恢复**。
     // 旧设计里 remove 的 cleanup 在批次内 → "全部包都删完、尚未提交"这个窗口一旦写了
     // CLEANUP 就不可回滚（Ctrl+C 后包保持已删）。新设计 cleanup 挪到提交后，
     // 这个窗口的中断必须把两个包都恢复。

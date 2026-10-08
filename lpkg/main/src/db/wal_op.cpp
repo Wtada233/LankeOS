@@ -88,7 +88,7 @@ WALOpType walop_type_from_name(std::string_view name)
 // 解析格式:
 //   TYPE arg1 [arg2 [arg3 [arg4 [arg5 [arg6]]]]]
 //
-// **分帧规则**（路径可以含空格，所以不能无脑按空格切——见 历史 TODO.md A1）：
+// **分帧规则**（路径可以含空格，所以不能无脑按空格切）：
 //   - 箭头形式（BACKUP/COPY/REMOVE_OLD/RESTORE_FILE/RESTORE_DB）以 " → " 为界，
 //     两侧整段各自成一个参数：TYPE <src> → <dst>
 //   - 其余形式用 tail_args() 给出"arg1 之后还有几个固定字段"，那些字段**从右往左**切，
@@ -227,7 +227,7 @@ static void wal_append_raw(const std::string& line)
     // **只在真的创建了文件时才做**：目录项只有在那一刻才需要落盘，文件本来就在时再
     // fsync 一次父目录是白付（这条路径每写一行审计行就会走一次；`open_wal_append` 用
     // O_CREAT|O_EXCL 原子地判出"本次是否创建"，不是 TOCTOU 的 fs::exists）。原先恒做，
-    // 实测占全部 fsync 的 34%~40%。行内容的 ::fsync(fd) 不受影响，恒生效。
+    // 占全部 fsync 的 34%~40%。行内容的 ::fsync(fd) 不受影响，恒生效。
     //
     // 守卫**只包这一小块**：绝不能扩成整个函数/函数外 —— `write_string_file_wal` 在它的
     // 最外层已经有一个守卫（那是 DB/元数据写的保证），而"批量文件数据"（包内容、
@@ -253,7 +253,6 @@ static void wal_append_raw(const std::string& line)
     ::close(fd);
 }
 
-/// 获取 .lpkg_db_bak 备份文件的路径
 static std::string db_bak_path(const std::string& db_path, const std::string& milestone)
 {
     return db_path + ".lpkg_db_bak_before:" + milestone;
@@ -445,13 +444,12 @@ constexpr UndoRow UNDO_TABLE[] = {
 
     // ── DIR_RM：删除空目录；回滚按元数据重建 ─────────────────────────────────────
     // arg1 = 目录路径, arg2 = mode(十进制), arg3 = uid, arg4 = gid（后三个由元数据列消费）。
-    // 目录键带尾斜杠 → 先规范化：否则下面的 is_symlink 守卫恒假（尾斜杠解引用末尾链接），
-    // 回滚会 chmod/lchown **穿过**链接改掉链接目标目录的权限/属主，还写一行 RESTORE_DIR
-    // 谎报"已重建"。审计行记的就是**规范化后**的那个路径（今天的字面）。
-    // （2026-09-26 补注：上面那句"恒假"只描述了**末段是符号链接**那一种形态。**中间段**成环
-    // 时抛型 `fs::is_symlink` 连"判否"都做不到 —— 它抛 code=40 直接打断回滚，所以本文件
-    // 里凡可能吃到中间段环的判定都换成了 `is_symlink_no_follow()`；这里的 `strip` 仍然必要，
-    // 但理由要从"守卫会恒假"升级为"守卫可能既不等价、又可能抛"。）
+    // 目录键带尾斜杠 → 先规范化：否则下面的 is_symlink 守卫会解引用末尾链接（尾斜杠把
+    // 判定落到**目标**上），回滚会 chmod/lchown **穿过**链接改掉链接目标目录的权限/属主，
+    // 还写一行 RESTORE_DIR 谎报"已重建"。**中间段**成环时抛型 `fs::is_symlink` 更会直接抛
+    // code=40 打断回滚 —— 所以本文件里凡可能吃到中间段环的判定都换成了
+    // `is_symlink_no_follow()`；这里的 `strip` 仍然必要（守卫可能既不等价、又可能抛）。
+    // 审计行记的就是**规范化后**的那个路径（今天的字面）。
     // `Guard::Always`：没有"目标不存在就跳过"这一说 —— 目录缺失正是它要修的状态；是否算
     // "真的动了盘"由动作自己判（重建成功、或本来就已是真目录，都算）。
     {WALOpType::DIR_RM,
@@ -495,12 +493,12 @@ constexpr UndoRow UNDO_TABLE[] = {
     // 破坏行分帧（键里的空格 / 换行 / `" → "`）。**空值**用哨兵 `-`（base64 字母表里没有
     // `-`，故与任何合法编码都不冲突）—— 不能用空字段，那与"这一侧不存在"同形。
     //
-    // `Guard::RealDir`（2026-09-26 修，原来是 `TakenNotSymlink`）：**与写入侧逐字对齐** ——
+    // `Guard::RealDir`（比 `TakenNotSymlink` 更严）：**与写入侧逐字对齐** ——
     // 写入侧（`OpSink::set_xattr` / `unset_xattr`）的前置是 `lstat` + `S_ISDIR`，也就是**这些
     // 行只描述真实目录**；而 `TakenNotSymlink` 放行的范围宽得多（普通文件 / FIFO / 设备都算），
     // 于是回滚会 `lsetxattr` 在**写入侧从不写**的路径上造出一个键（"写入侧刻意不造的状态，
-    // 回滚侧造出来了"）。`DIR_META` 那一格用的就是 `RealDir` —— 这两格此前没跟上。
-    // 与符号链接那一半的关系：`is_real_directory` 同样排除符号链接，所以原来防住的那半没丢。
+    // 回滚侧造出来了"）。`DIR_META` 那一格用的就是 `RealDir`。
+    // 与符号链接那一半的关系：`is_real_directory` 同样排除符号链接，所以那一半也没丢。
     // `Confine::Arg1Only`：arg2/arg3 是 base64，**不是路径** —— 若按 Arg1AndArg2 查，
     // 一串 base64 会被当成越界路径从而**整行被跳过**（回滚静默少还原一次）。
     // `Stat::None`：同 DIR_META。
@@ -524,7 +522,7 @@ constexpr UndoRow UNDO_TABLE[] = {
     // ── COPY：两支，**互相独立**（第一支不做也不影响第二支）────────────────────────
     // ① 删落点（arg2）：绝不 rmdir —— COPY 的落点只可能是文件/符号链接（"归档文件撞真
     //    目录"已在 check_for_file_conflicts 前置拒绝）。这里仍显式挡住真目录 ——
-    //    `fs::remove` 对**空目录**会 rmdir 成功，实测会把盘上原有的空目录删掉而 DB 仍声称
+    //    `fs::remove` 对**空目录**会 rmdir 成功，会把盘上原有的空目录删掉而 DB 仍声称
     //    持有（盘面/DB 脱节，且没有 BACKUP 行可还原）。
     // ② 清残留（arg1）：COPY 只删 dst，`.lpkgtmp` 仍可能残留（清理中断安装的残留）。它
     //    **不是 COPY 落位的对象**，故无审计行，但同样计数。
@@ -556,7 +554,7 @@ constexpr UndoRow UNDO_TABLE[] = {
      {},
      // 同 COPY 两支：`fs::remove` 对空目录会 rmdir，而 NEW 只可能描述文件/符号链接
      // （目录走 NEW_DIR）。盘上若被真目录占了那个名字，宁可跳过也不 rmdir
-     // （2026-10-02 与 COPY 的 ① 支对齐）。
+     // （与 COPY 的 ① 支对齐）。
      Guard::TargetTakenNotDir,
      Confine::Arg1Only,
      {"RESTORE_FILE_RM", {ARG1, false}, {}},
@@ -572,7 +570,6 @@ constexpr UndoRow UNDO_TABLE[] = {
     // 拒绝（ENOTDIR，**不跟随**），所以修复前此形态实际是**静默 no-op**（不删、也不写
     // RESTORE_DIR_RM）——是"该删的没删"，不是"删错"。真正可观测的差异在**无尾斜杠**形态：
     // `fs::remove` 会 unlink 掉链接本身（进而让回滚把它当"我们建的目录"抹掉）。
-    // （2026-09-25 据真实 syscall 行为订正。）
     // 审计行记的是**原样**的 arg1（含尾斜杠）—— 与 DIR_RM 的 RESTORE_DIR 不同，别统一。
     // 本行**不计统计量**（今天就是如此）。
     {WALOpType::NEW_DIR,
@@ -586,10 +583,9 @@ constexpr UndoRow UNDO_TABLE[] = {
 
     // ── DB / DBRM：从 DB 备份还原（备份侧由 `DB_BAK` 派生，不是 WAL 字段）──────────
     // bak 不存在 → WAL 已写但备份未完成 → 原文件还在 → 跳过（**幂等**）。
-    // 判据用**跟随语义 + 不抛**的 `exists_follow`（2026-09-26 订正：原文写"判据用**抛**的
-    // `fs::exists`：原样保留"）—— 保留跟随语义是**有意的**（DB 文件可以是符号链接，管理员
-    // 把 `state_dir` 搬走时常见），去掉的只是"抛"：备份路径被符号链接环占着时抛 `fs::exists`
-    // 会以 ELOOP 打断整条回滚，而回滚路径上的判定绝不能有能力打断事务。
+    // 判据用**跟随语义 + 不抛**的 `exists_follow` —— 保留跟随语义是**有意的**（DB 文件可以是
+    // 符号链接，管理员把 `state_dir` 搬走时常见），去掉的只是"抛"：备份路径被符号链接环占着时抛
+    // `fs::exists` 会以 ELOOP 打断整条回滚，而回滚路径上的判定绝不能有能力打断事务。
     {WALOpType::DB,
      Undo::RestoreDb,
      {ARG1, false},
@@ -692,7 +688,7 @@ bool guard_ok(Guard g, const fs::path& orig, const fs::path& bak)
             // 这一行被**静默跳过**（不计失败、不写审计），原物永久消失（`cleanup_db_backups`
             // 随后还会删掉那个备份）。跟随语义在这里不是"更宽容"，而是**漏掉写入侧真的搬过的
             // 那一份**。可达的 `bak`（目标存在的普通符号链接）两种谓词都给 true，所以
-            // "管理员把 `state_dir` 搬到别处"的布局不受影响（2026-10-03 修，见
+            // "管理员把 `state_dir` 搬到别处"的布局不受影响（见
             // tests/unit/test_undo_table.cpp 的 DbBakSymlinkLoopIsRestoredNotSkipped）。
             // 仍守原纪律：lstat（`exists_no_follow`）**永不抛** —— 回滚路径上的判定绝不能
             // 有能力打断事务。
@@ -733,12 +729,12 @@ std::optional<std::string> decode_b64_text(const std::string& s)
  * 字段缺失/解析失败 → 对应项保持 `-1` 哨兵（**有意吞**：单行写坏不该中断回滚，与 `guard_ok`
  * 同一条纪律）；`lchown` 只在 uid 与 gid **都**有效时才做（`-1` 是"不改"，不是合法属主）。
  *
- * 2026-10-03 修：这里的"解析失败"此前**名不副实** —— 用的是 `std::stoul`，而它恰好对两类坏
- * 输入都不抛（于是上面的 `catch` 形同虚设、哨兵永远不会被触发）：
+ * 为什么必须严格解析（`std::stoul` 恰好对两类坏输入都不抛，于是上面的 `catch` 形同虚设、
+ * 哨兵永远不会被触发）：
  *   · `stoul("-1")` → `ULONG_MAX`（接受前导负号、按模回绕），`& 07777` 之后正好是 `07777`
  *     （setuid+setgid+sticky+世界可写）⇒ 一条写坏的 WAL 行就能把**任意目录**改成完全开放；
  *   · `stoul("1777junk")` → `1777`（尾随垃圾静默忽略）。
- * 现在走下面这个"整串必须是数字"的严格解析。
+ * 所以走下面这个"整串必须是数字"的严格解析。
  */
 namespace
 {
@@ -944,10 +940,9 @@ bool apply_row(const UndoRow& row, const WALOp& op, bool write_audit, RollbackSt
 
 namespace
 {
-// 2026-10-03：这里原先自有一份 `path_has_prefix()` + `path_within_root()`（分量级比较 +
-// canonical 复核），与 `base/utils.cpp` 的 `path_within()` 是**同概念的第二份实现** —— 两者
-// 只靠注释声明"用同一套剥离规则"，必然漂移。现已收敛到 `base/utils.cpp` 的
-// `path_within_resolved(p, root)`（**唯一实现**，参数顺序与旧名相反），本文件只保留调用。
+// 路径判定收敛到 `base/utils.cpp` 的 `path_within_resolved(p, root)`（唯一实现，
+// 参数顺序与 `path_within_root()` 相反）—— 同概念的第二份实现（分量级比较 + canonical 复核）
+// 与它只靠注释声明"用同一套剥离规则"，必然漂移。本文件只保留调用。
 
 /**
  * 一条 WAL 行的**全部目标路径**是否都在允许范围内 —— 不在就跳过该行（并告警）。
@@ -1050,8 +1045,8 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit)
 
         // 越界的行：**告警 + 跳过** —— 绝不因此让恢复失败。
         //
-        // 订正 2026-10-03：原文接着说"与 'bak 不存在 → 跳过' 同一个保守方向"，**那是错的**，
-        // 而且正是 `perform_undo` 当初把三态压成 `bool` 的同一个混淆：
+        // ⚠️ 别把它与"bak 不存在 → 跳过"当成同一个保守方向 —— 那正是 `perform_undo` 曾经
+        // 把三态压成 `bool` 的同一个混淆：
         //   · `bak 不存在 → 跳过`  = **活已经干过了**（幂等，重复回滚的正常结局）；
         //   · **越界 → 跳过**      = **这一行压根没被撤销**（我们拒绝了）。
         // 后者属于 `RollbackStats::failures` 那一类，但这里**有意不计**，理由是：
@@ -1138,7 +1133,7 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path)
     for (int i = static_cast<int>(lines.size()) - 1; i >= 0; --i) {
         auto op = parse_op(lines[i]);
         // 未解析行（破损/半写尾部）必须跳过：否则它会以 INVALID 之外的类型参与判断，
-        // 甚至被当作批次起点，导致整个批次的操作集被截断（见 历史 TODO.md A2）。
+        // 甚至被当作批次起点，导致整个批次的操作集被截断。
         if (!op.is_valid()) continue;
         if (op.type == WALOpType::BEGIN_PKGS) {
             start_idx = i;
@@ -1183,7 +1178,7 @@ void write_string_file_wal(const std::string& path, const std::string& content,
     // 不受 durable_fsync_enabled()（默认关闭）影响。
     DurableFsyncGuard durable;
     const fs::path p(path);
-    // `exists_no_follow`（2026-09-26 修）：判据要的是"**这个名字**上有没有东西"，而悬空链接
+    // `exists_no_follow`：判据要的是"**这个名字**上有没有东西"，而悬空链接
     // 同样占着名字。用跟随语义会把悬空链接当成"没有旧内容" ⇒ 写 `DBNEW`（**无备份**）⇒
     // 回滚的 `Undo::RemoveFile` 只 unlink 新文件，**原来的悬空链接永久消失**（而不是"还原"）。
     const bool is_new = !exists_no_follow(p);
@@ -1222,14 +1217,14 @@ void write_string_file_wal(const std::string& path, const std::string& content,
 
 fs::path stash_root_of_bak(const fs::path& bak_in)
 {
-    // **先剥尾斜杠**（2026-09-26 加）：今天 WAL 字面量恒不带尾斜杠（`new_dir`/`new_file` 按
+    // **先剥尾斜杠**：今天 WAL 字面量恒不带尾斜杠（`new_dir`/`new_file` 按
     // 原样记录、其余调用点各自剥过），但那条只是**君子协定**；而调用方（`purge_consumed_stashes`
-    // 等）会拿本函数的返回值去 `fs::remove_all`，实测 **`fs::remove_all("link/")` 会删光链接
+    // 等）会拿本函数的返回值去 `fs::remove_all`，而 **`fs::remove_all("link/")` 会删光链接
     // 目标的全部内容**（返回 ENOTDIR）⇒ 尾斜杠一旦出现，"判不出 stash 根 → 原样返回自己" 就会
     // 变成灾难。剥掉不改变任何今天的答案（判据本来就要求末段是那个 stash 目录名）。
     const fs::path bak = strip_trailing_slash(bak_in);
     const fs::path par = bak.parent_path();
-    // 判据的唯一实现见 `base::is_stash_dir_name()`（此前这里是与它逐字重复的裸字面量）
+    // 判据的唯一实现见 `base::is_stash_dir_name()`
     return is_stash_dir_name(par.filename().string()) ? par : bak;
 }
 
@@ -1279,7 +1274,7 @@ void purge_consumed_stashes(const std::vector<WALOp>& ops)
         // ②-a UNSTASH 的逆操作没收敛：它引用的 bak 仍在（见上面 ②）
         if (op.type == WALOpType::UNSTASH && !op.arg1.empty() && exists_no_follow(op.arg1))
             note_unconverged(op.arg1);
-        // ②-b **同一推论的推广（2026-10-02 修）**：`reverse_execute` 会因**路径越界
+        // ②-b **同一推论的推广**：`reverse_execute` 会因**路径越界
         // （confinement）**而**跳过**某条可逆行（只告警），那一刻原物**只存在于 stash 里**，
         // 而下面照样整目录 remove_all ⇒ 把它删掉。判据与 ②-a 完全一样、方向也一样
         // （宁可留残留，也不删未还原的数据）：**reverse 之后 bak 还在 ⇒ 没被消费 ⇒ 保留**。

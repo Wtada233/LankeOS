@@ -1,4 +1,4 @@
-//! `src/scan.rs` 的单元测试（从生产文件搬出：那里测试比生产还长，正文被淹没）。
+//! `src/scan.rs` 的单元测试。
 //! 仍是同一父模块的子模块 ⇒ `use super::*` 与 crate 内私有项照旧可用。
 
 use super::*;
@@ -173,7 +173,7 @@ fn scan_content_emits_needed_symbol_versions() {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
-/// **H1（承重）**：绝对符号链接目标必须映射回**包内** content 根（归档里的 `/` == content/），
+/// **承重**：绝对符号链接目标必须映射回**包内** content 根（归档里的 `/` == content/），
 /// **绝不落到宿主机**。
 ///
 /// 场景：`content/usr/lib/libzzz.so -> /usr/lib/libzzz.so.1`（绝对），真身 ELF 在
@@ -214,7 +214,7 @@ fn scan_content_resolves_absolute_symlink_within_content() {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
-/// **H1（密闭性）**：绝对链接目标落在 **content 之外** 时**绝不读取** content 外的文件
+/// **密闭性**：绝对链接目标落在 **content 之外** 时**绝不读取** content 外的文件
 /// （宿主 / 仓库外）。
 ///
 /// 真实实例：keyutils 的 `content/usr/lib/libkeyutils.so -> /lib/libkeyutils.so.1`，而该包
@@ -251,7 +251,7 @@ fn scan_content_never_reads_absolute_target_outside_content() {
     let _ = std::fs::remove_dir_all(&tmp);
 }
 
-/// **H1（单元）**：`normalize_lexically` 只做词法归一（消 `.`/`..`），不碰文件系统。
+/// **单元**：`normalize_lexically` 只做词法归一（消 `.`/`..`），不碰文件系统。
 #[test]
 fn normalize_lexically_collapses_dot_segments() {
     assert_eq!(
@@ -260,7 +260,7 @@ fn normalize_lexically_collapses_dot_segments() {
     );
 }
 
-/// **H1（单元）**：相对目标借 `..` 逃出 content 根 → `None`（绝不越界解析）。
+/// **单元**：相对目标借 `..` 逃出 content 根 → `None`（绝不越界解析）。
 #[test]
 fn resolve_link_within_content_rejects_escape() {
     let tmp = std::env::temp_dir().join(format!("farm-scan-escape-{}", std::process::id()));

@@ -1,6 +1,6 @@
 /**
  * test_ultimate_multipkg.cpp — **终极**端到端：6 个包样本（3 包 × 2 版本）走完
- * 安装 / 升级 / 卸载 / 回滚 四条路径（2026-09-26 新增）
+ * 安装 / 升级 / 卸载 / 回滚 四条路径
  *
  * ── 它与既有测试的分工 ──────────────────────────────────────────────────────
  *   · `test_type_transition_matrix.cpp`：**单格**语义，一格里只放一个待考的形状（读得懂，
@@ -71,11 +71,11 @@
  *      `UpgradeRollsBackObsoleteRemovalAlreadyDone`：在**写入趟**注入（它跑在废弃清除 ②b
  *      **之后**），并在断点时刻断言"废弃的那棵树已经不在了" —— 那正是"废弃清除已经发生
  *      才失败"的取证，回滚要把它整棵还回来。等价性：窗口不同，但**被考的回滚责任相同**。
- *   2. ~~`test_base.hpp` 的 `db_family_files()` 漏了 `xattrkeys.db`~~ —— **已修（2026-09-26）**：
- *      那个 helper 现在列全 **6** 个（pkgs/files/provides/confhashes/xattrkeys/holdpkgs）。
- *      本文件原先在 `db_state()` 里显式补了一行 `add_file(xattr_keys_db())`，helper 修好后
- *      已删（重复了）。保留这条记录，是因为它是个**反复发生**的坑：那个 helper 的注释自己
- *      预言过「加新库时几处硬编码清单会漏掉它」，而**预言并没有防住第二次**。
+ *   2. `test_base.hpp` 的 `db_family_files()` 现在列全 **6** 个
+ *      （pkgs/files/provides/confhashes/xattrkeys/holdpkgs）。本文件原先在 `db_state()` 里
+ *      显式补了一行 `add_file(xattr_keys_db())`，helper 列全后已删（重复了）。保留这条记录，
+ *      是因为它是个**反复发生**的坑：那个 helper 的注释自己预言过「加新库时几处硬编码清单会
+ *      漏掉它」，而**预言并没有防住第二次**。
  */
 
 #include <gtest/gtest.h>
@@ -490,7 +490,7 @@ protected:
      *
      * `v1_tree()` 描述的是"刚装完 v1"那一瞬；而回滚用例的基线是
      * `install_v1_and_edit()` 之后（两份配置已被用户改过）—— 用 `v1_tree()` 当基线会红在
-     * "盘上是 keplocal-user，期望 keplocal-v1"上，那是我把**基线**写错了。
+     * "盘上是 keplocal-user，期望 keplocal-v1"上。
      */
     std::vector<Expect> v1_tree_edited() const
     {
@@ -540,7 +540,7 @@ protected:
         // **排除 lpkg 自己的状态目录**（`state_dir()`：WAL / transaction.log / db_bak /
         // 各库与 man 备份都在里面）。理由与 `test_upgrade_rollback_fidelity.cpp` 的"WAL 按
         // 约定不做字节比较"同源：那是**记账**不是**被管理的系统镜像**，而它的**内容**由
-        // `db_state()` 逐字节钉住。不排除的话，"拒绝时盘面一字未动"会被
+        // `db_state()` 逐字节固定。不排除的话，"拒绝时盘面一字未动"会被
         // `var/lib/lpkg/transaction.log` 的创建/改写误判成"盘面动了"。
         const fs::path state_dir = Config::instance().state_dir();
         for (auto it = fs::recursive_directory_iterator(test_root, ec);
@@ -781,7 +781,7 @@ TEST_F(UltimateMultiPkgTest, RemoveAllThreeLeavesOnlyEtcPolicyLeftovers)
 
     // `/etc`：被移除的配置都改名保留，内容逐字节在。
     // 注意 gamma 那份是**升级时**就已经改名的（v2 不再提供 ⇒ 废弃 ⇒ `.lpkgsave` + 撤所有权），
-    // 所以移除趟不会再给它加一层后缀 —— 我第一版期望 `.lpkgsave.lpkgsave` 是错的。
+    // 所以移除趟不会再给它加一层后缀（不会出现 `.lpkgsave.lpkgsave`）。
     for (const auto& [kept_path, content] : std::vector<std::pair<std::string, std::string>>{
              {std::string(ETC_INSTALLNEW) + ".lpkgsave", "installnew-v2\n"},
              {std::string(ETC_KEPLOCAL) + ".lpkgsave", "keplocal-user\n"},

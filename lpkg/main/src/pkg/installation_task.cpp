@@ -80,7 +80,7 @@ InstallationTask::InstallationTask(std::string pkg_name, std::string version, bo
 {
     // 包名来自**不可信来源**（远端索引 / .lpkg 内的 metadata.json），而它会被当成路径
     // 分量拼进 tmp_pkg_dir()、dep_dir()、needed_so_dir()、docs_dir()、hooks_dir()
-    // —— 一个 `../` 就能以 root 写到这些目录之外（历史 TODO.md X4）。此处在唯一的构造入口挡住。
+    // —— 一个 `../` 就能以 root 写到这些目录之外。此处在唯一的构造入口挡住。
     if (!is_safe_path_component(pkg_name_)) {
         throw LpkgException(
             string_format("error.unsafe_path_component", "package name", pkg_name_));
@@ -250,8 +250,8 @@ void InstallationTask::download_and_verify_package()
             actual_version_ = info->version;
             expected_hash_ = info->sha256;
         } else {
-            // 抛异常却用 `warning.*` 键（2026-10-03 订正：原为 warning.package_not_in_repo）
-            // —— 报错类别与键名对不上，同一件事在别处（`upgrade` 等）一律是 `error.*`。
+            // 抛异常用的是 `error.*` 键 —— 报错类别与键名必须一致（同一件事在别处，
+            // 如 `upgrade`，也一律是 `error.*`）。
             //
             // ⚠️ **本分支无对应用例 —— 有意的，不是漏测**：走到这里要求"包名在本地索引里
             // 查不到"，而正常安装路径上 `find_package` 更早就该命中（未命中会先以
@@ -262,7 +262,7 @@ void InstallationTask::download_and_verify_package()
     }
 
     // 版本号同样不可信（CLI `pkg:版本` 或远端索引），它会被拼进下载落点与
-    // `tmp_pkg_dir_ / (版本 + ".lpkg")` —— 含 `../` 即可写到临时目录之外（历史 TODO.md X4）。
+    // `tmp_pkg_dir_ / (版本 + ".lpkg")` —— 含 `../` 即可写到临时目录之外。
     if (!is_safe_path_component(actual_version_)) {
         throw LpkgException(
             string_format("error.unsafe_path_component", "version", actual_version_));
@@ -292,7 +292,7 @@ void InstallationTask::extract_and_validate_package()
     // metadata.json 必须是**真文件**、content 必须是**真目录**（lstat 语义，不跟随符号链接）：
     // `fs::exists` 会跟随链接，于是 `content -> /etc` 这类归档能通过校验，随后
     // `scan_content_files` 会把链接目标的内容当包内容（见那里的说明）。`metadata.json`
-    // 同理 —— 一条 `metadata.json -> /etc/passwd` 会让随后的读取落到包外（2026-10-02 修）。
+    // 同理 —— 一条 `metadata.json -> /etc/passwd` 会让随后的读取落到包外。
     const fs::path meta_path = tmp_pkg_dir_ / constants::PKG_METADATA_FILE;
     if (!is_regular_file_no_follow(meta_path))
         throw LpkgException(string_format("error.incomplete_package", meta_path.string()));
@@ -324,9 +324,8 @@ bool plan_provides(const InstallContext& ctx, const std::string& name)
  * 计划中是否有包**导出该 SONAME**。
  *
  * ⚠️ 与 `plan_provides()` **各查一个字段**：`provides` 是虚拟 provider、`provides_soname` 是
- * SONAME。此前两者共用一个函数（都查 `provides`）—— 8.0.0 拆分后 SONAME 不再进 `provides`，
- * 再共用就会让"计划里有包提供这个 SONAME"**永远为假** ⇒ 依赖该 SONAME 的包被判缺依赖、
- * 整批回滚。
+ * SONAME（SONAME **不进 `provides`**）。共用同一个函数（都查 `provides`）就会让"计划里有包
+ * 提供这个 SONAME"**永远为假** ⇒ 依赖该 SONAME 的包被判缺依赖、整批回滚。
  */
 bool plan_provides_soname(const InstallContext& ctx, const std::string& need)
 {
@@ -366,11 +365,9 @@ bool dep_satisfied_on_disk(const DependencyInfo& dep)
  * 处理，因为那一格要按 lpkg 语义复核**计划版本**是否符合约束 —— 而且必须在
  * `dep_satisfied_on_disk()` 之前判（盘上那份满足 ≠ 计划要换上的那份满足）。
  *
- * ⚠️ 这里**不再**把能力名记入 `ctx.targets`（以及相应的 `is_planned_target` 兜底仍保留，
- * 但不再写 targets）。那一步原本是给"元数据验证触发的重解"用的 —— 重解要靠 targets 记住
- * 被点名过的能力，才能在下一次求解时换个提供者。**重解已在 2026-10-02 删除**
- * （见 `package_manager.cpp` 的 `verify_package_metadata`）：此刻 `resolve_with_solver`
- * 早已跑完、`is_explicit` 早已定下，再写 targets 不会产生任何效果。
+ * ⚠️ 这里**不**把能力名记入 `ctx.targets`（相应的 `is_planned_target` 兜底仍保留，但不再
+ * 写 targets）：走到这里 `resolve_with_solver` 早已跑完、`is_explicit` 早已定下，再写
+ * targets 不会产生任何效果。
  *
  * 两者皆非 = solver/plan 不一致：依赖未安装、不在计划、也不由计划包提供。元数据一致性
  * 校验（`verify_package_metadata`）已在**每个包写盘之前**逐包比对过归档与索引，这里再
@@ -451,17 +448,16 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
 {
     if (Config::instance().no_deps_mode()) return;
     auto actual_deps = detail::parse_dep_strings(deps_);
-    // 早退只在"命名依赖与 SONAME **都没有**"时成立。这里曾经写的是
-    // `if (actual_deps.empty()) return;` —— 于是下面**整段 needed_so 校验成了死代码**
-    // （SONAME 检查与"有没有命名依赖"毫无关系）：一个 deps 为空、needed_so 缺失的包可以
-    // 静默滑过这道防线（2026-10-02 修）。
+    // 早退只在"命名依赖与 SONAME **都没有**"时成立：只判 `actual_deps.empty()` 会让下面
+    // **整段 needed_so 校验成为死代码**（SONAME 检查与"有没有命名依赖"毫无关系）——
+    // 一个 deps 为空、needed_so 缺失的包就静默滑过这道防线。
     if (actual_deps.empty() && needed_so_.empty()) return;
 
     // **成功时完全静默**：这是**一致性校验**（"盘面/计划能不能撑起这个包的依赖"），不是依赖解析
     // 的一步 —— 解析早在 solver 那一步做完了。校验只在**出错时**出声（下面两处 throw 与
-    // `warning.missing_so_no_error`），不报"我在检查"。
-    // 曾经打过一行 `info.checking_deps`：在批量输出里既吵又**误导** —— 只有带命名依赖的包打、
-    // 只带 SONAME 的不打，看起来像"只有第一个包查了依赖"（实测 `reinstall rust nano`）。
+    // `warning.missing_so_no_error`），不为"开始检查"这类动作打日志：`info.checking_deps`
+    // 在批量输出里既吵又**误导** —— 只有带命名依赖的包打、只带 SONAME 的不打，
+    // 看起来像"只有第一个包查了依赖"（`reinstall rust nano`）。
 
     for (const auto& dep : actual_deps) {
         // ① 计划里要装这个依赖 → 批次结束后生效的是**计划版本**，不是盘上那份。即使盘上
@@ -473,7 +469,7 @@ void InstallationTask::ensure_dependencies_satisfied(InstallContext& ctx)
             // 那份满足约束，计划把它换成违反约束的版本同样是错。复核**不受**"盘上已满足"
             // 短路 —— 那个短路只看盘面，会漏掉"计划正要换掉它"这一格。
             //
-            // 判据本体在 `detail::check_planned_dep_version()`（**唯一实现**，且可被直接
+            // 判据本体在 `detail::check_planned_dep_version()`（唯一实现，且可被直接
             // 喂手搓的计划做单测 —— 见其声明处说明）。
             detail::check_planned_dep_version(dep, ctx.plan, pkg_name_);
             continue;
@@ -505,11 +501,11 @@ namespace
  * 一个逻辑路径"此刻"的盘面状态（lstat 语义：符号链接算**存在**但**不是目录**）。
  *
  * 判之前一律 `strip_trailing_slash`：尾斜杠会把末尾的符号链接**解引用**
- * （pacman 为此专门写了 `llstat()`，见 FS#51377 / commit 16b91f79），`is_symlink` 恒假、
+ * （pacman 为此专门写了 `llstat()`，见 FS#51377），`is_symlink` 恒假、
  * "别动 symlink→目录"的守卫集体失效。`root / <绝对路径>` 会**丢弃**左值（archive.cpp
  * 里踩过同一个坑），所以这里先把逻辑路径转成相对路径再拼。
  *
- * ⚠️ **判据一律走不抛谓词族**（2026-09-26 修）：这两个字段**对每个归档条目**都会被求值
+ * ⚠️ **判据一律走不抛谓词族**：这两个字段**对每个归档条目**都会被求值
  * （install/upgrade 的批次预检入口），而老的写法
  * `fs::exists(phys, ec) || fs::is_symlink(phys)` 在**中间段**是符号链接环时**必抛**：
  * `fs::exists` 带 ec 对 ELOOP 返回 false（不抛），于是 `||` **必然**求值那个抛型的
@@ -517,7 +513,7 @@ namespace
  * `filesystem_error`**（不是 LpkgException、无 l10n 文案），整批中止、异常穿透到 CLI。
  * 触发形状毫不特殊：盘上 `/usr/share/pylib -> pylib`（自环）**加**包内
  * `content/usr/share/pylib/real.txt`（普通文件）就够了。
- * （实测细节见 base/utils.hpp 那族谓词的说明 —— `fs::is_symlink` 只在**末段**是环时不抛。）
+ * （细节见 base/utils.hpp 那族谓词的说明 —— `fs::is_symlink` 只在**末段**是环时不抛。）
  */
 struct PathProbe {
     bool exists = false;
@@ -562,7 +558,7 @@ struct ConflictView {
  * 的接管。**不加视图成员**：判据只需要 `owners` 与 `all_upgrading` 两个既有成员，
  * 由调用处直接传入，两个视图（真实 / 整批预检的模拟世界）自动共用同一段遍历逻辑。
  *
- * 为什么要"整棵树"而不是"这个目录路径归我"：目录可以被多个包共享（目录键是**累加**持有者
+ * 为什么要"整棵树"而不是"这个目录路径归本包"：目录可以被多个包共享（目录键是**累加**持有者
  * 的），把一棵被共享的目录整树让开（搬进 stash / 改名 .lpkgsave）会**连带搬走别人的文件**。
  * pacman 为此在 `conflict.c` 里写了 `dir_belongsto_pkgs`：遍历目录、逐条查归属，任何一条
  * 不属于"本包 ∪ 本次要移除/升级的包"就判否。
@@ -592,13 +588,13 @@ bool dir_tree_entirely_ours(
         // 目录键在 DB 里**带尾斜杠**；符号链接一律算非目录（与 probe_path/§3.6.1 同口径）
         const bool real_dir = !it->is_symlink(ec) && it->is_directory(ec);
         if (ec) return false;
-        // **`lexically_relative` 而不是 `fs::relative`**（2026-09-26 修）：后者会**解析
+        // **`lexically_relative` 而不是 `fs::relative`**：后者会**解析
         // 符号链接（含末段）**，于是"逐条查归属"查的是**链接目标**的键，而不是这个名字的。
         // 两个后果都是实的：① 树里有一个**别的包持有**的链接、其解析目标归本包 ⇒ 判"整树
         // 都是我们的" ⇒ 整树搬进 stash ⇒ 提交后 stash 被 `remove_all` ⇒ 别人那份文件**永久
         // 消失**，而它的 DB 归属还在原位（所有权脱节 —— 正是本函数存在的唯一意义）；
         // ② 中间段是链接（usr-merge `/bin`→`usr/bin`、`/lib64`）⇒ 键查不到 ⇒ 判"无主" ⇒
-        // **拒绝**本可放行的 dir→非目录 升级。同仓库 `scan/scanner.cpp:93` 早已为同一问题
+        // **拒绝**本可放行的 dir→非目录 升级。同仓库 `scan/scanner.cpp` 早已为同一问题
         // 改用 `lexically_relative` 并写明"假孤儿"的成因。
         const fs::path rel_entry = it->path().lexically_relative(root);
         if (rel_entry.empty()) return false;  // 词法上也对不上 → 判不了 → 拒绝（保守）
@@ -627,9 +623,9 @@ bool dir_tree_entirely_ours(
  *
  *   ① 自持短路：该路径由**本包**持有 → 不判冲突（重装 / 升级自己）；
  *   ② `ours` 豁免是**方向性**的：只豁免"归档**目录**条目接管本包旧版本的**文件/符号链接**"
- *      （文件→目录升级，历史 TODO E4）；反方向 dir→文件 **永不**豁免。
+ *      （文件→目录升级）；反方向 dir→文件 **永不**豁免。
  *
- *      理由**不是**"pacman 也不允许"（订正 2026-09-25，原文如此写、引证错层）：pacman 的
+ *      理由**不是**"pacman 也不允许"：pacman 的
  *      **冲突层**其实允许它 —— `conflict.c` 的 `_alpm_db_find_fileconflicts` 里有
  *      "check if all files of the dir belong to the installed pkg"，当目录里外全属于
  *      `dbpkg ∪ rem`（本包已装版本 ∪ 本次要移除的包）时 `resolved_conflict = 1`，
@@ -668,10 +664,10 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
         // ── 类型变更冲突（pacman 的 case 4 / case 5）────────────────────────────
         // 盘上与归档里"目录 / 非目录"不一致时判冲突。lstat 语义下 **symlink 一律算非目录**
         // （pacman conflict.c CHECK 2：只有 lstat 意义上的真目录才 `continue` 免检）。
-        //   归档是目录 `x/`、盘上是文件/符号链接 → 不能"搬走它再建目录"（实测事故：把
+        //   归档是目录 `x/`、盘上是文件/符号链接 → 不能"搬走它再建目录"（曾把
         //     filesystem 的 `/var/run -> ../run` 换成实体目录）
         //   归档是文件 `x`、盘上是真目录     → 永不覆盖（pacman："not overwriting dir with file"）
-        // 例外：该路径由**本包**以另一形态持有（文件→目录升级，历史 TODO E4）→ 照旧接管。
+        // 例外：该路径由**本包**以另一形态持有（文件→目录升级）→ 照旧接管。
         {
             const PathProbe disk = view.probe(bare);
             if (disk.exists && disk.is_dir != path_str.ends_with('/')) {
@@ -682,7 +678,7 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
                 // **dir → 非目录**（归档是文件/符号链接、盘上是真目录）对称放行，但要满足
                 // pacman 的 `dir_belongsto_pkgs`：**整棵目录树**都归本包或本批次正在升级的包。
                 // 为什么必须"整棵树"：目录键是**累加**持有者的（目录可被多包共享），只凭
-                // "这个目录路径归我"就整树让开，会连带搬走别的包的文件。
+                // "这个目录路径归本包"就整树让开，会连带搬走别的包的文件。
                 std::string
                     foreign_holder;  // 判否时 = 树里第一个"不是我们的"条目的持有者（无主则空）
                 const bool dir_takeover =
@@ -700,7 +696,7 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
                     if (holders.empty()) holders = view.owners(bare + "/");
                     // 报错要点名**真实**冲突源。盘上是本包的目录、但树里有别人的/无主的条目时，
                     // 直接报那个条目的持有者；只报"本包持有这个目录"会把人引去查一个不存在的
-                    // 冲突源（实测：报 "owned by other packages: owned by package <自己>"）。
+                    // 冲突源（报 "owned by other packages: owned by package <自己>"）。
                     if (disk.is_dir && ours) {
                         conflicts[path_str] = foreign_holder.empty()
                                                   ? get_string("error.unknown_manual_file")
@@ -713,7 +709,7 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
                 } else if (!ours_exempts) {
                     // ⚠️ 这里放行的是"归档**目录**覆盖盘上属于**别的包**的文件"，靠
                     // `--overwrite` 豁免（`force_exempts && overwrite_allows(bare)`）。
-                    // **必须撤销旧持有者的文件键**（2026-10-02 修）：下面那句
+                    // **必须撤销旧持有者的文件键**：下面那句
                     // `path_str.ends_with('/')` 会把控制流直接跳过去，于是旧持有者那条
                     // `/usr/share/x`（**文件**键）永远留在 DB 里，而盘上该路径已经是目录 ——
                     // `check_removal_preconditions` 的"文件键却在盘上是实体目录"检查随即
@@ -725,7 +721,7 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
                 // **放行之后必须跳出**：`dir_takeover` 判真说明这次是"盘上是本包的目录、归档是
                 // 文件/符号链接"，而**目录在 DB 里的键带尾斜杠**（`<bare>/`）。放行后若继续往下
                 // 走尾部的"路径级"检查，那里按 bare（无尾斜杠）查归属 → 什么都查不到，会把刚
-                // 放行的接管又判成"无主手工文件"重新拒掉（实测：报 "owned by package unknown
+                // 放行的接管又判成"无主手工文件"重新拒掉（报 "owned by package unknown
                 // (manual file)"，整条升级路径依旧装不上；`/etc` 的 save_config 分支也因此
                 // 永远不可达）。
                 if (dir_takeover) continue;
@@ -756,7 +752,7 @@ void collect_content_conflicts(const std::vector<std::string>& files, const std:
         }
 
         {
-            // 类型变更块可能已经写入了**真正的持有者**，别用泛化消息盖掉它（实测：归档文件撞
+            // 类型变更块可能已经写入了**真正的持有者**，别用泛化消息盖掉它（归档文件撞
             // 别的包的真目录，报的会是 "unknown (manual file)" 而不是那个包的名字）。
             if (view.probe(bare).exists && !Config::instance().overwrite_allows(bare) &&
                 !conflicts.contains(path_str)) {
@@ -772,7 +768,7 @@ void throw_on_file_conflicts(const std::map<std::string, std::string>& conflicts
     if (conflicts.empty()) return;
     // "无主手工文件"不是**包名**：它是 `error.unknown_manual_file`（"unknown (manual file)"）
     // 这个占位文本，塞进 `error.file_conflict_entry` 的持有者槽会渲染成
-    // "File {} is owned by package unknown (manual file)" —— 语法破碎（2026-10-03 订正）。
+    // "File {} is owned by package unknown (manual file)" —— 语法破碎。
     // 判定持有者就是那个占位文本时改用与它配套的措辞
     // `error.file_conflict_unowned`（只认文件路径）。 注意：赋值点仍保留
     // `error.unknown_manual_file`（它仍是"这一格没有真实持有者"的哨兵，
@@ -805,18 +801,19 @@ ConflictView real_conflict_view(InstallContext* ctx)
                         },
                         [&cache](const std::string& key) {
                             // 接管 = "归属被摘"：所有权与**哈希记录**是同一条声明（"这个路径归
-                            // 我 / 我往这里装过什么"），摘一个就必须摘另一个。原先只摘所有权，
-                            // 记录只由 remove_package_files / 升级丢弃 /etc 条目这两处清（且都
-                            // 要求"此刻仍持有"）→ 被接管的包留下的记录永久残留：一个不在册的
+                            // 本包 / 本包往这里装过什么"），摘一个就必须摘另一个。只摘所有权
+                            // 的话，记录只由 remove_package_files / 升级丢弃 /etc 条目这两处清
+                            // （且都要求"此刻仍持有"）→ 被接管的包留下的记录永久残留：一个不在册的
                             // 包留下的记录会被重新装回来的它当成 hash_orig，"记录随包走"在接管
                             // 场景不成立。
                             //
                             // 选**删除**而不是"改名转手给新持有者"：转手会让新持有者在**它自己
                             // 这次安装**里读到一条它从未装过的 hash_orig（copy_package_files 先
                             // 查 get_conf_hash 再 set_conf_hash）——盘上那份若恰好等于那条外来
-                            // 记录，判定表就落到 ① **静默就地替换**，正是本轮刚修掉的那类静默
-                            // 覆盖；何况它随后必被新持有者自己的 set_conf_hash（先删同包前缀）
-                            // 抹掉，转手是纯亏。删除与移除侧、升级丢弃侧的口径也一致。
+                            // 记录，判定表就落到 ① **静默就地替换**（那正是要防的静默覆盖）；
+                            // 何况转手的那条记录随后必被新持有者自己的 set_conf_hash
+                            // （先删同包前缀）抹掉，转手是纯亏。
+                            // 删除与移除侧、升级丢弃侧的口径也一致。
                             //
                             // 与所有权一样只改**内存**：批次成功 → 随 cache.write(<pkg>:installed)
                             // 落盘；批次失败 → batch_rollback 恢复磁盘 DB 后必然 cache.load()
@@ -859,7 +856,7 @@ void InstallationTask::check_for_file_conflicts(InstallContext* ctx)
  * 包的 content 清单 + 当前所有权状态 + 本批次内的接管顺序**一起**算一遍，判定会不会冲突；
  * 有冲突就在**一个文件都没动**的情况下拒绝。
  *
- * **为什么必须整批**：冲突判定原先只在逐包检查（InstallationTask::check_for_file_conflicts）
+ * 必须整批的原因：冲突判定原先只在逐包检查（InstallationTask::check_for_file_conflicts）
  * 里做，而它跑在批次循环内 —— 语义后果是"该批次前面若干包已经完整落地（文件 + DB 里程碑）
  * 之后才发现后面某包的冲突"，然后整批回滚：文件能撤，已经出去的副作用撤不回来。上游
  * libalpm 相反：`alpm_trans_commit` 的第一步就把**整笔事务**的冲突检完
@@ -884,9 +881,9 @@ void InstallationTask::check_for_file_conflicts(InstallContext* ctx)
  * **不改变失败语义**：预检拒绝时尚未 `run_batch_transaction`，WAL 里不会出现 BEGIN_PKGS
  * —— "什么都没发生"（与 check_removal_preconditions 前移后的形态一致）。
  *
- * ⚠️ **前置条件（2026-10-03 起）**：每个成员的归档**已经下载并解压**到标准临时目录
+ * ⚠️ **前置条件**：每个成员的归档**已经下载并解压**到标准临时目录
  * （由 `download_batch` / `extract_batch` 两个阶段完成）。本函数**只读**那份内容清单，
- * 自己不再下载/解压（此前它在同一趟里把两件事都做了）。
+ * 自己不做下载/解压。
  */
 void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
                                 const std::vector<std::string>& order)
@@ -980,21 +977,19 @@ void check_batch_file_conflicts(std::map<std::string, InstallPlan>& plan,
         for (const auto& old_key : cache.get_package_files(n)) {
             if (new_keys.contains(old_key)) continue;
             owners[old_key].erase(n);
-            // ⚠️ 这里**不再**对 `/etc` 一刀切地 `continue`（2026-10-02 修）。原先那行写着
-            // "`/etc` 的废弃条目只撤所有权、文件留在盘上（改名 .lpkgsave 是移除侧的事）"，
-            // 但那描述的是 **2026-09-26 之前**的语义：现在升级侧会把废弃的 `/etc`
-            // **文件/符号链接**改名成 `<路径>.lpkgsave`（`SaveConfigObsolete`，
-            // 见 installation_task_letgo.cpp），该路径**确实被腾空**了。沿用旧注释会让
-            // "后序成员合法接管这个路径"被误判成"无主手工文件"⇒ **整批拒绝**，而且随成员
-            // 顺序时好时坏（`taker` 排在 `migrator` 前就没事）。只有废弃的 `/etc` **目录**
-            // 才留在原地（`DropOwnership`），而那已由下面那句 `ends_with('/')` 覆盖。
+            // ⚠️ 升级侧会把废弃的 `/etc` **文件/符号链接**改名成 `<路径>.lpkgsave`
+            // （`SaveConfigObsolete`，见 installation_task_letgo.cpp）—— 该路径**确实被腾空**了。
+            // 若只撤所有权、把文件留在盘上（`DropOwnership`），"后序成员合法接管这个路径"会被
+            // 误判成"无主手工文件" ⇒ **整批拒绝**，而且随成员顺序时好时坏（`taker` 排在
+            // `migrator` 前就没事）。只有废弃的 `/etc` **目录**才留在原地（`DropOwnership`），
+            // 而那已由下面那句 `ends_with('/')` 覆盖。
             // 废弃**目录**键不在这里模拟：阶段 2 只在"本包是最后持有者且目录为空"时 rmdir，
             // 漏建模的方向是"预检偏保守"，且此类形态变化由逐包检查兜底。
             if (old_key.ends_with('/')) continue;
             // 还有别的持有者 → 文件不搬走（REMOVE_OLD 的 `!owners.empty()` 分支）
             if (!owners[old_key].empty()) continue;
             const std::string bare = strip_trailing_slash(old_key);
-            // 新版本把它变成了**目录**（文件→目录升级，历史 TODO E4）：文件不消失、也不搬 stash
+            // 新版本把它变成了**目录**（文件→目录升级）：文件不消失、也不搬 stash
             if (new_keys.contains(bare + "/")) continue;
             const PathProbe disk = probe_now(bare);
             if (disk.exists && !disk.is_dir) released.insert(bare);

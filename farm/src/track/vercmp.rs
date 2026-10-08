@@ -2,8 +2,7 @@
 //!
 //! ## 为什么是这一份实现
 //!
-//! lpkg 从 8.0.0 起**原生就是 rpm 的 EVR**：它把版本串**原样**交给 libsolv 的
-//! `pool_evrcmp_str()`，再没有"自己的语义 + 编码桥"（见 lpkg `vercmp/version.hpp` 的订正块）。
+//! lpkg **原生就是 rpm 的 EVR**：它把版本串**原样**交给 libsolv 的 `pool_evrcmp_str()`。
 //! farm 这边没有 libsolv 绑定（Rust + 静态链接的 C 库不便），所以这里**移植** libsolv 的
 //! 同一套算法 —— 移植的是 `evr.c` 的 `solv_vercmp_rpm()` 与 `pool_evrcmp_str()` 的
 //! COMPARE 分支（epoch 处理、**最后一个** `-` 切 release、"有 release 者更大"）。
@@ -21,9 +20,7 @@
 //! - 段按数字比大小、数字段 > 字母段、字母段按字典序；数字段去掉前导 0 再比位数；
 //! - 有 epoch 且非 0 者更大；`0:` 与无 epoch 等价。
 //!
-//! ⚠️ **旧实现（`主版本[补丁后缀][-预发布][+发行修订号]`）已删除** —— 那是 lpkg 旧语义的
-//! 影子（`-` 当预发布、`+N` 当发行修订号），随 lpkg 的破坏性改动一起作废。farm 写进
-//! `LankeBUILD.json` 的版本也不再拼 `<ver>+<release>`，而是 `<ver>-<release>`
+//! farm 写进 `LankeBUILD.json` 的版本是 `<ver>-<release>`
 //! （`build/repo.rs` 的 `effective_version`）。
 
 use std::cmp::Ordering;

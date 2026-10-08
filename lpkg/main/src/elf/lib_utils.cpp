@@ -25,7 +25,7 @@ std::string get_elf_soname(const fs::path& path)
 {
     // libelf 要求进程先调用 elf_version(EV_CURRENT)，否则 elf_begin 恒返回 NULL。
     // 此前只有 strip.cpp 调过它 → 安装期的 ldconfig 触发器（apply_soname_links）
-    // 在"本进程没 strip 过"时**一个 SONAME 链接都不建，且完全静默**（历史 TODO.md F2）。
+    // 在"本进程没 strip 过"时**一个 SONAME 链接都不建，且完全静默**。
     // 这里做一次性的惰性初始化，消除调用顺序依赖。
     static const bool elf_ready = (elf_version(EV_CURRENT) != EV_NONE);
     if (!elf_ready) return "";
@@ -57,9 +57,6 @@ std::string get_elf_soname(const fs::path& path)
                         // 只挡得住"指针为 NULL"，挡不住"指针非 NULL 但**没有 NUL 终止**" ——
                         // 那种情况下 `std::string s = ptr` 的 `strlen` 会越过 `.dynstr` 一路读。
                         // 改用**有界**取值（见 `lib_utils.hpp` 的 `elf_strtab_get`）。
-                        // ⚠️ 这条是**推理出来的纵深防御**，不是被复现的活缺陷（订正 2026-10-03：
-                        // 当初写"fuzz 实测读回垃圾"是错的，那次是 harness 的 oracle 把
-                        // `char` 与 `uint8_t` 直接比较导致的误报）。
                         soname = std::string(elf_strtab_get(elf, shdr.sh_link, dyn.d_un.d_val));
                         break;
                     }
@@ -124,10 +121,9 @@ void apply_soname_links(const fs::path& lib_dir,
     // 内容** —— `trigger.cpp` 传目标 root 的 `<root>/usr/lib`，`builder.cpp` 传构建 staging 的
     // `<staging>/usr/lib`。盘上（或 staging 里）有**符号链接环**时，抛出型判定会让任何提供
     // `usr/lib/**.so*` 的包在**提交之后**的触发器里炸：包已落地、DB 已提交，命令却报失败。
-    // 措辞订正 2026-09-26：原文写"判定一律不抛"，但下面 `fs::directory_iterator(lib_dir)`
-    // 是**抛型**构造（没有 ec 重载）—— 它靠**紧邻的上面这一行**守卫：`is_directory_follow`
-    // 解不开就返回 false 提前退出，所以迭代只在 lib_dir 确实解析到目录时才进入。
-    // 这是"判定不抛 + 迭代有守卫"，不是"整段不可能抛"。
+    // 但下面 `fs::directory_iterator(lib_dir)` 是**抛型**构造（没有 ec 重载）—— 它靠**紧邻的
+    // 上面这一行**守卫：`is_directory_follow` 解不开就返回 false 提前退出，所以迭代只在
+    // lib_dir 确实解析到目录时才进入。这是"判定不抛 + 迭代有守卫"，不是"整段不可能抛"。
     if (!is_directory_follow(lib_dir)) return;
 
     // **顺序必须确定**（可复现构建）：`fs::directory_iterator` 的顺序由 readdir 决定 —— 同一个
@@ -147,7 +143,7 @@ void apply_soname_links(const fs::path& lib_dir,
         // **保持"跟随"语义、只把"抛"换成"判否"**（不要换成 lstat 语义）：`libfoo.so ->
         // libfoo.so.1.2.3` 这类链接本就该被本函数处理（修正指错的 SONAME 链接正是它的职责），
         // 换成 lstat 会把这些条目一并跳过 = 静默丢掉一段行为。
-        // `directory_entry::is_regular_file()` 走 `status()`，对环抛 ELOOP（实测 code=40）。
+        // `directory_entry::is_regular_file()` 走 `status()`，对环抛 ELOOP（code=40）。
         std::error_code entry_ec;
         if (!fs::is_regular_file(entry.path(), entry_ec) || entry_ec) continue;
         entries.push_back({entry.path(), is_symlink_no_follow(entry.path())});
@@ -163,18 +159,18 @@ void apply_soname_links(const fs::path& lib_dir,
         if (!soname.empty()) {
             // SONAME 取自被扫描的库文件（不可信输入）：绝对路径或 `..` 会让
             // `lib_dir / soname` 逃出 lib_dir（fs::path 语义下绝对右值丢弃左值），
-            // 从而以 root 在任意位置建符号链接（历史 TODO.md X3）。只接受落在 lib_dir 内的。
+            // 从而以 root 在任意位置建符号链接。只接受落在 lib_dir 内的。
             //
             // ⚠️ 判据必须**带 canonical 复核**，不能只用词法判据：`path_within` 是纯词法的，
             // 而这里要判的是"这条链接**落位时会被跟随**的路径"。包同时发一条
             // `usr/lib/sub -> /etc`（`write_symlink_entry` 对链接目标不做校验）与一个
             // SONAME 为 `sub/evil.so` 的库时，`lib_dir/sub/evil.so` 词法上**完全在**
             // lib_dir 内，`create_symlink` 却会穿过中间段的 `sub` 建到 lib_dir 之外。
-            // 两个调用点 2026-10-03 加的 `path_resolves_within(lib_dir, root)` 只护了
+            // 两个调用点加的 `path_resolves_within(lib_dir, root)` 只护了
             // `lib_dir` **自身**、护不到它的**子项** —— 同族判据只推了一条分支。
             // `path_within_resolved` 的语义正是这里要的：① 词法级 ② 父目录 canonical 复核
             // （只解析父目录、末段不解析 ⇒ 不误伤"要建的那条链接名本身不存在"）。
-            // 裸 SONAME 时 `parent_path() == lib_dir`，行为与旧判据逐字相同。
+            // 裸 SONAME 时 `parent_path() == lib_dir`。
             // 解不开（ELOOP 等）时它 fail-open —— 与全仓"判定一律不抛"的取向一致，
             // 且此时 `create_symlink` 会失败并被下面的 catch 转成告警，不构成逃逸。
             const fs::path lib_dir_n = lib_dir.lexically_normal();
@@ -184,11 +180,10 @@ void apply_soname_links(const fs::path& lib_dir,
                                           e.path.filename().string(), lib_dir.string()));
                 continue;
             }
-            // 不抛谓词（2026-09-26 修）：本函数的两个调用点传进来的都是**包内容**
+            // 不抛谓词：本函数的两个调用点传进来的都是**包内容**
             // （trigger.cpp 的目标 root、builder.cpp 的 staging），而包的 `usr/lib` 下完全
             // 可以有自环/两跳环 —— `fs::is_symlink` 对**中间段**成环抛 ELOOP，那一刻包已经
-            // 落地、DB 已经提交，命令却报失败（本文件上方那句"判定一律不抛"的横幅此前并不
-            // 成立，见 CLAUDE.md 的记账）。
+            // 落地、DB 已经提交，命令却报失败。
             if (is_symlink_no_follow(link_path)) {
                 // 链接已存在：正确就不动（避免无谓的 inode/时间戳抖动）；
                 // 否则删掉重建 —— 升级到"同 SONAME、不同文件名"后指向已删旧文件的悬空
@@ -228,18 +223,17 @@ void apply_soname_links(const fs::path& lib_dir,
         if (ec || target.has_parent_path()) continue;
         // 能解析 → 不是悬空。
         //
-        // ⚠️ **这里只判返回值、不判 `ec`，是有意的**（2026-10-03 审计报过"姊妹点 `:106` 写了
-        // `|| ec`、此处漏了"——**实测后判定不成立，故不改**，把量出来的事实记在这里免得下轮再报）：
+        // ⚠️ **这里只判返回值、不判 `ec`，是有意的**：
         //   · `fs::exists(p, ec)` 对**真悬空**（ENOENT）返回 false 且 **`ec` 被清成 0**
-        //     （实测：悬空链接 → `exists=false, ec=0`）；
-        //   · 只有 ELOOP（自环/多跳环）与 EACCES/EIO 才让 `ec != 0`（实测 ELOOP → `ec=40`）。
+        //     （悬空链接 → `exists=false, ec=0`）；
+        //   · 只有 ELOOP（自环/多跳环）与 EACCES/EIO 才让 `ec != 0`（ELOOP → `ec=40`）。
         // 所以补 `|| ec` 会**改变行为**：把"环链接"从"清理"变成"永久留下"，那不是修缺陷、
         // 是改语义（本函数的职责就是收尾解不开的 SONAME 链接）。而 `:106` 的 `|| ec` 是**另一
         // 极性**的用途（判"链接是否正确"⇒ 判不出来就重建，是安全动作），两者不可互推。
         // 真正"判不出来"的只剩 EACCES/EIO —— lpkg 恒以 root 跑、目标在自家 usr/lib 下，
         // 这条分支不可达，不为它写分支（本仓纪律：别为走不到的路径写判据）。
         if (fs::exists(entry.path(), ec)) continue;
-        // ⚠️ **别删属于某个包的链接**（2026-10-02 修）：包可以刻意发一条
+        // ⚠️ **别删属于某个包的链接**：包可以刻意发一条
         // `libfoo.so.1 -> libfoo.so.1.2.3`，而 `.1.2.3` 由**另一个**包提供、此刻还没装 ——
         // 那条链接当下就是悬空的，但删掉它**没有任何机制会重建**（第一遍只会按 SONAME 生成
         // 链接，而这里的名字未必是任何库的 SONAME）⇒ 运行期 `cannot open shared object file`。

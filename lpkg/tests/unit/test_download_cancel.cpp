@@ -82,8 +82,8 @@ TEST_F(DownloadCancelTest, CancelIsNotRetried)
         << "l10n 键缺失，下面的断言会退化成恒真：" << retry_marker;
 
     sigint_graceful.store(true);  // 用户已按 Ctrl+C
-    // ⚠️ 捕的是 **stderr**：`log_warning` 写 `std::cerr`（`base/utils.cpp:120`）。捕 stdout 的话
-    //    这条锚点会**恒真**（文案永远不在被捕获的流里）—— 实测踩到过：第一版捕 stdout，锚点①
+    // ⚠️ 捕的是 **stderr**：`log_warning` 写 `std::cerr`（`base/utils.cpp`）。捕 stdout 的话
+    //    这条锚点会**恒真**（文案永远不在被捕获的流里）—— 踩到过：捕 stdout 的话，锚点①
     //    "通过"了，而缺陷明明打出了 4 条重试告警。
     testing::internal::CaptureStderr();
     EXPECT_THROW(download_with_retries(url, out, /*max_retries=*/5, /*show_progress=*/false),

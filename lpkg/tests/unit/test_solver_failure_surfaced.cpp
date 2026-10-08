@@ -1,7 +1,7 @@
 /**
  * test_solver_failure_surfaced.cpp — "求解失败"绝不能被读成"无事可做"
  *
- * 缺口（CLAUDE.md §3「collect_problems 无兜底桶」）：`solver_solve` 的返回值是**问题数**
+ * 缺口（「collect_problems 无兜底桶」）：`solver_solve` 的返回值是**问题数**
  * （0 = 成功），而 `collect_problems`（pkg/solver.cpp）把问题按"规则类型"分桶，末尾那类
  * （通用 JOB / DISTUPGRADE / CHOICE / BEST / YUMOBS / BLACK …）是**故意跳过**的。
  * 若 libsolv 报的问题**全部**落在跳过的那几类，`result.problems` 就是空的 →
@@ -12,11 +12,11 @@
  *  ① 不变量（对**所有**可达的失败类别）：`!ok()` ⟹ `problems` 非空 —— "失败必须可见"。
  *  ② 兜底分支本身（`res != 0` 却一个桶都没认领 → 合成一条 error.solve_failed_undiagnosed）。
  *
- * ⚠️ 关于 ② 的**可达性**：未证实（2026-09-25 静态分析：lpkg 的 pool 只建模 provides +
+ * ⚠️ 关于 ② 的**可达性**：未证实（静态分析：lpkg 的 pool 只建模 provides +
  * requires，没有 CONFLICTS/OBSOLETES；任何"装不上"的目标最终都由某条 requires 规则触发，
  * 而它的类型落在 PKG_* / JOB_* 桶里；weak 规则（choice 等）参与的问题会被 libsolv 的
  * analyze_unsolvable 直接撤销、根本不会留在 problems 队列里）。所以 ② 是**纵深防御**，
- * 不是已复现的缺陷 —— 本文件只用 ① 钉"失败可见"，并用 l10n 渲染钉住 ② 的消息通路
+ * 不是已复现的缺陷 —— 本文件只用 ① 覆盖"失败可见"，并用 l10n 渲染覆盖 ② 的消息通路
  * （真实触发要靠 libsolv 版本的规则分类变化，构造不出来就不假装构造）。
  */
 

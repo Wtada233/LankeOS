@@ -6,7 +6,7 @@
  * 整批回滚能撤文件，撤不回来已经出去的副作用。上游 libalpm 相反：`alpm_trans_commit` 的
  * 第一步就把**整笔事务**（`trans->add`）的文件冲突检完，要么全不动要么全动。
  *
- * 本文件钉住预检的收益、它的边界、以及改写后的 `all_upgrading` 顺序语义：
+ * 本文件覆盖预检的收益、它的边界、以及改写后的 `all_upgrading` 顺序语义：
  *   ① 收益：批次 [A, B] 里 B 与盘上某文件冲突（B **不是**第一个）→ 抛错，且 A 的文件
  *      **一个都没落地**、DB 里没有 A、A 的 postinst 没跑。
  *      ⚠ "WAL 里没有 BEGIN_PKGS"**不是**这条收益的证据（成功/回滚收尾的 trim 会把整个
@@ -24,7 +24,7 @@
  * 行为下**完全相同**（回滚保证），所以只有断点取证能区分二者 —— 这正是本文件的核心断言。
  * 每条"没命中"的断言都配一条**正向对照**（同一套 fixture 里冲突消失后同一个断点必须命中、
  * 且顺序符合预期），否则"没命中"可能只是断点名字写错。正向对照里还在**批次内**读一次
- * WAL（`install_after_begin_prefirst` 回调），钉住"跑起来的批次此刻确实有 BEGIN_PKGS 与
+ * WAL（`install_after_begin_prefirst` 回调），断言"跑起来的批次此刻确实有 BEGIN_PKGS 与
  * 包级行" —— 那是否定式 WAL 断言唯一可能的判别力来源（见 expect_no_batch_rows）。
  */
 
@@ -253,7 +253,7 @@ TEST_F(BatchConflictPreflightTest, ConflictInLaterBatchMemberLeavesEarlierMember
     EXPECT_EQ(order_log, (std::vector<std::string>{"prefirst", "prelater"}))
         << "prelater 必须排在 prefirst 之后（依赖先处理）—— 这是本用例的前提";
     EXPECT_TRUE(any_postinst) << "正向对照：成功批次里 postinst 必须真的跑到执行点";
-    // 把 expect_no_batch_rows 那条注释的**前提**钉住：同一套 fixture 里批次真的进过事务
+    // 把 expect_no_batch_rows 那条注释的**前提**固定下来：同一套 fixture 里批次真的进过事务
     // （上面刚在批次内读到 BEGIN_PKGS 与包级行），而成功的批次收尾 trim_completed() 会把
     // 整个 WAL 清空 —— 所以"事后 WAL 为空"在结构上无法区分"从没进事务"与"进过又收尾"。
     // 这条断言失败 ⇒ expect_no_batch_rows 里那段"不具判别力"的说明需要重写。
@@ -295,8 +295,7 @@ TEST_F(BatchConflictPreflightTest, ManualFileConflictIsRefusedByPreflightToo)
 
     // 无人持有 → 用"不属于任何包"的**配套措辞**（`error.file_conflict_unowned`，只认文件路径）；
     // **不再**把占位文本 `error.unknown_manual_file` 当**持有者名**塞进 file_conflict_entry
-    // （那会渲染成 "owned by package unknown (manual file)"，2026-10-03
-    // 改）。判据与逐包检查同一份。
+    // （那会渲染成 "owned by package unknown (manual file)"）。判据与逐包检查同一份。
     EXPECT_NE(msg.find(string_format("error.file_conflict_unowned", "/usr/share/manual.txt")),
               std::string::npos)
         << "无人持有 → 应报 error.file_conflict_unowned（只认文件路径）：" << msg;
@@ -500,11 +499,11 @@ TEST_F(BatchConflictPreflightTest, UpgradeExemptionHoldsWhenOldFileMovesToALater
 }
 
 /**
- * **回归（2026-10-02）**：上一条用例的 `/etc` 孪生版 —— 同一形状原样搬到 `/etc` 下。
+ * **回归**：上一条用例的 `/etc` 孪生版 —— 同一形状原样搬到 `/etc` 下。
  *
  * 预检里模拟"前序成员腾空了这些路径"的那段，曾经对**所有** `/etc` 键一刀切 `continue`，
  * 注释理由是"`/etc` 的废弃条目只撤所有权、文件留在盘上（改名 .lpkgsave 是移除侧的事）"。
- * 那描述的是 **2026-09-26 之前**的语义：现在升级侧会把废弃的 `/etc` **文件/符号链接**改名成
+ * 那描述的是**更早**的语义：现在升级侧会把废弃的 `/etc` **文件/符号链接**改名成
  * `<路径>.lpkgsave`（`SaveConfigObsolete`，见 `installation_task_letgo.cpp`），该路径**确实
  * 被腾空**。沿用旧注释 ⇒ 后序成员的合法接管被判成"无主手工文件"⇒ **整批拒绝**，而且随成员
  * 顺序时好时坏。非 `/etc` 的孪生用例一直是绿的，正是因为它不走那行 `continue`。

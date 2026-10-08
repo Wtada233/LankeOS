@@ -9,7 +9,7 @@
 
 /**
  * 去除首尾空白（空格与制表符）。依赖串/索引字段/配置值都要按同一套规则归一，
- * 否则 " glibc"、"glibc " 会被当成两个不同的包名去找（历史 TODO.md D1）。
+ * 否则 " glibc"、"glibc " 会被当成两个不同的包名去找。
  */
 std::string trim_copy(std::string_view s);
 
@@ -61,9 +61,7 @@ std::optional<std::vector<char>> base64_decode(std::string_view s);
  * `split_dep_field` / `split_comma_list` 的说明。**不要**为了"省掉一次 `if`"而修改本函数
  * 去吞掉空段：那会波及全部调用点，且会改变 `"a,"` 这类输入对"尾段存在性"的语义。
  *
- * @param s  输入的字符串视图
- * @param d  分隔字符
- * @return   切分后的子串列表（含空段，含尾段）
+ * @return 切分后的子串列表（含空段，含尾段）
  */
 inline std::vector<std::string_view> split_string_view(std::string_view s, char d)
 {

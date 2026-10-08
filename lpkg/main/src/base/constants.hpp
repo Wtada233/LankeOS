@@ -8,7 +8,7 @@
  * 非交互模式 —— 控制是否以及如何自动响应用户提示（**全局作用域**，不是
  * `constants::` 的成员：它是个运行模式，不是常量，且全仓 66 处按裸名使用）。
  *
- * 定义在 **base**（而不是 `config/config.hpp`）的理由（2026-10-03 修分层倒置）：
+ * 定义在 **base**（而不是 `config/config.hpp`）的理由：
  * `base/utils.hpp` 的确认提示要用它，而 base 是最底层 —— 放在 config 会让
  * `base → config` 反向依赖，同时 config 那一侧又依赖 base，两边成环。
  * 枚举本身与"配置"无关，只是"怎么回答提示"这个运行模式，下移不损失任何语义。
@@ -19,10 +19,7 @@ enum class NonInteractiveMode {
     NO            // 自动回答"否"
 };
 
-/**
- * lpkg 全局常量命名空间
- * 集中管理所有字符串常量，包括分隔符、JSON 键名、路径、命令名等
- */
+/// 集中管理字符串常量：分隔符、JSON 键名、路径、命令名等。
 namespace constants
 {
 // 分隔符字符常量
@@ -107,8 +104,7 @@ inline constexpr std::string_view EXT_LPKG = ".lpkg";
 inline constexpr std::string_view EXT_ZST = ".zst";
 inline constexpr std::string_view EXT_LA = ".la";
 inline constexpr std::string_view SUFFIX_LPKG_NEW = ".lpkgnew";
-/// 安装期"先写临时文件再 rename 到位"用的后缀（`<dst>.lpkgtmp`）。**唯一出处** ——
-/// 此前它是 `archive.cpp` 的局部常量 + 两处裸字面量，正是"同一件事三处表达"的形态。
+/// 安装期"先写临时文件再 rename 到位"用的后缀（`<dst>.lpkgtmp`）。唯一出处。
 inline constexpr std::string_view SUFFIX_LPKG_TMP = ".lpkgtmp";
 inline constexpr std::string_view SUFFIX_LPKG_BAK = ".lpkg_bak_";
 /// 移除时配置文件改名保留的后缀（pacman 的 `.pacsave` 对应物）。
@@ -135,7 +131,7 @@ inline constexpr std::string_view SUFFIX_MAN = ".man";
 ///
 /// ⚠️ **新增 lpkg 自用的落位名时，加进这一张表**：守卫（`archive/archive.cpp` 的
 /// `member_name_rejection_message`，读侧解压与写侧 `packer.cpp` **共用同一份判据**）遍历它，
-/// 不要在守卫里另列一遍 —— 2026-10-03 的缺陷正是"常量头里有 `SUFFIX_LPKG_BAK`、守卫里只列了
+/// 不要在守卫里另列一遍 —— 当初的缺陷正是"常量头里有 `SUFFIX_LPKG_BAK`、守卫里只列了
 /// 另外三个"。同理，`l10n` 的 `error.unsafe_member_suffix` 文案也要跟着列全。
 struct ReservedMemberName {
     std::string_view token;
@@ -155,9 +151,9 @@ inline constexpr std::string_view CONF_HASH_SEP = ":";
 
 /// **SONAME 空间**的内部前缀：`needed_so` 的每条需求、以及每条 `provides_soname`，都带它。
 ///
-/// 为什么需要命名空间（2026-10-04，维护者拍板）：libsolv 的池里每个包都有一条**自提供**
+/// 为什么需要命名空间：libsolv 的池里每个包都有一条**自提供**
 /// （`<包名> = evr`），而"**不带版本的 provide 能满足任意 requires**"。若 SONAME 与包名
-/// 共用一个命名空间，就会互相串 —— 实测复现过 `needed_so: o` 被**名叫 `o` 的包**满足。
+/// 共用一个命名空间，就会互相串 —— `needed_so: o` 会被**名叫 `o` 的包**满足。
 ///
 /// 池里因此只有**两个**命名空间，与两个字段一一对应（**全程零字符串形状判断**）：
 ///   · **裸名** —— 「包名 + 虚拟能力」：包的自提供、以及 `provides` 的每一条。
@@ -167,14 +163,11 @@ inline constexpr std::string_view CONF_HASH_SEP = ":";
 /// 裸名撞不进 `so:` 空间这件事由**两处**共同保证，缺一不可：
 ///   · **包名**不可能含 `:` —— `is_safe_path_component` 把 `:` 当**分帧字符**拒掉；
 ///   · **`provides` 的每一项**由读入处校验（`reject_reserved_provides_prefix`，
-///     `pkg/install_common.cpp`）。
-/// ⚠️ **订正 2026-10-05**：这里原文只写了第一条，并据此断言"所以裸名永远撞不进 `so:` 空间"
-/// —— **不成立**。`provides` 的项与包名走**同一条裸名路径**，而它当时在**任何地方**都没被
-/// 校验过（`reject_unsafe_metadata_tokens` 只拒 `\0\n\r\t`，不拒 `:`），于是一条
-/// `provides: ["so:libfoo.so.1"]` 就能与 `needed_so: ["libfoo.so.1"]` 灌出同一个 pool id：
-/// 求解器当 SONAME 接受，安装期的 `soname_satisfied()`（只看 `provides_soname`）拒绝 ——
-/// 重现了"求解器说能装、安装期拒装"的分叉。这就是把"包名"的性质当成"裸名命名空间"的性质
-/// 来论证的典型错误：**论证的作用域比结论窄**。
+///     `pkg/install_common.cpp`）—— 它走的是与包名**同一条裸名路径**，而
+///     `reject_unsafe_metadata_tokens` 只拒 `\0\n\r\t`、不拒 `:`，所以这道校验不能省：
+///     少了它，一条 `provides: ["so:libfoo.so.1"]` 就能与 `needed_so: ["libfoo.so.1"]` 灌出
+///     同一个 pool id —— 求解器当 SONAME 接受，安装期的 `soname_satisfied()`（只看
+///     `provides_soname`）拒绝，重现"求解器说能装、安装期拒装"的分叉。
 /// ⚠️ 它是**内部编码**：进了用户可见的冲突消息必须先剥掉（见 `decode_libsolv_message`）。
 inline constexpr std::string_view POOL_SONAME_PREFIX = "so:";
 
@@ -222,7 +215,7 @@ inline constexpr long CURL_LOW_SPEED_TIME_SEC = 30;
 //   · `install_common.cpp` 的 `read_package_metadata`（解析 JSON 前按盘上实际大小判）。
 // 归档自报大小是**不可信输入**（GNU base-256 头能声明 1 TiB），无上限的 resize 会
 // bad_alloc/abort 掉整个进程，而调用方只承诺抛 LpkgException。两边真正要读的都是
-// `metadata.json`（几 KB），超过就是畸形/恶意归档。**别再各写一份**（2026-10-03 合并）。
+// `metadata.json`（几 KB），超过就是畸形/恶意归档。**别再各写一份**。
 inline constexpr size_t ARCHIVE_MEMBER_MAX_SIZE = 16 * 1024 * 1024;
 
 // I/O 缓冲区大小

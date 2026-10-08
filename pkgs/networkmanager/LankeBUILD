@@ -11,8 +11,8 @@ lankebuild_build() {
     #   resolvconf 软链已删**，若不钉这个，`auto` 会在运行时探测后退化成"直接写文件"。
     # - `-Dpolkit_noauth_group=wheel`：上游据此装 `org.freedesktop.NetworkManager.rules`
     #   （data/meson.build 的 configure_file），**只授一条**：`settings.modify.system` ∧
-    #   wheel 组 ∧ `subject.local`（本地控制台免密改系统连接）。原先配方手写过同路径的规则文件，
-    #   给根本不存在的 netdev 组**无条件放行整族 action**，既覆盖了上游又宽得多 —— 已删。
+    #   wheel 组 ∧ `subject.local`（本地控制台免密改系统连接）。**不手写**同路径的规则文件 ——
+    #   手写会覆盖上游，且容易写成给不存在的 netdev 组**无条件放行整族 action**（宽得多）。
     # - `-Dppp=true` / `-Dmodem_manager=true`：**构建期硬性要求**对应包在 build_deps 里
     #   （ppp 要 `pppd/pppd.h` + 找到 `/usr/sbin/pppd`，modem 要 `mm-glib.pc`），否则 meson assert 失败。
     # - `-Db_lto=true`：Arch 同款。NM 的 meson 说明"构建会检查这个选项，只从 *FLAGS 注入是坏的"。

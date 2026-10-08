@@ -26,9 +26,6 @@ namespace
 bool g_warned_conf_unavailable = false;
 }  // namespace
 
-/**
- * 获取 TriggerManager 单例实例
- */
 TriggerManager& TriggerManager::instance()
 {
     static TriggerManager inst;
@@ -108,10 +105,6 @@ void TriggerManager::load_config()
     config_loaded = true;
 }
 
-/**
- * 检查指定路径是否匹配任意触发器规则
- * 如果匹配，将对应的命令加入待执行集合
- */
 void TriggerManager::check_file(const std::string& path)
 {
     if (!config_loaded) load_config();
@@ -124,20 +117,12 @@ void TriggerManager::check_file(const std::string& path)
     }
 }
 
-/**
- * 手动添加一个待执行的触发器命令
- */
 void TriggerManager::add(const std::string& cmd)
 {
     std::lock_guard<std::mutex> lock(mtx);
     pending_triggers.insert(cmd);
 }
 
-/**
- * 执行所有待处理的触发器命令
- * 特殊处理 ldconfig 命令：直接调用内部 SONAME 链接生成，而非执行外部程序
- * 在测试模式（testing mode）下跳过所有系统级触发器执行
- */
 void TriggerManager::reset_for_test()
 {
     std::lock_guard<std::mutex> lock(mtx);
@@ -155,6 +140,10 @@ std::set<std::string> TriggerManager::pending_for_test()
     return pending_triggers;
 }
 
+/**
+ * 特殊处理 ldconfig 命令：直接调用内部 SONAME 链接生成，而非执行外部程序
+ * 在测试模式（testing mode）下跳过所有系统级触发器执行
+ */
 void TriggerManager::run_all()
 {
     std::lock_guard<std::mutex> lock(mtx);
@@ -168,7 +157,7 @@ void TriggerManager::run_all()
 
         // 内部处理 ldconfig，避免调用外部程序
         if (cmd == "ldconfig") {
-            // **提交后阶段不得穿透 --root**（2026-10-03 审计）：`apply_soname_links` 用**跟随**
+            // **提交后阶段不得穿透 --root**：`apply_soname_links` 用**跟随**
             // 语义处理这个目录（`is_directory_follow` + `create_symlink` + `fs::remove`），而
             // 包发的 `usr/lib -> <root 外>` 链接是**有意**放行的（§5.4 不变量 6 只解析父目录）
             // ⇒ 不挡就是"提交之后在宿主的那个目录里建/删链接"。
@@ -198,7 +187,7 @@ void TriggerManager::run_all()
             line.finish(ui::skipped());
         } else {
             // **在目标 root 内**执行：命令里写的是绝对路径（/usr/share/... 等），
-            // 不 chroot 就会打在宿主上、目标 root 反而没更新（历史 TODO F3）
+            // 不 chroot 就会打在宿主上、目标 root 反而没更新
             const int ret = run_shell_in_root(cmd);
             line.finish(ui::ok(ret == 0));
             if (ret != 0) {

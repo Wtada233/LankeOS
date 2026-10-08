@@ -1,7 +1,7 @@
 /**
  * test_query_exit_code.cpp — `lpkg query -p <未安装的包>` 必须**非零退出**且用 query 语境的文案
  *
- * 背景（2026-10-03 改）：`query_package()`（`main/src/pkg/package_manager.cpp`）此前在包未安装时
+ * 背景：`query_package()`（`main/src/pkg/package_manager.cpp`）此前在包未安装时
  * 复用 `info.package_not_installed`（那是 **remove** 语境的文案，意思是"…没有可移除的"）并
  * **静默返回** ⇒ 退出码 0。脚本/farm 拿到的信号是"查询成功、只是这个包没文件"，与"这包根本没装"
  * 无法区分。改动后：抛 `LpkgException`（文案 `error.query_package_not_installed`），由 `run_cli`
@@ -13,7 +13,7 @@
  *   · 输出含 `error.query_package_not_installed` 的**字面片段** —— 若又复用 remove 语境的
  *     `info.package_not_installed`（"…no need to remove"），query 的模板锚对不上则红；
  *     只断言"非零退出"无法把"报对了原因"与"报了别的错"区分开。
- *   · 输出含**包名** —— 报错必须能定位到具体是哪个包（CLAUDE.md §8 第 7 条）。
+ *   · 输出含**包名** —— 报错必须能定位到具体是哪个包。
  *   · 对照组：已安装包的 query 必须退 **0** —— 防"query 一律退 1"也能让上面那条绿。
  */
 
@@ -99,7 +99,7 @@ TEST_F(QueryExitCodeTest, QueryingUninstalledPackageExitsNonZero)
 
     // ② 文案来自 query 语境（锚取模板里最长字面片段，与语言无关）。
     //    取**值**再取锚：`get_string` 返回引用，以临时字面量调用它绑引用会撞 GCC 的
-    //    `-Wdangling-reference` 误报（本仓库已有同款订正）。
+    //    `-Wdangling-reference` 误报。
     const std::string query_tmpl = get_string("error.query_package_not_installed");
     // ⚠️ `string_format()` 收的是**key**（内部 `get_string(key)` 再 `vformat`），不是模板 ——
     // 拿已经取出来的模板去调它会走成"查一个不存在的 key"，返回 `[MISSING_STRING: …]`（而占位符
@@ -151,10 +151,8 @@ TEST_F(QueryExitCodeTest, QueryingInstalledPackageExitsZero)
 
 // ── 两条查询腿口径统一：`query <文件>` 查不到属主也必须非零退出 ──────────────
 //
-// 此前 `query -p <未安装>` 抛错退 1，而 `query <无主文件>` 只打一条 `info.file_not_owned`
-// 并**静默退 0** —— 同是"查不到"，脚本拿不到统一判据。2026-10-03 统一成非零：本处改成抛
-// `LpkgException`（新键 `error.query_file_not_owned`），`info.file_not_owned` 随之失去唯一
-// 使用点、已从两份 l10n 中删除（否则"无孤儿键"那条闸门会红）。
+// 与 `query -p <未安装>` 同口径：查不到属主抛 `LpkgException`（`error.query_file_not_owned`）、
+// **非零退出** —— 不再"打条 info 然后退 0"。
 
 TEST_F(QueryExitCodeTest, QueryingUnownedFileExitsNonZero)
 {

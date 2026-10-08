@@ -5,7 +5,7 @@
 // （`process_archive`）**自己重写整份归档**，还要把符号索引里那串"符号 → 成员头偏移"
 // 重算到新位置。这里真出过 bug：重写后**照抄**旧索引（成员变短 ⇒ 其后成员全前移 ⇒ 偏移
 // 全错），`ld` 报 `error adding symbols: no more archived files`（硬失败，不是"少个优化"），
-// 实测污染过 bison / nspr / gcc 三个包的产物。`elf_strip_fuzz` 覆盖不到这条路 —— 它只调
+// 污染过 bison / nspr / gcc 三个包的产物。`elf_strip_fuzz` 覆盖不到这条路 —— 它只调
 // `strip_elf_data`（纯内存），`.a` 在它那里一律返回 false。
 //
 // oracle（都不需要外部工具）：
@@ -117,14 +117,14 @@ ArInfo scan_ar(const std::vector<uint8_t>& b)
 /// 看到的名字。
 ///
 /// ⚠️ **别拿成员头里的裸名字段来比**：libarchive 的 ar 写入器会把**不合规**的名字段规范化
-/// （实测 `/     -` → `     -/`），裸字段比对会把这段既有行为误报成"改名"——本 harness 第一版
-/// 就是这么假红的（那个输入 `index_invalid=false`，**根本没进** strip.cpp 的索引代码）。
+/// （`/     -` → `     -/`），裸字段比对会把这段既有行为误报成"改名"（这种输入
+/// `index_invalid=false`，**根本没进** strip.cpp 的索引代码）。
 /// 名字段形如 `/     -` 的归档不是任何真实工具产出的形态，但 fuzzer 会造出来，判据要免疫。
 /// 成员头里的名字段是不是 GNU ar 能**原样往返**的形态（可打印 ASCII，`/` 只做结尾终止符）。
 ///
 /// **为什么 oracle ③ 要先过这道筛**：libarchive 的 ar **写入器**会把不合规的名字段规范化
-/// ——实测 `/             p` → `             p/`、`a.o/è` → `è/`（高位字节）——于是"名字不变"
-/// 会假红三次（本 harness 第一、二、三版各一次）。那既**不是 lpkg 的逻辑**（`index_invalid`
+/// —— `/             p` → `             p/`、`a.o/è` → `è/`（高位字节）——于是"名字不变"
+/// 会假红。那既**不是 lpkg 的逻辑**（`index_invalid`
 /// 为 false 时压根没进新代码，而且改动前也走同一条 libarchive 拷贝路径），也不是真实上游会
 /// 产出的形态：GNU ar 的名字里不允许 `/`（它是终止符），名字段以 `/` 开头则被保留给特殊成员
 /// （`/`、`//`、`/SYM64/`）。**生产侧对这类归档的态度也很明确**：`scan_ar_raw_layout` 一见
@@ -249,7 +249,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         }
         const ArInfo after = scan_ar(out);
         // ④ **保持性**：输入里的索引**本来就好** ⇒ 输出里的也必须好。判据必须先看输入 ——
-        // 输入自带一份坏索引（fuzzer 造得出来，实测偏移 1750335488）时，lpkg 只要没改动成员
+        // 输入自带一份坏索引（fuzzer 造得出来，偏移 1750335488）时，lpkg 只要没改动成员
         // 就会**原样照抄**它（既有行为：畸形归档我们**不修**，只是别把好的弄坏），单方面拿输出
         // 断言"偏移必须落在成员头"会假红。
         const auto index_consistent = [](const ArInfo& i) {

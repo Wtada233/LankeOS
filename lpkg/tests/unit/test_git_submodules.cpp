@@ -17,7 +17,7 @@ namespace fs = std::filesystem;
 // `git+` 源的 **submodule 递归拉取** —— `update_submodules` / `update_one_submodule`
 // （builder_executor.cpp），`--recurse-submodules` 的等价物。
 //
-// 这两条函数在真实配方里在用（根 CLAUDE.md 的源码约定：git+ 源不额外加 git build_dep，
+// 这两条函数在真实配方里在用（源码约定：git+ 源不额外加 git build_dep，
 // 因为 "子模块 --recurse-submodules 自动拉"），而在此之前 tests/ 里**一次都没引用过**
 // —— 只能靠 run_build 间接撞。
 //
@@ -187,7 +187,7 @@ protected:
     /// 子模块仓库里 `origin/main` 上**可达的 commit 数**（用 git 二进制数）。
     /// 浅拉（depth=1）会把历史截断在浅边界上 ⇒ 只数到 1；完整拉则数到全部。
     /// 这是"某一轮到底是浅拉还是完整拉"的**直接机械判据**。
-    /// （`sub/.git/shallow` 不是判据 —— 实测 libgit2 在这条路上不留下它。）
+    /// （`sub/.git/shallow` 不是判据 —— libgit2 在这条路上不留下它。）
     int reachable_commit_count(const std::string& sub_path) const
     {
         std::string out;
@@ -223,7 +223,7 @@ protected:
     }
 };
 
-// ── ① 有子模块：拉下来、内容正确、且停在**父仓库钉住的那个 commit** 上 ──────────
+// ── ① 有子模块：拉下来、内容正确、且停在**父仓库锁定的那个 commit** 上 ──────────
 
 TEST_F(GitSubmoduleTest, SubmoduleIsFetchedAtTheCommitPinnedByParent)
 {
@@ -233,9 +233,9 @@ TEST_F(GitSubmoduleTest, SubmoduleIsFetchedAtTheCommitPinnedByParent)
     // 于是这条用例压的是：子模块不是"拉个默认分支就完事"，而是检出父仓库记录的 **index id**
     // (c2)，而不是 leaf 的分支尖端(c3)。
     //
-    // ⚠️ 它**不**覆盖 `prepare_repo` 的"{1,0} 完整拉兜底轮"：本用例曾被写成压那件事，但实测
-    // 不成立 —— 本地 `file://` 传输**不认 depth**（机制见 ⑯），depth=1 那一轮就拿到了全部
-    // 对象，钉住的 c2 是**直接**取到的、并非退到 depth=0 才拿到。兜底轮在本地 fixture 里
+    // ⚠️ 它**不**覆盖 `prepare_repo` 的"{1,0} 完整拉兜底轮"：本用例曾被写成压那件事，但那
+    // 并不成立 —— 本地 `file://` 传输**不认 depth**（机制见 ⑯），depth=1 那一轮就拿到了全部
+    // 对象，锁定的 c2 是**直接**取到的、并非退到 depth=0 才拿到。兜底轮在本地 fixture 里
     // 不可达（⑮/⑯ 已把这点钉成字面量）。
     const fs::path leaf = upstream_path("leaf-repo");
     make_repo(leaf);
@@ -287,7 +287,7 @@ TEST_F(GitSubmoduleTest, SubmodulePinnedAtItsOwnTipUsesShallowFetch)
 
 TEST_F(GitSubmoduleTest, NestedSubmodulesAreFetchedRecursively)
 {
-    // parent → sub(leaf) → inner(subsub)：钉住 `update_one_submodule` 里
+    // parent → sub(leaf) → inner(subsub)：覆盖 `update_one_submodule` 里
     // "checkout 成功后再 update_submodules(sub) 递归" 那一跳（必须在 free(sub) 之前）。
     const fs::path subsub = upstream_path("subsub-repo");
     make_repo(subsub);
@@ -367,7 +367,7 @@ TEST_F(GitSubmoduleTest, SubmoduleIsASelfContainedRepoNotAGitfileIntoModulesDir)
     // `prepare_repo` 的 git_repository_init 建出来），不是 git 二进制那种
     // `.git` 文件 + 父仓库 `.git/modules/<name>` 的记账布局。
     //
-    // 影响面（钉住现状，供以后判断）：从子模块目录里跑 `git status/log/fetch` 都正常
+    // 影响面（记录现状，供以后判断）：从子模块目录里跑 `git status/log/fetch` 都正常
     // （origin 是 prepare_repo 建的，指向 .gitmodules 里那个 URL），但父仓库侧没有
     // submodule 的记账 —— 依赖 `git submodule update --init` 之类的下游脚本拿不到东西。
     // lpkg 的场景只是"把源码树拉下来"，构建脚本不跑这些。
@@ -391,7 +391,7 @@ TEST_F(GitSubmoduleTest, SubmoduleIsASelfContainedRepoNotAGitfileIntoModulesDir)
 
 TEST_F(GitSubmoduleTest, RelativeSubmoduleUrlOnAFileOriginIsBrokenByLibgit2UrlRewriting)
 {
-    // ⚠️ **实测（2026-09-26，libgit2 1.7.2）**：`.gitmodules` 里写相对 URL、且父仓库
+    // ⚠️ **（libgit2 1.7.2）**：`.gitmodules` 里写相对 URL、且父仓库
     // origin 是 `file://` 形态时，`git_submodule_resolve_url` 产出的 URL 是**畸形的**：
     //     file:///…/parent-repo  +  ../leaf-repo   →   file://…/leaf-repo
     // （绝对路径的第一个 '/' 被吃掉），fetch 于是以
@@ -402,7 +402,7 @@ TEST_F(GitSubmoduleTest, RelativeSubmoduleUrlOnAFileOriginIsBrokenByLibgit2UrlRe
     // 真实配方里的 git+ 源是 https / ssh 形态，不受影响；对照见下一条用例
     // （RelativeUrlResolutionAnchorsAtParentOriginHost）。
     //
-    // 顺带钉住 `../` 的**语义**：libgit2 是"弹出父仓库 URL 的最后一个路径段"——
+    // 顺带确认 `../` 的**语义**：libgit2 是"弹出父仓库 URL 的最后一个路径段"——
     // `../leaf-repo` = 父仓库的**兄弟仓库**（与 git 一致），不是父目录的兄弟。
     const fs::path leaf = upstream_path("leaf-repo");
     make_repo(leaf);
@@ -437,7 +437,7 @@ TEST_F(GitSubmoduleTest, RelativeSubmoduleUrlOnAFileOriginIsBrokenByLibgit2UrlRe
 TEST_F(GitSubmoduleTest, RelativeUrlResolutionAnchorsAtParentOriginHost)
 {
     // 直接问 libgit2 要解析结果（不经 lpkg），把 update_one_submodule 里
-    // `git_submodule_resolve_url` 那一步在**两种父 origin 形态**下的行为钉住：
+    // `git_submodule_resolve_url` 那一步在**两种父 origin 形态**下的行为断言：
     //   https 形态（真实配方里的形态）→ `../leaf-repo` 解析正确（同 host 同 group）；
     //   file:// 形态（本文件的 fixture 形态）→ 拼坏（见上一条用例）。
     // 这两个断言合起来说明：上一条的失败是 **file:// 空 host** 特有的，不是相对 URL 本身。
@@ -509,12 +509,12 @@ TEST_F(GitSubmoduleTest, UnreachableSubmoduleUrlFailsAndNamesTheBadUrl)
         << "报错没有点名不可达的子模块 URL，用户无法定位: " << msg;
 }
 
-// ── ⑨ 失败路径：钉住的 commit 在子模块仓库里已不可达 ──────────────────────────
+// ── ⑨ 失败路径：锁定的 commit 在子模块仓库里已不可达 ──────────────────────────
 
 TEST_F(GitSubmoduleTest, SubmodulePinnedToUnreachableCommitNamesTheSubmoduleAndCommit)
 {
-    // fixture：父仓库钉住 leaf 上一个**只存在于已删除分支**的 commit（再 gc 掉）。
-    // 于是 fetch 本身成功（leaf 的默认分支 tip 拿得到），但钉住的那个 object
+    // fixture：父仓库在 leaf 上锁定一个**只存在于已删除分支**的 commit（再 gc 掉）。
+    // 于是 fetch 本身成功（leaf 的默认分支 tip 拿得到），但锁定的那个 object
     // 无论浅拉还是完整拉都拿不到 → prepare_repo 返回 GIT_ENOTFOUND。
     const fs::path leaf = upstream_path("leaf-repo");
     make_repo(leaf);
@@ -538,11 +538,11 @@ TEST_F(GitSubmoduleTest, SubmodulePinnedToUnreachableCommitNamesTheSubmoduleAndC
     ASSERT_FALSE(msg.empty());
 
     EXPECT_NE(msg.find(parent_url(parent)), std::string::npos) << "报错没有点名父仓库 URL: " << msg;
-    // **已修（2026-09-26）**：这条路径原先的 detail 是 l10n 的通用兜底文案（`error.unknown`）
+    // **已修**：这条路径原先的 detail 是 l10n 的通用兜底文案（`error.unknown`）
     // —— 因为 `prepare_repo` 在"fetch 成功但目标 rev 不存在"（`GIT_ENOTFOUND`）时不写
     // `prog->err`，`clone_error_detail` 于是回落成 "Unknown error"，既不知道是哪个子模块、
     // 也不知道它钉的是哪个 commit（而 name / oid_hex / final_url 在 `update_one_submodule`
-    // 手里全都有）。现在那条分支会写 `error.git_submodule_rev_missing`，本用例钉住它。
+    // 手里全都有）。现在那条分支会写 `error.git_submodule_rev_missing`，本用例覆盖它。
     const std::string detail_tmpl = get_string("error.git_submodule_rev_missing");
     const auto cut = detail_tmpl.find("{}");
     const std::string detail_prefix =
@@ -550,7 +550,7 @@ TEST_F(GitSubmoduleTest, SubmodulePinnedToUnreachableCommitNamesTheSubmoduleAndC
     ASSERT_FALSE(detail_prefix.empty()) << "l10n 键缺失: " << detail_tmpl;
     EXPECT_NE(msg.find(detail_prefix), std::string::npos)
         << "detail 没有点名『钉住的 commit 拿不到』（回落到通用兜底了？）: " << msg;
-    // 三样都必须点到：子模块 URL、钉住的 commit、子模块名。
+    // 三样都必须点到：子模块 URL、锁定的 commit、子模块名。
     // （不能用子模块的**路径** "sub" 当标记 —— 临时目录名 tmp_git_submodules_test 本身含 "sub"。）
     EXPECT_NE(msg.find("leaf-repo"), std::string::npos)
         << "报错没有点名子模块 URL，用户无法定位: " << msg;
@@ -578,7 +578,7 @@ TEST_F(GitSubmoduleTest, GitmodulesEntryWithoutGitlinkNamesTheSubmodule)
     ASSERT_FALSE(msg.empty());
 
     EXPECT_NE(msg.find(parent_url(parent)), std::string::npos) << "报错没有点名父仓库 URL: " << msg;
-    // **已修（2026-09-26）**：这条早退分支原先只写 `error.unknown`，**连入参 `name` 都不报**。
+    // **已修**：这条早退分支原先只写 `error.unknown`，**连入参 `name` 都不报**。
     // 现在写 `error.git_submodule_entry_incomplete`，点名是哪个子模块、缺的是什么
     // （`.gitmodules` 声明了条目、父仓库索引里没有 gitlink）。
     const std::string tmpl = get_string("error.git_submodule_entry_incomplete");
@@ -598,7 +598,7 @@ TEST_F(GitSubmoduleTest, GitmodulesEntryWithoutGitlinkNamesTheSubmodule)
 // 然后一路原样返回 —— 但最外层 `update_one_submodule` 在尾巴上**又写了一次**
 // prog->err = last_git_error()（`if (err != 0)` 那一段），把内层留下的消息**覆盖**掉。
 // 覆盖后还剩不剩有用的信息，取决于 libgit2 的 last-error 是线程局部的、且成功调用不重置它。
-// 本用例把实测结果钉住：内层点名的那条消息**活了下来**（外层覆盖写入的是同一条）。
+// 本用例把这个结果固定下来：内层点名的那条消息**活了下来**（外层覆盖写入的是同一条）。
 TEST_F(GitSubmoduleTest, NestedSubmoduleFailureStillNamesTheBadInnerUrl)
 {
     const fs::path subsub = upstream_path("subsub-repo");
@@ -636,7 +636,7 @@ TEST_F(GitSubmoduleTest, NestedSubmoduleFailureStillNamesTheBadInnerUrl)
 // 此前所有用例的子模块都是**单个**或**嵌套**（一个套一个），没有"并列兄弟"这一形态。
 // `update_submodules()` 是先 `git_submodule_foreach` 收名字、再逐个 `update_one_submodule`
 // 并在**首个非 0 返回处** `return err` —— 下面两条把这两半各钉一遍：
-//   · ⑬ 前面的兄弟**已经拉下来**（checkout 到父仓库钉住的 commit），后面那个才失败
+//   · ⑬ 前面的兄弟**已经拉下来**（checkout 到父仓库锁定的 commit），后面那个才失败
 //     ⇒ 证明是"按序逐个做"，不是"先探测全部再一起拉"；
 //   · ⑭ 第一个就失败 ⇒ 排在后面的兄弟**压根没被尝试**（"首个失败即返回"）。
 //
@@ -671,7 +671,7 @@ TEST_F(GitSubmoduleTest, EarlierSiblingIsFetchedBeforeALaterOneFails)
     EXPECT_NE(msg.find(gone.string()), std::string::npos)
         << "报错没有点名不可达的那个**兄弟**子模块 URL: " << msg;
 
-    // 排在前面的兄弟必须已经落地并停在钉住的 commit 上 —— 这才说明是"按序逐个拉"
+    // 排在前面的兄弟必须已经落地并停在锁定的 commit 上 —— 这才说明是"按序逐个拉"
     ASSERT_TRUE(fs::exists(dest() / "sib_a" / ".git"))
         << "sib_a 排在 sib_z 之前且本身没问题，却不曾被拉下来";
     EXPECT_EQ(checked_out_commit("sib_a"), pinned_commit(parent, "sib_a"))
@@ -715,10 +715,10 @@ TEST_F(GitSubmoduleTest, FirstSiblingFailureStopsBeforeLaterSiblings)
 // ── ⑮ gitlink 钉在**祖先** commit 上（上游已往前走）─────────────────────────────
 //
 // 子模块的 gitlink 可以钉在分支历史上的任意 commit 上，而上游随后继续前进。这个形态此前
-// 没有被覆盖：装出来的内容与 HEAD 都必须是**钉住那个祖先**，而不是分支尖端。
+// 没有被覆盖：装出来的内容与 HEAD 都必须是**锁定的那个祖先**，而不是分支尖端。
 //
 // ⚠️ **本用例不覆盖 `{1, 0}` 兜底轮**（尽管它长得像那个场景）。`prepare_repo()` 的兜底轮
-// 要跑起来，前提是 depth=1 那一轮 revparse 不到目标；而实测本地 `file://` 传输**不认
+// 要跑起来，前提是 depth=1 那一轮 revparse 不到目标；而本地 `file://` 传输**不认
 // depth**（机制见 ⑯），第一轮就拿到全部对象 ⇒ 第二轮永远不跑。所以这里 `rev-list` 数到
 // 2（完整历史）在"走了兜底"与"第一轮就没浅"两种情形下都成立，**不是**兜底轮的证据。
 // 它证明的只有一件事：钉祖先这条安装路径本身是对的。
@@ -749,20 +749,20 @@ TEST_F(GitSubmoduleTest, PinnedAncestorCommitIsCheckedOut)
         << "拿到的是尖端的内容（v2）而不是钉住那个祖先的内容（v1）";
 }
 
-// ── ⑯ 实测：本地 file:// 传输**不认 depth** ⇒ 兜底轮在本地 fixture 里不可达 ────────
+// ── ⑯ 本地 file:// 传输**不认 depth** ⇒ 兜底轮在本地 fixture 里不可达 ────────
 //
 // `prepare_repo()` 是 `for (int depth : {1, 0})`：先浅拉，目标 revparse 不到就删掉重建、
 // 完整拉。要让它跑到第二轮，得有一份"depth=1 拿不到目标 commit"的源。
 //
-// **本地 fixture 造不出这份源** —— 实测（本用例）libgit2 的本地传输不做浅取：即便钉住的
+// **本地 fixture 造不出这份源** —— libgit2 的本地传输不做浅取：即便锁定的
 // 就是分支尖端，落地仓库里 `origin/main` 的整条历史也在（`rev-list --count` 数到 2，
 // 且**没有** `.git/shallow`）。于是第一轮 `any_rev_exists` 就成功，第二轮永远不跑。
 //
-// 这就是 lpkg/CLAUDE.md §7.4 那句"构造不出场景"背后的**机制**：不是"钉祖先"这种状态造不
+// 这就是"构造不出场景"背后的**机制**：不是"钉祖先"这种状态造不
 // 出来（造得出来，见 ⑮），而是**本地传输不认 depth**。真网络传输（https/ssh）认，但测试
 // 一律不碰网（§8 第 3 条），所以这一轮在测试里确实覆盖不到。
 //
-// 这条把**实测**钉成字面量，兼作绊线：哪天本地传输开始认 depth（或换到真传输），它会变红
+// 这条把结果钉成字面量，兼作绊线：哪天本地传输开始认 depth（或换到真传输），它会变红
 // —— 那时才第一次有可能为 `{1, 0}` 的第二轮写真用例。
 TEST_F(GitSubmoduleTest, LocalTransportIgnoresDepthSoTheFallbackRoundStaysUnreachable)
 {

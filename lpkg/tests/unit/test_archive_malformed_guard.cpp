@@ -14,8 +14,8 @@
  * 处断掉，并且**盘上不留下**那份 payload。
  *
  * ## 怎么造样本
- * **手写 ustar 字节**，不用 libarchive 写侧。理由有两条，都是实测的：
- *   · GNU tar 会把"同一个文件列两次"塌成**硬链接条目**（实测输出
+ * **手写 ustar 字节**，不用 libarchive 写侧。理由有两条：
+ *   · GNU tar 会把"同一个文件列两次"塌成**硬链接条目**（输出
  *     `hrw-r--r-- … metadata.json 连接到 metadata.json`）——拿它造样本会造出**假样本**；
  *   · 要造"声明尺寸与实际不符"、"空名字"这类形态，写侧根本不给你写。
  * 写法照 `tests/fuzz/archive_name_fuzz.cpp` 的 `append_header`（同一套最小 ustar）。
@@ -313,7 +313,7 @@ TEST_F(ArchiveMalformedGuardTest, SingleDotComponentsAreLegalAndStillExtract)
  *
  * systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜杠**（全仓 861 个包扫下来
  * 仅此一例，而它恰好是 base 包 —— 拒了它整个发行版都装不上）。POSIX 上 `\` 只是普通字节，
- * lpkg 不跨平台解压，所以这条判据对**本仓库**只有害处。判据当天删掉，用例改成钉住"必须放行"。
+ * lpkg 不跨平台解压，所以这条判据对**本仓库**只有害处。判据当天删掉，用例改成断言"必须放行"。
  *
  * 这条**红**意味着有人把反斜杠判据加回来了 —— 那时先去扫一遍真实仓库再决定。
  */
@@ -383,7 +383,7 @@ TEST_F(ArchiveMalformedGuardTest, EscapeCharacterInMemberNameIsRejected)
 /**
  * **绊线（tripwire）**：`typeflag='0'` 但名字以 `/` 结尾的成员，libarchive **按尾斜杠
  * 判定类型**，读回来就是 `AE_IFDIR` —— 也就是说"尾斜杠与类型不一致"这个冲突
- * **到不了解压代码这一层**，`tar_guard` 里因此**没有**这条判据（写过一版，实测不可达，删了）。
+ * **到不了解压代码这一层**，`tar_guard` 里因此**没有**这条判据（写过一版，不可达，删了）。
  *
  * 这条用例绿 = 现状成立；**红 = libarchive 改了行为**，那时才需要把判据补回去。
  * 它不声称"我们防住了什么"，只记录一个边界 —— 别把它当成覆盖率。
@@ -407,7 +407,7 @@ TEST_F(ArchiveMalformedGuardTest, TrailingSlashIsNormalizedByLibarchive)
  * libarchive 在 `archive_read_data_block` 上直接返 **FATAL**（"Truncated tar archive
  * detected"），`extract_tar_zst` 在上层那个 `r < ARCHIVE_WARN` 分支就抛了 —— 到达不了任何
  * "声明 vs 实际"的比较。所以这个向量**由 libarchive 覆盖**，`tar_guard` 里没有第二份实现
- * （写过一版，实测不可达，删了）。
+ * （写过一版，不可达，删了）。
  *
  * 断言落在 `error.extract_failed` 的**字面前缀**上：整包拒绝这件事成立，
  * 只是原因键是 libarchive 那条路径的。

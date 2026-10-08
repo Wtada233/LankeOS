@@ -3,9 +3,9 @@
 // 为什么是它：这个函数按 SONAME 在 `lib_dir` 下建/删符号链接，而两个调用点传的都是
 // **包内容** —— `trigger.cpp` 传目标 root 的 `<root>/usr/lib`、`builder.cpp` 传构建 staging，
 // 而它跑在**批次提交之后**。所以它的任何越界写都发生在"包已落地、DB 已提交"之后，
-// 且判定一抛，命令就报失败（ARCH.md 与 CLAUDE.md 都记着这一类）。
+// 且判定一抛，命令就报失败（ARCH.md 记着这一类）。
 //
-// **它刚刚真的出过事**（2026-10-03，`ARCH.md` §20.1）：判定链里用的是**纯词法**的
+// **它真的出过事**（`ARCH.md` §20.1）：判定链里用的是**纯词法**的
 // `path_within`，而包可以同时发一条 `usr/lib/sub -> /etc` 的符号链接（归档侧对**链接目标**
 // 不做任何校验）与一个 `DT_SONAME = "sub/EVIL.so"` 的库 ⇒ `lib_dir/sub/EVIL.so` 词法上完全
 // 在 lib_dir 内 ⇒ `fs::create_symlink` 穿过 `sub`，在 `<root>` 之外建出链接。
@@ -30,7 +30,7 @@
 // 另外统计三类结局（建出链接数 / 被拒/跳过数 / 异常数）并在退出时打印：证明 harness
 // 真的走到了**建链接**那条路，而不是每轮都在空转。
 //
-// ── 已知边界（2026-10-05）─────────────────────────────────────────────
+// ── 已知边界 ─────────────────────────────────────────────────────────
 // **夹具自己曾经越界，导致 oracle 1 每跑必红**：记录解释器用 `ofstream` 落地 `L`/`F`，而它会
 // **跟随**先前的 `S` 记录留下的符号链接 —— `S x /out` + `L x <soname>` 就把 512 字节的 ELF
 // 写到了沙箱之外（最小复现 4 字节输入）。**那与本 harness 要测的函数无关**：`apply_soname_links`
@@ -176,7 +176,7 @@ std::vector<uint8_t> crafted_elf(const std::string& soname_in)
 
 bool write_bytes(const fs::path& p, const std::vector<uint8_t>& bytes)
 {
-    // ⚠️ **先摘掉同名符号链接**（2026-10-05 实测踩到，最小复现 4 个字节的输入就够）：
+    // ⚠️ **先摘掉同名符号链接**（最小复现 4 个字节的输入就够）：
     // 下面的 `ofstream` 会**跟随**链接。于是记录序列
     //     `S x /.EVILPROBE`   →  建出 `lib/x -> /.EVILPROBE`
     //     `L x libfoo.so.1`   →  把 512 字节的 ELF **写到了沙箱之外**
@@ -284,7 +284,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         switch (r.kind) {
             case 'L':
                 if (r.b.empty()) continue;
-                // SONAME 含 `/` 是 2026-10-03 那条缺陷的形态（`lib_dir/sub/EVIL.so` 词法上
+                // SONAME 含 `/` 是那条缺陷的形态（`lib_dir/sub/EVIL.so` 词法上
                 // 仍在 lib_dir 内），单独计数以便确认这一侧被覆盖到
                 if (r.b.find('/') != std::string::npos) ++g_escape_shaped;
                 if (write_bytes(p, crafted_elf(r.b))) ++g_entries;

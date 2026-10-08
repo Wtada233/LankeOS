@@ -245,11 +245,9 @@ TEST_F(NewFeaturesTest, QuerySymlinkDoesNotResolve)
 
     // BUG 复现：此时 query_file 不应跟随软链接去解析目标。
     //
-    // ⚠️ 断言 2026-10-03 随语义改动更新（原来的 `"is not owned by any package"` 那条
-    // 钉的是 `info.file_not_owned` 这条 info 文案 + 静默退 0 的旧行为；现在"查不到属主"
-    // 与 `query -p <未安装>` 口径统一 —— 抛 `LpkgException`，`run_cli` 落退出码 1）。
-    // **本条用例真正守的不变量没变**：绝不能跟随软链接把归属算到**目标**头上。
-    // 改成异常断言后反而更强 —— 旧写法里"静默返回"与"报对了"是分不开的。
+    // ⚠️ "查不到属主"与 `query -p <未安装>` 口径统一 —— 抛 `LpkgException`（`run_cli` 落
+    // 退出码 1），不再是"打条 info 然后退 0"。
+    // **本条用例真正守的不变量**：绝不能跟随软链接把归属算到**目标**头上。
     std::string msg;
     testing::internal::CaptureStdout();
     try {
@@ -319,10 +317,9 @@ TEST_F(NewFeaturesTest, QueryDirectoryWithoutTrailingSlashStillResolvesOwner)
     install_packages({(pkg_dir / "dir_owner_ns-1.0.lpkg").string()}, "", false);
 
     testing::internal::CaptureStdout();
-    // 2026-10-03 起"查不到属主"是**抛异常**（`error.query_file_not_owned`），所以
-    // "没被判成无主"最直接的判据就是"不抛" —— 比原来那条"消息里不含某某文案"的**否定式**
-    // 断言更强（那条在新语义下恒真，等于没有牙）。断言消息文本本身仍然需要：只断言包名
-    // 出现会假通过（查询路径里本来就含包名）。
+    // "查不到属主"是**抛异常**（`error.query_file_not_owned`），所以"没被判成无主"最直接的
+    // 判据就是"不抛" —— 只断言"消息里不含某某文案"的**否定式**在新语义下恒真、等于没有牙。
+    // 断言消息文本本身仍然需要：只断言包名出现会假通过（查询路径里本来就含包名）。
     EXPECT_NO_THROW(query_file("/usr/share/dir_owner_ns"))  // 注意：不带尾斜杠
         << "不带尾斜杠查询目录被判为无归属";
     const std::string out = testing::internal::GetCapturedStdout();

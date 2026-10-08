@@ -26,7 +26,7 @@
  * （`"cmake >= 3.20, < 4.0"` 是一个依赖，见 tests/integration/test_build_deps.cpp）。
  * 所以拆开后，以操作符开头的片段是上一条的续接（"< 4.0"），必须合回上一条——
  * 否则它会变成空名依赖，在 libsolv 里是 ID_EMPTY：不解析也不报错，求解静默产出
- * 空事务，用户看到"所有包都已安装"却没装任何东西（历史 TODO.md D2）。
+ * 空事务，用户看到"所有包都已安装"却没装任何东西。
  *
  * 判断依据是"片段是否以比较操作符开头"——依赖名不可能这样开头。
  */
@@ -56,7 +56,6 @@ static std::vector<std::string> split_dep_field(std::string_view deps_sv)
  */
 static std::optional<std::filesystem::path> resolve_index_path()
 {
-    // 读取镜像地址（可能为本地路径或 http URL）
     std::string mirror;
     try {
         mirror = Config::instance().get_mirror_url();
@@ -144,7 +143,7 @@ void Repository::absorb_index_line(std::string_view line)
         if (!soname_specs_wellformed(b)) continue;  // 已告警；整块不登记
         // 走 `split_so_list`（与 make_package_info 同一清洗）：空 token 不能进表，
         // 否则 `find_provider("")` / 依赖判定会拿到脏结果。
-        // **两个字段进两张表** —— 混进同一张就回到了 8.0.0 拆分前的串味。
+        // **两个字段进两张表** —— 混进同一张就串味了。
         for (const auto& prov : split_so_list(b.provides)) {
             auto& pv = providers_[prov];
             if (pv.empty() || pv.back() != b.name) {
@@ -176,7 +175,7 @@ void Repository::sort_package_versions()
 /**
  * 按**路径**解析索引文件 —— 与 `load_index()` 共用同一套解析与排序，只是不负责"去哪拿"。
  *
- * 逐个解析索引行，格式: 包名|版本:哈希:依赖:提供:needed_so;版本2:...|包级提供
+ * 逐个解析索引行，格式: `包名|版本:哈希:依赖:provides:provides_soname:needed_so;版本2:...|`
  *
  * **字段切分走 base/utils.cpp 的 parse_repo_index_line（唯一实现）**：本函数与
  * pkg/depend_scanner.cpp 曾各写一份，而那份要求版本块 ≥5 字段 —— 4 字段的行
@@ -191,7 +190,7 @@ bool Repository::load_index_from_file(const std::filesystem::path& index_path)
 {
     packages_.clear();
     providers_.clear();
-    soname_providers_.clear();  // ⚠️ 此前漏清：重复 load 时旧包的 SONAME 提供者会残留成幽灵
+    soname_providers_.clear();  // ⚠️ 重复 load 时旧包的 SONAME 提供者不清会残留成幽灵
     soname_specs_.clear();
 
     std::ifstream file(index_path);
@@ -202,7 +201,7 @@ bool Repository::load_index_from_file(const std::filesystem::path& index_path)
     while (std::getline(file, line)) {
         absorb_index_line(line);
     }
-    // 非 EOF 收尾且 `bad`（实测：目录 = open 成功 + badbit；空文件是干净的 eof）⇒
+    // 非 EOF 收尾且 `bad`（目录 = open 成功 + badbit；空文件是干净的 eof）⇒
     // 读中途失败。**不抛**：调用方要先决定"这算不算致命"（见头文件的两条策略）。
     const bool clean = !file.bad();
     sort_package_versions();
@@ -220,7 +219,7 @@ void Repository::load_index()
 {
     packages_.clear();
     providers_.clear();
-    soname_providers_.clear();  // ⚠️ 此前漏清：重复 load 时旧包的 SONAME 提供者会残留成幽灵
+    soname_providers_.clear();  // ⚠️ 重复 load 时旧包的 SONAME 提供者不清会残留成幽灵
     soname_specs_.clear();
 
     const auto index_path = resolve_index_path();
@@ -229,27 +228,25 @@ void Repository::load_index()
     try {
         // 返回值（读中途出错 = 包表可能残缺）在这条路径上**有意忽略**：本函数无论读没读全，
         // 结局都是"空/残缺仓库 + 告警"，由下面那条 packages_.empty() 兜住用户可见性。
-        // 实测契约：索引用**目录**占住时（open 成功、读即失败 ⇒ badbit）这里落的是
+        // 契约：索引用**目录**占住时（open 成功、读即失败 ⇒ badbit）这里落的是
         // `warning.repo_index_empty`，**不是** `repo_index_unreadable`
         // —— `AggregatedIndexTest.DirectoryIndexIsReportedNotEmptyRepo` 钉着它。
         (void)load_index_from_file(*index_path);
     } catch (const std::exception&) {
         // 文件"存在"但打不开/读不出来此前完全静默：解析出 0 个包 → 上层会报告"所有包
-        // 都已是最新版本"，用户以为没事（历史 TODO D4）。
+        // 都已是最新版本"，用户以为没事。
         //
-        // ⚠️ **实测订正 2026-09-26：这条分支几乎不可达，别指望它兜住"索引是目录/损坏"**。
+        // ⚠️ **这条分支几乎不可达，别指望它兜住"索引是目录/损坏"**。
         //    · "**竟是个目录**"不成立 —— Linux 上 `std::ifstream` **打开目录是成功的**（失败的
         //      是随后的读），于是目录索引会落到下面"解析出 0 个包"那条告警（`repo_index_empty`）
-        //      上，而不是这里（实测：造一个目录索引，捕获到的是 `repo_index_empty`）。
+        //      上，而不是这里。
         //    · "权限"也挡不住 —— lpkg 永远以 root 跑。
         //    真正兜住"索引损坏/是目录/被截断"的是下面那条 **`warning.repo_index_empty`**：
         //    它可达、且是用户可见的那个"不静默"。本分支保留是纵深防御（FIFO/设备之类的怪场景）。
         //
         // ⚠️ **这里的处置与 `resolve_index_path()` 的几种失败是同一形状：告警 + 返回（仓库留空、
-        //    不抛）**，不是"中止命令"。（订正 2026-09-26：本行原写"**这是硬失败，不是当空仓库**"
-        //    —— 那句话描述的是**意图**，而实现就是"当空仓库 + 告警"，两者不可区分；这种措辞会让人
-        //    以为改这里会挡住安装。）
-        //    **为什么不抛**：仓库只用于**依赖解析**，本地 `.lpkg` 走 `local_candidates` 那条路 ——
+        //    不抛）**，不是"中止命令"。
+        //    不抛的原因：仓库只用于**依赖解析**，本地 `.lpkg` 走 `local_candidates` 那条路 ——
         //    "仓库连不上/索引坏掉"不该让 `lpkg install ./x.lpkg` 失败（离线装包是常见用法）。
         //    所以真正的要求不是"硬失败"，而是**绝不静默**：四种取不到索引的情形
         //    （配置缺失 / 索引不存在 / 下载失败 / 打不开）各发自己的告警键，用户能区分原因。
@@ -258,7 +255,7 @@ void Repository::load_index()
     }
 
     // 解析出 0 个包（空文件/半截下载/全是被跳过的坏行）必须告警：否则上游会把
-    // "仓库为空"读成"一切正常"，`lpkg upgrade` 直接打印"所有包都已是最新版本"（历史 TODO D4）
+    // "仓库为空"读成"一切正常"，`lpkg upgrade` 直接打印"所有包都已是最新版本"
     if (packages_.empty()) {
         log_warning(string_format("warning.repo_index_empty", index_path->string()));
     }
@@ -454,7 +451,7 @@ std::optional<PackageInfo> Repository::find_best_matching_version(const std::str
     return std::nullopt;
 }
 
-/** 见 repository.hpp 的说明：`load_index()` 失败时"只告警不抛"的**唯一**实现。 */
+/// `load_index()` 失败时"只告警不抛"的唯一实现（说明见 repository.hpp）。
 bool load_index_or_warn(Repository& repo)
 {
     try {

@@ -1,7 +1,5 @@
 //! gen-trackers 子命令：LLM 提示词 + 批次解析 + 编排。
 //!
-//! 从 `cli/mod.rs` 拆出（那里曾同时装 6 件事：日志设施 / clap schema /
-//! 共享 helper / track 引擎 / gen-trackers 子系统 / 帮助文本英化表）。
 //! `use super::*;` 拿到父模块的共享 helper（子模块可见祖先的私有项）。
 
 use super::*;

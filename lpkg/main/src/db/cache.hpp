@@ -9,15 +9,12 @@
 #include <vector>
 
 /**
- * 本地状态数据库（单例）
- *
- * 维护已安装包列表、文件归属、providers、反向依赖等状态的运行时缓存。
- * 所有读写操作均为线程安全，修改后通过 write() 持久化到磁盘。
+ * 本地状态数据库（单例）：已安装包列表、文件归属、providers、反向依赖等的运行时缓存。
+ * 读写均线程安全，修改后由 `write()` 持久化。
  */
 class Cache
 {
 public:
-    /** 获取全局单例实例 */
     static Cache& instance();
 
     Cache(const Cache&) = delete;
@@ -44,29 +41,20 @@ public:
 
     // ===== 包状态查询 =====
 
-    /** 查询包是否已安装 */
     bool is_installed(std::string_view name);
-    /** 获取已安装包的版本号 */
     std::string get_installed_version(std::string_view name);
-    /** 查询包是否为核心包 */
     bool is_essential(std::string_view name);
-    /** 查询包是否被锁定 */
     bool is_held(std::string_view name);
 
-    /** 将包标记为已安装 */
     void add_installed(std::string_view name, std::string_view ver, bool hold = false);
-    /** 移除已安装包 */
     void remove_installed(std::string_view name);
 
-    /** 记录文件归属（普通文件强制单一所有者，已归属他人时抛 error.file_already_owned） */
+    /// 普通文件强制单一所有者：已归属他人时抛 error.file_already_owned。
     void add_file_owner(std::string_view path, std::string_view pkg);
-    /** 记录目录归属（允许共享——多个包可拥有同一目录） */
+    /// 目录允许共享（多个包可拥有同一目录）。
     void add_dir_owner(std::string_view path, std::string_view pkg);
-    /** 移除文件归属 */
     void remove_file_owner(std::string_view path, std::string_view pkg);
-    /** 查询文件归属的包集合 */
     std::unordered_set<std::string> get_file_owners(std::string_view path);
-    /** 检查某文件是否由指定包所有 */
     bool is_file_owned_by(std::string_view path, std::string_view pkg);
 
     // ===== 配置文件哈希（升级时三哈希分流的 hash_orig） =====
@@ -116,19 +104,15 @@ public:
      */
     std::vector<std::pair<std::string, std::string>> get_package_xattr_keys(std::string_view pkg);
 
-    /** 添加**虚拟 provider**（能力名称 -> 包名） */
+    /// 能力名称 -> 包名（`provides` 语义）。
     void add_provider(std::string_view capability, std::string_view pkg);
-    /** 移除虚拟 provider */
     void remove_provider(std::string_view capability, std::string_view pkg);
-    /** 查询提供某能力的包集合 */
     std::unordered_set<std::string> get_providers(std::string_view capability);
 
     // ── SONAME 归属（**另一张表**，与上面的虚拟 provider 表并列）──────────────────────────
     // 两张表**故意不合并**：合并了就会让"依赖包名/虚拟能力"与"需要 SONAME"互相误匹配 ——
     // 那正是 8.0.0 字段拆分要根除的毛病（`provides_soname.db` ↔ `provides.db`）。
-    /** 添加 SONAME 归属（SONAME -> 包名） */
     void add_soname_provider(std::string_view soname, std::string_view pkg);
-    /** 移除 SONAME 归属 */
     void remove_soname_provider(std::string_view soname, std::string_view pkg);
     /**
      * 谁**满足**这个 SONAME 需求。
@@ -140,35 +124,26 @@ public:
      */
     std::unordered_set<std::string> get_soname_providers(std::string_view need);
 
-    /** 添加反向依赖记录 */
     void add_reverse_dep(std::string_view dep, std::string_view pkg);
-    /** 移除反向依赖记录 */
     void remove_reverse_dep(std::string_view dep, std::string_view pkg);
-    /** 查询某包的反向依赖集合 */
     std::unordered_set<std::string> get_reverse_deps(std::string_view name);
 
-    /** 确保反向依赖数据已加载 */
     void ensure_reverse_deps();
-    /** 确保核心包数据已加载 */
     void ensure_essentials();
 
     // ===== 反向查询 =====
 
-    /** 获取某包拥有的所有文件 */
     std::unordered_set<std::string> get_package_files(std::string_view pkg);
-    /** 获取某包提供的所有能力 */
     std::unordered_set<std::string> get_package_provides(std::string_view pkg);
-    /** 这个包**导出**了哪些 SONAME */
+    /// 本包**导出**的 SONAME（区别于它需要的 needed_so）。
     std::unordered_set<std::string> get_package_provides_soname(std::string_view pkg);
 
-    // ===== 迭代支持：**一律值语义快照**（2026-10-03 收紧） =====
+    // ===== 迭代支持：**一律值语义快照** =====
     //
-    // 这里原本是 `std::mutex& get_mutex()` + 两个**引用返回**的访问器，契约是"调用者自己
-    // 加锁、加锁期间不得再调任何会加锁的方法"。那条契约有两处纰漏：
-    //   · 引用返回的两个访问器**根本不用锁**就把内部容器交了出去；
-    //   · `get_mutex()` 的外泄让"持锁跨文件 I/O"成为可能（`force_solve_conflict` 曾经
-    //     在锁内做 `ifstream` 与 `find_provider`），而正确写法从来不需要那样。
-    // 全部改成"持锁拷贝一份出去"：调用方拿到的是**快照**，不再需要也不该持有锁。
+    // 不要引用返回、也不要暴露 `get_mutex()`：前者**根本不用锁**就把内部容器交了出去，
+    // 后者让"持锁跨文件 I/O"成为可能（`force_solve_conflict` 曾经在锁内做 `ifstream` 与
+    // `find_provider`），而正确写法从来不需要那样。
+    // 全部是"持锁拷贝一份出去"：调用方拿到的是**快照**，不再需要也不该持有锁。
     // 没有一处调用点需要"跨读-改-写持锁"—— 所有改动本来就都走 Cache 自己的加锁方法。
 
     /** 已安装包（名称 → 版本）的**快照**。 */
@@ -206,36 +181,27 @@ private:
     bool soname_specs_dirty = true;
     // 已安装包（包名 -> 版本）
     std::map<std::string, std::string, std::less<>> installed_pkgs;
-    // 锁定包名集合
     std::unordered_set<std::string> holdpkgs;
-    // 核心包名集合
     std::unordered_set<std::string> essentials;
     // 反向依赖数据库（依赖 -> 依赖它的包集合）
     std::map<std::string, std::unordered_set<std::string>, std::less<>> reverse_deps;
 
-    std::mutex mtx;                    // 线程安全互斥锁
-    bool dirty = false;                // 是否有未写入的修改
-    bool reverse_deps_loaded = false;  // 反向依赖是否已加载
-    bool essentials_loaded = false;    // 核心包是否已加载
+    std::mutex mtx;
+    bool dirty = false;
+    bool reverse_deps_loaded = false;
+    bool essentials_loaded = false;
 
 public:
-    /** 从文件读取多值数据库（不经过缓存） */
+    /// 不经过缓存，直接从文件读。
     std::map<std::string, std::unordered_set<std::string>, std::less<>> read_db_uncached(
         const std::filesystem::path& path);
 
-    /** 直接写入已安装包列表 */
     void write_pkgs();
-    /** 直接写入锁定包列表 */
     void write_holdpkgs();
-    /** 直接写入文件归属数据库 */
     void write_file_db();
-    /** 直接写入配置文件哈希数据库 */
     void write_conf_hashes();
-    /** 直接写入 xattr 键归属数据库 */
     void write_xattr_keys();
-    /** 直接写入 providers 数据库 */
     void write_providers();
-    /** 直接写入 SONAME 归属数据库 */
     void write_provides_soname();
 
     /// 重建 SONAME 派生索引（**调用方必须已持 `mtx`**）。
@@ -243,14 +209,13 @@ public:
     /// `get_soname_providers()` 的**持锁版本**（`ensure_reverse_deps` 在锁内要用）。
     std::unordered_set<std::string> get_soname_providers_locked(std::string_view need);
 
-    /** 从 installed_pkgs 构建 set 格式数据 */
     std::unordered_set<std::string> build_pkgs_set() const;
 
-    /** 直接写入 DB 文件（.tmp + fsync + rename） */
+    /// 落盘序列：.tmp + fsync + rename。
     void write_db_file_direct(
         const std::filesystem::path& path,
         const std::map<std::string, std::unordered_set<std::string>, std::less<>>& db);
-    /** 直接写入 set 文件（.tmp + fsync + rename） */
+    /// 落盘序列：.tmp + fsync + rename。
     void write_set_file_direct(const std::filesystem::path& path,
                                const std::unordered_set<std::string>& data);
 
@@ -263,10 +228,8 @@ public:
      * @param db_path     DB 文件路径
      * @param db          要写入的 DB 内容
      * @param milestone   里程碑标签（如 ":batch-start" / ":batch-end"）。本函数只由
-     *                    `Cache::write(milestone)` 调用，里程碑只有这两个批次级值
-     *                    （订正 2026-10-03：原示例写 "glibc:installed"，那是逐包落盘时代的
-     *                    形态，DB 已不再逐包写；包级元数据文件走的是 `wal::write_string_file_wal`，
-     *                    不经本函数）
+     *                    `Cache::write(milestone)` 调用，里程碑只有这两个批次级值；
+     *                    包级元数据文件走的是 `wal::write_string_file_wal`，不经本函数
      * @param wal_op_type WAL 操作类型（DB / DBNEW / DBRM）
      */
     void write_db_file_wal(
@@ -274,9 +237,7 @@ public:
         const std::map<std::string, std::unordered_set<std::string>, std::less<>>& db,
         const std::string& milestone, const std::string& wal_op_type = "DB");
 
-    /**
-     * write-ahead set 写入：与 write_db_file_wal 相同序列
-     */
+    /// 与 write_db_file_wal 相同序列。
     void write_set_file_wal(const std::filesystem::path& path,
                             const std::unordered_set<std::string>& data,
                             const std::string& milestone, const std::string& wal_op_type = "DB");
@@ -284,13 +245,13 @@ public:
 
 // ── WAL 恢复与清理（全局函数） ──────────────────────────────────────
 
-/// 从未完成的 WAL 事务中恢复（仅用于崩溃恢复）
+/// 仅用于崩溃恢复。
 void recover_packages();
 
-/// 清理已提交批次的 WAL 日志行
+/// 清理已提交批次的 WAL 日志行。
 void trim_completed();
 
-/// 清理孤立的 .lpkg_db_bak_before:* 备份文件
+/// 清理孤立的 .lpkg_db_bak_before:* 备份文件。
 void cleanup_db_backups();
 
 /**

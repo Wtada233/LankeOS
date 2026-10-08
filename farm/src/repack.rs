@@ -4,9 +4,7 @@
 //! （NOSUID，suid 程序受影响，§6）。解包/重打包**纯 Rust**（tar + zstd crate），不再 spawn
 //! `sudo`/`tar`/`zstd` CLI（操作命令以 root 运行，见 ARCH §「root 运行」）。
 //!
-//! **xattr 保留：做**（原先的"明确不做"决策已作废——它基于"tar 0.4.46 的 Builder 不暴露 PAX
-//! xattr 写入"，而实测 `Builder::append_pax_extensions` 就在 `tar::pax` 里，且该模块**无 feature
-//! 门控**）。打包时把每个条目的 xattr 逐条写成 PAX 的 `SCHILY.xattr.<name>=<value>`（GNU tar 的
+//! **xattr 保留：做**。打包时把每个条目的 xattr 逐条写成 PAX 的 `SCHILY.xattr.<name>=<value>`（GNU tar 的
 //! 约定），解包侧由 `scan::extract_lpkg` 的 `set_unpack_xattrs(true)` 还原——两侧对称。
 //! 丢 xattr 的代价是**功能性的**：`security.capability` 一丢，systemd native 二进制、ping 这类
 //! 靠文件能力提权的程序就废了；SUID/SGID 由 mode 保留覆盖不到它（那是另一套机制）。
@@ -16,7 +14,7 @@
 //! repack 有效性由构建不变量保证（§6：构建成功 ⇒ needed_so 的 provider 当时都在 local repo），
 //! 无需额外 guard。
 //!
-//! repack 只改 `needed_so`/`provides_soname`（用户明确：deps 不动，由 gen_deps/deprules 规则生成；
+//! repack 只改 `needed_so`/`provides_soname`（deps 不动，由 gen_deps/deprules 规则生成；
 //! **`provides`（虚拟 provider）是手写值，farm 原样保留、绝不覆盖**）。
 //! **同时返回 LankeBUILD.json 需要的字段**（`update_lankebuild` 在调用方），确保仓库源定义
 //! 与包内 metadata 一致（§6：把漂移 diff 落回仓库，源定义是真相）。
@@ -190,12 +188,11 @@ const PAX_SCHILYXATTR: &str = "SCHILY.xattr.";
 /// - 值是**原始字节**：`security.capability` 是二进制结构，不能当字符串处理（PAX 值本就是字节串）。
 /// - **按 PAX 键排序**：枚举顺序由文件系统决定，不排序会破坏"同一内容两次打包字节一致"的可复现性
 ///   契约——mtime/uid/gid 都已归一到 0，xattr 顺序是同一个契约的一部分。
-/// - 读失败分两类，不能一刀切（实测教训）：
+/// - 读失败分两类，不能一刀切：
 ///   - **`ENOENT`（悬空符号链接）/ `EOPNOTSUPP`（文件系统或该文件类型不支持 xattr）** → 当"没有
 ///     xattr"：这两种表示**这里本来就没东西可保**，不是读失败。悬空符号链接是**合法包内容**
 ///     （dbus 的 `var/lib/dbus/machine-id`、ncurses 等都有；`repack_survives_broken_symlink_in_content`
-///     就是守它的），在它上面 `llistxattr` 会返回 ENOENT——最初按"任何错误都致命"写，直接把那三个
-///     既有测试打挂了。
+///     就是守它的），在它上面 `llistxattr` 会返回 ENOENT。
 ///   - **其余错误**（EACCES 等）→ **报错**：静默丢一个 `security.capability` 等于发个残包
 ///     （与"repack 失败必须 BLOCK、绝不静默降级"的既有立场一致）。
 fn read_pax_xattrs(path: &Path) -> Result<Vec<(String, Vec<u8>)>, FarmError> {

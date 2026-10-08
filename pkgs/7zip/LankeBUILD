@@ -8,12 +8,12 @@
 # 所以这里是直接删掉 pkgs/p7zip、新增本包 —— 全仓库没有任何包依赖 p7zip（已核）。
 #
 # 无补丁：源用官方 GitHub tag 归档（ip7z/7zip，即 Igor Pavlov 的官方仓库；
-# 与 7-zip.org 的 tarball 内容等价，实测去掉 CR 后 1292 个文件零差异，
+# 与 7-zip.org 的 tarball 内容等价，去掉 CR 后 1292 个文件零差异，
 # 只是行尾 LF vs CRLF）。版本与 URL 都来自 tag，无需任何格式变换。
 #
 # 编译期注意：
 #  - USE_ASM=1 MY_ASM=uasm：x86_64 要用 uasm 汇编 Asm/x86/*.asm（MASM 语法，
-#    nasm/yasm 不兼容）。实测收益主要在**解压**（约 25-30%），压缩约 0-5%；
+#    nasm/yasm 不兼容）。收益主要在**解压**（约 25-30%），压缩约 0-5%；
 #    产出的归档体积与官方预编译版完全一致。
 #  - CFLAGS_WARN_WALL 覆盖：makefile 硬编了 `-Werror -Wall -Wextra`，而 GCC 16 在
 #    ProgressUtils.h 的 COM 引用计数模式上报 -Warray-bounds 误报，被 -Werror 提升为

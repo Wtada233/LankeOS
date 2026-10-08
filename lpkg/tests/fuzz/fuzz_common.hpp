@@ -14,11 +14,11 @@
  * 把 **stdout** 永久接到 /dev/null。
  *
  * 只静音 stdout、**必须保留 stderr**：
- *   · 进度行全走 stdout（`ui/term.cpp:385/430/469-492` 都是 `std::cout`），而
- *     `extract_tar_zst` 每轮都构造一个 `ui::Line`（`archive.cpp:215`），非 TTY 下析构也至少
+ *   · 进度行全走 stdout（`ui/term.cpp` 都是 `std::cout`），而
+ *     `extract_tar_zst` 每轮都构造一个 `ui::Line`（`archive.cpp`），非 TTY 下析构也至少
  *     打一行 —— 不静音的话 libFuzzer 每秒几百次的输出会被进度行冲垮，还白搭 I/O；
  *   · 而 ASan/UBSan 的崩溃报告、libFuzzer 自己的统计、以及 `log_warning`/`log_error`
- *     （`base/utils.cpp:120/128` 都走 `std::cerr`）**全在 stderr 上** —— 把 stderr 也关掉
+ *     （`base/utils.cpp` 里都走 `std::cerr`）**全在 stderr 上** —— 把 stderr 也关掉
  *     就等于把"为什么崩"一起关掉。
  *
  * 幂等；在 `LLVMFuzzerInitialize` 里调一次即可。
@@ -33,7 +33,7 @@ inline void silence_stdout()
 
 // ============================ 内存追踪（定因用） ============================
 //
-// **存在的理由**：2026-10-03 有一次 `elf_strip_fuzz` 运行把宿主内存吃到 60 GB 触发 OOM，
+// **存在的理由**：曾有一次 `elf_strip_fuzz` 运行把宿主内存吃到 60 GB 触发 OOM，
 // 事后**查不出是谁**：OOM 转储里所有任务的 rss_anon 加起来只有 1.1 GB、内核却声称
 // `active_anon` 59.85 GB；fuzzer 自己的 fd 恒为 5、RssShmem=0。也就是说单看"跑完之后的
 // 快照"根本定不了因 —— 必须**在跑的过程中**记录"第几次迭代开始涨、当时的输入是什么"。
@@ -72,7 +72,7 @@ inline long meminfo_kb(const char* key)
 /**
  * 读**本 cgroup** 的计数（`/sys/fs/cgroup/memory.stat`），单位 kB。
  *
- * 为什么需要它、而且**必须以它为准**：实测有一次运行里容器 cgroup 的 `shmem` 涨到 18 GB、
+ * 为什么需要它、而且**必须以它为准**：曾有一次运行里容器 cgroup 的 `shmem` 涨到 18 GB、
  * 把容器自己的内存上限撞穿，而**宿主的 `meminfo` `Shmem` 平在 150 MB、进程 RSS 也毫无变化**
  * （`anon=0`）。也就是说：**用 `/proc/meminfo` 或进程 RSS 做判据根本看不到这个泄漏**。
  * 只有 cgroup 的记账反映它。（容器内 `/sys/fs/cgroup` 就是它自己的 cgroup，直接读即可。）
@@ -113,7 +113,7 @@ inline void mem_trace(const uint8_t* data, std::size_t size, const char* tag)
     static const char* dump_dir = std::getenv("LPKG_FUZZ_MEM_DUMP");
     ++iter;
 
-    // **滚动记录"最后见过的输入"**：实测那个巨额分配是**某一次迭代一口气**吃掉的，
+    // **滚动记录"最后见过的输入"**：那个巨额分配是**某一次迭代一口气**吃掉的，
     // 进程会在分配中途被 cgroup 杀掉 —— 按窗口采样永远追不上（`shmem` 每 50 次看都是 0，
     // 可容器却涨到 19 GB）。这里每 10 次把当前输入覆写到 `<dump>/last.bin`，
     // 于是**卡死/崩溃后这个文件里就是触发者本身**（每次都写，不偏）。
@@ -129,13 +129,13 @@ inline void mem_trace(const uint8_t* data, std::size_t size, const char* tag)
 
     if (iter % 50 != 0) return;
 
-    // **必须用 cgroup 的计数**：实测宿主 `meminfo` 的 `Shmem` 与进程 RSS 都看不到这次泄漏
+    // **必须用 cgroup 的计数**：宿主 `meminfo` 的 `Shmem` 与进程 RSS 都看不到这次泄漏
     // （容器 cgroup 记到 18 GB 时，宿主 Shmem 只有 150 MB、进程 anon≈0）。
     const long shmem = stat_kb("shmem", "Shmem:");
     const long anon = stat_kb("anon", "AnonPages:");
     const long file = stat_kb("file", "Cached:");  // 页缓存（cgroup 的 file 含 shmem）
     const long avail = meminfo_kb("MemAvailable:");
-    // 用"**自本轮起的累计增长**"而不是"单窗口增量"：实测 fuzzer 往往在**语料初始化阶段**
+    // 用"**自本轮起的累计增长**"而不是"单窗口增量"：fuzzer 往往在**语料初始化阶段**
     // 就吃满上限（13 条 [dbg] 之后就被 cgroup 杀了），单窗口采样根本来不及。累计量只要越过
     // 门槛就落盘，跳变再陡也能抓到。
     if (base_shmem < 0) {

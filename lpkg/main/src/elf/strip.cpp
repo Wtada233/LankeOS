@@ -258,7 +258,7 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
         GElf_Shdr shdr;
         if (gelf_getshdr(scn, &shdr) == nullptr) continue;
         // 用**有界**取值：`elf_strptr` + 判空挡不住"offset 在节区内但 NUL 在节区外"
-        // （见 lib_utils.hpp 的 `elf_strtab_get`，那条洞是 fuzz 实测出来的）。
+        // （见 lib_utils.hpp 的 `elf_strtab_get`，那条洞是 fuzz 发现的）。
         const std::string name(elf_strtab_get(in_elf, shstrndx, shdr.sh_name));
 
         bool keep = true;
@@ -267,9 +267,9 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
             name.starts_with(".rel.debug") || name == ".comment")
             keep = false;
 
-        // **量级封顶（2026-10-03 修）**：`sh_size` 是**输入可控**的，而下面会把整份节区头
+        // **量级封顶**：`sh_size` 是**输入可控**的，而下面会把整份节区头
         // （含 `sh_size`）写进输出 ELF，再交给 `elf_update` 去布局 —— libelf 会**按这些尺寸
-        // 创建/分配空间**。实测（fuzz harness 抓到、再最小复现）：一个 **1224 字节**的 ET_REL
+        // 创建/分配空间**（fuzz harness 抓到、再最小复现）：一个 **1224 字节**的 ET_REL
         // 声明了 192 GB 的节区 ⇒ `elf_update` 去申请上百 GB ⇒ 容器 cgroup 的 shmem 冲到上限、
         // 全局 OOM。**合法 ELF 的节区数据必然落在文件内**，所以用输入大小封顶 ——
         // 与 `strip_elf_exec_dyn` 那条路是**同一判据**（那边判的是"重排后的输出不可能大于输入"）。
@@ -282,10 +282,10 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
             error_msg = get_string("error.strip_malformed_elf");
             return false;
         }
-        // **`sh_addralign` 也必须封顶**（2026-10-03 由 fuzz harness 抓到、再用"只改这一个字段"
+        // **`sh_addralign` 也必须封顶**（由 fuzz harness 抓到、再用"只改这一个字段"
         // 的最小复现钉死）：`elf_update` 会**按 `sh_addralign` 对齐每个节区的落点** —— 一个
         // `sh_addralign = 2^56` 的节区就让输出文件的偏移跳到 64 PiB，memfd 随之被 `ftruncate`
-        // 到 64 PiB 并**真实占掉几十 GB**（实测：宿主内存 7 秒掉 48 GB，进程自身 RSS 只有
+        // 到 64 PiB 并**真实占掉几十 GB**（宿主内存 7 秒掉 48 GB，进程自身 RSS 只有
         // 0.4 GB，每次都被内存上限杀掉）。这正是先前只封 `sh_offset`/`sh_size` 时漏掉的那一格。
         // 判据同族：**对齐值不可能大于整个输入文件**。`sh_entsize` 是同一类输入可控字段，一并封。
         if (shdr.sh_addralign > input_size || shdr.sh_entsize > input_size) {
@@ -293,10 +293,10 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
             return false;
         }
         if (keep) {
-            // **聚合量级封顶（2026-10-03 修）**：上面的 `sh_offset`/`sh_size` 守卫只**逐节区**
+            // **聚合量级封顶**：上面的 `sh_offset`/`sh_size` 守卫只**逐节区**
             // 判"落在文件内"，挡不住**多个节区指向输入里同一片数据**、各自声明 ~input_size 的
             // 形态 —— k 个这样的节区让下面的 `owned_data.emplace_back` 与 `elf_update` 各拷贝
-            // k 份 ⇒ 峰值 ~input²/128（实测：**223 KB** 的输入产出 **167 MB** 输出）。
+            // k 份 ⇒ 峰值 ~input²/128（**223 KB** 的输入产出 **167 MB** 输出）。
             //
             // 判据与 `strip_elf_exec_dyn` 那条**是同一个不变量**（那边是
             // `e_shoff + e_shnum*shentsize > input_data.size()` 的封顶）：**strip 只删节区 ⇒
@@ -311,7 +311,7 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
                 }
                 retained_data_total += shdr.sh_size;
             }
-            // **对齐填充的聚合封顶（2026-10-05 修）—— A3 的本体。**
+            // **对齐填充的聚合封顶**。
             //
             // 上面每条判据都只盯**单个**输入可控的量：逐节区的 `sh_offset`/`sh_size` 要落在
             // 文件内、`sh_addralign ≤ input_size`、被保留节区的 `sh_size` 之和 ≤ input_size。
@@ -325,7 +325,7 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
             // （它按这些对齐值 ftruncate 那个 memfd / 铺出全部填充），等拿到产物尺寸再判已经晚
             // 了 —— 那时内存（memfd 是 shmem）已经被吃掉，正是本缺陷"strip 放大到 OOM"的现场。
             // 判据与上面 `retained_data_total` **同形**（输入可控字段的聚合上界），量级取
-            // **输入大小**：合法文件的对齐值之和远小于文件本身（实测 128 个真实 `.o` —— 本仓库
+            // **输入大小**：合法文件的对齐值之和远小于文件本身（128 个真实 `.o` —— 本仓库
             // 构建树的测试目标 + 若干 gcc 产物：`Σsh_addralign / 文件大小` 最大 **2.0%**、
             // 中位 **0.8%**），而放大形态需要它 ≫ 输入。`sh_addralign` 的逐节区
             // 守卫已保证每项 ≤ input_size ⇒ 这个减法不回绕。
@@ -371,7 +371,7 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
             *out_data = *in_data;
             // **只为真有数据的节区复制自有缓冲**：SHT_NOBITS（.bss 等）在 libelf 里
             // d_buf == NULL 而 d_size > 0 —— 按 d_size 从 NULL 构造 vector 是 UB
-            // （bad_alloc/崩溃），会让整个 strip 失败（LLVM 的 .o 带 .bss，实测卡住其构建）。
+            // （bad_alloc/崩溃），会让整个 strip 失败（LLVM 的 .o 带 .bss，卡住其构建）。
             // 这类节区没有数据可改写，直接沿用描述符即可。
             if (in_data->d_buf != nullptr && in_data->d_size > 0) {
                 const auto* begin = static_cast<const uint8_t*>(in_data->d_buf);
@@ -430,20 +430,20 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
         error_msg = get_string("error.strip_object_failed");
         return false;
     }
-    // **产物尺寸复核（2026-10-05 修）—— 纵深防御，主判据是上面那条对齐聚合封顶。**
+    // **产物尺寸复核 —— 纵深防御，主判据是上面那条对齐聚合封顶。**
     //
     // 产物 = ELF 头 + 节区表 + 各保留节区的数据 + **对齐填充**。前两项与第三项我们都有
     // 确切值（`retained_data_total`），于是这条复核等价于"**对齐填充不得超过输入文件本身**"
-    // —— 合法文件里填充只占千分之几（实测同上），放大形态则是输入的几十倍。
+    // —— 合法文件里填充只占千分之几（同上），放大形态则是输入的几十倍。
     //
-    // ⚠️ **为什么它只能当第二道**：判据在 `elf_update` **之后**，而放大恰恰发生在
+    // ⚠️ 它只能当第二道的原因：判据在 `elf_update` **之后**，而放大恰恰发生在
     // `elf_update` **内部**（它按对齐值铺出全部填充、把 memfd ftruncate 到那个尺寸）——
     // 走到这里时内存已经被吃掉，正是本缺陷的现场。**真正拦住它的是上面那条 pre-update 的
     // 对齐聚合封顶**，这里再核一遍产物，防的是"判据没想到的第三种放大向量"。
     //
-    // ⚠️ 判据**不能**写成朴素的 `size > input_size`（2026-10-05 实测**不成立**）：良构
+    // ⚠️ 判据**不能**写成朴素的 `size > input_size`（**不成立**）：良构
     // ELF 里节区数据可以与被保留的其它区域重叠，重建后 libelf 把每个节区各铺一份 ⇒ 产物合法
-    // 地变大。实测 `CraftedElfTest.RelSectionsWithinFileStillStrip` 的输入 **512** 字节、
+    // 地变大。`CraftedElfTest.RelSectionsWithinFileStillStrip` 的输入 **512** 字节、
     // 产物 **592** 字节（那条用例正是"正常形态必须照常 strip"的正面控制）。所以上界里必须
     // 带上"头 + 节区表 + 节区数据"这三项已知量。
     const size_t header_bytes =
@@ -452,8 +452,7 @@ static bool strip_elf_rel_object(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shst
     if (static_cast<size_t>(size) > input_size + header_bytes + retained_data_total) {
         // 这里在 `strip_elf_data` 之下，**拿不到路径**（它自己也没有）—— 所以路径由调用方
         // 一路传下来（`source_path`），只为让这条错误点名文件（`strip_binary` 的告警判据是
-        // "失败且 error_msg 非空"，不点名等于没报）。`elf_strip_fuzz` 走 3 参重载时它是空串
-        // （fuzz 不消费 error_msg）。
+        // "失败且 error_msg 非空"，不点名等于没报）。
         error_msg = string_format("error.strip_output_grew", source_path, static_cast<size_t>(size),
                                   input_size);
         return false;
@@ -489,7 +488,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
     // ⚠️ `e_ehsize` 是**输入可控**的字段，而下面 `write_ehdr` 会无条件写入**整个**
     // `Elf32_Ehdr` / `Elf64_Ehdr`（52 / 64 字节），那个 `memcpy` 的守卫却取自
     // `max(e_phoff + e_phnum*phsize, e_ehsize)` —— 把 `e_ehsize` 改成 4 就能让它通过，
-    // 于是往只有几十字节的输出缓冲区里写 52/64 字节（实测 ASan：`heap-buffer-overflow
+    // 于是往只有几十字节的输出缓冲区里写 52/64 字节（ASan：`heap-buffer-overflow
     // WRITE of size 2`，非 ASan 下是堆损坏 → SIGABRT → 目标文件已被截断成 0 字节）。
     // 规范里 `e_ehsize` 恒等于 ELF 头自身的大小，对不上就是畸形输入 —— 直接拒。
     const size_t ehdr_size = (elf_class == ELFCLASS64) ? sizeof(Elf64_Ehdr) : sizeof(Elf32_Ehdr);
@@ -516,7 +515,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
         GElf_Shdr shdr;
         if (gelf_getshdr(scn, &shdr) == nullptr) continue;
         // 用**有界**取值：`elf_strptr` + 判空挡不住"offset 在节区内但 NUL 在节区外"
-        // （见 lib_utils.hpp 的 `elf_strtab_get`，那条洞是 fuzz 实测出来的）。
+        // （见 lib_utils.hpp 的 `elf_strtab_get`，那条洞是 fuzz 发现的）。
         const std::string name(elf_strtab_get(in_elf, shstrndx, shdr.sh_name));
 
         bool keep = true;
@@ -547,7 +546,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
     }
 
     // 节区数据与节区表的落点必须**整体排在 ELF 头 + 程序头之后**。
-    // 少了这道下界时（2026-10-03 由 `tests/fuzz/elf_strip_fuzz.cpp` 实测抓到）：一个
+    // 少了这道下界时（由 `tests/fuzz/elf_strip_fuzz.cpp` 抓到）：一个
     // "既没有 SHF_ALLOC 数据、又没有非 ALLOC 载荷"的文件会算出 `current_offset == 0`，
     // 于是 `e_shoff == 0`；而 `kept_sections` **永远含节区 0**（null section，内容全零），
     // `write_shdr(0)` 正好写在第 0 字节 —— **把 ELF 头覆盖成全零**，函数却返回 true，
@@ -612,7 +611,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
     // SHN_XINDEX 扩展编号（真值放 `section[0].sh_size`、`e_shnum` 写 0），本函数没有实现
     // 那套。直接赋 `size_t` 会**截断**，而下面的 `output_data.resize()` 用截断后的数、
     // 写节区表的循环却用**未截断**的 `kept_sections.size()` —— 于是写到缓冲区之外
-    // （实测 ASan：64 字节缓冲区上 `heap-buffer-overflow WRITE of size 4`）。
+    // （ASan：64 字节缓冲区上 `heap-buffer-overflow WRITE of size 4`）。
     // 超限即拒（畸形/超大输入，不是我们要 strip 的东西）。
     if (kept_sections.size() >= SHN_LORESERVE) {
         error_msg = get_string("error.strip_malformed_elf");
@@ -632,7 +631,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
         error_msg = get_string("error.strip_malformed_elf");
         return false;
     }
-    // **量级**也要封顶（2026-10-03 修）：上面的守卫只防**回绕**，不防"不回绕但巨大"。
+    // **量级**也要封顶：上面的守卫只防**回绕**，不防"不回绕但巨大"。
     // `e_shoff` 是 `align(max_alloc_end)` + 保留节区 `sh_size` 之和推出的，而 `sh_size` 来自
     // 输入、只被"加法不回绕"约束 —— 一个 `1<<40` 级的 `sh_size` 会让 `resize` 去分配几十 TiB，
     // 那是 `std::length_error`/`bad_alloc`（或 OOM），**不是**这里该给的"畸形 ELF → 放弃 strip"。
@@ -655,13 +654,13 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
                 // 缓冲内。校验用 elf_range_within（饱和比较，加法不会回绕）。
                 // 不一致 = 输入 ELF 的节区布局与重排结果矛盾（构造/畸形文件）→
                 // 放弃 strip 并返回 false，由调用方告警并**保留原文件**：
-                // 绝不部分拷贝出损坏产物，更不能越界写（曾实测 128 字节区域写 4320）。
+                // 绝不部分拷贝出损坏产物，更不能越界写（曾经在 128 字节的区域写出 4320 字节）。
                 if (!elf_range_within(old_shdr.sh_offset, old_shdr.sh_size, input_data.size()) ||
                     !elf_range_within(ks.shdr.sh_offset, ks.shdr.sh_size, output_data.size())) {
                     // **必须填 error_msg**：上面注释写着"由调用方告警"，而调用方的判据是
                     // `!strip_file(...) && !error_msg.empty()`（strip_binary）—— 空串 = 拒绝得
                     // 一声不响（静默跳过、原文件保留但用户毫不知情）。与 process_archive 的
-                    // `bail()` 同一个纪律（2026-10-03 修）。
+                    // `bail()` 同一个纪律。
                     error_msg = get_string("error.strip_malformed_elf");
                     return false;
                 }
@@ -676,7 +675,7 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
     // 迟早会漂移（`updated_ehdr` 是 `ehdr` 的副本，只改了 e_shoff/e_shnum/e_shstrndx）。
     if (!elf_range_within(0, headers_size, input_data.size()) ||
         !elf_range_within(0, headers_size, output_data.size())) {
-        // 同上：拒绝必须带原因，否则调用方静默跳过（2026-10-03 修）。
+        // 同上：拒绝必须带原因，否则调用方静默跳过。
         error_msg = get_string("error.strip_malformed_elf");
         return false;
     }
@@ -727,7 +726,7 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
 {
     // 本函数**每个失败分支都必须填 `error_msg`** —— 消费者的判据是
     // `!strip_file(...) && !error_msg.empty()`（`strip_binary`），空串 = 拒绝得一声不响
-    // （既不剥、也不告警）。2026-10-03 把这几个分支补齐。
+    // （既不剥、也不告警）。
     if (elf_version(EV_CURRENT) == EV_NONE) {
         error_msg = get_string("error.strip_libelf_mismatch");
         return false;
@@ -747,7 +746,7 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
         return false;
     }
 
-    // 端序检查（2026-10-03 修）：本文件的写出路径（`write_ehdr` / `write_shdr`）用
+    // 端序检查：本文件的写出路径（`write_ehdr` / `write_shdr`）用
     // `reinterpret_cast<Hdr*>` 按**本机字节序**改写 ELF 头与节区表，而节区数据是从输入
     // 原样 `memcpy` 的。于是**大端** ELF（`EI_DATA == ELFDATA2MSB`）会被写成一个
     // "头/节区表是本机序、节区数据仍是大端"的**混合端序**文件 —— 静默损坏。
@@ -767,9 +766,8 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
         error_msg = get_string("error.strip_malformed_elf");
         return false;
     }
-    // **没有节区表 ⇒ 静默返回**（2026-10-03 订正：一度给它加了 `error.strip_no_sections`
-    // 告警，**那是错的**）。"没有节区表"是**正常形态**、不是异常：被完整 strip 过的二进制
-    // 就长这样 —— 本仓库自己的 `make docker` 产物 `build/lpkg-docker` 实测 `readelf -h`
+    // **没有节区表 ⇒ 静默返回**。"没有节区表"是**正常形态**、不是异常：被完整 strip 过的二进制
+    // 就长这样 —— 本仓库自己的 `make docker` 产物 `build/lpkg-docker` 的 `readelf -h`
     // 就是 `Number of section headers: 0`（UPX 打包的二进制同理）。strip 是**尽力而为**的
     // 构建步骤，对"没什么可剥"的文件出声只会让每次构建都刷一行无意义的告警。
     // 判据：**没有可剥的东西 ≠ 失败**。
@@ -793,10 +791,6 @@ bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>
     }
     return result;  // `in_elf` 由 RAII 收尾
 }
-
-// ⚠️ 这里曾有一个 **3 参重载**（只为当时不能改动的 `tests/fuzz/elf_strip_fuzz.cpp` 转发）。
-// 2026-10-05 把那个 harness 的声明同步到上面这个 4 参签名后**已删除** —— 同一件事不留第二个
-// 签名，否则下次改签名又会漏掉一边（"第二份实现必然漂移"）。
 
 /** 读取 ELF 文件内容，调用 strip_elf_data 处理后写回原文件 */
 bool process_elf(const fs::path& path, std::string& error_msg)
@@ -827,12 +821,12 @@ bool process_elf(const fs::path& path, std::string& error_msg)
     std::vector<uint8_t> output_buffer;
     if (!strip_elf_data(buffer, output_buffer, error_msg, path.string())) return false;
 
-    // **原子落位（2026-10-05 修）**：此前这里是
+    // **原子落位**：此前这里是
     // `std::ofstream os(path, std::ios::binary | std::ios::trunc);` —— **打开的那一刻原内容
     // 就没了**（`trunc` 是打开时生效的，与后面写不写得进去无关），而随后写入失败
     // （ENOSPC/EIO）只让本函数返回 false，调用方 `strip_binary` 又只把它降级成一条告警
     // ⇒ staging 里留着一个**被截断的 `.so`**，照样被打进 `.lpkg`。
-    // **实测**（`StripTest.ElfOriginalStaysIntactWhenTheTmpWriteCannotEvenStart` 的修前跑）：
+    // （`StripTest.ElfOriginalStaysIntactWhenTheTmpWriteCannotEvenStart` 的修前跑）：
     // 写不进去时本函数照样返回 **true**、且原文件**已被就地重写**（内容与 strip 前不同）。
     //
     // 现在与同文件的 `process_archive` 统一：先写暂存文件 → 检查每一次写 → `fsync_and_rename`
@@ -843,7 +837,7 @@ bool process_elf(const fs::path& path, std::string& error_msg)
     // 否则一个 0755 的可执行文件 strip 完就变成 0644、打进包里不可执行。`.a` 那条腿只处理
     // 静态库（惯例 0644），所以此前没暴露这个问题。
     //
-    // ⚠️ **已知取舍（2026-10-05，有意保留）**：换 inode 也意味着**扩展属性不随行** ——
+    // ⚠️ **已知取舍（有意保留）**：换 inode 也意味着**扩展属性不随行** ——
     // 尤其 `security.capability`（file capabilities），以及硬链接关系（新文件与别人不再共享
     // inode）。两条都不处理，理由：
     //   · 本函数只跑在**构建期的 staging 树**上（`builder.cpp` 对刚编译出来的产物调
@@ -918,7 +912,7 @@ bool process_elf(const fs::path& path, std::string& error_msg)
  * 10 位十进制，上限约 9.3 GiB）。libarchive 对"成员头合法、成员体被截断"的归档**第一次
  * `archive_read_next_header` 就返回 OK**，于是紧随其后的 `std::vector<uint8_t> data(size)`
  * 会按那个自报值分配并逐字节清零 —— 一个 **约 72 字节**的文件就能触发 ~9.3 GiB 分配
- * （实测症状：OOM / `std::bad_alloc`）。**必须在分配之前**判掉。
+ * （症状：OOM / `std::bad_alloc`）。**必须在分配之前**判掉。
  *
  * 上界取**结构性**的那一个：成员数据不可能大于整个归档文件本身 —— 所以调用方在进循环前
  * `fs::file_size` 取一次传进来，判据里不含任何魔数。**绝不能**复用
@@ -936,7 +930,7 @@ static bool ar_member_declared_size_ok(la_int64_t declared, uint64_t archive_siz
 /**
  * 预扫静态库：判断它**值不值得重写**，并挡掉我们写不出来的形态。
  *
- * **为什么必须先扫一遍**：符号表成员（名为 `/`）恒是整个归档的**第一个**成员，而它记录的
+ * 必须先扫一遍的原因：符号表成员（名为 `/`）恒是整个归档的**第一个**成员，而它记录的
  * 是一串"符号 → 字节偏移"，那些偏移只在**没有任何成员改变长度**时才继续成立。读到 `/` 时
  * 我们尚未知道后面有没有 `.o` 成员会在 strip 后变短，所以必须先看一遍全库再决定写出方案。
  *
@@ -950,18 +944,18 @@ static bool ar_member_declared_size_ok(la_int64_t declared, uint64_t archive_siz
  * 的归档完全可以带一张没人引用的 `//` 表，子审计逐字节复刻验证过索引 stale 0 → 2。）
  *
  * 有意的跳过：成员名超过 15 字节。GNU/SVR4 ar 的名字字段只有 16 字节（含结尾 `/`），
- * libarchive 的 ar 写入器写不了更长的名字 —— 实测它会让 `archive_write_header` 失败，
- * 而且**继续写下去的成员会被静默丢掉**（实测：长名成员在输出里整个消失，只剩后面的）。
+ * libarchive 的 ar 写入器写不了更长的名字 —— 它会让 `archive_write_header` 失败，
+ * 而且**继续写下去的成员会被静默丢掉**（长名成员在输出里整个消失，只剩后面的）。
  * 这种库我们不碰、原样留着。这是**工具的固有限制**而不是错误，所以不告警（否则 llvm 那种
  * 一堆 `libclang_rt.*.a`（成员名如 `asan_preinit.cpp.o`）每次构建都会刷屏）。
  *
- * ⚠️ **这条判据必须与成员顺序无关**（2026-10-07 修）。>15 字节的名字在归档里是 `//` 长名表
+ * ⚠️ **这条判据必须与成员顺序无关**。>15 字节的名字在归档里是 `//` 长名表
  * + `/N` 引用，**真名要经 libarchive 解析之后才看得见** ⇒ 提前收工绝不能发生在还没看完所有
  * 名字的时候。此前"判定要重写"时直接 `break`，于是"短名 `.o` 排在长名成员**之前**"的库会
  * 漏判：它带着 `//` 表继续走到 `process_archive`（判 `index_invalid`）→ 原始布局扫描
  * `scan_ar_raw_layout` → 那里把 `/N` 当成"认不出的形态" ⇒ 填
  * `error.strip_archive_broken`（"Static library is malformed…"）⇒ 调用方**告警**。
- * 实测：llvm 的 `libLLVMSupport.a`（第 3 个成员是短名 `blake3.c.o`）与 `libLLVMDemangle.a`
+ * llvm 的 `libLLVMSupport.a`（第 3 个成员是短名 `blake3.c.o`）与 `libLLVMDemangle.a`
  * （`Demangle.cpp.o`）每次构建各刷一条假警告，而同族的 `libLLVMTableGen.a` 第 3 个成员就是
  * `/0`（真名 `DetailedRecordsBackend.cpp.o`）⇒ 静默跳过 —— **同一个包、同一种库，只差排列**。
  * 现在已知"要重写"后仍走完成员表，但只查名字（`archive_read_data_skip`，不读数据、不再试剥）。
@@ -1045,22 +1039,22 @@ static int archive_strip_scan(const fs::path& path, std::string& error_msg,
 // 归档符号索引（`/` 32 位、`/SYM64/` 64 位）：解析 → 重映射 → 回填
 // ---------------------------------------------------------------------------
 //
-// **为什么必须重映射，而不是丢掉**（订正 2026-10-03 —— 原文写的是"重写就丢弃索引"，
-// 那是错的）：重写会让 `.o` 成员变短 ⇒ 其后每个成员的偏移前移，**照抄**的旧索引全部失效,
-// 链接器直接拒绝 —— 实测 `ld: error adding symbols: malformed archive`（同族症状还有
-// `no more archived files`，本机 `bison` / `nspr` / `gcc` 三个包的 `.a` 曾这样被写坏）。
+// 必须重映射而非丢掉的原因：重写会让 `.o` 成员变短 ⇒
+// 其后每个成员的偏移前移，**照抄**的旧索引全部失效, 链接器直接拒绝 —— `ld: error adding symbols:
+// malformed archive`（同族症状还有 `no more archived files`，本机 `bison` / `nspr` / `gcc` 三个包的
+// `.a` 曾这样被写坏）。
 //
 // binutils 的做法（`binutils/objcopy.c` 原文）：
 //     if (strip_symbols == STRIP_ALL) obfd->has_armap = false;
 //     else                            obfd->has_armap = ibfd->has_armap;  /* 交给 BFD 重新生成 */
 // —— 只有 `--strip-all`（连符号一起剥）才不要索引；`--strip-debug` / `-g` /
 // `--strip-unneeded` 都**保留并重建**。而 lpkg 剥的正是"调试信息那一档"（ET_REL 路径只丢
-// `.debug*` / `.comment`，`.symtab` 保留），所以索引必须保留并重算。实测：`ar rcs` 出的归档
+// `.debug*` / `.comment`，`.symtab` 保留），所以索引必须保留并重算。`ar rcs` 出的归档
 // 经 `strip --strip-debug` 后索引成员仍在、符号集不变、偏移被重算成新位置（b 2846→1358、
 // c 5602→2626）；同一套判据跑 lpkg 现在的产物，1 / 8 / 30 成员三档的索引**逐条与 binutils
 // 一致**，且每条都落在"真正定义该符号"的那个成员头上。
 //
-// ⚠️ **别把理由写成"没有索引就链不了"**（2026-10-03 我先这么写，实测**不成立**）：本机
+// ⚠️ **别把理由写成"没有索引就链不了"**：本机
 // GNU ld 2.47 对**无索引**的归档会退化成**顺序扫描成员**，`ar rcS` 造的无索引库照样链得上
 // （`nm`/`ar t` 也照常）。"保留索引"的理由是：**与 binutils 同档位的行为一致**、省掉链接器的
 // 顺序扫描、不把一份正常形态的 `.a` 降级成畸形形态 —— 不是"否则链接失败"。
@@ -1071,7 +1065,7 @@ static int archive_strip_scan(const fs::path& path, std::string& error_msg,
 //   `/SYM64/` 同上，偏移是 8 字节（>4GiB 的归档，Irix 6 出身）
 // 重建只需**换偏移**：符号名与顺序逐字节照旧（strip 不删 `.symtab` ⇒ 符号集不变）。
 //
-// **认不出的索引一律"整份归档不剥 + 告警"，绝不产出错误产物**（维护者 2026-10-03 定）：
+// **认不出的索引一律"整份归档不剥 + 告警"，绝不产出错误产物**：
 //   · `__.SYMDEF` / `__.SYMDEF SORTED`（BSD ranlib 表）—— 数值字段是**宿主字节序**
 //     （bfd 自己的注释："Probably we're using the wrong byte ordering"），跨平台没有可靠
 //     判据，而 GNU ar 在 Linux/ELF 上也不产它；
@@ -1079,7 +1073,7 @@ static int archive_strip_scan(const fs::path& path, std::string& error_msg,
 // 处置都是**把整个库原样留着**（一个字节不动，索引照旧有效、链接照常）并返回失败让调用方
 // 告警 —— 而不是"丢掉索引接着写"。丢索引在这里虽然还能链（链接器顺序扫描，见上），但那是
 // 把一份正常形态的 `.a` 降级成畸形形态，而且我们**没法保证**重算出来的偏移是对的；
-// 少剥一个库只是大几 KB，**不产出错误产物**优先（维护者 2026-10-03 定）。
+// 少剥一个库只是大几 KB，**不产出错误产物**优先。
 
 constexpr std::string_view kArIndexName = "/";
 constexpr std::string_view kArIndex64Name = "/SYM64/";
@@ -1129,12 +1123,12 @@ struct ArRawLayout {
  * 走完必须**恰好**落在文件末尾（`pos == file_size`）才算 `ok` —— 尾部有残留说明布局不是
  * 我们认得的形态（非标准填充之类），此时索引偏移不可信，宁可退回丢弃。
  *
- * ⚠️ **`/N` 长名引用不再算"认不出的形态"**（2026-10-07 订正：原文把它与"非标准填充"并列，
- * 那是错的 —— `/N` 是 GNU/SVR4 ar 的**标准**长名引用写法，只是本函数按 `name` 字面量判而已，
- * 各成员头的 60 字节布局与它无关）。合法归档里它到不了这里：`archive_strip_scan` 会在**所有**
- * 成员上判完 >15 字节的长名（判据与顺序无关，见那里的说明），命中的库整库静默跳过。
- * 于是走到这里只可能是那张 `//` 表**解析不出真名**（悬空/损坏的引用）—— 那种库确实是畸形，
- * 调用方的"Static library is malformed"是**如实**的。
+ * ⚠️ **`/N` 长名引用不算"认不出的形态"**（`/N` 是 GNU/SVR4 ar 的**标准**长名引用写法，
+ * 只是本函数按 `name` 字面量判而已，各成员头的 60
+ * 字节布局与它无关）。合法归档里它到不了这里：`archive_strip_scan` 会在**所有** 成员上判完 >15
+ * 字节的长名（判据与顺序无关，见那里的说明），命中的库整库静默跳过。 于是走到这里只可能是那张 `//`
+ * 表**解析不出真名**（悬空/损坏的引用）—— 那种库确实是畸形， 调用方的"Static library is
+ * malformed"是**如实**的。
  */
 static ArRawLayout scan_ar_raw_layout(const fs::path& path, uint64_t file_size)
 {
@@ -1265,7 +1259,7 @@ static std::vector<uint8_t> build_gnu_ar_index(bool sym64, const std::vector<ArI
     // 先算总长、一次性分配、按偏移写入 —— 与"反复 push_back/insert 增长"逐字节等价，
     // 但**不触发 gcc 13 的 `-Wstringop-overflow` 误报**：`_GLIBCXX_ASSERTIONS`（build.conf
     // 默认带）会把 vector 的 insert/push_back 内联成检查版，gcc 13.2.1 据此算出"往大小为 0
-    // 的区域写 2..SIZE_MAX 字节"的伪告警（实测：同一份源码 gcc 13.2.1 报错、gcc 16.2.0 干净；
+    // 的区域写 2..SIZE_MAX 字节"的伪告警（同一份源码 gcc 13.2.1 报错、gcc 16.2.0 干净；
     // 单独 `-D_GLIBCXX_ASSERTIONS` 即可触发，`-Werror` 下变成硬失败）。
     const std::vector<uint8_t> offs = serialize_ar_offsets(sym64, offsets);
     const uint32_t n = static_cast<uint32_t>(entries.size());
@@ -1300,7 +1294,7 @@ static std::vector<uint8_t> build_gnu_ar_index(bool sym64, const std::vector<ArI
  * 见上面那段"归档符号索引"的说明；**别退回"干脆丢掉索引"**（那是非正常形态，也偏离 binutils
  * 同档位的行为）。
  *
- * 会造成偏移改变的有两种，**判据必须两个都看**（2026-10-02 只看了前者）：
+ * 会造成偏移改变的有两种，**判据必须两个都看**：
  *   ① 有 `.o` 成员在 strip 后**变短**（预扫的 `scan == 1`）；
  *   ② 归档里有 `//` 长名表 —— 它恒定被丢弃（见下），其后成员整体前移。
  * ② 正是"外来/构造归档"能钻的空子：一张没人引用的 `//` 表配上有效的 `/` 索引，成员没变短
@@ -1413,11 +1407,11 @@ bool process_archive(const fs::path& path, std::string& error_msg)
     archive_write_set_format_ar_svr4(out);
 
     fs::path temp_path = path.string() + ".tmp";
-    // **暂存路径不得是符号链接（2026-10-05 修）**：`archive_write_open_filename` 走的是
+    // **暂存路径不得是符号链接**：`archive_write_open_filename` 走的是
     // `open(O_CREAT|O_WRONLY|O_TRUNC)`，**跟随**末段链接 —— 构建树里若有一个
     // `usr/lib/libfoo.a.tmp` 指向别处（上游产物、配方留下的链接、上一次构建的残留都可能），
     // 本进程（root）会把整份新归档写进那个链接的**目标**；随后收尾的
-    // `safe_rename(temp_path, path)` 又把**链接本身**改名成 `.a`。实测（修前跑
+    // `safe_rename(temp_path, path)` 又把**链接本身**改名成 `.a`。（修前跑
     // `StripTest.ArchiveTmpPathSymlinkIsRefusedNotFollowed`）：链接目标里赫然是
     // `!<arch>\n…` 整份归档，而 `fs::is_symlink(<lib>.a)` 为真。仓库对
     // `.lpkgtmp` 有同款守卫（`pkg/install_common.cpp` 的 `refuse_symlink_tmp_path`）——
@@ -1441,13 +1435,13 @@ bool process_archive(const fs::path& path, std::string& error_msg)
     struct archive_entry* entry;
     // 逐成员读到 EOF。**不能**用 `== ARCHIVE_OK` 当循环条件：那样第一个 WARN/FATAL 成员
     // 就静默结束循环，若碰巧是首成员则写出一个**空归档**，随后照样 rename 覆盖掉原 `.a`
-    // —— 静态库被悄悄清空、构建还报成功（2026-10-02 实测复现：50+ 字节的畸形 ar 变成
+    // —— 静态库被悄悄清空、构建还报成功（50+ 字节的畸形 ar 变成
     // 8 字节 `!<arch>\n`，`strip_binary` 连告警都不打）。任何非 OK ⇒ 丢弃临时文件、
     // 保留原库、返回 false（调用方 `strip_binary` 只告警，绝不因此失败整个构建）。
     //
     // 收尾统一走 `bail()`：**必须填 `error_msg`** —— 调用方的告警判据是
     // `!strip_file(...) && !error_msg.empty()`，此前这些分支一个都不设它，于是**任何失败
-    // 都不出声**（实测：成员名超过 15 字节的静态库整库静默不剥离，谁也不告诉）。
+    // 都不出声**（成员名超过 15 字节的静态库整库静默不剥离，谁也不告诉）。
     const auto bail = [&]() {
         if (error_msg.empty()) error_msg = get_string("error.strip_archive_broken");
         archive_read_free(a);
@@ -1537,12 +1531,12 @@ bool process_archive(const fs::path& path, std::string& error_msg)
         }
     }
 
-    // **完整性判据（2026-10-02）**：libarchive 的 ar 读取器在"magic 之后读不出成员头"时
-    // **不报错**，而是直接返回 ARCHIVE_EOF（实测：`!<arch>\n` + 54 字节垃圾 与 合法的 8 字节
+    // **完整性判据**：libarchive 的 ar 读取器在"magic 之后读不出成员头"时
+    // **不报错**，而是直接返回 ARCHIVE_EOF（`!<arch>\n` + 54 字节垃圾 与 合法的 8 字节
     // 空归档，两者 next_header 都立即 EOF、成员数都是 0）—— 于是整个库被吞掉、写出一个
-    // **空归档**、rename 覆盖原文件、返回 true（端到端实测：`lpkg build` 报成功，`.lpkg` 里
+    // **空归档**、rename 覆盖原文件、返回 true（`lpkg build` 报成功，`.lpkg` 里
     // 的 `.a` 只剩 8 字节）。判据取"**解析器有没有把整个文件消费掉**"：合法归档在 EOF 时
-    // `filter_bytes == 文件大小`（实测 1370→1370、2668→2668；畸形的是 8→62）。
+    // `filter_bytes == 文件大小`（1370→1370、2668→2668；畸形的是 8→62）。
     // 任何未消费的尾部 = 我们读不懂的内容 = 不能悄悄丢掉。
     const la_int64_t consumed = archive_filter_bytes(a, -1);
     archive_read_free(a);
@@ -1609,7 +1603,7 @@ bool process_archive(const fs::path& path, std::string& error_msg)
         return true;
     } catch (const std::exception&) {
         fs::remove(temp_path);
-        // 拒绝必须带原因（同上：空串 = 调用方静默跳过）。2026-10-03 修。
+        // 拒绝必须带原因（同上：空串 = 调用方静默跳过）。
         error_msg = get_string("error.strip_archive_broken");
         return false;
     }
@@ -1619,7 +1613,7 @@ bool process_archive(const fs::path& path, std::string& error_msg)
  * 对二进制文件执行 strip 操作
  * 失败时仅记录警告而不中断流程
  *
- * （2026-09-26 从 `base/utils.cpp` 搬来：见 `strip.hpp` 里的说明 —— 它属于本层。）
+ * （从 `base/utils.cpp` 搬来：见 `strip.hpp` 里的说明 —— 它属于本层。）
  */
 void strip_binary(const fs::path& path)
 {

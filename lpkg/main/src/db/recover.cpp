@@ -97,16 +97,15 @@ static std::optional<std::vector<std::string>> read_wal_lines(const std::string&
 }
 
 /**
- * WAL 的批次配对情况 —— **前向 depth 记账的唯一实现**。
+ * WAL 的批次配对情况 —— 前向 depth 记账的唯一实现。
  *
- * 三处曾各写一份：continue_post_commit_cleanup、recover_packages、trim_completed。
- * 现在只有这里定义"什么是未提交区域"，其余各处都读它的结果。
+ * 只有这里定义"什么是未提交区域"，其余各处都读它的结果。
  *
  * "未提交区域起点"必须是**第一个**未配对 BEGIN_PKGS，而不是最后一个：一次崩溃可能留下
  * **两个**未提交批次（前一批回滚自身失败后同进程又开了新批次），按"最后一个"裁剪/回滚会让
  * 更早那批的 BEGIN/BACKUP 行被当成已完成内容处理 —— 恢复依据就此消失；而且已提交批次的行
- * 仍留在 WAL 里、下一轮扫描的起点仍落在它上面，更早那批永远轮不到（实测两轮下来文件一次都
- * 没被还原，历史 TODO.md X6/Z5）。配对成功的批次（depth 回到 0）即清空起点。
+ * 仍留在 WAL 里、下一轮扫描的起点仍落在它上面，更早那批永远轮不到（两轮下来文件一次都
+ * 没被还原）。配对成功的批次（depth 回到 0）即清空起点。
  */
 struct BatchPairing {
     ssize_t unpaired_begin = -1;  // **第一个**未配对 BEGIN_PKGS 的行号；-1 = 无未提交区域
@@ -121,7 +120,7 @@ struct BatchPairing {
     //
     // 这种形状从哪来：`rollback_uncommitted_region` 在"有撤销动作真的没成功"时**故意不 seal**
     // （留给下次 rec 重做），而 `init_database_for` 不返回恢复成败、同进程继续执行用户命令 ⇒
-    // 新批次在未封口的 WAL 上开了。2026-10-03 起 `run_batch_transaction` 入口加了守卫堵住这条
+    // 新批次在未封口的 WAL 上开了。`run_batch_transaction` 的入口守卫堵住了这条
     // 产生路径；这里保留跳过逻辑，是为了**已有现场**（旧二进制留下的 WAL）也不被误回滚。
     std::vector<bool> committed_line;
 
@@ -182,7 +181,7 @@ static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
     // 1. 定位：**第一个**未配对 BEGIN_PKGS（未提交区域起点）与最后一个 COMMIT_PKGS。
     //
     //    夹在两个未提交批次之间的 bak 属于**还没还原**的前一批，若按"已提交区域"删掉就是
-    //    永久丢文件（历史 TODO.md X6）；配对记账的语义见 scan_batch_pairing 的说明。
+    //    永久丢文件；配对记账的语义见 scan_batch_pairing 的说明。
     const BatchPairing pairing = scan_batch_pairing(lines);
     const ssize_t unpaired = pairing.unpaired_begin;
     const ssize_t last_commit = pairing.last_commit;
@@ -227,7 +226,7 @@ static void continue_post_commit_cleanup(const std::vector<std::string>& lines)
         // 也正是靠"父目录名以 `.lpkg_bak_` 开头"判它是不是 stash 根。而被篡改/损坏的 WAL 里
         // 一条 `CLEANUP /etc` 会让它**原样返回**那个路径（父目录名不匹配），于是这里就
         // `remove_all("/etc")` —— 这条清理路径**不经过** `reverse_execute` 的 confinement，
-        // 它是另一个 WAL 消费者（2026-10-03 修，见 test_wal_confinement.cpp 的
+        // 它是另一个 WAL 消费者（见 test_wal_confinement.cpp 的
         // PostCommitCleanupDoesNotRemoveNonStashTargets）。
         //
         // 判据用**名字**而不是"落在 root 内"：生产形态 `root=="/"` 下包含判定**恒真**、拦不住
@@ -351,7 +350,7 @@ void recover_packages()
         rollback_uncommitted_region(lines, static_cast<size_t>(unpaired_begin), pairing);
 
     // 4. 清理残留的 .lpkg_db_bak_before:* 备份文件。
-    //    有批次恢复失败时**跳过**：那些备份是重试还原 DB 的唯一依据（历史 TODO.md A3 同理）。
+    //    有批次恢复失败时**跳过**：那些备份是重试还原 DB 的唯一依据。
     if (!any_batch_failed) cleanup_db_backups();
 }
 
@@ -477,8 +476,7 @@ void trim_completed()
  * 配对判定复用 scan_batch_pairing（唯一实现），**行读取与规范化也复用 read_wal_lines**
  * （同一个唯一实现）。
  *
- * ⚠️ **订正 2026-09-26：原先这里刻意"原样收集行、不剥 \r"，理由是"守卫的答案不该取决于行的
- * 规范化"。实测表明那个理由**站反了** —— 不剥 \r 给出的答案在**危险的那一侧**：
+ * ⚠️ **行必须剥 `\r`** —— 不剥给出的答案落在**危险的那一侧**：
  *
  *   · `BEGIN_PKGS` / `COMMIT_PKGS` 是**裸行**（`begin_batch()` → `w.log("BEGIN_PKGS")`、
  *     `commit_batch()` → `log_wal_line("COMMIT_PKGS")`，**不带任何载荷**）。
@@ -532,7 +530,7 @@ void cleanup_db_backups()
     // man 备份由 write_string_file_wal 写在 docs/ 目录（state_dir 之外），
     // 漏扫会导致每次安装/升级都残留 *.man.lpkg_db_bak_before:* 文件。
     //
-    // ⚠️ 三个坑（2026-10-02 一起修）：
+    // ⚠️ 三个坑：
     //   · **单个删除失败不能中断整轮**：此前删除与迭代器共用同一个 `ec`，一个删不掉的
     //     备份（EACCES/EROFS/immutable）会让下一轮 `if (ec) break` 直接跳出，该 base 下
     //     **其余备份全被跳过**。
@@ -542,7 +540,7 @@ void cleanup_db_backups()
     //   · 删除失败的备份**保留**（下次再试），只记一条警告。
     for (const fs::path& base : {Config::instance().state_dir(), Config::instance().docs_dir()}) {
         // 判定不抛（ELOOP 会让 fs::exists 抛，见 base/path_predicates.hpp
-        // 的谓词说明）；仍用**跟随** 语义（原来是 exists + is_directory），状态目录可以是符号链接。
+        // 的谓词说明）；仍用**跟随** 语义（状态目录可以是符号链接）。
         if (!is_directory_follow(base)) continue;
 
         std::error_code walk_ec;

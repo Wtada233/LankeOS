@@ -11,7 +11,6 @@ namespace
 
 /// 符号版本名的字符集：`[A-Za-z0-9_.+-]`（GLIBC_2.40 / GLIBCXX_3.4.30 / CXXABI_1.3.11 / QT_6 …）。
 /// `-` 与 `+` 也允许（见下）；其余字符一律拒，把拼错的规格挡在读入处。
-/// ⚠️ **订正 2026-10-05**：原文写字符集是 `[A-Za-z0-9_.]`（漏了 `-` / `+`），与实现不符。
 bool symbol_ok(std::string_view s)
 {
     if (s.empty()) return false;

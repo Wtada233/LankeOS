@@ -22,12 +22,10 @@ std::mutex g_out_mutex;
 
 /// 进度条**最少**保留的列数 —— `progress_frame()` 用它给条留位置。
 ///
-/// 2026-10-03 修：这个常量原先写着 20 却**从来没被引用过**，而实现里硬编的是 **12**
-/// （同一件事两处表达、其中一处是死的 —— 改一处不改另一处不会有任何编译错误）。
-/// 现在它是**唯一出处**：取实现既有的 12（那是有意的，见 `progress_frame` 里的注释），
-/// 不是常量上原来写的 20 —— 常量上的数字从来没生效过。
-/// 是 `make tidy` 第一轮跑出来的（`clang-diagnostic-unused-const-variable`；
-/// gcc 的 `-Wall -Wextra` 对 C++ 里文件作用域未使用的 const 变量**不报**）。
+/// 取 `progress_frame` 里既有的实现值 **12**；唯一出处 —— 同一件事两处表达时，
+/// 改一处不改另一处不会有任何编译错误。由 `make tidy` 抓出
+/// （`clang-diagnostic-unused-const-variable`；gcc 的 `-Wall -Wextra` 对 C++ 里文件作用域
+/// 未使用的 const 变量**不报**）。
 constexpr int kMinBarCols = 12;
 
 /// 一行可用的总列数：留最后一列不打（不然很多终端会在写满时自动换行）。
@@ -244,7 +242,7 @@ std::string human_size(std::uint64_t bytes)
 std::string human_rate(double bytes_per_sec)
 {
     // 非有限值（±Inf/NaN）与 0/负数走同一条"算不出来"的路：`static_cast<uint64_t>` 对
-    // Inf **和**出界的有限值都是未定义行为（2026-10-03）。输入来自下载回调的速率。
+    // Inf **和**出界的有限值都是未定义行为。输入来自下载回调的速率。
     if (!(bytes_per_sec > 0.0) || !std::isfinite(bytes_per_sec)) return "-";
     constexpr double kMaxBytes = 9e18;  // < 2^64，给转换留余量
     if (bytes_per_sec > kMaxBytes) bytes_per_sec = kMaxBytes;
@@ -437,10 +435,10 @@ void Line::progress(double percent, std::string mid)
     // 版式全部交给 `progress_frame()`（纯函数、可测）：信息段固定 60%、进度条固定占剩下的
     // 部分 —— 同一终端上**每一行的条一样长**，多行叠起来右端是齐的（pacman 的口径）。
     //
-    // ⚠️ `mid` **按值收是有意的**（2026-10-03 修）：它曾经是 `std::string_view`，而
-    // `finish_progress()` 恰好把 `last_mid_` **自己**当视图喂回来 —— 下面那句赋值会把
+    // ⚠️ `mid` **按值收是有意的**：它**不能**是 `std::string_view` ——
+    // `finish_progress()` 恰好把 `last_mid_` **自己**当视图喂回来，而下面那句赋值会把
     // `last_mid_` 的旧缓冲清空（首字节写 `\0`），于是紧接着 `progress_frame()` 透过那个
-    // 视图读到的就是**同一块已被改过的内存**。实测症状：解压行的最后一帧把 mid 印成
+    // 视图读到的就是**同一块已被改过的内存**。症状：解压行的最后一帧把 mid 印成
     // `"\0" + "63.3 KiB / 863.3 KiB"`（原本是 `863.3 KiB / 863.3 KiB`）—— 终端丢弃那个
     // NUL，整行比别的行**少一列**、`863.3` 显示成 `63.3`。
     //
@@ -496,7 +494,7 @@ void section(std::string_view title)
 {
     // pacman 风格：`:: <标题>`。走 `log_info` 是为了与普通信息行**同形同色**
     // （`info.log_prefix` + 同样的着色），不另立一套分割符 —— 早期版本打的是
-    // `====== title ======`，用户明确要求换成 pacman 的 `::`。
+    // `====== title ======`。
     log_info(title);
 }
 

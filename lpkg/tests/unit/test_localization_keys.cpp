@@ -32,7 +32,7 @@ std::set<std::string> keys_of_l10n_file(const fs::path& p)
  * 比 `extract_keys_from_source` 更宽松 —— 它不要求字面量紧跟 `get_string(`/`string_format(`：
  * 键经常是**当参数传**的（`reject("error.unsafe_member_control")`、
  * `log_summary("info.remove_summary", …)`、`print_depend_trees(args, "info.depend_remove_header",
- * …)`）， 那种写法前缀正则一个都匹配不到（2026-10-03 实测：按前缀正则做"死键"检查会误报 10
+ * …)`）， 那种写法前缀正则一个都匹配不到（按前缀正则做"死键"检查会误报 10
  * 个在用键）。
  *
  * ⚠️ 代价：**注释里提到某个键也算"用过"**。这对"死键"检查够用 —— 它要抓的是
@@ -138,7 +138,7 @@ TEST_F(L10nIntegrityTest, AllSourceKeysExistInTranslations)
  * **反向检查：不许有"死键"**。
  *
  * 删功能/换文案时很容易只把调用点删掉、把 l10n 行留下：它们不会报错、不会显示，只会**永远**
- * 躺在两个语言文件里，让人误以为"这个键在某个分支上用着"。2026-10-03 一次扫出 22 个这样的
+ * 躺在两个语言文件里，让人误以为"这个键在某个分支上用着"。曾一次扫出 22 个这样的
  * 遗留（`info.rollback_debug_*`、`error.upgrade_failed`、`warning.circular_dependency` …——
  * 全是**手动解析依赖时代**的残骸），外加一个只存在于 zh 的行。
  *
@@ -167,7 +167,7 @@ TEST_F(L10nIntegrityTest, NoOrphanKeysInTranslations)
  * **中英键集合必须一致**（少一个 key 会让那种语言悄悄退化成 `[MISSING_STRING: …]`，
  * 而英文兜底会让它更难被发现）。
  *
- * 2026-10-03 实测存在一条只写在 `zh.txt` 的 `error.installation_failed_rolling_back`
+ * 曾有一条只写在 `zh.txt` 的 `error.installation_failed_rolling_back`
  * （代码里从未引用过），已删。
  */
 TEST_F(L10nIntegrityTest, EnglishAndChineseHaveIdenticalKeySets)

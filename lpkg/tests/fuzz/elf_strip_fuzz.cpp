@@ -1,14 +1,14 @@
 // harness #1：`elf/strip.cpp` 的 strip_elf_data()。
 //
 // 为什么是它：`strip_elf_data` 手写 ELF 节区重写 —— 用 `reinterpret_cast<Hdr*>` 就地把输入
-// 头/节区表改掉（`strip.cpp:573-598`），memcpy 长度直接取 `sh_size`（:553-554）。输入是
-// **不可信上游构建产物**（`builder.cpp:197` 对 staging 下每个 magic 命中的文件调它；
-// `lib_utils.hpp:11-12` 明写"上游构建产物（不可信输入）"）。这条路径上已经真出过一个
-// ASan heap-buffer-overflow（`e_ehsize` 那条守卫，`strip.cpp:393-397` 就是为它加的）。
+// 头/节区表改掉（`strip.cpp`），memcpy 长度直接取 `sh_size`（:553-554）。输入是
+// **不可信上游构建产物**（`builder.cpp` 对 staging 下每个 magic 命中的文件调它；
+// `lib_utils.hpp` 明写"上游构建产物（不可信输入）"）。这条路径上已经真出过一个
+// ASan heap-buffer-overflow（`e_ehsize` 那条守卫，`strip.cpp` 就是为它加的）。
 //
 // oracle 只有一条：**返回 true ⇒ 输出必须仍是 libelf 能解析的合法 ELF，且
 // class/data/type/machine 逐项与输入一致**。不断言"符号变少""节区数"这类语义 —— 那是 strip
-// 的功能，不是不变量，而且合法的 strip 产物本来就可以没有节区表（`strip.cpp:663` 正是
+// 的功能，不是不变量，而且合法的 strip 产物本来就可以没有节区表（`strip.cpp` 正是
 // "无节区 = 无事可做"，它走的是返回 false）。
 
 #include <elf.h>
@@ -23,13 +23,12 @@
 
 #include "fuzz_common.hpp"  // mem_trace（LPKG_FUZZ_MEM_TRACE=1 时开）
 
-// `strip_elf_data` 是**外部链接**的（`strip.cpp:612`），但任何头文件里都没有声明
+// `strip_elf_data` 是**外部链接**的（`strip.cpp`），但任何头文件里都没有声明
 // （`strip.hpp` 只导出 `strip_file` / `strip_binary`），所以在这里自己声明一次。
 // **签名必须与 strip.cpp 里那份逐字一致**，改那边要同步这里。
 //
-// ⚠️ 2026-10-05：新增第 4 个参数 `source_path`（只为让 `error.strip_output_grew` 这条
-// 错误能点名文件）。此前 main/src 不允许改动，这里只能声明 3 参、由 strip.cpp 侧保留一个
-// 3 参重载转发；现在两边**同步到同一个签名**，重载已删 —— 别再留第二个签名。
+// ⚠️ 第 4 个参数 `source_path` 只为让 `error.strip_output_grew` 这条错误能点名文件 ——
+// 两边**同步到同一个签名**，别再留第二个签名。
 bool strip_elf_data(const std::vector<uint8_t>& input_data, std::vector<uint8_t>& output_data,
                     std::string& error_msg, const std::string& source_path);
 
@@ -51,7 +50,7 @@ bool parses_as_elf(const std::vector<uint8_t>& bytes, GElf_Ehdr& out_hdr)
 /// oracle 违反 —— **先把原因打到 stderr 再崩**。
 ///
 /// 为什么必须先打：`__builtin_trap()` 出的是 SIGILL，而 ASan 的信号处理器打印的是**处理器
-/// 自己**的栈 —— 触发点会丢（实测：栈里只剩 `__sanitizer_print_stack_trace`/`PrintStackTrace`
+/// 自己**的栈 —— 触发点会丢（栈里只剩 `__sanitizer_print_stack_trace`/`PrintStackTrace`
 /// 那几帧，一条我们自己的帧都没有）。没有这行输出，四个断言点炸出来长得一模一样。
 /// stderr 是**没有**被静音的（见 fuzz_common.hpp 的说明）。
 ///
@@ -66,7 +65,7 @@ bool parses_as_elf(const std::vector<uint8_t>& bytes, GElf_Ehdr& out_hdr)
 
 extern "C" int LLVMFuzzerInitialize(int*, char***)
 {
-    // libelf 的版本是进程级的一次性初始化；`strip_elf_data` 内部也会调（`strip.cpp:618`），
+    // libelf 的版本是进程级的一次性初始化；`strip_elf_data` 内部也会调（`strip.cpp`），
     // 这里先调一次只是让 oracle 那侧不依赖调用顺序。
     elf_version(EV_CURRENT);
     return 0;
@@ -76,7 +75,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 {
     mem_trace(data, size, "elf_strip");  // 定因用：跳变时把当前输入落盘（默认关闭）
 
-    // 空输入是**有意保留**的形态：`strip.cpp:623` 会拿 `input_data.data()`（空 vector 时
+    // 空输入是**有意保留**的形态：`strip.cpp` 会拿 `input_data.data()`（空 vector 时
     // 可能是 nullptr）和长度 0 去调 `elf_memory`。
     std::vector<uint8_t> input(data, data + size);
     std::vector<uint8_t> output;
@@ -84,7 +83,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 
     // 路径只影响错误消息的措辞（本 harness 不读 error_msg），给个固定名即可。
     if (!strip_elf_data(input, output, error_msg, "<fuzz-input>")) {
-        // 拒绝是正常结局。注意**不能**在这里断言 error_msg 非空：`strip.cpp:663`
+        // 拒绝是正常结局。注意**不能**在这里断言 error_msg 非空：`strip.cpp`
         // （`shnum == 0`）是有意的静默跳过，false 时 error_msg 就是空的。
         return 0;
     }

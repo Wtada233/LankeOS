@@ -44,7 +44,7 @@ lankebuild_build() {
     # 手工跑 unix/configure 把我们完整的 CFLAGS 传进去 —— configure 据此探测平台并生成
     # flags 文件（顺手打开 BZIP2/LARGE_FILE/UNICODE 支持），随后 make generic 读该文件。
     # 不能只 make generic：那样 configure 通过 `flags` 目标只收到 CFLAGS_NOOPT（= -I. -DUNIX），
-    # 生成的 flags 里 CFLAGS 就没有我们的 -O2/-Wall/加固 flag（旧配方即如此，实测只剩
+    # 生成的 flags 里 CFLAGS 就没有我们的 -O2/-Wall/加固 flag（只剩
     # `-I. -DUNIX -O3`，-O3 还是 configure 自己塞的，且 LDFLAGS 全丢）。
     # 也不用 generic_gcc：它把 CC=gcc 硬写在子 make 命令行上，会压掉从外面传的 CC。
     # LDFLAGS 走环境变量：0009 让 configure 把它写进 flags 的 LFLAGS1（链接期才生效）。

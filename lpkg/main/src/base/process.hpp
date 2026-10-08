@@ -7,21 +7,15 @@
 
 // ============ 日志输出 ============
 
-/** 输出普通信息日志 */
 void log_info(std::string_view msg);
-/** 输出警告日志 */
 void log_warning(std::string_view msg);
-/** 输出错误日志 */
 void log_error(std::string_view msg);
-// 进度条 / 单行状态 / 阶段分隔条走 `ui/term.hpp`（`ui::Line` / `ui::section`）——
-// 原先这里有个只在 TTY 生效的 `log_progress`，它只会画一条固定宽度的裸进度条、
-// 不带字节/速率，且无法原地收尾（`[OK]`）；2026-10-03 由 `ui::Line` 取代。
 
 // ============ 进程执行 ============
 
-/** 执行外部命令（参数列表形式） */
+/// 参数列表形式。
 int run_command(const std::vector<std::string>& args, const std::filesystem::path& work_dir = "");
-/** 执行外部命令（Shell 字符串形式） */
+/// Shell 字符串形式。
 int run_shell(const std::string& cmd, const std::filesystem::path& work_dir = "");
 
 /**
@@ -34,7 +28,7 @@ int run_shell(const std::string& cmd, const std::filesystem::path& work_dir = ""
  * 为什么必须有它：外部触发器命令（`systemctl daemon-reload` /
  * `glib-compile-schemas /usr/share/glib-2.0/schemas` / `gtk-update-icon-cache`）里写的是
  * 绝对路径。`lpkg --root /mnt/base install ...` 时若不 chroot，它们会**打在宿主上**，
- * 目标 root 反而没更新（历史 TODO F3）。
+ * 目标 root 反而没更新。
  */
 int run_shell_in_root(const std::string& cmd);
 
@@ -51,10 +45,10 @@ int run_shell_in_root(const std::string& cmd);
  */
 bool read_line_interruptible(std::string& out);
 
-/** 向用户请求确认（非交互模式自动返回 true） */
+/// 非交互模式自动返回 true。
 bool user_confirms(const std::string& prompt);
 
 // ============ 系统检查 ============
 
-/** 检查是否以 root 权限运行，非 root 则退出 */
+/// 非 root 则退出。
 void check_root();

@@ -6,7 +6,7 @@
  * libelf 在**三种**情况下对 elf_strptr 返回 NULL：offset 越出 .dynstr、sh_link 指向的不是
  * SHT_STRTAB、目标节区不存在（efllutils 的 libelf_strptr.c：先查 sh_type != SHT_STRTAB →
  * ELF_E_NOT_A_STRING，再查 offset >= data->d_size → ELF_E_INVALID_OFFSET，两条都 return NULL）。
- * 把 NULL 直接赋给 std::string 是 UB：libstdc++ 下等价 strlen(nullptr) → SIGSEGV（实测 gcc -O2
+ * 把 NULL 直接赋给 std::string 是 UB：libstdc++ 下等价 strlen(nullptr) → SIGSEGV（gcc -O2
  * 编译的旧代码在这两个用例上 exit=139）。
  *
  * 危害面：get_elf_soname 对 `usr/lib` 下**每个** ELF 调用（安装期的 ldconfig 触发器
@@ -14,7 +14,7 @@
  * .so 就能让打包/安装进程在事务中途段错误。修复后与 strip.cpp 对同一 API 的判空（
  * `name_ptr ? name_ptr : ""`）对齐。
  *
- * 本文件钉住的不变量：
+ * 本文件固定的不变量：
  *   ① 手搓 ELF 的节区遍历/gelf_getdyn/elf_strptr 这条**取值路径确实走通**（正向对照）——
  *      否则"返回空串"的三条断言会因为"整只 ELF 压根没被解析"而恒真（假绿）；
  *   ② d_val 越出 .dynstr → 返回空串，不崩；

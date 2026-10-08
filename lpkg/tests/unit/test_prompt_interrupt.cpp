@@ -1,14 +1,14 @@
 /**
  * test_prompt_interrupt.cpp — **输入等待期间 Ctrl+C 必须有效**
  *
- * 现象（2026-10-03 修）：`lpkg force-solve-conflict` 的确认短语、`lpkg remove -r` 的三轮验证码
+ * 现象：`lpkg force-solve-conflict` 的确认短语、`lpkg remove -r` 的三轮验证码
  * 用**裸** `std::getline(std::cin, …)` / `std::cin >> x` 读输入 —— 而 glibc 下 `std::signal()`
  * 装的 handler 带 `SA_RESTART`，被打断的 `read(2)` 会被**自动重启**（iostreams 也会重试）。
  * 于是 Ctrl+C 只把 `sigint_graceful` 置位、打印一句提示，进程**仍旧卡在输入上**：
  * 用户看到的就是"**Ctrl+C 无效，只能 kill -9**"。
  *
  * 修法：唯一的读取实现 `read_line_interruptible()`（base/utils.cpp）——100ms 轮询，
- * 每轮先看 `sigint_graceful`。本文件钉住它，**并且钉住"必须会红"的那一条**：
+ * 每轮先看 `sigint_graceful`。本文件覆盖它，**并且覆盖"必须会红"的那一条**：
  * 若退回裸 `std::cin`，`CtrlC...ReturnsInsteadOfHanging` 会**永久挂起**（不是变红那么简单）。
  *
  * 用 dup2 把管道接到 fd 0 上造输入；用线程在读取过程中置标志 —— 这正是"读取中途按 Ctrl+C"

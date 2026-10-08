@@ -27,8 +27,8 @@ CORPUS=tests/fuzz/corpus
 rm -rf "$BUILD"
 # 暂存语料目录**按 harness 名派生**（与下面的构建目标同一套推导）：加 harness 不必回来改这里。
 # （libFuzzer 要求"第一个语料目录"必须存在，否则直接报 `required directory ... does not exist`
-# 并退出 —— 实测就是这么发现漏建的。）
-# **每次跑先清空容器内的产物目录**（2026-10-04 加）。理由：`docker cp` 是整目录拷贝，
+# 并退出。）
+# **每次跑先清空容器内的产物目录**。理由：`docker cp` 是整目录拷贝，
 # 而 `lpkg-builder` 容器是长期存活的 —— 不清的话上一轮的崩溃样本会被留在那儿，
 # 于是 ① `fuzz-collect` 的"有崩溃样本"**被旧文件误触发**（看起来本轮又红了，其实没有），
 # ② 旧 reproducer 会一直堆着、没人知道它对应哪一轮。产物本来就是**一次性**的
@@ -41,7 +41,7 @@ done
 
 echo "fuzz: 容器内构建（clang + libFuzzer/ASan/UBSan，构建树 $BUILD/）..."
 # 构建目标**从源文件自动推导**：加一个 harness 只要往这里的 `*_fuzz.cpp` 放一个文件，
-# 不必回来改这行（实测踩过：Makefile 里加了名字、这行还写着旧的两个 ⇒ 新 harness 压根
+# 不必回来改这行（Makefile 里加了名字、这行还写着旧的两个 ⇒ 新 harness 压根
 # 没编出来，要到"跑"那一步才报"没有那个文件"）。
 targets=""
 for src in tests/fuzz/*_fuzz.cpp; do
@@ -66,7 +66,7 @@ run_one() {
     # 一个**空的** libFuzzer harness 也照样漏（对照实验：`clang++ -fsanitize=fuzzer,address` 编一个
     # 只 `return 0` 的 harness，跑 `-runs=1` 即复现）—— 那是 compiler-rt 的启动分配，不是 lpkg、
     # 也不是 harness。留着它会让每次跑都"报一个崩溃"，把真信号淹掉。lpkg 自身的泄漏另由
-    # `make test-sanitize` 覆盖（那条基线实测是干净的）。
+    # `make test-sanitize` 覆盖（那条基线是干净的）。
     #
     # libFuzzer 语义：**第一个**语料目录是"新单元写出处"，其余是只读种子源。
     # scratch 放 /tmp：既不污染入库种子，也不受 docker-sync 清空 /app 的影响。

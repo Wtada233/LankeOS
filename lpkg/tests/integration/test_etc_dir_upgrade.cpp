@@ -1,5 +1,5 @@
 /**
- * test_etc_dir_upgrade.cpp — `/etc` 下的**文件→目录**升级必须能成功（历史 TODO E4 的 /etc 腿）
+ * test_etc_dir_upgrade.cpp — `/etc` 下的**文件→目录**升级必须能成功
  *
  * ── 缺陷 ────────────────────────────────────────────────────────────────────
  * `InstallationTask::backup_existing_files()` 开头有一句
@@ -147,7 +147,7 @@ TEST_F(EtcDirUpgradeTest, EtcFileBecomesDirectoryUpgradeRollsBackCleanly)
 /**
  * ③ 对照：**非 `/etc`** 路径的"文件→目录"接管仍走 stash，提交后清干净、不留 `.lpkgsave`。
  *
- * 钉的是"我没有把 save_config 用过头"：`.lpkgsave` 是 /etc 配置的语义，别的路径上的
+ * 钉的是 save_config 没被用过头：`.lpkgsave` 是 /etc 配置的语义，别的路径上的
  * 挡路文件是包自己的内容，进 stash（回滚要用）并在提交后清理即可。
  */
 TEST_F(EtcDirUpgradeTest, NonEtcFileBecomesDirectoryStillUsesStash)

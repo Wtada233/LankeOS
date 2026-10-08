@@ -35,7 +35,7 @@ protected:
         init_localization();
 
         // 目录名带 PID：并发的第二个测试进程会 rm -rf 掉固定名目录（同 test_base.hpp 的
-        // `tmp_lpkg_itest`，实测产生成片 SetUp 假失败）。
+        // `tmp_lpkg_itest`，产生成片 SetUp 假失败）。
         suite_work_dir = fs::absolute("tmp_advanced_test_" + std::to_string(getpid()));
         test_root = suite_work_dir / "root";
         pkg_dir = suite_work_dir / "pkgs";
@@ -144,7 +144,7 @@ TEST_F(AdvancedPackageManagerTest, ChrootHook)
     // 正向对照：`run_hook` 的**执行点**断点（hooks 已启用、脚本确实存在、只剩 exec）。
     // 沙盒 root 里没有 /bin/bash，run_hook 会在 chroot 分支提前 return —— 钩子不会真的执行。
     // 正因如此，"没有落文件"这句若不配这个断点就是**恒真**：包不带 hook / hook 没被识别 /
-    // 钩子被禁用，都会得到"没落文件"，而它们与 root 前缀对不对无关。断点先钉住"处理确实走到
+    // 钩子被禁用，都会得到"没落文件"，而它们与 root 前缀对不对无关。断点先确认"处理确实走到
     // 了执行决策那一步"，下面的否定断言才有咬合力（同 test_hook_transaction.cpp 的取证方式）。
     bool hook_exec_point_reached = false;
     auto on_hook = [&] { hook_exec_point_reached = true; };

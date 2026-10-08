@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 ///   容器里用旧版工具即可，切断不影响 ABI 正确性。
 /// - `Group`(1)：次之。声明式重建组的排序约束，切断只是少等一轮。
 /// - `Abi`(2)：**最后切**。`needed_so` 链接边是构建序的真相——切了会让消费者先于库重建，
-///   按旧 ABI 白跑甚至编错（用户规则：build_deps 优先级在 ABI 下面）。
+///   按旧 ABI 白跑甚至编错（build_deps 优先级在 ABI 下面）。
 ///
 /// 同一对 (P→D) 同时是多种边时取**最高**优先级（宁可切别的边）。
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -39,7 +39,7 @@ use crate::ux;
 /// 强制排在触发包 `on` 之后，否则 `--all` 模式下 python-cairo 会在 python 重建前构建（容器升级时
 /// repo 还是旧 python，构建基于旧 ABI 白跑）。
 ///
-/// 参考 `lpkg/main/scripts/lankeos-world-rebuild-helper.py`（确定性 Kahn + 三色 DFS 切环）；区别：
+/// 算法是确定性的 Kahn + 三色 DFS 切环；区别：
 /// farm 增量构建，已就绪（不在 targets）的包不进图，无需全量重建。循环依赖：打印警告并切断环上
 /// **优先级最低**的边（每轮一条，确定性），保证总能给出完整顺序。
 ///
@@ -50,7 +50,7 @@ use crate::ux;
 ///
 /// **切环偏好**（`EdgeKind`）：出现环时按 **build_deps → 组边 → needed_so 链接边** 的顺序挑
 /// **位于环上**的边切断（"位于环上" = 该边回归可达，见 `find_cycle_edge`）。**只认 DFS 后向边是不够的**：
-/// 环里那条 build_deps 边可能恰好是树边（实测 `gtk4 →(BuildDep) sysprof →(Abi) libadwaita →(Abi) gtk4`，
+/// 环里那条 build_deps 边可能恰好是树边（`gtk4 →(BuildDep) sysprof →(Abi) libadwaita →(Abi) gtk4`，
 /// 从名字最小的 gtk4 起 DFS 时 `gtk4→sysprof` 就是树边）→ 挑不到它就会退切链接边 `libadwaita→gtk4`，
 /// 于是 libadwaita 先于 gtk4 构建、容器里还是旧 gtk4（4.22.4 而 libadwaita 1.10 要 ≥4.23.1）→ 直接失败。
 /// 链接边是构建序的真相（切它会让消费者先于库重建 → 按旧 ABI 白跑），**最后**才切；build_deps 环
@@ -179,7 +179,7 @@ fn add_edge(deps: &mut BTreeMap<String, EdgeKind>, d: String, k: EdgeKind) {
 /// 找一条**可切的边**：按切环偏好（build_deps → 组边 → 链接边）挑**确实位于某个环上**的边。
 ///
 /// 为什么不是"找后向边"（旧实现）：环里那条 build_deps 边完全可能是 DFS 的**树边**——
-/// 实测三角形 `gtk4 →(BuildDep) sysprof →(Abi) libadwaita →(Abi) gtk4`：DFS 从名字最小的 gtk4 起，
+/// 三角形 `gtk4 →(BuildDep) sysprof →(Abi) libadwaita →(Abi) gtk4`：DFS 从名字最小的 gtk4 起，
 /// `gtk4→sysprof` 是树边、`libadwaita→gtk4` 才是后向边 → 只认后向边就永远选不到那条构建工具边，
 /// 只能退而切链接边 → **libadwaita 排到 gtk4 前面**，容器里还是旧 gtk4（4.22.4）而 libadwaita 1.10
 /// 要求 ≥4.23.1 → configure 直接失败（真实事故）。判"在环上" = 该边回归可达（v ⇝ u）。

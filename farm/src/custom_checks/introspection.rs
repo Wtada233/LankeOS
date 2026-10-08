@@ -29,7 +29,6 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     Ok(serde_json::json!({ "files": files }))
 }
 
-/// 跑 introspectionchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let walk = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
 

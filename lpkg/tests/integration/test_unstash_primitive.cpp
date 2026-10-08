@@ -18,7 +18,7 @@
  *   B. **端到端**（`UnstashBreakpointTest`）：三个**新补的 write-ahead 断点**
  *      （`symlink_after_wal_` / `newdir_after_wal_` / `unstash_after_wal_`）各注入一次
  *      失败，断言整批回滚后盘面逐项回到批次前 —— 这三个窗口此前**根本注入不进去**
- *      （`lpkg/CLAUDE.md` §2 记着这个空档：符号链接分支与目录分支都没有断点）。
+ *      （符号链接分支与目录分支此前都没有断点）。
  */
 
 #include <gtest/gtest.h>
@@ -244,8 +244,8 @@ TEST_F(UnstashWalTest, PurgeStillRemovesConvergedStashRoots)
  *   · `symlink_after_wal_<pkg>` —— `NEW <dest>` 行已落、`create_symlink` 未做；
  *   · `newdir_after_wal_<pkg>`  —— `NEW_DIR <path>` 行已落、`create_directories` 未做；
  *   · `unstash_after_wal_<pkg>` —— `UNSTASH <bak> → <orig>` 行已落、`rename` 未做。
- * 前两个此前**根本无法注入**（符号链接/目录分支没有断点，lpkg/CLAUDE.md §2 记着这个
- * 空档）；第三个是第③步新增的窗口（`/etc` 配置"搬回来"的那一刻）。
+ * 前两个此前**根本无法注入**（符号链接/目录分支当时没有断点）；第三个是第③步新增的窗口（`/etc`
+ * 配置"搬回来"的那一刻）。
  *
  * 每个用例的取证都是三件套：断点**真的命中**（否则断言恒真）+ 失败后**整批回滚**
  * （抛 LpkgException）+ 盘面**逐项**回到批次前（形态 + 内容 + 无 stash/.lpkgtmp 残留）。
@@ -490,13 +490,12 @@ TEST_F(UnstashBreakpointTest, UnstashWindowInjectsFailureAndRollsBackSaveLpkgnew
  * 是"**搬回之前那份不在盘上**"。
  *
  * ⚠️ **观测点必须取"配置自己的搬回窗口"（`unstash_after_wal_<pkg>`），不能借别的文件的 COPY
- * 窗口** —— 2026-09-27 CI 实测踩过：三哈希 ③（`SaveLpkgnew`）下写入趟**故意**先 `un_stash`
- * 把配置搬回原位、再落 `.lpkgnew`，于是"配置此刻在不在盘上"**只取决于条目处理先后**；而
- * 条目顺序来自 `scan_content_files` 的 readdir 顺序（当时**无排序**，文件系统决定）⇒
- * 原版用例（挂在别的文件的 `copy_after_wal_<pkg>` 上）是**顺序依赖**的，同一个提交在 CI 上
- * **三跑两过一挂**（success / failure / success）。挂在配置自己的搬回窗口上则与顺序无关：
- * 那一刻 UNSTASH 行已落、rename 未做 ⇒ 盘上那份必然还没回来、stash 里必然还躺着它。
- * （`scan_content_files` 同日已排序，顺序依赖的**根**也一并去掉了。）
+ * 窗口**：三哈希 ③（`SaveLpkgnew`）下写入趟**故意**先 `un_stash` 把配置搬回原位、再落
+ * `.lpkgnew`，于是"配置此刻在不在盘上"**只取决于条目处理先后**（顺序来自
+ * `scan_content_files` 的 readdir 顺序）⇒ 挂在别的文件的 `copy_after_wal_<pkg>` 上是
+ * **顺序依赖**的。挂在配置自己的搬回窗口上则与顺序无关：那一刻 UNSTASH 行已落、rename 未做
+ * ⇒ 盘上那份必然还没回来、stash 里必然还躺着它。（`scan_content_files` 已排序，顺序依赖的
+ * **根**也一并去掉了。）
  *
  * 同一条断言的另一半（回滚保真）也在这里：注入失败后配置必须逐字节回到原位。
  */
@@ -553,8 +552,8 @@ TEST_F(UnstashBreakpointTest, ConfigIsStashedAwayUntilTheWritePassRestoresIt)
  * 状态：`conf_replace_after_wal_<pkg>` 正好落在"BACKUP 行已写、rename 已做"之后、记录写出
  * 之前，回调里把包内那份删掉 —— 正好复刻"搬走了但读不到"。
  */
-// 名字里的 "LeavesConfigInPlace" 是改前的落点；2026-09-26 起那条路径被判成废弃条目、
-// 改名成 `.lpkgsave`（见断言处的说明），所以改名以反映**不变量**而不是落点。
+// 名字里的 "LeavesConfigInPlace" 是旧落点；那条路径现被判成废弃条目、改名成 `.lpkgsave`
+// （见断言处的说明），所以改名以反映**不变量**而不是落点。
 TEST_F(UnstashBreakpointTest, VanishedPackageContentDoesNotLoseTheConfig)
 {
     const std::string pkg = "ub_vanish";
@@ -602,9 +601,9 @@ TEST_F(UnstashBreakpointTest, VanishedPackageContentDoesNotLoseTheConfig)
            "（「从未搬过」同样是 absent）";
 
     // **配置永不静默丢失**：用户那份必须能在**原位**或 `<路径>.lpkgsave` 里逐字节找回。
-    // 本用例的现场落点是后者（2026-09-26 起）：断点把**包内**那份删掉之后，这条路径在
-    // `remove_obsolete_files()` 眼里就是"新版本不再提供"的废弃条目，于是按新规则改名成
-    // `.lpkgsave`（改前它"保持原位不动"，所以这条断言当时写的是原位）。
+    // 本用例的现场落点是后者：断点把**包内**那份删掉之后，这条路径在
+    // `remove_obsolete_files()` 眼里就是"新版本不再提供"的废弃条目，于是按规则改名成
+    // `.lpkgsave`。
     // 断言的是**内容还在**这条不变量，不是它落在哪个名字上 —— 两个落点都逐字节比。
     {
         const std::string in_place = read_file(test_root / "etc/ub_vanish.conf");

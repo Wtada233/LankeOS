@@ -79,23 +79,18 @@ farm 只扫/比 `needed_so` + `provides_soname`（`build/repo.rs` 规则 3：`de
 > `Repack`（向后兼容、不是断裂，但配方陈旧要写回）；`needed_so` **任一方向**的规格变化 →
 > `Repack`。`Repack` 会用**扫描值**写回 `LankeBUILD.json`。
 >
-> ⚠️ **订正 2026-10-05**：原文写"farm 侧**只做基线归一**：`graph::so_bare()` 剥掉 `@…` 之后才建
-> 索引/查表/比较 —— 因为**扫描只会产出裸名**，而 metadata 里可能是手写的规格；逐字比较会把
-> '声明了符号版本'判成漂移（`verify` 会 repack 把它涂掉，`abi` 会误报断裂并触发传播重建）"。
-> **该前提已被推翻**：扫描**会产出**符号版本（见下一段），`needed_so`/`provides_soname` 是
-> farm 生成的；漂移判定已改为**版本级**（见上）。
-> farm **会产出**符号版本（2026-10-05 起）：`scan.rs` 读每个 ELF 的 `.gnu.version_d`（verdef：
+> farm **会产出**符号版本：`scan.rs` 读每个 ELF 的 `.gnu.version_d`（verdef：
 > 本库定义哪些版本，**跳过 BASE 节点**）与 `.gnu.version_r`（verneed：从哪个库需要哪些版本），
 > 汇总成规格串写进 `needed_so`/`provides_soname`。⚠️ `Verneed::vn_file` 是 **dynstr 偏移**不是
-> 字符串（实测踩过：直接 `to_string()` 得到 `{"11": …}`，随后被 provider 过滤成静默的空版本需求）。
+> 字符串（直接 `to_string()` 得到 `{"11": …}`，随后被 provider 过滤成静默的空版本需求）。
 > 版本名先过字符集闸（`[A-Za-z0-9_.+-]`）——**扫出来的东西必须能被 lpkg 接受**（lpkg 对非法规格
 > 是"索引里整块跳过 / 元数据里拒装"），宁可少声明也不写它不认的串。
-> 实测（2026-10-05，真实 `out/pre-8.0.0` 产物）：glibc 的 `libc.so.6` 46 个 `GLIBC_*`、
+> 真实 `out/pre-8.0.0` 产物：glibc 的 `libc.so.6` 46 个 `GLIBC_*`、
 > gcc 的 `libgcc_s.so.1@{GCC_3.0,…}`、Qt 的 `libQt6Core.so.6@{NonQt,Qt_6,…,Qt_6_PRIVATE_API}`；
 > 消费侧 python 得到 `libcrypto.so.3@{OPENSSL_3.0.0,OPENSSL_3.3.0,OPENSSL_3.4.0}` /
 > `liblzma.so.5@XZ_5.0`（单版本不加花括号）、bash 得到 `libc.so.6@{…}`。
 > 原始规格串（来自 metadata 的写法）逐字保留、不改写。
-> 历史：`provides` 与 SONAME 原是同一条目——两处全量覆写（`update_lankebuild_metadata` / `repack_with_metadata`）把扫描结果直接盖上手写值，于是**虚拟 provider 永远存不下来**（真实仓库 861 个包的 `provides` 曾 100% 是 SONAME）。拆分后扫描只写 `needed_so`/`provides_soname`，`provides` 原样保留。
+> **`provides` 与 SONAME 是两条独立条目**——两者合一则全量覆写（`update_lankebuild_metadata` / `repack_with_metadata`）会用扫描结果盖掉手写值，**虚拟 provider 存不下来**。扫描只写 `needed_so`/`provides_soname`，`provides` 原样保留。
 
 ## 4. build 调度（run_build）
 
@@ -111,15 +106,15 @@ farm **不再 spawn `sudo`/`tar`/`zstd` CLI**——解包走 `zstd`+`tar` Rust c
 2. **增量选择**：`--all` 时用 `needs_build`（配方 effective_version vs 旧索引）跳过一致的包；指定 `pkg` 强制重建。
 
 > **有效版本的拼法**（`build/repo.rs` 的 `effective_version`）：`version` 有 `release` 时拼成
-> **`<version>-<release>`** —— 8.0.0 起分隔符是 `-`（rpm 的 release 语义），**不再是 `+`**。
+> **`<version>-<release>`** —— 分隔符是 `-`（rpm 的 release 语义），**不再是 `+`**。
 > lpkg 现在把版本串原样交给 libsolv，`+N` 在 rpm 里只是普通字符（会被当成"版本里多了一段"），
 > 排序与 release 语义都会错。farm 侧的版本比较（`track/vercmp.rs`）也同步换成了 **rpm EVR
 > 语义的 libsolv 移植**，用 `tests/fixtures/vercmp_rpm.txt`（期望值由真 libsolv 生成）逐值对齐。
 3. **拓扑排序**：`sched::topo_order` 按 **needed_so 链接边 ∪ 声明式重建组边（victim → on）∪ build_deps 边** 做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps` 不参与排序；`build_deps` **无条件进边（仅限本轮 targets 内）**——构建期需要另一个包先产出时必须等它先建（如 python-bar 要 python-foo 本轮重建的产物、gjs 要同轮首建的 sysprof）；指向本轮不重建的包 → 边丢弃。组边保证"不链 libpython 的 python-* 包"也排在 python 之后（见 §4 声明式组）。**切环偏好**：出现环时按 **build_deps → 组边 → needed_so 链接边** 挑边切断——无条件进边会引入"构建工具伪环"（如 glibc ← python/cmake 的 build_deps），这些边正是**该被切**的那类，链接序不会因此被破坏。
-4. **计划预览 + 确认**（2.5）：交互模式（stdin 是 tty）列出 topo 顺序（包 + 版本）并让 operator 确认（回车继续 / n 取消）；非交互（CI/测试/脚本）直接开始。
+4. **计划预览 + 确认**：交互模式（stdin 是 tty）列出 topo 顺序（包 + 版本）并让 operator 确认（回车继续 / n 取消）；非交互（CI/测试/脚本）直接开始。
 5. **预下载拆分**：确认后**只给确认集** bulk 预下载全部源；ABI 受害者动态入队**不预下载**（构建时由 lpkg build 自己下载）。批量预下载失败不阻塞——循环里每个确认集包会再走一次源就绪门（带交互接管）。
 6. **逐包循环**（队列，受害者带 `is_victim` 标记）：
-   - 受害者先 `bump_release`（release+1，用户规则 1）
+   - 受害者先 `bump_release`（release+1）
    - 确认集包走源就绪门（已 bulk 预取，幂等）→ 容器构建（见 §5）
    - `scan` 产物 → `verify::decide` 三分支（见 §6）
    - **无条件归一化重打**（level 22 + mtime 1970，复用 scan 解包目录）：漂移与否都重打 → 进 repo 的
@@ -131,7 +126,7 @@ farm **不再 spawn `sudo`/`tar`/`zstd` CLI**——解包走 `zstd`+`tar` Rust c
 ### 排序与 ABI 受害者重排（build/sched.rs）
 
 - `topo_order`：**needed_so 链接边 + build_deps 依赖边 + 声明式组边** Kahn + 三色 DFS 环切割。**确定性**：就绪队列弹名字最小者 → 同级按名字升序；`find_cycle_edge` 节点与邻接都排序 → 切环也确定。**切环偏好**（`EdgeKind`）：按 **build_deps(0) → 组边(1) → needed_so 链接边(2)** 挑后向边切断；同一对 (P→D) 同时是多种边时取**最高**优先级（不把链接边降级成可切的 build_deps 边）。理由：链接边是构建序的真相（切了消费者会先于库重建、按旧 ABI 白跑），build_deps 环多是构建工具互赖（gtk4 ↔ sysprof）或无条件进边引入的伪环。**有回归测试锁死（同级升序 + 两次运行一致 + 输入乱序不影响 + 组受害者排触发包之后 + 切环优先挑 build_deps/组边、只有链接边时才切链接边）**。
-- `build_deps` 边（`src/build/sched.rs`）：读配方 LankeBUILD.json，`build_deps` 里某依赖 D 当且仅当 **D 在本轮 targets** 时作为边 P→D 入图——**无条件**（原 `BUILD_AFTER_BUILD_DEPS` flag 已删除，该行为已成默认；配方里再写它会得到"未知 farm flag"告警）。与链接/组边同规则，只对 targets 内生效。**有回归测试锁死（gjs→sysprof 先建，无论 sysprof 在不在旧索引；D 不在 targets 时不加边、维持名字升序）**。
+- `build_deps` 边（`src/build/sched.rs`）：读配方 LankeBUILD.json，`build_deps` 里某依赖 D 当且仅当 **D 在本轮 targets** 时作为边 P→D 入图——**无条件**（`BUILD_AFTER_BUILD_DEPS` 已删除；配方里再写它会得到"未知 farm flag"告警）。与链接/组边同规则，只对 targets 内生效。**有回归测试锁死（gjs→sysprof 先建，无论 sysprof 在不在旧索引；D 不在 targets 时不加边、维持名字升序）**。
 
 ### 声明式 ABI 重建组（build/groups.rs，data/build/*.yaml）
 
@@ -145,7 +140,7 @@ packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` g
 
 `rebuild-on-abichange` 包触发时，`groups.victims_for` 把匹配 `packages` glob 的配方包并入重建受害者集（与 `direct_victims` 并集、去重、排序入队，release bump + 重建）。
 
-**触发语义（用户规则）**：
+**触发语义**：
 - 有版本化 SONAME 的包（python…）→ **只在 SONAME 断裂时**触发（removed_sonames 非空）
 - 无版本化 SONAME 的纯脚本解释器（perl…）→ **任何重建**都算运行时变化 → 触发（ABI 信号不存在，靠这个补）
 
@@ -203,8 +198,7 @@ provides_soname 漂移优先（ABI 面是最高信号）。
 
 **`deps` 不参与判定**：deps 由 gen_deps/deprules 规则生成，farm 不扫不比（`ScanResult.deps` 保留但 `decide` 不读）。
 
-**xattr 保留：做**（原"明确不做"的决策已作废——它假定 tar 的 Builder 不能写 PAX xattr，而
-`Builder::append_pax_extensions` 就在 `tar::pax` 里且无 feature 门控）。两侧对称：打包
+**xattr 保留：做**（`Builder::append_pax_extensions` 就在 `tar::pax` 里且无 feature 门控）。两侧对称：打包
 （`repack.rs`）把每个条目的 xattr 写成 PAX `SCHILY.xattr.<name>`，解包（`scan.rs::extract_lpkg`）
 开 `set_unpack_xattrs(true)` 还原。**丢 `security.capability` 是功能性损坏**（systemd native 二进制、
 ping 这类靠文件能力提权的程序会失效），SUID/SGID 是另一套机制、覆盖不到它。
@@ -252,15 +246,14 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
   `html-index` / `multi-level-html-index` / `gcs` / `gnome` / `sourceforge` / `pypi` /
   `same-version` / `same-version-of-source` / `script`。
   **加模板 = 新文件 + 注册表加一行**：字段白名单（`validate_supported_fields`）与探测分发
-  （`SourceConfig::probe_with`）都从注册表取，**不再各写一份 `match`**（历史上加一个模板要同步改
-  5 处：struct / set 表 / supported / 分发 / 文档）。注册项里 `ProbeFn` 用四族类型别名显式写出
+  （`SourceConfig::probe_with`）都从注册表取，**不再各写一份 `match`**。注册项里 `ProbeFn` 用四族类型别名显式写出
   "版本从哪来"的差异：`Web`（联网探测）/ `LockPackage`（读另一个包）/ `LockSlot`（读本 tracker
   更早槽位）/ `Script`（脚本自述）。
 - **`multi-level-html-index`（N 级目录逐级进，版本藏在路径里）**：`levels` 每级 `{name, url, pattern}`。
   **级名即占位符**（`{series}` 只能在**后续级**的 url 与 template 里引用）；**必须且只能有一级叫 `version`**
   ——它的捕获即包版本（**按名字定，不按位置**）。位置隐式的 `{v1}..{vN}` **已废弃**：引用它会得到
-  "未知占位符"报错（原先"靠级序号猜语义"的坑）。校验在探测前全部做完：级名必填/非空/唯一、不得取保留名
-  `name`（上游名占位符）、前向引用与未知占位符（**含 `levels[i].url`**，原先只查最终 URL）一律报错。
+  "未知占位符"报错。校验在探测前全部做完：级名必填/非空/唯一、不得取保留名
+  `name`（上游名占位符）、前向引用与未知占位符（**含 `levels[i].url`**）一律报错。
   例（KDE frameworks，73 个 kf-* tracker 同形）：
   ```yaml
   levels:
@@ -286,8 +279,8 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
   multi-level「只能引用前面的级」同规则），前向/自引用在探测时报错并说明可用范围。
 - **包级字段**（`TrackerConfig`）：`pkg-name`（必填）、`version-source`（`sources[i]` /
   `work_sources[i]`，缺省 `sources[0]`、空则 `work_sources[0]`）、`after` / `last`（依赖排序）、
-  `sources` / `work_sources`。**没有包级 `type`**——`type` / `script-content` 是**已删除**的旧字段
-  （曾为"迁移期给明确指引"而保留，850 个 tracker 迁完后连同守卫一起删了）；现在写它们落回
+  `sources` / `work_sources`。**没有包级 `type`**——`type` / `script-content` 是**已删除**的旧字段；
+  现在写它们落回
   `deny_unknown_fields` 的 `unknown field`（仍是报错）。
 - **版本筛选：各模板共享的单一汇点**（`templates::VersionFilter`）。所有探测模板的候选版本一律
   先过这一层，再谈"稳定版优先 → 取最大"：
@@ -299,7 +292,7 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
   - **`stable-minor: even`**——只保留 minor（第二段）为偶数的候选，**全被滤掉时退回全部**
     （与 GNOME 同款兜底：上游偶尔没有偶数 minor 的稳定分支时不该直接探测失败）。GNOME 惯例
     （pango/vala/perl 等开发分支与稳定分支同号段并存）。
-  - **加约束请加在这一层**：历史上 `max-version` 只有部分模板支持，正是"各写各的"造成的漂移。
+  - **加约束请加在这一层**。
     `script` 与两个**锁版本**模板（`same-version` / `same-version-of-source`）不参与——它们不探测上游。
   - **约束的实现在 `pool_filter` 一处**：硬约束（`allows`：major / 封顶 / exclude）+ 奇偶偏好。
     一维候选列表（`max_version_stable_first`）与**两段式探测**（`gnome` 先按目录挑、再挑目录里的
@@ -376,12 +369,12 @@ build --all ──> run_build
   `architecture_guards.rs`（分层守护：docker 只在 binding 叶 spawn、net 必设读写超时）、
   `docker_binding_sequence.rs`（假 docker 影子脚本锁定 docker 子命令序列，拆步重构的行为不变证据）
 
-**285 个测试全绿**（252 lib + 33 集成/二进制——`cargo test` 实测 2026-09-25）。
+**285 个测试全绿**（252 lib + 33 集成/二进制——`cargo test`）。
 > 这个数字随每次加测试而变；写死只代表当时状态，别当契约。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**、**vercmp 与真 libsolv 的逐值对齐（`tests/fixtures/vercmp_rpm.txt`，3944 对）**、**注释掉的 hook 调用 / QML import 不误判**、**docker 拆步后子命令序列不变**、**HTTP 读超时（无应答连接秒级失败）**。
 
 ## 16. ABI 符号/版本审计（`custom_checks/abi`，`farm chk abi`）
 
-`src/custom_checks/abi.rs`（原顶层 `abi_fullchk.rs` / `manual-abi-fullchk`）镜像 `/tmp/scan_elf_ver.py` 的两段式审计，但原生/缓存/单趟：
+`src/custom_checks/abi.rs` 镜像 `/tmp/scan_elf_ver.py` 的两段式审计，但原生/缓存/单趟：
 - **provider/cache 来源 = `--source`（默认 out）下全部包**：每个 .lpkg 解包一次到临时目录，逐 ELF 用
   goblin 读 `.gnu.version_d/.gnu.version_r/.gnu.version`（verdef/verneed/versym）。**整包缓存**
   `~/.cache/lankefarm/abi/<pkg>.json`（key = 当前 `.lpkg` 文件 sha256 + 本检則 `schema`；内容为该包
@@ -397,8 +390,8 @@ build --all ──> run_build
 `src/custom_checks/` 一族的策略/打包检测（非 farm 核心 ABI），参考 abichk（§16）的架构与缓存思路，
 由 `farm chk full` 一并跑（或 `farm chk <kind>` 单跑；ABI 审计 §16 同属此工具集）。逐包一次解包；
 **整包缓存 key = `.lpkg` 文件 sha256 + 本检則的 `schema` 常量**（不是名字/版本），命中即复用分析。
-缓存根 `~/.cache/lankefarm/<chk>`（无 HOME 回落 `--source/.abi-cache`）——**单跑与 `farm chk full` 共用同一根**
-（曾两处路径不一致、同一检則互不命中）；`schema` 由每个检則模块自持，改一类分析只失效该类缓存。判定：
+缓存根 `~/.cache/lankefarm/<chk>`（无 HOME 回落 `--source/.abi-cache`）——**单跑与 `farm chk full` 共用同一根**；
+`schema` 由每个检則模块自持，改一类分析只失效该类缓存。判定：
 - qmlchk/pkgconfchk：`import`/`Requires` 模块的**归属包** ∈ 本包 binpkg `deps`（仓库 index 记录的运行时
   依赖，`binpkg_deps`；**不读 LankeBUILD.json**）∪ `needed_so` 推导链接依赖（`graph::link_deps`）即满足。
   三段判定：闭包内命中 → 通过；仓库内其它包提供但不在闭包 → Warning（少依赖）；**仓库内无任何 provider

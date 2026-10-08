@@ -159,7 +159,7 @@ TEST(SoSpec, NeededSymbolVersionIsNotSatisfiedByABareProvider)
 {
     // 这条是整个特性的**存在理由**：今天所有包都只声明裸 SONAME，如果裸 provider 放行，
     // 任何带符号版本的 need 都会被随便一个 provider 满足 ⇒ 特性形同虚设。
-    // 这里连"自我声明"也一并钉住：
+    // 这里连"自我声明"也一并固定：
     EXPECT_FALSE(so_spec_satisfies("libc.so.6", "libc.so.6@GLIBC_2.40"));
     EXPECT_TRUE(so_spec_satisfies("libc.so.6@GLIBC_2.40", "libc.so.6@GLIBC_2.40"));
     EXPECT_TRUE(so_spec_satisfies("libc.so.6@{GLIBC_2.40,GLIBC_2.39}", "libc.so.6@GLIBC_2.40"));

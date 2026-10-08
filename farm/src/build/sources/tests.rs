@@ -1,7 +1,7 @@
 //! `src/build/sources.rs` 的单元测试。
-//! 从 `build/tests.rs` 与 `sources.rs` 迁来：`sources_ready` 用到 `is_skip_source` /
-//! `source_filename` 这两个**本模块私有**的纯函数，只有住在本模块里才不必为测试放宽可见性
-//! （它此前是 `sources.rs` 里 `#[cfg(test)] pub fn` —— 不进二进制，但按约定生产文件不放测试代码）。
+//! 测试住在本模块（不放 `build/tests.rs`）：`sources_ready` 用到 `is_skip_source` /
+//! `source_filename` 这两个**本模块私有**的纯函数，住在这里才不必为测试放宽可见性
+//! （按约定生产文件也不放 `#[cfg(test)]` 测试代码）。
 
 use super::*;
 

@@ -101,9 +101,6 @@ void log_internal(std::string_view prefix, std::string_view prefix_color,
 }
 }  // namespace
 
-/**
- * 输出信息级别日志
- */
 void log_info(std::string_view msg)
 {
     // 前缀后补一个空格（与 warning/error 一致）：pacman 风格的信息前缀是 `::`。
@@ -112,17 +109,11 @@ void log_info(std::string_view msg)
                  constants::COLOR_BOLD, msg, std::cout);
 }
 
-/**
- * 输出警告级别日志
- */
 void log_warning(std::string_view msg)
 {
     log_internal(get_string("warning.prefix") + " ", constants::COLOR_YELLOW, {}, msg, std::cerr);
 }
 
-/**
- * 输出错误级别日志
- */
 void log_error(std::string_view msg)
 {
     log_internal(get_string("error.prefix") + " ", constants::COLOR_RED, {}, msg, std::cerr);
@@ -289,7 +280,7 @@ DBLock::DBLock()
     ensure_dir_exists(Config::instance().lock_dir());
     // O_CLOEXEC：锁是 flock 在 open file description 上的，fork/exec 的子进程若继承
     // 这个 fd，就会在 lpkg 退出后继续持有锁 → 之后每次 lpkg 都报 "database is locked"，
-    // 而现场没有任何 lpkg 在跑（构建/hook 起的长命子进程是常见来源，历史 TODO.md C3）。
+    // 而现场没有任何 lpkg 在跑（构建/hook 起的长命子进程是常见来源）。
     lock_fd = open(Config::instance().lock_file().c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0644);
     if (lock_fd < 0) {
         throw LpkgException(
@@ -362,13 +353,12 @@ bool is_safe_path_component(std::string_view s)
     //   `|`  索引行的一级字段（`<name>|<版本块>|<…>`）
     //   `;`  索引行的版本块分隔
     //   `,`  `files.db` 的属主集合（`a,b,c`）与索引行的 deps 字段
-    // 2026-10-03 审计实测的后果（`coreutils,evil` 这种名字）：`files.db` 读回变成两个幽灵
+    // 后果（`coreutils,evil` 这种名字）：`files.db` 读回变成两个幽灵
     // 属主 ⇒ 该包能"卸载成功"（退 0）却把文件与归属全留下，而真实包 `coreutils` 会**误含**
     // 它的文件（autoremove / remove -r / force-solve 这些内部 force 路径会把文件搬走删掉）。
     // `:` 也是**分帧**字符（上面已列：`pkgs` 的 `name:version`、索引版本块的
-    // `<ver>:<hash>:…`）。⚠️ **订正 2026-10-04（8.0.0）**：本条此前还拒 `^` / `~`，理由是
-    // "版本桥接的保留字符" —— 桥已拆掉（见 vercmp/version.hpp），`~` 现在是**合法的预发布
-    // 标记**（rpm 语义）、`^` 无特殊含义，两者都**放行**。
+    // `<ver>:<hash>:…`）。`^` 与 `~` 都**放行**：`~` 是**合法的预发布标记**
+    // （rpm 语义），`^` 无特殊含义。
     // 本函数只用于包名与版本号，不用于内容文件路径，所以不会误伤合法文件名。
     for (const char c : s)
         if (c == '|' || c == ';' || c == ',' || c == ':') return false;
@@ -597,7 +587,7 @@ bool is_symlink_no_follow(const fs::path& p)
 {
     // `symlink_status` = lstat：末段**不**解引用，且把 ELOOP/EACCES 放进 ec 而不是抛。
     // 注意这对"中间段成环"同样成立（`symlink_status("self/x")` 只报 ec，不抛）——
-    // 与 `fs::is_symlink` 的关键差别就在这里（实测见 utils.hpp 那段订正）。
+    // 与 `fs::is_symlink` 的关键差别就在这里（见 `base/path_predicates.hpp` 文件头那张调用表）。
     std::error_code ec;
     const auto st = fs::symlink_status(p, ec);
     return !ec && st.type() == fs::file_type::symlink;
@@ -685,7 +675,7 @@ std::vector<RepoIndexVersionBlock> parse_repo_index_line(std::string_view line)
     if (parts.size() < 2) return blocks;
 
     const std::string pkg_name(parts[0]);
-    // ⚠️ **行内第 3 段（包级 provides）已废除**（2026-10-04，8.0.0）：`provides_soname` 拆出来之后
+    // ⚠️ **行内第 3 段（包级 provides）已废除**：`provides_soname` 拆出来之后
     // 版本块的字段数固定为 6，再留一个"包级兜底"只会让"某个字段没写"变成静默的另一种解释。
     // 这里**只读前两段**，第 3 段及之后一律忽略。
 
@@ -951,14 +941,12 @@ std::string random_suffix(size_t len)
 /**
  * 安全重命名。
  *
- * 仅做 rename(2)，失败一律抛异常，**不做 EXDEV copy+remove 回退**。
- *
- * 历史：曾对 overlayfs 的 EXDEV（跨设备/跨层 rename）退回到 copy_recursive
- * （逐条目复制后 remove_all 源）。但 copy_recursive 用 fs::is_directory(from)
- * 判断源类型——对"指向目录的符号链接"会跟随链接判成目录，进而**递归删除整棵
- * 被 rename 的目录树**。升级 filesystem 包（usr-merge 布局，/lib → usr/lib 等
- * 根级目录符号链接）时，backup 阶段对这类符号链接的 safe_rename 一旦落到
- * fallback，/usr/lib 全树被删（overlayFS 下表现为整目录 whiteout）。
+ * 仅做 rename(2)，失败一律抛异常，**不做 EXDEV copy+remove 回退** —— 那条回退会
+ * **静默破坏数据**：退回 copy_recursive（逐条目复制后 remove_all 源）时，
+ * copy_recursive 用 fs::is_directory(from) 判断源类型，对"指向目录的符号链接"会跟随
+ * 链接判成目录，进而**递归删除整棵被 rename 的目录树**。升级 filesystem 包
+ * （usr-merge 布局，/lib → usr/lib 等根级目录符号链接）时，backup 阶段对这类符号链接的
+ * safe_rename 一旦落到 fallback，/usr/lib 全树被删（overlayFS 下表现为整目录 whiteout）。
  *
  * 且该 fallback 仅对"未开 redirect_dir 的 overlayfs"有意义；开 redirect 的
  * overlay 目录 rename 本就不返回 EXDEV。宁可 rename 失败抛错，也不静默破坏
@@ -986,13 +974,13 @@ void cleanup_tmp_dirs()
 {
     const fs::path tmp_path = "/tmp";
     // 判定不抛：/tmp 是符号链接环时 `fs::exists` 会抛，而这里是启动期的清理兜底
-    // （见 utils.hpp 的不抛谓词说明）。**跟随**语义与原来的 exists+is_directory 一致
+    // （见 base/path_predicates.hpp 的不抛谓词说明）。**跟随**语义与原来的 exists+is_directory 一致
     // （/tmp 可以是指向 /var/tmp 的符号链接）。
     if (!is_directory_follow(tmp_path)) return;
 
     for (const auto& entry : fs::directory_iterator(tmp_path)) {
         try {
-            // 一次 lstat 的"真目录"判据（2026-09-26 修）：原来的
+            // 一次 lstat 的"真目录"判据：原来的
             // `fs::is_symlink(p) || !entry.is_directory()` 两个操作数**都会在环上抛** ——
             // 前者对中间段成环抛、后者（`directory_entry::is_directory()` 走 `status()`）
             // 对末段成环抛。而本函数跑在清理路径上：一次抛 = 包已落地、DB 已提交、命令报失败。
@@ -1002,7 +990,7 @@ void cleanup_tmp_dirs()
 
             // 生产端（config.cpp 的 TmpDirManager）名字是 `lpkg_<pid>_<rand>`，所以只取第一个
             // '_' 之前那段做 PID。此前整串都喂 parse_pid_strict，带 `_<rand>` 后缀的名字永远
-            // 解析失败 → SIGKILL/断电残留的临时目录**永远不被回收**（实测：/tmp 里 lpkg_<pid>_<n>
+            // 解析失败 → SIGKILL/断电残留的临时目录**永远不被回收**（/tmp 里 lpkg_<pid>_<n>
             // 长期堆积，正常退出才有 TmpDirManager 析构清理）。
             const std::string rest = dirname.substr(5);
             const auto sep = rest.find('_');
@@ -1030,7 +1018,7 @@ bool is_stash_dir_name(std::string_view name)
 }
 
 /**
- * 回收孤儿备份 stash（历史 TODO.md §5）：崩溃/续传没清掉的
+ * 回收孤儿备份 stash：崩溃/续传没清掉的
  * `<fsroot>/.lpkg_bak_<pkg>_<pid>`。扫描范围有界：root_dir 顶层 + 顶层子目录里
  * st_dev 与 root_dir 不同的（= 子挂载点）的直接子目录。pid 已死（kill ESRCH）才删，
  * 绝不碰自己/存活进程的 stash。stash 正常由 CLEANUP 清除，本函数只是兜底安全网。
@@ -1061,7 +1049,7 @@ void cleanup_orphan_stashes(const std::set<fs::path>& keep)
             const fs::path p = it->path();
             const std::string name = p.filename().string();
             if (!is_stash_dir_name(name)) continue;
-            // 同上（2026-09-26 修）：两个操作数在环上都抛；换成一次 lstat 的真目录判据。
+            // 同上：两个操作数在环上都抛；换成一次 lstat 的真目录判据。
             if (!is_real_directory(p)) continue;
             // WAL 仍引用（回滚/续传还要用）→ 绝不回收
             if (keep.contains(p.lexically_normal())) continue;
@@ -1092,7 +1080,7 @@ void cleanup_orphan_stashes(const std::set<fs::path>& keep)
             break;
         }
         const fs::path p = it->path();
-        // 同上（2026-09-26 修）。
+        // 同上。
         if (!is_real_directory(p)) continue;
         struct stat st{};
         if (::lstat(p.c_str(), &st) != 0) continue;

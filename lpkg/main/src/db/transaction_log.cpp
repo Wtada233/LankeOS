@@ -34,7 +34,7 @@ WalWriter::WalWriter()
     fd_ = ::open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, constants::PERM_WAL_LOG);
     if (fd_ < 0) throw LpkgException(string_format("error.wal_open_failed", path));
     // 新建/首次打开后 fsync 父目录：否则断电可能只丢了目录项——已经 fsync 过的 WAL 行
-    // （描述了文件系统改动）变得不可达，回滚依据随之消失（I-FSYNC-3，历史 TODO.md X7）。
+    // （描述了文件系统改动）变得不可达，回滚依据随之消失。
     //
     // **必须恒生效**（所以套守卫，不受默认关闭的 durable_fsync_enabled() 影响）：
     // POSIX 下 fsync(文件) 不覆盖父目录的 dentry，于是"WAL 行已 fsync、文件整个不存在"
@@ -119,9 +119,9 @@ void log_wal_line(std::string_view line)
     // 行在、文件却因 dentry 未落盘而整个消失，就是那个不可恢复组合。
     //
     // **只在真的创建了文件时才做**：目录项只需要在创建那一刻落盘，而本函数**每写一行**
-    // 都要走一次 —— 恒做等于每条 WAL 行白付一次父目录 fsync（实测占全部 fsync 的
+    // 都要走一次 —— 恒做等于每条 WAL 行白付一次父目录 fsync（占全部 fsync 的
     // 34%~40%）。`open_wal_append` 用 O_CREAT|O_EXCL 原子地判出"本次是否创建"（不是
-    // TOCTOU 的 fs::exists）。行内容自己的 ::fsync(fd) 不受影响，恒生效（I-FSYNC-1 不变）。
+    // TOCTOU 的 fs::exists）。行内容自己的 ::fsync(fd) 不受影响，恒生效。
     if (created) {
         DurableFsyncGuard durable;  // WAL 文件目录项：创建即落盘，与开关无关
         fsync_parent_dir(path);

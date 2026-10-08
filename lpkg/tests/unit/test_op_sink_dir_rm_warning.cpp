@@ -118,7 +118,7 @@ TEST_F(OpSinkDirRmWarningTest, FailedRmdirIsWarnedWithPathAndReason)
         << "rmdir 失败没有告警（或告警没点名路径）。实际输出：\n"
         << err;
 
-    // 行仍然在（write-ahead 不允许反悔，理由见文件头）：用例把它钉住，免得后人"顺手"改成
+    // 行仍然在（write-ahead 不允许反悔，理由见文件头）：用例把它固定住，免得后人"顺手"改成
     // 先 rmdir 后写行 —— 那会让崩溃窗口从"行与盘面不一致"恶化成"目录没了、WAL 无记录"。
     EXPECT_NE(read_wal().find("DIR_RM " + target.string() + " "), std::string::npos)
         << "DIR_RM 行必须照写（write-ahead）：";

@@ -1,25 +1,25 @@
 // harness #2：归档成员名 → 整归档解压 + 沙箱逃逸检测。
 //
-// 为什么是它：`archive.cpp:118` 原话 —— "成员名是**不可信输入**（未校验的 .lpkg、无校验和的
+// 为什么是它：`archive.cpp` 原话 —— "成员名是**不可信输入**（未校验的 .lpkg、无校验和的
 // 上游源码包）"。名字会变成 WAL 行的字面内容，也能决定解压落点。判据在
-// `member_name_rejection_message`（读侧 `archive.cpp:171`、写侧 `packer.cpp:40` **共用同一份**）。
+// `member_name_rejection_message`（读侧 `archive.cpp`、写侧 `packer.cpp` **共用同一份**）。
 //
 // **输入是"成员名"，不是归档字节**：直接变异压缩后的 .tar.zst 字节，绝大多数变异会死在 zstd
 // framing 上、压根到不了判据，覆盖率是假的。所以每轮由 harness 现场造一个**裸 tar**
-// （`extract_tar_zst` 走 `archive_read_support_filter_all`，见 `archive.cpp:184`，裸 tar
+// （`extract_tar_zst` 走 `archive_read_support_filter_all`，见 `archive.cpp`，裸 tar
 // 照样能读），成员名取 fuzz 输入 —— 变异预算全花在真正要测的那个量上。
 //
-// **tar 是手写的，不是 libarchive 写的**（2026-10-03 改）。原因：libarchive 3.8.3 的写侧对
+// **tar 是手写的，不是 libarchive 写的**。原因：libarchive 3.8.3 的写侧对
 // 某类路径名有 heap-buffer-overflow（用一个**只链 libarchive、零 lpkg 代码**的 20 行程序
-// 复现过：`archive_write_header` 内部 `strncpy` 读到自己缓冲区前 1 字节）。那是库的缺陷，
+// 即可复现：`archive_write_header` 内部 `strncpy` 读到自己缓冲区前 1 字节）。那是库的缺陷，
 // 不是 lpkg 的，但走写侧的 harness 会把它当"崩溃"报出来、并让整轮 fuzz 就此结束。
 // 手写 ustar 之后，fuzz 字节只进入 **libarchive 的读侧**与 **lpkg 的判据** —— 正是生产路径
 // 的形状（`packer.cpp` 也从不把任意名字交给写侧）。
 //
-// **关于 `..` 的预期**（别把它当缺陷报）：`member_path_relative`(`archive.cpp:133`) 只剥前导
+// **关于 `..` 的预期**（别把它当缺陷报）：`member_path_relative`(`archive.cpp`) 只剥前导
 // `/` 与 `./`，**不**拦 `..`；生产靠 libarchive 的 `ARCHIVE_EXTRACT_SECURE_NODOTDOT` /
-// `SECURE_SYMLINKS`(`archive.cpp:191-195`) 兜底 ——
-// `tests/unit/test_archive_confinement.cpp:113-124` 钉的就是"整包被拒"。所以含 `..`
+// `SECURE_SYMLINKS`(`archive.cpp`) 兜底 ——
+// `tests/unit/test_archive_confinement.cpp` 钉的就是"整包被拒"。所以含 `..`
 // 的名字**表现为整包解压失败**才是对的。
 //
 // **逃逸检测的边界（别读成比它更强的保证）**：容器里没有 CAP_SYS_ADMIN（挂载不可用），所以
@@ -244,7 +244,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         extract_tar_zst(kArc, kRun, "fuzz");
         ++g_extracted;
     } catch (const std::exception&) {
-        // 拒绝是正常结局：判据抛 UnsafeArchiveException（`archive.cpp:173`），libarchive 抛
+        // 拒绝是正常结局：判据抛 UnsafeArchiveException（`archive.cpp`），libarchive 抛
         // 它自己的（SECURE_NODOTDOT / SECURE_SYMLINKS / 越界 hardlink 目标）。
         ++g_refused;
     }

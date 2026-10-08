@@ -1,5 +1,5 @@
 /**
- * test_wal_framing.cpp — WAL 行分帧与哨兵的回归测试（历史 TODO.md A1/A2）
+ * test_wal_framing.cpp — WAL 行分帧与哨兵的回归测试
  *
  * 背景（两个真实缺陷）：
  *   A1 旧 split_line() 只对 "A → B" 箭头形式保空格，NEW/NEW_DIR/DIR_RM/DB/DBNEW/DBRM

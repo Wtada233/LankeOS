@@ -324,8 +324,7 @@ fn in_system_lib_dir(fpath: &Path, content_dir: &Path) -> bool {
 
 /// 系统库目录（**唯一清单**）：`.lpkg` 内容里只有这些目录下的文件参与 SONAME/NEEDED 扫描与 ABI 备份。
 ///
-/// 加一种库目录**只改这里**——历史上这份清单散在 4 处（`scan` 里 1 处、`build/repo.rs` 里 3 处），
-/// 两处带尾 `/` 两处不带，加目录时极易漏（漏了表现为：新库目录里的 .so 不进 ABI 反图）。
+/// 加一种库目录**只改这里**（漏了表现为：新库目录里的 .so 不进 ABI 反图）。
 pub(crate) const LIB_DIRS: &[&str] = &["usr/lib", "lib", "usr/lib64", "lib64"];
 
 /// 相对路径是否位于某个系统库目录**之下**（`usr/lib/foo.so` → true；`usr/lib` 自身 → false）。
@@ -372,7 +371,7 @@ struct ElfDynamic {
 ///
 /// **扫出来的东西必须能被 lpkg 接受**：lpkg 的读入处对非法规格是"索引里整块跳过 / 元数据里
 /// 直接拒装"，所以这里宁可**少声明**（丢掉这个怪版本名）也不能写进去一个它不认的串。
-/// 实测真实世界的版本名（GLIBC_2.40 / GLIBCXX_3.4.30 / Qt_6_PRIVATE_API / OPENSSL_3.0.0 /
+/// 真实世界的版本名（GLIBC_2.40 / GLIBCXX_3.4.30 / Qt_6_PRIVATE_API / OPENSSL_3.0.0 /
 /// XZ_5.2）全部落在这个集合里。
 fn version_name_ok(name: &str) -> bool {
     !name.is_empty()
@@ -426,7 +425,7 @@ fn parse_elf_dynamic(bytes: &[u8]) -> ElfDynamic {
     if let Some(verneed) = &elf.verneed {
         for n in verneed.iter() {
             // ⚠️ `vn_file` 是 **dynstr 偏移**（本版 goblin 里是 `usize`），不是字符串 —— 直接 `to_string()` 会得到
-            // 一个数字当库名（实测踩过：`{"11": {"V2"}}`，随后被 repo_provides 过滤成静默的
+            // 一个数字当库名（如 `{"11": {"V2"}}`，随后被 repo_provides 过滤成静默的
             // 空版本需求）。必须过 dynstrtab 解引用。
             let Some(file) = elf.dynstrtab.get_at(n.vn_file) else {
                 continue;

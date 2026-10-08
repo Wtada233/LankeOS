@@ -8,21 +8,21 @@
 namespace depscan
 {
 
-// ── Status labels for tree nodes ───────────────────────────────────────────
+// ── 树节点状态 ─────────────────────────────────────────────────────────────
 enum class ScanStatus {
-    REMOVED,      // Package would be removed
-    REBUILD,      // Package needs ABI-triggered rebuild
-    INSTALL,      // Package would be newly installed
-    ABI_CHANGED,  // Target package whose ABI changed (not rebuilt itself)
-    KEEP          // Package stays unchanged (shown with --all)
+    REMOVED,
+    REBUILD,
+    INSTALL,
+    ABI_CHANGED,  // ABI 变化的目标包自身（不重编）
+    KEEP          // 保持不变（--all 时才显示）
 };
 
-// ── A single node in the dependency tree ───────────────────────────────────
+// ── 依赖树节点 ─────────────────────────────────────────────────────────────
 struct ScanNode {
     std::string name;
     std::string version;
     ScanStatus status = ScanStatus::KEEP;
-    std::string reason;  // optional: short explanation
+    std::string reason;
     std::vector<ScanNode> children;
 
     bool is_affected() const
@@ -32,30 +32,23 @@ struct ScanNode {
     }
 };
 
-// ── Public scan API ────────────────────────────────────────────────────────
+// ── 公开扫描 API ───────────────────────────────────────────────────────────
 
-// Scan what would be REMOVED (broken) if <pkg> is removed.
-// Walks the transitive closure of reverse dependencies.
-// show_all: also show forward dependencies that are shared and thus stay.
+// 走反向依赖的传递闭包；show_all 时也列出共享、因而保留的前向依赖。
 ScanNode scan_remove_tree(const std::string& pkg_name, bool show_all = false);
 
-// Scan what would need an ABI-triggered REBUILD if <pkg> changes ABI.
-// Only direct reverse dependencies are affected (indirect ones are
-// shielded by the direct layer's abstraction).
-// show_all: also show indirect reverse deps (they stay).
+// 只有直接反向依赖受影响（间接的隔着直接层的抽象，不会随 ABI 变化而断）。
+// show_all 时也列出保留的间接反向依赖。
 ScanNode scan_abibreak_tree(const std::string& pkg_name, bool show_all = false);
 
-// Scan what would be newly INSTALLED if <pkg> (or a local .lpkg file)
-// is installed.  Resolves transitive deps via the repository.
-// show_all: also show already-installed packages in the tree.
+// 经仓库解析传递依赖；show_all 时也列出树里已装的包。
 ScanNode scan_install_tree(const std::string& pkg_name, bool show_all = false);
 
-// Convenience: accept local .lpkg path for install scan
 ScanNode scan_install_from_file(const std::filesystem::path& lpkg_path, bool show_all = false);
 
-// ── Display ────────────────────────────────────────────────────────────────
+// ── 显示 ───────────────────────────────────────────────────────────────────
 
-// Pretty-print a dependency tree to stdout with Unicode box-drawing.
+// 以 Unicode 制表符把依赖树打印到 stdout。
 void print_tree(const ScanNode& node);
 
 // ScanStatus → l10n 键（调用方用 `get_string(...)` 取译文）。以前这里返回硬编码英文标签，

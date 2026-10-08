@@ -131,7 +131,7 @@ public:
     ///
     /// `mid` **按值收**（不是 `string_view`）是有意的：`finish_progress()` 会把 `last_mid_`
     /// 本身当 mid 再喂一次，而本函数要把它存回 `last_mid_` —— 按引用收就会在"存"的过程中
-    /// 改掉自己正在读的那块内存（实测会把首字节写成 `\0`，见 `term.cpp` 的实现注释）。
+    /// 改掉自己正在读的那块内存（会把首字节写成 `\0`，见 `term.cpp` 的实现注释）。
     void progress(double percent, std::string mid = {});
     /// 右侧画任意文本。
     void right(std::string_view text);

@@ -42,7 +42,7 @@ lankebuild_build() {
     # 阻止 pip 直接装进系统 site-packages：python 升级后会留下孤儿 /usr/lib/python{旧版}
     # （pip 装的不随版本迁移），造成污染与玄学加载问题。系统包用 lpkg，用户包用 venv / pip --user。
     # 注意：标记必须放在 sysconfig stdlib 根（/usr/lib/python{MINOR}/EXTERNALLY-MANAGED）——
-    #       pip 只查 stdlib 根；放 site-packages 下 pip 不检测，PEP 668 形同虚设（实测）。
+    #       pip 只查 stdlib 根；放 site-packages 下 pip 不检测，PEP 668 形同虚设。
     mkdir -p "{STAGING_ROOT}{LIBDIR}/python${PY_MINOR}"
     cat > "{STAGING_ROOT}{LIBDIR}/python${PY_MINOR}/EXTERNALLY-MANAGED" << 'EOF'
 [externally-managed]

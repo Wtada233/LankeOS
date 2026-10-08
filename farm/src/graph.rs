@@ -46,14 +46,11 @@ pub struct Index {
 /// farm 在**建索引 / 查表 / 图比较**这一层只按裸名：`soname_index` 的键、`link_deps` 的比对、
 /// `RevMap` 的查询都用它 —— 同一个库的多个规格必须归到同一条边。
 ///
-/// ⚠️ **订正 2026-10-05**：原文写"farm 侧只做**基线归一**：它**不判定符号版本语义**（那是
-/// lpkg 的判据，见 `base/so_spec.hpp`），但必须按裸名比较；否则手写的 `X@{A}` 会被当成不同的
-/// SONAME ⇒ `verify` 判漂移 ⇒ repack 把符号版本静默涂掉"。**那个前提已被推翻**：
-/// `needed_so` / `provides_soname` 现由 **farm 生成**（`scan.rs` 读 ELF 的 verdef/verneed），
+/// ⚠️ **`needed_so` / `provides_soname` 由 farm 生成**（`scan.rs` 读 ELF 的 verdef/verneed），
 /// 漂移判定在 `verify::decide()` 里是**版本级**的 —— 规格按 `(裸名, 去重排序的版本集)`
 /// （`canon_specs`）比较：`provides_soname` 少一个版本节点 → `AbiBreak`，多出来 → `Repack`，
 /// `needed_so` 任一方向的规格变化 → `Repack`，`Repack` 会**写回 `LankeBUILD.json`（写扫描值）**。
-/// `so_bare()` 仍只在**上面那层**（裸名索引 / 图）沿用 —— 别再把它读成"farm 忽略符号版本"。
+/// `so_bare()` 仍只在**上面那层**（裸名索引 / 图）沿用 —— 别把它读成"farm 忽略符号版本"。
 pub fn so_bare(s: &str) -> &str {
     match s.find('@') {
         Some(i) => &s[..i],
@@ -78,8 +75,8 @@ pub fn parse_so_spec(s: &str) -> (String, Vec<String>) {
                 .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'+' | b'-'))
     };
     // **名字段也要校验**（与 lpkg 的 `soname_ok` 同）：非空、不含空白/控制字符、不含结构字符
-    // `@ { } , | ; :`。⚠️ 这条是"镜像向量"抓出来的 —— 我第一版只校验了版本段，于是 `"X @A"`
-    // 被解析成裸名 `"X "` + 版本 `A`（lpkg 那边判畸形）⇒ 两侧对同一串给出相反结论。
+    // `@ { } , | ; :`。⚠️ 不校验名字段的话，`"X @A"` 会被解析成裸名 `"X "` + 版本 `A`
+    //（lpkg 那边判畸形）⇒ 两侧对同一串给出相反结论。
     let name_ok = |t: &str| {
         !t.is_empty()
             && t.bytes().all(|b| {
@@ -214,11 +211,9 @@ pub fn soname_provides_of(soname_list: &[String]) -> HashSet<String> {
 /// C++ 孪生测试同一份 fixture 钉住。改写这里之前先看那份 fixture。
 ///
 /// 花括号**未闭合**时**不会**退化成普通逗号切分：`depth` 是计数器，未配对的 `{` 会让其后所有
-/// 逗号**都不切**（整段留成一条）；只有**多余的 `}`** 因为 `depth` 被 clamp 在 0 才退化回普通
-/// 逗号切分。lpkg 的读入处会把这种畸形块整块跳过并告警，所以 farm 这边只需要"有界、确定"即可。
-///
-/// ⚠️ **订正 2026-10-05**：原文笼统写"花括号不配对时退化成普通逗号切分"—— **对未闭合的 `{`
-/// 不成立**（实测：`a{b,c` 切成一条 `a{b,c`；`a}b,c` 才切成 `a}b` 与 `c`）。
+/// 逗号**都不切**（整段留成一条，如 `a{b,c` 切成一条 `a{b,c`）；只有**多余的 `}`** 因为 `depth`
+/// 被 clamp 在 0 才退化回普通逗号切分（如 `a}b,c` 切成 `a}b` 与 `c`）。lpkg 的读入处会把这种
+/// 畸形块整块跳过并告警，所以 farm 这边只需要"有界、确定"即可。
 fn split_field(field: Option<&str>) -> Vec<String> {
     field.map(split_brace_aware).unwrap_or_default()
 }

@@ -46,7 +46,7 @@
  *      拒了，那是新问题，不能靠"计入 not_exercised"就不了了之。
  *   ③ `bp_hit == false` 而 v2 竟然装成功 → 断点没接上，直接判失败。
  *
- * ── "用户改动"不许制造出**正确拒绝**（2026-09-25）──────────────────────────────
+ * ── "用户改动"不许制造出**正确拒绝**──────────────────────────────
  * 用户改动里"往目录里加一个文件"那一支，只有在**该目录不参与 dir→非目录 转换**时才用：
  * 目录被 v2 换成文件/链接时，往里塞一个**无人持有**的文件会让整批被 `dir_tree_entirely_ours`
  * 判否而**正确拒绝**（pacman 语义：整树搬走会毁掉那个文件）—— 那种种子考不到"接管 + 回滚"，
@@ -521,7 +521,7 @@ struct EtcOutcome {
     int install_new = 0;   ///< 三哈希 ①：盘上 == 上次装进去的（用户没改过）→ 静默换新版
     int keep_local = 0;    ///< 三哈希 ②：包本身没改这个配置 → 盘上那份留原位、**无** `.lpkgnew`
     int save_lpkgnew = 0;  ///< 三哈希 ③ / 符号链接条目 → 新版落 `.lpkgnew`，盘上那份留原位
-    int obsolete_to_lpkgsave = 0;      ///< 废弃的 /etc 文件/链接 → 改名 `.lpkgsave`（2026-09-26）
+    int obsolete_to_lpkgsave = 0;      ///< 废弃的 /etc 文件/链接 → 改名 `.lpkgsave`
     int type_changed_to_lpkgsave = 0;  ///< 类型变化（文件↔链接）→ 原物 `.lpkgsave` + 新物就地
 
     int dir_on_disk_replaced = 0;  ///< 盘上是**真目录**、归档是非目录 → 整树 `.lpkgsave` + 就地落位
@@ -530,8 +530,7 @@ struct EtcOutcome {
     int write_in_place = 0;  ///< 盘上没被占（或让开趟已清空）→ 就地落位
     int kept_on_disk = 0;    ///< 盘上那份被保留（= 上面三项之和，读起来直观）
     /// 符号链接条目的 symlink→symlink 且**目标逐字节相同** → `KeepOnDisk`：盘上那条就是
-    /// 我们要的，**连 `.lpkgnew` 都不产生**（2026-10-03 新增；旧模型"符号链接条目一律退
-    /// `.lpkgnew`"会让链接没变的重装堆一堆同内容副本）。它是 `kept_on_disk` 的第三种来源。
+    /// 我们要的，**连 `.lpkgnew` 都不产生**。它是 `kept_on_disk` 的第三种来源。
     int symlink_identical_kept = 0;
 };
 
@@ -548,10 +547,9 @@ struct EtcOutcome {
  *   1. **confhashes 只记 `/etc` 的普通文件条目**：符号链接与目录条目在 `copy_package_files`
  *      里各自 `continue`（`is_symlink(src)` / `is_directory_follow(src)` 两个分支），够不到
  *      `set_conf_hash`。所以"有旧记录"当且仅当 v1 在该路径上是**普通文件**。
- *   2. ~~**废弃的 `/etc` 条目不碰盘**~~（2026-09-26 改）：v1 提供、v2 **不再提供**的
- *      `/etc` **文件/符号链接** → 改名 `<路径>.lpkgsave`（实现里的 `SaveConfigObsolete`），
- *      内容一个不丢；**目录**仍维持"只撤所有权、不碰盘"（有意例外）。
- *      ⇒ 模型对这些路径做一次 `model_save_config`，而不是"什么都不做"。
+ *   2. v1 提供、v2 **不再提供**的 `/etc` **文件/符号链接** → 改名 `<路径>.lpkgsave`
+ *      （实现里的 `SaveConfigObsolete`），内容一个不丢；**目录**仍维持"只撤所有权、不碰盘"
+ *      （有意例外）。⇒ 模型对这些路径做一次 `model_save_config`，而不是"什么都不做"。
  *   3. 归档是**目录**条目：盘上已是真目录 → 不动；盘上被非目录占住 → `save_config` 整树改名
  *      再建目录；盘上没有 → 直接建。
  *   4. 归档是**非目录**条目而盘上是**真目录** → `SaveConfig`（整树改名成 `<路径>.lpkgsave/`）
@@ -598,7 +596,7 @@ EtcOutcome model_etc_after(const Tree& v1, const Tree& disk_before, const Tree& 
             continue;
         }
 
-        // 判据 4b（2026-09-26 统一）：盘上与归档**都是非目录**、但**类型不同**
+        // 判据 4b：盘上与归档**都是非目录**、但**类型不同**
         // （文件 ↔ 符号链接）→ 原物改名 `.lpkgsave` + 新物**就地**落位。
         // 改前这两格是分裂的：file→symlink 走"退 `.lpkgnew`、原文件留原样"、
         // symlink→file 走**三哈希**（拿链接目标的内容当 hash_local）—— 后者尤其没道理：
@@ -618,7 +616,7 @@ EtcOutcome model_etc_after(const Tree& v1, const Tree& disk_before, const Tree& 
 
         // ── 判据 5：盘上被**非目录**占住 ──────────────────────────────────────
         if (node.kind == "symlink") {
-            // 2026-10-03：**目标逐字节相同**的 symlink→symlink 是 no-op（决策表给
+            // **目标逐字节相同**的 symlink→symlink 是 no-op（决策表给
             // `KeepOnDisk`）—— 盘上那条链接就是我们要的，连 `.lpkgnew` 都不产生。
             // 目标**不同**才按配置冲突处理、退 `.lpkgnew`（盘上那份不动）。
             // 判据用**载荷（链接目标）相等**，与实现里的 `symlink_targets_equal` 同义。
@@ -651,10 +649,10 @@ EtcOutcome model_etc_after(const Tree& v1, const Tree& disk_before, const Tree& 
             ++o.save_lpkgnew;
         }
     }
-    // 判据 2（2026-09-26 改）：废弃的 `/etc` **文件/符号链接** → 改名 `.lpkgsave`。
+    // 判据 2：废弃的 `/etc` **文件/符号链接** → 改名 `.lpkgsave`。
     // `v2.count(path)` 同时覆盖了"新版本以**目录**形态提供同一个裸键"的情形 —— 那种情况下
     // 让开趟已按"非目录 → 目录"那一格处理过（改名 + 建目录），这里绝不能再来一次
-    // （实测：会搬走刚建好的目录、留下空的 `<路径>.lpkgsave/` 空壳）。
+    // （会搬走刚建好的目录、留下空的 `<路径>.lpkgsave/` 空壳）。
     for (const auto& [path, node] : v1) {
         if (v2.count(path)) continue;       // 新版本仍提供（含"变成了目录"）
         if (node.kind == "dir") continue;   // 目录：只撤所有权，不碰盘（有意例外）
@@ -1066,7 +1064,7 @@ void gen_etc_model(SlotGen& g, SeedModel& m, bool allow_dir_replaced)
  * `ns`：命名空间（属性 A 用 "a"、属性 B 用 "b"）。**两条属性必须各占一套包名与路径前缀**：
  * 同一个测试里 test_root 是共用的，而属性 A 会把包升到 2.0、把路径弄成"已被本包持有"，
  * 属性 B 再用同一个包名重装 v1 就变成"2.0 降级回 1.0"，撞上的是**另一套**语义
- * （实测：整批预检直接判 file conflict，B 的前置全部失败 —— 那是测试自己制造的假红）。
+ * （整批预检直接判 file conflict，B 的前置全部失败 —— 那是测试自己制造的假红）。
  */
 SeedModel make_model(std::uint64_t seed, bool allow_dir_replaced, const std::string& ns)
 {
@@ -1080,7 +1078,7 @@ SeedModel make_model(std::uint64_t seed, bool allow_dir_replaced, const std::str
     m.pkg = "p" + ns + tag + std::to_string(seed);
     m.co_pkg = "c" + ns + tag + std::to_string(seed);
     // 路径前缀也带 tag：单种子复现用例会把两个变体跑在**同一个** test_root 里，
-    // 前缀不带 tag 的话第二个变体会撞上第一个变体装出来的文件（实测：整批预检
+    // 前缀不带 tag 的话第二个变体会撞上第一个变体装出来的文件（整批预检
     // 报 "File /usr/share/prop/b0/S0 is owned by package pball0"）
     m.base = "usr/share/prop/" + ns + tag + std::to_string(seed);
 
@@ -1296,7 +1294,7 @@ std::vector<UserEdit> plan_user_edits(const SeedModel& m, SlotGen& g)
  * 配置保护的**全部意义**，覆盖不该靠种子碰运气（加种子不是正道 —— 见文件头）。
  * 兜底只**追加**两格改动（不动随机那一批），因此每个种子至多多出两条改动。
  *
- * 覆盖**非空**的保证分两层：本函数在**每个种子**内钉住"内容相同 / 内容不同"两格的用户改动
+ * 覆盖**非空**的保证分两层：本函数在**每个种子**内断言"内容相同 / 内容不同"两格的用户改动
  * （前者需要该种子确实有一格 `file → file`，生成器已显式钉了一格 —— 见 `gen_etc_model`）；
  * 跨种子的 `EXPECT_GT(b.etc_keep_local, 0)` / `EXPECT_GT(b.etc_save_lpkgnew, 0)` 由文件末尾
  * 的用例断言兜底（`SaveLpkgnew` 还有 `companion.conf` 这一格恒在的原料，与种子无关）。
@@ -1522,7 +1520,7 @@ protected:
      * 默认种子数。**这个数字不测"更多样本"，只测"形态覆盖"**：生成器是结构化的
      * （每个种子随机组合 路径形态 × v1→v2 迁移 × 用户改动 × 注入断点），形态空间是有限的，
      * 再多的种子只是在同一批形态上重采样 —— 它不是 fuzz（没有字节级变异、没有
-     * `random_device`，种子确定 ⇒ 结果确定）。实测 200 个种子 320 s，而 **全部** 历史红种子
+     * `random_device`，种子确定 ⇒ 结果确定）。200 个种子 320 s，而 **全部** 历史红种子
      * 都由同一个缺陷解释（dir→非目录 那一格），加种子并没有换来新发现。
      *
      * 所以默认取 32（约 50 s）：**要深度时手动加**——`LPKG_PROP_SEEDS=200 make test`，
@@ -1579,7 +1577,7 @@ protected:
     ///
     /// `xattrs`：**目录**上的 xattr 声明（路径 → 键 → 值，与 `tree` 同口径）。写在 content/ 上
     /// 之后由 `pack_package`（libarchive 的 disk reader）带进包 —— 这一条已由
-    /// `test_dir_xattrs.cpp` 端到端实测（目录的 `user.*` 与 `system.posix_acl_default`
+    /// `test_dir_xattrs.cpp` 端到端覆盖（目录的 `user.*` 与 `system.posix_acl_default`
     /// 都能穿过打包/解包落到安装目标上），所以这里的 xattr 是真的进了包的归档。
     std::string pack_tree(const std::string& name, const std::string& ver, const Tree& tree,
                           const std::map<std::string, std::string>& extra_files = {},
@@ -1741,15 +1739,9 @@ protected:
     /**
      * 回滚后的 xattr 检查：**逐键严格比**（少键 / 多键 / 值不同一律报）。
      *
-     * 订正 2026-09-26：本函数原先带**一条窄口径的宽容**（`may_lose` = 允许"该目录的键整批缺失"
-     * 的路径集合），用来把 `DIR_RM` 不记 xattr 那个缺口**量化**而不是当通过 —— 那条缺口已在
-     * 本日修好（`OpSink::remove_empty_dir` 现在在写 `DIR_RM` **之前**把该目录的 xattr 逐键记成
-     * `XATTR_SET` 行，回滚逆序先重建目录再写回键），**宽容因此整段删除**，恢复严格断言。
-     *
-     * 顺手留下一条前人踩过的坑（它解释了为什么"宽容"当初只能做到"整批丢键"这一步、不能更省：
-     * 也不能"把这些路径直接从期望里删掉" —— 被**搬进 stash** 的目录在断点时刻同样"不在盘上"，
-     * 而它的回滚是 **rename 回来**（inode 不变 ⇒ xattr 完好）。把路径从期望里删掉，那条本来正确
-     * 的键反而会被"多出一个不该有的键"判红 —— 一个把好种子判红、还把缺口范围算错的假判据。）
+     * 不能把路径直接从期望里删掉：被**搬进 stash** 的目录在断点时刻同样"不在盘上"，而它的
+     * 回滚是 **rename 回来**（inode 不变 ⇒ xattr 完好）。把路径从期望里删掉，那条本来正确的键
+     * 反而会被"多出一个不该有的键"判红。
      */
     std::string xattr_rollback_problems(const XMap& want, const XMap& got) const
     {
@@ -2243,13 +2235,6 @@ protected:
             return;
         }
         // ④′ xattr 也要**逐字节**回到改动后的 v1（含"键原本不存在 ⇒ 回滚后必须仍不存在"）
-        //
-        // 订正 2026-09-26：这一格原先带一条**窄口径宽容**，用来量化一个当时未修的真缺口 ——
-        // `remove_empty_dir` 写的 `DIR_RM <path> <mode> <uid> <gid>` **不含 xattr**，而回滚侧的
-        // `Undo::RecreateDir` 只 `create_directories` + `lchown`/`chmod` ⇒ **被 rmdir 又重建的
-        // 目录丢掉那份 ACL / SELinux 标签**（本轮新加的 xattr 维度当场抓到，实测 2/32 种子）。
-        // **缺口已修**：`remove_empty_dir` 现在在写 `DIR_RM` **之前**把该目录的 xattr 逐键记成
-        // `XATTR_SET` 行；回滚是逆序的 ⇒ 先 `RecreateDir` 再把键写回去。宽容整段删除，恢复严格比。
         const XMap got_rb_x_usr = disk_xattrs_usr(m);
         const XMap got_rb_x_etc = disk_xattrs_etc(m);
         // 绊线：**任何**基线里有 xattr 的目录在回滚后丢键都记一次 —— 修好之后应**恒为 0**。
@@ -2655,7 +2640,7 @@ protected:
         // 只兜 usr 侧等于把新维度交给运气（加种子不解决覆盖 —— 见文件头那条结论）。
         // 单种子复现模式（LPKG_PROP_SEED）下**不补**：那时用户要的就是"只跑这一个"。
         // **只在"允许 dir→非目录"的那一组兜底**：受限组（allow_dir_replaced=false）按构造
-        // 永远不会有这一格（usr 与 /etc 都禁），探下去是白跑（实测：不加这个守卫，受限组会
+        // 永远不会有这一格（usr 与 /etc 都禁），探下去是白跑（不加这个守卫，受限组会
         // 多跑 64 个种子 ≈ 100 s，而且探到上限也不会有结果）。
         constexpr int kCoverageProbe = 64;
         if (allow_dir_replaced && (replaced_seeds == 0 || etc_replaced_seeds == 0) &&
@@ -3056,7 +3041,7 @@ TEST_F(UpgradePropertyTest, SingleSeedReplay)
         note_env_overrides();
         // 与 run_group 一致：属性 A / B 各占一套包名与路径前缀（ns=a/b）。**不能**两条属性
         // 共用一个模型 —— 同一个 test_root 里 A 会把包升到 2.0，B 再用同一套路径装 v1 就成了
-        // "2.0 降级回 1.0"，撞的是另一套语义（实测整批预检直接判 file conflict）。
+        // "2.0 降级回 1.0"，撞的是另一套语义（整批预检直接判 file conflict）。
         for (const char* ns : {"a", "b"}) {
             const bool is_a = (std::string(ns) == "a");
             const SeedModel m = make_model(seed, allow_dir_replaced, ns);

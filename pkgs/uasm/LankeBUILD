@@ -12,7 +12,7 @@
 #    抄来的 CC-BY-SA-3.0 片段），7-Zip 构建用的是 uasm 本体，用不到它。
 #  - 构建日期在配方里直接写死（Arch 是 sed 注入 git 提交日期）。这样构建期不需要 git，
 #    且避开了 Arch 那步的隐患：`git log --date=format:'%b %d %Y'` 跟随 locale，
-#    在中文 locale 下会把 "8月 10 2024" 编进二进制（实测）。
+#    在中文 locale 下会把 "8月 10 2024" 编进二进制。
 # 命名沿用 rust 包的 NNNN-<子系统>-<描述>.patch，序号即应用顺序。
 
 _BD=$(dirname {WORK_DIR})

@@ -19,11 +19,11 @@ namespace fs = std::filesystem;
  * `IntegrationTestBase` 把 `Config` 的 root 指向沙盒 ⇒ `triggers_conf()` 落在
  * `<sandbox>/etc/lpkg/triggers.conf`，用例可以自己写规则、再断言"匹配真的发生了"。
  *
- * ⚠️ **订正 2026-10-03**：此前这些用例**只断言 `EXPECT_NO_THROW`**，而 `check_file` 惰性
+ * ⚠️ 这些用例**不靠"只断言 `EXPECT_NO_THROW`"**：`check_file` 惰性
  * 加载的配置文件在测试环境里**根本不存在** ⇒ 规则表恒空 ⇒ 待执行队列恒空 ⇒ "不抛异常"是
  * **恒真的废话**（用例名却声称验证了 ldconfig / systemd / 图标 / GSettings 触发器）。
- * 现在改为：显式写规则 → 断言 `pending_for_test()` 里**确实**出现了对应命令；
- * 去重用例断言队列**大小**（此前也只断言"不抛"，同样测不出是否去重）。
+ * 做法：显式写规则 → 断言 `pending_for_test()` 里**确实**出现了对应命令；
+ * 去重用例断言队列**大小**。
  */
 class TriggerManagerTest : public IntegrationTestBase
 {

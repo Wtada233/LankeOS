@@ -1,4 +1,4 @@
-//! `track` 的单元测试。**从 `mod.rs` 搬出来**：那边 54% 的行数是测试，生产代码被淹没了。
+//! `src/track/mod.rs` 的单元测试。
 //! 作为 `track` 的子模块，`use super::*` 与 crate 内私有项照旧可用。
 
 use super::*;

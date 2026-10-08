@@ -244,8 +244,8 @@ TEST_F(SolverTest, NotEqualOperatorMapping)
 
 // 回归测试：反向依赖图不包含自身。
 //
-// 这条原本钉的是 `solv::repo_revrequires()`（生产侧零调用、只被本用例吊着）。2026-10-03 把
-// 它与 `pkg/depend_scanner.cpp` 的第二份实现收敛成一份（`repo/revdep.hpp`），断言迁到这里：
+// 这条原本钉的是 `solv::repo_revrequires()`（生产侧零调用、只被本用例吊着）。现已与
+// `pkg/depend_scanner.cpp` 的第二份实现收敛成一份（`repo/revdep.hpp`），断言迁到这里：
 // 语义按"两种边都看"，而"不把 glibc 记成自己的反向依赖"改由**构建期排自环**保证
 // （不是查询期再 skip 一次 —— 那样两个消费者都得各写一遍）。
 TEST_F(SolverTest, ReverseDependencyMapExcludesSelf)
@@ -310,8 +310,8 @@ TEST_F(SolverTest, ForceReinstallSameVersionProducesPlan)
 
 // S2 回归：latest 要在预发布与稳定版之间选对 —— rpm 里**预发布是 `~`**（`1.0~rc1 < 1.0`），
 // 已装预发布应升到稳定版。
-// ⚠️ 8.0.0 起 `-rc1` 是 **release**（`1.0-rc1 > 1.0`），所以这里必须写 `~` ——
-// 旧用例写的是 `1.0-rc1`，那条在 rpm 语义下**本来就该**选 rc（它更新），不是缺陷。
+// ⚠️ `-rc1` 是 **release**（`1.0-rc1 > 1.0`），所以这里必须写 `~` ——
+// 写 `1.0-rc1` 的话，rpm 语义下**本来就该**选 rc（它更新），不是缺陷。
 TEST_F(SolverTest, LatestPrefersStableOverPrerelease)
 {
     add("pkgB", "1.0", {}, {}, {}, {});
@@ -365,17 +365,17 @@ TEST_F(SolverTest, InstallNonexistentPackageWithVersionErrors)
 }
 
 // ============================================================================
-// A6 回归：`install pkg:版本` 在**同名包已装**、而仓库(avail)里根本没有这个包名时
+// 回归：`install pkg:版本` 在**同名包已装**、而仓库(avail)里根本没有这个包名时
 // 曾被静默丢弃。
 //
 // 机制：avail 扫描（`name_exists`）只扫 available repo，已装包不在其中。于是请求落到
 // "无同名包 → capability 回退"分支：按**裸包名**入队。而 libsolv 认为每个 solvable
 // 自提供 `名字 = evr`，installed repo 里同名的旧版本正好满足这个裸能力 ⇒ **空事务** ⇒
 // 上层 `first_unreached_target` 因 `cache.is_installed(名字)` 为真而放行 ⇒ 打印
-// "所有包都已安装"、退出码 0。用户明确请求的版本被静默丢弃。
+// "所有包都已安装"、退出码 0。用户请求的版本被静默丢弃。
 // ============================================================================
 
-// A6 主格：已装 pkgA 2.0、avail 里没有 pkgA、请求 pkgA:1.0 → 必须报错（点名两版本）
+// 主格：已装 pkgA 2.0、avail 里没有 pkgA、请求 pkgA:1.0 → 必须报错（点名两版本）
 TEST_F(SolverTest, RequestedVersionDiffersFromInstalledAndRepoLacksPackageErrors)
 {
     installed["pkgA"] = {"2.0", {}, {}, {}, {}};  // 已装 2.0；avail 里根本没有 pkgA
@@ -391,7 +391,7 @@ TEST_F(SolverTest, RequestedVersionDiffersFromInstalledAndRepoLacksPackageErrors
 }
 
 // 对照（别改坏）：请求的版本**正是已装版本**、仓库里也没有该包名 → 幂等 no-op，不是错误。
-// 这是 A6 的相反一侧：同名包已装，但版本对得上 ⇒ 本来就走不到"丢版本"。
+// 相反的一侧：同名包已装，但版本对得上 ⇒ 本来就走不到"丢版本"。
 TEST_F(SolverTest, RequestedVersionAlreadyInstalledWithoutRepoEntryIsNoop)
 {
     installed["pkgA"] = {"1.0", {}, {}, {}, {}};
@@ -590,14 +590,14 @@ TEST_F(SolverTest, GenuineConflictStillRejectedUnderMissingFlag)
 }
 
 // ============================================================================
-// 能力命名空间（8.0.0 字段拆分后的最终语义）：**两个方向都不许串**
+// 能力命名空间（字段拆分后的最终语义）：**两个方向都不许串**
 //
 // 池里有两套彼此隔离的命名空间：
 //   · 裸名空间（能力）：包的**自提供**（`<名> = evr`）、`deps` 的需求、虚拟 `provides`、
 //     以及"按能力名安装"的 target —— 都在这一侧；
 //   · `so:` 空间（SONAME）：`provides_soname` 的导出、`needed_so` 的需求 —— 只在
 //     `solver.cpp` 的 `scoped_soname()` 那一侧。
-// 于是（维护者 2026-10-04 拍板）：
+// 于是：
 //   · `deps: X`  ⇒ 匹配**包名**（自提供）或**虚拟 provides**；
 //   · `needed_so: X` ⇒ **只**匹配 `provides_soname`（包名与虚拟 provides 都不行）。
 // ============================================================================

@@ -23,7 +23,7 @@
  *
  *   `:batch-end` 那一次由 **op 自己在末尾调用**（执行器不认识 Cache），全批次**只写一次**。
  *   曾经是**逐包** `Cache::write(pkg + ":installed")`：每包把 6 个 DB 文件全量重写一遍、
- *   各留一份全量备份，本机实测 `files.db` 19.8 MB ⇒ 100 包批次落下 ~2 GB 临时备份。
+ *   各留一份全量备份，本机 `files.db` 19.8 MB ⇒ 100 包批次落下 ~2 GB 临时备份。
  *   改为一次的依据有两条，都是查实的：① **批次进行中没有任何读取器读盘上的 DB**
  *   （`Cache::load()` 的调用点全在批次之外，循环内一律走内存 `Cache`）；② 未提交批次
  *   **一律整体回滚**，所以中途的盘上状态既不可观测、也不可能成为最终状态。
@@ -49,12 +49,10 @@
  *
  * 模板参数 OpT 是一个可调用对象 OpT(std::vector<std::string>& success)，
  * 负责执行包级操作；包级 WAL 写入统一走 wal::log_wal_line()。
- * （曾向 OpT 传 WalWriter& 但调用方从未使用——所有写都走 log_wal_line，
- *   持有无用 fd 反而迷惑，故移除。）
+ * （OpT 不持有 WalWriter：所有写都走 log_wal_line，多一个无用的 fd 反而迷惑。）
  *
- * @param op          包级操作的可调用对象
- * @return            成功安装的包名列表
- * @throws            在操作失败时重新抛出，回滚后再抛
+ * @return 成功安装的包名列表
+ * @throws 在操作失败时重新抛出，回滚后再抛
  */
 template <typename OpT>
 std::vector<std::string> run_batch_transaction(OpT&& op)
@@ -64,7 +62,7 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
     // 这里再 trim 一次已完成的批次，保证新批次从干净的日志开始。
     trim_completed();
 
-    // **入口守卫（2026-10-03 补）**：上面那条"前提"此前只是**假设** —— 调用方不一定做得到。
+    // **入口守卫**：上面那条"前提"此前只是**假设** —— 调用方不一定做得到。
     // `recover_packages()` 在"有撤销动作真的没成功"时会**故意不封口**（留给下次 rec 重做），
     // 而 `init_database_for()` 不返回恢复成败、同进程继续执行用户命令 ⇒ 新批次就开在了未封口的
     // WAL 上，造出 `BEGIN₁ …(未封口) BEGIN₂ … COMMIT₂` 这种"已提交批次**嵌套**在未提交批次里"
@@ -126,5 +124,3 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
         throw;
     }
 }
-
-// （曾提供 run_ordered_batch 便捷包装，但从未被任何调用点使用，已移除。）

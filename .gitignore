@@ -31,3 +31,7 @@ site/docs/lpkg/index.md
 
 # Python缓存
 __pycache__
+
+# 维护者的工作笔记：含会话语境与内部记账，是笔记不是公开文档 —— 不提交。
+# 注释规范见仓库根的 CLAUDE.md，它指向这两份。
+LOCAL.md

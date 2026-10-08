@@ -150,8 +150,9 @@ TEST_F(SymlinkLogicTest, HandlesConfigSymlinkConflict)
     ASSERT_NO_THROW(task.copy_package_files());
 
     // **类型变化**（盘上是普通文件、包内是符号链接）→ 原物改名 `<路径>.lpkgsave`，
-    // 新链接**就地**落位（2026-09-26 统一；改前是"链接一律按配置冲突退 `.lpkgnew`、原文件
-    // 留原样"）。这是直连写入趟的**回退路径**（无记录 ⇒ 没有让开趟），所以那次改名由写入趟
+    // 新链接**就地**落位（改前是"链接一律按配置冲突退 `.lpkgnew`、原文件
+    // 留原样"，现已按"类型变化"统一）。这是直连写入趟的**回退路径**（无记录 ⇒ 没有让开趟），
+    // 所以那次改名由写入趟
     // 自己按表的 `let_go = SaveConfig` 补做。
     EXPECT_TRUE(fs::is_symlink(conf_phys)) << "新链接应当**就地**落 /etc/os-release";
     EXPECT_EQ(fs::read_symlink(conf_phys), "/usr/lib/os-release");

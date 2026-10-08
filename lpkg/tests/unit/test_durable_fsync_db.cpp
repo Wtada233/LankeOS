@@ -179,8 +179,8 @@ TEST_F(DurableFsyncDbTest, WalAuditAppendFsyncsParentDirOnlyWhenItCreatesTheFile
            "WAL 文件，而它描述的物理操作已经做完 —— 无行可回滚";
 
     // (b) WAL **已存在** → 本次调用没有创建任何东西 → 父目录 fsync 次数必须是 0
-    //     （否则每条审计行都白付一次父目录 fsync，实测占 fsync 总数 34%~40%）。
-    //     "审计行真的写了"要一并钉住：否则 0 次可能只是"什么都没发生"。
+    //     （否则每条审计行都白付一次父目录 fsync，占 fsync 总数 34%~40%）。
+    //     "审计行真的写了"要一并断言：否则 0 次可能只是"什么都没发生"。
     const fs::path victim2 = test_root / "usr/lib/libaudit2.so.1";
     std::ofstream(victim2) << "x";
     wal::WALOp op2;
@@ -200,7 +200,7 @@ TEST_F(DurableFsyncDbTest, WalAuditAppendFsyncsParentDirOnlyWhenItCreatesTheFile
 // ── 性能回归：已存在的 WAL 上连续追加 N 行，父目录 fsync 次数必须是 0 ──────────
 //
 // `wal::log_wal_line` 的注释写的是"**首次创建时**把目录项也落盘"，实现却在**每次调用**
-// 都做一次 `fsync_parent_dir` —— 每条 WAL 行白付一次父目录 fsync（实测占 fsync 总数
+// 都做一次 `fsync_parent_dir` —— 每条 WAL 行白付一次父目录 fsync（占 fsync 总数
 // 34%~40%）。WAL 行自己的内容 fsync（::fsync(fd)）不受影响，恒生效；这里只砍掉"文件
 // 本来就在、dentry 早就落过盘"时那次多余的目录 fsync。
 TEST_F(DurableFsyncDbTest, ExistingWalAppendDoesNotFsyncParentDirPerLine)

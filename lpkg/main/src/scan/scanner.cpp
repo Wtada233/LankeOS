@@ -14,9 +14,7 @@
 namespace fs = std::filesystem;
 
 /**
- * 扫描系统中不受任何包管理的孤立文件
- * 遍历 /usr、/etc、/opt、/var 等目录，跳过已知的系统路径和包管理器路径，
- * 检查每个文件是否在缓存中有对应的包所有者记录
+ * 遍历 /usr、/etc、/opt、/var 等目录，跳过已知的系统路径与包管理器路径。
  */
 void scan_orphans(const std::string& scan_root_override)
 {
@@ -35,7 +33,7 @@ void scan_orphans(const std::string& scan_root_override)
         (actual_root / "usr/share/lpkg")
             .string(),  // 这两个是lpkg数据目录，有包DB本身，不是扫描范围
         (actual_root / "var").string(),
-        (actual_root / "mnt").string(),  // 挂载点（如 /mnt/base 的镜像树）不属于本机，2026-10-03
+        (actual_root / "mnt").string(),  // 挂载点（如 /mnt/base 的镜像树）不属于本机
         (actual_root / "proc").string(),
         (actual_root / "sys").string(),
         (actual_root / "dev").string(),
@@ -54,7 +52,7 @@ void scan_orphans(const std::string& scan_root_override)
     bool walk_truncated = false;
 
     for (const auto& root : scan_roots) {
-        // 两处判定都走**不抛**的谓词（2026-09-26 修）：这两个 root 是拼出来的已知路径，
+        // 两处判定都走**不抛**的谓词：这两个 root 是拼出来的已知路径，
         // 其中**中间段**成环时抛型重载会以 ELOOP 打断整趟扫描 —— 而这不是"某个文件读不了"
         // （那种有下面的 try/catch 兜着），是整趟 `lpkg scan` 直接失败。
         // 判据本身保持原语义：`exists_follow` = 跟随语义的 `fs::exists`；
@@ -65,13 +63,13 @@ void scan_orphans(const std::string& scan_root_override)
         // 跳过本身就是符号链接的根目录（例如 /bin -> /usr/bin）
         if (is_symlink_no_follow(root)) continue;
 
-        // 显式迭代器循环，且**把 increment 的错误码当成一等公民**（2026-10-03 修）。
+        // 显式迭代器循环，且**把 increment 的错误码当成一等公民**。
         //
         // 为什么不能写 `for (...; it != end; it.increment(ec))`：`recursive_directory_iterator
         // ::increment(ec)` 出错时会把迭代器**置为 end**，而 `ec` 是在**循环条件里**被求值的
         // —— 循环体永远没机会看它。于是"走到一半失败"与"正常走完"**完全无法区分**，
         // 扫描结果**静默截断**，summary 还照打一个看着挺大的数。
-        // 实测（2026-10-03，本机）：不剪枝时走 `/` 会在 `/proc/<pid>/task/<pid>/net` 上拿到
+        // 不剪枝时走 `/` 会在 `/proc/<pid>/task/<pid>/net` 上拿到
         // `EINVAL(22)` → 迭代器变 end → 整趟扫描停在 `/proc` 里，`/usr`（28 万个文件）
         // **一个都没扫到**；而它仍打印"共扫描 389551 个文件"。
         std::error_code walk_ec;
@@ -87,7 +85,7 @@ void scan_orphans(const std::string& scan_root_override)
 
                     bool ignored = false;
                     for (const auto& prefix : ignored_prefixes) {
-                        // **分量级**前缀，不是字符串前缀（2026-10-03 修）：`path.compare(0, n,
+                        // **分量级**前缀，不是字符串前缀：`path.compare(0, n,
                         // prefix)` 会把 `usr/manual`、`var/logrotate` 这类**同级**目录也算成命中
                         // `usr/man` / `var/log`，害得它们下面的孤儿被静默忽略。要求前缀之后紧跟
                         // `/`（或路径恰好 就是该前缀本身）。
@@ -116,7 +114,7 @@ void scan_orphans(const std::string& scan_root_override)
                         }
                     }
                 } else {
-                    // ── 剪枝：被忽略的目录**根本不走进去**（2026-10-03 修）──────────────
+                    // ── 剪枝：被忽略的目录**根本不走进去** ──────────────
                     // `ignored_prefixes` 此前只用于**过滤报告**，遍历照样递归进 `/proc` /
                     // `/sys` / `/var` —— 那既是本缺陷的**触发器**（`/proc` 下的目录随进程生灭，
                     // 走进去必然撞上 increment 失败 → 整趟截断），也是纯粹的浪费

@@ -96,7 +96,7 @@ TEST_F(UtilsTest, ReadSetFromFile)
 {
     // 直接用 ofstream 造文件 —— 不经过任何"写集合"的助手：生产侧写集合文件的是
     // `Cache` 自己的 `ofstream + fsync_and_rename`，曾经那个 `write_set_to_file()`
-    // 生产零调用（2026-10-03 删），留着它只会让这条用例变成"自己写、自己读"的往返，
+    // 生产零调用（已删），留着它只会让这条用例变成"自己写、自己读"的往返，
     // 证明不了读侧对**真实文件格式**的处理。
     const fs::path f = test_dir / "set.txt";
     {
@@ -147,7 +147,7 @@ TEST_F(UtilsTest, SplitStringView_NoDelimiter)
     EXPECT_EQ(parts[0], "hello");
 }
 
-// ── strip_trailing_slash：**唯一**一份"剥尾斜杠"实现（2026-10-03 合并了 strip_trailing_sep）──
+// ── strip_trailing_slash：**唯一**一份"剥尾斜杠"实现（合并了 strip_trailing_sep）──
 //
 // 不变量：只剥**末尾**的 '/'，根 "/" 原样保留，**不做**任何 lexically_normal 之外的规范化
 // （合并后 `strip_trailing_sep` 仍先 lexically_normal 再走这里，行为与合并前逐字节一致）。

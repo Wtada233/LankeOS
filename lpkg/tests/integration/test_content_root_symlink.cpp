@@ -13,14 +13,14 @@
  *   · 随后 `extract_and_validate_package` 的 `fs::exists(tmp/content)`（**跟随**语义）为真、
  *     `scan_content_files` 的 `recursive_directory_iterator(content_dir)` 会**跟随起点目录**，
  *     于是**安装机上**那个目录里的文件被当成"包内容"登记、复制进目标 root
- *     （2026-10-02 端到端实测复现：包 owning 外部目录里的文件）。
+ *     （端到端复现：包 owning 外部目录里的文件）。
  *
  * ── 修法 ──────────────────────────────────────────────────────────────────────
  *   · `extract_and_validate_package`：`content` 必须是**真目录**（lstat），`metadata.json`
  *     必须是**真文件**；
  *   · `scan_content_files`：根不是真目录即抛 `error.content_not_directory`（第二道防线）。
  *
- * 本用例钉"装不上 + 外部文件既没被登记、也没被复制"。
+ * 本用例覆盖"装不上 + 外部文件既没被登记、也没被复制"。
  */
 
 #include <archive.h>

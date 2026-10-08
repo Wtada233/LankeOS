@@ -23,7 +23,7 @@
 
 // libsolv 的 `Solvable` 有 `requires` 字段，而它在 C++20 里是关键字 → 宏改名绕开。
 // **必须在 libsolv 头之后立刻 `#undef`**：这宏一旦泄漏到 C++ 标准库头里就炸
-// （`<type_traits>` 自己用 `requires` 当关键字 —— 实测报 `unknown type name 'solv_requires'`）。
+// （`<type_traits>` 自己用 `requires` 当关键字 —— 会报 `unknown type name 'solv_requires'`）。
 // `solver.cpp` 就是这么收的，照抄，别在这里发明第二种。
 #define requires solv_requires
 #include <solv/evr.h>
@@ -90,9 +90,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 
     // **只接受可打印 ASCII（外加作为分隔符的换行）**：`pool_str2id` 收的是 **C 串** —— 输入里的
     // NUL 会让 libsolv 看到的版本串**被截断**，而 `version_satisfies` 看的是完整串 ⇒ 两边比的
-    // **根本不是同一个字符串**，报出来的"分叉"是这个 harness 造出来的。实测踩过：一条带
-    // `1.<0x80>\0\0\x16...` 的输入被报成分叉。真实版本串全部落在可打印 ASCII 内（索引 678 个
-    // 版本实测过），所以这条过滤不损失覆盖。
+    // **根本不是同一个字符串**，报出来的"分叉"是这个 harness 造出来的（例如一条带
+    // `1.<0x80>\0\0\x16...` 的输入会被报成分叉）。真实版本串全部落在可打印 ASCII 内（索引
+    // 678 个版本），所以这条过滤不损失覆盖。
     for (std::size_t i = 0; i < size; ++i) {
         const uint8_t c = data[i];
         if (c == '\n') continue;

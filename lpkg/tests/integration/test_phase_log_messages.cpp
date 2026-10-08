@@ -16,7 +16,7 @@
  *   · 造红时仍定位得到：模板退回"不带包名"的旧形态（没有占位符）时，
  *     "包名必须落在第一个占位符处"无从满足 → 匹配不到行 → 红，
  *     而不是变成"找不到行"的另一种红（两种红的诊断价值不同）。
- *   · 顺带钉住参数落在**对的槽位**上（`string_format` 是 std::vformat，槽位顺序即用户看到的语序）。
+ *   · 顺带断言参数落在**对的槽位**上（`string_format` 是 std::vformat，槽位顺序即用户看到的语序）。
  *
  * 造红说明（踩过一次，值得记）：l10n 是**运行时加载**的，查找顺序为 `<exe>/../l10n` →
  * `<exe>/../main/l10n` → `<exe>/../src/l10n` → 安装路径。容器里跑测试命中的是
@@ -208,11 +208,9 @@ TEST_F(PhaseLogMessageTest, InstallPhaseLinesNameThePackage)
     cap.stop();
     const std::string& out = cap.out;
 
-    // 2026-10-03 起每个阶段只有**一行**（进度条那一行就点名叫什么、在干什么）：
+    // 每个阶段只有**一行**（进度条那一行就点名叫什么、在干什么）：
     //   解压 → `ui.extract`（`==> Extracting <pkg> ... 100%`）
     //   拷贝 → `ui.installing`（`==> Installing <pkg> <ver> ... 100%`）
-    // 旧的 `info.extracting{,_to_tmp}` / `info.extract_complete` / `info.copying_files` 已删除
-    // （它们是同一件事的三种说法，且"每 100 个文件刷一行"在真终端上只是噪音）。
     expect_phase_names_package(out, "ui.extract", pkg, "解压进度行");
     expect_phase_names_package(out, "ui.installing", pkg, "安装进度行");
 }

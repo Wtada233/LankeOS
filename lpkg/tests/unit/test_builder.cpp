@@ -79,7 +79,7 @@ TEST_F(BuilderTest, CleanupLibtoolFiles)
  * 里的判定用的是 `directory_entry::is_regular_file()` / `entry.is_regular_file()` /
  * `entry.is_directory()` —— 它们走 `status()`（**跟随**末段链接），对**环**抛
  * `filesystem_error(ELOOP)` → **整个构建被打死**（上游源码树里自指链接很常见）。
- * 2026-09-26 改为不抛形态（`base/utils.hpp` 的谓词族），本用例钉住它。
+ * 现在改用不抛形态（`base/utils.hpp` 的谓词族），本用例覆盖它。
  */
 TEST_F(BuilderTest, SymlinkLoopInStagingDoesNotBreakFinalize)
 {
@@ -124,7 +124,7 @@ TEST_F(BuilderTest, VariableSubstitutionWorks)
 }
 
 // ============================================================================
-// run_build 的失败路径与 6.5 阶段（2026-09-26 拆 run_build 时抽出，此前无覆盖）
+// run_build 的失败路径与 6.5 阶段（拆 run_build 时抽出）
 // ============================================================================
 
 /** 元数据阶段：LankeBUILD.json 缺失 → 报错且**点名构建目录**（不是含糊的"构建失败"）。 */
@@ -211,8 +211,8 @@ TEST_F(BuilderTest, ProcessedScriptIsRemovedAfterBuild)
 TEST_F(BuilderTest, MissingNameFieldErrorNamesTheJsonPath)
 {
     // LankeBUILD.json 缺 name/version 或字段类型不对时，nlohmann 抛的是 `json::exception`
-    // （**不是** LpkgException）。此前那几个 `meta.at(...)` 在 try 之外，异常会一路穿到 main 的
-    // 兜底 catch，报错里也**不点名是哪个 LankeBUILD.json**（2026-10-02 修）。
+    // （**不是** LpkgException）。那几个 `meta.at(...)` 已在 try 内，报错会点名是哪个
+    // LankeBUILD.json，不再一路穿到 main 的兜底 catch。
     {
         std::ofstream json(test_dir / "LankeBUILD.json");
         json << R"({"version": "1.0.0"})";  // 故意缺 name

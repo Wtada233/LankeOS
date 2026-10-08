@@ -47,7 +47,6 @@ pub struct ChkOpts {
     pub full_rescan: bool,
 }
 
-/// 检則报告。
 #[derive(Debug, Default, Clone)]
 pub struct Report {
     pub checked: usize,
@@ -58,7 +57,6 @@ pub struct Report {
     pub failed: Vec<String>,
 }
 
-/// 严重度。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
     /// 依赖树不正确：对象（module/符号）存在但不在本包 deps∪needed_so 内（缺依赖）。
@@ -74,7 +72,6 @@ pub fn sev_marker(s: Severity) -> &'static str {
     }
 }
 
-/// 单条发现。
 #[derive(Debug, Clone)]
 pub struct Finding {
     /// 来源文件（相对 content，如 `usr/share/.../a.qml` / `usr/lib/pkgconfig/glib-2.0.pc`）

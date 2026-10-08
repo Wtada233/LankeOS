@@ -5,8 +5,9 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    # GTK4 immodule：仓库原先只发 GTK3 那个（/usr/lib/gtk-3.0/3.0.0/immodules/im-fcitx5.so），
-    # GTK4 侧 /usr/lib/gtk-4.0/4.0.0/immodules/ 一个都没有 —— GTK4 应用当时只能走 Wayland
+    # GTK4 immodule：本包裹同时发 GTK3 与 GTK4 两个模块（GTK3 的在
+    # /usr/lib/gtk-3.0/3.0.0/immodules/im-fcitx5.so，GTK4 的在
+    # /usr/lib/gtk-4.0/4.0.0/immodules/）；只有 GTK3 模块时 GTK4 应用只能走 Wayland
     # text-input 协议。终端的 VTE 用 gtk_im_multicontext_new()（两条路都留着），补上 GTK4
     # 模块后可用 GTK_IM_MODULE=fcitx5 让它走 immodule 路径（值必须是 fcitx5：
     # GTK 按 im-<名字>.so 找模块）。这正是 Arch 的默认：Arch PKGBUILD 只关 GTK2，
@@ -30,7 +31,7 @@ lankebuild_build() {
 lankebuild_package() {
     # GTK4 在 Wayland 下**不会**自己选输入法上下文（GTK3 会：im-wayland.so 被自动挑中），
     # 必须由 gtk-im-module 指名。该键在 GTK4 里没有 gsettings 映射（gtksettings.c 只有
-    # g_param_spec_string("gtk-im-module")），实测 settings.ini 也不生效（把
+    # g_param_spec_string("gtk-im-module")），settings.ini 也不生效（把
     # GTK_DATA_PREFIX 下的 /usr/share 与 /etc 两份 gtk-4.0/settings.ini 的值都改成
     # "none"，探测结果不变 → 属性根本没被应用），所以机制只能是会话环境，由本包随包投递。
     # 值是冒号分隔的列表（GTK 按 ':' 切分，逐项按 backend 过滤后取第一个可用者）：
@@ -38,7 +39,7 @@ lankebuild_package() {
     #     gtkimmulticontext 的 match_backend 要求 Wayland 显示且合成器宣告
     #     zwp_text_input_manager_v3，kwin ✓）；
     #   fcitx —— 本包提供的 GTK4 模块。键名用 fcitx：fcitx5-diagnose 给的就是这个值，
-    #     且模块的 GIO 扩展同时注册了 fcitx 与 fcitx5 两个名字（实测枚举确认）。
+    #     且模块的 GIO 扩展同时注册了 fcitx 与 fcitx5 两个名字（枚举确认）。
     # 于是 Wayland 下走协议，拿不到协议的 backend（X11/Xwayland 里的 GTK4 应用）才落到模块。
     install -dm 755 "{STAGING_ROOT}/usr/lib/environment.d"
     cat > "{STAGING_ROOT}/usr/lib/environment.d/fcitx5-gtk.conf" << 'EOF'

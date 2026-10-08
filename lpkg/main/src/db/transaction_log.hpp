@@ -30,7 +30,6 @@ namespace wal
 class WalWriter
 {
 public:
-    /// 打开 WAL 文件进行追加写入
     WalWriter();
     ~WalWriter();
 
@@ -69,7 +68,6 @@ private:
 /// 调用者持有该实例用于后续 WAL 写入（使用 move 语义）
 WalWriter begin_batch();
 
-/// 对当前批次的单条 WAL 行进行 log + fsync
 void log_wal_line(std::string_view line);
 
 /// 写入 COMMIT_PKGS + fsync

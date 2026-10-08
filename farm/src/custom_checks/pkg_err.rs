@@ -1,4 +1,4 @@
-//! pkg-errchk — 打包错误检测（CLAUDE.md 铁律护栏）：
+//! pkg-errchk — 打包错误检测：
 //! - `usr/etc/` / `usr/var/`：打包时把 PREFIX 拼进了系统根（`/etc`、`/var` 才对，不应有 usr/etc）→ 错位。
 //! - `.la`（libtool 存档）：已废弃，禁止进入 .lpkg。
 //! - `.a`（静态库）：一般应删，除非包 .cmake 配置引用了它（如 LLVM/aom）；发现即报，operator 用
@@ -28,7 +28,6 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     Ok(serde_json::json!({ "paths": paths }))
 }
 
-/// 跑 pkg-errchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let walk = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
     // 过滤（subset / IGNORE_CHK_PKGERR）与汇总由公共骨架做，这里只回答"本包有什么问题"

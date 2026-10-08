@@ -20,14 +20,14 @@
 #include "packer.hpp"
 #include "pkg/package_manager.hpp"
 #include "repo/repository.hpp"
-#include "strip.hpp"  // strip_binary（原住 base/utils.hpp，2026-09-26 挪回本层）
+#include "strip.hpp"  // strip_binary
 #include "vercmp/dep_parser.hpp"
 
 /** 在 main/src/main_cli.cpp 中定义，由 SIGINT 信号处理函数设置（SigIntGuard 生命周期内生效） */
 extern std::atomic<bool> sigint_graceful;
 
 /**
- * Ctrl+C 检查点（**唯一形态**）：`lpkg build`/`pack` 挂在 `SigIntGuard` 之下，本进程只置标志、
+ * Ctrl+C 检查点（唯一形态）：`lpkg build`/`pack` 挂在 `SigIntGuard` 之下，本进程只置标志、
  * 不打断当前动作 —— 每个可能长时间停留的**进程内**步骤（阶段之间、strip 循环、打包前）都要
  * 在这里把它翻成 `UserAbort`，否则那个窗口里的 Ctrl+C 会被静默吞掉（用户以为没反应）。
  * 下载期间那一份在 `downloader.cpp` 的 curl 进度回调里（curl 是进程内的，没有子进程会替我们死）。
@@ -47,9 +47,8 @@ namespace
 {
 
 /**
- * 设置构建目录结构
- * 创建工作目录、staging 目录和 hooks 目录，初始化 UsrMerge 符号链接
- * 创建默认的 post-install 脚本占位符
+ * 创建工作目录、staging 目录和 hooks 目录，初始化 UsrMerge 符号链接，
+ * 并创建默认的 post-install 脚本占位符。
  */
 fs::path setup_build_directories(const fs::path& build_dir)
 {
@@ -250,7 +249,7 @@ void cleanup_build(const fs::path& work_root, const fs::path& staging_root,
     }
 }
 
-// ── run_build 的零件（2026-09-26 从 172 行的函数里按构建阶段抽出）───────────────
+// ── run_build 的零件（按构建阶段抽出）──────────────────────────────
 // 全都是**纯搬移**：语句、顺序、日志、异常与清理行为与抽之前逐行一致。
 
 /** 解析并校验过的构建元数据（run_build 后续各阶段只读）。 */

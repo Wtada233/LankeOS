@@ -47,7 +47,7 @@ void add_to_archive(struct archive* a, const fs::path& path, const std::string& 
     // 用 libarchive 的 **disk reader** 填 entry：它会一并带上 xattr **和真正的 ACL 记录**
     // （PAX `SCHILY.acl.access` 等）。此前手工 copy_stat + 把 ACL 当裸 xattr 写
     // （`SCHILY.xattr.system.posix_acl_access`）是**不生效**的——libarchive 不会把裸 xattr
-    // 当 ACL 应用，实测（真 lpkg pack/install 后 `getfacl` 命名条目消失；bsdtar 用
+    // 当 ACL 应用（真 lpkg pack/install 后 `getfacl` 命名条目消失；bsdtar 用
     // `--xattrs --acls` 解也照样丢，证明问题在打包侧而非 lpkg 的解压/拷贝）。
     struct archive* disk = archive_read_disk_new();
     archive_read_disk_set_symlink_physical(disk);  // 不跟随符号链接（与 lstat 语义一致）
@@ -184,8 +184,7 @@ void pack_package(const std::string& output_filename, const std::string& source_
 
             // 用 `write_string_to_file`（带 open/写失败检查 + fsync + 原子 rename）而不是
             // 裸 `std::ofstream`：后者不查失败，磁盘满/IO 错误会留下**截断的 metadata.json**
-            // 并被照常打进 `.lpkg`，而 `pack_package` 仍报成功、还给它算 SHA256
-            // （2026-10-02 修）。
+            // 并被照常打进 `.lpkg`，而 `pack_package` 仍报成功、还给它算 SHA256。
             write_string_to_file(tmp_meta, meta.dump(2) + "\n");
         }
         add_to_archive(a, tmp_meta, std::string(constants::PKG_METADATA_FILE), output_filename);
@@ -213,7 +212,7 @@ void pack_package(const std::string& output_filename, const std::string& source_
 
     // close 的返回值就是"整包是否真的写完落盘"：写失败（磁盘满/EIO）时 libarchive
     // 返回 ARCHIVE_FAILED/FATAL。不检查就会把**截断的 .lpkg 当成功**，还对截断内容
-    // 算 SHA256 → farm 把该哈希写进索引，下游校验通过、装到一半才炸（历史 TODO.md B2）。
+    // 算 SHA256 → farm 把该哈希写进索引，下游校验通过、装到一半才炸。
     // 阈值取 ARCHIVE_WARN：FAILED/FATAL 一律失败，WARN 只告警（与 archive.cpp 读侧一致）。
     if (close_rc < ARCHIVE_WARN) {
         discard_partial();

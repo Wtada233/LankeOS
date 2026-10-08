@@ -1,7 +1,7 @@
 /**
  * test_complex_atomic_scenarios.cpp — 复杂真实场景原子性测试
  *
- * 严格按 历史 TODO.md 要求：
+ * 覆盖这些场景：
  *   - remove -r 中途回滚（模拟 Ctrl+C / 断电）
  *   - 批量安装本地包（其中一个依赖另一个）
  *   - 升级 needed_so 断裂后回滚
@@ -53,7 +53,6 @@ TEST_F(ComplexAtomicTest, RecursiveRemoveRollbackDeepChain)
 
     install_packages({pRoot, pMid1, pMid2, pMid3, pLeaf});
 
-    // 验证全部安装
     for (auto& n : {"cr_root", "cr_mid1", "cr_mid2", "cr_mid3", "cr_leaf"})
         EXPECT_FALSE(Cache::instance().get_installed_version(n).empty());
 
@@ -97,8 +96,6 @@ TEST_F(ComplexAtomicTest, BatchInstallLocalPackagesWithInterDependency)
 {
     // 用本地文件路径安装：计划里的 deps/provides 直接从**归档 metadata** 读出，与索引天然
     // 一致，所以元数据一致性校验（不一致即硬报错）不会拦它。
-    // （2026-10-02 订正：原名 `MetadataDriftDuringInstall`，测的是已删除的"动态重解析"；
-    //   那套行为不再存在 —— 索引与归档不一致一律拒绝安装。）
 
     std::string pA = create_pkg("md_drift_A", "1.0", {}, {}, {"libA_drift.so.1"});
     std::string pB = create_pkg("md_drift_B", "1.0", {"md_drift_A"}, {}, {"libB_drift.so.1"});
@@ -110,7 +107,6 @@ TEST_F(ComplexAtomicTest, BatchInstallLocalPackagesWithInterDependency)
     EXPECT_FALSE(Cache::instance().get_installed_version("md_drift_A").empty());
     EXPECT_FALSE(Cache::instance().get_installed_version("md_drift_B").empty());
 
-    // 验证 provides_soname 正确注册
     EXPECT_TRUE(Cache::instance().get_soname_providers("libA_drift.so.1").contains("md_drift_A"));
     EXPECT_TRUE(Cache::instance().get_soname_providers("libB_drift.so.1").contains("md_drift_B"));
 }
@@ -186,7 +182,6 @@ TEST_F(ComplexAtomicTest, ForceOverwriteRollbackRestoresOwnership)
     // 先正常安装 fo_overwriter（和新文件路径 /usr/bin/fo_overwriter 不同，不冲突）
     install_packages({pOverwriter});
 
-    // 验证 fo_owner 的文件仍归 fo_owner
     auto after = Cache::instance().get_file_owners("/usr/bin/fo_owner");
     EXPECT_TRUE(after.contains("fo_owner"));
     EXPECT_FALSE(after.contains("fo_overwriter"));
@@ -206,7 +201,6 @@ TEST_F(ComplexAtomicTest, TripleInstallRollbackOnLastFailure)
     // C 有不可解析的 needed_so → 安装应失败，回滚 A 和 B
     EXPECT_THROW(install_packages({pC, pB, pA}), LpkgException);
 
-    // 验证全部回滚
     Cache::instance().load();
     EXPECT_TRUE(Cache::instance().get_installed_version("tri_A").empty());
     EXPECT_TRUE(Cache::instance().get_installed_version("tri_B").empty());
@@ -224,7 +218,6 @@ TEST_F(ComplexAtomicTest, TripleInstallRollbackOnLastFailure)
 
 TEST_F(ComplexAtomicTest, FullLifecycleInstallReinstallRemove)
 {
-    // 安装
     std::string p1 = create_pkg("lifecycle", "1.0", {}, {}, {"lifecycle.so.1"});
     install_packages({p1});
     EXPECT_EQ(Cache::instance().get_installed_version("lifecycle"), "1.0");
@@ -333,7 +326,6 @@ TEST_F(ComplexAtomicTest, SequentialUpgrades)
 {
     setup_local_mirror();
 
-    // 安装 v1
     std::string pV1 = create_pkg("seq_lib", "1.0", {}, {}, {"seq.so.1"});
     add_to_mirror("seq_lib", "1.0");
     install_packages({pV1});
@@ -442,7 +434,6 @@ TEST_F(ComplexAtomicTest, ReverseDependencyUpdateAfterRemove)
 
     install_packages({pApp, pLib});
 
-    // 验证反向依赖
     auto rdeps = Cache::instance().get_reverse_deps("rdep_lib");
     EXPECT_TRUE(rdeps.contains("rdep_app"));
 

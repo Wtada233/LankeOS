@@ -5,21 +5,21 @@ lankebuild_prepare() {
 
 lankebuild_build() {
     mkdir build && cd build
-    # 关掉的都是"镜像/扩展/安装/家目录"这一族**非核心可选栈**（每一项都实测过没有包依赖它）：
+    # 关掉的都是"镜像/扩展/安装/家目录"这一族**非核心可选栈**（每一项都没有包依赖它）：
     # - networkd：systemd-networkd 整套（内核态网络交给 NetworkManager）
     # - sysext：systemd-sysext / systemd-confext（扩展镜像层）
     # - sysupdate + sysupdated：**两个独立选项**——前者是 CLI 工具、后者是守护服务（262 的
     #   meson_options.txt 里 sysupdated 是 combo，choices = auto/enabled/disabled），
     #   只关前者会留下 systemd-sysupdated，必须两个都关。
     # - mountfsd / nsresourced：镜像挂载 / 非特权 userns 两个 varlink 服务。**唯一客户端在 systemd
-    #   自己的工具里**（`systemd-dissect --mount`、nspawn/run 的非特权路径）；实测 udisks2 / gvfs /
+    #   自己的工具里**（`systemd-dissect --mount`、nspawn/run 的非特权路径）；udisks2 / gvfs /
     #   gnome-shell / nautilus / plasma-workspace / kf-solid / flatpak / libblockdev **全部零引用**
     #   —— 桌面自动挂载走 udisks2，gvfs 走自己的 FUSE，与这两个服务无关。
     # - homed：systemd-homed / homectl / pam_systemd_home.so。linux-pam 的 PAM 配置里那 4 行
     #   `pam_systemd_home.so` **带 `-` 前缀**（= 模块缺失不报错），注释也写着"尚未构建"，故关掉与现状一致。
     # - sysinstall：262 的交互式 OS 安装器（提示选目标盘、注册固件启动项）—— 不是发行版安装路径。
     #   它的 varlink 客户端依赖是 `io.systemd.Repart`（23 处）+ BootControl/Credentials/Shutdown，
-    #   **不依赖 mountfsd**（实测）。
+    #   **不依赖 mountfsd**。
     # - repart：按 `/usr/lib/repart.d/*.conf` 声明式**创建/增长分区表**（典型用途：镜像写盘后首次
     #   启动把根分区撑满、mkosi 打磁盘镜像）。关了之后发行版里没有任何消费者（sysinstall 已关）。
     # - imds：**v262 新增**的云端实例元数据栈（systemd-imdsd / systemd-imds 工具 / imds-generator /
@@ -36,12 +36,12 @@ lankebuild_build() {
     #   `systemd-bless-boot`(+generator)、`systemd-boot-*` 服务，以及（配合 HAVE_OPENSSL+HAVE_TPM2）
     #   整族 TPM2/PCR 度量与 pcrlock：`pcrlock*` / `pcrphase*` / `tpm2-setup*` / `pcrextend`。
     #   **为什么要显式写**：它是 `auto`（要求 `pyelftools + efi + efi_arch`，top_meson.build）。
-    #   实测目前解析为 0 —— release 6/7/8 里 `bless-boot`/`*.efi`/`pcrlock`/`pcrphase`/`tpm2-setup`
+    #   目前解析为 0 —— release 6/7/8 里 `bless-boot`/`*.efi`/`pcrlock`/`pcrphase`/`tpm2-setup`
     #   一律为空 ——**但那只是环境碰巧**：哪天 pyelftools / efi 被满足，这一族会悄无声息冒出来。
     #   写死它，结果就不依赖 auto 的依赖探测。
     #   **注意它并不门控 `bootctl`**：bootctl 在独立目录 `src/bootctl/`，唯一条件是 `HAVE_BLKID`；
     #   `systemd-boot-check-no-failures`（`src/bless-boot/meson.build` 第三条）更是**无条件**。
-    #   两者是**通用 EFI 管理/查询工具**，不依赖 sd-boot，配 GRUB 一样有用（实测 `bootctl`
+    #   两者是**通用 EFI 管理/查询工具**，不依赖 sd-boot，配 GRUB 一样有用（`bootctl`
     #   照常输出固件、Secure Boot 状态、`TPM2 Support: yes`——那是**固件** EFI TCG2 协议的探测，
     #   与 systemd 编译选项无关），故保留、不受这个开关影响。
     #   将来要做 TPM 度量启动 / pcrlock / LUKS-TPM：需 `-Dbootloader=enabled` + python-pyelftools
@@ -74,7 +74,7 @@ lankebuild_build() {
     # 想用其中任一功能：去掉对应开关重编即可（一次 systemd 重编的代价）。
     # 注：factory-reset **没有 meson 开关**（见下方删除块）。
     #
-    # **开关取值按 meson 类型写，别一律用 false**（实测踩过）：
+    # **开关取值按 meson 类型写，别一律用 false**：
     #   - `feature` 型（homed / repart / sysupdate / imds）必须写 `enabled`/`disabled`/`auto`。
     #     `=false` 只对声明了 `deprecated : { 'true':'enabled', 'false':'disabled' }` 的选项能过，
     #     且 meson 会打 `DEPRECATION: value 'false' is replaced by 'disabled'`；
@@ -89,12 +89,12 @@ lankebuild_build() {
     # factory-reset（systemd-factory-reset + factory-reset*.target 等）：上游**没有 meson 开关**
     # （meson_options.txt 里无 factory* 选项；units/meson.build 的条目也没有 conditions）→ 只能事后删。
     # glob 覆盖 二进制 / generator / unit / wants 链接与空目录，上游将来新增同名 unit 也一并覆盖。
-    # （原先是在设备上手工把 unit mask 到 /dev/null —— 那样字节仍在包里；这里是根本不打包。）
+    # （mask 到 /dev/null 不够 —— 那样字节仍在包里；这里是不打包。）
     #
     # pattern 必须写 `factory-reset*`、**不能**写 `factory-reset*.target`：上游把
     # `factory-reset.target.wants/` 这个**目录**也装出来（units/meson.build 两条条目带
     # `'symlinks': ['factory-reset.target.wants/']`），目录名以 `.wants` 结尾不匹配 `*.target`
-    # → 里面两个链接被删、空目录留下（实测残留一个空 `factory-reset.target.wants/`）。
+    # → 里面两个链接被删、空目录留下（残留一个空 `factory-reset.target.wants/`）。
     # 改成 `factory-reset*` 后，find 的后序（-delete 隐含 -depth）会先删内容再 rmdir 空目录。
     find "{STAGING_ROOT}" \
         \( -name 'systemd-factory-reset*' -o -name 'factory-reset*' \
@@ -122,7 +122,7 @@ lankebuild_build() {
         ln -sfv systemctl {STAGING_ROOT}{BINDIR}/$tool
     done
     # 注意：**不建** `systemd-resolve` 与 `resolvconf` 这两条软链 —— 一是上游
-    # `src/resolve/meson.build` 自己就 install_symlink 了它们（这里原本是重复），二是
+    # `src/resolve/meson.build` 自己就 install_symlink 了它们，二是
     # `-Dresolve=false` 后 resolvectl 不存在，建了就是悬空链。
     ln -sfv ../lib/systemd/systemd {STAGING_ROOT}{BINDIR}/init
     ln -sfv systemd-run {STAGING_ROOT}{BINDIR}/run0
@@ -135,8 +135,8 @@ lankebuild_build() {
 
 lankebuild_package() {
     # **刻意不在这里放发行版预设（`system-preset/*.preset`）**：systemd 是基础件，不应该知道
-    # NetworkManager / sshd / bluetooth 这些**上层组件**的存在。原先这里有一份 99-lankeos.preset
-    # （disable networkd/resolved + enable NetworkManager/sshd/bluetooth），已删。
+    # NetworkManager / sshd / bluetooth 这些**上层组件**的存在 —— 预设里不该出现 disable
+    # networkd/resolved 或 enable NetworkManager/sshd/bluetooth 这类替上层做的决定。
     #
     # `systemctl preset-all` **仍然要调**，但它现在只应用 **systemd 自带的 vendor 预设**
     # （`presets/90-systemd.preset` → 装到 `/usr/lib/systemd/system-preset/`）——那是 systemd
@@ -148,8 +148,8 @@ lankebuild_package() {
     # - sysusers.d 的 basic/systemd-* 用户在安装期建出来（rtkit 同款，不依赖开机
     #   systemd-sysusers.service）；tmpfiles 同理（不依赖 systemd-tmpfiles-setup.service）。
     # - `systemd-machine-id-setup` 生成 /etc/machine-id：**必须合并进这一个 heredoc**。
-    #   原先是 `echo >> postinst.sh` 追加、随后被这里的 `cat >` 覆盖 —— 静默丢失（CLAUDE.md
-    #   明写的坑：已有 postinst 要合并追加，别用 `cat >` 覆盖掉原逻辑）。
+    #   另用 `echo >> postinst.sh` 追加、随后被这里的 `cat >` 覆盖 —— 会静默丢失。
+    #   已有 postinst 必须合并追加，别用 `cat >` 覆盖掉原逻辑。
     cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
 #!/bin/sh
 systemd-sysusers

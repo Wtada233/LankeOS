@@ -59,7 +59,6 @@ protected:
         Config::instance().init_filesystem();
         Cache::instance().load();
 
-        // 设置本地镜像
         std::ofstream(test_root / "etc/lpkg/mirror.conf")
             << "file://" << suite_work_dir.string() << "/mirror/" << std::endl;
     }

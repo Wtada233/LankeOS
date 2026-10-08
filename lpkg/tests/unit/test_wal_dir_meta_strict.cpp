@@ -10,7 +10,7 @@
  *     （setuid + setgid + sticky + 世界可写）—— 一条写坏的 WAL 行就能把**任意目录**改成
  *     完全开放；
  *   · `stoul("1777junk")` **不抛**，尾随垃圾被静默忽略，取到 `1777`。
- * 2026-10-03 换成 `parse_decimal_strict`（`std::from_chars` + "整串必须是数字"）。
+ * 现已换成 `parse_decimal_strict`（`std::from_chars` + "整串必须是数字"）。
  *
  * ## 为什么走公开路径
  * `parse_decimal_strict` / `apply_dir_meta` 都在 `wal_op.cpp` 的匿名命名空间里，测试不可直调。

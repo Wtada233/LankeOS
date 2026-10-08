@@ -21,7 +21,7 @@ protected:
     void SetUp() override
     {
         // 沙箱目录名带 PID：两个测试进程并发时会各自 rm -rf 对方的固定名目录
-        // （实测 58 条 SetUp 假失败：cannot remove all: Directory not empty）。同进程内
+        // （会产生 58 条 SetUp 假失败：cannot remove all: Directory not empty）。同进程内
         // 多次 SetUp/TearDown 仍复用同一路径（getpid 不变），TearDown 照旧清理干净。
         test_root = fs::absolute("tmp_lock_test_" + std::to_string(getpid()));
         if (fs::exists(test_root)) fs::remove_all(test_root);

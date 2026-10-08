@@ -10,12 +10,10 @@
  *   · `installation_task_register.cpp` **摘除**反向依赖      → `ss >> dn`（**纯空白**）
  *   · `db/cache.cpp`       `ensure_reverse_deps`（建索引）  → `find_first_of(" \t")`
  *
- * ── 订正：我原本断言的"登记/摘除键不一致 ⇒ 摘不掉"是**错的** ──────────────────────
- * `Cache::load()` 会把 `reverse_deps_loaded` 复位（`cache.cpp:450`），于是**每次摘除之前
+ * ── 登记/摘除键不一致被**惰性重建**掩盖 ────────────────────────────────────────
+ * `Cache::load()` 会把 `reverse_deps_loaded` 复位（`cache.cpp`），于是**每次摘除之前
  * 必然先有一次 `ensure_reverse_deps()` 重建**，而重建用的规则（纯空白）恰好与摘除用的
- * 规则（`ss >> dn`）**一致** ⇒ 两者互相抵消，那条分叉被惰性重建**掩盖**了。
- * 我按"摘不掉"写的第一版用例，在**改任何代码之前就是绿的** —— 那是恒真废话，不是证据
- * （实测踩到：三条全绿）。这一段留在这里，免得后人再按同一个错推演写一遍。
+ * 规则（`ss >> dn`）**一致** ⇒ 两者互相抵消，那条分叉看不出来。
  *
  * ── 真正**可达**的缺陷在 `ensure_reverse_deps` 的规则上 ────────────────────────────
  * 它用**纯空白**切名字 ⇒ 遇到 `provb>=2.0` 这种**约束紧贴包名**（无空格）的写法，整串被
@@ -72,7 +70,7 @@ protected:
     /**
      * 先把"被依赖的那个包"**真装进去** —— 否则求解器会在 `libB`/`libC` 上直接拒绝
      * （`Dependency 'x' has no provider in repository`），用例红在**前提没搭起来**上，
-     * 而不是红在它要考的那件事上（实测踩到：三条全红在 no provider）。
+     * 而不是红在它要考的那件事上（三条全红在 no provider）。
      */
     void install_provider(const std::string& name, const std::string& ver)
     {

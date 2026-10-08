@@ -65,9 +65,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         //
         // ⚠️ **必须按 `unsigned char` 比较**：`std::string` 的元素是 `char`（本机**有符号**），
         // 而 `in` 是 `uint8_t` —— 直接 `std::search(in.begin(), in.end(), soname.begin(), ...)`
-        // 会把所有 ≥0x80 的字节判成**不相等**。这不是理论问题：本 harness 第一版就是这么写的，
-        // 于是**凡是 `.dynstr` 里带高位字节的 ELF 都被误报成"SONAME 读越界"**（实测在一个
-        // 16304 字节的畸变 `.so` 上误报，而那 6 字节其实就在文件偏移 1167 处）。
+        // 会把所有 ≥0x80 的字节判成**不相等**。这不是理论问题：**凡是 `.dynstr` 里带高位字节
+        // 的 ELF 都会被误报成"SONAME 读越界"**（例如一个 16304 字节的畸变 `.so`，那 6 字节
+        // 其实就在文件偏移 1167 处）。
         // 教训：**判据先拿"已知好"验一遍**（正常 `.so` 的 SONAME 全是 ASCII，所以没暴露）。
         const bool found =
             std::search(in.begin(), in.end(), soname.begin(), soname.end(),

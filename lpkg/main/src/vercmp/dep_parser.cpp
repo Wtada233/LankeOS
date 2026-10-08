@@ -43,9 +43,6 @@ std::string dependency_name_of(std::string_view line)
     return d;  // 没有运算符 ⇒ 整串就是包名
 }
 
-/**
- * 解析依赖字符串列表为 DependencyInfo 结构体，支持复合约束
- */
 std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& dep_strs)
 {
     std::vector<DependencyInfo> deps;
@@ -56,7 +53,7 @@ std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& de
         const std::string d = trim_copy(raw);
         // 空片段（索引里 "a,,b" 拆出的空元素、纯空白）不成依赖。**空名依赖必须在
         // 这里就被挡掉**：它在 libsolv 里是 ID_EMPTY，既不解析也不报错，求解会"成功"
-        // 却产出空事务 → 上层打印"所有包都已安装"并 exit 0（历史 TODO.md D1/D3）。
+        // 却产出空事务 → 上层打印"所有包都已安装"并 exit 0。
         if (d.empty()) continue;
 
         DependencyInfo dep;
@@ -114,8 +111,7 @@ std::vector<DependencyInfo> parse_dep_strings(const std::vector<std::string>& de
                 pos = ver_end;
             }
         }
-        // 无运算符时 `dependency_name_of` 返回整串，这里**不需要** else 分支
-        // （原先那句 `dep.name = d;` 是它那份重复实现的一部分）。
+        // 无运算符时 `dependency_name_of` 返回整串，这里**不需要** else 分支。
 
         // 只由操作符构成的片段（如复合约束被拆开后剩下的 "< 4.0"）不产生依赖项
         if (dep.name.empty()) continue;

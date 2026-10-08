@@ -1,7 +1,7 @@
 /**
  * test_config_save_on_remove.cpp — 移除时配置文件变 `.lpkgsave`（除非 --purge-config）
  *
- * 语义（已拍板，勿改）：
+ * 语义（勿改）：
  *   任何移除路径（`remove` / `remove -r` / `autoremove` / `force-solve-conflict`，
  *   **无论给不给 --force**）碰到包内配置文件（判据仍是路径前缀 `/etc/`，
  *   `constants::DIR_ETC_PREFIX`）时：
@@ -109,7 +109,7 @@ protected:
         return read_file(wal::wal_log_path());
     }
 
-    /** 覆盖写 WAL（"盘面精确复现"崩溃现场用：把窗口里实测到的真实内容放回去） */
+    /** 覆盖写 WAL（"盘面精确复现"崩溃现场用：把窗口里的真实内容放回去） */
     void write_wal(const std::string& content) const
     {
         const std::string p = wal::wal_log_path();
@@ -380,7 +380,7 @@ TEST_F(ConfigSaveOnRemoveTest, BatchRollbackRestoresSavedConfigInPlace)
         << wal_after_a << ")";
 
     // 回滚后：改名被逆操作抵消（RESTORE 审计行随 trim 一起消失，故这里靠"改名确实发生过
-    // + 现在配置回到原位且没有 .lpkgsave 残留"这一对断言钉住，不依赖事后 WAL 文本）
+    // + 现在配置回到原位且没有 .lpkgsave 残留"这一对断言覆盖，不依赖事后 WAL 文本）
     EXPECT_TRUE(fs::exists(conf)) << "回滚后配置必须回到原位";
     EXPECT_EQ(read_file(conf), "CS-RB-A\n");
     EXPECT_FALSE(fs::exists(saved)) << "回滚后不得留下 .lpkgsave 半成品";
@@ -460,7 +460,7 @@ TEST_F(ConfigSaveOnRemoveTest, RollbackRestoresShiftedLpkgsaveAndArchives)
     EXPECT_FALSE(Cache::instance().get_installed_version("cs_shrb").empty()) << "包应仍在册";
 }
 
-// 同一窗口的**崩溃续传**（rec）形态：盘面用"窗口内实测到的状态"精确复现（WAL 就是那一刻
+// 同一窗口的**崩溃续传**（rec）形态：盘面用"窗口内的状态"精确复现（WAL 就是那一刻
 // 的真实内容），再交给 recover_packages()。进程死在窗口里时没有任何人替它回滚，只能靠这条
 // 路径 —— 而它与批次内回滚走的是同一个 reverse_execute，所以两条都要钉。
 TEST_F(ConfigSaveOnRemoveTest, RecoveryRestoresShiftedLpkgsaveFromCrashWindow)

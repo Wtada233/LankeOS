@@ -53,7 +53,7 @@ int progress_callback(void* clientp, curl_off_t dltotal, curl_off_t dlnow,
                       [[maybe_unused]] curl_off_t ultotal, [[maybe_unused]] curl_off_t ulnow)
 {
     auto* st = static_cast<DlProgress*>(clientp);
-    // **Ctrl+C 的唯一出口**（2026-10-03 补）：`lpkg build` 下载源码是**进程内** curl
+    // **Ctrl+C 的唯一出口**：`lpkg build` 下载源码是**进程内** curl
     // （没有子进程接收信号），而这个回调是下载期间唯一被反复调到的地方 —— 在这里看一眼
     // 优雅退出标志并**返回非 0**，curl 会以 `CURLE_ABORTED_BY_CALLBACK` 中止传输
     // （调用方据此抛 `UserAbort`，走带清理的异常路径）。不这么做的话，`SIGINT` 只是置了个
@@ -183,7 +183,7 @@ void download_file(const std::string& url, const fs::path& output_path, bool sho
     }
 
     // 本地写盘错误（磁盘满/EIO）只会在 flush/close 时暴露：不检查就会留下被静默
-    // 截断的文件，而 download_with_retries 会把它当成"下载成功"（历史 TODO.md B4）。
+    // 截断的文件，而 download_with_retries 会把它当成"下载成功"。
     ofile.flush();
     if (!ofile) {
         throw LpkgException(string_format("error.create_file_failed", output_path.string()));

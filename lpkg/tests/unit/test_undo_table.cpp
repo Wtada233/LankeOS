@@ -1,7 +1,7 @@
 /**
  * test_undo_table.cpp — 撤销表（`reverse_execute` 的表驱动实现）的**可执行规格**
  *
- * 生产端的表在 `db/wal_op.cpp`（匿名命名空间，测试看不见），所以本文件用**行为**钉住它的
+ * 生产端的表在 `db/wal_op.cpp`（匿名命名空间，测试看不见），所以本文件用**行为**覆盖它的
  * 每一格：每种可逆 op 的 ① 撤销动作的方向 ② 幂等口径（目标缺失/形态不符 → 跳过）
  * ③ `RESTORE_*` 审计行的字面（含**原样**还是**剥过尾斜杠**这种一眼看不出的差异）
  * ④ 计到 `RollbackStats` 的哪个量。
@@ -14,7 +14,7 @@
  *   · 让 `COPY` 的两支变成互斥（`also` 列），第二支（清残留 `.lpkgtmp`）就不再跑。
  *
  * 每种可逆 op 都至少有一条"必须动作"的用例：表里漏一行、或某行的 guard 恒假，
- * 对应用例就会红（`--gtest_filter` 里也点名了这些用例，见 lpkg/CLAUDE.md §2）。
+ * 对应用例就会红（`--gtest_filter` 里也点名了这些用例）。
  */
 
 #include <gtest/gtest.h>
@@ -505,7 +505,7 @@ TEST_F(UndoTableTest, RestoreIsIdempotentOnSecondRunOfTheSameLine)
 }
 
 /**
- * `XATTR_SET` / `XATTR_NEW` 的逆操作只该落在**真实目录**上（2026-09-26 修）。
+ * `XATTR_SET` / `XATTR_NEW` 的逆操作只该落在**真实目录**上。
  *
  * 写入侧（`OpSink::set_xattr` / `unset_xattr`）的前置是 `lstat` + `S_ISDIR` ⇒ **这些行只描述
  * 真实目录**。而回滚侧原来用的是 `Guard::TakenNotSymlink` —— 它放行的范围宽得多
@@ -547,7 +547,7 @@ TEST_F(UndoTableTest, SetXattrUndoSkipsPlainFileTargets)
 }
 
 // ============================================================================
-// NEW / COPY-tmp 的逆操作同样不得 rmdir 真目录（2026-10-02 与 COPY 落点支对齐）
+// NEW / COPY-tmp 的逆操作同样不得 rmdir 真目录（与 COPY 落点支对齐）
 // ============================================================================
 
 TEST_F(UndoTableTest, NewNeverRemovesRealDirectoryAtTarget)
@@ -598,7 +598,7 @@ TEST_F(UndoTableTest, CopyLeftoverTmpIsNotRmdirWhenItIsARealDirectory)
  * 两者都不是 ⇒ 红。新类型只要写在 `TYPE_COUNT` 前面，这条就会逼你做出选择，
  * 而**不写**是唯一会静默出错的选项。
  *
- * 顺带钉住"名字必须登记进 `TYPE_MAP`"：`walop_type_name` 认不出 = 解析器也不认，
+ * 顺带固定"名字必须登记进 `TYPE_MAP`"：`walop_type_name` 认不出 = 解析器也不认，
  * 那么写出去的那行永远落回 INVALID（同一种静默）。
  */
 TEST(UndoTableCompletenessTest, EveryTypeIsEitherReversibleOrExplicitlySkipped)

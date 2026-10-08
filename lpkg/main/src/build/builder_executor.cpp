@@ -54,7 +54,7 @@ void parse_git_url(const std::string& url, std::string& git_url, std::string& re
     // "ref 分隔符"。判据以 **`://` 之后的第一个 `/`**（权威段与路径的分界）为准：
     //   · 凭据的 '@' 一定在它**之前**（位于 `scheme://[user[:pass]@]host` 的 userinfo 段）；
     //   · ref 里的 '/' 一定在它**之后**（ref 是路径段的一部分，如 `repo.git@feature/x`）。
-    // **订正**：旧判据是"最后一个 '/' 之后"，它把 `@feature/x` 判成"无 ref"——因为那个 '@'
+    // ⚠️ 判据**不能**取"最后一个 '/' 之后"：那样 `@feature/x` 会被判成"无 ref"——那个 '@'
     // 在最后一个 '/' 之前，于是整段 `feature/x` 被吞进 URL、ref 回落 HEAD，静默克隆默认分支。
     const auto at = rest.rfind('@');
     std::string::size_type boundary = std::string::npos;
@@ -175,10 +175,10 @@ int prepare_repo(const fs::path& dest, const std::string& url,
                  GitProgress* prog, git_repository** out)
 {
     int last_err = GIT_ENOTFOUND;
-    // ⚠️ **`depth=0` 这一轮在测试里到不了 —— 有意的，不是漏测**（lpkg/CLAUDE.md §7.4）：
+    // ⚠️ **`depth=0` 这一轮在测试里到不了 —— 有意的，不是漏测**：
     // 测试用本地 `file://` fixture，而 libgit2 的**本地传输不认 depth** ⇒ 第一轮 `depth=1`
     // 就已经拿到全部对象、`any_rev_exists` 直接成功，第二轮**永不执行**（`test_git_submodules.cpp`
-    // 把这条实测钉成字面量兼绊线：哪天本地传输开始认 depth 它会变红）。网络传输认 depth，但
+    // 把这条钉成字面量兼绊线：哪天本地传输开始认 depth 它会变红）。网络传输认 depth，但
     // 测试一律不碰网。**所以这条兜底在生产走得到、在测试走不到** —— 别以为它没用。
     for (int depth : {1, 0}) {  // 先浅拉，再完整拉
         std::error_code ec;
@@ -235,7 +235,7 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
     const char* wd = git_repository_workdir(parent);
     if (url == nullptr || path == nullptr || oid == nullptr || wd == nullptr) {
         // 点名是**哪个**子模块、以及缺的是什么 —— 原先只写 `error.unknown`，连入参 `name`
-        // 都不报（实测可达：`.gitmodules` 声明了条目但父仓库索引里没有 gitlink）。
+        // 都不报（可达：`.gitmodules` 声明了条目但父仓库索引里没有 gitlink）。
         prog->err = string_format("error.git_submodule_entry_incomplete", name);
         git_submodule_free(sm);
         return -1;
@@ -300,7 +300,7 @@ int update_one_submodule(git_repository* parent, const std::string& name, GitPro
     }
     if (err != 0) {
         // ⚠️ **这条失败路径从生产入口不可达、测试里也没有对应用例 —— 有意的，不是漏测**
-        // （lpkg/CLAUDE.md §7.4）：走到这里要求"子模块的锁定 commit 已解析成功、却 checkout
+        // **有意的，不是漏测**：走到这里要求"子模块的锁定 commit 已解析成功、却 checkout
         // 不出来"，实践中构造不出。保留是因为 libgit2 的返回值必须处理，且 `err` 还兜住上面
         // revparse 失败那一格（`err = -1`）。
         // 内联复制过 4 份 —— 收敛到唯一的 `last_git_error()`（同族判据只推一条分支的老问题）。
@@ -338,7 +338,7 @@ int update_submodules(git_repository* repo, GitProgress* prog)
     return 0;
 }
 
-// ── clone_git_source 的零件（2026-09-26 从 128 行的函数里按自然缝抽出）──────────
+// ── clone_git_source 的零件（按自然缝抽出）────────────────────────
 // 全都是**纯搬移 + 参数化**：语义、调用顺序、资源释放顺序与抽之前逐行一致。
 
 /** 上报用文案：prog->err 为空时回落到通用文案。 */
@@ -384,12 +384,12 @@ fs::path prepare_clone_destination(const std::string& git_url, const fs::path& w
     // 末段**恰好**是 `.git`（裸仓库，如 `git+file:///srv/repos/.git`）时，上面的 resize 会把
     // 名字变成**空串** —— `work_root / ""` 就是 work_root 自己，下面那句 `fs::remove_all(dest)`
     // 会**删掉整个构建工作根**。这与 safe_name_from_url 头注释警告的危险同类，只是发生在
-    // "剥后缀"之后（2026-10-02 修）。
+    // "剥后缀"之后。
     if (name.empty() || name == "." || name == "..") {
         throw LpkgException(string_format("error.invalid_source_url", git_url));
     }
     fs::path dest = work_root / name;
-    // `exists_no_follow`（2026-09-26 修）：悬空链接也占着这个名字 ⇒ 必须清掉，否则随后的
+    // `exists_no_follow`：悬空链接也占着这个名字 ⇒ 必须清掉，否则随后的
     // clone 撞 EEXIST，而报错只说"目标已存在"、定位不到真实原因（一个悬空链接）。
     if (exists_no_follow(dest)) {
         fs::remove_all(dest);  // 对链接按名字删（`remove_all` 不跟随**末段**）
@@ -566,7 +566,7 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
     std::vector<fs::path> downloaded_files;
     // 本次运行内 `dest → 产生它的 URL`：两个**不同** URL 落成同一个 basename 时，下面那个
     // `if (!fs::exists(dest))` 会让第二个被静默跳过、复用第一个文件 —— 配方于是从**错源码**
-    // 构建，且没有任何提示（2026-10-03 修）。记下来并显式报错（点名两个 URL）。
+    // 构建，且没有任何提示。记下来并显式报错（点名两个 URL）。
     // 与"上次运行留下的文件"区分：那种 dest 在本次运行开始前就存在、不在本表里，保持原样
     // 跳过（行为不变，见 DownloadPrepareSources_WorkSourcesCopy）。
     std::map<fs::path, std::string> claimed_by;
@@ -584,7 +584,7 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
             // **先下到 .part 再 rename**：被中断（SIGKILL/断电）的构建只会留下不完整的
             // .part，正式文件仅在下载完整后出现。否则 `if (!fs::exists(dest))` 会把上次
             // 留下的**截断源码包永久当成"已下载好"**，错误延后到某个无关的构建阶段
-            // 才以看不懂的形式爆出来（历史 TODO.md C4）。
+            // 才以看不懂的形式爆出来。
             const fs::path part = dest.string() + ".part";
             std::error_code ec;
             fs::remove(part, ec);  // 清掉上次残留的半截
@@ -632,7 +632,7 @@ std::vector<fs::path> download_and_prepare_sources(const std::vector<std::string
 
         log_info(string_format("info.copying_to_workdir", filename.string()));
         try {
-            // **`exists_no_follow`（2026-09-26 修）**：判据要的是"**这个名字**被占着"，
+            // **`exists_no_follow`**：判据要的是"**这个名字**被占着"，
             // 而 `fs::exists` 跟随末段链接 ⇒ **悬空链接判 false**（不让开），紧接着
             // `fs::copy_file` 也**跟随** ⇒ 内容被写到**链接目标**上（父目录存在时），
             // 即以 root 写到 `work_root` **之外**。可达路径：源码归档里一个悬空链接
@@ -688,10 +688,7 @@ fs::path detect_source_tree(const fs::path& work_root)
     return work_root;
 }
 
-/**
- * 读取构建脚本内容，并进行变量替换
- * 将脚本中的 {PKG_NAME}、{SRC_DIR} 等占位符替换为实际值
- */
+/// 把脚本里的 {PKG_NAME}、{SRC_DIR} 等占位符替换为实际值。
 std::string process_build_script(const fs::path& script_path,
                                  const std::map<std::string, std::string>& vars)
 {
@@ -712,9 +709,7 @@ std::string process_build_script(const fs::path& script_path,
 }
 
 /**
- * 执行构建阶段的 shell 脚本
- * source 处理后的构建脚本，然后调用指定的 phase_name 函数
- * 构建失败时清理临时脚本并抛出异常
+ * source 处理后的构建脚本，再调用 phase_name 函数；失败时清理临时脚本并抛出异常。
  *
  * 执行前 export CFLAGS/CXXFLAGS/LDFLAGS/MAKEFLAGS：保证默认不出现
  * -march=native（见 build_defaults.hpp），configure/make/cmake 自动继承；

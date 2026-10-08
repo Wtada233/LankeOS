@@ -1,11 +1,11 @@
-//! `src/build/farm_flags.rs` 的单元测试（从生产文件搬出：那里测试比生产还长，正文被淹没）。
+//! `src/build/farm_flags.rs` 的单元测试。
 //! 仍是同一父模块的子模块 ⇒ `use super::*` 与 crate 内私有项照旧可用。
 
 use super::*;
 
 #[test]
 fn parse_known_and_unknown() {
-    // 已删除的 BUILD_AFTER_BUILD_DEPS 现在必须**未知**——配方里残留会走 warn，不静默
+    // BUILD_AFTER_BUILD_DEPS 必须**未知**——配方里残留会走 warn，不静默
     assert_eq!(FarmFlag::parse("BUILD_AFTER_BUILD_DEPS"), None);
     assert_eq!(FarmFlag::parse("UNKNOWN_FLAG"), None);
     assert_eq!(FarmFlag::parse(""), None);

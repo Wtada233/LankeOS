@@ -1,5 +1,5 @@
 /**
- * test_dir_xattrs.cpp — **目录**的 xattr 必须跟着包落位（2026-09-26 新增）
+ * test_dir_xattrs.cpp — **目录**的 xattr 必须跟着包落位
  *
  * ── 缺陷 ──────────────────────────────────────────────────────────────────────
  * `copy_xattrs` 全仓只有两个调用点，都是**普通文件**（`stage_regular_file` 的 `.lpkgtmp`、
@@ -14,17 +14,15 @@
  * xattr 与真正的 ACL 记录），解包用了 `ARCHIVE_EXTRACT_XATTR | ARCHIVE_EXTRACT_ACL`
  * —— 所以包内 `content/` 下那份目录**有** xattr，只是写入系统时没人把它拷过去。
  *
- * ── 两条边界（有意，均由用例钉住）──────────────────────────────────────────────
+ * ── 两条边界（有意，均由用例覆盖）──────────────────────────────────────────────
  *   1. **目标目录是符号链接 → 整个 xattr 块跳过**。与相邻的元数据块（`lchown`/`chmod`）
  *      同源：`symlink→目录`（usr-merge 的 `/lib -> usr/lib`、`/var/run -> ../run`）时内容是
  *      **穿过**链接写进真实目录的，而 xattr 写下去改的是**别的包持有的**那个目录。
  *   2. **已被多个包持有的目录 → 只写包内声明的键，不整份覆盖**。本文件里的实现方式已经
  *      是**逐键** `lsetxattr`（只写 `from` 有的键、从不删 `to` 上别的键），所以第二个包装
  *      同一个目录时不会抹掉第一个包设的键。
- *      ⚠️ **订正 2026-09-26（同日傍晚）**：本行原写"**代价（有意）**：包在新版本里不再声明的
- *      键不会被撤掉 —— xattr 的'撤'没有归属记账可依据，宁留不删"。**那个前提已经不成立**：
- *      现在有了按**键**的归属记账（`xattrkeys.db`），"新版本不再声明"的键会被撤（判据是
- *      "这个**键**还有没有别的属主"，见 `test_dir_state_wal.cpp`）。撤销不是清理洁癖而是
+ *      ⚠️ 包在新版本里**不再声明的键会被撤掉**：现在有按**键**的归属记账（`xattrkeys.db`），
+ *      判据是"这个**键**还有没有别的属主"（见 `test_dir_state_wal.cpp`）。撤销不是清理洁癖而是
  *      **安全性质** —— 陈旧的 `system.posix_acl_default` 会继续决定该目录下新建文件的继承
  *      权限、陈旧的 `security.selinux` 会继续打旧标签。
  */
@@ -62,7 +60,7 @@ constexpr uint16_t TAG_OTHER = 0x20;
 /**
  * 手工拼一份 `system.posix_acl_default` 的值。
  *
- * 容器里**没有任何 xattr 工具**（`setfacl`/`setfattr`/`getfattr` 全无，实测），所以只能直接发
+ * 容器里**没有任何 xattr 工具**（`setfacl`/`setfattr`/`getfattr` 全无），所以只能直接发
  * 系统调用；而这个 xattr 的值不是任意字节 —— 内核会**校验**它是不是合法的 ACL 记录。
  * 格式（小端）：`struct posix_acl_xattr_header { __le32 a_version; }`（=2）后跟若干
  * `struct posix_acl_xattr_entry { __le16 e_tag; __le16 e_perm; __le32 e_id; }`。
@@ -168,7 +166,7 @@ TEST_F(DirXattrTest, NewDirectoryKeepsPackageXattrs)
         << "会静默退回 umask 默认值";
     // 逐字节比对：这条链是 打包（libarchive disk reader 读 ACL → PAX 记录）→ 解包
     // （ARCHIVE_EXTRACT_ACL 写回）→ `copy_xattrs`（原样搬 xattr 字节），中途**没有**任何一步
-    // 会把 ACL 重新序列化成别的等价形态（实测落位的 36 字节与设进去的那份逐字节相同）。
+    // 会把 ACL 重新序列化成别的等价形态（落位的 36 字节与设进去的那份逐字节相同）。
     {
         const std::vector<char> expect = default_acl_blob();
         ASSERT_TRUE(get_xattr(target, ACL_DEFAULT).has_value()) << "（上一条已失败，跳过比对）";
@@ -203,11 +201,9 @@ TEST_F(DirXattrTest, ExistingDirectoryGetsNewVersionKeys)
     EXPECT_EQ(read_file(target / "a.txt"), "v2\n") << "前置：内容换代了";
     EXPECT_EQ(get_xattr(target, "user.v2").value_or("<缺失>"), "two")
         << "刷新既有目录时新版本声明的 xattr 没写上";
-    // **语义已改（2026-09-26 傍晚，不是放宽断言）**：v2 不再声明 `user.v1` ⇒ 它**被撤掉**。
-    // 原期望写的是"留着不删"，依据是"xattr 没有归属记账可依据，宁留不删"——那个依据已经
-    // 不成立：现在 `xattrkeys.db` 按**键**记归属，能精确判断"这个键还有没有别的属主"，
-    // 于是可以只撤自己的、不碰别人的（多包共用的边界由
-    // `test_dir_state_wal.KeyOwnedByAnotherPackageIsNotRevoked` 钉住）。
+    // v2 不再声明 `user.v1` ⇒ 它**被撤掉**：`xattrkeys.db` 按**键**记归属，能精确判断"这个键
+    // 还有没有别的属主"，于是可以只撤自己的、不碰别人的（多包共用的边界由
+    // `test_dir_state_wal.KeyOwnedByAnotherPackageIsNotRevoked` 覆盖）。
     // 为什么必须撤：陈旧的 `system.posix_acl_default` 是**该目录下新建文件的继承权限**，
     // 留着 = 上游删掉的授权继续生效（安全性质，不是清理洁癖）。
     EXPECT_FALSE(get_xattr(target, "user.v1").has_value())
@@ -245,7 +241,7 @@ TEST_F(DirXattrTest, SecondPackageDoesNotWipeFirstPackageKeys)
 // 走**直连写入趟**（`task.copy_package_files()`，与 `test_tmp_path_symlink_guard.cpp`
 // 同一手法）：这条边界要求"写入趟那一刻目标路径**仍是**符号链接"，而经 `install_packages`
 // 走完整流程时让开趟会先把盘上那条链接搬走/改名（盘上无主的链接还会被冲突预检直接拒绝，
-// 实测：`File conflict detected`）—— 构造不出这个形态。直连写入趟（无让开趟 ⇒ 无记录 ⇒
+// `File conflict detected`）—— 构造不出这个形态。直连写入趟（无让开趟 ⇒ 无记录 ⇒
 // 回退路径）才是它的现场。
 TEST_F(DirXattrTest, SymlinkedDirectoryTargetXattrsAreNotTouched)
 {
@@ -285,20 +281,20 @@ TEST_F(DirXattrTest, SymlinkedDirectoryTargetXattrsAreNotTouched)
         << "链接目标上原有的键被动了";
 }
 
-// ── ⑤ 目录当废弃删掉后回滚：xattr 必须逐键回来（2026-09-26 修的缺口）────────────
+// ── ⑤ 目录当废弃删掉后回滚：xattr 必须逐键回来（已修的缺口）────────────
 /**
  * **缺陷**：`OpSink::remove_empty_dir` 写的 `DIR_RM <path> <mode> <uid> <gid>` **不含 xattr**，
  * 而回滚侧的 `Undo::RecreateDir` 只 `create_directories` + `lchown`/`chmod` ⇒ **被 rmdir 又由
  * 回滚重建的目录，那份 xattr 全丢**（目录 xattr 正是 POSIX ACL 与 SELinux 标签的存放处）。
  * 这与刚为目录元数据补的 `DIR_META` 是**同一族缺口**，只是长在**移除侧**；由属性测试新加的
- * xattr 维度当场抓到（实测 2/32 种子）。
+ * xattr 维度当场抓到（2/32 种子）。
  *
  * **修法**：`remove_empty_dir` 在写 `DIR_RM` **之前**，把该目录的 xattr 逐键记成 `XATTR_SET` 行
  * （复用现成行类型；只记行、不动盘 —— 目录马上要删）。**行序是承重的**：回滚是逆序的 ⇒
  * 先撤 `DIR_RM`（把目录重建出来）、**再**撤各 `XATTR_SET`（把旧值写回去），正好落在重建好的
  * 目录上；顺序反了的话写回会打在还不存在的路径上，`Guard::TakenNotSymlink` 判否跳过 ⇒ 静默丢失。
  *
- * 本用例钉住这一整条：v1 的目录带一个 `user.*` 键 + 默认 ACL，v2 把它整个丢掉（里面的文件被当
+ * 本用例覆盖这一整条：v1 的目录带一个 `user.*` 键 + 默认 ACL，v2 把它整个丢掉（里面的文件被当
  * 废弃搬走 ⇒ 目录空 ⇒ `DIR_RM`），写入趟注入失败 ⇒ 回滚后目录**连同两个 xattr 逐字节**回来。
  * 另在断点时刻钉一条：那个目录**确实已经不在盘上** —— 否则"回滚后 xattr 还在"可能只是因为
  * 它压根没被删过（恒真废话）。

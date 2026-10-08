@@ -1,5 +1,5 @@
 /**
- * test_stash_semantics.cpp — stash + DIR_RM 的专属语义测试（历史 TODO.md §6 测试补位）
+ * test_stash_semantics.cpp — stash + DIR_RM 的专属语义测试
  *
  * 覆盖（WAL 级 + 行为级）：
  *   1. DIR_RM 行解析（mode/uid/gid）
@@ -163,7 +163,7 @@ TEST_F(StashSemanticsTest, PurgeConsumedStashesRemovesStashRoots)
     ops.push_back(o1);
     ops.push_back(o2);
 
-    // 方向一（2026-10-02 修）：**bak 还在**说明这条逆操作没被消费 —— 例如
+    // 方向一：**bak 还在**说明这条逆操作没被消费 —— 例如
     // `reverse_execute` 因路径越界（confinement）**跳过**了它（只告警），那一刻原物
     // **只存在于 stash 里**。此时整目录 remove_all 会把**唯一一份数据**删掉，必须保留。
     // 旧行为是不看 bak 在不在、一律删（这正是缺陷）。

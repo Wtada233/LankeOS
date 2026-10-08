@@ -10,13 +10,11 @@
 #include "vercmp/dep_parser.hpp"  // `DependencyInfo`（纯语法层类型，见那里的说明）
 #include "vercmp/version.hpp"
 
-/**
- * 包信息：从仓库索引中解析的完整包描述
- */
+/** 从仓库索引中解析出的包描述 */
 struct PackageInfo {
-    std::string name;                          // 包名
-    std::string version;                       // 版本号
-    std::string sha256;                        // 包文件 SHA256 校验值
+    std::string name;
+    std::string version;
+    std::string sha256;
     std::vector<DependencyInfo> dependencies;  // 依赖列表（**包名/虚拟能力**语义）
     std::vector<std::string> provides;         // **虚拟 provider**（与 .so 无关）
     std::vector<std::string> provides_soname;  // 本包**导出**的 SONAME
@@ -24,14 +22,11 @@ struct PackageInfo {
 };
 
 /**
- * 仓库管理器
- *
- * 从远程或本地仓库加载包索引，提供包查询、版本匹配与 provider 查找功能。
+ * 仓库管理器：从远程或本地仓库加载包索引，提供包查询、版本匹配与 provider 查找。
  */
 class Repository
 {
 public:
-    /** 加载并解析仓库索引文件 */
     void load_index();
     /**
      * 解析**指定的**索引文件（按路径），**绝不下载**、**不发任何告警**。
@@ -41,9 +36,9 @@ public:
      *     （离线装本地 `.lpkg` 是常见用法，仓库坏掉不该让命令失败）；
      *   · 反向依赖图（`depend remove` / `depend abibreak`）：读不出内容 ⇒ **fail-closed 抛错**
      *     （静默当空会让它报出"无受影响包"这个**错误答案**，用户据此删包）。
-     * 2026-10-03 第一版把这个选择写进了本函数（读错误一律抛），当场把
-     * `AggregatedIndexTest.DirectoryIndexIsReportedNotEmptyRepo` 打红 —— 它钉的正是
-     * "索引用一个**目录**占住时，`load_index()` 要落 `warning.repo_index_empty`"这条实测契约。
+     * 这条分工**不能烘进本函数**：`AggregatedIndexTest.DirectoryIndexIsReportedNotEmptyRepo`
+     * 钉的正是"索引用一个**目录**占住时，`load_index()` 要落 `warning.repo_index_empty`"
+     * 这条契约。
      *
      * 调用方是那些**已经有确定路径**、且不该触发下载的场景 —— 反向依赖图就是：它优先读
      * `tmp` 里那份已下载的缓存副本，没有就回退本地镜像路径；**绝不能**在这里顺手
@@ -64,11 +59,9 @@ public:
                              const std::vector<std::string>& provides,
                              const std::vector<std::string>& provides_soname = {},
                              const std::vector<std::string>& needed_so = {});
-    /** 查找包（不指定版本时返回最新版本） */
-    std::optional<PackageInfo> find_package(const std::string& name);
-    /** 精确查找指定版本的包 */
+    std::optional<PackageInfo> find_package(const std::string& name);  // 不指定版本时返回最新版
     std::optional<PackageInfo> find_package(const std::string& name, const std::string& version);
-    /** 查找满足单一版本约束的最佳匹配版本 */
+    /** 单一版本约束（`op version_req`） */
     std::optional<PackageInfo> find_best_matching_version(const std::string& name,
                                                           const std::string& op,
                                                           const std::string& version_req);
@@ -84,7 +77,7 @@ public:
      * 虚拟能力"与"需要 SONAME"互相误匹配（那正是 8.0.0 拆分要根除的毛病）。
      */
     std::optional<PackageInfo> find_soname_provider(const std::string& soname) const;
-    /** 全部包（包名 -> 版本列表；供 solver 构建 libsolv pool） */
+    /// 包名 -> 版本列表（供 solver 构建 libsolv pool）。
     const std::unordered_map<std::string, std::vector<PackageInfo>>& packages() const
     {
         return packages_;
@@ -132,7 +125,7 @@ private:
 };
 
 /**
- * 加载仓库索引 —— **失败只告警、不抛** 的唯一入口（2026-10-03 收敛）。
+ * 加载仓库索引 —— **失败只告警、不抛** 的唯一入口。
  *
  * 为什么必须收敛成一处：`load_index()` 失败时"降级成仓库暂时不可用"这条语义，在
  * 6 个调用点上**必须逐字一致**（同一条 `warning.repo_index_load_failed`）。此前每个调用点

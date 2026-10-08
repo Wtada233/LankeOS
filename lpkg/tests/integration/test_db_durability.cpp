@@ -1,5 +1,5 @@
 /**
- * test_db_durability.cpp — DB 备份生命周期 × 断电持久化（缺陷 ① 的集成侧）
+ * test_db_durability.cpp — DB 备份生命周期 × 断电持久化
  *
  * 单元侧（test_durable_fsync_db.cpp）证明"DB/元数据写在开关关闭时仍会 fsync"。
  * 这里从整条安装链路看两件事：

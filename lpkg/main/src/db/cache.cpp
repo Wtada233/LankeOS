@@ -32,7 +32,7 @@ namespace
  * （`test_db_backup_chain.cpp`、`test_upgrade_rollback_fidelity.cpp` 都在断言）要求
  * 「同一个逻辑状态 → 同样的字节」：恢复只把**某一次先前写出的内容**放回原位，任何后续
  * 重写（`batch_rollback` 恢复 DB 后必然 `load()` 再 `write(":batch-start")`）都不该改变
- * 字节。不排序时这件事只是**碰巧**成立（取决于容器历史），实测崩溃恢复路径上就会出现
+ * 字节。不排序时这件事只是**碰巧**成立（取决于容器历史），崩溃恢复路径上就会出现
  * "同一组所有者、顺序不同"的差异。
  *
  * 排序把序列化变成**唯一形态**：只由逻辑状态决定，与读取顺序、容器历史无关。
@@ -472,7 +472,7 @@ std::unordered_set<std::string> Cache::get_package_provides_soname(std::string_v
     return result;
 }
 
-// ── 值语义快照（2026-10-03：替代原先的 `get_mutex()` + 两个引用返回的访问器）──────
+// ── 值语义快照 ───────────────────────────────────────────────────────
 // 契约只有一条：**持锁拷一份出去**，调用方拿到快照后不需要、也不该持有锁。
 // 这些方法都是"读一整块状态"，逐个走加锁方法既做不到原子、又会退化成 O(n²)。
 
@@ -544,7 +544,7 @@ void Cache::ensure_reverse_deps()
 {
     if (reverse_deps_loaded) return;
     reverse_deps.clear();
-    // ⚠️ 这里**整段**都得是不抛的形态（2026-10-02 修）：上面那句守卫特意换成了
+    // ⚠️ 这里**整段**都得是不抛的形态：上面那句守卫特意换成了
     // `is_directory_follow`（不抛），可**紧接着两行**用的却是抛型的 `fs::directory_iterator`
     // 与 `directory_entry::is_regular_file()` —— 后者是**跟随**语义，路径上任何一段成环都会
     // 抛 ELOOP，而我们正走在这条路的入口上（`get_reverse_deps` / `add_reverse_dep` /

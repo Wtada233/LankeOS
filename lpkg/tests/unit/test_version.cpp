@@ -16,7 +16,7 @@ TEST(VersionCompare, SimpleNumeric)
 TEST(VersionCompare, MultiSegment)
 {
     EXPECT_TRUE(version_compare("1.0", "1.0.1"));  // 1.0 < 1.0.1 → true
-    // rpm 不补段：1.0.1 < 1.0.1.0（段数不同即不等，曾自研补 0 视为相等，已删除）
+    // rpm 不补段：1.0.1 < 1.0.1.0（段数不同即不等）
     EXPECT_TRUE(version_compare("1.0.1", "1.0.1.0"));
     EXPECT_FALSE(version_compare("1.0.1.0", "1.0.1"));   // 1.0.1.0 < 1.0.1 → false
     EXPECT_FALSE(version_compare("1.0.1", "1.0"));       // 1.0.1 < 1.0 → false
@@ -46,7 +46,7 @@ TEST(VersionCompare, DifferentLength)
 TEST(VersionCompare, PreRelease)
 {
     // rpm 的**预发布标记是 `~`**：`1.0~beta < 1.0`。
-    // ⚠️ 8.0.0 起 `-` 之后是 **release**（修订号），不再是预发布 —— `1.0-beta` 现在意为
+    // ⚠️ `-` 之后是 **release**（修订号），不再是预发布 —— `1.0-beta` 现在意为
     // "1.0 的第 beta 号修订"，**大于** 1.0。旧的"`-` = 预发布"语义随版本桥一起删除。
     EXPECT_TRUE(version_compare("1.0~beta", "1.0"));
     EXPECT_FALSE(version_compare("1.0", "1.0~beta"));
@@ -149,8 +149,8 @@ TEST(VersionSatisfies, PreReleaseConstraints)
 
 // 约束判定用的是 **rpm 的依赖匹配语义**（`EVRCMP_MATCH_RELEASE`，与 libsolv 求解器判
 // "谁满足这条依赖"是同一份代码），不是排序语义 —— 两者对"一侧有 release、另一侧没写"的
-// 处置不同：rpm 把**没写 release 当通配**。下面每一条都是**实测**的（容器里的 libsolv
-// 直接给答案），看着怪，但它们正是"求解器说能装、安装期说不满足"那类事故的防线本身。
+// 处置不同：rpm 把**没写 release 当通配**。下面每一条都以容器里的 libsolv 为准
+// （它直接给答案），看着怪，但它们正是"求解器说能装、安装期说不满足"那类事故的防线本身。
 TEST(VersionSatisfies, ReleaseIsAWildcardInDependencyMatching)
 {
     // 候选有 release、约束没写 → 匹配 `=`/`>=`/`<=`，但**不**匹配 `>`/`<`
@@ -183,8 +183,8 @@ TEST(VersionSatisfies, ComplexScenarios)
 }
 
 // ===== 发行修订号（release，`-N`）测试 =====
-// 8.0.0 起 `-` 之后就是 rpm 的 **release**（revision）：`1.0-1 > 1.0`。
-// 旧写法（`1.0+1`，自有语义 + 编码桥）随桥一起删除，见 vercmp/version.hpp 的订正块。
+// `-` 之后就是 rpm 的 **release**（revision）：`1.0-1 > 1.0`。
+// 旧写法（`1.0+1`，自有语义 + 编码桥）已随桥一起删除。
 
 TEST(VersionCompare, ReleaseSuffix)
 {
@@ -210,7 +210,7 @@ TEST(VersionCompare, ReleaseSuffix)
 // 回归：版本升级必须主导 release（systemd 261-3 → 261.2-3、tmux 3.7-2 → 3.7b-2）。
 // 版本串**原样**交给 libsolv 的 rpm 比较器，它本身就按 epoch → version → release 分域比：
 // 版本段不同时 release 根本不参与，于是版本升级必然主导 release 数字。
-// （`1.0-9 < 1.0.1` 与旧实现的结论一致，但现在是别人的判据给的。）
+// （例：`1.0-9 < 1.0.1`。）
 TEST(VersionCompare, VersionBumpDominatesRelease)
 {
     EXPECT_TRUE(version_compare("261-3", "261.2-3"));
@@ -226,7 +226,7 @@ TEST(VersionCompare, VersionBumpDominatesRelease)
 
 // ===== 补丁后缀 (pN) 测试 =====
 // pN 跟在**版本段**末尾（`1.9.17p2` 的版本段就是 `17p2`），所以比基础版新；
-// release（`-1`）排在基础版**之后**、补丁版**之前**（实测的 rpm 段语义）。
+// release（`-1`）排在基础版**之后**、补丁版**之前**（rpm 的段语义）。
 
 TEST(VersionCompare, PatchSuffix)
 {
@@ -247,7 +247,7 @@ TEST(VersionCompare, PatchSuffix)
     EXPECT_TRUE(version_compare("1.0p", "1.0p2"));
     EXPECT_FALSE(version_compare("1.0p2", "1.0p"));
 
-    // 与 release 的相对顺序（实测）：base < release < patch
+    // 与 release 的相对顺序：base < release < patch
     EXPECT_TRUE(version_compare("1.0", "1.0-1"));
     EXPECT_TRUE(version_compare("1.0-1", "1.0p1"));
     EXPECT_FALSE(version_compare("1.0p1", "1.0-1"));
@@ -290,7 +290,7 @@ TEST(VersionCompare, GitHashAlphaSuffixDistinctness)
 #include "../../main/src/vercmp/dep_parser.hpp"
 
 // 语义：= / == / != 按 libsolv EVRCMP 比较（归一化后）。
-// 注意：与 rpm 一致不再补段——1.0 与 1.0.0 是**不同**版本（曾自研补 0 视为相等，已删除）。
+// 注意：与 rpm 一致不再补段——1.0 与 1.0.0 是**不同**版本。
 TEST(VersionCompare, EqualConstraintUsesSemanticComparison)
 {
     EXPECT_TRUE(version_satisfies("1.0", "=", "1.0"));
@@ -327,7 +327,7 @@ TEST(DepParser, OperatorAppearanceOrder)
 // tests/integration/test_reverse_dep_key_consistency.cpp：纯空白规则把 `provb>=2.0`
 // 整串当成包名，`get_reverse_deps("provb")` 于是永远查不到那个依赖者）。
 //
-// 本用例钉两件事：
+// 本用例覆盖两件事：
 //   ① 逐条列举的语义（含最容易写错的"约束紧贴包名"与 `!=`）；
 //   ② **与 `parse_dep_strings` 交叉验证** —— 两者对同一个串必须给出同一个名字。
 //      第 ② 条是关键：只要有人在任一头上改了判据，这里立刻红。

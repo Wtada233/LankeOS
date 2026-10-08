@@ -84,7 +84,6 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     Ok(serde_json::json!({ "provides": provides, "requires": requires }))
 }
 
-/// 跑 pkgconfchk。
 pub fn run(opts: &ChkOpts) -> Result<Report, FarmError> {
     let walk = walk_all(opts, SCHEMA, |ext, _pkg| analyze(ext))?;
 

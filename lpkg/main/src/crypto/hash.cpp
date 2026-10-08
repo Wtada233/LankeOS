@@ -30,7 +30,6 @@ using EvpMdCtxPtr = std::unique_ptr<EVP_MD_CTX, EvpMdCtxDeleter>;
 /**
  * 计算文件的 SHA-256 哈希值
  * 使用 OpenSSL EVP 接口进行哈希计算，支持大文件流式读取
- * @param file_path 目标文件路径
  * @return 小写十六进制字符串表示的 SHA-256 哈希值
  * @throws LpkgException 文件无法打开或哈希计算失败时抛出
  */
@@ -58,7 +57,7 @@ std::string calculate_sha256(const fs::path& file_path)
     }
     // **必须查 `bad()`**：循环条件 `read(...) || gcount() > 0` 把"读到 EOF"与"读出错"
     // （磁盘/网络 FS 的 EIO）都当成了正常结束 —— 于是对**截断的内容**算出一个哈希，
-    // 拿它去比对只会得到莫名其妙 "hash mismatch"，而不是"I/O 错误"（2026-10-02 修）。
+    // 拿它去比对只会得到莫名其妙 "hash mismatch"，而不是"I/O 错误"。
     if (file.bad()) {
         throw LpkgException(string_format("error.file_read_failed", file_path.string()));
     }

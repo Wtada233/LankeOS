@@ -2,7 +2,7 @@
 //!
 //! 从远程 lankerepo 播种本地 repo：
 //! 1. 下载 `<remote>/<arch>/index.txt`（graph.rs 解析，得每包版本 + SHA256 + **完整 needed_so**）；
-//! 2. 逐包下载 `<remote>/<arch>/<pkg>/<ver>.lpkg`（URL 模式对齐 installation_task.cpp:380），
+//! 2. 逐包下载 `<remote>/<arch>/<pkg>/<ver>.lpkg`（URL 模式对齐 installation_task.cpp），
 //!    **SHA256 校验**（index 里的 hash，防破损/篡改）；
 //! 3. 落本地 repo `out/<arch>/<pkg>/<ver>.lpkg`，index.txt **原样保留**（已含全部字段）。
 //!
@@ -17,7 +17,6 @@ use std::path::Path;
 use crate::graph::Index;
 use crate::tr;
 
-/// 播种结果。
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct SeedReport {
     pub total: usize,

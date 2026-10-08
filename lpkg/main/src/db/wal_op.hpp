@@ -15,7 +15,7 @@ namespace wal
 
 struct DbMilestone {
     std::string pkg;  // 包名；批次级里程碑（":batch-start" / ":batch-end"）时 pkg=""
-    // 生产端实际写入的 state（2026-10-03 订正，原文缺 "batch-end"）：
+    // 生产端实际写入的 state：
     //   "batch-start" / "batch-end" —— DB 一族（`Cache::write`）的批次级里程碑；
     //   "installed" / "removed"    —— 包级元数据文件（deps/needed_so/man，经
     //                                 `wal::write_string_file_wal`）安装/卸载时的里程碑。
@@ -49,7 +49,7 @@ enum class WALOpType {
     // 解析失败/未知类型。**必须留在首位**：WALOp 默认构造即 INVALID，任何未被成功解析的
     // 行都是"惰性"的，扫描方只需 is_valid() 一处判断。曾经用 `type=BEGIN_PKGS` 当哨兵 +
     // `arg1="__INVALID__"` 字符串标记，导致破损行在"找最后一个 BEGIN_PKGS"的反向扫描里
-    // 冒充真实批次起点，整批回滚静默失效（见 历史 TODO.md A2）。
+    // 冒充真实批次起点，整批回滚静默失效。
     INVALID,
 
     // 批次边界
@@ -81,7 +81,7 @@ enum class WALOpType {
     // 第③步统一让开之后，这两种结果从"完全不碰盘"变成"先搬进 stash，判定后再搬回来"，
     // 可观测行为不变（文件回到原位，逐字节、逐 inode 属性不变）。
     UNSTASH,  // UNSTASH <bak> → <orig>
-    // 目录的"改前状态"（2026-09-26 新增）：目录是就地改**活对象**的（不像普通文件那样
+    // 目录的"改前状态"：目录是就地改**活对象**的（不像普通文件那样
     // 先写 `.lpkgtmp` 再 rename 覆盖，旧 inode 由 BACKUP 保住），所以 lchown/chmod/xattr
     // 必须**先把旧状态记下来**才能回滚。三行的共同语义是"**记录改前的状态**"，不是
     // "记录正向动作" —— 于是"覆盖一个已有键"与"删掉一个已有键"共用 `XATTR_SET`
@@ -195,7 +195,6 @@ bool wal_type_is_reversible(WALOpType t);
 // WAL 行解析
 // ============================================================================
 
-/// 解析单行 WAL 日志为 WALOp
 WALOp parse_op(const std::string& line);
 
 // ============================================================================
@@ -209,13 +208,13 @@ struct RollbackStats {
     int db_restored = 0;
 
     /**
-     * **撤销动作真的没成功**的行数（2026-10-03 新增）。
+     * **撤销动作真的没成功**的行数。
      *
      * 前四个字段全是**成功计数**，它们答不了"有没有哪一行没撤掉"。而这个区别是承重的：
      * `apply_row` 原先把"guard 跳过（正常的重复回滚）"与"动作执行了却没成功"压成同一个
      * `false`，于是**一次"文件存在却删不掉"（EROFS / EACCES / immutable）会被当成
      * 回滚成功** —— 批次照常封 `COMMIT_PKGS`、`cleanup_db_backups()` 照常删掉唯一的还原点，
-     * 现场只剩一条 `warning.rollback_path_not_removed` 日志（2026-10-02 才补上的那一半）。
+     * 现场只剩一条 `warning.rollback_path_not_removed` 日志。
      *
      * **语义边界**：只计"guard 过了、动作也执行了、却没成功"。guard 跳过与
      * `UndoResult::NothingToDo` **一律不计** —— 重复回滚是正常结局，把它们计进来会让这个
@@ -260,10 +259,10 @@ RollbackStats reverse_execute(const std::vector<WALOp>& ops, bool write_audit = 
  * 撞到第一条 `BEGIN_PKGS` 就是它（若先撞到 `COMMIT_PKGS` 说明尾部批次已提交 → 返回空）。
  * 调用者是 `batch_rollback()` —— 它回滚的正是**本进程刚刚执行失败的那一批**。
  *
- * ⚠️ **不要把它与 `recover.cpp` 的"未提交区域起点"统一**（2026-09-26 明确记录，
- *    免得后人当重复代码合并掉）：那是**另一个问题** —— 崩溃恢复要从**第一个**未配对
- *    `BEGIN_PKGS` 开始，好把"更早的、同样没提交的批次"一起收掉（`scan_batch_pairing()`
- *    一处实现、四个消费者；那里踩过"取最后一个 ⇒ 更早那批永远轮不到"的坑，见 ARCH §11.2）。
+ * ⚠️ **不要把它与 `recover.cpp` 的"未提交区域起点"统一**（**别当重复代码合并掉**）：
+ *    那是**另一个问题** —— 崩溃恢复要从**第一个**未配对 `BEGIN_PKGS` 开始，好把"更早的、
+ *    同样没提交的批次"一起收掉（`scan_batch_pairing()` 一处实现、四个消费者；那里踩过
+ *    "取最后一个 ⇒ 更早那批永远轮不到"的坑，见 ARCH §11.2）。
  *    而这里问的是"**当前**那批是谁"，反向扫才对。
  *    两者在实践中重合（进程内未配对 `BEGIN_PKGS` 至多一个 —— 批次事务不可重入），
  *    但在**手工构造/破损的 WAL** 上会给出不同答案，而测试正好钉住那些形状
@@ -290,8 +289,8 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path);
  * @return true = 确实回滚了（批次已由 COMMIT_PKGS 收尾，DB 备份已被消费，可以安全清理）；
  *         false = 无可回滚的行（WAL 里没有未完成批次，如尾部破损行导致 ops 为空）——
  *         此时**批次仍开着、DB 备份还没被消费**，调用方必须保留它们交给下次 rec 续传，
- *         绝不能 cleanup_db_backups()（否则文件能还原而 DB 永远还原不回来，见 历史 TODO.md
- * A2/A3）。 ⚠️ 返回 true **不代表回滚完整** —— `stats.failures > 0` 时批次照样被封口，
+ *         绝不能 cleanup_db_backups()（否则文件能还原而 DB 永远还原不回来）。
+ *         ⚠️ 返回 true **不代表回滚完整** —— `stats.failures > 0` 时批次照样被封口，
  *         但调用方应当保留 DB 备份（那是唯一还能重试的还原点）。
  */
 bool batch_rollback(const std::vector<std::string>& successfully_installed,
@@ -312,14 +311,13 @@ std::filesystem::path stash_root_of_bak(const std::filesystem::path& bak);
  * WAL 当前仍引用到的 stash 根集合（BACKUP/REMOVE_OLD 的 dst、CLEANUP 的 arg1）。
  * `cleanup_orphan_stashes()` **必须**跳过这些：它们是回滚/续传的数据来源，而 stash 落在
  * 文件系统顶层（= root_dir 的直接子目录）正是 reaper 的扫描范围，被延迟处理的未提交批次
- * 其 pid 又必然已死 —— 不排除就会在同一次启动里被回收（历史 TODO.md Z5）。
+ * 其 pid 又必然已死 —— 不排除就会在同一次启动里被回收。
  */
 std::set<std::filesystem::path> referenced_stash_roots();
 
 // ============================================================================
 // stash 收尸（备份落点已是每文件系统隔离 stash `<fsroot>/.lpkg_bak_<pkg>_<pid>/`，
-// 故按 stash 根整目录 remove_all 是安全的 —— 这正是先前「待备份移到隔离 stash 后」
-// 那个 TODO 所指的前提，已随该设计落地，见 ARCH.md §3.6）
+// 故按 stash 根整目录 remove_all 是安全的，见 ARCH.md §3.6）
 // ============================================================================
 
 /**
@@ -353,7 +351,6 @@ void write_string_file_wal(const std::string& path, const std::string& content,
 // WAL 文件路径
 // ============================================================================
 
-/// 获取 WAL 日志文件的路径
 std::string wal_log_path();
 
 /**
@@ -362,8 +359,8 @@ std::string wal_log_path();
  * 为什么要区分"创建"与"打开"：WAL 文件**自身**的目录项（dentry）只在**首次创建**那一刻
  * 需要落盘（`fsync(文件)` 管不到父目录），所以 `wal::log_wal_line` 与 `wal_append_raw`
  * 这两条"每行都要走一次"的路径只在 `created == true` 时付父目录 fsync —— 恒做等于每条
- * WAL 行白付一次（实测占 fsync 总数 34%~40%）。**行内容自己的 `::fsync(fd)` 恒生效**，
- * 与这里无关（I-FSYNC-1 的前提不变）。
+ * WAL 行白付一次（占 fsync 总数 34%~40%）。**行内容自己的 `::fsync(fd)` 恒生效**，
+ * 与这里无关。
  *
  * 判定用 `O_CREAT|O_EXCL`（原子，无 TOCTOU）：成功 = 本次创建；`EEXIST` = 本来就在 →
  * 退回普通追加打开。返回的 fd 由调用方负责 `::close`；`< 0` 时调用方按原有口径报错。

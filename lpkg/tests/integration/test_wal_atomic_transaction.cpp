@@ -173,7 +173,6 @@ TEST_F(AtomicUpgradeTest, UpgradeToNewerVersion)
 {
     setup_local_mirror();
 
-    // 安装旧版本
     std::string p1 = create_pkg("upgpkg", "1.0", {}, {}, {"libupg.so.1"});
     add_to_mirror("upgpkg", "1.0");
     install_packages({p1});
