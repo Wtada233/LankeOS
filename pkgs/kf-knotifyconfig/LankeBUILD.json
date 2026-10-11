@@ -1,13 +1,13 @@
 {
   "name": "kf-knotifyconfig",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 1,
   "deps": [],
   "needed_so": [
     "libKF6ConfigCore.so.6",
     "libKF6I18n.so.6",
     "libKF6KIOWidgets.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Widgets.so.6@Qt_6",
@@ -33,7 +33,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/knotifyconfig-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/knotifyconfig-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

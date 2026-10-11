@@ -1,0 +1,18 @@
+lankebuild_prepare() {
+    # Rust 构建：先拉 crates，构建期 MATURIN_SETUP_ARGS=--frozen 不再解析
+    cargo fetch --locked --target host-tuple
+}
+
+lankebuild_build() {
+    # maturin 用 setuptools-rust 自建（backend setuptools + setuptools-rust）
+    MATURIN_SETUP_ARGS="--frozen" python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    # 合并 Arch 的 maturin(CLI) + python-maturin(模块) 为单包：全装，不删 /usr/lib
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+    install -Dm644 Changelog.md {STAGING_ROOT}/usr/share/doc/maturin/Changelog.md
+    install -Dm644 README.md {STAGING_ROOT}/usr/share/doc/maturin/README.md
+    install -Dm644 license-mit {STAGING_ROOT}/usr/share/licenses/maturin/license-mit
+}

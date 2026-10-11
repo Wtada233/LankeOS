@@ -1,6 +1,6 @@
 {
   "name": "kf-kquickcharts",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 4,
   "deps": [
     "kf-kirigami"
@@ -32,7 +32,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/kquickcharts-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/kquickcharts-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

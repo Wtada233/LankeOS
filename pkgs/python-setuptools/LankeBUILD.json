@@ -1,7 +1,7 @@
 {
   "name": "python-setuptools",
   "version": "84.0.0",
-  "release": 3,
+  "release": 5,
   "deps": [
     "python"
   ],
@@ -9,10 +9,9 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
-    "git"
+    "lanke-py-bootstrap"
   ],
   "sources": [
-    "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
     "https://files.pythonhosted.org/packages/6d/44/f5da03a8ef95d369145c5bb53050e7877c9f3d312e128605fd9504829143/setuptools-84.0.0.tar.gz"
   ],
   "work_sources": []

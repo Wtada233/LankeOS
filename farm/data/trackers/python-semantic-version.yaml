@@ -1,0 +1,5 @@
+pkg-name: python-semantic-version
+version-source: sources[0]
+sources:
+  - tracker-template: pypi
+    project: semantic-version

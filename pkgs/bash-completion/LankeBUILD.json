@@ -12,5 +12,6 @@
   "sources": [
     "https://github.com/scop/bash-completion/releases/download/2.18.0/bash-completion-2.18.0.tar.xz"
   ],
-  "work_sources": []
+  "work_sources": [],
+  "release": 1
 }

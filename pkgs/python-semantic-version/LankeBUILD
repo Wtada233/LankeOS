@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    # 纯 python；sdist 是 legacy setup.py/setup.cfg（无 pyproject → PEP 517 走
+    # setuptools.build_meta:__legacy__）
+    :
+}
+
+lankebuild_build() {
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

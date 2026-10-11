@@ -1,10 +1,10 @@
 {
   "name": "kf-prison",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Multimedia.so.6@Qt_6",
     "libQt6Qml.so.6@Qt_6",
@@ -38,7 +38,7 @@
     "zxing-cpp"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/prison-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/prison-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

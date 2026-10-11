@@ -1,6 +1,6 @@
 {
   "name": "evolution-data-server",
-  "version": "3.62.0",
+  "version": "3.62.1",
   "release": 9,
   "deps": [],
   "needed_so": [
@@ -90,7 +90,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.gnome.org/sources/evolution-data-server/3.62/evolution-data-server-3.62.0.tar.xz"
+    "https://download.gnome.org/sources/evolution-data-server/3.62/evolution-data-server-3.62.1.tar.xz"
   ],
   "work_sources": []
 }

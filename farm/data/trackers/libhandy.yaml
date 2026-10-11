@@ -3,5 +3,5 @@ version-source: sources[0]
 sources:
   - tracker-template: gnome
     source-name: libhandy
-    stable-minor: all
+    stable-minor: all    # 1.7.0 是正式版（odd minor 在此包是稳定号，非 dev）
     template: https://download.gnome.org/sources/libhandy/{path_version}/libhandy-{version}.tar.xz

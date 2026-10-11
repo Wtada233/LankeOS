@@ -1,0 +1,25 @@
+{
+  "name": "python-setuptools-rust",
+  "version": "1.13.0",
+  "release": 2,
+  "deps": [
+    "python",
+    "python-semantic-version",
+    "python-setuptools",
+    "rust"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-setuptools-scm",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/68/ba/b31781d61bf9ee3c232a1d1160db11c11cdeae1d44e06c90723b25a8279f/setuptools_rust-1.13.0.tar.gz"
+  ],
+  "work_sources": []
+}

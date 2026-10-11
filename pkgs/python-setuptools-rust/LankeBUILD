@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    # 纯 python（setuptools + setuptools_scm 后端）
+    :
+}
+
+lankebuild_build() {
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+}

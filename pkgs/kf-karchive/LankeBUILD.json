@@ -1,10 +1,10 @@
 {
   "name": "kf-karchive",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libbz2.so.1.0",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libcrypto.so.3@OPENSSL_3.0.0",
@@ -31,7 +31,7 @@
     "zstd"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/karchive-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/karchive-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

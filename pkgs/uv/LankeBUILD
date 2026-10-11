@@ -1,0 +1,52 @@
+lankebuild_prepare() {
+    # Rust 构建：先拉 crates
+    cargo fetch --locked --target host-tuple
+    mkdir -p completions
+}
+
+lankebuild_build() {
+    # release profile 对齐 Arch（调试信息保留、thin LTO、单 codegen unit、O3）
+    export CARGO_PROFILE_RELEASE_DEBUG=2
+    export CARGO_PROFILE_RELEASE_STRIP=false
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+    export CARGO_PROFILE_RELEASE_OPT_LEVEL=3
+    # 注意：占位符前不加 $（lpkg 先字面替换）
+    export CFLAGS="{CFLAGS} -ffat-lto-objects"
+
+    local tripple="$(rustc --print host-tuple)"
+
+    export ZSTD_SYS_USE_PKG_CONFIG=1
+    export JEMALLOC_OVERRIDE={LIBDIR}/libjemalloc.so
+    export CARGO_FEATURE_UNPREFIXED_MALLOC_ON_SUPPORTED_PLATFORMS=1
+
+    # 不用 --all-features（会启用自更新器）
+    maturin build --locked --release --target "$tripple" --strip --compatibility linux
+    maturin build --locked --release --target "$tripple" --strip --compatibility linux -m crates/uv-build/Cargo.toml
+
+    local compgen="target/$tripple/release/uv --generate-shell-completion"
+    $compgen bash > "completions/uv"
+    $compgen elvish > "completions/uv.elv"
+    $compgen fish > "completions/uv.fish"
+    $compgen zsh > "completions/_uv"
+}
+
+lankebuild_package() {
+    # uv wheel 自带 .data/scripts/{uv,uvx}（maturin bindings=bin 把编译版二进制打进 wheel）
+    # + site-packages/uv（薄封装，找二进制）；uv_build wheel 带 uv-build 脚本 + uv_build 后端。
+    # 不再单独装 cargo target 产物 —— wheel 已提供，重复装会撞 /usr/bin/uv（installer 不覆盖已存在文件）
+    python3 -m installer --destdir={STAGING_ROOT} target/wheels/uv-*.whl
+    python3 -m installer --destdir={STAGING_ROOT} target/wheels/uv_build-*.whl
+
+    # shell 补全（构建期用 cargo 产物生成，不安装它）
+    install -Dm644 completions/uv {STAGING_ROOT}/usr/share/bash-completion/completions/uv
+    install -Dm644 completions/uv.elv {STAGING_ROOT}/usr/share/elvish/lib/uv.elv
+    install -Dm644 completions/uv.fish {STAGING_ROOT}/usr/share/fish/vendor_completions.d/uv.fish
+    install -Dm644 completions/_uv {STAGING_ROOT}/usr/share/zsh/site-functions/_uv
+
+    find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
+
+    install -Dm644 LICENSE-APACHE {STAGING_ROOT}/usr/share/licenses/uv/LICENSE-APACHE
+    install -Dm644 LICENSE-MIT {STAGING_ROOT}/usr/share/licenses/uv/LICENSE-MIT
+    install -Dm644 README.md {STAGING_ROOT}/usr/share/doc/uv/README.md
+}

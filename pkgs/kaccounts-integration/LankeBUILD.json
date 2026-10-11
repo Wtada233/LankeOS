@@ -1,6 +1,6 @@
 {
   "name": "kaccounts-integration",
-  "version": "26.08.1",
+  "version": "26.08.2",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -12,7 +12,7 @@
     "libKF6KCMUtilsQuick.so.6",
     "libKF6KIOCore.so.6",
     "libKF6Wallet.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Qml.so.6@Qt_6",
     "libQt6Widgets.so.6@Qt_6",
@@ -47,7 +47,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/release-service/26.08.1/src/kaccounts-integration-26.08.1.tar.xz"
+    "https://download.kde.org/stable/release-service/26.08.2/src/kaccounts-integration-26.08.2.tar.xz"
   ],
   "work_sources": []
 }

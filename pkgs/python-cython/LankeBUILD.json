@@ -1,7 +1,7 @@
 {
   "name": "python-cython",
   "version": "3.3.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python",
     "python-pygments",

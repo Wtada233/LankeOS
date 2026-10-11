@@ -1,6 +1,6 @@
 {
   "name": "python",
-  "version": "3.14.8",
+  "version": "3.15.0",
   "release": 3,
   "deps": [
     "bash"
@@ -21,14 +21,14 @@
     "libpanelw.so.6",
     "libreadline.so.8",
     "libsqlite3.so.0",
-    "libssl.so.3@{OPENSSL_3.0.0,OPENSSL_3.3.0}",
+    "libssl.so.3@{OPENSSL_3.0.0,OPENSSL_3.2.0,OPENSSL_3.3.0,OPENSSL_3.4.0}",
     "libuuid.so.1@UUID_2.20",
-    "libz.so.1@ZLIB_1.2.0",
+    "libz.so.1@{ZLIB_1.2.0,ZLIB_1.2.3.3}",
     "libzstd.so.1"
   ],
   "provides_soname": [
-    "libpython3.14.so",
-    "libpython3.14.so.1.0",
+    "libpython3.15.so",
+    "libpython3.15.so.1.0",
     "libpython3.so"
   ],
   "build_deps": [
@@ -47,7 +47,7 @@
     "zstd"
   ],
   "sources": [
-    "https://www.python.org/ftp/python/3.14.8/Python-3.14.8.tar.xz"
+    "https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tar.xz"
   ],
   "work_sources": []
 }

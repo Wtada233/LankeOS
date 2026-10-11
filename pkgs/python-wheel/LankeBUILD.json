@@ -1,7 +1,7 @@
 {
   "name": "python-wheel",
   "version": "0.48.0",
-  "release": 3,
+  "release": 5,
   "deps": [
     "python",
     "python-packaging"
@@ -10,10 +10,9 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
-    "git"
+    "lanke-py-bootstrap"
   ],
   "sources": [
-    "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
     "https://files.pythonhosted.org/packages/d0/20/50ed6bdf27dec98b568a8ae25dc599f35baa3d9709f9e83fd1edb56b9a90/wheel-0.48.0.tar.gz"
   ],
   "work_sources": []

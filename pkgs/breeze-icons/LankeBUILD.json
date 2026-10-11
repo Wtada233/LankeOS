@@ -1,10 +1,10 @@
 {
   "name": "breeze-icons",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
     "libc.so.6@{GLIBC_2.2.5,GLIBC_ABI_DT_RELR}"
   ],
@@ -21,7 +21,7 @@
     "qt6-base"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/breeze-icons-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/breeze-icons-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

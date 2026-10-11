@@ -1,0 +1,30 @@
+{
+  "name": "maturin",
+  "version": "1.15.0",
+  "release": 2,
+  "deps": [
+    "rust"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.27,GLIBC_2.28,GLIBC_2.29,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.39,GLIBC_2.4,GLIBC_2.5,GLIBC_2.6,GLIBC_2.9}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
+    "liblzma.so.5@XZ_5.0",
+    "libm.so.6@{GLIBC_2.27,GLIBC_2.29}"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-setuptools-rust",
+    "python-wheel",
+    "rust",
+    "xz"
+  ],
+  "sources": [
+    "https://github.com/PyO3/maturin/archive/refs/tags/v1.15.0.tar.gz"
+  ],
+  "work_sources": []
+}

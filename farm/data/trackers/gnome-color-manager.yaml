@@ -3,5 +3,5 @@ version-source: sources[0]
 sources:
   - tracker-template: gnome
     source-name: gnome-color-manager
-    stable-minor: all
+    # 该包用 GNOME 偶/奇惯例（3.35.90 是开发版）→ 用模板默认，不设 stable-minor
     template: https://download.gnome.org/sources/gnome-color-manager/{path_version}/gnome-color-manager-{version}.tar.xz

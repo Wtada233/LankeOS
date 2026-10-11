@@ -1,0 +1,8 @@
+pkg-name: maturin
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: PyO3/maturin
+    mode: releases
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

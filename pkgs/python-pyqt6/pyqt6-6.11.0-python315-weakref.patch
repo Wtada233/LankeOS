@@ -1,0 +1,49 @@
+Python 3.15 removed PyWeakref_GetObject(); use PyWeakref_GetRef() instead.
+
+PyWeakref_GetRef() is only declared for Py_LIMITED_API >= 0x030d0000, while sip
+builds the qpy support code with 0x030a0000, so this file is compiled against a
+higher stable ABI baseline.
+--- a/qpy/QtCore/qpycore_pyqtslot.cpp
++++ b/qpy/QtCore/qpycore_pyqtslot.cpp
+@@ -18,6 +18,14 @@
+ // WARRANTY OF DESIGN, MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+
++// PyWeakref_GetRef() is not declared below Py_LIMITED_API 0x030d0000 (3.13),
++// so compile this file against a higher stable ABI baseline than the one sip
++// passes on the command line.
++#ifdef Py_LIMITED_API
++#  undef Py_LIMITED_API
++#endif
++#define Py_LIMITED_API 0x030d0000
++
+ #include <Python.h>
+
+ #include "qpycore_chimera.h"
+@@ -207,7 +215,25 @@
+ {
+     // Use the weak reference if possible.
+     if (mself_wr)
+-        return PyWeakref_GetObject(mself_wr);
++    {
++        PyObject *obj;
++        int rc = PyWeakref_GetRef(mself_wr, &obj);
++
++        // A dead referent is not an error.
++        if (rc == 0)
++            return Py_None;
++
++        if (rc < 0)
++            return 0;
++
++        // The callers want a borrowed reference.  Dropping the new reference
++        // returned by PyWeakref_GetRef() is safe: the referent was still
++        // alive, so something else references it, and the GIL means nothing
++        // runs before the caller has finished with it.
++        Py_DECREF(obj);
++
++        return obj;
++    }
+
+     return mself;
+ }

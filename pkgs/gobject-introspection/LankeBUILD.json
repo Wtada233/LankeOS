@@ -1,13 +1,13 @@
 {
   "name": "gobject-introspection",
   "version": "1.86.0",
-  "release": 4,
+  "release": 5,
   "deps": [
     "python",
     "python-setuptools"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.34,GLIBC_2.7}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libffi.so.8@{LIBFFI_BASE_8.0,LIBFFI_CLOSURE_8.0}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",

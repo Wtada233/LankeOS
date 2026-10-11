@@ -1,10 +1,11 @@
 {
   "name": "kf-kcoreaddons",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 1,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Network.so.6@Qt_6",
     "libQt6Qml.so.6@Qt_6",
@@ -32,7 +33,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/kcoreaddons-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/kcoreaddons-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

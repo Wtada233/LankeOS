@@ -1,6 +1,6 @@
 {
   "name": "libevdev",
-  "version": "1.13.7",
+  "version": "1.14.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -8,8 +8,8 @@
     "libm.so.6@GLIBC_2.2.5"
   ],
   "provides_soname": [
-    "libevdev.so.2@{LIBEVDEV_1,LIBEVDEV_1_10,LIBEVDEV_1_3,LIBEVDEV_1_6,LIBEVDEV_1_7}",
-    "libevdev.so@{LIBEVDEV_1,LIBEVDEV_1_10,LIBEVDEV_1_3,LIBEVDEV_1_6,LIBEVDEV_1_7}"
+    "libevdev.so.2@{LIBEVDEV_1,LIBEVDEV_1_10,LIBEVDEV_1_14,LIBEVDEV_1_3,LIBEVDEV_1_6,LIBEVDEV_1_7}",
+    "libevdev.so@{LIBEVDEV_1,LIBEVDEV_1_10,LIBEVDEV_1_14,LIBEVDEV_1_3,LIBEVDEV_1_6,LIBEVDEV_1_7}"
   ],
   "build_deps": [
     "base-devel",
@@ -17,7 +17,7 @@
     "ninja"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-1.13.7/libevdev-libevdev-1.13.7.tar.gz"
+    "https://gitlab.freedesktop.org/libevdev/libevdev/-/archive/libevdev-1.14.0/libevdev-libevdev-1.14.0.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,7 +1,7 @@
 {
   "name": "blueprint-compiler",
   "version": "0.22.2",
-  "release": 2,
+  "release": 3,
   "deps": [
     "glib",
     "python",

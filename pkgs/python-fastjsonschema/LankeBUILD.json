@@ -1,7 +1,7 @@
 {
   "name": "python-fastjsonschema",
   "version": "2.22.2",
-  "release": 1,
+  "release": 2,
   "deps": [
     "python"
   ],

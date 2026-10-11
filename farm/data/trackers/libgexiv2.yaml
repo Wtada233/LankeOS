@@ -4,5 +4,7 @@ pkg-name: libgexiv2
 version-source: sources[0]
 sources:
   - tracker-template: gnome
+    # 版本跟 GNOME 发布号（单段目录如 51/），odd minor 不是 dev（GNOME 40 起废弃偶/奇）→ 不设 stable-minor 会误排除
+    stable-minor: all
     template: https://download.gnome.org/sources/gexiv2/{path_version}/gexiv2-{version}.tar.xz
     source-name: gexiv2

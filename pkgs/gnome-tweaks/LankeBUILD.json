@@ -1,7 +1,7 @@
 {
   "name": "gnome-tweaks",
   "version": "49.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "dconf",
     "glib",

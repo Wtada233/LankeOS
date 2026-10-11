@@ -17,5 +17,5 @@ lankebuild_package() {
     # 清理 __pycache__（与 python 配方一致，.pyc 冗余）
     find {STAGING_ROOT}/ -name "__pycache__" -type d -exec rm -rf {} +
     sed -i 's/basename(/os.path.basename(/g' \
-        {STAGING_ROOT}/usr/lib/python3.14/site-packages/lsbtools/lsb_release.py
+        {STAGING_ROOT}/usr/lib/python*/site-packages/lsbtools/lsb_release.py
 }

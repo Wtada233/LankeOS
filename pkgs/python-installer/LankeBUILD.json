@@ -1,7 +1,7 @@
 {
   "name": "python-installer",
   "version": "1.0.1",
-  "release": 3,
+  "release": 5,
   "deps": [
     "python"
   ],
@@ -9,10 +9,9 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
-    "git"
+    "lanke-py-bootstrap"
   ],
   "sources": [
-    "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
     "https://files.pythonhosted.org/packages/06/fe/b9f481cf0cc867958a21338baa900357b7b7d86cac9b025948049d77923c/installer-1.0.1.tar.gz"
   ],
   "work_sources": []

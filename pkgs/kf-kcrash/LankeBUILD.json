@@ -1,11 +1,11 @@
 {
   "name": "kf-kcrash",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 1,
   "deps": [],
   "needed_so": [
     "libKF6CoreAddons.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
     "libX11.so.6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
@@ -28,7 +28,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/kcrash-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/kcrash-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

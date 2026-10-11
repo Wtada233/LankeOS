@@ -1,11 +1,11 @@
 {
   "name": "kf-kunitconversion",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 1,
   "deps": [],
   "needed_so": [
     "libKF6I18n.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Network.so.6@Qt_6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_ABI_DT_RELR}",
     "libm.so.6@GLIBC_2.29",
@@ -28,7 +28,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/kunitconversion-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/kunitconversion-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,0 +1,30 @@
+pkg-name: lanke-py-bootstrap
+version-source: sources[0]
+sources:
+  # 版本手动钉：本 bootstrap 已验证的 Python 版本。升级 python 时改这里（并确认核心源兼容）。
+  # 源用真的 Python 源码 tarball 当版本锚（farm 不接受裸目录 URL）；它只提供版本，
+  # recipe 不拿它做构建输入，只用版本派生 {pyver}。
+  - tracker-template: script
+    script: |
+      echo "3.15|https://www.python.org/ftp/python/3.15.0/Python-3.15.0.tar.xz"
+  - tracker-template: pypi
+    project: build
+    max-version: 1.6.1
+  - tracker-template: pypi
+    project: installer
+    max-version: 1.0.1
+  - tracker-template: pypi
+    project: flit-core
+    max-version: 4.1.0
+  - tracker-template: pypi
+    project: wheel
+    max-version: 0.48.0
+  - tracker-template: pypi
+    project: packaging
+    max-version: 26.3
+  - tracker-template: pypi
+    project: pyproject-hooks
+    max-version: 1.3.3
+  - tracker-template: pypi
+    project: setuptools
+    max-version: 84.0.0

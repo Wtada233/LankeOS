@@ -1,7 +1,7 @@
 {
   "name": "python-packaging",
   "version": "26.3",
-  "release": 3,
+  "release": 5,
   "deps": [
     "python"
   ],
@@ -9,10 +9,9 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
-    "git"
+    "lanke-py-bootstrap"
   ],
   "sources": [
-    "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
     "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz"
   ],
   "work_sources": []

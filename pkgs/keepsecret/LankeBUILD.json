@@ -1,6 +1,6 @@
 {
   "name": "keepsecret",
-  "version": "26.08.1",
+  "version": "26.08.2",
   "release": 3,
   "deps": [
     "kf-kirigami",
@@ -55,7 +55,7 @@
     "qt6-svg"
   ],
   "sources": [
-    "https://download.kde.org/stable/release-service/26.08.1/src/keepsecret-26.08.1.tar.xz"
+    "https://download.kde.org/stable/release-service/26.08.2/src/keepsecret-26.08.2.tar.xz"
   ],
   "work_sources": []
 }

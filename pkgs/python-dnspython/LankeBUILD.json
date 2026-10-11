@@ -1,7 +1,7 @@
 {
   "name": "python-dnspython",
-  "version": "2.8.0",
-  "release": 1,
+  "version": "2.9.0",
+  "release": 2,
   "deps": [
     "python"
   ],
@@ -10,11 +10,11 @@
   "build_deps": [
     "base-devel",
     "python-build",
-    "python-hatchling",
-    "python-installer"
+    "python-installer",
+    "uv"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/8c/8b/57666417c0f90f08bcafa776861060426765fdb422eb10212086fb811d26/dnspython-2.8.0.tar.gz"
+    "https://files.pythonhosted.org/packages/ef/4a/50822184bd67cc6493f0fb6a880749158fcd31ab3fa07409acfd91f9fc85/dnspython-2.9.0.tar.gz"
   ],
   "work_sources": []
 }

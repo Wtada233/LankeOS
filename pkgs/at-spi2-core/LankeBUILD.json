@@ -1,7 +1,7 @@
 {
   "name": "at-spi2-core",
-  "version": "2.62.0.1",
-  "release": 2,
+  "version": "2.62.1",
+  "release": 3,
   "deps": [
     "bash",
     "xwayland"
@@ -41,7 +41,7 @@
     "python-setuptools"
   ],
   "sources": [
-    "https://download.gnome.org/sources/at-spi2-core/2.62/at-spi2-core-2.62.0.1.tar.xz"
+    "https://download.gnome.org/sources/at-spi2-core/2.62/at-spi2-core-2.62.1.tar.xz"
   ],
   "work_sources": []
 }

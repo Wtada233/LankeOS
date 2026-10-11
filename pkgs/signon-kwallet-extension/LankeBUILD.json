@@ -1,11 +1,11 @@
 {
   "name": "signon-kwallet-extension",
-  "version": "26.08.1",
+  "version": "26.08.2",
   "release": 1,
   "deps": [],
   "needed_so": [
     "libKF6Wallet.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_ABI_DT_RELR}",
     "libgcc_s.so.1@GCC_3.0",
     "libsignon-extension.so.1",
@@ -22,7 +22,7 @@
     "signond"
   ],
   "sources": [
-    "https://download.kde.org/stable/release-service/26.08.1/src/signon-kwallet-extension-26.08.1.tar.xz"
+    "https://download.kde.org/stable/release-service/26.08.2/src/signon-kwallet-extension-26.08.2.tar.xz"
   ],
   "work_sources": []
 }

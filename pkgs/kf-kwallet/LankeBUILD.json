@@ -1,6 +1,6 @@
 {
   "name": "kf-kwallet",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -14,7 +14,7 @@
     "libKF6Notifications.so.6",
     "libKF6WidgetsAddons.so.6",
     "libKF6WindowSystem.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Widgets.so.6@Qt_6",
@@ -27,7 +27,7 @@
     "libgpgmepp.so.7",
     "libqca-qt6.so.2",
     "libsecret-1.so.0",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.21,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.21,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "libKF6Wallet.so",
@@ -60,7 +60,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/kwallet-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/kwallet-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

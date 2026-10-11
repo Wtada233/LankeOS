@@ -1,7 +1,7 @@
 {
   "name": "python-pip",
   "version": "26.2.1",
-  "release": 1,
+  "release": 2,
   "deps": [
     "python"
   ],
@@ -11,7 +11,8 @@
     "base-devel",
     "python-build",
     "python-flit-core",
-    "python-installer"
+    "python-installer",
+    "python-pyproject-hooks"
   ],
   "sources": [
     "https://github.com/pypa/pip/archive/26.2.1/pip-26.2.1.tar.gz"

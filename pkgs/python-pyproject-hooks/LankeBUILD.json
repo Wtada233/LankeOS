@@ -1,7 +1,7 @@
 {
   "name": "python-pyproject-hooks",
   "version": "1.3.3",
-  "release": 3,
+  "release": 5,
   "deps": [
     "python"
   ],
@@ -9,10 +9,9 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
-    "git"
+    "lanke-py-bootstrap"
   ],
   "sources": [
-    "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
     "https://files.pythonhosted.org/packages/6d/5d/f2ddeef4a855a102aaae5e97826a0260007522ab504421b75addfdb1517c/pyproject_hooks-1.3.3.tar.gz"
   ],
   "work_sources": []

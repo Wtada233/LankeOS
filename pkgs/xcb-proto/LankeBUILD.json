@@ -1,7 +1,7 @@
 {
   "name": "xcb-proto",
   "version": "1.17.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

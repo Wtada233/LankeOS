@@ -1,7 +1,7 @@
 {
   "name": "python-pygdbmi",
   "version": "0.11.0.0",
-  "release": 6,
+  "release": 7,
   "deps": [
     "gdb",
     "python"

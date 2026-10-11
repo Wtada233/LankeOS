@@ -1,0 +1,21 @@
+{
+  "name": "python-semantic-version",
+  "version": "2.10.0",
+  "release": 2,
+  "deps": [
+    "python"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/7d/31/f2289ce78b9b473d582568c234e104d2a342fd658cc288a7553d83bb8595/semantic_version-2.10.0.tar.gz"
+  ],
+  "work_sources": []
+}

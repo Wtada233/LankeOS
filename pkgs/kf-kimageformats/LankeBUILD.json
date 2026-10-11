@@ -1,11 +1,11 @@
 {
   "name": "kf-kimageformats",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 1,
   "deps": [],
   "needed_so": [
     "libKF6Archive.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
     "libQt6PrintSupport.so.6@Qt_6",
     "libavif.so.16",
@@ -32,7 +32,7 @@
     "qt6-base"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/kimageformats-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/kimageformats-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

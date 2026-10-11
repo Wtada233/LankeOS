@@ -1,0 +1,32 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    # {pyver} 从 {ORIG_PKG_VER}（本包版本 = python 版本，如 3.15.0）派生 → 3.15
+    local pyver="$(printf '%s' '{ORIG_PKG_VER}' | cut -d. -f1-2)"
+    local dst="{STAGING_ROOT}/usr/share/lanke-py-bootstrap/${pyver}"
+
+    install -d "$dst/bootstrap" "$dst/external/flit"
+
+    # src/bootstrap 取自 Arch 的 python-bootstrap（gitlab.archlinux.org/archlinux/python-bootstrap），
+    # 本仓库改过一处：install_package_egginfo 改成改前备份 setup.cfg、末尾写回
+    # ——上游用 git checkout 还原，而这里喂进去的是 sdist，没有 .git。
+    # LICENSE 随模块一起装出（MIT：副本须带版权与许可声明）。
+    cp -a "{WORK_DIR}/../src/bootstrap/." "$dst/bootstrap/"
+    install -Dm644 {WORK_DIR}/../LICENSE "$dst/LICENSE"
+
+    # 7 个核心包源码 → 模块 PACKAGES 期望的 external/<layout>
+    # （flit_core 模块里放在 external/flit/flit_core，故单独一层）
+    cp -a {SRC_DIR}/build-*/.           "$dst/external/build/"
+    cp -a {SRC_DIR}/installer-*/.       "$dst/external/installer/"
+    cp -a {SRC_DIR}/flit_core-*/.       "$dst/external/flit/flit_core/"
+    cp -a {SRC_DIR}/wheel-*/.           "$dst/external/wheel/"
+    cp -a {SRC_DIR}/packaging-*/.       "$dst/external/packaging/"
+    cp -a {SRC_DIR}/pyproject_hooks-*/. "$dst/external/pyproject-hooks/"
+    cp -a {SRC_DIR}/setuptools-*/.      "$dst/external/setuptools/"
+}
+
+lankebuild_package() {
+    :
+}

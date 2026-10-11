@@ -1,0 +1,7 @@
+pkg-name: uv
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: astral-sh/uv
+    mode: releases
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

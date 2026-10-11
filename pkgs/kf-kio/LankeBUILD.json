@@ -1,6 +1,6 @@
 {
   "name": "kf-kio",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -84,7 +84,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/kio-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/kio-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,12 +1,12 @@
 {
   "name": "python-pyyaml",
   "version": "6.0.3",
-  "release": 1,
+  "release": 2,
   "deps": [
     "python"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
     "libyaml-0.so.2"
   ],
   "provides_soname": [],

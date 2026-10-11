@@ -1,6 +1,6 @@
 {
   "name": "fzf",
-  "version": "0.74.4",
+  "version": "0.74.5",
   "deps": [
     "bash"
   ],
@@ -14,7 +14,7 @@
     "golang"
   ],
   "sources": [
-    "https://github.com/junegunn/fzf/archive/refs/tags/v0.74.4.tar.gz"
+    "https://github.com/junegunn/fzf/archive/refs/tags/v0.74.5.tar.gz"
   ],
   "work_sources": []
 }

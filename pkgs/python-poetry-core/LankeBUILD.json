@@ -1,7 +1,7 @@
 {
   "name": "python-poetry-core",
   "version": "2.5.0",
-  "release": 1,
+  "release": 2,
   "deps": [
     "python",
     "python-fastjsonschema",

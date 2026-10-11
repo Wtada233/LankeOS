@@ -1,6 +1,6 @@
 {
   "name": "kf-kfilemetadata",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 5,
   "deps": [],
   "needed_so": [
@@ -8,7 +8,7 @@
     "libKF6Codecs.so.6",
     "libKF6CoreAddons.so.6",
     "libKF6I18n.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Xml.so.6@Qt_6",
     "libavcodec.so.63@LIBAVCODEC_63",
@@ -43,7 +43,7 @@
     "taglib"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/kfilemetadata-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/kfilemetadata-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "kf-ksvg",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -10,7 +10,7 @@
     "libKF6CoreAddons.so.6",
     "libKF6GuiAddons.so.6",
     "libKirigamiPlatform.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Qml.so.6@Qt_6",
     "libQt6Quick.so.6@Qt_6",
@@ -41,7 +41,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/ksvg-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/ksvg-6.31.0.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,11 +1,16 @@
 lankebuild_prepare() {
-    :
+    # 放宽 pyproject 的 uv_build 上界（<0.13.0 → <0.14.0）：uv 0.13.0 的 CHANGELOG 明确
+    # uv_build 0.13 无破坏性改动、消费者应把上界放宽到 <0.14。上游 dnspython 更新约束后
+    # 本补丁自动变 no-op（容错三段式）
+    patch -N -p1 -i "{WORK_DIR}/../relax-uv-build-version.patch" \
+        || patch -R --dry-run -p1 -i "{WORK_DIR}/../relax-uv-build-version.patch" >/dev/null 2>&1 \
+        || exit 1
 }
 
 lankebuild_build() {
     # PEP 517 wheel 构建（build/installer 已成包）
-    # --no-isolation：上游 [build-system] 只要 hatchling>=1.21，仓库里 python-hatchling 已成包
-    # → 不必每次构建都起一个隔离环境去联网装后端。
+    # --no-isolation：上游 [build-system] 用 uv_build 后端（uv 包提供）
+    # → 不必每次构建都起隔离环境联网装后端
     python3 -m build --wheel --no-isolation
 }
 

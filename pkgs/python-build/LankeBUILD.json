@@ -1,7 +1,7 @@
 {
   "name": "python-build",
   "version": "1.6.1",
-  "release": 3,
+  "release": 5,
   "deps": [
     "python",
     "python-packaging",
@@ -11,10 +11,9 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
-    "git"
+    "lanke-py-bootstrap"
   ],
   "sources": [
-    "git+https://gitlab.archlinux.org/archlinux/python-bootstrap.git@3.14.0",
     "https://files.pythonhosted.org/packages/bd/67/4898a44ea4f3f8e213b0954ec0aa0a16971d62a6212d6ea3931e97115b99/build-1.6.1.tar.gz"
   ],
   "work_sources": []

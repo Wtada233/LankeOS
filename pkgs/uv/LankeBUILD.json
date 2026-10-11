@@ -1,0 +1,30 @@
+{
+  "name": "uv",
+  "version": "0.13.0",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.27,GLIBC_2.28,GLIBC_2.29,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.39,GLIBC_2.4,GLIBC_2.5,GLIBC_2.6,GLIBC_2.7,GLIBC_2.9}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
+    "libjemalloc.so.2",
+    "libm.so.6@GLIBC_2.29",
+    "libzstd.so.1"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "bzip2",
+    "cmake",
+    "jemalloc",
+    "maturin",
+    "python-installer",
+    "rust",
+    "xz",
+    "zstd"
+  ],
+  "sources": [
+    "https://github.com/astral-sh/uv/archive/refs/tags/0.13.0.tar.gz"
+  ],
+  "work_sources": []
+}

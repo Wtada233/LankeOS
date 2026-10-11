@@ -1,7 +1,7 @@
 {
   "name": "python-pyqt6",
   "version": "6.11.0",
-  "release": 4,
+  "release": 5,
   "deps": [
     "python",
     "python-pyqt6-sip"
@@ -38,7 +38,7 @@
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}",
     "libgcc_s.so.1@GCC_3.0",
     "libm.so.6@{GLIBC_2.35,GLIBC_2.38,GLIBC_2.43}",
-    "libpython3.14.so.1.0",
+    "libpython3.15.so.1.0",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.20}"
   ],
   "provides_soname": [],

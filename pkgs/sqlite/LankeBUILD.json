@@ -1,12 +1,11 @@
 {
   "name": "sqlite",
-  "version": "3.53.4",
+  "version": "3.54.0",
   "release": 2,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.38,GLIBC_2.44}",
-    "libncursesw.so.6",
     "libreadline.so.8",
     "libtcl8.6.so",
     "libz.so.1@ZLIB_1.2.0"
@@ -22,7 +21,8 @@
     "zlib"
   ],
   "sources": [
-    "https://www.sqlite.org/2026/sqlite-src-3530400.zip"
+    "https://www.sqlite.org/2026/sqlite-src-3540000.zip"
   ],
-  "no_strip": false
+  "no_strip": false,
+  "work_sources": []
 }

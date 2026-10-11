@@ -1,7 +1,7 @@
 {
   "name": "samba",
   "version": "4.25.0",
-  "release": 7,
+  "release": 9,
   "deps": [
     "python-dnspython",
     "python-markdown"
@@ -28,8 +28,8 @@
     "libpam.so.0@{LIBPAM_1.0,LIBPAM_EXTENSION_1.0}",
     "libpanelw.so.6",
     "libpopt.so.0@LIBPOPT_0",
-    "libpytalloc-util.cpython-314-x86-64-linux-gnu.so.2@{PYTALLOC_UTIL_2.0.6,PYTALLOC_UTIL_2.1.6,PYTALLOC_UTIL_2.1.9,PYTALLOC_UTIL_2.3.0}",
-    "libpython3.14.so.1.0",
+    "libpytalloc-util.cpython-315-x86-64-linux-gnu.so.2@{PYTALLOC_UTIL_2.0.6,PYTALLOC_UTIL_2.1.6,PYTALLOC_UTIL_2.1.9,PYTALLOC_UTIL_2.3.0}",
+    "libpython3.15.so.1.0",
     "libreadline.so.8",
     "libsystemd.so.0@LIBSYSTEMD_209",
     "libtalloc.so.2@{TALLOC_2.0.2,TALLOC_2.0.8,TALLOC_2.1.0,TALLOC_2.3.5,TALLOC_2.4.4,TALLOC_2.5.0}",
@@ -78,6 +78,8 @@
     "cups",
     "cyrus-sasl",
     "dbus",
+    "docbook-xml",
+    "docbook-xsl",
     "fuse3",
     "gdb",
     "git",
@@ -113,7 +115,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.samba.org/pub/samba/stable/samba-4.25.0.tar.gz"
+    "https://github.com/samba-team/samba/archive/refs/tags/samba-4.25.0.tar.gz"
   ],
   "work_sources": [],
   "farm_flags": [

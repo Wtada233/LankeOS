@@ -1,7 +1,7 @@
 {
   "name": "liborcus",
   "version": "0.21.0",
-  "release": 4,
+  "release": 5,
   "deps": [],
   "needed_so": [
     "libboost_date_time.so.1.92.0",

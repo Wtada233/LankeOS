@@ -1,6 +1,6 @@
 {
   "name": "ark",
-  "version": "26.08.1",
+  "version": "26.08.2",
   "release": 1,
   "deps": [
     "unzip",
@@ -29,7 +29,7 @@
     "libKF6WidgetsAddons.so.6",
     "libKF6WindowSystem.so.6",
     "libKF6XmlGui.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Widgets.so.6@Qt_6",
@@ -70,7 +70,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.kde.org/stable/release-service/26.08.1/src/ark-26.08.1.tar.xz"
+    "https://download.kde.org/stable/release-service/26.08.2/src/ark-26.08.2.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "kf-kirigami",
-  "version": "6.30.0",
+  "version": "6.31.0",
   "release": 4,
   "deps": [
     "kf-kitemmodels"
@@ -63,7 +63,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/frameworks/6.30/kirigami-6.30.0.tar.xz"
+    "https://download.kde.org/stable/frameworks/6.31/kirigami-6.31.0.tar.xz"
   ],
   "work_sources": []
 }
