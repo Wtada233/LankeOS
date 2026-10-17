@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'site/**'
-      - '.github/workflows/site-build.yml'
+      - "site/**"
+      - ".github/workflows/site-build.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'site/**'
-      - '.github/workflows/site-build.yml'
+      - "site/**"
+      - ".github/workflows/site-build.yml"
   workflow_dispatch:
 
 jobs:

@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'lpkg/**'
-      - '.github/workflows/lpkg-build.yml'
+      - "lpkg/**"
+      - ".github/workflows/lpkg-build.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'lpkg/**'
-      - '.github/workflows/lpkg-build.yml'
+      - "lpkg/**"
+      - ".github/workflows/lpkg-build.yml"
   workflow_dispatch:
 
 jobs:

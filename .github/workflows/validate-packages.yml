@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'pkgs/**'
-      - '.github/workflows/validate-packages.yml'
+      - "pkgs/**"
+      - ".github/workflows/validate-packages.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'pkgs/**'
-      - '.github/workflows/validate-packages.yml'
+      - "pkgs/**"
+      - ".github/workflows/validate-packages.yml"
   workflow_dispatch:
 
 jobs:

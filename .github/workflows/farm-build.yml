@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'farm/**'
-      - '.github/workflows/farm-build.yml'
+      - "farm/**"
+      - ".github/workflows/farm-build.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'farm/**'
-      - '.github/workflows/farm-build.yml'
+      - "farm/**"
+      - ".github/workflows/farm-build.yml"
   workflow_dispatch:
 
 jobs:
@@ -21,6 +21,12 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      # farm 的 `.lpkg` 编解码走系统 libarchive（`src/libarchive_ffi.rs` 的
+      # `#[link(name = "archive")]`）：链接期要 `libarchive.so`（`libarchive-dev` 提供未版本化
+      # 符号链接），运行时 `libarchive13` 作为依赖一起装上。
+      - name: Install libarchive
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libarchive-dev
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2

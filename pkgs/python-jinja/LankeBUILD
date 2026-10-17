@@ -3,8 +3,11 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    # PEP 517 wheel 构建（build/installer 已成包，走标准模板）
-    python3 -m build --wheel # --no-isolation
+    # PEP 517 wheel 构建（build/installer 已成包，走标准模板）。--no-isolation 用系统环境，
+    # 不建隔离 venv 去 PyPI 拉构建依赖（flit_core 由 build_deps 的 python-flit-core 提供）。
+    # 上游 pyproject 要求 flit_core<4，本仓库是 4.x，依赖检查会拒（`Unmet dependencies: flit_core<4 / wanted <4 / found 4.1.0`）；
+    # 跳过该检查（flit 3→4 对本包无 breaking，同 python-docutils / python-lxml 的做法）。
+    python3 -m build --wheel --no-isolation --skip-dependency-check
 }
 
 lankebuild_package() {
