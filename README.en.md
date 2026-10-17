@@ -43,13 +43,13 @@ LankeOS is a Linux distribution built using the Linux From Scratch methodology. 
 
 ## Components
 
-| Sub-project | Description | Docs |
-|---|---|---|
-| [lpkg](lpkg/) | C++20 package manager: atomic WAL transactions with rollback, `needed_so` ABI validation, aggregate index, static builds | [README](lpkg/README.en.md) |
-| [farm](farm/) | Rust ABI-driven incremental build farm with container-isolated builds | [README](farm/README.en.md) |
-| [pkgs](pkgs/) | Hundreds of package build recipes (`LankeBUILD` + `LankeBUILD.json`) | — |
-| [live](live/) | Live ISO / initramfs tooling with three boot modes | — |
-| [site](site/) | VitePress documentation site (zh + en) | [lankeos.wtada233.top](https://lankeos.wtada233.top) |
+| Sub-project   | Description                                                                                                              | Docs                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| [lpkg](lpkg/) | C++20 package manager: atomic WAL transactions with rollback, `needed_so` ABI validation, aggregate index, static builds | [README](lpkg/README.en.md)                          |
+| [farm](farm/) | Rust ABI-driven incremental build farm with container-isolated builds                                                    | [README](farm/README.en.md)                          |
+| [pkgs](pkgs/) | Hundreds of package build recipes (`LankeBUILD` + `LankeBUILD.json`)                                                     | —                                                    |
+| [live](live/) | Live ISO / initramfs tooling with three boot modes                                                                       | —                                                    |
+| [site](site/) | VitePress documentation site (zh + en)                                                                                   | [lankeos.wtada233.top](https://lankeos.wtada233.top) |
 
 ## Quick Start
 

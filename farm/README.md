@@ -95,7 +95,7 @@ lankefarm serve --root out --port 8000
 ```yaml
 # 单源包：github tags 探测
 pkg-name: systemd
-version-source: sources[0]        # 显式声明版本来自哪条
+version-source: sources[0] # 显式声明版本来自哪条
 sources:
   - tracker-template: github
     repo: systemd/systemd
@@ -159,16 +159,16 @@ cargo build --release        # 产物: target/release/lankefarm
 
 ## CLI 命令
 
-| 命令 | 说明 |
-|---|---|
-| `build <pkg>...\|--all --image <img>` | 增量、ABI 感知的构建，带计划预览（仅容器构建，`--image` 必填） |
-| `validate --image <img>` | 重建所有缺少 `.build_ok` 标记的包 |
-| `export --output <dir>` | 将构建仓库扁平化复制为发行格式 `<pkg>-<ver>.lpkg`（不重打包） |
-| `chk <kind> --source <repo> [--pkgs …]` | 维护期实用检則工具集（**非稳定接口**，可能因技术变迁移除）：`qml`（QML import 依赖）/ `pkgconf`（.pc Requires 依赖）/ `pkg-err`（usr/etc|usr/var、.la、.a）/ `introspection`（装 `.gir` 的包须声明 `gobject-introspection` 构建依赖）/ `vapi`（装 `.vapi` 的包须声明 `vala` 构建依赖）/ `build-deps`（每个 `needed_so` 的 SONAME 提供者须直接在本包 `build_deps`）/ `pycache`（包内不得含 `__pycache__`）/ `hook`（sysusers/tmpfiles → postinst 自动跑）/ `abi`（全 ABI 符号@版本审计）/ `full`（一键全跑）。共享 `--source/--arch/--pkgs-dir/--cache/--pkg/--full-rescan`；非 root、只读 |
-| `track <pkg>\|--all [--run]` | 探测上游版本（默认只读提案，`--run` 应用） |
-| `gen-trackers` | 批量调用 LLM 生成 tracker yaml |
-| `seed --remote <url>` | 冷启动播种远程仓库（并行下载 + SHA-256 校验） |
-| `serve [--root out] [--port 8000]` | 本地仓库静态 HTTP 服务器 |
+| 命令                                    | 说明                                                                                                                                     |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `build <pkg>...\|--all --image <img>`   | 增量、ABI 感知的构建，带计划预览（仅容器构建，`--image` 必填）                                                                           |
+| `validate --image <img>`                | 重建所有缺少 `.build_ok` 标记的包                                                                                                        |
+| `export --output <dir>`                 | 将构建仓库扁平化复制为发行格式 `<pkg>-<ver>.lpkg`（不重打包）                                                                            |
+| `chk <kind> --source <repo> [--pkgs …]` | 维护期实用检則工具集（**非稳定接口**，可能因技术变迁移除）：`qml`（QML import 依赖）/ `pkgconf`（.pc Requires 依赖）/ `pkg-err`（usr/etc | usr/var、.la、.a）/ `introspection`（装 `.gir` 的包须声明 `gobject-introspection` 构建依赖）/ `vapi`（装 `.vapi` 的包须声明 `vala` 构建依赖）/ `build-deps`（每个 `needed_so` 的 SONAME 提供者须直接在本包 `build_deps`）/ `pycache`（包内不得含 `__pycache__`）/ `hook`（sysusers/tmpfiles → postinst 自动跑）/ `abi`（全 ABI 符号@版本审计）/ `full`（一键全跑）。共享 `--source/--arch/--pkgs-dir/--cache/--pkg/--full-rescan`；非 root、只读 |
+| `track <pkg>\|--all [--run]`            | 探测上游版本（默认只读提案，`--run` 应用）                                                                                               |
+| `gen-trackers`                          | 批量调用 LLM 生成 tracker yaml                                                                                                           |
+| `seed --remote <url>`                   | 冷启动播种远程仓库（并行下载 + SHA-256 校验）                                                                                            |
+| `serve [--root out] [--port 8000]`      | 本地仓库静态 HTTP 服务器                                                                                                                 |
 
 ## 构建流水线
 
@@ -218,12 +218,12 @@ farm/
 
 ## 技术栈
 
-| 技术 | 用途 |
-|---|---|
-| Rust | 实现语言（serde / clap / rusqlite / ureq / goblin / zstd / sha2） |
-| SQLite | 任务状态库（`out/farm-state.db`） |
-| Docker | 容器隔离构建（`--image` 指定基础镜像） |
-| zstd · tar（Rust crate） | `.lpkg` 解包 / 重打（纯 Rust，无需系统 `zstd`/`tar`/`sudo`） |
+| 技术                     | 用途                                                              |
+| ------------------------ | ----------------------------------------------------------------- |
+| Rust                     | 实现语言（serde / clap / rusqlite / ureq / goblin / zstd / sha2） |
+| SQLite                   | 任务状态库（`out/farm-state.db`）                                 |
+| Docker                   | 容器隔离构建（`--image` 指定基础镜像）                            |
+| zstd · tar（Rust crate） | `.lpkg` 解包 / 重打（纯 Rust，无需系统 `zstd`/`tar`/`sudo`）      |
 
 ## 贡献
 

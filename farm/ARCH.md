@@ -110,6 +110,7 @@ farm **不再 spawn `sudo`/`tar`/`zstd` CLI**——解包走 `zstd`+`tar` Rust c
 > lpkg 现在把版本串原样交给 libsolv，`+N` 在 rpm 里只是普通字符（会被当成"版本里多了一段"），
 > 排序与 release 语义都会错。farm 侧的版本比较（`track/vercmp.rs`）也同步换成了 **rpm EVR
 > 语义的 libsolv 移植**，用 `tests/fixtures/vercmp_rpm.txt`（期望值由真 libsolv 生成）逐值对齐。
+
 3. **拓扑排序**：`sched::topo_order` 按 **needed_so 链接边 ∪ 声明式重建组边（victim → on）∪ build_deps 边** 做 Kahn 拓扑 + 三色 DFS 切环。**确定性**：就绪队列用 `BinaryHeap<Reverse<String>>` 弹名字最小者 → **同级包固定按名字升序**，两次运行逐位一致。`deps` 不参与排序；`build_deps` **无条件进边（仅限本轮 targets 内）**——构建期需要另一个包先产出时必须等它先建（如 python-bar 要 python-foo 本轮重建的产物、gjs 要同轮首建的 sysprof）；指向本轮不重建的包 → 边丢弃。组边保证"不链 libpython 的 python-* 包"也排在 python 之后（见 §4 声明式组）。**切环偏好**：出现环时按 **build_deps → 组边 → needed_so 链接边** 挑边切断——无条件进边会引入"构建工具伪环"（如 glibc ← python/cmake 的 build_deps），这些边正是**该被切**的那类，链接序不会因此被破坏。
 4. **计划预览 + 确认**：交互模式（stdin 是 tty）列出 topo 顺序（包 + 版本）并让 operator 确认（回车继续 / n 取消）；非交互（CI/测试/脚本）直接开始。
 5. **预下载拆分**：确认后**只给确认集** bulk 预下载全部源；ABI 受害者动态入队**不预下载**（构建时由 lpkg build 自己下载）。批量预下载失败不阻塞——循环里每个确认集包会再走一次源就绪门（带交互接管）。
@@ -135,16 +136,18 @@ farm **不再 spawn `sudo`/`tar`/`zstd` CLI**——解包走 `zstd`+`tar` Rust c
 ```yaml
 # data/build/python.yaml
 rebuild-on-abichange: python
-packages: python-* meson gobject-introspection blueman   # 空格分隔的 `*` glob
+packages: python-* meson gobject-introspection blueman # 空格分隔的 `*` glob
 ```
 
 `rebuild-on-abichange` 包触发时，`groups.victims_for` 把匹配 `packages` glob 的配方包并入重建受害者集（与 `direct_victims` 并集、去重、排序入队，release bump + 重建）。
 
 **触发语义**：
+
 - 有版本化 SONAME 的包（python…）→ **只在 SONAME 断裂时**触发（removed_sonames 非空）
 - 无版本化 SONAME 的纯脚本解释器（perl…）→ **任何重建**都算运行时变化 → 触发（ABI 信号不存在，靠这个补）
 
 目录缺失/为空 → 空组（无害）。与 data/trackers 同一套 YAML 模式。
+
 - `reorder_queue`：受害者入队后按依赖算法重排，**先去重**（同一受害者被多个断裂重复入队 → `rev` 被污染导致顺序错乱）+ victim 标记取 OR。保证"被依赖者先建"（如 librsvg 先于 appstream）且叶子（chromium）**维持队尾、只构建一次**。
 
 **version-change 组动态受害者（Qt 私有 API 场景）**：version-change 与 ABI breaking **不同**——ABI 断裂
@@ -181,6 +184,7 @@ extract 后 `grep -rla "Qt_6_PRIVATE_API"` 命中即 echo 包名。这覆盖 **Q
 6. `docker cp` 产物回宿主 staging
 
 `ContainerGuard` RAII：所有失败路径自动 `docker rm -f`。容器名唯一（`lankefarm-build-<pid>-<pkg>`，
+
 > 并发 build 进程互不踩踏）；启动前只清理"创建者 PID 已死"的孤儿容器（SIGKILL/断电，RAII 未执行时）。
 
 ## 6. 验证三分支（verify.rs）
@@ -209,6 +213,7 @@ ping 这类靠文件能力提权的程序会失效），SUID/SGID 是另一套�
 ### 交互接管（build/prompt.rs）
 
 BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
+
 - `1) 开 shell 修复`（宿主 shell 改配方，exit 后重试）
 - `2) 跳过此包`（仅 operator 明确选择才跳过）
 - `3) 结束构建`
@@ -234,6 +239,7 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 ## 8. seed（冷启动播种）
 
 `seed.rs`：
+
 1. 下载远端 `index.txt` → 解析（含**完整 needed_so**）
 2. 并行（`-j`，默认 CPU 核数）逐包：下载 + **SHA256 校验** + 清旧版本（本地已有该版本 → 增量跳过下载）
 3. 本地 `index.txt` **原样保留**（不重写哈希），`.lpkg` **不重打**——单一真源，容器与 farm 共用
@@ -257,12 +263,12 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
   例（KDE frameworks，73 个 kf-* tracker 同形）：
   ```yaml
   levels:
-  - name: series      # {series} = 6.11
-    url: https://download.kde.org/stable/frameworks/
-    pattern: href="([0-9][0-9.]*)/"
-  - name: version     # 保留名：= 包版本 6.11.0
-    url: https://download.kde.org/stable/frameworks/{series}/
-    pattern: ki18n-([0-9][0-9.]*)\.tar\.xz
+    - name: series # {series} = 6.11
+      url: https://download.kde.org/stable/frameworks/
+      pattern: href="([0-9][0-9.]*)/"
+    - name: version # 保留名：= 包版本 6.11.0
+      url: https://download.kde.org/stable/frameworks/{series}/
+      pattern: ki18n-([0-9][0-9.]*)\.tar\.xz
   template: https://download.kde.org/stable/frameworks/{series}/ki18n-{version}.tar.xz
   ```
 - **`script`（条目级逃生舱，与其他模板平级）**：stdout 每行 `<版本>|URL`，**默认恰好一行**
@@ -323,6 +329,7 @@ BLOCKED 或源预下载失败 → **进程内交互提示，不退出**：
 ## 11. 状态模型（state.rs）
 
 SQLite（`out/farm-state.db`，可选 `--state`）：
+
 - `jobs` 表：每包状态（`Building`/`Done`/`Blocked`/`Skipped`）+ 失败阶段 + 配方 hash
 - `build_history`：版本 + 成功/失败
 
@@ -370,11 +377,13 @@ build --all ──> run_build
   `docker_binding_sequence.rs`（假 docker 影子脚本锁定 docker 子命令序列，拆步重构的行为不变证据）
 
 **285 个测试全绿**（252 lib + 33 集成/二进制——`cargo test`）。
+
 > 这个数字随每次加测试而变；写死只代表当时状态，别当契约。关键回归：ABI 中链包排序、叶子维持队尾、多断裂去重、坏 symlink repack、**同级构建顺序确定（名字升序、两次运行一致、输入乱序不影响）**、**ABI 受害者跳过预下载（确认集 bulk 预取）**、**备份清理（无引用删 / 有引用留）**、**声明式重建组（python ABI 断裂 → 不链 libpython 的 python 生态包被重建；perl 无 SONAME → 任何重建都触发 xml-parser 重建）**、index 写回完整 needed_so（单一真源）、**seed 半文件/损坏包不被接受**、**依赖环 track 不崩溃**、**repack 失败不静默发布**、**vercmp alpha 后缀（`1.0beta > 1.0`）**、**vercmp 与真 libsolv 的逐值对齐（`tests/fixtures/vercmp_rpm.txt`，3944 对）**、**注释掉的 hook 调用 / QML import 不误判**、**docker 拆步后子命令序列不变**、**HTTP 读超时（无应答连接秒级失败）**。
 
 ## 16. ABI 符号/版本审计（`custom_checks/abi`，`farm chk abi`）
 
 `src/custom_checks/abi.rs` 镜像 `/tmp/scan_elf_ver.py` 的两段式审计，但原生/缓存/单趟：
+
 - **provider/cache 来源 = `--source`（默认 out）下全部包**：每个 .lpkg 解包一次到临时目录，逐 ELF 用
   goblin 读 `.gnu.version_d/.gnu.version_r/.gnu.version`（verdef/verneed/versym）。**整包缓存**
   `~/.cache/lankefarm/abi/<pkg>.json`（key = 当前 `.lpkg` 文件 sha256 + 本检則 `schema`；内容为该包
@@ -392,6 +401,7 @@ build --all ──> run_build
 **整包缓存 key = `.lpkg` 文件 sha256 + 本检則的 `schema` 常量**（不是名字/版本），命中即复用分析。
 缓存根 `~/.cache/lankefarm/<chk>`（无 HOME 回落 `--source/.abi-cache`）——**单跑与 `farm chk full` 共用同一根**；
 `schema` 由每个检則模块自持，改一类分析只失效该类缓存。判定：
+
 - qmlchk/pkgconfchk：`import`/`Requires` 模块的**归属包** ∈ 本包 binpkg `deps`（仓库 index 记录的运行时
   依赖，`binpkg_deps`；**不读 LankeBUILD.json**）∪ `needed_so` 推导链接依赖（`graph::link_deps`）即满足。
   三段判定：闭包内命中 → 通过；仓库内其它包提供但不在闭包 → Warning（少依赖）；**仓库内无任何 provider
@@ -416,6 +426,6 @@ build --all ──> run_build
 - hookchk：建了 `usr/lib/sysusers.d`/`tmpfiles.d` 的包，其 `hooks/postinst.sh` 必须调
   `systemd-sysusers`/`systemd-tmpfiles --create`；**只认非注释行**（行首可选空白后 `#` 视为注释）——
   注释里出现字样不算已调用。
-配方 `farm_flags` 支持 `IGNORE_CHK_ABI/QML/PKGCONF/PKGERR/INTROSPECTION/VAPI/BUILDDEPS/PYCACHE/HOOK`（大写）整包豁免；列表值 flag
-（如 `QML_CHK_IGN_LST`）**只认 JSON 数组对象成员** `{"QML_CHK_IGN_LST": ["a","b"]}`（`NAME=a,b` 裸串
-已废弃，会告警）。这些 flag 已在 `build/farm_flags.rs` 注册（topo 解析不告警）。检則都非 root、只读。
+  配方 `farm_flags` 支持 `IGNORE_CHK_ABI/QML/PKGCONF/PKGERR/INTROSPECTION/VAPI/BUILDDEPS/PYCACHE/HOOK`（大写）整包豁免；列表值 flag
+  （如 `QML_CHK_IGN_LST`）**只认 JSON 数组对象成员** `{"QML_CHK_IGN_LST": ["a","b"]}`（`NAME=a,b` 裸串
+  已废弃，会告警）。这些 flag 已在 `build/farm_flags.rs` 注册（topo 解析不告警）。检則都非 root、只读。

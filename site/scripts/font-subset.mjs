@@ -74,7 +74,9 @@ function extractText(html) {
 async function main() {
   const htmlFiles = getFilesRecursive(DIST_DIR, [".html"]);
   if (htmlFiles.length === 0) {
-    console.warn(`[font-subset] 未找到构建产物: ${DIST_DIR}（请先运行 pnpm build）`);
+    console.warn(
+      `[font-subset] 未找到构建产物: ${DIST_DIR}（请先运行 pnpm build）`,
+    );
     return;
   }
 
@@ -83,11 +85,14 @@ async function main() {
   for (const file of htmlFiles) {
     const text = extractText(fs.readFileSync(file, "utf-8"));
     for (const ch of text) {
-      if (ch.trim() || ch === " " || ch === "\t" || ch === "\n") charSet.add(ch);
+      if (ch.trim() || ch === " " || ch === "\t" || ch === "\n")
+        charSet.add(ch);
     }
   }
   const allChars = Array.from(charSet).sort().join("");
-  console.log(`[font-subset] 从 ${htmlFiles.length} 个 HTML 提取 ${charSet.size} 个字符`);
+  console.log(
+    `[font-subset] 从 ${htmlFiles.length} 个 HTML 提取 ${charSet.size} 个字符`,
+  );
 
   // 2. 逐字体子集化 → 按内容哈希改名（指纹）→ 记录待改写的引用映射
   //    renames: 旧路径 → 新路径，供第 3 步改写 dist 内所有引用
@@ -100,10 +105,16 @@ async function main() {
     }
     try {
       const buf = fs.readFileSync(fontPath);
-      const subset = await subsetFont(buf, allChars, { targetFormat: "truetype" });
+      const subset = await subsetFont(buf, allChars, {
+        targetFormat: "truetype",
+      });
 
       // 内容哈希前 10 位做指纹；`.ttf` 前插入，保持扩展名可被静态服务器正确 Content-Type
-      const hash = crypto.createHash("sha256").update(subset).digest("hex").slice(0, 10);
+      const hash = crypto
+        .createHash("sha256")
+        .update(subset)
+        .digest("hex")
+        .slice(0, 10);
       const ext = path.extname(fontPath);
       const hashedName = `${path.basename(fontPath, ext)}.${hash}${ext}`;
       const hashedPath = path.join(path.dirname(fontPath), hashedName);
@@ -138,7 +149,8 @@ async function main() {
     }
   }
   console.log(`[font-subset] 已改写 ${touched} 个文件中的字体引用`);
-  for (const [from, to] of renames) console.log(`[font-subset]   ${from} → ${to}`);
+  for (const [from, to] of renames)
+    console.log(`[font-subset]   ${from} → ${to}`);
 }
 
 main().catch((err) => {

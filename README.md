@@ -43,13 +43,13 @@ LankeOS 是一套基于 Linux From Scratch 方法论构建的 Linux 发行版。
 
 ## 项目组成
 
-| 子项目 | 说明 | 文档 |
-|---|---|---|
-| [lpkg](lpkg/) | C++20 编写的包管理器：原子 WAL 事务回滚、`needed_so` ABI 校验、聚合索引、静态构建 | [README](lpkg/README.md) |
-| [farm](farm/) | Rust 编写的 ABI 驱动增量构建农场，容器隔离构建 | [README](farm/README.md) |
-| [pkgs](pkgs/) | 数百个软件包的构建配方（`LankeBUILD` + `LankeBUILD.json`） | — |
-| [live](live/) | Live ISO / initramfs 工具链与三种启动模式 | — |
-| [site](site/) | VitePress 文档网站（中英双语） | [lankeos.wtada233.top](https://lankeos.wtada233.top) |
+| 子项目        | 说明                                                                              | 文档                                                 |
+| ------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| [lpkg](lpkg/) | C++20 编写的包管理器：原子 WAL 事务回滚、`needed_so` ABI 校验、聚合索引、静态构建 | [README](lpkg/README.md)                             |
+| [farm](farm/) | Rust 编写的 ABI 驱动增量构建农场，容器隔离构建                                    | [README](farm/README.md)                             |
+| [pkgs](pkgs/) | 数百个软件包的构建配方（`LankeBUILD` + `LankeBUILD.json`）                        | —                                                    |
+| [live](live/) | Live ISO / initramfs 工具链与三种启动模式                                         | —                                                    |
+| [site](site/) | VitePress 文档网站（中英双语）                                                    | [lankeos.wtada233.top](https://lankeos.wtada233.top) |
 
 ## 快速上手
 

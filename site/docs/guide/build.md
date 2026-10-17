@@ -8,14 +8,14 @@ title: 从源码构建
 
 ## 构建环境要求
 
-| 组件 | 要求 |
-|------|------|
-| 操作系统 | 任意现代 Linux 发行版（Arch/Ubuntu/Fedora 等） |
-| CPU | x86_64-v3，建议 8 核以上 |
-| 内存 | 建议 8 GiB+ |
-| 磁盘 | 至少 64 GiB 可用空间 |
-| 容器 | Docker（所有构建都在 fresh 容器内进行，`--image` 为必填参数） |
-| 权限 | root（`lankefarm` 与 `lpkg` 的操作命令需要） |
+| 组件     | 要求                                                          |
+| -------- | ------------------------------------------------------------- |
+| 操作系统 | 任意现代 Linux 发行版（Arch/Ubuntu/Fedora 等）                |
+| CPU      | x86_64-v3，建议 8 核以上                                      |
+| 内存     | 建议 8 GiB+                                                   |
+| 磁盘     | 至少 64 GiB 可用空间                                          |
+| 容器     | Docker（所有构建都在 fresh 容器内进行，`--image` 为必填参数） |
+| 权限     | root（`lankefarm` 与 `lpkg` 的操作命令需要）                  |
 
 ## 获取源码
 
@@ -80,16 +80,16 @@ pkgs/<package>/
 }
 ```
 
-| 字段 | 说明 |
-|------|------|
-| `sources` | 主源（release tarball / github 归档 / `git+<url>@<tag>`）。`lankefarm track` 会自动更新 |
-| `work_sources` | 辅助源（补丁、数据文件、字体等非归档文件） |
-| `build_deps` | **构建时**依赖，必须写全（构建容器只装 `build_deps`）。含 `base-devel` 作为锚点 |
-| `deps` | **运行时**依赖。通常留空——由 farm 从 `needed_so` 反查生成；只有 dlopen / QML / D-Bus 这类扫描不出的隐式依赖才手写 |
-| `provides` | **纯虚拟 provider**（与 `.so` 无关，如 `rustc`）。**手写**，farm 不扫不改 |
-| `provides_soname` / `needed_so` | 由 farm 扫描构建产物的 ELF 自动写入，**不要手编** |
-| `release` | 打包修订号，发行版内部重建时递增（成品版本形如 `1.2.3-1` —— rpm 的 release，8.0.0 起用 `-` 而不是 `+`） |
-| `no_strip` | 跳过 ELF strip（解释器、编译器、`linux` 等） |
+| 字段                            | 说明                                                                                                              |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `sources`                       | 主源（release tarball / github 归档 / `git+<url>@<tag>`）。`lankefarm track` 会自动更新                           |
+| `work_sources`                  | 辅助源（补丁、数据文件、字体等非归档文件）                                                                        |
+| `build_deps`                    | **构建时**依赖，必须写全（构建容器只装 `build_deps`）。含 `base-devel` 作为锚点                                   |
+| `deps`                          | **运行时**依赖。通常留空——由 farm 从 `needed_so` 反查生成；只有 dlopen / QML / D-Bus 这类扫描不出的隐式依赖才手写 |
+| `provides`                      | **纯虚拟 provider**（与 `.so` 无关，如 `rustc`）。**手写**，farm 不扫不改                                         |
+| `provides_soname` / `needed_so` | 由 farm 扫描构建产物的 ELF 自动写入，**不要手编**                                                                 |
+| `release`                       | 打包修订号，发行版内部重建时递增（成品版本形如 `1.2.3-1` —— rpm 的 release，8.0.0 起用 `-` 而不是 `+`）           |
+| `no_strip`                      | 跳过 ELF strip（解释器、编译器、`linux` 等）                                                                      |
 
 ### LankeBUILD 脚本
 

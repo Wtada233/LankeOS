@@ -39,13 +39,13 @@ The installer will guide you through partitioning (GPT + EFI), formatting, data 
 
 ## System Requirements
 
-| Hardware | Minimum | Recommended |
-|----------|---------|-------------|
-| CPU | x86_64-**v3** | Intel Core i3 or equivalent |
-| Memory | 128 MiB (base system only) | 2 GiB+ (KDE desktop) |
-| Storage | 4 GiB | 10 GiB+ |
-| Graphics | KMS/DRM support | Intel / AMD / NVIDIA |
-| UEFI | 64-bit UEFI | 64-bit UEFI |
+| Hardware | Minimum                    | Recommended                 |
+| -------- | -------------------------- | --------------------------- |
+| CPU      | x86_64-**v3**              | Intel Core i3 or equivalent |
+| Memory   | 128 MiB (base system only) | 2 GiB+ (KDE desktop)        |
+| Storage  | 4 GiB                      | 10 GiB+                     |
+| Graphics | KMS/DRM support            | Intel / AMD / NVIDIA        |
+| UEFI     | 64-bit UEFI                | 64-bit UEFI                 |
 
 > **About these requirements**
 >

@@ -39,13 +39,13 @@ sudo lanke_install
 
 ## 系统要求
 
-| 硬件 | 最低配置 | 推荐配置 |
-|------|---------|---------|
-| CPU | x86_64-**v3** | Intel Core i3 或同等 |
-| 内存 | 128 MiB（仅基础系统） | 2 GiB+（KDE 桌面） |
-| 存储 | 4 GiB | 10 GiB+ |
-| 显卡 | 支持 KMS/DRM | Intel / AMD / NVIDIA |
-| UEFI | 64 位 UEFI | 64 位 UEFI |
+| 硬件 | 最低配置              | 推荐配置             |
+| ---- | --------------------- | -------------------- |
+| CPU  | x86_64-**v3**         | Intel Core i3 或同等 |
+| 内存 | 128 MiB（仅基础系统） | 2 GiB+（KDE 桌面）   |
+| 存储 | 4 GiB                 | 10 GiB+              |
+| 显卡 | 支持 KMS/DRM          | Intel / AMD / NVIDIA |
+| UEFI | 64 位 UEFI            | 64 位 UEFI           |
 
 > **关于这几项要求**
 >

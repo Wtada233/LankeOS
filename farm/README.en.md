@@ -95,7 +95,7 @@ lankefarm serve --root out --port 8000
 ```yaml
 # Single-source package: GitHub tags probing
 pkg-name: systemd
-version-source: sources[0]        # explicitly declares which entry provides the version
+version-source: sources[0] # explicitly declares which entry provides the version
 sources:
   - tracker-template: github
     repo: systemd/systemd
@@ -159,16 +159,16 @@ cargo build --release        # binary: target/release/lankefarm
 
 ## CLI Commands
 
-| Command | Description |
-|---|---|
-| `build <pkg>...\|--all --image <img>` | Incremental, ABI-aware build with plan preview (container builds only, `--image` required) |
-| `validate --image <img>` | Rebuild every package missing its `.build_ok` marker |
-| `export --output <dir>` | Flatten-copy the build repo into distribution-format `<pkg>-<ver>.lpkg` files (no repack) |
-| `chk <kind> --source <repo> [--pkgs …]` | Maintainer utility checks (**not a stable interface** - may be removed as techniques change): `qml` (QML import deps) / `pkgconf` (.pc Requires deps) / `pkg-err` (usr/etc|usr/var, .la, .a) / `hook` (sysusers/tmpfiles → postinst auto-run) / `abi` (full ABI symbol@version audit) / `full` (run all at once). Shared `--source/--arch/--pkgs-dir/--cache/--pkg/--full-rescan`; non-root, read-only |
-| `track <pkg>\|--all [--run]` | Probe upstream versions (read-only proposal by default, `--run` applies) |
-| `gen-trackers` | Batch-generate tracker YAML files via an LLM |
-| `seed --remote <url>` | Cold-start a remote repository (parallel download + SHA-256 verification) |
-| `serve [--root out] [--port 8000]` | Static HTTP server for the local repository |
+| Command                                 | Description                                                                                                                                                                |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `build <pkg>...\|--all --image <img>`   | Incremental, ABI-aware build with plan preview (container builds only, `--image` required)                                                                                 |
+| `validate --image <img>`                | Rebuild every package missing its `.build_ok` marker                                                                                                                       |
+| `export --output <dir>`                 | Flatten-copy the build repo into distribution-format `<pkg>-<ver>.lpkg` files (no repack)                                                                                  |
+| `chk <kind> --source <repo> [--pkgs …]` | Maintainer utility checks (**not a stable interface** - may be removed as techniques change): `qml` (QML import deps) / `pkgconf` (.pc Requires deps) / `pkg-err` (usr/etc | usr/var, .la, .a) / `hook` (sysusers/tmpfiles → postinst auto-run) / `abi` (full ABI symbol@version audit) / `full` (run all at once). Shared `--source/--arch/--pkgs-dir/--cache/--pkg/--full-rescan`; non-root, read-only |
+| `track <pkg>\|--all [--run]`            | Probe upstream versions (read-only proposal by default, `--run` applies)                                                                                                   |
+| `gen-trackers`                          | Batch-generate tracker YAML files via an LLM                                                                                                                               |
+| `seed --remote <url>`                   | Cold-start a remote repository (parallel download + SHA-256 verification)                                                                                                  |
+| `serve [--root out] [--port 8000]`      | Static HTTP server for the local repository                                                                                                                                |
 
 ## Build Pipeline
 
@@ -218,11 +218,11 @@ farm/
 
 ## Tech Stack
 
-| Technology | Purpose |
-|---|---|
-| Rust | Implementation language (serde / clap / rusqlite / ureq / goblin / zstd / sha2) |
-| SQLite | Job state store (`out/farm-state.db`) |
-| Docker | Container-isolated builds (`--image` specifies the base image) |
+| Technology               | Purpose                                                                           |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| Rust                     | Implementation language (serde / clap / rusqlite / ureq / goblin / zstd / sha2)   |
+| SQLite                   | Job state store (`out/farm-state.db`)                                             |
+| Docker                   | Container-isolated builds (`--image` specifies the base image)                    |
 | zstd · tar (Rust crates) | `.lpkg` extraction / repacking (pure Rust — no system `zstd`/`tar`/`sudo` needed) |
 
 ## Contributing

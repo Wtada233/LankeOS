@@ -64,10 +64,12 @@
 - **I-BAK-2**: 安装流程的 `.lpkg_bak` 清理统一在 `COMMIT_PKGS` 之后执行（调用方把
   `task.get_stashes()` 收进批次级向量，交给 `finish_committed_batch()` 的
   `cleanup_stashes()` 按 stash 根 `remove_all`）。批次内绝不提前清理，确保批量回滚时可恢复每个已安装包的文件。
+
 > **stash 根的派生必须先 `strip_trailing_slash`**：`stash_root_of_bak()`
 > 的返回值会被喂给 `fs::remove_all`，而 **`fs::remove_all("link/")` 会删光链接目标的全部内容**
 > （并返回 `ENOTDIR`）。今天它只靠"WAL 字面量恒不带尾斜杠"这条君子协定（bak 名由
 > `dir / (base + 后缀 + …)` 拼出），尾斜杠一旦出现就是灾难性的 —— 故在派生处显式剥一次。
+
 - **I-BAK-3**: 移除流程的 `.lpkg_bak` 清理与安装**完全一致**：统一在 `COMMIT_PKGS` **之后**执行
   （`finish_committed_batch()`：写 `CLEANUP` 行 → 物理删除 stash → 剪枝 hooks → 执行 postinst → `trim_completed` → `cleanup_db_backups`）。
   stash 是移除的**唯一回滚来源**（装的是刚被删掉的文件），因此必须活到"批次已不可能回滚"为止——
@@ -181,11 +183,11 @@ libsolv 的 EVR 比较（`vercmp/version.cpp` 的 `evr_cmp` → `pool_evrcmp_str
   规则把**没写 release 当通配**（`evr.c` 在 MATCH_RELEASE 下返回 ±2），于是：
   - 候选 `1.0-5`、约束 `= 1.0` → **满足**；约束 `> 1.0` → **不**满足；`>= 1.0`/`<= 1.0` → 满足；
   - 候选 `1.0`（无 release）、约束 `> 1.0-5` → **满足**（`!=` 也满足）。
-  这张三元表**逐条对应** `pooldep.c` 的 `pool_match_nevr_rel()` —— 也就是 libsolv 判定
-  "某个 solvable 是否满足某条依赖"用的那一份，`pool_whatprovides` 同一份。所以"求解器说
-  能装、安装期说不满足"这类分叉**结构上不存在**，而不是"靠两边写得一样"。
-  上面那几条**反直觉**的结论由容器里的 libsolv 直接给出答案，并已钉进
-  `tests/unit/test_version.cpp` 的 `ReleaseIsAWildcardInDependencyMatching`。
+    这张三元表**逐条对应** `pooldep.c` 的 `pool_match_nevr_rel()` —— 也就是 libsolv 判定
+    "某个 solvable 是否满足某条依赖"用的那一份，`pool_whatprovides` 同一份。所以"求解器说
+    能装、安装期说不满足"这类分叉**结构上不存在**，而不是"靠两边写得一样"。
+    上面那几条**反直觉**的结论由容器里的 libsolv 直接给出答案，并已钉进
+    `tests/unit/test_version.cpp` 的 `ReleaseIsAWildcardInDependencyMatching`。
 - **`version_compare()` 与 `version_satisfies()` 用的是两种模式**，别把它们当成一个：
   `version_compare`（排序、"谁更新"）走 `EVRCMP_COMPARE`（有 release 者更大），
   `version_satisfies`（依赖、"谁满足约束"）走 `EVRCMP_MATCH_RELEASE`。这与 rpm 本身的分工
@@ -295,40 +297,40 @@ provider 侧那段循环一次都不跑（零成本）。
 
 ### 2.1 日志行完整列表
 
-| 分类 | 行前缀 | 含义 | fsync |
-|------|--------|------|-------|
-| **批次边界** | `BEGIN_PKGS` | 批次开始 | 写后 fsync |
-| | `COMMIT_PKGS` | 批次完结（成功或回滚后） | 写后 fsync |
-| **安装操作** | `BEGIN <pkg> <ver>` | 单包安装开始 | 写后 fsync |
-| | `COMMIT <pkg> <ver>` | 单包安装提交 | 写后 fsync |
-| | `ROLLBACK <pkg> <ver>` | 单包安装回滚 | 写后 fsync |
-| | `END <pkg> <ver>` | 单包安装结束 | 写后 fsync |
-| **文件操作** | `BACKUP <src> → <dst>` | 覆盖/接管已有文件：rename 进 stash（write-ahead） | 写后 fsync |
-| | `NEW <path>` | 新文件（日志记录，非实际创建） | 写后 fsync |
-| | `NEW_DIR <path>` | 新目录（日志记录） | 写后 fsync |
-| | `COPY <src> → <dst>` | `.lpkgtmp` → 目标路径 | 写后 fsync |
-| | `REMOVE_OLD <src> → <dst>` | 升级时旧版废弃文件移除（同样 rename 进 stash） | 写后 fsync |
-| | `UNSTASH <bak> → <orig>` | 把 stash 里那份**搬回原位**（第③步引入）；逆操作 = 再搬进 stash | 写后 fsync |
-| | `SAVE_CONF <src> → <dst>` | 配置文件改名保留（`dst = <src>.lpkgsave`，**不进 stash**）。三个入口：移除整包时（可被 `--purge-config` 改成真删）、升级时 `/etc` 条目**类型变化**、升级时 `/etc` **废弃条目**（文件/符号链接） | 写后 fsync |
-| **目录状态** | `DIR_META <path> <mode> <uid> <gid>` | 目录元数据的**改前**值（write-ahead：先写行再 `lchown`/`chmod`） | 写后 fsync |
-| | `XATTR_SET <path> <b64_key> <b64_old>` | 该键**本来有值**、即将被覆盖或删除 —— 行里是**改前**值 | 写后 fsync |
-| | `XATTR_NEW <path> <b64_key>` | 该键**本来不存在**、即将被写入 | 写后 fsync |
-| | `DIR_RM <path> <mode> <uid> <gid>` | 删除一个**空目录**（`rmdir`；元数据供回滚重建）。目录若带 xattr 则**先逐键写 `XATTR_SET`**（见 §3.6） | 写后 fsync |
-| **移除操作** | `RM_BEGIN <pkg> <ver>` | 移除开始 | 写后 fsync |
-| | `RM_COMMIT <pkg> <ver>` | 移除提交 | 写后 fsync |
-| | `RM_END <pkg> <ver>` | 移除结束 | 写后 fsync |
-| | `CLEANUP <path>` | stash 根清理记录（不可回滚） | 写后 fsync |
-| **DB 操作** | `DB <path> <pkg>:<state>` | DB 文件修改后状态 | 写前已备份 + fsync |
-| | `DBNEW <path> <pkg>:<state>` | DB 文件新建后状态 | 写前已备份 + fsync |
-| | `DBRM <path> <pkg>:<state>` | DB 文件删除后状态 | 写前已备份 + fsync |
-| **回滚审计** | `RESTORE_FILE <bak> → <orig>` | rollback：从 .bak 恢复文件 | 写后 fsync |
-| | `RESTORE_DB <bak> → <db>` | rollback：从 .db_bak 恢复 DB | 写后 fsync |
-| | `RESTORE_DIR <path>` | rollback：按 `DIR_RM` 行里的元数据重建目录 | 写后 fsync |
-| | `RESTORE_FILE_RM <path>` | rollback：删除新文件（`COPY`/`NEW` 的逆操作） | 写后 fsync |
-| | `RESTORE_DIR_RM <path>` | rollback：删除新建的目录（`NEW_DIR` 的逆操作） | 写后 fsync |
-| | `RESTORE_DB_RM <path>` | rollback：删除新建的 DB（`DBNEW` 无备份时的逆操作） | 写后 fsync |
-| | `RESTORE_DIRSTATE <path>` | rollback：`DIR_META` / `XATTR_SET` / `XATTR_NEW` 三种逆操作**共用**的审计行 —— 它们记的是同一个对象（目录状态）的三类改前值，分三个关键字只让词汇表变大 | 写后 fsync |
-| **旧名称（只解析）** | `REMOVE_FILE <path>` / `REMOVE_DIR <path>` | `RESTORE_FILE_RM` / `RESTORE_DIR_RM` 的历史名：**仍能解析**（`walop_type_from_name`），但当前代码**不再写入**（`wal_op.hpp` 的 `WALOpType` 注释与 `wal_op.cpp` 的 `TYPE_MAP`） | 写后 fsync |
+| 分类                 | 行前缀                                     | 含义                                                                                                                                                                                            | fsync              |
+| -------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| **批次边界**         | `BEGIN_PKGS`                               | 批次开始                                                                                                                                                                                        | 写后 fsync         |
+|                      | `COMMIT_PKGS`                              | 批次完结（成功或回滚后）                                                                                                                                                                        | 写后 fsync         |
+| **安装操作**         | `BEGIN <pkg> <ver>`                        | 单包安装开始                                                                                                                                                                                    | 写后 fsync         |
+|                      | `COMMIT <pkg> <ver>`                       | 单包安装提交                                                                                                                                                                                    | 写后 fsync         |
+|                      | `ROLLBACK <pkg> <ver>`                     | 单包安装回滚                                                                                                                                                                                    | 写后 fsync         |
+|                      | `END <pkg> <ver>`                          | 单包安装结束                                                                                                                                                                                    | 写后 fsync         |
+| **文件操作**         | `BACKUP <src> → <dst>`                     | 覆盖/接管已有文件：rename 进 stash（write-ahead）                                                                                                                                               | 写后 fsync         |
+|                      | `NEW <path>`                               | 新文件（日志记录，非实际创建）                                                                                                                                                                  | 写后 fsync         |
+|                      | `NEW_DIR <path>`                           | 新目录（日志记录）                                                                                                                                                                              | 写后 fsync         |
+|                      | `COPY <src> → <dst>`                       | `.lpkgtmp` → 目标路径                                                                                                                                                                           | 写后 fsync         |
+|                      | `REMOVE_OLD <src> → <dst>`                 | 升级时旧版废弃文件移除（同样 rename 进 stash）                                                                                                                                                  | 写后 fsync         |
+|                      | `UNSTASH <bak> → <orig>`                   | 把 stash 里那份**搬回原位**（第③步引入）；逆操作 = 再搬进 stash                                                                                                                                 | 写后 fsync         |
+|                      | `SAVE_CONF <src> → <dst>`                  | 配置文件改名保留（`dst = <src>.lpkgsave`，**不进 stash**）。三个入口：移除整包时（可被 `--purge-config` 改成真删）、升级时 `/etc` 条目**类型变化**、升级时 `/etc` **废弃条目**（文件/符号链接） | 写后 fsync         |
+| **目录状态**         | `DIR_META <path> <mode> <uid> <gid>`       | 目录元数据的**改前**值（write-ahead：先写行再 `lchown`/`chmod`）                                                                                                                                | 写后 fsync         |
+|                      | `XATTR_SET <path> <b64_key> <b64_old>`     | 该键**本来有值**、即将被覆盖或删除 —— 行里是**改前**值                                                                                                                                          | 写后 fsync         |
+|                      | `XATTR_NEW <path> <b64_key>`               | 该键**本来不存在**、即将被写入                                                                                                                                                                  | 写后 fsync         |
+|                      | `DIR_RM <path> <mode> <uid> <gid>`         | 删除一个**空目录**（`rmdir`；元数据供回滚重建）。目录若带 xattr 则**先逐键写 `XATTR_SET`**（见 §3.6）                                                                                           | 写后 fsync         |
+| **移除操作**         | `RM_BEGIN <pkg> <ver>`                     | 移除开始                                                                                                                                                                                        | 写后 fsync         |
+|                      | `RM_COMMIT <pkg> <ver>`                    | 移除提交                                                                                                                                                                                        | 写后 fsync         |
+|                      | `RM_END <pkg> <ver>`                       | 移除结束                                                                                                                                                                                        | 写后 fsync         |
+|                      | `CLEANUP <path>`                           | stash 根清理记录（不可回滚）                                                                                                                                                                    | 写后 fsync         |
+| **DB 操作**          | `DB <path> <pkg>:<state>`                  | DB 文件修改后状态                                                                                                                                                                               | 写前已备份 + fsync |
+|                      | `DBNEW <path> <pkg>:<state>`               | DB 文件新建后状态                                                                                                                                                                               | 写前已备份 + fsync |
+|                      | `DBRM <path> <pkg>:<state>`                | DB 文件删除后状态                                                                                                                                                                               | 写前已备份 + fsync |
+| **回滚审计**         | `RESTORE_FILE <bak> → <orig>`              | rollback：从 .bak 恢复文件                                                                                                                                                                      | 写后 fsync         |
+|                      | `RESTORE_DB <bak> → <db>`                  | rollback：从 .db_bak 恢复 DB                                                                                                                                                                    | 写后 fsync         |
+|                      | `RESTORE_DIR <path>`                       | rollback：按 `DIR_RM` 行里的元数据重建目录                                                                                                                                                      | 写后 fsync         |
+|                      | `RESTORE_FILE_RM <path>`                   | rollback：删除新文件（`COPY`/`NEW` 的逆操作）                                                                                                                                                   | 写后 fsync         |
+|                      | `RESTORE_DIR_RM <path>`                    | rollback：删除新建的目录（`NEW_DIR` 的逆操作）                                                                                                                                                  | 写后 fsync         |
+|                      | `RESTORE_DB_RM <path>`                     | rollback：删除新建的 DB（`DBNEW` 无备份时的逆操作）                                                                                                                                             | 写后 fsync         |
+|                      | `RESTORE_DIRSTATE <path>`                  | rollback：`DIR_META` / `XATTR_SET` / `XATTR_NEW` 三种逆操作**共用**的审计行 —— 它们记的是同一个对象（目录状态）的三类改前值，分三个关键字只让词汇表变大                                         | 写后 fsync         |
+| **旧名称（只解析）** | `REMOVE_FILE <path>` / `REMOVE_DIR <path>` | `RESTORE_FILE_RM` / `RESTORE_DIR_RM` 的历史名：**仍能解析**（`walop_type_from_name`），但当前代码**不再写入**（`wal_op.hpp` 的 `WALOpType` 注释与 `wal_op.cpp` 的 `TYPE_MAP`）                  | 写后 fsync         |
 
 上表是**当前可解析的全部行前缀 = 33 个**（`wal_op.cpp` 的 `TYPE_MAP`，不含只作哨兵的
 `INVALID`）。**数的是前缀个数，不是表格行数** —— `REMOVE_FILE` / `REMOVE_DIR` 那一行装了
@@ -356,10 +358,10 @@ provider 侧那段循环一次都不跑（零成本）。
 
 格式：`<pkg>:<state>`
 
-| 标签 | 含义 |
-|------|------|
+| 标签           | 含义                                 |
+| -------------- | ------------------------------------ |
 | `:batch-start` | 批次开始前的状态（**唯一**的还原点） |
-| `:batch-end` | 批次末尾、提交前的状态（每批次一次） |
+| `:batch-end`   | 批次末尾、提交前的状态（每批次一次） |
 
 就 **DB 文件一族**（`pkgs` / `files.db` / `provides.db` / `confhashes.db` /
 `xattrkeys.db` / `holdpkgs`）而言，里程碑只有 `:batch-start` 与 `:batch-end` 两个，每批次只落盘
@@ -380,6 +382,7 @@ provider 侧那段循环一次都不跑（零成本）。
 原始：/var/lib/lpkg/pkgs
 备份：/var/lib/lpkg/pkgs.lpkg_db_bak_before::batch-start
 ```
+
 ^ 这个文件的内容是"**批次开始之前**的 pkgs 内容"。
 
 （就 **DB 一族**而言，每批次只产生 `:batch-start` 与 `:batch-end` 两个里程碑的备份。
@@ -390,6 +393,7 @@ provider 侧那段循环一次都不跑（零成本）。
 ### 2.4 WAL 示例
 
 **成功安装单个包**：
+
 ```
 BEGIN_PKGS                        ← fsync
 Cache::write(":batch-start") 的 6 条 DB 行  ← 每库一条（备份后 + fsync）
@@ -406,6 +410,7 @@ COMMIT_PKGS                          ← fsync
 ```
 
 **批量 [A, B] 中 B 失败 → 全批次回滚（含 RESTORE 审计）**：
+
 ```
 BEGIN_PKGS                        ← fsync
 Cache::write(":batch-start") 的 6 条 DB 行  ← fsync
@@ -436,6 +441,7 @@ COMMIT_PKGS                           ← fsync
 逆操作就自然是 no-op）。详见 §10.2 / §10.3。
 
 **移除失败回滚**：
+
 ```
 BEGIN_PKGS                        ← fsync
 RM_BEGIN curl 8.11.1                 ← fsync
@@ -452,6 +458,7 @@ ROLLBACK curl 8.11.1                   ← fsync
 END curl 8.11.1                        ← fsync
 COMMIT_PKGS                           ← fsync
 ```
+
 > 回滚期写的 DB 行 milestone **恒为** `:batch-start` 这一个值（`curl:installed` 那样的值是
 > **正向** DB 行的形态，回滚期不会写）。另外：本批若有 `DB`/`DBNEW`/`DBRM` 行，它们的逆操作会先产出
 > `RESTORE_DB <path>.lpkg_db_bak_before:<milestone> → <path>` 审计行（本示例的批次里没有 DB 行，
@@ -459,6 +466,7 @@ COMMIT_PKGS                           ← fsync
 > → `cache.write(":batch-start")` → 逐包 `ROLLBACK`/`END` → `COMMIT_PKGS`。
 
 **升级失败回滚到旧版本**：
+
 ```
 BEGIN_PKGS
 BEGIN libfoo 2.0
@@ -486,6 +494,7 @@ COMMIT_PKGS
 
 假设 rollback 中途崩溃（示例取"批次末尾那次 DB 写已落、提交前崩溃"这一轮，
 所以 WAL 里有 `:batch-end` 的 DB 行 —— 这是唯一会带 DB 行的正向场景）：
+
 ```
 BEGIN_PKGS
 ... (install A, B fails) ...
@@ -494,6 +503,7 @@ RESTORE_DB /var/lib/lpkg/pkgs.lpkg_db_bak_before::batch-end → /var/lib/lpkg/pk
 ```
 
 重启 `recover_packages()`：
+
 1. 读 WAL，看到 `BEGIN_PKGS` 无 `COMMIT_PKGS` → 存在未提交区域（§11.2）
 2. 逆序处理所有行；**`RESTORE_*` 行整类跳过**（它们是上次回滚的审计痕迹，不是恢复的输入）
 3. 遇到正向行 `DB /pkgs :batch-end`（其逆操作要消费 `.lpkg_db_bak_before::batch-end`）：
@@ -546,17 +556,18 @@ RESTORE_DB /var/lib/lpkg/pkgs.lpkg_db_bak_before::batch-end → /var/lib/lpkg/pk
 
 **断电分析**：
 
-| 断电点 | 系统状态 | 恢复行为 |
-|--------|---------|---------|
-| 1-2 之间 | WAL 行未持久化，原文件未改 | `recover_packages()` 无 DB 条目→跳过。**安全** |
-| 2-3 之间 | WAL 持久化，未备份，原文件完好 | `reverse_execute` 找到 DB 条目但 `.lpkg_db_bak_before:<milestone>` 不存在→跳过（原文件还在，是离目标最近的可用状态） |
-| 3-4 之间 | WAL 已记录，备份已 rename（可能未 fsync） | 备份存在→rename 回→恢复旧内容 |
-| 4-5 之间 | WAL + 持久化备份，.tmp 不存在 | restore 从备份恢复 |
-| 5-6 之间 | WAL + 备份 + .tmp 可能不完整 | restore 从备份恢复（.tmp 不完整不影响） |
-| 6-7 之间 | WAL + 备份 + 完整 .tmp | restore 从备份恢复 |
-| 7-8 之间 | WAL + 备份 + 新文件已到位 | restore 从备份恢复 |
+| 断电点   | 系统状态                                  | 恢复行为                                                                                                             |
+| -------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 1-2 之间 | WAL 行未持久化，原文件未改                | `recover_packages()` 无 DB 条目→跳过。**安全**                                                                       |
+| 2-3 之间 | WAL 持久化，未备份，原文件完好            | `reverse_execute` 找到 DB 条目但 `.lpkg_db_bak_before:<milestone>` 不存在→跳过（原文件还在，是离目标最近的可用状态） |
+| 3-4 之间 | WAL 已记录，备份已 rename（可能未 fsync） | 备份存在→rename 回→恢复旧内容                                                                                        |
+| 4-5 之间 | WAL + 持久化备份，.tmp 不存在             | restore 从备份恢复                                                                                                   |
+| 5-6 之间 | WAL + 备份 + .tmp 可能不完整              | restore 从备份恢复（.tmp 不完整不影响）                                                                              |
+| 6-7 之间 | WAL + 备份 + 完整 .tmp                    | restore 从备份恢复                                                                                                   |
+| 7-8 之间 | WAL + 备份 + 新文件已到位                 | restore 从备份恢复                                                                                                   |
 
 **恢复规则**：
+
 - `DB` 条目：`.lpkg_db_bak_before:<milestone>` 存在→rename 回。不存在→跳过（备份未完成，原文件还在）。
 - `DBNEW` 条目：备份不存在→文件是新建的，删除。备份存在→rename 回。
 - `DBRM` 条目：备份不存在→跳过。备份存在→rename 回。
@@ -589,6 +600,7 @@ RESTORE_DB /var/lib/lpkg/pkgs.lpkg_db_bak_before::batch-end → /var/lib/lpkg/pk
 ```
 
 **断电分析**：
+
 - 1-2 之间：WAL 行未持久化，文件未改。**安全**（什么都没发生）。
 - 2-3 之间：WAL 有记录、文件仍在原位。`reverse_execute` 遇到 BACKUP 条目，检查 `op.arg2`
   （备份路径）是否存在 —— 不存在 → 跳过，原文件还在原位。**安全**。
@@ -611,6 +623,7 @@ RESTORE_DB /var/lib/lpkg/pkgs.lpkg_db_bak_before::batch-end → /var/lib/lpkg/pk
 ```
 
 **断电分析**：
+
 - 1-2 之间：.lpkgtmp 可能不完整。WAL 无记录。重新执行即可（下次安装用
   `overwrite_existing` 覆盖同名 `.lpkgtmp`；崩溃后的普通文件残留是这套原语的正常形态，
   `refuse_symlink_tmp_path()` 只拒绝**符号链接**形态的 tmp 路径）。
@@ -627,6 +640,7 @@ RESTORE_DB /var/lib/lpkg/pkgs.lpkg_db_bak_before::batch-end → /var/lib/lpkg/pk
 ### 3.4 NEW 操作（install 新文件）
 
 NEW 只是一个 WAL 日志记录，文件实际由 COPY 创建。所以 NEW 的逆向非常简单：
+
 ```
 reverse_execute 遇到 NEW：
   → 删除 op.arg1（文件路径）
@@ -641,12 +655,14 @@ NEW 的 WAL 写入时机：在**备份阶段**（`backup_existing_files()`）当
 ### 3.5 NEW_DIR 操作
 
 同样只是日志记录（目录由调用方的 `create_directories` 落位）。逆向：
+
 ```
 reverse_execute 遇到 NEW_DIR：
   → 路径先剥尾斜杠（否则 is_symlink 恒假）
   → 非 symlink && 存在 && 是真目录 && 为空 → rmdir + RESTORE_DIR_RM
   → 其余情况一律跳过（不删）
 ```
+
 （`wal_op.cpp` 的 NEW_DIR 分支有"剥尾斜杠 + 非 symlink + 真目录"三道守卫，
 回归测试见 `tests/unit/test_wal_newdir_symlink_guard.cpp`。）
 
@@ -682,6 +698,7 @@ reverse_execute 遇到 NEW_DIR：
      紧接着又被写入趟重建（丢原 mode/uid、白写两条 WAL）。所以显式排除
      `new_set` 里以 `<废弃目录键>` 开头的条目（`obsolete_dirs_pass`）。**remove 侧没有这一条**
      （那里没有"新版本"）。
+
 3. **回滚**：`DIR_RM` 的逆操作是 `RESTORE_DIR` —— `create_directories` 重建 + **按行内
    mode/uid/gid 恢复元数据**（路径先剥尾斜杠；不是真目录就静默跳过、**不** chmod/chown）。
    ⚠️ **幂等口径是 `Guard::Always`，不是"已存在就跳过"**：目录缺失正是它要修的状态，所以
@@ -761,7 +778,7 @@ reinstall 后符号链接被 rename 进 stash、再建出实体目录（系统�
    **(b) 盘上是真目录、归档是文件/符号链接（即第 3 条被拒的那一格）—— 当该目录整棵子树
    （递归）里的每个条目都属于"本包"或"本批次正在升级的包"时放行接管**：
    `dir_tree_entirely_ours()`（`installation_task.cpp`，对齐 pacman `conflict.c:
-   dir_belongsto_pkgs`），判据是 `dir_takeover`，放行后**必须跳出**该路径后续的检查
+dir_belongsto_pkgs`），判据是 `dir_takeover`，放行后**必须跳出**该路径后续的检查
    （**⚠️ 它算条目的 DB 键必须用 `lexically_relative`，不能用 `fs::relative`**：后者**解析符号链接
    （含末段）** ⇒ 查的是**链接目标**的归属。后果一：树里有"别的包
    持有、解析目标归本包"的链接 ⇒ 判"整树都是我们的" ⇒ 整树搬走 ⇒ 提交后 stash 被 `remove_all`
@@ -833,10 +850,10 @@ reinstall 后符号链接被 rename 进 stash、再建出实体目录（系统�
 调用点：`package_manager.cpp` 的 `cleanup_with_dbr`（移除时清 dep/needed_so/man）。
 
 **断电分析**：
+
 - 1-2 之间：WAL 行未持久化。文件未改。
 - 2-3 之间：WAL 有记录，文件未 rename。`reverse_execute` 找 `.lpkg_db_bak_before:<milestone>` 不存在→跳过。DBRM 的逆向是 restore 备份回原位。但备份不存在。→ 安全，文件还在原位。
 - 3-4 之间：WAL 有记录，文件已 rename。恢复时找备份存在 → rename 回。**正确**。
-
 
 ### 3.8 目录状态的改前值（`DIR_META` / `XATTR_SET` / `XATTR_NEW`）
 
@@ -857,11 +874,11 @@ mode/uid/xattr，违反 §5.4 不变量 3（终态 == 事务开始时的盘面�
 **做法**：三个原语在 `OpSink`（本仓库约定：新增"文件操作 + 它的 WAL 行"一律加在写入层），
 语义统一为**"记录改前状态"**而非"记录正向动作"，且**先写行再动盘**（write-ahead）：
 
-| 原语 | WAL 行 | 何时写 | 逆操作 |
-|---|---|---|---|
-| `OpSink::dir_meta(phys, mode, uid, gid, record_previous, …)` | `DIR_META <path> <mode> <uid> <gid>` | `record_previous` 为真时 | `lchown`+`chmod` 写回 |
-| `OpSink::set_xattr(phys, key, val, …)` | 键**本来有值** → `XATTR_SET <path> <b64_key> <b64_old>`；**本来不存在** → `XATTR_NEW <path> <b64_key>` | 恒 | `lsetxattr` 旧值 / `lremovexattr` |
-| `OpSink::unset_xattr(phys, key, …)` | `XATTR_SET`（行里是**待删那个键的旧值**） | 恒 | `lsetxattr` 旧值 |
+| 原语                                                         | WAL 行                                                                                                 | 何时写                   | 逆操作                            |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------ | --------------------------------- |
+| `OpSink::dir_meta(phys, mode, uid, gid, record_previous, …)` | `DIR_META <path> <mode> <uid> <gid>`                                                                   | `record_previous` 为真时 | `lchown`+`chmod` 写回             |
+| `OpSink::set_xattr(phys, key, val, …)`                       | 键**本来有值** → `XATTR_SET <path> <b64_key> <b64_old>`；**本来不存在** → `XATTR_NEW <path> <b64_key>` | 恒                       | `lsetxattr` 旧值 / `lremovexattr` |
+| `OpSink::unset_xattr(phys, key, …)`                          | `XATTR_SET`（行里是**待删那个键的旧值**）                                                              | 恒                       | `lsetxattr` 旧值                  |
 
 四个刻意的决定：
 
@@ -889,7 +906,6 @@ mode/uid/xattr，违反 §5.4 不变量 3（终态 == 事务开始时的盘面�
 `dirmeta_after_wal_<pkg>` / `xattrset_after_wal_<pkg>` / `xattrrm_after_wal_<pkg>`（断点清单见
 §13 第 6 阶段 6.1）。三条窗口用例各自钉三件事：断点**真命中** / **WAL 里已有那一行** /
 **盘面还没被改** —— 只钉前两件的话，"先改盘再补写行"的实现照样绿。
-
 
 ## 4. DB 状态管理（确定性回滚顺序）
 
@@ -924,11 +940,11 @@ struct DbMilestone {
 `provides.db`、`confhashes.db`、**`xattrkeys.db`**（§6.3.1）、`holdpkgs`。
 每个库各写一条**同里程碑**的 `DB` 行（`write_db_file_wal` / `write_set_file_wal`）。
 
-| 场景 | DB 写入点 | 里程碑 |
-|------|----------|--------|
-| 批次开始 | `Cache::write(":batch-start")` | 保存"所有包都还没装"的状态 |
-| 批次末尾（提交前） | `Cache::write(":batch-end")` | "本批次全部改动已生效"的状态（**每批次一次**） |
-| 回滚后 | `Cache::write(":batch-start")` | 回到初始状态 |
+| 场景               | DB 写入点                      | 里程碑                                         |
+| ------------------ | ------------------------------ | ---------------------------------------------- |
+| 批次开始           | `Cache::write(":batch-start")` | 保存"所有包都还没装"的状态                     |
+| 批次末尾（提交前） | `Cache::write(":batch-end")`   | "本批次全部改动已生效"的状态（**每批次一次**） |
+| 回滚后             | `Cache::write(":batch-start")` | 回到初始状态                                   |
 
 就 **DB 一族**（本表说的就是 `Cache::write` 写的 6 个库）而言，**没有** `<pkg>:installed` /
 `<pkg>:removed` 这种逐包里程碑：DB 不再逐包落盘（理由见 §3.1 的调用时机），里程碑名只剩
@@ -970,6 +986,7 @@ WAL 中的 DB 条目（安装 [A, B, C] 的批次，B 失败）：
 且非空**（= 已被更晚的各里程碑逆操作带回批次起点内容）就跳过；不在位则从该里程碑备份还原；
 **"在位但为空"时要看备份** —— **文件空 + 备份也空 → 同样跳过**（两者等价，还省下一条
 `RESTORE_DB` 审计行）；只有"文件空 + 备份非空"才真的要从备份还原。
+
 ### 4.5 关键：DB 恢复后必须重载 Cache
 
 ```
@@ -1044,19 +1061,19 @@ std::vector<std::string> run_batch_transaction(OpT&& op);
 - `BEGIN_PKGS` 写入 + fsync 后：异常路径保证 `COMMIT_PKGS` 一定被写入（catch 补写）——**例外有两条**：
   1. `batch_rollback()` 返回 **false**（WAL 里提不出未提交批次的行，比如尾部被写坏）；
   2. **回滚自身抛异常** —— `reverse_execute` 里的 `safe_rename` 失败、`wal_append_raw` 写不进去等都会抛穿 `batch_rollback`，而 `batch_transaction.hpp` 为它写了**专门的 `catch (...)`**：绝不清理 DB 备份、不 `trim_completed`，同样把未提交批次与全部 `.lpkg_db_bak_before:*` / `.lpkg_bak` 原样留给下次 `recover_packages()` 幂等续传。这条分支的存在本身就说明设计上承认"回滚可能失败"（§11.2 的未提交区域定义也以"前一批回滚失败后又开了新批次"为前提）。
-  两条都不写 `COMMIT_PKGS`、都不清 DB 备份 —— 这正是"宁可留现场，不可删重试依据"。
+     两条都不写 `COMMIT_PKGS`、都不清 DB 备份 —— 这正是"宁可留现场，不可删重试依据"。
 - `COMMIT_PKGS` 是批次完结的唯一标记——不区分"成功完结"和"回滚完结"。外部只看有无 COMMIT_PKGS。
 - 回滚后：WAL 包含完整的 RESTORE 审计链，系统状态一致。
 
 ### 5.3 回滚触发条件
 
-| 触发条件 | 回滚范围 | 路径 |
-|---------|---------|------|
-| 安装包中途失败 | 整个批次 | `InstallationTask::run()` 的 catch → 写 ROLLBACK/END 标记 → `batch_rollback()`（单撤销路径，§6.5） |
-| 整批中后续包失败 | **整个批次**（与前一行相同） | `run_batch_transaction` 的 catch → `batch_rollback()` |
-| Ctrl+C | 整个批次 | 检查点抛异常 → 同异常路径 |
-| 致命错误 | 整个批次 | 同异常路径 |
-| 断电 | 整个批次 | 下次启动 `recover_packages()` |
+| 触发条件         | 回滚范围                     | 路径                                                                                               |
+| ---------------- | ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| 安装包中途失败   | 整个批次                     | `InstallationTask::run()` 的 catch → 写 ROLLBACK/END 标记 → `batch_rollback()`（单撤销路径，§6.5） |
+| 整批中后续包失败 | **整个批次**（与前一行相同） | `run_batch_transaction` 的 catch → `batch_rollback()`                                              |
+| Ctrl+C           | 整个批次                     | 检查点抛异常 → 同异常路径                                                                          |
+| 致命错误         | 整个批次                     | 同异常路径                                                                                         |
+| 断电             | 整个批次                     | 下次启动 `recover_packages()`                                                                      |
 
 > **回滚范围是整个批次**：`batch_rollback()`
 > 拿的是 `extract_current_batch_ops()` —— **整批**的行（从批次 `BEGIN_PKGS` 到 EOF），
@@ -1289,20 +1306,21 @@ InstallationTask::run(ctx)
 安装/升级一个 `/etc/` 条目时，pacman `add.c` 用**三份哈希**决定"用户改没改过这个配置文件"。
 
 ⚠️ **先分清两个常量**：
+
 - `constants::DIR_ETC` = `"etc/"` —— **归档条目**的相对形态（`scan_content_files` 的返回值），
   本节判"这条归档条目是不是配置"用它；
 - `constants::DIR_ETC_PREFIX` = `"/etc/"` —— **逻辑路径**形态（DB 键、`/` 开头的绝对路径），
   移除侧（§7.2.1）与 `LogEntry` 判的是它。
-两者**不是同一个字符串**，混用会让某侧永远判假。本节用前者。
+  两者**不是同一个字符串**，混用会让某侧永远判假。本节用前者。
 
-| 符号 | 含义 |
-|------|------|
-| `hash_local` | 用户那份配置的内容 SHA256（符号链接 / 读不到 → **空**，= 无从判定）。
-**第③步之后它读的是 stash 副本**（`hash_stashed_copy(rec.bak)`），不是"判定时刻盘上那份" ——
-让开趟已经把盘上那份搬进了 stash，判定不再依赖"它在盘上还在不在"。
-这也是"升级期间 `/etc` 配置短暂不在盘上"那个窗口的前提（§5 取舍）。 |
-| `hash_orig`  | **上一次我们往这个包的这个路径里装进去的内容**的 SHA256（记在 `confhashes.db` 里） |
-| `hash_pkg`   | 本次包里那个条目的内容 SHA256 |
+| 符号                                                                                        | 含义                                                                               |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `hash_local`                                                                                | 用户那份配置的内容 SHA256（符号链接 / 读不到 → **空**，= 无从判定）。              |
+| **第③步之后它读的是 stash 副本**（`hash_stashed_copy(rec.bak)`），不是"判定时刻盘上那份" —— |
+| 让开趟已经把盘上那份搬进了 stash，判定不再依赖"它在盘上还在不在"。                          |
+| 这也是"升级期间 `/etc` 配置短暂不在盘上"那个窗口的前提（§5 取舍）。                         |
+| `hash_orig`                                                                                 | **上一次我们往这个包的这个路径里装进去的内容**的 SHA256（记在 `confhashes.db` 里） |
+| `hash_pkg`                                                                                  | 本次包里那个条目的内容 SHA256                                                      |
 
 分流（判定表只有一份：`classify_config_update()`，别在调用点再抄一遍）：
 
@@ -1313,16 +1331,16 @@ InstallationTask::run(ctx)
 `PathFacts::disk_is_symlink` —— 只有 `disk_exists` + `disk_is_dir` 区分不出"盘上是普通文件"
 还是"盘上是符号链接"，而这两条路从此不同）：
 
-| 盘上 | 归档条目 | 判定 | 让开趟 | 写入趟 |
-|---|---|---|---|---|
-| 真目录 | 目录 | 类型未变 | `Noop` | `WriteDirMetadata`（刷 uid/mode/xattr）|
-| 普通文件 | 普通文件 | 类型未变 | `Stash`（为三哈希备 stash 副本）| **三哈希分流**（下面两张表）|
-| 符号链接 | 符号链接 | 类型未变 | `Noop` | `WriteLpkgnew`（不接管）|
-| 普通文件 | **符号链接** | **类型变化** | `SaveConfig` | `WriteInPlace` |
-| **符号链接** | **普通文件** | **类型变化** | `SaveConfig` | `WriteInPlace` |
-| 真目录 | 非目录 | **类型变化** | `SaveConfig` | `WriteInPlace` |
-| 非目录 | 目录 | **类型变化** | `SaveConfigAndMkDir` | `WriteDirMetadata` |
-| 无 | 任意 | — | `Noop`/`MakeDir` | 就地落位 |
+| 盘上         | 归档条目     | 判定         | 让开趟                           | 写入趟                                  |
+| ------------ | ------------ | ------------ | -------------------------------- | --------------------------------------- |
+| 真目录       | 目录         | 类型未变     | `Noop`                           | `WriteDirMetadata`（刷 uid/mode/xattr） |
+| 普通文件     | 普通文件     | 类型未变     | `Stash`（为三哈希备 stash 副本） | **三哈希分流**（下面两张表）            |
+| 符号链接     | 符号链接     | 类型未变     | `Noop`                           | `WriteLpkgnew`（不接管）                |
+| 普通文件     | **符号链接** | **类型变化** | `SaveConfig`                     | `WriteInPlace`                          |
+| **符号链接** | **普通文件** | **类型变化** | `SaveConfig`                     | `WriteInPlace`                          |
+| 真目录       | 非目录       | **类型变化** | `SaveConfig`                     | `WriteInPlace`                          |
+| 非目录       | 目录         | **类型变化** | `SaveConfigAndMkDir`             | `WriteDirMetadata`                      |
+| 无           | 任意         | —            | `Noop`/`MakeDir`                 | 就地落位                                |
 
 即：**类型一变，原物就改名 `<路径>.lpkgsave`（内容一个不丢、`SAVE_CONF` 可回滚、不进 stash
 所以提交后不会被清掉），新物就地落位**；**类型没变**才走"用户改没改过"那套（三哈希 /
@@ -1356,18 +1374,18 @@ InstallationTask::run(ctx)
 
 **有旧记录**（正常路径）：
 
-| 条件（按序判） | 结论 | 盘面动作 |
-|---|---|---|
-| `hash_local == hash_orig` | ① 用户**没改过** | 静默换成新版（**不产生** `.lpkgnew`） |
-| `hash_orig == hash_pkg` | ② 包本身没改这个配置 | **保留**用户文件，**连 `.lpkgnew` 都不产生** |
-| 三者互异（含 `hash_local` 为空） | ③ | 新版落 `<路径>.lpkgnew` + 告警 |
+| 条件（按序判）                   | 结论                 | 盘面动作                                     |
+| -------------------------------- | -------------------- | -------------------------------------------- |
+| `hash_local == hash_orig`        | ① 用户**没改过**     | 静默换成新版（**不产生** `.lpkgnew`）        |
+| `hash_orig == hash_pkg`          | ② 包本身没改这个配置 | **保留**用户文件，**连 `.lpkgnew` 都不产生** |
+| 三者互异（含 `hash_local` 为空） | ③                    | 新版落 `<路径>.lpkgnew` + 告警               |
 
 **无旧记录**（老 DB：本特性之前装的包，`confhashes.db` 里没有这一条）→ **只算两份哈希**：
 
-| 条件 | 结论 | 盘面动作 |
-|---|---|---|
-| `hash_local == hash_pkg`（盘上那份与新包那份逐字节相同） | ② | **保留**原文件（内容一致 = 没有"新东西"要审阅），不产生 `.lpkgnew` |
-| 不一致 / `hash_local` 为空 | ③ | 新版落 `<路径>.lpkgnew` + 告警 |
+| 条件                                                     | 结论 | 盘面动作                                                           |
+| -------------------------------------------------------- | ---- | ------------------------------------------------------------------ |
+| `hash_local == hash_pkg`（盘上那份与新包那份逐字节相同） | ②    | **保留**原文件（内容一致 = 没有"新东西"要审阅），不产生 `.lpkgnew` |
+| 不一致 / `hash_local` 为空                               | ③    | 新版落 `<路径>.lpkgnew` + 告警                                     |
 
 两个分支**都**由调用点把 **`hash_pkg`（包内那份）**的哈希写进 DB（与正常路径同一个值，
 **没有例外**），于是这条退化分支只可能进入一次：记录一旦建起来，下一次升级就回到上面的正常
@@ -1523,11 +1541,11 @@ COPY  /etc/foo.lpkgtmp → /etc/foo                    ← OpSink::commit_copy�
 `run_batch_transaction` 返回后（`COMMIT_PKGS` 已落盘、批次不可能再回滚）由调用方依次执行
 **三段**（顺序承重）：
 
-| 段 | 函数 | 做什么 |
-|---|---|---|
-| ① | `finish_committed_batch()` | 清 stash（`CLEANUP` → `remove_all`）→ 删被移除包的 `hooks_dir/<pkg>/` → **剪枝**新版本不再提供的 hook 文件 |
-| ② | `run_post_install_hooks()` | **执行 postinst**（`:: 运行安装后钩子`；`hook_sets` 里没有任何 `postinst.sh` 时整段不出现） |
-| ③ | `finish_post_commit_cleanup()` | `trim_completed()` → `cleanup_db_backups()` |
+| 段  | 函数                           | 做什么                                                                                                     |
+| --- | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| ①   | `finish_committed_batch()`     | 清 stash（`CLEANUP` → `remove_all`）→ 删被移除包的 `hooks_dir/<pkg>/` → **剪枝**新版本不再提供的 hook 文件 |
+| ②   | `run_post_install_hooks()`     | **执行 postinst**（`:: 运行安装后钩子`；`hook_sets` 里没有任何 `postinst.sh` 时整段不出现）                |
+| ③   | `finish_post_commit_cleanup()` | `trim_completed()` → `cleanup_db_backups()`                                                                |
 
 **为什么剪枝一定要在 ② 之前**：跑的时候 `hooks_dir/<pkg>/` 里必须已经是**本版本最终**的那份
 脚本。**为什么 ③ 在最后**：它与 ①② 同属"提交后的清理"，失败都不算批次失败；而
@@ -1545,8 +1563,8 @@ COPY  /etc/foo.lpkgtmp → /etc/foo                    ← OpSink::commit_copy�
   `hooks_dir/<pkg>/` 里仍是**旧版本**的脚本内容。原先的 `fs::copy(overwrite_existing)` 不进
   WAL、覆盖即永久丢失 —— 回滚后包体是旧版本、钩子却是新版本，后续 remove/upgrade 跑错版本。
 - **hook 成员是符号链接时"限定在包内"**：`directory_entry::
-  is_regular_file()` **跟随**末段链接，而 `fs::copy` **也跟随** —— 于是 `hooks/postinst.sh ->
-  /etc/shadow` 会让 root 把**宿主**该文件的内容拷成 `hooks_dir/<pkg>/postinst.sh`（带 exec）并
+is_regular_file()` **跟随**末段链接，而 `fs::copy` **也跟随** —— 于是 `hooks/postinst.sh ->
+/etc/shadow` 会让 root 把**宿主**该文件的内容拷成 `hooks_dir/<pkg>/postinst.sh`（带 exec）并
   **当 postinst 执行**：包内容读出了包外。判据：解析后（`weakly_canonical`）必须仍落在**本包的解压
   目录之内** —— 包内互指（`hooks/postinst.sh -> ./real.sh`）**照旧跟随复制**（那是合法用法，
   今天的行为不变）；落到包外则**整包拒绝**（新键 `error.hook_symlink_escapes_package`，
@@ -1575,6 +1593,7 @@ rollback_files()
 │
 └── stashes_.clear(); new_files_.clear(); new_dirs_.clear();
 ```
+
 （成员名就是这三个向量；`hook_files_` **不**清 —— 它由批次级的 `hook_sets` 账本用
 `did_process()` 判读，清了会把"本包没被处理"误表示成"新版本没有 hooks"。）
 
@@ -1718,7 +1737,7 @@ pacman 的 `backup=()` 那一维，本模型不变）。任何移除路径 —�
   - 崩在"rename 已做"→ 回滚把 `.lpkgsave` rename 回原位（内容完整）；
   - 崩在"移位已做、本次改名未做"→ 回滚先把本次改名的 no-op 跳过，再把 `.lpkgsave.<N>`
     rename 回 `.lpkgsave`。
-  **移位必须严格先于本次改名**：否则回滚会把上一次的旧存档 rename 到配置原位，盖掉真配置。
+    **移位必须严格先于本次改名**：否则回滚会把上一次的旧存档 rename 到配置原位，盖掉真配置。
 - **`.lpkgsave` 不是待清理的 bak**：`trim_completed()` / `continue_post_commit_cleanup()`
   只认 BACKUP/REMOVE_OLD/CLEANUP 的行，不会把它当残留删掉（有集成用例盯着这一点）。
 
@@ -1759,6 +1778,7 @@ batch_rollback 对移除的逆向：
 ### 8.1 顶层流程
 
 同 install 流程，使用 `run_batch_transaction`。区别：
+
 - `InstallationTask` 设置了 `old_version_to_replace_`
 - **废弃清除走让开趟的 `remove_obsolete_files()`（跑在写入之前）**，不在注册趟里：
   阶段 1 `REMOVE_OLD`（非 `/etc` 文件 → stash）/ `SAVE_CONF`（`/etc` 文件与符号
@@ -1851,26 +1871,26 @@ bool batch_rollback(const std::vector<std::string> &success);
 
 ### 9.2 reverse_execute 操作表
 
-| 操作类型 | 逆向操作 | fsync | RESTORE 条目 | 备份不存在时 |
-|---------|---------|-------|-----------|-------------|
-| `BACKUP`（只可能是**文件**/符号链接；目录不走这条路，见 §3.6） | rename .bak → 原位 | fsync 父目录 | `RESTORE_FILE <bak> → <orig>` | .bak 不存在→跳过（已被消费→幂等） |
-| `REMOVE_OLD` | 同上（同 BACKUP 分支） | 同上 | `RESTORE_FILE <bak> → <orig>` | 同上 |
-| `SAVE_CONF` | 同上（**三型合一个分支**：`rename(arg2 → arg1)`，dst 不在 stash 里） | 同上 | `RESTORE_FILE <bak> → <orig>` | dst 不存在→跳过（幂等） |
-| `UNSTASH`（第③步引入） | **再搬进 stash**：`rename(arg2 → arg1)`（与 BACKUP 正好互为逆） | fsync 父目录 | `RESTORE_FILE <orig> → <bak>`（记**实际动作方向**） | orig 不存在 / bak 父目录不存在→跳过（幂等） |
-| ↑ 引入 `UNSTASH` 时**必须一并复核** `purge_consumed_stashes` 的"已消费"判据：被 `UNSTASH` 搬回原位的 bak **已被消费**，不该再被它 `remove_all` 掉；同一路径的 `BACKUP` 行在前、`UNSTASH` 行在后，回滚逆序才收敛回原点（两步 rename，幂等）。 | | | | |
-| `COPY` | remove(dst)；**并顺带清掉 `arg1` 的 `.lpkgtmp`**。⚠️ **删除那一支的判据不是"存在"而是 `Guard::TargetTakenNotDir`**（`exists_no_follow(orig) && !is_real_directory(orig)`）—— 落点是**真目录**时**绝不删**：`fs::remove` 对**空目录**会 `rmdir` 成功，那会把盘上原有的空目录删掉而 DB 仍声称持有（盘面/DB 脱节，且没有 BACKUP 行可还原；真实事故） | 不需要 | `RESTORE_FILE_RM <dst>` | 不存在→跳过 |
-| `DIR_META`（§3.8） | `lchown`+`chmod` 写回行内 mode/uid/gid | fsync 父目录 | `RESTORE_DIRSTATE <path>` | `Guard::RealDir`：**只回写真还是目录的**；目录已被更晚的逆操作删掉时跳过、**不重建**（重建是 `DIR_RM` 的职责） |
-| `XATTR_SET` | `lsetxattr` 写回 `arg3` 的**旧值**（base64 解码后） | fsync 父目录 | `RESTORE_DIRSTATE <path>` | `Guard::RealDir`：**只回写真还是目录的** —— 与写入侧（`lstat`+`S_ISDIR`，**只描述真实目录**）逐字对齐。（用 `Guard::TakenNotSymlink` 的话它**普通文件/FIFO/设备也放行** ⇒ 回滚会在写入侧从不写的路径上 `lsetxattr` **造出一个键**） |
-| `XATTR_NEW` | `lremovexattr` 删掉 `arg2` 的键（base64 解码） | fsync 父目录 | `RESTORE_DIRSTATE <path>` | `Guard::RealDir` 同上 |
-| `NEW` | remove(path)（含 dangling symlink） | 不需要 | `RESTORE_FILE_RM <path>` | 不存在→跳过 |
-| `NEW_DIR` | rmdir（仅当"非 symlink + 是真目录 + 为空"） | 不需要 | `RESTORE_DIR_RM <path>` | 不存在→跳过 |
-| `DIR_RM` | 需要则 `create_directories` 重建 + 按行内 mode/uid/gid 恢复元数据（路径**先剥尾斜杠**，见 §3.6.1 第 1 条；不是真目录则跳过、**不** chmod/chown） | 不需要 | `RESTORE_DIR <path>` | 幂等口径是 `Guard::Always`：**目录已存在且是真目录也照样** `lchown`/`chmod` 写回并计一次 —— "已存在→跳过"**不存在**（目录缺失正是它要修的状态；"目录已存在"在回滚路径上反而是常态）。只有"不是真目录"才判否 |
-| `DB` | .bak_before 存在→rename 回 | fsync 父目录 + WAL | `RESTORE_DB <bak> → <db>` | .bak 不存在→跳过（WAL 已写但备份未完成→原文件还在） |
-| `DBNEW` | .bak 存在→rename 回; 不存在→删除文件 | fsync 父目录 + WAL | `RESTORE_DB` 或 `RESTORE_DB_RM` | - |
-| `DBRM` | .bak 存在→rename 回 | fsync 父目录 + WAL | `RESTORE_DB <bak> → <db>` | .bak 不存在→跳过 |
-| `CLEANUP` | **跳过（不可回滚）** | 不执行 | 不写入 | - |
-| 元数据行（`BEGIN`/`COMMIT`/`ROLLBACK`/`END`/`RM_*`/`BEGIN_PKGS`/`COMMIT_PKGS`） | 跳过（`is_metadata()`） | - | 不写入 | - |
-| RESTORE 审计行（含旧名 `REMOVE_FILE`/`REMOVE_DIR`） | 跳过（`is_restore_audit()`） | - | 不写入 | - |
+| 操作类型                                                                                                                                                                                                                                     | 逆向操作                                                                                                                                                                                                                                                                                                                                          | fsync              | RESTORE 条目                                        | 备份不存在时                                                                                                                                                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BACKUP`（只可能是**文件**/符号链接；目录不走这条路，见 §3.6）                                                                                                                                                                               | rename .bak → 原位                                                                                                                                                                                                                                                                                                                                | fsync 父目录       | `RESTORE_FILE <bak> → <orig>`                       | .bak 不存在→跳过（已被消费→幂等）                                                                                                                                                                                                   |
+| `REMOVE_OLD`                                                                                                                                                                                                                                 | 同上（同 BACKUP 分支）                                                                                                                                                                                                                                                                                                                            | 同上               | `RESTORE_FILE <bak> → <orig>`                       | 同上                                                                                                                                                                                                                                |
+| `SAVE_CONF`                                                                                                                                                                                                                                  | 同上（**三型合一个分支**：`rename(arg2 → arg1)`，dst 不在 stash 里）                                                                                                                                                                                                                                                                              | 同上               | `RESTORE_FILE <bak> → <orig>`                       | dst 不存在→跳过（幂等）                                                                                                                                                                                                             |
+| `UNSTASH`（第③步引入）                                                                                                                                                                                                                       | **再搬进 stash**：`rename(arg2 → arg1)`（与 BACKUP 正好互为逆）                                                                                                                                                                                                                                                                                   | fsync 父目录       | `RESTORE_FILE <orig> → <bak>`（记**实际动作方向**） | orig 不存在 / bak 父目录不存在→跳过（幂等）                                                                                                                                                                                         |
+| ↑ 引入 `UNSTASH` 时**必须一并复核** `purge_consumed_stashes` 的"已消费"判据：被 `UNSTASH` 搬回原位的 bak **已被消费**，不该再被它 `remove_all` 掉；同一路径的 `BACKUP` 行在前、`UNSTASH` 行在后，回滚逆序才收敛回原点（两步 rename，幂等）。 |                                                                                                                                                                                                                                                                                                                                                   |                    |                                                     |                                                                                                                                                                                                                                     |
+| `COPY`                                                                                                                                                                                                                                       | remove(dst)；**并顺带清掉 `arg1` 的 `.lpkgtmp`**。⚠️ **删除那一支的判据不是"存在"而是 `Guard::TargetTakenNotDir`**（`exists_no_follow(orig) && !is_real_directory(orig)`）—— 落点是**真目录**时**绝不删**：`fs::remove` 对**空目录**会 `rmdir` 成功，那会把盘上原有的空目录删掉而 DB 仍声称持有（盘面/DB 脱节，且没有 BACKUP 行可还原；真实事故） | 不需要             | `RESTORE_FILE_RM <dst>`                             | 不存在→跳过                                                                                                                                                                                                                         |
+| `DIR_META`（§3.8）                                                                                                                                                                                                                           | `lchown`+`chmod` 写回行内 mode/uid/gid                                                                                                                                                                                                                                                                                                            | fsync 父目录       | `RESTORE_DIRSTATE <path>`                           | `Guard::RealDir`：**只回写真还是目录的**；目录已被更晚的逆操作删掉时跳过、**不重建**（重建是 `DIR_RM` 的职责）                                                                                                                      |
+| `XATTR_SET`                                                                                                                                                                                                                                  | `lsetxattr` 写回 `arg3` 的**旧值**（base64 解码后）                                                                                                                                                                                                                                                                                               | fsync 父目录       | `RESTORE_DIRSTATE <path>`                           | `Guard::RealDir`：**只回写真还是目录的** —— 与写入侧（`lstat`+`S_ISDIR`，**只描述真实目录**）逐字对齐。（用 `Guard::TakenNotSymlink` 的话它**普通文件/FIFO/设备也放行** ⇒ 回滚会在写入侧从不写的路径上 `lsetxattr` **造出一个键**） |
+| `XATTR_NEW`                                                                                                                                                                                                                                  | `lremovexattr` 删掉 `arg2` 的键（base64 解码）                                                                                                                                                                                                                                                                                                    | fsync 父目录       | `RESTORE_DIRSTATE <path>`                           | `Guard::RealDir` 同上                                                                                                                                                                                                               |
+| `NEW`                                                                                                                                                                                                                                        | remove(path)（含 dangling symlink）                                                                                                                                                                                                                                                                                                               | 不需要             | `RESTORE_FILE_RM <path>`                            | 不存在→跳过                                                                                                                                                                                                                         |
+| `NEW_DIR`                                                                                                                                                                                                                                    | rmdir（仅当"非 symlink + 是真目录 + 为空"）                                                                                                                                                                                                                                                                                                       | 不需要             | `RESTORE_DIR_RM <path>`                             | 不存在→跳过                                                                                                                                                                                                                         |
+| `DIR_RM`                                                                                                                                                                                                                                     | 需要则 `create_directories` 重建 + 按行内 mode/uid/gid 恢复元数据（路径**先剥尾斜杠**，见 §3.6.1 第 1 条；不是真目录则跳过、**不** chmod/chown）                                                                                                                                                                                                  | 不需要             | `RESTORE_DIR <path>`                                | 幂等口径是 `Guard::Always`：**目录已存在且是真目录也照样** `lchown`/`chmod` 写回并计一次 —— "已存在→跳过"**不存在**（目录缺失正是它要修的状态；"目录已存在"在回滚路径上反而是常态）。只有"不是真目录"才判否                         |
+| `DB`                                                                                                                                                                                                                                         | .bak_before 存在→rename 回                                                                                                                                                                                                                                                                                                                        | fsync 父目录 + WAL | `RESTORE_DB <bak> → <db>`                           | .bak 不存在→跳过（WAL 已写但备份未完成→原文件还在）                                                                                                                                                                                 |
+| `DBNEW`                                                                                                                                                                                                                                      | .bak 存在→rename 回; 不存在→删除文件                                                                                                                                                                                                                                                                                                              | fsync 父目录 + WAL | `RESTORE_DB` 或 `RESTORE_DB_RM`                     | -                                                                                                                                                                                                                                   |
+| `DBRM`                                                                                                                                                                                                                                       | .bak 存在→rename 回                                                                                                                                                                                                                                                                                                                               | fsync 父目录 + WAL | `RESTORE_DB <bak> → <db>`                           | .bak 不存在→跳过                                                                                                                                                                                                                    |
+| `CLEANUP`                                                                                                                                                                                                                                    | **跳过（不可回滚）**                                                                                                                                                                                                                                                                                                                              | 不执行             | 不写入                                              | -                                                                                                                                                                                                                                   |
+| 元数据行（`BEGIN`/`COMMIT`/`ROLLBACK`/`END`/`RM_*`/`BEGIN_PKGS`/`COMMIT_PKGS`）                                                                                                                                                              | 跳过（`is_metadata()`）                                                                                                                                                                                                                                                                                                                           | -                  | 不写入                                              | -                                                                                                                                                                                                                                   |
+| RESTORE 审计行（含旧名 `REMOVE_FILE`/`REMOVE_DIR`）                                                                                                                                                                                          | 跳过（`is_restore_audit()`）                                                                                                                                                                                                                                                                                                                      | -                  | 不写入                                              | -                                                                                                                                                                                                                                   |
 
 > 表外还有两列，只有新加的三行会用到（见 §3.8 与 `UNDO_TABLE` 的注释）：
 > **`Stat`** 全部取 `Stat::None` —— `DIR_META`/`XATTR_SET`/`XATTR_NEW` 既没还原文件、也没重建
@@ -1885,11 +1905,11 @@ bool batch_rollback(const std::vector<std::string> &success);
 `ok()` 判定，内容是 `path_within_root(root, p) || ∃sr ∈ stash_roots: path_within_root(sr, p)`，
 **对所有行一视同仁**。逐行不同的是 `Confine::` 这个枚举，它**只决定查哪些字段**：
 
-| `Confine` | 查什么 | 用在 |
-|---|---|---|
-| `None` | 不查（该行不碰文件系统，或不进 reverse） | `CLEANUP`、`BEGIN/COMMIT/ROLLBACK/END`、`RESTORE_*` 审计行等 |
-| `Arg1Only` | 只查 `arg1` | `NEW`/`NEW_DIR`/`DIR_RM`/`DB*`/**`DIR_META`**/**`XATTR_SET`**/**`XATTR_NEW`** |
-| `Arg1AndArg2` | 两个都查 | `BACKUP`/`REMOVE_OLD`/`SAVE_CONF`/`UNSTASH`/**`COPY`** |
+| `Confine`     | 查什么                                   | 用在                                                                          |
+| ------------- | ---------------------------------------- | ----------------------------------------------------------------------------- |
+| `None`        | 不查（该行不碰文件系统，或不进 reverse） | `CLEANUP`、`BEGIN/COMMIT/ROLLBACK/END`、`RESTORE_*` 审计行等                  |
+| `Arg1Only`    | 只查 `arg1`                              | `NEW`/`NEW_DIR`/`DIR_RM`/`DB*`/**`DIR_META`**/**`XATTR_SET`**/**`XATTR_NEW`** |
+| `Arg1AndArg2` | 两个都查                                 | `BACKUP`/`REMOVE_OLD`/`SAVE_CONF`/`UNSTASH`/**`COPY`**                        |
 
 （`COPY` 的 `confine` 是 `Arg1AndArg2`（与 `BACKUP`/…/`UNSTASH` 同组）；stash 落点**本就落在
 root 之内**（`stash_parent_dir` 恒 clamp 在 root 内），把它单列是为了**不误拒**。）
@@ -1916,12 +1936,13 @@ xattr 键/值**，**不是路径** —— 若按 `Arg1AndArg2` 查，一串 base
 ### 10.1 为什么需要 RESTORE 审计
 
 如果 `batch_rollback()` 自身崩溃，系统处于"半回滚"状态。WAL 中有：
+
 - 正向操作行（BEGIN、BACKUP、COPY 等）
 - 部分逆向操作行（RESTORE_FILE、RESTORE_DB 等）
 - 没有 COMMIT_PKGS
 
 `recover_packages()` 启动后，收集所有行（包括 RESTORE 行）作为"事务内容"，然后 `reverse_execute`
-全部。**RESTORE_\* 行本身一律被跳过**（`WALOp::skip_in_reverse()` → `is_restore_audit()`）——
+全部。**RESTORE\_\* 行本身一律被跳过**（`WALOp::skip_in_reverse()` → `is_restore_audit()`）——
 它们是**上一次回滚留下的记录**，再逆向一次等于"撤销撤销" = 重做正向操作（推演见 §10.2 末尾）。
 真正的幂等判据在**正向操作行**上：每个逆操作自己检查"备份/目标还在不在" ——
 
@@ -1937,6 +1958,7 @@ xattr 键/值**，**不是路径** —— 若按 `Arg1AndArg2` 查，一串 base
 ### 10.2 二次回滚的场景
 
 场景 A：rollback 在 RESTORE_DB 完成后、RESTORE_FILE 前崩溃
+
 ```
 WAL 状态：
   BEGIN_PKGS
@@ -1957,6 +1979,7 @@ WAL 状态：
 ```
 
 场景 B：rollback 全部完成但 COMMIT_PKGS 未写（在 COMMIT_PKGS 写入前崩溃）
+
 ```
 WAL 状态：
   BEGIN_PKGS
@@ -2009,6 +2032,7 @@ WAL 状态：
 跳过），现场复现与断言在 `tests/integration/test_db_batch_start_recovery.cpp`。
 
 在 `reverse_execute` 中（`wal_op.cpp` 的实现形态）：
+
 ```cpp
 if (is_batch_start_milestone(op) && batch_start_db_still_in_place(op)) continue;
 ```
@@ -2017,6 +2041,7 @@ if (is_batch_start_milestone(op) && batch_start_db_still_in_place(op)) continue;
 对三型一视同仁）。
 
 这样场景 B 的恢复顺序（场景 B 里正式文件一直在位 → 仍然跳过，语义一字未变）：
+
 ```
 reverse_execute 逆序：
   DB <6 个库> :batch-start → 跳过（判据 `batch_start_db_still_in_place(op)`：文件**仍在位且非空**；
@@ -2029,6 +2054,7 @@ reverse_execute 逆序：
   DB <6 个库> A:installed → bak 不存在，跳过（幂等）
   ...（正向操作逆序）...
 ```
+
 > 这里"反向处理 BACKUP 时 bak 已被 RESTORE_FILE 消费"正是幂等的来源 —— 不是靠"认出哪一行
 > 是 RESTORE、哪一行是正向"，而是靠**每条逆操作自己检查备份/目标还在不在**。
 
@@ -2047,6 +2073,7 @@ if (op.skip_in_reverse()) continue;   // !is_valid() || is_metadata() || is_rest
 ```
 
 这样 `recover_packages()` 中的 `reverse_execute` 对场景 B：
+
 ```
 逆序处理（元数据行、RESTORE_* 审计行、CLEANUP、未解析行一律跳过；DB `:batch-start`
           仅在正式文件仍在（且仍持有批次起点内容）时跳过，否则从该里程碑备份还原）：
@@ -2068,6 +2095,7 @@ if (op.skip_in_reverse()) continue;   // !is_valid() || is_metadata() || is_rest
 
 `batch_rollback()` 在 reverse_execute **过程中**写入 RESTORE_* 审计行（`wal_append_raw`，
 每行 fsync 恒生效）：
+
 - 每完成一个逆向操作 → 立即 WAL: RESTORE_* + fsync
 - 这样 WAL 中 RESTORE 行的顺序记录了 rollback 的进度
 - rollback 崩溃后 restart 的 `recover_packages()` 中的 `reverse_execute` **跳过**这些行
@@ -2129,17 +2157,17 @@ void recover_packages() {          // db/recover.cpp
 
 ### 11.3 rec 的关键设计决策
 
-| 设计点 | 决策 | 理由 |
-|--------|------|------|
-| 是否跳过 RESTORE_* 行 | ✅ 跳过 | RESTORE_* 是 rollback 的产物，再次逆序会重做正向操作 |
-| 是否处理 :batch-start DB 标记 | ⚠️ **有条件跳过**：正式文件仍在**且非空**才跳过，否则从该里程碑备份还原（`batch_start_db_still_in_place()`，`wal_op.cpp`） | "最终状态"只在该状态确实还在盘上时成立。`write_db_file_wal`/`write_set_file_wal` 的 rename 窗口里正式名已消失（`init_filesystem()` 之后则是"存在但 0 字节"），此时那份备份是唯一还原依据；无条件跳过 = 它永远无人消费，且 `cleanup_db_backups()` 随后把唯一备份删掉（`pkgs`/`holdpkgs` 缺失让恢复整体失败，`files.db`/`provides.db`/`provides_soname.db`/`confhashes.db` 静默归零，均不可逆）。现场复现：`test_db_batch_start_recovery.cpp` |
-| 是否写 RESTORE_* 审计 | ✅ 是 | rec 的 reverse_execute 应该与 batch_rollback 行为一致 |
-| 旧版二进制写入的"批次内 CLEANUP"WAL | ❌ **不支持** | lpkg 经 lpkg 升级时，**旧二进制**会先跑 `recover_packages()` 处理掉遗留 WAL，新二进制才上线；因此更新后不存在需要兼容的旧形状事务。**手工替换 lpkg 二进制不受支持**（若此时正躺着一个被中断的 remove WAL，回滚会让 DB 回到"已安装"而文件已删 —— 遇到时用 `lpkg rec` 前先人工核对） |
-| 是否检测 CLEANUP 分岔 | ❌ 不再需要 | CLEANUP 只出现在事务之外（post-commit），事务内不可能有 → 未提交批次一律 `reverse_execute`。post-commit 的残留清理由 `continue_post_commit_cleanup` 负责（**§11.2 步骤 1.5**） |
-| 是否清理孤备份 | ⚠️ **有条件**：有批次恢复失败 → 不清理；WAL 里仍有未配对批次 → `cleanup_db_backups()` 自己也不清理（`wal_has_unpaired_batch()` 门控） | `.lpkg_db_bak_before:*` 是"重试还原 DB"的唯一依据。`main_cli.cpp` 的 `lpkg rec` 分支在 `recover_packages()` 之后**无条件**再调一次 `cleanup_db_backups()` —— 门控必须放在函数内部，否则刚被特意保留的还原点会被立刻删光，而 CLI 照打"恢复完成" |
-| 未提交区域怎么划 | **第一个**未配对 `BEGIN_PKGS` → EOF，**一次逆序回滚整段** | 一次崩溃可能留下两个未提交批次（前一批回滚失败后同进程又开新批次）。按"最后一个 BEGIN_PKGS"逐轮收敛是错的：已提交批次的行仍在 WAL 里，下一轮起点仍落在它上面，更早那批永远轮不到（两轮下来一个文件都没还原） |
-| 某个批次回滚失败怎么办 | 告警 + **保持未提交**（WAL/备份原样保留，下次可重试）+ 跳过 DB 备份清理 | 一条失败不该把整段恢复作废，也不该把重试依据删掉；**没有批次循环**（整段一次回滚，见 §11.2 第 4 步） |
-| `lpkg rec` 的退出码 | **恒为 0**：`recover_packages()` 无返回值，某段回滚失败时只打 `warning.rollback_remove_failed`；`run_rec_command()` 不读任何失败信号，`handle_command()` 对 `CMD_REC` 恒 `return 0`。于是"回滚失败 + 备份被保留 + 打印恢复完成 + 退出码 0"是可能组合（DB 备份的内部门控保证不会误删，所以是**报告不准**而非数据丢失）。对照：`remove_packages()` 为"脚本凭退出码区分"专门抛 `error.removal_refused` —— 这一处的取向恰好相反，**别拿退出码判断恢复是否成功** |
+| 设计点                              | 决策                                                                                                                                                                                                                                                                                                                                                                                                                                                        | 理由                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 是否跳过 RESTORE_* 行               | ✅ 跳过                                                                                                                                                                                                                                                                                                                                                                                                                                                     | RESTORE_* 是 rollback 的产物，再次逆序会重做正向操作                                                                                                                                                                                                                                                                                                                                                                                        |
+| 是否处理 :batch-start DB 标记       | ⚠️ **有条件跳过**：正式文件仍在**且非空**才跳过，否则从该里程碑备份还原（`batch_start_db_still_in_place()`，`wal_op.cpp`）                                                                                                                                                                                                                                                                                                                                  | "最终状态"只在该状态确实还在盘上时成立。`write_db_file_wal`/`write_set_file_wal` 的 rename 窗口里正式名已消失（`init_filesystem()` 之后则是"存在但 0 字节"），此时那份备份是唯一还原依据；无条件跳过 = 它永远无人消费，且 `cleanup_db_backups()` 随后把唯一备份删掉（`pkgs`/`holdpkgs` 缺失让恢复整体失败，`files.db`/`provides.db`/`provides_soname.db`/`confhashes.db` 静默归零，均不可逆）。现场复现：`test_db_batch_start_recovery.cpp` |
+| 是否写 RESTORE_* 审计               | ✅ 是                                                                                                                                                                                                                                                                                                                                                                                                                                                       | rec 的 reverse_execute 应该与 batch_rollback 行为一致                                                                                                                                                                                                                                                                                                                                                                                       |
+| 旧版二进制写入的"批次内 CLEANUP"WAL | ❌ **不支持**                                                                                                                                                                                                                                                                                                                                                                                                                                               | lpkg 经 lpkg 升级时，**旧二进制**会先跑 `recover_packages()` 处理掉遗留 WAL，新二进制才上线；因此更新后不存在需要兼容的旧形状事务。**手工替换 lpkg 二进制不受支持**（若此时正躺着一个被中断的 remove WAL，回滚会让 DB 回到"已安装"而文件已删 —— 遇到时用 `lpkg rec` 前先人工核对）                                                                                                                                                          |
+| 是否检测 CLEANUP 分岔               | ❌ 不再需要                                                                                                                                                                                                                                                                                                                                                                                                                                                 | CLEANUP 只出现在事务之外（post-commit），事务内不可能有 → 未提交批次一律 `reverse_execute`。post-commit 的残留清理由 `continue_post_commit_cleanup` 负责（**§11.2 步骤 1.5**）                                                                                                                                                                                                                                                              |
+| 是否清理孤备份                      | ⚠️ **有条件**：有批次恢复失败 → 不清理；WAL 里仍有未配对批次 → `cleanup_db_backups()` 自己也不清理（`wal_has_unpaired_batch()` 门控）                                                                                                                                                                                                                                                                                                                       | `.lpkg_db_bak_before:*` 是"重试还原 DB"的唯一依据。`main_cli.cpp` 的 `lpkg rec` 分支在 `recover_packages()` 之后**无条件**再调一次 `cleanup_db_backups()` —— 门控必须放在函数内部，否则刚被特意保留的还原点会被立刻删光，而 CLI 照打"恢复完成"                                                                                                                                                                                              |
+| 未提交区域怎么划                    | **第一个**未配对 `BEGIN_PKGS` → EOF，**一次逆序回滚整段**                                                                                                                                                                                                                                                                                                                                                                                                   | 一次崩溃可能留下两个未提交批次（前一批回滚失败后同进程又开新批次）。按"最后一个 BEGIN_PKGS"逐轮收敛是错的：已提交批次的行仍在 WAL 里，下一轮起点仍落在它上面，更早那批永远轮不到（两轮下来一个文件都没还原）                                                                                                                                                                                                                                |
+| 某个批次回滚失败怎么办              | 告警 + **保持未提交**（WAL/备份原样保留，下次可重试）+ 跳过 DB 备份清理                                                                                                                                                                                                                                                                                                                                                                                     | 一条失败不该把整段恢复作废，也不该把重试依据删掉；**没有批次循环**（整段一次回滚，见 §11.2 第 4 步）                                                                                                                                                                                                                                                                                                                                        |
+| `lpkg rec` 的退出码                 | **恒为 0**：`recover_packages()` 无返回值，某段回滚失败时只打 `warning.rollback_remove_failed`；`run_rec_command()` 不读任何失败信号，`handle_command()` 对 `CMD_REC` 恒 `return 0`。于是"回滚失败 + 备份被保留 + 打印恢复完成 + 退出码 0"是可能组合（DB 备份的内部门控保证不会误删，所以是**报告不准**而非数据丢失）。对照：`remove_packages()` 为"脚本凭退出码区分"专门抛 `error.removal_refused` —— 这一处的取向恰好相反，**别拿退出码判断恢复是否成功** |
 
 ---
 
@@ -2176,8 +2204,8 @@ void trim_completed() {              // db/recover.cpp
 
 ### 12.2 与 RESTORE 审计行的交互
 
-trim 只按 `BEGIN_PKGS`/`COMMIT_PKGS` 配对跟踪批次边界，不关心块内行内容：RESTORE_*、
-CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行（含 RESTORE_*）一律保留。
+trim 只按 `BEGIN_PKGS`/`COMMIT_PKGS` 配对跟踪批次边界，不关心块内行内容：RESTORE__、
+CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行（含 RESTORE__）一律保留。
 
 **但它确实会看两类行的"落点"**：第 4 步要检查 `BACKUP`/`REMOVE_OLD` 的目标与 `CLEANUP`
 引用的 stash 根是否还在盘上 —— 那是"post-commit 清理完成没有"的唯一判据
@@ -2215,7 +2243,7 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
   - `installation_task_letgo.cpp`（让开趟）— `backup_existing_files()`（`BACKUP`/`SAVE_CONF`/`NEW`/`NEW_DIR`，write-ahead）、`remove_obsolete_files()`（`REMOVE_OLD`/`DIR_RM`（升级废弃条目）/`SAVE_CONF`（废弃 `/etc` 条目）/`DropOwnership`，**跑在写入之前**，§6.2）、`revoke_undeclared_xattrs()`（§6.3）。
   - `installation_task_copy.cpp`（写入趟）— `copy_package_files()`（`COPY`；`/etc` 条目先走三哈希分流，§6.3；目录状态经 §3.8 的三个原语）。
   - `installation_task_register.cpp`（注册趟）— `commit_without_file_ops()`（**只有** `register_package()` + `install_hook_files()`）、`register_package()`、`install_hook_files()`（`BACKUP`/`COPY`/`NEW_DIR`）。
-  `rollback_files()` 只写 `ROLLBACK`/`END` 标记（**单撤销路径**，文件撤销统一由 `batch_rollback` → `reverse_execute` 完成，见 §6.5）。`.lpkg_bak` 延迟到批次提交后清理（stash 化：`get_stashes()` → `finish_committed_batch`）。
+    `rollback_files()` 只写 `ROLLBACK`/`END` 标记（**单撤销路径**，文件撤销统一由 `batch_rollback` → `reverse_execute` 完成，见 §6.5）。`.lpkg_bak` 延迟到批次提交后清理（stash 化：`get_stashes()` → `finish_committed_batch`）。
 
 ### 第 3 阶段：移除事务
 
@@ -2233,13 +2261,14 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 
 > **recover 侧的四个函数名（照 §11.2/§12.1 去代码里找落点请认这些名字）**：
 > · **`scan_batch_pairing()`**（`recover.cpp`）—— "**第一个**未配对 `BEGIN_PKGS`"这条规则的
->   **唯一实现**，四个消费者共用：`continue_post_commit_cleanup` / `recover_packages` /
->   `trim_completed` / `wal_has_unpaired_batch`。§11.2 与 §12.1 各用一大段文字**复述**它，
->   描述与它一致，但改代码时请认这个名字；
+> **唯一实现**，四个消费者共用：`continue_post_commit_cleanup` / `recover_packages` /
+> `trim_completed` / `wal_has_unpaired_batch`。§11.2 与 §12.1 各用一大段文字**复述**它，
+> 描述与它一致，但改代码时请认这个名字；
 > · **`rollback_uncommitted_region()`** —— 对未提交区域**一次逆序回滚整段**（§11.2 第 4 步）；
 > · **`post_commit_cleanup_pending()`** —— trim 前判断"post-commit 清理是否做完"（§12.1 第 4 步），
->   判据用 `exists_no_follow`（lstat 语义，不抛）；
+> 判据用 `exists_no_follow`（lstat 语义，不抛）；
 > · **`rewrite_wal_tail()`** —— trim 的落盘动作（写 `.trim_tmp` → fsync → rename 回 WAL）。
+
 - **5.3 二次回滚测试** — 覆盖于 `tests/integration/test_breakpoints.cpp`（模拟 rollback 中途崩溃：RESTORE_DB 后 / rollback 完成后 COMMIT_PKGS 未写，验证 `recover_packages` 幂等续传）与 `tests/integration/test_db_batch_start_recovery.cpp`（`:batch-start` 库"缺失/存在但 0 字节"两个窗口的现场复现）。
 
 ### 第 6 阶段：测试
@@ -2271,10 +2300,10 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 
 人看的输出分两层，**别混**：
 
-| 层 | 位置 | 形态 | 谁在用 |
-|---|---|---|---|
-| 通用日志 | `base/utils.*` 的 `log_info/log_warning/log_error` | **一行一条**、不刷新；信息前缀 `::`（pacman 风格）、警告/错误 `Warning:` / `Error:` | 所有命令 |
-| 动态输出 | `ui/term.*` 的 `ui::Line` / `ui::section` | 会**原地刷新**的行（进度条、`[OK]`）、阶段分隔条 | 下载 / 解压 / 安装 / 钩子 / 触发器 / git 传输 |
+| 层       | 位置                                               | 形态                                                                                | 谁在用                                        |
+| -------- | -------------------------------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------- |
+| 通用日志 | `base/utils.*` 的 `log_info/log_warning/log_error` | **一行一条**、不刷新；信息前缀 `::`（pacman 风格）、警告/错误 `Warning:` / `Error:` | 所有命令                                      |
+| 动态输出 | `ui/term.*` 的 `ui::Line` / `ui::section`          | 会**原地刷新**的行（进度条、`[OK]`）、阶段分隔条                                    | 下载 / 解压 / 安装 / 钩子 / 触发器 / git 传输 |
 
 **`==> ` 前缀**（`ui::step_prefix()`）只给 `ui::Line` 的"动作行"；`::` 给普通信息行 —— 两者一眼可分。
 **动态行一律经 `ui::Line`，不要自己拼 `\r`**（曾经 `builder_executor.cpp` 的 git 传输进度自己管
@@ -2286,11 +2315,9 @@ CLEANUP 等行在已完成事务中随整块被清掉，未提交区域里的行
 （下载条）、源码归档解压走 `extract_tar_zst`（解压条，与安装路径同一个函数）、git 源走
 `transfer_progress_cb`（`ui::Line` + `received_objects/total_objects` 对象数进度条）。
 
-
 ### 14.1 两类版式：**每帧等宽** + **进度条等长**
 
 **① 每帧等宽**（状态行与进度行都适用）：
-
 
 对齐 pacman 的 `cb_progress` / `fill_progress`：**每一帧都恰好占满 `width()-1` 个显示列**
 （信息段补齐 + 进度条段补齐到剩余列），行尾再 `\r` 回列 0。只要每帧等宽，前几帧更长的部分
@@ -2371,7 +2398,7 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
   `info.uninstall_complete`（与 install 侧早已删掉的假消息同款，脚本/farm 会以为删掉了）。
   现在 `remove_packages()` / `remove_packages_recursive()` 返回**实际移除的包数**，CLI 只在
   > 0 时收尾；两条路径各自的早退仍照常给出原因（`info.package_not_installed` /
-  `info.recursive_nothing_to_remove`）。
+  > `info.recursive_nothing_to_remove`）。
 
 ---
 
@@ -2391,10 +2418,11 @@ ANSI、不画字符画**，每条 step 仍输出**一行**纯文本（`==> Insta
 ③ 成员名 > 15 字节 ⇒ GNU/SVR4 ar 的名字字段装不下、libarchive 的 ar 写入器写不出来
 （它会让 `archive_write_header` 失败，**且继续写下去的成员会被静默丢掉**），
 整个库**有意放弃、原样保留**且**不告警**（llvm 那种一堆 `libclang_rt.*.a` 否则每次构建刷屏）。
+
 > ⚠️ 上面 ③ 的**实现**曾与**成员顺序**相关（短名 `.o` 排在长名成员之前就漏判、进而报
 > "malformed"），已在 §22 修掉。规则本身没变 —— 变的是它现在**真的**成立。
-顺带：`process_archive` 的 `error_msg` 此前是 `[[maybe_unused]]`、**任何失败都不出声**
-（`strip_binary` 的告警判据是 `!strip_file(...) && !error_msg.empty()`）—— 现在真失败都会填。
+> 顺带：`process_archive` 的 `error_msg` 此前是 `[[maybe_unused]]`、**任何失败都不出声**
+> （`strip_binary` 的告警判据是 `!strip_file(...) && !error_msg.empty()`）—— 现在真失败都会填。
 
 **(b) `e_ehsize` / `e_shnum`（`strip_elf_exec_dyn`）。** `e_ehsize` 是**输入可控**字段，而
 `write_ehdr` 无条件写整个 ELF 头（52/64 字节）；唯一那道守卫取自
@@ -2595,6 +2623,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 整修。下面只列**行为或不变量真的变了**的（纯注释订正、测试补强不在此列）。
 
 **安全 / 隔离**
+
 1. 暂存目录改为 `mkdtemp` 原子创建 + `0700`（§1.7）—— 修"本地无权用户可劫持 root 暂存目录"。
 2. 落位/让开目标的**祖先链**约束：`detail::confine_target_path()`（§5.4 不变量 6）——
    `--root` 下不再可能经中间段符号链接写到 root 之外。
@@ -2602,26 +2631,19 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 4. 包名/版本号额外拒 `,` / `|` / `;`（`base/utils.cpp` 的 `is_safe_path_component`）——
    修"包名含 `,` ⇒ `files.db` 属主集合读回成两个幽灵属主、真实包误含它的文件"。
 
-**正确性 / 加固**
-5. `DIR_META` 的字段改严格十进制解析（§3.8）：`stoul("-1")` 回绕成 `07777` 那条路没了。
-6. 回滚侧的 confinement 与安装侧收敛成**唯一实现**（`base/utils.cpp::path_within_resolved`，
-   参数顺序 `(p, root)`）；`wal_op.cpp` 里那份"同名、参数顺序相反、自己写分量比较"的第二
-   实现删除。
-7. `lpkg build` / `pack` 纳入 `SigIntGuard`，并在**阶段边界**把 Ctrl+C 翻成 `UserAbort` ——
-   `run_build` 的异常清理路径这才有机会跑（此前 Ctrl+C 走 `SIG_DFL` 直接杀进程）。
-8. 一批"丢弃返回值 / 静默"收口：`run_build` 异常路径也清理、`catch` 里不再调用抛型
-   `fs::remove`、`ifstream`/`ofstream` 失败显式处理（移除侧与 force-solve 的反向依赖图、
-   `depend` 的索引读取）、`fs::file_size` / `lseek` / `strftime` 的失败不再驱动后续计算、
-   `human_rate`/`human_time` 对非有限值不再 UB、`ensure_stash_dir` 的
-   `create_directories` 失败当场报错而不是继续。
-9. `lpkg query <未安装>` 由"退 0 + 复用 remove 语境的文案"改为**抛错退 1**（与 `man` 对齐）。
+**正确性 / 加固** 5. `DIR_META` 的字段改严格十进制解析（§3.8）：`stoul("-1")` 回绕成 `07777` 那条路没了。6. 回滚侧的 confinement 与安装侧收敛成**唯一实现**（`base/utils.cpp::path_within_resolved`，
+参数顺序 `(p, root)`）；`wal_op.cpp` 里那份"同名、参数顺序相反、自己写分量比较"的第二
+实现删除。7. `lpkg build` / `pack` 纳入 `SigIntGuard`，并在**阶段边界**把 Ctrl+C 翻成 `UserAbort` ——
+`run_build` 的异常清理路径这才有机会跑（此前 Ctrl+C 走 `SIG_DFL` 直接杀进程）。8. 一批"丢弃返回值 / 静默"收口：`run_build` 异常路径也清理、`catch` 里不再调用抛型
+`fs::remove`、`ifstream`/`ofstream` 失败显式处理（移除侧与 force-solve 的反向依赖图、
+`depend` 的索引读取）、`fs::file_size` / `lseek` / `strftime` 的失败不再驱动后续计算、
+`human_rate`/`human_time` 对非有限值不再 UB、`ensure_stash_dir` 的
+`create_directories` 失败当场报错而不是继续。9. `lpkg query <未安装>` 由"退 0 + 复用 remove 语境的文案"改为**抛错退 1**（与 `man` 对齐）。
 
-**UX**
-10. `--help` → stdout；`remove` 只在真删了东西时才打"卸载完成"（§14.6）。
+**UX** 10. `--help` → stdout；`remove` 只在真删了东西时才打"卸载完成"（§14.6）。
 
-**测试**
-11. 45 处固定名测试沙箱按 PID 唯一化（并发跑不再互删）；补/收紧一批"只验不抛"的断言；
-    为 `lpkgnew_bak_after_wal_`（**唯一一个接了线却零用例**的断点）补上注入用例。
+**测试** 11. 45 处固定名测试沙箱按 PID 唯一化（并发跑不再互删）；补/收紧一批"只验不抛"的断言；
+为 `lpkgnew_bak_after_wal_`（**唯一一个接了线却零用例**的断点）补上注入用例。
 
 ---
 
@@ -2658,28 +2680,26 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 7. **退化写法 `1.0+`（空 release）** 现在与 `1.0` **同编**：不特判会编出 `1.0^^`，而它在
    libsolv 里**大于** `1.0` ⇒ 桥在该边界不再保序（6 对退化串分叉；真实版本不以 `+` 结尾）。
 
-**写入层原语的祖先链闸（补 §19 的收口）**
-8. `OpSink::confined()`：DB 键派生的路径（升级废弃文件 / 移除趟 / 空目录回收 / xattr 撤销）
-   此前用裸 `root_dir()/rel`，祖先若是**逃出 root 的符号链接**，`rename`/`rmdir`/`chmod`/
-   `lremovexattr` 就会落到 root 之外（把宿主文件搬进 stash、提交后随 stash 清掉 = 静默删数据）。
-   闸放进**唯一写盘入口** —— 8 个碰文件系统的原语（`backup_impl`（含 `backup`/`backup_obsolete`）、
-   `save_config`、`un_stash`、`commit_copy`、`dir_meta`、`set_xattr`、`unset_xattr`、
-   `remove_empty_dir`）各自开头一次，将来任何新调用点自动被覆盖。语义是**跳过 + 告警**、
-   **绝不抛**：这些路径出现在移除/回滚链上，抛了等于"包卸不掉"；跳过才是安全方向（那条路径
-   按定义解析在 root 之外，本来就不该动）。`root_dir()=="/"` 时恒真、不付代价。
-   越界时各原语返回"什么都没做"：`fs::path` 类返回空（**不写 WAL 行** —— 行会承诺一次没发生的
-   备份）、`bool` 类返回 false、`remove_empty_dir` 返回 `DirRemoval::NotRemoved`、
-   `commit_copy` 顺手收掉自己 staged 的 `.lpkgtmp`。
-9. **`--overwrite` 的模式不再被"剥成裸通配"**：`*/`（剥完只剩通配符）**保持原样、继续不匹配**
-   —— fail-closed（照常报冲突），因为 `*` 在 fnmatch 里本就跨 `/` 匹配，剥了等于把"用户以为
-   只针对目录"的写法静默放大成"豁免一切冲突"。带真实分量的模式照旧剥尾斜杠（`usr/lib/foo/`
-   ≡ `usr/lib/foo`）。
-10. **测试补齐**：`OpSink` 闸（8 个原语 + 正反对照）、`--overwrite` 尾斜杠与 `*/`、
-   归档 `.lpkgsave` 成员名、`--help`/参数错误两条流的**流归属**断言、`DIR_META` 严格十进制
-   （坏行不许把目录改成 `07777`）、移除侧 `ifstream` fail-closed、`query` 退出码、
-   `confine_target_path` 的**接线**（祖先逃逸时包被拒且 root 之外什么也没多出来）。
+**写入层原语的祖先链闸（补 §19 的收口）** 8. `OpSink::confined()`：DB 键派生的路径（升级废弃文件 / 移除趟 / 空目录回收 / xattr 撤销）
+此前用裸 `root_dir()/rel`，祖先若是**逃出 root 的符号链接**，`rename`/`rmdir`/`chmod`/
+`lremovexattr` 就会落到 root 之外（把宿主文件搬进 stash、提交后随 stash 清掉 = 静默删数据）。
+闸放进**唯一写盘入口** —— 8 个碰文件系统的原语（`backup_impl`（含 `backup`/`backup_obsolete`）、
+`save_config`、`un_stash`、`commit_copy`、`dir_meta`、`set_xattr`、`unset_xattr`、
+`remove_empty_dir`）各自开头一次，将来任何新调用点自动被覆盖。语义是**跳过 + 告警**、
+**绝不抛**：这些路径出现在移除/回滚链上，抛了等于"包卸不掉"；跳过才是安全方向（那条路径
+按定义解析在 root 之外，本来就不该动）。`root_dir()=="/"` 时恒真、不付代价。
+越界时各原语返回"什么都没做"：`fs::path` 类返回空（**不写 WAL 行** —— 行会承诺一次没发生的
+备份）、`bool` 类返回 false、`remove_empty_dir` 返回 `DirRemoval::NotRemoved`、
+`commit_copy` 顺手收掉自己 staged 的 `.lpkgtmp`。9. **`--overwrite` 的模式不再被"剥成裸通配"**：`*/`（剥完只剩通配符）**保持原样、继续不匹配**
+—— fail-closed（照常报冲突），因为 `*` 在 fnmatch 里本就跨 `/` 匹配，剥了等于把"用户以为
+只针对目录"的写法静默放大成"豁免一切冲突"。带真实分量的模式照旧剥尾斜杠（`usr/lib/foo/`
+≡ `usr/lib/foo`）。10. **测试补齐**：`OpSink` 闸（8 个原语 + 正反对照）、`--overwrite` 尾斜杠与 `*/`、
+归档 `.lpkgsave` 成员名、`--help`/参数错误两条流的**流归属**断言、`DIR_META` 严格十进制
+（坏行不许把目录改成 `07777`）、移除侧 `ifstream` fail-closed、`query` 退出码、
+`confine_target_path` 的**接线**（祖先逃逸时包被拒且 root 之外什么也没多出来）。
 
 **两处订正**
+
 - **剥尾斜杠必须落成真实串**：`fnmatch(3)` 只吃 C 串（无长度参数），而"view 剥前缀后余下一直
   读到 NUL"这个技巧**只对剥前缀成立** —— 剪尾巴时 NUL 还在被剪掉的那段之后，fnmatch 照样看得见
   （写成 `usr/lib/foo/` 依旧不匹配 = **假修**）。
@@ -2688,6 +2708,7 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
   这样）。顺序反了会把前者盖成 `NotRemoved`（既有用例 `RemoveEmptyDirSkipsMountPoint` 当场红）。
 
 **关于 §19 第 2 条（`apply_soname_links`）与"祖先逃逸"的两处可达性订正**：
+
 - 无 `--force-overwrite` 时，"装 A（发 `usr/lib -> 外部`）再装 B（`usr/lib/libb.so`）"**够不到**
   `confine_target_path` —— B 的归档必然带目录条目 `usr/lib/`（解压器补建父目录 → `scan_content_files`
   扫到 → 排序在子文件之前），它在 `collect_content_conflicts` 里先撞上 A 持有的那个符号链接，
@@ -2753,8 +2774,8 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 - **l10n 同步**：`error.unsafe_member_suffix` 的文案此前只列三个后缀（用户照它定位不到真因），
   en/zh 两份都补上 `.lpkg_bak_`；用例断言里也钉了"文案必须跟上判据"。
 - **用例**：`ArchiveMemberNameSafetyTest.ReservedStashNamespaceIsRejectedInAnyPathComponent`
-  + fuzz 语料补 `tests/fuzz/corpus/archive_name/reject_lpkg_bak`（此前三个命名空间都有语料，
-  唯独缺它）。
+  - fuzz 语料补 `tests/fuzz/corpus/archive_name/reject_lpkg_bak`（此前三个命名空间都有语料，
+    唯独缺它）。
 
 ### 20.3 反向依赖的两份实现 → 一份（边种类由调用方选）
 
@@ -2813,13 +2834,13 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 
 ### 20.5 同批小缺陷
 
-| 位置 | 问题 | 处置 |
-|---|---|---|
-| `archive/downloader.cpp` | `download_with_retries()` 捕 `const LpkgException&`，而 **`UserAbort` 是它的子类** ⇒ 用户 Ctrl+C 被当成可重试失败：删掉已落位的输出文件、打「正在重试」、**空转 5 次**（重试期间 `sigint_graceful` 仍为真、进度回调立刻又中止 curl） | 在宽 catch **之前**单独接住 `UserAbort` 并 `throw;`（与 `main_cli.cpp` 的 catch 顺序同款）。用例 `DownloadCancelTest.CancelIsNotRetried`，两个独立锚点：stderr 里不得出现重试告警 + 已落位的输出文件不得被删 |
-| `pkg/depend_scanner.cpp` | 回退路径上的 `catch (...) { return rev; }` **静默**返回空图 ⇒ `depend remove/abibreak` 报"无受影响包"（错误答案），与同文件"打不开就抛"的取向相反 | 改落 `warning.repo_mirror_config`（与 `resolve_index_path()` 的同一种失败同源） |
-| `pkg/package_manager.cpp` | 注释"（失败仅告警语义在上层？此处静默）"**不实** —— `remove_stash_dir` 自身就打 `warning.cleanup_failed` | 改成自足且正确的表述（防后人按注释"补上层告警"造成重复告警） |
-| `tests/integration/test_cancel_semantics.cpp` | 断言输出不含 `info.install_complete`，而**该键根本不存在** ⇒ `get_string` 返回 `[MISSING_STRING: …]` ⇒ **恒真断言** | 删掉该行（下一行已用**存在**的键 `info.install_summary` 断言同一件事） |
-| `base/constants.hpp` | `constants::TAB` **零引用**（全仓生产/测试各 0 处） | 删 |
+| 位置                                          | 问题                                                                                                                                                                                                                                 | 处置                                                                                                                                                                                                         |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `archive/downloader.cpp`                      | `download_with_retries()` 捕 `const LpkgException&`，而 **`UserAbort` 是它的子类** ⇒ 用户 Ctrl+C 被当成可重试失败：删掉已落位的输出文件、打「正在重试」、**空转 5 次**（重试期间 `sigint_graceful` 仍为真、进度回调立刻又中止 curl） | 在宽 catch **之前**单独接住 `UserAbort` 并 `throw;`（与 `main_cli.cpp` 的 catch 顺序同款）。用例 `DownloadCancelTest.CancelIsNotRetried`，两个独立锚点：stderr 里不得出现重试告警 + 已落位的输出文件不得被删 |
+| `pkg/depend_scanner.cpp`                      | 回退路径上的 `catch (...) { return rev; }` **静默**返回空图 ⇒ `depend remove/abibreak` 报"无受影响包"（错误答案），与同文件"打不开就抛"的取向相反                                                                                    | 改落 `warning.repo_mirror_config`（与 `resolve_index_path()` 的同一种失败同源）                                                                                                                              |
+| `pkg/package_manager.cpp`                     | 注释"（失败仅告警语义在上层？此处静默）"**不实** —— `remove_stash_dir` 自身就打 `warning.cleanup_failed`                                                                                                                             | 改成自足且正确的表述（防后人按注释"补上层告警"造成重复告警）                                                                                                                                                 |
+| `tests/integration/test_cancel_semantics.cpp` | 断言输出不含 `info.install_complete`，而**该键根本不存在** ⇒ `get_string` 返回 `[MISSING_STRING: …]` ⇒ **恒真断言**                                                                                                                  | 删掉该行（下一行已用**存在**的键 `info.install_summary` 断言同一件事）                                                                                                                                       |
+| `base/constants.hpp`                          | `constants::TAB` **零引用**（全仓生产/测试各 0 处）                                                                                                                                                                                  | 删                                                                                                                                                                                                           |
 
 > ⚠️ **一条被推翻、因而不改的审计结论**（留档免得下轮再报）：审计报
 > `elf/lib_utils.cpp` 第二遍清理悬空 SONAME 链接时的 `fs::exists(entry.path(), ec)`
@@ -2836,12 +2857,12 @@ ELF **返回 true**）。**现行规则**：入口检查 `input_data[EI_DATA]`�
 一轮复核里对四个"生产零调用"的 API 做了逐个判定。**它们不是同一类东西**，判定依据是
 "删掉它，有没有一条**生产不变量**失去唯一的观测点"：
 
-| API | 它到底是什么 | 判定 |
-|---|---|---|
-| `remove_package_recursive()`（单数） | **三行纯转发**给复数版；测试借它走一遍，而生产全走复数版 | **删**：迁移 4 个测试调用点，覆盖一点不丢（行为在复数版里） |
-| `write_set_to_file()` | 生产写集合文件走的是 `Cache` 自己的 `ofstream + fsync_and_rename`，**根本不用它**；唯一消费者是与 `read_set_from_file` 的往返测试 | **删**：测试改成直接 `ofstream` 造文件 —— 读侧覆盖保住，且不再"自己写、自己读" |
-| `conf_hashes_for_path()` | "这个路径上有没有**任何**记录"；两处取证用它做粗粒度存在性检查 | **删**：两处改用 `get_conf_hash(path, pkg)` —— 问得更**紧**（哪个包的记录），旧 API 唯一的价值是让用例少写一个包名 |
-| `wal_type_is_reversible()` | `UNDO_TABLE` 的**唯一观测点** | **保留**：它守的是"新增 WAL 类型忘了登记 ⇒ 回滚静默少做一步"这条**生产不变量**（数据一致性），删它等于删掉那条闸门。生产不调用它，但它观测的是生产行为 |
+| API                                  | 它到底是什么                                                                                                                      | 判定                                                                                                                                                   |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `remove_package_recursive()`（单数） | **三行纯转发**给复数版；测试借它走一遍，而生产全走复数版                                                                          | **删**：迁移 4 个测试调用点，覆盖一点不丢（行为在复数版里）                                                                                            |
+| `write_set_to_file()`                | 生产写集合文件走的是 `Cache` 自己的 `ofstream + fsync_and_rename`，**根本不用它**；唯一消费者是与 `read_set_from_file` 的往返测试 | **删**：测试改成直接 `ofstream` 造文件 —— 读侧覆盖保住，且不再"自己写、自己读"                                                                         |
+| `conf_hashes_for_path()`             | "这个路径上有没有**任何**记录"；两处取证用它做粗粒度存在性检查                                                                    | **删**：两处改用 `get_conf_hash(path, pkg)` —— 问得更**紧**（哪个包的记录），旧 API 唯一的价值是让用例少写一个包名                                     |
+| `wal_type_is_reversible()`           | `UNDO_TABLE` 的**唯一观测点**                                                                                                     | **保留**：它守的是"新增 WAL 类型忘了登记 ⇒ 回滚静默少做一步"这条**生产不变量**（数据一致性），删它等于删掉那条闸门。生产不调用它，但它观测的是生产行为 |
 
 **判据（可复用）**：一个只有测试在用的 API，如果它**只是通往生产行为的另一条门**
 （入口/包装/转发），那是死代码，删；如果它**是某条不变量唯一的观测点**，那它活着 ——
@@ -2865,13 +2886,13 @@ tar 是**纯顺序**格式：没有中央目录、没有成员索引、没有一
 接在 `extract_tar_zst` 的成员循环里（`member_path_relative` 之后、`archive_write_header` 之前），
 违规抛 `UnsafeArchiveException`。
 
-| # | 形态 | 判据 |
-|---|---|---|
-| 1 | **重名成员** | 归一化后的相对路径进 `seen_` 集合，第二次即拒 |
-| 2 | **控制字符**（`\n\r\t\0` 之外的，最典型是 ESC） | 逐字节判 `< 0x20 \|\| == 0x7f` |
-| 3 | **超长名字 / 超长分量** | > 4096 字节 / 任一分量 > 255 字节（libarchive 已知在超长路径上绕过自己的符号链接检查，issue #744/#745） |
-| 4 | **`..` 分量** | 归一化后首分量是 `..` 即拒。**`.` 放行**（`./usr/bin/foo` 是正常打包产物） |
-| 5 | **符号链接目标逃出根** | 绝对目标放行；相对目标按"符号所在目录 + 目标"词法归一化后判首分量 |
+| #   | 形态                                            | 判据                                                                                                    |
+| --- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 1   | **重名成员**                                    | 归一化后的相对路径进 `seen_` 集合，第二次即拒                                                           |
+| 2   | **控制字符**（`\n\r\t\0` 之外的，最典型是 ESC） | 逐字节判 `< 0x20 \|\| == 0x7f`                                                                          |
+| 3   | **超长名字 / 超长分量**                         | > 4096 字节 / 任一分量 > 255 字节（libarchive 已知在超长路径上绕过自己的符号链接检查，issue #744/#745） |
+| 4   | **`..` 分量**                                   | 归一化后首分量是 `..` 即拒。**`.` 放行**（`./usr/bin/foo` 是正常打包产物）                              |
+| 5   | **符号链接目标逃出根**                          | 绝对目标放行；相对目标按"符号所在目录 + 目标"词法归一化后判首分量                                       |
 
 #### ⚠️ 一劳永逸的教训：通用加固清单必须先在**真实产物**上跑一遍
 
@@ -2906,26 +2927,26 @@ systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜�
 
 #### 三条"看着该判、实际不可达"的判据 —— 已删，只留绊线用例
 
-| 形态 | 为什么删 |
-|---|---|
-| **尾斜杠与类型不一致** | libarchive **按尾斜杠自己判定类型**：`typeflag='0'` 但名字以 `/` 结尾的成员读回来就是 `AE_IFDIR`，冲突到不了本层。绊线：`TrailingSlashIsNormalizedByLibarchive` |
+| 形态                    | 为什么删                                                                                                                                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **尾斜杠与类型不一致**  | libarchive **按尾斜杠自己判定类型**：`typeflag='0'` 但名字以 `/` 结尾的成员读回来就是 `AE_IFDIR`，冲突到不了本层。绊线：`TrailingSlashIsNormalizedByLibarchive`                                                         |
 | **声明尺寸 ≠ 实际数据** | libarchive 在 `archive_read_data_block` 上直接返 **FATAL**（`Truncated tar archive detected`），上层 `r < ARCHIVE_WARN` 分支先抛了。绊线：`TruncatedMemberIsRejectedByLibarchive`（断言落在 `error.extract_failed` 上） |
-| **无名成员** | 调用点在本函数**之前**就有 `if (member.empty()) continue;`（`.`、`./` 这类），空名进不来 |
+| **无名成员**            | 调用点在本函数**之前**就有 `if (member.empty()) continue;`（`.`、`./` 这类），空名进不来                                                                                                                                |
 
 按本仓库纪律（不为走不到的分支写断言），这些**不留判据、不留断言**，只留记录它们
 "不可达"的绊线用例 —— 绊线红 = 第三方行为变了，那时才需要补判据。
 
 #### 明确**不采纳**的通用加固建议（每条都有依据，别照着通用清单"补全"）
 
-| 通用建议 | 不采纳的理由 |
-|---|---|
-| **拒反斜杠** | 通用清单里的常客，但**误伤真实包**（systemd 的 `\x2d` unit 名，见上）—— 判据已删，只留绊线 |
-| 剥/拒 setuid、setgid | **真实包依赖它**：`dbus-daemon-launch-helper`、`unix_chkpwd`、`passwd`、`sudo`、`su`、`mount`、`chfn/chsh`、`newuidmap/newgidmap`、`wall`(setgid) 全是。剥掉 = 系统坏掉 |
-| 拒绝对目标的符号链接 | `--root` 下包发 `<root>/usr/bin/foo -> /etc/foo` 合法且必要 |
-| 文件类型黑名单 → 白名单 | 本函数同时服务**源码 tarball** 解压，某些 tar 变体的 `filetype` 可能是 0 或不认识的值，白名单会误伤合法源码包（`archive.cpp` 里原有的论证成立） |
-| 拒非 UTF-8 名字 | 上游源码 tarball 里带 Latin-1 等历史编码的文件名真实存在；只拒**控制字符** |
-| 资源上界（成员数 / 解压比 / 累计尺寸） | 有意**不加** |
-| 用 `SECURE_NOOVERWRITE` 替代 `UNLINK` | `UNLINK` 是"重装/升级时往非空临时目录里再解一次"所必需的；重名已由判据 1 拦掉 |
+| 通用建议                               | 不采纳的理由                                                                                                                                                            |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **拒反斜杠**                           | 通用清单里的常客，但**误伤真实包**（systemd 的 `\x2d` unit 名，见上）—— 判据已删，只留绊线                                                                              |
+| 剥/拒 setuid、setgid                   | **真实包依赖它**：`dbus-daemon-launch-helper`、`unix_chkpwd`、`passwd`、`sudo`、`su`、`mount`、`chfn/chsh`、`newuidmap/newgidmap`、`wall`(setgid) 全是。剥掉 = 系统坏掉 |
+| 拒绝对目标的符号链接                   | `--root` 下包发 `<root>/usr/bin/foo -> /etc/foo` 合法且必要                                                                                                             |
+| 文件类型黑名单 → 白名单                | 本函数同时服务**源码 tarball** 解压，某些 tar 变体的 `filetype` 可能是 0 或不认识的值，白名单会误伤合法源码包（`archive.cpp` 里原有的论证成立）                         |
+| 拒非 UTF-8 名字                        | 上游源码 tarball 里带 Latin-1 等历史编码的文件名真实存在；只拒**控制字符**                                                                                              |
+| 资源上界（成员数 / 解压比 / 累计尺寸） | 有意**不加**                                                                                                                                                            |
+| 用 `SECURE_NOOVERWRITE` 替代 `UNLINK`  | `UNLINK` 是"重装/升级时往非空临时目录里再解一次"所必需的；重名已由判据 1 拦掉                                                                                           |
 
 **不可实现、只记录为已知边界**（不为它们写判据、更不写用例）：**内嵌 NUL**
 （`archive_entry_pathname()` 返回 C 串，NUL 之后的字节在 API 层面观测不到）；
@@ -2962,13 +2983,13 @@ systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜�
 
 ### 21.3 本批的数据（用于确认判据不会误伤真实包）
 
-| 事实 | 数值 |
-|---|---|
-| 真实仓库（`farm/out/x86_64`）包数 | 861 |
-| 含**重名成员**的包 | **0**（逐包 `tar -tf \| sort \| uniq -d` 全扫） |
-| 最大成员数 | 43,974（libreoffice） |
-| 最大解压比 | 4.9×（164 MiB → 811 MiB，libreoffice） |
-| 含 setuid/setgid 的包 | **有**（dbus / linux-pam / shadow / util-linux / sudo）—— 见 §21.1 的"不采纳"表 |
+| 事实                              | 数值                                                                            |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| 真实仓库（`farm/out/x86_64`）包数 | 861                                                                             |
+| 含**重名成员**的包                | **0**（逐包 `tar -tf \| sort \| uniq -d` 全扫）                                 |
+| 最大成员数                        | 43,974（libreoffice）                                                           |
+| 最大解压比                        | 4.9×（164 MiB → 811 MiB，libreoffice）                                          |
+| 含 setuid/setgid 的包             | **有**（dbus / linux-pam / shadow / util-linux / sudo）—— 见 §21.1 的"不采纳"表 |
 
 ### 21.4 strip 的三条 —— 其中一条的**方案被推翻**
 
@@ -2986,8 +3007,8 @@ systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜�
 **ET_REL 对齐填充不在聚合上界内（⇒ 产物 ≈ N×输入 ⇒ OOM）这一条的原方案没能成立**，落地的是
 另一套判据：
 
-| 原方案 | 结果 |
-|---|---|
+| 原方案                                         | 结果                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 在 `elf_update` **之后**判 `size > input_size` | ① **判据本身不成立**：良构 ELF 重建会**合法地变大**（既有正面控制 `RelSectionsWithinFileStillStrip`：输入 **512** 字节 → 产物 **592** 字节），朴素判据会把正常 `.o` 拒掉；② **拦不住 OOM**：放大发生在 `elf_update` **内部**（按对齐值 `ftruncate` 那个 memfd），等拿到 `size` 时内存已经被吃掉 |
 
 **实际落地**：主判据前置到 `elf_update` **之前** —— 与 `retained_data_total` 同形的聚合封顶
@@ -3007,7 +3028,6 @@ systemd 用 `\x2d` 转义 unit 名里的 `-`，**文件名里字面就带反斜�
 （31.7 万次迭代 `rc=0`）。
 
 ---
-
 
 ```
 成功安装:
@@ -3086,11 +3106,11 @@ Warning: Failed to strip file …/libLLVMDemangle.a: Static library is malformed
 
 **结果**（把真实产物喂给修后的 `strip_file`，链接 `build/main/*.o` 的一次性探针）：
 
-| 库 | 修前 | 修后 |
-|---|---|---|
-| `libLLVMSupport.a` | 假告警（malformed） | 静默跳过，sha256 不变 |
-| `libLLVMDemangle.a` | 假告警（malformed） | 静默跳过，sha256 不变 |
-| `libLLVMTableGen.a` / `libLLVMHTTP.a` | 静默跳过 | 静默跳过（不变） |
+| 库                                    | 修前                | 修后                  |
+| ------------------------------------- | ------------------- | --------------------- |
+| `libLLVMSupport.a`                    | 假告警（malformed） | 静默跳过，sha256 不变 |
+| `libLLVMDemangle.a`                   | 假告警（malformed） | 静默跳过，sha256 不变 |
+| `libLLVMTableGen.a` / `libLLVMHTTP.a` | 静默跳过            | 静默跳过（不变）      |
 
 不剥的代价：这两个库的成员**没有任何 `.debug*` 节区**（Support 180 个 / Demangle 6 个全为 0），
 只有 `.comment`（每个约 96 字节）⇒ 合计约 17 KB / 0.5 KB。同形态的库本机还有一批
