@@ -1,12 +1,13 @@
 {
   "name": "kinfocenter",
-  "version": "6.7.5",
-  "release": 5,
+  "version": "6.8.0",
+  "release": 6,
   "deps": [
     "kf-kirigami",
     "kf-kdeclarative"
   ],
   "needed_so": [
+    "libEGL.so.1",
     "libKF6AuthCore.so.6",
     "libKF6ConfigCore.so.6",
     "libKF6CoreAddons.so.6",
@@ -52,17 +53,19 @@
     "kf-solid",
     "libdisplay-info",
     "libdrm",
+    "libglvnd",
     "libpulse",
     "libusb",
     "lm_sensors",
     "ninja",
     "qt6-base",
     "qt6-declarative",
+    "qt6-graphs",
     "systemsettings",
     "vulkan-headers"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/kinfocenter-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/kinfocenter-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

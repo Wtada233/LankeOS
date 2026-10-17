@@ -1,6 +1,6 @@
 {
   "name": "python-pluggy",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "release": 3,
   "deps": [
     "python"
@@ -17,7 +17,7 @@
     "python-wheel"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/f9/e2/3e91f31a7d2b083fe6ef3fa267035b518369d9511ffab804f839851d2779/pluggy-1.6.0.tar.gz"
+    "https://files.pythonhosted.org/packages/bf/db/7fc19e6f2dc92a966727031389fc2e08b558f0f25eb7403c1119ad4713cd/pluggy-1.7.0.tar.gz"
   ],
   "work_sources": []
 }

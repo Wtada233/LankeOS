@@ -1,6 +1,6 @@
 {
   "name": "mutter",
-  "version": "51.0",
+  "version": "51.1",
   "release": 7,
   "deps": [
     "gobject-introspection",
@@ -119,7 +119,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://download.gnome.org/sources/mutter/51/mutter-51.0.tar.xz"
+    "https://download.gnome.org/sources/mutter/51/mutter-51.1.tar.xz"
   ],
   "work_sources": []
 }

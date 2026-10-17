@@ -1,6 +1,6 @@
 {
   "name": "bubblewrap",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -20,7 +20,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/containers/bubblewrap/releases/download/v0.13.0/bubblewrap-0.13.0.tar.xz"
+    "https://github.com/containers/bubblewrap/releases/download/v0.13.1/bubblewrap-0.13.1.tar.xz"
   ],
   "work_sources": []
 }

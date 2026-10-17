@@ -1,6 +1,6 @@
 {
   "name": "python-sip",
-  "version": "6.17.0",
+  "version": "6.17.1",
   "release": 3,
   "deps": [
     "python",
@@ -19,7 +19,7 @@
     "python-wheel"
   ],
   "sources": [
-    "https://github.com/Python-SIP/sip/archive/refs/tags/6.17.0.tar.gz"
+    "https://github.com/Python-SIP/sip/archive/refs/tags/6.17.1.tar.gz"
   ],
   "work_sources": []
 }

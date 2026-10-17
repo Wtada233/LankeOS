@@ -1,12 +1,13 @@
 {
   "name": "polkit",
-  "version": "127",
+  "version": "128",
   "release": 5,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libduktape.so.207",
     "libexpat.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
@@ -32,7 +33,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/polkit-org/polkit/archive/127/polkit-127.tar.gz"
+    "https://github.com/polkit-org/polkit/archive/refs/tags/128.tar.gz"
   ],
   "work_sources": []
 }

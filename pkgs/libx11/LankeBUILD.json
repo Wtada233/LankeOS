@@ -1,6 +1,6 @@
 {
   "name": "libx11",
-  "version": "1.8.13",
+  "version": "1.8.14",
   "release": 3,
   "deps": [
     "xorgproto"
@@ -23,7 +23,7 @@
     "xtrans"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libX11-1.8.13.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/lib/libX11-1.8.14.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

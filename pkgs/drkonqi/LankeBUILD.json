@@ -1,6 +1,6 @@
 {
   "name": "drkonqi",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -9,6 +9,8 @@
     "libKF6ConfigGui.so.6",
     "libKF6CoreAddons.so.6",
     "libKF6Crash.so.6",
+    "libKF6DBusAddons.so.6",
+    "libKF6GuiAddons.so.6",
     "libKF6I18n.so.6",
     "libKF6IdleTime.so.6",
     "libKF6KIOCore.so.6",
@@ -16,7 +18,6 @@
     "libKF6Notifications.so.6",
     "libKF6Service.so.6",
     "libKF6StatusNotifierItem.so.6",
-    "libKF6SyntaxHighlighting.so.6",
     "libKF6Wallet.so.6",
     "libKF6WidgetsAddons.so.6",
     "libKF6WindowSystem.so.6",
@@ -24,7 +25,8 @@
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Network.so.6@Qt_6",
-    "libQt6Qml.so.6@Qt_6",
+    "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Quick.so.6@Qt_6",
     "libQt6Widgets.so.6@Qt_6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.4}",
     "libgcc_s.so.1@GCC_3.0",
@@ -43,6 +45,8 @@
     "kf-kconfig",
     "kf-kcoreaddons",
     "kf-kcrash",
+    "kf-kdbusaddons",
+    "kf-kguiaddons",
     "kf-ki18n",
     "kf-kidletime",
     "kf-kio",
@@ -64,7 +68,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/drkonqi-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/drkonqi-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

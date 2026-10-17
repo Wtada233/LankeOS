@@ -1,0 +1,54 @@
+{
+  "name": "union",
+  "version": "6.8.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libKF6ColorScheme.so.6",
+    "libKF6ConfigCore.so.6",
+    "libKF6CoreAddons.so.6",
+    "libKF6GuiAddons.so.6",
+    "libKF6IconThemes.so.6",
+    "libKirigamiPlatform.so.6",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
+    "libQt6DBus.so.6@Qt_6",
+    "libQt6Gui.so.6@Qt_6",
+    "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Quick.so.6@Qt_6",
+    "libQt6QuickControls2.so.6@Qt_6",
+    "libQt6Widgets.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
+    "libcxx-rust-cssparser.so.1",
+    "libgcc_s.so.1@GCC_3.0",
+    "libm.so.6@GLIBC_2.2.5",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.35,GLIBCXX_3.4.9}",
+    "libz.so.1"
+  ],
+  "provides_soname": [
+    "libUnion.so",
+    "libUnion.so.6",
+    "libUnionQuickImpl.so.6",
+    "libUnionQuickStyle.so.6"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "cxx-rust-cssparser",
+    "extra-cmake-modules",
+    "kf-kcolorscheme",
+    "kf-kconfig",
+    "kf-kcoreaddons",
+    "kf-kguiaddons",
+    "kf-kiconthemes",
+    "kf-kirigami",
+    "ninja",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-shadertools",
+    "zlib"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/plasma/6.8.0/union-6.8.0.tar.xz"
+  ],
+  "work_sources": []
+}

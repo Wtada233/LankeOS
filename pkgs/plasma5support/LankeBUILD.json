@@ -1,6 +1,6 @@
 {
   "name": "plasma5support",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -23,13 +23,10 @@
     "libPlasmaActivities.so.7",
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
-    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Gui.so.6@Qt_6",
     "libQt6Network.so.6@Qt_6",
     "libQt6Qml.so.6@Qt_6",
     "libQt6Sql.so.6@Qt_6",
-    "libQt6Widgets.so.6@Qt_6",
-    "libX11.so.6",
-    "libXfixes.so.3",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_ABI_DT_RELR}",
     "libm.so.6@GLIBC_2.2.5",
     "libprocesscore.so.11",
@@ -69,7 +66,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/plasma5support-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/plasma5support-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

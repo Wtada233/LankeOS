@@ -1,6 +1,6 @@
 {
   "name": "kwrited",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -26,7 +26,7 @@
     "qt6-base"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/kwrited-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/kwrited-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

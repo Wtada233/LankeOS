@@ -1,7 +1,7 @@
 {
   "name": "plasma-workspace",
-  "version": "6.7.5",
-  "release": 6,
+  "version": "6.8.0",
+  "release": 7,
   "deps": [
     "kf-kded",
     "kio-fuse",
@@ -20,12 +20,15 @@
     "kf-kcoreaddons",
     "kf-kitemmodels",
     "kf-kwindowsystem",
-    "qt6-positioning"
+    "qt6-positioning",
+    "libkexiv2",
+    "union"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libAppStreamQt.so.3",
     "libICE.so.6",
+    "libKExiv2Qt6.so.0",
     "libKF6Archive.so.6",
     "libKF6AuthCore.so.6",
     "libKF6Baloo.so.6",
@@ -45,6 +48,7 @@
     "libKF6Holidays.so.6",
     "libKF6I18n.so.6",
     "libKF6I18nLocaleData.so.6",
+    "libKF6I18nQml.so.6",
     "libKF6IconThemes.so.6",
     "libKF6IconWidgets.so.6",
     "libKF6IdleTime.so.6",
@@ -76,14 +80,13 @@
     "libKF6WindowSystem.so.6",
     "libKF6XmlGui.so.6",
     "libKNightTime.so.0",
-    "libKScreenLocker.so.6",
     "libKSysGuardSensorFaces.so.2",
     "libKWaylandClient.so.6",
     "libLayerShellQtInterface.so.6",
-    "libPlasma.so.7",
+    "libPlasma.so.8",
     "libPlasmaActivities.so.7",
     "libPlasmaActivitiesStats.so.1",
-    "libPlasmaQuick.so.7",
+    "libPlasmaQuick.so.8",
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
@@ -98,13 +101,12 @@
     "libQt6Widgets.so.6@Qt_6",
     "libQt6Xml.so.6@Qt_6",
     "libSM.so.6",
+    "libUnion.so.6",
     "libX11.so.6",
     "libXau.so.6",
-    "libXcursor.so.1",
-    "libXfixes.so.3",
     "libXft.so.2",
     "libXtst.so.6",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
     "libcanberra.so.0",
     "libcrypt.so.2@XCRYPT_2.0",
     "libdbus-1.so.3@LIBDBUS_1_3",
@@ -127,7 +129,6 @@
     "libxcb-damage.so.0",
     "libxcb-icccm.so.4",
     "libxcb-image.so.0",
-    "libxcb-randr.so.0",
     "libxcb-shape.so.0",
     "libxcb-util.so.1",
     "libxcb.so.1",
@@ -145,7 +146,6 @@
     "libklookandfeel.so",
     "libklookandfeel.so.6",
     "libkmpris.so.6",
-    "libkrdb.so",
     "libkworkspace6.so",
     "libkworkspace6.so.6",
     "libnotificationmanager.so",
@@ -218,6 +218,7 @@
     "layer-shell-qt",
     "libcanberra",
     "libice",
+    "libkexiv2",
     "libksysguard",
     "libplasma",
     "libqalculate",
@@ -247,6 +248,7 @@
     "qt6-svg",
     "qt6-tools",
     "qt6-virtualkeyboard",
+    "union",
     "wayland",
     "xcb-util",
     "xcb-util-cursor",
@@ -255,7 +257,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/plasma-workspace-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/plasma-workspace-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

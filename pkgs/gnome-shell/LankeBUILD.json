@@ -1,6 +1,6 @@
 {
   "name": "gnome-shell",
-  "version": "51.0",
+  "version": "51.1",
   "release": 8,
   "deps": [
     "accountsservice",
@@ -93,7 +93,7 @@
     "sassc"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gnome-shell/51/gnome-shell-51.0.tar.xz"
+    "https://download.gnome.org/sources/gnome-shell/51/gnome-shell-51.1.tar.xz"
   ],
   "work_sources": []
 }

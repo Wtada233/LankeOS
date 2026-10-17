@@ -1,11 +1,4 @@
 lankebuild_prepare() {
-    # node 26.11.1 的 configure 只探测到 python3.14、白名单也到 3.14，系统 python 是 3.15 会被拒。
-    # 上游 main 已修（commit 85543c1522 "build: support Python 3.15"，PR #65750），release 分支还没有。
-    # 先正向打；已应用则反向 dry-run 通过直接跳过；两样都不行说明与上游冲突，直接失败。
-    patch -N -p1 -i {WORK_DIR}/../nodejs-26.11.1-python-3.15.patch \
-        || patch -R --dry-run -p1 -i {WORK_DIR}/../nodejs-26.11.1-python-3.15.patch >/dev/null 2>&1 \
-        || exit 1
-
     export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
     export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
 

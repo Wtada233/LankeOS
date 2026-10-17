@@ -1,6 +1,6 @@
 {
   "name": "plasma-nm",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 5,
   "deps": [
     "kf-kquickcharts",
@@ -30,7 +30,7 @@
     "libKF6Solid.so.6",
     "libKF6WidgetsAddons.so.6",
     "libKF6WindowSystem.so.6",
-    "libPlasma.so.7",
+    "libPlasma.so.8",
     "libQCoro6DBus.so.0",
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
@@ -46,7 +46,7 @@
     "libgobject-2.0.so.0",
     "libnm.so.0@{libnm_1_0_0,libnm_1_20_0,libnm_1_2_0,libnm_1_40_0}",
     "libqt6keychain.so.1",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.9,GLIBCXX_3.4}"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.3,CXXABI_1.3.9,GLIBCXX_3.4}"
   ],
   "provides_soname": [
     "libplasmanm_cellular.so",
@@ -90,7 +90,7 @@
     "networkmanager"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/plasma-nm-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/plasma-nm-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

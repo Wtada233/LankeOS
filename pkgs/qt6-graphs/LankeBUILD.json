@@ -1,0 +1,47 @@
+{
+  "name": "qt6-graphs",
+  "version": "6.12.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",
+    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Quick.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Quick3D.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6QuickShapes.so.6@Qt_6_PRIVATE_API",
+    "libQt6QuickWidgets.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.14,GLIBCXX_3.4.30}"
+  ],
+  "provides_soname": [
+    "libQt6Graphs.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Graphs.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Graphs2DImpl.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Graphs2DImpl.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6GraphsWidgets.so.6@{NonQt,Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6GraphsWidgets.so@{NonQt,Qt_6,Qt_6_PRIVATE_API}"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja",
+    "qt6-base",
+    "qt6-declarative",
+    "qt6-quick3d",
+    "qt6-shadertools"
+  ],
+  "sources": [
+    "https://download.qt.io/official_releases/qt/6.12/6.12.0/submodules/qtgraphs-everywhere-src-6.12.0.tar.xz"
+  ],
+  "work_sources": [],
+  "farm_flags": [
+    {
+      "QML_CHK_IGN_LST": [
+        "HelperWidgets",
+        "StudioTheme"
+      ]
+    }
+  ]
+}

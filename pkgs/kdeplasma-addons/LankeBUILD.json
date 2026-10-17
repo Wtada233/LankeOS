@@ -1,7 +1,7 @@
 {
   "name": "kdeplasma-addons",
-  "version": "6.7.5",
-  "release": 5,
+  "version": "6.8.0",
+  "release": 6,
   "deps": [
     "qt6-quick3d",
     "kwin",
@@ -38,7 +38,7 @@
     "libKF6UnitConversion.so.6",
     "libKF6WidgetsAddons.so.6",
     "libKF6XmlGui.so.6",
-    "libPlasma.so.7",
+    "libPlasma.so.8",
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
@@ -107,7 +107,7 @@
     "rust"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/kdeplasma-addons-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/kdeplasma-addons-6.8.0.tar.xz"
   ],
   "work_sources": [],
   "farm_flags": [

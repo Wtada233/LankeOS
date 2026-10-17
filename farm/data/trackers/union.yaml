@@ -1,0 +1,7 @@
+pkg-name: union
+version-source: sources[0]
+sources:
+  - tracker-template: html-index
+    url: https://download.kde.org/stable/plasma/
+    pattern: href="([0-9][0-9.]*)/"
+    template: https://download.kde.org/stable/plasma/{version}/union-{version}.tar.xz

@@ -1,6 +1,6 @@
 {
   "name": "cargo-c",
-  "version": "0.10.25",
+  "version": "0.10.26",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -21,7 +21,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/lu-zero/cargo-c/archive/refs/tags/v0.10.25.tar.gz"
+    "https://github.com/lu-zero/cargo-c/archive/refs/tags/v0.10.26.tar.gz"
   ],
   "work_sources": []
 }

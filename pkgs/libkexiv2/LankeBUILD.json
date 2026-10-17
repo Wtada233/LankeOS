@@ -1,0 +1,31 @@
+{
+  "name": "libkexiv2",
+  "version": "26.08.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
+    "libQt6Gui.so.6@Qt_6",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_ABI_DT_RELR}",
+    "libexiv2.so.28",
+    "libgcc_s.so.1@GCC_3.0",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.15,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.26,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
+  ],
+  "provides_soname": [
+    "libKExiv2Qt6.so",
+    "libKExiv2Qt6.so.0"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "exiv2",
+    "extra-cmake-modules",
+    "ninja",
+    "qt6-base"
+  ],
+  "sources": [
+    "https://download.kde.org/stable/release-service/26.08.2/src/libkexiv2-26.08.2.tar.xz"
+  ],
+  "work_sources": []
+}

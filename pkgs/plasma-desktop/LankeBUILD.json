@@ -1,7 +1,7 @@
 {
   "name": "plasma-desktop",
-  "version": "6.7.5",
-  "release": 5,
+  "version": "6.8.0",
+  "release": 6,
   "deps": [
     "qt5compat",
     "kf-kdeclarative",
@@ -12,10 +12,13 @@
     "kf-ksvg",
     "kf-kwindowsystem",
     "libplasma",
-    "kf-kconfig"
+    "kf-kconfig",
+    "kscreenlocker"
   ],
   "needed_so": [
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libKF6Attica.so.6",
+    "libKF6AuthCore.so.6",
     "libKF6Baloo.so.6",
     "libKF6Bookmarks.so.6",
     "libKF6Codecs.so.6",
@@ -51,11 +54,11 @@
     "libKF6WidgetsAddons.so.6",
     "libKF6WindowSystem.so.6",
     "libKF6XmlGui.so.6",
-    "libPlasma.so.7",
+    "libPlasma.so.8",
     "libPlasmaActivities.so.7",
     "libPlasmaActivitiesStats.so.1",
-    "libPlasmaQuick.so.7",
-    "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",
+    "libPlasmaQuick.so.8",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
     "libQt6Network.so.6@Qt_6",
@@ -68,7 +71,6 @@
     "libQt6Xml.so.6@Qt_6",
     "libSDL2-2.0.so.0",
     "libX11.so.6",
-    "libXi.so.6",
     "libaccounts-qt6.so.1",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
     "libcanberra.so.0",
@@ -78,14 +80,13 @@
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
     "libnotificationmanager.so.1",
     "libpackagekitqt6.so.2",
+    "libpolkit-qt6-core-1.so.1",
     "libprocesscore.so.11",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.14,GLIBCXX_3.4.20,GLIBCXX_3.4.30}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.20,GLIBCXX_3.4.30}",
     "libtaskmanager.so.6",
     "libudev.so.1@LIBUDEV_183",
     "libwacom.so.9@LIBWACOM_2.0",
     "libwayland-client.so.0",
-    "libxcb-xkb.so.1",
-    "libxcb.so.1",
     "libxkbcommon.so.0@V_0.5.0",
     "libxkbfile.so.1",
     "libxkbregistry.so.0@V_1.0.0"
@@ -101,6 +102,7 @@
     "kaccounts-integration",
     "kf-attica",
     "kf-baloo",
+    "kf-kauth",
     "kf-kbookmarks",
     "kf-kcmutils",
     "kf-kcodecs",
@@ -156,6 +158,7 @@
     "plasma-activities-stats",
     "plasma-workspace",
     "plasma5support",
+    "polkit-qt",
     "powerdevil",
     "qt5compat",
     "qt6-base",
@@ -169,7 +172,7 @@
     "xkeyboard-config"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/plasma-desktop-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/plasma-desktop-6.8.0.tar.xz"
   ],
   "work_sources": [],
   "farm_flags": [

@@ -1,6 +1,6 @@
 {
   "name": "kpipewire",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 5,
   "deps": [],
   "needed_so": [
@@ -31,6 +31,8 @@
     "libKPipeWire.so.6",
     "libKPipeWireDmaBuf.so",
     "libKPipeWireDmaBuf.so.6",
+    "libKPipeWireMonitor.so",
+    "libKPipeWireMonitor.so.6",
     "libKPipeWireRecord.so",
     "libKPipeWireRecord.so.6"
   ],
@@ -51,7 +53,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/kpipewire-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/kpipewire-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

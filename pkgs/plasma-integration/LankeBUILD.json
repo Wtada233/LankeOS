@@ -1,6 +1,6 @@
 {
   "name": "plasma-integration",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 5,
   "deps": [
     "kf-qqc2-desktop-style",
@@ -19,6 +19,7 @@
     "libKF6KIOFileWidgets.so.6",
     "libKF6KIOGui.so.6",
     "libKF6KIOWidgets.so.6",
+    "libKF6Notifications.so.6",
     "libKF6Service.so.6",
     "libKF6StatusNotifierItem.so.6",
     "libKF6WidgetsAddons.so.6",
@@ -49,6 +50,7 @@
     "kf-kiconthemes",
     "kf-kio",
     "kf-kjobwidgets",
+    "kf-knotifications",
     "kf-kservice",
     "kf-kstatusnotifieritem",
     "kf-kwidgetsaddons",
@@ -64,7 +66,7 @@
     "wayland"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/plasma-integration-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/plasma-integration-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

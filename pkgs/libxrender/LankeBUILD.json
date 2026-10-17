@@ -1,6 +1,6 @@
 {
   "name": "libxrender",
-  "version": "0.9.12",
+  "version": "0.9.13",
   "release": 3,
   "deps": [
     "xorgproto"
@@ -20,7 +20,7 @@
     "xorgproto"
   ],
   "sources": [
-    "https://xorg.freedesktop.org/archive/individual/lib/libXrender-0.9.12.tar.xz"
+    "https://xorg.freedesktop.org/archive/individual/lib/libXrender-0.9.13.tar.xz"
   ],
   "work_sources": [],
   "no_strip": false

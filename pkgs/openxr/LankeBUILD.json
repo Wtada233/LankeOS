@@ -1,6 +1,6 @@
 {
   "name": "openxr",
-  "version": "1.1.63",
+  "version": "1.1.65",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -30,7 +30,7 @@
     "wayland"
   ],
   "sources": [
-    "https://github.com/KhronosGroup/OpenXR-SDK-Source/releases/download/release-1.1.63/OpenXR-SDK-Source-release-1.1.63.tar.gz"
+    "https://github.com/KhronosGroup/OpenXR-SDK-Source/releases/download/release-1.1.65/OpenXR-SDK-Source-release-1.1.65.tar.gz"
   ],
   "work_sources": []
 }

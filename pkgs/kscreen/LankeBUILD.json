@@ -1,6 +1,6 @@
 {
   "name": "kscreen",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 4,
   "deps": [],
   "needed_so": [
@@ -8,28 +8,26 @@
     "libKF6ConfigGui.so.6",
     "libKF6CoreAddons.so.6",
     "libKF6Crash.so.6",
-    "libKF6DBusAddons.so.6",
     "libKF6I18n.so.6",
     "libKF6I18nQml.so.6",
     "libKF6KCMUtilsCore.so.6",
     "libKF6KCMUtilsQuick.so.6",
     "libKF6Screen.so.8",
+    "libKF6ScreenDpms.so.8",
     "libKF6WindowSystem.so.6",
     "libLayerShellQtInterface.so.6",
-    "libPlasma.so.7",
+    "libPlasma.so.8",
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Qml.so.6@{Qt_6,Qt_6_PRIVATE_API}",
     "libQt6Quick.so.6@Qt_6",
     "libQt6WaylandClient.so.6@Qt_6",
-    "libX11.so.6",
-    "libXi.so.6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_13.0.0,GCC_3.0,GCC_4.3.0}",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.38}",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.18,GLIBCXX_3.4.29,GLIBCXX_3.4.30}",
-    "libwayland-client.so.0",
-    "libxcb.so.1"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.31,GLIBCXX_3.4.32,GLIBCXX_3.4.36}",
+    "libwayland-client.so.0"
   ],
   "provides_soname": [],
   "build_deps": [
@@ -61,7 +59,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/kscreen-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/kscreen-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "gdm",
-  "version": "51.0",
+  "version": "51.1",
   "release": 4,
   "deps": [
     "accountsservice",
@@ -47,7 +47,7 @@
     "upower"
   ],
   "sources": [
-    "https://download.gnome.org/sources/gdm/51/gdm-51.0.tar.xz"
+    "https://download.gnome.org/sources/gdm/51/gdm-51.1.tar.xz"
   ],
   "work_sources": []
 }

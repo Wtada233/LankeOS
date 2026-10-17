@@ -1,12 +1,13 @@
 {
   "name": "systemsettings",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 4,
   "deps": [],
   "needed_so": [
     "libKF6AuthCore.so.6",
     "libKF6ColorScheme.so.6",
     "libKF6ConfigCore.so.6",
+    "libKF6ConfigGui.so.6",
     "libKF6ConfigWidgets.so.6",
     "libKF6CoreAddons.so.6",
     "libKF6Crash.so.6",
@@ -67,7 +68,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/systemsettings-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/systemsettings-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

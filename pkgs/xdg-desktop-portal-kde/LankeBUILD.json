@@ -1,6 +1,6 @@
 {
   "name": "xdg-desktop-portal-kde",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 4,
   "deps": [
     "kio-fuse"
@@ -23,6 +23,7 @@
     "libKF6Service.so.6",
     "libKF6StatusNotifierItem.so.6",
     "libKF6WindowSystem.so.6",
+    "libKPipeWireMonitor.so.6",
     "libKWaylandClient.so.6",
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
@@ -72,7 +73,7 @@
     "xdg-desktop-portal"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/xdg-desktop-portal-kde-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/xdg-desktop-portal-kde-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

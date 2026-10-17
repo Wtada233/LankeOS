@@ -1,6 +1,6 @@
 {
   "name": "sqlite",
-  "version": "3.54.0",
+  "version": "3.54.1",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -21,7 +21,7 @@
     "zlib"
   ],
   "sources": [
-    "https://www.sqlite.org/2026/sqlite-src-3540000.zip"
+    "https://www.sqlite.org/2026/sqlite-src-3540100.zip"
   ],
   "no_strip": false,
   "work_sources": []

@@ -1,6 +1,6 @@
 {
   "name": "python-distlib",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "release": 3,
   "deps": [
     "python"
@@ -16,7 +16,7 @@
     "python-wheel"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/c9/02/bd72be9134d25ed783ecbbc38a539ffaefbf90c78418c7fb7229600dbac7/distlib-0.4.3.tar.gz"
+    "https://files.pythonhosted.org/packages/68/bc/d36966de7304047a1001a7559fbf266c464bb5d8cc85464536ef8c9bcc32/distlib-0.4.4.tar.gz"
   ],
   "work_sources": []
 }

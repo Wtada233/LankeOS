@@ -1,6 +1,6 @@
 {
   "name": "libplasma",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 5,
   "deps": [
     "qt5compat",
@@ -8,8 +8,6 @@
     "kf-ksvg"
   ],
   "needed_so": [
-    "libEGL.so.1",
-    "libGLX.so.0",
     "libKF6ColorScheme.so.6",
     "libKF6ConfigCore.so.6",
     "libKF6ConfigGui.so.6",
@@ -28,7 +26,6 @@
     "libKF6WidgetsAddons.so.6",
     "libKF6WindowSystem.so.6",
     "libKirigamiPlatform.so.6",
-    "libOpenGL.so.0",
     "libPlasmaActivities.so.7",
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
@@ -36,21 +33,16 @@
     "libQt6Quick.so.6@Qt_6",
     "libQt6WaylandClient.so.6@Qt_6",
     "libQt6Widgets.so.6@Qt_6",
-    "libX11.so.6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_ABI_DT_RELR}",
     "libm.so.6@GLIBC_2.2.5",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4}",
-    "libwayland-client.so.0",
-    "libxcb-composite.so.0",
-    "libxcb-damage.so.0",
-    "libxcb-render.so.0",
-    "libxcb.so.1"
+    "libwayland-client.so.0"
   ],
   "provides_soname": [
     "libPlasma.so",
-    "libPlasma.so.7",
+    "libPlasma.so.8",
     "libPlasmaQuick.so",
-    "libPlasmaQuick.so.7"
+    "libPlasmaQuick.so.8"
   ],
   "build_deps": [
     "base-devel",
@@ -84,7 +76,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/libplasma-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/libplasma-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

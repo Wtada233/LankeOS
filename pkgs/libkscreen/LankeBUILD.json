@@ -1,21 +1,18 @@
 {
   "name": "libkscreen",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 3,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
-    "libQt6Gui.so.6@{Qt_6,Qt_6_PRIVATE_API}",
+    "libQt6Gui.so.6@Qt_6",
     "libQt6WaylandClient.so.6@Qt_6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
     "libgcc_s.so.1@{GCC_13.0.0,GCC_3.0,GCC_4.3.0}",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",
     "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.31,GLIBCXX_3.4.36}",
-    "libwayland-client.so.0",
-    "libxcb-dpms.so.0",
-    "libxcb-randr.so.0",
-    "libxcb.so.1"
+    "libwayland-client.so.0"
   ],
   "provides_soname": [
     "libKF6Screen.so",
@@ -35,7 +32,7 @@
     "wayland"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/libkscreen-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/libkscreen-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

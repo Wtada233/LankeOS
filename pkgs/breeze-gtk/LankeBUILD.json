@@ -1,6 +1,6 @@
 {
   "name": "breeze-gtk",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -15,7 +15,7 @@
     "sassc"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/breeze-gtk-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/breeze-gtk-6.8.0.tar.xz"
   ],
   "work_sources": []
 }

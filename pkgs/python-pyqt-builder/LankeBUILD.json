@@ -1,6 +1,6 @@
 {
   "name": "python-pyqt-builder",
-  "version": "1.20.0",
+  "version": "1.20.1",
   "release": 3,
   "deps": [
     "python",
@@ -20,7 +20,7 @@
     "python-sip"
   ],
   "sources": [
-    "https://github.com/Python-PyQt/PyQt-builder/archive/refs/tags/1.20.0.tar.gz"
+    "https://github.com/Python-PyQt/PyQt-builder/archive/refs/tags/1.20.1.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "breeze",
-  "version": "6.7.5",
+  "version": "6.8.0",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -51,7 +51,7 @@
     "qt6-svg"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.7.5/breeze-6.7.5.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.0/breeze-6.8.0.tar.xz"
   ],
   "work_sources": []
 }
