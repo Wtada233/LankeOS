@@ -1,7 +1,7 @@
 {
   "name": "ffmpeg",
   "version": "9.0.2",
-  "release": 6,
+  "release": 7,
   "deps": [
     "xwayland"
   ],

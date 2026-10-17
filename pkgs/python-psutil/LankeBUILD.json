@@ -1,7 +1,7 @@
 {
   "name": "python-psutil",
   "version": "7.2.2",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

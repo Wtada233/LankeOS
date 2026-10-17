@@ -1,7 +1,7 @@
 {
   "name": "libice",
   "version": "1.1.2",
-  "release": 3,
+  "release": 4,
   "deps": [
     "xorgproto"
   ],
@@ -15,6 +15,7 @@
   "build_deps": [
     "base-devel",
     "util-macros",
+    "xorgproto",
     "xtrans"
   ],
   "sources": [

@@ -8,16 +8,23 @@ lankebuild_build() {
     meson setup .. --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --buildtype=release -Ddefault_library=shared --wrap-mode=nofallback
     ninja -j$(nproc)
     DESTDIR={STAGING_ROOT} ninja install
-    # 使 D-Bus 和 systemd 使用同一个 machine-id
+    # libdbus、GLib/GDBus、Qt 会优先读 /var/lib/dbus/machine-id；
+    # 用指向 /etc/machine-id 的软链避免两处 ID 分叉
     mkdir -pv {STAGING_ROOT}/var/lib/dbus
     ln -sfv ../../../etc/machine-id {STAGING_ROOT}/var/lib/dbus/machine-id
-    # system bus 启动 root 服务需要 setuid helper（提权执行 system-services）
-    # 缺失/非 SUID 会导致 "Failed to execute program ... Permission denied"
+    # 系统/会话总线由 dbus-broker 接管；dbus-daemon 只保留给
+    # dbus-run-session / dbus-launch 启动私有总线。它若按 system 配置运行
+    # 仍需 setuid helper，因此按上游权限保留。
     chmod 4755 {STAGING_ROOT}/usr/libexec/dbus-daemon-launch-helper
 }
 
 
 lankebuild_package() {
+    # 删除 dbus-daemon 的总线 unit，让 dbus.socket 激活落到 dbus-broker.service。
+    # 配置、dbus.socket、sysusers、tmpfiles 和客户端工具仍由本包提供。
+    rm -f \
+        {STAGING_ROOT}/usr/lib/systemd/system/dbus.service \
+        {STAGING_ROOT}/usr/lib/systemd/user/dbus.service
     # sysusers.d/dbus.conf 的 dbus 用户需 postinst 建（rtkit 同款）
     cat > {STAGING_HOOKS}/postinst.sh <<'EOF'
 #!/bin/sh

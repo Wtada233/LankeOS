@@ -1,7 +1,7 @@
 {
   "name": "grep",
   "version": "3.12",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],

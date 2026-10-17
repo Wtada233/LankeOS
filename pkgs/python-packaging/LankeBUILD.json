@@ -1,7 +1,7 @@
 {
   "name": "python-packaging",
   "version": "26.3",
-  "release": 5,
+  "release": 6,
   "deps": [
     "python"
   ],

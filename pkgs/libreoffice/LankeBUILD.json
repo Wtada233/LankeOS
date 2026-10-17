@@ -1,7 +1,7 @@
 {
   "name": "libreoffice",
   "version": "26.8.1.1",
-  "release": 8,
+  "release": 9,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",

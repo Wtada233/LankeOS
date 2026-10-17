@@ -1,7 +1,7 @@
 {
   "name": "autoconf",
   "version": "2.73",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash",
     "perl"

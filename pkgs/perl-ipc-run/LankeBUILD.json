@@ -1,7 +1,7 @@
 {
   "name": "perl-ipc-run",
   "version": "20260402.0",
-  "release": 1,
+  "release": 2,
   "deps": [
     "perl",
     "perl-io-tty"

@@ -1,7 +1,7 @@
 {
   "name": "mpv",
   "version": "0.41.0",
-  "release": 9,
+  "release": 10,
   "deps": [
     "ffnvcodec-headers",
     "wayland-protocols",

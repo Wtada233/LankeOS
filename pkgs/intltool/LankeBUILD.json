@@ -1,7 +1,7 @@
 {
   "name": "intltool",
   "version": "0.51.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash",
     "perl",

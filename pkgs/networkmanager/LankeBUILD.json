@@ -1,11 +1,12 @@
 {
   "name": "networkmanager",
   "version": "1.58.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "mobile-broadband-provider-info",
     "modemmanager",
-    "ppp"
+    "ppp",
+    "wpa_supplicant"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",

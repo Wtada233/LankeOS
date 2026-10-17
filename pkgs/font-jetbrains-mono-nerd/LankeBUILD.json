@@ -1,7 +1,7 @@
 {
   "name": "font-jetbrains-mono-nerd",
   "version": "3.5.1",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

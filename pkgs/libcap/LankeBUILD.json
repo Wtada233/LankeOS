@@ -1,10 +1,11 @@
 {
   "name": "libcap",
   "version": "2.78",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.9}"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libpam.so.0@LIBPAM_1.0"
   ],
   "provides_soname": [
     "libcap.so",
@@ -13,7 +14,8 @@
     "libpsx.so.2"
   ],
   "build_deps": [
-    "base-devel"
+    "base-devel",
+    "linux-pam"
   ],
   "sources": [
     "https://www.kernel.org/pub/linux/libs/security/linux-privs/libcap2/libcap-2.78.tar.xz"

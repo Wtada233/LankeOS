@@ -1,7 +1,7 @@
 {
   "name": "xmlto",
   "version": "0.0.29",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash",
     "docbook-xml",
@@ -9,7 +9,7 @@
     "libxslt"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.34}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34}"
   ],
   "provides_soname": [],
   "build_deps": [

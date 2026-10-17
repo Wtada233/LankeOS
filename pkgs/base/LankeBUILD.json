@@ -1,6 +1,7 @@
 {
   "name": "base",
   "version": "1",
+  "release": 1,
   "deps": [
     "bash",
     "coreutils",

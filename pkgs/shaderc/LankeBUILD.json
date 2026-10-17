@@ -1,7 +1,7 @@
 {
   "name": "shaderc",
   "version": "2026.4",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libSPIRV-Tools-opt.so",

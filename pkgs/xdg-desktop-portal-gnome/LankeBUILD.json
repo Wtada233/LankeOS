@@ -1,6 +1,7 @@
 {
   "name": "xdg-desktop-portal-gnome",
   "version": "51.0",
+  "release": 1,
   "deps": [
     "gsettings-desktop-schemas",
     "xwayland"

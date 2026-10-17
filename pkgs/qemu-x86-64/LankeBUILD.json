@@ -1,7 +1,7 @@
 {
   "name": "qemu-x86-64",
   "version": "11.1.2",
-  "release": 4,
+  "release": 5,
   "deps": [
     "xwayland"
   ],

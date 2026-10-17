@@ -1,7 +1,7 @@
 {
   "name": "python-pefile",
   "version": "2024.8.26",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

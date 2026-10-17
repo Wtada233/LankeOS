@@ -1,7 +1,7 @@
 {
   "name": "libva",
   "version": "2.24.1",
-  "release": 2,
+  "release": 3,
   "deps": [
     "xwayland"
   ],
@@ -11,7 +11,7 @@
     "libX11.so.6",
     "libXext.so.6",
     "libXfixes.so.3",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
+    "libc.so.6@{GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libdrm.so.2",
     "libwayland-client.so.0",
     "libxcb-dri3.so.0",

@@ -1,7 +1,7 @@
 {
   "name": "python-aaf2",
   "version": "1.7.1",
-  "release": 5,
+  "release": 6,
   "deps": [
     "python"
   ],

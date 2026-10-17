@@ -7,11 +7,13 @@
 # tests 关（要 dbus/python-dbusmock）。
 
 lankebuild_prepare() {
+    # landlock 默认 auto：构建时运行 ABI 探测，内核未启用则直接 error。
+    # 这里只影响 miner 的沙箱，显式关掉。
     meson setup _build --prefix=/usr --buildtype=release \
         -D xps=disabled -D iso=disabled -D zip=disabled -D playlist=disabled \
         -D iptc=disabled -D cue=disabled \
         -D abiword=false -D ps=false -D unzip_ps_gz_files=false \
-        -D man=false \
+        -D man=false -D landlock=disabled \
         -D functional_tests=false -D sandbox_tests=false
 }
 

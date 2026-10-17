@@ -1,7 +1,7 @@
 {
   "name": "parallel",
   "version": "20260922",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash",
     "perl"

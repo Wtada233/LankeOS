@@ -1,7 +1,7 @@
 {
   "name": "openjdk25",
   "version": "25.0.5",
-  "release": 3,
+  "release": 4,
   "deps": [
     "xwayland"
   ],
@@ -29,6 +29,7 @@
   "build_deps": [
     "alsa-lib",
     "base-devel",
+    "cups",
     "freetype",
     "giflib",
     "harfbuzz",
@@ -38,6 +39,7 @@
     "libx11",
     "libxext",
     "libxi",
+    "libxrandr",
     "libxrender",
     "libxt",
     "libxtst",

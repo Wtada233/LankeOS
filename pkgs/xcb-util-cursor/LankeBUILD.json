@@ -1,10 +1,10 @@
 {
   "name": "xcb-util-cursor",
   "version": "0.1.6",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.38}",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.38,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libxcb-image.so.0",
     "libxcb-render-util.so.0",
     "libxcb-render.so.0",

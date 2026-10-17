@@ -1,7 +1,7 @@
 {
   "name": "python-urllib3",
   "version": "2.8.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

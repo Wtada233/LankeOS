@@ -1,7 +1,7 @@
 {
   "name": "libxpresent",
   "version": "1.0.2",
-  "release": 2,
+  "release": 3,
   "deps": [
     "xorgproto"
   ],
@@ -10,7 +10,7 @@
     "libXext.so.6",
     "libXfixes.so.3",
     "libXrandr.so.2",
-    "libc.so.6@GLIBC_2.2.5"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libXpresent.so",

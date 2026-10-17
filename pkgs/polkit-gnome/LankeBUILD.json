@@ -1,6 +1,7 @@
 {
   "name": "polkit-gnome",
   "version": "0.105",
+  "release": 1,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.2.5,GLIBC_2.34}",
@@ -18,7 +19,8 @@
     "gtk3",
     "polkit",
     "gdk-pixbuf",
-    "glib"
+    "glib",
+    "intltool"
   ],
   "sources": [
     "https://download.gnome.org/sources/polkit-gnome/0.105/polkit-gnome-0.105.tar.xz"

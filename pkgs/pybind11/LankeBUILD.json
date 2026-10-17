@@ -1,7 +1,7 @@
 {
   "name": "pybind11",
   "version": "3.1.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

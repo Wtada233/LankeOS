@@ -1,10 +1,10 @@
 {
   "name": "libxcrypt",
   "version": "4.5.2",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.36,GLIBC_2.38,GLIBC_2.43}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.36,GLIBC_2.38,GLIBC_2.43,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libcrypt.so.2@{XCRYPT_2.0,XCRYPT_4.3,XCRYPT_4.4}",

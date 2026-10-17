@@ -1,7 +1,7 @@
 {
   "name": "coin-or-cgl",
   "version": "0.60.10",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libClp.so.1",

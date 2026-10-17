@@ -1,7 +1,7 @@
 {
   "name": "sddm-kcm",
   "version": "6.7.5",
-  "release": 1,
+  "release": 2,
   "deps": [
     "sddm"
   ],
@@ -17,7 +17,7 @@
     "libKF6KIOGui.so.6",
     "libKF6Service.so.6",
     "libKF6WidgetsAddons.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Qml.so.6@Qt_6",

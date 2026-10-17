@@ -1,7 +1,7 @@
 {
   "name": "gdm",
   "version": "51.0",
-  "release": 3,
+  "release": 4,
   "deps": [
     "accountsservice",
     "gnome-session",

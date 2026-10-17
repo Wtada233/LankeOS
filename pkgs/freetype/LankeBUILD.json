@@ -1,14 +1,14 @@
 {
   "name": "freetype",
   "version": "2.14.3",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "libbrotlidec.so.1",
     "libbz2.so.1.0",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.33,GLIBC_2.38}",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.33,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libharfbuzz.so.0",
     "libpng16.so.16@PNG16_0",
     "libz.so.1"

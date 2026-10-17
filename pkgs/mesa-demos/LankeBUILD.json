@@ -1,7 +1,7 @@
 {
   "name": "mesa-demos",
   "version": "9.0.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "xwayland"
   ],
@@ -11,11 +11,11 @@
     "libGLESv2.so.2",
     "libX11.so.6",
     "libXext.so.6",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.34,GLIBC_2.38,GLIBC_2.8}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.8}",
     "libdecor-0.so.0",
     "libdrm.so.2",
     "libgbm.so.1",
-    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.38}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27}",
     "libvulkan.so.1",
     "libwayland-client.so.0",
     "libwayland-egl.so.1",

@@ -1,13 +1,15 @@
 {
   "name": "libnvme",
   "version": "1.16.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libcrypto.so.3@OPENSSL_3.0.0",
     "libdbus-1.so.3@LIBDBUS_1_3",
-    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}"
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libjson-c.so.5@JSONC_0.14",
+    "libkeyutils.so.1@{KEYUTILS_0.3,KEYUTILS_1.4,KEYUTILS_1.5}"
   ],
   "provides_soname": [
     "libnvme-mi.so.1@{LIBNVME_MI_1_1,LIBNVME_MI_1_10,LIBNVME_MI_1_11,LIBNVME_MI_1_12,LIBNVME_MI_1_14,LIBNVME_MI_1_15,LIBNVME_MI_1_2,LIBNVME_MI_1_3,LIBNVME_MI_1_4,LIBNVME_MI_1_5,LIBNVME_MI_UNRELEASED}",

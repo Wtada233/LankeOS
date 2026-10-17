@@ -1,7 +1,7 @@
 {
   "name": "nodejs",
   "version": "26.11.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash",
     "python"

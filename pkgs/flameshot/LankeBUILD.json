@@ -1,14 +1,14 @@
 {
   "name": "flameshot",
   "version": "14.0.0",
-  "release": 1,
+  "release": 2,
   "deps": [
     "qt6-imageformats",
     "xdg-desktop-portal"
   ],
   "needed_so": [
     "libKF6GuiAddons.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Network.so.6@Qt_6",

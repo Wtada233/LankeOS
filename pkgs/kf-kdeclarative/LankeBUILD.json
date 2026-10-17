@@ -1,7 +1,7 @@
 {
   "name": "kf-kdeclarative",
   "version": "6.31.0",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libKF6ConfigGui.so.6",

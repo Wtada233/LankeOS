@@ -1,7 +1,7 @@
 {
   "name": "ncurses",
   "version": "6.5-20250809",
-  "release": 4,
+  "release": 5,
   "deps": [
     "bash"
   ],

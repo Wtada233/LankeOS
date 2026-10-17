@@ -1,7 +1,7 @@
 {
   "name": "font-noto-sans-cjk",
   "version": "2.004",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

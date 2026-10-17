@@ -1,10 +1,12 @@
 {
   "name": "xdg-desktop-portal",
   "version": "1.22.1",
+  "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.10,GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.36,GLIBC_2.38,GLIBC_2.4,GLIBC_2.6}",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.36,GLIBC_2.38,GLIBC_2.4,GLIBC_2.5,GLIBC_2.6,GLIBC_2.7}",
     "libfuse3.so.4@{FUSE_3.0,FUSE_3.12,FUSE_3.17,FUSE_3.2}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgdk_pixbuf-2.0.so.0",
     "libgio-2.0.so.0",
     "libglib-2.0.so.0",

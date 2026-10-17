@@ -1,7 +1,7 @@
 {
   "name": "libpng",
   "version": "1.6.59",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],

@@ -1,7 +1,7 @@
 {
   "name": "ark",
   "version": "26.08.2",
-  "release": 1,
+  "release": 2,
   "deps": [
     "unzip",
     "zip"

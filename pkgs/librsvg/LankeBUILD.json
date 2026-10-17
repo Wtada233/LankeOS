@@ -1,7 +1,7 @@
 {
   "name": "librsvg",
   "version": "2.62.91",
-  "release": 5,
+  "release": 6,
   "deps": [
     "freetype"
   ],
@@ -10,6 +10,7 @@
     "libc.so.6@{GLIBC_2.14,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
     "libcairo-gobject.so.2",
     "libcairo.so.2",
+    "libdav1d.so.7",
     "libfontconfig.so.1",
     "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
     "libgdk_pixbuf-2.0.so.0",
@@ -30,6 +31,7 @@
     "base-devel",
     "cairo",
     "cargo-c",
+    "dav1d",
     "gdk-pixbuf",
     "git",
     "glib",

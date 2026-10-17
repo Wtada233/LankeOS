@@ -1,11 +1,11 @@
 {
   "name": "libsm",
   "version": "1.2.6",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libICE.so.6",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
     "libuuid.so.1@UUID_1.0"
   ],
   "provides_soname": [

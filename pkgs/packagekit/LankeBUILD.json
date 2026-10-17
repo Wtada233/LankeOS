@@ -1,7 +1,7 @@
 {
   "name": "packagekit",
   "version": "1.4.0",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash-completion"
   ],

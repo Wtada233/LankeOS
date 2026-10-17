@@ -1,7 +1,7 @@
 {
   "name": "corrosion",
   "version": "0.6.1",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

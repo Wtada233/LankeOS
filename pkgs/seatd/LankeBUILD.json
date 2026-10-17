@@ -1,10 +1,10 @@
 {
   "name": "seatd",
   "version": "0.9.3",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.4}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.28,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libsystemd.so.0@{LIBSYSTEMD_209,LIBSYSTEMD_213,LIBSYSTEMD_221,LIBSYSTEMD_237,LIBSYSTEMD_238}"
   ],
   "provides_soname": [

@@ -1,7 +1,7 @@
 {
   "name": "python-setuptools-rust",
   "version": "1.13.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python",
     "python-semantic-version",

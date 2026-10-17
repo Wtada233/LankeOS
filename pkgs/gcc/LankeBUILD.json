@@ -1,7 +1,7 @@
 {
   "name": "gcc",
   "version": "16.2.0",
-  "release": 5,
+  "release": 6,
   "deps": [
     "bash",
     "python"

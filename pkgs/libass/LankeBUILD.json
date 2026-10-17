@@ -1,10 +1,10 @@
 {
   "name": "libass",
   "version": "0.17.5",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.38}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.38,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libfontconfig.so.1",
     "libfreetype.so.6",
     "libfribidi.so.0",

@@ -1,9 +1,10 @@
 {
   "name": "speexdsp",
   "version": "1.2.1",
+  "release": 1,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.43}"
   ],
   "provides_soname": [

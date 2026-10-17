@@ -1,7 +1,7 @@
 {
   "name": "grub",
   "version": "2.14",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash",
     "python"

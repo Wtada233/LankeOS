@@ -1,7 +1,7 @@
 {
   "name": "libmpg123",
   "version": "1.33.7",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libasound.so.2@{ALSA_0.9,ALSA_0.9.0rc4}",

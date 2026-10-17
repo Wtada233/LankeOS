@@ -1,7 +1,7 @@
 {
   "name": "libxscrnsaver",
   "version": "1.2.5",
-  "release": 3,
+  "release": 4,
   "deps": [
     "xorgproto"
   ],

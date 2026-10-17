@@ -1,7 +1,7 @@
 {
   "name": "libreoffice-i18n",
   "version": "26.8.1.1",
-  "release": 1,
+  "release": 2,
   "deps": [
     "libreoffice"
   ],

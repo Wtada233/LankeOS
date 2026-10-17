@@ -1,7 +1,7 @@
 {
   "name": "xwayland-satellite",
   "version": "0.8.3",
-  "release": 2,
+  "release": 3,
   "deps": [
     "xwayland"
   ],
@@ -16,6 +16,7 @@
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "clang",
     "libxcb",
     "llvm",
     "rust",

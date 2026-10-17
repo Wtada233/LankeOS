@@ -1,7 +1,7 @@
 {
   "name": "libunibreak",
   "version": "8_0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.2.5,GLIBC_ABI_DT_RELR}"

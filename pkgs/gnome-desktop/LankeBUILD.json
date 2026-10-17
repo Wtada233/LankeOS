@@ -1,6 +1,7 @@
 {
   "name": "gnome-desktop",
   "version": "51.0",
+  "release": 1,
   "deps": [
     "gsettings-desktop-schemas",
     "iso-codes",

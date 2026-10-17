@@ -1,7 +1,7 @@
 {
   "name": "libime",
   "version": "1.1.17",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libFcitx5Utils.so.2",

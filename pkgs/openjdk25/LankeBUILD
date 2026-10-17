@@ -19,6 +19,17 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
+    # boot JDK 由 prepare 下到 /tmp/openjdk<major>-boot-jdk。三个 phase 各自是**独立 shell**
+    # （lpkg 每段 `sh -c '. <构建脚本> && <该函数>'`），shell 变量不跨阶段 —— 这里必须按同一
+    # 公式重新推导，否则下面展开成 `--with-boot-jdk=`（空值），configure 会去 PATH 找 java，
+    # 报 "Could not find a valid Boot JDK"。
+    MAJOR=$(printf '%s' "{ORIG_PKG_VER}" | grep -oE '^[0-9]+')
+    BOOT_JDK_DIR="/tmp/openjdk${MAJOR}-boot-jdk"
+    test -x "$BOOT_JDK_DIR/bin/javac" || {
+        echo "boot JDK 不在 $BOOT_JDK_DIR（prepare 阶段没下成？）"
+        exit 1
+    }
+
     local MAKEFLAG_J=$(echo "{MAKEFLAGS}" | sed -En 's/.*-j([0-9]+).*/\1/p')
     export MAKEFLAGS=${MAKEFLAGS/-j${MAKEFLAG_J}/}
 

@@ -1,7 +1,7 @@
 {
   "name": "glew",
   "version": "2.3.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "glu"
   ],

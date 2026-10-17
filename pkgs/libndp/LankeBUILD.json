@@ -1,11 +1,11 @@
 {
   "name": "libndp",
   "version": "1.9",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4}"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libndp.so",

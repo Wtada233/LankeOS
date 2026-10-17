@@ -1,7 +1,7 @@
 {
   "name": "fast_float",
   "version": "8.3.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

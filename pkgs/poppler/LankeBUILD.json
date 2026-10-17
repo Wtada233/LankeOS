@@ -1,7 +1,7 @@
 {
   "name": "poppler",
   "version": "26.10.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "poppler-data"
   ],

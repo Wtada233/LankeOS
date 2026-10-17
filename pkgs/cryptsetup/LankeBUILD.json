@@ -1,7 +1,7 @@
 {
   "name": "cryptsetup",
   "version": "2.8.8",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libblkid.so.1@{BLKID_2.15,BLKID_2.17,BLKID_2.21}",

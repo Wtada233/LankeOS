@@ -1582,6 +1582,89 @@ TEST_F(CraftedElfTest, RelSectionWithHugeAddralignIsRejectedInsteadOfRunawayAllo
     EXPECT_FALSE(error_msg.empty()) << "拒绝必须带上原因（空串 = 调用方静默跳过）";
 }
 
+TEST_F(CraftedElfTest, TightEightByteAlignedTailIsStrippedNotRejectedAsMalformed)
+{
+    // **回归**：GNU ld/lld 产出的二进制尾部常按 **8** 字节对齐且紧贴文件末尾 ——
+    // `.shstrtab` 起点是 8 mod 16、`e_shoff + e_shnum*shentsize` 正好等于文件大小。
+    // 重排会把 `.shstrtab` 的起点和 `e_shoff` 各对齐到 16，产物因此**合法地**比输入大；
+    // 旧封顶拿输入大小当上界，于是把这类文件误判成 `error.strip_malformed_elf`
+    // （Firefox 整包的 strip 全被这样拒掉）。
+    //
+    // 布局：.text(ALLOC) 64..88（结束于 8 mod 16），.shstrtab 88..105，
+    //       e_shoff = align8(105) = 112，输入 = 112 + 3*64 = 304。
+    // 重排后：.shstrtab → 96..113，e_shoff = align16(113) = 128，产物 = 320。
+    constexpr size_t kShentSize = sizeof(Elf64_Shdr);
+    const std::string shstr("\0.text\0.shstrtab\0", 17);
+    constexpr size_t kTextOff = sizeof(Elf64_Ehdr);  // 64
+    constexpr size_t kTextSize = 24;                 // 结束于 88（8 mod 16）
+    constexpr size_t kShstrOff = kTextOff + kTextSize;
+    constexpr size_t kShOff = 112;  // align8(88 + 17)
+    constexpr size_t kFileSize = kShOff + 3 * kShentSize;
+
+    std::vector<uint8_t> buf(kFileSize, 0);
+    Elf64_Ehdr ehdr{};
+    std::memcpy(ehdr.e_ident, ELFMAG, SELFMAG);
+    ehdr.e_ident[EI_CLASS] = ELFCLASS64;
+    ehdr.e_ident[EI_DATA] = ELFDATA2LSB;
+    ehdr.e_ident[EI_VERSION] = EV_CURRENT;
+    ehdr.e_type = ET_EXEC;
+    ehdr.e_machine = EM_X86_64;
+    ehdr.e_version = EV_CURRENT;
+    ehdr.e_ehsize = sizeof(Elf64_Ehdr);
+    ehdr.e_shoff = kShOff;
+    ehdr.e_shentsize = sizeof(Elf64_Shdr);
+    ehdr.e_shnum = 3;
+    ehdr.e_shstrndx = 2;
+    std::memcpy(buf.data(), &ehdr, sizeof(ehdr));
+    std::memcpy(buf.data() + kShstrOff, shstr.data(), shstr.size());
+
+    Elf64_Shdr sh[3]{};
+    sh[1].sh_name = 1;  // ".text"
+    sh[1].sh_type = SHT_PROGBITS;
+    sh[1].sh_flags = SHF_ALLOC;
+    sh[1].sh_offset = kTextOff;
+    sh[1].sh_size = kTextSize;
+    sh[1].sh_addralign = 1;
+    sh[2].sh_name = 7;  // ".shstrtab"
+    sh[2].sh_type = SHT_STRTAB;
+    sh[2].sh_offset = kShstrOff;
+    sh[2].sh_size = shstr.size();
+    sh[2].sh_addralign = 1;
+    std::memcpy(buf.data() + kShOff, sh, sizeof(sh));
+
+    {
+        std::ofstream f(test_file, std::ios::binary | std::ios::trunc);
+        f.write(reinterpret_cast<const char*>(buf.data()),
+                static_cast<std::streamsize>(buf.size()));
+    }
+
+    std::string error_msg;
+    EXPECT_TRUE(strip_file(test_file, error_msg))
+        << "尾部 8 字节对齐的合法 ELF 被当成畸形拒了: " << error_msg;
+
+    std::ifstream in(test_file, std::ios::binary);
+    ASSERT_TRUE(in.good()) << "strip 之后文件不该消失";
+    std::vector<uint8_t> out{std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>()};
+    EXPECT_GT(out.size(), kFileSize) << "重排引入的对齐填充本来就会让产物略大于输入";
+
+    Elf* elf = elf_memory(reinterpret_cast<char*>(out.data()), out.size());
+    ASSERT_NE(elf, nullptr);
+    GElf_Ehdr got{};
+    ASSERT_NE(gelf_getehdr(elf, &got), nullptr) << "strip 的产物必须仍能被 libelf 解析";
+    EXPECT_EQ(got.e_shoff, 128u);
+    EXPECT_EQ(got.e_shnum, 3);
+
+    // 重排后节区名仍须可解析（.shstrtab 被搬了位置，sh_name 必须跟着新表走）
+    size_t shstrndx;
+    ASSERT_GE(elf_getshdrstrndx(elf, &shstrndx), 0);
+    Elf_Scn* scn = elf_getscn(elf, 2);
+    ASSERT_NE(scn, nullptr);
+    GElf_Shdr shdr{};
+    ASSERT_NE(gelf_getshdr(scn, &shdr), nullptr);
+    EXPECT_STREQ(elf_strptr(elf, shstrndx, shdr.sh_name), ".shstrtab");
+    elf_end(elf);
+}
+
 TEST_F(CraftedElfTest, RealSharedLibraryStillStripsAndKeepsSoname)
 {
     // 正向对照：正常产物必须仍然能被 strip 且 SONAME 可读（防止校验过严把好文件拒了）

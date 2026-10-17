@@ -1,7 +1,7 @@
 {
   "name": "libgweather-4",
   "version": "4.6.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "gweather-locations"
   ],

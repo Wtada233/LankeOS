@@ -1,7 +1,7 @@
 {
   "name": "gnome-shell-extensions",
   "version": "51.0",
-  "release": 1,
+  "release": 2,
   "deps": [
     "gnome-shell"
   ],

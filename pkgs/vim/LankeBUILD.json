@@ -1,7 +1,7 @@
 {
   "name": "vim",
   "version": "9.2.1172",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash",
     "gawk",

@@ -1,7 +1,7 @@
 {
   "name": "python-pygments",
   "version": "2.21.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

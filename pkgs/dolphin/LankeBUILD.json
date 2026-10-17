@@ -1,7 +1,7 @@
 {
   "name": "dolphin",
   "version": "26.08.2",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libKF6Bookmarks.so.6",

@@ -1,7 +1,7 @@
 {
   "name": "python-wheel",
   "version": "0.48.0",
-  "release": 5,
+  "release": 6,
   "deps": [
     "python",
     "python-packaging"

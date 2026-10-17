@@ -1,10 +1,11 @@
 {
   "name": "libnl",
   "version": "3.12.0",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.6}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.6,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}"
   ],
   "provides_soname": [
     "libnl-3.so.200@{libnl_3,libnl_3_10,libnl_3_11,libnl_3_12,libnl_3_2_26,libnl_3_2_27,libnl_3_2_28,libnl_3_2_29,libnl_3_5,libnl_3_6}",

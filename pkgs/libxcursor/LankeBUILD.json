@@ -1,7 +1,7 @@
 {
   "name": "libxcursor",
   "version": "1.2.3",
-  "release": 2,
+  "release": 3,
   "deps": [
     "xorgproto"
   ],
@@ -9,7 +9,7 @@
     "libX11.so.6",
     "libXfixes.so.3",
     "libXrender.so.1",
-    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.38}"
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.38,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libXcursor.so",

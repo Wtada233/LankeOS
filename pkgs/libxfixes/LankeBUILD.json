@@ -1,13 +1,13 @@
 {
   "name": "libxfixes",
   "version": "6.0.2",
-  "release": 2,
+  "release": 3,
   "deps": [
     "xorgproto"
   ],
   "needed_so": [
     "libX11.so.6",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libXfixes.so",

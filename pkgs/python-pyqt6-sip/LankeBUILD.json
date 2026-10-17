@@ -1,7 +1,7 @@
 {
   "name": "python-pyqt6-sip",
   "version": "13.13.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

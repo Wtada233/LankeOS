@@ -1,7 +1,7 @@
 {
   "name": "at-spi2-core",
   "version": "2.62.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash",
     "xwayland"

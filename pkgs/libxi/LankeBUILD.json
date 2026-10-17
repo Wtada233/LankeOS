@@ -1,7 +1,7 @@
 {
   "name": "libxi",
   "version": "1.8.3",
-  "release": 3,
+  "release": 4,
   "deps": [
     "libxfixes",
     "xorgproto"
@@ -9,7 +9,7 @@
   "needed_so": [
     "libX11.so.6",
     "libXext.so.6",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libXi.so",

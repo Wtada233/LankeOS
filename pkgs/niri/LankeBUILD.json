@@ -1,7 +1,7 @@
 {
   "name": "niri",
   "version": "26.04",
-  "release": 5,
+  "release": 6,
   "deps": [
     "bash"
   ],

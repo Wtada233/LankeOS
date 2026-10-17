@@ -1,7 +1,7 @@
 {
   "name": "libfyaml",
   "version": "0.9.6",
-  "release": 5,
+  "release": 6,
   "deps": [],
   "needed_so": [
     "libLLVM.so.23.1",

@@ -1,7 +1,7 @@
 {
   "name": "gweather-locations",
   "version": "2026.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

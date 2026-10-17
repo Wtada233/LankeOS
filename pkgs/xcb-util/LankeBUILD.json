@@ -1,10 +1,10 @@
 {
   "name": "xcb-util",
   "version": "0.4.1",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@GLIBC_2.2.5",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libxcb.so.1"
   ],
   "provides_soname": [

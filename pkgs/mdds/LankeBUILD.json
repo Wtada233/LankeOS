@@ -1,7 +1,7 @@
 {
   "name": "mdds",
   "version": "3.2.1",
-  "release": 1,
+  "release": 3,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

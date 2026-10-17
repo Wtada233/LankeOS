@@ -1,6 +1,7 @@
 {
   "name": "docker",
   "version": "29.9.0",
+  "release": 1,
   "deps": [
     "containerd",
     "iproute2",

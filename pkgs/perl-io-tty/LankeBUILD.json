@@ -1,7 +1,7 @@
 {
   "name": "perl-io-tty",
   "version": "1.31",
-  "release": 1,
+  "release": 2,
   "deps": [
     "perl"
   ],

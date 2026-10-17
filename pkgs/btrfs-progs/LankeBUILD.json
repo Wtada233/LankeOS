@@ -1,14 +1,14 @@
 {
   "name": "btrfs-progs",
   "version": "7.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libblkid.so.1@{BLKID_1.0,BLKID_2.15,BLKID_2.17}",
-    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.26,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.5,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8}",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.26,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.5,GLIBC_2.6,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libcom_err.so.2",
     "libext2fs.so.2",
     "libudev.so.1@LIBUDEV_183",

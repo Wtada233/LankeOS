@@ -1,7 +1,7 @@
 {
   "name": "gvfs",
   "version": "1.62.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "openssh"
   ],

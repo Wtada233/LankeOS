@@ -1,7 +1,7 @@
 {
   "name": "p11-kit",
   "version": "0.26.5",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],

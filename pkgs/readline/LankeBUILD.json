@@ -1,10 +1,10 @@
 {
   "name": "readline",
   "version": "8.3",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.38}",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.15,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libncursesw.so.6"
   ],
   "provides_soname": [

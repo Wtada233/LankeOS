@@ -1,10 +1,10 @@
 {
   "name": "libogg",
   "version": "1.3.6",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libogg.so",

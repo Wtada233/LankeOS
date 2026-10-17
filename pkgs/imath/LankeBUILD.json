@@ -1,7 +1,7 @@
 {
   "name": "imath",
   "version": "3.2.3",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libm.so.6@GLIBC_2.2.5",

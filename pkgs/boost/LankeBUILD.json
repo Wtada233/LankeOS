@@ -1,7 +1,7 @@
 {
   "name": "boost",
   "version": "1.92.0",
-  "release": 4,
+  "release": 5,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",

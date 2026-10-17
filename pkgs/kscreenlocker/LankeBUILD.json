@@ -1,7 +1,7 @@
 {
   "name": "kscreenlocker",
   "version": "6.7.5",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libKF6ConfigCore.so.6",
@@ -24,7 +24,7 @@
     "libLayerShellQtInterface.so.6",
     "libPlasma.so.7",
     "libPlasmaQuick.so.7",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Network.so.6@Qt_6",

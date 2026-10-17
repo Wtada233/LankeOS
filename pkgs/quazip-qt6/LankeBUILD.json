@@ -1,10 +1,10 @@
 {
   "name": "quazip-qt6",
   "version": "1.7.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Core5Compat.so.6@Qt_6",
     "libbz2.so.1.0",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",

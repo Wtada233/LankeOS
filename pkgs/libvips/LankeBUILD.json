@@ -1,7 +1,7 @@
 {
   "name": "libvips",
   "version": "8.18.7",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libOpenEXR-3_5.so.34",

@@ -1,0 +1,4 @@
+# cargo-fuzz 的活体语料与崩溃样本（会长到几百 MB，不入库）；种子在 seeds/ 里，入库。
+corpus/
+artifacts/
+target/

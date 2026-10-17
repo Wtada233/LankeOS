@@ -1,7 +1,7 @@
 {
   "name": "qt6-multimedia",
   "version": "6.12.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "gst-plugins-good",
     "qt6-base"

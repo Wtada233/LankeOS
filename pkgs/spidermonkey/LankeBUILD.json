@@ -1,7 +1,7 @@
 {
   "name": "spidermonkey",
   "version": "140.17.0",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -18,12 +18,14 @@
   "build_deps": [
     "base-devel",
     "cbindgen",
+    "clang",
     "compiler-rt",
     "lld",
     "llvm",
     "python-pip",
     "readline",
     "rust",
+    "uv",
     "zlib"
   ],
   "sources": [

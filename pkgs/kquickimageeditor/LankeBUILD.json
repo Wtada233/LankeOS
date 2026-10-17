@@ -1,7 +1,7 @@
 {
   "name": "kquickimageeditor",
   "version": "0.7.0.1",
-  "release": 5,
+  "release": 6,
   "deps": [
     "kf-kirigami"
   ],

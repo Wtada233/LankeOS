@@ -1,7 +1,7 @@
 {
   "name": "python-argcomplete",
   "version": "3.7.2",
-  "release": 5,
+  "release": 6,
   "deps": [
     "python"
   ],

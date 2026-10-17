@@ -1,14 +1,13 @@
 {
   "name": "pciutils",
   "version": "3.15.0",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libkmod.so.2@LIBKMOD_5",
-    "libresolv.so.2",
     "libudev.so.1@{LIBUDEV_183,LIBUDEV_196}",
     "libz.so.1"
   ],

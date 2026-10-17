@@ -1,7 +1,7 @@
 {
   "name": "base-devel",
   "version": "1",
-  "release": 2,
+  "release": 3,
   "deps": [
     "autoconf",
     "automake",

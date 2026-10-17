@@ -1,7 +1,7 @@
 {
   "name": "gzip",
   "version": "1.15",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],

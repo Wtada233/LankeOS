@@ -1,7 +1,7 @@
 {
   "name": "spirv-headers",
   "version": "1.4.363.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

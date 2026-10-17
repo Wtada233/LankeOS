@@ -1,0 +1,29 @@
+#
+# dbus-broker — D-Bus 消息总线实现，替代 dbus-daemon。
+# 配置、dbus.socket、sysusers/tmpfiles 仍由 dbus 包提供；本包只装总线本体。
+# 发布 tarball 已内嵌全部 c-util 子项目，默认 wrap 模式直接使用，无需联网克隆。
+
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    mkdir build && cd build
+    meson setup .. \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --buildtype=release \
+        --wrap-mode=default \
+        -Ddocs=true \
+        -Dsystem-console-users=sddm,gdm,lightdm,lxdm
+    ninja -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja install
+}
+
+lankebuild_package() {
+    # dbus 包的 dbus.socket 未写 Service=，socket 激活默认找 dbus.service。
+    # 用软链把该名字交给 dbus-broker.service（上游单元另有 Alias=，这里保证
+    # multi-user.target.wants/dbus.service 这类既有链接能解析）。
+    ln -sfv dbus-broker.service {STAGING_ROOT}/usr/lib/systemd/system/dbus.service
+    ln -sfv dbus-broker.service {STAGING_ROOT}/usr/lib/systemd/user/dbus.service
+}

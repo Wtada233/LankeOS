@@ -1,7 +1,7 @@
 {
   "name": "python-trove-classifiers",
   "version": "2026.9.21.13",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

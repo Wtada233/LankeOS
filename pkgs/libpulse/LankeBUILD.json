@@ -1,13 +1,13 @@
 {
   "name": "libpulse",
   "version": "17.0",
-  "release": 1,
+  "release": 2,
   "deps": [
     "bash",
     "xwayland"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.9}",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
     "libdbus-1.so.3@LIBDBUS_1_3",
     "libglib-2.0.so.0",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29}",

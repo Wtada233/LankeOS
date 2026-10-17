@@ -1,7 +1,7 @@
 {
   "name": "poppler-data",
   "version": "0.4.12",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

@@ -1,7 +1,7 @@
 {
   "name": "coin-or-coinutils",
   "version": "2.11.13",
-  "release": 1,
+  "release": 2,
   "deps": [
     "coin-or-data-sample"
   ],

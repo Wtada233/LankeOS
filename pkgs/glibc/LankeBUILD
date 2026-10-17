@@ -12,7 +12,11 @@ lankebuild_build() {
     done
     mkdir build && cd build
     echo 'rootsbindir={BINDIR}' > configparms
-    CC=gcc CXX=g++ ../configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-werror --enable-kernel=5.10 --enable-stack-protector=strong --disable-nscd libc_cv_slibdir={LIBDIR} --disable-static
+    # CFLAGS 里的 -Wp,-D_FORTIFY_SOURCE=3 与 glibc 自身注入的加固源宏冲突，构建会失败。
+    # 剥掉它，加固改由 glibc 自己的 --enable-fortify-source 提供（与 Arch 同因同解）。
+    CFLAGS=${CFLAGS/-Wp,-D_FORTIFY_SOURCE=3/}
+    # CFLAGS 带 -fcf-protection，glibc 侧必须同步开 CET（--enable-cet），否则构建报错
+    CC=gcc CXX=g++ ../configure --prefix={PREFIX} --sysconfdir={SYSCONFDIR} --disable-werror --enable-fortify-source --enable-cet --enable-sframe --enable-kernel=5.10 --enable-stack-protector=strong --disable-nscd libc_cv_slibdir={LIBDIR} --disable-static
     CC=gcc CXX=g++ make -j$(nproc)
 
     make DESTDIR={STAGING_ROOT} install
@@ -20,11 +24,9 @@ lankebuild_build() {
     # 修正 ldd 中的硬编码路径
     sed '/RTLDLIST=/s@/usr@@g' -i {STAGING_ROOT}{BINDIR}/ldd
 
-    # Locales
-    mkdir -p "{STAGING_ROOT}/{LIBDIR}/locale"
-    localedef --prefix="{STAGING_ROOT}" -i C -f UTF-8 C.UTF-8
-    localedef --prefix="{STAGING_ROOT}" -i en_US -f UTF-8 en_US.UTF-8
-    localedef --prefix="{STAGING_ROOT}" -i zh_CN -f UTF-8 zh_CN.UTF-8
+    # Locales：全量，走 glibc 自己的 install-locales（LFS 同款），
+    # 按 localedata/SUPPORTED 生成全部 locale 进 {LIBDIR}/locale/locale-archive
+    make -C ../localedata objdir="$PWD" DESTDIR={STAGING_ROOT} install-locales
     # 添加 ld.so 兼容性链接 (Usr-Merge 规范)
     ln -sfv ../lib/ld-linux-x86-64.so.2 {STAGING_ROOT}{BINDIR}/ld.so
 

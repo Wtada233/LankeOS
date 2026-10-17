@@ -1,7 +1,7 @@
 {
   "name": "coin-or-clp",
   "version": "1.17.11",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libCoinUtils.so.3",

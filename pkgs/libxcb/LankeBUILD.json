@@ -1,14 +1,14 @@
 {
   "name": "libxcb",
   "version": "1.17.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "xcb-proto"
   ],
   "needed_so": [
     "libXau.so.6",
     "libXdmcp.so.6",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.2,GLIBC_2.33,GLIBC_2.38}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.38,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libxcb-composite.so",

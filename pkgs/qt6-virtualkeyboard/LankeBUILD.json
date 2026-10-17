@@ -1,7 +1,7 @@
 {
   "name": "qt6-virtualkeyboard",
   "version": "6.12.0",
-  "release": 3,
+  "release": 4,
   "deps": [
     "qt6-multimedia"
   ],

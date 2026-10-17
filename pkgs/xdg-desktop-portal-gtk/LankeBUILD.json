@@ -1,12 +1,14 @@
 {
   "name": "xdg-desktop-portal-gtk",
   "version": "1.15.3",
+  "release": 1,
   "deps": [
     "gsettings-desktop-schemas"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.34,GLIBC_2.38}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38}",
     "libfontconfig.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libgdk-3.so.0",
     "libgdk_pixbuf-2.0.so.0",
     "libgio-2.0.so.0",

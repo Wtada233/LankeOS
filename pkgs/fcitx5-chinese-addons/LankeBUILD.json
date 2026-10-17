@@ -1,7 +1,7 @@
 {
   "name": "fcitx5-chinese-addons",
   "version": "5.1.15",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",

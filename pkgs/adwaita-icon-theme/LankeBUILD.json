@@ -1,7 +1,7 @@
 {
   "name": "adwaita-icon-theme",
   "version": "51.0",
-  "release": 1,
+  "release": 2,
   "deps": [
     "hicolor-icon-theme"
   ],

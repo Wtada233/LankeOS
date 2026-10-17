@@ -1,7 +1,7 @@
 {
   "name": "libinput",
   "version": "1.32.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

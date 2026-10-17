@@ -1,7 +1,7 @@
 {
   "name": "fish",
   "version": "4.9.3",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.28,GLIBC_2.29,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.39,GLIBC_2.4,GLIBC_2.6,GLIBC_2.7,GLIBC_2.9}",
@@ -22,7 +22,7 @@
     "rust"
   ],
   "sources": [
-    "https://github.com/fish-shell/fish-shell/releases/download/4.9.3/fish-4.9.3.tar.xz"
+    "https://github.com/fish-shell/fish-shell/archive/refs/tags/4.9.3.tar.gz"
   ],
   "work_sources": []
 }

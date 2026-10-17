@@ -1,11 +1,12 @@
 {
   "name": "mbedtls",
   "version": "3.6.7",
+  "release": 1,
   "deps": [
     "bash"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.33,GLIBC_2.34,GLIBC_2.7}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libmbedcrypto.so.16",

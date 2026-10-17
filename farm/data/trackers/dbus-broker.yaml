@@ -1,0 +1,8 @@
+pkg-name: dbus-broker
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: bus1/dbus-broker
+    mode: releases
+    tag-prefix: v
+    template: https://github.com/bus1/dbus-broker/releases/download/{tag}/dbus-broker-{version}.tar.xz

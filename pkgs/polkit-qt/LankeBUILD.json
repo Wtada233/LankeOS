@@ -1,10 +1,10 @@
 {
   "name": "polkit-qt",
   "version": "0.201.1",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libQt6Gui.so.6@Qt_6",
     "libQt6Widgets.so.6@Qt_6",

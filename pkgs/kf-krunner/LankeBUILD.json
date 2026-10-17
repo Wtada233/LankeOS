@@ -1,7 +1,7 @@
 {
   "name": "kf-krunner",
   "version": "6.31.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libKF6ConfigCore.so.6",

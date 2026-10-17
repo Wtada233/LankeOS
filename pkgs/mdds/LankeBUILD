@@ -3,7 +3,10 @@ lankebuild_prepare() {
 }
 
 lankebuild_build() {
-    # release tarball 自带 configure
+    # 源是 gitlab 归档（/-/archive/），只有 configure.ac、没有 configure。
+    # autogen.sh 末尾会自己跑一次不带参数的 configure，用 NOCONFIGURE 拦住它，
+    # 真正的 configure 由下一行带 prefix 跑。
+    NOCONFIGURE=1 ./autogen.sh
     ./configure --prefix={PREFIX}
     make -j$(nproc)
     make DESTDIR={STAGING_ROOT} install

@@ -1,7 +1,7 @@
 {
   "name": "libepoxy",
   "version": "1.5.10",
-  "release": 3,
+  "release": 4,
   "deps": [
     "libglvnd",
     "libx11"
@@ -17,6 +17,7 @@
     "base-devel",
     "doxygen",
     "git",
+    "libglvnd",
     "mesa",
     "meson",
     "ninja"

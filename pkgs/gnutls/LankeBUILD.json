@@ -1,14 +1,15 @@
 {
   "name": "gnutls",
   "version": "3.8.13",
-  "release": 4,
+  "release": 5,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.43}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.43,GLIBC_2.7,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
     "libgcc_s.so.1@GCC_3.0",
     "libgmp.so.10",
     "libhogweed.so.7@HOGWEED_7",
+    "libidn2.so.0@IDN2_0.0.0",
     "libm.so.6@GLIBC_2.2.5",
     "libnettle.so.9@NETTLE_9",
     "libp11-kit.so.0@LIBP11_KIT_1.0",
@@ -24,6 +25,7 @@
   "build_deps": [
     "base-devel",
     "gmp",
+    "libidn2",
     "libtasn1",
     "nettle",
     "p11-kit"

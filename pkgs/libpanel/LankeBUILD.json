@@ -1,7 +1,7 @@
 {
   "name": "libpanel",
   "version": "1.10.4",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libadwaita-1.so.0@LIBADWAITA_1_0",

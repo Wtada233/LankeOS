@@ -1,6 +1,7 @@
 {
   "name": "simde",
   "version": "0.8.2",
+  "release": 1,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

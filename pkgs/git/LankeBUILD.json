@@ -1,7 +1,7 @@
 {
   "name": "git",
   "version": "2.56.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash",
     "perl",

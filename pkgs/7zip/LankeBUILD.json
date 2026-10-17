@@ -1,7 +1,7 @@
 {
   "name": "7zip",
   "version": "26.04",
-  "release": 1,
+  "release": 2,
   "deps": [
     "bash"
   ],

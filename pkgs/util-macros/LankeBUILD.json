@@ -1,7 +1,7 @@
 {
   "name": "util-macros",
   "version": "1.20.2",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

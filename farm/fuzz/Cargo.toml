@@ -1,0 +1,38 @@
+[package]
+name = "lankefarm-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# cargo-fuzz 约定：这个 crate 不属于 farm 的 workspace。
+[package.metadata]
+cargo-fuzz = true
+
+# 需要 nightly（libFuzzer + ASAN），stable 上只跑 `cargo test` 里那条变异网。
+# 用法：
+#   cargo install cargo-fuzz
+#   cargo +nightly fuzz run extract_lpkg          # 解包路径
+#   cargo +nightly fuzz run read_member           # 流式取成员那条路
+#   cargo +nightly fuzz run --sanitizer=address … # 默认即 ASAN
+[dependencies]
+libfuzzer-sys = "0.4"
+zstd = "0.13"
+
+[dependencies.lankefarm]
+path = ".."
+
+[[bin]]
+name = "extract_lpkg"
+path = "fuzz_targets/extract_lpkg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "read_member"
+path = "fuzz_targets/read_member.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

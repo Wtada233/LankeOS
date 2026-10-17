@@ -1,7 +1,7 @@
 {
   "name": "samba",
   "version": "4.25.0",
-  "release": 9,
+  "release": 10,
   "deps": [
     "python-dnspython",
     "python-markdown"

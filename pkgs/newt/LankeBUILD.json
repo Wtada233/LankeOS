@@ -1,7 +1,7 @@
 {
   "name": "newt",
   "version": "0.52.25",
-  "release": 3,
+  "release": 4,
   "deps": [
     "python"
   ],

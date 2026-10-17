@@ -1,7 +1,7 @@
 {
   "name": "glm",
   "version": "1.0.3",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.43}"

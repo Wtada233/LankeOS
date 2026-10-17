@@ -1,7 +1,7 @@
 {
   "name": "libkscreen",
   "version": "6.7.5",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",

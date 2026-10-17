@@ -1,7 +1,7 @@
 {
   "name": "parted",
   "version": "3.8",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libblkid.so.1@{BLKID_2.15,BLKID_2.17}",

@@ -1,7 +1,7 @@
 {
   "name": "gst-plugins-good",
   "version": "1.29.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libFLAC.so.14",

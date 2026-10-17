@@ -1,6 +1,7 @@
 {
   "name": "gsettings-desktop-schemas",
   "version": "51.0",
+  "release": 1,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

@@ -1,7 +1,7 @@
 {
   "name": "python-markupsafe",
   "version": "3.0.4",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

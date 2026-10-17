@@ -1,7 +1,7 @@
 {
   "name": "mesa",
   "version": "26.2.4",
-  "release": 9,
+  "release": 10,
   "deps": [
     "libclc",
     "python"

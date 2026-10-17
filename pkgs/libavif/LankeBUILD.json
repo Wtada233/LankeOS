@@ -1,7 +1,7 @@
 {
   "name": "libavif",
   "version": "1.4.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libaom.so.3",

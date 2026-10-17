@@ -1,7 +1,7 @@
 {
   "name": "yasm",
   "version": "1.3.0.1785537982.09d1bc9",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.7,GLIBC_ABI_DT_RELR}"

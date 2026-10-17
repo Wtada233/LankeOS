@@ -1,7 +1,7 @@
 {
   "name": "opentimelineio",
   "version": "0.18.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "python",
     "python-aaf2"

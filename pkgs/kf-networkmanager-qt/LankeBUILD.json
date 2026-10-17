@@ -1,7 +1,7 @@
 {
   "name": "kf-networkmanager-qt",
   "version": "6.31.0",
-  "release": 1,
+  "release": 2,
   "deps": [
     "networkmanager"
   ],

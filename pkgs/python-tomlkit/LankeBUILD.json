@@ -1,7 +1,7 @@
 {
   "name": "python-tomlkit",
   "version": "0.15.1",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

@@ -1,7 +1,7 @@
 {
   "name": "exiv2",
   "version": "0.28.9",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libINIReader.so.0",

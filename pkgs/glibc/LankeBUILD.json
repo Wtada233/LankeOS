@@ -1,7 +1,7 @@
 {
   "name": "glibc",
   "version": "2.44",
-  "release": 3,
+  "release": 6,
   "deps": [
     "bash"
   ],

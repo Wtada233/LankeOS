@@ -1,7 +1,7 @@
 {
   "name": "signon-kwallet-extension",
   "version": "26.08.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libKF6Wallet.so.6",

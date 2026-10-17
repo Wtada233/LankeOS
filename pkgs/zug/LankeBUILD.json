@@ -1,7 +1,7 @@
 {
   "name": "zug",
   "version": "0.1.2",
-  "release": 1,
+  "release": 2,
   "deps": [
     "boost"
   ],

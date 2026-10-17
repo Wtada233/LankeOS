@@ -1,6 +1,7 @@
 {
   "name": "b3sum",
   "version": "1.8.7",
+  "release": 1,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",

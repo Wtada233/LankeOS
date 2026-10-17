@@ -1,10 +1,10 @@
 {
   "name": "signon-plugin-oauth2",
   "version": "0.25",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Network.so.6@Qt_6",
     "libQt6Test.so.6@Qt_6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.34}",

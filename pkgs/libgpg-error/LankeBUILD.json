@@ -1,12 +1,12 @@
 {
   "name": "libgpg-error",
   "version": "1.61",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38}"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_2.42,GLIBC_2.7,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libgpg-error.so.0@GPG_ERROR_1.0",

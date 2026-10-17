@@ -1,7 +1,7 @@
 {
   "name": "python-jinja",
   "version": "3.1.6",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python",
     "python-markupsafe"

@@ -1,7 +1,7 @@
 {
   "name": "gnome-keyring",
   "version": "51.1",
-  "release": 1,
+  "release": 2,
   "deps": [
     "gcr",
     "gcr-4",

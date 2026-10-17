@@ -1,7 +1,7 @@
 {
   "name": "chromium",
   "version": "155.0.8059.39",
-  "release": 5,
+  "release": 6,
   "deps": [
     "desktop-file-utils",
     "gtk3",

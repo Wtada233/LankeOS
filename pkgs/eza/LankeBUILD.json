@@ -1,16 +1,18 @@
 {
   "name": "eza",
   "version": "0.23.5",
+  "release": 1,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.28,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34}",
     "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
-    "libm.so.6@GLIBC_2.27",
-    "libz.so.1"
+    "libgit2.so.1.9",
+    "libm.so.6@GLIBC_2.27"
   ],
   "provides_soname": [],
   "build_deps": [
     "base-devel",
+    "libgit2",
     "rust",
     "zlib"
   ],

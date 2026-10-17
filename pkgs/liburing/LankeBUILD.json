@@ -1,7 +1,7 @@
 {
   "name": "liburing",
   "version": "2.15",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [],
   "provides_soname": [

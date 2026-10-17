@@ -1,7 +1,7 @@
 {
   "name": "python-distlib",
   "version": "0.4.3",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python"
   ],

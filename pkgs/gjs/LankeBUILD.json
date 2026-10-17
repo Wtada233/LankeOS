@@ -1,7 +1,7 @@
 {
   "name": "gjs",
   "version": "1.90.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libX11.so.6",

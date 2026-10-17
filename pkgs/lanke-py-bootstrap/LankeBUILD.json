@@ -1,7 +1,7 @@
 {
   "name": "lanke-py-bootstrap",
   "version": "3.15",
-  "release": 1,
+  "release": 2,
   "deps": [
     "python"
   ],

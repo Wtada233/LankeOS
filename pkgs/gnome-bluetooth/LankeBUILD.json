@@ -1,7 +1,7 @@
 {
   "name": "gnome-bluetooth",
   "version": "47.2",
-  "release": 1,
+  "release": 2,
   "deps": [
     "bluez"
   ],

@@ -1,7 +1,7 @@
 {
   "name": "kaccounts-integration",
   "version": "26.08.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libKF6ConfigCore.so.6",

@@ -1,7 +1,7 @@
 {
   "name": "gpgme",
   "version": "2.2.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "glib"
   ],

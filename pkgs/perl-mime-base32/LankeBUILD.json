@@ -1,7 +1,7 @@
 {
   "name": "perl-mime-base32",
   "version": "1.303",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

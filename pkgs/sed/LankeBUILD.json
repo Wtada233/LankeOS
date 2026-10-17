@@ -1,7 +1,7 @@
 {
   "name": "sed",
   "version": "4.10",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libacl.so.1@ACL_1.0",

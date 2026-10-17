@@ -1,7 +1,7 @@
 {
   "name": "pipewire",
   "version": "1.6.9",
-  "release": 4,
+  "release": 5,
   "deps": [
     "bash"
   ],

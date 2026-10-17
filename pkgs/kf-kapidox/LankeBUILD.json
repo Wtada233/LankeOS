@@ -1,7 +1,7 @@
 {
   "name": "kf-kapidox",
   "version": "6.31.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python",
     "python-jinja",

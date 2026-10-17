@@ -1,7 +1,7 @@
 {
   "name": "openssh",
   "version": "10.6p1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "glibc",
     "krb5",

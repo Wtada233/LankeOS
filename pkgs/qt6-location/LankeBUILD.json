@@ -1,7 +1,7 @@
 {
   "name": "qt6-location",
   "version": "6.12.0",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",

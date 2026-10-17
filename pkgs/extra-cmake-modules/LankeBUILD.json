@@ -1,7 +1,7 @@
 {
   "name": "extra-cmake-modules",
   "version": "6.31.0",
-  "release": 4,
+  "release": 5,
   "deps": [
     "bash",
     "cmake",

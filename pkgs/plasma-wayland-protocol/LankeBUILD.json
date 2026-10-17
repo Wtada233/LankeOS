@@ -1,7 +1,7 @@
 {
   "name": "plasma-wayland-protocol",
   "version": "1.23.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

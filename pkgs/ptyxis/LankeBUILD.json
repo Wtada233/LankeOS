@@ -1,7 +1,7 @@
 {
   "name": "ptyxis",
   "version": "50.1",
-  "release": 1,
+  "release": 2,
   "deps": [
     "dconf",
     "gsettings-desktop-schemas"

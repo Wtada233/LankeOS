@@ -1,7 +1,7 @@
 {
   "name": "hwdata",
   "version": "0.412",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

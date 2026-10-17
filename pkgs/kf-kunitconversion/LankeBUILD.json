@@ -1,7 +1,7 @@
 {
   "name": "kf-kunitconversion",
   "version": "6.31.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libKF6I18n.so.6",

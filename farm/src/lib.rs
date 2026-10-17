@@ -11,6 +11,7 @@ pub mod error;
 pub mod export;
 pub mod graph;
 pub mod i18n;
+pub mod libarchive_ffi;
 pub mod llm;
 pub mod lpkg_binding;
 pub mod net;

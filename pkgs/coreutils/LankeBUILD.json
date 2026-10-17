@@ -1,7 +1,7 @@
 {
   "name": "coreutils",
   "version": "9.12",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libacl.so.1@ACL_1.0",

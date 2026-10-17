@@ -1,6 +1,7 @@
 {
   "name": "libpcap",
   "version": "1.11.0",
+  "release": 1,
   "deps": [
     "bash"
   ],

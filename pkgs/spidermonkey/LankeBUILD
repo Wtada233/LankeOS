@@ -5,17 +5,16 @@
 # 命名：Arch 叫 js140，LankeOS 叫 spidermonkey。产物 libmozjs-140.so + /usr/bin/js + mozjs-140.pc
 # 版本锁定 140 ESR 线（gjs 需要），tracker 用 max-version 封顶——勿放行到 144。
 
-# 单 source、无 work_sources → detect_source_tree 返回解压出的 firefox-140.15.0esr/
+# 单 source、无 work_sources → detect_source_tree 返回解压出的 firefox-<ver>esr/
 # 为源码根，各 phase 的 cwd 已自动在其内，无需 cd。
 # 补丁在包目录 = work 的父级（chromium 同款）
 _BD=$(dirname {WORK_DIR})
 
 lankebuild_prepare() {
 
-    # Arch 同款 6 个补丁：
+    # Arch 同款补丁：
     #  0001 mozjs-140.pc 补 DXP_UNIX（gjs 链接需要）
     #  0002-0005 Fix Python 3.14 AST/ast.Str 弃用
-    #  0006 Handle rust 1.98 新增 oe-linux target
     for _p in \
         0001-Bug-1973994-mozjs-140.pc-does-not-contain-DXP_UNIX-o.patch \
         0002-Bug-1969769-Change-uses-of-ast.Str-with-ast.Constant.patch \
@@ -33,6 +32,10 @@ lankebuild_build() {
     export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
     export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
 
+    # mach 装 sites/*.txt 里的 pypi 依赖时默认用源码树里 vendored 的 pip 24.0；它的
+    # WheelDistribution 没实现 importlib.metadata 的抽象方法 locate_file（上游 pip 25.0
+    # 才补上），而 CPython 那边的 Distribution 是 ABC，于是每次 pip install 都 TypeError。
+    # uv 在 build_deps 里 → mach/site.py 的 pip_command 见到它就改走 `uv pip`。
     export MACH_BUILD_PYTHON_NATIVE_PACKAGE_SOURCE=pip
     export MOZBUILD_STATE_PATH="$_abs/mozbuild"
     export MOZ_BUILD_DATE="$(date -u${SOURCE_DATE_EPOCH:+d @$SOURCE_DATE_EPOCH} +%Y%m%d%H%M%S)"

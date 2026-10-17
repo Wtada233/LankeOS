@@ -1,7 +1,7 @@
 {
   "name": "noctalia",
   "version": "5.2.1",
-  "release": 3,
+  "release": 4,
   "deps": [
     "bash",
     "python"

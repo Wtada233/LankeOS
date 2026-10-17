@@ -1,7 +1,7 @@
 {
   "name": "python-sip",
   "version": "6.17.0",
-  "release": 2,
+  "release": 3,
   "deps": [
     "python",
     "python-packaging",

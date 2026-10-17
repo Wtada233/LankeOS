@@ -1,7 +1,7 @@
 {
   "name": "volume_key",
   "version": "0.3.12",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libblkid.so.1@BLKID_1.0",

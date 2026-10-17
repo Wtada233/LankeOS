@@ -1,9 +1,10 @@
 {
   "name": "gegl",
   "version": "0.4.72",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
+    "libSDL2-2.0.so.0",
     "libbabl-0.1.so.0@V0_1_0",
     "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
     "libcairo.so.2",
@@ -49,6 +50,7 @@
     "ninja",
     "pango",
     "poppler",
+    "sdl2",
     "vala"
   ],
   "sources": [

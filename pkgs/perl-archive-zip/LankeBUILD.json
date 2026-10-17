@@ -1,7 +1,7 @@
 {
   "name": "perl-archive-zip",
   "version": "1.68",
-  "release": 2,
+  "release": 3,
   "deps": [
     "perl"
   ],

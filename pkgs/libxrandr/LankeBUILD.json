@@ -1,7 +1,7 @@
 {
   "name": "libxrandr",
   "version": "1.5.5",
-  "release": 3,
+  "release": 4,
   "deps": [
     "xorgproto"
   ],

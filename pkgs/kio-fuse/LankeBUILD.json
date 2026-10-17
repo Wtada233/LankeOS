@@ -1,12 +1,12 @@
 {
   "name": "kio-fuse",
   "version": "5.1.1",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "libKF6CoreAddons.so.6",
     "libKF6KIOCore.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6DBus.so.6@Qt_6",
     "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34}",
     "libfuse3.so.4@{FUSE_3.0,FUSE_3.12,FUSE_3.17}",

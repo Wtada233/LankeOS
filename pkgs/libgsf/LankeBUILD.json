@@ -1,7 +1,7 @@
 {
   "name": "libgsf",
   "version": "1.14.60",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libbz2.so.1.0",

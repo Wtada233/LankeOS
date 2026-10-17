@@ -1,7 +1,7 @@
 {
   "name": "python-cairo",
   "version": "1.29.2",
-  "release": 4,
+  "release": 5,
   "deps": [
     "python"
   ],

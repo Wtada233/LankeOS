@@ -1,12 +1,11 @@
 {
   "name": "json-c",
   "version": "0.19.20260627",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.36,GLIBC_2.38}",
-    "libm.so.6"
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.36,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}"
   ],
   "provides_soname": [
     "libjson-c.so.5@{JSONC_0.14,JSONC_0.15,JSONC_0.16,JSONC_0.17,JSONC_0.18,JSONC_0.19,JSONC_PRIVATE}",

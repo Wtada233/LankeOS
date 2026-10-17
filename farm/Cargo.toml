@@ -12,11 +12,9 @@ thiserror = "2"
 regex = "1"
 ureq = { version = "2", features = ["tls"] }
 clap = { version = "4", features = ["derive"] }
-tar = "0.4"
-# 读条目的 xattr（repack 打包时写成 PAX 的 `SCHILY.xattr.*`；解包侧由 tar 的 xattr feature 还原）。
-# 本来就在依赖树里（tar 的传递依赖），显式声明才能直接用。
-xattr = "1"
-zstd = "0.13"
+# `.lpkg` 的读写走**系统 libarchive**（`src/libarchive_ffi.rs` 的手写绑定）—— 与格式写方 lpkg
+# 同一份 .so、同一版本。不用 binding crate：那些要么停更，要么自带一份静态 libarchive
+# （版本分叉 + 构建期把 cmake/bindgen/libclang 塞进自举路径），且表达不了非 UTF-8 成员名与 default ACL。
 goblin = "0.9"
 # git 协议列 tag（`mode: tags` 要**全量** tag，REST 端点是分页窗口）——
 # 链系统 libgit2（lpkg 的 `git+` 源用的是同一个库，本系统已装）。
@@ -25,6 +23,13 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 sha2 = "0.10"
 ctrlc = "3"
 libc = "0.2"
+
+[dev-dependencies]
+# 测试 fixture 用 tar/zstd 现打：与生产路径的 libarchive 是**不同实现**，于是顺带成为
+# "farm 能读懂别的实现写出的 .lpkg" 的对照网；xattr 用于断言 xattr 往返。
+tar = "0.4"
+zstd = "0.13"
+xattr = "1"
 
 [profile.dev]
 opt-level = 0

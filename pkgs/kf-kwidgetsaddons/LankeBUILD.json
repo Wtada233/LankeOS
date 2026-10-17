@@ -1,7 +1,7 @@
 {
   "name": "kf-kwidgetsaddons",
   "version": "6.31.0",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",

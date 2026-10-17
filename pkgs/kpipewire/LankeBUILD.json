@@ -1,13 +1,13 @@
 {
   "name": "kpipewire",
   "version": "6.7.5",
-  "release": 4,
+  "release": 5,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
     "libKF6CoreAddons.so.6",
     "libKF6I18n.so.6",
-    "libQt6Core.so.6@{Qt_6,Qt_6.11}",
+    "libQt6Core.so.6@{Qt_6,Qt_6.12}",
     "libQt6Gui.so.6@Qt_6",
     "libQt6OpenGL.so.6@Qt_6",
     "libQt6Qml.so.6@Qt_6",

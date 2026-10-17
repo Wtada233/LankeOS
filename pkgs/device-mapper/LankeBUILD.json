@@ -1,6 +1,7 @@
 {
   "name": "device-mapper",
   "version": "2.03.43",
+  "release": 1,
   "deps": [
     "bash"
   ],

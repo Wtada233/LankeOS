@@ -1,6 +1,7 @@
 {
   "name": "ffnvcodec-headers",
   "version": "13.1.15.0",
+  "release": 1,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

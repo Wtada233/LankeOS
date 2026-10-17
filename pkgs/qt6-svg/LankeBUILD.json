@@ -1,6 +1,7 @@
 {
   "name": "qt6-svg",
   "version": "6.12.0",
+  "release": 1,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12,Qt_6_PRIVATE_API}",

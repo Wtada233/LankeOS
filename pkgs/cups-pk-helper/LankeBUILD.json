@@ -1,7 +1,7 @@
 {
   "name": "cups-pk-helper",
   "version": "0.2.7",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.4}",

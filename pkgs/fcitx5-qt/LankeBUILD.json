@@ -1,7 +1,7 @@
 {
   "name": "fcitx5-qt",
   "version": "5.1.16",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libFcitx5Utils.so.2",

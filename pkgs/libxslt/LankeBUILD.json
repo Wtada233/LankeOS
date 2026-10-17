@@ -1,12 +1,12 @@
 {
   "name": "libxslt",
   "version": "1.1.45",
-  "release": 4,
+  "release": 5,
   "deps": [
     "bash"
   ],
   "needed_so": [
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.38}",
     "libxml2.so.16"
   ],

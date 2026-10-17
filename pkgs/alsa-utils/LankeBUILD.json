@@ -1,16 +1,17 @@
 {
   "name": "alsa-utils",
   "version": "1.2.16",
-  "release": 2,
+  "release": 3,
   "deps": [
     "bash"
   ],
   "needed_so": [
     "libasound.so.2@{ALSA_0.9,ALSA_0.9.0rc4,ALSA_0.9.0rc8,ALSA_1.2.10,ALSA_1.2.13,ALSA_1.2.15}",
     "libatopology.so.2@ALSA_0.9",
-    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9}",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
     "libfftw3f.so.3",
     "libformw.so.6",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.43}",
     "libmenuw.so.6",
     "libncursesw.so.6",

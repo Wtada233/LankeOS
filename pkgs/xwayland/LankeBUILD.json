@@ -1,7 +1,7 @@
 {
   "name": "xwayland",
   "version": "26.0.99.903",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libGL.so.1",

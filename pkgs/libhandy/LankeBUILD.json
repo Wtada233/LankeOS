@@ -1,7 +1,7 @@
 {
   "name": "libhandy",
   "version": "1.8.3",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libatk-1.0.so.0",

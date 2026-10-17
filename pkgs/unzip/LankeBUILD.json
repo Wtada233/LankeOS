@@ -1,7 +1,7 @@
 {
   "name": "unzip",
   "version": "6.0",
-  "release": 4,
+  "release": 5,
   "deps": [
     "bash"
   ],

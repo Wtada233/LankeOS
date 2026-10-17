@@ -1,6 +1,7 @@
 {
   "name": "autoconf-archive",
   "version": "2024.10.16",
+  "release": 1,
   "deps": [],
   "needed_so": [],
   "provides_soname": [],

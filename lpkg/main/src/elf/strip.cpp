@@ -635,9 +635,13 @@ static bool strip_elf_exec_dyn(Elf* in_elf, const GElf_Ehdr& ehdr, size_t shstrn
     // `e_shoff` 是 `align(max_alloc_end)` + 保留节区 `sh_size` 之和推出的，而 `sh_size` 来自
     // 输入、只被"加法不回绕"约束 —— 一个 `1<<40` 级的 `sh_size` 会让 `resize` 去分配几十 TiB，
     // 那是 `std::length_error`/`bad_alloc`（或 OOM），**不是**这里该给的"畸形 ELF → 放弃 strip"。
-    // strip 只会**删**节区，产物**不可能大于输入** ⇒ 用输入大小封顶（`>` 不是 `>=`：全保留时
-    // 两者可相等）。回绕守卫已保证这里加法不回绕，所以这个比较本身安全。
-    if (updated_ehdr.e_shoff + updated_ehdr.e_shnum * shentsize > input_data.size()) {
+    //
+    // 上界取"输入大小 + 两处对齐填充"：重排本身只删节区，但它把非 ALLOC 节区的起点和 `e_shoff`
+    // 各对齐一次，每次最多引入 `ELF_SECTION_ALIGN_MASK` 字节 —— 尾部按 8 字节对齐、紧贴
+    // 节区表的合法文件（GNU ld/lld 的常见产物）重排后会**略大于输入**。直接拿输入大小封顶
+    // 会把这种文件误判成畸形；留出这两处填充即可，放大形态仍远在界外。
+    if (updated_ehdr.e_shoff + updated_ehdr.e_shnum * shentsize >
+        input_data.size() + 2 * constants::ELF_SECTION_ALIGN_MASK) {
         error_msg = get_string("error.strip_malformed_elf");
         return false;
     }

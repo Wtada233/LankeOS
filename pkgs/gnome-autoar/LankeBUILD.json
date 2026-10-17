@@ -1,7 +1,7 @@
 {
   "name": "gnome-autoar",
   "version": "0.5.2",
-  "release": 1,
+  "release": 2,
   "deps": [],
   "needed_so": [
     "libarchive.so.13",

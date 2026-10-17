@@ -1,10 +1,10 @@
 {
   "name": "graphene",
   "version": "1.10.8",
-  "release": 2,
+  "release": 3,
   "deps": [],
   "needed_so": [
-    "libc.so.6@GLIBC_2.2.5",
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_ABI_DT_RELR}",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.43}"

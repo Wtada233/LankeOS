@@ -1,7 +1,7 @@
 {
   "name": "docbook-xsl",
   "version": "1.79.2",
-  "release": 1,
+  "release": 2,
   "deps": [
     "docbook-xml"
   ],
