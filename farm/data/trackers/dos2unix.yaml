@@ -1,0 +1,8 @@
+pkg-name: dos2unix
+version-source: sources[0]
+sources:
+  - tracker-template: sourceforge
+    project: dos2unix
+    path: dos2unix
+    pattern: dos2unix-([0-9.]+)\.tar\.gz
+    template: https://downloads.sourceforge.net/project/{project}/{path}/{version}/dos2unix-{version}.tar.gz

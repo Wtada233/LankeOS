@@ -1,0 +1,30 @@
+{
+  "name": "zenity",
+  "version": "4.2.2",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libadwaita-1.so.0@LIBADWAITA_1_0",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38,GLIBC_2.7}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgtk-4.so.1",
+    "libpango-1.0.so.0"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "gtk4",
+    "libadwaita",
+    "meson",
+    "ninja",
+    "pango"
+  ],
+  "sources": [
+    "https://download.gnome.org/sources/zenity/4.2/zenity-4.2.2.tar.xz"
+  ],
+  "work_sources": []
+}

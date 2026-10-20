@@ -1,0 +1,12 @@
+pkg-name: log4cplus
+version-source: sources[0]
+sources:
+  - tracker-template: script
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+      tags=$(git ls-remote --tags --refs https://github.com/log4cplus/log4cplus.git)
+      version=$(printf '%s\n' "$tags" | sed -n 's#.*refs/tags/REL_\([0-9_]*\)$#\1#p' | tr '_' '.' | sort -V | tail -n1)
+      [ -n "$version" ] || { echo "log4cplus: no REL_ tag" >&2; exit 1; }
+      tag="REL_$(printf '%s' "$version" | tr '.' '_')"
+      echo "$version|https://github.com/log4cplus/log4cplus/releases/download/${tag}/log4cplus-${version}.tar.xz"

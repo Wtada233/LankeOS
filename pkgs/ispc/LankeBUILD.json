@@ -1,0 +1,37 @@
+{
+  "name": "ispc",
+  "version": "1.32.0",
+  "release": 2,
+  "deps": [],
+  "needed_so": [
+    "libLLVM.so.23.1@LLVM_23.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.8,GLIBC_ABI_DT_RELR}",
+    "libclang-cpp.so.23.1",
+    "libgcc_s.so.1@GCC_3.0",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.5,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
+    "libtbb.so.12"
+  ],
+  "provides_soname": [
+    "libispc.so",
+    "libispc.so.1",
+    "libispcrt.so",
+    "libispcrt.so.1",
+    "libispcrt_device_cpu.so",
+    "libispcrt_device_cpu.so.1"
+  ],
+  "build_deps": [
+    "base-devel",
+    "clang",
+    "cmake",
+    "llvm",
+    "ninja",
+    "onetbb",
+    "spirv-llvm-translator",
+    "vc-intrinsics",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/ispc/ispc/archive/refs/tags/v1.32.0.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,29 @@
+{
+  "name": "google-glog",
+  "version": "0.7.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@GCC_3.0",
+    "libgflags.so.2.2",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.9}",
+    "libunwind.so.8"
+  ],
+  "provides_soname": [
+    "libglog.so",
+    "libglog.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "gflags",
+    "libunwind",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/google/glog/archive/refs/tags/v0.7.1.tar.gz"
+  ],
+  "work_sources": []
+}

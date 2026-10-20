@@ -1,0 +1,29 @@
+{
+  "name": "meson-python",
+  "version": "0.22.1",
+  "release": 1,
+  "deps": [
+    "meson",
+    "patchelf",
+    "python",
+    "python-packaging",
+    "python-pyproject-metadata"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "meson",
+    "ninja",
+    "patchelf",
+    "python-build",
+    "python-installer",
+    "python-packaging",
+    "python-pyproject-metadata",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/b4/40/343ae23722d5d66a7b94b752d1b194202640995296379333b274b1860871/meson_python-0.22.1.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,8 @@
+pkg-name: ceres-solver
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: ceres-solver/ceres-solver
+    mode: tags
+    tag-prefix: ""
+    template: http://ceres-solver.org/ceres-solver-{version}.tar.gz

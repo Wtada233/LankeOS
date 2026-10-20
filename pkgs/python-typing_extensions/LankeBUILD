@@ -1,0 +1,20 @@
+lankebuild_prepare() {
+    # 上游要求 flit_core <4，本仓库是 4.x；flit 3→4 对本包无 breaking
+    if ! patch -N -p1 -i "{WORK_DIR}/../relax-flit-core-version.patch"; then
+        if patch -R --dry-run -p1 -i "{WORK_DIR}/../relax-flit-core-version.patch" >/dev/null 2>&1; then
+            echo "flit_core 版本约束已放宽，跳过"
+        else
+            echo "flit_core 版本补丁应用失败" >&2
+            exit 1
+        fi
+    fi
+}
+
+lankebuild_build() {
+    python3 -m build --wheel --no-isolation
+}
+
+lankebuild_package() {
+    python3 -m installer --destdir={STAGING_ROOT} dist/*.whl
+    find "{STAGING_ROOT}" -name "__pycache__" -type d -exec rm -rf {} +
+}

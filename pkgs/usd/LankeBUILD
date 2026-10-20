@@ -1,0 +1,57 @@
+lankebuild_prepare() {
+    if ! patch -Np1 -i "{WORK_DIR}/../python315-weakref.patch"; then
+        if patch -R -p1 --dry-run -i "{WORK_DIR}/../python315-weakref.patch" >/dev/null 2>&1; then
+            echo "Python 3.15 weakref 补丁已应用，跳过"
+        else
+            echo "Python 3.15 weakref 补丁应用失败" >&2
+            exit 1
+        fi
+    fi
+
+    cmake -B build -G Ninja -S . \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_SKIP_INSTALL_RPATH=ON \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DPXR_INSTALL_LOCATION=/usr/lib/usd/plugin \
+        -DPXR_BUILD_MONOLITHIC=ON \
+        -DPXR_BUILD_DOCUMENTATION=OFF \
+        -DPXR_BUILD_EXAMPLES=OFF \
+        -DPXR_BUILD_TESTS=OFF \
+        -DPXR_BUILD_TUTORIALS=OFF \
+        -DPXR_BUILD_IMAGING=ON \
+        -DPXR_BUILD_USD_IMAGING=ON \
+        -DPXR_BUILD_USD_TOOLS=ON \
+        -DPXR_BUILD_USDVIEW=OFF \
+        -DPXR_ENABLE_PYTHON_SUPPORT=ON \
+        -DPXR_VALIDATE_GENERATED_CODE=OFF \
+        -DPXR_MALLOC_LIBRARY=/usr/lib/libjemalloc.so \
+        -DPXR_BUILD_ALEMBIC_PLUGIN=ON \
+        -DPXR_BUILD_DRACO_PLUGIN=ON \
+        -DPXR_BUILD_EMBREE_PLUGIN=ON \
+        -DPXR_BUILD_OPENCOLORIO_PLUGIN=ON \
+        -DPXR_BUILD_OPENIMAGEIO_PLUGIN=ON \
+        -DPXR_BUILD_PRMAN_PLUGIN=OFF \
+        -DPXR_ENABLE_MATERIALX_SUPPORT=ON \
+        -DPXR_ENABLE_OPENVDB_SUPPORT=ON \
+        -DPXR_ENABLE_HDF5_SUPPORT=ON \
+        -DPXR_ENABLE_PTEX_SUPPORT=OFF \
+        -DPXR_ENABLE_OSL_SUPPORT=ON
+}
+
+lankebuild_build() {
+    mem_gb=$(awk '/^MemTotal:/ {printf "%.0f", $2 / 1048576}' /proc/meminfo)
+    jobs=$((mem_gb / 4))
+    [ "$jobs" -lt 1 ] && jobs=1
+    [ "$jobs" -gt "$(nproc)" ] && jobs=$(nproc)
+    echo "usd: ${mem_gb} GiB RAM, using ${jobs} jobs"
+    ninja -C build -j"$jobs"
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+
+    find "{STAGING_ROOT}/usr" \( -name '*.pyc' -o -name '*.pyo' \) -delete
+    find "{STAGING_ROOT}/usr" -name "__pycache__" -type d -exec rm -rf {} +
+}

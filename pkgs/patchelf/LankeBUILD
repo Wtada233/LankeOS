@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    autoreconf -fiv
+    ./configure --prefix={PREFIX}
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+}

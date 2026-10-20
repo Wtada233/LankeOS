@@ -1,0 +1,42 @@
+{
+  "name": "python-numpy",
+  "version": "2.5.4",
+  "release": 1,
+  "deps": [
+    "lapack",
+    "python"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libblas.so.3",
+    "libc.so.6@{GLIBC_2.10,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libcblas.so.3",
+    "libgcc_s.so.1@GCC_3.0",
+    "liblapack.so.3",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43,GLIBC_2.44}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.14,GLIBCXX_3.4.18,GLIBCXX_3.4.21,GLIBCXX_3.4.29,GLIBCXX_3.4.30}"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "lapack",
+    "meson",
+    "meson-python",
+    "ninja",
+    "patchelf",
+    "python-build",
+    "python-cython",
+    "python-installer",
+    "python-packaging",
+    "python-pyproject-metadata",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/95/b0/c7453d0b6e2073c3264468b106ee1563750cecc910965e67357e3698c83e/numpy-2.5.4.tar.gz"
+  ],
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
+}

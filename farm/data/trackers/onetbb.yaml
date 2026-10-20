@@ -1,0 +1,8 @@
+pkg-name: onetbb
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: uxlfoundation/oneTBB
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/{tag}/onetbb-{version}.tar.gz

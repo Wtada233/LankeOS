@@ -1,0 +1,5 @@
+pkg-name: python-hatch-fancy-pypi-readme
+version-source: sources[0]
+sources:
+  - tracker-template: pypi
+    project: hatch-fancy-pypi-readme

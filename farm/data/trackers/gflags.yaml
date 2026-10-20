@@ -1,0 +1,8 @@
+pkg-name: gflags
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: gflags/gflags
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/{tag}.tar.gz

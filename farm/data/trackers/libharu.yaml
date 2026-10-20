@@ -1,0 +1,8 @@
+pkg-name: libharu
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: libharu/libharu
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/refs/tags/{tag}/libharu-{version}.tar.gz

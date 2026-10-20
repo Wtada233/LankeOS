@@ -1,0 +1,33 @@
+{
+  "name": "onetbb",
+  "version": "2023.1.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libhwloc.so.15",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.3,CXXABI_1.3.8,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.18,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.30}"
+  ],
+  "provides_soname": [
+    "libtbb.so",
+    "libtbb.so.12",
+    "libtbbbind_2_5.so",
+    "libtbbbind_2_5.so.3",
+    "libtbbmalloc.so",
+    "libtbbmalloc.so.2",
+    "libtbbmalloc_proxy.so",
+    "libtbbmalloc_proxy.so.2"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "hwloc",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/uxlfoundation/oneTBB/archive/v2023.1.0/onetbb-2023.1.0.tar.gz"
+  ],
+  "work_sources": []
+}

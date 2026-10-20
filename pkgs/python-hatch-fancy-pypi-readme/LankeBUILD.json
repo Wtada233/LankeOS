@@ -1,0 +1,22 @@
+{
+  "name": "python-hatch-fancy-pypi-readme",
+  "version": "25.1.0",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-hatchling"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-hatchling",
+    "python-installer",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/f3/0f/aed57c301f339936eb91cb4d8c1e5088a101081854bd3ec18a889df32365/hatch_fancy_pypi_readme-25.1.0.tar.gz"
+  ],
+  "work_sources": []
+}

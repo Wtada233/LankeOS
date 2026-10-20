@@ -1,0 +1,23 @@
+lankebuild_prepare() {
+    cmake -B build -G Ninja -S . \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=ON \
+        -DBUILD_STATIC=OFF \
+        -DBUILD_TESTS=OFF \
+        -DBUILD_BENCHMARKS=OFF \
+        -DDEACTIVATE_SNAPPY=OFF \
+        -DPREFER_EXTERNAL_LZ4=ON \
+        -DPREFER_EXTERNAL_ZLIB=ON \
+        -DPREFER_EXTERNAL_ZSTD=ON
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}

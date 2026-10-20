@@ -1,0 +1,11 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    make -j$(nproc) LDFLAGS_USER="{LDFLAGS}"
+}
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+}

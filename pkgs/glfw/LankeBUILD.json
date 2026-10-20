@@ -1,0 +1,34 @@
+{
+  "name": "glfw",
+  "version": "3.5.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.4,GLIBC_2.7,GLIBC_2.8,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27}"
+  ],
+  "provides_soname": [
+    "libglfw.so",
+    "libglfw.so.3"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "libglvnd",
+    "libx11",
+    "libxcursor",
+    "libxi",
+    "libxinerama",
+    "libxkbcommon",
+    "libxrandr",
+    "ninja",
+    "vulkan-headers",
+    "vulkan-loader",
+    "wayland",
+    "wayland-protocols"
+  ],
+  "sources": [
+    "https://github.com/glfw/glfw/archive/refs/tags/3.5.1.tar.gz"
+  ],
+  "work_sources": []
+}

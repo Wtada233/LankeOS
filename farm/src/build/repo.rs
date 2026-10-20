@@ -499,6 +499,14 @@ pub(crate) fn sha256_file(path: &Path) -> Result<String, FarmError> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+/// 写配方 JSON：serde_json 的输出不带结尾换行，而 prettier 会补一个。
+/// 统一补 `\n`，避免同一份配方因写入方不同导致 recipe_hash 漂移。
+pub(crate) fn write_recipe_json(path: &Path, v: &serde_json::Value) -> std::io::Result<()> {
+    let mut out = serde_json::to_string_pretty(v).unwrap();
+    out.push('\n');
+    fs::write(path, out)
+}
+
 /// 传播重建前 bump release（规则 1）。
 pub(crate) fn bump_release(pkgs_dir: &Path, pkg: &str) {
     let path = super::recipe_json_path(pkgs_dir, pkg);
@@ -510,7 +518,7 @@ pub(crate) fn bump_release(pkgs_dir: &Path, pkg: &str) {
     };
     let rel = v["release"].as_u64().unwrap_or(0) + 1;
     v["release"] = serde_json::json!(rel);
-    if fs::write(&path, serde_json::to_string_pretty(&v).unwrap()).is_ok() {
+    if write_recipe_json(&path, &v).is_ok() {
         println!("{}", tr!("build.release_bump", pkg, rel));
     }
 }
@@ -540,7 +548,7 @@ pub(crate) fn update_lankebuild_metadata(pkgs_dir: &Path, pkg: &str, outcome: &B
             .map(|s| serde_json::Value::String(s.clone()))
             .collect(),
     );
-    if fs::write(&path, serde_json::to_string_pretty(&v).unwrap()).is_ok() {
+    if write_recipe_json(&path, &v).is_ok() {
         println!("{}", tr!("build.meta_sync", pkg));
     }
 }

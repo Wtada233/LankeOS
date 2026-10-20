@@ -1,0 +1,8 @@
+pkg-name: embree
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: embree/embree
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/{tag}/embree-{version}.tar.gz

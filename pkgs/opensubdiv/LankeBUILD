@@ -1,0 +1,25 @@
+lankebuild_prepare() {
+    sed -i 's|cudaThreadSynchronize|cudaDeviceSynchronize|g' opensubdiv/osd/cudaEvaluator.cpp
+
+    cmake -B build -G Ninja -S . \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=ON \
+        -DNO_EXAMPLES=ON \
+        -DNO_REGRESSION=ON \
+        -DNO_TUTORIALS=ON \
+        -DNO_TESTS=ON \
+        -DNO_CUDA=ON \
+        -DNO_OPENCL=ON \
+        -DNO_DX=ON \
+        -DNO_METAL=ON
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}

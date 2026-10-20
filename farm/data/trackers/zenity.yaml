@@ -1,0 +1,7 @@
+pkg-name: zenity
+version-source: sources[0]
+sources:
+  - tracker-template: gnome
+    source-name: zenity
+    stable-minor: all
+    template: https://download.gnome.org/sources/zenity/{path_version}/zenity-{version}.tar.xz

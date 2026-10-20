@@ -1,0 +1,26 @@
+{
+  "name": "python-requests",
+  "version": "2.34.2",
+  "release": 1,
+  "deps": [
+    "make-ca",
+    "python",
+    "python-certifi",
+    "python-charset-normalizer",
+    "python-idna",
+    "python-urllib3"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-installer",
+    "python-setuptools",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/ac/c3/e2a2b89f2d3e2179abd6d00ebd70bff6273f37fb3e0cc209f48b39d00cbf/requests-2.34.2.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -1,0 +1,14 @@
+lankebuild_prepare() {
+    sh bootstrap
+    ./configure \
+        --prefix={PREFIX} \
+        --mandir={DATADIR}/man
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+}

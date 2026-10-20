@@ -1,0 +1,19 @@
+lankebuild_prepare() {
+    cmake -B build -G Ninja -S . \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DEMBREE_STATIC_LIB=OFF \
+        -DEMBREE_ISPC_SUPPORT=ON \
+        -DEMBREE_TUTORIALS=OFF \
+        -DEMBREE_MAX_ISA=AVX512SKX \
+        -DEMBREE_BACKFACE_CULLING=OFF
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}

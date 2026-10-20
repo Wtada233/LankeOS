@@ -1,0 +1,74 @@
+lankebuild_prepare() {
+    # 资源和库路径固定到安装位置
+    sed -i 's|resources|/usr/share/materialx/resources|g' source/MaterialXView/{Main.cpp,Viewer.cpp}
+    sed -i 's|"libraries"|"/usr/share/materialx/libraries"|g' source/MaterialXView/Main.cpp
+    sed -i 's|resources|/usr/share/materialx/resources|g' source/MaterialXGraphEditor/{Main.cpp,Graph.cpp}
+    sed -i 's|"libraries"|"/usr/share/materialx/libraries"|g' source/MaterialXGraphEditor/{Main.cpp,Graph.cpp}
+    sed -i 's|"libraries"|"/usr/share/materialx/libraries"|g' source/MaterialXGenShader/GenOptions.h
+
+    # Python 包的 configure_file 不要写进宿主机的 /usr
+    sed -i 's|CMAKE_INSTALL_PREFIX|CMAKE_BINARY_DIR|g' python/CMakeLists.txt
+
+    dos2unix python/Scripts/*
+
+    # 顶层文档安装到 share/doc，避免落到 /usr 根
+    sed -i 's|install(FILES LICENSE CHANGELOG.md README.md THIRD-PARTY.md DESTINATION .)|install(FILES LICENSE CHANGELOG.md README.md THIRD-PARTY.md DESTINATION share/doc/materialx)|' CMakeLists.txt
+
+    cmake -B build -G Ninja -S . \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+        -DCMAKE_SKIP_INSTALL_RPATH=ON \
+        -DCMAKE_SKIP_RPATH=ON \
+        -DMATERIALX_BUILD_SHARED_LIBS=ON \
+        -DMATERIALX_BUILD_PYTHON=ON \
+        -DMATERIALX_BUILD_VIEWER=ON \
+        -DMATERIALX_BUILD_GRAPH_EDITOR=ON \
+        -DMATERIALX_BUILD_TESTS=OFF \
+        -DMATERIALX_BUILD_DOCS=OFF
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+
+    pyver=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+
+    mkdir -p "{STAGING_ROOT}/usr/share/materialx"
+    if [ -d "{STAGING_ROOT}/usr/resources" ]; then
+        mv "{STAGING_ROOT}/usr/resources" "{STAGING_ROOT}/usr/share/materialx/resources"
+    fi
+    if [ -d "{STAGING_ROOT}/usr/libraries" ]; then
+        mv "{STAGING_ROOT}/usr/libraries" "{STAGING_ROOT}/usr/share/materialx/libraries"
+    fi
+
+    if [ -d "{STAGING_ROOT}/usr/python/Scripts" ]; then
+        mkdir -p "{STAGING_ROOT}/usr/bin"
+        for f in "{STAGING_ROOT}/usr/python/Scripts/"*; do
+            chmod +x "$f"
+            cp "$f" "{STAGING_ROOT}/usr/bin/$(basename "${f%.py}")"
+        done
+        rm -rf "{STAGING_ROOT}/usr/python/Scripts"
+    fi
+
+    if [ -d "{STAGING_ROOT}/usr/python" ]; then
+        mkdir -p "{STAGING_ROOT}/usr/lib/python${pyver}/site-packages"
+        cp -a "{STAGING_ROOT}/usr/python/." "{STAGING_ROOT}/usr/lib/python${pyver}/site-packages/"
+        rm -rf "{STAGING_ROOT}/usr/python"
+    fi
+
+    if [ -f "{STAGING_ROOT}/usr/lib/cmake/MaterialX/MaterialXConfig.cmake" ]; then
+        sed -i 's|libraries|share/materialx/libraries|g' \
+            "{STAGING_ROOT}/usr/lib/cmake/MaterialX/MaterialXConfig.cmake"
+        sed -i "s|python|lib/python${pyver}/site-packages/MaterialX|g" \
+            "{STAGING_ROOT}/usr/lib/cmake/MaterialX/MaterialXConfig.cmake"
+        sed -i 's|resources|share/materialx/resources|g' \
+            "{STAGING_ROOT}/usr/lib/cmake/MaterialX/MaterialXConfig.cmake"
+    fi
+
+    find "{STAGING_ROOT}/usr" -empty -type d -delete
+}

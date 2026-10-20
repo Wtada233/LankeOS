@@ -1,0 +1,17 @@
+lankebuild_prepare() {
+    sed -i "/subdir('help')/d" meson.build
+
+    meson setup build \
+        --prefix={PREFIX} \
+        --sysconfdir={SYSCONFDIR} \
+        --buildtype=release \
+        -Dmanpage=false
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}

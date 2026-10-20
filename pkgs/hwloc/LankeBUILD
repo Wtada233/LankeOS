@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    ./configure \
+        --prefix={PREFIX} \
+        --sbindir={BINDIR} \
+        --sysconfdir={SYSCONFDIR} \
+        --enable-plugins \
+        --disable-static
+}
+
+lankebuild_build() {
+    make -j$(nproc)
+}
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+}

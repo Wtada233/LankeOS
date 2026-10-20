@@ -1,0 +1,12 @@
+pkg-name: opensubdiv
+version-source: sources[0]
+sources:
+  - tracker-template: script
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+      tags=$(git ls-remote --tags --refs https://github.com/PixarAnimationStudios/OpenSubdiv.git)
+      tag=$(printf '%s\n' "$tags" | sed -n 's#.*refs/tags/\(v[0-9_]*\)$#\1#p' | sort -V | tail -n1)
+      [ -n "$tag" ] || { echo "opensubdiv: no vX_Y_Z tag" >&2; exit 1; }
+      version=$(printf '%s' "$tag" | sed 's/^v//; s/_/./g')
+      echo "$version|https://github.com/PixarAnimationStudios/OpenSubdiv/archive/${tag}.tar.gz"

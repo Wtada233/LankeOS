@@ -1,0 +1,8 @@
+pkg-name: materialx
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: AcademySoftwareFoundation/MaterialX
+    mode: tags
+    tag-prefix: v
+    template: git+https://github.com/{repo}@{tag}

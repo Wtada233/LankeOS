@@ -1,0 +1,24 @@
+{
+  "name": "python-cattrs",
+  "version": "26.2.1",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-attrs",
+    "python-typing_extensions"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "python-build",
+    "python-hatch-vcs",
+    "python-hatchling",
+    "python-installer",
+    "python-wheel"
+  ],
+  "sources": [
+    "https://files.pythonhosted.org/packages/23/75/e72b839c3dc869c990b4842f3dba730bdcdf5215f68fc7955edf849a1792/cattrs-26.2.1.tar.gz"
+  ],
+  "work_sources": []
+}

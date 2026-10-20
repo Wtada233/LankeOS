@@ -1,0 +1,17 @@
+{
+  "name": "robin-map",
+  "version": "1.4.1",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/Tessil/robin-map/archive/refs/tags/v1.4.1.tar.gz"
+  ],
+  "work_sources": []
+}

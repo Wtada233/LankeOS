@@ -1,0 +1,8 @@
+pkg-name: google-glog
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: google/glog
+    mode: tags
+    tag-prefix: v
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

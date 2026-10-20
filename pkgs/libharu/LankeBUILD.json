@@ -1,0 +1,27 @@
+{
+  "name": "libharu",
+  "version": "2.4.6",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_ABI_DT_RELR}",
+    "libm.so.6@GLIBC_2.2.5",
+    "libpng16.so.16@PNG16_0",
+    "libz.so.1"
+  ],
+  "provides_soname": [
+    "libhpdf.so",
+    "libhpdf.so.2.4"
+  ],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "libpng",
+    "ninja",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/libharu/libharu/archive/refs/tags/v2.4.6/libharu-2.4.6.tar.gz"
+  ],
+  "work_sources": []
+}

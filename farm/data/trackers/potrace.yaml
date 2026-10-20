@@ -1,0 +1,7 @@
+pkg-name: potrace
+version-source: sources[0]
+sources:
+  - tracker-template: sourceforge
+    project: potrace
+    pattern: potrace-([0-9.]+)\.tar\.gz
+    template: https://potrace.sourceforge.net/download/{version}/potrace-{version}.tar.gz

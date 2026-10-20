@@ -1,0 +1,21 @@
+{
+  "name": "vc-intrinsics",
+  "version": "0.25.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "llvm",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/intel/vc-intrinsics/archive/refs/tags/v0.25.0.tar.gz"
+  ],
+  "work_sources": [],
+  "farm_flags": [
+    "IGNORE_CHK_PKGERR"
+  ]
+}

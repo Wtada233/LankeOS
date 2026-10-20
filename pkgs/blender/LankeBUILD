@@ -1,0 +1,51 @@
+lankebuild_prepare() {
+    if ! patch -Np1 -i "{WORK_DIR}/../ffmpeg-9.patch"; then
+        if patch -R -p1 --dry-run -i "{WORK_DIR}/../ffmpeg-9.patch" >/dev/null 2>&1; then
+            echo "FFmpeg 9 兼容补丁已应用，跳过"
+        else
+            echo "FFmpeg 9 兼容补丁应用失败" >&2
+            exit 1
+        fi
+    fi
+
+    cmake -B build -G Ninja -S . \
+        -C build_files/cmake/config/blender_release.cmake \
+        -D CMAKE_BUILD_TYPE=Release \
+        -D CMAKE_INSTALL_PREFIX={PREFIX} \
+        -D CMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld \
+        -D CMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld \
+        -D CMAKE_MODULE_LINKER_FLAGS=-fuse-ld=lld \
+        -D WITH_LINKER_MOLD=OFF \
+        -D WITH_INSTALL_PORTABLE=OFF \
+        -D WITH_PYTHON_INSTALL=OFF \
+        -D PYTHON_VERSION=3.15 \
+        -D USD_ROOT_DIR=/usr \
+        -D WITH_SYSTEM_GFLAGS=ON \
+        -D WITH_SYSTEM_GLOG=ON \
+        -D WITH_CYCLES_DEVICE_CUDA=OFF \
+        -D WITH_CYCLES_DEVICE_OPTIX=OFF \
+        -D WITH_CYCLES_CUDA_BINARIES=OFF \
+        -D WITH_CYCLES_DEVICE_HIP=OFF \
+        -D WITH_CYCLES_DEVICE_HIPRT=OFF \
+        -D WITH_CYCLES_HIP_BINARIES=OFF \
+        -D WITH_CYCLES_DEVICE_ONEAPI=OFF \
+        -D WITH_CYCLES_ONEAPI_BINARIES=OFF \
+        -D WITH_JACK=OFF \
+        -D WITH_PIPEWIRE=ON \
+        -D WITH_GHOST_X11=ON \
+        -D WITH_GHOST_WAYLAND=ON
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" cmake --install build
+
+    find "{STAGING_ROOT}/usr/share/blender" -name "__pycache__" -type d -prune -exec rm -rf {} +
+    find "{STAGING_ROOT}/usr/share/blender" \( -name '*.pyc' -o -name '*.pyo' \) -delete
+
+    install -Dm644 release/freedesktop/org.blender.Blender.metainfo.xml \
+        "{STAGING_ROOT}/usr/share/metainfo/org.blender.Blender.metainfo.xml"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "opencl-headers",
+  "version": "2026.05.29",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "cmake",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/KhronosGroup/OpenCL-Headers/archive/refs/tags/v2026.05.29.tar.gz"
+  ],
+  "work_sources": []
+}

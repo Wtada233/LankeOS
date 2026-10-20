@@ -1,0 +1,12 @@
+pkg-name: hwloc
+version-source: sources[0]
+sources:
+  - tracker-template: multi-level-html-index
+    levels:
+      - name: series
+        url: https://www.open-mpi.org/software/hwloc/
+        pattern: v([0-9]+\.[0-9]+)/
+      - name: version
+        url: https://www.open-mpi.org/software/hwloc/v{series}/
+        pattern: hwloc-([0-9][0-9.]*)\.tar\.bz2
+    template: https://www.open-mpi.org/software/hwloc/v{series}/downloads/hwloc-{version}.tar.bz2

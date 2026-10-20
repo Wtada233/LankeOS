@@ -1,0 +1,52 @@
+{
+  "name": "openshadinglanguage",
+  "version": "1.15.7.0",
+  "release": 1,
+  "deps": [],
+  "needed_so": [
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libLLVM.so.23.1@LLVM_23.1",
+    "libOpenImageIO.so.3.1",
+    "libOpenImageIO_Util.so.3.1",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
+    "libclang-cpp.so.23.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27}",
+    "libpugixml.so.1",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.15,CXXABI_1.3.2,CXXABI_1.3.3,CXXABI_1.3.5,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
+  ],
+  "provides_soname": [
+    "liboslcomp.so",
+    "liboslcomp.so.1.15",
+    "liboslexec.so",
+    "liboslexec.so.1.15",
+    "liboslnoise.so",
+    "liboslnoise.so.1.15",
+    "liboslquery.so",
+    "liboslquery.so.1.15",
+    "osl.imageio.so"
+  ],
+  "build_deps": [
+    "base-devel",
+    "clang",
+    "cmake",
+    "fmt",
+    "freetype",
+    "imath",
+    "libpng",
+    "libtiff",
+    "llvm",
+    "ncurses",
+    "ninja",
+    "openimageio",
+    "pugixml",
+    "pybind11",
+    "qt6-base",
+    "robin-map",
+    "zlib"
+  ],
+  "sources": [
+    "https://github.com/AcademySoftwareFoundation/OpenShadingLanguage/archive/refs/tags/v1.15.7.0.tar.gz"
+  ],
+  "work_sources": []
+}

@@ -388,7 +388,9 @@ fn apply_proposal(pkg: &str, pkgs_dir: &Path, p: &lankefarm::track::Proposal) ->
         return false;
     };
     apply_version_update(&mut value, p);
-    match std::fs::write(&json_path, serde_json::to_string_pretty(&value).unwrap()) {
+    let mut out = serde_json::to_string_pretty(&value).unwrap();
+    out.push('\n');
+    match std::fs::write(&json_path, out) {
         Err(e) => {
             error_log!("{}", lankefarm::tr!("track.apply_fail", e));
             false

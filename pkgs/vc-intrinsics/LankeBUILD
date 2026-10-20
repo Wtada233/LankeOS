@@ -1,0 +1,26 @@
+lankebuild_prepare() {
+    _patch="{WORK_DIR}/../c9c1011e61c5aaa30c421d1feaedc7c74a9b67c1.patch"
+    echo "vc-intrinsics patch: $_patch (cwd=$(pwd))" >&2
+    if patch -Np1 --dry-run -i "$_patch"; then
+        patch -Np1 -i "$_patch"
+    elif patch -R -p1 --dry-run -i "$_patch"; then
+        echo "LLVM 23 支持补丁已应用，跳过"
+    else
+        echo "LLVM 23 支持补丁应用失败: $_patch (cwd=$(pwd))" >&2
+        exit 1
+    fi
+
+    cmake -B build -G Ninja -S . \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DLLVM_DIR=/usr/lib/cmake/llvm
+}
+
+lankebuild_build() {
+    ninja -C build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" ninja -C build install
+}
