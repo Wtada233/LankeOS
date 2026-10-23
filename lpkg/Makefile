@@ -37,14 +37,35 @@ PKGS_LIST = $(PKGS)
 # static 构建额外校验：各模块**自身** Libs（--libs-only-l，即 lpkg 真正链接的，
 # 不含传递私有依赖如 -lz）都能在其 libdir 找到 .a。
 LPKG_DEPS = libcurl:8.14.1:9 libarchive:3.8.3:4 libelf:0.190:nolimit \
-            libgit2:1.7.2:2 libsolv:0.7.39:0.8 openssl:3.1.8:4
+            libgit2:1.7.2:2 openssl:3.1.8:4
+
+# libsolv 不在上面的版本窗口里：lpkg 只接受自己的 fork（src/patches/libsolv/），
+# 精确版本号是 0.0.0-lpkg。上游 libsolv 没有求解器内的 SONAME 宽松模式，拿错库
+# 会在编译期被 solver.cpp 的 #error 拦下；这里再在构建入口拦一次。
+LIBSOLV_TAG = 0.7.39
+LIBSOLV_FORK_VERSION = 0.0.0-lpkg
+LIBSOLV_PATCH = src/patches/libsolv/0001-tolerate-missing-soname.patch
+LIBSOLV_PATCH_HASH = $(shell sha256sum $(LIBSOLV_PATCH) 2>/dev/null | cut -c1-12)
+LIBSOLV_STAMP = $(LIBSOLV_TAG)-$(LIBSOLV_FORK_VERSION)-$(LIBSOLV_PATCH_HASH)
 
 .PHONY: deps-check
 deps-check:
 	@# 版本窗口 +（static 时）自身库 .a，单循环按模块探测；任一失败 → 立即终止。
 	@command -v pkg-config >/dev/null 2>&1 || { echo "deps-check: error: 未找到 pkg-config（无法探测依赖库）"; exit 1; }; \
-	dirs=""; for spec in $(LPKG_DEPS); do mod="$${spec%%:*}"; dirs="$$dirs $$(pkg-config --variable=libdir "$$mod" 2>/dev/null)"; done; \
+	got=$$(pkg-config --modversion libsolv 2>/dev/null || true); \
+	if [ "$$got" != "$(LIBSOLV_FORK_VERSION)" ]; then \
+	  echo "deps-check: error: libsolv 必须是 lpkg fork $(LIBSOLV_FORK_VERSION)（当前: $${got:-未安装}）"; \
+	  echo "  fork 补丁: $(LIBSOLV_PATCH)（容器构建用 make docker-env 自动应用）"; \
+	  exit 1; \
+	fi; \
+	echo "  dep  libsolv $$got  （lpkg fork，精确 pin）"; \
+	dirs="$$(pkg-config --variable=libdir libsolv 2>/dev/null)"; \
+	for spec in $(LPKG_DEPS); do mod="$${spec%%:*}"; dirs="$$dirs $$(pkg-config --variable=libdir "$$mod" 2>/dev/null)"; done; \
 	need_static=0; echo "$(MAKECMDGOALS)" | grep -qw static && need_static=1; \
+	if [ "$$need_static" = 1 ]; then \
+	  ldir=$$(pkg-config --variable=libdir libsolv 2>/dev/null); \
+	  if [ ! -f "$$ldir/libsolv.a" ]; then echo "deps-check: error: 静态库 libsolv.a 缺失（lpkg fork 需 -DENABLE_STATIC=ON）"; exit 1; fi; \
+	fi; \
 	for spec in $(LPKG_DEPS); do \
 	  mod="$${spec%%:*}"; rest="$${spec#*:}"; min="$${rest%%:*}"; cap="$${rest#*:}"; \
 	  [ "$$cap" = nolimit ] && cap=""; \
@@ -507,9 +528,9 @@ DOCKER_ENV_CONTAINER = lpkg-builder
 #   又会把主机的 glibc 工具链假设带进 musl 容器。）
 DOCKER_ENV_FLAGS = -e 'CFLAGS=$(HOST_CFLAGS)' -e 'CXXFLAGS=$(HOST_CXXFLAGS)' -e 'LDFLAGS=$(HOST_LDFLAGS)'
 
-# libsolv 锁定版本（tag，稳定发布版，非浮动 HEAD）：git clone --branch 拉取发布 tag。
-# /usr/lib/libsolv.tag 版本戳记录已装版本，改 tag 后 docker-env 自动重编（见下），无需手动删容器。
-LIBSOLV_TAG = 0.7.39
+# libsolv 锁定版本 + fork 补丁：LIBSOLV_TAG / LIBSOLV_FORK_VERSION / LIBSOLV_PATCH 在上方
+# 依赖探测一节定义。docker-env 拉取该 tag、应用补丁、把版本号改写成 0.0.0-lpkg；
+# /usr/lib/libsolv.tag 记录 <tag>-<fork 版本>-<补丁 hash>，补丁一改就自动重编（无需手动删容器）。
 # libgit2 锁定版本（tag，用于 git clone --branch）：与 libsolv 同策略，改此变量后
 # docker-env 通过 /usr/lib/libgit2.tag 版本戳自动重编（见下），无需手动删容器。
 LIBGIT2_TAG = v1.7.2
@@ -518,9 +539,10 @@ LIBGIT2_TAG = v1.7.2
 # libgit2 —— alpine 的 libgit2-static 依赖系统 http-parser/ssh2，而 http-parser 无静态库，
 # 全静态链接会失败；故自建（bundled http-parser、USE_SSH=OFF）。锁定 LIBGIT2_TAG（见上），
 # /usr/lib/libgit2.tag 记录已装版本，与 pin 不符或 .a 缺失时重编。
-# libsolv —— Alpine 无此包（apk 自家 resolver 不用 libsolv）。锁定 LIBSOLV_TAG（见上，稳定
-# 发布 tag），/usr/lib/libsolv.tag 记录已装版本，与 pin 不符或 lib 缺失时重编，防止现有容器
-# 静默沿用旧版 libsolv（版本漂移的来源）。cmake：共享库 libsolv.so 默认无条件构建（无需
+# libsolv —— Alpine 无此包（apk 自家 resolver 不用 libsolv）。锁定 LIBSOLV_TAG（见上），
+# 拉取后应用 src/patches/libsolv/ 的 fork 补丁（求解器内 SONAME 宽松模式），pkg-config 版本
+# 被改写成 0.0.0-lpkg；/usr/lib/libsolv.tag 记录 tag + fork 版本 + 补丁 hash，任一变化即重编，
+# 防止现有容器静默沿用旧版 libsolv。cmake：共享库 libsolv.so 默认无条件构建（无需
 # ENABLE_SHARED）；ENABLE_STATIC=ON 额外构建静态库 libsolv.a（供静态链接的 lpkg 二进制）。
 # libsolv 无 ENABLE_TESTS 选项。
 # （这些注释写在 recipe **外面**：recipe 里的 `#` 行会被 make 原样回显到构建日志里刷屏。）
@@ -537,9 +559,11 @@ docker-env:
 	@# 运行时** —— 实测 `g++ -fsanitize=address` 报 `cannot find -lasan`；alpine 的 gcc 只装了
 	@# 头文件 `plugin/include/asan.h`）。`clang-extra-tools`：`make tidy` 用的 `clang-tidy`
 	@# （**不在 `clang` 包里**，实测 `apk info -L clang | grep -c clang-tidy` = 0）。
-	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base bash pkgconfig curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static elfutils-dev upx gtest-dev tar sudo git cmake clang compiler-rt clang-extra-tools
+	@docker exec $(DOCKER_ENV_CONTAINER) apk add --no-cache build-base bash pkgconfig patch curl-dev curl-static libarchive-dev libarchive-static openssl-dev openssl-libs-static zlib-static zstd-static lz4-static bzip2-static xz-static brotli-static nghttp2-static libpsl-static libidn2-static libunistring-static c-ares-static acl-static expat-static elfutils-dev upx gtest-dev tar sudo git cmake clang compiler-rt clang-extra-tools
 	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "LIBGIT2_TAG=$(LIBGIT2_TAG); if [ ! -f /usr/lib/libgit2.a ] || [ \"\$$(cat /usr/lib/libgit2.tag 2>/dev/null)\" != \"\$$LIBGIT2_TAG\" ]; then rm -rf /tmp/libgit2 && git clone -q --depth 1 --branch \$$LIBGIT2_TAG https://github.com/libgit2/libgit2.git /tmp/libgit2 && cd /tmp/libgit2 && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_SHARED_LIBS=OFF -DBUILD_CLI=OFF -DBUILD_TESTS=OFF -DUSE_SSH=OFF -DUSE_HTTPS=OpenSSL >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null && echo \$$LIBGIT2_TAG > /usr/lib/libgit2.tag; fi"
-	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "LIBSOLV_TAG=$(LIBSOLV_TAG); if [ ! -f /usr/lib/libsolv.so ] || [ \"\$$(cat /usr/lib/libsolv.tag 2>/dev/null)\" != \"\$$LIBSOLV_TAG\" ]; then rm -rf /tmp/libsolv && git clone -q --depth 1 --branch \$$LIBSOLV_TAG https://github.com/openSUSE/libsolv.git /tmp/libsolv && cd /tmp/libsolv && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_STATIC=ON >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null && echo \$$LIBSOLV_TAG > /usr/lib/libsolv.tag; fi"
+	@test -f $(LIBSOLV_PATCH) || { echo "docker-env: error: 缺少 libsolv fork 补丁 $(LIBSOLV_PATCH)"; exit 1; }
+	@docker cp $(LIBSOLV_PATCH) $(DOCKER_ENV_CONTAINER):/tmp/lpkg-libsolv.patch
+	@docker exec $(DOCKER_ENV_CONTAINER) sh -c "LIBSOLV_STAMP='$(LIBSOLV_STAMP)'; if [ ! -f /usr/lib/libsolv.so ] || [ \"\$$(cat /usr/lib/libsolv.tag 2>/dev/null)\" != \"\$$LIBSOLV_STAMP\" ]; then rm -rf /tmp/libsolv && git clone -q --depth 1 --branch $(LIBSOLV_TAG) https://github.com/openSUSE/libsolv.git /tmp/libsolv && cd /tmp/libsolv && patch -p1 < /tmp/lpkg-libsolv.patch && mkdir -p build && cd build && cmake .. -DCMAKE_INSTALL_PREFIX=/usr -DENABLE_STATIC=ON >/dev/null && make -j\$$(nproc) >/dev/null && make install >/dev/null && echo \"\$$LIBSOLV_STAMP\" > /usr/lib/libsolv.tag; fi"
 
 docker-sync:
 	@echo "Syncing source code to container..."

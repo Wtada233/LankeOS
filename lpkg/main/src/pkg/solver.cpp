@@ -19,6 +19,11 @@
 #include <solv/transaction.h>
 #undef requires
 
+#ifndef SOLVER_FLAG_LPKG_TOLERATE_MISSING_SONAME
+#error \
+    "lpkg 需要 libsolv fork 0.0.0-lpkg（见 src/patches/libsolv/）：上游 libsolv 没有求解器内 SONAME 宽松模式"
+#endif
+
 #include "../base/constants.hpp"
 #include "../base/so_spec.hpp"
 #include "../base/utils.hpp"
@@ -449,8 +454,7 @@ void order_by_dependencies(Pool* pool, const std::vector<Id>& sids, std::vector<
 }
 
 PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& local,
-                     const std::map<std::string, InstalledPkg>& installed, const SolveOptions& opts,
-                     const std::vector<std::string>& extra_provides)
+                     const std::map<std::string, InstalledPkg>& installed, const SolveOptions& opts)
 {
     PoolState ps;
     ps.pool = pool_create();
@@ -529,18 +533,11 @@ PoolState build_pool(const Repository& repo, const std::vector<PackageInfo>& loc
     }
 
     // --use-system-soname：系统 .so 作为 installed 伪 solvable 的 provides
-    // 以及 missing-so 容忍注入的缺 SONAME（都视为"已装满足"）
     if (opts.use_system_soname && !opts.system_sonames.empty()) {
         Id sid = repo_add_solvable(inst);
         Solvable* s = pool_id2solvable(ps.pool, sid);
         s->name = pool_str2id(ps.pool, "@system-sonames", 1);
         add_provides_soname(s, ps.pool, opts.system_sonames, versioned_needs);
-    }
-    if (!extra_provides.empty()) {
-        Id sid = repo_add_solvable(inst);
-        Solvable* s = pool_id2solvable(ps.pool, sid);
-        s->name = pool_str2id(ps.pool, "@missing-tolerated", 1);
-        add_provides_soname(s, ps.pool, extra_provides, versioned_needs);
     }
 
     pool_createwhatprovides(ps.pool);
@@ -557,231 +554,210 @@ SolveResult solve_install(const Repository& repo, const std::vector<PackageInfo>
     std::lock_guard<std::mutex> lock(g_solv_mutex);
     SolveResult result;
 
-    std::vector<std::string> injected;  // 容忍模式注入的缺 SONAME
-    const int rounds = opts.missing_so_no_error ? 2 : 1;
-    for (int round = 0; round < rounds; ++round) {
-        PoolState ps = build_pool(repo, local, installed, opts, injected);
+    PoolState ps = build_pool(repo, local, installed, opts);
 
-        Queue jobs;
-        queue_init(&jobs);
-        for (const auto& [name, vspec] : targets) {
-            Id nid = pool_str2id(ps.pool, name.c_str(), 1);
-            if (vspec == std::string(constants::VER_LATEST)) {
-                // "装到最新可用版本"。SOLVER_SOLVABLE_NAME|INSTALL 只"确保已装"，
-                // 已装时不升级（空 transaction）；加 SOLVER_UPDATE 又会让未装包变空操作。
-                // 正解：有同名真实包时找 available 最高版本 solvable，用
-                // SOLVER_SOLVABLE|INSTALL 精确指定（新装=装它，已装且更高=升级到它）；
-                // 无同名包时当 capability 处理（SOLVER_SOLVABLE_PROVIDES|INSTALL——
-                // 已装满足则 no-op，否则装 provider，缺则报错）。
-                // "最新"用 `version_compare()` 选 —— 它的实现**就是** libsolv 的 EVR 比较
-                // （版本串原样进池），与别处的判据是同一个，不存在"选错版本/升不到稳定版"。
-                Id best = 0;
-                int pi;
-                Solvable* sa;
-                FOR_REPO_SOLVABLES(ps.avail, pi, sa)
-                {
-                    if (sa->name != nid) continue;
-                    // 版本串**原样**进池，所以直接拿池里的 EVR 去比即可。
-                    if (!best ||
-                        version_compare(pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr),
-                                        pool_id2str(ps.pool, sa->evr)))
-                        best = pi;  // 当前 best 版本 < sa 版本 → sa 更新为 best
-                }
-                // 已装版本 >= available 最高版本时不降级（仓库暂缺该新版本 / 已最新）
-                std::string installed_ver;
-                if (Repo* ir = ps.pool->installed) {
-                    int ip;
-                    Solvable* is;
-                    FOR_REPO_SOLVABLES(ir, ip, is)
-                    if (is->name == nid) {
-                        installed_ver = pool_id2str(ps.pool, is->evr);
-                        break;
-                    }
-                }
-                const std::string best_ver =
-                    best ? pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr)
-                         : std::string{};
-                if (best && (installed_ver.empty() || version_compare(installed_ver, best_ver)))
-                    queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, best);  // 新装 / 升级
-                else if (best)
-                    queue_push2(&jobs, SOLVER_SOLVABLE_NAME | SOLVER_INSTALL,
-                                nid);  // 已装同版/更高 → no-op
-                else
-                    // capability —— ⚠️ 用**带命名空间前缀**的 id（能力与包名不共用命名空间，
-                    // 见 constants::POOL_SONAME_PREFIX）。这里 `nid` 是裸包名，不能直接拿来问
-                    // "谁提供这个能力"。
-                    queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL, nid);
-            } else {
-                // 指定版本（`pkg:版本` / 本地 .lpkg）。libsolv 对"已装 identical"的
-                // SOLVER_SOLVABLE|INSTALL 会产出 REINSTALL 步骤，导致非 --force 的
-                // 同版本安装也进计划。这里在 job 层做策略：
-                //   已装**请求的版本**（且非 force）→ 不发 job（上层报"已安装"）；
-                //   真包但版本不在 avail → 明确报错，附可用版本；
-                //   已装同名包但版本不符、且 avail 里根本没有该名字 → 明确报错；
-                //   无同名包（也没装）→ 当 capability 处理（同 latest 分支：装提供者/缺则报错）。
-                Id evr = pool_str2id(ps.pool, vspec.c_str(), 1);
-                Id target_sid = 0;
-                bool name_exists = false;
-                std::string avail_versions;
-                {
-                    int pi2;
-                    Solvable* sa2;
-                    FOR_REPO_SOLVABLES(ps.avail, pi2, sa2)
-                    {
-                        if (sa2->name != nid) continue;
-                        name_exists = true;
-                        if (!avail_versions.empty()) avail_versions += ", ";
-                        avail_versions += pool_id2str(ps.pool, sa2->evr);
-                        if (sa2->evr == evr) target_sid = pi2;
-                    }
-                }
-                // 已装同名包的 evr（0 = 没装）。**必须单独取**：上面的 avail 扫描只覆盖
-                // available repo，而同名包完全可能**已装却不在 avail 里**（本地 .lpkg 装的、
-                // 索引下架、索引加载失败）—— 上面"已装同名包但版本不符"那条判据的全部机制，
-                // 就藏在这条缝里。
-                Id installed_evr = 0;
-                if (Repo* ir = ps.pool->installed) {
-                    int ip;
-                    Solvable* is;
-                    FOR_REPO_SOLVABLES(ir, ip, is)
-                    if (is->name == nid) {
-                        installed_evr = is->evr;
-                        break;
-                    }
-                }
-                // "请求的版本已装"= 幂等判据（直接比 evr id：同一 pool 下同串同 id）。
-                const bool req_already_installed = (installed_evr != 0 && installed_evr == evr);
-                if (target_sid) {
-                    // 请求的版本就在 avail 里：已装该版本（且非 --force）时不发 job，否则
-                    // libsolv 会产出 REINSTALL 步骤、把同版本安装也算进计划。
-                    if (!req_already_installed || opts.force_reinstall)
-                        queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, target_sid);
-                } else if (req_already_installed) {
-                    // 请求的版本**已装**、只是当前不在 avail 里 → 幂等 no-op（上层报"已安装"）。
-                    // 与 S1 同一语义：`install pkg:ver` 要求的是"系统处于该版本"，不是"仓库里
-                    // 现在能装到它"。**不得**因为 avail 里正好没有就报错，更不得丢版本。
-                } else if (name_exists) {
-                    // 真包存在但指定版本不在 avail → 报错，附可用版本（不再静默"已安装"）
-                    result.problems.push_back(string_format("error.package_version_not_found", name,
-                                                            vspec, avail_versions));
-                } else if (installed_evr != 0) {
-                    // avail 里根本没有这个名字，而**同名包已装**且版本与请求不符。
-                    // 落到下面的 capability 回退会按**裸包名**入队，而 libsolv 认为
-                    // installed repo 里的同名 solvable 自提供 `名字 = evr`，正好满足这个裸
-                    // 能力 ⇒ **空事务** ⇒ 上层 `first_unreached_target` 因
-                    // `cache.is_installed(名字)` 为真而放行 ⇒ 打印"所有包都已安装"、退出码 0，
-                    // 用户明确请求的版本被**静默丢弃**。这里显式报错（点名请求版本与已装
-                    // 版本），与上一条同样"绝不静默"。
-                    result.problems.push_back(string_format("error.installed_version_mismatch",
-                                                            name, vspec,
-                                                            pool_id2str(ps.pool, installed_evr)));
-                } else {
-                    // 无同名真实包（也没装）→ capability 回退：提供者由 libsolv 选（同 latest
-                    // 分支），无提供者时产生 SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP →
-                    // collect_problems 报错。
-                    // 指定版本对能力无意义——提示找不到同名包、忽略版本约束，仍装提供者。
-                    log_warning(string_format("warning.capability_version_ignored", name, vspec));
-                    queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL, nid);
+    Queue jobs;
+    queue_init(&jobs);
+    for (const auto& [name, vspec] : targets) {
+        Id nid = pool_str2id(ps.pool, name.c_str(), 1);
+        if (vspec == std::string(constants::VER_LATEST)) {
+            // "装到最新可用版本"。SOLVER_SOLVABLE_NAME|INSTALL 只"确保已装"，
+            // 已装时不升级（空 transaction）；加 SOLVER_UPDATE 又会让未装包变空操作。
+            // 正解：有同名真实包时找 available 最高版本 solvable，用
+            // SOLVER_SOLVABLE|INSTALL 精确指定（新装=装它，已装且更高=升级到它）；
+            // 无同名包时当 capability 处理（SOLVER_SOLVABLE_PROVIDES|INSTALL——
+            // 已装满足则 no-op，否则装 provider，缺则报错）。
+            // "最新"用 `version_compare()` 选 —— 它的实现**就是** libsolv 的 EVR 比较
+            // （版本串原样进池），与别处的判据是同一个，不存在"选错版本/升不到稳定版"。
+            Id best = 0;
+            int pi;
+            Solvable* sa;
+            FOR_REPO_SOLVABLES(ps.avail, pi, sa)
+            {
+                if (sa->name != nid) continue;
+                // 版本串**原样**进池，所以直接拿池里的 EVR 去比即可。
+                if (!best ||
+                    version_compare(pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr),
+                                    pool_id2str(ps.pool, sa->evr)))
+                    best = pi;  // 当前 best 版本 < sa 版本 → sa 更新为 best
+            }
+            // 已装版本 >= available 最高版本时不降级（仓库暂缺该新版本 / 已最新）
+            std::string installed_ver;
+            if (Repo* ir = ps.pool->installed) {
+                int ip;
+                Solvable* is;
+                FOR_REPO_SOLVABLES(ir, ip, is)
+                if (is->name == nid) {
+                    installed_ver = pool_id2str(ps.pool, is->evr);
+                    break;
                 }
             }
-        }
-
-        if (!result.problems.empty()) {
-            queue_free(&jobs);
-            return result;  // S3：真包指定版本不存在 → 直接报错，不再静默"已安装"
-        }
-
-        Solver* solv = solver_create(ps.pool);
-        int res = solver_solve(solv, &jobs);
-        queue_free(&jobs);
-
-        if (res != 0) {
-            std::vector<std::string> missing_so, soname_conflicts, missing_dep, missing_target,
-                fatal;
-            collect_problems(solv, ps.pool, missing_so, soname_conflicts, missing_dep,
-                             missing_target, fatal);
-
-            if (round == 0 && opts.missing_so_no_error && missing_dep.empty() &&
-                missing_target.empty()) {
-                // --missing-so-no-error 容忍（round0 注入一次后重解）：
-                // 注入 = nothing-provides 缺 SONAME（missing_so）∪ PKG 冲突形态的缺
-                // SONAME（soname_conflicts，libsolv 措辞不同、性质相同）。命名依赖/顶层
-                // 请求缺失仍不可容忍。真冲突不进这两个桶 → 注入集空 → 落到
-                // 下方照常报错；若某 fatal 实为缺 SONAME 引起，注入后 round1 重解即消解。
-                std::vector<std::string> inject = missing_so;
-                for (const auto& c : soname_conflicts) {
-                    if (std::find(inject.begin(), inject.end(), c) == inject.end())
-                        inject.push_back(c);
-                }
-                if (!inject.empty()) {
-                    injected = std::move(inject);
-                    solver_free(solv);
-                    continue;
+            const std::string best_ver =
+                best ? pool_id2str(ps.pool, pool_id2solvable(ps.pool, best)->evr) : std::string{};
+            if (best && (installed_ver.empty() || version_compare(installed_ver, best_ver)))
+                queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, best);  // 新装 / 升级
+            else if (best)
+                queue_push2(&jobs, SOLVER_SOLVABLE_NAME | SOLVER_INSTALL,
+                            nid);  // 已装同版/更高 → no-op
+            else
+                // capability —— ⚠️ 用**带命名空间前缀**的 id（能力与包名不共用命名空间，
+                // 见 constants::POOL_SONAME_PREFIX）。这里 `nid` 是裸包名，不能直接拿来问
+                // "谁提供这个能力"。
+                queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL, nid);
+        } else {
+            // 指定版本（`pkg:版本` / 本地 .lpkg）。libsolv 对"已装 identical"的
+            // SOLVER_SOLVABLE|INSTALL 会产出 REINSTALL 步骤，导致非 --force 的
+            // 同版本安装也进计划。这里在 job 层做策略：
+            //   已装**请求的版本**（且非 force）→ 不发 job（上层报"已安装"）；
+            //   真包但版本不在 avail → 明确报错，附可用版本；
+            //   已装同名包但版本不符、且 avail 里根本没有该名字 → 明确报错；
+            //   无同名包（也没装）→ 当 capability 处理（同 latest 分支：装提供者/缺则报错）。
+            Id evr = pool_str2id(ps.pool, vspec.c_str(), 1);
+            Id target_sid = 0;
+            bool name_exists = false;
+            std::string avail_versions;
+            {
+                int pi2;
+                Solvable* sa2;
+                FOR_REPO_SOLVABLES(ps.avail, pi2, sa2)
+                {
+                    if (sa2->name != nid) continue;
+                    name_exists = true;
+                    if (!avail_versions.empty()) avail_versions += ", ";
+                    avail_versions += pool_id2str(ps.pool, sa2->evr);
+                    if (sa2->evr == evr) target_sid = pi2;
                 }
             }
-            for (const auto& p : fatal) result.problems.push_back(p);
-            // 顶层请求的包/能力无提供者 → "仓库中未找到软件包"，不是"依赖"
-            for (const auto& t : missing_target)
-                result.problems.push_back(string_format("error.package_not_in_repo", t));
-            for (const auto& d : missing_dep)
-                result.problems.push_back(string_format("error.unresolved_dependency", d));
-            for (const auto& c : missing_so)
-                result.problems.push_back(string_format("error.unresolved_soname", c));
-            for (const auto& c : soname_conflicts)
-                result.problems.push_back(string_format("error.unresolved_soname", c));
-
-            // ── 兜底桶：libsolv 报了问题，却**没有任何桶认领** ────────────────────────
-            //
-            // `solver_solve` 的返回值是**问题数**（0 = 求解成功），所以 `res != 0` 意味着
-            // libsolv 确实有一个它无法满足的约束。而本函数把问题按"规则类型"分桶，
-            // 末尾那段 `else`（通用 JOB、DISTUPGRADE、CHOICE、BEST、YUMOBS、BLACK …）
-            // 是**故意跳过**的：那些规则在 lpkg 的 pool 里不该成为最终冲突（可容忍/结构性）。
-            //
-            // 但"跳过"不能变成"什么都不报"：`result.problems` 空 = `ok()` = 上层把它读成
-            // **求解成功、无事可做** —— `upgrade` 会打印"所有包都已是最新版本"并以 0 退出，
-            // 而磁盘上什么都没变。这是把"失败"伪装成"成功"的最恶劣形态（脚本无法区分）。
-            // 所以此处兜底：诊断不出具体原因也要**报一次失败**，绝不放行。
-            //
-            // 可达性：**未证实**（静态分析：lpkg 的 pool 只建模 provides +
-            // requires，没有 CONFLICTS/OBSOLETES；任何装不上的目标最终都由某条 requires 规则
-            // 触发，而它的类型落在 PKG_* / JOB_* 桶里；weak 规则（choice 等）参与的问题会被
-            // libsolv 的 analyze_unsolvable 直接撤销、不会留在 problems 队列里）。
-            // 这是**纵深防御**：不在上面加桶的那天起，这段就只是把"漏报"钉成"必报"。
-            if (result.problems.empty()) {
+            // 已装同名包的 evr（0 = 没装）。**必须单独取**：上面的 avail 扫描只覆盖
+            // available repo，而同名包完全可能**已装却不在 avail 里**（本地 .lpkg 装的、
+            // 索引下架、索引加载失败）—— 上面"已装同名包但版本不符"那条判据的全部机制，
+            // 就藏在这条缝里。
+            Id installed_evr = 0;
+            if (Repo* ir = ps.pool->installed) {
+                int ip;
+                Solvable* is;
+                FOR_REPO_SOLVABLES(ir, ip, is)
+                if (is->name == nid) {
+                    installed_evr = is->evr;
+                    break;
+                }
+            }
+            // "请求的版本已装"= 幂等判据（直接比 evr id：同一 pool 下同串同 id）。
+            const bool req_already_installed = (installed_evr != 0 && installed_evr == evr);
+            if (target_sid) {
+                // 请求的版本就在 avail 里：已装该版本（且非 --force）时不发 job，否则
+                // libsolv 会产出 REINSTALL 步骤、把同版本安装也算进计划。
+                if (!req_already_installed || opts.force_reinstall)
+                    queue_push2(&jobs, SOLVER_SOLVABLE | SOLVER_INSTALL, target_sid);
+            } else if (req_already_installed) {
+                // 请求的版本**已装**、只是当前不在 avail 里 → 幂等 no-op（上层报"已安装"）。
+                // 与 S1 同一语义：`install pkg:ver` 要求的是"系统处于该版本"，不是"仓库里
+                // 现在能装到它"。**不得**因为 avail 里正好没有就报错，更不得丢版本。
+            } else if (name_exists) {
+                // 真包存在但指定版本不在 avail → 报错，附可用版本（不再静默"已安装"）
                 result.problems.push_back(
-                    string_format("error.solve_failed_undiagnosed", std::to_string(res)));
+                    string_format("error.package_version_not_found", name, vspec, avail_versions));
+            } else if (installed_evr != 0) {
+                // avail 里根本没有这个名字，而**同名包已装**且版本与请求不符。
+                // 落到下面的 capability 回退会按**裸包名**入队，而 libsolv 认为
+                // installed repo 里的同名 solvable 自提供 `名字 = evr`，正好满足这个裸
+                // 能力 ⇒ **空事务** ⇒ 上层 `first_unreached_target` 因
+                // `cache.is_installed(名字)` 为真而放行 ⇒ 打印"所有包都已安装"、退出码 0，
+                // 用户明确请求的版本被**静默丢弃**。这里显式报错（点名请求版本与已装
+                // 版本），与上一条同样"绝不静默"。
+                result.problems.push_back(string_format("error.installed_version_mismatch", name,
+                                                        vspec,
+                                                        pool_id2str(ps.pool, installed_evr)));
+            } else {
+                // 无同名真实包（也没装）→ capability 回退：提供者由 libsolv 选（同 latest
+                // 分支），无提供者时产生 SOLVER_RULE_JOB_NOTHING_PROVIDES_DEP →
+                // collect_problems 报错。
+                // 指定版本对能力无意义——提示找不到同名包、忽略版本约束，仍装提供者。
+                log_warning(string_format("warning.capability_version_ignored", name, vspec));
+                queue_push2(&jobs, SOLVER_SOLVABLE_PROVIDES | SOLVER_INSTALL, nid);
             }
-            solver_free(solv);
-            return result;
         }
-
-        Transaction* trans = solver_create_transaction(solv);
-        // 不用 transaction_order：libsolv 的启发式对真实大图会漏排依赖边
-        // （bootstrap 里 job 包 bash 被留在最前、gcc 先于 gmp/mpfr/mpc）。
-        // 只取原始步骤，随后自己做稳定拓扑排序（order_by_dependencies）。
-        std::vector<Id> order_sids;
-        for (int i = 0; i < trans->steps.count; ++i) {
-            Id step = trans->steps.elements[i];
-            Solvable* s = pool_id2solvable(ps.pool, step);
-            // 旧包（被替换/删除，repo==installed）跳过：升级时 libsolv 会同时产出
-            // 旧包（UPGRADED/DOWNGRADED/OBSOLETED/ERASE）与新包（UPGRADE/INSTALL）
-            // 两个 step，旧包必须忽略，否则幽灵"app 1.0"进 order 破坏升级计划。
-            if (s->repo == ps.pool->installed) continue;
-            int type = transaction_type(trans, step, 0);
-            if (type == SOLVER_TRANSACTION_ERASE) continue;  // 兜底
-            ResolvedPkg r;
-            r.name = pool_id2str(ps.pool, s->name);
-            // pool 内 evr **原样**就是 lpkg 版本，直接读回即可
-            r.version = pool_id2str(ps.pool, s->evr);
-            r.is_install = (type == SOLVER_TRANSACTION_INSTALL);
-            result.order.push_back(std::move(r));
-            order_sids.push_back(step);
-        }
-        transaction_free(trans);
-        order_by_dependencies(ps.pool, order_sids, result.order);
-        solver_free(solv);
-        break;
     }
+
+    if (!result.problems.empty()) {
+        queue_free(&jobs);
+        return result;  // S3：真包指定版本不存在 → 直接报错，不再静默"已安装"
+    }
+
+    Solver* solv = solver_create(ps.pool);
+    // SONAME 容忍已下沉到 libsolv fork：无可用 provider 的 "so:" requires 会被标成 weak
+    // rule，求解器可以为了满足升级 job 而违反它（详见 src/patches/libsolv/）。
+    if (opts.missing_so_no_error)
+        solver_set_flag(solv, SOLVER_FLAG_LPKG_TOLERATE_MISSING_SONAME, 1);
+    int res = solver_solve(solv, &jobs);
+    queue_free(&jobs);
+
+    if (res != 0) {
+        std::vector<std::string> missing_so, soname_conflicts, missing_dep, missing_target, fatal;
+        collect_problems(solv, ps.pool, missing_so, soname_conflicts, missing_dep, missing_target,
+                         fatal);
+
+        for (const auto& p : fatal) result.problems.push_back(p);
+        // 顶层请求的包/能力无提供者 → "仓库中未找到软件包"，不是"依赖"
+        for (const auto& t : missing_target)
+            result.problems.push_back(string_format("error.package_not_in_repo", t));
+        for (const auto& d : missing_dep)
+            result.problems.push_back(string_format("error.unresolved_dependency", d));
+        for (const auto& c : missing_so)
+            result.problems.push_back(string_format("error.unresolved_soname", c));
+        for (const auto& c : soname_conflicts)
+            result.problems.push_back(string_format("error.unresolved_soname", c));
+
+        // ── 兜底桶：libsolv 报了问题，却**没有任何桶认领** ────────────────────────
+        //
+        // `solver_solve` 的返回值是**问题数**（0 = 求解成功），所以 `res != 0` 意味着
+        // libsolv 确实有一个它无法满足的约束。而本函数把问题按"规则类型"分桶，
+        // 末尾那段 `else`（通用 JOB、DISTUPGRADE、CHOICE、BEST、YUMOBS、BLACK …）
+        // 是**故意跳过**的：那些规则在 lpkg 的 pool 里不该成为最终冲突（可容忍/结构性）。
+        //
+        // 但"跳过"不能变成"什么都不报"：`result.problems` 空 = `ok()` = 上层把它读成
+        // **求解成功、无事可做** —— `upgrade` 会打印"所有包都已是最新版本"并以 0 退出，
+        // 而磁盘上什么都没变。这是把"失败"伪装成"成功"的最恶劣形态（脚本无法区分）。
+        // 所以此处兜底：诊断不出具体原因也要**报一次失败**，绝不放行。
+        //
+        // 可达性：**未证实**（静态分析：lpkg 的 pool 只建模 provides +
+        // requires，没有 CONFLICTS/OBSOLETES；任何装不上的目标最终都由某条 requires 规则
+        // 触发，而它的类型落在 PKG_* / JOB_* 桶里；weak 规则（choice 等）参与的问题会被
+        // libsolv 的 analyze_unsolvable 直接撤销、不会留在 problems 队列里）。
+        // 这是**纵深防御**：不在上面加桶的那天起，这段就只是把"漏报"钉成"必报"。
+        if (result.problems.empty()) {
+            result.problems.push_back(
+                string_format("error.solve_failed_undiagnosed", std::to_string(res)));
+        }
+        solver_free(solv);
+        return result;
+    }
+
+    Transaction* trans = solver_create_transaction(solv);
+    // 不用 transaction_order：libsolv 的启发式对真实大图会漏排依赖边
+    // （bootstrap 里 job 包 bash 被留在最前、gcc 先于 gmp/mpfr/mpc）。
+    // 只取原始步骤，随后自己做稳定拓扑排序（order_by_dependencies）。
+    std::vector<Id> order_sids;
+    for (int i = 0; i < trans->steps.count; ++i) {
+        Id step = trans->steps.elements[i];
+        Solvable* s = pool_id2solvable(ps.pool, step);
+        // 旧包（被替换/删除，repo==installed）跳过：升级时 libsolv 会同时产出
+        // 旧包（UPGRADED/DOWNGRADED/OBSOLETED/ERASE）与新包（UPGRADE/INSTALL）
+        // 两个 step，旧包必须忽略，否则幽灵"app 1.0"进 order 破坏升级计划。
+        if (s->repo == ps.pool->installed) continue;
+        int type = transaction_type(trans, step, 0);
+        if (type == SOLVER_TRANSACTION_ERASE) continue;  // 兜底
+        ResolvedPkg r;
+        r.name = pool_id2str(ps.pool, s->name);
+        // pool 内 evr **原样**就是 lpkg 版本，直接读回即可
+        r.version = pool_id2str(ps.pool, s->evr);
+        r.is_install = (type == SOLVER_TRANSACTION_INSTALL);
+        result.order.push_back(std::move(r));
+        order_sids.push_back(step);
+    }
+    transaction_free(trans);
+    order_by_dependencies(ps.pool, order_sids, result.order);
+    solver_free(solv);
 
     // --force 的"已是最新版本"目标：同版本无需安装，libsolv 不会为它们产生事务步骤，
     // 必须逐目标补回。**不能只在 result.order 为空时补**——`install --force A B`

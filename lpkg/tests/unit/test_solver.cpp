@@ -113,6 +113,42 @@ TEST_F(SolverTest, MissingProviderTolerated)
     EXPECT_TRUE(order_has(r, "appB"));
 }
 
+// ABI 过渡：已装消费者仍要求旧 SONAME，而旧 provider 必须被升级替换（icu 78→79）。
+// 非宽松模式下 libsolv 报的是"旧 provider 要留、新版本要装"的同名包冲突，不是
+// nothing-provides；宽松模式（libsolv fork）把这条 requires 标成 weak，升级才能完成。
+TEST_F(SolverTest, ToleratesSonameOfProviderBeingUpgraded)
+{
+    add("icu", "79.1", {}, {}, {"libicui18n.so.79", "libicuuc.so.79"}, {});
+    add("tinysparql", "3.12.0", {}, {}, {"libtinysparql-3.0.so.0"},
+        {"libicui18n.so.78", "libicuuc.so.78"});
+    installed["icu"] = {"78.3", {}, {}, {"libicui18n.so.78", "libicuuc.so.78"}, {}};
+    installed["tinysparql"] = {
+        "3.12.0", {}, {}, {"libtinysparql-3.0.so.0"}, {"libicui18n.so.78", "libicuuc.so.78"}};
+
+    // 默认模式必须无解——否则这个用例证明不了宽松模式在起作用。
+    auto strict = solve({{"icu", "latest"}});
+    EXPECT_FALSE(strict.ok()) << "非宽松模式不应放过 ABI 断裂";
+
+    SolveOptions opts;
+    opts.missing_so_no_error = true;
+    auto r = solve({{"icu", "latest"}}, opts);
+    ASSERT_TRUE(r.ok()) << "problems: " << (r.problems.empty() ? "" : r.problems[0]);
+
+    bool found_icu = false;
+    for (const auto& p : r.order) {
+        if (p.name == "tinysparql") {
+            // 弱规则被违反时，求解器可能把消费者列成"同版本重装"；执行阶段
+            // plan_member_skipped 会跳过它。关键是版本不变、不能被移除/降级。
+            EXPECT_EQ(p.version, "3.12.0") << "消费者不应被改动";
+        }
+        if (p.name == "icu") {
+            found_icu = true;
+            EXPECT_EQ(p.version, "79.1");
+        }
+    }
+    EXPECT_TRUE(found_icu) << "icu 应升级到 79.1";
+}
+
 // M1 回归：缺失**命名依赖**（非 SONAME）默认即报错
 TEST_F(SolverTest, MissingNamedDepErrorsByDefault)
 {

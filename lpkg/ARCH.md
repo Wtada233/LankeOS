@@ -31,6 +31,7 @@
 20. [第五批：两条中危缺陷 + 保留命名空间表 + 反向依赖收敛 + `utils.hpp` 拆分](#20-第五批两条中危缺陷--保留命名空间表--反向依赖收敛--utilshpp-拆分)
 21. [第六批：畸形 tar 守卫 + `so:` 命名空间不变量订正](#21-第六批畸形-tar-守卫--so-命名空间不变量订正)
 22. [静态库"长名成员"判据必须与成员顺序无关](#22-静态库长名成员判据必须与成员顺序无关)
+23. [libsolv 的 lpkg fork](#23-libsolv-的-lpkg-fork)
 
 ---
 
@@ -3123,3 +3124,35 @@ Warning: Failed to strip file …/libLLVMDemangle.a: Static library is malformed
 
 **收口数字**：`make test` **1217 用例 / 144 套件 / 1216 通过 / 0 失败 / 1 跳过**（基线 1216/144，
 +1 即本条用例），`make format-check` 222 文件 0 残留。
+
+## 23. libsolv 的 lpkg fork
+
+`--missing-so-no-error` 的 SONAME 容忍**不在 lpkg 里做注入**，而是由 lpkg 维护的 libsolv fork
+在规则层完成。lpkg 只接受这个 fork：
+
+- 补丁：`src/patches/libsolv/0001-tolerate-missing-soname.patch`，打在 upstream tag `0.7.39` 上
+- pkg-config `Version` 被改写成 `0.0.0-lpkg`；`deps-check` 要求**精确等于**它，`solver.cpp`
+  另有 `#error` 兜底（上游 libsolv 没有这个 flag，编译期就会拦下）
+- 新增 solver flag：`SOLVER_FLAG_LPKG_TOLERATE_MISSING_SONAME`
+
+**语义**：开关打开时，`solver_addpkgrulesforsolvable()` 把**没有可用 provider** 的 `so:`
+requires 规则标成 weak（与 recommends 同一机制）：
+
+- 完全无人提供（`SOLVER_RULE_PKG_NOTHING_PROVIDES_DEP` 分支）；
+- 只有已装 provider（升级会把旧 provider 换掉，即 ABI 过渡场景）。
+
+有可用 provider 时保持强依赖，正常解析不受影响；非 `so:` 的命名依赖永不放宽。
+
+**为什么必须在规则层**：升级替换 provider 时，libsolv 报的是"旧 provider 要留、新版本又要装"
+的**同名包冲突**（`cannot install both icu-78 and icu-79`），不是 `nothing-provides`。求解失败
+后再按问题桶注入 SONAME 根本看不到它（旧实现就是在这里失效的）。weak 规则让求解器可以为了
+满足升级 job 而违反旧 requires，消费者留在系统里，等它自己的新版本（要求新 SONAME）被仓库
+提供后再正常升级。
+
+**构建**：`make docker-env` 克隆 pin 的 tag、把补丁 `docker cp` 进容器、`patch -p1` 后构建；
+`/usr/lib/libsolv.tag` 记录 `<tag>-0.0.0-lpkg-<补丁 hash>`，补丁一改就自动重编。主机构建要求
+同名 fork 已安装，否则 `deps-check` 直接报错并指出补丁路径。
+
+**版本号**：fork 只改 `CMakeLists.txt` 里的 `VERSION`（pkg-config/CPACK 用）；`solvversion.h`
+里的数值版本与 SONAME 保持 upstream 值，避免破坏头文件里的数值运算。
+
