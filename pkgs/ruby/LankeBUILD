@@ -16,5 +16,8 @@ lankebuild_build() {
 lankebuild_package() {
     echo "Packaging ruby-{ORIG_PKG_VER}"
     make DESTDIR="{STAGING_ROOT}" install
+    # RubyGems 的 cache/*.gem 是 default/bundled gem 的安装缓存，运行期不需要；
+    # .gem 内含构建时间戳，还会让包不可复现（Arch 也显式删除）。
+    rm -rf "{STAGING_ROOT}"/usr/lib/ruby/gems/*/cache
     echo "Package staging complete."
 }

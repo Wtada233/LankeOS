@@ -1,6 +1,6 @@
 {
   "name": "uv",
-  "version": "0.13.1",
+  "version": "0.13.5",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -24,7 +24,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/astral-sh/uv/archive/refs/tags/0.13.1.tar.gz"
+    "https://github.com/astral-sh/uv/archive/refs/tags/0.13.5.tar.gz"
   ],
   "work_sources": []
 }

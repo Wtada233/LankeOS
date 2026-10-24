@@ -1,6 +1,6 @@
 {
   "name": "union",
-  "version": "6.8.0",
+  "version": "6.8.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -48,7 +48,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/union-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/union-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

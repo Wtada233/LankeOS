@@ -1,7 +1,7 @@
 {
   "name": "ruby",
-  "version": "4.0.7",
-  "release": 3,
+  "version": "4.0.9",
+  "release": 4,
   "deps": [
     "bash"
   ],
@@ -35,7 +35,7 @@
     "zlib"
   ],
   "sources": [
-    "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.7.tar.xz"
+    "https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.9.tar.xz"
   ],
   "no_strip": false,
   "work_sources": []

@@ -1,6 +1,6 @@
 {
   "name": "perl-uri",
-  "version": "5.37",
+  "version": "5.40",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -9,7 +9,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://cpan.metacpan.org/authors/id/O/OA/OALDERS/URI-5.37.tar.gz"
+    "https://cpan.metacpan.org/authors/id/O/OA/OALDERS/URI-5.40.tar.gz"
   ],
   "work_sources": []
 }

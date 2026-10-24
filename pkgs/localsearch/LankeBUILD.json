@@ -1,7 +1,7 @@
 {
   "name": "localsearch",
   "version": "3.12.0",
-  "release": 2,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libavformat.so.63@LIBAVFORMAT_63",
@@ -17,7 +17,7 @@
     "libgsf-1.so.114",
     "libgstreamer-1.0.so.0",
     "libgsttag-1.0.so.0",
-    "libicui18n.so.78",
+    "libicui18n.so.79",
     "libjpeg.so.62@LIBJPEG_6.2",
     "libm.so.6@GLIBC_2.2.5",
     "libpng16.so.16@PNG16_0",

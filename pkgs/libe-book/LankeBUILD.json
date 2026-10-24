@@ -1,12 +1,12 @@
 {
   "name": "libe-book",
   "version": "0.1.4",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
     "libgcc_s.so.1@GCC_3.0",
-    "libicui18n.so.78",
+    "libicui18n.so.79",
     "liblangtag.so.1",
     "libm.so.6",
     "librevenge-0.0.so.0",

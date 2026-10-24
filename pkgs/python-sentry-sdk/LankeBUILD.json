@@ -1,6 +1,6 @@
 {
   "name": "python-sentry-sdk",
-  "version": "2.72.0",
+  "version": "2.73.0",
   "release": 3,
   "deps": [
     "python",
@@ -19,7 +19,7 @@
     "python-wheel"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/26/c1/d2bbb2b03bdc2ef14b35e02b647b8489156c50b6e0b8bacc5fa303902e23/sentry_sdk-2.72.0.tar.gz"
+    "https://files.pythonhosted.org/packages/c5/3b/1e47acf2456781c26e12007379ecc154bf310b8f64d40390d78b791d55c3/sentry_sdk-2.73.0.tar.gz"
   ],
   "work_sources": []
 }

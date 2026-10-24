@@ -1,7 +1,7 @@
 {
   "name": "libksysguard",
-  "version": "6.8.0",
-  "release": 5,
+  "version": "6.8.1",
+  "release": 6,
   "deps": [
     "qt5compat",
     "kf-kirigami",
@@ -73,7 +73,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/libksysguard-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/libksysguard-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

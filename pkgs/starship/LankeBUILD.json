@@ -1,6 +1,6 @@
 {
   "name": "starship",
-  "version": "1.26.0",
+  "version": "1.27.0",
   "release": 4,
   "deps": [],
   "needed_so": [
@@ -16,6 +16,7 @@
     "rust"
   ],
   "sources": [
-    "https://github.com/starship/starship/archive/refs/tags/v1.26.0.tar.gz"
-  ]
+    "https://github.com/starship/starship/archive/refs/tags/v1.27.0.tar.gz"
+  ],
+  "work_sources": []
 }

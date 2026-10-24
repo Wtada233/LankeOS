@@ -1,7 +1,7 @@
 {
   "name": "blender",
-  "version": "5.2.2",
-  "release": 1,
+  "version": "5.2.3",
+  "release": 6,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -15,8 +15,8 @@
     "libOpenEXR-3_5.so.34",
     "libOpenEXRCore-3_5.so.34",
     "libOpenImageDenoise.so.2",
-    "libOpenImageIO.so.3.1",
-    "libOpenImageIO_Util.so.3.1",
+    "libOpenImageIO.so.3.2",
+    "libOpenImageIO_Util.so.3.2",
     "libX11.so.6",
     "libXfixes.so.3",
     "libXi.so.6",
@@ -29,7 +29,7 @@
     "libavutil.so.61@LIBAVUTIL_61",
     "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.28,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.7}",
     "libceres.so.4",
-    "libdraco.so.9",
+    "libdraco.so.11",
     "libembree4.so.4",
     "libepoxy.so.0",
     "libfftw3.so.3",
@@ -38,7 +38,7 @@
     "libfmt.so.12",
     "libfreetype.so.6",
     "libgcc_s.so.1@{GCC_3.0,GCC_4.0.0}",
-    "libgflags.so.2.2",
+    "libgflags.so.2.3",
     "libglog.so.2",
     "libgmp.so.10",
     "libgmpxx.so.4",
@@ -49,7 +49,7 @@
     "libopenal.so.1",
     "libopenjp2.so.7",
     "libopenpgl.so.0",
-    "libopenvdb.so.13.0",
+    "libopenvdb.so.13.1",
     "libopenxr_loader.so.1",
     "libosdCPU.so.3.7.0",
     "libosdGPU.so.3.7.0",
@@ -168,7 +168,7 @@
     "zstd"
   ],
   "sources": [
-    "https://download.blender.org/source/blender-5.2.2.tar.xz"
+    "https://download.blender.org/source/blender-5.2.3.tar.xz"
   ],
   "work_sources": []
 }

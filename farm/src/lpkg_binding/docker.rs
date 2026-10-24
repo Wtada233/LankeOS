@@ -461,20 +461,23 @@ impl RealBinding {
         Ok(())
     }
 
-    /// 容器内 `lpkg install lpkg` → `lpkg upgrade`（必要时 force-solve-conflict 重试）→ `rm -rf
-    /// /backups` 白洞化；成功后 commit 滚动快照或 GC 扁平化。
+    /// 容器内 `lpkg install lpkg` → `lpkg upgrade` → `rm -rf /backups` 白洞化；成功后 commit
+    /// 滚动快照或 GC 扁平化。
     ///
     /// **实时流式日志**，不捕获（捕获 = 黑盒，构建完成才输出；stdout 末尾混入 ls 结果会污染文件名
     /// 提取）。index.txt 含**完整 needed_so**（单一真源），lpkg 的 SONAME 检查在容器里真实运行——
     /// 过渡期缺失 SONAME 由 `--missing-so-no-error` 显式容忍，不再靠剥索引/清状态压制检查。
-    /// force-solve-conflict 是显式破坏性操作，lpkg 在非交互（-y）下拒绝执行——确认短语从 stdin 读，
-    /// 正确姿势是 `echo '...' | lpkg force-solve-conflict`（不带 -y），带 -y 会废掉短语机制。
-    /// upgrade 失败 → 容器状态不可信，不 commit、不滚动，直接报错。
+    ///
+    /// **不用 force-solve-conflict 兜底**：它把「needed_so 无人提供」也算作 broken，会把 ABI
+    /// 过渡（如 icu 78→79）中待重编的受害者整批删掉，恰好抵消 `--missing-so-no-error` 的容忍。
+    /// 而且 solver 的容忍是全有或全无——只要容器里另有一个缺命名依赖，第一次 upgrade 就会失败，
+    /// 此时 force-solve 会把与失败原因无关的 SONAME 受害者一并删除。upgrade 失败 → 容器状态不可信，
+    /// 不 commit、不滚动，直接报错（宁可让构建停下，也不能悄悄删包）。
     /// commit/GC 失败 → **硬报错**（滚动快照是性能核心，静默跳过会让下次 upgrade 重新滚雪球；且容器
     /// 随后会被 rm，未 commit 的状态就丢了）。
     fn run_upgrade_and_roll(&self, pkg: &str, cid: &str, roll: u32) -> Result<(), FarmError> {
         let upgrade_script = "lpkg install lpkg -y && \
-             ( lpkg upgrade -y --missing-so-no-error || { echo 'I understand that this may break my system.' | lpkg force-solve-conflict && lpkg upgrade -y --missing-so-no-error; } ) || exit 1 ; \
+             lpkg upgrade -y --missing-so-no-error || exit 1 ; \
              rm -rf /backups ; \
              exit 0";
         let status = docker_stream(&["exec", cid, "sh", "-c", upgrade_script])

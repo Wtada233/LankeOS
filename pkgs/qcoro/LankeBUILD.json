@@ -1,7 +1,7 @@
 {
   "name": "qcoro",
   "version": "0.13.0",
-  "release": 4,
+  "release": 5,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",

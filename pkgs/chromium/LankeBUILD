@@ -115,6 +115,8 @@ lankebuild_prepare() {
         chromium-152-unbundle-minizip-undo-unicode.patch \
         chromium-152-unbundle-opus-devtools.patch \
         chromium-153-iamf-tools-unbundled-opus.patch \
+        chromium-156-revert-gn-check-includes.patch \
+        chromium-156-isolatedDeclarations.patch \
         openxr-vendored-vulkan-headers.patch; do
         if patch -Np1 --dry-run -i "$_BD/$_p" >/dev/null 2>&1; then
             patch -Np1 -i "$_BD/$_p"
@@ -245,7 +247,6 @@ lankebuild_build() {
     _flags="$_flags chrome_pgo_phase=2"
     # rust：内置工具链（use_chromium_rust_toolchain，rust_sysroot_absolute 留空即默认），
     # 版本/绑定由 third_party/rust-toolchain 的 VERSION 文件与 crubit 自动提供
-    _flags="$_flags icu_use_data_file=false"
 
     # Google API key（编译进 GOOGLE_API_KEY 宏，见 google_apis/BUILD.gn）
     if [ -n "$_GOOG_API_KEY" ]; then
@@ -311,7 +312,7 @@ lankebuild_package() {
 
     # --- 资源文件 ---
     for _f in \
-        chrome_100_percent.pak chrome_200_percent.pak \
+        chrome_100_percent.pak chrome_200_percent.pak icudtl.dat \
         chrome_crashpad_handler libqt6_shim.so resources.pak v8_context_snapshot.bin \
         libEGL.so libGLESv2.so libvk_swiftshader.so libvulkan.so.1 \
         vk_swiftshader_icd.json; do

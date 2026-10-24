@@ -1,7 +1,7 @@
 {
   "name": "kwayland",
-  "version": "6.8.0",
-  "release": 4,
+  "version": "6.8.1",
+  "release": 5,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
@@ -27,7 +27,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/kwayland-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/kwayland-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "ocean-sound-theme",
-  "version": "6.8.0",
+  "version": "6.8.1",
   "release": 2,
   "deps": [],
   "needed_so": [],
@@ -13,7 +13,7 @@
     "qt6-base"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/ocean-sound-theme-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/ocean-sound-theme-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,13 +1,4 @@
 lankebuild_prepare() {
-    if ! patch -Np1 -i "{WORK_DIR}/../python315-weakref.patch"; then
-        if patch -R -p1 --dry-run -i "{WORK_DIR}/../python315-weakref.patch" >/dev/null 2>&1; then
-            echo "Python 3.15 weakref 补丁已应用，跳过"
-        else
-            echo "Python 3.15 weakref 补丁应用失败" >&2
-            exit 1
-        fi
-    fi
-
     cmake -B build -G Ninja -S . \
         -DCMAKE_INSTALL_PREFIX={PREFIX} \
         -DCMAKE_INSTALL_LIBDIR=lib \

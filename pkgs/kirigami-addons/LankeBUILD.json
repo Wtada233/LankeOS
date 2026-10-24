@@ -1,7 +1,7 @@
 {
   "name": "kirigami-addons",
   "version": "1.15.0",
-  "release": 5,
+  "release": 6,
   "deps": [
     "qt6-multimedia",
     "kf-kirigami",

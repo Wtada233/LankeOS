@@ -1,6 +1,6 @@
 {
   "name": "python-pip",
-  "version": "26.2.1",
+  "version": "26.2.2",
   "release": 3,
   "deps": [
     "python"
@@ -15,7 +15,7 @@
     "python-pyproject-hooks"
   ],
   "sources": [
-    "https://github.com/pypa/pip/archive/26.2.1/pip-26.2.1.tar.gz"
+    "https://files.pythonhosted.org/packages/fa/e8/0842d757e483e895e670f655084cfe8b8c72580c6769a76b30b2789a0608/pip-26.2.2.tar.gz"
   ],
   "work_sources": []
 }

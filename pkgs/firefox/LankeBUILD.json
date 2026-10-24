@@ -1,7 +1,7 @@
 {
   "name": "firefox",
-  "version": "158.0",
-  "release": 6,
+  "version": "158.0.1",
+  "release": 7,
   "deps": [
     "ffmpeg"
   ],
@@ -24,8 +24,8 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libgtk-3.so.0",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
+    "libicui18n.so.79",
+    "libicuuc.so.79",
     "libjpeg.so.62@LIBJPEG_6.2",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43,GLIBC_2.44}",
     "libnspr4.so",
@@ -80,7 +80,7 @@
     "zlib"
   ],
   "sources": [
-    "https://archive.mozilla.org/pub/firefox/releases/158.0/source/firefox-158.0.source.tar.xz"
+    "https://archive.mozilla.org/pub/firefox/releases/158.0.1/source/firefox-158.0.1.source.tar.xz"
   ],
   "work_sources": []
 }

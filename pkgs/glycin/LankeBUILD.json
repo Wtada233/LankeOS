@@ -1,6 +1,6 @@
 {
   "name": "glycin",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "release": 2,
   "deps": [
     "bubblewrap"
@@ -48,7 +48,7 @@
     "vala"
   ],
   "sources": [
-    "https://download.gnome.org/sources/glycin/2.2/glycin-2.2.3.tar.xz"
+    "https://download.gnome.org/sources/glycin/2.2/glycin-2.2.4.tar.xz"
   ],
   "work_sources": []
 }

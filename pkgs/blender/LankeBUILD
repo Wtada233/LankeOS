@@ -8,6 +8,8 @@ lankebuild_prepare() {
         fi
     fi
 
+    # USD 26.11 把 pxr/imaging/glf/drawTarget.h 移到了 hdSt/，Blender 5.2.3 的
+    # Hydra 仍 include 旧路径；关掉 Hydra，USD 导入/导出不受影响。
     cmake -B build -G Ninja -S . \
         -C build_files/cmake/config/blender_release.cmake \
         -D CMAKE_BUILD_TYPE=Release \
@@ -20,6 +22,7 @@ lankebuild_prepare() {
         -D WITH_PYTHON_INSTALL=OFF \
         -D PYTHON_VERSION=3.15 \
         -D USD_ROOT_DIR=/usr \
+        -D WITH_HYDRA=OFF \
         -D WITH_SYSTEM_GFLAGS=ON \
         -D WITH_SYSTEM_GLOG=ON \
         -D WITH_CYCLES_DEVICE_CUDA=OFF \

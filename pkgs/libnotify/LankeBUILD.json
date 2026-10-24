@@ -1,6 +1,6 @@
 {
   "name": "libnotify",
-  "version": "0.8.8",
+  "version": "0.8.9",
   "release": 4,
   "deps": [],
   "needed_so": [
@@ -28,7 +28,7 @@
     "xmlto"
   ],
   "sources": [
-    "https://download.gnome.org/sources/libnotify/0.8/libnotify-0.8.8.tar.xz"
+    "https://download.gnome.org/sources/libnotify/0.8/libnotify-0.8.9.tar.xz"
   ],
   "work_sources": []
 }

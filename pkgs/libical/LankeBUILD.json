@@ -1,15 +1,15 @@
 {
   "name": "libical",
-  "version": "4.0.6",
-  "release": 5,
+  "version": "4.0.7",
+  "release": 7,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
     "libgcc_s.so.1@GCC_3.0",
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
+    "libicui18n.so.79",
+    "libicuuc.so.79",
     "libstdc++.so.6@{CXXABI_1.3,GLIBCXX_3.4}",
     "libxml2.so.16"
   ],
@@ -46,7 +46,7 @@
     "vala"
   ],
   "sources": [
-    "https://github.com/libical/libical/releases/download/v4.0.6/libical-4.0.6.tar.gz"
+    "https://github.com/libical/libical/releases/download/v4.0.7/libical-4.0.7.tar.gz"
   ],
   "work_sources": []
 }

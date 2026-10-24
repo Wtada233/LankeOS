@@ -1,6 +1,6 @@
 {
   "name": "icu",
-  "version": "78.3",
+  "version": "79.1",
   "release": 3,
   "deps": [
     "bash"
@@ -14,23 +14,23 @@
   ],
   "provides_soname": [
     "libicudata.so",
-    "libicudata.so.78",
+    "libicudata.so.79",
     "libicui18n.so",
-    "libicui18n.so.78",
+    "libicui18n.so.79",
     "libicuio.so",
-    "libicuio.so.78",
+    "libicuio.so.79",
     "libicutest.so",
-    "libicutest.so.78",
+    "libicutest.so.79",
     "libicutu.so",
-    "libicutu.so.78",
+    "libicutu.so.79",
     "libicuuc.so",
-    "libicuuc.so.78"
+    "libicuuc.so.79"
   ],
   "build_deps": [
     "base-devel"
   ],
   "sources": [
-    "https://github.com/unicode-org/icu/releases/download/release-78.3/icu4c-78.3-sources.tgz"
+    "https://github.com/unicode-org/icu/releases/download/release-79.1/icu4c-79.1-sources.tgz"
   ],
   "work_sources": []
 }

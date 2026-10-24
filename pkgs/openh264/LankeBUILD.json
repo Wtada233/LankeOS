@@ -1,6 +1,6 @@
 {
   "name": "openh264",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -18,7 +18,7 @@
     "nasm"
   ],
   "sources": [
-    "https://github.com/cisco/openh264/archive/refs/tags/v2.6.0.tar.gz"
+    "https://github.com/cisco/openh264/archive/refs/tags/v2.7.0.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

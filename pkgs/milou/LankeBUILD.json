@@ -1,7 +1,7 @@
 {
   "name": "milou",
-  "version": "6.8.0",
-  "release": 5,
+  "version": "6.8.1",
+  "release": 6,
   "deps": [
     "kf-kirigami",
     "kf-ksvg",
@@ -34,7 +34,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/milou-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/milou-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,7 +1,7 @@
 {
   "name": "usd",
-  "version": "26.08",
-  "release": 3,
+  "version": "26.11.1",
+  "release": 7,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -15,16 +15,16 @@
     "libMaterialXRender.so.1",
     "libMaterialXRenderGlsl.so.1",
     "libOpenColorIO.so.2.6",
-    "libOpenImageIO.so.3.1",
-    "libOpenImageIO_Util.so.3.1",
+    "libOpenImageIO.so.3.2",
+    "libOpenImageIO_Util.so.3.2",
     "libX11.so.6",
     "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
-    "libdraco.so.9",
+    "libdraco.so.11",
     "libembree4.so.4",
     "libgcc_s.so.1@{GCC_3.0,GCC_3.3}",
     "libjemalloc.so.2",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.38,GLIBC_2.43}",
-    "libopenvdb.so.13.0",
+    "libopenvdb.so.13.1",
     "libosdCPU.so.3.7.0",
     "libosdGPU.so.3.7.0",
     "liboslquery.so.1.15",
@@ -64,7 +64,7 @@
     "zlib"
   ],
   "sources": [
-    "https://github.com/PixarAnimationStudios/OpenUSD/archive/refs/tags/v26.08.tar.gz"
+    "https://github.com/PixarAnimationStudios/OpenUSD/archive/refs/tags/v26.11.1.tar.gz"
   ],
   "work_sources": []
 }

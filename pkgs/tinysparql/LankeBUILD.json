@@ -1,7 +1,7 @@
 {
   "name": "tinysparql",
   "version": "3.12.0",
-  "release": 2,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_ABI_DT_RELR}",
@@ -10,8 +10,8 @@
     "libglib-2.0.so.0",
     "libgmodule-2.0.so.0",
     "libgobject-2.0.so.0",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
+    "libicui18n.so.79",
+    "libicuuc.so.79",
     "libjson-glib-1.0.so.0@libjson-glib-1.0.so.0",
     "libm.so.6@GLIBC_2.2.5",
     "libsoup-3.0.so.0",

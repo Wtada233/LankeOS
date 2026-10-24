@@ -1,6 +1,6 @@
 {
   "name": "nix",
-  "version": "2.35.3",
+  "version": "2.35.4",
   "release": 7,
   "deps": [
     "nlohmann-json"
@@ -29,31 +29,31 @@
   ],
   "provides_soname": [
     "libnixcmd.so",
-    "libnixcmd.so.2.35.3",
+    "libnixcmd.so.2.35.4",
     "libnixexpr.so",
-    "libnixexpr.so.2.35.3",
+    "libnixexpr.so.2.35.4",
     "libnixexprc.so",
-    "libnixexprc.so.2.35.3",
+    "libnixexprc.so.2.35.4",
     "libnixfetchers.so",
-    "libnixfetchers.so.2.35.3",
+    "libnixfetchers.so.2.35.4",
     "libnixfetchersc.so",
-    "libnixfetchersc.so.2.35.3",
+    "libnixfetchersc.so.2.35.4",
     "libnixflake.so",
-    "libnixflake.so.2.35.3",
+    "libnixflake.so.2.35.4",
     "libnixflakec.so",
-    "libnixflakec.so.2.35.3",
+    "libnixflakec.so.2.35.4",
     "libnixmain.so",
-    "libnixmain.so.2.35.3",
+    "libnixmain.so.2.35.4",
     "libnixmainc.so",
-    "libnixmainc.so.2.35.3",
+    "libnixmainc.so.2.35.4",
     "libnixstore.so",
-    "libnixstore.so.2.35.3",
+    "libnixstore.so.2.35.4",
     "libnixstorec.so",
-    "libnixstorec.so.2.35.3",
+    "libnixstorec.so.2.35.4",
     "libnixutil.so",
-    "libnixutil.so.2.35.3",
+    "libnixutil.so.2.35.4",
     "libnixutilc.so",
-    "libnixutilc.so.2.35.3"
+    "libnixutilc.so.2.35.4"
   ],
   "build_deps": [
     "b3sum",
@@ -75,7 +75,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/NixOS/nix/archive/refs/tags/2.35.3.tar.gz"
+    "https://github.com/NixOS/nix/archive/refs/tags/2.35.4.tar.gz"
   ],
   "work_sources": []
 }

@@ -1,6 +1,6 @@
 {
   "name": "kscreenlocker",
-  "version": "6.8.0",
+  "version": "6.8.1",
   "release": 5,
   "deps": [],
   "needed_so": [
@@ -71,7 +71,7 @@
     "xcb-util-keysyms"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/kscreenlocker-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/kscreenlocker-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

@@ -1,7 +1,7 @@
 {
   "name": "drkonqi",
-  "version": "6.8.0",
-  "release": 2,
+  "version": "6.8.1",
+  "release": 3,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -68,7 +68,7 @@
     "qt6-declarative"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/drkonqi-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/drkonqi-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

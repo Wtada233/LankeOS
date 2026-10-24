@@ -1,7 +1,7 @@
 {
   "name": "kwin",
-  "version": "6.8.0",
-  "release": 7,
+  "version": "6.8.1",
+  "release": 8,
   "deps": [
     "qt5compat",
     "kf-kirigami",
@@ -162,7 +162,7 @@
     "xcb-util-wm"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/kwin-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/kwin-6.8.1.tar.xz"
   ],
   "work_sources": [],
   "farm_flags": [

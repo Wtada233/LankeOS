@@ -1,6 +1,6 @@
 {
   "name": "linux-firmware",
-  "version": "20260916",
+  "version": "20261019",
   "release": 5,
   "deps": [],
   "needed_so": [],
@@ -11,7 +11,7 @@
     "parallel"
   ],
   "sources": [
-    "https://gitlab.com/kernel-firmware/linux-firmware/-/archive/20260916/linux-firmware-20260916.tar.gz"
+    "https://gitlab.com/kernel-firmware/linux-firmware/-/archive/20261019/linux-firmware-20261019.tar.gz"
   ],
   "work_sources": [],
   "no_strip": true

@@ -1,7 +1,7 @@
 {
   "name": "libplasma",
-  "version": "6.8.0",
-  "release": 5,
+  "version": "6.8.1",
+  "release": 6,
   "deps": [
     "qt5compat",
     "kf-kconfig",
@@ -76,7 +76,7 @@
     "wayland-protocols"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/libplasma-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/libplasma-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

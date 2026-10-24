@@ -1,6 +1,6 @@
 {
   "name": "draco",
-  "version": "1.5.7",
+  "version": "1.5.9",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -11,7 +11,7 @@
   ],
   "provides_soname": [
     "libdraco.so",
-    "libdraco.so.9"
+    "libdraco.so.11"
   ],
   "build_deps": [
     "base-devel",
@@ -19,7 +19,7 @@
     "ninja"
   ],
   "sources": [
-    "https://github.com/google/draco/archive/refs/tags/1.5.7.tar.gz"
+    "https://github.com/google/draco/archive/refs/tags/1.5.9.tar.gz"
   ],
   "work_sources": [],
   "farm_flags": [

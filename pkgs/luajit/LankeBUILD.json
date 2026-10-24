@@ -1,6 +1,6 @@
 {
   "name": "luajit",
-  "version": "2.1.1791988261.2a8e017",
+  "version": "2.1.1792588164.a4c0645",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -17,7 +17,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/LuaJIT/LuaJIT/archive/2a8e017ef1ece6a95b983ffca073d30609dce7c4.tar.gz"
+    "https://github.com/LuaJIT/LuaJIT/archive/a4c064539ea931274d407e1249b4bb575424a0f4.tar.gz"
   ],
   "work_sources": []
 }

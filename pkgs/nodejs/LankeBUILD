@@ -1,4 +1,14 @@
 lankebuild_prepare() {
+    # V8 14.6 的 regexp case folding 没有处理 Unicode 18 新增的跨 BMP 等价
+    # （U+1DF95 ↔ U+00DF）。补丁回移 V8 main 的完整语义：
+    #   - 生成器丢弃增补平面字符，并生成 SupplementaryEquivalentsSet；
+    #   - 非 Unicode /i 的 runtime 闭包同样过滤增补平面字符；
+    #   - /iu、/iv 下对含增补等价物的 BMP 字符强制 desugar，使其能匹配代理对。
+    for p in "{WORK_DIR}"/../*.patch; do
+        [ -f "$p" ] || continue
+        patch -Np1 -i "$p"
+    done
+
     export CFLAGS="${CFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
     export CXXFLAGS="${CXXFLAGS/_FORTIFY_SOURCE=3/_FORTIFY_SOURCE=2}"
 

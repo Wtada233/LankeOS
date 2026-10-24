@@ -1,6 +1,6 @@
 {
   "name": "7zip",
-  "version": "26.04",
+  "version": "26.05",
   "release": 2,
   "deps": [
     "bash"
@@ -16,7 +16,7 @@
     "uasm"
   ],
   "sources": [
-    "https://github.com/ip7z/7zip/archive/26.04/7zip-26.04.tar.gz"
+    "https://github.com/ip7z/7zip/archive/26.05/7zip-26.05.tar.gz"
   ],
   "work_sources": []
 }

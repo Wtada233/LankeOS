@@ -1,6 +1,6 @@
 {
   "name": "openimagedenoise",
-  "version": "2.4.1",
+  "version": "2.5.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -14,8 +14,8 @@
   "provides_soname": [
     "libOpenImageDenoise.so",
     "libOpenImageDenoise.so.2",
-    "libOpenImageDenoise_core.so.2.4.1",
-    "libOpenImageDenoise_device_cpu.so.2.4.1"
+    "libOpenImageDenoise_core.so.2.5.1",
+    "libOpenImageDenoise_device_cpu.so.2.5.1"
   ],
   "build_deps": [
     "base-devel",
@@ -25,7 +25,7 @@
     "onetbb"
   ],
   "sources": [
-    "https://github.com/OpenImageDenoise/oidn/releases/download/v2.4.1/oidn-2.4.1.src.tar.gz"
+    "https://github.com/OpenImageDenoise/oidn/releases/download/v2.5.1/oidn-2.5.1.src.tar.gz"
   ],
   "work_sources": []
 }

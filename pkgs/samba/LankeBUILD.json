@@ -1,7 +1,7 @@
 {
   "name": "samba",
   "version": "4.25.0",
-  "release": 10,
+  "release": 12,
   "deps": [
     "python-dnspython",
     "python-markdown"
@@ -18,8 +18,8 @@
     "libformw.so.6",
     "libgnutls.so.30@{GNUTLS_3_4,GNUTLS_3_6_10,GNUTLS_3_6_13,GNUTLS_3_6_3,GNUTLS_3_6_5,GNUTLS_3_7_0,GNUTLS_3_7_2,GNUTLS_3_7_7}",
     "libgpgme.so.45@{GPGME_1.0,GPGME_1.1}",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
+    "libicui18n.so.79",
+    "libicuuc.so.79",
     "libjansson.so.4@libjansson.so.4",
     "liblber.so.2@OPENLDAP_2.200",
     "libldap.so.2@OPENLDAP_2.200",

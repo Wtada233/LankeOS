@@ -1,7 +1,7 @@
 {
   "name": "kde-cli-tools",
-  "version": "6.8.0",
-  "release": 3,
+  "version": "6.8.1",
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libKF6Completion.so.6",
@@ -50,7 +50,7 @@
     "qt6-svg"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/kde-cli-tools-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/kde-cli-tools-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

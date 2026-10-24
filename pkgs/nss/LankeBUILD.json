@@ -1,6 +1,6 @@
 {
   "name": "nss",
-  "version": "3.131",
+  "version": "3.132",
   "release": 2,
   "deps": [
     "bash",
@@ -33,7 +33,7 @@
     "zlib"
   ],
   "sources": [
-    "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_131_RTM/src/nss-3.131.tar.gz"
+    "https://ftp.mozilla.org/pub/security/nss/releases/NSS_3_132_RTM/src/nss-3.132.tar.gz"
   ],
   "work_sources": [],
   "no_strip": false

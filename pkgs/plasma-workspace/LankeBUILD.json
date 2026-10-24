@@ -1,7 +1,7 @@
 {
   "name": "plasma-workspace",
-  "version": "6.8.0",
-  "release": 7,
+  "version": "6.8.1",
+  "release": 11,
   "deps": [
     "kf-kded",
     "kio-fuse",
@@ -113,8 +113,8 @@
     "libfontconfig.so.1",
     "libfreetype.so.6",
     "libgcc_s.so.1@GCC_3.0",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
+    "libicui18n.so.79",
+    "libicuuc.so.79",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.29,GLIBC_2.38}",
     "libpackagekitqt6.so.2",
     "libpolkit-qt6-core-1.so.1",
@@ -257,7 +257,7 @@
     "zlib"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/plasma-workspace-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/plasma-workspace-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

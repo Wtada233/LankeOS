@@ -1,6 +1,6 @@
 {
   "name": "knighttime",
-  "version": "6.8.0",
+  "version": "6.8.1",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -34,7 +34,7 @@
     "qt6-tools"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/knighttime-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/knighttime-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

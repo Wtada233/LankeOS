@@ -1,7 +1,7 @@
 {
   "name": "postgresql",
   "version": "18.6",
-  "release": 8,
+  "release": 11,
   "deps": [
     "perl"
   ],
@@ -12,8 +12,8 @@
     "libcurl.so.4",
     "libgcc_s.so.1@GCC_3.0",
     "libgssapi_krb5.so.2@gssapi_krb5_2_MIT",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
+    "libicui18n.so.79",
+    "libicuuc.so.79",
     "liblz4.so.1",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.23,GLIBC_2.29,GLIBC_2.38,GLIBC_2.43,GLIBC_2.44}",
     "libpam.so.0@LIBPAM_1.0",

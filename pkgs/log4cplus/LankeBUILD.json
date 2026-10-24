@@ -1,6 +1,6 @@
 {
   "name": "log4cplus",
-  "version": "2.2.0.1",
+  "version": "2.2.1",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -8,7 +8,7 @@
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3.4,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.4,GLIBC_2.9,GLIBC_ABI_DT_RELR}",
     "libgcc_s.so.1@GCC_3.0",
     "libm.so.6@GLIBC_2.38",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.2,CXXABI_1.3.3,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.3,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.19,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}"
   ],
   "provides_soname": [
     "liblog4cplus-2.2.so.11",
@@ -20,7 +20,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://github.com/log4cplus/log4cplus/releases/download/REL_2_2_0_1/log4cplus-2.2.0.1.tar.xz"
+    "https://github.com/log4cplus/log4cplus/releases/download/REL_2_2_1/log4cplus-2.2.1.tar.xz"
   ],
   "work_sources": []
 }

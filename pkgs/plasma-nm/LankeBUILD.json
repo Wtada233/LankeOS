@@ -1,6 +1,6 @@
 {
   "name": "plasma-nm",
-  "version": "6.8.0",
+  "version": "6.8.1",
   "release": 5,
   "deps": [
     "kf-kquickcharts",
@@ -90,7 +90,7 @@
     "networkmanager"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/plasma-nm-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/plasma-nm-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

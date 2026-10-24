@@ -1,6 +1,6 @@
 {
   "name": "plasma-desktop",
-  "version": "6.8.0",
+  "version": "6.8.1",
   "release": 6,
   "deps": [
     "qt5compat",
@@ -172,7 +172,7 @@
     "xkeyboard-config"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/plasma-desktop-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/plasma-desktop-6.8.1.tar.xz"
   ],
   "work_sources": [],
   "farm_flags": [

@@ -1,7 +1,7 @@
 {
   "name": "kddockwidgets",
-  "version": "2.4.1",
-  "release": 4,
+  "version": "2.5.1",
+  "release": 5,
   "deps": [],
   "needed_so": [
     "libQt6Core.so.6@{Qt_6,Qt_6.12}",
@@ -17,7 +17,7 @@
   ],
   "provides_soname": [
     "libkddockwidgets-qt6.so",
-    "libkddockwidgets-qt6.so.3"
+    "libkddockwidgets-qt6.so.4"
   ],
   "build_deps": [
     "base-devel",
@@ -31,7 +31,7 @@
     "spdlog"
   ],
   "sources": [
-    "https://github.com/KDAB/KDDockWidgets/archive/refs/tags/v2.4.1.tar.gz"
+    "https://github.com/KDAB/KDDockWidgets/archive/refs/tags/v2.5.1.tar.gz"
   ],
   "work_sources": []
 }

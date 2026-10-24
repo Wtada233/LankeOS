@@ -1,7 +1,7 @@
 {
   "name": "libreoffice",
   "version": "26.8.1.1",
-  "release": 9,
+  "release": 12,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -64,8 +64,8 @@
     "libharfbuzz.so.0",
     "libhunspell-1.7.so.0",
     "libhyphen.so.0",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
+    "libicui18n.so.79",
+    "libicuuc.so.79",
     "libjpeg.so.62@LIBJPEG_6.2",
     "liblangtag.so.1",
     "liblcms2.so.2",

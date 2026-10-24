@@ -1,10 +1,13 @@
 lankebuild_prepare() {
+    # Python 绑定用已打包的 pybind11；默认的 nanobind 会尝试从 GitHub 下载源码，
+    # 需要 git/网络，构建容器里没有。
     cmake -B build -G Ninja -S . \
         -DCMAKE_INSTALL_PREFIX={PREFIX} \
         -DCMAKE_INSTALL_LIBDIR=lib \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=ON \
         -DUSE_PYTHON=ON \
+        -DOIIO_PYTHON_BINDINGS_BACKEND=pybind11 \
         -DUSE_QT=OFF \
         -DUSE_OPENGL=OFF \
         -DOIIO_BUILD_TESTS=OFF \

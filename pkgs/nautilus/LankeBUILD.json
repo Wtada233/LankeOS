@@ -1,7 +1,7 @@
 {
   "name": "nautilus",
   "version": "51.1",
-  "release": 2,
+  "release": 5,
   "deps": [
     "gvfs",
     "localsearch"
@@ -27,8 +27,8 @@
     "libgstpbutils-1.0.so.0",
     "libgstreamer-1.0.so.0",
     "libgtk-4.so.1",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
+    "libicui18n.so.79",
+    "libicuuc.so.79",
     "libm.so.6@GLIBC_2.2.5",
     "libpango-1.0.so.0",
     "libportal-gtk4.so.1",

@@ -1,12 +1,12 @@
 {
   "name": "libqxp",
   "version": "0.0.3",
-  "release": 3,
+  "release": 4,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.32,GLIBC_2.34,GLIBC_ABI_DT_RELR}",
     "libgcc_s.so.1@GCC_3.0",
-    "libicuuc.so.78",
+    "libicuuc.so.79",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.35,GLIBC_2.38}",
     "librevenge-0.0.so.0",
     "librevenge-generators-0.0.so.0",

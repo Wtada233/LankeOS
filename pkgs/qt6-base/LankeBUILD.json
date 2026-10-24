@@ -33,8 +33,8 @@
     "libgssapi_krb5.so.2@gssapi_krb5_2_MIT",
     "libgtk-3.so.0",
     "libharfbuzz.so.0",
-    "libicui18n.so.78",
-    "libicuuc.so.78",
+    "libicui18n.so.79",
+    "libicuuc.so.79",
     "libinput.so.10@{LIBINPUT_0.12.0,LIBINPUT_1.19}",
     "libjpeg.so.62@LIBJPEG_6.2",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43}",
@@ -174,5 +174,5 @@
     "https://download.qt.io/official_releases/qt/6.12/6.12.0/submodules/qtbase-everywhere-src-6.12.0.tar.xz"
   ],
   "work_sources": [],
-  "release": 4
+  "release": 7
 }

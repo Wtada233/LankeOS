@@ -1,18 +1,21 @@
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    # 用上游 CMake 构建：除了共享库和 libzstd.pc，还生成 CMake 包配置
+    # （zstdConfig.cmake / zstdTargets.cmake），OpenImageIO 等 CMake 消费者
+    # 走 find_package(zstd CONFIG) 时需要它。
+    cmake -B build -G Ninja -S build/cmake \
+        -DCMAKE_INSTALL_PREFIX={PREFIX} \
+        -DCMAKE_INSTALL_LIBDIR=lib \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DZSTD_BUILD_STATIC=OFF \
+        -DZSTD_BUILD_TESTS=OFF \
+        -DZSTD_BUILD_CONTRIB=OFF \
+        -DZSTD_PROGRAMS_LINK_SHARED=ON
 }
 
 lankebuild_build() {
-    make prefix=/usr -j$(nproc)
-    make prefix=/usr DESTDIR={STAGING_ROOT} install
-    rm -f {STAGING_ROOT}{LIBDIR}/libzstd.a
-    # 添加兼容性链接
-    ln -sfv zstd {STAGING_ROOT}{BINDIR}/zstdcat
-    ln -sfv zstd {STAGING_ROOT}{BINDIR}/unzstd
-    ln -sfv zstd {STAGING_ROOT}{BINDIR}/zstdmt
+    ninja -C build -j$(nproc)
+    DESTDIR={STAGING_ROOT} ninja -C build install
 }
-
 
 lankebuild_package() {
     # Installation handled by builder

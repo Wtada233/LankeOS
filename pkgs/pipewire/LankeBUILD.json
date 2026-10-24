@@ -1,6 +1,6 @@
 {
   "name": "pipewire",
-  "version": "1.6.9",
+  "version": "1.6.10",
   "release": 5,
   "deps": [
     "bash"
@@ -28,7 +28,8 @@
     "libsbc.so.1@{SBC_1.0,SBC_1.1}",
     "libsndfile.so.1@libsndfile.so.1.0",
     "libsystemd.so.0@LIBSYSTEMD_209",
-    "libudev.so.1@LIBUDEV_183"
+    "libudev.so.1@LIBUDEV_183",
+    "libusb-1.0.so.0"
   ],
   "provides_soname": [
     "libjack.so",
@@ -51,6 +52,7 @@
     "gstreamer",
     "libpulse",
     "libsndfile",
+    "libusb",
     "meson",
     "ncurses",
     "ninja",
@@ -59,7 +61,7 @@
     "sbc"
   ],
   "sources": [
-    "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.9/pipewire-1.6.9.tar.gz"
+    "https://gitlab.freedesktop.org/pipewire/pipewire/-/archive/1.6.10/pipewire-1.6.10.tar.gz"
   ],
   "work_sources": []
 }

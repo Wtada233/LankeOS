@@ -1,6 +1,6 @@
 {
   "name": "kinfocenter",
-  "version": "6.8.0",
+  "version": "6.8.1",
   "release": 6,
   "deps": [
     "kf-kirigami",
@@ -65,7 +65,7 @@
     "vulkan-headers"
   ],
   "sources": [
-    "https://download.kde.org/stable/plasma/6.8.0/kinfocenter-6.8.0.tar.xz"
+    "https://download.kde.org/stable/plasma/6.8.1/kinfocenter-6.8.1.tar.xz"
   ],
   "work_sources": []
 }

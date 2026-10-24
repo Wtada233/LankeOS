@@ -1,7 +1,7 @@
 {
   "name": "harfbuzz",
-  "version": "14.6.0",
-  "release": 5,
+  "version": "15.0.0",
+  "release": 7,
   "deps": [],
   "needed_so": [
     "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_ABI_DT_RELR}",
@@ -10,7 +10,7 @@
     "libglib-2.0.so.0",
     "libgobject-2.0.so.0",
     "libgraphite2.so.3",
-    "libicuuc.so.78",
+    "libicuuc.so.79",
     "libm.so.6@{GLIBC_2.2.5,GLIBC_2.35,GLIBC_2.38,GLIBC_2.43}",
     "libpng16.so.16@PNG16_0",
     "libstdc++.so.6@{CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.30}",
@@ -49,7 +49,7 @@
     "graphite"
   ],
   "sources": [
-    "https://github.com/harfbuzz/harfbuzz/releases/download/14.6.0/harfbuzz-14.6.0.tar.xz"
+    "https://github.com/harfbuzz/harfbuzz/releases/download/15.0.0/harfbuzz-15.0.0.tar.xz"
   ],
   "work_sources": []
 }
