@@ -1,0 +1,10 @@
+pkg-name: greetd
+version-source: sources[0]
+sources:
+  - tracker-template: script
+    script: |
+      ver=$(git ls-remote --tags https://git.sr.ht/~kennylevinsen/greetd |
+        sed -n 's|.*refs/tags/\([0-9][0-9.]*\)$|\1|p' |
+        sort -V | tail -1)
+      test -n "$ver" || exit 1
+      echo "$ver|https://git.sr.ht/~kennylevinsen/greetd/archive/$ver.tar.gz"

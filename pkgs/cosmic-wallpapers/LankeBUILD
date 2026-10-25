@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    :
+}
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+    install -Dm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/cosmic-wallpapers/LICENSE"
+}

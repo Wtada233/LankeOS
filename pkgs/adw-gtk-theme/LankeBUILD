@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    :
+}
+
+lankebuild_package() {
+    install -d "{STAGING_ROOT}/usr/share/themes"
+    cp -a adw-gtk3 adw-gtk3-dark "{STAGING_ROOT}/usr/share/themes/"
+    install -Dm644 "{WORK_DIR}/../LICENSE" "{STAGING_ROOT}/usr/share/licenses/adw-gtk-theme/LICENSE"
+}

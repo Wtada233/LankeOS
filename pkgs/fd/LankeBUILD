@@ -1,0 +1,22 @@
+lankebuild_prepare() {
+    cargo fetch --locked --target host-tuple
+}
+
+lankebuild_build() {
+    cargo build --release --frozen --features use-jemalloc
+}
+
+lankebuild_package() {
+    install -Dm755 target/release/fd "{STAGING_ROOT}/usr/bin/fd"
+    install -Dm644 doc/fd.1 "{STAGING_ROOT}/usr/share/man/man1/fd.1"
+
+    mkdir -p "{STAGING_ROOT}/usr/share/bash-completion/completions"
+    target/release/fd --gen-completions bash > "{STAGING_ROOT}/usr/share/bash-completion/completions/fd"
+    mkdir -p "{STAGING_ROOT}/usr/share/fish/vendor_completions.d"
+    target/release/fd --gen-completions fish > "{STAGING_ROOT}/usr/share/fish/vendor_completions.d/fd.fish"
+    mkdir -p "{STAGING_ROOT}/usr/share/zsh/site-functions"
+    target/release/fd --gen-completions zsh > "{STAGING_ROOT}/usr/share/zsh/site-functions/_fd"
+
+    install -Dm644 LICENSE-APACHE "{STAGING_ROOT}/usr/share/licenses/fd/LICENSE-APACHE"
+    install -Dm644 LICENSE-MIT "{STAGING_ROOT}/usr/share/licenses/fd/LICENSE-MIT"
+}

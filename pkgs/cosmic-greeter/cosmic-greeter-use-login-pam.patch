@@ -1,0 +1,33 @@
+--- a/cosmic-greeter.toml
++++ b/cosmic-greeter.toml
+@@ -2,7 +2,7 @@
+ vt = "1"
+
+ [general]
+-service = "cosmic-greeter"
++service = "login"
+
+ [default_session]
+ command = "cosmic-greeter-start"
+--- a/examples/pam.rs
++++ b/examples/pam.rs
+@@ -5,7 +5,7 @@
+     let passwd = pwd::Passwd::current_user().expect("Failed to get current user");
+
+     let mut context = Context::new(
+-        "cosmic-greeter",    // Service name, decides which policy is used (see `/etc/pam.d`)
++        "login",             // Service name, decides which policy is used (see `/etc/pam.d`)
+         Some(&passwd.name),  // Optional preset user name
+         Conversation::new(), // Handler for user interaction
+     )
+--- a/src/locker.rs
++++ b/src/locker.rs
+@@ -130,7 +130,7 @@
+     //TODO: send errors to GUI, restart process
+
+     // Create PAM context
+-    let mut context = pam_client::Context::new("cosmic-greeter", Some(&username), conversation)?;
++    let mut context = pam_client::Context::new("login", Some(&username), conversation)?;
+
+     // Authenticate the user (ask for password, 2nd-factor token, fingerprint, etc.)
+     tracing::info!("authenticate");

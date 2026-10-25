@@ -1,0 +1,60 @@
+--- a/src/menu.rs
++++ b/src/menu.rs
+@@ -11,16 +11,13 @@
+     widget::{
+         self,
+         menu::{ItemHeight, ItemWidth},
+-        responsive_menu_bar, segmented_button,
++        segmented_button,
+     },
+ };
+-use std::{collections::HashMap, sync::LazyLock};
++use std::collections::HashMap;
+ 
+ use crate::{Action, ColorSchemeId, ColorSchemeKind, Config, Message, fl};
+ 
+-static MENU_ID: LazyLock<cosmic::widget::Id> =
+-    LazyLock::new(|| cosmic::widget::Id::new("responsive-menu"));
+-
+ /// What the terminal found under the right-click
+ #[derive(Debug, Clone)]
+ pub struct MenuState {
+@@ -149,16 +146,7 @@
+ 
+     let color_scheme_kind = config.color_scheme_kind(core.system_theme());
+ 
+-    responsive_menu_bar()
+-        .item_height(ItemHeight::Dynamic(40))
+-        .item_width(ItemWidth::Uniform(320))
+-        .spacing(4.0)
+-        .into_element(
+-            core,
+-            key_binds,
+-            MENU_ID.clone(),
+-            Message::Surface,
+-            vec![
++    let trees: Vec<widget::menu::Tree<Message>> = vec![
+                 (
+                     fl!("file"),
+                     vec![
+@@ -231,6 +219,19 @@
+                         MenuItem::Button(fl!("menu-about"), None, Action::About),
+                     ],
+                 ),
+-            ],
++    ]
++    .into_iter()
++    .map(|(label, items)| {
++        widget::menu::Tree::with_children(
++            widget::RcElementWrapper::new(Element::from(widget::menu::root(label))),
++            widget::menu::items(key_binds, items),
+         )
++    })
++    .collect();
++
++    widget::menu::bar(trees)
++        .item_height(ItemHeight::Dynamic(40))
++        .item_width(ItemWidth::Uniform(320))
++        .spacing(4.0)
++        .into()
+ }

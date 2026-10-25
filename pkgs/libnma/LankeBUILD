@@ -13,4 +13,6 @@ lankebuild_build() {
 
 lankebuild_package() {
     DESTDIR="{STAGING_ROOT}" meson install -C _build
+    # org.gnome.nm-applet.gschema.xml 归 network-manager-applet；libnma 不打包它
+    rm -f "{STAGING_ROOT}/usr/share/glib-2.0/schemas/org.gnome.nm-applet.gschema.xml"
 }

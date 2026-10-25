@@ -11,7 +11,7 @@ lankebuild_build() {
 lankebuild_package() {
     DESTDIR="{STAGING_ROOT}" ninja -C build install
 
-    # Qt 应用自动使用 qt6ct 主题
-    install -dm 755 "{STAGING_ROOT}/usr/lib/environment.d"
-    echo "QT_QPA_PLATFORMTHEME=qt6ct" > "{STAGING_ROOT}/usr/lib/environment.d/qt6ct.conf"
+    # 不写全局 QT_QPA_PLATFORMTHEME=qt6ct：portal 后端也是 Qt 程序，qt6ct
+    # 会连带加载 libqxdgdesktopportal，在启动时反查 portal Settings，与尚未
+    # 注册的 front-end 互等 25 秒。需要时由用户在应用级设置。
 }

@@ -1,0 +1,32 @@
+{
+  "name": "switcheroo-control",
+  "version": "3.0",
+  "release": 1,
+  "deps": [
+    "python",
+    "python-gobject"
+  ],
+  "needed_so": [
+    "libc.so.6@{GLIBC_2.2.5,GLIBC_2.34}",
+    "libdrm.so.2",
+    "libdrm_amdgpu.so.1",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgudev-1.0.so.0"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "glib",
+    "libdrm",
+    "libgudev",
+    "meson",
+    "ninja"
+  ],
+  "sources": [
+    "https://gitlab.freedesktop.org/hadess/switcheroo-control/-/archive/3.0/switcheroo-control-3.0.tar.gz"
+  ],
+  "work_sources": []
+}

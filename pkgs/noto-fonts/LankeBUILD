@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    :
+}
+
+lankebuild_package() {
+    install -vDm644 -t "{STAGING_ROOT}/usr/share/fonts/noto" *.ttf
+    install -Dm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/noto-fonts/LICENSE"
+}

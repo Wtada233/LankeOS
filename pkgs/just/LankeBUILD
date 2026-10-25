@@ -1,0 +1,20 @@
+lankebuild_prepare() {
+    cargo fetch --locked --target host-tuple
+}
+
+lankebuild_build() {
+    export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+    export CARGO_PROFILE_RELEASE_LTO=true
+    cargo build --frozen --release
+    target/release/just --man > just.1
+}
+
+lankebuild_package() {
+    install -Dm755 target/release/just "{STAGING_ROOT}/usr/bin/just"
+    install -Dm644 just.1 "{STAGING_ROOT}/usr/share/man/man1/just.1"
+    install -Dm644 completions/just.bash "{STAGING_ROOT}/usr/share/bash-completion/completions/just"
+    install -Dm644 completions/just.fish "{STAGING_ROOT}/usr/share/fish/vendor_completions.d/just.fish"
+    install -Dm644 completions/just.zsh "{STAGING_ROOT}/usr/share/zsh/site-functions/_just"
+    install -Dm644 completions/just.elvish "{STAGING_ROOT}/usr/share/elvish/lib/just.elv"
+    install -Dm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/just/LICENSE"
+}

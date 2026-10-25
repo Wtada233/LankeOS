@@ -1,0 +1,47 @@
+{
+  "name": "network-manager-applet",
+  "version": "1.36.0",
+  "release": 1,
+  "deps": [
+    "networkmanager"
+  ],
+  "needed_so": [
+    "libatk-1.0.so.0",
+    "libc.so.6@{GLIBC_2.14,GLIBC_2.2.5,GLIBC_2.3,GLIBC_2.3.4,GLIBC_2.34,GLIBC_2.38}",
+    "libcairo.so.2",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3.1}",
+    "libgdk-3.so.0",
+    "libgdk_pixbuf-2.0.so.0",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libgtk-3.so.0",
+    "libmm-glib.so.0",
+    "libnm.so.0@{libnm_1_0_0,libnm_1_12_0,libnm_1_16_0,libnm_1_2_0,libnm_1_40_0,libnm_1_4_0,libnm_1_6_0}",
+    "libnma.so.0@{libnma_1_2_0,libnma_1_8_20,libnma_1_8_22,libnma_1_8_28,libnma_1_8_36}",
+    "libpango-1.0.so.0",
+    "libpangocairo-1.0.so.0",
+    "libsecret-1.so.0"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "at-spi2-core",
+    "base-devel",
+    "cairo",
+    "gdk-pixbuf",
+    "glib",
+    "gtk3",
+    "jansson",
+    "libnma",
+    "libsecret",
+    "meson",
+    "modemmanager",
+    "networkmanager",
+    "ninja",
+    "pango"
+  ],
+  "sources": [
+    "https://gitlab.gnome.org/GNOME/network-manager-applet/-/archive/1.36.0/network-manager-applet-1.36.0.tar.gz"
+  ],
+  "work_sources": []
+}

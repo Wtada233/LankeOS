@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    meson setup _build --prefix=/usr --buildtype=release
+}
+
+lankebuild_build() {
+    meson compile -C _build -j$(nproc)
+}
+
+lankebuild_package() {
+    DESTDIR="{STAGING_ROOT}" meson install -C _build
+    install -Dm644 COPYING "{STAGING_ROOT}/usr/share/licenses/pop-icon-theme/COPYING"
+}

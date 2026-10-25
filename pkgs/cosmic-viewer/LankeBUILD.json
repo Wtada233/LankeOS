@@ -1,0 +1,57 @@
+{
+  "name": "cosmic-viewer",
+  "version": "1.11.0",
+  "release": 1,
+  "deps": [
+    "dav1d",
+    "hicolor-icon-theme",
+    "libde265",
+    "libjpeg-turbo",
+    "libxkbcommon",
+    "wayland"
+  ],
+  "needed_so": [
+    "ld-linux-x86-64.so.2@GLIBC_2.3",
+    "libaom.so.3",
+    "libc.so.6@{GLIBC_2.11,GLIBC_2.14,GLIBC_2.15,GLIBC_2.16,GLIBC_2.17,GLIBC_2.18,GLIBC_2.2.5,GLIBC_2.25,GLIBC_2.27,GLIBC_2.28,GLIBC_2.29,GLIBC_2.3,GLIBC_2.3.2,GLIBC_2.3.4,GLIBC_2.30,GLIBC_2.32,GLIBC_2.33,GLIBC_2.34,GLIBC_2.38,GLIBC_2.39,GLIBC_2.4,GLIBC_2.5,GLIBC_2.7,GLIBC_2.9}",
+    "libdav1d.so.7",
+    "libde265.so.0",
+    "libgcc_s.so.1@{GCC_3.0,GCC_3.3,GCC_4.2.0}",
+    "libjpeg.so.62@{LIBJPEGTURBO_6.2,LIBJPEG_6.2}",
+    "libm.so.6@{GLIBC_2.2.5,GLIBC_2.27,GLIBC_2.29,GLIBC_2.35,GLIBC_2.43,GLIBC_2.44}",
+    "libopenh264.so.8",
+    "libopenjp2.so.7",
+    "libopenjph.so.0.32",
+    "libsharpyuv.so.0",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.13,CXXABI_1.3.2,CXXABI_1.3.3,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.11,GLIBCXX_3.4.14,GLIBCXX_3.4.15,GLIBCXX_3.4.17,GLIBCXX_3.4.18,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.22,GLIBCXX_3.4.26,GLIBCXX_3.4.29,GLIBCXX_3.4.30,GLIBCXX_3.4.9}",
+    "libturbojpeg.so.0@TURBOJPEG_3",
+    "libx264.so.165",
+    "libx265.so.216",
+    "libxkbcommon.so.0@V_0.5.0"
+  ],
+  "provides_soname": [],
+  "build_deps": [
+    "aom",
+    "base-devel",
+    "clang",
+    "cmake",
+    "dav1d",
+    "just",
+    "libde265",
+    "libjpeg-turbo",
+    "libwebp",
+    "libx264",
+    "libx265",
+    "libxkbcommon",
+    "lld",
+    "openh264",
+    "openjpeg",
+    "openjph",
+    "rust",
+    "wayland"
+  ],
+  "sources": [
+    "https://github.com/pop-os/cosmic-viewer/archive/refs/tags/epoch-1.11.0.tar.gz"
+  ],
+  "work_sources": []
+}

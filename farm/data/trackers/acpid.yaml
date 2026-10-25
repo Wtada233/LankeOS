@@ -1,0 +1,8 @@
+pkg-name: acpid
+version-source: sources[0]
+sources:
+  - tracker-template: sourceforge
+    project: acpid2
+    path: ""
+    pattern: acpid-([0-9.]+)\.tar\.xz
+    template: https://downloads.sourceforge.net/sourceforge/{project}/acpid-{version}.tar.xz

@@ -1,0 +1,12 @@
+lankebuild_prepare() {
+    :
+}
+
+lankebuild_build() {
+    :
+}
+
+lankebuild_package() {
+    just rootdir="{STAGING_ROOT}" install
+    install -Dm644 COPYING "{STAGING_ROOT}/usr/share/licenses/cosmic-icon-theme/COPYING"
+}

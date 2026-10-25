@@ -1,6 +1,14 @@
 lankebuild_prepare() {
-    # Prepare environment
-    :
+    # kde-baloo 要在 compositor 和 Plasma 会话就绪后再启动，否则 extractor 的
+    # QGuiApplication 在没有 DISPLAY/WAYLAND_DISPLAY 时直接 abort。
+    # -N 对已应用的补丁返回 1，用反向 dry-run 识别并跳过，上游纳入修复后自动 no-op。
+    for patch in "{WORK_DIR}"/../0*.patch; do
+        [ -f "$patch" ] || continue
+        echo "Applying patch: $patch"
+        patch -Np1 < "$patch" \
+            || patch -R --dry-run -p1 < "$patch" >/dev/null 2>&1 \
+            || exit 1
+    done
 }
 
 lankebuild_build() {

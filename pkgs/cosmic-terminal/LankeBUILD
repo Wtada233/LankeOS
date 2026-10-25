@@ -1,0 +1,16 @@
+lankebuild_prepare() {
+    # 菜单栏统一使用窗口内 overlay，避免 Wayland popup 在 COSMIC/GNOME 下不显示
+    patch -Np1 -i "{WORK_DIR}/../cosmic-terminal-menu-overlay.patch"
+    cargo fetch --locked
+}
+
+lankebuild_build() {
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    export RUSTFLAGS="${RUSTFLAGS} -C link-arg=-fuse-ld=lld"
+    just build-release --frozen
+}
+
+lankebuild_package() {
+    just rootdir="{STAGING_ROOT}" install
+    install -Dm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/cosmic-terminal/LICENSE"
+}

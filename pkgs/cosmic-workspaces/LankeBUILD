@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    cargo fetch --locked
+}
+
+lankebuild_build() {
+    export RUSTFLAGS="${RUSTFLAGS} -C link-arg=-fuse-ld=lld"
+    make ARGS="--frozen --release"
+}
+
+lankebuild_package() {
+    make prefix=/usr DESTDIR="{STAGING_ROOT}" install
+    install -Dm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/cosmic-workspaces/LICENSE"
+}

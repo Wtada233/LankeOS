@@ -1,0 +1,21 @@
+lankebuild_prepare() {
+    # COSMIC 注销只停 cosmic-session.target，graphical-session.target 仍 active；
+    # xdg-desktop-portal（PartOf=graphical-session.target）会带着 COSMIC 环境活到
+    # 下一个 KDE 会话。让 cosmic-session.target 停止时一并停掉会话 target。
+    patch -Np1 -i "{WORK_DIR}/../0001-data-propagate-stop-to-graphical-session-target.patch" \
+        || patch -R --dry-run -p1 -i "{WORK_DIR}/../0001-data-propagate-stop-to-graphical-session-target.patch" >/dev/null 2>&1 \
+        || exit 1
+
+    cargo fetch --locked
+}
+
+lankebuild_build() {
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    export RUSTFLAGS="${RUSTFLAGS} -C link-arg=-fuse-ld=lld"
+    cargo build --release --frozen
+}
+
+lankebuild_package() {
+    just rootdir="{STAGING_ROOT}" install
+    install -Dm644 LICENSE.md "{STAGING_ROOT}/usr/share/licenses/cosmic-session/LICENSE.md"
+}

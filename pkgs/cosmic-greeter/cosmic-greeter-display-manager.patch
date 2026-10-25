@@ -1,0 +1,8 @@
+--- a/debian/cosmic-greeter.service
++++ b/debian/cosmic-greeter.service
+@@ -20,3 +20,2 @@
+-# Managed by debconf
+-#[Install]
+-#Alias=display-manager.service
++[Install]
++Alias=display-manager.service

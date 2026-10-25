@@ -1,0 +1,19 @@
+{
+  "name": "pop-icon-theme",
+  "version": "3.5.1",
+  "release": 1,
+  "deps": [
+    "adwaita-icon-theme"
+  ],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel",
+    "meson",
+    "ninja"
+  ],
+  "sources": [
+    "https://github.com/pop-os/icon-theme/archive/refs/tags/v3.5.1.tar.gz"
+  ],
+  "work_sources": []
+}

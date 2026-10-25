@@ -1,0 +1,15 @@
+{
+  "name": "adw-gtk-theme",
+  "version": "6.5",
+  "release": 1,
+  "deps": [],
+  "needed_so": [],
+  "provides_soname": [],
+  "build_deps": [
+    "base-devel"
+  ],
+  "sources": [
+    "https://github.com/lassekongo83/adw-gtk3/releases/download/v6.5/adw-gtk3v6.5.tar.xz"
+  ],
+  "work_sources": []
+}

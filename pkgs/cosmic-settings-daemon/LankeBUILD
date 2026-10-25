@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    cargo fetch --locked
+}
+
+lankebuild_build() {
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    export GEOCLUE_AGENT="/usr/libexec/geoclue-2.0/demos/agent"
+    export RUSTFLAGS="${RUSTFLAGS} -C link-arg=-fuse-ld=lld"
+    CC=clang just build-release --frozen
+}
+
+lankebuild_package() {
+    just rootdir="{STAGING_ROOT}" install
+    install -Dm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/cosmic-settings-daemon/LICENSE"
+}

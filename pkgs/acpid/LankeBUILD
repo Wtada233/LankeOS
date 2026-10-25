@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    ./configure --prefix=/usr --sbindir=/usr/bin
+}
+
+lankebuild_build() {
+    make
+}
+
+lankebuild_package() {
+    make DESTDIR="{STAGING_ROOT}" install
+    install -Dm644 "{WORK_DIR}/../anything" "{STAGING_ROOT}/etc/acpi/events/anything"
+    install -Dm755 "{WORK_DIR}/../handler.sh" "{STAGING_ROOT}/etc/acpi/handler.sh"
+    install -Dm644 "{WORK_DIR}/../acpid.service" "{STAGING_ROOT}/usr/lib/systemd/system/acpid.service"
+    install -Dm644 COPYING "{STAGING_ROOT}/usr/share/licenses/acpid/COPYING"
+}

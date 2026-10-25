@@ -1,0 +1,15 @@
+lankebuild_prepare() {
+    cargo fetch --locked
+}
+
+lankebuild_build() {
+    # the release build needs a larger rustc stack in this workspace
+    export RUST_MIN_STACK=33554432
+    export RUSTFLAGS="${RUSTFLAGS} -C link-arg=-fuse-ld=lld"
+    just build-release --frozen
+}
+
+lankebuild_package() {
+    just rootdir="{STAGING_ROOT}" install
+    install -Dm644 LICENSE.md "{STAGING_ROOT}/usr/share/licenses/cosmic-notifications/LICENSE.md"
+}

@@ -1,0 +1,13 @@
+lankebuild_prepare() {
+    cargo fetch --locked
+}
+
+lankebuild_build() {
+    export RUSTFLAGS="${RUSTFLAGS} -C link-arg=-fuse-ld=lld"
+    just build-release --frozen
+}
+
+lankebuild_package() {
+    just rootdir="{STAGING_ROOT}" install
+    install -Dm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/cosmic-screenshot/LICENSE"
+}

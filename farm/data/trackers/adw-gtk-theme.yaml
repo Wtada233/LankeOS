@@ -1,0 +1,8 @@
+pkg-name: adw-gtk-theme
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: lassekongo83/adw-gtk3
+    mode: releases
+    tag-prefix: v
+    template: https://github.com/{repo}/releases/download/{tag}/adw-gtk3v{version}.tar.xz

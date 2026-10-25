@@ -1,0 +1,23 @@
+lankebuild_prepare() {
+    cargo fetch --locked
+}
+
+lankebuild_build() {
+    cargo build --release --frozen
+}
+
+lankebuild_package() {
+    install -Dm755 target/release/greetd "{STAGING_ROOT}/usr/bin/greetd"
+    install -Dm755 target/release/agreety "{STAGING_ROOT}/usr/bin/agreety"
+    install -Dm644 greetd.service "{STAGING_ROOT}/usr/lib/systemd/system/greetd.service"
+    install -Dm644 config.toml "{STAGING_ROOT}/etc/greetd/config.toml"
+    install -Dm644 "{WORK_DIR}/../greetd.pam" "{STAGING_ROOT}/etc/pam.d/greetd"
+    install -Dm644 "{WORK_DIR}/../greetd.sysusers" "{STAGING_ROOT}/usr/lib/sysusers.d/greetd.conf"
+    install -Dm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/greetd/LICENSE"
+
+    cat > "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+#!/bin/sh
+systemd-sysusers
+exit 0
+EOF
+}

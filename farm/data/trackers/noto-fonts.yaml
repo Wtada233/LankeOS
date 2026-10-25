@@ -1,0 +1,41 @@
+pkg-name: noto-fonts
+version-source: work_sources[0]
+work_sources:
+  - tracker-template: github
+    repo: notofonts/notofonts.github.io
+    mode: tags
+    tag-prefix: noto-monthly-release-
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/{tag}/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSans/hinted/ttf/NotoSans-Bold.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSans/hinted/ttf/NotoSans-Italic.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSans/hinted/ttf/NotoSans-BoldItalic.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSerif/hinted/ttf/NotoSerif-Regular.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSerif/hinted/ttf/NotoSerif-Bold.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSerif/hinted/ttf/NotoSerif-Italic.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSerif/hinted/ttf/NotoSerif-BoldItalic.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSansMono/hinted/ttf/NotoSansMono-Regular.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSansMono/hinted/ttf/NotoSansMono-Bold.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-{version}/fonts/NotoSansSymbols2/hinted/ttf/NotoSansSymbols2-Regular.ttf
+  - tracker-template: same-version-of-source
+    same-version-of-source: work_sources[0]
+    template: https://raw.githubusercontent.com/notofonts/noto-fonts/main/LICENSE

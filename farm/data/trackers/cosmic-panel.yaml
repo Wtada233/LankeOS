@@ -1,0 +1,8 @@
+pkg-name: cosmic-panel
+version-source: sources[0]
+sources:
+  - tracker-template: github
+    repo: pop-os/cosmic-panel
+    mode: tags
+    tag-prefix: epoch-
+    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz

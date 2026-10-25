@@ -1,0 +1,29 @@
+lankebuild_prepare() {
+    patch -Np1 -i "{WORK_DIR}/../cosmic-greeter-display-manager.patch"
+    patch -Np1 -i "{WORK_DIR}/../cosmic-greeter-use-login-pam.patch"
+    cargo fetch --locked
+}
+
+lankebuild_build() {
+    export CARGO_PROFILE_RELEASE_LTO=thin
+    # GitHub archives carry no git metadata; vergen reads these values from the environment
+    export VERGEN_GIT_SHA="epoch-{ORIG_PKG_VER}"
+    export VERGEN_GIT_COMMIT_DATE="1970-01-01"
+    export RUSTFLAGS="${RUSTFLAGS} -C link-arg=-fuse-ld=lld"
+    just build-release --frozen
+}
+
+lankebuild_package() {
+    just rootdir="{STAGING_ROOT}" install
+    install -Dm644 cosmic-greeter.toml "{STAGING_ROOT}/etc/greetd/cosmic-greeter.toml"
+    install -Dm644 debian/cosmic-greeter.service "{STAGING_ROOT}/usr/lib/systemd/system/cosmic-greeter.service"
+    install -Dm644 debian/cosmic-greeter-daemon.service "{STAGING_ROOT}/usr/lib/systemd/system/cosmic-greeter-daemon.service"
+    install -Dm644 LICENSE "{STAGING_ROOT}/usr/share/licenses/cosmic-greeter/LICENSE"
+
+    cat > "{STAGING_HOOKS}/postinst.sh" << 'EOF'
+#!/bin/sh
+systemd-sysusers
+systemd-tmpfiles --create
+exit 0
+EOF
+}

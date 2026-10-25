@@ -1,0 +1,8 @@
+pkg-name: switcheroo-control
+version-source: sources[0]
+sources:
+  - tracker-template: gitlab
+    host: gitlab.freedesktop.org
+    mode: tags
+    project: hadess/switcheroo-control
+    template: https://gitlab.freedesktop.org/{project}/-/archive/{tag}/{name}-{tag}.tar.gz

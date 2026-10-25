@@ -1,0 +1,18 @@
+Subject: [PATCH] data: propagate stop to graphical-session.target
+
+COSMIC logout stops cosmic-session.target but leaves
+graphical-session.target active. xdg-desktop-portal is
+PartOf=graphical-session.target, so it survives with the COSMIC
+environment and keeps selecting the COSMIC backend in the next
+KDE session. Propagate the stop so the session target is torn down.
+
+--- a/data/cosmic-session.target
++++ b/data/cosmic-session.target
+@@ -4,6 +4,7 @@
+ 
+ BindsTo=graphical-session.target
+ Before=graphical-session.target
++PropagatesStopTo=graphical-session.target
+ 
+ Wants=graphical-session-pre.target
+ After=graphical-session-pre.target
