@@ -3155,4 +3155,3 @@ requires 规则标成 weak（与 recommends 同一机制）：
 
 **版本号**：fork 只改 `CMakeLists.txt` 里的 `VERSION`（pkg-config/CPACK 用）；`solvversion.h`
 里的数值版本与 SONAME 保持 upstream 值，避免破坏头文件里的数值运算。
-

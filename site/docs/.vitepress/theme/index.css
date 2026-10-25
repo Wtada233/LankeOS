@@ -2,8 +2,8 @@
    字体来源：AUR ttf-unifont（/usr/share/fonts/Unifont/），仅 Regular */
 
 @font-face {
-  font-family: 'Unifont';
-  src: url('/fonts/Unifont.ttf') format('truetype');
+  font-family: "Unifont";
+  src: url("/fonts/Unifont.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -12,8 +12,8 @@
 }
 
 @font-face {
-  font-family: 'Unifont';
-  src: url('/fonts/Unifont_Upper.ttf') format('truetype');
+  font-family: "Unifont";
+  src: url("/fonts/Unifont_Upper.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -22,9 +22,11 @@
 }
 
 :root {
-  --vp-font-family-base: 'Unifont', Inter, ui-sans-serif, system-ui, sans-serif;
+  --vp-font-family-base: "Unifont", Inter, ui-sans-serif, system-ui, sans-serif;
   /* 代码块保持等宽栈，Unifont 不做正文代码 */
-  --vp-font-family-mono: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
+  --vp-font-family-mono:
+    ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Courier New",
+    monospace;
 }
 
 /* 首页功能卡的 emoji 以文本形式呈现 → 走 Unifont 单色字形，

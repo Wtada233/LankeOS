@@ -49,10 +49,10 @@ On first boot you'll see:
 
 The default user is `LankeOS` with password `LankeOS`. Live mode additionally does two things: it clears `root`'s password field and auto-logs in `LankeOS` (on tty1 and serial). Persistence mode and the installed system do neither, so you log in manually:
 
-| Account | Live Mode | Persistence Mode / Installed System |
-|---------|-----------|-------------------------------------|
-| `LankeOS` | Auto-login; password `LankeOS` (for sudo and graphical login) | Password `LankeOS` |
-| `root` | Password field cleared → **`su` accepts no password at all** (a PAM safety mechanism), so root cannot log in directly | Password was set during development and is not published; for a root shell, reset it with `sudo passwd root` |
+| Account   | Live Mode                                                                                                             | Persistence Mode / Installed System                                                                          |
+| --------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `LankeOS` | Auto-login; password `LankeOS` (for sudo and graphical login)                                                         | Password `LankeOS`                                                                                           |
+| `root`    | Password field cleared → **`su` accepts no password at all** (a PAM safety mechanism), so root cannot log in directly | Password was set during development and is not published; for a root shell, reset it with `sudo passwd root` |
 
 > Get root privileges through `sudo` (as `LankeOS`). If you do want a working root password, run `sudo passwd root` first.
 

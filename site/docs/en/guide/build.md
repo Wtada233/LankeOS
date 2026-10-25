@@ -8,14 +8,14 @@ title: Build from Source
 
 ## Build Environment Requirements
 
-| Component | Requirement |
-|-----------|-------------|
-| Host OS | Any modern Linux distribution (Arch/Ubuntu/Fedora, etc.) |
-| CPU | x86_64-v3, 8+ cores recommended |
-| Memory | 8 GiB+ recommended |
-| Disk | At least 64 GiB free space |
-| Container | Docker (all builds run in fresh containers; `--image` is required) |
-| Privileges | root (required by `lankefarm` and `lpkg` operations) |
+| Component  | Requirement                                                        |
+| ---------- | ------------------------------------------------------------------ |
+| Host OS    | Any modern Linux distribution (Arch/Ubuntu/Fedora, etc.)           |
+| CPU        | x86_64-v3, 8+ cores recommended                                    |
+| Memory     | 8 GiB+ recommended                                                 |
+| Disk       | At least 64 GiB free space                                         |
+| Container  | Docker (all builds run in fresh containers; `--image` is required) |
+| Privileges | root (required by `lankefarm` and `lpkg` operations)               |
 
 ## Get the Source
 
@@ -80,16 +80,16 @@ pkgs/<package>/
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `sources` | Primary sources (release tarballs / GitHub archives / `git+<url>@<tag>`). Kept up to date by `lankefarm track` |
-| `work_sources` | Auxiliary sources (patches, data files, fonts — non-archive files) |
-| `build_deps` | **Build-time** dependencies, must be complete (the build container only installs `build_deps`). Includes `base-devel` as the anchor |
-| `deps` | **Runtime** dependencies. Normally empty — farm derives them from `needed_so`; only implicit dependencies invisible to ELF scanning (dlopen / QML / D-Bus) are written by hand |
-| `provides` | **Pure virtual providers** (unrelated to `.so`, e.g. `rustc`). **Hand-written**; farm never scans or overwrites it |
-| `provides_soname` / `needed_so` | Written automatically by farm after scanning the built ELF files — **do not edit manually** |
-| `release` | Packaging revision, bumped for in-distribution rebuilds (final version looks like `1.2.3-1` — rpm release, `-` not `+` since 8.0.0) |
-| `no_strip` | Skip ELF stripping (interpreters, compilers, `linux`, etc.) |
+| Field                           | Description                                                                                                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sources`                       | Primary sources (release tarballs / GitHub archives / `git+<url>@<tag>`). Kept up to date by `lankefarm track`                                                                 |
+| `work_sources`                  | Auxiliary sources (patches, data files, fonts — non-archive files)                                                                                                             |
+| `build_deps`                    | **Build-time** dependencies, must be complete (the build container only installs `build_deps`). Includes `base-devel` as the anchor                                            |
+| `deps`                          | **Runtime** dependencies. Normally empty — farm derives them from `needed_so`; only implicit dependencies invisible to ELF scanning (dlopen / QML / D-Bus) are written by hand |
+| `provides`                      | **Pure virtual providers** (unrelated to `.so`, e.g. `rustc`). **Hand-written**; farm never scans or overwrites it                                                             |
+| `provides_soname` / `needed_so` | Written automatically by farm after scanning the built ELF files — **do not edit manually**                                                                                    |
+| `release`                       | Packaging revision, bumped for in-distribution rebuilds (final version looks like `1.2.3-1` — rpm release, `-` not `+` since 8.0.0)                                            |
+| `no_strip`                      | Skip ELF stripping (interpreters, compilers, `linux`, etc.)                                                                                                                    |
 
 ### LankeBUILD Script
 
@@ -158,7 +158,7 @@ docker pull wtada233/lankeos:latest
 sudo lankefarm validate --image wtada233/lankeos:latest
 ```
 
-The marker *is* the recipe hash (`sha256(LankeBUILD contents + LankeBUILD.json contents)`), and it lives in the **recipe directory** (`pkgs/<pkg>/.build_ok`), independent of the repository directory `out/`. So "the recipe changed" is equivalent to "the marker went stale": **editing a recipe by hand (`build_deps`, patches, build flags) or simply deleting its `.build_ok` means that package gets rebuilt**, with no need to track affected packages by hand.
+The marker _is_ the recipe hash (`sha256(LankeBUILD contents + LankeBUILD.json contents)`), and it lives in the **recipe directory** (`pkgs/<pkg>/.build_ok`), independent of the repository directory `out/`. So "the recipe changed" is equivalent to "the marker went stale": **editing a recipe by hand (`build_deps`, patches, build flags) or simply deleting its `.build_ok` means that package gets rebuilt**, with no need to track affected packages by hand.
 
 `seed` does not affect the markers — it only populates `out/` and never touches `pkgs/`. So running `validate` right after seeding rebuilds **nothing at all**, as long as the recipes and the artifacts in the repository come from the same build.
 
