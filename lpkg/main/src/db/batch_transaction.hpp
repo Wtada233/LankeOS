@@ -44,7 +44,9 @@
  *
  * 不变量：
  *   - 进入前 WAL 已 trim_completed，无未完成事务
- *   - BEGIN_PKGS 写入 + fsync 后，异常路径保证 COMMIT_PKGS 被写入
+ *   - BEGIN_PKGS 写入 + fsync 后，异常路径**通常**以 COMMIT_PKGS 收尾；例外是回滚自身
+ *     失败（抛异常）与**有撤销动作没成功**（`stats.failures > 0`）—— 这两种情况下批次
+ *     **有意不封口**，保持"未提交"好让下次 `lpkg rec` 幂等重试那些没撤掉的行
  *   - COMMIT_PKGS 是批次完结的唯一标记
  *
  * 模板参数 OpT 是一个可调用对象 OpT(std::vector<std::string>& success)，
@@ -101,17 +103,15 @@ std::vector<std::string> run_batch_transaction(OpT&& op)
             // "见到 CLEANUP 就不回滚"的分岔。旧版 lpkg 把 CLEANUP 写在批次内，其遗留 WAL
             // **不在支持范围**：lpkg 经 lpkg 升级时旧二进制会先 recover_packages() 处理掉
             // 遗留 WAL、新二进制才上线；手工替换二进制不受支持（ARCH.md §11.3）。
-            wal::RollbackStats rs;
-            if (wal::batch_rollback(successfully_installed, &rs)) {
-                // 有撤销动作**真的没成功**（EROFS / immutable / 权限…）⇒ 批次虽已封口，
-                // 但 DB 备份是**唯一还能重试的还原点**：留着它，下次 `lpkg rec` 或人工处理
-                // 还有第二次机会。宁可留残留，也不删未还原的数据 —— 与
-                // `purge_consumed_stashes` 的收敛判据同一取向。
-                // 告警已由 `reverse_execute` 统一发出（那是唯一看得到全部失败行的地方）。
-                if (rs.failures == 0) {
-                    cleanup_db_backups();
-                    trim_completed();
-                }
+            // `batch_rollback` 返回 true ⟺ 整批已回滚并**封口**（没有没撤销成功的行）。
+            // 返回 false 时批次仍未提交（有撤销动作真的没成功，如 EROFS / immutable / 权限；
+            // 或 WAL 里提取不到可回滚的行）—— 此时 WAL 与 DB 备份都是**唯一还能重试的
+            // 还原点**，留给下次 `lpkg rec` 或人工处理，绝不清理。宁可留残留，也不删未还原
+            // 的数据 —— 与 `purge_consumed_stashes` 的收敛判据同一取向。
+            // 告警已由 `reverse_execute` 统一发出（那是唯一看得到全部失败行的地方）。
+            if (wal::batch_rollback(successfully_installed, nullptr)) {
+                cleanup_db_backups();
+                trim_completed();
             }
             // NOLINTNEXTLINE(bugprone-empty-catch) — 下面的注释就是理由：绝不清理，留给下次 rec
         } catch (...) {

@@ -292,14 +292,16 @@ TEST_F(SolverRegressionTest, UpgradeFlushesTriggersAndRegeneratesSonameLinks)
     update_index({{"libtrig", "1.0", "", "", "", ""}});
     install_packages({"libtrig"});
 
+    // 安装路径不再内部生成 SONAME 链接（生产由真 ldconfig 负责）；直接驱动构建期
+    // 仍在用的 `apply_soname_links`，模拟 ldconfig 的效果。
     const fs::path link = test_root / "usr/lib/libtrig.so.1";
-    ASSERT_TRUE(fs::exists(link))
-        << "安装后没有生成 SONAME 链接：ldconfig 触发器空转（libelf 未 elf_version？）";
+    apply_soname_links(test_root / "usr/lib");
+    ASSERT_TRUE(fs::is_symlink(link)) << "apply_soname_links 未生成 SONAME 链接";
+    ASSERT_EQ(fs::read_symlink(link).string(), "libtrig.so.1.0");
 
-    fs::remove(link);  // 清掉，用来观察升级是否重新生成
+    fs::remove(link);  // 清掉，用来观察升级后是否重新生成
 
-    // 直击接线本身：显式登记一条待执行触发器（不依赖 check_file 的累积路径），
-    // 升级若 flush，它就会被执行 → SONAME 链接重建
+    // 显式登记一条待执行触发器（不依赖 check_file 的累积路径）：升级若 flush，队列就会被清空。
     TriggerManager::instance().add("ldconfig");
 
     ASSERT_TRUE(create_lib_pkg("libtrig", "2.0"));
@@ -310,8 +312,13 @@ TEST_F(SolverRegressionTest, UpgradeFlushesTriggersAndRegeneratesSonameLinks)
     Cache::instance().load();
     EXPECT_EQ(Cache::instance().get_installed_version("libtrig"), "2.0") << "升级没有落地新版本";
     EXPECT_TRUE(fs::exists(test_root / "usr/lib/libtrig.so.2.0")) << "新版本文件不存在";
-    EXPECT_TRUE(fs::exists(link))
-        << "升级没有 flush 触发器（ldconfig/glib-compile-schemas/daemon-reload 全都不跑）";
+    EXPECT_TRUE(TriggerManager::instance().pending_for_test().empty())
+        << "升级没有 flush 触发器（队列未清空）";
+
+    // 升级后模拟 ldconfig：缺失/悬空的 SONAME 链接必须重新指到新文件。
+    apply_soname_links(test_root / "usr/lib");
+    ASSERT_TRUE(fs::is_symlink(link)) << "升级后 apply_soname_links 未重建 SONAME 链接";
+    EXPECT_EQ(fs::read_symlink(link).string(), "libtrig.so.2.0");
 }
 
 TEST_F(SolverRegressionTest, GetElfSonameReadsRealSharedObject)

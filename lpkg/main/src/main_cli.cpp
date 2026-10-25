@@ -331,13 +331,22 @@ static void run_scan_command(const cxxopts::ParseResult& result)
 }
 
 /** 本函数负责 `lpkg rec`：从未完成事务中恢复 → 清理已完成批次 → 回收 DB 备份。 */
-static void run_rec_command()
+static int run_rec_command()
 {
     log_info(get_string("info.rec_recovering"));
-    recover_packages();
+    const bool clean = recover_packages();
+    // trim 与备份清理各自带"有未配对批次一律不动"的内部守卫，故失败时调用无害：
+    // 它们不会碰那个还没收回来的批次，也不会删它的还原点。
     trim_completed();
     cleanup_db_backups();
-    log_info(get_string("info.rec_complete"));
+    if (clean) {
+        log_info(get_string("info.rec_complete"));
+        return 0;
+    }
+    // 恢复没做完：退出码必须让脚本看得见 —— 此前恒 0，
+    // "回滚失败 + 备份被保留 + 却打印恢复完成"是可能组合。
+    log_warning(get_string("warning.rec_incomplete"));
+    return 1;
 }
 
 /**
@@ -403,7 +412,7 @@ static int handle_command(const std::string& command, const cxxopts::ParseResult
     } else if (command == constants::CMD_SCAN) {
         run_scan_command(result);
     } else if (command == constants::CMD_REC) {
-        run_rec_command();
+        return run_rec_command();
     } else {
         usage();
         return 1;

@@ -277,21 +277,26 @@ std::vector<WALOp> extract_current_batch_ops(const std::string& wal_path);
 /**
  * 完整的批次回滚。
  * 1. 提取当前批次 WAL 行
- * 2. 清理内存 cache
- * 3. reverse_execute(ops)
- * 4. DB /pkgs :batch-start
- * 5. ROLLBACK pkg + END pkg 对每个已回滚包
- * 6. COMMIT_PKGS
+ * 2. reverse_execute(ops)
+ * 3. stash 收尸
+ * 4. 重载 Cache（从磁盘恢复的 DB）
+ * 5. DB /pkgs :batch-start
+ * 6. ROLLBACK pkg + END pkg 对每个已回滚包
+ * 7. COMMIT_PKGS（**仅在没有任何失败行时**）
  *
- * @param out_stats 可选出参：回滚的计数（**含 `failures`**）。传它的调用方能在"批次已封口"
- *                  的同时知道**有没有哪一行其实没撤掉** —— `batch_rollback` 的返回值答不了
- *                  这个问题（它只答"有没有可回滚的行"）。不传则行为与从前**完全一致**。
- * @return true = 确实回滚了（批次已由 COMMIT_PKGS 收尾，DB 备份已被消费，可以安全清理）；
- *         false = 无可回滚的行（WAL 里没有未完成批次，如尾部破损行导致 ops 为空）——
- *         此时**批次仍开着、DB 备份还没被消费**，调用方必须保留它们交给下次 rec 续传，
- *         绝不能 cleanup_db_backups()（否则文件能还原而 DB 永远还原不回来）。
- *         ⚠️ 返回 true **不代表回滚完整** —— `stats.failures > 0` 时批次照样被封口，
- *         但调用方应当保留 DB 备份（那是唯一还能重试的还原点）。
+ * @param out_stats 可选出参：回滚的计数（**含 `failures`**）。
+ * @return true = 整批已回滚并**封口**（COMMIT_PKGS 已写、stash 已收、DB 备份已被消费，
+ *         可以安全清理）；
+ *         false = 批次**仍处于"未提交"状态**，调用方必须保留 WAL 与 DB 备份交给下次
+ *         rec 续传，绝不能 cleanup_db_backups()（否则文件能还原而 DB 永远还原不回来）。
+ *         两种情况都会返回 false 且**不写 COMMIT_PKGS**：
+ *           · 有撤销动作真的没成功（`stats.failures > 0`，如 EROFS / immutable / 权限）
+ *             —— 此时**第 3-7 步一律不执行**：没还原成功的 bak 还躺在 stash 里，那是重试
+ *             的依据，收掉就没得重试了；
+ *           · WAL 里没有可回滚的行（尾部破损导致 ops 为空）。
+ *         封口会让 `wal_has_unpaired_batch()` 立刻判假 ⇒ `cleanup_db_backups()` 不再拒绝，
+ *         那个"唯一还能重试的还原点"被下一条命令删掉，而那些行再没有任何机制会重试。
+ *         ⚠️ 因此 true **蕴含回滚完整**；要单独拿失败计数用 `out_stats`。
  */
 bool batch_rollback(const std::vector<std::string>& successfully_installed,
                     RollbackStats* out_stats = nullptr);

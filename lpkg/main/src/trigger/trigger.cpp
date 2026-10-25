@@ -5,9 +5,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "cache.hpp"
 #include "config.hpp"
-#include "elf/lib_utils.hpp"
 #include "localization.hpp"
 #include "ui/term.hpp"
 #include "utils.hpp"
@@ -141,7 +139,7 @@ std::set<std::string> TriggerManager::pending_for_test()
 }
 
 /**
- * 特殊处理 ldconfig 命令：直接调用内部 SONAME 链接生成，而非执行外部程序
+ * 执行待办系统触发器。
  * 在测试模式（testing mode）下跳过所有系统级触发器执行
  */
 void TriggerManager::run_all()
@@ -155,35 +153,8 @@ void TriggerManager::run_all()
         // 单行状态：`==> Running system trigger: ldconfig ... [OK]`（[OK] 靠终端最右）。
         ui::Line line(string_format("ui.running_trigger", cmd));
 
-        // 内部处理 ldconfig，避免调用外部程序
-        if (cmd == "ldconfig") {
-            // **提交后阶段不得穿透 --root**：`apply_soname_links` 用**跟随**
-            // 语义处理这个目录（`is_directory_follow` + `create_symlink` + `fs::remove`），而
-            // 包发的 `usr/lib -> <root 外>` 链接是**有意**放行的（§5.4 不变量 6 只解析父目录）
-            // ⇒ 不挡就是"提交之后在宿主的那个目录里建/删链接"。
-            // 这里**只告警不抛**：触发器跑在批次提交之后，抛了等于"包已装好却报命令失败"
-            // （与其余触发器失败的处置一致）；判据见 `base/path_safety.hpp::path_resolves_within`。
-            const std::filesystem::path soname_dir = Config::instance().root_dir() / "usr/lib";
-            if (!path_resolves_within(soname_dir, Config::instance().root_dir())) {
-                log_warning(string_format("warning.soname_dir_outside_root", soname_dir.string()));
-                line.finish(ui::skipped());
-            } else {
-                // 清理悬空 SONAME 链接时**跳过属于某个包的那些**：包可以刻意发一条指向
-                // "由另一个包提供、此刻还没装"的库的链接，删掉它没有任何机制会重建
-                // （详见 apply_soname_links 的说明）。归属判据在这里注入 —— `elf/` 层不许
-                // 反向依赖 `db/`。逻辑键按 `root_dir()` 归一（与其他调用点同一口径）。
-                apply_soname_links(soname_dir, [](const std::filesystem::path& link) {
-                    const std::filesystem::path rel =
-                        link.lexically_relative(Config::instance().root_dir());
-                    if (rel.empty() || rel.native().starts_with("..")) return false;
-                    const std::string logical =
-                        (std::filesystem::path("/") / rel).lexically_normal().string();
-                    return !Cache::instance().get_file_owners(logical).empty();
-                });
-                line.finish(ui::ok(true));
-            }
-        } else if (Config::instance().testing_mode()) {
-            // 测试模式下跳过外部命令（systemctl daemon-reload 等），避免 polkit 弹窗
+        if (Config::instance().testing_mode()) {
+            // 测试模式下跳过外部命令（ldconfig / systemctl daemon-reload 等），避免 polkit 弹窗
             line.finish(ui::skipped());
         } else {
             // **在目标 root 内**执行：命令里写的是绝对路径（/usr/share/... 等），

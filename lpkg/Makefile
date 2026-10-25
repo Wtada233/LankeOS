@@ -99,7 +99,7 @@ deps-check:
 
 TARGET = lpkg
 TEST_TARGET = run_tests
-VERSION ?= 8.0.0
+VERSION ?= 8.0.1
 
 BUILD_DIR = build
 MAIN_DIR = main

@@ -318,11 +318,16 @@ static bool rollback_uncommitted_region(const std::vector<std::string>& lines, s
     return false;
 }
 
-void recover_packages()
+/**
+ * @return true  = 恢复干净：没有未完成批次，或未完成批次已全部撤销成功。
+ *         false = 有撤销动作没能成功；WAL 与 DB 备份**有意保留**，可再次 `lpkg rec` 重试。
+ *         调用方（`lpkg rec` 的 CLI 分支）据此决定退出码 —— 恢复失败必须让脚本看得见。
+ */
+bool recover_packages()
 {
     // 0. 读取所有行。"没有可处理的日志"（路径不存在/打不开/为空）→ 没有任何事要做。
     auto maybe_lines = read_wal_lines(wal::wal_log_path());
-    if (!maybe_lines || maybe_lines->empty()) return;
+    if (!maybe_lines || maybe_lines->empty()) return true;
     const std::vector<std::string>& lines = *maybe_lines;
 
     // 1. 续传 post-commit 清理：删除已提交批次残留的 .lpkg_bak。
@@ -342,7 +347,7 @@ void recover_packages()
         // DBLock 保证单进程，安全）。
         trim_completed();
         cleanup_db_backups();
-        return;
+        return true;
     }
 
     // 3. 一次逆序回滚整段未提交区域（跳过其中属于**已提交**批次的行，见 BatchPairing）
@@ -352,6 +357,7 @@ void recover_packages()
     // 4. 清理残留的 .lpkg_db_bak_before:* 备份文件。
     //    有批次恢复失败时**跳过**：那些备份是重试还原 DB 的唯一依据。
     if (!any_batch_failed) cleanup_db_backups();
+    return !any_batch_failed;
 }
 
 // ============================================================================

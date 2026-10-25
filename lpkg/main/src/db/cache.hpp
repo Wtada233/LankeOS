@@ -245,8 +245,8 @@ public:
 
 // ── WAL 恢复与清理（全局函数） ──────────────────────────────────────
 
-/// 仅用于崩溃恢复。
-void recover_packages();
+/// 仅用于崩溃恢复。@return false = 有撤销动作没能成功（WAL 与 DB 备份已保留，可重试）。
+bool recover_packages();
 
 /// 清理已提交批次的 WAL 日志行。
 void trim_completed();

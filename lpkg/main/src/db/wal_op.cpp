@@ -794,7 +794,20 @@ UndoResult perform_undo(Undo u, const WALOp& op, const fs::path& orig, const fs:
         case Undo::ReStash: {
             // 方向由 undo 列决定（备份类：bak → orig；UNSTASH：orig → bak）
             const bool from_bak = (u == Undo::RestoreFromBak);
-            ::safe_rename(from_bak ? bak : orig, from_bak ? orig : bak);
+            // **回滚路径上的动作不许有能力打断整批回滚**：`safe_rename` 失败一律抛
+            // （`fs_atomic.hpp` 有意不做 copy+remove 回退）。抛穿 `reverse_execute` 会让
+            // `batch_rollback` 够不到 `COMMIT_PKGS`，批次永远封不了口，入口守卫
+            // `wal_has_unpaired_batch()` 从此拒绝一切新批次 —— 而恢复路径又会撞上同一行
+            // 再次抛出，于是每条 lpkg 命令都失败，只能手工改 WAL。与 `RemoveFile` /
+            // `RemoveEmptyDir` 一样就地转成 `Failed`，交给 `RollbackStats::failures`
+            // （它已经让调用方保留 WAL 与 DB 备份，并让批次保持未提交以便重试）。
+            try {
+                ::safe_rename(from_bak ? bak : orig, from_bak ? orig : bak);
+            } catch (const std::exception& e) {
+                log_warning(string_format("warning.rollback_path_not_restored",
+                                          (from_bak ? orig : bak).string(), e.what()));
+                return UndoResult::Failed;
+            }
             return UndoResult::Did;
         }
         case Undo::RecreateDir: {
@@ -840,7 +853,14 @@ UndoResult perform_undo(Undo u, const WALOp& op, const fs::path& orig, const fs:
             return UndoResult::Did;  // rmdir 成功才算"动了盘"（不写 RESTORE_DIR_RM 谎报）
         }
         case Undo::RestoreDb:
-            ::safe_rename(bak, orig);
+            // 同 RestoreFromBak：抛会打断整批回滚（见上）。
+            try {
+                ::safe_rename(bak, orig);
+            } catch (const std::exception& e) {
+                log_warning(
+                    string_format("warning.rollback_path_not_restored", orig.string(), e.what()));
+                return UndoResult::Failed;
+            }
             return UndoResult::Did;
         case Undo::RestoreDirMeta: {
             if (orig.empty()) return UndoResult::NothingToDo;
@@ -1310,7 +1330,7 @@ bool batch_rollback(const std::vector<std::string>& successfully_installed,
         return false;
     }
 
-    // 1. 无需在此手动清理内存 cache：下方 reverse_execute 恢复磁盘 DB 后，
+    // 无需在此手动清理内存 cache：下方 reverse_execute 恢复磁盘 DB 后，
     //    步骤 3 的 cache.load() 会从磁盘整体重载（曾对 successfully_installed 逐包
     //    remove_installed——install 失败时这些包本就不该在内存、remove 失败时更是
     //    no-op，且随后被 load() 覆盖，纯死代码）。
@@ -1320,17 +1340,30 @@ bool batch_rollback(const std::vector<std::string>& successfully_installed,
     const RollbackStats stats = reverse_execute(ops, true);
     if (out_stats) *out_stats = stats;
 
-    // 2.5 stash 收尸：reverse 已把每个文件从 stash 还原，清掉空 stash（绝不能在
+    // **有撤销动作没成功 ⇒ 绝不封口**（不写 COMMIT_PKGS、不收 stash、不写 ROLLBACK/END）：
+    // 让批次保持"未提交"，下次 `recover_packages()` 幂等重做那些没撤掉的行 —— 与
+    // `rollback_uncommitted_region` 的 failures>0 处置同源。
+    //
+    // 原实现无条件封口，两个后果都不可逆：① `wal_has_unpaired_batch()` 随即判假 ⇒
+    // `cleanup_db_backups()` 不再拒绝，那个"唯一还能重试的还原点"被下一条命令删掉；
+    // ② 没有任何机制会重试 —— 调用点注释里"DB 备份是唯一还能重试的还原点"成了空头支票。
+    //
+    // 这一支**必须早于 `purge_consumed_stashes`**：没还原成功的 bak 还躺在 stash 里，
+    // 那是重试的依据（原实现能无条件收尸，只是因为那时 rename 失败会抛、根本走不到这里）。
+    // 保持未提交时入口守卫会拒绝开新批次 —— 那正是它的用途：先让 `lpkg rec` 把这条路径解决掉。
+    if (stats.failures > 0) return false;
+
+    // 3. stash 收尸：reverse 已把每个文件从 stash 还原，清掉空 stash（绝不能在
     //     reverse 完成前删——残留的 bak 是"还没还原"的数据）
     purge_consumed_stashes(ops);
 
-    // 3. 重载 Cache（从磁盘恢复的 DB 文件）
+    // 4. 重载 Cache（从磁盘恢复的 DB 文件）
     cache.load();
 
-    // 4. DB :batch-start（保存回滚后的状态）
+    // 5. DB :batch-start（保存回滚后的状态）
     cache.write(":batch-start");
 
-    // 5. 对每个已成功（已回滚）包写 ROLLBACK + END
+    // 6. 对每个已成功（已回滚）包写 ROLLBACK + END
     //    版本号从 WAL 的 BEGIN 行提取——load() 后的 Cache 对全新安装的包返回空版本
     std::map<std::string, std::string> pkg_versions;
     for (const auto& op : ops) {
@@ -1344,7 +1377,8 @@ bool batch_rollback(const std::vector<std::string>& successfully_installed,
         wal_append_raw(std::format("END {} {}", pkg, ver));
     }
 
-    // 6. COMMIT_PKGS
+    // 7. COMMIT_PKGS —— 只在这一步才封口；上面 `stats.failures > 0` 已经提前返回，
+    //    所以走到这里必然"每一行都撤掉了"。
     wal_append_raw("COMMIT_PKGS");
     return true;
 }

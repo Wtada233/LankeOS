@@ -1,13 +1,14 @@
 /**
- * test_soname_remove_refresh.cpp — 升级/删除后 SONAME 链接必须跟着变
+ * test_soname_remove_refresh.cpp — SONAME 链接在升级/删除后必须跟着变
  *
- * 两条链路缺一不可：
+ * 安装路径不再内部生成 SONAME 链接：生产由真实的 `ldconfig(8)` 负责（触发器里直接
+ * 执行外部命令）。这些用例因此**直接驱动 `apply_soname_links`**（构建期 staging
+ * 仍在用的同一个函数）来模拟 ldconfig，盯住两条语义：
  *   升级：同 SONAME、不同文件名（libfoo.so.1.2.3 → libfoo.so.1.4.5）时，旧链接指向的
- *         文件已被删 → 链接悬空。修好的 apply_soname_links 会把它重指到新文件
+ *         文件已被删 → 链接悬空。apply_soname_links 会把它重指到新文件
  *         （旧实现在“链接已存在”时直接跳过，于是永久悬空）。
- *   删除：删掉库文件后链接留着悬空 —— 删除路径此前**一次都不跑触发器**
- *         （TriggerManager::run_all 只在 install/upgrade 里 flush），
- *         而 apply_soname_links 现在会把无人提供 SONAME 的悬空链接清掉。
+ *   删除：删掉库文件后链接留着悬空 —— apply_soname_links 会把无人提供 SONAME 的
+ *         悬空链接清掉。
  *
  * 真实 ELF（gcc 不可用则跳过）。
  */
@@ -24,6 +25,7 @@
 #include "../../main/src/base/utils.hpp"
 #include "../../main/src/config/config.hpp"
 #include "../../main/src/db/cache.hpp"
+#include "../../main/src/elf/lib_utils.hpp"
 #include "../../main/src/i18n/localization.hpp"
 #include "../../main/src/pkg/package_manager.hpp"
 #include "../../main/src/trigger/trigger.hpp"
@@ -80,14 +82,18 @@ TEST_F(SonameRemoveRefreshTest, UpgradeRepointsSonameLinkToNewFileName)
     ASSERT_NO_THROW(install_packages({(pkg_dir / "librep-1.2.3.lpkg").string()}));
 
     const fs::path link = test_root / "usr/lib/librep.so.1";
-    ASSERT_TRUE(fs::is_symlink(link)) << "安装后没有生成 SONAME 链接";
+    // 安装路径不再内部生成链接（生产由真 ldconfig 负责）；直接驱动构建期函数模拟之。
+    apply_soname_links(test_root / "usr/lib");
+    ASSERT_TRUE(fs::is_symlink(link)) << "apply_soname_links 未生成 SONAME 链接";
     ASSERT_EQ(fs::read_symlink(link).string(), "librep.so.1.2.3");
 
     ASSERT_TRUE(create_lib_pkg("librep", "1.4.5", "1.4.5", "librep.so.1", /*tag=*/2));
     ASSERT_NO_THROW(install_packages({(pkg_dir / "librep-1.4.5.lpkg").string()}));
 
     ASSERT_FALSE(fs::exists(test_root / "usr/lib/librep.so.1.2.3")) << "旧文件名应当已被删";
-    EXPECT_TRUE(fs::exists(link))
+    // 此刻链接悬空（指向升级时被删掉的旧文件名）；apply_soname_links 必须把它重指到新文件。
+    apply_soname_links(test_root / "usr/lib");
+    EXPECT_TRUE(fs::is_symlink(link))
         << "链接悬空（指向升级时被删掉的旧文件名）：依赖 librep.so.1 的二进制将报 "
            "cannot open shared object file";
     EXPECT_EQ(fs::read_symlink(link).string(), "librep.so.1.4.5");
@@ -101,13 +107,15 @@ TEST_F(SonameRemoveRefreshTest, RemovePrunesDanglingSonameLink)
     ASSERT_NO_THROW(install_packages({(pkg_dir / "libson-1.0.lpkg").string()}));
 
     const fs::path link = test_root / "usr/lib/libson.so.1";
-    ASSERT_TRUE(fs::is_symlink(link));
+    apply_soname_links(test_root / "usr/lib");
+    ASSERT_TRUE(fs::is_symlink(link)) << "apply_soname_links 未生成 SONAME 链接";
 
     ASSERT_NO_THROW(remove_packages({"libson"}, /*force=*/false));
 
     EXPECT_FALSE(Cache::instance().is_installed("libson"));
     EXPECT_FALSE(fs::exists(test_root / "usr/lib/libson.so.1.0"));
+    // 生产由 ldconfig 清理；这里直接驱动函数确认它会剪掉悬空链接。
+    apply_soname_links(test_root / "usr/lib");
     EXPECT_FALSE(fs::is_symlink(link))
-        << "库文件已删除，SONAME 链接仍留在 /usr/lib —— 删除路径没有跑触发器"
-           "（或 apply_soname_links 不会清理悬空链接）";
+        << "库文件已删除，apply_soname_links 仍把悬空 SONAME 链接留在 /usr/lib";
 }
