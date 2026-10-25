@@ -52,9 +52,10 @@ pub(crate) fn repack_if_drift(
     let extract = opts.out_dir.join("extract").join(pkg);
     // 期望值 = .lpkg 内 metadata.json（由 lpkg build 从 LankeBUILD.json 写入）
     let meta = crate::scan::read_metadata_json(&extract.join("metadata.json")).map_err(|e| {
-        format!(
-            "读 {} 的 metadata.json 失败: {e}",
-            extract.join("metadata.json").display()
+        tr!(
+            "repo.read_metadata_json",
+            extract.join("metadata.json").display(),
+            e
         )
     })?;
     // actual.deps 恒空：farm 不扫 deps（gen_deps 生成，decide 不比较）
@@ -74,7 +75,7 @@ pub(crate) fn repack_if_drift(
     match repack::repack_with_metadata(lpkg, &extract, &outcome.needed_so, &outcome.provides_soname)
     {
         Ok(()) => Ok(drifted),
-        Err(e) => Err(format!("repack {} 失败: {e}", pkg).into()),
+        Err(e) => Err(tr!("repo.repack_failed", pkg, e).into()),
     }
 }
 
@@ -89,31 +90,43 @@ pub(crate) fn place_in_repo(
     pkg: &str,
 ) -> Result<PathBuf, FarmError> {
     let Some(lpkg) = &outcome.lpkg_path else {
-        return Err("无构建产物".to_string().into());
+        return Err(tr!("repo.no_artifact").into());
     };
-    let version = effective_version(&opts.pkgs_dir, pkg).ok_or("配方无有效版本")?;
+    let version = effective_version(&opts.pkgs_dir, pkg).ok_or(tr!("repo.no_valid_version"))?;
     let repo_pkg_dir = opts.out_dir.join(&opts.arch).join(pkg);
-    fs::create_dir_all(&repo_pkg_dir).map_err(|e| format!("创建 {repo_pkg_dir:?} 失败: {e}"))?;
+    fs::create_dir_all(&repo_pkg_dir)
+        .map_err(|e| tr!("repo.create_pkg_dir", format!("{repo_pkg_dir:?}"), e))?;
     let dest = repo_pkg_dir.join(format!("{version}.lpkg"));
-    fs::rename(lpkg, &dest).map_err(|e| format!("移动 {lpkg:?} → {dest:?} 失败: {e}"))?;
+    fs::rename(lpkg, &dest).map_err(|e| {
+        tr!(
+            "repo.move_artifact",
+            format!("{lpkg:?}"),
+            format!("{dest:?}"),
+            e
+        )
+    })?;
     // 取代旧版本：先备份旧包中「新版不再提供」的 SONAME .so，再清旧版本。
     // **备份失败必须保留旧版本并报错**（曾静默吞掉：备份失败仍删旧版 → 过渡期
     // 旧二进制失去旧 .so 永久断链，不可恢复）。
-    if let Ok(rd) = fs::read_dir(&repo_pkg_dir) {
-        for e in rd.flatten() {
-            let p = e.path();
-            if p.extension().and_then(|x| x.to_str()) == Some("lpkg") && p != dest {
-                backup_removed_sonames(&opts.out_dir, &p, pkg, &outcome.provides_soname).map_err(
-                    |e| {
-                        format!(
-                            "备份 {} 的旧 SONAME 失败（{e}），保留旧版本不删除",
-                            p.display()
-                        )
-                    },
-                )?;
-                fs::remove_file(&p).map_err(|e| format!("删除旧版本 {:?} 失败: {e}", p))?;
-            }
+    // 两阶段：先把**全部**旧版本备份成功，再统一删旧文件 —— 逐条「备份→删」会在
+    // 中途失败时留下"前一个已删、后一个还在"的半成品。
+    let mut old_lpkgs: Vec<PathBuf> = Vec::new();
+    for e in fs::read_dir(&repo_pkg_dir)
+        .map_err(|e| tr!("repo.read_pkg_dir", format!("{repo_pkg_dir:?}"), e))?
+    {
+        let p = e
+            .map_err(|e| tr!("repo.read_pkg_dir_entry", format!("{repo_pkg_dir:?}"), e))?
+            .path();
+        if p.extension().and_then(|x| x.to_str()) == Some("lpkg") && p != dest {
+            old_lpkgs.push(p);
         }
+    }
+    for p in &old_lpkgs {
+        backup_removed_sonames(&opts.out_dir, p, pkg, &outcome.provides_soname)
+            .map_err(|e| tr!("repo.backup_old_sonames", p.display(), e))?;
+    }
+    for p in &old_lpkgs {
+        fs::remove_file(p).map_err(|e| tr!("repo.remove_old_version", format!("{p:?}"), e))?;
     }
     Ok(dest)
 }
@@ -142,9 +155,10 @@ pub(crate) fn backup_removed_sonames(
     pkg: &str,
     new_provides_soname: &[String],
 ) -> Result<(), FarmError> {
-    let Ok(meta) = crate::scan::read_lpkg_metadata(old_lpkg) else {
-        return Ok(());
-    };
+    // 读不出旧包的 metadata ⇒ 无从判断该备份哪些 SONAME。**不能当成"无事可做"**：
+    // 调用方随后会删旧版本，旧 .so 就永久丢了（这正是本函数契约要防的那类静默失败）。
+    let meta = crate::scan::read_lpkg_metadata(old_lpkg)
+        .map_err(|e| tr!("repo.read_old_metadata", old_lpkg.display(), e))?;
     let old_provides_soname: Vec<String> = meta["provides_soname"]
         .as_array()
         .map(|a| {
@@ -168,15 +182,19 @@ pub(crate) fn backup_removed_sonames(
     let tmp = out_dir.join("backup_tmp").join(pkg);
     crate::scan::extract_lpkg(old_lpkg, &tmp)?;
     let backup_dir = out_dir.join("backups"); // 扁平：备份文件直接放 out/backups/<soname>.so.*
-    fs::create_dir_all(&backup_dir).map_err(|e| format!("创建备份目录失败: {e}"))?;
+    fs::create_dir_all(&backup_dir).map_err(|e| tr!("repo.create_backup_dir", e))?;
     for sub in crate::scan::LIB_DIRS {
         let lib_dir = tmp.join("content").join(sub);
         if !lib_dir.is_dir() {
             continue;
         }
-        if let Ok(rd) = fs::read_dir(&lib_dir) {
-            for e in rd.flatten() {
-                let p = e.path();
+        {
+            let rd = fs::read_dir(&lib_dir)
+                .map_err(|e| tr!("repo.read_lib_dir", lib_dir.display(), e))?;
+            for e in rd {
+                let p = e
+                    .map_err(|e| tr!("repo.read_lib_dir_entry", lib_dir.display(), e))?
+                    .path();
                 let fname = p
                     .file_name()
                     .and_then(|n| n.to_str())
@@ -216,32 +234,51 @@ pub(crate) fn backup_removed_sonames(
                     //   /usr/lib/xxx.so.x -> xxx/xxx.so.x.x
                     //   ⇒ out/backups/xxx.so.x (symlink) + out/backups/xxx/xxx.so.x.x (实体)
                     // 目标可能已被同目录实体/中间链接备份过（版本化链）→ 不覆盖（保留符号链接）。
-                    if let Ok(target) = fs::read_link(&p) {
-                        // 绝对目标在 archive 里定位（content/ → /），符号链接一律转相对（相对备份树根 /usr/lib）
-                        let (src, rel) =
-                            resolve_link_target(&target, &lib_dir, &tmp.join("content"));
-                        if fs::symlink_metadata(&src).is_ok() {
-                            if let Some(parent) = rel.parent() {
-                                if !parent.as_os_str().is_empty() {
-                                    let _ = fs::create_dir_all(backup_dir.join(parent));
-                                }
-                            }
-                            let backup_dest = backup_dir.join(&rel);
-                            if fs::symlink_metadata(&backup_dest).is_err() {
-                                let _ = fs::copy(&src, &backup_dest); // fs::copy 跟随符号链接 → 实体内容
+                    let target =
+                        fs::read_link(&p).map_err(|e| tr!("repo.read_symlink", p.display(), e))?;
+                    // 绝对目标在 archive 里定位（content/ → /），符号链接一律转相对（相对备份树根 /usr/lib）
+                    let (src, rel) = resolve_link_target(&target, &lib_dir, &tmp.join("content"));
+                    if fs::symlink_metadata(&src).is_ok() {
+                        if let Some(parent) = rel.parent() {
+                            if !parent.as_os_str().is_empty() {
+                                let dir = backup_dir.join(parent);
+                                fs::create_dir_all(&dir).map_err(|e| {
+                                    tr!("repo.create_backup_subdir", dir.display(), e)
+                                })?;
                             }
                         }
-                        let _ = fs::remove_file(&dest);
-                        let _ = std::os::unix::fs::symlink(&rel, &dest);
+                        let backup_dest = backup_dir.join(&rel);
+                        if fs::symlink_metadata(&backup_dest).is_err() {
+                            // fs::copy 跟随符号链接 → 实体内容
+                            fs::copy(&src, &backup_dest).map_err(|e| {
+                                tr!("repo.backup_file", src.display(), backup_dest.display(), e)
+                            })?;
+                        }
                     }
+                    // 落点可能被同名实体占着（先备份了实体、再处理指向它的链接）；
+                    // 目录占住落点则必须报错 —— 否则接下来建符号链接会失败得莫名其妙。
+                    remove_if_exists(&dest)?;
+                    std::os::unix::fs::symlink(&rel, &dest)
+                        .map_err(|e| tr!("repo.create_backup_symlink", dest.display(), e))?;
                 } else {
-                    let _ = fs::copy(&p, &dest);
+                    fs::copy(&p, &dest)
+                        .map_err(|e| tr!("repo.backup_file", p.display(), dest.display(), e))?;
                 }
             }
         }
     }
+    // 临时解包目录的清理失败不影响备份结果（落盘已完成），下次 `extract_lpkg` 会重来。
     let _ = fs::remove_dir_all(&tmp);
     Ok(())
+}
+
+/// 删除一个可能不存在的文件：`NotFound` 视为成功，其余错误上抛。
+fn remove_if_exists(path: &Path) -> Result<(), FarmError> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(tr!("repo.remove_old_backup", path.display(), e).into()),
+    }
 }
 
 /// 文件名是否属于某被移除的 SONAME：`r` 本身或其版本化派生名 `r.x.y`。
@@ -455,7 +492,8 @@ pub(crate) fn update_repo_index(
     needed_so: &[String],
 ) -> Result<(), FarmError> {
     let path = out_dir.join(arch).join("index.txt");
-    let content = fs::read_to_string(&path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
+    let content =
+        fs::read_to_string(&path).map_err(|e| tr!("repo.read_file", format!("{path:?}"), e))?;
     let mut found = false;
     let mut lines: Vec<String> = Vec::new();
     for line in content.lines() {
@@ -489,11 +527,12 @@ pub(crate) fn update_repo_index(
             needed_so = needed_so.join(",")
         ));
     }
-    fs::write(&path, lines.join("\n") + "\n").map_err(|e| format!("写 {path:?} 失败: {e}").into())
+    fs::write(&path, lines.join("\n") + "\n")
+        .map_err(|e| tr!("repo.write_file", format!("{path:?}"), e).into())
 }
 
 pub(crate) fn sha256_file(path: &Path) -> Result<String, FarmError> {
-    let data = fs::read(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
+    let data = fs::read(path).map_err(|e| tr!("repo.read_file", format!("{path:?}"), e))?;
     let mut hasher = Sha256::new();
     hasher.update(&data);
     Ok(format!("{:x}", hasher.finalize()))
@@ -568,14 +607,11 @@ pub(crate) fn read_index(out_dir: &Path, arch: &str) -> Option<Index> {
 
 pub(crate) fn load_old_index(out_dir: &Path, arch: &str) -> Result<Index, FarmError> {
     let path = out_dir.join(arch).join("index.txt");
-    let text = fs::read_to_string(&path).map_err(|e| {
-        format!("缺少本地 repo 索引 {path:?}（{e}）——请先 `farm seed` 播种，禁止无基线构建")
-    })?;
+    let text =
+        fs::read_to_string(&path).map_err(|e| tr!("repo.index_missing", format!("{path:?}"), e))?;
     let idx = Index::parse(&text);
     if idx.packages.is_empty() {
-        return Err(
-            format!("本地 repo 索引 {path:?} 为空——请先 `farm seed` 播种，禁止无基线构建").into(),
-        );
+        return Err(tr!("repo.index_empty", format!("{path:?}")).into());
     }
     Ok(idx)
 }

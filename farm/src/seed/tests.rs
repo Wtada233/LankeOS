@@ -156,3 +156,50 @@ fn seed_empty_index_returns_empty_report() {
     assert_eq!(res.unwrap().total, 0);
     fs::remove_dir_all(&out).ok();
 }
+
+/// 本地 HTTP 服务：`index.txt` 返回 200 + body；其余路径也返回 200（错误内容），
+/// 让下载成功但 SHA256 校验失败——避免重试退避拖慢测试。
+fn serve_index_and_bad_pkg(index: Vec<u8>, max_conns: usize) -> u16 {
+    use std::io::{Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    std::thread::spawn(move || {
+        for _ in 0..max_conns {
+            let Ok((mut sock, _)) = listener.accept() else {
+                break;
+            };
+            let mut buf = [0u8; 8192];
+            let n = sock.read(&mut buf).unwrap_or(0);
+            let req = String::from_utf8_lossy(&buf[..n]);
+            let payload: &[u8] = if req.contains(" /x86_64/index.txt ") {
+                &index
+            } else {
+                b"wrong-content"
+            };
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                payload.len()
+            );
+            let _ = sock.write_all(head.as_bytes());
+            let _ = sock.write_all(payload);
+        }
+    });
+    port
+}
+
+#[test]
+fn partial_failure_does_not_write_index() {
+    // 索引声称有一个包，但包内容哈希对不上 ⇒ failed；
+    // 此时绝不能写本地 index.txt（否则它的 SONAME 会被当成"已提供"= 幽灵 provider）。
+    let out = std::env::temp_dir().join(format!("farm-seed-partial-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&out);
+    let index = "p|1.0:deadbeef::::|\n";
+    let port = serve_index_and_bad_pkg(index.as_bytes().to_vec(), 8);
+    let report = seed(&format!("http://127.0.0.1:{port}"), "x86_64", &out, 1).unwrap();
+    assert!(!report.failed.is_empty(), "包内容哈希不匹配应记入 failed");
+    assert!(
+        !out.join("x86_64/index.txt").exists(),
+        "有包失败时不得写 index.txt（幽灵 provider）"
+    );
+    fs::remove_dir_all(&out).ok();
+}

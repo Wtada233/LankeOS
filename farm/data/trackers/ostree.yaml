@@ -5,4 +5,4 @@ sources:
     repo: ostreedev/ostree
     mode: tags
     tag-prefix: v
-    template: https://github.com/{repo}/archive/refs/tags/{tag}.tar.gz
+    template: git+https://github.com/{repo}@{tag}

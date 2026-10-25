@@ -1,6 +1,6 @@
 {
   "name": "btrfs-progs",
-  "version": "7.1",
+  "version": "7.3",
   "release": 4,
   "deps": [
     "bash"
@@ -12,7 +12,7 @@
     "libcom_err.so.2",
     "libext2fs.so.2",
     "libudev.so.1@LIBUDEV_183",
-    "libuuid.so.1@UUID_1.0",
+    "libuuid.so.1@{UUID_1.0,UUID_2.31}",
     "libz.so.1@ZLIB_1.2.0",
     "libzstd.so.1"
   ],
@@ -32,7 +32,7 @@
     "zstd"
   ],
   "sources": [
-    "https://github.com/kdave/btrfs-progs/archive/refs/tags/v7.1.tar.gz"
+    "https://github.com/kdave/btrfs-progs/archive/refs/tags/v7.3.tar.gz"
   ],
   "work_sources": []
 }

@@ -7,7 +7,7 @@ use std::path::Path;
 
 pub fn pre_download_sources(pkgs_dir: &Path, pkg: &str, retries: u32) -> Result<(), FarmError> {
     let Some(b) = read_lankebuild(pkgs_dir, pkg) else {
-        return Err("无 LankeBUILD.json".to_string().into());
+        return Err(crate::tr!("build.no_lankebuild").into());
     };
     let pkg_dir = pkgs_dir.join(pkg);
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -17,12 +17,14 @@ pub fn pre_download_sources(pkgs_dir: &Path, pkg: &str, retries: u32) -> Result<
         }
         let filename = source_filename(url);
         if filename.is_empty() {
-            return Err(format!("{url}: 源 URL 无文件名（裸目录 URL 不可作为源）").into());
+            return Err(crate::tr!("build.source_no_filename", url).into());
         }
         // 同名落盘冲突 → 显式报错而非静默跳过第二个（曾导致第二个源永不预取、source 门控误判）
         if !seen.insert(filename.to_string()) {
-            return Err(format!(
-                "{url}: 与另一源解析出相同文件名 {filename:?}（query/fragment 已剥离），无法预下载"
+            return Err(crate::tr!(
+                "build.source_duplicate_filename",
+                url,
+                format!("{filename:?}")
             )
             .into());
         }

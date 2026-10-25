@@ -1,6 +1,6 @@
 {
   "name": "obs-studio",
-  "version": "32.2.2",
+  "version": "33.0.0",
   "deps": [
     "python",
     "xwayland"
@@ -121,8 +121,8 @@
     "zlib"
   ],
   "sources": [
-    "git+https://github.com/obsproject/obs-studio@32.2.2"
+    "git+https://github.com/obsproject/obs-studio@33.0.0"
   ],
   "work_sources": [],
-  "release": 10
+  "release": 11
 }

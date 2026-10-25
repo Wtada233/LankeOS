@@ -48,18 +48,16 @@ impl LlmClient {
         }
         let resp = req
             .send_string(&body.to_string())
-            .map_err(|e| format!("LLM API 调用失败: {e}"))?;
+            .map_err(|e| crate::tr!("llm.api_failed", e))?;
         let text = resp
             .into_string()
-            .map_err(|e| format!("LLM 响应读取失败: {e}"))?;
+            .map_err(|e| crate::tr!("llm.read_response_failed", e))?;
         let data: Value =
-            serde_json::from_str(&text).map_err(|e| format!("LLM 响应非 JSON: {e}"))?;
+            serde_json::from_str(&text).map_err(|e| crate::tr!("llm.non_json_response", e))?;
         data["choices"][0]["message"]["content"]
             .as_str()
             .map(|s| s.to_string())
-            .ok_or_else(|| {
-                format!("LLM 响应无 choices[0].message.content: {}", excerpt(&text)).into()
-            })
+            .ok_or_else(|| crate::tr!("llm.missing_content", excerpt(&text)).into())
     }
 }
 

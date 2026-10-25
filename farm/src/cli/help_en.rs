@@ -4,6 +4,34 @@
 
 /// LANG=en 时把 clap 帮助文本（doc comment 是中文）覆盖为英文。builder 风格（消费 self 返回 Self）。
 pub(super) fn localize_help(cmd: clap::Command) -> clap::Command {
+    /// `ChkArgs` 是 flatten 到每个检則叶子子命令上的；`next_help_heading` 是
+    /// derive 期的中文字面量，只能逐 arg 覆盖。
+    fn with_chk_headings(c: clap::Command) -> clap::Command {
+        c.mut_arg("source", |a| {
+            a.help("Build repository root (contains <arch>/; every package builds providers/cache)")
+                .help_heading("Check options")
+        })
+        .mut_arg("arch", |a| {
+            a.help("Architecture (read source/<arch>/)")
+                .help_heading("Check options")
+        })
+        .mut_arg("pkgs_dir", |a| {
+            a.help("Recipe root (reads deps/farm_flags from LankeBUILD.json)")
+                .help_heading("Check options")
+        })
+        .mut_arg("cache", |a| {
+            a.help("Cache root (one subdirectory per check; defaults to ~/.cache/lankefarm)")
+                .help_heading("Check options")
+        })
+        .mut_arg("pkg", |a| {
+            a.help("Only check/report these packages (providers still come from the full --source)")
+                .help_heading("Check options")
+        })
+        .mut_arg("full_rescan", |a| {
+            a.help("Ignore the cache and force a full rescan")
+                .help_heading("Check options")
+        })
+    }
     if !lankefarm::i18n::is_en() {
         return cmd;
     }
@@ -68,14 +96,14 @@ pub(super) fn localize_help(cmd: clap::Command) -> clap::Command {
             .mut_arg("arch", |a| a.help("Architecture")))
         .mut_subcommand("chk", |c| c
             .about("Maintainer utility checks (qml/pkgconf/pkg-err/introspection/vapi/build-deps/pycache/hook/abi/full). NOT a stable interface - these tools may be removed as techniques change; see `farm chk --help`")
-            .mut_subcommand("qml", |c| c.about("Check QML imports: each imported module's owner package must be in this package's deps∪needed_so"))
-            .mut_subcommand("pkgconf", |c| c.about("Check pkg-config Requires(/private): each module's owner package must be in deps∪needed_so"))
-            .mut_subcommand("pkg-err", |c| c.about("Packaging errors: usr/etc|usr/var misplacement, leftover .la/.a"))
-            .mut_subcommand("introspection", |c| c.about("Packages shipping .gir must declare gobject-introspection as a build dependency"))
-            .mut_subcommand("vapi", |c| c.about("Packages shipping .vapi must declare vala as a build dependency"))
-            .mut_subcommand("build-deps", |c| c.about("Every needed_so provider must be declared directly in this package's build_deps (transitive availability does not count)"))
-            .mut_subcommand("pycache", |c| c.about("Packages must not ship __pycache__ bytecode caches (empty dirs included)"))
-            .mut_subcommand("hook", |c| c.about("postinst hook check: packages shipping sysusers.d/tmpfiles.d must call systemd-sysusers / systemd-tmpfiles --create"))
-            .mut_subcommand("abi", |c| c.about("Full ABI symbol@version audit (formerly manual-abi-fullchk)"))
-            .mut_subcommand("full", |c| c.about("Run every check with one set of args: qml + pkgconf + pkg-err + introspection + vapi + build-deps + pycache + hook + abi")))
+            .mut_subcommand("qml", |c| with_chk_headings(c.about("Check QML imports: each imported module's owner package must be in this package's deps∪needed_so")))
+            .mut_subcommand("pkgconf", |c| with_chk_headings(c.about("Check pkg-config Requires(/private): each module's owner package must be in deps∪needed_so")))
+            .mut_subcommand("pkg-err", |c| with_chk_headings(c.about("Packaging errors: usr/etc|usr/var misplacement, leftover .la/.a")))
+            .mut_subcommand("introspection", |c| with_chk_headings(c.about("Packages shipping .gir must declare gobject-introspection as a build dependency")))
+            .mut_subcommand("vapi", |c| with_chk_headings(c.about("Packages shipping .vapi must declare vala as a build dependency")))
+            .mut_subcommand("build-deps", |c| with_chk_headings(c.about("Every needed_so provider must be declared directly in this package's build_deps (transitive availability does not count)")))
+            .mut_subcommand("pycache", |c| with_chk_headings(c.about("Packages must not ship __pycache__ bytecode caches (empty dirs included)")))
+            .mut_subcommand("hook", |c| with_chk_headings(c.about("postinst hook check: packages shipping sysusers.d/tmpfiles.d must call systemd-sysusers / systemd-tmpfiles --create")))
+            .mut_subcommand("abi", |c| with_chk_headings(c.about("Full ABI symbol@version audit (formerly manual-abi-fullchk)")))
+            .mut_subcommand("full", |c| with_chk_headings(c.about("Run every check with one set of args: qml + pkgconf + pkg-err + introspection + vapi + build-deps + pycache + hook + abi"))))
 }

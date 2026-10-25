@@ -41,7 +41,8 @@ pub fn probe(
                         format!("https://{host}/api/v4/projects/{enc}/releases?per_page=100");
                     let items = templates::fetch_json_pages(fetcher, &base, 100, 10)?;
                     let names = templates::release_tag_names(&items);
-                    max_tag_version(&names, tag_prefix, &f).ok_or("releases 中无匹配版本/主版本")?
+                    max_tag_version(&names, tag_prefix, &f)
+                        .ok_or(crate::tr!("track.no_matching_release"))?
                 }
             }
         }
@@ -49,7 +50,7 @@ pub fn probe(
             // tags 模式：同 github——走 **git 协议列全量 tag**（libgit2）；REST tags 端点 per_page
             // 上限 100，靠翻页且顺序与版本无关。
             let names = fetcher.list_tags(&format!("https://{host}/{project}.git"))?;
-            max_tag_version(&names, tag_prefix, &f).ok_or("tags 中无匹配版本/主版本")?
+            max_tag_version(&names, tag_prefix, &f).ok_or(crate::tr!("track.no_matching_tags"))?
         }
     };
     let tag = format!("{tag_prefix}{version}");

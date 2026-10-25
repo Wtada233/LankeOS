@@ -48,7 +48,7 @@ pub fn http_agent() -> &'static ureq::Agent {
 /// - 回调内若服务端只接受我们不支持的凭据类型（如 SSH key）→ 交回空凭据（退回匿名）而非硬失败。
 pub fn list_remote_tags(repo_url: &str, token: Option<&str>) -> Result<Vec<String>, FarmError> {
     let mut remote = git2::Remote::create_detached(repo_url)
-        .map_err(|e| format!("创建 remote {repo_url} 失败: {e}"))?;
+        .map_err(|e| crate::tr!("net.create_remote", repo_url, e))?;
     let mut callbacks = git2::RemoteCallbacks::new();
     if let Some(tok) = token {
         let tok = tok.to_string();
@@ -63,10 +63,10 @@ pub fn list_remote_tags(repo_url: &str, token: Option<&str>) -> Result<Vec<Strin
     }
     remote
         .connect_auth(git2::Direction::Fetch, Some(callbacks), None)
-        .map_err(|e| format!("连接 {repo_url} 失败: {e}"))?;
+        .map_err(|e| crate::tr!("net.connect_failed", repo_url, e))?;
     let heads = remote
         .list()
-        .map_err(|e| format!("列出 {repo_url} 的 refs 失败: {e}"))?;
+        .map_err(|e| crate::tr!("net.list_refs_failed", repo_url, e))?;
     let mut tags: Vec<String> = heads
         .iter()
         .filter_map(|h| h.name().strip_prefix("refs/tags/"))
@@ -113,7 +113,7 @@ pub trait Fetcher {
     /// GitLab `per_page` 上限 100，都靠翻页），且**顺序与版本无关**——tracker 要的是"最新版本"，
     /// 只看首页会取到老 tag（hdf5 事故：首页 30 个全是老 tag，`max` 够不到 2.2.0）。
     fn list_tags(&self, repo_url: &str) -> Result<Vec<String>, FarmError> {
-        Err(format!("list_tags 未实现: {repo_url}").into())
+        Err(crate::tr!("net.list_tags_unimplemented", repo_url).into())
     }
 
     /// 平台 token 环境变量（供 script 模板内嵌 curl 继承），无则空。
@@ -230,7 +230,7 @@ pub fn fetch_text(url: &str) -> Result<String, FarmError> {
         .call()
         .map_err(|e| FarmError::http(format!("GET {url}"), e))?;
     body.into_string()
-        .map_err(|e| FarmError::io(format!("读 {url}"), e))
+        .map_err(|e| FarmError::io(crate::tr!("net.read_url", url), e))
 }
 
 /// 下载重试退避：第 `failed` 次失败后等待 `2^failed` 秒（封顶 30s）。固定 2s 在长时间故障下会
@@ -276,10 +276,10 @@ fn download_once(url: &str, dest: &std::path::Path) -> Result<(), FarmError> {
         .set("User-Agent", CURL_UA)
         .call()
         .map_err(|e| FarmError::http(format!("GET {url}"), e))?;
-    let mut f =
-        std::fs::File::create(dest).map_err(|e| FarmError::io(format!("创建 {dest:?} 失败"), e))?;
+    let mut f = std::fs::File::create(dest)
+        .map_err(|e| FarmError::io(crate::tr!("net.create_file_failed", format!("{dest:?}")), e))?;
     std::io::copy(&mut resp.into_reader(), &mut f)
-        .map_err(|e| FarmError::io(format!("写 {dest:?} 失败"), e))?;
+        .map_err(|e| FarmError::io(crate::tr!("net.write_file_failed", format!("{dest:?}")), e))?;
     Ok(())
 }
 
@@ -294,7 +294,7 @@ pub fn probe_source(url: &str) -> Result<(), FarmError> {
     let resp = match http_agent().get(url).set("User-Agent", CURL_UA).call() {
         Ok(r) => r,
         Err(ureq::Error::Status(code, _)) => return Err(format!("{url} HTTP {code}").into()),
-        Err(e) => return Err(FarmError::http(format!("{url} 请求失败"), e)),
+        Err(e) => return Err(FarmError::http(crate::tr!("net.request_failed", url), e)),
     };
     let status = resp.status();
     if !(200..400).contains(&status) {
@@ -304,7 +304,7 @@ pub fn probe_source(url: &str) -> Result<(), FarmError> {
     let mut reader = resp.into_reader();
     let mut buf = [0u8; 1];
     let _ = std::io::Read::read(&mut reader, &mut buf)
-        .map_err(|e| FarmError::io(format!("读 {url} 响应失败"), e))?;
+        .map_err(|e| FarmError::io(crate::tr!("net.read_response_failed", url), e))?;
     Ok(())
 }
 

@@ -43,7 +43,7 @@ pub fn probe(
         std::process::id(),
         SCRIPT_SEQ.fetch_add(1, Ordering::Relaxed),
     ));
-    std::fs::write(&tmp, content).map_err(|e| format!("写临时脚本失败: {e}"))?;
+    std::fs::write(&tmp, content).map_err(|e| crate::tr!("track.script_write_failed", e))?;
     let mut cmd = std::process::Command::new("bash");
     cmd.arg(&tmp).env("PKG_NAME", pkg_name);
     // version-var 注入**先于**平台 token：token 是运维凭据，同名时以 token 为准。
@@ -55,11 +55,11 @@ pub fn probe(
     }
     let out = cmd
         .output()
-        .map_err(|e| format!("运行 track 脚本失败: {e}"))?;
+        .map_err(|e| crate::tr!("track.script_run_failed", e))?;
     let _ = std::fs::remove_file(&tmp);
     if !out.status.success() {
-        return Err(format!(
-            "track 脚本退出码非零: {}（stderr: {}）",
+        return Err(crate::tr!(
+            "track.script_nonzero_exit",
             out.status,
             String::from_utf8_lossy(&out.stderr).trim()
         )
@@ -78,17 +78,14 @@ fn parse_stdout(stdout: &str, expand: bool) -> Result<Vec<EntryProbe>, FarmError
         }
         let n = i + 1;
         let Some((ver, url)) = line.split_once('|') else {
-            return Err(format!(
-                "脚本 stdout 第 {n} 行不是 `<版本>|URL` 格式（旧的「首行版本 + 后续行 URL」两行格式已废弃）: {line}"
-            )
-            .into());
+            return Err(crate::tr!("track.script_bad_line", n, line).into());
         };
         let (ver, url) = (ver.trim(), url.trim());
         if ver.is_empty() {
-            return Err(format!("脚本 stdout 第 {n} 行版本为空: {line}").into());
+            return Err(crate::tr!("track.script_empty_version", n, line).into());
         }
         if url.is_empty() {
-            return Err(format!("脚本 stdout 第 {n} 行 URL 为空: {line}").into());
+            return Err(crate::tr!("track.script_empty_url", n, line).into());
         }
         // 残留占位符不在这里判：`track::probe_with` 对**每个产出槽位**统一 validate_url（唯一一处）
         probes.push(EntryProbe {
@@ -97,17 +94,10 @@ fn parse_stdout(stdout: &str, expand: bool) -> Result<Vec<EntryProbe>, FarmError
         });
     }
     if probes.is_empty() {
-        return Err("脚本 stdout 无输出（每行应为 `<版本>|URL`）"
-            .to_string()
-            .into());
+        return Err(crate::tr!("track.script_no_output").into());
     }
     if !expand && probes.len() > 1 {
-        return Err(format!(
-            "脚本 stdout 输出了 {} 行，但该条目未声明 `expand: true`（一个脚本默认只产一个槽位；\
-             要产多个槽位请显式加 `expand: true`）",
-            probes.len()
-        )
-        .into());
+        return Err(crate::tr!("track.script_needs_expand", probes.len()).into());
     }
     Ok(probes)
 }

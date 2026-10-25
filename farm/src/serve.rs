@@ -35,9 +35,9 @@ where
 {
     let root_abs = root
         .canonicalize()
-        .map_err(|e| format!("root {root:?} 不可访问: {e}"))?;
-    let listener =
-        TcpListener::bind((bind, port)).map_err(|e| format!("绑定 {bind}:{port} 失败: {e}"))?;
+        .map_err(|e| crate::tr!("serve.root_inaccessible", format!("{root:?}"), e))?;
+    let listener = TcpListener::bind((bind, port))
+        .map_err(|e| crate::tr!("serve.bind_failed", bind, port, e))?;
     let actual = listener.local_addr().map(|a| a.port()).unwrap_or(port);
     println!("{}", tr!("serve.started", bind, actual, root_abs.display()));
     if let Some(cb) = on_bound {

@@ -35,7 +35,8 @@ pub fn seed(remote: &str, arch: &str, out: &Path, jobs: usize) -> Result<SeedRep
     let names = index.sorted_names();
 
     let dest_arch = out.join(arch);
-    fs::create_dir_all(&dest_arch).map_err(|e| format!("创建 {dest_arch:?} 失败: {e}"))?;
+    fs::create_dir_all(&dest_arch)
+        .map_err(|e| crate::tr!("seed.create_dir_failed", format!("{dest_arch:?}"), e))?;
 
     // 空索引防御：names 为空 → div_ceil 得 chunk_size=0 → chunks(0) 直接 panic。
     if names.is_empty() {
@@ -86,9 +87,15 @@ pub fn seed(remote: &str, arch: &str, out: &Path, jobs: usize) -> Result<SeedRep
         report.failed.extend(r.failed);
     }
 
-    // 3. 本地 index.txt **原样保留**（完整 needed_so）——不再剥、不再重写哈希
+    // 3. 本地 index.txt **原样保留**（完整 needed_so）——不再剥、不再重写哈希。
+    //    但**有包没落盘时绝不写**：索引是 ABI 传播的基线，声称一个盘上不存在的包，
+    //    它的 SONAME 就会被算作"已提供"，消费者可能被幽灵 provider 满足。
+    //    已成功的 .lpkg 原样保留，重跑会跳过已校验通过的文件。
+    if !report.failed.is_empty() {
+        return Ok(report);
+    }
     fs::write(dest_arch.join("index.txt"), &index_text)
-        .map_err(|e| format!("写本地 index.txt 失败: {e}"))?;
+        .map_err(|e| crate::tr!("seed.write_index_failed", e))?;
     Ok(report)
 }
 
@@ -111,7 +118,9 @@ fn seed_chunk(
         let url = format!("{remote}/{arch}/{name}/{}.lpkg", info.version);
         let pkg_dir = dest_arch.join(name);
         if fs::create_dir_all(&pkg_dir).is_err() {
-            report.failed.push((name.clone(), "创建目录失败".into()));
+            report
+                .failed
+                .push((name.clone(), crate::tr!("seed.create_dir_short").into()));
             continue;
         }
         let dest = pkg_dir.join(format!("{}.lpkg", info.version));
@@ -167,7 +176,7 @@ fn seed_one_pkg(
         }
         Ok(_) => {
             let _ = fs::remove_file(dest);
-            Err("SHA256 不匹配".to_string().into())
+            Err(crate::tr!("seed.sha256_mismatch").into())
         }
         Err(e) => Err(e),
     }

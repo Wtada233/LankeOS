@@ -70,7 +70,7 @@ pub fn repack_with_metadata(
             .collect(),
     );
     fs::write(&meta_path, serde_json::to_string_pretty(&meta).unwrap())
-        .map_err(|e| format!("写 {meta_path:?} 失败: {e}"))?;
+        .map_err(|e| crate::tr!("repack.write_meta_failed", format!("{meta_path:?}"), e))?;
     // 2. 重打覆盖 .lpkg
     repack_lpkg(extract_dir, lpkg_path)
 }
@@ -91,7 +91,8 @@ fn repack_lpkg_at(extract_dir: &Path, out_path: &Path, level: u8) -> Result<(), 
     // 打包必须 root（操作命令已强制）：普通用户读不到完整 mode（SUID/SGID 被内核剥掉），也读不了
     // root-only 文件（如 /etc/shadow 0600）与 `trusted.*` / `security.*` xattr。
     pack_dir_tar(extract_dir, &tmp, level)?;
-    fs::rename(&tmp, out_path).map_err(|e| format!("替换 {out_path:?} 失败: {e}"))?;
+    fs::rename(&tmp, out_path)
+        .map_err(|e| crate::tr!("repack.replace_failed", format!("{out_path:?}"), e))?;
     guard.disarm(); // 成功：tmp 已 rename 到目标，无需再删
     Ok(())
 }
@@ -109,14 +110,15 @@ fn sorted_tree_paths(root: &Path) -> Result<Vec<PathBuf>, FarmError> {
     let mut out: Vec<PathBuf> = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     while let Some(dir) = stack.pop() {
-        let children = fs::read_dir(&dir).map_err(|e| format!("读取 {dir:?} 失败: {e}"))?;
+        let children = fs::read_dir(&dir)
+            .map_err(|e| crate::tr!("repack.read_dir_failed", format!("{dir:?}"), e))?;
         for child in children {
             let abs = child
-                .map_err(|e| format!("读取 {dir:?} 的目录项失败: {e}"))?
+                .map_err(|e| crate::tr!("repack.read_dir_entry_failed", format!("{dir:?}"), e))?
                 .path();
             let rel = abs.strip_prefix(root).unwrap_or(&abs).to_path_buf();
             let is_dir = fs::symlink_metadata(&abs)
-                .map_err(|e| format!("stat {abs:?} 失败: {e}"))?
+                .map_err(|e| crate::tr!("repack.stat_failed", format!("{abs:?}"), e))?
                 .is_dir();
             if is_dir {
                 stack.push(abs);

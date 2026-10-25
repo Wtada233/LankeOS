@@ -29,7 +29,8 @@ pub fn probe(
                 let base = format!("https://api.github.com/repos/{repo}/releases?per_page=100");
                 let items = templates::fetch_json_pages(fetcher, &base, 100, 10)?;
                 let names = templates::release_tag_names(&items);
-                max_tag_version(&names, tag_prefix, &f).ok_or("releases 中无匹配版本/主版本")?
+                max_tag_version(&names, tag_prefix, &f)
+                    .ok_or(crate::tr!("track.no_matching_release"))?
             } else {
                 // 无封顶：单条 `/releases/latest`（无分页窗口）
                 let url = format!("https://api.github.com/repos/{repo}/releases/latest");
@@ -38,7 +39,7 @@ pub fn probe(
                 // 单条候选也要过约束（否则 /releases/latest 会绕开 max-version/exclude/稳定版过滤）
                 strip_version(&tag, tag_prefix)
                     .filter(|v| f.allows(v))
-                    .ok_or("release tag 无匹配版本/主版本")?
+                    .ok_or(crate::tr!("track.no_matching_tag"))?
             }
         }
         _ => {
@@ -46,7 +47,7 @@ pub fn probe(
             // —— 后者分页（默认 30 / 最大 100，靠 Link 头翻页）且**顺序与版本无关**，只看首页会取到
             // 老 tag（hdf5 事故：首页 30 个全是老 tag，`max` 够不到 2.2.0）。
             let names = fetcher.list_tags(&format!("https://github.com/{repo}.git"))?;
-            max_tag_version(&names, tag_prefix, &f).ok_or("tags 中无匹配版本/主版本")?
+            max_tag_version(&names, tag_prefix, &f).ok_or(crate::tr!("track.no_matching_tags"))?
         }
     };
     let tag = format!("{tag_prefix}{version}");

@@ -252,13 +252,15 @@ fn write_analysis(
     analysis: &serde_json::Value,
     schema: u32,
 ) -> Result<(), FarmError> {
-    std::fs::create_dir_all(cache).map_err(|e| format!("创建缓存目录 {:?} 失败: {e}", cache))?;
+    std::fs::create_dir_all(cache)
+        .map_err(|e| crate::tr!("chk.create_cache_dir_failed", format!("{cache:?}"), e))?;
     let c = serde_json::json!({ "schema": schema, "lpkg_sha": lpkg_sha, "analysis": analysis });
     std::fs::write(
         cache_path(cache, pkg),
-        serde_json::to_string_pretty(&c).map_err(|e| format!("序列化缓存失败: {e}"))?,
+        serde_json::to_string_pretty(&c)
+            .map_err(|e| crate::tr!("chk.serialize_cache_failed", e))?,
     )
-    .map_err(|e| format!("写缓存 {pkg} 失败: {e}").into())
+    .map_err(|e| crate::tr!("chk.write_cache_failed", pkg, e).into())
 }
 
 /// 单包 analysis（结构由各检則自定义）。
@@ -313,10 +315,11 @@ pub fn walk_all(
     schema: u32,
     analyze: impl Fn(&Path /*extract_dir*/, &str /*pkg*/) -> Result<Analysis, FarmError>,
 ) -> Result<WalkAll, FarmError> {
-    std::fs::create_dir_all(&opts.cache).map_err(|e| format!("创建缓存目录失败: {e}"))?;
+    std::fs::create_dir_all(&opts.cache)
+        .map_err(|e| crate::tr!("chk.create_cache_dir_short", e))?;
     let repo_root = opts.source.join(&opts.arch);
     let mut pkgdirs: Vec<PathBuf> = std::fs::read_dir(&repo_root)
-        .map_err(|e| format!("读取 {repo_root:?} 失败: {e}"))?
+        .map_err(|e| crate::tr!("chk.read_repo_failed", format!("{repo_root:?}"), e))?
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.is_dir())
         .collect();
@@ -330,7 +333,7 @@ pub fn walk_all(
             .map(|d| d.subsec_nanos())
             .unwrap_or(0)
     ));
-    std::fs::create_dir_all(&scratch).map_err(|e| format!("创建临时工作目录失败: {e}"))?;
+    std::fs::create_dir_all(&scratch).map_err(|e| crate::tr!("chk.create_scratch_failed", e))?;
     let mut analyses = BTreeMap::new();
     let mut hits = 0u64;
     let mut misses = 0u64;
@@ -375,7 +378,7 @@ pub fn walk_all(
                 }
                 Err(e) => failed.push(format!("{pkg}: {e}")),
             },
-            Err(e) => failed.push(format!("{pkg}: 解包失败 {e}")),
+            Err(e) => failed.push(crate::tr!("chk.unpack_failed", pkg, e)),
         }
         let _ = crate::scan::remove_dir_tree(&extract_dir);
     }

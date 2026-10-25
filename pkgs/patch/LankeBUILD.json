@@ -1,6 +1,6 @@
 {
   "name": "patch",
-  "version": "2.8",
+  "version": "2.8.1",
   "release": 3,
   "deps": [],
   "needed_so": [
@@ -13,7 +13,7 @@
     "base-devel"
   ],
   "sources": [
-    "https://ftpmirror.gnu.org/patch/patch-2.8.tar.xz"
+    "https://ftp.gnu.org/gnu/patch/patch-2.8.1.tar.xz"
   ],
   "work_sources": []
 }

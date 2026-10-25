@@ -24,11 +24,13 @@ fn safe_component(s: &str) -> bool {
 /// 遍历 `input/<arch>/<pkg>/*.lpkg`，逐个**复制**为 `<pkg>-<ver>.lpkg` 扁平输出（字节即仓库产物，
 /// 已 level 22 + mtime 1970 归一化，无需再解压/重压）。
 pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, FarmError> {
-    fs::create_dir_all(output).map_err(|e| format!("创建输出目录 {output:?} 失败: {e}"))?;
+    fs::create_dir_all(output)
+        .map_err(|e| crate::tr!("export.create_output_failed", format!("{output:?}"), e))?;
     let repo_root = input.join(arch);
     let mut report = ExportReport::default();
 
-    let entries = fs::read_dir(&repo_root).map_err(|e| format!("读取 {repo_root:?} 失败: {e}"))?;
+    let entries = fs::read_dir(&repo_root)
+        .map_err(|e| crate::tr!("export.read_repo_failed", format!("{repo_root:?}"), e))?;
     let mut pkgs: Vec<PathBuf> = entries
         .filter_map(|e| e.ok().map(|e| e.path()))
         .filter(|p| p.is_dir())
@@ -44,7 +46,7 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, F
             continue;
         };
         if !safe_component(&pkg) {
-            report.failed.push(format!("{pkg}: 包名含非法字符，跳过"));
+            report.failed.push(crate::tr!("export.bad_pkg_name", pkg));
             continue;
         }
         let mut lpkg_files: Vec<PathBuf> = fs::read_dir(&pkgdir)
@@ -57,7 +59,7 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, F
             .unwrap_or_default();
         lpkg_files.sort();
         if lpkg_files.is_empty() {
-            report.failed.push(format!("{pkg}: 无 .lpkg"));
+            report.failed.push(crate::tr!("export.no_lpkg", pkg));
             continue;
         }
 
@@ -65,13 +67,15 @@ pub fn export(input: &Path, output: &Path, arch: &str) -> Result<ExportReport, F
             let Some(ver) = lpkg.file_stem().and_then(|s| s.to_str()).map(String::from) else {
                 report
                     .failed
-                    .push(format!("{pkg}: 无法解析 .lpkg 文件名版本"));
+                    .push(crate::tr!("export.unparsable_version", pkg));
                 continue;
             };
             if !safe_component(&ver) {
-                report
-                    .failed
-                    .push(format!("{pkg}: 版本名 {ver:?} 含非法字符，跳过"));
+                report.failed.push(crate::tr!(
+                    "export.bad_version_name",
+                    pkg,
+                    format!("{ver:?}")
+                ));
                 continue;
             }
             let out_path = output.join(format!("{pkg}-{ver}.lpkg"));

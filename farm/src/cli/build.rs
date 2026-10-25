@@ -135,7 +135,7 @@ fn run_build_flow(
             let res = lankefarm::serve::serve_ready("127.0.0.1", &repo_root, port, |_actual| {
                 serve_tx
                     .send(Ok(()))
-                    .map_err(|e| format!("serve 就绪信号发送失败: {e}").into())
+                    .map_err(|e| lankefarm::tr!("cli.serve_ready_send_failed", e).into())
             });
             if let Err(e) = &res {
                 // FarmError 不再 Clone（Io/Http/Sqlite 源类型非 Clone）——按消息重建一份即可
@@ -155,7 +155,11 @@ fn run_build_flow(
         Err(_) => {
             eprintln!(
                 "{}",
-                lankefarm::tr!("build.serve_fail", repo_port, "5s 内未就绪")
+                lankefarm::tr!(
+                    "build.serve_fail",
+                    repo_port,
+                    lankefarm::tr!("cli.serve_not_ready_5s")
+                )
             );
             drop(serve_handle);
             return ExitCode::from(2);

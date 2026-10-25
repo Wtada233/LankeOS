@@ -583,7 +583,7 @@ pub fn run_build(
             let stage = outcome
                 .failure_stage
                 .clone()
-                .unwrap_or_else(|| "未知阶段".to_string());
+                .unwrap_or_else(|| crate::tr!("build.unknown_stage").to_string());
             if let Some(st) = state {
                 let _ = st.set_job(&pkg, JobStatus::Blocked, Some(&stage), rhash.as_deref());
             }

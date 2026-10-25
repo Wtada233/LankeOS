@@ -1,6 +1,6 @@
 {
   "name": "opensubdiv",
-  "version": "3.7.0",
+  "version": "3.8.0",
   "release": 1,
   "deps": [],
   "needed_so": [
@@ -8,14 +8,14 @@
     "libgcc_s.so.1@GCC_3.0",
     "libgomp.so.1@{GOMP_4.0,OMP_1.0}",
     "libm.so.6@GLIBC_2.2.5",
-    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
+    "libstdc++.so.6@{CXXABI_1.3,CXXABI_1.3.11,CXXABI_1.3.8,CXXABI_1.3.9,GLIBCXX_3.4,GLIBCXX_3.4.20,GLIBCXX_3.4.21,GLIBCXX_3.4.30,GLIBCXX_3.4.32,GLIBCXX_3.4.9}",
     "libtbb.so.12"
   ],
   "provides_soname": [
     "libosdCPU.so",
-    "libosdCPU.so.3.7.0",
+    "libosdCPU.so.3.8.0",
     "libosdGPU.so",
-    "libosdGPU.so.3.7.0"
+    "libosdGPU.so.3.8.0"
   ],
   "build_deps": [
     "base-devel",
@@ -32,7 +32,7 @@
     "ptex"
   ],
   "sources": [
-    "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_7_0.tar.gz"
+    "https://github.com/PixarAnimationStudios/OpenSubdiv/archive/v3_8_0.tar.gz"
   ],
   "work_sources": [],
   "farm_flags": [

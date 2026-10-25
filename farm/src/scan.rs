@@ -57,7 +57,8 @@ pub fn running_as_root() -> bool {
 /// content/var 等只读 root 目录——export 的 `.export-extract` 曾因删不动残留 14G）。
 /// 曾用 `sudo -n rm -rf` 兜底（已去 sudo，见 ARCH §「root 运行」）。
 pub(crate) fn remove_dir_tree(path: &Path) -> Result<(), FarmError> {
-    fs::remove_dir_all(path).map_err(|e| format!("删除目录树 {path:?} 失败: {e}").into())
+    fs::remove_dir_all(path)
+        .map_err(|e| crate::tr!("scan.remove_tree_failed", format!("{path:?}"), e).into())
 }
 
 /// 解包 .lpkg（zstd 帧 + PAX tar）到 `extract_dir`；已存在则先整树删除。
@@ -69,7 +70,8 @@ pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), FarmErro
     if extract_dir.exists() {
         remove_dir_tree(extract_dir)?;
     }
-    fs::create_dir_all(extract_dir).map_err(|e| format!("创建 {extract_dir:?} 失败: {e}"))?;
+    fs::create_dir_all(extract_dir)
+        .map_err(|e| crate::tr!("scan.create_dir_failed", format!("{extract_dir:?}"), e))?;
     crate::libarchive_ffi::extract(lpkg_path, extract_dir, running_as_root())
 }
 
@@ -78,15 +80,17 @@ pub fn extract_lpkg(lpkg_path: &Path, extract_dir: &Path) -> Result<(), FarmErro
 pub fn read_lpkg_metadata(lpkg_path: &Path) -> Result<serde_json::Value, FarmError> {
     match crate::libarchive_ffi::read_member(lpkg_path, "metadata.json")? {
         Some(bytes) => serde_json::from_slice(&bytes)
-            .map_err(|e| format!("解析 metadata.json 失败: {e}").into()),
-        None => Err(format!("{lpkg_path:?} 内无 metadata.json").into()),
+            .map_err(|e| crate::tr!("scan.parse_metadata_failed", e).into()),
+        None => Err(crate::tr!("scan.no_metadata", format!("{lpkg_path:?}")).into()),
     }
 }
 
 /// 读 metadata.json（返回 serde Value 供 name/version 与后续 repack 复用）。
 pub(crate) fn read_metadata_json(path: &Path) -> Result<serde_json::Value, FarmError> {
-    let content = fs::read_to_string(path).map_err(|e| format!("读 {path:?} 失败: {e}"))?;
-    serde_json::from_str(&content).map_err(|e| format!("解析 {path:?} 失败: {e}").into())
+    let content = fs::read_to_string(path)
+        .map_err(|e| crate::tr!("scan.read_failed", format!("{path:?}"), e))?;
+    serde_json::from_str(&content)
+        .map_err(|e| crate::tr!("scan.parse_file_failed", format!("{path:?}"), e).into())
 }
 
 /// 遍历 content/，扫 ELF → (needed_so, provides_soname)。

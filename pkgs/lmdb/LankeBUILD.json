@@ -1,6 +1,6 @@
 {
   "name": "lmdb",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "release": 2,
   "deps": [],
   "needed_so": [
@@ -14,7 +14,7 @@
     "base-devel"
   ],
   "sources": [
-    "git+https://git.openldap.org/openldap/openldap.git@LMDB_1.0.2"
+    "git+https://git.openldap.org/openldap/openldap.git@LMDB_1.0.3"
   ],
   "work_sources": []
 }

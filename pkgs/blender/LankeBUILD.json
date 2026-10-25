@@ -1,7 +1,7 @@
 {
   "name": "blender",
   "version": "5.2.3",
-  "release": 6,
+  "release": 7,
   "deps": [],
   "needed_so": [
     "ld-linux-x86-64.so.2@GLIBC_2.3",
@@ -51,8 +51,8 @@
     "libopenpgl.so.0",
     "libopenvdb.so.13.1",
     "libopenxr_loader.so.1",
-    "libosdCPU.so.3.7.0",
-    "libosdGPU.so.3.7.0",
+    "libosdCPU.so.3.8.0",
+    "libosdGPU.so.3.8.0",
     "liboslcomp.so.1.15",
     "liboslexec.so.1.15",
     "liboslnoise.so.1.15",

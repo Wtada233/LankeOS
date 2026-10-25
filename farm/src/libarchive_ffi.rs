@@ -50,6 +50,7 @@
 //!   都要 nightly），所以**日常那道网是上面的变异测试**，fuzz 是想深挖时的手段。
 
 use crate::error::FarmError;
+use crate::tr;
 use std::collections::HashSet;
 use std::ffi::{c_char, c_int, c_void, CStr, CString};
 use std::fs;
@@ -237,7 +238,7 @@ fn err_str(a: *mut archive) -> String {
     // SAFETY: 任意非空句柄可调；返回内部静态串或 NULL。
     let p = unsafe { archive_error_string(a) };
     if p.is_null() {
-        return "（libarchive 未给出原因）".to_string();
+        return tr!("archive.no_reason").to_string();
     }
     // SAFETY: 非空即 NUL 结尾的 C 串。
     unsafe { CStr::from_ptr(p) }.to_string_lossy().into_owned()
@@ -246,12 +247,12 @@ fn err_str(a: *mut archive) -> String {
 /// 判决：`< ARCHIVE_WARN` 报错（FAILED/FATAL），`ARCHIVE_WARN` 告警后继续 —— lpkg 两侧同一判据。
 fn judge(status: c_int, a: *mut archive, what: &str, lpkg: &Path) -> Result<(), FarmError> {
     if status < ARCHIVE_WARN {
-        return Err(format!("libarchive {what} 失败（{lpkg:?}）: {}", err_str(a)).into());
+        return Err(tr!("archive.op_failed", what, format!("{lpkg:?}"), err_str(a)).into());
     }
     if status < ARCHIVE_OK {
         eprintln!(
-            "warning: libarchive {what} 有警告（{lpkg:?}）: {}",
-            err_str(a)
+            "{}",
+            tr!("archive.op_warning", what, format!("{lpkg:?}"), err_str(a))
         );
     }
     Ok(())
@@ -266,13 +267,13 @@ fn cstr_to_string(p: *const c_char, what: &str, lpkg: &Path) -> Result<String, F
     let bytes = unsafe { CStr::from_ptr(p) }.to_bytes();
     match std::str::from_utf8(bytes) {
         Ok(s) => Ok(s.to_string()),
-        Err(_) => Err(format!("{lpkg:?} 的{what}不是合法 UTF-8，拒绝静默改名").into()),
+        Err(_) => Err(tr!("archive.not_utf8", format!("{lpkg:?}"), what).into()),
     }
 }
 
 fn cstring(path: &Path) -> Result<CString, FarmError> {
     CString::new(path.as_os_str().as_bytes())
-        .map_err(|_| FarmError::from(format!("路径含 NUL 字节: {path:?}")))
+        .map_err(|_| FarmError::from(tr!("archive.nul_byte", format!("{path:?}"))))
 }
 
 // ─────────────────────────── 成员名判据（读写两侧共用）───────────────────────────
@@ -315,9 +316,11 @@ fn escapes_root_lexically(relative: &Path) -> bool {
 /// - 长度/分量上限与 lpkg `tar_guard.cpp` 一致（超长路径会绕过 libarchive 自己的符号链接检查）。
 fn member_path(raw: &str, lpkg: &Path) -> Result<PathBuf, FarmError> {
     if raw.len() > MAX_MEMBER_NAME_BYTES {
-        return Err(format!(
-            "{lpkg:?} 成员名过长（{} 字节 > {MAX_MEMBER_NAME_BYTES}）",
-            raw.len()
+        return Err(tr!(
+            "archive.member_name_too_long",
+            format!("{lpkg:?}"),
+            raw.len(),
+            MAX_MEMBER_NAME_BYTES
         )
         .into());
     }
@@ -329,9 +332,13 @@ fn member_path(raw: &str, lpkg: &Path) -> Result<PathBuf, FarmError> {
         }
         run += 1;
         if run > MAX_COMPONENT_BYTES {
-            return Err(
-                format!("{lpkg:?} 成员名的路径分量过长（{run} > {MAX_COMPONENT_BYTES}）").into(),
-            );
+            return Err(tr!(
+                "archive.component_too_long",
+                format!("{lpkg:?}"),
+                run,
+                MAX_COMPONENT_BYTES
+            )
+            .into());
         }
     }
     let mut rel = PathBuf::new();
@@ -340,7 +347,12 @@ fn member_path(raw: &str, lpkg: &Path) -> Result<PathBuf, FarmError> {
             Component::Normal(part) => rel.push(part),
             Component::CurDir => {}
             Component::RootDir | Component::ParentDir | Component::Prefix(_) => {
-                return Err(format!("{lpkg:?} 成员路径越界（绝对路径或含 ..）: {raw:?}").into());
+                return Err(tr!(
+                    "archive.member_path_escape",
+                    format!("{lpkg:?}"),
+                    format!("{raw:?}")
+                )
+                .into());
             }
         }
     }
@@ -372,12 +384,22 @@ impl MemberGuard {
         //    且是 base 包（lpkg tar_guard.cpp 记过这个教训）。
         for b in raw.bytes() {
             if b < 0x20 || b == 0x7f {
-                return Err(format!("{lpkg:?} 成员名含控制字符: {raw:?}").into());
+                return Err(tr!(
+                    "archive.member_control_char",
+                    format!("{lpkg:?}"),
+                    format!("{raw:?}")
+                )
+                .into());
             }
         }
         // ② 逃出根（`..` 或绝对路径，已在 member_path 里判过，这里判归一化后的语义）。
         if escapes_root_lexically(rel) {
-            return Err(format!("{lpkg:?} 成员路径逃出解压根: {raw:?}").into());
+            return Err(tr!(
+                "archive.member_escapes_root",
+                format!("{lpkg:?}"),
+                format!("{raw:?}")
+            )
+            .into());
         }
         // ③ 符号链接目标：绝对目标放行（`<root>/usr/bin/foo -> /etc/foo` 合法且必要）；
         //    相对目标按"链接所在目录 + 目标"归一化，逃出根才拒 —— 不能按"含不含 `..`"判，
@@ -389,14 +411,17 @@ impl MemberGuard {
         if ftype == AE_IFLNK {
             // SAFETY: 同上。
             let target = unsafe { archive_entry_symlink(entry) };
-            let target = cstr_to_string(target, "符号链接目标", lpkg)?;
+            let target = cstr_to_string(target, tr!("archive.step_symlink_target"), lpkg)?;
             if !target.is_empty() {
                 let t = Path::new(&target);
                 if !t.is_absolute() {
                     let joined = rel.parent().unwrap_or(Path::new("")).join(t);
                     if escapes_root_lexically(&joined) {
-                        return Err(format!(
-                            "{lpkg:?} 的符号链接 {raw:?} 目标逃出解压根: {target:?}"
+                        return Err(tr!(
+                            "archive.symlink_escapes_root",
+                            format!("{lpkg:?}"),
+                            format!("{raw:?}"),
+                            format!("{target:?}")
                         )
                         .into());
                     }
@@ -406,7 +431,12 @@ impl MemberGuard {
         // ④ 重名成员：tar 是纯顺序格式，后一份静默覆盖前一份 ⇒ "流式读到的"与"落盘的是"**不是同一个对象**
         //    （lpkg 真实踩过 metadata.json 放两份）。放在最后判，让更具体的原因先报出来。
         if !self.seen.insert(rel.to_string_lossy().into_owned()) {
-            return Err(format!("{lpkg:?} 有重名成员: {raw:?}").into());
+            return Err(tr!(
+                "archive.duplicate_member",
+                format!("{lpkg:?}"),
+                format!("{raw:?}")
+            )
+            .into());
         }
         Ok(())
     }
@@ -428,24 +458,24 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
     unsafe {
         let reader = Reader(archive_read_new());
         if reader.0.is_null() {
-            return Err(format!("libarchive 初始化失败（{lpkg_path:?}）").into());
+            return Err(tr!("archive.init_failed", format!("{lpkg_path:?}")).into());
         }
         judge(
             archive_read_support_filter_all(reader.0),
             reader.0,
-            "启用过滤器",
+            tr!("archive.step_filter"),
             lpkg_path,
         )?;
         judge(
             archive_read_support_format_all(reader.0),
             reader.0,
-            "启用归档格式",
+            tr!("archive.step_format"),
             lpkg_path,
         )?;
 
         let disk = Disk(archive_write_disk_new());
         if disk.0.is_null() {
-            return Err(format!("libarchive 写盘端初始化失败（{lpkg_path:?}）").into());
+            return Err(tr!("archive.disk_init_failed", format!("{lpkg_path:?}")).into());
         }
         let mut flags = EXTRACT_TIME
             | EXTRACT_PERM
@@ -461,7 +491,7 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
         judge(
             archive_write_disk_set_options(disk.0, flags),
             disk.0,
-            "设置解包选项",
+            tr!("archive.step_extract_options"),
             lpkg_path,
         )?;
         // 注意：**不**调 archive_write_disk_set_standard_lookup（文件头第 5 条）。
@@ -469,7 +499,7 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
         judge(
             archive_read_open_filename(reader.0, c_lpkg.as_ptr(), 64 * 1024),
             reader.0,
-            "打开包",
+            tr!("archive.step_open"),
             lpkg_path,
         )?;
 
@@ -479,7 +509,7 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
             if status == ARCHIVE_EOF {
                 break;
             }
-            judge(status, reader.0, "读条目头", lpkg_path)?;
+            judge(status, reader.0, tr!("archive.step_read_header"), lpkg_path)?;
             if entry_ptr.is_null() {
                 continue;
             }
@@ -492,7 +522,7 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
             if raw_name.is_null() {
                 continue; // 无名成员：不落盘（lpkg 同款）
             }
-            let raw_name = cstr_to_string(raw_name, "成员名", lpkg_path)?;
+            let raw_name = cstr_to_string(raw_name, tr!("archive.step_member_name"), lpkg_path)?;
             let rel = member_path(&raw_name, lpkg_path)?;
             if rel.as_os_str().is_empty() {
                 continue; // `.` / `./` 这类归档根条目：不产生文件（lpkg 同款）
@@ -510,8 +540,10 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
             }
             // 特殊文件成员：整包拒绝（lpkg 给出的后果：FIFO 会让后续读哈希永久阻塞、设备会让复制无限读）。
             if matches!(ftype, AE_IFIFO | AE_IFCHR | AE_IFBLK | AE_IFSOCK) {
-                return Err(format!(
-                    "{lpkg_path:?} 含不支持的特殊文件成员 {raw_name:?}（fifo/设备/socket）——不应出现在 .lpkg"
+                return Err(tr!(
+                    "archive.special_file_member",
+                    format!("{lpkg_path:?}"),
+                    format!("{raw_name:?}")
                 )
                 .into());
             }
@@ -521,7 +553,8 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
             // "跳过该成员"只会让人拿到一个装了一半的包）。
             let hardlink = archive_entry_hardlink(entry);
             if !hardlink.is_null() {
-                let target = cstr_to_string(hardlink, "硬链接目标", lpkg_path)?;
+                let target =
+                    cstr_to_string(hardlink, tr!("archive.step_hardlink_target"), lpkg_path)?;
                 // 判据用**原始目标**：绝对路径或 `..` 上溯出根 → 整包拒绝（lpkg 同款 —— 否则一个
                 // 成员就能给任意已有文件（如 /etc/shadow）起别名）。`member_path` 已覆盖这两条，
                 // 这里只负责"归一化后重写成解压根下的绝对路径"（libarchive 需要绝对路径）。
@@ -533,7 +566,7 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
             judge(
                 archive_write_header(disk.0, entry),
                 disk.0,
-                "解包条目",
+                tr!("archive.step_extract_entry"),
                 lpkg_path,
             )?;
 
@@ -547,15 +580,19 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
                     break;
                 }
                 if status < ARCHIVE_WARN {
-                    return Err(format!(
-                        "libarchive 读条目数据失败（{lpkg_path:?} / {raw_name:?}）: {}",
+                    return Err(tr!(
+                        "archive.read_data_failed",
+                        format!("{lpkg_path:?}"),
+                        format!("{raw_name:?}"),
                         err_str(reader.0)
                     )
                     .into());
                 }
                 if archive_write_data_block(disk.0, buff, size, offset) < 0 {
-                    return Err(format!(
-                        "libarchive 写条目数据失败（{lpkg_path:?} / {raw_name:?}）: {}",
+                    return Err(tr!(
+                        "archive.write_data_failed",
+                        format!("{lpkg_path:?}"),
+                        format!("{raw_name:?}"),
                         err_str(disk.0)
                     )
                     .into());
@@ -565,12 +602,17 @@ pub fn extract(lpkg_path: &Path, extract_dir: &Path, restore_owner: bool) -> Res
             judge(
                 archive_write_finish_entry(disk.0),
                 disk.0,
-                "收尾条目",
+                tr!("archive.step_finish_entry"),
                 lpkg_path,
             )?;
         }
         // 显式收尾：目录 mtime/权限等延迟动作在这里落盘，close 的失败要报出来。
-        judge(archive_write_close(disk.0), disk.0, "收尾写盘", lpkg_path)?;
+        judge(
+            archive_write_close(disk.0),
+            disk.0,
+            tr!("archive.step_close_disk"),
+            lpkg_path,
+        )?;
         Ok(())
     }
 }
@@ -591,24 +633,24 @@ pub fn read_member(lpkg_path: &Path, wanted: &str) -> Result<Option<Vec<u8>>, Fa
     unsafe {
         let reader = Reader(archive_read_new());
         if reader.0.is_null() {
-            return Err(format!("libarchive 初始化失败（{lpkg_path:?}）").into());
+            return Err(tr!("archive.init_failed", format!("{lpkg_path:?}")).into());
         }
         judge(
             archive_read_support_filter_all(reader.0),
             reader.0,
-            "启用过滤器",
+            tr!("archive.step_filter"),
             lpkg_path,
         )?;
         judge(
             archive_read_support_format_all(reader.0),
             reader.0,
-            "启用归档格式",
+            tr!("archive.step_format"),
             lpkg_path,
         )?;
         judge(
             archive_read_open_filename(reader.0, c_lpkg.as_ptr(), 64 * 1024),
             reader.0,
-            "打开包",
+            tr!("archive.step_open"),
             lpkg_path,
         )?;
 
@@ -618,7 +660,7 @@ pub fn read_member(lpkg_path: &Path, wanted: &str) -> Result<Option<Vec<u8>>, Fa
             if status == ARCHIVE_EOF {
                 return Ok(None);
             }
-            judge(status, reader.0, "读条目头", lpkg_path)?;
+            judge(status, reader.0, tr!("archive.step_read_header"), lpkg_path)?;
             if entry_ptr.is_null() {
                 continue;
             }
@@ -628,7 +670,7 @@ pub fn read_member(lpkg_path: &Path, wanted: &str) -> Result<Option<Vec<u8>>, Fa
             let matched = if raw_name.is_null() {
                 false
             } else {
-                let raw = cstr_to_string(raw_name, "成员名", lpkg_path)?;
+                let raw = cstr_to_string(raw_name, tr!("archive.step_member_name"), lpkg_path)?;
                 member_path(&raw, lpkg_path)?.as_os_str().as_bytes() == wanted.as_bytes()
             };
             if matched {
@@ -638,8 +680,10 @@ pub fn read_member(lpkg_path: &Path, wanted: &str) -> Result<Option<Vec<u8>>, Fa
                 loop {
                     let n = archive_read_data(reader.0, buf.as_mut_ptr().cast(), buf.len());
                     if n < 0 {
-                        return Err(format!(
-                            "读 {wanted} 失败（{lpkg_path:?}）: {}",
+                        return Err(tr!(
+                            "archive.read_member_failed",
+                            wanted,
+                            format!("{lpkg_path:?}"),
                             err_str(reader.0)
                         )
                         .into());
@@ -654,7 +698,7 @@ pub fn read_member(lpkg_path: &Path, wanted: &str) -> Result<Option<Vec<u8>>, Fa
             judge(
                 archive_read_data_skip(reader.0),
                 reader.0,
-                "跳过成员数据",
+                tr!("archive.step_skip_data"),
                 lpkg_path,
             )?;
         }
@@ -681,13 +725,13 @@ pub fn write_tree(
     unsafe {
         let mut writer = Writer(archive_write_new());
         if writer.0.is_null() {
-            return Err(format!("libarchive 初始化失败（{out_path:?}）").into());
+            return Err(tr!("archive.init_failed", format!("{out_path:?}")).into());
         }
         // 与 lpkg packer.cpp 同款：zstd 过滤器 + pax_restricted 格式。
         judge(
             archive_write_add_filter_zstd(writer.0),
             writer.0,
-            "启用 zstd 过滤器",
+            tr!("archive.step_zstd_filter"),
             out_path,
         )?;
         if level != 0 {
@@ -703,34 +747,37 @@ pub fn write_tree(
             if rc < ARCHIVE_OK {
                 // 不是致命：打包内容与可复现性不受影响，只是压缩级别回到 libarchive 默认值。
                 eprintln!(
-                    "warning: libarchive 不接受 zstd compression-level={level}（{out_path:?}）: {}",
-                    err_str(writer.0)
+                    "{}",
+                    tr!(
+                        "archive.zstd_level_ignored",
+                        level,
+                        format!("{out_path:?}"),
+                        err_str(writer.0)
+                    )
                 );
             }
         }
         judge(
             archive_write_set_format_pax_restricted(writer.0),
             writer.0,
-            "设置 pax_restricted 格式",
+            tr!("archive.step_pax_format"),
             out_path,
         )?;
         judge(
             archive_write_open_filename(writer.0, c_out.as_ptr()),
             writer.0,
-            "打开输出包",
+            tr!("archive.step_open_output"),
             out_path,
         )?;
 
         for rel in rel_paths {
             let abs = root.join(rel);
             // 磁盘侧类型判据（symlink_metadata：符号链接按链接本身，损坏链接也算合法内容）。
-            let md = fs::symlink_metadata(&abs).map_err(|e| format!("stat {abs:?} 失败: {e}"))?;
+            let md = fs::symlink_metadata(&abs)
+                .map_err(|e| tr!("archive.stat_failed", format!("{abs:?}"), e))?;
             let ft = md.file_type();
             if ft.is_socket() || ft.is_block_device() || ft.is_char_device() || ft.is_fifo() {
-                return Err(format!(
-                    "content 含不支持的特殊文件类型 {abs:?}（socket/设备/fifo）——不应出现在 .lpkg"
-                )
-                .into());
+                return Err(tr!("archive.special_file_walk", format!("{abs:?}")).into());
             }
             // 写侧同样过名字判据（与解包侧共用 member_path）：名字进入归档的**唯一漏斗**，
             // 不判的话 farm 能产出一个自己的（以及 lpkg 的）解包器会整包拒收的包。
@@ -744,34 +791,39 @@ pub fn write_tree(
             // 填完再改成归档内名字 —— 反了会报 "Couldn't determine path"。
             let entry = Entry(archive_entry_new());
             if entry.0.is_null() {
-                return Err(format!("libarchive 条目分配失败（{abs:?}）").into());
+                return Err(tr!("archive.entry_alloc_failed", format!("{abs:?}")).into());
             }
             let c_abs = cstring(&abs)?;
             archive_entry_set_pathname(entry.0, c_abs.as_ptr());
 
             let mut st: libc::stat = std::mem::zeroed();
             if libc::lstat(c_abs.as_ptr(), &mut st) != 0 {
-                return Err(
-                    format!("lstat {abs:?} 失败: {}", std::io::Error::last_os_error()).into(),
-                );
+                return Err(tr!(
+                    "archive.lstat_failed",
+                    format!("{abs:?}"),
+                    std::io::Error::last_os_error()
+                )
+                .into());
             }
             let disk = Reader(archive_read_disk_new());
             if disk.0.is_null() {
-                return Err(format!("libarchive 磁盘读取器初始化失败（{abs:?}）").into());
+                return Err(tr!("archive.disk_reader_init_failed", format!("{abs:?}")).into());
             }
             // 不跟随符号链接（与 lstat 语义一致）。
             judge(
                 archive_read_disk_set_symlink_physical(disk.0),
                 disk.0,
-                "设置符号链接模式",
+                tr!("archive.step_symlink_mode"),
                 out_path,
             )?;
             // 这一句带 xattr **和真正的 ACL**（文件头第 10 条）。读不到元数据不能静默跳过该文件
             // （那会打出一个少内容的包），直接报错。
             let rc = archive_read_disk_entry_from_file(disk.0, entry.0, -1, &st);
             if rc < ARCHIVE_WARN {
-                return Err(format!(
-                    "读 {abs:?} 的元数据失败（{out_path:?}）: {}",
+                return Err(tr!(
+                    "archive.read_metadata_failed",
+                    format!("{abs:?}"),
+                    format!("{out_path:?}"),
                     err_str(disk.0)
                 )
                 .into());
@@ -791,8 +843,8 @@ pub fn write_tree(
             // 符号链接目标显式读取：`readlink` 不保证 NUL 结尾，长度顶到缓冲上限 = 被截断，
             // 静默打包一个**错误**的链接目标不可接受（lpkg `add_to_archive` 同判据）。
             if ft.is_symlink() {
-                let target =
-                    fs::read_link(&abs).map_err(|e| format!("read_link {abs:?} 失败: {e}"))?;
+                let target = fs::read_link(&abs)
+                    .map_err(|e| tr!("archive.readlink_failed", format!("{abs:?}"), e))?;
                 let c_target = cstring(&target)?;
                 archive_entry_set_symlink(entry.0, c_target.as_ptr());
             }
@@ -800,23 +852,26 @@ pub fn write_tree(
             judge(
                 archive_write_header(writer.0, entry.0),
                 writer.0,
-                "写条目头",
+                tr!("archive.step_write_header"),
                 out_path,
             )?;
             if ft.is_file() {
                 use std::io::Read;
-                let mut f = fs::File::open(&abs).map_err(|e| format!("打开 {abs:?} 失败: {e}"))?;
+                let mut f = fs::File::open(&abs)
+                    .map_err(|e| tr!("archive.open_failed", format!("{abs:?}"), e))?;
                 let mut buf = vec![0u8; 64 * 1024];
                 loop {
                     let n = f
                         .read(&mut buf)
-                        .map_err(|e| format!("读 {abs:?} 失败: {e}"))?;
+                        .map_err(|e| tr!("archive.read_failed", format!("{abs:?}"), e))?;
                     if n == 0 {
                         break;
                     }
                     if archive_write_data(writer.0, buf.as_ptr().cast(), n) < 0 {
-                        return Err(format!(
-                            "写 {rel_str:?} 的数据失败（{out_path:?}）: {}",
+                        return Err(tr!(
+                            "archive.write_file_data_failed",
+                            format!("{rel_str:?}"),
+                            format!("{out_path:?}"),
                             err_str(writer.0)
                         )
                         .into());
@@ -831,11 +886,16 @@ pub fn write_tree(
         archive_write_free(writer.0);
         writer.0 = ptr::null_mut(); // 已释放：别让 Drop 再 free 一次
         if close_rc < ARCHIVE_WARN {
-            return Err(format!("libarchive 收尾 {out_path:?} 失败（包被截断）").into());
+            return Err(tr!("archive.close_output_failed", format!("{out_path:?}")).into());
         }
         if close_rc < ARCHIVE_OK {
             eprintln!(
-                "warning: libarchive 收尾 {out_path:?} 有警告: {close_rc}（包内容可能不完整）"
+                "{}",
+                tr!(
+                    "archive.close_output_warning",
+                    format!("{out_path:?}"),
+                    close_rc
+                )
             );
         }
         Ok(())

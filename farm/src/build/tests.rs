@@ -3140,3 +3140,76 @@ fn version_drop_rebuilds_only_consumers_needing_that_version() {
     fs::remove_dir_all(&dir).ok();
     fs::remove_dir_all(&out).ok();
 }
+
+#[test]
+fn backup_fails_when_old_lpkg_metadata_unreadable() {
+    // 读不出旧包 metadata ⇒ 无从判断该备份哪些 SONAME，必须报错。
+    // 当成"无事可做"会让调用方随后删掉旧版本，旧 .so 永久丢失。
+    let out = temp_dir("farm-backup-badmeta-out");
+    let bad = out.join("old.lpkg");
+    fs::write(&bad, b"not a zstd tar").unwrap();
+    let err = super::repo::backup_removed_sonames(&out, &bad, "p", &[]).unwrap_err();
+    assert!(
+        err.to_string().contains("metadata"),
+        "应报 metadata 读失败，而不是静默成功: {err}"
+    );
+    fs::remove_dir_all(&out).ok();
+}
+
+#[test]
+fn place_in_repo_keeps_old_version_when_backup_fails() {
+    // 备份落点被目录占住 → fs::copy 失败；place_in_repo 必须报错并**保留**旧 .lpkg
+    // （否则过渡期唯一的旧 .so 没了，旧二进制永久断链）。
+    let pkgs = temp_dir("farm-place-pkgs");
+    let out = temp_dir("farm-place-out");
+    fs::create_dir_all(pkgs.join("foo")).unwrap();
+    fs::write(
+        pkgs.join("foo/LankeBUILD.json"),
+        r#"{"name":"foo","version":"2.0","release":1,"deps":[],"provides":[],"provides_soname":[],"needed_so":[],"build_deps":[],"sources":[],"work_sources":[]}"#,
+    )
+    .unwrap();
+
+    let repo_pkg_dir = out.join("x86_64/foo");
+    fs::create_dir_all(&repo_pkg_dir).unwrap();
+    let old = repo_pkg_dir.join("1.0.lpkg");
+    make_test_lpkg(&old, "foo", "1.0", &[], &["libfoo.so.1"]);
+
+    // 用普通文件占住备份目录 → create_dir_all(out/backups) 必失败。
+    // （不能用目录占落点：fs::copy 到已存在目录会写进目录内，反而成功。）
+    fs::write(out.join("backups"), b"blocker").unwrap();
+
+    let staging = out.join(".staging/foo");
+    fs::create_dir_all(&staging).unwrap();
+    let new_lpkg = staging.join("foo-2.0.lpkg");
+    make_test_lpkg(&new_lpkg, "foo", "2.0", &[], &[]);
+
+    let outcome = BuildOutcome {
+        ok: true,
+        needed_so: vec![],
+        provides: vec![],
+        provides_soname: vec![],
+        deps: vec![],
+        failure_stage: None,
+        lpkg_path: Some(new_lpkg),
+    };
+    let opts = BuildOptions {
+        pkgs_dir: pkgs.clone(),
+        out_dir: out.clone(),
+        targets: vec!["foo".into()],
+        arch: "x86_64".into(),
+        image: String::new(),
+        download_retries: 1,
+        interactive: false,
+        build_data_dir: std::path::PathBuf::from("data/build"),
+        validate: false,
+        manual_sort: false,
+    };
+    let err = super::repo::place_in_repo(&outcome, &opts, "foo").unwrap_err();
+    assert!(
+        err.to_string().contains("保留旧版本"),
+        "错误应说明旧版本被保留: {err}"
+    );
+    assert!(old.exists(), "备份失败时旧版本必须保留");
+    fs::remove_dir_all(&pkgs).ok();
+    fs::remove_dir_all(&out).ok();
+}

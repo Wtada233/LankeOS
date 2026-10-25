@@ -299,7 +299,7 @@ farm_pkg_extract() {  # $1=<pkg> $2=<dest>
         );
     }
     body.push_str(script);
-    std::fs::write(&tmp, &body).map_err(|e| format!("写 version-change 脚本失败: {e}"))?;
+    std::fs::write(&tmp, &body).map_err(|e| crate::tr!("build.version_script_write_failed", e))?;
 
     let mut cmd = std::process::Command::new("bash");
     cmd.arg(&tmp)
@@ -312,7 +312,7 @@ farm_pkg_extract() {  # $1=<pkg> $2=<dest>
     }
     let out = cmd
         .output()
-        .map_err(|e| format!("运行 version-change 脚本失败: {e}"))?;
+        .map_err(|e| crate::tr!("build.version_script_run_failed", e))?;
     let _ = std::fs::remove_file(&tmp);
     if !out.status.success() {
         // 非零 = 明确"不重建"（如 minor 未变）；stderr 非空时打印，辅助排查脚本错误

@@ -30,7 +30,7 @@ pub fn probe(
         .filter_map(|c| c.get(1).map(|m| m.as_str().to_string()))
         .collect();
     if dirs.is_empty() {
-        return Err("gnome 目录列表无版本子目录".into());
+        return Err(crate::tr!("track.gnome_no_version_dir").into());
     }
     // 约束筛选（major-of / max-version 封顶 / exclude / 奇偶偏好）**走共享汇点** —— 与其它模板
     // 同一处实现（`pool_filter`），不再在本文件里重写一遍 major/封顶/even 的判定。
@@ -40,7 +40,7 @@ pub fn probe(
     f.even_minor = cfg.stable_minor.as_deref() != Some("all");
     let mut candidates: Vec<String> = templates::pool_filter(dirs, &f);
     if candidates.is_empty() {
-        return Err("gnome 目录无匹配主版本/封顶的子目录".into());
+        return Err(crate::tr!("track.gnome_no_constraint_dir").into());
     }
     // 降序遍历候选目录，取第一个有稳定版本文件的：2.90 可能只有 alpha 快照 → 落到 2.80
     candidates.sort_by(|a, b| vercmp::cmp_version(b, a));
@@ -65,7 +65,7 @@ pub fn probe(
             break;
         }
     }
-    let (dir, version) = found.ok_or("gnome 目录无匹配稳定版本文件")?;
+    let (dir, version) = found.ok_or(crate::tr!("track.gnome_no_stable_file"))?;
     let url = templates::substitute(
         template,
         &[

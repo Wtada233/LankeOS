@@ -45,11 +45,19 @@ impl State {
     /// 打开（或创建）状态库。
     pub fn open(path: &Path) -> Result<State, FarmError> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| FarmError::io(format!("创建状态目录 {parent:?} 失败"), e))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                FarmError::io(
+                    crate::tr!("state.create_dir_failed", format!("{parent:?}")),
+                    e,
+                )
+            })?;
         }
-        let conn = rusqlite::Connection::open(path)
-            .map_err(|e| FarmError::sqlite(format!("打开 SQLite {path:?} 失败"), e))?;
+        let conn = rusqlite::Connection::open(path).map_err(|e| {
+            FarmError::sqlite(
+                crate::tr!("state.open_sqlite_failed", format!("{path:?}")),
+                e,
+            )
+        })?;
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS jobs (
                 pkg TEXT PRIMARY KEY,
@@ -67,7 +75,7 @@ impl State {
             );
             ",
         )
-        .map_err(|e| FarmError::sqlite("初始化 SQLite schema 失败", e))?;
+        .map_err(|e| FarmError::sqlite(crate::tr!("state.init_schema_failed"), e))?;
         Ok(State { conn })
     }
 
@@ -88,7 +96,7 @@ impl State {
                     updated_at = datetime('now')",
                 rusqlite::params![pkg, status.as_str(), failure_stage, recipe_hash],
             )
-            .map_err(|e| FarmError::sqlite("更新 job 状态失败", e))?;
+            .map_err(|e| FarmError::sqlite(crate::tr!("state.update_job_failed"), e))?;
         Ok(())
     }
 
@@ -97,7 +105,7 @@ impl State {
         self.conn
             .execute("DELETE FROM jobs WHERE pkg=?1", rusqlite::params![pkg])
             .map(|_| ())
-            .map_err(|e| FarmError::sqlite("删除 job 条目失败", e))
+            .map_err(|e| FarmError::sqlite(crate::tr!("state.delete_job_failed"), e))
     }
 
     pub fn record_build(&self, pkg: &str, version: &str, ok: bool) -> Result<(), FarmError> {
@@ -106,7 +114,7 @@ impl State {
                 "INSERT INTO build_history (pkg, version, outcome) VALUES (?1, ?2, ?3)",
                 rusqlite::params![pkg, version, if ok { "ok" } else { "failed" }],
             )
-            .map_err(|e| FarmError::sqlite("记录构建历史失败", e))?;
+            .map_err(|e| FarmError::sqlite(crate::tr!("state.record_history_failed"), e))?;
         Ok(())
     }
 }

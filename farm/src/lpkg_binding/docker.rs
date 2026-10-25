@@ -135,15 +135,15 @@ fn flatten_to_base(cid: &str, base_image: &str) -> Result<(), FarmError> {
         .args(["export", cid])
         .stdout(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("docker export 失败: {e}"))?;
+        .map_err(|e| crate::tr!("docker.export_failed", e))?;
     let import = std::process::Command::new("docker")
         .args(["import", "-", base_image])
         .stdin(Stdio::from(export.stdout.unwrap()))
         .output()
-        .map_err(|e| format!("docker import 失败: {e}"))?;
+        .map_err(|e| crate::tr!("docker.import_failed", e))?;
     if !import.status.success() {
-        return Err(format!(
-            "docker import 失败: {}",
+        return Err(crate::tr!(
+            "docker.import_failed",
             String::from_utf8_lossy(&import.stderr)
         )
         .into());
@@ -197,10 +197,10 @@ pub fn finalize_roll(out_dir: &Path, base_image: &str) -> Result<(), FarmError> 
             "tail -f /dev/null",
         ])
         .output()
-        .map_err(|e| format!("docker create（finalize）失败: {e}"))?;
+        .map_err(|e| crate::tr!("docker.create_finalize_failed", e))?;
     if !create.status.success() {
-        return Err(format!(
-            "docker create（finalize）失败: {}",
+        return Err(crate::tr!(
+            "docker.create_finalize_failed",
             String::from_utf8_lossy(&create.stderr)
         )
         .into());
@@ -412,7 +412,7 @@ impl RealBinding {
                     "mkdir -p /work && tail -f /dev/null",
                 ])
                 .output()
-                .map_err(|e| format!("docker create 失败: {e}"))
+                .map_err(|e| crate::tr!("docker.create_failed", e))
         };
         let mut create = mk_create(&create_image)?;
         // 健壮性：roll 镜像缺失/已删（如 GC 后计数未及时归零的崩溃窗口）→ 回退原始 base 并重置计数。
@@ -423,8 +423,8 @@ impl RealBinding {
             create = mk_create(&create_image)?;
         }
         if !create.status.success() {
-            return Err(format!(
-                "docker create 失败: {}",
+            return Err(crate::tr!(
+                "docker.create_failed",
                 String::from_utf8_lossy(&create.stderr)
             )
             .into());
@@ -439,7 +439,7 @@ impl RealBinding {
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {
-            return Err(format!("docker start 失败（{pkg}）").into());
+            return Err(crate::tr!("docker.start_failed", pkg).into());
         }
         Ok(())
     }
@@ -456,7 +456,7 @@ impl RealBinding {
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {
-            return Err(format!("容器内写入 mirror.conf 失败（{pkg}）").into());
+            return Err(crate::tr!("docker.write_mirror_conf_failed", pkg).into());
         }
         Ok(())
     }
@@ -481,9 +481,9 @@ impl RealBinding {
              rm -rf /backups ; \
              exit 0";
         let status = docker_stream(&["exec", cid, "sh", "-c", upgrade_script])
-            .map_err(|e| format!("docker exec 失败: {e}"))?;
+            .map_err(|e| crate::tr!("docker.exec_failed", e))?;
         if !status.success() {
-            return Err(format!("容器内 lpkg upgrade 失败（{pkg}）").into());
+            return Err(crate::tr!("docker.upgrade_failed", pkg).into());
         }
 
         // 滚动 commit / GC：commit → <base>:roll<N+1>；达到 ROLL_LIMIT 后 export+import 扁平化
@@ -495,7 +495,7 @@ impl RealBinding {
                 .map(|s| s.success())
                 .unwrap_or(false);
             if !ok {
-                return Err(format!("docker commit {tag} 失败（滚动快照未保存）").into());
+                return Err(crate::tr!("docker.commit_failed", tag).into());
             }
             write_roll_counter(&self.out_dir, next);
         } else {
@@ -524,9 +524,9 @@ impl RealBinding {
         let restore_script =
             "if [ -d /backups ]; then cp -a /backups/. /usr/lib/ && ldconfig -X; fi; true";
         let status = docker_stream(&["exec", cid, "sh", "-c", restore_script])
-            .map_err(|e| format!("docker exec 恢复旧 .so 失败: {e}"))?;
+            .map_err(|e| crate::tr!("docker.restore_exec_failed", e))?;
         if !status.success() {
-            return Err(format!("容器内恢复备份旧 .so 失败（{pkg}）").into());
+            return Err(crate::tr!("docker.restore_backup_failed", pkg).into());
         }
         Ok(())
     }
@@ -543,7 +543,7 @@ impl RealBinding {
         .map(|s| s.success())
         .unwrap_or(false);
         if !ok {
-            return Err(format!("docker cp {pkg} 配方进容器失败").into());
+            return Err(crate::tr!("docker.cp_recipe_failed", pkg).into());
         }
         Ok(())
     }
@@ -553,9 +553,9 @@ impl RealBinding {
     fn run_lpkg_build(&self, pkg: &str, cid: &str) -> Result<(), FarmError> {
         let build_script = format!("cd /work/{pkg} && lpkg build -y --use-system-soname");
         let status = docker_stream(&["exec", cid, "sh", "-c", &build_script])
-            .map_err(|e| format!("docker exec 失败: {e}"))?;
+            .map_err(|e| crate::tr!("docker.exec_failed", e))?;
         if !status.success() {
-            return Err(format!("容器内 lpkg build 失败（{pkg}）").into());
+            return Err(crate::tr!("docker.build_failed", pkg).into());
         }
         Ok(())
     }
@@ -572,17 +572,17 @@ impl RealBinding {
                 &format!("cd /work/{pkg} && ls -1 *.lpkg 2>/dev/null | tail -1"),
             ])
             .output()
-            .map_err(|e| format!("docker exec 取产物名失败: {e}"))?;
+            .map_err(|e| crate::tr!("docker.list_artifacts_failed", e))?;
         let lpkg_name = String::from_utf8_lossy(&out.stdout).trim().to_string();
         if lpkg_name.is_empty() {
-            return Err(format!("容器内未产出 .lpkg（{pkg}）").into());
+            return Err(crate::tr!("docker.no_artifact", pkg).into());
         }
         let remote = format!("{cid}:/work/{pkg}/{lpkg_name}");
         let ok = docker_quiet(&["cp", &remote, staging.to_string_lossy().as_ref()])
             .map(|s| s.success())
             .unwrap_or(false);
         if !ok {
-            return Err(format!("docker cp {pkg} .lpkg 回宿主失败").into());
+            return Err(crate::tr!("docker.cp_artifact_failed", pkg).into());
         }
         self.cleanup.lock().unwrap().current_cid = None;
         Ok(staging.join(&lpkg_name))
@@ -619,7 +619,7 @@ impl LpkgBinding for RealBinding {
             Ok(dest) => dest,
             Err(e) => {
                 self.cleanup.lock().unwrap().current_pkg = None;
-                return BuildOutcome::failure(&format!("docker build 失败: {e}"));
+                return BuildOutcome::failure(&crate::tr!("docker.build_image_failed", e));
             }
         };
         self.cleanup.lock().unwrap().current_pkg = None;

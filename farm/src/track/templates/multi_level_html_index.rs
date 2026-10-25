@@ -43,7 +43,7 @@ pub fn probe(
     pkg_name: &str,
 ) -> Result<EntryProbe, FarmError> {
     if cfg.levels.is_empty() {
-        return Err("multi-level-html-index 需 levels 列表（每级 {name, url, pattern}）".into());
+        return Err(crate::tr!("track.multi_level_requires_levels").into());
     }
     let template = need(&cfg.template, "template")?;
     let names = validate_levels(cfg)?;
@@ -51,7 +51,7 @@ pub fn probe(
     let version_idx = names
         .iter()
         .position(|n| n == VERSION_LEVEL)
-        .ok_or("levels 缺 name: version（该级捕获 = 包版本）")?;
+        .ok_or(crate::tr!("track.multi_level_missing_version"))?;
     let upstream = cfg.effective_name(pkg_name);
     // 版本筛选约束（exclude / stable-minor / 封顶）逐级生效，与单级模板同一汇点
     let f = templates::version_filter(cfg, major)?;
@@ -68,9 +68,9 @@ pub fn probe(
         let page = templates::substitute(lvl_url, &vars(&names[..i], &vers, upstream));
         let html = fetcher.get(&page)?;
         let pat = need(&lvl.pattern, &format!("levels[{i}].pattern"))?;
-        let re = Regex::new(pat).map_err(|e| format!("正则无效 {pat}: {e}"))?;
+        let re = Regex::new(pat).map_err(|e| crate::tr!("track.invalid_regex", pat, e))?;
         let v = templates::max_match(&re, &html, &f)
-            .ok_or_else(|| format!("{page} 中未匹配到版本（pattern: {pat}）"))?;
+            .ok_or_else(|| crate::tr!("track.multi_level_no_match", page, pat))?;
         vers.push(v);
     }
 
@@ -89,25 +89,19 @@ fn validate_levels(cfg: &SourceConfig) -> Result<Vec<String>, FarmError> {
             .trim()
             .to_string();
         if n.is_empty() {
-            return Err(format!("levels[{i}].name 不得为空").into());
+            return Err(crate::tr!("track.level_name_empty", i).into());
         }
         if n == UPSTREAM_NAME {
-            return Err(format!(
-                "levels[{i}].name 不得取保留名 `{UPSTREAM_NAME}`（上游名占位符 {{{UPSTREAM_NAME}}} 已被占用）"
-            )
-            .into());
+            return Err(crate::tr!("track.level_name_reserved", i, UPSTREAM_NAME).into());
         }
         if names.contains(&n) {
-            return Err(format!("levels[{i}].name `{n}` 与前面的级重名").into());
+            return Err(crate::tr!("track.level_name_duplicate", i, n).into());
         }
         names.push(n);
     }
     // 上面已保证名字唯一 → `version` 至多出现一次；只需查"缺"。
     if !names.iter().any(|n| n == VERSION_LEVEL) {
-        return Err(format!(
-            "levels 必须有一级 name: {VERSION_LEVEL}（该级捕获 = 包版本，不按位置）"
-        )
-        .into());
+        return Err(crate::tr!("track.multi_level_missing_version_level", VERSION_LEVEL).into());
     }
     Ok(names)
 }
@@ -146,8 +140,9 @@ fn check_placeholders(s: &str, allowed: &[&str], where_: &str) -> Result<(), Far
         return Ok(());
     }
     let bad: Vec<String> = bad.iter().map(|b| format!("{{{b}}}")).collect();
-    Err(format!(
-        "{where_} 引用了未知占位符 {}（可用: {}；位置隐式的 {{v1}}..{{vN}} 已废弃——每级须用 name 显式命名）",
+    Err(crate::tr!(
+        "track.unknown_placeholder",
+        where_,
         bad.join(", "),
         allowed
             .iter()

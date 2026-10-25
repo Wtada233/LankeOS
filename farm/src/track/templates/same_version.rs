@@ -21,9 +21,7 @@ pub fn probe(
     _pkg_name: &str,
 ) -> Result<EntryProbe, FarmError> {
     let target = need(&cfg.same_version_of, "same-version-of")?;
-    let v = lookup(target).ok_or_else(|| {
-        format!("same-version-of 依赖 {target} 无版本（读 LankeBUILD.json/已解析版本失败）")
-    })?;
+    let v = lookup(target).ok_or_else(|| crate::tr!("track.same_version_no_version", target))?;
     let template = need(&cfg.template, "template")?;
     // {version} / {major_minor} 的替换与 same-version-of-source 共用同一处（见 templates::substitute_locked_version）
     // 残留占位符不在这里判：`track::probe_with` 对**每个产出槽位**统一 validate_url（唯一一处）。

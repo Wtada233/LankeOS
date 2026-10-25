@@ -73,6 +73,10 @@ fn collect_targets(
     result
 }
 
+/// prompt 里列的模板字段与版本约束字段必须和 `src/track/templates/mod.rs` 的
+/// `TEMPLATES`（各自的 `supported`）保持一致：注册表既不接受 prompt 多写的字段
+/// （生成的 yaml 会在下次 `farm track` 被拒），也不会替 prompt 漏写的约束兜底。
+/// 改任何一边都回来同步这里。
 const SYSTEM_PROMPT: &str = r#"你是 LankeOS 发行版的 tracker 配置生成器。根据给定包的源 URL 和探测输出（真实抓取），生成正确的 tracker yaml。
 
 tracker yaml 是 sources/work_sources 的完整清单，结构：
@@ -99,11 +103,11 @@ source 条目可用 tracker-template 及字段：
     url: https://download.kde.org/stable/frameworks/{series}/
     pattern: ki18n-([0-9][0-9.]*)\.tar\.xz
   template: https://download.kde.org/stable/frameworks/{series}/ki18n-{version}.tar.xz
-- same-version: same-version-of(锁定为指定**包**的版本，直接确定版本不经探测), tag-prefix, repo, template
+- same-version: same-version-of(锁定为指定**包**的版本，直接确定版本不经探测), template
 - same-version-of-source: same-version-of-source(锁定为**本 tracker 中位于它之前的槽位**本轮解析出的版本，如 sources[0]), template
 - script: script（内嵌 bash，stdout 每行 `<版本>|URL`；**默认恰好一行**，加 expand: true 才允许多行/多槽位）——**条目级**，与其他模板平级
 
-条目级版本约束（只作用于本条目，探测模板适用）：major-of、major-version-lock、max-version、source-name。
+条目级版本约束（只作用于本条目，探测模板适用）：major-of、major-version-lock、max-version、stable-minor、exclude、source-name。
 template 是**完整下载 URL**（含 https:// 和主机名，占位符替换后可直接下载），不要把 URL 拆开只留文件名/相对路径。
 template 占位符：{name} {version} {tag} {repo} {project} {path_version}（multi-level-html-index 另可用各级的 name）。
 pattern 是提取版本的正则，必须含一个捕获组，如 (\d[\d.]*)。

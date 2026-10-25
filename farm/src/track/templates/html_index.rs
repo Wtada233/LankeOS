@@ -22,10 +22,10 @@ pub fn probe(
     let pattern = need(&cfg.pattern, "pattern")?;
     let template = need(&cfg.template, "template")?;
     let html = fetcher.get(url)?;
-    let re = Regex::new(pattern).map_err(|e| format!("正则无效 {}: {e}", pattern))?;
+    let re = Regex::new(pattern).map_err(|e| crate::tr!("track.invalid_regex", pattern, e))?;
     let f = templates::version_filter(cfg, major)?;
-    let version =
-        templates::max_match(&re, &html, &f).ok_or_else(|| format!("{url} 中未匹配到版本"))?;
+    let version = templates::max_match(&re, &html, &f)
+        .ok_or_else(|| crate::tr!("track.no_version_match", url))?;
     let name = cfg.effective_name(pkg_name);
     let url = templates::substitute(template, &[("name", name), ("version", &version)]);
     Ok(EntryProbe { version, url })

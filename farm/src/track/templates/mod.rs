@@ -265,7 +265,9 @@ pub(crate) fn version_filter<'a>(
     major: Option<&'a str>,
 ) -> Result<VersionFilter<'a>, FarmError> {
     let exclude = match cfg.exclude.as_deref() {
-        Some(pat) => Some(Regex::new(pat).map_err(|e| format!("exclude 正则无效 `{pat}`: {e}"))?),
+        Some(pat) => {
+            Some(Regex::new(pat).map_err(|e| crate::tr!("track.invalid_exclude_regex", pat, e))?)
+        }
         None => None,
     };
     Ok(VersionFilter {
@@ -354,10 +356,10 @@ fn is_stable(v: &str) -> bool {
 /// 解析 JSON 数组响应（列表端点）。
 pub(crate) fn parse_json_array(json: &str, ctx: &str) -> Result<Vec<serde_json::Value>, FarmError> {
     let v: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| format!("{ctx} API 响应解析失败: {e}"))?;
+        serde_json::from_str(json).map_err(|e| crate::tr!("track.api_parse_failed", ctx, e))?;
     match v {
         serde_json::Value::Array(a) => Ok(a),
-        _ => Err(format!("{ctx} API 响应非数组").into()),
+        _ => Err(crate::tr!("track.api_not_array", ctx).into()),
     }
 }
 
@@ -384,7 +386,7 @@ pub(crate) fn fetch_json_pages(
     for page in 1..=max_pages {
         let url = format!("{url_without_page}&page={page}");
         let body = fetcher.get(&url)?;
-        let mut arr = parse_json_array(&body, "列表")?;
+        let mut arr = parse_json_array(&body, crate::tr!("track.ctx_list"))?;
         let n = arr.len();
         out.append(&mut arr);
         if n < per_page {
@@ -397,11 +399,11 @@ pub(crate) fn fetch_json_pages(
 /// 从 JSON `{"tag_name": "v1.2"}` 提取最新 release tag。
 pub(crate) fn extract_latest_release_tag(json: &str) -> Result<String, FarmError> {
     let v: serde_json::Value =
-        serde_json::from_str(json).map_err(|e| format!("release API 响应解析失败: {e}"))?;
+        serde_json::from_str(json).map_err(|e| crate::tr!("track.release_api_parse_failed", e))?;
     v.get("tag_name")
         .and_then(|t| t.as_str())
         .map(String::from)
-        .ok_or_else(|| "release API 响应无 tag_name".to_string().into())
+        .ok_or_else(|| crate::tr!("track.release_no_tag").into())
 }
 
 /// 取 tag 列表中版本最大的（按 `tag_prefix` 剥离后过 `VersionFilter`，稳定版优先）。

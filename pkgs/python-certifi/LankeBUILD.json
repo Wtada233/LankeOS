@@ -1,6 +1,6 @@
 {
   "name": "python-certifi",
-  "version": "2026.10.19",
+  "version": "2026.10.23",
   "release": 3,
   "deps": [
     "make-ca",
@@ -16,7 +16,7 @@
     "python-wheel"
   ],
   "sources": [
-    "https://files.pythonhosted.org/packages/a6/bd/1436c50cc46699de0230fbaacc1d1de7bfec413176099949e9d5112e88f2/certifi-2026.10.19.tar.gz"
+    "https://files.pythonhosted.org/packages/fd/11/b524cbd9bbdaca58608e4cf4053fd463417549e1959fa8d3aa18319f9555/certifi-2026.10.23.tar.gz"
   ],
   "work_sources": []
 }

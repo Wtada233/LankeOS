@@ -9,6 +9,8 @@ lankebuild_prepare() {
     cmake -B build -G Ninja \
         -DCMAKE_BUILD_TYPE=None \
         -DCMAKE_INSTALL_PREFIX=/usr \
+        -DCMAKE_INSTALL_INCLUDEDIR=include/mbedtls3 \
+        -DCMAKE_INSTALL_LIBDIR=lib/mbedtls3 \
         -DCMAKE_SKIP_RPATH=ON \
         -DUSE_SHARED_MBEDTLS_LIBRARY=ON \
         -DUSE_STATIC_MBEDTLS_LIBRARY=OFF \
@@ -24,19 +26,9 @@ lankebuild_build() {
 lankebuild_package() {
     DESTDIR="{STAGING_ROOT}" ninja -C build install
 
-    # namespace includes -> /usr/include/mbedtls3/
-    install -dm 755 "{STAGING_ROOT}/usr/include/mbedtls3"
-    mv "{STAGING_ROOT}/usr/include/everest" "{STAGING_ROOT}/usr/include/mbedtls3/"
-    mv "{STAGING_ROOT}/usr/include/mbedtls" "{STAGING_ROOT}/usr/include/mbedtls3/"
-    mv "{STAGING_ROOT}/usr/include/psa" "{STAGING_ROOT}/usr/include/mbedtls3/"
-
-    # namespace libs -> /usr/lib/mbedtls3/
-    install -dm 755 "{STAGING_ROOT}/usr/lib/mbedtls3"
-    mv "{STAGING_ROOT}"/usr/lib/{cmake,lib*.so*,pkgconfig} "{STAGING_ROOT}/usr/lib/mbedtls3/"
-
-    # 保留关不掉的静态库（everest/p256m），连同存在的 .a 一并移入
-    for _a in "{STAGING_ROOT}"/usr/lib/*.a; do
-        [ -f "$_a" ] && mv "$_a" "{STAGING_ROOT}/usr/lib/mbedtls3/"
+    # 静态库权限（everest/p256m）
+    for _a in "{STAGING_ROOT}"/usr/lib/mbedtls3/*.a; do
+        [ -f "$_a" ] && chmod 644 "$_a"
     done
 
     # rename generic utils -> mbedtls3_前缀

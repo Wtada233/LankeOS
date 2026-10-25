@@ -25,7 +25,7 @@ pub fn probe(
     let url = format!("https://pypi.org/pypi/{project}/json");
     let body = fetcher.get(&url)?;
     let json: serde_json::Value =
-        serde_json::from_str(&body).map_err(|e| format!("PyPI JSON 解析失败（{url}）: {e}"))?;
+        serde_json::from_str(&body).map_err(|e| crate::tr!("track.pypi_json_failed", url, e))?;
 
     // 有约束（major-of / exclude / stable-minor）时必须扫 `releases` 全量挑选：
     // 单条 `info.version` 表达不了"排除某版""只要偶数 minor"。
@@ -34,10 +34,15 @@ pub fn probe(
     let (version, sdist_url) = if constrained {
         let releases = json["releases"]
             .as_object()
-            .ok_or_else(|| format!("PyPI {url} 无 releases"))?;
+            .ok_or_else(|| crate::tr!("track.pypi_no_releases", url))?;
         let versions: Vec<String> = releases.keys().cloned().collect();
-        let v = templates::max_version_stable_first(versions, &f)
-            .ok_or_else(|| format!("PyPI {project} 无满足约束的版本（major={major:?}）"))?;
+        let v = templates::max_version_stable_first(versions, &f).ok_or_else(|| {
+            crate::tr!(
+                "track.pypi_no_matching_version",
+                project,
+                format!("{major:?}")
+            )
+        })?;
         let sdist = json["releases"][&v]
             .as_array()
             .and_then(|arr| {
@@ -45,13 +50,13 @@ pub fn probe(
                     .find(|f| f["packagetype"].as_str() == Some("sdist"))
             })
             .and_then(|f| f["url"].as_str())
-            .ok_or_else(|| format!("PyPI {project} {v} 无 sdist URL"))?
+            .ok_or_else(|| crate::tr!("track.pypi_no_sdist_url", project, v))?
             .to_string();
         (v, sdist)
     } else {
         let v = json["info"]["version"]
             .as_str()
-            .ok_or_else(|| format!("PyPI {url} 无 info.version"))?
+            .ok_or_else(|| crate::tr!("track.pypi_no_info_version", url))?
             .to_string();
         let sdist = json["urls"]
             .as_array()
@@ -60,7 +65,7 @@ pub fn probe(
                     .find(|f| f["packagetype"].as_str() == Some("sdist"))
             })
             .and_then(|f| f["url"].as_str())
-            .ok_or_else(|| format!("PyPI {project} 最新版无 sdist URL"))?
+            .ok_or_else(|| crate::tr!("track.pypi_latest_no_sdist", project))?
             .to_string();
         (v, sdist)
     };

@@ -40,7 +40,7 @@ struct Probe {
 }
 
 fn probe(bytes: &[u8]) -> Result<Probe, FarmError> {
-    let elf = Elf::parse(bytes).map_err(|e| format!("ELF 解析失败: {e}"))?;
+    let elf = Elf::parse(bytes).map_err(|e| crate::tr!("chk.elf_parse_failed", e))?;
     Ok(Probe {
         soname: elf.soname.map(String::from),
         needed: elf.libraries.iter().map(|s| s.to_string()).collect(),
@@ -50,7 +50,7 @@ fn probe(bytes: &[u8]) -> Result<Probe, FarmError> {
 /// 完整符号版本 join：defined（版本 → 符号集，provider 导出）与 undef（(符号, 版本)，
 /// consumer 引用）。索引 0/1（local/global=无版本）跳过（对齐 objdump -T 只收带 @ 的项）。
 fn symbols(bytes: &[u8]) -> Result<(DefinedMap, UndefRefs), FarmError> {
-    let elf = goblin::elf::Elf::parse(bytes).map_err(|e| format!("ELF 解析失败: {e}"))?;
+    let elf = goblin::elf::Elf::parse(bytes).map_err(|e| crate::tr!("chk.elf_parse_failed", e))?;
     let strtab = &elf.dynstrtab;
     // verdef：vd_ndx → 版本名（本 .so 导出的版本）
     let mut defver: std::collections::HashMap<u16, String> = std::collections::HashMap::new();
@@ -154,6 +154,50 @@ fn analyze(extract: &Path) -> Result<serde_json::Value, FarmError> {
     Ok(serde_json::json!({ "files": files, "links": links }))
 }
 
+/// 一个 ELF 可被 DT_NEEDED 引用的名字集合：SONAME ∪ 文件名 basename。
+/// provider 目录与「提供的名字」判定共用这一份，避免两套口径漂移。
+fn file_names(f: &serde_json::Value) -> BTreeSet<String> {
+    let mut out = BTreeSet::new();
+    if let Some(s) = f["soname"].as_str() {
+        out.insert(s.to_string());
+    }
+    if let Some(base) = f["file"].as_str().and_then(|rel| rel.rsplit('/').next()) {
+        out.insert(base.to_string());
+    }
+    out
+}
+
+/// provider 目录：每个可被 DT_NEEDED 引用的名字（SONAME ∪ 文件名）→ sym → {ver}。
+/// **不能只按 SONAME 建键**：无 SONAME 的库（libtcl8.6.so 这类）导出符号会完全不进目录，
+/// 其消费者的 `sym@ver` 引用永远 join 不上；而同一批名字在「孤儿 SONAME」判定里本就走文件名。
+fn build_catalog(
+    analyses: &BTreeMap<String, serde_json::Value>,
+) -> BTreeMap<String, BTreeMap<String, BTreeSet<String>>> {
+    let mut catalog: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
+    for a in analyses.values() {
+        let Some(files) = a["files"].as_array() else {
+            continue;
+        };
+        for f in files {
+            let Some(def) = f["defined"].as_object() else {
+                continue;
+            };
+            for name in file_names(f) {
+                let entry = catalog.entry(name).or_default();
+                for (ver, syms) in def {
+                    let Some(syms) = syms.as_array() else {
+                        continue;
+                    };
+                    for s in syms.iter().filter_map(|s| s.as_str()) {
+                        entry.entry(s.to_string()).or_default().insert(ver.clone());
+                    }
+                }
+            }
+        }
+    }
+    catalog
+}
+
 /// 全仓库「提供的名字」集合：每个包的 ELF SONAME ∪ 常规文件名 ∪ **符号链接名**（含目录前缀的
 /// 相对路径只取 basename）。抽成纯函数便于单测（runc/libpathrs 那类 dev 链接名就是被这里收进来的）。
 fn provided_names_from(analyses: &BTreeMap<String, serde_json::Value>) -> BTreeSet<String> {
@@ -161,12 +205,7 @@ fn provided_names_from(analyses: &BTreeMap<String, serde_json::Value>) -> BTreeS
     for a in analyses.values() {
         if let Some(files) = a["files"].as_array() {
             for f in files {
-                if let Some(s) = f["soname"].as_str() {
-                    out.insert(s.to_string());
-                }
-                if let Some(base) = f["file"].as_str().and_then(|rel| rel.rsplit('/').next()) {
-                    out.insert(base.to_string());
-                }
+                out.extend(file_names(f));
             }
         }
         if let Some(links) = a["links"].as_array() {
@@ -190,30 +229,8 @@ pub fn run(o: &ChkOpts) -> Result<Report, FarmError> {
     let walk = walk_all(o, SCHEMA, |ext, _pkg| analyze(ext))?;
     let analyses = &walk.0;
 
-    // 1) provider 目录：soname → sym → {ver}
-    let mut catalog: BTreeMap<String, BTreeMap<String, BTreeSet<String>>> = BTreeMap::new();
-    for a in analyses.values() {
-        let Some(files) = a["files"].as_array() else {
-            continue;
-        };
-        for f in files {
-            let Some(soname) = f["soname"].as_str() else {
-                continue;
-            };
-            let Some(def) = f["defined"].as_object() else {
-                continue;
-            };
-            let entry = catalog.entry(soname.to_string()).or_default();
-            for (ver, syms) in def {
-                let Some(syms) = syms.as_array() else {
-                    continue;
-                };
-                for s in syms.iter().filter_map(|s| s.as_str()) {
-                    entry.entry(s.to_string()).or_default().insert(ver.clone());
-                }
-            }
-        }
-    }
+    // 1) provider 目录：每个可被 DT_NEEDED 引用的名字（SONAME ∪ 文件名）→ sym → {ver}
+    let catalog = build_catalog(analyses);
 
     // 1b) 全仓库「提供的名字」：ELF 的 SONAME ∪ 常规文件名 ∪ **符号链接名**——用于判定
     //     「DT_NEEDED 的名字仓库里根本没人提供」= ABI 断裂（见步骤 2 的 ①）。
@@ -619,5 +636,32 @@ mod tests {
             r2.findings
         );
         fs::remove_dir_all(&base).ok();
+    }
+
+    #[test]
+    fn catalog_keys_include_no_soname_basenames() {
+        // 无 SONAME 的共享库（如 libtcl8.6.so）也要能以库名查到导出符号 ——
+        // 否则消费者的 sym@ver 引用永远 join 不上，与「孤儿 SONAME」按文件名判定的口径不一致。
+        let mut analyses: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+        analyses.insert(
+            "tcl".into(),
+            serde_json::json!({
+                "files": [{
+                    "file": "usr/lib/libtcl8.6.so",
+                    "soname": serde_json::Value::Null,
+                    "needed": [],
+                    "defined": {"V1": ["Tcl_Init"]},
+                    "undef": [],
+                }],
+                "links": [],
+            }),
+        );
+        let catalog = build_catalog(&analyses);
+        assert!(
+            catalog
+                .get("libtcl8.6.so")
+                .is_some_and(|m| m.get("Tcl_Init").is_some_and(|v| v.contains("V1"))),
+            "无 SONAME 的库必须按文件名进 provider 目录: {catalog:?}"
+        );
     }
 }

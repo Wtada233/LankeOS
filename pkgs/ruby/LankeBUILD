@@ -19,5 +19,11 @@ lankebuild_package() {
     # RubyGems 的 cache/*.gem 是 default/bundled gem 的安装缓存，运行期不需要；
     # .gem 内含构建时间戳，还会让包不可复现（Arch 也显式删除）。
     rm -rf "{STAGING_ROOT}"/usr/lib/ruby/gems/*/cache
+    # ext 构建目录里的临时产物（Makefile/mkmf.log/gem_make.out/*.o/*.log/
+    # extconf.h 和重复的 .so）不属于运行期内容；安装好的扩展在 extensions/ 下。
+    find "{STAGING_ROOT}/usr/lib/ruby/gems" -type f -path '*/ext/*' \
+        \( -name Makefile -o -name mkmf.log -o -name gem_make.out \
+           -o -name '*.o' -o -name '*.a' -o -name '*.log' \
+           -o -name '*.so' -o -name extconf.h \) -delete
     echo "Package staging complete."
 }

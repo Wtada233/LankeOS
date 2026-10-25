@@ -21,7 +21,7 @@ fn log_init(path: Option<&str>) -> Result<(), FarmError> {
             .create(true)
             .append(true)
             .open(p)
-            .map_err(|e| format!("打开日志文件失败 {p}: {e}"))?;
+            .map_err(|e| lankefarm::tr!("cli.open_log_failed", p, e))?;
         *LOG.lock().unwrap() = Some(f);
     }
     Ok(())
@@ -336,9 +336,10 @@ struct BuildJson {
 
 fn load_build_json(pkg_dir: &std::path::Path) -> Result<BuildJson, FarmError> {
     let path = pkg_dir.join("LankeBUILD.json");
-    let content =
-        std::fs::read_to_string(&path).map_err(|e| format!("读取 {} 失败: {e}", path.display()))?;
-    serde_json::from_str(&content).map_err(|e| format!("解析 {} 失败: {e}", path.display()).into())
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| lankefarm::tr!("cli.read_failed", path.display(), e))?;
+    serde_json::from_str(&content)
+        .map_err(|e| lankefarm::tr!("cli.parse_failed", path.display(), e).into())
 }
 
 /// 第一个非 file:// 的 source URL（file:// 是包内自带，无需 track）。

@@ -247,7 +247,7 @@ impl TrackerConfig {
     /// 从 tracker yaml 文本解析：供 `cli::load_trackers` 使用——
     /// 解析失败必须**可见**（不能像以前那样 `if let Ok` 静默跳过，让写错的 tracker"看着在、实际不生效"）。
     pub fn from_yaml(text: &str) -> Result<TrackerConfig, FarmError> {
-        serde_yaml_ng::from_str(text).map_err(|e| format!("解析 tracker yaml 失败: {e}").into())
+        serde_yaml_ng::from_str(text).map_err(|e| crate::tr!("track.parse_yaml_failed", e).into())
     }
 
     /// 用到的模板名（去重、升序、`+` 连接；显示用）。
@@ -297,9 +297,7 @@ impl TrackerConfig {
                 } else if !self.work_sources.is_empty() {
                     (SlotList::WorkSources, 0)
                 } else {
-                    return Err(
-                        format!("tracker {} 无 sources/work_sources 条目", self.pkg_name).into(),
-                    );
+                    return Err(crate::tr!("track.no_entries", self.pkg_name).into());
                 }
             }
         };
@@ -308,12 +306,7 @@ impl TrackerConfig {
             SlotList::WorkSources => &wss,
         };
         let version = pool.get(idx).map(|e| e.version.clone()).ok_or_else(|| {
-            format!(
-                "version-source 越界: {}[{}]（共 {} 条）",
-                which.label(),
-                idx,
-                pool.len()
-            )
+            crate::tr!("track.version_source_oob", which.label(), idx, pool.len())
         })?;
         Ok(ProbeResult {
             version,
@@ -380,7 +373,7 @@ fn probe_entry_list(
         // 槽位顺序 = 条目顺序 × 条目内展开顺序，即 LankeBUILD.json 数组的位置语义。
         let probes = cfg
             .probe_with(fetcher, lookup, pkg_name, resolved)
-            .map_err(|e| format!("{field}[{i}] 探测失败: {e}"))?;
+            .map_err(|e| crate::tr!("track.probe_failed", field, i, e))?;
         // 立即并入已探测表：只有**后面的**条目能用 version-var 引用它（前向引用取不到 → 报错）
         match which {
             SlotList::Sources => resolved.sources.extend(probes.iter().cloned()),
@@ -404,15 +397,10 @@ impl SourceConfig {
         // BTreeMap → 迭代顺序确定（序列化与报错信息都可复现）
         for (name, sel) in &self.version_var {
             if !is_shell_ident(name) {
-                return Err(format!(
-                    "version-var 名 `{name}` 不是合法 shell 变量名（应为 [A-Za-z_][A-Za-z0-9_]*）"
-                )
-                .into());
+                return Err(crate::tr!("track.bad_version_var_name", name).into());
             }
             if name == "PKG_NAME" {
-                return Err("version-var 名不得占用保留变量 `PKG_NAME`"
-                    .to_string()
-                    .into());
+                return Err(crate::tr!("track.reserved_version_var").into());
             }
             let version =
                 resolved_slot_version(sel, resolved, &format!("version-var `{name}: {sel}`"))?;
@@ -441,9 +429,7 @@ impl SourceConfig {
         } else {
             match &self.major_of {
                 Some(p) => {
-                    let v = lookup(p).ok_or_else(|| {
-                        format!("major-of 依赖 {p} 无版本（读 LankeBUILD.json 失败）")
-                    })?;
+                    let v = lookup(p).ok_or_else(|| crate::tr!("track.major_of_no_version", p))?;
                     Some(v.split('.').next().unwrap_or("").to_string())
                 }
                 None => None,
@@ -479,9 +465,9 @@ fn validate_supported_fields(
     cfg: &SourceConfig,
 ) -> Result<&'static templates::TemplateSpec, FarmError> {
     let name = cfg.tracker_template.as_str();
-    let spec = templates::spec(name).ok_or_else(|| format!("未知 tracker_template: {name}"))?;
-    let value =
-        serde_json::to_value(cfg).map_err(|e| format!("tracker 字段校验失败（{name}）: {e}"))?;
+    let spec = templates::spec(name).ok_or_else(|| crate::tr!("track.unknown_template", name))?;
+    let value = serde_json::to_value(cfg)
+        .map_err(|e| crate::tr!("track.field_validation_failed", name, e))?;
     let mut unsupported: Vec<&str> = value
         .as_object()
         .map(|o| o.keys().map(String::as_str).collect::<Vec<_>>())
@@ -495,11 +481,7 @@ fn validate_supported_fields(
         .collect();
     unsupported.sort_unstable();
     if !unsupported.is_empty() {
-        return Err(format!(
-            "tracker-template {name} 不支持字段: {}（需要版本封顶/稳定分支等约束时改用支持它的模板，或用条目级 script 模板 `tracker-template: script`）",
-            unsupported.join(", ")
-        )
-        .into());
+        return Err(crate::tr!("track.unsupported_field", name, unsupported.join(", ")).into());
     }
     Ok(spec)
 }
@@ -507,7 +489,7 @@ fn validate_supported_fields(
 /// 解析 `version-source` / `version-var` 选择器：`sources[i]` / `work_sources[i]`
 /// → `(列表, 下标)`。
 pub(crate) fn parse_version_source(sel: &str) -> Result<(SlotList, usize), FarmError> {
-    let err = || format!("version-source 无效 '{sel}'（应为 sources[i] 或 work_sources[i]）");
+    let err = || crate::tr!("track.invalid_version_source", sel);
     let (which, rest) = if let Some(r) = sel.strip_prefix("sources[") {
         (SlotList::Sources, r)
     } else if let Some(r) = sel.strip_prefix("work_sources[") {
@@ -538,27 +520,21 @@ pub(crate) fn resolved_slot_version(
         SlotList::WorkSources => &resolved.work_sources,
     };
     pool.get(idx).map(|e| e.version.clone()).ok_or_else(|| {
-        format!(
-            "{what} 尚不可用——只能引用本 tracker 中**位于它之前**的槽位\
-             （sources 先于 work_sources 探测，列表内从左到右；当前 {} 已探测 {} 条）",
-            which.label(),
-            pool.len()
-        )
-        .into()
+        crate::tr!("track.slot_not_available", what, which.label(), pool.len()).into()
     })
 }
 
 /// 需要的必填字段缺失时给出清晰错误。
 pub(crate) fn need<'a>(opt: &'a Option<String>, field: &str) -> Result<&'a str, FarmError> {
     opt.as_deref()
-        .ok_or_else(|| format!("tracker 配置缺 {field}").into())
+        .ok_or_else(|| crate::tr!("track.missing_field", field).into())
 }
 
 /// 校验探测产出的 URL：残留 `{...}` 说明模板引用了未提供的占位符，生成的 URL 必然损坏。
 /// 报错而非静默写入坏 URL（杜绝"莫名其妙改 URL"）。
 pub(crate) fn validate_url(url: &str) -> Result<(), FarmError> {
     if url.contains('{') {
-        return Err(format!("探测生成的 URL 残留未替换占位符: {url}").into());
+        return Err(crate::tr!("track.unresolved_placeholder", url).into());
     }
     Ok(())
 }

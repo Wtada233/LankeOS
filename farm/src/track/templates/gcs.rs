@@ -38,14 +38,14 @@ pub fn probe(
             _ => break,
         }
         if all_xml.len() > 100_000_000 {
-            return Err("GCS 分页超出安全上限".into());
+            return Err(crate::tr!("track.gcs_page_limit").into());
         }
     }
 
-    let re = Regex::new(pattern).map_err(|e| format!("正则无效 {}: {e}", pattern))?;
+    let re = Regex::new(pattern).map_err(|e| crate::tr!("track.invalid_regex", pattern, e))?;
     let f = templates::version_filter(cfg, major)?;
     let version = templates::max_match(&re, &all_xml, &f)
-        .ok_or_else(|| format!("{url} GCS 列表未匹配到版本"))?;
+        .ok_or_else(|| crate::tr!("track.gcs_no_match", url))?;
     let name = cfg.effective_name(pkg_name);
     let url = templates::substitute(template, &[("name", name), ("version", &version)]);
     Ok(EntryProbe { version, url })
