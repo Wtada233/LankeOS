@@ -1,9 +1,9 @@
 lankebuild_prepare() {
-    # COSMIC 注销只停 cosmic-session.target，graphical-session.target 仍 active；
-    # xdg-desktop-portal（PartOf=graphical-session.target）会带着 COSMIC 环境活到
-    # 下一个 KDE 会话。让 cosmic-session.target 停止时一并停掉会话 target。
-    patch -Np1 -i "{WORK_DIR}/../0001-data-propagate-stop-to-graphical-session-target.patch" \
-        || patch -R --dry-run -p1 -i "{WORK_DIR}/../0001-data-propagate-stop-to-graphical-session-target.patch" >/dev/null 2>&1 \
+    # COSMIC 注销只停 cosmic-session.target，graphical-session.target、portal
+    # 和会话环境会留到下一个会话。补丁加 cosmic-session-shutdown.target，
+    # 并在 start-cosmic 退出后停 target、清理环境。
+    patch -Np1 -i "{WORK_DIR}/../0001-cosmic-session-shutdown-target.patch" \
+        || patch -R --dry-run -p1 -i "{WORK_DIR}/../0001-cosmic-session-shutdown-target.patch" >/dev/null 2>&1 \
         || exit 1
 
     cargo fetch --locked

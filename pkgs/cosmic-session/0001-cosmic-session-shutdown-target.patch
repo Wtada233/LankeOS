@@ -1,0 +1,88 @@
+Subject: [PATCH] session: add a real shutdown target and clear session environment
+
+COSMIC logout stops cosmic-session.target but leaves
+graphical-session.target, xdg-desktop-autostart.target, the portal, and
+the environment imported by start-cosmic (WAYLAND_DISPLAY,
+XDG_CURRENT_DESKTOP, DCONF_PROFILE, Qt/GDK variables) behind for the
+next session.
+
+Add cosmic-session-shutdown.target in the GNOME/niri style, install it,
+and start it from start-cosmic after cosmic-session exits. Then unset
+the COSMIC-specific environment from the user manager.
+
+PropagatesStopTo on cosmic-session.target is kept as a fallback for the
+case where start-cosmic is killed before it can run the shutdown target.
+
+diff --git a/Justfile b/Justfile
+index 6237df6..aeb0f9a 100644
+--- a/Justfile
++++ b/Justfile
+@@ -40,6 +40,7 @@ install:
+ 
+     # systemd target
+     install -Dm0644 data/cosmic-session.target {{ systemddir }}/cosmic-session.target
++    install -Dm0644 data/cosmic-session-shutdown.target {{ systemddir }}/cosmic-session-shutdown.target
+ 
+     # session
+     install -Dm0644 data/cosmic.desktop {{ sessiondir }}/cosmic.desktop
+diff --git a/data/cosmic-session-shutdown.target b/data/cosmic-session-shutdown.target
+new file mode 100644
+index 0000000..ff2211a
+--- /dev/null
++++ b/data/cosmic-session-shutdown.target
+@@ -0,0 +1,10 @@
++[Unit]
++Description=Shutdown running COSMIC session
++DefaultDependencies=no
++StopWhenUnneeded=true
++
++Conflicts=graphical-session.target graphical-session-pre.target
++After=graphical-session.target graphical-session-pre.target
++
++Conflicts=cosmic-session.target xdg-desktop-autostart.target
++After=cosmic-session.target xdg-desktop-autostart.target
+diff --git a/data/cosmic-session.target b/data/cosmic-session.target
+index b459124..d4187a4 100644
+--- a/data/cosmic-session.target
++++ b/data/cosmic-session.target
+@@ -4,6 +4,7 @@ Documentation=man:systemd.special(7)
+ 
+ BindsTo=graphical-session.target
+ Before=graphical-session.target
++PropagatesStopTo=graphical-session.target
+ 
+ Wants=graphical-session-pre.target
+ After=graphical-session-pre.target
+diff --git a/data/start-cosmic b/data/start-cosmic
+index 46dec47..4f00fa6 100755
+--- a/data/start-cosmic
++++ b/data/start-cosmic
+@@ -103,9 +103,25 @@ if command -v systemctl >/dev/null; then
+     done
+ fi
+ 
+-# Run cosmic-session
++# Run cosmic-session and clean up after it exits.
++rc=0
+ if [ -z "${DBUS_SESSION_BUS_ADDRESS}" ]; then
+-    exec /usr/bin/dbus-run-session -- /usr/bin/cosmic-session
++    /usr/bin/dbus-run-session -- /usr/bin/cosmic-session || rc=$?
+ else
+-    exec /usr/bin/cosmic-session
++    /usr/bin/cosmic-session || rc=$?
+ fi
++
++if command -v systemctl >/dev/null; then
++    # Tear down the generic session target and everything PartOf it.
++    systemctl --user start --job-mode=replace-irreversibly cosmic-session-shutdown.target || true
++
++    # Drop COSMIC-specific environment from the user manager so the next
++    # session does not inherit it.
++    systemctl --user unset-environment \
++        WAYLAND_DISPLAY DISPLAY XDG_SESSION_TYPE XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP \
++        DCONF_PROFILE GDK_BACKEND MOZ_ENABLE_WAYLAND QT_QPA_PLATFORM \
++        QT_AUTO_SCREEN_SCALE_FACTOR QT_ENABLE_HIGHDPI_SCALING \
++        _JAVA_AWT_WM_NONREPARENTING QT_QPA_PLATFORMTHEME || true
++fi
++
++exit "$rc"
