@@ -1,4 +1,10 @@
 lankebuild_prepare() {
+    # 注销时 stderr 管道断开；Rust 默认忽略 SIGPIPE，println! 会 EPIPE
+    # panic 并 abort/core。补丁恢复 SIG_DFL，让内核用 SIGPIPE 终止。
+    patch -Np1 -i "{WORK_DIR}/../0001-cosmic-applets-reset-sigpipe.patch" \
+        || patch -R --dry-run -p1 -i "{WORK_DIR}/../0001-cosmic-applets-reset-sigpipe.patch" >/dev/null 2>&1 \
+        || exit 1
+
     cargo fetch --locked
 }
 

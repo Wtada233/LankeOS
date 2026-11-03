@@ -1,0 +1,35 @@
+Subject: [PATCH] Reset SIGPIPE to default so a closed stderr pipe does not abort
+
+The COSMIC session closes the panel stderr pipe during logout.  Rust
+ignores SIGPIPE, so a println!/eprintln! write returns EPIPE and panics;
+with panic=abort this becomes SIGABRT and dumps core.  Restore SIG_DFL so
+the kernel terminates the panel with SIGPIPE instead.
+
+diff --git a/cosmic-panel-bin/src/main.rs b/cosmic-panel-bin/src/main.rs
+index 8b0923d..df8382f 100644
+--- a/cosmic-panel-bin/src/main.rs
++++ b/cosmic-panel-bin/src/main.rs
+@@ -69,7 +69,23 @@ mod malloc {
+     }
+ }
+ 
++// Rust ignores SIGPIPE by default.  When the session closes stderr, a
++// println!/eprintln! write returns EPIPE and panics; with panic=abort that
++// becomes SIGABRT and a core dump.  Restore the default disposition so a
++// broken pipe terminates the process with SIGPIPE instead.
++fn reset_sigpipe() {
++    unsafe extern "C" {
++        fn signal(signum: i32, handler: usize) -> usize;
++    }
++
++    // SIGPIPE = 13, SIG_DFL = 0 on Linux.
++    unsafe {
++        signal(13, 0);
++    }
++}
++
+ fn main() -> Result<()> {
++    reset_sigpipe();
+     // Prevents glibc from hoarding memory via memory fragmentation.
+     #[cfg(target_env = "gnu")]
+     malloc::limit_mmap_threshold();

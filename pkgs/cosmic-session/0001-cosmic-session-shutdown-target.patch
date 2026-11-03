@@ -41,18 +41,6 @@ index 0000000..ff2211a
 +
 +Conflicts=cosmic-session.target xdg-desktop-autostart.target
 +After=cosmic-session.target xdg-desktop-autostart.target
-diff --git a/data/cosmic-session.target b/data/cosmic-session.target
-index b459124..d4187a4 100644
---- a/data/cosmic-session.target
-+++ b/data/cosmic-session.target
-@@ -4,6 +4,7 @@ Documentation=man:systemd.special(7)
- 
- BindsTo=graphical-session.target
- Before=graphical-session.target
-+PropagatesStopTo=graphical-session.target
- 
- Wants=graphical-session-pre.target
- After=graphical-session-pre.target
 diff --git a/data/start-cosmic b/data/start-cosmic
 index 46dec47..4f00fa6 100755
 --- a/data/start-cosmic
